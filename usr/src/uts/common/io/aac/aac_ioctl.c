@@ -516,35 +516,24 @@ aac_send_raw_srb(struct aac_softstate *softs, dev_t dev, intptr_t arg, int mode)
 	}
 	for (usge = usgt; usge < &usgt[srb_sgcount]; usge++) {
 		if (sg64) {
-			uint64_t sgaddr = ((struct aac_sg_entry64 *) \
-			    srb->sg.SgEntry)->SgAddress;
+			struct aac_sg_entry64 *sg64p =
+			    (struct aac_sg_entry64 *)srb->sg.SgEntry;
 
-			usge->bcount = ((struct aac_sg_entry64 *)srb-> \
-			    sg.SgEntry)->SgByteCount;
-			if (sgaddr > 0xffffffffull ||
-			    (sgaddr + usge->bcount - 1) > 0xffffffffull) {
-#ifndef _LP64
-				if (!(softs->flags & AAC_FLAGS_SG_64BIT))
-#endif
-				{
-					rval = EINVAL;
-					AACDB_PRINT(softs, CE_NOTE,
-					    "64-bit addresses not supported");
-					goto finish;
-				}
-			}
+			usge->bcount = sg64p->SgByteCount;
 			usge->addr = (caddr_t)
 #ifndef _LP64
 			    (uint32_t)
 #endif
-			    sgaddr;
+			    sg64p->SgAddress;
 		} else {
-			usge->bcount = srb->sg.SgEntry->SgByteCount;
+			struct aac_sg_entry *sgp = srb->sg.SgEntry;
+
+			usge->bcount = sgp->SgByteCount;
 			usge->addr = (caddr_t)
 #ifdef _LP64
 			    (uint64_t)
 #endif
-			    srb->sg.SgEntry->SgAddress;
+			    sgp->SgAddress;
 		}
 		acp->bcount += usge->bcount;
 		if (usge->addr < addrlo)

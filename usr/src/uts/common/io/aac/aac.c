@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3024,7 +3024,8 @@ aac_inquiry(struct aac_softstate *softs, struct scsi_pkt *pkt,
 		switch (page) {
 		case 0x00:
 			/* Supported VPD pages */
-			if (vpdp == NULL)
+			if (vpdp == NULL ||
+			    bp->b_bcount < (AAC_VPD_PAGE_DATA + 3))
 				return;
 			bzero(vpdp, AAC_VPD_PAGE_LENGTH);
 			vpdp[AAC_VPD_PAGE_CODE] = 0x00;
@@ -3039,7 +3040,8 @@ aac_inquiry(struct aac_softstate *softs, struct scsi_pkt *pkt,
 
 		case 0x80:
 			/* Unit serial number page */
-			if (vpdp == NULL)
+			if (vpdp == NULL ||
+			    bp->b_bcount < (AAC_VPD_PAGE_DATA + 8))
 				return;
 			bzero(vpdp, AAC_VPD_PAGE_LENGTH);
 			vpdp[AAC_VPD_PAGE_CODE] = 0x80;
@@ -3053,7 +3055,8 @@ aac_inquiry(struct aac_softstate *softs, struct scsi_pkt *pkt,
 
 		case 0x83:
 			/* Device identification page */
-			if (vpdp == NULL)
+			if (vpdp == NULL ||
+			    bp->b_bcount < (AAC_VPD_PAGE_DATA + 32))
 				return;
 			bzero(vpdp, AAC_VPD_PAGE_LENGTH);
 			vpdp[AAC_VPD_PAGE_CODE] = 0x83;
@@ -3096,7 +3099,7 @@ aac_inquiry(struct aac_softstate *softs, struct scsi_pkt *pkt,
 			    0x24, 0x00, 0);
 			return;
 		}
-		if (inqp == NULL)
+		if (inqp == NULL || bp->b_bcount < len)
 			return;
 
 		bzero(inqp, len);
@@ -3125,10 +3128,17 @@ aac_mode_sense(struct aac_softstate *softs, struct scsi_pkt *pkt,
     union scsi_cdb *cdbp, struct buf *bp, int capacity)
 {
 	uchar_t pagecode;
-	struct mode_format *page3p;
-	struct mode_geometry *page4p;
 	struct mode_header *headerp;
+	struct mode_header_g1 *g1_headerp;
 	unsigned int ncyl;
+	caddr_t sense_data;
+	caddr_t next_page;
+	size_t sdata_size;
+	size_t pages_size;
+	int unsupport_page = 0;
+
+	ASSERT(cdbp->scc_cmd == SCMD_MODE_SENSE ||
+	    cdbp->scc_cmd == SCMD_MODE_SENSE_G1);
 
 	if (!(bp && bp->b_un.b_addr && bp->b_bcount))
 		return;
@@ -3136,25 +3146,89 @@ aac_mode_sense(struct aac_softstate *softs, struct scsi_pkt *pkt,
 	if (bp->b_flags & (B_PHYS | B_PAGEIO))
 		bp_mapin(bp);
 	pkt->pkt_state |= STATE_XFERRED_DATA;
-	pagecode = cdbp->cdb_un.sg.scsi[0];
-	headerp = (struct mode_header *)(bp->b_un.b_addr);
-	headerp->bdesc_length = MODE_BLK_DESC_LENGTH;
+	pagecode = cdbp->cdb_un.sg.scsi[0] & 0x3F;
 
+	/* calculate the size of needed buffer */
+	if (cdbp->scc_cmd == SCMD_MODE_SENSE)
+		sdata_size = MODE_HEADER_LENGTH;
+	else /* must be SCMD_MODE_SENSE_G1 */
+		sdata_size = MODE_HEADER_LENGTH_G1;
+
+	pages_size = 0;
 	switch (pagecode) {
-	/* SBC-3 7.1.3.3 Format device page */
 	case SD_MODE_SENSE_PAGE3_CODE:
-		page3p = (struct mode_format *)((caddr_t)headerp +
-		    MODE_HEADER_LENGTH + MODE_BLK_DESC_LENGTH);
+		pages_size += sizeof (struct mode_format);
+		break;
+
+	case SD_MODE_SENSE_PAGE4_CODE:
+		pages_size += sizeof (struct mode_geometry);
+		break;
+
+	case MODEPAGE_CTRL_MODE:
+		if (softs->flags & AAC_FLAGS_LBA_64BIT) {
+			pages_size += sizeof (struct mode_control_scsi3);
+		} else {
+			unsupport_page = 1;
+		}
+		break;
+
+	case MODEPAGE_ALLPAGES:
+		if (softs->flags & AAC_FLAGS_LBA_64BIT) {
+			pages_size += sizeof (struct mode_format) +
+			    sizeof (struct mode_geometry) +
+			    sizeof (struct mode_control_scsi3);
+		} else {
+			pages_size += sizeof (struct mode_format) +
+			    sizeof (struct mode_geometry);
+		}
+		break;
+
+	default:
+		/* unsupported pages */
+		unsupport_page = 1;
+	}
+
+	/* allocate buffer to fill the send data */
+	sdata_size += pages_size;
+	sense_data = kmem_zalloc(sdata_size, KM_SLEEP);
+
+	if (cdbp->scc_cmd == SCMD_MODE_SENSE) {
+		headerp = (struct mode_header *)sense_data;
+		headerp->length = MODE_HEADER_LENGTH + pages_size -
+		    sizeof (headerp->length);
+		headerp->bdesc_length = 0;
+		next_page = sense_data + sizeof (struct mode_header);
+	} else {
+		g1_headerp = (struct mode_header_g1 *)sense_data;
+		headerp->length = BE_16(MODE_HEADER_LENGTH_G1 + pages_size -
+		    sizeof (headerp->length));
+		g1_headerp->bdesc_length = 0;
+		next_page = sense_data + sizeof (struct mode_header_g1);
+	}
+
+	if (unsupport_page)
+		goto finish;
+
+	if (pagecode == SD_MODE_SENSE_PAGE3_CODE ||
+	    pagecode == MODEPAGE_ALLPAGES) {
+		/* SBC-3 7.1.3.3 Format device page */
+		struct mode_format *page3p;
+
+		page3p = (struct mode_format *)next_page;
 		page3p->mode_page.code = SD_MODE_SENSE_PAGE3_CODE;
 		page3p->mode_page.length = sizeof (struct mode_format);
 		page3p->data_bytes_sect = BE_16(AAC_SECTOR_SIZE);
 		page3p->sect_track = BE_16(AAC_SECTORS_PER_TRACK);
-		break;
 
-	/* SBC-3 7.1.3.8 Rigid disk device geometry page */
-	case SD_MODE_SENSE_PAGE4_CODE:
-		page4p = (struct mode_geometry *)((caddr_t)headerp +
-		    MODE_HEADER_LENGTH + MODE_BLK_DESC_LENGTH);
+		next_page += sizeof (struct mode_format);
+	}
+
+	if (pagecode == SD_MODE_SENSE_PAGE4_CODE ||
+	    pagecode == MODEPAGE_ALLPAGES) {
+		/* SBC-3 7.1.3.8 Rigid disk device geometry page */
+		struct mode_geometry *page4p;
+
+		page4p = (struct mode_geometry *)next_page;
 		page4p->mode_page.code = SD_MODE_SENSE_PAGE4_CODE;
 		page4p->mode_page.length = sizeof (struct mode_geometry);
 		page4p->heads = AAC_NUMBER_OF_HEADS;
@@ -3163,28 +3237,27 @@ aac_mode_sense(struct aac_softstate *softs, struct scsi_pkt *pkt,
 		page4p->cyl_lb = ncyl & 0xff;
 		page4p->cyl_mb = (ncyl >> 8) & 0xff;
 		page4p->cyl_ub = (ncyl >> 16) & 0xff;
-		break;
 
-	case MODEPAGE_CTRL_MODE: /* 64-bit LBA need large sense data */
-		if (softs->flags & AAC_FLAGS_LBA_64BIT) {
-			struct mode_control_scsi3 *mctl;
-
-			mctl = (struct mode_control_scsi3 *)((caddr_t)headerp +
-			    MODE_HEADER_LENGTH + MODE_BLK_DESC_LENGTH);
-			mctl->mode_page.code = MODEPAGE_CTRL_MODE;
-			mctl->mode_page.length =
-			    sizeof (struct mode_control_scsi3) -
-			    sizeof (struct mode_page);
-			mctl->d_sense = 1;
-		} else {
-			bzero(bp->b_un.b_addr, bp->b_bcount);
-		}
-		break;
-
-	default:
-		bzero(bp->b_un.b_addr, bp->b_bcount);
-		break;
+		next_page += sizeof (struct mode_geometry);
 	}
+
+	if ((pagecode == MODEPAGE_CTRL_MODE || pagecode == MODEPAGE_ALLPAGES) &&
+	    softs->flags & AAC_FLAGS_LBA_64BIT) {
+		/* 64-bit LBA need large sense data */
+		struct mode_control_scsi3 *mctl;
+
+		mctl = (struct mode_control_scsi3 *)next_page;
+		mctl->mode_page.code = MODEPAGE_CTRL_MODE;
+		mctl->mode_page.length =
+		    sizeof (struct mode_control_scsi3) -
+		    sizeof (struct mode_page);
+		mctl->d_sense = 1;
+	}
+
+finish:
+	/* copyout the valid data. */
+	bcopy(sense_data, bp->b_un.b_addr, min(sdata_size, bp->b_bcount));
+	kmem_free(sense_data, sdata_size);
 }
 
 /*ARGSUSED*/
@@ -3726,7 +3799,7 @@ aac_tran_start_ld(struct aac_softstate *softs, struct aac_cmd *acp)
 			aac_free_dmamap(acp);
 			if (bp->b_flags & (B_PHYS|B_PAGEIO))
 				bp_mapin(bp);
-			bcopy(&cap, bp->b_un.b_addr, 8);
+			bcopy(&cap, bp->b_un.b_addr, min(bp->b_bcount, 8));
 			pkt->pkt_state |= STATE_XFERRED_DATA;
 		}
 		aac_soft_callback(softs, acp);
@@ -3747,7 +3820,8 @@ aac_tran_start_ld(struct aac_softstate *softs, struct aac_cmd *acp)
 				aac_free_dmamap(acp);
 				if (bp->b_flags & (B_PHYS | B_PAGEIO))
 					bp_mapin(bp);
-				bcopy(&cap16, bp->b_un.b_addr, cap_len);
+				bcopy(&cap16, bp->b_un.b_addr,
+				    min(bp->b_bcount, cap_len));
 				pkt->pkt_state |= STATE_XFERRED_DATA;
 			}
 			aac_soft_callback(softs, acp);
