@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -339,9 +339,15 @@ checkdevinuse(char *cur_disk_path, diskaddr_t start, diskaddr_t end, int print,
 
 	dm_get_slices(cur_disk_path, &slices, &error);
 	if (error) {
-		err_print("Error occurred with device in use checking: %s\n",
-		    strerror(error));
-		return (found);
+		/*
+		 * If ENODEV, it actually means the device is not in use.
+		 * We will return 0 without displaying error.
+		 */
+		if (error != ENODEV) {
+			err_print("Error occurred with device in use"
+			    "checking: %s\n", strerror(error));
+			return (found);
+		}
 	}
 	if (slices == NULL)
 		return (found);
