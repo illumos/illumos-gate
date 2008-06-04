@@ -379,6 +379,7 @@ case "$1" in
 		fi
 
 		if (smf_is_system_labeled); then
+			do_servicetag_register /
 			daemon_start
 			exit $SMF_EXIT_OK
 		fi
