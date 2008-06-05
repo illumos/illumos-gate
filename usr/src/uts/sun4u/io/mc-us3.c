@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -376,7 +376,7 @@ bad1:
 	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
 	    MEM_CFG_PROP_NAME) == 1) {
 		(void) ddi_prop_remove(DDI_DEV_T_NONE, softsp->dip,
-			MEM_CFG_PROP_NAME);
+		    MEM_CFG_PROP_NAME);
 	}
 
 bad2:
@@ -420,7 +420,7 @@ mc_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
 	    MEM_CFG_PROP_NAME) == 1) {
 		(void) ddi_prop_remove(DDI_DEV_T_NONE, softsp->dip,
-			MEM_CFG_PROP_NAME);
+		    MEM_CFG_PROP_NAME);
 	}
 
 	/* release all allocated data struture for this MC */
@@ -918,8 +918,8 @@ mc_get_mcregs(struct mc_soft_state *softsp)
 	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
 	    MEM_CFG_PROP_NAME) != 1) {
 		(void) ddi_prop_create(DDI_DEV_T_NONE, softsp->dip,
-			DDI_PROP_CANSLEEP, MEM_CFG_PROP_NAME,
-			(caddr_t)&ma_reg_array, sizeof (ma_reg_array));
+		    DDI_PROP_CANSLEEP, MEM_CFG_PROP_NAME,
+		    (caddr_t)&ma_reg_array, sizeof (ma_reg_array));
 	}
 
 exit:
@@ -1223,7 +1223,7 @@ mc_get_mem_unum(int synd_code, uint64_t paddr, char *buf, int buflen, int *lenp)
 		mutex_exit(&mcdatamutex);
 		if ((strlen(unum) >= UNUM_NAMLEN) ||
 		    (strlen(unum) >= buflen)) {
-			return (ENOSPC);
+			return (ENAMETOOLONG);
 		} else {
 			(void) strncpy(buf, unum, buflen);
 			*lenp = strlen(buf);
@@ -1706,7 +1706,7 @@ mlayout_add(int mc_id, int bank_no, uint64_t reg, void *dimminfop)
 		bank_curr->seg_id = seg_curr->seg_node.id;
 	} else {
 		seg_curr = (struct seg_info *)
-		kmem_zalloc(sizeof (struct seg_info), KM_SLEEP);
+		    kmem_zalloc(sizeof (struct seg_info), KM_SLEEP);
 		bank_curr->seg_id = seg_id;
 		seg_curr->seg_node.id = seg_id++;
 		seg_curr->base = base;
@@ -1924,7 +1924,7 @@ static void
 mc_node_add(mc_dlist_t *node, mc_dlist_t **head, mc_dlist_t **tail)
 {
 	DPRINTF(MC_LIST_DEBUG, ("mc_node_add: node->id %d head %p tail %p\n",
-		node->id, *head, *tail));
+	    node->id, *head, *tail));
 
 	if (*head != NULL) {
 		node->prev = *tail;

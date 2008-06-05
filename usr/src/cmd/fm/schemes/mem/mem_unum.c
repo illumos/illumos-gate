@@ -244,7 +244,13 @@ mem_unum_burst_pattern(const char *pat, char ***dimmsp, size_t *ndimmsp)
 
 	mem_strarray_free(dimms, ndimms);
 
-	return (fmd_fmri_set_errno(EINVAL));
+	/*
+	 * Set errno to ENOTSUP and return -1. This allows support for DIMMs
+	 * with unknown unum strings and/or serial numbers. The only consumer
+	 * of mem_unum_burst_pattern() that cares/checks for the returned
+	 * errno is fmd_fmri_expand().
+	 */
+	return (fmd_fmri_set_errno(ENOTSUP));
 }
 
 int

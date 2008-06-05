@@ -629,7 +629,7 @@ mmioctl_get_mem_name(intptr_t data)
 
 	if (len >= mem_name.m_namelen) {
 		kmem_free(buf, bufsize);
-		return (ENAMETOOLONG);
+		return (ENOSPC);
 	}
 
 	if (copyoutstr(buf, (char *)mem_name.m_name,

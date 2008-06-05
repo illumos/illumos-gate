@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -256,7 +256,7 @@ mc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	    (mcreg1_len == sizeof (uint64_t))) {
 		softsp->mcr_read_ok = 1;
 		DPRINTF(MC_ATTACH_DEBUG, ("mc%d from obp: Reg1: 0x%lx\n",
-		instance, softsp->mcreg1));
+		    instance, softsp->mcreg1));
 	}
 
 	/* attach fails if mcreg1 cannot be accessed */
@@ -1059,8 +1059,8 @@ mc_add_xor_banks(struct mctrl_info *mctrl,
 		}
 		/* xor ds bits to get the dimm-pair */
 		id = ((xmatch & (1ULL << ds_shift)) >> ds_shift) ^
-			((xmatch & (1ULL << XOR_DEVICE_SELECT_SHIFT)) >>
-			XOR_DEVICE_SELECT_SHIFT);
+		    ((xmatch & (1ULL << XOR_DEVICE_SELECT_SHIFT)) >>
+		    XOR_DEVICE_SELECT_SHIFT);
 		banki = mc_add_bank(bankid, mask, match | xmatch, size,
 		    mctrl->devgrpids[id]);
 		mc_add_segment(banki);
@@ -1160,7 +1160,7 @@ mc_logical_layout(struct mctrl_info *mctrl, struct mc_soft_state *softsp)
 	bankid = mcid * NLOGBANKS_PER_MC;
 	for (i = 0; i < mctrl->ndevgrps; i++) {
 		bankid += mc_add_dgrp_banks(bankid, mctrl->devgrpids[i],
-				mask, match, interleave);
+		    mask, match, interleave);
 	}
 }
 
@@ -1637,7 +1637,7 @@ mc_get_mem_unum(int synd_code, uint64_t paddr, char *buf, int buflen, int *lenp)
 			    UNUM_NAMLEN);
 
 			DPRINTF(MC_GUNUM_DEBUG,
-				("mc_get_mem_unum:unum %s\n", unum));
+			    ("mc_get_mem_unum:unum %s\n", unum));
 
 			/*
 			 * platform hook for adding label information to unum.
@@ -1669,7 +1669,7 @@ mc_get_mem_unum(int synd_code, uint64_t paddr, char *buf, int buflen, int *lenp)
 		mutex_exit(&mcdatamutex);
 		if ((strlen(unum) >= UNUM_NAMLEN) ||
 		    (strlen(unum) >= buflen)) {
-			return (ENOSPC);
+			return (ENAMETOOLONG);
 		} else {
 			(void) strncpy(buf, unum, UNUM_NAMLEN);
 			*lenp = strlen(buf);
