@@ -6468,6 +6468,8 @@ static void
 nxge_uninit_common_dev(p_nxge_t nxgep)
 {
 	p_nxge_hw_list_t	hw_p, h_hw_p;
+	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
+	p_nxge_hw_pt_cfg_t	p_cfgp;
 	dev_info_t 		*p_dip;
 
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL, "==> nxge_uninit_common_device"));
@@ -6494,6 +6496,17 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 			    hw_p,
 			    p_dip,
 			    hw_p->ndevs));
+
+			/*
+			 * Release the RDC table, a shared resoruce
+			 * of the nxge hardware.  The RDC table was
+			 * assigned to this instance of nxge in
+			 * nxge_use_cfg_dma_config().
+			 */
+			p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
+			p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
+			(void) nxge_fzc_rdc_tbl_unbind(nxgep,
+			    p_cfgp->def_mac_rxdma_grpid);
 
 			if (hw_p->ndevs) {
 				hw_p->ndevs--;
