@@ -26795,7 +26795,7 @@ sddump_do_read_of_rmw(struct sd_lun *un, uint64_t blkno, uint64_t nblk,
 	bp = scsi_alloc_consistent_buf(SD_ADDRESS(un), (struct buf *)NULL,
 	    (size_t)(nblk * target_blocksize), B_READ, NULL_FUNC, NULL);
 	if (bp == NULL) {
-		scsi_log(SD_DEVINFO(un), sd_label, CE_CONT,
+		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
 		    "no resources for dumping; giving up");
 		err = ENOMEM;
 		goto done;
@@ -26805,7 +26805,7 @@ sddump_do_read_of_rmw(struct sd_lun *un, uint64_t blkno, uint64_t nblk,
 	    blkno, nblk);
 	if (rval != 0) {
 		scsi_free_consistent_buf(bp);
-		scsi_log(SD_DEVINFO(un), sd_label, CE_CONT,
+		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
 		    "no resources for dumping; giving up");
 		err = ENOMEM;
 		goto done;
