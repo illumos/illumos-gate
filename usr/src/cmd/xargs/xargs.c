@@ -99,6 +99,7 @@ static int	mac;		/* modified argc, after parsing		*/
 static char	**mav;		/* modified argv, after parsing		*/
 static int	n_inserts;	/* # of insertions.			*/
 static int	inquote = 0;	/* processing a quoted string		*/
+static int	save_index = 0;
 
 /*
  * the pio structure is used to save any pending input before the
@@ -376,9 +377,16 @@ main(int argc, char **argv)
 			lastarg = "";
 		}
 
-		while (((ARGV - arglist) < MAXARGS) &&
-		    ((*ARGV++ = getarg()) != NULL) && OK)
-			;
+		while (((*ARGV++ = getarg()) != NULL) && OK) {
+			if ((ARGV - arglist) == MAXARGS) {
+				save_index = ARGV - arglist;
+				break;
+			}
+		}
+		if ((save_index == MAXARGS) && !MORE && (N_args == 0)) {
+			/* there were no more args after filling arglist */
+			exit(exitstat);
+		}
 
 		/* insert arg if requested */
 
