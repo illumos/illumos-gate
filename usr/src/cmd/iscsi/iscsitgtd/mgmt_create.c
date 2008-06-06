@@ -575,22 +575,25 @@ create_zfs(tgt_node_t *x, ucred_t *cred)
 	c = tgt_node_alloc(XML_ELEMENT_SIZE, Uint64, &size);
 	tgt_node_add(l, c);
 
-	/* register with iSNS */
-	if (isns_enabled() == True) {
-		cptr = NULL;
-		if (tgt_find_value_str(n, XML_ELEMENT_INAME, &cptr) == True) {
-			if (isns_reg(cptr) != 0) {
-				xml_rtn_msg(&msg, ERR_ISNS_ERROR);
-				goto error;
-			}
-		}
+	cptr = NULL;
+	if (tgt_find_value_str(n, XML_ELEMENT_INAME, &cptr) != True) {
+		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_INAME);
+		goto error; /* xml node contruction has an issue. */
 	}
 
 	/*
 	 * Add ZVOL target to config of all targets
 	 */
 	tgt_node_add(targets_config, n);
-	n = NULL;
+	n = NULL; /* don't remove the node from the targets_config. */
+
+	/* register with iSNS */
+	if (isns_enabled() == True) {
+		if (isns_reg(cptr) != 0) {
+			xml_rtn_msg(&msg, ERR_ISNS_ERROR);
+			goto error;
+		}
+	}
 
 	xml_rtn_msg(&msg, ERR_SUCCESS);
 
