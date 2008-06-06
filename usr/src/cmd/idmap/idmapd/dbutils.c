@@ -1086,7 +1086,7 @@ load_cfg_in_state(lookup_state_t *state)
 		}
 	} else {
 		UNLOCK_CONFIG();
-		return (IDMAP_ERR_DOMAIN_NOTFOUND);
+		return (IDMAP_SUCCESS);
 	}
 	if (_idmapdstate.cfg->pgcfg.ds_name_mapping_enabled == FALSE) {
 		UNLOCK_CONFIG();
