@@ -271,17 +271,17 @@ add_target_address(iscsi_conn_t *c, char **text, int *text_length,
 		if (convert_local_tpgt(text, text_length, tpgt->x_value) ==
 		    False) {
 			if (c->c_target_sockaddr.ss_family == AF_INET) {
-				/*CSTYLED*/
-				sp4 = (struct sockaddr_in *)&c->c_target_sockaddr;
+				sp4 = (struct sockaddr_in *)
+				    &c->c_target_sockaddr;
 				(void) snprintf(buf, sizeof (buf), "%s,%s",
 				    inet_ntop(sp4->sin_family,
 				    (void *)&sp4->sin_addr,
 				    net_buf, sizeof (net_buf)),
 				    tpgt->x_value);
 			} else {
-				/*CSTYLED*/
-				sp6 = (struct sockaddr_in6 *)&c->c_target_sockaddr;
-				(void) snprintf(buf, sizeof (buf), "%s,%s",
+				sp6 = (struct sockaddr_in6 *)
+				    &c->c_target_sockaddr;
+				(void) snprintf(buf, sizeof (buf), "[%s],%s",
 				    inet_ntop(sp6->sin6_family,
 				    (void *)&sp6->sin6_addr,
 				    net_buf, sizeof (net_buf)),

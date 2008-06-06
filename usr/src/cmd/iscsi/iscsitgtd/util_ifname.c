@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,17 +128,11 @@ if_find_mac(target_queue_t *mgmt)
 void
 if_target_address(char **text, int *text_length, struct sockaddr *sp)
 {
-	struct lifreq		*lp,
-				*first;
-	int			n,
-				i,
-				s;
-	struct sockaddr_in	*sin4_cur,
-				*sin4_pos;
-	struct sockaddr_in6	*sin6_cur,
-				*sin6_pos;
-	char			ta[80],
-				ip_buf[INET6_ADDRSTRLEN];
+	struct lifreq		*lp, *first;
+	int			n, i, s;
+	struct sockaddr_in	*sin4_cur, *sin4_pos;
+	struct sockaddr_in6	*sin6_cur, *sin6_pos;
+	char			ta[80], ip_buf[INET6_ADDRSTRLEN];
 	int			fromlen;
 
 	if (sp->sa_family == AF_INET) {
@@ -170,9 +164,6 @@ if_target_address(char **text, int *text_length, struct sockaddr *sp)
 
 	first = if_setup(&n);
 	for (lp = first, i = 0; i < n; i++, lp++) {
-
-		if (ioctl(s, SIOCGLIFADDR, lp) < 0)
-			continue;
 
 		if (sp->sa_family != lp->lifr_addr.ss_family)
 			continue;
@@ -233,13 +224,14 @@ if_target_address(char **text, int *text_length, struct sockaddr *sp)
 			continue;
 
 		if (bcmp(sp, &lp->lifr_addr, fromlen) != 0) {
-			dump_addr_to_ascii((struct sockaddr *)&lp->lifr_addr,
-			    ip_buf, sizeof (ip_buf));
+			struct sockaddr *sp2;
+			sp2 = (struct sockaddr *)&lp->lifr_addr;
+			dump_addr_to_ascii(sp2, ip_buf, sizeof (ip_buf));
 
-			if (sp->sa_family == AF_INET) {
+			if (sp2->sa_family == AF_INET) {
 				(void) snprintf(ta, sizeof (ta), "%s,1",
 				    ip_buf);
-			} else if (sp->sa_family == AF_INET6) {
+			} else if (sp2->sa_family == AF_INET6) {
 				(void) snprintf(ta, sizeof (ta), "[%s],1",
 				    ip_buf);
 			} else
