@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,10 +47,6 @@ enum ix {
 	ix_cfgetospeed,
 	ix_chdir,
 	ix_close,
-	ix_dlclose,
-	ix_dlerror,
-	ix_dlopen,
-	ix_dlsym,
 	ix_exit,
 	ix_exit_handler,
 	ix_fclose,
@@ -132,10 +128,6 @@ struct intpose {
 	{ "cfgetospeed",	0 },
 	{ "chdir",		0 },
 	{ "close",		0 },
-	{ "dlclose",		0 },
-	{ "dlerror",		0 },
-	{ "dlopen",		0 },
-	{ "dlsym",		0 },
 	{ "exit",		0 },
 	{ "exit_handler",	0 },
 	{ "fclose",		0 },
@@ -202,7 +194,7 @@ struct intpose {
 };
 
 #define	RTLD_NEXT	(void *)-1
-extern	void	*_dlsym(void *handle, const char *name);
+extern	void	*dlsym(void *handle, const char *name);
 
 static	long	global_g7 = -1;
 
@@ -223,7 +215,7 @@ callfunc(struct intpose *ip,
 	set_g7(global_g7);
 	if ((realfunc = ip->realfunc) == 0)
 		ip->realfunc = realfunc =
-			(realfunc_t)_dlsym(RTLD_NEXT, ip->fname);
+		    (realfunc_t)dlsym(RTLD_NEXT, ip->fname);
 	rv = realfunc(a0, a1, a2, a3, a4, a5);
 	set_g7(my_g7);
 	return (rv);
@@ -246,10 +238,6 @@ ipose(atoi)
 ipose(cfgetospeed)
 ipose(chdir)
 ipose(close)
-ipose(dlclose)
-ipose(dlerror)
-ipose(dlopen)
-ipose(dlsym)
 ipose(exit)
 ipose(exit_handler)
 ipose(fclose)

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,11 +32,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak defopen = _defopen
-#pragma weak defread = _defread
-#pragma weak defcntl = _defcntl
-
-#include "synonyms.h"
+#include "lint.h"
 #include "libc.h"
 #include <stdio.h>
 #include <stdlib.h>

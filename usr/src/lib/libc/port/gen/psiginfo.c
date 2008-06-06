@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,32 +18,30 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Print the name of the siginfo indicated by "sig", along with the
  * supplied message
  */
 
-#pragma weak psiginfo = _psiginfo
-
-#include	"synonyms.h"
-#include	"_libc_gettext.h"
-#include	<sys/types.h>
-#include	<stdio.h>
-#include	<unistd.h>
-#include	<string.h>
-#include	<signal.h>
-#include	<siginfo.h>
+#include "lint.h"
+#include "_libc_gettext.h"
+#include <sys/types.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <signal.h>
+#include <siginfo.h>
 
 #define	strsignal(i)	(_libc_gettext(_sys_siglistp[i]))
 
@@ -60,10 +57,9 @@ psiginfo(siginfo_t *sip, char *s)
 
 
 	if (sip->si_code <= 0) {
-		/* LINTED variable format specifier */
 		(void) snprintf(buf, sizeof (buf),
-			_libc_gettext("%s : %s ( from process  %d )\n"),
-			s, strsignal(sip->si_signo), sip->si_pid);
+		    _libc_gettext("%s : %s ( from process  %d )\n"),
+		    s, strsignal(sip->si_signo), sip->si_pid);
 	} else if (((listp = &_sys_siginfolist[sip->si_signo-1]) != NULL) &&
 	    sip->si_code <= listp->nsiginfo) {
 		c = _libc_gettext(listp->vsiginfo[sip->si_code-1]);
@@ -72,24 +68,21 @@ psiginfo(siginfo_t *sip, char *s)
 		case SIGBUS:
 		case SIGILL:
 		case SIGFPE:
-			/* LINTED variable format specifier */
 			(void) snprintf(buf, sizeof (buf),
-				_libc_gettext("%s : %s ( [%p] %s)\n"),
-				s, strsignal(sip->si_signo),
-				sip->si_addr, c);
+			    _libc_gettext("%s : %s ( [%p] %s)\n"),
+			    s, strsignal(sip->si_signo),
+			    sip->si_addr, c);
 			break;
 		default:
-			/* LINTED variable format specifier */
 			(void) snprintf(buf, sizeof (buf),
-				_libc_gettext("%s : %s (%s)\n"),
-				s, strsignal(sip->si_signo), c);
+			    _libc_gettext("%s : %s (%s)\n"),
+			    s, strsignal(sip->si_signo), c);
 			break;
 		}
 	} else {
-		/* LINTED variable format specifier */
 		(void) snprintf(buf, sizeof (buf),
-			_libc_gettext("%s : %s\n"),
-			s, strsignal(sip->si_signo));
+		    _libc_gettext("%s : %s\n"),
+		    s, strsignal(sip->si_signo));
 	}
 	(void) write(2, buf, strlen(buf));
 }

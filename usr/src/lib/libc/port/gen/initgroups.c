@@ -18,20 +18,20 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak initgroups = _initgroups
+#pragma weak _initgroups = initgroups
 
-#include "synonyms.h"
+#include "lint.h"
 #include <stdlib.h>
 #include <errno.h>
 #include <grp.h>
@@ -68,7 +68,7 @@ initgroups(const char *uname, gid_t agroup)
 	groups[0] = agroup;
 
 	ngroups = _getgroupsbymember(uname, groups, (int)ngroups_max,
-					(agroup <= MAXUID) ? 1 : 0);
+	    (agroup <= MAXUID) ? 1 : 0);
 	if (ngroups < 0) {
 		/* XXX -- man page does not define a value for errno in */
 		/* this case.  Should be looked into sometime.	*/

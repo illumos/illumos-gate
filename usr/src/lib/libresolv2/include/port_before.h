@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,10 +128,6 @@
 	__attribute__((__format__(__printf__, fmt, args)))
 #else
 #define ISC_FORMAT_PRINTF(fmt, args)
-#endif
-
-#ifdef SUNW_SYNONYMS
-#include "c_synonyms.h"
 #endif
 
 /*

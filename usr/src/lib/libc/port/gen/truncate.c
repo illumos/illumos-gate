@@ -24,11 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ftruncate() and truncate() set a file to a specified
@@ -41,16 +40,13 @@
 #include <sys/feature_tests.h>
 
 #if !defined(_LP64) && _FILE_OFFSET_BITS == 64
-#pragma weak ftruncate64 = _ftruncate64
-#pragma weak truncate64 = _truncate64
-#define	_ftruncate	_ftruncate64
-#define	_truncate	_truncate64
-#else /* !_LP64 && _FILE_OFFSET_BITS == 64 */
-#pragma weak ftruncate = _ftruncate
-#pragma weak truncate = _truncate
+#pragma weak _ftruncate64 = ftruncate64
+#pragma weak _truncate64 = truncate64
+#define	ftruncate	ftruncate64
+#define	truncate	truncate64
 #endif /* !_LP64 && _FILE_OFFSET_BITS == 64 */
 
-#include "synonyms.h"
+#include "lint.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <fcntl.h>
@@ -58,7 +54,7 @@
 #include <sys/types.h>
 
 int
-_ftruncate(int fildes, off_t len)
+ftruncate(int fildes, off_t len)
 {
 	struct flock lck;
 
@@ -74,7 +70,7 @@ _ftruncate(int fildes, off_t len)
 }
 
 int
-_truncate(const char *path, off_t len)
+truncate(const char *path, off_t len)
 {
 
 	int rval = 0;

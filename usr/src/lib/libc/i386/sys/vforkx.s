@@ -20,18 +20,13 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 	.file	"%M%"
-
-#include <sys/asm_linkage.h>
-
-	ANSI_PRAGMA_WEAK(vforkx,function)
-	ANSI_PRAGMA_WEAK(vfork,function)
 
 #include "SYS.h"
 #include <assym.h>

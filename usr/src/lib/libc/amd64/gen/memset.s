@@ -20,18 +20,23 @@
  */
 
 /*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  * Copyright (c) 2008, Intel Corporation
  * All rights reserved.
  */
-		.ident	"%Z%%M%	%I%	%E% SMI"
 
-		.file	"%M%"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+	.file	"%M%"
 
 #include <sys/asm_linkage.h>
 
-		ANSI_PRAGMA_WEAK(memset,function)
+	ANSI_PRAGMA_WEAK(memset,function)
 
-#include "synonyms.h"
 #include "cache.h"
 #include "proc64_id.h"
 

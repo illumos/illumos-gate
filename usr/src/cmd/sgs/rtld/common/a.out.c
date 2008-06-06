@@ -23,12 +23,12 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Object file dependent support for a.out format objects.
  */
-#include	"_synonyms.h"
 
 #include	<a.out.h>		/* Explicitly override M_SEGSIZE */
 #include	<machdep.h>		/*	used in M_SROUND */

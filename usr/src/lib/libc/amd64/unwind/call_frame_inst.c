@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,7 @@
  */
 
 #ifndef _LIBCRUN_
-#include "synonyms.h"
+#include "lint.h"
 #endif
 #include <sys/types.h>
 #include "stack_unwind.h"
@@ -144,19 +144,19 @@ fix_cfa(struct _Unwind_Context *ctx, struct register_state *rs)
 {
 	switch (rs[CF_ADDR].rule) {
 	default:
-	    ctx->cfa = 0;
+		ctx->cfa = 0;
 		break;
 	case register_rule:	/* CFA = offset + source_reg */
 		ctx->cfa = (ctx->current_regs)[rs[CF_ADDR].source_reg] +
-			rs[CF_ADDR].offset;
+		    rs[CF_ADDR].offset;
 		break;
 	case constant_rule:	/* CFA = offset */
 		ctx->cfa = rs[CF_ADDR].offset;
 		break;
 	case indirect_rule:	/* CFA = *(offset + source_reg) */
 		ctx->cfa = *(uint64_t *)
-			(ctx->current_regs[rs[CF_ADDR].source_reg] +
-			rs[CF_ADDR].offset);
+		    (ctx->current_regs[rs[CF_ADDR].source_reg] +
+		    rs[CF_ADDR].offset);
 		break;
 	}
 	ctx->entry_regs[SP_RSP] = ctx->cfa;
@@ -168,19 +168,19 @@ fix_ra(struct _Unwind_Context *ctx, struct register_state *rs)
 	switch (rs[RET_ADD].rule) {
 	case undefined_rule:
 	default:
-	    ctx->ra = 0;
+		ctx->ra = 0;
 		break;
 	case offset_rule:	/* RA = *(offset + CFA) */
 		ctx->ra = *(uint64_t *)(ctx->cfa + rs[RET_ADD].offset);
 		break;
 	case register_rule:	/* RA = offset + source_reg */
 		ctx->ra = ctx->current_regs[rs[RET_ADD].source_reg] +
-			rs[RET_ADD].offset;
+		    rs[RET_ADD].offset;
 		break;
 	case indirect_rule:	/* RA = *(offset + source_reg) */
 		ctx->ra = *(uint64_t *)
-			(ctx->current_regs[rs[RET_ADD].source_reg] +
-			rs[RET_ADD].offset);
+		    (ctx->current_regs[rs[RET_ADD].source_reg] +
+		    rs[RET_ADD].offset);
 		break;
 	}
 }
@@ -194,23 +194,23 @@ fix_reg(struct _Unwind_Context *ctx, struct register_state *rs, int index)
 		break;
 	case offset_rule:	/* target_reg = *(offset + CFA) */
 		ctx->entry_regs[index] = *(uint64_t *)
-			(ctx->cfa + rs[index].offset);
+		    (ctx->cfa + rs[index].offset);
 		break;
 	case is_offset_rule:	/* target_reg = offset + CFA */
 		ctx->entry_regs[index] = ctx->cfa + rs[index].offset;
 		break;
 	case register_rule:	/* target_reg = offset + source_reg */
 		ctx->entry_regs[index] =
-			ctx->current_regs[rs[index].source_reg] +
-			rs[index].offset;
+		    ctx->current_regs[rs[index].source_reg] +
+		    rs[index].offset;
 		break;
 	case constant_rule:	/* target_reg = offset */
 		ctx->entry_regs[index] = rs[index].offset;
 		break;
 	case indirect_rule:	/* target_reg = *(offset + source_reg) */
 		ctx->entry_regs[index] = *(uint64_t *)
-			(ctx->current_regs[rs[index].source_reg] +
-			rs[index].offset);
+		    (ctx->current_regs[rs[index].source_reg] +
+		    rs[index].offset);
 		break;
 	}
 }
@@ -249,7 +249,7 @@ _Unw_Rollback_Registers(struct eh_frame_fields *f,
 			return (0);
 		}
 		ctx->entry_regs[FP_RBP] = ((uint64_t *)
-			(ctx->current_regs[FP_RBP]))[0];
+		    (ctx->current_regs[FP_RBP]))[0];
 		ctx->cfa = ctx->current_regs[FP_RBP] + 16;
 		ctx->entry_regs[SP_RSP] = ctx->cfa;
 		ctx->entry_regs[GPR_RBX] = ctx->current_regs[GPR_RBX];
@@ -264,13 +264,13 @@ _Unw_Rollback_Registers(struct eh_frame_fields *f,
 	for (i = 0; i < 18; i++)
 		func_start_state[i] = nop;
 	first_pc = interpret_ops(f->cie_ops, f->cie_ops_end,
-		f->cie_reloc, ctx->func, ctx->pc, func_start_state, 0,
-		f->data_align, f->code_align, f->code_enc);
+	    f->cie_reloc, ctx->func, ctx->pc, func_start_state, 0,
+	    f->data_align, f->code_align, f->code_enc);
 	for (i = 0; i < 18; i++)
 		func_state[i] = func_start_state[i];
 	(void) interpret_ops(f->fde_ops, f->fde_ops_end,
-		f->fde_reloc, first_pc, ctx->pc, func_state, func_start_state,
-		f->data_align, f->code_align, f->code_enc);
+	    f->fde_reloc, first_pc, ctx->pc, func_state, func_start_state,
+	    f->data_align, f->code_align, f->code_enc);
 
 	fix_cfa(ctx, func_state);
 	if (ctx->cfa < ctx->current_regs[SP_RSP]) {

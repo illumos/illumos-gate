@@ -20,22 +20,13 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma	weak clock_getres = _clock_getres
-#pragma	weak clock_gettime = _clock_gettime
-#pragma	weak clock_settime = _clock_settime
-#pragma	weak timer_create = _timer_create
-#pragma	weak timer_delete = _timer_delete
-#pragma	weak timer_getoverrun = _timer_getoverrun
-#pragma	weak timer_gettime = _timer_gettime
-#pragma	weak timer_settime = _timer_settime
-
-#include "synonyms.h"
+#include "lint.h"
 #include <time.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -72,25 +63,25 @@ timer_init(void)
 }
 
 int
-_clock_getres(clockid_t clock_id, timespec_t *res)
+clock_getres(clockid_t clock_id, timespec_t *res)
 {
 	return (__clock_getres(clock_id, res));
 }
 
 int
-_clock_gettime(clockid_t clock_id, timespec_t *tp)
+clock_gettime(clockid_t clock_id, timespec_t *tp)
 {
 	return (__clock_gettime(clock_id, tp));
 }
 
 int
-_clock_settime(clockid_t clock_id, const timespec_t *tp)
+clock_settime(clockid_t clock_id, const timespec_t *tp)
 {
 	return (__clock_settime(clock_id, tp));
 }
 
 int
-_timer_create(clockid_t clock_id, struct sigevent *sigevp, timer_t *timerid)
+timer_create(clockid_t clock_id, struct sigevent *sigevp, timer_t *timerid)
 {
 	struct sigevent sigevent;
 	port_notify_t port_notify;
@@ -132,7 +123,7 @@ _timer_create(clockid_t clock_id, struct sigevent *sigevp, timer_t *timerid)
 }
 
 int
-_timer_delete(timer_t timerid)
+timer_delete(timer_t timerid)
 {
 	int rc;
 
@@ -143,19 +134,19 @@ _timer_delete(timer_t timerid)
 }
 
 int
-_timer_getoverrun(timer_t timerid)
+timer_getoverrun(timer_t timerid)
 {
 	return (__timer_getoverrun(timerid) + sigev_timer_getoverrun(timerid));
 }
 
 int
-_timer_gettime(timer_t timerid, itimerspec_t *value)
+timer_gettime(timer_t timerid, itimerspec_t *value)
 {
 	return (__timer_gettime(timerid, value));
 }
 
 int
-_timer_settime(timer_t timerid, int flags, const itimerspec_t *value,
+timer_settime(timer_t timerid, int flags, const itimerspec_t *value,
 	itimerspec_t *ovalue)
 {
 	return (__timer_settime(timerid, flags, value, ovalue));

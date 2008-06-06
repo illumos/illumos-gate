@@ -18,19 +18,19 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak fchownat = _fchownat
-#pragma weak renameat = _renameat
-#pragma weak futimesat = _futimesat
-#pragma weak unlinkat = _unlinkat
+#pragma weak _fchownat = fchownat
+#pragma weak _futimesat = futimesat
+#pragma weak _unlinkat = unlinkat
 
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <sys/stat.h>

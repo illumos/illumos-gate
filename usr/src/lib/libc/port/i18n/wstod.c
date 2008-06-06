@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,26 +18,26 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file is based on /usr/src/lib/libc/port/gen/strtod.c and
  * /usr/src/lib/libc/sparc/fp/string_decim.c
  */
 
-#pragma weak wcstod = _wcstod
-#pragma weak wstod = _wstod
+#pragma weak _wcstod = wcstod
+#pragma weak _wstod = wstod
 
-#include "synonyms.h"
+#include "lint.h"
 #include <errno.h>
 #include <stdio.h>
 #include <values.h>
@@ -53,7 +52,7 @@
 static void wstring_to_decimal(const wchar_t **, int, decimal_record *, int *);
 
 double
-_wcstod(const wchar_t *cp, wchar_t **ptr)
+wcstod(const wchar_t *cp, wchar_t **ptr)
 {
 	double		x;
 	decimal_mode	mr;
@@ -147,9 +146,9 @@ wcstold(const wchar_t *cp, wchar_t **ptr)
 }
 
 double
-_wstod(const wchar_t *cp, wchar_t **ptr)
+wstod(const wchar_t *cp, wchar_t **ptr)
 {
-	return (_wcstod(cp, ptr));
+	return (wcstod(cp, ptr));
 }
 
 static const char *infstring = "INFINITY";

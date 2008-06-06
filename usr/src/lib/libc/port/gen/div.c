@@ -1,9 +1,7 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (c) 1990, 1993
@@ -41,7 +39,9 @@
  * SUCH DAMAGE.
  */
 
-#include "synonyms.h"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include "lint.h"
 #include <sys/types.h>
 #include <stdlib.h>
 

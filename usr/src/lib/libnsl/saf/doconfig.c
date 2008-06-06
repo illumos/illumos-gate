@@ -20,14 +20,14 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mt.h"
 #include <stdio.h>
@@ -49,8 +49,6 @@
 #define	COMMENT	'#'
 #define	NOWAIT	0
 #define	WAIT	1
-
-extern char	**_environ;
 
 static char	*eatwhite(char *);
 static int	doassign(char *);
@@ -480,8 +478,7 @@ dorun(char *p, int waitflg)
 			/* stderr */
 			if (dup(0) != 2)
 				return (-1);
-			(void) execle("/usr/bin/sh", "sh", "-c",
-							p, 0, _environ);
+			(void) execl("/usr/bin/sh", "sh", "-c", p, NULL);
 			/*
 			 * if we get here, there is a problem - remember that
 			 * this is the child

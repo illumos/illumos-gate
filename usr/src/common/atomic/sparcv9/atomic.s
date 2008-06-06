@@ -18,12 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-	.ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 	.file	"%M%"
 
@@ -108,10 +109,6 @@ label/**/1:
 #endif	/* ATOMIC_BO_ENABLE_SHIFT */
 
 #else	/* _KERNEL */
-	/*
-	 * Include the definitions for the libc weak aliases.
-	 */
-#include "../atomic_asm_weak.h"
 
 /*
  * ATOMIC_BO_ENABLE_SHIFT may be enabled/defined here for generic

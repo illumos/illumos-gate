@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,8 +58,6 @@
 
 #define	MAX_SHORTSTRLEN 6
 
-extern char *_dgettext();
-
 void _ruserpass(const char *host, char **aname, char **apass);
 
 int rexec(char **ahost, unsigned short rport, const char *name,
@@ -81,7 +80,7 @@ int rexec_af(char **ahost, unsigned short rport, const char *name,
 
 	if (!(af == AF_INET || af == AF_INET6 || af == AF_UNSPEC)) {
 		(void) fprintf(stderr,
-		    _dgettext(TEXT_DOMAIN, "%d: Address family not "
+		    dgettext(TEXT_DOMAIN, "%d: Address family not "
 		    "supported\n"), af);
 		errno = EAFNOSUPPORT;
 		return (-1);
@@ -95,7 +94,7 @@ int rexec_af(char **ahost, unsigned short rport, const char *name,
 
 	if (rc != 0) {
 		(void) fprintf(stderr,
-		    _dgettext(TEXT_DOMAIN, "%s: unknown host\n"),
+		    dgettext(TEXT_DOMAIN, "%s: unknown host\n"),
 		    *ahost);
 		return (-1);
 	}

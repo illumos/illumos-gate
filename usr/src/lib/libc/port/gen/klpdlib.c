@@ -26,12 +26,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
-
+#include "lint.h"
 #include "priv_private.h"
 #include "mtlib.h"
 #include "libc.h"
-
 #include <door.h>
 #include <errno.h>
 #include <priv.h>

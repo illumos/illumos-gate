@@ -20,17 +20,17 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma	weak crypt = _crypt
-#pragma weak encrypt = _encrypt
-#pragma weak setkey = _setkey
+#pragma	weak _crypt = crypt
+#pragma weak _encrypt = encrypt
+#pragma weak _setkey = setkey
 
-#include "synonyms.h"
+#include "lint.h"
 #include "mtlib.h"
 #include <synch.h>
 #include <thread.h>
@@ -504,7 +504,7 @@ getalgbyname(const char *algname, boolean_t *found)
 
 	if ((configfd = open(CRYPT_CONFFILE, O_RDONLY)) == -1) {
 		syslog(LOG_ALERT, "crypt: open(%s) failed: %s",
-			CRYPT_CONFFILE, strerror(errno));
+		    CRYPT_CONFFILE, strerror(errno));
 		return (NULL);
 	}
 
@@ -513,7 +513,7 @@ getalgbyname(const char *algname, boolean_t *found)
 	 */
 	if (fstat(configfd, &stb) < 0) {
 		syslog(LOG_ALERT, "crypt: stat(%s) failed: %s",
-			CRYPT_CONFFILE, strerror(errno));
+		    CRYPT_CONFFILE, strerror(errno));
 		goto cleanup;
 	}
 
@@ -536,13 +536,13 @@ getalgbyname(const char *algname, boolean_t *found)
 	}
 	if (stb.st_mode & S_IWOTH) {
 		syslog(LOG_ALERT,
-			"crypt: %s writable by world", CRYPT_CONFFILE);
+		    "crypt: %s writable by world", CRYPT_CONFFILE);
 		goto cleanup;
 	}
 
 	if ((fconf = fdopen(configfd, "rF")) == NULL) {
 		syslog(LOG_ALERT, "crypt: fdopen(%d) failed: %s",
-			configfd, strerror(errno));
+		    configfd, strerror(errno));
 		goto cleanup;
 	}
 
@@ -1037,12 +1037,12 @@ unlocked_encrypt(char *block, int fake)
 			preS[j] = R[E[j]-1] ^ *(KS+index+j);
 		for (j = 0; j < 8; j++) {
 			t = 6 * j;
-			k = S[j][(preS[t+0]<<5)+
-				(preS[t+1]<<3)+
-				(preS[t+2]<<2)+
-				(preS[t+3]<<1)+
-				(preS[t+4]<<0)+
-				(preS[t+5]<<4)];
+			k = S[j][(preS[t+0]<<5) +
+			    (preS[t+1]<<3) +
+			    (preS[t+2]<<2) +
+			    (preS[t+3]<<1) +
+			    (preS[t+4]<<0) +
+			    (preS[t+5]<<4)];
 			t = 4*j;
 			f[t+0] = (k>>3)&01;
 			f[t+1] = (k>>2)&01;

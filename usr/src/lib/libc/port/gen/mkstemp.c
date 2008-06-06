@@ -18,10 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ */
+
+/*
  * Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
  * All Rights Reserved
  *
@@ -35,17 +38,15 @@
 #include <sys/feature_tests.h>
 
 #if !defined(_LP64) && _FILE_OFFSET_BITS == 64
-#pragma weak mkstemp64 = _mkstemp64
-#pragma weak mkstemps64 = _mkstemps64
-#define	_mkstemp	_mkstemp64
-#define	_mkstemps	_mkstemps64
+#define	mkstemp		mkstemp64
+#define	mkstemps	mkstemps64
 #define	libc_mkstemps	libc_mkstemps64		/* prefer unique statics */
+#pragma weak _mkstemp64 = mkstemp64
 #else
-#pragma weak mkstemp = _mkstemp
-#pragma weak mkstemps = _mkstemps
+#pragma weak _mkstemp = mkstemp
 #endif
 
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/fcntl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -82,7 +83,7 @@ libc_mkstemps(char *as, int slen)
 	 * name is used then keep trying until you find a free filename.
 	 */
 
-	for (; ; ) {
+	for (;;) {
 		if (*str == 'X') { /* If no trailing X's don't call mktemp. */
 			mkret = libc_mktemps(as, slen);
 			if (*mkret == '\0') {
@@ -113,13 +114,13 @@ libc_mkstemps(char *as, int slen)
 }
 
 int
-_mkstemp(char *as)
+mkstemp(char *as)
 {
 	return (libc_mkstemps(as, 0));
 }
 
 int
-_mkstemps(char *as, int slen)
+mkstemps(char *as, int slen)
 {
 	return (libc_mkstemps(as, slen));
 }

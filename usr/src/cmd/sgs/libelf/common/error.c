@@ -20,23 +20,19 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 1.16	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-
-#pragma weak	elf_errmsg = _elf_errmsg
-#pragma weak	elf_errno = _elf_errno
-
-#include "syn.h"
 #include <thread.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <libelf.h>
+#include <libintl.h>
 #include "msg.h"
 #include "decl.h"
 
@@ -94,13 +90,11 @@ thr_keycreate_once(thread_key_t *keyp, void (*destructor)(void *))
 
 #endif	/* NATIVE_BUILD */
 
-extern char *_dgettext(const char *, const char *);
-
 
 const char *
 _libelf_msg(Msg mid)
 {
-	return (_dgettext(MSG_ORIG(MSG_SUNW_OST_SGS), MSG_ORIG(mid)));
+	return (dgettext(MSG_ORIG(MSG_SUNW_OST_SGS), MSG_ORIG(mid)));
 }
 
 

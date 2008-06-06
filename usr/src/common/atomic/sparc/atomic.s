@@ -18,12 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-	.ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 	.file	"%M%"
 
@@ -41,11 +42,6 @@
 	ANSI_PRAGMA_WEAK2(atomic_and_long,atomic_and_ulong,function)
 	ANSI_PRAGMA_WEAK2(atomic_or_long,atomic_or_ulong,function)
 	ANSI_PRAGMA_WEAK2(swapl,atomic_swap_32,function)
-#else
-	/*
-	 * Include the definitions for the libc weak aliases.
-	 */
-#include "../atomic_asm_weak.h"
 #endif
 
 	/*

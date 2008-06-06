@@ -65,8 +65,6 @@ typedef struct file_attr {
 	int		fa_newfiledes;	/* new file descriptor for dup2() */
 } file_attr_t;
 
-extern	pid_t	_vforkx(int);
-#pragma unknown_control_flow(_vforkx)
 extern	int	__lwp_sigmask(int, const sigset_t *, sigset_t *);
 extern	int	__sigaction(int, const struct sigaction *, struct sigaction *);
 
@@ -185,13 +183,12 @@ get_error(int *errp)
  * (with a defunct owner) and we would deadlock ourself if we invoked it.
  *
  * Therefore, all of the functions we call here after returning from
- * _vforkx() in the child are not and must never be exported from libc
+ * vforkx() in the child are not and must never be exported from libc
  * as global symbols.  To do so would risk invoking the dynamic linker.
  */
 
-#pragma weak posix_spawn = _posix_spawn
 int
-_posix_spawn(
+posix_spawn(
 	pid_t *pidp,
 	const char *path,
 	const posix_spawn_file_actions_t *file_actions,
@@ -207,7 +204,7 @@ _posix_spawn(
 	if (attrp != NULL && sap == NULL)
 		return (EINVAL);
 
-	switch (pid = _vforkx(forkflags(sap))) {
+	switch (pid = vforkx(forkflags(sap))) {
 	case 0:			/* child */
 		break;
 	case -1:		/* parent, failure */
@@ -267,10 +264,9 @@ execat(const char *s1, const char *s2, char *si)
 	return (*s1? ++s1: NULL);
 }
 
-#pragma weak posix_spawnp = _posix_spawnp
 /* ARGSUSED */
 int
-_posix_spawnp(
+posix_spawnp(
 	pid_t *pidp,
 	const char *file,
 	const posix_spawn_file_actions_t *file_actions,
@@ -309,7 +305,7 @@ _posix_spawnp(
 		continue;
 	newargs = alloca((argc + 2) * sizeof (char *));
 
-	switch (pid = _vforkx(forkflags(sap))) {
+	switch (pid = vforkx(forkflags(sap))) {
 	case 0:			/* child */
 		break;
 	case -1:		/* parent, failure */
@@ -392,20 +388,16 @@ _posix_spawnp(
 	return (0);	/* not reached */
 }
 
-#pragma weak posix_spawn_file_actions_init = \
-		_posix_spawn_file_actions_init
 int
-_posix_spawn_file_actions_init(
+posix_spawn_file_actions_init(
 	posix_spawn_file_actions_t *file_actions)
 {
 	file_actions->__file_attrp = NULL;
 	return (0);
 }
 
-#pragma weak posix_spawn_file_actions_destroy = \
-		_posix_spawn_file_actions_destroy
 int
-_posix_spawn_file_actions_destroy(
+posix_spawn_file_actions_destroy(
 	posix_spawn_file_actions_t *file_actions)
 {
 	file_attr_t *froot = file_actions->__file_attrp;
@@ -440,10 +432,8 @@ add_file_attr(posix_spawn_file_actions_t *file_actions, file_attr_t *fap)
 	}
 }
 
-#pragma weak posix_spawn_file_actions_addopen = \
-		_posix_spawn_file_actions_addopen
 int
-_posix_spawn_file_actions_addopen(
+posix_spawn_file_actions_addopen(
 	posix_spawn_file_actions_t *file_actions,
 	int filedes,
 	const char *path,
@@ -473,10 +463,8 @@ _posix_spawn_file_actions_addopen(
 	return (0);
 }
 
-#pragma weak posix_spawn_file_actions_addclose = \
-		_posix_spawn_file_actions_addclose
 int
-_posix_spawn_file_actions_addclose(
+posix_spawn_file_actions_addclose(
 	posix_spawn_file_actions_t *file_actions,
 	int filedes)
 {
@@ -494,10 +482,8 @@ _posix_spawn_file_actions_addclose(
 	return (0);
 }
 
-#pragma weak posix_spawn_file_actions_adddup2 = \
-		_posix_spawn_file_actions_adddup2
 int
-_posix_spawn_file_actions_adddup2(
+posix_spawn_file_actions_adddup2(
 	posix_spawn_file_actions_t *file_actions,
 	int filedes,
 	int newfiledes)
@@ -517,10 +503,8 @@ _posix_spawn_file_actions_adddup2(
 	return (0);
 }
 
-#pragma weak posix_spawnattr_init = \
-		_posix_spawnattr_init
 int
-_posix_spawnattr_init(
+posix_spawnattr_init(
 	posix_spawnattr_t *attr)
 {
 	if ((attr->__spawn_attrp = lmalloc(sizeof (posix_spawnattr_t))) == NULL)
@@ -531,10 +515,8 @@ _posix_spawnattr_init(
 	return (0);
 }
 
-#pragma weak posix_spawnattr_destroy = \
-		_posix_spawnattr_destroy
 int
-_posix_spawnattr_destroy(
+posix_spawnattr_destroy(
 	posix_spawnattr_t *attr)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
@@ -550,10 +532,8 @@ _posix_spawnattr_destroy(
 	return (0);
 }
 
-#pragma weak posix_spawnattr_setflags = \
-		_posix_spawnattr_setflags
 int
-_posix_spawnattr_setflags(
+posix_spawnattr_setflags(
 	posix_spawnattr_t *attr,
 	short flags)
 {
@@ -567,10 +547,8 @@ _posix_spawnattr_setflags(
 	return (0);
 }
 
-#pragma weak posix_spawnattr_getflags = \
-		_posix_spawnattr_getflags
 int
-_posix_spawnattr_getflags(
+posix_spawnattr_getflags(
 	const posix_spawnattr_t *attr,
 	short *flags)
 {
@@ -583,10 +561,8 @@ _posix_spawnattr_getflags(
 	return (0);
 }
 
-#pragma weak posix_spawnattr_setpgroup = \
-		_posix_spawnattr_setpgroup
 int
-_posix_spawnattr_setpgroup(
+posix_spawnattr_setpgroup(
 	posix_spawnattr_t *attr,
 	pid_t pgroup)
 {
@@ -599,10 +575,8 @@ _posix_spawnattr_setpgroup(
 	return (0);
 }
 
-#pragma weak posix_spawnattr_getpgroup = \
-		_posix_spawnattr_getpgroup
 int
-_posix_spawnattr_getpgroup(
+posix_spawnattr_getpgroup(
 	const posix_spawnattr_t *attr,
 	pid_t *pgroup)
 {
@@ -615,10 +589,8 @@ _posix_spawnattr_getpgroup(
 	return (0);
 }
 
-#pragma weak posix_spawnattr_setschedparam = \
-		_posix_spawnattr_setschedparam
 int
-_posix_spawnattr_setschedparam(
+posix_spawnattr_setschedparam(
 	posix_spawnattr_t *attr,
 	const struct sched_param *schedparam)
 {
@@ -634,10 +606,8 @@ _posix_spawnattr_setschedparam(
 	return (0);
 }
 
-#pragma weak posix_spawnattr_getschedparam = \
-		_posix_spawnattr_getschedparam
 int
-_posix_spawnattr_getschedparam(
+posix_spawnattr_getschedparam(
 	const posix_spawnattr_t *attr,
 	struct sched_param *schedparam)
 {
@@ -650,10 +620,8 @@ _posix_spawnattr_getschedparam(
 	return (0);
 }
 
-#pragma weak posix_spawnattr_setschedpolicy = \
-		_posix_spawnattr_setschedpolicy
 int
-_posix_spawnattr_setschedpolicy(
+posix_spawnattr_setschedpolicy(
 	posix_spawnattr_t *attr,
 	int schedpolicy)
 {
@@ -673,10 +641,8 @@ _posix_spawnattr_setschedpolicy(
 	return (0);
 }
 
-#pragma weak posix_spawnattr_getschedpolicy = \
-		_posix_spawnattr_getschedpolicy
 int
-_posix_spawnattr_getschedpolicy(
+posix_spawnattr_getschedpolicy(
 	const posix_spawnattr_t *attr,
 	int *schedpolicy)
 {
@@ -689,10 +655,8 @@ _posix_spawnattr_getschedpolicy(
 	return (0);
 }
 
-#pragma weak posix_spawnattr_setsigdefault = \
-		_posix_spawnattr_setsigdefault
 int
-_posix_spawnattr_setsigdefault(
+posix_spawnattr_setsigdefault(
 	posix_spawnattr_t *attr,
 	const sigset_t *sigdefault)
 {
@@ -705,10 +669,8 @@ _posix_spawnattr_setsigdefault(
 	return (0);
 }
 
-#pragma weak posix_spawnattr_getsigdefault = \
-		_posix_spawnattr_getsigdefault
 int
-_posix_spawnattr_getsigdefault(
+posix_spawnattr_getsigdefault(
 	const posix_spawnattr_t *attr,
 	sigset_t *sigdefault)
 {
@@ -721,10 +683,8 @@ _posix_spawnattr_getsigdefault(
 	return (0);
 }
 
-#pragma weak posix_spawnattr_setsigmask = \
-		_posix_spawnattr_setsigmask
 int
-_posix_spawnattr_setsigmask(
+posix_spawnattr_setsigmask(
 	posix_spawnattr_t *attr,
 	const sigset_t *sigmask)
 {
@@ -737,10 +697,8 @@ _posix_spawnattr_setsigmask(
 	return (0);
 }
 
-#pragma weak posix_spawnattr_getsigmask = \
-		_posix_spawnattr_getsigmask
 int
-_posix_spawnattr_getsigmask(
+posix_spawnattr_getsigmask(
 	const posix_spawnattr_t *attr,
 	sigset_t *sigmask)
 {

@@ -93,55 +93,8 @@ SUNW_0.9 {
 
 SUNWprivate_1.1 {
     global:
-	__td_init;
-	__td_log;
-	__td_sync_get_info;
 	td_sync_get_stats;
-	__td_sync_get_stats;
-	__td_sync_setstate;
-	__td_sync_waiters;
-	__td_ta_clear_event;
-	__td_ta_delete;
-	__td_ta_enable_stats;
-	__td_ta_event_addr;
-	__td_ta_event_getmsg;
-	__td_ta_get_nthreads;
-	__td_ta_get_ph;
-	__td_ta_get_stats;
-	__td_ta_map_addr2sync;
-	__td_ta_map_id2thr;
-	__td_ta_map_lwp2thr;
-	__td_ta_new;
-	__td_ta_reset_stats;
-	__td_ta_setconcurrency;
-	__td_ta_set_event;
-	__td_ta_sync_iter;
 	td_ta_sync_tracking_enable;
-	__td_ta_sync_tracking_enable;
-	__td_ta_thr_iter;
-	__td_ta_tsd_iter;
-	__td_thr_clear_event;
-	__td_thr_dbresume;
-	__td_thr_dbsuspend;
-	__td_thr_event_enable;
-	__td_thr_event_getmsg;
-	__td_thr_getfpregs;
-	__td_thr_getgregs;
-	__td_thr_get_info;
-	__td_thr_getxregs;
-	__td_thr_getxregsize;
-	__td_thr_lockowner;
-	__td_thr_set_event;
-	__td_thr_setfpregs;
-	__td_thr_setgregs;
-	__td_thr_setprio;
-	__td_thr_setsigpending;
-	__td_thr_setxregs;
-	__td_thr_sigsetmask;
-	__td_thr_sleepinfo;
-	__td_thr_tlsbase;
-	__td_thr_tsd;
-	__td_thr_validate;
     local:
 	*;
 };

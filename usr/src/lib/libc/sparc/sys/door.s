@@ -28,27 +28,18 @@
 
 	.file	"%M%"
 
-#include <sys/asm_linkage.h>
+#include "SYS.h"
+#include <sys/door.h>
 
 	/*
 	 * weak aliases for public interfaces
 	 */
-	ANSI_PRAGMA_WEAK(_door_bind,function)
-	ANSI_PRAGMA_WEAK(_door_getparam,function)
-	ANSI_PRAGMA_WEAK(_door_info,function)
-	ANSI_PRAGMA_WEAK(_door_revoke,function)
-	ANSI_PRAGMA_WEAK(_door_setparam,function)
-	ANSI_PRAGMA_WEAK(_door_unbind,function)
-
-	ANSI_PRAGMA_WEAK(door_bind,function)
-	ANSI_PRAGMA_WEAK(door_getparam,function)
-	ANSI_PRAGMA_WEAK(door_info,function)
-	ANSI_PRAGMA_WEAK(door_revoke,function)
-	ANSI_PRAGMA_WEAK(door_setparam,function)
-	ANSI_PRAGMA_WEAK(door_unbind,function)
-
-#include <sys/door.h>
-#include "SYS.h"
+	ANSI_PRAGMA_WEAK2(door_bind,__door_bind,function)
+	ANSI_PRAGMA_WEAK2(door_getparam,__door_getparam,function)
+	ANSI_PRAGMA_WEAK2(door_info,__door_info,function)
+	ANSI_PRAGMA_WEAK2(door_revoke,__door_revoke,function)
+	ANSI_PRAGMA_WEAK2(door_setparam,__door_setparam,function)
+	ANSI_PRAGMA_WEAK2(door_unbind,__door_unbind,function)
 
 /*
  * Offsets within struct door_results
@@ -138,7 +129,7 @@ door_restart:
 	ldn	[%sp + DOOR_DESC_SIZE], %o4
 
 	/* Exit the thread if we return here */
-	call	_thr_terminate
+	call	_thrp_terminate
 	mov	%g0, %o0
 	/* NOTREACHED */
 2:

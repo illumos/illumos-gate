@@ -40,7 +40,6 @@ SUNW_1.23 {
 	enable_extended_FILE_stdio;
 	lio_listio64;
 	mkstemps64;
-	_mkstemps64;
 	posix_fallocate64;
 };
 
@@ -924,6 +923,7 @@ SUNWprivate_1.1 {
 	__xtoull;
 
     local:
+	_syscall6 =		NODYNSORT;
 	__systemcall6 =		NODYNSORT;
 	_seekdir64 =		NODYNSORT;
 	_telldir64 =		NODYNSORT;

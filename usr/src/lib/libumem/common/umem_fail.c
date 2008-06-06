@@ -30,7 +30,6 @@
  * Failure routines for libumem (not standalone)
  */
 
-#include "c_synonyms.h"
 #include <sys/types.h>
 #include <signal.h>
 #include <stdarg.h>

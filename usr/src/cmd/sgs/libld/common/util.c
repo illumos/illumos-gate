@@ -20,29 +20,33 @@
  */
 
 /*
- *	Copyright (c) 1988 AT&T
- *	  All Rights Reserved
- *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*
+ *	Copyright (c) 1988 AT&T
+ *	  All Rights Reserved
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Utility functions
  */
-#include	<unistd.h>
-#include	<stdio.h>
-#include	<stdarg.h>
-#include	<string.h>
-#include	<fcntl.h>
-#include	<sys/types.h>
-#include	<sys/mman.h>
-#include	<errno.h>
-#include	<sgs.h>
-#include	<debug.h>
-#include	"msg.h"
-#include	"_libld.h"
+#include <unistd.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/mman.h>
+#include <errno.h>
+#include <sgs.h>
+#include <libintl.h>
+#include <debug.h>
+#include "msg.h"
+#include "_libld.h"
 
 /*
  * libld_malloc() and dz_map() are used for both performance and for ease of
@@ -436,15 +440,13 @@ add_string(char *old, char *str)
 }
 
 /*
- * Messaging support - funnel everything through _dgettext() as this provides
- * a stub binding to libc, or a real binding to libintl.
+ * Messaging support - funnel everything through dgettext().
  */
-extern char	*_dgettext(const char *, const char *);
 
 const char *
 _libld_msg(Msg mid)
 {
-	return (_dgettext(MSG_ORIG(MSG_SUNW_OST_SGS), MSG_ORIG(mid)));
+	return (dgettext(MSG_ORIG(MSG_SUNW_OST_SGS), MSG_ORIG(mid)));
 }
 
 /*

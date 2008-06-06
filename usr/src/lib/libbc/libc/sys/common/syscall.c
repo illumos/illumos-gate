@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -146,7 +146,7 @@ syscall(int sysnum, ...)
 			c3 = va_arg(ap, char *);
 			c4 = va_arg(ap, char *);
 			va_end(ap);
-			return (_select(i1, c1, c2, c3, c4));
+			return (select(i1, c1, c2, c3, c4));
 		case XSYS_ioctl :
 			i1 = va_arg(ap, int);
 			i2 = va_arg(ap, int);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,11 +46,11 @@
 #include	<sys/feature_tests.h>
 
 #if !defined(_LP64)
-#pragma weak readdir64 = _readdir64
+#pragma weak _readdir64 = readdir64
 #endif
-#pragma weak readdir = _readdir
+#pragma weak _readdir = readdir
 
-#include "synonyms.h"
+#include "lint.h"
 #include <dirent.h>
 #include <limits.h>
 #include <errno.h>

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +50,6 @@
  */
 
 #include <sys/asm_linkage.h>
-#include "synonyms.h"
 
 	ENTRY(strncmp)
 	save	%sp, -SA(WINDOWSIZE), %sp

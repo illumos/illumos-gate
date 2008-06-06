@@ -26,20 +26,19 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-	.file	"asm_subr.s"
+	.file	"%M%"
 
-#include <sys/asm_linkage.h>
+#include "SYS.h"
 #include <sys/trap.h>
 #include <../assym.h>
-#include "SYS.h"
 
 	! This is where execution resumes when a thread created with
 	! thr_create() or pthread_create() returns (see setup_context()).
-	! We pass the (void *) return value to _thr_terminate().
+	! We pass the (void *) return value to _thrp_terminate().
 	ENTRY(_lwp_start)
 	nop	! this is the location from which the func() was "called"
 	nop
-	call	_thr_terminate	! %o0 contains the return value
+	call	_thrp_terminate	! %o0 contains the return value
 	nop
 	SET_SIZE(_lwp_start)
 

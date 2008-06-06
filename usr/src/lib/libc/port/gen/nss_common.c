@@ -30,13 +30,7 @@
  * Shared code used by the name-service-switch frontends (e.g. getpwnam_r())
  */
 
-#pragma weak nss_delete = _nss_delete
-#pragma weak nss_endent = _nss_endent
-#pragma weak nss_getent = _nss_getent
-#pragma weak nss_search = _nss_search
-#pragma weak nss_setent = _nss_setent
-
-#include "synonyms.h"
+#include "lint.h"
 #include <mtlib.h>
 #include <dlfcn.h>
 #include <atomic.h>

@@ -526,10 +526,10 @@ SUNWprivate_3.23 {
 # we're capable of doing, rather than an admission that its really worth it :-).
 
 {
-		_dgettext =	FUNCTION extern;
 		_close =	FUNCTION extern;
 		_open =		FUNCTION extern;
 		_write =	FUNCTION extern;
+		dgettext =	FUNCTION extern;
 		dlopen =	FUNCTION extern;
 		dlsym =		FUNCTION extern;
 		free =		FUNCTION parent;

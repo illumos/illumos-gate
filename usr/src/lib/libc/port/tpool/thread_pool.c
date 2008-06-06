@@ -20,13 +20,13 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#include "lint.h"
 #include "thr_uberdata.h"
 #include <stdlib.h>
 #include <signal.h>
@@ -287,7 +287,7 @@ tpool_create(uint_t min_threads, uint_t max_threads, uint_t linger,
 	 * If the attribute pointer is NULL, we need to initialize
 	 * the new pthread_attr_t structure with default values.
 	 */
-	error = _pthread_attr_clone(&tpool->tp_attr, attr);
+	error = pthread_attr_clone(&tpool->tp_attr, attr);
 	if (error) {
 		lfree(tpool, sizeof (*tpool));
 		errno = error;
@@ -297,7 +297,7 @@ tpool_create(uint_t min_threads, uint_t max_threads, uint_t linger,
 	/* make all pool threads be detached daemon threads */
 	(void) pthread_attr_setdetachstate(&tpool->tp_attr,
 	    PTHREAD_CREATE_DETACHED);
-	(void) _pthread_attr_setdaemonstate_np(&tpool->tp_attr,
+	(void) pthread_attr_setdaemonstate_np(&tpool->tp_attr,
 	    PTHREAD_CREATE_DAEMON_NP);
 
 	/* insert into the global list of all thread pools */

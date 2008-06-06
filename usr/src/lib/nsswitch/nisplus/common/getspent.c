@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,8 +53,6 @@ extern int key_secretkey_is_set_g();
  * threaded, note dtlogin is now linked with libthread (bugid 4263325)
  * which is why this bug exists (Note thr_main() check was removed)
  */
-extern int _mutex_lock(mutex_t *mp);
-extern int _mutex_unlock(mutex_t *mp);
 
 static mutex_t  one_lane = DEFAULTMUTEX;
 
@@ -74,7 +73,7 @@ getbynam(be, a)
 	char			*save_buf;
 
 	/* part of fix for bugid 4301477 */
-	_mutex_lock(&one_lane);
+	(void) mutex_lock(&one_lane);
 
 	/*
 	 * There is a dirty little private protocol with the nis_object2str()
@@ -149,7 +148,7 @@ getbynam(be, a)
 
 out:
 	/* end of fix for bugid 4301477 unlock NIS+/getspnam() */
-	_mutex_unlock(&one_lane);
+	(void) mutex_unlock(&one_lane);
 
 	argp->key.name = username;
 	return (status);

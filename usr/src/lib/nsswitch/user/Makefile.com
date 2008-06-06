@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,4 +44,4 @@ LINTFLAGS64 +=	-erroff=E_GLOBAL_COULD_BE_STATIC2 -erroff=E_FUNC_SET_NOT_USED
 
 DYNLIB1 =	nss_user.so$(VERS)
 
-all: $(DYNLIB1) fnamecheck
+all: $(DYNLIB1)

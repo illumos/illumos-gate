@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-	.ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 	.file	"%M%"
 
@@ -51,11 +51,9 @@
  *	}
  */
 
-#include <sys/asm_linkage.h>
+#include "SYS.h"
 
 	ANSI_PRAGMA_WEAK(memcpy,function)
-
-#include "synonyms.h"
 
 	ENTRY(memcpy)
 	st	%o0, [%sp + 68]		! save des address for return val

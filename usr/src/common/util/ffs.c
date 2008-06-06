@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,9 +36,8 @@
 #include <sys/int_types.h>
 #define	arg_t	uintmax_t
 #else
-#pragma weak ffs = _ffs
 #define	arg_t	int
-#include "synonyms.h"
+#include "lint.h"
 #endif
 
 int

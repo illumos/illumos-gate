@@ -39,7 +39,7 @@
  *	aio_cancel
  */
 
-#include "synonyms.h"
+#include "lint.h"
 #include "thr_uberdata.h"
 #include "asyncio.h"
 #include <atomic.h>

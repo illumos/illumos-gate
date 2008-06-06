@@ -20,14 +20,14 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * telldir -- C library extension routine
@@ -36,11 +36,11 @@
 #include <sys/isa_defs.h>
 
 #if !defined(_LP64)
-#pragma weak telldir64 = _telldir64
+#pragma weak _telldir64 = telldir64
 #endif
-#pragma weak telldir = _telldir
+#pragma weak _telldir = telldir
 
-#include "synonyms.h"
+#include "lint.h"
 #include "libc.h"
 #include <mtlib.h>
 #include <dirent.h>

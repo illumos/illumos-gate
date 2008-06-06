@@ -20,19 +20,18 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak gettxt = _gettxt
+#pragma weak _gettxt = gettxt
 
-#include "synonyms.h"
+#include "lint.h"
 #include "libc.h"
 #include <mtlib.h>
 #include <ctype.h>

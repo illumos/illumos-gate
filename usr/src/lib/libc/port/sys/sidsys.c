@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,7 @@
  * UID/SID mapping system call entries.
  */
 
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/sid.h>
 #include <sys/syscall.h>
 

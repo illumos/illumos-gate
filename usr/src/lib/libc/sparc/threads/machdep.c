@@ -67,7 +67,7 @@ setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
  * Machine-dependent startup code for a newly-created thread.
  */
 void *
-_thr_setup(ulwp_t *self)
+_thrp_setup(ulwp_t *self)
 {
 	extern void _setfsr(greg_t *);
 

@@ -31,17 +31,24 @@
 #include <stddef.h>
 
 /*
+ * These symbols should not be exported from libc, but
+ * /lib/libm.so.2 references them.  libm needs to be fixed.
+ * Also, some older versions of the Studio compiler/debugger
+ * components reference them.  These need to be fixed, too.
+ */
+#pragma weak _thr_getspecific = thr_getspecific
+#pragma weak _thr_keycreate = thr_keycreate
+#pragma weak _thr_setspecific = thr_setspecific
+
+/*
  * 128 million keys should be enough for anyone.
  * This allocates half a gigabyte of memory for the keys themselves and
  * half a gigabyte of memory for each thread that uses the largest key.
  */
 #define	MAX_KEYS	0x08000000U
 
-#pragma weak thr_keycreate = _thr_keycreate
-#pragma weak pthread_key_create = _thr_keycreate
-#pragma weak _pthread_key_create = _thr_keycreate
 int
-_thr_keycreate(thread_key_t *pkey, void (*destructor)(void *))
+thr_keycreate(thread_key_t *pkey, void (*destructor)(void *))
 {
 	tsd_metadata_t *tsdm = &curthread->ul_uberdata->tsd_metadata;
 	void (**old_data)(void *) = NULL;
@@ -128,8 +135,15 @@ _thr_keycreate(thread_key_t *pkey, void (*destructor)(void *))
 	return (0);
 }
 
+#pragma weak _pthread_key_create = pthread_key_create
+int
+pthread_key_create(pthread_key_t *pkey, void (*destructor)(void *))
+{
+	return (thr_keycreate(pkey, destructor));
+}
+
 /*
- * Same as _thr_keycreate(), above, except that the key creation
+ * Same as thr_keycreate(), above, except that the key creation
  * is performed only once.  This relies upon the fact that a key
  * value of THR_ONCE_KEY is invalid, and requires that the key be
  * allocated with a value of THR_ONCE_KEY before calling here.
@@ -141,11 +155,9 @@ _thr_keycreate(thread_key_t *pkey, void (*destructor)(void *))
  *	...
  *	pthread_key_create_once_np(&key, destructor);
  */
-#pragma weak pthread_key_create_once_np = _thr_keycreate_once
-#pragma weak _pthread_key_create_once_np = _thr_keycreate_once
-#pragma weak thr_keycreate_once = _thr_keycreate_once
+#pragma weak pthread_key_create_once_np = thr_keycreate_once
 int
-_thr_keycreate_once(thread_key_t *keyp, void (*destructor)(void *))
+thr_keycreate_once(thread_key_t *keyp, void (*destructor)(void *))
 {
 	static mutex_t key_lock = DEFAULTMUTEX;
 	thread_key_t key;
@@ -154,25 +166,23 @@ _thr_keycreate_once(thread_key_t *keyp, void (*destructor)(void *))
 	if (*keyp == THR_ONCE_KEY) {
 		lmutex_lock(&key_lock);
 		if (*keyp == THR_ONCE_KEY) {
-			error = _thr_keycreate(&key, destructor);
+			error = thr_keycreate(&key, destructor);
 			if (error) {
 				lmutex_unlock(&key_lock);
 				return (error);
 			}
-			_membar_producer();
+			membar_producer();
 			*keyp = key;
 		}
 		lmutex_unlock(&key_lock);
 	}
-	_membar_consumer();
+	membar_consumer();
 
 	return (0);
 }
 
-#pragma weak pthread_key_delete = _thr_key_delete
-#pragma weak _pthread_key_delete = _thr_key_delete
 int
-_thr_key_delete(thread_key_t key)
+pthread_key_delete(pthread_key_t key)
 {
 	tsd_metadata_t *tsdm = &curthread->ul_uberdata->tsd_metadata;
 
@@ -200,9 +210,8 @@ _thr_key_delete(thread_key_t key)
  * incurred by thr_getspecific().  Every once in a while, the Standards
  * get it right -- but usually by accident.
  */
-#pragma weak	pthread_getspecific	= _pthread_getspecific
 void *
-_pthread_getspecific(pthread_key_t key)
+pthread_getspecific(pthread_key_t key)
 {
 	tsd_t *stsd;
 
@@ -223,9 +232,8 @@ _pthread_getspecific(pthread_key_t key)
 	return (NULL);
 }
 
-#pragma weak thr_getspecific = _thr_getspecific
 int
-_thr_getspecific(thread_key_t key, void **valuep)
+thr_getspecific(thread_key_t key, void **valuep)
 {
 	tsd_t *stsd;
 
@@ -250,13 +258,13 @@ _thr_getspecific(thread_key_t key, void **valuep)
 }
 
 /*
- * We call _thr_setspecific_slow() when the key specified
+ * We call thr_setspecific_slow() when the key specified
  * is beyond the current thread's currently allocated range.
  * This case is in a separate function because we want
  * the compiler to optimize for the common case.
  */
 static int
-_thr_setspecific_slow(thread_key_t key, void *value)
+thr_setspecific_slow(thread_key_t key, void *value)
 {
 	ulwp_t *self = curthread;
 	tsd_metadata_t *tsdm = &self->ul_uberdata->tsd_metadata;
@@ -310,18 +318,15 @@ _thr_setspecific_slow(thread_key_t key, void *value)
 	return (0);
 }
 
-#pragma weak thr_setspecific = _thr_setspecific
-#pragma weak pthread_setspecific = _thr_setspecific
-#pragma weak _pthread_setspecific = _thr_setspecific
 int
-_thr_setspecific(thread_key_t key, void *value)
+thr_setspecific(thread_key_t key, void *value)
 {
 	tsd_t *stsd;
 	int ret;
 	ulwp_t *self = curthread;
 
 	/*
-	 * See the comment in _thr_getspecific(), above.
+	 * See the comment in thr_getspecific(), above.
 	 */
 	if (key == 0)
 		return (EINVAL);
@@ -341,9 +346,15 @@ _thr_setspecific(thread_key_t key, void *value)
 	 * allocation and free. Similar protection required in tsd_free().
 	 */
 	enter_critical(self);
-	ret = _thr_setspecific_slow(key, value);
+	ret = thr_setspecific_slow(key, value);
 	exit_critical(self);
 	return (ret);
+}
+
+int
+pthread_setspecific(pthread_key_t key, const void *value)
+{
+	return (thr_setspecific(key, (void *)value));
 }
 
 /*

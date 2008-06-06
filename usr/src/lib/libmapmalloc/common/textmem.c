@@ -20,16 +20,14 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVR4/MNLS 1.1.2.1 */
-
-/*LINTLIBRARY*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -48,7 +46,6 @@
  * New memory chunks are allocated on a first-fit basis.
  * Freed blocks are joined in larger blocks. Free pages are unmapped.
  */
-#include <c_synonyms.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -137,7 +134,7 @@ found:
 
 		if ((page = (struct page *)mmap(0, totpage,
 		    PROT_READ|PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0))
-			== MAP_FAILED)
+		    == MAP_FAILED)
 			return (0);
 
 		page->next = memstart;
@@ -253,7 +250,7 @@ defrag(struct page *page)
 		if (block->status == BUSY)
 			continue;
 		for (block2 = block->next; block2 && block2->status == FREE;
-			block2 = block2->next) {
+		    block2 = block2->next) {
 			block->next = block2->next;
 			block->size += block2->size + HDR_BLOCK;
 		}
@@ -268,7 +265,7 @@ defrag(struct page *page)
 		else {
 			struct page *page2;
 			for (page2 = memstart; page2->next;
-				page2 = page2->next) {
+			    page2 = page2->next) {
 				if (page2->next == page) {
 					page2->next = page->next;
 					break;

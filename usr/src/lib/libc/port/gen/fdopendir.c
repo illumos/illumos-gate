@@ -34,10 +34,9 @@
  * while holding internal libc locks.
  */
 
-#pragma weak fdopendir = _fdopendir
-#pragma weak dirfd = _dirfd
+#pragma weak _fdopendir = fdopendir
 
-#include "synonyms.h"
+#include "lint.h"
 #include <mtlib.h>
 #include <dirent.h>
 #include <sys/stat.h>

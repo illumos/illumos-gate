@@ -18,28 +18,24 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include	"synonyms.h"
-#include	<sys/types.h>
-#include	<sys/syscall.h>
-#include 	<libtsnet.h>
-#include	<sys/tsol/tsyscall.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
+#include <libtsnet.h>
+#include <sys/tsol/tsyscall.h>
 
 /*
  * tnrh(2TSOL) - manipulate kernel trusted network remote hosts cache
  *
  * This is the library interface to the system call.
  */
-
-#ifdef __STDC__
-#pragma weak tnrh = _tnrh
-#endif
 
 int
 tnrh(int cmd, tsol_rhent_t *buf)

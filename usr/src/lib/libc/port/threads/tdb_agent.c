@@ -218,7 +218,7 @@ initialize_sync_hash()
 
 	tdbp->tdb_register_count = 1;
 	/* assign to tdb_sync_addr_hash only after fully initialized */
-	_membar_producer();
+	membar_producer();
 	tdbp->tdb_sync_addr_hash = addr_hash;
 	lmutex_unlock(&udp->tdb_hash_lock);
 }
@@ -269,7 +269,7 @@ tdb_sync_obj_register(void *addr, int *new)
 			goto out;
 		}
 	}
-	_membar_consumer();
+	membar_consumer();
 
 	sapp = &tdbp->tdb_sync_addr_hash[tdb_addr_hash(addr)];
 	if (udp->uberflags.uf_tdb_register_sync == REGISTER_SYNC_ON) {

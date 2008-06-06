@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#include "lint.h"
 #include "mtlib.h"
 #include <string.h>
 #include <syslog.h>
@@ -149,7 +149,7 @@ nls_safe_open(const char *path, struct stat64 *statbuf, int *trust, int safe)
 	 */
 	if ((statbuf->st_mode & (S_IWOTH)) == 0 &&
 	    ((statbuf->st_mode & (S_IWGRP)) == 0 ||
-		(statbuf->st_gid < 4 && statbuf->st_gid != 1))) {
+	    (statbuf->st_gid < 4 && statbuf->st_gid != 1))) {
 		trust_group = 1;
 	}
 
@@ -464,7 +464,7 @@ done:
 	}
 #ifdef DEBUG
 	for (t = 0; t < maxarg * FORMAT_SIZE; t += FORMAT_SIZE) {
-	    printf("%c(%d)", norm[t], norm[t+1]);
+		printf("%c(%d)", norm[t], norm[t+1]);
 	}
 	putchar('\n');
 #endif
@@ -609,6 +609,11 @@ void
 clean_env(void)
 {
 	const char **p;
+
+	if (environ == NULL) {		/* can't happen? */
+		nlspath_safe = 1;
+		return;
+	}
 
 	/* Find the first NLSPATH occurrence */
 	for (p = environ; *p; p++)

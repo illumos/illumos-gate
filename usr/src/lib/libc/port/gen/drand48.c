@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,16 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	drand48, etc. pseudo-random number generator
@@ -47,17 +46,8 @@
  *	previously used (32 bit precision) are now using the int32_t
  *	type (32 bit precision in both ILP32 and LP64 worlds).
  */
-#pragma weak drand48 = _drand48
-#pragma weak erand48 = _erand48
-#pragma weak lrand48 = _lrand48
-#pragma weak mrand48 = _mrand48
-#pragma weak srand48 = _srand48
-#pragma weak seed48 = _seed48
-#pragma weak lcong48 = _lcong48
-#pragma weak nrand48 = _nrand48
-#pragma weak jrand48 = _jrand48
 
-#include "synonyms.h"
+#include "lint.h"
 #include <mtlib.h>
 #include <synch.h>
 #include <thread.h>
@@ -148,13 +138,13 @@ next(void)
 	ADDEQU(p[1], q[0], carry0);
 	MUL(a[1], x[0], r);
 	x[2] = LOW(carry0 + carry1 + CARRY(p[1], r[0]) + q[1] + r[1] +
-		a[0] * x[2] + a[1] * x[1] + a[2] * x[0]);
+	    a[0] * x[2] + a[1] * x[1] + a[2] * x[0]);
 	x[1] = LOW(p[1] + r[0]);
 	x[0] = LOW(p[0]);
 }
 
 void
-_srand48(long seedval)
+srand48(long seedval)
 {
 	int32_t fixseed = (int32_t)seedval;	/* limit to 32 bits */
 
@@ -187,14 +177,14 @@ NEST(long, _nrand48_u, _lrand48_u)
 
 NEST(long, _jrand48_u, _mrand48_u)
 
-EXPORT0(double, _drand48, _drand48_u)
-EXPORT1(double, _erand48, _erand48_u)
+EXPORT0(double, drand48, _drand48_u)
+EXPORT1(double, erand48, _erand48_u)
 
-EXPORT0(long, _lrand48, _lrand48_u)
-EXPORT1(long, _nrand48, _nrand48_u)
+EXPORT0(long, lrand48, _lrand48_u)
+EXPORT1(long, nrand48, _nrand48_u)
 
-EXPORT0(long, _mrand48, _mrand48_u)
-EXPORT1(long, _jrand48, _jrand48_u)
+EXPORT0(long, mrand48, _mrand48_u)
+EXPORT1(long, jrand48, _jrand48_u)
 
 #ifdef DRIVER
 /*

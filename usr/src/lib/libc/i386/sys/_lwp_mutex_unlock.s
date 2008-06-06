@@ -28,12 +28,8 @@
 
 	.file	"%M%"
 
-#include <sys/asm_linkage.h>
-
-	ANSI_PRAGMA_WEAK(_lwp_mutex_unlock,function)
-
 #include "SYS.h"
-#include <assym.h>
+#include <../assym.h>
 
 	ENTRY(_lwp_mutex_unlock)
 	movl	4(%esp), %eax

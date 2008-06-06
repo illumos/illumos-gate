@@ -29,10 +29,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ifndef NATIVE_BUILD
-#include "c_synonyms.h"
-#endif
-
 #include <libscf.h>
 #include <libscf_priv.h>
 

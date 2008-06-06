@@ -18,10 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*
  * Common code and structures used by name-service-switch "dns" backends.
  */
@@ -72,10 +74,6 @@ extern int	(*override_retry)(int);
 extern void	switch_resolver_setup(int *, sigset_t *, int *);
 extern void	switch_resolver_reset(int, sigset_t, int);
 extern mutex_t	one_lane;
-
-extern int _thr_sigsetmask(int, const sigset_t *, sigset_t *);
-extern int _mutex_lock(mutex_t *);
-extern int _mutex_unlock(mutex_t *);
 
 extern int ent2result(struct hostent *, nss_XbyY_args_t *, int);
 extern int ent2str(struct hostent *, nss_XbyY_args_t *, int);

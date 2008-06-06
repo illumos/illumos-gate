@@ -20,14 +20,14 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ttyname(f): return "/dev/X" (where X is a relative pathname
@@ -64,10 +64,9 @@
  * device numbers.
  */
 
-#pragma weak ttyname = _ttyname
-#pragma weak ttyname_r = _ttyname_r
+#pragma weak _ttyname = ttyname
 
-#include "synonyms.h"
+#include "lint.h"
 #include "mtlib.h"
 #include "libc.h"
 #include "_libc_gettext.h"
@@ -173,7 +172,7 @@ _ttyname_dev(dev_t rdev, char *buffer, size_t buflen)
  * It was implemented by Solaris 2.3.
  */
 char *
-_ttyname_r(int f, char *buffer, int buflen)
+ttyname_r(int f, char *buffer, int buflen)
 {
 	struct stat64 fsb;	/* what we are searching for */
 	/*
@@ -342,7 +341,7 @@ __posix_ttyname_r(int fildes, char *name, size_t namesize)
 	else
 		namelen = (int)namesize;
 
-	if (_ttyname_r(fildes, name, namelen) == NULL) {
+	if (ttyname_r(fildes, name, namelen) == NULL) {
 		if (errno == 0)
 			nerrno = EINVAL;
 		else
@@ -734,7 +733,6 @@ get_pri_dirs(void)
 				int tfd = open("/dev/console", O_WRONLY);
 				if (tfd >= 0) {
 					char buf[256];
-					/* LINTED variable format specifier */
 					(void) snprintf(buf, sizeof (buf),
 					    _libc_gettext(
 "ERROR: Entry '%s' in /etc/ttysrch ignored.\n"), vec->name);
@@ -772,5 +770,5 @@ ttyname(int f)
 
 	if (ans == NULL)
 		return (NULL);
-	return (_ttyname_r(f, ans, MAX_DEV_PATH));
+	return (ttyname_r(f, ans, MAX_DEV_PATH));
 }

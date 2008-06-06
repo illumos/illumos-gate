@@ -18,16 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	_xftw - file tree walk the uses expanded stat structure
@@ -92,31 +92,6 @@
 #ifdef _STYPES
 #undef _STYPES
 #endif
-
-#include <sys/feature_tests.h>
-
-#if !defined(_LP64) && _FILE_OFFSET_BITS == 64
-#define	fstatat64	_fstatat64
-#define	lstat64		_lstat64
-#define	openat64	_openat64
-#define	readdir64	_readdir64
-#define	stat64		_stat64
-#else
-#define	fstatat		_fstatat
-#define	lstat		_lstat
-#define	openat		_openat
-#define	readdir		_readdir
-#define	stat		_stat
-#endif /* !_LP64 && _FILE_OFFSET_BITS == 64 */
-
-#define	close		_close
-#define	closedir	_closedir
-#define	fdopendir	_fdopendir
-#define	opendir		_opendir
-#define	seekdir		_seekdir
-#define	strdup		_strdup
-#define	strtok_r	_strtok_r
-#define	telldir		_telldir
 
 #include "lint.h"
 #include <sys/types.h>

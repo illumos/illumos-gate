@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,9 +51,6 @@
 static mutex_t audit_mountd_lock = DEFAULTMUTEX;
 static int cannotaudit = 0;
 
-extern int _mutex_lock(mutex_t *);
-extern int _mutex_unlock(mutex_t *);
-
 /*
  * This setup call is made only once at the start of mountd.
  * The call sets the auditing state off if appropriate, and is
@@ -81,7 +78,7 @@ int	sorf;		/* flag for success or failure */
 	if (cannotaudit)
 		return;
 
-	(void) _mutex_lock(&audit_mountd_lock);
+	(void) mutex_lock(&audit_mountd_lock);
 
 	(void) aug_save_namask();
 
@@ -93,7 +90,7 @@ int	sorf;		/* flag for success or failure */
 	(void) aug_get_machine(clname, buf, &type);
 	aug_save_tid_ex(aug_get_port(), buf, type);
 	(void) aug_audit();
-	(void) _mutex_unlock(&audit_mountd_lock);
+	(void) mutex_unlock(&audit_mountd_lock);
 }
 
 void
@@ -108,7 +105,7 @@ char	*path;		/* mount path */
 	if (cannotaudit)
 		return;
 
-	(void) _mutex_lock(&audit_mountd_lock);
+	(void) mutex_lock(&audit_mountd_lock);
 
 	(void) aug_save_namask();
 
@@ -120,5 +117,5 @@ char	*path;		/* mount path */
 	(void) aug_get_machine(clname, buf, &type);
 	aug_save_tid_ex(aug_get_port(), buf, type);
 	(void) aug_audit();
-	(void) _mutex_unlock(&audit_mountd_lock);
+	(void) mutex_unlock(&audit_mountd_lock);
 }

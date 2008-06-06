@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,16 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Return file offset.
@@ -38,11 +37,11 @@
 #include <sys/feature_tests.h>
 
 #if !defined(_LP64)
-#pragma weak ftello64 = _ftello64
+#pragma weak _ftello64 = ftello64
 #endif
-#pragma weak ftello = _ftello
+#pragma weak _ftello = ftello
 
-#include "synonyms.h"
+#include "lint.h"
 #include "file64.h"
 #include "mtlib.h"
 #include <sys/types.h>
@@ -73,7 +72,7 @@ ftello64(FILE *iop)
 	else if (iop->_flag & (_IOWRT | _IORW)) {
 		adjust = 0;
 		if (((iop->_flag & (_IOWRT | _IONBF)) == _IOWRT) &&
-						(iop->_base != 0))
+		    (iop->_base != 0))
 			adjust = iop->_ptr - iop->_base;
 	} else {
 		errno = EBADF;	/* file descriptor refers to no open file */

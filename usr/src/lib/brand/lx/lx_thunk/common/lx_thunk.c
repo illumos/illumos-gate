@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,8 +166,8 @@ init(void)
 		 * in just a second, so we won't be able to open it later.
 		 */
 		if ((debug_fd = open(lxt_debug_path,
-			    O_WRONLY|O_APPEND|O_CREAT|O_NDELAY|O_NOCTTY,
-			    0666)) != -1) {
+		    O_WRONLY|O_APPEND|O_CREAT|O_NDELAY|O_NOCTTY,
+		    0666)) != -1) {
 			(void) fchmod(debug_fd, 0666);
 		}
 	}
@@ -1042,8 +1042,9 @@ lxt_getservbyname_r(const char *name, const char *proto,
 /*
  * "Public" interfaces - used to override public existing interfaces
  */
+#pragma weak _close = close
 int
-_close(int fd)
+close(int fd)
 {
 	static fp1_t	fp = NULL;
 
@@ -1057,7 +1058,7 @@ _close(int fd)
 		return (0);
 
 	if (fp == NULL)
-		fp = (fp1_t)dlsym(RTLD_NEXT, "_close");
+		fp = (fp1_t)dlsym(RTLD_NEXT, "close");
 	return (fp((uintptr_t)fd));
 }
 

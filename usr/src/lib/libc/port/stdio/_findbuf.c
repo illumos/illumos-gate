@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,7 @@
 
 #define	_LARGEFILE64_SOURCE	1
 
-#include "synonyms.h"
+#include "lint.h"
 #include "file64.h"
 #include <stdlib.h>
 #include <stdio.h>

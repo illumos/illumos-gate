@@ -29,10 +29,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak pclose = _pclose
-#pragma weak popen = _popen
+#pragma weak _pclose = pclose
+#pragma weak _popen = popen
 
-#include "synonyms.h"
+#include "lint.h"
 #include "mtlib.h"
 #include "file64.h"
 #include <sys/types.h>

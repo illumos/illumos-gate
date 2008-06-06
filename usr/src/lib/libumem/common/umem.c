@@ -357,7 +357,6 @@
  *		lh_lock
  */
 
-#include "c_synonyms.h"
 #include <umem_impl.h>
 #include <sys/vmem_impl_user.h>
 #include "umem_base.h"
@@ -502,8 +501,7 @@ umem_log_header_t *umem_content_log;
 umem_log_header_t *umem_failure_log;
 umem_log_header_t *umem_slab_log;
 
-extern thread_t _thr_self(void);
-#define	CPUHINT()		(_thr_self())
+#define	CPUHINT()		(thr_self())
 #define	CPUHINT_MAX()		INT_MAX
 
 #define	CPU(mask)		(umem_cpus + (CPUHINT() & (mask)))

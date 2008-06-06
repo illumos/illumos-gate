@@ -26,13 +26,13 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak signal = _signal
-#pragma weak sighold = _sighold
-#pragma weak sigrelse = _sigrelse
-#pragma weak sigignore = _sigignore
-#pragma weak sigset = _sigset
+#pragma weak _signal = signal
+#pragma weak _sighold = sighold
+#pragma weak _sigrelse = sigrelse
+#pragma weak _sigignore = sigignore
+#pragma weak _sigset = sigset
 
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>

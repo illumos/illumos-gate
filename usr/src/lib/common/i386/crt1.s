@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,9 +30,9 @@
  * where it will be picked up by gcc, along with crti.o and crtn.o
  */
 
-	.ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-	.file	"crt1.s"
+	.file	"%M%"
 
 	.globl	_start
 
@@ -57,7 +57,7 @@ _environ:
 	.globl	__environ_lock
 	.type	__environ_lock,@object
 	.size	__environ_lock,24
-	.align	4
+	.align	8
 __environ_lock:
 	.zero	24
 

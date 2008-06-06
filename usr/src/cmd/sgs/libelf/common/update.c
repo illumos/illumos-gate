@@ -20,21 +20,17 @@
  */
 
 /*
- *	Copyright (c) 1988 AT&T
- *	  All Rights Reserved
- *
- *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+/*
+ *	Copyright (c) 1988 AT&T
+ *	  All Rights Reserved
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#if !defined(_ELF64)
-#pragma weak elf_update = _elf_update
-#endif
-
-#include "syn.h"
 #include <memory.h>
 #include <malloc.h>
 #include <limits.h>

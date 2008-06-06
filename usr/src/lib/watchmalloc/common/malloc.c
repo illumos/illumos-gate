@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,6 @@
  *			Otherwise, it is always 0.
  */
 
-#include <c_synonyms.h>
 #include "mallint.h"
 
 static	mutex_t	__watch_malloc_lock = DEFAULTMUTEX;

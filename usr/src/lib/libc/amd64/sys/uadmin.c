@@ -26,8 +26,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak uadmin = _uadmin
-
 /*
  * Wrapper function to implement reboot w/ arguments on x86
  * platforms. Extract reboot arguments and place them in
@@ -35,7 +33,7 @@
  * All other commands are passed through.
  */
 
-#include "synonyms.h"
+#include "lint.h"
 #include <fcntl.h>
 #include <ctype.h>
 #include <stdio.h>

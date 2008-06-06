@@ -69,7 +69,7 @@ Abort(const char *msg)
 		panic_thread = self;
 		lwpid = self->ul_lwpid;
 	} else {
-		lwpid = __lwp_self();
+		lwpid = _lwp_self();
 	}
 
 	/* set SIGABRT signal handler to SIG_DFL w/o grabbing any locks */
@@ -82,8 +82,8 @@ Abort(const char *msg)
 	(void) sigaddset(&sigmask, SIGABRT);
 	(void) __lwp_sigmask(SIG_UNBLOCK, &sigmask, NULL);
 
-	(void) __lwp_kill(lwpid, SIGABRT);	/* never returns */
-	(void) _kill(getpid(), SIGABRT);	/* if it does, try harder */
+	(void) _lwp_kill(lwpid, SIGABRT);	/* never returns */
+	(void) kill(getpid(), SIGABRT);	/* if it does, try harder */
 	_exit(127);
 }
 
@@ -182,7 +182,7 @@ lock_error(const mutex_t *mp, const char *who, void *cv, const char *msg)
 	} else {
 		self = NULL;
 		(void) _lwp_mutex_lock(&assert_lock);
-		lwpid = __lwp_self();
+		lwpid = _lwp_self();
 		udp = &__uberdata;
 		pid = getpid();
 	}
@@ -200,7 +200,7 @@ lock_error(const mutex_t *mp, const char *who, void *cv, const char *msg)
 	if (msg != NULL) {
 		(void) strcat(buf, ": ");
 		(void) strcat(buf, msg);
-	} else if (!mutex_is_held(&mcopy)) {
+	} else if (!mutex_held(&mcopy)) {
 		(void) strcat(buf, ": calling thread does not own the lock");
 	} else if (mcopy.mutex_rcount) {
 		(void) strcat(buf, ": mutex rcount = ");
@@ -212,7 +212,7 @@ lock_error(const mutex_t *mp, const char *who, void *cv, const char *msg)
 	ultos((uint64_t)(uintptr_t)self, 16, buf + strlen(buf));
 	(void) strcat(buf, " thread-id ");
 	ultos((uint64_t)lwpid, 10, buf + strlen(buf));
-	if (msg != NULL || mutex_is_held(&mcopy))
+	if (msg != NULL || mutex_held(&mcopy))
 		/* EMPTY */;
 	else if (mcopy.mutex_lockw == 0)
 		(void) strcat(buf, "\nthe lock is unowned");
@@ -269,7 +269,7 @@ rwlock_error(const rwlock_t *rp, const char *who, const char *msg)
 	} else {
 		self = NULL;
 		(void) _lwp_mutex_lock(&assert_lock);
-		lwpid = __lwp_self();
+		lwpid = _lwp_self();
 		udp = &__uberdata;
 		pid = getpid();
 	}
@@ -347,7 +347,7 @@ thread_error(const char *msg)
 	} else {
 		self = NULL;
 		(void) _lwp_mutex_lock(&assert_lock);
-		lwpid = __lwp_self();
+		lwpid = _lwp_self();
 		udp = &__uberdata;
 	}
 
@@ -395,7 +395,7 @@ __assfail(const char *assertion, const char *filename, int line_num)
 	} else {
 		self = NULL;
 		(void) _lwp_mutex_lock(&assert_lock);
-		lwpid = __lwp_self();
+		lwpid = _lwp_self();
 	}
 
 	(void) strcpy(buf, "assertion failed for thread ");

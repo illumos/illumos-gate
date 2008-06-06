@@ -1,7 +1,4 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -20,6 +17,9 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -256,181 +256,60 @@ SUNW_0.7 {
 SUNWprivate_1.1 {
     global:
 	_thr_suspend_allmutators = FUNCTION;
-	__nanosleep = FUNCTION;
 	_thr_join = FUNCTION;
-	_pthread_setcancelstate = FUNCTION;
-	_thr_detach = FUNCTION;
-	_cond_wait = FUNCTION;
-	_pthread_mutexattr_getprioceiling = FUNCTION;
-	_pthread_mutex_getprioceiling = FUNCTION;
 	_sigoff = FUNCTION;
-	_rwlock_init = FUNCTION;
 	_pthread_setcleanupinit = FUNCTION;
-	_pthread_join = FUNCTION;
-	_pthread_setspecific = FUNCTION;
-	_pthread_attr_destroy = FUNCTION;
-	_pthread_mutex_unlock = FUNCTION;
-	_pthread_rwlock_tryrdlock = FUNCTION;
 	_thr_sighndlrinfo = FUNCTION;
 	thr_suspend_mutator = FUNCTION;
 	_thr_setspecific = FUNCTION;
 	_sigaction = FUNCTION NODIRECT;
 	_thr_keycreate = FUNCTION;
-	_pthread_attr_setinheritsched = FUNCTION;
-	_pthread_mutexattr_destroy = FUNCTION;
 	_mutex_destroy = FUNCTION;
 	_resume = FUNCTION;
-	_pthread_attr_setguardsize = FUNCTION;
-	_sema_init = FUNCTION;
 	_sigon = FUNCTION;
-	_pthread_mutexattr_init = FUNCTION;
-	_pthread_once = FUNCTION;
 	_setcontext = FUNCTION;
-	_thr_kill = FUNCTION;
-	_pthread_create = FUNCTION;
-	_pthread_key_create = FUNCTION;
-	_pthread_attr_setscope = FUNCTION;
-	_pthread_mutex_trylock = FUNCTION;
-	_pthread_getconcurrency = FUNCTION;
 	_thr_setmutator = FUNCTION;
 	thr_wait_mutator = FUNCTION;
-	_thr_stksegment = FUNCTION;
-	__sigtimedwait = FUNCTION;
 	_mutex_init = FUNCTION;
 	_fork = FUNCTION;
-	_pthread_attr_setstacksize = FUNCTION;
 	_resume_ret = FUNCTION;
-	_pthread_mutexattr_setrobust_np = FUNCTION;
-	_pthread_rwlockattr_destroy = FUNCTION;
 	_sema_destroy = FUNCTION;
-	_pthread_attr_getinheritsched = FUNCTION;
-	_pthread_equal = FUNCTION;
-	_pthread_mutexattr_setpshared = FUNCTION;
 	_sigprocmask = FUNCTION;
 	_thr_getstate = FUNCTION;
 	_thr_self = FUNCTION;
-	_fork1 = FUNCTION;
-	_pthread_attr_getguardsize = FUNCTION;
 	_mutex_lock = FUNCTION;
-	_pthread_attr_getstacksize = FUNCTION;
-	__pthread_min_stack = FUNCTION;
-	_pthread_key_delete = FUNCTION;
-	_pthread_attr_getscope = FUNCTION;
-	_pthread_cond_destroy = FUNCTION;
 	thr_mutators_barrier = FUNCTION;
 	_thr_getspecific = FUNCTION;
 	_rwlock_destroy = FUNCTION;
-	_sema_post = FUNCTION;
 	_sleep = FUNCTION;
-	_pthread_exit = FUNCTION;
-	_pthread_condattr_getpshared = FUNCTION;
-	_sigwait = FUNCTION;
 	_thr_setstate = FUNCTION;
-	_thr_setprio = FUNCTION;
-	_pthread_mutexattr_settype = FUNCTION;
-	_pthread_rwlockattr_getpshared = FUNCTION;
-	_mutex_trylock = FUNCTION;
 	_alarm = FUNCTION;
-	_pthread_attr_setschedpolicy = FUNCTION;
-	_pthread_mutexattr_getrobust_np = FUNCTION;
-	_pthread_mutexattr_getpshared = FUNCTION;
-	_sema_trywait = FUNCTION;
-	_pthread_kill = FUNCTION;
-	_pthread_detach = FUNCTION;
-	_pthread_cancel = FUNCTION;
-	_pthread_mutex_init = FUNCTION;
-	_pthread_cond_wait = FUNCTION;
-	_pthread_setconcurrency = FUNCTION;
-	_pthread_rwlock_init = FUNCTION;
 	thr_probe_setup = FUNCTION;
 	_thr_suspend_mutator = FUNCTION;
-	_cond_timedwait = FUNCTION;
 	_sigsuspend = FUNCTION;
 	thr_getstate = FUNCTION;
-	_thr_suspend = FUNCTION;
-	_pthread_attr_setstackaddr = FUNCTION;
 	_mutex_unlock = FUNCTION;
-	_canceloff = FUNCTION;
-	_pthread_condattr_setpshared = FUNCTION;
-	_sema_wait = FUNCTION;
-	_pthread_self = FUNCTION;
-	_pthread_mutex_consistent_np = FUNCTION;
 	_sigsetjmp = FUNCTION;
 	thr_setmutator = FUNCTION;
-	_thr_yield = FUNCTION;
-	_pthread_attr_getschedpolicy = FUNCTION;
-	_pthread_setschedparam = FUNCTION;
-	_pthread_testcancel = FUNCTION;
-	_pthread_condattr_init = FUNCTION;
-	_pthread_cond_signal = FUNCTION;
-	_pthread_mutexattr_setprioceiling = FUNCTION;
-	_pthread_mutexattr_setprotocol = FUNCTION;
-	_pthread_rwlock_rdlock = FUNCTION;
-	_thr_key_delete = FUNCTION;
 	_thr_wait_mutator = FUNCTION;
-	_thr_getconcurrency = FUNCTION;
 	___tls_get_addr = FUNCTION;
-	_rw_rdlock = FUNCTION;
-	_cancelon = FUNCTION;
 	thr_suspend_allmutators = FUNCTION;
-	_thr_continue = FUNCTION;
-	_pthread_attr_getstackaddr = FUNCTION;
 	_setitimer = FUNCTION;
 	thr_setstate = FUNCTION;
 	_thr_main = FUNCTION;
-	_pthread_rwlock_trywrlock = FUNCTION;
-	_pthread_cond_timedwait = FUNCTION;
-	_rw_tryrdlock = FUNCTION;
-	_pthread_getspecific = FUNCTION;
-	_pthread_cond_init = FUNCTION;
 	_thr_continue_allmutators = FUNCTION;
-	_pthread_rwlock_wrlock = FUNCTION;
-	__thr_door_unbind = FUNCTION;
 	thr_continue_mutator = FUNCTION;
-	_cond_reltimedwait = FUNCTION;
 	__gettsp = FUNCTION;
 	_thr_create = FUNCTION;
-	_pthread_attr_setschedparam = FUNCTION;
-	_pthread_mutexattr_getprotocol = FUNCTION;
 	mutex_held = FUNCTION;
-	_cond_init = FUNCTION;
-	_thr_min_stack = FUNCTION;
-	_pthread_mutexattr_gettype = FUNCTION;
-	_pthread_rwlock_destroy = FUNCTION;
-	_rw_trywrlock = FUNCTION;
-	_pthread_attr_setdetachstate = FUNCTION;
-	_pthread_attr_getschedparam = FUNCTION;
 	_assfail = FUNCTION;
-	_thr_exit = FUNCTION;
-	_pthread_sigmask = FUNCTION;
-	_pthread_setcanceltype = FUNCTION;
-	_pthread_mutex_destroy = FUNCTION;
-	_pthread_cond_broadcast = FUNCTION;
-	_pthread_rwlock_unlock = FUNCTION;
 	_thr_continue_mutator = FUNCTION;
 	thr_sighndlrinfo = FUNCTION;
-	_thr_sigsetmask = FUNCTION;
 	rw_read_held = FUNCTION;
-	_cond_destroy = FUNCTION;
 	__tls_get_addr = FUNCTION;
-	_pthread_rwlockattr_setpshared = FUNCTION;
 	thr_continue_allmutators = FUNCTION;
-	_rw_unlock = FUNCTION;
-	_pthread_mutex_setprioceiling = FUNCTION;
-	_thr_getprio = FUNCTION;
-	_pthread_rwlockattr_init = FUNCTION;
 	rw_write_held = FUNCTION;
-	_cond_signal = FUNCTION;
-	_pthread_attr_getdetachstate = FUNCTION;
-	_pthread_getschedparam = FUNCTION;
-	_pthread_attr_init = FUNCTION;
-	_pthread_mutex_lock = FUNCTION;
-	_pthread_condattr_destroy = FUNCTION;
 	_thr_mutators_barrier = FUNCTION;
-	_cond_broadcast = FUNCTION;
-	_thr_setconcurrency = FUNCTION;
-	_rw_wrlock = FUNCTION;
-	_pthread_cond_reltimedwait_np = FUNCTION;
 	sema_held = FUNCTION;
 };
 

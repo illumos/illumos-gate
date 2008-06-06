@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,15 +35,6 @@
 #include <sys/asm_linkage.h>
 #include <sys/syscall.h>
 #include <sys/errno.h>
-#include "synonyms.h"
-
-#undef	syscall		/* override synonyms.h */
-
-/*
- * XX64 -- the SOS9 assembler doesn't recognize the 'syscall' instruction yet.
- * We compensate by defining the byte sequence here.
- */
-#define	syscall	.byte 0xf, 0x5
 
 #define	_fref_(name)	name@PLT
 #define	_daref_(name)	name@GOTPCREL(%rip)

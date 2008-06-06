@@ -24,18 +24,14 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#include "lint.h"
 #include "mtlib.h"
 #include "file64.h"
-
-#define	_iob	__iob
-
 #include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -49,6 +45,8 @@
 #include <stddef.h>
 #include <errno.h>
 #include <fcntl.h>
+
+#define	_iob	__iob
 
 #undef end
 
@@ -365,14 +363,16 @@ rescan:
 #ifdef	_LP64
 	fp = hdr->iobp;
 	for (i = 0; i < FILE_ARY_SZ; i++)
-		mutex_init(&fp[i]._lock, USYNC_THREAD | LOCK_RECURSIVE, NULL);
+		(void) mutex_init(&fp[i]._lock,
+		    USYNC_THREAD | LOCK_RECURSIVE, NULL);
 #else
 	xfp = hdr->iobp;
 	fp = &xfp->_iob;
 
 	for (i = 0; i < FILE_ARY_SZ; i++) {
 		xfp[i].xmagic = XMAGIC(&xfp[i]);
-		mutex_init(&xfp[i].xlock, USYNC_THREAD | LOCK_RECURSIVE, NULL);
+		(void) mutex_init(&xfp[i].xlock,
+		    USYNC_THREAD | LOCK_RECURSIVE, NULL);
 	}
 #endif	/*	_LP64	*/
 

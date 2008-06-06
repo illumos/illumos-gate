@@ -18,20 +18,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak setrctl = _setrctl
-#pragma weak getrctl = _getrctl
-#pragma weak rctllist = _rctllist
-#pragma weak rctlctl = _rctlctl
-#pragma	weak setprojrctl = _setprojrctl
+#pragma weak _getrctl = getrctl
+#pragma weak _setrctl = setrctl
 
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <sys/rctl.h>

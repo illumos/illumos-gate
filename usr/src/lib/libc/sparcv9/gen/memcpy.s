@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-	.ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 	.file	"%M%"
 
@@ -57,8 +57,6 @@
 #include <sys/asm_linkage.h>
 
 	ANSI_PRAGMA_WEAK(memcpy,function)
-
-#include "synonyms.h"
 
 	ENTRY(memcpy)
 	ENTRY(__align_cpy_1)

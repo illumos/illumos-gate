@@ -20,14 +20,14 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * seekdir -- C library extension routine
@@ -36,11 +36,11 @@
 #include	<sys/feature_tests.h>
 
 #if !defined(_LP64)
-#pragma weak seekdir64 = _seekdir64
+#pragma weak _seekdir64 = seekdir64
 #endif
-#pragma weak seekdir = _seekdir
+#pragma weak _seekdir = seekdir
 
-#include "synonyms.h"
+#include "lint.h"
 #include "libc.h"
 #include <mtlib.h>
 #include <dirent.h>

@@ -20,15 +20,14 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	nftw - new file tree walk
@@ -96,41 +95,6 @@
  *
  */
 
-#include <sys/feature_tests.h>
-
-#if !defined(_LP64) && _FILE_OFFSET_BITS == 64
-#pragma weak nftw64 = _nftw64
-#define	_nftw		_nftw64
-#define	fstat64		_fstat64
-#define	fstatat64	_fstatat64
-#define	lstat64		_lstat64
-#define	openat64	_openat64
-#define	readdir64	_readdir64
-#define	stat64		_stat64
-#else
-#pragma weak nftw = _nftw
-#define	fstat		_fstat
-#define	fstatat		_fstatat
-#define	lstat		_lstat
-#define	openat		_openat
-#define	readdir		_readdir
-#define	stat		_stat
-#endif /* !_LP64 && _FILE_OFFSET_BITS == 64 */
-
-#define	chdir		_chdir
-#define	close		_close
-#define	closedir	_closedir
-#define	fchdir		_fchdir
-#define	fdopendir	_fdopendir
-#define	fprintf		_fprintf
-#define	getcwd		_getcwd
-#define	opendir		_opendir
-#define	seekdir		_seekdir
-#define	strdup		_strdup
-#define	strerror	_strerror
-#define	strtok_r	_strtok_r
-#define	telldir		_telldir
-
 #include "lint.h"
 #include <mtlib.h>
 #include <sys/types.h>
@@ -147,6 +111,16 @@
 #include <stdio.h>
 #include <strings.h>
 #include <fcntl.h>
+
+#if !defined(_LP64) && _FILE_OFFSET_BITS == 64
+#define	nftw	nftw64
+#define	stat	stat64
+#define	fstat	fstat64
+#define	fstatat	fstatat64
+#pragma weak _nftw64 = nftw64
+#else
+#pragma weak _nftw = nftw
+#endif /* !_LP64 && _FILE_OFFSET_BITS == 64 */
 
 #ifndef PATH_MAX
 #define	PATH_MAX	1023
@@ -518,7 +492,7 @@ quit:
 }
 
 int
-_nftw(const char *path,
+nftw(const char *path,
     int (*fn)(const char *, const struct stat *, int, struct FTW *),
     int depth, int flags)
 {

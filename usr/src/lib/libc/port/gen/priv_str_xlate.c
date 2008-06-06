@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,11 +30,11 @@
  *	priv_str_xlate.c - Privilege translation routines.
  */
 
-#pragma weak priv_str_to_set = _priv_str_to_set
-#pragma weak priv_set_to_str = _priv_set_to_str
-#pragma weak priv_gettext = _priv_gettext
+#pragma weak _priv_str_to_set = priv_str_to_set
+#pragma weak _priv_set_to_str = priv_set_to_str
+#pragma weak _priv_gettext = priv_gettext
 
-#include "synonyms.h"
+#include "lint.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -400,7 +401,7 @@ do_priv_gettext(const char *priv, const char *file)
 			/* Remove leading white space */
 			tstart = lp;
 			while (*tstart != '\0' &&
-				isspace((unsigned char)*tstart)) {
+			    isspace((unsigned char)*tstart)) {
 				tstart++;
 			}
 

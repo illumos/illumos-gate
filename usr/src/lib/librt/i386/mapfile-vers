@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -123,28 +123,5 @@ SUNW_0.7 {
 
 SUNWprivate_1.1 {
     global:
-	_clock_getres = FUNCTION;
-	_clock_gettime = FUNCTION;
-	_clock_nanosleep = FUNCTION;
-	_clock_settime = FUNCTION;
-	_nanosleep = FUNCTION;
-	_sem_close = FUNCTION;
-	_sem_destroy = FUNCTION;
-	_sem_getvalue = FUNCTION;
-	_sem_init = FUNCTION;
-	_sem_open = FUNCTION;
-	_sem_post = FUNCTION;
-	_sem_reltimedwait_np = FUNCTION;
-	_sem_timedwait = FUNCTION;
-	_sem_trywait = FUNCTION;
-	_sem_unlink = FUNCTION;
-	_sem_wait = FUNCTION;
-	_sigqueue = FUNCTION;
-	_sigtimedwait = FUNCTION;
-	_sigwaitinfo = FUNCTION;
-	_timer_create = FUNCTION;
-	_timer_delete = FUNCTION;
-	_timer_getoverrun = FUNCTION;
-	_timer_gettime = FUNCTION;
-	_timer_settime = FUNCTION;
+	SUNWprivate_1.1;
 };

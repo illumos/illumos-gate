@@ -24,10 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Emulation of select() system call using poll() system call.
@@ -39,13 +39,11 @@
  * Note that is it not feasible to emulate all error conditions,
  * in particular conditions that would return EFAULT are far too
  * difficult to check for in a library routine.
- *
  */
 
-#pragma weak pselect = _pselect
-#pragma weak select = _select
+#pragma weak _select = select
 
-#include "synonyms.h"
+#include "lint.h"
 #include <values.h>
 #include <pthread.h>
 #include <errno.h>

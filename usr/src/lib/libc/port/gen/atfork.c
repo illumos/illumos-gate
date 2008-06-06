@@ -45,9 +45,8 @@
  * handlers installed by a library are deleted when that library
  * is unloaded (see _preexec_atfork_unload() in atexit.c).
  */
-#pragma weak pthread_atfork = _pthread_atfork
 int
-_pthread_atfork(void (*prepare)(void),
+pthread_atfork(void (*prepare)(void),
 	void (*parent)(void), void (*child)(void))
 {
 	ulwp_t *self = curthread;

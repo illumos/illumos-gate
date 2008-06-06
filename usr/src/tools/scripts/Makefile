@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -39,7 +38,6 @@ SHFILES= \
 	bringovercheck \
 	checkpaths \
 	checkproto \
-	check_fnames \
 	cstyle \
 	elfcmp \
 	flg.flp \

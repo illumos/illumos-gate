@@ -24,10 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Emulation of select() system call using _pollsys() system call.
@@ -52,15 +52,7 @@
 #endif
 #define	FD_SETSIZE 65536
 
-/*
- * We do not #redefine the name since the only users of this
- * are external to the libraries and commands.
- *
- *  #pragma weak pselect_large_fdset = _pselect_large_fdset
- *  #pragma weak select_large_fdset = _select_large_fdset
- */
-
-#include "synonyms.h"
+#include "lint.h"
 #include <values.h>
 #include <stdlib.h>
 #include <string.h>
@@ -170,7 +162,7 @@ pselect_large_fdset(int nfds, fd_set *in0, fd_set *out0, fd_set *ex0,
 					    &nfds_on_list, &pfd_list, pfd))
 					    == NULL) {
 						if (pfd_list != pfd)
-							(void) free(pfd_list);
+							free(pfd_list);
 						pthread_testcancel();
 						return (-1);
 					}
@@ -193,7 +185,7 @@ done:
 
 	if (rv < 0) {		/* no need to set bit masks */
 		if (pfd_list != pfd)
-			(void) free(pfd_list);
+			free(pfd_list);
 		return (rv);
 	} else if (rv == 0) {
 		/*
@@ -217,7 +209,7 @@ done:
 				*ex++ = 0;
 		}
 		if (pfd_list != pfd)
-			(void) free(pfd_list);
+			free(pfd_list);
 		return (0);
 	}
 
@@ -237,7 +229,7 @@ done:
 		if (p->revents & POLLNVAL) {
 			errno = EBADF;
 			if (pfd_list != pfd)
-				(void) free(pfd_list);
+				free(pfd_list);
 			return (-1);
 		}
 		/*
@@ -336,7 +328,7 @@ done:
 		}
 	}
 	if (pfd_list != pfd)
-		(void) free(pfd_list);
+		free(pfd_list);
 	return (rv);
 }
 
@@ -391,7 +383,7 @@ realloc_fds(int *num, struct pollfd **list_head, struct pollfd *orig)
 		(void) memset(b, 0, (size_t)nta);
 		(void) memcpy(b, *list_head, nta / 2);
 		if (*list_head != orig)
-			(void) free(*list_head);
+			free(*list_head);
 		*list_head = b;
 		b += *num;
 		*num = n2;

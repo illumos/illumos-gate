@@ -70,7 +70,7 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n librtld_msg
 
 SRCS=		../common/llib-lrtld
 LINTSRCS=	$(MACHOBJS:%.o=%.c)  $(COMOBJS:%.o=../common/%.c) \
-		$(BLTDATA) ../common/lintsup.c
+		$(BLTDATA)
 
 CLEANFILES +=	$(BLTFILES) $(LINTOUTS)
 CLOBBERFILES +=	$(DYNLIB) $(LINTLIB) $(LIBLINKS)

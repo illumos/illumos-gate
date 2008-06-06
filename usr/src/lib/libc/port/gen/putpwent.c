@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,22 +18,22 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * format a password file entry
  */
-#pragma weak putpwent = _putpwent
-#include "synonyms.h"
+
+#include "lint.h"
 #include <sys/types.h>
 #include <stdio.h>
 #include <pwd.h>
@@ -52,16 +51,16 @@ putpwent(const struct passwd *p, FILE *f)
 	/* leading "+/-"  taken from getpwnam_r.c */
 	if (black_magic) {
 		(void) fprintf(f, ":::%s:%s:%s",
-			p->pw_gecos ? p->pw_gecos : "",
-			p->pw_dir ? p->pw_dir : "",
-			p->pw_shell ? p->pw_shell : "");
+		    p->pw_gecos ? p->pw_gecos : "",
+		    p->pw_dir ? p->pw_dir : "",
+		    p->pw_shell ? p->pw_shell : "");
 	} else { /* "normal case" */
 		(void) fprintf(f, ":%d:%d:%s:%s:%s",
-			p->pw_uid,
-			p->pw_gid,
-			p->pw_gecos,
-			p->pw_dir,
-			p->pw_shell);
+		    p->pw_uid,
+		    p->pw_gid,
+		    p->pw_gecos,
+		    p->pw_dir,
+		    p->pw_shell);
 	}
 	(void) putc('\n', f);
 	(void) fflush(f);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +47,6 @@
  * bytes are always in network order.
  */
 
-#include "c_synonyms.h"
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
@@ -92,7 +91,7 @@ ether_hostton(
 	NSS_XbyY_INIT(&arg, e, NULL, 0, str2ether);
 	arg.key.name = host;
 	res = nss_search(&db_root, _nss_initf_ethers,
-			NSS_DBOP_ETHERS_HOSTTON, &arg);
+	    NSS_DBOP_ETHERS_HOSTTON, &arg);
 	(void) NSS_XbyY_FINI(&arg);
 	return (arg.status = res);
 }
@@ -117,7 +116,7 @@ ether_ntohost(
 	NSS_XbyY_INIT(&arg, NULL, host, 0, str2ether);
 	arg.key.ether = (void *)e;
 	res = nss_search(&db_root, _nss_initf_ethers,
-			NSS_DBOP_ETHERS_NTOHOST, &arg);
+	    NSS_DBOP_ETHERS_NTOHOST, &arg);
 	/* memcpy(host, ether_res.host, strlen(ether_res.host)); */
 	(void) NSS_XbyY_FINI(&arg);
 	return (arg.status = res);
@@ -294,7 +293,7 @@ ether_aton(const char *s)
 	i = sscanf(s, " %x:%x:%x:%x:%x:%x",
 	    &t[0], &t[1], &t[2], &t[3], &t[4], &t[5]);
 	if (i != 6)
-	    return (NULL);
+		return (NULL);
 	for (i = 0; i < 6; i++)
 		e->ether_addr_octet[i] = (uchar_t)t[i];
 	return (e);

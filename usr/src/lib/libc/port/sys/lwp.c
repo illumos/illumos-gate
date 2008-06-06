@@ -26,16 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak _lwp_mutex_lock = __lwp_mutex_lock
-#pragma weak _lwp_mutex_trylock = __lwp_mutex_trylock
-#pragma weak _lwp_sema_init = __lwp_sema_init
-#pragma weak _lwp_sema_wait = __lwp_sema_wait
-#pragma weak _lwp_suspend = __lwp_suspend
-#if defined(__i386) || defined(__amd64)
-#pragma weak _lwp_private = __lwp_private
-#endif	/* __i386 || __amd64 */
-
-#include "synonyms.h"
+#include "lint.h"
 #include "thr_uberdata.h"
 #include <sys/types.h>
 #include <sys/time.h>
@@ -77,15 +68,6 @@ _lwp_sema_wait(lwp_sema_t *sp)
 {
 	return (___lwp_sema_timedwait(sp, NULL, 0));
 }
-
-#if defined(__x86)
-int
-_lwp_private(int cmd, int which, void *sbase)
-{
-	extern int ___lwp_private(int, int, void *);
-	return (___lwp_private(cmd, which, sbase));
-}
-#endif	/* __x86 */
 
 int
 _lwp_suspend(lwpid_t lwpid)

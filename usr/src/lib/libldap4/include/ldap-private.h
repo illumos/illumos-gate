@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -11,10 +11,10 @@
 #include <signal.h>
 #include <pthread.h> 				/* rri */
 
-#define  pthread_self		_thr_self
-#define  thr_self		_thr_self
-#define  pthread_kill		_thr_kill
-#define  thr_kill		_thr_kill
+#define  pthread_self		thr_self
+#define  thr_self		thr_self
+#define  pthread_kill		thr_kill
+#define  thr_kill		thr_kill
 
 #ifdef _REENTRANT
 #ifndef MAX_THREAD_ID
@@ -37,19 +37,19 @@
 #endif /* LDAP_DNS */
 
 /*
-#define DBG_LOCK1(st) printf("%d> %s %d:%s\n", _thr_self(), st, __LINE__, __FILE__);
-#define DBG_LOCK2(ld,st) printf("%d> %s ld_lockcount=%d %d:%s\n",  _thr_self(), st, (ld)->ld_lockcount, __LINE__, __FILE__);
+#define DBG_LOCK1(st) printf("%d> %s %d:%s\n", thr_self(), st, __LINE__, __FILE__);
+#define DBG_LOCK2(ld,st) printf("%d> %s ld_lockcount=%d %d:%s\n",  thr_self(), st, (ld)->ld_lockcount, __LINE__, __FILE__);
 */
 #define DBG_LOCK1(st)
 #define DBG_LOCK2(ld,st)
 
-extern pthread_t _thr_self();
+extern pthread_t thr_self();
 #define LOCK_RESPONSE(ld) \
-	if ((ld)->ld_response_lockthread != _thr_self()) { \
+	if ((ld)->ld_response_lockthread != thr_self()) { \
 		DBG_LOCK1("waiting for response lock") \
 		pthread_mutex_lock( &((ld)->ld_response_mutex) ); \
 		DBG_LOCK1("got response lock") \
-		(ld)->ld_response_lockthread = _thr_self(); \
+		(ld)->ld_response_lockthread = thr_self(); \
 	} else  { \
 	        (ld)->ld_response_lockcount++; \
 		DBG_LOCK2(ld, "fake ldap lock") \
@@ -66,11 +66,11 @@ extern pthread_t _thr_self();
 	}
 
 #define LOCK_LDAP(ld) \
-	if ((ld)->ld_lockthread != _thr_self()) { \
+	if ((ld)->ld_lockthread != thr_self()) { \
 	        DBG_LOCK1("waiting for ldap lock") \
                 pthread_mutex_lock( &((ld)->ld_ldap_mutex) ); \
 		DBG_LOCK1("got ldap lock") \
-		(ld)->ld_lockthread = _thr_self(); \
+		(ld)->ld_lockthread = thr_self(); \
 	} else  { \
 	        (ld)->ld_lockcount++; \
 		DBG_LOCK2(ld, "fake ldap lock") \

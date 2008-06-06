@@ -17,8 +17,6 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-
-
 #
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
@@ -47,6 +45,7 @@ i depend
 #
 d none lib 755 root bin
 s none lib/32=.
+f none lib/c_synonyms.so.1 755 root bin
 f none lib/ld.so.1 755 root bin
 f none lib/libadm.so.1 755 root bin
 s none lib/libadm.so=libadm.so.1

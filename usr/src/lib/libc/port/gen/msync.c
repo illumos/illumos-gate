@@ -24,12 +24,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#include "synonyms.h"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include "lint.h"
 #include <sys/types.h>
 #include <sys/mman.h>
 

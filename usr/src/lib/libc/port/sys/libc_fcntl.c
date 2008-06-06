@@ -29,7 +29,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/param.h>
 #include <sys/sockio.h>
 #include <sys/filio.h>
@@ -58,13 +58,12 @@ extern int __fcntl_syscall(int fd, int cmd, ...);
 /*
  * XXX these hacks are needed for X.25 which assumes that s_fcntl and
  * s_ioctl exist in the socket library.
- * There is no need for _s_ioctl for other purposes.
+ * There is no need for s_ioctl for other purposes.
  */
 #pragma weak s_fcntl = __fcntl
 #pragma weak _s_fcntl = __fcntl
-#pragma weak s_ioctl = _s_ioctl
 int
-_s_ioctl(int fd, int cmd, intptr_t arg)
+s_ioctl(int fd, int cmd, intptr_t arg)
 {
 	return (ioctl(fd, cmd, arg));
 }

@@ -20,11 +20,13 @@
  */
 
 /*
- *	Copyright (c) 1988 AT&T
- *	  All Rights Reserved
- *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+/*
+ *	Copyright (c) 1988 AT&T
+ *	  All Rights Reserved
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,7 +34,6 @@
 /*
  * Programmatic interface to the run_time linker.
  */
-#include	"_synonyms.h"
 
 #include	<sys/debug.h>
 #include	<stdio.h>
@@ -100,14 +101,14 @@ _caller(caddr_t cpc, int flags)
 	return (0);
 }
 
-#pragma weak dlerror = _dlerror
+#pragma weak _dlerror = dlerror
 
 /*
  * External entry for dlerror(3dl).  Returns a pointer to the string describing
  * the last occurring error.  The last occurring error is cleared.
  */
 char *
-_dlerror()
+dlerror()
 {
 	char	*error;
 	Rt_map	*clmp;
@@ -522,13 +523,13 @@ dlclose_check(void *handle, Rt_map *clmp)
 	return (dlclose_intn(ghp, clmp));
 }
 
-#pragma weak dlclose = _dlclose
+#pragma weak _dlclose = dlclose
 
 /*
  * External entry for dlclose(3dl).  Returns 0 for success, non-zero otherwise.
  */
 int
-_dlclose(void *handle)
+dlclose(void *handle)
 {
 	int		error, entry;
 	Rt_map		*clmp;
@@ -930,7 +931,7 @@ dlmopen_check(Lm_list *lml, const char *path, int mode, Rt_map *clmp)
 	return (dlmopen_intn(lml, path, mode, clmp, 0, 0));
 }
 
-#pragma weak dlopen = _dlopen
+#pragma weak _dlopen = dlopen
 
 /*
  * External entry for dlopen(3dl).  On success, returns a pointer (handle) to
@@ -938,7 +939,7 @@ dlmopen_check(Lm_list *lml, const char *path, int mode, Rt_map *clmp)
  * be used by dlsym(). On failure, returns a null pointer.
  */
 void *
-_dlopen(const char *path, int mode)
+dlopen(const char *path, int mode)
 {
 	int	entry;
 	Rt_map	*clmp;
@@ -957,13 +958,13 @@ _dlopen(const char *path, int mode)
 	return ((void *)ghp);
 }
 
+#pragma weak _dlmopen = dlmopen
+
 /*
  * External entry for dlmopen(3dl).
  */
-#pragma weak dlmopen = _dlmopen
-
 void *
-_dlmopen(Lmid_t lmid, const char *path, int mode)
+dlmopen(Lmid_t lmid, const char *path, int mode)
 {
 	int	entry;
 	Rt_map	*clmp;
@@ -1426,14 +1427,14 @@ dlsym_check(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 }
 
 
-#pragma weak dlsym = _dlsym
+#pragma weak _dlsym = dlsym
 
 /*
  * External entry for dlsym().  On success, returns the address of the specified
  * symbol.  On error returns a null.
  */
 void *
-_dlsym(void *handle, const char *name)
+dlsym(void *handle, const char *name)
 {
 	int	entry;
 	Rt_map	*clmp, *dlmp = 0;
@@ -1477,14 +1478,14 @@ dladdr_core(Rt_map *clmp, void *addr, Dl_info *dlip, void **info, int flags)
 	LM_DLADDR(clmp)((ulong_t)addr, clmp, dlip, info, flags);
 }
 
-#pragma weak dladdr = _dladdr
+#pragma weak _dladdr = dladdr
 
 /*
  * External entry for dladdr(3dl) and dladdr1(3dl).  Returns an information
  * structure that reflects the symbol closest to the address specified.
  */
 int
-_dladdr(void *addr, Dl_info *dlip)
+dladdr(void *addr, Dl_info *dlip)
 {
 	int	entry, error;
 	Rt_map	*clmp;
@@ -1510,10 +1511,10 @@ _dladdr(void *addr, Dl_info *dlip)
 	return (error);
 }
 
-#pragma weak dladdr1 = _dladdr1
+#pragma weak _dladdr1 = dladdr1
 
 int
-_dladdr1(void *addr, Dl_info *dlip, void **info, int flags)
+dladdr1(void *addr, Dl_info *dlip, void **info, int flags)
 {
 	int	entry, error = 0;
 	Rt_map	*clmp;
@@ -1622,13 +1623,13 @@ dldump_core(Lm_list *lml, const char *ipath, const char *opath, int flags)
 	return (rt_dldump(lmp, opath, flags, addr));
 }
 
-#pragma weak dldump = _dldump
+#pragma weak _dldump = dldump
 
 /*
  * External entry for dldump(3c).  Returns 0 on success, non-zero otherwise.
  */
 int
-_dldump(const char *ipath, const char *opath, int flags)
+dldump(const char *ipath, const char *opath, int flags)
 {
 	int	error, entry;
 	Rt_map	*clmp;
@@ -1896,13 +1897,13 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 	return (0);
 }
 
-#pragma weak dlinfo = _dlinfo
+#pragma weak _dlinfo = dlinfo
 
 /*
  * External entry for dlinfo(3dl).
  */
 int
-_dlinfo(void *handle, int request, void *p)
+dlinfo(void *handle, int request, void *p)
 {
 	int	error, entry;
 	Rt_map	*clmp;

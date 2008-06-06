@@ -24,14 +24,14 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma weak atexit = _atexit
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#pragma weak _atexit = atexit
+
+#include "lint.h"
 #include "thr_uberdata.h"
 #include "libc_int.h"
 #include "atexit.h"
@@ -95,7 +95,7 @@ atexit_unlocks()
  * Be careful about dereferencing self->ul_uberdata->atexit_root.
  */
 int
-_atexit(void (*func)(void))
+atexit(void (*func)(void))
 {
 	ulwp_t *self;
 	atexit_root_t *arp;

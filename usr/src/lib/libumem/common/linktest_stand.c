@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,9 +32,9 @@
  */
 
 void __umem_assert_failed(void) {}
-void _atomic_add_64(void) {}
-void _atomic_add_32_nv(void) {}
-void _dladdr1(void) {}
+void atomic_add_64(void) {}
+void atomic_add_32_nv(void) {}
+void dladdr1(void) {}
 void bcopy(void) {}
 void bzero(void) {}
 void exit(void) {}

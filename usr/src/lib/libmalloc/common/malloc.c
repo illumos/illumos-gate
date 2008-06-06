@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +29,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <c_synonyms.h>
 #include <sys/types.h>
 
 #ifndef debug
@@ -206,7 +205,7 @@ memalign(size_t alignment, size_t size)
 	static int realloc;
 
 	if (size == 0 || alignment == 0 ||
-		(alignment & (alignment - 1)) != 0) {
+	    (alignment & (alignment - 1)) != 0) {
 		return (NULL);
 	}
 	if (alignment <= ALIGNSZ)
@@ -838,7 +837,6 @@ realloc_unlocked(void *ptr, size_t size)
 }
 
 
-/* LINTLIBRARY */
 /*
  * calloc - allocate and clear memory block
  */
@@ -930,7 +928,7 @@ mallopt(int cmd, int value)
 		break;
 	case M_KEEP:
 		if (change && holdhead != NULL) {
-			mutex_unlock(&mlock);
+			(void) mutex_unlock(&mlock);
 			return (1);
 		}
 		minhead = HEADSZ;

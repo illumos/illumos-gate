@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,9 +40,6 @@
  *	pointers is only valid while the buffer is intact.
  */
 
-#pragma weak bufsplit = _bufsplit
-
-#include "gen_synonyms.h"
 #include <sys/types.h>
 #include <stdlib.h>
 #include <string.h>

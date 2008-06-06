@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,11 +75,6 @@ char	*strchr();
 char	*index();
 #endif /* SYSV */
 
-extern char *_dgettext();
-extern int  _sigaction();
-extern int  _sigaddset();
-extern int  _sigprocmask();
-extern int  _fcntl();
 extern int  usingypmap();
 
 static int _validuser(FILE *hostf, char *rhost, const char *luser,
@@ -151,7 +147,7 @@ int rcmd_af(char **ahost, unsigned short rport, const char *locuser,
 	rc = getaddrinfo(*ahost, aport, &hints, &res);
 	if (rc != 0) {
 		(void) fprintf(stderr,
-		    _dgettext(TEXT_DOMAIN, "%s: unknown host%s\n"),
+		    dgettext(TEXT_DOMAIN, "%s: unknown host%s\n"),
 		    *ahost, rc == EAI_AGAIN ? " (try again later)" : "");
 		return (-1);
 	}
@@ -162,12 +158,12 @@ int rcmd_af(char **ahost, unsigned short rport, const char *locuser,
 	/* ignore SIGPIPE */
 	bzero((char *)&newaction, sizeof (newaction));
 	newaction.sa_handler = SIG_IGN;
-	(void) _sigaction(SIGPIPE, &newaction, &oldaction);
+	(void) sigaction(SIGPIPE, &newaction, &oldaction);
 
 	/* block SIGURG */
 	bzero((char *)&newmask, sizeof (newmask));
-	(void) _sigaddset(&newmask, SIGURG);
-	(void) _sigprocmask(SIG_BLOCK, &newmask, &oldmask);
+	(void) sigaddset(&newmask, SIGURG);
+	(void) sigprocmask(SIG_BLOCK, &newmask, &oldmask);
 #else
 	oldmask = _sigblock(sigmask(SIGURG));
 #endif /* SYSV */
@@ -188,17 +184,17 @@ int rcmd_af(char **ahost, unsigned short rport, const char *locuser,
 
 			if (errno == EAGAIN)
 				(void) fprintf(stderr,
-				    _dgettext(TEXT_DOMAIN,
+				    dgettext(TEXT_DOMAIN,
 				    "socket: All ports in use\n"));
 			else
 				perror("rcmd: socket");
 #ifdef SYSV
 			/* restore original SIGPIPE handler */
-			(void) _sigaction(SIGPIPE, &oldaction,
+			(void) sigaction(SIGPIPE, &oldaction,
 			    (struct sigaction *)0);
 
 			/* restore original signal mask */
-			(void) _sigprocmask(SIG_SETMASK, &oldmask,
+			(void) sigprocmask(SIG_SETMASK, &oldmask,
 			    (sigset_t *)0);
 #else
 			sigsetmask(oldmask);
@@ -219,7 +215,7 @@ int rcmd_af(char **ahost, unsigned short rport, const char *locuser,
 			in6addr->sin6_family = AF_INET6;
 			addrlen = sizeof (struct sockaddr_in6);
 		}
-		(void) _fcntl(s, F_SETOWN, pid);
+		(void) fcntl(s, F_SETOWN, pid);
 		if (connect(s, (struct sockaddr *)&caddr, addrlen) >= 0)
 			break;
 		(void) close(s);
@@ -241,7 +237,7 @@ int rcmd_af(char **ahost, unsigned short rport, const char *locuser,
 				addr = (char *)&((struct sockaddr_in *)
 				    res->ai_addr)->sin_addr;
 			(void) fprintf(stderr,
-			    _dgettext(TEXT_DOMAIN, "connect to address %s: "),
+			    dgettext(TEXT_DOMAIN, "connect to address %s: "),
 			    inet_ntop(res->ai_addr->sa_family, addr,
 			    abuf, sizeof (abuf)));
 			errno = oerrno;
@@ -254,7 +250,7 @@ int rcmd_af(char **ahost, unsigned short rport, const char *locuser,
 				addr = (char *)&((struct sockaddr_in *)
 				    res->ai_addr)->sin_addr;
 			(void) fprintf(stderr,
-			    _dgettext(TEXT_DOMAIN, "Trying %s...\n"),
+			    dgettext(TEXT_DOMAIN, "Trying %s...\n"),
 			    inet_ntop(res->ai_addr->sa_family, addr,
 			    abuf, sizeof (abuf)));
 			continue;
@@ -263,11 +259,11 @@ int rcmd_af(char **ahost, unsigned short rport, const char *locuser,
 		freeaddrinfo(resp);
 #ifdef SYSV
 		/* restore original SIGPIPE handler */
-		(void) _sigaction(SIGPIPE, &oldaction,
+		(void) sigaction(SIGPIPE, &oldaction,
 		    (struct sigaction *)0);
 
 		/* restore original signal mask */
-		(void) _sigprocmask(SIG_SETMASK, &oldmask, (sigset_t *)0);
+		(void) sigprocmask(SIG_SETMASK, &oldmask, (sigset_t *)0);
 #else
 		sigsetmask(oldmask);
 #endif /* SYSV */
@@ -286,7 +282,7 @@ int rcmd_af(char **ahost, unsigned short rport, const char *locuser,
 		(void) listen(s2, 1);
 		(void) snprintf(aport, MAX_SHORTSTRLEN, "%d", lport);
 		if (write(s, aport, strlen(aport)+1) != strlen(aport)+1) {
-			perror(_dgettext(TEXT_DOMAIN,
+			perror(dgettext(TEXT_DOMAIN,
 			    "write: setting up stderr"));
 			(void) close(s2);
 			goto bad;
@@ -339,9 +335,9 @@ int rcmd_af(char **ahost, unsigned short rport, const char *locuser,
 			sin = (struct sockaddr_in *)&faddr;
 			if (ntohs(sin->sin_port) >= IPPORT_RESERVED) {
 				(void) fprintf(stderr,
-				    _dgettext(TEXT_DOMAIN,
-					"socket: protocol failure in circuit "
-					"setup.\n"));
+				    dgettext(TEXT_DOMAIN,
+				    "socket: protocol failure in circuit "
+				    "setup.\n"));
 				goto bad2;
 			}
 			break;
@@ -349,15 +345,15 @@ int rcmd_af(char **ahost, unsigned short rport, const char *locuser,
 			sin6 = (struct sockaddr_in6 *)&faddr;
 			if (ntohs(sin6->sin6_port) >= IPPORT_RESERVED) {
 				(void) fprintf(stderr,
-				    _dgettext(TEXT_DOMAIN,
-					"socket: protocol failure in circuit "
-					"setup.\n"));
+				    dgettext(TEXT_DOMAIN,
+				    "socket: protocol failure in circuit "
+				    "setup.\n"));
 				goto bad2;
 			}
 			break;
 		default:
 			(void) fprintf(stderr,
-			    _dgettext(TEXT_DOMAIN,
+			    dgettext(TEXT_DOMAIN,
 			    "socket: protocol failure in circuit setup.\n"));
 			goto bad2;
 		}
@@ -369,14 +365,14 @@ int rcmd_af(char **ahost, unsigned short rport, const char *locuser,
 	if (retval != 1) {
 		if (retval == 0) {
 			(void) fprintf(stderr,
-			    _dgettext(TEXT_DOMAIN,
+			    dgettext(TEXT_DOMAIN,
 			    "Protocol error, %s closed connection\n"),
 			    *ahost);
 		} else if (retval < 0) {
 			perror(*ahost);
 		} else {
 			(void) fprintf(stderr,
-			    _dgettext(TEXT_DOMAIN,
+			    dgettext(TEXT_DOMAIN,
 			    "Protocol error, %s sent %d bytes\n"),
 			    *ahost, retval);
 		}
@@ -392,10 +388,10 @@ int rcmd_af(char **ahost, unsigned short rport, const char *locuser,
 	}
 #ifdef SYSV
 	/* restore original SIGPIPE handler */
-	(void) _sigaction(SIGPIPE, &oldaction, (struct sigaction *)0);
+	(void) sigaction(SIGPIPE, &oldaction, (struct sigaction *)0);
 
 	/* restore original signal mask */
-	(void) _sigprocmask(SIG_SETMASK, &oldmask, (sigset_t *)0);
+	(void) sigprocmask(SIG_SETMASK, &oldmask, (sigset_t *)0);
 #else
 	sigsetmask(oldmask);
 #endif /* SYSV */
@@ -408,10 +404,10 @@ bad:
 	(void) close(s);
 #ifdef SYSV
 	/* restore original SIGPIPE handler */
-	(void) _sigaction(SIGPIPE, &oldaction, (struct sigaction *)0);
+	(void) sigaction(SIGPIPE, &oldaction, (struct sigaction *)0);
 
 	/* restore original signal mask */
-	(void) _sigprocmask(SIG_SETMASK, &oldmask, (sigset_t *)0);
+	(void) sigprocmask(SIG_SETMASK, &oldmask, (sigset_t *)0);
 #else
 	sigsetmask(oldmask);
 #endif /* SYSV */
@@ -707,7 +703,7 @@ _validuser(FILE *hostf, char *rhost, const char *luser,
 				p++;
 			user = p;
 			while (*p != '\n' && *p != ' ' && *p != '\t' &&
-				*p != '\0')
+			    *p != '\0')
 				p++;
 		} else
 			user = p;
@@ -744,7 +740,7 @@ _validuser(FILE *hostf, char *rhost, const char *luser,
 #ifdef NIS
 			else if (user[0] == '+' && user[1] == '@')
 				usermatch = innetgr(user+2, NULL,
-						    ruser, domain);
+				    ruser, domain);
 			else if (user[0] == '-' && user[1] == '@') {
 				if (hostmatch &&
 				    innetgr(user+2, NULL, ruser, domain))

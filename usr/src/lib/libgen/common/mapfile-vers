@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -68,36 +68,9 @@ SUNW_1.1 {
 
 SUNWprivate_1.1 {
     global:
-	_bgets;
-	_braelist;
-	_braslist;
-	_bufsplit;
-	_compile;
-	_copylist;
-	_eaccess;
-	_gmatch;
-	_isencrypt;
-	_loc1;
-	_loc2;
-	_locs;
-	_mkdirp;
-	_nbra;
-	_p2close;
-	__p2close;
-	_p2open;
-	__p2open;
-	_pathfind;
-	_regerrno;
-	_reglength;
-	_rmdirp;
-	_step;
-	_strcadd;
-	_strccpy;
-	_streadd;
-	_strecpy;
-	_strfind;
-	_strrspn;
-	_strtrns;
+	_compile;	# just for vi
+	__p2close;	# just for libcrypt
+	__p2open;	# just for libcrypt
     local:
 	*;
 };

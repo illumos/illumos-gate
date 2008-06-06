@@ -20,21 +20,20 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * A part of this file comes from public domain source, so
  * clarified as of June 5, 1996 by Arthur David Olson
  * (arthur_david_olson@nih.gov).
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * localtime.c
@@ -87,11 +86,9 @@
  * Functions that are common to ctime(3C) and cftime(3C)
  */
 
-#pragma weak tzset = _tzset
-#pragma weak localtime_r = _localtime_r
-#pragma weak gmtime_r = _gmtime_r
+#pragma weak _tzset = tzset
 
-#include "synonyms.h"
+#include "lint.h"
 #include "libc.h"
 #include "tsd.h"
 #include <stdarg.h>
@@ -462,7 +459,7 @@ difftime(time_t time1, time_t time0)
  * See ctime(3C)
  */
 struct tm *
-_gmtime_r(const time_t *timep, struct tm *p_tm)
+gmtime_r(const time_t *timep, struct tm *p_tm)
 {
 	return (offtime_u((time_t)*timep, 0L, p_tm));
 }
@@ -486,7 +483,7 @@ gmtime(const time_t *timep)
 
 	if (p_tm == NULL)	/* memory allocation failure */
 		p_tm = &tm;	/* use static buffer and hope for the best */
-	return (_gmtime_r(timep, p_tm));
+	return (gmtime_r(timep, p_tm));
 }
 
 /*
@@ -585,7 +582,7 @@ find_zone(const char *zonename, state_t ***link_prev, state_t **link_next)
  * See ctime(3C)
  */
 struct tm *
-_localtime_r(const time_t *timep, struct tm *p_tm)
+localtime_r(const time_t *timep, struct tm *p_tm)
 {
 	long	offset;
 	struct tm *rt;
@@ -637,7 +634,7 @@ localtime(const time_t *timep)
 
 	if (p_tm == NULL)	/* memory allocation failure */
 		p_tm = &tm;	/* use static buffer and hope for the best */
-	return (_localtime_r(timep, p_tm));
+	return (localtime_r(timep, p_tm));
 }
 
 /*
@@ -787,7 +784,7 @@ mktime(struct tm *tmptr)
  * are updated.  See ctime(3C) manpage.
  */
 void
-_tzset(void)
+tzset(void)
 {
 	systemtz_t	stz;
 	systemtz_t	*tzp;

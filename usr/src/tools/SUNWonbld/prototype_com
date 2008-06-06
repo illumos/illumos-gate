@@ -18,9 +18,8 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -61,7 +60,6 @@ f none opt/onbld/bin/bldenv 555 root bin
 f none opt/onbld/bin/bringovercheck 555 root bin
 f none opt/onbld/bin/build_cscope 555 root bin
 f none opt/onbld/bin/cddlchk 555 root bin
-f none opt/onbld/bin/check_fnames 555 root bin
 f none opt/onbld/bin/check_rtime 555 root bin
 f none opt/onbld/bin/checkpaths 555 root bin
 f none opt/onbld/bin/checkproto 555 root bin

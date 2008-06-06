@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,35 +18,36 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+	.file	"%M%"
 
+#define	SYN(name)				\
+	.align	4;				\
+	.global	name;				\
+	.global	_/**/name;			\
+	.type	_/**/name, #function;		\
+_/**/name:					\
+	mov	%o7, %g1;			\
+	call	name;				\
+	mov	%g1, %o7;			\
+	.size	_/**/name, (. - _/**/name)
 
-#pragma weak llog10 = _llog10
+#define	SYN2(name)				\
+	.align	4;				\
+	.global	name;				\
+	.global	__/**/name;			\
+	.type	__/**/name, #function;		\
+__/**/name:					\
+	mov	%o7, %g1;			\
+	call	name;				\
+	mov	%g1, %o7;			\
+	.size	__/**/name, (. - __/**/name)
 
-#include	"synonyms.h"
-#include	<sys/types.h>
-#include	<sys/dl.h>
-
-dl_t
-llog10(dl_t val)
-{
-	dl_t	result;
-
-	result = lzero;
-	val    = ldivide(val, lten);
-
-	while (val.dl_hop != 0 || val.dl_lop != 0) {
-		val = ldivide(val, lten);
-		result = ladd(result, lone);
-	}
-
-	return (result);
-}
+#include "synonym_list"

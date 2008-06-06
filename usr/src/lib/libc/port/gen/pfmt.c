@@ -18,19 +18,20 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma	weak pfmt = _pfmt
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#pragma	weak _pfmt = pfmt
+
+#include "lint.h"
 #include "mtlib.h"
 #include <pfmt.h>
 #include <stdio.h>

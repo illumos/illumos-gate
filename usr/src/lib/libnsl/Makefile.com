@@ -214,7 +214,7 @@ LINTFLAGS64 +=	-m -DPORTMAP
 
 .KEEP_STATE:
 
-all: $(LIBS) fnamecheck
+all: $(LIBS)
 
 # Don't lint WRAPPERS as they are explicitly unclean
 SRCS=	$(DES:%.o=../des/%.c)			\

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,10 +30,7 @@
  * mkdtemp(3C) - create a directory with a unique name.
  */
 
-#pragma weak mkdtemp = _mkdtemp
-
-#include "synonyms.h"
-
+#include "lint.h"
 #include <alloca.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -48,7 +45,7 @@ mkdtemp(char *template)
 
 	/* Save template */
 	(void) strcpy(t, template);
-	for (; ; ) {
+	for (;;) {
 		r = mktemp(template);
 
 		if (*r == '\0')

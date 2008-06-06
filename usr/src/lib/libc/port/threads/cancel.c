@@ -34,9 +34,8 @@
  * If the target thread has already exited no action is taken.
  * Else send SIGCANCEL to request the other thread to cancel itself.
  */
-#pragma weak pthread_cancel = _pthread_cancel
 int
-_pthread_cancel(thread_t tid)
+pthread_cancel(thread_t tid)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -77,7 +76,7 @@ _pthread_cancel(thread_t tid)
 		/*
 		 * Request the other thread to cancel itself.
 		 */
-		error = __lwp_kill(tid, SIGCANCEL);
+		error = _lwp_kill(tid, SIGCANCEL);
 		ulwp_unlock(ulwp, udp);
 	}
 
@@ -91,9 +90,8 @@ _pthread_cancel(thread_t tid)
  * is pending, then the thread is cancelled right here.
  * Otherwise, pthread_setcancelstate() is not a cancellation point.
  */
-#pragma weak pthread_setcancelstate = _pthread_setcancelstate
 int
-_pthread_setcancelstate(int state, int *oldstate)
+pthread_setcancelstate(int state, int *oldstate)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -130,7 +128,7 @@ _pthread_setcancelstate(int state, int *oldstate)
 	if ((!self->ul_cancel_disabled || !was_disabled) &&
 	    self->ul_cancel_async && self->ul_cancel_pending) {
 		ulwp_unlock(self, udp);
-		_pthread_exit(PTHREAD_CANCELED);
+		pthread_exit(PTHREAD_CANCELED);
 	}
 
 	ulwp_unlock(self, udp);
@@ -149,9 +147,8 @@ _pthread_setcancelstate(int state, int *oldstate)
  * If the type is being set as ASYNC, then it becomes
  * a cancellation point if there is a cancellation pending.
  */
-#pragma weak pthread_setcanceltype = _pthread_setcanceltype
 int
-_pthread_setcanceltype(int type, int *oldtype)
+pthread_setcanceltype(int type, int *oldtype)
 {
 	ulwp_t *self = curthread;
 	int was_async;
@@ -184,7 +181,7 @@ _pthread_setcanceltype(int type, int *oldtype)
 	if ((self->ul_cancel_async || was_async) &&
 	    self->ul_cancel_pending && !self->ul_cancel_disabled) {
 		exit_critical(self);
-		_pthread_exit(PTHREAD_CANCELED);
+		pthread_exit(PTHREAD_CANCELED);
 	}
 
 	exit_critical(self);
@@ -204,14 +201,13 @@ _pthread_setcanceltype(int type, int *oldtype)
  * it by calling thr_exit. thr_exit takes care of calling
  * cleanup handlers.
  */
-#pragma weak pthread_testcancel = _pthread_testcancel
 void
-_pthread_testcancel(void)
+pthread_testcancel(void)
 {
 	ulwp_t *self = curthread;
 
 	if (self->ul_cancel_pending && !self->ul_cancel_disabled)
-		_pthread_exit(PTHREAD_CANCELED);
+		pthread_exit(PTHREAD_CANCELED);
 }
 
 /*
@@ -229,7 +225,7 @@ _cancelon()
 		ASSERT(self->ul_cancelable >= 0);
 		self->ul_cancelable++;
 		if (self->ul_cancel_pending)
-			_pthread_exit(PTHREAD_CANCELED);
+			pthread_exit(PTHREAD_CANCELED);
 	}
 }
 
@@ -245,7 +241,7 @@ _canceloff()
 	ASSERT(!(self->ul_cancelable && self->ul_cancel_disabled));
 	if (!self->ul_cancel_disabled) {
 		if (self->ul_cancel_pending)
-			_pthread_exit(PTHREAD_CANCELED);
+			pthread_exit(PTHREAD_CANCELED);
 		self->ul_cancelable--;
 		ASSERT(self->ul_cancelable >= 0);
 	}

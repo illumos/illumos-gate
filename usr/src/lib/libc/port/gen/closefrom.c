@@ -20,16 +20,16 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak closefrom = _closefrom
-#pragma weak fdwalk = _fdwalk
+#pragma weak _closefrom = closefrom
+#pragma weak _fdwalk = fdwalk
 
-#include "synonyms.h"
+#include "lint.h"
 #include <ctype.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -91,7 +91,7 @@ fdwalk(int (*func)(void *, int), void *cd)
 		 */
 		if (getrlimit(RLIMIT_NOFILE, &rl) == 0)
 			max_fds = (rl.rlim_max == RLIM_INFINITY)?
-				INT_MAX : rl.rlim_max;
+			    INT_MAX : rl.rlim_max;
 		for (i = 0; i < max_fds; i++) {
 			if (fcntl(i, F_GETFD) < 0)
 				continue;

@@ -20,19 +20,21 @@
  */
 
 /*
- *	Copyright (c) 1988 AT&T
- *	  All Rights Reserved
- *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*
+ *	Copyright (c) 1988 AT&T
+ *	  All Rights Reserved
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * x86 machine dependent and ELF file class dependent functions.
  * Contains routines for performing function binding and symbol relocations.
  */
-#include	"_synonyms.h"
 
 #include	<stdio.h>
 #include	<sys/elf.h>

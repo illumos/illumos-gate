@@ -73,7 +73,7 @@ _thr_setparam(pthread_t tid, int policy, int prio)
 				ulwp->ul_rtclassid = cid;
 			ulwp->ul_cid = cid;
 			ulwp->ul_pri = prio;
-			_membar_producer();
+			membar_producer();
 			ulwp->ul_policy = policy;
 		}
 		ulwp_unlock(ulwp, curthread->ul_uberdata);
@@ -85,9 +85,9 @@ _thr_setparam(pthread_t tid, int policy, int prio)
  * pthread_create: creates a thread in the current process.
  * calls common _thrp_create() after copying the attributes.
  */
-#pragma weak	pthread_create			= _pthread_create
+#pragma weak _pthread_create = pthread_create
 int
-_pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 	void * (*start_routine)(void *), void *arg)
 {
 	ulwp_t		*self = curthread;
@@ -141,7 +141,7 @@ _pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 		} else if (thread) {
 			*thread = tid;
 		}
-		(void) _thr_continue(tid);
+		(void) thr_continue(tid);
 	}
 
 	/* posix version expects EAGAIN for lack of memory */
@@ -154,9 +154,8 @@ _pthread_create(pthread_t *thread, const pthread_attr_t *attr,
  * pthread_once: calls given function only once.
  * it synchronizes via mutex in pthread_once_t structure
  */
-#pragma weak	pthread_once			= _pthread_once
 int
-_pthread_once(pthread_once_t *once_control, void (*init_routine)(void))
+pthread_once(pthread_once_t *once_control, void (*init_routine)(void))
 {
 	__once_t *once = (__once_t *)once_control;
 
@@ -169,12 +168,12 @@ _pthread_once(pthread_once_t *once_control, void (*init_routine)(void))
 			pthread_cleanup_push(mutex_unlock, &once->mlock);
 			(*init_routine)();
 			pthread_cleanup_pop(0);
-			_membar_producer();
+			membar_producer();
 			once->once_flag = PTHREAD_ONCE_DONE;
 		}
 		(void) mutex_unlock(&once->mlock);
 	}
-	_membar_consumer();
+	membar_consumer();
 
 	return (0);
 }
@@ -182,9 +181,8 @@ _pthread_once(pthread_once_t *once_control, void (*init_routine)(void))
 /*
  * pthread_equal: equates two thread ids.
  */
-#pragma weak	pthread_equal			= _pthread_equal
 int
-_pthread_equal(pthread_t t1, pthread_t t2)
+pthread_equal(pthread_t t1, pthread_t t2)
 {
 	return (t1 == t2);
 }
@@ -192,9 +190,9 @@ _pthread_equal(pthread_t t1, pthread_t t2)
 /*
  * pthread_getschedparam: get the thread's sched parameters.
  */
-#pragma weak	pthread_getschedparam		= _pthread_getschedparam
+#pragma weak _pthread_getschedparam = pthread_getschedparam
 int
-_pthread_getschedparam(pthread_t tid, int *policy, struct sched_param *param)
+pthread_getschedparam(pthread_t tid, int *policy, struct sched_param *param)
 {
 	ulwp_t *ulwp;
 	id_t cid;
@@ -218,7 +216,7 @@ _pthread_getschedparam(pthread_t tid, int *policy, struct sched_param *param)
 				ulwp->ul_rtclassid = cid;
 			ulwp->ul_cid = cid;
 			ulwp->ul_pri = param->sched_priority;
-			_membar_producer();
+			membar_producer();
 			ulwp->ul_policy = *policy;
 		}
 		ulwp_unlock(ulwp, curthread->ul_uberdata);
@@ -227,15 +225,15 @@ _pthread_getschedparam(pthread_t tid, int *policy, struct sched_param *param)
 	return (error);
 }
 
-#pragma weak thr_getprio = _thr_getprio
+#pragma weak _thr_getprio = thr_getprio
 int
-_thr_getprio(thread_t tid, int *priority)
+thr_getprio(thread_t tid, int *priority)
 {
 	struct sched_param param;
 	int policy;
 	int error;
 
-	if ((error = _pthread_getschedparam(tid, &policy, &param)) == 0)
+	if ((error = pthread_getschedparam(tid, &policy, &param)) == 0)
 		*priority = param.sched_priority;
 	return (error);
 }
@@ -243,29 +241,26 @@ _thr_getprio(thread_t tid, int *priority)
 /*
  * pthread_setschedparam: sets the sched parameters for a thread.
  */
-#pragma weak	pthread_setschedparam		= _pthread_setschedparam
 int
-_pthread_setschedparam(pthread_t tid,
+pthread_setschedparam(pthread_t tid,
 	int policy, const struct sched_param *param)
 {
 	return (_thr_setparam(tid, policy, param->sched_priority));
 }
 
-#pragma weak thr_setprio = _thr_setprio
-#pragma weak pthread_setschedprio = _thr_setprio
-#pragma weak _pthread_setschedprio = _thr_setprio
+#pragma weak pthread_setschedprio = thr_setprio
 int
-_thr_setprio(thread_t tid, int prio)
+thr_setprio(thread_t tid, int prio)
 {
 	struct sched_param param;
 	int policy;
 	int error;
 
 	/*
-	 * _pthread_getschedparam() has the side-effect of setting
+	 * pthread_getschedparam() has the side-effect of setting
 	 * the target thread's ul_policy, ul_pri and ul_cid correctly.
 	 */
-	if ((error = _pthread_getschedparam(tid, &policy, &param)) != 0)
+	if ((error = pthread_getschedparam(tid, &policy, &param)) != 0)
 		return (error);
 	if (param.sched_priority == prio)	/* no change */
 		return (0);

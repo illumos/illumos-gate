@@ -39,8 +39,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
-
+#include "lint.h"
 #include <string.h>
 #include <limits.h>
 #include <sys/types.h>

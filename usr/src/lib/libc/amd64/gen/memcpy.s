@@ -20,6 +20,11 @@
  */
 
 /*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  * Copyright (c) 2008, Intel Corporation
  * All rights reserved.
  */
@@ -28,15 +33,16 @@
  * memcpy.s - copies two blocks of memory
  *	Implements memcpy() and memmove() libc primitives.
  */
-	.ident	"%Z%%M%	%I%	%E% SMI"
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 	.file	"%M%"
 
 #include <sys/asm_linkage.h>
+
 	ANSI_PRAGMA_WEAK(memmove,function)
 	ANSI_PRAGMA_WEAK(memcpy,function)
 
-#include "synonyms.h"
 #include "cache.h"
 #include "proc64_id.h"
 

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -100,9 +100,6 @@ $(DYNLIB): pics .WAIT $$(PICS) $$(ALTPICS)
 $(DYNLIBCCC): pics .WAIT $$(PICS) $$(ALTPICS)
 	$(BUILDCCC.SO)
 	$(POST_PROCESS_SO)
-
-fnamecheck: $(DYNLIB)
-	$(CHECK_FNAMES) -s $(C_SYNONYMS_H) -l $(DYNLIB) $(PICS) $(ALTPICS)
 
 $(LINTLIB): $$(SRCS) 
 	$(LINT.c) -o $(LIBNAME) $(SRCS) > $(LINTOUT) 2>&1 

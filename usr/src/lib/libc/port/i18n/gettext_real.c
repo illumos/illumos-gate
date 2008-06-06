@@ -26,7 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#include "lint.h"
 #include "mtlib.h"
 #include <ctype.h>
 #include <locale.h>

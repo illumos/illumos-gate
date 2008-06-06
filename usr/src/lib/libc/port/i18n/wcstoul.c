@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,21 +20,20 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1986 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	_WCS_LONGLONG
-#pragma weak wcstoul = _wcstoul
+#pragma weak _wcstoul = wcstoul
 #endif
 
-#include "synonyms.h"
+#include "lint.h"
 #include <limits.h>
 #include <errno.h>
 #include <wchar.h>
@@ -57,7 +55,7 @@ wcstoull(const wchar_t *_RESTRICT_KYWD str, wchar_t **_RESTRICT_KYWD ptr,
     int base)
 #else /* _WCS_LONGLONG */
 unsigned long
-_wcstoul(const wchar_t *str, wchar_t **ptr, int base)
+wcstoul(const wchar_t *str, wchar_t **ptr, int base)
 #endif /* _WCS_LONGLONG */
 {
 	_WULONG_T	val;

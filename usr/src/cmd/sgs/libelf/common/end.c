@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,28 +18,22 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 1.11	*/
-
-#pragma weak	elf_end = _elf_end
-
-
-#include "syn.h"
 #include <ar.h>
 #include <stdlib.h>
 #include "libelf.h"
 #include "decl.h"
 #include "member.h"
-
 
 int
 elf_end(Elf * elf)

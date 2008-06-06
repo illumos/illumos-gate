@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,21 +18,19 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*
  *	Copyright (c) 1988 AT&T
- *
  *	  All Rights Reserved
- *
  */
 
-/*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
- */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 1.6	*/
-
-#include "syn.h"
 #include <ar.h>
 #include <stdlib.h>
 #include <memory.h>
@@ -100,7 +97,7 @@ static const char	fmag[] = ARFMAG;
  * Returns the converted integer of the string being scaned.
  */
 unsigned long
-_elf_number(char * p, char * end, int base)
+_elf_number(char *p, char *end, int base)
 {
 	register unsigned	c;
 	register unsigned long	n = 0;
@@ -125,7 +122,7 @@ _elf_number(char * p, char * end, int base)
  *	Converts ascii file representation to the binary memory values.
  */
 Member *
-_elf_armem(Elf * elf, char * file, size_t fsz)
+_elf_armem(Elf *elf, char *file, size_t fsz)
 {
 	register struct ar_hdr	*f = (struct ar_hdr *)file;
 	register Member		*m;
@@ -167,7 +164,7 @@ _elf_armem(Elf * elf, char * file, size_t fsz)
 		l->m_next = 0;
 		l->m_free = (Memident *)(l + 1);
 		l->m_end = (Memident *)((uintptr_t)l->m_free +
-			(sizeof (Memident) * MEMIDENTNO));
+		    (sizeof (Memident) * MEMIDENTNO));
 
 		if (elf->ed_memlist == 0)
 			elf->ed_memlist = l;
@@ -205,7 +202,7 @@ _elf_armem(Elf * elf, char * file, size_t fsz)
 		register unsigned long	j;
 
 		j = _elf_number(&f->ar_name[1],
-			&f->ar_name[ARSZ(ar_name)], 10);
+		    &f->ar_name[ARSZ(ar_name)], 10);
 		if (j < elf->ed_arstrsz)
 			m->m_hdr.ar_name = elf->ed_arstr + j;
 		else {
@@ -224,18 +221,18 @@ _elf_armem(Elf * elf, char * file, size_t fsz)
 	}
 
 	m->m_hdr.ar_date = (time_t)_elf_number(f->ar_date,
-		&f->ar_date[ARSZ(ar_date)], 10);
+	    &f->ar_date[ARSZ(ar_date)], 10);
 	/* LINTED */
 	m->m_hdr.ar_uid = (uid_t)_elf_number(f->ar_uid,
-		&f->ar_uid[ARSZ(ar_uid)], 10);
+	    &f->ar_uid[ARSZ(ar_uid)], 10);
 	/* LINTED */
 	m->m_hdr.ar_gid = (gid_t)_elf_number(f->ar_gid,
-		&f->ar_gid[ARSZ(ar_gid)], 10);
+	    &f->ar_gid[ARSZ(ar_gid)], 10);
 	/* LINTED */
 	m->m_hdr.ar_mode = (mode_t)_elf_number(f->ar_mode,
-		&f->ar_mode[ARSZ(ar_mode)], 8);
+	    &f->ar_mode[ARSZ(ar_mode)], 8);
 	m->m_hdr.ar_size = (off_t)_elf_number(f->ar_size,
-		&f->ar_size[ARSZ(ar_size)], 10);
+	    &f->ar_size[ARSZ(ar_size)], 10);
 
 	return (m);
 }
@@ -260,11 +257,11 @@ _elf_armem(Elf * elf, char * file, size_t fsz)
 void
 _elf_arinit(Elf * elf)
 {
-	char *				base = elf->ed_ident;
-	register char *			end = base + elf->ed_fsz;
-	register struct ar_hdr *	a;
-	register char *			hdr = base + SARMAG;
-	register char *			mem;
+	char				*base = elf->ed_ident;
+	register char			*end = base + elf->ed_fsz;
+	register struct ar_hdr		*a;
+	register char			*hdr = base + SARMAG;
+	register char			*mem;
 	int				j;
 	size_t				sz = SARMAG;
 
@@ -298,7 +295,7 @@ _elf_arinit(Elf * elf)
 			    sz) != OK_YES)
 				return;
 			if (elf->ed_vm == 0) {
-				char *	nmem;
+				char	*nmem;
 				if ((nmem = malloc(sz)) == 0) {
 					_elf_seterr(EMEM_ARSTR, errno);
 					return;

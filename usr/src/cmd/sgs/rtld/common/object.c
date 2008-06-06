@@ -23,12 +23,12 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Object file dependent suport for ELF objects.
  */
-#include	"_synonyms.h"
 
 #include	<sys/mman.h>
 #include	<stdio.h>

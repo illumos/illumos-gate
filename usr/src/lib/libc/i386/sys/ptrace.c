@@ -30,9 +30,9 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak ptrace = _ptrace
+#pragma weak _ptrace = ptrace
 
-#include "synonyms.h"
+#include "lint.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

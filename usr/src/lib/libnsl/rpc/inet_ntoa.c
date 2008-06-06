@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,8 +111,6 @@
  * Reentrant interface
  */
 
-#pragma weak inet_aton = _inet_aton
-
 #include "mt.h"
 #include "rpc_mt.h"
 #include <errno.h>
@@ -193,7 +191,7 @@ inet_aton(const char *cp, struct in_addr *addr)
 				c = *++cp;
 			} else if (base == 16 && isascii(c) && isxdigit(c)) {
 				val = (val << 4) |
-					(c + 10 - (islower(c) ? 'a' : 'A'));
+				    (c + 10 - (islower(c) ? 'a' : 'A'));
 				c = *++cp;
 			} else
 				break;

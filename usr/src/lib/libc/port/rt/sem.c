@@ -20,25 +20,13 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak	sem_open = _sem_open
-#pragma weak	sem_close = _sem_close
-#pragma weak	sem_unlink = _sem_unlink
-#pragma weak	sem_init = _sem_init
-#pragma weak	sem_destroy = _sem_destroy
-#pragma weak	sem_wait = _sem_wait
-#pragma weak	sem_timedwait = _sem_timedwait
-#pragma weak	sem_reltimedwait_np = _sem_reltimedwait_np
-#pragma weak	sem_trywait = _sem_trywait
-#pragma weak	sem_post = _sem_post
-#pragma weak	sem_getvalue = _sem_getvalue
-
-#include "synonyms.h"
+#include "lint.h"
 #include "mtlib.h"
 #include <sys/types.h>
 #include <semaphore.h>
@@ -66,7 +54,7 @@ static semaddr_t *semheadp = NULL;
 static mutex_t semlock = DEFAULTMUTEX;
 
 sem_t *
-_sem_open(const char *path, int oflag, /* mode_t mode, int value */ ...)
+sem_open(const char *path, int oflag, /* mode_t mode, int value */ ...)
 {
 	va_list	ap;
 	mode_t	crmode = 0;
@@ -106,7 +94,7 @@ _sem_open(const char *path, int oflag, /* mode_t mode, int value */ ...)
 	errno = 0;
 
 	if ((fd = __pos4obj_open(path, SEM_DATA_TYPE,
-				oflag, crmode, &cr_flag)) < 0)
+	    oflag, crmode, &cr_flag)) < 0)
 		goto out;
 
 	if (cr_flag)
@@ -150,7 +138,7 @@ _sem_open(const char *path, int oflag, /* mode_t mode, int value */ ...)
 
 	/* LINTED */
 	sem = (sem_t *)mmap64(NULL, sizeof (sem_t), PROT_READ|PROT_WRITE,
-				MAP_SHARED, fd, (off64_t)0);
+	    MAP_SHARED, fd, (off64_t)0);
 	(void) __close_nc(fd);
 	cr_flag &= ~DFILE_OPEN;
 	if (sem == MAP_FAILED)
@@ -194,7 +182,7 @@ out:
 }
 
 int
-_sem_close(sem_t *sem)
+sem_close(sem_t *sem)
 {
 	semaddr_t	**next;
 	semaddr_t	*freeit;
@@ -215,7 +203,7 @@ _sem_close(sem_t *sem)
 }
 
 int
-_sem_unlink(const char *path)
+sem_unlink(const char *path)
 {
 	int	error;
 	int	oerrno;
@@ -255,7 +243,7 @@ sem_invalid(sem_t *sem)
 }
 
 int
-_sem_init(sem_t *sem, int pshared, uint_t value)
+sem_init(sem_t *sem, int pshared, uint_t value)
 {
 	int	error;
 
@@ -268,7 +256,7 @@ _sem_init(sem_t *sem, int pshared, uint_t value)
 }
 
 int
-_sem_destroy(sem_t *sem)
+sem_destroy(sem_t *sem)
 {
 	int	error;
 
@@ -282,7 +270,7 @@ _sem_destroy(sem_t *sem)
 }
 
 int
-_sem_post(sem_t *sem)
+sem_post(sem_t *sem)
 {
 	int	error;
 
@@ -296,7 +284,7 @@ _sem_post(sem_t *sem)
 }
 
 int
-_sem_wait(sem_t *sem)
+sem_wait(sem_t *sem)
 {
 	int	error;
 
@@ -310,7 +298,7 @@ _sem_wait(sem_t *sem)
 }
 
 int
-_sem_timedwait(sem_t *sem, const timespec_t *abstime)
+sem_timedwait(sem_t *sem, const timespec_t *abstime)
 {
 	int	error;
 
@@ -326,7 +314,7 @@ _sem_timedwait(sem_t *sem, const timespec_t *abstime)
 }
 
 int
-_sem_reltimedwait_np(sem_t *sem, const timespec_t *reltime)
+sem_reltimedwait_np(sem_t *sem, const timespec_t *reltime)
 {
 	int	error;
 
@@ -342,7 +330,7 @@ _sem_reltimedwait_np(sem_t *sem, const timespec_t *reltime)
 }
 
 int
-_sem_trywait(sem_t *sem)
+sem_trywait(sem_t *sem)
 {
 	int	error;
 
@@ -358,7 +346,7 @@ _sem_trywait(sem_t *sem)
 }
 
 int
-_sem_getvalue(sem_t *sem, int *sval)
+sem_getvalue(sem_t *sem, int *sval)
 {
 	if (sem_invalid(sem))
 		return (-1);

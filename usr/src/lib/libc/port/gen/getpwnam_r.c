@@ -18,21 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak endpwent = _endpwent
-#pragma weak setpwent = _setpwent
-#pragma weak getpwnam_r = _getpwnam_r
-#pragma weak getpwuid_r = _getpwuid_r
-#pragma weak getpwent_r = _getpwent_r
-#pragma weak fgetpwent_r = _fgetpwent_r
-
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/types.h>
 #include <pwd.h>
 #include <nss_dbdefs.h>
@@ -71,7 +65,7 @@ _uncached_getpwnam_r(const char *name, struct passwd *result, char *buffer,
  * It was implemented by Solaris 2.3.
  */
 struct passwd *
-_getpwnam_r(const char *name, struct passwd *result, char *buffer, int buflen)
+getpwnam_r(const char *name, struct passwd *result, char *buffer, int buflen)
 {
 	nss_XbyY_args_t arg;
 
@@ -82,7 +76,7 @@ _getpwnam_r(const char *name, struct passwd *result, char *buffer, int buflen)
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2passwd);
 	arg.key.name = name;
 	(void) nss_search(&db_root, _nss_initf_passwd, NSS_DBOP_PASSWD_BYNAME,
-				&arg);
+	    &arg);
 	return ((struct passwd *)NSS_XbyY_FINI(&arg));
 }
 
@@ -91,14 +85,14 @@ _getpwnam_r(const char *name, struct passwd *result, char *buffer, int buflen)
  * It was implemented by Solaris 2.3.
  */
 struct passwd *
-_getpwuid_r(uid_t uid, struct passwd *result, char *buffer, int buflen)
+getpwuid_r(uid_t uid, struct passwd *result, char *buffer, int buflen)
 {
 	nss_XbyY_args_t arg;
 
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2passwd);
 	arg.key.uid = uid;
 	(void) nss_search(&db_root, _nss_initf_passwd, NSS_DBOP_PASSWD_BYUID,
-				&arg);
+	    &arg);
 	return ((struct passwd *)NSS_XbyY_FINI(&arg));
 }
 
@@ -112,7 +106,7 @@ _uncached_getpwuid_r(uid_t uid, struct passwd *result, char *buffer,
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2passwd);
 	arg.key.uid = uid;
 	(void) nss_search(&db_root, _nss_initf_passwd, NSS_DBOP_PASSWD_BYUID,
-				&arg);
+	    &arg);
 	return ((struct passwd *)NSS_XbyY_FINI(&arg));
 }
 
@@ -129,8 +123,8 @@ __posix_getpwuid_r(uid_t uid, struct passwd *pwd, char *buffer,
 	int oerrno = errno;
 
 	errno = 0;
-	if ((*result = _getpwuid_r(uid, pwd, buffer, (uintptr_t)bufsize))
-		== NULL) {
+	if ((*result = getpwuid_r(uid, pwd, buffer, (uintptr_t)bufsize))
+	    == NULL) {
 			nerrno = errno;
 	}
 	errno = oerrno;
@@ -146,7 +140,7 @@ _uncached_getpwnam_r(const char *name, struct passwd *result, char *buffer,
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2passwd);
 	arg.key.name = name;
 	(void) nss_search(&db_root, _nss_initf_passwd, NSS_DBOP_PASSWD_BYNAME,
-				&arg);
+	    &arg);
 	return ((struct passwd *)NSS_XbyY_FINI(&arg));
 }
 
@@ -162,8 +156,8 @@ __posix_getpwnam_r(const char *name, struct passwd *pwd, char *buffer,
 	int oerrno = errno;
 
 	errno = 0;
-	if ((*result = _getpwnam_r(name, pwd, buffer, (uintptr_t)bufsize))
-		== NULL) {
+	if ((*result = getpwnam_r(name, pwd, buffer, (uintptr_t)bufsize))
+	    == NULL) {
 			nerrno = errno;
 	}
 	errno = oerrno;
@@ -197,7 +191,7 @@ getpwent_r(struct passwd *result, char *buffer, int buflen)
 		(void) nss_getent(&db_root, _nss_initf_passwd, &context, &arg);
 	} while (arg.returnval != 0 &&
 	    (nam = ((struct passwd *)arg.returnval)->pw_name) != 0 &&
-		(*nam == '+' || *nam == '-'));
+	    (*nam == '+' || *nam == '-'));
 
 	return ((struct passwd *)NSS_XbyY_FINI(&arg));
 }

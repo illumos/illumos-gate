@@ -20,18 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak elf32_fsize = _elf32_fsize
-#pragma weak elf_version = _elf_version
-#pragma weak elf32_xlatetof = _elf32_xlatetof
-#pragma weak elf32_xlatetom = _elf32_xlatetom
-
-#include "syn.h"
 #include <memory.h>
 #include <libelf.h>
 #include <link.h>

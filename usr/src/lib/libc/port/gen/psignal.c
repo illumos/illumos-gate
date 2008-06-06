@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,16 +44,16 @@
  * supplied message
  */
 
-#pragma weak psignal = _psignal
+#pragma weak _psignal = psignal
 
-#include	"synonyms.h"
-#include	"_libc_gettext.h"
-#include	<sys/types.h>
-#include	<stdio.h>
-#include	<unistd.h>
-#include	<string.h>
-#include	<signal.h>
-#include	<siginfo.h>
+#include "lint.h"
+#include "_libc_gettext.h"
+#include <sys/types.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <signal.h>
+#include <siginfo.h>
 
 #define	strsignal(i)	(_libc_gettext(_sys_siglistp[i]))
 

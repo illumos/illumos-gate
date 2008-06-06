@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,23 +20,20 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak run_setkey = _run_setkey
-#pragma weak run_crypt = _run_crypt
-#pragma weak crypt_close = _crypt_close
-#pragma weak makekey = _makekey
+#pragma weak _run_setkey = run_setkey
+#pragma weak _run_crypt = run_crypt
+#pragma weak _crypt_close = crypt_close
+#pragma weak _makekey = makekey
 
-#include "des_synonyms.h"
 #include <stdio.h>
 #include <signal.h>
 #include <fcntl.h>
@@ -133,7 +129,7 @@ run_crypt(long offset, char *buffer, unsigned int count, int p[2])
 	header.offset = offset;
 	pstat = signal(SIGPIPE, SIG_IGN);
 	if (write(p[READER], (char *)&header, sizeof (header))
-		!= sizeof (header)) {
+	    != sizeof (header)) {
 		(void) crypt_close_nolock(p);
 		(void) signal(SIGPIPE, pstat);
 		(void) mutex_unlock(&lock);

@@ -18,27 +18,26 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* sysconf(3C) - returns system configuration information */
 
-#pragma weak sysconf = _sysconf
+#pragma weak _sysconf = sysconf
 
-#include "synonyms.h"
+#include "lint.h"
 #include <mtlib.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/sysconfig.h>
-#include <sys/errno.h>
 #include <limits.h>
 #include <time.h>
 #include <errno.h>
@@ -378,7 +377,7 @@ sysconf(int name)
 			return (-1L);
 
 		case _SC_THREAD_STACK_MIN:
-			return ((long)_thr_min_stack());
+			return ((long)thr_min_stack());
 
 		case _SC_THREAD_THREADS_MAX:
 			return (-1L);

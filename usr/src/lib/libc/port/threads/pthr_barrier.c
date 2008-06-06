@@ -37,9 +37,8 @@ typedef struct {
 	int	pshared;
 } barrierattr_t;
 
-#pragma weak pthread_barrierattr_init = _pthread_barrierattr_init
 int
-_pthread_barrierattr_init(pthread_barrierattr_t *attr)
+pthread_barrierattr_init(pthread_barrierattr_t *attr)
 {
 	barrierattr_t *ap;
 
@@ -50,9 +49,8 @@ _pthread_barrierattr_init(pthread_barrierattr_t *attr)
 	return (0);
 }
 
-#pragma weak pthread_barrierattr_destroy = _pthread_barrierattr_destroy
 int
-_pthread_barrierattr_destroy(pthread_barrierattr_t *attr)
+pthread_barrierattr_destroy(pthread_barrierattr_t *attr)
 {
 	if (attr == NULL || attr->__pthread_barrierattrp == NULL)
 		return (EINVAL);
@@ -61,9 +59,8 @@ _pthread_barrierattr_destroy(pthread_barrierattr_t *attr)
 	return (0);
 }
 
-#pragma weak pthread_barrierattr_setpshared =  _pthread_barrierattr_setpshared
 int
-_pthread_barrierattr_setpshared(pthread_barrierattr_t *attr, int pshared)
+pthread_barrierattr_setpshared(pthread_barrierattr_t *attr, int pshared)
 {
 	barrierattr_t *ap;
 
@@ -75,9 +72,8 @@ _pthread_barrierattr_setpshared(pthread_barrierattr_t *attr, int pshared)
 	return (0);
 }
 
-#pragma weak pthread_barrierattr_getpshared =  _pthread_barrierattr_getpshared
 int
-_pthread_barrierattr_getpshared(const pthread_barrierattr_t *attr, int *pshared)
+pthread_barrierattr_getpshared(const pthread_barrierattr_t *attr, int *pshared)
 {
 	barrierattr_t *ap;
 
@@ -88,9 +84,8 @@ _pthread_barrierattr_getpshared(const pthread_barrierattr_t *attr, int *pshared)
 	return (0);
 }
 
-#pragma weak pthread_barrier_init = _pthread_barrier_init
 int
-_pthread_barrier_init(pthread_barrier_t *barrier,
+pthread_barrier_init(pthread_barrier_t *barrier,
 	const pthread_barrierattr_t *attr, uint_t count)
 {
 	mutex_t *mp = (mutex_t *)&barrier->__pthread_barrier_lock;
@@ -113,20 +108,19 @@ _pthread_barrier_init(pthread_barrier_t *barrier,
 	barrier->__pthread_barrier_current = count;
 	barrier->__pthread_barrier_cycle = 0;
 	barrier->__pthread_barrier_reserved = 0;
-	(void) __mutex_init(mp, type, NULL);
-	(void) _cond_init(cvp, type, NULL);
+	(void) mutex_init(mp, type, NULL);
+	(void) cond_init(cvp, type, NULL);
 	return (0);
 }
 
-#pragma weak pthread_barrier_destroy = _pthread_barrier_destroy
 int
-_pthread_barrier_destroy(pthread_barrier_t *barrier)
+pthread_barrier_destroy(pthread_barrier_t *barrier)
 {
 	mutex_t *mp = (mutex_t *)&barrier->__pthread_barrier_lock;
 	cond_t *cvp = (cond_t *)&barrier->__pthread_barrier_cond;
 
-	(void) __mutex_destroy(mp);
-	(void) _cond_destroy(cvp);
+	(void) mutex_destroy(mp);
+	(void) cond_destroy(cvp);
 	(void) memset(barrier, -1, sizeof (*barrier));
 	return (0);
 }
@@ -134,33 +128,32 @@ _pthread_barrier_destroy(pthread_barrier_t *barrier)
 /*
  * pthread_barrier_wait() is not a cancellation point;
  */
-#pragma weak pthread_barrier_wait = _pthread_barrier_wait
 int
-_pthread_barrier_wait(pthread_barrier_t *barrier)
+pthread_barrier_wait(pthread_barrier_t *barrier)
 {
 	mutex_t *mp = (mutex_t *)&barrier->__pthread_barrier_lock;
 	cond_t *cvp = (cond_t *)&barrier->__pthread_barrier_cond;
 	uint64_t cycle;
 	int cancel_state;
 
-	(void) __mutex_lock(mp);
+	(void) mutex_lock(mp);
 
 	if (--barrier->__pthread_barrier_current == 0) {
 		barrier->__pthread_barrier_cycle++;
 		barrier->__pthread_barrier_current =
 		    barrier->__pthread_barrier_count;
-		(void) __mutex_unlock(mp);
-		(void) _cond_broadcast(cvp);
+		(void) mutex_unlock(mp);
+		(void) cond_broadcast(cvp);
 		return (PTHREAD_BARRIER_SERIAL_THREAD);
 	}
 
-	(void) _pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	cycle = barrier->__pthread_barrier_cycle;
 	do {
-		(void) _cond_wait(cvp, mp);
+		(void) cond_wait(cvp, mp);
 	} while (cycle == barrier->__pthread_barrier_cycle);
-	(void) _pthread_setcancelstate(cancel_state, NULL);
+	(void) pthread_setcancelstate(cancel_state, NULL);
 
-	(void) __mutex_unlock(mp);
+	(void) mutex_unlock(mp);
 	return (0);
 }

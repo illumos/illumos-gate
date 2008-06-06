@@ -30,9 +30,9 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
-#pragma weak _filbuf = __filbuf
+#pragma weak __filbuf = _filbuf
 
-#include "synonyms.h"
+#include "lint.h"
 #include "file64.h"
 #include <stdio.h>
 #include <errno.h>

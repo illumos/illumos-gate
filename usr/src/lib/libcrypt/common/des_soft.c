@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +33,6 @@
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-/*LINTLIBRARY*/
 
 /*
  * Warning!  Things are arranged very carefully in this file to
@@ -50,7 +48,6 @@
 #define	CRYPT	/* cannot configure out of user-level code */
 #endif
 
-#include "des_synonyms.h"
 #ifdef CRYPT
 #include <sys/types.h>
 #include <des/softdes.h>
@@ -78,8 +75,8 @@
 
 #endif /* def CRYPT */
 
-static void des_setkey(u_char [8], struct deskeydata *, unsigned);
-static void des_encrypt(u_char *, struct deskeydata *);
+static void des_setkey(uchar_t [8], struct deskeydata *, unsigned);
+static void des_encrypt(uchar_t *, struct deskeydata *);
 
 #ifndef	_KERNEL
 /*
@@ -136,8 +133,8 @@ __des_crypt(char *buf, unsigned int len, struct desparams *desp)
 	char nextiv[8];
 	struct deskeydata softkey;
 
-	mode = (unsigned) desp->des_mode;
-	dir = (unsigned) desp->des_dir;
+	mode = (unsigned)desp->des_mode;
+	dir = (unsigned)desp->des_dir;
 	des_setkey(desp->des_key, &softkey, dir);
 	while (len != 0) {
 		switch (mode) {
@@ -146,14 +143,14 @@ __des_crypt(char *buf, unsigned int len, struct desparams *desp)
 			case ENCRYPT:
 				for (i = 0; i < 8; i++)
 					buf[i] ^= desp->des_ivec[i];
-				des_encrypt((u_char *)buf, &softkey);
+				des_encrypt((uchar_t *)buf, &softkey);
 				for (i = 0; i < 8; i++)
 					desp->des_ivec[i] = buf[i];
 				break;
 			case DECRYPT:
 				for (i = 0; i < 8; i++)
 					nextiv[i] = buf[i];
-				des_encrypt((u_char *)buf, &softkey);
+				des_encrypt((uchar_t *)buf, &softkey);
 				for (i = 0; i < 8; i++) {
 					buf[i] ^= desp->des_ivec[i];
 					desp->des_ivec[i] = nextiv[i];
@@ -162,7 +159,7 @@ __des_crypt(char *buf, unsigned int len, struct desparams *desp)
 			}
 			break;
 		case ECB:
-			des_encrypt((u_char *)buf, &softkey);
+			des_encrypt((uchar_t *)buf, &softkey);
 			break;
 		}
 		buf += 8;
@@ -178,7 +175,7 @@ __des_crypt(char *buf, unsigned int len, struct desparams *desp)
  * We build the 16 key entries here
  */
 static void
-des_setkey(u_char userkey[8], struct deskeydata *kd, unsigned int dir)
+des_setkey(uchar_t userkey[8], struct deskeydata *kd, unsigned int dir)
 {
 /* EXPORT DELETE START */
 	long C, D;
@@ -261,7 +258,6 @@ des_setkey(u_char userkey[8], struct deskeydata *kd, unsigned int dir)
 
 	}
 /* EXPORT DELETE END */
-	return;
 }
 
 
@@ -274,7 +270,7 @@ des_setkey(u_char userkey[8], struct deskeydata *kd, unsigned int dir)
  * processor byte-order independence.
  */
 static void
-des_encrypt(u_char *data, struct deskeydata *kd)
+des_encrypt(uchar_t *data, struct deskeydata *kd)
 {
 /* EXPORT DELETE START */
 	chunk_t work1, work2;
@@ -339,9 +335,13 @@ des_encrypt(u_char *data, struct deskeydata *kd)
 	chunk_t R, ER;					\
 	uint32_t e0, e1;				\
 	R.long0 = inR;					\
+	/* CSTYLED */					\
 	do_R_to_ER(=, 0);				\
+	/* CSTYLED */					\
 	do_R_to_ER(|=, 1);				\
+	/* CSTYLED */					\
 	do_R_to_ER(|=, 2);				\
+	/* CSTYLED */					\
 	do_R_to_ER(|=, 3);				\
 	ER.long0 = e0 ^ kd->keyval[iter].long0;		\
 	ER.long1 = e1 ^ kd->keyval[iter].long1;		\
@@ -442,6 +442,5 @@ des_encrypt(u_char *data, struct deskeydata *kd)
 	data[7] = work2.byte7;
 
 /* EXPORT DELETE END */
-	return;
 }
 #endif /* def CRYPT */

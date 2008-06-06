@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,20 +31,20 @@
 
 /*
  * Initialization of the main stack is performed in libc_init().
- * Initialization of thread stacks is performed in _thr_setup().
+ * Initialization of thread stacks is performed in _thrp_setup().
  */
 
-#pragma weak stack_getbounds = _stack_getbounds
+#pragma weak _stack_getbounds = stack_getbounds
 int
-_stack_getbounds(stack_t *sp)
+stack_getbounds(stack_t *sp)
 {
 	*sp = curthread->ul_ustack;
 	return (0);
 }
 
-#pragma weak stack_setbounds = _stack_setbounds
+#pragma weak _stack_setbounds = stack_setbounds
 int
-_stack_setbounds(const stack_t *sp)
+stack_setbounds(const stack_t *sp)
 {
 	ulwp_t *self = curthread;
 
@@ -69,9 +69,9 @@ _stack_setbounds(const stack_t *sp)
  *	0 addr is outside of the bounds of the current stack
  * Note that addr is an unbiased value.
  */
-#pragma weak stack_inbounds = _stack_inbounds
+#pragma weak _stack_inbounds = stack_inbounds
 int
-_stack_inbounds(void *addr)
+stack_inbounds(void *addr)
 {
 	stack_t *ustackp = &curthread->ul_ustack;
 	uintptr_t base = (uintptr_t)ustackp->ss_sp;
@@ -80,9 +80,9 @@ _stack_inbounds(void *addr)
 	return ((uintptr_t)addr >= base && (uintptr_t)addr < base + size);
 }
 
-#pragma weak stack_violation = _stack_violation
+#pragma weak _stack_violation = stack_violation
 int
-_stack_violation(int sig, const siginfo_t *sip, const ucontext_t *ucp)
+stack_violation(int sig, const siginfo_t *sip, const ucontext_t *ucp)
 {
 	uintptr_t addr;
 	uintptr_t base;

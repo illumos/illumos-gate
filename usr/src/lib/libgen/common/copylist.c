@@ -19,30 +19,21 @@
  * CDDL HEADER END
  */
 
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1.3.2 */
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
-/*LINTLIBRARY*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * copylist copies a file into a block of memory, replacing newlines
  * with null characters, and returns a pointer to the copy.
  */
 
-#include <sys/feature_tests.h>
-#ifndef _LP64
-#pragma weak copylist64 = _copylist64
-#endif
-#pragma weak copylist = _copylist
-
-#include "gen_synonyms.h"
 #include <sys/types.h>
 #include <libgen.h>
 #include <stdlib.h>
@@ -87,7 +78,7 @@ common_copylist(const char *filenm, off64_t size)
 
 #ifndef _LP64
 char *
-_copylist64(const char *filenm, off64_t *szptr)
+copylist64(const char *filenm, off64_t *szptr)
 {
 	struct	stat64	stbuf;
 
@@ -103,7 +94,7 @@ _copylist64(const char *filenm, off64_t *szptr)
 
 
 char *
-_copylist(const char *filenm, off_t *szptr)
+copylist(const char *filenm, off_t *szptr)
 {
 	struct	stat64	stbuf;
 

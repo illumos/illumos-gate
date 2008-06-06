@@ -17,11 +17,14 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- *
+ */
+
+/*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ */
+
+/*
  * Remove objects.  Objects need removal from a process as part of:
  *
  *  o	a dlclose() request
@@ -47,8 +50,6 @@
  * remove_hdl() is called to remove the handle and the link-map.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include	"_synonyms.h"
 
 #include	<string.h>
 #include	<stdio.h>

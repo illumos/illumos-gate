@@ -35,21 +35,21 @@
 
 /*ARGSUSED*/
 int
-_cond_init(cond_t *cvp, int type, void *arg)
+cond_init(cond_t *cvp, int type, void *arg)
 {
 	return (0);
 }
 
 /*ARGSUSED*/
 int
-_cond_destroy(cond_t *cvp)
+cond_destroy(cond_t *cvp)
 {
 	return (0);
 }
 
 /*ARGSUSED*/
 int
-_cond_wait(cond_t *cv, mutex_t *mutex)
+cond_wait(cond_t *cv, mutex_t *mutex)
 {
 	umem_panic("attempt to wait on standumem cv %p", cv);
 
@@ -59,20 +59,20 @@ _cond_wait(cond_t *cv, mutex_t *mutex)
 
 /*ARGSUSED*/
 int
-_cond_broadcast(cond_t *cvp)
+cond_broadcast(cond_t *cvp)
 {
 	return (0);
 }
 
 /*ARGSUSED*/
 int
-_pthread_setcancelstate(int state, int *oldstate)
+pthread_setcancelstate(int state, int *oldstate)
 {
 	return (0);
 }
 
 thread_t
-_thr_self(void)
+thr_self(void)
 {
 	return ((thread_t)1);
 }
@@ -81,7 +81,7 @@ static mutex_t _mp = DEFAULTMUTEX;
 
 /*ARGSUSED*/
 int
-__mutex_init(mutex_t *mp, int type, void *arg)
+mutex_init(mutex_t *mp, int type, void *arg)
 {
 	(void) memcpy(mp, &_mp, sizeof (mutex_t));
 	return (0);
@@ -89,41 +89,41 @@ __mutex_init(mutex_t *mp, int type, void *arg)
 
 /*ARGSUSED*/
 int
-__mutex_destroy(mutex_t *mp)
+mutex_destroy(mutex_t *mp)
 {
 	return (0);
 }
 
 /*ARGSUSED*/
 int
-__mutex_held(mutex_t *mp)
+_mutex_held(mutex_t *mp)
 {
 	return (1);
 }
 
 /*ARGSUSED*/
 int
-__mutex_lock(mutex_t *mp)
+mutex_lock(mutex_t *mp)
 {
 	return (0);
 }
 
 /*ARGSUSED*/
 int
-__mutex_trylock(mutex_t *mp)
+mutex_trylock(mutex_t *mp)
 {
 	return (0);
 }
 
 /*ARGSUSED*/
 int
-__mutex_unlock(mutex_t *mp)
+mutex_unlock(mutex_t *mp)
 {
 	return (0);
 }
 
 int
-_issetugid(void)
+issetugid(void)
 {
 	return (1);
 }

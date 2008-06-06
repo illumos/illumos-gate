@@ -29,9 +29,9 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak getcontext = _getcontext
+#pragma weak _getcontext = getcontext
 
-#include "synonyms.h"
+#include "lint.h"
 #include "thr_uberdata.h"
 #include <ucontext.h>
 #include <sys/types.h>

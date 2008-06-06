@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -137,8 +137,8 @@ DTS_ERRNO=
 # We need to rename some standard functions so we can easily implement them
 # in consumers.
 STAND_RENAMED_FUNCS= \
-	_atomic_add_64 \
-	_atomic_add_32_nv \
+	atomic_add_64 \
+	atomic_add_32_nv \
 	snprintf \
 	vsnprintf
 

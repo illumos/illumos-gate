@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,29 +44,26 @@ static FILE	*au_class_file = NULL;
 static mutex_t	mutex_classfile = DEFAULTMUTEX;
 static mutex_t	mutex_classcache = DEFAULTMUTEX;
 
-extern int _mutex_lock(mutex_t *);
-extern int _mutex_unlock(mutex_t *);
-
 void
 setauclass()
 {
-	_mutex_lock(&mutex_classfile);
+	(void) mutex_lock(&mutex_classfile);
 	if (au_class_file) {
 		(void) fseek(au_class_file, 0L, 0);
 	}
-	_mutex_unlock(&mutex_classfile);
+	(void) mutex_unlock(&mutex_classfile);
 }
 
 
 void
 endauclass()
 {
-	_mutex_lock(&mutex_classfile);
+	(void) mutex_lock(&mutex_classfile);
 	if (au_class_file) {
 		(void) fclose(au_class_file);
 		au_class_file = NULL;
 	}
-	_mutex_unlock(&mutex_classfile);
+	(void) mutex_unlock(&mutex_classfile);
 }
 
 /*
@@ -107,10 +105,10 @@ getauclassent_r(au_class_entry)
 	}
 
 	/* open audit class file if it isn't already */
-	_mutex_lock(&mutex_classfile);
+	(void) mutex_lock(&mutex_classfile);
 	if (!au_class_file) {
 		if (!(au_class_file = fopen(au_class_fname, "rF"))) {
-			_mutex_unlock(&mutex_classfile);
+			(void) mutex_unlock(&mutex_classfile);
 			return ((au_class_ent_t *)0);
 		}
 	}
@@ -152,7 +150,7 @@ getauclassent_r(au_class_entry)
 		}
 	}
 
-	_mutex_unlock(&mutex_classfile);
+	(void) mutex_unlock(&mutex_classfile);
 
 	if (!error && found) {
 		return (au_class_entry);
@@ -228,12 +226,12 @@ xcacheauclass(result, class_name, class_no, flags)
 	int		hit = 0;
 	char		*s;
 
-	_mutex_lock(&mutex_classcache);
+	(void) mutex_lock(&mutex_classcache);
 	if (called_once == 0) {
 
 		/* Count number of lines in the class file */
 		if ((fp = fopen(au_class_fname, "rF")) == NULL) {
-			_mutex_unlock(&mutex_classcache);
+			(void) mutex_unlock(&mutex_classcache);
 			return (-1);
 		}
 		while (fgets(line, 256, fp) != NULL) {
@@ -247,7 +245,7 @@ xcacheauclass(result, class_name, class_no, flags)
 		class_tbl = (au_class_ent_t **)calloc((size_t)lines + 1,
 			sizeof (au_class_ent_t));
 		if (class_tbl == NULL) {
-			_mutex_unlock(&mutex_classcache);
+			(void) mutex_unlock(&mutex_classcache);
 			return (-2);
 		}
 
@@ -262,7 +260,7 @@ xcacheauclass(result, class_name, class_no, flags)
 			class_tbl[lines] = (au_class_ent_t *)
 				malloc(sizeof (au_class_ent_t));
 			if (class_tbl[lines] == NULL) {
-				_mutex_unlock(&mutex_classcache);
+				(void) mutex_unlock(&mutex_classcache);
 				return (-3);
 			}
 			class_tbl[lines]->ac_name = strdup(p_class->ac_name);
@@ -278,7 +276,7 @@ xcacheauclass(result, class_name, class_no, flags)
 		class_tbl[invalid] = (au_class_ent_t *)
 			malloc(sizeof (au_class_ent_t));
 		if (class_tbl[invalid] == NULL) {
-			_mutex_unlock(&mutex_classcache);
+			(void) mutex_unlock(&mutex_classcache);
 			return (-4);
 		}
 		class_tbl[invalid]->ac_name = "invalid class";
@@ -312,7 +310,7 @@ xcacheauclass(result, class_name, class_no, flags)
 			}
 		}
 	}
-	_mutex_unlock(&mutex_classcache);
+	(void) mutex_unlock(&mutex_classcache);
 	return (hit);
 }
 

@@ -20,26 +20,27 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	rewinddir -- C library extension routine
  */
 
-#pragma weak rewinddir = _rewinddir
+#pragma weak _rewinddir = rewinddir
 
-#include "synonyms.h"
+#include "lint.h"
 #include <dirent.h>
 
+#undef rewinddir
 void
-_rewinddir(DIR *dirp)
+rewinddir(DIR *dirp)
 {
 	(void) seekdir(dirp, 0L);
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,7 @@
  */
 
 #ifndef _LIBCRUN_
-#include "synonyms.h"
+#include "lint.h"
 #endif
 #include <sys/types.h>
 #include <limits.h>
@@ -92,13 +92,13 @@ _Unw_Decode_FDE(struct eh_frame_fields *f, struct _Unwind_Context *ctx)
 	fde_data = ctx->fde;
 	data = fde_data;
 	fde_end = (void *)(((intptr_t)fde_data) + 4 +
-		_Unw_get_val(&data, 0, UNUM32, 1, 1, 0));
+	    _Unw_get_val(&data, 0, UNUM32, 1, 1, 0));
 	reloc = 0;
 	base = ((intptr_t)data) + reloc;
 	cie_data = (void *)(base -  _Unw_get_val(&data, 0, UNUM32, 1, 1, 0));
 	cdata = cie_data;
 	cie_end = (void *)(((intptr_t)cie_data) + 4 +
-		_Unw_get_val(&cdata, 0, UNUM32, 1, 1, 0));
+	    _Unw_get_val(&cdata, 0, UNUM32, 1, 1, 0));
 	creloc = 0;
 	/* data mapping has happened */
 
@@ -111,7 +111,7 @@ _Unw_Decode_FDE(struct eh_frame_fields *f, struct _Unwind_Context *ctx)
 	(void) _Unw_get_val(&cdata, creloc, UNUM8, 1, 1, 0);
 	/* LINTED alignment */
 	(*((uint64_t *)(&(augment[0]))))  =
-		_Unw_get_val(&cdata, creloc, ZTSTRING, 1, 1, 0);
+	    _Unw_get_val(&cdata, creloc, ZTSTRING, 1, 1, 0);
 	f->code_align = _Unw_get_val(&cdata, creloc, ULEB128, 1, 1, 0);
 	f->data_align = _Unw_get_val(&cdata, creloc, SLEB128, 1, 1, 0);
 	(void) _Unw_get_val(&cdata, creloc, UNUM8, 1, 1, 0);
@@ -371,7 +371,7 @@ locate_fde_for_pc(uint64_t pc, int enc,
 		    pi + (((pj - pi) >> (log_size + 1)) << log_size);
 				/* Don't use (pi+pj)>>1 */
 		get_table_ent_val(pr, table_end, enc, reloc, base,
-			&range_start, &range_end, &fde);
+		    &range_start, &range_end, &fde);
 
 		/* Return fde if tpc is in this range. */
 

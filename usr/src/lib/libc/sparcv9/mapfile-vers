@@ -796,6 +796,7 @@ SUNWprivate_1.1 {
 	_install_utrap;
 	_memcmp = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
 	_memcpy = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
+	_memcpy = NODYNSORT;
 	_memmove = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
 	_memset = AUXILIARY /platform/$PLATFORM/lib/sparcv9/libc_psr.so.1;
 	nop;

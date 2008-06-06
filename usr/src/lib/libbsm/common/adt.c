@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -64,9 +65,6 @@ static void adt_setto_unaudited(adt_internal_state_t *);
 #define	DPRINTF(x)
 #define	DFLUSH
 #endif
-
-extern int _mutex_lock(mutex_t *);
-extern int _mutex_unlock(mutex_t *);
 
 static int auditstate = AUC_DISABLED;	/* default state */
 
@@ -1913,12 +1911,12 @@ adt_generate_event(const adt_event_data_t *p_extdata,
 	 * as subject are set to -1 by adt_calcOffset()
 	 */
 	if (p_xlate->tx_offsetsCalculated == 0) {
-		(void) _mutex_lock(&lock);
+		(void) mutex_lock(&lock);
 		p_xlate->tx_offsetsCalculated = 1;
 
 		adt_calcOffsets(p_xlate->tx_top_entry, p_xlate->tx_entries,
 		    (void *)p_extdata);
-		(void) _mutex_unlock(&lock);
+		(void) mutex_unlock(&lock);
 	}
 	while (p_entry != NULL) {
 		adt_generate_token(p_entry, (char *)p_extdata,

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,7 +113,7 @@ parseargs(int argc, char *argv[], char *envp[])
 			break;
 		case 'f': 	/* alternate config file */
 			if (strlcpy(configFile, optarg,
-				MAXPATHLEN) >= MAXPATHLEN) {
+			    MAXPATHLEN) >= MAXPATHLEN) {
 				printf("Alternate config file too long\n");
 				return (-1);
 			}
@@ -134,7 +134,7 @@ parseargs(int argc, char *argv[], char *envp[])
 			int	i;
 
 			if (strlcpy(ifName, argv[optind],
-				MAXPATHLEN) >= MAXPATHLEN) {
+			    MAXPATHLEN) >= MAXPATHLEN) {
 				printf("Network interface name too long\n");
 				return (-1);
 			}
@@ -193,7 +193,7 @@ parseargs(int argc, char *argv[], char *envp[])
 			break;
 		case 'l':	/* alt. log file name */
 			if (strlcpy(logFile, optarg,
-				MAXPATHLEN) >= MAXPATHLEN) {
+			    MAXPATHLEN) >= MAXPATHLEN) {
 				printf("Alternate log file too long\n");
 				return (-1);
 			}
@@ -265,10 +265,10 @@ parseargs(int argc, char *argv[], char *envp[])
 
 		/* ask IP for the list of configured interfaces */
 #ifdef SIOCGIFNUM
-		if (_ioctl(ip_fd, SIOCGIFNUM, (char *)&numifs) < 0) {
+		if (ioctl(ip_fd, SIOCGIFNUM, (char *)&numifs) < 0) {
 			if (debugLevel >= MSG_FATAL) {
 				sprintf(debugmsg,
-				    "Failed _ioctl(SIOCGIFNUM)\n");
+				    "Failed ioctl(SIOCGIFNUM)\n");
 				senddebug(MSG_FATAL);
 			}
 			close(ip_fd);
@@ -292,7 +292,7 @@ parseargs(int argc, char *argv[], char *envp[])
 		}
 		ifconf.ifc_len = bufsize;
 		ifconf.ifc_buf = (caddr_t)reqbuf;
-		if (_ioctl(ip_fd, SIOCGIFCONF, (char *)&ifconf) < 0) {
+		if (ioctl(ip_fd, SIOCGIFCONF, (char *)&ifconf) < 0) {
 			if (debugLevel >= MSG_FATAL) {
 				sprintf(debugmsg,
 				    "SIOCGIFCONF failed, -a option failed.\n");
@@ -450,7 +450,7 @@ llc_is_needed(char *devname, int ifUnit)
 
 		if (debugLevel >= MSG_INFO_1) {
 			sprintf(debugmsg,
-				"Need to determine if LLC driver is needed\n");
+			    "Need to determine if LLC driver is needed\n");
 			senddebug(MSG_INFO_1);
 		}
 
@@ -554,7 +554,7 @@ readconfig(int running)
 		/* Try to use default config file if not already done so */
 		if (strcmp(configFile, DFT_CONFIGFILE) != 0) {
 			printf("Using the default config file %s\n",
-						DFT_CONFIGFILE);
+			    DFT_CONFIGFILE);
 			(void) strlcpy(configFile, DFT_CONFIGFILE, MAXPATHLEN);
 			if ((fstr = fopen(configFile, "r")) == NULL) {
 				if (running && debugLevel >= MSG_ERROR_1) {
@@ -599,8 +599,8 @@ readconfig(int running)
 		line[i++] = '\0';	/* put NULL after keyword token */
 
 		while (line[i] < '0' || line[i] > 'z' ||
-				(line[i] > '9' && line[i] < 'A') ||
-				(line[i] > 'Z' && line[i] < 'a'))
+		    (line[i] > '9' && line[i] < 'A') ||
+		    (line[i] > 'Z' && line[i] < 'a'))
 			i++;
 
 		if (strcmp(line, "DebugLevel") == 0)
@@ -646,7 +646,7 @@ readconfig(int running)
 			} else {
 				logFileChange = 0;
 				(void) strlcpy(newLogFile, &line[i],
-					MAXPATHLEN);
+				    MAXPATHLEN);
 				if (strcmp(newLogFile, logFile) == 0)
 					continue;
 				else
@@ -704,7 +704,7 @@ readconfig(int running)
 					}
 				} else {
 					(void) strlcpy(logFile, newLogFile,
-						MAXPATHLEN);
+					    MAXPATHLEN);
 					setbuf(log_str, (char *)NULL);
 				}
 				break;
@@ -743,7 +743,7 @@ open_debug_dest(void)
 		if (log_str == NULL) {
 			if (debugLevel >= MSG_FATAL) {
 				sprintf(debugmsg, "Cannot open log file %s\n",
-					logFile);
+				    logFile);
 				senddebug(MSG_FATAL);
 			}
 			return (-1);

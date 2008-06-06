@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -57,7 +57,7 @@ $(LINTLIB) :=	LINTFLAGS64 = -nvx -Xarch=$(MACH64:sparcv9=v9)
 
 .KEEP_STATE:
 
-all : $(LIBS) fnamecheck
+all : $(LIBS)
 	$(CHMOD) 755 $(DYNLIB)
 
 lint :

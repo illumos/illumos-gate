@@ -24,10 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The SunStudio compiler may generate calls to _memcpy and so we
@@ -37,15 +37,11 @@
 
 #if !defined(_KMDB) && !defined(_BOOT) && !defined(_KERNEL)
 
-#pragma weak memcpy = _memcpy
-
-#include "synonyms.h"
-
-#else
-
-#pragma weak _memcpy = memcpy
+#include "lint.h"
 
 #endif /* !_KMDB && !_BOOT && !_KERNEL */
+
+#pragma weak _memcpy = memcpy
 
 #include <sys/types.h>
 

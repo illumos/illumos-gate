@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -144,47 +143,7 @@ SUNWprivate_1.1 {
     global:
 	_elf_getxoff;
 	_elf_outsync;
-	_elf_begin  =		NODYNSORT;
-	_elf_memory =		NODYNSORT;
-	_elf_cntl =		NODYNSORT;
-	_elf_end =		NODYNSORT;
-	_elf_errno =		NODYNSORT;
-	_elf_errmsg =		NODYNSORT;
-	_elf_fill =		NODYNSORT;
-	_elf_flagdata =		NODYNSORT;
-	_elf_flagehdr =		NODYNSORT;
-	_elf_flagelf =		NODYNSORT;
-	_elf_flagphdr =		NODYNSORT;
-	_elf_flagscn =		NODYNSORT;
-	_elf_flagshdr =		NODYNSORT;
-	_elf_getarhdr =		NODYNSORT;
-	_elf_getarsym =		NODYNSORT;
-	_elf_getbase =		NODYNSORT;
-	_elf_getdata =		NODYNSORT;
-	_elf32_getehdr =	NODYNSORT;
-	_elf_getident =		NODYNSORT;
-	_elf32_getphdr =	NODYNSORT;
-	_elf_getscn =		NODYNSORT;
-	_elf32_getshdr =	NODYNSORT;
-	_elf_hash =		NODYNSORT;
 	_elf_sys_encoding;
-	_elf_kind =		NODYNSORT;
-	_elf_ndxscn =		NODYNSORT;
-	_elf_newdata =		NODYNSORT;
-	_elf32_newehdr =	NODYNSORT;
-	_elf32_newphdr =	NODYNSORT;
-	_elf_newscn =		NODYNSORT;
-	_elf_next =		NODYNSORT;
-	_elf_nextscn =		NODYNSORT;
-	_elf_rand =		NODYNSORT;
-	_elf_rawdata =		NODYNSORT;
-	_elf_rawfile =		NODYNSORT;
-	_elf_strptr =		NODYNSORT;
 	_elf_swap_wrimage;
-	_elf_update =		NODYNSORT;
-	_elf32_fsize =		NODYNSORT;
-	_elf32_xlatetof =	NODYNSORT;
-	_elf32_xlatetom =	NODYNSORT;
-	_elf_version =		NODYNSORT;
 	_gelf_getdyndtflags_1;
 };

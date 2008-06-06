@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,9 +38,8 @@
 #include <ctype.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <libintl.h>
 #include <net/if.h>
-
-extern char *_dgettext(const char *, const char *);
 
 #define	ai2sin(x)	((struct sockaddr_in *)((x)->ai_addr))
 #define	ai2sin6(x)	((struct sockaddr_in6 *)((x)->ai_addr))
@@ -837,9 +836,9 @@ const char *
 gai_strerror(int ecode)
 {
 	if (ecode < 0)
-		return (_dgettext(TEXT_DOMAIN,
+		return (dgettext(TEXT_DOMAIN,
 		    "name translation internal error"));
 	else if (ecode < gai_nerr)
-		return (_dgettext(TEXT_DOMAIN, gai_errlist[ecode]));
-	return (_dgettext(TEXT_DOMAIN, "unknown name translation error"));
+		return (dgettext(TEXT_DOMAIN, gai_errlist[ecode]));
+	return (dgettext(TEXT_DOMAIN, "unknown name translation error"));
 }

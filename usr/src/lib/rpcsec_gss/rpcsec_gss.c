@@ -20,12 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
@@ -34,6 +31,8 @@
  * /afs/gza.com/product/secure/rel-eng/src/1.1/rpc/RCS/auth_gssapi.c,v
  * 1.14 1995/03/22 22:07:55 jik Exp $
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,11 +58,6 @@ static bool_t	validate_seqwin();
  * Globals that should have header files but don't.
  */
 extern bool_t	xdr_opaque_auth(XDR *, struct opaque_auth *);
-extern int	_thr_main(void);
-extern void	*_pthread_getspecific(pthread_key_t key);
-typedef void	(*PFrV) (void *);
-extern int	_thr_keycreate_once(thread_key_t *pkey, PFrV destructor);
-extern int	_thr_setspecific(unsigned int key, void *value);
 
 
 static struct auth_ops rpc_gss_ops = {
@@ -584,7 +578,7 @@ validate_seqwin(rpc_gss_data *ap)
 	tok_buf.value = ap->verifier->oa_base;
 	major = gss_verify(&minor, ap->context, &msg_buf, &tok_buf, &qop_state);
 	if (major != GSS_S_COMPLETE)
-	    return (FALSE);
+		return (FALSE);
 	return (TRUE);
 }
 
@@ -912,14 +906,14 @@ __rpc_gss_err()
 	static thread_key_t rpc_gss_err_key = THR_ONCE_KEY;
 	rpc_gss_error_t *tsd;
 
-	if (_thr_main())
+	if (thr_main())
 		return (&rpc_gss_err);
-	if (_thr_keycreate_once(&rpc_gss_err_key, free) != 0)
+	if (thr_keycreate_once(&rpc_gss_err_key, free) != 0)
 		return (&rpc_gss_err);
-	tsd = _pthread_getspecific(rpc_gss_err_key);
+	tsd = pthread_getspecific(rpc_gss_err_key);
 	if (tsd == NULL) {
 		tsd = (rpc_gss_error_t *)calloc(1, sizeof (rpc_gss_error_t));
-		if (_thr_setspecific(rpc_gss_err_key, tsd) != 0) {
+		if (thr_setspecific(rpc_gss_err_key, tsd) != 0) {
 			if (tsd)
 				free(tsd);
 			return (&rpc_gss_err);

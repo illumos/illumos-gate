@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,9 +113,7 @@ extern nss_status_t	_nss_nis_ypmatch(const char		*domain,
 					int			*yp_statusp);
 extern const char	*_nss_nis_domain();
 extern int __nss2herrno(nss_status_t nsstat);
-extern int _thr_sigsetmask(int how, const sigset_t *set, sigset_t *oset);
-extern int _mutex_lock(mutex_t *mp);
-extern int _mutex_unlock(mutex_t *mp);
+extern int thr_sigsetmask(int how, const sigset_t *set, sigset_t *oset);
 extern int _nss_nis_check_name_aliases(nss_XbyY_args_t *argp,
 					const char *line,
 					int linelen);

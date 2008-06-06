@@ -34,6 +34,17 @@
 #include <ctype.h>
 #include "libc.h"
 
+/*
+ * These symbols should not be exported from libc, but
+ * /lib/libm.so.2 references _thr_main.  libm needs to be fixed.
+ * Also, some older versions of the Studio compiler/debugger
+ * components reference them.  These need to be fixed, too.
+ */
+#pragma weak _thr_main = thr_main
+#pragma weak _thr_create = thr_create
+#pragma weak _thr_join = thr_join
+#pragma weak _thr_self = thr_self
+
 #undef errno
 extern int errno;
 
@@ -243,7 +254,7 @@ dead_and_buried(ulwp_t *ulwp)
 	if (ulwp->ul_lwpid == (lwpid_t)(-1))
 		return (1);
 	if (ulwp->ul_dead && ulwp->ul_detached &&
-	    __lwp_kill(ulwp->ul_lwpid, 0) == ESRCH) {
+	    _lwp_kill(ulwp->ul_lwpid, 0) == ESRCH) {
 		ulwp->ul_lwpid = (lwpid_t)(-1);
 		return (1);
 	}
@@ -512,7 +523,7 @@ ulwp_broadcast(ulwp_t *ulwp)
 	uberdata_t *udp = self->ul_uberdata;
 
 	ASSERT(MUTEX_OWNED(ulwp_mutex(ulwp, udp), self));
-	(void) cond_broadcast_internal(ulwp_condvar(ulwp, udp));
+	(void) cond_broadcast(ulwp_condvar(ulwp, udp));
 }
 
 /*
@@ -591,7 +602,7 @@ _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 	if (flags & THR_DAEMON)
 		lwp_flags |= LWP_DAEMON;
 
-	/* creating a thread: enforce mt-correctness in _mutex_lock() */
+	/* creating a thread: enforce mt-correctness in mutex_lock() */
 	self->ul_async_safe = 1;
 
 	/* per-thread copies of global variables, for speed */
@@ -635,12 +646,12 @@ _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 	_fpinherit(ulwp);
 	/*
 	 * Defer signals on the new thread until its TLS constructors
-	 * have been called.  _thr_setup() will call sigon() after
+	 * have been called.  _thrp_setup() will call sigon() after
 	 * it has called tls_setup().
 	 */
 	ulwp->ul_sigdefer = 1;
 
-	if (setup_context(&uc, _thr_setup, ulwp,
+	if (setup_context(&uc, _thrp_setup, ulwp,
 	    (caddr_t)ulwp->ul_stk + ulwp->ul_guardsize, stksize) != 0)
 		error = EAGAIN;
 
@@ -702,9 +713,8 @@ _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 	return (0);
 }
 
-#pragma weak thr_create = _thr_create
 int
-_thr_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
+thr_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 	long flags, thread_t *new_thread)
 {
 	return (_thrp_create(stk, stksize, func, arg, flags, new_thread, 0));
@@ -714,7 +724,7 @@ _thr_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
  * A special cancellation cleanup hook for DCE.
  * cleanuphndlr, when it is not NULL, will contain a callback
  * function to be called before a thread is terminated in
- * _thr_exit() as a result of being cancelled.
+ * thr_exit() as a result of being cancelled.
  */
 static void (*cleanuphndlr)(void) = NULL;
 
@@ -887,8 +897,8 @@ collect_queue_statistics()
 }
 #endif
 
-void
-_thr_exit_common(void *status, int unwind)
+static void __NORETURN
+_thrp_exit_common(void *status, int unwind)
 {
 	ulwp_t *self = curthread;
 	int cancelled = (self->ul_cancel_pending && status == PTHREAD_CANCELED);
@@ -919,7 +929,7 @@ _thr_exit_common(void *status, int unwind)
 	 * bad behavior.  Such signals will be lost to the process
 	 * when the thread finishes exiting.
 	 */
-	(void) _thr_sigsetmask(SIG_SETMASK, &maskset, NULL);
+	(void) thr_sigsetmask(SIG_SETMASK, &maskset, NULL);
 	sigoff(self);
 
 	self->ul_rval = status;
@@ -938,7 +948,10 @@ _thr_exit_common(void *status, int unwind)
 	 * It never returns.
 	 */
 	_thrp_unwind(NULL);
-	thr_panic("_thr_exit_common(): _thrp_unwind() returned");
+	thr_panic("_thrp_exit_common(): _thrp_unwind() returned");
+
+	for (;;)	/* to shut the compiler up about __NORETURN */
+		continue;
 }
 
 /*
@@ -946,18 +959,17 @@ _thr_exit_common(void *status, int unwind)
  * We are at the top of the stack; no unwinding is necessary.
  */
 void
-_thr_terminate(void *status)
+_thrp_terminate(void *status)
 {
-	_thr_exit_common(status, 0);
+	_thrp_exit_common(status, 0);
 }
 
-#pragma weak thr_exit = _thr_exit
-#pragma weak pthread_exit = _thr_exit
-#pragma weak _pthread_exit = _thr_exit
+#pragma weak pthread_exit = thr_exit
+#pragma weak _thr_exit = thr_exit
 void
-_thr_exit(void *status)
+thr_exit(void *status)
 {
-	_thr_exit_common(status, 1);
+	_thrp_exit_common(status, 1);
 }
 
 int
@@ -1047,9 +1059,8 @@ _thrp_join(thread_t tid, thread_t *departed, void **status, int do_cancel)
 	return (0);
 }
 
-#pragma weak thr_join = _thr_join
 int
-_thr_join(thread_t tid, thread_t *departed, void **status)
+thr_join(thread_t tid, thread_t *departed, void **status)
 {
 	int error = _thrp_join(tid, departed, status, 1);
 	return ((error == EINVAL)? ESRCH : error);
@@ -1061,17 +1072,15 @@ _thr_join(thread_t tid, thread_t *departed, void **status)
  * and hence does not have a "departed" argument.
  * It returns EINVAL if tid refers to a detached thread.
  */
-#pragma weak pthread_join = _pthread_join
+#pragma weak _pthread_join = pthread_join
 int
-_pthread_join(pthread_t tid, void **status)
+pthread_join(pthread_t tid, void **status)
 {
 	return ((tid == 0)? ESRCH : _thrp_join(tid, NULL, status, 1));
 }
 
-#pragma weak pthread_detach = _thr_detach
-#pragma weak _pthread_detach = _thr_detach
 int
-_thr_detach(thread_t tid)
+pthread_detach(pthread_t tid)
 {
 	uberdata_t *udp = curthread->ul_uberdata;
 	ulwp_t *ulwp;
@@ -1092,20 +1101,6 @@ _thr_detach(thread_t tid)
 		ulwp_unlock(ulwp, udp);
 	}
 	return (error);
-}
-
-/*
- * Static local string compare function to avoid calling strncmp()
- * (and hence the dynamic linker) during library initialization.
- */
-static int
-sncmp(const char *s1, const char *s2, size_t n)
-{
-	n++;
-	while (--n != 0 && *s1 == *s2++)
-		if (*s1++ == '\0')
-			return (0);
-	return (n == 0 ? 0 : *(uchar_t *)s1 - *(uchar_t *)--s2);
 }
 
 static const char *
@@ -1184,18 +1179,18 @@ etest(const char *ev)
 static void
 set_thread_vars()
 {
-	extern const char **_environ;
+	extern const char **environ;
 	const char **pev;
 	const char *ev;
 	char c;
 
-	if ((pev = _environ) == NULL)
+	if ((pev = environ) == NULL)
 		return;
 	while ((ev = *pev++) != NULL) {
 		c = *ev;
-		if (c == '_' && sncmp(ev, "_THREAD_", 8) == 0)
+		if (c == '_' && strncmp(ev, "_THREAD_", 8) == 0)
 			etest(ev + 8);
-		if (c == 'L' && sncmp(ev, "LIBTHREAD_", 10) == 0)
+		if (c == 'L' && strncmp(ev, "LIBTHREAD_", 10) == 0)
 			etest(ev + 10);
 	}
 }
@@ -1314,7 +1309,7 @@ libc_init(void)
 	self->ul_forw = self->ul_back = self;
 	self->ul_hash = NULL;
 	self->ul_ix = 0;
-	self->ul_lwpid = 1; /* __lwp_self() */
+	self->ul_lwpid = 1; /* _lwp_self() */
 	self->ul_main = 1;
 	self->ul_self = self;
 	self->ul_policy = -1;		/* initialize only when needed */
@@ -1603,7 +1598,7 @@ postfork1_child()
 	__libc_threaded = 0;
 	for (i = 0; i < udp->hash_size; i++)
 		udp->thr_hash_table[i].hash_bucket = NULL;
-	self->ul_lwpid = __lwp_self();
+	self->ul_lwpid = _lwp_self();
 	hash_in_unlocked(self, TIDHASH(self->ul_lwpid, udp), udp);
 
 	/*
@@ -1611,8 +1606,10 @@ postfork1_child()
 	 * while holding udp->callout_lock or udp->ld_lock.
 	 * Reinitialize the child's copies.
 	 */
-	mutex_init(&udp->callout_lock, USYNC_THREAD | LOCK_RECURSIVE, NULL);
-	mutex_init(&udp->ld_lock, USYNC_THREAD | LOCK_RECURSIVE, NULL);
+	(void) mutex_init(&udp->callout_lock,
+	    USYNC_THREAD | LOCK_RECURSIVE, NULL);
+	(void) mutex_init(&udp->ld_lock,
+	    USYNC_THREAD | LOCK_RECURSIVE, NULL);
 
 	/* no one in the child is on a sleep queue; reinitialize */
 	if ((qp = udp->queue_head) != NULL) {
@@ -1692,19 +1689,16 @@ lwp_self(void)
 	return (curthread->ul_lwpid);
 }
 
-#pragma weak _ti_thr_self = _thr_self
-#pragma weak thr_self = _thr_self
-#pragma weak pthread_self = _thr_self
-#pragma weak _pthread_self = _thr_self
+#pragma weak _ti_thr_self = thr_self
+#pragma weak pthread_self = thr_self
 thread_t
-_thr_self()
+thr_self()
 {
 	return (curthread->ul_lwpid);
 }
 
-#pragma weak thr_main = _thr_main
 int
-_thr_main()
+thr_main()
 {
 	ulwp_t *self = __curthread();
 
@@ -1726,9 +1720,9 @@ _thrp_stksegment(ulwp_t *ulwp, stack_t *stk)
 	return (0);
 }
 
-#pragma weak thr_stksegment = _thr_stksegment
+#pragma weak _thr_stksegment = thr_stksegment
 int
-_thr_stksegment(stack_t *stk)
+thr_stksegment(stack_t *stk)
 {
 	return (_thrp_stksegment(curthread, stk));
 }
@@ -1747,7 +1741,7 @@ force_continue(ulwp_t *ulwp)
 	ASSERT(MUTEX_OWNED(ulwp_mutex(ulwp, udp), self));
 
 	for (;;) {
-		error = __lwp_continue(ulwp->ul_lwpid);
+		error = _lwp_continue(ulwp->ul_lwpid);
 		if (error != 0 && error != EINTR)
 			break;
 		error = 0;
@@ -1869,7 +1863,7 @@ top:
 		}
 	}
 
-	(void) cond_broadcast_internal(cvp);
+	(void) cond_broadcast(cvp);
 	lmutex_unlock(mp);
 	return (error);
 }
@@ -2099,36 +2093,32 @@ _thrp_continue(thread_t tid, uchar_t whystopped)
 	return (error);
 }
 
-#pragma weak thr_suspend = _thr_suspend
 int
-_thr_suspend(thread_t tid)
+thr_suspend(thread_t tid)
 {
 	return (_thrp_suspend(tid, TSTP_REGULAR));
 }
 
-#pragma weak thr_continue = _thr_continue
 int
-_thr_continue(thread_t tid)
+thr_continue(thread_t tid)
 {
 	return (_thrp_continue(tid, TSTP_REGULAR));
 }
 
-#pragma weak thr_yield = _thr_yield
 void
-_thr_yield()
+thr_yield()
 {
 	yield();
 }
 
-#pragma weak thr_kill = _thr_kill
-#pragma weak pthread_kill = _thr_kill
-#pragma weak _pthread_kill = _thr_kill
+#pragma weak pthread_kill = thr_kill
+#pragma weak _thr_kill = thr_kill
 int
-_thr_kill(thread_t tid, int sig)
+thr_kill(thread_t tid, int sig)
 {
 	if (sig == SIGCANCEL)
 		return (EINVAL);
-	return (__lwp_kill(tid, sig));
+	return (_lwp_kill(tid, sig));
 }
 
 /*
@@ -2200,7 +2190,7 @@ _ti_bind_guard(int flags)
 	if ((flags & (THR_FLG_NOLOCK | THR_FLG_REENTER)) == THR_FLG_NOLOCK) {
 		ASSERT(self->ul_critical == 0);
 		sigoff(self);	/* see no signals while holding ld_lock */
-		mutex_lock(&udp->ld_lock);
+		(void) mutex_lock(&udp->ld_lock);
 	}
 	enter_critical(self);
 	self->ul_save_state = self->ul_cancel_disabled;
@@ -2226,7 +2216,7 @@ _ti_bind_clear(int flags)
 	if ((flags & (THR_FLG_NOLOCK | THR_FLG_REENTER)) == THR_FLG_NOLOCK) {
 		ASSERT(self->ul_critical == 0);
 		if (MUTEX_OWNED(&udp->ld_lock, self)) {
-			mutex_unlock(&udp->ld_lock);
+			(void) mutex_unlock(&udp->ld_lock);
 			sigon(self);	/* reenable signals */
 		}
 	}
@@ -2237,7 +2227,7 @@ _ti_bind_clear(int flags)
  * sigoff() and sigon() enable cond_wait() to behave (optionally) like
  * it does in the old libthread (see the comments in cond_wait_queue()).
  * Also, signals are deferred at thread startup until TLS constructors
- * have all been called, at which time _thr_setup() calls sigon().
+ * have all been called, at which time _thrp_setup() calls sigon().
  *
  * _sigoff() and _sigon() are external consolidation-private interfaces to
  * sigoff() and sigon(), respectively, in libc.  These are used in libnsl.
@@ -2272,23 +2262,20 @@ sigon(ulwp_t *self)
 	}
 }
 
-#pragma weak thr_getconcurrency = _thr_getconcurrency
 int
-_thr_getconcurrency()
+thr_getconcurrency()
 {
 	return (thr_concurrency);
 }
 
-#pragma weak pthread_getconcurrency = _pthread_getconcurrency
 int
-_pthread_getconcurrency()
+pthread_getconcurrency()
 {
 	return (pthread_concurrency);
 }
 
-#pragma weak thr_setconcurrency = _thr_setconcurrency
 int
-_thr_setconcurrency(int new_level)
+thr_setconcurrency(int new_level)
 {
 	uberdata_t *udp = curthread->ul_uberdata;
 
@@ -2303,9 +2290,8 @@ _thr_setconcurrency(int new_level)
 	return (0);
 }
 
-#pragma weak pthread_setconcurrency = _pthread_setconcurrency
 int
-_pthread_setconcurrency(int new_level)
+pthread_setconcurrency(int new_level)
 {
 	if (new_level < 0)
 		return (EINVAL);
@@ -2315,10 +2301,8 @@ _pthread_setconcurrency(int new_level)
 	return (0);
 }
 
-#pragma weak thr_min_stack = _thr_min_stack
-#pragma weak __pthread_min_stack = _thr_min_stack
 size_t
-_thr_min_stack(void)
+thr_min_stack(void)
 {
 	return (MINSTACK);
 }
@@ -2346,9 +2330,9 @@ cond_t	mutatorscv = DEFAULTCV;		/* where non-mutators sleep. */
  * Get the available register state for the target thread.
  * Return non-volatile registers: TRS_NONVOLATILE
  */
-#pragma weak thr_getstate = _thr_getstate
+#pragma weak _thr_getstate = thr_getstate
 int
-_thr_getstate(thread_t tid, int *flag, lwpid_t *lwp, stack_t *ss, gregset_t rs)
+thr_getstate(thread_t tid, int *flag, lwpid_t *lwp, stack_t *ss, gregset_t rs)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -2393,9 +2377,9 @@ _thr_getstate(thread_t tid, int *flag, lwpid_t *lwp, stack_t *ss, gregset_t rs)
  * Set the appropriate register state for the target thread.
  * This is not used by java.  It exists solely for the MSTC test suite.
  */
-#pragma weak thr_setstate = _thr_setstate
+#pragma weak _thr_setstate = thr_setstate
 int
-_thr_setstate(thread_t tid, int flag, gregset_t rs)
+thr_setstate(thread_t tid, int flag, gregset_t rs)
 {
 	uberdata_t *udp = curthread->ul_uberdata;
 	ulwp_t *ulwp;
@@ -2524,9 +2508,9 @@ __gettsp(thread_t tid)
  * This tells java stack walkers how to find the ucontext
  * structure passed to signal handlers.
  */
-#pragma weak thr_sighndlrinfo = _thr_sighndlrinfo
+#pragma weak _thr_sighndlrinfo = thr_sighndlrinfo
 void
-_thr_sighndlrinfo(void (**func)(), int *funcsize)
+thr_sighndlrinfo(void (**func)(), int *funcsize)
 {
 	*func = &__sighndlr;
 	*funcsize = (char *)&__sighndlrend - (char *)&__sighndlr;
@@ -2536,9 +2520,9 @@ _thr_sighndlrinfo(void (**func)(), int *funcsize)
  * Mark a thread a mutator or reset a mutator to being a default,
  * non-mutator thread.
  */
-#pragma weak thr_setmutator = _thr_setmutator
+#pragma weak _thr_setmutator = thr_setmutator
 int
-_thr_setmutator(thread_t tid, int enabled)
+thr_setmutator(thread_t tid, int enabled)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -2566,11 +2550,11 @@ top:
 		lmutex_lock(&mutatorslock);
 		if (mutatorsbarrier) {
 			ulwp_unlock(ulwp, udp);
-			(void) _pthread_setcancelstate(PTHREAD_CANCEL_DISABLE,
+			(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE,
 			    &cancel_state);
 			while (mutatorsbarrier)
-				(void) _cond_wait(&mutatorscv, &mutatorslock);
-			(void) _pthread_setcancelstate(cancel_state, NULL);
+				(void) cond_wait(&mutatorscv, &mutatorslock);
+			(void) pthread_setcancelstate(cancel_state, NULL);
 			lmutex_unlock(&mutatorslock);
 			goto top;
 		}
@@ -2586,9 +2570,9 @@ top:
  * Establish a barrier against new mutators.  Any non-mutator trying
  * to become a mutator is suspended until the barrier is removed.
  */
-#pragma weak thr_mutators_barrier = _thr_mutators_barrier
+#pragma weak _thr_mutators_barrier = thr_mutators_barrier
 void
-_thr_mutators_barrier(int enabled)
+thr_mutators_barrier(int enabled)
 {
 	int oldvalue;
 	int cancel_state;
@@ -2598,10 +2582,10 @@ _thr_mutators_barrier(int enabled)
 	/*
 	 * Wait if trying to set the barrier while it is already set.
 	 */
-	(void) _pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 	while (mutatorsbarrier && enabled)
-		(void) _cond_wait(&mutatorscv, &mutatorslock);
-	(void) _pthread_setcancelstate(cancel_state, NULL);
+		(void) cond_wait(&mutatorscv, &mutatorslock);
+	(void) pthread_setcancelstate(cancel_state, NULL);
 
 	oldvalue = mutatorsbarrier;
 	mutatorsbarrier = enabled;
@@ -2609,7 +2593,7 @@ _thr_mutators_barrier(int enabled)
 	 * Wakeup any blocked non-mutators when barrier is removed.
 	 */
 	if (oldvalue && !enabled)
-		(void) cond_broadcast_internal(&mutatorscv);
+		(void) cond_broadcast(&mutatorscv);
 	lmutex_unlock(&mutatorslock);
 }
 
@@ -2619,9 +2603,9 @@ _thr_mutators_barrier(int enabled)
  * in this list are suspended.  Actively running non-mutators remain
  * running.  Any other thread is suspended.
  */
-#pragma weak thr_suspend_allmutators = _thr_suspend_allmutators
+#pragma weak _thr_suspend_allmutators = thr_suspend_allmutators
 int
-_thr_suspend_allmutators(void)
+thr_suspend_allmutators(void)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -2678,9 +2662,9 @@ top:
  * suspended mutator, whether suspended by thr_suspend_mutator(), or by
  * thr_suspend_allmutators(), can be resumed by thr_continue_mutator().
  */
-#pragma weak thr_suspend_mutator = _thr_suspend_mutator
+#pragma weak _thr_suspend_mutator = thr_suspend_mutator
 int
-_thr_suspend_mutator(thread_t tid)
+thr_suspend_mutator(thread_t tid)
 {
 	if (tid == 0)
 		tid = curthread->ul_lwpid;
@@ -2690,9 +2674,9 @@ _thr_suspend_mutator(thread_t tid)
 /*
  * Resume the set of all suspended mutators.
  */
-#pragma weak thr_continue_allmutators = _thr_continue_allmutators
+#pragma weak _thr_continue_allmutators = thr_continue_allmutators
 int
-_thr_continue_allmutators()
+thr_continue_allmutators()
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -2731,26 +2715,26 @@ _thr_continue_allmutators()
 /*
  * Resume a suspended mutator.
  */
-#pragma weak thr_continue_mutator = _thr_continue_mutator
+#pragma weak _thr_continue_mutator = thr_continue_mutator
 int
-_thr_continue_mutator(thread_t tid)
+thr_continue_mutator(thread_t tid)
 {
 	return (_thrp_continue(tid, TSTP_MUTATOR));
 }
 
-#pragma weak thr_wait_mutator = _thr_wait_mutator
+#pragma weak _thr_wait_mutator = thr_wait_mutator
 int
-_thr_wait_mutator(thread_t tid, int dontwait)
+thr_wait_mutator(thread_t tid, int dontwait)
 {
 	uberdata_t *udp = curthread->ul_uberdata;
 	ulwp_t *ulwp;
 	int cancel_state;
 	int error = 0;
 
-	(void) _pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel_state);
 top:
 	if ((ulwp = find_lwp(tid)) == NULL) {
-		(void) _pthread_setcancelstate(cancel_state, NULL);
+		(void) pthread_setcancelstate(cancel_state, NULL);
 		return (ESRCH);
 	}
 
@@ -2763,13 +2747,13 @@ top:
 		cond_t *cvp = ulwp_condvar(ulwp, udp);
 		mutex_t *mp = ulwp_mutex(ulwp, udp);
 
-		(void) _cond_wait(cvp, mp);
+		(void) cond_wait(cvp, mp);
 		(void) lmutex_unlock(mp);
 		goto top;
 	}
 
 	ulwp_unlock(ulwp, udp);
-	(void) _pthread_setcancelstate(cancel_state, NULL);
+	(void) pthread_setcancelstate(cancel_state, NULL);
 	return (error);
 }
 

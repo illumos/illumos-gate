@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -230,20 +229,18 @@ typedef struct {
 /* PRIVATE GLOBAL VARIABLES */
 
 /*
- * Flags to indicate whether any NaNs or infinities have been read
- * or written.  These are exported solely for the use of the old
- * Sun Fortran runtime library.  Once that becomes obsolete, these
- * can be removed.
+ * Thread-specific flags to indicate whether any NaNs or infinities
+ * have been read or written.
  */
-extern int *_thr_get_inf_read(void);
-extern int *_thr_get_inf_written(void);
-extern int *_thr_get_nan_read(void);
-extern int *_thr_get_nan_written(void);
+extern int *_thrp_get_inf_read(void);
+extern int *_thrp_get_inf_written(void);
+extern int *_thrp_get_nan_read(void);
+extern int *_thrp_get_nan_written(void);
 
-#define	__inf_read		(*(int *)_thr_get_inf_read())
-#define	__inf_written		(*(int *)_thr_get_inf_written())
-#define	__nan_read		(*(int *)_thr_get_nan_read())
-#define	__nan_written		(*(int *)_thr_get_nan_written())
+#define	__inf_read		(*(int *)_thrp_get_inf_read())
+#define	__inf_written		(*(int *)_thrp_get_inf_written())
+#define	__nan_read		(*(int *)_thrp_get_nan_read())
+#define	__nan_written		(*(int *)_thrp_get_nan_written())
 
 /*
  * Powers of 5 in base 2**16 and powers of 2 in base 10**4.

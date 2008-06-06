@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,9 +56,6 @@ static int	LASTOP;
 static int	DIRINIT;
 static FILE *acf;    /* pointer into audit control file */
 static mutex_t mutex_acf = DEFAULTMUTEX;
-
-extern int _mutex_lock(mutex_t *);
-extern int _mutex_unlock(mutex_t *);
 
 /*
  * getacinfo.c  -  get audit control info
@@ -103,12 +101,12 @@ getacdir(dir, len)
 	/* void	setac(); */
 
 	/* open file if it is not already opened */
-	_mutex_lock(&mutex_acf);
+	(void) mutex_lock(&mutex_acf);
 	if (acf == NULL && (acf = fopen(AUDIT_CTRL, "rF")) == NULL)
 		retstat = ERROR;
 	else if (LASTOP != DIROP && DIRINIT == 1) {
 		retstat = REW_WARN;
-		_mutex_unlock(&mutex_acf);
+		(void) mutex_unlock(&mutex_acf);
 		setac();
 	} else {
 		DIRINIT = 1;
@@ -171,7 +169,7 @@ getacdir(dir, len)
 		}
 	} while (gotone == 0 && retstat >= SUCCESS);
 
-	_mutex_unlock(&mutex_acf);
+	(void) mutex_unlock(&mutex_acf);
 	return (retstat);
 }
 
@@ -199,7 +197,7 @@ getacmin(min_val)
 	char	entry[LEN];
 
 	/* open file if it is not already opened */
-	_mutex_lock(&mutex_acf);
+	(void) mutex_lock(&mutex_acf);
 	if (acf == NULL && (acf = fopen(AUDIT_CTRL, "rF")) == NULL)
 		retstat = ERROR;
 	else
@@ -247,7 +245,7 @@ getacmin(min_val)
 		DIRINIT = 0;
 	}
 
-	_mutex_unlock(&mutex_acf);
+	(void) mutex_unlock(&mutex_acf);
 	return (retstat);
 }
 
@@ -277,7 +275,7 @@ getacflg(auditstring, len)
 	char	entry[LEN];
 
 	/* open file if it is not already opened */
-	_mutex_lock(&mutex_acf);
+	(void) mutex_lock(&mutex_acf);
 	if (acf == NULL && (acf = fopen(AUDIT_CTRL, "rF")) == NULL)
 		retstat = ERROR;
 	else
@@ -340,7 +338,7 @@ getacflg(auditstring, len)
 		DIRINIT = 0;
 	}
 
-	_mutex_unlock(&mutex_acf);
+	(void) mutex_unlock(&mutex_acf);
 	return (retstat);
 }
 
@@ -370,7 +368,7 @@ getacna(auditstring, len)
 	char	entry[LEN];
 
 	/* open file if it is not already opened */
-	_mutex_lock(&mutex_acf);
+	(void) mutex_lock(&mutex_acf);
 	if (acf == NULL && (acf = fopen(AUDIT_CTRL, "rF")) == NULL) {
 		retstat = ERROR;
 	} else {
@@ -439,7 +437,7 @@ getacna(auditstring, len)
 		DIRINIT = 0;
 	}
 
-	_mutex_unlock(&mutex_acf);
+	(void) mutex_unlock(&mutex_acf);
 	return (retstat);
 }
 
@@ -448,14 +446,14 @@ getacna(auditstring, len)
 void
 setac()
 {
-	_mutex_lock(&mutex_acf);
+	(void) mutex_lock(&mutex_acf);
 	if (acf == NULL)
 		acf = fopen(AUDIT_CTRL, "rF");
 	else
 		rewind(acf);
 	LASTOP = DIROP;
 	DIRINIT = 0;
-	_mutex_unlock(&mutex_acf);
+	(void) mutex_unlock(&mutex_acf);
 }
 
 
@@ -463,12 +461,12 @@ setac()
 void
 endac()
 {
-	_mutex_lock(&mutex_acf);
+	(void) mutex_lock(&mutex_acf);
 	if (acf != NULL) {
 		(void) fclose(acf);
 		acf = NULL;
 	}
 	LASTOP = DIROP;
 	DIRINIT = 0;
-	_mutex_unlock(&mutex_acf);
+	(void) mutex_unlock(&mutex_acf);
 }

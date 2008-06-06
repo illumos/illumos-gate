@@ -26,7 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#include "lint.h"
 #include <synch.h>
 #include <time.h>
 #include <errno.h>

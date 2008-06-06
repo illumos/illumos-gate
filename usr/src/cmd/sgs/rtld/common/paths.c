@@ -20,18 +20,20 @@
  */
 
 /*
- *	Copyright (c) 1988 AT&T
- *	  All Rights Reserved
- *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*
+ *	Copyright (c) 1988 AT&T
+ *	  All Rights Reserved
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PATH setup and search directory functions.
  */
-#include	"_synonyms.h"
 
 #include	<stdio.h>
 #include	<limits.h>
@@ -234,10 +236,12 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 			/* BEGIN CSTYLED */
 			if (search) {
 				if (dirlist->p_orig & LA_SER_CONFIG)
-				    (void) printf(MSG_INTL(MSG_LDD_PTH_ENDDFLC),
-					config->c_name);
+					(void) printf(
+					    MSG_INTL(MSG_LDD_PTH_ENDDFLC),
+					    config->c_name);
 				else
-				    (void) printf(MSG_INTL(MSG_LDD_PTH_ENDDFL));
+					(void) printf(
+					    MSG_INTL(MSG_LDD_PTH_ENDDFL));
 			}
 			/* END CSTYLED */
 		}
@@ -806,15 +810,17 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 		if (lml->lm_flags & LML_FLG_TRC_ENABLE) {
 			/* BEGIN CSTYLED */
 			if ((FLAGS1(clmp) & FL1_RT_LDDSTUB) == 0) {
-			    if (lml->lm_flags &
-				(LML_FLG_TRC_VERBOSE | LML_FLG_TRC_SEARCH))
-				    (void) printf(MSG_INTL(MSG_LDD_FIL_FIND),
-					opath, NAME(clmp));
+				if (lml->lm_flags &
+				    (LML_FLG_TRC_VERBOSE | LML_FLG_TRC_SEARCH))
+					(void) printf(
+					    MSG_INTL(MSG_LDD_FIL_FIND),
+					    opath, NAME(clmp));
 
-			    if (((rtld_flags & RT_FL_SILENCERR) == 0) ||
-				(lml->lm_flags & LML_FLG_TRC_VERBOSE))
-				    (void) printf(MSG_INTL(MSG_LDD_FIL_ILLEGAL),
-					opath);
+				if (((rtld_flags & RT_FL_SILENCERR) == 0) ||
+				    (lml->lm_flags & LML_FLG_TRC_VERBOSE))
+					(void) printf(
+					    MSG_INTL(MSG_LDD_FIL_ILLEGAL),
+					    opath);
 			}
 			/* END CSTYLED */
 		} else

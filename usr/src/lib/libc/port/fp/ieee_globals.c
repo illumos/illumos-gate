@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -18,10 +17,14 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ */
+
+/*
  * Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
  * All Rights Reserved
  *
@@ -37,8 +40,7 @@
  * modes; IEEE floating-point arithmetic exception handling;
  */
 
-
-#include "synonyms.h"
+#include "lint.h"
 #include <thread.h>
 #include <synch.h>
 #include <mtlib.h>
@@ -59,25 +61,25 @@ typedef struct {
 #define	fpvars	((fpvars_t *)tsdalloc(_T_FP_GET, sizeof (fpvars_t), NULL))
 
 int *
-_thr_get_nan_written()
+_thrp_get_nan_written()
 {
-	return (_thr_main() ? &__nan_written : &fpvars->__nan_written);
+	return (thr_main() ? &__nan_written : &fpvars->__nan_written);
 }
 
 int *
-_thr_get_nan_read()
+_thrp_get_nan_read()
 {
-	return (_thr_main() ? &__nan_read : &fpvars->__nan_read);
+	return (thr_main() ? &__nan_read : &fpvars->__nan_read);
 }
 
 int *
-_thr_get_inf_written()
+_thrp_get_inf_written()
 {
-	return (_thr_main() ? &__inf_written : &fpvars->__inf_written);
+	return (thr_main() ? &__inf_written : &fpvars->__inf_written);
 }
 
 int *
-_thr_get_inf_read()
+_thrp_get_inf_read()
 {
-	return (_thr_main() ? &__inf_read : &fpvars->__inf_read);
+	return (thr_main() ? &__inf_read : &fpvars->__inf_read);
 }

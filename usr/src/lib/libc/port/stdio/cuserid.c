@@ -24,14 +24,14 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma weak cuserid = _cuserid
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#pragma weak _cuserid = cuserid
+
+#include "lint.h"
 #include <stdio.h>
 #include <pwd.h>
 #include <string.h>

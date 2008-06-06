@@ -30,7 +30,6 @@
  * Initialization routines for the library version of libumem.
  */
 
-#include "c_synonyms.h"
 #include "umem_base.h"
 #include "vmem_base.h"
 #include <unistd.h>

@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,22 +114,22 @@ _nss_dns_init(void)
 	/* If no libresolv library, then load one */
 	if (res_gethostbyname == 0) {
 		if ((reslib =
-		dlopen(NSS_DNS_LIBRESOLV, RTLD_LAZY|RTLD_GLOBAL)) != 0) {
+		    dlopen(NSS_DNS_LIBRESOLV, RTLD_LAZY|RTLD_GLOBAL)) != 0) {
 			/* Turn off /etc/hosts fall back in libresolv */
 			if ((f_void_ptr = (void (*)(void))dlsym(reslib,
-				RES_SET_NO_HOSTS_FALLBACK)) != 0) {
+			    RES_SET_NO_HOSTS_FALLBACK)) != 0) {
 				set_no_hosts_fallback = f_void_ptr;
 			}
 			if ((f_void_ptr = (void (*)(void))dlsym(reslib,
-				RES_SET_NO_HOSTS_FALLBACK)) != 0) {
+			    RES_SET_NO_HOSTS_FALLBACK)) != 0) {
 				unset_no_hosts_fallback = f_void_ptr;
 			}
 			/* Set number of resolver retries */
 			if ((override_retry = (int (*)(int))dlsym(reslib,
-				RES_OVERRIDE_RETRY)) == 0) {
+			    RES_OVERRIDE_RETRY)) == 0) {
 				set_res_retry =
-				(struct __res_state *(*)(void))dlsym(reslib,
-					RES_GET_RES);
+				    (struct __res_state *(*)(void))dlsym(reslib,
+				    RES_GET_RES);
 				override_retry = __fallback_override_retry;
 			}
 			/*
@@ -149,7 +150,7 @@ _nss_dns_init(void)
 			} else {
 				if ((get_h_errno =
 				    (int *(*)(void))dlsym(reslib,
-					RES_GET_H_ERRNO)) == 0) {
+				    RES_GET_H_ERRNO)) == 0) {
 					get_h_errno = __fallback_h_errno;
 				}
 				/*
@@ -159,7 +160,7 @@ _nss_dns_init(void)
 				if ((enable_mt = (int (*)(void))dlsym(reslib,
 				    RES_ENABLE_MT)) != 0 &&
 				    (disable_mt = (int (*)(void))dlsym(reslib,
-					RES_DISABLE_MT)) == 0) {
+				    RES_DISABLE_MT)) == 0) {
 					enable_mt = 0;
 				}
 			}
@@ -177,7 +178,7 @@ _nss_dns_init(void)
 			override_retry = __fallback_override_retry;
 		}
 		if ((get_h_errno = __h_errno) == 0 &&
-			(get_h_errno = __res_get_h_errno) == 0) {
+		    (get_h_errno = __res_get_h_errno) == 0) {
 			get_h_errno = __fallback_h_errno;
 		}
 		if (get_h_errno == __h_errno) {
@@ -277,8 +278,8 @@ switch_resolver_setup(int *mt_disabled, sigset_t *oldmask, int *old_retry) {
 	if (enable_mt == 0 || (*mt_disabled = (*enable_mt)()) != 0) {
 		sigset_t	newmask;
 		(void) sigfillset(&newmask);
-		_thr_sigsetmask(SIG_SETMASK, &newmask, oldmask);
-		_mutex_lock(&one_lane);
+		(void) thr_sigsetmask(SIG_SETMASK, &newmask, oldmask);
+		(void) mutex_lock(&one_lane);
 	}
 
 	/*
@@ -298,8 +299,8 @@ void
 switch_resolver_reset(int mt_disabled, sigset_t oldmask, int old_retry) {
 
 	if (mt_disabled) {
-		_mutex_unlock(&one_lane);
-		_thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
+		(void) mutex_unlock(&one_lane);
+		(void) thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
 	} else {
 		(void) (*disable_mt)();
 	}

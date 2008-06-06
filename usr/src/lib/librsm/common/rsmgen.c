@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,18 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "c_synonyms.h"
-#if !defined(__lint)	/* need a *_synonyms.h file */
-#define	rsm_memseg_export_create	_rsm_memseg_export_create
-#define	rsm_memseg_export_destroy	_rsm_memseg_export_destroy
-#define	rsm_memseg_export_publish	_rsm_memseg_export_publish
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -115,7 +108,7 @@ __rsm_get8x8(rsm_memseg_import_handle_t im_memseg, off_t off,
 {
 	rsmseg_handle_t *seg = (rsmseg_handle_t *)im_memseg;
 	uint8_t *data_addr =
-		(uint8_t *)&seg->rsmseg_vaddr[off - seg->rsmseg_mapoffset];
+	    (uint8_t *)&seg->rsmseg_vaddr[off - seg->rsmseg_mapoffset];
 	uint_t i = 0;
 	int	e;
 
@@ -305,7 +298,7 @@ __rsm_put8x8(rsm_memseg_import_handle_t im_memseg, off_t off,
 {
 	rsmseg_handle_t *seg = (rsmseg_handle_t *)im_memseg;
 	uint8_t *data_addr =
-		(uint8_t *)&seg->rsmseg_vaddr[off - seg->rsmseg_mapoffset];
+	    (uint8_t *)&seg->rsmseg_vaddr[off - seg->rsmseg_mapoffset];
 	uint_t i = 0;
 	int	e;
 
@@ -546,8 +539,8 @@ __rsm_getv(rsm_scat_gath_t *sg_io)
 				if (errno == EINVAL)
 					return (RSMERR_BAD_MEM_ALIGNMENT);
 				else if (errno == ENOMEM || errno == ENXIO ||
-					errno == EOVERFLOW)
-						return (RSMERR_BAD_LENGTH);
+				    errno == EOVERFLOW)
+					return (RSMERR_BAD_LENGTH);
 				else if (errno == EAGAIN)
 					return (RSMERR_INSUFFICIENT_RESOURCES);
 				else
@@ -641,7 +634,7 @@ __rsm_put(rsm_memseg_import_handle_t im_memseg, off_t offset, void *src_addr,
 	}
 
 	bcopy(src_addr, seg->rsmseg_vaddr + offset - seg->rsmseg_mapoffset,
-		length);
+	    length);
 
 	if (seg->rsmseg_barmode == RSM_BARRIER_MODE_IMPLICIT) {
 		e = seg->rsmseg_ops->rsm_memseg_import_close_barrier(
@@ -696,8 +689,8 @@ __rsm_putv(rsm_scat_gath_t *sg_io)
 				if (errno == EINVAL)
 					return (RSMERR_BAD_MEM_ALIGNMENT);
 				else if (errno == ENOMEM || errno == ENXIO ||
-					errno == EOVERFLOW)
-						return (RSMERR_BAD_LENGTH);
+				    errno == EOVERFLOW)
+					return (RSMERR_BAD_LENGTH);
 				else if (errno == EAGAIN)
 					return (RSMERR_INSUFFICIENT_RESOURCES);
 				else
@@ -720,7 +713,7 @@ __rsm_putv(rsm_scat_gath_t *sg_io)
 			if (l_iovec->io_type == RSM_HANDLE_TYPE) {
 				/* Get the surrogate export segment handle */
 				seg_hndl = (rsmseg_handle_t *)
-							l_iovec->local.handle;
+				    l_iovec->local.handle;
 				l_iovec->local.vaddr = seg_hndl->rsmseg_vaddr;
 				l_iovec->io_type = RSM_VA_TYPE;
 			}

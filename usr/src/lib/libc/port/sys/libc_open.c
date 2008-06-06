@@ -29,7 +29,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/mkdev.h>
 #include <limits.h>
 #include <stdarg.h>

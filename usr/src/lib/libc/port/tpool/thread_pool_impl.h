@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,7 +88,7 @@ struct tpool {
 #define	TP_DESTROY	0x04		/* pool is being destroyed */
 #define	TP_ABANDON	0x08		/* pool is abandoned (auto-destroy) */
 
-extern int _pthread_attr_clone(pthread_attr_t *, const pthread_attr_t *);
+extern int pthread_attr_clone(pthread_attr_t *, const pthread_attr_t *);
 
 extern const sigset_t maskset;		/* set of all maskable signals */
 

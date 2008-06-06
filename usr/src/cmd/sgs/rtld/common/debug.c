@@ -26,8 +26,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include	"_synonyms.h"
-
 #include	<sys/types.h>
 #include	<sys/stat.h>
 #include	<sys/param.h>

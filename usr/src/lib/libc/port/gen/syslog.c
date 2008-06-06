@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,13 +53,9 @@
  * The output of this routine is intended to be read by /etc/syslogd.
  */
 
-#pragma weak syslog = _syslog
-#pragma weak vsyslog = _vsyslog
-#pragma weak openlog = _openlog
-#pragma weak closelog = _closelog
-#pragma weak setlogmask = _setlogmask
+#pragma weak _syslog = syslog
 
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/types.h>
 #include <sys/types32.h>
 #include <sys/mman.h>

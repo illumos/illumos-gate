@@ -57,9 +57,9 @@ def_thrattr(void)
  * pthread_attr_init: allocates the attribute object and initializes it
  * with the default values.
  */
-#pragma weak pthread_attr_init = _pthread_attr_init
+#pragma weak _pthread_attr_init = pthread_attr_init
 int
-_pthread_attr_init(pthread_attr_t *attr)
+pthread_attr_init(pthread_attr_t *attr)
 {
 	thrattr_t *ap;
 
@@ -75,9 +75,8 @@ _pthread_attr_init(pthread_attr_t *attr)
  * pthread_attr_destroy: frees the attribute object and invalidates it
  * with NULL value.
  */
-#pragma weak pthread_attr_destroy = _pthread_attr_destroy
 int
-_pthread_attr_destroy(pthread_attr_t *attr)
+pthread_attr_destroy(pthread_attr_t *attr)
 {
 	if (attr == NULL || attr->__pthread_attrp == NULL)
 		return (EINVAL);
@@ -87,10 +86,10 @@ _pthread_attr_destroy(pthread_attr_t *attr)
 }
 
 /*
- * _pthread_attr_clone: make a copy of a pthread_attr_t.
+ * pthread_attr_clone: make a copy of a pthread_attr_t.
  */
 int
-_pthread_attr_clone(pthread_attr_t *attr, const pthread_attr_t *old_attr)
+pthread_attr_clone(pthread_attr_t *attr, const pthread_attr_t *old_attr)
 {
 	thrattr_t *ap;
 	const thrattr_t *old_ap =
@@ -106,12 +105,12 @@ _pthread_attr_clone(pthread_attr_t *attr, const pthread_attr_t *old_attr)
 }
 
 /*
- * _pthread_attr_equal: compare two pthread_attr_t's, return 1 if equal.
+ * pthread_attr_equal: compare two pthread_attr_t's, return 1 if equal.
  * A NULL pthread_attr_t pointer implies default attributes.
  * This is a consolidation-private interface, for librt.
  */
 int
-_pthread_attr_equal(const pthread_attr_t *attr1, const pthread_attr_t *attr2)
+pthread_attr_equal(const pthread_attr_t *attr1, const pthread_attr_t *attr2)
 {
 	const thrattr_t *ap1 = attr1? attr1->__pthread_attrp : def_thrattr();
 	const thrattr_t *ap2 = attr2? attr2->__pthread_attrp : def_thrattr();
@@ -126,9 +125,8 @@ _pthread_attr_equal(const pthread_attr_t *attr1, const pthread_attr_t *attr2)
  * be PTHREAD_STACK_MIN (MINSTACK).
  * This is equivalent to stksize argument in thr_create().
  */
-#pragma weak pthread_attr_setstacksize = _pthread_attr_setstacksize
 int
-_pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
+pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
 {
 	thrattr_t *ap;
 
@@ -143,9 +141,9 @@ _pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
 /*
  * pthread_attr_getstacksize: gets the user stack size.
  */
-#pragma weak pthread_attr_getstacksize = _pthread_attr_getstacksize
+#pragma weak _pthread_attr_getstacksize = pthread_attr_getstacksize
 int
-_pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
+pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
 {
 	thrattr_t *ap;
 
@@ -161,9 +159,8 @@ _pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
  * pthread_attr_setstackaddr: sets the user stack addr.
  * This is equivalent to stkaddr argument in thr_create().
  */
-#pragma weak pthread_attr_setstackaddr = _pthread_attr_setstackaddr
 int
-_pthread_attr_setstackaddr(pthread_attr_t *attr, void *stackaddr)
+pthread_attr_setstackaddr(pthread_attr_t *attr, void *stackaddr)
 {
 	thrattr_t *ap;
 
@@ -177,9 +174,9 @@ _pthread_attr_setstackaddr(pthread_attr_t *attr, void *stackaddr)
 /*
  * pthread_attr_getstackaddr: gets the user stack addr.
  */
-#pragma weak pthread_attr_getstackaddr = _pthread_attr_getstackaddr
+#pragma weak _pthread_attr_getstackaddr = pthread_attr_getstackaddr
 int
-_pthread_attr_getstackaddr(const pthread_attr_t *attr, void **stackaddr)
+pthread_attr_getstackaddr(const pthread_attr_t *attr, void **stackaddr)
 {
 	thrattr_t *ap;
 
@@ -195,9 +192,8 @@ _pthread_attr_getstackaddr(const pthread_attr_t *attr, void **stackaddr)
  * pthread_attr_setdetachstate: sets the detach state to DETACHED or JOINABLE.
  * PTHREAD_CREATE_DETACHED is equivalent to thr_create(THR_DETACHED).
  */
-#pragma weak pthread_attr_setdetachstate = _pthread_attr_setdetachstate
 int
-_pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate)
+pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate)
 {
 	thrattr_t *ap;
 
@@ -213,9 +209,9 @@ _pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate)
 /*
  * pthread_attr_getdetachstate: gets the detach state.
  */
-#pragma weak pthread_attr_getdetachstate = _pthread_attr_getdetachstate
+#pragma weak _pthread_attr_getdetachstate = pthread_attr_getdetachstate
 int
-_pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate)
+pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate)
 {
 	thrattr_t *ap;
 
@@ -233,7 +229,7 @@ _pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate)
  * For now, this is a private interface in libc.
  */
 int
-_pthread_attr_setdaemonstate_np(pthread_attr_t *attr, int daemonstate)
+pthread_attr_setdaemonstate_np(pthread_attr_t *attr, int daemonstate)
 {
 	thrattr_t *ap;
 
@@ -251,7 +247,7 @@ _pthread_attr_setdaemonstate_np(pthread_attr_t *attr, int daemonstate)
  * For now, this is a private interface in libc.
  */
 int
-_pthread_attr_getdaemonstate_np(const pthread_attr_t *attr, int *daemonstate)
+pthread_attr_getdaemonstate_np(const pthread_attr_t *attr, int *daemonstate)
 {
 	thrattr_t *ap;
 
@@ -267,9 +263,8 @@ _pthread_attr_getdaemonstate_np(const pthread_attr_t *attr, int *daemonstate)
  * pthread_attr_setscope: sets the scope to SYSTEM or PROCESS.
  * This is equivalent to setting THR_BOUND flag in thr_create().
  */
-#pragma weak pthread_attr_setscope = _pthread_attr_setscope
 int
-_pthread_attr_setscope(pthread_attr_t *attr, int scope)
+pthread_attr_setscope(pthread_attr_t *attr, int scope)
 {
 	thrattr_t *ap;
 
@@ -285,9 +280,9 @@ _pthread_attr_setscope(pthread_attr_t *attr, int scope)
 /*
  * pthread_attr_getscope: gets the scheduling scope.
  */
-#pragma weak pthread_attr_getscope = _pthread_attr_getscope
+#pragma weak _pthread_attr_getscope = pthread_attr_getscope
 int
-_pthread_attr_getscope(const pthread_attr_t *attr, int *scope)
+pthread_attr_getscope(const pthread_attr_t *attr, int *scope)
 {
 	thrattr_t *ap;
 
@@ -303,9 +298,8 @@ _pthread_attr_getscope(const pthread_attr_t *attr, int *scope)
  * pthread_attr_setinheritsched: sets the scheduling parameters to be
  * EXPLICIT or INHERITED from parent thread.
  */
-#pragma weak pthread_attr_setinheritsched = _pthread_attr_setinheritsched
 int
-_pthread_attr_setinheritsched(pthread_attr_t *attr, int inherit)
+pthread_attr_setinheritsched(pthread_attr_t *attr, int inherit)
 {
 	thrattr_t *ap;
 
@@ -321,9 +315,9 @@ _pthread_attr_setinheritsched(pthread_attr_t *attr, int inherit)
 /*
  * pthread_attr_getinheritsched: gets the scheduling inheritance.
  */
-#pragma weak pthread_attr_getinheritsched = _pthread_attr_getinheritsched
+#pragma weak _pthread_attr_getinheritsched = pthread_attr_getinheritsched
 int
-_pthread_attr_getinheritsched(const pthread_attr_t *attr, int *inherit)
+pthread_attr_getinheritsched(const pthread_attr_t *attr, int *inherit)
 {
 	thrattr_t *ap;
 
@@ -338,9 +332,8 @@ _pthread_attr_getinheritsched(const pthread_attr_t *attr, int *inherit)
 /*
  * pthread_attr_setschedpolicy: sets the scheduling policy.
  */
-#pragma weak pthread_attr_setschedpolicy = _pthread_attr_setschedpolicy
 int
-_pthread_attr_setschedpolicy(pthread_attr_t *attr, int policy)
+pthread_attr_setschedpolicy(pthread_attr_t *attr, int policy)
 {
 	thrattr_t *ap;
 
@@ -355,9 +348,9 @@ _pthread_attr_setschedpolicy(pthread_attr_t *attr, int policy)
 /*
  * pthread_attr_getpolicy: gets the scheduling policy.
  */
-#pragma weak pthread_attr_getschedpolicy = _pthread_attr_getschedpolicy
+#pragma weak _pthread_attr_getschedpolicy = pthread_attr_getschedpolicy
 int
-_pthread_attr_getschedpolicy(const pthread_attr_t *attr, int *policy)
+pthread_attr_getschedpolicy(const pthread_attr_t *attr, int *policy)
 {
 	thrattr_t *ap;
 
@@ -373,9 +366,8 @@ _pthread_attr_getschedpolicy(const pthread_attr_t *attr, int *policy)
  * pthread_attr_setschedparam: sets the scheduling parameters.
  * Currently, we support priority only.
  */
-#pragma weak pthread_attr_setschedparam = _pthread_attr_setschedparam
 int
-_pthread_attr_setschedparam(pthread_attr_t *attr,
+pthread_attr_setschedparam(pthread_attr_t *attr,
 	const struct sched_param *param)
 {
 	thrattr_t *ap;
@@ -392,9 +384,9 @@ _pthread_attr_setschedparam(pthread_attr_t *attr,
  * pthread_attr_getschedparam: gets the scheduling parameters.
  * Currently, only priority is defined as sched parameter.
  */
-#pragma weak pthread_attr_getschedparam = _pthread_attr_getschedparam
+#pragma weak _pthread_attr_getschedparam = pthread_attr_getschedparam
 int
-_pthread_attr_getschedparam(const pthread_attr_t *attr,
+pthread_attr_getschedparam(const pthread_attr_t *attr,
 					struct sched_param *param)
 {
 	thrattr_t *ap;
@@ -411,9 +403,8 @@ _pthread_attr_getschedparam(const pthread_attr_t *attr,
  * UNIX98
  * pthread_attr_setguardsize: sets the guardsize
  */
-#pragma weak pthread_attr_setguardsize = _pthread_attr_setguardsize
 int
-_pthread_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
+pthread_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
 {
 	thrattr_t *ap;
 
@@ -428,9 +419,8 @@ _pthread_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
  * UNIX98
  * pthread_attr_getguardsize: gets the guardsize
  */
-#pragma weak pthread_attr_getguardsize = _pthread_attr_getguardsize
 int
-_pthread_attr_getguardsize(const pthread_attr_t *attr, size_t *guardsize)
+pthread_attr_getguardsize(const pthread_attr_t *attr, size_t *guardsize)
 {
 	thrattr_t *ap;
 
@@ -447,9 +437,8 @@ _pthread_attr_getguardsize(const pthread_attr_t *attr, size_t *guardsize)
  * This is equivalent to the stack_base and stack_size arguments
  * to thr_create().
  */
-#pragma weak pthread_attr_setstack = _pthread_attr_setstack
 int
-_pthread_attr_setstack(pthread_attr_t *attr,
+pthread_attr_setstack(pthread_attr_t *attr,
 	void *stackaddr, size_t stacksize)
 {
 	thrattr_t *ap;
@@ -466,9 +455,8 @@ _pthread_attr_setstack(pthread_attr_t *attr,
 /*
  * pthread_attr_getstack: gets the user stack addr and stack size.
  */
-#pragma weak pthread_attr_getstack = _pthread_attr_getstack
 int
-_pthread_attr_getstack(const pthread_attr_t *attr,
+pthread_attr_getstack(const pthread_attr_t *attr,
 	void **stackaddr, size_t *stacksize)
 {
 	thrattr_t *ap;

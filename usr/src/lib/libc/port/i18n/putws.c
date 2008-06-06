@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,18 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1986 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*	This module is created for NLS on Sep.03.86		*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Putws transforms process codes in wchar_t array pointed to by
@@ -56,12 +53,12 @@ putws(const wchar_t *ptr)
 
 	FLOCKFILE(lk, stdout);
 	for (; *ptr; ptr++) {		/* putwc till NULL */
-		if (_fputwc(*ptr, stdout) == EOF) {
+		if (fputwc(*ptr, stdout) == EOF) {
 			FUNLOCKFILE(lk);
 			return (EOF);
 		}
 	}
-	(void) _fputwc('\n', stdout); /* append a new line */
+	(void) fputwc('\n', stdout); /* append a new line */
 	FUNLOCKFILE(lk);
 
 	if (fflush(stdout))  /* flush line */

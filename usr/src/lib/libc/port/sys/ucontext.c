@@ -26,10 +26,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak getustack = _getustack
-#pragma weak setustack = _setustack
+#pragma weak _getustack = getustack
+#pragma weak _setustack = setustack
 
-#include "synonyms.h"
+#include "lint.h"
 #include <ucontext.h>
 #include <sys/syscall.h>
 

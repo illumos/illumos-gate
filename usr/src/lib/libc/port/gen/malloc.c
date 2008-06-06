@@ -24,10 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Memory management: malloc(), realloc(), free().
@@ -60,7 +60,7 @@
  *			Otherwise, it is always 0.
  */
 
-#include "synonyms.h"
+#include "lint.h"
 #include "mallint.h"
 #include "mtlib.h"
 

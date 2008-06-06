@@ -26,14 +26,14 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak getpgrp = _getpgrp
-#pragma weak setpgrp = _setpgrp
-#pragma weak getsid = _getsid
-#pragma weak setsid = _setsid
-#pragma weak getpgid = _getpgid
-#pragma weak setpgid = _setpgid
+#pragma weak _getpgrp = getpgrp
+#pragma weak _setpgrp = setpgrp
+#pragma weak _getsid = getsid
+#pragma weak _setsid = setsid
+#pragma weak _getpgid = getpgid
+#pragma weak _setpgid = setpgid
 
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/syscall.h>

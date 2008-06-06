@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,14 +34,13 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
-
 /*
  * Compatibility lib for BSD's getrusgae(). Only the
  * CPU time usage is supported for RUSAGE_CHILDREN, and hence does not
  * fully support BSD's rusage semantics.
  */
 
+#include "lint.h"
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/times.h>

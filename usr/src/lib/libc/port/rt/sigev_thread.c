@@ -26,7 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#include "lint.h"
 #include "thr_uberdata.h"
 #include <sys/types.h>
 #include <pthread.h>
@@ -345,7 +345,7 @@ aio_spawner(void *arg)
 
 		if (function == NULL)
 			error = EINVAL;
-		else if (_pthread_attr_equal(attrp, tcdp->tcd_attrp))
+		else if (pthread_attr_equal(attrp, tcdp->tcd_attrp))
 			error = sigev_add_work(tcdp, function, argument);
 		else {
 			/*
@@ -358,12 +358,12 @@ aio_spawner(void *arg)
 			if ((stdp = lmalloc(sizeof (*stdp))) == NULL)
 				error = ENOMEM;
 			else
-				error = _pthread_attr_clone(&local_attr, attrp);
+				error = pthread_attr_clone(&local_attr, attrp);
 
 			if (error == 0) {
 				(void) pthread_attr_setdetachstate(
 				    &local_attr, PTHREAD_CREATE_DETACHED);
-				(void) _pthread_attr_setdaemonstate_np(
+				(void) pthread_attr_setdaemonstate_np(
 				    &local_attr, PTHREAD_CREATE_DAEMON_NP);
 				stdp->std_func = function;
 				stdp->std_arg = argument;
@@ -472,7 +472,7 @@ setup_sigev_handler(const struct sigevent *sigevp, subsystem_t caller)
 		 * pthread_attr_t.
 		 */
 		tcdp->tcd_attrp = &tcdp->tcd_user_attr;
-		error = _pthread_attr_clone(tcdp->tcd_attrp,
+		error = pthread_attr_clone(tcdp->tcd_attrp,
 		    sigevp->sigev_notify_attributes);
 		if (error) {
 			tcdp->tcd_attrp = NULL;

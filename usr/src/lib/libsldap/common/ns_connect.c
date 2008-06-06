@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -48,7 +49,6 @@
 #include <procfs.h>
 #include <unistd.h>
 
-extern unsigned int _sleep(unsigned int);
 extern int ldap_sasl_cram_md5_bind_s(LDAP *, char *, struct berval *,
 		LDAPControl **, LDAPControl **);
 extern int ldapssl_install_gethostbyaddr(LDAP *ld, const char *skip);
@@ -2900,7 +2900,7 @@ __s_api_getConnection(
 	(void) memset(&anon, 0, sizeof (ns_cred_t));
 	anon.auth.type = NS_LDAP_AUTH_NONE;
 
-	for (; ; ) {
+	for (;;) {
 		if (cred != NULL) {
 			/* using specified auth method */
 			rc = makeConnection(&con, server, cred,
@@ -2999,7 +2999,7 @@ __s_api_getConnection(
 		if (flags & NS_LDAP_HARD) {
 			if (sec < LDAPMAXHARDLOOKUPTIME)
 				sec *= 2;
-			_sleep(sec);
+			(void) sleep(sec);
 		} else {
 			break;
 		}

@@ -18,10 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ */
+
+/*
  *	nis/getrpcent.c -- "nis" backend for nsswitch "rpc" database
  */
 
@@ -78,11 +81,11 @@ getbyname(be, a)
 	sigset_t		oldmask, newmask;
 
 	(void) sigfillset(&newmask);
-	(void) _thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
-	(void) _mutex_lock(&no_byname_lock);
+	(void) thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
+	(void) mutex_lock(&no_byname_lock);
 	no_map = no_byname_map;
-	(void) _mutex_unlock(&no_byname_lock);
-	(void) _thr_sigsetmask(SIG_SETMASK, &oldmask, (sigset_t *)NULL);
+	(void) mutex_unlock(&no_byname_lock);
+	(void) thr_sigsetmask(SIG_SETMASK, &oldmask, (sigset_t *)NULL);
 
 	if (no_map == 0) {
 		int		yp_status;
@@ -92,11 +95,11 @@ getbyname(be, a)
 					argp->key.name, &yp_status);
 		if (yp_status == YPERR_MAP) {
 			(void) sigfillset(&newmask);
-			_thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
-			_mutex_lock(&no_byname_lock);
+			(void) thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
+			(void) mutex_lock(&no_byname_lock);
 			no_byname_map = 1;
-			_mutex_unlock(&no_byname_lock);
-			_thr_sigsetmask(SIG_SETMASK, &oldmask,
+			(void) mutex_unlock(&no_byname_lock);
+			(void) thr_sigsetmask(SIG_SETMASK, &oldmask,
 					(sigset_t *)NULL);
 		} else /* if (res == NSS_SUCCESS) <==== */ {
 			return (res);

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,89 +28,47 @@
 SUNWprivate_1.1 {
     global:
 	rsm_create_localmemory_handle;
-	_rsm_create_localmemory_handle;
 	rsm_free_interconnect_topology;
-	_rsm_free_interconnect_topology;
 	rsm_free_localmemory_handle;
-	_rsm_free_localmemory_handle;
 	rsm_get_controller;
-	_rsm_get_controller;
 	rsm_get_controller_attr;
-	_rsm_get_controller_attr;
 	rsm_get_interconnect_topology;
-	_rsm_get_interconnect_topology;
 	rsm_get_segmentid_range;
-	_rsm_get_segmentid_range;
 	rsm_intr_signal_post;
-	_rsm_intr_signal_post;
 	rsm_intr_signal_wait;
-	_rsm_intr_signal_wait;
 	rsm_intr_signal_wait_pollfd;
-	_rsm_intr_signal_wait_pollfd;
 	rsm_memseg_export_create;
-	_rsm_memseg_export_create;
 	rsm_memseg_export_destroy;
-	_rsm_memseg_export_destroy;
 	rsm_memseg_export_publish;
-	_rsm_memseg_export_publish;
 	rsm_memseg_export_rebind;
-	_rsm_memseg_export_rebind;
 	rsm_memseg_export_republish;
-	_rsm_memseg_export_republish;
 	rsm_memseg_export_unpublish;
-	_rsm_memseg_export_unpublish;
 	rsm_memseg_get_pollfd;
-	_rsm_memseg_get_pollfd;
 	rsm_memseg_import_close_barrier;
-	_rsm_memseg_import_close_barrier;
 	rsm_memseg_import_connect;
-	_rsm_memseg_import_connect;
 	rsm_memseg_import_destroy_barrier;
-	_rsm_memseg_import_destroy_barrier;
 	rsm_memseg_import_disconnect;
-	_rsm_memseg_import_disconnect;
 	rsm_memseg_import_get;
-	_rsm_memseg_import_get;
 	rsm_memseg_import_get16;
-	_rsm_memseg_import_get16;
 	rsm_memseg_import_get32;
-	_rsm_memseg_import_get32;
 	rsm_memseg_import_get64;
-	_rsm_memseg_import_get64;
 	rsm_memseg_import_get8;
-	_rsm_memseg_import_get8;
 	rsm_memseg_import_get_mode;
-	_rsm_memseg_import_get_mode;
 	rsm_memseg_import_getv;
-	_rsm_memseg_import_getv;
 	rsm_memseg_import_init_barrier;
-	_rsm_memseg_import_init_barrier;
 	rsm_memseg_import_map;
-	_rsm_memseg_import_map;
 	rsm_memseg_import_open_barrier;
-	_rsm_memseg_import_open_barrier;
 	rsm_memseg_import_order_barrier;
-	_rsm_memseg_import_order_barrier;
 	rsm_memseg_import_put;
-	_rsm_memseg_import_put;
 	rsm_memseg_import_put16;
-	_rsm_memseg_import_put16;
 	rsm_memseg_import_put32;
-	_rsm_memseg_import_put32;
 	rsm_memseg_import_put64;
-	_rsm_memseg_import_put64;
 	rsm_memseg_import_put8;
-	_rsm_memseg_import_put8;
 	rsm_memseg_import_putv;
-	_rsm_memseg_import_putv;
 	rsm_memseg_import_set_mode;
-	_rsm_memseg_import_set_mode;
 	rsm_memseg_import_unmap;
-	_rsm_memseg_import_unmap;
 	rsm_memseg_release_pollfd;
-	_rsm_memseg_release_pollfd;
 	rsm_release_controller;
-	_rsm_release_controller;
     local:
 	*;
 };

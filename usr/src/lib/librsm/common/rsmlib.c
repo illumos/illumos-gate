@@ -20,13 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "c_synonyms.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -52,54 +51,6 @@
 #include <sys/rsm/rsmndi.h>
 #include <rsmlib_in.h>
 #include <sys/rsm/rsm.h>
-
-#ifdef __STDC__
-
-#pragma weak rsm_get_controller = _rsm_get_controller
-#pragma weak rsm_get_controller_attr = _rsm_get_controller_attr
-#pragma weak rsm_release_controller = _rsm_release_controller
-#pragma weak rsm_get_interconnect_topology = _rsm_get_interconnect_topology
-#pragma weak rsm_free_interconnect_topology = _rsm_free_interconnect_topology
-#pragma weak rsm_memseg_export_create = _rsm_memseg_export_create
-#pragma weak rsm_memseg_export_destroy = _rsm_memseg_export_destroy
-#pragma weak rsm_memseg_export_rebind = _rsm_memseg_export_rebind
-#pragma weak rsm_memseg_export_publish = _rsm_memseg_export_publish
-#pragma weak rsm_memseg_export_unpublish = _rsm_memseg_export_unpublish
-#pragma weak rsm_memseg_export_republish = _rsm_memseg_export_republish
-#pragma weak rsm_memseg_import_connect = _rsm_memseg_import_connect
-#pragma weak rsm_memseg_import_disconnect = _rsm_memseg_import_disconnect
-#pragma weak rsm_memseg_import_get8 = _rsm_memseg_import_get8
-#pragma weak rsm_memseg_import_get16 = _rsm_memseg_import_get16
-#pragma weak rsm_memseg_import_get32 = _rsm_memseg_import_get32
-#pragma weak rsm_memseg_import_get64 = _rsm_memseg_import_get64
-#pragma weak rsm_memseg_import_get = _rsm_memseg_import_get
-#pragma weak rsm_memseg_import_getv = _rsm_memseg_import_getv
-#pragma weak rsm_memseg_import_put8 = _rsm_memseg_import_put8
-#pragma weak rsm_memseg_import_put16 = _rsm_memseg_import_put16
-#pragma weak rsm_memseg_import_put32 = _rsm_memseg_import_put32
-#pragma weak rsm_memseg_import_put64 = _rsm_memseg_import_put64
-#pragma weak rsm_memseg_import_put = _rsm_memseg_import_put
-#pragma weak rsm_memseg_import_putv = _rsm_memseg_import_putv
-#pragma weak rsm_memseg_import_map = _rsm_memseg_import_map
-#pragma weak rsm_memseg_import_unmap = _rsm_memseg_import_unmap
-#pragma weak rsm_memseg_import_init_barrier = _rsm_memseg_import_init_barrier
-#pragma weak rsm_memseg_import_open_barrier = _rsm_memseg_import_open_barrier
-#pragma weak rsm_memseg_import_close_barrier = _rsm_memseg_import_close_barrier
-#pragma weak rsm_memseg_import_order_barrier = _rsm_memseg_import_order_barrier
-#pragma weak rsm_memseg_import_destroy_barrier = \
-				_rsm_memseg_import_destroy_barrier
-#pragma weak rsm_memseg_import_get_mode = _rsm_memseg_import_get_mode
-#pragma weak rsm_memseg_import_set_mode = _rsm_memseg_import_set_mode
-#pragma weak rsm_create_localmemory_handle = _rsm_create_localmemory_handle
-#pragma weak rsm_free_localmemory_handle = _rsm_free_localmemory_handle
-#pragma weak rsm_intr_signal_post = _rsm_intr_signal_post
-#pragma weak rsm_intr_signal_wait = _rsm_intr_signal_wait
-#pragma weak rsm_intr_signal_wait_pollfd = _rsm_intr_signal_wait_pollfd
-#pragma weak rsm_memseg_get_pollfd = _rsm_memseg_get_pollfd
-#pragma weak rsm_memseg_release_pollfd = _rsm_memseg_release_pollfd
-#pragma weak rsm_get_segmentid_range = _rsm_get_segmentid_range
-
-#endif /* __STDC__ */
 
 /* lint -w2 */
 extern void __rsmloopback_init_ops(rsm_segops_t *);
@@ -153,14 +104,7 @@ static	rsm_lib_funcs_t lib_functions = {
 	_rsm_get_nodeid
 };
 
-int _rsm_get_interconnect_topology(rsm_topology_t **);
-void _rsm_free_interconnect_topology(rsm_topology_t *);
-int _rsm_memseg_import_open_barrier(rsmapi_barrier_t *);
-int _rsm_memseg_import_close_barrier(rsmapi_barrier_t *);
-int _rsm_memseg_import_unmap(rsm_memseg_import_handle_t);
-
 rsm_topology_t *tp;
-
 
 
 /*
@@ -230,7 +174,7 @@ _rsm_librsm_init()
 	    "_rsm_fd is %d\n", _rsm_fd));
 
 	if (fcntl(_rsm_fd, F_SETFD, FD_CLOEXEC) < 0) {
-	    DBPRINTF((RSM_LIBRARY, RSM_ERR,
+		DBPRINTF((RSM_LIBRARY, RSM_ERR,
 		"F_SETFD failed\n"));
 	}
 
@@ -266,7 +210,7 @@ _rsm_librsm_init()
 		    "unable to obtain topology data\n"));
 		return (e);
 	} else
-	    rsm_local_nodeid = tp->topology_hdr.local_nodeid;
+		rsm_local_nodeid = tp->topology_hdr.local_nodeid;
 
 	rsm_free_interconnect_topology(tp);
 
@@ -604,7 +548,7 @@ _rsm_remove_pollfd_table(int segfd)
 }
 
 int
-_rsm_get_controller(char *name, rsmapi_controller_handle_t *chdl)
+rsm_get_controller(char *name, rsmapi_controller_handle_t *chdl)
 {
 	rsm_controller_t *p;
 	char	cntr_name[MAXNAMELEN];	/* cntr_name=<cntr_type><unit> */
@@ -682,7 +626,7 @@ _rsm_get_controller(char *name, rsmapi_controller_handle_t *chdl)
 }
 
 int
-_rsm_release_controller(rsmapi_controller_handle_t cntr_handle)
+rsm_release_controller(rsmapi_controller_handle_t cntr_handle)
 {
 	int			e = RSM_SUCCESS;
 	rsm_controller_t	*chdl = (rsm_controller_t *)cntr_handle;
@@ -737,7 +681,8 @@ _rsm_release_controller(rsmapi_controller_handle_t cntr_handle)
 	return (e);
 }
 
-int _rsm_get_controller_attr(rsmapi_controller_handle_t chandle,
+int
+rsm_get_controller_attr(rsmapi_controller_handle_t chandle,
     rsmapi_controller_attr_t *attr)
 {
 	rsm_controller_t *p;
@@ -802,7 +747,7 @@ int _rsm_get_controller_attr(rsmapi_controller_handle_t chandle,
  * by vaddr and size
  */
 int
-_rsm_memseg_export_create(rsmapi_controller_handle_t controller,
+rsm_memseg_export_create(rsmapi_controller_handle_t controller,
     rsm_memseg_export_handle_t *memseg,
     void *vaddr,
     size_t length,
@@ -850,7 +795,7 @@ _rsm_memseg_export_create(rsmapi_controller_handle_t controller,
 	}
 
 	if (((size_t)vaddr & (PAGESIZE - 1)) ||
-		(length & (PAGESIZE - 1))) {
+	    (length & (PAGESIZE - 1))) {
 		DBPRINTF((RSM_LIBRARY, RSM_ERR,
 		    "invalid mem alignment for vaddr or length\n"));
 		return (RSMERR_BAD_MEM_ALIGNMENT);
@@ -955,7 +900,7 @@ _rsm_memseg_export_create(rsmapi_controller_handle_t controller,
 }
 
 int
-_rsm_memseg_export_destroy(rsm_memseg_export_handle_t memseg)
+rsm_memseg_export_destroy(rsm_memseg_export_handle_t memseg)
 {
 	rsmseg_handle_t *seg;
 
@@ -993,7 +938,7 @@ _rsm_memseg_export_destroy(rsm_memseg_export_handle_t memseg)
 }
 
 int
-_rsm_memseg_export_rebind(rsm_memseg_export_handle_t memseg, void *vaddr,
+rsm_memseg_export_rebind(rsm_memseg_export_handle_t memseg, void *vaddr,
     offset_t off, size_t length)
 {
 	rsm_ioctlmsg_t msg;
@@ -1040,7 +985,7 @@ _rsm_memseg_export_rebind(rsm_memseg_export_handle_t memseg, void *vaddr,
 }
 
 int
-_rsm_memseg_export_publish(rsm_memseg_export_handle_t memseg,
+rsm_memseg_export_publish(rsm_memseg_export_handle_t memseg,
     rsm_memseg_id_t *seg_id,
     rsmapi_access_entry_t access_list[],
     uint_t access_list_length)
@@ -1117,7 +1062,7 @@ _rsm_memseg_export_publish(rsm_memseg_export_handle_t memseg,
 }
 
 int
-_rsm_memseg_export_unpublish(rsm_memseg_export_handle_t memseg)
+rsm_memseg_export_unpublish(rsm_memseg_export_handle_t memseg)
 {
 	rsm_ioctlmsg_t msg;
 	rsmseg_handle_t *seg = (rsmseg_handle_t *)memseg;
@@ -1136,7 +1081,7 @@ _rsm_memseg_export_unpublish(rsm_memseg_export_handle_t memseg)
 		mutex_unlock(&seg->rsmseg_lock);
 		DBPRINTF((RSM_LIBRARY|RSM_EXPORT, RSM_ERR,
 		    "segment not published %d\n",
-			seg->rsmseg_keyid));
+		    seg->rsmseg_keyid));
 		return (RSMERR_SEG_NOT_PUBLISHED);
 	}
 
@@ -1159,7 +1104,7 @@ _rsm_memseg_export_unpublish(rsm_memseg_export_handle_t memseg)
 
 
 int
-_rsm_memseg_export_republish(rsm_memseg_export_handle_t memseg,
+rsm_memseg_export_republish(rsm_memseg_export_handle_t memseg,
     rsmapi_access_entry_t access_list[],
     uint_t access_list_length)
 {
@@ -1213,7 +1158,7 @@ _rsm_memseg_export_republish(rsm_memseg_export_handle_t memseg,
 	 * import side memory segment operations:
 	 */
 int
-_rsm_memseg_import_connect(rsmapi_controller_handle_t controller,
+rsm_memseg_import_connect(rsmapi_controller_handle_t controller,
     rsm_node_id_t node_id,
     rsm_memseg_id_t segment_id,
     rsm_permission_t perm,
@@ -1263,8 +1208,8 @@ _rsm_memseg_import_connect(rsmapi_controller_handle_t controller,
 
 	p->rsmseg_fd = open(DEVRSM, O_RDWR);
 	if (p->rsmseg_fd < 0) {
-		    DBPRINTF((RSM_LIBRARY|RSM_IMPORT, RSM_ERR,
-			"unable to open /dev/rsm"));
+		DBPRINTF((RSM_LIBRARY|RSM_IMPORT, RSM_ERR,
+		    "unable to open /dev/rsm"));
 		free((void *)p);
 		return (RSMERR_INSUFFICIENT_RESOURCES);
 	}
@@ -1351,7 +1296,7 @@ _rsm_memseg_import_connect(rsmapi_controller_handle_t controller,
 
 
 int
-_rsm_memseg_import_disconnect(rsm_memseg_import_handle_t im_memseg)
+rsm_memseg_import_disconnect(rsm_memseg_import_handle_t im_memseg)
 {
 	rsmseg_handle_t *seg = (rsmseg_handle_t *)im_memseg;
 	int e;
@@ -1553,7 +1498,7 @@ __rsm_import_implicit_map(rsmseg_handle_t *seg, int iotype)
 }
 
 int
-_rsm_memseg_import_get8(rsm_memseg_import_handle_t im_memseg,
+rsm_memseg_import_get8(rsm_memseg_import_handle_t im_memseg,
     off_t offset,
     uint8_t *datap,
     ulong_t rep_cnt)
@@ -1594,7 +1539,7 @@ _rsm_memseg_import_get8(rsm_memseg_import_handle_t im_memseg,
 }
 
 int
-_rsm_memseg_import_get16(rsm_memseg_import_handle_t im_memseg,
+rsm_memseg_import_get16(rsm_memseg_import_handle_t im_memseg,
     off_t offset,
     uint16_t *datap,
     ulong_t rep_cnt)
@@ -1636,7 +1581,7 @@ _rsm_memseg_import_get16(rsm_memseg_import_handle_t im_memseg,
 }
 
 int
-_rsm_memseg_import_get32(rsm_memseg_import_handle_t im_memseg,
+rsm_memseg_import_get32(rsm_memseg_import_handle_t im_memseg,
     off_t offset,
     uint32_t *datap,
     ulong_t rep_cnt)
@@ -1677,7 +1622,7 @@ _rsm_memseg_import_get32(rsm_memseg_import_handle_t im_memseg,
 }
 
 int
-_rsm_memseg_import_get64(rsm_memseg_import_handle_t im_memseg,
+rsm_memseg_import_get64(rsm_memseg_import_handle_t im_memseg,
     off_t offset,
     uint64_t *datap,
     ulong_t rep_cnt)
@@ -1718,7 +1663,7 @@ _rsm_memseg_import_get64(rsm_memseg_import_handle_t im_memseg,
 }
 
 int
-_rsm_memseg_import_get(rsm_memseg_import_handle_t im_memseg,
+rsm_memseg_import_get(rsm_memseg_import_handle_t im_memseg,
     off_t offset,
     void *dst_addr,
     size_t length)
@@ -1760,7 +1705,7 @@ _rsm_memseg_import_get(rsm_memseg_import_handle_t im_memseg,
 
 
 int
-_rsm_memseg_import_getv(rsm_scat_gath_t *sg_io)
+rsm_memseg_import_getv(rsm_scat_gath_t *sg_io)
 {
 	rsm_controller_t *cntrl;
 	rsmseg_handle_t *seg;
@@ -1875,7 +1820,7 @@ _rsm_memseg_import_getv(rsm_scat_gath_t *sg_io)
 	 */
 
 int
-_rsm_memseg_import_put8(rsm_memseg_import_handle_t im_memseg,
+rsm_memseg_import_put8(rsm_memseg_import_handle_t im_memseg,
     off_t offset,
     uint8_t *datap,
     ulong_t rep_cnt)
@@ -1918,7 +1863,7 @@ _rsm_memseg_import_put8(rsm_memseg_import_handle_t im_memseg,
 }
 
 int
-_rsm_memseg_import_put16(rsm_memseg_import_handle_t im_memseg,
+rsm_memseg_import_put16(rsm_memseg_import_handle_t im_memseg,
     off_t offset,
     uint16_t *datap,
     ulong_t rep_cnt)
@@ -1962,7 +1907,7 @@ _rsm_memseg_import_put16(rsm_memseg_import_handle_t im_memseg,
 }
 
 int
-_rsm_memseg_import_put32(rsm_memseg_import_handle_t im_memseg,
+rsm_memseg_import_put32(rsm_memseg_import_handle_t im_memseg,
     off_t offset,
     uint32_t *datap,
     ulong_t rep_cnt)
@@ -2005,7 +1950,7 @@ _rsm_memseg_import_put32(rsm_memseg_import_handle_t im_memseg,
 }
 
 int
-_rsm_memseg_import_put64(rsm_memseg_import_handle_t im_memseg,
+rsm_memseg_import_put64(rsm_memseg_import_handle_t im_memseg,
     off_t offset,
     uint64_t *datap,
     ulong_t rep_cnt)
@@ -2048,7 +1993,7 @@ _rsm_memseg_import_put64(rsm_memseg_import_handle_t im_memseg,
 }
 
 int
-_rsm_memseg_import_put(rsm_memseg_import_handle_t im_memseg,
+rsm_memseg_import_put(rsm_memseg_import_handle_t im_memseg,
     off_t offset,
     void *src_addr,
     size_t length)
@@ -2090,7 +2035,7 @@ _rsm_memseg_import_put(rsm_memseg_import_handle_t im_memseg,
 
 
 int
-_rsm_memseg_import_putv(rsm_scat_gath_t *sg_io)
+rsm_memseg_import_putv(rsm_scat_gath_t *sg_io)
 {
 	rsm_controller_t *cntrl;
 	rsmseg_handle_t *seg;
@@ -2171,7 +2116,7 @@ _rsm_memseg_import_putv(rsm_scat_gath_t *sg_io)
 	 * by the user, and hence a signal post needs to be done here.
 	 */
 	if (sg_io->flags & RSM_IMPLICIT_SIGPOST &&
-		e == RSM_SUCCESS) {
+	    e == RSM_SUCCESS) {
 		/* Do the implicit signal post */
 
 		/*
@@ -2207,7 +2152,7 @@ _rsm_memseg_import_putv(rsm_scat_gath_t *sg_io)
 	 * import side memory segment operations (mapping):
 	 */
 int
-_rsm_memseg_import_map(rsm_memseg_import_handle_t im_memseg,
+rsm_memseg_import_map(rsm_memseg_import_handle_t im_memseg,
     void **address,
     rsm_attribute_t attr,
     rsm_permission_t perm,
@@ -2339,7 +2284,7 @@ _rsm_memseg_import_map(rsm_memseg_import_handle_t im_memseg,
 }
 
 int
-_rsm_memseg_import_unmap(rsm_memseg_import_handle_t im_memseg)
+rsm_memseg_import_unmap(rsm_memseg_import_handle_t im_memseg)
 {
 	/*
 	 * Until we fix the rsm driver to catch unload, we unload
@@ -2381,7 +2326,7 @@ _rsm_memseg_import_unmap(rsm_memseg_import_handle_t im_memseg)
 	 * import side memory segment operations (barriers):
 	 */
 int
-_rsm_memseg_import_init_barrier(rsm_memseg_import_handle_t im_memseg,
+rsm_memseg_import_init_barrier(rsm_memseg_import_handle_t im_memseg,
     rsm_barrier_type_t type,
     rsmapi_barrier_t *barrier)
 {
@@ -2415,7 +2360,7 @@ _rsm_memseg_import_init_barrier(rsm_memseg_import_handle_t im_memseg,
 }
 
 int
-_rsm_memseg_import_open_barrier(rsmapi_barrier_t *barrier)
+rsm_memseg_import_open_barrier(rsmapi_barrier_t *barrier)
 {
 	rsmbar_handle_t *bar = (rsmbar_handle_t *)barrier;
 	rsm_segops_t *ops;
@@ -2447,7 +2392,7 @@ _rsm_memseg_import_open_barrier(rsmapi_barrier_t *barrier)
 }
 
 int
-_rsm_memseg_import_order_barrier(rsmapi_barrier_t *barrier)
+rsm_memseg_import_order_barrier(rsmapi_barrier_t *barrier)
 {
 	rsmbar_handle_t *bar = (rsmbar_handle_t *)barrier;
 	rsm_segops_t *ops;
@@ -2476,7 +2421,7 @@ _rsm_memseg_import_order_barrier(rsmapi_barrier_t *barrier)
 }
 
 int
-_rsm_memseg_import_close_barrier(rsmapi_barrier_t *barrier)
+rsm_memseg_import_close_barrier(rsmapi_barrier_t *barrier)
 {
 	rsmbar_handle_t *bar = (rsmbar_handle_t *)barrier;
 	rsm_segops_t *ops;
@@ -2510,7 +2455,7 @@ _rsm_memseg_import_close_barrier(rsmapi_barrier_t *barrier)
 }
 
 int
-_rsm_memseg_import_destroy_barrier(rsmapi_barrier_t *barrier)
+rsm_memseg_import_destroy_barrier(rsmapi_barrier_t *barrier)
 {
 	rsmbar_handle_t *bar = (rsmbar_handle_t *)barrier;
 	rsm_segops_t *ops;
@@ -2541,7 +2486,7 @@ _rsm_memseg_import_destroy_barrier(rsmapi_barrier_t *barrier)
 }
 
 int
-_rsm_memseg_import_get_mode(rsm_memseg_import_handle_t im_memseg,
+rsm_memseg_import_get_mode(rsm_memseg_import_handle_t im_memseg,
     rsm_barrier_mode_t *mode)
 {
 	rsmseg_handle_t *seg = (rsmseg_handle_t *)im_memseg;
@@ -2566,7 +2511,7 @@ _rsm_memseg_import_get_mode(rsm_memseg_import_handle_t im_memseg,
 }
 
 int
-_rsm_memseg_import_set_mode(rsm_memseg_import_handle_t im_memseg,
+rsm_memseg_import_set_mode(rsm_memseg_import_handle_t im_memseg,
     rsm_barrier_mode_t mode)
 {
 	rsmseg_handle_t *seg = (rsmseg_handle_t *)im_memseg;
@@ -2597,7 +2542,7 @@ _rsm_memseg_import_set_mode(rsm_memseg_import_handle_t im_memseg,
 }
 
 int
-_rsm_intr_signal_post(void *memseg, uint_t flags)
+rsm_intr_signal_post(void *memseg, uint_t flags)
 {
 	rsm_ioctlmsg_t msg;
 	rsmseg_handle_t *seg = (rsmseg_handle_t *)memseg;
@@ -2626,7 +2571,7 @@ _rsm_intr_signal_post(void *memseg, uint_t flags)
 }
 
 int
-_rsm_intr_signal_wait(void *memseg, int timeout)
+rsm_intr_signal_wait(void *memseg, int timeout)
 {
 	rsmseg_handle_t *seg = (rsmseg_handle_t *)memseg;
 	struct pollfd fds;
@@ -2650,7 +2595,7 @@ _rsm_intr_signal_wait(void *memseg, int timeout)
 }
 
 int
-_rsm_intr_signal_wait_pollfd(struct pollfd fds[], nfds_t nfds, int timeout,
+rsm_intr_signal_wait_pollfd(struct pollfd fds[], nfds_t nfds, int timeout,
 	int *numfdsp)
 {
 	return (__rsm_intr_signal_wait_common(fds, NULL, nfds, timeout,
@@ -2721,7 +2666,7 @@ __rsm_intr_signal_wait_common(struct pollfd fds[], minor_t rnums[],
 		 * lets just allocate on the heap
 		 */
 		event_list = (rsm_poll_event_t *)malloc(
-			sizeof (rsm_poll_event_t)*numfd);
+		    sizeof (rsm_poll_event_t)*numfd);
 		if (!event_list) {
 			/*
 			 * return with error even if poll might have succeeded
@@ -2829,7 +2774,7 @@ __rsm_intr_signal_wait_common(struct pollfd fds[], minor_t rnums[],
  * A reference count for the descriptor is incremented.
  */
 int
-_rsm_memseg_get_pollfd(void *memseg,
+rsm_memseg_get_pollfd(void *memseg,
 			struct pollfd *poll_fd)
 {
 	int	i;
@@ -2870,7 +2815,7 @@ _rsm_memseg_get_pollfd(void *memseg,
  * non zero.
  */
 int
-_rsm_memseg_release_pollfd(void * memseg)
+rsm_memseg_release_pollfd(void * memseg)
 {
 	int	i;
 	rsmseg_handle_t *seg = (rsmseg_handle_t *)memseg;
@@ -2910,7 +2855,7 @@ _rsm_memseg_release_pollfd(void * memseg)
  * call rsm_free_interconnect_topolgy() to free the allocated memory.
  */
 int
-_rsm_get_interconnect_topology(rsm_topology_t **topology_data)
+rsm_get_interconnect_topology(rsm_topology_t **topology_data)
 {
 	uint32_t		topology_data_size;
 	rsm_topology_t		*topology_ptr;
@@ -2969,7 +2914,7 @@ again:
 
 
 void
-_rsm_free_interconnect_topology(rsm_topology_t *topology_ptr)
+rsm_free_interconnect_topology(rsm_topology_t *topology_ptr)
 {
 
 	DBPRINTF((RSM_LIBRARY, RSM_DEBUG_VERBOSE,
@@ -2984,7 +2929,7 @@ _rsm_free_interconnect_topology(rsm_topology_t *topology_ptr)
 }
 
 int
-_rsm_create_localmemory_handle(rsmapi_controller_handle_t cntrl_handle,
+rsm_create_localmemory_handle(rsmapi_controller_handle_t cntrl_handle,
 				rsm_localmemory_handle_t *local_hndl_p,
 				caddr_t local_vaddr, size_t len)
 {
@@ -3029,7 +2974,7 @@ _rsm_create_localmemory_handle(rsmapi_controller_handle_t cntrl_handle,
 }
 
 int
-_rsm_free_localmemory_handle(rsmapi_controller_handle_t cntrl_handle,
+rsm_free_localmemory_handle(rsmapi_controller_handle_t cntrl_handle,
     rsm_localmemory_handle_t local_handle)
 {
 	int e;
@@ -3061,7 +3006,7 @@ _rsm_free_localmemory_handle(rsmapi_controller_handle_t cntrl_handle,
 }
 
 int
-_rsm_get_segmentid_range(const char *appid, rsm_memseg_id_t *baseid,
+rsm_get_segmentid_range(const char *appid, rsm_memseg_id_t *baseid,
 	uint32_t *length)
 {
 	char    buf[RSMFILE_BUFSIZE];
@@ -3244,8 +3189,7 @@ dbg_printf(int msg_category, int msg_level, char *fmt, ...)
 		va_list arg_list;
 		va_start(arg_list, fmt);
 		mutex_lock(&rsmlog_lock);
-		fprintf(rsmlog_fd,
-			"Thread %d ", thr_self());
+		fprintf(rsmlog_fd, "Thread %d ", thr_self());
 		vfprintf(rsmlog_fd, fmt, arg_list);
 		fflush(rsmlog_fd);
 		mutex_unlock(&rsmlog_lock);

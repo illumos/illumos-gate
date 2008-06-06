@@ -18,16 +18,17 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma	weak confstr = _confstr
+#pragma	weak _confstr = confstr
 
-#include "synonyms.h"
+#include "lint.h"
 #include "xpg6.h"
 #include <sys/types.h>
 #include <unistd.h>
@@ -101,11 +102,11 @@ confstr(int name, char *buf, size_t length)
 
 	if (name == _CS_PATH) {
 		if (__xpg6 & _C99SUSv3_XPG6_sysconf_version)
-		    path = "/usr/xpg6/bin:/usr/xpg4/bin:/usr/ccs/bin:"\
-				"/usr/bin:/opt/SUNWspro/bin";
+			path = "/usr/xpg6/bin:/usr/xpg4/bin:/usr/ccs/bin:"
+			    "/usr/bin:/opt/SUNWspro/bin";
 		else
-		    path = "/usr/xpg4/bin:/usr/ccs/bin:/usr/bin:"\
-				"/opt/SUNWspro/bin";
+			path = "/usr/xpg4/bin:/usr/ccs/bin:/usr/bin:"
+			    "/opt/SUNWspro/bin";
 
 		conf_length = strlen(path) + 1;
 		if (length != 0) {

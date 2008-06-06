@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,15 +29,12 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak pathfind = _pathfind
-
 /*
  * Search the specified path for a file with the specified
  * mode and type.  Return a pointer to the path.  If the
  * file isn't found, return NULL.
  */
 
-#include "gen_synonyms.h"
 #ifdef _REENTRANT
 #include <thread.h>
 #include <pthread.h>
@@ -163,20 +160,20 @@ pathfind(const char *path, const char *name, const char *mode)
 		path = ":";
 	while (*path) {
 		for (cp = cpath; (/* const */ char *) cp <
-			&cpath[PATH_MAX] && (*cp = *path); cp++) {
+		    &cpath[PATH_MAX] && (*cp = *path); cp++) {
 			path++;
 			if (*cp == ':')
 				break;
 		}
 		if ((/* const */ char *) cp + strlen(name) + 2 >=
-			&cpath[PATH_MAX])
+		    &cpath[PATH_MAX])
 			continue;
 		if (cp != cpath)
 			*cp++ = '/';
 		*cp = '\0';
 		(void) strcat(cp, name);
 		if (access(cpath, imode&07) == 0 &&
-			fullck(cpath, imode, nzflag))
+		    fullck(cpath, imode, nzflag))
 			return (cpath);
 	}
 

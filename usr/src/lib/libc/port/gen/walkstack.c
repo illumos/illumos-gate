@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,7 +76,7 @@
  * The bottom-most struct frame is actually constructed by the kernel by
  * copying the previous stack frame, allowing naive backtrace code to simply
  * skip over the interrupted frame.  The copied frame is never really used,
- * since it is presumed the libc or libthread signal handler wrapper function
+ * since it is presumed the signal handler wrapper function
  * will explicitly setcontext(2) to the interrupted context if the user
  * program's handler returns.  If we detect a signal handler frame, we simply
  * read the interrupted context structure from the stack, use its embedded
@@ -96,18 +96,11 @@
  * Since we want to provide the signal number that generated a signal stack
  * frame and on sparc this information isn't written to the stack by the kernel
  * the way it's done on i386, we're forced to read the signo from the stack as
- * one of the arguments to the signal handler.  What we hope is that no one has
- * used __sigaction directly; if we're not linked with libthread
- * (_thr_sighndlrinfo is NULL) then we attempt to read the signo directly from
- * the register window. Otherwise we use the _thr_sighndlrinfo interface to find
- * the correct frame.
- *
+ * one of the arguments to the signal handler.  We use the thr_sighndlrinfo
+ * interface to find the correct frame.
  */
 
-#pragma weak walkcontext		= _walkcontext
-#pragma weak printstack			= _printstack
-
-#include "synonyms.h"
+#include "lint.h"
 #include <assert.h>
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -221,11 +214,9 @@ walkcontext(const ucontext_t *uptr, int (*operate_func)(uintptr_t, int, void *),
 
 	/*
 	 * Since we don't write signo to the stack on sparc, we need
-	 * to extract signo from the stack frames.  This is problematic
-	 * in the case of libthread (libc has deterministic behavior)
-	 * since we're not sure where we can do that safely.  An awkward
-	 * interface was provided for this purpose in libthread:
-	 * _thr_sighndlrinfo; this is documented in
+	 * to extract signo from the stack frames.
+	 * An awkward interface is provided for this purpose:
+	 * thr_sighndlrinfo; this is documented in
 	 * /shared/sac/PSARC/1999/024.  When called, this function
 	 * returns the PC of a special function (and its size) that
 	 * will be present in the stack frame if a signal was
@@ -235,20 +226,15 @@ walkcontext(const ucontext_t *uptr, int (*operate_func)(uintptr_t, int, void *),
 	 * Since this function is written in assembler and doesn't
 	 * perturb its registers, we can then read sig out of arg0
 	 * when the saved pc is inside this function.
-	 *
 	 */
 #if defined(__sparc)
 
 	uintptr_t special_pc = NULL;
 	int special_size = 0;
 
-	extern void _thr_sighndlrinfo(void (**func)(), int *funcsize);
+	extern void thr_sighndlrinfo(void (**func)(), int *funcsize);
 
-#pragma weak _thr_sighndlrinfo
-
-	if (_thr_sighndlrinfo != NULL) {
-		_thr_sighndlrinfo((void (**)())&special_pc, &special_size);
-	}
+	thr_sighndlrinfo((void (**)())&special_pc, &special_size);
 #endif /* sparc */
 
 
@@ -290,24 +276,14 @@ walkcontext(const ucontext_t *uptr, int (*operate_func)(uintptr_t, int, void *),
 
 #if defined(__sparc)
 			/*
-			 * with sparc we need to handle
-			 * single and multi-threaded cases
-			 * separately
-			 * If we're single threaded, the trampoline
-			 * in libc will have the signo as the first
-			 * argumment; we can snag that directly.
 			 * In the case of threads, since there are multiple
 			 * complex routines between kernel and user handler,
 			 * we need to figure out where we can read signal from
-			 * using _thr_sighndlrinfo - which we've already done
+			 * using thr_sighndlrinfo - which we've already done
 			 * for this signal, since it appeared on the stack
 			 * before the signal frame.... sigh.
 			 */
-
-			if (_thr_sighndlrinfo == NULL) /* single threaded */
-				sig = fp->fr_arg[0];
-			else
-				sig = signo; /* already read - see below */
+			sig = signo; /* already read - see below */
 #endif
 			/*
 			 * this is the special signal frame, so cons up
@@ -328,8 +304,7 @@ walkcontext(const ucontext_t *uptr, int (*operate_func)(uintptr_t, int, void *),
 		 * lookahead code to find right spot to read signo from...
 		 */
 
-		if (_thr_sighndlrinfo &&
-		    savepc >= special_pc && savepc <
+		if (savepc >= special_pc && savepc <
 		    (special_pc + special_size))
 			signo = fp->fr_arg[0];
 #endif
@@ -389,7 +364,7 @@ display_stack_info(uintptr_t pc, int signo, void *arg)
 		(void) sig2str(signo, sigbuf);
 
 		async_filenoprintf(filenum, "%s [Signal %d (%s)]\n",
-			buffer, (ulong_t)signo, sigbuf);
+		    buffer, (ulong_t)signo, sigbuf);
 	} else
 		async_filenoprintf(filenum, "%s\n", buffer);
 

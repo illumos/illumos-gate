@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,21 +29,21 @@
 /* This is Sun's propriatry implementation of wsxfrm() and wscoll()	*/
 /* using dynamic linking.  It is probably free from AT&T copyright.	*/
 
-#pragma weak wscoll = _wscoll
-#pragma weak wsxfrm = _wsxfrm
+#pragma weak _wscoll = wscoll
+#pragma weak _wsxfrm = wsxfrm
 
 #include "lint.h"
 #include <wchar.h>
 #include "libc.h"
 
 size_t
-_wsxfrm(wchar_t *s1, const wchar_t *s2, size_t n)
+wsxfrm(wchar_t *s1, const wchar_t *s2, size_t n)
 {
-	return (_wcsxfrm(s1, s2, n));
+	return (wcsxfrm(s1, s2, n));
 }
 
 int
-_wscoll(const wchar_t *s1, const wchar_t *s2)
+wscoll(const wchar_t *s1, const wchar_t *s2)
 {
-	return (_wcscoll(s1, s2));
+	return (wcscoll(s1, s2));
 }

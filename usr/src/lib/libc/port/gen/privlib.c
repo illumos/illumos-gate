@@ -20,36 +20,36 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" /* TSOL 8 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak getprivimplinfo	= _getprivimplinfo
-#pragma weak priv_addset	= _priv_addset
-#pragma weak priv_allocset	= _priv_allocset
-#pragma weak priv_copyset	= _priv_copyset
-#pragma weak priv_delset	= _priv_delset
-#pragma weak priv_emptyset	= _priv_emptyset
-#pragma weak priv_fillset	= _priv_fillset
-#pragma weak priv_freeset	= _priv_freeset
-#pragma weak priv_getbyname	= _priv_getbyname
-#pragma weak priv_getbynum	= _priv_getbynum
-#pragma weak priv_getsetbyname	= _priv_getsetbyname
-#pragma weak priv_getsetbynum	= _priv_getsetbynum
-#pragma weak priv_ineffect	= _priv_ineffect
-#pragma weak priv_intersect	= _priv_intersect
-#pragma weak priv_inverse	= _priv_inverse
-#pragma weak priv_isemptyset	= _priv_isemptyset
-#pragma weak priv_isequalset	= _priv_isequalset
-#pragma weak priv_isfullset	= _priv_isfullset
-#pragma weak priv_ismember	= _priv_ismember
-#pragma weak priv_issubset	= _priv_issubset
-#pragma weak priv_set		= _priv_set
-#pragma weak priv_union		= _priv_union
+#pragma weak _getprivimplinfo	= getprivimplinfo
+#pragma weak _priv_addset	= priv_addset
+#pragma weak _priv_allocset	= priv_allocset
+#pragma weak _priv_copyset	= priv_copyset
+#pragma weak _priv_delset	= priv_delset
+#pragma weak _priv_emptyset	= priv_emptyset
+#pragma weak _priv_fillset	= priv_fillset
+#pragma weak _priv_freeset	= priv_freeset
+#pragma weak _priv_getbyname	= priv_getbyname
+#pragma weak _priv_getbynum	= priv_getbynum
+#pragma weak _priv_getsetbyname	= priv_getsetbyname
+#pragma weak _priv_getsetbynum	= priv_getsetbynum
+#pragma weak _priv_ineffect	= priv_ineffect
+#pragma weak _priv_intersect	= priv_intersect
+#pragma weak _priv_inverse	= priv_inverse
+#pragma weak _priv_isemptyset	= priv_isemptyset
+#pragma weak _priv_isequalset	= priv_isequalset
+#pragma weak _priv_isfullset	= priv_isfullset
+#pragma weak _priv_ismember	= priv_ismember
+#pragma weak _priv_issubset	= priv_issubset
+#pragma weak _priv_set		= priv_set
+#pragma weak _priv_union	= priv_union
 
-#include "synonyms.h"
+#include "lint.h"
 
 #define	_STRUCTURED_PROC	1
 
@@ -193,7 +193,7 @@ __priv_parse_info(priv_impl_info_t *ip)
 				tmparr[i].name = tmp->pd_privnames[i];
 			}
 			qsort(tmparr, tmp->pd_nprivs, sizeof (struct strint),
-				strintcmp);
+			    strintcmp);
 			for (i = 0; i < tmp->pd_nprivs; i++)
 				tmp->pd_setsort[i] = tmparr[i].rank;
 			libc_free(tmparr);
@@ -272,8 +272,8 @@ refresh_data(void)
 
 	/* copy the extra information to the old datastructure */
 	(void) memcpy((char *)privdata->pd_pinfo + sizeof (priv_impl_info_t),
-		(char *)ip + sizeof (priv_impl_info_t),
-		PRIV_IMPL_INFO_SIZE(ip) - sizeof (priv_impl_info_t));
+	    (char *)ip + sizeof (priv_impl_info_t),
+	    PRIV_IMPL_INFO_SIZE(ip) - sizeof (priv_impl_info_t));
 
 	/* Copy the first oldn pointers */
 	(void) memcpy(tmp->pd_privnames, privdata->pd_privnames,
@@ -369,7 +369,7 @@ out:
 }
 
 const priv_impl_info_t *
-_getprivimplinfo(void)
+getprivimplinfo(void)
 {
 	priv_data_t *d;
 
@@ -430,7 +430,7 @@ priv_set(priv_op_t op, priv_ptype_t setname, ...)
 
 		for (set = 0; set < d->pd_nsets; set++)
 			if ((ret = syscall(SYS_privsys, PRIVSYS_SETPPRIV, op,
-					set, (void *)pset, d->pd_setsize)) != 0)
+			    set, (void *)pset, d->pd_setsize)) != 0)
 				break;
 	} else {
 		ret = setppriv(op, setname, pset);
@@ -932,7 +932,7 @@ boolean_t
 __priv_issubset(priv_data_t *d, const priv_set_t *a, const priv_set_t *b)
 {
 	PRIV_TEST_BODY_D(d, (((priv_chunk_t *)a)[i] | ((priv_chunk_t *)b)[i]) ==
-		((priv_chunk_t *)b)[i]);
+	    ((priv_chunk_t *)b)[i]);
 }
 
 boolean_t

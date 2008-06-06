@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -61,12 +61,6 @@ SUNWprivate_1.1 {
 	_tnfctl_externally_traced_pid;
 	_tnfctl_internal_tracing_flag;
     local:
-	# dlclose/_dlclose and dlopen/_dlopen are aliases of each other
-	# Prevent the underscore version from going into the SUNW_dynsymsort
-	# section.
-	_dlclose = NODYNSORT;
-	_dlopen =NODYNSORT;
-
 	# Redunce all remaining globals to local scope
 	*;
 };

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,14 +52,14 @@
 
 #include <sys/feature_tests.h>
 
-#pragma weak scandir = _scandir
-#pragma weak alphasort = _alphasort
+#pragma weak _scandir = scandir
+#pragma weak _alphasort = alphasort
 #if !defined(_LP64)
-#pragma weak scandir64 = _scandir64
-#pragma weak alphasort64 = _alphasort64
+#pragma weak _scandir64 = scandir64
+#pragma weak _alphasort64 = alphasort64
 #endif
 
-#include "synonyms.h"
+#include "lint.h"
 #include <dirent.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -138,7 +138,7 @@ scandir64(const char *dirname, struct dirent64 *(*namelist[]),
 	(void) closedir(dirp);
 	if (nitems && dcomp != NULL)
 		qsort(names, nitems, sizeof (struct dirent64 *),
-			(int(*)(const void *, const void *))dcomp);
+		    (int(*)(const void *, const void *))dcomp);
 	*namelist = names;
 
 	return ((int)nitems);
@@ -211,7 +211,7 @@ scandir(const char *dirname, struct dirent *(*namelist[]),
 			}
 			arraysz += 512;		/* no science here */
 			tmp = realloc(names,
-				arraysz * sizeof (struct dirent *));
+			    arraysz * sizeof (struct dirent *));
 			if (tmp == NULL) {
 				free(p);
 				goto fail;
@@ -223,7 +223,7 @@ scandir(const char *dirname, struct dirent *(*namelist[]),
 	(void) closedir(dirp);
 	if (nitems && dcomp != NULL)
 		qsort(names, nitems, sizeof (struct dirent *),
-			(int(*)(const void *, const void *))dcomp);
+		    (int(*)(const void *, const void *))dcomp);
 	*namelist = names;
 
 	return ((int)nitems);

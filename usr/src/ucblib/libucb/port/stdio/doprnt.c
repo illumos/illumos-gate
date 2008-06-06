@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,13 +39,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/*LINTLIBRARY*/
-
 /*
  *	_doprnt: common code for printf, fprintf, sprintf
  */
 
-#include "../../../lib/common/inc/c_synonyms.h"
 #include <sys/types.h>
 #include "file64.h"
 #include <stdio.h>
@@ -272,8 +268,8 @@ _doprnt(char *format, va_list in_args, FILE *iop)
 	/* initialize buffer pointer and buffer end pointer */
 	bufptr = iop->_ptr;
 	bufferend = (iop->_flag & _IOREAD) ?
-		(unsigned char *)((long)bufptr | (-1L & ~HIBITL))
-		: _bufend(iop);
+	    (unsigned char *)((long)bufptr | (-1L & ~HIBITL))
+	    : _bufend(iop);
 
 	/*
 	 *	The main loop -- this loop goes through one iteration
@@ -321,7 +317,7 @@ _doprnt(char *format, va_list in_args, FILE *iop)
 		 *	encountered.
 		 */
 		width = prefixlength = otherlength = flagword =
-			suffixlength = 0;
+		    suffixlength = 0;
 		format++;
 
 	charswitch:
@@ -420,7 +416,8 @@ _doprnt(char *format, va_list in_args, FILE *iop)
 		case '7':
 		case '8':
 		case '9':
-			{ 	int num = fcode - '0';
+			{
+				int num = fcode - '0';
 				while (isdigit(fcode = *format)) {
 					num = num * 10 + fcode - '0';
 					format++;
@@ -543,7 +540,8 @@ _doprnt(char *format, va_list in_args, FILE *iop)
 			}
 
 		decimal:
-			{	long qval = val;
+			{
+				long qval = val;
 				long saveq;
 
 				if (qval <= 9) {
@@ -554,7 +552,7 @@ _doprnt(char *format, va_list in_args, FILE *iop)
 						saveq = qval;
 						qval /= 10;
 						*--bp = (char)(saveq -
-							qval * 10 + '0');
+						    qval * 10 + '0');
 					} while (qval > 9);
 					*--bp = (char)(qval + '0');
 					pdiff = (ptrdiff_t)saveq;
@@ -630,7 +628,8 @@ _doprnt(char *format, va_list in_args, FILE *iop)
 		put_pc:
 			/* Develop the digits of the value */
 			p = bp = buf + MAXDIGS;
-			{	long qval = val;
+			{
+				long qval = val;
 				if (qval == 0) {
 					if (!(flagword & DOTSEEN)) {
 						otherlength = lzero = 1;
@@ -640,7 +639,7 @@ _doprnt(char *format, va_list in_args, FILE *iop)
 					do {
 						*--bp = tab[qval & mradix];
 						qval = ((qval >> 1) & ~HIBITL)
-								>> lradix;
+						    >> lradix;
 					} while (qval != 0);
 			}
 
@@ -741,7 +740,8 @@ _doprnt(char *format, va_list in_args, FILE *iop)
 				*p++ = _numeric[0];
 
 			/* Create the rest of the mantissa */
-			{	int rz = prec;
+			{
+				int rz = prec;
 				for (; rz > 0 && *bp != '\0'; --rz)
 					*p++ = *bp++;
 				if (rz > 0) {
@@ -757,7 +757,7 @@ _doprnt(char *format, va_list in_args, FILE *iop)
 			if (dval != 0) {
 				int nn = decpt - 1;
 				if (nn < 0)
-				    nn = -nn;
+					nn = -nn;
 				for (; nn > 9; nn /= 10)
 					*--suffix = todigit(nn % 10);
 				*--suffix = todigit(nn);
@@ -775,7 +775,7 @@ _doprnt(char *format, va_list in_args, FILE *iop)
 
 			/* compute size of suffix */
 			otherlength += (suffixlength =
-				(int)(&expbuf[MAXESIZ] - suffix));
+			    (int)(&expbuf[MAXESIZ] - suffix));
 			flagword |= SUFFIX;
 
 			break;
@@ -838,15 +838,15 @@ _doprnt(char *format, va_list in_args, FILE *iop)
 
 			/* Initialize buffer pointer */
 			p = &buf[0];
-
-			{	int nn = decpt;
+			{
+				int nn = decpt;
 
 				/* Emit the digits before the decimal point */
 				k = 0;
 				do {
 					*p++ = (nn <= 0 || *bp == '\0' ||
-						k >= MAXFSIG) ?
-						'0' : (k++, *bp++);
+					    k >= MAXFSIG) ?
+					    '0' : (k++, *bp++);
 				} while (--nn > 0);
 
 				/* Decide whether we need a decimal point */
@@ -861,8 +861,8 @@ _doprnt(char *format, va_list in_args, FILE *iop)
 				}
 				while (--nn >= 0)
 					*p++ = (++decpt <= 0 || *bp == '\0' ||
-						k >= MAXFSIG) ?
-						'0' : (k++, *bp++);
+					    k >= MAXFSIG) ?
+					    '0' : (k++, *bp++);
 			}
 
 			bp = &buf[0];
@@ -917,8 +917,8 @@ _doprnt(char *format, va_list in_args, FILE *iop)
 			bp = ecvt(dval, min(prec, MAXECVT), &decpt, &sign);
 			if (dval == 0)
 				decpt = 1;
-
-			{	int kk = prec;
+			{
+				int kk = prec;
 				size_t sz;
 
 				if (!(flagword & FSHARP)) {
@@ -1002,7 +1002,7 @@ _doprnt(char *format, va_list in_args, FILE *iop)
 
 		/* Calculate number of padding blanks */
 		k = (int)(pdiff = p - bp) + prefixlength + otherlength +
-			NaN_flg;
+		    NaN_flg;
 		if (width <= k)
 			count += k;
 		else {

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,7 +43,7 @@ CTFCONVERT_POST	= :
 CTFMERGE_LIB	= :
 
 LIBS		= $(DYNLIB)
-IFLAGS		= -I$(SRC)/lib/libc/inc -I$(SRC)/uts/sun4u \
+IFLAGS		= -I$(SRC)/uts/sun4u \
 		  -I$(ROOT)/usr/platform/sun4u/include
 CPPFLAGS	= -D_REENTRANT -D$(MACH) $(IFLAGS) $(CPPFLAGS.master)
 ASDEFS		= -D__STDC__ -D_ASM $(CPPFLAGS)

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,9 +36,6 @@
  * NOTE: This function will not work for multi-byte characters.
  */
 
-#pragma weak bgets = _bgets
-
-#include "gen_synonyms.h"
 #include <sys/types.h>
 #include <libgen.h>
 #include <stdio.h>
@@ -86,8 +83,8 @@ bgets(char *buf, size_t count, FILE *fp, char *stopstr)
 	static thread_key_t key = THR_ONCE_KEY;
 	char  *stop  = _get_stop(&key);
 #else /* _REENTRANT */
-	if (! stop)
-	    stop = (char *)calloc(CHARS, sizeof (char));
+	if (!stop)
+		stop = (char *)calloc(CHARS, sizeof (char));
 	else
 #endif /* _REENTRANT */
 	if (stopstr) 	/* reset stopstr array */

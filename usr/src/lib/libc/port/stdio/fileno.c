@@ -20,18 +20,18 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma weak fileno = _fileno
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#pragma weak _fileno = fileno
+
+#include "lint.h"
 #include "file64.h"
 #include "mtlib.h"
 #include <sys/types.h>
@@ -41,7 +41,7 @@
 #include "stdiom.h"
 
 int
-_fileno(FILE *iop)
+fileno(FILE *iop)
 {
 	return (GET_FD(iop));
 }

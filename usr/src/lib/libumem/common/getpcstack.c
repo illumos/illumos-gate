@@ -26,7 +26,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "c_synonyms.h"
 #include "misc.h"
 #include <ucontext.h>
 #include <sys/frame.h>

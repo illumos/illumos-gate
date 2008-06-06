@@ -24,10 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Return the number of the slot in the utmp file
@@ -35,9 +35,7 @@
  * Returns -1 if slot not found.
  */
 
-#pragma weak ttyslot = _ttyslot
-
-#include "synonyms.h"
+#include "lint.h"
 #include <string.h>
 #include <stdio.h>
 #include <sys/types.h>

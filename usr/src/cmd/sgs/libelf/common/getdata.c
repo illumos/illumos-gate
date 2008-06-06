@@ -18,23 +18,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 1.16	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-
-#pragma weak	elf_getdata = _elf_getdata
-
-
-#include "syn.h"
 #include <stdlib.h>
 #include <assert.h>
 #include <errno.h>
@@ -265,9 +259,9 @@ _elf_locked_getdata(Elf_Scn * scn, Elf_Data * data)
 
 		if (d->db_data.d_size <= src.d_size) {
 			d->db_data.d_buf = (Elf_Void *)(elf->ed_ident +
-				d->db_off);
+			    d->db_off);
 			if (((uintptr_t)d->db_data.d_buf
-				% ALIGN(elf)[d->db_data.d_type]) == 0) {
+			    % ALIGN(elf)[d->db_data.d_type]) == 0) {
 				break;
 			} else {   /* Failure: Restore NULL buffer pointer */
 				d->db_data.d_buf = 0;

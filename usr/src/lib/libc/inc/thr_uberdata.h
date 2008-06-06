@@ -38,6 +38,7 @@
 #include <ucontext.h>
 #include <thread.h>
 #include <pthread.h>
+#include <atomic.h>
 #include <link.h>
 #include <sys/resource.h>
 #include <sys/lwp.h>
@@ -1288,7 +1289,7 @@ extern	void	set_cancel_eintr_flag(ulwp_t *);
 extern	void	set_parking_flag(ulwp_t *, int);
 extern	int	cancel_active(void);
 
-extern	void	*_thr_setup(ulwp_t *);
+extern	void	*_thrp_setup(ulwp_t *);
 extern	void	_fpinherit(ulwp_t *);
 extern	void	_lwp_start(void);
 extern	void	_lwp_terminate(void);
@@ -1333,7 +1334,6 @@ extern	void	_thrp_unwind(void *);
 
 extern	pid_t	__forkx(int);
 extern	pid_t	__forkallx(int);
-extern	int	_kill(pid_t, int);
 extern	int	__open(const char *, int, ...);
 extern	int	__close(int);
 extern	ssize_t	__read(int, void *, size_t);
@@ -1341,8 +1341,6 @@ extern	ssize_t	__write(int, const void *, size_t);
 extern	int	__fcntl(int, int, ...);
 extern	int	__lwp_continue(lwpid_t);
 extern	int	__lwp_create(ucontext_t *, uint_t, lwpid_t *);
-extern	int	__lwp_kill(lwpid_t, int);
-extern	lwpid_t	__lwp_self(void);
 extern	int	___lwp_suspend(lwpid_t);
 extern	int	lwp_wait(lwpid_t, lwpid_t *);
 extern	int	__lwp_wait(lwpid_t, lwpid_t *);
@@ -1361,88 +1359,35 @@ extern	int	__lwp_sigmask(int, const sigset_t *, sigset_t *);
 extern	void	__sighndlr(int, siginfo_t *, ucontext_t *, void (*)());
 extern	caddr_t	__sighndlrend;
 #pragma unknown_control_flow(__sighndlr)
-extern	void	_siglongjmp(sigjmp_buf, int);
-
-extern	int	_pthread_setspecific(pthread_key_t, const void *);
-extern	void	*_pthread_getspecific(pthread_key_t);
-extern	void	_pthread_exit(void *);
-extern	int	_pthread_setcancelstate(int, int *);
 
 /* belongs in <pthread.h> */
 #define	PTHREAD_CREATE_DAEMON_NP	0x100	/* = THR_DAEMON */
 #define	PTHREAD_CREATE_NONDAEMON_NP	0
-extern	int	_pthread_attr_setdaemonstate_np(pthread_attr_t *, int);
-extern	int	_pthread_attr_getdaemonstate_np(const pthread_attr_t *, int *);
+extern	int	pthread_attr_setdaemonstate_np(pthread_attr_t *, int);
+extern	int	pthread_attr_getdaemonstate_np(const pthread_attr_t *, int *);
 
-extern	int	_mutex_init(mutex_t *, int, void *);
-extern	int	_mutex_destroy(mutex_t *);
-extern	int	_mutex_consistent(mutex_t *);
-extern	int	_mutex_lock(mutex_t *);
-extern	int	_mutex_trylock(mutex_t *);
-extern	int	_mutex_unlock(mutex_t *);
-extern	int	__mutex_init(mutex_t *, int, void *);
-extern	int	__mutex_destroy(mutex_t *);
-extern	int	__mutex_consistent(mutex_t *);
-extern	int	__mutex_lock(mutex_t *);
-extern	int	__mutex_trylock(mutex_t *);
-extern	int	__mutex_unlock(mutex_t *);
-extern	int	mutex_is_held(mutex_t *);
+extern	int	mutex_held(mutex_t *);
 extern	int	mutex_lock_internal(mutex_t *, timespec_t *, int);
 extern	int	mutex_unlock_internal(mutex_t *, int);
 
-extern	int	_cond_init(cond_t *, int, void *);
-extern	int	_cond_signal(cond_t *);
-extern	int	_cond_broadcast(cond_t *);
-extern	int	_cond_destroy(cond_t *);
-extern	int	cond_signal_internal(cond_t *);
-extern	int	cond_broadcast_internal(cond_t *);
-/* cancellation points: */
-extern	int	_cond_wait(cond_t *, mutex_t *);
-extern	int	_cond_timedwait(cond_t *, mutex_t *, const timespec_t *);
-extern	int	_cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
 /* not cancellation points: */
 extern	int	__cond_wait(cond_t *, mutex_t *);
 extern	int	__cond_timedwait(cond_t *, mutex_t *, const timespec_t *);
 extern	int	__cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
 
-extern	int	__rwlock_init(rwlock_t *, int, void *);
-extern	int	rw_read_is_held(rwlock_t *);
-extern	int	rw_write_is_held(rwlock_t *);
+extern	int	rw_read_held(rwlock_t *);
+extern	int	rw_write_held(rwlock_t *);
 
-extern	void	_membar_enter(void);
-extern	void	_membar_exit(void);
-extern	void	_membar_producer(void);
-extern	void	_membar_consumer(void);
-
-extern	int	_thr_continue(thread_t);
-extern	int	_thr_create(void *, size_t, void *(*)(void *), void *, long,
-			thread_t *);
 extern	int	_thrp_create(void *, size_t, void *(*)(void *), void *, long,
 			thread_t *, size_t);
-extern	int	_thr_getspecific(thread_key_t, void **);
-extern	int	_thr_join(thread_t, thread_t *, void **);
-extern	int	_thr_keycreate(thread_key_t *, PFrV);
-extern	int	_thr_keycreate_once(thread_key_t *, PFrV);
-extern	int	_thr_key_delete(thread_key_t);
-extern	int	_thr_main(void);
-extern	thread_t _thr_self(void);
-extern	int	_thr_getconcurrency(void);
-extern	int	_thr_setconcurrency(int);
-extern	int	_thr_setprio(thread_t, int);
-extern	int	_thr_setspecific(thread_key_t, void *);
-extern	int	_thr_stksegment(stack_t *);
 extern	int	_thrp_suspend(thread_t, uchar_t);
 extern	int	_thrp_continue(thread_t, uchar_t);
-extern	int	_thr_sigsetmask(int, const sigset_t *, sigset_t *);
 
-extern	void	_thr_terminate(void *);
-extern	void	_thr_exit(void *);
+extern	void	_thrp_terminate(void *);
 extern	void	_thrp_exit(void);
 
 extern	const pcclass_t *get_info_by_class(id_t);
 extern	const pcclass_t *get_info_by_policy(int);
-extern	void	_membar_producer(void);
-extern	void	_membar_consumer(void);
 extern	const thrattr_t *def_thrattr(void);
 extern	id_t	setparam(idtype_t, id_t, int, int);
 extern	id_t	setprio(idtype_t, id_t, int, int *);
@@ -1457,11 +1402,7 @@ extern	int	___lwp_mutex_timedlock(mutex_t *, timespec_t *);
 extern	int	___lwp_mutex_unlock(mutex_t *);
 extern	int	___lwp_mutex_wakeup(mutex_t *, int);
 extern	int	___lwp_cond_wait(cond_t *, mutex_t *, timespec_t *, int);
-extern	int	__lwp_cond_signal(lwp_cond_t *);
-extern	int	__lwp_cond_broadcast(lwp_cond_t *);
 extern	int	___lwp_sema_timedwait(lwp_sema_t *, timespec_t *, int);
-extern	int	__lwp_sema_trywait(lwp_sema_t *);
-extern	int	__lwp_sema_post(lwp_sema_t *);
 extern	int	__lwp_rwlock_rdlock(rwlock_t *, timespec_t *);
 extern	int	__lwp_rwlock_wrlock(rwlock_t *, timespec_t *);
 extern	int	__lwp_rwlock_tryrdlock(rwlock_t *);

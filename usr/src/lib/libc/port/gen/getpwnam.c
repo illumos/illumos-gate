@@ -18,23 +18,21 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak getpwnam = _getpwnam
-#pragma weak getpwuid = _getpwuid
-#pragma weak getpwent = _getpwent
-#pragma weak fgetpwent = _fgetpwent
+#pragma weak _getpwnam = getpwnam
+#pragma weak _getpwuid = getpwuid
 
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/types.h>
 #include <pwd.h>
 #include <nss_dbdefs.h>

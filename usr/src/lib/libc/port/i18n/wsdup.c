@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,16 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1986 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	string duplication
@@ -47,6 +46,6 @@ wsdup(const wchar_t *s1)
 {
 	wchar_t *s2;
 
-	s2 = malloc((_wcslen(s1) + 1) * sizeof (wchar_t));
-	return (s2 == NULL ? NULL : _wcscpy(s2, s1));
+	s2 = malloc((wcslen(s1) + 1) * sizeof (wchar_t));
+	return (s2 == NULL ? NULL : wcscpy(s2, s1));
 }

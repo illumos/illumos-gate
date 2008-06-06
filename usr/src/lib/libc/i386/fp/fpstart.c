@@ -46,7 +46,7 @@
 
 #pragma weak _fpstart = __fpstart
 
-#include	"synonyms.h"
+#include	"lint.h"
 #include	<sys/types.h>
 #include	<sys/sysi86.h>	/* for SI86FPHW/SI86FPSTART definitions */
 #include	<sys/fp.h>	/* for FPU_CW_INIT and SSE_MXCSR_INIT */

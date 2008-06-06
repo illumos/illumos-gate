@@ -26,10 +26,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ifndef NATIVE_BUILD
-#include "c_synonyms.h"
-#endif
-
 #include <repcache_protocol.h>
 #include "scf_type.h"
 #include <errno.h>

@@ -29,15 +29,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak flockfile = _flockfile
-#pragma weak ftrylockfile = _ftrylockfile
-#pragma weak funlockfile = _funlockfile
-
-#include "synonyms.h"
+#include "lint.h"
 #include "mtlib.h"
-
-#define	_iob	__iob
-
 #include "file64.h"
 #include <stdio.h>
 #include <thread.h>
@@ -46,6 +39,8 @@
 #include <errno.h>
 #include <stdio_ext.h>
 #include "stdiom.h"
+
+#define	_iob	__iob
 
 /*
  * _flockget and _flockrel are only called by the
@@ -82,7 +77,7 @@ flockfile(FILE *iop)
 	rmutex_t *rl = IOB_LCK(iop);
 
 	if (rl != NULL)
-		mutex_lock(rl);
+		(void) mutex_lock(rl);
 }
 
 void
@@ -91,7 +86,7 @@ funlockfile(FILE *iop)
 	rmutex_t *rl = IOB_LCK(iop);
 
 	if (rl != NULL)
-		mutex_unlock(rl);
+		(void) mutex_unlock(rl);
 }
 
 int

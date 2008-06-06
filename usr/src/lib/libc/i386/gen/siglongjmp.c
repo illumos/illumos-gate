@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,18 +30,16 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak siglongjmp = _siglongjmp
+#pragma weak _siglongjmp = siglongjmp
 
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/types.h>
 #include <sys/ucontext.h>
 #include <setjmp.h>
 #include <ucontext.h>
 
-extern int _setcontext(const ucontext_t *);
-
 void
-_siglongjmp(sigjmp_buf env, int val)
+siglongjmp(sigjmp_buf env, int val)
 {
 	ucontext_t *ucp = (ucontext_t *)env;
 
@@ -50,5 +48,5 @@ _siglongjmp(sigjmp_buf env, int val)
 	else
 		ucp->uc_mcontext.gregs[EAX] = 1;
 
-	(void) _setcontext(ucp);
+	(void) setcontext(ucp);
 }

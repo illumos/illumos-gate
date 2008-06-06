@@ -34,17 +34,17 @@ static uint32_t _semvaluemax;
 /*
  * Check to see if anyone is waiting for this semaphore.
  */
-#pragma weak sema_held = _sema_held
+#pragma weak _sema_held = sema_held
 int
-_sema_held(sema_t *sp)
+sema_held(sema_t *sp)
 {
 	return (sp->count == 0);
 }
 
-#pragma weak sema_init = _sema_init
-/* ARGSUSED2 */
+#pragma weak _sema_init = sema_init
+/* ARGSUSED3 */
 int
-_sema_init(sema_t *sp, unsigned int count, int type, void *arg)
+sema_init(sema_t *sp, unsigned int count, int type, void *arg)
 {
 	if (_semvaluemax == 0)
 		_semvaluemax = (uint32_t)_sysconf(_SC_SEM_VALUE_MAX);
@@ -58,9 +58,9 @@ _sema_init(sema_t *sp, unsigned int count, int type, void *arg)
 	return (0);
 }
 
-#pragma weak sema_destroy = _sema_destroy
+#pragma weak _sema_destroy = sema_destroy
 int
-_sema_destroy(sema_t *sp)
+sema_destroy(sema_t *sp)
 {
 	sp->magic = 0;
 	tdb_sync_obj_deregister(sp);
@@ -186,17 +186,16 @@ sema_wait_impl(sema_t *sp, timespec_t *tsp)
 	return (error);
 }
 
-#pragma weak sema_wait = _sema_wait
+#pragma weak _sema_wait = sema_wait
 int
-_sema_wait(sema_t *sp)
+sema_wait(sema_t *sp)
 {
 	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
 	return (sema_wait_impl(sp, NULL));
 }
 
-#pragma weak sema_reltimedwait = _sema_reltimedwait
 int
-_sema_reltimedwait(sema_t *sp, timespec_t *reltime)
+sema_reltimedwait(sema_t *sp, const timespec_t *reltime)
 {
 	timespec_t tslocal = *reltime;
 
@@ -204,9 +203,8 @@ _sema_reltimedwait(sema_t *sp, timespec_t *reltime)
 	return (sema_wait_impl(sp, &tslocal));
 }
 
-#pragma weak sema_timedwait = _sema_timedwait
 int
-_sema_timedwait(sema_t *sp, timespec_t *abstime)
+sema_timedwait(sema_t *sp, const timespec_t *abstime)
 {
 	timespec_t tslocal;
 
@@ -215,9 +213,9 @@ _sema_timedwait(sema_t *sp, timespec_t *abstime)
 	return (sema_wait_impl(sp, &tslocal));
 }
 
-#pragma weak sema_trywait = _sema_trywait
+#pragma weak _sema_trywait = sema_trywait
 int
-_sema_trywait(sema_t *sp)
+sema_trywait(sema_t *sp)
 {
 	lwp_sema_t *lsp = (lwp_sema_t *)sp;
 	ulwp_t *self = curthread;
@@ -232,7 +230,7 @@ _sema_trywait(sema_t *sp)
 		tdb_incr(ssp->sema_trywait);
 
 	if (lsp->type == USYNC_PROCESS) {	/* kernel-level */
-		error = __lwp_sema_trywait(lsp);
+		error = _lwp_sema_trywait(lsp);
 	} else if (!udp->uberflags.uf_mt) {	/* single threaded */
 		sigoff(self);
 		if (lsp->count == 0)
@@ -282,9 +280,9 @@ _sema_trywait(sema_t *sp)
 	return (error);
 }
 
-#pragma weak sema_post = _sema_post
+#pragma weak _sema_post = sema_post
 int
-_sema_post(sema_t *sp)
+sema_post(sema_t *sp)
 {
 	lwp_sema_t *lsp = (lwp_sema_t *)sp;
 	ulwp_t *self = curthread;
@@ -299,7 +297,7 @@ _sema_post(sema_t *sp)
 		_semvaluemax = (uint32_t)_sysconf(_SC_SEM_VALUE_MAX);
 
 	if (lsp->type == USYNC_PROCESS) {	/* kernel-level */
-		error = __lwp_sema_post(lsp);
+		error = _lwp_sema_post(lsp);
 	} else if (!udp->uberflags.uf_mt) {	/* single threaded */
 		sigoff(self);
 		if (lsp->count >= _semvaluemax)

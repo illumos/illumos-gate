@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,9 +33,9 @@
  * pthread_condattr_init: allocates the cond attribute object and
  * initializes it with the default values.
  */
-#pragma weak pthread_condattr_init = _pthread_condattr_init
+#pragma weak _pthread_condattr_init = pthread_condattr_init
 int
-_pthread_condattr_init(pthread_condattr_t *attr)
+pthread_condattr_init(pthread_condattr_t *attr)
 {
 	cvattr_t *ap;
 
@@ -51,9 +51,8 @@ _pthread_condattr_init(pthread_condattr_t *attr)
  * pthread_condattr_destroy: frees the cond attribute object and
  * invalidates it with NULL value.
  */
-#pragma weak pthread_condattr_destroy = _pthread_condattr_destroy
 int
-_pthread_condattr_destroy(pthread_condattr_t *attr)
+pthread_condattr_destroy(pthread_condattr_t *attr)
 {
 	if (attr == NULL || attr->__pthread_condattrp == NULL)
 		return (EINVAL);
@@ -65,9 +64,8 @@ _pthread_condattr_destroy(pthread_condattr_t *attr)
 /*
  * pthread_condattr_setclock: sets the clockid attribute.
  */
-#pragma weak pthread_condattr_setclock = _pthread_condattr_setclock
 int
-_pthread_condattr_setclock(pthread_condattr_t *attr, clockid_t clock_id)
+pthread_condattr_setclock(pthread_condattr_t *attr, clockid_t clock_id)
 {
 	cvattr_t *ap;
 
@@ -82,9 +80,8 @@ _pthread_condattr_setclock(pthread_condattr_t *attr, clockid_t clock_id)
 /*
  * pthread_condattr_getclock: gets the shared attr.
  */
-#pragma weak pthread_condattr_getclock = _pthread_condattr_getclock
 int
-_pthread_condattr_getclock(const pthread_condattr_t *attr, clockid_t *clock_id)
+pthread_condattr_getclock(const pthread_condattr_t *attr, clockid_t *clock_id)
 {
 	cvattr_t *ap;
 
@@ -101,9 +98,8 @@ _pthread_condattr_getclock(const pthread_condattr_t *attr, clockid_t *clock_id)
  * pthread_condattr_setpshared: sets the shared attr to PRIVATE or SHARED.
  * This is equivalent to setting USYNC_PROCESS/USYNC_THREAD flag in cond_init().
  */
-#pragma weak pthread_condattr_setpshared = _pthread_condattr_setpshared
 int
-_pthread_condattr_setpshared(pthread_condattr_t *attr, int pshared)
+pthread_condattr_setpshared(pthread_condattr_t *attr, int pshared)
 {
 	cvattr_t *ap;
 
@@ -119,9 +115,9 @@ _pthread_condattr_setpshared(pthread_condattr_t *attr, int pshared)
 /*
  * pthread_condattr_getpshared: gets the shared attr.
  */
-#pragma weak pthread_condattr_getpshared = _pthread_condattr_getpshared
+#pragma weak _pthread_condattr_getpshared = pthread_condattr_getpshared
 int
-_pthread_condattr_getpshared(const pthread_condattr_t *attr, int *pshared)
+pthread_condattr_getpshared(const pthread_condattr_t *attr, int *pshared)
 {
 	cvattr_t *ap;
 
@@ -137,9 +133,9 @@ _pthread_condattr_getpshared(const pthread_condattr_t *attr, int *pshared)
  * pthread_cond_init: Initializes the cond object. It copies the
  * pshared attr into type argument and calls cond_init().
  */
-#pragma weak pthread_cond_init = _pthread_cond_init
+#pragma weak _pthread_cond_init = pthread_cond_init
 int
-_pthread_cond_init(pthread_cond_t *cond, const pthread_condattr_t *attr)
+pthread_cond_init(pthread_cond_t *cond, const pthread_condattr_t *attr)
 {
 	cvattr_t *ap;
 	int type;
@@ -158,7 +154,7 @@ _pthread_cond_init(pthread_cond_t *cond, const pthread_condattr_t *attr)
 
 	if (clock_id != CLOCK_REALTIME && clock_id != CLOCK_HIGHRES)
 		error = EINVAL;
-	else if ((error = _cond_init((cond_t *)cond, type, NULL)) == 0)
+	else if ((error = cond_init((cond_t *)cond, type, NULL)) == 0)
 		((cond_t *)cond)->cond_clockid = (uint8_t)clock_id;
 
 	return (error);

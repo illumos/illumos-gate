@@ -23,6 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -37,7 +38,6 @@
  *		Chapter 29 Elementary Graph Algorithms
  *		Chapter 32 Directed Graph
  */
-#include	"_synonyms.h"
 
 #include	<sys/types.h>
 #include	<stdarg.h>

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,16 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Compile time switches:
@@ -46,11 +45,11 @@
  *  USCR - user supplied comparison routine.
  */
 
-#pragma weak hcreate = _hcreate
-#pragma weak hdestroy = _hdestroy
-#pragma weak hsearch = _hsearch
+#pragma weak _hcreate = hcreate
+#pragma weak _hdestroy = hdestroy
+#pragma weak _hsearch = hsearch
 
-#include "synonyms.h"
+#include "lint.h"
 #include <mtlib.h>
 #include <limits.h>
 #include <stdio.h>
@@ -172,29 +171,29 @@ start:
 #endif
 	new = (ENTRY *) malloc(sizeof (ENTRY));
 	if (new == NULL) {
-	    fprintf(stderr, "Out of core \n");
-	    exit(FAIL);
+		fprintf(stderr, "Out of core \n");
+		exit(FAIL);
 	} else {
-	    new->key = malloc((unsigned)strlen(line) + 1);
-	    if (new->key == NULL) {
-		fprintf(stderr, "Out of core \n");
-		exit(FAIL);
-	    }
-	    strcpy(new->key, line);
-	    new->data = malloc(sizeof (int));
-	    if (new->data == NULL) {
-		fprintf(stderr, "Out of core \n");
-		exit(FAIL);
-	    }
-	    *new->data = i++;
+		new->key = malloc((unsigned)strlen(line) + 1);
+		if (new->key == NULL) {
+			fprintf(stderr, "Out of core \n");
+			exit(FAIL);
+		}
+		strcpy(new->key, line);
+		new->data = malloc(sizeof (int));
+		if (new->data == NULL) {
+			fprintf(stderr, "Out of core \n");
+			exit(FAIL);
+		}
+		*new->data = i++;
 	}
 	res = hsearch(*new, ENTER);
 	printf("The number of probes required was %d\n", prcnt);
 	if (res == (ENTRY *) 0)
-	    printf("Table is full\n");
+		printf("Table is full\n");
 	else {
-	    printf("Success: ");
-	    printf("Key = %s, Value = %d\n", res->key, *res->data);
+		printf("Success: ");
+		printf("Key = %s, Value = %d\n", res->key, *res->data);
 	}
 	}
 	printf("Do you wish to start another hash table (yes/no?)");
@@ -556,19 +555,19 @@ hdump()			/* Dumps loc, data, probe count, key */
 			hsearch(table[i], FIND);
 			sum += prcnt;
 			printf("%o.\t%d,\t%d,\t%s\n", i,
-				*table[i].data, prcnt, table[i].key);
+			    *table[i].data, prcnt, table[i].key);
 			prcnt = oldpr;
 		}
 	printf("Total probes = %d\n", sum);
 #else
 #ifdef CHAINED
 	if (table[i] == NULL)
-	    printf("%o.\t-,\t-,\t(NULL)\n", i);
+		printf("%o.\t-,\t-,\t(NULL)\n", i);
 	else {
-	    printf("%o.", i);
-	    for (a = table[i]; a != NULL; a = a->next)
-		printf("\t%d,\t%#0.4x,\t%s\n",
-		    *a->item.data, a, a->item.key);
+		printf("%o.", i);
+		for (a = table[i]; a != NULL; a = a->next)
+			printf("\t%d,\t%#0.4x,\t%s\n",
+			    *a->item.data, a, a->item.key);
 	}
 #endif
 #endif

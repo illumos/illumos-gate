@@ -18,16 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * fmtmsg.c
@@ -51,9 +51,10 @@
  *	<stdlib.h>		miscellaneous function declarations
  */
 
-#pragma weak fmtmsg = _fmtmsg
-#pragma weak addseverity = _addseverity
-#include "synonyms.h"
+#pragma weak _fmtmsg = fmtmsg
+#pragma weak _addseverity = addseverity
+
+#include "lint.h"
 #include "mtlib.h"
 #include "libc.h"
 #include <sys/types.h>
@@ -456,7 +457,7 @@ getauxsevs(char *ptr)
 					 */
 
 					if (*(tokend =
-						exttok(current, ":")) == ':') {
+					    exttok(current, ":")) == ':') {
 						*tokend = '\0';
 						leftoff = tokend +
 						    (ptrdiff_t)1;

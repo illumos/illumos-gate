@@ -34,7 +34,7 @@
  * Ptr args aren't checked for NULL because the program would be a
  * catastrophic mess anyway.  Better to abort than just to return NULL.
  */
-#include "synonyms.h"
+#include "lint.h"
 #include "file64.h"
 #include "mtlib.h"
 #include <stdio.h>

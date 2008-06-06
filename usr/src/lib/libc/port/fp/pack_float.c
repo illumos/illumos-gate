@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#include "lint.h"
 #include "base_conversion.h"
 
 static void
@@ -172,7 +172,7 @@ infinity:
 	case fp_quiet:
 		kluge.f.msw.exponent = 0xff;
 		kluge.f.msw.significand = 0x400000 |
-			(0x3fffff & (pu->significand[0] >> 8));
+		    (0x3fffff & (pu->significand[0] >> 8));
 		break;
 	case fp_normal:
 		__fp_rightshift(pu, 8);
@@ -239,7 +239,7 @@ infinity:
 		kluge.f.msw.exponent = 0x7ff;
 		__fp_rightshift(pu, 11);
 		kluge.f.msw.significand = 0x80000 |
-			(0x7ffff & pu->significand[0]);
+		    (0x7ffff & pu->significand[0]);
 		kluge.f.significand2 = pu->significand[1];
 		break;
 	case fp_normal:
@@ -384,7 +384,7 @@ infinity:
 		kluge.f.msw.exponent = 0x7fff;
 		__fp_rightshift(pu, 15);
 		kluge.f.msw.significand = 0x8000 |
-			(0xffff & pu->significand[0]);
+		    (0xffff & pu->significand[0]);
 		kluge.f.significand2 = pu->significand[1];
 		kluge.f.significand3 = pu->significand[2];
 		kluge.f.significand4 = pu->significand[3];

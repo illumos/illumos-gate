@@ -28,14 +28,10 @@
 
 	.file	"%M%"
 
-#include <sys/asm_linkage.h>
+#include "SYS.h"
 
 	ANSI_PRAGMA_WEAK(sysi86,function)
 
-#include "SYS.h"
-
-	ENTRY(_sysi86)
-	SYSTRAP_RVAL1(sysi86)
-	SYSCERROR
+	SYSCALL_RVAL1(sysi86)
 	RET
-	SET_SIZE(_sysi86)
+	SET_SIZE(sysi86)

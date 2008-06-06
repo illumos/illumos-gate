@@ -1,13 +1,9 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,6 +17,9 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -58,8 +57,8 @@ BEGIN	{
 		oldfile = "errlst.c"
 
 		print "#pragma ident\t\"%Z%%M%\t%I%\t%E% SMI\"\n" >oldfile
-		print "#pragma weak sys_errlist = _sys_errlist\n" >oldfile
-		print "#include \"synonyms.h\"\n" >oldfile
+		print "#pragma weak _sys_errlist = sys_errlist\n" >oldfile
+		print "#include \"lint.h\"\n" >oldfile
 		# We need to include the errors strings proper in the
 		# C source for gettext; the macro C allows us to embed
 		# them as comment.
@@ -68,7 +67,7 @@ BEGIN	{
 		print "const char *sys_errlist[] = {" >oldfile
 
 		print "#pragma ident\t\"%Z%%M%\t%I%\t%E% SMI\"\n" >newfile
-		print "#include \"synonyms.h\"" >newfile
+		print "#include \"lint.h\"" >newfile
 		print "#include <sys/isa_defs.h>\n" >newfile
 		print "#pragma weak __sys_errs = _sys_errs\n" >newfile
 	}

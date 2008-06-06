@@ -20,24 +20,13 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 	.file	"%M%"
-
-#include <sys/asm_linkage.h>
-
-	ANSI_PRAGMA_WEAK(_lwp_continue,function)
-	ANSI_PRAGMA_WEAK(_lwp_kill,function)
-	ANSI_PRAGMA_WEAK(_lwp_self,function)
-	ANSI_PRAGMA_WEAK(_lwp_cond_broadcast,function)
-	ANSI_PRAGMA_WEAK(_lwp_cond_signal,function)
-	ANSI_PRAGMA_WEAK(_lwp_sema_trywait,function)
-	ANSI_PRAGMA_WEAK(_lwp_sema_post,function)
-	ANSI_PRAGMA_WEAK(_lwp_info,function)
 
 #include "SYS.h"
 
@@ -53,13 +42,13 @@
 
 /*
  * int
- * __lwp_continue(lwpid_t lwpid)
+ * _lwp_continue(lwpid_t lwpid)
  */
-	ENTRY(__lwp_continue)
+	ENTRY(_lwp_continue)
 	SYSTRAP_RVAL1(lwp_continue)
 	SYSLWPERR
 	RET
-	SET_SIZE(__lwp_continue)
+	SET_SIZE(_lwp_continue)
 
 /*
  * int
@@ -73,22 +62,22 @@
 
 /*
  * int
- * __lwp_kill(lwpid_t lwpid, int sig)
+ * _lwp_kill(lwpid_t lwpid, int sig)
  */
-	ENTRY(__lwp_kill)
+	ENTRY(_lwp_kill)
 	SYSTRAP_RVAL1(lwp_kill)
 	SYSLWPERR
 	RET
-	SET_SIZE(__lwp_kill)
+	SET_SIZE(_lwp_kill)
 
 /*
  * lwpid_t
- * __lwp_self(void)
+ * _lwp_self(void)
  */
-	ENTRY(__lwp_self)
+	ENTRY(_lwp_self)
 	SYSTRAP_RVAL1(lwp_self)
 	RET
-	SET_SIZE(__lwp_self)
+	SET_SIZE(_lwp_self)
 
 /*
  * int
@@ -140,13 +129,13 @@
 
 /*
  * int
- * __lwp_cond_broadcast(lwp_cond_t *cvp)
+ * _lwp_cond_broadcast(lwp_cond_t *cvp)
  */
-	ENTRY(__lwp_cond_broadcast)
+	ENTRY(_lwp_cond_broadcast)
 	SYSTRAP_RVAL1(lwp_cond_broadcast)
 	SYSLWPERR
 	RET
-	SET_SIZE(__lwp_cond_broadcast)
+	SET_SIZE(_lwp_cond_broadcast)
 
 /*
  * int
@@ -160,13 +149,13 @@
 
 /*
  * int
- * __lwp_cond_signal(lwp_cond_t *cvp)
+ * _lwp_cond_signal(lwp_cond_t *cvp)
  */
-	ENTRY(__lwp_cond_signal)
+	ENTRY(_lwp_cond_signal)
 	SYSTRAP_RVAL1(lwp_cond_signal)
 	SYSLWPERR
 	RET
-	SET_SIZE(__lwp_cond_signal)
+	SET_SIZE(_lwp_cond_signal)
 
 /*
  * int
@@ -180,33 +169,33 @@
 
 /*
  * int
- * __lwp_sema_trywait(lwp_sema_t *sp)
+ * _lwp_sema_trywait(lwp_sema_t *sp)
  */
-	ENTRY(__lwp_sema_trywait)
+	ENTRY(_lwp_sema_trywait)
 	SYSTRAP_RVAL1(lwp_sema_trywait)
 	SYSLWPERR
 	RET
-	SET_SIZE(__lwp_sema_trywait)
+	SET_SIZE(_lwp_sema_trywait)
 
 /*
  * int
- * __lwp_sema_post(lwp_sema_t *sp)
+ * _lwp_sema_post(lwp_sema_t *sp)
  */
-	ENTRY(__lwp_sema_post)
+	ENTRY(_lwp_sema_post)
 	SYSTRAP_RVAL1(lwp_sema_post)
 	SYSLWPERR
 	RET
-	SET_SIZE(__lwp_sema_post)
+	SET_SIZE(_lwp_sema_post)
 
 /*
  * int
- * __lwp_info(struct lwpinfo *infop)
+ * _lwp_info(struct lwpinfo *infop)
  */
-	ENTRY(__lwp_info)
+	ENTRY(_lwp_info)
 	SYSTRAP_RVAL1(lwp_info)
 	SYSLWPERR
 	RET
-	SET_SIZE(__lwp_info)
+	SET_SIZE(_lwp_info)
 
 /*
  * sc_shared_t *

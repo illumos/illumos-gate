@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This code is MKS code ported to Solaris originally with minimum
  * modifications so that upgrades from MKS would readily integrate.
@@ -45,15 +43,17 @@
  *
  */
 
-#pragma	weak wordexp = _wordexp
-#pragma	weak wordfree = _wordfree
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#pragma	weak _wordexp = wordexp
+#pragma	weak _wordfree = wordfree
 
 /* Safeguard against mistakes in the Makefiles */
 #ifndef WORDEXP_KSH93
 #error "WORDEXP_KSH93 not set. Please check the Makefile flags."
 #endif
 
-#include "synonyms.h"
+#include "lint.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <limits.h>

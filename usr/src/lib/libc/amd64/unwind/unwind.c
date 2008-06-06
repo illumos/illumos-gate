@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,22 +130,21 @@
 #define	_Unwind_SetGR  _SUNW_Unwind_SetGR
 #define	_Unwind_SetIP  _SUNW_Unwind_SetIP
 #else
-#pragma weak _Unwind_DeleteException = _SUNW_Unwind_DeleteException
-#pragma weak _Unwind_ForcedUnwind = _SUNW_Unwind_ForcedUnwind
-#pragma weak _Unwind_GetCFA = _SUNW_Unwind_GetCFA
-#pragma weak _Unwind_GetGR = _SUNW_Unwind_GetGR
-#pragma weak _Unwind_GetIP = _SUNW_Unwind_GetIP
-#pragma weak _Unwind_GetLanguageSpecificData = \
-			_SUNW_Unwind_GetLanguageSpecificData
-#pragma weak _Unwind_GetRegionStart = _SUNW_Unwind_GetRegionStart
-#pragma weak _Unwind_RaiseException = _SUNW_Unwind_RaiseException
-#pragma weak _Unwind_Resume = _SUNW_Unwind_Resume
-#pragma weak _Unwind_SetGR = _SUNW_Unwind_SetGR
-#pragma weak _Unwind_SetIP = _SUNW_Unwind_SetIP
-
-#include "synonyms.h"
+#pragma weak _SUNW_Unwind_DeleteException = _Unwind_DeleteException
+#pragma weak _SUNW_Unwind_ForcedUnwind = _Unwind_ForcedUnwind
+#pragma weak _SUNW_Unwind_GetCFA = _Unwind_GetCFA
+#pragma weak _SUNW_Unwind_GetGR = _Unwind_GetGR
+#pragma weak _SUNW_Unwind_GetIP = _Unwind_GetIP
+#pragma weak _SUNW_Unwind_GetLanguageSpecificData = \
+		_Unwind_GetLanguageSpecificData
+#pragma weak _SUNW_Unwind_GetRegionStart = _Unwind_GetRegionStart
+#pragma weak _SUNW_Unwind_RaiseException = _Unwind_RaiseException
+#pragma weak _SUNW_Unwind_Resume = _Unwind_Resume
+#pragma weak _SUNW_Unwind_SetGR = _Unwind_SetGR
+#pragma weak _SUNW_Unwind_SetIP = _Unwind_SetIP
 #endif
 
+#include "lint.h"
 #include <string.h>
 #include "stack_unwind.h"
 #include "reg_num.h"
@@ -376,7 +374,7 @@ _Unwind_ForcedUnwind_Body(struct _Unwind_Exception *exception_object,
 
 	finish_capture(ctx, resume);
 	if (resume && down_one(ctx, ctx))
-	    return (_URC_FATAL_PHASE2_ERROR);
+		return (_URC_FATAL_PHASE2_ERROR);
 
 	do {
 		again = 0;
@@ -418,8 +416,8 @@ _Unwind_ForcedUnwind_Body(struct _Unwind_Exception *exception_object,
 		case _URC_END_OF_STACK:
 			ctx->cfa = ctx->ra = ctx->pc = 0;
 			res = (*stop)(1, phase,
-					exception_object->exception_class,
-					exception_object, ctx, stop_parameter);
+			    exception_object->exception_class,
+			    exception_object, ctx, stop_parameter);
 			return (_URC_END_OF_STACK);
 			break;
 		default:

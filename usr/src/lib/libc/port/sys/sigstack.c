@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,9 +29,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak sigstack = _sigstack
-
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/types.h>
 #include <sys/ucontext.h>
 #include <signal.h>

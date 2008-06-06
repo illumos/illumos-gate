@@ -39,13 +39,6 @@ extern "C" {
 extern	int	primary_link_map;
 extern	void	lmutex_lock(mutex_t *);
 extern	void	lmutex_unlock(mutex_t *);
-extern	int	__rwlock_init(rwlock_t *, int, void *);
-extern	int	__rwlock_destroy(rwlock_t *);
-extern	int	__rw_rdlock(rwlock_t *);
-extern	int	__rw_wrlock(rwlock_t *);
-extern	int	__rw_tryrdlock(rwlock_t *);
-extern	int	__rw_trywrlock(rwlock_t *);
-extern	int	__rw_unlock(rwlock_t *);
 extern	void	lrw_rdlock(rwlock_t *);
 extern	void	lrw_wrlock(rwlock_t *);
 extern	void	lrw_unlock(rwlock_t *);
@@ -58,52 +51,11 @@ extern	void	cancel_safe_mutex_lock(mutex_t *);
 extern	void	cancel_safe_mutex_unlock(mutex_t *);
 extern	int	cancel_safe_mutex_trylock(mutex_t *);
 extern	int	cancel_active(void);
+extern	int	_thrp_cancelled(void);
 
 /* the private libc thread-safe allocator */
 extern	void	*lmalloc(size_t);
 extern	void	lfree(void *, size_t);
-
-/* the rest are public functions */
-extern	int	_mutex_init(mutex_t *, int, void *);
-extern	int	_mutex_destroy(mutex_t *);
-extern	int	_mutex_lock(mutex_t *);
-extern	int	_mutex_trylock(mutex_t *);
-extern	int	_mutex_unlock(mutex_t *);
-extern	int	__mutex_init(mutex_t *, int, void *);
-extern	int	__mutex_destroy(mutex_t *);
-extern	int	__mutex_lock(mutex_t *);
-extern	int	__mutex_trylock(mutex_t *);
-extern	int	__mutex_unlock(mutex_t *);
-
-extern	int	_cond_init(cond_t *, int, void *);
-extern	int	_cond_destroy(cond_t *);
-extern	int	__cond_wait(cond_t *, mutex_t *);
-extern	int	__cond_timedwait(cond_t *, mutex_t *, const timespec_t *);
-extern	int	__cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
-extern	int	_cond_signal(cond_t *);
-extern	int	_cond_broadcast(cond_t *);
-
-extern	int	_rwlock_init(rwlock_t *, int, void *);
-extern	int	_rwlock_destroy(rwlock_t *);
-extern	int	_rw_rdlock(rwlock_t *);
-extern	int	_rw_wrlock(rwlock_t *);
-extern	int	_rw_tryrdlock(rwlock_t *);
-extern	int	_rw_trywrlock(rwlock_t *);
-extern	int	_rw_unlock(rwlock_t *);
-
-extern	int	_thr_main(void);
-extern	thread_t _thr_self(void);
-extern	int	_thrp_cancelled(void);
-extern	void	_thr_exit(void *);
-extern	size_t	_thr_min_stack(void);
-extern	int	_thr_kill(thread_t, int);
-extern	int	_thr_create(void *, size_t, void *(*)(void *), void *, long,
-			thread_t *);
-extern	int	_thr_keycreate(thread_key_t *, void (*)(void *));
-extern	int	_thr_keycreate_once(thread_key_t *, void (*)(void *));
-extern	int	_thr_setspecific(thread_key_t, void *);
-extern	int	_thr_getspecific(thread_key_t, void **);
-extern	void	*_pthread_getspecific(thread_key_t);
 
 #if defined(THREAD_DEBUG)
 extern	void	assert_no_libc_locks_held(void);

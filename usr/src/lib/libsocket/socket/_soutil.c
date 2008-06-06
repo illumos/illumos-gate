@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,8 +42,6 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-
-extern int _stat();
 
 /*
  * XXX The functions in this file are only needed to support transport
@@ -144,7 +142,7 @@ retry:
 #if defined(i386)
 	if (_xstat(_STAT_VER, net->nc_device, &stats) < 0) {
 #else
-	if (_stat(net->nc_device, &stats) < 0) {
+	if (stat(net->nc_device, &stats) < 0) {
 #endif
 		switch (errno) {
 		case EINTR:
@@ -189,15 +187,16 @@ _s_match_netconf(int family, int type, int proto, void **nethandle)
 	char			*oproto;
 
 	if (family < 0 ||
-		family >= (int)sizeof (family_sw) / (int)sizeof (char *) ||
-		proto < 0 || proto >= IPPROTO_MAX)  {
-			errno = EPROTONOSUPPORT;
-			return (NULL);
+	    family >= (int)sizeof (family_sw) / (int)sizeof (char *) ||
+	    proto < 0 || proto >= IPPROTO_MAX)  {
+		errno = EPROTONOSUPPORT;
+		return (NULL);
 	}
 	if (proto) {
 		if (proto >= (int)sizeof (proto_sw) / (int)sizeof (char *))
 			oproto = "";
-		else	oproto = proto_sw[proto];
+		else
+			oproto = proto_sw[proto];
 	}
 
 	/*
@@ -236,7 +235,7 @@ _s_match_netconf(int family, int type, int proto, void **nethandle)
 			continue;
 		} else	{
 			if (strcmp(net->nc_protofmly, family_sw[family]) == 0 &&
-					semantics == type) {
+			    semantics == type) {
 				break;
 			}
 		}

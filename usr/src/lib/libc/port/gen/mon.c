@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,7 @@
  *
  *
  *	Routines:
- *		(global) _monitor	init, cleanup for prof(1)iling
+ *		(global) monitor	init, cleanup for prof(1)iling
  *		(global) _mcount	function call counter
  *		(global) _mcount_newent	call count entry manager
  *		(static) _mnewblock	call count block allocator
@@ -123,9 +123,9 @@
  *
  */
 
-#pragma weak monitor = _monitor
+#pragma weak _monitor = monitor
 
-#include "synonyms.h"
+#include "lint.h"
 #include "mtlib.h"
 #include "libc.h"
 #include <sys/types.h>
@@ -158,7 +158,7 @@ char **___Argv = NULL; /* initialized to argv array by mcrt0 (if loaded) */
  * countbase/countlimit are now STATIC!
  */
 static char *countbase;		/* addr of next pc,count cell to use in block */
-static char *_countlimit;	/* addr lim for cells (addr after last cell) */
+static char *countlimit;	/* addr lim for cells (addr after last cell) */
 
 typedef struct anchor	ANCHOR;
 
@@ -275,7 +275,7 @@ monitor(int (*alowpc)(void), int (*ahighpc)(void), WORD *buffer,
 		for (; ; n /= 10) {
 			*name++ = pid/n + '0';
 			if (n == 1)
-			    break;
+				break;
 			pid %= n;
 		}
 		*name++ = '.';
@@ -316,11 +316,11 @@ monitor(int (*alowpc)(void), int (*ahighpc)(void), WORD *buffer,
 
 	/* got it - enable use by mcount() */
 	countbase  = (char *)buffer + sizeof (struct hdr);
-	_countlimit = countbase + (nfunc * sizeof (struct cnt));
+	countlimit = countbase + (nfunc * sizeof (struct cnt));
 
 	/* (set size of region 3) */
 	newanchp->histSize = (int)
-	    (bufsize * sizeof (WORD) - (_countlimit - (char *)buffer));
+	    (bufsize * sizeof (WORD) - (countlimit - (char *)buffer));
 
 
 	/* done w/regions 1 + 2: setup 3  to activate profil processing. */
@@ -474,7 +474,7 @@ _mnewblock(void)
 
 					/* got it - enable use by mcount() */
 	countbase  = (char *)hdrp + sizeof (struct hdr);
-	_countlimit = countbase + (THISMANYFCNS * sizeof (struct cnt));
+	countlimit = countbase + (THISMANYFCNS * sizeof (struct cnt));
 
 	newanchp->histSize = 0;	/* (set size of region 3.. to 0) */
 
@@ -486,7 +486,7 @@ _mnewblock(void)
  * mcount_newent() -- call to get a new mcount call count entry.
  *
  * this function is called by _mcount to get a new call count entry
- * (struct cnt, in the region allocated by _monitor()), or to return
+ * (struct cnt, in the region allocated by monitor()), or to return
  * zero if profiling is off.
  *
  * This function acts as a funnel, an access function to make sure
@@ -543,7 +543,7 @@ _mcount_newent(void)
 	if (countbase == 0)
 		return (NULL);
 
-	if (countbase >= _countlimit)
+	if (countbase >= countlimit)
 		_mnewblock();		/* get a new block; set countbase */
 
 	if (countbase != 0) {

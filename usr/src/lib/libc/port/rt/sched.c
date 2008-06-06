@@ -26,7 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#include "lint.h"
 #include "thr_uberdata.h"
 #include <sched.h>
 #include <sys/tspriocntl.h>
@@ -128,7 +128,7 @@ get_info_by_policy(int policy)
 			 * dynamic loading of scheduling classes.
 			 */
 			if (base) {
-				_membar_producer();
+				membar_producer();
 				pccp->pcc_state = -1;
 			}
 			errno = EINVAL;
@@ -138,7 +138,7 @@ get_info_by_policy(int policy)
 		pccp->pcc_policy = policy;
 	} else if (policy != SCHED_SYS &&
 	    priocntl(0, 0, PC_GETCID, &pccp->pcc_info) == -1) {
-		_membar_producer();
+		membar_producer();
 		pccp->pcc_state = -1;
 		errno = EINVAL;
 		lmutex_unlock(&class_lock);
@@ -170,7 +170,7 @@ get_info_by_policy(int policy)
 		break;
 	}
 
-	_membar_producer();
+	membar_producer();
 	pccp->pcc_state = 1;
 	lmutex_unlock(&class_lock);
 	return (pccp);
@@ -577,7 +577,7 @@ update_sched(ulwp_t *self)
 		if (self->ul_policy < 0) {
 			self->ul_cid = 0;
 			self->ul_pri = 0;
-			_membar_producer();
+			membar_producer();
 			self->ul_policy = SCHED_OTHER;
 		}
 		exit_critical(self);
@@ -596,7 +596,7 @@ update_sched(ulwp_t *self)
 	if (pccp == NULL) {		/* can't happen? */
 		self->ul_cid = scp->sc_cid;
 		self->ul_pri = scp->sc_cpri;
-		_membar_producer();
+		membar_producer();
 		self->ul_policy = SCHED_OTHER;
 		exit_critical(self);
 		return;
@@ -629,7 +629,7 @@ update_sched(ulwp_t *self)
 
 	self->ul_cid = pcparm.pc_cid;
 	self->ul_pri = priority;
-	_membar_producer();
+	membar_producer();
 	self->ul_policy = policy;
 
 	exit_critical(self);

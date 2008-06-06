@@ -18,21 +18,21 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak getpass = _getpass
-#pragma weak getpassphrase = _getpassphrase
+#pragma weak _getpass = getpass
+#pragma weak _getpassphrase = getpassphrase
 
-#include "synonyms.h"
+#include "lint.h"
 #include "file64.h"
 #include "mtlib.h"
 #include <stdio.h>
@@ -98,7 +98,7 @@ __getpass(const char *prompt, int size)
 	(void) fputs(prompt, fi);
 	p = pbuf;
 	while (!intrupt &&
-		(c = GETC(fi)) != '\n' && c != '\r' && c != EOF) {
+	    (c = GETC(fi)) != '\n' && c != '\r' && c != EOF) {
 		if (p < &pbuf[ size ])
 			*p++ = (char)c;
 	}

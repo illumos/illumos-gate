@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,6 @@
 #include <sys/machelf.h>
 #include <thread.h>
 
-#define	walkcontext	_walkcontext		/* work around 4743525 */
 #include <ucontext.h>
 
 extern int ndebug;

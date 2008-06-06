@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,33 +18,31 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1986 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-/*	This module is created for NLS on Sep.03.86		*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Return the number of characters in the maximum leading segment
  * of string which consists solely of characters NOT from charset.
  */
 
-#pragma weak wcscspn = _wcscspn
-#pragma weak wscspn = _wscspn
+#pragma weak _wcscspn = wcscspn
+#pragma weak _wscspn = wscspn
 
 #include "lint.h"
 #include <stdlib.h>
 #include <wchar.h>
 
 size_t
-_wcscspn(const wchar_t *string, const wchar_t *charset)
+wcscspn(const wchar_t *string, const wchar_t *charset)
 {
 	const wchar_t *p, *q;
 
@@ -59,7 +56,7 @@ _wcscspn(const wchar_t *string, const wchar_t *charset)
 }
 
 size_t
-_wscspn(const wchar_t *string, const wchar_t *charset)
+wscspn(const wchar_t *string, const wchar_t *charset)
 {
-	return (_wcscspn(string, charset));
+	return (wcscspn(string, charset));
 }

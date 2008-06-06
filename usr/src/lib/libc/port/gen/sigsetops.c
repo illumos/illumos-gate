@@ -24,25 +24,24 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * POSIX signal manipulation functions.
  */
-#pragma weak sigfillset = _sigfillset
-#pragma weak sigemptyset = _sigemptyset
-#pragma weak sigaddset = _sigaddset
-#pragma weak sigdelset = _sigdelset
-#pragma weak sigismember = _sigismember
+#pragma weak _sigfillset = sigfillset
+#pragma weak _sigemptyset = sigemptyset
+#pragma weak _sigaddset = sigaddset
+#pragma weak _sigdelset = sigdelset
+#pragma weak _sigismember = sigismember
 
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/types.h>
 #include <stdio.h>
 #include <sys/param.h>
-#include <sys/errno.h>
 #include <sys/signal.h>
 #include <errno.h>
 #include "libc.h"

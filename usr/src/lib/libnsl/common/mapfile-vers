@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,7 +28,6 @@
 SUNW_1.10 {		# SunOS 5.11 (Solaris 11)
     global:
 	inet_aton;
-	_inet_aton;
 } SUNW_1.9;
 
 SUNW_1.9 {		# SunOS 5.10 (Solaris 10)
@@ -625,7 +624,6 @@ SUNWprivate_1.1 {
 	_switch_gethostbyname_r;
 	t_errlist;
 	tiusr_statetbl;
-	_t_strerror;
 	_uncached_gethostbyaddr_r;
 	_uncached_gethostbyname_r;
 	usingypmap;

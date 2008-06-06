@@ -20,14 +20,15 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#include "lint.h"
 #include <stdlib.h>
+#include <pthread.h>
 #include <errno.h>
 #include "mtlib.h"
 #include "libc.h"
@@ -75,12 +76,12 @@ tsdalloc(__tsd_item_t n, size_t size, pfrv_t destructor)
 		return (NULL);
 	}
 
-	if ((error = _thr_keycreate_once(&key, _free_tsdbuf)) != 0) {
+	if ((error = thr_keycreate_once(&key, _free_tsdbuf)) != 0) {
 		errno = error;
 		return (NULL);
 	}
 
-	if ((loc = _pthread_getspecific(key)) != NULL) {
+	if ((loc = pthread_getspecific(key)) != NULL) {
 		if ((p = loc[n].buf) != NULL)
 			return (p);
 	} else {
@@ -88,7 +89,7 @@ tsdalloc(__tsd_item_t n, size_t size, pfrv_t destructor)
 		loc = lmalloc(_T_NUM_ENTRIES * sizeof (tsdent_t));
 		if (loc == NULL)
 			return (NULL);
-		if ((error = _thr_setspecific(key, loc)) != 0) {
+		if ((error = thr_setspecific(key, loc)) != 0) {
 			lfree(loc, _T_NUM_ENTRIES * sizeof (tsdent_t));
 			errno = error;
 			return (NULL);

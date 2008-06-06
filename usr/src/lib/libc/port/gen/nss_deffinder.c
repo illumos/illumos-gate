@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,9 +36,9 @@
 
 	/* Allow our finder(s) to be overridden by user-supplied ones */
 
-#pragma weak nss_default_finders = _nss_default_finders
+#pragma weak _nss_default_finders = nss_default_finders
 
-#include "synonyms.h"
+#include "lint.h"
 #include "mtlib.h"
 #include <nss_common.h>
 #include <dlfcn.h>
@@ -98,4 +99,4 @@ static nss_backend_finder_t SO_per_src = {
 	0
 };
 
-nss_backend_finder_t *_nss_default_finders = &SO_per_src;
+nss_backend_finder_t *nss_default_finders = &SO_per_src;

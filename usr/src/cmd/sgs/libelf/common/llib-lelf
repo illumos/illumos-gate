@@ -18,8 +18,6 @@
  *
  * CDDL HEADER END
  */
-/* LINTLIBRARY */
-/* PROTOLIB1 */
 
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved. 
@@ -27,6 +25,9 @@
  */ 
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/* LINTLIBRARY */
+/* PROTOLIB1 */
 
 /*
  * Generic interface definition for usr/src/lib/libelf.
@@ -41,21 +42,13 @@
  * Elf32 Symbols
  */
 size_t		elf32_fsize(Elf_Type, size_t, uint_t);
-size_t		_elf32_fsize(Elf_Type, size_t, uint_t);
 Elf32_Ehdr *	elf32_getehdr(Elf *);
-Elf32_Ehdr *	_elf32_getehdr(Elf *);
 Elf32_Phdr *	elf32_getphdr(Elf *);
-Elf32_Phdr *	_elf32_getphdr(Elf *);
 Elf32_Shdr *	elf32_getshdr(Elf_Scn *);
-Elf32_Shdr *	_elf32_getshdr(Elf_Scn *);
 Elf32_Ehdr *	elf32_newehdr(Elf *);
-Elf32_Ehdr *	_elf32_newehdr(Elf *);
 Elf32_Phdr *	elf32_newphdr(Elf *, size_t);
-Elf32_Phdr *	_elf32_newphdr(Elf *, size_t);
 Elf_Data *	elf32_xlatetof(Elf_Data *, const Elf_Data *, uint_t);
-Elf_Data *	_elf32_xlatetof(Elf_Data *, const Elf_Data *, uint_t);
 Elf_Data *	elf32_xlatetom(Elf_Data *, const Elf_Data *, uint_t);
-Elf_Data *	_elf32_xlatetom(Elf_Data *, const Elf_Data *, uint_t);
 
 
 /*
@@ -111,73 +104,41 @@ GElf_Xword	_gelf_getdyndtflags_1(Elf *);
  * Class-Independent Elf Symbols
  */
 Elf *		elf_begin(int, Elf_Cmd, Elf *);
-Elf *		_elf_begin(int, Elf_Cmd, Elf *);
 int		elf_cntl(Elf *, Elf_Cmd);
-int		_elf_cntl(Elf *, Elf_Cmd);
 int		elf_end(Elf *);
-int		_elf_end(Elf *);
 const char *	elf_errmsg(int);
-const char *	_elf_errmsg(int);
 int		elf_errno(void);
-int		_elf_errno(void);
 void		elf_fill(int);
-void		_elf_fill(int);
 uint_t		elf_flagdata(Elf_Data *, Elf_Cmd, uint_t);
-uint_t		_elf_flagdata(Elf_Data *, Elf_Cmd, uint_t);
 uint_t		elf_flagehdr(Elf *, Elf_Cmd,  uint_t);
-uint_t		_elf_flagehdr(Elf *, Elf_Cmd,  uint_t);
 uint_t		elf_flagelf(Elf *, Elf_Cmd,  uint_t);
-uint_t		_elf_flagelf(Elf *, Elf_Cmd,  uint_t);
 uint_t		elf_flagphdr(Elf *, Elf_Cmd,  uint_t);
-uint_t		_elf_flagphdr(Elf *, Elf_Cmd,  uint_t);
 uint_t		elf_flagscn(Elf_Scn *, Elf_Cmd, uint_t);
-uint_t		_elf_flagscn(Elf_Scn *, Elf_Cmd, uint_t);
 uint_t		elf_flagshdr(Elf_Scn *, Elf_Cmd, uint_t);
-uint_t		_elf_flagshdr(Elf_Scn *, Elf_Cmd, uint_t);
 Elf_Arhdr *	elf_getarhdr(Elf *);
-Elf_Arhdr *	_elf_getarhdr(Elf *);
 Elf_Arsym *	elf_getarsym(Elf *, size_t *);
-Elf_Arsym *	_elf_getarsym(Elf *, size_t *);
 off_t		elf_getbase(Elf *);
-off_t		_elf_getbase(Elf *);
 Elf_Data *	elf_getdata(Elf_Scn *, Elf_Data *);
-Elf_Data *	_elf_getdata(Elf_Scn *, Elf_Data *);
 char *		elf_getident(Elf *, size_t *);
-char *		_elf_getident(Elf *, size_t *);
 int		elf_getphnum(Elf *, size_t *);
 int		elf_getshnum(Elf *, size_t *);
 int		elf_getshstrndx(Elf *, size_t *);
 Elf_Scn *	elf_getscn(Elf *elf, size_t);
-Elf_Scn *	_elf_getscn(Elf *elf, size_t);
 ulong_t		elf_hash(const char *);
-ulong_t		_elf_hash(const char *);
 Elf_Kind	elf_kind(Elf *);
-Elf_Kind	_elf_kind(Elf *);
 Elf *		elf_memory(char *, size_t);
-Elf *		_elf_memory(char *, size_t);
 size_t		elf_ndxscn(Elf_Scn *);
-size_t		_elf_ndxscn(Elf_Scn *);
 Elf_Data *	elf_newdata(Elf_Scn *);
-Elf_Data *	_elf_newdata(Elf_Scn *);
 Elf_Scn *	elf_newscn(Elf *);
-Elf_Scn *	_elf_newscn(Elf *);
 Elf_Cmd		elf_next(Elf *);
-Elf_Cmd		_elf_next(Elf *);
 Elf_Scn *	elf_nextscn(Elf *, Elf_Scn *);
-Elf_Scn *	_elf_nextscn(Elf *, Elf_Scn *);
 size_t		_elf_outsync(int, char *, size_t, uint_t);
 size_t		elf_rand(Elf *, size_t);
-size_t		_elf_rand(Elf *, size_t);
 Elf_Data *	elf_rawdata(Elf_Scn *, Elf_Data *);
-Elf_Data *	_elf_rawdata(Elf_Scn *, Elf_Data *);
 char *		elf_rawfile(Elf *, size_t *);
-char *		_elf_rawfile(Elf *, size_t *);
 char *		elf_strptr(Elf *, size_t, size_t);
-char *		_elf_strptr(Elf *, size_t, size_t);
 off_t		elf_update(Elf *, Elf_Cmd);
-off_t		_elf_update(Elf *, Elf_Cmd);
 uint_t		elf_version(uint_t);
-uint_t		_elf_version(uint_t);
 int		nlist(const char *, struct nlist *);
 
 

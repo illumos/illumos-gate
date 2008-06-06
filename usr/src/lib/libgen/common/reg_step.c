@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,15 +29,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak loc1 = _loc1
-#pragma weak loc2 = _loc2
-#pragma weak locs = _locs
-#pragma weak braelist = _braelist
-#pragma weak braslist = _braslist
-#pragma weak step = _step
-#pragma weak advance = _radvance
-
-#include "gen_synonyms.h"
 #include <sys/types.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -515,16 +506,16 @@ _advance(char *lp, char *ep)
 			c = (unsigned char)*lp;
 			d = (unsigned char)*(lp-1);
 			if ((isdigit((int)c) || uletter((int)c) || c >= 0200 &&
-				MB_CUR_MAX > 1) && !isdigit((int)d) &&
-				    !uletter((int)d) &&
-				(d < 0200 || MB_CUR_MAX == 1))
+			    MB_CUR_MAX > 1) && !isdigit((int)d) &&
+			    !uletter((int)d) &&
+			    (d < 0200 || MB_CUR_MAX == 1))
 				continue;
 			return (0);
 
 		case CLET:
 			d = (unsigned char)*lp;
 			if (!isdigit((int)d) && !uletter((int)d) && (d < 0200 ||
-				MB_CUR_MAX == 1))
+			    MB_CUR_MAX == 1))
 				continue;
 			return (0);
 
@@ -548,10 +539,10 @@ mstar:
 				/* back up appropriate number of bytes    */
 				if ((unsigned char)*lp >= 0200) {
 					if (p1 >= curlp &&
-						(unsigned char)*p1 == SS2)
+					    (unsigned char)*p1 == SS2)
 						lp = p1;
 					else if (p2 >= curlp &&
-						(unsigned char)*p2 == SS3)
+					    (unsigned char)*p2 == SS3)
 						lp = p2;
 					else
 						lp = lp - eucw1 + 1;

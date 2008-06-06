@@ -1,9 +1,7 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (c) 2002 Todd C. Miller <Todd.Miller@courtesan.com>
@@ -67,18 +65,19 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma weak getopt_clip = _getopt_clip
-#pragma weak getopt_long = _getopt_long
-#pragma weak getopt_long_only = _getopt_long_only
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#pragma weak _getopt_clip = getopt_clip
+#pragma weak _getopt_long = getopt_long
+#pragma weak _getopt_long_only = getopt_long_only
+
+#include "lint.h"
 #include <getopt.h>
 #include <stdio.h>
 #include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include "_libc_gettext.h"
 
 static int optreset = 0;	/* keep track of first entry to getopt() */

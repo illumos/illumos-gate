@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,9 +53,6 @@
 #define	AU_TABLE_LENGTH	16
 #define	AU_TABLE_MAX	256
 
-extern int _mutex_lock(mutex_t *);
-extern int _mutex_unlock(mutex_t *);
-
 static token_t	**au_d;
 static int	au_d_length = 0;	/* current table length */
 static int	au_d_required_length = AU_TABLE_LENGTH; /* new table length */
@@ -71,7 +68,7 @@ au_open()
 	int d;			/* descriptor */
 	token_t	**au_d_new;
 
-	_mutex_lock(&mutex_au_d);
+	(void) mutex_lock(&mutex_au_d);
 
 	if (au_d_required_length > au_d_length) {
 		au_d_new = (token_t **)calloc(au_d_required_length,
@@ -79,7 +76,7 @@ au_open()
 
 		if (au_d_new == NULL) {
 			au_d_required_length = au_d_length;
-			_mutex_unlock(&mutex_au_d);
+			(void) mutex_unlock(&mutex_au_d);
 			return (-1);
 		}
 		if (au_d_length > 0) {
@@ -93,7 +90,7 @@ au_open()
 	for (d = 0; d < au_d_length; d++) {
 		if (au_d[d] == (token_t *)0) {
 			au_d[d] = (token_t *)&au_d;
-			_mutex_unlock(&mutex_au_d);
+			(void) mutex_unlock(&mutex_au_d);
 			return (d);
 		}
 	}
@@ -103,11 +100,11 @@ au_open()
 	 * Logic here expects AU_TABLE_MAX to be multiple of AU_TABLE_LENGTH
 	 */
 	if (au_d_length >= AU_TABLE_MAX) {
-		_mutex_unlock(&mutex_au_d);
+		(void) mutex_unlock(&mutex_au_d);
 		return (-1);
 	}
 	au_d_required_length += AU_TABLE_LENGTH;
-	_mutex_unlock(&mutex_au_d);
+	(void) mutex_unlock(&mutex_au_d);
 
 	return (au_open());
 }
@@ -132,19 +129,19 @@ au_write(d, m)
 		return (-1);
 	if (m == (token_t *)0)
 		return (-1);
-	_mutex_lock(&mutex_au_d);
+	(void) mutex_lock(&mutex_au_d);
 	if ((d >= au_d_length) || (au_d[d] == (token_t *)0)) {
-		_mutex_unlock(&mutex_au_d);
+		(void) mutex_unlock(&mutex_au_d);
 		return (-1);
 	} else if (au_d[d] == (token_t *)&au_d) {
 		au_d[d] = m;
-		_mutex_unlock(&mutex_au_d);
+		(void) mutex_unlock(&mutex_au_d);
 		return (0);
 	}
 	for (mp = au_d[d]; mp->tt_next != (token_t *)0; mp = mp->tt_next)
 		;
 	mp->tt_next = m;
-	_mutex_unlock(&mutex_au_d);
+	(void) mutex_unlock(&mutex_au_d);
 	return (0);
 }
 
@@ -175,17 +172,17 @@ au_close(d, right, e_type)
 	int  byte_count;	/* bytes in the record */
 	int   v;
 
-	_mutex_lock(&mutex_au_d);
+	(void) mutex_lock(&mutex_au_d);
 	if (d < 0 || d >= au_d_length ||
 	    ((dchain = au_d[d]) == (token_t *)0)) {
-		_mutex_unlock(&mutex_au_d);
+		(void) mutex_unlock(&mutex_au_d);
 		return (-1);
 	}
 
 	au_d[d] = (token_t *)0;
 
 	if (dchain == (token_t *)&au_d) {
-		_mutex_unlock(&mutex_au_d);
+		(void) mutex_unlock(&mutex_au_d);
 		return (0);
 	}
 	/*
@@ -198,7 +195,7 @@ au_close(d, right, e_type)
 			free(record->tt_data);
 			free(record);
 		}
-		_mutex_unlock(&mutex_au_d);
+		(void) mutex_unlock(&mutex_au_d);
 		return (0);
 	}
 
@@ -281,6 +278,6 @@ au_close(d, right, e_type)
 	 */
 	v = audit((caddr_t)buffer, byte_count);
 	free(buffer);
-	_mutex_unlock(&mutex_au_d);
+	(void) mutex_unlock(&mutex_au_d);
 	return (v);
 }

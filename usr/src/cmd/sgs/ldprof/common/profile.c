@@ -18,34 +18,37 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Routines to provide profiling of shared libraries required by the called
  * executable.
  */
-#include	<stdio.h>
-#include	<fcntl.h>
-#include	<sys/mman.h>
-#include	<unistd.h>
-#include	<stdlib.h>
-#include	<string.h>
-#include	<sys/types.h>
-#include	<sys/stat.h>
-#include	<synch.h>
-#include	<signal.h>
-#include	<synch.h>
-#include	<link.h>
-#include	<sys/param.h>
-#include	<procfs.h>
-#include	"msg.h"
-#include	"sgs.h"
-#include	"profile.h"
-#include	"_rtld.h"
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <synch.h>
+#include <signal.h>
+#include <synch.h>
+#include <link.h>
+#include <libintl.h>
+#include <sys/param.h>
+#include <procfs.h>
+#include "msg.h"
+#include "sgs.h"
+#include "profile.h"
+#include "_rtld.h"
 
 
 static char	Profile[MAXPATHLEN];	/* Profile buffer pathname */
@@ -89,14 +92,10 @@ prof_mutex_unlock(mutex_t *mp, sigset_t *oset)
 	return (0);
 }
 
-
-extern char	*_dgettext(const char *, const char *);
-
-
 const char *
 _ldprof_msg(Msg mid)
 {
-	return (_dgettext(MSG_ORIG(MSG_SUNW_OST_SGS), MSG_ORIG(mid)));
+	return (dgettext(MSG_ORIG(MSG_SUNW_OST_SGS), MSG_ORIG(mid)));
 }
 
 /*
@@ -125,7 +124,7 @@ la_version(uint_t version)
 
 	if (version < LAV_CURRENT) {
 		(void) fprintf(stderr, MSG_INTL(MSG_GEN_AUDITVERSION),
-			LAV_CURRENT, version);
+		    LAV_CURRENT, version);
 		return (LAV_CURRENT);
 	}
 
@@ -231,7 +230,7 @@ profile_open(const char *fname, Link_map *lmp)
 			dynp = (Dyn *)phdr->p_vaddr;
 			if (fixed == 0) {
 				dynp = (Dyn *)((unsigned long)dynp +
-					(unsigned long)lpc);
+				    (unsigned long)lpc);
 			}
 			continue;
 		}
@@ -242,7 +241,7 @@ profile_open(const char *fname, Link_map *lmp)
 		_hpc = (caddr_t)(phdr->p_vaddr + phdr->p_memsz);
 		if (fixed == 0) {
 			_hpc = (caddr_t)((unsigned long)_hpc +
-				(unsigned long)lpc);
+			    (unsigned long)lpc);
 		}
 		if (_hpc > hpc)
 			hpc = _hpc;
@@ -266,7 +265,7 @@ profile_open(const char *fname, Link_map *lmp)
 			hashp = (unsigned int *)dynp->d_un.d_ptr;
 			if (fixed == 0) {
 				hashp = (unsigned int *)((unsigned long)hashp +
-					(unsigned long)lpc);
+				    (unsigned long)lpc);
 			}
 			nsym = hashp[1];
 			break;
@@ -369,7 +368,7 @@ profile_open(const char *fname, Link_map *lmp)
 	 */
 	/* LINTED */
 	profil((unsigned short *)(addr + hsize),
-		psize, (unsigned long)lpc, (unsigned int) PRF_SCALE);
+	    psize, (unsigned long)lpc, (unsigned int) PRF_SCALE);
 
 	return (1);
 }
@@ -508,7 +507,7 @@ plt_cg_interp(uint_t ndx, caddr_t from, caddr_t to)
 		fd = open(Profile, O_RDWR, 0);
 		if (remap_profile(fd) == 0) {
 			(void) prof_mutex_unlock((mutex_t *)&Hptr->hd_mutex,
-				&mask);
+			    &mask);
 			exit(1);
 		}
 		(void) close(fd);
@@ -545,7 +544,7 @@ plt_cg_interp(uint_t ndx, caddr_t from, caddr_t to)
 			 * entry and link it in.
 			 */
 			while ((cptr->cg_from != from) &&
-				(cptr->cg_from != PRF_UNKNOWN)) {
+			    (cptr->cg_from != PRF_UNKNOWN)) {
 				if (cptr->cg_next != 0)
 					cptr = &Cptr[cptr->cg_next];
 				else {
@@ -584,10 +583,11 @@ plt_cg_interp(uint_t ndx, caddr_t from, caddr_t to)
 						addr = (caddr_t)((Addr)cptr -
 						    (Addr)Cptr);
 						if (remap_profile(fd) == 0) {
+						    /* CSTYLED */
 						    (void) prof_mutex_unlock(
 							(mutex_t *)&Hptr->
 							hd_mutex, &mask);
-						    exit(1);
+							exit(1);
 						}
 						cptr = (L_cgarc *)((Addr)addr +
 						    (Addr)Cptr);

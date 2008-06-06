@@ -20,13 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <c_synonyms.h>
 #include <mtmalloc.h>
 #include "mtmalloc_impl.h"
 #include <unistd.h>

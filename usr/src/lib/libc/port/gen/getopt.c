@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * See getopt(3C) and SUS/XPG getopt() for function definition and
@@ -39,9 +39,9 @@
  * alnum characters ([a-z][A-Z][0-9]).
  */
 
-#pragma weak getopt = _getopt
+#pragma weak _getopt = getopt
 
-#include "synonyms.h"
+#include "lint.h"
 #include "_libc_gettext.h"
 
 #include <unistd.h>
@@ -149,10 +149,10 @@ parselong(const char *optstring, const char *opt, char **longoptarg)
 			if (match && *ip == ')' &&
 			    (*op == '\0' || *op == '=')) {
 				if ((*op) == '=') {
-				    /* may be an empty string - OK */
-				    (*longoptarg) = op + 1;
+					/* may be an empty string - OK */
+					(*longoptarg) = op + 1;
 				} else {
-				    (*longoptarg) = NULL;
+					(*longoptarg) = NULL;
 				}
 				return (cp);
 			}
@@ -166,7 +166,7 @@ parselong(const char *optstring, const char *opt, char **longoptarg)
 		 * required argument.
 		 */
 		while ((cp > optstring) && ((*cp) == ':')) {
-		    --cp;
+			--cp;
 		}
 	} while (*cp != '\0');
 	return (NULL);
@@ -230,7 +230,6 @@ getopt(int argc, char *const *argv, const char *optstring)
 	if (!(longopt ?
 	    ((cp = parselong(optstring, argv[optind]+2, &longoptarg)) != NULL) :
 	    ((cp = parseshort(optstring, c)) != NULL))) {
-		/* LINTED: variable format specifier */
 		ERR(_libc_gettext("%s: illegal option -- %s\n"),
 		    c, (longopt ? optind : 0));
 		/*
@@ -281,7 +280,6 @@ getopt(int argc, char *const *argv, const char *optstring)
 			optind++;
 			optarg = longoptarg;
 		} else if (++optind >= argc) {
-			/* LINTED: variable format specifier */
 			ERR(_libc_gettext("%s: option requires an argument" \
 			    " -- %s\n"), c, (longopt ? optind - 1 : 0));
 			_sp = 1;
@@ -293,13 +291,12 @@ getopt(int argc, char *const *argv, const char *optstring)
 	} else {
 		/* The option does NOT take an argument */
 		if (longopt && (longoptarg != NULL)) {
-		    /* User supplied an arg to an option that takes none */
-		    /* LINTED: variable format specifier */
-		    ERR(_libc_gettext(
-			"%s: option doesn't take an argument -- %s\n"),
-			0, (longopt ? optind : 0));
-		    optarg = longoptarg = NULL;
-		    c = '?';
+			/* User supplied an arg to an option that takes none */
+			ERR(_libc_gettext(
+			    "%s: option doesn't take an argument -- %s\n"),
+			    0, (longopt ? optind : 0));
+			optarg = longoptarg = NULL;
+			c = '?';
 		}
 
 		if (longopt || argv[optind][++_sp] == '\0') {

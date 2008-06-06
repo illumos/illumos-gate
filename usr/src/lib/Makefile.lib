@@ -58,8 +58,6 @@ SRCDIR =	..
 #
 MAPFILES =	$(SRCDIR)/mapfile-vers
 
-C_SYNONYMS_H=	$(SRC)/lib/common/inc/c_synonyms.h
-
 #
 # If HDRDIR is left unset, then it's possible for the $(ROOTHDRDIR)/%
 # install rule in lib/Makefile.targ to generate false matches if there

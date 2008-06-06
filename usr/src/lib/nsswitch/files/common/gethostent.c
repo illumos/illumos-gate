@@ -18,11 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * files/gethostent.c -- "files" backend for nsswitch "hosts" database
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -77,13 +76,13 @@ check_name(nss_XbyY_args_t *argp, const char *line, int linelen,
 	keyp = argp->key.name;
 	*namep = linep;
 	while (*keyp && linep < limit && !isspace(*linep) &&
-			tolower(*keyp) == tolower(*linep)) {
+	    tolower(*keyp) == tolower(*linep)) {
 		keyp++;
 		linep++;
 	}
 	if (*keyp == '\0' && (linep == limit || isspace(*linep))) {
 		if (__nss_files_get_addr(type, addrstart, addrlen,
-					addrp, v6flag, addrsize)) {
+		    addrp, v6flag, addrsize)) {
 			*namelen = linep - *namep;
 			return (1);
 		}
@@ -101,13 +100,13 @@ check_name(nss_XbyY_args_t *argp, const char *line, int linelen,
 		/* compare name (case insensitive) */
 		keyp = argp->key.name;
 		while (*keyp && linep < limit && !isspace(*linep) &&
-				tolower(*keyp) == tolower(*linep)) {
+		    tolower(*keyp) == tolower(*linep)) {
 			keyp++;
 			linep++;
 		}
 		if (*keyp == '\0' && (linep == limit || isspace(*linep)))
 			return (__nss_files_get_addr(type, addrstart, addrlen,
-					addrp, v6flag, addrsize));
+			    addrp, v6flag, addrsize));
 
 		/* skip remainder of alias, if any */
 		while (linep < limit && !isspace(*linep))
@@ -157,7 +156,7 @@ __nss_files_get_addr(int af, const char *addrstart, int addrlen,
 				return (0);
 		} else {
 			if ((addr_ipv4.s_addr = inet_addr(addrbuf)) ==
-							0xffffffffU)
+			    0xffffffffU)
 				return (0);
 			IN6_INADDR_TO_V4MAPPED(&addr_ipv4, addrpv6);
 		}
@@ -198,13 +197,13 @@ __nss_files_check_addr(int af, nss_XbyY_args_t *argp, const char *line,
 	}
 	addrlen = linep - addrstart;
 	if (__nss_files_get_addr(af, addrstart, addrlen, h_addrp,
-			v6flag, &h_length) == 0)
+	    v6flag, &h_length) == 0)
 		return (0);
 
 	/* Compare the address */
 	return (h_length == argp->key.hostaddr.len &&
-		memcmp(h_addrp, argp->key.hostaddr.addr,
-			argp->key.hostaddr.len) == 0);
+	    memcmp(h_addrp, argp->key.hostaddr.addr,
+	    argp->key.hostaddr.len) == 0);
 }
 
 static int
@@ -227,7 +226,6 @@ getbyaddr(be, a)
 	return (res);
 }
 
-int _inet_aton(const char *cp, struct in_addr *addr);
 /*
  * filter_ipv6
  *
@@ -261,7 +259,7 @@ filter_ipv6(char *instr, int lenstr) {
 	/* extract IP address */
 	c = *p;
 	*p = '\0';
-	rc = _inet_aton(addrstart, &addr);
+	rc = inet_aton(addrstart, &addr);
 	*p = c;
 
 	if (rc == 0)
@@ -299,7 +297,7 @@ getent_hosts(files_backend_ptr_t be, void *a)
 			 * These addresses have to be filtered.
 			 */
 			if (filter_ipv6(args->returnval, args->returnlen)
-					== NSS_STR_PARSE_SUCCESS)
+			    == NSS_STR_PARSE_SUCCESS)
 				break;
 			/*
 			 * The entry is an IPv6 address or other errors.

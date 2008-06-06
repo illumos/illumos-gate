@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,18 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak iconv_open = _iconv_open
-#pragma weak iconv_close = _iconv_close
-#pragma weak iconv = _iconv
-
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -63,7 +59,7 @@ static iconv_p	iconv_search_alias(const char *, const char *, char *);
  */
 
 iconv_t
-_iconv_open(const char *tocode, const char *fromcode)
+iconv_open(const char *tocode, const char *fromcode)
 {
 	iconv_t	cd;
 	char	*ipath;
@@ -124,13 +120,13 @@ search_alias(char **paddr, size_t size, const char *variant)
 		}
 		/* skip leading spaces */
 		while ((q > p) &&
-			((*p == ' ') || (*p == '\t')))
+		    ((*p == ' ') || (*p == '\t')))
 			p++;
 		if (q <= p)
 			break;
 		sp = p;
 		while ((q > p) && (*p != ' ') &&
-			(*p != '\t') && (*p != '\n'))
+		    (*p != '\t') && (*p != '\n'))
 			p++;
 		if (q <= p) {
 			/* invalid entry */
@@ -143,8 +139,8 @@ search_alias(char **paddr, size_t size, const char *variant)
 		}
 
 		if (((p - sp) != var_len) ||
-			((strncmp(sp, variant, var_len) != 0) &&
-			(strncasecmp(sp, variant, var_len) != 0))) {
+		    ((strncmp(sp, variant, var_len) != 0) &&
+		    (strncasecmp(sp, variant, var_len) != 0))) {
 			/*
 			 * didn't match
 			 */
@@ -160,13 +156,13 @@ search_alias(char **paddr, size_t size, const char *variant)
 
 		/* skip spaces */
 		while ((q > p) &&
-			((*p == ' ') || (*p == '\t')))
+		    ((*p == ' ') || (*p == '\t')))
 			p++;
 		if (q <= p)
 			break;
 		sp = p;
 		while ((q > p) && (*p != ' ') &&
-			(*p != '\t') && (*p != '\n'))
+		    (*p != '\t') && (*p != '\n'))
 			p++;
 		can_len = p - sp;
 		if (can_len == 0) {
@@ -304,7 +300,7 @@ iconv_open_private(const char *lib, const char *tbl)
 
 	/* gets address of _icv_open */
 	if ((fptr = (iconv_t(*)(const char *))dlsym(cdpath->_icv_handle,
-		"_icv_open")) == NULL) {
+	    "_icv_open")) == NULL) {
 		(void) dlclose(cdpath->_icv_handle);
 		free(cdpath);
 		/* dlsym does not define errno */
@@ -318,8 +314,8 @@ iconv_open_private(const char *lib, const char *tbl)
 	 */
 
 	if ((cdpath->_icv_iconv = (size_t(*)(iconv_t, const char **,
-		size_t *, char **, size_t *))dlsym(cdpath->_icv_handle,
-		"_icv_iconv")) == NULL) {
+	    size_t *, char **, size_t *))dlsym(cdpath->_icv_handle,
+	    "_icv_iconv")) == NULL) {
 		(void) dlclose(cdpath->_icv_handle);
 		free(cdpath);
 		/* dlsym does not define errno */
@@ -332,7 +328,7 @@ iconv_open_private(const char *lib, const char *tbl)
 	 * and stores it in cd->_icv_close
 	 */
 	if ((cdpath->_icv_close = (void(*)(iconv_t))dlsym(cdpath->_icv_handle,
-		"_icv_close")) == NULL) {
+	    "_icv_close")) == NULL) {
 		(void) dlclose(cdpath->_icv_handle);
 		free(cdpath);
 		/* dlsym does not define errno */
@@ -343,7 +339,7 @@ iconv_open_private(const char *lib, const char *tbl)
 	/*
 	 * initialize the state of the actual _icv_iconv conversion routine
 	 * For the normal iconv module, NULL will be passed as an argument
-	 * although the _iconv_open() of the module won't use that.
+	 * although the iconv_open() of the module won't use that.
 	 */
 	cdpath->_icv_state = (void *)(*fptr)(tbl);
 
@@ -359,7 +355,7 @@ iconv_open_private(const char *lib, const char *tbl)
 }
 
 int
-_iconv_close(iconv_t cd)
+iconv_close(iconv_t cd)
 {
 	if (cd == NULL) {
 		errno = EBADF;
@@ -373,7 +369,7 @@ _iconv_close(iconv_t cd)
 }
 
 size_t
-_iconv(iconv_t cd, const char **inbuf, size_t *inbytesleft,
+iconv(iconv_t cd, const char **inbuf, size_t *inbytesleft,
 	char **outbuf, size_t *outbytesleft)
 {
 	/* check if cd is valid */
@@ -384,5 +380,5 @@ _iconv(iconv_t cd, const char **inbuf, size_t *inbytesleft,
 
 	/* direct conversion */
 	return ((*(cd->_conv)->_icv_iconv)(cd->_conv->_icv_state,
-		inbuf, inbytesleft, outbuf, outbytesleft));
+	    inbuf, inbytesleft, outbuf, outbytesleft));
 }

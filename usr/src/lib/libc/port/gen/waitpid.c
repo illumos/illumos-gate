@@ -24,20 +24,18 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-/*
- * All of these functions are cancellation points.
- */
-#pragma weak waitpid = _waitpid
-#pragma weak wait = _wait
-#pragma weak wait4 = _wait4
-#pragma weak wait3 = _wait3
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+/*
+ * All of the wait*() functions are cancellation points.
+ */
+#pragma weak _waitpid = waitpid
+#pragma weak _wait = wait
+
+#include "lint.h"
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>

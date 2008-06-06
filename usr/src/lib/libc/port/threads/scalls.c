@@ -39,6 +39,46 @@
 #include <sys/door.h>
 
 /*
+ * These leading-underbar symbols exist because mistakes were made
+ * in the past that put them into non-SUNWprivate versions of
+ * the libc mapfiles.  They should be eliminated, but oh well...
+ */
+#pragma weak _fork = fork
+#pragma weak _read = read
+#pragma weak _write = write
+#pragma weak _getmsg = getmsg
+#pragma weak _getpmsg = getpmsg
+#pragma weak _putmsg = putmsg
+#pragma weak _putpmsg = putpmsg
+#pragma weak _sleep = sleep
+#pragma weak _close = close
+#pragma weak _creat = creat
+#pragma weak _fcntl = fcntl
+#pragma weak _fsync = fsync
+#pragma weak _lockf = lockf
+#pragma weak _msgrcv = msgrcv
+#pragma weak _msgsnd = msgsnd
+#pragma weak _msync = msync
+#pragma weak _open = open
+#pragma weak _openat = openat
+#pragma weak _pause = pause
+#pragma weak _readv = readv
+#pragma weak _sigpause = sigpause
+#pragma weak _sigsuspend = sigsuspend
+#pragma weak _tcdrain = tcdrain
+#pragma weak _waitid = waitid
+#pragma weak _writev = writev
+
+#if !defined(_LP64)
+#pragma weak _creat64 = creat64
+#pragma weak _lockf64 = lockf64
+#pragma weak _open64 = open64
+#pragma weak _openat64 = openat64
+#pragma weak _pread64 = pread64
+#pragma weak _pwrite64 = pwrite64
+#endif
+
+/*
  * atfork_lock protects the pthread_atfork() data structures.
  *
  * fork_lock does double-duty.  Not only does it (and atfork_lock)
@@ -100,9 +140,8 @@ callout_lock_exit(void)
 	cancel_safe_mutex_unlock(&curthread->ul_uberdata->callout_lock);
 }
 
-#pragma weak forkx = _forkx
 pid_t
-_forkx(int flags)
+forkx(int flags)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -213,22 +252,19 @@ _forkx(int flags)
  * The forkall() interface exists for applications that require
  * the semantics of replicating all threads.
  */
-#pragma weak fork1 = _fork
-#pragma weak _fork1 = _fork
-#pragma weak fork = _fork
+#pragma weak fork1 = fork
 pid_t
-_fork(void)
+fork(void)
 {
-	return (_forkx(0));
+	return (forkx(0));
 }
 
 /*
  * Much of the logic here is the same as in forkx().
  * See the comments in forkx(), above.
  */
-#pragma weak forkallx = _forkallx
 pid_t
-_forkallx(int flags)
+forkallx(int flags)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -281,11 +317,10 @@ _forkallx(int flags)
 	return (pid);
 }
 
-#pragma weak forkall = _forkall
 pid_t
-_forkall(void)
+forkall(void)
 {
-	return (_forkallx(0));
+	return (forkallx(0));
 }
 
 /*
@@ -303,7 +338,7 @@ _forkall(void)
 		if (!self->ul_cancel_disabled) {			\
 			self->ul_cancel_async = 1;			\
 			if (self->ul_cancel_pending)			\
-				_pthread_exit(PTHREAD_CANCELED);	\
+				pthread_exit(PTHREAD_CANCELED);		\
 		}							\
 		self->ul_sp = stkptr();					\
 	} else if (self->ul_cancel_pending &&				\
@@ -374,7 +409,7 @@ _forkall(void)
 						self->ul_sigsuspend = 0;\
 						restore_signals(self);	\
 					}				\
-					_pthread_exit(PTHREAD_CANCELED);\
+					pthread_exit(PTHREAD_CANCELED);	\
 				}					\
 			}						\
 			self->ul_sp = stkptr();				\
@@ -415,7 +450,7 @@ _cancel_prologue(void)
 		if (!self->ul_cancel_disabled) {
 			self->ul_cancel_async = 1;
 			if (self->ul_cancel_pending)
-				_pthread_exit(PTHREAD_CANCELED);
+				pthread_exit(PTHREAD_CANCELED);
 		}
 		self->ul_sp = stkptr();
 	} else if (self->ul_cancel_pending &&
@@ -452,9 +487,8 @@ lwp_wait(thread_t tid, thread_t *found)
 	return (error);
 }
 
-#pragma weak read = _read
 ssize_t
-_read(int fd, void *buf, size_t size)
+read(int fd, void *buf, size_t size)
 {
 	extern ssize_t __read(int, void *, size_t);
 	ssize_t rv;
@@ -462,9 +496,8 @@ _read(int fd, void *buf, size_t size)
 	PERFORM(__read(fd, buf, size))
 }
 
-#pragma weak write = _write
 ssize_t
-_write(int fd, const void *buf, size_t size)
+write(int fd, const void *buf, size_t size)
 {
 	extern ssize_t __write(int, const void *, size_t);
 	ssize_t rv;
@@ -472,9 +505,8 @@ _write(int fd, const void *buf, size_t size)
 	PERFORM(__write(fd, buf, size))
 }
 
-#pragma weak getmsg = _getmsg
 int
-_getmsg(int fd, struct strbuf *ctlptr, struct strbuf *dataptr,
+getmsg(int fd, struct strbuf *ctlptr, struct strbuf *dataptr,
 	int *flagsp)
 {
 	extern int __getmsg(int, struct strbuf *, struct strbuf *, int *);
@@ -483,9 +515,8 @@ _getmsg(int fd, struct strbuf *ctlptr, struct strbuf *dataptr,
 	PERFORM(__getmsg(fd, ctlptr, dataptr, flagsp))
 }
 
-#pragma weak getpmsg = _getpmsg
 int
-_getpmsg(int fd, struct strbuf *ctlptr, struct strbuf *dataptr,
+getpmsg(int fd, struct strbuf *ctlptr, struct strbuf *dataptr,
 	int *bandp, int *flagsp)
 {
 	extern int __getpmsg(int, struct strbuf *, struct strbuf *,
@@ -495,9 +526,8 @@ _getpmsg(int fd, struct strbuf *ctlptr, struct strbuf *dataptr,
 	PERFORM(__getpmsg(fd, ctlptr, dataptr, bandp, flagsp))
 }
 
-#pragma weak putmsg = _putmsg
 int
-_putmsg(int fd, const struct strbuf *ctlptr,
+putmsg(int fd, const struct strbuf *ctlptr,
 	const struct strbuf *dataptr, int flags)
 {
 	extern int __putmsg(int, const struct strbuf *,
@@ -518,9 +548,8 @@ __xpg4_putmsg(int fd, const struct strbuf *ctlptr,
 	PERFORM(__putmsg(fd, ctlptr, dataptr, flags|MSG_XPG4))
 }
 
-#pragma weak putpmsg = _putpmsg
 int
-_putpmsg(int fd, const struct strbuf *ctlptr,
+putpmsg(int fd, const struct strbuf *ctlptr,
 	const struct strbuf *dataptr, int band, int flags)
 {
 	extern int __putpmsg(int, const struct strbuf *,
@@ -541,9 +570,8 @@ __xpg4_putpmsg(int fd, const struct strbuf *ctlptr,
 	PERFORM(__putpmsg(fd, ctlptr, dataptr, band, flags|MSG_XPG4))
 }
 
-#pragma weak nanosleep = _nanosleep
 int
-_nanosleep(const timespec_t *rqtp, timespec_t *rmtp)
+nanosleep(const timespec_t *rqtp, timespec_t *rmtp)
 {
 	int error;
 
@@ -557,9 +585,8 @@ _nanosleep(const timespec_t *rqtp, timespec_t *rmtp)
 	return (0);
 }
 
-#pragma weak clock_nanosleep = _clock_nanosleep
 int
-_clock_nanosleep(clockid_t clock_id, int flags,
+clock_nanosleep(clockid_t clock_id, int flags,
 	const timespec_t *rqtp, timespec_t *rmtp)
 {
 	timespec_t reltime;
@@ -634,9 +661,8 @@ restart:
 	return (error);
 }
 
-#pragma weak sleep = _sleep
 unsigned int
-_sleep(unsigned int sec)
+sleep(unsigned int sec)
 {
 	unsigned int rem = 0;
 	timespec_t ts;
@@ -644,7 +670,7 @@ _sleep(unsigned int sec)
 
 	ts.tv_sec = (time_t)sec;
 	ts.tv_nsec = 0;
-	if (_nanosleep(&ts, &tsr) == -1 && errno == EINTR) {
+	if (nanosleep(&ts, &tsr) == -1 && errno == EINTR) {
 		rem = (unsigned int)tsr.tv_sec;
 		if (tsr.tv_nsec >= NANOSEC / 2)
 			rem++;
@@ -652,21 +678,19 @@ _sleep(unsigned int sec)
 	return (rem);
 }
 
-#pragma weak usleep = _usleep
 int
-_usleep(useconds_t usec)
+usleep(useconds_t usec)
 {
 	timespec_t ts;
 
 	ts.tv_sec = usec / MICROSEC;
 	ts.tv_nsec = (long)(usec % MICROSEC) * 1000;
-	(void) _nanosleep(&ts, NULL);
+	(void) nanosleep(&ts, NULL);
 	return (0);
 }
 
-#pragma weak close = _close
 int
-_close(int fildes)
+close(int fildes)
 {
 	extern void _aio_close(int);
 	extern int __close(int);
@@ -684,9 +708,8 @@ _close(int fildes)
 	PERFORM(__close(fildes))
 }
 
-#pragma weak creat = _creat
 int
-_creat(const char *path, mode_t mode)
+creat(const char *path, mode_t mode)
 {
 	extern int __creat(const char *, mode_t);
 	int rv;
@@ -695,9 +718,8 @@ _creat(const char *path, mode_t mode)
 }
 
 #if !defined(_LP64)
-#pragma weak creat64 = _creat64
 int
-_creat64(const char *path, mode_t mode)
+creat64(const char *path, mode_t mode)
 {
 	extern int __creat64(const char *, mode_t);
 	int rv;
@@ -706,9 +728,8 @@ _creat64(const char *path, mode_t mode)
 }
 #endif	/* !_LP64 */
 
-#pragma weak door_call = _door_call
 int
-_door_call(int d, door_arg_t *params)
+door_call(int d, door_arg_t *params)
 {
 	extern int __door_call(int, door_arg_t *);
 	int rv;
@@ -716,9 +737,8 @@ _door_call(int d, door_arg_t *params)
 	PERFORM(__door_call(d, params))
 }
 
-#pragma weak fcntl = _fcntl
 int
-_fcntl(int fildes, int cmd, ...)
+fcntl(int fildes, int cmd, ...)
 {
 	extern int __fcntl(int, int, ...);
 	intptr_t arg;
@@ -733,9 +753,8 @@ _fcntl(int fildes, int cmd, ...)
 	PERFORM(__fcntl(fildes, cmd, arg))
 }
 
-#pragma weak fdatasync = _fdatasync
 int
-_fdatasync(int fildes)
+fdatasync(int fildes)
 {
 	extern int __fdsync(int, int);
 	int rv;
@@ -743,9 +762,8 @@ _fdatasync(int fildes)
 	PERFORM(__fdsync(fildes, FDSYNC))
 }
 
-#pragma weak fsync = _fsync
 int
-_fsync(int fildes)
+fsync(int fildes)
 {
 	extern int __fdsync(int, int);
 	int rv;
@@ -753,9 +771,8 @@ _fsync(int fildes)
 	PERFORM(__fdsync(fildes, FSYNC))
 }
 
-#pragma weak lockf = _lockf
 int
-_lockf(int fildes, int function, off_t size)
+lockf(int fildes, int function, off_t size)
 {
 	extern int __lockf(int, int, off_t);
 	int rv;
@@ -764,9 +781,8 @@ _lockf(int fildes, int function, off_t size)
 }
 
 #if !defined(_LP64)
-#pragma weak lockf64 = _lockf64
 int
-_lockf64(int fildes, int function, off64_t size)
+lockf64(int fildes, int function, off64_t size)
 {
 	extern int __lockf64(int, int, off64_t);
 	int rv;
@@ -775,9 +791,8 @@ _lockf64(int fildes, int function, off64_t size)
 }
 #endif	/* !_LP64 */
 
-#pragma weak msgrcv = _msgrcv
 ssize_t
-_msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg)
+msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg)
 {
 	extern ssize_t __msgrcv(int, void *, size_t, long, int);
 	ssize_t rv;
@@ -785,9 +800,8 @@ _msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg)
 	PERFORM(__msgrcv(msqid, msgp, msgsz, msgtyp, msgflg))
 }
 
-#pragma weak msgsnd = _msgsnd
 int
-_msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg)
+msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg)
 {
 	extern int __msgsnd(int, const void *, size_t, int);
 	int rv;
@@ -795,9 +809,8 @@ _msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg)
 	PERFORM(__msgsnd(msqid, msgp, msgsz, msgflg))
 }
 
-#pragma weak msync = _msync
 int
-_msync(caddr_t addr, size_t len, int flags)
+msync(caddr_t addr, size_t len, int flags)
 {
 	extern int __msync(caddr_t, size_t, int);
 	int rv;
@@ -805,9 +818,8 @@ _msync(caddr_t addr, size_t len, int flags)
 	PERFORM(__msync(addr, len, flags))
 }
 
-#pragma weak open = _open
 int
-_open(const char *path, int oflag, ...)
+open(const char *path, int oflag, ...)
 {
 	extern int __open(const char *, int, ...);
 	mode_t mode;
@@ -820,9 +832,8 @@ _open(const char *path, int oflag, ...)
 	PERFORM(__open(path, oflag, mode))
 }
 
-#pragma weak openat = _openat
 int
-_openat(int fd, const char *path, int oflag, ...)
+openat(int fd, const char *path, int oflag, ...)
 {
 	extern int __openat(int, const char *, int, ...);
 	mode_t mode;
@@ -836,9 +847,8 @@ _openat(int fd, const char *path, int oflag, ...)
 }
 
 #if !defined(_LP64)
-#pragma weak open64 = _open64
 int
-_open64(const char *path, int oflag, ...)
+open64(const char *path, int oflag, ...)
 {
 	extern int __open64(const char *, int, ...);
 	mode_t mode;
@@ -851,9 +861,8 @@ _open64(const char *path, int oflag, ...)
 	PERFORM(__open64(path, oflag, mode))
 }
 
-#pragma weak openat64 = _openat64
 int
-_openat64(int fd, const char *path, int oflag, ...)
+openat64(int fd, const char *path, int oflag, ...)
 {
 	extern int __openat64(int, const char *, int, ...);
 	mode_t mode;
@@ -867,9 +876,8 @@ _openat64(int fd, const char *path, int oflag, ...)
 }
 #endif	/* !_LP64 */
 
-#pragma weak pause = _pause
 int
-_pause(void)
+pause(void)
 {
 	extern int __pause(void);
 	int rv;
@@ -877,9 +885,8 @@ _pause(void)
 	PERFORM(__pause())
 }
 
-#pragma weak pread = _pread
 ssize_t
-_pread(int fildes, void *buf, size_t nbyte, off_t offset)
+pread(int fildes, void *buf, size_t nbyte, off_t offset)
 {
 	extern ssize_t __pread(int, void *, size_t, off_t);
 	ssize_t rv;
@@ -888,9 +895,8 @@ _pread(int fildes, void *buf, size_t nbyte, off_t offset)
 }
 
 #if !defined(_LP64)
-#pragma weak pread64 = _pread64
 ssize_t
-_pread64(int fildes, void *buf, size_t nbyte, off64_t offset)
+pread64(int fildes, void *buf, size_t nbyte, off64_t offset)
 {
 	extern ssize_t __pread64(int, void *, size_t, off64_t);
 	ssize_t rv;
@@ -899,9 +905,8 @@ _pread64(int fildes, void *buf, size_t nbyte, off64_t offset)
 }
 #endif	/* !_LP64 */
 
-#pragma weak pwrite = _pwrite
 ssize_t
-_pwrite(int fildes, const void *buf, size_t nbyte, off_t offset)
+pwrite(int fildes, const void *buf, size_t nbyte, off_t offset)
 {
 	extern ssize_t __pwrite(int, const void *, size_t, off_t);
 	ssize_t rv;
@@ -910,9 +915,8 @@ _pwrite(int fildes, const void *buf, size_t nbyte, off_t offset)
 }
 
 #if !defined(_LP64)
-#pragma weak pwrite64 = _pwrite64
 ssize_t
-_pwrite64(int fildes, const void *buf, size_t nbyte, off64_t offset)
+pwrite64(int fildes, const void *buf, size_t nbyte, off64_t offset)
 {
 	extern ssize_t __pwrite64(int, const void *, size_t, off64_t);
 	ssize_t rv;
@@ -921,9 +925,8 @@ _pwrite64(int fildes, const void *buf, size_t nbyte, off64_t offset)
 }
 #endif	/* !_LP64 */
 
-#pragma weak readv = _readv
 ssize_t
-_readv(int fildes, const struct iovec *iov, int iovcnt)
+readv(int fildes, const struct iovec *iov, int iovcnt)
 {
 	extern ssize_t __readv(int, const struct iovec *, int);
 	ssize_t rv;
@@ -931,9 +934,8 @@ _readv(int fildes, const struct iovec *iov, int iovcnt)
 	PERFORM(__readv(fildes, iov, iovcnt))
 }
 
-#pragma weak sigpause = _sigpause
 int
-_sigpause(int sig)
+sigpause(int sig)
 {
 	extern int __sigpause(int);
 	int rv;
@@ -941,9 +943,8 @@ _sigpause(int sig)
 	PERFORM(__sigpause(sig))
 }
 
-#pragma weak sigsuspend = _sigsuspend
 int
-_sigsuspend(const sigset_t *set)
+sigsuspend(const sigset_t *set)
 {
 	extern int __sigsuspend(const sigset_t *);
 	int rv;
@@ -968,9 +969,8 @@ _pollsys(struct pollfd *fds, nfds_t nfd, const timespec_t *timeout,
 	return (rv);
 }
 
-#pragma weak sigtimedwait = _sigtimedwait
 int
-_sigtimedwait(const sigset_t *set, siginfo_t *infop, const timespec_t *timeout)
+sigtimedwait(const sigset_t *set, siginfo_t *infop, const timespec_t *timeout)
 {
 	extern int __sigtimedwait(const sigset_t *, siginfo_t *,
 	    const timespec_t *);
@@ -996,23 +996,20 @@ _sigtimedwait(const sigset_t *set, siginfo_t *infop, const timespec_t *timeout)
 	return (sig);
 }
 
-#pragma weak sigwait = _sigwait
 int
-_sigwait(sigset_t *set)
+sigwait(sigset_t *set)
 {
-	return (_sigtimedwait(set, NULL, NULL));
+	return (sigtimedwait(set, NULL, NULL));
 }
 
-#pragma weak sigwaitinfo = _sigwaitinfo
 int
-_sigwaitinfo(const sigset_t *set, siginfo_t *info)
+sigwaitinfo(const sigset_t *set, siginfo_t *info)
 {
-	return (_sigtimedwait(set, info, NULL));
+	return (sigtimedwait(set, info, NULL));
 }
 
-#pragma weak sigqueue = _sigqueue
 int
-_sigqueue(pid_t pid, int signo, const union sigval value)
+sigqueue(pid_t pid, int signo, const union sigval value)
 {
 	extern int __sigqueue(pid_t pid, int signo,
 	    /* const union sigval */ void *value, int si_code, int block);
@@ -1095,9 +1092,8 @@ _so_sendto(int sock, const void *buf, size_t len, int flags,
 	PERFORM(__so_sendto(sock, buf, len, flags, addr, addrlen))
 }
 
-#pragma weak tcdrain = _tcdrain
 int
-_tcdrain(int fildes)
+tcdrain(int fildes)
 {
 	extern int __tcdrain(int);
 	int rv;
@@ -1105,9 +1101,8 @@ _tcdrain(int fildes)
 	PERFORM(__tcdrain(fildes))
 }
 
-#pragma weak waitid = _waitid
 int
-_waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options)
+waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options)
 {
 	extern int __waitid(idtype_t, id_t, siginfo_t *, int);
 	int rv;
@@ -1117,9 +1112,8 @@ _waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options)
 	PERFORM(__waitid(idtype, id, infop, options))
 }
 
-#pragma weak writev = _writev
 ssize_t
-_writev(int fildes, const struct iovec *iov, int iovcnt)
+writev(int fildes, const struct iovec *iov, int iovcnt)
 {
 	extern ssize_t __writev(int, const struct iovec *, int);
 	ssize_t rv;

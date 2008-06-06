@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,7 +168,8 @@ __posix_asctime_r(const struct tm *t, char *cbuf)
 		return (NULL);
 
 	cp = cbuf;
-	for (ncp = Date; *cp++ = *ncp++; /* */);
+	for (ncp = Date; *cp++ = *ncp++; /* */)
+		;
 	ncp = Day + (3*t->tm_wday);
 	cp = cbuf;
 	*cp++ = *ncp++;
@@ -202,7 +203,7 @@ __posix_asctime_r(const struct tm *t, char *cbuf)
  * It was implemented by Solaris 2.3.
  */
 char *
-_asctime_r(const struct tm *t, char *cbuf, int buflen)
+asctime_r(const struct tm *t, char *cbuf, int buflen)
 {
 	if (buflen < CBUFSIZ) {
 		errno = ERANGE;
@@ -223,7 +224,7 @@ asctime(const struct tm *t)
 {
 	static char cbuf[CBUFSIZ];
 
-	return (_asctime_r(t, cbuf, CBUFSIZ));
+	return (asctime_r(t, cbuf, CBUFSIZ));
 }
 
 

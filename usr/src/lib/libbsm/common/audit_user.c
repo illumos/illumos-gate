@@ -18,10 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -48,9 +50,6 @@ static mutex_t mutex_userfile = DEFAULTMUTEX;
 static int use_nsswitch = 1;
 static au_user_ent_t *auuserstr2ent(au_user_ent_t *, au_user_str_t *);
 
-extern int _mutex_lock(mutex_t *);
-extern int _mutex_unlock(mutex_t *);
-
 /*
  * Externs from libnsl
  */
@@ -64,27 +63,27 @@ extern au_user_str_t *_getauusernam(char *, au_user_str_t *, char *, int,
 void
 setauuser()
 {
-	_mutex_lock(&mutex_userfile);
+	(void) mutex_lock(&mutex_userfile);
 	if (use_nsswitch)
 		_setauuser();
 	else if (au_user_file) {
 		(void) fseek(au_user_file, 0L, 0);
 	}
-	_mutex_unlock(&mutex_userfile);
+	(void) mutex_unlock(&mutex_userfile);
 }
 
 
 void
 endauuser()
 {
-	_mutex_lock(&mutex_userfile);
+	(void) mutex_lock(&mutex_userfile);
 	if (use_nsswitch)
 		_endauuser();
 	else if (au_user_file) {
 		(void) fclose(au_user_file);
 		au_user_file = NULL;
 	}
-	_mutex_unlock(&mutex_userfile);
+	(void) mutex_unlock(&mutex_userfile);
 }
 
 au_user_ent_t *
@@ -107,7 +106,7 @@ getauuserent_r(au_user_ent_t *au_user_entry)
 	char	*s, input[256];
 
 
-	_mutex_lock(&mutex_userfile);
+	(void) mutex_lock(&mutex_userfile);
 
 	if (use_nsswitch) {
 		au_user_str_t us;
@@ -117,14 +116,14 @@ getauuserent_r(au_user_ent_t *au_user_entry)
 
 		(void) memset(buf, NULL, NSS_BUFLEN_AUDITUSER);
 		tmp = _getauuserent(&us, buf, NSS_BUFLEN_AUDITUSER, &errp);
-		_mutex_unlock(&mutex_userfile);
+		(void) mutex_unlock(&mutex_userfile);
 		return (auuserstr2ent(au_user_entry, tmp));
 	}
 
 	/* open audit user file if it isn't already */
 	if (!au_user_file)
 		if (!(au_user_file = fopen(au_user_fname, "rF"))) {
-			_mutex_unlock(&mutex_userfile);
+			(void) mutex_unlock(&mutex_userfile);
 			return (NULL);
 		}
 
@@ -168,7 +167,7 @@ getauuserent_r(au_user_ent_t *au_user_entry)
 		}
 	}
 
-	_mutex_unlock(&mutex_userfile);
+	(void) mutex_unlock(&mutex_userfile);
 
 	if (!error && found) {
 		return (au_user_entry);

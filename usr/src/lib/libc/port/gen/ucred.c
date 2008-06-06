@@ -18,35 +18,36 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak ucred_free	 = _ucred_free
-#pragma weak ucred_get	 = _ucred_get
-#pragma weak ucred_getegid = _ucred_getegid
-#pragma weak ucred_geteuid = _ucred_geteuid
-#pragma weak ucred_getgroups = _ucred_getgroups
-#pragma weak ucred_getpflags = _ucred_getpflags
-#pragma weak ucred_getpid = _ucred_getpid
-#pragma weak ucred_getzoneid = _ucred_getzoneid
-#pragma weak ucred_getprojid = _ucred_getprojid
-#pragma weak ucred_getprivset = _ucred_getprivset
-#pragma weak ucred_getrgid = _ucred_getrgid
-#pragma weak ucred_getruid = _ucred_getruid
-#pragma weak ucred_getsgid = _ucred_getsgid
-#pragma weak ucred_getsuid = _ucred_getsuid
-#pragma weak ucred_getauid = _ucred_getauid
-#pragma weak ucred_getasid = _ucred_getasid
-#pragma weak ucred_getatid = _ucred_getatid
-#pragma weak ucred_getlabel = _ucred_getlabel
-#pragma weak ucred_getamask = _ucred_getamask
-#pragma weak ucred_size	 = _ucred_size
+#pragma weak _ucred_free = ucred_free
+#pragma weak _ucred_get = ucred_get
+#pragma weak _ucred_getegid = ucred_getegid
+#pragma weak _ucred_geteuid = ucred_geteuid
+#pragma weak _ucred_getgroups = ucred_getgroups
+#pragma weak _ucred_getpflags = ucred_getpflags
+#pragma weak _ucred_getpid = ucred_getpid
+#pragma weak _ucred_getzoneid = ucred_getzoneid
+#pragma weak _ucred_getprojid = ucred_getprojid
+#pragma weak _ucred_getprivset = ucred_getprivset
+#pragma weak _ucred_getrgid = ucred_getrgid
+#pragma weak _ucred_getruid = ucred_getruid
+#pragma weak _ucred_getsgid = ucred_getsgid
+#pragma weak _ucred_getsuid = ucred_getsuid
+#pragma weak _ucred_getauid = ucred_getauid
+#pragma weak _ucred_getasid = ucred_getasid
+#pragma weak _ucred_getatid = ucred_getatid
+#pragma weak _ucred_getlabel = ucred_getlabel
+#pragma weak _ucred_getamask = ucred_getamask
+#pragma weak _ucred_size = ucred_size
 
-#include "synonyms.h"
+#include "lint.h"
 
 #define	_STRUCTURED_PROC	1
 

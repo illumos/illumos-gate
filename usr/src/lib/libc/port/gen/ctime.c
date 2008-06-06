@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,16 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This routine converts time as follows.
@@ -77,9 +76,7 @@
  * may also be called explicitly by the user.
  */
 
-#pragma weak asctime_r = _asctime_r
-
-#include "synonyms.h"
+#include "lint.h"
 #include <mtlib.h>
 #include <sys/types.h>
 #include <time.h>
@@ -119,7 +116,8 @@ __posix_asctime_r(const struct tm *t, char *cbuf)
 	const char *Month = "JanFebMarAprMayJunJulAugSepOctNovDec";
 
 	cp = cbuf;
-	for (ncp = Date; *cp++ = *ncp++; /* */);
+	for (ncp = Date; *cp++ = *ncp++; /* */)
+		;
 	ncp = Day + (3 * t->tm_wday);
 	cp = cbuf;
 	*cp++ = *ncp++;

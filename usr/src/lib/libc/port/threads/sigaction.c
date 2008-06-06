@@ -27,13 +27,20 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
+#include <sys/feature_tests.h>
+/*
+ * setcontext() really can return, if UC_CPU is not specified.
+ * Make the compiler shut up about it.
+ */
+#if defined(__NORETURN)
+#undef	__NORETURN
+#endif
+#define	__NORETURN
 #include "thr_uberdata.h"
 #include "asyncio.h"
 #include <signal.h>
 #include <siginfo.h>
 #include <sys/systm.h>
-
-extern int _setcontext(const ucontext_t *);
 
 const sigset_t maskset = {MASKSET0, MASKSET1, 0, 0};	/* maskable signals */
 
@@ -171,10 +178,10 @@ call_user_handler(int sig, siginfo_t *sip, ucontext_t *ucp)
 	 * we are an aio worker thread, cancel the aio request.
 	 */
 	if (sig == SIGAIOCANCEL) {
-		aio_worker_t *aiowp = _pthread_getspecific(_aio_key);
+		aio_worker_t *aiowp = pthread_getspecific(_aio_key);
 
 		if (sip != NULL && sip->si_code == SI_LWP && aiowp != NULL)
-			_siglongjmp(aiowp->work_jmp_buf, 1);
+			siglongjmp(aiowp->work_jmp_buf, 1);
 		/* SIGLWP is ignored by default */
 		if (uact.sa_sigaction == SIG_DFL ||
 		    uact.sa_sigaction == SIG_IGN)
@@ -206,8 +213,8 @@ call_user_handler(int sig, siginfo_t *sip, ucontext_t *ucp)
 #endif	/* sparc */
 
 out:
-	(void) _setcontext(ucp);
-	thr_panic("call_user_handler(): _setcontext() returned");
+	(void) setcontext(ucp);
+	thr_panic("call_user_handler(): setcontext() returned");
 }
 
 /*
@@ -327,7 +334,7 @@ sigacthandler(int sig, siginfo_t *sip, void *uvp)
 	 * Return to the previous context with all signals blocked.
 	 * We will restore the signal mask in take_deferred_signal().
 	 * Note that we are calling the system call trap here, not
-	 * the _setcontext() wrapper.  We don't want to change the
+	 * the setcontext() wrapper.  We don't want to change the
 	 * thread's ul_sigmask by this operation.
 	 */
 	ucp->uc_sigmask = maskset;
@@ -335,9 +342,9 @@ sigacthandler(int sig, siginfo_t *sip, void *uvp)
 	thr_panic("sigacthandler(): __setcontext() returned");
 }
 
-#pragma weak sigaction = _sigaction
+#pragma weak _sigaction = sigaction
 int
-_sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
+sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -494,9 +501,9 @@ set_setcontext_enforcement(int on)
 	setcontext_enforcement = on;
 }
 
-#pragma weak setcontext = _setcontext
+#pragma weak _setcontext = setcontext
 int
-_setcontext(const ucontext_t *ucp)
+setcontext(const ucontext_t *ucp)
 {
 	ulwp_t *self = curthread;
 	int ret;
@@ -507,7 +514,7 @@ _setcontext(const ucontext_t *ucp)
 	 * the thread to exit.  See setcontext(2) and makecontext(3C).
 	 */
 	if (ucp == NULL)
-		_thr_exit(NULL);
+		thr_exit(NULL);
 	(void) memcpy(&uc, ucp, sizeof (uc));
 
 	/*
@@ -566,11 +573,9 @@ _setcontext(const ucontext_t *ucp)
 	return (ret);
 }
 
-#pragma weak thr_sigsetmask = _thr_sigsetmask
-#pragma weak pthread_sigmask = _thr_sigsetmask
-#pragma weak _pthread_sigmask = _thr_sigsetmask
+#pragma weak _thr_sigsetmask = thr_sigsetmask
 int
-_thr_sigsetmask(int how, const sigset_t *set, sigset_t *oset)
+thr_sigsetmask(int how, const sigset_t *set, sigset_t *oset)
 {
 	ulwp_t *self = curthread;
 	sigset_t saveset;
@@ -620,9 +625,16 @@ _thr_sigsetmask(int how, const sigset_t *set, sigset_t *oset)
 	return (0);
 }
 
-#pragma weak sigprocmask = _sigprocmask
+#pragma weak _pthread_sigmask = pthread_sigmask
 int
-_sigprocmask(int how, const sigset_t *set, sigset_t *oset)
+pthread_sigmask(int how, const sigset_t *set, sigset_t *oset)
+{
+	return (thr_sigsetmask(how, set, oset));
+}
+
+#pragma weak _sigprocmask = sigprocmask
+int
+sigprocmask(int how, const sigset_t *set, sigset_t *oset)
 {
 	int error;
 
@@ -632,7 +644,7 @@ _sigprocmask(int how, const sigset_t *set, sigset_t *oset)
 	if (curthread->ul_vfork)
 		return (__lwp_sigmask(how, set, oset));
 
-	if ((error = _thr_sigsetmask(how, set, oset)) != 0) {
+	if ((error = thr_sigsetmask(how, set, oset)) != 0) {
 		errno = error;
 		return (-1);
 	}
@@ -698,7 +710,7 @@ do_sigcancel(void)
 	    !self->ul_cancel_disabled &&
 	    self->ul_libc_locks == 0 &&
 	    !self->ul_cancelable)
-		_pthread_exit(PTHREAD_CANCELED);
+		pthread_exit(PTHREAD_CANCELED);
 	set_cancel_pending_flag(self, 0);
 }
 

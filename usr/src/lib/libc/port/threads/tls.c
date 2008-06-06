@@ -312,7 +312,7 @@ __tls_get_addr(TLS_index *tls_index)
 #endif	/* TLS_GET_ADDR_IS_WRITTEN_IN_ASSEMBLER */
 
 /*
- * This is called by _thr_setup() to initialize the thread's static TLS.
+ * This is called by _thrp_setup() to initialize the thread's static TLS.
  * Constructors for initially allocated static TLS are called here.
  */
 void

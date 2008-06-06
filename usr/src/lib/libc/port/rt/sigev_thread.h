@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,8 +101,8 @@ extern void del_sigev_mq(thread_communication_data_t *);
 extern void *aio_spawner(void *);
 
 /* Private interfaces elsewhere in libc */
-extern int _pthread_attr_clone(pthread_attr_t *, const pthread_attr_t *);
-extern int _pthread_attr_equal(const pthread_attr_t *, const pthread_attr_t *);
+extern int pthread_attr_clone(pthread_attr_t *, const pthread_attr_t *);
+extern int pthread_attr_equal(const pthread_attr_t *, const pthread_attr_t *);
 extern int _port_dispatch(int, int, int, int, uintptr_t, void *);
 
 extern thread_communication_data_t *sigev_aio_tcd;

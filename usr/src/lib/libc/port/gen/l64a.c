@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,16 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * convert long int to base 64 ascii
@@ -38,9 +37,7 @@
  *
  */
 
-#pragma weak l64a = _l64a
-
-#include "synonyms.h"
+#include "lint.h"
 #include "mtlib.h"
 #include "libc.h"
 #include <values.h>
@@ -80,7 +77,7 @@ l64a(long value)
 		/* fill high-order CHAR if negative */
 		/* but suppress sign propagation */
 		lg = ((lg < 0) ? (lg >> BITSPERCHAR) | SIGN :
-			lg >> BITSPERCHAR) & WORDMASK;
+		    lg >> BITSPERCHAR) & WORDMASK;
 	}
 	*s = '\0';
 	return (buf);

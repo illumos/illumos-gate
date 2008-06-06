@@ -29,8 +29,9 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak _flsbuf = __flsbuf
-#include "synonyms.h"
+#pragma weak __flsbuf = _flsbuf
+
+#include "lint.h"
 #include "file64.h"
 #include <mtlib.h>
 #include <stdio.h>

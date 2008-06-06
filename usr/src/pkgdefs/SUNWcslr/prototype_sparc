@@ -17,8 +17,6 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-
-
 #
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
@@ -52,6 +50,7 @@ d none lib/secure/sparcv9 755 root bin
 s none lib/secure/64=sparcv9
 d none lib/sparcv9 755 root bin
 s none lib/64=sparcv9
+f none lib/sparcv9/c_synonyms.so.1 755 root bin
 f none lib/sparcv9/ld.so.1 755 root bin
 s none lib/sparcv9/libadm.so=libadm.so.1
 f none lib/sparcv9/libadm.so.1 755 root bin

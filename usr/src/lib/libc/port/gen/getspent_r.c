@@ -18,20 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak setspent	= _setspent
-#pragma weak endspent	= _endspent
-#pragma weak getspnam_r	= _getspnam_r
-#pragma weak getspent_r	= _getspent_r
-#pragma weak fgetspent_r = _fgetspent_r
-
-#include "synonyms.h"
+#include "lint.h"
 #include <mtlib.h>
 #include <sys/types.h>
 #include <shadow.h>
@@ -62,8 +57,8 @@ getspnam_r(const char *name, struct spwd *result, char *buffer, int buflen)
 
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2spwd);
 	arg.key.name = name;
-	(void) nss_search(&db_root, _nss_initf_shadow, \
-		    NSS_DBOP_SHADOW_BYNAME, &arg);
+	(void) nss_search(&db_root, _nss_initf_shadow,
+	    NSS_DBOP_SHADOW_BYNAME, &arg);
 	return ((struct spwd *)NSS_XbyY_FINI(&arg));
 }
 
@@ -93,8 +88,8 @@ getspent_r(struct spwd *result, char *buffer, int buflen)
 		/* No key to fill in */
 		(void) nss_getent(&db_root, _nss_initf_shadow, &context, &arg);
 	} while (arg.returnval != 0 &&
-		    (nam = ((struct spwd *)arg.returnval)->sp_namp) != 0 &&
-		    (*nam == '+' || *nam == '-'));
+	    (nam = ((struct spwd *)arg.returnval)->sp_namp) != 0 &&
+	    (*nam == '+' || *nam == '-'));
 
 	return (struct spwd *)NSS_XbyY_FINI(&arg);
 }
@@ -192,8 +187,8 @@ str2spwd(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 
 	limit = p + lenstr;
 	if ((p = memchr(instr, ':', lenstr)) == 0 ||
-		++p >= limit ||
-		(p = memchr(p, ':', limit - p)) == 0) {
+	    ++p >= limit ||
+	    (p = memchr(p, ':', limit - p)) == 0) {
 		lencopy = (size_t)lenstr;
 		p = 0;
 	} else {

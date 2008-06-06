@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,9 +37,9 @@
 
 #define	_LARGEFILE64_SOURCE 1
 
-#pragma weak fdopen = _fdopen
+#pragma weak _fdopen = fdopen
 
-#include "synonyms.h"
+#include "lint.h"
 #include <mtlib.h>
 #include "file64.h"
 #include <sys/types.h>

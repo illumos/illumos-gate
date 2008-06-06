@@ -108,7 +108,6 @@
  * sorted in address order.
  */
 
-#include "c_synonyms.h"
 #include <sys/vmem_impl_user.h>
 #include <alloca.h>
 #include <sys/sysmacros.h>

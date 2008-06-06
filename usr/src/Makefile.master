@@ -184,11 +184,6 @@ XARGS=		/usr/bin/xargs
 ELFEDIT=	/usr/bin/elfedit
 ELFSIGN=	/usr/bin/elfsign
 DTRACE=		/usr/sbin/dtrace
-CHECK_FNAMES=	$(ONBLD_TOOLS)/bin/check_fnames
-
-# Due to 6367203, objects built with gcc will fail the namespace checks.
-# Remove this override once the compiler bug is fixed.
-$(__GNUC)CHECK_FNAMES=	$(TRUE)
 
 FILEMODE=	644
 DIRMODE=	755

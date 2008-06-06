@@ -26,16 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak err = _err
-#pragma weak errx = _errx
-#pragma weak verr = _verr
-#pragma weak verrx = _verrx
-#pragma weak warn = _warn
-#pragma weak warnx = _warnx
-#pragma weak vwarn = _vwarn
-#pragma weak vwarnx = _vwarnx
-
-#include "synonyms.h"
+#include "lint.h"
 #include "file64.h"
 #include "mtlib.h"
 #include <sys/types.h>

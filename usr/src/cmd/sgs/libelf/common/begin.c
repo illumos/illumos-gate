@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,24 +18,19 @@
  *
  * CDDL HEADER END
  */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	All Rights Reserved
- *
  */
 
-/*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
- */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 1.13	*/
-
-#pragma weak	elf_begin = _elf_begin
-#pragma weak	elf_memory = _elf_memory
-
-
-#include "syn.h"
 #include <ar.h>
 #include <stdlib.h>
 #include <memory.h>
@@ -138,7 +132,7 @@ _elf_regular(int fd, unsigned flags)		/* initialize regular file */
 Elf *
 _elf_config(Elf * elf)
 {
-	char *		base;
+	char		*base;
 	unsigned	encode;
 
 	ELFRWLOCKINIT(&elf->ed_rwlock);
@@ -202,7 +196,7 @@ _elf_config(Elf * elf)
 }
 
 Elf *
-elf_memory(char * image, size_t sz)
+elf_memory(char *image, size_t sz)
 {
 	Elf		*elf;
 	unsigned	work;
@@ -325,7 +319,7 @@ elf_begin(int fd, Elf_Cmd cmd, Elf *ref)
 
 	case ELF_C_IMAGE:
 		if (ref) {
-			char *	image;
+			char	*image;
 			size_t	imagesz;
 			ELFRLOCK(ref);
 			if ((image = ref->ed_wrimage) == 0) {

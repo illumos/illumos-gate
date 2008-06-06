@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -57,8 +58,6 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-
-#define	walkcontext	_walkcontext
 #include <ucontext.h>
 
 #define	min(a, b)		((a) > (b) ? (b) : (a))

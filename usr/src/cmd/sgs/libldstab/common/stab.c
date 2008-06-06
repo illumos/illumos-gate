@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,26 +18,29 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains all functions relating to stab processing.  The
  * stab table is compressed by eliminating duplicate include file entries.
  */
-#include	<stdio.h>
-#include	<string.h>
-#include	<stab.h>
-#include	<unistd.h>
-#include	<stdlib.h>
-#include	<signal.h>
-#include	<sys/param.h>
-#include	<errno.h>
-#include	"libld.h"
-#include	"msg.h"
+#include <stdio.h>
+#include <string.h>
+#include <stab.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <sys/param.h>
+#include <errno.h>
+#include <libintl.h>
+#include "libld.h"
+#include "msg.h"
 
 
 /*
@@ -176,14 +178,14 @@ static Xword
 pass1_stabindex(const Elf_Data *s_data, const Elf_Data *str_data,
 		const size_t cwd_len, const size_t name_len)
 {
-	struct nlist	*elem,
-			*last = NULL;
-	size_t		i,
-			str_offset = 0,
-			new_size = 0,
-			first_object = 1,
-			any_obj = 0,
-			num_elem;
+	struct nlist	*elem;
+	struct nlist	*last = NULL;
+	size_t		i;
+	size_t		str_offset = 0;
+	size_t		new_size = 0;
+	size_t		first_object = 1;
+	size_t		any_obj = 0;
+	size_t		num_elem;
 	/*
 	 * The processing of the stab table happens in two passes.
 	 *
@@ -203,7 +205,7 @@ pass1_stabindex(const Elf_Data *s_data, const Elf_Data *str_data,
 			break;
 		case N_OBJ:
 			str = (char *)str_data->d_buf + str_offset +
-				elem->n_strx;
+			    elem->n_strx;
 
 			if ((*str == '\0') && first_object) {
 				/*
@@ -241,12 +243,12 @@ static int
 pass2_stabindex(Elf_Data *s_data, Elf_Data *str_data, const char *name,
 		size_t name_len, size_t cwd_pos, size_t free_pos)
 {
-	struct nlist	*elem,
-			*last = NULL;
-	size_t		i,
-			str_offset = 0,
-			first_object = 1,
-			num_elem;
+	struct nlist	*elem;
+	struct nlist	*last = NULL;
+	size_t		i;
+	size_t		str_offset = 0;
+	size_t		first_object = 1;
+	size_t		num_elem;
 	/*
 	 * The processing of the stab table happens in two passes.
 	 *
@@ -266,7 +268,7 @@ pass2_stabindex(Elf_Data *s_data, Elf_Data *str_data, const char *name,
 			break;
 		case N_OBJ:
 			str = (char *)str_data->d_buf + str_offset +
-				elem->n_strx;
+			    elem->n_strx;
 
 			if ((*str == '\0') && first_object) {
 				/*
@@ -288,7 +290,7 @@ pass2_stabindex(Elf_Data *s_data, Elf_Data *str_data, const char *name,
 				 * to it.
 				 */
 				(void) strcpy((char *)str_data->d_buf +
-					free_pos, name);
+				    free_pos, name);
 				/*LINTED*/
 				elem->n_strx = (unsigned)(free_pos -
 				    str_offset);
@@ -377,24 +379,24 @@ get_str_data(Elf *elf, const char *strtab, const char *name, Shdr *shdr)
 		    shdr->sh_flags, &str_scn);
 		if (strscn_ndx == 0) {
 			(void) fprintf(stderr, MSG_INTL(MSG_STAB_MISTBL),
-				in_fname);
+			    in_fname);
 			return ((Elf_Data *)S_ERROR);
 		} else if (strscn_ndx == (size_t)-1) {
 			(void) fprintf(stderr, MSG_INTL(MSG_STAB_BADTBL),
-				in_fname);
+			    in_fname);
 			return ((Elf_Data *)S_ERROR);
 		}
 	} else {
 		if ((str_scn = elf_getscn(elf, shdr->sh_link)) == NULL) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ELF_GETSCN),
-				in_fname, elf_errmsg(0));
+			    in_fname, elf_errmsg(0));
 			return ((Elf_Data *)S_ERROR);
 		}
 	}
 
 	if ((str_data = elf_getdata(str_scn, NULL)) == NULL) {
 		(void) fprintf(stderr, MSG_INTL(MSG_ELF_GETDATA), in_fname,
-			elf_errmsg(0));
+		    elf_errmsg(0));
 		return ((Elf_Data *)S_ERROR);
 	}
 
@@ -420,9 +422,9 @@ process_stabindex(Elf *elf, const char *elf_strtab, const char *strtab_name,
 	Elf_Data	*str_data;
 	static char	*cwd = NULL;
 	static size_t 	cwd_len;
-	size_t 		new_size,
-			cwd_pos,
-			name_len;
+	size_t 		new_size;
+	size_t 		cwd_pos;
+	size_t 		name_len;
 	Elf_Void	*data;
 
 	if ((str_data = get_str_data(elf, elf_strtab, strtab_name,
@@ -432,7 +434,7 @@ process_stabindex(Elf *elf, const char *elf_strtab, const char *strtab_name,
 	if (cwd == NULL) {
 		if ((cwd = getcwd(NULL, MAXPATHLEN)) == NULL) {
 			(void) fprintf(stderr, MSG_INTL(MSG_SYS_GETCWD),
-				in_fname, strerror(errno));
+			    in_fname, strerror(errno));
 			return;
 		}
 		cwd_len = strlen(cwd);
@@ -468,7 +470,7 @@ process_stabindex(Elf *elf, const char *elf_strtab, const char *strtab_name,
 	str_data->d_size = str_data->d_size + new_size;
 
 	(void) pass2_stabindex(s_data, str_data, in_fname, name_len, cwd_pos,
-		cwd_pos + cwd_len + 1);
+	    cwd_pos + cwd_len + 1);
 }
 
 
@@ -637,14 +639,12 @@ ld_atexit(int status)
 
 #if	!defined(_ELF64)
 /*
- * Messaging support - funnel everything through _dgettext() as this provides
- * a stub binding to libc, or a real binding to libintl.
+ * Messaging support - funnel everything through dgettext().
  */
-extern char	*_dgettext(const char *, const char *);
 
 const char *
 _libldstab_msg(Msg mid)
 {
-	return (_dgettext(MSG_ORIG(MSG_SUNW_OST_SGS), MSG_ORIG(mid)));
+	return (dgettext(MSG_ORIG(MSG_SUNW_OST_SGS), MSG_ORIG(mid)));
 }
 #endif

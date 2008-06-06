@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +35,6 @@
 #define	SUNW_AREWEINNAMED	/* Override _confcheck if proc is in.named */
 #define	SUNW_OPENFDOFFSET	/* Open non-stdio fd:s with offset */
 #define	SUNW_POLL	/* Use poll(2) instead of select(3) */
-#define	SUNW_SYNONYMS	/* Include synonyms.h (libresolv) */
 #define	SUNW_HOSTS_FALLBACK	/* Configurable /etc/hosts fallback */
 #define	SUNW_LISTEN_BACKLOG	/* Configurable listen(3N) backlog (named) */
 #define	SUNW_REJECT_BOGUS_H_LENGTH	/* (libresolv) */

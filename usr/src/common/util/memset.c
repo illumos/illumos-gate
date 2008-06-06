@@ -24,17 +24,16 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if !defined(_KMDB) && !defined(_BOOT) && !defined(_KERNEL)
 
-#pragma weak memset = _memset
+#pragma weak _memset = memset
 
-#include "synonyms.h"
+#include "lint.h"
 #endif /* !_KMDB && !_BOOT && !_KERNEL */
 
 #include <sys/types.h>

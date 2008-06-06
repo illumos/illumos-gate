@@ -20,19 +20,21 @@
  */
 
 /*
- *	Copyright (c) 1988 AT&T
- *	  All Rights Reserved
- *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*
+ *	Copyright (c) 1988 AT&T
+ *	  All Rights Reserved
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Utility routines for run-time linker.  some are duplicated here from libc
  * (with different names) to avoid name space collisions.
  */
-#include	"_synonyms.h"
 #include	<stdio.h>
 #include	<sys/types.h>
 #include	<sys/mman.h>
@@ -3635,7 +3637,6 @@ security(uid_t uid, uid_t euid, gid_t gid, gid_t egid, int auxflags)
  * is basically singled threaded.  Provide the interface for our dependencies.
  */
 #undef errno
-#pragma weak _private___errno = ___errno
 int *
 ___errno()
 {

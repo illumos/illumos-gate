@@ -26,8 +26,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#define	atomic_cas_64	_atomic_cas_64
-
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <sys/rtpriocntl.h>
@@ -125,11 +123,10 @@ int	thread_queue_spin = 10000;
  *	LOCK_PRIO_PROTECT
  *	LOCK_ROBUST
  */
-#pragma weak mutex_init = __mutex_init
-#pragma weak _mutex_init = __mutex_init
+#pragma weak _mutex_init = mutex_init
 /* ARGSUSED2 */
 int
-__mutex_init(mutex_t *mp, int type, void *arg)
+mutex_init(mutex_t *mp, int type, void *arg)
 {
 	int basetype = (type & ~ALL_ATTRIBUTES);
 	const pcclass_t *pccp;
@@ -169,15 +166,14 @@ __mutex_init(mutex_t *mp, int type, void *arg)
 		 * atomic_or_16() to set the LOCK_INITED flag so as
 		 * not to disturb surrounding bits (LOCK_OWNERDEAD, etc).
 		 */
-		extern void _atomic_or_16(volatile uint16_t *, uint16_t);
 		if (!(mp->mutex_flag & LOCK_INITED)) {
 			mp->mutex_type = (uint8_t)type;
-			_atomic_or_16(&mp->mutex_flag, LOCK_INITED);
+			atomic_or_16(&mp->mutex_flag, LOCK_INITED);
 			mp->mutex_magic = MUTEX_MAGIC;
 		} else if (type != mp->mutex_type ||
 		    ((type & LOCK_PRIO_PROTECT) && mp->mutex_ceiling != ceil)) {
 			error = EINVAL;
-		} else if (__mutex_consistent(mp) != 0) {
+		} else if (mutex_consistent(mp) != 0) {
 			error = EBUSY;
 		}
 		/* register a process robust mutex with the kernel */
@@ -1107,19 +1103,16 @@ setup_schedctl(void)
  * Interfaces from libsched, incorporated into libc.
  * libsched.so.1 is now a filter library onto libc.
  */
-#pragma weak schedctl_lookup = _schedctl_init
-#pragma weak _schedctl_lookup = _schedctl_init
-#pragma weak schedctl_init = _schedctl_init
+#pragma weak schedctl_lookup = schedctl_init
 schedctl_t *
-_schedctl_init(void)
+schedctl_init(void)
 {
 	volatile sc_shared_t *scp = setup_schedctl();
 	return ((scp == NULL)? NULL : (schedctl_t *)&scp->sc_preemptctl);
 }
 
-#pragma weak schedctl_exit = _schedctl_exit
 void
-_schedctl_exit(void)
+schedctl_exit(void)
 {
 }
 
@@ -1820,7 +1813,7 @@ mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
 static int
 mutex_recursion(mutex_t *mp, int mtype, int try)
 {
-	ASSERT(mutex_is_held(mp));
+	ASSERT(mutex_held(mp));
 	ASSERT(mtype & (LOCK_RECURSIVE|LOCK_ERRORCHECK));
 	ASSERT(try == MUTEX_TRY || try == MUTEX_LOCK);
 
@@ -1859,12 +1852,12 @@ register_lock(mutex_t *mp)
 		lmutex_lock(&udp->tdb_hash_lock);
 		if ((table = udp->robustlocks) == NULL) {
 			table = lmalloc(LOCKHASHSZ * sizeof (robust_t *));
-			_membar_producer();
+			membar_producer();
 			udp->robustlocks = table;
 		}
 		lmutex_unlock(&udp->tdb_hash_lock);
 	}
-	_membar_consumer();
+	membar_consumer();
 
 	/*
 	 * First search the registered table with no locks held.
@@ -1898,7 +1891,7 @@ register_lock(mutex_t *mp)
 	(void) ___lwp_mutex_register(mp);
 	rlp = lmalloc(sizeof (*rlp));
 	rlp->robust_lock = mp;
-	_membar_producer();
+	membar_producer();
 	*rlpp = rlp;
 
 	lmutex_unlock(&udp->tdb_hash_lock);
@@ -1956,11 +1949,11 @@ mutex_lock_internal(mutex_t *mp, timespec_t *tsp, int try)
 	if (msp && try == MUTEX_TRY)
 		tdb_incr(msp->mutex_try);
 
-	if ((mtype & (LOCK_RECURSIVE|LOCK_ERRORCHECK)) && mutex_is_held(mp))
+	if ((mtype & (LOCK_RECURSIVE|LOCK_ERRORCHECK)) && mutex_held(mp))
 		return (mutex_recursion(mp, mtype, try));
 
 	if (self->ul_error_detection && try == MUTEX_LOCK &&
-	    tsp == NULL && mutex_is_held(mp))
+	    tsp == NULL && mutex_held(mp))
 		lock_error(mp, "mutex_lock", NULL, NULL);
 
 	if ((mtype & LOCK_PRIO_PROTECT) && noceil == 0) {
@@ -2166,53 +2159,48 @@ mutex_lock_impl(mutex_t *mp, timespec_t *tsp)
 	return (mutex_lock_internal(mp, tsp, MUTEX_LOCK));
 }
 
-#pragma weak mutex_lock = __mutex_lock
-#pragma weak _mutex_lock = __mutex_lock
-#pragma weak pthread_mutex_lock = __mutex_lock
-#pragma weak _pthread_mutex_lock = __mutex_lock
+#pragma weak pthread_mutex_lock = mutex_lock
+#pragma weak _mutex_lock = mutex_lock
 int
-__mutex_lock(mutex_t *mp)
+mutex_lock(mutex_t *mp)
 {
 	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
 	return (mutex_lock_impl(mp, NULL));
 }
 
-#pragma weak pthread_mutex_timedlock = _pthread_mutex_timedlock
 int
-_pthread_mutex_timedlock(mutex_t *mp, const timespec_t *abstime)
+pthread_mutex_timedlock(pthread_mutex_t *_RESTRICT_KYWD mp,
+	const struct timespec *_RESTRICT_KYWD abstime)
 {
 	timespec_t tslocal;
 	int error;
 
 	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
 	abstime_to_reltime(CLOCK_REALTIME, abstime, &tslocal);
-	error = mutex_lock_impl(mp, &tslocal);
+	error = mutex_lock_impl((mutex_t *)mp, &tslocal);
 	if (error == ETIME)
 		error = ETIMEDOUT;
 	return (error);
 }
 
-#pragma weak pthread_mutex_reltimedlock_np = _pthread_mutex_reltimedlock_np
 int
-_pthread_mutex_reltimedlock_np(mutex_t *mp, const timespec_t *reltime)
+pthread_mutex_reltimedlock_np(pthread_mutex_t *_RESTRICT_KYWD mp,
+	const struct timespec *_RESTRICT_KYWD reltime)
 {
 	timespec_t tslocal;
 	int error;
 
 	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
 	tslocal = *reltime;
-	error = mutex_lock_impl(mp, &tslocal);
+	error = mutex_lock_impl((mutex_t *)mp, &tslocal);
 	if (error == ETIME)
 		error = ETIMEDOUT;
 	return (error);
 }
 
-#pragma weak mutex_trylock = __mutex_trylock
-#pragma weak _mutex_trylock = __mutex_trylock
-#pragma weak pthread_mutex_trylock = __mutex_trylock
-#pragma weak _pthread_mutex_trylock = __mutex_trylock
+#pragma weak pthread_mutex_trylock = mutex_trylock
 int
-__mutex_trylock(mutex_t *mp)
+mutex_trylock(mutex_t *mp)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -2283,10 +2271,10 @@ mutex_unlock_internal(mutex_t *mp, int retain_robust_flags)
 	int release_all;
 	lwpid_t lwpid;
 
-	if ((mtype & LOCK_ERRORCHECK) && !mutex_is_held(mp))
+	if ((mtype & LOCK_ERRORCHECK) && !mutex_held(mp))
 		return (EPERM);
 
-	if (self->ul_error_detection && !mutex_is_held(mp))
+	if (self->ul_error_detection && !mutex_held(mp))
 		lock_error(mp, "mutex_unlock", NULL, NULL);
 
 	if ((mtype & LOCK_RECURSIVE) && mp->mutex_rcount != 0) {
@@ -2333,12 +2321,10 @@ mutex_unlock_internal(mutex_t *mp, int retain_robust_flags)
 	return (error);
 }
 
-#pragma weak mutex_unlock = __mutex_unlock
-#pragma weak _mutex_unlock = __mutex_unlock
-#pragma weak pthread_mutex_unlock = __mutex_unlock
-#pragma weak _pthread_mutex_unlock = __mutex_unlock
+#pragma weak pthread_mutex_unlock = mutex_unlock
+#pragma weak _mutex_unlock = mutex_unlock
 int
-__mutex_unlock(mutex_t *mp)
+mutex_unlock(mutex_t *mp)
 {
 	ulwp_t *self = curthread;
 	int mtype = mp->mutex_type;
@@ -2435,7 +2421,7 @@ slow_unlock:
 /*
  * Internally to the library, almost all mutex lock/unlock actions
  * go through these lmutex_ functions, to protect critical regions.
- * We replicate a bit of code from __mutex_lock() and __mutex_unlock()
+ * We replicate a bit of code from mutex_lock() and mutex_unlock()
  * to make these functions faster since we know that the mutex type
  * of all internal locks is USYNC_THREAD.  We also know that internal
  * locking can never fail, so we panic if it does.
@@ -2626,7 +2612,7 @@ cancel_safe_mutex_unlock(mutex_t *mp)
 	    !(self->ul_vfork | self->ul_nocancel |
 	    self->ul_critical | self->ul_sigdefer) &&
 	    cancel_active())
-		_pthread_exit(PTHREAD_CANCELED);
+		pthread_exit(PTHREAD_CANCELED);
 }
 
 static int
@@ -2652,18 +2638,9 @@ shared_mutex_held(mutex_t *mparg)
 	return (MUTEX_OWNED(mp, self) && mp->mutex_ownerpid == udp->pid);
 }
 
-/*
- * Some crufty old programs define their own version of _mutex_held()
- * to be simply return(1).  This breaks internal libc logic, so we
- * define a private version for exclusive use by libc, mutex_is_held(),
- * and also a new public function, __mutex_held(), to be used in new
- * code to circumvent these crufty old programs.
- */
-#pragma weak mutex_held = mutex_is_held
-#pragma weak _mutex_held = mutex_is_held
-#pragma weak __mutex_held = mutex_is_held
+#pragma weak _mutex_held = mutex_held
 int
-mutex_is_held(mutex_t *mparg)
+mutex_held(mutex_t *mparg)
 {
 	volatile mutex_t *mp = (volatile mutex_t *)mparg;
 
@@ -2672,12 +2649,10 @@ mutex_is_held(mutex_t *mparg)
 	return (MUTEX_OWNED(mp, curthread));
 }
 
-#pragma weak mutex_destroy = __mutex_destroy
-#pragma weak _mutex_destroy = __mutex_destroy
-#pragma weak pthread_mutex_destroy = __mutex_destroy
-#pragma weak _pthread_mutex_destroy = __mutex_destroy
+#pragma weak pthread_mutex_destroy = mutex_destroy
+#pragma weak _mutex_destroy = mutex_destroy
 int
-__mutex_destroy(mutex_t *mp)
+mutex_destroy(mutex_t *mp)
 {
 	if (mp->mutex_type & USYNC_PROCESS)
 		forget_lock(mp);
@@ -2686,18 +2661,15 @@ __mutex_destroy(mutex_t *mp)
 	return (0);
 }
 
-#pragma weak mutex_consistent = __mutex_consistent
-#pragma weak _mutex_consistent = __mutex_consistent
-#pragma weak pthread_mutex_consistent_np = __mutex_consistent
-#pragma weak _pthread_mutex_consistent_np = __mutex_consistent
+#pragma weak pthread_mutex_consistent_np = mutex_consistent
 int
-__mutex_consistent(mutex_t *mp)
+mutex_consistent(mutex_t *mp)
 {
 	/*
 	 * Do this only for an inconsistent, initialized robust lock
 	 * that we hold.  For all other cases, return EINVAL.
 	 */
-	if (mutex_is_held(mp) &&
+	if (mutex_held(mp) &&
 	    (mp->mutex_type & LOCK_ROBUST) &&
 	    (mp->mutex_flag & LOCK_INITED) &&
 	    (mp->mutex_flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED))) {
@@ -2713,9 +2685,8 @@ __mutex_consistent(mutex_t *mp)
  * but we use the same data structure for them.
  */
 
-#pragma weak pthread_spin_init = _pthread_spin_init
 int
-_pthread_spin_init(pthread_spinlock_t *lock, int pshared)
+pthread_spin_init(pthread_spinlock_t *lock, int pshared)
 {
 	mutex_t *mp = (mutex_t *)lock;
 
@@ -2729,17 +2700,15 @@ _pthread_spin_init(pthread_spinlock_t *lock, int pshared)
 	return (0);
 }
 
-#pragma weak pthread_spin_destroy = _pthread_spin_destroy
 int
-_pthread_spin_destroy(pthread_spinlock_t *lock)
+pthread_spin_destroy(pthread_spinlock_t *lock)
 {
 	(void) memset(lock, 0, sizeof (*lock));
 	return (0);
 }
 
-#pragma weak pthread_spin_trylock = _pthread_spin_trylock
 int
-_pthread_spin_trylock(pthread_spinlock_t *lock)
+pthread_spin_trylock(pthread_spinlock_t *lock)
 {
 	mutex_t *mp = (mutex_t *)lock;
 	ulwp_t *self = curthread;
@@ -2758,9 +2727,8 @@ _pthread_spin_trylock(pthread_spinlock_t *lock)
 	return (error);
 }
 
-#pragma weak pthread_spin_lock = _pthread_spin_lock
 int
-_pthread_spin_lock(pthread_spinlock_t *lock)
+pthread_spin_lock(pthread_spinlock_t *lock)
 {
 	mutex_t *mp = (mutex_t *)lock;
 	ulwp_t *self = curthread;
@@ -2797,9 +2765,8 @@ _pthread_spin_lock(pthread_spinlock_t *lock)
 	return (0);
 }
 
-#pragma weak pthread_spin_unlock = _pthread_spin_unlock
 int
-_pthread_spin_unlock(pthread_spinlock_t *lock)
+pthread_spin_unlock(pthread_spinlock_t *lock)
 {
 	mutex_t *mp = (mutex_t *)lock;
 	ulwp_t *self = curthread;
@@ -2942,7 +2909,7 @@ heldlock_exit(void)
 		 * We avoid that case here.
 		 */
 		if ((mp = *lockptr) != NULL &&
-		    mutex_is_held(mp) &&
+		    mutex_held(mp) &&
 		    (mp->mutex_type & (LOCK_ROBUST | LOCK_PRIO_INHERIT)) ==
 		    LOCK_ROBUST) {
 			mp->mutex_rcount = 0;
@@ -2955,10 +2922,10 @@ heldlock_exit(void)
 	heldlock_free(self);
 }
 
-#pragma weak cond_init = _cond_init
+#pragma weak _cond_init = cond_init
 /* ARGSUSED2 */
 int
-_cond_init(cond_t *cvp, int type, void *arg)
+cond_init(cond_t *cvp, int type, void *arg)
 {
 	if (type != USYNC_THREAD && type != USYNC_PROCESS)
 		return (EINVAL);
@@ -3091,7 +3058,7 @@ cond_sleep_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 	 * then perform another cond_signal() to avoid consuming it.
 	 */
 	if (error && signalled)
-		(void) cond_signal_internal(cvp);
+		(void) cond_signal(cvp);
 
 	return (error);
 }
@@ -3213,7 +3180,7 @@ cond_wait_kernel(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 }
 
 /*
- * Common code for _cond_wait() and _cond_timedwait()
+ * Common code for cond_wait() and cond_timedwait()
  */
 int
 cond_wait_common(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
@@ -3261,7 +3228,7 @@ cond_wait_common(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 		begin_sleep = gethrtime();
 
 	if (self->ul_error_detection) {
-		if (!mutex_is_held(mp))
+		if (!mutex_held(mp))
 			lock_error(mp, "cond_wait", cvp, NULL);
 		if ((mtype & LOCK_RECURSIVE) && mp->mutex_rcount != 0)
 			lock_error(mp, "recursive mutex in cond_wait",
@@ -3309,8 +3276,8 @@ cond_wait_common(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 }
 
 /*
- * cond_wait() and _cond_wait() are cancellation points but __cond_wait()
- * is not.  Internally, libc calls the non-cancellation version.
+ * cond_wait() is a cancellation point but __cond_wait() is not.
+ * Internally, libc calls the non-cancellation version.
  * Other libraries need to use pthread_setcancelstate(), as appropriate,
  * since __cond_wait() is not exported from libc.
  */
@@ -3337,9 +3304,9 @@ __cond_wait(cond_t *cvp, mutex_t *mp)
 	return (cond_wait_common(cvp, mp, NULL));
 }
 
-#pragma weak cond_wait = _cond_wait
+#pragma weak _cond_wait = cond_wait
 int
-_cond_wait(cond_t *cvp, mutex_t *mp)
+cond_wait(cond_t *cvp, mutex_t *mp)
 {
 	int error;
 
@@ -3355,19 +3322,18 @@ _cond_wait(cond_t *cvp, mutex_t *mp)
 /*
  * pthread_cond_wait() is a cancellation point.
  */
-#pragma weak pthread_cond_wait = _pthread_cond_wait
 int
-_pthread_cond_wait(cond_t *cvp, mutex_t *mp)
+pthread_cond_wait(pthread_cond_t *_RESTRICT_KYWD cvp,
+	pthread_mutex_t *_RESTRICT_KYWD mp)
 {
 	int error;
 
-	error = _cond_wait(cvp, mp);
+	error = cond_wait((cond_t *)cvp, (mutex_t *)mp);
 	return ((error == EINTR)? 0 : error);
 }
 
 /*
- * cond_timedwait() and _cond_timedwait() are cancellation points
- * but __cond_timedwait() is not.
+ * cond_timedwait() is a cancellation point but __cond_timedwait() is not.
  */
 int
 __cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
@@ -3394,9 +3360,8 @@ __cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
 	return (error);
 }
 
-#pragma weak cond_timedwait = _cond_timedwait
 int
-_cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
+cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
 {
 	int error;
 
@@ -3412,13 +3377,14 @@ _cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
 /*
  * pthread_cond_timedwait() is a cancellation point.
  */
-#pragma weak pthread_cond_timedwait = _pthread_cond_timedwait
 int
-_pthread_cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
+pthread_cond_timedwait(pthread_cond_t *_RESTRICT_KYWD cvp,
+	pthread_mutex_t *_RESTRICT_KYWD mp,
+	const struct timespec *_RESTRICT_KYWD abstime)
 {
 	int error;
 
-	error = _cond_timedwait(cvp, mp, abstime);
+	error = cond_timedwait((cond_t *)cvp, (mutex_t *)mp, abstime);
 	if (error == ETIME)
 		error = ETIMEDOUT;
 	else if (error == EINTR)
@@ -3427,8 +3393,7 @@ _pthread_cond_timedwait(cond_t *cvp, mutex_t *mp, const timespec_t *abstime)
 }
 
 /*
- * cond_reltimedwait() and _cond_reltimedwait() are cancellation points
- * but __cond_reltimedwait() is not.
+ * cond_reltimedwait() is a cancellation point but __cond_reltimedwait() is not.
  */
 int
 __cond_reltimedwait(cond_t *cvp, mutex_t *mp, const timespec_t *reltime)
@@ -3438,9 +3403,8 @@ __cond_reltimedwait(cond_t *cvp, mutex_t *mp, const timespec_t *reltime)
 	return (cond_wait_common(cvp, mp, &tslocal));
 }
 
-#pragma weak cond_reltimedwait = _cond_reltimedwait
 int
-_cond_reltimedwait(cond_t *cvp, mutex_t *mp, const timespec_t *reltime)
+cond_reltimedwait(cond_t *cvp, mutex_t *mp, const timespec_t *reltime)
 {
 	int error;
 
@@ -3453,14 +3417,14 @@ _cond_reltimedwait(cond_t *cvp, mutex_t *mp, const timespec_t *reltime)
 	return (error);
 }
 
-#pragma weak pthread_cond_reltimedwait_np = _pthread_cond_reltimedwait_np
 int
-_pthread_cond_reltimedwait_np(cond_t *cvp, mutex_t *mp,
-	const timespec_t *reltime)
+pthread_cond_reltimedwait_np(pthread_cond_t *_RESTRICT_KYWD cvp,
+	pthread_mutex_t *_RESTRICT_KYWD mp,
+	const struct timespec *_RESTRICT_KYWD reltime)
 {
 	int error;
 
-	error = _cond_reltimedwait(cvp, mp, reltime);
+	error = cond_reltimedwait((cond_t *)cvp, (mutex_t *)mp, reltime);
 	if (error == ETIME)
 		error = ETIMEDOUT;
 	else if (error == EINTR)
@@ -3468,12 +3432,10 @@ _pthread_cond_reltimedwait_np(cond_t *cvp, mutex_t *mp,
 	return (error);
 }
 
-#pragma weak pthread_cond_signal = cond_signal_internal
-#pragma weak _pthread_cond_signal = cond_signal_internal
-#pragma weak cond_signal = cond_signal_internal
-#pragma weak _cond_signal = cond_signal_internal
+#pragma weak pthread_cond_signal = cond_signal
+#pragma weak _cond_signal = cond_signal
 int
-cond_signal_internal(cond_t *cvp)
+cond_signal(cond_t *cvp)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -3492,7 +3454,7 @@ cond_signal_internal(cond_t *cvp)
 		tdb_incr(csp->cond_signal);
 
 	if (cvp->cond_waiters_kernel)	/* someone sleeping in the kernel? */
-		error = __lwp_cond_signal(cvp);
+		error = _lwp_cond_signal(cvp);
 
 	if (!cvp->cond_waiters_user)	/* no one sleeping at user-level */
 		return (error);
@@ -3601,12 +3563,10 @@ alloc_lwpids(lwpid_t *lwpid, int *nlwpid_ptr, int *maxlwps_ptr)
 	return (lwpid);
 }
 
-#pragma weak pthread_cond_broadcast = cond_broadcast_internal
-#pragma weak _pthread_cond_broadcast = cond_broadcast_internal
-#pragma weak cond_broadcast = cond_broadcast_internal
-#pragma weak _cond_broadcast = cond_broadcast_internal
+#pragma weak pthread_cond_broadcast = cond_broadcast
+#pragma weak _cond_broadcast = cond_broadcast
 int
-cond_broadcast_internal(cond_t *cvp)
+cond_broadcast(cond_t *cvp)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -3627,7 +3587,7 @@ cond_broadcast_internal(cond_t *cvp)
 		tdb_incr(csp->cond_broadcast);
 
 	if (cvp->cond_waiters_kernel)	/* someone sleeping in the kernel? */
-		error = __lwp_cond_broadcast(cvp);
+		error = _lwp_cond_broadcast(cvp);
 
 	if (!cvp->cond_waiters_user)	/* no one sleeping at user-level */
 		return (error);
@@ -3699,11 +3659,9 @@ cond_broadcast_internal(cond_t *cvp)
 	return (error);
 }
 
-#pragma weak pthread_cond_destroy = _cond_destroy
-#pragma weak _pthread_cond_destroy = _cond_destroy
-#pragma weak cond_destroy = _cond_destroy
+#pragma weak pthread_cond_destroy = cond_destroy
 int
-_cond_destroy(cond_t *cvp)
+cond_destroy(cond_t *cvp)
 {
 	cvp->cond_magic = 0;
 	tdb_sync_obj_deregister(cvp);
@@ -3745,9 +3703,6 @@ record_spin_locks(ulwp_t *ulwp)
 /*
  * atexit function:  dump the queue statistics to stderr.
  */
-#if !defined(__lint)
-#define	fprintf	_fprintf
-#endif
 #include <stdio.h>
 void
 dump_queue_statistics(void)

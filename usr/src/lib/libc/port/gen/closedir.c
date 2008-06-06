@@ -20,14 +20,14 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * closedir -- C library extension routine
@@ -37,9 +37,9 @@
  * while holding internal libc locks.
  */
 
-#pragma weak closedir = _closedir
+#pragma weak _closedir = closedir
 
-#include "synonyms.h"
+#include "lint.h"
 #include <dirent.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -51,7 +51,7 @@ closedir(DIR *dirp)
 	private_DIR *pdirp = (private_DIR *)(uintptr_t)dirp;
 	int fd = dirp->dd_fd;
 
-	mutex_destroy(&pdirp->dd_lock);
+	(void) mutex_destroy(&pdirp->dd_lock);
 	lfree(dirp->dd_buf, DIRBUF);
 	lfree(pdirp, sizeof (*pdirp));
 	return (close(fd));

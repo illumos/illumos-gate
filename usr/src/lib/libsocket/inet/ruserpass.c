@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,8 +48,6 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <libintl.h>
-
-extern char *_dgettext();
 
 #ifdef SYSV
 #define	index	strchr
@@ -126,7 +125,7 @@ _ruserpass(const char *host, char **aname, char **apass)
 
 		*aname = malloc(MAXANAME + 1);
 		(void) cuserid(myname);
-		(void) printf(_dgettext(TEXT_DOMAIN, "Name (%s:%s): "),
+		(void) printf(dgettext(TEXT_DOMAIN, "Name (%s:%s): "),
 		    host, myname);
 		(void) fflush(stdout);
 		if (read(2, *aname, MAXANAME) <= 0)
@@ -139,8 +138,8 @@ _ruserpass(const char *host, char **aname, char **apass)
 				*index(*aname, '\n') = 0;
 	}
 	if (*aname && *apass == 0) {
-		(void) printf(_dgettext(TEXT_DOMAIN, "Password (%s:%s): "),
-			host, *aname);
+		(void) printf(dgettext(TEXT_DOMAIN, "Password (%s:%s): "),
+		    host, *aname);
 		(void) fflush(stdout);
 		*apass = getpass("");
 	}
@@ -194,12 +193,12 @@ next:
 			break;
 		case PASSWD:
 			if (fstat64(fileno(d->cfile), &stb) >= 0 &&
-				    (stb.st_mode & 077) != 0) {
+			    (stb.st_mode & 077) != 0) {
 				(void) fprintf(stderr,
-				    _dgettext(TEXT_DOMAIN,
+				    dgettext(TEXT_DOMAIN,
 				    "Error - .netrc file not correct mode.\n"));
 				(void) fprintf(stderr,
-				    _dgettext(TEXT_DOMAIN,
+				    dgettext(TEXT_DOMAIN,
 				    "Remove password or correct mode.\n"));
 				exit(1);
 			}
@@ -215,7 +214,7 @@ next:
 			(void) token();
 			break;
 		default:
-			(void) fprintf(stderr, _dgettext(TEXT_DOMAIN,
+			(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
 			    "Unknown .netrc option %s\n"), d->tokval);
 			break;
 		}
@@ -253,7 +252,7 @@ token()
 	} else {
 		*cp++ = (char)c;
 		while ((c = getc(d->cfile)) != EOF &&
-			    c != '\n' && c != '\t' && c != ' ' && c != ',') {
+		    c != '\n' && c != '\t' && c != ' ' && c != ',') {
 			if (c == '\\')
 				c = getc(d->cfile);
 			*cp++ = (char)c;

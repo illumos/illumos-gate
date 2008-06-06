@@ -133,12 +133,10 @@ rwl_free(ulwp_t *ulwp)
 
 /*
  * Check if a reader version of the lock is held by the current thread.
- * rw_read_is_held() is private to libc.
  */
-#pragma weak rw_read_is_held = _rw_read_held
-#pragma weak rw_read_held = _rw_read_held
+#pragma weak _rw_read_held = rw_read_held
 int
-_rw_read_held(rwlock_t *rwlp)
+rw_read_held(rwlock_t *rwlp)
 {
 	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
 	uint32_t readers;
@@ -178,12 +176,10 @@ _rw_read_held(rwlock_t *rwlp)
 
 /*
  * Check if a writer version of the lock is held by the current thread.
- * rw_write_is_held() is private to libc.
  */
-#pragma weak rw_write_is_held = _rw_write_held
-#pragma weak rw_write_held = _rw_write_held
+#pragma weak _rw_write_held = rw_write_held
 int
-_rw_write_held(rwlock_t *rwlp)
+rw_write_held(rwlock_t *rwlp)
 {
 	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
 	uint32_t readers;
@@ -203,11 +199,10 @@ _rw_write_held(rwlock_t *rwlp)
 	return (rval);
 }
 
-#pragma weak rwlock_init = __rwlock_init
-#pragma weak _rwlock_init = __rwlock_init
+#pragma weak _rwlock_init = rwlock_init
 /* ARGSUSED2 */
 int
-__rwlock_init(rwlock_t *rwlp, int type, void *arg)
+rwlock_init(rwlock_t *rwlp, int type, void *arg)
 {
 	if (type != USYNC_THREAD && type != USYNC_PROCESS)
 		return (EINVAL);
@@ -227,12 +222,10 @@ __rwlock_init(rwlock_t *rwlp, int type, void *arg)
 	return (0);
 }
 
-#pragma weak rwlock_destroy = __rwlock_destroy
-#pragma weak _rwlock_destroy = __rwlock_destroy
-#pragma weak pthread_rwlock_destroy = __rwlock_destroy
-#pragma weak _pthread_rwlock_destroy = __rwlock_destroy
+#pragma weak pthread_rwlock_destroy = rwlock_destroy
+#pragma weak _rwlock_destroy = rwlock_destroy
 int
-__rwlock_destroy(rwlock_t *rwlp)
+rwlock_destroy(rwlock_t *rwlp)
 {
 	/*
 	 * Once destroyed, we can no longer be holding a read or write lock.
@@ -638,7 +631,7 @@ rw_rdlock_impl(rwlock_t *rwlp, timespec_t *tsp)
 	/*
 	 * If we hold the writer lock, bail out.
 	 */
-	if (rw_write_is_held(rwlp)) {
+	if (rw_write_held(rwlp)) {
 		if (self->ul_error_detection)
 			rwlock_error(rwlp, "rwlock_rdlock",
 			    "calling thread owns the writer lock");
@@ -668,12 +661,10 @@ out:
 	return (error);
 }
 
-#pragma weak rw_rdlock = __rw_rdlock
-#pragma weak _rw_rdlock = __rw_rdlock
-#pragma weak pthread_rwlock_rdlock = __rw_rdlock
-#pragma weak _pthread_rwlock_rdlock = __rw_rdlock
+#pragma weak pthread_rwlock_rdlock = rw_rdlock
+#pragma weak _rw_rdlock = rw_rdlock
 int
-__rw_rdlock(rwlock_t *rwlp)
+rw_rdlock(rwlock_t *rwlp)
 {
 	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
 	return (rw_rdlock_impl(rwlp, NULL));
@@ -686,31 +677,30 @@ lrw_rdlock(rwlock_t *rwlp)
 	(void) rw_rdlock_impl(rwlp, NULL);
 }
 
-#pragma weak pthread_rwlock_reltimedrdlock_np = \
-	_pthread_rwlock_reltimedrdlock_np
 int
-_pthread_rwlock_reltimedrdlock_np(rwlock_t *rwlp, const timespec_t *reltime)
+pthread_rwlock_reltimedrdlock_np(pthread_rwlock_t *_RESTRICT_KYWD rwlp,
+    const struct timespec *_RESTRICT_KYWD reltime)
 {
 	timespec_t tslocal = *reltime;
 	int error;
 
 	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
-	error = rw_rdlock_impl(rwlp, &tslocal);
+	error = rw_rdlock_impl((rwlock_t *)rwlp, &tslocal);
 	if (error == ETIME)
 		error = ETIMEDOUT;
 	return (error);
 }
 
-#pragma weak pthread_rwlock_timedrdlock = _pthread_rwlock_timedrdlock
 int
-_pthread_rwlock_timedrdlock(rwlock_t *rwlp, const timespec_t *abstime)
+pthread_rwlock_timedrdlock(pthread_rwlock_t *_RESTRICT_KYWD rwlp,
+    const struct timespec *_RESTRICT_KYWD abstime)
 {
 	timespec_t tslocal;
 	int error;
 
 	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
 	abstime_to_reltime(CLOCK_REALTIME, abstime, &tslocal);
-	error = rw_rdlock_impl(rwlp, &tslocal);
+	error = rw_rdlock_impl((rwlock_t *)rwlp, &tslocal);
 	if (error == ETIME)
 		error = ETIMEDOUT;
 	return (error);
@@ -727,7 +717,7 @@ rw_wrlock_impl(rwlock_t *rwlp, timespec_t *tsp)
 	/*
 	 * If we hold a readers lock on this rwlock, bail out.
 	 */
-	if (rw_read_is_held(rwlp)) {
+	if (rw_read_held(rwlp)) {
 		if (self->ul_error_detection)
 			rwlock_error(rwlp, "rwlock_wrlock",
 			    "calling thread owns the readers lock");
@@ -738,7 +728,7 @@ rw_wrlock_impl(rwlock_t *rwlp, timespec_t *tsp)
 	/*
 	 * If we hold the writer lock, bail out.
 	 */
-	if (rw_write_is_held(rwlp)) {
+	if (rw_write_held(rwlp)) {
 		if (self->ul_error_detection)
 			rwlock_error(rwlp, "rwlock_wrlock",
 			    "calling thread owns the writer lock");
@@ -769,12 +759,10 @@ out:
 	return (error);
 }
 
-#pragma weak rw_wrlock = __rw_wrlock
-#pragma weak _rw_wrlock = __rw_wrlock
-#pragma weak pthread_rwlock_wrlock = __rw_wrlock
-#pragma weak _pthread_rwlock_wrlock = __rw_wrlock
+#pragma weak pthread_rwlock_wrlock = rw_wrlock
+#pragma weak _rw_wrlock = rw_wrlock
 int
-__rw_wrlock(rwlock_t *rwlp)
+rw_wrlock(rwlock_t *rwlp)
 {
 	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
 	return (rw_wrlock_impl(rwlp, NULL));
@@ -787,42 +775,37 @@ lrw_wrlock(rwlock_t *rwlp)
 	(void) rw_wrlock_impl(rwlp, NULL);
 }
 
-#pragma weak pthread_rwlock_reltimedwrlock_np = \
-	_pthread_rwlock_reltimedwrlock_np
 int
-_pthread_rwlock_reltimedwrlock_np(rwlock_t *rwlp, const timespec_t *reltime)
+pthread_rwlock_reltimedwrlock_np(pthread_rwlock_t *_RESTRICT_KYWD rwlp,
+    const struct timespec *_RESTRICT_KYWD reltime)
 {
 	timespec_t tslocal = *reltime;
 	int error;
 
 	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
-	error = rw_wrlock_impl(rwlp, &tslocal);
+	error = rw_wrlock_impl((rwlock_t *)rwlp, &tslocal);
 	if (error == ETIME)
 		error = ETIMEDOUT;
 	return (error);
 }
 
-#pragma weak pthread_rwlock_timedwrlock = _pthread_rwlock_timedwrlock
 int
-_pthread_rwlock_timedwrlock(rwlock_t *rwlp, const timespec_t *abstime)
+pthread_rwlock_timedwrlock(pthread_rwlock_t *rwlp, const timespec_t *abstime)
 {
 	timespec_t tslocal;
 	int error;
 
 	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
 	abstime_to_reltime(CLOCK_REALTIME, abstime, &tslocal);
-	error = rw_wrlock_impl(rwlp, &tslocal);
+	error = rw_wrlock_impl((rwlock_t *)rwlp, &tslocal);
 	if (error == ETIME)
 		error = ETIMEDOUT;
 	return (error);
 }
 
-#pragma weak rw_tryrdlock = __rw_tryrdlock
-#pragma weak _rw_tryrdlock = __rw_tryrdlock
-#pragma weak pthread_rwlock_tryrdlock = __rw_tryrdlock
-#pragma weak _pthread_rwlock_tryrdlock = __rw_tryrdlock
+#pragma weak pthread_rwlock_tryrdlock = rw_tryrdlock
 int
-__rw_tryrdlock(rwlock_t *rwlp)
+rw_tryrdlock(rwlock_t *rwlp)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -878,12 +861,9 @@ out:
 	return (error);
 }
 
-#pragma weak rw_trywrlock = __rw_trywrlock
-#pragma weak _rw_trywrlock = __rw_trywrlock
-#pragma weak pthread_rwlock_trywrlock = __rw_trywrlock
-#pragma weak _pthread_rwlock_trywrlock = __rw_trywrlock
+#pragma weak pthread_rwlock_trywrlock = rw_trywrlock
 int
-__rw_trywrlock(rwlock_t *rwlp)
+rw_trywrlock(rwlock_t *rwlp)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -920,12 +900,10 @@ __rw_trywrlock(rwlock_t *rwlp)
 	return (error);
 }
 
-#pragma weak rw_unlock = __rw_unlock
-#pragma weak _rw_unlock = __rw_unlock
-#pragma weak pthread_rwlock_unlock = __rw_unlock
-#pragma weak _pthread_rwlock_unlock = __rw_unlock
+#pragma weak pthread_rwlock_unlock = rw_unlock
+#pragma weak _rw_unlock = rw_unlock
 int
-__rw_unlock(rwlock_t *rwlp)
+rw_unlock(rwlock_t *rwlp)
 {
 	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
 	uint32_t readers;
@@ -951,7 +929,7 @@ __rw_unlock(rwlock_t *rwlp)
 		 * Since the writer lock is held, we'd better be
 		 * holding it, else we cannot legitimately be here.
 		 */
-		if (!rw_write_is_held(rwlp)) {
+		if (!rw_write_held(rwlp)) {
 			if (self->ul_error_detection)
 				rwlock_error(rwlp, "rwlock_unlock",
 				    "writer lock held, "
@@ -1041,6 +1019,6 @@ out:
 void
 lrw_unlock(rwlock_t *rwlp)
 {
-	(void) __rw_unlock(rwlp);
+	(void) rw_unlock(rwlp);
 	exit_critical(curthread);
 }

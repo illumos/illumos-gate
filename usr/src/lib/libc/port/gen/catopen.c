@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,10 +31,10 @@
  *
  */
 
-#pragma weak catopen = _catopen
-#pragma weak catclose = _catclose
+#pragma weak _catopen = catopen
+#pragma weak _catclose = catclose
 
-#include "synonyms.h"
+#include "lint.h"
 #include "libc.h"
 #include <sys/types.h>
 #include <unistd.h>
@@ -58,7 +58,7 @@ static nl_catd file_open(const char *, int);
 static nl_catd process_nls_path(char *, int);
 
 nl_catd
-_catopen(const char *name, int oflag)
+catopen(const char *name, int oflag)
 {
 	nl_catd p;
 
@@ -156,7 +156,7 @@ process_nls_path(char *name, int oflag)
 
 			/* replace Substitution field */
 			s = replace_nls_option(s, name, pathname, locale,
-						lang, territory, codeset);
+			    lang, territory, codeset);
 
 			p = file_open(pathname, UNSAFE_F);
 			if (p != NULL) {
@@ -246,14 +246,14 @@ replace_nls_option(char *s, char *name, char *pathname, char *locale,
 				if (lang) {
 					u = lang;
 					while (*u && *u != '_' &&
-						t < pathname + PATH_MAX)
+					    t < pathname + PATH_MAX)
 						*t++ = *u++;
 				}
 			} else if (*s == 't') {
 				if (territory) {
 					u = territory;
 					while (*u && *u != '.' &&
-						t < pathname + PATH_MAX)
+					    t < pathname + PATH_MAX)
 						*t++ = *u++;
 				}
 			} else if (*s == 'c') {
@@ -320,7 +320,7 @@ file_open(const char *name, int safe)
 }
 
 int
-_catclose(nl_catd catd)
+catclose(nl_catd catd)
 {
 	if (catd &&
 	    catd != (nl_catd)-1) {

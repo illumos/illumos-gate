@@ -23,19 +23,18 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#define		dgettext	_dgettext
-
-#include	<libintl.h>
-#include	<sys/varargs.h>
-#include	<stdio.h>
-#include	<string.h>
-#include	<stdlib.h>
-#include	<alist.h>
-#include	<debug.h>
-#include	<_debug.h>
-#include	<msg.h>
+#include <libintl.h>
+#include <sys/varargs.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <alist.h>
+#include <debug.h>
+#include <_debug.h>
+#include <msg.h>
 
 /*
  * Define a debug descriptor.  Note, although this provides the default

@@ -68,7 +68,7 @@ ROOTLINT= $(LINTSRC:%=$(ROOTLIBDIR)/%)
 
 .KEEP_STATE:
 
-all: $(LIBS) fnamecheck
+all: $(LIBS)
 
 lint: lintcheck
 

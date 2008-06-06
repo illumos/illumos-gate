@@ -18,12 +18,13 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Interfaces to audit_event(5)  (/etc/security/audit_event)
@@ -67,30 +68,27 @@ static mutex_t mutex_eventcache = DEFAULTMUTEX;
  */
 static int cacheauclass_failure = 0;
 
-extern int _mutex_lock(mutex_t *);
-extern int _mutex_unlock(mutex_t *);
-
 
 void
 setauevent()
 {
-	_mutex_lock(&mutex_eventfile);
+	(void) mutex_lock(&mutex_eventfile);
 	if (au_event_file) {
 		(void) fseek(au_event_file, 0L, 0);
 	}
-	_mutex_unlock(&mutex_eventfile);
+	(void) mutex_unlock(&mutex_eventfile);
 }
 
 
 void
 endauevent()
 {
-	_mutex_lock(&mutex_eventfile);
+	(void) mutex_lock(&mutex_eventfile);
 	if (au_event_file) {
 		(void) fclose(au_event_file);
 		au_event_file = (FILE *)0;
 	}
-	_mutex_unlock(&mutex_eventfile);
+	(void) mutex_unlock(&mutex_eventfile);
 }
 
 au_event_ent_t *
@@ -116,10 +114,10 @@ getauevent_r(au_event_entry)
 	char	trim_buf[AU_EVENT_NAME_MAX+1];
 
 	/* open audit event file if it isn't already */
-	_mutex_lock(&mutex_eventfile);
+	(void) mutex_lock(&mutex_eventfile);
 	if (!au_event_file)
 		if (!(au_event_file = fopen(au_event_fname, "rF"))) {
-			_mutex_unlock(&mutex_eventfile);
+			(void) mutex_unlock(&mutex_eventfile);
 			return ((au_event_ent_t *)0);
 		}
 
@@ -168,7 +166,7 @@ getauevent_r(au_event_entry)
 			break;
 		}
 	}
-	_mutex_unlock(&mutex_eventfile);
+	(void) mutex_unlock(&mutex_eventfile);
 
 	if (!error && found) {
 		return (au_event_entry);
@@ -314,12 +312,12 @@ cacheauevent(result, event_number)
 	int	hit = 0;
 	char	*s;
 
-	_mutex_lock(&mutex_eventcache);
+	(void) mutex_lock(&mutex_eventcache);
 	if (called_once == 0) {
 
 		/* Count number of lines in the events file */
 		if ((fp = fopen(au_event_fname, "rF")) == NULL) {
-			_mutex_unlock(&mutex_eventcache);
+			(void) mutex_unlock(&mutex_eventcache);
 			return (-1);
 		}
 		while (fgets(line, AU_EVENT_LINE_MAX, fp) != NULL) {
@@ -340,7 +338,7 @@ cacheauevent(result, event_number)
 
 		p_tbl = calloc(lines + 1, sizeof (au_event_ent_t));
 		if (p_tbl == NULL) {
-			_mutex_unlock(&mutex_eventcache);
+			(void) mutex_unlock(&mutex_eventcache);
 			return (-2);
 		}
 		lines = 0;
@@ -351,7 +349,7 @@ cacheauevent(result, event_number)
 			p_tbl[lines] = (au_event_ent_t *)
 				malloc(sizeof (au_event_ent_t));
 			if (p_tbl[lines] == NULL) {
-				_mutex_unlock(&mutex_eventcache);
+				(void) mutex_unlock(&mutex_eventcache);
 				return (-3);
 			}
 			p_tbl[lines]->ae_number = p_event->ae_number;
@@ -374,7 +372,7 @@ cacheauevent(result, event_number)
 		p_tbl[invalid] = (au_event_ent_t *)
 			malloc(sizeof (au_event_ent_t));
 		if (p_tbl[invalid] == NULL) {
-			_mutex_unlock(&mutex_eventcache);
+			(void) mutex_unlock(&mutex_eventcache);
 			return (-4);
 		}
 		p_tbl[invalid]->ae_number = -1;
@@ -393,7 +391,7 @@ cacheauevent(result, event_number)
 		/* get space for the index_tbl */
 		index_tbl = calloc(max+1, sizeof (au_event_ent_t *));
 		if (index_tbl == NULL) {
-			_mutex_unlock(&mutex_eventcache);
+			(void) mutex_unlock(&mutex_eventcache);
 			return (-5);
 		}
 
@@ -417,7 +415,7 @@ cacheauevent(result, event_number)
 		*result = index_tbl[(ushort_t)event_number];
 		hit = 1;
 	}
-	_mutex_unlock(&mutex_eventcache);
+	(void) mutex_unlock(&mutex_eventcache);
 	return (hit);
 }
 

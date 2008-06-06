@@ -18,16 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	mktemp() expects a string with up to six trailing 'X's.
@@ -67,10 +67,11 @@
  *	sequence number is randomized using the current time.
  */
 
-#define	XCNT  6
-#pragma weak mktemp = _mktemp
+#pragma weak _mktemp = mktemp
 
-#include "synonyms.h"
+#define	XCNT  6
+
+#include "lint.h"
 #include "mtlib.h"
 #include <sys/types.h>
 #include <string.h>

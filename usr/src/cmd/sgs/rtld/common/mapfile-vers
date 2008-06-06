@@ -41,24 +41,25 @@
 
 SUNWprivate_1.2 {
 	protected:
-		_dladdr;		# Standard dlopen(3x) family	
-		 dladdr;
-		_dladdr1;
+		 dladdr;		# Standard dlopen(3x) family
 		 dladdr1;
-		_dldump;
 		 dldump;
-		_dlclose;
 		 dlclose;
-		_dlerror;
 		 dlerror;
-		_dlinfo;
 		 dlinfo;
-		_dlopen;
 		 dlopen;
-		_dlmopen;
 		 dlmopen;
-		_dlsym;
 		 dlsym;
+
+		_dladdr;		# these should not exist
+		_dladdr1;
+		_dldump;
+		_dlclose;
+		_dlerror;
+		_dlinfo;
+		_dlopen;
+		_dlmopen;
+		_dlsym;
 
 		_ld_libc;		# provides libc initialization
 
@@ -82,7 +83,7 @@ SUNWprivate_1.2 {
 		 dbg_print;
 		 eprintf;		# Error message printing
 
-		_dgettext;		# Messaging support
+		 dgettext;		# Messaging support
 		 strerror;
 
 		 calloc;		# Memory management (mapmalloc).

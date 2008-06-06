@@ -18,12 +18,13 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * au_preselect.c
@@ -54,9 +55,6 @@ static uint_t alloc_count;	/* number of entries currently allocated */
 static uint_t event_count;	/* number of entries in map */
 static mutex_t mutex_au_preselect = DEFAULTMUTEX;
 
-extern int _mutex_lock(mutex_t *);
-extern int _mutex_unlock(mutex_t *);
-
 /*
  * au_preselect:
  *
@@ -84,15 +82,15 @@ au_preselect(au_event, au_mask_p, sorf, flag)
 	register int i;
 	register au_class_t comp_class;
 
-	_mutex_lock(&mutex_au_preselect);
+	(void) mutex_lock(&mutex_au_preselect);
 	if (!been_here_before) {
 		if (alloc_map() == -1) {
-			_mutex_unlock(&mutex_au_preselect);
+			(void) mutex_unlock(&mutex_au_preselect);
 			return (-1);
 		}
 
 		if (load_map() == -1) {
-			_mutex_unlock(&mutex_au_preselect);
+			(void) mutex_unlock(&mutex_au_preselect);
 			return (-1);
 		}
 
@@ -104,7 +102,7 @@ au_preselect(au_event, au_mask_p, sorf, flag)
 	 */
 	if (flag == AU_PRS_REREAD) {
 		if (load_map() == -1) {
-			_mutex_unlock(&mutex_au_preselect);
+			(void) mutex_unlock(&mutex_au_preselect);
 			return (-1);
 		}
 	}
@@ -120,16 +118,16 @@ au_preselect(au_event, au_mask_p, sorf, flag)
 	for (i = 0; i < event_count; i++) {
 		if (event_map[i].event == au_event) {
 			if (event_map[i].class & comp_class) {
-				_mutex_unlock(&mutex_au_preselect);
+				(void) mutex_unlock(&mutex_au_preselect);
 				return (1);
 			} else {
-				_mutex_unlock(&mutex_au_preselect);
+				(void) mutex_unlock(&mutex_au_preselect);
 				return (0);
 			}
 		}
 	}
 
-	_mutex_unlock(&mutex_au_preselect);
+	(void) mutex_unlock(&mutex_au_preselect);
 	return (-1);	/* could not find event in the table */
 }
 

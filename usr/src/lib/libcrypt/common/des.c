@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,13 +33,11 @@
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-/*LINTLIBRARY*/
 
 /*
  * DES encryption library routines
  */
 
-#include "des_synonyms.h"
 #include <sys/types.h>
 #include <rpc/des_crypt.h>
 #include <sys/stat.h>
@@ -75,8 +72,8 @@
  * Copy 8 bytes
  */
 #define	COPY8(src, dst) { \
-	char *a = (char *) dst; \
-	char *b = (char *) src; \
+	char *a = (char *)dst; \
+	char *b = (char *)src; \
 	*a++ = *b++; *a++ = *b++; *a++ = *b++; *a++ = *b++; \
 	*a++ = *b++; *a++ = *b++; *a++ = *b++; *a++ = *b++; \
 }
@@ -85,10 +82,10 @@
  * Copy multiple of 8 bytes
  */
 #define	DESCOPY(src, dst, len) { \
-	char *a = (char *) dst; \
-	char *b = (char *) src; \
+	char *a = (char *)dst; \
+	char *b = (char *)src; \
 	int i; \
-	for (i = (int) len; i > 0; i -= 8) { \
+	for (i = (int)len; i > 0; i -= 8) { \
 		*a++ = *b++; *a++ = *b++; *a++ = *b++; *a++ = *b++; \
 		*a++ = *b++; *a++ = *b++; *a++ = *b++; *a++ = *b++; \
 	} \
@@ -138,7 +135,8 @@ ecb_crypt(char *key, char *buf, size_t len, unsigned int mode)
  * Common code to cbc_crypt() & ecb_crypt()
  */
 static int
-common_crypt(char *key, char *buf, unsigned len, unsigned mode, struct desparams *desp)
+common_crypt(char *key, char *buf, unsigned len,
+    unsigned mode, struct desparams *desp)
 {
 	int desdev;
 	int res;
@@ -148,7 +146,7 @@ common_crypt(char *key, char *buf, unsigned len, unsigned mode, struct desparams
 		return (DESERR_BADPARAM);
 	}
 	desp->des_dir =
-		((mode & DES_DIRMASK) == DES_ENCRYPT) ? ENCRYPT : DECRYPT;
+	    ((mode & DES_DIRMASK) == DES_ENCRYPT) ? ENCRYPT : DECRYPT;
 
 	desdev = mode & DES_DEVMASK;
 	COPY8(key, desp->des_key);
@@ -166,11 +164,11 @@ common_crypt(char *key, char *buf, unsigned len, unsigned mode, struct desparams
 		desp->des_len = len;
 		if (len <= DES_QUICKLEN) {
 			DESCOPY(buf, desp->des_data, len);
-			res = ioctl(g_desfd, (int)DESIOCQUICK, (char *) desp);
+			res = ioctl(g_desfd, (int)DESIOCQUICK, (char *)desp);
 			DESCOPY(desp->des_data, buf, len);
 		} else {
-			desp->des_buf = (u_char *) buf;
-			res = ioctl(g_desfd, (int)DESIOCBLOCK, (char *) desp);
+			desp->des_buf = (uchar_t *)buf;
+			res = ioctl(g_desfd, (int)DESIOCBLOCK, (char *)desp);
 		}
 		return (res == 0 ? DESERR_NONE : DESERR_HWERROR);
 	}

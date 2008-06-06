@@ -799,7 +799,8 @@ int remove(const char *filename);
 int rename(const char *old, const char *new);
 
 /* rewinddir.c */
-void _rewinddir(DIR *dirp);
+#undef rewinddir
+void rewinddir(DIR *dirp);
 
 /* scandir.c */
 int alphasort(const struct dirent **, const struct dirent **);

@@ -59,7 +59,6 @@ extern "C" {
 
 extern void __set_panicstr(const char *);
 extern void _rewind_unlocked(FILE *);
-extern int _rename(const char *, const char *);
 extern long _sysconfig(int);
 extern int kill(pid_t pid, int sig);
 
@@ -79,12 +78,6 @@ extern void *libc_malloc(size_t);
 extern void *libc_realloc(void *, size_t);
 extern void libc_free(void *);
 extern char *libc_strdup(const char *);
-extern int _sigwait(sigset_t *);
-extern int _thr_getspecific(thread_key_t key, void **valuep);
-extern int _thr_setspecific(unsigned int key, void *value);
-extern int _thr_keycreate(thread_key_t *pkey, void (*destructor)(void *));
-extern int _thr_keycreate_once(thread_key_t *pkey, void (*destructor)(void *));
-extern void *_pthread_getspecific(thread_key_t);
 extern int _pollsys(struct pollfd *, nfds_t, const timespec_t *,
 	const sigset_t *);
 
@@ -246,17 +239,6 @@ extern uint_t __xpg6;		/* global */
 extern uint_t libc__xpg6;	/* copy of __xpg6, private to libc */
 
 /*
- * i18n prototypes - strong symbols (weak symbols are in libintl.h)
- */
-extern char *_textdomain(const char *);
-extern char *_bindtextdomain(const char *, const char *);
-extern char *_dcgettext(const char *, const char *, const int);
-extern char *_dgettext(const char *, const char *);
-extern char *_gettext(const char *);
-extern int _fnmatch(const char *, const char *, int);
-
-
-/*
  * defined in port/stdio/doscan.c
  */
 extern int _doscan(FILE *, const char *, va_list);
@@ -324,30 +306,6 @@ extern wint_t _putwc(wint_t, FILE *);
  */
 extern wint_t	__ungetwc_xpg5(wint_t, FILE *);
 
-/*
- * defined in wscmp.c
- */
-extern int	_wcscmp(const wchar_t *, const wchar_t *);
-
-/*
- * defined in wslen.c
- */
-extern size_t	_wcslen(const wchar_t *);
-
-/*
- * defined in wscpy.c
- */
-extern wchar_t	*_wcscpy(wchar_t *, const wchar_t *);
-
-/*
- * misc synonyms
- */
-extern int _wctomb(char *, wchar_t);
-extern wint_t _towlower(wint_t);
-extern int _doscan(FILE *, const char *, va_list);
-extern int _wcscoll(const wchar_t *, const wchar_t *);
-extern size_t _wcsxfrm(wchar_t *, const wchar_t *, size_t);
-extern wint_t _fputwc(wint_t, FILE *);
 #ifdef	__cplusplus
 }
 #endif

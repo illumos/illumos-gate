@@ -20,21 +20,13 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak endgrent = _endgrent
-#pragma weak setgrent = _setgrent
-
-#pragma weak getgrnam_r = _getgrnam_r
-#pragma weak getgrgid_r = _getgrgid_r
-#pragma weak getgrent_r = _getgrent_r
-#pragma weak fgetgrent_r = _fgetgrent_r
-
-#include "synonyms.h"
+#include "lint.h"
 #include <mtlib.h>
 #include <sys/types.h>
 #include <grp.h>
@@ -79,7 +71,7 @@ _uncached_getgrgid_r(gid_t gid, struct group *result, char *buffer, int buflen);
  * It was implemented by Solaris 2.3.
  */
 struct group *
-_getgrnam_r(const char *name, struct group *result, char *buffer, int buflen)
+getgrnam_r(const char *name, struct group *result, char *buffer, int buflen)
 {
 	nss_XbyY_args_t arg;
 
@@ -90,7 +82,7 @@ _getgrnam_r(const char *name, struct group *result, char *buffer, int buflen)
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2group);
 	arg.key.name = name;
 	(void) nss_search(&db_root, _nss_initf_group,
-			NSS_DBOP_GROUP_BYNAME, &arg);
+	    NSS_DBOP_GROUP_BYNAME, &arg);
 	return ((struct group *)NSS_XbyY_FINI(&arg));
 }
 
@@ -99,14 +91,14 @@ _getgrnam_r(const char *name, struct group *result, char *buffer, int buflen)
  * It was implemented by Solaris 2.3.
  */
 struct group *
-_getgrgid_r(gid_t gid, struct group *result, char *buffer, int buflen)
+getgrgid_r(gid_t gid, struct group *result, char *buffer, int buflen)
 {
 	nss_XbyY_args_t arg;
 
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2group);
 	arg.key.gid = gid;
 	(void) nss_search(&db_root, _nss_initf_group,
-				NSS_DBOP_GROUP_BYGID, &arg);
+	    NSS_DBOP_GROUP_BYGID, &arg);
 	return ((struct group *)NSS_XbyY_FINI(&arg));
 }
 
@@ -119,7 +111,7 @@ _uncached_getgrgid_r(gid_t gid, struct group *result, char *buffer,
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2group);
 	arg.key.gid = gid;
 	(void) nss_search(&db_root, _nss_initf_group,
-				NSS_DBOP_GROUP_BYGID, &arg);
+	    NSS_DBOP_GROUP_BYGID, &arg);
 	return ((struct group *)NSS_XbyY_FINI(&arg));
 }
 
@@ -135,17 +127,13 @@ __posix_getgrgid_r(gid_t gid, struct group *grp, char *buffer,
 	int oerrno = errno;
 
 	errno = 0;
-	if ((*result = _getgrgid_r(gid, grp, buffer, (uintptr_t)bufsize))
-		== NULL) {
+	if ((*result = getgrgid_r(gid, grp, buffer, (uintptr_t)bufsize))
+	    == NULL) {
 			nerrno = errno;
 	}
 	errno = oerrno;
 	return (nerrno);
 }
-
-extern struct group *
-_getgrnam_r(const char *name, struct group *result, char *buffer,
-	int buflen);
 
 struct group *
 _uncached_getgrnam_r(const char *name, struct group *result, char *buffer,
@@ -156,7 +144,7 @@ _uncached_getgrnam_r(const char *name, struct group *result, char *buffer,
 	NSS_XbyY_INIT(&arg, result, buffer, buflen, str2group);
 	arg.key.name = name;
 	(void) nss_search(&db_root, _nss_initf_group,
-			NSS_DBOP_GROUP_BYNAME, &arg);
+	    NSS_DBOP_GROUP_BYNAME, &arg);
 	return ((struct group *)NSS_XbyY_FINI(&arg));
 }
 
@@ -171,8 +159,8 @@ __posix_getgrnam_r(const char *name, struct group *grp, char *buffer,
 	int nerrno = 0;
 	int oerrno = errno;
 
-	if ((*result = _getgrnam_r(name, grp, buffer, (uintptr_t)bufsize))
-		== NULL) {
+	if ((*result = getgrnam_r(name, grp, buffer, (uintptr_t)bufsize))
+	    == NULL) {
 			nerrno = errno;
 	}
 	errno = oerrno;
@@ -205,8 +193,8 @@ getgrent_r(struct group *result, char *buffer, int buflen)
 		/* No key to fill in */
 		(void) nss_getent(&db_root, _nss_initf_group, &context, &arg);
 	} while (arg.returnval != 0 &&
-		(nam = ((struct group *)arg.returnval)->gr_name) != 0 &&
-		(*nam == '+' || *nam == '-'));
+	    (nam = ((struct group *)arg.returnval)->gr_name) != 0 &&
+	    (*nam == '+' || *nam == '-'));
 
 	return ((struct group *)NSS_XbyY_FINI(&arg));
 }
@@ -289,7 +277,7 @@ _getgroupsbymember(const char *username, gid_t gid_array[],
 	}
 
 	(void) nss_search(&db_root, _nss_initf_group,
-			NSS_DBOP_GROUP_BYMEMBER, &arg);
+	    NSS_DBOP_GROUP_BYMEMBER, &arg);
 
 	return (arg.numgids);
 }
@@ -445,7 +433,7 @@ process_cstr(const char *instr, int instr_len, struct nss_groupsbymem *gbm)
 	grp = (struct group *)buf->result;
 
 	parsestat = (*gbm->str2ent)(instr, instr_len,
-				    grp, buf->buffer, buf->buflen);
+	    grp, buf->buffer, buf->buflen);
 
 	if (parsestat != NSS_STR_PARSE_SUCCESS) {
 		_nss_XbyY_buf_free(buf);
@@ -454,7 +442,7 @@ process_cstr(const char *instr, int instr_len, struct nss_groupsbymem *gbm)
 
 	if (grp->gr_mem) {
 		for (memp = grp->gr_mem; (memp) && ((mem = *memp) != 0);
-								memp++) {
+		    memp++) {
 			if (strcmp(mem, username) == 0) {
 				gid_t	gid 	= grp->gr_gid;
 				gid_t	*gidp	= gbm->gid_array;
@@ -464,7 +452,7 @@ process_cstr(const char *instr, int instr_len, struct nss_groupsbymem *gbm)
 				_nss_XbyY_buf_free(buf);
 
 				for (i = 0; i < numgids && *gidp != gid; i++,
-								gidp++) {
+				    gidp++) {
 					;
 				}
 				if (i >= numgids) {

@@ -26,10 +26,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#if !defined(UMEM_STANDALONE)
-#include "c_synonyms.h"
-#endif
-
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>

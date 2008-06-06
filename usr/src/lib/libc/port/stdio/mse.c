@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#include "lint.h"
 #include "mtlib.h"
 #include "mbstatet.h"
 #include "file64.h"
@@ -137,7 +137,7 @@ _get_internal_mbstate(int item)
 	lmutex_lock(&__top_mbstates_lock);
 	if (__top_mbstates == NULL) {
 		__top_mbstates =
-			lmalloc((_MAX_MB_FUNC + 1) * sizeof (mbstate_t *));
+		    lmalloc((_MAX_MB_FUNC + 1) * sizeof (mbstate_t *));
 		if (__top_mbstates == NULL) {
 			lmutex_unlock(&__top_mbstates_lock);
 			return (NULL);
@@ -203,8 +203,7 @@ __mbst_get_consumed_array(const mbstate_t *ps, char *str,
 		/* The max size of __consumed[] is 8 */
 		return (-1);
 	}
-	(void) memcpy((void *)str, (const void *)&ps->__consumed[index],
-		len);
+	(void) memcpy((void *)str, (const void *)&ps->__consumed[index], len);
 	return (0);
 }
 
@@ -217,8 +216,7 @@ __mbst_set_consumed_array(mbstate_t *ps, const char *str,
 		/* The max size of __consumed[] is 8 */
 		return (-1);
 	}
-	(void) memcpy((void *)&ps->__consumed[index], (const void *)str,
-		len);
+	(void) memcpy((void *)&ps->__consumed[index], (const void *)str, len);
 	return (0);
 }
 

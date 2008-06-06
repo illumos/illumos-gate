@@ -35,11 +35,11 @@
 	/*
 	 * This is where execution resumes when a thread created with
 	 * thr_create() or pthread_create() returns (see setup_context()).
-	 * We pass the (void *) return value to _thr_terminate().
+	 * We pass the (void *) return value to _thrp_terminate().
 	 */
 	ENTRY(_lwp_start)
 	movq	%rax, %rdi
-	call	_thr_terminate
+	call	_thrp_terminate
 	RET		/* actually, never returns */
 	SET_SIZE(_lwp_start)
 

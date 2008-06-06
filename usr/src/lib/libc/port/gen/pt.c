@@ -20,21 +20,20 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma weak ptsname = _ptsname
-#pragma weak grantpt = _grantpt
-#pragma weak unlockpt = _unlockpt
-#pragma weak posix_openpt = _posix_openpt
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#pragma weak _ptsname = ptsname
+#pragma weak _grantpt = grantpt
+#pragma weak _unlockpt = unlockpt
+
+#include "lint.h"
 #include "libc.h"
 #include "mtlib.h"
 #include <sys/types.h>

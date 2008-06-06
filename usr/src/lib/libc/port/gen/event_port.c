@@ -20,20 +20,11 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#pragma weak port_create = _port_create
-#pragma weak port_associate = _port_associate
-#pragma weak port_dissociate = _port_dissociate
-#pragma weak port_send = _port_send
-#pragma weak port_sendn = _port_sendn
-#pragma weak port_get = _port_get
-#pragma weak port_getn = _port_getn
-#pragma weak port_alert = _port_alert
 
 #include "lint.h"
 #include <sys/types.h>
@@ -57,7 +48,7 @@
  * set to 0 and no check will be done in the kernel interface.
  */
 int
-_port_create()
+port_create()
 {
 	rval_t	r;
 	r.r_vals = _portfs(PORT_CREATE | PORT_SYS_NOPORT, 0, 0, 0, 0, 0);
@@ -65,7 +56,7 @@ _port_create()
 }
 
 int
-_port_associate(int port, int source, uintptr_t object, int events, void *user)
+port_associate(int port, int source, uintptr_t object, int events, void *user)
 {
 	rval_t	r;
 	r.r_vals = _portfs(PORT_ASSOCIATE, port, source, object, events,
@@ -75,7 +66,7 @@ _port_associate(int port, int source, uintptr_t object, int events, void *user)
 
 
 int
-_port_get(int port, port_event_t *pe, struct timespec *to)
+port_get(int port, port_event_t *pe, struct timespec *to)
 {
 	rval_t	r;
 	if (to)
@@ -87,7 +78,7 @@ _port_get(int port, port_event_t *pe, struct timespec *to)
 }
 
 int
-_port_getn(int port, port_event_t list[], uint_t max, uint_t *nget,
+port_getn(int port, port_event_t list[], uint_t max, uint_t *nget,
     struct timespec *timeout)
 {
 	rval_t	r;
@@ -110,7 +101,7 @@ _port_getn(int port, port_event_t list[], uint_t max, uint_t *nget,
 }
 
 int
-_port_dissociate(int port, int source, uintptr_t object)
+port_dissociate(int port, int source, uintptr_t object)
 {
 	rval_t	r;
 	r.r_vals = _portfs(PORT_DISSOCIATE, port, source, object, 0, 0);
@@ -118,7 +109,7 @@ _port_dissociate(int port, int source, uintptr_t object)
 }
 
 int
-_port_send(int port, int events, void *user)
+port_send(int port, int events, void *user)
 {
 	rval_t	r;
 	r.r_vals = _portfs(PORT_SEND, port, events, (uintptr_t)user, NULL,
@@ -146,7 +137,7 @@ _port_dispatch(int port, int flags, int source, int events, uintptr_t object,
 }
 
 int
-_port_sendn(int ports[], int errors[], uint_t nent, int events, void *user)
+port_sendn(int ports[], int errors[], uint_t nent, int events, void *user)
 {
 	rval_t	r;
 	uint_t	offset;
@@ -184,7 +175,7 @@ _port_sendn(int ports[], int errors[], uint_t nent, int events, void *user)
 }
 
 int
-_port_alert(int port, int flags, int events, void *user)
+port_alert(int port, int flags, int events, void *user)
 {
 	rval_t	r;
 	r.r_vals = _portfs(PORT_ALERT, port, flags, events, (uintptr_t)user,

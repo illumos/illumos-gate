@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,9 +34,8 @@
  * pthread_rwlockattr_init: allocates the mutex attribute object and
  * initializes it with the default values.
  */
-#pragma weak pthread_rwlockattr_init = _pthread_rwlockattr_init
 int
-_pthread_rwlockattr_init(pthread_rwlockattr_t *attr)
+pthread_rwlockattr_init(pthread_rwlockattr_t *attr)
 {
 	rwlattr_t *ap;
 
@@ -52,9 +51,8 @@ _pthread_rwlockattr_init(pthread_rwlockattr_t *attr)
  * pthread_rwlockattr_destroy: frees the rwlock attribute object and
  * invalidates it with NULL value.
  */
-#pragma weak pthread_rwlockattr_destroy =  _pthread_rwlockattr_destroy
 int
-_pthread_rwlockattr_destroy(pthread_rwlockattr_t *attr)
+pthread_rwlockattr_destroy(pthread_rwlockattr_t *attr)
 {
 	if (attr == NULL || attr->__pthread_rwlockattrp == NULL)
 		return (EINVAL);
@@ -67,9 +65,8 @@ _pthread_rwlockattr_destroy(pthread_rwlockattr_t *attr)
  * UNIX98
  * pthread_rwlockattr_setpshared: sets the shared attr to PRIVATE or SHARED.
  */
-#pragma weak pthread_rwlockattr_setpshared =  _pthread_rwlockattr_setpshared
 int
-_pthread_rwlockattr_setpshared(pthread_rwlockattr_t *attr, int pshared)
+pthread_rwlockattr_setpshared(pthread_rwlockattr_t *attr, int pshared)
 {
 	rwlattr_t *ap;
 
@@ -86,9 +83,8 @@ _pthread_rwlockattr_setpshared(pthread_rwlockattr_t *attr, int pshared)
  * UNIX98
  * pthread_rwlockattr_getpshared: gets the shared attr.
  */
-#pragma weak pthread_rwlockattr_getpshared =  _pthread_rwlockattr_getpshared
 int
-_pthread_rwlockattr_getpshared(const pthread_rwlockattr_t *attr, int *pshared)
+pthread_rwlockattr_getpshared(const pthread_rwlockattr_t *attr, int *pshared)
 {
 	rwlattr_t *ap;
 
@@ -105,9 +101,9 @@ _pthread_rwlockattr_getpshared(const pthread_rwlockattr_t *attr, int *pshared)
  * pthread_rwlock_init: Initializes the rwlock object. It copies the
  * pshared attr into type argument and calls rwlock_init().
  */
-#pragma weak pthread_rwlock_init = _pthread_rwlock_init
 int
-_pthread_rwlock_init(pthread_rwlock_t *rwlock, pthread_rwlockattr_t *attr)
+pthread_rwlock_init(pthread_rwlock_t *_RESTRICT_KYWD rwlock,
+    const pthread_rwlockattr_t *_RESTRICT_KYWD attr)
 {
 	rwlattr_t *ap;
 	int type;
@@ -119,5 +115,5 @@ _pthread_rwlock_init(pthread_rwlock_t *rwlock, pthread_rwlockattr_t *attr)
 	else
 		return (EINVAL);
 
-	return (__rwlock_init((rwlock_t *)rwlock, type, NULL));
+	return (rwlock_init((rwlock_t *)rwlock, type, NULL));
 }

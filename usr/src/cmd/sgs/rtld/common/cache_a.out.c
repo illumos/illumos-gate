@@ -20,15 +20,15 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * 4.x ld.so directory caching: run-time link-editor specific functions.
  */
-#include	"_synonyms.h"
 
 #include	<dirent.h>
 #include	<string.h>
@@ -486,7 +486,7 @@ verscmp(const char *c1p, const char *c2p)
 					/*	represents */
 
 	while (((l_c1p_ok = stol(l_c1p, '.', &l_c1p, &c1p_dig)) == 1) &&
-		stol(l_c2p, '.', &l_c2p, &c2p_dig) && (c2p_dig == c1p_dig)) {
+	    stol(l_c2p, '.', &l_c2p, &c2p_dig) && (c2p_dig == c1p_dig)) {
 		if (EMPTY(l_c1p) && EMPTY(l_c2p))
 			return (0);
 		else if (EMPTY(l_c1p) && !EMPTY(l_c2p) &&

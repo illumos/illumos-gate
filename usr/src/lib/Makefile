@@ -63,6 +63,7 @@ $(CLOSED_BUILD)SUBDIRS += \
 SUBDIRS += \
 	libc			.WAIT	\
 	../cmd/sgs/libelf	.WAIT	\
+	c_synonyms			\
 	libmd				\
 	libmd5				\
 	librsm				\

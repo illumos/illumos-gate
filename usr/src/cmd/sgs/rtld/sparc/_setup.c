@@ -20,12 +20,15 @@
  */
 
 /*
- *	Copyright (c) 1988 AT&T
- *	  All Rights Reserved
- *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*
+ *	Copyright (c) 1988 AT&T
+ *	  All Rights Reserved
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -38,7 +41,6 @@
  * If errors occur, send process signal - otherwise
  * return executable's entry point to the bootstrap routine.
  */
-#include	"_synonyms.h"
 
 #include	<signal.h>
 #include	<stdlib.h>
@@ -252,6 +254,7 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 #ifdef	A_OUT
 	    aoutdyn, auxflags, hwcap_1)) == (Rt_map *)0) {
 #else
+	    /* CSTYLED */
 	    NULL, auxflags, hwcap_1)) == NULL) {
 #endif	/* A_OUT */
 		rtldexit(&lml_main, 1);

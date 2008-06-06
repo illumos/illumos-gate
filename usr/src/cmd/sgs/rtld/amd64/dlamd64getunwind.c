@@ -30,7 +30,6 @@
  * Block comment which describes the contents of this file.
  */
 
-#include <_synonyms.h>
 #include <string.h>
 #include <dlfcn.h>
 #include <debug.h>
@@ -124,10 +123,10 @@ getunwind_core(Lm_list *lml, void *pc, Dl_amd64_unwindinfo *unwindinfo)
 	return (unwindinfo);
 }
 
-#pragma weak dlamd64getunwind = _dlamd64getunwind
+#pragma weak _dlamd64getunwind = dlamd64getunwind
 
 Dl_amd64_unwindinfo *
-_dlamd64getunwind(void *pc, Dl_amd64_unwindinfo *unwindinfo)
+dlamd64getunwind(void *pc, Dl_amd64_unwindinfo *unwindinfo)
 {
 	Rt_map	*lmp;
 	Lm_list	*lml;

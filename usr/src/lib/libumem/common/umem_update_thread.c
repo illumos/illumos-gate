@@ -26,7 +26,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "c_synonyms.h"
 #include "umem_base.h"
 #include "vmem_base.h"
 

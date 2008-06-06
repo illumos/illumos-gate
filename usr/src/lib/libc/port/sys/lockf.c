@@ -24,10 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -35,7 +35,7 @@
 #define	__lockf		__lockf64
 #endif
 
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>

@@ -18,32 +18,22 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	This routine is a special case, in that it is aware of
  *	both small and large file interfaces. It must be built
  *	in the small compilation environment.
  */
-
-#include <sys/feature_tests.h>
-
-#define	close		_close
-#define	lseek		_lseek
-#define	open		_open
-#if !defined(_LP64)
-#define	lseek64		_lseek64
-#define	open64		_open64
-#endif
 
 #include "lint.h"
 #include "file64.h"

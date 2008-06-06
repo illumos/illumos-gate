@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,12 +29,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak nbra = _nbra
-#pragma weak regerrno = _regerrno
-#pragma weak reglength = _reglength
-#pragma weak compile = __compile
-
-#include "gen_synonyms.h"
 #include <sys/types.h>
 #include <ctype.h>
 #include <limits.h>
@@ -205,7 +199,7 @@ _compile(const char *sp, char *ep, char *endbuf, int viflag)
 	for (;;) {
 		if (ep >= endbuf)
 			ERROR(50);
-		Popwchar
+		Popwchar;
 		if (c != '*' && ((c != '\\') || (PEEKC() != '{')))
 			lastep = ep;
 		if (c == '\0') {
@@ -222,7 +216,7 @@ _compile(const char *sp, char *ep, char *endbuf, int viflag)
 
 		case '*':
 			if (lastep == 0 || *lastep == CBRA ||*lastep == CKET ||
-				*lastep == CBRC || *lastep == CLET)
+			    *lastep == CBRC || *lastep == CLET)
 				goto defchar;
 			*lastep |= STAR;
 			continue;
@@ -246,10 +240,10 @@ _compile(const char *sp, char *ep, char *endbuf, int viflag)
 				ep[i] = 0;
 
 			neg = 0;
-			Popwchar
+			Popwchar;
 			if (c == '^') {
 				neg = 1;
-				Popwchar
+				Popwchar;
 			}
 			if (multibyte) {
 				if (neg) {
@@ -266,7 +260,7 @@ _compile(const char *sp, char *ep, char *endbuf, int viflag)
 				if (c == '\0')
 					ERROR(49);
 				if (c == '-' && lc != 0) {
-					Popwchar
+					Popwchar;
 					if (c == '\0')
 						ERROR(49);
 					if (c == ']') {
@@ -291,14 +285,14 @@ _compile(const char *sp, char *ep, char *endbuf, int viflag)
 						lc = c;
 				} else
 				if (c == '\\' && (viflag & 1) &&
-					strchr("\\^-]", PEEKC())) {
+				    strchr("\\^-]", PEEKC())) {
 					c = GETC();
 					lc = c;
 				} else
 					lc = c;
 				/* put eight bit characters into bitmap */
 				if (!multibyte || c <= 0177 || c <= 0377 &&
-					iscntrl((int)c))
+				    iscntrl((int)c))
 					PLACE(c);
 				else {
 					/*
@@ -311,7 +305,7 @@ _compile(const char *sp, char *ep, char *endbuf, int viflag)
 					while (n--)
 						*start++ = *oldsp++;
 				}
-				Popwchar
+				Popwchar;
 			} while (c != ']');
 
 			if (neg) {
@@ -334,7 +328,7 @@ _compile(const char *sp, char *ep, char *endbuf, int viflag)
 			continue;
 
 		case '\\':
-			Popwchar
+			Popwchar;
 			switch (c) {
 
 			case '(':
@@ -385,7 +379,7 @@ _compile(const char *sp, char *ep, char *endbuf, int viflag)
 					*ep++ = (char)i;
 				else
 				if ((int)(unsigned char)ep[-1] <
-					(int)(unsigned char)ep[-2])
+				    (int)(unsigned char)ep[-2])
 					ERROR(46);
 				continue;
 

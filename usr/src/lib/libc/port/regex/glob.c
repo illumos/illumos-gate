@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This code is MKS code ported to Solaris originally with minimum
@@ -45,10 +43,12 @@
  * Written by Eric Gisin.
  */
 
-#pragma	weak glob = _glob
-#pragma	weak globfree = _globfree
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#pragma	weak _glob = glob
+#pragma	weak _globfree = globfree
+
+#include "lint.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <limits.h>
@@ -136,7 +136,7 @@ glob(const char *pattern, int flags,
 	i = gp->gl_pathc - ipathc;
 	if (i >= 1 && !(flags & GLOB_NOSORT)) {
 		qsort((char *)(gp->gl_pathp+ipathc), i, sizeof (char *),
-			pstrcmp);
+		    pstrcmp);
 	}
 	if (i == 0) {
 		if (flags & GLOB_NOCHECK)
@@ -232,7 +232,7 @@ globit(size_t dend, const char *sp, glob_t *gp, int flags,
 			/* expand path to max. expansion */
 			n = dp - *path;
 			*path = realloc(*path,
-				strlen(*path) + NAME_MAX + strlen(sp) + 1);
+			    strlen(*path) + NAME_MAX + strlen(sp) + 1);
 			if (*path == NULL) {
 				(void) closedir(dirp);
 				free(pat);
@@ -290,7 +290,7 @@ append(glob_t *gp, const char *str)
 	if ((gp->gl_pathc + gp->gl_offs) >= gp->gl_pathn) {
 		gp->gl_pathn *= 2;
 		gp->gl_pathv = (char **)realloc((void *)gp->gl_pathv,
-						gp->gl_pathn * sizeof (char *));
+		    gp->gl_pathn * sizeof (char *));
 		if (gp->gl_pathv == NULLCPP)
 			return (GLOB_NOSPACE);
 		gp->gl_pathp = gp->gl_pathv + gp->gl_offs;

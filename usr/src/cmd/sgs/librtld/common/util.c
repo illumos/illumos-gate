@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,22 +18,23 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 1998 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include	"msg.h"
+#include <libintl.h>
+#include "msg.h"
 
 /*
- * Messaging support - funnel everything through _dgettext() as this provides
- * a stub binding to libc, or a real binding to libintl.
+ * Messaging support - funnel everything through dgettext().
  */
-extern char *	_dgettext(const char *, const char *);
 
 const char *
 _librtld_msg(Msg mid)
 {
-	return (_dgettext(MSG_ORIG(MSG_SUNW_OST_SGS), MSG_ORIG(mid)));
+	return (dgettext(MSG_ORIG(MSG_SUNW_OST_SGS), MSG_ORIG(mid)));
 }

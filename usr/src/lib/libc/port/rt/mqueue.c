@@ -26,20 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak mq_open = _mq_open
-#pragma weak mq_close = _mq_close
-#pragma weak mq_unlink = _mq_unlink
-#pragma weak mq_send = _mq_send
-#pragma weak mq_timedsend = _mq_timedsend
-#pragma weak mq_reltimedsend_np = _mq_reltimedsend_np
-#pragma weak mq_receive = _mq_receive
-#pragma weak mq_timedreceive = _mq_timedreceive
-#pragma weak mq_reltimedreceive_np = _mq_reltimedreceive_np
-#pragma weak mq_notify = _mq_notify
-#pragma weak mq_setattr = _mq_setattr
-#pragma weak mq_getattr = _mq_getattr
-
-#include "synonyms.h"
+#include "lint.h"
 #include "mtlib.h"
 #define	_KMEMUSER
 #include <sys/param.h>		/* _MQ_OPEN_MAX, _MQ_PRIO_MAX, _SEM_VALUE_MAX */
@@ -349,7 +336,7 @@ mq_putmsg(mqhdr_t *mqhp, const char *msgp, ssize_t len, uint_t prio)
 }
 
 mqd_t
-_mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
+mq_open(const char *path, int oflag, /* mode_t mode, mq_attr *attr */ ...)
 {
 	va_list		ap;
 	mode_t		mode;
@@ -568,7 +555,7 @@ mq_close_cleanup(mqdes_t *mqdp)
 }
 
 int
-_mq_close(mqd_t mqdes)
+mq_close(mqd_t mqdes)
 {
 	mqdes_t *mqdp = (mqdes_t *)mqdes;
 	mqhdr_t *mqhp;
@@ -601,7 +588,7 @@ _mq_close(mqd_t mqdes)
 }
 
 int
-_mq_unlink(const char *path)
+mq_unlink(const char *path)
 {
 	int err;
 
@@ -731,14 +718,14 @@ __mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
 }
 
 int
-_mq_send(mqd_t mqdes, const char *msg_ptr, size_t msg_len, uint_t msg_prio)
+mq_send(mqd_t mqdes, const char *msg_ptr, size_t msg_len, uint_t msg_prio)
 {
 	return (__mq_timedsend(mqdes, msg_ptr, msg_len, msg_prio,
 	    NULL, ABS_TIME));
 }
 
 int
-_mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
+mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
 	uint_t msg_prio, const timespec_t *abs_timeout)
 {
 	return (__mq_timedsend(mqdes, msg_ptr, msg_len, msg_prio,
@@ -746,7 +733,7 @@ _mq_timedsend(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
 }
 
 int
-_mq_reltimedsend_np(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
+mq_reltimedsend_np(mqd_t mqdes, const char *msg_ptr, size_t msg_len,
 	uint_t msg_prio, const timespec_t *rel_timeout)
 {
 	return (__mq_timedsend(mqdes, msg_ptr, msg_len, msg_prio,
@@ -843,14 +830,14 @@ __mq_timedreceive(mqd_t mqdes, char *msg_ptr, size_t msg_len,
 }
 
 ssize_t
-_mq_receive(mqd_t mqdes, char *msg_ptr, size_t msg_len, uint_t *msg_prio)
+mq_receive(mqd_t mqdes, char *msg_ptr, size_t msg_len, uint_t *msg_prio)
 {
 	return (__mq_timedreceive(mqdes, msg_ptr, msg_len, msg_prio,
 	    NULL, ABS_TIME));
 }
 
 ssize_t
-_mq_timedreceive(mqd_t mqdes, char *msg_ptr, size_t msg_len,
+mq_timedreceive(mqd_t mqdes, char *msg_ptr, size_t msg_len,
 	uint_t *msg_prio, const timespec_t *abs_timeout)
 {
 	return (__mq_timedreceive(mqdes, msg_ptr, msg_len, msg_prio,
@@ -858,7 +845,7 @@ _mq_timedreceive(mqd_t mqdes, char *msg_ptr, size_t msg_len,
 }
 
 ssize_t
-_mq_reltimedreceive_np(mqd_t mqdes, char *msg_ptr, size_t msg_len,
+mq_reltimedreceive_np(mqd_t mqdes, char *msg_ptr, size_t msg_len,
 	uint_t *msg_prio, const timespec_t *rel_timeout)
 {
 	return (__mq_timedreceive(mqdes, msg_ptr, msg_len, msg_prio,
@@ -866,7 +853,7 @@ _mq_reltimedreceive_np(mqd_t mqdes, char *msg_ptr, size_t msg_len,
 }
 
 /*
- * Only used below, in _mq_notify().
+ * Only used below, in mq_notify().
  * We already have a spawner thread.
  * Verify that the attributes match; cancel it if necessary.
  */
@@ -874,7 +861,7 @@ static int
 cancel_if_necessary(thread_communication_data_t *tcdp,
 	const struct sigevent *sigevp)
 {
-	int do_cancel = !_pthread_attr_equal(tcdp->tcd_attrp,
+	int do_cancel = !pthread_attr_equal(tcdp->tcd_attrp,
 	    sigevp->sigev_notify_attributes);
 
 	if (do_cancel) {
@@ -898,7 +885,7 @@ cancel_if_necessary(thread_communication_data_t *tcdp,
 }
 
 int
-_mq_notify(mqd_t mqdes, const struct sigevent *sigevp)
+mq_notify(mqd_t mqdes, const struct sigevent *sigevp)
 {
 	mqdes_t *mqdp = (mqdes_t *)mqdes;
 	mqhdr_t *mqhp;
@@ -1030,7 +1017,7 @@ bad:
 }
 
 int
-_mq_setattr(mqd_t mqdes, const struct mq_attr *mqstat, struct mq_attr *omqstat)
+mq_setattr(mqd_t mqdes, const struct mq_attr *mqstat, struct mq_attr *omqstat)
 {
 	mqdes_t *mqdp = (mqdes_t *)mqdes;
 	mqhdr_t *mqhp;
@@ -1062,7 +1049,7 @@ _mq_setattr(mqd_t mqdes, const struct mq_attr *mqstat, struct mq_attr *omqstat)
 }
 
 int
-_mq_getattr(mqd_t mqdes, struct mq_attr *mqstat)
+mq_getattr(mqd_t mqdes, struct mq_attr *mqstat)
 {
 	mqdes_t *mqdp = (mqdes_t *)mqdes;
 	mqhdr_t *mqhp;

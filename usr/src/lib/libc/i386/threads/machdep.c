@@ -70,7 +70,7 @@ setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
 	 * to pass down self pointer and set %gs selector
 	 * value so __lwp_create() can setup %gs atomically.
 	 * Without this we would need to block all signals
-	 * and directly call __lwp_setprivate() in _thr_setup
+	 * and directly call ___lwp_private() in _thrp_setup
 	 * on the other side of __lwp_create().
 	 */
 	ucp->uc_mcontext.gregs[ESP] = (greg_t)ulwp;
@@ -98,7 +98,7 @@ setup_context(ucontext_t *ucp, void *(*func)(ulwp_t *),
  * Machine-dependent startup code for a newly-created thread.
  */
 void *
-_thr_setup(ulwp_t *self)
+_thrp_setup(ulwp_t *self)
 {
 	self->ul_ustack.ss_sp = (void *)(self->ul_stktop - self->ul_stksiz);
 	self->ul_ustack.ss_size = self->ul_stksiz;

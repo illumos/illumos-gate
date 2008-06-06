@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,22 +28,17 @@
 
 	.file	"%M%"
 
-#include <sys/asm_linkage.h>
+#include "SYS.h"
 #include <sys/trap.h>
 
 	ANSI_PRAGMA_WEAK(syscall,function)
 
-#include "SYS.h"
-
-#undef _syscall		/* override "synonyms.h" */
-#undef __systemcall
-
 /*
- * See sparc/sys/syscall.s to understand why __syscall6() exists.
+ * See sparc/sys/syscall.s to understand why _syscall6() exists.
  * On x86, the implementation of the two are the same, the only
- * difference being that __syscall6 is not an exported symbol.
+ * difference being that _syscall6 is not an exported symbol.
  */
-	ENTRY2(_syscall,_syscall6)
+	ENTRY2(syscall,_syscall6)
 	popl	%edx		/ return address
 	popl	%eax		/ system call number
 	pushl	%edx
@@ -63,7 +58,7 @@
 	pushl	%edx		/ restore the return address
 	SYSCERROR
 	ret
-	SET_SIZE(_syscall)
+	SET_SIZE(syscall)
 	SET_SIZE(_syscall6)
 
 /*

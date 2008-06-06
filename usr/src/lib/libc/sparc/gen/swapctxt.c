@@ -29,9 +29,9 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak swapcontext = _swapcontext
+#pragma weak _swapcontext = swapcontext
 
-#include "synonyms.h"
+#include "lint.h"
 #include "thr_uberdata.h"
 #include <ucontext.h>
 #include <sys/types.h>

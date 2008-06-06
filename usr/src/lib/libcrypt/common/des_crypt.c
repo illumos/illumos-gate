@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,13 +28,11 @@
 /*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-/*LINTLIBRARY*/
 
-#pragma weak des_crypt = _des_crypt
-#pragma weak des_encrypt = _des_encrypt
-#pragma weak des_setkey = _des_setkey
+#pragma weak _des_crypt = des_crypt
+#pragma weak _des_encrypt = des_encrypt
+#pragma weak _des_setkey = des_setkey
 
-#include "des_synonyms.h"
 #include <sys/types.h>
 #include <crypt.h>
 #include "des_soft.h"
@@ -305,7 +303,7 @@ des_encrypt_nolock(char *block, int edflag)
 /* EXPORT DELETE START */
 
 	if (edflag)
-		(void) des_decrypt1(block, L, IP, &L[32],
+		(void) _des_decrypt1(block, L, IP, &L[32],
 		    preS, E, KS, S, f, tempL, P, FP);
 	else
 		(void) des_encrypt1(block, L, IP, &L[32],

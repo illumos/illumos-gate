@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -273,15 +273,15 @@ _nss_dns_setent(be, dummy)
 	 */
 	if (enable_mt == 0 || (mt_disabled = (*enable_mt)()) != 0) {
 		(void) sigfillset(&newmask);
-		_thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
-		_mutex_lock(&one_lane);
+		(void) thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
+		(void) mutex_lock(&one_lane);
 	}
 
 	_sethostent(&errp, 1);
 
 	if (mt_disabled) {
-		_mutex_unlock(&one_lane);
-		_thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
+		(void) mutex_unlock(&one_lane);
+		(void) thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
 	} else {
 		(void) (*disable_mt)();
 	}
@@ -307,15 +307,15 @@ _nss_dns_endent(be, dummy)
 	 */
 	if (enable_mt == 0 || (mt_disabled = (*enable_mt)()) != 0) {
 		(void) sigfillset(&newmask);
-		_thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
-		_mutex_lock(&one_lane);
+		(void) thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
+		(void) mutex_lock(&one_lane);
 	}
 
 	_endhostent(&errp);
 
 	if (mt_disabled) {
-		_mutex_unlock(&one_lane);
-		_thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
+		(void) mutex_unlock(&one_lane);
+		(void) thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
 	} else {
 		(void) (*disable_mt)();
 	}
@@ -339,15 +339,15 @@ _nss_dns_destr(be, dummy)
 
 		if (enable_mt == 0 || (mt_disabled = (*enable_mt)()) != 0) {
 			(void) sigfillset(&newmask);
-			_thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
-			_mutex_lock(&one_lane);
+			(void) thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
+			(void) mutex_lock(&one_lane);
 		}
 
 		_endhostent(&errp);
 
 		if (mt_disabled) {
-			_mutex_unlock(&one_lane);
-			_thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
+			(void) mutex_unlock(&one_lane);
+			(void) thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
 		} else {
 			(void) (*disable_mt)();
 		}

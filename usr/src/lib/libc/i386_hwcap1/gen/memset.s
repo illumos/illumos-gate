@@ -24,15 +24,13 @@
  * Use is subject to license terms.
  */
 
-	.ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 	.file	"%M%"
 
 #include <sys/asm_linkage.h>
 
 	ANSI_PRAGMA_WEAK(memset,function)
-
-#include "SYS.h"
 
 	ENTRY(memset)
 	pushl	%edi		/ save register variable

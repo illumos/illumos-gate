@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-	.ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 	.file	"%M%"
 
@@ -32,8 +32,6 @@
 
 	ANSI_PRAGMA_WEAK(memmove,function)
 	ANSI_PRAGMA_WEAK(memcpy,function)
-
-#include "SYS.h"
 
 	ENTRY(memmove)
 	movl	0+12(%esp),%ecx	/ get number of bytes to move

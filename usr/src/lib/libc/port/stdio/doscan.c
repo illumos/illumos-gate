@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,18 +18,18 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#include "lint.h"
 #include <sys/types.h>
 #include "mtlib.h"
 #include "file64.h"
@@ -738,7 +737,7 @@ number(int *chcount, int *flag_eof, int stow, int type, int len, int size,
 		if ((type != 'i' && type != 'x') || (len <= 1))
 			break;
 		if (((inchar = locgetc((*chcount))) == 'x') ||
-			(inchar == 'X')) {
+		    (inchar == 'X')) {
 			lookahead = readchar(iop, chcount);
 			if (isxdigit(lookahead)) {
 				base = 16;
@@ -765,12 +764,12 @@ number(int *chcount, int *flag_eof, int stow, int type, int len, int size,
 	}
 	for (; --len  >= 0; *np++ = (char)c, c = locgetc((*chcount))) {
 		if (np > numbuf + 62) {
-		    errno = ERANGE;
-		    return (0);
+			errno = ERANGE;
+			return (0);
 		}
 		if (isdigit(c) || base == 16 && isxdigit(c)) {
 			int digit = c - (isdigit(c) ? '0' :
-				isupper(c) ? 'A' - 10 : 'a' - 10);
+			    isupper(c) ? 'A' - 10 : 'a' - 10);
 			if (digit >= base)
 				break;
 			if (stow)
@@ -804,7 +803,7 @@ number(int *chcount, int *flag_eof, int stow, int type, int len, int size,
 		}
 	}
 	if (locungetc((*chcount), c) == EOF)
-	    *flag_eof = 1;
+		*flag_eof = 1;
 	return (digitseen); /* successful match if non-zero */
 }
 
@@ -842,11 +841,11 @@ string(int *chcount, int *flag_eof, int stow, int type, int len, char *tab,
 		len = 1;
 #ifdef	_WIDE
 	while ((ch = locgetc((*chcount))) != EOF &&
-		!(((type == 's') || (type == 'S')) && isspace(ch))) {
+	    !(((type == 's') || (type == 'S')) && isspace(ch))) {
 #else  /* _WIDE */
 	while ((ch = locgetc((*chcount))) != EOF &&
-		!(((type == 's') || (type == 'S')) &&
-			isspace(ch) || type == '[' && tab[ch])) {
+	    !(((type == 's') || (type == 'S')) &&
+	    isspace(ch) || type == '[' && tab[ch])) {
 #endif /* _WIDE */
 		if (stow)
 			*ptr = (char)ch;
@@ -973,7 +972,7 @@ wstring(int *chcount, int *flag_eof, int stow, int type,
 	if ((type == 'c') && len == MAXINT)
 		len = 1;
 	while (((wch = _wd_getwc(chcount, iop)) != WEOF) &&
-		!(type == 's' && iswspace(wch))) {
+	    !(type == 's' && iswspace(wch))) {
 		if (stow)
 			*ptr = wch;
 		ptr++;
@@ -1007,7 +1006,7 @@ wstring(int *chcount, int *flag_eof, int stow, int type, int len, FILE *iop,
 	if ((type == 'c') && len == MAXINT)
 		len = 1;
 	while (((wch = _bi_getwc(iop)) != EOF) &&
-		!(type == 's' && (isascii(wch) ? isspace(wch) : 0))) {
+	    !(type == 's' && (isascii(wch) ? isspace(wch) : 0))) {
 		(*chcount) += _scrwidth((wchar_t)wch);
 		if (stow)
 			*ptr = wch;
@@ -1047,7 +1046,7 @@ _wd_getwc(int *chcount, FILE *iop)
 		if (*iop->_ptr == '\0')
 			return (WEOF);
 		len = mbtowc((wchar_t *)&wc, (const char *)iop->_ptr,
-								MB_CUR_MAX);
+		    MB_CUR_MAX);
 		if (len == -1)
 			return (WEOF);
 		iop->_ptr += len;
@@ -1094,7 +1093,7 @@ _watoi(wchar_t *fmt)
 	if ((ch >= 0) && (ch < 256) && isdigit((int)ch)) {
 		n = ch - '0';
 		while (((ch = *++fmt) >= 0) && (ch < 256) &&
-				isdigit((int)ch)) {
+		    isdigit((int)ch)) {
 			n *= 10;
 			n += ch - '0';
 		}
@@ -1129,7 +1128,7 @@ wbrstring(int *chcount, int *flag_eof, int stow, int type,
 		}
 		str[i] = '\0';
 		if (fnmatch((const char *)brstr, (const char *)str,
-			FNM_NOESCAPE)) {
+		    FNM_NOESCAPE)) {
 			break;
 		} else {
 			if (len > 0) {
@@ -1188,7 +1187,7 @@ brstring(int *chcount, int *flag_eof, int stow, int type,
 		}
 		str[i] = '\0';
 		if (fnmatch((const char *)brstr, (const char *)str,
-			FNM_NOESCAPE)) {
+		    FNM_NOESCAPE)) {
 			break;
 		} else {
 			if (len >= i) {

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1994, by Sun Microsytems, Inc.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -65,7 +66,6 @@
 
 extern void thr_probe_setup(void *);
 #pragma weak thr_probe_setup
-extern int _thr_main(void);
 
 /*
  * Globals
@@ -153,7 +153,7 @@ _tnf_trace_initialize(void)
 	 */
 
 	if ((((int(*)())dlsym(RTLD_DEFAULT, "thr_probe_setup")) != NULL) &&
-			(_thr_main() == -1)) {
+	    (thr_main() == -1)) {
 		return (0);
 	}
 
@@ -182,7 +182,7 @@ _tnf_trace_initialize(void)
 			}
 			/* try creating it rather than opening it */
 			fd = open(tnf_trace_file_name,
-				O_CREAT | O_RDWR | O_TRUNC, TNF_FILE_MODE);
+			    O_CREAT | O_RDWR | O_TRUNC, TNF_FILE_MODE);
 			if (fd < 0) {
 				goto SetBroken;
 			}
@@ -204,8 +204,7 @@ _tnf_trace_initialize(void)
 
 	/* mmap the file */
 	if ((file_start = mmap(0, tnf_trace_file_size,
-				PROT_READ | PROT_WRITE, MAP_SHARED,
-				fd, 0)) == (caddr_t) - 1) {
+	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)) == (caddr_t)-1) {
 		goto SetBroken;
 	}
 	if (created_file == 1) {
@@ -215,7 +214,7 @@ _tnf_trace_initialize(void)
 	_tnfw_b_control->tnf_buffer = file_start;
 
 	if (tnfw_b_init_buffer(file_start, tnf_trace_file_size / TNF_BLOCK_SIZE,
-				TNF_BLOCK_SIZE, B_TRUE) != TNFW_B_OK) {
+	    TNF_BLOCK_SIZE, B_TRUE) != TNFW_B_OK) {
 		goto SetBroken;
 	}
 
@@ -236,7 +235,7 @@ SetBroken:
  */
 
 void
-_tnf_sched_init(tnf_schedule_t * sched, hrtime_t t)
+_tnf_sched_init(tnf_schedule_t *sched, hrtime_t t)
 {
 	thread_t tid = 0;
 

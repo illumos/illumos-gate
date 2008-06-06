@@ -26,10 +26,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak sbrk = _sbrk
-#pragma weak brk = _brk
+#pragma weak _sbrk = sbrk
+#pragma weak _brk = brk
 
-#include "synonyms.h"
+#include "lint.h"
 #include <synch.h>
 #include <errno.h>
 #include <sys/isa_defs.h>
@@ -45,7 +45,7 @@ void *_nd = &_end;
 mutex_t __sbrk_lock = DEFAULTMUTEX;
 
 extern int _brk_unlocked(void *);
-static void *_sbrk_unlocked(intptr_t);
+extern void *_sbrk_unlocked(intptr_t);
 
 /*
  * The break must always be at least 8-byte aligned
@@ -84,7 +84,7 @@ sbrk(intptr_t addend)
  *   - the addend is negative and brk + addend < 0.
  *   - the addend is positive and brk + addend > ULONG_MAX
  */
-static void *
+void *
 _sbrk_unlocked(intptr_t addend)
 {
 	char *old_brk = BRKALIGN(_nd);

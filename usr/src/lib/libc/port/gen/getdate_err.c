@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,28 +18,30 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak getdate_err = _getdate_err
+#pragma weak _getdate_err = getdate_err
 
-#include "synonyms.h"
+#include "lint.h"
 #include <mtlib.h>
 #include <time.h>
 #include <thread.h>
 #include <libc.h>
 #include "tsd.h"
 
-int _getdate_err = 0;
+#undef getdate_err
+int getdate_err = 0;
 
 int *
 _getdate_err_addr(void)
 {
-	if (_thr_main())
-		return (&_getdate_err);
+	if (thr_main())
+		return (&getdate_err);
 	return ((int *)tsdalloc(_T_GETDATE_ERR_ADDR, sizeof (int), NULL));
 }

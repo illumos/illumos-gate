@@ -18,22 +18,22 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* vlfmt() - format, print and log (variable arguments) */
 
-#pragma	weak vlfmt = _vlfmt
+#pragma	weak _vlfmt = vlfmt
 
-#include "synonyms.h"
+#include "lint.h"
 #include "mtlib.h"
 #include <sys/types.h>
 #include <pfmt.h>

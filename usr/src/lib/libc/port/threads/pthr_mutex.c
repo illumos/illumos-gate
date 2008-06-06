@@ -34,9 +34,9 @@
  * pthread_mutexattr_init: allocates the mutex attribute object and
  * initializes it with the default values.
  */
-#pragma weak pthread_mutexattr_init = _pthread_mutexattr_init
+#pragma weak _pthread_mutexattr_init = pthread_mutexattr_init
 int
-_pthread_mutexattr_init(pthread_mutexattr_t *attr)
+pthread_mutexattr_init(pthread_mutexattr_t *attr)
 {
 	mattr_t	*ap;
 
@@ -54,9 +54,8 @@ _pthread_mutexattr_init(pthread_mutexattr_t *attr)
  * pthread_mutexattr_destroy: frees the mutex attribute object and
  * invalidates it with NULL value.
  */
-#pragma weak pthread_mutexattr_destroy =  _pthread_mutexattr_destroy
 int
-_pthread_mutexattr_destroy(pthread_mutexattr_t *attr)
+pthread_mutexattr_destroy(pthread_mutexattr_t *attr)
 {
 	if (attr == NULL || attr->__pthread_mutexattrp == NULL)
 		return (EINVAL);
@@ -71,9 +70,8 @@ _pthread_mutexattr_destroy(pthread_mutexattr_t *attr)
  * This is equivalent to setting the USYNC_THREAD/USYNC_PROCESS
  * flag in mutex_init().
  */
-#pragma weak pthread_mutexattr_setpshared =  _pthread_mutexattr_setpshared
 int
-_pthread_mutexattr_setpshared(pthread_mutexattr_t *attr, int pshared)
+pthread_mutexattr_setpshared(pthread_mutexattr_t *attr, int pshared)
 {
 	mattr_t	*ap;
 
@@ -88,9 +86,9 @@ _pthread_mutexattr_setpshared(pthread_mutexattr_t *attr, int pshared)
 /*
  * pthread_mutexattr_getpshared: gets the shared attribute.
  */
-#pragma weak pthread_mutexattr_getpshared =  _pthread_mutexattr_getpshared
+#pragma weak _pthread_mutexattr_getpshared = pthread_mutexattr_getpshared
 int
-_pthread_mutexattr_getpshared(const pthread_mutexattr_t *attr, int *pshared)
+pthread_mutexattr_getpshared(const pthread_mutexattr_t *attr, int *pshared)
 {
 	mattr_t	*ap;
 
@@ -104,10 +102,8 @@ _pthread_mutexattr_getpshared(const pthread_mutexattr_t *attr, int *pshared)
 /*
  * pthread_mutexattr_setprioceiling: sets the prioceiling attribute.
  */
-#pragma weak pthread_mutexattr_setprioceiling = \
-					_pthread_mutexattr_setprioceiling
 int
-_pthread_mutexattr_setprioceiling(pthread_mutexattr_t *attr, int prioceiling)
+pthread_mutexattr_setprioceiling(pthread_mutexattr_t *attr, int prioceiling)
 {
 	const pcclass_t *pccp = get_info_by_policy(SCHED_FIFO);
 	mattr_t	*ap;
@@ -122,10 +118,10 @@ _pthread_mutexattr_setprioceiling(pthread_mutexattr_t *attr, int prioceiling)
 /*
  * pthread_mutexattr_getprioceiling: gets the prioceiling attribute.
  */
-#pragma weak pthread_mutexattr_getprioceiling = \
-					_pthread_mutexattr_getprioceiling
+#pragma weak _pthread_mutexattr_getprioceiling = \
+			pthread_mutexattr_getprioceiling
 int
-_pthread_mutexattr_getprioceiling(const pthread_mutexattr_t *attr, int *ceiling)
+pthread_mutexattr_getprioceiling(const pthread_mutexattr_t *attr, int *ceiling)
 {
 	mattr_t	*ap;
 
@@ -139,9 +135,8 @@ _pthread_mutexattr_getprioceiling(const pthread_mutexattr_t *attr, int *ceiling)
 /*
  * pthread_mutexattr_setprotocol: sets the protocol attribute.
  */
-#pragma weak pthread_mutexattr_setprotocol =  _pthread_mutexattr_setprotocol
 int
-_pthread_mutexattr_setprotocol(pthread_mutexattr_t *attr, int protocol)
+pthread_mutexattr_setprotocol(pthread_mutexattr_t *attr, int protocol)
 {
 	mattr_t	*ap;
 
@@ -158,9 +153,9 @@ _pthread_mutexattr_setprotocol(pthread_mutexattr_t *attr, int protocol)
 /*
  * pthread_mutexattr_getprotocol: gets the protocol attribute.
  */
-#pragma weak pthread_mutexattr_getprotocol =  _pthread_mutexattr_getprotocol
+#pragma weak _pthread_mutexattr_getprotocol = pthread_mutexattr_getprotocol
 int
-_pthread_mutexattr_getprotocol(const pthread_mutexattr_t *attr, int *protocol)
+pthread_mutexattr_getprotocol(const pthread_mutexattr_t *attr, int *protocol)
 {
 	mattr_t	*ap;
 
@@ -175,10 +170,8 @@ _pthread_mutexattr_getprotocol(const pthread_mutexattr_t *attr, int *protocol)
  * pthread_mutexattr_setrobust_np: sets the robustness attribute
  * to PTHREAD_MUTEX_ROBUST_NP or PTHREAD_MUTEX_STALL_NP.
  */
-#pragma weak pthread_mutexattr_setrobust_np = \
-					_pthread_mutexattr_setrobust_np
 int
-_pthread_mutexattr_setrobust_np(pthread_mutexattr_t *attr, int robust)
+pthread_mutexattr_setrobust_np(pthread_mutexattr_t *attr, int robust)
 {
 	mattr_t	*ap;
 
@@ -193,10 +186,8 @@ _pthread_mutexattr_setrobust_np(pthread_mutexattr_t *attr, int robust)
 /*
  * pthread_mutexattr_getrobust_np: gets the robustness attribute.
  */
-#pragma weak pthread_mutexattr_getrobust_np = \
-					_pthread_mutexattr_getrobust_np
 int
-_pthread_mutexattr_getrobust_np(const pthread_mutexattr_t *attr, int *robust)
+pthread_mutexattr_getrobust_np(const pthread_mutexattr_t *attr, int *robust)
 {
 	mattr_t	*ap;
 
@@ -211,9 +202,10 @@ _pthread_mutexattr_getrobust_np(const pthread_mutexattr_t *attr, int *robust)
  * pthread_mutex_init: Initializes the mutex object.  It copies the
  * various attributes into one type argument and calls mutex_init().
  */
-#pragma weak pthread_mutex_init = _pthread_mutex_init
+#pragma weak _pthread_mutex_init = pthread_mutex_init
 int
-_pthread_mutex_init(pthread_mutex_t *mutex, pthread_mutexattr_t *attr)
+pthread_mutex_init(pthread_mutex_t *_RESTRICT_KYWD mutex,
+    const pthread_mutexattr_t *_RESTRICT_KYWD attr)
 {
 	mattr_t *ap;
 	int	type;
@@ -245,9 +237,8 @@ _pthread_mutex_init(pthread_mutex_t *mutex, pthread_mutexattr_t *attr)
  * We pass the MUTEX_NOCEIL flag to mutex_lock_internal() so that
  * a non-realtime thread can successfully execute this operation.
  */
-#pragma weak pthread_mutex_setprioceiling =  _pthread_mutex_setprioceiling
 int
-_pthread_mutex_setprioceiling(pthread_mutex_t *mutex, int ceil, int *oceil)
+pthread_mutex_setprioceiling(pthread_mutex_t *mutex, int ceil, int *oceil)
 {
 	mutex_t *mp = (mutex_t *)mutex;
 	const pcclass_t *pccp = get_info_by_policy(SCHED_FIFO);
@@ -269,9 +260,9 @@ _pthread_mutex_setprioceiling(pthread_mutex_t *mutex, int ceil, int *oceil)
 /*
  * pthread_mutex_getprioceiling: gets the prioceiling.
  */
-#pragma weak pthread_mutex_getprioceiling =  _pthread_mutex_getprioceiling
+#pragma weak _pthread_mutex_getprioceiling = pthread_mutex_getprioceiling
 int
-_pthread_mutex_getprioceiling(const pthread_mutex_t *mp, int *ceiling)
+pthread_mutex_getprioceiling(const pthread_mutex_t *mp, int *ceiling)
 {
 	*ceiling = ((mutex_t *)mp)->mutex_ceiling;
 	return (0);
@@ -281,9 +272,8 @@ _pthread_mutex_getprioceiling(const pthread_mutex_t *mp, int *ceiling)
  * UNIX98
  * pthread_mutexattr_settype: sets the type attribute
  */
-#pragma weak pthread_mutexattr_settype =  _pthread_mutexattr_settype
 int
-_pthread_mutexattr_settype(pthread_mutexattr_t *attr, int type)
+pthread_mutexattr_settype(pthread_mutexattr_t *attr, int type)
 {
 	mattr_t	*ap;
 
@@ -310,9 +300,8 @@ _pthread_mutexattr_settype(pthread_mutexattr_t *attr, int type)
  * UNIX98
  * pthread_mutexattr_gettype: gets the type attribute.
  */
-#pragma weak pthread_mutexattr_gettype =  _pthread_mutexattr_gettype
 int
-_pthread_mutexattr_gettype(const pthread_mutexattr_t *attr, int *typep)
+pthread_mutexattr_gettype(const pthread_mutexattr_t *attr, int *typep)
 {
 	mattr_t	*ap;
 	int type;

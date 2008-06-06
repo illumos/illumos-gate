@@ -18,11 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 /*
  * nis_common.c
@@ -163,14 +163,14 @@ _nss_nis_ypmatch(domain, map, key, valp, vallenp, ypstatusp)
 	sigset_t		oldmask, newmask;
 
 	(void) sigfillset(&newmask);
-	_thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
-	_mutex_lock(&one_lane);
+	(void) thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
+	(void) mutex_lock(&one_lane);
 #endif
 	ypstatus = __yp_match_cflookup((grrr)domain, (grrr)map,
 			    (grrr)key, (int)strlen(key), valp, vallenp, 0);
 #if	MT_UNSAFE_YP
-	_mutex_unlock(&one_lane);
-	_thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
+	(void) mutex_unlock(&one_lane);
+	(void) thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
 #endif
 
 	if (ypstatusp != 0) {
@@ -199,14 +199,14 @@ _nss_nis_ypmatch_rsvdport(domain, map, key, valp, vallenp, ypstatusp)
 	sigset_t		oldmask, newmask;
 
 	(void) sigfillset(&newmask);
-	_thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
-	_mutex_lock(&one_lane);
+	(void) thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
+	(void) mutex_lock(&one_lane);
 #endif
 	ypstatus = __yp_match_rsvdport_cflookup((grrr)domain, (grrr)map,
 			    (grrr)key, strlen(key), valp, vallenp, 0);
 #if	MT_UNSAFE_YP
-	_mutex_unlock(&one_lane);
-	_thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
+	(void) mutex_unlock(&one_lane);
+	(void) thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
 #endif
 
 	if (ypstatusp != 0) {
@@ -322,8 +322,8 @@ do_getent(be, args, netdb)
 	sigset_t		oldmask, newmask;
 
 	(void) sigfillset(&newmask);
-	_thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
-	_mutex_lock(&one_lane);
+	(void) thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
+	(void) mutex_lock(&one_lane);
 #endif
 	if (be->enum_key == 0) {
 		ypstatus = __yp_first_cflookup((grrr)be->domain,
@@ -338,8 +338,8 @@ do_getent(be, args, netdb)
 					    &outvallen, 0);
 	}
 #if	MT_UNSAFE_YP
-	_mutex_unlock(&one_lane);
-	_thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
+	(void) mutex_unlock(&one_lane);
+	(void) thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
 #endif
 
 	if ((res = switch_err(ypstatus, 0)) != NSS_SUCCESS) {
@@ -461,14 +461,14 @@ _nss_nis_do_all(be, args, filter, func)
 	sigset_t		oldmask, newmask;
 
 	(void) sigfillset(&newmask);
-	_thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
-	_mutex_lock(&one_lane);
+	(void) thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
+	(void) mutex_lock(&one_lane);
 #endif
 	ypall_status = __yp_all_cflookup((grrr)be->domain,
 			(grrr) be->enum_map, &cback, 0);
 #if	MT_UNSAFE_YP
-	_mutex_unlock(&one_lane);
-	_thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
+	(void) mutex_unlock(&one_lane);
+	(void) thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
 #endif
 
 	switch (ypall_status) {
@@ -579,23 +579,23 @@ _nss_nis_domain()
 	sigset_t		oldmask, newmask;
 
 	(void) sigfillset(&newmask);
-	(void) _thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
-	(void) _mutex_lock(&yp_domain_lock);
+	(void) thr_sigsetmask(SIG_SETMASK, &newmask, &oldmask);
+	(void) mutex_lock(&yp_domain_lock);
 
 	if ((domain = yp_domain) == 0) {
 #if	MT_UNSAFE_YP
-		_mutex_lock(&one_lane);
+		(void) mutex_lock(&one_lane);
 #endif
 		if (yp_get_default_domain(&yp_domain) == 0) {
 			domain = yp_domain;
 		}
 #if	MT_UNSAFE_YP
-		_mutex_unlock(&one_lane);
+		(void) mutex_unlock(&one_lane);
 #endif
 	}
 
-	_mutex_unlock(&yp_domain_lock);
-	_thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
+	(void) mutex_unlock(&yp_domain_lock);
+	(void) thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
 
 	return (domain);
 }
@@ -667,7 +667,7 @@ _nss_nis_check_name_aliases(nss_XbyY_args_t *argp, const char *line,
 		/* compare with the alias name */
 		keyp = argp->key.name;
 		while (*keyp && linep < limit && !isspace(*linep) &&
-				*keyp == *linep) {
+		    *keyp == *linep) {
 			keyp++;
 			linep++;
 		}

@@ -19,15 +19,15 @@
  * CDDL HEADER END
  */
 
-/* LINTLIBRARY */
-/* PROTOLIB1 */
-
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/* LINTLIBRARY */
+/* PROTOLIB1 */
 
 #include <sys/types.h>
 #include <thread.h>
@@ -544,7 +544,7 @@ int t_sndrel(int);
 int t_sndudata(int, struct t_unitdata *);
 
 /* t_strerror.c */
-char *_t_strerror(int);
+char *t_strerror(int);
 
 /* t_sync.c */
 int t_sync(int);

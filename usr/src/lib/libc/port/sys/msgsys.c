@@ -24,18 +24,17 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma weak msgctl = _msgctl
-#pragma weak msgctl64 = _msgctl64
-#pragma weak msgget = _msgget
-#pragma weak msgids = _msgids
-#pragma weak msgsnap = _msgsnap
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#pragma weak _msgctl = msgctl
+#pragma weak _msgget = msgget
+#pragma weak _msgids = msgids
+#pragma weak _msgsnap = msgsnap
+
+#include "lint.h"
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/ipc_impl.h>

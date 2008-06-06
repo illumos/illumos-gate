@@ -165,7 +165,6 @@
  *			CI_* via RTLDINFO and _ld_libc()  - new libthread
  */
 
-#include "_synonyms.h"
 #include <sys/debug.h>
 #include <synch.h>
 #include <signal.h>
@@ -502,44 +501,32 @@ rt_cond_broadcast(Rt_cond * cvp)
  * libc_pic.a.  Note, as ld.so.1 is essentially single threaded these can be
  * noops.
  */
-#pragma weak lmutex_lock = __mutex_lock
-#pragma weak _private_mutex_lock = __mutex_lock
-#pragma weak mutex_lock = __mutex_lock
-#pragma weak _mutex_lock = __mutex_lock
+#pragma weak lmutex_lock = mutex_lock
 /* ARGSUSED */
 int
-__mutex_lock(mutex_t *mp)
+mutex_lock(mutex_t *mp)
 {
 	return (0);
 }
 
-#pragma weak lmutex_unlock = __mutex_unlock
-#pragma weak _private_mutex_unlock = __mutex_unlock
-#pragma weak mutex_unlock = __mutex_unlock
-#pragma weak _mutex_unlock = __mutex_unlock
+#pragma weak lmutex_unlock = mutex_unlock
 /* ARGSUSED */
 int
-__mutex_unlock(mutex_t *mp)
+mutex_unlock(mutex_t *mp)
 {
 	return (0);
 }
 
-#pragma weak _private_mutex_init = __mutex_init
-#pragma weak mutex_init = __mutex_init
-#pragma weak _mutex_init = __mutex_init
 /* ARGSUSED */
 int
-__mutex_init(mutex_t *mp, int type, void *arg)
+mutex_init(mutex_t *mp, int type, void *arg)
 {
 	return (0);
 }
 
-#pragma weak _private_mutex_destroy = __mutex_destroy
-#pragma weak mutex_destroy = __mutex_destroy
-#pragma weak _mutex_destroy = __mutex_destroy
 /* ARGSUSED */
 int
-__mutex_destroy(mutex_t *mp)
+mutex_destroy(mutex_t *mp)
 {
 	return (0);
 }
@@ -547,9 +534,8 @@ __mutex_destroy(mutex_t *mp)
 /*
  * This is needed to satisfy sysconf() (case _SC_THREAD_STACK_MIN)
  */
-#pragma weak thr_min_stack = _thr_min_stack
 size_t
-_thr_min_stack()
+thr_min_stack()
 {
 #ifdef _LP64
 	return (8 * 1024);
@@ -566,18 +552,16 @@ _thr_min_stack()
  * non-cancellation interfaces.
  */
 
-#pragma weak close = _close
 int
-_close(int fildes)
+close(int fildes)
 {
 	extern int __close(int);
 
 	return (__close(fildes));
 }
 
-#pragma weak fcntl = _fcntl
 int
-_fcntl(int fildes, int cmd, ...)
+fcntl(int fildes, int cmd, ...)
 {
 	extern int __fcntl(int, int, ...);
 	intptr_t arg;
@@ -589,9 +573,8 @@ _fcntl(int fildes, int cmd, ...)
 	return (__fcntl(fildes, cmd, arg));
 }
 
-#pragma weak open = _open
 int
-_open(const char *path, int oflag, ...)
+open(const char *path, int oflag, ...)
 {
 	extern int __open(const char *, int, ...);
 	mode_t mode;
@@ -603,9 +586,8 @@ _open(const char *path, int oflag, ...)
 	return (__open(path, oflag, mode));
 }
 
-#pragma weak openat = _openat
 int
-_openat(int fd, const char *path, int oflag, ...)
+openat(int fd, const char *path, int oflag, ...)
 {
 	extern int __openat(int, const char *, int, ...);
 	mode_t mode;
@@ -617,17 +599,15 @@ _openat(int fd, const char *path, int oflag, ...)
 	return (__openat(fd, path, oflag, mode));
 }
 
-#pragma weak read = _read
 ssize_t
-_read(int fd, void *buf, size_t size)
+read(int fd, void *buf, size_t size)
 {
 	extern ssize_t __read(int, void *, size_t);
 	return (__read(fd, buf, size));
 }
 
-#pragma weak write = _write
 ssize_t
-_write(int fd, const void *buf, size_t size)
+write(int fd, const void *buf, size_t size)
 {
 	extern ssize_t __write(int, const void *, size_t);
 	return (__write(fd, buf, size));
