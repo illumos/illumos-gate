@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,7 +107,7 @@ socksdpv_open(struct vnode **vpp, int flag, struct cred *cr,
 	struct sonode *so;
 	struct sdp_sonode *ss;
 	struct vnode *vp = *vpp;
-	int error = 0;
+	int error = EPROTONOSUPPORT;	/* in case sdpib fails to load */
 	sdp_sockbuf_limits_t sbl;
 	sdp_upcalls_t *upcalls;
 
@@ -133,9 +133,16 @@ socksdpv_open(struct vnode **vpp, int flag, struct cred *cr,
 	 */
 	upcalls = &sosdp_sock_upcalls;
 
+	/*
+	 * When the necessary hardware is not available, the sdp_create stub
+	 * will evaluate to nomod_zero, which leaves 'error' untouched. Hence
+	 * the EPROTONOSUPPORT above. A successful call to sdp_create clears
+	 * the error.
+	 */
 	so->so_priv = sdp_create(ss, NULL, so->so_family, SDP_CAN_BLOCK,
 	    upcalls, &sbl, cr, &error);
 	if (so->so_priv == NULL) {
+		ASSERT(error != 0);
 		mutex_enter(&so->so_lock);
 		ASSERT(so->so_count > 0);
 		so->so_count--;		/* one less open reference */
