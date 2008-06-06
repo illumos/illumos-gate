@@ -1333,8 +1333,8 @@ zpool_do_import(int argc, char **argv)
 	boolean_t do_force = B_FALSE;
 	nvpair_t *elem;
 	nvlist_t *config;
-	uint64_t searchguid;
-	char *searchname;
+	uint64_t searchguid = 0;
+	char *searchname = NULL;
 	char *propval;
 	nvlist_t *found_config;
 	nvlist_t *props = NULL;
@@ -1447,18 +1447,7 @@ zpool_do_import(int argc, char **argv)
 		}
 	}
 
-	if (cachefile)
-		pools = zpool_find_import_cached(g_zfs, cachefile, B_FALSE);
-	else
-		pools = zpool_find_import(g_zfs, nsearch, searchdirs, B_FALSE);
-
-	if (pools == NULL) {
-		free(searchdirs);
-		return (1);
-	}
-
 	/*
-	 * We now have a list of all available pools in the given directories.
 	 * Depending on the arguments given, we do one of the following:
 	 *
 	 *	<none>	Iterate through all pools and display information about
@@ -1478,11 +1467,38 @@ zpool_do_import(int argc, char **argv)
 		searchguid = strtoull(argv[0], &endptr, 10);
 		if (errno != 0 || *endptr != '\0')
 			searchname = argv[0];
-		else
-			searchname = NULL;
 		found_config = NULL;
 	}
 
+	if (cachefile) {
+		pools = zpool_find_import_cached(g_zfs, cachefile, B_FALSE,
+		    searchname, searchguid);
+	} else if (searchname != NULL) {
+		pools = zpool_find_import_byname(g_zfs, nsearch, searchdirs,
+		    searchname);
+	} else {
+		/*
+		 * It's OK to search by guid even if searchguid is 0.
+		 */
+		pools = zpool_find_import_byguid(g_zfs, nsearch, searchdirs,
+		    searchguid);
+	}
+
+	if (pools == NULL) {
+		if (argc != 0) {
+			(void) fprintf(stderr, gettext("cannot import '%s': "
+			    "no such pool available\n"), argv[0]);
+		}
+		free(searchdirs);
+		return (1);
+	}
+
+	/*
+	 * At this point we have a list of import candidate configs. Even if
+	 * we were searching by pool name or guid, we still need to
+	 * post-process the list to deal with pool state and possible
+	 * duplicate names.
+	 */
 	err = 0;
 	elem = NULL;
 	first = B_TRUE;

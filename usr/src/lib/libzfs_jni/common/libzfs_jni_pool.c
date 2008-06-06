@@ -1137,7 +1137,7 @@ zjni_pool_status_to_obj(JNIEnv *env, zpool_status_t status)
 int
 zjni_ipool_iter(int argc, char **argv, zjni_ipool_iter_f func, void *data)
 {
-	nvlist_t *pools = zpool_find_import(g_zfs, argc, argv, B_FALSE);
+	nvlist_t *pools = zpool_find_import(g_zfs, argc, argv);
 
 	if (pools != NULL) {
 		nvpair_t *elem = NULL;

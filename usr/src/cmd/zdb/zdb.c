@@ -2322,12 +2322,14 @@ find_exported_zpool(char *pool_id, nvlist_t **configp, char *vdev_dir,
 	int error = ENOENT;
 	nvlist_t *match = NULL;
 
-	if (vdev_dir != NULL)
-		pools = zpool_find_import(g_zfs, 1, &vdev_dir, B_TRUE);
-	else if (cachefile != NULL)
-		pools = zpool_find_import_cached(g_zfs, cachefile, B_TRUE);
-	else
-		pools = zpool_find_import(g_zfs, 0, NULL, B_TRUE);
+	if (vdev_dir != NULL) {
+		pools = zpool_find_import_activeok(g_zfs, 1, &vdev_dir);
+	} else if (cachefile != NULL) {
+		pools = zpool_find_import_cached(g_zfs, cachefile, B_TRUE,
+		    NULL, 0);
+	} else {
+		pools = zpool_find_import_activeok(g_zfs, 0, NULL);
+	}
 
 	if (pools != NULL) {
 		nvpair_t *elem = NULL;

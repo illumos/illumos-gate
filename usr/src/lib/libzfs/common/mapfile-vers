@@ -123,6 +123,9 @@ SUNWprivate_1.1 {
 	zpool_expand_proplist;
 	zpool_export;
 	zpool_find_import;
+	zpool_find_import_activeok;
+	zpool_find_import_byguid;
+	zpool_find_import_byname;
 	zpool_find_import_cached;
 	zpool_find_vdev;
 	zpool_get_config;
