@@ -961,36 +961,39 @@ check_type_iterator(struct node *np)
 void
 check_func(struct node *np)
 {
+	struct node *arglist = np->u.func.arglist;
+
 	ASSERTinfo(np->t == T_FUNC, ptree_nodetype2str(np->t));
 
 	if (np->u.func.s == L_within) {
-		struct node *arglist = np->u.func.arglist;
 		switch (arglist->t) {
-			case T_NUM:
-				if (arglist->u.ull != 0ULL)
-					outfl(O_ERR,
-					    arglist->file, arglist->line,
-					    "parameter of within must be 0"
-					    ", \"infinity\" or a time value.");
-				break;
-			case T_NAME:
-				if (arglist->u.name.s != L_infinity)
-					outfl(O_ERR,
-					    arglist->file, arglist->line,
-					    "parameter of within must be 0"
-					    ", \"infinity\" or a time value.");
-				break;
-			case T_LIST:
-				/*
-				 * if two parameters, the left or min must be
-				 * either T_NUM or T_TIMEVAL
-				 */
-				if (arglist->u.expr.left->t != T_NUM &&
-				    arglist->u.expr.left->t != T_TIMEVAL)
-					outfl(O_ERR,
-					    arglist->file, arglist->line,
-					    "first parameter of within must be"
-					    " either a time value or zero.");
+		case T_NUM:
+			if (arglist->u.ull != 0ULL) {
+				outfl(O_ERR, arglist->file, arglist->line,
+				    "parameter of within must be 0"
+				    ", \"infinity\" or a time value.");
+			}
+			break;
+
+		case T_NAME:
+			if (arglist->u.name.s != L_infinity) {
+				outfl(O_ERR, arglist->file, arglist->line,
+				    "parameter of within must be 0"
+				    ", \"infinity\" or a time value.");
+			}
+			break;
+
+		case T_LIST:
+			/*
+			 * if two parameters, the left or min must be
+			 * either T_NUM or T_TIMEVAL
+			 */
+			if (arglist->u.expr.left->t != T_NUM &&
+			    arglist->u.expr.left->t != T_TIMEVAL) {
+				outfl(O_ERR, arglist->file, arglist->line,
+				    "first parameter of within must be"
+				    " either a time value or zero.");
+			}
 
 			/*
 			 * if two parameters, the right or max must
@@ -998,198 +1001,187 @@ check_func(struct node *np)
 			 */
 			if (arglist->u.expr.right->t != T_NUM &&
 			    arglist->u.expr.right->t != T_TIMEVAL &&
-			    arglist->u.expr.right->t != T_NAME)
-				outfl(O_ERR,
-				    arglist->file, arglist->line,
+			    arglist->u.expr.right->t != T_NAME) {
+				outfl(O_ERR, arglist->file, arglist->line,
 				    "second parameter of within must "
-				    "be 0, \"infinity\" "
-				    "or time value.");
+				    "be 0, \"infinity\" or time value.");
+			}
 
-				/*
-				 * if right or left is a T_NUM it must
-				 * be zero
-				 */
-				if (arglist->u.expr.left->t == T_NUM)
-					if (arglist->u.expr.left->u.ull != 0ULL)
-						outfl(O_ERR, arglist->file,
-						    arglist->line,
-						    "within parameter must be "
-						    "0 or a time value.");
-				if (arglist->u.expr.right->t == T_NUM)
-					if (arglist->u.expr.right->u.ull
-					    != 0ULL)
-						outfl(O_ERR,
-						    arglist->file,
-						    arglist->line,
-						    "within parameter must be "
-						    "0 or a time value.");
+			/*
+			 * if right or left is a T_NUM it must
+			 * be zero
+			 */
+			if ((arglist->u.expr.left->t == T_NUM) &&
+			    (arglist->u.expr.left->u.ull != 0ULL)) {
+				outfl(O_ERR, arglist->file, arglist->line,
+				    "within parameter must be "
+				    "0 or a time value.");
+			}
+			if ((arglist->u.expr.right->t == T_NUM) &&
+			    (arglist->u.expr.right->u.ull != 0ULL)) {
+				outfl(O_ERR, arglist->file, arglist->line,
+				    "within parameter must be "
+				    "0 or a time value.");
+			}
 
-				/* if right is a T_NAME it must be "infinity" */
-				if (arglist->u.expr.right->t == T_NAME)
-					if (arglist->u.expr.right->u.name.s
-					    != L_infinity)
-						outfl(O_ERR,
-						    arglist->file,
-						    arglist->line,
-						    "\"infinity\" is the only "
-						    "valid name for within "
-						    "parameter.");
+			/* if right is a T_NAME it must be "infinity" */
+			if ((arglist->u.expr.right->t == T_NAME) &&
+			    (arglist->u.expr.right->u.name.s != L_infinity)) {
+				outfl(O_ERR, arglist->file, arglist->line,
+				    "\"infinity\" is the only "
+				    "valid name for within parameter.");
+			}
 
 			/*
 			 * the first parameter [min] must not be greater
 			 * than the second parameter [max].
 			 */
 			if (arglist->u.expr.left->u.ull >
-			    arglist->u.expr.right->u.ull)
+			    arglist->u.expr.right->u.ull) {
 				outfl(O_ERR, arglist->file, arglist->line,
-				    "parameter of within must be 0"
-				    ", \"infinity\" or a time value.");
+				    "the first value (min) of"
+				    " within must be less than"
+				    " the second (max) value");
+			}
+			break;
+
+		case T_TIMEVAL:
+			break; /* no restrictions on T_TIMEVAL */
+
+		default:
+			outfl(O_ERR, arglist->file, arglist->line,
+			    "parameter of within must be 0"
+			    ", \"infinity\" or a time value.");
 		}
 	} else if (np->u.func.s == L_call) {
-		if (np->u.func.arglist->t != T_QUOTE &&
-		    np->u.func.arglist->t != T_LIST &&
-		    np->u.func.arglist->t != T_GLOBID &&
-		    np->u.func.arglist->t != T_CONDIF &&
-		    np->u.func.arglist->t != T_LIST &&
-		    np->u.func.arglist->t != T_FUNC)
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+		if (arglist->t != T_QUOTE &&
+		    arglist->t != T_LIST &&
+		    arglist->t != T_GLOBID &&
+		    arglist->t != T_CONDIF &&
+		    arglist->t != T_LIST &&
+		    arglist->t != T_FUNC)
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "invalid first argument to call()");
 	} else if (np->u.func.s == L_fru) {
-		if (np->u.func.arglist->t != T_NAME)
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+		if (arglist->t != T_NAME)
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "argument to fru() must be a path");
 	} else if (np->u.func.s == L_asru) {
-		if (np->u.func.arglist->t != T_NAME)
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+		if (arglist->t != T_NAME)
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "argument to asru() must be a path");
 	} else if (np->u.func.s == L_is_connected ||
 	    np->u.func.s == L_is_under) {
-		if (np->u.func.arglist->t == T_LIST &&
-		    (np->u.func.arglist->u.expr.left->t == T_NAME ||
-		    (np->u.func.arglist->u.expr.left->t == T_FUNC &&
-		    (np->u.func.arglist->u.expr.left->u.func.s == L_fru ||
-		    np->u.func.arglist->u.expr.left->u.func.s == L_asru))) &&
-		    (np->u.func.arglist->u.expr.right->t == T_NAME ||
-		    (np->u.func.arglist->u.expr.right->t == T_FUNC &&
-		    (np->u.func.arglist->u.expr.right->u.func.s == L_fru ||
-		    np->u.func.arglist->u.expr.right->u.func.s == L_asru)))) {
-			if (np->u.func.arglist->u.expr.left->t == T_FUNC)
-				check_func(np->u.func.arglist->u.expr.left);
-			if (np->u.func.arglist->u.expr.right->t == T_FUNC)
-				check_func(np->u.func.arglist->u.expr.right);
+		if (arglist->t == T_LIST &&
+		    (arglist->u.expr.left->t == T_NAME ||
+		    (arglist->u.expr.left->t == T_FUNC &&
+		    (arglist->u.expr.left->u.func.s == L_fru ||
+		    arglist->u.expr.left->u.func.s == L_asru))) &&
+		    (arglist->u.expr.right->t == T_NAME ||
+		    (arglist->u.expr.right->t == T_FUNC &&
+		    (arglist->u.expr.right->u.func.s == L_fru ||
+		    arglist->u.expr.right->u.func.s == L_asru)))) {
+			if (arglist->u.expr.left->t == T_FUNC)
+				check_func(arglist->u.expr.left);
+			if (arglist->u.expr.right->t == T_FUNC)
+				check_func(arglist->u.expr.right);
 		} else {
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "%s() must have paths or calls to "
 			    "fru() and/or asru() as arguments",
 			    np->u.func.s);
 		}
 	} else if (np->u.func.s == L_is_on) {
-		if (np->u.func.arglist->t == T_FUNC &&
-		    (np->u.func.arglist->u.func.s == L_fru ||
-		    np->u.func.arglist->u.func.s == L_asru)) {
-			check_func(np->u.func.arglist);
+		if (arglist->t == T_FUNC &&
+		    (arglist->u.func.s == L_fru ||
+		    arglist->u.func.s == L_asru)) {
+			check_func(arglist);
 		} else {
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "argument to is_on() must be a call to "
 			    "fru() or asru()");
 		}
 	} else if (np->u.func.s == L_is_present) {
-		if (np->u.func.arglist->t == T_FUNC &&
-		    (np->u.func.arglist->u.func.s == L_fru ||
-		    np->u.func.arglist->u.func.s == L_asru)) {
-			check_func(np->u.func.arglist);
+		if (arglist->t == T_FUNC &&
+		    (arglist->u.func.s == L_fru ||
+		    arglist->u.func.s == L_asru)) {
+			check_func(arglist);
 		} else {
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "argument to is_present() must be a call to "
 			    "fru() or asru()");
 		}
 	} else if (np->u.func.s == L_is_type) {
-		if (np->u.func.arglist->t == T_FUNC &&
-		    (np->u.func.arglist->u.func.s == L_fru ||
-		    np->u.func.arglist->u.func.s == L_asru)) {
-			check_func(np->u.func.arglist);
+		if (arglist->t == T_FUNC &&
+		    (arglist->u.func.s == L_fru ||
+		    arglist->u.func.s == L_asru)) {
+			check_func(arglist);
 		} else {
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "argument to is_type() must be a call to "
 			    "fru() or asru()");
 		}
 	} else if (np->u.func.s == L_confcall) {
-		if (np->u.func.arglist->t != T_QUOTE &&
-		    (np->u.func.arglist->t != T_LIST ||
-		    np->u.func.arglist->u.expr.left->t != T_QUOTE))
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+		if (arglist->t != T_QUOTE &&
+		    (arglist->t != T_LIST ||
+		    arglist->u.expr.left->t != T_QUOTE))
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "confcall(): first argument must be a string "
 			    "(the name of the operation)");
 	} else if (np->u.func.s == L_confprop ||
 	    np->u.func.s == L_confprop_defined) {
-		if (np->u.func.arglist->t == T_LIST &&
-		    (np->u.func.arglist->u.expr.left->t == T_FUNC &&
-		    (np->u.func.arglist->u.expr.left->u.func.s == L_fru ||
-		    np->u.func.arglist->u.expr.left->u.func.s == L_asru)) &&
-		    np->u.func.arglist->u.expr.right->t == T_QUOTE) {
-			check_func(np->u.func.arglist->u.expr.left);
+		if (arglist->t == T_LIST &&
+		    (arglist->u.expr.left->t == T_FUNC &&
+		    (arglist->u.expr.left->u.func.s == L_fru ||
+		    arglist->u.expr.left->u.func.s == L_asru)) &&
+		    arglist->u.expr.right->t == T_QUOTE) {
+			check_func(arglist->u.expr.left);
 		} else {
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "%s(): first argument must be a call to "
 			    "fru() or asru(); "
 			    "second argument must be a string", np->u.func.s);
 		}
 	} else if (np->u.func.s == L_count) {
-		if (np->u.func.arglist->t != T_EVENT) {
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+		if (arglist->t != T_EVENT) {
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "count(): argument must be an engine name");
 		}
 	} else if (np->u.func.s == L_defined) {
-		if (np->u.func.arglist->t != T_GLOBID)
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+		if (arglist->t != T_GLOBID)
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "argument to defined() must be a global");
 	} else if (np->u.func.s == L_payloadprop) {
-		if (np->u.func.arglist->t != T_QUOTE)
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+		if (arglist->t != T_QUOTE)
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "argument to payloadprop() must be a string");
 	} else if (np->u.func.s == L_payloadprop_contains) {
-		if (np->u.func.arglist->t != T_LIST ||
-		    np->u.func.arglist->u.expr.left->t != T_QUOTE ||
-		    np->u.func.arglist->u.expr.right == NULL)
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+		if (arglist->t != T_LIST ||
+		    arglist->u.expr.left->t != T_QUOTE ||
+		    arglist->u.expr.right == NULL)
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "args to payloadprop_contains(): must be a quoted "
 			    "string (property name) and an expression "
 			    "(to match)");
 	} else if (np->u.func.s == L_payloadprop_defined) {
-		if (np->u.func.arglist->t != T_QUOTE)
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+		if (arglist->t != T_QUOTE)
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "arg to payloadprop_defined(): must be a quoted "
 			    "string");
 	} else if (np->u.func.s == L_setpayloadprop) {
-		if (np->u.func.arglist->t == T_LIST &&
-		    np->u.func.arglist->u.expr.left->t == T_QUOTE) {
-			if (np->u.func.arglist->u.expr.right->t == T_FUNC)
-				check_func(np->u.func.arglist->u.expr.right);
+		if (arglist->t == T_LIST &&
+		    arglist->u.expr.left->t == T_QUOTE) {
+			if (arglist->u.expr.right->t == T_FUNC)
+				check_func(arglist->u.expr.right);
 		} else {
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "setpayloadprop(): "
 			    "first arg must be a string, "
 			    "second arg a value");
 		}
 	} else if (np->u.func.s == L_envprop) {
-		if (np->u.func.arglist->t != T_QUOTE)
-			outfl(O_ERR, np->u.func.arglist->file,
-			    np->u.func.arglist->line,
+		if (arglist->t != T_QUOTE)
+			outfl(O_ERR, arglist->file, arglist->line,
 			    "argument to envprop() must be a string");
 	} else
 		outfl(O_WARN, np->file, np->line,
