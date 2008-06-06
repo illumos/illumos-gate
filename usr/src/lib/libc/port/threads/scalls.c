@@ -977,11 +977,6 @@ _sigtimedwait(const sigset_t *set, siginfo_t *infop, const timespec_t *timeout)
 	siginfo_t info;
 	int sig;
 
-	if (!primary_link_map) {
-		errno = ENOTSUP;
-		return (-1);
-	}
-
 	PROLOGUE
 	if (abort) {
 		*self->ul_errnop = EINTR;

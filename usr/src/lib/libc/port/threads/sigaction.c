@@ -346,11 +346,6 @@ _sigaction(int sig, const struct sigaction *nact, struct sigaction *oact)
 	struct sigaction *tactp = NULL;
 	int rv;
 
-	if (nact != NULL && !primary_link_map) {
-		errno = ENOTSUP;
-		return (-1);
-	}
-
 	if (sig <= 0 || sig >= NSIG) {
 		errno = EINVAL;
 		return (-1);
