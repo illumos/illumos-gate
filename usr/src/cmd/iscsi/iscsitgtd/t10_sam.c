@@ -485,11 +485,11 @@ t10_cmd_done(t10_cmd_t *cmd)
  *	---+---------+---+---+---+---+-------+
  *	 S2|T5       | - |T2 |T3 |T7 |T6 | - |
  *	---+---------+---+---+---+---+-------+
- *	 S3|T5/6     |T4 | - | - |T7 | - | - |
+ *	 S3|T5       |T4 | - | - |T7 |T6 | - |
  *	---+---------+---+---+---+---+-------+
  *	 S4|T5       |T4 | - | - | - | - |T6 |
  *	---+---------+---+---+---+---+-------+
- *	 S5|T6       | - |T4 | - | - | - | - |
+ *	 S5|         | - |T4 | - | - |T6 | - |
  *	---+---------+---+---+---+---+-------+
  *       S6|T2/4/5/6 | - | - | - | - | - |T3 |
  *	---+---------+---+---+---+---+-------+
@@ -585,11 +585,13 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 			break;
 
 		case T10_Cmd_T5:
-			/*FALLTHRU*/
-		case T10_Cmd_T6:
 			c->c_state = T10_Cmd_S1_Free;
 			cmd_common_free(c);
 			return (T10_Cmd_S1_Free);
+
+		case T10_Cmd_T6:
+			c->c_state = T10_Cmd_S6_Freeing_In;
+			break;
 
 		case T10_Cmd_T7:
 			c->c_state = T10_Cmd_S5_Wait;
@@ -633,9 +635,8 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 			break;
 
 		case T10_Cmd_T6:
-			c->c_state = T10_Cmd_S1_Free;
-			cmd_common_free(c);
-			return (T10_Cmd_S1_Free);
+			c->c_state = T10_Cmd_S6_Freeing_In;
+			break;
 
 		default:
 			queue_prt(mgmtq, Q_STE_ERRS,
@@ -1832,11 +1833,10 @@ lu_runner(void *v)
 			(void) pthread_mutex_lock(&lu->l_common_mutex);
 			assert(avl_find(&lu->l_all_open, (void *)itl, NULL) !=
 			    NULL);
-			avl_remove(&lu->l_all_open, (void *)itl);
-
 			queue_walker_free(lu->l_from_transports,
 			    lu_remove_cmds, (void *)itl);
 			(*sam_emul_table[lu->l_dtype].t_per_fini)(itl);
+			avl_remove(&lu->l_all_open, (void *)itl);
 
 			/*
 			 * Don't remove reference to l_common area until after

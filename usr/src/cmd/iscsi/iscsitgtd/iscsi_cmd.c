@@ -143,6 +143,8 @@ iscsi_cmd_free(iscsi_conn_t *c, iscsi_cmd_t *cmd)
 	cmd->c_t_completion	= h - cmd->c_t_start;
 	c->c_cmds_avg_sum	+= cmd->c_t_completion;
 	c->c_cmds_avg_cnt++;
+	/* decrement active count here */
+	c->c_cmds_active--;
 }
 
 /*
@@ -226,7 +228,6 @@ iscsi_cmd_remove(iscsi_conn_t *c, uint32_t statsn)
 				cmd->c_next = cmd_free;
 				cmd_free = cmd;
 				cmd = n;
-				c->c_cmds_active--;
 			} else {
 				cmd = cmd->c_next;
 			}
