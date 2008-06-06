@@ -169,7 +169,8 @@ main(int argc, char **argv)
 		} else if (typestr && *typestr == 'I') {
 			(void) inet_ntop(AF_INET, (void *)ansp, nbuf,
 			    INET6_ADDRSTRLEN);
-			(void) strncpy(name, nbuf, MAXHOSTNAMELEN);
+			len = size;
+			(void) printf("%s\n", nbuf);
 		} else if (type == T_PTR) {
 			len = dn_expand(answer, end, ansp, name, hostlen);
 			if (len < 0) {
@@ -180,7 +181,7 @@ main(int argc, char **argv)
 		ansp += len;
 		if (type == rr_type && class == C_IN) {
 			found = 1;
-			if (type != T_SRV)
+			if (type != T_SRV && !(typestr && *typestr == 'I'))
 				break;
 		}
 	}
@@ -194,7 +195,7 @@ main(int argc, char **argv)
 		*cp = tolower(*cp);
 	}
 
-	if (type != T_SRV)
+	if (type != T_SRV && !(typestr && *typestr == 'I'))
 		(void) printf("%s\n", name);
 
 	res_ndestroy(&stat);

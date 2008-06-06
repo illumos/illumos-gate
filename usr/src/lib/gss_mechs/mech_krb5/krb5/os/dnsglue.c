@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,6 +93,7 @@ krb5int_dns_init(struct krb5int_dns_state **dsp,
 #endif
 
 #if HAVE_RES_NSEARCH
+    memset(&statbuf, 0, sizeof(statbuf));
     ret = res_ninit(&statbuf);
     if (ret < 0)
 	return -1;

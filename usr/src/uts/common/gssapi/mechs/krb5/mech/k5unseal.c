@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,7 +93,7 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
     int direction;
     krb5_ui_4 seqnum;
     OM_uint32 retval;
-    size_t sumlen;
+    size_t sumlen, blocksize;
     int tmsglen;
     krb5_keyusage sign_usage = KG_USAGE_SIGN;
 
@@ -277,6 +277,23 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
 	    token.length = tmsglen;
 	} else {
 	    conflen = kg_confounder_size(context, ctx->enc);
+	    /*
+	     * Solaris Kerberos: we want to perform a sanity check on the
+	     * pad length, so we know it can not be more than the blocksize.
+	     */
+	    code = krb5_c_block_size(context, ctx->enc->enctype, &blocksize);
+	    if (code != 0) {
+		if (sealalg != 0xffff)
+		    xfree_wrap(plain, tmsglen);
+		*minor_status = code;
+		return(GSS_S_FAILURE);
+	    }
+	    if (plain[tmsglen-1] > blocksize) {
+		if (sealalg != 0xffff)
+		    xfree_wrap(plain, tmsglen);
+		*minor_status = KG_BAD_LENGTH;
+		return(GSS_S_FAILURE);
+	    }
 	    token.length = tmsglen - conflen - plain[tmsglen-1];
 	}
 

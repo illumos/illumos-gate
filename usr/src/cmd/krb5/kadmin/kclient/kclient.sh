@@ -1,4 +1,4 @@
-#!/bin/ksh -p
+#!/bin/ksh93 -p
 #
 # CDDL HEADER START
 #
@@ -94,13 +94,11 @@ function update_pam_conf {
 		svc=${service%:*}
 		auth_type=${service#*:}
 		if egrep -s "^$svc[ 	][ 	]*auth.*pam_krb5*" $TPAM; then
-			printf "\n$(gettext "The %s service is already configure
-d for pam_krb5, please merge this service in %s").\n" $svc $PAM >&2
+			printf "$(gettext "The %s service is already configured for pam_krb5, please merge this service in %s").\n\n" $svc $PAM >&2
 			continue
 		else
 			exec 3>>$TPAM
-			printf "\n$svc\tauth include\t\tpam_krb5_$auth_type\n" 1
->&3
+			printf "\n$svc\tauth include\t\tpam_krb5_$auth_type\n" 1>&3
 		fi
 	done
 
@@ -145,18 +143,18 @@ function call_kadmin {
 
 	kadmin -c $KRB5CCNAME -q "$getprincsubcommand" 1>$TMP_FILE 2>&1
 
-	egrep -s $(gettext "get_principal: Principal does not exist") $TMP_FILE
+	egrep -s "$(gettext "get_principal: Principal does not exist")" $TMP_FILE
 	bool1=$?
-	egrep -s $(gettext "get_principal: Operation requires ``get") $TMP_FILE
+	egrep -s "$(gettext "get_principal: Operation requires ``get")" $TMP_FILE
 	bool2=$?
 
 	if [[ $bool1 -eq 0 || $bool2 -eq 0 ]]; then
 		kadmin -c $KRB5CCNAME -q "$anksubcommand" 1>$TMP_FILE 2>&1
 
-		egrep -s $(gettext "add_principal: Principal or policy already exists while creating \"$service_princ@$realm\".") $TMP_FILE
+		egrep -s "$(gettext "add_principal: Principal or policy already exists while creating \"$service_princ@$realm\".")" $TMP_FILE
 		bool3=$?
 
-		egrep -s $(gettext "Principal \"$service_princ@$realm\" created.") $TMP_FILE
+		egrep -s "$(gettext "Principal \"$service_princ@$realm\" created.")" $TMP_FILE
 		bool4=$?
 
 		if [[ $bool3 -eq 0 || $bool4 -eq 0 ]]; then
@@ -180,7 +178,7 @@ function call_kadmin {
 	fi
 
 	kadmin -c $KRB5CCNAME -q "$ktaddsubcommand" 1>$TMP_FILE 2>&1
-	egrep -s $(gettext "added to keytab WRFILE:$KRB5_KEYTAB_FILE.") $TMP_FILE
+	egrep -s "$(gettext "added to keytab WRFILE:$KRB5_KEYTAB_FILE.")" $TMP_FILE
 	if [[ $? -ne 0 ]]; then
 		cat $TMP_FILE;
 		printf "\n$(gettext "kadmin: ktadd of %s failed, exiting").\n" $service_princ >&2
@@ -231,7 +229,7 @@ function writeup_krb5_conf {
 		fi
 	    else
 		if [[ $dnsarg = dns_lookup_realm ]]; then
-
+		    printf "\tdefault_realm = $realm\n" 1>&3
 		    printf "\n[realms]\n" 1>&3
 		    printf "\t$realm = {\n" 1>&3
 		    if [[ -n $kdc_list ]]; then
@@ -247,7 +245,7 @@ function writeup_krb5_conf {
 		    fi
 		    printf "\t}\n\n" 1>&3
 		else
-		    printf "\n\n" 1>&3
+		    printf "\tdefault_realm = $realm\n\n" 1>&3
 		fi
 	    fi
 	else
@@ -448,7 +446,8 @@ function ping_check {
 	if [[ -z $profile && $string == KDC ]]; then
 		# It's difficult to sync up time with KDC esp. if in a
 		# zone so just print a warning about KDC time sync.
-		printf "\n$(gettext "Note, this system and the KDC's time must be within 5 minutes of each other for Kerberos to function.  Both systems should run some form of time synchronization system like Network Time Protocol (NTP)").\n\n" >&2
+		printf "\n$(gettext "Note, this system and the KDC's time must be within 5 minutes of each other for Kerberos to function").\n" >&2
+		printf "$(gettext "Both systems should run some form of time synchronization system like Network Time Protocol (NTP)").\n" >&2
 break
 	fi
 }
@@ -601,7 +600,7 @@ function setup_keytab {
 		kinit -S kadmin/$FKDC $ADMIN_PRINC
 	fi
 	klist 1>$TMP_FILE 2>&1
-	if egrep -s $(gettext "Valid starting") $TMP_FILE && egrep -s "kadmin/$FKDC@$realm" $TMP_FILE; then
+	if egrep -s "$(gettext "Valid starting")" $TMP_FILE && egrep -s "kadmin/$FKDC@$realm" $TMP_FILE; then
     		:
 	else
 		printf "\n$(gettext "kinit of %s failed, exiting").\n" $ADMIN_PRINC >&2
@@ -613,11 +612,10 @@ function setup_keytab {
 	#    other than the one listed in resolv.conf(4) ?
 	#
 	if [[ -z $options ]]; then
-		echo
 		query "$(gettext "Do you have multiple DNS domains spanning the Kerberos realm") $realm ?"
 		ask_fqdns=$answer
 		if [[ $ask_fqdns == yes ]]; then
-			printf "$(gettext "Enter a comma-seperated list of DNS domain names"): "
+			printf "$(gettext "Enter a comma-separated list of DNS domain names"): "
 			read fqdnlist
 			verify_fqdnlist "$fqdnlist"
 		else
@@ -734,6 +732,14 @@ function canon_resolve {
 
 	ip=`$KLOOKUP $name I`
 	[[ -z $ip ]] && return
+	for i in $ip
+	do
+		if ping $i 2 > /dev/null 2>&1; then
+			break
+		else
+			i=
+		fi
+	done
 
 	cname=`$KLOOKUP $ip P`
 	[[ -z $cname ]] && return
@@ -807,7 +813,9 @@ function getSRVs {
 
 	$KLOOKUP $1 S | while read srv port
 	do
-		print -- $srv $port
+		if ping $srv 2 > /dev/null 2>&1; then
+			print -- $srv $port
+		fi
 	done
 }
 
@@ -1018,6 +1026,7 @@ function getSite {
 		[[ -z $subnetDN ]] && continue
 		subnet_dom=$(dn2dns $subnetDN)
 		ldapsrv=$(canon_resolve DomainDnsZones.$subnet_dom)
+		[[ -z $ldapsrv ]] && continue
 		ldapsearch -R -T -h $ldapsrv $ldap_args \
 		    -b "$subnetDN" -s base "" siteObject \
 		    |grep ^siteObject|read j siteDN
@@ -1037,10 +1046,10 @@ function doKRB5config {
 	[[ -f $KRB5_KEYTAB_FILE ]] && \
 		cp $KRB5_KEYTAB_FILE ${KRB5_KEYTAB_FILE}-pre-kclient
 
-	cp $KRB5_CONFIG $KRB5_CONFIG_FILE
-	chmod 0644 $KRB5_CONFIG_FILE
-	cp $new_keytab $KRB5_KEYTAB_FILE
-	chmod 0600 $KRB5_KEYTAB_FILE
+	[[ -s $KRB5_CONFIG ]] && cp $KRB5_CONFIG $KRB5_CONFIG_FILE
+	[[ -s $KRB5_CONFIG_FILE ]] && chmod 0644 $KRB5_CONFIG_FILE
+	[[ -s $new_keytab ]] && cp $new_keytab $KRB5_KEYTAB_FILE
+	[[ -s $KRB5_KEYTAB_FILE ]] && chmod 0600 $KRB5_KEYTAB_FILE
 }
 
 function addDNSRR {
@@ -1083,7 +1092,7 @@ function setSMB {
 		return
 	fi
 
-	svcadm refresh $smbFMRI
+	svcadm refresh $smbFMRI > /dev/null 2>&1
 	if [[ $? -ne 0 ]]; then
 		printf "$(gettext "Warning: wasn't able to set refresh %s domain, server, and password information").\n" $smbFMRI
 	fi
@@ -1095,7 +1104,7 @@ function compareDomains {
 	# If the client has been previously configured in a different
 	# realm/domain then we need to prompt the user to see if they wish to
 	# switch domains.
-	klist -k | grep @ | read j hspn
+	klist -k 2>&1 | grep @ | read j hspn
 	[[ -z $hspn ]] && return
 
 	oldDom=${hspn#*@}
@@ -1181,7 +1190,7 @@ function join_domain {
 
 	write_ads_krb5conf
 
-	printf "$(gettext "Attempting to join the '%s' domain").\n\n" $realm
+	printf "$(gettext "Attempting to join '%s' to the '%s' domain").\n\n" $upcase_nodename $realm
 
 	kinit $cprinc@$realm
 	if [[ $? -ne 0 ]]; then
@@ -1309,7 +1318,7 @@ dNSHostname: ${fqdn}
 EOF
 
 		printf "$(gettext "A machine account already exists; updating it").\n"
-		ldapadd -h "$dc" $ldap_args -f "$object" 
+		ldapadd -h "$dc" $ldap_args -f "$object" > /dev/null 2>&1
 		if [[ $? -ne 0 ]]; then
 			printf "$(gettext "Failed to create the AD object via LDAP").\n"
 			error_message
@@ -1548,6 +1557,7 @@ KDYNDNS=/usr/lib/krb5/kdyndns;	check_bin $KDYNDNS
 dns_lookup=no
 ask_fqdns=no
 adddns=no
+no_keytab=no
 checkval=""
 profile=""
 typeset -u realm
@@ -1559,7 +1569,7 @@ mkdir $TMPDIR > /dev/null 2>&1
 
 TMP_FILE=$(mktemp -q -t kclient-tmpfile.XXXXXX)
 export KRB5_CONFIG=$(mktemp -q -t kclient-krb5conf.XXXXXX)
-KRB5CCNAME=$(mktemp -q -t kclient-krb5ccache.XXXXXX) 
+export KRB5CCNAME=$(mktemp -q -t kclient-krb5ccache.XXXXXX) 
 new_keytab=$(mktemp -q -t kclient-krb5keytab.XXXXXX) 
 if [[ -z $TMP_FILE || -z $KRB5_CONFIG || -z $KRB5CCNAME || -z $new_keytab ]]
 then
@@ -1691,6 +1701,34 @@ else
 fi
 
 #
+# Check to see if we will be a client of a MIT, Heimdal, Shishi, etc.
+#
+if [[ -z $options ]]; then
+	query "$(gettext "Is this a client of a non-Solaris KDC") ?"
+	non_solaris=$answer
+	if [[ $non_solaris == yes ]]; then
+		printf "$(gettext "Which type of KDC is the server"):\n"
+		printf "\t$(gettext "ms_ad: Microsoft Active Directory")\n"
+		printf "\t$(gettext "mit: MIT KDC server")\n"
+		printf "\t$(gettext "heimdal: Heimdal KDC server")\n"
+		printf "\t$(gettext "shishi: Shishi KDC server")\n"
+		printf "$(gettext "Enter required KDC type"): "
+		read kdctype
+		if [[ $kdctype == ms_ad ]]; then
+			msad=yes
+		elif [[ $kdctype == mit || $kdctype == heimdal || \
+		    $kdctype == shishi ]]; then
+			no_keytab=yes
+		else
+			printf "\n$(gettext "Invalid KDC type option, valid types are ms_ad, mit, heimdal, or shishi, exiting").\n" >&2
+			error_message
+		fi
+	fi
+fi
+
+[[ $msad == yes ]] && join_domain
+
+#
 # Check for /etc/resolv.conf
 #
 if [[ -r $RESOLV_CONF_FILE ]]; then
@@ -1723,30 +1761,11 @@ else
 	error_message
 fi
 
-check_nss_conf || printf "$(gettext "/etc/nsswitch.conf does not make use of DN
-S for hosts and/or ipnodes").\n"
-
-#
-# Check to see if we will be a client of a MIT, Heimdal, Shishi, etc.
-#
-if [[ -z $options ]]; then
-	query "$(gettext "Is this a client of a non-Solaris KDC (MIT, Heimdal, Shishi, etc.)") ?"
-	non_solaris=$answer
-	if [[ $non_solaris == yes ]]; then
-		no_keytab=yes
-	else
-		query "$(gettext "Is this a client of a Microsoft Active Directory (MS AD) server") ?"
-		if [[ $answer == yes ]]; then
-			msad=yes
-		fi
-	fi
-fi
-
-[[ $msad == yes ]] && join_domain
+check_nss_conf || printf "$(gettext "/etc/nsswitch.conf does not make use of DNS for hosts and/or ipnodes").\n"
 
 [[ -n $fqdnlist ]] && verify_fqdnlist "$fqdnlist"
 
-if [[ -z $options || -z $filepath ]]; then
+if [[ -z $dnsarg && (-z $options || -z $filepath) ]]; then
 	query "$(gettext "Do you want to use DNS for kerberos lookups") ?"
 	if [[ $answer == yes ]]; then
 		printf "\n$(gettext "Valid DNS lookup options are dns_lookup_kdc, dns_lookup_realm,\nand dns_fallback. Refer krb5.conf(4) for further details").\n"
@@ -1756,6 +1775,7 @@ if [[ -z $options || -z $filepath ]]; then
 		set_dns_value $dnsarg
 	fi
 else
+	[[ -z $dnsarg ]] && dnsarg=none
 	set_dns_value $dnsarg
 fi
 
@@ -1768,12 +1788,12 @@ if [[ -n $kdc_list ]]; then
 	fi
 fi
 
-if [[ -z $realm && -z $filepath ]]; then
+if [[ -z $realm ]]; then
 	printf "$(gettext "Enter the Kerberos realm"): "
 	read realm
 	checkval="REALM"; check_value $realm
 fi
-if [[ -z $KDC && -z $filepath ]]; then
+if [[ -z $KDC ]]; then
 	printf "$(gettext "Specify the master KDC hostname for the above realm"): "
 	read KDC
 	checkval="KDC"; check_value $KDC
@@ -1785,6 +1805,16 @@ FKDC=`$KLOOKUP $KDC`
 # Ping to see if the kdc is alive !
 #
 ping_check $FKDC "KDC"
+
+if [[ -z $kdc_list && (-z $options || -z $filepath) ]]; then
+	query "$(gettext "Do you have any slave KDC(s)") ?"
+	if [[ $answer == yes ]]; then
+		printf "$(gettext "Enter a comma-separated list of slave KDC host names"): "
+		read kdc_list
+	fi
+fi
+
+[[ -n $kdc_list ]] && verify_kdcs "$kdc_list"
 
 #
 # Check to see if we will have a dynamic presence in the realm
@@ -1810,21 +1840,11 @@ if [[ -z $options ]]; then
 	fi
 fi
 
-if [[ -z $options || -z $filepath ]]; then
-	query "$(gettext "Do you have any slave KDC(s)") ?"
-	if [[ $answer == yes ]]; then
-		printf "$(gettext "Enter a comma-seperated list of slave KDC host names"): "
-		read kdc_list
-	fi
-fi
-
-[[ -n $kdc_list ]] && verify_kdcs "$kdc_list"
-
-if [[ -z $options || -z $filepath ]]; then
+if [[ -n $domain_list && (-z $options || -z $filepath) ]]; then
 	query "$(gettext "Do you have multiple domains/hosts to map to realm %s"
 ) ?" $realm
 	if [[ $answer == yes ]]; then
-		printf "$(gettext "Enter a comma-seperated list of domain/hosts
+		printf "$(gettext "Enter a comma-separated list of domain/hosts
 to map to the default realm"): "
 		read domain_list
 	fi
@@ -1841,7 +1861,6 @@ writeup_krb5_conf
 # Is this client going to use krb-nfs?  If so then we need to at least
 # uncomment the krb5* sec flavors in nfssec.conf.
 #
-echo
 if [[ -z $options ]]; then
 	query "$(gettext "Do you plan on doing Kerberized nfs") ?"
 	add_nfs=$answer
@@ -1871,7 +1890,6 @@ fi
 # Copy over krb5.conf master copy from filepath
 #
 if [[ -z $options || -z $filepath ]]; then
-	echo
 	query "$(gettext "Do you want to copy over the master krb5.conf file") ?"
 	if [[ $answer == yes ]]; then
 		printf "$(gettext "Enter the pathname of the file to be copied"): "
@@ -1879,27 +1897,30 @@ if [[ -z $options || -z $filepath ]]; then
 	fi
 fi
 
-if [[ -z $filepath ]]; then
-	doKRB5config
-else
-	if [[ -r $filepath ]]; then
-		cp $filepath $KRB5_CONFIG_FILE
-		if [[ $? -eq 0 ]]; then
-			printf "\n$(gettext "Copied %s").\n" $filepath
-		else
-			printf "\n$(gettext "Copy of %s failed, exiting").\n" $filepath >&2
-			error_message
-		fi
+if [[ -n $filepath && -r $filepath ]]; then
+	cp $filepath $KRB5_CONFIG
+	if [[ $? -eq 0 ]]; then
+		printf "$(gettext "Copied %s to %s").\n" $filepath $KRB5_CONFIG
 	else
-		printf "\n$(gettext "%s not found, exiting").\n" $filepath >&2
+		printf "$(gettext "Copy of %s failed, exiting").\n" $filepath >&2
 		error_message
 	fi
+elif [[ -n $filepath ]]; then
+	printf "\n$(gettext "%s not found, exiting").\n" $filepath >&2
+	error_message
 fi
+
+doKRB5config
 
 #
 # Populate any service keys needed for the client in the keytab file
 #
-[[ $no_keytab != yes ]] && setup_keytab
+if [[ $no_keytab != yes ]]; then
+	setup_keytab
+else
+	printf "\n$(gettext "Note: %s file not created, please refer to verify_ap_req_nofail in krb5.conf(4) for the implications").\n" $KRB5_KEYTAB_FILE
+	printf "$(gettext "Client will also not be able to host services that use Kerberos").\n"
+fi
 
 printf -- "\n---------------------------------------------------\n"
 printf "$(gettext "Setup COMPLETE").\n\n"
