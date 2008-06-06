@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2835,8 +2835,6 @@ md_getdevnum(
 		& MDDB_DEVID_STYLE) {
 		(void) md_load_namespace(setno, NULL, NM_DEVID);
 		devid_nm = 1;
-	} else {
-		(void) md_unload_namespace(setno, NM_DEVID);
 	}
 
 	/*
