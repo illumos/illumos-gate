@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,8 +52,6 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE=1 -I/usr/include/libxml2
 CFLAGS64 +=	$(CCVERBOSE)
 
-SUFFIX_LINT = .ln
-
 GROUP = sys
 
 CLEANFILES += $(OBJS) ../$(DTRACE_HEADER)
@@ -62,20 +60,20 @@ CLEANFILES += $(OBJS) ../$(DTRACE_HEADER)
 
 all: $(PROG)
 
-LDLIBS	+= -lumem -luuid -lxml2 -lsocket -lnsl -ldoor -lavl -lmd5 -ladm -lefi
+LDLIBS	+= -lumem -luuid -lsocket -lnsl -ldoor -lavl -lmd5 -ladm -lefi
 LDLIBS  += -liscsitgt -lzfs -ldlpi -lscf -lsasl
+XMLLIB   = -lxml2
 
 $(PROG): $(OBJS) $(COMMON_OBJS)
-	$(LINK.c) $(OBJS) $(COMMON_OBJS) -o $@ $(LDLIBS) $(CTFMERGE_HOOK)
+	$(LINK.c) $(OBJS) $(COMMON_OBJS) -o $@ $(LDLIBS) $(XMLLIB) $(CTFMERGE_HOOK)
 	$(POST_PROCESS)
 
-lint := LINTFLAGS += -u
-lint := LINTFLAGS64 += -u
+lint := LINTFLAGS += -unv 
+lint := LINTFLAGS64 += -unv 
 
-lint: $(SRCS:../%=%$(SUFFIX_LINT))
+lint:	$$(SRCS)
+	$(LINT.c) -I.. ${INCLUDES} $(SRCS) $(LDLIBS)
 
-%$(SUFFIX_LINT): ../%
-	${LINT.c} -I.. ${INCLUDES} -y -c $< && touch $@
 
 ../%.h:	../%.d
 	$(DTRACE) -xnolibs -h -s $< -o $@
@@ -92,6 +90,6 @@ lint: $(SRCS:../%=%$(SUFFIX_LINT))
 	$(COMPILE.d) -xnolibs -s $< $(COBJS)
 
 clean:
-	$(RM) $(CLEANFILES) $(COMMON_OBJS) *$(SUFFIX_LINT)
+	$(RM) $(CLEANFILES) $(COMMON_OBJS)
 
 include ../../../Makefile.targ

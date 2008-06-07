@@ -408,7 +408,8 @@ target_info(char **msg, char *targ_name, tgt_node_t *tnode)
 		if (incore == False) {
 			local_name = get_local_name(targ_name);
 			if (local_name != NULL) {
-				mgmt_get_param(&params, local_name, lun_num);
+				(void) mgmt_get_param(&params, local_name,
+				    lun_num);
 				free(local_name);
 			} else {
 				continue;
@@ -418,7 +419,7 @@ target_info(char **msg, char *targ_name, tgt_node_t *tnode)
 		}
 
 		tgt_buf_add_tag(msg, XML_ELEMENT_LUN, Tag_Start);
-		snprintf(lun_buf, sizeof (lun_buf), "%d", lun_num);
+		(void) snprintf(lun_buf, sizeof (lun_buf), "%d", lun_num);
 		tgt_buf_add_tag(msg, lun_buf, Tag_String);
 
 		if (tgt_find_value_str(params, XML_ELEMENT_GUID, &prop) ==

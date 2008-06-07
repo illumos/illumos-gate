@@ -148,7 +148,8 @@ append_tpgt(tgt_node_t *tgt, isns_pdu_t *cmd)
 	ip_t		eid;
 
 	/* Always add the default TPGT (1) */
-	isns_append_attr(cmd, ISNS_PG_TAG_ATTR_ID, ISNS_PG_TAG_SZ, NULL, 1);
+	(void) isns_append_attr(cmd, ISNS_PG_TAG_ATTR_ID, ISNS_PG_TAG_SZ, NULL,
+	    1);
 	if (isns_append_attr(cmd, ISNS_PG_PORTAL_IP_ADDR_ATTR_ID,
 	    eid_ip.ai_addrlen, (void *)&eid_ip.ip_adr,
 	    eid_ip.ip_len) != 0) {
@@ -184,7 +185,7 @@ append_tpgt(tgt_node_t *tgt, isns_pdu_t *cmd)
 
 			/* get ip-addr & port */
 			for (x = tpgt->x_child; x; x = x->x_sibling) {
-				get_ip_addr(x->x_value, &eid);
+				(void) get_ip_addr(x->x_value, &eid);
 				if (isns_append_attr(cmd,
 				    ISNS_PG_PORTAL_IP_ADDR_ATTR_ID,
 				    eid.ai_addrlen, (void *)&eid.ip_adr,
@@ -286,7 +287,7 @@ process_scn(int so, isns_pdu_t *scn)
 				case ISNS_OBJ_UPDATED:
 					queue_prt(mgmtq, Q_ISNS_DBG,
 					    "PROCESS_SCN OBJ ADDED");
-					isns_update();
+					(void) isns_update();
 					break;
 				case ISNS_OBJ_REMOVED:
 					queue_prt(mgmtq, Q_ISNS_DBG,
@@ -375,14 +376,14 @@ static void
 	if ((so = isns_open(args->server)) < 0) {
 		syslog(LOG_ERR,
 		    "esi_scn_thr: isns server %s not found", args->server);
-		sema_post(&isns_sema);
+		(void) sema_post(&isns_sema);
 		return (NULL);
 	}
 	len = sizeof (sa);
 	if (getsockname(so, &sa, &len) < 0) {
 		isns_close(so);
 		syslog(LOG_ALERT, "getsockname failed");
-		sema_post(&isns_sema);
+		(void) sema_post(&isns_sema);
 		return (NULL);
 	}
 	pf = sa.sa_family;
@@ -390,7 +391,7 @@ static void
 
 	if (pf != PF_INET && pf != PF_INET6) {
 		syslog(LOG_ERR, "esi_scn_thr: unknown domain type");
-		sema_post(&isns_sema);
+		(void) sema_post(&isns_sema);
 		return (NULL);
 	}
 
@@ -400,7 +401,7 @@ static void
 	 */
 	if ((so = socket(pf, SOCK_STREAM, 0)) == -1) {
 		syslog(LOG_ALERT, "socket failed");
-		sema_post(&isns_sema);
+		(void) sema_post(&isns_sema);
 		return (NULL);
 	}
 
@@ -424,7 +425,7 @@ static void
 
 	if (bind(so, ai, len) < 0) {
 		syslog(LOG_ALERT, "esi_scn_thr: bind failed");
-		sema_post(&isns_sema);
+		(void) sema_post(&isns_sema);
 		return (NULL);
 	}
 
@@ -432,18 +433,18 @@ static void
 	len = sizeof (sa);
 	if (getsockname(so, &sa, &len) < 0) {
 		syslog(LOG_ALERT, "getsockname failed");
-		sema_post(&isns_sema);
+		(void) sema_post(&isns_sema);
 		return (NULL);
 	}
 	if (getnameinfo(&sa, len, NULL, 0, strport, NI_MAXSERV,
 	    NI_NUMERICSERV) != 0) {
 		syslog(LOG_ALERT, "getnameinfo failed");
-		sema_post(&isns_sema);
+		(void) sema_post(&isns_sema);
 		return (NULL);
 	}
 	scn_port = atoi(strport);
 
-	sema_post(&isns_sema);
+	(void) sema_post(&isns_sema);
 
 	if (listen(so, 5) < 0) {
 		syslog(LOG_ALERT, "esi_scn_thr: failed listen");
@@ -479,7 +480,7 @@ static void
 			syslog(LOG_ALERT, "esi_scn_thr fails isns_recv ");
 		}
 
-		close(fd);
+		(void) close(fd);
 	}
 	return (NULL);
 }
@@ -557,7 +558,7 @@ isns_init(target_queue_t *q)
 		return (0);
 
 	/* initialize */
-	sema_init(&isns_sema, 0, USYNC_THREAD, NULL);
+	(void) sema_init(&isns_sema, 0, USYNC_THREAD, NULL);
 
 	/* get isns server info */
 	tgt_find_value_str(main_config, XML_ELEMENT_ISNS_SERV, &isns_srv);
@@ -603,7 +604,7 @@ isns_init(target_queue_t *q)
 		/* scn register all targets */
 		if (isns_op_all(ISNS_SCN_REG) != 0) {
 			syslog(LOG_ERR, "SCN registrations failed\n");
-			isns_op_all(ISNS_DEV_DEREG);
+			(void) isns_op_all(ISNS_DEV_DEREG);
 			return (-1);
 		}
 	}
@@ -623,7 +624,7 @@ isns_update()
 	if (isns_initialized == False) {
 		/* isns enabled after iscsi started */
 		if (isns_enabled() == True) {
-			isns_init(NULL);
+			(void) isns_init(NULL);
 		}
 		return (0);
 	}
@@ -668,7 +669,7 @@ isns_update()
 			/* scn register all targets */
 			if (isns_op_all(ISNS_SCN_REG) != 0) {
 				syslog(LOG_ERR, "SCN registrations failed\n");
-				isns_op_all(ISNS_DEV_DEREG);
+				(void) isns_op_all(ISNS_DEV_DEREG);
 				return (-1);
 			}
 		}
@@ -689,11 +690,11 @@ isns_fini()
 	 * de-register all targets 1st, this prevents initiator from
 	 * logging back in
 	 */
-	isns_op_all(ISNS_SCN_DEREG);
-	isns_op_all(ISNS_DEV_DEREG);
+	(void) isns_op_all(ISNS_SCN_DEREG);
+	(void) isns_op_all(ISNS_DEV_DEREG);
 
 	/* log off all targets */
-	isns_op_all(ISNS_TGT_LOGOUT);
+	(void) isns_op_all(ISNS_TGT_LOGOUT);
 
 	isns_initialized = False;
 }
@@ -1302,7 +1303,7 @@ isns_reg_all()
 		syslog(LOG_ALERT, "ISNS: no XML_ELEMENT_INAME found\n");
 		return (-1);
 	}
-	strcpy(iname, n);
+	(void) strcpy(iname, n);
 	free(n);
 
 	if ((so = isns_open(isns_args.server)) == -1) {
@@ -1387,19 +1388,19 @@ isns_reg_all()
 			continue;
 		}
 		/* use this value as alias if alias is not set */
-		strcpy(alias, tgt->x_value);
+		(void) strcpy(alias, tgt->x_value);
 
 		if (tgt_find_value_str(tgt, XML_ELEMENT_INAME, &n)
 		    == FALSE) {
 			continue;
 		}
-		strcpy(iname, n);
+		(void) strcpy(iname, n);
 		free(n);
 
 		/* find alias */
 		if (tgt_find_value_str(tgt, XML_ELEMENT_ALIAS, &a)
 		    == TRUE) {
-			strcpy(alias, a);
+			(void) strcpy(alias, a);
 			free(a);
 		}
 
@@ -1494,10 +1495,10 @@ isns_dev_update(char *targ, uint32_t mods)
 	if ((tgt = find_tgt_by_name(targ, &iname)) != NULL) {
 		if (tgt_find_value_str(tgt, XML_ELEMENT_ALIAS, &dummy) ==
 		    True) {
-			strcpy(alias, dummy);
+			(void) strcpy(alias, dummy);
 			free(dummy);
 		} else
-			strcpy(alias, tgt->x_value);
+			(void) strcpy(alias, tgt->x_value);
 
 		if ((so = isns_open(isns_args.server)) < 0) {
 			goto error;
@@ -1524,9 +1525,9 @@ isns_dev_update(char *targ, uint32_t mods)
 		 * get current operating attributes, alias & portal group
 		 * objects, these should be the only things that get change
 		 */
-		isns_append_attr(cmd, ISNS_ISCSI_NAME_ATTR_ID, STRLEN(iname),
-		    iname, 0);
-		isns_append_attr(cmd, ISNS_ISCSI_NODE_TYPE_ATTR_ID,
+		(void) isns_append_attr(cmd, ISNS_ISCSI_NAME_ATTR_ID,
+		    STRLEN(iname), iname, 0);
+		(void) isns_append_attr(cmd, ISNS_ISCSI_NODE_TYPE_ATTR_ID,
 		    ISNS_NODE_TYP_SZ, NULL, ISNS_TARGET_NODE_TYPE);
 
 		if (mods & ISNS_MOD_ALIAS)

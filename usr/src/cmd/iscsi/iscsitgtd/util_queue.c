@@ -261,7 +261,7 @@ queue_reset(target_queue_t *q)
 			n = m->msg_next;
 			queue_message_free(m);
 			m = n;
-			sema_wait(&q->q_sema);
+			(void) sema_wait(&q->q_sema);
 			break;
 
 		case msg_reset_lu:
@@ -351,7 +351,7 @@ queue_str(target_queue_t *q, uint32_t lvl, msg_type_t type, char *fmt)
 
 	(void) pthread_mutex_lock(&q_mutex);
 	if ((qlog) && (qlog_lvl & lvl)) {
-		ctime_r(&tval, debug, sizeof (debug));
+		(void) ctime_r(&tval, debug, sizeof (debug));
 		(void) fprintf(qlog, "%s %s", debug, fmt);
 		(void) fflush(qlog);
 	}

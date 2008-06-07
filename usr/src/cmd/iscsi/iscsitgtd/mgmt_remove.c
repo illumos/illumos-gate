@@ -489,7 +489,7 @@ remove_tpgt(tgt_node_t *x)
 	if (change_made == True) {
 		/* Isns re-register all target */
 		if (isns_enabled() == True)
-			isns_reg_all();
+			(void) isns_reg_all();
 		if (mgmt_config_save2scf() == True)
 			xml_rtn_msg(&msg, ERR_SUCCESS);
 	} else {

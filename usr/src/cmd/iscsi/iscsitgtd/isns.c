@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,9 +61,9 @@ get_xid()
 {
 	uint16_t	tmp;
 
-	pthread_mutex_lock(&xid_lock);
+	(void) pthread_mutex_lock(&xid_lock);
 	tmp = xid++;
-	pthread_mutex_unlock(&xid_lock);
+	(void) pthread_mutex_unlock(&xid_lock);
 	return (tmp);
 }
 
@@ -157,7 +157,7 @@ print_ntoh_tlv(isns_tlv_t *tlv)
 				case PF_INET6:
 					bcopy(tlv->attr_value, &sin6,
 					    sizeof (struct sockaddr_in6));
-					inet_ntop(pf_type,
+					(void) inet_ntop(pf_type,
 					    (void *)&sin6.sin6_addr,
 					    buf, 256);
 					break;
@@ -212,7 +212,7 @@ print_attr(isns_tlv_t *attr, void *pval, uint32_t ival)
 			if (len) {
 				pf_type = (ival == sizeof (in6_addr_t))
 				    ? PF_INET6 : PF_INET;
-				inet_ntop(pf_type, pval, buf, 256);
+				(void) inet_ntop(pf_type, pval, buf, 256);
 				queue_prt(mgmtq, Q_ISNS_DBG, "IP_ADDR %s\n",
 				    buf);
 			}
@@ -427,7 +427,7 @@ isns_open(char *server)
 				return (so);
 			} else {
 				syslog(LOG_ALERT, "Connect failed");
-				close(so);
+				(void) close(so);
 			}
 		}
 	} while ((aip = aip->ai_next) != NULL);
@@ -441,7 +441,7 @@ void
 isns_close(int so)
 {
 	if (so) {
-		close(so);
+		(void) close(so);
 	}
 }
 

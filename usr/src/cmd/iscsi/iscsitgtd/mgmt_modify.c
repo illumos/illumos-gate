@@ -158,13 +158,13 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 	 * storage. Therefore we can easily get IQN name from target
 	 * name by read the symbolic link content.
 	 */
-	snprintf(path, sizeof (path), "%s/%s", target_basedir, name);
+	(void) snprintf(path, sizeof (path), "%s/%s", target_basedir, name);
 	bzero(iscsi_path, sizeof (iscsi_path));
-	readlink(path, iscsi_path, sizeof (iscsi_path));
+	(void) readlink(path, iscsi_path, sizeof (iscsi_path));
 	iscsi = basename(iscsi_path);
 
 	/* ---- Finished with these so go ahead and release the memory ---- */
-	strncpy(targ_name, name, sizeof (targ_name));
+	(void) strncpy(targ_name, name, sizeof (targ_name));
 	free(name);
 
 	/*
@@ -197,7 +197,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		(void) tgt_find_value_int(x, XML_ELEMENT_LUN, &lun);
 
 		/* ---- read in current parameters ---- */
-		mgmt_get_param(&node, targ_name, lun);
+		(void) mgmt_get_param(&node, targ_name, lun);
 
 		/* ---- validate that we're indeed growing the LU ---- */
 		if (tgt_find_value_str(node, XML_ELEMENT_SIZE, &prop) ==
@@ -231,8 +231,8 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		free(prop);
 
 		/* ---- validate the backing store is a regular file ---- */
-		snprintf(path, sizeof (path), "%s/%s/%s%d", target_basedir,
-		    iscsi, LUNBASE, lun);
+		(void) snprintf(path, sizeof (path), "%s/%s/%s%d",
+		    target_basedir, iscsi, LUNBASE, lun);
 		if (stat(path, &st) == -1) {
 			xml_rtn_msg(&msg, ERR_STAT_BACKING_FAILED);
 			return (msg);
@@ -253,11 +253,11 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		tgt_node_free(c);
 
 		/* ---- now update params file ---- */
-		mgmt_param_save2scf(node, targ_name, lun);
+		(void) mgmt_param_save2scf(node, targ_name, lun);
 
 		/* ---- grow lu backing store ---- */
-		snprintf(path, sizeof (path), "%s/%s/%s%d", target_basedir,
-		    iscsi, LUNBASE, lun);
+		(void) snprintf(path, sizeof (path), "%s/%s/%s%d",
+		    target_basedir, iscsi, LUNBASE, lun);
 		if ((fd = open(path, O_RDWR|O_CREAT|O_LARGEFILE, 0600)) < 0) {
 			xml_rtn_msg(&msg, ERR_LUN_NOT_FOUND);
 			return (msg);
@@ -407,7 +407,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 			xml_rtn_msg(&msg, ERR_NO_MEM);
 			return (msg);
 		}
-		snprintf(prop, 32, "%d", val);
+		(void) snprintf(prop, 32, "%d", val);
 
 		if (modify_element(XML_ELEMENT_MAXRECV, prop, t, MatchName) ==
 		    False) {
@@ -673,7 +673,7 @@ modify_tpgt(tgt_node_t *x)
 	 * update TPGT for individual target
 	 */
 	if (isns_enabled() == True) {
-		isns_reg_all();
+		(void) isns_reg_all();
 	}
 
 error:

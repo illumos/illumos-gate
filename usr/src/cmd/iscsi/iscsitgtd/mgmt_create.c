@@ -285,10 +285,10 @@ create_target(tgt_node_t *x)
 		 */
 		(void) snprintf(path, sizeof (path), "%s/%s",
 		    target_basedir, node_name);
-		rmdir(path);
+		(void) rmdir(path);
 		(void) snprintf(path, sizeof (path), "%s/%s",
 		    target_basedir, name);
-		unlink(path);
+		(void) unlink(path);
 		tgt_node_remove(targets_config, n, MatchBoth);
 	} else
 		tgt_node_remove(c, l, MatchBoth);
@@ -845,7 +845,7 @@ create_lun(char *targ_name, char *local_name, char *type, int lun,
 		tgt_node_add(n, pn);
 	}
 
-	mgmt_param_save2scf(n, local_name, lun);
+	(void) mgmt_param_save2scf(n, local_name, lun);
 
 	if ((strcmp(type, TGT_TYPE_DISK) == 0) ||
 	    (strcmp(type, TGT_TYPE_TAPE) == 0)) {
@@ -905,7 +905,7 @@ create_lun_common(char *targ_name, char *local_name, int lun, uint64_t size,
 	(void) lseek(fd, size - 512LL, 0);
 	bzero(buf, sizeof (buf));
 	if (write(fd, buf, sizeof (buf)) != sizeof (buf)) {
-		unlink(path);
+		(void) unlink(path);
 		if (errno == EFBIG)
 			*code = ERR_FILE_TO_BIG;
 		else
@@ -982,7 +982,7 @@ create_lun_common(char *targ_name, char *local_name, int lun, uint64_t size,
 			queue_message_free(queue_message_get(tp->q));
 		}
 	} else {
-		mgmt_get_param(&node, local_name, lun);
+		(void) mgmt_get_param(&node, local_name, lun);
 
 		c = tgt_node_alloc(XML_ELEMENT_STATUS, String,
 		    TGT_STATUS_ONLINE);
@@ -1066,10 +1066,10 @@ setup_disk_backing(err_code_t *code, char *path, char *backing, tgt_node_t *n,
 				*code = ERR_FAILED_TO_CREATE_LU;
 				return (False);
 			}
-			lseek(fd, *size - 512LL, 0);
+			(void) lseek(fd, *size - 512LL, 0);
 			bzero(buf, sizeof (buf));
 			(void) write(fd, buf, sizeof (buf));
-			close(fd);
+			(void) close(fd);
 		}
 	} else if (*size != 0) {
 		*code = ERR_DISK_BACKING_SIZE_OR_FILE;
@@ -1358,7 +1358,7 @@ get_zfs_shareiscsi(char *dataset, tgt_node_t **n, uint64_t *size, ucred_t *cred)
 			}
 
 			/* Cleanup XML data */
-			xmlTextReaderClose(xml_ptr);
+			(void) xmlTextReaderClose(xml_ptr);
 			xmlFreeTextReader(xml_ptr);
 			xmlCleanupParser();
 

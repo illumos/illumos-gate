@@ -1311,16 +1311,20 @@ conn_state(iscsi_conn_t *c, iscsi_transition_t t)
 			if (c->c_last_pkg) {
 				iscsi_logout_rsp_hdr_t *rsp =
 				    (iscsi_logout_rsp_hdr_t *)c->c_last_pkg;
-				assert(rsp->opcode ==
-				    ISCSI_OP_LOGOUT_RSP);
+				assert(rsp->opcode == ISCSI_OP_LOGOUT_RSP);
 
 				if (ISCSI_LOGOUT_RESPONSE_ENABLED()) {
 					uiscsiproto_t info;
 					char nil = '\0';
 
+					info.uip_target_addr =
+					    &c->c_target_sockaddr;
+					info.uip_initiator_addr =
+					    &c->c_initiator_sockaddr;
+					info.uip_target = &nil;
+
 					info.uip_initiator =
 					    c->c_sess->s_i_name;
-					info.uip_target = &nil;
 					info.uip_lun = 0;
 
 					info.uip_itt = rsp->itt;

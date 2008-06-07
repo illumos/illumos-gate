@@ -168,13 +168,13 @@ t10_aio_done(void *v)
 		}
 		if ((a != NULL) && (a->a_aio_cmplt != NULL)) {
 			lu = a->a_cmd->c_lu;
-			pthread_mutex_lock(&lu->l_cmd_mutex);
+			(void) pthread_mutex_lock(&lu->l_cmd_mutex);
 			if (t10_cmd_state_machine(a->a_cmd, T10_Cmd_T4) !=
 			    T10_Cmd_S1_Free) {
-				pthread_mutex_unlock(&lu->l_cmd_mutex);
+				(void) pthread_mutex_unlock(&lu->l_cmd_mutex);
 				(*a->a_aio_cmplt)(a->a_id);
 			} else
-				pthread_mutex_unlock(&lu->l_cmd_mutex);
+				(void) pthread_mutex_unlock(&lu->l_cmd_mutex);
 		} else {
 			queue_prt(mgmtq, Q_STE_ERRS,
 			    "SAM   aiowait returned results, but is NULL\n");
@@ -319,8 +319,8 @@ t10_handle_destroy(t10_targ_handle_t tp)
 					    (c2free->c_state ==
 					    T10_Cmd_S6_Freeing_In)) {
 						fast_free++;
-						t10_cmd_state_machine(c2free,
-						    T10_Cmd_T6);
+						(void) t10_cmd_state_machine(
+						    c2free, T10_Cmd_T6);
 					}
 				}
 				queue_prt(mgmtq, Q_STE_NONIO,
@@ -1022,8 +1022,8 @@ t10_thick_provision(char *target, int lun, target_queue_t *q)
 		if (local_name == NULL)
 			goto error;
 
-		mgmt_param_save2scf(cmd->c_lu->l_common->l_root, local_name,
-		    lun);
+		(void) mgmt_param_save2scf(cmd->c_lu->l_common->l_root,
+		    local_name, lun);
 		free(local_name);
 		queue_message_set(cmd->c_lu->l_common->l_from_transports, 0,
 		    msg_lu_online, 0);
@@ -1306,15 +1306,15 @@ trans_aiowrite(t10_cmd_t *cmd, char *data, size_t data_len, off_t offset,
 {
 	taio->a_cmd = cmd;
 
-	pthread_mutex_lock(&cmd->c_lu->l_cmd_mutex);
+	(void) pthread_mutex_lock(&cmd->c_lu->l_cmd_mutex);
 	if (aiowrite(cmd->c_lu->l_common->l_fd, data, data_len, offset, 0,
 	    &taio->a_aio) == -1) {
-		pthread_mutex_unlock(&cmd->c_lu->l_cmd_mutex);
+		(void) pthread_mutex_unlock(&cmd->c_lu->l_cmd_mutex);
 		taio->a_aio.aio_return = -1;
 		(*taio->a_aio_cmplt)(taio->a_id);
 	} else {
-		t10_cmd_state_machine(cmd, T10_Cmd_T3);
-		pthread_mutex_unlock(&cmd->c_lu->l_cmd_mutex);
+		(void) t10_cmd_state_machine(cmd, T10_Cmd_T3);
+		(void) pthread_mutex_unlock(&cmd->c_lu->l_cmd_mutex);
 	}
 }
 
@@ -1323,15 +1323,15 @@ trans_aioread(t10_cmd_t *cmd, char *data, size_t data_len, off_t offset,
     t10_aio_t *taio)
 {
 	taio->a_cmd = cmd;
-	pthread_mutex_lock(&cmd->c_lu->l_cmd_mutex);
+	(void) pthread_mutex_lock(&cmd->c_lu->l_cmd_mutex);
 	if (aioread(cmd->c_lu->l_common->l_fd, data, data_len, offset, 0,
 	    &taio->a_aio) == -1) {
-		pthread_mutex_unlock(&cmd->c_lu->l_cmd_mutex);
+		(void) pthread_mutex_unlock(&cmd->c_lu->l_cmd_mutex);
 		taio->a_aio.aio_return = -1;
 		(*taio->a_aio_cmplt)(taio->a_id);
 	} else {
-		t10_cmd_state_machine(cmd, T10_Cmd_T3);
-		pthread_mutex_unlock(&cmd->c_lu->l_cmd_mutex);
+		(void) t10_cmd_state_machine(cmd, T10_Cmd_T3);
+		(void) pthread_mutex_unlock(&cmd->c_lu->l_cmd_mutex);
 	}
 }
 
@@ -1492,7 +1492,7 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 		 * will do to the params file.
 		 */
 
-		mgmt_get_param(&n, local_name, lun);
+		(void) mgmt_get_param(&n, local_name, lun);
 		okay_to_free = True;
 
 		if (tgt_find_value_str(n, XML_ELEMENT_GUID, &guid) == False) {
@@ -2157,14 +2157,14 @@ load_params(t10_lu_common_t *lu, char *basedir)
 	 * the LU has grown since it was last opened.
 	 */
 	if (lu->l_mmap != MAP_FAILED)
-		munmap(lu->l_mmap, lu->l_size);
+		(void) munmap(lu->l_mmap, lu->l_size);
 	if (lu->l_fd != -1)
-		close(lu->l_fd);
+		(void) close(lu->l_fd);
 
 	node = lu->l_root;
 
 	if (validate_version(node, &version_maj, &version_min) == False)
-		fprintf(stderr, "Failed version check\n");
+		(void) fprintf(stderr, "Failed version check\n");
 
 	if (tgt_find_value_str(node, XML_ELEMENT_PID, &lu->l_pid) == False)
 		goto error;

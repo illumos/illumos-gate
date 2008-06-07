@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,19 +33,11 @@ POFILES= $(OBJS:%.o=%.po)
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/iscsi/Makefile.iscsi
 
-LDLIBS += -liscsitgt -lxml2
+LDLIBS += -liscsitgt
+XMLLIB = -lxml2
 CFLAGS += $(CCVERBOSE) -I${ISCSICOMMONDIR}
 FILEMODE= 0555
 GROUP= bin
-
-#
-# We can't use the default lint target because there is not a libxml2
-# lint library and we'll get warnings. So, we'll just lint the local
-# source and not do the cross checks.
-#
-#lint := LINTFLAGS = -muxs -I$(ISCSICOMMONDIR)
-
-SUFFIX_LINT	= .ln
 
 .KEEP_STATE:
 
@@ -54,7 +46,7 @@ all: $(PROG)
 install: all $(ROOTUSRSBINPROG)
 
 $(PROG): $(OBJS) $(COMMON_OBJS)
-	$(LINK.c) -o $(PROG) $(OBJS) $(COMMON_OBJS) $(LDLIBS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(COMMON_OBJS) $(LDLIBS) $(XMLLIB)
 	$(POST_PROCESS)
 
 catalog:	$(POFILE)
@@ -62,10 +54,8 @@ catalog:	$(POFILE)
 lint	:= LINTFLAGS += -u
 lint	:= LINTFLAGS64 += -u
 
-lint: $(SRCS:%=%$(SUFFIX_LINT))
-
-%$(SUFFIX_LINT): %
-	${LINT.c} -I. -I$(ISCSICOMMONDIR) -y -c $< && touch $@
+lint:	$$(SRCS)
+	$(LINT.c) $(SRCS) $(LDLIBS)
 
 $(POFILE): $(POFILES)
 	$(RM) $@
@@ -76,6 +66,6 @@ $(POFILE): $(POFILES)
 	$(POST_PROCESS_O)
 
 clean:
-	-$(RM) $(OBJS) $(COMMON_OBJS) *$(SUFFIX_LINT)
+	-$(RM) $(OBJS) $(COMMON_OBJS) 
 
 include $(SRC)/cmd/Makefile.targ

@@ -242,7 +242,7 @@ sbc_cmd_reserved(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	case SCMD_SVC_ACTION_IN_G5: /* READ MEDIA SERIAL NUMBER (ABh) */
 		break;
 	default:
-		pthread_rwlock_rdlock(&res->res_rwlock);
+		(void) pthread_rwlock_rdlock(&res->res_rwlock);
 		switch (res->res_type) {
 		case RT_NONE:
 			/* conflict = False; */
@@ -257,7 +257,7 @@ sbc_cmd_reserved(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			conflict = True;
 			break;
 		}
-		pthread_rwlock_unlock(&res->res_rwlock);
+		(void) pthread_rwlock_unlock(&res->res_rwlock);
 	}
 
 	queue_prt(mgmtq, Q_PR_IO,
@@ -1848,7 +1848,7 @@ sbc_io_alloc(t10_cmd_t *c)
 		if (d->d_io_used == True) {
 			d->d_io_need = True;
 			while (d->d_io_used == True)
-				pthread_cond_wait(&d->d_io_cond, &d->d_mutex);
+			(void) pthread_cond_wait(&d->d_io_cond, &d->d_mutex);
 			d->d_io_need = False;
 		}
 		d->d_io_used	= True;
@@ -1885,8 +1885,8 @@ sbc_io_free(emul_handle_t e)
 		(void) pthread_mutex_lock(&io->da_params->d_mutex);
 		io->da_params->d_io_used = False;
 		if (io->da_params->d_io_need == True)
-			pthread_cond_signal(&io->da_params->d_io_cond);
-		(void) pthread_mutex_unlock(&io->da_params->d_mutex);
+			(void) pthread_cond_signal(&io->da_params->d_io_cond);
+			(void) pthread_mutex_unlock(&io->da_params->d_mutex);
 	} else {
 		free(io);
 	}

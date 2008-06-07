@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -251,25 +251,24 @@ osd_list(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	osd_cmd_list_t		*o	= (osd_cmd_list_t *)cdb;
 	osd_obj_id_t		part;
 	osd_list_param_t	*data;
-	uint64_t		len,
-				alloc_len;
+	uint64_t		len, alloc_len;
 
 	part = (uint64_t)o->ocdb_partition_id[0] << 56 |
-		(uint64_t)o->ocdb_partition_id[1] << 48 |
-		(uint64_t)o->ocdb_partition_id[2] << 40 |
-		(uint64_t)o->ocdb_partition_id[3] << 32 |
-		(uint64_t)o->ocdb_partition_id[4] << 24 |
-		(uint64_t)o->ocdb_partition_id[5] << 16 |
-		(uint64_t)o->ocdb_partition_id[6] << 8 |
-		(uint64_t)o->ocdb_partition_id[7];
+	    (uint64_t)o->ocdb_partition_id[1] << 48 |
+	    (uint64_t)o->ocdb_partition_id[2] << 40 |
+	    (uint64_t)o->ocdb_partition_id[3] << 32 |
+	    (uint64_t)o->ocdb_partition_id[4] << 24 |
+	    (uint64_t)o->ocdb_partition_id[5] << 16 |
+	    (uint64_t)o->ocdb_partition_id[6] << 8 |
+	    (uint64_t)o->ocdb_partition_id[7];
 	len = (uint64_t)o->ocdb_length[0] << 56 |
-		(uint64_t)o->ocdb_length[1] << 48 |
-		(uint64_t)o->ocdb_length[2] << 40 |
-		(uint64_t)o->ocdb_length[3] << 32 |
-		(uint64_t)o->ocdb_length[4] << 24 |
-		(uint64_t)o->ocdb_length[5] << 16 |
-		(uint64_t)o->ocdb_length[6] << 8 |
-		(uint64_t)o->ocdb_length[7];
+	    (uint64_t)o->ocdb_length[1] << 48 |
+	    (uint64_t)o->ocdb_length[2] << 40 |
+	    (uint64_t)o->ocdb_length[3] << 32 |
+	    (uint64_t)o->ocdb_length[4] << 24 |
+	    (uint64_t)o->ocdb_length[5] << 16 |
+	    (uint64_t)o->ocdb_length[6] << 8 |
+	    (uint64_t)o->ocdb_length[7];
 
 	if (len == 0) {
 		trans_send_complete(cmd, STATUS_GOOD);
@@ -286,8 +285,8 @@ osd_list(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	if (part == OSD_PARTITION_ROOT)
 		data->op_root = 1;
 
-	trans_send_datain(cmd, (char *)data, sizeof (*data), 0, free, True,
-	    (emul_handle_t)data);
+	(void) trans_send_datain(cmd, (char *)data, sizeof (*data), 0, free,
+	    True, (emul_handle_t)data);
 }
 
 /*

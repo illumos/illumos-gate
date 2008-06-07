@@ -732,7 +732,7 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 				(void) getcwd(newdir, sizeof (newdir));
 				tgt_buf_add(&first_str, XML_ELEMENT_BASEDIR,
 				    newdir);
-				chdir(olddir);
+				(void) chdir(olddir);
 				break;
 			case 'H': /* chap name */
 				if (strlen(optionList->optarg) != 0) {

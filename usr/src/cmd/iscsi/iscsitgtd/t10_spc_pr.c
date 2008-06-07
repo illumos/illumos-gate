@@ -486,7 +486,7 @@ spc_cmd_pr_in(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	/*
 	 * Start processing, lock reservation
 	 */
-	pthread_rwlock_rdlock(&res->res_rwlock);
+	(void) pthread_rwlock_rdlock(&res->res_rwlock);
 
 	queue_prt(mgmtq, Q_PR_NONIO, "PGR%x LUN%d action:%s\n",
 	    cmd->c_lu->l_targ->s_targ_num, cmd->c_lu->l_common->l_num,
@@ -525,7 +525,7 @@ spc_cmd_pr_in(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	/*
 	 * Complete processing, unlock reservation
 	 */
-	pthread_rwlock_unlock(&res->res_rwlock);
+	(void) pthread_rwlock_unlock(&res->res_rwlock);
 
 	/*
 	 * Now send the selected Persistent Reservation response back
@@ -705,7 +705,8 @@ spc_pr_in_fullstat(
 			buf->full_desc[i].trans_id.format_code =
 			    WW_UID_DEVICE_NAME;
 			SCSI_WRITE16(buf->full_desc[i].trans_id.add_len, 0);
-			sprintf(buf->full_desc[i].trans_id.iscsi_name, "");
+			(void) sprintf(buf->full_desc[i].trans_id.iscsi_name,
+			    "");
 
 			i++;
 		}
@@ -830,7 +831,7 @@ spc_cmd_pr_out_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 	 * If this is the first time using the persistance data,
 	 * initialize the reservation and resource key queues
 	 */
-	pthread_rwlock_wrlock(&res->res_rwlock);
+	(void) pthread_rwlock_wrlock(&res->res_rwlock);
 	if (pgr->pgr_rsrvlist.lnk_fwd == NULL) {
 		spc_pr_initialize(pgr);
 	}
@@ -906,7 +907,7 @@ spc_cmd_pr_out_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 		/*
 		 * Check condition required.
 		 */
-		pthread_rwlock_unlock(&res->res_rwlock);
+		(void) pthread_rwlock_unlock(&res->res_rwlock);
 		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
 		spc_sense_ascq(cmd, cmd->c_lu->l_asc, cmd->c_lu->l_ascq);
 		trans_send_complete(cmd, STATUS_CHECK);
@@ -917,7 +918,7 @@ spc_cmd_pr_out_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 	 * Handle Failed processing status
 	 */
 	if (status != STATUS_GOOD) {
-		pthread_rwlock_unlock(&res->res_rwlock);
+		(void) pthread_rwlock_unlock(&res->res_rwlock);
 		trans_send_complete(cmd, status);
 		return;
 	}
@@ -934,7 +935,7 @@ spc_cmd_pr_out_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 	 * this PGR data on disk
 	 */
 	if (plist->aptpl || pgr->pgr_aptpl)
-		spc_pr_write(cmd);
+		(void) spc_pr_write(cmd);
 
 	/*
 	 * When the last registration is removed, PGR is no longer
@@ -962,7 +963,7 @@ spc_cmd_pr_out_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
 	/*
 	 * Processing is complete, release mutex
 	 */
-	pthread_rwlock_unlock(&res->res_rwlock);
+	(void) pthread_rwlock_unlock(&res->res_rwlock);
 
 	/*
 	 * Send back a succesful response
@@ -1920,7 +1921,7 @@ spc_pr_read(t10_cmd_t *cmd)
 	 */
 	if (status == False) {
 		if (pfd >= 0)
-			close(pfd);
+			(void) close(pfd);
 		if (buf)
 			free(buf);
 		return;
@@ -2058,9 +2059,9 @@ spc_pr_write(t10_cmd_t *cmd)
 
 		klist[i].rectype = PGRDISKKEY;
 		klist[i].key = key->k_key;
-		strncpy(klist[i].i_name, key->k_i_name,
+		(void) strncpy(klist[i].i_name, key->k_i_name,
 		    sizeof (klist[i].i_name));
-		strncpy(klist[i].transportID, key->k_transportID,
+		(void) strncpy(klist[i].transportID, key->k_transportID,
 		    sizeof (klist[i].transportID));
 	}
 
@@ -2077,9 +2078,9 @@ spc_pr_write(t10_cmd_t *cmd)
 		rlist[i].key = rsrv->r_key;
 		rlist[i].scope = rsrv->r_scope;
 		rlist[i].type = rsrv->r_type;
-		strncpy(rlist[i].i_name, rsrv->r_i_name,
+		(void) strncpy(rlist[i].i_name, rsrv->r_i_name,
 		    sizeof (rlist[i].i_name));
-		strncpy(rlist[i].transportID, rsrv->r_transportID,
+		(void) strncpy(rlist[i].transportID, rsrv->r_transportID,
 		    sizeof (rlist[i].transportID));
 	}
 
@@ -2091,7 +2092,7 @@ spc_pr_write(t10_cmd_t *cmd)
 	    PERSISTANCEBASE, cmd->c_lu->l_common->l_num);
 	if ((pfd = open(path, O_WRONLY|O_CREAT, 0600)) >= 0) {
 		length = write(pfd, buf, bufsize);
-		close(pfd);
+		(void) close(pfd);
 	} else {
 		if ((pfd < 0) || (length != bufsize))
 			status = False;

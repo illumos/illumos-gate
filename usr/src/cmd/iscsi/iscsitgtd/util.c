@@ -1135,7 +1135,7 @@ util_create_guid(char **guid)
 		 * second here since part of the GUID is a time stamp with
 		 * a one second resolution.
 		 */
-		sleep(1);
+		(void) sleep(1);
 	}
 
 	if (tgt_xml_encode((uint8_t *)&eui, sizeof (eui), guid,

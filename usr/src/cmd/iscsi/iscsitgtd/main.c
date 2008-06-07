@@ -435,7 +435,7 @@ server_for_door(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 	 */
 	if (door_ucred(&uc) != 0) {
 		xml_rtn_msg(&err_rply, ERR_BAD_CREDS);
-		strlcpy(argp, err_rply, arg_size);
+		(void) strlcpy(argp, err_rply, arg_size);
 		free(err_rply);
 		(void) door_return(argp, strlen(argp) + 1, NULL, 0);
 		return;
@@ -467,10 +467,10 @@ server_for_door(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 
 			queue_message_set(mgmtq, 0, msg_mgmt_rqst, &m);
 			if ((msg = queue_message_get(m.m_q)) == NULL) {
-				xmlFreeTextReader(r);
-				xmlCleanupParser();
-				ucred_free(uc);
-				door_return("", 1, NULL, 0);
+				(void) xmlFreeTextReader(r);
+				(void) xmlCleanupParser();
+				(void) ucred_free(uc);
+				(void) door_return("", 1, NULL, 0);
 			}
 
 			/*
@@ -505,7 +505,7 @@ server_for_door(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 	if (node != NULL)
 		tgt_node_free(node);
 	if (err_rply != NULL) {
-		strlcpy(argp, err_rply, arg_size);
+		(void) strlcpy(argp, err_rply, arg_size);
 		free(err_rply);
 	}
 	if (m.m_q != NULL)
@@ -805,7 +805,7 @@ main(int argc, char **argv)
 	port_init();
 	queue_init();
 	util_init();
-	isns_init(q);
+	(void) isns_init(q);
 
 	/*
 	 * If there's no MAC address currently available don't worry about
