@@ -985,6 +985,7 @@ int kmem_flags = KMF_AUDIT | KMF_DEADBEEF | KMF_REDZONE | KMF_CONTENTS;
 int kmem_flags = 0;
 #endif
 int kmem_ready;
+static boolean_t kmem_mp_init_done = B_FALSE;
 
 static kmem_cache_t	*kmem_slab_cache;
 static kmem_cache_t	*kmem_bufctl_cache;
@@ -3148,7 +3149,7 @@ kmem_partial_slab_cmp(const void *p0, const void *p1)
 static void
 kmem_check_destructor(kmem_cache_t *cp)
 {
-	ASSERT(taskq_member(kmem_move_taskq, curthread));
+	void *buf;
 
 	if (cp->cache_destructor == NULL)
 		return;
@@ -3159,7 +3160,7 @@ kmem_check_destructor(kmem_cache_t *cp)
 	 * Allocate from the slab layer to ensure that the client has not
 	 * touched the buffer.
 	 */
-	void *buf = kmem_slab_alloc(cp, KM_NOSLEEP);
+	buf = kmem_slab_alloc(cp, KM_NOSLEEP);
 	if (buf == NULL)
 		return;
 
@@ -3473,10 +3474,8 @@ kmem_cache_create(
 	if (kmem_ready)
 		kmem_cache_magazine_enable(cp);
 
-	if (kmem_move_taskq != NULL && cp->cache_destructor != NULL) {
-		(void) taskq_dispatch(kmem_move_taskq,
-		    (task_func_t *)kmem_check_destructor, cp,
-		    TQ_NOSLEEP);
+	if (kmem_mp_init_done && cp->cache_destructor != NULL) {
+		kmem_check_destructor(cp);
 	}
 
 	return (cp);
@@ -3983,8 +3982,6 @@ kmem_thread_init(void)
 	kmem_move_init();
 	kmem_taskq = taskq_create_instance("kmem_taskq", 0, 1, minclsyspri,
 	    300, INT_MAX, TASKQ_PREPOPULATE);
-	kmem_cache_applyall(kmem_check_destructor, kmem_move_taskq,
-	    TQ_NOSLEEP);
 }
 
 void
@@ -3995,6 +3992,13 @@ kmem_mp_init(void)
 	mutex_exit(&cpu_lock);
 
 	kmem_update_timeout(NULL);
+
+	kmem_mp_init_done = B_TRUE;
+	/*
+	 * Defer checking destructors until now to avoid constructor
+	 * dependencies during startup.
+	 */
+	kmem_cache_applyall(kmem_check_destructor, NULL, 0);
 }
 
 /*

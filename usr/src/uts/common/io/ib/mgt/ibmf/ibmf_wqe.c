@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -527,20 +526,6 @@ ibmf_i_init_wqes(ibmf_ci_t *cip)
 	    IBMF_TNF_TRACE, "", "ibmf_i_init_wqes() enter, cip = %p\n",
 	    tnf_opaque, cip, cip);
 
-	bzero(string, 128);
-	(void) sprintf(string, "ibmf_%016" PRIx64 "_swqe", cip->ci_node_guid);
-	/* create a kmem cache for the send WQEs */
-	cip->ci_send_wqes_cache = kmem_cache_create(string,
-	    sizeof (ibmf_send_wqe_t), 0, ibmf_send_wqe_cache_constructor,
-	    ibmf_send_wqe_cache_destructor, NULL, (void *)cip, NULL, 0);
-
-	bzero(string, 128);
-	(void) sprintf(string, "ibmf_%016" PRIx64 "_rwqe", cip->ci_node_guid);
-	/* create a kmem cache for the receive WQEs */
-	cip->ci_recv_wqes_cache = kmem_cache_create(string,
-	    sizeof (ibmf_recv_wqe_t), 0, ibmf_recv_wqe_cache_constructor,
-	    ibmf_recv_wqe_cache_destructor, NULL, (void *)cip, NULL, 0);
-
 	/*
 	 * Allocate memory for the WQE management structure
 	 */
@@ -569,8 +554,6 @@ ibmf_i_init_wqes(ibmf_ci_t *cip)
 	if (status != IBT_SUCCESS) {
 		kmem_free(wqe_mgtp->wqes_kmem,
 		    wqe_mgtp->wqes_kmem_sz);
-		kmem_cache_destroy(cip->ci_recv_wqes_cache);
-		kmem_cache_destroy(cip->ci_send_wqes_cache);
 		IBMF_TRACE_2(IBMF_TNF_NODEBUG, DPRINT_L1,
 		    ibmf_i_init_wqes_err, IBMF_TNF_ERROR, "",
 		    "ibmf_i_init_wqes(): %s, status = %d\n", tnf_string, msg,
@@ -596,6 +579,20 @@ ibmf_i_init_wqes(ibmf_ci_t *cip)
 	mutex_enter(&cip->ci_wqe_mutex);
 	cip->ci_wqe_mgt_list = wqe_mgtp;
 	mutex_exit(&cip->ci_wqe_mutex);
+
+	bzero(string, 128);
+	(void) sprintf(string, "ibmf_%016" PRIx64 "_swqe", cip->ci_node_guid);
+	/* create a kmem cache for the send WQEs */
+	cip->ci_send_wqes_cache = kmem_cache_create(string,
+	    sizeof (ibmf_send_wqe_t), 0, ibmf_send_wqe_cache_constructor,
+	    ibmf_send_wqe_cache_destructor, NULL, (void *)cip, NULL, 0);
+
+	bzero(string, 128);
+	(void) sprintf(string, "ibmf_%016" PRIx64 "_rwqe", cip->ci_node_guid);
+	/* create a kmem cache for the receive WQEs */
+	cip->ci_recv_wqes_cache = kmem_cache_create(string,
+	    sizeof (ibmf_recv_wqe_t), 0, ibmf_recv_wqe_cache_constructor,
+	    ibmf_recv_wqe_cache_destructor, NULL, (void *)cip, NULL, 0);
 
 	IBMF_TRACE_0(IBMF_TNF_DEBUG, DPRINT_L4, ibmf_i_init_wqes_end,
 	    IBMF_TNF_TRACE, "", "ibmf_i_init_wqes() exit\n");
