@@ -357,6 +357,8 @@ csfiles="
 	platform/sun4u-us3/kernel/crypto/sparcv9/aes
 	platform/sun4u/kernel/crypto/sparcv9/arcfour
 	platform/sun4u/kernel/crypto/sparcv9/des
+	SUNWcakr.v
+	platform/sun4v/kernel/drv/sparcv9/ncp
 	SUNWckr
 	kernel/crypto/sparcv9/aes
 	kernel/crypto/sparcv9/arcfour
@@ -367,6 +369,8 @@ csfiles="
 	usr/lib/security/sparcv9/pkcs11_softtoken.so.1
 	SUNWdcar
 	kernel/drv/sparcv9/dca
+	SUNWn2cp.v
+	platform/sun4v/kernel/drv/sparcv9/n2cp
 "
 # x86-only
 cxfiles="
