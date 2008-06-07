@@ -81,11 +81,11 @@ static void sbc_io_free(emul_handle_t e);
 static void sbc_read_cmplt(emul_handle_t e);
 static void sbc_write_cmplt(emul_handle_t e);
 static void sbc_read_capacity16(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len);
-static char *sense_page3(disk_params_t *d, char *buf);
-static char *sense_page4(disk_params_t *d, char *buf);
-static char *sense_cache(disk_params_t *d, char *buf);
-static char *sense_mode_control(t10_lu_impl_t *lu, char *buf);
-static char *sense_info_ctrl(char *buf);
+static char *sense_page3(disk_params_t *d, char *buf, uint8_t pc);
+static char *sense_page4(disk_params_t *d, char *buf, uint8_t pc);
+static char *sense_cache(disk_params_t *d, char *buf, uint8_t pc);
+static char *sense_mode_control(t10_lu_impl_t *lu, char *buf, uint8_t pc);
+static char *sense_info_ctrl(char *buf, uint8_t pc);
 static scsi_cmd_table_t lba_table[];
 
 static long sbc_page_size;
@@ -794,13 +794,15 @@ sbc_write_cmplt(emul_handle_t e)
 	int		sense_len;
 	uint64_t	err_blkno;
 
-	if (io->da_aio.a_aio.aio_return != io->da_data_len) {
+	if ((cmd->c_lu->l_common->l_mmap == MAP_FAILED) &&
+	    (io->da_aio.a_aio.aio_return != io->da_data_len)) {
 		err_blkno = io->da_lba + ((io->da_offset + 511) / 512);
 		cmd->c_resid = (io->da_lba_cnt * 512) - io->da_offset;
 		if (err_blkno > FIXED_SENSE_ADDL_INFO_LEN)
 			sense_len = INFORMATION_SENSE_DESCR;
 		else
 			sense_len = 0;
+
 		spc_sense_create(cmd, KEY_HARDWARE_ERROR, sense_len);
 		spc_sense_info(cmd, err_blkno);
 		trans_send_complete(cmd, STATUS_CHECK);
@@ -997,6 +999,7 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	disk_params_t		*d;
 	disk_io_t		*io;
 	int			rtn_len;
+	uint8_t			pc;
 	struct block_descriptor	bd;
 
 	if ((d = (disk_params_t *)T10_PARAMS_AREA(cmd)) == NULL)
@@ -1080,11 +1083,27 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	}
 
 	/*
-	 * cdb[2] contains page code, and page control field. So, we need
+	 * cdb[2] contains page code, and page control field.  So, we need
 	 * to mask page control field,  while checking for the page code.
+	 *
+	 * Page control specifies whether to report the current, changeable
+	 * default or saved values.  This parameter only applies to the
+	 * mode page data itself.  From spc-3 section 6.9.1:
+	 *
+	 * "The PC field only affects the mode parameters within the mode
+	 * pages, however the PS, SPF, PAGE CODE field, SUBPAGE CODE field,
+	 * and PAGE LENGTH field should return current values (i.e. as if
+	 * PC is set to 00b).  The mode parameter header and mode parameter
+	 * block descriptor should return current values."
+	 *
+	 * Also:  "Some SCSI target devices may not distinguish between
+	 * current and saved mode parameters and report identical values
+	 * in response to a PC field of either 0 or 3."  Our implementation
+	 * will treat 0 and 3 the same.
 	 */
+	pc  = (cdb[2] & SPC_MODE_SENSE_PC_MASK) >> SPC_MODE_SENSE_PC_SHIFT;
 
-	switch (cdb[2] & SPC_MODE_SENSE_PC) {
+	switch (cdb[2] & SPC_MODE_SENSE_PAGE_CODE_MASK) {
 
 	case MODE_SENSE_PAGE3_CODE:
 		if ((d->d_heads == 0) && (d->d_cyl == 0) && (d->d_spt == 0)) {
@@ -1094,7 +1113,8 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		}
 		mode_hdr->length += sizeof (struct mode_format);
 		(void) sense_page3(d,
-		    io->da_data + sizeof (*mode_hdr) + mode_hdr->bdesc_length);
+		    io->da_data + sizeof (*mode_hdr) + mode_hdr->bdesc_length,
+		    pc);
 		break;
 
 	case MODE_SENSE_PAGE4_CODE:
@@ -1105,25 +1125,28 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		}
 		mode_hdr->length += sizeof (struct mode_geometry);
 		(void) sense_page4(d,
-		    io->da_data + sizeof (*mode_hdr) + mode_hdr->bdesc_length);
+		    io->da_data + sizeof (*mode_hdr) + mode_hdr->bdesc_length,
+		    pc);
 		break;
 
 	case MODE_SENSE_CACHE:
 		mode_hdr->length += sizeof (struct mode_cache_scsi3);
 		(void) sense_cache(d,
-		    io->da_data + sizeof (*mode_hdr) + mode_hdr->bdesc_length);
+		    io->da_data + sizeof (*mode_hdr) + mode_hdr->bdesc_length,
+		    pc);
 		break;
 
 	case MODE_SENSE_CONTROL:
 		mode_hdr->length += sizeof (struct mode_control_scsi3);
 		(void) sense_mode_control(cmd->c_lu,
-		    io->da_data + sizeof (*mode_hdr) + mode_hdr->bdesc_length);
+		    io->da_data + sizeof (*mode_hdr) + mode_hdr->bdesc_length,
+		    pc);
 		break;
 
 	case MODE_SENSE_INFO_CTRL:
 		mode_hdr->length += sizeof (struct mode_info_ctrl);
 		(void) sense_info_ctrl(io->da_data + sizeof (*mode_hdr) +
-		    mode_hdr->bdesc_length);
+		    mode_hdr->bdesc_length, pc);
 		break;
 
 	case MODE_SENSE_SEND_ALL:
@@ -1167,12 +1190,12 @@ sbc_msense(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			 */
 			rtn_len = sizeof (*mode_hdr) + mode_hdr->bdesc_length;
 			if (d->d_heads && d->d_cyl && d->d_spt) {
-				np = sense_page3(d, np);
-				np = sense_page4(d, np);
+				np = sense_page3(d, np, pc);
+				np = sense_page4(d, np, pc);
 			}
-			np = sense_cache(d, np);
-			np = sense_mode_control(cmd->c_lu, np);
-			(void) sense_info_ctrl(np);
+			np = sense_cache(d, np, pc);
+			np = sense_mode_control(cmd->c_lu, np, pc);
+			(void) sense_info_ctrl(np, pc);
 		}
 		break;
 
@@ -1611,17 +1634,35 @@ sbc_verify_data(t10_cmd_t *cmd, emul_handle_t id, size_t offset, char *data,
  * []----
  */
 static char *
-sense_page3(disk_params_t *d, char *buf)
+sense_page3(disk_params_t *d, char *buf, uint8_t pc)
 {
 	struct mode_format		mode_fmt;
 
 	bzero(&mode_fmt, sizeof (mode_fmt));
+
+	/* Page code and page length are always set */
 	mode_fmt.mode_page.code		= MODE_SENSE_PAGE3_CODE;
 	mode_fmt.mode_page.length	= sizeof (struct mode_format) -
 	    sizeof (struct mode_page);
-	mode_fmt.data_bytes_sect	= htons(d->d_bytes_sect);
-	mode_fmt.sect_track		= htons(d->d_spt);
-	mode_fmt.interleave		= htons(d->d_interleave);
+
+	/*
+	 * No modifiable values so we report all zeros for
+	 * SPC_PC_MODIFIABLE_VALUES and all other page control values
+	 * result in the same values as SPC_PC_CURRENT_VALUES.
+	 */
+	switch (pc) {
+	case SPC_PC_MODIFIABLE_VALUES:
+		/* Leave it blank */
+		break;
+	case SPC_PC_CURRENT_VALUES:
+	case SPC_PC_DEFAULT_VALUES:
+	case SPC_PC_SAVED_VALUES:
+		mode_fmt.data_bytes_sect	= htons(d->d_bytes_sect);
+		mode_fmt.sect_track		= htons(d->d_spt);
+		mode_fmt.interleave		= htons(d->d_interleave);
+		break;
+	}
+
 	bcopy(&mode_fmt, buf, sizeof (mode_fmt));
 
 	return (buf + sizeof (mode_fmt));
@@ -1636,35 +1677,73 @@ sense_page3(disk_params_t *d, char *buf)
  * []----
  */
 static char *
-sense_page4(disk_params_t *d, char *buf)
+sense_page4(disk_params_t *d, char *buf, uint8_t pc)
 {
 	struct mode_geometry	mode_geom;
 
 	bzero(&mode_geom, sizeof (mode_geom));
+
+	/* Page code and page length are always set */
 	mode_geom.mode_page.code	= MODE_SENSE_PAGE4_CODE;
 	mode_geom.mode_page.length	=
 	    sizeof (struct mode_geometry) - sizeof (struct mode_page);
-	mode_geom.heads			= d->d_heads;
-	mode_geom.cyl_ub		= d->d_cyl >> 16;
-	mode_geom.cyl_mb		= d->d_cyl >> 8;
-	mode_geom.cyl_lb		= d->d_cyl;
-	mode_geom.rpm			= htons(d->d_rpm);
+
+	/*
+	 * No modifiable values so we report all zeros for
+	 * SPC_PC_MODIFIABLE_VALUES and all other page control values
+	 * result in the same values as SPC_PC_CURRENT_VALUES.
+	 */
+	switch (pc) {
+	case SPC_PC_MODIFIABLE_VALUES:
+		/* Leave it blank */
+		break;
+	case SPC_PC_CURRENT_VALUES:
+	case SPC_PC_DEFAULT_VALUES:
+	case SPC_PC_SAVED_VALUES:
+		mode_geom.heads			= d->d_heads;
+		mode_geom.cyl_ub		= d->d_cyl >> 16;
+		mode_geom.cyl_mb		= d->d_cyl >> 8;
+		mode_geom.cyl_lb		= d->d_cyl;
+		mode_geom.rpm			= htons(d->d_rpm);
+		break;
+	}
+
 	bcopy(&mode_geom, buf, sizeof (mode_geom));
 
 	return (buf + sizeof (mode_geom));
 }
 
 static char *
-sense_cache(disk_params_t *d, char *buf)
+sense_cache(disk_params_t *d, char *buf, uint8_t pc)
 {
 	struct mode_cache_scsi3		mode_cache;
 
 	bzero(&mode_cache, sizeof (mode_cache));
 
+	/* Page code and page length are always set */
 	mode_cache.mode_page.code	= MODE_SENSE_CACHE;
 	mode_cache.mode_page.length	= sizeof (mode_cache) -
 	    sizeof (struct mode_page);
-	mode_cache.wce = d->d_fast_write == True ? 1 : 0;
+
+	/*
+	 * No modifiable values so we report all zeros for
+	 * SPC_PC_MODIFIABLE_VALUES and all other page control values
+	 * result in the same values as SPC_PC_CURRENT_VALUES.
+	 *
+	 * Technically wce is modifiable but not by using a mode
+	 * select command.
+	 */
+	switch (pc) {
+	case SPC_PC_MODIFIABLE_VALUES:
+		/* Leave it blank */
+		break;
+	case SPC_PC_CURRENT_VALUES:
+	case SPC_PC_DEFAULT_VALUES:
+	case SPC_PC_SAVED_VALUES:
+		mode_cache.wce = d->d_fast_write == True ? 1 : 0;
+		break;
+	}
+
 	bcopy(&mode_cache, buf, sizeof (mode_cache));
 
 	return (buf + sizeof (mode_cache));
@@ -1676,16 +1755,37 @@ sense_cache(disk_params_t *d, char *buf)
  * []----
  */
 static char *
-sense_mode_control(t10_lu_impl_t *lu, char *buf)
+sense_mode_control(t10_lu_impl_t *lu, char *buf, uint8_t pc)
 {
 	struct mode_control_scsi3	m;
 
 	bzero(&m, sizeof (m));
+
+	/* Page code and page length are always set */
 	m.mode_page.code	= MODE_SENSE_CONTROL;
 	m.mode_page.length	= sizeof (struct mode_control_scsi3) -
 	    sizeof (struct mode_page);
-	m.d_sense		= (lu->l_dsense_enabled == True) ? 1 : 0;
-	m.que_mod		= SPC_QUEUE_UNRESTRICTED;
+
+	/*
+	 * D_SENSE is modifiable so we need to reflect this in the
+	 * SPC_PC_MODIFIABLE_VALUES page as well as report the default
+	 * value of '0' in SPC_PC_DEFAULT_VALUES.
+	 */
+	switch (pc) {
+	case SPC_PC_MODIFIABLE_VALUES:
+		m.d_sense	= 1; /* Modifiable */
+		break;
+	case SPC_PC_DEFAULT_VALUES:
+		m.d_sense	= 0; /* Default is disabled */
+		m.que_mod	= SPC_QUEUE_UNRESTRICTED;
+		break;
+	case SPC_PC_CURRENT_VALUES:
+	case SPC_PC_SAVED_VALUES:
+		m.d_sense	= (lu->l_dsense_enabled == True) ? 1 : 0;
+		m.que_mod	= SPC_QUEUE_UNRESTRICTED;
+		break;
+	}
+
 	bcopy(&m, buf, sizeof (m));
 
 	return (buf + sizeof (m));
@@ -1697,14 +1797,32 @@ sense_mode_control(t10_lu_impl_t *lu, char *buf)
  * []----
  */
 static char *
-sense_info_ctrl(char *buf)
+sense_info_ctrl(char *buf, uint8_t pc)
 {
 	struct mode_info_ctrl	info;
 
 	bzero(&info, sizeof (info));
+
+	/* Page code and page length are always set */
 	info.mode_page.code	= MODE_SENSE_INFO_CTRL;
 	info.mode_page.length	= sizeof (struct mode_info_ctrl) -
 	    sizeof (struct mode_page);
+
+	/*
+	 * No modifiable values so we report all zeros for
+	 * SPC_PC_MODIFIABLE_VALUES and all other page control values
+	 * result in the same values as SPC_PC_CURRENT_VALUES.
+	 */
+	switch (pc) {
+	case SPC_PC_MODIFIABLE_VALUES:
+		/* Leave it blank */
+		break;
+	case SPC_PC_CURRENT_VALUES:
+	case SPC_PC_DEFAULT_VALUES:
+	case SPC_PC_SAVED_VALUES:
+		break;
+	}
+
 	bcopy(&info, buf, sizeof (info));
 
 	return (buf + sizeof (info));

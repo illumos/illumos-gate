@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -440,7 +440,14 @@ struct mode_info_ctrl {
 #define	MODE_SENSE_SEND_ALL		0x3f
 
 /* -- Page Control Mask for Mode Sense -- */
-#define	SPC_MODE_SENSE_PC		0x3f
+#define	SPC_MODE_SENSE_PAGE_CODE_MASK	0x3f
+#define	SPC_MODE_SENSE_PC_MASK		0xc0
+#define	SPC_MODE_SENSE_PC_SHIFT		6
+
+#define	SPC_PC_CURRENT_VALUES		0
+#define	SPC_PC_MODIFIABLE_VALUES	1
+#define	SPC_PC_DEFAULT_VALUES		2
+#define	SPC_PC_SAVED_VALUES		3
 
 #define	SCSI_REPORTLUNS_ADDRESS_SIZE			8
 #define	SCSI_REPORTLUNS_ADDRESS_MASK			0xC0

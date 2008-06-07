@@ -2147,7 +2147,7 @@ load_params(t10_lu_common_t *lu, char *basedir)
 	char		file[MAXPATHLEN];
 	char		*str;
 	int		oflags		= O_RDWR|O_LARGEFILE|O_NDELAY;
-	Boolean_t	mmap_lun	= True;
+	Boolean_t	mmap_lun	= False;
 	tgt_node_t	*node		= NULL;
 	int		version_maj	= XML_VERS_LUN_MAJ;
 	int		version_min	= XML_VERS_LUN_MIN;
@@ -2255,13 +2255,6 @@ load_params(t10_lu_common_t *lu, char *basedir)
 			goto error;
 	}
 
-#ifndef	_LP64
-	/*
-	 * Since the address space is so limited on 32bit machines
-	 * disable mmap'ing the file by default.
-	 */
-	mmap_lun	= False;
-#endif
 	(void) tgt_find_value_boolean(node, XML_ELEMENT_MMAP_LUN, &mmap_lun);
 	if (tgt_find_value_str(node, XML_ELEMENT_SIZE, &str) == True) {
 		lu->l_size = strtoll(str, NULL, 0) * 512LL;
@@ -2278,12 +2271,6 @@ load_params(t10_lu_common_t *lu, char *basedir)
 		lu->l_mmap = mmap(0, lu->l_size, PROT_READ|PROT_WRITE,
 		    MAP_SHARED|MAP_ALIGN, lu->l_fd, 0);
 	} else {
-
-		/*
-		 * Since the default case will be to mmap
-		 * in all files someone has asked that this
-		 * lun not be mmap.
-		 */
 		lu->l_mmap = MAP_FAILED;
 	}
 	return (True);
