@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,6 +113,7 @@ static struct CK_FUNCTION_LIST functionList = {
 boolean_t pkcs11_initialized = B_FALSE;
 boolean_t pkcs11_cant_create_threads = B_FALSE;
 boolean_t fini_called = B_FALSE;
+static boolean_t pkcs11_atfork_initialized = B_FALSE;
 static pid_t pkcs11_pid = 0;
 
 /* protects pkcs11_[initialized|pid], and fastpath */
@@ -123,32 +123,71 @@ static CK_RV finalize_common(CK_VOID_PTR pReserved);
 static void pkcs11_fini();
 
 /*
- * Ensure that before a fork, globalmutex is taken.
+ * Ensure that before a fork, all mutexes are taken.
+ * Order:
+ * 1. globalmutex
+ * 2. slottable->st_mutex
+ * 3. all slottable->st_slots' mutexes
  */
 static void
 pkcs11_fork_prepare(void)
 {
+	int i;
 	(void) pthread_mutex_lock(&globalmutex);
+	if (slottable != NULL) {
+		(void) pthread_mutex_lock(&slottable->st_mutex);
+
+		/* Take the sl_mutex of all slots */
+		for (i = slottable->st_first; i <= slottable->st_last; i++) {
+			if (slottable->st_slots[i] != NULL) {
+				(void) pthread_mutex_lock(
+				    &slottable->st_slots[i]->sl_mutex);
+			}
+		}
+	}
 }
 
 
 /*
- * Ensure that after a fork, in the parent, globalmutex is released.
+ * Ensure that after a fork, in the parent, all mutexes are released in opposite
+ * order to pkcs11_fork_prepare().
  */
 static void
 pkcs11_fork_parent(void)
 {
+	int i;
+	if (slottable != NULL) {
+		/* Release the sl_mutex of all slots */
+		for (i = slottable->st_first; i <= slottable->st_last; i++) {
+			if (slottable->st_slots[i] != NULL) {
+				(void) pthread_mutex_unlock(
+				    &slottable->st_slots[i]->sl_mutex);
+			}
+		}
+		(void) pthread_mutex_unlock(&slottable->st_mutex);
+	}
 	(void) pthread_mutex_unlock(&globalmutex);
 }
 
 
 /*
- * Ensure that after a fork, in the child, globalmutex is released
- * and cleanup is done.
+ * Ensure that after a fork, in the child, all mutexes are released in opposite
+ * order to pkcs11_fork_prepare() and cleanup is done.
  */
 static void
 pkcs11_fork_child(void)
 {
+	int i;
+	if (slottable != NULL) {
+		/* Release the sl_mutex of all slots */
+		for (i = slottable->st_first; i <= slottable->st_last; i++) {
+			if (slottable->st_slots[i] != NULL) {
+				(void) pthread_mutex_unlock(
+				    &slottable->st_slots[i]->sl_mutex);
+			}
+		}
+		(void) pthread_mutex_unlock(&slottable->st_mutex);
+	}
 	(void) pthread_mutex_unlock(&globalmutex);
 	pkcs11_fini();
 }
@@ -256,8 +295,12 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 
 	pkcs11_initialized = B_TRUE;
 	pkcs11_pid = initialize_pid;
-	(void) pthread_atfork(pkcs11_fork_prepare,
-	    pkcs11_fork_parent, pkcs11_fork_child);
+	/* Children inherit parent's atfork handlers */
+	if (!pkcs11_atfork_initialized) {
+		(void) pthread_atfork(pkcs11_fork_prepare,
+		    pkcs11_fork_parent, pkcs11_fork_child);
+		pkcs11_atfork_initialized = B_TRUE;
+	}
 	(void) pthread_mutex_unlock(&globalmutex);
 
 	/* Cleanup data structures no longer needed */

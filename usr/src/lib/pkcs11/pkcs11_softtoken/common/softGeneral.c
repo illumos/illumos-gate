@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,6 +112,7 @@ static struct CK_FUNCTION_LIST functionList = {
 };
 
 boolean_t softtoken_initialized = B_FALSE;
+static boolean_t softtoken_atfork_initialized = B_FALSE;
 
 static pid_t softtoken_pid = 0;
 
@@ -134,6 +135,9 @@ pthread_mutex_t soft_giant_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static CK_RV finalize_common(boolean_t force, CK_VOID_PTR pReserved);
 static void softtoken_fini();
+static void softtoken_fork_prepare();
+static void softtoken_fork_parent();
+static void softtoken_fork_child();
 
 CK_RV
 C_Initialize(CK_VOID_PTR pInitArgs)
@@ -242,6 +246,13 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 	if (pthread_mutex_init(&soft_slot.keystore_mutex, NULL) != 0) {
 		(void) pthread_mutex_unlock(&soft_giant_mutex);
 		return (CKR_CANT_LOCK);
+	}
+
+	/* Children inherit parent's atfork handlers */
+	if (!softtoken_atfork_initialized) {
+		(void) pthread_atfork(softtoken_fork_prepare,
+		    softtoken_fork_parent, softtoken_fork_child);
+		softtoken_atfork_initialized = B_TRUE;
 	}
 
 	(void) pthread_mutex_unlock(&soft_giant_mutex);
@@ -477,6 +488,55 @@ looping_write(int fd, void *buf, int len)
 		}
 	} while (len > 0);
 	return (len2);
+}
+
+/*
+ * Take out all mutexes before fork.
+ * Order:
+ * 1. soft_giant_mutex
+ * 2. soft_sessionlist_mutex
+ * 3. soft_slot.slot_mutex
+ * 4. soft_slot.keystore_mutex
+ * 5. all soft_session_list mutexs via soft_acquire_all_session_mutexes()
+ * 6. obj_delay_freed.obj_to_be_free_mutex;
+ * 7. ses_delay_freed.ses_to_be_free_mutex
+ */
+void
+softtoken_fork_prepare()
+{
+	(void) pthread_mutex_lock(&soft_giant_mutex);
+	(void) pthread_mutex_lock(&soft_sessionlist_mutex);
+	(void) pthread_mutex_lock(&soft_slot.slot_mutex);
+	(void) pthread_mutex_lock(&soft_slot.keystore_mutex);
+	soft_acquire_all_session_mutexes();
+	(void) pthread_mutex_lock(&obj_delay_freed.obj_to_be_free_mutex);
+	(void) pthread_mutex_lock(&ses_delay_freed.ses_to_be_free_mutex);
+}
+
+/* Release in opposite order to softtoken_fork_prepare(). */
+void
+softtoken_fork_parent()
+{
+	(void) pthread_mutex_unlock(&ses_delay_freed.ses_to_be_free_mutex);
+	(void) pthread_mutex_unlock(&obj_delay_freed.obj_to_be_free_mutex);
+	soft_release_all_session_mutexes();
+	(void) pthread_mutex_unlock(&soft_slot.keystore_mutex);
+	(void) pthread_mutex_unlock(&soft_slot.slot_mutex);
+	(void) pthread_mutex_unlock(&soft_sessionlist_mutex);
+	(void) pthread_mutex_unlock(&soft_giant_mutex);
+}
+
+/* Release in opposite order to softtoken_fork_prepare(). */
+void
+softtoken_fork_child()
+{
+	(void) pthread_mutex_unlock(&ses_delay_freed.ses_to_be_free_mutex);
+	(void) pthread_mutex_unlock(&obj_delay_freed.obj_to_be_free_mutex);
+	soft_release_all_session_mutexes();
+	(void) pthread_mutex_unlock(&soft_slot.keystore_mutex);
+	(void) pthread_mutex_unlock(&soft_slot.slot_mutex);
+	(void) pthread_mutex_unlock(&soft_sessionlist_mutex);
+	(void) pthread_mutex_unlock(&soft_giant_mutex);
 }
 
 /*

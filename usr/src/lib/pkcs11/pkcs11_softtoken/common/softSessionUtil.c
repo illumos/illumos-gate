@@ -711,3 +711,31 @@ soft_logout(void)
 	return;
 
 }
+
+void
+soft_acquire_all_session_mutexes()
+{
+	soft_session_t *session_p = soft_session_list;
+
+	/* Iterate through sessions acquiring all mutexes */
+	while (session_p) {
+		(void) pthread_mutex_lock(&session_p->session_mutex);
+		session_p = session_p->next;
+	}
+}
+
+void
+soft_release_all_session_mutexes()
+{
+	soft_session_t *session_p = soft_session_list;
+
+	/* Iterate through sessions releasing all mutexes */
+	while (session_p) {
+		/*
+		 * N.B. Ideally, should go in opposite order to guarantee
+		 * lock-order requirements but there is no tail pointer.
+		 */
+		(void) pthread_mutex_unlock(&session_p->session_mutex);
+		session_p = session_p->next;
+	}
+}

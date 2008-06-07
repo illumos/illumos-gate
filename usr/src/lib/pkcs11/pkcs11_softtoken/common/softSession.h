@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -200,6 +200,9 @@ CK_RV soft_set_operationstate(soft_session_t *, CK_BYTE_PTR, CK_ULONG,
 CK_RV soft_login(CK_UTF8CHAR_PTR pPin, CK_ULONG ulPinLen);
 
 void soft_logout(void);
+
+void soft_acquire_all_session_mutexes();
+void soft_release_all_session_mutexes();
 
 #ifdef	__cplusplus
 }

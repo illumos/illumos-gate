@@ -253,8 +253,16 @@ kernel_delete_session(CK_SLOT_ID slotID, kernel_session_t *session_p,
 	 * count is not zero. This means that if the thread that is attempting
 	 * to close the session must wait until the prior operations on this
 	 * session are finished.
+	 *
+	 * Unless we are being forced to shut everything down, this only
+	 * happens if the library's _fini() is running not if someone
+	 * explicitly called C_Finalize().
 	 */
 	(void) pthread_mutex_lock(&session_p->ses_free_mutex);
+
+	if (wrapper_only) {
+		session_p->ses_refcnt = 0;
+	}
 
 	while (session_p->ses_refcnt != 0) {
 		/*
@@ -457,4 +465,59 @@ kernel_session_delay_free(kernel_session_t *sp)
 		ses_delay_freed.first = tmp;
 	}
 	(void) pthread_mutex_unlock(&ses_delay_freed.ses_to_be_free_mutex);
+}
+
+/*
+ * Acquire all slots' mutexes and all their sessions' mutexes.
+ * Order:
+ * 1. delete_sessions_mutex
+ * for each slot:
+ *  2. pslot->sl_mutex
+ *  for each session:
+ *   3. session_p->session_mutex
+ *   4. session_p->ses_free_mutex
+ */
+void
+kernel_acquire_all_slots_mutexes()
+{
+	int slotID;
+	kernel_slot_t *pslot;
+	kernel_session_t *session_p;
+
+	(void) pthread_mutex_lock(&delete_sessions_mutex);
+	for (slotID = 0; slotID < slot_count; slotID++) {
+		pslot = slot_table[slotID];
+		(void) pthread_mutex_lock(&pslot->sl_mutex);
+
+		/* Iterate through sessions acquiring all mutexes */
+		session_p = pslot->sl_sess_list;
+		while (session_p) {
+			(void) pthread_mutex_lock(&session_p->session_mutex);
+			session_p = session_p->next;
+		}
+	}
+}
+
+/* Release in opposite order to kernel_acquire_all_slots_mutexes(). */
+void
+kernel_release_all_slots_mutexes()
+{
+	int slotID;
+	kernel_slot_t *pslot;
+	kernel_session_t *session_p;
+
+	for (slotID = 0; slotID < slot_count; slotID++) {
+		pslot = slot_table[slotID];
+
+		/* Iterate through sessions releasing all mutexes */
+		session_p = pslot->sl_sess_list;
+		while (session_p) {
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			session_p = session_p->next;
+		}
+
+		(void) pthread_mutex_unlock(&pslot->sl_mutex);
+	}
+
+	(void) pthread_mutex_unlock(&delete_sessions_mutex);
 }

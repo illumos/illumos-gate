@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,6 +171,9 @@ void kernel_delete_session(CK_SLOT_ID slotID, kernel_session_t *sp,
     boolean_t lock_held, boolean_t wrapper_only);
 
 void kernel_session_delay_free(kernel_session_t *sp);
+
+void kernel_acquire_all_slots_mutexes();
+void kernel_release_all_slots_mutexes();
 
 #ifdef	__cplusplus
 }
