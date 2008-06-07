@@ -514,6 +514,7 @@ door_call(int did, void *args)
 	void		*destarg;
 	model_t		datamodel;
 	int		gotresults = 0;
+	int		needcleanup = 0;
 	int		cancel_pending;
 
 	lwp = ttolwp(curthread);
@@ -773,7 +774,7 @@ shuttle_return:
 		 * descriptors.
 		 */
 		if (!ct->d_args_done) {
-			door_fp_close(ct->d_fpp, ct->d_args.desc_num);
+			needcleanup = 1;
 			ct->d_args_done = 1;
 		}
 
@@ -789,6 +790,9 @@ shuttle_return:
 	if (--dp->door_active == 0 && (dp->door_flags & DOOR_DELAY))
 		door_deliver_unref(dp);
 	mutex_exit(&door_knob);
+
+	if (needcleanup)
+		door_fp_close(ct->d_fpp, ct->d_args.desc_num);
 
 results:
 	/*
