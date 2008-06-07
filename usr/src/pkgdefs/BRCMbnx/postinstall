@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,7 +40,9 @@ DRV=bnx
 DRVALIAS="\"pci14e4,164a\" \
 	\"pci14e4,16aa\" \
 	\"pci14e4,164c\" \
-	\"pci14e4,16ac\""
+	\"pci14e4,16ac\" \
+	\"pci14e4,1639\" \
+        \"pci14e4,163a\""
 
 #
 # Select the correct add_drv options to execute.
