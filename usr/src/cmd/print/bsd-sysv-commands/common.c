@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -193,6 +193,8 @@ print_job_line(FILE *fp, int count, papi_job_t job, int fmt, int ac, char *av[])
 
 	(void) papiAttributeListGetInteger(list, NULL,
 					"job-id", &id);
+	(void) papiAttributeListGetInteger(list, NULL,
+					"job-id-requested", &id);
 	(void) papiAttributeListGetString(list, NULL,
 					"job-originating-user-name", &user);
 	(void) papiAttributeListGetString(list, NULL,
@@ -238,16 +240,20 @@ cancel_job(papi_service_t svc, FILE *fp, char *printer, papi_job_t job,
 	papi_status_t status;
 	papi_attribute_t **list = papiJobGetAttributeList(job);
 	int id = 0;
+	int rid = 0;
 	char *user = "";
 	char *mesg = gettext("cancelled");
 
 	papiAttributeListGetInteger(list, NULL,
 					"job-id", &id);
+	papiAttributeListGetInteger(list, NULL,
+					"job-id-requested", &rid);
 	papiAttributeListGetString(list, NULL,
 					"job-originating-user-name", &user);
 
 	/* if we are looking and it doesn't match, return early */
-	if ((ac > 0) && (match_job(id, user, ac, av) < 0))
+	if ((ac > 0) && (match_job(id, user, ac, av) < 0) &&
+	    (match_job(rid, user, ac, av) < 0))
 		return;
 
 	status = papiJobCancel(svc, printer, id);
@@ -267,7 +273,7 @@ berkeley_queue_report(papi_service_t svc, FILE *fp, char *dest, int fmt,
 	char *pattrs[] = { "printer-name", "printer-state",
 			"printer-state-reasons", NULL };
 	char *jattrs[] = { "job-name", "job-octets", "job-k-octets", "job-id",
-			"job-originating-user-name",
+			"job-originating-user-name", "job-id-requested",
 			"job-originating-host-name",
 			"number-of-intervening-jobs", NULL };
 	int num_jobs = 0;
@@ -315,7 +321,8 @@ berkeley_cancel_request(papi_service_t svc, FILE *fp, char *dest,
 {
 	papi_status_t status;
 	papi_job_t *jobs = NULL;
-	char *jattrs[] = { "job-originating-user-name", "job-id", NULL };
+	char *jattrs[] = { "job-originating-user-name", "job-id",
+			"job-id-requested", NULL };
 
 	status = papiPrinterListJobs(svc, dest, jattrs, PAPI_LIST_JOBS_ALL,
 					0, &jobs);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -268,9 +268,14 @@ fill_printer_uri_supported(papi_attribute_t ***list)
 	if (attribute != NULL) /* we have what we need, return */
 		return;
 
-	/* do we have a printer-uri to rename */
+	/* do we have a printer-uri (in URI form) to rename */
 	attribute = papiAttributeListFind(*list, "printer-uri");
-	if (attribute != NULL) { /* rename it in place and return */
+	if ((attribute != NULL) &&
+	    (attribute->type == PAPI_STRING) &&
+	    (attribute->values != NULL) &&
+	    (attribute->values[0]->string != NULL) &&
+	    (strstr(attribute->values[0]->string, "://") != NULL)) {
+			/* rename it in place and return */
 		free(attribute->name);
 		attribute->name = strdup("printer-uri-supported");
 		return;

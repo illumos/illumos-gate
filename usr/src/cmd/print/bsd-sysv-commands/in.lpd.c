@@ -35,6 +35,7 @@
 #include <fcntl.h>
 #include <stdarg.h>
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 #include <syslog.h>
 #include <libintl.h>
@@ -381,7 +382,8 @@ parse_cf(papi_service_t svc, char *cf, char **files)
 }
 
 static papi_status_t
-submit_job(papi_service_t svc, FILE *ifp, char *printer, char *cf, char **files)
+submit_job(papi_service_t svc, FILE *ifp, char *printer, int rid, char *cf,
+		char **files)
 {
 	papi_attribute_t **list = NULL;
 	papi_status_t status;
@@ -396,6 +398,10 @@ submit_job(papi_service_t svc, FILE *ifp, char *printer, char *cf, char **files)
 			papiAttributeListAddString(&list, PAPI_ATTR_REPLACE,
 					"job-originating-host-name", host);
 			free(host);
+		}
+		if (rid > 0) {
+			papiAttributeListAddInteger(&list, PAPI_ATTR_EXCL,
+					"job-id-requested", rid);
 		}
 	}
 
@@ -500,6 +506,7 @@ berkeley_receive_files(papi_service_t svc, FILE *ifp, FILE *ofp, char *printer)
 	papi_status_t status = PAPI_OK;
 	char *file, **files = NULL;	/* the job data files */
 	char *cf = NULL;
+	int rid = 0;
 	char buf[BUFSIZ];
 
 	while (fgets(buf, sizeof (buf), ifp) != NULL) {
@@ -515,12 +522,18 @@ berkeley_receive_files(papi_service_t svc, FILE *ifp, FILE *ofp, char *printer)
 			cleanup(&files, &cf);
 			break;
 		case 0x02: {	/* Receive control file */
+			if (((cf = strchr(buf, ' ')) != NULL) &&
+			    (strlen(cf) > 4)) {
+				while ((*cf != NULL) && (isdigit(*cf) == 0))
+					cf++;
+				rid = atoi(cf);
+			}
 			cf = receive_control_file(svc, ifp, ofp, atoi(&buf[1]));
 			if (cf == NULL) {
 				cleanup(&files, &cf);
 				return (PAPI_BAD_REQUEST);
 			} else if (files != NULL) {
-				status = submit_job(svc, ifp, printer, cf,
+				status = submit_job(svc, ifp, printer, rid, cf,
 							files);
 				cleanup(&files, &cf);
 			}
@@ -543,7 +556,7 @@ berkeley_receive_files(papi_service_t svc, FILE *ifp, FILE *ofp, char *printer)
 	}
 
 	if ((cf != NULL) && (files != NULL))
-		status = submit_job(svc, ifp, printer, cf, files);
+		status = submit_job(svc, ifp, printer, rid, cf, files);
 
 	cleanup(&files, &cf);
 
