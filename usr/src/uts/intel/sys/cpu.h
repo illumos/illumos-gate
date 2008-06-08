@@ -65,19 +65,7 @@ extern void i86_mwait(uint32_t data, uint32_t extensions);
 /*
  * Used to insert cpu-dependent instructions into spin loops
  */
-#if defined(__xpv)
-extern int xpv_panicking;
-#define	SMT_PAUSE()				\
-	{					\
-		if (IN_XPV_PANIC())		\
-			ht_pause();		\
-		else 				\
-			(void) HYPERVISOR_yield();	\
-	}
-
-#else
 #define	SMT_PAUSE()		ht_pause()
-#endif
 
 /*
  *
