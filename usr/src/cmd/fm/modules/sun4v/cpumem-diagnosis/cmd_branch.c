@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,13 +37,13 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <fm/fmd_api.h>
+#include <fm/libtopo.h>
 #include <sys/fm/protocol.h>
 #include <sys/mem.h>
 #include <sys/nvpair.h>
 
 #define	BUF_SIZE	120
 #define	LEN_CMP		6
-
 
 int
 is_t5440_unum(const char *unum)
@@ -109,12 +109,13 @@ cmd_branch_remove_dimm(fmd_hdl_t *hdl, cmd_branch_t *branch, cmd_dimm_t *dimm)
 }
 
 static cmd_dimm_t *
-branch_dimm_create(fmd_hdl_t *hdl, char *dimm_unum)
+branch_dimm_create(fmd_hdl_t *hdl, char *dimm_unum, char **serids,
+    size_t nserids)
 {
 	nvlist_t *fmri;
 	cmd_dimm_t *dimm;
 
-	fmri = cmd_mem_fmri_create(dimm_unum);
+	fmri = cmd_mem_fmri_create(dimm_unum, serids, nserids);
 
 	if (fmri != NULL && (fmd_nvl_fmri_expand(hdl, fmri) == 0)) {
 		dimm = cmd_dimm_create(hdl, fmri);
@@ -127,6 +128,70 @@ branch_dimm_create(fmd_hdl_t *hdl, char *dimm_unum)
 	nvlist_free(fmri);
 	return (NULL);
 }
+
+static fmd_hdl_t *br_hdl; /* for exclusive use of callback */
+static int br_dimmcount;
+
+/*ARGSUSED*/
+static int
+branch_dimm_cb(topo_hdl_t *thp, tnode_t *node, void *arg)
+{
+	char *lbl, *p, *q;
+	char cx[BUF_SIZE], cy[BUF_SIZE];
+	nvlist_t *rsrc;
+	int err;
+	cmd_branch_t *branch = (cmd_branch_t *)arg;
+	cmd_dimm_t *dimm;
+	size_t nserids;
+	char **serids;
+
+	if (topo_node_resource(node, &rsrc, &err) < 0)
+		return (TOPO_WALK_NEXT);	/* no label, try next */
+
+	if ((nvlist_lookup_string(rsrc, FM_FMRI_MEM_UNUM, &lbl) != 0) ||
+	    (nvlist_lookup_string_array(rsrc, FM_FMRI_MEM_SERIAL_ID,
+	    &serids, &nserids) != 0)) {
+		nvlist_free(rsrc);
+		return (TOPO_WALK_NEXT);
+	}
+
+	/*
+	 * Massage the unum of the candidate DIMM as follows:
+	 * a) remove any trailing J number.  Use result for cmd_dimm_t.
+	 * b) for branch membership purposes only, remove reference to
+	 * a riser card (MR%d) if one exists.
+	 */
+	if ((p = strstr(lbl, "/J")) != NULL) {
+		(void) strncpy(cx, lbl, p - lbl);
+		cx[p - lbl] = '\0';
+	} else {
+		(void) strcpy(cx, lbl);
+	}
+	(void) strcpy(cy, cx);
+	if ((p = strstr(cy, "/MR")) != NULL) {
+		if ((q = strchr(p + 1, '/')) != NULL)
+			(void) strcpy(p, q);
+		else
+			*p = '\0';
+	}
+
+	/*
+	 * For benefit of Batoka-like platforms, start comparison with
+	 * "CMP", so that any leading "MEM" or "CPU" makes no difference.
+	 */
+
+	p = strstr(branch->branch_unum, "CMP");
+	q = strstr(cy, "CMP");
+
+	if ((p != NULL) && (q != NULL) && strncmp(p, q, strlen(p)) == 0) {
+		dimm = branch_dimm_create(br_hdl, cx, serids, nserids);
+		if (dimm != NULL)
+			cmd_branch_add_dimm(br_hdl, branch, dimm);
+	}
+	nvlist_free(rsrc);
+	return (TOPO_WALK_NEXT);
+}
+
 
 /*
  * The cmd_dimm_t structure created for a DIMM in a branch never has a
@@ -141,63 +206,29 @@ branch_dimm_create(fmd_hdl_t *hdl, char *dimm_unum)
 static int
 branch_dimmlist_create(fmd_hdl_t *hdl, cmd_branch_t *branch)
 {
-	int channel, d;
-	char dimm_unum[BUF_SIZE];
-	cmd_dimm_t *dimm;
-	int dimm_count = 0;
-	int bn, cmp, br;
+	topo_hdl_t *thp;
+	topo_walk_t *twp;
+	int err, dimm_count;
+	cmd_list_t *bp;
 
-	if (is_t5440_unum(branch->branch_unum) == 0) {
-		for (channel = 0; channel < MAX_CHANNELS_ON_CHIP; channel++) {
-			for (d = 0; d < MAX_DIMMS_IN_CHANNEL; d++) {
-				(void) snprintf(dimm_unum, BUF_SIZE,
-				    "%s/CH%1d/D%1d", branch->branch_unum,
-				    channel, d);
-				dimm = branch_dimm_create(hdl, dimm_unum);
-				if (dimm != NULL) {
-					cmd_branch_add_dimm(hdl, branch, dimm);
-					dimm_count++;
-				}
-			}
-		}
-	} else {
-		(void) sscanf(branch->branch_unum, "%*6s%d%*4s%d%*3s%d",
-		    &bn, &cmp, &br);
-		/*
-		 * check dimm present for all possible branch dimms
-		 * on cpuboard
-		 */
-		for (channel = 0; channel < BTK_MAX_CHANNEL; channel++) {
-			(void) snprintf(dimm_unum, BUF_SIZE,
-			    "MB/CPU%1d/CMP%1d/BR%1d/CH%1d/D0", bn, cmp,
-			    br, channel);
-			dimm = branch_dimm_create(hdl, dimm_unum);
-			if (dimm != NULL) {
-				cmd_branch_add_dimm(hdl, branch, dimm);
-				dimm_count++;
-			}
-		}
-		/*
-		 * check dimm present for all possible branch dimms on
-		 * memory-board.
-		 */
-		for (channel = 0; channel < BTK_MAX_CHANNEL; channel++) {
-			for (d = 1; d < MAX_DIMMS_IN_CHANNEL; d++) {
-				(void) snprintf(dimm_unum, BUF_SIZE,
-				    "MB/MEM%1d/CMP%1d/BR%1d/CH%1d/D%1d",
-				    bn, cmp, br, channel, d);
-				dimm = branch_dimm_create(hdl, dimm_unum);
-				if (dimm != NULL) {
-					cmd_branch_add_dimm(hdl, branch, dimm);
-					dimm_count++;
-				}
-			}
-		}
+	if ((thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION)) == NULL)
+		return (0);
+	if ((twp = topo_walk_init(thp,
+	    FM_FMRI_SCHEME_MEM, branch_dimm_cb, branch, &err))
+	    == NULL) {
+		fmd_hdl_topo_rele(hdl, thp);
+		return (0);
 	}
+	br_hdl = hdl;
+	(void) topo_walk_step(twp, TOPO_WALK_CHILD);
+	topo_walk_fini(twp);
+	fmd_hdl_topo_rele(hdl, thp);
 
+	for (dimm_count = 0, bp = &branch->branch_dimms; bp != NULL;
+	    bp = cmd_list_next(bp), dimm_count++)
+		;
 	return (dimm_count);
 }
-
 
 /*
  * For t5440, the memory channel goes like this:
@@ -494,65 +525,66 @@ cmd_branch_destroy(fmd_hdl_t *hdl, cmd_branch_t *branch)
 	branch_free(hdl, branch, FMD_B_TRUE);
 }
 
-int
+/*ARGSUSED*/
+static int
+branch_exist_cb(topo_hdl_t *thp, tnode_t *node, void *arg)
+{
+	char *lbl, *p, *q;
+	char cy[BUF_SIZE];
+	nvlist_t *rsrc;
+	int err;
+
+	cmd_branch_t *branch = (cmd_branch_t *)arg;
+
+	if (topo_node_resource(node, &rsrc, &err) < 0)
+		return (TOPO_WALK_NEXT);	/* no label, try next */
+
+	if (nvlist_lookup_string(rsrc, "unum", &lbl) != 0) {
+		nvlist_free(rsrc);
+		return (TOPO_WALK_NEXT);
+	}
+	/*
+	 * for branch membership purposes only, remove reference to
+	 * a riser card (MR%d) if one exists.
+	 */
+	(void) strcpy(cy, lbl);
+	if ((p = strstr(cy, "/MR")) != NULL) {
+		if ((q = strchr(p + 1, '/')) != NULL)
+			(void) strcpy(p, q);
+		else
+			*p = '\0';
+	}
+	if (strncmp(branch->branch_unum, cy,
+	    strlen(branch->branch_unum)) == 0) {
+		br_dimmcount++;
+		nvlist_free(rsrc);
+		return (TOPO_WALK_TERMINATE);
+	}
+	nvlist_free(rsrc);
+	return (TOPO_WALK_NEXT);
+}
+
+static int
 branch_exist(fmd_hdl_t *hdl, cmd_branch_t *branch)
 {
-	char dimm_unum[BUF_SIZE];
-	int channel, d;
-	nvlist_t *fmri;
-	int bn, cmp, br;
+	topo_hdl_t *thp;
+	topo_walk_t *twp;
+	int err;
 
-	fmd_hdl_debug(hdl, "branch_exist");
-
-	if (is_t5440_unum(branch->branch_unum) == 0) {
-		for (channel = 0; channel < MAX_CHANNELS_ON_CHIP; channel++) {
-			for (d = 0; d < MAX_DIMMS_IN_CHANNEL; d++) {
-				(void) snprintf(dimm_unum, BUF_SIZE,
-				    "%s/CH%1d/D%1d", branch->branch_unum,
-				    channel, d);
-				fmri = cmd_mem_fmri_create(dimm_unum);
-				if (fmri != NULL &&
-				    (fmd_nvl_fmri_expand(hdl, fmri) == 0)) {
-					nvlist_free(fmri);
-					return (1);
-				}
-				nvlist_free(fmri);
-			}
-		}
-	} else {
-		(void) sscanf(branch->branch_unum, "%*6s%d%*4s%d%*3s%d",
-		    &bn, &cmp, &br);
-
-		for (channel = 0; channel < BTK_MAX_CHANNEL; channel++) {
-			(void) snprintf(dimm_unum, BUF_SIZE,
-			    "MB/CPU%1d/CMP%1d/BR%1d/CH%1d/D0", bn, cmp,
-			    br, channel);
-			fmri = cmd_mem_fmri_create(dimm_unum);
-			if (fmri != NULL &&
-			    (fmd_nvl_fmri_expand(hdl, fmri) == 0)) {
-				nvlist_free(fmri);
-				return (1);
-			}
-			nvlist_free(fmri);
-		}
-
-		for (channel = 0; channel < BTK_MAX_CHANNEL; channel++) {
-			for (d = 1; d < MAX_DIMMS_IN_CHANNEL; d++) {
-				(void) snprintf(dimm_unum, BUF_SIZE,
-				    "MB/MEM%1d/CMP%1d/BR%1d/CH%1d/D%1d",
-				    bn, cmp, br, channel, d);
-				fmri = cmd_mem_fmri_create(dimm_unum);
-				if (fmri != NULL &&
-				    (fmd_nvl_fmri_expand(hdl, fmri) == 0)) {
-					nvlist_free(fmri);
-					return (1);
-				}
-				nvlist_free(fmri);
-			}
-		}
+	if ((thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION)) == NULL)
+		return (0);
+	if ((twp = topo_walk_init(thp,
+	    FM_FMRI_SCHEME_MEM, branch_exist_cb, branch, &err))
+	    == NULL) {
+		fmd_hdl_topo_rele(hdl, thp);
+		return (0);
 	}
-	fmd_hdl_debug(hdl, "branch %s does not exist\n", branch->branch_unum);
-	return (0);
+	br_dimmcount = 0;
+	(void) topo_walk_step(twp, TOPO_WALK_CHILD);
+	topo_walk_fini(twp);
+	fmd_hdl_topo_rele(hdl, thp);
+
+	return (br_dimmcount);
 }
 
 /*

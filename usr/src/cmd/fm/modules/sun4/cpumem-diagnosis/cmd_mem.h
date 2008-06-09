@@ -176,7 +176,7 @@ extern void cmd_iorxefrx_queue(fmd_hdl_t *, cmd_iorxefrx_t *);
 extern void cmd_iorxefrx_free(fmd_hdl_t *, cmd_iorxefrx_t *);
 
 extern const char *cmd_fmri_get_unum(nvlist_t *);
-extern nvlist_t *cmd_mem_fmri_create(const char *);
+extern nvlist_t *cmd_mem_fmri_create(const char *, char **, size_t);
 extern nvlist_t *cmd_mem_fmri_derive(fmd_hdl_t *, uint64_t, uint64_t, uint16_t);
 
 extern void cmd_mem_case_restore(fmd_hdl_t *, cmd_case_t *, fmd_case_t *,

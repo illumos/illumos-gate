@@ -614,75 +614,12 @@ cmd_upos2dram(uint16_t upos) {
 nvlist_t *
 cmd_mem2hc(fmd_hdl_t *hdl, nvlist_t *mem_fmri) {
 
-	char *nac_name, *s, **sa;
-	const char *unum = cmd_fmri_get_unum(mem_fmri);
-	nvlist_t *fp, **hc_list;
-	int i, n;
-	unsigned int usi;
+	char **snp;
+	uint_t n;
 
-	nac_name = fmd_hdl_zalloc(hdl, strlen(unum)+1, FMD_SLEEP);
-	if ((s = strstr(unum, ": ")) != NULL) {
-		(void) strncpy(nac_name, unum, s-unum); /* up to ": " */
-		(void) strncpy(nac_name+(s-unum), "/", 2); /* add "/" and \0 */
-		(void) strncat(nac_name, s+2, strlen(unum)-(s+2-unum)+1);
-	} else {
-		(void) strcpy(nac_name, unum);
-	}
-
-	n = cmd_count_components(nac_name, '/');
-	hc_list = fmd_hdl_zalloc(hdl, sizeof (nvlist_t *)*n, FMD_SLEEP);
-
-	for (i = 0; i < n; i++) {
-		(void) nvlist_alloc(&hc_list[i],
-		    NV_UNIQUE_NAME|NV_UNIQUE_NAME_TYPE, 0);
-	}
-
-	if (cmd_breakup_components(nac_name, "/", hc_list) < 0) {
-		fmd_hdl_error(hdl, "cannot allocate components for hc-list\n");
-		for (i = 0; i < n; i++) {
-			if (hc_list[i] != NULL)
-			    nvlist_free(hc_list[i]);
-		}
-		fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
-		fmd_hdl_free(hdl, nac_name, strlen(unum)+1);
-		return (NULL);
-	}
-	(void) nvlist_alloc(&fp, NV_UNIQUE_NAME|NV_UNIQUE_NAME_TYPE, 0);
-	if ((nvlist_add_uint8(fp, FM_VERSION,
-	    FM_HC_VERS0) != 0) ||
-	    (nvlist_add_string(fp, FM_FMRI_SCHEME, FM_FMRI_SCHEME_HC) != 0) ||
-	    (nvlist_add_string(fp, FM_FMRI_HC_ROOT, "/") != 0) ||
-	    (nvlist_add_uint32(fp, FM_FMRI_HC_LIST_SZ, n) != 0) ||
-	    (nvlist_add_nvlist_array(fp, FM_FMRI_HC_LIST, hc_list, n) != 0)) {
-		for (i = 0; i < n; i++) {
-			if (hc_list[i] != NULL)
-				nvlist_free(hc_list[i]);
-		}
-		fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
-		fmd_hdl_free(hdl, nac_name, strlen(unum)+1);
-		nvlist_free(fp);
-		return (NULL);
-	}
-
-	for (i = 0; i < n; i++) {
-		if (hc_list[i] != NULL)
-			nvlist_free(hc_list[i]);
-	}
-	fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
-	fmd_hdl_free(hdl, nac_name, strlen(unum)+1);
 	if (nvlist_lookup_string_array(mem_fmri, FM_FMRI_HC_SERIAL_ID,
-	    &sa, &usi) == 0) {
-		if (nvlist_add_string(fp, FM_FMRI_HC_SERIAL_ID, *sa) != 0) {
-			nvlist_free(fp);
-			return (NULL);
-		}
-	}
-	if (nvlist_lookup_string_array(mem_fmri, FM_FMRI_HC_PART,
-	    &sa, &usi) == 0) {
-		if (nvlist_add_string(fp, FM_FMRI_HC_PART, *sa) != 0) {
-			nvlist_free(fp);
-			return (NULL);
-		}
-	}
-	return (fp);
+	    &snp, &n) != 0)
+		return (NULL); /* doesn't have serial id */
+
+	return (cmd_find_dimm_by_sn(hdl, FM_FMRI_SCHEME_HC, *snp));
 }

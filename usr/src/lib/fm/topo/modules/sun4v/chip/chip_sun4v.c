@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <strings.h>
 #include <sys/types.h>
 #include <fm/topo_mod.h>
+#include <fm/topo_hc.h>
 #include <sys/fm/protocol.h>
 
 #include <unistd.h>
@@ -290,6 +291,39 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name, md_info_t *chip,
 	return (0);
 }
 
+static int
+dimm_instantiate(tnode_t *parent, const char *name, topo_mod_t *mod)
+{
+	if (strcmp(name, CHIP) != 0) {
+		topo_mod_dprintf(mod,
+		    "Currently only know how to enumerate %s components.\n",
+		    CHIP);
+		return (0);
+	}
+	topo_mod_dprintf(mod,
+	    "Calling dimm_enum\n");
+	if (topo_mod_enumerate(mod,
+	    parent, DIMM, DIMM, 0, 0, NULL) != 0) {
+		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
+	}
+	return (0);
+}
+
+static topo_mod_t *
+dimm_enum_load(topo_mod_t *mp)
+{
+	topo_mod_t *rp = NULL;
+
+	topo_mod_dprintf(mp, "dimm_enum_load: %s\n", CHIP);
+	if ((rp = topo_mod_load(mp, DIMM, TOPO_VERSION)) == NULL) {
+		topo_mod_dprintf(mp,
+		    "%s enumerator could not load %s enum. (%d: %s)\n",
+		    CHIP, DIMM, errno, strerror(errno));
+	}
+	topo_mod_dprintf(mp, "dimm_enum_load(EXIT): %s, rp=%p\n", CHIP, rp);
+	return (rp);
+}
+
 /*ARGSUSED*/
 static int
 chip_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
@@ -309,6 +343,9 @@ chip_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 		topo_mod_dprintf(mod, "Invalid chip range(%d,%d)\n", min, max);
 		return (-1);
 	}
+
+	if (dimm_enum_load(mod) == NULL)
+		return (-1);
 
 	/*
 	 * Create the chip[i] nodes, one for each CMP chip uniquely identified
@@ -341,6 +378,13 @@ chip_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 		    procp->serialno);
 		if (err != 0) {
 			nerr++;
+		}
+
+		/* Enumerate all DIMMs belonging to this chip */
+		if (dimm_instantiate(cnode, CHIP, mod) < 0) {
+			topo_mod_dprintf(mod, "Enumeration of dimm "
+			    "failed %s\n", topo_mod_errmsg(mod));
+			return (-1);
 		}
 	}
 

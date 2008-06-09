@@ -18,23 +18,19 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = chip \
-	cpuboard \
-	dimm \
-	hostbridge \
-	pcibus \
-	motherboard \
-	niu \
-	platform-cpu \
-	platform-mem \
-	xaui \
-	zambezi
+MODULE = platform-mem
+ARCH = sun4v
+CLASS = arch
 
-include ../../../Makefile.subdirs
+MODULESRCS = mem.c mem_mdesc.c
+
+include ../../Makefile.plugin
+
+CPPFLAGS += -I$(ROOT)/usr/platform/sun4v/include
+LDLIBS += -lumem -lmdesc -lldom

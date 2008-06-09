@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
 <!--
- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -28,20 +28,23 @@
 
 <topology name='SUNW,T5440' scheme='hc'>
   <range name='motherboard' min='0' max='0'>
-   <enum-method name='motherboard' version='1'/>
+    <enum-method name='motherboard' version='1'/>
 
-     <dependents grouping='children'>
-       <range name='interconnect' min='0' max='3'>
-         <enum-method name='zambezi' version='1'/>
-       </range>
-     </dependents>
+      <dependents grouping='children'>
+        <range name='cpuboard' min='0' max='3'>
+          <enum-method name='cpuboard' version='1'/>
+        </range>
+      </dependents>
 
-     <dependents grouping='children'>
-       <range name='cpuboard' min='0' max='3'>
-         <enum-method name='cpuboard' version='1'/>
-       </range>
-     </dependents>
+      <dependents grouping='children'>
+        <range name='interconnect' min='0' max='3'>
+          <enum-method name='zambezi' version='1'/>
+        </range>
+        <range name='dimm' min='0' max='0'>
+          <enum-method name='dimm' version='1'/>
+        </range>
+      </dependents>
 
-   </range>
+  </range>
 </topology>
 

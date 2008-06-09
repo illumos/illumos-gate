@@ -193,6 +193,8 @@ cmd_dimm_create(fmd_hdl_t *hdl, nvlist_t *asru)
 	cmd_dimm_t *dimm;
 	const char *unum;
 	nvlist_t *fmri;
+	size_t nserids = 0;
+	char **serids = NULL;
 
 	if (!fmd_nvl_fmri_present(hdl, asru)) {
 		fmd_hdl_debug(hdl, "dimm_lookup: discarding old ereport\n");
@@ -204,7 +206,16 @@ cmd_dimm_create(fmd_hdl_t *hdl, nvlist_t *asru)
 		return (NULL);
 	}
 
-	fmri = cmd_mem_fmri_create(unum);
+#ifdef sun4v
+	if (nvlist_lookup_string_array(asru, FM_FMRI_HC_SERIAL_ID, &serids,
+	    &nserids) != 0) {
+		fmd_hdl_debug(hdl, "sun4v mem: FMRI does not"
+		    " have serial_ids\n");
+		CMD_STAT_BUMP(bad_mem_asru);
+		return (NULL);
+	}
+#endif
+	fmri = cmd_mem_fmri_create(unum, serids, nserids);
 	if (fmd_nvl_fmri_expand(hdl, fmri) < 0) {
 		CMD_STAT_BUMP(bad_mem_asru);
 		nvlist_free(fmri);

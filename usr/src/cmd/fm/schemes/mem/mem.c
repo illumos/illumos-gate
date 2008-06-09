@@ -28,17 +28,11 @@
 
 #include <mem.h>
 #include <fm/fmd_fmri.h>
+#include <fm/libtopo.h>
 
 #include <string.h>
 #include <strings.h>
 #include <sys/mem.h>
-
-#ifdef	sparc
-#include <sys/fm/ldom.h>
-ldom_hdl_t *mem_scheme_lhp;
-#else
-#include <fm/libtopo.h>
-#endif	/* sparc */
 
 mem_t mem;
 
@@ -139,14 +133,24 @@ fmd_fmri_expand(nvlist_t *nvl)
 	char *unum, **serids;
 	uint_t nnvlserids;
 	size_t nserids;
-	int rc;
+	int rc, err = 0;
+	topo_hdl_t *thp;
 
 	if ((mem_fmri_get_unum(nvl, &unum) < 0) || (*unum == '\0'))
 		return (fmd_fmri_set_errno(EINVAL));
 
+	/*
+	 * If the mem-scheme topology exports this method expand(), invoke it.
+	 */
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
+		return (fmd_fmri_set_errno(EINVAL));
+	rc = topo_fmri_expand(thp, nvl, &err);
+	fmd_fmri_topo_rele(thp);
+	if (err != ETOPO_METHOD_NOTSUP)
+		return (rc);
+
 	if ((rc = nvlist_lookup_string_array(nvl, FM_FMRI_MEM_SERIAL_ID,
 	    &serids, &nnvlserids)) == 0) { /* already have serial #s */
-		mem_expand_opt(nvl, unum, serids);
 		return (0);
 	} else if (rc != ENOENT)
 		return (fmd_fmri_set_errno(EINVAL));
@@ -161,7 +165,6 @@ fmd_fmri_expand(nvlist_t *nvl)
 
 	rc = nvlist_add_string_array(nvl, FM_FMRI_MEM_SERIAL_ID, serids,
 	    nserids);
-	mem_expand_opt(nvl, unum, serids);
 
 	mem_strarray_free(serids, nserids);
 
@@ -193,22 +196,30 @@ int
 fmd_fmri_present(nvlist_t *nvl)
 {
 	char *unum = NULL;
-	int rc;
+	int rc, err = 0;
+	struct topo_hdl *thp;
 #ifdef sparc
 	char **nvlserids, **serids;
 	uint_t nnvlserids;
 	size_t nserids;
-	uint64_t memconfig;
 #else
-	struct topo_hdl *thp;
 	nvlist_t *unum_nvl;
-	int err;
 #endif /* sparc */
 
 	if (mem_fmri_get_unum(nvl, &unum) < 0)
 		return (-1); /* errno is set for us */
 
 #ifdef sparc
+	/*
+	 * If the mem-scheme topology exports this method present(), invoke it.
+	 */
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
+		return (fmd_fmri_set_errno(EINVAL));
+	rc = topo_fmri_present(thp, nvl, &err);
+	fmd_fmri_topo_rele(thp);
+	if (err != ETOPO_METHOD_NOTSUP)
+		return (rc);
+
 	if (nvlist_lookup_string_array(nvl, FM_FMRI_MEM_SERIAL_ID, &nvlserids,
 	    &nnvlserids) != 0) {
 		/*
@@ -222,21 +233,6 @@ fmd_fmri_present(nvlist_t *nvl)
 		else
 			return (fmd_fmri_set_errno(EINVAL));
 	}
-
-	/*
-	 * Hypervisor will change the memconfig value when the mapping of
-	 * pages to DIMMs changes, e.g. for change in DIMM size or interleave.
-	 * If we detect such a change, we discard ereports associated with a
-	 * previous memconfig value as invalid.
-	 *
-	 * The test (mem.mem_memconfig != 0) means we run on a system that
-	 * actually suplies a memconfig value.
-	 */
-
-	if ((nvlist_lookup_uint64(nvl, FM_FMRI_MEM_MEMCONFIG,
-	    &memconfig) == 0) && (mem.mem_memconfig != 0) &&
-	    (memconfig != mem.mem_memconfig))
-		return (0);
 
 	if (mem_get_serids_by_unum(unum, &serids, &nserids) < 0) {
 		if (errno == ENOTSUP)
@@ -285,8 +281,20 @@ fmd_fmri_present(nvlist_t *nvl)
 int
 fmd_fmri_contains(nvlist_t *er, nvlist_t *ee)
 {
+	int rc, err = 0;
+	struct topo_hdl *thp;
 	char *erunum, *eeunum;
 	uint64_t erval = 0, eeval = 0;
+
+	/*
+	 * If the mem-scheme topology exports this method contains(), invoke it.
+	 */
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
+		return (fmd_fmri_set_errno(EINVAL));
+	rc = topo_fmri_contains(thp, er, ee, &err);
+	fmd_fmri_topo_rele(thp);
+	if (err != ETOPO_METHOD_NOTSUP)
+		return (rc);
 
 	if (mem_fmri_get_unum(er, &erunum) < 0 ||
 	    mem_fmri_get_unum(ee, &eeunum) < 0)
@@ -318,13 +326,24 @@ fmd_fmri_unusable(nvlist_t *nvl)
 {
 	uint64_t val;
 	uint8_t version;
-	int rc, err1, err2;
+	int rc, err1 = 0, err2;
 	nvlist_t *nvlcp = NULL;
 	int retval;
+	topo_hdl_t *thp;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
 	    version > FM_MEM_SCHEME_VERSION)
 		return (fmd_fmri_set_errno(EINVAL));
+
+	/*
+	 * If the mem-scheme topology exports this method unusable(), invoke it.
+	 */
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
+		return (fmd_fmri_set_errno(EINVAL));
+	rc = topo_fmri_unusable(thp, nvl, &err1);
+	fmd_fmri_topo_rele(thp);
+	if (err1 != ETOPO_METHOD_NOTSUP)
+		return (rc);
 
 	err1 = nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &val);
 	err2 = nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &val);
@@ -380,9 +399,6 @@ fmd_fmri_unusable(nvlist_t *nvl)
 int
 fmd_fmri_init(void)
 {
-#ifdef	sparc
-	mem_scheme_lhp = ldom_init(fmd_fmri_alloc, fmd_fmri_free);
-#endif	/* sparc */
 	return (mem_discover());
 }
 
@@ -413,7 +429,4 @@ fmd_fmri_fini(void)
 		tm = sm->sm_next;
 		fmd_fmri_free(sm, sizeof (mem_seg_map_t));
 	}
-#ifdef	sparc
-	ldom_fini(mem_scheme_lhp);
-#endif	/* sparc */
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,11 +31,6 @@
 #include <errno.h>
 #include <sys/mem.h>
 #include <fm/fmd_fmri.h>
-
-#ifdef sparc
-#include <sys/fm/ldom.h>
-extern ldom_hdl_t *mem_scheme_lhp;
-#endif
 
 void
 mem_strarray_free(char **arr, size_t dim)
@@ -52,26 +47,6 @@ mem_strarray_free(char **arr, size_t dim)
 int
 mem_page_cmd(int cmd, nvlist_t *nvl)
 {
-#ifdef sparc
-	int rc;
-
-	if (cmd == MEM_PAGE_ISRETIRED || cmd == MEM_PAGE_FMRI_ISRETIRED) {
-		rc = ldom_fmri_status(mem_scheme_lhp, nvl);
-	} else if (cmd == MEM_PAGE_RETIRE || cmd == MEM_PAGE_FMRI_RETIRE) {
-		rc = ldom_fmri_retire(mem_scheme_lhp, nvl);
-	} else {
-		errno = ENOTSUP;
-		return (-1);
-	}
-
-	/* Make the return value and errno value similar to the ioctl() call */
-	if (rc > 0) {
-		errno = rc;
-		return (-1);
-	}
-
-	return (0);
-#else
 	mem_page_t mpage;
 	char *fmribuf;
 	size_t fmrisz;
@@ -110,5 +85,4 @@ mem_page_cmd(int cmd, nvlist_t *nvl)
 	}
 
 	return (0);
-#endif
 }

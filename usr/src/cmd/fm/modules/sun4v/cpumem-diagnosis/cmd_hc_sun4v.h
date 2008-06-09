@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@ extern nvlist_t *cmd_fault_add_location(fmd_hdl_t *, nvlist_t *, const char *);
 extern nvlist_t *cmd_boardfru_create_fault(fmd_hdl_t *, nvlist_t *,
     const char *, uint_t, char *);
 extern nvlist_t *init_mb(fmd_hdl_t *);
+extern nvlist_t *cmd_find_dimm_by_sn(fmd_hdl_t *, char *, char *);
 extern char *cmd_getfru_loc(fmd_hdl_t *, nvlist_t *);
 extern int cmd_count_components(const char *, char sep);
 extern int cmd_breakup_components(char *, char *, nvlist_t **);

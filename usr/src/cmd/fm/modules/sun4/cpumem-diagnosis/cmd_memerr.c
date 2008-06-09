@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,10 @@
 #include <sys/fm/protocol.h>
 #include <sys/async.h>
 #include <sys/errclassify.h>
+
+#ifdef sun4v
+#include <cmd_hc_sun4v.h>
+#endif /* sun4v */
 
 struct ce_name2type {
 	const char *name;
@@ -551,53 +555,7 @@ cmd_bank_fault(fmd_hdl_t *hdl, cmd_bank_t *bank)
 	fmd_case_add_suspect(hdl, cp, flt);
 #else /* sun4v */
 	{
-		/*
-		 * Break up the bank's unum into separate unums for each dimm.
-		 * Create an asru from each unum.
-		 */
-
 		cmd_bank_memb_t *d;
-		char dimm_unum_string[MAXPATHLEN];
-		const char *q, *r;
-		nvlist_t *fmri;
-		size_t baselen;
-
-		q = strchr(bank->bank_unum, ' ');
-		baselen = q - bank->bank_unum + 1;
-		(void) strncpy(dimm_unum_string, bank->bank_unum, baselen);
-
-		/*
-		 * This method of breaking apart the bank unum works for
-		 * sun4v bank unums, until such time as a dimm enumerator
-		 * is written for libtopo.
-		 */
-
-		while (*q == ' ') {
-			r = strchr(q+1, ' ');
-			if (r == NULL)
-				r = bank->bank_unum +
-				    strlen(bank->bank_unum) + 1; /* null@end */
-			(void) strncpy(dimm_unum_string+baselen,
-			    q+1, r-q-1);
-			dimm_unum_string[baselen+(r-q-1)] = 0;
-			fmri = cmd_mem_fmri_create(dimm_unum_string);
-			if (fmd_nvl_fmri_expand(hdl, fmri) < 0) {
-				nvlist_free(fmri);
-				fmd_hdl_abort(hdl,
-				    "failed to expand dimm FMRI from "
-				    "previously validated bank\n");
-			}
-
-			/*
-			 * If dimm structure doesn't already exist for
-			 * each dimm, create and link to bank.
-			 */
-
-			if (cmd_dimm_lookup(hdl, fmri) == NULL)
-				(void) cmd_dimm_create(hdl, fmri);
-			nvlist_free(fmri);
-			q = r;
-		}
 
 		/* create separate fault for each dimm in bank */
 
@@ -688,6 +646,36 @@ cmd_ue_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	if ((bank = cmd_bank_lookup(hdl, asru)) == NULL &&
 	    (bank = cmd_bank_create(hdl, asru)) == NULL)
 		return (CMD_EVD_UNUSED);
+
+#ifdef sun4v
+	{
+		nvlist_t *fmri;
+		char **snarray;
+		unsigned int i, n;
+
+		/*
+		 * 1: locate the array of serial numbers inside the bank asru.
+		 * 2: for each serial #, lookup its mem: FMRI in libtopo
+		 * 3: ensure that each DIMM's FMRI is on bank's dimmlist
+		 */
+
+		if (nvlist_lookup_string_array(asru,
+		    FM_FMRI_MEM_SERIAL_ID, &snarray, &n) != 0)
+			fmd_hdl_abort(hdl, "Cannot locate serial #s for bank");
+
+		for (i = 0; i < n; i++) {
+			fmri = cmd_find_dimm_by_sn(hdl, FM_FMRI_SCHEME_MEM,
+			    snarray[i]);
+			/*
+			 * If dimm structure doesn't already exist for
+			 * each dimm, create and link to bank.
+			 */
+			if (cmd_dimm_lookup(hdl, fmri) == NULL)
+				(void) cmd_dimm_create(hdl, fmri);
+			nvlist_free(fmri);
+		}
+	}
+#endif /* sun4v */
 
 	if (bank->bank_case.cc_cp == NULL) {
 		const char *uuid;

@@ -204,7 +204,7 @@ opl_mem_fru_create(fmd_hdl_t *hdl, nvlist_t *nvl)
 
 	fmd_hdl_debug(hdl, "opl_mem_fru_create for mem %s\n", unum);
 
-	if ((fmri = cmd_mem_fmri_create(unum)) == NULL)
+	if ((fmri = cmd_mem_fmri_create(unum, NULL, 0)) == NULL)
 		return (NULL);
 
 	if ((nvlist_lookup_string_array(nvl, FM_FMRI_MEM_SERIAL_ID, &serids,

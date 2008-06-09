@@ -18,23 +18,46 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = chip \
-	cpuboard \
-	dimm \
-	hostbridge \
-	pcibus \
-	motherboard \
-	niu \
-	platform-cpu \
-	platform-mem \
-	xaui \
-	zambezi
+ARCH = sun4v
+PRIDIR=../platform-mem
 
-include ../../../Makefile.subdirs
+sun4v_SRCS = dimm_sun4v.c mem_mdesc.c
+
+INCDIRS = $(ROOT)/usr/platform/sun4v/include \
+		$(PRIDIR)
+
+# include ../../sun4/chip/Makefile.chip
+
+MODULE = dimm
+CLASS = arch
+SUN4DIR = ../../sun4/$(MODULE)
+MODULESRCS = $($(ARCH)_SRCS)
+
+include ../../Makefile.plugin
+
+INCDIRS += $(SUN4DIR)
+
+CPPFLAGS += $(INCDIRS:%=-I%)
+
+%.o: $(SUN4DIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.ln: $(SUN4DIR)/%.c
+	$(LINT.c) -c $<
+
+# end of what would be body of ../../sun4/mem/Makefile.mem
+LDLIBS += -lumem -lmdesc -lldom
+
+%.o: $(PRIDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.ln: $(PRIDIR)/%.c
+	$(LINT.c) -c $<

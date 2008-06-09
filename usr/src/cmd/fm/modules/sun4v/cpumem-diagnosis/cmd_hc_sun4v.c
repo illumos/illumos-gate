@@ -32,6 +32,9 @@
 #include <string.h>
 #include <cmd_hc_sun4v.h>
 
+/* Using a global variable is safe because the DE is single threaded */
+
+nvlist_t *dimm_nvl;
 nvlist_t *mb_nvl;
 
 nvlist_t *
@@ -331,4 +334,86 @@ init_mb(fmd_hdl_t *hdl)
 	topo_walk_fini(twp);
 	fmd_hdl_topo_rele(hdl, thp);
 	return (mb_nvl);
+}
+
+/*ARGSUSED*/
+static int
+find_dimm_sn_mem(topo_hdl_t *thp, tnode_t *node, void *arg)
+{
+	int err;
+	uint_t n;
+	nvlist_t *rsrc;
+	char **sn;
+
+	if (topo_node_resource(node, &rsrc, &err) < 0) {
+		return (TOPO_WALK_NEXT);	/* no resource, try next */
+	}
+	if (nvlist_lookup_string_array(rsrc,
+	    FM_FMRI_HC_SERIAL_ID, &sn, &n) != 0) {
+		nvlist_free(rsrc);
+		return (TOPO_WALK_NEXT);
+	}
+	if (strcmp(*sn, (char *)arg) != 0) {
+		nvlist_free(rsrc);
+		return (TOPO_WALK_NEXT);
+	}
+	(void) nvlist_dup(rsrc, &dimm_nvl, NV_UNIQUE_NAME);
+	nvlist_free(rsrc);
+	return (TOPO_WALK_TERMINATE);	/* if no space, give up */
+}
+
+/*ARGSUSED*/
+static int
+find_dimm_sn_hc(topo_hdl_t *thp, tnode_t *node, void *arg)
+{
+	int err;
+	nvlist_t *fru;
+	char *sn;
+
+	if (topo_node_fru(node, &fru, 0,  &err) < 0) {
+		return (TOPO_WALK_NEXT);	/* no fru, try next */
+	}
+	if (nvlist_lookup_string(fru, FM_FMRI_HC_SERIAL_ID, &sn) != 0) {
+		nvlist_free(fru);
+		return (TOPO_WALK_NEXT);
+	}
+	if (strcmp(sn, (char *)arg) != 0) {
+		nvlist_free(fru);
+		return (TOPO_WALK_NEXT);
+	}
+	(void) nvlist_dup(fru, &dimm_nvl, NV_UNIQUE_NAME);
+	nvlist_free(fru);
+	return (TOPO_WALK_TERMINATE);	/* if no space, give up */
+}
+
+/* cmd_find_dimm_by_sn -- find fmri by sn from libtopo */
+
+nvlist_t *
+cmd_find_dimm_by_sn(fmd_hdl_t *hdl, char *schemename, char *sn)
+{
+	topo_hdl_t *thp;
+	topo_walk_t *twp;
+	int err;
+
+	dimm_nvl = NULL;
+
+	if ((thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION)) == NULL)
+		return (NULL);
+	if (strcmp(schemename, FM_FMRI_SCHEME_MEM) == 0) {
+		if ((twp = topo_walk_init(thp,
+		    schemename, find_dimm_sn_mem, sn, &err)) == NULL) {
+			fmd_hdl_topo_rele(hdl, thp);
+			return (NULL);
+		}
+	} else {
+		if ((twp = topo_walk_init(thp,
+		    schemename, find_dimm_sn_hc, sn, &err)) == NULL) {
+			fmd_hdl_topo_rele(hdl, thp);
+			return (NULL);
+		}
+	}
+	(void) topo_walk_step(twp, TOPO_WALK_CHILD);
+	topo_walk_fini(twp);
+	fmd_hdl_topo_rele(hdl, thp);
+	return (dimm_nvl);
 }

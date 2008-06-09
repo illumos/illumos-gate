@@ -147,6 +147,14 @@ extern nvlist_t *topo_mod_auth(topo_mod_t *, tnode_t *);
 #define	TOPO_METH_EXPAND_VERSION0	0
 #define	TOPO_METH_EXPAND_VERSION	TOPO_METH_EXPAND_VERSION0
 
+#define	TOPO_METH_CONTAINS		"topo_contains"
+#define	TOPO_METH_CONTAINS_DESC		"FMRI contains sub-FMRI"
+#define	TOPO_METH_CONTAINS_VERSION0	0
+#define	TOPO_METH_CONTAINS_VERSION	TOPO_METH_CONTAINS_VERSION0
+#define	TOPO_METH_CONTAINS_RET		"contains-return"
+#define	TOPO_METH_FMRI_ARG_FMRI		"fmri"
+#define	TOPO_METH_FMRI_ARG_SUBFMRI	"sub-fmri"
+
 #define	TOPO_METH_ASRU_COMPUTE		"topo_asru_compute"
 #define	TOPO_METH_ASRU_COMPUTE_VERSION	0
 #define	TOPO_METH_ASRU_COMPUTE_DESC	"Dynamic ASRU constructor"

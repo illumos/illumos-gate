@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -159,7 +159,7 @@ cmd_mem_thresh_check(fmd_hdl_t *hdl, uint_t nret)
 }
 
 nvlist_t *
-cmd_mem_fmri_create(const char *unum)
+cmd_mem_fmri_create(const char *unum, char **serids, size_t nserids)
 {
 	nvlist_t *fmri;
 
@@ -174,6 +174,10 @@ cmd_mem_fmri_create(const char *unum)
 		return (NULL);
 	}
 
+	if ((nserids > 0) && (serids != NULL)) {
+		(void) nvlist_add_string_array(fmri, FM_FMRI_MEM_SERIAL_ID,
+		    serids, nserids);
+	}
 	return (fmri);
 }
 
@@ -211,7 +215,7 @@ cmd_mem_fmri_derive(fmd_hdl_t *hdl, uint64_t afar, uint64_t afsr, uint16_t synd)
 
 	(void) close(fd);
 
-	fmri = cmd_mem_fmri_create(mn.m_name);
+	fmri = cmd_mem_fmri_create(mn.m_name, NULL, 0);
 	fmd_hdl_free(hdl, mn.m_name, mn.m_namelen);
 
 	return (fmri);
