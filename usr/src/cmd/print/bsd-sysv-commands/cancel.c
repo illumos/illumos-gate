@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -53,6 +53,49 @@ usage(char *program)
 }
 
 int
+cancel_jobs_for_user(char *user, papi_encryption_t encryption, char *pname) {
+
+	papi_status_t status;
+	papi_service_t svc = NULL;
+	char **printers = NULL;
+	int i, exit_code;
+
+	if (pname == NULL) {
+		status = papiServiceCreate(&svc, NULL, user, NULL,
+		    cli_auth_callback, encryption, NULL);
+		printers = interest_list(svc);
+		papiServiceDestroy(svc);
+	} else {
+		list_append(&printers, strdup(pname));
+	}
+
+	if (printers == NULL)
+		exit(0);
+
+	for (i = 0; printers[i] != NULL; i++) {
+		char *printer = printers[i];
+
+		status = papiServiceCreate(&svc, printer, user, NULL,
+		    cli_auth_callback, encryption, NULL);
+
+		if (status != PAPI_OK) {
+			fprintf(stderr, gettext(
+			    "Failed to contact service for %s: %s\n"),
+			    printer, verbose_papi_message(svc, status));
+			exit(1);
+		}
+		exit_code = berkeley_cancel_request(svc, stdout, printer, 1,
+		    &user);
+
+		papiServiceDestroy(svc);
+		if (exit_code != 0)
+			break;
+	}
+	free(printers);
+	return (exit_code);
+}
+
+int
 main(int ac, char *av[])
 {
 	int exit_code = 0;
@@ -62,6 +105,9 @@ main(int ac, char *av[])
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain("SUNW_OST_OSCMD");
+
+	if (ac == 1)
+		usage(av[0]);
 
 	while ((c = getopt(ac, av, "Eu:")) != EOF)
 		switch (c) {
@@ -85,11 +131,11 @@ main(int ac, char *av[])
 		(void) get_printer_id(av[c], &printer, &id);
 
 		status = papiServiceCreate(&svc, printer, user, NULL,
-					cli_auth_callback, encryption, NULL);
+		    cli_auth_callback, encryption, NULL);
 		if (status != PAPI_OK) {
-			fprintf(stderr, gettext(
-				"Failed to contact service for %s: %s\n"),
-				printer, verbose_papi_message(svc, status));
+			fprintf(stderr,
+			    gettext("Failed to contact service for %s: %s\n"),
+			    printer, verbose_papi_message(svc, status));
 			exit(1);
 		}
 
@@ -99,29 +145,55 @@ main(int ac, char *av[])
 			char *mesg = "cancelled";
 
 			status = papiJobCancel(svc, printer, id);
-			if (status != PAPI_OK) {
+			if (status == PAPI_NOT_AUTHORIZED) {
+				mesg = papiStatusString(status);
+				exit_code = 1;
+			} else if (status != PAPI_OK) {
 				mesg = verbose_papi_message(svc, status);
 				exit_code = 1;
 			}
 			fprintf(OUT, "%s-%d: %s\n", printer, id, mesg);
+
 		} else {	/* it's a printer */
-			status = papiPrinterPurgeJobs(svc, printer, &jobs);
-			if (status != PAPI_OK) {
-				fprintf(stderr, gettext("PurgeJobs %s: %s\n"),
-					printer,
-					verbose_papi_message(svc, status));
-				exit_code = 1;
+			if (user == NULL) {
+
+				/* Remove first job from printer */
+
+				status = papiPrinterListJobs(svc, printer,
+				    NULL, NULL, 0, &jobs);
+
+				if (status != PAPI_OK) {
+					fprintf(stderr, gettext(
+					    "ListJobs %s: %s\n"), printer,
+					    verbose_papi_message(svc, status));
+					exit_code = 1;
+				}
+
+				if (jobs != NULL && *jobs != NULL) {
+					char jobid[32];
+					char *jid;
+
+					snprintf(jobid, sizeof (jobid), "%u",
+					    papiJobGetId(*jobs));
+
+					jid = jobid;
+					exit_code = berkeley_cancel_request(svc,
+					    stdout, printer, 1, &jid);
+
+				}
+				papiJobListFree(jobs);
+
+			} else {
+				/* Purging user's print jobs */
+				exit_code = cancel_jobs_for_user(user,
+				    encryption, printer);
 			}
-
-			while ((jobs != NULL) && (*jobs != NULL))
-				fprintf(OUT, "%s-%d: %s\n", printer,
-					papiJobGetId(*jobs++), "cancelled");
-
-			papiJobListFree(jobs);
 		}
-
 		papiServiceDestroy(svc);
 	}
+
+	if (optind == ac)
+		exit_code = cancel_jobs_for_user(user, encryption, NULL);
 
 	return (exit_code);
 }
