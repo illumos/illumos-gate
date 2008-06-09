@@ -26,29 +26,10 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-default: all
-
-include $(SRC)/lib/Makefile.lib
-
-SUBDIRS = $(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
-
-LINT_SUBDIRS=	$(MACH)
-$(BUILD64)LINT_SUBDIRS += $(MACH64)
-
-all :=          TARGET= all
-clean :=        TARGET= clean
-clobber :=      TARGET= clobber
-install :=      TARGET= install
-lint :=         TARGET= lint
-
-.KEEP_STATE:
-
-all install clean clobber: $(SUBDIRS)
-
-lint: $(LINT_SUBDIRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+SUNWprivate_1.1 {
+    global:
+	_rd_get_dyns64;
+	_rd_get_ehdr64;
+	_rd_loadobj_iter64;
+	validate_rdebug64;
+};

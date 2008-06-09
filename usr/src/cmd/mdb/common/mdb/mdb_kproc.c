@@ -182,6 +182,8 @@ kp_file_create(mdb_tgt_t *t, kp_map_t *kpm, GElf_Half etype)
 {
 	kp_file_t *kpf = mdb_zalloc(sizeof (kp_file_t), UM_SLEEP);
 	kp_data_t *kp = t->t_data;
+	size_t dyns_sz;
+	void *dyns;
 
 	kpf->kpf_fio = kp_io_create(t, kpm);
 	kpf->kpf_map = kpm;
@@ -197,6 +199,10 @@ kp_file_create(mdb_tgt_t *t, kp_map_t *kpm, GElf_Half etype)
 
 	mdb_dprintf(MDB_DBG_TGT, "loading symbols for %s\n",
 	    kpm->kpm_map.map_name);
+
+	if ((kp->kp_rap != NULL) && (rd_get_dyns(kp->kp_rap,
+	    kpf->kpf_text_base, &dyns, &dyns_sz) == RD_OK))
+		mdb_gelf_dyns_set(kpf->kpf_file, dyns, dyns_sz);
 
 	kpf->kpf_dynsym = mdb_gelf_symtab_create_dynamic(kpf->kpf_file,
 	    MDB_TGT_DYNSYM);

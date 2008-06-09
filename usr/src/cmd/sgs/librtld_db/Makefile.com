@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -73,6 +73,9 @@ ROOTFS_LINKS64=		$(ROOTFS_LIBDIR64)/$(LIBLINKS)
 
 $(ROOTFS_DYNLIB) :=	FILEMODE= 755
 $(ROOTFS_DYNLIB64) :=	FILEMODE= 755
+
+pics/rd_elf.o :=	CERRWARN += -erroff=E_END_OF_LOOP_CODE_NOT_REACHED
+pics/rd_elf64.o :=	CERRWARN += -erroff=E_END_OF_LOOP_CODE_NOT_REACHED
 
 $(VAR_POUND_1)$(ROOTFS_LIBDIR)/$(LINTLIBSRC): ../common/$(LINTLIBSRC)
 	$(VAR_POUND_1)$(INS.file) ../common/$(LINTLIBSRC)

@@ -1,7 +1,4 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -21,7 +18,13 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 SUNW_1.1 {
     global:
@@ -37,12 +40,19 @@ SUNW_1.1 {
 	rd_new;
 	rd_objpad_enable;
 	rd_plt_resolution;
-	rd_fix_phdrs;
 	rd_reset;
     local:
 	*;
 };
 
+SUNWprivate_1.1 {
+    global:
+	_rd_get_dyns32;
+	_rd_get_ehdr32;
+	_rd_loadobj_iter32;
+	rd_get_dyns;
+	validate_rdebug32;
+};
 
 #Externally defined symbols
 {

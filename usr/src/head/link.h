@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,11 +114,10 @@ extern void	ld_section64();
  */
 #define	LM_ID_BASE		0x00
 #define	LM_ID_LDSO		0x01
-#define	LM_ID_BRAND		0x02	/* marks branded objs in rd_loadobj_t */
+#define	LM_ID_NUM		2
 
-#define	LM_ID_NUM		3
-
-
+#define	LM_ID_BRAND		0xfd	/* brand emulation linkmap objs */
+#define	LM_ID_NONE		0xfe	/* no link map specified */
 #define	LM_ID_NEWLM		0xff	/* create a new link-map */
 
 /*

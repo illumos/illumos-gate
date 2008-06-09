@@ -18,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,27 +29,46 @@
 LIBRARY =	lx_librtld_db.a
 VERS	=	.1
 COBJS	=	lx_librtld_db.o
-OBJECTS	=	$(COBJS)
+OBJECTS	=	$(COBJS) $(COBJS64)
 
-include ../../../../Makefile.lib
+include $(SRC)/lib/Makefile.lib
 include ../../Makefile.lx
 
 CSRCS =       $(COBJS:%o=../common/%c)
 SRCS  =       $(CSRCS)
 
 SRCDIR =	../common
-UTSBASE	=	../../../../../uts
+UTSBASE	=	$(SRC)/uts
 
+#
+# ATTENTION:
+#	Librtl_db brand plugin libraries should NOT directly invoke any
+#	libproc.so interfaces or be linked against libproc.  If a librtl_db
+#	brand plugin library uses libproc.so interfaces then it may break
+#	any other librtld_db consumers (like mdb) that tries to attach
+#	to a branded process.  The only safe interfaces that the a librtld_db
+#	brand plugin library can use to access a target process are the
+#	proc_service(3PROC) apis.
+#
+DYNFLAGS +=	$(VERSREF) -M../common/mapfile-vers
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lc -lproc
+LDLIBS +=	-lc -lrtld_db
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I../ -I$(UTSBASE)/common/brand/lx \
-			-I../../../../../cmd/sgs/librtld_db/common \
-			-I../../../../../cmd/sgs/include \
-			-I../../../../../cmd/sgs/include/$(MACH)
+			-I$(SRC)/cmd/sgs/librtld_db/common \
+			-I$(SRC)/cmd/sgs/include \
+			-I$(SRC)/cmd/sgs/include/$(MACH)
 
 ROOTLIBDIR =	$(ROOT)/usr/lib/brand/lx
 ROOTLIBDIR64 =	$(ROOT)/usr/lib/brand/lx/$(MACH64)
+
+#
+# The top level Makefiles define define TEXT_DOMAIN.  But librtld_db.so.1
+# isn't internationalized and this library won't be either.  The only
+# messages that this library can generate are messages used for debugging
+# the operation of the library itself.
+#
+DTEXTDOM =
 
 .KEEP_STATE:
 
@@ -56,4 +76,8 @@ all: $(LIBS)
 
 lint: lintcheck
 
-include ../../../../Makefile.targ
+pics/%64.o:	../common/%.c
+		$(COMPILE.c) -D_ELF64 $(PICFLAGS) -o $@ $<
+		$(POST_PROCESS_O)
+
+include $(SRC)/lib/Makefile.targ

@@ -22,9 +22,9 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */ 
+ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -45,6 +45,5 @@ rd_agent_t *	rd_new(struct ps_prochandle *);
 rd_err_e	rd_objpad_enable(struct rd_agent *, size_t);
 rd_err_e	rd_plt_resolution(rd_agent_t *, psaddr_t, lwpid_t,
 			psaddr_t, rd_plt_info_t *);
-void		rd_fix_phdrs(struct rd_agent *, Elf32_Dyn *, size_t,
-			uintptr_t);
+rd_err_e	rd_get_dyns(rd_agent_t *, psaddr_t, void **, size_t *);
 rd_err_e	rd_reset(struct rd_agent *);

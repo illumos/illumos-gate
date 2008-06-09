@@ -20,10 +20,11 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 # Message file for cmd/sgs/librtld_db.
 
@@ -75,13 +76,15 @@
 @ MSG_DB_READFAIL_2	"rtld_db: rpr: read of 0x%llx failed"
 @ MSG_DB_READFAIL_3	"rtld_db: roe: read of 0x%llx failed"
 @ MSG_DB_READFAIL_4	"rtld_db: fde: read of 0x%llx failed"
+@ MSG_DB_READFAIL_5	"rtld_db: ge: read of 0x%llx failed"
+@ MSG_DB_READFAIL_6	"rtld_db: gd: read of 0x%llx failed"
 @ MSG_DB_WRITEFAIL_1	"rtld_db: ree: write of 0x%llx failed"
 @ MSG_DB_WRITEFAIL_2	"rtld_db: roe: write of 0x%llx failed"
 @ MSG_DB_UNFNDSYM	"rtld_db: rbea: unable to find sym: %s"
 @ MSG_DB_NODYNDEBUG	"rtld_db: fde: no %lld found in .dynamic"
 @ MSG_DB_FINDDYNAMIC	"rtld_db: fde: DYNAMIC entry found tag: %d found. \
 			 val: 0x%llx"
-@ MSG_DB_HELPER_PREFIX	"/usr/lib/brand/"
+@ MSG_DB_HELPER_PREFIX	"/usr/lib/brand"
 
 
 
@@ -99,7 +102,7 @@
 @ MSG_DB_RDEVENTGETMSG	"rtld_db: rd_event_getmsg(dmodel=%d, type=%d, \
 			 state=%d)"
 @ MSG_DB_RDOBJPADE	"rtld_db: rd_objpad_enable(padsize=0x%llx)"
-@ MSG_DB_64BIT_PREFIX	"64/";
+@ MSG_DB_64BIT_PREFIX	"64/"
 @ MSG_DB_BRAND_HELPERPATH_PREFIX "%s/%s/%s/%s%s_librtld_db.so.1"
 @ MSG_DB_BRAND_HELPERPATH "%s/%s/%s%s_librtld_db.so.1"
 @ MSG_DB_HELPERNOOPS	"rtld_db: helper lib loaded but ops not preset"
@@ -122,4 +125,5 @@
 @ MSG_SYM_DLACT		"rtld_db_dlactivity"
 @ MSG_SYM_RTBIND	"elf_rtbndr"
 @ MSG_SYM_DYNAMIC	"_DYNAMIC"
-@ MSG_SYM_BRANDOPS	"rtld_db_brand_ops"
+@ MSG_SYM_BRANDOPS32	"rtld_db_brand_ops32"
+@ MSG_SYM_BRANDOPS64	"rtld_db_brand_ops64"

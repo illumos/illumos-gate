@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,27 +161,6 @@ typedef struct rd_plt_info {
 	unsigned int	pi_flags;
 } rd_plt_info_t;
 
-/*
- * State kept for brand helper libraries
- */
-typedef struct rd_helper_ops {
-	void	*(*rho_init)(struct ps_prochandle *);
-	int	(*rho_loadobj_iter)(struct ps_prochandle *, rl_iter_f *cb,
-	    void *client_data, void *helper_data);
-	void	(*rho_fix_phdrs)(struct rd_agent *, Elf32_Dyn *, size_t,
-	    psaddr_t addr);
-} rd_helper_ops_t;
-
-typedef struct rd_helper {
-	rd_helper_ops_t	*rh_ops;
-	void		*rh_data;
-	void		*rh_dlhandle;
-} rd_helper_t;
-
-/*
- * Brand helper libraries must name their ops vector using this macro.
- */
-#define	RTLD_DB_BRAND_OPS rtld_db_brand_ops
 
 /*
  * Values for pi_flags
@@ -211,10 +190,9 @@ extern rd_agent_t	*rd_new(struct ps_prochandle *);
 extern rd_err_e		rd_objpad_enable(struct rd_agent *, size_t);
 extern rd_err_e		rd_plt_resolution(rd_agent_t *, psaddr_t, lwpid_t,
 				psaddr_t, rd_plt_info_t *);
-extern void		rd_fix_phdrs(struct rd_agent *, Elf32_Dyn *,
-    size_t, uintptr_t);
+extern rd_err_e		rd_get_dyns(rd_agent_t *, psaddr_t, void **, size_t *);
 extern rd_err_e		rd_reset(struct rd_agent *);
-#else
+#else /* !__STDC__ */
 extern void		rd_delete();
 extern char		*rd_errstr();
 extern rd_err_e		rd_event_addr();
@@ -227,9 +205,9 @@ extern void		rd_log();
 extern rd_agent_t	*rd_new();
 extern rd_err_e		rd_objpad_enable();
 extern rd_err_e		rd_plt_resolution();
-extern void		rd_fix_phdrs();
+extern rd_err_e		rd_get_dyns();
 extern rd_err_e		rd_reset();
-#endif
+#endif /* !__STDC__ */
 
 #ifdef	__cplusplus
 }

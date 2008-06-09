@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,24 +44,30 @@
  */
 #ifdef _LP64
 #ifdef _ELF64
-#define	_rd_reset32		_rd_reset64
 #define	_rd_event_enable32	_rd_event_enable64
 #define	_rd_event_getmsg32	_rd_event_getmsg64
+#define	_rd_get_dyns32		_rd_get_dyns64
+#define	_rd_get_ehdr32		_rd_get_ehdr64
 #define	_rd_objpad_enable32	_rd_objpad_enable64
 #define	_rd_loadobj_iter32	_rd_loadobj_iter64
+#define	_rd_reset32		_rd_reset64
 #define	find_dynamic_ent32	find_dynamic_ent64
+#define	validate_rdebug32	validate_rdebug64
 #define	TList			List
 #define	TListnode		Listnode
+#define	MSG_SYM_BRANDOPS	MSG_SYM_BRANDOPS64
 #else	/* ELF32 */
 #define	Rt_map			Rt_map32
 #define	Rtld_db_priv		Rtld_db_priv32
 #define	TList			List32
 #define	TListnode		Listnode32
 #define	Lm_list			Lm_list32
+#define	MSG_SYM_BRANDOPS	MSG_SYM_BRANDOPS32
 #endif	/* _ELF64 */
 #else	/* _LP64 */
 #define	TList			List
 #define	TListnode		Listnode
+#define	MSG_SYM_BRANDOPS	MSG_SYM_BRANDOPS32
 #endif	/* _LP64 */
 
 /*
@@ -73,8 +79,8 @@
 typedef ps_err_e (*ps_pbrandname_fp_t)(struct ps_prochandle *,
     char *, size_t);
 
-static rd_err_e
-validate_rdebug(struct rd_agent *rap)
+rd_err_e
+validate_rdebug32(struct rd_agent *rap)
 {
 	struct ps_prochandle	*php = rap->rd_psp;
 	psaddr_t		db_privp;
@@ -168,15 +174,6 @@ find_dynamic_ent32(struct rd_agent *rap, psaddr_t dynaddr,
 
 extern char rtld_db_helper_path[MAXPATHLEN];
 
-#ifndef _ELF64
-void
-rd_fix_phdrs(struct rd_agent *rap, Elf32_Dyn *dp, size_t sz, uintptr_t a)
-{
-	if (rap->rd_helper.rh_ops != NULL)
-		rap->rd_helper.rh_ops->rho_fix_phdrs(rap, dp, sz, a);
-}
-#endif
-
 rd_err_e
 _rd_reset32(struct rd_agent *rap)
 {
@@ -231,7 +228,7 @@ _rd_reset32(struct rd_agent *rap)
 				rap->rd_rdebug = (uintptr_t)auxvp->a_un.a_ptr;
 				LOG(ps_plog(MSG_ORIG(MSG_DB_FLDDATA),
 				    rap->rd_rdebug));
-				rc = validate_rdebug(rap);
+				rc = validate_rdebug32(rap);
 				break;
 			}
 			auxvp++;
@@ -258,7 +255,7 @@ _rd_reset32(struct rd_agent *rap)
 			rap->rd_rdebug = symaddr;
 			LOG(ps_plog(MSG_ORIG(MSG_DB_SYMRDEBUG),
 			    EC_ADDR(symaddr)));
-			rc = validate_rdebug(rap);
+			rc = validate_rdebug32(rap);
 		}
 	}
 
@@ -280,7 +277,7 @@ _rd_reset32(struct rd_agent *rap)
 			return (rc);
 		}
 		rap->rd_rdebug = dyn.d_un.d_ptr;
-		rc = validate_rdebug(rap);
+		rc = validate_rdebug32(rap);
 		if (rc != RD_OK) {
 			LOG(ps_plog(MSG_ORIG(MSG_DB_INITFAILED)));
 			return (rc);
@@ -288,17 +285,19 @@ _rd_reset32(struct rd_agent *rap)
 	}
 
 	/*
-	 * If we are debugging a branded executable, load the appropriate helper
-	 * library, and call its initialization routine.
+	 * If we are debugging a branded executable, load the appropriate
+	 * helper library, and call its initialization routine.  Being unable
+	 * to load the helper library is not a critical error.  (Hopefully
+	 * we'll still be able to access some objects in the target.)
 	 */
 	ps_pbrandname = (ps_pbrandname_fp_t)dlsym(RTLD_PROBE, "ps_pbrandname");
-	if ((ps_pbrandname != NULL) &&
+	while ((ps_pbrandname != NULL) &&
 	    (ps_pbrandname(php, brandname, MAXPATHLEN) == PS_OK)) {
 		const char *isa = "";
 
-#ifdef __amd64
+#ifdef _LP64
 		isa = MSG_ORIG(MSG_DB_64BIT_PREFIX);
-#endif /* __amd64 */
+#endif /* _LP64 */
 
 		if (rtld_db_helper_path[0] != '\0')
 			(void) snprintf(brandlib, MAXPATHLEN,
@@ -312,28 +311,36 @@ _rd_reset32(struct rd_agent *rap)
 			    MSG_ORIG(MSG_DB_HELPER_PREFIX), brandname, isa,
 			    brandname);
 
-		if ((rap->rd_helper.rh_dlhandle = dlopen(brandlib,
-		    RTLD_LAZY | RTLD_LOCAL)) == NULL) {
+		rap->rd_helper.rh_dlhandle = dlopen(brandlib,
+		    RTLD_LAZY | RTLD_LOCAL);
+		if (rap->rd_helper.rh_dlhandle == NULL) {
 			LOG(ps_plog(MSG_ORIG(MSG_DB_HELPERLOADFAILED),
 			    brandlib));
-			return (RD_ERR);
+			break;
 		}
 
-		if ((rap->rd_helper.rh_ops = dlsym(rap->rd_helper.rh_dlhandle,
-		    MSG_ORIG(MSG_SYM_BRANDOPS))) == NULL) {
+		rap->rd_helper.rh_ops = dlsym(rap->rd_helper.rh_dlhandle,
+		    MSG_ORIG(MSG_SYM_BRANDOPS));
+		if (rap->rd_helper.rh_ops == NULL) {
 			LOG(ps_plog(MSG_ORIG(MSG_DB_HELPERNOOPS),
 			    brandlib));
-			return (RD_ERR);
+			(void) dlclose(rap->rd_helper.rh_dlhandle);
+			rap->rd_helper.rh_dlhandle = NULL;
+			break;
 		}
 
-		rap->rd_helper.rh_data = rap->rd_helper.rh_ops->rho_init(php);
+		rap->rd_helper.rh_data = rap->rd_helper.rh_ops->rho_init(rap,
+		    php);
 		if (rap->rd_helper.rh_data == NULL) {
 			LOG(ps_plog(MSG_ORIG(MSG_DB_HELPERINITFAILED)));
 			(void) dlclose(rap->rd_helper.rh_dlhandle);
 			rap->rd_helper.rh_dlhandle = NULL;
 			rap->rd_helper.rh_ops = NULL;
-		} else
-			LOG(ps_plog(MSG_ORIG(MSG_DB_HELPERLOADED), brandname));
+			break;
+		}
+
+		LOG(ps_plog(MSG_ORIG(MSG_DB_HELPERLOADED), brandname));
+		break;
 	}
 
 	if ((rap->rd_flags & RDF_FL_COREFILE) == 0) {
@@ -363,6 +370,85 @@ _rd_reset32(struct rd_agent *rap)
 		rap->rd_tbinder = 0;
 	}
 
+	return (RD_OK);
+}
+
+rd_err_e
+_rd_get_ehdr32(struct rd_agent *rap,
+    psaddr_t addr, Ehdr *ehdr, uint_t *phnum)
+{
+	struct ps_prochandle	*php = rap->rd_psp;
+	Shdr			shdr;
+
+	if (ps_pread(php, addr, ehdr, sizeof (*ehdr)) != PS_OK) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_READFAIL_5), EC_ADDR(addr)));
+		return (RD_ERR);
+	}
+	if (phnum == NULL)
+		return (RD_OK);
+
+	if (ehdr->e_phnum != PN_XNUM) {
+		*phnum = ehdr->e_phnum;
+		return (RD_OK);
+	}
+
+	/* deal with elf extended program headers */
+	if ((ehdr->e_shoff == 0) || (ehdr->e_shentsize < sizeof (shdr)))
+		return (RD_ERR);
+
+	addr += ehdr->e_shoff;
+	if (ps_pread(php, addr, &shdr, sizeof (shdr)) != PS_OK) {
+		LOG(ps_plog(MSG_ORIG(MSG_DB_READFAIL_5), EC_ADDR(addr)));
+		return (RD_ERR);
+	}
+
+	if (shdr.sh_info == 0)
+		return (RD_ERR);
+
+	*phnum = shdr.sh_info;
+	return (RD_OK);
+}
+
+rd_err_e
+_rd_get_dyns32(rd_agent_t *rap, psaddr_t addr, Dyn **dynpp, size_t *dynpp_sz)
+{
+	struct ps_prochandle	*php = rap->rd_psp;
+	rd_err_e		err;
+	uint_t			phnum;
+	Ehdr			ehdr;
+	Phdr			phdr;
+	Dyn			*dynp;
+	int			i;
+
+	/* We only need to muck with dyn elements for ET_DYN objects */
+	if ((err = _rd_get_ehdr32(rap, addr, &ehdr, &phnum)) != RD_OK)
+		return (err);
+
+	for (i = 0; i < phnum; i++) {
+		psaddr_t a = addr + ehdr.e_phoff + (i * ehdr.e_phentsize);
+		if (ps_pread(php, a, &phdr, sizeof (phdr)) != PS_OK) {
+			LOG(ps_plog(MSG_ORIG(MSG_DB_READFAIL_6), EC_ADDR(a)));
+			return (RD_ERR);
+		}
+		if (phdr.p_type == PT_DYNAMIC)
+			break;
+	}
+	if (i == phnum)
+		return (RD_ERR);
+
+	if ((dynp = malloc(phdr.p_filesz)) == NULL)
+		return (RD_ERR);
+	if (ehdr.e_type == ET_DYN)
+		phdr.p_vaddr += addr;
+	if (ps_pread(php, phdr.p_vaddr, dynp, phdr.p_filesz) != PS_OK) {
+		free(dynp);
+		LOG(ps_plog(MSG_ORIG(MSG_DB_READFAIL_6),
+		    EC_ADDR(phdr.p_vaddr)));
+		return (RD_ERR);
+	}
+
+	*dynpp = dynp;
+	*dynpp_sz = phdr.p_filesz;
 	return (RD_OK);
 }
 
@@ -502,8 +588,10 @@ iter_map(rd_agent_t *rap, unsigned long ident, psaddr_t lmaddr,
 		lobj.rl_base = (psaddr_t)ADDR(&rmap);
 		lobj.rl_flags = 0;
 		lobj.rl_refnameaddr = (psaddr_t)REFNAME(&rmap);
-		if (rap->rd_helper.rh_dlhandle != NULL)
-			lobj.rl_lmident = LM_ID_BRAND;
+		if ((rap->rd_helper.rh_ops != NULL) &&
+		    (rap->rd_helper.rh_ops->rho_lmid != LM_ID_NONE))
+			lobj.rl_lmident =
+			    rap->rd_helper.rh_ops->rho_lmid;
 		else
 			lobj.rl_lmident = ident;
 
@@ -679,8 +767,8 @@ _rd_loadobj_iter32(rd_agent_t *rap, rl_iter_f *cb, void *client_data)
 		return (rc);
 
 	if (rap->rd_helper.rh_ops != NULL)
-		return (rap->rd_helper.rh_ops->rho_loadobj_iter(rap->rd_psp, cb,
-		    client_data, rap->rd_helper.rh_data));
+		return (rap->rd_helper.rh_ops->rho_loadobj_iter(
+		    rap->rd_helper.rh_data, cb, client_data));
 
 	return (RD_OK);
 }

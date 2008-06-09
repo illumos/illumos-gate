@@ -35,51 +35,92 @@
 #include <proc_service.h>
 #include <rtld_db.h>
 #include <synch.h>
+
 #include <sys/lx_brand.h>
 
-static void *lx_ldb_client_init(struct ps_prochandle *);
-static int lx_ldb_iter(struct ps_prochandle *, rl_iter_f *, void *, void *);
-static void lx_ldb_fix_phdr(struct rd_agent *, Elf32_Dyn *, size_t,
-    psaddr_t);
+/*
+ * ATTENTION:
+ *	Librtl_db brand plugin libraries should NOT directly invoke any
+ *	libproc.so interfaces or be linked against libproc.  If a librtl_db
+ *	brand plugin library uses libproc.so interfaces then it may break
+ *	any other librtld_db consumers (like mdb) that tries to attach
+ *	to a branded process.  The only safe interfaces that the a librtld_db
+ *	brand plugin library can use to access a target process are the
+ *	proc_service(3PROC) apis.
+ */
 
-struct rd_agent {
-	mutex_t				rd_mutex;
-	struct ps_prochandle		*rd_psp;	/* prochandle pointer */
-	psaddr_t			rd_rdebug;	/* rtld r_debug */
-	psaddr_t			rd_preinit;	/* rtld_db_preinit */
-	psaddr_t			rd_postinit;	/* rtld_db_postinit */
-	psaddr_t			rd_dlact;	/* rtld_db_dlact */
-	psaddr_t			rd_tbinder;	/* tail of binder */
-	psaddr_t			rd_rtlddbpriv;	/* rtld rtld_db_priv */
-	ulong_t				rd_flags;	/* flags */
-	ulong_t				rd_rdebugvers;	/* rtld_db_priv.vers */
-	int				rd_dmodel;	/* data model */
-	rd_helper_t			rd_helper;	/* private to helper */
-};
+/*
+ * M_DATA comes from some streams header file but is also redifined in
+ * _rtld_db.h, so nuke the old streams definition here.
+ */
+#ifdef M_DATA
+#undef M_DATA
+#endif /* M_DATA */
+
+/*
+ * For 32-bit versions of this library, this file get's compiled once.
+ * For 64-bit versions of this library, this file get's compiled twice,
+ * once with _ELF64 defined and once without.  The expectation is that
+ * the 64-bit version of the library can properly deal with both 32-bit
+ * and 64-bit elf files, hence in the 64-bit library there are two copies
+ * of all the interfaces in this file, one set named *32 and one named *64.
+ *
+ * This also means that we need to be careful when declaring local pointers
+ * that point to objects in another processes address space, since these
+ * pointers may not match the current processes pointer width.  Basically,
+ * we should avoid using data types that change size between 32 and 64 bit
+ * modes like: long, void *, uintprt_t, caddr_t, psaddr_t, size_t, etc.
+ * Instead we should declare all pointers as uint32_t.  Then when we
+ * are compiled to deal with 64-bit targets we'll re-define uint32_t
+ * to be a uint64_t.
+ *
+ * Finally, one last importante note.  All the 64-bit elf file code
+ * is never used and can't be tested.  This is because we don't actually
+ * support 64-bit Linux processes yet.  The reason that we have it here
+ * is because we want to support debugging 32-bit elf targets with the
+ * 64-bit version of this library, so we need to have a 64-bit version
+ * of this library.  But a 64-bit version of this library is expected
+ * to provide debugging interfaces for both 32 and 64-bit elf targets.
+ * So we provide the 64-bit elf target interfaces, but they will never
+ * be invoked and are untested.  If we ever add support for 64-bit elf
+ * Linux processes, we'll need to verify that this code works correctly
+ * for those targets.
+ */
+#ifdef _LP64
+#ifdef _ELF64
+#define	lx_ldb_get_dyns32		lx_ldb_get_dyns64
+#define	lx_ldb_init32			lx_ldb_init64
+#define	lx_ldb_fini32			lx_ldb_fini64
+#define	lx_ldb_loadobj_iter32		lx_ldb_loadobj_iter64
+#define	lx_ldb_getauxval32		lx_ldb_getauxval64
+#define	lx_elf_props32			lx_elf_props64
+#define	_rd_get_dyns32			_rd_get_dyns64
+#define	_rd_get_ehdr32			_rd_get_ehdr64
+#define	uint32_t			uint64_t
+#define	Elf32_Dyn			Elf64_Dyn
+#define	Elf32_Ehdr			Elf64_Ehdr
+#define	Elf32_Phdr			Elf64_Phdr
+#endif /* _ELF64 */
+#endif /* _LP64 */
+
+/* Included from usr/src/cmd/sgs/librtld_db/common */
+#include <_rtld_db.h>
 
 typedef struct lx_rd {
-	struct ps_prochandle	*lr_php;	/* prochandle of target */
-	uint32_t lr_rdebug;	/* address of lx r_debug */
-	uint32_t lr_exec;	/* base address of main executable */
+	rd_agent_t		*lr_rap;
+	struct ps_prochandle	*lr_php;	/* proc handle pointer */
+	uint32_t		lr_rdebug;	/* address of lx r_debug */
+	uint32_t		lr_exec;	/* base address of executable */
 } lx_rd_t;
 
-rd_helper_ops_t RTLD_DB_BRAND_OPS = {
-	lx_ldb_client_init,
-	lx_ldb_iter,
-	lx_ldb_fix_phdr
-};
-
-struct lx_link_map
-{
+typedef struct lx_link_map {
 	uint32_t lxm_addr;	/* Base address shared object is loaded at.  */
 	uint32_t lxm_name;	/* Absolute file name object was found in.  */
 	uint32_t lxm_ld;	/* Dynamic section of the shared object.  */
-	uint32_t lxm_next; /* Chain of loaded objects.  */
-	uint32_t lxm_prev;
-};
+	uint32_t lxm_next;	/* Chain of loaded objects.  */
+} lx_link_map_t;
 
-struct lx_r_debug
-{
+typedef struct lx_r_debug {
 	int r_version;		/* Version number for this protocol.  */
 	uint32_t	r_map;	/* Head of the chain of loaded objects. */
 
@@ -93,7 +134,23 @@ struct lx_r_debug
 	uint32_t	r_brk;
 	r_state_e	r_state; /* defined the same way between lx/solaris */
 	uint32_t	r_ldbase; /* Base address the linker is loaded at. */
-};
+} lx_r_debug_t;
+
+static uint32_t
+lx_ldb_getauxval32(struct ps_prochandle *php, int type)
+{
+	const auxv_t		*auxvp = NULL;
+
+	if (ps_pauxv(php, &auxvp) != PS_OK)
+		return ((uint32_t)-1);
+
+	while (auxvp->a_type != AT_NULL) {
+		if (auxvp->a_type == type)
+			return ((uint32_t)(uintptr_t)auxvp->a_un.a_ptr);
+		auxvp++;
+	}
+	return ((uint32_t)-1);
+}
 
 /*
  * A key difference between the linux linker and ours' is that the linux
@@ -115,103 +172,111 @@ struct lx_r_debug
  * DT_NEEDED section. For all matching sections, we subtract the segment
  * base address to get back to relative addresses.
  */
-static void
-lx_ldb_fix_phdr(struct rd_agent *rap, Elf32_Dyn *dp, size_t size,
-    psaddr_t addr)
+static rd_err_e
+lx_ldb_get_dyns32(rd_helper_data_t rhd,
+    psaddr_t addr, void **dynpp, size_t *dynpp_sz)
 {
-	struct ps_prochandle	*php = rap->rd_psp;
+	lx_rd_t			*lx_rd = (lx_rd_t *)rhd;
+	rd_agent_t		*rap = lx_rd->lr_rap;
+	Elf32_Ehdr		ehdr;
+	Elf32_Dyn		*dynp = NULL;
+	size_t			dynp_sz;
+	uint_t			ndyns;
 	int			i;
-	int			strsz = 0;
-	uint32_t		strtab_p = NULL;
-	char			*strtab;
 
-	/* Make sure addr matches the current byte size */
-	addr = (uint32_t)addr;
+	ps_plog("lx_ldb_get_dyns: invoked for object at 0x%p", addr);
 
-	/*
-	 * First we need to find the address of the string table.
-	 */
-	for (i = 0; i < size / sizeof (Elf32_Dyn); i++) {
-		if (dp[i].d_tag == DT_STRTAB)
-			strtab_p = dp[i].d_un.d_ptr;
-		if (dp[i].d_tag == DT_STRSZ)
-			strsz = dp[i].d_un.d_val;
-	}
-	if (strtab_p == NULL) {
-		ps_plog("lx_librtld_db: couldn't find strtab");
-		return;
-	}
-	if (strsz == 0) {
-		ps_plog("lx_librtld_db: couldn't find strsz");
-		return;
+	/* Read in a copy of the ehdr */
+	if (_rd_get_ehdr32(rap, addr, &ehdr, NULL) != RD_OK) {
+		ps_plog("lx_ldb_get_dyns: _rd_get_ehdr() failed");
+		return (RD_ERR);
 	}
 
-	if ((strtab = malloc(strsz)) == NULL)
-		return;
-	if (Pread(php, strtab, strsz, strtab_p) != strsz) {
-		ps_plog("lx_librtld_db: couldn't read strtab at 0x%p",
-		    strtab_p);
-		free(strtab);
-		return;
+	/* read out the PT_DYNAMIC elements for this object */
+	if (_rd_get_dyns32(rap, addr, &dynp, &dynp_sz) != RD_OK) {
+		ps_plog("lx_ldb_get_dyns: _rd_get_dyns() failed");
+		return (RD_ERR);
 	}
 
 	/*
-	 * ELF binaries may have more than one DT_NEEDED entry - we must
-	 * check them all. The linux linker segment also needs to be fixed,
-	 * but it doesn't have a DT_NEEDED entry. Instead, look for a
-	 * matching DT_SONAME.
+	 * From here on out if we encounter an error we'll just return
+	 * success and pass back the unmolested dynamic elements that
+	 * we've already obtained.
 	 */
-	for (i = 0; i < size / sizeof (Elf32_Dyn); i++) {
-		if (dp[i].d_tag == DT_SONAME &&
-		    strncmp(strtab + dp[i].d_un.d_ptr, LX_LINKER_NAME,
-		    sizeof (LX_LINKER_NAME)) == 0)
-			break;
+	*dynpp = dynp;
+	*dynpp_sz = dynp_sz;
+	ndyns = dynp_sz / sizeof (Elf32_Dyn);
 
-		if (dp[i].d_tag != DT_NEEDED)
-			continue;
+	/* If this isn't a dynamic object, there's nothing left todo */
+	if (ehdr.e_type != ET_DYN) {
+		ps_plog("lx_ldb_get_dyns: done: not a shared object");
+		return (RD_OK);
+	}
 
-		if (strncmp(strtab + dp[i].d_un.d_ptr,
-		    LX_LINKER_NAME, sizeof (LX_LINKER_NAME)) == 0 ||
-		    strncmp(strtab + dp[i].d_un.d_ptr, LX_LIBC_NAME,
-		    sizeof (LX_LIBC_NAME)) == 0)
+	/*
+	 * Before we blindly start changing dynamic section addresses
+	 * we need to figure out if the current object that we're looking
+	 * at is a linux object or a solaris object.  To do this first
+	 * we need to find the string tab dynamic section element.
+	 */
+	for (i = 0; i < ndyns; i++) {
+		if (dynp[i].d_tag == DT_STRTAB)
 			break;
 	}
-	free(strtab);
-	if (i == size / sizeof (Elf32_Dyn)) {
-		/*
-		 * This is not a linux mapping, so we have nothing left to do.
-		 */
-		ps_plog("lx_librtld_db: "
-		    "0x%p doesn't appear to be an lx object", addr);
-		return;
+	if (i == ndyns) {
+		ps_plog("lx_ldb_get_dyns: "
+		    "failed to find string tab in the dynamic section");
+		return (RD_OK);
 	}
 
 	/*
-	 * The linux linker added the segment's base address to a bunch of the
-	 * dynamic section addresses. Fix them back to their original, on-disk
-	 * format so Solaris understands them.
+	 * Check if the strtab value looks like an offset or an address.
+	 * It's an offset if the value is less then the base address that
+	 * the object is loaded at, or if the value is less than the offset
+	 * of the section headers in the same elf object.  This check isn't
+	 * perfect, but in practice it's good enough.
 	 */
-	for (i = 0; i < size / sizeof (Elf32_Dyn); i++) {
-		switch (dp[i].d_tag) {
-		case DT_INIT:
-		case DT_FINI:
+	if ((dynp[i].d_un.d_ptr < addr) ||
+	    (dynp[i].d_un.d_ptr < ehdr.e_shoff)) {
+		ps_plog("lx_ldb_get_dyns: "
+		    "doesn't appear to be an lx object");
+		return (RD_OK);
+	}
+
+	/*
+	 * This seems to be a a linux object, so we'll patch up the dynamic
+	 * section addresses
+	 */
+	ps_plog("lx_ldb_get_dyns: "
+	    "patching up lx object dynamic section addresses");
+	for (i = 0; i < ndyns; i++) {
+		switch (dynp[i].d_tag) {
+		case DT_PLTGOT:
 		case DT_HASH:
 		case DT_STRTAB:
 		case DT_SYMTAB:
-		case DT_DEBUG:
-		case DT_PLTGOT:
-		case DT_JMPREL:
+		case DT_RELA:
 		case DT_REL:
-		case DT_VERNEED:
+		case DT_DEBUG:
+		case DT_JMPREL:
 		case DT_VERSYM:
-			if (dp[i].d_un.d_val > addr) {
-				dp[i].d_un.d_ptr -= addr;
+			if (dynp[i].d_un.d_val > addr) {
+				dynp[i].d_un.d_ptr -= addr;
 			}
 			break;
 		default:
 			break;
 		}
 	}
+	return (RD_OK);
+}
+
+static void
+lx_ldb_fini32(rd_helper_data_t rhd)
+{
+	lx_rd_t *lx_rd = (lx_rd_t *)rhd;
+	ps_plog("lx_ldb_fini: cleaning up lx helper");
+	free(lx_rd);
 }
 
 /*
@@ -224,64 +289,64 @@ lx_ldb_fix_phdr(struct rd_agent *rap, Elf32_Dyn *dp, size_t size,
  * address of the Elf header, and from there we can easily get to the DT_DEBUG
  * entry.
  */
-static void *
-lx_ldb_client_init(struct ps_prochandle *php)
+static rd_helper_data_t
+lx_ldb_init32(rd_agent_t *rap, struct ps_prochandle *php)
 {
-	lx_rd_t		*rd = calloc(sizeof (lx_rd_t), 1);
-	uint32_t	phdr_addr, ehdr_addr, dp_addr;
-	Elf32_Dyn	*dp;
+	lx_rd_t		*lx_rd;
+	uint32_t	addr, phdr_addr, dyn_addr;
+	Elf32_Dyn	*dyn;
 	Elf32_Phdr	phdr, *ph, *phdrs;
 	Elf32_Ehdr	ehdr;
-	int		i, dp_count;
+	int		i, dyn_count;
 
-	rd->lr_rdebug = 0;
-
-	if (rd == NULL) {
-		ps_plog("lx_ldb_client_init: cannot allocate memory");
+	lx_rd = calloc(sizeof (lx_rd_t), 1);
+	if (lx_rd == NULL) {
+		ps_plog("lx_ldb_init: cannot allocate memory");
 		return (NULL);
 	}
+	lx_rd->lr_rap = rap;
+	lx_rd->lr_php = php;
 
-	phdr_addr = Pgetauxval(php, AT_SUN_BRAND_LX_PHDR);
+	phdr_addr = lx_ldb_getauxval32(php, AT_SUN_BRAND_LX_PHDR);
 	if (phdr_addr == (uint32_t)-1) {
-		ps_plog("lx_ldb_client_init: no LX_PHDR found in aux vector");
+		ps_plog("lx_ldb_init: no LX_PHDR found in aux vector");
 		return (NULL);
 	}
-	ps_plog("lx_ldb_client_init: found LX_PHDR auxv phdr at: 0x%p",
+	ps_plog("lx_ldb_init: found LX_PHDR auxv phdr at: 0x%p",
 	    phdr_addr);
 
 	if (ps_pread(php, phdr_addr, &phdr, sizeof (phdr)) != PS_OK) {
-		ps_plog("lx_ldb_client_init: couldn't read phdr at 0x%p",
+		ps_plog("lx_ldb_init: couldn't read phdr at 0x%p",
 		    phdr_addr);
-		free(rd);
+		free(lx_rd);
 		return (NULL);
 	}
 
 	/* The ELF headher should be before the program header in memory */
-	rd->lr_exec = ehdr_addr = phdr_addr - phdr.p_offset;
-	if (ps_pread(php, ehdr_addr, &ehdr, sizeof (ehdr)) !=
-	    PS_OK) {
-		ps_plog("lx_ldb_client_init: couldn't read ehdr at 0x%p",
-		    rd->lr_exec);
-		free(rd);
+	lx_rd->lr_exec = addr = phdr_addr - phdr.p_offset;
+	if (ps_pread(php, addr, &ehdr, sizeof (ehdr)) != PS_OK) {
+		ps_plog("lx_ldb_init: couldn't read ehdr at 0x%p",
+		    lx_rd->lr_exec);
+		free(lx_rd);
 		return (NULL);
 	}
-	ps_plog("lx_ldb_client_init: read ehdr at: 0x%p", ehdr_addr);
+	ps_plog("lx_ldb_init: read ehdr at: 0x%p", addr);
 
 	if ((phdrs = malloc(ehdr.e_phnum * ehdr.e_phentsize)) == NULL) {
-		ps_plog("lx_ldb_client_init: couldn't alloc phdrs memory");
-		free(rd);
+		ps_plog("lx_ldb_init: couldn't alloc phdrs memory");
+		free(lx_rd);
 		return (NULL);
 	}
 
 	if (ps_pread(php, phdr_addr, phdrs, ehdr.e_phnum * ehdr.e_phentsize) !=
 	    PS_OK) {
-		ps_plog("lx_ldb_client_init: couldn't read phdrs at 0x%p",
+		ps_plog("lx_ldb_init: couldn't read phdrs at 0x%p",
 		    phdr_addr);
-		free(rd);
+		free(lx_rd);
 		free(phdrs);
 		return (NULL);
 	}
-	ps_plog("lx_ldb_client_init: read %d phdrs at: 0x%p",
+	ps_plog("lx_ldb_init: read %d phdrs at: 0x%p",
 	    ehdr.e_phnum, phdr_addr);
 
 	for (i = 0, ph = phdrs; i < ehdr.e_phnum; i++,
@@ -291,51 +356,51 @@ lx_ldb_client_init(struct ps_prochandle *php)
 			break;
 	}
 	if (i == ehdr.e_phnum) {
-		ps_plog("lx_ldb_client_init: no PT_DYNAMIC in executable");
-		free(rd);
+		ps_plog("lx_ldb_init: no PT_DYNAMIC in executable");
+		free(lx_rd);
 		free(phdrs);
 		return (NULL);
 	}
-	ps_plog("lx_ldb_client_init: found PT_DYNAMIC phdr[%d] at: 0x%p",
+	ps_plog("lx_ldb_init: found PT_DYNAMIC phdr[%d] at: 0x%p",
 	    i, (phdr_addr + ((char *)ph - (char *)phdrs)));
 
-	if ((dp = malloc(ph->p_filesz)) == NULL) {
-		ps_plog("lx_ldb_client_init: couldn't alloc for PT_DYNAMIC");
-		free(rd);
+	if ((dyn = malloc(ph->p_filesz)) == NULL) {
+		ps_plog("lx_ldb_init: couldn't alloc for PT_DYNAMIC");
+		free(lx_rd);
 		free(phdrs);
 		return (NULL);
 	}
 
-	dp_addr = ehdr_addr + ph->p_offset;
-	dp_count = ph->p_filesz / sizeof (Elf32_Dyn);
-	if (ps_pread(php, dp_addr, dp, ph->p_filesz) != PS_OK) {
-		ps_plog("lx_ldb_client_init: couldn't read dynamic at 0x%p",
-		    dp_addr);
-		free(rd);
+	dyn_addr = addr + ph->p_offset;
+	dyn_count = ph->p_filesz / sizeof (Elf32_Dyn);
+	if (ps_pread(php, dyn_addr, dyn, ph->p_filesz) != PS_OK) {
+		ps_plog("lx_ldb_init: couldn't read dynamic at 0x%p",
+		    dyn_addr);
+		free(lx_rd);
 		free(phdrs);
-		free(dp);
+		free(dyn);
 		return (NULL);
 	}
-	ps_plog("lx_ldb_client_init: read %d dynamic headers at: 0x%p",
-	    dp_count, dp_addr);
+	ps_plog("lx_ldb_init: read %d dynamic headers at: 0x%p",
+	    dyn_count, dyn_addr);
 
-	for (i = 0; i < dp_count; i++) {
-		if (dp[i].d_tag == DT_DEBUG) {
-			rd->lr_rdebug = dp[i].d_un.d_ptr;
+	for (i = 0; i < dyn_count; i++) {
+		if (dyn[i].d_tag == DT_DEBUG) {
+			lx_rd->lr_rdebug = dyn[i].d_un.d_ptr;
 			break;
 		}
 	}
 	free(phdrs);
-	free(dp);
+	free(dyn);
 
-	if (rd->lr_rdebug == 0) {
-		ps_plog("lx_ldb_client_init: no DT_DEBUG found in exe");
-		free(rd);
+	if (lx_rd->lr_rdebug == 0) {
+		ps_plog("lx_ldb_init: no DT_DEBUG found in exe");
+		free(lx_rd);
 		return (NULL);
 	}
-	ps_plog("lx_ldb_client_init: found DT_DEBUG: 0x%p", rd->lr_rdebug);
+	ps_plog("lx_ldb_init: found DT_DEBUG: 0x%p", lx_rd->lr_rdebug);
 
-	return (rd);
+	return ((rd_helper_data_t)lx_rd);
 }
 
 /*
@@ -343,7 +408,7 @@ lx_ldb_client_init(struct ps_prochandle *php)
  * the proper link map ID.
  */
 static size_t
-lx_elf_props(struct ps_prochandle *php, uint32_t addr, psaddr_t *data_addr)
+lx_elf_props32(struct ps_prochandle *php, uint32_t addr, psaddr_t *data_addr)
 {
 	Elf32_Ehdr	ehdr;
 	Elf32_Phdr	*phdrs, *ph;
@@ -399,20 +464,20 @@ lx_elf_props(struct ps_prochandle *php, uint32_t addr, psaddr_t *data_addr)
 }
 
 static int
-lx_ldb_iter(struct ps_prochandle *php, rl_iter_f *cb, void *client_data,
-    void *rd_addr)
+lx_ldb_loadobj_iter32(rd_helper_data_t rhd, rl_iter_f *cb, void *client_data)
 {
-	lx_rd_t			*lx_rd = (lx_rd_t *)rd_addr;
-	struct lx_r_debug	r_debug;
-	struct lx_link_map	map;
+	lx_rd_t			*lx_rd = (lx_rd_t *)rhd;
+	struct ps_prochandle	*php = lx_rd->lr_php;
+	lx_r_debug_t		r_debug;
+	lx_link_map_t		map;
 	uint32_t		p = NULL;
 	int			rc;
 	rd_loadobj_t		exec;
 
 	if ((rc = ps_pread(php, (psaddr_t)lx_rd->lr_rdebug, &r_debug,
 	    sizeof (r_debug))) != PS_OK) {
-		ps_plog("lx_ldb_iter: Couldn't read linux r_debug at 0x%p",
-		    rd_addr);
+		ps_plog("lx_ldb_loadobj_iter: "
+		    "Couldn't read linux r_debug at 0x%p", lx_rd->lr_rdebug);
 		return (rc);
 	}
 
@@ -427,22 +492,23 @@ lx_ldb_iter(struct ps_prochandle *php, rl_iter_f *cb, void *client_data,
 	 * the AT_EXECNAME entry instead.
 	 */
 	if ((rc = ps_pread(php, (psaddr_t)p, &map, sizeof (map))) != PS_OK) {
-		ps_plog("lx_ldb_iter: Couldn't read linux link map at 0x%p",
-		    p);
+		ps_plog("lx_ldb_loadobj_iter: "
+		    "Couldn't read linux link map at 0x%p", p);
 		return (rc);
 	}
 
 	bzero(&exec, sizeof (exec));
 	exec.rl_base = lx_rd->lr_exec;
 	exec.rl_dynamic = map.lxm_ld;
-	exec.rl_nameaddr = Pgetauxval(php, AT_SUN_EXECNAME);
+	exec.rl_nameaddr = lx_ldb_getauxval32(php, AT_SUN_EXECNAME);
 	exec.rl_lmident = LM_ID_BASE;
 
 	exec.rl_bend = exec.rl_base +
-	    lx_elf_props(php, lx_rd->lr_exec, &exec.rl_data_base);
+	    lx_elf_props32(php, lx_rd->lr_exec, &exec.rl_data_base);
 
 	if ((*cb)(&exec, client_data) == 0) {
-		ps_plog("lx_ldb_iter: client callb failed for executable");
+		ps_plog("lx_ldb_loadobj_iter: "
+		    "client callb failed for executable");
 		return (PS_ERR);
 	}
 
@@ -451,8 +517,8 @@ lx_ldb_iter(struct ps_prochandle *php, rl_iter_f *cb, void *client_data,
 
 		if ((rc = ps_pread(php, (psaddr_t)p, &map, sizeof (map))) !=
 		    PS_OK) {
-			ps_plog("lx_ldb_iter: Couldn't read lk map at %p",
-			    p);
+			ps_plog("lx_ldb_loadobj_iter: "
+			    "Couldn't read lk map at %p", p);
 			return (rc);
 		}
 
@@ -476,20 +542,34 @@ lx_ldb_iter(struct ps_prochandle *php, rl_iter_f *cb, void *client_data,
 		 */
 
 		obj.rl_bend = map.lxm_addr +
-		    lx_elf_props(php, map.lxm_addr, &obj.rl_data_base);
+		    lx_elf_props32(php, map.lxm_addr, &obj.rl_data_base);
 		obj.rl_padstart = obj.rl_base;
 		obj.rl_padend = obj.rl_bend;
 		obj.rl_dynamic = map.lxm_ld;
 		obj.rl_tlsmodid = 0;
 
-		ps_plog("lx_ldb_iter: 0x%p to 0x%p",
+		ps_plog("lx_ldb_loadobj_iter: 0x%p to 0x%p",
 		    obj.rl_base, obj.rl_bend);
 
 		if ((*cb)(&obj, client_data) == 0) {
-			ps_plog("lx_ldb_iter: Client callback failed on %s",
-			    map.lxm_name);
+			ps_plog("lx_ldb_loadobj_iter: "
+			    "Client callback failed on %s", map.lxm_name);
 			return (rc);
 		}
 	}
 	return (RD_OK);
 }
+
+/*
+ * Librtld_db plugin linkage struct.
+ *
+ * When we get loaded by librtld_db, it will look for the symbol below
+ * to find our plugin entry points.
+ */
+rd_helper_ops_t RTLD_DB_BRAND_OPS = {
+	LM_ID_BRAND,
+	lx_ldb_init32,
+	lx_ldb_fini32,
+	lx_ldb_loadobj_iter32,
+	lx_ldb_get_dyns32
+};

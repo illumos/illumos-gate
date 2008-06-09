@@ -94,6 +94,7 @@ typedef struct mdb_gelf_dsym {
 extern int mdb_gelf_check(mdb_io_t *, Elf32_Ehdr *, GElf_Half);
 extern mdb_gelf_file_t *mdb_gelf_create(mdb_io_t *, GElf_Half, int);
 extern void mdb_gelf_destroy(mdb_gelf_file_t *);
+extern void mdb_gelf_dyns_set(mdb_gelf_file_t *, void *, size_t);
 
 extern void mdb_gelf_ehdr_to_gehdr(Ehdr *, GElf_Ehdr *);
 

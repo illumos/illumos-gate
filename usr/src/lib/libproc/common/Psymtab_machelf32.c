@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -255,25 +255,19 @@ fake_elf32(struct ps_prochandle *P, file_info_t *fptr, uintptr_t addr,
 	Off off;
 	size_t pltsz = 0, pltentsz;
 
-
 	if (ehdr->e_type == ET_DYN)
 		phdr->p_vaddr += addr;
 
-	if ((dp = malloc(phdr->p_filesz)) == NULL)
-		goto bad;
-
-	if (Pread(P, dp, phdr->p_filesz, phdr->p_vaddr) != phdr->p_filesz)
-		goto bad;
-
-#ifndef _ELF64
-	/*
-	 * Allow librtld_db the opportunity to "fix" the program
-	 * headers, if it needs to, before we process them.
-	 */
-	if (P->rap != NULL && ehdr->e_type == ET_DYN) {
-		rd_fix_phdrs(P->rap, dp, phdr->p_filesz, addr);
+	if (P->rap != NULL) {
+		if (rd_get_dyns(P->rap, addr, (void **)&dp, NULL) != RD_OK)
+			goto bad;
+	} else {
+		if ((dp = malloc(phdr->p_filesz)) == NULL)
+			goto bad;
+		if (Pread(P, dp, phdr->p_filesz, phdr->p_vaddr) !=
+		    phdr->p_filesz)
+			goto bad;
 	}
-#endif
 
 	/*
 	 * Iterate over the items in the dynamic section, grabbing

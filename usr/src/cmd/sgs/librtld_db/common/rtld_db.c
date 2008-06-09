@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,6 +110,23 @@ rd_ctl(int cmd, void *arg)
 }
 
 rd_err_e
+rd_get_dyns(rd_agent_t *rap, psaddr_t addr, void **dynpp, size_t *dynpp_sz)
+{
+	if (rap->rd_helper.rh_ops != NULL)
+		return (rap->rd_helper.rh_ops->rho_get_dyns(
+		    rap->rd_helper.rh_data, addr, dynpp, dynpp_sz));
+
+#ifdef _LP64
+	if (rap->rd_dmodel == PR_MODEL_LP64)
+		return (_rd_get_dyns64(rap,
+		    addr, (Elf64_Dyn **)dynpp, dynpp_sz));
+	else
+#endif
+		return (_rd_get_dyns32(rap,
+		    addr, (Dyn **)dynpp, dynpp_sz));
+}
+
+rd_err_e
 rd_reset(struct rd_agent *rap)
 {
 	rd_err_e			err;
@@ -151,7 +168,10 @@ rd_new(struct ps_prochandle *php)
 	rap->rd_psp = php;
 	(void) mutex_init(&rap->rd_mutex, USYNC_THREAD, 0);
 	if (rd_reset(rap) != RD_OK) {
-		(void) dlclose(rap->rd_helper.rh_dlhandle);
+		if (rap->rd_helper.rh_dlhandle != NULL) {
+			rap->rd_helper.rh_ops->rho_fini(rap->rd_helper.rh_data);
+			(void) dlclose(rap->rd_helper.rh_dlhandle);
+		}
 		free(rap);
 		LOG(ps_plog(MSG_ORIG(MSG_DB_RESETFAIL)));
 		return ((rd_agent_t *)0);
@@ -165,6 +185,10 @@ void
 rd_delete(rd_agent_t *rap)
 {
 	LOG(ps_plog(MSG_ORIG(MSG_DB_RDDELETE), rap));
+	if (rap->rd_helper.rh_dlhandle != NULL) {
+		rap->rd_helper.rh_ops->rho_fini(rap->rd_helper.rh_data);
+		(void) dlclose(rap->rd_helper.rh_dlhandle);
+	}
 	free(rap);
 }
 

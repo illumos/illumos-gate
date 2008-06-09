@@ -20,14 +20,27 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 {
 	global:
-		rtld_db_brand_ops;
+		rtld_db_brand_ops32;
 	local:
 		*;
+};
+
+#Externally defined symbols
+{
+    global:
+	ps_pauxv =		NODIRECT PARENT;
+	ps_pdmodel =		NODIRECT PARENT;
+	ps_pglobal_lookup =	NODIRECT PARENT;
+	ps_pglobal_sym =	NODIRECT PARENT;
+	ps_plog =		NODIRECT PARENT;
+	ps_pread =		NODIRECT PARENT;
+	ps_pwrite =		NODIRECT PARENT;
 };

@@ -468,6 +468,45 @@ gelf_dyn_lookup(mdb_gelf_file_t *gf, GElf_Xword tag)
 	return ((GElf_Xword)-1L);
 }
 
+void
+mdb_gelf_dyns_set(mdb_gelf_file_t *gf, void *dyns, size_t dyns_sz)
+{
+	size_t ndyns, i, dyn_size;
+	caddr_t dp;
+	GElf_Dyn *gdp;
+
+	if (gf->gf_dyns != NULL) {
+		/* Free the existing dyn entries */
+		free(gf->gf_dyns);
+		gf->gf_dyns = NULL;
+		gf->gf_ndyns = 0;
+	}
+
+	if (gf->gf_ehdr.e_ident[EI_CLASS] == ELFCLASS32)
+		dyn_size = sizeof (Elf32_Dyn);
+	else
+		dyn_size = sizeof (Elf64_Dyn);
+
+	ndyns = dyns_sz / dyn_size;
+	gf->gf_dyns = mdb_zalloc(sizeof (GElf_Dyn) * ndyns, UM_SLEEP);
+	gf->gf_ndyns = ndyns;
+
+	dp = dyns;
+	gdp = gf->gf_dyns;
+
+	if (gf->gf_ehdr.e_ident[EI_CLASS] == ELFCLASS32) {
+		for (i = 0; i < ndyns; i++, dp += dyn_size, gdp++) {
+			/* LINTED - alignment */
+			(void) gelf32_to_dyn((Elf32_Dyn *)dp, gdp);
+		}
+	} else {
+		for (i = 0; i < ndyns; i++, dp += dyn_size, gdp++) {
+			/* LINTED - alignment */
+			(void) gelf64_to_dyn((Elf64_Dyn *)dp, gdp);
+		}
+	}
+}
+
 static GElf_Dyn *
 gelf_dyns_init(mdb_gelf_file_t *gf, size_t dyn_size,
     GElf_Dyn *(*elf2gelf)(const void *, GElf_Dyn *))

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,6 +37,7 @@ SGSMSGTARG +=	$(SGSMSGINTEL)
 LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
 CPPFLAGS +=	-D_SYSCALL32
 CONVLIBDIR =	$(CONVLIBDIR64)
+DYNFLAGS +=	-M../common/mapfile-vers.64
 
 .KEEP_STATE:
 
