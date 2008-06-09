@@ -2114,7 +2114,8 @@ ip_set_srcfilter(conn_t *connp, struct group_filter *gf,
     struct ip_msfilter *imsf, ipaddr_t grp, ipif_t *ipif, boolean_t isv4mapped)
 {
 	ilg_t *ilg;
-	int i, err, insrcs, infmode, new_fmode;
+	int i, err, infmode, new_fmode;
+	uint_t insrcs;
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6;
 	struct in_addr *addrp;
@@ -2483,7 +2484,7 @@ ip_sioctl_msfilter(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	/* existence verified in ip_wput_nondata() */
 	mblk_t *data_mp = mp->b_cont->b_cont;
 	int datalen, err, cmd, minsize;
-	int expsize = 0;
+	uint_t expsize = 0;
 	conn_t *connp;
 	boolean_t isv6, is_v4only_api, getcmd;
 	struct sockaddr_in *gsin;
