@@ -7289,7 +7289,10 @@ save_patch(patch_node_t *patch, uu_avl_t *patches_avl)
 	patch_node_t *existing;
 	uu_avl_index_t where;
 
-	/* Check if this is a newer version of a patch we already have. */
+	/*
+	 * Check if this is a newer version of a patch we already have.
+	 * If it is an older version of a patch we already have, ignore it.
+	 */
 	if ((existing = (patch_node_t *)uu_avl_find(patches_avl, patch, NULL,
 	    &where)) != NULL) {
 		char *endptr;
@@ -7301,10 +7304,12 @@ save_patch(patch_node_t *patch, uu_avl_t *patches_avl)
 		if (pvers > evers) {
 			free(existing->patch_vers);
 			existing->patch_vers = patch->patch_vers;
-			free(patch->patch_num);
-			free(patch);
-			return;
+		} else {
+			free(patch->patch_vers);
 		}
+		free(patch->patch_num);
+		free(patch);
+		return;
 	}
 
 	uu_avl_insert(patches_avl, patch, where);
