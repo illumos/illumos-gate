@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,8 @@ extern "C" {
 #endif
 
 #define	MAX_KEY_LENGTH 26
-#define	MAX_ESSID_LENGTH 32
+#define	MAX_ESSID_LENGTH (32 + 1)	/* max essid length is 32 */
+					/* one more for '\0' */
 #define	MAX_CHANNEL_NUM	99
 #define	MAX_RSSI 15
 #define	MAX_NWEPKEYS 4

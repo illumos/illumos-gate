@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -934,7 +933,7 @@ fprint_config_file(config_file_t *p_config_file, const char *file_name)
 	struct stat buf;
 
 	PRTDBG(("fprint_config_file(0x%x, \"%s\")\n", p_config_file,
-			file_name));
+	    file_name));
 	assert((p_config_file != NULL)&&(strcmp(file_name, "") != 0));
 
 	safe_snprintf(temp_file, sizeof (temp_file),
@@ -1207,7 +1206,7 @@ call_ioctl(int fd, int cmd, uint32_t params, uint32_t buf_len)
 		return (B_TRUE);
 	} else {
 		return (gbuf->wldp_result != WL_SUCCESS ?
-			B_FALSE:B_TRUE);
+		    B_FALSE:B_TRUE);
 	}
 }
 
@@ -1536,32 +1535,32 @@ do_print_usage()
 	(void) fprintf(stderr, gettext("\t%s [-R root_path][-i interface]"
 	    " setparam [parameter=value [...]]\n"), gExecName);
 	(void) fprintf(stderr, gettext(
-		"\tparameters:\n"
-		"\t\tbssid\t\t - read only: 6 byte mac address of "
-		"base station\n"
-		"\t\tessid\t\t - name of the network, a string of up "
-		"to 32 chars\n"
-		"\t\tbsstype\t\t - bss(ap, infrastructure), ibss(ad-hoc)"
-		" or auto\n"
-		"\t\tcreateibss\t - flag to identify whether a ibss is to be\n"
-		"\t\t\t\t   created when the network to connect is\n"
-		"\t\t\t\t   not available, yes or no\n"
-		"\t\tchannel\t\t - channel(used only when creating an ibss)\n"
-		"\t\t\t\t   valid value:\n"
-		"\t\t\t\t\t 802.11a: 0-99\n"
-		"\t\t\t\t\t 802.11b: 1-14\n"
-		"\t\t\t\t\t 802.11g: 1-14\n"
-		"\t\trates\t\t - set of rates, seperated by ',' valid rates:\n"
-		"\t\t\t\t   1,2,5.5,6,9,11,12,18,22,24,33,36,48 and 54\n"
-		"\t\tpowermode\t - off, mps or fast\n"
-		"\t\tauthmode\t - opensystem or shared_key\n"
-		"\t\tencryption\t - none or wep\n"
-		"\t\twepkey|1-4\t - write only:\n"
-		"\t\t\t\t   5 chars or 10 hex digits for 40bit wepkey;\n"
-		"\t\t\t\t   13 chars or 26 hex digits for 128bit wepkey\n"
-		"\t\twepkeyindex\t - an integer within the range 1-4\n"
-		"\t\tsignal\t\t - read only: signal strength from 0 to 15\n"
-		"\t\tradio\t\t - on or off\n"));
+	    "\tparameters:\n"
+	    "\t\tbssid\t\t - read only: 6 byte mac address of "
+	    "base station\n"
+	    "\t\tessid\t\t - name of the network, a string of up "
+	    "to 32 chars\n"
+	    "\t\tbsstype\t\t - bss(ap, infrastructure), ibss(ad-hoc)"
+	    " or auto\n"
+	    "\t\tcreateibss\t - flag to identify whether a ibss is to be\n"
+	    "\t\t\t\t   created when the network to connect is\n"
+	    "\t\t\t\t   not available, yes or no\n"
+	    "\t\tchannel\t\t - channel(used only when creating an ibss)\n"
+	    "\t\t\t\t   valid value:\n"
+	    "\t\t\t\t\t 802.11a: 0-99\n"
+	    "\t\t\t\t\t 802.11b: 1-14\n"
+	    "\t\t\t\t\t 802.11g: 1-14\n"
+	    "\t\trates\t\t - set of rates, seperated by ',' valid rates:\n"
+	    "\t\t\t\t   1,2,5.5,6,9,11,12,18,22,24,33,36,48 and 54\n"
+	    "\t\tpowermode\t - off, mps or fast\n"
+	    "\t\tauthmode\t - opensystem or shared_key\n"
+	    "\t\tencryption\t - none or wep\n"
+	    "\t\twepkey|1-4\t - write only:\n"
+	    "\t\t\t\t   5 chars or 10 hex digits for 40bit wepkey;\n"
+	    "\t\t\t\t   13 chars or 26 hex digits for 128bit wepkey\n"
+	    "\t\twepkeyindex\t - an integer within the range 1-4\n"
+	    "\t\tsignal\t\t - read only: signal strength from 0 to 15\n"
+	    "\t\tradio\t\t - on or off\n"));
 	(void) fprintf(stderr, gettext("\t%s [-R root_path][-i interface]"
 	    " restoredef\n"), gExecName);
 	(void) fprintf(stderr, gettext("\t%s [-R root_path][-i interface]"
@@ -2424,9 +2423,9 @@ do_printpf(int fd, int argc, char ** argv)
 			}
 		} else {
 			(void) fprintf(stderr,
-				gettext("%s: showprofile : "
-				    "no such profile: '%s'\n"),
-				    gExecName, argv[i]);
+			    gettext("%s: showprofile : "
+			    "no such profile: '%s'\n"),
+			    gExecName, argv[i]);
 			return (B_FALSE);
 		}
 	}
@@ -3262,7 +3261,7 @@ do_set_essid(int fd, const char *arg)
 		essid.wl_essid_essid[0] = '\0';
 	} else {
 		essid.wl_essid_length = strlen(arg);
-		if (essid.wl_essid_length > MAX_ESSID_LENGTH) {
+		if (essid.wl_essid_length > MAX_ESSID_LENGTH - 1) {
 			(void) fprintf(stderr, gettext("%s: "
 			    "essid exceeds 32 bytes\n"), gExecName);
 			exit(WIFI_FATAL_ERR);
@@ -4534,7 +4533,7 @@ do_set(int fd, int argc, char **argv)
 			goto exit0;
 		}
 		if (do_gs_func[j].p_do_set_func(fd, value)
-			    == B_TRUE) {
+		    == B_TRUE) {
 			ret = B_TRUE;
 		} else {
 			if (gbuf->wldp_result != WL_SUCCESS) {

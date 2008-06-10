@@ -947,7 +947,7 @@ dladm_wlan_linkstatus2str(dladm_wlan_linkstatus_t *linkstatus, char *buf)
 dladm_status_t
 dladm_wlan_str2essid(const char *str, dladm_wlan_essid_t *essid)
 {
-	if (str[0] == '\0')
+	if (str[0] == '\0' || strlen(str) > DLADM_WLAN_MAX_ESSID_LEN - 1)
 		return (DLADM_STATUS_BADARG);
 
 	(void) strlcpy(essid->we_bytes, str, DLADM_WLAN_MAX_ESSID_LEN);

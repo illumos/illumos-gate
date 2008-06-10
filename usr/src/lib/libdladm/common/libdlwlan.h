@@ -47,7 +47,9 @@
 extern "C" {
 #endif
 
-#define	DLADM_WLAN_MAX_ESSID_LEN	32	/* per 802.11 spec */
+#define	DLADM_WLAN_MAX_ESSID_LEN    (32 + 1)	/* per 802.11 spec */
+						/* max essid length is 32 */
+						/* one more for '\0' */
 #define	DLADM_WLAN_BSSID_LEN		6	/* per 802.11 spec */
 #define	DLADM_WLAN_WPA_KEY_LEN		32	/* per 802.11i spec */
 #define	DLADM_WLAN_MAX_WPA_IE_LEN	40	/* per 802.11i spec */
