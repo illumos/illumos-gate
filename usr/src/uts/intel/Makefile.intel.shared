@@ -647,7 +647,7 @@ DACF_KMODS	+= usb_ac_dacf
 #
 #	Performance Counter BackEnd modules (/usr/kernel/pcbe)
 #
-PCBE_KMODS	+= p123_pcbe p4_pcbe opteron_pcbe
+PCBE_KMODS	+= p123_pcbe p4_pcbe opteron_pcbe core_pcbe
 
 #
 #	MAC-Type Plugin Modules (/kernel/mac)

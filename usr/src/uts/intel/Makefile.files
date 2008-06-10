@@ -241,6 +241,11 @@ P4_PCBE_OBJS = p4_pcbe.o
 OPTERON_PCBE_OBJS = opteron_pcbe.o
 
 #
+#	Intel Core Architecture Performance Counter BackEnd module
+#
+CORE_PCBE_OBJS = core_pcbe.o
+
+#
 #	AMR module
 #
 AMR_OBJS = amr.o
