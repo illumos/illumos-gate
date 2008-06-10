@@ -1492,7 +1492,12 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 		 * will do to the params file.
 		 */
 
-		(void) mgmt_get_param(&n, local_name, lun);
+		if (mgmt_get_param(&n, local_name, lun) == False) {
+			(void) pthread_mutex_unlock(&lu_list_mutex);
+			/* --- LUN no longer exists --- */
+			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
+			goto error;
+		}
 		okay_to_free = True;
 
 		if (tgt_find_value_str(n, XML_ELEMENT_GUID, &guid) == False) {

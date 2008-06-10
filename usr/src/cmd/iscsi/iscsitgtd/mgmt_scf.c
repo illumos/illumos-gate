@@ -834,6 +834,8 @@ mgmt_get_param(tgt_node_t **node, char *target_name, int lun)
 	tgt_node_t	*n;
 	Boolean_t status = False;
 
+	/* Set NULL as default output value */
+	*node = NULL;
 	h = mgmt_handle_init();
 
 	if (h == NULL)
