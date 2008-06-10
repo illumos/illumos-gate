@@ -6525,7 +6525,7 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 			p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
 			p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
 			(void) nxge_fzc_rdc_tbl_unbind(nxgep,
-			p_cfgp->def_mac_rxdma_grpid);
+			    p_cfgp->def_mac_rxdma_grpid);
 
 			if (hw_p->ndevs) {
 				hw_p->ndevs--;

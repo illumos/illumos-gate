@@ -936,7 +936,7 @@ nxge_param_get_port_mode(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 		    nxgep->hot_swappable_phy ? "[Hot Swappable]" : "");
 		break;
 	case PORT_1G_TN1010:
-		 (void) mi_mpprintf(mp, "Port mode for nxge%d:"
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:"
 		    " 1G Copper with TN1010 %s\n", nxgep->instance,
 		    nxgep->hot_swappable_phy ? "[Hot Swappable]" : "");
 		break;
