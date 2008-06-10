@@ -371,7 +371,6 @@ usr/include/inet/tun.h			sparc
 #
 # The following are win and graphics related also ignore and do NOT replace.
 #
-usr/include/sys/cms.h			sparc
 usr/include/sys/ieeefp.h		sparc
 usr/include/sys/memvar.h		sparc
 usr/include/sys/pixrect.h		sparc

@@ -33,7 +33,6 @@
 #include	<sys/debug.h>
 #include	<sys/stropts.h>
 #include	<sys/stream.h>
-#include	<sys/strlog.h>
 #include	<sys/strsubr.h>
 #include	<sys/kmem.h>
 #include	<sys/crc32.h>
@@ -56,16 +55,13 @@
 
 #include	<sys/pci.h>
 
-#include	<sys/eri_phy.h>
-#include	<sys/eri_mac.h>
-#include	<sys/eri.h>
-#include	<sys/eri_common.h>
+#include	"eri_phy.h"
+#include	"eri_mac.h"
+#include	"eri.h"
+#include	"eri_common.h"
 
-#include	<sys/eri_msg.h>
+#include	"eri_msg.h"
 
-#ifdef	DEBUG
-#include	<sys/spl.h>
-#endif
 /*
  *  **** Function Prototypes *****
  */
@@ -4800,25 +4796,11 @@ fill_it:
 /*PRINTFLIKE5*/
 static void
 eri_debug_msg(const char *file, int line, struct eri *erip,
-	debug_msg_t type, const char *fmt, ...)
+    debug_msg_t type, const char *fmt, ...)
 {
 	char	msg_buffer[255];
 	va_list ap;
 
-	static kmutex_t eridebuglock;
-	static int eri_debug_init = 0;
-
-	if (!eri_debug_level)
-		return;
-	if (eri_debug_init == 0) {
-		/*
-		 * Block I/O interrupts
-		 */
-		mutex_init(&eridebuglock, NULL, MUTEX_DRIVER, (void *)SPL3);
-		eri_debug_init = 1;
-	}
-
-	mutex_enter(&eridebuglock);
 	va_start(ap, fmt);
 	(void) vsprintf(msg_buffer, fmt, ap);
 	va_end(ap);
@@ -4837,7 +4819,6 @@ eri_debug_msg(const char *file, int line, struct eri *erip,
 				    line, msg_buffer);
 		}
 	}
-	mutex_exit(&eridebuglock);
 }
 #endif
 

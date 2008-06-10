@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,29 +28,17 @@
 # include global definitions
 include ../../../Makefile.master
 
-# NOTE: pm.h is not shipped.  It should be shipped when power management
-# is a real feature of Solaris.
-
 HDRS=  \
-aflt.h \
 avintr.h \
-bmac.h \
 bootconf.h		bpp_reg.h \
 bpp_var.h \
-bw2reg.h		bw2var.h \
 cg3var.h		\
 cg6fbc.h		cg6reg.h		cg6tec.h \
 cg6thc.h		cg6var.h \
-cms.h 			cursor_impl.h \
 dkmpio.h		dmaga.h	\
-eri.h			eri_common.h		eri_mac.h \
-eri_msg.h		eri_phy.h \
 fdreg.h			fdvar.h \
-hme.h			hme_mac.h \
-hme_phy.h		i82586.h \
-isdnio.h \
-mace.h \
-memfb.h			memreg.h		memvar.h \
+hme.h			hme_mac.h 		hme_phy.h \
+memvar.h \
 obpdefs.h		pixrect.h  \
 pr_impl_util.h		pr_planegroups.h \
 promif.h		promimpl.h \

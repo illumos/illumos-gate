@@ -7318,6 +7318,25 @@ mondo_loop() {
 	rm -f $usr/platform/sun4u/include/sys/us_drv.h
 
 	#
+	# Remove device private and legacy sun headers we don't need
+	#
+	rm -f $usr/include/sys/aflt.h
+	rm -f $usr/include/sys/bmac.h
+	rm -f $usr/include/sys/bw2reg.h
+	rm -f $usr/include/sys/bw2var.h
+	rm -f $usr/include/sys/cursor_impl.h
+	rm -f $usr/include/sys/eri.h
+	rm -f $usr/include/sys/eri_common.h
+	rm -f $usr/include/sys/eri_mac.h
+	rm -f $usr/include/sys/eri_msg.h
+	rm -f $usr/include/sys/eri_phy.h
+	rm -f $usr/include/sys/i82586.h
+	rm -f $usr/include/sys/isdnio.h
+	rm -f $usr/include/sys/mace.h
+	rm -f $usr/include/sys/memfb.h
+	rm -f $usr/include/sys/memreg.h
+
+	#
 	# Remove new files in order to go backward.
 	#
 	rm -f $root/usr/lib/rcm/modules/SUNW_vlan_rcm.so
