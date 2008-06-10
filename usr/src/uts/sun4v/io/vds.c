@@ -57,6 +57,8 @@
 #include <sys/scsi/impl/uscsi.h>
 #include <vm/seg_map.h>
 
+#define	ONE_TERABYTE	(1ULL << 40)
+
 /* Virtual disk server initialization flags */
 #define	VDS_LDI			0x01
 #define	VDS_MDEG		0x02
@@ -106,6 +108,10 @@
  * unfortunately, this convention does not appear to be codified.
  */
 #define	VD_ENTIRE_DISK_SLICE	2
+
+/* Logical block address for EFI */
+#define	VD_EFI_LBA_GPT		1	/* LBA of the GPT */
+#define	VD_EFI_LBA_GPE		2	/* LBA of the GPE */
 
 /* Driver types */
 typedef enum vd_driver {
@@ -403,7 +409,7 @@ typedef struct vd {
 	char			device_path[MAXPATHLEN + 1]; /* vdisk device */
 	dev_t			dev[V_NUMPAR];	/* dev numbers for slices */
 	int			open_flags;	/* open flags */
-	uint_t			nslices;	/* number of slices */
+	uint_t			nslices;	/* number of slices we export */
 	size_t			vdisk_size;	/* number of blocks in vdisk */
 	size_t			vdisk_block_size; /* size of each vdisk block */
 	vd_disk_type_t		vdisk_type;	/* slice or entire disk */
@@ -418,9 +424,10 @@ typedef struct vd {
 	vnode_t			*file_vnode;	/* file vnode */
 	size_t			file_size;	/* file size */
 	ddi_devid_t		file_devid;	/* devid for disk image */
-	efi_gpt_t		efi_gpt;	/* EFI GPT for slice type */
-	efi_gpe_t		efi_gpe;	/* EFI GPE for slice type */
 	int			efi_reserved;	/* EFI reserved slice */
+	caddr_t			flabel;		/* fake label for slice type */
+	uint_t			flabel_size;	/* fake label size */
+	uint_t			flabel_limit;	/* limit of the fake label */
 	struct dk_geom		dk_geom;	/* synthetic for slice type */
 	struct vtoc		vtoc;		/* synthetic for slice type */
 	vd_slice_t		slices[VD_MAXPART]; /* logical partitions */
@@ -446,6 +453,32 @@ typedef struct vd {
 	boolean_t		reset_state;	/* reset connection state? */
 	boolean_t		reset_ldc;	/* reset LDC channel? */
 } vd_t;
+
+/*
+ * Macros to manipulate the fake label (flabel) for single slice disks.
+ *
+ * If we fake a VTOC label then the fake label consists of only one block
+ * containing the VTOC label (struct dk_label).
+ *
+ * If we fake an EFI label then the fake label consists of a blank block
+ * followed by a GPT (efi_gpt_t) and a GPE (efi_gpe_t).
+ *
+ */
+#define	VD_LABEL_VTOC_SIZE					\
+	P2ROUNDUP(sizeof (struct dk_label), DEV_BSIZE)
+
+#define	VD_LABEL_EFI_SIZE					\
+	P2ROUNDUP(DEV_BSIZE + sizeof (efi_gpt_t) + 		\
+	    sizeof (efi_gpe_t) * VD_MAXPART, DEV_BSIZE)
+
+#define	VD_LABEL_VTOC(vd)	\
+		((struct dk_label *)((vd)->flabel))
+
+#define	VD_LABEL_EFI_GPT(vd)	\
+		((efi_gpt_t *)((vd)->flabel + DEV_BSIZE))
+#define	VD_LABEL_EFI_GPE(vd)	\
+		((efi_gpe_t *)((vd)->flabel + DEV_BSIZE + sizeof (efi_gpt_t)))
+
 
 typedef struct vds_operation {
 	char	*namep;
@@ -524,6 +557,33 @@ static boolean_t vd_volume_force_slice = B_FALSE;
 static boolean_t vd_file_validate_sanity = B_FALSE;
 
 /*
+ * When a backend is exported as a single-slice disk then we entirely fake
+ * its disk label. So it can be exported either with a VTOC label or with
+ * an EFI label. If vd_slice_label is set to VD_DISK_LABEL_VTOC then all
+ * single-slice disks will be exported with a VTOC label; and if it is set
+ * to VD_DISK_LABEL_EFI then all single-slice disks will be exported with
+ * an EFI label.
+ *
+ * If vd_slice_label is set to VD_DISK_LABEL_UNK and the backend is a disk
+ * or volume device then it will be exported with the same type of label as
+ * defined on the device. Otherwise if the backend is a file then it will
+ * exported with the disk label type set in the vd_file_slice_label variable.
+ *
+ * Note that if the backend size is greater than 1TB then it will always be
+ * exported with an EFI label no matter what the setting is.
+ */
+static vd_disk_label_t vd_slice_label = VD_DISK_LABEL_UNK;
+
+static vd_disk_label_t vd_file_slice_label = VD_DISK_LABEL_VTOC;
+
+/*
+ * Tunable for backward compatibility. If this variable is set to B_TRUE then
+ * single-slice disks are exported as disks with only one slice instead of
+ * faking a complete disk partitioning.
+ */
+static boolean_t vd_slice_single_slice = B_FALSE;
+
+/*
  * Supported protocol version pairs, from highest (newest) to lowest (oldest)
  *
  * Each supported major version should appear only once, paired with (and only
@@ -548,6 +608,49 @@ static int vd_backend_ioctl(vd_t *vd, int cmd, caddr_t arg);
 static int vds_efi_alloc_and_read(vd_t *, efi_gpt_t **, efi_gpe_t **);
 static void vds_efi_free(vd_t *, efi_gpt_t *, efi_gpe_t *);
 static void vds_driver_types_free(vds_t *vds);
+static void vd_vtocgeom_to_label(struct vtoc *vtoc, struct dk_geom *geom,
+    struct dk_label *label);
+static void vd_label_to_vtocgeom(struct dk_label *label, struct vtoc *vtoc,
+    struct dk_geom *geom);
+static boolean_t vd_slice_geom_isvalid(vd_t *vd, struct dk_geom *geom);
+static boolean_t vd_slice_vtoc_isvalid(vd_t *vd, struct vtoc *vtoc);
+
+extern int is_pseudo_device(dev_info_t *);
+
+/*
+ * Function:
+ *	vd_get_readable_size
+ *
+ * Description:
+ * 	Convert a given size in bytes to a human readable format in
+ * 	kilobytes, megabytes, gigabytes or terabytes.
+ *
+ * Parameters:
+ *	full_size	- the size to convert in bytes.
+ *	size		- the converted size.
+ *	unit		- the unit of the converted size: 'K' (kilobyte),
+ *			  'M' (Megabyte), 'G' (Gigabyte), 'T' (Terabyte).
+ *
+ * Return Code:
+ *	none
+ */
+void
+vd_get_readable_size(size_t full_size, size_t *size, char *unit)
+{
+	if (full_size < (1ULL << 20)) {
+		*size = full_size >> 10;
+		*unit = 'K'; /* Kilobyte */
+	} else if (full_size < (1ULL << 30)) {
+		*size = full_size >> 20;
+		*unit = 'M'; /* Megabyte */
+	} else if (full_size < (1ULL << 40)) {
+		*size = full_size >> 30;
+		*unit = 'G'; /* Gigabyte */
+	} else {
+		*size = full_size >> 40;
+		*unit = 'T'; /* Terabyte */
+	}
+}
 
 /*
  * Function:
@@ -593,6 +696,13 @@ vd_file_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t blk,
 	if (vd->vdisk_type == VD_DISK_TYPE_SLICE || slice == VD_SLICE_NONE) {
 		/* raw disk access */
 		offset = blk * DEV_BSIZE;
+		if (offset >= vd->file_size) {
+			/* offset past the end of the disk */
+			PR0("offset (0x%lx) >= fsize (0x%lx)",
+			    offset, vd->file_size);
+			return (0);
+		}
+		maxlen = vd->file_size - offset;
 	} else {
 		ASSERT(slice >= 0 && slice < V_NUMPAR);
 
@@ -621,24 +731,23 @@ vd_file_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t blk,
 
 		if (blk >= vd->slices[slice].nblocks) {
 			/* address past the end of the slice */
-			PR0("req_addr (0x%lx) > psize (0x%lx)",
+			PR0("req_addr (0x%lx) >= psize (0x%lx)",
 			    blk, vd->slices[slice].nblocks);
 			return (0);
 		}
 
 		offset = (vd->slices[slice].start + blk) * DEV_BSIZE;
-
-		/*
-		 * If the requested size is greater than the size
-		 * of the partition, truncate the read/write.
-		 */
 		maxlen = (vd->slices[slice].nblocks - blk) * DEV_BSIZE;
+	}
 
-		if (len > maxlen) {
-			PR0("I/O size truncated to %lu bytes from %lu bytes",
-			    maxlen, len);
-			len = maxlen;
-		}
+	/*
+	 * If the requested size is greater than the size
+	 * of the partition, truncate the read/write.
+	 */
+	if (len > maxlen) {
+		PR0("I/O size truncated to %lu bytes from %lu bytes",
+		    maxlen, len);
+		len = maxlen;
 	}
 
 	/*
@@ -700,30 +809,27 @@ vd_file_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t blk,
 
 /*
  * Function:
- *	vd_file_build_default_label
+ *	vd_build_default_label
  *
  * Description:
- *	Return a default label for the given disk. This is used when the disk
+ *	Return a default label for a given disk size. This is used when the disk
  *	does not have a valid VTOC so that the user can get a valid default
  *	configuration. The default label has all slice sizes set to 0 (except
  *	slice 2 which is the entire disk) to force the user to write a valid
  *	label onto the disk image.
  *
  * Parameters:
- *	vd		- disk on which the operation is performed.
+ *	disk_size	- the disk size in bytes
  *	label		- the returned default label.
  *
  * Return Code:
  *	none.
  */
 static void
-vd_file_build_default_label(vd_t *vd, struct dk_label *label)
+vd_build_default_label(size_t disk_size, struct dk_label *label)
 {
 	size_t size;
-	char prefix;
-
-	ASSERT(vd->file);
-	ASSERT(vd->vdisk_type == VD_DISK_TYPE_DISK);
+	char unit;
 
 	bzero(label, sizeof (struct dk_label));
 
@@ -746,10 +852,10 @@ vd_file_build_default_label(vd_t *vd, struct dk_label *label)
 	 * for a small file, or so many on a big file that you waste space
 	 * for backup superblocks or cylinder group structures.
 	 */
-	if (vd->file_size < (2 * 1024 * 1024))
-		label->dkl_pcyl = vd->file_size / (100 * 1024);
+	if (disk_size < (2 * 1024 * 1024))
+		label->dkl_pcyl = disk_size / (100 * 1024);
 	else
-		label->dkl_pcyl = vd->file_size / (300 * 1024);
+		label->dkl_pcyl = disk_size / (300 * 1024);
 
 	if (label->dkl_pcyl == 0)
 		label->dkl_pcyl = 1;
@@ -759,8 +865,7 @@ vd_file_build_default_label(vd_t *vd, struct dk_label *label)
 	if (label->dkl_pcyl > 2)
 		label->dkl_acyl = 2;
 
-	label->dkl_nsect = vd->file_size /
-	    (DEV_BSIZE * label->dkl_pcyl);
+	label->dkl_nsect = disk_size / (DEV_BSIZE * label->dkl_pcyl);
 	label->dkl_ncyl = label->dkl_pcyl - label->dkl_acyl;
 	label->dkl_nhead = 1;
 	label->dkl_write_reinstruct = 0;
@@ -769,26 +874,14 @@ vd_file_build_default_label(vd_t *vd, struct dk_label *label)
 	label->dkl_apc = 0;
 	label->dkl_intrlv = 0;
 
-	PR0("requested disk size: %ld bytes\n", vd->file_size);
+	PR0("requested disk size: %ld bytes\n", disk_size);
 	PR0("setup: ncyl=%d nhead=%d nsec=%d\n", label->dkl_pcyl,
 	    label->dkl_nhead, label->dkl_nsect);
 	PR0("provided disk size: %ld bytes\n", (uint64_t)
 	    (label->dkl_pcyl * label->dkl_nhead *
 	    label->dkl_nsect * DEV_BSIZE));
 
-	if (vd->file_size < (1ULL << 20)) {
-		size = vd->file_size >> 10;
-		prefix = 'K'; /* Kilobyte */
-	} else if (vd->file_size < (1ULL << 30)) {
-		size = vd->file_size >> 20;
-		prefix = 'M'; /* Megabyte */
-	} else if (vd->file_size < (1ULL << 40)) {
-		size = vd->file_size >> 30;
-		prefix = 'G'; /* Gigabyte */
-	} else {
-		size = vd->file_size >> 40;
-		prefix = 'T'; /* Terabyte */
-	}
+	vd_get_readable_size(disk_size, &size, &unit);
 
 	/*
 	 * We must have a correct label name otherwise format(1m) will
@@ -796,7 +889,7 @@ vd_file_build_default_label(vd_t *vd, struct dk_label *label)
 	 */
 	(void) snprintf(label->dkl_asciilabel, LEN_DKL_ASCII,
 	    "SUN-DiskImage-%ld%cB cyl %d alt %d hd %d sec %d",
-	    size, prefix,
+	    size, unit,
 	    label->dkl_ncyl, label->dkl_acyl, label->dkl_nhead,
 	    label->dkl_nsect);
 
@@ -1328,6 +1421,312 @@ vd_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t vblk, size_t vlen)
 }
 
 /*
+ * Function:
+ *	vd_slice_flabel_read
+ *
+ * Description:
+ *	This function simulates a read operation from the fake label of
+ *	a single-slice disk.
+ *
+ * Parameters:
+ *	vd		- single-slice disk to read from
+ *	data		- buffer where data should be read to
+ *	offset		- offset in byte where the read should start
+ *	length		- number of bytes to read
+ *
+ * Return Code:
+ *	n >= 0		- success, n indicates the number of bytes read
+ *	-1		- error
+ */
+static ssize_t
+vd_slice_flabel_read(vd_t *vd, caddr_t data, size_t offset, size_t length)
+{
+	size_t n = 0;
+	uint_t limit = vd->flabel_limit * DEV_BSIZE;
+
+	ASSERT(vd->vdisk_type == VD_DISK_TYPE_SLICE);
+	ASSERT(vd->flabel != NULL);
+
+	/* if offset is past the fake label limit there's nothing to read */
+	if (offset >= limit)
+		return (0);
+
+	/* data with offset 0 to flabel_size are read from flabel */
+	if (offset < vd->flabel_size) {
+
+		if (offset + length <= vd->flabel_size) {
+			bcopy(vd->flabel + offset, data, length);
+			return (length);
+		}
+
+		n = vd->flabel_size - offset;
+		bcopy(vd->flabel + offset, data, n);
+		data += n;
+	}
+
+	/* data with offset from flabel_size to flabel_limit are all zeros */
+	if (offset + length <= limit) {
+		bzero(data, length - n);
+		return (length);
+	}
+
+	bzero(data, limit - offset - n);
+	return (limit - offset);
+}
+
+/*
+ * Function:
+ *	vd_slice_flabel_write
+ *
+ * Description:
+ *	This function simulates a write operation to the fake label of
+ *	a single-slice disk. Write operations are actually faked and return
+ *	success although the label is never changed. This is mostly to
+ *	simulate a successful label update.
+ *
+ * Parameters:
+ *	vd		- single-slice disk to write to
+ *	data		- buffer where data should be written from
+ *	offset		- offset in byte where the write should start
+ *	length		- number of bytes to written
+ *
+ * Return Code:
+ *	n >= 0		- success, n indicates the number of bytes written
+ *	-1		- error
+ */
+static ssize_t
+vd_slice_flabel_write(vd_t *vd, caddr_t data, size_t offset, size_t length)
+{
+	uint_t limit = vd->flabel_limit * DEV_BSIZE;
+	struct dk_label *label;
+	struct dk_geom geom;
+	struct vtoc vtoc;
+
+	ASSERT(vd->vdisk_type == VD_DISK_TYPE_SLICE);
+	ASSERT(vd->flabel != NULL);
+
+	if (offset >= limit)
+		return (0);
+
+	/*
+	 * If this is a request to overwrite the VTOC disk label, check that
+	 * the new label is similar to the previous one and return that the
+	 * write was successful, but note that nothing is actually overwritten.
+	 */
+	if (vd->vdisk_label == VD_DISK_LABEL_VTOC &&
+	    offset == 0 && length == DEV_BSIZE) {
+		label = (struct dk_label *)data;
+
+		/* check that this is a valid label */
+		if (label->dkl_magic != DKL_MAGIC ||
+		    label->dkl_cksum != vd_lbl2cksum(label))
+			return (-1);
+
+		/* check the vtoc and geometry */
+		vd_label_to_vtocgeom(label, &vtoc, &geom);
+		if (vd_slice_geom_isvalid(vd, &geom) &&
+		    vd_slice_vtoc_isvalid(vd, &vtoc))
+			return (length);
+	}
+
+	/* fail any other write */
+	return (-1);
+}
+
+/*
+ * Function:
+ *	vd_slice_fake_rdwr
+ *
+ * Description:
+ *	This function simulates a raw read or write operation to a single-slice
+ *	disk. It only handles the faked part of the operation i.e. I/Os to
+ *	blocks which have no mapping with the vdisk backend (I/Os to the
+ *	beginning and to the end of the vdisk).
+ *
+ *	The function returns 0 is the operation	is completed and it has been
+ *	entirely handled as a fake read or write. In that case, lengthp points
+ *	to the number of bytes not read or written. Values returned by datap
+ *	and blkp are undefined.
+ *
+ *	If the fake operation has succeeded but the read or write is not
+ *	complete (i.e. the read/write operation extends beyond the blocks
+ *	we fake) then the function returns EAGAIN and datap, blkp and lengthp
+ *	pointers points to the parameters for completing the operation.
+ *
+ *	In case of an error, for example if the slice is empty or parameters
+ *	are invalid, then the function returns a non-zero value different
+ *	from EAGAIN. In that case, the returned values of datap, blkp and
+ *	lengthp are undefined.
+ *
+ * Parameters:
+ *	vd		- single-slice disk on which the operation is performed
+ *	slice		- slice on which the operation is performed,
+ *			  VD_SLICE_NONE indicates that the operation
+ *			  is done using an absolute disk offset.
+ *	operation	- operation to execute: read (VD_OP_BREAD) or
+ *			  write (VD_OP_BWRITE).
+ *	datap		- pointer to the buffer where data are read to
+ *			  or written from. Return the pointer where remaining
+ *			  data have to be read to or written from.
+ *	blkp		- pointer to the starting block for the operation.
+ *			  Return the starting block relative to the vdisk
+ *			  backend for the remaining operation.
+ *	lengthp		- pointer to the number of bytes to read or write.
+ *			  This should be a multiple of DEV_BSIZE. Return the
+ *			  remaining number of bytes to read or write.
+ *
+ * Return Code:
+ *	0		- read/write operation is completed
+ *	EAGAIN		- read/write operation is not completed
+ *	other values	- error
+ */
+static int
+vd_slice_fake_rdwr(vd_t *vd, int slice, int operation, caddr_t *datap,
+    size_t *blkp, size_t *lengthp)
+{
+	struct dk_label *label;
+	caddr_t data;
+	size_t blk, length, csize;
+	size_t ablk, asize, aoff, alen;
+	ssize_t n;
+	int sec, status;
+
+	ASSERT(vd->vdisk_type == VD_DISK_TYPE_SLICE);
+	ASSERT(slice != 0);
+
+	data = *datap;
+	blk = *blkp;
+	length = *lengthp;
+
+	/*
+	 * If this is not a raw I/O or an I/O from a full disk slice then
+	 * this is an I/O to/from an empty slice.
+	 */
+	if (slice != VD_SLICE_NONE &&
+	    (slice != VD_ENTIRE_DISK_SLICE ||
+	    vd->vdisk_label != VD_DISK_LABEL_VTOC) &&
+	    (slice != VD_EFI_WD_SLICE ||
+	    vd->vdisk_label != VD_DISK_LABEL_EFI)) {
+		return (EIO);
+	}
+
+	if (length % DEV_BSIZE != 0)
+		return (EINVAL);
+
+	/* handle any I/O with the fake label */
+	if (operation == VD_OP_BWRITE)
+		n = vd_slice_flabel_write(vd, data, blk * DEV_BSIZE, length);
+	else
+		n = vd_slice_flabel_read(vd, data, blk * DEV_BSIZE, length);
+
+	if (n == -1)
+		return (EINVAL);
+
+	ASSERT(n % DEV_BSIZE == 0);
+
+	/* adjust I/O arguments */
+	data += n;
+	blk += n / DEV_BSIZE;
+	length -= n;
+
+	/* check if there's something else to process */
+	if (length == 0) {
+		status = 0;
+		goto done;
+	}
+
+	if (vd->vdisk_label == VD_DISK_LABEL_VTOC &&
+	    slice == VD_ENTIRE_DISK_SLICE) {
+		status = EAGAIN;
+		goto done;
+	}
+
+	if (vd->vdisk_label == VD_DISK_LABEL_EFI) {
+		asize = EFI_MIN_RESV_SIZE + 33;
+		ablk = vd->vdisk_size - asize;
+	} else {
+		ASSERT(vd->vdisk_label == VD_DISK_LABEL_VTOC);
+		ASSERT(vd->dk_geom.dkg_apc == 0);
+
+		csize = vd->dk_geom.dkg_nhead * vd->dk_geom.dkg_nsect;
+		ablk = vd->dk_geom.dkg_ncyl * csize;
+		asize = vd->dk_geom.dkg_acyl * csize;
+	}
+
+	alen = length / DEV_BSIZE;
+	aoff = blk;
+
+	/* if we have reached the last block then the I/O is completed */
+	if (aoff == ablk + asize) {
+		status = 0;
+		goto done;
+	}
+
+	/* if we are past the last block then return an error */
+	if (aoff > ablk + asize)
+		return (EIO);
+
+	/* check if there is any I/O to end of the disk */
+	if (aoff + alen < ablk) {
+		status = EAGAIN;
+		goto done;
+	}
+
+	/* we don't allow any write to the end of the disk */
+	if (operation == VD_OP_BWRITE)
+		return (EIO);
+
+	if (aoff < ablk) {
+		alen -= (ablk - aoff);
+		aoff = ablk;
+	}
+
+	if (aoff + alen > ablk + asize) {
+		alen = ablk + asize - aoff;
+	}
+
+	alen *= DEV_BSIZE;
+
+	if (operation == VD_OP_BREAD) {
+		bzero(data + (aoff - blk) * DEV_BSIZE, alen);
+
+		if (vd->vdisk_label == VD_DISK_LABEL_VTOC) {
+			/* check if we read backup labels */
+			label = VD_LABEL_VTOC(vd);
+			ablk += (label->dkl_acyl - 1) * csize +
+			    (label->dkl_nhead - 1) * label->dkl_nsect;
+
+			for (sec = 1; (sec < 5 * 2 + 1); sec += 2) {
+
+				if (ablk + sec >= blk &&
+				    ablk + sec < blk + (length / DEV_BSIZE)) {
+					bcopy(label, data +
+					    (ablk + sec - blk) * DEV_BSIZE,
+					    sizeof (struct dk_label));
+				}
+			}
+		}
+	}
+
+	length -= alen;
+
+	status = (length == 0)? 0: EAGAIN;
+
+done:
+	ASSERT(length == 0 || blk >= vd->flabel_limit);
+
+	/*
+	 * Return the parameters for the remaining I/O. The starting block is
+	 * adjusted so that it is relative to the vdisk backend.
+	 */
+	*datap = data;
+	*blkp = blk - vd->flabel_limit;
+	*lengthp = length;
+
+	return (status);
+}
+
+/*
  * Return Values
  *	EINPROGRESS	- operation was successfully started
  *	EIO		- encountered LDC (aka. task error)
@@ -1347,6 +1746,7 @@ vd_start_bio(vd_task_t *task)
 	int 			slice;
 	char			*bufaddr = 0;
 	size_t			buflen;
+	size_t			offset, length, nbytes;
 
 	ASSERT(vd != NULL);
 	ASSERT(request != NULL);
@@ -1389,7 +1789,11 @@ vd_start_bio(vd_task_t *task)
 		return (EIO);
 	}
 
-	buflen = request->nbytes;
+	/*
+	 * The buffer size has to be 8-byte aligned, so the client should have
+	 * sent a buffer which size is roundup to the next 8-byte aligned value.
+	 */
+	buflen = P2ROUNDUP(request->nbytes, 8);
 
 	status = ldc_mem_acquire(task->mhdl, 0, buflen);
 	if (status != 0) {
@@ -1398,70 +1802,118 @@ vd_start_bio(vd_task_t *task)
 		return (EIO);
 	}
 
+	offset = request->addr;
+	nbytes = request->nbytes;
+	length = nbytes;
+
+	/* default number of byte returned by the I/O */
+	request->nbytes = 0;
+
+	if (vd->vdisk_type == VD_DISK_TYPE_SLICE) {
+
+		if (slice != 0) {
+			/* handle any fake I/O */
+			rv = vd_slice_fake_rdwr(vd, slice, request->operation,
+			    &bufaddr, &offset, &length);
+
+			/* record the number of bytes from the fake I/O */
+			request->nbytes = nbytes - length;
+
+			if (rv == 0) {
+				request->status = 0;
+				goto io_done;
+			}
+
+			if (rv != EAGAIN) {
+				request->nbytes = 0;
+				request->status = EIO;
+				goto io_done;
+			}
+
+			/*
+			 * If we return with EAGAIN then this means that there
+			 * are still data to read or write.
+			 */
+			ASSERT(length != 0);
+
+			/*
+			 * We need to continue the I/O from the slice backend to
+			 * complete the request. The variables bufaddr, offset
+			 * and length have been adjusted to have the right
+			 * information to do the remaining I/O from the backend.
+			 * The backend is entirely mapped to slice 0 so we just
+			 * have to complete the I/O from that slice.
+			 */
+			slice = 0;
+		}
+
+	} else if ((slice == VD_SLICE_NONE) && (!vd->file)) {
+
+		/*
+		 * This is not a disk image so it is a real disk. We
+		 * assume that the underlying device driver supports
+		 * USCSICMD ioctls. This is the case of all SCSI devices
+		 * (sd, ssd...).
+		 *
+		 * In the future if we have non-SCSI disks we would need
+		 * to invoke the appropriate function to do I/O using an
+		 * absolute disk offset (for example using DIOCTL_RWCMD
+		 * for IDE disks).
+		 */
+		rv = vd_scsi_rdwr(vd, request->operation, bufaddr, offset,
+		    length);
+		if (rv != 0) {
+			request->status = EIO;
+		} else {
+			request->nbytes = length;
+			request->status = 0;
+		}
+		goto io_done;
+	}
+
 	/* Start the block I/O */
 	if (vd->file) {
-		rv = vd_file_rw(vd, slice, request->operation, bufaddr,
-		    request->addr, request->nbytes);
+		rv = vd_file_rw(vd, slice, request->operation, bufaddr, offset,
+		    length);
 		if (rv < 0) {
 			request->nbytes = 0;
 			request->status = EIO;
 		} else {
-			request->nbytes = rv;
+			request->nbytes += rv;
 			request->status = 0;
 		}
 	} else {
-		if (slice == VD_SLICE_NONE) {
-			/*
-			 * This is not a disk image so it is a real disk. We
-			 * assume that the underlying device driver supports
-			 * USCSICMD ioctls. This is the case of all SCSI devices
-			 * (sd, ssd...).
-			 *
-			 * In the future if we have non-SCSI disks we would need
-			 * to invoke the appropriate function to do I/O using an
-			 * absolute disk offset (for example using DIOCTL_RWCMD
-			 * for IDE disks).
-			 */
-			rv = vd_scsi_rdwr(vd, request->operation, bufaddr,
-			    request->addr, request->nbytes);
-			if (rv != 0) {
-				request->nbytes = 0;
-				request->status = EIO;
-			} else {
-				request->status = 0;
-			}
-		} else {
-			bioinit(buf);
-			buf->b_flags	= B_BUSY;
-			buf->b_bcount	= request->nbytes;
-			buf->b_lblkno	= request->addr;
-			buf->b_edev 	= vd->dev[slice];
-			buf->b_un.b_addr = bufaddr;
-			buf->b_flags 	|= (request->operation == VD_OP_BREAD)?
-			    B_READ : B_WRITE;
+		bioinit(buf);
+		buf->b_flags	= B_BUSY;
+		buf->b_bcount	= length;
+		buf->b_lblkno	= offset;
+		buf->b_bufsize	= buflen;
+		buf->b_edev 	= vd->dev[slice];
+		buf->b_un.b_addr = bufaddr;
+		buf->b_flags 	|= (request->operation == VD_OP_BREAD)?
+		    B_READ : B_WRITE;
 
-			request->status =
-			    ldi_strategy(vd->ldi_handle[slice], buf);
+		request->status = ldi_strategy(vd->ldi_handle[slice], buf);
 
-			/*
-			 * This is to indicate to the caller that the request
-			 * needs to be finished by vd_complete_bio() by calling
-			 * biowait() there and waiting for that to return before
-			 * triggering the notification of the vDisk client.
-			 *
-			 * This is necessary when writing to real disks as
-			 * otherwise calls to ldi_strategy() would be serialized
-			 * behind the calls to biowait() and performance would
-			 * suffer.
-			 */
-			if (request->status == 0)
-				return (EINPROGRESS);
+		/*
+		 * This is to indicate to the caller that the request
+		 * needs to be finished by vd_complete_bio() by calling
+		 * biowait() there and waiting for that to return before
+		 * triggering the notification of the vDisk client.
+		 *
+		 * This is necessary when writing to real disks as
+		 * otherwise calls to ldi_strategy() would be serialized
+		 * behind the calls to biowait() and performance would
+		 * suffer.
+		 */
+		if (request->status == 0)
+			return (EINPROGRESS);
 
-			biofini(buf);
-		}
+		biofini(buf);
 	}
 
-	/* Clean up after error */
+io_done:
+	/* Clean up after error or completion */
 	rv = ldc_mem_release(task->mhdl, 0, buflen);
 	if (rv) {
 		PR0("ldc_mem_release() returned err %d ", rv);
@@ -1685,17 +2137,18 @@ vd_complete_bio(vd_task_t *task)
 	ASSERT(task->msg != NULL);
 	ASSERT(task->msglen >= sizeof (*task->msg));
 	ASSERT(!vd->file);
-	ASSERT(request->slice != VD_SLICE_NONE);
+	ASSERT(request->slice != VD_SLICE_NONE || (!vd_slice_single_slice &&
+	    vd->vdisk_type == VD_DISK_TYPE_SLICE));
 
 	/* Wait for the I/O to complete [ call to ldi_strategy(9f) ] */
 	request->status = biowait(buf);
 
-	/* return back the number of bytes read/written */
-	request->nbytes = buf->b_bcount - buf->b_resid;
+	/* Update the number of bytes read/written */
+	request->nbytes += buf->b_bcount - buf->b_resid;
 
 	/* Release the buffer */
 	if (!vd->reset_state)
-		status = ldc_mem_release(task->mhdl, 0, buf->b_bcount);
+		status = ldc_mem_release(task->mhdl, 0, buf->b_bufsize);
 	if (status) {
 		PR0("ldc_mem_release() returned errno %d copying to "
 		    "client", status);
@@ -2050,6 +2503,185 @@ vd_lbl2cksum(struct dk_label *label)
 }
 
 /*
+ * Copy information from a vtoc and dk_geom structures to a dk_label structure.
+ */
+static void
+vd_vtocgeom_to_label(struct vtoc *vtoc, struct dk_geom *geom,
+    struct dk_label *label)
+{
+	int i;
+
+	ASSERT(vtoc->v_nparts == V_NUMPAR);
+	ASSERT(vtoc->v_sanity == VTOC_SANE);
+
+	bzero(label, sizeof (struct dk_label));
+
+	label->dkl_ncyl = geom->dkg_ncyl;
+	label->dkl_acyl = geom->dkg_acyl;
+	label->dkl_pcyl = geom->dkg_pcyl;
+	label->dkl_nhead = geom->dkg_nhead;
+	label->dkl_nsect = geom->dkg_nsect;
+	label->dkl_intrlv = geom->dkg_intrlv;
+	label->dkl_apc = geom->dkg_apc;
+	label->dkl_rpm = geom->dkg_rpm;
+	label->dkl_write_reinstruct = geom->dkg_write_reinstruct;
+	label->dkl_read_reinstruct = geom->dkg_read_reinstruct;
+
+	label->dkl_vtoc.v_nparts = V_NUMPAR;
+	label->dkl_vtoc.v_sanity = VTOC_SANE;
+	label->dkl_vtoc.v_version = vtoc->v_version;
+	for (i = 0; i < V_NUMPAR; i++) {
+		label->dkl_vtoc.v_timestamp[i] = vtoc->timestamp[i];
+		label->dkl_vtoc.v_part[i].p_tag = vtoc->v_part[i].p_tag;
+		label->dkl_vtoc.v_part[i].p_flag = vtoc->v_part[i].p_flag;
+		label->dkl_map[i].dkl_cylno = vtoc->v_part[i].p_start /
+		    (label->dkl_nhead * label->dkl_nsect);
+		label->dkl_map[i].dkl_nblk = vtoc->v_part[i].p_size;
+	}
+
+	/*
+	 * The bootinfo array can not be copied with bcopy() because
+	 * elements are of type long in vtoc (so 64-bit) and of type
+	 * int in dk_vtoc (so 32-bit).
+	 */
+	label->dkl_vtoc.v_bootinfo[0] = vtoc->v_bootinfo[0];
+	label->dkl_vtoc.v_bootinfo[1] = vtoc->v_bootinfo[1];
+	label->dkl_vtoc.v_bootinfo[2] = vtoc->v_bootinfo[2];
+	bcopy(vtoc->v_asciilabel, label->dkl_asciilabel, LEN_DKL_ASCII);
+	bcopy(vtoc->v_volume, label->dkl_vtoc.v_volume, LEN_DKL_VVOL);
+
+	/* re-compute checksum */
+	label->dkl_magic = DKL_MAGIC;
+	label->dkl_cksum = vd_lbl2cksum(label);
+}
+
+/*
+ * Copy information from a dk_label structure to a vtoc and dk_geom structures.
+ */
+static void
+vd_label_to_vtocgeom(struct dk_label *label, struct vtoc *vtoc,
+    struct dk_geom *geom)
+{
+	int i;
+
+	bzero(vtoc, sizeof (struct vtoc));
+	bzero(geom, sizeof (struct dk_geom));
+
+	geom->dkg_ncyl = label->dkl_ncyl;
+	geom->dkg_acyl = label->dkl_acyl;
+	geom->dkg_nhead = label->dkl_nhead;
+	geom->dkg_nsect = label->dkl_nsect;
+	geom->dkg_intrlv = label->dkl_intrlv;
+	geom->dkg_apc = label->dkl_apc;
+	geom->dkg_rpm = label->dkl_rpm;
+	geom->dkg_pcyl = label->dkl_pcyl;
+	geom->dkg_write_reinstruct = label->dkl_write_reinstruct;
+	geom->dkg_read_reinstruct = label->dkl_read_reinstruct;
+
+	vtoc->v_sanity = label->dkl_vtoc.v_sanity;
+	vtoc->v_version = label->dkl_vtoc.v_version;
+	vtoc->v_sectorsz = DEV_BSIZE;
+	vtoc->v_nparts = label->dkl_vtoc.v_nparts;
+
+	for (i = 0; i < vtoc->v_nparts; i++) {
+		vtoc->v_part[i].p_tag = label->dkl_vtoc.v_part[i].p_tag;
+		vtoc->v_part[i].p_flag = label->dkl_vtoc.v_part[i].p_flag;
+		vtoc->v_part[i].p_start = label->dkl_map[i].dkl_cylno *
+		    (label->dkl_nhead * label->dkl_nsect);
+		vtoc->v_part[i].p_size = label->dkl_map[i].dkl_nblk;
+		vtoc->timestamp[i] = label->dkl_vtoc.v_timestamp[i];
+	}
+
+	/*
+	 * The bootinfo array can not be copied with bcopy() because
+	 * elements are of type long in vtoc (so 64-bit) and of type
+	 * int in dk_vtoc (so 32-bit).
+	 */
+	vtoc->v_bootinfo[0] = label->dkl_vtoc.v_bootinfo[0];
+	vtoc->v_bootinfo[1] = label->dkl_vtoc.v_bootinfo[1];
+	vtoc->v_bootinfo[2] = label->dkl_vtoc.v_bootinfo[2];
+	bcopy(label->dkl_asciilabel, vtoc->v_asciilabel, LEN_DKL_ASCII);
+	bcopy(label->dkl_vtoc.v_volume, vtoc->v_volume, LEN_DKL_VVOL);
+}
+
+/*
+ * Check if a geometry is valid for a single-slice disk. A geometry is
+ * considered valid if the main attributes of the geometry match with the
+ * attributes of the fake geometry we have created.
+ */
+static boolean_t
+vd_slice_geom_isvalid(vd_t *vd, struct dk_geom *geom)
+{
+	ASSERT(vd->vdisk_type == VD_DISK_TYPE_SLICE);
+	ASSERT(vd->vdisk_label == VD_DISK_LABEL_VTOC);
+
+	if (geom->dkg_ncyl != vd->dk_geom.dkg_ncyl ||
+	    geom->dkg_acyl != vd->dk_geom.dkg_acyl ||
+	    geom->dkg_nsect != vd->dk_geom.dkg_nsect ||
+	    geom->dkg_pcyl != vd->dk_geom.dkg_pcyl)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * Check if a vtoc is valid for a single-slice disk. A vtoc is considered
+ * valid if the main attributes of the vtoc match with the attributes of the
+ * fake vtoc we have created.
+ */
+static boolean_t
+vd_slice_vtoc_isvalid(vd_t *vd, struct vtoc *vtoc)
+{
+	size_t csize;
+	int i;
+
+	ASSERT(vd->vdisk_type == VD_DISK_TYPE_SLICE);
+	ASSERT(vd->vdisk_label == VD_DISK_LABEL_VTOC);
+
+	if (vtoc->v_sanity != vd->vtoc.v_sanity ||
+	    vtoc->v_version != vd->vtoc.v_version ||
+	    vtoc->v_nparts != vd->vtoc.v_nparts ||
+	    strcmp(vtoc->v_volume, vd->vtoc.v_volume) != 0 ||
+	    strcmp(vtoc->v_asciilabel, vd->vtoc.v_asciilabel) != 0)
+		return (B_FALSE);
+
+	/* slice 2 should be unchanged */
+	if (vtoc->v_part[VD_ENTIRE_DISK_SLICE].p_start !=
+	    vd->vtoc.v_part[VD_ENTIRE_DISK_SLICE].p_start ||
+	    vtoc->v_part[VD_ENTIRE_DISK_SLICE].p_size !=
+	    vd->vtoc.v_part[VD_ENTIRE_DISK_SLICE].p_size)
+		return (B_FALSE);
+
+	/*
+	 * Slice 0 should be mostly unchanged and cover most of the disk.
+	 * However we allow some flexibility wrt to the start and the size
+	 * of this slice mainly because we can't exactly know how it will
+	 * be defined by the OS installer.
+	 *
+	 * We allow slice 0 to be defined as starting on any of the first
+	 * 4 cylinders.
+	 */
+	csize = vd->dk_geom.dkg_nhead * vd->dk_geom.dkg_nsect;
+
+	if (vtoc->v_part[0].p_start > 4 * csize ||
+	    vtoc->v_part[0].p_size > vtoc->v_part[VD_ENTIRE_DISK_SLICE].p_size)
+			return (B_FALSE);
+
+	if (vd->vtoc.v_part[0].p_size >= 4 * csize &&
+	    vtoc->v_part[0].p_size < vd->vtoc.v_part[0].p_size - 4 *csize)
+			return (B_FALSE);
+
+	/* any other slice should have a size of 0 */
+	for (i = 1; i < vtoc->v_nparts; i++) {
+		if (i != VD_ENTIRE_DISK_SLICE &&
+		    vtoc->v_part[i].p_size != 0)
+			return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+/*
  * Handle ioctls to a disk slice.
  *
  * Return Values
@@ -2062,6 +2694,9 @@ static int
 vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 {
 	dk_efi_t *dk_ioc;
+	struct vtoc *vtoc;
+	struct dk_geom *geom;
+	size_t len, lba;
 	int rval;
 
 	ASSERT(vd->vdisk_type == VD_DISK_TYPE_SLICE);
@@ -2082,14 +2717,41 @@ vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 	case VD_DISK_LABEL_VTOC:
 
 		switch (cmd) {
+
 		case DKIOCGGEOM:
 			ASSERT(ioctl_arg != NULL);
 			bcopy(&vd->dk_geom, ioctl_arg, sizeof (vd->dk_geom));
 			return (0);
+
 		case DKIOCGVTOC:
 			ASSERT(ioctl_arg != NULL);
 			bcopy(&vd->vtoc, ioctl_arg, sizeof (vd->vtoc));
 			return (0);
+
+		case DKIOCSGEOM:
+			ASSERT(ioctl_arg != NULL);
+			if (vd_slice_single_slice)
+				return (ENOTSUP);
+
+			/* fake success only if new geometry is valid */
+			geom = (struct dk_geom *)ioctl_arg;
+			if (!vd_slice_geom_isvalid(vd, geom))
+				return (EINVAL);
+
+			return (0);
+
+		case DKIOCSVTOC:
+			ASSERT(ioctl_arg != NULL);
+			if (vd_slice_single_slice)
+				return (ENOTSUP);
+
+			/* fake sucess only if the new vtoc is valid */
+			vtoc = (struct vtoc *)ioctl_arg;
+			if (!vd_slice_vtoc_isvalid(vd, vtoc))
+				return (EINVAL);
+
+			return (0);
+
 		default:
 			return (ENOTSUP);
 		}
@@ -2097,49 +2759,35 @@ vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 	/* ioctls for a single slice disk with an EFI label */
 	case VD_DISK_LABEL_EFI:
 
+		if (cmd != DKIOCGETEFI && cmd != DKIOCSETEFI)
+			return (ENOTSUP);
+
+		ASSERT(ioctl_arg != NULL);
+		dk_ioc = (dk_efi_t *)ioctl_arg;
+
+		len = dk_ioc->dki_length;
+		lba = dk_ioc->dki_lba;
+
+		if ((lba != VD_EFI_LBA_GPT && lba != VD_EFI_LBA_GPE) ||
+		    (lba == VD_EFI_LBA_GPT && len < sizeof (efi_gpt_t)) ||
+		    (lba == VD_EFI_LBA_GPE && len < sizeof (efi_gpe_t)))
+			return (EINVAL);
+
 		switch (cmd) {
 		case DKIOCGETEFI:
-			ASSERT(ioctl_arg != NULL);
-			dk_ioc = (dk_efi_t *)ioctl_arg;
+			len = vd_slice_flabel_read(vd,
+			    (caddr_t)dk_ioc->dki_data, lba * DEV_BSIZE, len);
 
-			/*
-			 * For a single slice disk with an EFI label, we define
-			 * a fake EFI label with the GPT at LBA 1 and one GPE
-			 * at LBA 2. So we return the GPT or the GPE depending
-			 * on which LBA is requested.
-			 */
-			if (dk_ioc->dki_lba == 1) {
-
-				/* return the EFI GPT */
-				if (dk_ioc->dki_length < sizeof (efi_gpt_t))
-					return (EINVAL);
-
-				bcopy(&vd->efi_gpt, dk_ioc->dki_data,
-				    sizeof (efi_gpt_t));
-
-				/* also return the GPE if possible */
-				if (dk_ioc->dki_length >= sizeof (efi_gpt_t) +
-				    sizeof (efi_gpe_t)) {
-					bcopy(&vd->efi_gpe, dk_ioc->dki_data +
-					    1, sizeof (efi_gpe_t));
-				}
-
-			} else if (dk_ioc->dki_lba == 2) {
-
-				/* return the EFI GPE */
-				if (dk_ioc->dki_length < sizeof (efi_gpe_t))
-					return (EINVAL);
-
-				bcopy(&vd->efi_gpe, dk_ioc->dki_data,
-				    sizeof (efi_gpe_t));
-
-			} else {
-				return (EINVAL);
-			}
+			ASSERT(len > 0);
 
 			return (0);
-		default:
-			return (ENOTSUP);
+
+		case DKIOCSETEFI:
+			if (vd_slice_single_slice)
+				return (ENOTSUP);
+
+			/* we currently don't support writing EFI */
+			return (EIO);
 		}
 
 	default:
@@ -2264,58 +2912,14 @@ vd_file_validate_geometry(vd_t *vd)
 		}
 
 		vd->vdisk_label = VD_DISK_LABEL_UNK;
-		vd_file_build_default_label(vd, &label);
+		vd_build_default_label(vd->file_size, &label);
 		status = EINVAL;
 	} else {
 		vd->vdisk_label = VD_DISK_LABEL_VTOC;
 	}
 
-	/* Update the driver geometry */
-	bzero(geom, sizeof (struct dk_geom));
-
-	geom->dkg_ncyl = label.dkl_ncyl;
-	geom->dkg_acyl = label.dkl_acyl;
-	geom->dkg_nhead = label.dkl_nhead;
-	geom->dkg_nsect = label.dkl_nsect;
-	geom->dkg_intrlv = label.dkl_intrlv;
-	geom->dkg_apc = label.dkl_apc;
-	geom->dkg_rpm = label.dkl_rpm;
-	geom->dkg_pcyl = label.dkl_pcyl;
-	geom->dkg_write_reinstruct = label.dkl_write_reinstruct;
-	geom->dkg_read_reinstruct = label.dkl_read_reinstruct;
-
-	/* Update the driver vtoc */
-	bzero(vtoc, sizeof (struct vtoc));
-
-	vtoc->v_sanity = label.dkl_vtoc.v_sanity;
-	vtoc->v_version = label.dkl_vtoc.v_version;
-	vtoc->v_sectorsz = DEV_BSIZE;
-	vtoc->v_nparts = label.dkl_vtoc.v_nparts;
-
-	for (i = 0; i < vtoc->v_nparts; i++) {
-		vtoc->v_part[i].p_tag =
-		    label.dkl_vtoc.v_part[i].p_tag;
-		vtoc->v_part[i].p_flag =
-		    label.dkl_vtoc.v_part[i].p_flag;
-		vtoc->v_part[i].p_start =
-		    label.dkl_map[i].dkl_cylno *
-		    (label.dkl_nhead * label.dkl_nsect);
-		vtoc->v_part[i].p_size = label.dkl_map[i].dkl_nblk;
-		vtoc->timestamp[i] =
-		    label.dkl_vtoc.v_timestamp[i];
-	}
-	/*
-	 * The bootinfo array can not be copied with bcopy() because
-	 * elements are of type long in vtoc (so 64-bit) and of type
-	 * int in dk_vtoc (so 32-bit).
-	 */
-	vtoc->v_bootinfo[0] = label.dkl_vtoc.v_bootinfo[0];
-	vtoc->v_bootinfo[1] = label.dkl_vtoc.v_bootinfo[1];
-	vtoc->v_bootinfo[2] = label.dkl_vtoc.v_bootinfo[2];
-	bcopy(label.dkl_asciilabel, vtoc->v_asciilabel,
-	    LEN_DKL_ASCII);
-	bcopy(label.dkl_vtoc.v_volume, vtoc->v_volume,
-	    LEN_DKL_VVOL);
+	/* Update the driver geometry and vtoc */
+	vd_label_to_vtocgeom(&label, vtoc, geom);
 
 	/* Update logical partitions */
 	bzero(vd->slices, sizeof (vd_slice_t) * VD_MAXPART);
@@ -2343,7 +2947,7 @@ vd_do_file_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 	struct dk_geom *geom;
 	struct vtoc *vtoc;
 	dk_efi_t *efi;
-	int i, rc;
+	int rc;
 
 	ASSERT(vd->file);
 	ASSERT(vd->vdisk_type == VD_DISK_TYPE_DISK);
@@ -2397,50 +3001,7 @@ vd_do_file_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 		    vtoc->v_nparts != V_NUMPAR)
 			return (EINVAL);
 
-		bzero(&label, sizeof (label));
-		label.dkl_ncyl = vd->dk_geom.dkg_ncyl;
-		label.dkl_acyl = vd->dk_geom.dkg_acyl;
-		label.dkl_pcyl = vd->dk_geom.dkg_pcyl;
-		label.dkl_nhead = vd->dk_geom.dkg_nhead;
-		label.dkl_nsect = vd->dk_geom.dkg_nsect;
-		label.dkl_intrlv = vd->dk_geom.dkg_intrlv;
-		label.dkl_apc = vd->dk_geom.dkg_apc;
-		label.dkl_rpm = vd->dk_geom.dkg_rpm;
-		label.dkl_write_reinstruct = vd->dk_geom.dkg_write_reinstruct;
-		label.dkl_read_reinstruct = vd->dk_geom.dkg_read_reinstruct;
-
-		label.dkl_vtoc.v_nparts = V_NUMPAR;
-		label.dkl_vtoc.v_sanity = VTOC_SANE;
-		label.dkl_vtoc.v_version = vtoc->v_version;
-		for (i = 0; i < V_NUMPAR; i++) {
-			label.dkl_vtoc.v_timestamp[i] =
-			    vtoc->timestamp[i];
-			label.dkl_vtoc.v_part[i].p_tag =
-			    vtoc->v_part[i].p_tag;
-			label.dkl_vtoc.v_part[i].p_flag =
-			    vtoc->v_part[i].p_flag;
-			label.dkl_map[i].dkl_cylno =
-			    vtoc->v_part[i].p_start /
-			    (label.dkl_nhead * label.dkl_nsect);
-			label.dkl_map[i].dkl_nblk =
-			    vtoc->v_part[i].p_size;
-		}
-		/*
-		 * The bootinfo array can not be copied with bcopy() because
-		 * elements are of type long in vtoc (so 64-bit) and of type
-		 * int in dk_vtoc (so 32-bit).
-		 */
-		label.dkl_vtoc.v_bootinfo[0] = vtoc->v_bootinfo[0];
-		label.dkl_vtoc.v_bootinfo[1] = vtoc->v_bootinfo[1];
-		label.dkl_vtoc.v_bootinfo[2] = vtoc->v_bootinfo[2];
-		bcopy(vtoc->v_asciilabel, label.dkl_asciilabel,
-		    LEN_DKL_ASCII);
-		bcopy(vtoc->v_volume, label.dkl_vtoc.v_volume,
-		    LEN_DKL_VVOL);
-
-		/* re-compute checksum */
-		label.dkl_magic = DKL_MAGIC;
-		label.dkl_cksum = vd_lbl2cksum(&label);
+		vd_vtocgeom_to_label(vtoc, &vd->dk_geom, &label);
 
 		/* write label to the disk image */
 		if ((rc = vd_file_set_vtoc(vd, &label)) != 0)
@@ -2782,6 +3343,19 @@ vd_get_devid(vd_task_t *task)
 	int bufbytes;
 
 	PR1("Get Device ID, nbytes=%ld", request->nbytes);
+
+	if (vd->vdisk_type == VD_DISK_TYPE_SLICE) {
+		/*
+		 * We don't support devid for single-slice disks because we
+		 * have no space to store a fabricated devid and for physical
+		 * disk slices, we can't use the devid of the disk otherwise
+		 * exporting multiple slices from the same disk will produce
+		 * the same devids.
+		 */
+		PR2("No Device ID for slices");
+		request->status = ENOTSUP;
+		return (0);
+	}
 
 	if (vd->file) {
 		if (vd->file_devid == NULL) {
@@ -3218,11 +3792,12 @@ vd_do_process_task(vd_task_t *task)
 
 	/* Range-check slice */
 	if (request->slice >= vd->nslices &&
-	    (vd->vdisk_type != VD_DISK_TYPE_DISK ||
+	    ((vd->vdisk_type != VD_DISK_TYPE_DISK && vd_slice_single_slice) ||
 	    request->slice != VD_SLICE_NONE)) {
 		PR0("Invalid \"slice\" %u (max %u) for virtual disk",
 		    request->slice, (vd->nslices - 1));
-		return (EINVAL);
+		request->status = EINVAL;
+		return (0);
 	}
 
 	/*
@@ -3577,7 +4152,8 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	attr_msg->max_xfer_sz		= vd->max_xfer_sz;
 
 	attr_msg->vdisk_size = vd->vdisk_size;
-	attr_msg->vdisk_type = vd->vdisk_type;
+	attr_msg->vdisk_type = (vd_slice_single_slice)? vd->vdisk_type :
+	    VD_DISK_TYPE_DISK;
 	attr_msg->vdisk_media = vd->vdisk_media;
 
 	/* Discover and save the list of supported VD_OP_XXX operations */
@@ -4450,21 +5026,6 @@ vds_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
-static boolean_t
-is_pseudo_device(dev_info_t *dip)
-{
-	dev_info_t	*parent, *root = ddi_root_node();
-
-
-	for (parent = ddi_get_parent(dip); (parent != NULL) && (parent != root);
-	    parent = ddi_get_parent(parent)) {
-		if (strcmp(ddi_get_name(parent), DEVI_PSEUDO_NEXNAME) == 0)
-			return (B_TRUE);
-	}
-
-	return (B_FALSE);
-}
-
 /*
  * Description:
  *	This function checks to see if the file being used as a
@@ -4690,43 +5251,45 @@ vd_setup_full_disk(vd_t *vd)
  *
  * So when exporting the disk as a VTOC disk, we fake a disk with the following
  * layout:
+ *                flabel +--- flabel_limit
+ *                 <->   V
+ *                 0 1   C                          D  E
+ *                 +-+---+--------------------------+--+
+ *  virtual disk:  |L|XXX|           slice 0        |AA|
+ *                 +-+---+--------------------------+--+
+ *                  ^    :                          :
+ *                  |    :                          :
+ *      VTOC LABEL--+    :                          :
+ *                       +--------------------------+
+ *  disk backend:        |     slice/volume/file    |
+ *                       +--------------------------+
+ *                       0                          N
  *
- *                 0 1                         N+1
- *                 +-+--------------------------+
- *  virtual disk:  |L|           slice 0        |
- *                 +-+--------------------------+
- *                  ^:                          :
- *                  |:                          :
- *      VTOC LABEL--+:                          :
- *                   +--------------------------+
- *  disk backend:    |       slice/volume       |
- *                   +--------------------------+
- *                   0                          N
+ * N is the number of blocks in the slice/volume/file.
  *
- * N is the number of blocks in the slice/volume.
+ * We simulate a disk with N+M blocks, where M is the number of blocks
+ * simluated at the beginning and at the end of the disk (blocks 0-C
+ * and D-E).
  *
- * We simulate a disk with N+1 blocks. The first block (block 0) is faked and
- * can not be changed. The remaining blocks (1 to N+1) defines slice 0 and are
- * mapped to the exported slice or volume:
+ * The first blocks (0 to C-1) are emulated and can not be changed. Blocks C
+ * to D defines slice 0 and are mapped to the backend. Finally we emulate 2
+ * alternate cylinders at the end of the disk (blocks D-E). In summary we have:
  *
- * - block 0 (L) can return a fake VTOC label if raw read was implemented.
- * - block 1 to N+1 is mapped to the exported slice or volume.
+ * - block 0 (L) returns a fake VTOC label
+ * - blocks 1 to C-1 (X) are unused and return 0
+ * - blocks C to D-1 are mapped to the exported slice or volume
+ * - blocks D and E (A) are blocks defining alternate cylinders (2 cylinders)
  *
+ * Note: because we define a fake disk geometry, it is possible that the length
+ * of the backend is not a multiple of the size of cylinder, in that case the
+ * very end of the backend will not map to any block of the virtual disk.
  */
 static int
 vd_setup_partition_vtoc(vd_t *vd)
 {
-	int rval, status;
 	char *device_path = vd->device_path;
-
-	status = ldi_ioctl(vd->ldi_handle[0], DKIOCGGEOM,
-	    (intptr_t)&vd->dk_geom, (vd->open_flags | FKIOCTL), kcred, &rval);
-
-	if (status != 0) {
-		PRN("ldi_ioctl(DKIOCGEOM) returned errno %d for %s",
-		    status, device_path);
-		return (status);
-	}
+	char unit;
+	size_t size, csize;
 
 	/* Initialize dk_geom structure for single-slice device */
 	if (vd->dk_geom.dkg_nsect == 0) {
@@ -4737,26 +5300,85 @@ vd_setup_partition_vtoc(vd_t *vd)
 		PRN("%s geometry claims 0 heads", device_path);
 		return (EIO);
 	}
-	vd->dk_geom.dkg_ncyl = (vd->vdisk_size + 1) / vd->dk_geom.dkg_nsect /
-	    vd->dk_geom.dkg_nhead;
-	vd->dk_geom.dkg_acyl = 0;
+
+	/* size of a cylinder in block */
+	csize = vd->dk_geom.dkg_nhead * vd->dk_geom.dkg_nsect;
+
+	/*
+	 * Add extra cylinders: we emulate the first cylinder (which contains
+	 * the disk label).
+	 */
+	vd->dk_geom.dkg_ncyl = vd->vdisk_size / csize + 1;
+
+	/* we emulate 2 alternate cylinders */
+	vd->dk_geom.dkg_acyl = 2;
 	vd->dk_geom.dkg_pcyl = vd->dk_geom.dkg_ncyl + vd->dk_geom.dkg_acyl;
 
 
 	/* Initialize vtoc structure for single-slice device */
-	bcopy(VD_VOLUME_NAME, vd->vtoc.v_volume,
-	    MIN(sizeof (VD_VOLUME_NAME), sizeof (vd->vtoc.v_volume)));
 	bzero(vd->vtoc.v_part, sizeof (vd->vtoc.v_part));
-	vd->vtoc.v_nparts = 1;
 	vd->vtoc.v_part[0].p_tag = V_UNASSIGNED;
 	vd->vtoc.v_part[0].p_flag = 0;
-	vd->vtoc.v_part[0].p_start = 1;
-	vd->vtoc.v_part[0].p_size = vd->vdisk_size;
-	bcopy(VD_ASCIILABEL, vd->vtoc.v_asciilabel,
-	    MIN(sizeof (VD_ASCIILABEL), sizeof (vd->vtoc.v_asciilabel)));
+	/*
+	 * Partition 0 starts on cylinder 1 and its size has to be
+	 * a multiple of a number of cylinder.
+	 */
+	vd->vtoc.v_part[0].p_start = csize; /* start on cylinder 1 */
+	vd->vtoc.v_part[0].p_size = (vd->vdisk_size / csize) * csize;
 
-	/* adjust the vdisk_size, we emulate the first block */
-	vd->vdisk_size += 1;
+	if (vd_slice_single_slice) {
+		vd->vtoc.v_nparts = 1;
+		bcopy(VD_ASCIILABEL, vd->vtoc.v_asciilabel,
+		    MIN(sizeof (VD_ASCIILABEL),
+		    sizeof (vd->vtoc.v_asciilabel)));
+		bcopy(VD_VOLUME_NAME, vd->vtoc.v_volume,
+		    MIN(sizeof (VD_VOLUME_NAME), sizeof (vd->vtoc.v_volume)));
+	} else {
+		/* adjust the number of slices */
+		vd->nslices = V_NUMPAR;
+		vd->vtoc.v_nparts = V_NUMPAR;
+
+		/* define slice 2 representing the entire disk */
+		vd->vtoc.v_part[VD_ENTIRE_DISK_SLICE].p_tag = V_BACKUP;
+		vd->vtoc.v_part[VD_ENTIRE_DISK_SLICE].p_flag = 0;
+		vd->vtoc.v_part[VD_ENTIRE_DISK_SLICE].p_start = 0;
+		vd->vtoc.v_part[VD_ENTIRE_DISK_SLICE].p_size =
+		    vd->dk_geom.dkg_ncyl * csize;
+
+		vd_get_readable_size(vd->vdisk_size * vd->vdisk_block_size,
+		    &size, &unit);
+
+		/*
+		 * Set some attributes of the geometry to what format(1m) uses
+		 * so that writing a default label using format(1m) does not
+		 * produce any error.
+		 */
+		vd->dk_geom.dkg_bcyl = 0;
+		vd->dk_geom.dkg_intrlv = 1;
+		vd->dk_geom.dkg_write_reinstruct = 0;
+		vd->dk_geom.dkg_read_reinstruct = 0;
+
+		/*
+		 * We must have a correct label name otherwise format(1m) will
+		 * not recognized the disk as labeled.
+		 */
+		(void) snprintf(vd->vtoc.v_asciilabel, LEN_DKL_ASCII,
+		    "SUN-DiskSlice-%ld%cB cyl %d alt %d hd %d sec %d",
+		    size, unit,
+		    vd->dk_geom.dkg_ncyl, vd->dk_geom.dkg_acyl,
+		    vd->dk_geom.dkg_nhead, vd->dk_geom.dkg_nsect);
+		bzero(vd->vtoc.v_volume, sizeof (vd->vtoc.v_volume));
+
+		/* create a fake label from the vtoc and geometry */
+		vd->flabel_limit = csize;
+		vd->flabel_size = VD_LABEL_VTOC_SIZE;
+		vd->flabel = kmem_zalloc(vd->flabel_size, KM_SLEEP);
+		vd_vtocgeom_to_label(&vd->vtoc, &vd->dk_geom,
+		    VD_LABEL_VTOC(vd));
+	}
+
+	/* adjust the vdisk_size, we emulate 3 cylinders */
+	vd->vdisk_size += csize * 3;
 
 	return (0);
 }
@@ -4769,30 +5391,42 @@ vd_setup_partition_vtoc(vd_t *vd)
  * So when exporting the disk as an EFI disk, we fake a disk with the following
  * layout:
  *
- *                 0 1 2 3      34                        34+N
- *                 +-+-+-+-------+--------------------------+
- *  virtual disk:  |X|T|E|XXXXXXX|           slice 0        |
- *                 +-+-+-+-------+--------------------------+
- *                    ^ ^        :                          :
- *                    | |        :                          :
- *                GPT-+ +-GPE    :                          :
- *                               +--------------------------+
- *  disk backend:                |     slice/volume/file    |
- *                               +--------------------------+
- *                               0                          N
+ *                  flabel        +--- flabel_limit
+ *                 <------>       v
+ *                 0 1 2  L      34                        34+N      P
+ *                 +-+-+--+-------+--------------------------+-------+
+ *  virtual disk:  |X|T|EE|XXXXXXX|           slice 0        |RRRRRRR|
+ *                 +-+-+--+-------+--------------------------+-------+
+ *                    ^ ^         :                          :
+ *                    | |         :                          :
+ *                GPT-+ +-GPE     :                          :
+ *                                +--------------------------+
+ *  disk backend:                 |     slice/volume/file    |
+ *                                +--------------------------+
+ *                                0                          N
  *
  * N is the number of blocks in the slice/volume/file.
  *
- * We simulate a disk with 34+N blocks. The first 34 blocks (0 to 33) are
- * emulated and can not be changed. The remaining blocks (34 to 34+N) defines
- * slice 0 and are mapped to the exported slice, volume or file:
+ * We simulate a disk with N+M blocks, where M is the number of blocks
+ * simluated at the beginning and at the end of the disk (blocks 0-34
+ * and 34+N-P).
  *
- * - block 0 (X) is unused and can return 0 if raw read was implemented.
+ * The first 34 blocks (0 to 33) are emulated and can not be changed. Blocks 34
+ * to 34+N defines slice 0 and are mapped to the exported backend, and we
+ * emulate some blocks at the end of the disk (blocks 34+N to P) as a the EFI
+ * reserved partition.
+ *
+ * - block 0 (X) is unused and return 0
  * - block 1 (T) returns a fake EFI GPT (via DKIOCGETEFI)
- * - block 2 (E) returns a fake EFI GPE (via DKIOCGETEFI)
- * - block 3 to 33 (X) are unused and return 0 if raw read is implemented.
- * - block 34 to 34+N is mapped to the exported slice, volume or file.
+ * - blocks 2 to L-1 (E) defines a fake EFI GPE (via DKIOCGETEFI)
+ * - blocks L to 33 (X) are unused and return 0
+ * - blocks 34 to 34+N are mapped to the exported slice, volume or file
+ * - blocks 34+N+1 to P define a fake reserved partition and backup label, it
+ *   returns 0
  *
+ * Note: if the backend size is not a multiple of the vdisk block size
+ * (DEV_BSIZE = 512 byte) then the very end of the backend will not map to
+ * any block of the virtual disk.
  */
 static int
 vd_setup_partition_efi(vd_t *vd)
@@ -4800,31 +5434,57 @@ vd_setup_partition_efi(vd_t *vd)
 	efi_gpt_t *gpt;
 	efi_gpe_t *gpe;
 	struct uuid uuid = EFI_USR;
+	struct uuid efi_reserved = EFI_RESERVED;
 	uint32_t crc;
+	uint64_t s0_start, s0_end;
 
-	gpt = &vd->efi_gpt;
-	gpe = &vd->efi_gpe;
-
-	bzero(gpt, sizeof (efi_gpt_t));
-	bzero(gpe, sizeof (efi_gpe_t));
+	vd->flabel_limit = 34;
+	vd->flabel_size = VD_LABEL_EFI_SIZE;
+	vd->flabel = kmem_zalloc(vd->flabel_size, KM_SLEEP);
+	gpt = VD_LABEL_EFI_GPT(vd);
+	gpe = VD_LABEL_EFI_GPE(vd);
 
 	/* adjust the vdisk_size, we emulate the first 34 blocks */
 	vd->vdisk_size += 34;
+	s0_start = 34;
+	s0_end = vd->vdisk_size - 1;
 
 	gpt->efi_gpt_Signature = LE_64(EFI_SIGNATURE);
 	gpt->efi_gpt_Revision = LE_32(EFI_VERSION_CURRENT);
 	gpt->efi_gpt_HeaderSize = LE_32(sizeof (efi_gpt_t));
 	gpt->efi_gpt_FirstUsableLBA = LE_64(34ULL);
-	gpt->efi_gpt_LastUsableLBA = LE_64(vd->vdisk_size - 1);
-	gpt->efi_gpt_NumberOfPartitionEntries = LE_32(1);
 	gpt->efi_gpt_PartitionEntryLBA = LE_64(2ULL);
 	gpt->efi_gpt_SizeOfPartitionEntry = LE_32(sizeof (efi_gpe_t));
 
-	UUID_LE_CONVERT(gpe->efi_gpe_PartitionTypeGUID, uuid);
-	gpe->efi_gpe_StartingLBA = gpt->efi_gpt_FirstUsableLBA;
-	gpe->efi_gpe_EndingLBA = gpt->efi_gpt_LastUsableLBA;
+	UUID_LE_CONVERT(gpe[0].efi_gpe_PartitionTypeGUID, uuid);
+	gpe[0].efi_gpe_StartingLBA = LE_64(s0_start);
+	gpe[0].efi_gpe_EndingLBA = LE_64(s0_end);
 
-	CRC32(crc, gpe, sizeof (efi_gpe_t), -1U, crc32_table);
+	if (vd_slice_single_slice) {
+		gpt->efi_gpt_NumberOfPartitionEntries = LE_32(1);
+	} else {
+		/* adjust the number of slices */
+		gpt->efi_gpt_NumberOfPartitionEntries = LE_32(VD_MAXPART);
+		vd->nslices = V_NUMPAR;
+
+		/* define a fake reserved partition */
+		UUID_LE_CONVERT(gpe[VD_MAXPART - 1].efi_gpe_PartitionTypeGUID,
+		    efi_reserved);
+		gpe[VD_MAXPART - 1].efi_gpe_StartingLBA =
+		    LE_64(s0_end + 1);
+		gpe[VD_MAXPART - 1].efi_gpe_EndingLBA =
+		    LE_64(s0_end + EFI_MIN_RESV_SIZE);
+
+		/* adjust the vdisk_size to include the reserved slice */
+		vd->vdisk_size += EFI_MIN_RESV_SIZE;
+	}
+
+	gpt->efi_gpt_LastUsableLBA = LE_64(vd->vdisk_size - 1);
+
+	/* adjust the vdisk size for the backup GPT and GPE */
+	vd->vdisk_size += 33;
+
+	CRC32(crc, gpe, sizeof (efi_gpe_t) * VD_MAXPART, -1U, crc32_table);
 	gpt->efi_gpt_PartitionEntryArrayCRC32 = LE_32(~crc);
 
 	CRC32(crc, gpt, sizeof (efi_gpt_t), -1U, crc32_table);
@@ -4849,6 +5509,7 @@ vd_setup_backend_vnode(vd_t *vd)
 	char		dev_path[MAXPATHLEN + 1];
 	ldi_handle_t	lhandle;
 	struct dk_cinfo	dk_cinfo;
+	struct dk_label label;
 
 	if ((status = vn_open(file_path, UIO_SYSSPACE, vd->open_flags | FOFFMAX,
 	    0, &vd->file_vnode, 0, 0)) != 0) {
@@ -4933,9 +5594,24 @@ vd_setup_backend_vnode(vd_t *vd)
 
 	if (vd->vdisk_type == VD_DISK_TYPE_SLICE) {
 		ASSERT(!vd->volume);
-		vd->vdisk_label = VD_DISK_LABEL_EFI;
-		status = vd_setup_partition_efi(vd);
-		return (0);
+		vd->vdisk_media = VD_MEDIA_FIXED;
+		vd->vdisk_label = (vd_slice_label == VD_DISK_LABEL_UNK)?
+		    vd_file_slice_label : vd_slice_label;
+		if (vd->vdisk_label == VD_DISK_LABEL_EFI ||
+		    vd->file_size >= ONE_TERABYTE) {
+			status = vd_setup_partition_efi(vd);
+		} else {
+			/*
+			 * We build a default label to get a geometry for
+			 * the vdisk. Then the partition setup function will
+			 * adjust the vtoc so that it defines a single-slice
+			 * disk.
+			 */
+			vd_build_default_label(vd->file_size, &label);
+			vd_label_to_vtocgeom(&label, &vd->vtoc, &vd->dk_geom);
+			status = vd_setup_partition_vtoc(vd);
+		}
+		return (status);
 	}
 
 	/*
@@ -5161,6 +5837,7 @@ static int
 vd_setup_single_slice_disk(vd_t *vd)
 {
 	int status, rval;
+	struct dk_label label;
 	char *device_path = vd->device_path;
 
 	/* Get size of backing device */
@@ -5189,25 +5866,48 @@ vd_setup_single_slice_disk(vd_t *vd)
 	 * care about any partitioning exposed by the backend. The goal is just
 	 * to export the backend as a flat storage. We provide a fake partition
 	 * table (either a VTOC or EFI), which presents only one slice, to
-	 * accommodate tools expecting a disk label.
-	 *
-	 * We check the label of the backend to export the device as a slice
-	 * using the same type of label (VTOC or EFI). If there is no label
-	 * then we create a fake EFI label.
-	 *
-	 * Note that the partition table we are creating could also be faked
-	 * by the client based on the size of the backend device.
+	 * accommodate tools expecting a disk label. The selection of the label
+	 * type (VTOC or EFI) depends on the value of the vd_slice_label
+	 * variable.
 	 */
-	status = ldi_ioctl(vd->ldi_handle[0], DKIOCGVTOC, (intptr_t)&vd->vtoc,
-	    (vd->open_flags | FKIOCTL), kcred, &rval);
+	if (vd_slice_label == VD_DISK_LABEL_EFI ||
+	    vd->vdisk_size >= ONE_TERABYTE / DEV_BSIZE) {
+		vd->vdisk_label = VD_DISK_LABEL_EFI;
+	} else {
+		status = ldi_ioctl(vd->ldi_handle[0], DKIOCGVTOC,
+		    (intptr_t)&vd->vtoc, (vd->open_flags | FKIOCTL),
+		    kcred, &rval);
 
-	if (status == 0) {
+		if (status == 0) {
+			status = ldi_ioctl(vd->ldi_handle[0], DKIOCGGEOM,
+			    (intptr_t)&vd->dk_geom, (vd->open_flags | FKIOCTL),
+			    kcred, &rval);
+
+			if (status != 0) {
+				PRN("ldi_ioctl(DKIOCGEOM) returned errno %d "
+				    "for %s", status, device_path);
+				return (status);
+			}
+			vd->vdisk_label = VD_DISK_LABEL_VTOC;
+
+		} else if (vd_slice_label == VD_DISK_LABEL_VTOC) {
+
+			vd->vdisk_label = VD_DISK_LABEL_VTOC;
+			vd_build_default_label(vd->vdisk_size * DEV_BSIZE,
+			    &label);
+			vd_label_to_vtocgeom(&label, &vd->vtoc, &vd->dk_geom);
+
+		} else {
+			vd->vdisk_label = VD_DISK_LABEL_EFI;
+		}
+	}
+
+	if (vd->vdisk_label == VD_DISK_LABEL_VTOC) {
 		/* export with a fake VTOC label */
-		vd->vdisk_label = VD_DISK_LABEL_VTOC;
 		status = vd_setup_partition_vtoc(vd);
+
 	} else {
 		/* export with a fake EFI label */
-		vd->vdisk_label = VD_DISK_LABEL_EFI;
 		status = vd_setup_partition_efi(vd);
 	}
 
@@ -5669,13 +6369,20 @@ vds_destroy_vd(void *arg)
 			ddi_devid_free(vd->file_devid);
 	} else {
 		/* Close any open backing-device slices */
-		for (uint_t slice = 0; slice < vd->nslices; slice++) {
+		for (uint_t slice = 0; slice < V_NUMPAR; slice++) {
 			if (vd->ldi_handle[slice] != NULL) {
 				PR0("Closing slice %u", slice);
 				(void) ldi_close(vd->ldi_handle[slice],
 				    vd->open_flags, kcred);
 			}
 		}
+	}
+
+	/* Free any fake label */
+	if (vd->flabel) {
+		kmem_free(vd->flabel, vd->flabel_size);
+		vd->flabel = NULL;
+		vd->flabel_size = 0;
 	}
 
 	/* Free lock */
