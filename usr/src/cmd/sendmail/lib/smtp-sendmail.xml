@@ -159,7 +159,7 @@
 			<propval name='include_info'
 				type='boolean' value='false' />
 			<propval name='local_only'
-				type='boolean' value='false' />
+				type='boolean' value='true' />
 			<propval name='path_to_sendmail_mc'
 				type='astring' value='' />
 			<propval name='path_to_submit_mc'
