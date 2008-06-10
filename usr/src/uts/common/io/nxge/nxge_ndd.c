@@ -142,6 +142,8 @@ static void nxge_param_sync(p_nxge_t);
  * exported to ndd to display and run-time configuration (at least
  * some of them).
  *
+ * Parameters with DONT_SHOW are not shown by ndd.
+ *
  */
 
 static nxge_param_t	nxge_param_arr[] = {
@@ -927,6 +929,16 @@ nxge_param_get_port_mode(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	case PORT_HSP_MODE:
 		(void) mi_mpprintf(mp, "Port mode for nxge%d:  Hot Swappable "
 		    "PHY, Currently NOT present\n", nxgep->instance);
+		break;
+	case PORT_10G_TN1010:
+		(void) mi_mpprintf(mp, "Port mode for nxge%d:"
+		    " 10G Copper with TN1010 %s\n", nxgep->instance,
+		    nxgep->hot_swappable_phy ? "[Hot Swappable]" : "");
+		break;
+	case PORT_1G_TN1010:
+		 (void) mi_mpprintf(mp, "Port mode for nxge%d:"
+		    " 1G Copper with TN1010 %s\n", nxgep->instance,
+		    nxgep->hot_swappable_phy ? "[Hot Swappable]" : "");
 		break;
 	default:
 		(void) mi_mpprintf(mp, "Port mode for nxge%d:  Unknown %s\n",

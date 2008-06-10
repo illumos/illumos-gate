@@ -35,6 +35,10 @@ extern "C" {
 
 #include <nxge_defs.h>
 
+/*
+ * Clause 45 and Clause 22 port/phy addresses 0 through 7 are reserved
+ * for on-chip serdes. So here the starting port is 8.
+ */
 #define	NXGE_MAX_PHY_PORTS		32
 #define	NXGE_EXT_PHY_PORT_ST		8
 
@@ -50,7 +54,7 @@ extern "C" {
 #define	MRVL88X201X_CHIP_ID		0x5043
 
 /*
- * The BCM_PHY_ID_MASK is explained below:
+ * Description of BCM_PHY_ID_MASK:
  * The first nibble (bits 0 through 3) is changed with every revision
  * of the silicon. So these bits are masked out to support future revisions
  * of the same chip. The third nibble (bits 8 through 11) is changed for
@@ -67,28 +71,43 @@ extern "C" {
 #define	PHY_BCM8704_FAMILY		(BCM8704_DEV_ID & BCM_PHY_ID_MASK)
 #define	PHY_BCM5464R_FAMILY		(BCM5464R_PHY_ID & BCM_PHY_ID_MASK)
 #define	PHY_BCM5482_FAMILY		(BCM5482_PHY_ID & BCM_PHY_ID_MASK)
+/*
+ * The default value is 0xa19410, after masking out model and revision
+ * (bits[9:0]) use 0xa19400 for any model or revision of the TN1010
+ */
+#define	TN1010_DEV_ID			0xa19400
+/*
+ * Description of TN1010_DEV_ID_MASK:
+ * The device ID assigned to Teranetics is stored in TN1010 register
+ * 1.2 and register 1.3 except bits[9:4] of register 1.3 for model number
+ * and bits[3:0] of register 1.3 for revision numbers. Use mask 0xfffffc00
+ * to mask off model number and revision number and keep TN1010's device
+ * identifier
+ */
+#define	TN1010_DEV_ID_MASK		0xfffffc00
 
 #define	CLAUSE_45_TYPE	1
 #define	CLAUSE_22_TYPE	2
 
-#define	BCM5464_NEPTUNE_PORT_ADDR_BASE		10
-#define	BCM8704_NEPTUNE_PORT_ADDR_BASE		8
-#define	BCM8704_N2_PORT_ADDR_BASE		16
+/* IEEE802.3 Clause45 and Clause22 MDIO port addresses */
+#define	NEPTUNE_CLAUSE22_PORT_ADDR_BASE		10
+#define	NEPTUNE_CLAUSE45_PORT_ADDR_BASE		8
+#define	N2_CLAUSE45_PORT_ADDR_BASE		16
 #define	MRVL88X2011_NEPTUNE_PORT_ADDR_BASE	8
 
 /*
  * Phy address for the second NIU port on Goa NEM card can be either
  * 20 or 17
  */
-#define	BCM8706_GOA_PORT_ADDR_BASE		16
-#define	BCM8706_ALT_GOA_PORT1_ADDR		20
+#define	GOA_CLAUSE45_PORT_ADDR_BASE		16
+#define	ALT_GOA_CLAUSE45_PORT1_ADDR		20
 /*
  * Phy addresses for Maramba support. Support for P0 will eventually
  * be removed.
  */
-#define	BCM5464_MARAMBA_P0_PORT_ADDR_BASE	10
-#define	BCM5464_MARAMBA_P1_PORT_ADDR_BASE	26
-#define	BCM8704_MARAMBA_PORT_ADDR_BASE		16
+#define	MARAMBA_P0_CLAUSE22_PORT_ADDR_BASE	10
+#define	MARAMBA_P1_CLAUSE22_PORT_ADDR_BASE	26
+#define	MARAMBA_CLAUSE45_PORT_ADDR_BASE		16
 
 #define	BCM8704_PMA_PMD_DEV_ADDR		1
 #define	BCM8704_PCS_DEV_ADDR			3
@@ -652,9 +671,6 @@ typedef	union _pmd_tx_control {
 
 /* PMD/Optics Digital Control Register (Dev=3 Addr=0xc808) */
 
-
-/* PMD/Optics Digital Control Register (Dev=3 Addr=0xc808) */
-
 typedef	union _optics_dcntr {
 	uint16_t value;
 	struct {
@@ -714,6 +730,162 @@ typedef	union _optics_dcntr {
 #define	XGXS_LANE1_SYNC			0x0002
 #define	XGXS_LANE0_SYNC			0x0001
 #define	XGXS_LANE_STAT_MAGIC		0x0400
+
+
+/* Teranetics TN1010 Definitions */
+
+/* Teranetics TN1010 PHY MMD Addresses */
+#define	TN1010_PMA_PMD_DEV_ADDR		1
+#define	TN1010_PCS_DEV_ADDR		3
+#define	TN1010_PHYXS_DEV_ADDR		4
+#define	TN1010_AUTONEG_DEV_ADDR		7
+#define	TN1010_VENDOR_MMD1_DEV_ADDR	30
+
+/* TN1010 PCS Control Register */
+typedef union _tn1010_pcs_ctrl {
+	uint16_t value;
+	struct {
+#ifdef _BIT_FIELDS_HTOL
+		uint16_t reset			: 1;    /* bit 15 */
+		uint16_t loopback		: 1;	/* bit 14 */
+		uint16_t speed_sel2		: 1;
+		uint16_t res2			: 1;
+		uint16_t low_power		: 1;
+		uint16_t res1			: 4;
+		uint16_t speed_sel1		: 1;    /* bit 6 */
+		uint16_t speed_sel0		: 4;    /* bits[5:2] */
+		uint16_t res0			: 2;
+#else
+		uint16_t res0			: 2;
+		uint16_t speed_sel0		: 4;    /* bits[5:2] */
+		uint16_t speed_sel1		: 1;    /* bit 6 */
+		uint16_t res1			: 4;
+		uint16_t low_power		: 1;
+		uint16_t res2			: 1;
+		uint16_t speed_sel2		: 1;
+		uint16_t loopback		: 1;	/* bit 14 */
+		uint16_t reset			: 1;    /* bit 15 */
+#endif
+	} bits;
+} tn1010_phyxs_ctrl_t, *p_tn1010_phyxs_ctrl_t;
+
+/* TN1010 PHY XS Control Register */
+typedef union _tn1010_phyxs_ctrl {
+	uint16_t value;
+	struct {
+#ifdef _BIT_FIELDS_HTOL
+		uint16_t reset			: 1;    /* bit 15 */
+		uint16_t loopback		: 1;	/* bit 14 */
+		uint16_t speed_sel2		: 1;
+		uint16_t res2			: 1;
+		uint16_t low_power		: 1;
+		uint16_t res1			: 4;
+		uint16_t speed_sel1		: 1;    /* bit 6 */
+		uint16_t speed_sel0		: 4;    /* bits[5:2] */
+		uint16_t res0			: 2;
+#else
+		uint16_t res0			: 2;
+		uint16_t speed_sel0		: 4;    /* bits[5:2] */
+		uint16_t speed_sel1		: 1;    /* bit 6 */
+		uint16_t res1			: 4;
+		uint16_t low_power		: 1;
+		uint16_t res2			: 1;
+		uint16_t speed_sel2		: 1;
+		uint16_t loopback		: 1;	/* bit 14 */
+		uint16_t reset			: 1;    /* bit 15 */
+#endif
+	} bits;
+} tn1010_pcs_ctrl_t, *p_tn1010_pcs_ctrl_t;
+
+/* TN1010 VENDOR MMD1 GPHY Control register 30.310 */
+#define	TN1010_SGMII_LOOPBACK			1
+#define	TN1010_DEEP_LOOPBACK			2
+
+#define	TN1010_PMD_CONTROL_REG			0
+#define	TN1010_PMD_STATUS_REG			1
+#define	TN1010_PMD_ID_HIGH_REG			2
+#define	TN1010_PMD_ID_LOW_REG			3
+#define	TN1010_PMD_SPEED_ABIL_REG		4
+#define	TN1010_PMD_DEV_IN_PKG1_REG		5
+#define	TN1010_PMD_DEV_IN_PKG2_REG		6
+#define	TN1010_PMD_CONTROL2_REG			7
+#define	TN1010_PMD_STATUS2_REG			8
+#define	TN1010_PMD_TRANSMIT_DIS_REG		9
+#define	TN1010_PMD_RECEIVE_SIG_DETECT		10
+#define	TN1010_PMD_ORG_UNIQUE_ID_0_REG		14
+#define	TN1010_PMD_ORG_UNIQUE_ID_1_REG		15
+#define	TN1010_PCS_CONTROL_REG			0
+#define	TN1010_PCS_STATUS1_REG			1
+#define	TN1010_PCS_ID_HIGH_REG			2
+#define	TN1010_PCS_ID_LOW_REG			3
+#define	TN1010_PCS_SPEED_ABILITY_REG		4
+#define	TN1010_PCS_DEV_IN_PKG1_REG		5
+#define	TN1010_PCS_DEV_IN_PKG2_REG		6
+#define	TN1010_PCS_CONTROL2_REG			7
+#define	TN1010_PCS_STATUS2_REG			8
+#define	TN1010_PCS_ORG_UNIQUE_ID_0_REG		14
+#define	TN1010_PCS_ORG_UNIQUE_ID_1_REG		15
+#define	TN1010_PCS_10GBASE_R_T_STATUS1_REG	32
+#define	TN1010_PCS_10GBASE_R_T_STATUS2_REG	33
+#define	TN1010_PHYXS_CONTROL_REG		0
+#define	TN1010_PHYXS_STATUS_REG			1
+#define	TN1010_PHY_ID_HIGH_REG			2
+#define	TN1010_PHY_ID_LOW_REG			3
+#define	TN1010_PHYXS_SPEED_ABILITY_REG		4
+#define	TN1010_PHYXS_DEV_IN_PKG2_REG		5
+#define	TN1010_PHYXS_DEV_IN_PKG1_REG		6
+#define	TN1010_PHYXS_STATUS2_REG		8
+#define	TN1010_PHYXS_ORG_UNIQUE_ID_0_REG	14
+#define	TN1010_PHYXS_ORG_UNIQUE_ID_1_REG	15
+#define	TN1010_PHYXS_XGXS_LANE_STATUS_REG	24
+#define	TN1010_PHYXS_XGXS_TEST_CONTROL_REG	25
+
+#define	TN1010_AUTONEG_CONTROL_REG		0
+#define	TN1010_AUTONEG_STATUS_REG		1
+#define	TN1010_AUTONEG_ID_HIGH_REG		2
+#define	TN1010_AUTONEG_ID_LOW_REG		3
+#define	TN1010_AUTONEG_DEV_IN_PKG1_REG		5
+#define	TN1010_AUTUNEG_DEV_IN_PKG2_REG		6
+#define	TN1010_AUTONEG_ORG_UNIQUE_ID_0_REG	14
+#define	TN1010_AUTONEG_ORG_UNIQUE_ID_1_REG	15
+#define	TN1010_AUTONEG_ADVERTISE_REG		16
+#define	TN1010_AUTONEG_PARTNER_ABILITY_REG	19
+
+#define	TN1010_VENDOR_MMD1_CONTROL_REG		0
+#define	TN1010_VENDOR_MMD1_STATUS_REG		1
+#define	TN1010_VENDOR_MMD1_ID_HIGH		2
+#define	TN1010_VENDOR_MMD1_ID_LOW		3
+#define	TN1010_VENDOR_MMD1_DEV_STATUS_REG	8
+#define	TN1010_VENDOR_MMD1_FNS_CONTROL_RER	9
+#define	TN1010_VENDOR_MMD1_PKG_ID_0_REG		14
+#define	TN1010_VENDOR_MMD1_PKG_ID_1_REG		15
+#define	TN1010_VENDOR_MMD1_GPHY_CTRL		310
+
+/* Bits definitions of TN1010_AUTONEG_CONTROL_REG */
+#define	TN1010_AN_CTRL_RESET_BIT	0x8000	/* Reset */
+#define	TN1010_AN_CTRL_EN_BIT		0x1000	/* Enable autoneg */
+#define	TN1010_AN_CTRL_RESTART_BIT	0x200	/* Restart autoneg */
+#define	TN1010_AN_LINK_STAT_BIT		0x4	/* Link status */
+
+/* Bits definitions of TN1010_PHYXS_CONTROL_REG	*/
+#define	TN1010_VENDOR_MMD1_AN_STAT_BITS		0xC0
+
+/*
+ * Shift right 6 bits so bits[7:6] becomes [1:0].
+ * Bits[7:6] of TN1010_VENDOR_MND1_STATUS_REG are for autoneg status
+ * 00 in progress
+ * 01 completed
+ * 10 reserved
+ * 11 failed
+ */
+#define	TN1010_VENDOR_MMD1_AN_STAT_SHIFT	6
+
+/* Bit 4 of TN1010_VENDOR_MMD1_STATUS_REG is speed. 0: 10G, 1: 1G */
+#define	TN1010_VENDOR_MMD1_AN_SPEED_BIT		0x10
+
+/* Shift right 4 bits so bit4 becomes bit0 */
+#define	TN1010_VENDOR_MMD1_AN_SPEED_SHIFT	4
+
 
 #ifdef	__cplusplus
 }

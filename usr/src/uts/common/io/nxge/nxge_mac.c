@@ -35,6 +35,13 @@
 #define	SERDES_RDY_WT_INTERVAL	50
 #define	MAX_SERDES_RDY_RETRIES	10
 
+#define	TN1010_SPEED_1G		1
+#define	TN1010_SPEED_10G	0
+#define	TN1010_AN_IN_PROG	0	/* Auto negotiation in progress */
+#define	TN1010_AN_COMPLETE	1
+#define	TN1010_AN_RSVD		2
+#define	TN1010_AN_FAILED	3
+
 extern uint32_t nxge_no_link_notify;
 extern boolean_t nxge_no_msg;
 extern uint32_t nxge_lb_dbg;
@@ -70,7 +77,8 @@ static ether_addr_st etherzeroaddr =
 static uint32_t nxge_supported_cl45_ids[] = {
 	BCM8704_DEV_ID,
 	MARVELL_88X_201X_DEV_ID,
-	BCM8706_DEV_ID
+	BCM8706_DEV_ID,
+	TN1010_DEV_ID
 };
 
 static uint32_t nxge_supported_cl22_ids[] = {BCM5464R_PHY_ID};
@@ -103,13 +111,36 @@ static nxge_status_t nxge_BCM8704_xcvr_init(p_nxge_t);
 static nxge_status_t nxge_BCM8706_xcvr_init(p_nxge_t);
 static nxge_status_t nxge_1G_xcvr_init(p_nxge_t);
 static void nxge_bcm5464_link_led_off(p_nxge_t);
-static nxge_status_t nxge_mrvl88x2011_link(p_nxge_t, boolean_t *);
+static nxge_status_t nxge_check_mrvl88x2011_link(p_nxge_t, boolean_t *);
 static nxge_status_t nxge_mrvl88x2011_xcvr_init(p_nxge_t);
+static nxge_status_t nxge_get_num_of_xaui(uint32_t *port_pma_pmd_dev_id,
+	uint32_t *port_pcs_dev_id, uint32_t *port_phy_id, uint8_t *num_xaui);
+static nxge_status_t nxge_get_tn1010_speed(p_nxge_t nxgep, uint16_t *speed);
+static nxge_status_t nxge_set_tn1010_param(p_nxge_t nxgep);
+static nxge_status_t nxge_tn1010_check(p_nxge_t nxgep,
+	nxge_link_state_t *link_up);
+static boolean_t nxge_is_tn1010_phy(p_nxge_t nxgep);
+static nxge_status_t nxge_tn1010_xcvr_init(p_nxge_t nxgep);
+
+nxge_status_t nxge_mac_init(p_nxge_t);
+static nxge_status_t nxge_mii_get_link_mode(p_nxge_t);
+
+#ifdef NXGE_DEBUG
+static void nxge_mii_dump(p_nxge_t);
+static nxge_status_t nxge_tn1010_reset(p_nxge_t nxgep);
+static void nxge_dump_tn1010_status_regs(p_nxge_t nxgep);
+#endif
 
 /*
  * xcvr tables for supported transceivers
  */
 
+/*
+ * nxge_n2_10G_table is for 10G fiber or serdes on N2-NIU systems.
+ * The Teranetics TN1010 based copper XAUI card can also be used
+ * on N2-NIU systems in 10G mode, but it uses its own table
+ * nxge_n2_10G_tn1010_table below.
+ */
 static nxge_xcvr_table_t nxge_n2_10G_table = {
 	nxge_n2_serdes_init,
 	nxge_10G_xcvr_init,
@@ -119,12 +150,51 @@ static nxge_xcvr_table_t nxge_n2_10G_table = {
 	PCS_XCVR
 };
 
+/*
+ * For the Teranetics TN1010 based copper XAUI card
+ */
+static nxge_xcvr_table_t nxge_n2_10G_tn1010_table = {
+	nxge_n2_serdes_init,		/* Handle both 1G and 10G */
+	nxge_tn1010_xcvr_init,		/* Handle both 1G and 10G */
+	nxge_10G_link_intr_stop,
+	nxge_10G_link_intr_start,
+	nxge_check_tn1010_link,		/* Will figure out speed */
+	XPCS_XCVR
+};
+
 static nxge_xcvr_table_t nxge_n2_1G_table = {
 	nxge_n2_serdes_init,
 	nxge_1G_xcvr_init,
 	nxge_1G_fiber_link_intr_stop,
 	nxge_1G_fiber_link_intr_start,
 	nxge_check_mii_link,
+	PCS_XCVR
+};
+
+static nxge_xcvr_table_t nxge_n2_1G_tn1010_table = {
+	nxge_n2_serdes_init,
+	nxge_tn1010_xcvr_init,
+	nxge_1G_fiber_link_intr_stop,	/* TN1010 is a Cu PHY, but it uses */
+	nxge_1G_fiber_link_intr_start,	/* PCS for 1G, so call fiber func */
+	nxge_check_tn1010_link,
+	PCS_XCVR
+};
+
+static nxge_xcvr_table_t nxge_10G_tn1010_table = {
+	nxge_neptune_10G_serdes_init,
+	nxge_tn1010_xcvr_init,
+	nxge_10G_link_intr_stop,
+	nxge_10G_link_intr_start,
+	nxge_check_tn1010_link,
+	XPCS_XCVR
+};
+
+static nxge_xcvr_table_t nxge_1G_tn1010_table = {
+	nxge_1G_serdes_init,
+	nxge_tn1010_xcvr_init,
+	nxge_1G_fiber_link_intr_stop,
+	nxge_1G_fiber_link_intr_start,
+	nxge_check_tn1010_link,
 	PCS_XCVR
 };
 
@@ -146,6 +216,7 @@ static nxge_xcvr_table_t nxge_1G_copper_table = {
 	INT_MII_XCVR
 };
 
+/* This table is for Neptune portmode == PORT_1G_SERDES cases */
 static nxge_xcvr_table_t nxge_1G_fiber_table = {
 	nxge_1G_serdes_init,
 	nxge_1G_xcvr_init,
@@ -164,19 +235,50 @@ static nxge_xcvr_table_t nxge_10G_copper_table = {
 	PCS_XCVR
 };
 
-nxge_status_t nxge_mac_init(p_nxge_t);
+/*
+ * NXGE_PORT_TN1010 is defined as,
+ *      NXGE_PORT_SPD_NONE | (NXGE_PHY_TN1010 << NXGE_PHY_SHIFT)
+ *	= 0 | 5 << 16 = 0x50000
+ *
+ * So NEPTUNE_2_TN1010 =
+ *      (NXGE_PORT_TN1010 |
+ *      (NXGE_PORT_TN1010 << 4) |
+ *      (NXGE_PORT_NONE << 8) |
+ *      (NXGE_PORT_NONE << 12)),
+ *      = 0x50000 | (0x50000 << 4)
+ *	= 0x550000
+ *
+ * This function partitions nxgep->nxge_hw_p->niu_type (which may have
+ * value NEPTUNE_2_TN1010) and checks if a port has type = NXGE_PORT_TN1010
+ * = 0x50000
+ */
+static boolean_t nxge_is_tn1010_phy(p_nxge_t nxgep)
+{
+	uint8_t	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
 
-#ifdef NXGE_DEBUG
-static void nxge_mii_dump(p_nxge_t);
-#endif
-static nxge_status_t nxge_mii_get_link_mode(p_nxge_t);
+	if (((nxgep->nxge_hw_p->niu_type >> (NXGE_PORT_TYPE_SHIFT * portn))
+	    & NXGE_PHY_MASK) == NXGE_PORT_TN1010) {
+		return (B_TRUE);
+	} else {
+		return (B_FALSE);
+	}
+}
 
+
+/*
+ * Figure out nxgep->mac.portmode from nxge.conf, OBP's device properties,
+ * serial EEPROM or VPD if possible.  Note that not all systems could get
+ * the portmode information by calling this function.  For example, the
+ * Maramba system figures out the portmode information by calling function
+ * nxge_setup_xcvr_table.
+ */
 nxge_status_t
 nxge_get_xcvr_type(p_nxge_t nxgep)
 {
 	nxge_status_t status = NXGE_OK;
 	char *phy_type;
 	char *prop_val;
+	uint8_t portn = NXGE_GET_PORT_NUM(nxgep->function_num);
 
 	nxgep->mac.portmode = 0;
 	nxgep->xcvr_addr = 0;
@@ -206,9 +308,6 @@ nxge_get_xcvr_type(p_nxge_t nxgep)
 	 * MDIO polling support for Monza RTM card, Goa NEM card
 	 */
 	if (nxgep->mac.portmode == PORT_HSP_MODE) {
-
-		uint8_t portn = NXGE_GET_PORT_NUM(nxgep->function_num);
-
 		nxgep->hot_swappable_phy = B_TRUE;
 		/*
 		 * If this is the 2nd NIU port, then check 2 addresses
@@ -217,17 +316,17 @@ nxge_get_xcvr_type(p_nxge_t nxgep)
 		 */
 		if (portn == 1) {
 			if (nxge_is_phy_present(nxgep,
-			    BCM8706_ALT_GOA_PORT1_ADDR, BCM8706_DEV_ID,
+			    ALT_GOA_CLAUSE45_PORT1_ADDR, BCM8706_DEV_ID,
 			    BCM_PHY_ID_MASK)) {
 				nxgep->xcvr_addr =
-				    BCM8706_ALT_GOA_PORT1_ADDR;
+				    ALT_GOA_CLAUSE45_PORT1_ADDR;
 				goto found_phy;
 			}
 		}
 		if (nxge_is_phy_present(nxgep,
-		    BCM8706_GOA_PORT_ADDR_BASE + portn,
+		    GOA_CLAUSE45_PORT_ADDR_BASE + portn,
 		    BCM8706_DEV_ID, BCM_PHY_ID_MASK)) {
-			nxgep->xcvr_addr = BCM8706_GOA_PORT_ADDR_BASE +
+			nxgep->xcvr_addr = GOA_CLAUSE45_PORT_ADDR_BASE +
 			    portn;
 			goto found_phy;
 		}
@@ -244,7 +343,7 @@ check_phy_done:
 		return (status);
 	}
 
-	/* Get phy-type property from the driver conf. file */
+	/* Get phy-type property (May have been set by nxge.conf) */
 	if ((ddi_prop_lookup_string(DDI_DEV_T_ANY, nxgep->dip,
 	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    "phy-type", &prop_val)) == DDI_PROP_SUCCESS) {
@@ -268,9 +367,30 @@ check_phy_done:
 			nxgep->mac.portmode = PORT_1G_FIBER;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "1G FIBER Xcvr"));
 		} else if (strcmp("xgf", prop_val) == 0) {
-			nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
-			nxgep->mac.portmode = PORT_10G_FIBER;
-			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "10G FIBER Xcvr"));
+			/*
+			 * Before OBP supports new phy-type property
+			 * value "xgc", the 10G copper XAUI may carry
+			 * "xgf" instead of "xgc". If the OBP is
+			 * upgraded to a newer version which supports
+			 * "xgc", then the TN1010 related code in this
+			 * "xgf" case will not be used anymore.
+			 */
+			if (nxge_is_tn1010_phy(nxgep)) {
+				if ((status = nxge_set_tn1010_param(nxgep))
+				    != NXGE_OK) {
+					return (status);
+				}
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL, "TN1010 Xcvr"));
+			} else {  /* For Fiber XAUI */
+				nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
+				nxgep->mac.portmode = PORT_10G_FIBER;
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "10G Fiber Xcvr"));
+			}
+		} else if (strcmp("xgc", prop_val) == 0) {
+			if ((status = nxge_set_tn1010_param(nxgep)) != NXGE_OK)
+				return (status);
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "TN1010 Xcvr"));
 		}
 
 		(void) ddi_prop_update_string(DDI_DEV_T_NONE, nxgep->dip,
@@ -289,11 +409,29 @@ check_phy_done:
 		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, nxgep->dip, 0,
 		    "phy-type", &prop_val) == DDI_PROP_SUCCESS) {
 			if (strcmp("xgf", prop_val) == 0) {
-				nxgep->statsp->mac_stats.xcvr_inuse =
-				    XPCS_XCVR;
-				nxgep->mac.portmode = PORT_10G_FIBER;
-				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-				    "10G Fiber Xcvr"));
+				/*
+				 * Before OBP supports new phy-type property
+				 * value "xgc", the 10G copper XAUI may carry
+				 * "xgf" instead of "xgc". If the OBP is
+				 * upgraded to a newer version which supports
+				 * "xgc", then the TN1010 related code in this
+				 * "xgf" case will not be used anymore.
+				 */
+				if (nxge_is_tn1010_phy(nxgep)) {
+					if ((status =
+					    nxge_set_tn1010_param(nxgep))
+					    != NXGE_OK) {
+						return (status);
+					}
+					NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+					    "TN1010 Xcvr"));
+				} else {  /* For Fiber XAUI */
+					nxgep->statsp->mac_stats.xcvr_inuse
+					    = XPCS_XCVR;
+					nxgep->mac.portmode = PORT_10G_FIBER;
+					NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+					    "10G Fiber Xcvr"));
+				}
 			} else if (strcmp("mif", prop_val) == 0) {
 				nxgep->statsp->mac_stats.xcvr_inuse =
 				    INT_MII_XCVR;
@@ -306,11 +444,10 @@ check_phy_done:
 				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 				    "1G Fiber Xcvr"));
 			} else if (strcmp("xgc", prop_val) == 0) {
-				nxgep->statsp->mac_stats.xcvr_inuse =
-				    XPCS_XCVR;
-				nxgep->mac.portmode = PORT_10G_COPPER;
-				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-				    "10G Copper Xcvr"));
+				status = nxge_set_tn1010_param(nxgep);
+				if (status != NXGE_OK)
+					return (status);
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL, "TN1010 Xcvr"));
 			} else if (strcmp("xgsd", prop_val) == 0) {
 				nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
 				nxgep->mac.portmode = PORT_10G_SERDES;
@@ -371,8 +508,12 @@ check_phy_done:
 		nxgep->mac.portmode = PORT_1G_FIBER;
 		nxgep->statsp->mac_stats.xcvr_inuse = PCS_XCVR;
 	} else if (strncmp(phy_type, "xgc", 3) == 0) {
-		nxgep->mac.portmode = PORT_10G_COPPER;
-		nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
+		status = nxge_set_tn1010_param(nxgep);
+		if (status != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_get_xcvr_type: Failed to set TN1010 param"));
+			goto read_seeprom;
+		}
 	} else if (strncmp(phy_type, "xgsd", 4) == 0) {
 		nxgep->mac.portmode = PORT_10G_SERDES;
 		nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
@@ -446,6 +587,18 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 			    (nxgep->mac.portmode == PORT_10G_FIBER) ? "Fiber" :
 			    "Serdes"));
 			break;
+		case PORT_1G_TN1010:
+			nxgep->xcvr = nxge_n2_1G_tn1010_table;
+			nxgep->xcvr_addr = nxgep->nxge_hw_p->xcvr_addr[portn];
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "TN1010 Copper Xcvr in 1G"));
+			break;
+		case PORT_10G_TN1010:
+			nxgep->xcvr = nxge_n2_10G_tn1010_table;
+			nxgep->xcvr_addr = nxgep->nxge_hw_p->xcvr_addr[portn];
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "TN1010 Copper Xcvr in 10G"));
+			break;
 		case PORT_HSP_MODE:
 			nxgep->xcvr = nxge_n2_10G_table;
 			nxgep->xcvr.xcvr_inuse = HSP_XCVR;
@@ -498,8 +651,26 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 			case NXGE_PORT_10G_SERDES:
 				nxgep->mac.portmode = PORT_10G_SERDES;
 				break;
+			/* Ports 2 and 3 of Alonso or ARTM */
 			case NXGE_PORT_1G_RGMII_FIBER:
 				nxgep->mac.portmode = PORT_1G_RGMII_FIBER;
+				break;
+			case NXGE_PORT_TN1010:
+				/*
+				 * If this port uses the TN1010 copper
+				 * PHY, then its speed is not known yet
+				 * because nxge_scan_ports_phy could only
+				 * figure out the vendor of the PHY but
+				 * not its speed. nxge_set_tn1010_param
+				 * will read the PHY speed and set
+				 * portmode accordingly.
+				 */
+				if ((status = nxge_set_tn1010_param(nxgep))
+				    != NXGE_OK) {
+					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+					    "nxge_set_tn1010_param failed"));
+					return (status);
+				}
 				break;
 			default:
 				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -509,6 +680,11 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 			}
 		}
 
+		/*
+		 * Above switch has figured out nxge->mac.portmode, now set
+		 * nxgep->xcvr (the table) and nxgep->xcvr_addr according
+		 * to portmode.
+		 */
 		switch (nxgep->mac.portmode) {
 		case PORT_1G_COPPER:
 		case PORT_1G_RGMII_FIBER:
@@ -551,10 +727,26 @@ nxge_setup_xcvr_table(p_nxge_t nxgep)
 			    (nxgep->mac.portmode == PORT_1G_COPPER) ?
 			    "Copper" : "RGMII Fiber"));
 			break;
+
 		case PORT_10G_COPPER:
 			nxgep->xcvr = nxge_10G_copper_table;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "10G Copper Xcvr"));
 			break;
+
+		case PORT_1G_TN1010:
+			nxgep->xcvr = nxge_1G_tn1010_table;
+			nxgep->xcvr_addr = nxgep->nxge_hw_p->xcvr_addr[portn];
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "1G TN1010 copper Xcvr"));
+			break;
+
+		case PORT_10G_TN1010:
+			nxgep->xcvr = nxge_10G_tn1010_table;
+			nxgep->xcvr_addr = nxgep->nxge_hw_p->xcvr_addr[portn];
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "10G TN1010 copper Xcvr"));
+			break;
+
 		case PORT_1G_FIBER:
 		case PORT_1G_SERDES:
 			nxgep->xcvr = nxge_1G_fiber_table;
@@ -682,7 +874,6 @@ nxge_mac_init(p_nxge_t nxgep)
 {
 	uint8_t			portn;
 	nxge_status_t		status = NXGE_OK;
-
 	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_mac_init: port<%d>", portn));
@@ -692,6 +883,7 @@ nxge_mac_init(p_nxge_t nxgep)
 
 	if ((portn == BMAC_PORT_0) || (portn == BMAC_PORT_1))
 		nxgep->mac.porttype = PORT_TYPE_BMAC;
+
 
 	/* Initialize XIF to configure a network mode */
 	if ((status = nxge_xif_init(nxgep)) != NXGE_OK) {
@@ -734,6 +926,7 @@ nxge_mac_init(p_nxge_t nxgep)
 	/* The Neptune Serdes needs to be reinitialized again */
 	if ((NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) &&
 	    ((nxgep->mac.portmode == PORT_1G_SERDES) ||
+	    (nxgep->mac.portmode == PORT_1G_TN1010) ||
 	    (nxgep->mac.portmode == PORT_1G_FIBER)) &&
 	    ((portn == 0) || (portn == 1))) {
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
@@ -776,13 +969,20 @@ nxge_link_init(p_nxge_t nxgep)
 
 	portmode = nxgep->mac.portmode;
 
+	/*
+	 * Workaround to get link up in both NIU ports. Some portmodes require
+	 * that the xcvr be initialized twice, the first time before calling
+	 * nxge_serdes_init.
+	 */
 	if (nxgep->niu_type == N2_NIU && (portmode != PORT_10G_SERDES) &&
+	    (portmode != PORT_10G_TN1010) &&
+	    (portmode != PORT_1G_TN1010) &&
 	    (portmode != PORT_1G_SERDES)) {
-		/* Workaround to get link up in both NIU ports */
 		if ((status = nxge_xcvr_init(nxgep)) != NXGE_OK) {
 			goto fail;
 		}
 	}
+
 	NXGE_DELAY(200000);
 	/* Initialize internal serdes */
 	if ((status = nxge_serdes_init(nxgep)) != NXGE_OK)
@@ -830,6 +1030,7 @@ nxge_xif_init(p_nxge_t nxgep)
 
 	if ((NXGE_IS_VALID_NEPTUNE_TYPE(nxgep)) &&
 	    ((nxgep->mac.portmode == PORT_1G_SERDES) ||
+	    (nxgep->mac.portmode == PORT_1G_TN1010) ||
 	    (nxgep->mac.portmode == PORT_1G_FIBER)) &&
 	    ((portn == 0) || (portn == 1))) {
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
@@ -843,9 +1044,11 @@ nxge_xif_init(p_nxge_t nxgep)
 
 		if ((portmode == PORT_10G_FIBER) ||
 		    (portmode == PORT_10G_COPPER) ||
+		    (portmode == PORT_10G_TN1010) ||
 		    (portmode == PORT_10G_SERDES))
 			xif_cfg |= CFG_XMAC_XIF_LFS;
 
+		/* Bypass PCS so that RGMII will be used */
 		if (portmode == PORT_1G_COPPER) {
 			xif_cfg |= CFG_XMAC_XIF_1G_PCS_BYPASS;
 		}
@@ -860,7 +1063,10 @@ nxge_xif_init(p_nxge_t nxgep)
 		xif_cfg |= CFG_XMAC_XIF_TX_OUTPUT;
 
 		if ((portmode == PORT_10G_FIBER) ||
+		    (portmode == PORT_10G_TN1010) ||
+		    (portmode == PORT_1G_TN1010) ||
 		    (portmode == PORT_10G_SERDES)) {
+			/* Assume LED same for 1G and 10G */
 			if (statsp->mac_stats.link_up) {
 				xif_cfg |= CFG_XMAC_XIF_LED_POLARITY;
 			} else {
@@ -877,6 +1083,7 @@ nxge_xif_init(p_nxge_t nxgep)
 		/* Set Port Mode */
 		if ((portmode == PORT_10G_FIBER) ||
 		    (portmode == PORT_10G_COPPER) ||
+		    (portmode == PORT_10G_TN1010) ||
 		    (portmode == PORT_10G_SERDES)) {
 			SET_MAC_ATTR1(handle, ap, portn, MAC_PORT_MODE,
 						MAC_XGMII_MODE, rs);
@@ -892,6 +1099,7 @@ nxge_xif_init(p_nxge_t nxgep)
 		} else if ((portmode == PORT_1G_FIBER) ||
 		    (portmode == PORT_1G_COPPER) ||
 		    (portmode == PORT_1G_SERDES) ||
+		    (portmode == PORT_1G_TN1010) ||
 		    (portmode == PORT_1G_RGMII_FIBER)) {
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 			    "nxge_xif_init: Port[%d] Mode[%d] Speed[%d]",
@@ -937,7 +1145,6 @@ nxge_xif_init(p_nxge_t nxgep)
 			goto fail;
 		nxgep->mac.xif_config = xif_cfg;
 	}
-
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_xif_init: port<%d>", portn));
 	return (NXGE_OK);
 fail:
@@ -947,8 +1154,11 @@ fail:
 	return (NXGE_ERROR | rs);
 }
 
-/* Initialize the PCS sub-block in the MAC */
 
+/*
+ * Initialize the PCS sub-block in the MAC.  Note that PCS does not
+ * support loopback like XPCS.
+ */
 nxge_status_t
 nxge_pcs_init(p_nxge_t nxgep)
 {
@@ -958,7 +1168,9 @@ nxge_pcs_init(p_nxge_t nxgep)
 	nxge_port_mode_t	portmode;
 	npi_handle_t		handle;
 	p_nxge_stats_t		statsp;
+	pcs_ctrl_t		pcs_ctrl;
 	npi_status_t		rs = NPI_SUCCESS;
+	uint8_t i;
 
 	handle = nxgep->npi_handle;
 	portmode = nxgep->mac.portmode;
@@ -967,9 +1179,21 @@ nxge_pcs_init(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_pcs_init: port<%d>", portn));
 
-	if ((portmode == PORT_1G_FIBER) || (portmode == PORT_1G_SERDES)) {
-		if ((rs = npi_mac_pcs_reset(handle, portn)) != NPI_SUCCESS) {
-			goto fail;
+	if (portmode == PORT_1G_FIBER ||
+	    portmode == PORT_1G_TN1010 ||
+	    portmode == PORT_1G_SERDES) {
+		if (portmode == PORT_1G_TN1010) {
+			/* Reset PCS multiple time in PORT_1G_TN1010 mode */
+			for (i = 0; i < 6; i ++) {
+				if ((rs = npi_mac_pcs_reset(handle, portn))
+				    != NPI_SUCCESS) {
+					goto fail;
+				}
+			}
+		} else {
+			if ((rs = npi_mac_pcs_reset(handle, portn))
+			    != NPI_SUCCESS)
+				goto fail;
 		}
 
 		/* Initialize port's PCS */
@@ -982,8 +1206,22 @@ nxge_pcs_init(p_nxge_t nxgep)
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 		    "==> nxge_pcs_init: (1G) port<%d> write config 0x%llx",
 		    portn, pcs_cfg.value));
-	} else if ((portmode == PORT_10G_FIBER) ||
-	    (portmode == PORT_10G_COPPER) || (portmode == PORT_10G_SERDES)) {
+
+		if (portmode == PORT_1G_TN1010) {
+			/*
+			 * Must disable PCS auto-negotiation when the the driver
+			 * is driving the TN1010 based XAUI card  Otherwise the
+			 * autonegotiation between the PCS and the TN1010 PCS
+			 * will never complete and the Neptune/NIU will not work
+			 */
+			pcs_ctrl.value = 0;
+			PCS_REG_WR(handle, portn, PCS_MII_CTRL_REG,
+			    pcs_ctrl.value);
+		}
+	} else if (portmode == PORT_10G_FIBER ||
+	    portmode == PORT_10G_COPPER ||
+	    portmode == PORT_10G_TN1010 ||
+	    portmode == PORT_10G_SERDES) {
 		/* Use internal XPCS, bypass 1G PCS */
 		XMAC_REG_RD(handle, portn, XMAC_CONFIG_REG, &val);
 		val &= ~XMAC_XIF_XPCS_BYPASS;
@@ -997,6 +1235,7 @@ nxge_pcs_init(p_nxge_t nxgep)
 						XPCS_REG_CONTROL1, &val))
 						!= NPI_SUCCESS)
 			goto fail;
+
 		if ((statsp->port_stats.lb_mode == nxge_lb_mac10g) ||
 			(statsp->port_stats.lb_mode == nxge_lb_mac1000))
 			val |= XPCS_CTRL1_LOOPBK;
@@ -1069,7 +1308,7 @@ nxge_mac_ctrl_init(p_nxge_t nxgep)
 	statsp = nxgep->statsp;
 
 	if (portt == PORT_TYPE_XMAC) {
-		/* Readin the current XMAC Config Register for XMAC */
+		/* Reading the current XMAC Config Register for XMAC */
 		XMAC_REG_RD(handle, portn, XMAC_CONFIG_REG, &val);
 
 		/*
@@ -1118,7 +1357,7 @@ nxge_mac_ctrl_init(p_nxge_t nxgep)
 		}
 		XMAC_REG_WR(handle, portn, XMAC_CONFIG_REG, val);
 	} else if (portt == PORT_TYPE_BMAC) {
-		/* Readin the current MAC CTRL Config Register for BMAC */
+		/* Reading the current MAC CTRL Config Register for BMAC */
 		BMAC_REG_RD(handle, portn, MAC_CTRL_CONFIG_REG, &val);
 
 		/* Setup MAC CTRL Configuration for BMAC */
@@ -1236,8 +1475,26 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 	pll_sts_l.value = 0;
 	test_cfg.value = 0;
 
-	if ((nxgep->mac.portmode == PORT_10G_FIBER) ||
-	    (nxgep->mac.portmode == PORT_10G_SERDES)) {
+	/*
+	 * If the nxge driver has been plumbed without a link, then it will
+	 * detect a link up when a cable connecting to an anto-negotiation
+	 * partner is plugged into the port. Because the TN1010 PHY supports
+	 * both 1G and 10G speeds, the driver must re-configure the
+	 * Neptune/NIU according to the negotiated speed.  nxge_n2_serdes_init
+	 * is called at the post-link-up reconfiguration time. Here it calls
+	 * nxge_set_tn1010_param to set portmode before re-initializing
+	 * the serdes.
+	 */
+	if (nxgep->mac.portmode == PORT_1G_TN1010 ||
+	    nxgep->mac.portmode == PORT_10G_TN1010) {
+		if (nxge_set_tn1010_param(nxgep) != NXGE_OK) {
+			goto fail;
+		}
+	}
+
+	if (nxgep->mac.portmode == PORT_10G_FIBER ||
+	    nxgep->mac.portmode == PORT_10G_TN1010 ||
+	    nxgep->mac.portmode == PORT_10G_SERDES) {
 		/* 0x0E01 */
 		tx_cfg_l.bits.entx = 1;
 		tx_cfg_l.bits.swing = CFGTX_SWING_1375MV;
@@ -1263,11 +1520,34 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 			goto fail;
 		}
 
-		/* Use default PLL value */
+		/* Initialize PLL for 10G */
+		pll_cfg_l.bits.mpy = CFGPLL_MPY_10X;
+		pll_cfg_l.bits.enpll = 1;
+		pll_sts_l.bits.enpll = 1;
+		if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
+		    ESR_N2_PLL_CFG_L_REG, pll_cfg_l.value)) != NXGE_OK)
+			goto fail;
 
-	} else if ((nxgep->mac.portmode == PORT_1G_FIBER) ||
-	    (nxgep->mac.portmode == PORT_1G_SERDES)) {
+		if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
+		    ESR_N2_PLL_STS_L_REG, pll_sts_l.value)) != NXGE_OK)
+			goto fail;
 
+#ifdef  NXGE_DEBUG
+		nxge_mdio_read(nxgep, portn, ESR_N2_DEV_ADDR,
+		    ESR_N2_PLL_CFG_L_REG, &cfg.value);
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_serdes_init port<%d>: PLL cfg.l 0x%x (0x%x)",
+		    portn, pll_cfg_l.value, cfg.value));
+
+		nxge_mdio_read(nxgep, portn, ESR_N2_DEV_ADDR,
+		    ESR_N2_PLL_STS_L_REG, &cfg.value);
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "==> nxge_n2_serdes_init port<%d>: PLL sts.l 0x%x (0x%x)",
+		    portn, pll_sts_l.value, cfg.value));
+#endif
+	} else if (nxgep->mac.portmode == PORT_1G_FIBER ||
+	    nxgep->mac.portmode == PORT_1G_TN1010 ||
+	    nxgep->mac.portmode == PORT_1G_SERDES) {
 		/* 0x0E21 */
 		tx_cfg_l.bits.entx = 1;
 		tx_cfg_l.bits.rate = CFGTX_RATE_HALF;
@@ -1285,10 +1565,8 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 			rx_cfg_h.bits.eq = CFGRX_EQ_ADAPTIVE_LP_ADAPTIVE_ZF;
 		}
 
-		/* MPY = 0x100 */
+		/* Initialize PLL for 1G */
 		pll_cfg_l.bits.mpy = CFGPLL_MPY_8X;
-
-		/* Set PLL */
 		pll_cfg_l.bits.enpll = 1;
 		pll_sts_l.bits.enpll = 1;
 		if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
@@ -1371,6 +1649,7 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 		    "==> nxge_n2_serdes_init port<%d>: chan %d rx_cfg_l 0x%x",
 		    portn, chan, rx_cfg_l.value));
+
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 		    "==> nxge_n2_serdes_init port<%d>: chan %d rx_cfg_h 0x%x",
 		    portn, chan, rx_cfg_h.value));
@@ -1412,7 +1691,6 @@ nxge_neptune_10G_serdes_init(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 	    "==> nxge_neptune_10G_serdes_init port<%d>", portn));
-
 	handle = nxgep->npi_handle;
 	switch (portn) {
 	case 0:
@@ -1598,7 +1876,7 @@ nxge_neptune_10G_serdes_init(p_nxge_t nxgep)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "nxge_neptune_10G_serdes_init: "
 			    "Serdes/signal for port<%d> not ready", portn));
-			goto done;
+				goto done;
 		}
 	} else if (portn == 1) {
 		/* Wait for serdes to be ready */
@@ -1627,7 +1905,7 @@ nxge_neptune_10G_serdes_init(p_nxge_t nxgep)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "nxge_neptune_10G_serdes_init: "
 			    "Serdes/signal for port<%d> not ready", portn));
-			goto done;
+				goto done;
 		}
 	}
 
@@ -1860,7 +2138,7 @@ nxge_1G_serdes_init(p_nxge_t nxgep)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "nxge_neptune_1G_serdes_init: "
 			    "Serdes/signal for port<%d> not ready", portn));
-			goto done;
+				goto done;
 		}
 	} else if (portn == 1) {
 		if ((val & ESR_SIG_P1_BITS_MASK_1G) !=
@@ -1874,7 +2152,8 @@ nxge_1G_serdes_init(p_nxge_t nxgep)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "nxge_neptune_1G_serdes_init: "
 			    "Serdes/signal for port<%d> not ready", portn));
-			goto done;
+				goto done;
+
 		}
 	}
 done:
@@ -2313,17 +2592,17 @@ nxge_10G_xcvr_init(p_nxge_t nxgep)
 
 	switch (nxgep->chip_id) {
 	case BCM8704_CHIP_ID:
-		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_xcvr_init: "
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_10G_xcvr_init: "
 		    "Chip ID 8704 [0x%x] for 10G xcvr", nxgep->chip_id));
 		status = nxge_BCM8704_xcvr_init(nxgep);
 		break;
 	case BCM8706_CHIP_ID:
-		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_xcvr_init: "
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_10G_xcvr_init: "
 		    "Chip ID 8706 [0x%x] for 10G xcvr", nxgep->chip_id));
 		status = nxge_BCM8706_xcvr_init(nxgep);
 		break;
 	case MRVL88X201X_CHIP_ID:
-		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_xcvr_init: "
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_10G_xcvr_init: "
 		    "Chip ID 8706 [0x%x] for 10G xcvr", nxgep->chip_id));
 		status = nxge_mrvl88x2011_xcvr_init(nxgep);
 		break;
@@ -2388,6 +2667,214 @@ done:
 	return (status);
 }
 
+/*
+ * Although the Teranetics copper transceiver (TN1010) does not need
+ * to be initialized by the driver for passing packets, this funtion
+ * initializes the members of nxgep->statsp->mac_stats struct for
+ * kstat based on the value of nxgep->statsp->ports_stats.lb_mode.
+ * It also configures the TN1010 for PHY loopback to support SunVTS.
+ *
+ * TN1010 only has the option to disable advertisement for the 10G
+ * mode. So we can set it to either Dual Mode or 1G Only mode but
+ * can't set it to 10G Only mode.
+ *
+ * ndd -set command can set the following 6 speed/duplex related parameters.
+ *
+ * ----------------------------------------------------------------
+ * ndd -set /dev/nxgeX param n		kstat nxge:X | grep param
+ * ----------------------------------------------------------------
+ * adv_autoneg_cap		kstat nxge:1 | grep adv_cap_autoneg
+ * adv_10gfdx_cap
+ * adv_1000fdx_cap		kstat nxge:1 | grep adv_cap_1000fdx
+ * adv_100fdx_cap		kstat nxge:1 | grep adv_cap_100fdx
+ * adv_10fdx_cap		kstat nxge:1 | grep adv_cap_10fdx
+ * adv_pause_cap		kstat nxge:1 | grep adv_cap_pause
+ * ----------------------------------------------------------------
+ */
+static nxge_status_t
+nxge_tn1010_xcvr_init(p_nxge_t nxgep)
+{
+	p_nxge_param_t		param_arr;
+	p_nxge_stats_t		statsp;
+	tn1010_pcs_ctrl_t	tn1010_pcs_ctrl;
+	uint16_t		speed;
+	uint8_t			phy_port_addr;
+	uint8_t			portn = NXGE_GET_PORT_NUM(nxgep->function_num);
+	int			status = NXGE_OK;
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_1G_tn1010_xcvr_init"));
+
+	param_arr	= nxgep->param_arr;
+	statsp		= nxgep->statsp;
+
+	/*
+	 * Initialize the xcvr statistics which are NOT controlled by ndd
+	 */
+	statsp->mac_stats.cap_autoneg  = 1; /* TN1010 autoneg is always on */
+	statsp->mac_stats.cap_100T4    = 0;
+
+	/*
+	 * Read the TN1010 link speed and initialize capabilities kstat. Note
+	 * that function nxge_check_tn1010_link repeatedly invoked by the
+	 * timer will update link_speed real time.
+	 */
+	if (nxge_get_tn1010_speed(nxgep,  &speed) != NXGE_OK) {
+		goto fail;
+	}
+	if (speed == TN1010_SPEED_1G) {
+		statsp->mac_stats.cap_10gfdx = 0;
+	} else {
+		statsp->mac_stats.cap_10gfdx = 1;
+	}
+
+	/* Whether we are in 1G or 10G mode, we always have the 1G capability */
+	statsp->mac_stats.cap_1000fdx  = 1;
+
+	/* TN1010 is not able to operate in the following states */
+	statsp->mac_stats.cap_1000hdx  = 0;
+	statsp->mac_stats.cap_100fdx   = 0;
+	statsp->mac_stats.cap_100hdx   = 0;
+	statsp->mac_stats.cap_10fdx    = 0;
+	statsp->mac_stats.cap_10hdx    = 0;
+
+	/* param_anar_pause can be modified by ndd -set */
+	statsp->mac_stats.cap_pause    = param_arr[param_anar_pause].value;
+
+	/*
+	 * The following 4 lines actually overwrites what ever the ndd command
+	 * has set. For example, by command
+	 * 	ndd -set /dev/nxge1 adv_autoneg_cap n (n = 0 or 1)
+	 * we could set param_arr[param_autoneg].value to n.  However, because
+	 * here we assign constants to these parameters, whatever we set with
+	 * the "ndd -set" command will be replaced. So command
+	 *	kstat nxge:X | grep param
+	 * will always show those constant values.  In other words, the
+	 * "ndd -set" command can NOT change the values of these 4 parameters
+	 * even though the command appears to be successful.
+	 *
+	 * Note: TN1010 auto negotiation is always enabled.
+	 */
+	statsp->mac_stats.adv_cap_autoneg
+	    = param_arr[param_autoneg].value = 1;
+	statsp->mac_stats.adv_cap_1000fdx
+	    = param_arr[param_anar_1000fdx].value = 1;
+	statsp->mac_stats.adv_cap_100fdx
+	    = param_arr[param_anar_100fdx].value = 0;
+	statsp->mac_stats.adv_cap_10fdx
+	    = param_arr[param_anar_10fdx].value = 0;
+
+	/*
+	 * The following 4 ndd params have type NXGE_PARAM_MAC_DONT_SHOW as
+	 * defined in nxge_param_arr[], therefore they are not seen by the
+	 * "ndd -get" command and can not be changed by ndd.  We just set
+	 * them (both ndd param and kstat values) to constant 0 because TN1010
+	 * does not support those speeds.
+	 */
+	statsp->mac_stats.adv_cap_100T4
+	    = param_arr[param_anar_100T4].value = 0;
+	statsp->mac_stats.adv_cap_1000hdx
+	    = param_arr[param_anar_1000hdx].value = 0;
+	statsp->mac_stats.adv_cap_100hdx
+	    = param_arr[param_anar_100hdx].value = 0;
+	statsp->mac_stats.adv_cap_10hdx
+	    = param_arr[param_anar_10hdx].value = 0;
+
+	/*
+	 * adv_cap_pause has type NXGE_PARAM_MAC_RW, so it can be modified
+	 * by ndd
+	 */
+	statsp->mac_stats.adv_cap_pause    = param_arr[param_anar_pause].value;
+
+	/*
+	 * nxge_param_arr[] defines the adv_cap_asmpause with type
+	 * NXGE_PARAM_DONT_SHOW, therefore they are NOT seen by the
+	 * "ndd -get" command and can not be changed by ndd. Here we do not
+	 * assign a constant to it so the default value defined in
+	 * nxge_param_arr[] will be used to set the parameter and
+	 * will be shown by the kstat.
+	 */
+	statsp->mac_stats.adv_cap_asmpause
+	    = param_arr[param_anar_asmpause].value;
+
+	/*
+	 * Initialize the link statistics.
+	 */
+	statsp->mac_stats.link_T4 = 0;
+	statsp->mac_stats.link_asmpause = 0;
+	statsp->mac_stats.link_pause = 0;
+	if (speed == TN1010_SPEED_1G) {
+		statsp->mac_stats.link_speed = 1000;
+		statsp->mac_stats.link_duplex = 2;	/* Full duplex */
+		statsp->mac_stats.link_up = 1;
+	} else {
+		statsp->mac_stats.link_speed = 10000;
+		statsp->mac_stats.link_duplex = 2;
+		statsp->mac_stats.link_up = 1;
+	}
+
+	/*
+	 * Because TN1010 does not have a link partner register, to
+	 * figure out the link partner's capabilities is tricky. Here we
+	 * just set the kstat based on our knowledge about the partner
+	 * (The partner must support auto-neg because auto-negotiation
+	 * has completed, it must support 1G or 10G because that is the
+	 * negotiated speed we are using.)
+	 *
+	 * Note: Current kstat does not show lp_cap_10gfdx and
+	 *	lp_cap_10ghdx.
+	 */
+	if (speed == TN1010_SPEED_1G) {
+		statsp->mac_stats.lp_cap_1000fdx  = 1;
+		statsp->mac_stats.lp_cap_10gfdx   = 0;
+	} else {
+		statsp->mac_stats.lp_cap_1000fdx  = 0;
+		statsp->mac_stats.lp_cap_10gfdx   = 1;
+	}
+	statsp->mac_stats.lp_cap_10ghdx   = 0;
+	statsp->mac_stats.lp_cap_1000hdx  = 0;
+	statsp->mac_stats.lp_cap_100fdx   = 0;
+	statsp->mac_stats.lp_cap_100hdx   = 0;
+	statsp->mac_stats.lp_cap_10fdx    = 0;
+	statsp->mac_stats.lp_cap_10hdx    = 0;
+	statsp->mac_stats.lp_cap_10gfdx   = 0;
+	statsp->mac_stats.lp_cap_10ghdx   = 0;
+	statsp->mac_stats.lp_cap_100T4    = 0;
+	statsp->mac_stats.lp_cap_autoneg  = 1;
+	statsp->mac_stats.lp_cap_asmpause = 0;
+	statsp->mac_stats.lp_cap_pause    = 0;
+
+	/* Handle PHY loopback for SunVTS loopback test */
+	npi_mac_mif_set_indirect_mode(nxgep->npi_handle, B_TRUE);
+	phy_port_addr = nxgep->nxge_hw_p->xcvr_addr[portn];
+
+	if ((status = nxge_mdio_read(nxgep, phy_port_addr,
+	    TN1010_PCS_DEV_ADDR, TN1010_PCS_CONTROL_REG,
+	    &tn1010_pcs_ctrl.value)) != NXGE_OK) {
+		goto fail;
+	}
+	if ((statsp->port_stats.lb_mode == nxge_lb_phy1000) ||
+	    (statsp->port_stats.lb_mode == nxge_lb_phy10g)) {
+		tn1010_pcs_ctrl.bits.loopback = 1;
+	} else {
+		tn1010_pcs_ctrl.bits.loopback = 0;
+	}
+	if ((status = nxge_mdio_write(nxgep, phy_port_addr,
+	    TN1010_PCS_DEV_ADDR, TN1010_PCS_CONTROL_REG,
+	    tn1010_pcs_ctrl.value)) != NXGE_OK) {
+		goto fail;
+	}
+
+	statsp->mac_stats.xcvr_inits++;
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "<== nxge_1G_tn1010_xcvr_init status 0x%x", status));
+	return (status);
+fail:
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+	    "<== nxge_1G_tn1010_xcvr_init status 0x%x", status));
+	return (status);
+}
+
 /* Initialize transceiver */
 
 nxge_status_t
@@ -2406,7 +2893,8 @@ nxge_xcvr_init(p_nxge_t nxgep)
 	statsp = nxgep->statsp;
 
 	/*
-	 * Initialize the xcvr statistics.
+	 * Initialize the xcvr statistics. nxgep->xcvr.xcvr_init will
+	 * modify mac_stats.
 	 */
 	statsp->mac_stats.cap_autoneg = 0;
 	statsp->mac_stats.cap_100T4 = 0;
@@ -2487,7 +2975,7 @@ nxge_tx_mac_init(p_nxge_t nxgep)
 	/* Set Max and Min Frame Size */
 	/*
 	 * Use maxframesize to configure the hardware maxframe size
-	 * and minframesize to configure the hardwae minframe size.
+	 * and minframesize to configure the hardware minframe size.
 	 */
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 	    "==> nxge_tx_mac_init: port<%d> "
@@ -2511,6 +2999,7 @@ nxge_tx_mac_init(p_nxge_t nxgep)
 		nxgep->mac.tx_iconfig = NXGE_XMAC_TX_INTRS;
 		if ((portmode == PORT_10G_FIBER) ||
 		    (portmode == PORT_10G_COPPER) ||
+		    (portmode == PORT_10G_TN1010) ||
 		    (portmode == PORT_10G_SERDES)) {
 			SET_MAC_ATTR1(handle, ap, portn, XMAC_10G_PORT_IPG,
 					XGMII_IPG_12_15, rs);
@@ -2677,7 +3166,7 @@ nxge_hio_hostinfo_init(
 	slot = vr->slot - 1;
 
 	/*
-	 * Programm the mac address.
+	 * Program the mac address.
 	 */
 	altmac.w2 = (((uint16_t)addr[0]) << 8) |
 	    (((uint16_t)addr[1]) & 0x0ff);
@@ -3377,7 +3866,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	statsp->mac_stats.cap_pause = param_arr[param_anar_pause].value;
 
 	/*
-	 * Initialise the xcvr advertised capability statistics.
+	 * Initialize the xcvr advertised capability statistics.
 	 */
 	statsp->mac_stats.adv_cap_autoneg = param_arr[param_autoneg].value;
 	statsp->mac_stats.adv_cap_1000fdx = param_arr[param_anar_1000fdx].value;
@@ -3425,7 +3914,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	statsp->mac_stats.adv_cap_1000hdx = param_arr[param_anar_1000hdx].value;
 
 	/*
-	 * Initialise the link statistics.
+	 * Initialize the link statistics.
 	 */
 	statsp->mac_stats.link_T4 = 0;
 	statsp->mac_stats.link_asmpause = 0;
@@ -3471,6 +3960,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 			goto fail;
 	}
 
+	/* If auto-negotiation is desired */
 	if (param_arr[param_autoneg].value) {
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 				"Restarting Auto-negotiation."));
@@ -3493,6 +3983,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 			anar.bits.cap_pause = statsp->mac_stats.cap_pause;
 		}
 
+		/* Write to the auto-negotiation advertisement register */
 		if ((status = nxge_mii_write(nxgep, xcvr_portn,
 #if defined(__i386)
 			(uint8_t)(uint32_t)(&mii_regs->anar), anar.value))
@@ -3532,6 +4023,8 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 		bmcr.bits.speed_sel = (~bmcr.bits.speed_1000_sel) &
 			(param_arr[param_anar_100fdx].value |
 				param_arr[param_anar_100hdx].value);
+
+		/* Force to 1G */
 		if (bmcr.bits.speed_1000_sel) {
 			statsp->mac_stats.link_speed = 1000;
 			gcr.value = 0;
@@ -3553,6 +4046,8 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 				statsp->mac_stats.link_duplex = 2;
 			} else
 				statsp->mac_stats.link_duplex = 1;
+
+		/* Force to 100M */
 		} else if (bmcr.bits.speed_sel) {
 			statsp->mac_stats.link_speed = 100;
 			if (param_arr[param_anar_100fdx].value) {
@@ -3560,6 +4055,8 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 				statsp->mac_stats.link_duplex = 2;
 			} else
 				statsp->mac_stats.link_duplex = 1;
+
+		/* Force to 10M */
 		} else {
 			statsp->mac_stats.link_speed = 10;
 			if (param_arr[param_anar_10fdx].value) {
@@ -4011,8 +4508,20 @@ fail:
 	return (NXGE_ERROR | rs);
 }
 
-/* Perform read from Clause45 serdes / transceiver device */
-
+/*
+ * Perform write to Clause45 serdes / transceiver device
+ * Arguments:
+ *	xcvr_portn: 	The IEEE 802.3 Clause45 PHYAD, it is the same as port
+ *			number if nxge_mdio_write is used for accessing the
+ *			internal LSIL serdes. Otherwise PHYAD is different
+ * 			for different platforms.
+ *	device:		With each PHYAD, the driver can use MDIO to control
+ *			multiple devices inside the PHY, here "device" is an
+ *			MMD (MDIO managable device).
+ *	xcvr_reg:	Each device has multiple registers. xcvr_reg specifies
+ *			the register which the driver will write value to.
+ *	value:		The register value will be filled in.
+ */
 nxge_status_t
 nxge_mdio_read(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t device,
 		uint16_t xcvr_reg, uint16_t *value)
@@ -4291,12 +4800,14 @@ fail:
 	return (status);
 }
 
-/* Check PCS to see if there is any link status change */
-nxge_status_t
+/*
+ * Check PCS to see if there is any link status change.
+ * This function is called by PORT_1G_SERDES only.
+ */
+void
 nxge_pcs_check(p_nxge_t nxgep, uint8_t portn, nxge_link_state_t *link_up)
 {
 	p_nxge_stats_t	statsp;
-	nxge_status_t	status = NXGE_OK;
 	boolean_t	linkup;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_pcs_check"));
@@ -4326,11 +4837,6 @@ nxge_pcs_check(p_nxge_t nxgep, uint8_t portn, nxge_link_state_t *link_up)
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_pcs_check"));
-	return (NXGE_OK);
-fail:
-	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-	    "nxge_pcs_check: Unable to check PCS"));
-	return (status);
 }
 
 /* Add a multicast address entry into the HW hash table */
@@ -4487,8 +4993,7 @@ fail:
 
 static
 check_link_state_t
-nxge_check_link_stop(
-	nxge_t *nxge)
+nxge_check_link_stop(nxge_t *nxge)
 {
 	/* If the poll has been cancelled, return STOP. */
 	MUTEX_ENTER(&nxge->poll_lock);
@@ -4509,8 +5014,12 @@ nxge_check_link_stop(
 	return (CHECK_LINK_RESCHEDULE);
 }
 
-/* Check status of MII (MIF or PCS) link */
-
+/*
+ * Check status of MII (MIF or PCS) link.
+ * This function is called once per second, that is because this function
+ * calls nxge_link_monitor with LINK_MONITOR_START, which starts a timer to
+ * call this function recursively.
+ */
 static nxge_status_t
 nxge_check_mii_link(p_nxge_t nxgep)
 {
@@ -4626,12 +5135,15 @@ nxge_check_mii_link(p_nxge_t nxgep)
 		break;
 
 	case PORT_1G_SERDES:
+		/*
+		 * Above default is for all cases except PORT_1G_SERDES.
+		 * The default case gets information from the PHY, but a
+		 * nxge whose portmode equals PORT_1G_SERDES does not
+		 * have a PHY.
+		 */
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 		    "==> nxge_check_mii_link port<%d> (SERDES)", portn));
-		if ((status = nxge_pcs_check(nxgep, portn, &link_up))
-		    != NXGE_OK) {
-			goto fail;
-		}
+		nxge_pcs_check(nxgep, portn, &link_up);
 		break;
 	}
 
@@ -4642,7 +5154,6 @@ nxge_check_mii_link_exit:
 	} else if (link_up == LINK_IS_DOWN) {
 		nxge_link_is_down(nxgep);
 	}
-
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_check_mii_link port<%d>",
@@ -4658,7 +5169,6 @@ fail:
 			portn));
 	return (status);
 }
-
 
 /*ARGSUSED*/
 static nxge_status_t
@@ -4697,19 +5207,19 @@ nxge_check_10g_link(p_nxge_t nxgep)
 			 */
 			if (portn == 1) {
 				if (nxge_is_phy_present(nxgep,
-				    BCM8706_ALT_GOA_PORT1_ADDR,
+				    ALT_GOA_CLAUSE45_PORT1_ADDR,
 				    BCM8706_DEV_ID, BCM_PHY_ID_MASK)) {
 					phy_present_now = B_TRUE;
 					nxgep->xcvr_addr =
-					    BCM8706_ALT_GOA_PORT1_ADDR;
+					    ALT_GOA_CLAUSE45_PORT1_ADDR;
 					goto phy_check_done;
 				}
 			}
 			if (nxge_is_phy_present(nxgep,
-			    (BCM8706_GOA_PORT_ADDR_BASE) + portn,
+			    (GOA_CLAUSE45_PORT_ADDR_BASE) + portn,
 			    BCM8706_DEV_ID, BCM_PHY_ID_MASK)) {
 				nxgep->xcvr_addr =
-				    (BCM8706_GOA_PORT_ADDR_BASE) + portn;
+				    (GOA_CLAUSE45_PORT_ADDR_BASE) + portn;
 				phy_present_now = B_TRUE;
 			}
 
@@ -4762,7 +5272,7 @@ phy_check_done:
 			}
 		}
 		if (nxgep->chip_id == MRVL88X201X_CHIP_ID) {
-			status = nxge_mrvl88x2011_link(nxgep, &link_up);
+			status = nxge_check_mrvl88x2011_link(nxgep, &link_up);
 		} else {
 			status = nxge_check_bcm8704_link(nxgep, &link_up);
 		}
@@ -4878,7 +5388,6 @@ nxge_link_is_up(p_nxge_t nxgep)
 	else
 		(void) strcat(link_stat_msg, "half duplex");
 
-	(void) nxge_xif_init(nxgep);
 
 	/* Clean up symbol errors incurred during link transition */
 	if ((nxgep->mac.portmode == PORT_10G_FIBER) ||
@@ -4889,6 +5398,49 @@ nxge_link_is_up(p_nxge_t nxgep)
 					XPCS_REG_SYMBOL_ERR_L2_3_COUNTER, &val);
 	}
 
+	/*
+	 * If the driver was plumbed without a link (therefore auto-negotiation
+	 * could not complete), the driver will detect a link up when a cable
+	 * conneting to a link partner is plugged into the port. By the time
+	 * link-up is detected, auto-negotiation should have completed (The
+	 * TN1010 tries to contact a link partner every 8~24ms). Here we re-
+	 * configure the Neptune/NIU according to the newly negotiated speed.
+	 * This is necessary only for the TN1010 basad device because only the
+	 * TN1010 supports dual speeds.
+	 */
+	if (nxgep->mac.portmode == PORT_1G_TN1010 ||
+	    nxgep->mac.portmode == PORT_10G_TN1010) {
+
+		(void) nxge_set_tn1010_param(nxgep);
+
+		/*
+		 * nxge_xcvr_find calls nxge_get_xcvr_type (which sets
+		 * nxgep->portmode) and nxge_setup_xcvr_table (which sets
+		 * the nxgep->xcvr to the proper nxge_xcvr_table_t struct).
+		 */
+		if (nxge_xcvr_find(nxgep) != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_link_is_up: nxge_xcvr_find failed"));
+		}
+
+		/* nxge_link_init calls nxge_xcvr_init and nxge_serdes_init */
+		if (nxge_link_init(nxgep) != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_link_is_up: nxge_link_init failed"));
+		}
+
+		/*
+		 * nxge_mac_init calls many subroutines including
+		 * nxge_xif_init which sets XGMII or GMII mode
+		 */
+		if (nxge_mac_init(nxgep) != NXGE_OK) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "nxge_link_is_up: nxge_mac_init failed"));
+		}
+	} else {
+		(void) nxge_xif_init(nxgep);
+	}
+
 	if (nxge_no_msg == B_FALSE) {
 		NXGE_ERROR_MSG((nxgep, NXGE_NOTE, "%s", link_stat_msg));
 	}
@@ -4897,6 +5449,84 @@ nxge_link_is_up(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_link_is_up"));
 }
+
+#ifdef NXGE_DEBUG
+/* Dump all TN1010 Status registers */
+static void
+nxge_dump_tn1010_status_regs(p_nxge_t nxgep)
+{
+	uint16_t val;
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_PMA_PMD_DEV_ADDR, 1, &val);
+	cmn_err(CE_NOTE, "PMA status1 = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_PMA_PMD_DEV_ADDR, 8, &val);
+	cmn_err(CE_NOTE, "PMA status2 = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_PMA_PMD_DEV_ADDR, 129, &val);
+	cmn_err(CE_NOTE, "10BASET-T status = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_PCS_DEV_ADDR, 1, &val);
+	cmn_err(CE_NOTE, "PCS status1 = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_PCS_DEV_ADDR, 8, &val);
+	cmn_err(CE_NOTE, "PCS status2 = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_PCS_DEV_ADDR, 32, &val);
+	cmn_err(CE_NOTE, "10GBASE-R status1 = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_PCS_DEV_ADDR, 33, &val);
+	cmn_err(CE_NOTE, "10GBASE-R Status2 = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_PHYXS_DEV_ADDR, 1, &val);
+	cmn_err(CE_NOTE, "PHYXS status1 = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_PHYXS_DEV_ADDR, 8, &val);
+	cmn_err(CE_NOTE, "PHYXS status2 = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_PHYXS_DEV_ADDR, 24, &val);
+	cmn_err(CE_NOTE, "XGXS Lane status = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_AUTONEG_DEV_ADDR, 1, &val);
+	cmn_err(CE_NOTE, "Autoneg status = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_AUTONEG_DEV_ADDR, 33, &val);
+	cmn_err(CE_NOTE, "10Gbase-T An status = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_VENDOR_MMD1_DEV_ADDR, 1, &val);
+	cmn_err(CE_NOTE, "TN1010 status = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_VENDOR_MMD1_DEV_ADDR, 8, &val);
+	cmn_err(CE_NOTE, "Device status = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_VENDOR_MMD1_DEV_ADDR, 16, &val);
+	cmn_err(CE_NOTE, "DDR status = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_VENDOR_MMD1_DEV_ADDR, 17, &val);
+	cmn_err(CE_NOTE, "DDR fault status = 0x%x", val);
+
+	nxge_mdio_read(nxgep, nxgep->xcvr_addr,
+	    TN1010_VENDOR_MMD1_DEV_ADDR, 11, &val);
+	cmn_err(CE_NOTE, "Firmware Revision = 0x%x  Major = 0x%x Minor = 0x%x",
+	    val,  (val & 0xFF00) >> 8, val & 0x00FF);
+}
+#endif
 
 /*
  * Calculate the bit in the multicast address filter
@@ -4943,7 +5573,13 @@ nxge_serdes_reset(p_nxge_t nxgep)
 	return (NXGE_OK);
 }
 
-/* Monitor link status using interrupt or polling */
+/*
+ * This function monitors link status using interrupt or polling.
+ * It calls nxgep->xcvr.check_link, a member function of
+ * nxge_xcvr_table_t. But nxgep->xcvr.check_link calls this
+ * function back, that is why the check_link routine is
+ * executed periodically.
+ */
 nxge_status_t
 nxge_link_monitor(p_nxge_t nxgep, link_mon_enable_t enable)
 {
@@ -4980,10 +5616,19 @@ nxge_link_monitor(p_nxge_t nxgep, link_mon_enable_t enable)
 				goto fail;
 		} else {
 			timeout_id_t timerid;
-
+			/*
+			 * check_link_stop means "Stop the link check", so
+			 * we return without starting the timer.
+			 */
 			if (nxge_check_link_stop(nxgep) == CHECK_LINK_STOP)
 				return (NXGE_OK);
 
+			/*
+			 * Otherwise fire the timer for the nxge to check
+			 * the link using the check_link function
+			 * of the nxge_xcvr_table and pass "nxgep" as the
+			 * argument to the check_link function.
+			 */
 			if (nxgep->xcvr.check_link) {
 				timerid = timeout(
 				    (fptrv_t)(nxgep->xcvr.check_link),
@@ -5038,7 +5683,109 @@ nxge_link_monitor(p_nxge_t nxgep, link_mon_enable_t enable)
 	return (NXGE_OK);
 fail:
 	return (status);
+
 }
+
+nxge_status_t
+nxge_check_tn1010_link(p_nxge_t nxgep)
+{
+	nxge_status_t	status = NXGE_OK;
+	nxge_link_state_t link_up;
+
+	if (nxgep->nxge_magic != NXGE_MAGIC) {
+		/* magic is 0 if driver is not attached */
+		return (NXGE_ERROR);
+	}
+
+	/* Link has been stopped, no need to continue */
+	if (nxge_check_link_stop(nxgep) == CHECK_LINK_STOP) {
+		return (NXGE_OK);
+	}
+
+	if (nxgep->statsp->port_stats.lb_mode > nxge_lb_ext10)
+		goto nxge_check_tn1010_link_exit;
+
+	if ((status = nxge_tn1010_check(nxgep, &link_up)) != NXGE_OK)
+		goto fail;
+
+nxge_check_tn1010_link_exit:
+	if (link_up == LINK_IS_UP)
+		nxge_link_is_up(nxgep);
+	else if (link_up == LINK_IS_DOWN)
+		nxge_link_is_down(nxgep);
+
+	/*
+	 * nxge_link_monitor will call (nxgep->xcvr.check_link)
+	 * which could be THIS function.
+	 */
+	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_check_tn1010_link port<%d>",
+	    portn));
+	return (NXGE_OK);
+
+fail:
+	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
+
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+	    "nxge_check_tn1010_link: Failed to check link"));
+	return (status);
+}
+
+
+/*
+ * Fill variable "link_up" with either LINK_IS_UP or LINK_IS_DOWN.
+ */
+static nxge_status_t
+nxge_tn1010_check(p_nxge_t nxgep, nxge_link_state_t *link_up)
+{
+	nxge_status_t	status = NXGE_OK;
+	p_nxge_stats_t	statsp;
+	uint8_t		phy_port_addr, portn;
+	uint16_t	val;
+
+	*link_up = LINK_NO_CHANGE;
+
+	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
+	phy_port_addr = nxgep->nxge_hw_p->xcvr_addr[portn];
+	statsp = nxgep->statsp;
+
+	/* Check if link is up */
+	if ((status = nxge_mdio_read(nxgep, phy_port_addr,
+	    TN1010_AUTONEG_DEV_ADDR, TN1010_AUTONEG_STATUS_REG, &val))
+	    != NXGE_OK) {
+		goto fail;
+	}
+	/*
+	 * nxge_link_is_up has called nxge_set_tn1010_param and set
+	 * portmode and link_speed
+	 */
+	if (val & TN1010_AN_LINK_STAT_BIT) {
+		if (nxgep->link_notify ||
+		    nxgep->statsp->mac_stats.link_up == 0) {
+			statsp->mac_stats.link_up = 1;
+			statsp->mac_stats.link_duplex = 2;
+			*link_up = LINK_IS_UP;
+			nxgep->link_notify = B_FALSE;
+		}
+	} else {
+		if (nxgep->link_notify ||
+		    nxgep->statsp->mac_stats.link_up == 1) {
+			statsp->mac_stats.link_up = 0;
+			statsp->mac_stats.link_speed = 0;
+			statsp->mac_stats.link_duplex = 0;
+			*link_up = LINK_IS_DOWN;
+			nxgep->link_notify = B_FALSE;
+		}
+	}
+	return (NXGE_OK);
+
+fail:
+	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+	    "nxge_tn1010_check: Unable to check TN1010"));
+	return (status);
+}
+
 
 /* Set promiscous mode */
 
@@ -5505,7 +6252,7 @@ fail:
 }
 
 static nxge_status_t
-nxge_mrvl88x2011_link(p_nxge_t nxgep, boolean_t *link_up)
+nxge_check_mrvl88x2011_link(p_nxge_t nxgep, boolean_t *link_up)
 {
 	uint8_t		phy;
 	nxge_status_t   status = NXGE_OK;
@@ -5629,22 +6376,21 @@ static boolean_t
 nxge_is_supported_phy(uint32_t id, uint8_t type)
 {
 	int		i;
-	int		cl45_arr_len = NUM_CLAUSE_45_IDS;
-	int		cl22_arr_len = NUM_CLAUSE_22_IDS;
 	boolean_t	found = B_FALSE;
 
 	switch (type) {
 	case CLAUSE_45_TYPE:
-		for (i = 0; i < cl45_arr_len; i++) {
-			if ((nxge_supported_cl45_ids[i] & BCM_PHY_ID_MASK) ==
-			    (id & BCM_PHY_ID_MASK)) {
+		for (i = 0; i < NUM_CLAUSE_45_IDS; i++) {
+			if (((nxge_supported_cl45_ids[i] & BCM_PHY_ID_MASK) ==
+			    (id & BCM_PHY_ID_MASK)) ||
+			    (TN1010_DEV_ID == (id & TN1010_DEV_ID_MASK))) {
 				found = B_TRUE;
 				break;
 			}
 		}
 		break;
 	case CLAUSE_22_TYPE:
-		for (i = 0; i < cl22_arr_len; i++) {
+		for (i = 0; i < NUM_CLAUSE_22_IDS; i++) {
 			if ((nxge_supported_cl22_ids[i] & BCM_PHY_ID_MASK) ==
 			    (id & BCM_PHY_ID_MASK)) {
 				found = B_TRUE;
@@ -5674,6 +6420,7 @@ nxge_get_cl45_pma_pmd_id(p_nxge_t nxgep, int phy_port)
 	    NXGE_DEV_ID_REG_2, &val2);
 	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
+	/* Concatenate the Device ID stored in two registers. */
 	pma_pmd_dev_id = val1;
 	pma_pmd_dev_id = (pma_pmd_dev_id << 16);
 	pma_pmd_dev_id |= val2;
@@ -5750,8 +6497,12 @@ exit:
  * read and the PMA/PMD device ID and the PCS device ID using Clause 45 MDIO
  * read. Then use the values obtained to determine the phy type of each port
  * and the Neptune type.
+ *
+ * This function sets hw_p->xcvr_addr[i] for future MDIO access and set
+ * hw_p->niu_type for each nxge instance to figure out nxgep->mac.portmode
+ * in case the portmode information is not available via OBP, nxge.conf,
+ * VPD or SEEPROM.
  */
-
 nxge_status_t
 nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 {
@@ -5767,6 +6518,7 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 	uint8_t		phy_fd_arr[NXGE_MAX_PHY_PORTS];
 	uint8_t		port_fd_arr[NXGE_MAX_PHY_PORTS];
 	uint8_t		total_port_fd, total_phy_fd;
+	uint8_t		num_xaui;
 	nxge_status_t	status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_scan_ports_phy: "));
@@ -5784,7 +6536,7 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 	total_port_fd = total_phy_fd = 0;
 	/*
 	 * Clause 45 and Clause 22 port/phy addresses 0 through 7 are reserved
-	 * for on chip serdes usages.
+	 * for on chip serdes usages. "i" in the following for loop starts at 8.
 	 */
 	for (i = NXGE_EXT_PHY_PORT_ST; i < NXGE_MAX_PHY_PORTS; i++) {
 
@@ -5795,8 +6547,13 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "port[%d] "
 			    "PMA/PMD dev %x found", i, pma_pmd_dev_id));
 			if (j < NXGE_PORTS_NEPTUNE) {
-				port_pma_pmd_dev_id[j] = pma_pmd_dev_id &
-				    BCM_PHY_ID_MASK;
+				if ((pma_pmd_dev_id & TN1010_DEV_ID_MASK)
+				    == TN1010_DEV_ID) {
+					port_pma_pmd_dev_id[j] = TN1010_DEV_ID;
+				} else {
+					port_pma_pmd_dev_id[j] =
+					pma_pmd_dev_id & BCM_PHY_ID_MASK;
+				}
 				port_fd_arr[j] = (uint8_t)i;
 				j++;
 			}
@@ -5811,12 +6568,26 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "port[%d] PCS "
 			    "dev %x found", i, pcs_dev_id));
 			if (pma_pmd_dev_fd[i] == 1) {
-				port_pcs_dev_id[j - 1] = pcs_dev_id &
-				    BCM_PHY_ID_MASK;
+				if ((pcs_dev_id & TN1010_DEV_ID_MASK)
+				    == TN1010_DEV_ID) {
+					port_pcs_dev_id[j - 1] =
+					    TN1010_DEV_ID;
+				} else {
+					port_pcs_dev_id[j - 1] =
+					    pcs_dev_id &
+					    BCM_PHY_ID_MASK;
+				}
 			} else {
 				if (j < NXGE_PORTS_NEPTUNE) {
-					port_pcs_dev_id[j] = pcs_dev_id &
-					    BCM_PHY_ID_MASK;
+					if ((pcs_dev_id & TN1010_DEV_ID_MASK)
+						== TN1010_DEV_ID) {
+						port_pcs_dev_id[j] =
+						    TN1010_DEV_ID;
+					} else {
+						port_pcs_dev_id[j] =
+						    pcs_dev_id &
+						    BCM_PHY_ID_MASK;
+					}
 					port_fd_arr[j] = (uint8_t)i;
 					j++;
 				}
@@ -5830,13 +6601,18 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 		}
 
 		phy_id = nxge_get_cl22_phy_id(nxgep, i);
-
 		if (nxge_is_supported_phy(phy_id, CLAUSE_22_TYPE)) {
 			total_phy_fd ++;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "port[%d] PHY ID"
 			    "%x found", i, phy_id));
 			if (l < NXGE_PORTS_NEPTUNE) {
-				port_phy_id[l] = phy_id & BCM_PHY_ID_MASK;
+				if ((phy_id & TN1010_DEV_ID_MASK)
+				    == TN1010_DEV_ID) {
+					port_phy_id[l] = TN1010_DEV_ID;
+				} else {
+					port_phy_id[l]
+					    = phy_id & BCM_PHY_ID_MASK;
+				}
 				phy_fd_arr[l] = (uint8_t)i;
 				l++;
 			}
@@ -5880,7 +6656,10 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			    "Unsupported neptune type 2 10G, 1 1G"));
 			goto error_exit;
 		case 0:
-			/* 2 10G */
+			/*
+			 * 2 10G: 2XGF NIC, Marvell, Goa, Huron with 2 XAUI
+			 * cards, etc.
+			 */
 			if (((port_pcs_dev_id[0] == PHY_BCM8704_FAMILY) &&
 			    (port_pcs_dev_id[1] == PHY_BCM8704_FAMILY)) ||
 			    ((port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY) &&
@@ -5899,19 +6678,19 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 				 */
 
 				switch (port_fd_arr[0]) {
-				case BCM8704_NEPTUNE_PORT_ADDR_BASE:
+				case NEPTUNE_CLAUSE45_PORT_ADDR_BASE:
 					/*
 					 * The Marvell case also falls into
 					 * this case as
 					 * MRVL88X2011_NEPTUNE_PORT_ADDR_BASE
-					 * == BCM8704_NEPTUNE_PORT_ADDR_BASE.
+					 * == NEPTUNE_CLAUSE45_PORT_ADDR_BASE.
 					 * This is OK for the 2 10G case.
 					 */
 					hw_p->niu_type = NEPTUNE_2_10GF;
 					hw_p->platform_type =
 					    P_NEPTUNE_ATLAS_2PORT;
 					break;
-				case BCM8706_GOA_PORT_ADDR_BASE:
+				case GOA_CLAUSE45_PORT_ADDR_BASE:
 					if (hw_p->platform_type !=
 					    P_NEPTUNE_NIU) {
 						hw_p->platform_type =
@@ -5929,53 +6708,110 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 				for (i = 0; i < 2; i++) {
 					hw_p->xcvr_addr[i] = port_fd_arr[i];
 				}
+
+			/* Both XAUI slots have copper XAUI cards */
+			} else if ((((port_pcs_dev_id[0] & TN1010_DEV_ID_MASK)
+			    == TN1010_DEV_ID) &&
+			    ((port_pcs_dev_id[1] & TN1010_DEV_ID_MASK)
+			    == TN1010_DEV_ID)) ||
+			    (((port_pma_pmd_dev_id[0] & TN1010_DEV_ID_MASK)
+			    == TN1010_DEV_ID) &&
+			    ((port_pma_pmd_dev_id[1] & TN1010_DEV_ID_MASK)
+			    == TN1010_DEV_ID))) {
+				hw_p->niu_type = NEPTUNE_2_TN1010;
+				hw_p->xcvr_addr[0] = port_fd_arr[0];
+				hw_p->xcvr_addr[1] = port_fd_arr[1];
+
+			/* Slot0 has fiber XAUI, slot1 has copper XAUI */
+			} else if ((port_pcs_dev_id[0] == PHY_BCM8704_FAMILY &&
+			    (port_pcs_dev_id[1] & TN1010_DEV_ID_MASK)
+			    == TN1010_DEV_ID) ||
+			    (port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY &&
+			    (port_pma_pmd_dev_id[1] & TN1010_DEV_ID_MASK) ==
+			    TN1010_DEV_ID)) {
+				hw_p->niu_type = NEPTUNE_1_10GF_1_TN1010;
+				hw_p->xcvr_addr[0] = port_fd_arr[0];
+				hw_p->xcvr_addr[1] = port_fd_arr[1];
+
+			/* Slot0 has copper XAUI, slot1 has fiber XAUI */
+			} else if ((port_pcs_dev_id[1] == PHY_BCM8704_FAMILY &&
+			    (port_pcs_dev_id[0] & TN1010_DEV_ID_MASK)
+			    == TN1010_DEV_ID) ||
+			    (port_pma_pmd_dev_id[1] == PHY_BCM8704_FAMILY &&
+			    (port_pma_pmd_dev_id[0] & TN1010_DEV_ID_MASK)
+			    == TN1010_DEV_ID)) {
+				hw_p->niu_type = NEPTUNE_1_TN1010_1_10GF;
+				hw_p->xcvr_addr[0] = port_fd_arr[0];
+				hw_p->xcvr_addr[1] = port_fd_arr[1];
+
 			} else {
 				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 				    "Unsupported neptune type 2"));
 				goto error_exit;
 			}
 			break;
+
 		case 4:
-			/* Maramba with 2 XAUI */
-			if ((((port_pcs_dev_id[0] == PHY_BCM8704_FAMILY) &&
-			    (port_pcs_dev_id[1] == PHY_BCM8704_FAMILY)) ||
-			    ((port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY) &&
-			    (port_pma_pmd_dev_id[1] == PHY_BCM8704_FAMILY))) &&
-			    ((port_phy_id[0] == PHY_BCM5464R_FAMILY) &&
-			    (port_phy_id[1] == PHY_BCM5464R_FAMILY) &&
-			    (port_phy_id[2] == PHY_BCM5464R_FAMILY) &&
-			    (port_phy_id[3] == PHY_BCM5464R_FAMILY))) {
+			if (nxge_get_num_of_xaui(
+			    port_pma_pmd_dev_id, port_pcs_dev_id,
+			    port_phy_id, &num_xaui) == NXGE_ERROR) {
+				goto error_exit;
+			}
+			if (num_xaui != 2)
+				goto error_exit;
 
-				/*
-				 * Check the first phy port address against
-				 * the known phy start addresses to determine
-				 * the platform type.
-				 */
-				switch (phy_fd_arr[0]) {
-				case BCM5464_MARAMBA_P0_PORT_ADDR_BASE:
-					hw_p->platform_type =
-					    P_NEPTUNE_MARAMBA_P0;
-					break;
-				case BCM5464_MARAMBA_P1_PORT_ADDR_BASE:
-					hw_p->platform_type =
-					    P_NEPTUNE_MARAMBA_P1;
-					break;
-				default:
-					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-					    "Unknown port %d...Cannot "
-					    "determine platform type", i));
-					goto error_exit;
-				}
+			/*
+			 *  Maramba with 2 XAUIs (either fiber or copper)
+			 *
+			 * Check the first phy port address against
+			 * the known phy start addresses to determine
+			 * the platform type.
+			 */
+			switch (phy_fd_arr[0]) {
+			case MARAMBA_P0_CLAUSE22_PORT_ADDR_BASE:
+				hw_p->platform_type =
+				    P_NEPTUNE_MARAMBA_P0;
+				break;
+			case MARAMBA_P1_CLAUSE22_PORT_ADDR_BASE:
+				hw_p->platform_type =
+				    P_NEPTUNE_MARAMBA_P1;
+				break;
+			default:
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "Unknown port %d...Cannot "
+				    "determine platform type", i));
+				goto error_exit;
+			}
 
+			hw_p->xcvr_addr[0] = port_fd_arr[0];
+			hw_p->xcvr_addr[1] = port_fd_arr[1];
+			hw_p->xcvr_addr[2] = phy_fd_arr[2];
+			hw_p->xcvr_addr[3] = phy_fd_arr[3];
+
+			/* slot0 has fiber XAUI, slot1 has Cu XAUI */
+			if (port_pcs_dev_id[0] == PHY_BCM8704_FAMILY &&
+			    (port_pcs_dev_id[1] & TN1010_DEV_ID_MASK)
+			    == TN1010_DEV_ID) {
+				hw_p->niu_type = NEPTUNE_1_10GF_1_TN1010_2_1GC;
+
+			/* slot0 has Cu XAUI, slot1 has fiber XAUI */
+			} else if (((port_pcs_dev_id[0] & TN1010_DEV_ID_MASK)
+			    == TN1010_DEV_ID) &&
+			    port_pcs_dev_id[1] == PHY_BCM8704_FAMILY) {
+				hw_p->niu_type = NEPTUNE_1_TN1010_1_10GF_2_1GC;
+
+			/* Both slots have fiber XAUI */
+			} else if (port_pcs_dev_id[0] == PHY_BCM8704_FAMILY &&
+			    port_pcs_dev_id[1] == PHY_BCM8704_FAMILY) {
 				hw_p->niu_type = NEPTUNE_2_10GF_2_1GC;
 
-				hw_p->xcvr_addr[0] = port_fd_arr[0];
-				hw_p->xcvr_addr[1] = port_fd_arr[1];
-				hw_p->xcvr_addr[2] = phy_fd_arr[2];
-				hw_p->xcvr_addr[3] = phy_fd_arr[3];
+			/* Both slots have copper XAUI */
+			} else if (((port_pcs_dev_id[0] & TN1010_DEV_ID_MASK)
+			    == TN1010_DEV_ID) &&
+			    (port_pcs_dev_id[1] & TN1010_DEV_ID_MASK)
+			    == TN1010_DEV_ID) {
+				hw_p->niu_type = NEPTUNE_2_TN1010_2_1GC;
 
-				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-				    "Maramba with 2 XAUI"));
 			} else {
 				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 				    "Unsupported neptune type 3"));
@@ -5988,8 +6824,8 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			goto error_exit;
 		}
 		break;
-	case 1:
-		switch (total_phy_fd) {
+	case 1: 	/* Only one clause45 port */
+		switch (total_phy_fd) {	/* Number of clause22 ports */
 		case 3:
 			/*
 			 * TODO 3 1G, 1 10G mode.
@@ -6017,8 +6853,8 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 			    "Unsupported neptune type 9"));
 			goto error_exit;
-		case 0:
-			/* 1 10G mode, N2 with 1 XAUI */
+		case 0:	/* N2 with 1 XAUI (fiber or copper) */
+			/* Fiber XAUI */
 			if (port_pcs_dev_id[0] == PHY_BCM8704_FAMILY ||
 			    port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY) {
 
@@ -6029,9 +6865,18 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 				 */
 
 				switch (port_fd_arr[0]) {
-				case BCM8704_N2_PORT_ADDR_BASE:
-				case (BCM8704_N2_PORT_ADDR_BASE + 1):
-				case BCM8706_ALT_GOA_PORT1_ADDR:
+				case N2_CLAUSE45_PORT_ADDR_BASE:
+				case (N2_CLAUSE45_PORT_ADDR_BASE + 1):
+				case ALT_GOA_CLAUSE45_PORT1_ADDR:
+					/*
+					 * If hw_p->platform_type ==
+					 * P_NEPTUNE_NIU, then portmode
+					 * is already known, so there is
+					 * no need to figure out hw_p->
+					 * platform_type because
+					 * platform_type is only for
+					 * figuring out portmode.
+					 */
 					if (hw_p->platform_type !=
 					    P_NEPTUNE_NIU) {
 						hw_p->platform_type =
@@ -6058,34 +6903,63 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 				 * boards where function 0 is mapped to addr 17
 				 */
 				if (port_fd_arr[0] ==
-				    BCM8706_ALT_GOA_PORT1_ADDR) {
+				    ALT_GOA_CLAUSE45_PORT1_ADDR) {
 					hw_p->xcvr_addr[1] = port_fd_arr[0];
 				} else {
 					hw_p->xcvr_addr[nxgep->function_num] =
 					    port_fd_arr[0];
 				}
+
+			/* A 10G copper XAUI in either slot0 or slot1 */
+			} else if ((port_pcs_dev_id[0] & TN1010_DEV_ID_MASK)
+			    == TN1010_DEV_ID ||
+			    (port_pma_pmd_dev_id[0] & TN1010_DEV_ID_MASK)
+			    == TN1010_DEV_ID) {
+				switch (port_fd_arr[0]) {
+				/* The XAUI is in slot0 */
+				case N2_CLAUSE45_PORT_ADDR_BASE:
+					hw_p->niu_type = NEPTUNE_1_TN1010;
+					break;
+
+				/* The XAUI is in slot1 */
+				case (N2_CLAUSE45_PORT_ADDR_BASE + 1):
+					hw_p->niu_type
+					    = NEPTUNE_1_NONE_1_TN1010;
+					break;
+				default:
+					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+					    "Unsupported XAUI port address"));
+					goto error_exit;
+				}
+				hw_p->xcvr_addr[nxgep->function_num]
+				    = port_fd_arr[0];
+
 			} else {
 				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-				    "Unsupported neptune type 10 - 1"));
+				    "Unsupported PHY type"));
 				goto error_exit;
 			}
 			break;
-		case 4:
-			/* Maramba with 1 XAUI */
-			if ((port_pcs_dev_id[0] == PHY_BCM8704_FAMILY) ||
-			    (port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY)) {
+		case 4: /* Maramba always have 4 clause 45 ports */
 
+			/* Maramba with 1 XAUI */
+			if (port_pcs_dev_id[0] == PHY_BCM8704_FAMILY ||
+			    port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY ||
+			    ((port_pcs_dev_id[0] & TN1010_DEV_ID_MASK)
+			    == TN1010_DEV_ID) ||
+			    ((port_pma_pmd_dev_id[0] & TN1010_DEV_ID_MASK)
+			    == TN1010_DEV_ID)) {
 				/*
 				 * Check the first phy port address against
 				 * the known phy start addresses to determine
 				 * the platform type.
 				 */
 				switch (phy_fd_arr[0]) {
-				case BCM5464_MARAMBA_P0_PORT_ADDR_BASE:
+				case MARAMBA_P0_CLAUSE22_PORT_ADDR_BASE:
 					hw_p->platform_type =
 					    P_NEPTUNE_MARAMBA_P0;
 					break;
-				case BCM5464_MARAMBA_P1_PORT_ADDR_BASE:
+				case MARAMBA_P1_CLAUSE22_PORT_ADDR_BASE:
 					hw_p->platform_type =
 					    P_NEPTUNE_MARAMBA_P1;
 					break;
@@ -6098,21 +6972,38 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 				}
 
 				/*
-				 * Check the BCM8704 address to determine
+				 * Check the clause45 address to determine
 				 * if XAUI is in port 0 or port 1.
 				 */
 				switch (port_fd_arr[0]) {
-				case BCM8704_MARAMBA_PORT_ADDR_BASE:
-					hw_p->niu_type = NEPTUNE_1_10GF_3_1GC;
+				case MARAMBA_CLAUSE45_PORT_ADDR_BASE:
+					if (port_pcs_dev_id[0]
+					    == PHY_BCM8704_FAMILY ||
+					    port_pma_pmd_dev_id[0]
+					    == PHY_BCM8704_FAMILY) {
+						hw_p->niu_type
+						    = NEPTUNE_1_10GF_3_1GC;
+					} else {
+						hw_p->niu_type
+						    = NEPTUNE_1_TN1010_3_1GC;
+					}
 					hw_p->xcvr_addr[0] = port_fd_arr[0];
 					for (i = 1; i < NXGE_MAX_PORTS; i++) {
 						hw_p->xcvr_addr[i] =
 						    phy_fd_arr[i];
 					}
 					break;
-				case (BCM8704_MARAMBA_PORT_ADDR_BASE + 1):
-					hw_p->niu_type =
-					    NEPTUNE_1_1GC_1_10GF_2_1GC;
+				case (MARAMBA_CLAUSE45_PORT_ADDR_BASE + 1):
+					if (port_pcs_dev_id[0]
+					    == PHY_BCM8704_FAMILY ||
+					    port_pma_pmd_dev_id[0]
+					    == PHY_BCM8704_FAMILY) {
+						hw_p->niu_type =
+						    NEPTUNE_1_1GC_1_10GF_2_1GC;
+					} else {
+						hw_p->niu_type =
+						NEPTUNE_1_1GC_1_TN1010_2_1GC;
+					}
 					hw_p->xcvr_addr[0] = phy_fd_arr[0];
 					hw_p->xcvr_addr[1] = port_fd_arr[0];
 					hw_p->xcvr_addr[2] = phy_fd_arr[2];
@@ -6124,7 +7015,7 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 					goto error_exit;
 				}
 				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-				    "Maramba with 1 XAUI"));
+				    "Maramba with 1 XAUI (fiber or copper)"));
 			} else {
 				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 				    "Unsupported neptune type 12"));
@@ -6137,7 +7028,7 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			goto error_exit;
 		}
 		break;
-	case 0:
+	case 0: /* 4 ports Neptune based NIC */
 		switch (total_phy_fd) {
 		case 4:
 			if ((port_phy_id[0] == PHY_BCM5464R_FAMILY) &&
@@ -6151,11 +7042,11 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 				 * the platform type.
 				 */
 				switch (phy_fd_arr[0]) {
-				case BCM5464_MARAMBA_P1_PORT_ADDR_BASE:
+				case MARAMBA_P1_CLAUSE22_PORT_ADDR_BASE:
 					hw_p->platform_type =
 					    P_NEPTUNE_MARAMBA_P1;
 					break;
-				case BCM5464_NEPTUNE_PORT_ADDR_BASE:
+				case NEPTUNE_CLAUSE22_PORT_ADDR_BASE:
 					hw_p->platform_type =
 					    P_NEPTUNE_ATLAS_4PORT;
 					break;
@@ -6246,9 +7137,9 @@ nxge_bcm5464_link_led_off(p_nxge_t nxgep) {
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "==> nxge_bcm5464_link_led_off"));
 
 	if (nxgep->nxge_hw_p->platform_type == P_NEPTUNE_MARAMBA_P1) {
-		xcvr_portn = BCM5464_MARAMBA_P1_PORT_ADDR_BASE;
+		xcvr_portn = MARAMBA_P1_CLAUSE22_PORT_ADDR_BASE;
 	} else if (nxgep->nxge_hw_p->platform_type == P_NEPTUNE_MARAMBA_P0) {
-		xcvr_portn = BCM5464_MARAMBA_P0_PORT_ADDR_BASE;
+		xcvr_portn = MARAMBA_P0_CLAUSE22_PORT_ADDR_BASE;
 	}
 	/*
 	 * For Altas 4-1G copper, Xcvr port numbers are
@@ -6391,6 +7282,159 @@ nxge_mac_set_framesize(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 	    "<== nxge_mac_set_framesize: port<%d>", portn));
 
+	return (NXGE_OK);
+}
+
+static nxge_status_t
+nxge_get_num_of_xaui(uint32_t *port_pma_pmd_dev_id,
+    uint32_t *port_pcs_dev_id, uint32_t *port_phy_id, uint8_t *num_xaui)
+{
+	uint8_t i;
+
+	for (i = 0; i < 4; i++) {
+		if (port_phy_id[i] != PHY_BCM5464R_FAMILY)
+			return (NXGE_ERROR);
+	}
+
+	*num_xaui = 0;
+	if ((port_pma_pmd_dev_id[0]  == PHY_BCM8704_FAMILY &&
+	    port_pcs_dev_id[0] 	== PHY_BCM8704_FAMILY) ||
+	    (((port_pma_pmd_dev_id[0] & TN1010_DEV_ID_MASK)
+	    == TN1010_DEV_ID) &&
+	    ((port_pcs_dev_id[0] & TN1010_DEV_ID_MASK)
+	    == TN1010_DEV_ID))) {
+		(*num_xaui) ++;
+	}
+	if ((port_pma_pmd_dev_id[1]  == PHY_BCM8704_FAMILY &&
+	    port_pcs_dev_id[1] == PHY_BCM8704_FAMILY) ||
+	    (((port_pma_pmd_dev_id[1] & TN1010_DEV_ID_MASK)
+	    == TN1010_DEV_ID) &&
+	    ((port_pcs_dev_id[1] & TN1010_DEV_ID_MASK)
+	    == TN1010_DEV_ID))) {
+		(*num_xaui) ++;
+	}
+	return (NXGE_OK);
+}
+
+/*
+ * Instruction from Teranetics:  Once you detect link is up, go
+ * read Reg 30.1.4 for link speed: '1' for 1G and '0' for 10G. You
+ * may want to qualify it by first checking Register 30.1.7:6 and
+ * making sure it reads "01" (Auto-Neg Complete).
+ *
+ * If this function is called when the link is down or before auto-
+ * negotiation has completed, then the speed of the PHY is not certain.
+ * In such cases, this function returns 1G as the default speed with
+ * NXGE_OK status instead of NXGE_ERROR.  It is OK to initialize the
+ * driver based on a default speed because this function will be called
+ * again when the link comes up.  Returning NXGE_ERROR, which may
+ * cause brutal chain reaction in caller functions, is not necessary.
+ */
+static nxge_status_t
+nxge_get_tn1010_speed(p_nxge_t nxgep, uint16_t *speed)
+{
+	uint8_t		phy_port_addr, autoneg_stat, link_up;
+	nxge_status_t	status = NXGE_OK;
+	uint16_t	val;
+	uint8_t		portn = NXGE_GET_PORT_NUM(nxgep->function_num);
+
+	/* Set default speed to 10G */
+	*speed = TN1010_SPEED_10G;
+
+	/* Set Clause 45 */
+	npi_mac_mif_set_indirect_mode(nxgep->npi_handle, B_TRUE);
+
+	phy_port_addr = nxgep->nxge_hw_p->xcvr_addr[portn];
+
+	/* Check Device 1 Register 0xA bit0 for link up status */
+	status = nxge_mdio_read(nxgep, phy_port_addr,
+	    TN1010_AUTONEG_DEV_ADDR, TN1010_AUTONEG_STATUS_REG, &val);
+	if (status != NXGE_OK)
+		goto fail;
+
+	link_up = ((val & TN1010_AN_LINK_STAT_BIT)
+	    ? B_TRUE : B_FALSE);
+	if (link_up == B_FALSE) {
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "nxge_get_tn1010_speed: link is down"));
+		goto nxge_get_tn1010_speed_exit;
+	}
+
+	if ((status = nxge_mdio_read(nxgep, phy_port_addr,
+	    TN1010_VENDOR_MMD1_DEV_ADDR, TN1010_VENDOR_MMD1_STATUS_REG,
+	    &val)) != NXGE_OK) {
+		goto fail;
+	}
+	autoneg_stat = (val & TN1010_VENDOR_MMD1_AN_STAT_BITS) >>
+	    TN1010_VENDOR_MMD1_AN_STAT_SHIFT;
+
+	/*
+	 * Return NXGE_OK even when we can not get a settled speed. In
+	 * such case, the speed reported should not be trusted but that
+	 * is OK, we will call this function periodically and will get
+	 * the correct speed after the link is up.
+	 */
+	switch (autoneg_stat) {
+	case TN1010_AN_IN_PROG:
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "nxge_get_tn1010_speed: Auto-negotiation in progress"));
+		break;
+	case TN1010_AN_COMPLETE:
+		if ((status = nxge_mdio_read(nxgep, phy_port_addr,
+		    TN1010_VENDOR_MMD1_DEV_ADDR,
+		    TN1010_VENDOR_MMD1_STATUS_REG,
+		    &val)) != NXGE_OK) {
+			goto fail;
+		}
+		*speed = (val & TN1010_VENDOR_MMD1_AN_SPEED_BIT) >>
+		    TN1010_VENDOR_MMD1_AN_SPEED_SHIFT;
+		break;
+	case TN1010_AN_RSVD:
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_get_tn1010_speed: Autoneg status undefined"));
+		break;
+	case TN1010_AN_FAILED:
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "nxge_get_tn1010_speed: Auto-negotiation failed"));
+		break;
+	default:
+		break;
+	}
+nxge_get_tn1010_speed_exit:
+	return (NXGE_OK);
+fail:
+	return (status);
+}
+
+
+/*
+ * Teranetics TN1010 PHY chip supports both 1G and 10G modes, this function
+ * figures out the speed of the PHY determined by the autonegotiation
+ * process and sets the following 3 parameters,
+ * 	nxgep->mac.portmode
+ *     	nxgep->statsp->mac_stats.link_speed
+ *	nxgep->statsp->mac_stats.xcvr_inuse
+ */
+static nxge_status_t
+nxge_set_tn1010_param(p_nxge_t nxgep)
+{
+	uint16_t speed;
+
+	if (nxge_get_tn1010_speed(nxgep,  &speed) != NXGE_OK) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "nxge_set_tn1010_param: "
+		    "Failed to get TN1010 speed"));
+		return (NXGE_ERROR);
+	}
+	if (speed == TN1010_SPEED_1G) {
+		nxgep->mac.portmode = PORT_1G_TN1010;
+		nxgep->statsp->mac_stats.link_speed = 1000;
+		nxgep->statsp->mac_stats.xcvr_inuse = PCS_XCVR;
+	} else {
+		nxgep->mac.portmode = PORT_10G_TN1010;
+		nxgep->statsp->mac_stats.link_speed = 10000;
+		nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
+	}
 	return (NXGE_OK);
 }
 

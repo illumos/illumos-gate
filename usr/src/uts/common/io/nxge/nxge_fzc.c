@@ -988,6 +988,7 @@ nxge_init_fzc_rxdma_port(p_nxge_t nxgep)
 
 	if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
 	    (nxgep->mac.portmode == PORT_1G_FIBER) ||
+	    (nxgep->mac.portmode == PORT_1G_TN1010) ||
 	    (nxgep->mac.portmode == PORT_1G_SERDES)) {
 		rs = npi_rxdma_cfg_port_ddr_weight(handle,
 		    nxgep->function_num, NXGE_RX_DRR_WT_1G);

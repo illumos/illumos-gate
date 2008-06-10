@@ -1356,6 +1356,10 @@ nxge_cfg_verify_set_quick_config(p_nxge_t nxgep)
 	return (status);
 }
 
+/*
+ * Device properties adv-autoneg-cap etc are defined by FWARC
+ * http://sac.sfbay/FWARC/2002/345/20020610_asif.haswarey
+ */
 static void
 nxge_use_cfg_link_cfg(p_nxge_t nxgep)
 {
@@ -1477,6 +1481,7 @@ nxge_use_cfg_link_cfg(p_nxge_t nxgep)
 	} else
 		duplex = 0;
 
+	/* speed == 0 or duplex == 0 means auto negotiation. */
 	adv_autoneg_cap = (speed == 0) || (duplex == 0);
 	if (adv_autoneg_cap == 0) {
 		adv_10gfdx_cap = ((speed == 10000) && (duplex == 2));

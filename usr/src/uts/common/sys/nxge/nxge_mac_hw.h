@@ -101,6 +101,7 @@ typedef enum  {
 #define	NXGE_PHY_FIBRE		0x2
 #define	NXGE_PHY_SERDES		0x3
 #define	NXGE_PHY_RGMII_FIBER	0x4
+#define	NXGE_PHY_TN1010		0x5
 #define	NXGE_PHY_RSVD		0x7
 
 #define	NXGE_PORT_SPD_SHIFT	0
@@ -109,9 +110,20 @@ typedef enum  {
 #define	NXGE_PHY_SHIFT		16
 #define	NXGE_PHY_MASK		0x0f0000
 
-#define	NXGE_PORT_1G_COPPER	(NXGE_PORT_SPD_1G |	\
-	(NXGE_PHY_COPPER << NXGE_PHY_SHIFT))
+/*
+ * "xgc" as a possible value for the device property "phy-type"
+ * was intended for the portmode == PORT_10G_COPPER case. But
+ * the first 10G copper network I/O device available is the
+ * TN1010 based copper XAUI card and we use PORT_10G_TN1010 or
+ * PORT_1G_TN1010 as the portmode, so PORT_10G_COPPER is never
+ * used as portmode. The driver code related to PORT_10G_COPPER
+ * is kept in the driver as a place holder for possble future
+ * 10G copper devices.
+ */
 #define	NXGE_PORT_10G_COPPER	(NXGE_PORT_SPD_10G |	\
+	(NXGE_PHY_COPPER << NXGE_PHY_SHIFT))
+
+#define	NXGE_PORT_1G_COPPER	(NXGE_PORT_SPD_1G |	\
 	(NXGE_PHY_COPPER << NXGE_PHY_SHIFT))
 #define	NXGE_PORT_1G_FIBRE	(NXGE_PORT_SPD_1G |	\
 	(NXGE_PHY_FIBRE << NXGE_PHY_SHIFT))
@@ -123,6 +135,11 @@ typedef enum  {
 	(NXGE_PHY_SERDES << NXGE_PHY_SHIFT))
 #define	NXGE_PORT_1G_RGMII_FIBER	(NXGE_PORT_SPD_1G |	\
 	(NXGE_PHY_RGMII_FIBER << NXGE_PHY_SHIFT))
+
+/* The speed of TN1010 will be determined by each nxge instance */
+#define	NXGE_PORT_TN1010	(NXGE_PORT_SPD_NONE |	\
+	(NXGE_PHY_TN1010 << NXGE_PHY_SHIFT))
+
 #define	NXGE_PORT_NONE		(NXGE_PORT_SPD_NONE |	\
 	(NXGE_PHY_NONE << NXGE_PHY_SHIFT))
 #define	NXGE_PORT_RSVD		(NXGE_PORT_SPD_RSVD |	\
@@ -158,11 +175,13 @@ typedef	enum nxge_port_mode {
 	PORT_1G_FIBER,
 	PORT_10G_COPPER,
 	PORT_10G_FIBER,
-	PORT_10G_SERDES,
-	PORT_1G_SERDES,
-	PORT_1G_RGMII_FIBER,
+	PORT_10G_SERDES,	/* Port0 or 1 of Alonso or Monza */
+	PORT_1G_SERDES,		/* Port0 or 1 of Alonso or Monza */
+	PORT_1G_RGMII_FIBER,	/* Port2 or 3 of Alonso or ARTM  */
 	PORT_HSP_MODE,
-	PORT_LOGICAL
+	PORT_LOGICAL,
+	PORT_1G_TN1010,		/* Teranetics PHY in 1G mode */
+	PORT_10G_TN1010		/* Teranetics PHY in 10G mode */
 } nxge_port_mode_t;
 
 typedef	enum nxge_linkchk_mode {

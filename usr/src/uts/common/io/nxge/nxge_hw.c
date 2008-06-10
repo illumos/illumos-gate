@@ -274,6 +274,25 @@ nxge_intr(void *arg1, void *arg2)
 	return (serviced);
 }
 
+
+/*
+ * XFP Related Status Register Values Under 3 Different Conditions
+ *
+ * -------------+-------------------------+-------------------------
+ * 		|   Intel XFP and Avago   |	    Sun XFP
+ * -------------+---------+---------------+---------+---------------
+ *		| STATUS0 | TX_ALARM_STAT | STATUS0 | TX_ALARM_STAT
+ * -------------+---------+---------------+---------+---------------
+ *	No XFP  | 0x639C  |      0x40     | 0x639C  |      0x40
+ * -------------+---------+---------------+---------+---------------
+ * XFP,linkdown | 0x43BC  |      0x40     | 0x639C  |      0x40
+ * -------------+---------+---------------+---------+---------------
+ * XFP,linkup   | 0x03FC  |      0x0      | 0x03FC  |      0x0
+ * -------------+---------+---------------+---------+---------------
+ * Note:
+ *      STATUS0         = BCM8704_USER_ANALOG_STATUS0_REG
+ *      TX_ALARM_STAT   = BCM8704_USER_TX_ALARM_STATUS_REG
+ */
 /* ARGSUSED */
 static nxge_status_t
 nxge_check_xaui_xfp(p_nxge_t nxgep)
@@ -289,6 +308,11 @@ nxge_check_xaui_xfp(p_nxge_t nxgep)
 	portn = nxgep->mac.portnum;
 	phy_port_addr = nxgep->statsp->mac_stats.xcvr_portn;
 
+	/*
+	 * Keep the val1 code even though it is not used. Could be
+	 * used to differenciate the "No XFP" case and "XFP,linkdown"
+	 * case when a Intel XFP is used.
+	 */
 	if ((status = nxge_mdio_read(nxgep, phy_port_addr,
 	    BCM8704_USER_DEV3_ADDR,
 	    BCM8704_USER_ANALOG_STATUS0_REG, &val)) == NXGE_OK) {
@@ -296,11 +320,14 @@ nxge_check_xaui_xfp(p_nxge_t nxgep)
 		    BCM8704_USER_DEV3_ADDR,
 		    BCM8704_USER_TX_ALARM_STATUS_REG, &val1);
 	}
+
 	if (status != NXGE_OK) {
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
 		    NXGE_FM_EREPORT_XAUI_ERR);
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		    "XAUI is bad or absent on port<%d>\n", portn));
+		if (DDI_FM_EREPORT_CAP(nxgep->fm_capabilities)) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "XAUI is bad or absent on port<%d>\n", portn));
+		}
 	} else if (nxgep->mac.portmode == PORT_10G_FIBER) {
 		/*
 		 * 0x03FC = 0000 0011 1111 1100 (XFP is normal)
@@ -313,8 +340,11 @@ nxge_check_xaui_xfp(p_nxge_t nxgep)
 		if (val == 0x639C) {
 			NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
 			    NXGE_FM_EREPORT_XFP_ERR);
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			    "XFP is bad or absent on port<%d>\n", portn));
+			if (DDI_FM_EREPORT_CAP(nxgep->fm_capabilities)) {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "XFP is bad or absent on port<%d>\n",
+				    portn));
+			}
 			status = NXGE_ERROR;
 		}
 	}
@@ -422,8 +452,14 @@ nxge_syserr_intr(void *arg1, void *arg2)
 		(void) nxge_fflp_handle_sys_errors(nxgep);
 	}
 
+	/*
+	 * nxge_check_xaui_xfg checks XAUI for all of the following
+	 * portmodes, but checks XFP only if portmode == PORT_10G_FIBER.
+	 */
 	if (nxgep->mac.portmode == PORT_10G_FIBER ||
-	    nxgep->mac.portmode == PORT_10G_COPPER) {
+		nxgep->mac.portmode == PORT_10G_COPPER ||
+		nxgep->mac.portmode == PORT_10G_TN1010 ||
+		nxgep->mac.portmode == PORT_1G_TN1010) {
 		if (nxge_check_xaui_xfp(nxgep) != NXGE_OK) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "==> nxge_syserr_intr: device error - XAUI"));
@@ -619,21 +655,38 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 		if (nxgep != NULL) {
 			size = sizeof (lb_normal);
 			if (nxgep->statsp->mac_stats.cap_10gfdx) {
-				size += sizeof (lb_external10g);
+				/* TN1010 does not support external loopback */
+				if (nxgep->mac.portmode != PORT_1G_TN1010 &&
+				    nxgep->mac.portmode != PORT_10G_TN1010) {
+					size += sizeof (lb_external10g);
+				}
 				size += sizeof (lb_mac10g);
 				/* Publish PHY loopback if PHY is present */
 				if (nxgep->mac.portmode == PORT_10G_COPPER ||
+				    nxgep->mac.portmode == PORT_10G_TN1010 ||
 				    nxgep->mac.portmode == PORT_10G_FIBER)
 					size += sizeof (lb_phy10g);
 			}
+
+			/*
+			 * Even if cap_10gfdx is false, we still do 10G
+			 * serdes loopback as a part of SunVTS xnetlbtest
+			 * internal loopback test.
+			 */
 			if (nxgep->mac.portmode == PORT_10G_FIBER ||
+			    nxgep->mac.portmode == PORT_10G_TN1010 ||
 			    nxgep->mac.portmode == PORT_10G_SERDES)
 				size += sizeof (lb_serdes10g);
 
 			if (nxgep->statsp->mac_stats.cap_1000fdx) {
-				size += sizeof (lb_external1000);
+				/* TN1010 does not support external loopback */
+				if (nxgep->mac.portmode != PORT_1G_TN1010 &&
+				    nxgep->mac.portmode != PORT_10G_TN1010) {
+					size += sizeof (lb_external1000);
+				}
 				size += sizeof (lb_mac1000);
 				if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
+				    nxgep->mac.portmode == PORT_1G_TN1010 ||
 				    (nxgep->mac.portmode ==
 				    PORT_1G_RGMII_FIBER))
 					size += sizeof (lb_phy1000);
@@ -643,6 +696,7 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 			if (nxgep->statsp->mac_stats.cap_10fdx)
 				size += sizeof (lb_external10);
 			if (nxgep->mac.portmode == PORT_1G_FIBER ||
+			    nxgep->mac.portmode == PORT_1G_TN1010 ||
 			    nxgep->mac.portmode == PORT_1G_SERDES)
 				size += sizeof (lb_serdes1000);
 
@@ -660,30 +714,44 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 		if (nxgep != NULL) {
 			size = sizeof (lb_normal);
 			if (nxgep->statsp->mac_stats.cap_10gfdx) {
-				size += sizeof (lb_external10g);
+				/* TN1010 does not support external loopback */
+				if (nxgep->mac.portmode != PORT_1G_TN1010 &&
+				    nxgep->mac.portmode != PORT_10G_TN1010) {
+					size += sizeof (lb_external10g);
+				}
 				size += sizeof (lb_mac10g);
 				/* Publish PHY loopback if PHY is present */
 				if (nxgep->mac.portmode == PORT_10G_COPPER ||
+				    nxgep->mac.portmode == PORT_10G_TN1010 ||
 				    nxgep->mac.portmode == PORT_10G_FIBER)
 					size += sizeof (lb_phy10g);
 			}
 			if (nxgep->mac.portmode == PORT_10G_FIBER ||
+			    nxgep->mac.portmode == PORT_10G_TN1010 ||
 			    nxgep->mac.portmode == PORT_10G_SERDES)
 				size += sizeof (lb_serdes10g);
 
 			if (nxgep->statsp->mac_stats.cap_1000fdx) {
-				size += sizeof (lb_external1000);
+				/* TN1010 does not support external loopback */
+				if (nxgep->mac.portmode != PORT_1G_TN1010 &&
+				    nxgep->mac.portmode != PORT_10G_TN1010) {
+					size += sizeof (lb_external1000);
+				}
 				size += sizeof (lb_mac1000);
 				if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
+				    nxgep->mac.portmode == PORT_1G_TN1010 ||
 				    (nxgep->mac.portmode ==
 				    PORT_1G_RGMII_FIBER))
 					size += sizeof (lb_phy1000);
 			}
 			if (nxgep->statsp->mac_stats.cap_100fdx)
 				size += sizeof (lb_external100);
+
 			if (nxgep->statsp->mac_stats.cap_10fdx)
 				size += sizeof (lb_external10);
+
 			if (nxgep->mac.portmode == PORT_1G_FIBER ||
+			    nxgep->mac.portmode == PORT_1G_TN1010 ||
 			    nxgep->mac.portmode == PORT_1G_SERDES)
 				size += sizeof (lb_serdes1000);
 
@@ -693,28 +761,53 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 				i = 0;
 				lb_props = (p_lb_property_t)mp->b_cont->b_rptr;
 				lb_props[i++] = lb_normal;
+
 				if (nxgep->statsp->mac_stats.cap_10gfdx) {
 					lb_props[i++] = lb_mac10g;
 					if (nxgep->mac.portmode ==
 					    PORT_10G_COPPER ||
 					    nxgep->mac.portmode ==
-					    PORT_10G_FIBER)
+					    PORT_10G_TN1010 ||
+					    nxgep->mac.portmode ==
+					    PORT_10G_FIBER) {
 						lb_props[i++] = lb_phy10g;
+					}
+					/* TN1010 does not support ext lb */
+					if (nxgep->mac.portmode !=
+					    PORT_10G_TN1010 &&
+					    nxgep->mac.portmode !=
+					    PORT_1G_TN1010) {
+						lb_props[i++] = lb_external10g;
+					}
 					lb_props[i++] = lb_external10g;
 				}
+
 				if (nxgep->mac.portmode == PORT_10G_FIBER ||
+				    nxgep->mac.portmode == PORT_10G_TN1010 ||
 				    nxgep->mac.portmode == PORT_10G_SERDES)
 					lb_props[i++] = lb_serdes10g;
 
-				if (nxgep->statsp->mac_stats.cap_1000fdx)
-					lb_props[i++] = lb_external1000;
+				if (nxgep->statsp->mac_stats.cap_1000fdx) {
+					/* TN1010 does not support ext lb */
+					if (nxgep->mac.portmode !=
+					    PORT_10G_TN1010 &&
+					    nxgep->mac.portmode !=
+					    PORT_1G_TN1010) {
+						lb_props[i++] = lb_external1000;
+					}
+				}
+
 				if (nxgep->statsp->mac_stats.cap_100fdx)
 					lb_props[i++] = lb_external100;
+
 				if (nxgep->statsp->mac_stats.cap_10fdx)
 					lb_props[i++] = lb_external10;
+
 				if (nxgep->statsp->mac_stats.cap_1000fdx)
 					lb_props[i++] = lb_mac1000;
+
 				if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
+				    nxgep->mac.portmode == PORT_1G_TN1010 ||
 				    (nxgep->mac.portmode ==
 				    PORT_1G_RGMII_FIBER)) {
 					if (nxgep->statsp->mac_stats.
@@ -722,6 +815,7 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 						lb_props[i++] = lb_phy1000;
 				} else if ((nxgep->mac.portmode ==
 				    PORT_1G_FIBER) ||
+				    (nxgep->mac.portmode == PORT_1G_TN1010) ||
 				    (nxgep->mac.portmode == PORT_1G_SERDES)) {
 					lb_props[i++] = lb_serdes1000;
 				}
@@ -856,10 +950,12 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 		lb_info = &lb_external10;
 	else if ((lb_mode == lb_phy10g.value) &&
 			((nxgep->mac.portmode == PORT_10G_COPPER) ||
+			(nxgep->mac.portmode == PORT_10G_TN1010) ||
 			(nxgep->mac.portmode == PORT_10G_FIBER)))
 		lb_info = &lb_phy10g;
 	else if ((lb_mode == lb_phy1000.value) &&
 	    ((nxgep->mac.portmode == PORT_1G_COPPER) ||
+	    (nxgep->mac.portmode == PORT_1G_TN1010) ||
 	    (nxgep->mac.portmode == PORT_1G_RGMII_FIBER)))
 		lb_info = &lb_phy1000;
 	else if ((lb_mode == lb_phy.value) &&
@@ -868,11 +964,13 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 	else if ((lb_mode == lb_serdes10g.value) &&
 	    ((nxgep->mac.portmode == PORT_10G_FIBER) ||
 	    (nxgep->mac.portmode == PORT_10G_COPPER) ||
+	    (nxgep->mac.portmode == PORT_10G_TN1010) ||
 	    (nxgep->mac.portmode == PORT_10G_SERDES)))
 		lb_info = &lb_serdes10g;
 	else if ((lb_mode == lb_serdes1000.value) &&
-	    (nxgep->mac.portmode == PORT_1G_FIBER ||
-	    (nxgep->mac.portmode == PORT_1G_SERDES)))
+	    (nxgep->mac.portmode == PORT_1G_FIBER) ||
+	    (nxgep->mac.portmode == PORT_1G_TN1010) ||
+	    (nxgep->mac.portmode == PORT_1G_SERDES))
 		lb_info = &lb_serdes1000;
 	else if (lb_mode == lb_mac10g.value)
 		lb_info = &lb_mac10g;
@@ -985,6 +1083,7 @@ nxge_set_lb_err:
 	return (status);
 }
 
+/* Return to normal (no loopback) mode */
 /* ARGSUSED */
 nxge_status_t
 nxge_set_lb_normal(p_nxge_t nxgep)

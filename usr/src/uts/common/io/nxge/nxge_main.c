@@ -796,7 +796,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	nxge_intrs_enable(nxgep);
 
-	// If a guest, register with vio_net instead.
+	/* If a guest, register with vio_net instead. */
 	if ((status = nxge_mac_register(nxgep)) != NXGE_OK) {
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 		    "unable to register to mac layer (%d)", status));
@@ -808,6 +808,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 	    "registered to mac (instance %d)", instance));
 
+	/* nxge_link_monitor calls xcvr.check_link recursively */
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 
 	goto nxge_attach_exit;
@@ -1091,6 +1092,10 @@ nxge_map_regs(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 	    "nxge_map_regs: pathname devname %s", devname));
 
+	/*
+	 * The driver is running on a N2-NIU system if devname is something
+	 * like "/niu@80/network@0"
+	 */
 	if (strstr(devname, n2_siu_name)) {
 		/* N2/NIU */
 		nxgep->niu_type = N2_NIU;
@@ -5116,6 +5121,10 @@ nxge_set_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 
 		return (err);
 	}
+	/*
+	 * Commands like "ndd -set /dev/nxge0 adv_10gfdx_cap 1" cause the
+	 * following code to be executed.
+	 */
 	if (strcmp(pr_name, "_adv_10gfdx_cap") == 0) {
 		err = nxge_param_set_mac(nxgep, NULL, NULL, (char *)pr_val,
 		    (caddr_t)&param_arr[param_anar_10gfdx]);
@@ -5207,6 +5216,16 @@ nxge_get_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_flags,
 		case PORT_1G_SERDES:
 			(void) snprintf(valstr, sizeof (valstr), "1G serdes %s",
 			    nxgep->hot_swappable_phy ?
+			    "[hot swappable]" : "");
+			break;
+		case PORT_1G_TN1010:
+			(void) snprintf(valstr, sizeof (valstr),
+			    "1G TN1010 copper %s", nxgep->hot_swappable_phy ?
+			    "[hot swappable]" : "");
+			break;
+		case PORT_10G_TN1010:
+			(void) snprintf(valstr, sizeof (valstr),
+			    "10G TN1010 copper %s", nxgep->hot_swappable_phy ?
 			    "[hot swappable]" : "");
 			break;
 		case PORT_1G_RGMII_FIBER:
@@ -6506,7 +6525,7 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 			p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
 			p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
 			(void) nxge_fzc_rdc_tbl_unbind(nxgep,
-			    p_cfgp->def_mac_rxdma_grpid);
+			p_cfgp->def_mac_rxdma_grpid);
 
 			if (hw_p->ndevs) {
 				hw_p->ndevs--;
@@ -6628,6 +6647,7 @@ nxge_create_msi_property(p_nxge_t nxgep)
 	switch (nxgep->mac.portmode) {
 	case PORT_10G_COPPER:
 	case PORT_10G_FIBER:
+	case PORT_10G_TN1010:
 		(void) ddi_prop_create(DDI_DEV_T_NONE, nxgep->dip,
 		    DDI_PROP_CANSLEEP, "#msix-request", NULL, 0);
 		/*

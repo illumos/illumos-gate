@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,14 +66,14 @@ extern "C" {
 /* Register address */
 
 #define	ESR_N2_PLL_CFG_REG		ESR_N2_BASE + ESR_N2_PLL_REG_OFFSET
-#define	ESR_N2_PLL_CFG_L_REG	ESR_N2_BASE + ESR_N2_PLL_REG_OFFSET
-#define	ESR_N2_PLL_CFG_H_REG	ESR_N2_BASE + ESR_N2_PLL_REG_OFFSET + 1
+#define	ESR_N2_PLL_CFG_L_REG		ESR_N2_BASE + ESR_N2_PLL_REG_OFFSET
+#define	ESR_N2_PLL_CFG_H_REG		ESR_N2_BASE + ESR_N2_PLL_REG_OFFSET + 1
 #define	ESR_N2_PLL_STS_REG		ESR_N2_BASE + ESR_N2_PLL_REG_OFFSET + 2
-#define	ESR_N2_PLL_STS_L_REG	ESR_N2_BASE + ESR_N2_PLL_REG_OFFSET + 2
-#define	ESR_N2_PLL_STS_H_REG	ESR_N2_BASE + ESR_N2_PLL_REG_OFFSET + 3
+#define	ESR_N2_PLL_STS_L_REG		ESR_N2_BASE + ESR_N2_PLL_REG_OFFSET + 2
+#define	ESR_N2_PLL_STS_H_REG		ESR_N2_BASE + ESR_N2_PLL_REG_OFFSET + 3
 #define	ESR_N2_TEST_CFG_REG		ESR_N2_BASE + ESR_N2_TEST_REG_OFFSET
-#define	ESR_N2_TEST_CFG_L_REG	ESR_N2_BASE + ESR_N2_TEST_REG_OFFSET
-#define	ESR_N2_TEST_CFG_H_REG	ESR_N2_BASE + ESR_N2_TEST_REG_OFFSET + 1
+#define	ESR_N2_TEST_CFG_L_REG		ESR_N2_BASE + ESR_N2_TEST_REG_OFFSET
+#define	ESR_N2_TEST_CFG_H_REG		ESR_N2_BASE + ESR_N2_TEST_REG_OFFSET + 1
 
 #define	ESR_N2_TX_CFG_REG_ADDR(chan)	(ESR_N2_BASE + ESR_N2_TX_REG_OFFSET +\
 					(chan * 4))
@@ -107,7 +107,7 @@ typedef	union _esr_ti_cfgpll_l {
 	struct {
 #if defined(_BIT_FIELDS_HTOL)
 		uint16_t res2		: 6;
-		uint16_t lb			: 2;
+		uint16_t lb		: 2;
 		uint16_t res1		: 3;
 		uint16_t mpy		: 4;
 		uint16_t enpll		: 1;
@@ -115,7 +115,7 @@ typedef	union _esr_ti_cfgpll_l {
 		uint16_t enpll		: 1;
 		uint16_t mpy		: 4;
 		uint16_t res1		: 3;
-		uint16_t lb			: 2;
+		uint16_t lb		: 2;
 		uint16_t res2		: 6;
 #endif
 	} bits;

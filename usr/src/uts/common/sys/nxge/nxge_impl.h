@@ -310,33 +310,108 @@ typedef struct _nxge_block_mv_t nxge_block_mv_t, *p_nxge_block_mv_t;
 typedef enum {
 	NIU_TYPE_NONE = 0,
 
+	/* QGC NIC */
 	NEPTUNE_4_1GC =
 	    (NXGE_PORT_1G_COPPER |
 	    (NXGE_PORT_1G_COPPER << 4) |
 	    (NXGE_PORT_1G_COPPER << 8) |
 	    (NXGE_PORT_1G_COPPER << 12)),
 
+	/* Huron: 2 fiber XAUI cards */
 	NEPTUNE_2_10GF =
 	    (NXGE_PORT_10G_FIBRE |
 	    (NXGE_PORT_10G_FIBRE << 4) |
 	    (NXGE_PORT_NONE << 8) |
 	    (NXGE_PORT_NONE << 12)),
 
+	/* Huron: port0 is a TN1010 copper XAUI */
+	NEPTUNE_1_TN1010 =
+	    (NXGE_PORT_TN1010 |
+	    (NXGE_PORT_NONE << 4) |
+	    (NXGE_PORT_NONE << 8) |
+	    (NXGE_PORT_NONE << 12)),
+
+	/* Huron: port1 is a TN1010 copper XAUI */
+	NEPTUNE_1_NONE_1_TN1010 =
+	    (NXGE_PORT_NONE |
+	    (NXGE_PORT_TN1010 << 4) |
+	    (NXGE_PORT_NONE << 8) |
+	    (NXGE_PORT_NONE << 12)),
+
+	/* Huron: 2 TN1010 copper XAUI cards */
+	NEPTUNE_2_TN1010 =
+	    (NXGE_PORT_TN1010 |
+	    (NXGE_PORT_TN1010 << 4) |
+	    (NXGE_PORT_NONE << 8) |
+	    (NXGE_PORT_NONE << 12)),
+
+	/* Huron: port0 is fiber XAUI, port1 is copper XAUI */
+	NEPTUNE_1_10GF_1_TN1010 =
+	    (NXGE_PORT_10G_FIBRE |
+	    (NXGE_PORT_TN1010 << 4) |
+	    (NXGE_PORT_NONE << 8) |
+	    (NXGE_PORT_NONE << 12)),
+
+	/* Huron: port0 is copper XAUI, port1 is fiber XAUI */
+	NEPTUNE_1_TN1010_1_10GF =
+	    (NXGE_PORT_TN1010 |
+	    (NXGE_PORT_10G_FIBRE << 4) |
+	    (NXGE_PORT_NONE << 8) |
+	    (NXGE_PORT_NONE << 12)),
+
+	/* Maramba: port0 and port1 are fiber XAUIs */
 	NEPTUNE_2_10GF_2_1GC =
 	    (NXGE_PORT_10G_FIBRE |
 	    (NXGE_PORT_10G_FIBRE << 4) |
 	    (NXGE_PORT_1G_COPPER << 8) |
 	    (NXGE_PORT_1G_COPPER << 12)),
 
+	/* Maramba: port0 and port1 are copper TN1010 XAUIs */
+	NEPTUNE_2_TN1010_2_1GC =
+	    (NXGE_PORT_TN1010 |
+	    (NXGE_PORT_TN1010 << 4) |
+	    (NXGE_PORT_1G_COPPER << 8) |
+	    (NXGE_PORT_1G_COPPER << 12)),
+
+	/* Maramba: port0 is copper XAUI, port1 is Fiber XAUI */
+	NEPTUNE_1_TN1010_1_10GF_2_1GC =
+	    (NXGE_PORT_TN1010 |
+	    (NXGE_PORT_10G_FIBRE << 4) |
+	    (NXGE_PORT_1G_COPPER << 8) |
+	    (NXGE_PORT_1G_COPPER << 12)),
+
+	/* Maramba: port0 is fiber XAUI, port1 is copper XAUI */
+	NEPTUNE_1_10GF_1_TN1010_2_1GC =
+	    (NXGE_PORT_10G_FIBRE |
+	    (NXGE_PORT_TN1010 << 4) |
+	    (NXGE_PORT_1G_COPPER << 8) |
+	    (NXGE_PORT_1G_COPPER << 12)),
+
+	/* Maramba: port0 is fiber XAUI */
 	NEPTUNE_1_10GF_3_1GC =
 	    (NXGE_PORT_10G_FIBRE |
 	    (NXGE_PORT_1G_COPPER << 4) |
 	    (NXGE_PORT_1G_COPPER << 8) |
 	    (NXGE_PORT_1G_COPPER << 12)),
 
+	/* Maramba: port0 is TN1010 copper XAUI */
+	NEPTUNE_1_TN1010_3_1GC =
+	    (NXGE_PORT_TN1010 |
+	    (NXGE_PORT_1G_COPPER << 4) |
+	    (NXGE_PORT_1G_COPPER << 8) |
+	    (NXGE_PORT_1G_COPPER << 12)),
+
+	/* Maramba: port1 is fiber XAUI */
 	NEPTUNE_1_1GC_1_10GF_2_1GC =
 	    (NXGE_PORT_1G_COPPER |
 	    (NXGE_PORT_10G_FIBRE << 4) |
+	    (NXGE_PORT_1G_COPPER << 8) |
+	    (NXGE_PORT_1G_COPPER << 12)),
+
+	/* Maramba: port1 is TN1010 copper XAUI */
+	NEPTUNE_1_1GC_1_TN1010_2_1GC =
+	    (NXGE_PORT_1G_COPPER |
+	    (NXGE_PORT_TN1010 << 4) |
 	    (NXGE_PORT_1G_COPPER << 8) |
 	    (NXGE_PORT_1G_COPPER << 12)),
 
@@ -360,6 +435,19 @@ typedef enum {
 
 } niu_type_t;
 
+/*
+ * P_NEPTUNE_GENERIC:
+ *	The cover-all case for Neptune (as opposed to NIU) where we do not
+ *	care the exact platform as we do not do anything that is platform
+ *	specific.
+ * P_NEPTUNE_ATLAS_2PORT:
+ *	Dual Port Fiber Neptune based NIC (2XGF)
+ * P_NEPTUNE_ATLAS_4PORT:
+ *	Quad Port Copper Neptune based NIC (QGC)
+ * P_NEPTUNE_NIU:
+ *	This is NIU. Could be Huron, Glendale, Monza or any other NIU based
+ *	platform.
+ */
 typedef enum {
 	P_NEPTUNE_NONE,
 	P_NEPTUNE_GENERIC,
@@ -438,6 +526,9 @@ typedef mblk_t *p_mblk_t;
 
 /*
  * Generic phy table to support different phy types.
+ *
+ * The argument for check_link is nxgep, which is passed to check_link
+ * as an argument to the timer routine.
  */
 typedef struct _nxge_xcvr_table {
 	nxge_status_t	(*serdes_init)	();	/* Serdes init routine */
@@ -947,11 +1038,12 @@ nxge_status_t nxge_mdio_write(p_nxge_t, uint8_t,
 			uint8_t, uint16_t, uint16_t);
 nxge_status_t nxge_mii_check(p_nxge_t, mii_bmsr_t,
 			mii_bmsr_t, nxge_link_state_t *);
-nxge_status_t nxge_pcs_check(p_nxge_t, uint8_t portn, nxge_link_state_t *);
+void nxge_pcs_check(p_nxge_t, uint8_t portn, nxge_link_state_t *);
 nxge_status_t nxge_add_mcast_addr(p_nxge_t, struct ether_addr *);
 nxge_status_t nxge_del_mcast_addr(p_nxge_t, struct ether_addr *);
 nxge_status_t nxge_set_mac_addr(p_nxge_t, struct ether_addr *);
 nxge_status_t nxge_check_bcm8704_link(p_nxge_t, boolean_t *);
+nxge_status_t nxge_check_tn1010_link(p_nxge_t);
 void nxge_link_is_down(p_nxge_t);
 void nxge_link_is_up(p_nxge_t);
 nxge_status_t nxge_link_monitor(p_nxge_t, link_mon_enable_t);
