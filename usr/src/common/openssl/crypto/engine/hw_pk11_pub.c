@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -66,19 +66,27 @@
  */
 
 #include <stdio.h>
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include <openssl/e_os2.h>
+#include <openssl/crypto.h>
 #include <openssl/engine.h>
 #include <openssl/dso.h>
 #include <openssl/err.h>
 #include <openssl/bn.h>
 #include <openssl/pem.h>
+#ifndef OPENSSL_NO_RSA
 #include <openssl/rsa.h>
+#endif
+#ifndef OPENSSL_NO_DSA
+#include <openssl/dsa.h>
+#endif
+#ifndef OPENSSL_NO_DH
+#include <openssl/dh.h>
+#endif
 #include <openssl/rand.h>
 #include <openssl/objects.h>
 #include <openssl/x509.h>
@@ -90,6 +98,27 @@
 #include "security/cryptoki.h"
 #include "security/pkcs11.h"
 #include "hw_pk11_err.c"
+
+/*
+ * structure for tracking handles of asymmetric key objects
+ *
+ * Note: can be split into multiple active lists per
+ *       assym cipher (RSA, DSA, DH)
+ */
+typedef struct PK11_active_st
+	{
+	CK_OBJECT_HANDLE h;
+	unsigned int refcnt;
+	struct PK11_active_st *prev;
+	struct PK11_active_st *next;
+	} PK11_active;
+
+/*
+ * list of asymmetric key handles which are active (referenced by at least
+ * one PK11_SESSION structure, either held by a thread or present
+ * in free_session list)
+ */
+static PK11_active *active_list = NULL;
 
 #ifndef OPENSSL_NO_RSA
 /* RSA stuff */
@@ -122,13 +151,17 @@ static int pk11_RSA_public_decrypt_low(int flen, const unsigned char *from,
 static int pk11_RSA_private_decrypt_low(int flen, const unsigned char *from, 
 	unsigned char *to, RSA *rsa);
 
-static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa, PK11_SESSION *sp);
-static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa, 
-	PK11_SESSION *sp);
+static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa, RSA** key_ptr,
+	BIGNUM **rsa_n_num, BIGNUM **rsa_e_num, CK_SESSION_HANDLE session);
+static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa, RSA** key_ptr,
+	BIGNUM **rsa_d_num, CK_SESSION_HANDLE session);
+
+static int check_new_rsa_key_pub(PK11_SESSION *sp, const RSA *rsa);
+static int check_new_rsa_key_priv(PK11_SESSION *sp, const RSA *rsa);
 #endif
 
 /* DSA stuff */
-#ifndef OPENSSL_NO_RSA
+#ifndef OPENSSL_NO_DSA
 static int pk11_DSA_init(DSA *dsa);
 static int pk11_DSA_finish(DSA *dsa);
 static DSA_SIG *pk11_dsa_do_sign(const unsigned char *dgst, int dlen, 
@@ -136,10 +169,13 @@ static DSA_SIG *pk11_dsa_do_sign(const unsigned char *dgst, int dlen,
 static int pk11_dsa_do_verify(const unsigned char *dgst, int dgst_len,
 	DSA_SIG *sig, DSA *dsa);
 
-static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
-	PK11_SESSION *sp);
-static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa, 
-	PK11_SESSION *sp);
+static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa, DSA **key_ptr,
+	BIGNUM **dsa_pub_num, CK_SESSION_HANDLE session);
+static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa, DSA **key_ptr,
+	BIGNUM **dsa_priv_num, CK_SESSION_HANDLE session);
+
+static int check_new_dsa_key_pub(PK11_SESSION *sp, DSA *dsa);
+static int check_new_dsa_key_priv(PK11_SESSION *sp, DSA *dsa);
 #endif
 
 /* DH stuff */
@@ -150,15 +186,128 @@ static int pk11_DH_generate_key(DH *dh);
 static int pk11_DH_compute_key(unsigned char *key,
 	const BIGNUM *pub_key,DH *dh);
 
-static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh, PK11_SESSION *sp);
+static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh, DH **key_ptr,
+	BIGNUM **priv_key, CK_SESSION_HANDLE session);
+
+static int check_new_dh_key(PK11_SESSION *sp, DH *dh);
 #endif
 
 static int init_template_value(BIGNUM *bn, CK_VOID_PTR *pValue,
         CK_ULONG *ulValueLen);
-static void check_new_rsa_key(PK11_SESSION *sp, void *rsa);
-static void check_new_dsa_key(PK11_SESSION *sp, void *dsa);
-static void check_new_dh_key(PK11_SESSION *sp, void *dh);
 
+/*
+ * Find active list entry according to object handle and return pointer
+ * to the entry otherwise return NULL.
+ */
+static PK11_active *pk11_active_find(CK_OBJECT_HANDLE h)
+	{
+	PK11_active *entry;
+
+	for (entry = active_list; entry != NULL; entry = entry->next)
+		if (entry->h == h)
+			return (entry);
+
+	return (NULL);
+	}
+
+/*
+ * Search for an entry in the active list using PKCS#11 object handle as a
+ * search key and return refcnt of the found/created entry or -1 in case
+ * of failure.
+ *
+ * This function presumes we are called with lock protecting the active
+ * list held.
+ */
+int pk11_active_add(CK_OBJECT_HANDLE h)
+	{
+	int found = 0;
+	PK11_active *entry = NULL;
+
+	if (h == CK_INVALID_HANDLE)
+		{
+		PK11err(PK11_F_ACTIVE_ADD, PK11_R_INVALID_HANDLE);
+		return (-1);
+		}
+
+	/* search for entry in the active list */
+	if ((entry = pk11_active_find(h)) != NULL)
+		entry->refcnt++;
+	else
+		{
+		/* not found, create new entry and add it to the list */
+		entry = OPENSSL_malloc(sizeof (PK11_active));
+		if (entry == NULL)
+			{
+			PK11err(PK11_F_ACTIVE_ADD, PK11_R_MALLOC_FAILURE);
+			return (-1);
+			}
+		entry->h = h;
+		entry->refcnt = 1;
+		entry->prev = NULL;
+		entry->next = NULL;
+		/* connect the newly created entry to the list */
+		if (active_list == NULL)
+			active_list = entry;
+		else /* make the entry first in the list */
+			{
+			entry->next = active_list;
+			active_list->prev = entry;
+			active_list = entry;
+			}
+		}
+
+	return (entry->refcnt);
+	}
+
+/*
+ * Search for active list entry associated with given PKCS#11 object handle,
+ * decrement its refcnt and if it drops to 0, disconnect the entry and free it.
+ *
+ * Return 1 if the PKCS#11 object associated with the entry has no references,
+ * return 0 if there is at least one reference, -1 on error.
+ *
+ * This function presumes it is called with lock protecting the active
+ * list held.
+ */
+int pk11_active_delete(CK_OBJECT_HANDLE h)
+	{
+	PK11_active *prev_entry = NULL;
+	PK11_active *entry = NULL;
+
+	if ((entry = pk11_active_find(h)) == NULL)
+		{
+		PK11err(PK11_F_ACTIVE_DELETE, PK11_R_INVALID_HANDLE);
+		return (-1);
+		}
+
+	OPENSSL_assert(entry->refcnt > 0);
+	entry->refcnt--;
+	if (entry->refcnt == 0)
+		{
+		/* remove the entry from the list and free it */
+		if ((prev_entry = entry->prev) != NULL)
+			{
+			prev_entry->next = entry->next;
+			entry->next->prev = prev_entry;
+			}
+		else
+			{
+			active_list = entry->next;
+			/* we are the first but not the only one */
+			if (entry->next != NULL)
+				entry->next->prev = NULL;
+			}
+
+		/* sanitization */
+		entry->h = CK_INVALID_HANDLE;
+		entry->prev = NULL;
+		entry->next = NULL;
+		OPENSSL_free(entry);
+		return (1);
+		}
+
+	return (0);
+	}
 
 #ifndef OPENSSL_NO_RSA
 /* Our internal RSA_METHOD that we provide pointers to */
@@ -205,11 +354,18 @@ DSA_METHOD *PK11_DSA(void)
 	{
 	return(&pk11_dsa);
 	}
-
 #endif
 
-
 #ifndef OPENSSL_NO_DH
+/*
+ * PKCS #11 V2.20, section 11.2 specifies that the number of bytes needed for
+ * output buffer may somewhat exceed the precise number of bytes needed, but
+ * should not exceed it by a large amount. That may be caused, for example, by
+ * rounding it up to multiple of X in the underlying bignum library. 8 should be
+ * enough.
+ */
+#define	DH_BUF_RESERVE	8
+
 /* Our internal DH_METHOD that we provide pointers to */
 static DH_METHOD pk11_dh =
 	{
@@ -242,7 +398,6 @@ static CK_BBOOL true = TRUE;
 static CK_BBOOL false = FALSE;
 
 #ifndef OPENSSL_NO_RSA
-
 /* Similiar to Openssl to take advantage of the paddings. The goal is to
  * support all paddings in this engine although PK11 library does not 
  * support all the paddings used in OpenSSL. 
@@ -513,12 +668,13 @@ static int pk11_RSA_public_encrypt_low(int flen,
 	if ((sp = pk11_get_session()) == NULL)
 		return -1;
 
-	check_new_rsa_key(sp, (void *) rsa);
+	(void) check_new_rsa_key_pub(sp, rsa);
 	
 	h_pub_key = sp->rsa_pub_key;
 	if (h_pub_key == CK_INVALID_HANDLE)
-		h_pub_key = sp->rsa_pub_key = 
-			pk11_get_public_rsa_key(rsa, sp);
+		h_pub_key = sp->rsa_pub_key =
+			pk11_get_public_rsa_key(rsa, &sp->rsa_pub,
+			    &sp->rsa_n_num, &sp->rsa_e_num, sp->session);
 
 	if (h_pub_key != CK_INVALID_HANDLE)
 		{
@@ -573,12 +729,13 @@ static int pk11_RSA_private_encrypt_low(int flen,
 	if ((sp = pk11_get_session()) == NULL)
 		return -1;
 	
-	check_new_rsa_key(sp, (void *) rsa);
+	(void) check_new_rsa_key_priv(sp, rsa);
 	
 	h_priv_key = sp->rsa_priv_key;
 	if (h_priv_key == CK_INVALID_HANDLE)
-		h_priv_key = sp->rsa_priv_key = 
-			pk11_get_private_rsa_key(rsa, sp);
+		h_priv_key = sp->rsa_priv_key =
+			pk11_get_private_rsa_key(rsa, &sp->rsa_priv,
+			    &sp->rsa_d_num, sp->session);
 	
 	if (h_priv_key != CK_INVALID_HANDLE)
 		{
@@ -633,12 +790,13 @@ static int pk11_RSA_private_decrypt_low(int flen,
 	if ((sp = pk11_get_session()) == NULL)
 		return -1;
 	
-	check_new_rsa_key(sp, (void *) rsa);
+	(void) check_new_rsa_key_priv(sp, rsa);
 	
 	h_priv_key = sp->rsa_priv_key;
 	if (h_priv_key == CK_INVALID_HANDLE)
-		h_priv_key = sp->rsa_priv_key = 
-			pk11_get_private_rsa_key(rsa, sp);
+		h_priv_key = sp->rsa_priv_key =
+			pk11_get_private_rsa_key(rsa, &sp->rsa_priv,
+			    &sp->rsa_d_num, sp->session);
 
 	if (h_priv_key != CK_INVALID_HANDLE)
 		{
@@ -693,12 +851,13 @@ static int pk11_RSA_public_decrypt_low(int flen,
 	if ((sp = pk11_get_session()) == NULL)
 		return -1;
 	
-	check_new_rsa_key(sp, (void *) rsa);
+	(void) check_new_rsa_key_pub(sp, rsa);
 	
 	h_pub_key = sp->rsa_pub_key;
 	if (h_pub_key == CK_INVALID_HANDLE)
-		h_pub_key = sp->rsa_pub_key = 
-			pk11_get_public_rsa_key(rsa, sp);
+		h_pub_key = sp->rsa_pub_key =
+			pk11_get_public_rsa_key(rsa, &sp->rsa_pub,
+			    &sp->rsa_n_num, &sp->rsa_e_num, sp->session);
 
 	if (h_pub_key != CK_INVALID_HANDLE)
 		{	
@@ -734,7 +893,6 @@ static int pk11_RSA_public_decrypt_low(int flen,
 	return retval;
 	}
 
-
 static int pk11_RSA_init(RSA *rsa)
 	{
 	/* This flag in the RSA_METHOD enables the new rsa_sign, 
@@ -744,19 +902,22 @@ static int pk11_RSA_init(RSA *rsa)
 	return 1;
 	}
 
-
 static int pk11_RSA_finish(RSA *rsa)
 	{
+	/*
+	 * Since we are overloading OpenSSL's native RSA_eay_finish() we need
+	 * to do the same as in the original function, i.e. to free bignum
+	 * structures.
+	 */
 	if (rsa->_method_mod_n != NULL)
 		BN_MONT_CTX_free(rsa->_method_mod_n);
 	if (rsa->_method_mod_p != NULL)
 		BN_MONT_CTX_free(rsa->_method_mod_p);
 	if (rsa->_method_mod_q != NULL)
 		BN_MONT_CTX_free(rsa->_method_mod_q);
-	
-	return pk11_destroy_rsa_key_objects(NULL);
-	}
 
+	return (1);
+	}
 
 /* Standard engine interface function. Majority codes here are from 
  * rsa/rsa_sign.c. We replaced the decrypt function call by C_Sign of PKCS#11.
@@ -841,12 +1002,13 @@ static int pk11_RSA_sign(int type, const unsigned char *m, unsigned int m_len,
 	if ((sp = pk11_get_session()) == NULL)
 		goto err;
 
-	check_new_rsa_key(sp, (void *) rsa);
+	(void) check_new_rsa_key_priv(sp, rsa);
 	
 	h_priv_key = sp->rsa_priv_key;
 	if (h_priv_key == CK_INVALID_HANDLE)
-		h_priv_key = sp->rsa_priv_key = 
-			pk11_get_private_rsa_key((RSA *)rsa, sp);
+		h_priv_key = sp->rsa_priv_key =
+			pk11_get_private_rsa_key((RSA *)rsa, &sp->rsa_priv,
+			    &sp->rsa_d_num, sp->session);
 
 	if (h_priv_key != CK_INVALID_HANDLE)
 		{
@@ -964,12 +1126,13 @@ static int pk11_RSA_verify(int type, const unsigned char *m,
 	if ((sp = pk11_get_session()) == NULL)
 		goto err;
 	
-	check_new_rsa_key(sp, (void *) rsa);
+	(void) check_new_rsa_key_pub(sp, rsa);
 	
 	h_pub_key = sp->rsa_pub_key;
 	if (h_pub_key == CK_INVALID_HANDLE)
-		h_pub_key = sp->rsa_pub_key = 
-			pk11_get_public_rsa_key((RSA *)rsa, sp);
+		h_pub_key = sp->rsa_pub_key =
+			pk11_get_public_rsa_key((RSA *)rsa, &sp->rsa_pub,
+			    &sp->rsa_n_num, &sp->rsa_e_num, sp->session);
 
 	if (h_pub_key != CK_INVALID_HANDLE)
 		{
@@ -1007,6 +1170,7 @@ err:
 	return ret;
 	}
 
+/* load RSA private key from a file */
 EVP_PKEY *pk11_load_privkey(ENGINE* e, const char* privkey_file,
 	UI_METHOD *ui_method, void *callback_data)
 	{
@@ -1021,17 +1185,18 @@ EVP_PKEY *pk11_load_privkey(ENGINE* e, const char* privkey_file,
 
 	if ((pubkey=fopen(privkey_file,"r")) != NULL)
 		{
-		pkey = PEM_read_PUBKEY(pubkey, NULL, NULL, NULL);
+		pkey = PEM_read_PrivateKey(pubkey, NULL, NULL, NULL);
 		fclose(pubkey);
-		if (pkey)
+		if (pkey != NULL)
 			{
 			rsa = EVP_PKEY_get1_RSA(pkey);
-			if (rsa)
+			if (rsa != NULL)
 				{
-				check_new_rsa_key(sp, (void *) rsa);
+				(void) check_new_rsa_key_priv(sp, rsa);
 	
-				h_priv_key = pk11_get_private_rsa_key(rsa,
-					sp);
+				h_priv_key = sp->rsa_priv_key =
+				    pk11_get_private_rsa_key(rsa,
+				    &sp->rsa_priv, &sp->rsa_d_num, sp->session);
 				if (h_priv_key == CK_INVALID_HANDLE)
 					{
 					EVP_PKEY_free(pkey);
@@ -1050,6 +1215,7 @@ EVP_PKEY *pk11_load_privkey(ENGINE* e, const char* privkey_file,
 	return(pkey);
 	}
 
+/* load RSA public key from a file */
 EVP_PKEY *pk11_load_pubkey(ENGINE* e, const char* pubkey_file,
 	UI_METHOD *ui_method, void *callback_data)
 	{
@@ -1066,14 +1232,17 @@ EVP_PKEY *pk11_load_pubkey(ENGINE* e, const char* pubkey_file,
 		{
 		pkey = PEM_read_PUBKEY(pubkey, NULL, NULL, NULL);
 		fclose(pubkey);
-		if (pkey)
+		if (pkey != NULL)
 			{
 			rsa = EVP_PKEY_get1_RSA(pkey);
-			if (rsa)
+			if (rsa != NULL)
 				{
-				check_new_rsa_key(sp, (void *) rsa);
+				(void) check_new_rsa_key_pub(sp, rsa);
 	
-				h_pub_key = pk11_get_public_rsa_key(rsa, sp);
+				h_pub_key = sp->rsa_pub_key =
+				    pk11_get_public_rsa_key(rsa,
+				    &sp->rsa_pub, &sp->rsa_n_num,
+				    &sp->rsa_e_num, sp->session);
 				if (h_pub_key == CK_INVALID_HANDLE)
 					{
 					EVP_PKEY_free(pkey);
@@ -1094,7 +1263,9 @@ EVP_PKEY *pk11_load_pubkey(ENGINE* e, const char* pubkey_file,
 
 /* Create a public key object in a session from a given rsa structure.
  */
-static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa, PK11_SESSION *sp)
+static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
+    RSA** key_ptr, BIGNUM **rsa_n_num, BIGNUM **rsa_e_num,
+    CK_SESSION_HANDLE session)
 	{
 	CK_RV rv;
 	CK_OBJECT_HANDLE h_key = CK_INVALID_HANDLE;
@@ -1116,7 +1287,6 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa, PK11_SESSION *sp)
 		};
 
 	int i;
-	CK_SESSION_HANDLE session = sp->session;
 
 	a_key_template[0].pValue = &o_key;
 	a_key_template[1].pValue = &k_type;
@@ -1143,6 +1313,13 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa, PK11_SESSION *sp)
 
 	BN_bn2bin(rsa->e, a_key_template[6].pValue);
 
+	/*
+	 * As stated in v2.20, 11.7 Object Management Function, in section for
+	 * C_FindObjectsInit(), at most one search operation may be active at
+	 * a given time in a given session. Therefore, we must group these
+	 * three calls in one atomic operation.
+	 */
+	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
 	rv = pFuncList->C_FindObjectsInit(session, a_key_template, 
 		ul_key_attr_count);
 
@@ -1151,6 +1328,7 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa, PK11_SESSION *sp)
 		PK11err(PK11_F_GET_PUB_RSA_KEY, PK11_R_FINDOBJECTSINIT);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1161,6 +1339,7 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa, PK11_SESSION *sp)
 		PK11err(PK11_F_GET_PUB_RSA_KEY, PK11_R_FINDOBJECTS);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1171,6 +1350,7 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa, PK11_SESSION *sp)
 		PK11err(PK11_F_GET_PUB_RSA_KEY, PK11_R_FINDOBJECTSFINAL);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1184,13 +1364,31 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa, PK11_SESSION *sp)
 				PK11_R_CREATEOBJECT);
 			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 			goto err;
 			}
 		}
 
-	sp->rsa = rsa;
+	(void) pk11_active_add(h_key);
+	if (key_ptr != NULL)
+		*key_ptr = rsa;
+	if (rsa_n_num != NULL)
+		if ((*rsa_n_num = BN_dup(rsa->n)) == NULL)
+			{
+			PK11err(PK11_F_GET_PUB_RSA_KEY, PK11_R_MALLOC_FAILURE);
+			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+			goto err;
+			}
+	if (rsa_e_num != NULL)
+		if ((*rsa_e_num = BN_dup(rsa->e)) == NULL)
+			{
+			PK11err(PK11_F_GET_PUB_RSA_KEY, PK11_R_MALLOC_FAILURE);
+			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+			goto err;
+			}
+	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 
- err:
+err:
 	for (i = 5; i <= 6; i++)
 		{
 		if (a_key_template[i].pValue != NULL)
@@ -1201,12 +1399,12 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa, PK11_SESSION *sp)
 		}
 
 	return h_key;
-
 	}
 
 /* Create a private key object in the session from a given rsa structure
  */
-static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa, PK11_SESSION *sp)
+static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa,
+    RSA** key_ptr, BIGNUM **rsa_d_num, CK_SESSION_HANDLE session)
 	{
 	CK_RV rv;
 	CK_OBJECT_HANDLE h_key = CK_INVALID_HANDLE;
@@ -1236,7 +1434,6 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa, PK11_SESSION *sp)
 		{CKA_EXPONENT_2, (void *)NULL, 0},
 		{CKA_COEFFICIENT, (void *)NULL, 0}
 		};
-	CK_SESSION_HANDLE session = sp->session;
 
 	a_key_template[0].pValue = &o_key;
 	a_key_template[1].pValue = &k_type;
@@ -1263,6 +1460,13 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa, PK11_SESSION *sp)
 		goto err;
 		}
 
+	/*
+	 * As stated in v2.20, 11.7 Object Management Function, in section for
+	 * C_FindObjectsInit(), at most one search operation may be active at
+	 * a given time in a given session. Therefore, we must group these
+	 * three calls in one atomic operation.
+	 */
+	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
 	rv = pFuncList->C_FindObjectsInit(session, a_key_template, 
 		ul_key_attr_count);
 
@@ -1271,6 +1475,7 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa, PK11_SESSION *sp)
 		PK11err(PK11_F_GET_PRIV_RSA_KEY, PK11_R_FINDOBJECTSINIT);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1281,6 +1486,7 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa, PK11_SESSION *sp)
 		PK11err(PK11_F_GET_PRIV_RSA_KEY, PK11_R_FINDOBJECTS);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1291,6 +1497,7 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa, PK11_SESSION *sp)
 		PK11err(PK11_F_GET_PRIV_RSA_KEY, PK11_R_FINDOBJECTSFINAL);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1304,13 +1511,24 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa, PK11_SESSION *sp)
 				PK11_R_CREATEOBJECT);
 			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 			goto err;
 			}
 		}
 
-	sp->rsa = rsa;
+	(void) pk11_active_add(h_key);
+	if (key_ptr != NULL)
+		*key_ptr = rsa;
+	if (rsa_d_num != NULL)
+		if ((*rsa_d_num = BN_dup(rsa->d)) == NULL)
+			{
+			PK11err(PK11_F_GET_PRIV_RSA_KEY, PK11_R_MALLOC_FAILURE);
+			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+			goto err;
+			}
+	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 
- err:
+err:
 	/* 6 to 13 entries in the key template are key components
 	 * They need to be freed apon exit or error.
 	 */
@@ -1328,8 +1546,61 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa, PK11_SESSION *sp)
 	return h_key;
 	}
 
-#endif
+/*
+ * Check for cache miss and clean the object pointer and handle
+ * in such case. Return 1 for cache hit, 0 for cache miss.
+ */
+static int check_new_rsa_key_pub(PK11_SESSION *sp, const RSA *rsa)
+	{
+	/*
+	 * Provide protection against RSA structure reuse by making the
+	 * check for cache hit stronger. Only public components of RSA
+	 * key matter here so it is sufficient to compare them with values
+	 * cached in PK11_SESSION structure.
+	 */
+	if ((sp->rsa_pub != rsa) ||
+	    (BN_cmp(sp->rsa_n_num, rsa->n) != 0) ||
+	    (BN_cmp(sp->rsa_e_num, rsa->e) != 0))
+		{
+		/*
+		 * We do not check the return value because even in case of
+		 * failure the sp structure will have both key pointer
+		 * and object handle cleaned and pk11_destroy_object()
+		 * reports the failure to the OpenSSL error message buffer.
+		 */
+		(void) pk11_destroy_rsa_object_pub(sp, TRUE);
+		return (0);
+		}
+	return (1);
+	}
 
+/*
+ * Check for cache miss and clean the object pointer and handle
+ * in such case. Return 1 for cache hit, 0 for cache miss.
+ */
+static int check_new_rsa_key_priv(PK11_SESSION *sp, const RSA *rsa)
+	{
+	/*
+	 * Provide protection against RSA structure reuse by making the
+	 * check for cache hit stronger. Comparing private exponent of RSA
+	 * key with value cached in PK11_SESSION structure should
+	 * be sufficient.
+	 */
+	if ((sp->rsa_priv != rsa) ||
+	    (BN_cmp(sp->rsa_d_num, rsa->d) != 0))
+		{
+		/*
+		 * We do not check the return value because even in case of
+		 * failure the sp structure will have both key pointer
+		 * and object handle cleaned and pk11_destroy_object()
+		 * reports the failure to the OpenSSL error message buffer.
+		 */
+		(void) pk11_destroy_rsa_object_priv(sp, TRUE);
+		return (0);
+		}
+	return (1);
+	}
+#endif
 
 #ifndef OPENSSL_NO_DSA
 /* The DSA function implementation
@@ -1342,7 +1613,7 @@ static int pk11_DSA_init(DSA *dsa)
 
 static int pk11_DSA_finish(DSA *dsa)
 	{
-	return pk11_destroy_dsa_key_objects(NULL);
+	return (1);
 	}
 
 
@@ -1384,12 +1655,13 @@ pk11_dsa_do_sign(const unsigned char *dgst, int dlen, DSA *dsa)
 	if ((sp = pk11_get_session()) == NULL)
 		goto ret;
 
-	check_new_dsa_key(sp, (void *) dsa);
+	(void) check_new_dsa_key_priv(sp, dsa);
 
 	h_priv_key = sp->dsa_priv_key;
 	if (h_priv_key == CK_INVALID_HANDLE)
 		h_priv_key = sp->dsa_priv_key =
-			pk11_get_private_dsa_key((DSA *)dsa, sp);
+			pk11_get_private_dsa_key((DSA *)dsa, &sp->dsa_priv,
+			    &sp->dsa_priv_num, sp->session);
 
 	if (h_priv_key != CK_INVALID_HANDLE)
 		{
@@ -1499,12 +1771,13 @@ pk11_dsa_do_verify(const unsigned char *dgst, int dlen, DSA_SIG *sig,
 	if ((sp = pk11_get_session()) == NULL)
 		goto ret;
 	
-	check_new_dsa_key(sp, (void *) dsa);
+	(void) check_new_dsa_key_pub(sp, dsa);
 
 	h_pub_key = sp->dsa_pub_key;
 	if (h_pub_key == CK_INVALID_HANDLE)
-		h_pub_key = sp->dsa_pub_key = 
-			pk11_get_public_dsa_key((DSA *)dsa, sp);
+		h_pub_key = sp->dsa_pub_key =
+			pk11_get_public_dsa_key((DSA *)dsa, &sp->dsa_pub,
+			    &sp->dsa_pub_num, sp->session);
 
 	if (h_pub_key != CK_INVALID_HANDLE)
 		{
@@ -1519,9 +1792,16 @@ pk11_dsa_do_verify(const unsigned char *dgst, int dlen, DSA_SIG *sig,
 			goto ret;
 			}
 
+		/*
+		 * The representation of each of the two big numbers could
+		 * be shorter than DSA_SIGNATURE_LEN/2 bytes so we need
+		 * to act accordingly and shift if necessary.
+		 */
 		memset(sigbuf, 0, siglen);
-		BN_bn2bin(sig->r, sigbuf);
-		BN_bn2bin(sig->s, &sigbuf[siglen2]);
+		BN_bn2bin(sig->r, sigbuf +
+		    siglen2 - BN_num_bytes(sig->r));
+		BN_bn2bin(sig->s, &sigbuf[siglen2] +
+		    siglen2 - BN_num_bytes(sig->s));
 		
 		rv = pFuncList->C_Verify(sp->session, 
 			(unsigned char *) dgst, dlen, sigbuf, (CK_ULONG)siglen);
@@ -1545,7 +1825,8 @@ ret:
 
 /* Create a public key object in a session from a given dsa structure.
  */
-static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa, PK11_SESSION *sp)
+static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
+    DSA **key_ptr, BIGNUM **dsa_pub_num, CK_SESSION_HANDLE session)
 	{
 	CK_RV rv;
 	CK_OBJECT_CLASS o_key = CKO_PUBLIC_KEY;
@@ -1567,7 +1848,6 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa, PK11_SESSION *sp)
 		{CKA_BASE, (void *)NULL, 0},		/* g */
 		{CKA_VALUE, (void *)NULL, 0}		/* pub_key - y */
 		};
-	CK_SESSION_HANDLE session = sp->session;
 
 	a_key_template[0].pValue = &o_key;
 	a_key_template[1].pValue = &k_type;
@@ -1585,6 +1865,14 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa, PK11_SESSION *sp)
 		goto err;
 		}
 
+
+	/*
+	 * As stated in v2.20, 11.7 Object Management Function, in section for
+	 * C_FindObjectsInit(), at most one search operation may be active at
+	 * a given time in a given session. Therefore, we must group these
+	 * three calls in one atomic operation.
+	 */
+	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
 	rv = pFuncList->C_FindObjectsInit(session, a_key_template, 
 		ul_key_attr_count);
 
@@ -1593,6 +1881,7 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa, PK11_SESSION *sp)
 		PK11err(PK11_F_GET_PUB_DSA_KEY, PK11_R_FINDOBJECTSINIT);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1603,6 +1892,7 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa, PK11_SESSION *sp)
 		PK11err(PK11_F_GET_PUB_DSA_KEY, PK11_R_FINDOBJECTS);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1613,6 +1903,7 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa, PK11_SESSION *sp)
 		PK11err(PK11_F_GET_PUB_DSA_KEY, PK11_R_FINDOBJECTSFINAL);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1626,13 +1917,24 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa, PK11_SESSION *sp)
 				PK11_R_CREATEOBJECT);
 			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 			goto err;
 			}
 		}
 
-	sp->dsa = dsa;
+	(void) pk11_active_add(h_key);
+	if (key_ptr != NULL)
+		*key_ptr = dsa;
+	if (dsa_pub_num != NULL)
+		if ((*dsa_pub_num = BN_dup(dsa->pub_key)) == NULL)
+			{
+			PK11err(PK11_F_GET_PUB_DSA_KEY, PK11_R_MALLOC_FAILURE);
+			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+			goto err;
+			}
+	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 
- err:
+err:
 	for (i = 4; i <= 7; i++)
 		{
 		if (a_key_template[i].pValue != NULL)
@@ -1648,7 +1950,8 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa, PK11_SESSION *sp)
 
 /* Create a private key object in the session from a given dsa structure
  */
-static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa, PK11_SESSION *sp)
+static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa,
+    DSA **key_ptr, BIGNUM **dsa_priv_num, CK_SESSION_HANDLE session)
 	{
 	CK_RV rv;
 	CK_OBJECT_HANDLE h_key = CK_INVALID_HANDLE;
@@ -1673,7 +1976,6 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa, PK11_SESSION *sp)
 		{CKA_BASE, (void *)NULL, 0},		/* g */
 		{CKA_VALUE, (void *)NULL, 0}		/* priv_key - x */
 		};
-	CK_SESSION_HANDLE session = sp->session;
 
 	a_key_template[0].pValue = &o_key;
 	a_key_template[1].pValue = &k_type;
@@ -1693,6 +1995,13 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa, PK11_SESSION *sp)
 		goto err;
 		}
 
+	/*
+	 * As stated in v2.20, 11.7 Object Management Function, in section for
+	 * C_FindObjectsInit(), at most one search operation may be active at
+	 * a given time in a given session. Therefore, we must group these
+	 * three calls in one atomic operation.
+	 */
+	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
 	rv = pFuncList->C_FindObjectsInit(session, a_key_template, 
 		ul_key_attr_count);
 
@@ -1701,6 +2010,7 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa, PK11_SESSION *sp)
 		PK11err(PK11_F_GET_PRIV_DSA_KEY, PK11_R_FINDOBJECTSINIT);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1711,6 +2021,7 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa, PK11_SESSION *sp)
 		PK11err(PK11_F_GET_PRIV_DSA_KEY, PK11_R_FINDOBJECTS);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1721,6 +2032,7 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa, PK11_SESSION *sp)
 		PK11err(PK11_F_GET_PRIV_DSA_KEY, PK11_R_FINDOBJECTSFINAL);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1734,11 +2046,22 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa, PK11_SESSION *sp)
 				PK11_R_CREATEOBJECT);
 			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 			goto err;
 			}
 		}
 
-	sp->dsa = dsa;
+	(void) pk11_active_add(h_key);
+	if (key_ptr != NULL)
+		*key_ptr = dsa;
+	if (dsa_priv_num != NULL)
+		if ((*dsa_priv_num = BN_dup(dsa->priv_key)) == NULL)
+			{
+			PK11err(PK11_F_GET_PRIV_DSA_KEY, PK11_R_MALLOC_FAILURE);
+			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+			goto err;
+			}
+	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 
 err:
 	/* 5 to 8 entries in the key template are key components
@@ -1758,11 +2081,64 @@ err:
 	return h_key;
 
 	}
+
+/*
+ * Check for cache miss and clean the object pointer and handle
+ * in such case. Return 1 for cache hit, 0 for cache miss.
+ */
+static int check_new_dsa_key_pub(PK11_SESSION *sp, DSA *dsa)
+	{
+	/*
+	 * Provide protection against DSA structure reuse by making the
+	 * check for cache hit stronger. Only public key component of DSA
+	 * key matters here so it is sufficient to compare it with value
+	 * cached in PK11_SESSION structure.
+	 */
+	if ((sp->dsa_pub != dsa) ||
+	    (BN_cmp(sp->dsa_pub_num, dsa->pub_key) != 0))
+		{
+		/*
+		 * We do not check the return value because even in case of
+		 * failure the sp structure will have both key pointer
+		 * and object handle cleaned and pk11_destroy_object()
+		 * reports the failure to the OpenSSL error message buffer.
+		 */
+		(void) pk11_destroy_dsa_object_pub(sp, TRUE);
+		return (0);
+		}
+	return (1);
+	}
+
+/*
+ * Check for cache miss and clean the object pointer and handle
+ * in such case. Return 1 for cache hit, 0 for cache miss.
+ */
+static int check_new_dsa_key_priv(PK11_SESSION *sp, DSA *dsa)
+	{
+	/*
+	 * Provide protection against DSA structure reuse by making the
+	 * check for cache hit stronger. Only private key component of DSA
+	 * key matters here so it is sufficient to compare it with value
+	 * cached in PK11_SESSION structure.
+	 */
+	if ((sp->dsa_priv != dsa) ||
+	    (BN_cmp(sp->dsa_priv_num, dsa->priv_key) != 0))
+		{
+		/*
+		 * We do not check the return value because even in case of
+		 * failure the sp structure will have both key pointer
+		 * and object handle cleaned and pk11_destroy_object()
+		 * reports the failure to the OpenSSL error message buffer.
+		 */
+		(void) pk11_destroy_dsa_object_priv(sp, TRUE);
+		return (0);
+		}
+	return (1);
+	}
 #endif
 
 
 #ifndef OPENSSL_NO_DH
-
 /* The DH function implementation
  */
 static int pk11_DH_init(DH *dh)
@@ -1770,17 +2146,25 @@ static int pk11_DH_init(DH *dh)
 	return 1;
 	}
 
-
 static int pk11_DH_finish(DH *dh)
 	{
-	return pk11_destroy_dh_key_objects(NULL);
+	return (1);
 	}
 
+/*
+ * Generate DH key-pair.
+ *
+ * Warning: Unlike OpenSSL's DH_generate_key(3) we ignore dh->priv_key
+ * and override it even if it is set. OpenSSL does not touch dh->priv_key
+ * if set and just computes dh->pub_key. It looks like PKCS#11 standard
+ * is not capable of providing this functionality. This could be a problem
+ * for applications relying on OpenSSL's semantics.
+ */
 static int pk11_DH_generate_key(DH *dh)
 	{
 	CK_ULONG i;
 	CK_RV rv, rv1;
-	int ret = 0;
+	int reuse_mem_len = 0, ret = 0;
 	PK11_SESSION *sp = NULL;
 	char tmp_buf[20];
 	CK_BYTE_PTR reuse_mem;
@@ -1820,8 +2204,14 @@ static int pk11_DH_generate_key(DH *dh)
 	pub_key_template[1].ulValueLen = BN_num_bytes(dh->p);
 	if (pub_key_template[1].ulValueLen > 0)
 		{
+		/*
+		 * We must not increase ulValueLen by DH_BUF_RESERVE since that
+		 * could cause the same rounding problem. See definition of
+		 * DH_BUF_RESERVE above.
+		 */
 		pub_key_template[1].pValue = 
-			OPENSSL_malloc(pub_key_template[1].ulValueLen);
+			OPENSSL_malloc(pub_key_template[1].ulValueLen +
+			DH_BUF_RESERVE);
 		if (pub_key_template[1].pValue == NULL)
 			{
 			PK11err(PK11_F_DH_GEN_KEY, PK11_R_MALLOC_FAILURE);
@@ -1837,7 +2227,8 @@ static int pk11_DH_generate_key(DH *dh)
 	if (pub_key_template[2].ulValueLen > 0)
 		{
 		pub_key_template[2].pValue = 
-			OPENSSL_malloc(pub_key_template[2].ulValueLen);
+			OPENSSL_malloc(pub_key_template[2].ulValueLen +
+			DH_BUF_RESERVE);
 		if (pub_key_template[2].pValue == NULL)
 			{
 			PK11err(PK11_F_DH_GEN_KEY, PK11_R_MALLOC_FAILURE);
@@ -1849,6 +2240,11 @@ static int pk11_DH_generate_key(DH *dh)
 	else
 		goto err;
 
+	/*
+	 * Note: we are only using PK11_SESSION structure for getting
+	 *	 a session handle. The objects created in this function are
+	 *	 destroyed before return and thus not cached.
+	 */
 	if ((sp = pk11_get_session()) == NULL)
 		goto err;
 	
@@ -1869,11 +2265,17 @@ static int pk11_DH_generate_key(DH *dh)
 		}
 
 	/* Reuse the larger memory allocated. We know the larger memory
-	 * is sufficient for reuse */
+	 * should be sufficient for reuse */
 	if (pub_key_template[1].ulValueLen > pub_key_template[2].ulValueLen)
+		{
 		reuse_mem = pub_key_template[1].pValue;
+		reuse_mem_len = pub_key_template[1].ulValueLen + DH_BUF_RESERVE;
+		}
 	else
+		{
 		reuse_mem = pub_key_template[2].pValue;
+		reuse_mem_len = pub_key_template[2].ulValueLen + DH_BUF_RESERVE;
+		}
 
 	rv = pFuncList->C_GetAttributeValue(sp->session, h_pub_key, 
 		pub_key_result, pub_key_attr_result_count);
@@ -1898,6 +2300,7 @@ static int pk11_DH_generate_key(DH *dh)
 	
 	/* Reuse the memory allocated */
 	pub_key_result[0].pValue = reuse_mem;
+	pub_key_result[0].ulValueLen = reuse_mem_len;
 
 	rv = pFuncList->C_GetAttributeValue(sp->session, h_pub_key, 
 		pub_key_result, pub_key_attr_result_count);
@@ -1913,13 +2316,19 @@ static int pk11_DH_generate_key(DH *dh)
 	if (pub_key_result[0].type == CKA_VALUE)
 		{
 		if (dh->pub_key == NULL)
-			dh->pub_key = BN_new();
+			if ((dh->pub_key = BN_new()) == NULL)
+				{
+				PK11err(PK11_F_DH_GEN_KEY,
+					PK11_R_MALLOC_FAILURE);
+				goto err;
+				}
 		dh->pub_key = BN_bin2bn(pub_key_result[0].pValue, 
 			pub_key_result[0].ulValueLen, dh->pub_key);
 		}
 
 	/* Reuse the memory allocated */
 	priv_key_result[0].pValue = reuse_mem;
+	priv_key_result[0].ulValueLen = reuse_mem_len;
 
 	rv = pFuncList->C_GetAttributeValue(sp->session, h_priv_key, 
 		priv_key_result, priv_key_attr_result_count);
@@ -1935,7 +2344,12 @@ static int pk11_DH_generate_key(DH *dh)
 	if (priv_key_result[0].type == CKA_VALUE)
 		{
 		if (dh->priv_key == NULL)
-			dh->priv_key = BN_new();
+			if ((dh->priv_key = BN_new()) == NULL)
+				{
+				PK11err(PK11_F_DH_GEN_KEY,
+					PK11_R_MALLOC_FAILURE);
+				goto err;
+				}
 		dh->priv_key = BN_bin2bn(priv_key_result[0].pValue, 
 			priv_key_result[0].ulValueLen, dh->priv_key);
 		}
@@ -2002,9 +2416,12 @@ static int pk11_DH_compute_key(unsigned char *key,const BIGNUM *pub_key,DH *dh)
 		};
 
 	CK_RV rv;
-	int ret = 0;
+	int ret = -1;
 	PK11_SESSION *sp = NULL;
 	char tmp_buf[20];
+
+	if (dh->priv_key == NULL)
+		goto err;
 
 	priv_key_template[0].pValue = &key_class;
 	priv_key_template[1].pValue = &key_type;
@@ -2021,11 +2438,13 @@ static int pk11_DH_compute_key(unsigned char *key,const BIGNUM *pub_key,DH *dh)
 		}
 	BN_bn2bin(pub_key, mechanism.pParameter);
 
-	check_new_dh_key(sp, dh);
+	(void) check_new_dh_key(sp, dh);
 
 	h_key = sp->dh_key;
 	if (h_key == CK_INVALID_HANDLE)
-		h_key = sp->dh_key = pk11_get_dh_key((DH*) dh, sp);
+		h_key = sp->dh_key =
+			pk11_get_dh_key((DH*) dh, &sp->dh,
+			    &sp->dh_priv_num, sp->session);
 
 	if (h_key == CK_INVALID_HANDLE)
 		{
@@ -2134,7 +2553,8 @@ err:
 	}
 
 
-static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh, PK11_SESSION *sp)
+static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
+	DH **key_ptr, BIGNUM **dh_priv_num, CK_SESSION_HANDLE session)
 	{
 	CK_RV rv;
 	CK_OBJECT_HANDLE h_key = CK_INVALID_HANDLE;
@@ -2155,8 +2575,6 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh, PK11_SESSION *sp)
 		{CKA_BASE, (void *) NULL, 0},
 		{CKA_VALUE, (void *) NULL, 0},
 		};
-
-	CK_SESSION_HANDLE session = sp->session;
 
 	key_template[0].pValue = &class;
 	key_template[1].pValue = &key_type;
@@ -2194,6 +2612,13 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh, PK11_SESSION *sp)
 
 	BN_bn2bin(dh->priv_key, key_template[6].pValue);
 
+	/*
+	 * As stated in v2.20, 11.7 Object Management Function, in section for
+	 * C_FindObjectsInit(), at most one search operation may be active at
+	 * a given time in a given session. Therefore, we must group these
+	 * three calls in one atomic operation.
+	 */
+	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
 	rv = pFuncList->C_FindObjectsInit(session, key_template, 
 		ul_key_attr_count);
 
@@ -2202,6 +2627,7 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh, PK11_SESSION *sp)
 		PK11err(PK11_F_GET_DH_KEY, PK11_R_FINDOBJECTSINIT);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -2212,6 +2638,7 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh, PK11_SESSION *sp)
 		PK11err(PK11_F_GET_DH_KEY, PK11_R_FINDOBJECTS);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -2222,6 +2649,7 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh, PK11_SESSION *sp)
 		PK11err(PK11_F_GET_DH_KEY, PK11_R_FINDOBJECTSFINAL);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -2234,13 +2662,24 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh, PK11_SESSION *sp)
 			PK11err(PK11_F_GET_DH_KEY, PK11_R_CREATEOBJECT);
 			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 			goto err;
 			}
 		}
 
-	sp->dh = dh;
+	(void) pk11_active_add(h_key);
+	if (key_ptr != NULL)
+		*key_ptr = dh;
+	if (dh_priv_num != NULL)
+		if ((*dh_priv_num = BN_dup(dh->priv_key)) == NULL)
+			{
+			PK11err(PK11_F_GET_DH_KEY, PK11_R_MALLOC_FAILURE);
+			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+			goto err;
+			}
+	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 
- err:
+err:
 	for (i = 4; i <= 6; i++)
 		{
 		if (key_template[i].pValue != NULL)
@@ -2253,6 +2692,35 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh, PK11_SESSION *sp)
 	return h_key;
 	}
 
+/*
+ * Check for cache miss and clean the object pointer and handle
+ * in such case. Return 1 for cache hit, 0 for cache miss.
+ *
+ * Note: we rely on pk11_destroy_dh_key_objects() to set sp->dh
+ *       to CK_INVALID_HANDLE even when it fails to destroy the object.
+ */
+static int check_new_dh_key(PK11_SESSION *sp, DH *dh)
+	{
+	/*
+	 * Provide protection against DH structure reuse by making the
+	 * check for cache hit stronger. Private key component of DH key
+	 * is unique so it is sufficient to compare it with value cached
+	 * in PK11_SESSION structure.
+	 */
+	if ((sp->dh != dh) ||
+	    (BN_cmp(sp->dh_priv_num, dh->priv_key) != 0))
+		{
+		/*
+		 * We do not check the return value because even in case of
+		 * failure the sp structure will have both key pointer
+		 * and object handle cleaned and pk11_destroy_object()
+		 * reports the failure to the OpenSSL error message buffer.
+		 */
+		(void) pk11_destroy_dh_object(sp, TRUE);
+		return (0);
+		}
+	return (1);
+	}
 #endif
 
 /* Local function to simplify key template population
@@ -2274,25 +2742,5 @@ static int init_template_value(BIGNUM *bn, CK_VOID_PTR *p_value,
 
 	return 1;
 	}
-
-static void check_new_rsa_key(PK11_SESSION *sp, void *rsa)
-	{
-	if (sp->rsa != rsa)
-		pk11_destroy_rsa_key_objects(sp);
-	}
-
-static void check_new_dsa_key(PK11_SESSION *sp, void *dsa)
-	{
-	if (sp->dsa != dsa)
-		pk11_destroy_dsa_key_objects(sp);
-	}
-
-static void check_new_dh_key(PK11_SESSION *sp, void *dh)
-	{
-	if (sp->dh != dh)
-		pk11_destroy_dh_key_objects(sp);
-	}
-
-
 #endif
 #endif

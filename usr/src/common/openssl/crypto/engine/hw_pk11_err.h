@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -127,6 +127,9 @@ static void ERR_pk11_error(int function, int reason, char *file, int line);
 #define PK11_F_DH_GEN_KEY			148
 #define PK11_F_DH_COMP_KEY 			149
 #define PK11_F_DIGEST_COPY 			150
+#define	PK11_F_CIPHER_CLEANUP			151
+#define	PK11_F_ACTIVE_ADD			152
+#define	PK11_F_ACTIVE_DELETE			153
 
 /* Reason codes. */
 #define PK11_R_ALREADY_LOADED 			100
@@ -190,6 +193,17 @@ static void ERR_pk11_error(int function, int reason, char *file, int line);
 #define PK11_R_DERIVEKEY			159
 #define PK11_R_GET_OPERATION_STATE		160
 #define PK11_R_SET_OPERATION_STATE		161
+#define	PK11_R_INVALID_HANDLE			162
+
+/*
+ * CRYPTO_LOCK_PK11_ENGINE lock is primarily used for the protection
+ * of free_session list and active_list but generally serves as global
+ * per-process lock for the whole engine.
+ * We reuse CRYPTO_LOCK_RSA lock (which is defined in OpenSSL for RSA
+ * method) as the global engine lock. This is not optimal w.r.t.
+ * performance but is safe.
+ */
+#define	CRYPTO_LOCK_PK11_ENGINE	CRYPTO_LOCK_RSA
 
 /* This structure encapsulates all reusable information for a PKCS#11
  * session. A list of this object is created on behalf of the
@@ -200,7 +214,7 @@ static void ERR_pk11_error(int function, int reason, char *file, int line);
  * application only uses the RSA related fields */
 typedef struct PK11_SESSION_st
         {
-        struct PK11_SESSION_st *next;
+	struct PK11_SESSION_st	*next;
         CK_SESSION_HANDLE       session;        /* PK11 session handle */
         CK_SESSION_HANDLE       session_cipher; /* PK11 sess handle for ciph */
         pid_t                   pid;            /* Current process ID */
@@ -210,9 +224,23 @@ typedef struct PK11_SESSION_st
         CK_OBJECT_HANDLE        dsa_priv_key;   /* DSA priv key handle */
         CK_OBJECT_HANDLE        dh_key;         /* RSA pub key handle for DH */
         CK_OBJECT_HANDLE        cipher_key;     /* Cipher key handle */
-        void                    *rsa;   /* Address of the RSA struct */
-        void                    *dsa;   /* Address of the DSA structure */
-        void                    *dh;    /* Address of the DH */
+#ifndef OPENSSL_NO_RSA
+	RSA			*rsa_pub;	/* Address of RSA public key */
+	BIGNUM			*rsa_n_num;	/* Public RSA modulus */
+	BIGNUM			*rsa_e_num;	/* Public RSA exponent */
+	RSA			*rsa_priv;	/* Address of RSA private key */
+	BIGNUM			*rsa_d_num;	/* Private RSA exponent */
+#endif
+#ifndef OPENSSL_NO_DSA
+	DSA			*dsa_pub;	/* Address of DSA public key */
+	BIGNUM			*dsa_pub_num;	/* Public DSA key */
+	DSA			*dsa_priv;	/* Address of DSA private key */
+	BIGNUM			*dsa_priv_num;	/* Private DSA key */
+#endif
+#ifndef OPENSSL_NO_DH
+	DH			*dh;		/* Address of DH keypair */
+	BIGNUM			*dh_priv_num;	/* Private DH key */
+#endif
         unsigned char           key[24];/* Save the private key here */
         int                     key_len;/* Saved private key length */
         int                     encrypt;/* 1/0 for encrypt/decrypt */
@@ -221,18 +249,27 @@ typedef struct PK11_SESSION_st
 extern PK11_SESSION *pk11_get_session();
 extern void pk11_return_session(PK11_SESSION *sp);
 
+#ifndef OPENSSL_NO_RSA
 extern int pk11_destroy_rsa_key_objects(PK11_SESSION *session);
-extern int pk11_destroy_dsa_key_objects(PK11_SESSION *session);
-extern int pk11_destroy_dh_key_objects(PK11_SESSION *session);
-
-extern RSA_METHOD *PK11_RSA(void);
-extern DSA_METHOD *PK11_DSA(void);
-extern DH_METHOD *PK11_DH(void);
-
+extern int pk11_destroy_rsa_object_pub(PK11_SESSION *sp, CK_BBOOL uselock);
+extern int pk11_destroy_rsa_object_priv(PK11_SESSION *sp, CK_BBOOL uselock);
 extern EVP_PKEY *pk11_load_privkey(ENGINE*, const char* pubkey_file,
         UI_METHOD *ui_method, void *callback_data);
 extern EVP_PKEY *pk11_load_pubkey(ENGINE*, const char* pubkey_file,
         UI_METHOD *ui_method, void *callback_data);
+extern RSA_METHOD *PK11_RSA(void);
+#endif
+#ifndef OPENSSL_NO_DSA
+extern int pk11_destroy_dsa_key_objects(PK11_SESSION *session);
+extern int pk11_destroy_dsa_object_pub(PK11_SESSION *sp, CK_BBOOL uselock);
+extern int pk11_destroy_dsa_object_priv(PK11_SESSION *sp, CK_BBOOL uselock);
+extern DSA_METHOD *PK11_DSA(void);
+#endif
+#ifndef OPENSSL_NO_DH
+extern int pk11_destroy_dh_key_objects(PK11_SESSION *session);
+extern int pk11_destroy_dh_object(PK11_SESSION *sp, CK_BBOOL uselock);
+extern DH_METHOD *PK11_DH(void);
+#endif
 
 extern CK_FUNCTION_LIST_PTR pFuncList;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,20 +67,28 @@
  */
 
 #include <stdio.h>
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include <openssl/e_os2.h>
+#include <openssl/crypto.h>
 #include <openssl/engine.h>
 #include <openssl/dso.h>
 #include <openssl/err.h>
 #include <openssl/bn.h>
 #include <openssl/md5.h>
 #include <openssl/pem.h>
+#ifndef OPENSSL_NO_RSA
 #include <openssl/rsa.h>
+#endif
+#ifndef OPENSSL_NO_DSA
+#include <openssl/dsa.h>
+#endif
+#ifndef OPENSSL_NO_DH
+#include <openssl/dh.h>
+#endif
 #include <openssl/rand.h>
 #include <openssl/objects.h>
 #include <openssl/x509.h>
@@ -121,15 +129,30 @@ static int pk11_rand_status(void);
 /* These functions are also used in other files */
 PK11_SESSION *pk11_get_session();
 void pk11_return_session(PK11_SESSION *sp);
+
+/* active list manipulation functions used here */
+int pk11_active_delete(CK_OBJECT_HANDLE h);
+
+#ifndef OPENSSL_NO_RSA
 int pk11_destroy_rsa_key_objects(PK11_SESSION *session);
+int pk11_destroy_rsa_object_pub(PK11_SESSION *sp, CK_BBOOL uselock);
+int pk11_destroy_rsa_object_priv(PK11_SESSION *sp, CK_BBOOL uselock);
+#endif
+#ifndef OPENSSL_NO_DSA
 int pk11_destroy_dsa_key_objects(PK11_SESSION *session);
+int pk11_destroy_dsa_object_pub(PK11_SESSION *sp, CK_BBOOL uselock);
+int pk11_destroy_dsa_object_priv(PK11_SESSION *sp, CK_BBOOL uselock);
+#endif
+#ifndef OPENSSL_NO_DH
 int pk11_destroy_dh_key_objects(PK11_SESSION *session);
+int pk11_destroy_dh_object(PK11_SESSION *session, CK_BBOOL uselock);
+#endif
 
 /* Local helper functions */
 static int pk11_free_all_sessions();
 static int pk11_setup_session(PK11_SESSION *sp);
 static int pk11_destroy_cipher_key_objects(PK11_SESSION *session);
-static int pk11_destroy_object(CK_SESSION_HANDLE session, 
+static int pk11_destroy_object(CK_SESSION_HANDLE session,
 	CK_OBJECT_HANDLE oh);
 static const char *get_PK11_LIBNAME(void);
 static void free_PK11_LIBNAME(void);
@@ -141,6 +164,8 @@ static int pk11_usable_ciphers(const int **nids);
 static int pk11_usable_digests(const int **nids);
 static int pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 	const unsigned char *iv, int enc);
+static int pk11_init_symmetric(EVP_CIPHER_CTX *ctx, PK11_SESSION *sp,
+	CK_MECHANISM_PTR pmech);
 static int pk11_cipher_final(PK11_SESSION *sp);
 static int pk11_cipher_do_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 	const unsigned char *in, unsigned int inl);
@@ -151,7 +176,7 @@ static int pk11_engine_digests(ENGINE *e, const EVP_MD **digest,
 	const int **nids, int nid);
 static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx, 
 	const unsigned char *key, CK_KEY_TYPE key_type, PK11_SESSION *sp);
-static void check_new_cipher_key(PK11_SESSION *sp, const unsigned char *key);
+static int check_new_cipher_key(PK11_SESSION *sp, const unsigned char *key);
 static int md_nid_to_pk11(int nid);
 static int pk11_digest_init(EVP_MD_CTX *ctx);
 static int pk11_digest_update(EVP_MD_CTX *ctx,const void *data,
@@ -180,6 +205,18 @@ static int pk11_count_digest(int slot_id, CK_MECHANISM_TYPE mech,
 #define PK11_DIGEST_MAX		2	/* Max num of digests supported */
 
 #define PK11_KEY_LEN_MAX	24
+
+#define	TRY_OBJ_DESTROY(sess_hdl, obj_hdl, retval, uselock)		\
+	{								\
+	if (uselock)							\
+		CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);			\
+	if (pk11_active_delete(obj_hdl) == 1)				\
+		{							\
+		retval = pk11_destroy_object(sess_hdl, obj_hdl);	\
+		}							\
+	if (uselock)							\
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);		\
+	}
 
 static int cipher_nids[PK11_CIPHER_MAX];
 static int digest_nids[PK11_DIGEST_MAX];
@@ -372,11 +409,6 @@ static const char def_PK11_LIBNAME[] = "/usr/lib/64/libpkcs11.so.1";
 static const char def_PK11_LIBNAME[] = "/usr/lib/libpkcs11.so.1";
 #endif
 
-/* CRYPTO_LOCK_RSA is defined in OpenSSL for RSA method. Since this pk11
- * engine replaces RSA method, we may reuse this lock here.
- */
-#define CRYPTO_LOCK_PK11_ENGINE CRYPTO_LOCK_RSA
-
 static CK_BBOOL true = TRUE;
 static CK_BBOOL false = FALSE;
 static CK_SLOT_ID SLOTID = 0;
@@ -389,9 +421,10 @@ static DSO *pk11_dso = NULL;
  */
 static int bind_pk11(ENGINE *e)
 	{
+#ifndef OPENSSL_NO_RSA
 	const RSA_METHOD *rsa = NULL;
 	RSA_METHOD *pk11_rsa = PK11_RSA();
-
+#endif
 	if (!pk11_library_initialized)
 		pk11_library_init(e);
 
@@ -691,7 +724,7 @@ static int pk11_finish(ENGINE *e)
 		goto err;
 		}
 
-	assert(pFuncList != NULL);
+	OPENSSL_assert(pFuncList != NULL);
 
 	if (pk11_free_all_sessions() == 0)
 		goto err;
@@ -808,7 +841,37 @@ static int pk11_rand_status(void)
 	return 1;
 	}
 
+/*
+ * Free all BIGNUM structures from PK11_SESSION.
+ */
+static void pk11_free_nums(PK11_SESSION *sp)
+	{
+#ifndef	OPENSSL_NO_RSA
+		if (sp->rsa_n_num != NULL)
+			BN_free(sp->rsa_n_num);
+		if (sp->rsa_e_num != NULL)
+			BN_free(sp->rsa_e_num);
+		if (sp->rsa_d_num != NULL)
+			BN_free(sp->rsa_d_num);
+#endif
+#ifndef	OPENSSL_NO_DSA
+		if (sp->dsa_pub_num != NULL)
+			BN_free(sp->dsa_pub_num);
+		if (sp->dsa_priv_num != NULL)
+			BN_free(sp->dsa_priv_num);
+#endif
+#ifndef	OPENSSL_NO_DH
+		if (sp->dh_priv_num != NULL)
+			BN_free(sp->dh_priv_num);
+#endif
+	}
 
+/*
+ * Get new PK11_SESSION structure ready for use. Every process must have
+ * its own freelist of PK11_SESSION structures so handle fork() here
+ * by destroying the old and creating new freelist.
+ * The returned PK11_SESSION structure is disconnected from the freelist.
+ */
 PK11_SESSION *pk11_get_session()
 	{
 	PK11_SESSION *sp, *sp1;
@@ -816,6 +879,11 @@ PK11_SESSION *pk11_get_session()
 	char tmp_buf[20];
 
 	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
+	/*
+	 * If the free list is empty, allocate new unitialized (filled
+	 * with zeroes) PK11_SESSION structure otherwise return first
+	 * structure from the freelist.
+	 */
 	if ((sp = free_session) == NULL)
 		{
 		if ((sp = OPENSSL_malloc(sizeof(PK11_SESSION))) == NULL)
@@ -833,12 +901,20 @@ PK11_SESSION *pk11_get_session()
 
 	if (sp->pid != 0 && sp->pid != getpid())
 		{
-		/* We are a new process and thus need to free any inherated
+		/*
+		 * We are a new process and thus need to free any inherited
 		 * PK11_SESSION objects.
 		 */
 		while ((sp1 = free_session) != NULL)
 			{
 			free_session = sp1->next;
+			/*
+			 * NOTE:
+			 *   we do not want to call pk11_free_all_sessions()
+			 *   here because it would close underlying PKCS11
+			 *   sessions and destroy objects.
+			 */
+			pk11_free_nums(sp1);
 			OPENSSL_free(sp1);
 			}
 
@@ -854,7 +930,8 @@ PK11_SESSION *pk11_get_session()
 			goto err;
 			}
 
-		/* Choose slot here since the slot table is different on 
+		/*
+		 * Choose slot here since the slot table is different on
 		 * this process.
 		 */
 		if (pk11_choose_slot() == 0)
@@ -893,7 +970,7 @@ PK11_SESSION *pk11_get_session()
 		}
 
 err:
-	if (sp)
+	if (sp != NULL)
 		sp->next = NULL;
 
 	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
@@ -926,10 +1003,16 @@ static int pk11_free_all_sessions()
 	pid_t mypid = getpid();
 	int ret = 0;
 
-	pk11_destroy_rsa_key_objects(NULL);
-	pk11_destroy_dsa_key_objects(NULL);
-	pk11_destroy_dh_key_objects(NULL);
-	pk11_destroy_cipher_key_objects(NULL);
+#ifndef OPENSSL_NO_RSA
+	(void) pk11_destroy_rsa_key_objects(NULL);
+#endif
+#ifndef OPENSSL_NO_DSA
+	(void) pk11_destroy_dsa_key_objects(NULL);
+#endif
+#ifndef OPENSSL_NO_DH
+	(void) pk11_destroy_dh_key_objects(NULL);
+#endif
+	(void) pk11_destroy_cipher_key_objects(NULL);
 	
 	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
 	while ((sp = free_session) != NULL)
@@ -959,6 +1042,7 @@ static int pk11_free_all_sessions()
 				}
 			}
 		free_session = sp->next;
+		pk11_free_nums(sp);
 		OPENSSL_free(sp);
 		}
 	ret = 1;
@@ -1018,125 +1102,273 @@ static int pk11_setup_session(PK11_SESSION *sp)
 	sp->dsa_priv_key = CK_INVALID_HANDLE;
 	sp->dh_key = CK_INVALID_HANDLE;
 	sp->cipher_key = CK_INVALID_HANDLE;
-	sp->rsa = NULL;
-	sp->dsa = NULL;
+#ifndef OPENSSL_NO_RSA
+	sp->rsa_pub = NULL;
+	sp->rsa_n_num = NULL;
+	sp->rsa_e_num = NULL;
+	sp->rsa_priv = NULL;
+	sp->rsa_d_num = NULL;
+#endif
+#ifndef OPENSSL_NO_DSA
+	sp->dsa_pub = NULL;
+	sp->dsa_pub_num = NULL;
+	sp->dsa_priv = NULL;
+	sp->dsa_priv_num = NULL;
+#endif
+#ifndef OPENSSL_NO_DH
 	sp->dh = NULL;
+	sp->dh_priv_num = NULL;
+#endif
 	sp->encrypt = -1;
 
 	return 1;
 	}
 
+#ifndef OPENSSL_NO_RSA
+/* Destroy RSA public key from single session. */
+int pk11_destroy_rsa_object_pub(PK11_SESSION *sp, CK_BBOOL uselock)
+	{
+	int ret = 0;
+
+	if (sp->rsa_pub_key != CK_INVALID_HANDLE)
+		{
+		TRY_OBJ_DESTROY(sp->session, sp->rsa_pub_key, ret, uselock);
+		sp->rsa_pub_key = CK_INVALID_HANDLE;
+		sp->rsa_pub = NULL;
+		if (sp->rsa_n_num != NULL)
+			BN_free(sp->rsa_n_num);
+		sp->rsa_n_num = NULL;
+		if (sp->rsa_e_num != NULL)
+			BN_free(sp->rsa_e_num);
+		sp->rsa_e_num = NULL;
+		}
+
+	return (ret);
+	}
+
+/* Destroy RSA private key from single session. */
+int pk11_destroy_rsa_object_priv(PK11_SESSION *sp, CK_BBOOL uselock)
+	{
+	int ret = 0;
+
+	if (sp->rsa_priv_key != CK_INVALID_HANDLE)
+		{
+		TRY_OBJ_DESTROY(sp->session, sp->rsa_priv_key, ret, uselock);
+		sp->rsa_priv_key = CK_INVALID_HANDLE;
+		sp->rsa_priv = NULL;
+		if (sp->rsa_d_num != NULL)
+			BN_free(sp->rsa_d_num);
+		sp->rsa_d_num = NULL;
+		}
+
+	return (ret);
+	}
+
+
+/*
+ * Destroy RSA key object wrapper.
+ *
+ * arg0: pointer to PKCS#11 engine session structure
+ *       if session is NULL, try to destroy all objects in the free list
+ */
 int pk11_destroy_rsa_key_objects(PK11_SESSION *session)
 	{
-	int ret = 0;
+	int ret = 1;
 	PK11_SESSION *sp = NULL;
 	PK11_SESSION *local_free_session;
+	CK_BBOOL uselock = TRUE;
 
-	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
-	if (session)
+	if (session != NULL)
 		local_free_session = session;
 	else
+		{
+		CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
 		local_free_session = free_session;
+		uselock = FALSE;
+		}
+
+	/*
+	 * go through the list of sessions and delete key objects
+	 */
 	while ((sp = local_free_session) != NULL)
 		{
 		local_free_session = sp->next;
 
-		if (sp->rsa_pub_key != CK_INVALID_HANDLE)
+		/*
+		 * Do not terminate list traversal if one of the
+		 * destroy operations fails.
+		 */
+		if (pk11_destroy_rsa_object_pub(sp, uselock) == 0)
 			{
-			if (pk11_destroy_object(sp->session, 
-				sp->rsa_pub_key) == 0)
-				goto err;
-			sp->rsa_pub_key = CK_INVALID_HANDLE;
+			ret = 0;
+			continue;
 			}
-
-		if (sp->rsa_priv_key != CK_INVALID_HANDLE)
+		if (pk11_destroy_rsa_object_priv(sp, uselock) == 0)
 			{
-			if (pk11_destroy_object(sp->session, 
-				sp->rsa_priv_key) == 0)
-				goto err;
-			sp->rsa_priv_key = CK_INVALID_HANDLE;
+			ret = 0;
+			continue;
 			}
-
-		sp->rsa = NULL;
 		}
-	ret = 1;
-err:
-	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+
+	if (session == NULL)
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 
 	return ret;
 	}
+#endif
 
+#ifndef OPENSSL_NO_DSA
+/* Destroy DSA public key from single session. */
+int pk11_destroy_dsa_object_pub(PK11_SESSION *sp, CK_BBOOL uselock)
+	{
+	int ret = 0;
+
+	if (sp->dsa_pub_key != CK_INVALID_HANDLE)
+		{
+		TRY_OBJ_DESTROY(sp->session, sp->dsa_pub_key, ret, uselock);
+		sp->dsa_pub_key = CK_INVALID_HANDLE;
+		sp->dsa_pub = NULL;
+		if (sp->dsa_pub_num != NULL)
+			BN_free(sp->dsa_pub_num);
+		sp->dsa_pub_num = NULL;
+		}
+
+	return (ret);
+	}
+
+/* Destroy DSA private key from single session. */
+int pk11_destroy_dsa_object_priv(PK11_SESSION *sp, CK_BBOOL uselock)
+	{
+	int ret = 0;
+
+	if (sp->dsa_priv_key != CK_INVALID_HANDLE)
+		{
+		TRY_OBJ_DESTROY(sp->session, sp->dsa_priv_key, ret, uselock);
+		sp->dsa_priv_key = CK_INVALID_HANDLE;
+		sp->dsa_priv = NULL;
+		if (sp->dsa_priv_num != NULL)
+			BN_free(sp->dsa_priv_num);
+		sp->dsa_priv_num = NULL;
+		}
+
+	return (ret);
+	}
+
+/*
+ * Destroy DSA key object wrapper.
+ *
+ * arg0: pointer to PKCS#11 engine session structure
+ *       if session is NULL, try to destroy all objects in the free list
+ */
 int pk11_destroy_dsa_key_objects(PK11_SESSION *session)
 	{
-	int ret = 0;
+	int ret = 1;
 	PK11_SESSION *sp = NULL;
 	PK11_SESSION *local_free_session;
+	CK_BBOOL uselock = TRUE;
 
-	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
-	if (session)
+	if (session != NULL)
 		local_free_session = session;
 	else
+		{
+		CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
 		local_free_session = free_session;
+		uselock = FALSE;
+		}
+
+	/*
+	 * go through the list of sessions and delete key objects
+	 */
 	while ((sp = local_free_session) != NULL)
 		{
 		local_free_session = sp->next;
 
-		if (sp->dsa_pub_key != CK_INVALID_HANDLE)
+		/*
+		 * Do not terminate list traversal if one of the
+		 * destroy operations fails.
+		 */
+		if (pk11_destroy_dsa_object_pub(sp, uselock) == 0)
 			{
-			if (pk11_destroy_object(sp->session, 
-				sp->dsa_pub_key) == 0)
-				goto err;
-			sp->dsa_pub_key = CK_INVALID_HANDLE;
+			ret = 0;
+			continue;
 			}
-
-		if (sp->dsa_priv_key != CK_INVALID_HANDLE)
+		if (pk11_destroy_dsa_object_priv(sp, uselock) == 0)
 			{
-			if (pk11_destroy_object(sp->session, 
-				sp->dsa_priv_key) == 0)
-				goto err;
-			sp->dsa_priv_key = CK_INVALID_HANDLE;
+			ret = 0;
+			continue;
 			}
-
-		sp->dsa = NULL;
 		}
-	ret = 1;
-err:
-	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+
+	if (session == NULL)
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 
 	return ret;
 	}
+#endif
 
-int pk11_destroy_dh_key_objects(PK11_SESSION *session)
+#ifndef OPENSSL_NO_DH
+/* Destroy DH key from single session. */
+int pk11_destroy_dh_object(PK11_SESSION *sp, CK_BBOOL uselock)
 	{
 	int ret = 0;
+
+	if (sp->dh_key != CK_INVALID_HANDLE)
+		{
+		TRY_OBJ_DESTROY(sp->session, sp->dh_key, ret, uselock);
+		sp->dh_key = CK_INVALID_HANDLE;
+		sp->dh = NULL;
+		if (sp->dh_priv_num != NULL)
+			BN_free(sp->dh_priv_num);
+		sp->dh_priv_num = NULL;
+		}
+
+	return (ret);
+	}
+
+/*
+ * Destroy DH key object wrapper.
+ *
+ * arg0: pointer to PKCS#11 engine session structure
+ *       if session is NULL, try to destroy all objects in the free list
+ */
+int pk11_destroy_dh_key_objects(PK11_SESSION *session)
+	{
+	int ret = 1;
 	PK11_SESSION *sp = NULL;
 	PK11_SESSION *local_free_session;
+	CK_BBOOL uselock = TRUE;
 
-	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
-	if (session)
+	if (session != NULL)
 		local_free_session = session;
 	else
+		{
+		CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
 		local_free_session = free_session;
+		uselock = FALSE;
+		}
+
 	while ((sp = local_free_session) != NULL)
 		{
 		local_free_session = sp->next;
 
-		if (sp->dh_key != CK_INVALID_HANDLE)
+		/*
+		 * Do not terminate list traversal if one of the
+		 * destroy operations fails.
+		 */
+		if (pk11_destroy_dh_object(sp, uselock) == 0)
 			{
-			if (pk11_destroy_object(sp->session, 
-				sp->dh_key) == 0)
-				goto err;
-			sp->dh_key = CK_INVALID_HANDLE;
+			ret = 0;
+			continue;
 			}
-
-		sp->dh = NULL;
 		}
-	ret = 1;
 err:
-	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+	if (session == NULL)
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 
 	return ret;
 	}
+#endif
+
 
 static int pk11_destroy_object(CK_SESSION_HANDLE session, CK_OBJECT_HANDLE oh)
 	{
@@ -1222,15 +1454,19 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 
 	/* The key object is destroyed here if it is not the current key
 	 */
-	check_new_cipher_key(sp, key);
+	(void) check_new_cipher_key(sp, key);
 	
 	/* If the key is the same and the encryption is also the same,
-	 * then just reuse it
+	 * then just reuse it. However, we must not forget to reinitialize the
+	 * context that was finalized in pk11_cipher_cleanup().
 	 */
 	if (sp->cipher_key != CK_INVALID_HANDLE && sp->encrypt == ctx->encrypt)
 		{
 		state->sp = sp;
-		return 1;
+		if (pk11_init_symmetric(ctx, sp, &mech) == 0)
+			return (0);
+
+		return (1);
 		}
 
 	/* Check if the key has been invalidated. If so, a new key object
@@ -1261,41 +1497,9 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 		return 0;
 		}
 
-	if (ctx->cipher->iv_len > 0)
-		{
-		mech.pParameter = (void *) ctx->iv;
-		mech.ulParameterLen = ctx->cipher->iv_len;
-		}
-
-	/* If we get here, the encryption needs to be reinitialized */
-	if (ctx->encrypt)
-		{
-		rv = pFuncList->C_EncryptInit(sp->session_cipher, &mech, 
-			sp->cipher_key);
-
-		if (rv != CKR_OK)
-			{
-			PK11err(PK11_F_CIPHER_INIT, PK11_R_ENCRYPTINIT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
-			pk11_return_session(sp);
-			return 0;
-			}
-		}
-	else
-		{
-		rv = pFuncList->C_DecryptInit(sp->session_cipher, &mech, 
-			sp->cipher_key);
-
-		if (rv != CKR_OK)
-			{
-			PK11err(PK11_F_CIPHER_INIT, PK11_R_DECRYPTINIT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
-			pk11_return_session(sp);
-			return 0;
-			}
-		}
+	/* now initialize the context with a new key */
+	if (pk11_init_symmetric(ctx, sp, &mech) == 0)
+		return (0);
 
 	sp->encrypt = ctx->encrypt;
 	state->sp = sp;
@@ -1406,21 +1610,98 @@ pk11_cipher_do_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 	return 1;
 	}
 
-/* Return the session to the pool. The C_EncryptFinal and C_DecryptFinal are
- * not used. Once a secret key is initialized, it is used until destroyed.
+/*
+ * Return the session to the pool. Calling C_EncryptFinal() and
+ * C_DecryptFinal() here is the right thing because in
+ * EVP_DecryptFinal_ex(), engine's do_cipher() is not even called, and in
+ * EVP_EncryptFinal_ex() it is called but the engine can't find out that
+ * it's the finalizing call. We wouldn't necessarily have to finalize the
+ * context here since reinitializing it with C_(Encrypt|Decrypt)Init()
+ * should be fine but for the sake of correctness, let's do it. Some
+ * implementations might leak memory if the previously used context is
+ * initialized without finalizing it first.
  */
 static int
 pk11_cipher_cleanup(EVP_CIPHER_CTX *ctx)
 	{
+	CK_RV rv;
+	CK_ULONG len;
+	char tmp_buf[20];
+	CK_BYTE buf[EVP_MAX_BLOCK_LENGTH];
 	PK11_CIPHER_STATE *state = ctx->cipher_data;
 
 	if (state != NULL && state->sp != NULL)
 		{
+		/*
+		 * We are not interested in the data here, we just need to get
+		 * rid of the context.
+		 */
+		if (ctx->encrypt)
+			rv = pFuncList->C_EncryptFinal(
+			    state->sp->session_cipher, buf, &len);
+		else
+			rv = pFuncList->C_DecryptFinal(
+			    state->sp->session_cipher, buf, &len);
+
+		if (rv != CKR_OK)
+			{
+			PK11err(PK11_F_CIPHER_CLEANUP, ctx->encrypt ?
+			    PK11_R_ENCRYPTFINAL : PK11_R_DECRYPTFINAL);
+			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
+			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			pk11_return_session(state->sp);
+			return (0);
+			}
+
 		pk11_return_session(state->sp);
 		state->sp = NULL;
 		}
 
-	return 1;
+	return (1);
+	}
+
+/*
+ * Init context for encryption or decryption using a symmetric key.
+ */
+static int pk11_init_symmetric(EVP_CIPHER_CTX *ctx, PK11_SESSION *sp,
+    CK_MECHANISM_PTR pmech)
+	{
+	CK_RV rv;
+	char tmp_buf[20];
+
+	if (ctx->cipher->iv_len > 0)
+		{
+		/*
+		 * We expect pmech->mechanism to be already set and
+		 * pParameter/ulParameterLen initialized to NULL/0 before
+		 * pk11_init_symetric() is called.
+		 */
+		OPENSSL_assert(pmech->mechanism != NULL);
+		OPENSSL_assert(pmech->pParameter == NULL);
+		OPENSSL_assert(pmech->ulParameterLen == 0);
+		pmech->pParameter = (void *) ctx->iv;
+		pmech->ulParameterLen = ctx->cipher->iv_len;
+		}
+
+	/* If we get here, the encryption needs to be reinitialized */
+	if (ctx->encrypt)
+		rv = pFuncList->C_EncryptInit(sp->session_cipher, pmech,
+			sp->cipher_key);
+	else
+		rv = pFuncList->C_DecryptInit(sp->session_cipher, pmech,
+			sp->cipher_key);
+
+	if (rv != CKR_OK)
+		{
+		PK11err(PK11_F_CIPHER_INIT, ctx->encrypt ?
+		    PK11_R_ENCRYPTINIT : PK11_R_DECRYPTINIT);
+		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
+		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		pk11_return_session(sp);
+		return (0);
+		}
+
+	return (1);
 	}
 
 /* Registered by the ENGINE when used to find out how to deal with
@@ -1696,7 +1977,7 @@ pk11_digest_copy(EVP_MD_CTX *to,const EVP_MD_CTX *from)
 	pstate = OPENSSL_malloc(ul_state_len);
 	if (pstate == NULL)
 		{
-		RSAerr(PK11_F_DIGEST_COPY, PK11_R_MALLOC_FAILURE);
+		PK11err(PK11_F_DIGEST_COPY, PK11_R_MALLOC_FAILURE);
 		goto err;
 		}
 
@@ -1755,14 +2036,20 @@ pk11_digest_cleanup(EVP_MD_CTX *ctx)
 	return 1;
 	}
 
-/* Check if the new key is the same as the key object in the session.
+/*
+ * Check if the new key is the same as the key object in the session.
  * If the key is the same, no need to create a new key object. Otherwise,
- * the old key object needs to be destroyed and a new one will be created
+ * the old key object needs to be destroyed and a new one will be created.
+ * Return 1 for cache hit, 0 for cache miss.
  */
-static void check_new_cipher_key(PK11_SESSION *sp, const unsigned char *key)
+static int check_new_cipher_key(PK11_SESSION *sp, const unsigned char *key)
 	{
 	if (memcmp(sp->key, key, sp->key_len) != 0)
+		{
 		pk11_destroy_cipher_key_objects(sp);
+		return (0);
+		}
+	return (1);
 	}
 
 /* Destroy one or more secret key objects. 
@@ -1869,7 +2156,7 @@ pk11_choose_slot()
 
 	if (pSlotList == NULL) 
 		{
-		RSAerr(PK11_F_CHOOSE_SLOT,PK11_R_MALLOC_FAILURE);
+		PK11err(PK11_F_CHOOSE_SLOT, PK11_R_MALLOC_FAILURE);
 		return retval;
 		}
 
@@ -1906,7 +2193,7 @@ pk11_choose_slot()
 
 		if (token_info.flags & CKF_RNG)
 			pk11_have_random = CK_TRUE;
-
+#ifndef OPENSSL_NO_RSA
 		/*
 		 * Check if this slot is capable of signing and
 		 * verifying with CKM_RSA_PKCS.
@@ -1931,7 +2218,8 @@ pk11_choose_slot()
 			    (mech_info.flags & CKF_DECRYPT)))
 				slot_has_rsa = CK_TRUE;
 			}
-
+#endif
+#ifndef OPENSSL_NO_DSA
 		/*
 		 * Check if this slot is capable of signing and
 		 * verifying with CKM_DSA.
@@ -1941,7 +2229,8 @@ pk11_choose_slot()
 		if (rv == CKR_OK && ((mech_info.flags & CKF_SIGN) &&
 		    (mech_info.flags & CKF_VERIFY)))
 			slot_has_dsa = CK_TRUE;
-
+#endif
+#ifndef OPENSSL_NO_DH
 		/*
 		 * Check if this slot is capable of DH key generataion and
 		 * derivation.
@@ -1956,7 +2245,7 @@ pk11_choose_slot()
 			if (rv == CKR_OK && (mech_info.flags & CKF_DERIVE))
 				slot_has_dh = CK_TRUE;
 			}
-
+#endif
 		if (!found_candidate_slot &&
 		    (slot_has_rsa || slot_has_dsa || slot_has_dh))
 			{
@@ -2054,8 +2343,8 @@ pk11_choose_slot()
 	  "OPENSSL_PKCS#11_ENGINE: pk11_have_random %d\n", pk11_have_random);
 #endif /* DEBUG_SLOT_SELECTION */
 		
-	if (pSlotList)
-		free(pSlotList);
+	if (pSlotList != NULL)
+		OPENSSL_free(pSlotList);
 
 	return retval;
 	}
@@ -2099,8 +2388,5 @@ static int pk11_count_digest(int slot_id, CK_MECHANISM_TYPE mech,
 
 	return 1;
 	}
-
-
 #endif
 #endif
-
