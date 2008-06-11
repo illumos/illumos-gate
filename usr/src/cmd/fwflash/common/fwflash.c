@@ -48,8 +48,8 @@
 #include <libintl.h> /* for gettext(3c) */
 #include <libdevinfo.h>
 #include <note.h>
-
 #include <fwflash/fwflash.h>
+#include <sys/modctl.h> /* for MAXMODCONFNAME */
 
 
 #if !defined(lint)
@@ -145,7 +145,7 @@ main(int argc, char **argv) {
 	}
 
 
-	while ((ch = getopt(argc, argv, "hvylc:f:r:Qd:")) != EOF) {
+	while ((ch = getopt(argc, argv, "hvylc:f:r:Qd:M")) != EOF) {
 		switch (ch) {
 		case 'h':
 			fwflash_arg_list |= FWFLASH_HELP_FLAG;
@@ -191,8 +191,15 @@ main(int argc, char **argv) {
 			/* NOT in the manpage */
 			fwflash_debug = 1;
 			break;
-
-	/* illegal options */
+		case 'M':
+			/* NOT in the manpage */
+#if (MANUFACTURING_MODE > 0)
+			manufacturing_mode = 1;
+			logmsg(MSG_WARN, "Enabling Manufacturing Mode "
+			    "operations. This can be destructive!\n");
+			break;
+#endif
+		/* illegal options */
 		default:
 			fwflash_usage(optarg);
 			return (FWFLASH_FAILURE);
@@ -330,7 +337,7 @@ flash_load_plugins() {
 
 	if ((dirp = opendir(fwplugdirpath)) == NULL) {
 		logmsg(MSG_ERROR,
-		    gettext("Unable to open %s!\n"),
+		    gettext("Unable to open %s\n"),
 		    fwplugdirpath);
 		return (errno);
 	}
@@ -420,8 +427,22 @@ flash_load_plugins() {
 		if ((sym = dlsym(tmpplug->handle, "drivername"))
 		    != NULL) {
 			/* max length of drivername */
-			tmpplug->drvname = calloc(1, 17);
-			(void) strlcpy(tmpplug->drvname, (char *)sym, 17);
+			tmpplug->drvname = calloc(1, MAXMODCONFNAME);
+
+			/* are we doing double-time? */
+			if (strncmp((char *)sym, plugdir->d_name,
+			    MAXMODCONFNAME) != 0) {
+				char *tempnm = calloc(1, MAXMODCONFNAME);
+
+				memcpy(tempnm, plugdir->d_name, MAXMODCONFNAME);
+				(void) strlcpy(tmpplug->drvname,
+				    strtok(tempnm, "."),
+				    strlen(plugdir->d_name) + 1);
+				free(tempnm);
+			} else {
+				(void) strlcpy(tmpplug->drvname,
+				    (char *)sym, strlen(sym) + 1);
+			}
 		} else {
 			CLOSEFREE();
 			continue;
@@ -458,10 +479,10 @@ flash_load_plugins() {
 			continue;
 		}
 
-		if ((tmpelem->drvname = calloc(1, 17))
+		if ((tmpelem->drvname = calloc(1, MAXMODCONFNAME))
 		    == NULL) {
 			logmsg(MSG_ERROR,
-			    gettext("Unable to allocate 17 bytes for "
+			    gettext("Unable to allocate space for a"
 				"drivername %s\n"),
 			    tmpplug->drvname);
 			return (FWFLASH_FAILURE);
@@ -476,7 +497,7 @@ flash_load_plugins() {
 			    gettext("Unable to allocate %d bytes for "
 				"filename %s\n"),
 			    strlen(tmpplug->filename) + 1,
-			    tmpplug->drvname);
+			    tmpplug->filename);
 			return (FWFLASH_FAILURE);
 		}
 
@@ -522,7 +543,6 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg) {
 	int imgfd;
 	char *fwvrfydirpath, *tempdirpath, *filename;
 	char *clean; /* for the space-removed vid */
-
 	struct stat fwstat;
 	struct vrfyplugin *vrfy;
 	void *vrfysym;
@@ -616,7 +636,7 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg) {
 			logmsg(MSG_ERROR, gettext(dlerror()));
 			logmsg(MSG_ERROR,
 			    gettext("Unable to open verification plugin "
-				"%s.\nUnable to verify firmware image. "
+				"%s. Unable to verify firmware image. "
 				"Aborting.\n"),
 			    filename);
 			free(filename);
@@ -864,6 +884,7 @@ fwflash_update(char *device, char *filename, int flags) {
 
 	int rv = FWFLASH_FAILURE;
 	int needsfree = 0;
+	int found = 0;
 	struct devicelist *curdev;
 	char *realfile;
 
@@ -900,7 +921,7 @@ fwflash_update(char *device, char *filename, int flags) {
 	if ((realfile = calloc(1, PATH_MAX + 1)) == NULL) {
 		logmsg(MSG_ERROR,
 		    gettext("Unable to allocate space for device "
-			"filename, operation might fail\nif %s is"
+			"filename, operation might fail if %s is"
 			"a symbolic link\n"),
 		    device);
 		realfile = device;
@@ -930,6 +951,7 @@ fwflash_update(char *device, char *filename, int flags) {
 	TAILQ_FOREACH(curdev, fw_devices, nextdev) {
 
 		if (strcmp(curdev->access_devname, realfile) == 0) {
+			found++;
 			rv = fwflash_load_verifier(curdev->drvname,
 			    curdev->ident->vid, filename);
 			if (rv == FWFLASH_FAILURE) {
@@ -975,6 +997,14 @@ fwflash_update(char *device, char *filename, int flags) {
 			}
 		}
 	}
+
+	if (!found)
+		/* report the same device that the user passed in */
+		logmsg(MSG_ERROR,
+		    gettext("Device %s does not appear "
+		    "to be flashable\n"),
+		    ((strncmp(device, realfile, strlen(device)) == 0) ?
+		    device : realfile));
 
 	if (needsfree)
 		free(realfile);
@@ -1101,6 +1131,7 @@ fwflash_intr(int sig)
 
 	(void) signal(SIGINT, SIG_IGN);
 	(void) signal(SIGTERM, SIG_IGN);
+	(void) signal(SIGABRT, SIG_IGN);
 	if (fwflash_in_write) {
 		(void) fprintf(stderr,
 		    gettext("WARNING: firmware image may be corrupted\n\t"));
@@ -1126,12 +1157,9 @@ fwflash_intr(int sig)
 			free(thisdev->access_devname);
 			free(thisdev->drvname);
 			free(thisdev->classname);
-			if (thisdev->ident != NULL) {
-				free(thisdev->ident->vid);
-				free(thisdev->ident->pid);
-				free(thisdev->ident->revid);
+			if (thisdev->ident != NULL)
 				free(thisdev->ident);
-			}
+
 			thisdev->ident = NULL;
 			thisdev->plugin = NULL; /* we free this elsewhere */
 			/* CONSTCOND */
@@ -1169,9 +1197,13 @@ fwflash_intr(int sig)
 	if (verifier != NULL) {
 		free(verifier->filename);
 		free(verifier->vendor);
+		free(verifier->imgfile);
+		free(verifier->fwimage);
 		verifier->filename = NULL;
 		verifier->vendor = NULL;
 		verifier->vendorvrfy = NULL;
+		verifier->imgfile = NULL;
+		verifier->fwimage = NULL;
 		(void) dlclose(verifier->handle);
 		verifier->handle = NULL;
 		free(verifier);
@@ -1199,10 +1231,12 @@ confirm_target(struct devicelist *thisdev, char *file)
 {
 	int resp;
 
-	(void) printf(gettext("About to update firmware on:\n  "
-	    "%s\nwith file %s.\n"
-	    "Do you want to continue? (Y/N): "),
-	    thisdev->access_devname, file);
+	(void) fflush(stdin);
+
+	(void) printf(gettext("About to update firmware on %s\n"),
+	    thisdev->access_devname);
+	(void) printf(gettext("with file %s. Do you want to continue? "
+	    "(Y/N): "), file);
 
 	resp = getchar();
 	if (resp == 'Y' || resp == 'y') {

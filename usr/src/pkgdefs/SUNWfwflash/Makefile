@@ -27,6 +27,8 @@
 
 include ../Makefile.com
 
+DATAFILES += depend
+
 LICENSEFILES += $(OSBL)
 CDDL=
 

@@ -42,22 +42,10 @@
 #include <fcntl.h>
 #include <string.h>
 #include <strings.h>
-
+#include <scsi/libscsi.h>
 #include <scsi/libses.h>
-#include <sys/scsi/generic/commands.h>
-#include <sys/scsi/impl/uscsi.h>
-
 #include <libintl.h> /* for gettext(3c) */
-
 #include <fwflash/fwflash.h>
-
-
-
-#ifdef NDEBUG
-#define	verify(EX)	((void)(EX))
-#else
-#define	verify(EX)	assert(EX)
-#endif
 
 
 #define	VIDLEN		0x08
@@ -121,11 +109,37 @@ typedef struct ucode_wait {
 } ucode_wait_t;
 
 
+typedef struct sam4_statdesc {
+	int status;
+	char *message;
+} sam4_statdesc_t;
+
+
+static sam4_statdesc_t sam4_status[] = {
+	{ SAM4_STATUS_GOOD, "Status: GOOD (success)" },
+	{ SAM4_STATUS_CHECK_CONDITION, "Status: CHECK CONDITION" },
+	{ SAM4_STATUS_CONDITION_MET, "Status: CONDITION MET" },
+	{ SAM4_STATUS_BUSY, "Status: Device is BUSY" },
+	{ SAM4_STATUS_RESERVATION_CONFLICT, "Status: Device is RESERVED" },
+	{ SAM4_STATUS_TASK_SET_FULL,
+	    "Status: TASK SET FULL (insufficient resources in command queue" },
+	{ SAM4_STATUS_TASK_ABORTED, "Status: TASK ABORTED" },
+	{ NULL, NULL }
+};
+
+#define	NSAM4_STATUS	\
+	(sizeof (sam4_status) / sizeof (sam4_status[0]))
+
+
+
 char drivername[] = "ses\0";
 static char *devprefix = "/devices";
-static char *devsuffix = ":0";
-static ses_target_t *ses_target;
+static char *sessuffix = ":0";
+static char *sgensuffix = ":ses";
 
+
+static ses_target_t *ses_target;
+static int internalstatus;
 
 extern di_node_t rootnode;
 extern int errno;
@@ -142,31 +156,29 @@ int fw_devinfo(struct devicelist *thisdev);
 
 
 /* helper functions */
-static struct vpr *inquiry(char *path);
-static int ses_dl_ucode_check(struct devicelist *flashdev);
-static ses_walk_action_t  print_updated_status(ses_node_t *np, void *arg);
+static void print_updated_status(ses_node_t *np, void *arg);
 static int get_status(nvlist_t *props, ucode_status_t *sp);
-static ses_walk_action_t sendimg(ses_node_t *np, void *data);
-
-
+static int sendimg(ses_node_t *np, void *data);
+static int scsi_writebuf();
 
 /*
- * SES2 does not actually allow us to read a firmware
- * image from an SES device, so we just return success
- * if this is requested, after printing a message.
+ * We don't currently support reading firmware from a SAS
+ * expander. If we do eventually support it, we would use
+ * the scsi READ BUFFER command to do so.
  */
 int
 fw_readfw(struct devicelist *flashdev, char *filename)
 {
-	int rv = FWFLASH_SUCCESS;
 
 	logmsg(MSG_INFO,
-	    "ses: not writing firmware for device %s to file %s\n",
-	    flashdev->access_devname, filename);
-	logmsg(MSG_ERROR, gettext("\n\nSES2 does not support retrieval "
-	    "of firmware images\n\n"));
+	    "%s: not writing firmware for device %s to file %s\n",
+	    flashdev->drvname, flashdev->access_devname, filename);
+	logmsg(MSG_ERROR,
+	    gettext("\n\nReading of firmware images from %s-attached "
+	    "devices is not supported\n\n"),
+	    flashdev->drvname);
 
-	return (rv);
+	return (FWFLASH_SUCCESS);
 }
 
 
@@ -185,26 +197,28 @@ fw_readfw(struct devicelist *flashdev, char *filename)
 int
 fw_writefw(struct devicelist *flashdev)
 {
-
+	int rv;
 	nvlist_t *nvl;
 	ses_snap_t *snapshot;
-
-
-
-	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0 ||
-	    nvlist_add_uint64(nvl, SES_CTL_PROP_UCODE_MODE,
-	    SES_DLUCODE_M_WITH_OFFS) != 0) {
-		logmsg(MSG_ERROR, gettext("ses: Unable to allocate "
-		    "space for device prop list\n"));
-		return (FWFLASH_FAILURE);
-	}
-
+	ses_node_t *targetnode;
 
 	if ((verifier == NULL) || (verifier->imgsize == 0) ||
 	    (verifier->fwimage == NULL)) {
 		/* should _not_ happen */
-		logmsg(MSG_ERROR, gettext("ses: Firmware image has not "
-		    "been verified.\n"));
+		logmsg(MSG_ERROR,
+		    gettext("%s: Firmware image has not "
+		    "been verified.\n"),
+		    flashdev->drvname);
+		return (FWFLASH_FAILURE);
+	}
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0 ||
+	    nvlist_add_uint64(nvl, SES_CTL_PROP_UCODE_MODE,
+	    SES_DLUCODE_M_WITH_OFFS) != 0) {
+		logmsg(MSG_ERROR,
+		    gettext("%s: Unable to allocate "
+		    "space for device prop list\n"),
+		    flashdev->drvname);
 		return (FWFLASH_FAILURE);
 	}
 
@@ -212,8 +226,10 @@ fw_writefw(struct devicelist *flashdev)
 
 	if (nvlist_add_uint64(nvl, SES_CTL_PROP_UCODE_BUFID,
 	    verifier->flashbuf) != 0) {
-		logmsg(MSG_ERROR, gettext("ses: Unable to add buffer id "
-		    "property\n"));
+		logmsg(MSG_ERROR,
+		    gettext("%s: Unable to add buffer id "
+		    "property, hence unable to flash device\n"),
+		    flashdev->drvname);
 		goto cancel;
 	}
 
@@ -221,40 +237,47 @@ fw_writefw(struct devicelist *flashdev)
 	    (uint8_t *)verifier->fwimage, verifier->imgsize) != 0) {
 		logmsg(MSG_ERROR,
 		    "%s: Out of memory for property addition\n",
-		    drivername);
+		    flashdev->drvname);
 		goto cancel;
 	}
 
 	if ((ses_target =
 	    ses_open(LIBSES_VERSION, flashdev->access_devname)) == NULL) {
 		logmsg(MSG_ERROR,
-		    gettext("ses: Unable to open flashable device\n%s\n"),
-		    flashdev->access_devname);
+		    gettext("%s: Unable to open flashable device %s\n"),
+		    flashdev->drvname, flashdev->access_devname);
 		goto cancel;
 	}
+
 	snapshot = ses_snap_hold(ses_target);
+	internalstatus = FWFLASH_FAILURE;
 
-	/*
-	 * We flash via a walker callback function, because it's easier
-	 * to do it this way when using libses.
-	 */
-
-	(void) ses_walk(snapshot, sendimg, nvl);
-
-
-	logmsg(MSG_ERROR,
-	    gettext("ses: Done. New image will be active "
-	    "after the system is rebooted.\n"));
-
-	fprintf(stdout, "\n");
+	if ((targetnode = ses_snap_primary_enclosure(snapshot)) == NULL) {
+		logmsg(MSG_ERROR,
+		    gettext("%s: Unable to locate primary enclosure for "
+		    "device %s\n"),
+		    flashdev->access_devname);
+	} else {
+		rv = sendimg(targetnode, nvl);
+		if (rv == FWFLASH_SUCCESS) {
+			logmsg(MSG_ERROR,
+			    gettext("%s: Done. New image will be active "
+			    "after the system is rebooted.\n\n"),
+			    flashdev->drvname);
+		} else {
+			logmsg(MSG_INFO,
+			    "%s: unable to flash image %s to device %s\n\n",
+			    flashdev->drvname, verifier->imgfile,
+			    flashdev->access_devname);
+		}
+	}
 
 	ses_snap_rele(snapshot);
 	ses_close(ses_target);
-
 cancel:
 	nvlist_free(nvl);
 
-	return (FWFLASH_SUCCESS);
+	return (internalstatus);
 }
 
 
@@ -276,25 +299,38 @@ fw_identify(int start)
 	di_node_t thisnode;
 	struct devicelist *newdev;
 	char *devpath;
+	char *devsuffix;
+	char *driver;
 	int idx = start;
 	int devlength = 0;
+	nvlist_t *props;
+	ses_snap_t *snapshot;
+	ses_node_t *rootnodep, *nodep;
 
 
-	thisnode = di_drv_first_node(drivername, rootnode);
+	if (strcmp(self->drvname, "sgen") == 0) {
+		devsuffix = sgensuffix;
+		driver = self->drvname;
+	} else {
+		devsuffix = sessuffix;
+		driver = drivername;
+	}
+
+	thisnode = di_drv_first_node(driver, rootnode);
 
 	if (thisnode == DI_NODE_NIL) {
 		logmsg(MSG_INFO, gettext("No %s nodes in this system\n"),
-		    drivername);
-
+		    driver);
 		return (rv);
 	}
 
 	if ((devpath = calloc(1, MAXPATHLEN + 1)) == NULL) {
-		logmsg(MSG_ERROR, gettext("ses: Unable to malloc space "
-		    "for a %s-attached device node\n"), drivername);
+		logmsg(MSG_ERROR,
+		    gettext("%s: Unable to allocate space "
+		    "for a device node\n"),
+		    driver);
 		return (rv);
 	}
-	bzero(devpath, MAXPATHLEN);
 
 	/* we've found one, at least */
 
@@ -305,102 +341,182 @@ fw_identify(int start)
 		if ((newdev = calloc(1, sizeof (struct devicelist)))
 		    == NULL) {
 			logmsg(MSG_ERROR,
-			    gettext("ses: identification function unable "
-			    "to allocate space for device entry\n"));
+			    gettext("%s: identification function unable "
+			    "to allocate space for device entry\n"),
+			    driver);
+			free(devpath);
 			return (rv);
 		}
 
-		/* malloc enough for /devices + devpath + ":0" + '\0' */
+		/* calloc enough for /devices + devpath + devsuffix + '\0' */
 		devlength = strlen(devpath) + strlen(devprefix) +
 		    strlen(devsuffix) + 2;
 
 		if ((newdev->access_devname = calloc(1, devlength)) == NULL) {
-			logmsg(MSG_ERROR, gettext("ses: Unable to malloc "
-			    "space for a devfs name\n"));
+			logmsg(MSG_ERROR,
+			    gettext("%s: Unable to allocate "
+			    "space for a devfs name\n"),
+			    driver);
 			free(devpath);
+			free(newdev);
 			return (FWFLASH_FAILURE);
 		}
 		snprintf(newdev->access_devname, devlength,
 		    "%s%s%s", devprefix, devpath, devsuffix);
 
-		if ((newdev->drvname = calloc(1, strlen(drivername) + 1))
-		    == NULL) {
-			logmsg(MSG_ERROR, gettext("ses: Unable to malloc "
-			    "space for a driver name\n"));
-			free(newdev->access_devname);
-			free(newdev);
-			return (FWFLASH_FAILURE);
-		}
-		(void) strlcpy(newdev->drvname, drivername,
-		    strlen(drivername) + 1);
-
-		if ((newdev->classname = calloc(1, strlen(drivername) + 1))
-		    == NULL) {
-			logmsg(MSG_ERROR, gettext("ses: Unable to malloc "
-			    "space for a class name\n"));
-			free(newdev->access_devname);
-			free(newdev->drvname);
-			free(newdev);
-			return (FWFLASH_FAILURE);
-		}
-		(void) strlcpy(newdev->classname, drivername,
-		    strlen(drivername) + 1);
-
-
-		/*
-		 * Check for friendly vendor names, and whether this device
-		 * supports the Download Microcode Control page.
-		 */
-
-		newdev->ident = inquiry(newdev->access_devname);
-		rv = ses_dl_ucode_check(newdev);
-		if ((rv == FWFLASH_FAILURE) || (newdev->ident == NULL))
-			continue;
-
-
-		if (newdev->ident == NULL) {
-			logmsg(MSG_INFO,
-			    "ses: unable to inquire on potentially "
-			    "flashable device\n%s\n",
-			    newdev->access_devname);
-			free(newdev->access_devname);
-			free(newdev->drvname);
-			free(newdev->classname);
-			free(newdev);
-			continue;
-		}
-
-		/*
-		 * Look for the target-port property. We use addresses[1]
-		 * because addresses[0] is already assigned by the inquiry
-		 * function
-		 */
-		if ((newdev->addresses[1] = calloc(1, SASADDRLEN + 1))
+		if ((newdev->drvname = calloc(1, strlen(driver) + 1))
 		    == NULL) {
 			logmsg(MSG_ERROR,
-			    gettext("ses: Out of memory for target-port\n"));
+			    gettext("%s: Unable to allocate "
+			    "space to store a driver name\n"),
+			    driver);
+			free(newdev->access_devname);
+			free(newdev);
+			free(devpath);
+			return (FWFLASH_FAILURE);
+		}
+		(void) strlcpy(newdev->drvname, driver,
+		    strlen(driver) + 1);
+
+		if ((newdev->classname = calloc(1, strlen(driver) + 1))
+		    == NULL) {
+			logmsg(MSG_ERROR,
+			    gettext("%s: Unable to malloc "
+			    "space for a class name\n"),
+			    drivername);
 			free(newdev->access_devname);
 			free(newdev->drvname);
-			free(newdev->classname);
 			free(newdev);
-			continue;
-		} else {
-			if (di_prop_lookup_strings(DDI_DEV_T_ANY, thisnode,
-			    "target-port", &newdev->addresses[1]) < 0) {
-				logmsg(MSG_INFO,
-				    "ses: no target-port property for "
-				    "device %s\n",
-				    newdev->access_devname);
-				strlcpy(newdev->addresses[1],
-				    "0000000000000000", 17);
-			}
+			free(devpath);
+			return (FWFLASH_FAILURE);
 		}
+		(void) strlcpy(newdev->classname, driver,
+		    strlen(driver) + 1);
+
+		/*
+		 * Only alloc as much as we truly need, and DON'T forget
+		 * that libnvpair manages the memory for property lookups!
+		 * The same goes for libdevinfo properties.
+		 *
+		 * Also note that we're allocating here before we try to
+		 * ses_open() the target, because if we can't allocate
+		 * sufficient space then we might as well go home.
+		 */
+		newdev->ident = calloc(1, VIDLEN + PIDLEN + REVLEN + 3);
+		if (newdev->ident == NULL) {
+			logmsg(MSG_ERROR,
+			    gettext("%s: Unable to malloc space for"
+			    "SCSI INQUIRY data\n"), driver);
+			free(newdev->classname);
+			free(newdev->drvname);
+			free(newdev->access_devname);
+			free(newdev);
+			free(devpath);
+			return (FWFLASH_FAILURE);
+		}
+
+		if ((ses_target =
+		    ses_open(LIBSES_VERSION, newdev->access_devname))
+		    == NULL) {
+			logmsg(MSG_INFO,
+			    gettext("%s: Unable to open device %s\n"),
+			    driver, newdev->access_devname);
+			free(newdev->ident);
+			free(newdev->classname);
+			free(newdev->access_devname);
+			free(newdev->drvname);
+			free(newdev);
+			free(devpath);
+			continue;
+		}
+		snapshot = ses_snap_hold(ses_target);
+		rootnodep = ses_root_node(snapshot);
+
+		/*
+		 * If the node has no properties, or the INQUIRY properties
+		 * don't exist, this device does not comply with SES2 so we
+		 * won't touch it.
+		 */
+		if ((props = ses_node_props(rootnodep)) == NULL) {
+			free(newdev->ident);
+			ses_snap_rele(snapshot);
+			ses_close(ses_target);
+			free(newdev->classname);
+			free(newdev->access_devname);
+			free(newdev->drvname);
+			free(newdev);
+			free(devpath);
+			continue;
+		}
+
+		if ((nvlist_lookup_string(props, SCSI_PROP_VENDOR,
+		    &newdev->ident->vid) != 0) ||
+		    (nvlist_lookup_string(props, SCSI_PROP_PRODUCT,
+		    &newdev->ident->pid) != 0) ||
+		    (nvlist_lookup_string(props, SCSI_PROP_REVISION,
+		    &newdev->ident->revid) != 0)) {
+			free(newdev->ident);
+			ses_snap_rele(snapshot);
+			ses_close(ses_target);
+			free(newdev->classname);
+			free(newdev->access_devname);
+			free(newdev->drvname);
+			free(newdev);
+			free(devpath);
+			continue;
+		}
+
+		nodep = ses_snap_primary_enclosure(snapshot);
+
+		if ((props = ses_node_props(nodep)) == NULL) {
+			free(newdev->ident);
+			ses_snap_rele(snapshot);
+			ses_close(ses_target);
+			free(newdev->classname);
+			free(newdev->access_devname);
+			free(newdev->drvname);
+			free(newdev);
+			free(devpath);
+			continue;
+		}
+
+		logmsg(MSG_INFO,
+		    "\nvid: %s\npid: %s\nrevid: %s\n",
+		    newdev->ident->vid,
+		    newdev->ident->pid,
+		    newdev->ident->revid);
+
+		if (nvlist_lookup_string(props, LIBSES_EN_PROP_CSN,
+		    &newdev->addresses[0]) == 0) {
+			logmsg(MSG_INFO,
+			    "Chassis Serial Number: %s\n",
+			    newdev->addresses[0]);
+		} else {
+			(void) strlcpy(newdev->addresses[0],
+			    "(not supported)", 17);
+		}
+
+
+		if (di_prop_lookup_strings(DDI_DEV_T_ANY,
+		    thisnode, "target-port",
+		    &newdev->addresses[1]) < 0) {
+			logmsg(MSG_INFO,
+			    "%s: no target-port property "
+			    "for device %s\n",
+			    driver, newdev->access_devname);
+			(void) strlcpy(newdev->addresses[1],
+			    "(not supported)", 17);
+		} else
+			logmsg(MSG_INFO,
+			    "target-port property: %s\n",
+			    newdev->addresses[1]);
 
 
 		newdev->index = idx;
 		++idx;
 		newdev->plugin = self;
 
+		ses_snap_rele(snapshot);
 		TAILQ_INSERT_TAIL(fw_devices, newdev, nextdev);
 	}
 
@@ -409,8 +525,10 @@ fw_identify(int start)
 		struct devicelist *tempdev;
 
 		TAILQ_FOREACH(tempdev, fw_devices, nextdev) {
-			logmsg(MSG_INFO, "ses:fw_writefw:\n");
-			logmsg(MSG_INFO, "\ttempdev @ 0x%lx\n"
+			logmsg(MSG_INFO, "%s:fw_identify:\n",
+			    driver);
+			logmsg(MSG_INFO,
+			    "\ttempdev @ 0x%lx\n"
 			    "\t\taccess_devname: %s\n"
 			    "\t\tdrvname: %s\tclassname: %s\n"
 			    "\t\tident->vid:   %s\n"
@@ -427,11 +545,9 @@ fw_identify(int start)
 			    tempdev->ident->pid,
 			    tempdev->ident->revid,
 			    tempdev->index,
-			    (tempdev->addresses[0] != NULL) ?
-			    (char *)tempdev->addresses[0] : "NULL",
-			    (tempdev->addresses[1] != NULL) ?
-			    (char *)tempdev->addresses[1] : "NULL",
-			    tempdev->plugin);
+			    tempdev->addresses[0],
+			    tempdev->addresses[1],
+			    &tempdev->plugin);
 		}
 	}
 
@@ -448,20 +564,16 @@ fw_devinfo(struct devicelist *thisdev)
 	fprintf(stdout, gettext("Device[%d] %s\n  Class [%s]\n"),
 	    thisdev->index, thisdev->access_devname, thisdev->classname);
 
-	if (thisdev->addresses[0] != NULL) {
-		fprintf(stdout,
-		    gettext("\tChassis Serial Number  : %s\n"),
-		    thisdev->addresses[0]);
-	}
-
 	fprintf(stdout,
 	    gettext("\tVendor                 : %s\n"
 	    "\tProduct                : %s\n"
 	    "\tFirmware revision      : %s\n"
+	    "\tChassis Serial Number  : %s\n"
 	    "\tTarget-port identifier : %s\n"),
 	    thisdev->ident->vid,
 	    thisdev->ident->pid,
 	    thisdev->ident->revid,
+	    thisdev->addresses[0],
 	    thisdev->addresses[1]);
 
 	fprintf(stdout, "\n\n");
@@ -484,10 +596,17 @@ get_status(nvlist_t *props, ucode_status_t *sp)
 		sp->us_status = -1ULL;
 		(void) snprintf(sp->us_desc, sizeof (sp->us_desc),
 		    "not supported");
+		internalstatus = FWFLASH_FAILURE;
 		return (-1);
 	}
 
-	verify(nvlist_lookup_uint64(props, SES_EN_PROP_UCODE_A, &astatus) == 0);
+	if (nvlist_lookup_uint64(props, SES_EN_PROP_UCODE_A,
+	    &astatus) != 0) {
+		logmsg(MSG_ERROR,
+		    gettext("\nError: Unable to retrieve current status\n"));
+		internalstatus = FWFLASH_FAILURE;
+		return (-1);
+	}
 
 	for (i = 0; i < NUCODE_STATUS; i++) {
 		if (ucode_statdesc_table[i].us_value == status)
@@ -512,42 +631,41 @@ get_status(nvlist_t *props, ucode_status_t *sp)
 }
 
 
-static ses_walk_action_t
+static void
 print_updated_status(ses_node_t *np, void *arg)
 {
 	ucode_wait_t *uwp = arg;
-	ses_node_t *oldnp = uwp->uw_oldnp;
-	nvlist_t *props, *oldprops;
-	uint64_t id, oldid;
+	nvlist_t *props;
 	ucode_status_t status;
 
-	if (ses_node_type(np) != SES_NODE_ENCLOSURE)
-		return (SES_WALK_ACTION_CONTINUE);
 
-	verify((props = ses_node_props(np)) != NULL);
-	verify((oldprops = ses_node_props(oldnp)) != NULL);
-	verify(nvlist_lookup_uint64(props, SES_EN_PROP_EID, &id) == 0);
-	verify(nvlist_lookup_uint64(oldprops, SES_EN_PROP_EID, &oldid) == 0);
+	if ((props = ses_node_props(np)) == NULL) {
+		internalstatus = FWFLASH_FAILURE;
+		return;
+	}
 
-	if (oldid != id)
-		return (SES_WALK_ACTION_CONTINUE);
+	if (get_status(props, &status) != 0)
+		/* internalstatus is already set to FWFLASH_FAILURE */
+		return;
 
-	(void) get_status(props, &status);
 	if (status.us_status != uwp->uw_prevstatus)
 		(void) printf("%30s: %s\n", "status", status.us_desc);
+
 	uwp->uw_prevstatus = status.us_status;
 	uwp->uw_pending = status.us_pending;
 
-	if (status.us_iserr)
+	if (status.us_iserr) {
 		logmsg(MSG_INFO,
-		    "ses: status.us_iserr: 0x%0x\n",
+		    "libses: status.us_iserr: 0x%0x\n",
 		    status.us_iserr);
+		internalstatus = FWFLASH_FAILURE;
+	} else
+		internalstatus = FWFLASH_SUCCESS;
 
-	return (SES_WALK_ACTION_CONTINUE);
 }
 
 /*ARGSUSED*/
-static ses_walk_action_t
+static int
 sendimg(ses_node_t *np, void *data)
 {
 	nvlist_t *props;
@@ -559,17 +677,23 @@ sendimg(ses_node_t *np, void *data)
 	ucode_status_t statdesc;
 	ucode_wait_t wait;
 	uint8_t *imagedata;
-	size_t len;
+	uint_t len;
 
-	if (ses_node_type(np) != SES_NODE_ENCLOSURE)
-		return (SES_WALK_ACTION_CONTINUE);
 
-	verify((props = ses_node_props(np)) != NULL);
+	/* If we've been called without data, eject */
+	if (nvlist_lookup_byte_array(arg, SES_CTL_PROP_UCODE_DATA,
+	    &imagedata, &len) != 0) {
+		return (FWFLASH_FAILURE);
+	}
 
-	verify(nvlist_lookup_string(props, SES_EN_PROP_VID, &vendor) == 0);
-	verify(nvlist_lookup_string(props, SES_EN_PROP_PID, &product) == 0);
-	verify(nvlist_lookup_string(props, SES_EN_PROP_REV, &revision) == 0);
-	verify(nvlist_lookup_string(props, LIBSES_EN_PROP_CSN, &csn) == 0);
+	props = ses_node_props(np);
+	if ((props == NULL) ||
+	    (nvlist_lookup_string(props, SES_EN_PROP_VID, &vendor) != 0) ||
+	    (nvlist_lookup_string(props, SES_EN_PROP_PID, &product) != 0) ||
+	    (nvlist_lookup_string(props, SES_EN_PROP_REV, &revision) != 0) ||
+	    (nvlist_lookup_string(props, LIBSES_EN_PROP_CSN, &csn) != 0)) {
+		return (FWFLASH_FAILURE);
+	}
 
 	(void) printf("%30s: %s\n", "vendor", vendor);
 	(void) printf("%30s: %s\n", "product", product);
@@ -579,273 +703,99 @@ sendimg(ses_node_t *np, void *data)
 	ret = get_status(props, &statdesc);
 	(void) printf("%30s: %s\n", "current status", statdesc.us_desc);
 	if (ret != 0) {
-		if (arg != NULL)
-			return (SES_WALK_ACTION_TERMINATE);
-		else
-			return (SES_WALK_ACTION_CONTINUE);
+		return (FWFLASH_FAILURE);
 	}
 
-	verify(nvlist_lookup_byte_array(arg, SES_CTL_PROP_UCODE_DATA,
-	    &imagedata, &len) == 0);
 	(void) snprintf(buf, sizeof (buf), "downloading %u bytes", len);
 	(void) printf("\n%30s: ", buf);
+
+	/*
+	 * If the bufferid isn't 2, then the verifier has already
+	 * OK'd the image that the user has provided. That means
+	 * we've got manufacturing_mode = 1 from the command line.
+	 *
+	 * At present the non-"standard" images need to be flashed
+	 * using the scsi WRITE BUFFER command
+	 */
+	if (verifier->flashbuf != 2)
+		return (scsi_writebuf());
+
+
 	if (ses_node_ctl(np, SES_CTL_OP_DL_UCODE, arg) != 0) {
 		(void) printf("failed!\n");
 		(void) printf("%s\n", ses_errmsg());
+		return (FWFLASH_FAILURE);
 	} else {
 		(void) printf("ok\n");
 	}
 
 	wait.uw_prevstatus = -1ULL;
 	wait.uw_oldnp = np;
-	do {
-		if ((newsnap = ses_snap_new(ses_target)) == NULL)
-			logmsg(MSG_ERROR,
-			    "failed to update SES snapshot: %s",
-			    ses_errmsg());
 
-		(void) ses_walk(newsnap, print_updated_status,
-		    &wait);
-		ses_snap_rele(newsnap);
-	} while (wait.uw_pending);
+	if ((newsnap = ses_snap_new(ses_target)) == NULL)
+		logmsg(MSG_ERROR,
+		    "failed to update SES snapshot: %s",
+		    ses_errmsg());
 
-	return (SES_WALK_ACTION_CONTINUE);
+	print_updated_status(ses_snap_primary_enclosure(newsnap),
+	    &wait);
+	ses_snap_rele(newsnap);
+
+	return (internalstatus);
 }
 
-/*
- * Simple function to sent a standard SCSI INQUIRY(6) cdb out
- * to thisnode and blat the response back into a struct vpr*
- */
-static struct vpr *
-inquiry(char *path) {
-
-	struct uscsi_cmd *inqcmd;
-	uchar_t inqbuf[INQBUFLEN];	/* inquiry response */
-	uchar_t rqbuf[RQBUFLEN];	/* request sense data */
-	struct vpr *inqvpr;
-	int fd, rval;
+static int
+scsi_writebuf()
+{
+	int ret;
+	int i = 0;
+	libscsi_action_t *action;
+	spc3_write_buffer_cdb_t *wb_cdb;
+	libscsi_hdl_t	*handle;
+	libscsi_target_t *target;
+	sam4_status_t samstatus;
 
 
-	inqvpr = NULL;
-	if ((inqcmd = calloc(1, sizeof (struct uscsi_cmd))) == NULL) {
-		logmsg(MSG_ERROR,
-		    gettext("ses: Unable to malloc %d bytes "
-		    "for a SCSI INQUIRY(6) command\n"),
-		    sizeof (struct uscsi_cmd));
-		return (NULL);
-	}
+	target = ses_scsi_target(ses_target);
+	handle = libscsi_get_handle(target);
+	action = libscsi_action_alloc(handle, SPC3_CMD_WRITE_BUFFER,
+	    LIBSCSI_AF_WRITE|LIBSCSI_AF_RQSENSE,
+	    (void *)verifier->fwimage, (size_t)verifier->imgsize);
 
-	if ((inqvpr = calloc(1, sizeof (struct vpr))) == NULL) {
-		logmsg(MSG_ERROR,
-		    gettext("ses: Unable to malloc %d bytes "
-		    "for SCSI INQUIRY(6) response\n"),
-		    sizeof (struct vpr));
-		free(inqcmd);
-		return (NULL);
-	}
+	wb_cdb = (spc3_write_buffer_cdb_t *)libscsi_action_get_cdb(action);
+	wb_cdb->wbc_mode = SPC3_WB_MODE_DATA;
+	wb_cdb->wbc_bufferid = verifier->flashbuf;
+	SCSI_WRITE24(&wb_cdb->wbc_buffer_offset, 0);
+	SCSI_WRITE24(&wb_cdb->wbc_parameter_list_len, verifier->imgsize);
 
-	if ((inqcmd->uscsi_cdb = calloc(1, CDB_GROUP0 * sizeof (caddr_t)))
-	    == NULL) {
-		logmsg(MSG_ERROR,
-		    gettext("ses: Unable to malloc %d bytes "
-		    "for SCSI INQUIRY(6)\n"),
-		    CDB_GROUP0 * sizeof (caddr_t));
-		free(inqcmd);
-		free(inqvpr);
-		return (NULL);
-	}
-
-	logmsg(MSG_INFO, "ses:inquiry:opening device %s\n",
-	    path);
-
-	if ((fd = open(path, O_RDONLY|O_SYNC)) < 0) {
-		logmsg(MSG_INFO,
-		    "ses: Unable to open device %s: %s\n",
-		    path, strerror(errno));
-		free(inqcmd->uscsi_cdb);
-		free(inqcmd);
-		free(inqvpr);
-		return (NULL);
-	}
-
-	if (((inqvpr->vid = calloc(1, VIDLEN + 1))
-	    == NULL) ||
-	    ((inqvpr->pid = calloc(1, PIDLEN + 1))
-		== NULL) ||
-	    ((inqvpr->revid = calloc(1, REVLEN + 1))
-		== NULL)) {
-		logmsg(MSG_ERROR,
-		    gettext("ses: Unable to malloc %d bytes "
-		    "for %s identification function.\n"),
-		    VIDLEN+PIDLEN+REVLEN, drivername);
-		free(inqcmd->uscsi_cdb);
-		free(inqcmd);
-		free(inqvpr->vid);
-		free(inqvpr->pid);
-		free(inqvpr->revid);
-		return (NULL);
-	}
-
-	/* just make sure these buffers are clean */
-	bzero(inqbuf, INQBUFLEN);
-	bzero(rqbuf, RQBUFLEN);
-	bzero(inqcmd->uscsi_cdb, CDB_GROUP0);
-	inqcmd->uscsi_flags = USCSI_READ;
-	inqcmd->uscsi_timeout = 0;
-	inqcmd->uscsi_bufaddr = (caddr_t)inqbuf;
-	inqcmd->uscsi_buflen = INQBUFLEN;
-	inqcmd->uscsi_cdblen = CDB_GROUP0; /* a GROUP 0 command */
-	inqcmd->uscsi_cdb[0] = SCMD_INQUIRY;
-	inqcmd->uscsi_cdb[1] = 0x00; /* EVPD = Enable Vital Product Data */
-	inqcmd->uscsi_cdb[2] = 0x00; /* which pagecode to query? */
-	inqcmd->uscsi_cdb[3] = 0x00; /* allocation length, msb */
-	inqcmd->uscsi_cdb[4] = INQBUFLEN; /* allocation length, lsb */
-	inqcmd->uscsi_cdb[5] = 0x0; /* control byte */
-	inqcmd->uscsi_rqbuf = (caddr_t)&rqbuf;
-	inqcmd->uscsi_rqlen = RQBUFLEN;
-
-
-	rval = ioctl(fd, USCSICMD, inqcmd);
-
-	if (rval < 0) {
-		/* ioctl failed */
-		logmsg(MSG_INFO,
-		    gettext("ses: Unable to retrieve SCSI INQUIRY(6) data "
-			"from device %s: %s\n"),
-		    path, strerror(errno));
-		free(inqcmd->uscsi_cdb);
-		free(inqcmd);
-		free(inqvpr->vid);
-		free(inqvpr->pid);
-		free(inqvpr->revid);
-		return (NULL);
-	}
-
-
-
-	bcopy(&inqbuf[8], inqvpr->vid, VIDLEN);
-	bcopy(&inqbuf[16], inqvpr->pid, PIDLEN);
-	bcopy(&inqbuf[32], inqvpr->revid, REVLEN);
-
-	(void) close(fd);
+	ret = libscsi_exec(action, target);
+	samstatus = libscsi_action_get_status(action);
 
 	logmsg(MSG_INFO,
-	    "ses inquiry: vid %s ; pid %s ; revid %s\n",
-	    inqvpr->vid, inqvpr->pid, inqvpr->revid);
+	    "\nscsi_writebuffer: ret 0x%0x, samstatus 0x%0x\n",
+	    ret, samstatus);
 
-	if ((strncmp(inqvpr->vid, "SUN", 3) != 0) &&
-	    (strncmp(inqvpr->vid, "LSI", 3) != 0) &&
-	    (strncmp(inqvpr->vid, "Quanta", 6) != 0) &&
-	    (strncmp(inqvpr->vid, "QUANTA", 6) != 0)) {
-		free(inqvpr->vid);
-		free(inqvpr->pid);
-		free(inqvpr->revid);
-		inqvpr->vid = NULL;
-		inqvpr->pid = NULL;
-		inqvpr->revid = NULL;
-		logmsg(MSG_INFO,
-		    "ses inquiry: unrecognised device\n");
-		return (NULL);
+	if ((ret != 0) || samstatus != 0) {
+		libscsi_action_free(action);
+		return (ret);
+	} else {
+		(void) printf("ok\n");
 	}
 
-	free(inqcmd->uscsi_cdb);
-	free(inqcmd);
-
-	return (inqvpr);
-}
-
-
-/*
- * ses_dl_ucode_check() lets us check whether SES2's Download
- * Microcode Control diagnostic and status pages are supported
- * by flashdev.
- */
-int
-ses_dl_ucode_check(struct devicelist *flashdev)
-{
-	int rv;
-	int limit;
-	int i = 0;
-	int fd;
-	struct uscsi_cmd *usc;
-	uchar_t sensebuf[RQBUFLEN]; /* for the request sense data */
-	uchar_t pagesup[PCBUFLEN]; /* should be less than 64 pages */
-
-
-	if ((fd = open(flashdev->access_devname,
-	    O_RDONLY|O_NDELAY)) < 0) {
-		logmsg(MSG_INFO,
-		    gettext("ses:ses_dl_ucode_check: Unable to open %s\n"),
-		    flashdev->access_devname);
-		return (FWFLASH_FAILURE);
-	}
-
-	if ((usc = calloc(1, sizeof (struct uscsi_cmd))) == NULL) {
-		logmsg(MSG_ERROR,
-		    gettext("ses: Unable to alloc %d bytes for "
-		    "microcode download query: %s\n"),
-		    sizeof (struct uscsi_cmd), strerror(errno));
-		(void) close(fd);
-		return (FWFLASH_FAILURE);
-	}
-
-	if ((usc->uscsi_cdb = calloc(1, CDB_GROUP0 * sizeof (caddr_t)))
-	    == NULL) {
-		logmsg(MSG_ERROR,
-		    gettext("ses: Unable to alloc %d bytes for "
-		    "microcode download query: %s\n"),
-		    CDB_GROUP0 * sizeof (caddr_t), strerror(errno));
-		(void) close(fd);
-		free(usc);
-		return (FWFLASH_FAILURE);
-	}
-
-
-	bzero(sensebuf, RQBUFLEN);
-
-	usc->uscsi_flags = USCSI_READ | USCSI_RQENABLE;
-	usc->uscsi_timeout = 0;
-	usc->uscsi_cdblen = CDB_GROUP0;
-	usc->uscsi_rqbuf = (caddr_t)&sensebuf;
-	usc->uscsi_rqlen = RQBUFLEN;
-
-
-	bzero(pagesup, PCBUFLEN);
-	usc->uscsi_bufaddr = (caddr_t)&pagesup;
-	usc->uscsi_buflen = PCBUFLEN;
-
-	usc->uscsi_cdb[0] = SCMD_GDIAG; /* "Get" or receive */
-	usc->uscsi_cdb[1] = 1; /* PCV = Page Code Valid */
-	usc->uscsi_cdb[2] = 0x00; /* list all Supported diag pages */
-	usc->uscsi_cdb[3] = 0x00;
-	usc->uscsi_cdb[4] = PCBUFLEN;
-	usc->uscsi_cdb[5] = 0; /* control byte, reserved */
-
-	rv = ioctl(fd, USCSICMD, usc);
-	if (rv < 0) {
-		logmsg(MSG_INFO,
-		    "ses: DL uCode checker ioctl error (%d): %s\n",
-		    errno, strerror(errno));
-		return (FWFLASH_FAILURE);
-	}
-
-	rv = FWFLASH_FAILURE;
-	/* in SPC4, this is an "n-3" field */
-	limit = (pagesup[2] << 8) + pagesup[3] + 4;
-	while (i < limit) {
-		if (pagesup[4 + i] == 0x0E) {
-			i = limit;
-			logmsg(MSG_INFO, "ses: device %s "
-			    "supports the Download Microcode "
-			    "diagnostic control page\n",
-			    flashdev->access_devname);
-			rv = FWFLASH_SUCCESS;
+	for (i = 0; i < NSAM4_STATUS; i++) {
+		if (sam4_status[i].status == samstatus) {
+			(void) printf("%s\n", (sam4_status[i].message));
+			break;
 		}
-		++i;
 	}
-	(void) close(fd);
-	free(usc->uscsi_cdb);
-	free(usc);
 
-	return (rv);
+	if (i == NSAM4_STATUS)
+		(void) printf("Status: UNKNOWN\n");
+
+	if (samstatus == SAM4_STATUS_GOOD) {
+		internalstatus = FWFLASH_SUCCESS;
+		return (FWFLASH_SUCCESS);
+	}
+
+	return (FWFLASH_FAILURE);
 }

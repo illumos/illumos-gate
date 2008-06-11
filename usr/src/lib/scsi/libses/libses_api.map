@@ -42,6 +42,7 @@
 	ses_open = FUNCTION extern;
 	ses_root_node = FUNCTION extern;
 	ses_scsi_target = FUNCTION extern;
+	ses_snap_primary_enclosure = FUNCTION extern;
 	ses_snap_generation = FUNCTION extern;
 	ses_strerror = FUNCTION extern;
 	ses_walk = FUNCTION extern;

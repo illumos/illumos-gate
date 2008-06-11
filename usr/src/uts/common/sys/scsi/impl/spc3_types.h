@@ -929,6 +929,71 @@ typedef struct spc3_test_unit_ready_cdb {
 } spc3_test_unit_ready_cdb_t;
 
 /*
+ * SPC-3 6.36 WRITE BUFFER
+ */
+typedef struct spc3_write_buffer_cdb {
+	uint8_t wbc_opcode;
+	DECL_BITFIELD2(
+	    wbc_mode		:5,
+	    _reserved		:3);
+	uint8_t wbc_bufferid;
+	uint8_t wbc_buffer_offset[3];
+	uint8_t wbc_parameter_list_len[3];
+	spc3_control_t wbc_control;
+} spc3_write_buffer_cdb_t;
+
+typedef enum spc3_write_buffer_mode {
+	SPC3_WB_MODE_COMB_HDR_DATA = 0x00,
+	SPC3_WB_MODE_VENDOR_SPECIFIC = 0x01,
+	SPC3_WB_MODE_DATA = 0x02,
+	SPC3_WB_MODE_DL_UCODE = 0x04,
+	SPC3_WB_MODE_DL_UCODE_SAVE = 0x05,
+	SPC3_WB_MODE_DL_UCODE_OFFS = 0x06,
+	SPC3_WB_MODE_DL_UCODE_OFFS_SAVE = 0x07,
+	SPC3_WB_MODE_ECHO_BUF = 0x0a,
+	SPC3_WB_MODE_DL_UCODE_OFFS_DEFER = 0x0e,
+	SPC3_WB_MODE_ACTIVATE_DEFERRED_UCODE = 0x0f,
+	SPC3_WB_MODE_ENABLE_EXPANDER_ECHO_BUF = 0x1a,
+	SPC3_WB_MODE_DISABLE_EXPANDER = 0x1b,
+	SPC3_WB_MODE_DL_APP_LOG = 0x1c
+} spc3_write_buffer_mode_t;
+
+typedef struct spc3_write_buffer_log {
+	uint8_t wbl_vendor[8];
+	uint16_t wbl_error_type;
+	uint16_t _reserved1;
+	uint8_t wbl_timestamp[6];
+	uint16_t _reserved2;
+	DECL_BITFIELD2(
+	    _reserved3		:4,
+	    wbl_codeset		:4);
+	uint8_t wbl_error_location_fmt;
+	uint16_t wbl_error_location_len;
+	uint16_t wbl_client_error_history_len;
+	uint32_t wbl_data[1];
+} spc3_write_buffer_log_t;
+
+typedef enum sp3_write_buffer_error_type {
+	SPC3_WB_ERROR_NONE = 0x0000,
+	SPC3_WB_ERROR_UNKNOWN = 0x0001,
+	SPC3_WB_ERROR_DATA_CORRUPT = 0x0002,
+	SPC3_WB_ERROR_PERMANENT = 0x0003,
+	SPC3_WB_ERROR_SERVICETARGET_FAILURE = 0x0004
+} spc3_write_buffer_error_type_t;
+
+typedef enum spc3_write_buffer_codeset {
+	SPC3_WB_CODESET_RESERVED = 0x00,
+	SPC3_WB_CODESET_BIN = 0x01,
+	SPC3_WB_CODESET_ASCII = 0x02,
+	SPC3_WB_CODESET_UTF8 = 0x03
+} spc3_write_buffer_codeset_t;
+
+typedef enum spc_3_write_buffer_error_location {
+	SPC3_WB_ERROR_LOCATION_FMT_NONE = 0x00,
+	SPC3_WB_ERROR_LOCATION_FMT_LBA = 0x01
+} spc3_write_buffer_error_location_t;
+
+/*
  * SPC-4 7.5.1 Protocol values
  */
 typedef enum spc4_protocol_id {

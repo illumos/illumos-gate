@@ -125,6 +125,8 @@ extern const char *ses_errmsg(void);
 extern const char *ses_strerror(ses_errno_t);
 extern const char *ses_nv_error_member(void);
 
+extern ses_node_t *ses_snap_primary_enclosure(ses_snap_t *);
+
 #ifdef	__cplusplus
 }
 #endif

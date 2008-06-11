@@ -48,6 +48,16 @@ ses_find_enclosure(ses_snap_t *sp, uint64_t number)
 	return (NULL);
 }
 
+/*
+ * ses_snap_primary_enclosure() finds the primary enclosure for
+ * the supplied ses_snap_t.
+ */
+ses_node_t *
+ses_snap_primary_enclosure(ses_snap_t *sp)
+{
+	return (ses_find_enclosure(sp, 0));
+}
+
 void
 ses_node_teardown(ses_node_t *np)
 {

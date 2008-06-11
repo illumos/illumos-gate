@@ -45,6 +45,7 @@ SUNWprivate_1.1 {
 		ses_open_scsi;
 		ses_root_node;
 		ses_scsi_target;
+		ses_snap_primary_enclosure;
 		ses_snap_generation;
 		ses_snap_hold;
 		ses_snap_new;
