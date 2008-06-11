@@ -2500,10 +2500,13 @@ if [ "$r_FLAG" = "y" -a "$build_ok" = "y" ]; then
 	CRLERROR="^crle:"
 	CRLECONF="^crle: configuration file:"
 
-	rm -f $SRC/runtime.ref
-	if [ -f $SRC/runtime.out ]; then
+	RUNTIMEREF=$SRC/runtime-${MACH}.ref
+	RUNTIMEOUT=$SRC/runtime-${MACH}.out
+
+	rm -f $RUNTIMEREF
+	if [ -f $RUNTIMEOUT ]; then
 		egrep -v "$LDDUSAGE|$LDDWRONG|$CRLERROR|$CRLECONF" \
-			$SRC/runtime.out > $SRC/runtime.ref
+			$RUNTIMEOUT > $RUNTIMEREF
 	fi
 
 	# If we're doing a debug build the proto area will be left with
@@ -2516,18 +2519,18 @@ if [ "$r_FLAG" = "y" -a "$build_ok" = "y" ]; then
 	check_rtime -d $checkroot -i -m -o $rtime_sflag $checkroot 2>&1 | \
 	    egrep -v ": unreferenced object=$checkroot/.*/lib(w|intl|thread|pthread).so" | \
 	    egrep -v ": unused object=$checkroot/.*/lib(w|intl|thread|pthread).so" | \
-	    sort >$SRC/runtime.out
+	    sort > $RUNTIMEOUT
 
 	# Determine any processing errors that will affect the final output
 	# and display these first.
-	grep -l "$LDDUSAGE" $SRC/runtime.out > /dev/null
+	grep -l "$LDDUSAGE" $RUNTIMEOUT > /dev/null
 	if [ $? -eq 0 ]; then
 	    echo "WARNING: ldd(1) does not support -e.  The version of ldd(1)" | \
 		tee -a $LOGFILE >> $mail_msg_file
 	    echo "on your system is old - 4390308 (s81_30) is required.\n" | \
 		tee -a $LOGFILE >> $mail_msg_file
 	fi
-	grep -l "$LDDWRONG" $SRC/runtime.out > /dev/null
+	grep -l "$LDDWRONG" $RUNTIMEOUT > /dev/null
 	if [ $? -eq 0 ]; then
 	    echo "WARNING: wrong class message detected.  ldd(1) was unable" | \
 		tee -a $LOGFILE >> $mail_msg_file
@@ -2538,38 +2541,38 @@ if [ "$r_FLAG" = "y" -a "$build_ok" = "y" ]; then
 	    echo "or an i386 object was encountered on a sparc system?\n" | \
 		tee -a $LOGFILE >> $mail_msg_file
 	fi
-	grep -l "$CRLECONF" $SRC/runtime.out > /dev/null
+	grep -l "$CRLECONF" $RUNTIMEOUT > /dev/null
 	if [ $? -eq 0 ]; then
 	    echo "WARNING: creation of an alternative dependency cache failed." | \
 		tee -a $LOGFILE >> $mail_msg_file
 	    echo "Dependencies will bind to the base system libraries.\n" | \
 		tee -a $LOGFILE >> $mail_msg_file
-	    grep "$CRLECONF" $SRC/runtime.out | \
+	    grep "$CRLECONF" $RUNTIMEOUT | \
 		tee -a $LOGFILE >> $mail_msg_file
-	    grep "$CRLERROR" $SRC/runtime.out | grep -v "$CRLECONF" | \
+	    grep "$CRLERROR" $RUNTIMEOUT | grep -v "$CRLECONF" | \
 		tee -a $LOGFILE >> $mail_msg_file
 	    echo "\n" | tee -a $LOGFILE >> $mail_msg_file
 	fi
 
-	egrep '<dependency no longer necessary>' $SRC/runtime.out | \
+	egrep '<dependency no longer necessary>' $RUNTIMEOUT | \
 	    tee -a $LOGFILE >> $mail_msg_file
 
 	# NEEDED= and RPATH= are informational; report anything else that we
 	# haven't already.
 	egrep -v "NEEDED=|RPATH=|$LDDUSAGE|$LDDWRONG|$CRLERROR|$CRLECONF" \
-	    $SRC/runtime.out | tee -a $LOGFILE >> $mail_msg_file
+	    $RUNTIMEOUT | tee -a $LOGFILE >> $mail_msg_file
 
 	# probably should compare against a 'known ok runpaths' list
-	if [ ! -f $SRC/runtime.ref ]; then
+	if [ ! -f $RUNTIMEREF ]; then
 		egrep -v "$LDDUSAGE|$LDDWRONG|$CRLERROR|$CRLECONF" \
-			$SRC/runtime.out >  $SRC/runtime.ref
+			$RUNTIMEOUT >  $RUNTIMEREF
 	fi
 
 	echo "\n==== Diff ELF runtime attributes (since last build) ====\n" \
 	    >> $mail_msg_file
 
-	egrep -v "$LDDUSAGE|$LDDWRONG|$CRLERROR|$CRLECONF" $SRC/runtime.out | \
-	    diff $SRC/runtime.ref - >> $mail_msg_file
+	egrep -v "$LDDUSAGE|$LDDWRONG|$CRLERROR|$CRLECONF" $RUNTIMEOUT | \
+	    diff $RUNTIMEREF - >> $mail_msg_file
 fi
 
 # DEBUG lint of kernel begins
