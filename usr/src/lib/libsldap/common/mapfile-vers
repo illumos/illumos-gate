@@ -30,6 +30,12 @@
 
 SUNWprivate_1.1 {
     global:
+	__ns_ldap_initStandalone;
+	__ns_ldap_getConnectionInfoFromDUA;
+	__ns_ldap_getRootDSE;
+	__ns_ldap_pingOfflineServers;
+	__ns_ldap_cancelStandalone;
+	__ns_ldap_initAuth;
 	__ns_ldap_getAcctMgmt;
 	__s_api_get_canonical_name;
 	__ns_ldap_getAttrStruct;
@@ -38,6 +44,8 @@ SUNWprivate_1.1 {
 	__ns_ldap_check_dns_preq;
 	__ns_ldap_check_gssapi_preq;
 	__ns_ldap_check_all_preq;
+	__s_api_ip2hostname;
+	__s_api_hostname2ip;
 } SUNWprivate_1.0;
 
 SUNWprivate_1.0 {

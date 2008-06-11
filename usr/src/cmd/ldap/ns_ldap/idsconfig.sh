@@ -24,7 +24,7 @@
 #
 # idsconfig -- script to setup iDS 5.x/6.x for Native LDAP II.
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -57,10 +57,15 @@ EOF
     ;;
     display_vlv_list) cat <<EOF
 
-Note: idsconfig has created entries for VLV indexes.  Use the 
-      directoryserver(1m) script on ${IDS_SERVER} to stop
-      the server and then enter the following vlvindex
-      sub-commands to create the actual VLV indexes:
+Note: idsconfig has created entries for VLV indexes. 
+
+      For DS5.x, use the directoryserver(1m) script on ${IDS_SERVER}
+      to stop the server.  Then, using directoryserver, follow the
+      directoryserver examples below to create the actual VLV indexes.
+
+      For DS6.x, use dsadm command delivered with DS6.x on ${IDS_SERVER}
+      to stop the server.  Then, using dsadm, follow the
+      dsadm examples below to create the actual VLV indexes.
 
 EOF
     ;;
@@ -3705,8 +3710,10 @@ add_vlv_indexes()
     STEP=`expr $STEP + 1`
 
     # Reset temp file for vlvindex commands.
-    [ -f ${TMPDIR}/vlvindex_list ] &&  rm ${TMPDIR}/vlvindex_list
-    touch ${TMPDIR}/vlvindex_list
+    [ -f ${TMPDIR}/ds5_vlvindex_list ] &&  rm ${TMPDIR}/ds5_vlvindex_list
+    touch ${TMPDIR}/ds5_vlvindex_list
+    [ -f ${TMPDIR}/ds6_vlvindex_list ] &&  rm ${TMPDIR}/ds6_vlvindex_list
+    touch ${TMPDIR}/ds6_vlvindex_list
 
     # Get the instance name from iDS server.
     _INSTANCE="<server-instance>"    # Default to old output.
@@ -3778,7 +3785,8 @@ EOF
 	${ECHO} "      ${i} vlv_index   Entry created"
 
 	# Add command to list of vlvindex commands to run.
-	${ECHO} "  directoryserver -s ${_INSTANCE} vlvindex -n ${IDS_DATABASE} -T ${i}" >> ${TMPDIR}/vlvindex_list
+	${ECHO} "  directoryserver -s ${_INSTANCE} vlvindex -n ${IDS_DATABASE} -T ${i}" >> ${TMPDIR}/ds5_vlvindex_list
+	${ECHO} "  <install-path>/bin/dsadm reindex -l -t ${i} <directory-instance-path> ${LDAP_SUFFIX}" >> ${TMPDIR}/ds6_vlvindex_list
     done
 }
 
@@ -3788,9 +3796,22 @@ EOF
 #
 display_vlv_cmds()
 {
-    if [ -s "${TMPDIR}/vlvindex_list" ]; then
+    if [ -s "${TMPDIR}/ds5_vlvindex_list" -o \
+	 -s "${TMPDIR}/ds6_vlvindex_list" ]; then
 	display_msg display_vlv_list
-	cat ${TMPDIR}/vlvindex_list
+    fi
+
+    if [ -s "${TMPDIR}/ds5_vlvindex_list" ]; then
+	cat ${TMPDIR}/ds5_vlvindex_list
+    fi
+
+    cat << EOF
+
+
+EOF
+
+    if [ -s "${TMPDIR}/ds6_vlvindex_list" ]; then
+	cat ${TMPDIR}/ds6_vlvindex_list
     fi
 }
 

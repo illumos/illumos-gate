@@ -33,7 +33,8 @@ SLDAPOBJ=	ns_common.o	ns_reads.o	ns_writes.o \
 		ns_connect.o	ns_config.o	ns_error.o \
 		ns_cache_door.o ns_getalias.o	ns_trace.o \
 		ns_init.o	ns_crypt.o	ns_confmgr.o \
-		ns_mapping.o	ns_wrapper.o	ns_sasl.o
+		ns_mapping.o	ns_wrapper.o	ns_sasl.o \
+		ns_standalone.o ns_connmgmt.o
 
 OBJECTS=	$(SLDAPOBJ)
 

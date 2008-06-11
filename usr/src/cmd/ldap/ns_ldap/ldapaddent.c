@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,10 +52,12 @@
 #include <rpc/rpcent.h>
 #include <grp.h>
 #include <pwd.h>
+#include <project.h>
 #include <shadow.h>
 #include <sys/systeminfo.h>
 #include "ns_internal.h"
 #include "ldapaddent.h"
+#include "standalone.h"
 
 #define	OP_ADD	0
 #define	OP_DUMP	3
@@ -75,6 +77,7 @@ int	continue_onerror = 0;  /* do not exit on error */
 
 static int get_basedn(char *service, char **basedn);
 static int check_ipaddr(char *addr, char **newaddr);
+static int check_projname(char *addr);
 
 extern	int	optind;
 extern	char	*optarg;
@@ -93,8 +96,8 @@ static void
 perr(ns_ldap_error_t *e)
 {
 	if (e)
-		(void) fprintf(stderr, gettext("%d: %s\n"),
-				e->status, e->message);
+		(void) fprintf(stderr, "%d: %s\n",
+		    e->status, e->message);
 }
 
 
@@ -145,7 +148,7 @@ again:
 	while ((c = *cp) != NULL) {
 		if (isdigit(c)) {
 			if ((c - '0') >= base)
-			    break;
+				break;
 			val = (val * base) + (c - '0');
 			cp++;
 			continue;
@@ -212,11 +215,11 @@ is_triplet(char *tok)
 {
 	char *s;
 	return (strchr(++tok, '(') == NULL &&		/* no more '(' */
-		(s = strchr(tok, ')')) != NULL &&	/* find ')' */
-		!*++s &&				/* ')' ends token */
-		(tok = strchr(tok, ',')) != NULL &&	/* host up to ',' */
-		(tok = strchr(++tok, ',')) != NULL &&	/* user up to ',' */
-		strchr(++tok, ',') == NULL);		/* no more ',' */
+	    (s = strchr(tok, ')')) != NULL &&		/* find ')' */
+	    !*++s &&					/* ')' ends token */
+	    (tok = strchr(tok, ',')) != NULL &&		/* host up to ',' */
+	    (tok = strchr(++tok, ',')) != NULL &&	/* user up to ',' */
+	    strchr(++tok, ',') == NULL);		/* no more ',' */
 }
 
 static void
@@ -325,7 +328,7 @@ __s_mk_entry(char **objclass, int max_attr)
 	if (e == NULL)
 		return (NULL);
 	e->attr_pair = (ns_ldap_attr_t **)calloc(max_attr+1,
-						sizeof (ns_ldap_attr_t *));
+	    sizeof (ns_ldap_attr_t *));
 	if (e->attr_pair == NULL) {
 		free(e);
 		return (NULL);
@@ -358,7 +361,7 @@ ldap_freeEntry(ns_ldap_entry_t *ep)
 			free(ep->attr_pair[j]->attrname);
 		if (ep->attr_pair[j]->attrvalue) {
 			for (k = 0; (k < ep->attr_pair[j]->value_count) &&
-				    (ep->attr_pair[j]->attrvalue[k]); k++) {
+			    (ep->attr_pair[j]->attrvalue[k]); k++) {
 				free(ep->attr_pair[j]->attrvalue[k]);
 			}
 			free(ep->attr_pair[j]->attrvalue);
@@ -380,10 +383,12 @@ addentry(void *entry, int mod)
 	/*  adds entry into the LDAP tree */
 	if (mod)
 		result = __ns_ldap_addTypedEntry(databasetype, inputbasedn,
-		    entry, 0, &authority, NS_LDAP_FOLLOWREF, &eres);
+		    entry, 0, &authority, NS_LDAP_FOLLOWREF | NS_LDAP_KEEP_CONN,
+		    &eres);
 	else
 		result = __ns_ldap_addTypedEntry(databasetype, inputbasedn,
-		    entry, 1, &authority, NS_LDAP_FOLLOWREF, &eres);
+		    entry, 1, &authority, NS_LDAP_FOLLOWREF | NS_LDAP_KEEP_CONN,
+		    &eres);
 	/*
 	 *  Return	0 on success
 	 *		LDAP_ALREADY_EXISTS if entry exists already
@@ -434,12 +439,12 @@ addentry(void *entry, int mod)
 
 	case NS_LDAP_INTERNAL:
 		if (eres->status == LDAP_ALREADY_EXISTS ||
-			eres->status == LDAP_NO_SUCH_OBJECT)
+		    eres->status == LDAP_NO_SUCH_OBJECT)
 			rc = eres->status;
 		else if (eres->status == LDAP_INSUFFICIENT_ACCESS) {
 			(void) fprintf(stderr,
-				gettext("The user does not have permission"
-					" to add/modify entries\n"));
+			    gettext("The user does not have permission"
+			    " to add/modify entries\n"));
 			perr(eres);
 			exit(1);
 		} else {
@@ -454,7 +459,6 @@ addentry(void *entry, int mod)
 	return (rc);
 }
 
-
 /*
  * usage(char *msg)
  * Display usage message to STDERR.
@@ -463,13 +467,33 @@ static void
 usage(char *msg) {
 
 	if (msg)
-		(void) fprintf(stderr, gettext("%s\n"), msg);
+		(void) fprintf(stderr, "%s\n", msg);
 
 	(void) fprintf(stderr, gettext(
-	    "usage: ldapaddent [ -cpv ] [ -a authenticationMethod ]\n"
-	    "[ -b baseDN ] -D bindDN -w bind_password [ -f file ] database\n\n"
-	    "usage: ldapaddent -d [ -cpv ] [ -a authenticationMethod ]\n"
-	    "[ -b baseDN ] [ -D bindDN ] [ -w bind_password ] database\n"));
+	"usage: ldapaddent [-cpv] [-a authenticationMethod] [-b baseDN]\n"
+	"-D bindDN [-w bindPassword] [-j passwdFile] [-f filename]\n"
+	"database\n"
+	"\n"
+	"usage: ldapaddent  [-cpv] -asasl/GSSAPI [-b baseDN] [-f filename]\n"
+	"database\n"
+	"\n"
+	"usage: ldapaddent  -d [-v] [-a authenticationMethod] [-D bindDN]\n"
+	"[-w bindPassword] [-j passwdFile] database\n"
+	"\n"
+	"usage: ldapaddent [-cpv] -h LDAP_server[:serverPort] [-M domainName]\n"
+	"[-N  profileName]  [-P certifPath]  [-a authenticationMethod]\n"
+	"[-b baseDN] -D bindDN [-w bindPassword] [-f filename]\n"
+	"[-j passwdFile] database\n"
+	"\n"
+	"usage: ldapaddent [-cpv] -h LDAP_server[:serverPort] [-M domainName]\n"
+	"[-N  profileName]  [-P certifPath] -asasl/GSSAPI  [-b baseDN]\n"
+	"[-f filename] database\n"
+	"\n"
+	"usage: ldapaddent -d [-v] -h LDAP_server[:serverPort]"
+	" [-M domainName]\n"
+	"[-N profileName]  [-P certifPath]  [-a authenticationMethod]\n"
+	"[-b baseDN] -D bindDN [-w bindPassword] [-j passwdFile]\n"
+	"database\n"));
 	exit(1);
 }
 
@@ -549,6 +573,28 @@ check_ipaddr(char *addr, char **newaddr) {
 	return (-1);
 }
 
+/*
+ * Verifies that project name meets the restrictions defined by project(4).
+ */
+static int
+check_projname(char *addr)
+{
+	int i;
+	if (addr == NULL || *addr == '\0')
+		return (-1);
+
+	for (i = 0; i < strlen(addr); i++) {
+		if (!isalpha(addr[i]) &&
+		    !isdigit(addr[i]) &&
+		    addr[i] != '_' &&
+		    addr[i] != '-' &&
+		    addr[i] != '.')
+			return (-1);
+	}
+
+	return (0);
+}
+
 static int
 genent_hosts(char *line, int (*cback)())
 {
@@ -566,7 +612,8 @@ genent_hosts(char *line, int (*cback)())
 	 * don't clobber our argument
 	 */
 	if (strlen(line) >= sizeof (buf)) {
-		(void) strcpy(parse_err_msg, "line too long");
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	(void) strcpy(buf, line);
@@ -600,16 +647,18 @@ genent_hosts(char *line, int (*cback)())
 	 * addr(col 2)
 	 */
 	if ((t = strtok(buf, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no host");
+		(void) strlcpy(parse_err_msg, gettext("no host"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 
 	af = check_ipaddr(t, &pref_addr);
 	if (af == -2) {
-		(void) strcpy(parse_err_msg, "Internal error");
+		(void) strlcpy(parse_err_msg, gettext("Internal error"),
+		    PARSE_ERR_MSG_LEN);
 	} else if (af == -1) {
 		(void) snprintf(parse_err_msg, sizeof (parse_err_msg),
-		    "Invalid IP address: %s", t);
+		    gettext("Invalid IP address: %s"), t);
 	} else if (flags & F_VERBOSE) {
 		if ((strncasecmp(t, pref_addr, strlen(t))) != 0) {
 			(void) fprintf(stdout,
@@ -619,7 +668,7 @@ genent_hosts(char *line, int (*cback)())
 	}
 
 	if (af < 0) {
-		(void) fprintf(stderr, gettext("%s\n"), parse_err_msg);
+		(void) fprintf(stderr, "%s\n", parse_err_msg);
 		if (continue_onerror == 0)
 			return (GENENT_CBERR);
 		else
@@ -633,7 +682,8 @@ genent_hosts(char *line, int (*cback)())
 	 * cname (col 0)
 	 */
 	if ((t = strtok(NULL, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no cname");
+		(void) strlcpy(parse_err_msg, gettext("no cname"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	ecol[0].ec_value.ec_value_val = t;
@@ -676,7 +726,7 @@ genent_hosts(char *line, int (*cback)())
 		ctr++;
 		alias = strdup(ecol[1].ec_value.ec_value_val);
 		if ((data.h_aliases = (char **)realloc(data.h_aliases,
-			ctr * sizeof (char **))) == NULL) {
+		    ctr * sizeof (char **))) == NULL) {
 			(void) fprintf(stderr, gettext("out of memory\n"));
 			exit(1);
 		}
@@ -689,8 +739,8 @@ genent_hosts(char *line, int (*cback)())
 	 * in the list of the host aliases
 	 */
 	if ((data.h_aliases = (char **)realloc(data.h_aliases,
-		(ecol[3].ec_value.ec_value_len != 0 ?
-			ctr + 2 : ctr + 1) * sizeof (char **))) == NULL) {
+	    (ecol[3].ec_value.ec_value_len != 0 ?
+	    ctr + 2 : ctr + 1) * sizeof (char **))) == NULL) {
 		(void) fprintf(stderr, gettext("out of memory\n"));
 		exit(1);
 	}
@@ -714,15 +764,15 @@ genent_hosts(char *line, int (*cback)())
 	if (retval == LDAP_ALREADY_EXISTS) {
 		if (continue_onerror)
 			(void) fprintf(stderr,
-				gettext("Entry: cn=%s+ipHostNumber=%s "
-					"already Exists -skipping it\n"),
-					data.h_name, data.h_addr_list[0]);
+			    gettext("Entry: cn=%s+ipHostNumber=%s "
+			    "already Exists -skipping it\n"),
+			    data.h_name, data.h_addr_list[0]);
 		else {
 			rc = GENENT_CBERR;
 			(void) fprintf(stderr,
-				gettext("Entry: cn=%s+ipHostNumber=%s"
-					" already Exists\n"),
-					data.h_name, data.h_addr_list[0]);
+			    gettext("Entry: cn=%s+ipHostNumber=%s"
+			    " already Exists\n"),
+			    data.h_name, data.h_addr_list[0]);
 		}
 	} else if (retval)
 		rc = GENENT_CBERR;
@@ -740,9 +790,9 @@ static void
 dump_hosts(ns_ldap_result_t *res)
 {
 	ns_ldap_attr_t	*attrptr = NULL,
-			*cn = NULL,
-			*iphostnumber = NULL,
-			*desc = NULL;
+	    *cn = NULL,
+	    *iphostnumber = NULL,
+	    *desc = NULL;
 	int		 i, j;
 	char		*name; /* host name */
 
@@ -820,7 +870,8 @@ genent_rpc(char *line, int (*cback)())
 	 * don't clobber our argument
 	 */
 	if (strlen(line) >= sizeof (buf)) {
-		(void) strcpy(parse_err_msg, "line too long");
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	(void) strcpy(buf, line);
@@ -847,7 +898,8 @@ genent_rpc(char *line, int (*cback)())
 	 * cname(col 0)
 	 */
 	if ((t = strtok(buf, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no number");
+		(void) strlcpy(parse_err_msg, gettext("no number"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	ecol[0].ec_value.ec_value_val = t;
@@ -858,7 +910,8 @@ genent_rpc(char *line, int (*cback)())
 	 * number (col 2)
 	 */
 	if ((t = strtok(NULL, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no number");
+		(void) strlcpy(parse_err_msg, gettext("no number"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	ecol[2].ec_value.ec_value_val = t;
@@ -871,12 +924,12 @@ genent_rpc(char *line, int (*cback)())
 
 	data.r_name = strdup(ecol[0].ec_value.ec_value_val);
 	if (ecol[2].ec_value.ec_value_val != NULL &&
-		ecol[2].ec_value.ec_value_val[0] != '\0') {
+	    ecol[2].ec_value.ec_value_val[0] != '\0') {
 
 		data.r_number = ascii_to_int(ecol[2].ec_value.ec_value_val);
 		if (data.r_number == -1) {
 			(void) snprintf(parse_err_msg, sizeof (parse_err_msg),
-			    "invalid program number: %s",
+			    gettext("invalid program number: %s"),
 			    ecol[2].ec_value.ec_value_val);
 		return (GENENT_PARSEERR);
 		}
@@ -904,7 +957,7 @@ genent_rpc(char *line, int (*cback)())
 		ctr++;
 		alias = strdup(ecol[1].ec_value.ec_value_val);
 		if ((data.r_aliases = (char **)realloc(data.r_aliases,
-			ctr * sizeof (char **))) == NULL) {
+		    ctr * sizeof (char **))) == NULL) {
 			(void) fprintf(stderr, gettext("out of memory\n"));
 			exit(1);
 		}
@@ -921,7 +974,7 @@ genent_rpc(char *line, int (*cback)())
 
 	/* End the list of all the aliases by NULL */
 	if ((data.r_aliases = (char **)realloc(data.r_aliases,
-		(ctr + 1) * sizeof (char **))) == NULL) {
+	    (ctr + 1) * sizeof (char **))) == NULL) {
 		(void) fprintf(stderr, gettext("out of memory\n"));
 		exit(1);
 	}
@@ -936,13 +989,13 @@ genent_rpc(char *line, int (*cback)())
 	if (retval == LDAP_ALREADY_EXISTS) {
 		if (continue_onerror)
 			(void) fprintf(stderr,
-			gettext("Entry: %s - already Exists, skipping it.\n"),
-			data.r_name);
+			    gettext("Entry: %s - already Exists,"
+			    " skipping it.\n"), data.r_name);
 		else {
 			rc = GENENT_CBERR;
 			(void) fprintf(stderr,
-				gettext("Entry: %s - already Exists\n"),
-				data.r_name);
+			    gettext("Entry: %s - already Exists\n"),
+			    data.r_name);
 		}
 	} else if (retval)
 		rc = GENENT_CBERR;
@@ -1028,7 +1081,8 @@ genent_protocols(char *line, int (*cback)())
 	 * don't clobber our argument
 	 */
 	if (strlen(line) >= sizeof (buf)) {
-		(void) strcpy(parse_err_msg, "line too long");
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	(void) strcpy(buf, line);
@@ -1055,7 +1109,8 @@ genent_protocols(char *line, int (*cback)())
 	 * cname(col 0)
 	 */
 	if ((t = strtok(buf, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no number");
+		(void) strlcpy(parse_err_msg, gettext("no number"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	ecol[0].ec_value.ec_value_val = t;
@@ -1066,7 +1121,8 @@ genent_protocols(char *line, int (*cback)())
 	 * number (col 2)
 	 */
 	if ((t = strtok(NULL, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no number");
+		(void) strlcpy(parse_err_msg, gettext("no number"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	ecol[2].ec_value.ec_value_val = t;
@@ -1079,12 +1135,12 @@ genent_protocols(char *line, int (*cback)())
 	data.p_name = strdup(ecol[0].ec_value.ec_value_val);
 
 	if (ecol[2].ec_value.ec_value_val != NULL &&
-		ecol[2].ec_value.ec_value_val[0] != '\0') {
+	    ecol[2].ec_value.ec_value_val[0] != '\0') {
 
 		data.p_proto = ascii_to_int(ecol[2].ec_value.ec_value_val);
 		if (data.p_proto == -1) {
 			(void) snprintf(parse_err_msg, sizeof (parse_err_msg),
-			    "invalid protocol number: %s",
+			    gettext("invalid protocol number: %s"),
 			    ecol[2].ec_value.ec_value_val);
 		return (GENENT_PARSEERR);
 		}
@@ -1113,7 +1169,7 @@ genent_protocols(char *line, int (*cback)())
 		ctr++;
 		alias = strdup(ecol[1].ec_value.ec_value_val);
 		if ((data.p_aliases = (char **)realloc(data.p_aliases,
-			ctr * sizeof (char **))) == NULL) {
+		    ctr * sizeof (char **))) == NULL) {
 			(void) fprintf(stderr, gettext("out of memory\n"));
 			exit(1);
 		}
@@ -1129,7 +1185,7 @@ genent_protocols(char *line, int (*cback)())
 
 	/* End the list of all the aliases by NULL */
 	if ((data.p_aliases = (char **)realloc(data.p_aliases,
-		(ctr + 1) * sizeof (char **))) == NULL) {
+	    (ctr + 1) * sizeof (char **))) == NULL) {
 		(void) fprintf(stderr, gettext("out of memory\n"));
 		exit(1);
 	}
@@ -1144,13 +1200,13 @@ genent_protocols(char *line, int (*cback)())
 	if (retval == LDAP_ALREADY_EXISTS) {
 		if (continue_onerror)
 			(void) fprintf(stderr,
-			gettext("Entry: %s - already Exists, skipping it.\n"),
-			data.p_name);
+			    gettext("Entry: %s - already Exists,"
+			    " skipping it.\n"), data.p_name);
 		else {
 			rc = GENENT_CBERR;
 			(void) fprintf(stderr,
-				gettext("Entry: %s - already Exists\n"),
-				data.p_name);
+			    gettext("Entry: %s - already Exists\n"),
+			    data.p_name);
 		}
 	} else if (retval)
 		rc = GENENT_CBERR;
@@ -1176,7 +1232,7 @@ dump_protocols(ns_ldap_result_t *res)
 		if (strcasecmp(attrptr->attrname, "cn") == 0)
 			cn = attrptr;
 		else if (strcasecmp(attrptr->attrname, "ipProtocolNumber")
-									== 0)
+		    == 0)
 			protocolnumber = attrptr;
 	}
 	/* sanity check */
@@ -1247,7 +1303,8 @@ genent_networks(char *line, int (*cback)())
 	 * don't clobber our argument
 	 */
 	if (strlen(line) >= sizeof (buf)) {
-		(void) strcpy(parse_err_msg, "line too long");
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	(void) strcpy(buf, line);
@@ -1274,7 +1331,8 @@ genent_networks(char *line, int (*cback)())
 	 * cname(col 0)
 	 */
 	if ((t = strtok(buf, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no number");
+		(void) strlcpy(parse_err_msg, gettext("no number"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	ecol[0].ec_value.ec_value_val = t;
@@ -1285,7 +1343,8 @@ genent_networks(char *line, int (*cback)())
 	 * number (col 2)
 	 */
 	if ((t = strtok(NULL, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no number");
+		(void) strlcpy(parse_err_msg, gettext("no number"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	ecol[2].ec_value.ec_value_val = t;
@@ -1332,7 +1391,7 @@ genent_networks(char *line, int (*cback)())
 		ctr++;
 		alias = strdup(ecol[1].ec_value.ec_value_val);
 		if ((data.n_aliases = (char **)realloc(data.n_aliases,
-			ctr * sizeof (char **))) == NULL) {
+		    ctr * sizeof (char **))) == NULL) {
 			(void) fprintf(stderr, gettext("out of memory\n"));
 			exit(1);
 		}
@@ -1348,7 +1407,7 @@ genent_networks(char *line, int (*cback)())
 
 	/* End the list of all the aliases by NULL */
 	if ((data.n_aliases = (char **)realloc(data.n_aliases,
-		(ctr + 1) * sizeof (char **))) == NULL) {
+	    (ctr + 1) * sizeof (char **))) == NULL) {
 		(void) fprintf(stderr, gettext("out of memory\n"));
 		exit(1);
 	}
@@ -1363,13 +1422,13 @@ genent_networks(char *line, int (*cback)())
 	if (retval == LDAP_ALREADY_EXISTS) {
 		if (continue_onerror)
 			(void) fprintf(stderr,
-			gettext("Entry: %s - already Exists, skipping it.\n"),
-			data.n_name);
+			    gettext("Entry: %s - already Exists,"
+			    " skipping it.\n"), data.n_name);
 		else {
 			rc = GENENT_CBERR;
 			(void) fprintf(stderr,
-				gettext("Entry: %s - already Exists\n"),
-				data.n_name);
+			    gettext("Entry: %s - already Exists\n"),
+			    data.n_name);
 		}
 	} else if (retval)
 		rc = GENENT_CBERR;
@@ -1395,7 +1454,7 @@ dump_networks(ns_ldap_result_t *res)
 		if (strcasecmp(attrptr->attrname, "cn") == 0)
 			cn = attrptr;
 		else if (strcasecmp(attrptr->attrname, "ipNetworkNumber")
-									== 0)
+		    == 0)
 			networknumber = attrptr;
 	}
 	/* sanity check */
@@ -1463,7 +1522,8 @@ genent_services(char *line, int (*cback)())
 	 * don't clobber our argument
 	 */
 	if (strlen(line) >= sizeof (buf)) {
-		(void) strcpy(parse_err_msg, "line too long");
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	(void) strcpy(buf, line);
@@ -1490,7 +1550,8 @@ genent_services(char *line, int (*cback)())
 	 * cname(col 0)
 	 */
 	if ((t = strtok(buf, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no port");
+		(void) strlcpy(parse_err_msg, gettext("no port"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	ecol[0].ec_value.ec_value_val = t;
@@ -1501,11 +1562,13 @@ genent_services(char *line, int (*cback)())
 	 * port (col 3)
 	 */
 	if ((t = strtok(NULL, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no protocol");
+		(void) strlcpy(parse_err_msg, gettext("no protocol"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	if ((p = strchr(t, '/')) == 0) {
-		(void) strcpy(parse_err_msg, "bad port/proto");
+		(void) strlcpy(parse_err_msg, gettext("bad port/proto"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*(p++) = 0;
@@ -1527,12 +1590,12 @@ genent_services(char *line, int (*cback)())
 	data.s_proto = strdup(ecol[2].ec_value.ec_value_val);
 
 	if (ecol[3].ec_value.ec_value_val != NULL &&
-		ecol[3].ec_value.ec_value_val[0] != '\0') {
+	    ecol[3].ec_value.ec_value_val[0] != '\0') {
 
 		data.s_port = ascii_to_int(ecol[3].ec_value.ec_value_val);
 		if (data.s_port == -1) {
 			(void) snprintf(parse_err_msg, sizeof (parse_err_msg),
-			    "invalid port number: %s",
+			    gettext("invalid port number: %s"),
 			    ecol[3].ec_value.ec_value_val);
 		return (GENENT_PARSEERR);
 		}
@@ -1560,7 +1623,7 @@ genent_services(char *line, int (*cback)())
 		ctr++;
 		alias = strdup(ecol[1].ec_value.ec_value_val);
 		if ((data.s_aliases = (char **)realloc(data.s_aliases,
-			ctr * sizeof (char **))) == NULL) {
+		    ctr * sizeof (char **))) == NULL) {
 			(void) fprintf(stderr, gettext("out of memory\n"));
 			exit(1);
 		}
@@ -1576,7 +1639,7 @@ genent_services(char *line, int (*cback)())
 
 	/* End the list of all the aliases by NULL */
 	if ((data.s_aliases = (char **)realloc(data.s_aliases,
-		(ctr + 1) * sizeof (char **))) == NULL) {
+	    (ctr + 1) * sizeof (char **))) == NULL) {
 		(void) fprintf(stderr, gettext("out of memory\n"));
 		exit(1);
 	}
@@ -1591,15 +1654,15 @@ genent_services(char *line, int (*cback)())
 	if (retval == LDAP_ALREADY_EXISTS) {
 		if (continue_onerror)
 			(void) fprintf(stderr, gettext(
-					"Entry: cn=%s+ipServiceProtocol=%s"
-					" already Exists, skipping it.\n"),
-					data.s_name, data.s_proto);
+			    "Entry: cn=%s+ipServiceProtocol=%s"
+			    " already Exists, skipping it.\n"),
+			    data.s_name, data.s_proto);
 		else {
 			rc = GENENT_CBERR;
 			(void) fprintf(stderr,
-				gettext("Entry: cn=%s+ipServiceProtocol=%s"
-					" - already Exists\n"),
-					data.s_name, data.s_proto);
+			    gettext("Entry: cn=%s+ipServiceProtocol=%s"
+			    " - already Exists\n"),
+			    data.s_name, data.s_proto);
 		}
 	} else if (retval)
 		rc = GENENT_CBERR;
@@ -1639,7 +1702,7 @@ dump_services(ns_ldap_result_t *res)
 		else if (strcasecmp(attrptr->attrname, "ipServicePort") == 0)
 			port = attrptr;
 		else if (strcasecmp(attrptr->attrname,
-					"ipServiceProtocol") == 0)
+		    "ipServiceProtocol") == 0)
 			protocol = attrptr;
 	}
 	/* sanity check */
@@ -1659,7 +1722,7 @@ dump_services(ns_ldap_result_t *res)
 
 		/* port & protocol */
 		(void) fprintf(stdout, "%s/%s%n", port->attrvalue[0],
-				protocol->attrvalue[i], &len);
+		    protocol->attrvalue[i], &len);
 
 		if (len < 8)
 			(void) fprintf(stdout, "\t\t");
@@ -1702,7 +1765,8 @@ genent_group(char *line, int (*cback)())
 	 * don't clobber our argument
 	 */
 	if (strlen(line) >= sizeof (buf)) {
-		(void) strcpy(parse_err_msg, "line too long");
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	(void) strcpy(buf, line);
@@ -1721,7 +1785,8 @@ genent_group(char *line, int (*cback)())
 	 * name (col 0)
 	 */
 	if ((s = strchr(t, ':')) == 0) {
-		(void) strcpy(parse_err_msg, "no passwd");
+		(void) strlcpy(parse_err_msg, gettext("no passwd"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*s++ = 0;
@@ -1733,7 +1798,8 @@ genent_group(char *line, int (*cback)())
 	 * passwd (col 1)
 	 */
 	if ((s = strchr(t, ':')) == 0) {
-		(void) strcpy(parse_err_msg, "no gid");
+		(void) strlcpy(parse_err_msg, gettext("no gid"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*s++ = 0;
@@ -1746,7 +1812,8 @@ genent_group(char *line, int (*cback)())
 	 * gid (col 2)
 	 */
 	if ((s = strchr(t, ':')) == 0 || s == t) {
-		(void) strcpy(parse_err_msg, "no members");
+		(void) strlcpy(parse_err_msg, gettext("no members"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*s++ = 0;
@@ -1767,17 +1834,17 @@ genent_group(char *line, int (*cback)())
 	data.gr_name = strdup(ecol[0].ec_value.ec_value_val);
 	data.gr_passwd = strdup(ecol[1].ec_value.ec_value_val);
 	if (ecol[2].ec_value.ec_value_val != NULL &&
-		ecol[2].ec_value.ec_value_val[0] != '\0') {
+	    ecol[2].ec_value.ec_value_val[0] != '\0') {
 
 		data.gr_gid = ascii_to_int(ecol[2].ec_value.ec_value_val);
-		if (data.gr_gid == -1) {
+		if (data.gr_gid == (uid_t)-1) {
 			(void) snprintf(parse_err_msg, sizeof (parse_err_msg),
-			    "invalid group id: %s",
+			    gettext("invalid group id: %s"),
 			    ecol[2].ec_value.ec_value_val);
 		return (GENENT_PARSEERR);
 		}
 	} else
-		data.gr_gid = -1;
+		data.gr_gid = (uid_t)-1;
 
 	data.gr_mem = NULL;
 
@@ -1821,13 +1888,13 @@ genent_group(char *line, int (*cback)())
 	if (retval == LDAP_ALREADY_EXISTS) {
 		if (continue_onerror)
 			(void) fprintf(stderr,
-			gettext("Entry: %s - already Exists, skipping it.\n"),
-			data.gr_name);
+			    gettext("Entry: %s - already Exists,"
+			    " skipping it.\n"), data.gr_name);
 		else {
 			rc = GENENT_CBERR;
 			(void) fprintf(stderr,
-				gettext("Entry: %s - already Exists\n"),
-				data.gr_name);
+			    gettext("Entry: %s - already Exists\n"),
+			    data.gr_name);
 		}
 	} else if (retval)
 		rc = GENENT_CBERR;
@@ -1870,7 +1937,7 @@ dump_group(ns_ldap_result_t *res)
 				(void) fprintf(stdout, "%s", value[attr_count]);
 			else
 				(void) fprintf(stdout, "%s,",
-					value[attr_count]);
+				    value[attr_count]);
 			attr_count++;
 		}
 		(void) fprintf(stdout, "\n");
@@ -1901,7 +1968,8 @@ genent_ethers(char *line, int (*cback)())
 	 * don't clobber our argument
 	 */
 	if (strlen(line) >= sizeof (buf)) {
-		(void) strcpy(parse_err_msg, "line too long");
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	(void) strcpy(buf, line);
@@ -1928,7 +1996,8 @@ genent_ethers(char *line, int (*cback)())
 	 * addr(col 0)
 	 */
 	if ((t = strtok(buf, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no name");
+		(void) strlcpy(parse_err_msg, gettext("no name"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	ecol[0].ec_value.ec_value_val = t;
@@ -1938,7 +2007,9 @@ genent_ethers(char *line, int (*cback)())
 	 * name(col 1)
 	 */
 	if ((t = strtok(NULL, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no white space allowed in name");
+		(void) strlcpy(parse_err_msg,
+		    gettext("no white space allowed in name"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	ecol[1].ec_value.ec_value_val = t;
@@ -1962,13 +2033,13 @@ genent_ethers(char *line, int (*cback)())
 	if (retval == LDAP_ALREADY_EXISTS) {
 		if (continue_onerror)
 			(void) fprintf(stderr,
-			gettext("Entry: %s - already Exists, skipping it.\n"),
-			data.name);
+			    gettext("Entry: %s - already Exists,"
+			    " skipping it.\n"), data.name);
 		else {
 			rc = GENENT_CBERR;
 			(void) fprintf(stderr,
-				gettext("Entry: %s - already Exists\n"),
-				data.name);
+			    gettext("Entry: %s - already Exists\n"),
+			    data.name);
 		}
 	} else if (retval)
 		rc = GENENT_CBERR;
@@ -2013,20 +2084,23 @@ genent_aliases(char *line, int (*cback)())
 	 * don't clobber our argument
 	 */
 	if (strlen(line) >= sizeof (buf)) {
-		(void) strcpy(parse_err_msg, "line too long");
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 
 	(void) strcpy(buf, line);
 
 	if ((t = strchr(buf, ':')) == 0) {
-		(void) strcpy(parse_err_msg, "no alias name");
+		(void) strlcpy(parse_err_msg, gettext("no alias name"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 
 	t[0] = '\0';
 	if (++t == '\0') {
-		(void) strcpy(parse_err_msg, "no alias value");
+		(void) strlcpy(parse_err_msg, gettext("no alias value"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 
@@ -2048,8 +2122,8 @@ genent_aliases(char *line, int (*cback)())
 			t++;
 		alias = strdup(t);
 		if ((alias == NULL) ||
-			((data.member = (char **)realloc(data.member,
-			(ctr + 1) * sizeof (char **))) == NULL)) {
+		    ((data.member = (char **)realloc(data.member,
+		    (ctr + 1) * sizeof (char **))) == NULL)) {
 			(void) fprintf(stderr, gettext("out of memory\n"));
 			exit(1);
 		}
@@ -2068,13 +2142,13 @@ genent_aliases(char *line, int (*cback)())
 	if (retval == LDAP_ALREADY_EXISTS) {
 		if (continue_onerror)
 			(void) fprintf(stderr,
-			gettext("Entry: %s - already Exists, skipping it.\n"),
-			data.alias);
+			    gettext("Entry: %s - already Exists,"
+			    " skipping it.\n"), data.alias);
 		else {
 			rc = GENENT_CBERR;
 			(void) fprintf(stderr,
-				gettext("Entry: %s - already Exists\n"),
-				data.alias);
+			    gettext("Entry: %s - already Exists\n"),
+			    data.alias);
 		}
 	} else if (retval)
 		rc = GENENT_CBERR;
@@ -2136,7 +2210,8 @@ genent_publickey(char *line, int (*cback)())
 	 * don't clobber our argument
 	 */
 	if (strlen(line) >= sizeof (buf)) {
-		(void) strcpy(parse_err_msg, "line too long");
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	(void) strcpy(buf, line);
@@ -2147,7 +2222,8 @@ genent_publickey(char *line, int (*cback)())
 	(void) memset((char *)ecol, 0, sizeof (ecol));
 
 	if ((t = strtok(buf, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no cname");
+		(void) strlcpy(parse_err_msg, gettext("no cname"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 
@@ -2162,12 +2238,14 @@ genent_publickey(char *line, int (*cback)())
 	 * cname (col 0)
 	 */
 	if (strncmp(t, "unix.", 5)) {
-		(void) strcpy(parse_err_msg, "bad cname");
+		(void) strlcpy(parse_err_msg, gettext("bad cname"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	(void) strcpy(tmpbuf, &(t[5]));
 	if ((p = strchr(tmpbuf, '@')) == 0) {
-		(void) strcpy(parse_err_msg, "bad cname");
+		(void) strlcpy(parse_err_msg, gettext("bad cname"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*(p++) = 0;
@@ -2180,40 +2258,40 @@ genent_publickey(char *line, int (*cback)())
 		if ((pwd = getpwuid(uid)) == 0) {
 			(void) fprintf(stderr,
 			gettext("can't map uid %d to username, skipping\n"),
-				uid);
+			    uid);
 			return (GENENT_OK);
 		}
 		(void) strcpy(cname, pwd->pw_name);
 		data.hostcred = NS_HOSTCRED_FALSE;
 	} else {
 		if ((hp = getipnodebyname(tmpbuf, AF_INET6,
-				AI_ALL | AI_V4MAPPED, &errnum)) == NULL) {
+		    AI_ALL | AI_V4MAPPED, &errnum)) == NULL) {
 			(void) fprintf(stderr,
-			gettext("can't map hostname %s to hostaddress, "
-				"errnum %d %s skipping\n"), tmpbuf, errnum,
-				h_errno2str(errnum));
+			    gettext("can't map hostname %s to hostaddress, "
+			    "errnum %d %s skipping\n"), tmpbuf, errnum,
+			    h_errno2str(errnum));
 			return (GENENT_OK);
 		}
 		(void) memcpy((char *)&in6.s6_addr, hp->h_addr_list[0],
-				hp->h_length);
+		    hp->h_length);
 		if (IN6_IS_ADDR_V4MAPPED(&in6) ||
-					IN6_IS_ADDR_V4COMPAT(&in6)) {
+		    IN6_IS_ADDR_V4COMPAT(&in6)) {
 			IN6_V4MAPPED_TO_INADDR(&in6, &in);
 			if (inet_ntop(AF_INET, (const void *)&in, abuf,
-					INET6_ADDRSTRLEN) == NULL) {
+			    INET6_ADDRSTRLEN) == NULL) {
 				(void) fprintf(stderr,
-					gettext("can't convert IPV4 address of"
-						" hostname %s to string, "
-						"skipping\n"), tmpbuf);
+				    gettext("can't convert IPV4 address of"
+				    " hostname %s to string, "
+				    "skipping\n"), tmpbuf);
 					return (GENENT_OK);
 			}
 		} else {
 			if (inet_ntop(AF_INET6, (const void *)&in6, abuf,
-					INET6_ADDRSTRLEN) == NULL) {
+			    INET6_ADDRSTRLEN) == NULL) {
 				(void) fprintf(stderr,
-					gettext("can't convert IPV6 address of"
-						" hostname %s to string, "
-						"skipping\n"), tmpbuf);
+				    gettext("can't convert IPV6 address of"
+				    " hostname %s to string, "
+				    "skipping\n"), tmpbuf);
 					return (GENENT_OK);
 			}
 		}
@@ -2237,11 +2315,13 @@ genent_publickey(char *line, int (*cback)())
 	 * public_data (col 1)
 	 */
 	if ((t = strtok(NULL, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no private_data");
+		(void) strlcpy(parse_err_msg, gettext("no private_data"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	if ((p = strchr(t, ':')) == 0) {
-		(void) strcpy(parse_err_msg, "bad public_data");
+		(void) strlcpy(parse_err_msg, gettext("bad public_data"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*(p++) = 0;
@@ -2257,8 +2337,8 @@ genent_publickey(char *line, int (*cback)())
 	t = p;
 	if (!(t = strchr(t, ':'))) {
 		(void) fprintf(stderr,
-		gettext("WARNING: No algorithm type data found "
-			"in publickey file, assuming 0\n"));
+		    gettext("WARNING: No algorithm type data found "
+		    "in publickey file, assuming 0\n"));
 		algtype = 0;
 	} else {
 		*t = '\0';
@@ -2281,10 +2361,10 @@ genent_publickey(char *line, int (*cback)())
 		 */
 		(void) strlcpy(auth_type, "DH192-0", BUFSIZ+1);
 	else if (!(__nis_keyalg2authtype(keylen, algtype, auth_type,
-						MECH_MAXATNAME))) {
+	    MECH_MAXATNAME))) {
 		(void) fprintf(stderr,
-		gettext("Could not convert algorithm type to "
-			"corresponding auth type string\n"));
+		    gettext("Could not convert algorithm type to "
+		    "corresponding auth type string\n"));
 		return (GENENT_ERR);
 	}
 
@@ -2321,14 +2401,14 @@ genent_publickey(char *line, int (*cback)())
 		if (retval == LDAP_NO_SUCH_OBJECT) {
 			if (data.hostcred == NS_HOSTCRED_TRUE)
 				(void) fprintf(stdout,
-				gettext("Cannot add publickey entry (%s), "
-					"add host entry first\n"),
-					tmpbuf);
+				    gettext("Cannot add publickey entry"" (%s),"
+				    " add host entry first\n"),
+				    tmpbuf);
 			else
 				(void) fprintf(stdout,
-				gettext("Cannot add publickey entry (%s), "
-					"add passwd entry first\n"),
-					data.name);
+				    gettext("Cannot add publickey entry (%s), "
+				    "add passwd entry first\n"),
+				    data.name);
 		}
 		if (continue_onerror == 0)
 			return (GENENT_CBERR);
@@ -2353,7 +2433,7 @@ dump_publickey(ns_ldap_result_t *res, char *container)
 
 	if (sysinfo(SI_SRPC_DOMAIN, domainname, BUFSIZ) < 0) {
 		(void) fprintf(stderr,
-			gettext("could not obtain domainname\n"));
+		    gettext("could not obtain domainname\n"));
 		exit(1);
 	}
 
@@ -2409,7 +2489,8 @@ genent_netmasks(char *line, int (*cback)())
 	 * don't clobber our argument
 	 */
 	if (strlen(line) >= sizeof (buf)) {
-		(void) strcpy(parse_err_msg, "line too long");
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	(void) strcpy(buf, line);
@@ -2436,7 +2517,8 @@ genent_netmasks(char *line, int (*cback)())
 	 * addr(col 0)
 	 */
 	if ((t = strtok(buf, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no mask");
+		(void) strlcpy(parse_err_msg, gettext("no mask"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	ecol[0].ec_value.ec_value_val = t;
@@ -2446,7 +2528,8 @@ genent_netmasks(char *line, int (*cback)())
 	 * mask (col 1)
 	 */
 	if ((t = strtok(NULL, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no mask");
+		(void) strlcpy(parse_err_msg, gettext("no mask"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	ecol[1].ec_value.ec_value_val = t;
@@ -2464,8 +2547,8 @@ genent_netmasks(char *line, int (*cback)())
 	if (retval != NS_LDAP_SUCCESS) {
 		if (retval == LDAP_NO_SUCH_OBJECT)
 			(void) fprintf(stdout,
-			gettext("Cannot add netmask entry (%s), "
-				"add network entry first\n"), data.netnumber);
+			    gettext("Cannot add netmask entry (%s), "
+			    "add network entry first\n"), data.netnumber);
 		if (continue_onerror == 0)
 			return (GENENT_CBERR);
 	}
@@ -2510,7 +2593,8 @@ genent_netgroup(char *line, int (*cback)())
 
 	/* don't clobber our argument */
 	if (strlen(line) >= sizeof (buf)) {
-		(void) strcpy(parse_err_msg, "line too long");
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	(void) strcpy(buf, line);
@@ -2538,7 +2622,8 @@ genent_netgroup(char *line, int (*cback)())
 
 	/* cname (col 0) */
 	if ((t = strtok(buf, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no cname");
+		(void) strlcpy(parse_err_msg, gettext("no cname"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 
@@ -2548,7 +2633,8 @@ genent_netgroup(char *line, int (*cback)())
 
 	/* addr(col 1 and 2) */
 	if ((t = strtok(NULL, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no members for netgroup");
+		(void) strlcpy(parse_err_msg,
+		    gettext("no members for netgroup"), PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 
@@ -2558,7 +2644,8 @@ genent_netgroup(char *line, int (*cback)())
 			ecol[1].ec_value.ec_value_val = t;
 			ecol[1].ec_value.ec_value_len = strlen(t)+1;
 		} else {
-			(void) strcpy(parse_err_msg, "invalid triplet");
+			(void) strlcpy(parse_err_msg,
+			    gettext("invalid triplet"), PARSE_ERR_MSG_LEN);
 			return (GENENT_PARSEERR);
 		}
 	} else {
@@ -2577,7 +2664,7 @@ genent_netgroup(char *line, int (*cback)())
 	if (ecol[1].ec_value.ec_value_val != NULL) {
 		if ((data.triplet = calloc(1, sizeof (char **))) == NULL) {
 				(void) fprintf(stderr,
-					gettext("out of memory\n"));
+				    gettext("out of memory\n"));
 				exit(1);
 		}
 		data.triplet[tripletcount++] =
@@ -2609,7 +2696,7 @@ genent_netgroup(char *line, int (*cback)())
 			if (is_triplet(t)) {
 				/* skip a triplet if it is added already */
 				for (i = 0; i < tripletcount &&
-					strcmp(t, data.triplet[i]); i++)
+				    strcmp(t, data.triplet[i]); i++)
 					;
 				if (i < tripletcount)
 					continue;
@@ -2617,22 +2704,23 @@ genent_netgroup(char *line, int (*cback)())
 				tripletcount++;
 				triplet_tmp = strdup(t);
 				if ((data.triplet = (char **)realloc(
-					data.triplet,
-					tripletcount * sizeof (char **)))
-					== NULL) {
+				    data.triplet,
+				    tripletcount * sizeof (char **))) == NULL) {
 					(void) fprintf(stderr,
-						gettext("out of memory\n"));
+					    gettext("out of memory\n"));
 					exit(1);
 				}
 				data.triplet[tripletcount-1] = triplet_tmp;
 			} else {
-				(void) strcpy(parse_err_msg, "invalid triplet");
+				(void) strlcpy(parse_err_msg,
+				    gettext("invalid triplet"),
+				    PARSE_ERR_MSG_LEN);
 				rc = GENENT_PARSEERR;
 			}
 		} else {
 			/* skip a netgroup if it is added already */
 			for (i = 0; i < netgcount &&
-				strcmp(t, data.netgroup[i]); i++)
+			    strcmp(t, data.netgroup[i]); i++)
 				;
 			if (i < netgcount)
 				continue;
@@ -2640,7 +2728,7 @@ genent_netgroup(char *line, int (*cback)())
 			netgcount++;
 			netg_tmp = strdup(t);
 			if ((data.netgroup = (char **)realloc(data.netgroup,
-				netgcount * sizeof (char **))) == NULL) {
+			    netgcount * sizeof (char **))) == NULL) {
 				(void) fprintf(stderr,
 				gettext("out of memory\n"));
 				exit(1);
@@ -2651,13 +2739,13 @@ genent_netgroup(char *line, int (*cback)())
 
 	/* End the list with NULL */
 	if ((data.triplet = (char **)realloc(data.triplet,
-		(tripletcount + 1) * sizeof (char **))) == NULL) {
+	    (tripletcount + 1) * sizeof (char **))) == NULL) {
 		(void) fprintf(stderr, gettext("out of memory\n"));
 		exit(1);
 	}
 	data.triplet[tripletcount] = NULL;
 	if ((data.netgroup = (char **)realloc(data.netgroup,
-		(netgcount + 1) * sizeof (char **))) == NULL) {
+	    (netgcount + 1) * sizeof (char **))) == NULL) {
 		(void) fprintf(stderr, gettext("out of memory\n"));
 		exit(1);
 	}
@@ -2673,13 +2761,13 @@ genent_netgroup(char *line, int (*cback)())
 		if (retval == LDAP_ALREADY_EXISTS) {
 			if (continue_onerror)
 				(void) fprintf(stderr, gettext(
-				"Entry: %s - already Exists, skipping it.\n"),
-				data.name);
+				    "Entry: %s - already Exists,"
+				    " skipping it.\n"), data.name);
 			else {
 				rc = GENENT_CBERR;
 				(void) fprintf(stderr,
-					gettext("Entry: %s - already Exists\n"),
-					data.name);
+				    gettext("Entry: %s - already Exists\n"),
+				    data.name);
 			}
 		} else if (retval)
 			rc = GENENT_CBERR;
@@ -2742,9 +2830,10 @@ genent_automount(char *line, int (*cback)())
 	 * don't clobber our argument
 	 */
 	if (strlen(line) >= sizeof (buf)) {
-		(void) strcpy(parse_err_msg, "line too long");
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
-		}
+	}
 
 	/* replace every tabspace with single space */
 	replace_tab2space(line);
@@ -2794,13 +2883,13 @@ genent_automount(char *line, int (*cback)())
 	if (retval == LDAP_ALREADY_EXISTS) {
 		if (continue_onerror)
 			(void) fprintf(stderr,
-			gettext("Entry: %s - already Exists, skipping it.\n"),
-			data.key);
+			    gettext("Entry: %s - already Exists,"
+			    " skipping it.\n"), data.key);
 		else {
 			rc = GENENT_CBERR;
 			(void) fprintf(stderr,
-				gettext("Entry: %s - already Exists\n"),
-				data.key);
+			    gettext("Entry: %s - already Exists\n"),
+			    data.key);
 		}
 	} else if (retval)
 		rc = GENENT_CBERR;
@@ -2853,7 +2942,8 @@ genent_passwd(char *line, int (*cback)())
 	 * don't clobber our argument
 	 */
 	if (strlen(line) >= sizeof (buf)) {
-		(void) strcpy(parse_err_msg, "line too long");
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	(void) strcpy(buf, line);
@@ -2872,7 +2962,8 @@ genent_passwd(char *line, int (*cback)())
 	 * name (col 0)
 	 */
 	if ((s = strchr(t, ':')) == 0) {
-		(void) strcpy(parse_err_msg, "no password");
+		(void) strlcpy(parse_err_msg, gettext("no password"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*s++ = 0;
@@ -2884,7 +2975,8 @@ genent_passwd(char *line, int (*cback)())
 	 * passwd (col 1)
 	 */
 	if ((s = strchr(t, ':')) == 0) {
-		(void) strcpy(parse_err_msg, "no uid");
+		(void) strlcpy(parse_err_msg, gettext("no uid"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*s++ = 0;
@@ -2898,7 +2990,8 @@ genent_passwd(char *line, int (*cback)())
 	 * uid (col 2)
 	 */
 	if ((s = strchr(t, ':')) == 0 || s == t) {
-		(void) strcpy(parse_err_msg, "no gid");
+		(void) strlcpy(parse_err_msg, gettext("no gid"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*s++ = 0;
@@ -2910,7 +3003,8 @@ genent_passwd(char *line, int (*cback)())
 	 * gid (col 3)
 	 */
 	if ((s = strchr(t, ':')) == 0 || s == t) {
-		(void) strcpy(parse_err_msg, "no gcos");
+		(void) strlcpy(parse_err_msg, gettext("no gcos"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*s++ = 0;
@@ -2922,7 +3016,8 @@ genent_passwd(char *line, int (*cback)())
 	 * gcos (col 4)
 	 */
 	if ((s = strchr(t, ':')) == 0) {
-		(void) strcpy(parse_err_msg, "no home");
+		(void) strlcpy(parse_err_msg, gettext("no home"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*s++ = 0;
@@ -2934,7 +3029,8 @@ genent_passwd(char *line, int (*cback)())
 	 * home (col 5)
 	 */
 	if ((s = strchr(t, ':')) == 0) {
-		(void) strcpy(parse_err_msg, "no shell");
+		(void) strlcpy(parse_err_msg, gettext("no shell"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*s++ = 0;
@@ -2965,25 +3061,27 @@ genent_passwd(char *line, int (*cback)())
 	if (ecol[2].ec_value.ec_value_val != NULL &&
 	    ecol[2].ec_value.ec_value_val[0] != '\0') {
 		data.pw_uid = ascii_to_int(ecol[2].ec_value.ec_value_val);
-		if (data.pw_uid == -1) {
+		if (data.pw_uid == (uid_t)-1) {
 			(void) snprintf(parse_err_msg, sizeof (parse_err_msg),
-			    "invalid uid : %s", ecol[2].ec_value.ec_value_val);
+			    gettext("invalid uid : %s"),
+			    ecol[2].ec_value.ec_value_val);
 		return (GENENT_PARSEERR);
 		}
 	} else
-		data.pw_uid = -1;
+		data.pw_uid = (uid_t)-1;
 
 	if (ecol[3].ec_value.ec_value_val != NULL &&
-		ecol[3].ec_value.ec_value_val[0] != '\0') {
+	    ecol[3].ec_value.ec_value_val[0] != '\0') {
 
 		data.pw_gid = ascii_to_int(ecol[3].ec_value.ec_value_val);
-		if (data.pw_gid == -1) {
+		if (data.pw_gid == (uid_t)-1) {
 			(void) snprintf(parse_err_msg, sizeof (parse_err_msg),
-			    "invalid gid : %s", ecol[3].ec_value.ec_value_val);
+			    gettext("invalid gid : %s"),
+			    ecol[3].ec_value.ec_value_val);
 		return (GENENT_PARSEERR);
 		}
 	} else
-		data.pw_gid = -1;
+		data.pw_gid = (uid_t)-1;
 
 	data.pw_age = NULL;
 	data.pw_comment = NULL;
@@ -3000,13 +3098,13 @@ genent_passwd(char *line, int (*cback)())
 	if (retval == LDAP_ALREADY_EXISTS) {
 		if (continue_onerror)
 			(void) fprintf(stderr,
-			gettext("Entry: %s - already Exists, skipping it.\n"),
-			data.pw_name);
+			    gettext("Entry: %s - already Exists,"
+			    " skipping it.\n"), data.pw_name);
 		else {
 			rc = GENENT_CBERR;
 			(void) fprintf(stderr,
-				gettext("Entry: %s - already Exists\n"),
-				data.pw_name);
+			    gettext("Entry: %s - already Exists\n"),
+			    data.pw_name);
 		}
 	} else if (retval)
 		rc = GENENT_CBERR;
@@ -3085,7 +3183,8 @@ genent_shadow(char *line, int (*cback)())
 	 * don't clobber our argument
 	 */
 	if (strlen(line) >= sizeof (buf)) {
-		(void) strcpy(parse_err_msg, "line too long");
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	(void) strcpy(buf, line);
@@ -3104,7 +3203,8 @@ genent_shadow(char *line, int (*cback)())
 	 * name (col 0)
 	 */
 	if ((s = strchr(t, ':')) == 0) {
-		(void) strcpy(parse_err_msg, "no uid");
+		(void) strlcpy(parse_err_msg, gettext("no uid"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*s++ = 0;
@@ -3116,7 +3216,8 @@ genent_shadow(char *line, int (*cback)())
 	 * passwd (col 1)
 	 */
 	if ((s = strchr(t, ':')) == 0) {
-		(void) strcpy(parse_err_msg, "Improper format");
+		(void) strlcpy(parse_err_msg, gettext("Improper format"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*s++ = 0;
@@ -3130,7 +3231,8 @@ genent_shadow(char *line, int (*cback)())
 	 * shadow last change (col 2)
 	 */
 	if ((s = strchr(t, ':')) == 0) {
-		(void) strcpy(parse_err_msg, "Improper format");
+		(void) strlcpy(parse_err_msg, gettext("Improper format"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*s++ = 0;
@@ -3142,7 +3244,8 @@ genent_shadow(char *line, int (*cback)())
 	 * shadow min (col 3)
 	 */
 	if ((s = strchr(t, ':')) == 0) {
-		(void) strcpy(parse_err_msg, "Improper format");
+		(void) strlcpy(parse_err_msg, gettext("Improper format"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*s++ = 0;
@@ -3154,7 +3257,8 @@ genent_shadow(char *line, int (*cback)())
 	 * shadow max (col 4)
 	 */
 	if ((s = strchr(t, ':')) == 0) {
-		(void) strcpy(parse_err_msg, "Improper format");
+		(void) strlcpy(parse_err_msg, gettext("Improper format"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*s++ = 0;
@@ -3166,7 +3270,8 @@ genent_shadow(char *line, int (*cback)())
 	 * shadow warn (col 5)
 	 */
 	if ((s = strchr(t, ':')) == 0) {
-		(void) strcpy(parse_err_msg, "Improper format");
+		(void) strlcpy(parse_err_msg, gettext("Improper format"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	*s++ = 0;
@@ -3207,7 +3312,7 @@ genent_shadow(char *line, int (*cback)())
 	data.sp_namp = strdup(ecol[0].ec_value.ec_value_val);
 
 	if (ecol[1].ec_value.ec_value_val != NULL &&
-		ecol[1].ec_value.ec_value_val[0] != '\0') {
+	    ecol[1].ec_value.ec_value_val[0] != '\0') {
 		/* Add {crypt} before passwd entry */
 		(void) snprintf(pname, sizeof (pname), "{crypt}%s",
 		    ecol[1].ec_value.ec_value_val);
@@ -3216,12 +3321,12 @@ genent_shadow(char *line, int (*cback)())
 		data.sp_pwdp = NULL;
 
 	if (ecol[2].ec_value.ec_value_val != NULL &&
-		ecol[2].ec_value.ec_value_val[0] != '\0') {
+	    ecol[2].ec_value.ec_value_val[0] != '\0') {
 
 		data.sp_lstchg = ascii_to_int(ecol[2].ec_value.ec_value_val);
 		if (data.sp_lstchg < -1) {
 			(void) snprintf(parse_err_msg, sizeof (parse_err_msg),
-			    "invalid last changed date: %s",
+			    gettext("invalid last changed date: %s"),
 			    ecol[2].ec_value.ec_value_val);
 		return (GENENT_PARSEERR);
 		}
@@ -3229,12 +3334,12 @@ genent_shadow(char *line, int (*cback)())
 		data.sp_lstchg = -1;
 
 	if (ecol[3].ec_value.ec_value_val != NULL &&
-		ecol[3].ec_value.ec_value_val[0] != '\0') {
+	    ecol[3].ec_value.ec_value_val[0] != '\0') {
 
 		data.sp_min = ascii_to_int(ecol[3].ec_value.ec_value_val);
 		if (data.sp_min < -1) {
 			(void) snprintf(parse_err_msg, sizeof (parse_err_msg),
-			    "invalid sp_min : %s",
+			    gettext("invalid sp_min : %s"),
 			    ecol[3].ec_value.ec_value_val);
 		return (GENENT_PARSEERR);
 		}
@@ -3242,12 +3347,12 @@ genent_shadow(char *line, int (*cback)())
 		data.sp_min = -1;
 
 	if (ecol[4].ec_value.ec_value_val != NULL &&
-		ecol[4].ec_value.ec_value_val[0] != '\0') {
+	    ecol[4].ec_value.ec_value_val[0] != '\0') {
 
 		data.sp_max = ascii_to_int(ecol[4].ec_value.ec_value_val);
 		if (data.sp_max < -1) {
 			(void) snprintf(parse_err_msg, sizeof (parse_err_msg),
-			    "invalid sp_max : %s",
+			    gettext("invalid sp_max : %s"),
 			    ecol[4].ec_value.ec_value_val);
 		return (GENENT_PARSEERR);
 		}
@@ -3255,12 +3360,12 @@ genent_shadow(char *line, int (*cback)())
 		data.sp_max = -1;
 
 	if (ecol[5].ec_value.ec_value_val != NULL &&
-		ecol[5].ec_value.ec_value_val[0] != '\0') {
+	    ecol[5].ec_value.ec_value_val[0] != '\0') {
 
 		data.sp_warn = ascii_to_int(ecol[5].ec_value.ec_value_val);
 		if (data.sp_warn < -1) {
 			(void) snprintf(parse_err_msg, sizeof (parse_err_msg),
-			    "invalid sp_warn : %s",
+			    gettext("invalid sp_warn : %s"),
 			    ecol[5].ec_value.ec_value_val);
 		return (GENENT_PARSEERR);
 		}
@@ -3268,12 +3373,12 @@ genent_shadow(char *line, int (*cback)())
 		data.sp_warn = -1;
 
 	if (ecol[6].ec_value.ec_value_val != NULL &&
-		ecol[6].ec_value.ec_value_val[0] != '\0') {
+	    ecol[6].ec_value.ec_value_val[0] != '\0') {
 
 		data.sp_inact = ascii_to_int(ecol[6].ec_value.ec_value_val);
 		if (data.sp_inact < -1) {
 			(void) snprintf(parse_err_msg, sizeof (parse_err_msg),
-			    "invalid sp_inact : %s",
+			    gettext("invalid sp_inact : %s"),
 			    ecol[6].ec_value.ec_value_val);
 		return (GENENT_PARSEERR);
 		}
@@ -3281,12 +3386,12 @@ genent_shadow(char *line, int (*cback)())
 		data.sp_inact = -1;
 
 	if (ecol[7].ec_value.ec_value_val != NULL &&
-		ecol[7].ec_value.ec_value_val[0] != '\0') {
+	    ecol[7].ec_value.ec_value_val[0] != '\0') {
 
 		data.sp_expire = ascii_to_int(ecol[7].ec_value.ec_value_val);
 		if (data.sp_expire < -1) {
 			(void) snprintf(parse_err_msg, sizeof (parse_err_msg),
-			    "invalid login expiry date : %s",
+			    gettext("invalid login expiry date : %s"),
 			    ecol[7].ec_value.ec_value_val);
 		return (GENENT_PARSEERR);
 		}
@@ -3294,7 +3399,7 @@ genent_shadow(char *line, int (*cback)())
 		data.sp_expire = -1;
 
 	if (ecol[8].ec_value.ec_value_val != NULL &&
-		ecol[8].ec_value.ec_value_val[0] != '\0') {
+	    ecol[8].ec_value.ec_value_val[0] != '\0') {
 
 		/*
 		 * data.sp_flag is an unsigned int,
@@ -3304,7 +3409,7 @@ genent_shadow(char *line, int (*cback)())
 		spflag = ascii_to_int(ecol[8].ec_value.ec_value_val);
 		if (spflag < 0) {
 			(void) snprintf(parse_err_msg, sizeof (parse_err_msg),
-			    "invalid flag value: %s",
+			    gettext("invalid flag value: %s"),
 			    ecol[8].ec_value.ec_value_val);
 		return (GENENT_PARSEERR);
 		} else
@@ -3320,8 +3425,8 @@ genent_shadow(char *line, int (*cback)())
 	if (retval != NS_LDAP_SUCCESS) {
 		if (retval == LDAP_NO_SUCH_OBJECT)
 			(void) fprintf(stdout,
-			gettext("Cannot add shadow entry (%s), "
-				"add passwd entry first\n"), data.sp_namp);
+			    gettext("Cannot add shadow entry (%s), "
+			    "add passwd entry first\n"), data.sp_namp);
 		if (continue_onerror == 0)
 			return (GENENT_CBERR);
 	}
@@ -3390,7 +3495,8 @@ genent_bootparams(char *line, int (*cback)())
 	 * don't clobber our argument
 	 */
 	if (strlen(line) >= sizeof (buf)) {
-		(void) strcpy(parse_err_msg, "line too long");
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	(void) strcpy(buf, line);
@@ -3405,7 +3511,8 @@ genent_bootparams(char *line, int (*cback)())
 	 * cname (col 0)
 	 */
 	if ((t = strtok(buf, " \t")) == 0) {
-		(void) strcpy(parse_err_msg, "no cname");
+		(void) strlcpy(parse_err_msg, gettext("no cname"),
+		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);
 	}
 	ecol[0].ec_value.ec_value_val = t;
@@ -3435,7 +3542,7 @@ genent_bootparams(char *line, int (*cback)())
 		ctr++;
 		parameter = strdup(ecol[1].ec_value.ec_value_val);
 		if ((data.param = (char **)realloc(data.param,
-			(ctr + 1) * sizeof (char **))) == NULL) {
+		    (ctr + 1) * sizeof (char **))) == NULL) {
 			(void) fprintf(stderr, gettext("out of memory\n"));
 			exit(1);
 		}
@@ -3446,7 +3553,7 @@ genent_bootparams(char *line, int (*cback)())
 
 	/* End the list of all the aliases by NULL */
 	if ((data.param = (char **)realloc(data.param,
-		(ctr + 1) * sizeof (char **))) == NULL) {
+	    (ctr + 1) * sizeof (char **))) == NULL) {
 		(void) fprintf(stderr, gettext("out of memory\n"));
 		exit(1);
 	}
@@ -3461,13 +3568,13 @@ genent_bootparams(char *line, int (*cback)())
 	if (retval == LDAP_ALREADY_EXISTS) {
 		if (continue_onerror)
 			(void) fprintf(stderr,
-			gettext("Entry: %s - already Exists, skipping it.\n"),
-			data.name);
+			    gettext("Entry: %s - already Exists,"
+			    " skipping it.\n"), data.name);
 		else {
 			rc = GENENT_CBERR;
 			(void) fprintf(stderr,
-				gettext("Entry: %s - already Exists\n"),
-				data.name);
+			    gettext("Entry: %s - already Exists\n"),
+			    data.name);
 		}
 	} else if (retval)
 		rc = GENENT_CBERR;
@@ -3479,6 +3586,315 @@ genent_bootparams(char *line, int (*cback)())
 
 }
 
+/*
+ * Count number of tokens in string which has tokens separated by colons.
+ *
+ * NULL or "" - 0 tokens
+ * "foo" - 1 token
+ * "foo:bar" - 2 tokens
+ * ":bar" - 2 tokens, first empty
+ * "::" - 3 tokens, all empty
+ */
+static int
+count_tokens(char *string, char delim)
+{
+	int i = 0;
+	char *s = string;
+
+	if (string == NULL || *string == '\0')
+		return (0);
+
+	/* Count delimiters */
+	while ((s = strchr(s, delim)) != NULL && *s != '\0') {
+		i++;
+		s++;
+	}
+
+	return (i + 1);
+}
+
+/*
+ * strsep
+ *
+ * The strsep() function locates, in the string referenced by *stringp, the
+ * first occurrence of any character in the string delim (or the terminating
+ * `\0' character) and replaces it with a `\0'.  The location of the next
+ * character after the delimiter character (or NULL, if the end of the
+ * string was reached) is stored in *stringp.  The original value of
+ * *stringp is returned.
+ *
+ * If *stringp is initially NULL, strsep() returns NULL.
+ */
+static char *
+strsep(char **stringp, const char *delim)
+{
+	char *s;
+	const char *spanp;
+	int c, sc;
+	char *tok;
+
+	if ((s = *stringp) == NULL)
+		return (NULL);
+
+	for (tok = s; ; ) {
+		c = *s++;
+		spanp = delim;
+		do {
+			if ((sc = *spanp++) == c) {
+				if (c == 0)
+					s = NULL;
+				else
+					s[-1] = 0;
+				*stringp = s;
+				return (tok);
+			}
+		} while (sc != 0);
+	}
+	/* NOTREACHED */
+}
+
+static int
+genent_project(char *line, int (*cback)())
+{
+	char buf[BUFSIZ+1];
+	char *b = buf;
+	char *s;
+	int rc = GENENT_OK, retval;
+	int index = 0;
+	struct project data;
+
+	(void) memset(&data, 0, sizeof (struct project));
+
+	/*
+	 * don't clobber our argument
+	 */
+	if (strlen(line) >= sizeof (buf)) {
+		(void) strlcpy(parse_err_msg, gettext("line too long"),
+		    PARSE_ERR_MSG_LEN);
+		return (GENENT_PARSEERR);
+	}
+
+	if (count_tokens(line, ':') != 6) {
+		(void) strlcpy(parse_err_msg, gettext("Improper format"),
+		    PARSE_ERR_MSG_LEN);
+		return (GENENT_PARSEERR);
+	}
+
+	(void) strcpy(buf, line);
+
+	s = strsep(&b, ":");
+	while (s != NULL) {
+		switch (index) {
+		/* Project name */
+		case 0:
+			if (check_projname(s) != 0) {
+				(void) strlcpy(parse_err_msg,
+				    gettext("invalid project name"),
+				    PARSE_ERR_MSG_LEN);
+				return (GENENT_PARSEERR);
+			} else {
+				data.pj_name = strdup(s);
+			}
+			break;
+
+		/* Project ID */
+		case 1:
+		{
+			char *endptr = NULL;
+			int projid = strtoul(s, &endptr, 10);
+
+			if (*s == '\0' || strlen(endptr) != 0 || projid < 0 ||
+			    projid > MAXPROJID) {
+				(void) strlcpy(parse_err_msg,
+				    gettext("invalid project id"),
+				    PARSE_ERR_MSG_LEN);
+				return (GENENT_PARSEERR);
+			} else {
+				data.pj_projid = projid;
+			}
+			break;
+		}
+
+		/* Project description */
+		case 2:
+			if (*s != '\0')
+				data.pj_comment = strdup(s);
+			break;
+
+		/* Project users */
+		case 3:
+		{
+			if (*s == '\0')
+				break;
+
+			char *usrlist = strdup(s);
+			int   i = 0;
+			int   usr_count = count_tokens(usrlist, ',');
+			char *u = strsep(&usrlist, ",");
+
+			if (usr_count == 0) {
+				free(usrlist);
+				break;
+			}
+
+			/* +1 to NULL-terminate the array */
+			data.pj_users = (char **)calloc(usr_count + 1,
+			    sizeof (char *));
+
+			while (u != NULL) {
+				data.pj_users[i++] = strdup(u);
+				u = strsep(&usrlist, ",");
+			}
+
+			free(usrlist);
+			break;
+		}
+
+		/* Project groups */
+		case 4:
+		{
+			if (*s == '\0')
+				break;
+
+			char *grouplist = strdup(s);
+			int   i = 0;
+			int   grp_count = count_tokens(grouplist, ',');
+			char *g = strsep(&grouplist, ",");
+
+			if (grp_count == 0) {
+				free(grouplist);
+				break;
+			}
+
+			/* +1 to NULL-terminate the array */
+			data.pj_groups = (char **)calloc(grp_count + 1,
+			    sizeof (char *));
+
+			while (g != NULL) {
+				data.pj_groups[i++] = strdup(g);
+				g = strsep(&grouplist, ",");
+			}
+
+			free(grouplist);
+			break;
+		}
+
+		/* Attributes */
+		case 5:
+			if (*s != '\0')
+				data.pj_attr = strdup(s);
+
+			break;
+		}
+
+		/* Next token */
+		s = strsep(&b, ":");
+		index++;
+	}
+
+	if (flags & F_VERBOSE)
+		(void) fprintf(stdout,
+		    gettext("Adding entry : %s\n"), data.pj_name);
+
+	retval = (*cback)(&data, 0);
+
+	if (retval == LDAP_ALREADY_EXISTS) {
+		if (continue_onerror)
+			(void) fprintf(stderr,
+			    gettext("Entry: %s - already Exists,"
+			    " skipping it.\n"), data.pj_name);
+		else {
+			rc = GENENT_CBERR;
+			(void) fprintf(stderr,
+			    gettext("Entry: %s - already Exists\n"),
+			    data.pj_name);
+		}
+	} else if (retval)
+		rc = GENENT_CBERR;
+
+	/* Clean up */
+	free(data.pj_name);
+	free(data.pj_attr);
+	if (data.pj_users != NULL) {
+		for (index = 0; data.pj_users[index] != NULL; index++)
+			free(data.pj_users[index]);
+		free(data.pj_users);
+	}
+	if (data.pj_groups != NULL) {
+		for (index = 0; data.pj_groups[index] != NULL; index++)
+			free(data.pj_groups[index]);
+		free(data.pj_groups);
+	}
+
+	return (rc);
+}
+
+static void
+dump_project(ns_ldap_result_t *res)
+{
+	char    **value = NULL;
+	char 	*endptr = NULL;
+	int 	projid;
+
+	if (res == NULL || res->entry == NULL)
+		return;
+
+	/* Sanity checking */
+	value = __ns_ldap_getAttr(res->entry, "SolarisProjectID");
+
+	if (value[0] == NULL)
+		return;
+
+	projid = strtoul(value[0], &endptr, 10);
+	if (*value[0] == '\0' || strlen(endptr) != 0 || projid < 0 ||
+	    projid > MAXPROJID)
+		return;
+
+	value = __ns_ldap_getAttr(res->entry, "SolarisProjectName");
+	if (value && value[0] && check_projname(value[0]) == 0)
+		(void) fprintf(stdout, "%s:", value[0]);
+	else
+		return;
+
+	(void) fprintf(stdout, "%d:", projid);
+
+	value = __ns_ldap_getAttr(res->entry, "description");
+	if (value && value[0])
+		(void) fprintf(stdout, "%s:", value[0]);
+	else
+		(void) fprintf(stdout, ":");
+
+	value = __ns_ldap_getAttr(res->entry, "memberUid");
+	if (value) {
+		int i;
+		for (i = 0; value[i] != NULL; i++)
+			if (value[i+1] != NULL)
+				(void) fprintf(stdout, "%s,", value[i]);
+			else
+				(void) fprintf(stdout, "%s:", value[i]);
+	} else {
+		(void) fprintf(stdout, ":");
+	}
+
+	value = __ns_ldap_getAttr(res->entry, "memberGid");
+	if (value) {
+		int i;
+		for (i = 0; value[i] != NULL; i++)
+			if (value[i+1] != NULL)
+				(void) fprintf(stdout, "%s,", value[i]);
+			else
+				(void) fprintf(stdout, "%s:", value[i]);
+	} else {
+		(void) fprintf(stdout, ":");
+	}
+
+	value = __ns_ldap_getAttr(res->entry, "SolarisProjectAttr");
+	if (value && value[0])
+		(void) fprintf(stdout, "%s\n", value[0]);
+	else
+		(void) fprintf(stdout, "\n");
+
+}
 
 static void
 dump_bootparams(ns_ldap_result_t *res)
@@ -3615,8 +4031,8 @@ filedbmline_plus(struct line_buf *line, FILE *etcf, int *lineno,
 		}
 
 		if (!blankline(line->str) &&
-		line->str[0] != '+' && line->str[0] != '-' &&
-		line->str[0] != '#')
+		    line->str[0] != '+' && line->str[0] != '-' &&
+		    line->str[0] != '#')
 			break;
 
 		len = 0;
@@ -3677,6 +4093,8 @@ static struct ttypelist_t ttypelist[] = {
 		filedbmline_comment, "ipTnetHost" },
 	{ NS_LDAP_TYPE_TNRHTP, genent_tnrhtp, dump_tnrhtp,
 		filedbmline_comment, "ipTnetTemplate" },
+	{ NS_LDAP_TYPE_PROJECT, genent_project, dump_project,
+		filedbmline_comment, "SolarisProject" },
 	{ 0, 0, 0, 0, 0 }
 };
 
@@ -3803,27 +4221,27 @@ dumptable(char *service)
 	case NS_LDAP_MEMORY:
 		exit_val = 2;
 		(void) fprintf(stderr,
-			gettext("internal memory allocation error.\n"));
+		    gettext("internal memory allocation error.\n"));
 		break;
 
 	case NS_LDAP_CONFIG:
 		exit_val = 2;
 		(void) fprintf(stderr,
-			gettext("LDAP Configuration problem.\n"));
+		    gettext("LDAP Configuration problem.\n"));
 		perr(err);
 		break;
 
 	case NS_LDAP_PARTIAL:
 		exit_val = 2;
 		(void) fprintf(stderr,
-			gettext("partial result returned\n"));
+		    gettext("partial result returned\n"));
 		perr(err);
 		break;
 
 	case NS_LDAP_INTERNAL:
 		exit_val = 2;
 		(void) fprintf(stderr,
-			gettext("internal LDAP error occured.\n"));
+		    gettext("internal LDAP error occured.\n"));
 		perr(err);
 		break;
 	}
@@ -3857,25 +4275,26 @@ dumptable(char *service)
 int
 main(int argc, char **argv)
 {
-	char	*password;
-	int	c;
-	int	rc;
-	int	ldaprc;
-	int		authstried = 0;
-	int		supportedauth = 0, gssapi = 0;
-	int		op = OP_ADD;
-	char	*ttype, *authmech = 0, *etcfile = 0;
-	char	ps[LDAP_MAXNAMELEN]; /* Temporary password variable */
-	char	filter[BUFSIZ];
-	void	**paramVal = NULL;
-	ns_auth_t	**app;
-	ns_auth_t	**authpp = NULL;
-	ns_auth_t	*authp = NULL;
-	ns_ldap_error_t	*errorp = NULL;
-	ns_ldap_result_t *resultp;
-	ns_ldap_entry_t *e;
-	int	flag = 0;
-	int	version1 = 0;
+	char			*password;
+	ns_standalone_conf_t	standalone_cfg = standaloneDefaults;
+	int			c;
+	int			rc;
+	int			ldaprc;
+	int			authstried = 0;
+	int			op = OP_ADD;
+	char			*ttype, *authmech = 0, *etcfile = 0;
+	/* Temporary password variable */
+	char			ps[LDAP_MAXNAMELEN];
+	char			filter[BUFSIZ];
+	void			**paramVal = NULL;
+	ns_auth_t		**app;
+	ns_auth_t		**authpp = NULL;
+	ns_auth_t		*authp = NULL;
+	ns_ldap_error_t		*errorp = NULL;
+	ns_ldap_result_t	*resultp;
+	ns_ldap_entry_t		*e;
+	int			flag = 0;
+	int			version1 = 0;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -3887,11 +4306,12 @@ main(int argc, char **argv)
 	authority.cred.unix_cred.userID = NULL;
 	authority.auth.type = NS_LDAP_AUTH_SIMPLE;
 
-	while ((c = getopt(argc, argv, "cdhvpf:D:w:b:a:")) != EOF) {
+	while ((c = getopt(argc, argv, "cdh:N:M:vpf:D:w:j:b:a:P:r:")) != EOF) {
 		switch (c) {
 		case 'd':
 			if (op)
-				usage("no other option should be specified");
+				usage(gettext(
+				    "no other option should be specified"));
 			op = OP_DUMP;
 			break;
 		case 'c':
@@ -3903,6 +4323,26 @@ main(int argc, char **argv)
 		case 'p':
 			flags |= F_PASSWD;
 			break;
+		case 'M':
+			standalone_cfg.type = NS_LDAP_SERVER;
+			standalone_cfg.SA_DOMAIN = optarg;
+			break;
+		case 'h':
+			standalone_cfg.type = NS_LDAP_SERVER;
+			if (separatePort(optarg,
+			    &standalone_cfg.SA_SERVER,
+			    &standalone_cfg.SA_PORT) > 0) {
+				exit(1);
+			}
+			break;
+		case 'P':
+			standalone_cfg.type = NS_LDAP_SERVER;
+			authority.hostcertpath = optarg;
+			break;
+		case 'N':
+			standalone_cfg.type = NS_LDAP_SERVER;
+			standalone_cfg.SA_PROFILE_NAME = optarg;
+			break;
 		case 'f':
 			etcfile = optarg;
 			break;
@@ -3910,7 +4350,32 @@ main(int argc, char **argv)
 			authority.cred.unix_cred.userID = strdup(optarg);
 			break;
 		case 'w':
+			if (authority.cred.unix_cred.passwd) {
+				(void) fprintf(stderr,
+				    gettext("Warning: The -w option is mutually"
+				    " exclusive of -j. -w is ignored.\n"));
+				break;
+			}
+
+			if (optarg != NULL &&
+			    optarg[0] == '-' && optarg[1] == '\0') {
+				/* Ask for a password later */
+				break;
+			}
+
 			authority.cred.unix_cred.passwd = strdup(optarg);
+			break;
+		case 'j':
+			if (authority.cred.unix_cred.passwd != NULL) {
+				(void) fprintf(stderr,
+				    gettext("The -w option is mutually "
+				    "exclusive of -j. -w is ignored.\n"));
+				free(authority.cred.unix_cred.passwd);
+			}
+			authority.cred.unix_cred.passwd = readPwd(optarg);
+			if (authority.cred.unix_cred.passwd == NULL) {
+				exit(1);
+			}
 			break;
 		case 'b':
 			inputbasedn = strdup(optarg);
@@ -3918,107 +4383,67 @@ main(int argc, char **argv)
 		case 'a':
 			authmech = strdup(optarg);
 			break;
-
 		default:
 			usage(gettext("Invalid option"));
 		}
 	}
 
-
-	if (authority.cred.unix_cred.userID == NULL && op != OP_DUMP) {
-	    /* This is not an optional parameter. Exit */
+	if (standalone_cfg.type == NS_LDAP_SERVER &&
+	    standalone_cfg.SA_SERVER == NULL) {
 		(void) fprintf(stderr,
-			gettext("Distinguished Name to bind to directory"
-				" must be specified. use option -D.\n"));
+		    gettext("Please specify an LDAP server you want "
+		    "to connect to. \n"));
 		exit(1);
 	}
 
-	if (authority.cred.unix_cred.passwd == NULL && op != OP_DUMP) {
-		/* If password is not specified, then prompt user for it. */
-		password = getpassphrase("Enter password:");
-		(void) strcpy(ps, password);
-		authority.cred.unix_cred.passwd = strdup(ps);
-	}
-
 	if (authmech != NULL) {
-		if (strcasecmp(authmech, "simple") == 0) {
-		authority.auth.type = NS_LDAP_AUTH_SIMPLE;
-		authority.auth.tlstype = NS_LDAP_TLS_NONE;
-		authority.auth.saslmech = NS_LDAP_SASL_NONE;
-		authority.auth.saslopt = NS_LDAP_SASLOPT_NONE;
-		supportedauth = 1;
-		}
-		if (strcasecmp(authmech, "sasl/CRAM-MD5") == 0) {
-		authority.auth.type = NS_LDAP_AUTH_SASL;
-		authority.auth.tlstype = NS_LDAP_TLS_SASL;
-		authority.auth.saslmech = NS_LDAP_SASL_CRAM_MD5;
-		authority.auth.saslopt = NS_LDAP_SASLOPT_NONE;
-		supportedauth = 1;
-		}
-		if (strcasecmp(authmech, "sasl/DIGEST-MD5") == 0) {
-		authority.auth.type = NS_LDAP_AUTH_SASL;
-		authority.auth.tlstype = NS_LDAP_TLS_SASL;
-		authority.auth.saslmech = NS_LDAP_SASL_DIGEST_MD5;
-		authority.auth.saslopt = NS_LDAP_SASLOPT_NONE;
-		supportedauth = 1;
-		}
-		if (strcasecmp(authmech, "sasl/GSSAPI") == 0) {
-		authority.auth.type = NS_LDAP_AUTH_SASL;
-		authority.auth.tlstype = NS_LDAP_TLS_SASL;
-		authority.auth.saslmech = NS_LDAP_SASL_GSSAPI;
-		authority.auth.saslopt = NS_LDAP_SASLOPT_PRIV |
-					NS_LDAP_SASLOPT_INT;
-		gssapi = 1;
-		supportedauth = 1;
-		}
-		if (strcasecmp(authmech, "tls:simple") == 0) {
-		authority.auth.type = NS_LDAP_AUTH_TLS;
-		authority.auth.tlstype = NS_LDAP_TLS_SIMPLE;
-		authority.auth.saslmech = NS_LDAP_SASL_NONE;
-		authority.auth.saslopt = NS_LDAP_SASLOPT_NONE;
-		supportedauth = 1;
-		}
-		if (strcasecmp(authmech, "tls:sasl/CRAM-MD5") == 0) {
-		authority.auth.type = NS_LDAP_AUTH_TLS;
-		authority.auth.tlstype = NS_LDAP_TLS_SASL;
-		authority.auth.saslmech = NS_LDAP_SASL_CRAM_MD5;
-		authority.auth.saslopt = NS_LDAP_SASLOPT_NONE;
-		supportedauth = 1;
-		}
-		if (strcasecmp(authmech, "tls:sasl/DIGEST-MD5") == 0) {
-		authority.auth.type = NS_LDAP_AUTH_TLS;
-		authority.auth.tlstype = NS_LDAP_TLS_SASL;
-		authority.auth.saslmech = NS_LDAP_SASL_DIGEST_MD5;
-		authority.auth.saslopt = NS_LDAP_SASLOPT_NONE;
-		supportedauth = 1;
-		}
-		if (!supportedauth) {
-			(void) fprintf(stderr,
-			gettext("Invalid authentication method specified"));
+		if (__ns_ldap_initAuth(authmech, &authority.auth, &errorp) !=
+		    NS_LDAP_SUCCESS) {
+			if (errorp) {
+				(void) fprintf(stderr, "%s", errorp->message);
+				(void) __ns_ldap_freeError(&errorp);
+			}
 			exit(1);
 		}
 	}
 
-	if (!gssapi && authority.cred.unix_cred.userID == NULL &&
-			op != OP_DUMP) {
+	if (authority.auth.saslmech != NS_LDAP_SASL_GSSAPI &&
+	    authority.cred.unix_cred.userID == NULL &&
+	    op != OP_DUMP) {
 	    /* This is not an optional parameter. Exit */
 		(void) fprintf(stderr,
-			gettext("Distinguished Name to bind to directory"
-				" must be specified. use option -D.\n"));
+		    gettext("DN must be specified unless SASL/GSSAPI is used."
+		    " Use option -D.\n"));
 		exit(1);
 	}
 
-	if (!gssapi && authority.cred.unix_cred.passwd == NULL &&
-			op != OP_DUMP) {
+	if (authority.auth.saslmech != NS_LDAP_SASL_GSSAPI &&
+	    authority.cred.unix_cred.passwd == NULL &&
+	    (op != OP_DUMP ||
+	    standalone_cfg.type != NS_CACHEMGR &&
+	    authority.cred.unix_cred.userID != NULL)) {
 		/* If password is not specified, then prompt user for it. */
 		password = getpassphrase("Enter password:");
 		(void) strcpy(ps, password);
 		authority.cred.unix_cred.passwd = strdup(ps);
 	}
 
+	standalone_cfg.SA_AUTH = authmech == NULL ? NULL : &authority.auth;
+	standalone_cfg.SA_CERT_PATH = authority.hostcertpath;
+	standalone_cfg.SA_BIND_DN = authority.cred.unix_cred.userID;
+	standalone_cfg.SA_BIND_PWD = authority.cred.unix_cred.passwd;
+
+	if (__ns_ldap_initStandalone(&standalone_cfg,
+	    &errorp) != NS_LDAP_SUCCESS) {
+		if (errorp) {
+			(void) fprintf(stderr, "%s", errorp->message);
+		}
+		exit(1);
+	}
+
 	if (authmech == NULL) {
 		ldaprc = __ns_ldap_getParam(NS_LDAP_AUTH_P, (void ***)&authpp,
-			&errorp);
+		    &errorp);
 		if (ldaprc != NS_LDAP_SUCCESS ||
 		    (authpp == NULL && op != OP_DUMP)) {
 			(void) fprintf(stderr,
@@ -4044,25 +4469,27 @@ main(int argc, char **argv)
 		}
 		if (authstried == 0 && op != OP_DUMP) {
 			(void) fprintf(stderr,
-			gettext("No legal authentication method configured.\n"
-				"Provide a legal authentication method using "
-				"-a option"));
+			    gettext("No legal authentication method configured."
+			    "\nProvide a legal authentication method using "
+			    "-a option"));
 			exit(1);
 		}
 		if (authority.auth.saslmech == NS_LDAP_SASL_GSSAPI &&
-				authority.cred.unix_cred.passwd != NULL &&
-				authority.cred.unix_cred.userID != NULL) {
+		    authority.cred.unix_cred.passwd != NULL &&
+		    authority.cred.unix_cred.userID != NULL) {
 			/*
 			 * -a is not specified and the auth method sasl/GSSAPI
 			 * is defined in the configuration of the ldap profile.
 			 * Even -D and -w is provided it's not valid usage.
+			 * Drop them on the floor.
 			 */
 
 			(void) fprintf(stderr,
-			gettext("The default authentication is sasl/GSSAPI.\n"
-				"The bind DN and and password is not allowed."
-				"\n"));
-			exit(1);
+			    gettext("The default authentication is "
+			    "sasl/GSSAPI.\n"
+			    "The bind DN and password will be ignored.\n"));
+			authority.cred.unix_cred.passwd = NULL;
+			authority.cred.unix_cred.userID = NULL;
 		}
 	}
 
@@ -4108,9 +4535,9 @@ main(int argc, char **argv)
 		paramVal = NULL;
 		errorp = NULL;
 		rc = __ns_ldap_getParam(NS_LDAP_FILE_VERSION_P, &paramVal,
-			&errorp);
+		    &errorp);
 		if (paramVal && *paramVal &&
-			strcasecmp(*paramVal, NS_LDAP_VERSION_1) == 0)
+		    strcasecmp(*paramVal, NS_LDAP_VERSION_1) == 0)
 			version1 = 1;
 		if (paramVal)
 			(void) __ns_ldap_freeParam(&paramVal);
@@ -4198,6 +4625,7 @@ main(int argc, char **argv)
 		(void) fprintf(stdout, gettext("%d entries added\n"), nent_add);
 	}
 
+	__ns_ldap_cancelStandalone();
 	/* exit() -> return for make lint */
 	return (exit_val);
 }

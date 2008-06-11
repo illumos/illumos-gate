@@ -487,6 +487,169 @@ typedef struct ns_ldap_objectclass_map {
 typedef struct ns_ldap_list_batch ns_ldap_list_batch_t;
 
 /*
+ * The type of standalone configuration specified by a client application.
+ * The meaning of the requests is as follows:
+ *
+ * NS_CACHEMGR:    libsldap will request all the configuration via door_call(3C)
+ *                 to ldap_cachemgr.
+ * NS_LDAP_SERVER: the consumer application has specified a directory server
+ *                 to communicate to.
+ * NS_PREDEFINED:  reserved for internal use
+ */
+typedef enum {
+	NS_CACHEMGR = 0,
+	NS_LDAP_SERVER
+} ns_standalone_request_type_t;
+
+/*
+ * This structure describes an LDAP server specified by a client application.
+ */
+typedef struct ns_dir_server {
+	char *server;			/* A directory server's IP */
+	uint16_t port;			/* A directory server's port. */
+					/* Default value is 389 */
+	char *domainName;		/* A domain name being served */
+					/* by the specified server. */
+					/* Default value is the local */
+					/* domain's name */
+	char *profileName;		/* A DUAProfile's name. */
+					/* Default value is 'default' */
+	ns_auth_t *auth;		/* Authentication information used */
+					/* during subsequent connections */
+	char *cred;			/* A credential level to be used */
+					/* along with the authentication info */
+	char *host_cert_path;		/* A path to the certificate database */
+					/* Default is '/vat/ldap' */
+	char *bind_dn;			/* A bind DN to be used during */
+					/* subsequent LDAP Bind requests */
+	char *bind_passwd;		/* A bind password to be used during */
+					/* subsequent LDAP Bind requests */
+} ns_dir_server_t;
+
+/*
+ * This structure contains information describing an LDAP server.
+ */
+typedef struct ns_standalone_conf {
+	union {
+		ns_dir_server_t server;
+		void *predefined_conf;	/* Reserved for internal use */
+	} ds_profile;			/* A type of the configuration */
+
+#define	SA_SERVER	ds_profile.server.server
+#define	SA_PORT		ds_profile.server.port
+#define	SA_DOMAIN	ds_profile.server.domainName
+#define	SA_PROFILE_NAME	ds_profile.server.profileName
+#define	SA_AUTH		ds_profile.server.auth
+#define	SA_CRED		ds_profile.server.cred
+#define	SA_CERT_PATH	ds_profile.server.host_cert_path
+#define	SA_BIND_DN	ds_profile.server.bind_dn
+#define	SA_BIND_PWD	ds_profile.server.bind_passwd
+
+	ns_standalone_request_type_t type;
+} ns_standalone_conf_t;
+
+/*
+ * This function "informs" libsldap that a client application has specified
+ * a directory to use. The function obtains a DUAProfile, credentials,
+ * and naming context. During all further operations on behalf
+ * of the application requested a standalone schema libsldap will use
+ * the information obtained by __ns_ldap_initStandalone() instead of
+ * door_call(3C)ing ldap_cachemgr(1M).
+ *
+ * conf
+ * 	A structure describing where and in which way to obtain all the
+ * 	configuration describing how to communicate to a choosen LDAP directory.
+ *
+ * errorp
+ * 	An error object describing an error occured.
+ */
+ns_ldap_return_code __ns_ldap_initStandalone(
+	const ns_standalone_conf_t *conf,
+	ns_ldap_error_t	**errorp);
+
+/*
+ * This function obtains the directory's base DN and a DUAProfile
+ * from a specified server.
+ *
+ * server
+ * 	Specifies the selected directory sever.
+ *
+ * cred
+ * 	Contains an authentication information and credential required to
+ * 	establish a connection.
+ *
+ * config
+ * 	If not NULL, a new configuration basing on a DUAProfile specified in the
+ * 	server parameter will be create and returned.
+ *
+ * baseDN
+ * 	If not NULL, the directory's base DN will be returned.
+ *
+ * error
+ * 	Describes an error, if any.
+ */
+ns_ldap_return_code __ns_ldap_getConnectionInfoFromDUA(
+	const ns_dir_server_t *server,
+	const ns_cred_t *cred,
+	char **config,	char **baseDN,
+	ns_ldap_error_t **error);
+
+#define	SA_PROHIBIT_FALLBACK 0
+#define	SA_ALLOW_FALLBACK 1
+
+#define	DONT_SAVE_NSCONF 0
+#define	SAVE_NSCONF 1
+
+/*
+ * This function obtains the root DSE from a specified server.
+ *
+ * server_addr
+ * 	An adress of a server to be connected to.
+ *
+ * rootDSE
+ * 	A buffer containing the root DSE in the ldap_cachmgr door call format.
+ *
+ * errorp
+ * 	Describes an error, if any.
+ *
+ * anon_fallback
+ * 	If set to 1 and establishing a connection fails, __s_api_getRootDSE()
+ * 	will try once again using anonymous credentials.
+ */
+ns_ldap_return_code __ns_ldap_getRootDSE(
+	const char *server_addr,
+	char **rootDSE,
+	ns_ldap_error_t **errorp,
+	int anon_fallback);
+
+/*
+ * This function iterates through the list of the configured LDAP servers
+ * and "pings" those which are marked as removed or if any error occurred
+ * during the previous receiving of the server's root DSE. If the
+ * function is able to reach such a server and get its root DSE, it
+ * marks the server as on-line. Otherwise, the server's status is set
+ * to "Error".
+ * For each server the function tries to connect to, it fires up
+ * a separate thread and then waits until all the threads finish.
+ * The function returns NS_LDAP_INTERNAL if the Standalone mode was not
+ * initialized or was canceled prior to an invocation of
+ * __ns_ldap_pingOfflineServers().
+ */
+ns_ldap_return_code __ns_ldap_pingOfflineServers(void);
+
+/*
+ * This function cancels the Standalone mode and destroys the list of root DSEs.
+ */
+void __ns_ldap_cancelStandalone(void);
+/*
+ * This function initializes an ns_auth_t structure provided by a caller
+ * according to a specified authentication mechanism.
+ */
+ns_ldap_return_code __ns_ldap_initAuth(const char *auth_mech,
+	ns_auth_t *auth,
+	ns_ldap_error_t **errorp);
+
+/*
  * Simplified LDAP Naming APIs
  */
 int __ns_ldap_list(

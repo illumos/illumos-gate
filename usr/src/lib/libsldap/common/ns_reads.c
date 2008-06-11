@@ -37,10 +37,10 @@
 #include <string.h>
 #include <strings.h>
 
-
 #include "ns_sldap.h"
 #include "ns_internal.h"
 #include "ns_cache_door.h"
+#include "ns_connmgmt.h"
 
 #define	_NIS_FILTER	"nisdomain=*"
 #define	_NIS_DOMAIN	"nisdomain"
@@ -862,6 +862,13 @@ __s_api_get_cachemgr_data(const char *type,
 #ifdef DEBUG
 	(void) fprintf(stderr, "__s_api_get_cachemgr_data START\n");
 #endif
+	/*
+	 * We are not going to perform DN to domain mapping
+	 * in the Standalone mode
+	 */
+	if (__s_api_isStandalone()) {
+		return (-1);
+	}
 
 	if (from == NULL || from[0] == '\0' || to == NULL)
 		return (-1);
@@ -882,7 +889,7 @@ __s_api_get_cachemgr_data(const char *type,
 	sptr = &space.s_d;
 
 	rc = __ns_ldap_trydoorcall(&sptr, &ndata, &adata);
-	if (rc != SUCCESS)
+	if (rc != NS_CACHE_SUCCESS)
 		return (-1);
 	else
 		*to = strdup(sptr->ldap_ret.ldap_u.buff);
@@ -905,6 +912,13 @@ __s_api_set_cachemgr_data(const char *type,
 #ifdef DEBUG
 	(void) fprintf(stderr, "__s_api_set_cachemgr_data START\n");
 #endif
+	/*
+	 * We are not going to perform DN to domain mapping
+	 * in the Standalone mode
+	 */
+	if (__s_api_isStandalone()) {
+		return (-1);
+	}
 
 	if ((from == NULL) || (from[0] == '\0') ||
 	    (to == NULL) || (to[0] == '\0'))
@@ -928,7 +942,7 @@ __s_api_set_cachemgr_data(const char *type,
 	sptr = &space.s_d;
 
 	rc = __ns_ldap_trydoorcall(&sptr, &ndata, &adata);
-	if (rc != SUCCESS)
+	if (rc != NS_CACHE_SUCCESS)
 		return (-1);
 
 	return (NS_LDAP_SUCCESS);
@@ -1591,7 +1605,7 @@ get_current_session(ns_ldap_cookie_t *cookie)
 	rc = __s_api_getConnection(NULL, cookie->i_flags,
 	    cookie->i_auth, &connectionId, &conp,
 	    &cookie->errorp, fail_if_new_pwd_reqd,
-	    cookie->nopasswd_acct_mgmt);
+	    cookie->nopasswd_acct_mgmt, cookie->conn_user);
 
 	/*
 	 * If password control attached in *cookie->errorp,
@@ -1630,10 +1644,15 @@ get_next_session(ns_ldap_cookie_t *cookie)
 		cookie->connectionId = -1;
 	}
 
+	/* If using a MT connection, return it. */
+	if (cookie->conn_user != NULL &&
+	    cookie->conn_user->conn_mt != NULL)
+		__s_api_conn_mt_return(cookie->conn_user);
+
 	rc = __s_api_getConnection(NULL, cookie->i_flags,
 	    cookie->i_auth, &connectionId, &conp,
 	    &cookie->errorp, fail_if_new_pwd_reqd,
-	    cookie->nopasswd_acct_mgmt);
+	    cookie->nopasswd_acct_mgmt, cookie->conn_user);
 
 	/*
 	 * If password control attached in *cookie->errorp,
@@ -1671,10 +1690,18 @@ get_referral_session(ns_ldap_cookie_t *cookie)
 		cookie->connectionId = -1;
 	}
 
+	/* set it up to use a connection opened for referral */
+	if (cookie->conn_user != NULL) {
+		/* If using a MT connection, return it. */
+		if (cookie->conn_user->conn_mt != NULL)
+			__s_api_conn_mt_return(cookie->conn_user);
+		cookie->conn_user->referral = B_TRUE;
+	}
+
 	rc = __s_api_getConnection(cookie->refpos->refHost, 0,
 	    cookie->i_auth, &connectionId, &conp,
 	    &cookie->errorp, fail_if_new_pwd_reqd,
-	    cookie->nopasswd_acct_mgmt);
+	    cookie->nopasswd_acct_mgmt, cookie->conn_user);
 
 	/*
 	 * If password control attached in *cookie->errorp,
@@ -2057,7 +2084,10 @@ clear_results(ns_ldap_cookie_t *cookie)
 {
 	int rc;
 	if (cookie->conn != NULL && cookie->conn->ld != NULL &&
-	    cookie->connectionId != -1 && cookie->msgId != 0) {
+	    (cookie->connectionId != -1 ||
+	    (cookie->conn_user != NULL &&
+	    cookie->conn_user->conn_mt != NULL)) &&
+	    cookie->msgId != 0) {
 		/*
 		 * We need to cleanup the rest of response (if there is such)
 		 * and LDAP abandon is too heavy for LDAP servers, so we will
@@ -2109,6 +2139,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 	char		errstr[MAXERROR];
 	char		*err;
 	int		rc, ret;
+	int		rc_save;
 	ns_ldap_entry_t	*nextEntry;
 	ns_ldap_error_t *error = NULL;
 	ns_ldap_error_t **errorp;
@@ -2156,6 +2187,45 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 				    cookie->service,
 				    cookie->i_attr);
 			}
+			break;
+		case REINIT:
+			/* Check if we've reached MAX retries. */
+			cookie->retries++;
+			if (cookie->retries > NS_LIST_TRY_MAX - 1) {
+				cookie->new_state = LDAP_ERROR;
+				break;
+			}
+
+			/*
+			 * Even if we still have retries left, check
+			 * if retry is possible.
+			 */
+			if (cookie->conn_user != NULL) {
+				int		retry;
+				ns_conn_mgmt_t	*cmg;
+				cmg = cookie->conn_user->conn_mgmt;
+				retry = cookie->conn_user->retry;
+				if (cmg != NULL && cmg->cfg_reloaded == 1)
+					retry = 1;
+				if (retry == 0) {
+					cookie->new_state = LDAP_ERROR;
+					break;
+				}
+			}
+			/*
+			 * Free results if any, reset to the first
+			 * search descriptor and start a new session.
+			 */
+			if (cookie->resultMsg != NULL) {
+				(void) ldap_msgfree(cookie->resultMsg);
+				cookie->resultMsg = NULL;
+			}
+			(void) __ns_ldap_freeError(&cookie->errorp);
+			(void) __ns_ldap_freeResult(&cookie->result);
+			cookie->sdpos = cookie->sdlist;
+			cookie->err_from_result = 0;
+			cookie->err_rc = 0;
+			cookie->new_state = NEXT_SESSION;
 			break;
 		case NEXT_SEARCH_DESCRIPTOR:
 			/* get next search descriptor */
@@ -2263,7 +2333,12 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 				    rc == LDAP_CONNECT_ERROR ||
 				    rc == LDAP_SERVER_DOWN) {
 
-					cookie->new_state = NEXT_SESSION;
+					if (cookie->reinit_on_retriable_err) {
+						cookie->err_rc = rc;
+						cookie->new_state = REINIT;
+					} else
+						cookie->new_state =
+						    NEXT_SESSION;
 
 					/*
 					 * If not able to reach the
@@ -2279,11 +2354,14 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 					 * find out sooner when the server
 					 * is up again.
 					 */
-					if (rc == LDAP_CONNECT_ERROR ||
-					    rc == LDAP_SERVER_DOWN) {
+					if ((rc == LDAP_CONNECT_ERROR ||
+					    rc == LDAP_SERVER_DOWN) &&
+					    (cookie->conn_user == NULL ||
+					    cookie->conn_user->conn_mt ==
+					    NULL)) {
 						ret = __s_api_removeServer(
 						    cookie->conn->serverAddr);
-						if (ret == NOSERVER &&
+						if (ret == NS_CACHE_NOSERVER &&
 						    cookie->conn_auth_type
 						    == NS_LDAP_AUTH_NONE) {
 							/*
@@ -2313,6 +2391,19 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 							cookie->connectionId =
 							    -1;
 						}
+					} else if ((rc == LDAP_CONNECT_ERROR ||
+					    rc == LDAP_SERVER_DOWN) &&
+					    cookie->conn_user != NULL &&
+					    cookie->reinit_on_retriable_err) {
+						/*
+						 * MT connection not usable,
+						 * close it before REINIT.
+						 * rc has already been saved
+						 * in cookie->err_rc above.
+						 */
+						__s_api_conn_mt_close(
+						    cookie->conn_user,
+						    rc, &cookie->errorp);
 					}
 					break;
 				}
@@ -2375,8 +2466,10 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 					    cookie->resultMsg, 1);
 					break;
 				}
-				if (rc == LDAP_TIMEOUT ||
-				    rc == LDAP_SERVER_DOWN) {
+				if ((rc == LDAP_TIMEOUT ||
+				    rc == LDAP_SERVER_DOWN) &&
+				    (cookie->conn_user == NULL ||
+				    cookie->conn_user->conn_mt == NULL)) {
 					if (rc == LDAP_TIMEOUT)
 						(void) __s_api_removeServer(
 						    cookie->conn->serverAddr);
@@ -2393,7 +2486,31 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 				if (rc == LDAP_BUSY ||
 				    rc == LDAP_UNAVAILABLE ||
 				    rc == LDAP_UNWILLING_TO_PERFORM) {
-					cookie->new_state = NEXT_SESSION;
+					if (cookie->reinit_on_retriable_err) {
+						cookie->err_rc = rc;
+						cookie->err_from_result = 1;
+						cookie->new_state = REINIT;
+					} else
+						cookie->new_state =
+						    NEXT_SESSION;
+					break;
+				}
+				if ((rc == LDAP_CONNECT_ERROR ||
+				    rc == LDAP_SERVER_DOWN) &&
+				    cookie->reinit_on_retriable_err) {
+					ns_ldap_error_t *errorp = NULL;
+					cookie->err_rc = rc;
+					cookie->err_from_result = 1;
+					cookie->new_state = REINIT;
+					if (cookie->conn_user != NULL)
+						__s_api_conn_mt_close(
+						    cookie->conn_user,
+						    rc, &errorp);
+					if (errorp != NULL) {
+						(void) __ns_ldap_freeError(
+						    &cookie->errorp);
+						cookie->errorp = errorp;
+					}
 					break;
 				}
 				cookie->err_rc = rc;
@@ -2473,8 +2590,10 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 					    cookie->resultMsg, 1);
 					break;
 				}
-				if (rc == LDAP_TIMEOUT ||
-				    rc == LDAP_SERVER_DOWN) {
+				if ((rc == LDAP_TIMEOUT ||
+				    rc == LDAP_SERVER_DOWN) &&
+				    (cookie->conn_user == NULL ||
+				    cookie->conn_user->conn_mt == NULL)) {
 					if (rc == LDAP_TIMEOUT)
 						(void) __s_api_removeServer(
 						    cookie->conn->serverAddr);
@@ -2491,7 +2610,31 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 				if (rc == LDAP_BUSY ||
 				    rc == LDAP_UNAVAILABLE ||
 				    rc == LDAP_UNWILLING_TO_PERFORM) {
-					cookie->new_state = NEXT_SESSION;
+					if (cookie->reinit_on_retriable_err) {
+						cookie->err_rc = rc;
+						cookie->err_from_result = 1;
+						cookie->new_state = REINIT;
+					} else
+						cookie->new_state =
+						    NEXT_SESSION;
+					break;
+				}
+				if ((rc == LDAP_CONNECT_ERROR ||
+				    rc == LDAP_SERVER_DOWN) &&
+				    cookie->reinit_on_retriable_err) {
+					ns_ldap_error_t *errorp = NULL;
+					cookie->err_rc = rc;
+					cookie->err_from_result = 1;
+					cookie->new_state = REINIT;
+					if (cookie->conn_user != NULL)
+						__s_api_conn_mt_close(
+						    cookie->conn_user,
+						    rc, &errorp);
+					if (errorp != NULL) {
+						(void) __ns_ldap_freeError(
+						    &cookie->errorp);
+						cookie->errorp = errorp;
+					}
 					break;
 				}
 				cookie->err_rc = rc;
@@ -2578,6 +2721,8 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 				cookie->reflist = NULL;
 				cookie->new_state =
 				    NEXT_SEARCH_DESCRIPTOR;
+				if (cookie->conn_user != NULL)
+					cookie->conn_user->referral = B_FALSE;
 			}
 			break;
 		case GET_REFERRAL_SESSION:
@@ -2588,6 +2733,7 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			}
 			break;
 		case LDAP_ERROR:
+			rc_save = cookie->err_rc;
 			if (cookie->err_from_result) {
 				if (cookie->err_rc == LDAP_SERVER_DOWN) {
 					(void) sprintf(errstr,
@@ -2625,6 +2771,18 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			}
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
+			if (cookie->conn_user != NULL)  {
+				if (rc_save == LDAP_SERVER_DOWN ||
+				    rc_save == LDAP_CONNECT_ERROR) {
+					/*
+					 * MT connection is not usable,
+					 * close it.
+					 */
+					__s_api_conn_mt_close(cookie->conn_user,
+					    rc_save, &cookie->errorp);
+					return (ERROR);
+				}
+			}
 			return (ERROR);
 		default:
 		case ERROR:
@@ -2636,6 +2794,15 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 			    NULL);
 			cookie->err_rc = NS_LDAP_INTERNAL;
 			cookie->errorp = *errorp;
+			return (ERROR);
+		}
+
+		if (cookie->conn_user != NULL &&
+		    cookie->conn_user->bad_mt_conn ==  B_TRUE) {
+			__s_api_conn_mt_close(cookie->conn_user, 0, NULL);
+			cookie->err_rc = cookie->conn_user->ns_rc;
+			cookie->errorp = cookie->conn_user->ns_error;
+			cookie->conn_user->ns_error = NULL;
 			return (ERROR);
 		}
 
@@ -2656,7 +2823,6 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 #endif
 }
 
-
 /*
  * internal function for __ns_ldap_list
  */
@@ -2674,7 +2840,7 @@ ldap_list(
 	ns_ldap_error_t **errorp,
 	int *rcp,
 	int (*callback)(const ns_ldap_entry_t *entry, const void *userdata),
-	const void *userdata)
+	const void *userdata, ns_conn_user_t *conn_user)
 {
 	ns_ldap_cookie_t	*cookie;
 	ns_ldap_search_desc_t	**sdlist = NULL;
@@ -2695,6 +2861,7 @@ ldap_list(
 		*rcp = NS_LDAP_MEMORY;
 		return (NS_LDAP_MEMORY);
 	}
+	cookie->conn_user = conn_user;
 
 	/* see if need to follow referrals */
 	rc = __s_api_toFollowReferrals(flags,
@@ -2797,6 +2964,7 @@ ldap_list(
 
 	if (batch != NULL) {
 		cookie->batch = batch;
+		cookie->reinit_on_retriable_err = B_TRUE;
 		cookie->no_wait = B_TRUE;
 		(void) search_state_machine(cookie, INIT, 0);
 		cookie->no_wait = B_FALSE;
@@ -2828,8 +2996,13 @@ ldap_list(
 
 	/* Copy results back to user */
 	rc = cookie->err_rc;
-	if (rc != NS_LDAP_SUCCESS)
-		*errorp = cookie->errorp;
+	if (rc != NS_LDAP_SUCCESS) {
+		if (conn_user != NULL && conn_user->ns_error != NULL) {
+			*errorp = conn_user->ns_error;
+			conn_user->ns_error = NULL;
+		} else
+			*errorp = cookie->errorp;
+	}
 	*rResult = cookie->result;
 	from_result = cookie->err_from_result;
 
@@ -2848,7 +3021,8 @@ ldap_list(
 /*
  * __ns_ldap_list performs one or more LDAP searches to a given
  * directory server using service search descriptors and schema
- * mapping as appropriate.
+ * mapping as appropriate. The operation may be retried a
+ * couple of times in error situations.
  */
 
 int
@@ -2865,12 +3039,20 @@ __ns_ldap_list(
 	int (*callback)(const ns_ldap_entry_t *entry, const void *userdata),
 	const void *userdata)
 {
-	int	rc;
-	return (ldap_list(NULL, service, filter,
-	    init_filter_cb, attribute, auth, flags, rResult, errorp, &rc,
-	    callback, userdata));
-}
+	ns_conn_user_t	*cu = NULL;
+	int		try_cnt = 0;
+	int		rc = NS_LDAP_SUCCESS, trc;
 
+	for (;;) {
+		if (__s_api_setup_retry_search(&cu, NS_CONN_USER_SEARCH,
+		    &try_cnt, &rc, errorp) == 0)
+			break;
+		rc = ldap_list(NULL, service, filter, init_filter_cb, attribute,
+		    auth, flags, rResult, errorp, &trc, callback, userdata, cu);
+	}
+
+	return (rc);
+}
 
 /*
  * Create and initialize batch for native LDAP lookups
@@ -2904,9 +3086,31 @@ __ns_ldap_list_batch_add(
 	int (*callback)(const ns_ldap_entry_t *entry, const void *userdata),
 	const void *userdata)
 {
-	return (ldap_list(batch, service, filter,
-	    init_filter_cb, attribute, auth, flags, rResult, errorp, rcp,
-	    callback, userdata));
+	ns_conn_user_t	*cu;
+	int		rc;
+
+	cu =  __s_api_conn_user_init(NS_CONN_USER_SEARCH, NULL, 0);
+	if (cu == NULL) {
+		if (rcp != NULL)
+			*rcp = NS_LDAP_MEMORY;
+		return (NS_LDAP_MEMORY);
+	}
+
+	rc = ldap_list(batch, service, filter, init_filter_cb, attribute, auth,
+	    flags, rResult, errorp, rcp, callback, userdata, cu);
+
+	/*
+	 * Free the conn_user if the cookie was not batched. If the cookie
+	 * was batched then __ns_ldap_list_batch_end or release will free the
+	 * conn_user. The batch API instructs the search_state_machine
+	 * to reinit and retry (max 3 times) on retriable LDAP errors.
+	 */
+	if (rc != NS_LDAP_SUCCESS && cu != NULL) {
+		if (cu->conn_mt != NULL)
+			__s_api_conn_mt_return(cu);
+		__s_api_conn_user_free(cu);
+	}
+	return (rc);
 }
 
 
@@ -2920,11 +3124,19 @@ __ns_ldap_list_batch_release(ns_ldap_list_batch_t *batch)
 
 	for (c = batch->cookie_list; c != NULL; c = next) {
 		next = c->next_cookie_in_batch;
+		if (c->conn_user != NULL) {
+			if (c->conn_user->conn_mt != NULL)
+				__s_api_conn_mt_return(c->conn_user);
+			__s_api_conn_user_free(c->conn_user);
+			c->conn_user = NULL;
+		}
 		delete_search_cookie(c);
 	}
 	free(batch);
 }
 
+#define	LD_USING_STATE(st) \
+	((st == DO_SEARCH) || (st == MULTI_RESULT) || (st == NEXT_RESULT))
 
 /*
  * Process batch. Everytime this function is called it selects an
@@ -2948,6 +3160,7 @@ __ns_ldap_list_batch_process(ns_ldap_list_batch_t *batch, int *rcp)
 {
 	ns_ldap_cookie_t	*c, *ptr, **prev;
 	ns_state_t		state;
+	ns_ldap_error_t		*errorp = NULL;
 	int			rc;
 
 	/* Check if are already done */
@@ -2960,11 +3173,47 @@ __ns_ldap_list_batch_process(ns_ldap_list_batch_t *batch, int *rcp)
 
 	batch->next_cookie = c->next_cookie_in_batch;
 
-	if (c->conn->shared > 0) {
-		rc = __s_api_check_MTC_tsd();
-		if (rc != NS_LDAP_SUCCESS) {
+	/*
+	 * Checks the status of the cookie's connection if it needs
+	 * to use that connection for ldap_search_ext or ldap_result.
+	 * If the connection is no longer good but worth retrying
+	 * then reinit the search_state_machine for this cookie
+	 * starting from the first search descriptor. REINIT will
+	 * clear any leftover results if max retries have not been
+	 * reached and redo the search (which may also involve
+	 * following referrals again).
+	 *
+	 * Note that each cookie in the batch will make this
+	 * determination when it reaches one of the LD_USING_STATES.
+	 */
+	if (LD_USING_STATE(c->new_state) && c->conn_user != NULL) {
+		rc = __s_api_setup_getnext(c->conn_user, &c->err_rc, &errorp);
+		if (rc == LDAP_BUSY || rc == LDAP_UNAVAILABLE ||
+		    rc == LDAP_UNWILLING_TO_PERFORM) {
+			if (errorp != NULL) {
+				(void) __ns_ldap_freeError(&c->errorp);
+				c->errorp = errorp;
+			}
+			c->new_state = REINIT;
+		} else if (rc == LDAP_CONNECT_ERROR ||
+		    rc == LDAP_SERVER_DOWN) {
+			if (errorp != NULL) {
+				(void) __ns_ldap_freeError(&c->errorp);
+				c->errorp = errorp;
+			}
+			c->new_state = REINIT;
+			/*
+			 * MT connection is not usable,
+			 * close it before REINIT.
+			 */
+			__s_api_conn_mt_close(
+			    c->conn_user, rc, NULL);
+		} else if (rc != NS_LDAP_SUCCESS) {
 			if (rcp != NULL)
 				*rcp = rc;
+			*c->caller_result = NULL;
+			*c->caller_errorp = errorp;
+			*c->caller_rc = rc;
 			return (-1);
 		}
 	}
@@ -2998,6 +3247,12 @@ __ns_ldap_list_batch_process(ns_ldap_list_batch_t *batch, int *rcp)
 				ptr = ptr->next_cookie_in_batch;
 			}
 			/* Delete cookie and decrement active cookie count */
+			if (c->conn_user != NULL) {
+				if (c->conn_user->conn_mt != NULL)
+					__s_api_conn_mt_return(c->conn_user);
+				__s_api_conn_user_free(c->conn_user);
+				c->conn_user = NULL;
+			}
 			delete_search_cookie(c);
 			batch->nactive--;
 			break;
@@ -3045,19 +3300,15 @@ __ns_ldap_list_batch_end(ns_ldap_list_batch_t *batch)
 	return (rc);
 }
 
-
 /*
- * __s_api_find_domainname performs one or more LDAP searches to
+ * find_domainname performs one or more LDAP searches to
  * find the value of the nisdomain attribute associated with
- * the input DN
+ * the input DN (with no retry).
  */
 
 static int
-__s_api_find_domainname(
-	const char *dn,
-	char **domainname,
-	const ns_cred_t *cred,
-	ns_ldap_error_t **errorp)
+find_domainname(const char *dn, char **domainname, const ns_cred_t *cred,
+    ns_ldap_error_t **errorp, ns_conn_user_t *conn_user)
 {
 
 	ns_ldap_cookie_t	*cookie;
@@ -3075,6 +3326,7 @@ __s_api_find_domainname(
 	if (cookie == NULL) {
 		return (NS_LDAP_MEMORY);
 	}
+	cookie->conn_user = conn_user;
 
 	/* see if need to follow referrals */
 	rc = __s_api_toFollowReferrals(flags,
@@ -3122,8 +3374,13 @@ __s_api_find_domainname(
 
 	/* Copy domain name if found */
 	rc = cookie->err_rc;
-	if (rc != NS_LDAP_SUCCESS)
-		*errorp = cookie->errorp;
+	if (rc != NS_LDAP_SUCCESS) {
+		if (conn_user != NULL && conn_user->ns_error != NULL) {
+			*errorp = conn_user->ns_error;
+			conn_user->ns_error = NULL;
+		} else
+			*errorp = cookie->errorp;
+	}
 	if (cookie->result == NULL)
 		rc = NS_LDAP_NOTFOUND;
 	if (rc == NS_LDAP_SUCCESS) {
@@ -3142,19 +3399,44 @@ __s_api_find_domainname(
 	return (rc);
 }
 
-int
-__ns_ldap_firstEntry(
-	const char *service,
-	const char *filter,
-	int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
-	char **realfilter, const void *userdata),
-	const char * const *attribute,
-	const ns_cred_t *auth,
-	const int flags,
-	void **vcookie,
-	ns_ldap_result_t **result,
-	ns_ldap_error_t ** errorp,
-	const void *userdata)
+/*
+ * __s_api_find_domainname performs one or more LDAP searches to
+ * find the value of the nisdomain attribute associated with
+ * the input DN (with retry).
+ */
+
+static int
+__s_api_find_domainname(const char *dn, char **domainname,
+    const ns_cred_t *cred, ns_ldap_error_t **errorp)
+{
+	ns_conn_user_t	*cu = NULL;
+	int		try_cnt = 0;
+	int		rc = NS_LDAP_SUCCESS;
+
+	for (;;) {
+		if (__s_api_setup_retry_search(&cu, NS_CONN_USER_SEARCH,
+		    &try_cnt, &rc, errorp) == 0)
+			break;
+		rc = find_domainname(dn, domainname, cred, errorp, cu);
+	}
+
+	return (rc);
+}
+
+static int
+firstEntry(
+    const char *service,
+    const char *filter,
+    int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
+    char **realfilter, const void *userdata),
+    const char * const *attribute,
+    const ns_cred_t *auth,
+    const int flags,
+    void **vcookie,
+    ns_ldap_result_t **result,
+    ns_ldap_error_t ** errorp,
+    const void *userdata,
+    ns_conn_user_t *conn_user)
 {
 	ns_ldap_cookie_t	*cookie = NULL;
 	ns_ldap_error_t		*error = NULL;
@@ -3235,6 +3517,9 @@ __ns_ldap_firstEntry(
 		return (NS_LDAP_MEMORY);
 	}
 
+	/* identify self as a getent user */
+	cookie->conn_user = conn_user;
+
 	cookie->sdlist = sdlist;
 
 	/* see if need to follow referrals */
@@ -3289,8 +3574,13 @@ __ns_ldap_firstEntry(
 			/* FALLTHROUGH */
 		case ERROR:
 			rc = cookie->err_rc;
-			*errorp = cookie->errorp;
-			cookie->errorp = NULL;
+			if (conn_user != NULL && conn_user->ns_error != NULL) {
+				*errorp = conn_user->ns_error;
+				conn_user->ns_error = NULL;
+			} else {
+				*errorp = cookie->errorp;
+				cookie->errorp = NULL;
+			}
 			delete_search_cookie(cookie);
 			return (rc);
 		case EXIT:
@@ -3311,12 +3601,38 @@ __ns_ldap_firstEntry(
 	}
 }
 
+int
+__ns_ldap_firstEntry(
+    const char *service,
+    const char *filter,
+    int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
+    char **realfilter, const void *userdata),
+    const char * const *attribute,
+    const ns_cred_t *auth,
+    const int flags,
+    void **vcookie,
+    ns_ldap_result_t **result,
+    ns_ldap_error_t ** errorp,
+    const void *userdata)
+{
+	ns_conn_user_t	*cu = NULL;
+	int		try_cnt = 0;
+	int		rc = NS_LDAP_SUCCESS;
+
+	for (;;) {
+		if (__s_api_setup_retry_search(&cu, NS_CONN_USER_GETENT,
+		    &try_cnt, &rc, errorp) == 0)
+			break;
+		rc = firstEntry(service, filter, init_filter_cb, attribute,
+		    auth, flags, vcookie, result, errorp, userdata, cu);
+	}
+	return (rc);
+}
+
 /*ARGSUSED2*/
 int
-__ns_ldap_nextEntry(
-	void *vcookie,
-	ns_ldap_result_t **result,
-	ns_ldap_error_t ** errorp)
+__ns_ldap_nextEntry(void *vcookie, ns_ldap_result_t **result,
+    ns_ldap_error_t ** errorp)
 {
 	ns_ldap_cookie_t	*cookie;
 	ns_state_t		state;
@@ -3326,19 +3642,15 @@ __ns_ldap_nextEntry(
 	cookie->result = NULL;
 	*result = NULL;
 
+	if (cookie->conn_user != NULL) {
+		rc = __s_api_setup_getnext(cookie->conn_user,
+		    &cookie->err_rc, errorp);
+		if (rc != NS_LDAP_SUCCESS)
+			return (rc);
+	}
+
 	state = END_PROCESS_RESULT;
 	for (;;) {
-		/*
-		 * if the ldap connection being used is shared,
-		 * ensure the thread-specific data area for setting
-		 * status is allocated
-		 */
-		if (cookie->conn->shared > 0) {
-			rc = __s_api_check_MTC_tsd();
-			if (rc != NS_LDAP_SUCCESS)
-				return (rc);
-		}
-
 		state = search_state_machine(cookie, state, ONE_STEP);
 		switch (state) {
 		case PROCESS_RESULT:
@@ -3384,6 +3696,11 @@ __ns_ldap_endEntry(
 		*errorp = cookie->errorp;
 
 	cookie->errorp = NULL;
+	if (cookie->conn_user != NULL) {
+		if (cookie->conn_user->conn_mt != NULL)
+			__s_api_conn_mt_return(cookie->conn_user);
+		__s_api_conn_user_free(cookie->conn_user);
+	}
 	delete_search_cookie(cookie);
 	cookie = NULL;
 	*vcookie = NULL;
@@ -3437,6 +3754,7 @@ __ns_ldap_auth(const ns_cred_t *auth,
 	int		rc = 0;
 	int		do_not_fail_if_new_pwd_reqd = 0;
 	int		nopasswd_acct_mgmt = 0;
+	ns_conn_user_t	*conn_user;
 
 
 #ifdef DEBUG
@@ -3447,9 +3765,17 @@ __ns_ldap_auth(const ns_cred_t *auth,
 	if (!auth)
 		return (NS_LDAP_INVALID_PARAM);
 
+	conn_user = __s_api_conn_user_init(NS_CONN_USER_AUTH,
+	    NULL, B_FALSE);
+
 	rc = __s_api_getConnection(NULL, flags | NS_LDAP_NEW_CONN,
 	    auth, &connectionId, &conp, errorp,
-	    do_not_fail_if_new_pwd_reqd, nopasswd_acct_mgmt);
+	    do_not_fail_if_new_pwd_reqd, nopasswd_acct_mgmt,
+	    conn_user);
+
+	if (conn_user != NULL)
+		__s_api_conn_user_free(conn_user);
+
 	if (rc == NS_LDAP_OP_FAILED && *errorp)
 		(void) __ns_ldap_freeError(errorp);
 
@@ -5003,18 +5329,11 @@ parse_acct_cont_resp_msg(LDAPControl **ectrls, AcctUsableResponse_t *acctResp)
 }
 
 /*
- * __ns_ldap_getAcctMgmt() is called from pam account management stack
- * for retrieving accounting information of users with no user password -
- * eg. rlogin, rsh, etc. This function uses the account management control
- * request to do a search on the server for the user in question. The
- * response control returned from the server is got from the cookie.
- * Input params: username of whose account mgmt information is to be got
- *		 pointer to hold the parsed account management information
- * Return values: NS_LDAP_SUCCESS on success or appropriate error
- *		code on failure
+ * internal function for __ns_ldap_getAcctMgmt()
  */
-int
-__ns_ldap_getAcctMgmt(const char *user, AcctUsableResponse_t *acctResp)
+static int
+getAcctMgmt(const char *user, AcctUsableResponse_t *acctResp,
+	ns_conn_user_t *conn_user)
 {
 	int		scope, rc;
 	char		ldapfilter[1024];
@@ -5032,6 +5351,7 @@ __ns_ldap_getAcctMgmt(const char *user, AcctUsableResponse_t *acctResp)
 	cookie = init_search_state_machine();
 	if (cookie == NULL)
 		return (NS_LDAP_MEMORY);
+	cookie->conn_user = conn_user;
 
 	/* see if need to follow referrals */
 	rc = __s_api_toFollowReferrals(0,
@@ -5137,5 +5457,33 @@ __ns_ldap_getAcctMgmt(const char *user, AcctUsableResponse_t *acctResp)
 out:
 	delete_search_cookie(cookie);
 
+	return (rc);
+}
+
+/*
+ * __ns_ldap_getAcctMgmt() is called from pam account management stack
+ * for retrieving accounting information of users with no user password -
+ * eg. rlogin, rsh, etc. This function uses the account management control
+ * request to do a search on the server for the user in question. The
+ * response control returned from the server is got from the cookie.
+ * Input params: username of whose account mgmt information is to be got
+ *		 pointer to hold the parsed account management information
+ * Return values: NS_LDAP_SUCCESS on success or appropriate error
+ *		code on failure
+ */
+int
+__ns_ldap_getAcctMgmt(const char *user, AcctUsableResponse_t *acctResp)
+{
+	ns_conn_user_t	*cu = NULL;
+	int		try_cnt = 0;
+	int		rc = NS_LDAP_SUCCESS;
+	ns_ldap_error_t	*error = NULL;
+
+	for (;;) {
+		if (__s_api_setup_retry_search(&cu, NS_CONN_USER_SEARCH,
+		    &try_cnt, &rc, &error) == 0)
+			break;
+		rc = getAcctMgmt(user, acctResp, cu);
+	}
 	return (rc);
 }

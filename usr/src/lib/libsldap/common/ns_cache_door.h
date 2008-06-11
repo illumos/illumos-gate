@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +69,34 @@ typedef struct ldap_strlist {
 } ldap_strlist_t;
 
 /*
+ * Structure used to request/inform config and server status changes.
+ */
+
+typedef struct ldap_get_chg_cookie {
+	pid_t		mgr_pid;  /* current process id of ldap_cachemgr */
+	uint32_t	seq_num;  /* current config sequence number */
+} ldap_get_chg_cookie_t;
+
+typedef struct ldap_get_change {
+	uint32_t		op;	/* start or stop */
+	ldap_get_chg_cookie_t	cookie;	/* get status change cookie */
+} ldap_get_change_t;
+
+typedef struct ldap_get_change_out {
+	uint32_t	type;		 /* config change or server change */
+	ldap_get_chg_cookie_t cookie;    /* get status change cookie */
+	uint32_t	server_count;	 /* if server change: num of servers */
+	uint32_t	data_size;	 /* if server change: size of data */
+	char 		data[sizeof (int)]; /* real size is data_size */
+} ldap_get_change_out_t;
+
+typedef struct ldap_config_out {
+	ldap_get_chg_cookie_t cookie;    /* get status change cookie */
+	uint32_t	data_size;	 /* length of the config string */
+	char 		config_str[sizeof (int)]; /* real size is data_size */
+} ldap_config_out_t;
+
+/*
  * structure returned by server for all calls
  */
 
@@ -86,6 +114,8 @@ typedef struct {
 		char 		buff[4];
 		char 		ber[4];		/* BER/DER encoded packet */
 		ldap_strlist_t	strlist;
+		ldap_config_out_t config_str;
+		ldap_get_change_out_t changes;
 	} ldap_u;
 
 } ldap_return_t;
@@ -107,6 +137,7 @@ typedef struct {
 		} addr;
 		char servername[sizeof (int)]; 	/* Format: server:port */
 		ldap_strlist_t	strlist;
+		ldap_get_change_t get_change;
 	} ldap_u;
 } ldap_call_t;
 /*
@@ -154,6 +185,8 @@ typedef union {
 #define	SETCACHE	23
 	/* NativeLDAP II get cache data statistics */
 #define	GETCACHESTAT	24
+	/* Configuration change or server status change notification */
+#define	GETSTATUSCHANGE	25
 
 /*
  * GETLDAPSERVER request flags
@@ -166,6 +199,23 @@ typedef union {
 #define	NS_CACHE_ADDR_HOSTNAME	"H"
 #define	NS_CACHE_ADDR_IP	"I"
 
+/*
+ * GETSTATUSCHANGE operation: start or stop
+ */
+#define	NS_STATUS_CHANGE_OP_START	1
+#define	NS_STATUS_CHANGE_OP_STOP	2
+
+/*
+ * GETSTATUSCHANGE change type: config or server
+ */
+#define	NS_STATUS_CHANGE_TYPE_CONFIG	1
+#define	NS_STATUS_CHANGE_TYPE_SERVER	2
+
+/*
+ * Server status change
+ */
+#define	NS_SERVER_CHANGE_UP	"0"	/* mapped to NS_SERVER_UP */
+#define	NS_SERVER_CHANGE_DOWN	"1"	/* mapped to NS_SERVER_DOWN */
 /*
  * GETCACHE/SETCACHE data flags
  */
@@ -186,14 +236,20 @@ typedef union {
 #define	LDAP_CACHE_DOOR_COOKIE ((void*)(0xdeadbeef^LDAP_CACHE_DOOR_VERSION))
 #define	UPDATE_DOOR_COOKIE ((void*)(0xdeadcafe)
 
-#define	SUCCESS		0
-#define	NOTFOUND  	-1
-#define	CREDERROR 	-2
-#define	SERVERERROR 	-3
-#define	NOSERVER 	-4
+#define	NS_CACHE_SUCCESS	0
+#define	NS_CACHE_NOTFOUND  	-1
+#define	NS_CACHE_CREDERROR 	-2
+#define	NS_CACHE_SERVERERROR 	-3
+#define	NS_CACHE_NOSERVER 	-4
 
 int
 __ns_ldap_trydoorcall(ldap_data_t **dptr, int *ndata, int *adata);
+int
+__ns_ldap_trydoorcall_getfd();
+int
+__ns_ldap_trydoorcall_send(ldap_data_t **dptr, int *ndata, int *adata);
+void
+__ns_ldap_doorfd_close();
 
 #ifdef	__cplusplus
 }

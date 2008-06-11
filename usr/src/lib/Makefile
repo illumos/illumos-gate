@@ -532,7 +532,7 @@ libsip:		libmd5
 libsmbfs:	libsocket libnsl libkrb5
 libsocket:	libnsl
 libldap5:	libsasl libsocket libnsl libmd
-libsldap:	libldap5 libtsol
+libsldap:	libldap5 libtsol libnsl libc libscf libresolv
 libpool:	libnvpair libexacct
 libpp:		libast
 libzonecfg:	libc libsocket libnsl libuuid libnvpair libsysevent libsec \

@@ -2,12 +2,13 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 
 echo_file usr/src/lib/libsldap/common/ns_sldap.h
 echo_file usr/src/lib/libsldap/common/ns_internal.h
+echo_file usr/src/lib/libsldap/common/ns_cache_door.h
 echo_file usr/src/lib/libnsl/include/rpcsvc/nis_dhext.h
 echo_file usr/src/lib/libldap5/include/ldap/solaris-int.h
 echo_file usr/src/lib/libldap5/include/ldap/ldif.h

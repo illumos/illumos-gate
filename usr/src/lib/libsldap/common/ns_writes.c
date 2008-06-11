@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,9 +41,11 @@
 
 #include "ns_sldap.h"
 #include "ns_internal.h"
+#include "ns_connmgmt.h"
 
 /* Additional headers for addTypedEntry Conversion routines */
 #include <pwd.h>
+#include <project.h>
 #include <shadow.h>
 #include <grp.h>
 #include <netinet/in.h>
@@ -168,15 +170,13 @@ init_bval_mod(
 	 * assume single value,
 	 * since only one value/length pair passed in
 	 */
-	bmodval = (struct berval **)calloc(2,
-			sizeof (struct berval *));
+	bmodval = (struct berval **)calloc(2, sizeof (struct berval *));
 	if (bmodval == NULL) {
 		free(mod->mod_type);
 		mod->mod_type = NULL;
 		return	(-1);
 	}
-	bmodval[0] = (struct berval *)calloc(1,
-			sizeof (struct berval));
+	bmodval[0] = (struct berval *)calloc(1, sizeof (struct berval));
 	if (bmodval[0] == NULL) {
 		free(mod->mod_type);
 		mod->mod_type = NULL;
@@ -215,8 +215,7 @@ freeModList(LDAPMod **mods)
 		/* free attribute name */
 		name_is_oc = FALSE;
 		if (mods[i]->mod_type) {
-			if (strcasecmp(mods[i]->mod_type,
-				"objectclass") == 0)
+			if (strcasecmp(mods[i]->mod_type, "objectclass") == 0)
 				name_is_oc = TRUE;
 			free(mods[i]->mod_type);
 		}
@@ -313,8 +312,7 @@ __s_api_makeModListCount(
 		/*
 		 * Perform attribute mapping if necessary.
 		 */
-		if (schema_mapping_existed &&
-			(flags & NS_LDAP_NOMAP) == 0) {
+		if (schema_mapping_existed && (flags & NS_LDAP_NOMAP) == 0) {
 			mapping = __ns_ldap_getMappedAttributes(service,
 			    attr[k]->attrname);
 		} else
@@ -333,10 +331,9 @@ __s_api_makeModListCount(
 		}
 
 		if (mapping == NULL) {
-		    mods[i]->mod_type = strdup(attr[k]->attrname);
-		    if (mods[i]->mod_type == NULL) {
-			goto free_memory;
-		    }
+			mods[i]->mod_type = strdup(attr[k]->attrname);
+			if (mods[i]->mod_type == NULL)
+				goto free_memory;
 		} else {
 			/*
 			 * 1 to N attribute mapping is only done for "gecos",
@@ -378,11 +375,11 @@ __s_api_makeModListCount(
 			 *
 			 * notes: in case c2 and c3, ... could still contain ","
 			 */
-		    if (strcasecmp(service, "passwd") == 0 &&
-			strcasecmp(attr[k]->attrname, "gecos") == 0 &&
-			mapping[1] && attr[k]->attrvalue[0] &&
-			(comma1 = strchr(attr[k]->attrvalue[0],
-			COMMATOK)) != NULL) {
+			if (strcasecmp(service, "passwd") == 0 &&
+			    strcasecmp(attr[k]->attrname, "gecos") == 0 &&
+			    mapping[1] && attr[k]->attrvalue[0] &&
+			    (comma1 = strchr(attr[k]->attrvalue[0],
+			    COMMATOK)) != NULL) {
 
 			/* is there a second comma? */
 			if (*(comma1 + 1) != '\0')
@@ -393,8 +390,7 @@ __s_api_makeModListCount(
 			 * case c2: mapped to two attributes or just
 			 * one comma
 			 */
-			if (mapping[2] == NULL ||
-				comma2 == NULL) {
+			if (mapping[2] == NULL || comma2 == NULL) {
 				/* case c2 */
 
 				/*
@@ -405,7 +401,7 @@ __s_api_makeModListCount(
 
 				if (vlen > 0 && c) {
 					rc = init_bval_mod(mods[i], mod_op,
-						mapping[0], c, vlen);
+					    mapping[0], c, vlen);
 					if (rc != 0)
 						goto free_memory;
 				} else {
@@ -431,15 +427,17 @@ __s_api_makeModListCount(
 				 * get pointer to data.
 				 * Skip leading spaces.
 				 */
-				for (c = comma1 + 1; *c == SPACETOK; c++);
+				for (c = comma1 + 1; *c == SPACETOK; c++) {
+					/* empty */
+				}
 
 				/* get data length */
 				vlen = strlen(attr[k]->attrvalue[0]) -
-					(c - attr[k]->attrvalue[0]);
+				    (c - attr[k]->attrvalue[0]);
 
 				if (vlen > 0 && c) {
 					rc = init_bval_mod(mods[i], mod_op,
-						mapping[1], c, vlen);
+					    mapping[1], c, vlen);
 					if (rc != 0)
 						goto free_memory;
 				} else {
@@ -464,7 +462,7 @@ __s_api_makeModListCount(
 
 				if (vlen > 0 && c) {
 					rc = init_bval_mod(mods[i], mod_op,
-						mapping[0], c, vlen);
+					    mapping[0], c, vlen);
 					if (rc != 0)
 						goto free_memory;
 				} else {
@@ -483,14 +481,16 @@ __s_api_makeModListCount(
 				 * get pointer to data.
 				 * Skip leading spaces.
 				 */
-				for (c = comma1 + 1; *c == SPACETOK; c++);
+				for (c = comma1 + 1; *c == SPACETOK; c++) {
+					/* empty */
+				};
 
 				/* get data length */
 				vlen = comma2 - c;
 
 				if (vlen > 0 && c) {
 					rc = init_bval_mod(mods[i], mod_op,
-						mapping[1], c, vlen);
+					    mapping[1], c, vlen);
 					if (rc != 0)
 						goto free_memory;
 				} else {
@@ -514,15 +514,17 @@ __s_api_makeModListCount(
 				 * get pointer to data.
 				 * Skip leading spaces.
 				 */
-				for (c = comma2 + 1; *c == SPACETOK; c++);
+				for (c = comma2 + 1; *c == SPACETOK; c++) {
+					/* empty */
+				}
 
 				/* get data length */
 				vlen = strlen(attr[k]->attrvalue[0]) -
-					(c - attr[k]->attrvalue[0]);
+				    (c - attr[k]->attrvalue[0]);
 
 				if (vlen > 0 && c) {
 					rc = init_bval_mod(mods[i], mod_op,
-						mapping[2], c, vlen);
+					    mapping[2], c, vlen);
 					if (rc != 0)
 						goto free_memory;
 				} else {
@@ -536,20 +538,20 @@ __s_api_makeModListCount(
 				mapping = NULL;
 
 				continue;
+				}
 			}
-		    }
 
-		    /* case c1 */
-		    mods[i]->mod_type = strdup(mapping[0]);
-		    if (mods[i]->mod_type == NULL) {
+			/* case c1 */
+			mods[i]->mod_type = strdup(mapping[0]);
+			if (mods[i]->mod_type == NULL) {
 				goto free_memory;
-		    }
-		    __s_api_free2dArray(mapping);
-		    mapping = NULL;
+			}
+			__s_api_free2dArray(mapping);
+			mapping = NULL;
 		}
 
 		modval = (char **)calloc(attr[k]->value_count+1,
-				sizeof (char *));
+		    sizeof (char *));
 		if (modval == NULL)
 			goto free_memory;
 		/*
@@ -562,30 +564,30 @@ __s_api_makeModListCount(
 		if (strcasecmp(mods[i]->mod_type, "objectclass") == 0) {
 			for (j = 0; j < attr[k]->value_count; j++) {
 				if (schema_mapping_existed &&
-					(flags & NS_LDAP_NOMAP) == 0)
+				    (flags & NS_LDAP_NOMAP) == 0)
 					mapping =
-					__ns_ldap_getMappedObjectClass(
-					service, attr[k]->attrvalue[j]);
+					    __ns_ldap_getMappedObjectClass(
+					    service, attr[k]->attrvalue[j]);
 				else
 					mapping = NULL;
 
 				if (mapping == NULL && auto_service &&
-					(flags & NS_LDAP_NOMAP) == 0)
+				    (flags & NS_LDAP_NOMAP) == 0)
 					/*
 					 * if service == auto_xxx and
 					 * no mapped objectclass is found
 					 * then try automount
 					 */
 					mapping =
-					__ns_ldap_getMappedObjectClass(
-					"automount", attr[k]->attrvalue[j]);
+					    __ns_ldap_getMappedObjectClass(
+					    "automount", attr[k]->attrvalue[j]);
 
 				if (mapping && mapping[0]) {
 					/* assume single mapping */
 					modval[j] = strdup(mapping[0]);
 				} else {
 					modval[j] = strdup(attr[k]->
-							attrvalue[j]);
+					    attrvalue[j]);
 				}
 				if (modval[j] == NULL)
 					goto free_memory;
@@ -686,10 +688,26 @@ write_state_machine(
 	int		i = 0;
 	int		ldap_error;
 	int		nopasswd_acct_mgmt = 0;
+	ns_conn_user_t	*conn_user = NULL;
 
 	while (always) {
 		switch (state) {
 		case W_EXIT:
+			/* return the MT connection and free the conn user */
+			if (conn_user != NULL) {
+				if (conn_user->use_mt_conn == B_TRUE) {
+					if (conn_user->ns_error != NULL) {
+						*errorp = conn_user->ns_error;
+						conn_user->ns_error = NULL;
+						return_rc = conn_user->ns_rc;
+					}
+					if (conn_user->conn_mt != NULL)
+						__s_api_conn_mt_return(
+						    conn_user);
+				}
+				__s_api_conn_user_free(conn_user);
+			}
+
 			if (connectionId > -1)
 				DropConnection(connectionId, NS_LDAP_NEW_CONN);
 			if (ref_list)
@@ -700,7 +718,7 @@ write_state_machine(
 		case W_INIT:
 			/* see if need to follow referrals */
 			rc = __s_api_toFollowReferrals(flags,
-				&followRef, errorp);
+			    &followRef, errorp);
 			if (rc != NS_LDAP_SUCCESS) {
 				return_rc = rc;
 				new_state = W_ERROR;
@@ -709,9 +727,8 @@ write_state_machine(
 			len = strlen(dn);
 			if (dn[len-1] == COMMATOK)
 				rc = __s_api_append_default_basedn(
-					dn, &target_dn,
-					&target_dn_allocated,
-					errorp);
+				    dn, &target_dn, &target_dn_allocated,
+				    errorp);
 			else
 				target_dn = dn;
 			if (rc != NS_LDAP_SUCCESS) {
@@ -722,14 +739,13 @@ write_state_machine(
 				new_state = GET_CONNECTION;
 			break;
 		case GET_CONNECTION:
+			/* identify self as a write user */
+			conn_user = __s_api_conn_user_init(NS_CONN_USER_WRITE,
+			    NULL, B_FALSE);
 			rc = __s_api_getConnection(NULL,
-				flags | NS_LDAP_NEW_CONN,
-				cred,
-				&connectionId,
-				&conp,
-				errorp,
-				do_not_fail_if_new_pwd_reqd,
-				nopasswd_acct_mgmt);
+			    flags, cred, &connectionId, &conp, errorp,
+			    do_not_fail_if_new_pwd_reqd, nopasswd_acct_mgmt,
+			    conn_user);
 
 			/*
 			 * If password control attached
@@ -740,8 +756,7 @@ write_state_machine(
 			 * Reset rc to NS_LDAP_SUCCESS.
 			 */
 			if (rc == NS_LDAP_SUCCESS_WITH_INFO) {
-				(void) __ns_ldap_freeError(
-					errorp);
+				(void) __ns_ldap_freeError(errorp);
 				*errorp = NULL;
 				rc = NS_LDAP_SUCCESS;
 			}
@@ -774,39 +789,39 @@ write_state_machine(
 			break;
 		case DO_ADD_SYNC:
 			rc = ldap_add_ext_s(conp->ld, target_dn,
-				mods, NULL, NULL);
+			    mods, NULL, NULL);
 			new_state = GET_RESULT_SYNC;
 			break;
 		case DO_DELETE_SYNC:
 			rc = ldap_delete_ext_s(conp->ld, target_dn,
-				NULL, NULL);
+			    NULL, NULL);
 			new_state = GET_RESULT_SYNC;
 			break;
 		case DO_MODIFY_SYNC:
 			rc = ldap_modify_ext_s(conp->ld, target_dn,
-				mods, NULL, NULL);
+			    mods, NULL, NULL);
 			new_state = GET_RESULT_SYNC;
 			break;
 		case DO_ADD_ASYNC:
 			rc = ldap_add_ext(conp->ld, target_dn,
-				mods, NULL, NULL, &msgid);
+			    mods, NULL, NULL, &msgid);
 			new_state = GET_RESULT_ASYNC;
 			break;
 		case DO_DELETE_ASYNC:
 			rc = ldap_delete_ext(conp->ld, target_dn,
-				NULL, NULL, &msgid);
+			    NULL, NULL, &msgid);
 			new_state = GET_RESULT_ASYNC;
 			break;
 		case DO_MODIFY_ASYNC:
 			rc = ldap_modify_ext(conp->ld, target_dn,
-				mods, NULL, NULL, &msgid);
+			    mods, NULL, NULL, &msgid);
 			new_state = GET_RESULT_ASYNC;
 			break;
 		case GET_RESULT_SYNC:
 			if (rc != LDAP_SUCCESS) {
 				Errno = rc;
 				(void) ldap_get_lderrno(conp->ld,
-					NULL, &errmsg);
+				    NULL, &errmsg);
 				/*
 				 * free errmsg if it is an empty string
 				 */
@@ -822,7 +837,7 @@ write_state_machine(
 			break;
 		case GET_RESULT_ASYNC:
 			rc = ldap_result(conp->ld, msgid, 1,
-				(struct timeval *)NULL, &res);
+			    (struct timeval *)NULL, &res);
 			/* if no server response, set Errno */
 			if (rc == -1) {
 				(void) ldap_get_option(conp->ld,
@@ -830,9 +845,8 @@ write_state_machine(
 				new_state = W_LDAP_ERROR;
 				break;
 			}
-			if (rc == LDAP_RES_ADD ||
-				rc == LDAP_RES_MODIFY ||
-				rc == LDAP_RES_DELETE) {
+			if (rc == LDAP_RES_ADD || rc == LDAP_RES_MODIFY ||
+			    rc == LDAP_RES_DELETE) {
 				new_state = PARSE_RESULT;
 				break;
 			} else {
@@ -846,10 +860,8 @@ write_state_machine(
 			 * and the last "1" is to free
 			 * the result (res)
 			 */
-			rc = ldap_parse_result(conp->ld,
-				res, &Errno,
-				NULL, &errmsg,
-				&referrals, NULL, 1);
+			rc = ldap_parse_result(conp->ld, res, &Errno,
+			    NULL, &errmsg, &referrals, NULL, 1);
 			/*
 			 * free errmsg if it is an empty string
 			 */
@@ -871,9 +883,8 @@ write_state_machine(
 				for (i = 0; referrals[i] != NULL; i++) {
 					/* add to referral list */
 					rc = __s_api_addRefInfo(&ref_list,
-						referrals[i],
-						NULL, NULL, NULL,
-						conp->ld);
+					    referrals[i], NULL, NULL, NULL,
+					    conp->ld);
 					if (rc != NS_LDAP_SUCCESS) {
 						__s_api_deleteRefInfo(ref_list);
 						ref_list = NULL;
@@ -913,14 +924,22 @@ write_state_machine(
 				(void) __ns_ldap_freeError(errorp);
 			if (connectionId > -1)
 				DropConnection(connectionId, NS_LDAP_NEW_CONN);
+
+			/* set it up to use a referral connection */
+			if (conn_user != NULL) {
+				/*
+				 * If an MT connection is being used,
+				 * return it to the pool.
+				 */
+				if (conn_user->conn_mt != NULL)
+					__s_api_conn_mt_return(conn_user);
+
+				conn_user->referral = B_TRUE;
+			}
 			rc = __s_api_getConnection(current_ref->refHost,
-				0,
-				cred,
-				&connectionId,
-				&conp,
-				errorp,
-				do_not_fail_if_new_pwd_reqd,
-				nopasswd_acct_mgmt);
+			    0, cred, &connectionId, &conp, errorp,
+			    do_not_fail_if_new_pwd_reqd,
+			    nopasswd_acct_mgmt, conn_user);
 
 			/*
 			 * If password control attached
@@ -931,8 +950,7 @@ write_state_machine(
 			 * Reset rc to NS_LDAP_SUCCESS.
 			 */
 			if (rc == NS_LDAP_SUCCESS_WITH_INFO) {
-				(void) __ns_ldap_freeError(
-					errorp);
+				(void) __ns_ldap_freeError(errorp);
 				*errorp = NULL;
 				rc = NS_LDAP_SUCCESS;
 			}
@@ -946,28 +964,28 @@ write_state_machine(
 				 * Get LDAP error code from errorp.
 				 */
 				if (*errorp != NULL) {
+					ns_write_state_t get_ref =
+					    GET_REFERRAL_CONNECTION;
+
 					ldap_error = (*errorp)->status;
 					if (ldap_error == LDAP_BUSY ||
 					    ldap_error == LDAP_UNAVAILABLE ||
 					    ldap_error ==
-						LDAP_UNWILLING_TO_PERFORM ||
+					    LDAP_UNWILLING_TO_PERFORM ||
 					    ldap_error == LDAP_CONNECT_ERROR ||
 					    ldap_error == LDAP_SERVER_DOWN) {
 						current_ref = current_ref->next;
 						if (current_ref == NULL) {
-						    /* no more referral */
-						    /* to follow */
-						    new_state = W_ERROR;
-						} else {
-						    new_state =
-							GET_REFERRAL_CONNECTION;
-						}
+						/* no more referral to follow */
+							new_state = W_ERROR;
+						} else
+							new_state = get_ref;
 						/*
 						 * free errorp before going to
 						 * next referral
 						 */
 						(void) __ns_ldap_freeError(
-							errorp);
+						    errorp);
 						*errorp = NULL;
 						break;
 					}
@@ -981,6 +999,8 @@ write_state_machine(
 				__s_api_deleteRefInfo(ref_list);
 				ref_list = NULL;
 				new_state = W_ERROR;
+				if (conn_user != NULL)
+					conn_user->referral = B_FALSE;
 				break;
 			}
 			/* target DN may changed due to referrals */
@@ -1008,24 +1028,29 @@ write_state_machine(
 				 * password management
 				 */
 				passwd_mgmt =
-					__s_api_contain_passwd_control_oid(
-						conp->controls);
+				    __s_api_contain_passwd_control_oid(
+				    conp->controls);
 					if (passwd_mgmt)
 						pwd_status =
-						__s_api_set_passwd_status(
-						Errno, errmsg);
+						    __s_api_set_passwd_status(
+						    Errno, errmsg);
 				ldap_memfree(errmsg);
 				errmsg = NULL;
 			}
 
 			(void) sprintf(errstr,
-				gettext(ldap_err2string(Errno)));
+			    gettext(ldap_err2string(Errno)));
 			err = strdup(errstr);
 			if (pwd_status != NS_PASSWD_GOOD) {
 				MKERROR_PWD_MGMT(*errorp, Errno, err,
-					pwd_status, 0, NULL);
+				    pwd_status, 0, NULL);
 			} else {
 				MKERROR(LOG_INFO, *errorp, Errno, err, NULL);
+			}
+			if (conn_user != NULL &&
+			    (Errno == LDAP_SERVER_DOWN ||
+			    Errno == LDAP_CONNECT_ERROR)) {
+				__s_api_conn_mt_close(conn_user, Errno, errorp);
 			}
 			return_rc = NS_LDAP_INTERNAL;
 			new_state = W_EXIT;
@@ -1033,9 +1058,9 @@ write_state_machine(
 		case W_ERROR:
 		default:
 			(void) sprintf(errstr,
-				gettext("Internal write State machine exit"
-					" (state = %d, rc = %d)."),
-					err_state, return_rc);
+			    gettext("Internal write State machine exit"
+			    " (state = %d, rc = %d)."),
+			    err_state, return_rc);
 			err = strdup(errstr);
 			MKERROR(LOG_WARNING, *errorp, return_rc, err, NULL);
 			new_state = W_EXIT;
@@ -1044,6 +1069,12 @@ write_state_machine(
 
 		if (new_state == W_ERROR)
 			err_state = state;
+
+		if (conn_user != NULL && conn_user->bad_mt_conn == B_TRUE) {
+			__s_api_conn_mt_close(conn_user, 0, NULL);
+			new_state = W_EXIT;
+		}
+
 		state = new_state;
 	}
 
@@ -1391,7 +1422,7 @@ __s_cvt_passwd(const void *data, char **rdn,
 	}
 
 	if (ptr->pw_passwd != NULL &&
-		ptr->pw_passwd[0] != '\0') {
+	    ptr->pw_passwd[0] != '\0') {
 		rc = __s_add_attr(e, "userPassword", ptr->pw_passwd);
 		if (rc != NS_LDAP_SUCCESS) {
 			__s_cvt_freeEntryRdn(entry, rdn);
@@ -1413,7 +1444,7 @@ __s_cvt_passwd(const void *data, char **rdn,
 		return (rc);
 	}
 	if (ptr->pw_gecos != NULL &&
-		ptr->pw_gecos[0] != '\0') {
+	    ptr->pw_gecos[0] != '\0') {
 		rc = __s_add_attr(e, "gecos", ptr->pw_gecos);
 		if (rc != NS_LDAP_SUCCESS) {
 			__s_cvt_freeEntryRdn(entry, rdn);
@@ -1427,7 +1458,7 @@ __s_cvt_passwd(const void *data, char **rdn,
 		return (rc);
 	}
 	if (ptr->pw_shell != NULL &&
-		ptr->pw_shell[0] != '\0') {
+	    ptr->pw_shell[0] != '\0') {
 		rc = __s_add_attr(e, "loginShell", ptr->pw_shell);
 		if (rc != NS_LDAP_SUCCESS) {
 			__s_cvt_freeEntryRdn(entry, rdn);
@@ -1438,6 +1469,118 @@ __s_cvt_passwd(const void *data, char **rdn,
 	return (NS_LDAP_SUCCESS);
 }
 
+/*
+ * Conversion:			project
+ * Input format:		struct project
+ * Exported objectclass:	SolarisProject
+ */
+static int
+__s_cvt_project(const void *data, char **rdn,
+	ns_ldap_entry_t **entry, ns_ldap_error_t **errorp)
+{
+	ns_ldap_entry_t	*e;
+	int		rc;
+	char		trdn[RDNSIZE];
+
+	/* routine specific */
+	struct project	*ptr;
+	int		max_attr = 9;
+	char		ibuf[11];
+	static char 	*oclist[] = {
+			"SolarisProject",
+			"top",
+			NULL
+			};
+
+	if (data == NULL || rdn == NULL || entry == NULL || errorp == NULL)
+		return (NS_LDAP_OP_FAILED);
+
+	*entry = e = __s_mk_entry(oclist, max_attr);
+	if (e == NULL)
+		return (NS_LDAP_MEMORY);
+
+	/* Convert the structure */
+	ptr = (struct project *)data;
+
+	if (ptr->pj_name == NULL || ptr->pj_projid > MAXUID) {
+		__ns_ldap_freeEntry(e);
+		*entry = NULL;
+		return (NS_LDAP_INVALID_PARAM);
+	}
+
+	/* Create an appropriate rdn */
+	(void) snprintf(trdn, RDNSIZE, "SolarisProjectName=%s", ptr->pj_name);
+	*rdn = strdup(trdn);
+	if (*rdn == NULL) {
+		__ns_ldap_freeEntry(e);
+		*entry = NULL;
+		return (NS_LDAP_MEMORY);
+	}
+
+	/* Error check the data and add the attributes */
+
+	/* Project name */
+	rc = __s_add_attr(e, "SolarisProjectName", ptr->pj_name);
+	if (rc != NS_LDAP_SUCCESS) {
+		__s_cvt_freeEntryRdn(entry, rdn);
+		return (rc);
+	}
+
+	/*
+	 * Project ID:
+	 * ibuf is 11 chars big, which should be enough for string
+	 * representation of 32bit number + nul-car
+	 */
+	if (snprintf(ibuf, sizeof (ibuf), "%u", ptr->pj_projid) < 0) {
+		__s_cvt_freeEntryRdn(entry, rdn);
+		return (NS_LDAP_INVALID_PARAM);
+	}
+	rc = __s_add_attr(e, "SolarisProjectID", ibuf);
+	if (rc != NS_LDAP_SUCCESS) {
+		__s_cvt_freeEntryRdn(entry, rdn);
+		return (rc);
+	}
+
+	/* Comment/Description */
+	if (ptr->pj_comment != NULL && ptr->pj_comment[0] != '\0') {
+		rc = __s_add_attr(e, "description", ptr->pj_comment);
+		if (rc != NS_LDAP_SUCCESS) {
+			__s_cvt_freeEntryRdn(entry, rdn);
+			return (rc);
+		}
+	}
+
+	/* Attributes */
+	if (ptr->pj_attr != NULL && ptr->pj_attr[0] != '\0') {
+		rc = __s_add_attr(e, "SolarisProjectAttr", ptr->pj_attr);
+		if (rc != NS_LDAP_SUCCESS) {
+			__s_cvt_freeEntryRdn(entry, rdn);
+			return (rc);
+		}
+	}
+
+	/* Users */
+	if (ptr->pj_users != NULL) {
+		rc = __s_add_attrlist(e, "memberUid", ptr->pj_users);
+		if (rc != NS_LDAP_SUCCESS) {
+			__s_cvt_freeEntryRdn(entry, rdn);
+			return (rc);
+		}
+	}
+
+	/* Groups */
+	if (ptr->pj_groups != NULL) {
+		rc = __s_add_attrlist(e, "memberGid", ptr->pj_groups);
+		if (rc != NS_LDAP_SUCCESS) {
+			__s_cvt_freeEntryRdn(entry, rdn);
+			return (rc);
+		}
+	}
+
+
+
+	return (NS_LDAP_SUCCESS);
+}
 /*
  * Conversion:			shadow
  * Input format:		struct shadow
@@ -2019,7 +2162,7 @@ __s_cvt_services(const void *data, char **rdn,
 
 	/* Create an appropriate rdn */
 	(void) snprintf(trdn, RDNSIZE, "cn=%s+ipServiceProtocol=%s",
-				ptr->s_name, ptr->s_proto);
+	    ptr->s_name, ptr->s_proto);
 	*rdn = strdup(trdn);
 	if (*rdn == NULL) {
 		__ns_ldap_freeEntry(e);
@@ -2111,10 +2254,10 @@ __s_cvt_networks(const void *data, char **rdn,
 	}
 
 	(void) snprintf(cp, sizeof (cp), "%d.%d.%d.%d",
-			(ptr->n_net & 0xFF000000) >> 24,
-			(ptr->n_net & 0x00FF0000) >> 16,
-			(ptr->n_net & 0x0000FF00) >> 8,
-			(ptr->n_net & 0x000000FF));
+	    (ptr->n_net & 0xFF000000) >> 24,
+	    (ptr->n_net & 0x00FF0000) >> 16,
+	    (ptr->n_net & 0x0000FF00) >> 8,
+	    (ptr->n_net & 0x000000FF));
 
 	/* Create an appropriate rdn */
 	(void) snprintf(trdn, RDNSIZE, "ipNetworkNumber=%s", cp);
@@ -2505,7 +2648,7 @@ modify_ethers_bootp(
 	ns_ldap_error_t	 *new_errorp = NULL;
 
 	if (rdn == NULL || fulldn == NULL || attrlist == NULL ||
-		errorp == NULL || service == NULL)
+	    errorp == NULL || service == NULL)
 		return (NS_LDAP_OP_FAILED);
 
 	bzero(&new_attrlist, sizeof (new_attrlist));
@@ -2517,19 +2660,17 @@ modify_ethers_bootp(
 	new_attrlist[0]->value_count = 1;
 	if (strcasecmp(service, "ethers") == NULL) {
 		(void) snprintf(&filter[0], sizeof (filter),
-			"(&(objectClass=ieee802Device)(%s))",
-			rdn);
+		    "(&(objectClass=ieee802Device)(%s))", rdn);
 		new_attrlist[0]->attrvalue[0] = "ieee802Device";
 	} else {
 		(void) snprintf(&filter[0], sizeof (filter),
-			"(&(objectClass=bootableDevice)(%s))",
-			rdn);
+		    "(&(objectClass=bootableDevice)(%s))", rdn);
 		new_attrlist[0]->attrvalue[0] = "bootableDevice";
 	}
 
 	rc =  __ns_ldap_list(service, filter, NULL, (const char **)NULL,
-		NULL, NS_LDAP_SCOPE_SUBTREE, &resultp, &new_errorp,
-		NULL, NULL);
+	    NULL, NS_LDAP_SCOPE_SUBTREE, &resultp, &new_errorp,
+	    NULL, NULL);
 
 	switch (rc) {
 	case NS_LDAP_SUCCESS:
@@ -2549,9 +2690,9 @@ modify_ethers_bootp(
 			/* aptr2 needed here to avoid lint warning */
 			aptr2 = (ns_ldap_attr_t *)*aptr++;
 			if ((strcasecmp(aptr2->attrname, "cn") != 0) &&
-				(strcasecmp(aptr2->attrname,
-					"objectclass") != 0)) {
-				    new_attrlist[i++] =	(ns_ldap_attr_t *)aptr2;
+			    (strcasecmp(aptr2->attrname,
+			    "objectclass") != 0)) {
+				new_attrlist[i++] = (ns_ldap_attr_t *)aptr2;
 			}
 		}
 
@@ -2565,7 +2706,7 @@ modify_ethers_bootp(
 		/* clean errorp first */
 		(void) __ns_ldap_freeError(errorp);
 		rc =  __ns_ldap_addAttr(service, fulldn, aptr, cred, flags,
-			errorp);
+		    errorp);
 		break;
 	default:
 		/*
@@ -2753,7 +2894,7 @@ __s_cvt_auto_mount(const void *data, char **rdn,
 	/* determine profile version number */
 	rc = __ns_ldap_getParam(NS_LDAP_FILE_VERSION_P, &paramVal, errorp);
 	if (paramVal && *paramVal &&
-		strcasecmp(*paramVal, NS_LDAP_VERSION_1) == 0)
+	    strcasecmp(*paramVal, NS_LDAP_VERSION_1) == 0)
 		version1 = 1;
 	if (paramVal)
 		(void) __ns_ldap_freeParam(&paramVal);
@@ -2781,7 +2922,7 @@ __s_cvt_auto_mount(const void *data, char **rdn,
 
 	/* Create an appropriate rdn */
 	(void) snprintf(trdn, RDNSIZE, version1 ? "cn=%s" : "automountKey=%s",
-		ptr->key);
+	    ptr->key);
 	*rdn = strdup(trdn);
 	if (*rdn == NULL) {
 		__ns_ldap_freeEntry(e);
@@ -2791,7 +2932,7 @@ __s_cvt_auto_mount(const void *data, char **rdn,
 
 	if (ptr->key != '\0') {
 		rc = __s_add_attr(e, version1 ? "cn" : "automountKey",
-		(char *)ptr->key);
+		    (char *)ptr->key);
 		if (rc != NS_LDAP_SUCCESS) {
 			__s_cvt_freeEntryRdn(entry, rdn);
 			return (rc);
@@ -2799,7 +2940,7 @@ __s_cvt_auto_mount(const void *data, char **rdn,
 	}
 
 	rc = __s_add_attr(e, version1 ? "nisMapEntry" : "automountInformation",
-		(char *)ptr->value);
+	    (char *)ptr->value);
 	if (rc != NS_LDAP_SUCCESS) {
 		__s_cvt_freeEntryRdn(entry, rdn);
 		return (rc);
@@ -2811,7 +2952,7 @@ __s_cvt_auto_mount(const void *data, char **rdn,
 	 */
 	mappedschema = __ns_ldap_getMappedObjectClass("automount", "automount");
 	if (mappedschema && mappedschema[0] &&
-		strcasecmp(mappedschema[0], "nisObject") == 0)
+	    strcasecmp(mappedschema[0], "nisObject") == 0)
 		version1 = 1;
 	if (mappedschema)
 		__s_api_free2dArray(mappedschema);
@@ -3411,6 +3552,7 @@ static __ns_cvt_type_t __s_cvtlist[] = {
 	{ NS_LDAP_TYPE_AUUSER,		AE, __s_cvt_audituser },
 	{ NS_LDAP_TYPE_TNRHTP,		0,  __s_cvt_tnrhtp },
 	{ NS_LDAP_TYPE_TNRHDB,		0,  __s_cvt_tnrhdb },
+	{ NS_LDAP_TYPE_PROJECT,		0,  __s_cvt_project },
 	{ NULL,				0, NULL },
 };
 
@@ -3570,15 +3712,15 @@ int  __ns_ldap_addTypedEntry(
 			    cred, flags, errorp);
 		else {
 			rc = __ns_ldap_repAttr(service, fulldn, modattrlist,
-					cred, flags, errorp);
+			    cred, flags, errorp);
 			if (rc == NS_LDAP_INTERNAL && *errorp &&
 			    (*errorp)->status == LDAP_NO_SUCH_OBJECT) {
 				(void) __ns_ldap_freeError(errorp);
 				rc = __ns_ldap_addEntry(service, fulldn,
 				    entry, cred, flags, errorp);
 				if (rc == NS_LDAP_INTERNAL && *errorp &&
-				(*errorp)->status ==
-					LDAP_OBJECT_CLASS_VIOLATION)
+				    (*errorp)->status ==
+				    LDAP_OBJECT_CLASS_VIOLATION)
 					(*errorp)->status = LDAP_NO_SUCH_OBJECT;
 			}
 		}

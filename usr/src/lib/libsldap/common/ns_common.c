@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -299,6 +299,39 @@ __ns_ldap_freeCred(ns_cred_t ** credp)
 	free(ap);
 	*credp = NULL;
 	return (NS_LDAP_SUCCESS);
+}
+
+/*
+ * FUNCTION:	__s_api_is_auth_matched
+ *
+ *	Compare an authentication structure.
+ *
+ * RETURN VALUES:	B_TRUE if matched, B_FALSE otherwise.
+ * INPUT:		auth1, auth2
+ */
+boolean_t
+__s_api_is_auth_matched(const ns_cred_t *auth1,
+    const ns_cred_t *auth2)
+{
+	if ((auth1->auth.type != auth2->auth.type) ||
+	    (auth1->auth.tlstype != auth2->auth.tlstype) ||
+	    (auth1->auth.saslmech != auth2->auth.saslmech) ||
+	    (auth1->auth.saslopt != auth2->auth.saslopt))
+		return (B_FALSE);
+
+	if ((((auth1->auth.type == NS_LDAP_AUTH_SASL) &&
+	    ((auth1->auth.saslmech == NS_LDAP_SASL_CRAM_MD5) ||
+	    (auth1->auth.saslmech == NS_LDAP_SASL_DIGEST_MD5))) ||
+	    (auth1->auth.type == NS_LDAP_AUTH_SIMPLE)) &&
+	    ((auth1->cred.unix_cred.userID == NULL) ||
+	    (auth1->cred.unix_cred.passwd == NULL) ||
+	    ((strcasecmp(auth1->cred.unix_cred.userID,
+	    auth2->cred.unix_cred.userID) != 0)) ||
+	    ((strcmp(auth1->cred.unix_cred.passwd,
+	    auth2->cred.unix_cred.passwd) != 0))))
+		return (B_FALSE);
+
+	return (B_TRUE);
 }
 
 /*
@@ -1925,7 +1958,7 @@ __s_api_prepend_automountmapname_to_dn(
 				    "mapped to an empty string.\n"));
 
 				MKERROR(LOG_WARNING, *errorp, NS_CONFIG_SYNTAX,
-				    strdup(errstr), NULL);
+				    strdup(errstr), NS_LDAP_MEMORY);
 
 				return (NS_LDAP_CONFIG);
 			}
@@ -2216,18 +2249,48 @@ __s_api_removeServer(const char *server)
 		char		s_b[DOORBUFFERSIZE];
 	} space;
 
-	ns_server_info_t	r, *ret = &r;
+	ns_server_info_t		r, *ret = &r;
 	const char		*ireq;
 	ldap_data_t		*sptr;
 	int			ndata;
 	int			adata;
 	int			len;
 	int			rc;
+	ns_ldap_error_t		*error = NULL;
 
 	if (server == NULL)
 		return (-1);
 
 	ireq = NS_CACHE_NORESP;
+
+	if (__s_api_isStandalone()) {
+		/*
+		 * Remove 'server' from the standalone server list.
+		 * __s_api_findRootDSE() is the standalone version
+		 * of getldap_get_serverInfo() used in ldap_cachemgr.
+		 * Request NS_CACHE_NORESP indicates 'server' should
+		 * be removed.
+		 */
+		if (__s_api_findRootDSE(ireq,
+		    server,
+		    NS_CACHE_ADDR_IP,
+		    NULL,
+		    &error) != NS_LDAP_SUCCESS) {
+			syslog(LOG_WARNING,
+			    "libsldap (\"standalone\" mode): "
+			    " Unable to remove %s - %s",
+			    server,
+			    error != NULL && error->message != NULL ?
+			    error->message : " no error info");
+			if (error != NULL) {
+				(void) __ns_ldap_freeError(&error);
+			}
+
+			return (-1);
+		}
+
+		return (0);
+	}
 
 	(void) memset(ret, 0, sizeof (ns_server_info_t));
 	(void) memset(space.s_b, 0, DOORBUFFERSIZE);
@@ -2277,4 +2340,49 @@ __s_api_free_server_info(ns_server_info_t *sinfo) {
 	sinfo->saslMechanisms = NULL;
 	__s_api_free2dArray(sinfo->controls);
 	sinfo->controls = NULL;
+}
+
+/*
+ * Create an ns_ldap_error structure, set status to 'rc',
+ * and copy in the error message 'msg'.
+ */
+ns_ldap_error_t *
+__s_api_make_error(int rc, char *msg) {
+	ns_ldap_error_t *ep;
+
+	ep = (ns_ldap_error_t *)calloc(1, sizeof (*ep));
+	if (ep == NULL)
+		return (NULL);
+
+	ep->status = rc;
+	if (msg != NULL)
+		ep->message =  strdup(msg); /* OK if ep->message is NULL */
+
+	return (ep);
+}
+
+/*
+ * Make a copy of the input ns_ldap_error.
+ */
+ns_ldap_error_t *
+__s_api_copy_error(ns_ldap_error_t *errorp) {
+	ns_ldap_error_t *ep;
+	char		*msg;
+
+	if (errorp == NULL)
+		return (NULL);
+
+	ep = (ns_ldap_error_t *)malloc(sizeof (*ep));
+	if (ep != NULL) {
+		*ep = *errorp;
+		if (ep->message != NULL) {
+			msg = strdup(ep->message);
+			if (msg == NULL) {
+				free(ep);
+				ep = NULL;
+			} else
+				ep->message = msg;
+		}
+	}
+	return (ep);
 }

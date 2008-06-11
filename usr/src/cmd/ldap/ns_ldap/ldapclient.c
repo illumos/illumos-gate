@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,8 +115,8 @@
 #include <syslog.h>
 #include <libscf.h>
 #include <assert.h>
-#include "ns_sldap.h"
-#include "ns_internal.h"
+
+#include "standalone.h"
 
 #if !defined(TEXT_DOMAIN)
 #define	TEXT_DOMAIN "SUNW_OST_OSCMD"
@@ -274,6 +274,8 @@ typedef struct {
 	char		*profileTTL;
 	char		*proxyDN;
 	char		*proxyPassword;
+	char		*bindDN;
+	char		*bindPasswd;
 	char		*defaultSearchScope;
 	char		*searchTimeLimit;
 	multival_t	*serviceAuthenticationMethod;
@@ -292,7 +294,6 @@ extern int __ns_ldap_download(const char *, char *, char *, ns_ldap_error_t **);
 static void usage(void);
 
 static int credCheck(clientopts_t *arglist);
-static char *findBaseDN(char *);
 static int clientSetParam(clientopts_t *optlist, int paramFlag, char *attrVal);
 static int parseParam(char *param, char **paramVal);
 static void dumpargs(clientopts_t *arglist);
@@ -310,7 +311,6 @@ static int client_mod(clientopts_t *arglist);
 static int client_uninit(clientopts_t *arglist);
 static int client_genProfile(clientopts_t *arglist);
 static int client_init(clientopts_t *arglist);
-static boolean_t is_config_ok(const clientopts_t *list, boolean_t get_config);
 static int file_move(const char *from, const char *to);
 
 static int start_services(int flag);
@@ -326,18 +326,17 @@ static useconds_t get_timeout_value(int dowhat, const char *fmri,
 int
 main(int argc, char **argv)
 {
-	char *ret_locale, *ret_textdomain;
-	int retcode;
-	int paramFlag;
-	char *attrVal;
-	int sysinfostatus;
-	clientopts_t *optlist = NULL;
-	int op_manual = 0, op_mod = 0, op_uninit = 0;
-	int op_list = 0, op_init = 0, op_genprofile = 0;
-	extern char *optarg;
-	extern int optind;
-	int option;
-
+	char		*ret_locale, *ret_textdomain;
+	int		retcode;
+	int		paramFlag;
+	char		*attrVal;
+	int		sysinfostatus;
+	clientopts_t	*optlist = NULL;
+	int		op_manual = 0, op_mod = 0, op_uninit = 0;
+	int		op_list = 0, op_init = 0, op_genprofile = 0;
+	extern char	*optarg;
+	extern int	optind;
+	int		option;
 
 	ret_locale = setlocale(LC_ALL, "");
 	if (ret_locale == NULL) {
@@ -363,14 +362,14 @@ main(int argc, char **argv)
 	optlist = clientopts_new();
 	if (optlist == NULL) {
 		CLIENT_FPUTS(
-			gettext("Error getting optlist (malloc fail)\n"),
-			stderr);
+		    gettext("Error getting optlist (malloc fail)\n"),
+		    stderr);
 		exit(CLIENT_ERR_FAIL);
 	}
 
 	optind = 1;
 	while (optind < argc) {
-		option = getopt(argc, argv, "vqa:I");
+		option = getopt(argc, argv, "vqa:ID:w:j:y:");
 
 		switch (option) {
 		case 'v':
@@ -384,20 +383,71 @@ main(int argc, char **argv)
 			paramFlag = parseParam(optarg, &attrVal);
 			if (paramFlag == CLIENT_ERR_PARSE) {
 				CLIENT_FPRINTF(stderr,
-					gettext("Unrecognized "
-						"parameter \"%s\"\n"),
-					optarg);
+				    gettext("Unrecognized "
+				    "parameter \"%s\"\n"),
+				    optarg);
 				usage();
 				exit(CLIENT_ERR_FAIL);
+			}
+			if (paramFlag == NS_LDAP_BINDPASSWD_P &&
+			    optlist->proxyPassword != NULL) {
+				(void) fprintf(stderr,
+				    gettext("The -a proxyPassword option is "
+				    "mutually exclusive of -y. "
+				    "-a proxyPassword is ignored.\n"));
+				break;
 			}
 			retcode = clientSetParam(optlist, paramFlag, attrVal);
 			if (retcode != CLIENT_SUCCESS) {
 				CLIENT_FPRINTF(
-					stderr,
-					gettext("Error (%d) setting "
-						"param \"%s\"\n"),
-					retcode, optarg);
+				    stderr,
+				    gettext("Error (%d) setting "
+				    "param \"%s\"\n"),
+				    retcode, optarg);
 				usage();
+				exit(CLIENT_ERR_FAIL);
+			}
+			break;
+		case 'D':
+			optlist->bindDN = strdup(optarg);
+			break;
+		case 'w':
+			if (optlist->bindPasswd != NULL) {
+				CLIENT_FPRINTF(stderr,
+				    gettext("The -w option is mutually "
+				    "exclusive of -j. -w is ignored."));
+				break;
+			}
+
+			if (optarg[0] == '-' && optarg[1] == '\0') {
+				/* Ask for a password later */
+				break;
+			}
+
+			optlist->bindPasswd = strdup(optarg);
+			break;
+		case 'j':
+			if (optlist->bindPasswd != NULL) {
+				(void) fprintf(stderr,
+				    gettext("The -w option is mutually "
+				    "exclusive of -j. -w is ignored.\n"));
+				free(optlist->bindPasswd);
+			}
+			optlist->bindPasswd = readPwd(optarg);
+			if (optlist->bindPasswd == NULL) {
+				exit(CLIENT_ERR_FAIL);
+			}
+			break;
+		case 'y':
+			if (optlist->proxyPassword != NULL) {
+				(void) fprintf(stderr,
+				    gettext("The -a proxyPassword option is "
+				    "mutually exclusive of -y. "
+				    "-a proxyPassword is ignored.\n"));
+				free(optlist->proxyPassword);
+			}
+			optlist->proxyPassword = readPwd(optarg);
+			if (optlist->proxyPassword == NULL) {
 				exit(CLIENT_ERR_FAIL);
 			}
 			break;
@@ -417,23 +467,23 @@ main(int argc, char **argv)
 				op_genprofile = 1;
 			} else if (optind == argc-1) {
 				retcode = clientSetParam(
-					optlist,
-					NS_LDAP_SERVERS_P,
-					argv[optind]);	/* ipAddr */
+				    optlist,
+				    NS_LDAP_SERVERS_P,
+				    argv[optind]);	/* ipAddr */
 				if (retcode != CLIENT_SUCCESS) {
 					CLIENT_FPRINTF(
-						stderr,
-						gettext("Error (%d) setting "
-							"serverList param.\n"),
-						retcode);
+					    stderr,
+					    gettext("Error (%d) setting "
+					    "serverList param.\n"),
+					    retcode);
 					usage();
 					exit(CLIENT_ERR_FAIL);
 				}
 			} else {
 				CLIENT_FPUTS(
-					gettext("Error parsing "
-						"command line\n"),
-					stderr);
+				    gettext("Error parsing "
+				    "command line\n"),
+				    stderr);
 				usage();
 				exit(CLIENT_ERR_FAIL);
 			}
@@ -458,7 +508,7 @@ main(int argc, char **argv)
 
 	if ((getuid() != 0) && (!op_genprofile)) {
 		(void) puts(
-			"You must be root (SuperUser) to run this command.");
+		    "You must be root (SuperUser) to run this command.");
 		usage();
 		exit(CLIENT_ERR_FAIL);
 	}
@@ -472,9 +522,9 @@ main(int argc, char **argv)
 /* if gen and no no searchBase then err */
 	if (gen && !optlist->defaultSearchBase) {
 		CLIENT_FPUTS(
-			gettext("ldapclient: Missing required attrName "
-				"defaultSearchBase\n"),
-			stderr);
+		    gettext("ldapclient: Missing required attrName "
+		    "defaultSearchBase\n"),
+		    stderr);
 		usage();
 		clientopts_free(optlist);
 		exit(CLIENT_ERR_FAIL);
@@ -482,7 +532,7 @@ main(int argc, char **argv)
 
 /* Only one verb can be specified */
 	if ((op_init + op_manual + op_mod + op_uninit +
-		op_list + op_genprofile) != 1) {
+	    op_list + op_genprofile) != 1) {
 		usage();
 		clientopts_free(optlist);
 		exit(CLIENT_ERR_FAIL);
@@ -500,8 +550,8 @@ main(int argc, char **argv)
 	if (op_list) {
 		if (mode_verbose)
 			CLIENT_FPUTS(
-				gettext("Handling list option\n"),
-				stderr);
+			    gettext("Handling list option\n"),
+			    stderr);
 		retcode = client_list(optlist);
 	}
 
@@ -509,8 +559,8 @@ main(int argc, char **argv)
 	if (op_uninit) {
 		if (mode_verbose)
 			CLIENT_FPUTS(
-				gettext("Handling uninit option\n"),
-				stderr);
+			    gettext("Handling uninit option\n"),
+			    stderr);
 		retcode = client_uninit(optlist);
 	}
 
@@ -518,8 +568,8 @@ main(int argc, char **argv)
 	if (op_init) {
 		if (mode_verbose)
 			CLIENT_FPUTS(
-				gettext("Handling init option\n"),
-				stderr);
+			    gettext("Handling init option\n"),
+			    stderr);
 		retcode = client_init(optlist);
 	}
 
@@ -527,8 +577,8 @@ main(int argc, char **argv)
 	if (op_genprofile) {
 		if (mode_verbose)
 			CLIENT_FPUTS(
-				gettext("Handling genProfile\n"),
-				stderr);
+			    gettext("Handling genProfile\n"),
+			    stderr);
 		retcode = client_genProfile(optlist);
 	}
 
@@ -536,8 +586,8 @@ main(int argc, char **argv)
 	if (op_manual) {
 		if (mode_verbose)
 			CLIENT_FPUTS(
-				gettext("Handling manual option\n"),
-				stderr);
+			    gettext("Handling manual option\n"),
+			    stderr);
 		retcode = client_manual(optlist);
 	}
 
@@ -545,15 +595,15 @@ main(int argc, char **argv)
 	if (op_mod) {
 		if (mode_verbose)
 			CLIENT_FPUTS(
-				gettext("Handling mod option\n"),
-				stderr);
+			    gettext("Handling mod option\n"),
+			    stderr);
 		retcode = client_mod(optlist);
 	}
 
 	clientopts_free(optlist);
 	if ((retcode == CLIENT_SUCCESS) ||
-			(retcode == CLIENT_ERR_FAIL) ||
-			(retcode == CLIENT_ERR_CREDENTIAL))
+	    (retcode == CLIENT_ERR_FAIL) ||
+	    (retcode == CLIENT_ERR_CREDENTIAL))
 		return (retcode);
 	else
 		return (CLIENT_ERR_FAIL);
@@ -567,16 +617,16 @@ client_list(clientopts_t *arglist)
 
 	if (num_args(arglist) > 0) {
 		CLIENT_FPUTS(
-			gettext("No args supported with \"list\" option\n"),
-			stderr);
+		    gettext("No args supported with \"list\" option\n"),
+		    stderr);
 		usage();
 		return (CLIENT_ERR_FAIL);	/* exit code here ? */
 	}
 	if ((errorp = __ns_ldap_print_config(mode_verbose)) != NULL) {
 		retcode = CLIENT_ERR_FAIL;
 		CLIENT_FPUTS(
-			gettext("Cannot get print configuration\n"),
-			stderr);
+		    gettext("Cannot get print configuration\n"),
+		    stderr);
 		CLIENT_FPUTS(errorp->message, stderr);
 		(void) __ns_ldap_freeError(&errorp);
 		CLIENT_FPUTC('\n', stderr);
@@ -593,15 +643,15 @@ client_uninit(clientopts_t *arglist)
 
 	if (mode_verbose) {
 		CLIENT_FPUTS(
-			gettext("Restoring machine to previous "
-				"configuration state\n"),
-			stderr);
+		    gettext("Restoring machine to previous "
+		    "configuration state\n"),
+		    stderr);
 	}
 
 	if (num_args(arglist) > 0) {
 		CLIENT_FPUTS(
-			gettext("No args supported with \"uninit\" option\n"),
-			stderr);
+		    gettext("No args supported with \"uninit\" option\n"),
+		    stderr);
 		usage();
 		return (CLIENT_ERR_FAIL);
 	}
@@ -615,7 +665,7 @@ client_uninit(clientopts_t *arglist)
 
 	if (retcode != CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
-			gettext("Errors stopping network services.\n"), stderr);
+		    gettext("Errors stopping network services.\n"), stderr);
 		/* restart whatever services we can */
 		(void) start_services(START_RESET);
 		return (CLIENT_ERR_FAIL);
@@ -624,25 +674,25 @@ client_uninit(clientopts_t *arglist)
 	retcode = recover(STATE_SAVE);
 	if (retcode != CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
-			gettext("Cannot recover the configuration on "
-				"this machine.\n"),
-			stderr);
+		    gettext("Cannot recover the configuration on "
+		    "this machine.\n"),
+		    stderr);
 		(void) start_services(START_RESET);
 	} else {
 		retcode = start_services(START_UNINIT);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPUTS(
-				gettext("Config restored but problems "
-					"encountered resetting network "
-					"services.\n"),
-				stderr);
+			    gettext("Config restored but problems "
+			    "encountered resetting network "
+			    "services.\n"),
+			    stderr);
 		}
 	}
 
 	if (retcode == CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
-			gettext("System successfully recovered\n"),
-			stderr);
+		    gettext("System successfully recovered\n"),
+		    stderr);
 	}
 
 	return (retcode);
@@ -674,6 +724,20 @@ if (NULL != argval) {	\
 	}	\
 }
 
+/*
+ * The following macro is used to check if an arg has already been set
+ * and issues an error message, a usage message and then returns an error.
+ * This was made into a macro to avoid the duplication of this code many
+ * times in the function below.
+ */
+#define	LDAP_CHECK_INVALID(arg, param)	\
+if (arg) {	\
+	CLIENT_FPRINTF(stderr, gettext("Invalid parameter (%s) " \
+	    "specified\n"), param);	\
+	usage();	\
+	return (CLIENT_ERR_FAIL);	\
+}
+
 static int
 client_manual(clientopts_t *arglist)
 {
@@ -686,51 +750,48 @@ client_manual(clientopts_t *arglist)
 
 	if (dname == NULL) {
 		CLIENT_FPUTS(
-			gettext("Manual failed: System domain not set and "
-				"no domainName specified.\n"),
-			stderr);
+		    gettext("Manual failed: System domain not set and "
+		    "no domainName specified.\n"),
+		    stderr);
 		return (CLIENT_ERR_FAIL);
 	}
 
 	if (arglist->defaultSearchBase == NULL) {
 		CLIENT_FPUTS(
-			gettext("Manual failed: Missing required "
-				"defaultSearchBase attribute.\n"),
-			stderr);
+		    gettext("Manual failed: Missing required "
+		    "defaultSearchBase attribute.\n"),
+		    stderr);
 		return (CLIENT_ERR_FAIL);
 	}
 
 	if ((arglist->defaultServerList == NULL) &&
-		(arglist->preferredServerList == NULL)) {
+	    (arglist->preferredServerList == NULL)) {
 		CLIENT_FPUTS(
-			gettext("Manual failed: Missing required "
-				"defaultServerList or preferredServerList "
-				"attribute.\n"),
-			stderr);
+		    gettext("Manual failed: Missing required "
+		    "defaultServerList or preferredServerList "
+		    "attribute.\n"),
+		    stderr);
 		return (CLIENT_ERR_FAIL);
 	}
 
 	if (arglist->profileTTL != NULL) {
 		CLIENT_FPUTS(
-			gettext("Manual aborted: profileTTL is not supported "
-				"in manual mode.\n"),
-			stderr);
+		    gettext("Manual aborted: profileTTL is not supported "
+		    "in manual mode.\n"),
+		    stderr);
 		return (CLIENT_ERR_FAIL);
 	}
 
 	if (arglist->profileName != NULL) {
 		CLIENT_FPUTS(
-			gettext("Manual aborted: profileName is not supported "
-				"in manual mode.\n"),
-			stderr);
+		    gettext("Manual aborted: profileName is not supported "
+		    "in manual mode.\n"),
+		    stderr);
 		return (CLIENT_ERR_FAIL);
 	}
 
-	if (!is_config_ok(arglist, B_FALSE)) {
-		CLIENT_FPRINTF(stderr,
-			gettext("Cannot specify LDAP port with tls\n"));
-		return (CLIENT_ERR_FAIL);
-	}
+	LDAP_CHECK_INVALID(arglist->bindDN, "bind DN");
+	LDAP_CHECK_INVALID(arglist->bindPasswd, "bind password");
 
 	__ns_ldap_setServer(TRUE);	/* Need this for _ns_setParam() */
 	__ns_ldap_default_config();
@@ -757,60 +818,60 @@ client_manual(clientopts_t *arglist)
 	LDAP_SET_PARAM(arglist->certificatePath, NS_LDAP_HOST_CERTPATH_P);
 
 	for (counter = 0;
-		counter < arglist->serviceAuthenticationMethod->count;
-		counter++) {
+	    counter < arglist->serviceAuthenticationMethod->count;
+	    counter++) {
 
 		LDAP_SET_PARAM(
-			arglist->serviceAuthenticationMethod->optlist[counter],
-			NS_LDAP_SERVICE_AUTH_METHOD_P);
+		    arglist->serviceAuthenticationMethod->optlist[counter],
+		    NS_LDAP_SERVICE_AUTH_METHOD_P);
 	}
 	for (counter = 0;
-		counter < arglist->serviceCredentialLevel->count;
-		counter++) {
+	    counter < arglist->serviceCredentialLevel->count;
+	    counter++) {
 
 		LDAP_SET_PARAM(
-			arglist->serviceCredentialLevel->optlist[counter],
-			NS_LDAP_SERVICE_CRED_LEVEL_P);
+		    arglist->serviceCredentialLevel->optlist[counter],
+		    NS_LDAP_SERVICE_CRED_LEVEL_P);
 	}
 	for (counter = 0;
-		counter < arglist->objectclassMap->count;
-		counter++) {
+	    counter < arglist->objectclassMap->count;
+	    counter++) {
 
 		LDAP_SET_PARAM(arglist->objectclassMap->optlist[counter],
-			NS_LDAP_OBJECTCLASSMAP_P);
+		    NS_LDAP_OBJECTCLASSMAP_P);
 	}
 	for (counter = 0; counter < arglist->attributeMap->count; counter++) {
 		LDAP_SET_PARAM(arglist->attributeMap->optlist[counter],
-			NS_LDAP_ATTRIBUTEMAP_P);
+		    NS_LDAP_ATTRIBUTEMAP_P);
 	}
 	for (counter = 0;
-		counter < arglist->serviceSearchDescriptor->count;
-		counter++) {
+	    counter < arglist->serviceSearchDescriptor->count;
+	    counter++) {
 
 		LDAP_SET_PARAM(
-			arglist->serviceSearchDescriptor->optlist[counter],
-			NS_LDAP_SERVICE_SEARCH_DESC_P);
+		    arglist->serviceSearchDescriptor->optlist[counter],
+		    NS_LDAP_SERVICE_SEARCH_DESC_P);
 	}
 
 	retcode = credCheck(arglist);
 	if (retcode != CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
-			gettext("Error in setting up credentials\n"),
-			stderr);
+		    gettext("Error in setting up credentials\n"),
+		    stderr);
 		return (retcode);
 	}
 
 	if (mode_verbose)
 		CLIENT_FPUTS(
-			gettext("About to modify this machines "
-				"configuration by writing the files\n"),
-			stderr);
+		    gettext("About to modify this machines "
+		    "configuration by writing the files\n"),
+		    stderr);
 
 	/* get ready to start playing with files */
 	retcode = stop_services(STATE_SAVE);
 	if (retcode != CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
-			gettext("Errors stopping network services.\n"), stderr);
+		    gettext("Errors stopping network services.\n"), stderr);
 		return (CLIENT_ERR_FAIL);
 	}
 
@@ -818,36 +879,36 @@ client_manual(clientopts_t *arglist)
 	retcode = file_backup();
 	if (retcode == CLIENT_ERR_RESTORE) {
 		CLIENT_FPUTS(
-			gettext("System not in state to enable ldap client.\n"),
-			stderr);
+		    gettext("System not in state to enable ldap client.\n"),
+		    stderr);
 
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 		return (retcode);
 	} else if (retcode != CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
-			gettext("Save of system configuration failed!  "
-				"Attempting recovery.\n"),
-			stderr);
+		    gettext("Save of system configuration failed!  "
+		    "Attempting recovery.\n"),
+		    stderr);
 		retcode = recover(STATE_NOSAVE);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPUTS(
-				gettext("Recovery of systems configuration "
-					"failed.  Manual intervention of "
-					"config files is required.\n"),
-				stderr);
+			    gettext("Recovery of systems configuration "
+			    "failed.  Manual intervention of "
+			    "config files is required.\n"),
+			    stderr);
 			return (retcode);
 		}
 
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 
 		return (retcode);
@@ -857,22 +918,22 @@ client_manual(clientopts_t *arglist)
 	errorp = __ns_ldap_DumpConfiguration(NSCONFIGFILE);
 	if (errorp != NULL) {
 		CLIENT_FPRINTF(stderr,
-			gettext("%s manual: errorp is not NULL; %s\n"),
-			cmd, errorp->message);
+		    gettext("%s manual: errorp is not NULL; %s\n"),
+		    cmd, errorp->message);
 		retcode = recover(STATE_NOSAVE);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPUTS(
-				gettext("Recovery of systems configuration "
-					"failed.  Manual intervention of "
-					"config files is required.\n"),
-				stderr);
+			    gettext("Recovery of systems configuration "
+			    "failed.  Manual intervention of "
+			    "config files is required.\n"),
+			    stderr);
 			return (retcode);
 		}
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 		(void) __ns_ldap_freeError(&errorp);
 		return (CLIENT_ERR_FAIL);
@@ -882,22 +943,22 @@ client_manual(clientopts_t *arglist)
 	errorp = __ns_ldap_DumpConfiguration(NSCREDFILE);
 	if (errorp != NULL) {
 		CLIENT_FPRINTF(stderr,
-			gettext("%s init: errorp is not NULL; %s\n"),
-			cmd, errorp->message);
+		    gettext("%s init: errorp is not NULL; %s\n"),
+		    cmd, errorp->message);
 		retcode = recover(STATE_NOSAVE);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPUTS(
-				gettext("Recovery of systems configuration "
-					"failed.  Manual intervention of "
-					"config files is required.\n"),
-				stderr);
+			    gettext("Recovery of systems configuration "
+			    "failed.  Manual intervention of "
+			    "config files is required.\n"),
+			    stderr);
 			return (retcode);
 		}
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 		(void) __ns_ldap_freeError(&errorp);
 		return (CLIENT_ERR_FAIL);
@@ -906,42 +967,42 @@ client_manual(clientopts_t *arglist)
 	ret_copy = system(CMD_CP " " NSSWITCH_LDAP " " NSSWITCH_CONF);
 	if (ret_copy != 0) {
 		CLIENT_FPRINTF(stderr,
-			gettext("Error %d copying (%s) -> (%s)\n"),
-			ret_copy, NSSWITCH_LDAP, NSSWITCH_CONF);
+		    gettext("Error %d copying (%s) -> (%s)\n"),
+		    ret_copy, NSSWITCH_LDAP, NSSWITCH_CONF);
 		retcode = recover(STATE_NOSAVE);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPUTS(
-				gettext("Recovery of systems configuration "
-					"failed.  Manual intervention of "
-					"config files is required.\n"),
-				stderr);
+			    gettext("Recovery of systems configuration "
+			    "failed.  Manual intervention of "
+			    "config files is required.\n"),
+			    stderr);
 		}
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 		return (CLIENT_ERR_FAIL);
 	}
 
 	if ((domain_fp = open(DOMAINNAME, O_WRONLY|O_CREAT|O_TRUNC,
-		S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) { /* 0644 */
+	    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) { /* 0644 */
 		CLIENT_FPRINTF(stderr, gettext("Cannot open %s\n"), DOMAINNAME);
 		retcode = recover(STATE_NOSAVE);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPUTS(
-				gettext("Recovery of systems configuration "
-					"failed.  Manual intervention of "
-					"config files is required.\n"),
-				stderr);
+			    gettext("Recovery of systems configuration "
+			    "failed.  Manual intervention of "
+			    "config files is required.\n"),
+			    stderr);
 			return (CLIENT_ERR_FAIL);
 		}
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 		return (CLIENT_ERR_FAIL);
 	}
@@ -953,32 +1014,32 @@ client_manual(clientopts_t *arglist)
 
 	if (retcode == CLIENT_SUCCESS) {
 		CLIENT_FPUTS(gettext("System successfully configured\n"),
-								stderr);
+		    stderr);
 	} else {
 		CLIENT_FPUTS(gettext("Error resetting system.\n"
-			"Recovering old system settings.\n"), stderr),
+		    "Recovering old system settings.\n"), stderr),
 
-		/* stop any started services for recover */
-		/* don't stomp on history of saved services state */
-		reset_ret = stop_services(STATE_NOSAVE);
+		    /* stop any started services for recover */
+		    /* don't stomp on history of saved services state */
+		    reset_ret = stop_services(STATE_NOSAVE);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"stopping services during reset\n"),
-					reset_ret);
+			    "stopping services during reset\n"),
+			    reset_ret);
 			/* Coninue and try to recover what we can */
 		}
 		reset_ret = recover(STATE_NOSAVE);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"recovering service files during "
-					"reset\n"), reset_ret);
+			    "recovering service files during "
+			    "reset\n"), reset_ret);
 			/* Continue and start what we can */
 		}
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 	}
 
@@ -997,7 +1058,7 @@ client_mod(clientopts_t *arglist)
 	__ns_ldap_setServer(TRUE);	/* Need this for _ns_setParam() */
 	if ((errorp = __ns_ldap_LoadConfiguration()) != NULL) {
 		CLIENT_FPUTS(gettext("Cannot get load configuration\n"),
-			stderr);
+		    stderr);
 		CLIENT_FPUTS(errorp->message, stderr);
 		CLIENT_FPUTC('\n', stderr);
 		(void) __ns_ldap_freeError(&errorp);
@@ -1006,27 +1067,24 @@ client_mod(clientopts_t *arglist)
 
 	if (arglist->profileTTL != NULL) {
 		CLIENT_FPUTS(
-			gettext("Mod aborted: profileTTL modification is "
-				"not allowed in mod mode.\n"),
-			stderr);
+		    gettext("Mod aborted: profileTTL modification is "
+		    "not allowed in mod mode.\n"),
+		    stderr);
 		return (CLIENT_ERR_FAIL);
 	}
 
 	if (arglist->profileName != NULL) {
 		CLIENT_FPUTS(
-			gettext("Mod aborted: profileName modification is "
-				"not allowed.  If you want to use profiles "
-				"generate one with genProfile and load it "
-				"on the server with ldapadd.\n"),
-			stderr);
+		    gettext("Mod aborted: profileName modification is "
+		    "not allowed.  If you want to use profiles "
+		    "generate one with genProfile and load it "
+		    "on the server with ldapadd.\n"),
+		    stderr);
 		return (CLIENT_ERR_FAIL);
 	}
 
-	if (!is_config_ok(arglist, B_TRUE)) {
-		CLIENT_FPRINTF(stderr,
-			gettext("Cannot specify LDAP port with tls\n"));
-		return (CLIENT_ERR_FAIL);
-	}
+	LDAP_CHECK_INVALID(arglist->bindDN, "bind DN");
+	LDAP_CHECK_INVALID(arglist->bindPasswd, "bind password");
 
 	/* Set additional valid params from command line */
 	LDAP_SET_PARAM(arglist->authenticationMethod, NS_LDAP_AUTH_P);
@@ -1045,65 +1103,65 @@ client_mod(clientopts_t *arglist)
 	LDAP_SET_PARAM(arglist->certificatePath, NS_LDAP_HOST_CERTPATH_P);
 
 	for (counter = 0;
-		counter < arglist->serviceAuthenticationMethod->count;
-		counter++) {
+	    counter < arglist->serviceAuthenticationMethod->count;
+	    counter++) {
 
 		LDAP_SET_PARAM(
-			arglist->serviceAuthenticationMethod->optlist[counter],
-			NS_LDAP_SERVICE_AUTH_METHOD_P);
+		    arglist->serviceAuthenticationMethod->optlist[counter],
+		    NS_LDAP_SERVICE_AUTH_METHOD_P);
 	}
 	for (counter = 0;
-		counter < arglist->serviceCredentialLevel->count;
-		counter++) {
+	    counter < arglist->serviceCredentialLevel->count;
+	    counter++) {
 
 		LDAP_SET_PARAM(
-			arglist->serviceCredentialLevel->optlist[counter],
-			NS_LDAP_SERVICE_CRED_LEVEL_P);
+		    arglist->serviceCredentialLevel->optlist[counter],
+		    NS_LDAP_SERVICE_CRED_LEVEL_P);
 	}
 	for (counter = 0;
-		counter < arglist->objectclassMap->count;
-		counter++) {
+	    counter < arglist->objectclassMap->count;
+	    counter++) {
 
 		LDAP_SET_PARAM(
-			arglist->objectclassMap->optlist[counter],
-			NS_LDAP_OBJECTCLASSMAP_P);
+		    arglist->objectclassMap->optlist[counter],
+		    NS_LDAP_OBJECTCLASSMAP_P);
 	}
 	for (counter = 0;
-		counter < arglist->attributeMap->count;
-		counter++) {
+	    counter < arglist->attributeMap->count;
+	    counter++) {
 
 		LDAP_SET_PARAM(
-			arglist->attributeMap->optlist[counter],
-			NS_LDAP_ATTRIBUTEMAP_P);
+		    arglist->attributeMap->optlist[counter],
+		    NS_LDAP_ATTRIBUTEMAP_P);
 	}
 	for (counter = 0;
-		counter < arglist->serviceSearchDescriptor->count;
-		counter++) {
+	    counter < arglist->serviceSearchDescriptor->count;
+	    counter++) {
 
 		LDAP_SET_PARAM(
-			arglist->serviceSearchDescriptor->optlist[counter],
-			NS_LDAP_SERVICE_SEARCH_DESC_P);
+		    arglist->serviceSearchDescriptor->optlist[counter],
+		    NS_LDAP_SERVICE_SEARCH_DESC_P);
 	}
 
 	retcode = credCheck(arglist);
 	if (retcode != CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
-			gettext("Error in setting up credentials\n"),
-			stderr);
+		    gettext("Error in setting up credentials\n"),
+		    stderr);
 		return (retcode);
 	}
 
 	if (mode_verbose)
 		CLIENT_FPUTS(
-			gettext("About to modify this machines configuration "
-				"by writing the files\n"),
-			stderr);
+		    gettext("About to modify this machines configuration "
+		    "by writing the files\n"),
+		    stderr);
 
 	/* get ready to start playing with files */
 	retcode = stop_services(STATE_SAVE);
 	if (retcode != CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
-			gettext("Errors stopping network services.\n"), stderr);
+		    gettext("Errors stopping network services.\n"), stderr);
 		return (CLIENT_ERR_FAIL);
 	}
 
@@ -1111,8 +1169,8 @@ client_mod(clientopts_t *arglist)
 	retcode = mod_backup();
 	if (retcode != CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
-			gettext("Unable to backup the ldap client files!\n"),
-			stderr);
+		    gettext("Unable to backup the ldap client files!\n"),
+		    stderr);
 
 		return (retcode);
 
@@ -1122,22 +1180,22 @@ client_mod(clientopts_t *arglist)
 	errorp = __ns_ldap_DumpConfiguration(NSCONFIGFILE);
 	if (errorp != NULL) {
 		CLIENT_FPRINTF(stderr,
-			gettext("%s mod: errorp is not NULL; %s\n"),
-			cmd, errorp->message);
+		    gettext("%s mod: errorp is not NULL; %s\n"),
+		    cmd, errorp->message);
 		retcode = mod_recover();
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPUTS(
-				gettext("Recovery of systems configuration "
-					"failed.  Manual intervention of "
-					"config files is required.\n"),
-				stderr);
+			    gettext("Recovery of systems configuration "
+			    "failed.  Manual intervention of "
+			    "config files is required.\n"),
+			    stderr);
 		}
 		(void) __ns_ldap_freeError(&errorp);
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 		return (CLIENT_ERR_FAIL);
 	}
@@ -1146,42 +1204,42 @@ client_mod(clientopts_t *arglist)
 	errorp = __ns_ldap_DumpConfiguration(NSCREDFILE);
 	if (errorp != NULL) {
 		CLIENT_FPRINTF(stderr,
-			gettext("%s mod: errorp is not NULL; %s\n"),
-			cmd, errorp->message);
+		    gettext("%s mod: errorp is not NULL; %s\n"),
+		    cmd, errorp->message);
 		retcode = mod_recover();
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPUTS(
-				gettext("Recovery of systems configuration "
-					"failed.  Manual intervention of "
-					"config files is required.\n"),
-				stderr);
+			    gettext("Recovery of systems configuration "
+			    "failed.  Manual intervention of "
+			    "config files is required.\n"),
+			    stderr);
 		}
 		(void) __ns_ldap_freeError(&errorp);
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 		return (CLIENT_ERR_FAIL);
 	}
 
 	if ((domain_fp = open(DOMAINNAME, O_WRONLY|O_CREAT|O_TRUNC,
-		S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) { /* 0644 */
+	    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) { /* 0644 */
 		CLIENT_FPRINTF(stderr, gettext("Cannot open %s\n"), DOMAINNAME);
 		retcode = mod_recover();
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPUTS(
-				gettext("Recovery of systems configuration "
-					"failed!  Machine needs to be "
-					"fixed!\n"),
-				stderr);
+			    gettext("Recovery of systems configuration "
+			    "failed!  Machine needs to be "
+			    "fixed!\n"),
+			    stderr);
 		}
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 		return (CLIENT_ERR_FAIL);
 	}
@@ -1193,32 +1251,32 @@ client_mod(clientopts_t *arglist)
 
 	if (retcode == CLIENT_SUCCESS) {
 		CLIENT_FPUTS(gettext("System successfully configured\n"),
-								stderr);
+		    stderr);
 	} else {
 		CLIENT_FPUTS(gettext("Error resetting system.\n"
-			"Recovering old system settings.\n"), stderr),
+		    "Recovering old system settings.\n"), stderr),
 
-		/* stop any started services for recover */
-		/* don't stomp on history of saved services state */
-		reset_ret = stop_services(STATE_NOSAVE);
+		    /* stop any started services for recover */
+		    /* don't stomp on history of saved services state */
+		    reset_ret = stop_services(STATE_NOSAVE);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"stopping services during reset\n"),
-					reset_ret);
+			    "stopping services during reset\n"),
+			    reset_ret);
 			/* Coninue and try to recover what we can */
 		}
 		reset_ret = mod_recover();
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"recovering service files during "
-					"reset\n"), reset_ret);
+			    "recovering service files during "
+			    "reset\n"), reset_ret);
 			/* Continue and start what we can */
 		}
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 	}
 
@@ -1228,20 +1286,6 @@ client_mod(clientopts_t *arglist)
 	return (retcode);
 }
 
-
-/*
- * The following macro is used to check if an arg has already been set
- * and issues an error message, a usage message and then returns an error.
- * This was made into a macro to avoid the duplication of this code many
- * times in the function below.
- */
-#define	LDAP_CHECK_INVALID(arg, param)	\
-if (arg) {	\
-	CLIENT_FPRINTF(stderr, gettext("Invalid parameter (%s) " \
-		"specified\n"), param);	\
-	usage();	\
-	return (CLIENT_ERR_FAIL);	\
-}
 
 static int
 client_genProfile(clientopts_t *arglist)
@@ -1258,14 +1302,16 @@ client_genProfile(clientopts_t *arglist)
 	LDAP_CHECK_INVALID(arglist->proxyPassword, "proxyPassword");
 	LDAP_CHECK_INVALID(arglist->certificatePath, "certificatePath");
 	LDAP_CHECK_INVALID(arglist->domainName, "domainName");
+	LDAP_CHECK_INVALID(arglist->bindDN, "bind DN");
+	LDAP_CHECK_INVALID(arglist->bindPasswd, "bind password");
 	/* *** End check for invalid args *** */
 
 	if (arglist->profileName == NULL) {
 		if (mode_verbose)
 			CLIENT_FPUTS(
-				gettext("No profile specified. "
-					"Using \"default\"\n"),
-				stderr);
+			    gettext("No profile specified. "
+			    "Using \"default\"\n"),
+			    stderr);
 		arglist->profileName = "default";
 	}
 
@@ -1289,50 +1335,44 @@ client_genProfile(clientopts_t *arglist)
 	LDAP_SET_PARAM(arglist->defaultServerList, NS_LDAP_SERVERS_P);
 
 	for (counter = 0;
-		counter < arglist->serviceAuthenticationMethod->count;
-		counter++) {
+	    counter < arglist->serviceAuthenticationMethod->count;
+	    counter++) {
 
 		LDAP_SET_PARAM(
-			arglist->serviceAuthenticationMethod->optlist[counter],
-			NS_LDAP_SERVICE_AUTH_METHOD_P);
+		    arglist->serviceAuthenticationMethod->optlist[counter],
+		    NS_LDAP_SERVICE_AUTH_METHOD_P);
 	}
 	for (counter = 0;
-		counter < arglist->serviceCredentialLevel->count;
-		counter++) {
+	    counter < arglist->serviceCredentialLevel->count;
+	    counter++) {
 
 		LDAP_SET_PARAM(
-			arglist->serviceCredentialLevel->optlist[counter],
-			NS_LDAP_SERVICE_CRED_LEVEL_P);
+		    arglist->serviceCredentialLevel->optlist[counter],
+		    NS_LDAP_SERVICE_CRED_LEVEL_P);
 	}
 	for (counter = 0;
-		counter < arglist->objectclassMap->count;
-		counter++) {
+	    counter < arglist->objectclassMap->count;
+	    counter++) {
 
 		LDAP_SET_PARAM(
-			arglist->objectclassMap->optlist[counter],
-			NS_LDAP_OBJECTCLASSMAP_P);
+		    arglist->objectclassMap->optlist[counter],
+		    NS_LDAP_OBJECTCLASSMAP_P);
 	}
 	for (counter = 0;
-		counter < arglist->attributeMap->count;
-		counter++) {
+	    counter < arglist->attributeMap->count;
+	    counter++) {
 
 		LDAP_SET_PARAM(
-			arglist->attributeMap->optlist[counter],
-			NS_LDAP_ATTRIBUTEMAP_P);
+		    arglist->attributeMap->optlist[counter],
+		    NS_LDAP_ATTRIBUTEMAP_P);
 	}
 	for (counter = 0;
-		counter < arglist->serviceSearchDescriptor->count;
-		counter++) {
+	    counter < arglist->serviceSearchDescriptor->count;
+	    counter++) {
 
 		LDAP_SET_PARAM(
-			arglist->serviceSearchDescriptor->optlist[counter],
-			NS_LDAP_SERVICE_SEARCH_DESC_P);
-	}
-
-	if (!is_config_ok(arglist, B_FALSE)) {
-		CLIENT_FPRINTF(stderr,
-			gettext("WARNING: some clients do not support an LDAP "
-				"port with tls\n"));
+		    arglist->serviceSearchDescriptor->optlist[counter],
+		    NS_LDAP_SERVICE_SEARCH_DESC_P);
 	}
 
 	errorp = __ns_ldap_DumpLdif(NULL);
@@ -1346,27 +1386,38 @@ client_genProfile(clientopts_t *arglist)
 	return (CLIENT_SUCCESS);
 }
 
+/* INET6_ADDRSTRLEN + ":" + <5-digit port> + some round-up */
+#define	MAX_HOSTADDR_LEN (INET6_ADDRSTRLEN + 6 + 12)
+
 static int
 client_init(clientopts_t *arglist)
 {
-	int profile_fp;
-	int retcode = CLIENT_SUCCESS;
-	char *nisBaseDN = NULL;
-	ns_ldap_error_t *errorp;
-	int reset_ret;
-	int ret_copy;
+	int			profile_fp;
+	int			retcode = CLIENT_SUCCESS;
+	ns_ldap_error_t		*errorp;
+	int			reset_ret;
+	int			ret_copy;
+	ns_standalone_conf_t	cfg = standaloneDefaults;
+	ns_auth_t		auth = {NS_LDAP_AUTH_NONE,
+					NS_LDAP_TLS_NONE,
+					NS_LDAP_SASL_NONE,
+					NS_LDAP_SASLOPT_NONE};
+	char			peer[MAX_HOSTADDR_LEN];
+	ns_auth_t		**authMethod;
+	int			**credLevel, i;
+	char			*cred;
 
 	if (mode_verbose)
 		CLIENT_FPUTS(
-			gettext("About to configure machine by downloading "
-				"a profile\n"),
-			stderr);
+		    gettext("About to configure machine by downloading "
+		    "a profile\n"),
+		    stderr);
 
 	if (dname == NULL) {
 		CLIENT_FPUTS(
-			gettext("Init failed: System domain not set and "
-				"no domainName specified.\n"),
-			stderr);
+		    gettext("Init failed: System domain not set and "
+		    "no domainName specified.\n"),
+		    stderr);
 		return (CLIENT_ERR_FAIL);
 	}
 
@@ -1376,96 +1427,99 @@ client_init(clientopts_t *arglist)
 	}
 
 	/* *** Check for invalid args *** */
-	LDAP_CHECK_INVALID(arglist->authenticationMethod,
-		"authenticationMethod");
 	LDAP_CHECK_INVALID(arglist->defaultSearchBase,
-		"defaultSearchBase");
-	LDAP_CHECK_INVALID(arglist->credentialLevel,
-		"credentialLevel");
+	    "defaultSearchBase");
 	LDAP_CHECK_INVALID(arglist->profileTTL,
-		"profileTTL");
+	    "profileTTL");
 	LDAP_CHECK_INVALID(arglist->searchTimeLimit,
-		"searchTimeLimit");
+	    "searchTimeLimit");
 	LDAP_CHECK_INVALID(arglist->preferredServerList,
-		"preferredServerList");
+	    "preferredServerList");
 	LDAP_CHECK_INVALID(arglist->followReferrals,
-		"followReferrals");
+	    "followReferrals");
 	LDAP_CHECK_INVALID(arglist->defaultSearchScope,
-		"defaultSearchScope");
+	    "defaultSearchScope");
 	LDAP_CHECK_INVALID(arglist->bindTimeLimit,
-		"bindTimeLimit");
+	    "bindTimeLimit");
 
 	LDAP_CHECK_INVALID(arglist->objectclassMap->count,
-		"objectclassMap");
+	    "objectclassMap");
 	LDAP_CHECK_INVALID(arglist->attributeMap->count,
-		"attributeMap");
+	    "attributeMap");
 	LDAP_CHECK_INVALID(arglist->serviceAuthenticationMethod->count,
-		"serviceAuthenticationMethod");
+	    "serviceAuthenticationMethod");
 	LDAP_CHECK_INVALID(arglist->serviceCredentialLevel->count,
-		"serviceCredentialLevel");
+	    "serviceCredentialLevel");
 	LDAP_CHECK_INVALID(arglist->serviceSearchDescriptor->count,
-		"serviceSearchDescriptor");
+	    "serviceSearchDescriptor");
 	/* *** End check for invalid args *** */
-
-	__ns_ldap_setServer(TRUE);
 
 	if (arglist->profileName == NULL) {
 		if (mode_verbose)
 			CLIENT_FPUTS(
-				gettext("No profile specified. "
-					"Using \"default\"\n"),
-				stderr);
+			    gettext("No profile specified. "
+			    "Using \"default\"\n"),
+			    stderr);
 		arglist->profileName = "default";
 	}
 
-	/* need to free nisBaseDN */
-	nisBaseDN = findBaseDN(arglist->defaultServerList);
-	if (nisBaseDN == NULL) {
-		CLIENT_FPRINTF(stderr,
-			gettext("Failed to find defaultSearchBase for "
-				"domain %s\n"),
-			dname);
-
-		if (gStartLdap == START_RESET)
-			(void) start_service(LDAP_FMRI, B_TRUE);
-
+	(void) strncpy(peer, arglist->defaultServerList, MAX_HOSTADDR_LEN - 1);
+	if (separatePort(peer, &cfg.SA_SERVER, &cfg.SA_PORT) > 0) {
 		return (CLIENT_ERR_FAIL);
 	}
-	retcode = __ns_ldap_setParam(
-			NS_LDAP_SEARCH_BASEDN_P,
-			(void *)nisBaseDN,
-			&errorp);
-	if (retcode != 0) {
-		CLIENT_FPUTS(
-			gettext("Unable to set search baseDN.\n"), stderr);
-		/* non-fatal */
-	}
 
-	LDAP_SET_PARAM(arglist->defaultServerList, NS_LDAP_SERVERS_P);
-	if (retcode != 0) {
-		CLIENT_FPUTS(
-			gettext("Unable to set server address.\n"), stderr);
-		/* non-fatal */
-	}
+	if (arglist->bindDN != NULL) {
+		cfg.SA_CRED = "proxy";
+		/*
+		 * We don't want to force users to always specify authentication
+		 * method when we can infer it. If users wants SSL, he/she would
+		 * have to specify appropriate -a though.
+		 */
+		auth.type = NS_LDAP_AUTH_SIMPLE;
+		if (arglist->bindPasswd == NULL) {
+			arglist->bindPasswd =
+			    getpassphrase("Bind Password:");
+			if (arglist->bindPasswd == NULL) {
+				CLIENT_FPUTS(gettext("Get password failed\n"),
+				    stderr);
 
-	/* Get and set profile params */
-	retcode = __ns_ldap_download(
-			(const char *)arglist->profileName,
-			arglist->defaultServerList,
-			nisBaseDN,
-			&errorp);
-	if (retcode != NS_LDAP_SUCCESS) {
-		CLIENT_FPRINTF(stderr,
-			gettext("The download of the profile failed.\n"));
+				if (gStartLdap == START_RESET)
+					(void) start_service(LDAP_FMRI, B_TRUE);
+
+				return (CLIENT_ERR_CREDENTIAL);
+			}
+		}
+	}
+	cfg.SA_BIND_DN = arglist->bindDN;
+	cfg.SA_BIND_PWD = arglist->bindPasswd;
+
+	if (arglist->authenticationMethod != NULL) {
+		if (__ns_ldap_initAuth(arglist->authenticationMethod,
+		    &auth, &errorp) != NS_LDAP_SUCCESS) {
+			if (errorp != NULL) {
+				CLIENT_FPRINTF(stderr, "%s", errorp->message);
+				(void) __ns_ldap_freeError(&errorp);
+			}
+
+			if (gStartLdap == START_RESET)
+				(void) start_service(LDAP_FMRI, B_TRUE);
+
+			return (CLIENT_ERR_FAIL);
+		}
+		cfg.SA_AUTH = &auth;
+	}
+	cfg.SA_CRED = arglist->credentialLevel;
+
+	cfg.SA_DOMAIN = arglist->domainName;
+	cfg.SA_PROFILE_NAME = arglist->profileName;
+	cfg.SA_CERT_PATH = arglist->certificatePath;
+
+	cfg.type = NS_LDAP_SERVER;
+
+	if (__ns_ldap_initStandalone(&cfg, &errorp) != NS_LDAP_SUCCESS) {
 		if (errorp != NULL) {
-			CLIENT_FPRINTF(stderr, "%s\n", errorp->message);
+			CLIENT_FPRINTF(stderr, "%s", errorp->message);
 			(void) __ns_ldap_freeError(&errorp);
-		} else if (retcode == NS_LDAP_NOTFOUND) {
-			CLIENT_FPRINTF(stderr,
-			gettext("Could not read the profile '%s'.\n"
-				"Perhaps it does not exist or you don't "
-				"have sufficient rights to read it.\n"),
-				arglist->profileName);
 		}
 
 		if (gStartLdap == START_RESET)
@@ -1474,25 +1528,122 @@ client_init(clientopts_t *arglist)
 		return (CLIENT_ERR_FAIL);
 	}
 
-	/* Set additional valid params from command line */
-	/* note that the domainName is not used in setParam */
-	LDAP_SET_PARAM(arglist->proxyDN, NS_LDAP_BINDDN_P);
-	if (retcode != 0) {
-		CLIENT_FPUTS(gettext("setParam proxyDN failed.\n"), stderr);
-		/* non-fatal */
+	if (arglist->proxyDN != NULL && arglist->proxyPassword == NULL) {
+		arglist->proxyPassword = getpassphrase("Proxy Bind Password:");
+		if (arglist->proxyPassword == NULL) {
+			CLIENT_FPUTS(gettext("Get password failed\n"), stderr);
+
+			if (gStartLdap == START_RESET)
+				(void) start_service(LDAP_FMRI, B_TRUE);
+
+			return (CLIENT_ERR_CREDENTIAL);
+		}
 	}
-	LDAP_SET_PARAM(arglist->proxyPassword, NS_LDAP_BINDPASSWD_P);
-	if (retcode != 0) {
-		CLIENT_FPUTS(
-			gettext("setParam proxyPassword failed.\n"), stderr);
-		/* non-fatal */
+	if (arglist->proxyDN != NULL && arglist->proxyPassword != NULL) {
+		if (__ns_ldap_setParam(NS_LDAP_BINDDN_P,
+		    arglist->proxyDN, &errorp) != NS_LDAP_SUCCESS) {
+			if (errorp != NULL) {
+				CLIENT_FPRINTF(stderr, "%s", errorp->message);
+				(void) __ns_ldap_freeError(&errorp);
+			}
+			return (CLIENT_ERR_CREDENTIAL);
+		}
+		if (__ns_ldap_setParam(NS_LDAP_BINDPASSWD_P,
+		    arglist->proxyPassword, &errorp) != NS_LDAP_SUCCESS) {
+			if (errorp != NULL) {
+				CLIENT_FPRINTF(stderr, "%s", errorp->message);
+				(void) __ns_ldap_freeError(&errorp);
+			}
+			return (CLIENT_ERR_CREDENTIAL);
+		}
 	}
-	LDAP_SET_PARAM(arglist->certificatePath, NS_LDAP_HOST_CERTPATH_P);
+
+	if (arglist->authenticationMethod != NULL) {
+		if (__ns_ldap_getParam(NS_LDAP_AUTH_P,
+		    (void ***)&authMethod, &errorp) != NS_LDAP_SUCCESS) {
+			if (errorp != NULL) {
+				CLIENT_FPRINTF(stderr, "%s", errorp->message);
+				(void) __ns_ldap_freeError(&errorp);
+			}
+			return (CLIENT_ERR_CREDENTIAL);
+		}
+
+		if (authMethod != NULL) {
+			for (i = 0; authMethod[i] != NULL; ++i) {
+				if (authMethod[i]->type == auth.type) {
+					break;
+				}
+			}
+
+			if (authMethod[i] == NULL) {
+				CLIENT_FPRINTF(stderr, gettext(
+				    "Warning: init authentication method "
+				    "not found in DUAConfigProfile.\n"));
+			} else {
+				if (i != 0) {
+					CLIENT_FPRINTF(stderr,
+					    gettext(
+					    "Warning: init authentication"
+					    "method using secondary "
+					    "authentication method from "
+					    "DUAConfigProfile.\n"));
+				}
+			}
+			(void) __ns_ldap_freeParam((void ***) &authMethod);
+		}
+	}
+
+	if (arglist->credentialLevel != NULL) {
+		if (__ns_ldap_getParam(NS_LDAP_CREDENTIAL_LEVEL_P,
+		    (void ***)&credLevel, &errorp) != NS_LDAP_SUCCESS) {
+			if (errorp != NULL) {
+				CLIENT_FPRINTF(stderr, "%s", errorp->message);
+				(void) __ns_ldap_freeError(&errorp);
+			}
+			return (CLIENT_ERR_CREDENTIAL);
+		}
+		if (credLevel != NULL) {
+			for (i = 0; credLevel[i] != NULL; ++i) {
+				switch (*credLevel[i]) {
+				case NS_LDAP_CRED_ANON :
+					cred = "none";
+					break;
+				case NS_LDAP_CRED_PROXY :
+					cred = "proxy";
+					break;
+				case NS_LDAP_CRED_SELF :
+					cred = "self";
+					break;
+				default:
+					continue;
+					break;
+				}
+				if (strcmp(cred,
+				    arglist->credentialLevel) == 0) {
+					break;
+				}
+			}
+			if (credLevel[i] == NULL) {
+				CLIENT_FPRINTF(stderr, gettext(
+				    "Warning: init credential level not found "
+				    "in DUAConfigProfile.\n"));
+			} else {
+				if (i != 0) {
+					CLIENT_FPRINTF(stderr,
+					    gettext("Warning: "
+					    "init credential level using "
+					    "secondary credential level from "
+					    "DUAConfigProfile.\n"));
+				}
+			}
+			(void) __ns_ldap_freeParam((void ***) &credLevel);
+		}
+	}
 
 	retcode = credCheck(arglist);
 	if (retcode != CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
-			gettext("Error in setting up credentials\n"), stderr);
+		    gettext("Error in setting up credentials\n"), stderr);
 
 		if (gStartLdap == START_RESET)
 			(void) start_service(LDAP_FMRI, B_TRUE);
@@ -1502,15 +1653,15 @@ client_init(clientopts_t *arglist)
 
 	if (mode_verbose)
 		CLIENT_FPUTS(
-			gettext("About to modify this machines configuration "
-				"by writing the files\n"),
-			stderr);
+		    gettext("About to modify this machines configuration "
+		    "by writing the files\n"),
+		    stderr);
 
 	/* get ready to start playing with files */
 	retcode = stop_services(STATE_SAVE);
 	if (retcode != CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
-			gettext("Errors stopping network services.\n"), stderr);
+		    gettext("Errors stopping network services.\n"), stderr);
 
 		if (gStartLdap == START_RESET)
 			(void) start_service(LDAP_FMRI, B_TRUE);
@@ -1522,30 +1673,30 @@ client_init(clientopts_t *arglist)
 	retcode = file_backup();
 	if (retcode == CLIENT_ERR_RESTORE) {
 		CLIENT_FPUTS(
-			gettext("System not in state to enable ldap client.\n"),
-			stderr);
+		    gettext("System not in state to enable ldap client.\n"),
+		    stderr);
 
 		return (retcode);
 
 	} else if (retcode != CLIENT_SUCCESS) {
 		CLIENT_FPUTS(
-			gettext("Save of system configuration failed.  "
-				"Attempting recovery.\n"),
-			stderr);
+		    gettext("Save of system configuration failed.  "
+		    "Attempting recovery.\n"),
+		    stderr);
 		retcode = recover(STATE_NOSAVE);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPUTS(
-				gettext("Recovery of systems configuration "
-					"failed.  Manual intervention of "
-					"config files is required.\n"),
-				stderr);
+			    gettext("Recovery of systems configuration "
+			    "failed.  Manual intervention of "
+			    "config files is required.\n"),
+			    stderr);
 		}
 
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 
 		return (retcode);
@@ -1555,23 +1706,23 @@ client_init(clientopts_t *arglist)
 	errorp = __ns_ldap_DumpConfiguration(NSCONFIGFILE);
 	if (NULL != errorp) {
 		CLIENT_FPRINTF(stderr,
-			gettext("%s init: errorp is not NULL; %s\n"),
-			cmd, errorp->message);
+		    gettext("%s init: errorp is not NULL; %s\n"),
+		    cmd, errorp->message);
 		retcode = recover(STATE_NOSAVE);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPUTS(
-				gettext("Recovery of systems configuration "
-					"failed.  Manual intervention of "
-					"config files is required.\n"),
-				stderr);
+			    gettext("Recovery of systems configuration "
+			    "failed.  Manual intervention of "
+			    "config files is required.\n"),
+			    stderr);
 			return (CLIENT_ERR_FAIL);
 		}
 		(void) __ns_ldap_freeError(&errorp);
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 		return (CLIENT_ERR_FAIL);
 	}
@@ -1580,23 +1731,23 @@ client_init(clientopts_t *arglist)
 	errorp = __ns_ldap_DumpConfiguration(NSCREDFILE);
 	if (NULL != errorp) {
 		CLIENT_FPRINTF(stderr,
-			gettext("%s init: errorp is not NULL; %s\n"),
-			cmd, errorp->message);
+		    gettext("%s init: errorp is not NULL; %s\n"),
+		    cmd, errorp->message);
 		retcode = recover(STATE_NOSAVE);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPUTS(
-				gettext("Recovery of systems configuration "
-					"failed.  Manual intervention of "
-					"config files is required.\n"),
-				stderr);
+			    gettext("Recovery of systems configuration "
+			    "failed.  Manual intervention of "
+			    "config files is required.\n"),
+			    stderr);
 			return (CLIENT_ERR_FAIL);
 		}
 		(void) __ns_ldap_freeError(&errorp);
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 		return (CLIENT_ERR_FAIL);
 	}
@@ -1604,42 +1755,42 @@ client_init(clientopts_t *arglist)
 	ret_copy = system(CMD_CP " " NSSWITCH_LDAP " " NSSWITCH_CONF);
 	if (ret_copy != 0) {
 		CLIENT_FPRINTF(stderr,
-			gettext("Error %d copying (%s) -> (%s)\n"),
-			ret_copy, NSSWITCH_LDAP, NSSWITCH_CONF);
+		    gettext("Error %d copying (%s) -> (%s)\n"),
+		    ret_copy, NSSWITCH_LDAP, NSSWITCH_CONF);
 		retcode = recover(STATE_NOSAVE);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPUTS(
-				gettext("Recovery of systems configuration "
-					"failed.  Manual intervention of "
-					"config files is required.\n"),
-				stderr);
+			    gettext("Recovery of systems configuration "
+			    "failed.  Manual intervention of "
+			    "config files is required.\n"),
+			    stderr);
 		}
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 		return (CLIENT_ERR_FAIL);
 	}
 
 	if ((profile_fp = open(DOMAINNAME, O_WRONLY|O_CREAT|O_TRUNC,
-		S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) { /* 0644 */
+	    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)) == -1) { /* 0644 */
 		CLIENT_FPRINTF(stderr, gettext("Cannot open %s\n"), DOMAINNAME);
 		retcode = recover(STATE_NOSAVE);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPUTS(
-				gettext("Recovery of systems configuration "
-					"failed.  Manual intervention of "
-					"config files is required.\n"),
-				stderr);
+			    gettext("Recovery of systems configuration "
+			    "failed.  Manual intervention of "
+			    "config files is required.\n"),
+			    stderr);
 			return (CLIENT_ERR_FAIL);
 		}
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 		return (CLIENT_ERR_FAIL);
 	}
@@ -1651,32 +1802,32 @@ client_init(clientopts_t *arglist)
 
 	if (retcode == CLIENT_SUCCESS) {
 		CLIENT_FPUTS(gettext("System successfully configured\n"),
-								stderr);
+		    stderr);
 	} else {
 		CLIENT_FPUTS(gettext("Error resetting system.\n"
-			"Recovering old system settings.\n"), stderr),
+		    "Recovering old system settings.\n"), stderr),
 
-		/* stop any started services for recover */
-		/* don't stomp on history of saved services state */
-		reset_ret = stop_services(STATE_NOSAVE);
+		    /* stop any started services for recover */
+		    /* don't stomp on history of saved services state */
+		    reset_ret = stop_services(STATE_NOSAVE);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"stopping services during reset\n"),
-					reset_ret);
+			    "stopping services during reset\n"),
+			    reset_ret);
 			/* Coninue and try to recover what we can */
 		}
 		reset_ret = recover(STATE_NOSAVE);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"recovering service files during "
-					"reset\n"), reset_ret);
+			    "recovering service files during "
+			    "reset\n"), reset_ret);
 			/* Continue and start what we can */
 		}
 		reset_ret = start_services(START_RESET);
 		if (reset_ret != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"starting services during reset\n"),
-					reset_ret);
+			    "starting services during reset\n"),
+			    reset_ret);
 		}
 	}
 
@@ -1692,30 +1843,36 @@ usage(void)
 
 	if (gen == 0) {
 		CLIENT_FPRINTF(stderr,
-			gettext("Usage: %s [-v | -q] init | manual | mod | "
-				"list | uninit [<args>]\n"),
-			cmd);
+		    gettext("Usage: %s [-v | -q] init | manual | mod | "
+		    "list | uninit [<args>]\n"),
+		    cmd);
+
+		CLIENT_FPRINTF(stderr,
+		    gettext("\n       %s [-v | -q] [-a authenticationMethod]"
+		    " [-D bindDN]\n\t[-w bindPassword] [-j passswdFile]"
+		    " [-y proxyPasswordFile] init [<args>]\n"),
+		    cmd);
 
 		CLIENT_FPUTS(
-			gettext("\nSet up a server or workstation as a "
-				"client of an LDAP namespace.\n"),
-			stderr);
+		    gettext("\nSet up a server or workstation as a "
+		    "client of an LDAP namespace.\n"),
+		    stderr);
 	} else {	/* genprofile */
 		CLIENT_FPRINTF(stderr,
-			gettext("Usage: %s [-v | -q] genprofile "
-				"-a profileName=<name> "
-				"-a defaultSearchBase=<base> <args>\n"),
-			cmd);
+		    gettext("Usage: %s [-v | -q] genprofile "
+		    "-a profileName=<name> "
+		    "-a defaultSearchBase=<base> <args>\n"),
+		    cmd);
 
 		CLIENT_FPUTS(
-			gettext("\nGenerate a profile used to set up clients "
-				"of an LDAP namespace.\n"),
-			stderr);
+		    gettext("\nGenerate a profile used to set up clients "
+		    "of an LDAP namespace.\n"),
+		    stderr);
 	}
 	CLIENT_FPUTS(
-		gettext("<args> take the form of \'-a attrName=attrVal\' as "
-			"described in the\n"),
-		stderr);
+	    gettext("<args> take the form of \'-a attrName=attrVal\' as "
+	    "described in the\n"),
+	    stderr);
 	CLIENT_FPUTS(gettext("man page: ldapclient(1M)\n"), stderr);
 }
 
@@ -1749,9 +1906,9 @@ stop_services(int saveState)
 		if (ret != CLIENT_SUCCESS) {
 			/* Not serious, but tell user what to do */
 			CLIENT_FPRINTF(stderr, gettext("Stopping sendmail "
-				"failed with (%d). You may need to restart "
-				"it manually for changes to take effect.\n"),
-				ret);
+			    "failed with (%d). You may need to restart "
+			    "it manually for changes to take effect.\n"),
+			    ret);
 		} else enableFlag |= SENDMAIL_ON;
 	} else {
 		if (mode_verbose)
@@ -1779,9 +1936,9 @@ stop_services(int saveState)
 		if (ret != CLIENT_SUCCESS) {
 			/* Not serious, but tell user what to do */
 			CLIENT_FPRINTF(stderr, gettext("Stopping autofs "
-				"failed with (%d). You may need to restart "
-				"it manually for changes to take effect.\n"),
-				ret);
+			    "failed with (%d). You may need to restart "
+			    "it manually for changes to take effect.\n"),
+			    ret);
 		} else enableFlag |= AUTOFS_ON;
 	} else {
 		if (mode_verbose)
@@ -1802,7 +1959,7 @@ stop_services(int saveState)
 	} else {
 		if (mode_verbose)
 			CLIENT_FPUTS(gettext("ldap not running\n"),
-								stderr);
+			    stderr);
 	}
 
 	if (!is_service(NISD_FMRI, SCF_STATE_STRING_DISABLED)) {
@@ -1817,7 +1974,7 @@ stop_services(int saveState)
 	} else {
 		if (mode_verbose)
 			CLIENT_FPUTS(gettext("nisd not running\n"),
-								stderr);
+			    stderr);
 	}
 
 	if (!is_service(YP_FMRI, SCF_STATE_STRING_DISABLED)) {
@@ -1834,7 +1991,7 @@ stop_services(int saveState)
 	} else {
 		if (mode_verbose)
 			CLIENT_FPUTS(gettext("nis(yp) not running\n"),
-								stderr);
+			    stderr);
 	}
 
 	return (CLIENT_SUCCESS);
@@ -1867,36 +2024,36 @@ start_services(int flag)
 	domain_fp = fopen(DOMAINNAME, "r");
 	if (domain_fp == NULL) {
 		CLIENT_FPRINTF(stderr, gettext("Error opening defaultdomain "
-							"(%d)\n"), errno);
+		    "(%d)\n"), errno);
 		/* if we did an ldap init, we must have domain */
 		if (flag == START_INIT)
 			return (CLIENT_ERR_FAIL);
 	} else {
 		if (fgets(domainname, BUFSIZ, domain_fp) == NULL) {
 			CLIENT_FPUTS(gettext("Error reading defaultdomain\n"),
-				stderr);
+			    stderr);
 			return (CLIENT_ERR_FAIL);
 		}
 
 		if (fclose(domain_fp) != 0) {
 			CLIENT_FPRINTF(stderr,
-				gettext("Error closing defaultdomain (%d)\n"),
-				errno);
+			    gettext("Error closing defaultdomain (%d)\n"),
+			    errno);
 			return (CLIENT_ERR_FAIL);
 		}
 		domainlen = strlen(domainname);
 		/* sanity check to make sure sprintf will fit */
 		if (domainlen > (BUFSIZE - sizeof (CMD_DOMAIN_START) -
-						sizeof (TO_DEV_NULL) - 3)) {
+		    sizeof (TO_DEV_NULL) - 3)) {
 			CLIENT_FPUTS(gettext("Specified domainname is "
-						"too large\n"), stderr);
+			    "too large\n"), stderr);
 			return (CLIENT_ERR_FAIL);
 		}
 		if (domainname[domainlen-1] == '\n')
 			domainname[domainlen-1] = 0;
 		/* buffer size is checked above */
 		(void) snprintf(cmd_domain_start, BUFSIZ, "%s %s %s",
-				CMD_DOMAIN_START, domainname, TO_DEV_NULL);
+		    CMD_DOMAIN_START, domainname, TO_DEV_NULL);
 	}
 
 	/*
@@ -1907,29 +2064,29 @@ start_services(int flag)
 		sysret = system(cmd_domain_start);
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr, "start: %s %s... %s\n",
-					CMD_DOMAIN_START, domainname,
-					(sysret == 0) ? gettext("success") :
-							gettext("failed"));
+			    CMD_DOMAIN_START, domainname,
+			    (sysret == 0) ? gettext("success") :
+			    gettext("failed"));
 		if (sysret != 0) {
 			CLIENT_FPRINTF(stderr, gettext("\"%s\" returned: %d\n"),
-					CMD_DOMAIN_START, sysret);
+			    CMD_DOMAIN_START, sysret);
 
 			retcode = CLIENT_ERR_FAIL;
 		}
 
 		if ((rc = __ns_ldap_self_gssapi_config(&config)) !=
-			NS_LDAP_SUCCESS) {
+		    NS_LDAP_SUCCESS) {
 			CLIENT_FPRINTF(stderr, gettext("Error (%d) while "
-					"checking sasl/GSSAPI configuration\n"),
-					rc);
+			    "checking sasl/GSSAPI configuration\n"),
+			    rc);
 			retcode = CLIENT_ERR_FAIL;
 		}
 
 		if (config != NS_LDAP_SELF_GSSAPI_CONFIG_NONE) {
 
 			rc = __ns_ldap_check_dns_preq(
-					1, mode_verbose, mode_quiet,
-					NSSWITCH_LDAP, config, &errorp);
+			    1, mode_verbose, mode_quiet,
+			    NSSWITCH_LDAP, config, &errorp);
 			if (errorp)
 				(void) __ns_ldap_freeError(&errorp);
 
@@ -1938,14 +2095,14 @@ start_services(int flag)
 		}
 
 		if (rc == NS_LDAP_SUCCESS &&
-			start_service(LDAP_FMRI, B_TRUE) != CLIENT_SUCCESS)
+		    start_service(LDAP_FMRI, B_TRUE) != CLIENT_SUCCESS)
 			retcode = CLIENT_ERR_FAIL;
 
 		if (config != NS_LDAP_SELF_GSSAPI_CONFIG_NONE &&
-			rc == NS_LDAP_SUCCESS && retcode == CLIENT_SUCCESS) {
+		    rc == NS_LDAP_SUCCESS && retcode == CLIENT_SUCCESS) {
 			rc = __ns_ldap_check_gssapi_preq(
-					1, mode_verbose, mode_quiet, config,
-					&errorp);
+			    1, mode_verbose, mode_quiet, config,
+			    &errorp);
 			if (errorp)
 				(void) __ns_ldap_freeError(&errorp);
 
@@ -1969,13 +2126,13 @@ start_services(int flag)
 			sysret = system(cmd_domain_start);
 			if (mode_verbose)
 				CLIENT_FPRINTF(stderr, "start: %s %s... %s\n",
-					CMD_DOMAIN_START, domainname,
-					(sysret == 0) ? gettext("success") :
-							gettext("failed"));
+				    CMD_DOMAIN_START, domainname,
+				    (sysret == 0) ? gettext("success") :
+				    gettext("failed"));
 			if (sysret != 0) {
 				CLIENT_FPRINTF(stderr, gettext("\"%s\" "
-						"returned: %d\n"),
-						CMD_DOMAIN_START, sysret);
+				    "returned: %d\n"),
+				    CMD_DOMAIN_START, sysret);
 
 				retcode = CLIENT_ERR_FAIL;
 			}
@@ -1984,7 +2141,7 @@ start_services(int flag)
 		if (gStartLdap == flag) {
 			if (!(is_service(LDAP_FMRI, SCF_STATE_STRING_ONLINE)))
 				if (start_service(LDAP_FMRI, B_TRUE)
-							!= CLIENT_SUCCESS)
+				    != CLIENT_SUCCESS)
 					retcode = CLIENT_ERR_FAIL;
 		}
 
@@ -2012,8 +2169,8 @@ start_services(int flag)
 	    retcode == CLIENT_SUCCESS &&
 	    !(is_service(NSCD_FMRI, SCF_STATE_STRING_ONLINE))) {
 		CLIENT_FPRINTF(stderr, "start: %s\n",
-				gettext("self/sasl/GSSAPI is configured"
-					" but nscd is not online"));
+		    gettext("self/sasl/GSSAPI is configured"
+		    " but nscd is not online"));
 		retcode = CLIENT_ERR_FAIL;
 	}
 #endif
@@ -2049,55 +2206,55 @@ credCheck(clientopts_t *arglist)
 
 /* If credentialLevel is proxy, make sure we have proxyDN and proxyPassword */
 	retcode = __ns_ldap_getParam(NS_LDAP_CREDENTIAL_LEVEL_P,
-			(void ***)&credLevel, &errorp);
+	    (void ***)&credLevel, &errorp);
 	if (retcode != 0) {
 		CLIENT_FPRINTF(stderr,
-			gettext("Error %d while trying to retrieve "
-				"credLevel\n"),
-			retcode);
+		    gettext("Error %d while trying to retrieve "
+		    "credLevel\n"),
+		    retcode);
 		return (CLIENT_ERR_FAIL);
 	}
 	retcode = __ns_ldap_getParam(NS_LDAP_AUTH_P,
-			(void ***)&authMethod, &errorp);
+	    (void ***)&authMethod, &errorp);
 	if (retcode != 0) {
 		CLIENT_FPRINTF(stderr,
-			gettext("Error %d while trying to retrieve "
-				"authMethod\n"), retcode);
+		    gettext("Error %d while trying to retrieve "
+		    "authMethod\n"), retcode);
 		return (CLIENT_ERR_FAIL);
 	}
 	retcode = __ns_ldap_getParam(NS_LDAP_BINDDN_P,
-			(void ***)&proxyDN, &errorp);
+	    (void ***)&proxyDN, &errorp);
 	if (retcode != 0) {
 		CLIENT_FPRINTF(stderr,
-			gettext("Error %d while trying to retrieve proxyDN\n"),
-			retcode);
+		    gettext("Error %d while trying to retrieve proxyDN\n"),
+		    retcode);
 		return (CLIENT_ERR_FAIL);
 	}
 	retcode = __ns_ldap_getParam(NS_LDAP_BINDPASSWD_P,
-			(void ***)&proxyPassword, &errorp);
+	    (void ***)&proxyPassword, &errorp);
 	if (retcode != 0) {
 		CLIENT_FPRINTF(stderr,
-			gettext("Error %d while trying to retrieve "
-				"proxyPassword\n"), retcode);
+		    gettext("Error %d while trying to retrieve "
+		    "proxyPassword\n"), retcode);
 		return (CLIENT_ERR_FAIL);
 	}
 
 	if (mode_verbose) {
 		CLIENT_FPRINTF(stderr,
-			gettext("Proxy DN: %s\n"),
-			(proxyDN && proxyDN[0]) ? proxyDN[0] : "NULL");
+		    gettext("Proxy DN: %s\n"),
+		    (proxyDN && proxyDN[0]) ? proxyDN[0] : "NULL");
 		CLIENT_FPRINTF(stderr,
-			gettext("Proxy password: %s\n"),
-			(proxyPassword && proxyPassword[0]) ?
-				proxyPassword[0] : "NULL");
+		    gettext("Proxy password: %s\n"),
+		    (proxyPassword && proxyPassword[0]) ?
+		    proxyPassword[0] : "NULL");
 	}
 
 	credProxy = 0;	/* flag to indicate if we have a credLevel of proxy */
 	for (counter = 0; credLevel && credLevel[counter] != NULL; counter++) {
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("Credential level: %d\n"),
-				*credLevel[counter]);
+			    gettext("Credential level: %d\n"),
+			    *credLevel[counter]);
 		if (*credLevel[counter] == NS_LDAP_CRED_PROXY) {
 			credProxy = 1;
 			break;
@@ -2106,13 +2263,13 @@ credCheck(clientopts_t *arglist)
 
 	authNotNone = 0;	/* flag for authMethod other than none */
 	for (counter = 0;
-		authMethod && authMethod[counter] != NULL;
-		counter++) {
+	    authMethod && authMethod[counter] != NULL;
+	    counter++) {
 
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("Authentication method: %d\n"),
-				authMethod[counter]->type);
+			    gettext("Authentication method: %d\n"),
+			    authMethod[counter]->type);
 		if (authMethod[counter]->type != NS_LDAP_AUTH_NONE &&
 		    !(authMethod[counter]->type == NS_LDAP_AUTH_TLS &&
 		    authMethod[counter]->tlstype == NS_LDAP_TLS_NONE)) {
@@ -2125,25 +2282,25 @@ credCheck(clientopts_t *arglist)
 	if (!(credProxy && authNotNone)) {
 		if (mode_verbose)
 			CLIENT_FPUTS(
-				gettext("No proxyDN/proxyPassword required\n"),
-				stderr);
+			    gettext("No proxyDN/proxyPassword required\n"),
+			    stderr);
 		return (CLIENT_SUCCESS);
 	}
 
 	/* Now let's check if we have the cred stuff we need */
 	if (!proxyDN || !proxyDN[0]) {
 		CLIENT_FPUTS(
-			gettext("credentialLevel is proxy and no proxyDN "
-				"specified\n"),
-			stderr);
+		    gettext("credentialLevel is proxy and no proxyDN "
+		    "specified\n"),
+		    stderr);
 		return (CLIENT_ERR_CREDENTIAL);
 	}
 
 	/* If we need proxyPassword (prompt) */
 	if (!proxyPassword || !proxyPassword[0]) {
 		CLIENT_FPUTS(
-			gettext("credentialLevel requires proxyPassword\n"),
-			stderr);
+		    gettext("credentialLevel requires proxyPassword\n"),
+		    stderr);
 		arglist->proxyPassword = getpassphrase("Proxy Bind Password:");
 		if (arglist->proxyPassword == NULL) {
 			CLIENT_FPUTS(gettext("Get password failed\n"), stderr);
@@ -2152,8 +2309,8 @@ credCheck(clientopts_t *arglist)
 		LDAP_SET_PARAM(arglist->proxyPassword, NS_LDAP_BINDPASSWD_P);
 		if (retcode != 0) {
 			CLIENT_FPUTS(
-				gettext("setParam proxyPassword failed.\n"),
-				stderr);
+			    gettext("setParam proxyPassword failed.\n"),
+			    stderr);
 			return (CLIENT_ERR_CREDENTIAL);
 		}
 	}
@@ -2182,19 +2339,19 @@ recover(int saveState)
 	stat_ret = stat(LDAP_RESTORE_DIR, &buf);
 	if (stat_ret != 0) {
 		CLIENT_FPUTS(
-			gettext("Cannot recover.  No backup files "
-				"found.\n"),
-			stderr);
+		    gettext("Cannot recover.  No backup files "
+		    "found.\n"),
+		    stderr);
 		CLIENT_FPUTS(
-			gettext("\t Either this machine was not initialized\n"),
-			stderr);
+		    gettext("\t Either this machine was not initialized\n"),
+		    stderr);
 		CLIENT_FPUTS(
-			gettext("\t by ldapclient or the backup files "
-				"have been\n"),
-			stderr);
+		    gettext("\t by ldapclient or the backup files "
+		    "have been\n"),
+		    stderr);
 		CLIENT_FPUTS(
-			gettext("\t removed manually or with an \"uninit\"\n"),
-			stderr);
+		    gettext("\t removed manually or with an \"uninit\"\n"),
+		    stderr);
 		return (CLIENT_ERR_RESTORE);	/* invalid backup */
 	}
 
@@ -2205,25 +2362,25 @@ recover(int saveState)
 	stat_ret = stat(DOMAINNAME_BACK, &buf);
 	if (mode_verbose)
 		CLIENT_FPRINTF(stderr,
-			gettext("recover: stat(%s)=%d\n"),
-			DOMAINNAME_BACK, stat_ret);
+		    gettext("recover: stat(%s)=%d\n"),
+		    DOMAINNAME_BACK, stat_ret);
 	if (stat_ret == 0) {
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("recover: open(%s)\n"),
-					DOMAINNAME_BACK);
+			    gettext("recover: open(%s)\n"),
+			    DOMAINNAME_BACK);
 		fd = open(DOMAINNAME_BACK, O_RDONLY);
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("recover: read(%s)\n"),
-					DOMAINNAME_BACK);
+			    gettext("recover: read(%s)\n"),
+			    DOMAINNAME_BACK);
 		domainlen = read(fd, &(name[0]), BUFSIZ-1);
 		(void) close(fd);
 		if (domainlen < 0) {
 			CLIENT_FPUTS(
-				gettext("Cannot recover.  Cannot determine "
-					"previous domain name.\n"),
-				stderr);
+			    gettext("Cannot recover.  Cannot determine "
+			    "previous domain name.\n"),
+			    stderr);
 			return (CLIENT_ERR_RESTORE);	/* invalid backup */
 		} else 	{
 			char *ptr;
@@ -2236,8 +2393,8 @@ recover(int saveState)
 
 			if (mode_verbose)
 				CLIENT_FPRINTF(stderr,
-					gettext("recover: old domainname "
-						"\"%s\"\n"), name);
+				    gettext("recover: old domainname "
+				    "\"%s\"\n"), name);
 
 			if (strlen(name) == 0)
 				domain = 0;
@@ -2264,20 +2421,20 @@ recover(int saveState)
 	stat_ret = stat(ldap_file_back, &buf);
 	if (mode_verbose)
 		CLIENT_FPRINTF(stderr,
-			gettext("recover: stat(%s)=%d\n"),
-			ldap_file_back, stat_ret);
+		    gettext("recover: stat(%s)=%d\n"),
+		    ldap_file_back, stat_ret);
 	if (stat_ret == 0) {
 		if (saveState)
 			gStartLdap = START_UNINIT;
 		retcode = file_move(ldap_file_back, NSCONFIGFILE);
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("recover: file_move(%s, %s)=%d\n"),
-				ldap_file_back, NSCONFIGFILE, retcode);
+			    gettext("recover: file_move(%s, %s)=%d\n"),
+			    ldap_file_back, NSCONFIGFILE, retcode);
 		if (retcode != 0)
 			CLIENT_FPRINTF(stderr,
-				gettext("recover: file_move(%s, %s) failed\n"),
-				ldap_file_back, NSCONFIGFILE);
+			    gettext("recover: file_move(%s, %s) failed\n"),
+			    ldap_file_back, NSCONFIGFILE);
 	}
 
 	(void) strlcpy(ldap_cred_back, LDAP_RESTORE_DIR "/", BUFSIZE);
@@ -2286,39 +2443,39 @@ recover(int saveState)
 	stat_ret = stat(ldap_cred_back, &buf);
 	if (mode_verbose)
 		CLIENT_FPRINTF(stderr,
-			gettext("recover: stat(%s)=%d\n"),
-			ldap_cred_back, stat_ret);
+		    gettext("recover: stat(%s)=%d\n"),
+		    ldap_cred_back, stat_ret);
 	if (stat_ret == 0) {
 		retcode = file_move(ldap_cred_back, NSCREDFILE);
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("recover: file_move(%s, %s)=%d\n"),
-				ldap_cred_back, NSCREDFILE, retcode);
+			    gettext("recover: file_move(%s, %s)=%d\n"),
+			    ldap_cred_back, NSCREDFILE, retcode);
 		if (retcode != 0)
 			CLIENT_FPRINTF(stderr,
-				gettext("recover: file_move(%s, %s) failed\n"),
-				ldap_cred_back, NSCREDFILE);
+			    gettext("recover: file_move(%s, %s) failed\n"),
+			    ldap_cred_back, NSCREDFILE);
 	}
 
 	/* Check for recovery of NIS+ */
 	stat_ret = stat(NIS_COLDSTART_BACK, &buf);
 	if (mode_verbose)
 		CLIENT_FPRINTF(stderr,
-			gettext("recover: stat(%s)=%d\n"),
-			NIS_COLDSTART_BACK, stat_ret);
+		    gettext("recover: stat(%s)=%d\n"),
+		    NIS_COLDSTART_BACK, stat_ret);
 	if (stat_ret == 0) {
 		if (saveState) {
 			gStartNisd = START_UNINIT;
 		}
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("recover: file_move(%s, %s)\n"),
-				NIS_COLDSTART_BACK, NIS_COLDSTART);
+			    gettext("recover: file_move(%s, %s)\n"),
+			    NIS_COLDSTART_BACK, NIS_COLDSTART);
 		retcode = file_move(NIS_COLDSTART_BACK, NIS_COLDSTART);
 		if (retcode != 0)
 			CLIENT_FPRINTF(stderr,
-				gettext("recover: file_move(%s, %s) failed!\n"),
-				NIS_COLDSTART_BACK, NIS_COLDSTART);
+			    gettext("recover: file_move(%s, %s) failed!\n"),
+			    NIS_COLDSTART_BACK, NIS_COLDSTART);
 	}
 
 	/* Check for recovery of NIS(YP) if we have a domainname */
@@ -2334,22 +2491,22 @@ recover(int saveState)
 		stat_ret = stat(yp_dir_back, &buf);
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("recover: stat(%s)=%d\n"),
-				yp_dir_back, stat_ret);
+			    gettext("recover: stat(%s)=%d\n"),
+			    yp_dir_back, stat_ret);
 		if (stat_ret == 0) {
 			(void) strlcpy(yp_dir, YP_BIND_DIR "/", BUFSIZE);
 			(void) strlcat(yp_dir, name, BUFSIZE);
 			retcode = file_move(yp_dir_back, yp_dir);
 			if (mode_verbose)
 				CLIENT_FPRINTF(stderr,
-					gettext("recover: file_move(%s, "
-						"%s)=%d\n"),
-					yp_dir_back, yp_dir, retcode);
+				    gettext("recover: file_move(%s, "
+				    "%s)=%d\n"),
+				    yp_dir_back, yp_dir, retcode);
 			if (retcode != 0) {
 				CLIENT_FPRINTF(stderr,
-					gettext("recover: file_move(%s, "
-						"%s) failed!\n"),
-					yp_dir_back, yp_dir);
+				    gettext("recover: file_move(%s, "
+				    "%s) failed!\n"),
+				    yp_dir_back, yp_dir);
 			} else {
 				if (saveState)
 					gStartYp = START_UNINIT;
@@ -2361,42 +2518,42 @@ recover(int saveState)
 	stat_ret = stat(NSSWITCH_BACK, &buf);
 	if (mode_verbose)
 		CLIENT_FPRINTF(stderr,
-			gettext("recover: stat(%s)=%d\n"),
-			NSSWITCH_BACK, stat_ret);
+		    gettext("recover: stat(%s)=%d\n"),
+		    NSSWITCH_BACK, stat_ret);
 	if (stat_ret == 0) {
 		retcode = file_move(NSSWITCH_BACK, NSSWITCH_CONF);
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("recover: file_move(%s, %s)=%d\n"),
-				NSSWITCH_BACK, NSSWITCH_CONF, retcode);
+			    gettext("recover: file_move(%s, %s)=%d\n"),
+			    NSSWITCH_BACK, NSSWITCH_CONF, retcode);
 		if (retcode != 0)
 			CLIENT_FPRINTF(stderr,
-				gettext("recover: file_move(%s, %s) failed\n"),
-				NSSWITCH_BACK, NSSWITCH_CONF);
+			    gettext("recover: file_move(%s, %s) failed\n"),
+			    NSSWITCH_BACK, NSSWITCH_CONF);
 	}
 
 	stat_ret = stat(DOMAINNAME_BACK, &buf);
 	if (mode_verbose)
 		CLIENT_FPRINTF(stderr,
-			gettext("recover: stat(%s)=%d\n"),
-			DOMAINNAME_BACK, stat_ret);
+		    gettext("recover: stat(%s)=%d\n"),
+		    DOMAINNAME_BACK, stat_ret);
 	if (stat_ret == 0) {
 		retcode = file_move(DOMAINNAME_BACK, DOMAINNAME);
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("recover: file_move(%s, %s)=%d\n"),
-				DOMAINNAME_BACK, DOMAINNAME, retcode);
+			    gettext("recover: file_move(%s, %s)=%d\n"),
+			    DOMAINNAME_BACK, DOMAINNAME, retcode);
 		if (retcode != 0)
 			CLIENT_FPRINTF(stderr,
-				gettext("recover: file_move(%s, %s) failed\n"),
-				DOMAINNAME_BACK, DOMAINNAME);
+			    gettext("recover: file_move(%s, %s) failed\n"),
+			    DOMAINNAME_BACK, DOMAINNAME);
 	}
 
 	retcode = rmdir(LDAP_RESTORE_DIR);
 	if (retcode != 0) {
 		CLIENT_FPRINTF(stderr,
-			gettext("Error removing \"%s\" directory.\n"),
-			LDAP_RESTORE_DIR);
+		    gettext("Error removing \"%s\" directory.\n"),
+		    LDAP_RESTORE_DIR);
 	}
 
 	return (CLIENT_SUCCESS);
@@ -2433,17 +2590,17 @@ file_backup(void)
 	if (restore_stat == 0) {
 		if (mode_verbose) {
 			CLIENT_FPUTS(
-				gettext("Removing existing restore "
-					"directory\n"),
-				stderr);
+			    gettext("Removing existing restore "
+			    "directory\n"),
+			    stderr);
 		}
 		(void) system("/bin/rm -fr " LDAP_RESTORE_DIR);
 		restore_stat = stat(LDAP_RESTORE_DIR, &buf);
 		if (restore_stat == 0) {
 			CLIENT_FPRINTF(stderr,
-				gettext("Unable to remove backup "
-					"directory (%s)\n"),
-				LDAP_RESTORE_DIR);
+			    gettext("Unable to remove backup "
+			    "directory (%s)\n"),
+			    LDAP_RESTORE_DIR);
 			return (CLIENT_ERR_RESTORE);
 		}
 	}
@@ -2451,92 +2608,92 @@ file_backup(void)
 	retcode = mkdir(LDAP_RESTORE_DIR, 0755);
 	if (retcode != 0) {
 		CLIENT_FPRINTF(stderr,
-			gettext("file_backup: Failed to make %s backup "
-				"directory. mkdir=%d\n"),
-			LDAP_RESTORE_DIR, retcode);
+		    gettext("file_backup: Failed to make %s backup "
+		    "directory. mkdir=%d\n"),
+		    LDAP_RESTORE_DIR, retcode);
 		return (CLIENT_ERR_FAIL);
 	}
 
 	conf_stat = stat(NSSWITCH_CONF, &buf);
 	if (mode_verbose)
 		CLIENT_FPRINTF(stderr,
-			gettext("file_backup: stat(%s)=%d\n"),
-			NSSWITCH_CONF, conf_stat);
+		    gettext("file_backup: stat(%s)=%d\n"),
+		    NSSWITCH_CONF, conf_stat);
 	if (conf_stat == 0) {
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("file_backup: (%s -> %s)\n"),
-				NSSWITCH_CONF, NSSWITCH_BACK);
+			    gettext("file_backup: (%s -> %s)\n"),
+			    NSSWITCH_CONF, NSSWITCH_BACK);
 		retcode = file_move(NSSWITCH_CONF, NSSWITCH_BACK);
 		if (retcode != 0) {
 			CLIENT_FPRINTF(stderr,
-				gettext("file_backup: file_move(%s, %s) failed "
-					"with %d\n"),
-				NSSWITCH_CONF, NSSWITCH_BACK, retcode);
+			    gettext("file_backup: file_move(%s, %s) failed "
+			    "with %d\n"),
+			    NSSWITCH_CONF, NSSWITCH_BACK, retcode);
 			ret = CLIENT_ERR_RENAME;
 		}
 	} else {
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("file_backup: No %s file.\n"),
-				NSSWITCH_CONF);
+			    gettext("file_backup: No %s file.\n"),
+			    NSSWITCH_CONF);
 	}
 
 	domain_stat = stat(DOMAINNAME, &buf);
 	if (mode_verbose)
 		CLIENT_FPRINTF(stderr,
-			gettext("file_backup: stat(%s)=%d\n"),
-			DOMAINNAME, domain_stat);
+		    gettext("file_backup: stat(%s)=%d\n"),
+		    DOMAINNAME, domain_stat);
 	if ((domain_stat == 0) && (buf.st_size > 0)) {
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("file_backup: (%s -> %s)\n"),
-				DOMAINNAME, DOMAINNAME_BACK);
+			    gettext("file_backup: (%s -> %s)\n"),
+			    DOMAINNAME, DOMAINNAME_BACK);
 		retcode = file_move(DOMAINNAME, DOMAINNAME_BACK);
 		if (retcode != 0) {
 			CLIENT_FPRINTF(stderr,
-				gettext("file_backup: file_move(%s, %s) failed "
-					"with %d\n"),
-				DOMAINNAME, DOMAINNAME_BACK, retcode);
+			    gettext("file_backup: file_move(%s, %s) failed "
+			    "with %d\n"),
+			    DOMAINNAME, DOMAINNAME_BACK, retcode);
 			ret = CLIENT_ERR_RENAME;
 		}
 	} else {
 		if (mode_verbose)
 			if (domain_stat != 0) {
 				CLIENT_FPRINTF(stderr,
-					gettext("file_backup: No %s file.\n"),
-					DOMAINNAME);
+				    gettext("file_backup: No %s file.\n"),
+				    DOMAINNAME);
 			} else {
 				CLIENT_FPRINTF(stderr,
-					gettext("file_backup: Empty %s "
-								"file.\n"),
-					DOMAINNAME);
+				    gettext("file_backup: Empty %s "
+				    "file.\n"),
+				    DOMAINNAME);
 			}
 	}
 
 	nis_stat = stat(NIS_COLDSTART, &buf);
 	if (mode_verbose)
 		CLIENT_FPRINTF(stderr,
-			gettext("file_backup: stat(%s)=%d\n"),
-			NIS_COLDSTART, nis_stat);
+		    gettext("file_backup: stat(%s)=%d\n"),
+		    NIS_COLDSTART, nis_stat);
 	if (nis_stat == 0) {
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("file_backup: (%s -> %s)\n"),
-				NIS_COLDSTART, NIS_COLDSTART_BACK);
+			    gettext("file_backup: (%s -> %s)\n"),
+			    NIS_COLDSTART, NIS_COLDSTART_BACK);
 		retcode = file_move(NIS_COLDSTART, NIS_COLDSTART_BACK);
 		if (retcode != 0) {
 			CLIENT_FPRINTF(stderr,
-				gettext("file_backup: file_move(%s, %s) failed "
-					"with %d\n"),
-				NIS_COLDSTART, NIS_COLDSTART_BACK, retcode);
+			    gettext("file_backup: file_move(%s, %s) failed "
+			    "with %d\n"),
+			    NIS_COLDSTART, NIS_COLDSTART_BACK, retcode);
 			ret = CLIENT_ERR_RENAME;
 		}
 	} else {
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("file_backup: No %s file.\n"),
-				NIS_COLDSTART);
+			    gettext("file_backup: No %s file.\n"),
+			    NIS_COLDSTART);
 	}
 
 	namelen = BUFSIZ;
@@ -2545,8 +2702,8 @@ file_backup(void)
 
 	if (mode_verbose)
 		CLIENT_FPRINTF(stderr,
-			gettext("file_backup: nis domain is \"%s\"\n"),
-			(namelen > 0) ? name : "EMPTY");
+		    gettext("file_backup: nis domain is \"%s\"\n"),
+		    (namelen > 0) ? name : "EMPTY");
 	/* check for domain name if not set cannot save NIS(YP) state */
 	if (namelen > 0) {
 		/* moving /var/yp/binding will cause ypbind to core dump */
@@ -2555,29 +2712,29 @@ file_backup(void)
 		yp_stat = stat(yp_dir, &buf);
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("file_backup: stat(%s)=%d\n"),
-				yp_dir, yp_stat);
+			    gettext("file_backup: stat(%s)=%d\n"),
+			    yp_dir, yp_stat);
 		if (yp_stat == 0) {
 			(void) strlcpy(yp_dir_back, LDAP_RESTORE_DIR "/",
-				BUFSIZE);
+			    BUFSIZE);
 			(void) strlcat(yp_dir_back, name, BUFSIZE);
 			if (mode_verbose)
 				CLIENT_FPRINTF(stderr,
-					gettext("file_backup: (%s -> %s)\n"),
-					yp_dir, yp_dir_back);
+				    gettext("file_backup: (%s -> %s)\n"),
+				    yp_dir, yp_dir_back);
 			retcode = file_move(yp_dir, yp_dir_back);
 			if (retcode != 0) {
 				CLIENT_FPRINTF(stderr,
-					gettext("file_backup: file_move(%s, %s)"
-						" failed with %d\n"),
-					yp_dir, yp_dir_back, retcode);
+				    gettext("file_backup: file_move(%s, %s)"
+				    " failed with %d\n"),
+				    yp_dir, yp_dir_back, retcode);
 				ret = CLIENT_ERR_RENAME;
 			}
 		} else {
 			if (mode_verbose)
 				CLIENT_FPRINTF(stderr,
-					gettext("file_backup: No %s "
-						"directory.\n"), yp_dir);
+				    gettext("file_backup: No %s "
+				    "directory.\n"), yp_dir);
 		}
 	}
 
@@ -2589,21 +2746,21 @@ file_backup(void)
 	ldap_stat = stat(NSCONFIGFILE, &buf);
 	if (mode_verbose)
 		CLIENT_FPRINTF(stderr,
-			gettext("file_backup: stat(%s)=%d\n"),
-			NSCONFIGFILE, ldap_stat);
+		    gettext("file_backup: stat(%s)=%d\n"),
+		    NSCONFIGFILE, ldap_stat);
 	if (ldap_stat == 0) {
 		(void) strlcpy(ldap_file_back, LDAP_RESTORE_DIR "/", BUFSIZE);
 		(void) strlcat(ldap_file_back, ldap_conf_file, BUFSIZE);
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("file_backup: (%s -> %s)\n"),
-				NSCONFIGFILE, ldap_file_back);
+			    gettext("file_backup: (%s -> %s)\n"),
+			    NSCONFIGFILE, ldap_file_back);
 		retcode = file_move(NSCONFIGFILE, ldap_file_back);
 		if (retcode != 0) {
 			CLIENT_FPRINTF(stderr,
-				gettext("file_backup: file_move(%s, %s) failed "
-					"with %d\n"),
-				NSCONFIGFILE, ldap_file_back, retcode);
+			    gettext("file_backup: file_move(%s, %s) failed "
+			    "with %d\n"),
+			    NSCONFIGFILE, ldap_file_back, retcode);
 			ret = CLIENT_ERR_RENAME;
 		}
 
@@ -2611,21 +2768,21 @@ file_backup(void)
 		(void) strlcat(ldap_cred_back, ldap_cred_file, BUFSIZE);
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("file_backup: (%s -> %s)\n"),
-				NSCREDFILE, ldap_cred_back);
+			    gettext("file_backup: (%s -> %s)\n"),
+			    NSCREDFILE, ldap_cred_back);
 		retcode = file_move(NSCREDFILE, ldap_cred_back);
 		if (retcode != 0) {
 			CLIENT_FPRINTF(stderr,
-				gettext("file_backup: file_move(%s, %s) failed "
-					"with %d\n"),
-				NSCREDFILE, ldap_cred_back, retcode);
+			    gettext("file_backup: file_move(%s, %s) failed "
+			    "with %d\n"),
+			    NSCREDFILE, ldap_cred_back, retcode);
 			ret = CLIENT_ERR_RENAME;
 		}
 	} else {
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr,
-				gettext("file_backup: No %s file.\n"),
-				NSCONFIGFILE);
+			    gettext("file_backup: No %s file.\n"),
+			    NSCONFIGFILE);
 	}
 
 	return (ret);
@@ -2725,210 +2882,6 @@ mod_cleanup(void)
 #define	MAX_DN_ARRAY 100
 #define	LDAP_NAMINGCONTEXTS	"namingcontexts"
 
-static char *
-findBaseDN(char *server)
-{
-	int ret;
-	ns_ldap_entry_t *entry;
-	ns_ldap_result_t *resultp;
-	ns_ldap_error_t *errorp = NULL;
-	char filter[BUFSIZ], *rootDN[MAX_DN_ARRAY], *nisBaseDN;
-	char *attribute[] = { LDAP_NAMINGCONTEXTS, NULL };
-	int root_cnt, found_cxt;
-	int i, j, k, retcode;
-
-	if (mode_verbose)
-		CLIENT_FPUTS(gettext("findBaseDN: begins\n"), stderr);
-
-	if (dname == NULL)
-		return (NULL);
-
-	if (is_service(LDAP_FMRI, SCF_STATE_STRING_ONLINE)) {
-		gStartLdap = START_RESET; /* reset flag for err cases */
-		if (mode_verbose)
-			CLIENT_FPUTS(gettext("findBaseDN: Stopping ldap\n"),
-								stderr);
-		ret = disable_service(LDAP_FMRI, B_TRUE);
-		if (ret != 0) {
-			CLIENT_FPRINTF(stderr, gettext("findBaseDN: Stopping "
-					"ldap failed with (%d)\n"), ret);
-			return (NULL);
-		}
-		(void) unlink(LDAP_CACHE_LOG);
-	} else {
-		if (mode_verbose)
-			CLIENT_FPUTS(gettext("findBaseDN: ldap not running\n"),
-			    stderr);
-	}
-
-	if (mode_verbose)
-		CLIENT_FPUTS(
-			gettext("findBaseDN: calling "
-				"__ns_ldap_default_config()\n"),
-			stderr);
-	__ns_ldap_default_config();
-
-	retcode = __ns_ldap_setParam(NS_LDAP_SERVERS_P,
-				(void *)server, &errorp);
-	if (retcode != NS_LDAP_SUCCESS) {
-		goto findDN_err_exit;
-	}
-
-	retcode = __ns_ldap_setParam(NS_LDAP_AUTH_P,
-			(void *)"NS_LDAP_AUTH_NONE", &errorp);
-	if (retcode != NS_LDAP_SUCCESS) {
-		goto findDN_err_exit;
-	}
-
-	retcode = __ns_ldap_setParam(NS_LDAP_TRANSPORT_SEC_P,
-			(void *)"NS_LDAP_SEC_NONE", &errorp);
-	if (retcode != NS_LDAP_SUCCESS) {
-		goto findDN_err_exit;
-	}
-
-	retcode = __ns_ldap_setParam(NS_LDAP_SEARCH_BASEDN_P,
-			(void *)"", &errorp);
-	if (retcode != NS_LDAP_SUCCESS) {
-		goto findDN_err_exit;
-	}
-
-	retcode = __ns_ldap_setParam(NS_LDAP_SEARCH_SCOPE_P,
-			(void *)"NS_LDAP_SCOPE_BASE", &errorp);
-	if (retcode != NS_LDAP_SUCCESS) {
-		goto findDN_err_exit;
-	}
-
-	(void) strcpy(&filter[0], "(objectclass=*)");
-
-	ret = __ns_ldap_list(NULL, filter, NULL, (const char **)attribute,
-				NULL, 0, &resultp, &errorp, NULL, NULL);
-	if (NULL == resultp) {
-		if (mode_verbose)
-			CLIENT_FPUTS(
-				gettext("__ns_ldap_list return NULL resultp\n"),
-				stderr);
-
-		goto findDN_err_exit;
-	}
-
-	for (i = 0; i < MAX_DN_ARRAY; i++)
-		rootDN[i] = NULL;
-	root_cnt = 0;
-	entry = resultp->entry;
-	for (i = 0; i < resultp->entries_count; i++) {
-	    for (j = 0; j < entry->attr_count; j++) {
-		char *cp;
-
-		cp = entry->attr_pair[j]->attrname;
-		if (0 != j) {
-		    for (k = 0; entry->attr_pair[j]->attrvalue[k]; k++)
-			if (0 == strcasecmp(cp, LDAP_NAMINGCONTEXTS)) {
-			    if (NULL == rootDN[root_cnt])
-				rootDN[root_cnt++] = strdup(entry->attr_pair[j]
-							->attrvalue[k]);
-				if (rootDN[root_cnt-1] == NULL) {
-					root_cnt--;
-					CLIENT_FPUTS(gettext("Memory "
-						"allocation error.\n"), stderr);
-			/*
-			 * fall through and let processing happen on the
-			 * rootDNs found to this point.  Most likely
-			 * things will fall apart if we are out of memory!
-			 */
-					break;
-				}
-			}
-		}
-	    }
-	    entry = entry->next;
-	}
-	(void) __ns_ldap_freeResult(&resultp);
-	if (mode_verbose)
-		CLIENT_FPRINTF(stderr,
-			gettext("found %d namingcontexts\n"), root_cnt);
-	if (root_cnt == 0) {
-		CLIENT_FPUTS(gettext("Cannot find the rootDN\n"), stderr);
-		goto findDN_err_exit;
-	}
-	found_cxt = -1;
-	for (i = 0; i < root_cnt; i++) {
-		retcode = __ns_ldap_setParam(NS_LDAP_SEARCH_BASEDN_P,
-						(void *)rootDN[i], &errorp);
-		if (NS_LDAP_SUCCESS != retcode) {
-			CLIENT_FPUTS(
-				gettext("Error setting param "
-					"NS_LDAP_SEARCH_BASEDN_P\n"), stderr);
-			goto findDN_err_exit;
-		}
-		retcode = __ns_ldap_setParam(NS_LDAP_SEARCH_SCOPE_P,
-				(void *)"NS_LDAP_SCOPE_SUBTREE", &errorp);
-		if (NS_LDAP_SUCCESS != retcode) {
-			CLIENT_FPUTS(
-				gettext("Error setting param "
-					"NS_LDAP_SEARCH_SCOPE_P\n"),
-				stderr);
-			goto findDN_err_exit;
-		}
-		(void) snprintf(&filter[0], BUFSIZ,
-			"(&(objectclass=nisDomainObject)(nisdomain=%s))",
-			dname);
-		if (mode_verbose) {
-		    CLIENT_FPRINTF(stderr,
-			gettext("findBaseDN: __ns_ldap_list(NULL, \"%s\"\n"),
-			filter);
-		    CLIENT_FPRINTF(stderr,
-			gettext("rootDN[%d] %s\n"), i, rootDN[i]);
-		}
-		ret = __ns_ldap_list(NULL, filter, NULL, (const char **)NULL,
-					NULL, 0, &resultp, &errorp, NULL, NULL);
-		if (ret == NS_LDAP_SUCCESS) {
-			found_cxt = i;
-			break;
-		} else {
-		    if (mode_verbose)
-			CLIENT_FPRINTF(stderr,
-				gettext("NOTFOUND:Could not find the "
-					"nisDomainObject for DN %s\n"),
-				rootDN[i]);
-		}
-	}
-	if (-1 == found_cxt) {
-		if (mode_verbose)
-			CLIENT_FPUTS(gettext("found_cxt = -1\n"), stderr);
-		goto findDN_err_exit;
-	}
-	if (resultp == NULL) {
-		CLIENT_FPUTS(gettext("resultp is NULL\n"), stderr);
-		goto findDN_err_exit;
-	}
-	entry = resultp->entry;
-	if (entry == NULL) {
-		CLIENT_FPUTS(gettext("entry is NULL\n"), stderr);
-		goto findDN_err_exit;
-	}
-
-	nisBaseDN = strdup(entry->attr_pair[0]->attrvalue[0]);
-
-	(void) __ns_ldap_freeResult(&resultp);
-
-	if (mode_verbose)
-		CLIENT_FPRINTF(stderr,
-			gettext("found baseDN %s for domain %s\n"),
-			nisBaseDN ? nisBaseDN : "NULL", dname);
-
-	return (nisBaseDN);
-
-findDN_err_exit:
-	if (mode_verbose) {
-		CLIENT_FPUTS(gettext("findBaseDN: Err exit\n"), stderr);
-	}
-	if (NULL != errorp) {
-		CLIENT_FPRINTF(stderr, gettext("\t%s\n"), errorp->message);
-		(void) __ns_ldap_freeError(&errorp);
-	}
-	return (NULL);
-}
-
 static multival_t *
 multival_new()
 {
@@ -2937,8 +2890,8 @@ multival_new()
 	hold = calloc(1, sizeof (multival_t));
 	if (hold == NULL) {
 		CLIENT_FPUTS(
-			gettext("multival_new: Memory allocation error\n"),
-			stderr);
+		    gettext("multival_new: Memory allocation error\n"),
+		    stderr);
 	}
 	return (hold);	/* NULL -> error */
 }
@@ -2948,8 +2901,8 @@ multival_add(multival_t *list, char *opt)
 {
 	if (opt == NULL) {
 		CLIENT_FPUTS(
-			gettext("Empty value passed to multival_add\n"),
-			stderr);
+		    gettext("Empty value passed to multival_add\n"),
+		    stderr);
 		return (CLIENT_ERR_FAIL);
 	}
 
@@ -2957,7 +2910,7 @@ multival_add(multival_t *list, char *opt)
 		list->optlist = (char **)malloc(sizeof (char **));
 	} else {
 		list->optlist = (char **)realloc(list->optlist,
-			(list->count + 1) * sizeof (char **));
+		    (list->count + 1) * sizeof (char **));
 	}
 
 	if (list->optlist == NULL) {
@@ -2990,14 +2943,14 @@ clientopts_new()
 	hold = calloc(1, sizeof (clientopts_t));
 	if (NULL == hold) {
 		CLIENT_FPUTS(gettext("Error allocating memory for "
-				"clientopts structure\n"), stderr);
+		    "clientopts structure\n"), stderr);
 		return (hold);	/* NULL -> error */
 	}
 
 	hold->serviceAuthenticationMethod = multival_new();
 	if (NULL == hold->serviceAuthenticationMethod) {
 		CLIENT_FPUTS(gettext("Error allocating memory for "
-				"serviceAuthenticationMethod\n"), stderr);
+		    "serviceAuthenticationMethod\n"), stderr);
 		free(hold);
 		return (NULL);	/* NULL -> error */
 	}
@@ -3005,7 +2958,7 @@ clientopts_new()
 	hold->serviceCredentialLevel = multival_new();
 	if (NULL == hold->serviceCredentialLevel) {
 		CLIENT_FPUTS(gettext("Error allocating memory for "
-				"serviceCredentialLevel\n"), stderr);
+		    "serviceCredentialLevel\n"), stderr);
 		multival_free(hold->serviceAuthenticationMethod);
 		free(hold);
 		return (NULL);	/* NULL -> error */
@@ -3014,7 +2967,7 @@ clientopts_new()
 	hold->objectclassMap = multival_new();
 	if (NULL == hold->objectclassMap) {
 		CLIENT_FPUTS(gettext("Error allocating memory for "
-				"objectclassMap\n"), stderr);
+		    "objectclassMap\n"), stderr);
 		multival_free(hold->serviceAuthenticationMethod);
 		multival_free(hold->serviceCredentialLevel);
 		free(hold);
@@ -3024,7 +2977,7 @@ clientopts_new()
 	hold->attributeMap = multival_new();
 	if (NULL == hold->attributeMap) {
 		CLIENT_FPUTS(gettext("Error allocating memory for "
-				"attributeMap\n"), stderr);
+		    "attributeMap\n"), stderr);
 		multival_free(hold->serviceAuthenticationMethod);
 		multival_free(hold->serviceCredentialLevel);
 		multival_free(hold->objectclassMap);
@@ -3035,7 +2988,7 @@ clientopts_new()
 	hold->serviceSearchDescriptor = multival_new();
 	if (NULL == hold->serviceSearchDescriptor) {
 		CLIENT_FPUTS(gettext("Error allocating memory for "
-				"serviceSearchDescriptor\n"), stderr);
+		    "serviceSearchDescriptor\n"), stderr);
 		multival_free(hold->serviceAuthenticationMethod);
 		multival_free(hold->serviceCredentialLevel);
 		multival_free(hold->objectclassMap);
@@ -3115,11 +3068,11 @@ dumpargs(clientopts_t *list)
 {
 	CLIENT_PRINT("\tauthenticationMethod: ", list->authenticationMethod);
 	multival_list("\tserviceAuthenticationMethod: ",
-		list->serviceAuthenticationMethod);
+	    list->serviceAuthenticationMethod);
 	CLIENT_PRINT("\tdefaultSearchBase: ", list->defaultSearchBase);
 	CLIENT_PRINT("\tcredentialLevel: ", list->credentialLevel);
 	multival_list("\tserviceCredentialLevel: ",
-		list->serviceCredentialLevel);
+	    list->serviceCredentialLevel);
 	CLIENT_PRINT("\tdomainName: ", list->domainName);
 	CLIENT_PRINT("\tproxyDN: ", list->proxyDN);
 	CLIENT_PRINT("\tprofileTTL: ", list->profileTTL);
@@ -3131,7 +3084,7 @@ dumpargs(clientopts_t *list)
 	multival_list("\tattributeMap: ", list->attributeMap);
 	CLIENT_PRINT("\tdefaultSearchScope: ", list->defaultSearchScope);
 	multival_list("\tserviceSearchDescriptor: ",
-		list->serviceSearchDescriptor);
+	    list->serviceSearchDescriptor);
 	CLIENT_PRINT("\tbindTimeLimit: ", list->bindTimeLimit);
 	CLIENT_PRINT("\tproxyPassword: ", list->proxyPassword);
 	CLIENT_PRINT("\tdefaultServerList: ", list->defaultServerList);
@@ -3182,8 +3135,8 @@ parseParam(char *param, char **paramVal)
 	val = strchr(param, '=');
 	if (val == NULL) {
 		CLIENT_FPUTS(
-			gettext("Didn\'t find \'=\' character in string\n"),
-			stderr);
+		    gettext("Didn\'t find \'=\' character in string\n"),
+		    stderr);
 		paramVal = NULL;
 		return (CLIENT_ERR_PARSE);
 	}
@@ -3231,11 +3184,11 @@ clientSetParam(clientopts_t *optlist, int paramFlag, char *attrVal)
 
 	case NS_LDAP_SERVICE_AUTH_METHOD_P:	/* multiple allowed */
 		retcode = multival_add(optlist->serviceAuthenticationMethod,
-				attrVal);
+		    attrVal);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr,
-				gettext("Error processing attrVal %s\n"),
-				attrVal?attrVal:"NULL");
+			    gettext("Error processing attrVal %s\n"),
+			    attrVal?attrVal:"NULL");
 			usage();
 			clientopts_free(optlist);
 			return (CLIENT_ERR_FAIL);
@@ -3254,11 +3207,11 @@ clientSetParam(clientopts_t *optlist, int paramFlag, char *attrVal)
 
 	case NS_LDAP_SERVICE_CRED_LEVEL_P:	/* multiple allowed */
 		retcode = multival_add(optlist->serviceCredentialLevel,
-				attrVal);
+		    attrVal);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr,
-				gettext("Error processing attrVal %s\n"),
-				attrVal?attrVal:"NULL");
+			    gettext("Error processing attrVal %s\n"),
+			    attrVal?attrVal:"NULL");
 			usage();
 			clientopts_free(optlist);
 			return (CLIENT_ERR_FAIL);
@@ -3285,8 +3238,8 @@ clientSetParam(clientopts_t *optlist, int paramFlag, char *attrVal)
 		retcode = multival_add(optlist->objectclassMap, attrVal);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr,
-				gettext("Error processing attrVal %s\n"),
-				attrVal?attrVal:"NULL");
+			    gettext("Error processing attrVal %s\n"),
+			    attrVal?attrVal:"NULL");
 			usage();
 			clientopts_free(optlist);
 			return (CLIENT_ERR_FAIL);
@@ -3303,8 +3256,8 @@ clientSetParam(clientopts_t *optlist, int paramFlag, char *attrVal)
 		optlist->preferredServerList = attrVal;
 		/* replace ',' chars with ' ' for proper syntax */
 		for (counter = 0;
-			counter < strlen(optlist->preferredServerList);
-			counter++) {
+		    counter < strlen(optlist->preferredServerList);
+		    counter++) {
 
 			if (optlist->preferredServerList[counter] == ',')
 				optlist->preferredServerList[counter] = ' ';
@@ -3330,8 +3283,8 @@ clientSetParam(clientopts_t *optlist, int paramFlag, char *attrVal)
 		retcode = multival_add(optlist->attributeMap, attrVal);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr,
-				gettext("Error processing attrVal %s\n"),
-				attrVal?attrVal:"NULL");
+			    gettext("Error processing attrVal %s\n"),
+			    attrVal?attrVal:"NULL");
 			usage();
 			clientopts_free(optlist);
 			return (CLIENT_ERR_FAIL);
@@ -3345,11 +3298,11 @@ clientSetParam(clientopts_t *optlist, int paramFlag, char *attrVal)
 
 	case NS_LDAP_SERVICE_SEARCH_DESC_P:	/* multiple allowed */
 		retcode = multival_add(optlist->serviceSearchDescriptor,
-				attrVal);
+		    attrVal);
 		if (retcode != CLIENT_SUCCESS) {
 			CLIENT_FPRINTF(stderr,
-				gettext("Error processing attrVal %s\n"),
-				attrVal?attrVal:"NULL");
+			    gettext("Error processing attrVal %s\n"),
+			    attrVal?attrVal:"NULL");
 			usage();
 			clientopts_free(optlist);
 			return (CLIENT_ERR_FAIL);
@@ -3400,7 +3353,7 @@ file_move(const char *from, const char *to)
 	char cmd_buffer[(2 * MAXPATHLEN) + sizeof (mvCommand) + 3];
 
 	(void) snprintf(cmd_buffer, sizeof (cmd_buffer), "%s %s %s",
-					mvCommand, from, to);
+	    mvCommand, from, to);
 
 	/*
 	 * This function should only be used internally to move
@@ -3411,175 +3364,6 @@ file_move(const char *from, const char *to)
 	retcode = system(cmd_buffer);
 
 	return (retcode);
-}
-
-
-static boolean_t
-has_port(const char *server)
-{
-	const char	*s;
-	const char	*end;
-
-	/*
-	 * Don't check that address is legal - only determine
-	 * if there is a port specified - works for both ipv4 and ipv6
-	 */
-
-	while (server != NULL) {
-		end = strchr(server, ',');
-		if (end == NULL)
-			s = server + strlen(server);
-		else {
-			s = end;
-			end = end + 1;
-		}
-
-		while (s >= server) {
-			if (*s == ']')
-				break;
-			else if (*s == ':')
-				return (B_TRUE);
-			s--;
-		}
-		server = end;
-	}
-	return (B_FALSE);
-}
-
-
-/*
- * Check to see if configured to use tls and some server has a port number
- * configured. The goal is to help prevent users from configuring impossible
- * profiles
- */
-
-static boolean_t
-is_config_ok(const clientopts_t *list, boolean_t get_config)
-{
-	boolean_t	has_tls = B_FALSE;
-	boolean_t	is_ok = B_TRUE;
-	multival_t	*m_val;
-	int		i, j, len;
-	const char	*begin;
-	const char	*end;
-	ns_auth_t	**authMethod;
-	char		**servers;
-	char		**sam;
-	ns_ldap_error_t	*errorp = NULL;
-	int		rc;
-
-	if (list->authenticationMethod != NULL) {
-		begin = list->authenticationMethod;
-		len = strlen(begin) - 3;
-		for (i = 0; i < len; i++)
-			if (strncasecmp(begin + i, "tls:", 4) == 0)
-				break;
-		has_tls = i < len;
-	} else if (get_config) {
-		rc = __ns_ldap_getParam(NS_LDAP_AUTH_P,
-			(void ***)&authMethod, &errorp);
-		if (rc == NS_LDAP_SUCCESS && authMethod != NULL) {
-			for (i = 0; authMethod[i] != NULL && !has_tls; i++)
-			    has_tls = authMethod[i]->type == NS_LDAP_AUTH_TLS;
-			(void) __ns_ldap_freeParam((void ***) &authMethod);
-		}
-		if (errorp != NULL)
-			(void) __ns_ldap_freeError(&errorp);
-		errorp = NULL;
-	}
-
-	m_val = list->serviceAuthenticationMethod;
-	if (!has_tls && m_val != NULL) {
-		for (j = 0; j < m_val->count && !has_tls; j++) {
-			begin = m_val->optlist[j];
-			/* skip over service tag */
-			if (begin != NULL)
-				begin = strchr(begin, ':');
-			if (begin == NULL)
-				continue;
-			len = strlen(begin) - 3;
-			for (i = 0; i < len; i++)
-				if (strncasecmp(begin + i, "tls:", 4) == 0)
-					break;
-			has_tls = i < len;
-		}
-	}
-	if (!has_tls && get_config) {
-		rc = __ns_ldap_getParam(NS_LDAP_SERVICE_AUTH_METHOD_P,
-			(void ***)&sam, &errorp);
-		if (rc == NS_LDAP_SUCCESS && sam != NULL) {
-		    for (i = 0; sam[i] != NULL && !has_tls; i++) {
-			if (m_val != NULL) {
-			    /* check to see if a new service is replacing */
-			    for (j = 0; j < m_val->count; j++) {
-				begin = m_val->optlist[j];
-				if (begin == NULL)
-					continue;
-				end = strchr(begin, ':');
-				if (end == NULL)
-					continue;
-				len = end - begin + 1;
-				if (strncasecmp(sam[i], begin, len) == 0)
-					break;
-			    }
-			    if (j != m_val->count)
-				continue;
-			}
-			begin = sam[i];
-			/* skip over service tag */
-			if (begin != NULL)
-				begin = strchr(begin, ':');
-			if (begin != NULL) {
-			    len = strlen(begin) - 3;
-			    for (i = 0; i < len; i++)
-				if (strncasecmp(begin + i, "tls:", 4) == 0)
-					break;
-			    has_tls = i < len;
-			}
-		    }
-		    (void) __ns_ldap_freeParam((void ***) &sam);
-		}
-		if (errorp != NULL)
-			(void) __ns_ldap_freeError(&errorp);
-		errorp = NULL;
-	}
-
-	if (has_tls) {
-		/*
-		 * Don't check that address is legal - only determine
-		 * if there is a port specified
-		 */
-		if (list->defaultServerList != NULL)
-			is_ok = !has_port(list->defaultServerList);
-		else if (get_config && is_ok) {
-			rc = __ns_ldap_getParam(NS_LDAP_SERVERS_P,
-				(void ***) &servers, &errorp);
-			if (rc == NS_LDAP_SUCCESS && servers != NULL) {
-				for (i = 0; servers[i] != NULL && is_ok; i++)
-					is_ok = !has_port(servers[i]);
-				(void) __ns_ldap_freeParam((void ***) &servers);
-			}
-		}
-		if (errorp != NULL)
-			(void) __ns_ldap_freeError(&errorp);
-		errorp = NULL;
-
-		if (is_ok)
-			is_ok = !has_port(list->preferredServerList);
-		else if (get_config && is_ok) {
-			rc = __ns_ldap_getParam(NS_LDAP_SERVER_PREF_P,
-				(void ***) &servers, &errorp);
-			if (rc == NS_LDAP_SUCCESS && servers != NULL) {
-				for (i = 0; servers[i] != NULL && is_ok; i++)
-					is_ok = !has_port(servers[i]);
-				(void) __ns_ldap_freeParam((void ***) &servers);
-			}
-			if (errorp != NULL)
-				(void) __ns_ldap_freeError(&errorp);
-		}
-	}
-
-	return (is_ok);
 }
 
 
@@ -3814,10 +3598,10 @@ get_timeout_value(int dowhat, const char *fmri, useconds_t default_val)
 	if (sp == NULL) {
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr, "%s: %s... %s: %s\n",
-				actionstr,
-				fmri,
-				gettext("failed to retrieve timeout property"),
-				scf_strerror(scf_error()));
+			    actionstr,
+			    fmri,
+			    gettext("failed to retrieve timeout property"),
+			    scf_strerror(scf_error()));
 		return (default_val);
 	}
 
@@ -3825,10 +3609,10 @@ get_timeout_value(int dowhat, const char *fmri, useconds_t default_val)
 	if (cp == NULL) {
 		if (mode_verbose)
 			CLIENT_FPRINTF(stderr, "%s: %s... %s: %s\n",
-				actionstr,
-				fmri,
-				gettext("failed to retrieve timeout value"),
-				scf_strerror(scf_error()));
+			    actionstr,
+			    fmri,
+			    gettext("failed to retrieve timeout value"),
+			    scf_strerror(scf_error()));
 		scf_simple_prop_free(sp);
 		return (default_val);
 	}

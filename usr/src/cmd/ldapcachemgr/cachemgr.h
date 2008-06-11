@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,10 @@
 extern "C" {
 #endif
 
+#include <thread.h>
+#include <synch.h>
+#include <unistd.h>
+#include <procfs.h>
 #include "ns_sldap.h"
 #include "ns_internal.h"
 #include "ns_cache_door.h"
@@ -47,6 +51,49 @@ typedef	union {
 	ldap_data_t	data;
 	char		space[BUFFERSIZE];
 } dataunion;
+
+/*
+ * In ldap_cachemgr, it return -99 for some case, start with -100 here
+ */
+typedef enum chg_error {
+	CHG_SUCCESS  = 0,
+	CHG_NO_MEMORY = -100,
+	CHG_INVALID_PARAM = -101,
+	CHG_NOT_FOUND_IN_WAITING_LIST = -102,
+	CHG_EXCEED_MAX_THREADS = -103,
+	CHG_NSCD_REPEATED_CALL = -104
+} chg_error_t;
+
+typedef struct waiting_list {
+	pid_t			pid;		/* pid of the door client */
+	thread_t		tid;		/* thread id of the server */
+						/* thread */
+	int			cleanup;	/* 1: the thread will be */
+						/* cleaned up */
+	struct waiting_list	*prev;		/* previous node in the */
+						/* linked list */
+	struct waiting_list	*next;		/* next node in the linked */
+						/* list */
+} waiting_list_t;
+
+/*
+ * This structure contains the buffer for the chang data and a wating list to
+ * regester all the threads that handle GETSTATUSCHANGE START call and are
+ * waiting for the change notification.
+ * The notification threads save the data in the buffer then send broadcast
+ * to wake up the GETSTATUSCHANGE START threads to copy data to the stack and
+ * door_return().
+ */
+typedef struct chg_info {
+	mutex_t		chg_lock;	/* mutex for this data structure */
+	cond_t		chg_cv;		/* cond var for synchronization */
+	int		chg_wakeup;	/* flag used with chg_cv for */
+					/* synchronization */
+	waiting_list_t	*chg_w_first;	/* the head of the linked list */
+	waiting_list_t	*chg_w_last;	/* the tail of the linked list */
+	char		*chg_data;	/* the buffer for the change data */
+	int		chg_data_size;	/* the size of the change data */
+} chg_info_t;
 
 extern char *getcacheopt(char *s);
 extern void logit(char *format, ...);
@@ -69,6 +116,15 @@ extern void getldap_getserver(LineBuf *config_info, ldap_call_t *in);
 extern void getldap_get_cacheData(LineBuf *config_info, ldap_call_t *in);
 extern int getldap_set_cacheData(ldap_call_t *in);
 extern void getldap_get_cacheStat(LineBuf *stat_info);
+extern int is_called_from_nscd(pid_t pid); /* in cachemgr.c */
+extern int chg_is_called_from_nscd_or_peruser_nscd(char *dc_str, pid_t *pidp);
+extern void *chg_cleanup_waiting_threads(void *arg);
+extern int chg_get_statusChange(LineBuf *config_info, ldap_call_t *in,
+	pid_t nscd_pid);
+extern int chg_notify_statusChange(char *str);
+extern void chg_test_config_change(ns_config_t *new, int *change_status);
+extern void chg_config_cookie_set(ldap_get_chg_cookie_t *cookie);
+extern ldap_get_chg_cookie_t chg_config_cookie_get(void);
 #ifdef __cplusplus
 }
 #endif

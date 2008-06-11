@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
 #include <strings.h>
 #include <libintl.h>
@@ -55,14 +56,17 @@
 #include "ns_sldap.h"
 #include "ns_internal.h"
 #include "ns_cache_door.h"
+#include "ns_connmgmt.h"
 
-#pragma fini(_free_config)
+#pragma fini(__s_api_free_sessionPool, __s_api_shutdown_conn_mgmt, \
+	_free_config, __ns_ldap_doorfd_close)
 
 static mutex_t		ns_parse_lock = DEFAULTMUTEX;
 static mutex_t		ns_loadrefresh_lock = DEFAULTMUTEX;
 static ns_config_t	*current_config = NULL;
 
 static int		cache_server = FALSE;
+extern thread_key_t	ns_cmgkey;
 
 /*
  * Parameter Index Type validation routines
@@ -110,7 +114,7 @@ static boolean_t
 timetorefresh(ns_config_t *cfg);
 
 static ns_config_t *
-LoadCacheConfiguration(ns_ldap_error_t **error);
+LoadCacheConfiguration(ns_config_t *, ns_ldap_error_t **error);
 
 static void **
 dupParam(ns_param_t *ptr);
@@ -787,6 +791,8 @@ destroy_config(ns_config_t *ptr)
 	ParamIndexType	i;
 
 	if (ptr != NULL) {
+		if (ptr == current_config)
+			current_config = NULL;
 		if (ptr->domainName != NULL)
 			free(ptr->domainName);
 			ptr->domainName = NULL;
@@ -827,16 +833,14 @@ __s_api_destroy_config(ns_config_t *cfg)
 
 /*
  * Increment the configuration use count by one - assumes ns_parse_lock has
- * been obtained
+ * been obtained.
  */
 
 static ns_config_t *
-get_curr_config_unlocked()
+get_curr_config_unlocked(ns_config_t *cfg)
 {
-	ns_config_t *cfg;
 	ns_config_t *ret;
 
-	cfg = current_config;
 	ret = cfg;
 	if (cfg != NULL) {
 		(void) mutex_lock(&cfg->config_mutex);
@@ -850,24 +854,62 @@ get_curr_config_unlocked()
 }
 
 /*
- * set_curr_config sets the current config to
- * the specified ns_config_t. Note that this function
- * is similar to the project private function __s_api_init_config
- * except that it does not release the new ns_config_t
+ * set_curr_config_global sets the current global config to the
+ * specified ns_config_t. Note that this function is similar
+ * to the project private function __s_api_init_config_global
+ * except that it does not release the new ns_config_t.
  */
-
 static void
-set_curr_config(ns_config_t *ptr)
+set_curr_config_global(ns_config_t *ptr)
 {
-	ns_config_t *cfg;
+	ns_config_t	*cfg;
+	ns_config_t	*cur_cfg;
 
 	(void) mutex_lock(&ns_parse_lock);
-	cfg = get_curr_config_unlocked();
+	cur_cfg = current_config;
+	cfg = get_curr_config_unlocked(cur_cfg);
 	if (cfg != ptr) {
 		__s_api_destroy_config(cfg);
 		current_config = ptr;
 	}
 	(void) mutex_unlock(&ns_parse_lock);
+}
+
+
+/*
+ * set_curr_config sets the current config or the per connection
+ * management one to the specified ns_config_t. Note that this function
+ * is similar to the project private function __s_api_init_config
+ * except that it does not release the new ns_config_t. Also note
+ * that if there's no per connection management one to set, the
+ * global current config will be set.
+ */
+
+static void
+set_curr_config(ns_config_t *ptr)
+{
+	ns_config_t	*cfg;
+	ns_config_t	*cur_cfg;
+	ns_conn_mgmt_t	*cmg;
+	int		rc;
+
+	rc = thr_getspecific(ns_cmgkey, (void **)&cmg);
+
+	/* set the per connection management config if possible */
+	if (rc == 0 && cmg != NULL && cmg->config != NULL) {
+		(void) mutex_lock(&cmg->cfg_lock);
+		cur_cfg = cmg->config;
+		cfg = get_curr_config_unlocked(cur_cfg);
+		if (cfg != ptr) {
+			__s_api_destroy_config(cfg);
+			cmg->config = ptr;
+		}
+		(void) mutex_unlock(&cmg->cfg_lock);
+		return;
+	}
+
+	/* else set the global current config */
+	set_curr_config_global(ptr);
 }
 
 /*
@@ -889,8 +931,20 @@ __s_api_release_config(ns_config_t *cfg)
 }
 
 /*
+ * __s_api_init_config function destroys the previous global configuration
+ * sets the new global configuration and then releases it
+ */
+void
+__s_api_init_config_global(ns_config_t *ptr)
+{
+	set_curr_config_global(ptr);
+	__s_api_release_config(ptr);
+}
+
+/*
  * __s_api_init_config function destroys the previous configuration
- * sets the new configuration and then releases it
+ * sets the new configuration and then releases it. The configuration
+ * may be the global one or the per connection management one.
  */
 void
 __s_api_init_config(ns_config_t *ptr)
@@ -924,16 +978,48 @@ __s_api_create_config(void)
 	return (ret);
 }
 
+/*
+ * __s_api_get_default_config_global returns the current global config
+ */
 ns_config_t *
-__s_api_get_default_config(void)
+__s_api_get_default_config_global(void)
 {
-	ns_config_t *cfg;
+	ns_config_t	*cfg;
+	ns_config_t	*cur_cfg;
 
 	(void) mutex_lock(&ns_parse_lock);
-	cfg = get_curr_config_unlocked();
+	cur_cfg = current_config;
+	cfg = get_curr_config_unlocked(cur_cfg);
 	(void) mutex_unlock(&ns_parse_lock);
 
 	return (cfg);
+}
+
+/*
+ * __s_api_get_default_config returns the current global config or the
+ * per connection management one.
+ */
+ns_config_t *
+__s_api_get_default_config(void)
+{
+	ns_config_t	*cfg;
+	ns_config_t	*cur_cfg;
+	ns_conn_mgmt_t	*cmg;
+	int		rc;
+
+	rc = thr_getspecific(ns_cmgkey, (void **)&cmg);
+
+	/* get the per connection management config if available */
+	if (rc == 0 && cmg != NULL && cmg->config != NULL) {
+		(void) mutex_lock(&cmg->cfg_lock);
+		cur_cfg = cmg->config;
+		cfg = get_curr_config_unlocked(cur_cfg);
+		(void) mutex_unlock(&cmg->cfg_lock);
+		return (cfg);
+	}
+
+	/* else get the global current config */
+	return (__s_api_get_default_config_global());
 }
 
 static char *
@@ -962,33 +1048,6 @@ stripdup(const char *instr)
 	return (ret);
 }
 
-static boolean_t
-has_port(char **ppc, int cnt)
-{
-	int		j;
-	const char	*s;
-	const char	*begin;
-
-	/*
-	 * Don't check that address is legal - only determine
-	 * if there is a port specified
-	 */
-	if (ppc != NULL) {
-		for (j = 0; j < cnt; j++) {
-			begin = ppc[j];
-			s = begin + strlen(begin);
-			while (s >= begin) {
-				if (*s == ']')
-					break;
-				else if (*s == COLONTOK)
-					return (B_TRUE);
-				s--;
-			}
-		}
-	}
-	return (B_FALSE);
-}
-
 /*
  * Note that __s_api_crosscheck is assumed to be called with an ns_config_t
  * that is properly protected - so that it will not change during the
@@ -1002,13 +1061,8 @@ __s_api_crosscheck(ns_config_t *ptr, char *errstr, int check_dn)
 	int		value, j;
 	time_t		tm;
 	const char	*str, *str1;
-	boolean_t	has_tls = B_FALSE;
-	boolean_t	is_ok = B_TRUE;
-	int		i, len, cnt;
-	const char	*begin;
-	char		**ppc;
-	int		*pi, self, gssapi;
-
+	int		i, cnt;
+	int		self, gssapi;
 
 	if (ptr == NULL)
 		return (NS_SUCCESS);
@@ -1103,60 +1157,6 @@ __s_api_crosscheck(ns_config_t *ptr, char *errstr, int check_dn)
 			break;
 		}
 		}
-	}
-
-	/*
-	 * Check to see if port and tls are both configured. This is not
-	 * supported until starttls is supported.
-	 */
-
-	pi = ptr->paramList[NS_LDAP_AUTH_P].ns_pi;
-	if (pi != NULL) {
-		cnt = ptr->paramList[NS_LDAP_AUTH_P].ns_acnt;
-		for (j = 0; j < cnt && !has_tls; j++) {
-			has_tls = (pi[j] == NS_LDAP_EA_TLS_NONE) ||
-			    (pi[j] == NS_LDAP_EA_TLS_SIMPLE) ||
-			    (pi[j] == NS_LDAP_EA_TLS_SASL_CRAM_MD5) ||
-			    (pi[j] == NS_LDAP_EA_TLS_SASL_DIGEST_MD5) ||
-			    (pi[j] == NS_LDAP_EA_TLS_SASL_DIGEST_MD5_INT) ||
-			    (pi[j] == NS_LDAP_EA_TLS_SASL_DIGEST_MD5_CONF) ||
-			    (pi[j] == NS_LDAP_EA_TLS_SASL_EXTERNAL);
-		}
-	}
-
-	ppc = ptr->paramList[NS_LDAP_SERVICE_AUTH_METHOD_P].ns_ppc;
-	if (!has_tls && ppc != NULL) {
-		cnt = ptr->paramList[NS_LDAP_SERVICE_AUTH_METHOD_P].ns_acnt;
-		for (j = 0; j < cnt && !has_tls; j++) {
-			begin = ppc[j];
-			/* skip over service tag */
-			if (begin != NULL)
-				begin = strchr(begin, ':');
-			if (!has_tls && begin != NULL) {
-				len = strlen(begin) - 3;
-				for (i = 0; i < len; i++)
-					if (strncasecmp(begin + i,
-					    "tls:", 4) == 0)
-						break;
-				has_tls = i < len;
-			}
-		}
-	}
-
-	if (has_tls) {
-		is_ok = !has_port(ptr->paramList[NS_LDAP_SERVERS_P].ns_ppc,
-		    ptr->paramList[NS_LDAP_SERVERS_P].ns_acnt);
-		ppc = ptr->paramList[NS_LDAP_SERVER_PREF_P].ns_ppc;
-		if (is_ok)
-			is_ok = !has_port(
-			    ptr->paramList[NS_LDAP_SERVER_PREF_P].ns_ppc,
-			    ptr->paramList[NS_LDAP_SERVER_PREF_P].ns_acnt);
-	}
-	if (!is_ok) {
-		(void) snprintf(errstr, MAXERROR,
-		    gettext("Configuration Error: "
-		    "Cannot specify LDAP port with tls"));
-		return (NS_PARSE_ERR);
 	}
 
 	/*
@@ -1377,11 +1377,12 @@ __ns_ldap_default_config()
 /*
  * Get the current configuration pointer and return it.
  * If necessary initialize or refresh the current
- * configuration as applicable.
+ * configuration as applicable. If global is set, returns
+ * the global one.
  */
 
-ns_config_t *
-__s_api_loadrefresh_config()
+static ns_config_t *
+loadrefresh_config(boolean_t global)
 {
 	ns_config_t		*cfg;
 	ns_config_t		*new_cfg;
@@ -1389,14 +1390,20 @@ __s_api_loadrefresh_config()
 
 	/* We want to refresh only one configuration at a time */
 	(void) mutex_lock(&ns_loadrefresh_lock);
-	cfg = __s_api_get_default_config();
+	if (global == B_TRUE)
+		cfg = __s_api_get_default_config_global();
+	else
+		cfg = __s_api_get_default_config();
 
 	/* (re)initialize configuration if necessary */
-	if (timetorefresh(cfg)) {
-		new_cfg = LoadCacheConfiguration(&errorp);
-		if (new_cfg != NULL) {
+	if (!__s_api_isStandalone() && timetorefresh(cfg)) {
+		new_cfg = LoadCacheConfiguration(cfg, &errorp);
+		if (new_cfg != NULL && new_cfg != cfg) {
 			__s_api_release_config(cfg);
-			set_curr_config(new_cfg);
+			if (global == B_TRUE)
+				set_curr_config_global(new_cfg);
+			else
+				set_curr_config(new_cfg);
 			cfg = new_cfg;
 		}
 		if (errorp != NULL)
@@ -1404,6 +1411,31 @@ __s_api_loadrefresh_config()
 	}
 	(void) mutex_unlock(&ns_loadrefresh_lock);
 	return (cfg);
+}
+
+/*
+ * Get the current global configuration pointer and return it.
+ * If necessary initialize or refresh the current
+ * configuration as applicable.
+ */
+
+ns_config_t *
+__s_api_loadrefresh_config_global()
+{
+	return (loadrefresh_config(B_TRUE));
+}
+
+/*
+ * Get the current configuration pointer and return it.
+ * If necessary initialize or refresh the current
+ * configuration as applicable. The configuration may
+ * be the global one or the per connection management one.
+ */
+
+ns_config_t *
+__s_api_loadrefresh_config()
+{
+	return (loadrefresh_config(B_FALSE));
 }
 
 /*
@@ -2621,7 +2653,9 @@ __ns_ldap_setParam(const ParamIndexType type,
 	int			ret;
 	char			errstr[2 * MAXERROR];
 	ns_config_t		*cfg;
+	ns_config_t		*cfg_g = (ns_config_t *)-1;
 	ns_config_t		*new_cfg;
+	boolean_t		reinit_connmgmt = B_FALSE;
 
 	/* We want to refresh only one configuration at a time */
 	(void) mutex_lock(&ns_loadrefresh_lock);
@@ -2654,9 +2688,16 @@ __ns_ldap_setParam(const ParamIndexType type,
 	}
 
 	/* (re)initialize configuration if necessary */
-	if (cache_server == FALSE && timetorefresh(cfg)) {
-		new_cfg = LoadCacheConfiguration(&errorp);
-		__s_api_release_config(cfg);
+	if (!__s_api_isStandalone() &&
+	    cache_server == FALSE && timetorefresh(cfg))
+		cfg_g = __s_api_get_default_config_global();
+	/* only (re)initialize the global configuration */
+	if (cfg == cfg_g) {
+		if (cfg_g != NULL)
+			__s_api_release_config(cfg_g);
+		new_cfg = LoadCacheConfiguration(cfg, &errorp);
+		if (new_cfg != cfg)
+			__s_api_release_config(cfg);
 		if (new_cfg == NULL) {
 			(void) snprintf(errstr, sizeof (errstr),
 			    gettext("Unable to load configuration '%s' "
@@ -2670,10 +2711,16 @@ __ns_ldap_setParam(const ParamIndexType type,
 			(void) mutex_unlock(&ns_loadrefresh_lock);
 			return (NS_LDAP_CONFIG);
 		}
-		set_curr_config(new_cfg);
-		cfg = new_cfg;
+		if (new_cfg != cfg) {
+			set_curr_config_global(new_cfg);
+			cfg = new_cfg;
+			reinit_connmgmt = B_TRUE;
+		}
 	}
 	(void) mutex_unlock(&ns_loadrefresh_lock);
+
+	if (reinit_connmgmt == B_TRUE)
+		__s_api_reinit_conn_mgmt_new_config(cfg);
 
 	/* translate input and save in the parameter list */
 	ret = __ns_ldap_setParamValue(cfg, type, data, error);
@@ -2826,7 +2873,9 @@ __ns_ldap_getParam(const ParamIndexType Param,
 	ns_ldap_error_t		*errorp;
 	ns_default_config	*def;
 	ns_config_t		*cfg;
+	ns_config_t		*cfg_g = (ns_config_t *)-1;
 	ns_config_t		*new_cfg;
+	boolean_t		reinit_connmgmt = B_FALSE;
 
 	if (data == NULL)
 		return (NS_LDAP_INVALID_PARAM);
@@ -2838,9 +2887,16 @@ __ns_ldap_getParam(const ParamIndexType Param,
 	cfg = __s_api_get_default_config();
 
 	/* (re)initialize configuration if necessary */
-	if (cache_server == FALSE && timetorefresh(cfg)) {
-		new_cfg = LoadCacheConfiguration(&errorp);
-		__s_api_release_config(cfg);
+	if (!__s_api_isStandalone() &&
+	    cache_server == FALSE && timetorefresh(cfg))
+		cfg_g = __s_api_get_default_config_global();
+	/* only (re)initialize the global configuration */
+	if (cfg == cfg_g) {
+		if (cfg_g != NULL)
+			__s_api_release_config(cfg_g);
+		new_cfg = LoadCacheConfiguration(cfg, &errorp);
+		if (new_cfg != cfg)
+			__s_api_release_config(cfg);
 		if (new_cfg == NULL) {
 			(void) snprintf(errstr, sizeof (errstr),
 			    gettext("Unable to load configuration "
@@ -2855,10 +2911,16 @@ __ns_ldap_getParam(const ParamIndexType Param,
 			(void) mutex_unlock(&ns_loadrefresh_lock);
 			return (NS_LDAP_CONFIG);
 		}
-		set_curr_config(new_cfg);
-		cfg = new_cfg;
+		if (new_cfg != cfg) {
+			set_curr_config_global(new_cfg);
+			cfg = new_cfg;
+			reinit_connmgmt = B_TRUE;
+		}
 	}
 	(void) mutex_unlock(&ns_loadrefresh_lock);
+
+	if (reinit_connmgmt == B_TRUE)
+		__s_api_reinit_conn_mgmt_new_config(cfg);
 
 	if (cfg == NULL) {
 		(void) snprintf(errstr, sizeof (errstr),
@@ -3232,6 +3294,7 @@ __door_getldapconfig(char **buffer, int *buflen, ns_ldap_error_t **error)
 	char			errstr[MAXERROR];
 	char			*domainname;
 	ns_ldap_return_code	retCode;
+	ldap_config_out_t	*cfghdr;
 
 	*error = NULL;
 
@@ -3255,9 +3318,9 @@ __door_getldapconfig(char **buffer, int *buflen, ns_ldap_error_t **error)
 	sptr = &space->s_d;
 
 	switch (__ns_ldap_trydoorcall(&sptr, &ndata, &adata)) {
-	case SUCCESS:
+	case NS_CACHE_SUCCESS:
 		break;
-	case NOTFOUND:
+	case NS_CACHE_NOTFOUND:
 		(void) snprintf(errstr, sizeof (errstr),
 		    gettext("Door call to "
 		    "ldap_cachemgr failed - error: %d."),
@@ -3274,13 +3337,14 @@ __door_getldapconfig(char **buffer, int *buflen, ns_ldap_error_t **error)
 	retCode = NS_LDAP_SUCCESS;
 
 	/* copy info from door call to buffer here */
-	*buflen = strlen(sptr->ldap_ret.ldap_u.config) + 1;
+	cfghdr = &sptr->ldap_ret.ldap_u.config_str;
+	*buflen = offsetof(ldap_config_out_t, config_str) +
+	    cfghdr->data_size + 1;
 	*buffer = calloc(*buflen, sizeof (char));
 	if (*buffer == NULL) {
 		retCode = NS_LDAP_MEMORY;
-	} else {
-		(void) strcpy(*buffer, sptr->ldap_ret.ldap_u.config);
-	}
+	} else
+		(void) memcpy(*buffer, cfghdr, *buflen - 1);
 
 	if (sptr != &space->s_d) {
 		(void) munmap((char *)sptr, ndata);
@@ -3309,6 +3373,7 @@ SetDoorInfo(char *buffer, ns_ldap_error_t **errorp)
 	int		ret;
 	int		first = 1;
 	int		errfnd = 0;
+	ldap_config_out_t *cfghdr;
 
 	if (errorp == NULL)
 		return (NULL);
@@ -3318,6 +3383,11 @@ SetDoorInfo(char *buffer, ns_ldap_error_t **errorp)
 	if (ptr == NULL) {
 		return (NULL);
 	}
+
+	/* get config cookie from the header */
+	cfghdr = (ldap_config_out_t *)bufptr;
+	ptr->config_cookie = cfghdr->cookie;
+	bufptr = (char *)cfghdr->config_str;
 
 	strptr = (char *)strtok_r(bufptr, DOORLINESEP, &rest);
 	for (; ; ) {
@@ -3371,12 +3441,15 @@ SetDoorInfo(char *buffer, ns_ldap_error_t **errorp)
 }
 
 static ns_config_t *
-LoadCacheConfiguration(ns_ldap_error_t **error)
+LoadCacheConfiguration(ns_config_t *oldcfg, ns_ldap_error_t **error)
 {
 	char		*buffer = NULL;
 	int		buflen = 0;
 	int		ret;
 	ns_config_t	*cfg;
+	ldap_config_out_t *cfghdr;
+	ldap_get_chg_cookie_t old_cookie;
+	ldap_get_chg_cookie_t new_cookie;
 
 	*error = NULL;
 	ret = __door_getldapconfig(&buffer, &buflen, error);
@@ -3385,6 +3458,18 @@ LoadCacheConfiguration(ns_ldap_error_t **error)
 		if (*error != NULL && (*error)->message != NULL)
 			syslog(LOG_WARNING, "libsldap: %s", (*error)->message);
 		return (NULL);
+	}
+
+	/* No need to reload configuration if config cookie is the same */
+	cfghdr = (ldap_config_out_t *)buffer;
+	new_cookie = cfghdr->cookie;
+	if (oldcfg != NULL)
+		old_cookie = oldcfg->config_cookie;
+
+	if (oldcfg != NULL && old_cookie.mgr_pid == new_cookie.mgr_pid &&
+	    old_cookie.seq_num == new_cookie.seq_num) {
+		free(buffer);
+		return (oldcfg);
 	}
 
 	/* now convert from door format */

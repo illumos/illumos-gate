@@ -236,6 +236,123 @@ read_file(ns_config_t *ptr, int cred_file, ns_ldap_error_t **error)
 }
 
 
+static
+ns_ldap_return_code
+set_attr(ns_config_t *config_struct,
+		char *attr_name,
+		char *attr_val,
+		ns_ldap_error_t **errorp)
+{
+	ParamIndexType	idx;
+	char		errmsg[MAXERROR];
+
+	if (errorp == NULL) {
+		return (NS_LDAP_INVALID_PARAM);
+	}
+
+	*errorp = NULL;
+
+	/*
+	 * This double call is made due to the presence of
+	 * two sets of LDAP config. attribute names.
+	 * An LDAP configuration can be obtained either from a server
+	 * or from SMF. The former sends a DUA with attributes' names
+	 * styled like "preferredServerList". But local configurations
+	 * will have names inherited from the /var/ldap/ldap* files such as
+	 * "NS_LDAP_SERVER_PREF".
+	 * So, the standalone bits are able to process both sets of
+	 * attributes' names.
+	 */
+	if (__s_api_get_profiletype(attr_name, &idx) < 0 &&
+	    __s_api_get_versiontype(config_struct, attr_name, &idx) < 0) {
+		(void) snprintf(errmsg, sizeof (errmsg),
+		    gettext("Illegal DUAProfile property: <%s>."), attr_name);
+		MKERROR(LOG_ERR, *errorp, NS_LDAP_CONFIG, strdup(errmsg), NULL);
+		return (NS_LDAP_CONFIG);
+	}
+
+	return (__ns_ldap_setParamValue(config_struct, idx, attr_val, errorp));
+}
+
+
+/*
+ * This function creates a configuration which will be used
+ * for all LDAP requests in the Standalone mode.
+ *
+ * INPUT:
+ *     config - a buffer returned by __ns_ldap_getConnectionInfo()'s
+ *              dua_profile parameter.
+ *
+ */
+ns_config_t *
+__s_api_create_config_door_str(char *config, ns_ldap_error_t **errorp)
+{
+	char		*attr, *attrName, *attrVal, *rest;
+	ns_config_t	*configStruct = NULL;
+	char		errmsg[MAXERROR];
+
+	if (config == NULL || errorp == NULL)
+		return (NULL);
+
+	if ((configStruct = __s_api_create_config()) == NULL) {
+		return (NULL);
+	}
+
+	*errorp = NULL;
+
+	attr = strtok_r(config, DOORLINESEP, &rest);
+	if (!attr) {
+		__s_api_destroy_config(configStruct);
+		(void) snprintf(errmsg, sizeof (errmsg),
+		    gettext("DUAProfile received from the server"
+		    " has bad format"));
+		MKERROR(LOG_ERR, *errorp, NS_LDAP_CONFIG, strdup(errmsg), NULL);
+		return (NULL);
+	}
+
+	do {
+		__s_api_split_key_value(attr, &attrName, &attrVal);
+
+		if (attrName == NULL || attrVal == NULL) {
+			__s_api_destroy_config(configStruct);
+			(void) snprintf(errmsg, sizeof (errmsg),
+			    gettext("Attribute %s is not valid"), attr);
+			MKERROR(LOG_ERR, *errorp, NS_LDAP_CONFIG,
+			    strdup(errmsg), NULL);
+			return (NULL);
+		}
+
+		/* Get the version of the profile. */
+		if (strcasecmp(attrName, "objectclass") == 0) {
+			if (strcasecmp(attrVal, _PROFILE2_OBJECTCLASS) == 0) {
+				if (__ns_ldap_setParamValue(configStruct,
+				    NS_LDAP_FILE_VERSION_P,
+				    NS_LDAP_VERSION_2,
+				    errorp) != NS_LDAP_SUCCESS) {
+					__s_api_destroy_config(configStruct);
+					return (NULL);
+				}
+			}
+			continue;
+		}
+
+		if (set_attr(configStruct, attrName, attrVal, errorp) !=
+		    NS_LDAP_SUCCESS) {
+			__s_api_destroy_config(configStruct);
+			return (NULL);
+		}
+	} while (attr = strtok_r(NULL, DOORLINESEP, &rest));
+
+	if (__s_api_crosscheck(configStruct, errmsg, B_FALSE) != NS_SUCCESS) {
+		MKERROR(LOG_ERR, *errorp, NS_LDAP_CONFIG, strdup(errmsg), NULL);
+		__s_api_destroy_config(configStruct);
+		return (NULL);
+	}
+
+	return (configStruct);
+}
+
+
 /*
  * Cache Manager side of configuration file loading
  */
@@ -342,7 +459,7 @@ _print2buf(LineBuf *line, char *toprint, int addsep)
  */
 
 ns_ldap_error_t *
-__ns_ldap_LoadDoorInfo(LineBuf *configinfo, char *domainname)
+__ns_ldap_LoadDoorInfo(LineBuf *configinfo, char *domainname, ns_config_t *new)
 {
 	ns_config_t	*ptr;
 	char		errstr[MAXERROR];
@@ -350,8 +467,19 @@ __ns_ldap_LoadDoorInfo(LineBuf *configinfo, char *domainname)
 	char		string[BUFSIZE];
 	char		*str;
 	ParamIndexType	i = 0;
+	int		len;
+	ldap_config_out_t *cout;
 
-	ptr = __s_api_get_default_config();
+	/*
+	 * If new is NULL, it outputs the flatten data of current default
+	 * config, if it's non-NULL, it outputs the flatten data of a temporary
+	 * config. It's used to compare the new config data with the current
+	 * default config data.
+	 */
+	if (new == NULL)
+		ptr = __s_api_get_default_config();
+	else
+		ptr = new;
 	if (ptr == NULL) {
 		(void) snprintf(errstr, sizeof (errstr),
 		    gettext("No configuration information available for %s."),
@@ -383,7 +511,46 @@ __ns_ldap_LoadDoorInfo(LineBuf *configinfo, char *domainname)
 			str = NULL;
 		}
 	}
-	__s_api_release_config(ptr);
+	if (new == NULL)
+		__s_api_release_config(ptr);
+
+	/*
+	 * The new interface of the configuration between ldap_cachemgr
+	 * & libsldap contains a header structure ldap_config_out_t.
+	 * The flatten configuration data configinfo->str is cloned
+	 * to cout->config_str, configinfo->len is saved in
+	 * cout->data_size and cout->cookie is set later after this function
+	 * is returned in ldap_cachemgr.
+	 * configinfo->str & configinfo->len are reused to save info of
+	 * header + data.
+	 * The format:
+	 * [cookie|data_size|config_str .............]
+	 */
+
+	if (configinfo->str) {
+		len = sizeof (ldap_config_out_t) - sizeof (int) +
+		    configinfo->len;
+		if ((cout = calloc(1, len)) == NULL) {
+			free(configinfo->str);
+			configinfo->str = NULL;
+			configinfo->len = 0;
+			(void) snprintf(errstr, sizeof (errstr),
+			    gettext("calloc: Out of memory."));
+			MKERROR(LOG_WARNING, errorp, NS_CONFIG_NOTLOADED,
+			    strdup(errstr), NULL);
+			return (errorp);
+		}
+		/*
+		 * cout->cookie is set by the caller,
+		 * which is in ldap_cachemgr.
+		 */
+		cout->data_size = configinfo->len;
+		(void) memcpy(cout->config_str, configinfo->str,
+		    configinfo->len);
+		free(configinfo->str);
+		configinfo->str = (char *)cout;
+		configinfo->len = len;
+	}
 	return (NULL);
 }
 

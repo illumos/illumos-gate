@@ -48,8 +48,10 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <ucred.h>
 #include "cachemgr.h"
 #include "solaris-priv.h"
+#include "ns_connmgmt.h"
 
 static rwlock_t	ldap_lock = DEFAULTRWLOCK;
 static int	sighup_update = FALSE;
@@ -68,8 +70,6 @@ static int	signal_done = FALSE;
 
 /* TCP connection timeout (in milliseconds) */
 static int tcptimeout = NS_DEFAULT_BIND_TIMEOUT * 1000;
-/* search timeout (in seconds) */
-static int search_timeout = NS_DEFAULT_SEARCH_TIMEOUT;
 
 #ifdef SLP
 extern int	use_slp;
@@ -92,7 +92,8 @@ typedef enum {
 	INFO_OP_REFRESH		= 2,
 	INFO_OP_REFRESH_WAIT	= 3,
 	INFO_OP_GETSERVER	= 4,
-	INFO_OP_GETSTAT		= 5
+	INFO_OP_GETSTAT		= 5,
+	INFO_OP_REMOVESERVER	= 6
 } info_op_t;
 
 typedef enum {
@@ -139,6 +140,7 @@ typedef struct server_info_ext {
 	info_server_t		server_status;
 	info_server_t		prev_server_status;
 	info_status_t 		info_status;
+	ns_server_status_t	change;
 } server_info_ext_t;
 
 typedef struct server_info {
@@ -155,7 +157,19 @@ typedef struct cache_hash {
 	struct cache_hash	*next;
 } cache_hash_t;
 
+/*
+ * The status of a server to be removed. It can be up or down.
+ */
+typedef struct rm_svr {
+	char	*addr;
+	int	up; /* 1: up, 0: down */
+} rm_svr_t;
+
 static int getldap_destroy_serverInfo(server_info_t *head);
+static void test_server_change(server_info_t *head);
+static void remove_server(char *addr);
+static ns_server_status_t set_server_status(char *input, server_info_t *head);
+static void create_buf_and_notify(char *input, ns_server_status_t st);
 
 /*
  * Load configuration
@@ -447,6 +461,16 @@ sync_current_with_update_copy(server_info_t *info)
 	(void) mutex_lock(&info->mutex[1]);
 	(void) mutex_lock(&info->mutex[0]);
 
+	if (info->sinfo[1].server_status == INFO_SERVER_UP &&
+	    info->sinfo[0].server_status != INFO_SERVER_UP)
+		info->sinfo[1].change = NS_SERVER_UP;
+	else if (info->sinfo[1].server_status != INFO_SERVER_UP &&
+	    info->sinfo[0].server_status == INFO_SERVER_UP)
+		info->sinfo[1].change = NS_SERVER_DOWN;
+	else
+		info->sinfo[1].change = 0;
+
+
 	/* free memory in current copy first */
 	if (info->sinfo[0].addr)
 		free(info->sinfo[0].addr);
@@ -499,22 +523,12 @@ static void *
 getldap_get_rootDSE(void *arg)
 {
 	server_info_t	*serverInfo = (server_info_t *)arg;
-	int 		ldapVersion = LDAP_VERSION3;
-	LDAP		*ld;
-	LDAPMessage	*resultMsg = NULL;
-	LDAPMessage	*e;
-	BerElement	*ber;
-	char		errmsg[MAXERROR];
 	char		*rootDSE;
-	char		*attrs[3];
-	char		*a;
-	char		**vals;
-	int		ldaperrno = 0;
-	int		rc = 0, exitrc = NS_LDAP_SUCCESS;
-	int		i = 0, len = 0;
+	int		exitrc = NS_LDAP_SUCCESS;
 	pid_t		ppid;
-	struct timeval	tv;
 	int		server_found = 0;
+
+	ns_ldap_error_t *error = NULL;
 
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("getldap_get_rootDSE()....\n");
@@ -546,19 +560,32 @@ getldap_get_rootDSE(void *arg)
 	serverInfo->sinfo[1].errormsg 		= NULL;
 	(void) mutex_unlock(&serverInfo->mutex[1]);
 
-	if ((ld = ldap_init(serverInfo->sinfo[1].addr,
-	    LDAP_PORT)) == NULL ||
-		/* SKIP ldap data base to prevent recursion */
-		/* in gethostbyname when resolving hostname */
-	    0 != ldap_set_option(ld, LDAP_X_OPT_DNS_SKIPDB, "ldap")) {
+	(void) mutex_lock(&serverInfo->mutex[1]);
+	serverInfo->sinfo[1].server_status = INFO_SERVER_CONNECTING;
+	(void) mutex_unlock(&serverInfo->mutex[1]);
 
+	/*
+	 * WARNING: anon_fallback == 1 (last argument) means that when
+	 * __ns_ldap_getRootDSE is unable to bind using the configured
+	 * credentials, it will try to fall back to using anonymous, non-SSL
+	 * mode of operation.
+	 *
+	 * This is for backward compatibility reasons - we might have machines
+	 * in the field with broken configuration (invalid credentials) and we
+	 * don't want them to be disturbed.
+	 */
+	if (__ns_ldap_getRootDSE(serverInfo->sinfo[1].addr,
+	    &rootDSE,
+	    &error,
+	    SA_ALLOW_FALLBACK) != NS_LDAP_SUCCESS) {
 		(void) mutex_lock(&serverInfo->mutex[1]);
-		serverInfo->sinfo[1].server_status =
-		    INFO_SERVER_ERROR;
-		serverInfo->sinfo[1].info_status =
-		    INFO_STATUS_ERROR;
-		serverInfo->sinfo[1].errormsg =
-		    strdup(gettext("ldap_init failed"));
+		serverInfo->sinfo[1].server_status = INFO_SERVER_ERROR;
+		serverInfo->sinfo[1].info_status = INFO_STATUS_ERROR;
+		serverInfo->sinfo[1].errormsg =	strdup(error->message);
+
+		if (error != NULL) {
+			(void) __ns_ldap_freeError(&error);
+		}
 
 		if (current_admin.debug_level >= DBG_ALL) {
 			logit("getldap_get_rootDSE: %s.\n",
@@ -572,158 +599,20 @@ getldap_get_rootDSE(void *arg)
 		sync_current_with_update_copy(serverInfo);
 		thr_exit((void *) -1);
 	}
-	ldap_set_option(ld,
-	    LDAP_OPT_PROTOCOL_VERSION, &ldapVersion);
-	ldap_set_option(ld,
-	    LDAP_X_OPT_CONNECT_TIMEOUT, &tcptimeout);
-
-	/* currently, only interested in two attributes */
-	attrs[0] = "supportedControl";
-	attrs[1] = "supportedsaslmechanisms";
-	attrs[2] = NULL;
 
 	(void) mutex_lock(&serverInfo->mutex[1]);
-	serverInfo->sinfo[1].server_status = INFO_SERVER_CONNECTING;
+
+	/* assume writeable, i.e., can do modify */
+	serverInfo->sinfo[1].type		= INFO_RW_WRITEABLE;
+	serverInfo->sinfo[1].server_status	= INFO_SERVER_UP;
+	serverInfo->sinfo[1].info_status	= INFO_STATUS_NEW;
+	/* remove the last DOORLINESEP */
+	*(rootDSE+strlen(rootDSE)-1) = '\0';
+	serverInfo->sinfo[1].rootDSE_data = rootDSE;
+
+	server_found = 1;
+
 	(void) mutex_unlock(&serverInfo->mutex[1]);
-
-	tv.tv_sec = search_timeout;
-	tv.tv_usec = 0;
-
-	rc = ldap_search_ext_s(ld, "", LDAP_SCOPE_BASE,
-	    "(objectclass=*)",
-	    attrs, 0, NULL, NULL, &tv, 0, &resultMsg);
-
-	switch (rc) {
-		/* If successful, the root DSE was found. */
-		case LDAP_SUCCESS:
-			break;
-		/*
-		 * If the root DSE was not found, the server does
-		 * not comply with the LDAP v3 protocol.
-		 */
-		default:
-			ldap_get_option(ld,
-			    LDAP_OPT_ERROR_NUMBER, &ldaperrno);
-			(void) snprintf(errmsg, sizeof (errmsg),
-			    gettext(ldap_err2string(ldaperrno)));
-			if (current_admin.debug_level >= DBG_ALL) {
-			logit("getldap_get_rootDSE: Root DSE not found."
-			    " %s is not an LDAPv3 server (%s).\n",
-			    serverInfo->sinfo[1].addr, errmsg);
-			}
-			(void) mutex_lock(&serverInfo->mutex[1]);
-			serverInfo->sinfo[1].errormsg
-			    = strdup(errmsg);
-			serverInfo->sinfo[1].info_status
-			    = INFO_STATUS_ERROR;
-			serverInfo->sinfo[1].server_status
-			    = INFO_SERVER_ERROR;
-			(void) mutex_unlock(&serverInfo->mutex[1]);
-			if (resultMsg)
-				ldap_msgfree(resultMsg);
-			ldap_unbind(ld);
-			/*
-			 * sync sinfo copies in the serverInfo.
-			 * protected by mutex
-			 */
-			sync_current_with_update_copy(serverInfo);
-			thr_exit((void *) -1);
-			break;
-	}
-
-
-	if ((e = ldap_first_entry(ld, resultMsg)) != NULL) {
-		/* calculate length of root DSE data */
-		for (a = ldap_first_attribute(ld, e, &ber);
-		    a != NULL;
-		    a = ldap_next_attribute(ld, e, ber)) {
-
-			if ((vals = ldap_get_values(ld, e, a)) != NULL) {
-				for (i = 0; vals[i] != NULL; i++) {
-					len +=  strlen(a) +
-					    strlen(vals[i]) +
-					    strlen(DOORLINESEP) +1;
-				}
-				ldap_value_free(vals);
-			}
-			ldap_memfree(a);
-		}
-		if (ber != NULL)
-			ber_free(ber, 0);
-		/* copy root DSE data */
-		if (len) {
-			/* add 1 for the last '\0' */
-			rootDSE  = (char *)malloc(len + 1);
-			if (rootDSE != NULL) {
-				/* make it an empty string first */
-				*rootDSE = '\0';
-				for (a = ldap_first_attribute(ld, e, &ber);
-				    a != NULL;
-				    a = ldap_next_attribute(
-				    ld, e, ber)) {
-
-					if ((vals = ldap_get_values(
-					    ld, e, a)) != NULL) {
-						for (i = 0; vals[i] != NULL;
-						    i++) {
-							int len;
-
-							len = strlen(a) +
-							    strlen(vals[i]) +
-							    strlen(DOORLINESEP)
-							    + 2;
-							(void) snprintf(
-							    rootDSE +
-							    strlen(rootDSE),
-							    len, "%s=%s%s",
-							    a, vals[i],
-							    DOORLINESEP);
-						}
-						ldap_value_free(vals);
-					}
-					ldap_memfree(a);
-				}
-				if (ber != NULL)
-					ber_free(ber, 0);
-			} else
-				len = 0;
-		}
-	}
-
-	/* error, if no root DSE data */
-	(void) mutex_lock(&serverInfo->mutex[1]);
-	if (len == 0) {
-		serverInfo->sinfo[1].errormsg =
-		    strdup(gettext("No root DSE data returned."));
-		if (current_admin.debug_level >= DBG_ALL) {
-			logit("getldap_get_rootDSE: %s.\n",
-			    serverInfo->sinfo[1].errormsg);
-		}
-		serverInfo->sinfo[1].type
-		    = INFO_RW_UNKNOWN;
-		serverInfo->sinfo[1].info_status
-		    = INFO_STATUS_ERROR;
-		serverInfo->sinfo[1].server_status 	= INFO_SERVER_ERROR;
-		exitrc = -1;
-	} else {
-		/* assume writeable, i.e., can do modify */
-		serverInfo->sinfo[1].type	= INFO_RW_WRITEABLE;
-		serverInfo->sinfo[1].server_status
-		    = INFO_SERVER_UP;
-		serverInfo->sinfo[1].info_status	= INFO_STATUS_NEW;
-		/* remove the last DOORLINESEP */
-		*(rootDSE+strlen(rootDSE)-1) = '\0';
-		serverInfo->sinfo[1].rootDSE_data = rootDSE;
-
-		server_found = 1;
-
-		exitrc = NS_LDAP_SUCCESS;
-	}
-	(void) mutex_unlock(&serverInfo->mutex[1]);
-
-	if (resultMsg)
-		ldap_msgfree(resultMsg);
-	ldap_unbind(ld);
 
 	/*
 	 * sync sinfo copies in the serverInfo.
@@ -876,8 +765,7 @@ getldap_destroy_serverInfo(server_info_t *head)
 }
 
 static int
-getldap_set_serverInfo(server_info_t *head,
-		int reset_bindtime)
+getldap_set_serverInfo(server_info_t *head, int reset_bindtime, info_op_t op)
 {
 	server_info_t	*info;
 	int 		atleast1 = 0;
@@ -910,18 +798,6 @@ getldap_set_serverInfo(server_info_t *head,
 		}
 		if (error)
 			(void) __ns_ldap_freeError(&error);
-
-		/* get search timeout value */
-		search_timeout = NS_DEFAULT_SEARCH_TIMEOUT;
-		(void) __ns_ldap_getParam(NS_LDAP_SEARCH_TIME_P,
-		    &paramVal, &error);
-		if (paramVal != NULL && *paramVal != NULL) {
-			search_timeout = **((int **)paramVal);
-			(void) __ns_ldap_freeParam(&paramVal);
-		}
-		if (error)
-			(void) __ns_ldap_freeError(&error);
-
 	}
 
 	for (info = head; info; info = info->next)
@@ -962,123 +838,14 @@ getldap_set_serverInfo(server_info_t *head,
 
 	free(tid);
 
-	if (atleast1)
+	if (op == INFO_OP_REFRESH)
+		test_server_change(head);
+	if (atleast1) {
 		return (NS_LDAP_SUCCESS);
-	else
+	} else
 		return (-1);
 }
 
-/*
- * Convert an IP to a host name
- */
-static int
-getldap_ip2hostname(char *ipaddr, char **hostname) {
-	struct in_addr	in;
-	struct in6_addr	in6;
-	struct hostent	*hp = NULL;
-	char	*start = NULL, *end = NULL, delim = '\0';
-	char	*port = NULL, *addr = NULL;
-	int	error_num = 0, len = 0;
-
-	if (ipaddr == NULL || hostname == NULL)
-		return (NS_LDAP_INVALID_PARAM);
-	*hostname = NULL;
-	if ((addr = strdup(ipaddr)) == NULL)
-		return (NS_LDAP_MEMORY);
-
-	if (addr[0] == '[') {
-		/*
-		 * Assume it's [ipv6]:port
-		 * Extract ipv6 IP
-		 */
-		start = &addr[1];
-		if ((end = strchr(addr, ']')) != NULL) {
-			*end = '\0';
-			delim = ']';
-			if (*(end + 1) == ':')
-				/* extract port */
-				port = end + 2;
-		} else {
-			return (NS_LDAP_INVALID_PARAM);
-		}
-	} else if ((end = strchr(addr, ':')) != NULL) {
-		/* assume it's ipv4:port */
-		*end = '\0';
-		delim = ':';
-		start = addr;
-		port = end + 1;
-	} else
-		/* No port */
-		start = addr;
-
-
-	if (inet_pton(AF_INET, start, &in) == 1) {
-		/* IPv4 */
-		hp = getipnodebyaddr((char *)&in,
-			sizeof (struct in_addr), AF_INET, &error_num);
-		if (hp && hp->h_name) {
-			/* hostname + '\0' */
-			len = strlen(hp->h_name) + 1;
-			if (port)
-				/* ':' + port */
-				len += strlen(port) + 1;
-			if ((*hostname = malloc(len)) == NULL) {
-				free(addr);
-				freehostent(hp);
-				return (NS_LDAP_MEMORY);
-			}
-
-			if (port)
-				(void) snprintf(*hostname, len, "%s:%s",
-						hp->h_name, port);
-			else
-				(void) strlcpy(*hostname, hp->h_name, len);
-
-			free(addr);
-			freehostent(hp);
-			return (NS_LDAP_SUCCESS);
-		} else {
-			return (NS_LDAP_NOTFOUND);
-		}
-	} else if (inet_pton(AF_INET6, start, &in6) == 1) {
-		/* IPv6 */
-		hp = getipnodebyaddr((char *)&in6,
-			sizeof (struct in6_addr), AF_INET6, &error_num);
-		if (hp && hp->h_name) {
-			/* hostname + '\0' */
-			len = strlen(hp->h_name) + 1;
-			if (port)
-				/* ':' + port */
-				len += strlen(port) + 1;
-			if ((*hostname = malloc(len)) == NULL) {
-				free(addr);
-				freehostent(hp);
-				return (NS_LDAP_MEMORY);
-			}
-
-			if (port)
-				(void) snprintf(*hostname, len, "%s:%s",
-						hp->h_name, port);
-			else
-				(void) strlcpy(*hostname, hp->h_name, len);
-
-			free(addr);
-			freehostent(hp);
-			return (NS_LDAP_SUCCESS);
-		} else {
-			return (NS_LDAP_NOTFOUND);
-		}
-	} else {
-		/*
-		 * A hostname
-		 * Return it as is
-		 */
-		if (end)
-			*end = delim;
-		*hostname = addr;
-		return (NS_LDAP_SUCCESS);
-	}
-}
 /*
  * getldap_get_serverInfo processes the GETLDAPSERVER door request passed
  * to this function from getldap_serverInfo_op().
@@ -1120,8 +887,10 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 	char 		*req	= NULL;
 	char 		req_new[] = NS_CACHE_NEW;
 	char 		addr_type[] = NS_CACHE_ADDR_IP;
-	int		matched = FALSE, len, rc = 0;
+	int		matched = FALSE, len = 0, rc = 0;
 	char		*ret_addr = NULL, *ret_addrFQDN = NULL;
+	char		*new_addr = NULL;
+	pid_t		pid;
 
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("getldap_get_serverInfo()...\n");
@@ -1183,14 +952,13 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 		    strcmp(info->sinfo[0].addr, addr) == 0) {
 			matched = TRUE;
 			if (strcmp(req, NS_CACHE_NORESP) == 0) {
-
-				/*
-				 * if the server has already been removed,
-				 * don't bother
-				 */
-				if (info->sinfo[0].server_status ==
-				    INFO_SERVER_REMOVED) {
+				if (chg_is_called_from_nscd_or_peruser_nscd(
+				    "REMOVE SERVER", &pid) == 0) {
 					(void) mutex_unlock(&info->mutex[0]);
+					if (current_admin.debug_level >=
+					    DBG_ALL)
+						logit("Only nscd can remove "
+						    "servers. pid %ld", pid);
 					continue;
 				}
 
@@ -1220,21 +988,18 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 					 * to mess up the server
 					 * list.
 					 */
-					info->sinfo[0].prev_server_status =
-					    info->sinfo[0].server_status;
-					info->sinfo[0].server_status  =
-					    INFO_SERVER_REMOVED;
 					/*
-					 * make sure this will be seen
-					 * if a user query the server
-					 * status via the ldap_cachemgr's
-					 * -g option
+					 * Make a copy of addr to contact
+					 * it later. It's not doing it here
+					 * to avoid long wait and possible
+					 * recursion to contact an LDAP server.
 					 */
-					info->sinfo[1].server_status  =
-					    INFO_SERVER_REMOVED;
+					new_addr = strdup(info->sinfo[0].addr);
+					if (new_addr)
+						remove_server(new_addr);
 					*svr_removed = TRUE;
 					(void) mutex_unlock(&info->mutex[0]);
-					continue;
+					break;
 				}
 			} else {
 				/*
@@ -1273,7 +1038,7 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 			 * ldap/foo.sun.com@SUN.COM
 			 */
 			if (server->sinfo[0].hostname == NULL) {
-				rc = getldap_ip2hostname(server->sinfo[0].addr,
+				rc = __s_api_ip2hostname(server->sinfo[0].addr,
 				    &server->sinfo[0].hostname);
 				if (rc != NS_LDAP_SUCCESS) {
 					(void) mutex_unlock(&info->mutex[0]);
@@ -1851,11 +1616,13 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 	server_info_t 		*serverInfo_1;
 	int 			is_creating;
 	int 			err, no_server_good = FALSE;
-	int 			server_removed = FALSE;
+	int			server_removed = FALSE;
+	int			fall_thru = FALSE;
 	static struct timespec	timeout;
 	struct timespec		new_timeout;
 	struct timeval		tp;
 	static time_t		prev_refresh = 0, next_refresh = 0;
+	ns_server_status_t		changed = 0;
 
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("getldap_serverInfo_op()...\n");
@@ -1916,7 +1683,7 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 		 */
 		(void) rw_rdlock(&info_lock);
 		/* reset bind time (tcptimeout) */
-		(void) getldap_set_serverInfo(serverInfo, 1);
+		(void) getldap_set_serverInfo(serverInfo, 1, INFO_OP_CREATE);
 
 		(void) mutex_lock(&info_mutex);
 		/*
@@ -1999,7 +1766,8 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 		(void) rw_rdlock(&info_lock);
 		if (serverInfo) {
 			/* do not reset bind time (tcptimeout) */
-			(void) getldap_set_serverInfo(serverInfo, 0);
+			(void) getldap_set_serverInfo(serverInfo, 0,
+			    INFO_OP_REFRESH);
 
 			(void) mutex_lock(&info_mutex);
 
@@ -2109,6 +1877,23 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 		(void) rw_unlock(&info_lock_old);
 
 		/*
+		 * Return here and let remove server thread do its job in
+		 * another thread. It executes INFO_OP_REMOVESERVER code later.
+		 */
+		if (server_removed)
+			break;
+
+		fall_thru = TRUE;
+
+		/* FALL THROUGH */
+
+	case INFO_OP_REMOVESERVER:
+		/*
+		 * INFO_OP_GETSERVER and INFO_OP_REMOVESERVER share the
+		 * following code except (!fall thru) part.
+		 */
+
+		/*
 		 * if server info is currently being
 		 * (re)created, do nothing
 		 */
@@ -2119,10 +1904,22 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 		if (is_creating)
 			break;
 
+		if (!fall_thru) {
+			if (current_admin.debug_level >= DBG_ALL)
+				logit("operation is INFO_OP_REMOVESERVER...\n");
+			(void) rw_rdlock(&info_lock_old);
+			changed = set_server_status(input, serverInfo_old);
+			(void) rw_unlock(&info_lock_old);
+			if (changed)
+				create_buf_and_notify(input, changed);
+			else
+				break;
+		}
+
 		/*
 		 * set cache manager server list TTL if necessary
 		 */
-		if (*output == NULL || server_removed) {
+		if (*output == NULL || changed) {
 			(void) rw_rdlock(&info_lock);
 			(void) mutex_lock(&info_mutex);
 
@@ -2404,7 +2201,7 @@ checkupdate(int sighup)
 
 
 static int
-update_from_profile()
+update_from_profile(int *change_status)
 {
 	ns_ldap_result_t *result = NULL;
 	char		searchfilter[BUFSIZ];
@@ -2524,8 +2321,8 @@ update_from_profile()
 			    ptr->paramList[NS_LDAP_EXP_P].ns_tm);
 		}
 
-		/* set ptr as current_config */
-		__s_api_init_config(ptr);
+		/* set ptr as current_config if the config is changed */
+		chg_test_config_change(ptr, change_status);
 		rc = 0;
 	} else {
 		__s_api_destroy_config(ptr);
@@ -2544,6 +2341,7 @@ getldap_init()
 {
 	ns_ldap_error_t	*error;
 	struct timeval	tp;
+	ldap_get_chg_cookie_t	cookie;
 
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("getldap_init()...\n");
@@ -2573,6 +2371,9 @@ getldap_init()
 	(void) getldap_cache_op(CACHE_OP_CREATE,
 	    0, NULL, NULL);
 
+	cookie.mgr_pid = getpid();
+	cookie.seq_num = 0;
+	chg_config_cookie_set(&cookie);
 	return (0);
 }
 
@@ -2583,6 +2384,7 @@ perform_update(void)
 	struct timeval	tp;
 	char		buf[20];
 	int		rc, rc1;
+	int		changed = 0;
 	void		**paramVal = NULL;
 	ns_ldap_self_gssapi_config_t	config;
 
@@ -2643,7 +2445,7 @@ perform_update(void)
 		(void) rw_unlock(&ldap_lock);
 
 		do {
-			rc = update_from_profile();
+			rc = update_from_profile(&changed);
 			if (rc != 0) {
 				logit("Error: Unable to update from profile\n");
 			}
@@ -2682,6 +2484,9 @@ perform_update(void)
 		    rc1);
 			exit(rc1);
 	}
+
+	if (!changed)
+		return;
 
 	(void) rw_rdlock(&ldap_lock);
 	if (((error = __ns_ldap_DumpConfiguration(NSCONFIGREFRESH)) != NULL) ||
@@ -2863,14 +2668,14 @@ void
 getldap_lookup(LineBuf *config_info, ldap_call_t *in)
 {
 	ns_ldap_error_t	*error;
+	ldap_config_out_t *cout;
 
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("getldap_lookup()...\n");
 	}
-
 	(void) rw_rdlock(&ldap_lock);
 	if ((error = __ns_ldap_LoadDoorInfo(config_info,
-	    in->ldap_u.domainname)) != NULL) {
+	    in->ldap_u.domainname, NULL)) != NULL) {
 		if (error != NULL && error->message != NULL)
 			logit("Error: ldap_lookup: %s\n", error->message);
 		(void) __ns_ldap_freeError(&error);
@@ -2878,6 +2683,248 @@ getldap_lookup(LineBuf *config_info, ldap_call_t *in)
 		config_info->str = NULL;
 		config_info->len = 0;
 	}
-
+	/* set change cookie */
+	cout = (ldap_config_out_t *)config_info->str;
+	if (cout)
+		cout->cookie = chg_config_cookie_get();
 	(void) rw_unlock(&ldap_lock);
+}
+/*
+ * It creates the header and data stream to be door returned and notify
+ * chg_get_statusChange() threads.
+ * This is called after all getldap_get_rootDSE() threads are joined.
+ */
+void
+test_server_change(server_info_t *head)
+{
+	server_info_t *info;
+	int	len = 0, num = 0, ds_len = 0, new_len = 0, tlen = 0;
+	char	*tmp_buf = NULL, *ptr = NULL, *status = NULL;
+	ldap_get_change_out_t *cout;
+
+	ds_len = strlen(DOORLINESEP);
+
+	for (info = head; info; info = info->next) {
+		(void) mutex_lock(&info->mutex[0]);
+		if (info->sinfo[0].change != 0) {
+			/* "9.9.9.9|NS_SERVER_CHANGE_UP|" */
+			len += 2 * ds_len + strlen(info->sinfo[0].addr) +
+			    strlen(NS_SERVER_CHANGE_UP);
+			num++;
+		}
+		(void) mutex_unlock(&info->mutex[0]);
+	}
+
+	if (len == 0)
+		return;
+
+	len++; /* '\0' */
+
+	tlen = sizeof (ldap_get_change_out_t) - sizeof (int) + len;
+	if ((tmp_buf = malloc(tlen)) == NULL)
+		return;
+
+	cout = (ldap_get_change_out_t *)tmp_buf;
+	cout->type = NS_STATUS_CHANGE_TYPE_SERVER;
+	/* cout->cookie is set by chg_notify_statusChange */
+	cout->server_count = num;
+	cout->data_size = len;
+
+	/* Create IP|UP or DOWN|IP|UP or DOWN| ... */
+	ptr = cout->data;
+	new_len = len;
+	for (info = head; info; info = info->next) {
+		(void) mutex_lock(&info->mutex[0]);
+		if (info->sinfo[0].change == 0) {
+			(void) mutex_unlock(&info->mutex[0]);
+			continue;
+		}
+
+		if (info->sinfo[0].change == NS_SERVER_UP)
+			status = NS_SERVER_CHANGE_UP;
+		else if (info->sinfo[0].change == NS_SERVER_DOWN)
+			status = NS_SERVER_CHANGE_DOWN;
+		else {
+			syslog(LOG_WARNING, gettext("Bad change value %d"),
+			    info->sinfo[0].change);
+			(void) mutex_unlock(&info->mutex[0]);
+			free(tmp_buf);
+			return;
+		}
+
+		if ((snprintf(ptr, new_len, "%s%s%s%s",
+		    info->sinfo[0].addr, DOORLINESEP,
+		    status, DOORLINESEP)) >= new_len) {
+			(void) mutex_unlock(&info->mutex[0]);
+			break;
+		}
+		new_len -= strlen(ptr);
+		ptr += strlen(ptr);
+
+		(void) mutex_unlock(&info->mutex[0]);
+	}
+	(void) chg_notify_statusChange(tmp_buf);
+}
+/*
+ * It creates the header and data stream to be door returned and notify
+ * chg_get_statusChange() threads.
+ * This is called in removing server case.
+ */
+static void
+create_buf_and_notify(char *input, ns_server_status_t st)
+{
+	rm_svr_t *rms = (rm_svr_t *)input;
+	char	*tmp_buf, *ptr, *status;
+	int	len, tlen;
+	ldap_get_change_out_t *cout;
+
+	/* IP|UP or DOWN| */
+	len = 2 * strlen(DOORLINESEP) + strlen(rms->addr) +
+	    strlen(NS_SERVER_CHANGE_UP) + 1;
+
+	tlen = sizeof (ldap_get_change_out_t) - sizeof (int) + len;
+
+	if ((tmp_buf = malloc(tlen)) == NULL)
+		return;
+
+	cout = (ldap_get_change_out_t *)tmp_buf;
+	cout->type = NS_STATUS_CHANGE_TYPE_SERVER;
+	/* cout->cookie is set by chg_notify_statusChange */
+	cout->server_count = 1;
+	cout->data_size = len;
+
+	/* Create IP|DOWN| */
+	ptr = cout->data;
+	if (st == NS_SERVER_UP)
+		status = NS_SERVER_CHANGE_UP;
+	else if (st == NS_SERVER_DOWN)
+		status = NS_SERVER_CHANGE_DOWN;
+
+	(void) snprintf(ptr, len, "%s%s%s%s",
+	    rms->addr, DOORLINESEP, status, DOORLINESEP);
+
+	(void) chg_notify_statusChange(tmp_buf);
+
+}
+
+/*
+ * Return: 0 server is down, 1 server is up
+ */
+static int
+contact_server(char *addr)
+{
+	char		*rootDSE = NULL;
+	ns_ldap_error_t	*error = NULL;
+	int		rc;
+
+	if (__ns_ldap_getRootDSE(addr, &rootDSE, &error,
+	    SA_ALLOW_FALLBACK) != NS_LDAP_SUCCESS) {
+		if (current_admin.debug_level >= DBG_ALL)
+			logit("get rootDSE %s failed. %s", addr,
+			    error->message ? error->message : "");
+		rc = 0;
+	} else
+		rc = 1;
+
+	if (rootDSE)
+		free(rootDSE);
+	if (error)
+		(void) __ns_ldap_freeError(&error);
+
+	return (rc);
+}
+
+/*
+ * The thread is spawned to do contact_server() so it won't be blocking
+ * getldap_serverInfo_op(INFO_OP_GETSERVER, ...) case.
+ * After contact_server() is done, it calls
+ * getldap_serverInfo_op(INFO_OP_REMOVESERVER, ...) to return to the remaining
+ * program flow. It's meant to maintain the original program flow yet be
+ * non-blocking when it's contacting server.
+ */
+static void *
+remove_server_thread(void *arg)
+{
+	char *addr = (char *)arg, *out = NULL;
+	int up;
+	rm_svr_t rms;
+
+	up = contact_server(addr);
+
+	rms.addr = addr;
+	rms.up = up;
+
+	(void) getldap_serverInfo_op(INFO_OP_REMOVESERVER, (char *)&rms, &out);
+
+	free(addr);
+
+	thr_exit(NULL);
+	return (NULL);
+}
+/*
+ * addr is allocated and is freed by remove_server_thread
+ * It starts a thread to contact server and remove server to avoid long wait
+ * or recursion.
+ */
+static void
+remove_server(char *addr)
+{
+	if (thr_create(NULL, 0, remove_server_thread,
+	    (void *)addr, THR_BOUND|THR_DETACHED, NULL) != 0) {
+		free(addr);
+		syslog(LOG_ERR, "thr_create failed for remove_server_thread");
+	}
+}
+/*
+ * Compare the server_status and mark it up or down accordingly.
+ * This is called in removing server case.
+ */
+static ns_server_status_t
+set_server_status(char *input, server_info_t *head)
+{
+	rm_svr_t *rms = (rm_svr_t *)input;
+	ns_server_status_t changed = 0;
+	server_info_t *info;
+
+	for (info = head; info != NULL; info = info->next) {
+		(void) mutex_lock(&info->mutex[0]);
+		if (strcmp(info->sinfo[0].addr, rms->addr) == 0) {
+			if (info->sinfo[0].server_status == INFO_SERVER_UP &&
+			    rms->up == FALSE) {
+				info->sinfo[0].prev_server_status =
+				    info->sinfo[0].server_status;
+				info->sinfo[0].server_status =
+				    INFO_SERVER_ERROR;
+				info->sinfo[0].change = NS_SERVER_DOWN;
+				changed = NS_SERVER_DOWN;
+
+			} else if (info->sinfo[0].server_status ==
+			    INFO_SERVER_ERROR && rms->up == TRUE) {
+				/*
+				 * It should be INFO_SERVER_UP, but check here
+				 */
+				info->sinfo[0].prev_server_status =
+				    info->sinfo[0].server_status;
+				info->sinfo[0].server_status =
+				    INFO_SERVER_UP;
+				info->sinfo[0].change = NS_SERVER_UP;
+				changed = NS_SERVER_UP;
+			}
+			(void) mutex_unlock(&info->mutex[0]);
+			break;
+		}
+		(void) mutex_unlock(&info->mutex[0]);
+	}
+	if (changed) {
+		/* ldap_cachemgr -g option looks up [1] */
+		(void) mutex_lock(&info->mutex[1]);
+		info->sinfo[1].prev_server_status =
+		    info->sinfo[1].server_status;
+		if (changed == NS_SERVER_DOWN)
+			info->sinfo[1].server_status = INFO_SERVER_ERROR;
+		else if (changed == NS_SERVER_UP)
+			info->sinfo[1].server_status = INFO_SERVER_UP;
+		(void) mutex_unlock(&info->mutex[1]);
+	}
+	return (changed);
 }

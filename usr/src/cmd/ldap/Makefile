@@ -1,5 +1,5 @@
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -10,10 +10,12 @@ include ../Makefile.cmd
 
 SUBDIRS=	$(MACH)	
 POFILE=		ldapcmd.po
-NS_FILES=	ldapclient ldaplist mapping printResult ldapaddent ldapaddrbac
+NS_FILES=	ldapclient ldaplist mapping printResult ldapaddent ldapaddrbac \
+		standalone
 COMM_FILES=	ldapsearch ldapmodify ldapmodrdn ldapdelete common  \
 		fileurl ldaptool-sasl
-POFILES=	$(NS_FILES:%=ns_ldap/%.po) $(COMM_FILES:%=common/%.po)
+NS_POFILES=	$(NS_FILES:%=ns_ldap/%.po) 
+POFILES=	$(NS_POFILES) $(COMM_FILES:%=common/%.po)
 
 all :=		TARGET= all
 clean :=	TARGET= clean
@@ -27,9 +29,10 @@ package :=	TARGET= package
 $(POFILES) :=	CFLAGS += -I ../../lib/libldap5/include/ldap \
 			-I ../../lib/libsldap/common \
 			-I ../../lib/libnsl/include/rpcsvc \
-                	-DNO_LIBLCACHE -DLDAP_REFERRALS -DNET_SSL \
+			-DNO_LIBLCACHE -DLDAP_REFERRALS -DNET_SSL \
 			-DLDAPSSLIO -DHAVE_SASL_OPTIONS \
 			-DSOLARIS_LDAP_CMD
+$(NS_POFILES) := C99MODE = $(C99_ENABLE)
 
 .KEEP_STATE:
 
@@ -44,7 +47,7 @@ clean:	$(SUBDIRS)
 # 	-$(RM) $(ROOTUSRBIN)
 
 check: $(CHECKHDRS)
-	
+
 $(MACH) :	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 

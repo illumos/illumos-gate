@@ -25,17 +25,26 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifndef	_STANDALONE_H
+#define	_STANDALONE_H
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
+#include <strings.h>
+#include <stdio.h>
 #include "ns_sldap.h"
 #include "ns_internal.h"
-#include "ns_connmgmt.h"
-#include <syslog.h>
 
-#pragma init(ns_ldap_init)
+ns_standalone_conf_t standaloneDefaults;
 
-static void
-ns_ldap_init()
-{
-	get_environment();	/* load environment debugging options */
+int separatePort(char *peer, char **name, uint16_t *port);
 
-	(void) __s_api_conn_mgmt_init();
+char *readPwd(char *pwd_file);
+
+#ifdef	__cplusplus
 }
+#endif
+
+#endif	/* _STANDALONE_H */

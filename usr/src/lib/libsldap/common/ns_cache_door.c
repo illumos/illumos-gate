@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,7 +40,7 @@
 
 /*
  *
- * Routine that actually performs the door call.
+ * Routines that actually performs the door call.
  * Note that we cache a file descriptor.  We do
  * the following to prevent disasters:
  *
@@ -80,12 +80,15 @@ extern int errno;
 static mutex_t	_door_lock = DEFAULTMUTEX;
 static	int 		doorfd = -1;
 
+/*
+ * This function does the first part: ensures a file descriptor is
+ * cached and usable.
+ */
 int
-__ns_ldap_trydoorcall(ldap_data_t **dptr, int *ndata, int *adata)
+__ns_ldap_trydoorcall_getfd()
 {
 	static	door_info_t 	real_door;
 	door_info_t 		my_door;
-	door_arg_t		param;
 
 	/*
 	 * the first time in we try and open and validate the door.
@@ -107,7 +110,7 @@ try_again:
 		if ((doorfd = open(LDAP_CACHE_DOOR, O_RDONLY, 0))
 		    == -1) {
 			(void) mutex_unlock(&_door_lock);
-			return (NOSERVER);
+			return (NS_CACHE_NOSERVER);
 		}
 
 		/*
@@ -120,15 +123,15 @@ try_again:
 			tbc[i++] = doorfd;
 			if ((doorfd = dup(doorfd)) < 0) {
 				while (i--)
-				    (void) close(tbc[i]);
+					(void) close(tbc[i]);
 				doorfd = -1;
 				(void) mutex_unlock(&_door_lock);
-				return (NOSERVER);
+				return (NS_CACHE_NOSERVER);
 			}
 		}
 
 		while (i--)
-		    (void) close(tbc[i]);
+			(void) close(tbc[i]);
 
 		/*
 		 * mark this door descriptor as close on exec
@@ -143,7 +146,7 @@ try_again:
 			(void) close(doorfd);
 			doorfd = -1;
 			(void) mutex_unlock(&_door_lock);
-			return (NOSERVER);
+			return (NS_CACHE_NOSERVER);
 		}
 	} else {
 		if (door_info(doorfd, &my_door) == -1 ||
@@ -165,6 +168,17 @@ try_again:
 	}
 
 	(void) mutex_unlock(&_door_lock);
+	return (NS_CACHE_SUCCESS);
+}
+
+/*
+ * This function does the second part: sends a door request to
+ * the ldap_cachemgr daemon.
+ */
+int
+__ns_ldap_trydoorcall_send(ldap_data_t **dptr, int *ndata, int *adata)
+{
+	door_arg_t		param;
 
 	param.rbuf = (char *)*dptr;
 	param.rsize = *ndata;
@@ -173,21 +187,35 @@ try_again:
 	param.desc_ptr = NULL;
 	param.desc_num = 0;
 	if (door_call(doorfd, &param) == -1) {
-		return (NOSERVER);
+		return (NS_CACHE_NOSERVER);
 	}
 	*adata = (int)param.data_size;
 	*ndata = (int)param.rsize;
 	*dptr = (ldap_data_t *)param.data_ptr;
 	if (*adata == 0 || *dptr == NULL) {
-		return (NOSERVER);
+		return (NS_CACHE_NOSERVER);
 	}
 
 	return ((*dptr)->ldap_ret.ldap_return_code);
 }
 
-#pragma fini(_doorfd_close)
-static void
-_doorfd_close()
+/*
+ * This function does part 1 and 2: makes sure a file descriptor is
+ * available and sends a door request to the ldap_cachemgr daemon.
+ */
+int
+__ns_ldap_trydoorcall(ldap_data_t **dptr, int *ndata, int *adata)
+{
+	int rc;
+
+	if ((rc = __ns_ldap_trydoorcall_getfd()) == NS_CACHE_SUCCESS)
+		return (__ns_ldap_trydoorcall_send(dptr, ndata, adata));
+	else
+		return (rc);
+}
+
+void
+__ns_ldap_doorfd_close()
 {
 	(void) mutex_lock(&_door_lock);
 	if (doorfd != -1) {

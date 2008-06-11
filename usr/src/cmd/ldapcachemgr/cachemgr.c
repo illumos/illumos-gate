@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,7 +72,6 @@ static int setadmin(ldap_call_t *ptr);
 static  int client_setadmin(admin_t *ptr);
 static int client_showstats(admin_t *ptr);
 static int is_root(int free_uc, char *dc_str, ucred_t **uc);
-static int is_nscd(pid_t pid);
 
 #ifdef SLP
 int			use_slp = 0;
@@ -124,11 +123,23 @@ sig_ok_to_exit(int signo)
 #define	COMMON_THREADS		20
 #define	CACHE_MISS_THREADS	(COMMON_THREADS + LDAP_TABLES * TABLE_THREADS)
 #define	CACHE_HIT_THREADS	20
-#define	MAX_SERVER_THREADS	(CACHE_HIT_THREADS + CACHE_MISS_THREADS)
+/*
+ * There is only one thread handling GETSTATUSCHANGE START from main nscd
+ * most of time. But it could happen that a main nscd is restarted, old main
+ * nscd's handling thread is still alive when new main nscd starts and sends
+ * START, or old main dies. STOP is not sent in both cases.
+ * The main nscd requires 2 threads to handle START and STOP. So max number
+ * of change threads is set to 4.
+ */
+#define	MAX_CHG_THREADS		4
+#define	MAX_SERVER_THREADS	(CACHE_HIT_THREADS + CACHE_MISS_THREADS + \
+				MAX_CHG_THREADS)
 
 static sema_t common_sema;
 static sema_t ldap_sema;
 static thread_key_t lookup_state_key;
+static int chg_threads_num = 0;
+static mutex_t chg_threads_num_lock = DEFAULTMUTEX;
 
 static void
 initialize_lookup_clearance()
@@ -303,7 +314,7 @@ main(int argc, char ** argv)
 			usage(argv[0]);
 		}
 
-		if ((__ns_ldap_cache_ping() != SUCCESS) ||
+		if ((__ns_ldap_cache_ping() != NS_CACHE_SUCCESS) ||
 		    (client_getadmin(&current_admin) != 0)) {
 			(void) fprintf(stderr,
 			    gettext("%s doesn't appear to be running.\n"),
@@ -320,7 +331,7 @@ main(int argc, char ** argv)
 	 *  Determine if there is already a daemon running
 	 */
 
-	will_become_server = (__ns_ldap_cache_ping() != SUCCESS);
+	will_become_server = (__ns_ldap_cache_ping() != NS_CACHE_SUCCESS);
 
 	/*
 	 *  load normal config file
@@ -553,8 +564,8 @@ main(int argc, char ** argv)
 	 *  kick off revalidate threads only if ttl != 0
 	 */
 
-	if (thr_create(NULL, NULL, (void *(*)(void*))getldap_refresh,
-	    0, 0, NULL) != 0) {
+	if (thr_create(NULL, 0, (void *(*)(void*))getldap_refresh,
+	    NULL, 0, NULL) != 0) {
 		logit("thr_create() call failed\n");
 		syslog(LOG_ERR,
 		    gettext("ldap_cachemgr: thr_create() call failed"));
@@ -566,8 +577,8 @@ main(int argc, char ** argv)
 	 *  kick off the thread which refreshes the server info
 	 */
 
-	if (thr_create(NULL, NULL, (void *(*)(void*))getldap_serverInfo_refresh,
-	    0, 0, NULL) != 0) {
+	if (thr_create(NULL, 0, (void *(*)(void*))getldap_serverInfo_refresh,
+	    NULL, 0, NULL) != 0) {
 		logit("thr_create() call failed\n");
 		syslog(LOG_ERR,
 		    gettext("ldap_cachemgr: thr_create() call failed"));
@@ -575,10 +586,24 @@ main(int argc, char ** argv)
 		exit(1);
 	}
 
+	/*
+	 * kick off the thread which cleans up waiting threads for
+	 * GETSTATUSCHANGE
+	 */
+
+	if (thr_create(NULL, 0, chg_cleanup_waiting_threads,
+	    NULL, 0, NULL) != 0) {
+		logit("thr_create() chg_cleanup_waiting_threads call failed\n");
+		syslog(LOG_ERR,
+		    gettext("ldap_cachemgr: thr_create() "
+		    "chg_cleanup_waiting_threads call failed"));
+		exit(1);
+	}
+
 #ifdef SLP
 	if (use_slp) {
 		/* kick off SLP discovery thread */
-		if (thr_create(NULL, NULL, (void *(*)(void *))discover,
+		if (thr_create(NULL, 0, (void *(*)(void *))discover,
 		    (void *)&refresh, 0, NULL) != 0) {
 			logit("thr_create() call failed\n");
 			syslog(LOG_ERR, gettext("ldap_cachemgr: thr_create() "
@@ -641,7 +666,7 @@ get_data_size(LineBuf *config_info, int *err_code)
 			    "is too big. There is not enough space "
 			    "to process it. Ignoring it."));
 
-			*err_code = SERVERERROR;
+			*err_code = NS_CACHE_SERVERERROR;
 
 			free(config_info->str);
 			config_info->str = NULL;
@@ -666,6 +691,7 @@ switcher(void *cookie, char *argp, size_t arg_size,
 
 	LineBuf		configInfo;
 	dataunion	*buf = NULL;
+
 	/*
 	 * By default the size of  a buffer to be passed down to a client
 	 * is equal to the size of the ldap_return_t structure. We need
@@ -797,7 +823,7 @@ switcher(void *cookie, char *argp, size_t arg_size,
 			 * buffer allocation.
 			 */
 			if (is_root(0, "SETCACHE", &uc) &&
-			    is_nscd(ucred_getpid(uc))) {
+			    is_called_from_nscd(ucred_getpid(uc))) {
 				ldapErrno = getldap_set_cacheData(ptr);
 				current_admin.ldap_stat.ldap_numbercalls++;
 			} else
@@ -806,6 +832,38 @@ switcher(void *cookie, char *argp, size_t arg_size,
 			if (uc != NULL)
 				ucred_free(uc);
 			state = ALLOCATE;
+			break;
+		case GETSTATUSCHANGE:
+			/*
+			 * Process the request and proceed with the default
+			 * buffer allocation.
+			 */
+			(void) mutex_lock(&chg_threads_num_lock);
+			chg_threads_num++;
+			if (chg_threads_num > MAX_CHG_THREADS) {
+				chg_threads_num--;
+				(void) mutex_unlock(&chg_threads_num_lock);
+				ldapErrno = CHG_EXCEED_MAX_THREADS;
+				state = ALLOCATE;
+				break;
+			}
+			(void) mutex_unlock(&chg_threads_num_lock);
+
+			if (is_root(0, "GETSTATUSCHANGE", &uc) &&
+			    is_called_from_nscd(ucred_getpid(uc))) {
+				ldapErrno = chg_get_statusChange(
+				    &configInfo, ptr, ucred_getpid(uc));
+				state = GETSIZE;
+			} else {
+				ldapErrno = -1;
+				state = ALLOCATE;
+			}
+			if (uc != NULL)
+				ucred_free(uc);
+
+			(void) mutex_lock(&chg_threads_num_lock);
+			chg_threads_num--;
+			(void) mutex_unlock(&chg_threads_num_lock);
 			break;
 		default:
 			/*
@@ -997,7 +1055,7 @@ client_getadmin(admin_t *ptr)
 	adata = sizeof (u.data);
 	dptr = &u.data;
 
-	if (__ns_ldap_trydoorcall(&dptr, &ndata, &adata) != SUCCESS) {
+	if (__ns_ldap_trydoorcall(&dptr, &ndata, &adata) != NS_CACHE_SUCCESS) {
 		return (-1);
 	}
 	(void) memcpy(ptr, dptr->ldap_ret.ldap_u.buff, sizeof (*ptr));
@@ -1063,7 +1121,7 @@ client_setadmin(admin_t *ptr)
 	adata = sizeof (*ptr);
 	dptr = &u.data;
 
-	if (__ns_ldap_trydoorcall(&dptr, &ndata, &adata) != SUCCESS) {
+	if (__ns_ldap_trydoorcall(&dptr, &ndata, &adata) != NS_CACHE_SUCCESS) {
 		return (-1);
 	}
 
@@ -1096,7 +1154,7 @@ client_showstats(admin_t *ptr)
 	adata = sizeof (ldap_call_t);
 	dptr = &u.data;
 
-	if (__ns_ldap_trydoorcall(&dptr, &ndata, &adata) != SUCCESS) {
+	if (__ns_ldap_trydoorcall(&dptr, &ndata, &adata) != NS_CACHE_SUCCESS) {
 		(void) printf(
 		    gettext("\nCache data statistics not available!\n"));
 		return (0);
@@ -1324,8 +1382,8 @@ is_root(int free_uc, char *dc_str, ucred_t **ucp)
  *         1 - Yes
  */
 
-static int
-is_nscd(pid_t pid)
+int
+is_called_from_nscd(pid_t pid)
 
 {
 	static mutex_t	_door_lock = DEFAULTMUTEX;

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,17 +48,17 @@ IDSCONFIGSRC=	idsconfig.sh
 
 # ldaplist command
 LDAPLISTPROG=	ldaplist
-LDAPLISTSRCS=	ldaplist.c mapping.c printResult.c
+LDAPLISTSRCS=	ldaplist.c mapping.c printResult.c standalone.c
 LDAPLISTOBJS=	$(LDAPLISTSRCS:%.c=%.o)
 
 # ldapaddent command
 LDAPADDENTPROG=	ldapaddent
-LDAPADDENTSRCS=	ldapaddent.c ldapaddrbac.c ldapaddtsol.c
+LDAPADDENTSRCS=	ldapaddent.c ldapaddrbac.c ldapaddtsol.c standalone.c
 LDAPADDENTOBJS=	$(LDAPADDENTSRCS:%.c=%.o)
 
 # ldapclient command
 LDAPCLIENTPROG=	ldapclient
-LDAPCLIENTSRCS=	ldapclient.c
+LDAPCLIENTSRCS=	ldapclient.c standalone.c
 LDAPCLIENTOBJS=	$(LDAPCLIENTSRCS:%.c=%.o)
 
 
@@ -109,6 +109,10 @@ ldapmodify :=	LDLIBS += -lldap
 ldaplist :=	LDLIBS += -lsldap
 ldapaddent :=	LDLIBS += -lsldap -lnsl -lsecdb
 ldapclient :=	LDLIBS += -lsldap -lscf
+
+ldaplist :=	C99MODE = $(C99_ENABLE)
+ldapaddent :=	C99MODE = $(C99_ENABLE)
+ldapclient :=	C99MODE = $(C99_ENABLE)
 
 lint :=		LDLIBS += -lldap
 
@@ -171,13 +175,19 @@ clean:
 lint: lintns_ldaplist lintns_ldapaddent lintns_ldapclient \
 	$(LDAPPROG:%=lintc_%)
 
+lintns_ldaplist := C99MODE = $(C99_ENABLE)
+
 lintns_ldaplist:
 	$(LINT.c) $(LDAPLISTSRCS:%=../ns_ldap/%) $(LDLIBS) -lsldap \
 		> $(LINTOUT) 2>&1
 
+lintns_ldapaddent := C99MODE = $(C99_ENABLE)
+
 lintns_ldapaddent:
 	$(LINT.c) $(LDAPADDENTSRCS:%=../ns_ldap/%) $(LDLIBS) -lsldap -lnsl \
 		-lsecdb >> $(LINTOUT) 2>&1
+
+lintns_ldapclient := C99MODE = $(C99_ENABLE)
 
 lintns_ldapclient:
 	$(LINT.c) $(LDAPCLIENTSRCS:%=../ns_ldap/%) $(LDLIBS) -lsldap -lscf \
