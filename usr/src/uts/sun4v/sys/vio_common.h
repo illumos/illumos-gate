@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,9 +33,10 @@
 extern "C" {
 #endif
 
+#include <sys/ldc.h>
 
 /*
- *  Common header for VIO descriptor ring entries
+ * Common header for VIO descriptor ring entries
  */
 typedef struct vio_dring_entry_hdr {
 	uint8_t		dstate;		/* Current state of Dring entry */
@@ -47,6 +48,26 @@ typedef struct vio_dring_entry_hdr {
 	uint16_t	resv[3];
 } vio_dring_entry_hdr_t;
 
+/*
+ * Common macros for acquiring and releasing VIO descriptor ring entries
+ */
+#define	VIO_DRING_ACQUIRE(otd, mtype, handle, start, stop)		\
+	((mtype) == LDC_DIRECT_MAP ?					\
+	LDC_MEM_BARRIER_OPEN((otd)) :					\
+	ldc_mem_dring_acquire((handle), (start), (stop)))
+
+#define	VIO_DRING_ACQUIRE_NOCOPYIN(otd, mtype)				\
+	((mtype) == LDC_DIRECT_MAP ?					\
+	LDC_MEM_BARRIER_OPEN((otd)) : 0)
+
+#define	VIO_DRING_RELEASE(mtype, handle, start, stop)			\
+	((mtype) == LDC_DIRECT_MAP ?					\
+	LDC_MEM_BARRIER_CLOSE() :					\
+	ldc_mem_dring_release((handle), (start), (stop)))
+
+#define	VIO_DRING_RELEASE_NOCOPYOUT(mtype)				\
+	((mtype) == LDC_DIRECT_MAP ?					\
+	LDC_MEM_BARRIER_CLOSE() : 0)
 
 #ifdef __cplusplus
 }

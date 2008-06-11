@@ -211,6 +211,7 @@ typedef struct vgen_ldc {
 	uint64_t		next_txseq;	/* next tx sequence number */
 	uint32_t		num_txdcookies;	/* # of tx dring cookies */
 	uint32_t		num_rxdcookies;	/* # of rx dring cookies */
+	uint8_t			dring_mtype;	/* dring mem map type */
 	uint32_t		next_txi;	/* next tx descriptor index */
 	uint32_t		num_txds;	/* number of tx descriptors */
 	clock_t			reclaim_lbolt;	/* time of last tx reclaim */

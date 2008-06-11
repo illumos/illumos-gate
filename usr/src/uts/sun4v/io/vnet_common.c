@@ -181,3 +181,38 @@ vnet_vlan_remove_tag(mblk_t *mp)
 
 	return (mp);
 }
+
+int
+vnet_dring_entry_copy(vnet_public_desc_t *from, vnet_public_desc_t *to,
+    uint8_t mtype, ldc_dring_handle_t handle, uint64_t start, uint64_t stop)
+{
+	int rv;
+	on_trap_data_t otd;
+
+	if ((rv = VIO_DRING_ACQUIRE(&otd, mtype, handle, start, stop)) != 0)
+		return (rv);
+
+	*to = *from;
+
+	rv = VIO_DRING_RELEASE_NOCOPYOUT(mtype);
+
+	return (rv);
+}
+
+int
+vnet_dring_entry_set_dstate(vnet_public_desc_t *descp, uint8_t mtype,
+    ldc_dring_handle_t handle, uint64_t start, uint64_t stop, uint8_t dstate)
+{
+	int rv;
+	on_trap_data_t otd;
+
+	rv = VIO_DRING_ACQUIRE_NOCOPYIN(&otd, mtype);
+	if (rv)
+		return (rv);
+
+	descp->hdr.dstate = dstate;
+
+	rv = VIO_DRING_RELEASE(mtype, handle, start, stop);
+
+	return (rv);
+}

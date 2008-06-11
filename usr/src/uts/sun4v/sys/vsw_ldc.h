@@ -253,6 +253,7 @@ typedef struct dring_info {
 	void			*data_addr;	/* base of data section */
 	size_t			data_sz;	/* size of data section */
 	size_t			desc_data_sz;	/* size of descr data blk */
+	uint8_t			dring_mtype;	/* dring mem map type */
 } dring_info_t;
 
 /*

@@ -55,6 +55,7 @@
 #include <sys/vfs.h>
 #include <sys/stat.h>
 #include <sys/scsi/impl/uscsi.h>
+#include <sys/ontrap.h>
 #include <vm/seg_map.h>
 
 #define	ONE_TERABYTE	(1ULL << 40)
@@ -443,6 +444,7 @@ typedef struct vd {
 	ldc_dring_handle_t	dring_handle;	/* handle for dring ops */
 	uint32_t		descriptor_size;	/* num bytes in desc */
 	uint32_t		dring_len;	/* number of dring elements */
+	uint8_t			dring_mtype;	/* dring mem map type */
 	caddr_t			dring;		/* address of dring */
 	caddr_t			vio_msgp;	/* vio msg staging buffer */
 	vd_task_t		inband_task;	/* task for inband descriptor */
@@ -555,6 +557,11 @@ static boolean_t vd_volume_force_slice = B_FALSE;
  * images.
  */
 static boolean_t vd_file_validate_sanity = B_FALSE;
+
+/*
+ * Enables the use of LDC_DIRECT_MAP when mapping in imported descriptor rings.
+ */
+static boolean_t vd_direct_mapped_drings = B_TRUE;
 
 /*
  * When a backend is exported as a single-slice disk then we entirely fake
@@ -2069,20 +2076,19 @@ vd_mark_elem_done(vd_t *vd, int idx, int elem_status, int elem_nbytes)
 {
 	boolean_t		accepted;
 	int			status;
+	on_trap_data_t		otd;
 	vd_dring_entry_t	*elem = VD_DRING_ELEM(idx);
 
 	if (vd->reset_state)
 		return (0);
 
 	/* Acquire the element */
-	if (!vd->reset_state &&
-	    (status = ldc_mem_dring_acquire(vd->dring_handle, idx, idx)) != 0) {
+	if ((status = VIO_DRING_ACQUIRE(&otd, vd->dring_mtype,
+	    vd->dring_handle, idx, idx)) != 0) {
 		if (status == ECONNRESET) {
 			vd_mark_in_reset(vd);
 			return (0);
 		} else {
-			PR0("ldc_mem_dring_acquire() returned errno %d",
-			    status);
 			return (status);
 		}
 	}
@@ -2099,13 +2105,13 @@ vd_mark_elem_done(vd_t *vd, int idx, int elem_status, int elem_nbytes)
 		VD_DUMP_DRING_ELEM(elem);
 	}
 	/* Release the element */
-	if (!vd->reset_state &&
-	    (status = ldc_mem_dring_release(vd->dring_handle, idx, idx)) != 0) {
+	if ((status = VIO_DRING_RELEASE(vd->dring_mtype,
+	    vd->dring_handle, idx, idx)) != 0) {
 		if (status == ECONNRESET) {
 			vd_mark_in_reset(vd);
 			return (0);
 		} else {
-			PR0("ldc_mem_dring_release() returned errno %d",
+			PR0("VIO_DRING_RELEASE() returned errno %d",
 			    status);
 			return (status);
 		}
@@ -2245,6 +2251,8 @@ vd_complete_notify(vd_task_t *task)
 		    request->status, request->nbytes);
 		if (status == ECONNRESET)
 			vd_mark_in_reset(vd);
+		else if (status == EACCES)
+			vd_need_reset(vd, B_TRUE);
 	}
 
 	/*
@@ -3863,6 +3871,8 @@ vd_process_task(vd_task_t *task)
 		    task->request->status, task->request->nbytes);
 		if (status == ECONNRESET)
 			vd_mark_in_reset(vd);
+		else if (status == EACCES)
+			vd_need_reset(vd, B_TRUE);
 	}
 
 	return (task->status);
@@ -4173,6 +4183,7 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	int			status;
 	size_t			expected;
 	ldc_mem_info_t		dring_minfo;
+	uint8_t			mtype;
 	vio_dring_reg_msg_t	*reg_msg = (vio_dring_reg_msg_t *)msg;
 
 
@@ -4227,9 +4238,14 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		return (EBADMSG);
 	}
 
+	if (vd_direct_mapped_drings)
+		mtype = LDC_DIRECT_MAP;
+	else
+		mtype = LDC_SHADOW_MAP;
+
 	status = ldc_mem_dring_map(vd->ldc_handle, reg_msg->cookie,
 	    reg_msg->ncookies, reg_msg->num_descriptors,
-	    reg_msg->descriptor_size, LDC_DIRECT_MAP, &vd->dring_handle);
+	    reg_msg->descriptor_size, mtype, &vd->dring_handle);
 	if (status != 0) {
 		PR0("ldc_mem_dring_map() returned errno %d", status);
 		return (status);
@@ -4264,6 +4280,7 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	vd->dring = dring_minfo.vaddr;
 	vd->descriptor_size = reg_msg->descriptor_size;
 	vd->dring_len = reg_msg->num_descriptors;
+	vd->dring_mtype = dring_minfo.mtype;
 	reg_msg->dring_ident = vd->dring_ident;
 
 	/*
@@ -4431,12 +4448,12 @@ vd_process_element(vd_t *vd, vd_task_type_t type, uint32_t idx,
 {
 	int			status;
 	boolean_t		ready;
+	on_trap_data_t		otd;
 	vd_dring_entry_t	*elem = VD_DRING_ELEM(idx);
 
-
 	/* Accept the updated dring element */
-	if ((status = ldc_mem_dring_acquire(vd->dring_handle, idx, idx)) != 0) {
-		PR0("ldc_mem_dring_acquire() returned errno %d", status);
+	if ((status = VIO_DRING_ACQUIRE(&otd, vd->dring_mtype,
+	    vd->dring_handle, idx, idx)) != 0) {
 		return (status);
 	}
 	ready = (elem->hdr.dstate == VIO_DESC_READY);
@@ -4446,8 +4463,9 @@ vd_process_element(vd_t *vd, vd_task_type_t type, uint32_t idx,
 		PR0("descriptor %u not ready", idx);
 		VD_DUMP_DRING_ELEM(elem);
 	}
-	if ((status = ldc_mem_dring_release(vd->dring_handle, idx, idx)) != 0) {
-		PR0("ldc_mem_dring_release() returned errno %d", status);
+	if ((status = VIO_DRING_RELEASE(vd->dring_mtype,
+	    vd->dring_handle, idx, idx)) != 0) {
+		PR0("VIO_DRING_RELEASE() returned errno %d", status);
 		return (status);
 	}
 	if (!ready)

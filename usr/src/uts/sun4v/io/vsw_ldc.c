@@ -2732,7 +2732,7 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 		if ((ldc_mem_dring_map(ldcp->ldc_handle, &dp->cookie[0],
 		    dp->ncookies, dp->num_descriptors, dp->descriptor_size,
-		    LDC_SHADOW_MAP, &(dp->handle))) != 0) {
+		    LDC_DIRECT_MAP, &(dp->handle))) != 0) {
 
 			DERR(vswp, "%s: dring_map failed\n", __func__);
 
@@ -2773,6 +2773,9 @@ vsw_process_ctrl_dring_reg_pkt(vsw_ldc_t *ldcp, void *pkt)
 		} else {
 			/* store the address of the pub part of ring */
 			dp->pub_addr = minfo.vaddr;
+
+			/* cache the dring mtype */
+			dp->dring_mtype = minfo.mtype;
 		}
 
 		/* no private section as we are importing */
@@ -3190,7 +3193,7 @@ static void
 vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 {
 	vio_dring_msg_t		*dring_pkt;
-	vnet_public_desc_t	*pub_addr = NULL;
+	vnet_public_desc_t	desc, *pub_addr = NULL;
 	vsw_private_desc_t	*priv_addr = NULL;
 	dring_info_t		*dp = NULL;
 	vsw_t			*vswp = ldcp->ldc_vswp;
@@ -3198,14 +3201,12 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 	mblk_t			*bp = NULL;
 	mblk_t			*bpt = NULL;
 	size_t			nbytes = 0;
-	uint64_t		ncookies = 0;
 	uint64_t		chain = 0;
 	uint64_t		len;
-	uint32_t		pos, start, datalen;
+	uint32_t		pos, start;
 	uint32_t		range_start, range_end;
 	int32_t			end, num, cnt = 0;
-	int			i, rv, msg_rv = 0;
-	boolean_t		ack_needed = B_FALSE;
+	int			i, rv, rng_rv = 0, msg_rv = 0;
 	boolean_t		prev_desc_ack = B_FALSE;
 	int			read_attempts = 0;
 	struct ether_header	*ehp;
@@ -3275,18 +3276,17 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 
 		while (cnt != num) {
 vsw_recheck_desc:
-			if ((rv = ldc_mem_dring_acquire(dp->handle,
-			    pos, pos)) != 0) {
-				RW_EXIT(&ldcp->lane_in.dlistrw);
-				DERR(vswp, "%s(%lld): unable to acquire "
-				    "descriptor at pos %d: err %d",
-				    __func__, pos, ldcp->ldc_id, rv);
-				SND_DRING_NACK(ldcp, dring_pkt);
-				ldcp->ldc_stats.ierrors++;
-				return;
-			}
-
 			pub_addr = (vnet_public_desc_t *)dp->pub_addr + pos;
+
+			if ((rng_rv = vnet_dring_entry_copy(pub_addr,
+			    &desc, dp->dring_mtype, dp->handle,
+			    pos, pos)) != 0) {
+				DERR(vswp, "%s(%lld): unable to copy "
+				    "descriptor at pos %d: err %d",
+				    __func__, pos, ldcp->ldc_id, rng_rv);
+				ldcp->ldc_stats.ierrors++;
+				break;
+			}
 
 			/*
 			 * When given a bounded range of descriptors
@@ -3295,7 +3295,7 @@ vsw_recheck_desc:
 			 * (end_idx == -1) this simply indicates we have
 			 * reached the end of the current active range.
 			 */
-			if (pub_addr->hdr.dstate != VIO_DESC_READY) {
+			if (desc.hdr.dstate != VIO_DESC_READY) {
 				/* unbound - no error */
 				if (end == -1) {
 					if (read_attempts == vsw_read_attempts)
@@ -3310,7 +3310,7 @@ vsw_recheck_desc:
 				RW_EXIT(&ldcp->lane_in.dlistrw);
 				DERR(vswp, "%s(%lld): descriptor not READY "
 				    "(%d)", __func__, ldcp->ldc_id,
-				    pub_addr->hdr.dstate);
+				    desc.hdr.dstate);
 				SND_DRING_NACK(ldcp, dring_pkt);
 				return;
 			}
@@ -3333,35 +3333,18 @@ vsw_recheck_desc:
 				prev_desc_ack = B_FALSE;
 			}
 
-			/*
-			 * Data is padded to align on 8 byte boundary,
-			 * datalen is actual data length, i.e. minus that
-			 * padding.
-			 */
-			datalen = pub_addr->nbytes;
-
-			/*
-			 * Does peer wish us to ACK when we have finished
-			 * with this descriptor ?
-			 */
-			if (pub_addr->hdr.ack)
-				ack_needed = B_TRUE;
-
 			D2(vswp, "%s(%lld): processing desc %lld at pos"
 			    " 0x%llx : dstate 0x%lx : datalen 0x%lx",
-			    __func__, ldcp->ldc_id, pos, pub_addr,
-			    pub_addr->hdr.dstate, datalen);
-
-			/*
-			 * Mark that we are starting to process descriptor.
-			 */
-			pub_addr->hdr.dstate = VIO_DESC_ACCEPTED;
+			    __func__, ldcp->ldc_id, pos, &desc,
+			    desc.hdr.dstate, desc.nbytes);
 
 			/*
 			 * Ensure that we ask ldc for an aligned
-			 * number of bytes.
+			 * number of bytes. Data is padded to align on 8
+			 * byte boundary, desc.nbytes is actual data length,
+			 * i.e. minus that padding.
 			 */
-			nbytes = (datalen + VNET_IPALIGN + 7) & ~7;
+			nbytes = (desc.nbytes + VNET_IPALIGN + 7) & ~7;
 
 			mp = vio_multipool_allocb(&ldcp->vmp, nbytes);
 			if (mp == NULL) {
@@ -3373,46 +3356,46 @@ vsw_recheck_desc:
 				 * of 8 as this is required by ldc_mem_copy.
 				 */
 				DTRACE_PROBE(allocb);
-				if ((mp = allocb(datalen + VNET_IPALIGN + 8,
+				if ((mp = allocb(desc.nbytes + VNET_IPALIGN + 8,
 				    BPRI_MED)) == NULL) {
 					DERR(vswp, "%s(%ld): allocb failed",
 					    __func__, ldcp->ldc_id);
-					pub_addr->hdr.dstate = VIO_DESC_DONE;
-					(void) ldc_mem_dring_release(dp->handle,
-					    pos, pos);
+					rng_rv = vnet_dring_entry_set_dstate(
+					    pub_addr, dp->dring_mtype,
+					    dp->handle, pos, pos,
+					    VIO_DESC_DONE);
 					ldcp->ldc_stats.ierrors++;
 					ldcp->ldc_stats.rx_allocb_fail++;
 					break;
 				}
 			}
 
-			ncookies = pub_addr->ncookies;
 			rv = ldc_mem_copy(ldcp->ldc_handle,
 			    (caddr_t)mp->b_rptr, 0, &nbytes,
-			    pub_addr->memcookie, ncookies, LDC_COPY_IN);
-
+			    desc.memcookie, desc.ncookies, LDC_COPY_IN);
 			if (rv != 0) {
 				DERR(vswp, "%s(%d): unable to copy in data "
 				    "from %d cookies in desc %d (rv %d)",
-				    __func__, ldcp->ldc_id, ncookies, pos, rv);
+				    __func__, ldcp->ldc_id, desc.ncookies,
+				    pos, rv);
 				freemsg(mp);
 
-				pub_addr->hdr.dstate = VIO_DESC_DONE;
-				(void) ldc_mem_dring_release(dp->handle,
-				    pos, pos);
+				rng_rv = vnet_dring_entry_set_dstate(pub_addr,
+				    dp->dring_mtype, dp->handle, pos, pos,
+				    VIO_DESC_DONE);
 				ldcp->ldc_stats.ierrors++;
 				break;
 			} else {
 				D2(vswp, "%s(%d): copied in %ld bytes"
 				    " using %d cookies", __func__,
-				    ldcp->ldc_id, nbytes, ncookies);
+				    ldcp->ldc_id, nbytes, desc.ncookies);
 			}
 
 			/* adjust the read pointer to skip over the padding */
 			mp->b_rptr += VNET_IPALIGN;
 
 			/* point to the actual end of data */
-			mp->b_wptr = mp->b_rptr + datalen;
+			mp->b_wptr = mp->b_rptr + desc.nbytes;
 
 			/* update statistics */
 			ehp = (struct ether_header *)mp->b_rptr;
@@ -3422,7 +3405,7 @@ vsw_recheck_desc:
 				ldcp->ldc_stats.multircv++;
 
 			ldcp->ldc_stats.ipackets++;
-			ldcp->ldc_stats.rbytes += datalen;
+			ldcp->ldc_stats.rbytes += desc.nbytes;
 
 			/*
 			 * IPALIGN space can be used for VLAN_TAG
@@ -3445,16 +3428,20 @@ vsw_recheck_desc:
 			}
 
 			/* mark we are finished with this descriptor */
-			pub_addr->hdr.dstate = VIO_DESC_DONE;
-
-			(void) ldc_mem_dring_release(dp->handle, pos, pos);
+			if ((rng_rv = vnet_dring_entry_set_dstate(pub_addr,
+			    dp->dring_mtype, dp->handle, pos, pos,
+			    VIO_DESC_DONE)) != 0) {
+				DERR(vswp, "%s(%lld): unable to update "
+				    "dstate at pos %d: err %d",
+				    __func__, pos, ldcp->ldc_id, rng_rv);
+				ldcp->ldc_stats.ierrors++;
+				break;
+			}
 
 			/*
 			 * Send an ACK back to peer if requested.
 			 */
-			if (ack_needed) {
-				ack_needed = B_FALSE;
-
+			if (desc.hdr.ack) {
 				dring_pkt->start_idx = range_start;
 				dring_pkt->end_idx = range_end;
 
@@ -3497,6 +3484,24 @@ vsw_recheck_desc:
 		}
 		RW_EXIT(&ldcp->lane_in.dlistrw);
 
+		/* send the chain of packets to be switched */
+		if (bp != NULL) {
+			DTRACE_PROBE1(vsw_rcv_msgs, int, chain);
+			D3(vswp, "%s(%lld): switching chain of %d msgs",
+			    __func__, ldcp->ldc_id, chain);
+			vswp->vsw_switch_frame(vswp, bp, VSW_VNETPORT,
+			    ldcp->ldc_port, NULL);
+		}
+
+		/*
+		 * If when we encountered an error when attempting to
+		 * access an imported dring, initiate a connection reset.
+		 */
+		if (rng_rv != 0) {
+			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
+			break;
+		}
+
 		/*
 		 * If when we attempted to send the ACK we found that the
 		 * channel had been reset then now handle this. We deal with
@@ -3508,15 +3513,6 @@ vsw_recheck_desc:
 		if (msg_rv == ECONNRESET) {
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESET);
 			break;
-		}
-
-		/* send the chain of packets to be switched */
-		if (bp != NULL) {
-			DTRACE_PROBE1(vsw_rcv_msgs, int, chain);
-			D3(vswp, "%s(%lld): switching chain of %d msgs",
-			    __func__, ldcp->ldc_id, chain);
-			vswp->vsw_switch_frame(vswp, bp, VSW_VNETPORT,
-			    ldcp->ldc_port, NULL);
 		}
 
 		DTRACE_PROBE1(msg_cnt, int, cnt);
@@ -4978,7 +4974,7 @@ vsw_create_dring(vsw_ldc_t *ldcp)
 
 	/* bind dring to the channel */
 	if ((ldc_mem_dring_bind(ldcp->ldc_handle, dp->handle,
-	    LDC_SHADOW_MAP, LDC_MEM_RW,
+	    LDC_DIRECT_MAP | LDC_SHADOW_MAP, LDC_MEM_RW,
 	    &dp->cookie[0], &dp->ncookies)) != 0) {
 		DERR(vswp, "vsw_create_dring: unable to bind to channel "
 		    "%lld", ldcp->ldc_id);

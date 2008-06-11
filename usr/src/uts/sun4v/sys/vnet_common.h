@@ -81,6 +81,10 @@ uint64_t vnet_macaddr_strtoul(const uint8_t *macaddr);
 void vnet_macaddr_ultostr(uint64_t value, uint8_t *macaddr);
 mblk_t *vnet_vlan_insert_tag(mblk_t *mp, uint16_t vid);
 mblk_t *vnet_vlan_remove_tag(mblk_t *mp);
+int vnet_dring_entry_copy(vnet_public_desc_t *dst, vnet_public_desc_t *src,
+    uint8_t mtype, ldc_dring_handle_t handle, uint64_t start, uint64_t stop);
+int vnet_dring_entry_set_dstate(vnet_public_desc_t *descp, uint8_t mtype,
+    ldc_dring_handle_t handle, uint64_t start, uint64_t stop, uint8_t dstate);
 
 #ifdef __cplusplus
 }

@@ -72,6 +72,12 @@ static int i_ldc_mem_acquire_release(ldc_mem_handle_t mhandle,
     uint8_t direction, uint64_t offset, size_t size);
 static int i_ldc_dring_acquire_release(ldc_dring_handle_t dhandle,
     uint8_t direction, uint64_t start, uint64_t end);
+static int i_ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie,
+    uint32_t ccount, uint8_t mtype, uint8_t perm, caddr_t *vaddr,
+    caddr_t *raddr);
+static int i_ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr,
+    size_t len, uint8_t mtype, uint8_t perm, ldc_mem_cookie_t *cookie,
+    uint32_t *ccount);
 
 /*
  * LDC framework supports mapping remote domain's memory
@@ -80,6 +86,29 @@ static int i_ldc_dring_acquire_release(ldc_dring_handle_t dhandle,
  * Direct map can be enabled by setting 'ldc_shmem_enabled'
  */
 int ldc_shmem_enabled = 0;
+
+/*
+ * Use of directly mapped shared memory for LDC descriptor
+ * rings is permitted if this variable is non-zero.
+ */
+int ldc_dring_shmem_enabled = 1;
+
+/*
+ * The major and minor versions required to use directly
+ * mapped shared memory for LDC descriptor rings. The
+ * ldc_dring_shmem_hv_force variable, if set to a non-zero
+ * value, overrides the hypervisor API version check.
+ */
+static int ldc_dring_shmem_hv_major = 1;
+static int ldc_dring_shmem_hv_minor = 1;
+static int ldc_dring_shmem_hv_force = 0;
+
+/*
+ * The results of the hypervisor service group API check.
+ * A non-zero value indicates the HV includes support for
+ * descriptor ring shared memory.
+ */
+static int ldc_dring_shmem_hv_ok = 0;
 
 /*
  * Pages exported for remote access over each channel is
@@ -91,6 +120,22 @@ uint64_t ldc_maptable_entries = LDC_MTBL_ENTRIES;
 
 #define	IDX2COOKIE(idx, pg_szc, pg_shift)				\
 	(((pg_szc) << LDC_COOKIE_PGSZC_SHIFT) | ((idx) << (pg_shift)))
+
+/*
+ * Sets ldc_dring_shmem_hv_ok to a non-zero value if the HV LDC
+ * API version supports directly mapped shared memory or if it has
+ * been explicitly enabled via ldc_dring_shmem_hv_force.
+ */
+void
+i_ldc_mem_set_hsvc_vers(uint64_t major, uint64_t minor)
+{
+	if ((major == ldc_dring_shmem_hv_major &&
+	    minor >= ldc_dring_shmem_hv_minor) ||
+	    (major > ldc_dring_shmem_hv_major) ||
+	    (ldc_dring_shmem_hv_force != 0)) {
+		ldc_dring_shmem_hv_ok = 1;
+	}
+}
 
 /*
  * Allocate a memory handle for the channel and link it into the list
@@ -239,6 +284,21 @@ int
 ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
     uint8_t mtype, uint8_t perm, ldc_mem_cookie_t *cookie, uint32_t *ccount)
 {
+	/*
+	 * Check if direct shared memory map is enabled, if not change
+	 * the mapping type to SHADOW_MAP.
+	 */
+	if (ldc_shmem_enabled == 0)
+		mtype = LDC_SHADOW_MAP;
+
+	return (i_ldc_mem_bind_handle(mhandle, vaddr, len, mtype, perm,
+	    cookie, ccount));
+}
+
+static int
+i_ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
+    uint8_t mtype, uint8_t perm, ldc_mem_cookie_t *cookie, uint32_t *ccount)
+{
 	ldc_mhdl_t	*mhdl;
 	ldc_chan_t 	*ldcp;
 	ldc_mtbl_t	*mtbl;
@@ -282,13 +342,13 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 		return (EINVAL);
 	}
 
+	mutex_enter(&ldcp->lock);
+
 	/*
 	 * If this channel is binding a memory handle for the
 	 * first time allocate it a memory map table and initialize it
 	 */
 	if ((mtbl = ldcp->mtbl) == NULL) {
-
-		mutex_enter(&ldcp->lock);
 
 		/* Allocate and initialize the map table structure */
 		mtbl = kmem_zalloc(sizeof (ldc_mtbl_t), KM_SLEEP);
@@ -323,7 +383,7 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 		rv = hv_ldc_set_map_table(ldcp->id,
 		    va_to_pa(mtbl->table), mtbl->num_entries);
 		if (rv != 0) {
-			cmn_err(CE_WARN,
+			DWARN(DBG_ALL_LDCS,
 			    "ldc_mem_bind_handle: (0x%lx) err %d mapping tbl",
 			    ldcp->id, rv);
 			if (mtbl->contigmem)
@@ -338,12 +398,13 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 		}
 
 		ldcp->mtbl = mtbl;
-		mutex_exit(&ldcp->lock);
 
 		D1(ldcp->id,
 		    "ldc_mem_bind_handle: (0x%llx) alloc'd map table 0x%llx\n",
 		    ldcp->id, ldcp->mtbl->table);
 	}
+
+	mutex_exit(&ldcp->lock);
 
 	/* FUTURE: get the page size, pgsz code, and shift */
 	pg_size = MMU_PAGESIZE;
@@ -390,13 +451,6 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 	    ldcp->id, npages);
 
 	addr = v_align;
-
-	/*
-	 * Check if direct shared memory map is enabled, if not change
-	 * the mapping type to include SHADOW_MAP.
-	 */
-	if (ldc_shmem_enabled == 0)
-		mtype = LDC_SHADOW_MAP;
 
 	/*
 	 * Table slots are used in a round-robin manner. The algorithm permits
@@ -634,7 +688,7 @@ ldc_mem_unbind_handle(ldc_mem_handle_t mhandle)
 	ldc_memseg_t	*memseg;
 	uint64_t	cookie_addr;
 	uint64_t	pg_shift, pg_size_code;
-	int		i, rv;
+	int		i, rv, retries;
 
 	if (mhandle == NULL) {
 		DWARN(DBG_ALL_LDCS,
@@ -664,19 +718,33 @@ ldc_mem_unbind_handle(ldc_mem_handle_t mhandle)
 	/* undo the pages exported */
 	for (i = 0; i < memseg->npages; i++) {
 
+		/* clear the entry from the table */
+		memseg->pages[i].mte->entry.ll = 0;
+
 		/* check for mapped pages, revocation cookie != 0 */
 		if (memseg->pages[i].mte->cookie) {
 
 			pg_size_code = page_szc(memseg->pages[i].size);
-			pg_shift = page_get_shift(memseg->pages[i].size);
+			pg_shift = page_get_shift(pg_size_code);
 			cookie_addr = IDX2COOKIE(memseg->pages[i].index,
 			    pg_size_code, pg_shift);
 
 			D1(ldcp->id, "ldc_mem_unbind_handle: (0x%llx) revoke "
 			    "cookie 0x%llx, rcookie 0x%llx\n", ldcp->id,
 			    cookie_addr, memseg->pages[i].mte->cookie);
-			rv = hv_ldc_revoke(ldcp->id, cookie_addr,
-			    memseg->pages[i].mte->cookie);
+
+			retries = 0;
+			do {
+				rv = hv_ldc_revoke(ldcp->id, cookie_addr,
+				    memseg->pages[i].mte->cookie);
+
+				if (rv != H_EWOULDBLOCK)
+					break;
+
+				drv_usecwait(ldc_delay);
+
+			} while (retries++ < ldc_max_retries);
+
 			if (rv) {
 				DWARN(ldcp->id,
 				    "ldc_mem_unbind_handle: (0x%llx) cannot "
@@ -685,8 +753,6 @@ ldc_mem_unbind_handle(ldc_mem_handle_t mhandle)
 			}
 		}
 
-		/* clear the entry from the table */
-		memseg->pages[i].mte->entry.ll = 0;
 		mtbl->num_avail++;
 	}
 	mutex_exit(&mtbl->lock);
@@ -1131,6 +1197,23 @@ int
 ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie, uint32_t ccount,
     uint8_t mtype, uint8_t perm, caddr_t *vaddr, caddr_t *raddr)
 {
+	/*
+	 * Check if direct map over shared memory is enabled, if not change
+	 * the mapping type to SHADOW_MAP.
+	 */
+	if (ldc_shmem_enabled == 0)
+		mtype = LDC_SHADOW_MAP;
+
+	return (i_ldc_mem_map(mhandle, cookie, ccount, mtype, perm,
+	    vaddr, raddr));
+}
+
+static int
+i_ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie,
+    uint32_t ccount, uint8_t mtype, uint8_t perm, caddr_t *vaddr,
+    caddr_t *raddr)
+{
+
 	int		i, j, idx, rv, retries;
 	ldc_chan_t 	*ldcp;
 	ldc_mhdl_t	*mhdl;
@@ -1207,13 +1290,6 @@ ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie, uint32_t ccount,
 	    "pages=0x%llx\n", ldcp->id, exp_size, map_size, npages);
 
 	/*
-	 * Check if direct map over shared memory is enabled, if not change
-	 * the mapping type to SHADOW_MAP.
-	 */
-	if (ldc_shmem_enabled == 0)
-		mtype = LDC_SHADOW_MAP;
-
-	/*
 	 * Check to see if the client is requesting direct or shadow map
 	 * If direct map is requested, try to map remote memory first,
 	 * and if that fails, revert to shadow map
@@ -1224,7 +1300,7 @@ ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie, uint32_t ccount,
 		memseg->vaddr = vmem_xalloc(heap_arena, map_size,
 		    pg_size, 0, 0, NULL, NULL, VM_NOSLEEP);
 		if (memseg->vaddr == NULL) {
-			cmn_err(CE_WARN,
+			DWARN(DBG_ALL_LDCS,
 			    "ldc_mem_map: (0x%lx) memory map failed\n",
 			    ldcp->id);
 			kmem_free(memseg->cookies,
@@ -1430,7 +1506,7 @@ ldc_mem_unmap(ldc_mem_handle_t mhandle)
 		for (i = 0; i < memseg->npages; i++) {
 			rv = hv_ldc_unmap(memseg->pages[i].raddr);
 			if (rv) {
-				cmn_err(CE_WARN,
+				DWARN(DBG_ALL_LDCS,
 				    "ldc_mem_map: (0x%lx) hv unmap err %d\n",
 				    ldcp->id, rv);
 			}
@@ -1728,6 +1804,17 @@ ldc_mem_dring_bind(ldc_handle_t handle, ldc_dring_handle_t dhandle,
 		return (EINVAL);
 	}
 
+	/* ensure the mtype is valid */
+	if ((mtype & (LDC_SHADOW_MAP|LDC_DIRECT_MAP)) == 0) {
+		DWARN(ldcp->id, "ldc_mem_dring_bind: invalid map type\n");
+		return (EINVAL);
+	}
+
+	/* no need to bind as direct map if it's not HV supported or enabled */
+	if (!ldc_dring_shmem_hv_ok || !ldc_dring_shmem_enabled) {
+		mtype = LDC_SHADOW_MAP;
+	}
+
 	mutex_enter(&dringp->lock);
 
 	if (dringp->status == LDC_BOUND) {
@@ -1765,7 +1852,7 @@ ldc_mem_dring_bind(ldc_handle_t handle, ldc_dring_handle_t dhandle,
 	dringp->mhdl = mhandle;
 
 	/* bind the descriptor ring to channel */
-	err = ldc_mem_bind_handle(mhandle, dringp->base, dringp->size,
+	err = i_ldc_mem_bind_handle(mhandle, dringp->base, dringp->size,
 	    mtype, perm, cookie, ccount);
 	if (err) {
 		DWARN(ldcp->id,
@@ -1845,6 +1932,7 @@ ldc_mem_dring_nextcookie(ldc_dring_handle_t dhandle, ldc_mem_cookie_t *cookie)
 
 	return (rv);
 }
+
 /*
  * Unbind a previously bound dring from a channel.
  */
@@ -1911,6 +1999,77 @@ ldc_mem_dring_unbind(ldc_dring_handle_t dhandle)
 
 	return (0);
 }
+
+#ifdef	DEBUG
+void
+i_ldc_mem_inject_dring_clear(ldc_chan_t *ldcp)
+{
+	ldc_dring_t	*dp;
+	ldc_mhdl_t	*mhdl;
+	ldc_mtbl_t	*mtbl;
+	ldc_memseg_t	*memseg;
+	uint64_t	cookie_addr;
+	uint64_t	pg_shift, pg_size_code;
+	int		i, rv, retries;
+
+	/* has a map table been allocated? */
+	if ((mtbl = ldcp->mtbl) == NULL)
+		return;
+
+	/* lock the memory table - exclusive access to channel */
+	mutex_enter(&mtbl->lock);
+
+	/* lock the exported dring list */
+	mutex_enter(&ldcp->exp_dlist_lock);
+
+	for (dp = ldcp->exp_dring_list; dp != NULL; dp = dp->ch_next) {
+		if ((mhdl = (ldc_mhdl_t *)dp->mhdl) == NULL)
+			continue;
+
+		if ((memseg = mhdl->memseg) == NULL)
+			continue;
+
+		/* undo the pages exported */
+		for (i = 0; i < memseg->npages; i++) {
+
+			/* clear the entry from the table */
+			memseg->pages[i].mte->entry.ll = 0;
+
+			pg_size_code = page_szc(memseg->pages[i].size);
+			pg_shift = page_get_shift(pg_size_code);
+			cookie_addr = IDX2COOKIE(memseg->pages[i].index,
+			    pg_size_code, pg_shift);
+
+			retries = 0;
+			do {
+				rv = hv_ldc_revoke(ldcp->id, cookie_addr,
+				    memseg->pages[i].mte->cookie);
+
+				if (rv != H_EWOULDBLOCK)
+					break;
+
+				drv_usecwait(ldc_delay);
+
+			} while (retries++ < ldc_max_retries);
+
+			if (rv != 0) {
+				DWARN(ldcp->id,
+				    "i_ldc_mem_inject_dring_clear(): "
+				    "hv_ldc_revoke failed: "
+				    "channel: 0x%lx, cookie addr: 0x%p,"
+				    "cookie: 0x%lx, rv: %d",
+				    ldcp->id, cookie_addr,
+				    memseg->pages[i].mte->cookie, rv);
+			}
+
+			mtbl->num_avail++;
+		}
+	}
+
+	mutex_exit(&ldcp->exp_dlist_lock);
+	mutex_exit(&mtbl->lock);
+}
+#endif
 
 /*
  * Get information about the dring. The base address of the descriptor
@@ -1998,6 +2157,17 @@ ldc_mem_dring_map(ldc_handle_t handle, ldc_mem_cookie_t *cookie,
 		return (EINVAL);
 	}
 
+	/* ensure the mtype is valid */
+	if ((mtype & (LDC_SHADOW_MAP|LDC_DIRECT_MAP)) == 0) {
+		DWARN(ldcp->id, "ldc_mem_dring_map: invalid map type\n");
+		return (EINVAL);
+	}
+
+	/* do not attempt direct map if it's not HV supported or enabled */
+	if (!ldc_dring_shmem_hv_ok || !ldc_dring_shmem_enabled) {
+		mtype = LDC_SHADOW_MAP;
+	}
+
 	*dhandle = 0;
 
 	/* Allocate an dring structure */
@@ -2033,10 +2203,10 @@ ldc_mem_dring_map(ldc_handle_t handle, ldc_mem_cookie_t *cookie,
 	dringp->base = NULL;
 
 	/* map the dring into local memory */
-	err = ldc_mem_map(mhandle, cookie, ccount, mtype, LDC_MEM_RW,
+	err = i_ldc_mem_map(mhandle, cookie, ccount, mtype, LDC_MEM_RW,
 	    &(dringp->base), NULL);
 	if (err || dringp->base == NULL) {
-		cmn_err(CE_WARN,
+		DWARN(DBG_ALL_LDCS,
 		    "ldc_mem_dring_map: cannot map desc ring err=%d\n", err);
 		(void) ldc_mem_free_handle(mhandle);
 		kmem_free(dringp, sizeof (ldc_dring_t));
@@ -2146,6 +2316,7 @@ i_ldc_dring_acquire_release(ldc_dring_handle_t dhandle,
 	int 			err;
 	ldc_dring_t		*dringp;
 	ldc_chan_t		*ldcp;
+	ldc_mhdl_t		*mhdl;
 	uint64_t		soff;
 	size_t			copy_size;
 
@@ -2167,6 +2338,22 @@ i_ldc_dring_acquire_release(ldc_dring_handle_t dhandle,
 	if (start >= dringp->length || end >= dringp->length) {
 		DWARN(DBG_ALL_LDCS,
 		    "i_ldc_dring_acquire_release: index out of range\n");
+		mutex_exit(&dringp->lock);
+		return (EINVAL);
+	}
+
+	mhdl = (ldc_mhdl_t *)dringp->mhdl;
+	if (mhdl == NULL) {
+		DWARN(DBG_ALL_LDCS,
+		    "i_ldc_dring_acquire_release: invalid memory handle\n");
+		mutex_exit(&dringp->lock);
+		return (EINVAL);
+	}
+
+	if (mhdl->mtype != LDC_SHADOW_MAP) {
+		DWARN(DBG_ALL_LDCS,
+		    "i_ldc_dring_acquire_release: invalid mtype: %d\n",
+		    mhdl->mtype);
 		mutex_exit(&dringp->lock);
 		return (EINVAL);
 	}

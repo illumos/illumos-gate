@@ -3266,7 +3266,7 @@ vgen_init_rxds(vgen_ldc_t *ldcp, uint32_t num_desc, uint32_t desc_size,
 	ldc_mem_info_t minfo;
 
 	rv = ldc_mem_dring_map(ldcp->ldc_handle, dcookie, ncookies, num_desc,
-	    desc_size, LDC_SHADOW_MAP, &(ldcp->rx_dhandle));
+	    desc_size, LDC_DIRECT_MAP, &(ldcp->rx_dhandle));
 	if (rv != 0) {
 		return (DDI_FAILURE);
 	}
@@ -3290,6 +3290,7 @@ vgen_init_rxds(vgen_ldc_t *ldcp, uint32_t num_desc, uint32_t desc_size,
 	ldcp->num_rxds = num_desc;
 	ldcp->next_rxi = 0;
 	ldcp->next_rxseq = VNET_ISS;
+	ldcp->dring_mtype = minfo.mtype;
 
 	return (DDI_SUCCESS);
 }
@@ -4095,7 +4096,8 @@ vgen_handshake_phase2(vgen_ldc_t *ldcp)
 	/* Bind descriptor ring to the channel */
 	if (ldcp->num_txdcookies == 0) {
 		rv = ldc_mem_dring_bind(ldcp->ldc_handle, ldcp->tx_dhandle,
-		    LDC_SHADOW_MAP, LDC_MEM_RW, &ldcp->tx_dcookie, &ncookies);
+		    LDC_DIRECT_MAP | LDC_SHADOW_MAP, LDC_MEM_RW,
+		    &ldcp->tx_dcookie, &ncookies);
 		if (rv != 0) {
 			DWARN(vgenp, ldcp, "ldc_mem_dring_bind failed "
 			    "rv(%x)\n", rv);
@@ -5466,13 +5468,11 @@ vgen_process_dring_data(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 	int rv = 0;
 	uint32_t retries = 0;
 	vgen_stats_t *statsp;
-	vnet_public_desc_t *rxdp;
+	vnet_public_desc_t rxd;
 	vio_dring_entry_hdr_t *hdrp;
 	mblk_t *bp = NULL;
 	mblk_t *bpt = NULL;
 	uint32_t ack_start;
-	uint32_t datalen;
-	uint32_t ncookies;
 	boolean_t rxd_err = B_FALSE;
 	mblk_t *mp = NULL;
 	size_t nbytes;
@@ -5505,7 +5505,8 @@ vgen_process_dring_data(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 	next_rxi = rxi =  start;
 	do {
 vgen_recv_retry:
-		rv = ldc_mem_dring_acquire(ldcp->rx_dhandle, rxi, rxi);
+		rv = vnet_dring_entry_copy(&(ldcp->rxdp[rxi]), &rxd,
+		    ldcp->dring_mtype, ldcp->rx_dhandle, rxi, rxi);
 		if (rv != 0) {
 			DWARN(vgenp, ldcp, "ldc_mem_dring_acquire() failed"
 			    " rv(%d)\n", rv);
@@ -5513,8 +5514,7 @@ vgen_recv_retry:
 			return (rv);
 		}
 
-		rxdp = &(ldcp->rxdp[rxi]);
-		hdrp = &rxdp->hdr;
+		hdrp = &rxd.hdr;
 
 		if (hdrp->dstate != VIO_DESC_READY) {
 			/*
@@ -5549,11 +5549,9 @@ vgen_recv_retry:
 			set_ack_start = B_FALSE;
 		}
 
-		datalen = rxdp->nbytes;
-		ncookies = rxdp->ncookies;
-		if ((datalen < ETHERMIN) ||
-		    (ncookies == 0) ||
-		    (ncookies > MAX_COOKIES)) {
+		if ((rxd.nbytes < ETHERMIN) ||
+		    (rxd.ncookies == 0) ||
+		    (rxd.ncookies > MAX_COOKIES)) {
 			rxd_err = B_TRUE;
 		} else {
 			/*
@@ -5561,7 +5559,7 @@ vgen_recv_retry:
 			 * of recv mblks for the channel.
 			 * If this fails, use allocb().
 			 */
-			nbytes = (VNET_IPALIGN + datalen + 7) & ~7;
+			nbytes = (VNET_IPALIGN + rxd.nbytes + 7) & ~7;
 			mp = vio_multipool_allocb(&ldcp->vmp, nbytes);
 			if (!mp) {
 				/*
@@ -5572,7 +5570,7 @@ vgen_recv_retry:
 				 * ldc_mem_copy().
 				 */
 				statsp->rx_vio_allocb_fail++;
-				mp = allocb(VNET_IPALIGN + datalen + 8,
+				mp = allocb(VNET_IPALIGN + rxd.nbytes + 8,
 				    BPRI_MED);
 			}
 		}
@@ -5591,13 +5589,13 @@ vgen_recv_retry:
 			ack_needed = hdrp->ack;
 
 			/* set descriptor done bit */
-			hdrp->dstate = VIO_DESC_DONE;
-
-			rv = ldc_mem_dring_release(ldcp->rx_dhandle,
-			    rxi, rxi);
+			rv = vnet_dring_entry_set_dstate(&(ldcp->rxdp[rxi]),
+			    ldcp->dring_mtype, ldcp->rx_dhandle, rxi, rxi,
+			    VIO_DESC_DONE);
 			if (rv != 0) {
 				DWARN(vgenp, ldcp,
-				    "ldc_mem_dring_release err rv(%d)\n", rv);
+				    "vnet_dring_entry_set_dstate err rv(%d)\n",
+				    rv);
 				return (rv);
 			}
 
@@ -5625,7 +5623,7 @@ vgen_recv_retry:
 		nread = nbytes;
 		rv = ldc_mem_copy(ldcp->ldc_handle,
 		    (caddr_t)mp->b_rptr, off, &nread,
-		    rxdp->memcookie, ncookies, LDC_COPY_IN);
+		    rxd.memcookie, rxd.ncookies, LDC_COPY_IN);
 
 		/* if ldc_mem_copy() failed */
 		if (rv) {
@@ -5636,12 +5634,13 @@ vgen_recv_retry:
 		}
 
 		ack_needed = hdrp->ack;
-		hdrp->dstate = VIO_DESC_DONE;
 
-		rv = ldc_mem_dring_release(ldcp->rx_dhandle, rxi, rxi);
+		rv = vnet_dring_entry_set_dstate(&(ldcp->rxdp[rxi]),
+		    ldcp->dring_mtype, ldcp->rx_dhandle, rxi, rxi,
+		    VIO_DESC_DONE);
 		if (rv != 0) {
 			DWARN(vgenp, ldcp,
-			    "ldc_mem_dring_release err rv(%d)\n", rv);
+			    "vnet_dring_entry_set_dstate err rv(%d)\n", rv);
 			goto error_ret;
 		}
 
@@ -5675,11 +5674,11 @@ vgen_recv_retry:
 		}
 
 		/* point to the actual end of data */
-		mp->b_wptr = mp->b_rptr + datalen;
+		mp->b_wptr = mp->b_rptr + rxd.nbytes;
 
 		/* update stats */
 		statsp->ipackets++;
-		statsp->rbytes += datalen;
+		statsp->rbytes += rxd.nbytes;
 		ehp = (struct ether_header *)mp->b_rptr;
 		if (IS_BROADCAST(ehp))
 			statsp->brdcstrcv++;

@@ -151,7 +151,7 @@ static struct modlinkage ml = {
 
 static uint64_t ldc_sup_minor;		/* Supported minor number */
 static hsvc_info_t ldc_hsvc = {
-	HSVC_REV_1, NULL, HSVC_GROUP_LDC, 1, 0, "ldc"
+	HSVC_REV_1, NULL, HSVC_GROUP_LDC, 1, 1, "ldc"
 };
 
 /*
@@ -239,9 +239,10 @@ ldcdebug(int64_t id, const char *fmt, ...)
 	cmn_err(CE_CONT, "?%s", buf);
 }
 
-#define	LDC_ERR_RESET	0x1
-#define	LDC_ERR_PKTLOSS	0x2
-#define	LDC_ERR_DQFULL	0x4
+#define	LDC_ERR_RESET		0x1
+#define	LDC_ERR_PKTLOSS		0x2
+#define	LDC_ERR_DQFULL		0x4
+#define	LDC_ERR_DRNGCLEAR	0x8
 
 static boolean_t
 ldc_inject_error(ldc_chan_t *ldcp, uint64_t error)
@@ -300,6 +301,8 @@ if (ldcdbg & 0x04)	\
 #define	LDC_INJECT_RESET(_ldcp)	ldc_inject_error(_ldcp, LDC_ERR_RESET)
 #define	LDC_INJECT_PKTLOSS(_ldcp) ldc_inject_error(_ldcp, LDC_ERR_PKTLOSS)
 #define	LDC_INJECT_DQFULL(_ldcp) ldc_inject_error(_ldcp, LDC_ERR_DQFULL)
+#define	LDC_INJECT_DRNGCLEAR(_ldcp) ldc_inject_error(_ldcp, LDC_ERR_DRNGCLEAR)
+extern void i_ldc_mem_inject_dring_clear(ldc_chan_t *ldcp);
 
 #else
 
@@ -315,6 +318,7 @@ if (ldcdbg & 0x04)	\
 #define	LDC_INJECT_RESET(_ldcp)	(B_FALSE)
 #define	LDC_INJECT_PKTLOSS(_ldcp) (B_FALSE)
 #define	LDC_INJECT_DQFULL(_ldcp) (B_FALSE)
+#define	LDC_INJECT_DRNGCLEAR(_ldcp) (B_FALSE)
 
 #endif
 
@@ -356,6 +360,7 @@ int
 _init(void)
 {
 	int status;
+	extern void i_ldc_mem_set_hsvc_vers(uint64_t major, uint64_t minor);
 
 	status = hsvc_register(&ldc_hsvc, &ldc_sup_minor);
 	if (status != 0) {
@@ -365,6 +370,9 @@ _init(void)
 		    ldc_hsvc.hsvc_major, ldc_hsvc.hsvc_minor, status);
 		return (-1);
 	}
+
+	/* Initialize shared memory HV API version checking */
+	i_ldc_mem_set_hsvc_vers(ldc_hsvc.hsvc_major, ldc_sup_minor);
 
 	/* allocate soft state structure */
 	ldcssp = kmem_zalloc(sizeof (ldc_soft_state_t), KM_SLEEP);
@@ -2208,6 +2216,8 @@ force_reset:
 #ifdef DEBUG
 		if (LDC_INJECT_RESET(ldcp))
 			goto force_reset;
+		if (LDC_INJECT_DRNGCLEAR(ldcp))
+			i_ldc_mem_inject_dring_clear(ldcp);
 #endif
 		if (trace_length) {
 			TRACE_RXHVQ_LENGTH(ldcp, rx_head, rx_tail);
