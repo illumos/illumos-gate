@@ -2470,7 +2470,7 @@ vd_scsicmd_out(void *ioctl_arg, void *vd_buf)
 	    uscsi->uscsi_status == STATUS_TERMINATED)) {
 		vd_scsi->sense_status = uscsi->uscsi_rqstatus;
 		if (uscsi->uscsi_rqstatus == STATUS_GOOD)
-			vd_scsi->sense_len -= uscsi->uscsi_resid;
+			vd_scsi->sense_len -= uscsi->uscsi_rqresid;
 		else
 			vd_scsi->sense_len = 0;
 	} else {
