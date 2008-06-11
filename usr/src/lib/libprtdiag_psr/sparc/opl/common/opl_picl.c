@@ -684,6 +684,7 @@ get_lane_width
 		close(fd);
 		return (PICL_FAILURE);
 	}
+	*type = PCI;
 	capid = cap_reg & PCI_CAP_MASK;
 	while (cap_ptr != 0) {
 
@@ -705,8 +706,7 @@ get_lane_width
 			*maximum = ((link_cap >> PCI_LINK_SHIFT) &
 			    PCI_LINK_MASK);
 			*type = PCIE;
-		}
-		if (capid == PCI_CAP_ID_PCIX) {
+		} else if (capid == PCI_CAP_ID_PCIX) {
 			uint32_t pcix_status;
 			uint8_t hdr_type;
 			int max_speed = PCI_FREQ_66;
@@ -718,6 +718,7 @@ get_lane_width
 				close(fd);
 				return (PICL_FAILURE);
 			}
+			*type = PCIX;
 			if ((hdr_type & PCI_HEADER_TYPE_M) == PCI_HEADER_PPB) {
 				/* This is a PCI-X bridge */
 				uint16_t sec_status, mode;
@@ -735,7 +736,6 @@ get_lane_width
 				if (sec_status & PCI_SEC_533)
 					max_speed = PCI_FREQ_533;
 				*speed_max = max_speed;
-				*type = PCIX;
 				mode = (sec_status >> PCI_CLASS_BRIDGE) &
 				    PCI_BRIDGE_MC;
 				if (mode) {
@@ -767,7 +767,6 @@ get_lane_width
 				    (PCI_LEAF_ULONG << PCI_SHIFT_533))
 					max_speed = PCI_FREQ_533;
 				*speed_max = max_speed;
-				*type = PCI;
 			}
 		}
 		cap_ptr = (cap_reg >> PCI_REG_FUNC_SHIFT);
