@@ -341,7 +341,6 @@ extern	void	nce_fastpath_list_delete(nce_t *);
 extern	void	nce_fastpath_list_dispatch(ill_t *,
     boolean_t (*)(nce_t *, void  *), void *);
 extern	void	nce_queue_mp_common(nce_t *, mblk_t *, boolean_t);
-extern	void	ndp_flush_qd_mp(nce_t *);
 extern	void	nce_delete_hw_changed(nce_t *, void *);
 extern	void	nce_fastpath(nce_t *);
 extern	int	ndp_add_v6(ill_t *, uchar_t *, const in6_addr_t *,

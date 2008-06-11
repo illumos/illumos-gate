@@ -2943,6 +2943,8 @@ nce_resolv_failed(nce_t *nce)
 			zoneid = io->ipsec_out_zoneid;
 			ASSERT(zoneid != ALL_ZONES);
 			mp = mp->b_cont;
+			mp->b_next = NULL;
+			mp->b_prev = NULL;
 		}
 
 		ip6h = (ip6_t *)mp->b_rptr;
@@ -3639,24 +3641,6 @@ err_ret:
 	freemsg(template);
 	return (err);
 }
-
-void
-ndp_flush_qd_mp(nce_t *nce)
-{
-	mblk_t *qd_mp, *qd_next;
-
-	ASSERT(MUTEX_HELD(&nce->nce_lock));
-	qd_mp = nce->nce_qd_mp;
-	nce->nce_qd_mp = NULL;
-	while (qd_mp != NULL) {
-		qd_next = qd_mp->b_next;
-		qd_mp->b_next = NULL;
-		qd_mp->b_prev = NULL;
-		freemsg(qd_mp);
-		qd_mp = qd_next;
-	}
-}
-
 
 /*
  * ndp_walk routine to delete all entries that have a given destination or
