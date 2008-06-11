@@ -22,7 +22,7 @@
 /* Portions Copyright 2005 Cyril Plisko */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1748,7 +1748,7 @@ find_ap_common(
 	int (*fcn)(di_node_t node, di_minor_t minor, void *arg),
 	char **errstring)
 {
-	di_node_t rnode;
+	di_node_t rnode, wnode;
 	char *cp, *rpath;
 	size_t len;
 
@@ -1782,25 +1782,31 @@ find_ap_common(
 	/*
 	 * begin walk of device tree
 	 */
-	rnode = di_init(rpath, DINFOCPYALL);
+	rnode = di_init("/", DINFOCACHE);
+	if (rnode)
+		wnode = di_lookup_node(rnode, rpath);
+	else
+		wnode = DI_NODE_NIL;
 	S_FREE(rpath);
 
-	if (rnode == DI_NODE_NIL) {
-		/*
-		 * di_init() may fail because the ap_id does not exist
-		 */
-		if (errno == EINVAL || errno == ENXIO) {
-			return (CFGA_APID_NOEXIST);
-		} else {
+	if (wnode == DI_NODE_NIL) {
+		if (rnode == DI_NODE_NIL) {
 			config_err(errno, DI_INIT_FAILED, errstring);
 			return (CFGA_LIB_ERROR);
+		} else {
+			/*
+			 * di_lookup_node() may fail because the ap_id
+			 * does not exist
+			 */
+			di_fini(rnode);
+			return (CFGA_APID_NOEXIST);
 		}
 	}
 
 	libloc_p->libp = NULL;
 	libloc_p->status = CFGA_APID_NOEXIST;
 
-	(void) di_walk_minor(rnode, "ddi_ctl:attachment_point",
+	(void) di_walk_minor(wnode, "ddi_ctl:attachment_point",
 	    DI_CHECK_ALIAS|DI_CHECK_INTERNAL_PATH,
 	    libloc_p, fcn);
 
@@ -2165,7 +2171,7 @@ list_common(list_stat_t *lstatp, const char *class)
 	/*
 	 * begin walk of device tree
 	 */
-	if ((rnode = di_init("/", DINFOCPYALL)) == DI_NODE_NIL) {
+	if ((rnode = di_init("/", DINFOCACHE)) == DI_NODE_NIL) {
 		config_err(errno, DI_INIT_FAILED, lstatp->errstr);
 		return (CFGA_LIB_ERROR);
 	}
