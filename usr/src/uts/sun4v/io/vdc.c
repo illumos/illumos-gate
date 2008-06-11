@@ -386,6 +386,7 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	kt_did_t failfast_tid, ownership_tid;
 	int	instance;
 	int	rv;
+	vdc_server_t *srvr;
 	vdc_t	*vdc = NULL;
 
 	switch (cmd) {
@@ -450,12 +451,13 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	vdc->lifecycle	= VDC_LC_DETACHING;
 
 	/*
-	 * try and disable callbacks to prevent another handshake
+	 * Try and disable callbacks to prevent another handshake. We have to
+	 * disable callbacks for all servers.
 	 */
-	if (vdc->curr_server != NULL) {
-		rv = ldc_set_cb_mode(vdc->curr_server->ldc_handle,
-		    LDC_CB_DISABLE);
-		DMSG(vdc, 0, "callback disabled (rv=%d)\n", rv);
+	for (srvr = vdc->server_list; srvr != NULL; srvr = srvr->next) {
+		rv = ldc_set_cb_mode(srvr->ldc_handle, LDC_CB_DISABLE);
+		DMSG(vdc, 0, "callback disabled (ldc=%lu, rv=%d)\n",
+		    srvr->ldc_id, rv);
 	}
 
 	if (vdc->initialized & VDC_THREAD) {
@@ -2378,12 +2380,12 @@ vdc_init_ports(vdc_t *vdc, md_t *mdp, mde_cookie_t vd_nodep)
 		}
 
 		/* add server to list */
-		if (prev_srvr) {
+		if (prev_srvr)
 			prev_srvr->next = srvr;
-		} else {
+		else
 			vdc->server_list = srvr;
-			prev_srvr = srvr;
-		}
+
+		prev_srvr = srvr;
 
 		/* inc numbers of servers */
 		vdc->num_servers++;
@@ -4094,8 +4096,6 @@ vdc_switch_server(vdc_t *vdcp)
 	/* switch the server */
 	vdcp->curr_server = new_server;
 
-	cmn_err(CE_NOTE, "Successfully failed over from VDS on port@%ld to "
-	    "VDS on port@%ld.\n", curr_server->id, new_server->id);
 	DMSG(vdcp, 0, "[%d] Switched to next vdisk server, port@%ld, ldc@%ld\n",
 	    vdcp->instance, vdcp->curr_server->id, vdcp->curr_server->ldc_id);
 }
@@ -4340,6 +4340,10 @@ done:
 				vdcp->ownership |= VDC_OWNERSHIP_RESET;
 			cv_signal(&vdcp->ownership_cv);
 
+			cmn_err(CE_CONT, "?vdisk@%d is online using "
+			    "ldc@%ld,%ld\n", vdcp->instance,
+			    vdcp->curr_server->ldc_id, vdcp->curr_server->id);
+
 			mutex_exit(&vdcp->lock);
 
 			for (;;) {
@@ -4360,6 +4364,9 @@ done:
 			}
 
 			mutex_enter(&vdcp->lock);
+
+			cmn_err(CE_CONT, "?vdisk@%d is offline\n",
+			    vdcp->instance);
 
 			vdcp->state = VDC_STATE_RESETTING;
 			vdcp->self_reset = B_TRUE;
