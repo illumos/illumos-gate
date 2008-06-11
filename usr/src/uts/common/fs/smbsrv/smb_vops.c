@@ -1539,7 +1539,7 @@ smb_vop_stream_readdir(vnode_t *fvp, uint32_t *cookiep,
     struct fs_stream_info *stream_info, vnode_t **vpp, vnode_t **xattrdirvpp,
     int flags, cred_t *cr)
 {
-	int nsize = MAXNAMELEN-1;
+	int nsize;
 	int error = 0;
 	ino64_t ino;
 	char *tmp_name;
@@ -1556,6 +1556,7 @@ smb_vop_stream_readdir(vnode_t *fvp, uint32_t *cookiep,
 	tmp_name = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
 
 	for (;;) {
+		nsize = MAXNAMELEN-1;
 		error = smb_vop_readdir(xattrdirvp, cookiep, tmp_name, &nsize,
 		    &ino, &vp, NULL, flags | SMB_STREAM_RDDIR, cr);
 

@@ -361,7 +361,11 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 	if (rc) {
 		smb_rdir_close(sr);
 		kmem_free(pattern, MAXNAMELEN);
-		smbsr_errno(sr, rc);
+		if (rc == ENOENT)
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
+			    ERRDOS, ERROR_INVALID_NAME);
+		else
+			smbsr_errno(sr, rc);
 		return (SDRC_ERROR);
 	}
 

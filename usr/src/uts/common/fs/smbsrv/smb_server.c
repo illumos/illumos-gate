@@ -1173,6 +1173,7 @@ smb_server_stop(smb_server_t *sv)
 	smb_thread_stop(&sv->si_thread_timers);
 	smb_kdoor_clnt_stop();
 	smb_kshare_fini(sv->sv_lmshrd);
+	sv->sv_lmshrd = NULL;
 	smb_server_fsop_stop(sv);
 	if (sv->sv_session) {
 		smb_session_delete(sv->sv_session);

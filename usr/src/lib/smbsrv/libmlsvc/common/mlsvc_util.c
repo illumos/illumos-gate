@@ -215,6 +215,7 @@ mlsvc_release_user_info(smb_userinfo_t *user_info)
 		free(user_info->other_grps);
 	}
 
+	free(user_info->session_key);
 	free(user_info->user_sid);
 	free(user_info->pgrp_sid);
 	bzero(user_info, sizeof (smb_userinfo_t));

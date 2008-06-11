@@ -392,9 +392,16 @@ smb_com_trans2_query_path_information(struct smb_request *sr, struct smb_xa *xa)
 		kmem_free(name, MAXNAMELEN);
 		kmem_free(short_name, MAXNAMELEN);
 		kmem_free(name83, MAXNAMELEN);
-		smbsr_errno(sr, rc);
+
+		if (rc == ENOENT)
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
+			    ERRDOS, ERROR_FILE_NOT_FOUND);
+		else
+			smbsr_errno(sr, rc);
+
 		return (SDRC_ERROR);
 	}
+
 	smb_node_release(dir_node);
 	(void) strcpy(name, node->od_name);
 

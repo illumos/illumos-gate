@@ -62,7 +62,6 @@ smb_kshare_init(int door_id)
 void
 smb_kshare_fini(door_handle_t dhdl)
 {
-	ASSERT(dhdl != NULL);
 	if (dhdl)
 		door_ki_rele(dhdl);
 }

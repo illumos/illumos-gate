@@ -369,7 +369,9 @@ ads_get_host_info(void)
  * controllers are also ADS servers.
  *
  * The ADS hostnames are stored in the answer section of the DNS reply message.
- * The IP addresses are stored in the additional section.
+ * The IP addresses are stored in the additional section.  If the additional
+ * section does not contain any IP addresses then do a host lookup by name
+ * to get the IP address of the hostname.
  *
  * The DNS reply message may be in compress formed.  The compression is done
  * on repeating domain name label in the message.  i.e hostname.
@@ -391,6 +393,7 @@ ads_find_host(char *ns, char *domain, char *sought, int *port, char *service,
 	int s;
 	uint16_t id, rid, data_len, eport;
 	int ipaddr;
+	struct hostent *h;
 	char buf[NS_PACKETSZ], buf2[NS_PACKETSZ];
 	char *bufptr, *str;
 	int i, ret;
@@ -559,7 +562,11 @@ retry:
 		bufptr += data_len;
 	}
 
-	/* check additional section to get IP address of ads host */
+	/*
+	 * Check additional section to get IP address of ADS host.
+	 * If additional section contains no IP address(es) then
+	 * do a host lookup by hostname to get the IP address.
+	 */
 	if (addit_cnt > 0) {
 		int j;
 
@@ -621,6 +628,7 @@ retry:
 			bzero(ads_host, sizeof (ADS_HOST_INFO));
 			ads_host->name = strdup(ads_hosts_list[j].name);
 			if (ads_host->name == NULL) {
+				free(ads_host);
 				ads_free_host_list(ads_hosts_list, ans_cnt);
 				ads_free_host_list(ads_hosts_list2, addit_cnt);
 				return (NULL);
@@ -637,6 +645,48 @@ retry:
 			return (ads_host);
 		}
 		ads_free_host_list(ads_hosts_list2, addit_cnt);
+	} else {
+		/*
+		 * Shouldn't get here unless entries exist in DNS but
+		 * DNS server did not put them in additional section of
+		 * DNS reply packet.
+		 */
+		for (i = 0; i < ans_cnt; i++) {
+			if ((sought) &&
+			    (strncasecmp(sought, ads_hosts_list[i].name,
+			    strlen(sought)) != 0))
+				continue;
+
+			h = gethostbyname(ads_hosts_list[i].name);
+			if (h == NULL || h->h_addr == NULL)
+				continue;
+
+			(void) memcpy(&ads_hosts_list[i].ip_addr,
+			    h->h_addr, sizeof (addr.s_addr));
+
+			ads_host = (ADS_HOST_INFO *)
+			    malloc(sizeof (ADS_HOST_INFO));
+			if (ads_host == NULL) {
+				ads_free_host_list(ads_hosts_list, ans_cnt);
+				return (NULL);
+			}
+			bzero(ads_host, sizeof (ADS_HOST_INFO));
+			ads_host->name = strdup(ads_hosts_list[i].name);
+			if (ads_host->name == NULL) {
+				free(ads_host);
+				ads_free_host_list(ads_hosts_list, ans_cnt);
+				return (NULL);
+			}
+			ads_host->ip_addr = ads_hosts_list[i].ip_addr;
+			ads_host->port = ads_hosts_list[i].port;
+			*port = ads_host->port;
+			addr.s_addr = ads_host->ip_addr;
+			syslog(LOG_DEBUG, "smb_ads: Found ADS server: %s (%s)"
+			    " from %s\n", ads_host->name, inet_ntoa(addr), ns);
+			ads_free_host_list(ads_hosts_list, ans_cnt);
+			ads_set_host_info(ads_host);
+			return (ads_host);
+		}
 	}
 
 	syslog(LOG_ERR, "smb_ads: Can't get IP for "

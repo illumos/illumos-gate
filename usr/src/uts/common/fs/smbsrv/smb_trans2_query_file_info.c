@@ -431,6 +431,11 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
  * the field lengths (i.e. next offset calculations) need to include
  * the null terminator and be padded to a multiple of 8 bytes. The
  * last entry does not seem to need any padding.
+ *
+ * If an error is encountered when trying to read the directory
+ * entries (smb_fsop_stream_readdir) it is treated as if there are
+ * no [more] directory entries. The entries that have been read so
+ * far are returned and no error is reported.
  */
 
 void
@@ -460,7 +465,7 @@ smb_encode_stream_info(
 	rc = smb_fsop_stream_readdir(sr, kcred, snode, &cookie, stream_info,
 	    NULL, NULL);
 
-	if ((cookie == 0x7FFFFFFF) || (rc == EACCES) || (rc == ENOENT)) {
+	if ((cookie == 0x7FFFFFFF) || (rc != 0)) {
 		if (is_dir == 0) {
 			stream_name = "::$DATA";
 			stream_nlen =
@@ -509,7 +514,7 @@ smb_encode_stream_info(
 		stream_info_next->name[0] = 0;
 		rc = smb_fsop_stream_readdir(sr, kcred, snode, &cookie,
 		    stream_info_next, NULL, NULL);
-		if (cookie == 0x7FFFFFFF) {
+		if ((cookie == 0x7FFFFFFF) || (rc != 0)) {
 			done = 1;
 		} else {
 			if (cookie == 0) {
