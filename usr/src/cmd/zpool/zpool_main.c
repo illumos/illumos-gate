@@ -86,6 +86,8 @@ static int zpool_do_set(int, char **);
  * These libumem hooks provide a reasonable set of defaults for the allocator's
  * debugging facilities.
  */
+
+#ifdef DEBUG
 const char *
 _umem_debug_init(void)
 {
@@ -97,6 +99,7 @@ _umem_logging_init(void)
 {
 	return ("fail,contents"); /* $UMEM_LOGGING setting */
 }
+#endif
 
 typedef enum {
 	HELP_ADD,

@@ -81,9 +81,10 @@ static int zfs_do_allow(int argc, char **argv);
 static int zfs_do_unallow(int argc, char **argv);
 
 /*
- * These libumem hooks provide a reasonable set of defaults for the allocator's
- * debugging facilities.
+ * Enable a reasonable set of defaults for libumem debugging on DEBUG builds.
  */
+
+#ifdef DEBUG
 const char *
 _umem_debug_init(void)
 {
@@ -95,6 +96,7 @@ _umem_logging_init(void)
 {
 	return ("fail,contents"); /* $UMEM_LOGGING setting */
 }
+#endif
 
 typedef enum {
 	HELP_CLONE,

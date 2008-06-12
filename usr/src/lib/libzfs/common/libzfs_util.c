@@ -587,6 +587,7 @@ libzfs_fini(libzfs_handle_t *hdl)
 	zfs_uninit_libshare(hdl);
 	if (hdl->libzfs_log_str)
 		(void) free(hdl->libzfs_log_str);
+	zpool_free_handles(hdl);
 	namespace_clear(hdl);
 	free(hdl);
 }

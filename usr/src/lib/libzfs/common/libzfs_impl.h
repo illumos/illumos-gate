@@ -54,6 +54,7 @@ struct libzfs_handle {
 	int libzfs_fd;
 	FILE *libzfs_mnttab;
 	FILE *libzfs_sharetab;
+	zpool_handle_t *libzfs_pool_handles;
 	uu_avl_pool_t *libzfs_ns_avlpool;
 	uu_avl_t *libzfs_ns_avl;
 	uint64_t libzfs_ns_gen;
@@ -69,6 +70,7 @@ struct libzfs_handle {
 
 struct zfs_handle {
 	libzfs_handle_t *zfs_hdl;
+	zpool_handle_t *zpool_hdl;
 	char zfs_name[ZFS_MAXNAMELEN];
 	zfs_type_t zfs_type; /* type including snapshot */
 	zfs_type_t zfs_head_type; /* type excluding snapshot */
@@ -77,7 +79,6 @@ struct zfs_handle {
 	nvlist_t *zfs_user_props;
 	boolean_t zfs_mntcheck;
 	char *zfs_mntopts;
-	char zfs_root[MAXPATHLEN];
 };
 
 /*
@@ -88,6 +89,7 @@ struct zfs_handle {
 
 struct zpool_handle {
 	libzfs_handle_t *zpool_hdl;
+	zpool_handle_t *zpool_next;
 	char zpool_name[ZPOOL_MAXNAMELEN];
 	int zpool_state;
 	size_t zpool_config_size;

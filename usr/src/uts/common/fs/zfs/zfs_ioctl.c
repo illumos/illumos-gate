@@ -1131,7 +1131,6 @@ zfs_ioc_vdev_setpath(zfs_cmd_t *zc)
  * zc_objset_stats	stats
  * zc_nvlist_dst	property nvlist
  * zc_nvlist_dst_size	size of property nvlist
- * zc_value		alternate root
  */
 static int
 zfs_ioc_objset_stats(zfs_cmd_t *zc)
@@ -1162,8 +1161,6 @@ zfs_ioc_objset_stats(zfs_cmd_t *zc)
 		error = put_nvlist(zc, nv);
 		nvlist_free(nv);
 	}
-
-	spa_altroot(dmu_objset_spa(os), zc->zc_value, sizeof (zc->zc_value));
 
 	dmu_objset_close(os);
 	return (error);
@@ -1241,7 +1238,6 @@ zfs_ioc_objset_zplprops(zfs_cmd_t *zc)
  * zc_objset_stats	stats
  * zc_nvlist_dst	property nvlist
  * zc_nvlist_dst_size	size of property nvlist
- * zc_value		alternate root
  */
 static int
 zfs_ioc_dataset_list_next(zfs_cmd_t *zc)
@@ -1293,7 +1289,6 @@ zfs_ioc_dataset_list_next(zfs_cmd_t *zc)
  * zc_objset_stats	stats
  * zc_nvlist_dst	property nvlist
  * zc_nvlist_dst_size	size of property nvlist
- * zc_value		alternate root
  */
 static int
 zfs_ioc_snapshot_list_next(zfs_cmd_t *zc)

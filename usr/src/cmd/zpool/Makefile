@@ -38,6 +38,7 @@ LDLIBS += -lzfs -lnvpair -ldevid -lefi -ldiskmgt -luutil -lumem
 INCS += -I../../common/zfs
 
 CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS)
+$(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 
 # lint complains about unused _umem_* functions
 LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2 

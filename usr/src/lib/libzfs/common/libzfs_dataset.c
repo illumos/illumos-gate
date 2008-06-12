@@ -254,6 +254,69 @@ process_user_props(zfs_handle_t *zhp, nvlist_t *props)
 	return (nvl);
 }
 
+static zpool_handle_t *
+zpool_add_handle(zfs_handle_t *zhp, const char *pool_name)
+{
+	libzfs_handle_t *hdl = zhp->zfs_hdl;
+	zpool_handle_t *zph;
+
+	if ((zph = zpool_open_canfail(hdl, pool_name)) != NULL) {
+		if (hdl->libzfs_pool_handles != NULL)
+			zph->zpool_next = hdl->libzfs_pool_handles;
+		hdl->libzfs_pool_handles = zph;
+	}
+	return (zph);
+}
+
+static zpool_handle_t *
+zpool_find_handle(zfs_handle_t *zhp, const char *pool_name, int len)
+{
+	libzfs_handle_t *hdl = zhp->zfs_hdl;
+	zpool_handle_t *zph = hdl->libzfs_pool_handles;
+
+	while ((zph != NULL) &&
+	    (strncmp(pool_name, zpool_get_name(zph), len) != 0))
+		zph = zph->zpool_next;
+	return (zph);
+}
+
+/*
+ * Returns a handle to the pool that contains the provided dataset.
+ * If a handle to that pool already exists then that handle is returned.
+ * Otherwise, a new handle is created and added to the list of handles.
+ */
+static zpool_handle_t *
+zpool_handle(zfs_handle_t *zhp)
+{
+	char *pool_name;
+	int len;
+	zpool_handle_t *zph;
+
+	len = strcspn(zhp->zfs_name, "/@") + 1;
+	pool_name = zfs_alloc(zhp->zfs_hdl, len);
+	(void) strlcpy(pool_name, zhp->zfs_name, len);
+
+	zph = zpool_find_handle(zhp, pool_name, len);
+	if (zph == NULL)
+		zph = zpool_add_handle(zhp, pool_name);
+
+	free(pool_name);
+	return (zph);
+}
+
+void
+zpool_free_handles(libzfs_handle_t *hdl)
+{
+	zpool_handle_t *next, *zph = hdl->libzfs_pool_handles;
+
+	while (zph != NULL) {
+		next = zph->zpool_next;
+		zpool_close(zph);
+		zph = next;
+	}
+	hdl->libzfs_pool_handles = NULL;
+}
+
 /*
  * Utility function to gather stats (objset and zpl) for the given object.
  */
@@ -282,8 +345,6 @@ get_stats(zfs_handle_t *zhp)
 	}
 
 	zhp->zfs_dmustats = zc.zc_objset_stats; /* structure assignment */
-
-	(void) strlcpy(zhp->zfs_root, zc.zc_value, sizeof (zhp->zfs_root));
 
 	if (zcmd_read_dst_nvlist(hdl, &zc, &allprops) != 0) {
 		zcmd_free_nvlists(&zc);
@@ -409,6 +470,7 @@ top:
 		abort();	/* we should never see any other types */
 
 	zhp->zfs_hdl->libzfs_log_str = logstr;
+	zhp->zpool_hdl = zpool_handle(zhp);
 	return (zhp);
 }
 
@@ -470,27 +532,13 @@ zfs_close(zfs_handle_t *zhp)
 int
 zfs_spa_version(zfs_handle_t *zhp, int *spa_version)
 {
-	char *pool_name;
-	zpool_handle_t *zpool_handle;
-	char *p;
+	zpool_handle_t *zpool_handle = zhp->zpool_hdl;
 
-	pool_name = zfs_alloc(zhp->zfs_hdl, MAXPATHLEN);
-	if (zfs_prop_get(zhp, ZFS_PROP_NAME, pool_name,
-	    MAXPATHLEN, NULL, NULL, 0, B_FALSE) != 0) {
-		free(pool_name);
-		return (-1);
-	}
-
-	if (p = strchr(pool_name, '/'))
-		*p = '\0';
-	zpool_handle = zpool_open(zhp->zfs_hdl, pool_name);
-	free(pool_name);
 	if (zpool_handle == NULL)
 		return (-1);
 
 	*spa_version = zpool_get_prop_int(zpool_handle,
 	    ZPOOL_PROP_VERSION, NULL);
-	zpool_close(zpool_handle);
 	return (0);
 }
 
@@ -2221,7 +2269,6 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 	char *source = NULL;
 	uint64_t val;
 	char *str;
-	const char *root;
 	const char *strval;
 
 	/*
@@ -2263,16 +2310,21 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		 * If the pool has an alternate root, we want to prepend that
 		 * root to any values we return.
 		 */
-		root = zhp->zfs_root;
+
 		str = getprop_string(zhp, prop, &source);
 
 		if (str[0] == '/') {
+			char buf[MAXPATHLEN];
+			char *root = buf;
 			const char *relpath = zhp->zfs_name + strlen(source);
-
 
 			if (relpath[0] == '/')
 				relpath++;
 
+			if ((zpool_get_prop(zhp->zpool_hdl,
+			    ZPOOL_PROP_ALTROOT, buf, MAXPATHLEN, NULL)) ||
+			    (strcmp(root, "-") == 0))
+				root[0] = '\0';
 			/*
 			 * Special case an alternate root of '/'. This will
 			 * avoid having multiple leading slashes in the
