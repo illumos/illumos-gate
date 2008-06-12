@@ -3,13 +3,13 @@
 
 
 /*
- * Copyright (c) 1982, 1986 Regents of the University of California.
+ * Copyright (c) 1982, 1986, 1993 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,6 +126,60 @@ extern "C" {
 	    ((tvp)->tv_sec cmp (uvp)->tv_sec))
 
 #define	timerclear(tvp)		(tvp)->tv_sec = (tvp)->tv_usec = 0
+
+#ifdef __lint
+/*
+ * Make innocuous, lint-happy versions until do {} while (0) is acknowleged as
+ * lint-safe.  If the compiler could know that we always make tv_usec < 1000000
+ * we wouldn't need a special linted version.
+ */
+#define	timeradd(tvp, uvp, vvp)					\
+	do								\
+	{								\
+		(vvp)->tv_sec = (tvp)->tv_sec + (uvp)->tv_sec;		\
+		(vvp)->tv_usec = (tvp)->tv_usec + (uvp)->tv_usec;	\
+		if ((vvp)->tv_usec >= 1000000)				\
+		{							\
+			(vvp)->tv_sec++;				\
+			(vvp)->tv_usec -= 1000000;			\
+		}							\
+	} while ((vvp)->tv_usec >= 1000000)
+#define	timersub(tvp, uvp, vvp)					\
+	do								\
+	{								\
+		(vvp)->tv_sec = (tvp)->tv_sec - (uvp)->tv_sec;		\
+		(vvp)->tv_usec = (tvp)->tv_usec - (uvp)->tv_usec;	\
+		if ((vvp)->tv_usec < 0)					\
+		{							\
+			(vvp)->tv_sec--;				\
+			(vvp)->tv_usec += 1000000;			\
+		}							\
+	} while ((vvp)->tv_usec >= 1000000)
+#else
+#define	timeradd(tvp, uvp, vvp)					\
+	do								\
+	{								\
+		(vvp)->tv_sec = (tvp)->tv_sec + (uvp)->tv_sec;		\
+		(vvp)->tv_usec = (tvp)->tv_usec + (uvp)->tv_usec;	\
+		if ((vvp)->tv_usec >= 1000000)				\
+		{							\
+			(vvp)->tv_sec++;				\
+			(vvp)->tv_usec -= 1000000;			\
+		}							\
+	} while (0)
+
+#define	timersub(tvp, uvp, vvp)					\
+	do								\
+	{								\
+		(vvp)->tv_sec = (tvp)->tv_sec - (uvp)->tv_sec;		\
+		(vvp)->tv_usec = (tvp)->tv_usec - (uvp)->tv_usec;	\
+		if ((vvp)->tv_usec < 0)					\
+		{							\
+			(vvp)->tv_sec--;				\
+			(vvp)->tv_usec += 1000000;			\
+		}							\
+	} while (0)
+#endif /* __lint */
 
 #endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 

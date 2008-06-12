@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -242,11 +242,10 @@ eloop_run(void)
 
 	default_t = 5 * 1000;	/* 5 seconds */
 	while (!eloop.terminate &&
-		(eloop.timeout || eloop.reader_count > 0)) {
+	    (eloop.timeout || eloop.reader_count > 0)) {
 		if (eloop.timeout) {
 			(void) gettimeofday(&now, NULL);
 			if (timercmp(&now, &eloop.timeout->time, < /* */))
-				/* LINTED E_CONSTANT_CONDITION */
 				timersub(&eloop.timeout->time, &now, &tv);
 			else
 				tv.tv_sec = tv.tv_usec = 0;

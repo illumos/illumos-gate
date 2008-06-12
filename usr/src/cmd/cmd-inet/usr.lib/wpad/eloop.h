@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -16,34 +16,6 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-#ifndef timersub
-#define	timersub(tvp, uvp, vvp)						\
-	do								\
-	{								\
-		(vvp)->tv_sec = (tvp)->tv_sec - (uvp)->tv_sec;		\
-		(vvp)->tv_usec = (tvp)->tv_usec - (uvp)->tv_usec;	\
-		if ((vvp)->tv_usec < 0)					\
-		{							\
-			(vvp)->tv_sec--;				\
-			(vvp)->tv_usec += 1000000;			\
-		}							\
-	} while (0)
-#endif /* !timersub */
-
-#ifndef timeradd
-#define	timeradd(tvp, uvp, vvp)						\
-	do								\
-	{								\
-		(vvp)->tv_sec = (tvp)->tv_sec + (uvp)->tv_sec;		\
-		(vvp)->tv_usec = (tvp)->tv_usec + (uvp)->tv_usec;	\
-		if ((vvp)->tv_usec >= 1000000)				\
-		{							\
-			(vvp)->tv_sec++;				\
-			(vvp)->tv_usec -= 1000000;			\
-		}							\
-	} while (0)
-#endif /* !timeradd */
 
 /* Magic number for eloop_cancel_timeout() */
 #define	ELOOP_ALL_CTX		(void *) -1
