@@ -448,7 +448,8 @@ _rd_get_dyns32(rd_agent_t *rap, psaddr_t addr, Dyn **dynpp, size_t *dynpp_sz)
 	}
 
 	*dynpp = dynp;
-	*dynpp_sz = phdr.p_filesz;
+	if (dynpp_sz != NULL)
+		*dynpp_sz = phdr.p_filesz;
 	return (RD_OK);
 }
 

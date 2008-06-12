@@ -26,11 +26,12 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-# This is a 64-bit build, and as such needs 64-bit ELF support
 COBJS64 =	lx_librtld_db64.o
 
 include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
+
+DYNFLAGS +=	-Mmapfile-vers
 
 CLOBBERFILES = $(ROOTLIBDIR64)/$(DYNLIB)
 
