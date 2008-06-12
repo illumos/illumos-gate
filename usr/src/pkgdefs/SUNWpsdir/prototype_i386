@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,7 +43,6 @@ i i.ataconf
 i pkginfo
 i postinstall
 i postremove
-i preinstall
 #
 # Path names are relative to the prototype root directory
 #
@@ -56,8 +55,6 @@ f none kernel/drv/ata 755 root sys
 e ataconf kernel/drv/ata.conf 644 root sys
 f none kernel/drv/mscsi 755 root sys
 f none kernel/drv/mscsi.conf 644 root sys
-f none kernel/drv/sbpro 755 root sys
-f none kernel/drv/sbpro.conf 644 root sys
 d none kernel/drv/amd64 755 root sys
 f none kernel/drv/amd64/ata 755 root sys
 

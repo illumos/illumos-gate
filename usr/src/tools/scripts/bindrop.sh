@@ -195,8 +195,6 @@ delete="$delete
 	kernel/drv/ifp.conf
 	kernel/drv/pcn
 	kernel/drv/pcn.conf
-	kernel/drv/sbpro
-	kernel/drv/sbpro.conf
 	kernel/drv/sparcv9/audioens
 	kernel/drv/sparcv9/ifp
 	kernel/drv/sparcv9/isp
@@ -218,7 +216,6 @@ delete="$delete
 	usr/include/smartcard/
 	usr/include/sys/audio/audioens.h
 	usr/include/sys/phx.h
-	usr/include/sys/sbpro.h
 	usr/include/sys/scsi/adapters/ifpcmd.h
 	usr/include/sys/scsi/adapters/ifpio.h
 	usr/include/sys/scsi/adapters/ifpmail.h

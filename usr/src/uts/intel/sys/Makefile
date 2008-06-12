@@ -96,8 +96,7 @@ HDRS	=			\
 	xen_errno.h
 
 CLOSEDHDRS = \
-	memtest.h \
-	sbpro.h
+	memtest.h
 
 SUBHDRS	=			\
 	dktp/mscsi.h

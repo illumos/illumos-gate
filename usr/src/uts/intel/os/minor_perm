@@ -22,7 +22,6 @@ clone:llc1 0666 root sys
 clone:loop 0666 root sys
 clone:ptmx 0666 root sys
 rts:rts 0666 root sys
-clone:sound,sbpro 0600 root sys
 tcp:tcp 0666 root sys
 tcp6:tcp6 0666 root sys
 clone:ticlts 0666 root sys
@@ -73,7 +72,6 @@ sad:user 0666 root sys
 sgen:* 0600 root sys
 cmdk:* 0640 root sys
 st:* 0666 root sys
-sbpro:* 0600 root sys
 sdt:sdt 0644 root sys
 sy:tty 0666 root tty
 sysmsg:msglog 0600 root sys

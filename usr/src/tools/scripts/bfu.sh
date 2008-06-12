@@ -6756,6 +6756,17 @@ mondo_loop() {
 	fi
 
 	#
+	# Remove EOF sbpro driver and supporting header file
+	# (Note that .conf file may also appear in /platform)
+	#
+	if [ $target_isa = i386 ]; then
+		rm -f $root/kernel/drv/sbpro
+		rm -f $root/kernel/drv/sbpro.conf
+		rm -f $root/platform/i86pc/kernel/drv/sbpro.conf
+		rm -f $usr/include/sys/sbpro.h
+	fi
+
+	#
 	# Diskless clients have already extracted /usr so don't delete this
 	# Non-global zones never extracts /usr so don't delete these
 	#

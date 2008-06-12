@@ -69,8 +69,6 @@ make_chattr_list()
 cat > /tmp/chattr.$$ << EOF
 vol:volctl		0600 root sys 0666 root sys	/dev/volctl
 clone:llc1		0600 root sys 0666 root sys	/dev/llc1
-clone:sound,sbpro	0666 root sys 0600 root sys	/dev/sound/*
-sbpro:*			0666 root sys 0600 root sys	/dev/sound/*
 log:conslog		0620 root sys 0666 root sys	/dev/conslog
 sy:tty			0666 root sys 0666 root tty	/dev/tty
 icmp:icmp		0600 root sys 0666 root sys	/dev/rawip
@@ -179,7 +177,9 @@ clone:ipsecesp
 clone:keysock
 clone:smc
 clone:tr
+clone:sbpro
 elx:*
+sbpro:*
 win:*
 cmtp:*
 profile:profile

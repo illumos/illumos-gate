@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -156,6 +156,7 @@ obsolete_i386()
 		obs["profile"] = 1;
 		obs["riles"] = 1;
 		obs["rip"] = 1;
+		obs["sbpro"] = 1;
 		obs["smartii"] = 1;
 		obs["smc"] = 1;
 		obs["smce"] = 1;

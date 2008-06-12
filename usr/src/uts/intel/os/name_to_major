@@ -53,7 +53,6 @@ ata 112
 logi 114
 msm 115
 mouse8042 116
-sbpro 118
 isa 120
 eisa 121
 vdi 123

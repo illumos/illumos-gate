@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +90,7 @@ minor_init(void)
 {
 	if (0 != regcomp(&isdn_re, ISDN_RE, REG_EXTENDED)) {
 		devfsadm_errprint("SUNW_audio_link: minor_init: regular "
-				    "expression bad: '%s'\n", ISDN_RE);
+		    "expression bad: '%s'\n", ISDN_RE);
 		return (DEVFSADM_FAILURE);
 	} else {
 		return (DEVFSADM_SUCCESS);
@@ -172,15 +172,13 @@ audio_process(di_minor_t minor, di_node_t node)
 
 		/* if this is a minor node, tack on the correct suffix */
 		au_mn = strchr(mn, ',');
-		if (strcmp(++au_mn, "audio") != 0 &&
-		    strcmp(au_mn, "sbpro") != 0) {
+		if (strcmp(++au_mn, "audio") != 0) {
 
 			/*
-			 * audioctl/sbproctl are special cases. They are handled
-			 * by stripping off the audio/sbpro from the node name
+			 * audioctl is a special case. It is handled
+			 * by stripping off the audio from the node name
 			 */
-			if (strcmp(au_mn, "audioctl") == 0 ||
-			    strcmp(au_mn, "sbproctl") == 0)
+			if (strcmp(au_mn, "audioctl") == 0)
 				au_mn = strstr(au_mn, "ctl");
 			(void) strcat(path, au_mn);
 		}
@@ -208,7 +206,7 @@ audio_process(di_minor_t minor, di_node_t node)
 
 	if (path[0] == '\0') {
 		devfsadm_errprint("SUNW_audio_link: audio_process: can't find"
-			" match for'%s'\n", mn);
+		    " match for'%s'\n", mn);
 		return (DEVFSADM_CONTINUE);
 	}
 
@@ -239,7 +237,7 @@ check_audio_link(char *secondary_link, const char *primary_link_format)
 		(void) sprintf(primary_link, primary_link_format, i);
 		if (devfsadm_link_valid(primary_link) == DEVFSADM_TRUE) {
 			(void) devfsadm_secondary_link(secondary_link,
-						primary_link, flags);
+			    primary_link, flags);
 			break;
 		}
 	}
