@@ -294,6 +294,7 @@ static void *xmalloc(size_t, struct lbuf *);
 static void free_sysattr(struct lbuf *);
 static nvpair_t *pair;
 static nvlist_t	*response;
+static int acl_err;
 
 int
 main(int argc, char *argv[])
@@ -693,6 +694,8 @@ main(int argc, char *argv[])
 		ep->lflags |= ISARG;
 		optind++;
 		nargs++;	/* count good arguments stored in flist */
+		if (acl_err)
+			err = 2;
 	}
 	colwidth = fixedwidth + filewidth;
 	qsort(flist, (unsigned)nargs, sizeof (struct lbuf *),
@@ -1557,6 +1560,7 @@ gstat(char *file, int argfl, struct ditem *myparent)
 				    gettext("ls: can't read ACL on %s: %s\n"),
 				    file, acl_strerror(error));
 				rep->acl = ' ';
+				acl_err++;
 				return (rep);
 			}
 
