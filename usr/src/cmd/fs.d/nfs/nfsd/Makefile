@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,8 +34,8 @@ include		../../Makefile.fstype
 LDLIBS +=	-lnsl -lnvpair
 
 LOCAL=		nfsd.o
-OBJS=		$(LOCAL) nfs_tbind.o thrpool.o
-SRCS=		$(LOCAL:%.o=%.c) ../lib/nfs_tbind.c ../lib/thrpool.c
+OBJS=		$(LOCAL) nfs_tbind.o thrpool.o daemon.o
+SRCS=		$(LOCAL:%.o=%.c) ../lib/nfs_tbind.c ../lib/thrpool.c ../lib/daemon.c
 CPPFLAGS +=	-I../lib
 
 $(TYPEPROG):	$(OBJS)
@@ -47,6 +47,9 @@ nfs_tbind.o:	../lib/nfs_tbind.c
 
 thrpool.o:	../lib/thrpool.c
 		$(COMPILE.c) ../lib/thrpool.c
+
+daemon.o:	../lib/daemon.c
+		$(COMPILE.c) ../lib/daemon.c
 
 clean:
 		$(RM) $(OBJS)

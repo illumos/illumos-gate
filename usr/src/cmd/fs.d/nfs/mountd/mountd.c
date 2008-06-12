@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,7 @@
 #include <sys/pathconf.h>
 #include <sys/systeminfo.h>
 #include <sys/utsname.h>
+#include <sys/wait.h>
 #include <signal.h>
 #include <locale.h>
 #include <unistd.h>
@@ -77,6 +78,9 @@
 #include <tsol/label.h>
 #include <sys/tsol/label_macro.h>
 #include <libtsnet.h>
+
+extern int daemonize_init(void);
+extern void daemonize_fini(int fd);
 
 struct sh_list *share_list;
 
@@ -175,6 +179,7 @@ nfsauth_svc(void *arg)
 	return (NULL);
 }
 
+
 int
 main(int argc, char *argv[])
 {
@@ -186,6 +191,8 @@ main(int argc, char *argv[])
 	bool_t	exclbind = TRUE;
 	bool_t	can_do_mlp;
 	long	thr_flags = (THR_NEW_LWP|THR_DAEMON);
+
+	int	pipe_fd = -1;
 
 	/*
 	 * Mountd requires uid 0 for:
@@ -205,8 +212,8 @@ main(int argc, char *argv[])
 	    PRIV_SYS_NFS, PRIV_PROC_AUDIT, PRIV_FILE_DAC_SEARCH,
 	    can_do_mlp ? PRIV_NET_BINDMLP : NULL, NULL) == -1) {
 		(void) fprintf(stderr,
-			"%s must be run as with sufficient privileges\n",
-			argv[0]);
+		    "%s: must be run with sufficient privileges\n",
+		    argv[0]);
 		exit(1);
 	}
 
@@ -225,7 +232,7 @@ main(int argc, char *argv[])
 			if (maxthreads < 1) {
 				(void) fprintf(stderr,
 	"%s: must specify positive maximum threads count, using default\n",
-						argv[0]);
+				    argv[0]);
 				maxthreads = 0;
 			}
 			break;
@@ -270,7 +277,7 @@ main(int argc, char *argv[])
 	 * to start nfsauth service, so continue on regardless of values.
 	 */
 	if (mount_vers_min > mount_vers_max) {
-		syslog(LOG_NOTICE, "NFS_SERVER_VERSMIN > NFS_SERVER_VERSMAX");
+		fprintf(stderr, "NFS_SERVER_VERSMIN > NFS_SERVER_VERSMAX");
 		mount_vers_max = mount_vers_min;
 	}
 	(void) setlocale(LC_ALL, "");
@@ -286,40 +293,13 @@ main(int argc, char *argv[])
 	/* Don't drop core if the NFS module isn't loaded. */
 	(void) signal(SIGSYS, SIG_IGN);
 
-	(void) signal(SIGHUP, sigexit);
-	(void) signal(SIGCLD, sigexit);
-
-	switch (fork()) {
-	case 0:		/* child */
-		break;
-	case -1:
-		perror("mountd: can't fork");
-		exit(1);
-	default:	/* parent */
-		for (;;)
-			(void) pause();
-		/* NOTREACHED */
-	}
-
-	(void) signal(SIGHUP, SIG_DFL);
-	(void) signal(SIGCLD, SIG_DFL);
+	pipe_fd = daemonize_init();
 
 	/*
 	 * If we coredump it'll be in /core
 	 */
 	if (chdir("/") < 0)
-		syslog(LOG_ERR, "chdir /: %m");
-
-	/*
-	 * Close existing file descriptors, open "/dev/null" as
-	 * standard input, output, and error, and detach from
-	 * controlling terminal.
-	 */
-	closefrom(0);
-	(void) open("/dev/null", O_RDONLY);
-	(void) open("/dev/null", O_WRONLY);
-	(void) dup(1);
-	(void) setsid();
+		fprintf(stderr, "chdir /: %s", strerror(errno));
 
 	openlog("mountd", LOG_PID, LOG_DAEMON);
 
@@ -333,7 +313,7 @@ main(int argc, char *argv[])
 	case 0:
 		break;
 	case -1:
-		syslog(LOG_ERR, "error locking for %s: %s", MOUNTD,
+		fprintf(stderr, "error locking for %s: %s", MOUNTD,
 		    strerror(errno));
 		exit(2);
 	default:
@@ -348,7 +328,7 @@ main(int argc, char *argv[])
 	 * A new thread will be spawned for each request.
 	 */
 	if (!rpc_control(RPC_SVC_MTMODE_SET, &rpc_svc_mode)) {
-		syslog(LOG_ERR, "unable to set automatic MT mode");
+		fprintf(stderr, "unable to set automatic MT mode");
 		exit(1);
 	}
 
@@ -357,7 +337,7 @@ main(int argc, char *argv[])
 	 * connection oriented transports.
 	 */
 	if (!rpc_control(RPC_SVC_CONNMAXREC_SET, &maxrecsz)) {
-		syslog(LOG_INFO, "unable to set RPC max record size");
+		fprintf(stderr, "unable to set RPC max record size");
 	}
 
 	/*
@@ -365,7 +345,7 @@ main(int argc, char *argv[])
 	 * from being hijacked by a bind to a more specific addr.
 	 */
 	if (!rpc_control(__RPC_SVC_EXCLBIND_SET, &exclbind)) {
-		syslog(LOG_INFO,  "warning: unable to set udp/tcp EXCLBIND");
+		fprintf(stderr, "warning: unable to set udp/tcp EXCLBIND");
 	}
 
 	/*
@@ -373,7 +353,7 @@ main(int argc, char *argv[])
 	 * maximum number of threads to the value specified.
 	 */
 	if (maxthreads > 0 && !rpc_control(RPC_SVC_THRMAX_SET, &maxthreads)) {
-		syslog(LOG_ERR, "unable to set maxthreads");
+		fprintf(stderr, "unable to set maxthreads");
 		exit(1);
 	}
 
@@ -392,7 +372,7 @@ main(int argc, char *argv[])
 	 * traffic) _and_ a doors server (for kernel upcalls).
 	 */
 	if (thr_create(NULL, 0, nfsauth_svc, 0, thr_flags, &nfsauth_thread)) {
-		syslog(LOG_ERR, gettext("Failed to create NFSAUTH svc thread"));
+		fprintf(stderr, gettext("Failed to create NFSAUTH svc thread"));
 		exit(2);
 	}
 
@@ -401,40 +381,40 @@ main(int argc, char *argv[])
 	 */
 	if (mount_vers_max >= MOUNTVERS) {
 		if (svc_create(mnt, MOUNTPROG, MOUNTVERS, "datagram_v") == 0) {
-			syslog(LOG_ERR,
-				"couldn't register datagram_v MOUNTVERS");
+			fprintf(stderr,
+			    "couldn't register datagram_v MOUNTVERS");
 			exit(1);
 		}
 		if (svc_create(mnt, MOUNTPROG, MOUNTVERS, "circuit_v") == 0) {
-			syslog(LOG_ERR,
-				"couldn't register circuit_v MOUNTVERS");
+			fprintf(stderr,
+			    "couldn't register circuit_v MOUNTVERS");
 			exit(1);
 		}
 	}
 	if (mount_vers_max >= MOUNTVERS_POSIX) {
 		if (svc_create(mnt, MOUNTPROG, MOUNTVERS_POSIX,
-							"datagram_v") == 0) {
-			syslog(LOG_ERR,
-				"couldn't register datagram_v MOUNTVERS_POSIX");
+		    "datagram_v") == 0) {
+			fprintf(stderr,
+			    "couldn't register datagram_v MOUNTVERS_POSIX");
 			exit(1);
 		}
 		if (svc_create(mnt, MOUNTPROG, MOUNTVERS_POSIX,
-							"circuit_v") == 0) {
-			syslog(LOG_ERR,
-				"couldn't register circuit_v MOUNTVERS_POSIX");
+		    "circuit_v") == 0) {
+			fprintf(stderr,
+			    "couldn't register circuit_v MOUNTVERS_POSIX");
 			exit(1);
 		}
 	}
 
 	if (mount_vers_max >= MOUNTVERS3) {
 		if (svc_create(mnt, MOUNTPROG, MOUNTVERS3, "datagram_v") == 0) {
-			syslog(LOG_ERR,
-				"couldn't register datagram_v MOUNTVERS3");
+			fprintf(stderr,
+			    "couldn't register datagram_v MOUNTVERS3");
 			exit(1);
 		}
 		if (svc_create(mnt, MOUNTPROG, MOUNTVERS3, "circuit_v") == 0) {
-			syslog(LOG_ERR,
-				"couldn't register circuit_v MOUNTVERS3");
+			fprintf(stderr,
+			    "couldn't register circuit_v MOUNTVERS3");
 			exit(1);
 		}
 	}
@@ -443,7 +423,8 @@ main(int argc, char *argv[])
 	 * Start serving
 	 */
 	rmtab_load();
-	(void) kill(getppid(), SIGHUP);
+
+	daemonize_fini(pipe_fd);
 
 	/* Get rid of the most dangerous basic privileges. */
 	__fini_daemon_priv(PRIV_PROC_EXEC, PRIV_PROC_INFO, PRIV_PROC_SESSION,
@@ -452,6 +433,7 @@ main(int argc, char *argv[])
 	svc_run();
 	syslog(LOG_ERR, "Error: svc_run shouldn't have returned");
 	abort();
+
 	/* NOTREACHED */
 	return (0);
 }
@@ -554,7 +536,7 @@ getclientsnames(SVCXPRT *transp, struct netbuf **nbuf,
 	nconf = getnetconfigent(transp->xp_netid);
 	if (nconf == NULL) {
 		syslog(LOG_ERR, "%s: getnetconfigent failed",
-			transp->xp_netid);
+		    transp->xp_netid);
 		*serv = anon_client(host);
 		return;
 	}
@@ -587,7 +569,7 @@ getclientsnames(SVCXPRT *transp, struct netbuf **nbuf,
 			/* LINTED pointer alignment */
 			sa = (struct sockaddr_in6 *)((*nbuf)->buf);
 			(void) inet_ntop(AF_INET6, sa->sin6_addr.s6_addr,
-					tmp, INET6_ADDRSTRLEN);
+			    tmp, INET6_ADDRSTRLEN);
 			*serv =	anon_client(host);
 			freenetconfigent(nconf);
 			return;
@@ -650,8 +632,8 @@ mnt_pathconf(struct svc_req *rqstp)
 	 */
 	if (realpath(path, rpath) == NULL) {
 		syslog(LOG_DEBUG,
-			"mount request: realpath failed on %s: %m",
-			path);
+		    "mount request: realpath failed on %s: %m",
+		    path);
 		_PC_SET(_PC_ERROR, p.pc_mask);
 		goto done;
 	}
@@ -748,7 +730,7 @@ mount_enoent_error(char *path, char *rpath, struct nd_hostservlist *clnames,
 			sh = NULL;
 		}
 		if ((sh = findentry(rpath)) == NULL &&
-			(sh = find_lofsentry(rpath, &lofs_tried)) == NULL) {
+		    (sh = find_lofsentry(rpath, &lofs_tried)) == NULL) {
 			/*
 			 * There is no file name entry.
 			 * If the file (with symbolic links resolved) exists,
@@ -771,10 +753,10 @@ mount_enoent_error(char *path, char *rpath, struct nd_hostservlist *clnames,
 			 */
 			if (newopts(sh->sh_opts))
 				flavor_count = getclientsflavors_new(sh, nb,
-					clnames, flavor_list);
+				    clnames, flavor_list);
 			else
 				flavor_count = getclientsflavors_old(sh, nb,
-					clnames, flavor_list);
+				    clnames, flavor_list);
 			if (flavor_count != 0) {
 				/*
 				 * Found entry in table and
@@ -861,7 +843,7 @@ mount(struct svc_req *rqstp)
 	if (rejecting || version < mount_vers_min) {
 		if (verbose)
 			syslog(LOG_NOTICE, "Rejected mount: %s for %s",
-				host, path);
+			    host, path);
 		error = EACCES;
 		goto reply;
 	}
@@ -889,15 +871,15 @@ mount(struct svc_req *rqstp)
 		error = errno;
 		if (verbose)
 			syslog(LOG_ERR,
-				"mount request: realpath: %s: %m", path);
+			    "mount request: realpath: %s: %m", path);
 		if (error == ENOENT)
 			error = mount_enoent_error(path, rpath, clnames, nb,
-					flavor_list);
+			    flavor_list);
 		goto reply;
 	}
 
 	if ((sh = findentry(rpath)) == NULL &&
-		(sh = find_lofsentry(rpath, &lofs_tried)) == NULL) {
+	    (sh = find_lofsentry(rpath, &lofs_tried)) == NULL) {
 		error = EACCES;
 		goto reply;
 	}
@@ -913,10 +895,10 @@ mount(struct svc_req *rqstp)
 
 	if (newopts(sh->sh_opts))
 		flavor_count = getclientsflavors_new(sh, nb, clnames,
-					flavor_list);
+		    flavor_list);
 	else
 		flavor_count = getclientsflavors_old(sh, nb, clnames,
-					flavor_list);
+		    flavor_list);
 
 	if (flavor_count == 0) {
 		error = EACCES;
@@ -1003,13 +985,13 @@ mount(struct svc_req *rqstp)
 	/* LINTED pointer alignment */
 	while (nfs_getfh(rpath, vers, &len, fh) < 0) {
 		if (errno == EINVAL &&
-			(sh = find_lofsentry(rpath, &lofs_tried)) != NULL) {
+		    (sh = find_lofsentry(rpath, &lofs_tried)) != NULL) {
 			errno = 0;
 			continue;
 		}
 		error = errno == EINVAL ? EACCES : errno;
 		syslog(LOG_DEBUG, "mount request: getfh failed on %s: %m",
-			path);
+		    path);
 		break;
 	}
 
@@ -1040,9 +1022,9 @@ reply:
 	case MOUNTVERS3:
 		if (!error) {
 		mountres3.mountres3_u.mountinfo.auth_flavors.auth_flavors_val =
-			flavor_list;
+		    flavor_list;
 		mountres3.mountres3_u.mountinfo.auth_flavors.auth_flavors_len =
-			flavor_count;
+		    flavor_count;
 
 		} else if (error == ENAMETOOLONG)
 			error = MNT3ERR_NAMETOOLONG;
@@ -1057,8 +1039,8 @@ reply:
 
 	if (verbose)
 		syslog(LOG_NOTICE, "MOUNT: %s %s %s",
-			(host == NULL) ? "unknown host" : host,
-			error ? "denied" : "mounted", path);
+		    (host == NULL) ? "unknown host" : host,
+		    error ? "denied" : "mounted", path);
 
 	if (path != NULL)
 		svc_freeargs(transp, xdr_dirpath, (caddr_t)&path);
@@ -1203,7 +1185,8 @@ find_lofsentry(char *rpath, int *done_flag)
 	 */
 	for (ml = mntl; ml; ml = ml->mntl_next) {
 		for (p1 = ml->mntl_mnt->mnt_mountp, p2 = rpath;
-			*p1 == *p2 && *p1; p1++, p2++);
+		    *p1 == *p2 && *p1; p1++, p2++)
+			;
 		if (is_substring(&p1, &p2) &&
 		    (tmp = strlen(ml->mntl_mnt->mnt_mountp)) >= mntpnt_len) {
 			mntpnt = ml;
@@ -1237,8 +1220,8 @@ find_lofsentry(char *rpath, int *done_flag)
 			if (strlen(rpath) + 2 > MAXPATHLEN) {
 				if (verbose) {
 					syslog(LOG_NOTICE,
-						"%s/.: exceeds MAXPATHLEN %d",
-						rpath, MAXPATHLEN);
+					    "%s/.: exceeds MAXPATHLEN %d",
+					    rpath, MAXPATHLEN);
 				}
 				goto done;
 			}
@@ -1272,7 +1255,8 @@ find_lofsentry(char *rpath, int *done_flag)
 			continue;
 
 		for (p1 = ml->mntl_mnt->mnt_mountp, p2 = rpath;
-				*p1 == *p2 && *p1; p1++, p2++);
+		    *p1 == *p2 && *p1; p1++, p2++)
+			;
 
 		if (is_substring(&p1, &p2) &&
 		    ((tmp = strlen(ml->mntl_mnt->mnt_mountp)) >= mntpnt_len)) {
@@ -1282,8 +1266,8 @@ find_lofsentry(char *rpath, int *done_flag)
 			    MAXPATHLEN) {
 				if (verbose) {
 					syslog(LOG_NOTICE, "%s%s: exceeds %d",
-						ml->mntl_mnt->mnt_special, p2,
-						MAXPATHLEN);
+					    ml->mntl_mnt->mnt_special, p2,
+					    MAXPATHLEN);
 				}
 				if (retcode)
 					sharefree(retcode);
@@ -1338,7 +1322,7 @@ in_access_list(struct netbuf *nb, struct nd_hostservlist *clnames,
 	nentries = 0;
 
 	for (gr = strtok_r(access_list, ":", &lasts);
-		gr != NULL; gr = strtok_r(NULL, ":", &lasts)) {
+	    gr != NULL; gr = strtok_r(NULL, ":", &lasts)) {
 
 		/*
 		 * If the list name has a '-' prepended
@@ -1420,9 +1404,9 @@ netmatch(struct netbuf *nb, char *name)
 		return (0);
 
 	(void) memcpy(&claddr,
-		/* LINTED pointer alignment */
-		&((struct sockaddr_in *)nb->buf)->sin_addr.s_addr,
-		sizeof (struct in_addr));
+	    /* LINTED pointer alignment */
+	    &((struct sockaddr_in *)nb->buf)->sin_addr.s_addr,
+	    sizeof (struct in_addr));
 	claddr = ntohl(claddr);
 
 	mp = strchr(name, '/');
@@ -1471,7 +1455,7 @@ netmatch(struct netbuf *nb, char *name)
 	if (mp) {
 		bits = atoi(mp);
 		mask = bits ? ~0 << ((sizeof (struct in_addr) * NBBY) - bits)
-			: 0;
+		    : 0;
 		addr &= mask;
 	} else {
 		if ((addr & 0x00ffffff) == 0)
@@ -1651,7 +1635,7 @@ getclientsflavors_new(struct share *sh, struct netbuf *nb,
 
 			/* get all the sec=f1[:f2] flavors */
 			while ((f = strtok_r(val, ":", &lasts))
-					!= NULL) {
+			    != NULL) {
 				flavors[c++] = map_flavor(f);
 				val = NULL;
 			}
@@ -1880,7 +1864,7 @@ check_client_new(struct share *sh, struct netbuf *nb,
 				goto done;
 
 			while ((f = strtok_r(val, ":", &lasts))
-					!= NULL) {
+			    != NULL) {
 				if (flavor == map_flavor(f)) {
 					match = 1;
 					break;
@@ -2069,7 +2053,7 @@ check_sharetab()
 	}
 	if (res < 0)
 		syslog(LOG_ERR, "%s: invalid at line %d\n",
-			SHARETAB, c + 1);
+		    SHARETAB, c + 1);
 
 	if (stat(SHARETAB, &st) != 0) {
 		syslog(LOG_ERR, "Cannot stat %s: %m", SHARETAB);

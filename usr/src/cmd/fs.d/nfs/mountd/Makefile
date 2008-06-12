@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,11 +31,12 @@ ATTMK	  =	$(TYPEPROG)
 
 include		../../Makefile.fstype
 
-COMMON	  =	$(FSLIB) nfs_sec.o sharetab.o
+COMMON	  =	$(FSLIB) nfs_sec.o sharetab.o daemon.o
 LOCAL	  =	mountd.o netgroup.o rmtab.o nfsauth.o \
 		nfsauth_xdr.o exportlist.o hashset.o
 OBJS	  = 	$(LOCAL) $(COMMON)
-SRCS	  =	$(LOCAL:%.o=%.c) $(FSLIBSRC) ../lib/nfs_sec.c ../lib/sharetab.c
+SRCS	  =	$(LOCAL:%.o=%.c) $(FSLIBSRC) ../lib/nfs_sec.c \
+		../lib/sharetab.c ../lib/daemon.c
 LDLIBS	 +=	-lrpcsvc -lnsl -lbsm -lsocket -ldoor -ltsnet -ltsol
 CPPFLAGS +=	-D_REENTRANT
 
@@ -48,6 +49,9 @@ nfs_sec.o:	../lib/nfs_sec.c
 
 sharetab.o:	../lib/sharetab.c
 		$(COMPILE.c) ../lib/sharetab.c
+
+daemon.o:	../lib/daemon.c
+		$(COMPILE.c) ../lib/daemon.c
 
 lint:
 	$(LINT.c) $(SRCS) $(LDLIBS)

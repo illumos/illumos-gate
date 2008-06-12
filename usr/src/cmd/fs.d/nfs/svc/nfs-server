@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -65,7 +65,22 @@ case "$1" in
 	# Options for nfsd are now set in /etc/default/nfs
 	if [ $startnfsd -ne 0 ]; then
 		/usr/lib/nfs/mountd
+		rc=$?
+		if [ $rc != 0 ]; then
+			/usr/sbin/svcadm mark -t maintenance svc:/network/nfs/server
+			echo "$0: mountd failed with $rc"
+			sleep 5 &
+			exit $SMF_EXIT_ERR_FATAL
+		fi
+
 		/usr/lib/nfs/nfsd
+		rc=$?
+		if [ $rc != 0 ]; then
+			/usr/sbin/svcadm mark -t maintenance svc:/network/nfs/server
+			echo "$0: nfsd failed with $rc"
+			sleep 5 &
+			exit $SMF_EXIT_ERR_FATAL
+		fi
 	else
 		/usr/sbin/svcadm disable -t svc:/network/nfs/server
 		echo "No NFS filesystems are shared"
