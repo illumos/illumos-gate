@@ -197,7 +197,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"ufs",
 	ufsinit,
-	VSW_HASPROTO|VSW_CANREMOUNT|VSW_STATS,
+	VSW_HASPROTO|VSW_CANREMOUNT|VSW_STATS|VSW_CANLOFI,
 	&ufs_mntopts
 };
 

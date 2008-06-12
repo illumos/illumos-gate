@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -709,7 +709,6 @@ ssm_open(dev_t *devi, int flags, int otyp, cred_t *credp)
 {
 	struct ssm_soft_state *softsp;
 	minor_t board, instance;
-	int modload(char *, char *);
 	int (*sbd_setup_instance)(int, dev_info_t *, int, int, caddr_t);
 	ssm_sbdp_info_t	sbdp_info;
 	int rv;

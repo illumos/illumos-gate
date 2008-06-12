@@ -150,7 +150,8 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"hsfs",
 	hsfsinit,
-	VSW_HASPROTO|VSW_STATS,	/* We don't suppport remounting */
+	/* We don't suppport remounting */
+	VSW_HASPROTO|VSW_STATS|VSW_CANLOFI,
 	&hsfs_proto_opttbl
 };
 

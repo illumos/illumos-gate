@@ -2442,7 +2442,7 @@ modload_thread(struct loadmt *ltp)
  * returned (-1 on error).
  */
 static int
-modrload(char *subdir, char *filename, struct modctl **rmodp)
+modrload(const char *subdir, const char *filename, struct modctl **rmodp)
 {
 	struct modctl *modp;
 	size_t size;
@@ -2467,7 +2467,7 @@ modrload(char *subdir, char *filename, struct modctl **rmodp)
 		fullname = kmem_zalloc(size, KM_SLEEP);
 		(void) sprintf(fullname, "%s/%s", subdir, filename);
 	} else {
-		fullname = filename;
+		fullname = (char *)filename;
 	}
 
 	modp = mod_hold_installed_mod(fullname, 1, 0, &retval);
@@ -2496,7 +2496,7 @@ done:	if (subdir != NULL)
  * _fini/mod_remove implementation to determine if unload will succeed.
  */
 int
-modload(char *subdir, char *filename)
+modload(const char *subdir, const char *filename)
 {
 	return (modrload(subdir, filename, NULL));
 }
@@ -2575,7 +2575,7 @@ modload_qualified(const char *subdir, const char *p1,
  * Load a module.
  */
 int
-modloadonly(char *subdir, char *filename)
+modloadonly(const char *subdir, const char *filename)
 {
 	struct modctl *modp;
 	char *fullname;
@@ -2590,7 +2590,7 @@ modloadonly(char *subdir, char *filename)
 		fullname = kmem_zalloc(size, KM_SLEEP);
 		(void) sprintf(fullname, "%s/%s", subdir, filename);
 	} else {
-		fullname = filename;
+		fullname = (char *)filename;
 	}
 
 	modp = mod_hold_loaded_mod(NULL, fullname, &retval);

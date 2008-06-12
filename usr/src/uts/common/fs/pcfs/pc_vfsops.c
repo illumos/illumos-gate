@@ -157,7 +157,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"pcfs",
 	pcfsinit,
-	VSW_HASPROTO|VSW_CANREMOUNT|VSW_STATS,
+	VSW_HASPROTO|VSW_CANREMOUNT|VSW_STATS|VSW_CANLOFI,
 	&pcfs_mntopts
 };
 

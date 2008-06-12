@@ -432,6 +432,7 @@ enum {
 #define	VSW_VOLATILEDEV	0x10	/* vfs_dev can change each time fs is mounted */
 #define	VSW_STATS	0x20	/* file system can collect stats */
 #define	VSW_XID		0x40	/* file system supports extended ids */
+#define	VSW_CANLOFI	0x80	/* file system supports lofi mounts */
 
 #define	VSW_INSTALLED	0x8000	/* this vsw is associated with a file system */
 
@@ -515,9 +516,9 @@ int	vfs_opsinuse(vfsops_t *);
 struct vfs *getvfs(fsid_t *);
 struct vfs *vfs_dev2vfsp(dev_t);
 struct vfs *vfs_mntpoint2vfsp(const char *);
-struct vfssw *allocate_vfssw(char *);
-struct vfssw *vfs_getvfssw(char *);
-struct vfssw *vfs_getvfsswbyname(char *);
+struct vfssw *allocate_vfssw(const char *);
+struct vfssw *vfs_getvfssw(const char *);
+struct vfssw *vfs_getvfsswbyname(const char *);
 struct vfssw *vfs_getvfsswbyvfsops(vfsops_t *);
 void	vfs_refvfssw(struct vfssw *);
 void	vfs_unrefvfssw(struct vfssw *);

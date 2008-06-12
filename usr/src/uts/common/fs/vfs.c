@@ -998,14 +998,21 @@ lofi_add(const char *fsname, struct vfs *vfsp,
 	struct pathname	pn = { NULL };
 	ldi_ident_t ldi_id;
 	ldi_handle_t ldi_hdl;
+	vfssw_t *vfssw;
 	int minor;
 	int err = 0;
 
-	if (fsname == NULL)
+	if (fsname == NULL ||
+	    (vfssw = vfs_getvfssw(fsname)) == NULL)
 		return (0);
-	if (strcmp(fsname, "mntfs") == 0 || strcmp(fsname, "lofs") == 0 ||
-	    strcmp(fsname, "autofs") == 0)
+
+	if (!(vfssw->vsw_flag & VSW_CANLOFI)) {
+		vfs_unrefvfssw(vfssw);
 		return (0);
+	}
+
+	vfs_unrefvfssw(vfssw);
+	vfssw = NULL;
 
 	if (pn_get(uap->spec, fromspace, &pn) != 0)
 		return (0);
@@ -3812,7 +3819,7 @@ vfs_opsinuse(vfsops_t *ops)
  * Allocate an entry in vfssw for a file system type
  */
 struct vfssw *
-allocate_vfssw(char *type)
+allocate_vfssw(const char *type)
 {
 	struct vfssw *vswp;
 
@@ -3843,8 +3850,8 @@ allocate_vfssw(char *type)
  * Impose additional layer of translation between vfstype names
  * and module names in the filesystem.
  */
-static char *
-vfs_to_modname(char *vfstype)
+static const char *
+vfs_to_modname(const char *vfstype)
 {
 	if (strcmp(vfstype, "proc") == 0) {
 		vfstype = "procfs";
@@ -3863,10 +3870,10 @@ vfs_to_modname(char *vfstype)
  * If it's installed, return the vfssw locked to prevent unloading.
  */
 struct vfssw *
-vfs_getvfssw(char *type)
+vfs_getvfssw(const char *type)
 {
 	struct vfssw *vswp;
-	char	*modname;
+	const char *modname;
 
 	RLOCK_VFSSW();
 	vswp = vfs_getvfsswbyname(type);
@@ -3925,7 +3932,7 @@ vfs_getvfssw(char *type)
  * Find a vfssw entry given a file system type name.
  */
 struct vfssw *
-vfs_getvfsswbyname(char *type)
+vfs_getvfsswbyname(const char *type)
 {
 	struct vfssw *vswp;
 
