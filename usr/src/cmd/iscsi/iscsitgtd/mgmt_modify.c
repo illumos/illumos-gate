@@ -544,8 +544,11 @@ modify_initiator(tgt_node_t *x)
 	}
 
 	if (changes_made == True) {
-		if (mgmt_config_save2scf() == True)
+		if (mgmt_config_save2scf() == True) {
 			xml_rtn_msg(&msg, ERR_SUCCESS);
+		} else {
+			xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+		}
 	} else {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_OPERAND);
 	}
@@ -615,8 +618,11 @@ modify_admin(tgt_node_t *x)
 			xml_rtn_msg(&msg, ERR_ISNS_ERROR);
 			return (msg);
 		}
-		if (mgmt_config_save2scf() == True)
+		if (mgmt_config_save2scf() == True) {
 			xml_rtn_msg(&msg, ERR_SUCCESS);
+		} else {
+			xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+		}
 	} else {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_OPERAND);
 	}
@@ -665,8 +671,12 @@ modify_tpgt(tgt_node_t *x)
 		return (msg);
 	}
 
-	if (mgmt_config_save2scf() == True)
+	if (mgmt_config_save2scf() == True) {
 		xml_rtn_msg(&msg, ERR_SUCCESS);
+	} else {
+		/* tpgt change should be updated to smf */
+		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+	}
 
 	/*
 	 * Re-register all targets, currently there's no method to

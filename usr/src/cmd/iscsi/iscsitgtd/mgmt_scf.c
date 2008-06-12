@@ -573,6 +573,7 @@ mgmt_config_save2scf()
 	scf_iter_t *iter = NULL;
 	char pgname[PGNAME_SIZE];
 	char passcode[32];
+	char *incore = NULL;
 	unsigned int	outlen;
 	tgt_node_t	*n = NULL;
 	tgt_node_t	*pn = NULL;
@@ -621,6 +622,20 @@ mgmt_config_save2scf()
 
 	if (mgmt_transaction_start(h, "iscsitgt", "basic") == True) {
 		for (n = main_config->x_child; n; n = n->x_sibling) {
+			if ((tgt_find_attr_str(n, XML_ELEMENT_INCORE, &incore))
+			    == True) {
+				if (strcmp(incore, "true") == 0) {
+					/*
+					 * Ignore in core only elements.
+					 * zvol target is the only one with
+					 * incore attr as of now.
+					 */
+					free(incore);
+					continue;
+				}
+				/* if incore is false continue on */
+				free(incore);
+			}
 			if (strcmp(n->x_name,
 			    XML_ELEMENT_CHAPSECRET) == 0) {
 				sl_tail->next =  (secret_list_t *)
@@ -660,6 +675,21 @@ mgmt_config_save2scf()
 	for (n = main_config->x_child; n; n = n->x_sibling) {
 		if (n->x_child == NULL)
 			continue;
+
+		if ((tgt_find_attr_str(n, XML_ELEMENT_INCORE, &incore))
+		    == True) {
+			if (strcmp(incore, "true") == 0) {
+				/*
+				 * Ignore in core only elements.
+				 * zvol target is the only one with
+				 * incore attr as of now.
+				 */
+				free(incore);
+				continue;
+			}
+			/* if incore is false continue on */
+			free(incore);
+		}
 
 		(void) snprintf(pgname, sizeof (pgname), "%s_%s", n->x_name,
 		    n->x_value);
