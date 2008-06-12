@@ -204,6 +204,7 @@ typedef struct ahci_ctl {
 	 * AHCI_CAP_NO_MCMDLIST_NONQUEUE
 	 * AHCI_CAP_NCQ
 	 * AHCI_CAP_PM
+	 * AHCI_CAP_32BIT_DMA
 	 */
 	int			ahcictl_cap;
 
@@ -277,6 +278,8 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_CAP_NCQ			0x4
 /* Power Management (PM) */
 #define	AHCI_CAP_PM			0x8
+/* 32-bit DMA addressing */
+#define	AHCI_CAP_32BIT_DMA		0x10
 
 /* Flags controlling the restart port behavior */
 #define	AHCI_PORT_RESET		0x0001	/* Reset the port */
