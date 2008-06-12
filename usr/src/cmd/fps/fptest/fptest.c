@@ -95,7 +95,7 @@ main(int argc, char *argv[])
 	int test_ret;
 	int procb;
 	int proc_setb;
-	int ret = 0;
+	int ret = FPU_OK;
 	hrtime_t test_start;
 	psetid_t opset = PS_NONE;
 	processorid_t proc_used = PBIND_NONE;
@@ -161,6 +161,31 @@ main(int argc, char *argv[])
 	ereport_data.cpu_id = fpu_cpu;
 	test_ret = start_testing(fpu_cpu, &ereport_data);
 
+	/*
+	 * Testing is now done and a return code is selected.
+	 * FPU_OK: No problems found on FPU tested.
+	 *
+	 * FPU_BIND_FAIL: CPU currently bound to is not the
+	 * one started on. Attempt to file ereport if CPU
+	 * is supported,  but don't include resource so
+	 * CPU isn't offlined.
+	 *
+	 * FPU_UNSUPPORT: Test wasn't run on a supported CPU.
+	 * Error was found, but no ereport will be filed since
+	 * CPU is unsupported and test values may not be valid.
+	 *
+	 * FPU_FOROFFLINE: Error found on FPU and ereport
+	 * payload successfully sent.
+	 *
+	 * FPU_EREPORT_INCOM: Error found on FPU, ereport payload
+	 * sent, but some nonessential information failed to add
+	 * to that payload. CPU will still be offlined.
+	 *
+	 * FPU_EREPORT_FAIL: Error found on FPU, but ereport payload
+	 * failed to transfer either due to lack of mandatory data
+	 * or unable to send on FPScrubber systevent channel.
+	 */
+
 	if (test_ret == FPU_FOROFFLINE) {
 		/*
 		 * check bind and
@@ -180,11 +205,10 @@ main(int argc, char *argv[])
 		}
 
 		if (ret != FPU_UNSUPPORT) {
-			if (fps_generate_ereport_struct(&ereport_data)
-			    != 0)
-				ret = FPU_EREPORT_INCOM;
-			else
-				ret = FPU_FOROFFLINE;
+			test_ret = fps_generate_ereport_struct(&ereport_data);
+			if (ret != FPU_BIND_FAIL) {
+				ret = test_ret;
+			}
 		}
 	}
 

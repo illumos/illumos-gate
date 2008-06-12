@@ -300,8 +300,9 @@ fps_generate_ereport_struct(struct fps_test_ereport *report)
 	uint64_t *observe;
 
 	if (report == NULL)
-		return (1);
+		return (FPU_EREPORT_FAIL);
 
+	ret = FPU_FOROFFLINE;
 	cpu_id = report->cpu_id;
 	test = report->test_id;
 	mask = report->mask;
