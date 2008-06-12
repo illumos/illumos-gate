@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2061,30 +2061,6 @@ ex(struct event *e)
 	}
 	rp = rinfo_get(0); /* allocating a new runinfo struct */
 
-#ifdef ATLIMIT
-	if ((e->u)->uid != 0 && (e->u)->aruncnt >= ATLIMIT) {
-		msg("ATLIMIT (%d) reached for uid %d",
-		    ATLIMIT, (e->u)->uid);
-		rinfo_free(rp);
-		resched(qp->nwait);
-		return (0);
-	}
-#endif
-#ifdef CRONLIMIT
-	if ((e->u)->uid != 0 && (e->u)->cruncnt >= CRONLIMIT) {
-		msg("CRONLIMIT (%d) reached for uid %d",
-		    CRONLIMIT, (e->u)->uid);
-		rinfo_free(rp);
-		resched(qp->nwait);
-		return (0);
-	}
-#endif
-	if ((e->u)->uid == 0) {	/* set default path */
-		/* path settable in defaults file */
-		envinit[2] = supath;
-	} else {
-		envinit[2] = path;
-	}
 
 	/*
 	 * the tempnam() function uses malloc(3C) to allocate space for the
@@ -2289,6 +2265,13 @@ ex(struct event *e)
 		audit_cron_bad_user(e->u->name);
 		clean_out_user(e->u);
 		exit(1);
+	}
+
+	if ((e->u)->uid == 0) { /* set default path */
+		/* path settable in defaults file */
+		envinit[2] = supath;
+	} else {
+		envinit[2] = path;
 	}
 
 	if (e->etype != CRONEVENT) {
