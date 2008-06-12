@@ -142,7 +142,6 @@ typedef struct tf_info {
 #define	Int32 "int32"
 #define	Int64 "int64"
 #define	Name "name"
-#define	Path "path"
 #define	Propname "propname"
 #define	Proptype "proptype"
 #define	Range "range"

@@ -27,7 +27,7 @@
 
 PLATFORMS = SUNW,Netra-CP3060
 CLASS = platform
-DTDFILE =
+DTDFILE = topology.dtd.1
 TOPOFILE = Netra-CP3060-hc-topology.xml
 
 SRCDIR = ../SUNW,Netra-CP3060

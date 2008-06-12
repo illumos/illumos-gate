@@ -46,6 +46,7 @@
 #include <topo_method.h>
 #include <topo_subr.h>
 #include <topo_prop.h>
+#include <topo_tree.h>
 #include <hc.h>
 
 static int hc_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
@@ -113,6 +114,7 @@ static const hcc_t hc_canon[] = {
 	{ CHASSIS, TOPO_STABILITY_PRIVATE },
 	{ CHIP, TOPO_STABILITY_PRIVATE },
 	{ CHIP_SELECT, TOPO_STABILITY_PRIVATE },
+	{ CONTROLLER, TOPO_STABILITY_PRIVATE },
 	{ CPU, TOPO_STABILITY_PRIVATE },
 	{ CPUBOARD, TOPO_STABILITY_PRIVATE },
 	{ DIMM, TOPO_STABILITY_PRIVATE },
@@ -140,6 +142,7 @@ static const hcc_t hc_canon[] = {
 	{ POWERMODULE, TOPO_STABILITY_PRIVATE },
 	{ PSU, TOPO_STABILITY_PRIVATE },
 	{ RANK, TOPO_STABILITY_PRIVATE },
+	{ SES_ENCLOSURE, TOPO_STABILITY_PRIVATE },
 	{ SYSTEMBOARD, TOPO_STABILITY_PRIVATE },
 	{ XAUI, TOPO_STABILITY_PRIVATE },
 	{ XFP, TOPO_STABILITY_PRIVATE }
@@ -1041,9 +1044,102 @@ struct hc_walk {
 	void *hcw_priv;
 	topo_walk_t *hcw_wp;
 	nvlist_t **hcw_list;
+	nvlist_t *hcw_fmri;
 	uint_t hcw_index;
 	uint_t hcw_end;
 };
+
+/*
+ * Returns true if the given node is beneath the specified FMRI.  This uses
+ * the TOPO_METH_CONTAINS method, because some enumerators (such as external
+ * enclosures) may want to do a comparison based on chassis WWN instead of the
+ * instance ID.  If this comparison function fails or is not supported, then we
+ * fall back to a direct name/instance comparison.
+ */
+static int
+hc_match(topo_mod_t *mod, tnode_t *node, nvlist_t *fmri, const char *name,
+    topo_instance_t inst, boolean_t *result)
+{
+	nvlist_t *rsrc;
+	nvlist_t *arg, *nvl;
+	uint32_t match = 0;
+	int err;
+
+	if (topo_node_resource(node, &rsrc, &err) != 0)
+		return (-1);
+
+	if (topo_mod_nvalloc(mod, &arg, NV_UNIQUE_NAME) != 0 ||
+	    nvlist_add_nvlist(arg, TOPO_METH_FMRI_ARG_FMRI,
+	    rsrc) != 0 ||
+	    nvlist_add_nvlist(arg, TOPO_METH_FMRI_ARG_SUBFMRI,
+	    fmri) != 0) {
+		nvlist_free(rsrc);
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+		return (-1);
+	}
+
+	nvlist_free(rsrc);
+
+	if (topo_method_invoke(node, TOPO_METH_CONTAINS,
+	    TOPO_METH_CONTAINS_VERSION, arg, &nvl, &err) != 0) {
+		nvlist_free(arg);
+		if (err == ETOPO_METHOD_NOTSUP) {
+			match = (strcmp(name,
+			    topo_node_name(node)) == 0 &&
+			    inst == topo_node_instance(node));
+		} else {
+			return (-1);
+		}
+	} else {
+		nvlist_free(arg);
+		if (nvlist_lookup_uint32(nvl, TOPO_METH_CONTAINS_RET,
+		    &match) != 0) {
+			nvlist_free(nvl);
+			(void) topo_mod_seterrno(mod, EMOD_NVL_INVAL);
+			return (-1);
+		}
+		nvlist_free(nvl);
+	}
+
+	*result = (match != 0);
+	return (0);
+}
+
+/*
+ * Ideally, we should just be able to call topo_walk_bysibling().  But that
+ * code assumes that the name/instance pair will match, so we need to
+ * explicitly iterate over children of the parent looking for a matching value.
+ */
+static int
+hc_walk_sibling(topo_mod_t *mod, tnode_t *node, struct hc_walk *hwp,
+    const char *name, topo_instance_t inst)
+{
+	tnode_t *pnp = topo_node_parent(node);
+	topo_walk_t *wp = hwp->hcw_wp;
+	tnode_t *np;
+	boolean_t matched;
+	int status;
+
+	for (np = topo_child_first(pnp); np != NULL;
+	    np = topo_child_next(pnp, np)) {
+		topo_node_hold(np);
+		if (hc_match(mod, np, hwp->hcw_fmri, name, inst,
+		    &matched) == 0 && matched) {
+			wp->tw_node = np;
+			if (wp->tw_mod != NULL)
+				status = wp->tw_cb(mod, np, hwp);
+			else
+				status = wp->tw_cb(wp->tw_thp, np, hwp);
+			topo_node_rele(np);
+			wp->tw_node = node;
+			return (status);
+		}
+
+		topo_node_rele(np);
+	}
+
+	return (TOPO_WALK_TERMINATE);
+}
 
 /*
  * Generic walker for the hc-scheme topo tree.  This function uses the
@@ -1061,6 +1157,7 @@ hc_walker(topo_mod_t *mod, tnode_t *node, void *pdata)
 	struct hc_walk *hwp = (struct hc_walk *)pdata;
 	char *name, *id;
 	topo_instance_t inst;
+	boolean_t match;
 
 	i = hwp->hcw_index;
 	if (i > hwp->hcw_end) {
@@ -1079,16 +1176,16 @@ hc_walker(topo_mod_t *mod, tnode_t *node, void *pdata)
 	inst = atoi(id);
 
 	/*
-	 * Special case for the root node.  We need to walk by siblings
-	 * until we find a matching node for cases where there may be multiple
-	 * nodes just below the hc root.
+	 * Check to see if our node matches the requested FMRI.  If it doesn't
+	 * (because the enumerator determines matching based on something other
+	 * than name/instance, or because we're at the first level below the
+	 * root), then iterate over siblings to find the matching node.
 	 */
-	if (i == 0) {
-		if (strcmp(name, topo_node_name(node)) != 0 ||
-		    inst != topo_node_instance(node)) {
-			return (topo_walk_bysibling(hwp->hcw_wp, name, inst));
-		}
-	}
+	if (hc_match(mod, node, hwp->hcw_fmri, name, inst, &match) != 0)
+		return (TOPO_WALK_ERR);
+
+	if (!match)
+		return (hc_walk_sibling(mod, node, hwp, name, inst));
 
 	topo_mod_dprintf(mod, "hc_walker: walking node:%s=%d for hc:"
 	    "%s=%d at %d, end at %d \n", topo_node_name(node),
@@ -1098,8 +1195,7 @@ hc_walker(topo_mod_t *mod, tnode_t *node, void *pdata)
 		 * We are at the end of the hc-list.  Verify that
 		 * the last node contains the name/instance we are looking for.
 		 */
-		if (strcmp(topo_node_name(node), name) == 0 &&
-		    inst == topo_node_instance(node)) {
+		if (match) {
 			if ((err = hwp->hcw_cb(mod, node, hwp->hcw_priv))
 			    != 0) {
 				(void) topo_mod_seterrno(mod, err);
@@ -1153,6 +1249,7 @@ hc_walk_init(topo_mod_t *mod, tnode_t *node, nvlist_t *rsrc,
 		return (NULL);
 	}
 
+	hwp->hcw_fmri = rsrc;
 	hwp->hcw_end = sz - 1;
 	hwp->hcw_index = 0;
 	hwp->hcw_priv = pdata;

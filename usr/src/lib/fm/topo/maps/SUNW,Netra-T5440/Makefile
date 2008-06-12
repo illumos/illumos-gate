@@ -19,14 +19,14 @@
 # CDDL HEADER END
 #
 
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 PLATFORMS = SUNW,Netra-T5440
 CLASS = platform
-DTDFILE =
+DTDFILE = topology.dtd.1
 TOPOFILE = Netra-T5440-hc-topology.xml
 SRCDIR = ../SUNW,Netra-T5440
 

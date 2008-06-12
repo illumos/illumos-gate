@@ -43,6 +43,8 @@ SUNWprivate {
 	topo_fmri_serial;
 	topo_fmri_setprop;
 	topo_fmri_str2nvl;
+	topo_fmri_strcmp;
+	topo_fmri_strhash;
 	topo_fmri_unusable;
 	topo_hdl_alloc;
 	topo_hdl_errmsg;

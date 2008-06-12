@@ -45,6 +45,7 @@ f none usr/include/fm/libtopo.h 644 root bin
 f none usr/include/fm/topo_mod.h 644 root bin
 f none usr/include/fm/topo_hc.h 644 root bin
 f none usr/include/fm/topo_list.h 644 root bin
+f none usr/include/fm/topo_method.h 644 root bin
 d none usr/lib 755 root bin
 d none usr/lib/fm 755 root bin
 d none usr/lib/fm/dict 755 root bin
@@ -136,6 +137,7 @@ f none usr/lib/fm/topo/maps/xfp-hc-topology.xml 444 root bin
 d none usr/lib/fm/topo/plugins 755 root bin
 f none usr/lib/fm/topo/plugins/disk.so 555 root bin
 f none usr/lib/fm/topo/plugins/ipmi.so 555 root bin
+f none usr/lib/fm/topo/plugins/ses.so 555 root bin
 f none usr/lib/fm/topo/plugins/xfp.so 555 root bin
 d none usr/lib/locale 755 root bin
 d none usr/lib/locale/C 755 root bin

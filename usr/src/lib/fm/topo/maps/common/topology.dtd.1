@@ -81,7 +81,7 @@
 	name		CDATA #REQUIRED
 	type		( int32 | uint32 | int64 | uint64 |
 			  string | fmri ) #REQUIRED
-	value		CDATA #REQUIRED
+	value		CDATA #REQUIRED >
 
 <!--
   propgroup
@@ -177,6 +177,7 @@
       		version		Version of the method API
       		propname	Name of the property to create
 		proptype	Type of the property to create
+-->
 
 <!ELEMENT propmethod
 	( argval* ) >
@@ -186,6 +187,7 @@
 	version		CDATA #REQUIRED
 	propname	CDATA #REQUIRED
 	proptype	CDATA #REQUIRED>
+
 <!--
   enum-method
 
@@ -235,10 +237,10 @@
 -->
 
 <!ELEMENT dependents 
-	(( range | xi:include )+, set) >
+	(( range | xi:include )*, set*) >
 
 <!ATTLIST dependents 
-	grouping ( children | siblings ) "children" #REQUIRED >
+	grouping ( children | siblings ) #REQUIRED >
 
 <!--
   range
@@ -257,8 +259,7 @@
 -->
 
 <!ELEMENT range
-	( enum-method?, propmap?, node*, propgroup*, dependents*,
-	    set? ) >
+	( enum-method?, propmap?, node*, propgroup*, set*, dependents* ) >
 
 <!ATTLIST range
 	name		CDATA #REQUIRED
@@ -276,7 +277,7 @@
 -->
 
 <!ELEMENT topology
-	((range* | xi:include*), set)>
+	((range* | xi:include*), set*)>
 
 <!ATTLIST topology
 	name	CDATA #REQUIRED

@@ -39,6 +39,7 @@ extern "C" {
 #include <fmd_api.h>
 #include <fmd_log.h>
 #include <fmd_list.h>
+#include <fmd_topo.h>
 
 /*
  * The resource is represented by an fmd_asru_t structure and one or more
@@ -121,6 +122,7 @@ typedef struct fmd_asru_hash {
 	uint_t ah_al_count;		/* count of number of entries in hash */
 	uint_t ah_count;		/* count of separate rsrcs in hash */
 	int ah_error;			/* error from opening asru log */
+	fmd_topo_t *ah_topo;		/* topo handle */
 } fmd_asru_hash_t;
 
 extern fmd_asru_hash_t *fmd_asru_hash_create(const char *, const char *);

@@ -26,12 +26,14 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <ctype.h>
 #include <string.h>
 #include <limits.h>
 #include <fm/topo_mod.h>
 #include <sys/fm/protocol.h>
 #include <topo_alloc.h>
 #include <topo_error.h>
+#include <topo_hc.h>
 #include <topo_method.h>
 #include <topo_subr.h>
 #include <topo_string.h>
@@ -604,4 +606,87 @@ topo_fmri_create(topo_hdl_t *thp, const char *scheme, const char *name,
 	}
 	nvlist_free(ins);
 	return (out);
+}
+
+/*
+ * These private utility functions are used by fmd to maintain its resource
+ * cache.  Because hc instance numbers are not guaranteed, it's possible to
+ * have two different FMRI strings represent the same logical entity.  These
+ * functions hide this implementation detail from unknowing consumers such as
+ * fmd.
+ *
+ * Ideally, we'd like to do a str2nvl() and then a full FMRI hash and
+ * comparison, but these functions are designed to be fast and efficient.
+ * Given that there is only a single hc node that has this property
+ * (ses-enclosure), we hard-code this behavior here.  If there are more
+ * instances of this behavior in the future, this function could be made more
+ * generic.
+ */
+static ulong_t
+topo_fmri_strhash_one(const char *fmri, size_t len)
+{
+	ulong_t g, h = 0;
+	size_t i;
+
+	for (i = 0; i < len; i++) {
+		h = (h << 4) + fmri[i];
+
+		if ((g = (h & 0xf0000000)) != 0) {
+			h ^= (g >> 24);
+			h ^= g;
+		}
+	}
+
+	return (h);
+}
+
+/*ARGSUSED*/
+ulong_t
+topo_fmri_strhash(topo_hdl_t *thp, const char *fmri)
+{
+	char *e;
+	ulong_t h;
+
+	if (strncmp(fmri, "hc://", 5) != 0 ||
+	    (e = strstr(fmri, SES_ENCLOSURE)) == NULL)
+		return (topo_fmri_strhash_one(fmri, strlen(fmri)));
+
+	h = topo_fmri_strhash_one(fmri, e - fmri);
+	e += sizeof (SES_ENCLOSURE);
+
+	while (isdigit(*e))
+		e++;
+
+	h += topo_fmri_strhash_one(e, strlen(e));
+
+	return (h);
+}
+
+/*ARGSUSED*/
+boolean_t
+topo_fmri_strcmp(topo_hdl_t *thp, const char *a, const char *b)
+{
+	char *ea, *eb;
+
+	if (strncmp(a, "hc://", 5) != 0 ||
+	    strncmp(b, "hc://", 5) != 0 ||
+	    (ea = strstr(a, SES_ENCLOSURE)) == NULL ||
+	    (eb = strstr(b, SES_ENCLOSURE)) == NULL)
+		return (strcmp(a, b) == 0);
+
+	if ((ea - a) != (eb - b))
+		return (B_FALSE);
+
+	if (strncmp(a, b, ea - a) != 0)
+		return (B_FALSE);
+
+	ea += sizeof (SES_ENCLOSURE);
+	eb += sizeof (SES_ENCLOSURE);
+
+	while (isdigit(*ea))
+		ea++;
+	while (isdigit(*eb))
+		eb++;
+
+	return (strcmp(ea, eb) == 0);
 }

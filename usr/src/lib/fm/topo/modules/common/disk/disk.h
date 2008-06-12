@@ -67,6 +67,7 @@ extern int disk_declare_path(topo_mod_t *, tnode_t *,
     struct topo_list *, const char *);
 extern int disk_declare_addr(topo_mod_t *, tnode_t *,
     struct topo_list *, const char *);
+extern char *disk_auth_clean(topo_mod_t *, const char *);
 
 #ifdef __cplusplus
 }

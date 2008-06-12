@@ -389,6 +389,7 @@ fmd_case_compare_elem(nvlist_t *nvl, nvlist_t *xnvl, const char *elem)
 	int fmri_present = 1;
 	int new_fmri_present = 1;
 	int match = B_FALSE;
+	fmd_topo_t *ftp = fmd_topo_hold();
 
 	if (nvlist_lookup_nvlist(xnvl, elem, &rsrc) != 0)
 		fmri_present = 0;
@@ -409,12 +410,14 @@ fmd_case_compare_elem(nvlist_t *nvl, nvlist_t *xnvl, const char *elem)
 			goto done;
 	}
 	match = (fmri_present == new_fmri_present &&
-	    (fmri_present == 0 || strcmp(name, new_name) == 0));
+	    (fmri_present == 0 ||
+	    topo_fmri_strcmp(ftp->ft_hdl, name, new_name)));
 done:
 	if (name != NULL)
 		fmd_free(name, namelen + 1);
 	if (new_name != NULL)
 		fmd_free(new_name, new_namelen + 1);
+	fmd_topo_rele(ftp);
 	return (match);
 }
 

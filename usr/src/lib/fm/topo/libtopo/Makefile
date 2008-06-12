@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,7 +28,7 @@
 include ../../../Makefile.lib
 include ../../Makefile.lib
 
-FMHDRS = libtopo.h topo_mod.h topo_hc.h topo_list.h
+FMHDRS = libtopo.h topo_mod.h topo_hc.h topo_list.h topo_method.h
 HDRDIR = common
 
 SUBDIRS = $(MACH)

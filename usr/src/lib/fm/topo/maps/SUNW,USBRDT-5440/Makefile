@@ -26,7 +26,7 @@
 
 PLATFORMS = SUNW,USBRDT-5440
 CLASS = platform
-DTDFILE =
+DTDFILE = topology.dtd.1
 TOPOFILE = USBRDT-5440-hc-topology.xml
 SRCDIR = ../SUNW,USBRDT-5440
 

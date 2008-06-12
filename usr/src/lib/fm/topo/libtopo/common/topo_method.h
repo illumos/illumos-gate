@@ -33,7 +33,7 @@
 extern "C" {
 #endif
 
-#include <topo_list.h>
+#include <fm/topo_list.h>
 
 typedef struct topo_imethod {
 	topo_list_t tim_list;		/* next/prev pointers */

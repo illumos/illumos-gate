@@ -28,7 +28,10 @@
 SUBDIRS =		\
 	disk		\
 	ipmi		\
+	ses		\
 	xfp
+
+ses:	disk
 
 .PARALLEL: $(SUBDIRS)
 

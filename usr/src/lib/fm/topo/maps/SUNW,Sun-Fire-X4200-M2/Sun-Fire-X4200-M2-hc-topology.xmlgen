@@ -121,10 +121,10 @@ while ($line = <IFILE>) {
 	if ($line =~ /range\s+name\s?=\s?\Wchassis\W/) {
 		$in_chassis_range = 1;
 	}
-	if ($in_chassis_range && ($line =~ /<\/dependents>/)) {
+
+	print OFILE "$line\n";
+	if ($in_chassis_range && ($line =~ /<dependents/)) {
 		last;
-	} else {
-		print OFILE "$line\n";
 	}
 }
 
@@ -141,7 +141,6 @@ printf OFILE "      </range>\n";
 printf OFILE "    </dependents>\n\n";
 printf OFILE "  </range>\n";
 
-print OFILE "$line\n";
 while ($line = <IFILE>) {
 	print OFILE $line;
 }

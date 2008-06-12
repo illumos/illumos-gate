@@ -20,14 +20,14 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 PLATFORMS = SUNW,Sun-Blade-T6320
 CLASS = platform
-DTDFILE =
+DTDFILE = topology.dtd.1
 TOPOFILE = Sun-Blade-T6320-hc-topology.xml
 SRCDIR = ../SUNW,Sun-Blade-T6320
 

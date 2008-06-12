@@ -27,7 +27,7 @@
 
 PLATFORMS = SUNW,Netra-T2000
 CLASS = platform
-DTDFILE =
+DTDFILE = topology.dtd.1
 TOPOFILE = Netra-T2000-hc-topology.xml
 
 SRCDIR = ../SUNW,Netra-T2000

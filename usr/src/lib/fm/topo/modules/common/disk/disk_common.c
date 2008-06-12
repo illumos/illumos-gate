@@ -37,6 +37,7 @@
  * its parent 'bay' node.
  */
 
+#include <ctype.h>
 #include <strings.h>
 #include <libdevinfo.h>
 #include <devid.h>
@@ -292,6 +293,40 @@ error:	err = topo_mod_seterrno(mod, err);
 	goto out;
 }
 
+/*
+ * Manufacturing strings can contain characters that are invalid for use in hc
+ * authority names.  This trims leading and trailing whitespace, and
+ * substitutes any characters known to be bad.
+ */
+char *
+disk_auth_clean(topo_mod_t *mod, const char *begin)
+{
+	const char *end;
+	char *buf, *str;
+	size_t count;
+
+	if (begin == NULL)
+		return (NULL);
+
+	end = begin + strlen(begin);
+
+	while (begin < end && isspace(*begin))
+		begin++;
+	while (begin < end && isspace(*(end - 1)))
+		end--;
+
+	count = end - begin;
+	if ((buf = topo_mod_alloc(mod, count + 1)) == NULL)
+		return (NULL);
+
+	(void) strlcpy(buf, begin, count + 1);
+
+	while ((str = strpbrk(buf, " :=")) != NULL)
+		*str = '-';
+
+	return (buf);
+}
+
 /* create the disk topo node */
 static tnode_t *
 disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
@@ -301,30 +336,32 @@ disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	nvlist_t	*fmri;
 	tnode_t		*dtn;
 	char		*part = NULL;
-	char		*b = NULL;
 	nvlist_t	*auth;
+	char		*mfg, *model, *firm, *serial;
+
+	mfg = disk_auth_clean(mod, dnode->ddn_mfg);
+	model = disk_auth_clean(mod, dnode->ddn_model);
+	firm = disk_auth_clean(mod, dnode->ddn_firm);
+	serial = disk_auth_clean(mod, dnode->ddn_serial);
 
 	/* form 'part=' of fmri as "<mfg>-<model>" */
-	if (dnode->ddn_mfg && dnode->ddn_model) {
-		/* XXX replace first ' ' in the model with a '-' */
-		if ((b = strchr(dnode->ddn_model, ' ')) != NULL)
-			*b = '-';
-		len = strlen(dnode->ddn_mfg) + 1 + strlen(dnode->ddn_model) + 1;
+	if (mfg != NULL && model != NULL) {
+		len = strlen(mfg) + 1 + strlen(model) + 1;
 		if ((part = topo_mod_alloc(mod, len)) != NULL)
 			(void) snprintf(part, len, "%s-%s",
-			    dnode->ddn_mfg, dnode->ddn_model);
+			    mfg, model);
 	}
 
 	auth = topo_mod_auth(mod, parent);
 	fmri = topo_mod_hcfmri(mod, parent, FM_HC_SCHEME_VERSION, name, i, NULL,
-	    auth, part ? part : dnode->ddn_model, dnode->ddn_firm,
-	    dnode->ddn_serial);
+	    auth, part ? part : model, firm, serial);
 	nvlist_free(auth);
 
-	if (part && (part != dnode->ddn_model))
-		topo_mod_free(mod, part, len);
-	else if (b)
-		*b = ' ';		/* restore blank */
+	topo_mod_strfree(mod, part);
+	topo_mod_strfree(mod, mfg);
+	topo_mod_strfree(mod, model);
+	topo_mod_strfree(mod, firm);
+	topo_mod_strfree(mod, serial);
 
 	if (fmri == NULL) {
 		topo_mod_dprintf(mod, "disk_tnode_create: "

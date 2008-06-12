@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,7 +31,7 @@
 
 ARCH = i86pc
 CLASS = arch
-DTDFILE =
+DTDFILE = topology.dtd.1
 TOPOFILE = Sun-Fire-X4500-hc-topology.xml
 SRCDIR = ../SUNW,Sun-Fire-X4500
 

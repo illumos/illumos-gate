@@ -86,4 +86,8 @@
 
   </range>
 
+  <range name='ses-enclosure' min='0' max='1024'>
+    <enum-method name='ses' version='1' />
+  </range>
+
 </topology>

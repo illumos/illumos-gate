@@ -93,6 +93,12 @@ extern int topo_fmri_serial(topo_hdl_t *, nvlist_t *, char **, int *);
 extern int topo_fmri_compare(topo_hdl_t *, nvlist_t *, nvlist_t *, int *);
 
 /*
+ * Private utility functions for fmd
+ */
+extern ulong_t topo_fmri_strhash(topo_hdl_t *, const char *);
+extern boolean_t topo_fmri_strcmp(topo_hdl_t *, const char *, const char *);
+
+/*
  * Topo node utilities: callable from topo_walk_step() callback or module
  * enumeration, topo_mod_enumerate()
  */

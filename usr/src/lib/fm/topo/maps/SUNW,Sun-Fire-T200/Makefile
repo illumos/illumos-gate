@@ -27,7 +27,7 @@
 
 PLATFORMS = SUNW,Sun-Fire-T200
 CLASS = platform
-DTDFILE =
+DTDFILE = topology.dtd.1
 TOPOFILE = Sun-Fire-T200-hc-topology.xml	\
 	Sun-Fire-T1000-hc-topology.xml	\
 	SPARC-Enterprise-T1000-hc-topology.xml \

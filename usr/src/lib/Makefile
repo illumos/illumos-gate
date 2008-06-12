@@ -261,6 +261,7 @@ FM_sparc_DEPLIBS= libpri
 fm:			\
 	libexacct	\
 	libipmi		\
+	scsi		\
 	$(FM_$(MACH)_DEPLIBS)
 
 #

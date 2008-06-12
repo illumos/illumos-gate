@@ -34,6 +34,7 @@
 #include <unistd.h>
 #include <alloca.h>
 #include <stddef.h>
+#include <fm/libtopo.h>
 
 #include <fmd_alloc.h>
 #include <fmd_string.h>
@@ -62,6 +63,18 @@ static const char *const _fmd_asru_snames[] = {
 };
 
 volatile uint32_t fmd_asru_fake_not_present = 0;
+
+static uint_t
+fmd_asru_strhash(fmd_asru_hash_t *ahp, const char *val)
+{
+	return (topo_fmri_strhash(ahp->ah_topo->ft_hdl, val) % ahp->ah_hashlen);
+}
+
+static boolean_t
+fmd_asru_strcmp(fmd_asru_hash_t *ahp, const char *a, const char *b)
+{
+	return (topo_fmri_strcmp(ahp->ah_topo->ft_hdl, a, b));
+}
 
 static fmd_asru_t *
 fmd_asru_create(fmd_asru_hash_t *ahp, const char *uuid,
@@ -105,7 +118,7 @@ fmd_asru_destroy(fmd_asru_t *ap)
 static void
 fmd_asru_hash_insert(fmd_asru_hash_t *ahp, fmd_asru_t *ap)
 {
-	uint_t h = fmd_strhash(ap->asru_name) % ahp->ah_hashlen;
+	uint_t h = fmd_asru_strhash(ahp, ap->asru_name);
 
 	ASSERT(RW_WRITE_HELD(&ahp->ah_lock));
 	ap->asru_next = ahp->ah_hash[h];
@@ -135,10 +148,10 @@ fmd_asru_hash_lookup(fmd_asru_hash_t *ahp, const char *name)
 	uint_t h;
 
 	ASSERT(RW_LOCK_HELD(&ahp->ah_lock));
-	h = fmd_strhash(name) % ahp->ah_hashlen;
+	h = fmd_asru_strhash(ahp, name);
 
 	for (ap = ahp->ah_hash[h]; ap != NULL; ap = ap->asru_next) {
-		if (strcmp(ap->asru_name, name) == 0)
+		if (fmd_asru_strcmp(ahp, ap->asru_name, name))
 			break;
 	}
 
@@ -185,7 +198,7 @@ static void
 fmd_asru_asru_hash_insert(fmd_asru_hash_t *ahp, fmd_asru_link_t *alp,
     char *name)
 {
-	uint_t h = fmd_strhash(name) % ahp->ah_hashlen;
+	uint_t h = fmd_asru_strhash(ahp, name);
 
 	ASSERT(RW_WRITE_HELD(&ahp->ah_lock));
 	alp->al_asru_next = ahp->ah_asru_hash[h];
@@ -197,7 +210,7 @@ static void
 fmd_asru_case_hash_insert(fmd_asru_hash_t *ahp, fmd_asru_link_t *alp,
     char *name)
 {
-	uint_t h = fmd_strhash(name) % ahp->ah_hashlen;
+	uint_t h = fmd_asru_strhash(ahp, name);
 
 	ASSERT(RW_WRITE_HELD(&ahp->ah_lock));
 	alp->al_case_next = ahp->ah_case_hash[h];
@@ -207,7 +220,7 @@ fmd_asru_case_hash_insert(fmd_asru_hash_t *ahp, fmd_asru_link_t *alp,
 static void
 fmd_asru_fru_hash_insert(fmd_asru_hash_t *ahp, fmd_asru_link_t *alp, char *name)
 {
-	uint_t h = fmd_strhash(name) % ahp->ah_hashlen;
+	uint_t h = fmd_asru_strhash(ahp, name);
 
 	ASSERT(RW_WRITE_HELD(&ahp->ah_lock));
 	alp->al_fru_next = ahp->ah_fru_hash[h];
@@ -218,7 +231,7 @@ static void
 fmd_asru_label_hash_insert(fmd_asru_hash_t *ahp, fmd_asru_link_t *alp,
     char *name)
 {
-	uint_t h = fmd_strhash(name) % ahp->ah_hashlen;
+	uint_t h = fmd_asru_strhash(ahp, name);
 
 	ASSERT(RW_WRITE_HELD(&ahp->ah_lock));
 	alp->al_label_next = ahp->ah_label_hash[h];
@@ -229,7 +242,7 @@ static void
 fmd_asru_rsrc_hash_insert(fmd_asru_hash_t *ahp, fmd_asru_link_t *alp,
     char *name)
 {
-	uint_t h = fmd_strhash(name) % ahp->ah_hashlen;
+	uint_t h = fmd_asru_strhash(ahp, name);
 
 	ASSERT(RW_WRITE_HELD(&ahp->ah_lock));
 	alp->al_rsrc_next = ahp->ah_rsrc_hash[h];
@@ -646,6 +659,7 @@ fmd_asru_hash_create(const char *root, const char *dir)
 	ahp->ah_al_count = 0;
 	ahp->ah_count = 0;
 	ahp->ah_error = 0;
+	ahp->ah_topo = fmd_topo_hold();
 
 	return (ahp);
 }
@@ -673,6 +687,7 @@ fmd_asru_hash_destroy(fmd_asru_hash_t *ahp)
 	fmd_free(ahp->ah_fru_hash, sizeof (void *) * ahp->ah_hashlen);
 	fmd_free(ahp->ah_label_hash, sizeof (void *) * ahp->ah_hashlen);
 	fmd_free(ahp->ah_rsrc_hash, sizeof (void *) * ahp->ah_hashlen);
+	fmd_topo_rele(ahp->ah_topo);
 	fmd_free(ahp, sizeof (fmd_asru_hash_t));
 }
 
@@ -750,13 +765,14 @@ fmd_asru_do_hash_apply(fmd_asru_hash_t *ahp, char *name,
 
 	(void) pthread_rwlock_rdlock(&ahp->ah_lock);
 
-	h = fmd_strhash(name) % ahp->ah_hashlen;
+	h = fmd_asru_strhash(ahp, name);
 
 	for (alp = hash[h]; alp != NULL; alp =
 	    /* LINTED pointer alignment */
 	    FMD_ASRU_AL_HASH_NEXT(alp, next_offset))
-		/* LINTED pointer alignment */
-		if (strcmp(FMD_ASRU_AL_HASH_NAME(alp, match_offset), name) == 0)
+		if (fmd_asru_strcmp(ahp,
+		    /* LINTED pointer alignment */
+		    FMD_ASRU_AL_HASH_NAME(alp, match_offset), name))
 			alpc++;
 
 	alps = alpp = fmd_alloc(alpc * sizeof (fmd_asru_link_t *), FMD_SLEEP);
@@ -764,8 +780,9 @@ fmd_asru_do_hash_apply(fmd_asru_hash_t *ahp, char *name,
 	for (alp = hash[h]; alp != NULL; alp =
 	    /* LINTED pointer alignment */
 	    FMD_ASRU_AL_HASH_NEXT(alp, next_offset))
-		/* LINTED pointer alignment */
-		if (strcmp(FMD_ASRU_AL_HASH_NAME(alp, match_offset), name) == 0)
+		if (fmd_asru_strcmp(ahp,
+		    /* LINTED pointer alignment */
+		    FMD_ASRU_AL_HASH_NAME(alp, match_offset), name))
 			*alpp++ = fmd_asru_al_hold(alp);
 
 	ASSERT(alpp == alps + alpc);
@@ -933,7 +950,7 @@ fmd_asru_do_delete_entry(fmd_asru_hash_t *ahp, fmd_case_t *cp,
 	fmd_asru_link_t *alp, **pp, *alpnext, **alpnextp;
 
 	(void) pthread_rwlock_wrlock(&ahp->ah_lock);
-	h = fmd_strhash(name) % ahp->ah_hashlen;
+	h = fmd_asru_strhash(ahp, name);
 	pp = &hash[h];
 	for (alp = *pp; alp != NULL; alp = alpnext) {
 		/* LINTED pointer alignment */
@@ -999,7 +1016,7 @@ fmd_asru_hash_delete_case(fmd_asru_hash_t *ahp, fmd_case_t *cp)
 	 * then delete associated case hash entries
 	 */
 	(void) pthread_rwlock_wrlock(&ahp->ah_lock);
-	h = fmd_strhash(cip->ci_uuid) % ahp->ah_hashlen;
+	h = fmd_asru_strhash(ahp, cip->ci_uuid);
 	plp = &ahp->ah_case_hash[h];
 	for (alp = *plp; alp != NULL; alp = alpnext) {
 		alpnext = alp->al_case_next;
@@ -1045,9 +1062,8 @@ fmd_asru_hash_delete_case(fmd_asru_hash_t *ahp, fmd_case_t *cp)
 
 				ASSERT(ahp->ah_count != 0);
 				ahp->ah_count--;
-				h = fmd_strhash(ap->asru_name) %
-				    ahp->ah_hashlen;
-					pp = &ahp->ah_hash[h];
+				h = fmd_asru_strhash(ahp, ap->asru_name);
+				pp = &ahp->ah_hash[h];
 				for (ap2 = *pp; ap2 != NULL; ap2 = apnext) {
 					apnextp = &ap2->asru_next;
 					apnext = *apnextp;

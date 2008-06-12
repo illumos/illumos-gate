@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -71,7 +71,14 @@ clobber: clean
 
 check: $(CHECKHDRS)
 
-install_h lint _msg:
+install_h _msg:
+
+lint: $(TOPOFILE:%=%.chk)
+
+%.xml.chk: %.xml
+	@echo xmllint $<
+	@xmllint --dropdtd $< | \
+	xmllint --noout --dtdvalid  $(DTDSRC) -
 
 $($(CLASS)_ROOTTOPOROOT)/%: %
 	$(INS.file)
