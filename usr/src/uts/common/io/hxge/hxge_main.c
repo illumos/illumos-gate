@@ -623,9 +623,6 @@ hxge_unattach(p_hxge_t hxgep)
 	/* Tear down the kstat setup. */
 	hxge_destroy_kstats(hxgep);
 
-	/* Destroy all mutexes.  */
-	hxge_destroy_mutexes(hxgep);
-
 	/*
 	 * Remove the list of ndd parameters which were setup during attach.
 	 */
@@ -634,6 +631,13 @@ hxge_unattach(p_hxge_t hxgep)
 		    " hxge_unattach: remove all properties"));
 		(void) ddi_prop_remove_all(hxgep->dip);
 	}
+
+	/*
+	 * Reset RDC, TDC, PFC, and VMAC blocks from PEU to clear any
+	 * previous state before unmapping the registers.
+	 */
+	HXGE_REG_WR32(hxgep->hpi_handle, BLOCK_RESET, 0x0000001E);
+	HXGE_DELAY(1000);
 
 	/*
 	 * Unmap the register setup.
@@ -646,6 +650,9 @@ hxge_unattach(p_hxge_t hxgep)
 	 * Free the soft state data structures allocated with this instance.
 	 */
 	ddi_soft_state_free(hxge_list, hxgep->instance);
+
+	/* Destroy all mutexes.  */
+	hxge_destroy_mutexes(hxgep);
 
 	HXGE_DEBUG_MSG((NULL, DDI_CTL, "<== hxge_unattach"));
 }
@@ -829,6 +836,8 @@ hxge_setup_mutexes(p_hxge_t hxgep)
 	    MUTEX_DRIVER, (void *) hxgep->interrupt_cookie);
 	RW_INIT(&hxgep->filter_lock, NULL,
 	    RW_DRIVER, (void *) hxgep->interrupt_cookie);
+	MUTEX_INIT(&hxgep->pio_lock, NULL,
+	    MUTEX_DRIVER, (void *) hxgep->interrupt_cookie);
 
 hxge_setup_mutexes_exit:
 	HXGE_DEBUG_MSG((hxgep, DDI_CTL,
@@ -847,6 +856,7 @@ hxge_destroy_mutexes(p_hxge_t hxgep)
 	RW_DESTROY(&hxgep->filter_lock);
 	MUTEX_DESTROY(&hxgep->ouraddr_lock);
 	MUTEX_DESTROY(hxgep->genlock);
+	MUTEX_DESTROY(&hxgep->pio_lock);
 
 	if (hxge_debug_init == 1) {
 		MUTEX_DESTROY(&hxgedebuglock);
@@ -2503,9 +2513,10 @@ hxge_m_resources(void *arg)
 
 	mrf.mrf_type = MAC_RX_FIFO;
 	mrf.mrf_blank = hxge_rx_hw_blank;
+	mrf.mrf_arg = (void *)hxgep;
 
-	mrf.mrf_normal_blank_time = RXDMA_RCR_PTHRES_DEFAULT;
-	mrf.mrf_normal_pkt_count = RXDMA_RCR_TO_DEFAULT;
+	mrf.mrf_normal_blank_time = RXDMA_RCR_TO_DEFAULT;
+	mrf.mrf_normal_pkt_count = RXDMA_RCR_PTHRES_DEFAULT;
 
 	rcr_rings = hxgep->rx_rcr_rings;
 	rcr_p = rcr_rings->rcr_rings;
@@ -2516,7 +2527,6 @@ hxge_m_resources(void *arg)
 	 */
 	for (i = 0; i < ndmas; i++) {
 		rcrp = (void *)(p_rx_rcr_ring_t)rcr_p[i];
-		mrf.mrf_arg = rcrp;
 		rcrp->rcr_mac_handle =
 		    mac_resource_add(hxgep->mach, (mac_resource_t *)&mrf);
 

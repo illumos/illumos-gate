@@ -209,18 +209,19 @@ typedef enum {
 } hxge_vmac_stat_index_t;
 
 hxge_kstat_index_t hxge_vmac_stats[] = {
-	{VMAC_STAT_TX_FRAME_CNT, KSTAT_DATA_ULONG, "vmac_tx_frame_cnt"},
-	{VMAC_STAT_TX_BYTE_CNT, KSTAT_DATA_ULONG, "vmac_tx_byte_cnt"},
+	{VMAC_STAT_TX_FRAME_CNT, KSTAT_DATA_UINT64, "vmac_tx_frame_cnt"},
+	{VMAC_STAT_TX_BYTE_CNT, KSTAT_DATA_UINT64, "vmac_tx_byte_cnt"},
 
-	{VMAC_STAT_RX_FRAME_CNT, KSTAT_DATA_ULONG, "vmac_rx_frame_cnt"},
-	{VMAC_STAT_RX_BYTE_CNT, KSTAT_DATA_ULONG, "vmac_rx_byte_cnt"},
-	{VMAC_STAT_RX_DROP_FRAME_CNT, KSTAT_DATA_ULONG,
+	{VMAC_STAT_RX_FRAME_CNT, KSTAT_DATA_UINT64, "vmac_rx_frame_cnt"},
+	{VMAC_STAT_RX_BYTE_CNT, KSTAT_DATA_UINT64, "vmac_rx_byte_cnt"},
+	{VMAC_STAT_RX_DROP_FRAME_CNT, KSTAT_DATA_UINT64,
 		"vmac_rx_drop_frame_cnt"},
-	{VMAC_STAT_RX_DROP_BYTE_CNT, KSTAT_DATA_ULONG, "vmac_rx_drop_byte_cnt"},
-	{VMAC_STAT_RX_CRC_CNT, KSTAT_DATA_ULONG, "vmac_rx_crc_cnt"},
-	{VMAC_STAT_RX_PAUSE_CNT, KSTAT_DATA_ULONG, "vmac_rx_pause_cnt"},
-	{VMAC_STAT_RX_BCAST_FR_CNT, KSTAT_DATA_ULONG, "vmac_rx_bcast_fr_cnt"},
-	{VMAC_STAT_RX_MCAST_FR_CNT, KSTAT_DATA_ULONG, "vmac_rx_mcast_fr_cnt"},
+	{VMAC_STAT_RX_DROP_BYTE_CNT, KSTAT_DATA_UINT64,
+		"vmac_rx_drop_byte_cnt"},
+	{VMAC_STAT_RX_CRC_CNT, KSTAT_DATA_UINT64, "vmac_rx_crc_cnt"},
+	{VMAC_STAT_RX_PAUSE_CNT, KSTAT_DATA_UINT64, "vmac_rx_pause_cnt"},
+	{VMAC_STAT_RX_BCAST_FR_CNT, KSTAT_DATA_UINT64, "vmac_rx_bcast_fr_cnt"},
+	{VMAC_STAT_RX_MCAST_FR_CNT, KSTAT_DATA_UINT64, "vmac_rx_mcast_fr_cnt"},
 	{VMAC_STAT_END, NULL, NULL}
 };
 

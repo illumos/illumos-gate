@@ -200,10 +200,12 @@ hxge_tcam_default_add_entry(p_hxge_t hxgep, tcam_class_t class)
 
 	key->blade_id = hxge_get_blade_id(hxgep);
 
-	mask->class_code = 0x1f;
+	mask->class_code = 0xf;
+	mask->class_code_l = 0x1;
 	mask->blade_id = 0;
 	mask->wild1 = 0x7ffffff;
-	mask->wild = ~0x0;
+	mask->wild = 0xffffffff;
+	mask->wild_l = 0xffffffff;
 
 	location = class;
 
@@ -687,7 +689,8 @@ hxge_pfc_ip_class_config_get(p_hxge_t hxgep, tcam_class_t class,
 static hxge_status_t
 hxge_pfc_config_init(p_hxge_t hxgep)
 {
-	hpi_handle_t handle;
+	hpi_handle_t		handle;
+	block_reset_t		reset_reg;
 
 	handle = hxgep->hpi_reg_handle;
 	if (hxgep->hxge_hw_p == NULL) {
@@ -695,6 +698,12 @@ hxge_pfc_config_init(p_hxge_t hxgep)
 		    " hxge_pfc_config_init: common hardware not set"));
 		return (HXGE_ERROR);
 	}
+
+	/* Reset PFC block from PEU to clear any previous state */
+	reset_reg.value = 0;
+	reset_reg.bits.pfc_rst = 1;
+	HXGE_REG_WR32(hxgep->hpi_handle, BLOCK_RESET, reset_reg.value);
+	HXGE_DELAY(1000);
 
 	(void) hpi_pfc_set_tcam_enable(handle, B_FALSE);
 	(void) hpi_pfc_set_l2_hash(handle, B_FALSE);

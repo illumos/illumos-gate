@@ -2117,12 +2117,14 @@ hxge_txdma_hw_start(p_hxge_t hxgep)
 			HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL, "PANIC ReordTbl "
 			    "unexpected data (hi), entry: %x, value: 0x%0llx\n",
 			    i, (unsigned long long)tmp));
+			status = HXGE_ERROR;
 		}
 
 		HXGE_REG_RD64(hxgep->hpi_handle, TDC_REORD_TBL_DATA_LO, &tmp);
 		if (tmp != 0) {
 			HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL, "PANIC ReordTbl "
 			    "unexpected data (lo), entry: %x\n", i));
+			status = HXGE_ERROR;
 		}
 
 		HXGE_REG_RD64(hxgep->hpi_handle, TDC_FIFO_ERR_STAT, &tmp);
@@ -2130,14 +2132,19 @@ hxge_txdma_hw_start(p_hxge_t hxgep)
 			HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL, "PANIC ReordTbl "
 			    "parity error, entry: %x, val 0x%llx\n",
 			    i, (unsigned long long)tmp));
+			status = HXGE_ERROR;
 		}
 
 		HXGE_REG_RD64(hxgep->hpi_handle, TDC_FIFO_ERR_STAT, &tmp);
 		if (tmp != 0) {
 			HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL, "PANIC ReordTbl "
 			    "parity error, entry: %x\n", i));
+			status = HXGE_ERROR;
 		}
 	}
+
+	if (status != HXGE_OK)
+		goto hxge_txdma_hw_start_exit;
 
 	/*
 	 * Reset FIFO Error Status for the TDC and enable FIFO error events.
@@ -2154,6 +2161,9 @@ hxge_txdma_hw_start(p_hxge_t hxgep)
 		    "<== hxge_txdma_hw_start: NULL ring pointer"));
 		return (HXGE_ERROR);
 	}
+
+	tx_rings->dma_to_reenable = 0;
+
 	tx_desc_rings = tx_rings->rings;
 	if (tx_desc_rings == NULL) {
 		HXGE_DEBUG_MSG((hxgep, TX_CTL,
@@ -2619,6 +2629,58 @@ hxge_tx_err_evnts(p_hxge_t hxgep, uint_t index, p_hxge_ldv_t ldvp,
 	return (status);
 }
 
+static hxge_status_t
+hxge_txdma_wait_for_qst(p_hxge_t hxgep, int channel)
+{
+	hpi_status_t		rs;
+	hxge_status_t		status = HXGE_OK;
+	hpi_handle_t		handle;
+
+	handle = HXGE_DEV_HPI_HANDLE(hxgep);
+
+	/*
+	 * Wait for QST state of the DMA.
+	 */
+	rs = hpi_txdma_control_stop_wait(handle, channel);
+	if (rs != HPI_SUCCESS)
+		status = HXGE_ERROR;
+
+	return (status);
+}
+
+static hxge_status_t
+hxge_txdma_handle_rtab_error(p_hxge_t hxgep)
+{
+	hxge_status_t		status = HXGE_OK;
+	int			ndmas, i;
+	uint16_t		chnl;
+
+	ndmas = hxgep->tx_rings->ndmas;
+
+	/*
+	 * Make sure each DMA is in the QST state.
+	 */
+	for (i = 0; i < ndmas; i++) {
+		status = hxge_txdma_wait_for_qst(hxgep, i);
+		if (status != HXGE_OK)
+			goto hxge_txdma_handle_rtab_error_exit;
+	}
+
+	/*
+	 * Enable the DMAs.
+	 */
+	for (i = 0; i < ndmas; i++) {
+		chnl = (hxgep->tx_rings->dma_to_reenable + i) % ndmas;
+		hxge_txdma_enable_channel(hxgep, chnl);
+	}
+
+	hxgep->tx_rings->dma_to_reenable =
+	    (hxgep->tx_rings->dma_to_reenable + 1) % ndmas;
+
+hxge_txdma_handle_rtab_error_exit:
+	return (status);
+}
+
 hxge_status_t
 hxge_txdma_handle_sys_errors(p_hxge_t hxgep)
 {
@@ -2646,11 +2708,7 @@ hxge_txdma_handle_sys_errors(p_hxge_t hxgep)
 	tdc_sys_stats = &hxgep->statsp->tdc_sys_stats;
 	if (fifo_stat.bits.reord_tbl_par_err) {
 		tdc_sys_stats->reord_tbl_par_err++;
-		HXGE_FM_REPORT_ERROR(hxgep, NULL,
-		    HXGE_FM_EREPORT_TDMC_REORD_TBL_PAR);
-		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
-		    "==> hxge_txdma_handle_sys_errors: fatal error: "
-		    "reord_tbl_par_err"));
+		status = hxge_txdma_handle_rtab_error(hxgep);
 	}
 
 	if (fifo_stat.bits.reord_buf_ded_err) {
@@ -2670,8 +2728,7 @@ hxge_txdma_handle_sys_errors(p_hxge_t hxgep)
 			    "reord_buf_sec_err"));
 	}
 
-	if (fifo_stat.bits.reord_tbl_par_err ||
-	    fifo_stat.bits.reord_buf_ded_err) {
+	if (fifo_stat.bits.reord_buf_ded_err) {
 		status = hxge_tx_port_fatal_err_recover(hxgep);
 		if (status == HXGE_OK) {
 			FM_SERVICE_RESTORED(hxgep);

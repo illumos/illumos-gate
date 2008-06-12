@@ -233,6 +233,7 @@ DRV_KMODS	+= ecpp
 DRV_KMODS	+= fd
 DRV_KMODS	+= fdc
 DRV_KMODS	+= fssnap
+DRV_KMODS	+= hxge
 DRV_KMODS	+= i8042
 DRV_KMODS	+= i915
 DRV_KMODS	+= icmp
@@ -328,7 +329,6 @@ DRV_KMODS	+= xge
 DRV_KMODS	+= zcons
 DRV_KMODS	+= chxge
 DRV_KMODS	+= nsmb
-DRV_KMODS	+= hxge
 
 #
 # Don't build some of these for OpenSolaris, since they will be

@@ -27,6 +27,7 @@
 
 #include <hpi_vir.h>
 #include <hxge_defs.h>
+#include <hxge_impl.h>
 
 /*
  * Set up a logical group number that a logical device belongs to.

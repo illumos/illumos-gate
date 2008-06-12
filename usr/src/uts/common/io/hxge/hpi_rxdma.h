@@ -114,9 +114,9 @@ typedef struct _rdc_desc_cfg_t {
 		channel)), (data_p))\
 }
 
-#define	RXDMA_REG_READ32(handle, reg, channel) \
-	HXGE_HPI_PIO_READ32(handle, (HXGE_RXDMA_OFFSET(reg, handle.is_vraddr,\
-		channel)))
+#define	RXDMA_REG_READ32(handle, reg, channel, data_p) \
+	HXGE_REG_RD32(handle, (HXGE_RXDMA_OFFSET(reg, handle.is_vraddr,\
+		channel)), (data_p))
 
 #define	RXDMA_REG_WRITE64(handle, reg, channel, data) {\
 	HXGE_REG_WR64(handle, (HXGE_RXDMA_OFFSET(reg, handle.is_vraddr,\
@@ -157,7 +157,7 @@ typedef struct _rdc_desc_cfg_t {
 	    (offset == SW_OFFSET_128))
 
 #define	RXDMA_RCR_TO_VALID(tov) ((tov) && (tov < 64))
-#define	RXDMA_RCR_THRESH_VALID(thresh) ((thresh) && (thresh < 512))
+#define	RXDMA_RCR_THRESH_VALID(thresh) ((thresh <= 0x8000))
 
 #define	hpi_rxdma_rdc_rcr_flush(handle, rdc) \
 	RXDMA_REG_WRITE64(handle, RDC_RCR_FLUSH, rdc, \

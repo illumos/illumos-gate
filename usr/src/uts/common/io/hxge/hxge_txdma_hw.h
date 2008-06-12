@@ -44,19 +44,21 @@ typedef union _tx_desc_t {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	sop:1;
-		uint64_t	mark:1;
-		uint64_t	num_ptr:4;
-		uint64_t	rsvd:1;
-		uint64_t	tr_len:13;
-		uint64_t	sad:44;
+		uint32_t	sop:1;
+		uint32_t	mark:1;
+		uint32_t	num_ptr:4;
+		uint32_t	rsvd:1;
+		uint32_t	tr_len:13;
+		uint32_t	sad:12;
+		uint32_t	sad_l:32;
 #else
-		uint64_t	sad:44;
-		uint64_t	tr_len:13;
-		uint64_t	rsvd:1;
-		uint64_t	num_ptr:4;
-		uint64_t	mark:1;
-		uint64_t	sop:1;
+		uint32_t	sad_l:32;
+		uint32_t	sad:12;
+		uint32_t	tr_len:13;
+		uint32_t	rsvd:1;
+		uint32_t	num_ptr:4;
+		uint32_t	mark:1;
+		uint32_t	sop:1;
 #endif
 	} bits;
 } tx_desc_t, *p_tx_desc_t;
@@ -161,35 +163,35 @@ typedef union _tx_pkt_header_t {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	cksum_en_pkt_type:2;
-		uint64_t	ip_ver:1;
-		uint64_t	rsrvd:4;
-		uint64_t	vlan:1;
-		uint64_t	ihl:4;
-		uint64_t	l3start:4;
-		uint64_t	rsvrvd1:2;
-		uint64_t	l4start:6;
-		uint64_t	rsvrvd2:2;
-		uint64_t	l4stuff:6;
-		uint64_t	rsvrvd3:2;
-		uint64_t	tot_xfer_len:14;
-		uint64_t	rsrrvd4:13;
-		uint64_t	pad:3;
+		uint32_t	cksum_en_pkt_type:2;
+		uint32_t	ip_ver:1;
+		uint32_t	rsrvd:4;
+		uint32_t	vlan:1;
+		uint32_t	ihl:4;
+		uint32_t	l3start:4;
+		uint32_t	rsvrvd1:2;
+		uint32_t	l4start:6;
+		uint32_t	rsvrvd2:2;
+		uint32_t	l4stuff:6;
+		uint32_t	rsvrvd3:2;
+		uint32_t	tot_xfer_len:14;
+		uint32_t	rsrrvd4:13;
+		uint32_t	pad:3;
 #else
-		uint64_t	pad:3;
-		uint64_t	rsrrvd4:13;
-		uint64_t	tot_xfer_len:14;
-		uint64_t	rsvrvd3:2;
-		uint64_t	l4stuff:6;
-		uint64_t	rsvrvd2:2;
-		uint64_t	l4start:6;
-		uint64_t	rsvrvd1:2;
-		uint64_t	l3start:4;
-		uint64_t	ihl:4;
-		uint64_t	vlan:1;
-		uint64_t	rsrvd:4;
-		uint64_t	ip_ver:1;
-		uint64_t	cksum_en_pkt_type:2;
+		uint32_t	pad:3;
+		uint32_t	rsrrvd4:13;
+		uint32_t	tot_xfer_len:14;
+		uint32_t	rsvrvd3:2;
+		uint32_t	l4stuff:6;
+		uint32_t	rsvrvd2:2;
+		uint32_t	l4start:6;
+		uint32_t	rsvrvd1:2;
+		uint32_t	l3start:4;
+		uint32_t	ihl:4;
+		uint32_t	vlan:1;
+		uint32_t	rsrvd:4;
+		uint32_t	ip_ver:1;
+		uint32_t	cksum_en_pkt_type:2;
 #endif
 	} bits;
 } tx_pkt_header_t, *p_tx_pkt_header_t;

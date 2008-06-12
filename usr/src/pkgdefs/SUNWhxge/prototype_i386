@@ -44,5 +44,6 @@
 #
 
 # SUN 10Gb hxge NIC driver
+f none kernel/drv/hxge		0755	root	sys
 d none kernel/drv/amd64		0755	root	sys
 f none kernel/drv/amd64/hxge	0755	root	sys

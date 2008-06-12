@@ -26,8 +26,6 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-set -u
-
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
 
@@ -68,8 +66,7 @@ grep -w "${DRV}" ${BASEDIR}/etc/name_to_major > /dev/null 2>&1
 if [ $? -eq 1 ]; then
         ${ADD_DRV} -m "${DRVPERM}" -i "${DRVALIAS}" ${DRV}
         if [ $? -ne 0 ]; then
-                echo "\nFailed add_drv!\n" >&2
-                exit 1
+                echo "\nFailed add_drv!\n"
         fi
 fi
 

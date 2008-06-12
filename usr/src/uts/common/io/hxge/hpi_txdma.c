@@ -26,13 +26,12 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <hpi_txdma.h>
+#include <hxge_impl.h>
 
 #define	TXDMA_WAIT_LOOP		10000
 #define	TXDMA_WAIT_MSEC		5
 
 static hpi_status_t hpi_txdma_control_reset_wait(hpi_handle_t handle,
-    uint8_t channel);
-static hpi_status_t hpi_txdma_control_stop_wait(hpi_handle_t handle,
     uint8_t channel);
 
 hpi_status_t
@@ -347,7 +346,8 @@ hpi_txdma_desc_gather_set(hpi_handle_t handle, p_tx_desc_t desc_p,
 		    desc_p->bits.tr_len, transfer_len));
 	}
 	desc_p->bits.tr_len = transfer_len;
-	desc_p->bits.sad = dma_ioaddr;
+	desc_p->bits.sad = dma_ioaddr >> 32;
+	desc_p->bits.sad_l = dma_ioaddr & 0xffffffff;
 
 	HPI_DEBUG_MSG((handle.function, HPI_TDC_CTL,
 	    "hpi_txdma_gather_set: xfer len %d to set (%d)",
@@ -415,9 +415,10 @@ hpi_txdma_dump_desc_one(hpi_handle_t handle, p_tx_desc_t desc_p, int desc_index)
 	    " desc_p $%p descriptor entry %d\n", desc_p, desc_index));
 	desc.value = 0;
 	desp = ((desc_p != NULL) ? desc_p : (p_tx_desc_t)&desc);
-	desp->value = HXGE_MEM_PIO_READ64(handle);
+	HXGE_MEM_PIO_READ64(handle, &desp->value);
 #ifdef HXGE_DEBUG
 	sad = desp->bits.sad;
+	sad = (sad << 32) | desp->bits.sad_l;
 	xfer_len = desp->bits.tr_len;
 #endif
 	HPI_DEBUG_MSG((handle.function, HPI_TDC_CTL, "\n\t: value 0x%llx\n"
@@ -461,7 +462,7 @@ hpi_txdma_control_reset_wait(hpi_handle_t handle, uint8_t channel)
 	return (HPI_SUCCESS);
 }
 
-static hpi_status_t
+hpi_status_t
 hpi_txdma_control_stop_wait(hpi_handle_t handle, uint8_t channel)
 {
 	tdc_tdr_cfg_t	txcs;

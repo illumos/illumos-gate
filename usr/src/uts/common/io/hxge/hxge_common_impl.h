@@ -105,7 +105,11 @@ typedef	ddi_iblock_cookie_t 		hxge_intr_cookie_t;
 
 typedef ddi_acc_handle_t		hxge_os_acc_handle_t;
 typedef	hxge_os_acc_handle_t		hpi_reg_handle_t;
+#if defined(__i386)
+typedef	uint32_t			hpi_reg_ptr_t;
+#else
 typedef	uint64_t			hpi_reg_ptr_t;
+#endif
 
 typedef ddi_dma_handle_t		hxge_os_dma_handle_t;
 typedef struct _hxge_dma_common_t	hxge_os_dma_common_t;
@@ -132,140 +136,100 @@ typedef frtn_t				hxge_os_frtn_t;
 
 #define	HXGE_DELAY(microseconds)	 (drv_usecwait(microseconds))
 
-#define	HXGE_PIO_READ8(handle, devaddr, offset)		\
-	(ddi_get8(handle, (uint8_t *)((caddr_t)devaddr + offset)))
-
-#define	HXGE_PIO_READ16(handle, devaddr, offset)		\
-	(ddi_get16(handle, (uint16_t *)((caddr_t)devaddr + offset)))
-
-#define	HXGE_PIO_READ32(handle, devaddr, offset)		\
-	(ddi_get32(handle, (uint32_t *)((caddr_t)devaddr + offset)))
-
-#define	HXGE_PIO_READ64(handle, devaddr, offset)		\
-	(ddi_get64(handle, (uint64_t *)((caddr_t)devaddr + offset)))
-
-#define	HXGE_PIO_WRITE8(handle, devaddr, offset, data)	\
-	(ddi_put8(handle, (uint8_t *)((caddr_t)devaddr + offset), data))
-
-#define	HXGE_PIO_WRITE16(handle, devaddr, offset, data)	\
-	(ddi_get16(handle, (uint16_t *)((caddr_t)devaddr + offset), data))
-
-#define	HXGE_PIO_WRITE32(handle, devaddr, offset, data)	\
-	(ddi_put32(handle, (uint32_t *)((caddr_t)devaddr + offset), data))
-
-#define	HXGE_PIO_WRITE64(handle, devaddr, offset, data)	\
-	(ddi_put64(handle, (uint64_t *)((caddr_t)devaddr + offset), data))
-
-#define	HXGE_HPI_PIO_READ8(hpi_handle, offset)		\
-	(ddi_get8(HPI_REGH(hpi_handle),			\
-	(uint8_t *)(HPI_REGP(hpi_handle) + offset)))
-
-#define	HXGE_HPI_PIO_READ16(hpi_handle, offset)		\
-	(ddi_get16(HPI_REGH(hpi_handle),		\
-	(uint16_t *)(HPI_REGP(hpi_handle) + offset)))
-
+/*
+ * HXGE_HPI_PIO_READ32 and HXGE_HPI_PIO_READ64 should not be called directly
+ * on 32 bit platforms
+ */
 #define	HXGE_HPI_PIO_READ32(hpi_handle, offset)		\
 	(ddi_get32(HPI_REGH(hpi_handle),		\
 	(uint32_t *)(HPI_REGP(hpi_handle) + offset)))
 
+#if defined(__i386)
+#define	HXGE_HPI_PIO_READ64(hpi_handle, offset)		\
+	(ddi_get64(HPI_REGH(hpi_handle),		\
+	(uint64_t *)(HPI_REGP(hpi_handle) + (uint32_t)offset)))
+#else
 #define	HXGE_HPI_PIO_READ64(hpi_handle, offset)		\
 	(ddi_get64(HPI_REGH(hpi_handle),		\
 	(uint64_t *)(HPI_REGP(hpi_handle) + offset)))
+#endif
 
-#define	HXGE_HPI_PIO_WRITE8(hpi_handle, offset, data)	\
-	(ddi_put8(HPI_REGH(hpi_handle),			\
-	(uint8_t *)(HPI_REGP(hpi_handle) + offset), data))
+#if defined(__i386)
 
-#define	HXGE_HPI_PIO_WRITE16(hpi_handle, offset, data)	\
-	(ddi_put16(HPI_REGH(hpi_handle),		\
-	(uint16_t *)(HPI_REGP(hpi_handle) + offset), data))
-
-#define	HXGE_HPI_PIO_WRITE32(hpi_handle, offset, data)	\
-	(ddi_put32(HPI_REGH(hpi_handle),		\
-	(uint32_t *)(HPI_REGP(hpi_handle) + offset), data))
-
-#define	HXGE_HPI_PIO_WRITE64(hpi_handle, offset, data)	\
-	(ddi_put64(HPI_REGH(hpi_handle),		\
-	(uint64_t *)(HPI_REGP(hpi_handle) + offset), data))
-
-#define	HXGE_MEM_PIO_READ8(hpi_handle)		\
-	(ddi_get8(HPI_REGH(hpi_handle), (uint8_t *)HPI_REGP(hpi_handle)))
-
-#define	HXGE_MEM_PIO_READ16(hpi_handle)		\
-	(ddi_get16(HPI_REGH(hpi_handle), (uint16_t *)HPI_REGP(hpi_handle)))
-
-#define	HXGE_MEM_PIO_READ32(hpi_handle)		\
-	(ddi_get32(HPI_REGH(hpi_handle), (uint32_t *)HPI_REGP(hpi_handle)))
-
-#define	HXGE_MEM_PIO_READ64(hpi_handle)		\
-	(ddi_get64(HPI_REGH(hpi_handle), (uint64_t *)HPI_REGP(hpi_handle)))
-
-#define	HXGE_MEM_PIO_WRITE8(hpi_handle, data)	\
-	(ddi_put8(HPI_REGH(hpi_handle), (uint8_t *)HPI_REGP(hpi_handle), data))
-
-#define	HXGE_MEM_PIO_WRITE16(hpi_handle, data)	\
-		(ddi_put16(HPI_REGH(hpi_handle),	\
-		(uint16_t *)HPI_REGP(hpi_handle), data))
-
-#define	HXGE_MEM_PIO_WRITE32(hpi_handle, data)	\
-		(ddi_put32(HPI_REGH(hpi_handle),	\
-		(uint32_t *)HPI_REGP(hpi_handle), data))
-
-#define	HXGE_MEM_PIO_WRITE64(hpi_handle, data)	\
-		(ddi_put64(HPI_REGH(hpi_handle),	\
-		(uint64_t *)HPI_REGP(hpi_handle), data))
-
-#define	FM_SERVICE_RESTORED(hxgep)					\
-		if (DDI_FM_EREPORT_CAP(hxgep->fm_capabilities))		\
-			ddi_fm_service_impact(hxgep->dip, DDI_SERVICE_RESTORED)
-#define	HXGE_FM_REPORT_ERROR(hxgep, chan, ereport_id)			\
-		if (DDI_FM_EREPORT_CAP(hxgep->fm_capabilities))		\
-			hxge_fm_report_error(hxgep, chan, ereport_id)
-
-
-#if defined(REG_TRACE)
-#define	HXGE_REG_RD64(handle, offset, val_p) {\
-	*(val_p) = HXGE_HPI_PIO_READ64(handle, offset);\
-	hpi_rtrace_update(handle, B_FALSE, &hpi_rtracebuf, (uint32_t)offset, \
-			(uint64_t)(*(val_p)));\
+#define	HXGE_HPI_PIO_WRITE32(hpi_handle, offset, data) {	\
+	MUTEX_ENTER(&((hxge_t *)hpi_handle.hxgep)->pio_lock);	\
+	ddi_put32(HPI_REGH(hpi_handle),				\
+	    (uint32_t *)(HPI_REGP(hpi_handle) +			\
+	    (uint32_t)offset), data);				\
+	MUTEX_EXIT(&((hxge_t *)hpi_handle.hxgep)->pio_lock);	\
 }
-#define	HXGE_REG_WR64(handle, offset, val) {\
-	HXGE_HPI_PIO_WRITE64(handle, (offset), (val));\
-	hpi_rtrace_update(handle, B_TRUE, &hpi_rtracebuf, (uint32_t)offset,\
-				(uint64_t)(val));\
+#define	HXGE_HPI_PIO_WRITE64(hpi_handle, offset, data) {	\
+	MUTEX_ENTER(&((hxge_t *)hpi_handle.hxgep)->pio_lock);	\
+	ddi_put64(HPI_REGH(hpi_handle),				\
+	    (uint64_t *)(HPI_REGP(hpi_handle) +			\
+	    (uint32_t)offset), data);				\
+	MUTEX_EXIT(&((hxge_t *)hpi_handle.hxgep)->pio_lock);	\
 }
-#elif defined(REG_SHOW)
-	/*
-	 * Send 0xbadbad to tell rs_show_reg that we do not have
-	 * a valid RTBUF index to pass
-	 */
-#define	HXGE_REG_RD64(handle, offset, val_p) {\
-	*(val_p) = HXGE_HPI_PIO_READ64(handle, offset);\
-	rt_show_reg(0xbadbad, B_FALSE, (uint32_t)offset, (uint64_t)(*(val_p)));\
+#define	HXGE_MEM_PIO_READ64(hpi_handle, val_p) {		\
+	MUTEX_ENTER(&((hxge_t *)hpi_handle.hxgep)->pio_lock);	\
+	*(val_p) = ddi_get64(HPI_REGH(hpi_handle),		\
+	    (uint64_t *)HPI_REGP(hpi_handle));			\
+	MUTEX_EXIT(&((hxge_t *)hpi_handle.hxgep)->pio_lock);	\
 }
-/*
- * Send 0xbadbad to tell rs_show_reg that we do not have
- * a valid RTBUF index to pass
- */
-#define	HXGE_REG_WR64(handle, offset, val) {\
-	HXGE_HPI_PIO_WRITE64(handle, offset, (val));\
-	rt_show_reg(0xbadbad, B_TRUE, (uint32_t)offset, (uint64_t)(val));\
+#define	HXGE_MEM_PIO_WRITE64(hpi_handle, data) {		\
+	MUTEX_ENTER(&((hxge_t *)hpi_handle.hxgep)->pio_lock);	\
+	ddi_put64(HPI_REGH(hpi_handle),				\
+	    (uint64_t *)HPI_REGP(hpi_handle), data);		\
+	MUTEX_EXIT(&((hxge_t *)hpi_handle.hxgep)->pio_lock);	\
 }
+#define	HXGE_REG_RD64(handle, offset, val_p) {			\
+	MUTEX_ENTER(&((hxge_t *)handle.hxgep)->pio_lock);	\
+	*(val_p) = HXGE_HPI_PIO_READ64(handle, offset);		\
+	MUTEX_EXIT(&((hxge_t *)handle.hxgep)->pio_lock);	\
+}
+#define	HXGE_REG_RD32(handle, offset, val_p) {			\
+	MUTEX_ENTER(&((hxge_t *)handle.hxgep)->pio_lock);	\
+	*(val_p) = HXGE_HPI_PIO_READ32(handle, offset);		\
+	MUTEX_EXIT(&((hxge_t *)handle.hxgep)->pio_lock);	\
+}
+
 #else
 
-#define	HXGE_REG_RD64(handle, offset, val_p) {\
-	*(val_p) = HXGE_HPI_PIO_READ64(handle, offset);\
+#define	HXGE_HPI_PIO_WRITE32(hpi_handle, offset, data)		\
+	(ddi_put32(HPI_REGH(hpi_handle),			\
+	(uint32_t *)(HPI_REGP(hpi_handle) + offset), data))
+#define	HXGE_HPI_PIO_WRITE64(hpi_handle, offset, data)		\
+	(ddi_put64(HPI_REGH(hpi_handle),			\
+	(uint64_t *)(HPI_REGP(hpi_handle) + offset), data))
+#define	HXGE_MEM_PIO_READ64(hpi_handle, val_p) {		\
+	*(val_p) = ddi_get64(HPI_REGH(hpi_handle),		\
+		(uint64_t *)HPI_REGP(hpi_handle));		\
 }
-#define	HXGE_REG_RD32(handle, offset, val_p) {\
-	*(val_p) = HXGE_HPI_PIO_READ32(handle, offset);\
+#define	HXGE_MEM_PIO_WRITE64(hpi_handle, data)			\
+	(ddi_put64(HPI_REGH(hpi_handle),			\
+		(uint64_t *)HPI_REGP(hpi_handle), data))
+#define	HXGE_REG_RD64(handle, offset, val_p) {			\
+	*(val_p) = HXGE_HPI_PIO_READ64(handle, offset);		\
 }
-#define	HXGE_REG_WR64(handle, offset, val) {\
-	HXGE_HPI_PIO_WRITE64(handle, (offset), (val));\
+#define	HXGE_REG_RD32(handle, offset, val_p) {			\
+	*(val_p) = HXGE_HPI_PIO_READ32(handle, offset);		\
 }
-#define	HXGE_REG_WR32(handle, offset, val) {\
-	HXGE_HPI_PIO_WRITE32(handle, (offset), (val));\
-}
+
 #endif
+
+#define	HXGE_REG_WR64(handle, offset, val) {			\
+	HXGE_HPI_PIO_WRITE64(handle, (offset), (val));		\
+}
+#define	HXGE_REG_WR32(handle, offset, val) {			\
+	HXGE_HPI_PIO_WRITE32(handle, (offset), (val));		\
+}
+
+#define	FM_SERVICE_RESTORED(hxgep)				\
+	if (DDI_FM_EREPORT_CAP(hxgep->fm_capabilities))		\
+		ddi_fm_service_impact(hxgep->dip, DDI_SERVICE_RESTORED)
+#define	HXGE_FM_REPORT_ERROR(hxgep, chan, ereport_id)		\
+	if (DDI_FM_EREPORT_CAP(hxgep->fm_capabilities))		\
+		hxge_fm_report_error(hxgep, chan, ereport_id)
 
 #ifdef	__cplusplus
 }

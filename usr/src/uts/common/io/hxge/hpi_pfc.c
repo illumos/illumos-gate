@@ -272,8 +272,13 @@ hpi_pfc_mac_addr_enable(hpi_handle_t handle, uint32_t slot)
 
 	(void) hpi_pfc_get_config(handle, &config);
 
-	bit = 1 << slot;
-	config.bits.mac_addr_en = config.bits.mac_addr_en | bit;
+	if (slot < 24) {
+		bit = 1 << slot;
+		config.bits.mac_addr_en_l = config.bits.mac_addr_en_l | bit;
+	} else {
+		bit = 1 << (slot - 24);
+		config.bits.mac_addr_en = config.bits.mac_addr_en | bit;
+	}
 
 	return (hpi_pfc_set_config(handle, config));
 }
@@ -290,8 +295,13 @@ hpi_pfc_mac_addr_disable(hpi_handle_t handle, uint32_t slot)
 
 	(void) hpi_pfc_get_config(handle, &config);
 
-	bit = 1 << slot;
-	config.bits.mac_addr_en = config.bits.mac_addr_en & ~bit;
+	if (slot < 24) {
+		bit = 1 << slot;
+		config.bits.mac_addr_en_l = config.bits.mac_addr_en_l & ~bit;
+	} else {
+		bit = 1 << (slot - 24);
+		config.bits.mac_addr_en = config.bits.mac_addr_en & ~bit;
+	}
 
 	return (hpi_pfc_set_config(handle, config));
 }
@@ -425,8 +435,10 @@ hpi_pfc_set_mac_address(hpi_handle_t handle, uint32_t slot, uint64_t address)
 	offset = PFC_MAC_ADDRESS(slot);
 	moffset = PFC_MAC_ADDRESS_MASK(slot);
 
-	addr.bits.addr = address;
+	addr.bits.addr = address >> 32;
+	addr.bits.addr_l = address & 0xffffffff;
 	mask.bits.mask = 0x0;
+	mask.bits.mask_l = 0x0;
 
 	REG_PIO_WRITE64(handle, offset, addr.value);
 	REG_PIO_WRITE64(handle, moffset, mask.value);

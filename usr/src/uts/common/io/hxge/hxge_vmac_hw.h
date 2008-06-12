@@ -69,15 +69,17 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:55;
-		uint64_t	rx_reset:1;
-		uint64_t	rsrvd1:7;
-		uint64_t	tx_reset:1;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:23;
+		uint32_t	rx_reset:1;
+		uint32_t	rsrvd1:7;
+		uint32_t	tx_reset:1;
 #else
-		uint64_t	tx_reset:1;
-		uint64_t	rsrvd1:7;
-		uint64_t	rx_reset:1;
-		uint64_t	rsrvd:55;
+		uint32_t	tx_reset:1;
+		uint32_t	rsrvd1:7;
+		uint32_t	rx_reset:1;
+		uint32_t	rsrvd_l:23;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_rst_t;
@@ -114,19 +116,19 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:32;
-		uint64_t	tx_max_frame_length:14;
-		uint64_t	rsrvd1:15;
-		uint64_t	tx_pad:1;
-		uint64_t	crc_insert:1;
-		uint64_t	tx_en:1;
+		uint32_t	rsrvd:32;
+		uint32_t	tx_max_frame_length:14;
+		uint32_t	rsrvd1:15;
+		uint32_t	tx_pad:1;
+		uint32_t	crc_insert:1;
+		uint32_t	tx_en:1;
 #else
-		uint64_t	tx_en:1;
-		uint64_t	crc_insert:1;
-		uint64_t	tx_pad:1;
-		uint64_t	rsrvd1:15;
-		uint64_t	tx_max_frame_length:14;
-		uint64_t	rsrvd:32;
+		uint32_t	tx_en:1;
+		uint32_t	crc_insert:1;
+		uint32_t	tx_pad:1;
+		uint32_t	rsrvd1:15;
+		uint32_t	tx_max_frame_length:14;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_tx_cfg_t;
@@ -162,27 +164,27 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:32;
-		uint64_t	rx_max_frame_length:14;
-		uint64_t	reserved:11;
-		uint64_t	loopback:1;
-		uint64_t	promiscuous_mode:1;
-		uint64_t	promiscuous_group:1;
-		uint64_t	pass_flow_ctrl_fr:1;
-		uint64_t	strip_crc:1;
-		uint64_t	crc_check_disable:1;
-		uint64_t	rx_en:1;
+		uint32_t	rsrvd:32;
+		uint32_t	rx_max_frame_length:14;
+		uint32_t	reserved:11;
+		uint32_t	loopback:1;
+		uint32_t	promiscuous_mode:1;
+		uint32_t	promiscuous_group:1;
+		uint32_t	pass_flow_ctrl_fr:1;
+		uint32_t	strip_crc:1;
+		uint32_t	crc_check_disable:1;
+		uint32_t	rx_en:1;
 #else
-		uint64_t	rx_en:1;
-		uint64_t	crc_check_disable:1;
-		uint64_t	strip_crc:1;
-		uint64_t	pass_flow_ctrl_fr:1;
-		uint64_t	promiscuous_group:1;
-		uint64_t	promiscuous_mode:1;
-		uint64_t	loopback:1;
-		uint64_t	reserved:11;
-		uint64_t	rx_max_frame_length:14;
-		uint64_t	rsrvd:32;
+		uint32_t	rx_en:1;
+		uint32_t	crc_check_disable:1;
+		uint32_t	strip_crc:1;
+		uint32_t	pass_flow_ctrl_fr:1;
+		uint32_t	promiscuous_group:1;
+		uint32_t	promiscuous_mode:1;
+		uint32_t	loopback:1;
+		uint32_t	reserved:11;
+		uint32_t	rx_max_frame_length:14;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_rx_cfg_t;
@@ -206,15 +208,17 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:61;
-		uint64_t	tx_byte_cnt_overflow:1;
-		uint64_t	tx_frame_cnt_overflow:1;
-		uint64_t	frame_tx:1;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:29;
+		uint32_t	tx_byte_cnt_overflow:1;
+		uint32_t	tx_frame_cnt_overflow:1;
+		uint32_t	frame_tx:1;
 #else
-		uint64_t	frame_tx:1;
-		uint64_t	tx_frame_cnt_overflow:1;
-		uint64_t	tx_byte_cnt_overflow:1;
-		uint64_t	rsrvd:61;
+		uint32_t	frame_tx:1;
+		uint32_t	tx_frame_cnt_overflow:1;
+		uint32_t	tx_byte_cnt_overflow:1;
+		uint32_t	rsrvd_l:29;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_tx_stat_t;
@@ -235,15 +239,17 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:61;
-		uint64_t	tx_byte_cnt_overflow_msk:1;
-		uint64_t	tx_frame_cnt_overflow_msk:1;
-		uint64_t	frame_tx_msk:1;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:29;
+		uint32_t	tx_byte_cnt_overflow_msk:1;
+		uint32_t	tx_frame_cnt_overflow_msk:1;
+		uint32_t	frame_tx_msk:1;
 #else
-		uint64_t	frame_tx_msk:1;
-		uint64_t	tx_frame_cnt_overflow_msk:1;
-		uint64_t	tx_byte_cnt_overflow_msk:1;
-		uint64_t	rsrvd:61;
+		uint32_t	frame_tx_msk:1;
+		uint32_t	tx_frame_cnt_overflow_msk:1;
+		uint32_t	tx_byte_cnt_overflow_msk:1;
+		uint32_t	rsrvd_l:29;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_tx_msk_t;
@@ -280,27 +286,29 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:55;
-		uint64_t	bcast_cnt_overflow:1;
-		uint64_t	mcast_cnt_overflow:1;
-		uint64_t	pause_cnt_overflow:1;
-		uint64_t	crc_err_cnt_overflow:1;
-		uint64_t	rx_drop_byte_cnt_overflow:1;
-		uint64_t	rx_drop_frame_cnt_overflow:1;
-		uint64_t	rx_byte_cnt_overflow:1;
-		uint64_t	rx_frame_cnt_overflow:1;
-		uint64_t	frame_rx:1;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:23;
+		uint32_t	bcast_cnt_overflow:1;
+		uint32_t	mcast_cnt_overflow:1;
+		uint32_t	pause_cnt_overflow:1;
+		uint32_t	crc_err_cnt_overflow:1;
+		uint32_t	rx_drop_byte_cnt_overflow:1;
+		uint32_t	rx_drop_frame_cnt_overflow:1;
+		uint32_t	rx_byte_cnt_overflow:1;
+		uint32_t	rx_frame_cnt_overflow:1;
+		uint32_t	frame_rx:1;
 #else
-		uint64_t	frame_rx:1;
-		uint64_t	rx_frame_cnt_overflow:1;
-		uint64_t	rx_byte_cnt_overflow:1;
-		uint64_t	rx_drop_frame_cnt_overflow:1;
-		uint64_t	rx_drop_byte_cnt_overflow:1;
-		uint64_t	crc_err_cnt_overflow:1;
-		uint64_t	pause_cnt_overflow:1;
-		uint64_t	mcast_cnt_overflow:1;
-		uint64_t	bcast_cnt_overflow:1;
-		uint64_t	rsrvd:55;
+		uint32_t	frame_rx:1;
+		uint32_t	rx_frame_cnt_overflow:1;
+		uint32_t	rx_byte_cnt_overflow:1;
+		uint32_t	rx_drop_frame_cnt_overflow:1;
+		uint32_t	rx_drop_byte_cnt_overflow:1;
+		uint32_t	crc_err_cnt_overflow:1;
+		uint32_t	pause_cnt_overflow:1;
+		uint32_t	mcast_cnt_overflow:1;
+		uint32_t	bcast_cnt_overflow:1;
+		uint32_t	rsrvd_l:23;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_rx_stat_t;
@@ -330,27 +338,29 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:55;
-		uint64_t	bcast_cnt_overflow_msk:1;
-		uint64_t	mcast_cnt_overflow_msk:1;
-		uint64_t	pause_cnt_overflow_msk:1;
-		uint64_t	crc_err_cnt_overflow_msk:1;
-		uint64_t	rx_drop_byte_cnt_overflow_msk:1;
-		uint64_t	rx_drop_frame_cnt_overflow_msk:1;
-		uint64_t	rx_byte_cnt_overflow_msk:1;
-		uint64_t	rx_frame_cnt_overflow_msk:1;
-		uint64_t	frame_rx_msk:1;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:23;
+		uint32_t	bcast_cnt_overflow_msk:1;
+		uint32_t	mcast_cnt_overflow_msk:1;
+		uint32_t	pause_cnt_overflow_msk:1;
+		uint32_t	crc_err_cnt_overflow_msk:1;
+		uint32_t	rx_drop_byte_cnt_overflow_msk:1;
+		uint32_t	rx_drop_frame_cnt_overflow_msk:1;
+		uint32_t	rx_byte_cnt_overflow_msk:1;
+		uint32_t	rx_frame_cnt_overflow_msk:1;
+		uint32_t	frame_rx_msk:1;
 #else
-		uint64_t	frame_rx_msk:1;
-		uint64_t	rx_frame_cnt_overflow_msk:1;
-		uint64_t	rx_byte_cnt_overflow_msk:1;
-		uint64_t	rx_drop_frame_cnt_overflow_msk:1;
-		uint64_t	rx_drop_byte_cnt_overflow_msk:1;
-		uint64_t	crc_err_cnt_overflow_msk:1;
-		uint64_t	pause_cnt_overflow_msk:1;
-		uint64_t	mcast_cnt_overflow_msk:1;
-		uint64_t	bcast_cnt_overflow_msk:1;
-		uint64_t	rsrvd:55;
+		uint32_t	frame_rx_msk:1;
+		uint32_t	rx_frame_cnt_overflow_msk:1;
+		uint32_t	rx_byte_cnt_overflow_msk:1;
+		uint32_t	rx_drop_frame_cnt_overflow_msk:1;
+		uint32_t	rx_drop_byte_cnt_overflow_msk:1;
+		uint32_t	crc_err_cnt_overflow_msk:1;
+		uint32_t	pause_cnt_overflow_msk:1;
+		uint32_t	mcast_cnt_overflow_msk:1;
+		uint32_t	bcast_cnt_overflow_msk:1;
+		uint32_t	rsrvd_l:23;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_rx_msk_t;
@@ -375,15 +385,17 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:61;
-		uint64_t	force_tx_byte_cnt_overflow:1;
-		uint64_t	force_tx_frame_cnt_overflow:1;
-		uint64_t	force_frame_tx:1;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:29;
+		uint32_t	force_tx_byte_cnt_overflow:1;
+		uint32_t	force_tx_frame_cnt_overflow:1;
+		uint32_t	force_frame_tx:1;
 #else
-		uint64_t	force_frame_tx:1;
-		uint64_t	force_tx_frame_cnt_overflow:1;
-		uint64_t	force_tx_byte_cnt_overflow:1;
-		uint64_t	rsrvd:61;
+		uint32_t	force_frame_tx:1;
+		uint32_t	force_tx_frame_cnt_overflow:1;
+		uint32_t	force_tx_byte_cnt_overflow:1;
+		uint32_t	rsrvd_l:29;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_tx_stat_mirror_t;
@@ -416,27 +428,29 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:55;
-		uint64_t	force_bcast_cnt_overflow:1;
-		uint64_t	force_mcast_cnt_overflow:1;
-		uint64_t	force_pause_cnt_overflow:1;
-		uint64_t	force_crc_err_cnt_overflow:1;
-		uint64_t	force_rx_drop_byte_cnt_overflow:1;
-		uint64_t	force_rx_drop_frame_cnt_overflow:1;
-		uint64_t	force_rx_byte_cnt_overflow:1;
-		uint64_t	force_rx_frame_cnt_overflow:1;
-		uint64_t	force_frame_rx:1;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:23;
+		uint32_t	force_bcast_cnt_overflow:1;
+		uint32_t	force_mcast_cnt_overflow:1;
+		uint32_t	force_pause_cnt_overflow:1;
+		uint32_t	force_crc_err_cnt_overflow:1;
+		uint32_t	force_rx_drop_byte_cnt_overflow:1;
+		uint32_t	force_rx_drop_frame_cnt_overflow:1;
+		uint32_t	force_rx_byte_cnt_overflow:1;
+		uint32_t	force_rx_frame_cnt_overflow:1;
+		uint32_t	force_frame_rx:1;
 #else
-		uint64_t	force_frame_rx:1;
-		uint64_t	force_rx_frame_cnt_overflow:1;
-		uint64_t	force_rx_byte_cnt_overflow:1;
-		uint64_t	force_rx_drop_frame_cnt_overflow:1;
-		uint64_t	force_rx_drop_byte_cnt_overflow:1;
-		uint64_t	force_crc_err_cnt_overflow:1;
-		uint64_t	force_pause_cnt_overflow:1;
-		uint64_t	force_mcast_cnt_overflow:1;
-		uint64_t	force_bcast_cnt_overflow:1;
-		uint64_t	rsrvd:55;
+		uint32_t	force_frame_rx:1;
+		uint32_t	force_rx_frame_cnt_overflow:1;
+		uint32_t	force_rx_byte_cnt_overflow:1;
+		uint32_t	force_rx_drop_frame_cnt_overflow:1;
+		uint32_t	force_rx_drop_byte_cnt_overflow:1;
+		uint32_t	force_crc_err_cnt_overflow:1;
+		uint32_t	force_pause_cnt_overflow:1;
+		uint32_t	force_mcast_cnt_overflow:1;
+		uint32_t	force_bcast_cnt_overflow:1;
+		uint32_t	rsrvd_l:23;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_rx_stat_mirror_t;
@@ -455,11 +469,11 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:32;
-		uint64_t	tx_frame_cnt:32;
+		uint32_t	rsrvd:32;
+		uint32_t	tx_frame_cnt:32;
 #else
-		uint64_t	tx_frame_cnt:32;
-		uint64_t	rsrvd:32;
+		uint32_t	tx_frame_cnt:32;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_tx_frame_cnt_t;
@@ -480,11 +494,11 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:32;
-		uint64_t	tx_byte_cnt:32;
+		uint32_t	rsrvd:32;
+		uint32_t	tx_byte_cnt:32;
 #else
-		uint64_t	tx_byte_cnt:32;
-		uint64_t	rsrvd:32;
+		uint32_t	tx_byte_cnt:32;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_tx_byte_cnt_t;
@@ -503,11 +517,11 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:32;
-		uint64_t	rx_frame_cnt:32;
+		uint32_t	rsrvd:32;
+		uint32_t	rx_frame_cnt:32;
 #else
-		uint64_t	rx_frame_cnt:32;
-		uint64_t	rsrvd:32;
+		uint32_t	rx_frame_cnt:32;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_rx_frame_cnt_t;
@@ -527,11 +541,11 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:32;
-		uint64_t	rx_byte_cnt:32;
+		uint32_t	rsrvd:32;
+		uint32_t	rx_byte_cnt:32;
 #else
-		uint64_t	rx_byte_cnt:32;
-		uint64_t	rsrvd:32;
+		uint32_t	rx_byte_cnt:32;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_rx_byte_cnt_t;
@@ -554,11 +568,11 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:32;
-		uint64_t	rx_drop_frame_cnt:32;
+		uint32_t	rsrvd:32;
+		uint32_t	rx_drop_frame_cnt:32;
 #else
-		uint64_t	rx_drop_frame_cnt:32;
-		uint64_t	rsrvd:32;
+		uint32_t	rx_drop_frame_cnt:32;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_rx_drop_fr_cnt_t;
@@ -581,11 +595,11 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:32;
-		uint64_t	rx_drop_byte_cnt:32;
+		uint32_t	rsrvd:32;
+		uint32_t	rx_drop_byte_cnt:32;
 #else
-		uint64_t	rx_drop_byte_cnt:32;
-		uint64_t	rsrvd:32;
+		uint32_t	rx_drop_byte_cnt:32;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_rx_drop_byte_cnt_t;
@@ -609,11 +623,11 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:32;
-		uint64_t	rx_crc_cnt:32;
+		uint32_t	rsrvd:32;
+		uint32_t	rx_crc_cnt:32;
 #else
-		uint64_t	rx_crc_cnt:32;
-		uint64_t	rsrvd:32;
+		uint32_t	rx_crc_cnt:32;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_rx_crc_cnt_t;
@@ -632,11 +646,11 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:32;
-		uint64_t	rx_pause_cnt:32;
+		uint32_t	rsrvd:32;
+		uint32_t	rx_pause_cnt:32;
 #else
-		uint64_t	rx_pause_cnt:32;
-		uint64_t	rsrvd:32;
+		uint32_t	rx_pause_cnt:32;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_rx_pause_cnt_t;
@@ -654,11 +668,11 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:32;
-		uint64_t	rx_bcast_fr_cnt:32;
+		uint32_t	rsrvd:32;
+		uint32_t	rx_bcast_fr_cnt:32;
 #else
-		uint64_t	rx_bcast_fr_cnt:32;
-		uint64_t	rsrvd:32;
+		uint32_t	rx_bcast_fr_cnt:32;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_rx_bcast_fr_cnt_t;
@@ -676,11 +690,11 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:32;
-		uint64_t	rx_mcast_fr_cnt:32;
+		uint32_t	rsrvd:32;
+		uint32_t	rx_mcast_fr_cnt:32;
 #else
-		uint64_t	rx_mcast_fr_cnt:32;
-		uint64_t	rsrvd:32;
+		uint32_t	rx_mcast_fr_cnt:32;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } vmac_rx_mcast_fr_cnt_t;

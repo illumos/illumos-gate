@@ -25,6 +25,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <hxge_impl.h>
 #include <hpi_vmac.h>
 
 #define	HXGE_VMAC_RX_STAT_CLEAR		0x1ffULL

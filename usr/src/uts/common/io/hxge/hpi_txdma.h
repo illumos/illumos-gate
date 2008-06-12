@@ -125,6 +125,8 @@ hpi_status_t hpi_txdma_desc_gather_set(hpi_handle_t handle,
     p_tx_desc_t desc_p, uint8_t gather_index,
     boolean_t mark, uint8_t ngathers,
     uint64_t dma_ioaddr, uint32_t transfer_len);
+hpi_status_t hpi_txdma_control_stop_wait(hpi_handle_t handle,
+    uint8_t channel);
 
 hpi_status_t hpi_txdma_desc_set_xfer_len(hpi_handle_t handle,
     p_tx_desc_t desc_p, uint32_t transfer_len);

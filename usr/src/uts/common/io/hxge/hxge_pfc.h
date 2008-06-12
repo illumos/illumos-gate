@@ -87,27 +87,29 @@ typedef union _hxge_tcam_res_t {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t padding:34;
-		uint64_t reserved:15;
-		uint64_t parity:1;
-		uint64_t hit_count:4;
-		uint64_t channel_d:2;
-		uint64_t channel_c:2;
-		uint64_t channel_b:2;
-		uint64_t channel_a:2;
-		uint64_t source_hash:1;
-		uint64_t discard:1;
+		uint32_t padding:32;
+		uint32_t padding_l:2;
+		uint32_t reserved:15;
+		uint32_t parity:1;
+		uint32_t hit_count:4;
+		uint32_t channel_d:2;
+		uint32_t channel_c:2;
+		uint32_t channel_b:2;
+		uint32_t channel_a:2;
+		uint32_t source_hash:1;
+		uint32_t discard:1;
 #else
-		uint64_t discard:1;
-		uint64_t source_hash:1;
-		uint64_t channel_a:2;
-		uint64_t channel_b:2;
-		uint64_t channel_c:2;
-		uint64_t channel_d:2;
-		uint64_t hit_count:4;
-		uint64_t parity:1;
-		uint64_t reserved:15;
-		uint64_t padding:34;
+		uint32_t discard:1;
+		uint32_t source_hash:1;
+		uint32_t channel_a:2;
+		uint32_t channel_b:2;
+		uint32_t channel_c:2;
+		uint32_t channel_d:2;
+		uint32_t hit_count:4;
+		uint32_t parity:1;
+		uint32_t reserved:15;
+		uint32_t padding_l:2;
+		uint32_t padding:32;
 #endif
 	} bits;
 } hxge_tcam_res_t, *p_hxge_tcam_res_t;
@@ -124,47 +126,58 @@ typedef struct tcam_reg {
 
 typedef struct hxge_tcam_ipv4_S {
 #if defined(_BIG_ENDIAN)
-	uint32_t	class_code:5;   /* 99:95 */
+	uint32_t	class_code:4;   /* 99:96 */
+	uint32_t	class_code_l:1;   /* 95:95 */
 	uint32_t	blade_id:4;	/* 94:91 */
 	uint32_t	rsrvd2:2;	/* 90:89 */
 	uint32_t	noport:1;	/* 88 */
 	uint32_t	protocol:8;	/* 87:80 */
-	uint32_t	l4_hdr;		/* 79:48 */
+	uint32_t	l4_hdr:16;	/* 79:64 */
+	uint32_t	l4_hdr_l:16;	/* 63:48 */
 	uint32_t	rsrvd:16;	/* 47:32 */
 	uint32_t	ip_daddr;	/* 31:0 */
 #else
 	uint32_t	ip_daddr;	/* 31:0 */
 	uint32_t	rsrvd:16;	/* 47:32 */
-	uint32_t	l4_hdr;		/* 79:48 */
+	uint32_t	l4_hdr_l:16;	/* 63:48 */
+	uint32_t	l4_hdr:16;	/* 79:64 */
 	uint32_t	protocol:8;	/* 87:80 */
 	uint32_t	noport:1;	/* 88 */
 	uint32_t	rsrvd2:2;	/* 90:89 */
 	uint32_t	blade_id:4;	/* 94:91 */
-	uint32_t	class_code:5;   /* 99:95 */
+	uint32_t	class_code_l:1;   /* 95:95 */
+	uint32_t	class_code:4;   /* 99:96 */
 #endif
 } hxge_tcam_ipv4_t;
 
 typedef struct hxge_tcam_ipv6_S {
 #if defined(_BIG_ENDIAN)
-	uint32_t	class_code:5;   /* 99:95 */
+	uint32_t	class_code:4;   /* 99:96 */
+	uint32_t	class_code_l:1;   /* 95:95 */
 	uint32_t	blade_id:4;	/* 94:91 */
-	uint64_t	rsrvd2:3;	/* 90:88 */
-	uint64_t	protocol:8;	/* 87:80 */
-	uint64_t	l4_hdr:32;	/* 79:48 */
-	uint64_t	rsrvd:48;	/* 47:0 */
+	uint32_t	rsrvd2:3;	/* 90:88 */
+	uint32_t	protocol:8;	/* 87:80 */
+	uint32_t	l4_hdr:16;	/* 79:64 */
+	uint32_t	l4_hdr_l:16;	/* 63:48 */
+	uint32_t	rsrvd:16;	/* 47:32 */
+	uint32_t	rsrvd_l:32;	/* 31:0 */
 #else
-	uint64_t	rsrvd:48;	/* 47:0 */
-	uint64_t	l4_hdr:32;	/* 79:48 */
-	uint64_t	protocol:8;	/* 87:80 */
-	uint64_t	rsrvd2:3;	/* 90:88 */
+	uint32_t	rsrvd_l:32;	/* 31:0 */
+	uint32_t	rsrvd:16;	/* 47:32 */
+	uint32_t	l4_hdr_l:16;	/* 63:48 */
+	uint32_t	l4_hdr:16;	/* 79:64 */
+	uint32_t	protocol:8;	/* 87:80 */
+	uint32_t	rsrvd2:3;	/* 90:88 */
 	uint32_t	blade_id:4;	/* 94:91 */
-	uint32_t	class_code:5;   /* 99:95 */
+	uint32_t	class_code_l:1;   /* 95:95 */
+	uint32_t	class_code:4;   /* 99:96 */
 #endif
 } hxge_tcam_ipv6_t;
 
 typedef struct hxge_tcam_enet_S {
 #if defined(_BIG_ENDIAN)
-	uint8_t		class_code:5;   /* 99:95 */
+	uint8_t		class_code:4;   /* 99:96 */
+	uint8_t		class_code_l:1; /* 95:95 */
 	uint8_t		blade_id:4;	/* 94:91 */
 	uint8_t		rsrvd:3;	/* 90:88 */
 	uint8_t		eframe[11];	/* 87:0 */
@@ -172,23 +185,28 @@ typedef struct hxge_tcam_enet_S {
 	uint8_t		eframe[11];	/* 87:0 */
 	uint8_t		rsrvd:3;	/* 90:88 */
 	uint8_t		blade_id:4;	/* 94:91 */
-	uint8_t		class_code:5;   /* 99:95 */
+	uint8_t		class_code_l:1; /* 95:95 */
+	uint8_t		class_code:4;   /* 99:96 */
 #endif
 } hxge_tcam_ether_t;
 
 typedef struct hxge_tcam_spread_S {
 #if defined(_BIG_ENDIAN)
-	uint64_t	unused:28;	/* 127:100 */
-	uint64_t	class_code:5;   /* 99:95 */
-	uint64_t	blade_id:4;	/* 94:91 */
-	uint64_t	wild1:27;	/* 90:64 */
-	uint64_t	wild;		/* 63:0 */
+	uint32_t	unused:28;	/* 127:100 */
+	uint32_t	class_code:4;   /* 99:96 */
+	uint32_t	class_code_l:1; /* 95:95 */
+	uint32_t	blade_id:4;	/* 94:91 */
+	uint32_t	wild1:27;	/* 90:64 */
+	uint32_t	wild;		/* 63:32 */
+	uint32_t	wild_l;		/* 31:0 */
 #else
-	uint64_t	wild;		/* 63:0 */
-	uint64_t	wild1:27;	/* 90:64 */
-	uint64_t	blade_id:4;	/* 94:91 */
-	uint64_t	class_code:5;   /* 99:95 */
-	uint64_t	unused:28;	/* 127:100 */
+	uint32_t	wild_l;		/* 31:0 */
+	uint32_t	wild;		/* 63:32 */
+	uint32_t	wild1:27;	/* 90:64 */
+	uint32_t	blade_id:4;	/* 94:91 */
+	uint32_t	class_code_l:1; /* 95:95 */
+	uint32_t	class_code:4;   /* 99:96 */
+	uint32_t	unused:28;	/* 127:100 */
 #endif
 } hxge_tcam_spread_t;
 
@@ -215,34 +233,44 @@ typedef struct hxge_tcam_entry_S {
 #define	mask1			mask.regs.reg1
 
 #define	ip4_class_key		key.ipv4.class_code
+#define	ip4_class_key_l		key.ipv4.class_code_l
 #define	ip4_blade_id_key	key.ipv4.blade_id
 #define	ip4_noport_key		key.ipv4.noport
 #define	ip4_proto_key		key.ipv4.protocol
 #define	ip4_l4_hdr_key		key.ipv4.l4_hdr
+#define	ip4_l4_hdr_key_l	key.ipv4.l4_hdr_l
 #define	ip4_dest_key		key.ipv4.ip_daddr
 
 #define	ip4_class_mask		mask.ipv4.class_code
+#define	ip4_class_mask_l	mask.ipv4.class_code_l
 #define	ip4_blade_id_mask	mask.ipv4.blade_id
 #define	ip4_noport_mask		mask.ipv4.noport
 #define	ip4_proto_mask		mask.ipv4.protocol
 #define	ip4_l4_hdr_mask		mask.ipv4.l4_hdr
+#define	ip4_l4_hdr_mask_l	mask.ipv4.l4_hdr_l
 #define	ip4_dest_mask		mask.ipv4.ip_daddr
 
 #define	ip6_class_key		key.ipv6.class_code
+#define	ip6_class_key_l		key.ipv6.class_code_l
 #define	ip6_blade_id_key	key.ipv6.blade_id
 #define	ip6_proto_key		key.ipv6.protocol
 #define	ip6_l4_hdr_key		key.ipv6.l4_hdr
+#define	ip6_l4_hdr_key_l	key.ipv6.l4_hdr_l
 
 #define	ip6_class_mask		mask.ipv6.class_code
+#define	ip6_class_mask_l	mask.ipv6.class_code_l
 #define	ip6_blade_id_mask	mask.ipv6.blade_id
 #define	ip6_proto_mask		mask.ipv6.protocol
 #define	ip6_l4_hdr_mask		mask.ipv6.l4_hdr
+#define	ip6_l4_hdr_mask_l	mask.ipv6.l4_hdr_l
 
 #define	ether_class_key		key.enet.class_code
+#define	ether_class_key_l	key.enet.class_code_l
 #define	ether_blade_id_key	key.enet.blade_id
 #define	ether_ethframe_key	key.enet.eframe
 
 #define	ether_class_mask	mask.enet.class_code
+#define	ether_class_mask_l	mask.enet.class_code_l
 #define	ether_blade_id_mask	mask.enet.blade_id
 #define	ether_ethframe_mask	mask.enet.eframe
 

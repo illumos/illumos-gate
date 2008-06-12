@@ -27,6 +27,7 @@
 
 #include <hpi_rxdma.h>
 #include <hxge_common.h>
+#include <hxge_impl.h>
 
 #define	 RXDMA_RESET_TRY_COUNT	5
 #define	 RXDMA_RESET_DELAY	5

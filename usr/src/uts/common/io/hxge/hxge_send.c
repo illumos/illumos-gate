@@ -206,9 +206,14 @@ start_again:
 	hpi_handle = desc_area.hpi_handle;
 	hpi_desc_handle.regh = (hxge_os_acc_handle_t)
 	    DMA_COMMON_ACC_HANDLE(desc_area);
+	hpi_desc_handle.hxgep = hxgep;
 	tx_desc_ring_vp = (p_tx_desc_t)DMA_COMMON_VPTR(desc_area);
 #ifdef	HXGE_DEBUG
+#if defined(__i386)
+	tx_desc_ring_pp = (p_tx_desc_t)(uint32_t)DMA_COMMON_IOADDR(desc_area);
+#else
 	tx_desc_ring_pp = (p_tx_desc_t)DMA_COMMON_IOADDR(desc_area);
+#endif
 #endif
 	tx_desc_dma_handle = (hxge_os_dma_handle_t)DMA_COMMON_HANDLE(desc_area);
 	tx_msg_ring = tx_ring_p->tx_msg_ring;
@@ -507,7 +512,8 @@ hxge_start_control_header_only:
 			sop_tx_desc_p = &sop_tx_desc;
 			sop_tx_desc_p->value = 0;
 			sop_tx_desc_p->bits.tr_len = clen;
-			sop_tx_desc_p->bits.sad = dma_ioaddr;
+			sop_tx_desc_p->bits.sad = dma_ioaddr >> 32;
+			sop_tx_desc_p->bits.sad_l = dma_ioaddr & 0xffffffff;
 		} else {
 #ifdef	HXGE_DEBUG
 			save_desc_p = &tx_desc;
@@ -515,7 +521,8 @@ hxge_start_control_header_only:
 			tmp_desc_p = &tx_desc;
 			tmp_desc_p->value = 0;
 			tmp_desc_p->bits.tr_len = clen;
-			tmp_desc_p->bits.sad = dma_ioaddr;
+			tmp_desc_p->bits.sad = dma_ioaddr >> 32;
+			tmp_desc_p->bits.sad_l = dma_ioaddr & 0xffffffff;
 
 			tx_desc_p->value = tmp_desc_p->value;
 		}
@@ -534,6 +541,7 @@ hxge_start_control_header_only:
 		hpi_desc_handle.function.function = 0;
 		hpi_desc_handle.function.instance = hxgep->instance;
 		sad = save_desc_p->bits.sad;
+		sad = (sad << 32) | save_desc_p->bits.sad_l;
 		xfer_len = save_desc_p->bits.tr_len;
 
 		HXGE_DEBUG_MSG((hxgep, TX_CTL, "\n\t: value 0x%llx\n"
@@ -578,7 +586,12 @@ hxge_start_control_header_only:
 	hdrp->value = 0;
 	(void) hxge_fill_tx_hdr(mp, B_FALSE, cksum_on,
 	    (pkt_len - TX_PKT_HEADER_SIZE), npads, pkthdrp);
-	if (pkt_len > STD_FRAME_SIZE) {
+
+	/*
+	 * Hardware header should not be counted as part of the frame
+	 * when determining the frame size
+	 */
+	if ((pkt_len - TX_PKT_HEADER_SIZE) > (STD_FRAME_SIZE - ETHERFCSL)) {
 		tdc_stats->tx_jumbo_pkts++;
 	}
 

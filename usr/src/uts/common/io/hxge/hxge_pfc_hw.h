@@ -80,13 +80,13 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:28;
-		uint64_t	parity:4;
-		uint64_t	member:32;
+		uint32_t	rsrvd:28;
+		uint32_t	parity:4;
+		uint32_t	member:32;
 #else
-		uint64_t	member:32;
-		uint64_t	parity:4;
-		uint64_t	rsrvd:28;
+		uint32_t	member:32;
+		uint32_t	parity:4;
+		uint32_t	rsrvd:28;
 #endif
 	} bits;
 } pfc_vlan_table_t;
@@ -110,15 +110,17 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:50;
-		uint64_t	par_en:1;
-		uint64_t	valid:1;
-		uint64_t	id:12;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:18;
+		uint32_t	par_en:1;
+		uint32_t	valid:1;
+		uint32_t	id:12;
 #else
-		uint64_t	id:12;
-		uint64_t	valid:1;
-		uint64_t	par_en:1;
-		uint64_t	rsrvd:50;
+		uint32_t	id:12;
+		uint32_t	valid:1;
+		uint32_t	par_en:1;
+		uint32_t	rsrvd_l:18;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } pfc_vlan_ctrl_t;
@@ -142,11 +144,13 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:16;
-		uint64_t	addr:48;
+		uint32_t	rsrvd:16;
+		uint32_t	addr:16;
+		uint32_t	addr_l:32;
 #else
-		uint64_t	addr:48;
-		uint64_t	rsrvd:16;
+		uint32_t	addr_l:32;
+		uint32_t	addr:16;
+		uint32_t	rsrvd:16;
 #endif
 	} bits;
 } pfc_mac_addr_t;
@@ -167,11 +171,13 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:16;
-		uint64_t	mask:48;
+		uint32_t	rsrvd:16;
+		uint32_t	mask:16;
+		uint32_t	mask_l:32;
 #else
-		uint64_t	mask:48;
-		uint64_t	rsrvd:16;
+		uint32_t	mask_l:32;
+		uint32_t	mask:16;
+		uint32_t	rsrvd:16;
 #endif
 	} bits;
 } pfc_mac_addr_mask_t;
@@ -193,11 +199,13 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:48;
-		uint64_t	hash_val:16;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:16;
+		uint32_t	hash_val:16;
 #else
-		uint64_t	hash_val:16;
-		uint64_t	rsrvd:48;
+		uint32_t	hash_val:16;
+		uint32_t	rsrvd_l:16;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } pfc_hash_table_t;
@@ -217,13 +225,15 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:47;
-		uint64_t	valid:1;
-		uint64_t	etype:16;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:15;
+		uint32_t	valid:1;
+		uint32_t	etype:16;
 #else
-		uint64_t	etype:16;
-		uint64_t	valid:1;
-		uint64_t	rsrvd:47;
+		uint32_t	etype:16;
+		uint32_t	valid:1;
+		uint32_t	rsrvd_l:15;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } pfc_l2_class_config_t;
@@ -244,15 +254,17 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:60;
-		uint64_t	discard:1;
-		uint64_t	tsel:1;
-		uint64_t	rsrvd1:2;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:28;
+		uint32_t	discard:1;
+		uint32_t	tsel:1;
+		uint32_t	rsrvd1:2;
 #else
-		uint64_t	rsrvd1:2;
-		uint64_t	tsel:1;
-		uint64_t	discard:1;
-		uint64_t	rsrvd:60;
+		uint32_t	rsrvd1:2;
+		uint32_t	tsel:1;
+		uint32_t	discard:1;
+		uint32_t	rsrvd_l:28;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } pfc_l3_class_config_t;
@@ -269,9 +281,11 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	key:64;
+		uint32_t	key:32;
+		uint32_t	key_l:32;
 #else
-		uint64_t	key:64;
+		uint32_t	key_l:32;
+		uint32_t	key:32;
 #endif
 	} bits;
 } pfc_tcam_key0_t;
@@ -288,11 +302,13 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:28;
-		uint64_t	key:36;
+		uint32_t	rsrvd:28;
+		uint32_t	key:4;
+		uint32_t	key_l:32;
 #else
-		uint64_t	key:36;
-		uint64_t	rsrvd:28;
+		uint32_t	key_l:32;
+		uint32_t	key:4;
+		uint32_t	rsrvd:28;
 #endif
 	} bits;
 } pfc_tcam_key1_t;
@@ -309,9 +325,11 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	mask:64;
+		uint32_t	mask:32;
+		uint32_t	mask_l:32;
 #else
-		uint64_t	mask:64;
+		uint32_t	mask_l:32;
+		uint32_t	mask:32;
 #endif
 	} bits;
 } pfc_tcam_mask0_t;
@@ -328,11 +346,13 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:28;
-		uint64_t	mask:36;
+		uint32_t	rsrvd:28;
+		uint32_t	mask:4;
+		uint32_t	mask_l:32;
 #else
-		uint64_t	mask:36;
-		uint64_t	rsrvd:28;
+		uint32_t	mask_l:32;
+		uint32_t	mask:4;
+		uint32_t	rsrvd:28;
 #endif
 	} bits;
 } pfc_tcam_mask1_t;
@@ -370,21 +390,23 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:45;
-		uint64_t	par_en:1;
-		uint64_t	cmd:3;
-		uint64_t	status:1;
-		uint64_t	match:1;
-		uint64_t	rsrvd1:5;
-		uint64_t	addr:8;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:13;
+		uint32_t	par_en:1;
+		uint32_t	cmd:3;
+		uint32_t	status:1;
+		uint32_t	match:1;
+		uint32_t	rsrvd1:5;
+		uint32_t	addr:8;
 #else
-		uint64_t	addr:8;
-		uint64_t	rsrvd1:5;
-		uint64_t	match:1;
-		uint64_t	status:1;
-		uint64_t	cmd:3;
-		uint64_t	par_en:1;
-		uint64_t	rsrvd:45;
+		uint32_t	addr:8;
+		uint32_t	rsrvd1:5;
+		uint32_t	match:1;
+		uint32_t	status:1;
+		uint32_t	cmd:3;
+		uint32_t	par_en:1;
+		uint32_t	rsrvd_l:13;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } pfc_tcam_ctrl_t;
@@ -411,21 +433,23 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:24;
-		uint64_t	mac_addr_en:32;
-		uint64_t	default_dma:4;
-		uint64_t	force_cs_en:1;
-		uint64_t	tcp_cs_en:1;
-		uint64_t	tcam_en:1;
-		uint64_t	l2_hash_en:1;
+		uint32_t	rsrvd:24;
+		uint32_t	mac_addr_en:8;
+		uint32_t	mac_addr_en_l:24;
+		uint32_t	default_dma:4;
+		uint32_t	force_cs_en:1;
+		uint32_t	tcp_cs_en:1;
+		uint32_t	tcam_en:1;
+		uint32_t	l2_hash_en:1;
 #else
-		uint64_t	l2_hash_en:1;
-		uint64_t	tcam_en:1;
-		uint64_t	tcp_cs_en:1;
-		uint64_t	force_cs_en:1;
-		uint64_t	default_dma:4;
-		uint64_t	mac_addr_en:32;
-		uint64_t	rsrvd:24;
+		uint32_t	l2_hash_en:1;
+		uint32_t	tcam_en:1;
+		uint32_t	tcp_cs_en:1;
+		uint32_t	force_cs_en:1;
+		uint32_t	default_dma:4;
+		uint32_t	mac_addr_en_l:24;
+		uint32_t	mac_addr_en:8;
+		uint32_t	rsrvd:24;
 #endif
 	} bits;
 } pfc_config_t;
@@ -454,23 +478,25 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:57;
-		uint64_t	discard:1;
-		uint64_t	fin:1;
-		uint64_t	syn:1;
-		uint64_t	rst:1;
-		uint64_t	psh:1;
-		uint64_t	ack:1;
-		uint64_t	urg:1;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:25;
+		uint32_t	discard:1;
+		uint32_t	fin:1;
+		uint32_t	syn:1;
+		uint32_t	rst:1;
+		uint32_t	psh:1;
+		uint32_t	ack:1;
+		uint32_t	urg:1;
 #else
-		uint64_t	urg:1;
-		uint64_t	ack:1;
-		uint64_t	psh:1;
-		uint64_t	rst:1;
-		uint64_t	syn:1;
-		uint64_t	fin:1;
-		uint64_t	discard:1;
-		uint64_t	rsrvd:57;
+		uint32_t	urg:1;
+		uint32_t	ack:1;
+		uint32_t	psh:1;
+		uint32_t	rst:1;
+		uint32_t	syn:1;
+		uint32_t	fin:1;
+		uint32_t	discard:1;
+		uint32_t	rsrvd_l:25;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } tcp_ctrl_mask_t;
@@ -485,11 +511,11 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:32;
-		uint64_t	seed:32;
+		uint32_t	rsrvd:32;
+		uint32_t	seed:32;
 #else
-		uint64_t	seed:32;
-		uint64_t	rsrvd:32;
+		uint32_t	seed:32;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } src_hash_val_t;
@@ -510,15 +536,17 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:61;
-		uint64_t	pkt_drop:1;
-		uint64_t	tcam_parity_err:1;
-		uint64_t	vlan_parity_err:1;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:29;
+		uint32_t	pkt_drop:1;
+		uint32_t	tcam_parity_err:1;
+		uint32_t	vlan_parity_err:1;
 #else
-		uint64_t	vlan_parity_err:1;
-		uint64_t	tcam_parity_err:1;
-		uint64_t	pkt_drop:1;
-		uint64_t	rsrvd:61;
+		uint32_t	vlan_parity_err:1;
+		uint32_t	tcam_parity_err:1;
+		uint32_t	pkt_drop:1;
+		uint32_t	rsrvd_l:29;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } pfc_int_status_t;
@@ -540,15 +568,17 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:61;
-		uint64_t	pkt_drop:1;
-		uint64_t	tcam_parity_err:1;
-		uint64_t	vlan_parity_err:1;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:29;
+		uint32_t	pkt_drop:1;
+		uint32_t	tcam_parity_err:1;
+		uint32_t	vlan_parity_err:1;
 #else
-		uint64_t	vlan_parity_err:1;
-		uint64_t	tcam_parity_err:1;
-		uint64_t	pkt_drop:1;
-		uint64_t	rsrvd:61;
+		uint32_t	vlan_parity_err:1;
+		uint32_t	tcam_parity_err:1;
+		uint32_t	pkt_drop:1;
+		uint32_t	rsrvd_l:29;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } pfc_dbg_int_status_t;
@@ -567,15 +597,17 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:61;
-		uint64_t	pkt_drop_mask:1;
-		uint64_t	tcam_parity_err_mask:1;
-		uint64_t	vlan_parity_err_mask:1;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:29;
+		uint32_t	pkt_drop_mask:1;
+		uint32_t	tcam_parity_err_mask:1;
+		uint32_t	vlan_parity_err_mask:1;
 #else
-		uint64_t	vlan_parity_err_mask:1;
-		uint64_t	tcam_parity_err_mask:1;
-		uint64_t	pkt_drop_mask:1;
-		uint64_t	rsrvd:61;
+		uint32_t	vlan_parity_err_mask:1;
+		uint32_t	tcam_parity_err_mask:1;
+		uint32_t	pkt_drop_mask:1;
+		uint32_t	rsrvd_l:29;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } pfc_int_mask_t;
@@ -597,19 +629,21 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:59;
-		uint64_t	tcp_ctrl_drop:1;
-		uint64_t	l2_addr_drop:1;
-		uint64_t	class_code_drop:1;
-		uint64_t	tcam_drop:1;
-		uint64_t	vlan_drop:1;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:27;
+		uint32_t	tcp_ctrl_drop:1;
+		uint32_t	l2_addr_drop:1;
+		uint32_t	class_code_drop:1;
+		uint32_t	tcam_drop:1;
+		uint32_t	vlan_drop:1;
 #else
-		uint64_t	vlan_drop:1;
-		uint64_t	tcam_drop:1;
-		uint64_t	class_code_drop:1;
-		uint64_t	l2_addr_drop:1;
-		uint64_t	tcp_ctrl_drop:1;
-		uint64_t	rsrvd:59;
+		uint32_t	vlan_drop:1;
+		uint32_t	tcam_drop:1;
+		uint32_t	class_code_drop:1;
+		uint32_t	l2_addr_drop:1;
+		uint32_t	tcp_ctrl_drop:1;
+		uint32_t	rsrvd_l:27;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } pfc_drop_log_t;
@@ -633,19 +667,21 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:59;
-		uint64_t	tcp_ctrl_drop_mask:1;
-		uint64_t	l2_addr_drop_mask:1;
-		uint64_t	class_code_drop_mask:1;
-		uint64_t	tcam_drop_mask:1;
-		uint64_t	vlan_drop_mask:1;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:27;
+		uint32_t	tcp_ctrl_drop_mask:1;
+		uint32_t	l2_addr_drop_mask:1;
+		uint32_t	class_code_drop_mask:1;
+		uint32_t	tcam_drop_mask:1;
+		uint32_t	vlan_drop_mask:1;
 #else
-		uint64_t	vlan_drop_mask:1;
-		uint64_t	tcam_drop_mask:1;
-		uint64_t	class_code_drop_mask:1;
-		uint64_t	l2_addr_drop_mask:1;
-		uint64_t	tcp_ctrl_drop_mask:1;
-		uint64_t	rsrvd:59;
+		uint32_t	vlan_drop_mask:1;
+		uint32_t	tcam_drop_mask:1;
+		uint32_t	class_code_drop_mask:1;
+		uint32_t	l2_addr_drop_mask:1;
+		uint32_t	tcp_ctrl_drop_mask:1;
+		uint32_t	rsrvd_l:27;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } pfc_drop_log_mask_t;
@@ -663,11 +699,13 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:52;
-		uint64_t	addr:12;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:20;
+		uint32_t	addr:12;
 #else
-		uint64_t	addr:12;
-		uint64_t	rsrvd:52;
+		uint32_t	addr:12;
+		uint32_t	rsrvd_l:20;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } pfc_vlan_par_err_log_t;
@@ -685,11 +723,13 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:56;
-		uint64_t	addr:8;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:24;
+		uint32_t	addr:8;
 #else
-		uint64_t	addr:8;
-		uint64_t	rsrvd:56;
+		uint32_t	addr:8;
+		uint32_t	rsrvd_l:24;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } pfc_tcam_par_err_log_t;
@@ -708,11 +748,11 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:32;
-		uint64_t	bad_cs_count:32;
+		uint32_t	rsrvd:32;
+		uint32_t	bad_cs_count:32;
 #else
-		uint64_t	bad_cs_count:32;
-		uint64_t	rsrvd:32;
+		uint32_t	bad_cs_count:32;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } pfc_bad_cs_counter_t;
@@ -732,11 +772,11 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:32;
-		uint64_t	drop_count:32;
+		uint32_t	rsrvd:32;
+		uint32_t	drop_count:32;
 #else
-		uint64_t	drop_count:32;
-		uint64_t	rsrvd:32;
+		uint32_t	drop_count:32;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } pfc_drop_counter_t;
@@ -756,11 +796,13 @@ typedef union {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t	rsrvd:63;
-		uint64_t	auto_init_status:1;
+		uint32_t	rsrvd:32;
+		uint32_t	rsrvd_l:31;
+		uint32_t	auto_init_status:1;
 #else
-		uint64_t	auto_init_status:1;
-		uint64_t	rsrvd:63;
+		uint32_t	auto_init_status:1;
+		uint32_t	rsrvd_l:31;
+		uint32_t	rsrvd:32;
 #endif
 	} bits;
 } pfc_auto_init_t;

@@ -170,21 +170,23 @@ typedef union _rcr_entry_t {
 	uint64_t value;
 	struct {
 #if defined(_BIG_ENDIAN)
-		uint64_t multi:1;
-		uint64_t pkt_type:2;
-		uint64_t reserved:3;
-		uint64_t error:4;
-		uint64_t l2_len:14;
-		uint64_t pktbufsz:2;
-		uint64_t pkt_buf_addr:38;
+		uint32_t multi:1;
+		uint32_t pkt_type:2;
+		uint32_t reserved:3;
+		uint32_t error:4;
+		uint32_t l2_len:14;
+		uint32_t pktbufsz:2;
+		uint32_t pkt_buf_addr:6;
+		uint32_t pkt_buf_addr_l:32;
 #else
-		uint64_t pkt_buf_addr:38;
-		uint64_t pktbufsz:2;
-		uint64_t l2_len:14;
-		uint64_t error:4;
-		uint64_t reserved:3;
-		uint64_t pkt_type:2;
-		uint64_t multi:1;
+		uint32_t pkt_buf_addr_l:32;
+		uint32_t pkt_buf_addr:6;
+		uint32_t pktbufsz:2;
+		uint32_t l2_len:14;
+		uint32_t error:4;
+		uint32_t reserved:3;
+		uint32_t pkt_type:2;
+		uint32_t multi:1;
 #endif
 	} bits;
 } rcr_entry_t, *p_rcr_entry_t;

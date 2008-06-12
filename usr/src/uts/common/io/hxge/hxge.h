@@ -350,6 +350,8 @@ struct _hxge_t {
 	uint32_t 		hxge_port_rcr_size;
 	uint32_t 		hxge_port_tx_ring_size;
 	hxge_mmac_t		hxge_mmac_info;
+
+	kmutex_t		pio_lock;
 };
 
 /*
