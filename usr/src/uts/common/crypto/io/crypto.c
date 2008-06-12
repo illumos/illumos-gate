@@ -233,7 +233,7 @@ static kcondvar_t crypto_cv;
  * sets the CRYPTO_SESSION_IS_BUSY flag.
  */
 #define	CRYPTO_DECREMENT_RCTL_SESSION(sp, val, rctl_chk) 	\
-	if ((val) != 0) {					\
+	if (((val) != 0) && ((sp) != NULL)) {			\
 		ASSERT(((sp)->sd_flags & CRYPTO_SESSION_IS_BUSY) != 0);	\
 		if (rctl_chk) {				\
 			CRYPTO_DECREMENT_RCTL(val);		\
@@ -2537,15 +2537,16 @@ cipher(dev_t dev, caddr_t arg, int mode,
 		goto release_minor;
 	}
 
-	do_inplace = (STRUCT_FGET(encrypt, ce_flags) &
-	    CRYPTO_INPLACE_OPERATION) != 0;
-	need = do_inplace ? datalen : datalen + encrlen;
-
 	session_id = STRUCT_FGET(encrypt, ce_session);
 
 	if (!get_session_ptr(session_id, cm, &sp, &error, &rv))  {
 		goto release_minor;
 	}
+
+	do_inplace = (STRUCT_FGET(encrypt, ce_flags) &
+	    CRYPTO_INPLACE_OPERATION) != 0;
+	need = do_inplace ? datalen : datalen + encrlen;
+
 	if ((rv = CRYPTO_BUFFER_CHECK(sp, need, rctl_chk)) !=
 	    CRYPTO_SUCCESS) {
 		need = 0;
