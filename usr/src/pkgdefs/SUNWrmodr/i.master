@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -464,6 +464,23 @@ EOF
 		cp $t $dest
 
 		#
+		# Remove all ACPI000x entries
+		#
+		sed	-e '/^ACPI0001/d'	\
+			-e '/^ACPI0002/d'	\
+			-e '/^ACPI0003/d'	\
+			-e '/^ACPI0004/d'	\
+			-e '/^ACPI0005/d'	\
+			-e '/^ACPI0006/d'	\
+			-e '/^ACPI0007/d'	\
+			-e '/^ACPI0008/d'	\
+			-e '/^ACPI0009/d'	\
+			-e '/^ACPI000A/d'	\
+			-e '/^ACPI000B/d'	\
+			$dest > $t
+		cp $t $dest
+
+		#
 		#  Console redesign changes
 		#
 		grep "pnpPNP,900" $dest > /dev/null 2>&1
@@ -544,17 +561,6 @@ EOF
 		    fi
 		done << EOF
 SVI0101 SVI0101 oth all none "Sun Fire B100x BSC"
-ACPI0001 acpi oth all none "ACPI SMBus 1.0 Host Controller"
-ACPI0002 acpi oth all none "ACPI Smart Battery Subsystem"
-ACPI0003 acpi oth all none "ACPI AC Device"
-ACPI0004 acpi oth all none "ACPI Module Device"
-ACPI0005 acpi oth all none "ACPI SMBus 2.0 Host Controller"
-ACPI0006 acpi oth all none "ACPI GPE Block Device"
-ACPI0007 acpi oth all none "ACPI Processor Device"
-ACPI0008 acpi oth all none "ACPI Ambient Light Sensor Device"
-ACPI0009 acpi oth all none "I/OxAPIC Device"
-ACPI000A acpi oth all none "I/O APIC Device"
-ACPI000B acpi oth all none "I/O SAPIC Device"
 PNP0300 keyboard key all none "IBM PC/XT keyboard controller (83-key)"
 PNP0302 keyboard key all none "IBM PC/XT keyboard controller (84-key)"
 PNP0301 keyboard key all none "IBM PC/AT keyboard controller (86-key)"
