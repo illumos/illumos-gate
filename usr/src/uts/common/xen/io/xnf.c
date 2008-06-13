@@ -267,7 +267,7 @@ DDI_DEFINE_STREAM_OPS(xnf_dev_ops, nulldev, nulldev, xnf_attach, xnf_detach,
 
 static struct modldrv xnf_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	IDENT " %I%",		/* short description */
+	IDENT " 1.11",		/* short description */
 	&xnf_dev_ops		/* driver specific ops */
 };
 
@@ -775,6 +775,18 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	macp = NULL;
 	if (err != 0)
 		goto failure_3;
+
+#ifdef XPV_HVM_DRIVER
+	/*
+	 * In the HVM case, this driver essentially replaces a driver for
+	 * a 'real' PCI NIC. Without the "model" property set to
+	 * "Ethernet controller", like the PCI code does, netbooting does
+	 * not work correctly, as strplumb_get_netdev_path() will not find
+	 * this interface.
+	 */
+	(void) ndi_prop_update_string(DDI_DEV_T_NONE, devinfo, "model",
+	    "Ethernet controller");
+#endif
 
 	return (DDI_SUCCESS);
 
