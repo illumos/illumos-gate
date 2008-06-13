@@ -367,6 +367,17 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	    E1000_RXCSUM_IPOFL;		/* IP checksum offload Enable */
 
 	E1000_WRITE_REG(hw, E1000_RXCSUM, reg_val);
+
+	/*
+	 * Workaround: Set bit 16 (IPv6_ExDIS) to disable the
+	 * processing of received IPV6 extension headers
+	 */
+	if ((hw->mac.type == e1000_82571) || (hw->mac.type == e1000_82572)) {
+		reg_val = E1000_READ_REG(hw, E1000_RFCTL);
+		reg_val |= (E1000_RFCTL_IPV6_EX_DIS |
+		    E1000_RFCTL_NEW_IPV6_EXT_DIS);
+		E1000_WRITE_REG(hw, E1000_RFCTL, reg_val);
+	}
 }
 
 /*
