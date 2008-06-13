@@ -37,6 +37,36 @@
 #include "assym.h"
 #endif
 
+#ifdef  DEBUG
+#define LED     1
+#define SERIAL  1
+#endif	/*	DEBUG	*/
+
+#ifdef	DEBUG
+#define	COM1	0x3f8
+#define	COM2	0x2f8
+#define	WC_COM	COM2	/* either COM1 or COM2			*/
+#define	WC_LED	0x80    /* diagnostic led port ON motherboard	*/
+
+/*
+ * defined as offsets from the data register
+ */
+#define	DLL	0	/* divisor latch (lsb) */
+#define	DLH	1	/* divisor latch (msb) */
+#define	LCR	3	/* line control register		*/
+#define	MCR	4	/* modem control register		*/
+
+
+#define	DLAB	0x80    /* divisor latch access bit		*/
+#define	B9600L	0X0c	/* lsb bit pattern for 9600 baud	*/
+#define	B9600H	0X0	/* hsb bit pattern for 9600 baud	*/
+#define	DTR	0x01    /* Data Terminal Ready			*/
+#define	RTS	0x02    /* Request To Send			*/
+#define	STOP1	0x00	/* 1 stop bit				*/
+#define	BITS8	0x03    /* 8 bits per char			*/
+
+#endif	/*	DEBUG	*/
+
 /*
  *	This file contains the low level routines involved in getting
  *	into and out of ACPI S3, including those needed for restarting
@@ -282,17 +312,15 @@ wc_rm_end(void)
 / using the following value blows up machines! - DO NOT USE
 /	D16 movl	0xffc, %esp
 
-#define LED     0
-#define SERIAL  0
 
 #if     LED
-	D16 movl        $0x80, %edx
+	D16 movl        $WC_LED, %edx
 	D16 movb        $0xd1, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	D16 movl        $0x3f8, %edx
+	D16 movl        $WC_COM, %edx
 	D16 movb        $0x61, %al
 	outb    (%dx)
 #endif
@@ -315,13 +343,13 @@ wc_rm_end(void)
 pestart:
 
 #if     LED
-	D16 movl        $0x80, %edx
+	D16 movl        $WC_LED, %edx
 	D16 movb        $0xd2, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	D16 movl        $0x3f8, %edx
+	D16 movl        $WC_COM, %edx
 	D16 movb        $0x62, %al
 	outb    (%dx)
 #endif
@@ -332,13 +360,13 @@ pestart:
 	 */
 
 #if     LED
-	D16 movl        $0x80, %edx
+	D16 movl        $WC_LED, %edx
 	D16 movb        $0xd3, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	D16 movl        $0x3f8, %edx
+	D16 movl        $WC_COM, %edx
 	D16 movb        $0x63, %al
 	outb    (%dx)
 #endif
@@ -356,13 +384,13 @@ pestart:
 	movl		%eax, %cr4
 
 #if     LED
-	D16 movl        $0x80, %edx
+	D16 movl        $WC_LED, %edx
 	D16 movb        $0xd4, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	D16 movl        $0x3f8, %edx
+	D16 movl        $WC_COM, %edx
 	D16 movb        $0x64, %al
 	outb    (%dx)
 #endif
@@ -387,13 +415,13 @@ pestart:
 	wrmsr
 
 #if     LED
-	D16 movl        $0x80, %edx
+	D16 movl        $WC_LED, %edx
 	D16 movb        $0xd5, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	D16 movl        $0x3f8, %edx
+	D16 movl        $WC_COM, %edx
 	D16 movb        $0x65, %al
 	outb    (%dx)
 #endif
@@ -413,13 +441,13 @@ pestart:
 long_mode_active:
 
 #if     LED
-	D16 movl        $0x80, %edx
+	D16 movl        $WC_LED, %edx
 	D16 movb        $0xd6, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	D16 movl        $0x3f8, %edx
+	D16 movl        $WC_COM, %edx
 	D16 movb        $0x66, %al
 	outb    (%dx)
 #endif
@@ -447,13 +475,13 @@ long_mode_active:
 	 */
 
 #if     LED
-	D16 movl        $0x80, %edx
+	D16 movl        $WC_LED, %edx
 	D16 movb        $0xd7, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	D16 movl        $0x3f8, %edx
+	D16 movl        $WC_COM, %edx
 	D16 movb        $0x67, %al
 	outb    (%dx)
 #endif
@@ -481,39 +509,71 @@ kbdinit:
  */
 cominit:
 	/ init COM1 & COM2
-	xorl		%edx, %edx		/ select COM1
-	D16 movl	$0xe3, %eax		/ ah=0; al=(9600bd|8_bit|nopar)
-	int		$0x14
-	D16 movl	$1, %edx		/ select COM2
-	D16 movl	$0xe3, %eax		/ ah=0; al=(9600bd|8_bit|nopar)
-	int		$0x14
+	
+#if     DEBUG
+/*
+ * on debug kernels we need to initialize COM1 & COM2 here, so that
+ * we can get debug output before the asy driver has resumed
+ */
+
+/ select COM1
+	D16 movl	$[COM1+LCR], %edx
+	D16 movb	$DLAB, %al		/ divisor latch
+	outb	(%dx)
+
+	D16 movl	$[COM1+DLL], %edx	/ divisor latch lsb
+	D16 movb	$B9600L, %al		/ divisor latch
+	outb	(%dx)
+
+	D16 movl	$[COM1+DLH], %edx	/ divisor latch hsb
+	D16 movb	$B9600H, %al		/ divisor latch
+	outb	(%dx)
+
+	D16 movl	$[COM1+LCR], %edx	/ select COM1
+	D16 movb	$[STOP1|BITS8], %al	/ 1 stop bit, 8bit word len
+	outb	(%dx)
+
+	D16 movl	$[COM1+MCR], %edx	/ select COM1
+	D16 movb	$[RTS|DTR], %al		/ data term ready & req to send
+	outb	(%dx)
+
+/ select COM2
+	D16 movl	$[COM2+LCR], %edx
+	D16 movb	$DLAB, %al		/ divisor latch
+	outb	(%dx)
+
+	D16 movl	$[COM2+DLL], %edx	/ divisor latch lsb
+	D16 movb	$B9600L, %al		/ divisor latch
+	outb	(%dx)
+
+	D16 movl	$[COM2+DLH], %edx	/ divisor latch hsb
+	D16 movb	$B9600H, %al		/ divisor latch
+	outb	(%dx)
+
+	D16 movl	$[COM2+LCR], %edx	/ select COM1
+	D16 movb	$[STOP1|BITS8], %al	/ 1 stop bit, 8bit word len
+	outb	(%dx)
+
+	D16 movl	$[COM2+MCR], %edx	/ select COM1
+	D16 movb	$[RTS|DTR], %al		/ data term ready & req to send
+	outb	(%dx)
+#endif	/*	DEBUG	*/
+
 	D16 ret
 
 	.code64
-/*
- * Support routine to re-initialize COM ports to something sane
- */
-cominit64:
-	/ init COM1 & COM2
-	xorq	%rdx, %rdx		/ select COM1
-	movq	$0xe3, %rax		/ ah=0; al=(9600bd|8_bit|nopar)
-	int	$0x14
-	movq	$1, %rdx		/ select COM2
-	movq	$0xe3, %rax		/ ah=0; al=(9600bd|8_bit|nopar)
-	int	$0x14
-	ret
 
 	.globl wc_long_mode_64
 wc_long_mode_64:
 
 #if     LED
-	movw        $0x80, %dx
+	movw        $WC_LED, %dx
 	movb        $0xd8, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	movw        $0x3f8, %dx
+	movw        $WC_COM, %dx
 	movb        $0x68, %al
 	outb    (%dx)
 #endif
@@ -552,14 +612,14 @@ wc_long_mode_64:
 	 */
 
 #if     LED
-	movw        $0x80, %dx
+	movw        $WC_LED, %dx
 	movb        $0xd9, %al
 	outb    (%dx)
 #endif
 
 / JAN this should produce 'i' but we get 'g' instead ???
 #if     SERIAL
-	movw        $0x3f8, %dx
+	movw        $WC_COM, %dx
 	movb        $0x69, %al
 	outb    (%dx)
 #endif
@@ -572,14 +632,14 @@ wc_long_mode_64:
 kernel_wc_code:
 
 #if     LED
-	movw        $0x80, %dx
+	movw        $WC_LED, %dx
 	movb        $0xda, %al
 	outb    (%dx)
 #endif
 
 / JAN this should produce 'j' but we get 'g' instead ???
 #if     SERIAL
-	movw        $0x3f8, %dx
+	movw        $WC_COM, %dx
 	movb        $0x6a, %al
 	outb    (%dx)
 #endif
@@ -593,13 +653,13 @@ kernel_wc_code:
 	addq	$WC_CPU, %rbx
 
 #if     LED
-	movw        $0x80, %dx
+	movw        $WC_LED, %dx
 	movb        $0xdb, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	movw        $0x3f8, %dx
+	movw        $WC_COM, %dx
 	movw        $0x6b, %ax
 	outb    (%dx)
 #endif
@@ -611,13 +671,13 @@ kernel_wc_code:
 	lidtq	WC_IDT(%rbx)
 
 #if     LED
-	movw        $0x80, %dx
+	movw        $WC_LED, %dx
 	movb        $0xdc, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	movw        $0x3f8, %dx
+	movw        $WC_COM, %dx
 	movw        $0x6c, %ax
 	outb    (%dx)
 #endif
@@ -655,13 +715,13 @@ kernel_wc_code:
 	ltr	WC_TR(%rbx)		
 
 #if     LED
-	movw        $0x80, %dx
+	movw        $WC_LED, %dx
 	movb        $0xdd, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	movw        $0x3f8, %dx
+	movw        $WC_COM, %dx
 	movw        $0x6d, %ax
 	outb    (%dx)
 #endif
@@ -697,13 +757,13 @@ kernel_wc_code:
 	movq	%rdx, %cr8
 
 #if     LED
-	movw        $0x80, %dx
+	movw        $WC_LED, %dx
 	movb        $0xde, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	movw        $0x3f8, %dx
+	movw        $WC_COM, %dx
 	movb        $0x6e, %al
 	outb    (%dx)
 #endif
@@ -754,13 +814,13 @@ kernel_wc_code:
 	movw	WC_ES(%rbx), %es
 
 #if     LED
-	movw        $0x80, %dx
+	movw        $WC_LED, %dx
 	movb        $0xdf, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	movw        $0x3f8, %dx
+	movw        $WC_COM, %dx
 	movb        $0x6f, %al
 	outb    (%dx)
 #endif
@@ -770,13 +830,13 @@ kernel_wc_code:
 	movq    WC_RSP(%rbx), %rsp
 
 #if     LED
-	movw        $0x80, %dx
+	movw        $WC_LED, %dx
 	movb        $0xe0, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	movw        $0x3f8, %dx
+	movw        $WC_COM, %dx
 	movb        $0x70, %al
 	outb    (%dx)
 #endif
@@ -788,13 +848,13 @@ kernel_wc_code:
 	popfq
 
 #if     LED
-	movw        $0x80, %dx
+	movw        $WC_LED, %dx
 	movb        $0xe1, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	movw        $0x3f8, %dx
+	movw        $WC_COM, %dx
 	movb        $0x71, %al
 	outb    (%dx)
 #endif
@@ -846,17 +906,14 @@ wc_rm_end:
 	movw		%ax, %ss		/ ... and ss:esp
 	D16 movl	$WC_STKSTART, %esp
 
-#define LED     1
-#define SERIAL  1
-
 #if     LED
-	D16 movl        $0x80, %edx
+	D16 movl        $WC_LED, %edx
 	D16 movb        $0xd1, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	D16 movl        $0x3f8, %edx
+	D16 movl        $WC_COM, %edx
 	D16 movb        $0x61, %al
 	outb    (%dx)
 #endif
@@ -867,13 +924,13 @@ wc_rm_end:
 	D16 call	cominit
 
 #if     LED
-	D16 movl        $0x80, %edx
+	D16 movl        $WC_LED, %edx
 	D16 movb        $0xd2, %al
 	outb    (%dx)
 #endif
 
 #if     SERIAL
-	D16 movl        $0x3f8, %edx
+	D16 movl        $WC_COM, %edx
 	D16 movb        $0x62, %al
 	outb    (%dx)
 #endif
@@ -882,52 +939,67 @@ wc_rm_end:
 
 #if     LED
 	D16 movb        $0xd3, %al
-	outb    $0x80
+	outb    $WC_LED
 #endif
 
 #if     SERIAL
-	D16 movl        $0x3f8, %edx
+	D16 movl        $WC_COM, %edx
 	D16 movb        $0x63, %al
 	outb    (%dx)
 #endif
 
 	D16 A16 movl	%cs:WC_DS(%ebx), %edx	/ %ds post prot/paging transit
 
+#if     LED
 	D16 movb        $0xd4, %al
-	outb    $0x80
+	outb    $WC_LED
+#endif
 
 	D16 A16 lgdt	%cs:WC_GDT(%ebx)	/ restore gdt and idtr
 	D16 A16 lidt	%cs:WC_IDT(%ebx)
 
+#if     LED
 	D16 movb        $0xd5, %al
-	outb    $0x80
+	outb    $WC_LED
+#endif
 
 	D16 A16 movl	%cs:WC_CR4(%ebx), %eax	/ restore cr4
 	D16 andl	$-1!CR4_PGE, %eax	/ don't set Global Enable yet
 	movl		%eax, %cr4
 
+#if     LED
 	D16 movb        $0xd6, %al
-	outb    $0x80
+	outb    $WC_LED
+#endif
 
 	D16 A16 movl	%cs:WC_CR3(%ebx), %eax	/ set PDPT
 	movl		%eax, %cr3
 
+#if     LED
 	D16 movb        $0xd7, %al
-	outb    $0x80
+	outb    $WC_LED
+#endif
 
 	D16 A16 movl	%cs:WC_CR0(%ebx), %eax	/ enable prot/paging, etc.
 	movl		%eax, %cr0
 
+#if     LED
 	D16 movb        $0xd8, %al
-	outb    $0x80
+	outb    $WC_LED
+#endif
 
 	D16 A16 movl	%cs:WC_VIRTADDR(%ebx), %ebx	/ virtaddr of wc_cpu_t
 
+#if     LED
 	D16 movb        $0xd9, %al
-	outb    $0x80
+	outb    $WC_LED
+#endif
 
+#if     LED
 	D16 movb        $0xda, %al
-	outb    $0x80
+	outb    $WC_LED
+#endif
+
 	jmp		flush			/ flush prefetch queue
 flush:
 	D16 pushl	$KCS_SEL
@@ -951,13 +1023,55 @@ kbdinit:
  * Support routine to re-initialize COM ports to something sane for debug output
  */
 cominit:
-	/ init COM1 & COM2
-	xorl		%edx, %edx		/ select COM1
-	D16 movl	$0xe3, %eax		/ ah=0; al=(9600bd|8_bit|nopar)
-	int		$0x14
-	D16 movl	$1, %edx		/ select COM2
-	D16 movl	$0xe3, %eax		/ ah=0; al=(9600bd|8_bit|nopar)
-	int		$0x14
+#if     DEBUG
+/*
+ * on debug kernels we need to initialize COM1 & COM2 here, so that
+ * we can get debug output before the asy driver has resumed
+ */
+
+/ select COM1
+	D16 movl	$[COM1+LCR], %edx
+	D16 movb	$DLAB, %al		/ divisor latch
+	outb	(%dx)
+
+	D16 movl	$[COM1+DLL], %edx	/ divisor latch lsb
+	D16 movb	$B9600L, %al		/ divisor latch
+	outb	(%dx)
+
+	D16 movl	$[COM1+DLH], %edx	/ divisor latch hsb
+	D16 movb	$B9600H, %al		/ divisor latch
+	outb	(%dx)
+
+	D16 movl	$[COM1+LCR], %edx	/ select COM1
+	D16 movb	$[STOP1|BITS8], %al	/ 1 stop bit, 8bit word len
+	outb	(%dx)
+
+	D16 movl	$[COM1+MCR], %edx	/ select COM1
+	D16 movb	$[RTS|DTR], %al		/ 1 stop bit, 8bit word len
+	outb	(%dx)
+
+/ select COM2
+	D16 movl	$[COM2+LCR], %edx
+	D16 movb	$DLAB, %al		/ divisor latch
+	outb	(%dx)
+
+	D16 movl	$[COM2+DLL], %edx	/ divisor latch lsb
+	D16 movb	$B9600L, %al		/ divisor latch
+	outb	(%dx)
+
+	D16 movl	$[COM2+DLH], %edx	/ divisor latch hsb
+	D16 movb	$B9600H, %al		/ divisor latch
+	outb	(%dx)
+
+	D16 movl	$[COM2+LCR], %edx	/ select COM1
+	D16 movb	$[STOP1|BITS8], %al	/ 1 stop bit, 8bit word len
+	outb	(%dx)
+
+	D16 movl	$[COM2+MCR], %edx	/ select COM1
+	D16 movb	$[RTS|DTR], %al		/ 1 stop bit, 8bit word len
+	outb	(%dx)
+#endif	/*	DEBUG	*/
+
 	D16 ret
 
 	.globl wc_rm_end
@@ -973,14 +1087,19 @@ kernel_wc_code:
 	/ %ebx is wc_cpu
 	/ %dx is our ds
 
+#if     LED
 	D16 movb        $0xdb, %al
-	outb	$0x80
+	outb	$WC_LED
+#endif
 
 / got here OK
 
 	movw	%dx, %ds		/ $KDS_SEL
+
+#if     LED
 	movb	$0xdc, %al
-	outb	$0x80
+	outb	$WC_LED
+#endif
 
 	/*
 	 * Before proceeding, enable usage of the page table NX bit if
