@@ -125,5 +125,5 @@
 @ MSG_SYM_DLACT		"rtld_db_dlactivity"
 @ MSG_SYM_RTBIND	"elf_rtbndr"
 @ MSG_SYM_DYNAMIC	"_DYNAMIC"
-@ MSG_SYM_BRANDOPS32	"rtld_db_brand_ops32"
-@ MSG_SYM_BRANDOPS64	"rtld_db_brand_ops64"
+@ MSG_SYM_BRANDOPS_32	"rtld_db_brand_ops32"
+@ MSG_SYM_BRANDOPS_64	"rtld_db_brand_ops64"

@@ -2557,18 +2557,19 @@ is_sym_interposer(Rt_map *lmp, Sym *sym)
  * are a form of interposition.
  */
 static Sym *
-lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list *lml,
-    Sym *osym, int *in_nfavl)
+lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Sym *osym,
+    int *in_nfavl)
 {
-	Rt_map		*lmp;
+	Rt_map		*lmp, *clmp;
 	Slookup		sl;
+	Lm_list		*lml;
 
 	/*
 	 * If we've bound to a copy relocation definition then we need to assign
 	 * this binding to the original copy reference.  Fabricate an inter-
 	 * position diagnostic, as this is a legitimate form of interposition.
 	 */
-	if (FLAGS1(*dlmp) & FL1_RT_COPYTOOK) {
+	if (osym && (FLAGS1(*dlmp) & FL1_RT_COPYTOOK)) {
 		Rel_copy	*rcp;
 		Aliste		idx;
 
@@ -2582,6 +2583,19 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list *lml,
 			}
 		}
 	}
+
+	/*
+	 * If a symbol binding has been established, inspect the link-map list
+	 * of the destination object, otherwise use the link-map list of the
+	 * original caller.
+	 */
+	if (osym)
+		clmp = *dlmp;
+	else
+		clmp = slp->sl_cmap;
+
+	lml = LIST(clmp);
+	lmp = lml->lm_head;
 
 	/*
 	 * Prior to Solaris 8, external references from an executable that were
@@ -2603,15 +2617,15 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list *lml,
 	 * .bss symbol definition as has been directly bound to, redirect the
 	 * binding to the executables data definition.
 	 */
-	lmp = lml->lm_head;
-	sl = *slp;
-	sl.sl_imap = lmp;
-
-	if (((FLAGS2(lmp) & FL2_RT_DTFLAGS) == 0) && (FCT(lmp) == &elf_fct) &&
+	if (osym && ((FLAGS2(lmp) & FL2_RT_DTFLAGS) == 0) &&
+	    (FCT(lmp) == &elf_fct) &&
 	    (ELF_ST_TYPE(osym->st_info) != STT_FUNC) &&
 	    are_bits_zero(*dlmp, osym, 0)) {
 		Rt_map	*ilmp;
 		Sym	*isym;
+
+		sl = *slp;
+		sl.sl_imap = lmp;
 
 		/*
 		 * Determine whether the same symbol name exists within the
@@ -2640,6 +2654,7 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list *lml,
 	 */
 	lmp = lml->lm_head;
 	sl = *slp;
+
 	if (((FLAGS(lmp) & MSK_RT_INTPOSE) == 0) || (sl.sl_flags & LKUP_COPY))
 		lmp = (Rt_map *)NEXT(lmp);
 
@@ -2649,7 +2664,7 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Lm_list *lml,
 		if ((FLAGS(lmp) & MSK_RT_INTPOSE) == 0)
 			break;
 
-		if (callable(lmp, *dlmp, 0, sl.sl_flags)) {
+		if (callable(lmp, clmp, 0, sl.sl_flags)) {
 			Rt_map	*ilmp;
 			Sym	*isym;
 
@@ -2720,7 +2735,7 @@ lookup_sym_direct(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Syminfo *sip,
 	 */
 	sl = *slp;
 	sl.sl_flags |= LKUP_DIRECT;
-	sym = 0;
+	sym = NULL;
 
 	if (sip->si_boundto == SYMINFO_BT_PARENT) {
 		Aliste		idx1;
@@ -2776,15 +2791,17 @@ found:
 		*binfo |= DBG_BINFO_DIRECT;
 
 	/*
-	 * If we've bound to an object, determine whether that object can be
-	 * interposed upon for this symbol.
+	 * If a reference to a directly bound symbol can't be satisfied, then
+	 * determine whether an interposer can provide the missing symbol.  If
+	 * a reference to a directly bound symbol is satisfied, then determine
+	 * whether that object can be interposed upon for this symbol.
 	 */
-	if (sym && (LIST(*dlmp)->lm_head != *dlmp) &&
-	    (LIST(*dlmp) == LIST(clmp))) {
+	if ((sym == NULL) || ((LIST(*dlmp)->lm_head != *dlmp) &&
+	    (LIST(*dlmp) == LIST(clmp)))) {
 		Sym	*isym;
 
-		if ((isym = lookup_sym_interpose(slp, dlmp, binfo,
-		    LIST(*dlmp), sym, in_nfavl)) != 0)
+		if ((isym = lookup_sym_interpose(slp, dlmp, binfo, sym,
+		    in_nfavl)) != 0)
 			return (isym);
 	}
 
@@ -3131,11 +3148,11 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 	 * determine if it is necessary to follow a binding from outside of
 	 * the group.
 	 */
-	if (sym && ((MODE(clmp) & (RTLD_GROUP | RTLD_WORLD)) == RTLD_GROUP)) {
+	if ((MODE(clmp) & (RTLD_GROUP | RTLD_WORLD)) == RTLD_GROUP) {
 		Sym	*isym;
 
-		if ((isym = lookup_sym_interpose(slp, dlmp, binfo, LIST(*dlmp),
-		    sym, in_nfavl)) != 0)
+		if ((isym = lookup_sym_interpose(slp, dlmp, binfo, sym,
+		    in_nfavl)) != 0)
 			return (isym);
 	}
 	return (sym);

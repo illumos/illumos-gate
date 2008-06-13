@@ -55,19 +55,19 @@
 #define	validate_rdebug32	validate_rdebug64
 #define	TList			List
 #define	TListnode		Listnode
-#define	MSG_SYM_BRANDOPS	MSG_SYM_BRANDOPS64
+#define	MSG_SYM_BRANDOPS	MSG_SYM_BRANDOPS_64
 #else	/* ELF32 */
 #define	Rt_map			Rt_map32
 #define	Rtld_db_priv		Rtld_db_priv32
 #define	TList			List32
 #define	TListnode		Listnode32
 #define	Lm_list			Lm_list32
-#define	MSG_SYM_BRANDOPS	MSG_SYM_BRANDOPS32
+#define	MSG_SYM_BRANDOPS	MSG_SYM_BRANDOPS_32
 #endif	/* _ELF64 */
 #else	/* _LP64 */
 #define	TList			List
 #define	TListnode		Listnode
-#define	MSG_SYM_BRANDOPS	MSG_SYM_BRANDOPS32
+#define	MSG_SYM_BRANDOPS	MSG_SYM_BRANDOPS_32
 #endif	/* _LP64 */
 
 /*
@@ -341,6 +341,8 @@ _rd_reset32(struct rd_agent *rap)
 
 		LOG(ps_plog(MSG_ORIG(MSG_DB_HELPERLOADED), brandname));
 		break;
+
+		/* NOTREACHED */
 	}
 
 	if ((rap->rd_flags & RDF_FL_COREFILE) == 0) {

@@ -1359,3 +1359,6 @@ Bugid   Risk Synopsis
 6705846 multithreaded C++ application seems to get deadlocked in the dynamic
 	linker code
 6686343 ldd(1) - unused search path diagnosis should be enabled
+6599700 librtld_db needs better plugin support (link-editor components only)
+6713830 mdb dumped core reading a gcore
+6712292 ld.so.1 should fall back to an interposer for failed direct bindings
