@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@
 #include <sys/zone.h>
 #include <sys/condvar.h>
 #include <sys/thread.h>
+#include <sys/sdt.h>
 
 /*
  * Administrivia system call.  We provide this in two flavors: one for calling
@@ -147,6 +148,7 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 	case A_REMOUNT:
 	case A_FREEZE:
 	case A_DUMP:
+	case A_SDTTEST:
 		if (secpolicy_sys_config(credp, B_FALSE) != 0)
 			return (EPERM);
 		break;
@@ -354,6 +356,13 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 
 		panic("forced crash dump initiated at user request");
 		/*NOTREACHED*/
+	}
+
+	case A_SDTTEST:
+	{
+		DTRACE_PROBE7(test, int, 1, int, 2, int, 3, int, 4, int, 5,
+		    int, 6, int, 7);
+		break;
 	}
 
 	default:

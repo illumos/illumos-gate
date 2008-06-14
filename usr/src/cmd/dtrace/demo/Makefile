@@ -52,6 +52,8 @@ DFILES = \
 	iosnoop.d \
 	iothrough.d \
 	iotime.d \
+	ipio.d \
+	ipproto.d \
 	iprb.d \
 	kstat.d \
 	ksyms.d \

@@ -1256,6 +1256,13 @@ ip_multicast_loopback(queue_t *q, ill_t *ill, mblk_t *mp_orig, int fanout_flags,
 
 	iph = (ipha_t *)mp->b_rptr;
 
+	/*
+	 * DTrace this as ip:::send.  A blocked packet will fire the send
+	 * probe, but not the receive probe.
+	 */
+	DTRACE_IP7(send, mblk_t *, ipsec_mp, conn_t *, NULL, void_ip_t *, iph,
+	    __dtrace_ipsr_ill_t *, ill, ipha_t *, iph, ip6_t *, NULL, int, 1);
+
 	DTRACE_PROBE4(ip4__loopback__out__start,
 	    ill_t *, NULL, ill_t *, ill,
 	    ipha_t *, iph, mblk_t *, ipsec_mp);

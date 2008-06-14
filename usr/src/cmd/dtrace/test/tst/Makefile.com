@@ -42,9 +42,11 @@ DSRCS :sh= find . -name SCCS -prune -o -name *.d -print | cut -b3-
 
 TSTS :sh= find . -name tst.*.d -o -name err.*.d -o \
 	-name tst.*.d.out -o -name err.*.d.out -o -name tst.*.ksh \
-	-o -name err.*.ksh -o -name tst.*.ksh.out -o -name drp.*.d
+	-o -name err.*.ksh -o -name tst.*.ksh.out -o -name drp.*.d \
+	-o -name get.*.pl
 
-EXES :sh= find . -name SCCS -prune -o -name *.exe -print | cut -b3-
+EXES :sh= find . -name SCCS -prune -o \( -name *.exe -o -name \*.pl \) -print \
+    | cut -b3-
 EXES += $(CSRCS:%.c=%.exe)
 EXES += $(SSRCS:%.s=%.exe)
 

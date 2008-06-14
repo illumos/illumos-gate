@@ -605,7 +605,8 @@ static int	conn_set_held_ipif(conn_t *, ipif_t **, ipif_t *);
 
 static int	ip_open(queue_t *q, dev_t *devp, int flag, int sflag,
 		    cred_t *credp, boolean_t isv6);
-static mblk_t	*ip_wput_attach_llhdr(mblk_t *, ire_t *, ip_proc_t, uint32_t);
+static mblk_t	*ip_wput_attach_llhdr(mblk_t *, ire_t *, ip_proc_t, uint32_t,
+		    ipha_t **);
 
 static void	icmp_frag_needed(queue_t *, mblk_t *, int, zoneid_t,
 		    ip_stack_t *);
@@ -14038,6 +14039,11 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
 		if (mp == NULL)
 			goto drop;
+
+		DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL, void_ip_t *,
+		    ipha, __dtrace_ipsr_ill_t *, stq_ill, ipha_t *, ipha,
+		    ip6_t *, NULL, int, 0);
+
 		putnext(ire->ire_stq, mp);
 	}
 	return (ire);
@@ -15065,6 +15071,10 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 
 		/* Obtain the dst of the current packet */
 		dst = ipha->ipha_dst;
+
+		DTRACE_IP7(receive, mblk_t *, first_mp, conn_t *, NULL,
+		    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, ill, ipha_t *,
+		    ipha, ip6_t *, NULL, int, 0);
 
 		/*
 		 * The following test for loopback is faster than
@@ -23424,6 +23434,14 @@ nullstq:
 			 */
 			out_ill = ire_to_ill(ire);
 
+			/*
+			 * DTrace this as ip:::send.  A blocked packet will
+			 * fire the send probe, but not the receive probe.
+			 */
+			DTRACE_IP7(send, mblk_t *, first_mp, conn_t *, NULL,
+			    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, out_ill,
+			    ipha_t *, ipha, ip6_t *, NULL, int, 1);
+
 			DTRACE_PROBE4(ip4__loopback__out__start,
 			    ill_t *, NULL, ill_t *, out_ill,
 			    ipha_t *, ipha, mblk_t *, first_mp);
@@ -23449,6 +23467,14 @@ nullstq:
 		}
 
 		out_ill = ire_to_ill(ire);
+
+		/*
+		 * DTrace this as ip:::send.  A blocked packet will fire the
+		 * send probe, but not the receive probe.
+		 */
+		DTRACE_IP7(send, mblk_t *, first_mp, conn_t *, NULL,
+		    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, out_ill,
+		    ipha_t *, ipha, ip6_t *, NULL, int, 1);
 
 		DTRACE_PROBE4(ip4__loopback__out__start,
 		    ill_t *, NULL, ill_t *, out_ill,
@@ -23981,6 +24007,10 @@ free_mmd:		IP_STAT(ipst, ip_frag_mdt_discarded);
 		 * the header, so this is easy to pass to ip_csum.
 		 */
 		ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
+
+		DTRACE_IP7(send, mblk_t *, md_mp, conn_t *, NULL, void_ip_t *,
+		    ipha, __dtrace_ipsr_ill_t *, ill, ipha_t *, ipha, ip6_t *,
+		    NULL, int, 0);
 
 		/*
 		 * Record offset and size of header and data of the next packet
@@ -24525,6 +24555,10 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, xmit_mp);
 
 		if (xmit_mp != NULL) {
+			DTRACE_IP7(send, mblk_t *, xmit_mp, conn_t *, NULL,
+			    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, out_ill,
+			    ipha_t *, ipha, ip6_t *, NULL, int, 0);
+
 			putnext(q, xmit_mp);
 
 			BUMP_MIB(out_ill->ill_ip_mib, ipIfStatsHCOutTransmits);
@@ -24830,6 +24864,11 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 				mp_orig = mp;
 
 			if (xmit_mp != NULL) {
+				DTRACE_IP7(send, mblk_t *, xmit_mp, conn_t *,
+				    NULL, void_ip_t *, ipha,
+				    __dtrace_ipsr_ill_t *, out_ill, ipha_t *,
+				    ipha, ip6_t *, NULL, int, 0);
+
 				putnext(q, xmit_mp);
 
 				BUMP_MIB(out_ill->ill_ip_mib,
@@ -25046,6 +25085,10 @@ ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
 
 	if (first_mp == NULL)
 		return;
+
+	DTRACE_IP7(receive, mblk_t *, first_mp, conn_t *, NULL, void_ip_t *,
+	    ipha, __dtrace_ipsr_ill_t *, ill, ipha_t *, ipha, ip6_t *, NULL,
+	    int, 1);
 
 	ipst->ips_loopback_packets++;
 
@@ -25474,7 +25517,8 @@ ip_wput_multicast(queue_t *q, mblk_t *mp, ipif_t *ipif, zoneid_t zoneid)
  * marking, if needed.
  */
 static mblk_t *
-ip_wput_attach_llhdr(mblk_t *mp, ire_t *ire, ip_proc_t proc, uint32_t ill_index)
+ip_wput_attach_llhdr(mblk_t *mp, ire_t *ire, ip_proc_t proc,
+    uint32_t ill_index, ipha_t **iphap)
 {
 	uint_t	hlen;
 	ipha_t *ipha;
@@ -25567,8 +25611,15 @@ unlock_err:
 			ip_process(proc, &mp1, ill_index);
 			if (mp1 == NULL)
 				return (NULL);
+
+			if (mp1->b_cont == NULL)
+				ipha = NULL;
+			else
+				ipha = (ipha_t *)mp1->b_cont->b_rptr;
 		}
 	}
+
+	*iphap = ipha;
 	return (mp1);
 #undef rptr
 }
@@ -25762,6 +25813,14 @@ send:
 
 		/* PFHooks: LOOPBACK_OUT */
 		out_ill = ire_to_ill(ire);
+
+		/*
+		 * DTrace this as ip:::send.  A blocked packet will fire the
+		 * send probe, but not the receive probe.
+		 */
+		DTRACE_IP7(send, mblk_t *, ipsec_mp, conn_t *, NULL,
+		    void_ip_t *, ip6h, __dtrace_ipsr_ill_t *, out_ill,
+		    ipha_t *, NULL, ip6_t *, ip6h, int, 1);
 
 		DTRACE_PROBE4(ip6__loopback__out__start,
 		    ill_t *, NULL, ill_t *, out_ill,
@@ -26098,6 +26157,14 @@ send:
 
 		/* PFHooks: LOOPBACK_OUT */
 		out_ill = ire_to_ill(ire);
+
+		/*
+		 * DTrace this as ip:::send.  A blocked packet will fire the
+		 * send probe, but not the receive probe.
+		 */
+		DTRACE_IP7(send, mblk_t *, ipsec_mp, conn_t *, NULL,
+		    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, out_ill,
+		    ipha_t *, ipha, ip6_t *, NULL, int, 1);
 
 		DTRACE_PROBE4(ip4__loopback__out__start,
 		    ill_t *, NULL, ill_t *, out_ill,
@@ -29839,6 +29906,7 @@ ipxmit_state_t
 ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
 {
 	nce_t		*arpce;
+	ipha_t		*ipha;
 	queue_t		*q;
 	int		ill_index;
 	mblk_t		*nxt_mp, *first_mp;
@@ -29886,13 +29954,14 @@ ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
 			out_ill = ire_to_ill(ire);
 			ill_index = out_ill->ill_phyint->phyint_ifindex;
 			first_mp = ip_wput_attach_llhdr(mp, ire, proc,
-			    ill_index);
+			    ill_index, &ipha);
 			if (first_mp == NULL) {
 				xmit_drop = B_TRUE;
 				BUMP_MIB(out_ill->ill_ip_mib,
 				    ipIfStatsOutDiscards);
 				goto next_mp;
 			}
+
 			/* non-ipsec hw accel case */
 			if (io == NULL || !io->ipsec_out_accelerated) {
 				/* send it */
@@ -29913,6 +29982,12 @@ ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
 					}
 					UPDATE_IP_MIB_OB_COUNTERS(out_ill,
 					    pkt_len);
+
+					DTRACE_IP7(send, mblk_t *, first_mp,
+					    conn_t *, NULL, void_ip_t *, ipha,
+					    __dtrace_ipsr_ill_t *, out_ill,
+					    ipha_t *, ipha, ip6_t *, NULL, int,
+					    0);
 
 					putnext(q, first_mp);
 				} else {
@@ -29937,6 +30012,13 @@ ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
 				} else {
 					UPDATE_IP_MIB_OB_COUNTERS(ill1,
 					    pkt_len);
+
+					DTRACE_IP7(send, mblk_t *, first_mp,
+					    conn_t *, NULL, void_ip_t *, ipha,
+					    __dtrace_ipsr_ill_t *, ill1,
+					    ipha_t *, ipha, ip6_t *, NULL,
+					    int, 0);
+
 					ipsec_hw_putnext(ire->ire_stq, mp);
 				}
 			}

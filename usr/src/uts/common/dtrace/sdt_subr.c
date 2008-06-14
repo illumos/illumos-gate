@@ -91,6 +91,7 @@ sdt_provider_t sdt_providers[] = {
 	{ "sched", "__sched_", &stab_attr, 0 },
 	{ "proc", "__proc_", &stab_attr, 0 },
 	{ "io", "__io_", &stab_attr, 0 },
+	{ "ip", "__ip_", &stab_attr, 0 },
 	{ "mib", "__mib_", &stab_attr, 0 },
 	{ "fsinfo", "__fsinfo_", &fsinfo_attr, 0 },
 	{ "nfsv3", "__nfsv3_", &stab_attr, 0 },
@@ -787,6 +788,21 @@ sdt_argdesc_t sdt_args[] = {
 	{ "nfsv4", "cb-recall-done", 1, 1, "rfs4_deleg_state_t *",
 	    "nfsv4cbinfo_t *" },
 	{ "nfsv4", "cb-recall-done", 2, 2, "CB_RECALL4res *" },
+
+	{ "ip", "send", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "ip", "send", 1, 1, "conn_t *", "csinfo_t *" },
+	{ "ip", "send", 2, 2, "void_ip_t *", "ipinfo_t *" },
+	{ "ip", "send", 3, 3, "__dtrace_ipsr_ill_t *", "ifinfo_t *" },
+	{ "ip", "send", 4, 4, "ipha_t *", "ipv4info_t *" },
+	{ "ip", "send", 5, 5, "ip6_t *", "ipv6info_t *" },
+	{ "ip", "send", 6, 6, "int" }, /* used by __dtrace_ipsr_ill_t */
+	{ "ip", "receive", 0, 0, "mblk_t *", "pktinfo_t *" },
+	{ "ip", "receive", 1, 1, "conn_t *", "csinfo_t *" },
+	{ "ip", "receive", 2, 2, "void_ip_t *", "ipinfo_t *" },
+	{ "ip", "receive", 3, 3, "__dtrace_ipsr_ill_t *", "ifinfo_t *" },
+	{ "ip", "receive", 4, 4, "ipha_t *", "ipv4info_t *" },
+	{ "ip", "receive", 5, 5, "ip6_t *", "ipv6info_t *" },
+	{ "ip", "receive", 6, 6, "int" }, /* used by __dtrace_ipsr_ill_t */
 
 	{ "sysevent", "post", 0, 0, "evch_bind_t *", "syseventchaninfo_t *" },
 	{ "sysevent", "post", 1, 1, "sysevent_impl_t *", "syseventinfo_t *" },

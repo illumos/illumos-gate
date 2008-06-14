@@ -542,6 +542,13 @@ typedef struct ipha_s {
 	ipaddr_t	ipha_dst;
 } ipha_t;
 
+/*
+ * IP Flags
+ *
+ * Some of these constant names are copied for the DTrace IP provider in
+ * usr/src/lib/libdtrace/common/{ip.d.in, ip.sed.in}, which should be kept
+ * in sync.
+ */
 #define	IPH_DF		0x4000	/* Don't fragment */
 #define	IPH_MF		0x2000	/* More fragments to come */
 #define	IPH_OFFSET	0x1FFF	/* Where the offset lives */

@@ -6352,8 +6352,12 @@ udp_xmit(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, zoneid_t zoneid)
 		    ipst->ips_ipv4firewall_physical_out,
 		    NULL, ill, ipha, mp, mp, ll_multicast, ipst);
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
-		if (mp != NULL)
+		if (mp != NULL) {
+			DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL,
+			    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, ill,
+			    ipha_t *, ipha, ip6_t *, NULL, int, 0);
 			putnext(ire->ire_stq, mp);
+		}
 	}
 
 	IRE_REFRELE(ire);

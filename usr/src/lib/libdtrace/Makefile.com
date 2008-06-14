@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -97,6 +97,7 @@ CLEANFILES += dt_lex.c dt_grammar.c dt_grammar.h y.output
 CLEANFILES += ../common/procfs.sed ../common/procfs.d
 CLEANFILES += ../common/io.sed ../common/io.d
 CLEANFILES += ../common/ip.sed ../common/ip.d
+CLEANFILES += ../common/net.sed ../common/net.d
 CLEANFILES += ../common/errno.d ../common/signal.d
 CLEANFILES += ../common/dt_errtags.c ../common/dt_names.c
 CLEANFILES += ../common/sysevent.sed ../common/sysevent.d
@@ -171,6 +172,9 @@ pics/dt_lex.o pics/dt_grammar.o := CCVERBOSE =
 
 ../common/ip.d: ../common/ip.sed ../common/ip.d.in
 	sed -f ../common/ip.sed < ../common/ip.d.in > $@
+
+../common/net.d: ../common/net.sed ../common/net.d.in
+	sed -f ../common/net.sed < ../common/net.d.in > $@
 
 ../common/sysevent.d: ../common/sysevent.sed ../common/sysevent.d.in
 	sed -f ../common/sysevent.sed < ../common/sysevent.d.in > $@

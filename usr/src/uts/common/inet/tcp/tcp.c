@@ -1464,6 +1464,11 @@ int cl_tcp_walk_list(int (*callback)(cl_tcp_info_t *, void *), void *arg);
 static int cl_tcp_walk_list_stack(int (*callback)(cl_tcp_info_t *, void *),
     void *arg, tcp_stack_t *tcps);
 
+#define	DTRACE_IP_FASTPATH(mp, iph, ill, ipha, ip6h) 			\
+	DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL, void_ip_t *,	\
+	    iph, __dtrace_ipsr_ill_t *, ill, ipha_t *, ipha,		\
+	    ip6_t *, ip6h, int, 0);
+
 /*
  * Figure out the value of window scale opton.  Note that the rwnd is
  * ASSUMED to be rounded up to the nearest MSS before the calculation.
@@ -19661,8 +19666,11 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		    ipst->ips_ipv4firewall_physical_out,
 		    NULL, out_ill, ipha, mp, mp, 0, ipst);
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
-		if (mp != NULL)
+
+		if (mp != NULL) {
+			DTRACE_IP_FASTPATH(mp, ipha, out_ill, ipha, NULL);
 			putnext(ire->ire_stq, mp);
+		}
 	}
 	IRE_REFRELE(ire);
 }
@@ -20708,6 +20716,10 @@ legacy_send_no_md:
 		do {
 			len = seg_len;
 
+			/* one must remain NULL for DTRACE_IP_FASTPATH */
+			ipha = NULL;
+			ip6h = NULL;
+
 			ASSERT(len > 0);
 			ASSERT(max_pld >= 0);
 			ASSERT(!add_buffer || cur_pld_off == 0);
@@ -21259,6 +21271,7 @@ legacy_send_no_md:
 					 * Need to pass it to normal path.
 					 */
 					CALL_IP_WPUT(tcp->tcp_connp, q, mp);
+					mp = NULL;
 				} else if (mp == NULL ||
 				    mp->b_rptr != pkt_info->hdr_rptr ||
 				    mp->b_wptr != pkt_info->hdr_wptr ||
@@ -21304,7 +21317,7 @@ legacy_send_no_md:
 						    q, mp);
 					} while (mp1 != NULL);
 
-					fw_mp_head = NULL;
+					fw_mp_head = mp = NULL;
 				} else {
 					if (fw_mp_head == NULL)
 						fw_mp_head = mp;
@@ -21312,6 +21325,11 @@ legacy_send_no_md:
 						fw_mp_head->b_prev->b_next = mp;
 					fw_mp_head->b_prev = mp;
 				}
+			}
+
+			if (mp != NULL) {
+				DTRACE_IP_FASTPATH(md_hbuf, pkt_info->hdr_rptr,
+				    ill, ipha, ip6h);
 			}
 
 			/* advance header offset */
@@ -21612,8 +21630,11 @@ tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
 		    ipst->ips_ipv4firewall_physical_out,
 		    NULL, out_ill, ipha, mp, mp, 0, ipst);
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
-		if (mp != NULL)
+
+		if (mp != NULL) {
+			DTRACE_IP_FASTPATH(mp, ipha, out_ill, ipha, NULL);
 			putnext(ire->ire_stq, mp);
+		}
 	}
 }
 

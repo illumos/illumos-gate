@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -186,6 +186,10 @@ struct	linger {
 
 /*
  * Address families.
+ *
+ * Some of these constant names are copied for the DTrace IP provider in
+ * usr/src/lib/libdtrace/common/{ip.d.in, ip.sed.in}, which should be kept
+ * in sync.
  */
 #define	AF_UNSPEC	0		/* unspecified */
 #define	AF_UNIX		1		/* local to host (pipes, portals) */

@@ -49,6 +49,7 @@ extern "C" {
 #define	A_FTRACE	15
 #define	A_SWAPCTL	16
 /*			17-21	   reserved for obsolete interface */
+#define	A_SDTTEST	22	/* DTrace sdt:::test */
 
 #define	AD_UNKNOWN	-1	/* no method */
 #define	AD_HALT		0	/* halt the processor */

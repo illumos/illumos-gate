@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -90,7 +90,7 @@ sub chaps_read {
 }	
 
 sub chaps_ascending {
-	$chaps{$a}{number} <=> $chaps{$b}{number};
+	$chaps{$a}{index} <=> $chaps{$b}{index};
 }
 
 sub demo_process {
@@ -108,9 +108,9 @@ sub demo_process {
 			print OUT <<EOF;
  *
  * This D script is used as an example in the Solaris Dynamic Tracing Guide
- * in Chapter $chaps{$chap}{number}, \"$chaps{$chap}{title}\".
+ * wiki in the \"$chaps{$chap}{title}\" Chapter.
  *
- * The full text of Chapter $chaps{$chap}{number} may be found here:
+ * The full text of the this chapter may be found here:
  *
  *   $chaps{$chap}{url}
  *
@@ -123,6 +123,9 @@ sub demo_process {
 EOF
 		}
 	}
+
+	close (DEMO);
+	close (OUT);
 }
 
 sub demo_find {
@@ -187,7 +190,6 @@ sub chaps_process {
 		print HTML "<tr>\n";
 		print HTML "<td align=left>";
 		print HTML "<a href=\"$chaps{$chap}{url}\">";
-		print HTML "Chapter $chaps{$chap}{number}: ";
 		print HTML "$chaps{$chap}{title}</a></td>\n";
 
 		print HTML "<td><table border=0>\n";

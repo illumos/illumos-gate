@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 #include <sys/sunddi.h>
 #include <sys/socket.h>
 #include <sys/neti.h>
+#include <sys/sdt.h>
 
 #include <netinet/in.h>
 #include <inet/common.h>
@@ -871,6 +872,10 @@ ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6,
 				freemsg(mp);
 				return (1);
 			}
+			DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL,
+			    void_ip_t *, ip6h, __dtrace_ipsr_ill_t *,
+			    ire->ire_ipif->ipif_ill, ipha_t *, NULL, ip6_t *,
+			    ip6h, int, 1);
 			ip_wput_local_v6(ire->ire_rfq,
 			    ire->ire_ipif->ipif_ill, ip6h, mp, ire, 0);
 			ire_refrele(ire);
@@ -1311,13 +1316,13 @@ ip_ni_queue_func_impl(injection_t *inject,  boolean_t out)
 			conn->conn_src_preferences = IPV6_PREFER_SRC_DEFAULT;
 			conn->conn_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;
 			ip_output_v6(conn, packet->ni_packet, ill->ill_wq,
-				IP_WPUT);
+			    IP_WPUT);
 		} else {
 			conn->conn_af_isv6 = B_FALSE;
 			conn->conn_pkt_isv6 = B_FALSE;
 			conn->conn_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;
 			ip_output(conn, packet->ni_packet, ill->ill_wq,
-				IP_WPUT);
+			    IP_WPUT);
 		}
 
 		CONN_DEC_REF(conn);

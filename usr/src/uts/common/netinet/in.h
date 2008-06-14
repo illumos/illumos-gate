@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -142,6 +142,10 @@ typedef	uint16_t	sa_family_t;
 
 /*
  * Protocols
+ *
+ * Some of these constant names are copied for the DTrace IP provider in
+ * usr/src/lib/libdtrace/common/{ip.d.in, ip.sed.in}, which should be kept
+ * in sync.
  */
 #define	IPPROTO_IP		0		/* dummy for IP */
 #define	IPPROTO_HOPOPTS		0		/* Hop by hop header for IPv6 */

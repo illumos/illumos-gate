@@ -1,110 +1,115 @@
 name: book
 title: Solaris Dynamic Tracing Guide
-number: 0
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 0
+url: http://wikis.sun.com/display/DTrace/Documentation
 
 name: act
 title: Actions and Subroutines
-number: 10
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 10
+url: http://wikis.sun.com/display/DTrace/Actions+and+Subroutines
 
 name: agg
 title: Aggregations
-number: 9
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 9
+url: http://wikis.sun.com/display/DTrace/Aggregations
 
 name: anon
 title: Anonymous Tracing
-number: 34
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 34
+url: http://wikis.sun.com/display/DTrace/Anonymous+Tracing
 
 name: buf
 title: Buffers and Buffering
-number: 11
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 11
+url: http://wikis.sun.com/display/DTrace/Buffers+and+Buffering
 
 name: dtrace
 title: dtrace Provider
-number: 17
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 17
+url: http://wikis.sun.com/display/DTrace/dtrace+Provider
 
 name: fbt
 title: fbt Provider
-number: 20
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 20
+url: http://wikis.sun.com/display/DTrace/fbt+Provider
 
 name: intro
 title: Introduction
-number: 1
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 1
+url: http://wikis.sun.com/display/DTrace/Introduction
 
 name: io
 title: io Provider
-number: 27
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 27
+url: http://wikis.sun.com/display/DTrace/io+Provider
 
 name: lockstat
 title: lockstat Provider
-number: 18
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 18
+url: http://wikis.sun.com/display/DTrace/lockstat+Provider
 
 name: out
 title: Output Formatting
-number: 12
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 12
+url: http://wikis.sun.com/display/DTrace/Output+Formatting
 
 name: proc
 title: proc Provider
-number: 25
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 25
+url: http://wikis.sun.com/display/DTrace/proc+Provider
 
 name: profile
 title: profile Provider
-number: 19
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 19
+url: http://wikis.sun.com/display/DTrace/profile+Provider
 
 name: sched
 title: sched Provider
-number: 26
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 26
+url: http://wikis.sun.com/display/DTrace/sched+Provider
 
 name: script
 title: Scripting
-number: 15
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 15
+url: http://wikis.sun.com/display/DTrace/Scripting
 
 name: sdt
 title: sdt Provider
-number: 22
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 22
+url: http://wikis.sun.com/display/DTrace/sdt+Provider
 
 name: spec
 title: Speculative Tracing
-number: 13
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 13
+url: http://wikis.sun.com/display/DTrace/Speculative+Tracing
 
 name: struct
 title: Structs and Unions
-number: 7
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 7
+url: http://wikis.sun.com/display/DTrace/Structs+and+Unions
 
 name: sysinfo
 title: sysinfo Provider
-number: 23
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 23
+url: http://wikis.sun.com/display/DTrace/sysinfo+Provider
 
 name: user
 title: User Process Tracing
-number: 32
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 32
+url: http://wikis.sun.com/display/DTrace/User+Process+Tracing
 
 name: vars
 title: Variables
-number: 3
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 3
+url: http://wikis.sun.com/display/DTrace/Variables
 
 name: vminfo
 title: vminfo Provider
-number: 24
-url: http://docs.sun.com/db/doc/817-6223?a=view
+index: 24
+url: http://wikis.sun.com/display/DTrace/vminfo+Provider
+
+name: ip
+title: ip Provider
+index: 101
+url: http://wikis.sun.com/display/DTrace/ip+Provider
 
