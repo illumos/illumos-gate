@@ -1179,12 +1179,12 @@ etest(const char *ev)
 static void
 set_thread_vars()
 {
-	extern const char **environ;
+	extern const char **_environ;
 	const char **pev;
 	const char *ev;
 	char c;
 
-	if ((pev = environ) == NULL)
+	if ((pev = _environ) == NULL)
 		return;
 	while ((ev = *pev++) != NULL) {
 		c = *ev;

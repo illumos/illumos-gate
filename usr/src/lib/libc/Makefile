@@ -125,10 +125,20 @@ etc:	$($(MACH)_ETC)
 lib32:	$(MACHLIBS) $(MACH)/$(LIB_PIC) $(VARIANTLIBS)
 	mkdir -p $(MACH)/i18n_pics
 	cd $(MACH)/i18n_pics ; $(AR) -x $(ROOTFS_LIBDIR)/libc_i18n.a
+	@if $(ELFDUMP) -r $(MACH)/$(DYNLIB) | $(GREP) -w environ ; then \
+		$(ECHO) "Error: Invalid reference to environ" ; \
+		$(ECHO) "Error: See comments in port/gen/env_data.c" ; \
+		exit 1; \
+	fi
 
 lib64:	$(MACHLIBS64) $(MACH64)/$(LIB_PIC) $(VARIANTLIBS)
 	mkdir -p $(MACH64)/i18n_pics
 	cd $(MACH64)/i18n_pics ; $(AR) -x $(ROOTFS_LIBDIR64)/libc_i18n.a
+	@if $(ELFDUMP) -r $(MACH64)/$(DYNLIB) | $(GREP) -w environ ; then \
+		$(ECHO) "Error: Invalid reference to environ" ; \
+		$(ECHO) "Error: See comments in port/gen/env_data.c" ; \
+		exit 1; \
+	fi
 
 $(VARIANTLIBS): FRC
 	@cd $(@D); pwd; VERSION='$(VERSION)' $(MAKE) $(@F)

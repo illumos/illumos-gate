@@ -46,7 +46,7 @@
 #include <spawn.h>
 #include "libc.h"
 
-extern const char **environ;
+extern const char **_environ;
 
 extern int __xpg4;	/* defined in _xpg4.c; 0 if not xpg4-compiled program */
 extern const sigset_t maskset;		/* all maskable signals */
@@ -228,7 +228,7 @@ system(const char *cmd)
 	argv[3] = NULL;
 	if (error == 0)
 		error = posix_spawn(&cu.pid, shpath, NULL, &attr,
-		    (char *const *)argv, (char *const *)environ);
+		    (char *const *)argv, (char *const *)_environ);
 
 	(void) posix_spawnattr_destroy(&attr);
 

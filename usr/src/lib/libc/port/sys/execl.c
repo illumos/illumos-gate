@@ -50,7 +50,7 @@ execl(const char *name, const char *arg0, ...)
 	char **argp;
 	va_list args;
 	char **argvec;
-	extern char **environ;
+	extern char **_environ;
 	int err;
 	int nargs = 0;
 	char *nextarg;
@@ -88,6 +88,6 @@ execl(const char *name, const char *arg0, ...)
 	 * call execve()
 	 */
 
-	err = execve(name, argvec, environ);
+	err = execve(name, argvec, _environ);
 	return (err);
 }

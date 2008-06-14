@@ -100,6 +100,7 @@ SUNW_0.7 {
 	frexp = FUNCTION FILTER libm.so.2;
 	getdate_err;
 	_getdate_err;
+	getenv;
 	__huge_val;
 	_iob;
 	__iob;
@@ -304,7 +305,6 @@ SUNW_0.7 {
 	_getdate;
 	getegid;
 	_getegid;
-	getenv;
 	geteuid;
 	_geteuid;
 	getgid;

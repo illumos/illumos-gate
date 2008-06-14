@@ -260,6 +260,7 @@ SYSVABI_1.3 {
 	frexp = FUNCTION FILTER libm.so.2;
 	getdate_err;
 	_getdate_err;
+	getenv;
 	__huge_val;
 	__iob;
 	isnan = FUNCTION FILTER libm.so.2;
@@ -422,7 +423,6 @@ SYSVABI_1.3 {
 	_getdate;
 	getegid;
 	_getegid;
-	getenv;
 	geteuid;
 	_geteuid;
 	getgid;

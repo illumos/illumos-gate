@@ -56,7 +56,7 @@
 #define	WTR	1
 
 extern	int __xpg4;	/* defined in _xpg4.c; 0 if not xpg4-compiled program */
-extern const char **environ;
+extern const char **_environ;
 
 static mutex_t popen_lock = DEFAULTMUTEX;
 
@@ -196,7 +196,7 @@ popen(const char *cmd, const char *mode)
 	argvec[2] = (char *)cmd;
 	argvec[3] = NULL;
 	error = posix_spawn(&pid, shpath, &fact, &attr,
-	    (char *const *)argvec, (char *const *)environ);
+	    (char *const *)argvec, (char *const *)_environ);
 	(void) posix_spawnattr_destroy(&attr);
 	(void) posix_spawn_file_actions_destroy(&fact);
 	(void) close(yourside);

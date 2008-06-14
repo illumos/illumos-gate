@@ -46,6 +46,6 @@
 int
 execv(const char *file, char *const argv[])
 {
-	extern  char    **environ;
-	return (execve(file, argv, environ));
+	extern  char    **_environ;
+	return (execve(file, argv, _environ));
 }

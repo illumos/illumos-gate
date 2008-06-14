@@ -335,7 +335,7 @@ extern	int __xpg4;	/* defined in _xpg4.c; 0 if not xpg4-compiled program */
  * Needs no locking if fetched only once.
  * See getenv()/putenv()/setenv().
  */
-extern	const char **environ;
+extern	const char **_environ;
 
 /*
  * Do word expansion.
@@ -436,7 +436,8 @@ wordexp(const char *word, wordexp_t *wp, int flags)
 	/*
 	 * Make sure PWD is in the environment.
 	 */
-	if ((envp = environ) == NULL) {		/* can't happen? */
+	if ((envp = _environ) == NULL) {
+		/* can happen when processing a SunOS 4.x AOUT file */
 		ev = NULL;
 		n = 0;
 	} else {

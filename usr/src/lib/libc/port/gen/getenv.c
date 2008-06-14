@@ -43,24 +43,24 @@
 
 #define	MIN_ENV_SIZE		128
 
-extern const char		**environ;
+extern const char		**_environ;
 extern void			clean_env();
 
 /*
- * For performance and consistency reasons we expand the environ list using
+ * For performance and consistency reasons we expand the _environ list using
  * the trusted "power of two, drop it on the floor" method. This allows for
  * a lockless, single pass implementation of getenv(), yet the memory leak
  * is bounded - in normal circumstances total wastage is never greater than
- * 3x the space needed to hold any environ list.
+ * 3x the space needed to hold any _environ list.
  *
- * The only abnormal circumstance is if an application modifies the environ
+ * The only abnormal circumstance is if an application modifies the _environ
  * list pointer directly. Such an application does not conform to POSIX.1
  * 2001. However, we also care about standards which did not foresee this
- * issue. For this reason we keep a working copy of our notion of environ in
- * my_environ. If, when we are called upon to modify environ, we ever detect
- * a mismatch between environ and my_environ we discard all our assumptions
- * concerning the location and size of the environ list. As an additional
- * precaution we only ever update environ once we have finished manipulating
+ * issue. For this reason we keep a working copy of our notion of _environ in
+ * my_environ. If, when we are called upon to modify _environ, we ever detect
+ * a mismatch between _environ and my_environ we discard all our assumptions
+ * concerning the location and size of the _environ list. As an additional
+ * precaution we only ever update _environ once we have finished manipulating
  * our working copy.
  *
  * The setenv() API is inherently leaky but we are completely at the mercy
@@ -70,7 +70,7 @@ extern void			clean_env();
  * being leaked in either of the above two scenarios. chunk_list must only
  * be updated under the protection of update_lock.
  *
- * Although we don't allocate the original environ list it is likely that
+ * Although we don't allocate the original _environ list it is likely that
  * we will leak this too. Accordingly, we create a reference in initenv().
  * However, we can't be held responsible for such leaks in abnormal (see
  * above) circumstances.
@@ -90,8 +90,8 @@ static int			initenv_done = 0;
 static chunk_t			*chunk_list = NULL;
 
 /*
- * Compute the size an environ list including the terminating NULL entry.
- * This is the only way we have to determine the size of an environ list
+ * Compute the size an _environ list including the terminating NULL entry.
+ * This is the only way we have to determine the size of an _environ list
  * we didn't allocate.
  */
 static int
@@ -110,38 +110,38 @@ envsize(const char **e)
 
 /*
  * Initialization for the following scenarios:
- * 1. The very first time we reference the environ list we must call in the
- *    NLSPATH janitor, make a reference to the original environ list to keep
+ * 1. The very first time we reference the _environ list we must call in the
+ *    NLSPATH janitor, make a reference to the original _environ list to keep
  *    leak detectors happy, initialize my_environ and environ_base, and then
  *    compute environ_size.
- * 2. Whenever we detect that someone else has hijacked environ (something
+ * 2. Whenever we detect that someone else has hijacked _environ (something
  *    very abnormal) we need to reinitialize my_environ and environ_base,
  *    and then recompute environ_size.
  *
  * The local globals my_environ, environ_base and environ_size may be used
  * by others only if initenv_done is true and only under the protection of
  * update_lock. However, our callers, who must NOT be holding update_lock,
- * may safely test initenv_done or my_environ against environ just prior to
+ * may safely test initenv_done or my_environ against _environ just prior to
  * calling us because we test these again whilst holding update_lock.
  */
 static void
 initenv()
 {
-	if ((my_environ != environ) || !initenv_done) {
+	if ((my_environ != _environ) || !initenv_done) {
 		lmutex_lock(&update_lock);
-		if ((my_environ != environ) || !initenv_done) {
+		if ((my_environ != _environ) || !initenv_done) {
 			if (!initenv_done) {
 				/* Call the NLSPATH janitor in. */
 				clean_env();
 
 				/* Pacify leak detectors in normal operation. */
-				orig_environ = environ;
+				orig_environ = _environ;
 #ifdef __lint
 				my_environ = orig_environ;
 #endif
 			}
 
-			my_environ = environ;
+			my_environ = _environ;
 			environ_base = my_environ;
 			environ_size = envsize(environ_base);
 			membar_producer();
@@ -153,7 +153,7 @@ initenv()
 }
 
 /*
- * Search an environ list for a particular entry. If name_only is set, then
+ * Search an _environ list for a particular entry. If name_only is set, then
  * string must be the entry name only, and we return the value of the first
  * match. Otherwise, string must be of the form "name=value", and we return
  * the address of the first matching entry.
@@ -197,10 +197,10 @@ findenv(const char **e, const char *string, int name_only, char **value)
  * Common code for putenv() and setenv(). We support the lockless getenv()
  * by inserting new entries at the bottom of the list, and by growing the
  * list using the trusted "power of two, drop it on the floor" method. We
- * use a lock (update_lock) to protect all updates to the environ list, but
+ * use a lock (update_lock) to protect all updates to the _environ list, but
  * we are obliged to release this lock whenever we call malloc() or free().
  * A generation number (environ_gen) is bumped whenever names are added to,
- * or removed from, the environ list so that we can detect collisions with
+ * or removed from, the _environ list so that we can detect collisions with
  * other updaters.
  *
  * Return values
@@ -250,12 +250,12 @@ addtoenv(char *string, int overwrite)
 		if (environ_base < my_environ) {
 			/*
 			 * The new value must be visible before we decrement
-			 * the environ list pointer.
+			 * the _environ list pointer.
 			 */
 			my_environ[-1] = string;
 			membar_producer();
 			my_environ--;
-			environ = my_environ;
+			_environ = my_environ;
 
 			/*
 			 * We've added a name, so bump the generation number.
@@ -267,7 +267,7 @@ addtoenv(char *string, int overwrite)
 		}
 
 		/*
-		 * There is no room. Attempt to allocate a new environ list
+		 * There is no room. Attempt to allocate a new _environ list
 		 * which is at least double the size of the current one. See
 		 * comment above concerning locking and malloc() etc.
 		 */
@@ -308,22 +308,22 @@ addtoenv(char *string, int overwrite)
 	new_chunk->next = chunk_list;
 	chunk_list = new_chunk;
 
-	/* Copy the old environ list into the top of the new environ list. */
+	/* Copy the old _environ list into the top of the new _environ list. */
 	new_base = (const char **)(new_chunk + 1);
 	new_environ = &new_base[(new_size - 1) - environ_size];
 	(void) memcpy(new_environ, my_environ, environ_size * sizeof (char *));
 
-	/* Insert the new entry at the bottom of the new environ list. */
+	/* Insert the new entry at the bottom of the new _environ list. */
 	new_environ[-1] = string;
 	new_environ--;
 
-	/* Ensure that the new environ list is visible to all. */
+	/* Ensure that the new _environ list is visible to all. */
 	membar_producer();
 
-	/* Make the switch (dropping the old environ list on the floor). */
+	/* Make the switch (dropping the old _environ list on the floor). */
 	environ_base = new_base;
 	my_environ = new_environ;
-	environ = my_environ;
+	_environ = my_environ;
 	environ_size = new_size;
 
 	/* We've added a name, so bump the generation number. */
@@ -344,7 +344,7 @@ putenv(char *string)
 
 /*
  * setenv() is a little more complex than putenv() because we have to allocate
- * and construct an environ entry on behalf of the caller. The bulk of the
+ * and construct an _environ entry on behalf of the caller. The bulk of the
  * work is still done in addtoenv().
  */
 
@@ -399,11 +399,11 @@ setenv(const char *envname, const char *envval, int overwrite)
 }
 
 /*
- * unsetenv() is tricky because we need to compress the environ list in a way
+ * unsetenv() is tricky because we need to compress the _environ list in a way
  * which supports a lockless getenv(). The approach here is to move the first
  * entry from the enrivon list into the space occupied by the entry to be
- * deleted, and then to increment environ. This has the added advantage of
- * making _any_ incremental linear search of the environ list consistent (i.e.
+ * deleted, and then to increment _environ. This has the added advantage of
+ * making _any_ incremental linear search of the _environ list consistent (i.e.
  * we will not break any naughty apps which read the list without our help).
  */
 int
@@ -423,7 +423,7 @@ unsetenv(const char *name)
 
 	/*
 	 * Find the target, overwrite it with the first entry, increment the
-	 * environ pointer.
+	 * _environ pointer.
 	 */
 	if ((p = findenv(my_environ, name, 1, &value)) != NULL) {
 		/* Overwrite target with the first entry. */
@@ -432,9 +432,9 @@ unsetenv(const char *name)
 		/* Ensure that the moved entry is visible to all.  */
 		membar_producer();
 
-		/* Shrink the environ list. */
+		/* Shrink the _environ list. */
 		my_environ++;
-		environ = my_environ;
+		_environ = my_environ;
 
 		/* Make sure addtoenv() knows that we've removed a name. */
 		environ_gen++;
@@ -454,7 +454,7 @@ getenv(const char *name)
 
 	initenv();
 
-	if (findenv(environ, name, 1, &value) != NULL)
+	if (findenv(_environ, name, 1, &value) != NULL)
 		return (value);
 
 	return (NULL);

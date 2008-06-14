@@ -482,7 +482,7 @@ getutline(const struct utmp *entry)
 static struct utmpx *
 invoke_utmp_update(const struct utmpx *entryx)
 {
-	extern char **environ;
+	extern char **_environ;
 
 	posix_spawnattr_t attr;
 	int status;
@@ -559,7 +559,7 @@ invoke_utmp_update(const struct utmpx *entryx)
 		errno = error;
 		goto out;
 	}
-	error = posix_spawn(&child, UTMP_UPDATE, NULL, &attr, argvec, environ);
+	error = posix_spawn(&child, UTMP_UPDATE, NULL, &attr, argvec, _environ);
 	(void) posix_spawnattr_destroy(&attr);
 	if (error) {
 		errno = error;
