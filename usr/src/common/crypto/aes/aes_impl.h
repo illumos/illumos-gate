@@ -36,7 +36,15 @@
 extern "C" {
 #endif
 
-#define	AES_BLOCK_LEN 16
+#include <sys/types.h>
+
+/* Similar to sysmacros.h IS_P2ALIGNED, but checks two pointers: */
+#define	IS_P2ALIGNED2(v, w, a) \
+	((((uintptr_t)(v) | (uintptr_t)(w)) & ((uintptr_t)(a) - 1)) == 0)
+
+#define	AES_BLOCK_LEN	16	/* bytes */
+/* Round constant length, in number of 32-bit elements: */
+#define	RC_LENGTH	(5 * ((AES_BLOCK_LEN) / 4 - 2))
 
 #define	AES_COPY_BLOCK(src, dst) \
 	(dst)[0] = (src)[0]; \
@@ -74,24 +82,29 @@ extern "C" {
 	(dst)[14] ^= (src)[14]; \
 	(dst)[15] ^= (src)[15]
 
+/* AES key size definitions */
 #define	AES_MINBITS		128
-#define	AES_MINBYTES		(AES_MINBITS >> 3)
+#define	AES_MINBYTES		((AES_MINBITS) >> 3)
 #define	AES_MAXBITS		256
-#define	AES_MAXBYTES		(AES_MAXBITS >> 3)
+#define	AES_MAXBYTES		((AES_MAXBITS) >> 3)
 
-#define	AES_MIN_KEY_BYTES	(AES_MINBITS >> 3)
-#define	AES_MAX_KEY_BYTES	(AES_MAXBITS >> 3)
+#define	AES_MIN_KEY_BYTES	((AES_MINBITS) >> 3)
+#define	AES_MAX_KEY_BYTES	((AES_MAXBITS) >> 3)
 #define	AES_192_KEY_BYTES	24
 #define	AES_IV_LEN		16
 
+/* AES key schedule may be implemented with 32- or 64-bit elements: */
 #define	AES_32BIT_KS		32
 #define	AES_64BIT_KS		64
 
-#define	MAX_AES_NR		14
+#define	MAX_AES_NR		14 /* Maximum number of rounds */
+#define	MAX_AES_NB		4  /* Number of columns comprising a state */
 
 typedef union {
-	uint64_t	ks64[(MAX_AES_NR + 1) * 4];
-	uint32_t	ks32[(MAX_AES_NR + 1) * 4];
+#ifdef	sun4u
+	uint64_t	ks64[((MAX_AES_NR) + 1) * (MAX_AES_NB)];
+#endif
+	uint32_t	ks32[((MAX_AES_NR) + 1) * (MAX_AES_NB)];
 } aes_ks_t;
 
 typedef struct aes_key aes_key_t;
@@ -102,14 +115,11 @@ struct aes_key {
 	aes_ks_t	decr_ks;
 };
 
-extern void aes_encrypt_block(void *, uint8_t *, uint8_t *);
-extern void aes_decrypt_block(void *, uint8_t *, uint8_t *);
-extern void aes_init_keysched(uint8_t *, uint_t, void *);
-extern void *aes_alloc_keysched(size_t *, int);
-extern void aes_encrypt_impl(const aes_ks_t *ks, int Nr, const uint32_t pt[4],
-    uint32_t ct[4]);
-extern void aes_decrypt_impl(const aes_ks_t *ks, int Nr, const uint32_t ct[4],
-    uint32_t pt[4]);
+extern void aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct);
+extern void aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt);
+extern void aes_init_keysched(const uint8_t *cipherKey, uint_t keyBits,
+	void *keysched);
+extern void *aes_alloc_keysched(size_t *size, int kmflag);
 
 #ifdef	__cplusplus
 }

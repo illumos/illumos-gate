@@ -33,14 +33,17 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
-COM_DIR = $(COMMONBASE)/crypto/aes
+COM_DIR	= $(COMMONBASE)/crypto/aes
 
 #
 #	Define the module and object file sets.
 #
 MODULE		= aes
-OBJECTS		= $(AESPROV_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(AESPROV_OBJS:%.o=$(LINTS_DIR)/%.ln)
+AESPROV_OBJS_32	=
+AESPROV_OBJS_64	= aes_amd64.o aeskey.o
+AESPROV_OBJS	+= $(AESPROV_OBJS_$(CLASS))
+OBJECTS		= $(AESPROV_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
 
 #
@@ -59,7 +62,7 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# Linkage dependencies
+#	Linkage dependencies
 #
 LDFLAGS += -dy
 
@@ -99,3 +102,17 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
+
+$(OBJS_DIR)/%.ln: $(COM_DIR)/amd64/%.c
+	@($(LHEAD) $(LINT.c) $(COM_DIR)/amd64/${@F:.ln=.c} $(LTAIL))
+
+$(OBJS_DIR)/%.o:  $(COM_DIR)/amd64/%.c
+	$(COMPILE.c) -o $@ $(COM_DIR)/amd64/${@F:.o=.c}
+	$(POST_PROCESS_O)
+
+$(OBJS_DIR)/aes_amd64.o: $(COM_DIR)/amd64/aes_amd64.s
+	$(COMPILE.s) -o $@ $(COM_DIR)/amd64/${@F:.o=.s}
+	$(POST_PROCESS_O)
+
+$(OBJS_DIR)/aes_amd64.ln: $(COM_DIR)/amd64/aes_amd64.s
+	@($(LHEAD) $(LINT.s) $(COM_DIR)/amd64/${@F:.ln=.s} $(LTAIL))

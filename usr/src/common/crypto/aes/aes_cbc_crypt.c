@@ -50,7 +50,7 @@ aes_ccm_decrypt_contiguous_blocks(aes_ctx_t *ctx, char *data, size_t length,
 
 /*
  * Initialize by setting iov_or_mp to point to the current iovec or mp,
- * and by setting current_offset to an offset within the current iovec or mp .
+ * and by setting current_offset to an offset within the current iovec or mp.
  */
 static void
 aes_init_ptrs(crypto_data_t *out, void **iov_or_mp, offset_t *current_offset)
@@ -253,8 +253,7 @@ aes_cbc_encrypt_contiguous_blocks(aes_ctx_t *ctx, char *data, size_t length,
 			 * XOR the previous cipher block or IV with the
 			 * current clear block. Check for alignment.
 			 */
-			if (IS_P2ALIGNED(blockp, sizeof (uint32_t)) &&
-			    IS_P2ALIGNED(lastp, sizeof (uint32_t))) {
+			if (IS_P2ALIGNED2(blockp, lastp, sizeof (uint32_t))) {
 				/* LINTED: pointer alignment */
 				*(uint32_t *)&blockp[0] ^=
 				/* LINTED: pointer alignment */
@@ -294,11 +293,27 @@ aes_cbc_encrypt_contiguous_blocks(aes_ctx_t *ctx, char *data, size_t length,
 			    &out_data_1_len, &out_data_2, AES_BLOCK_LEN);
 
 			/* copy block to where it belongs */
-			bcopy(lastp, out_data_1, out_data_1_len);
+			if ((out_data_1_len == AES_BLOCK_LEN) &&
+			    (IS_P2ALIGNED2(lastp, out_data_1,
+			    sizeof (uint32_t)))) {
+				/* LINTED: pointer alignment */
+				uint32_t *d = (uint32_t *)out_data_1;
+				/* LINTED: pointer alignment */
+				d[0] = *(uint32_t *)lastp;
+				/* LINTED: pointer alignment */
+				d[1] = *(uint32_t *)&lastp[4];
+				/* LINTED: pointer alignment */
+				d[2] = *(uint32_t *)&lastp[8];
+				/* LINTED: pointer alignment */
+				d[3] = *(uint32_t *)&lastp[12];
+			} else {
+				bcopy(lastp, out_data_1, out_data_1_len);
+			}
 			if (out_data_2 != NULL) {
 				bcopy(lastp + out_data_1_len, out_data_2,
 				    AES_BLOCK_LEN - out_data_1_len);
 			}
+
 			/* update offset */
 			out->cd_offset += AES_BLOCK_LEN;
 		}
@@ -463,8 +478,7 @@ aes_cbc_decrypt_contiguous_blocks(aes_ctx_t *ctx, char *data, size_t length,
 			 * XOR the previous cipher block or IV with the
 			 * currently decrypted block.  Check for alignment.
 			 */
-			if (IS_P2ALIGNED(blockp, sizeof (uint32_t)) &&
-			    IS_P2ALIGNED(lastp, sizeof (uint32_t))) {
+			if (IS_P2ALIGNED2(blockp, lastp, sizeof (uint32_t))) {
 				/* LINTED: pointer alignment */
 				*(uint32_t *)blockp ^= *(uint32_t *)lastp;
 				/* LINTED: pointer alignment */
@@ -492,7 +506,17 @@ aes_cbc_decrypt_contiguous_blocks(aes_ctx_t *ctx, char *data, size_t length,
 			    &out_data_1_len, &out_data_2, AES_BLOCK_LEN);
 
 			/* copy temporary block to where it belongs */
-			bcopy(&tmp, out_data_1, out_data_1_len);
+			if ((out_data_1_len == AES_BLOCK_LEN) &&
+			    (IS_P2ALIGNED(out_data_1, sizeof (uint32_t)))) {
+				/* LINTED: pointer alignment */
+				uint32_t *d = (uint32_t *)out_data_1;
+				d[0] = tmp[0];
+				d[1] = tmp[1];
+				d[2] = tmp[2];
+				d[3] = tmp[3];
+			} else {
+				bcopy(&tmp, out_data_1, out_data_1_len);
+			}
 			if (out_data_2 != NULL) {
 				bcopy((uint8_t *)&tmp + out_data_1_len,
 				    out_data_2, AES_BLOCK_LEN - out_data_1_len);
@@ -694,8 +718,7 @@ aes_ctr_ccm_mode_contiguous_blocks(aes_ctx_t *ctx, char *data, size_t length,
 			 * XOR the previous cipher block current clear block.
 			 * mac_buf always contain previous cipher block.
 			 */
-			if (IS_P2ALIGNED(blockp, sizeof (uint32_t)) &&
-			    IS_P2ALIGNED(mac_buf, sizeof (uint32_t))) {
+			if (IS_P2ALIGNED2(blockp, mac_buf, sizeof (uint32_t))) {
 				/* LINTED: pointer alignment */
 				*(uint32_t *)&mac_buf[0] ^=
 				/* LINTED: pointer alignment */
@@ -760,8 +783,7 @@ aes_ctr_ccm_mode_contiguous_blocks(aes_ctx_t *ctx, char *data, size_t length,
 		 * XOR the previous cipher block or IV with the
 		 * current clear block. Check for alignment.
 		 */
-		if (IS_P2ALIGNED(blockp, sizeof (uint32_t)) &&
-		    IS_P2ALIGNED(lastp, sizeof (uint32_t))) {
+		if (IS_P2ALIGNED2(blockp, lastp, sizeof (uint32_t))) {
 			/* LINTED: pointer alignment */
 			*(uint32_t *)&blockp[0] ^=
 			/* LINTED: pointer alignment */
@@ -800,11 +822,27 @@ aes_ctr_ccm_mode_contiguous_blocks(aes_ctx_t *ctx, char *data, size_t length,
 			    &out_data_1_len, &out_data_2, AES_BLOCK_LEN);
 
 			/* copy block to where it belongs */
-			bcopy(lastp, out_data_1, out_data_1_len);
+			if ((out_data_1_len == AES_BLOCK_LEN) &&
+			    (IS_P2ALIGNED2(lastp, out_data_1,
+			    sizeof (uint32_t)))) {
+				/* LINTED: pointer alignment */
+				uint32_t *d = (uint32_t *)out_data_1;
+				/* LINTED: pointer alignment */
+				d[0] = *(uint32_t *)lastp;
+				/* LINTED: pointer alignment */
+				d[1] = *(uint32_t *)&lastp[4];
+				/* LINTED: pointer alignment */
+				d[2] = *(uint32_t *)&lastp[8];
+				/* LINTED: pointer alignment */
+				d[3] = *(uint32_t *)&lastp[12];
+			} else {
+				bcopy(lastp, out_data_1, out_data_1_len);
+			}
 			if (out_data_2 != NULL) {
 				bcopy(lastp + out_data_1_len, out_data_2,
 				    AES_BLOCK_LEN - out_data_1_len);
 			}
+
 			/* update offset */
 			out->cd_offset += AES_BLOCK_LEN;
 		}
@@ -868,8 +906,7 @@ aes_ccm_init(aes_ctx_t *ctx, unsigned char *nonce, size_t nonce_len,
 	bzero(iv, AES_BLOCK_LEN);
 	ivp = (uint8_t *)iv;
 
-	if (IS_P2ALIGNED(ivp, sizeof (uint32_t)) &&
-	    IS_P2ALIGNED(mac_buf, sizeof (uint32_t))) {
+	if (IS_P2ALIGNED2(ivp, mac_buf, sizeof (uint32_t))) {
 		/* LINTED: pointer alignment */
 		*(uint32_t *)&mac_buf[0] ^= *(uint32_t *)&ivp[0];
 		/* LINTED: pointer alignment */
@@ -905,8 +942,7 @@ aes_ccm_init(aes_ctx_t *ctx, unsigned char *nonce, size_t nonce_len,
 	}
 	bcopy(auth_data, authp+encoded_a_len, processed);
 	/* xor with previous buffer */
-	if (IS_P2ALIGNED(authp, sizeof (uint32_t)) &&
-	    IS_P2ALIGNED(mac_buf, sizeof (uint32_t))) {
+	if (IS_P2ALIGNED2(authp, mac_buf, sizeof (uint32_t))) {
 		/* LINTED: pointer alignment */
 		*(uint32_t *)&mac_buf[0] ^= *(uint32_t *)&authp[0];
 		/* LINTED: pointer alignment */
@@ -942,8 +978,7 @@ aes_ccm_init(aes_ctx_t *ctx, unsigned char *nonce, size_t nonce_len,
 		}
 
 		/* xor with previous buffer */
-		if (IS_P2ALIGNED(datap, sizeof (uint32_t)) &&
-		    IS_P2ALIGNED(mac_buf, sizeof (uint32_t))) {
+		if (IS_P2ALIGNED2(datap, mac_buf, sizeof (uint32_t))) {
 			/* LINTED: pointer alignment */
 			*(uint32_t *)&mac_buf[0] ^= *(uint32_t *)&datap[0];
 			/* LINTED: pointer alignment */
@@ -1034,8 +1069,7 @@ aes_ccm_encrypt_final(aes_ctx_t *ctx, crypto_data_t *out)
 		bcopy(ctx->ac_remainder, macp, ctx->ac_remainder_len);
 
 		/* calculate the CBC MAC */
-		if (IS_P2ALIGNED(macp, sizeof (uint32_t)) &&
-		    IS_P2ALIGNED(mac_buf, sizeof (uint32_t))) {
+		if (IS_P2ALIGNED2(macp, mac_buf, sizeof (uint32_t))) {
 			/* LINTED: pointer alignment */
 			*(uint32_t *)&mac_buf[0] ^= *(uint32_t *)&macp[0];
 			/* LINTED: pointer alignment */
@@ -1147,7 +1181,7 @@ aes_ccm_validate_args(CK_AES_CCM_PARAMS *ccm_param, boolean_t is_encrypt_init)
 	uint64_t maxValue;
 
 	/*
-	 * Check the length of the MAC.  Only valid length
+	 * Check the byte length of the MAC.  The only valid
 	 * lengths for the MAC are: 4, 6, 8, 10, 12, 14, 16
 	 */
 	macSize = ccm_param->ulMACSize;
@@ -1155,12 +1189,13 @@ aes_ccm_validate_args(CK_AES_CCM_PARAMS *ccm_param, boolean_t is_encrypt_init)
 		return (CRYPTO_MECHANISM_PARAM_INVALID);
 	}
 
-	/* Check the nonce value.  Valid values are 7, 8, 9, 10, 11, 12, 13 */
+	/* Check the nonce length.  Valid values are 7, 8, 9, 10, 11, 12, 13 */
 	nonceSize = ccm_param->ulNonceSize;
 	if ((nonceSize < 7) || (nonceSize > 13)) {
 		return (CRYPTO_MECHANISM_PARAM_INVALID);
 	}
 
+	/* q is the length of the field storing the length, in bytes */
 	q = (uint8_t)((15 - nonceSize) & 0xFF);
 
 
@@ -1177,7 +1212,7 @@ aes_ccm_validate_args(CK_AES_CCM_PARAMS *ccm_param, boolean_t is_encrypt_init)
 	 * range of values allowed by q
 	 */
 	if (q < 8) {
-		maxValue = 1ULL << (q * 8);
+		maxValue = (1ULL << (q * 8)) - 1;
 	} else {
 		maxValue = ULONG_MAX;
 	}
@@ -1192,7 +1227,7 @@ aes_ccm_validate_args(CK_AES_CCM_PARAMS *ccm_param, boolean_t is_encrypt_init)
 
 /*
  * Format the first block used in CBC-MAC (B0) and the initial counter
- * block based on formating functions and counter generation functions
+ * block based on formatting functions and counter generation functions
  * specified in RFC 3610 and NIST publication 800-38C, appendix A
  *
  * b0 is the first block used in CBC-MAC
@@ -1219,7 +1254,7 @@ aes_ccm_format_initial_blocks(uchar_t *nonce, ulong_t nonceSize,
 	q = (uint8_t)((15 - nonceSize) & 0xFF);
 	t = (uint8_t)((aes_ctx->ac_ccm_mac_len) & 0xFF);
 
-	/* Construct the first octect of b0 */
+	/* Construct the first octet of b0 */
 	if (authDataSize > 0) {
 		have_adata = 1;
 	}
@@ -1272,7 +1307,7 @@ aes_ccm_format_initial_blocks(uchar_t *nonce, ulong_t nonceSize,
 	 * During calculation, we start using counter block 1, we will
 	 * set it up right here.
 	 * We can just set the last byte to have the value 1, because
-	 * even with the bigest nonce of 13, the last byte of the
+	 * even with the biggest nonce of 13, the last byte of the
 	 * counter block will be used for the counter value.
 	 */
 	cb[15] = 0x01;
@@ -1525,8 +1560,7 @@ aes_ccm_decrypt_contiguous_blocks(aes_ctx_t *ctx, char *data, size_t length,
 		    (ctx->ac_cb[1] & ~(ctx->ac_counter_mask)) | counter;
 
 		/* XOR with the ciphertext */
-		if (IS_P2ALIGNED(blockp, sizeof (uint32_t)) &&
-		    IS_P2ALIGNED(cbp, sizeof (uint32_t))) {
+		if (IS_P2ALIGNED2(blockp, cbp, sizeof (uint32_t))) {
 			/* LINTED: pointer alignment */
 			*(uint32_t *)&blockp[0] ^= *(uint32_t *)&cbp[0];
 			/* LINTED: pointer alignment */
@@ -1542,8 +1576,7 @@ aes_ccm_decrypt_contiguous_blocks(aes_ctx_t *ctx, char *data, size_t length,
 		/* Copy the plaintext to the "holding buffer" */
 		resultp = (uint8_t *)ctx->ac_ccm_pt_buf +
 		    ctx->ac_ccm_processed_data_len;
-		if (IS_P2ALIGNED(blockp, sizeof (uint32_t)) &&
-		    IS_P2ALIGNED(resultp, sizeof (uint32_t))) {
+		if (IS_P2ALIGNED2(blockp, resultp, sizeof (uint32_t))) {
 			/* LINTED: pointer alignment */
 			*(uint32_t *)&resultp[0] = *(uint32_t *)blockp;
 			/* LINTED: pointer alignment */
@@ -1629,8 +1662,7 @@ aes_ccm_decrypt_final(aes_ctx_t *ctx, crypto_data_t *out)
 			bcopy(pt, tmp, mac_remain);
 			mac_remain = 0;
 		} else {
-			if (IS_P2ALIGNED(pt, sizeof (uint32_t)) &&
-			    IS_P2ALIGNED(macp, sizeof (uint32_t))) {
+			if (IS_P2ALIGNED2(pt, macp, sizeof (uint32_t))) {
 				/* LINTED: pointer alignment */
 				*(uint32_t *)&macp[0] = *(uint32_t *)pt;
 				/* LINTED: pointer alignment */
@@ -1647,8 +1679,7 @@ aes_ccm_decrypt_final(aes_ctx_t *ctx, crypto_data_t *out)
 		}
 
 		/* calculate the CBC MAC */
-		if (IS_P2ALIGNED(macp, sizeof (uint32_t)) &&
-		    IS_P2ALIGNED(mac_buf, sizeof (uint32_t))) {
+		if (IS_P2ALIGNED2(macp, mac_buf, sizeof (uint32_t))) {
 			/* LINTED: pointer alignment */
 			*(uint32_t *)&mac_buf[0] ^= *(uint32_t *)&macp[0];
 			/* LINTED: pointer alignment */

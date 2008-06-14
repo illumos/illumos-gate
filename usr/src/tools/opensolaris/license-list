@@ -69,9 +69,10 @@ usr/src/cmd/vi/THIRDPARTYLICENSE
 usr/src/cmd/which/THIRDPARTYLICENSE
 usr/src/cmd/xntpd/THIRDPARTYLICENSE
 usr/src/cmd/xstr/THIRDPARTYLICENSE
-usr/src/common/crypto/arcfour/amd64/THIRDPARTYLICENSE
-usr/src/common/crypto/sha1/amd64/THIRDPARTYLICENSE
-usr/src/common/crypto/sha2/amd64/THIRDPARTYLICENSE
+usr/src/common/crypto/THIRDPARTYLICENSE.cryptogams
+usr/src/common/crypto/aes/amd64/THIRDPARTYLICENSE
+usr/src/common/crypto/ecc/THIRDPARTYLICENSE
+usr/src/common/crypto/md5/amd64/THIRDPARTYLICENSE
 usr/src/common/openssl/LICENSE
 usr/src/grub/grub-0.95/COPYING
 usr/src/lib/gss_mechs/mech_krb5/THIRDPARTYLICENSE
@@ -152,7 +153,6 @@ usr/src/uts/intel/THIRDPARTYLICENSE
 usr/src/uts/intel/io/acpica/THIRDPARTYLICENSE
 usr/src/uts/intel/io/amd8111s/THIRDPARTYLICENSE.amd8111s
 usr/src/uts/intel/io/amr/THIRDPARTYLICENSE
-usr/src/common/crypto/ecc/THIRDPARTYLICENSE
 usr/src/common/mpi/THIRDPARTYLICENSE
 usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.apple
 usr/src/lib/libsmbfs/smb/THIRDPARTYLICENSE.boris_popov

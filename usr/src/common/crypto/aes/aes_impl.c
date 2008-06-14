@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,9 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -36,13 +37,12 @@
 #include <stdlib.h>
 #endif	/* !_KERNEL */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file is derived from the file  rijndael-alg-fst.c  taken from the
  * "optimized C code v3.0" on the "rijndael home page"
- * (http://www.esat.kuleuven.ac.be/~rijmen/rijndael/)
- * pointed by the NIST web-site (http://nist.gov)
+ * http://www.iaik.tu-graz.ac.at/research/krypto/AES/old/~rijmen/rijndael/
+ * pointed by the NIST web-site http://csrc.nist.gov/archive/aes/
  *
  * The following note is from the original file:
  */
@@ -75,9 +75,33 @@
 
 /* EXPORT DELETE START */
 
-#ifndef _RIJNDAEL_TBL_H
-#define	_RIJNDAEL_TBL_H
+#if defined(sun4u) || defined(__amd64)
+/* External assembly functions: */
+extern void aes_encrypt_impl(const uint32_t rk[], int Nr, const uint32_t pt[4],
+	uint32_t ct[4]);
+extern void aes_decrypt_impl(const uint32_t rk[], int Nr, const uint32_t ct[4],
+	uint32_t pt[4]);
+#define	AES_ENCRYPT_IMPL		aes_encrypt_impl
+#define	AES_DECRYPT_IMPL		aes_decrypt_impl
 
+#ifdef	__amd64
+extern int rijndael_key_setup_enc(uint32_t rk[], const uint32_t cipherKey[],
+	int keyBits);
+extern int rijndael_key_setup_dec(uint32_t rk[], const uint32_t cipherKey[],
+	int keyBits);
+#endif
+
+#else
+#define	AES_ENCRYPT_IMPL		rijndael_encrypt
+#define	AES_DECRYPT_IMPL		rijndael_decrypt
+#define	rijndael_key_setup_enc_raw	rijndael_key_setup_enc
+#endif	/* sun4u || __amd64 */
+
+#if defined(_LITTLE_ENDIAN) && !defined(__amd64)
+#define	AES_BYTE_SWAP
+#endif
+
+#ifndef	__amd64
 /*
  *  Constant tables
  */
@@ -96,6 +120,7 @@
  * Td4[x] = Si[x].[01, 01, 01, 01];
  */
 
+/* Encrypt Sbox constants (for the substitute bytes operation) */
 
 static const uint32_t Te0[256] =
 {
@@ -440,6 +465,8 @@ static const uint32_t Te4[256] =
 	0xb0b0b0b0U, 0x54545454U, 0xbbbbbbbbU, 0x16161616U
 };
 
+/* Decrypt Sbox constants (for the substitute bytes operation) */
+
 static const uint32_t Td0[256] =
 {
 	0x51f4a750U, 0x7e416553U, 0x1a17a4c3U, 0x3a275e96U,
@@ -781,20 +808,27 @@ static const uint32_t Td4[256] =
 	0x55555555U, 0x21212121U, 0x0c0c0c0cU, 0x7d7d7d7dU
 };
 
-static const uint32_t rcon[] =
+/* Rcon is Round Constant; used for encryption key expansion */
+static const uint32_t rcon[RC_LENGTH] =
 {
 	/* for 128-bit blocks, Rijndael never uses more than 10 rcon values */
 	0x01000000, 0x02000000, 0x04000000, 0x08000000,
 	0x10000000, 0x20000000, 0x40000000, 0x80000000,
 	0x1B000000, 0x36000000
 };
-#endif
+
 
 /*
- *  Expand the cipher key into the encryption key schedule.
- *  return  the number of rounds for the given cipher key size.
- *  The size of the key schedule depends on the number of rounds
- *  (which can be computed from the size of the key), i.e. 4*(Nr + 1).
+ * Expand the cipher key into the encryption key schedule.
+ *
+ * Return the number of rounds for the given cipher key size.
+ * The size of the key schedule depends on the number of rounds
+ * (which can be computed from the size of the key), i.e. 4*(Nr + 1).
+ *
+ * Parameters:
+ * rk		AES key schedule 32-bit array to be initialized
+ * cipherKey	User key
+ * keyBits	AES key size (128, 192, or 256 bits)
  */
 static int
 rijndael_key_setup_enc_raw(uint32_t rk[], const uint32_t cipherKey[],
@@ -889,16 +923,23 @@ rijndael_key_setup_enc_raw(uint32_t rk[], const uint32_t cipherKey[],
 
 	return (0);
 }
+#endif	/* !__amd64 */
 
 
-#ifdef sun4u
+#ifdef	sun4u
 
 /*
- *  Expand the cipher key into the enryption key schedule as used
- *  by the sun4u optimized assembly implementation.
- *  return  the number of rounds for the given cipher key size.
- *  The size of the key schedule depends on the number of rounds
- *  (which can be computed from the size of the key), i.e. 4*(Nr + 1).
+ * Expand the cipher key into the encryption key schedule.
+ * by the sun4u optimized assembly implementation.
+ *
+ * Return the number of rounds for the given cipher key size.
+ * The size of the key schedule depends on the number of rounds
+ * (which can be computed from the size of the key), i.e. 4*(Nr + 1).
+ *
+ * Parameters:
+ * rk		AES key schedule 64-bit array to be initialized
+ * cipherKey	User key
+ * keyBits	AES key size (128, 192, or 256 bits)
  */
 static int
 rijndael_key_setup_enc(uint64_t rk[], const uint32_t cipherKey[], int keyBits)
@@ -929,11 +970,17 @@ rijndael_key_setup_enc(uint64_t rk[], const uint32_t cipherKey[], int keyBits)
 
 
 /*
- *  Expand the cipher key into the decryption key schedule as used
- *  by the sun4u optimized assembly implementation.
- *  return  the number of rounds for the given cipher key size.
- *  The size of the key schedule depends on the number of rounds
- *  (which can be computed from the size of the key), i.e. 4*(Nr + 1).
+ * Expand the cipher key into the decryption key schedule as used
+ * by the sun4u optimized assembly implementation.
+ *
+ * Return the number of rounds for the given cipher key size.
+ * The size of the key schedule depends on the number of rounds
+ * (which can be computed from the size of the key), i.e. 4*(Nr + 1).
+ *
+ * Parameters:
+ * rk		AES key schedule 32-bit array to be initialized
+ * cipherKey	User key
+ * keyBits	AES key size (128, 192, or 256 bits)
  */
 static int
 rijndael_key_setup_dec_raw(uint32_t rk[], const uint32_t cipherKey[],
@@ -982,10 +1029,15 @@ rijndael_key_setup_dec_raw(uint32_t rk[], const uint32_t cipherKey[],
 
 
 /*
- *  The size of the key schedule depends on the number of rounds
- *  (which can be computed from the size of the key), i.e. 4*(Nr + 1).
+ * The size of the key schedule depends on the number of rounds
+ * (which can be computed from the size of the key), i.e. 4*(Nr + 1).
+ *
+ * Parameters:
+ * rk		AES key schedule 64-bit array to be initialized
+ * cipherKey	User key
+ * keyBits	AES key size (128, 192, or 256 bits)
  */
-int
+static int
 rijndael_key_setup_dec(uint64_t rk[], const uint32_t cipherKey[], int keyBits)
 {
 	uint32_t	rk1[4 * (MAX_AES_NR + 1)];
@@ -1012,8 +1064,17 @@ rijndael_key_setup_dec(uint64_t rk[], const uint32_t cipherKey[], int keyBits)
 }
 
 
+/*
+ * Expand the 64-bit AES cipher key array into the encryption and decryption
+ * key schedules.
+ *
+ * Parameters:
+ * key		AES key schedule to be initialized
+ * keyarr32	User key
+ * keyBits	AES key size (128, 192, or 256 bits)
+ */
 static void
-aes_setupkeys(aes_key_t *key, uint32_t *keyarr32, int keybits)
+aes_setupkeys(aes_key_t *key, const uint32_t *keyarr32, int keybits)
 {
 	key->nr = rijndael_key_setup_enc(&(key->encr_ks.ks64[0]), keyarr32,
 	    keybits);
@@ -1022,26 +1083,19 @@ aes_setupkeys(aes_key_t *key, uint32_t *keyarr32, int keybits)
 	key->type = AES_64BIT_KS;
 }
 
-#else /* !sun4u */
 
-/*
- *  Expand the cipher key into the encryption key schedule.
- *  return  the number of rounds for the given cipher key size.
- *  The size of the key schedule depends on the number of rounds
- *  (which can be computed from the size of the key), i.e. 4*(Nr + 1).
- */
-static int
-rijndael_key_setup_enc(uint32_t rk[], const uint32_t cipherKey[], int keyBits)
-{
-	return (rijndael_key_setup_enc_raw(rk, cipherKey, keyBits));
-}
-
+#elif !defined(__amd64)
 
 /*
  *  Expand the cipher key into the decryption key schedule.
- *  @return  the number of rounds for the given cipher key size.
+ *  Return the number of rounds for the given cipher key size.
  *  The size of the key schedule depends on the number of rounds
  *  (which can be computed from the size of the key), i.e. 4*(Nr + 1).
+ *
+ * Parameters:
+ * rk		AES key schedule 32-bit array to be initialized
+ * cipherKey	User key
+ * keyBits	AES key size (128, 192, or 256 bits)
  */
 static int
 rijndael_key_setup_dec(uint32_t rk[], const uint32_t cipherKey[], int keyBits)
@@ -1096,16 +1150,6 @@ rijndael_key_setup_dec(uint32_t rk[], const uint32_t cipherKey[], int keyBits)
 }
 
 
-static void
-aes_setupkeys(aes_key_t *key, uint32_t *keyarr32, int keybits)
-{
-	key->nr = rijndael_key_setup_enc(&(key->encr_ks.ks32[0]), keyarr32,
-	    keybits);
-	key->nr = rijndael_key_setup_dec(&(key->decr_ks.ks32[0]), keyarr32,
-	    keybits);
-	key->type = AES_32BIT_KS;
-}
-
 /*
  * Encrypt one block of data. The block is assumed to be an array
  * of four uint32_t values, so copy for alignment (and byte-order
@@ -1113,8 +1157,14 @@ aes_setupkeys(aes_key_t *key, uint32_t *keyarr32, int keybits)
  * input and output byte streams.
  * The size of the key schedule depends on the number of rounds
  * (which can be computed from the size of the key), i.e. 4*(Nr + 1).
+ *
+ * Parameters:
+ * rk	Key schedule, of aes_ks_t (60 32-bit integers)
+ * Nr	Number of rounds
+ * pt	Input block (plain text)
+ * ct	Output block (crypto text).  Can overlap with pt
  */
-void
+static void
 rijndael_encrypt(const uint32_t rk[], int Nr, const uint32_t pt[4],
     uint32_t ct[4])
 {
@@ -1235,8 +1285,14 @@ rijndael_encrypt(const uint32_t rk[], int Nr, const uint32_t pt[4],
  * input and output byte streams.
  * The size of the key schedule depends on the number of rounds
  * (which can be computed from the size of the key), i.e. 4*(Nr + 1).
+ *
+ * Parameters:
+ * rk	Key schedule, of aes_ks_t (60 32-bit integers)
+ * Nr	Number of rounds
+ * ct	Input block (crypto text)
+ * pt	Output block (plain text). Can overlap with pt
  */
-void
+static void
 rijndael_decrypt(const uint32_t rk[], int Nr, const uint32_t ct[4],
     uint32_t pt[4])
 {
@@ -1347,36 +1403,50 @@ rijndael_decrypt(const uint32_t rk[], int Nr, const uint32_t ct[4],
 	    rk[3];
 	pt[3] = s3;
 }
+#endif	/* sun4u, !__amd64 */
 
-void
-aes_encrypt_impl(const aes_ks_t *ks, int Nr, const uint32_t pt[4],
-    uint32_t ct[4])
+#ifndef	sun4u
+/*
+ * Expand the 32-bit AES cipher key array into the encryption and decryption
+ * key schedules.
+ *
+ * Parameters:
+ * key		AES key schedule to be initialized
+ * keyarr32	User key
+ * keyBits	AES key size (128, 192, or 256 bits)
+ */
+static void
+aes_setupkeys(aes_key_t *key, const uint32_t *keyarr32, int keybits)
 {
-	rijndael_encrypt(&(ks->ks32[0]), Nr, pt, ct);
+	key->nr = rijndael_key_setup_enc(&(key->encr_ks.ks32[0]), keyarr32,
+	    keybits);
+	key->nr = rijndael_key_setup_dec(&(key->decr_ks.ks32[0]), keyarr32,
+	    keybits);
+	key->type = AES_32BIT_KS;
 }
-
-void
-aes_decrypt_impl(const aes_ks_t *ks, int Nr, const uint32_t ct[4],
-    uint32_t pt[4])
-{
-	rijndael_decrypt(&(ks->ks32[0]), Nr, ct, pt);
-}
-
-#endif /* sun4u */
+#endif	/* sun4u */
 /* EXPORT DELETE END */
 
 
 /*
  * Initialize key schedules for AES
+ *
+ * Parameters:
+ * cipherKey	User key
+ * keyBits	AES key size (128, 192, or 256 bits)
+ * keysched	AES key schedule to be initialized, of type aes_key_t.
+ *		Allocated by aes_alloc_keysched().
  */
 void
-aes_init_keysched(uint8_t *cipherKey, uint_t keyBits, void *keysched)
+aes_init_keysched(const uint8_t *cipherKey, uint_t keyBits, void *keysched)
 {
 /* EXPORT DELETE START */
-	aes_key_t *newbie = keysched;
-	uint64_t keyarr64[4];
-	uint32_t *keyarr32 = (uint32_t *)keyarr64;
-	uint_t keysize, i, j;
+	aes_key_t	*newbie = keysched;
+	uint_t		keysize, i, j;
+	union {
+		uint64_t	ka64[4];
+		uint32_t	ka32[8];
+		} keyarr;
 
 	switch (keyBits) {
 	case 128:
@@ -1398,65 +1468,87 @@ aes_init_keysched(uint8_t *cipherKey, uint_t keyBits, void *keysched)
 	keysize = keyBits >> 3;
 
 	/*
-	 * The code below, that is always executed on LITTLE_ENDIAN machines,
-	 * reverses every 4 bytes in the key.  On BIG_ENDIAN, the same code
-	 * copies the key without reversing bytes.
+	 * For _LITTLE_ENDIAN machines (except AMD64), reverse every
+	 * 4 bytes in the key.  On _BIG_ENDIAN and AMD64, copy the key
+	 * without reversing bytes.
+	 * For AMD64, do not byte swap for aes_setupkeys().
+	 *
+	 * SPARCv8/v9 uses a key schedule array with 64-bit elements.
+	 * X86/AMD64  uses a key schedule array with 32-bit elements.
 	 */
-#ifdef _BIG_ENDIAN
+#ifndef	AES_BYTE_SWAP
 	if (IS_P2ALIGNED(cipherKey, sizeof (uint64_t))) {
 		for (i = 0, j = 0; j < keysize; i++, j += 8) {
 			/* LINTED: pointer alignment */
-			keyarr64[i] = *((uint64_t *)&cipherKey[j]);
+			keyarr.ka64[i] = *((uint64_t *)&cipherKey[j]);
 		}
 	} else {
-#endif
-		for (i = 0, j = 0; j < keysize; i++, j += 4) {
-			keyarr32[i] = (((uint32_t)cipherKey[j] << 24) |
-			    ((uint32_t)cipherKey[j + 1] << 16) |
-			    ((uint32_t)cipherKey[j + 2] << 8) |
-			    (uint32_t)cipherKey[j + 3]);
-		}
-#ifdef _BIG_ENDIAN
+		bcopy(cipherKey, keyarr.ka32, keysize);
+	}
+
+#else	/* byte swap */
+	for (i = 0, j = 0; j < keysize; i++, j += 4) {
+		keyarr.ka32[i] = (((uint32_t)cipherKey[j] << 24) |
+		    ((uint32_t)cipherKey[j + 1] << 16) |
+		    ((uint32_t)cipherKey[j + 2] << 8) |
+		    (uint32_t)cipherKey[j + 3]);
 	}
 #endif
-	aes_setupkeys(newbie, keyarr32, keyBits);
 
+	aes_setupkeys(newbie, keyarr.ka32, keyBits);
 /* EXPORT DELETE END */
 }
 
+
+/*
+ * Encrypt one block using AES.
+ * Align if needed and (for x86 32-bit only) byte-swap.
+ *
+ * Parameters:
+ * ks	Key schedule, of type aes_key_t
+ * pt	Input block (plain text)
+ * ct	Output block (crypto text).  Can overlap with pt
+ */
 void
-aes_encrypt_block(void *ks, uint8_t *pt, uint8_t *ct)
+aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct)
 {
 /* EXPORT DELETE START */
+	aes_key_t	*ksch = (aes_key_t *)ks;
 
-	aes_key_t *ksch = (aes_key_t *)ks;
-
-#ifdef _BIG_ENDIAN
-	if (IS_P2ALIGNED(pt, sizeof (uint32_t)) &&
-	    IS_P2ALIGNED(ct, sizeof (uint32_t))) {
-		/* LINTED:  pointer alignment */
-		aes_encrypt_impl(&ksch->encr_ks, ksch->nr, (uint32_t *)pt,
+#ifndef	AES_BYTE_SWAP
+	if (IS_P2ALIGNED2(pt, ct, sizeof (uint32_t))) {
+		AES_ENCRYPT_IMPL(&ksch->encr_ks.ks32[0], ksch->nr,
 		    /* LINTED:  pointer alignment */
-		    (uint32_t *)ct);
+		    (uint32_t *)pt, (uint32_t *)ct);
 	} else {
 #endif
 		uint32_t buffer[AES_BLOCK_LEN / sizeof (uint32_t)];
 
+		/* Copy input block into buffer */
+#ifndef	AES_BYTE_SWAP
+		bcopy(pt, &buffer, AES_BLOCK_LEN);
+
+#else	/* byte swap */
 		buffer[0] = (((uint32_t)pt[0] << 24) | ((uint32_t)pt[1] << 16) |
 		    ((uint32_t)pt[2] << 8) | (uint32_t)pt[3]);
-
 		buffer[1] = (((uint32_t)pt[4] << 24) | ((uint32_t)pt[5] << 16) |
 		    ((uint32_t)pt[6] << 8) | (uint32_t)pt[7]);
-
 		buffer[2] = (((uint32_t)pt[8] << 24) | ((uint32_t)pt[9] << 16) |
 		    ((uint32_t)pt[10] << 8) | (uint32_t)pt[11]);
-
 		buffer[3] = (((uint32_t)pt[12] << 24) |
 		    ((uint32_t)pt[13] << 16) | ((uint32_t)pt[14] << 8) |
 		    (uint32_t)pt[15]);
+#endif
 
-		aes_encrypt_impl(&ksch->encr_ks, ksch->nr, buffer, buffer);
+		AES_ENCRYPT_IMPL(&ksch->encr_ks.ks32[0], ksch->nr,
+		    buffer, buffer);
 
+		/* Copy result from buffer to output block */
+#ifndef	AES_BYTE_SWAP
+		bcopy(&buffer, ct, AES_BLOCK_LEN);
+	}
+
+#else	/* byte swap */
 		ct[0] = buffer[0] >> 24;
 		ct[1] = buffer[0] >> 16;
 		ct[2] = buffer[0] >> 8;
@@ -1473,31 +1565,40 @@ aes_encrypt_block(void *ks, uint8_t *pt, uint8_t *ct)
 		ct[13] = buffer[3] >> 16;
 		ct[14] = buffer[3] >> 8;
 		ct[15] = (uint8_t)buffer[3];
-#ifdef _BIG_ENDIAN
-	}
 #endif
-
 /* EXPORT DELETE END */
 }
 
+
+/*
+ * Decrypt one block using AES.
+ * Align and byte-swap if needed.
+ *
+ * Parameters:
+ * ks	Key schedule, of type aes_key_t
+ * ct	Input block (crypto text)
+ * pt	Output block (plain text). Can overlap with pt
+ */
 void
-aes_decrypt_block(void *ks, uint8_t *ct, uint8_t *pt)
+aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt)
 {
 /* EXPORT DELETE START */
+	aes_key_t	*ksch = (aes_key_t *)ks;
 
-	aes_key_t *ksch = (aes_key_t *)ks;
-
-#ifdef _BIG_ENDIAN
-	if (IS_P2ALIGNED(ct, sizeof (uint32_t)) &&
-	    IS_P2ALIGNED(pt, sizeof (uint32_t))) {
-		/* LINTED:  pointer alignment */
-		aes_decrypt_impl(&ksch->decr_ks, ksch->nr, (uint32_t *)ct,
+#ifndef	AES_BYTE_SWAP
+	if (IS_P2ALIGNED2(ct, pt, sizeof (uint32_t))) {
+		AES_DECRYPT_IMPL(&ksch->decr_ks.ks32[0], ksch->nr,
 		    /* LINTED:  pointer alignment */
-		    (uint32_t *)pt);
+		    (uint32_t *)ct, (uint32_t *)pt);
 	} else {
 #endif
 		uint32_t buffer[AES_BLOCK_LEN / sizeof (uint32_t)];
 
+		/* Copy input block into buffer */
+#ifndef	AES_BYTE_SWAP
+		bcopy(ct, &buffer, AES_BLOCK_LEN);
+
+#else	/* byte swap */
 		buffer[0] = (((uint32_t)ct[0] << 24) | ((uint32_t)ct[1] << 16) |
 		    ((uint32_t)ct[2] << 8) | (uint32_t)ct[3]);
 
@@ -1510,9 +1611,17 @@ aes_decrypt_block(void *ks, uint8_t *ct, uint8_t *pt)
 		buffer[3] = (((uint32_t)ct[12] << 24) |
 		    ((uint32_t)ct[13] << 16) | ((uint32_t)ct[14] << 8) |
 		    (uint32_t)ct[15]);
+#endif
 
-		aes_decrypt_impl(&ksch->decr_ks, ksch->nr, buffer, buffer);
+		AES_DECRYPT_IMPL(&ksch->decr_ks.ks32[0], ksch->nr,
+		    buffer, buffer);
 
+		/* Copy result from buffer to output block */
+#ifndef	AES_BYTE_SWAP
+		bcopy(&buffer, pt, AES_BLOCK_LEN);
+	}
+
+#else	/* byte swap */
 		pt[0] = buffer[0] >> 24;
 		pt[1] = buffer[0] >> 16;
 		pt[2] = buffer[0] >> 8;
@@ -1529,26 +1638,30 @@ aes_decrypt_block(void *ks, uint8_t *ct, uint8_t *pt)
 		pt[13] = buffer[3] >> 16;
 		pt[14] = buffer[3] >> 8;
 		pt[15] = (uint8_t)buffer[3];
-#ifdef _BIG_ENDIAN
-	}
 #endif
 
 /* EXPORT DELETE END */
 }
 
+
 /*
- * Allocate key schedule for AES
+ * Allocate key schedule for AES.
+ *
+ * Return the pointer and set size to the number of bytes allocated.
+ * Memory allocated must be freed by the caller when done.
+ *
+ * Parameters:
+ * size		Size of key schedule allocated, in bytes
+ * kmflag	Flag passed to kmem_alloc(9F); ignored in userland.
  */
 /* ARGSUSED */
 void *
 aes_alloc_keysched(size_t *size, int kmflag)
 {
-
 /* EXPORT DELETE START */
-
 	aes_key_t *keysched;
 
-#ifdef 	_KERNEL
+#ifdef	_KERNEL
 	keysched = (aes_key_t *)kmem_alloc(sizeof (aes_key_t), kmflag);
 #else	/* !_KERNEL */
 	keysched = (aes_key_t *)malloc(sizeof (aes_key_t));
@@ -1558,8 +1671,6 @@ aes_alloc_keysched(size_t *size, int kmflag)
 		*size = sizeof (aes_key_t);
 		return (keysched);
 	}
-
 /* EXPORT DELETE END */
-
 	return (NULL);
 }

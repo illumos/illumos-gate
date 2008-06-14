@@ -30,11 +30,12 @@ include ../Makefile.com
 DATAFILES += depend
 
 LICENSEFILES_i386 = \
-	../../common/crypto/arcfour/amd64/THIRDPARTYLICENSE \
-	../../common/crypto/sha1/amd64/THIRDPARTYLICENSE \
-	../../common/crypto/sha2/amd64/THIRDPARTYLICENSE
+	../../common/crypto/aes/amd64/THIRDPARTYLICENSE \
+	../../common/crypto/md5/amd64/THIRDPARTYLICENSE \
+	../../common/crypto/THIRDPARTYLICENSE.cryptogams
 
 LICENSEFILES += \
+	../../common/crypto/ecc/THIRDPARTYLICENSE \
 	../../lib/libcmd/THIRDPARTYLICENSE \
 	../../lib/libinetutil/common/THIRDPARTYLICENSE \
 	../../lib/libmp/common/THIRDPARTYLICENSE \

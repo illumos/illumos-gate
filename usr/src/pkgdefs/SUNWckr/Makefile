@@ -34,10 +34,10 @@ MACHDATAFILES += i.sdconf
 CLOBBERFILES += $(MACHDATAFILES)
 
 LICENSEFILES_i386 = \
-	../../uts/intel/io/acpica/THIRDPARTYLICENSE \
-	../../common/crypto/arcfour/amd64/THIRDPARTYLICENSE \
-	../../common/crypto/sha1/amd64/THIRDPARTYLICENSE \
-	../../common/crypto/sha2/amd64/THIRDPARTYLICENSE
+	../../common/crypto/aes/amd64/THIRDPARTYLICENSE \
+	../../common/crypto/md5/amd64/THIRDPARTYLICENSE \
+	../../common/crypto/THIRDPARTYLICENSE.cryptogams \
+	../../uts/intel/io/acpica/THIRDPARTYLICENSE
 
 LICENSEFILES += \
 	../../common/crypto/ecc/THIRDPARTYLICENSE \

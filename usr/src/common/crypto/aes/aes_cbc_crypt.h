@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,7 +72,7 @@ extern "C" {
  *			length of the ciphertext for CCM mode decrypt.
  * ac_ccm_processed_data_len:
  *			Length of processed plaintext in CCM mode encrypt,
- *			or length of processed ciphertex for CCM mode decrypt.
+ *			or length of processed ciphertext for CCM mode decrypt.
  * ac_ccm_processed_mac_len:
  *			Length of MAC data accumulated in CCM mode decrypt.
  *
