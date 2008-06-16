@@ -604,14 +604,11 @@ pk_gencsr(int argc, char *argv[])
 		return (PK_ERR_USAGE);
 	}
 
-	if ((rv = kmf_initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
-		cryptoerror(LOG_STDERR, gettext("Error initializing KMF\n"));
-		return (PK_ERR_USAGE);
-	}
-
 	/* Assume keystore = PKCS#11 if not specified. */
 	if (kstype == 0)
 		kstype = KMF_KEYSTORE_PK11TOKEN;
+
+	DIR_OPTION_CHECK(kstype, dir);
 
 	if (EMPTYSTRING(outcsr) && interactive) {
 		(void) get_filename("CSR", &outcsr);
@@ -724,7 +721,6 @@ pk_gencsr(int argc, char *argv[])
 		}
 	}
 
-
 	if ((rv = Str2KeyType(keytype, &keyAlg, &sigAlg)) != 0) {
 		cryptoerror(LOG_STDERR, gettext("Unrecognized keytype (%s).\n"),
 		    keytype);
@@ -742,6 +738,12 @@ pk_gencsr(int argc, char *argv[])
 
 		(void) get_token_password(kstype, tokenname, &tokencred);
 	}
+
+	if ((rv = kmf_initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
+		cryptoerror(LOG_STDERR, gettext("Error initializing KMF\n"));
+		return (PK_ERR_USAGE);
+	}
+
 
 	if (kstype == KMF_KEYSTORE_NSS) {
 		if (dir == NULL)

@@ -937,6 +937,8 @@ pk_import(int argc, char *argv[])
 	if (argc)
 		return (PK_ERR_USAGE);
 
+	DIR_OPTION_CHECK(kstype, dir);
+
 	/* if PUBLIC or PRIVATE obj was given, the old syntax was used. */
 	if ((oclass & (PK_PUBLIC_OBJ | PK_PRIVATE_OBJ)) &&
 	    kstype != KMF_KEYSTORE_PK11TOKEN) {

@@ -525,6 +525,7 @@ pk_genkey(int argc, char *argv[])
 	} else if (kstype == KMF_KEYSTORE_NSS && tokenname == NULL) {
 		tokenname = DEFAULT_NSS_TOKEN;
 	}
+	DIR_OPTION_CHECK(kstype, dir);
 
 	if (kstype == KMF_KEYSTORE_PK11TOKEN || kstype == KMF_KEYSTORE_NSS)
 		(void) get_token_password(kstype, tokenname, &tokencred);

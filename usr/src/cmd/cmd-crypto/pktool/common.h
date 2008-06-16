@@ -140,6 +140,17 @@ void display_error(void *, KMF_RETURN, char *);
 #define	DEFAULT_TOKEN_PROMPT	"Enter PIN for %s: "
 
 #define	EMPTYSTRING(s) (s == NULL || !strlen((char *)s))
+/*
+ * The "dir" option is only valid with the NSS keystore.  This check
+ * forces PK_ERR_USAGE when it is used with non-NSS keystore.
+ */
+#define	DIR_OPTION_CHECK(k, d) \
+if (k != KMF_KEYSTORE_NSS && d != NULL) { \
+	cryptoerror(LOG_STDERR, gettext("The 'dir' option is " \
+	    "not supported with the indicated keystore\n")); \
+	return (PK_ERR_USAGE); \
+}
+
 
 #ifdef __cplusplus
 }

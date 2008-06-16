@@ -817,6 +817,8 @@ pk_delete(int argc, char *argv[])
 		return (PK_ERR_USAGE);
 	/* Done parsing command line options. */
 
+	DIR_OPTION_CHECK(kstype, dir);
+
 	if (kstype == KMF_KEYSTORE_PK11TOKEN && token_spec == NULL) {
 		token_spec = PK_DEFAULT_PK11TOKEN;
 	} else if (kstype == KMF_KEYSTORE_NSS && token_spec == NULL) {

@@ -822,6 +822,8 @@ pk_gencert(int argc, char *argv[])
 		return (PK_ERR_USAGE);
 	}
 
+	DIR_OPTION_CHECK(kstype, dir);
+
 	if (format && (fmt = Str2Format(format)) == KMF_FORMAT_UNDEF) {
 		cryptoerror(LOG_STDERR,
 		    gettext("Error parsing format string (%s).\n"),

@@ -658,13 +658,12 @@ pk_signcsr(int argc, char *argv[])
 	if (argc)
 		return (PK_ERR_USAGE);
 
-	if ((rv = kmf_initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
-		return (rv);
-	}
 
 	/* Assume keystore = PKCS#11 if not specified. */
 	if (kstype == 0)
 		kstype = KMF_KEYSTORE_PK11TOKEN;
+
+	DIR_OPTION_CHECK(kstype, dir);
 
 	if (signkey == NULL) {
 		(void) fprintf(stderr, gettext("The signing key label "
@@ -764,6 +763,10 @@ pk_signcsr(int argc, char *argv[])
 		    gettext("Error parsing format string (%s).\n"),
 		    format);
 		return (PK_ERR_USAGE);
+	}
+
+	if ((rv = kmf_initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
+		return (rv);
 	}
 
 	if (kstype == KMF_KEYSTORE_PK11TOKEN) {
