@@ -94,6 +94,7 @@ extern void mem_config_init(void);
 extern void memseg_remap_init(void);
 
 extern void mach_kpm_init(void);
+extern void pcf_init();
 extern int size_pse_array(pgcnt_t, int);
 
 /*
@@ -1335,6 +1336,12 @@ startup_memlist(void)
 
 	if ((caddr_t)memlist > (memspace + memlist_sz))
 		prom_panic("memlist overflow");
+
+	/*
+	 * Size the pcf array based on the number of cpus in the box at
+	 * boot time.
+	 */
+	pcf_init();
 
 	/*
 	 * Initialize the page structures from the memory lists.

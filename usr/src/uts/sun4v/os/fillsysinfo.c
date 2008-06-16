@@ -373,7 +373,7 @@ cpu_setup_common(char **cpu_module_isa_set)
 	if ((mdp = md_get_handle()) == NULL)
 		cmn_err(CE_PANIC, "Unable to initialize machine description");
 
-	nocpus = md_alloc_scan_dag(mdp,
+	boot_ncpus = nocpus = md_alloc_scan_dag(mdp,
 	    md_root_node(mdp), "cpu", "fwd", &cpulist);
 	if (nocpus < 1) {
 		cmn_err(CE_PANIC, "cpu_common_setup: cpulist allocation "

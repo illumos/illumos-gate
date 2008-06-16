@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -675,8 +675,8 @@ page_t  *page_create_va_large(vnode_t *vp, u_offset_t off, size_t bytes,
 	uint_t flags, struct seg *seg, caddr_t vaddr, void *arg);
 page_t	*page_create_va(struct vnode *, u_offset_t, size_t, uint_t,
 	struct seg *, caddr_t);
-int	page_create_wait(size_t npages, uint_t flags);
-void    page_create_putback(ssize_t npages);
+int	page_create_wait(pgcnt_t npages, uint_t flags);
+void    page_create_putback(spgcnt_t npages);
 void	page_free(page_t *, int);
 void	page_free_at_startup(page_t *);
 void	page_free_pages(page_t *);

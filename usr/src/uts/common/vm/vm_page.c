@@ -167,19 +167,9 @@ static kcondvar_t freemem_cv;
  * of clearning pcf_block, doing the wakeups, etc.
  */
 
-#if NCPU <= 4
-#define	PAD	2
-#define	PCF_FANOUT	4
-static	uint_t	pcf_mask = PCF_FANOUT - 1;
-#else
-#define	PAD	10
-#ifdef sun4v
-#define	PCF_FANOUT	32
-#else
-#define	PCF_FANOUT	128
-#endif
-static	uint_t	pcf_mask = PCF_FANOUT - 1;
-#endif
+#define	MAX_PCF_FANOUT NCPU
+static uint_t pcf_fanout = 1; /* Will get changed at boot time */
+static uint_t pcf_fanout_mask = 0;
 
 struct pcf {
 	kmutex_t	pcf_lock;	/* protects the structure */
@@ -187,11 +177,25 @@ struct pcf {
 	uint_t		pcf_wait;	/* number of waiters */
 	uint_t		pcf_block; 	/* pcgs flag to page_free() */
 	uint_t		pcf_reserve; 	/* pages freed after pcf_block set */
-	uint_t		pcf_fill[PAD];	/* to line up on the caches */
+	uint_t		pcf_fill[10];	/* to line up on the caches */
 };
 
-static struct	pcf	pcf[PCF_FANOUT];
-#define	PCF_INDEX()	((CPU->cpu_id) & (pcf_mask))
+/*
+ * PCF_INDEX hash needs to be dynamic (every so often the hash changes where
+ * it will hash the cpu to).  This is done to prevent a drain condition
+ * from happening.  This drain condition will occur when pcf_count decrement
+ * occurs on cpu A and the increment of pcf_count always occurs on cpu B.  An
+ * example of this shows up with device interrupts.  The dma buffer is allocated
+ * by the cpu requesting the IO thus the pcf_count is decremented based on that.
+ * When the memory is returned by the interrupt thread, the pcf_count will be
+ * incremented based on the cpu servicing the interrupt.
+ */
+static struct pcf pcf[MAX_PCF_FANOUT];
+#define	PCF_INDEX() ((int)(((long)CPU->cpu_seqid) + \
+	(randtick() >> 24)) & (pcf_fanout_mask))
+
+static int pcf_decrement_bucket(pgcnt_t);
+static int pcf_decrement_multiple(pgcnt_t *, pgcnt_t, int);
 
 kmutex_t	pcgs_lock;		/* serializes page_create_get_ */
 kmutex_t	pcgs_cagelock;		/* serializes NOSLEEP cage allocs */
@@ -349,6 +353,39 @@ int page_capture_take_action(page_t *, uint_t, void *);
 
 static void page_demote_vp_pages(page_t *);
 
+
+void
+pcf_init(void)
+
+{
+	int i;
+
+	if (boot_ncpus != -1) {
+		pcf_fanout = boot_ncpus;
+	} else {
+		pcf_fanout = max_ncpus;
+	}
+#ifdef sun4v
+	/*
+	 * Force at least 4 buckets if possible for sun4v.
+	 */
+	pcf_fanout = MAX(pcf_fanout, 4);
+#endif /* sun4v */
+
+	/*
+	 * Round up to the nearest power of 2.
+	 */
+	pcf_fanout = MIN(pcf_fanout, MAX_PCF_FANOUT);
+	if (!ISP2(pcf_fanout)) {
+		pcf_fanout = 1 << highbit(pcf_fanout);
+
+		if (pcf_fanout > MAX_PCF_FANOUT) {
+			pcf_fanout = 1 << (highbit(MAX_PCF_FANOUT) - 1);
+		}
+	}
+	pcf_fanout_mask = pcf_fanout - 1;
+}
+
 /*
  * vm subsystem related initialization
  */
@@ -492,7 +529,7 @@ page_free_large_ctr(pgcnt_t npages)
 
 	freemem += npages;
 
-	lump = roundup(npages, PCF_FANOUT) / PCF_FANOUT;
+	lump = roundup(npages, pcf_fanout) / pcf_fanout;
 
 	while (npages > 0) {
 
@@ -508,7 +545,7 @@ page_free_large_ctr(pgcnt_t npages)
 
 		ASSERT(!p->pcf_wait);
 
-		if (++p > &pcf[PCF_FANOUT - 1])
+		if (++p > &pcf[pcf_fanout - 1])
 			p = pcf;
 	}
 
@@ -1316,7 +1353,7 @@ set_freemem()
 
 	t = 0;
 	p = pcf;
-	for (i = 0;  i < PCF_FANOUT; i++) {
+	for (i = 0;  i < pcf_fanout; i++) {
 		t += p->pcf_count;
 		p++;
 	}
@@ -1340,7 +1377,7 @@ get_freemem()
 
 	t = 0;
 	p = pcf;
-	for (i = 0; i < PCF_FANOUT; i++) {
+	for (i = 0; i < pcf_fanout; i++) {
 		t += p->pcf_count;
 		p++;
 	}
@@ -1361,7 +1398,7 @@ pcf_acquire_all()
 	uint_t		i;
 
 	p = pcf;
-	for (i = 0; i < PCF_FANOUT; i++) {
+	for (i = 0; i < pcf_fanout; i++) {
 		mutex_enter(&p->pcf_lock);
 		p++;
 	}
@@ -1377,7 +1414,7 @@ pcf_release_all()
 	uint_t		i;
 
 	p = pcf;
-	for (i = 0; i < PCF_FANOUT; i++) {
+	for (i = 0; i < pcf_fanout; i++) {
 		mutex_exit(&p->pcf_lock);
 		p++;
 	}
@@ -1462,7 +1499,7 @@ page_create_throttle(pgcnt_t npages, int flags)
 		fm = 0;
 		pcf_acquire_all();
 		mutex_enter(&new_freemem_lock);
-		for (i = 0; i < PCF_FANOUT; i++) {
+		for (i = 0; i < pcf_fanout; i++) {
 			fm += pcf[i].pcf_count;
 			pcf[i].pcf_wait++;
 			mutex_exit(&pcf[i].pcf_lock);
@@ -1490,7 +1527,7 @@ page_create_throttle(pgcnt_t npages, int flags)
  * Sadly, this is called from platform/vm/vm_machdep.c
  */
 int
-page_create_wait(size_t npages, uint_t flags)
+page_create_wait(pgcnt_t npages, uint_t flags)
 {
 	pgcnt_t		total;
 	uint_t		i;
@@ -1514,44 +1551,9 @@ checkagain:
 		if (!page_create_throttle(npages, flags))
 			return (0);
 
-	/*
-	 * Since page_create_va() looked at every
-	 * bucket, assume we are going to have to wait.
-	 * Get all of the pcf locks.
-	 */
-	total = 0;
-	p = pcf;
-	for (i = 0; i < PCF_FANOUT; i++) {
-		mutex_enter(&p->pcf_lock);
-		total += p->pcf_count;
-		if (total >= npages) {
-			/*
-			 * Wow!  There are enough pages laying around
-			 * to satisfy the request.  Do the accounting,
-			 * drop the locks we acquired, and go back.
-			 *
-			 * freemem is not protected by any lock. So,
-			 * we cannot have any assertion containing
-			 * freemem.
-			 */
-			freemem -= npages;
-
-			while (p >= pcf) {
-				if (p->pcf_count <= npages) {
-					npages -= p->pcf_count;
-					p->pcf_count = 0;
-				} else {
-					p->pcf_count -= (uint_t)npages;
-					npages = 0;
-				}
-				mutex_exit(&p->pcf_lock);
-				p--;
-			}
-			ASSERT(npages == 0);
-			return (1);
-		}
-		p++;
-	}
+	if (pcf_decrement_bucket(npages) ||
+	    pcf_decrement_multiple(&total, npages, 0))
+		return (1);
 
 	/*
 	 * All of the pcf locks are held, there are not enough pages
@@ -1593,7 +1595,7 @@ checkagain:
 	mutex_enter(&new_freemem_lock);
 
 	p = pcf;
-	for (i = 0; i < PCF_FANOUT; i++) {
+	for (i = 0; i < pcf_fanout; i++) {
 		p->pcf_wait++;
 		mutex_exit(&p->pcf_lock);
 		p++;
@@ -1616,7 +1618,6 @@ checkagain:
 	VM_STAT_ADD(page_create_not_enough_again);
 	goto checkagain;
 }
-
 /*
  * A routine to do the opposite of page_create_wait().
  */
@@ -1632,10 +1633,10 @@ page_create_putback(spgcnt_t npages)
 	 * deal with lots of pages (min 64) so lets spread
 	 * the wealth around.
 	 */
-	lump = roundup(npages, PCF_FANOUT) / PCF_FANOUT;
+	lump = roundup(npages, pcf_fanout) / pcf_fanout;
 	freemem += npages;
 
-	for (p = pcf; (npages > 0) && (p < &pcf[PCF_FANOUT]); p++) {
+	for (p = pcf; (npages > 0) && (p < &pcf[pcf_fanout]); p++) {
 		which = &p->pcf_count;
 
 		mutex_enter(&p->pcf_lock);
@@ -1695,7 +1696,7 @@ pcgs_unblock(void)
 	/* Update freemem while we're here. */
 	freemem = 0;
 	p = pcf;
-	for (i = 0; i < PCF_FANOUT; i++) {
+	for (i = 0; i < pcf_fanout; i++) {
 		mutex_enter(&p->pcf_lock);
 		ASSERT(p->pcf_count == 0);
 		p->pcf_count = p->pcf_reserve;
@@ -1861,7 +1862,7 @@ page_create_get_something(vnode_t *vp, u_offset_t off, struct seg *seg,
 				VM_STAT_ADD(pcgs_locked);
 				locked = 1;
 				p = pcf;
-				for (i = 0; i < PCF_FANOUT; i++) {
+				for (i = 0; i < pcf_fanout; i++) {
 					mutex_enter(&p->pcf_lock);
 					ASSERT(p->pcf_block == 0);
 					p->pcf_block = 1;
@@ -2127,15 +2128,10 @@ page_t *
 page_create_va_large(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
     struct seg *seg, caddr_t vaddr, void *arg)
 {
-	pgcnt_t		npages, pcftotal;
+	pgcnt_t		npages;
 	page_t		*pp;
 	page_t		*rootpp;
 	lgrp_t		*lgrp;
-	uint_t		enough;
-	uint_t		pcf_index;
-	uint_t		i;
-	struct pcf	*p;
-	struct pcf	*q;
 	lgrp_id_t	*lgrpid = (lgrp_id_t *)arg;
 
 	ASSERT(vp != NULL);
@@ -2184,84 +2180,10 @@ page_create_va_large(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 		}
 	}
 
-	enough = 0;
-	pcf_index = PCF_INDEX();
-	p = &pcf[pcf_index];
-	q = &pcf[PCF_FANOUT];
-	for (pcftotal = 0, i = 0; i < PCF_FANOUT; i++) {
-		if (p->pcf_count > npages) {
-			/*
-			 * a good one to try.
-			 */
-			mutex_enter(&p->pcf_lock);
-			if (p->pcf_count > npages) {
-				p->pcf_count -= (uint_t)npages;
-				/*
-				 * freemem is not protected by any lock.
-				 * Thus, we cannot have any assertion
-				 * containing freemem here.
-				 */
-				freemem -= npages;
-				enough = 1;
-				mutex_exit(&p->pcf_lock);
-				break;
-			}
-			mutex_exit(&p->pcf_lock);
-		}
-		pcftotal += p->pcf_count;
-		p++;
-		if (p >= q) {
-			p = pcf;
-		}
-	}
-
-	if (!enough) {
-		/* If there isn't enough memory available, give up. */
-		if (pcftotal < npages) {
-			VM_STAT_ADD(page_create_large_cnt[3]);
-			return (NULL);
-		}
-
-		/* try to collect pages from several pcf bins */
-		for (p = pcf, pcftotal = 0, i = 0; i < PCF_FANOUT; i++) {
-			mutex_enter(&p->pcf_lock);
-			pcftotal += p->pcf_count;
-			if (pcftotal >= npages) {
-				/*
-				 * Wow!  There are enough pages laying around
-				 * to satisfy the request.  Do the accounting,
-				 * drop the locks we acquired, and go back.
-				 *
-				 * freemem is not protected by any lock. So,
-				 * we cannot have any assertion containing
-				 * freemem.
-				 */
-				pgcnt_t	tpages = npages;
-				freemem -= npages;
-				while (p >= pcf) {
-					if (p->pcf_count <= tpages) {
-						tpages -= p->pcf_count;
-						p->pcf_count = 0;
-					} else {
-						p->pcf_count -= (uint_t)tpages;
-						tpages = 0;
-					}
-					mutex_exit(&p->pcf_lock);
-					p--;
-				}
-				ASSERT(tpages == 0);
-				break;
-			}
-			p++;
-		}
-		if (i == PCF_FANOUT) {
-			/* failed to collect pages - release the locks */
-			while (--p >= pcf) {
-				mutex_exit(&p->pcf_lock);
-			}
-			VM_STAT_ADD(page_create_large_cnt[4]);
-			return (NULL);
-		}
+	if (!pcf_decrement_bucket(npages) &&
+	    !pcf_decrement_multiple(NULL, npages, 1)) {
+		VM_STAT_ADD(page_create_large_cnt[4]);
+		return (NULL);
 	}
 
 	/*
@@ -2336,11 +2258,7 @@ page_create_va(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 	pgcnt_t		found_on_free = 0;
 	pgcnt_t		pages_req;
 	page_t		*npp = NULL;
-	uint_t		enough;
-	uint_t		i;
-	uint_t		pcf_index;
 	struct pcf	*p;
-	struct pcf	*q;
 	lgrp_t		*lgrp;
 
 	TRACE_4(TR_FAC_VM, TR_PAGE_CREATE_START,
@@ -2410,38 +2328,7 @@ page_create_va(vnode_t *vp, u_offset_t off, size_t bytes, uint_t flags,
 
 	VM_STAT_ADD(page_create_cnt[0]);
 
-	enough = 0;
-	pcf_index = PCF_INDEX();
-
-	p = &pcf[pcf_index];
-	q = &pcf[PCF_FANOUT];
-	for (i = 0; i < PCF_FANOUT; i++) {
-		if (p->pcf_count > npages) {
-			/*
-			 * a good one to try.
-			 */
-			mutex_enter(&p->pcf_lock);
-			if (p->pcf_count > npages) {
-				p->pcf_count -= (uint_t)npages;
-				/*
-				 * freemem is not protected by any lock.
-				 * Thus, we cannot have any assertion
-				 * containing freemem here.
-				 */
-				freemem -= npages;
-				enough = 1;
-				mutex_exit(&p->pcf_lock);
-				break;
-			}
-			mutex_exit(&p->pcf_lock);
-		}
-		p++;
-		if (p >= q) {
-			p = pcf;
-		}
-	}
-
-	if (!enough) {
+	if (!pcf_decrement_bucket(npages)) {
 		/*
 		 * Have to look harder.  If npages is greater than
 		 * one, then we might have to coalesce the counters.
@@ -2668,7 +2555,7 @@ fail:
 
 		if (overshoot) {
 			VM_STAT_ADD(page_create_overshoot);
-			p = &pcf[pcf_index];
+			p = &pcf[PCF_INDEX()];
 			mutex_enter(&p->pcf_lock);
 			if (p->pcf_block) {
 				p->pcf_reserve += overshoot;
@@ -3006,7 +2893,6 @@ int
 page_reclaim(page_t *pp, kmutex_t *lock)
 {
 	struct pcf	*p;
-	uint_t		pcf_index;
 	struct cpu	*cpup;
 	int		enough;
 	uint_t		i;
@@ -3042,15 +2928,7 @@ page_reclaim(page_t *pp, kmutex_t *lock)
 		goto page_reclaim_nomem;
 	}
 
-	enough = 0;
-	pcf_index = PCF_INDEX();
-	p = &pcf[pcf_index];
-	mutex_enter(&p->pcf_lock);
-	if (p->pcf_count >= 1) {
-		enough = 1;
-		p->pcf_count--;
-	}
-	mutex_exit(&p->pcf_lock);
+	enough = pcf_decrement_bucket(1);
 
 	if (!enough) {
 		VM_STAT_ADD(page_reclaim_zero);
@@ -3061,7 +2939,7 @@ page_reclaim(page_t *pp, kmutex_t *lock)
 		 * until we find a page.
 		 */
 		p = pcf;
-		for (i = 0; i < PCF_FANOUT; i++) {
+		for (i = 0; i < pcf_fanout; i++) {
 			mutex_enter(&p->pcf_lock);
 			if (p->pcf_count >= 1) {
 				p->pcf_count -= 1;
@@ -3095,7 +2973,7 @@ page_reclaim_nomem:
 			mutex_enter(&new_freemem_lock);
 
 			p = pcf;
-			for (i = 0; i < PCF_FANOUT; i++) {
+			for (i = 0; i < pcf_fanout; i++) {
 				p->pcf_wait++;
 				mutex_exit(&p->pcf_lock);
 				p++;
@@ -7427,4 +7305,114 @@ page_capture_thread(void)
 		}
 	}
 	/*NOTREACHED*/
+}
+/*
+ * Attempt to locate a bucket that has enough pages to satisfy the request.
+ * The initial check is done without the lock to avoid unneeded contention.
+ * The function returns 1 if enough pages were found, else 0 if it could not
+ * find enough pages in a bucket.
+ */
+static int
+pcf_decrement_bucket(pgcnt_t npages)
+{
+	struct pcf	*p;
+	struct pcf	*q;
+	int i;
+
+	p = &pcf[PCF_INDEX()];
+	q = &pcf[pcf_fanout];
+	for (i = 0; i < pcf_fanout; i++) {
+		if (p->pcf_count > npages) {
+			/*
+			 * a good one to try.
+			 */
+			mutex_enter(&p->pcf_lock);
+			if (p->pcf_count > npages) {
+				p->pcf_count -= (uint_t)npages;
+				/*
+				 * freemem is not protected by any lock.
+				 * Thus, we cannot have any assertion
+				 * containing freemem here.
+				 */
+				freemem -= npages;
+				mutex_exit(&p->pcf_lock);
+				return (1);
+			}
+			mutex_exit(&p->pcf_lock);
+		}
+		p++;
+		if (p >= q) {
+			p = pcf;
+		}
+	}
+	return (0);
+}
+
+/*
+ * Arguments:
+ *	pcftotal_ret:	If the value is not NULL and we have walked all the
+ *			buckets but did not find enough pages then it will
+ *			be set to the total number of pages in all the pcf
+ *			buckets.
+ *	npages:		Is the number of pages we have been requested to
+ *			find.
+ *	unlock:		If set to 0 we will leave the buckets locked if the
+ *			requested number of pages are not found.
+ *
+ * Go and try to satisfy the page request  from any number of buckets.
+ * This can be a very expensive operation as we have to lock the buckets
+ * we are checking (and keep them locked), starting at bucket 0.
+ *
+ * The function returns 1 if enough pages were found, else 0 if it could not
+ * find enough pages in the buckets.
+ *
+ */
+static int
+pcf_decrement_multiple(pgcnt_t *pcftotal_ret, pgcnt_t npages, int unlock)
+{
+	struct pcf	*p;
+	pgcnt_t pcftotal;
+	int i;
+
+	p = pcf;
+	/* try to collect pages from several pcf bins */
+	for (pcftotal = 0, i = 0; i < pcf_fanout; i++) {
+		mutex_enter(&p->pcf_lock);
+		pcftotal += p->pcf_count;
+		if (pcftotal >= npages) {
+			/*
+			 * Wow!  There are enough pages laying around
+			 * to satisfy the request.  Do the accounting,
+			 * drop the locks we acquired, and go back.
+			 *
+			 * freemem is not protected by any lock. So,
+			 * we cannot have any assertion containing
+			 * freemem.
+			 */
+			freemem -= npages;
+			while (p >= pcf) {
+				if (p->pcf_count <= npages) {
+					npages -= p->pcf_count;
+					p->pcf_count = 0;
+				} else {
+					p->pcf_count -= (uint_t)npages;
+					npages = 0;
+				}
+				mutex_exit(&p->pcf_lock);
+				p--;
+			}
+			ASSERT(npages == 0);
+			return (1);
+		}
+		p++;
+	}
+	if (unlock) {
+		/* failed to collect pages - release the locks */
+		while (--p >= pcf) {
+			mutex_exit(&p->pcf_lock);
+		}
+	}
+	if (pcftotal_ret != NULL)
+		*pcftotal_ret = pcftotal;
+	return (0);
 }

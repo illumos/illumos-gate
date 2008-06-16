@@ -164,6 +164,7 @@ int pg_lpgcreate_nocage = LPGCREATE;
 typedef struct pcc_info {
 	pgcnt_t	pcc_pages_free;
 	pgcnt_t	*pcc_color_free;
+	uint_t	pad[12];
 } pcc_info_t;
 
 /*
@@ -288,6 +289,9 @@ typedef struct hw_page_map {
 	int		hpm_shift;
 	pfn_t		hpm_base;
 	size_t		*hpm_color_current[MAX_MNODE_MRANGES];
+#if defined(__sparc)
+	uint_t		pad[4];
+#endif
 } hw_page_map_t;
 
 /*

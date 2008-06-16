@@ -862,8 +862,35 @@ _tsc_lfence_end:
 
 #endif	/* __lint */
 
+
 #endif	/* __xpv */
 
+#ifdef __lint
+/*
+ * Do not use this function for obtaining clock tick.  This
+ * is called by callers who do not need to have a guarenteed
+ * correct tick value.  The proper routine to use is tsc_read().
+ */
+hrtime_t
+randtick(void)
+{
+	return (0);
+}
+#else
+#if defined(__amd64)
+	ENTRY_NP(randtick)
+	rdtsc
+	shlq    $32, %rdx
+	orq     %rdx, %rax
+	ret
+	SET_SIZE(randtick)
+#else
+	ENTRY_NP(randtick)
+	rdtsc
+	ret
+	SET_SIZE(randtick)
+#endif /* __i386 */
+#endif /* __lint */
 /*
  * Insert entryp after predp in a doubly linked list.
  */

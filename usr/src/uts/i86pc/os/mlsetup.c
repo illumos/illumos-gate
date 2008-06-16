@@ -104,7 +104,6 @@ mlsetup(struct regs *rp)
 	extern struct classfuncs sys_classfuncs;
 	extern disp_t cpu0_disp;
 	extern char t0stack[];
-	int boot_ncpus;
 #if !defined(__xpv)
 	extern int xpv_is_hvm;
 #endif

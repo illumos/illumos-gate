@@ -46,7 +46,13 @@ extern "C" {
  */
 
 #define	GETTICK()	tsc_read()
+/*
+ * Do not use this function for obtaining clock tick.  This
+ * is called by callers who do not need to have a guarenteed
+ * correct tick value.  The proper routine to use is tsc_read().
+ */
 
+extern hrtime_t		randtick();
 extern uint_t page_create_update_flags_x86(uint_t);
 
 extern size_t plcnt_sz(size_t);

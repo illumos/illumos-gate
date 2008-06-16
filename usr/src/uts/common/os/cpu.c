@@ -123,6 +123,7 @@ int max_ncpus = NCPU;
  * at device tree scan time during boot.
  */
 int boot_max_ncpus = -1;
+int boot_ncpus = -1;
 /*
  * Maximum possible CPU id.  This can never be >= NCPU since NCPU is
  * used to size arrays that are indexed by CPU id.

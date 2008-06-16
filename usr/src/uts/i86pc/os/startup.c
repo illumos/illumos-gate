@@ -136,6 +136,7 @@ struct xen_evt_data cpu0_evt_data;
 extern void progressbar_init(void);
 extern void progressbar_start(void);
 extern void brand_init(void);
+extern void pcf_init(void);
 
 extern int size_pse_array(pgcnt_t, int);
 
@@ -1152,6 +1153,13 @@ startup_memlist(void)
 	 * free page list counters
 	 */
 	(void) page_ctrs_alloc(page_ctrs_mem);
+
+	/*
+	 * Size the pcf array based on the number of cpus in the box at
+	 * boot time.
+	 */
+
+	pcf_init();
 
 	/*
 	 * Initialize the page structures from the memory lists.

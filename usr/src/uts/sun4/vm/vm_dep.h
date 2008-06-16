@@ -41,6 +41,12 @@ extern "C" {
 #include <sys/memnode.h>
 
 #define	GETTICK()	gettick()
+/*
+ * Do not use this function for obtaining clock tick.  This
+ * is called by callers who do not need to have a guarenteed
+ * correct tick value.  The proper routine to use is tsc_read().
+ */
+#define	randtick()	gettick()
 
 /*
  * Per page size free lists. Allocated dynamically.

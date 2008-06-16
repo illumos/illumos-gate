@@ -524,6 +524,7 @@ extern int		ncpus;		/* number of CPUs present */
 extern int		ncpus_online;	/* number of CPUs not quiesced */
 extern int		max_ncpus;	/* max present before ncpus is known */
 extern int		boot_max_ncpus;	/* like max_ncpus but for real */
+extern int		boot_ncpus;	/* # cpus present @ boot */
 extern processorid_t	max_cpuid;	/* maximum CPU number */
 extern struct cpu	*cpu_inmotion;	/* offline or partition move target */
 extern cpu_t		*clock_cpu_list;
