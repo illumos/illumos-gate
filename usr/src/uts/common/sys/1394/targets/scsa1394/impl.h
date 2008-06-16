@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,7 +76,9 @@ typedef enum {
 	SCSA1394_DEV_INIT		= 0,
 	SCSA1394_DEV_ONLINE,
 	SCSA1394_DEV_BUS_RESET,
-	SCSA1394_DEV_DISCONNECTED
+	SCSA1394_DEV_DISCONNECTED,
+	SCSA1394_DEV_PWRED_DOWN,
+	SCSA1394_DEV_SUSPENDED
 } scsa1394_dev_state_t;
 
 enum { SCSA1394_STAT_NCMD_LAST = 8 };
@@ -313,6 +314,8 @@ void	scsa1394_thr_wake(scsa1394_thread_t *, int);
 void	scsa1394_thr_clear_req(scsa1394_thread_t *, int);
 void	scsa1394_cmd_status_proc(scsa1394_lun_t *, scsa1394_cmd_t *);
 boolean_t scsa1394_dev_is_online(scsa1394_state_t *);
+void	scsa1394_sbp2_req_bus_reset(scsa1394_lun_t *);
+void	scsa1394_sbp2_req_reconnect(scsa1394_lun_t *);
 
 
 #ifdef	__cplusplus

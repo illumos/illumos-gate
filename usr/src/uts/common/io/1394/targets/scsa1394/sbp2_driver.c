@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,8 +46,6 @@
 static void	scsa1394_sbp2_detect_symbios(scsa1394_state_t *);
 static void	scsa1394_sbp2_worker_thread(void *);
 static void	scsa1394_sbp2_status_cb(void *, sbp2_task_t *);
-static void	scsa1394_sbp2_req_bus_reset(scsa1394_lun_t *);
-static void	scsa1394_sbp2_req_reconnect(scsa1394_lun_t *);
 static void	scsa1394_sbp2_seg2pt_default(scsa1394_lun_t *,
 		scsa1394_cmd_t *);
 static void	scsa1394_sbp2_seg2pt_symbios(scsa1394_lun_t *,
@@ -339,7 +337,7 @@ scsa1394_sbp2_req(scsa1394_state_t *sp, int lun, int req)
 	}
 }
 
-static void
+void
 scsa1394_sbp2_req_bus_reset(scsa1394_lun_t *lp)
 {
 	scsa1394_state_t	*sp = lp->l_sp;
@@ -405,7 +403,7 @@ disconnect:
 }
 
 /*ARGSUSED*/
-static void
+void
 scsa1394_sbp2_req_reconnect(scsa1394_lun_t *lp)
 {
 	scsa1394_state_t	*sp = lp->l_sp;

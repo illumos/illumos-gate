@@ -46,6 +46,8 @@
 static int	scsa1394_attach(dev_info_t *, ddi_attach_cmd_t);
 static int	scsa1394_detach(dev_info_t *, ddi_detach_cmd_t);
 static int	scsa1394_power(dev_info_t *, int, int);
+static int	scsa1394_cpr_suspend(dev_info_t *);
+static void	scsa1394_cpr_resume(dev_info_t *);
 
 /* configuration routines */
 static void	scsa1394_cleanup(scsa1394_state_t *, int);
@@ -163,7 +165,7 @@ static struct cb_ops scsa1394_cb_ops = {
 	ddi_prop_op,		/* prop_op */
 	NULL,			/* stream */
 	D_MP,			/* cb_flag */
-	CB_REV, 		/* rev */
+	CB_REV,			/* rev */
 	nodev,			/* aread */
 	nodev			/* awrite */
 };
@@ -184,7 +186,7 @@ static struct dev_ops scsa1394_ops = {
 
 static struct modldrv scsa1394_modldrv = {
 	&mod_driverops,			/* module type */
-	"1394 Mass Storage HBA Driver %I%", /* name of the module */
+	"1394 Mass Storage HBA Driver", /* name of the module */
 	&scsa1394_ops,			/* driver ops */
 };
 
@@ -265,6 +267,7 @@ scsa1394_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	case DDI_ATTACH:
 		break;
 	case DDI_RESUME:
+		scsa1394_cpr_resume(dip);
 		return (DDI_SUCCESS);
 	default:
 		return (DDI_FAILURE);
@@ -313,6 +316,15 @@ scsa1394_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+	/* prevent async PM changes until we are done */
+	(void) pm_busy_component(dip, 0);
+
+	/* Set power to full on */
+	(void) pm_raise_power(dip, 0, PM_LEVEL_D0);
+
+	/* we are done */
+	(void) pm_idle_component(dip, 0);
+
 #ifndef __lock_lint
 	sp->s_dev_state = SCSA1394_DEV_ONLINE;
 #endif
@@ -334,10 +346,13 @@ scsa1394_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	switch (cmd) {
 	case DDI_DETACH:
+		/* Cycle power state to off and idle  where done/gone */
+		(void) pm_lower_power(dip, 0, PM_LEVEL_D3);
+
 		scsa1394_cleanup(sp, SCSA1394_CLEANUP_LEVEL_MAX);
 		return (DDI_SUCCESS);
 	case DDI_SUSPEND:
-		return (DDI_FAILURE);
+		return (scsa1394_cpr_suspend(dip));
 	default:
 		return (DDI_FAILURE);
 	}
@@ -349,6 +364,86 @@ scsa1394_power(dev_info_t *dip, int comp, int level)
 {
 	return (DDI_SUCCESS);
 }
+
+/*
+ * scsa1394_cpr_suspend
+ *	determine if the device's state can be changed to SUSPENDED
+ */
+/* ARGSUSED */
+static int
+scsa1394_cpr_suspend(dev_info_t *dip)
+{
+	int		instance = ddi_get_instance(dip);
+	scsa1394_state_t *sp;
+	int		rval = DDI_FAILURE;
+
+	sp = SCSA1394_INST2STATE(instance);
+
+	ASSERT(sp != NULL);
+
+
+	mutex_enter(&sp->s_mutex);
+	switch (sp->s_dev_state) {
+	case SCSA1394_DEV_ONLINE:
+	case SCSA1394_DEV_PWRED_DOWN:
+	case SCSA1394_DEV_DISCONNECTED:
+		sp->s_dev_state = SCSA1394_DEV_SUSPENDED;
+
+		/*  Power down and make device idle */
+		(void) pm_lower_power(dip, 0, PM_LEVEL_D3);
+
+		rval = DDI_SUCCESS;
+		break;
+	case SCSA1394_DEV_SUSPENDED:
+	default:
+		if (scsa1394_bus_config_debug)
+			cmn_err(CE_WARN,
+			    "scsa1304_cpr_suspend: Illegal dev state: %d",
+			    sp->s_dev_state);
+
+		rval = DDI_SUCCESS;
+		break;
+	}
+	mutex_exit(&sp->s_mutex);
+
+	return (rval);
+}
+
+/*
+ * scsa2usb_cpr_resume:
+ *	restore device's state
+ */
+static void
+scsa1394_cpr_resume(dev_info_t *dip)
+{
+	int		instance = ddi_get_instance(dip);
+	scsa1394_state_t *sp;
+	int		i;
+	scsa1394_lun_t	*lp;
+
+	sp = SCSA1394_INST2STATE(instance);
+
+	ASSERT(sp != NULL);
+
+	if (sp->s_dev_state != SCSA1394_DEV_SUSPENDED)
+		return;
+
+	/*
+	 * Go through each lun and reset it to force a reconnect.
+	 */
+	for (i = 0; i < sp->s_nluns; i++) {
+		lp = &sp->s_lun[i];
+		if (lp->l_ses != NULL) {  /* Are we loged in? */
+			scsa1394_sbp2_req_bus_reset(lp);
+			scsa1394_sbp2_req_reconnect(lp);
+		}
+	}
+
+	/* we are down so let the power get managed */
+	(void) pm_idle_component(dip, 0);
+}
+
+
 
 /*
  *
@@ -680,7 +775,7 @@ scsa1394_dtype2name(int dtype, char **node_name, char **driver_name)
 		{ "generic",	NULL },		/* DTYPE_???		0x0A */
 		{ "generic",	NULL },		/* DTYPE_???		0x0B */
 		{ "array_ctrl",	NULL },		/* DTYPE_ARRAY_CTRL	0x0C */
-		{ "esi",	"ses" }, 	/* DTYPE_ESI		0x0D */
+		{ "esi",	"ses" },	/* DTYPE_ESI		0x0D */
 		{ "disk",	"sd" }		/* DTYPE_RBC		0x0E */
 	};
 

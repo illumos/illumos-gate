@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +65,19 @@ hci1394_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_DETACH:
 		/* Don't allow the HW to generate any more interrupts */
 		hci1394_ohci_intr_master_disable(soft_state->ohci);
+		hci1394_ohci_it_intr_disable(soft_state->ohci, 0xFFFFFFFF);
+		hci1394_ohci_ir_intr_disable(soft_state->ohci, 0xFFFFFFFF);
+
+		/* Clear any pending interrupts - no longer valid */
+		hci1394_ohci_intr_clear(soft_state->ohci, 0xFFFFFFFF);
+		hci1394_ohci_it_intr_clear(soft_state->ohci, 0xFFFFFFFF);
+		hci1394_ohci_ir_intr_clear(soft_state->ohci, 0xFFFFFFFF);
+
+		/* Make sure we tell others on the bus we are dropping out */
+		(void) hci1394_ohci_phy_clr(soft_state->ohci, 4, 0xc0);
+		ddi_put32(soft_state->ohci->ohci_reg_handle,
+		    &soft_state->ohci->ohci_regs->link_ctrl_clr,
+		    0xFFFFFFFF);
 
 		/* unregister interrupt handler */
 		hci1394_isr_handler_fini(soft_state);
@@ -73,6 +85,9 @@ hci1394_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		/* don't accept anymore commands from services layer */
 		(void) hci1394_state_set(&soft_state->drvinfo,
 		    HCI1394_SHUTDOWN);
+
+		/* Do a long reset on the bus so every one knows we are gone */
+		(void) hci1394_ohci_bus_reset_nroot(soft_state->ohci);
 
 		/* Reset the OHCI HW */
 		(void) hci1394_ohci_soft_reset(soft_state->ohci);
@@ -106,10 +121,26 @@ hci1394_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_SUSPEND:
 		/* Don't allow the HW to generate any more interrupts */
 		hci1394_ohci_intr_master_disable(soft_state->ohci);
+		hci1394_ohci_it_intr_disable(soft_state->ohci, 0xFFFFFFFF);
+		hci1394_ohci_ir_intr_disable(soft_state->ohci, 0xFFFFFFFF);
+
+		/* Clear any pending interrupts - no longer valid */
+		hci1394_ohci_intr_clear(soft_state->ohci, 0xFFFFFFFF);
+		hci1394_ohci_it_intr_clear(soft_state->ohci, 0xFFFFFFFF);
+		hci1394_ohci_ir_intr_clear(soft_state->ohci, 0xFFFFFFFF);
+
+		/* Make sure we tell others on the bus we are dropping out */
+		(void) hci1394_ohci_phy_clr(soft_state->ohci, 4, 0xc0);
+		ddi_put32(soft_state->ohci->ohci_reg_handle,
+		    &soft_state->ohci->ohci_regs->link_ctrl_clr,
+		    0xFFFFFFFF);
 
 		/* don't accept anymore commands from services layer */
 		(void) hci1394_state_set(&soft_state->drvinfo,
 		    HCI1394_SHUTDOWN);
+
+		/* Do a long reset on the bus so every one knows we are gone */
+		(void) hci1394_ohci_bus_reset_nroot(soft_state->ohci);
 
 		/* Reset the OHCI HW */
 		(void) hci1394_ohci_soft_reset(soft_state->ohci);

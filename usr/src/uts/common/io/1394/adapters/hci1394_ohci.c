@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1060,6 +1059,43 @@ hci1394_ohci_bus_reset(hci1394_ohci_handle_t ohci_hdl)
 	return (DDI_SUCCESS);
 }
 
+/*
+ *
+ * hci1394_ohci_bus_reset_nroot()
+ *     Reset the 1394 bus. This performs a "long" bus reset with out a root.
+ */
+int
+hci1394_ohci_bus_reset_nroot(hci1394_ohci_handle_t ohci_hdl)
+{
+	int status;
+	uint_t reg;
+
+	ASSERT(ohci_hdl != NULL);
+
+	/*
+	 * We want to reset the bus.  We don't care about any holdoff
+	 * we are suspending need no root...
+	 */
+	(void) hci1394_ohci_phy_read(ohci_hdl, 0x1, &reg);
+	reg = reg | OHCI_PHY_IBR;
+	reg = reg & ~OHCI_PHY_RHB;
+
+	/*
+	 * Reset the bus. We intentionally do NOT do a PHY read here.  A PHY
+	 * read could introduce race conditions and would be more likely to fail
+	 * due to a timeout.
+	 */
+	status = hci1394_ohci_phy_write(ohci_hdl, 0x1, reg);
+	if (status != DDI_SUCCESS) {
+		TNF_PROBE_0(hci1394_ohci_phy_write_fail,
+		    HCI1394_TNF_HAL_ERROR, "");
+		TNF_PROBE_0_DEBUG(hci1394_ohci_bus_reset_nroot_exit,
+		    HCI1394_TNF_HAL_STACK, "");
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
 
 /*
  * hci1394_ohci_phy_init()
