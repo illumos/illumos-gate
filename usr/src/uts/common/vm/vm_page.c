@@ -358,8 +358,6 @@ void
 pcf_init(void)
 
 {
-	int i;
-
 	if (boot_ncpus != -1) {
 		pcf_fanout = boot_ncpus;
 	} else {
