@@ -1246,7 +1246,7 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 	}
 	zalloced = 1;
 	(void) snprintf(namebuf, sizeof (namebuf), "%d", newminor);
-	(void) ddi_create_minor_node(lofi_dip, namebuf, S_IFBLK, newminor,
+	error = ddi_create_minor_node(lofi_dip, namebuf, S_IFBLK, newminor,
 	    DDI_PSEUDO, NULL);
 	if (error != DDI_SUCCESS) {
 		error = ENXIO;
