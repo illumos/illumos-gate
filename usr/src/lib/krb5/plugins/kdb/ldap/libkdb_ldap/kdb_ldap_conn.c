@@ -276,7 +276,11 @@ krb5_ldap_db_init(krb5_context context, krb5_ldap_context *ldap_context)
     krb5_error_code             st=0;
     krb5_boolean                sasl_mech_supported=TRUE;
     int                         cnt=0, version=LDAP_VERSION3;
+#ifdef LDAP_OPT_NETWORK_TIMEOUT
     struct timeval              local_timelimit = {10,0};
+#elif defined LDAP_X_OPT_CONNECT_TIMEOUT
+    int              		local_timelimit = 10;
+#endif
 
     if ((st=krb5_validate_ldap_context(context, ldap_context)) != 0)
 	goto err_out;
