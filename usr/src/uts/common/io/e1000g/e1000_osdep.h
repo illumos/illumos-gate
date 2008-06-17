@@ -87,6 +87,8 @@ extern "C" {
 #define	E1000_MDALIGN			4096
 #define	E1000_ERT_2048			0x100
 
+#define	E1000_DEV_ID_ICH10D_BM_LM	0x10DE
+
 /* PHY Extended Status Register */
 #define	IEEE_ESR_1000T_HD_CAPS	0x1000	/* 1000T HD capable */
 #define	IEEE_ESR_1000T_FD_CAPS	0x2000	/* 1000T FD capable */

@@ -239,7 +239,7 @@ e1000_set_mac_type(struct e1000_hw *hw)
 	case E1000_DEV_ID_ICH9_IGP_AMT:
 	case E1000_DEV_ID_ICH9_BM:
 	case E1000_DEV_ID_ICH9_IGP_C:
-	case E1000_DEV_ID_MCCREARY:
+	case E1000_DEV_ID_ICH10D_BM_LM:
 		mac->type = e1000_ich9lan;
 		break;
 	default:

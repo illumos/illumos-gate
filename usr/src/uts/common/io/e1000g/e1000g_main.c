@@ -46,9 +46,9 @@
 #include "e1000g_sw.h"
 #include "e1000g_debug.h"
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.2.8";
+static char ident[] = "Intel PRO/1000 Ethernet 5.2.9";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.2.8";
+static char e1000g_version[] = "Driver Ver. 5.2.9";
 
 /*
  * Proto types for DDI entry points

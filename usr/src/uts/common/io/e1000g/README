@@ -575,8 +575,12 @@ Notes on packaging:
 5.2.8
 ======
   This version has the following fix:
-   6674179 doradi panics at e1000g_receive
+   6674179 SunFire X4150 panics at e1000g_receive
    6679136 E1000g with patch 128028-03 will not allow pause frames to be set
    6687947 e1000g needs to integrate the latest Intel shared code to support ICH9m
    6699622 e1000g: add support for network device in new development machine
 
+5.2.9
+======
+   6665738 e1000g issues with some Ethernet controllers
+   6713685 e1000g:one device id macro should be renamed
