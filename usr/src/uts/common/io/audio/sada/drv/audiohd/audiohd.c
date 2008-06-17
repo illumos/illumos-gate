@@ -2223,8 +2223,19 @@ audiohd_fill_pbuf(audiohd_state_t *statep)
 	rs = am_get_audio(statep->hda_ahandle, buf, AUDIO_NO_CHANNEL, samples);
 	mutex_enter(&statep->hda_mutex);
 
-	/* If we cannot get sample */
-	if (rs <= 0) {
+	if (rs == 0) {
+		/*
+		 * If system is busy so that no sample is available, an
+		 * AUDIO_PLAY_EMPTY flag is set. And we will try to get
+		 * sample to refill play buffer when we receive an interrupt.
+		 * Only if we still cannot get sample then, we could stop
+		 * the playback engine.
+		 */
+		statep->hda_flags |= AUDIOHD_PLAY_EMPTY;
+	} else if (rs < 0) {
+		/*
+		 * Unknown error occurs, we have to stop playback.
+		 */
 		audio_sup_log(statep->hda_ahandle, CE_WARN,
 		    "!fill_pbuf() failed to get play sample");
 		statep->hda_flags &= ~AUDIOHD_PLAY_STARTED;
