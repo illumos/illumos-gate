@@ -596,8 +596,8 @@ hs_mountfs(
 	size_t		pathbufsz = strlen(path) + 1;
 	int		redo_rootvp;
 
-	struct hs_volume *svp;		/* Supplemental VD for ISO-9660:1999 */
-	struct hs_volume *jvp;		/* Joliet VD */
+	struct hs_volume *svp = NULL;	/* Supplemental VD for ISO-9660:1999 */
+	struct hs_volume *jvp = NULL;	/* Joliet VD */
 
 	/*
 	 * The rules for which extension will be used are:
