@@ -1544,24 +1544,29 @@ nxge_hio_tdc_share(
 	 */
 	ring = nxge->tx_rings->rings[channel];
 
-	/*
-	 * Wait for 30 seconds.
-	 */
 	(void) atomic_swap_32(&ring->tx_ring_offline, NXGE_TX_RING_OFFLINING);
-	for (count = 30 * 1000; count; count--) {
-		if (ring->tx_ring_offline & NXGE_TX_RING_OFFLINED) {
-			break;
+	if (ring->tx_ring_busy) {
+		/*
+		 * Wait for 30 seconds.
+		 */
+		for (count = 30 * 1000; count; count--) {
+			if (ring->tx_ring_offline & NXGE_TX_RING_OFFLINED) {
+				break;
+			}
+
+			drv_usecwait(1000);
 		}
 
-		drv_usecwait(1000);
-	}
-
-	if (count == 0) {
+		if (count == 0) {
+			(void) atomic_swap_32(&ring->tx_ring_offline,
+			    NXGE_TX_RING_ONLINE);
+			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nx_hio_tdc_share: "
+			    "Tx ring %d was always BUSY", channel));
+			return (-EIO);
+		}
+	} else {
 		(void) atomic_swap_32(&ring->tx_ring_offline,
-		    NXGE_TX_RING_ONLINE);
-		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nx_hio_tdc_share: "
-		    "Tx ring %d was always BUSY", channel));
-		return (-EIO);
+		    NXGE_TX_RING_OFFLINED);
 	}
 
 	if (nxge_intr_remove(nxge, VP_BOUND_TX, channel) != NXGE_OK) {

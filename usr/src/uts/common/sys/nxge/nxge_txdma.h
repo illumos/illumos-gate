@@ -150,6 +150,7 @@ typedef struct _tx_ring_t {
 #define	NXGE_TX_RING_OFFLINING	0x01
 #define	NXGE_TX_RING_OFFLINED	0x02
 	uint32_t		tx_ring_offline;
+	boolean_t		tx_ring_busy;
 
 	nxge_os_mutex_t		lock;
 	uint16_t 		index;

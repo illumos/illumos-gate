@@ -2527,6 +2527,7 @@ nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 		(void *)nxgep->interrupt_cookie);
 
 	(void) atomic_swap_32(&tx_ring_p->tx_ring_offline, NXGE_TX_RING_ONLINE);
+	tx_ring_p->tx_ring_busy = B_FALSE;
 	tx_ring_p->nxgep = nxgep;
 	tx_ring_p->serial = nxge_serialize_create(nmsgs,
 				nxge_serial_tx, tx_ring_p);

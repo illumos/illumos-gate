@@ -235,8 +235,12 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 	MUTEX_ENTER(&tx_ring_p->lock);
 
 	if (isLDOMservice(nxgep)) {
+		tx_ring_p->tx_ring_busy = B_TRUE;
 		if (tx_ring_p->tx_ring_offline) {
 			freemsg(mp);
+			tx_ring_p->tx_ring_busy = B_FALSE;
+			(void) atomic_swap_32(&tx_ring_p->tx_ring_offline,
+			    NXGE_TX_RING_OFFLINED);
 			MUTEX_EXIT(&tx_ring_p->lock);
 			return (status);
 		}
@@ -297,12 +301,15 @@ start_again:
 
 			cas32((uint32_t *)&tx_ring_p->queueing, 0, 1);
 			tdc_stats->tx_no_desc++;
-			if (isLDOMservice(nxgep) &&
-				tx_ring_p->tx_ring_offline) {
-				(void) atomic_swap_32(
-				    &tx_ring_p->tx_ring_offline,
-				    NXGE_TX_RING_OFFLINED);
-				skip_sched = B_TRUE;
+
+			if (isLDOMservice(nxgep)) {
+				tx_ring_p->tx_ring_busy = B_FALSE;
+				if (tx_ring_p->tx_ring_offline) {
+					(void) atomic_swap_32(
+					    &tx_ring_p->tx_ring_offline,
+					    NXGE_TX_RING_OFFLINED);
+					skip_sched = B_TRUE;
+				}
 			}
 
 			MUTEX_EXIT(&tx_ring_p->lock);
@@ -985,9 +992,13 @@ nxge_start_control_header_only:
 	tx_ring_p->descs_pending += ngathers;
 	tdc_stats->tx_starts++;
 
-	if (isLDOMservice(nxgep) && tx_ring_p->tx_ring_offline)
-		(void) atomic_swap_32(&tx_ring_p->tx_ring_offline,
-		    NXGE_TX_RING_OFFLINED);
+	if (isLDOMservice(nxgep)) {
+		tx_ring_p->tx_ring_busy = B_FALSE;
+		if (tx_ring_p->tx_ring_offline) {
+			(void) atomic_swap_32(&tx_ring_p->tx_ring_offline,
+			    NXGE_TX_RING_OFFLINED);
+		}
+	}
 
 	MUTEX_EXIT(&tx_ring_p->lock);
 
@@ -1005,9 +1016,15 @@ nxge_start_fail_lso:
 		freemsg(mp_chain);
 	}
 	if (!lso_again && !ngathers) {
-		if (isLDOMservice(nxgep) && tx_ring_p->tx_ring_offline)
-			(void) atomic_swap_32(&tx_ring_p->tx_ring_offline,
-			    NXGE_TX_RING_OFFLINED);
+		if (isLDOMservice(nxgep)) {
+			tx_ring_p->tx_ring_busy = B_FALSE;
+			if (tx_ring_p->tx_ring_offline) {
+				(void) atomic_swap_32(
+				    &tx_ring_p->tx_ring_offline,
+				    NXGE_TX_RING_OFFLINED);
+			}
+		}
+
 		MUTEX_EXIT(&tx_ring_p->lock);
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
 		    "==> nxge_start: lso exit (nothing changed)"));
@@ -1080,10 +1097,13 @@ nxge_start_fail2:
 		nxgep->resched_needed = B_TRUE;
 	}
 
-
-	if (isLDOMservice(nxgep) && tx_ring_p->tx_ring_offline)
-		(void) atomic_swap_32(&tx_ring_p->tx_ring_offline,
-		    NXGE_TX_RING_OFFLINED);
+	if (isLDOMservice(nxgep)) {
+		tx_ring_p->tx_ring_busy = B_FALSE;
+		if (tx_ring_p->tx_ring_offline) {
+			(void) atomic_swap_32(&tx_ring_p->tx_ring_offline,
+			    NXGE_TX_RING_OFFLINED);
+		}
+	}
 
 	MUTEX_EXIT(&tx_ring_p->lock);
 
@@ -1110,7 +1130,6 @@ nxge_serial_tx(mblk_t *mp, void *arg)
 	}
 
 	status = nxge_start(nxgep, tx_ring_p, mp);
-
 	return (status);
 }
 
