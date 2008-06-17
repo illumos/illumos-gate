@@ -888,18 +888,17 @@ zpool_find_import_impl(libzfs_handle_t *hdl, int argc, char **argv,
 
 				if (poolname != NULL) {
 					char *pname;
-					verify(nvlist_lookup_string(config,
+
+					matched = nvlist_lookup_string(config,
 					    ZPOOL_CONFIG_POOL_NAME,
-					    &pname) == 0);
-					if (strcmp(poolname, pname) != 0)
-						matched = B_FALSE;
+					    &pname) == 0 &&
+					    strcmp(poolname, pname) == 0;
 				} else if (guid != 0) {
 					uint64_t this_guid;
 					verify(nvlist_lookup_uint64(config,
 					    ZPOOL_CONFIG_POOL_GUID,
 					    &this_guid) == 0);
-					if (guid != this_guid)
-						matched = B_FALSE;
+					matched = guid == this_guid;
 				}
 				if (!matched) {
 					nvlist_free(config);
