@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,7 +84,7 @@ static struct dev_ops devops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops,			/* drv_modops */
-	"N2 RNG Driver v%I%",		/* drv_linkinfo */
+	"N2 RNG Driver",		/* drv_linkinfo */
 	&devops,			/* drv_dev_ops */
 };
 
