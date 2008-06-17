@@ -540,7 +540,19 @@ write_pmbr(int fd, struct dk_gpt *vtoc)
 	uchar_t		*cp;
 	diskaddr_t	size_in_lba;
 
-	mb.signature = LE_16(MBB_MAGIC);
+	/*
+	 * Preserve any boot code and disk signature if the first block is
+	 * already an MBR.
+	 */
+	dk_ioc.dki_lba = 0;
+	dk_ioc.dki_length = sizeof (mb);
+	/* LINTED -- always longlong aligned */
+	dk_ioc.dki_data = (efi_gpt_t *)&mb;
+	if (efi_ioctl(fd, DKIOCGETEFI, &dk_ioc) == -1 ||
+	    mb.signature != LE_16(MBB_MAGIC)) {
+		bzero(&mb, sizeof (mb));
+		mb.signature = LE_16(MBB_MAGIC);
+	}
 	bzero(&mb.parts, sizeof (mb.parts));
 	cp = (uchar_t *)&mb.parts[0];
 	/* bootable or not */
