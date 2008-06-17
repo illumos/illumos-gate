@@ -2235,7 +2235,7 @@ wpi_m_stat(void *arg, uint_t stat, uint64_t *val)
 	case MAC_STAT_IFSPEED:
 		*val = ((ic->ic_fixed_rate == IEEE80211_FIXED_RATE_NONE) ?
 		    (rs->ir_rates[in->in_txrate] & IEEE80211_RATE_VAL)
-		    : ic->ic_fixed_rate) * 5000000ull;
+		    : ic->ic_fixed_rate) / 2 * 1000000;
 		break;
 	case MAC_STAT_NOXMTBUF:
 		*val = sc->sc_tx_nobuf;

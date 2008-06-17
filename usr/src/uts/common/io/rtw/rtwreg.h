@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -1216,22 +1216,28 @@ struct rtw_rxdesc {
 #define	RTW_RXRSSI_SQ		BITS(7, 0)	/* Barker code-lock quality */
 
 #define	RTW_READ8(regs, ofs)						\
-	ddi_get8((regs)->r_handle, (uint8_t *)((regs)->r_base + (ofs)))
+	ddi_get8((regs)->r_handle,					\
+	(uint8_t *)((regs)->r_base + (ofs)))
 
 #define	RTW_READ16(regs, ofs)						\
-	ddi_get16((regs)->r_handle, (uint16_t *)((regs)->r_base + (ofs)))
+	ddi_get16((regs)->r_handle,					\
+	(uint16_t *)((uintptr_t)(regs)->r_base + (ofs)))
 
 #define	RTW_READ(regs, ofs)						\
-	ddi_get32((regs)->r_handle, (uint32_t *)((regs)->r_base + (ofs)))
+	ddi_get32((regs)->r_handle,					\
+	(uint32_t *)((uintptr_t)(regs)->r_base + (ofs)))
 
 #define	RTW_WRITE8(regs, ofs, val)					\
-	ddi_put8((regs)->r_handle, (uint8_t *)((regs)->r_base + (ofs)), val)
+	ddi_put8((regs)->r_handle,					\
+	(uint8_t *)((regs)->r_base + (ofs)), val)
 
 #define	RTW_WRITE16(regs, ofs, val)					\
-	ddi_put16((regs)->r_handle, (uint16_t *)((regs)->r_base + (ofs)), val)
+	ddi_put16((regs)->r_handle,					\
+	(uint16_t *)((uintptr_t)(regs)->r_base + (ofs)), val)
 
 #define	RTW_WRITE(regs, ofs, val)					\
-	ddi_put32((regs)->r_handle, (uint32_t *)((regs)->r_base + (ofs)), val)
+	ddi_put32((regs)->r_handle,					\
+	(uint32_t *)((uintptr_t)(regs)->r_base + (ofs)), val)
 
 #define	RTW_ISSET(regs, reg, mask)					\
 	(RTW_READ((regs), (reg)) & (mask))

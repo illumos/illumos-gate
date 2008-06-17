@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,7 +112,7 @@ static ddi_device_acc_attr_t rtw_buf_accattr = {
 static ddi_dma_attr_t dma_attr_desc = {
 	DMA_ATTR_V0,			/* dma_attr version */
 	0x0000000000000000ull,		/* dma_attr_addr_lo */
-	0xFFFFFFFFFFFFFFFFull,		/* dma_attr_addr_hi */
+	0xFFFFFFFF,			/* dma_attr_addr_hi */
 	0x00000000FFFFFFFFull,		/* dma_attr_count_max */
 	0x100,				/* dma_attr_align */
 	0xFFFFFFFF,			/* dma_attr_burstsizes */
@@ -127,7 +127,7 @@ static ddi_dma_attr_t dma_attr_desc = {
 static ddi_dma_attr_t dma_attr_rxbuf = {
 	DMA_ATTR_V0,			/* dma_attr version */
 	0x0000000000000000ull,		/* dma_attr_addr_lo */
-	0xFFFFFFFFFFFFFFFFull,		/* dma_attr_addr_hi */
+	0xFFFFFFFF,			/* dma_attr_addr_hi */
 	0x00000000FFFFFFFFull,		/* dma_attr_count_max */
 	(uint32_t)16,			/* dma_attr_align */
 	0xFFFFFFFF,			/* dma_attr_burstsizes */
@@ -142,7 +142,7 @@ static ddi_dma_attr_t dma_attr_rxbuf = {
 static ddi_dma_attr_t dma_attr_txbuf = {
 	DMA_ATTR_V0,			/* dma_attr version */
 	0x0000000000000000ull,		/* dma_attr_addr_lo */
-	0xFFFFFFFFFFFFFFFFull,		/* dma_attr_addr_hi */
+	0xFFFFFFFF,			/* dma_attr_addr_hi */
 	0x00000000FFFFFFFFull,		/* dma_attr_count_max */
 	(uint32_t)16,			/* dma_attr_align */
 	0xFFFFFFFF,			/* dma_attr_burstsizes */
@@ -200,7 +200,7 @@ static uint32_t rtw_qlen[RTW_NTXPRI] = {
 	RTW_TXQLENBCN
 };
 
-static uint32_t rtw_dbg_flags = 0;
+uint32_t rtw_dbg_flags = 0;
 	/*
 	 * RTW_DEBUG_ATTACH | RTW_DEBUG_TUNE |
 	 * RTW_DEBUG_ACCESS | RTW_DEBUG_INIT | RTW_DEBUG_PKTFILT |
@@ -1216,7 +1216,8 @@ rtw_dma_free(rtw_softc_t *rsc)
 	}
 
 	if (rsc->rxbuf_h != NULL) {
-		kmem_free(rsc->rxbuf_h, sizeof (struct rtw_rxbuf) * RTW_RXQLEN);
+		kmem_free(rsc->rxbuf_h,
+		    sizeof (struct rtw_rxbuf) * RTW_RXQLEN);
 		rsc->rxbuf_h = NULL;
 	}
 
@@ -1269,7 +1270,8 @@ rtw_dma_init(dev_info_t *devinfo, rtw_softc_t *rsc)
 		    sizeof (struct rtw_txbuf),
 		    offsetof(struct rtw_txbuf, bf_node));
 		/* virtual address of the first descriptor */
-		rsc->sc_txq[i].txdesc_h = (struct rtw_txdesc *)vtx[i];
+		rsc->sc_txq[i].txdesc_h =
+		    (struct rtw_txdesc *)(uintptr_t)vtx[i];
 
 		txds = rsc->sc_txq[i].txdesc_h;
 		/* allocate data structures to describe TX DMA buffers */
@@ -1278,8 +1280,8 @@ rtw_dma_init(dev_info_t *devinfo, rtw_softc_t *rsc)
 		rsc->sc_txq[i].txbuf_h = txbf;
 		for (j = 0; j < rtw_qlen[i]; j++, txbf++, txds++) {
 			txbf->txdesc = txds;
-			txbf->bf_daddr = ptx[i] + ((caddr_t)txds -
-			    (caddr_t)rsc->sc_txq[i].txdesc_h);
+			txbf->bf_daddr = ptx[i] + ((uintptr_t)txds -
+			    (uintptr_t)rsc->sc_txq[i].txdesc_h);
 			list_insert_tail(&rsc->sc_txq[i].tx_free_list, txbf);
 
 			/* alloc DMA memory */
@@ -1298,7 +1300,7 @@ rtw_dma_init(dev_info_t *devinfo, rtw_softc_t *rsc)
 	prx = RTW_RING_BASE(phybaseaddr, hd_rx);
 	vrx = (caddr_t)(RTW_RING_BASE(virbaseaddr, hd_rx));
 	/* virtual address of the first descriptor */
-	rsc->rxdesc_h = (struct rtw_rxdesc *)vrx;
+	rsc->rxdesc_h = (struct rtw_rxdesc *)(uintptr_t)vrx;
 	rxds = rsc->rxdesc_h;
 
 	/* allocate data structures to describe RX DMA buffers */
@@ -1308,7 +1310,8 @@ rtw_dma_init(dev_info_t *devinfo, rtw_softc_t *rsc)
 
 	for (j = 0; j < RTW_RXQLEN; j++, rxbf++, rxds++) {
 		rxbf->rxdesc = rxds;
-		rxbf->bf_daddr = prx + ((caddr_t)rxds - (caddr_t)rsc->rxdesc_h);
+		rxbf->bf_daddr =
+		    prx + ((uintptr_t)rxds - (uintptr_t)rsc->rxdesc_h);
 
 		/* alloc DMA memory */
 		err = rtw_alloc_dma_mem(devinfo, &dma_attr_rxbuf,
@@ -2129,7 +2132,7 @@ rtw_assembly_80211(rtw_softc_t *rsc, struct rtw_txbuf *bf,
 		return (-1);
 	}
 	for (; mp != NULL; mp = mp->b_cont) {
-			mblen = MBLKL(mp);
+			mblen = (uintptr_t)mp->b_wptr - (uintptr_t)mp->b_rptr;
 			bcopy(mp->b_rptr, mp0->b_wptr, mblen);
 			mp0->b_wptr += mblen;
 	}
@@ -2220,7 +2223,7 @@ rtw_assembly_80211(rtw_softc_t *rsc, struct rtw_txbuf *bf,
 		freemsg(mp0);
 		return (-1);
 	}
-	*(uint16_t *)wh->i_dur = (d0.d_data_dur);
+	*(uint16_t *)(uintptr_t)wh->i_dur = (d0.d_data_dur);
 
 	ctl1 = LSHIFT(d0.d_plcp_len, RTW_TXCTL1_LENGTH_MASK) |
 	    LSHIFT(d0.d_rts_dur, RTW_TXCTL1_RTSDUR_MASK);
@@ -2229,7 +2232,7 @@ rtw_assembly_80211(rtw_softc_t *rsc, struct rtw_txbuf *bf,
 		ctl1 |= RTW_TXCTL1_LENGEXT;
 
 	RTW_DPRINTF(RTW_DEBUG_XMIT, "%s: duration=%x, ctl1=%x", __func__,
-	    *(uint16_t *)wh->i_dur, ctl1);
+	    *(uint16_t *)(uintptr_t)wh->i_dur, ctl1);
 
 	if (bf->bf_dma.alength > RTW_TXLEN_LENGTH_MASK) {
 		RTW_DPRINTF(RTW_DEBUG_XMIT,
@@ -2839,6 +2842,7 @@ rtw_intr_timeout(rtw_softc_t *rsc)
 static uint_t
 rtw_intr(caddr_t arg)
 {
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	rtw_softc_t *rsc = (rtw_softc_t *)arg;
 	struct rtw_regs *regs = &rsc->sc_regs;
 	uint16_t isr = 0;
@@ -3186,9 +3190,9 @@ rtw_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		csz = 16;
 	rsc->sc_cachelsz = csz << 2;
 	vendor_id = ddi_get16(rsc->sc_cfg_handle,
-	    (uint16_t *)(rsc->sc_cfg_base + PCI_CONF_VENID));
+	    (uint16_t *)((uintptr_t)rsc->sc_cfg_base + PCI_CONF_VENID));
 	device_id = ddi_get16(rsc->sc_cfg_handle,
-	    (uint16_t *)(rsc->sc_cfg_base + PCI_CONF_DEVID));
+	    (uint16_t *)((uintptr_t)rsc->sc_cfg_base + PCI_CONF_DEVID));
 	RTW_DPRINTF(RTW_DEBUG_ATTACH, "rtw: rtw_attach(): vendor 0x%x, "
 	    "device id 0x%x, cache size %d\n", vendor_id, device_id, csz);
 
@@ -3198,7 +3202,7 @@ rtw_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 	command = PCI_COMM_MAE | PCI_COMM_ME;
 	ddi_put16(rsc->sc_cfg_handle,
-	    (uint16_t *)(rsc->sc_cfg_base + PCI_CONF_COMM), command);
+	    (uint16_t *)((uintptr_t)rsc->sc_cfg_base + PCI_CONF_COMM), command);
 	RTW_DPRINTF(RTW_DEBUG_ATTACH, "rtw: rtw_attach(): "
 	    "set command reg to 0x%x \n", command);
 

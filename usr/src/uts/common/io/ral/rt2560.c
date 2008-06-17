@@ -139,7 +139,7 @@ static ddi_device_acc_attr_t ral_desc_accattr = {
 static ddi_dma_attr_t ral_dma_attr = {
 	DMA_ATTR_V0,			/* dma_attr version */
 	0x0000000000000000ull,		/* dma_attr_addr_lo */
-	0xFFFFFFFFFFFFFFFFull,		/* dma_attr_addr_hi */
+	0xFFFFFFFF,			/* dma_attr_addr_hi */
 	0x00000000FFFFFFFFull,		/* dma_attr_count_max */
 	0x0000000000000001ull,		/* dma_attr_align */
 	0x00000FFF,			/* dma_attr_burstsizes */
@@ -2153,7 +2153,7 @@ rt2560_m_stat(void *arg, uint_t stat, uint64_t *val)
 	case MAC_STAT_IFSPEED:
 		*val = ((ic->ic_fixed_rate == IEEE80211_FIXED_RATE_NONE) ?
 		    (rs->ir_rates[ni->in_txrate] & IEEE80211_RATE_VAL)
-		    : ic->ic_fixed_rate) * 5000000ull;
+		    : ic->ic_fixed_rate) / 2 * 1000000;
 		break;
 	case MAC_STAT_NOXMTBUF:
 		*val = sc->sc_tx_nobuf;

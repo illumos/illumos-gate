@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,30 +86,35 @@ struct seeprom_descriptor {
 
 #define	SEEPROM_INB(sd) \
 	(((sd)->sd_regsize == 4) \
-	    ? ddi_get32((sd)->sd_handle, (uint32_t *)((sd)->sd_base+ \
+	    ? ddi_get32((sd)->sd_handle, \
+	    (uint32_t *)((uintptr_t)(sd)->sd_base+ \
 	    (sd)->sd_control_offset)) \
 	    : ddi_get8((sd)->sd_handle, (uint8_t *)((sd)->sd_base+ \
 	    (sd)->sd_control_offset)))
 
 #define	SEEPROM_OUTB(sd, value) { \
 	if ((sd)->sd_regsize == 4) \
-		ddi_put32((sd)->sd_handle, (uint32_t *)((sd)->sd_base+ \
+		ddi_put32((sd)->sd_handle, \
+		    (uint32_t *)((uintptr_t)(sd)->sd_base+ \
 		    (sd)->sd_control_offset), (value)); \
 	else \
-		ddi_put8((sd)->sd_handle, (uint8_t *)((sd)->sd_base+ \
+		ddi_put8((sd)->sd_handle, \
+		    (uint8_t *)((sd)->sd_base+ \
 		    (sd)->sd_control_offset), (uint8_t)(value)); \
 }
 
 #define	SEEPROM_STATUS_INB(sd) \
 	(((sd)->sd_regsize == 4) \
-	    ? ddi_get32((sd)->sd_handle, (uint32_t *)((sd)->sd_base+ \
+	    ? ddi_get32((sd)->sd_handle, \
+	    (uint32_t *)((uintptr_t)(sd)->sd_base+ \
 	    (sd)->sd_status_offset)) \
 	    : ddi_get8((sd)->sd_handle, (uint8_t *)((sd)->sd_base+ \
 	    (sd)->sd_status_offset)))
 
 #define	SEEPROM_DATA_INB(sd) \
 	(((sd)->sd_regsize == 4) \
-	    ? ddi_get32((sd)->sd_handle, (uint32_t *)((sd)->sd_base+ \
+	    ? ddi_get32((sd)->sd_handle, \
+	    (uint32_t *)((uintptr_t)(sd)->sd_base+ \
 	    (sd)->sd_dataout_offset)) \
 	    : ddi_get8((sd)->sd_handle, (uint8_t *)((sd)->sd_base+ \
 	    (sd)->sd_dataout_offset)))
