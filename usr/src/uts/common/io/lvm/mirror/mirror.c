@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,7 @@
 #include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent/svm.h>
 #include <sys/lvm/mdmn_commd.h>
+#include <sys/avl.h>
 
 md_ops_t		mirror_md_ops;
 #ifndef	lint
@@ -337,11 +338,11 @@ mirror_geterror(mm_unit_t *un, int *smi, int *cip, int clr_error,
 			 * flag. They are both exclusive tests.
 			 */
 			open_comp = (frm_probe) ?
-					(shared->ms_flags & MDM_S_PROBEOPEN):
-					(shared->ms_flags & MDM_S_ISOPEN);
+			    (shared->ms_flags & MDM_S_PROBEOPEN):
+			    (shared->ms_flags & MDM_S_ISOPEN);
 			if ((shared->ms_flags & MDM_S_IOERR || !open_comp) &&
-				((shared->ms_state == CS_OKAY) ||
-				(shared->ms_state == CS_RESYNC))) {
+			    ((shared->ms_state == CS_OKAY) ||
+			    (shared->ms_state == CS_RESYNC))) {
 				if (clr_error) {
 					shared->ms_flags &= ~MDM_S_IOERR;
 				}
@@ -418,7 +419,7 @@ check_comp_4_hotspares(
 	sm = &un->un_sm[smi];
 	smic = &un->un_smic[smi];
 	shared = (md_m_shared_t *)(*(smic->sm_shared_by_indx))
-		(sm->sm_dev, sm, ci);
+	    (sm->sm_dev, sm, ci);
 
 	if (shared->ms_state != CS_ERRED)
 		return (0);
@@ -447,12 +448,12 @@ check_comp_4_hotspares(
 			rw_exit(&mirror_md_ops.md_link_rw.lock);
 #ifdef DEBUG
 		if (mirror_debug_flag)
-		    printf("send alloc hotspare, flags=0x%x %x, %x, %x, %x\n",
-			flags,
-			allochspmsg.msg_allochsp_mnum,
-			allochspmsg.msg_allochsp_sm,
-			allochspmsg.msg_allochsp_comp,
-			allochspmsg.msg_allochsp_hs_id);
+			printf("send alloc hotspare, flags="
+			    "0x%x %x, %x, %x, %x\n", flags,
+			    allochspmsg.msg_allochsp_mnum,
+			    allochspmsg.msg_allochsp_sm,
+			    allochspmsg.msg_allochsp_comp,
+			    allochspmsg.msg_allochsp_hs_id);
 #endif
 		if (flags & MD_HOTSPARE_WMUPDATE) {
 			msgtype  = MD_MN_MSG_ALLOCATE_HOTSPARE2;
@@ -661,16 +662,15 @@ check_unit_4_hotspares(mm_unit_t *un, int flags)
 			md_m_shared_t		*shared;
 
 			shared = (md_m_shared_t *)
-				(*(smic->sm_shared_by_indx))(sm->sm_dev,
-				sm, ci);
+			    (*(smic->sm_shared_by_indx))(sm->sm_dev, sm, ci);
 			/*
 			 * Never called from ioctl context, so pass in
 			 * (IOLOCK *)NULL.  Pass through flags from calling
 			 * routine, also setting XMIT flag.
 			 */
 			if (check_comp_4_hotspares(un, i, ci,
-				(MD_HOTSPARE_XMIT | flags),
-				shared->ms_hs_id, (IOLOCK *)NULL) != 0)
+			    (MD_HOTSPARE_XMIT | flags),
+			    shared->ms_hs_id, (IOLOCK *)NULL) != 0)
 				return (1);
 		}
 	}
@@ -762,8 +762,8 @@ poke_hotspares()
 	if (hotspare_request.dr_pending == 0) {
 		hotspare_request.dr_pending = 1;
 		daemon_request(&md_mhs_daemon,
-		    check_4_hotspares,
-				(daemon_queue_t *)&hotspare_request, REQ_OLD);
+		    check_4_hotspares, (daemon_queue_t *)&hotspare_request,
+		    REQ_OLD);
 	}
 	mutex_exit(&hotspare_request.dr_mx);
 	return (0);
@@ -804,12 +804,11 @@ mirror_openfail_console_info(mm_unit_t *un, int smi, int ci)
 	if (get_dev != NULL) {
 		(void) (*get_dev)(tmpdev, smi, ci, &cd);
 		cmn_err(CE_WARN, "md %s: open error on %s",
-			md_shortname(MD_SID(un)),
-			md_devname(MD_UN2SET(un), cd.cd_dev,
-			NULL, 0));
+		    md_shortname(MD_SID(un)), md_devname(MD_UN2SET(un),
+		    cd.cd_dev, NULL, 0));
 	} else {
 		cmn_err(CE_WARN, "md %s: open error",
-			md_shortname(MD_SID(un)));
+		    md_shortname(MD_SID(un)));
 	}
 }
 
@@ -840,62 +839,63 @@ new_non_ff_driver(const char *s)
 {
 	mutex_enter(&non_ff_drv_mutex);
 	if (non_ff_drivers == NULL) {
-	    non_ff_drivers = (char **)kmem_alloc(2 * sizeof (char *),
-		KM_NOSLEEP);
-	    if (non_ff_drivers == NULL) {
-		mutex_exit(&non_ff_drv_mutex);
-		return (1);
-	    }
+		non_ff_drivers = (char **)kmem_alloc(2 * sizeof (char *),
+		    KM_NOSLEEP);
+		if (non_ff_drivers == NULL) {
+			mutex_exit(&non_ff_drv_mutex);
+			return (1);
+		}
 
-	    non_ff_drivers[0] = (char *)kmem_alloc(strlen(s) + 1, KM_NOSLEEP);
-	    if (non_ff_drivers[0] == NULL) {
-		kmem_free(non_ff_drivers, 2 * sizeof (char *));
-		non_ff_drivers = NULL;
-		mutex_exit(&non_ff_drv_mutex);
-		return (1);
-	    }
+		non_ff_drivers[0] = (char *)kmem_alloc(strlen(s) + 1,
+		    KM_NOSLEEP);
+		if (non_ff_drivers[0] == NULL) {
+			kmem_free(non_ff_drivers, 2 * sizeof (char *));
+			non_ff_drivers = NULL;
+			mutex_exit(&non_ff_drv_mutex);
+			return (1);
+		}
 
-	    (void) strcpy(non_ff_drivers[0], s);
-	    non_ff_drivers[1] = NULL;
+		(void) strcpy(non_ff_drivers[0], s);
+		non_ff_drivers[1] = NULL;
 
 	} else {
-	    int i;
-	    char **tnames;
-	    char **tmp;
+		int i;
+		char **tnames;
+		char **tmp;
 
-	    for (i = 0; non_ff_drivers[i] != NULL; i++) {
-		if (strcmp(s, non_ff_drivers[i]) == 0) {
-		    mutex_exit(&non_ff_drv_mutex);
-		    return (0);
+		for (i = 0; non_ff_drivers[i] != NULL; i++) {
+			if (strcmp(s, non_ff_drivers[i]) == 0) {
+				mutex_exit(&non_ff_drv_mutex);
+				return (0);
+			}
 		}
-	    }
 
-	    /* allow for new element and null */
-	    i += 2;
-	    tnames = (char **)kmem_alloc(i * sizeof (char *), KM_NOSLEEP);
-	    if (tnames == NULL) {
-		mutex_exit(&non_ff_drv_mutex);
-		return (1);
-	    }
+		/* allow for new element and null */
+		i += 2;
+		tnames = (char **)kmem_alloc(i * sizeof (char *), KM_NOSLEEP);
+		if (tnames == NULL) {
+			mutex_exit(&non_ff_drv_mutex);
+			return (1);
+		}
 
-	    for (i = 0; non_ff_drivers[i] != NULL; i++)
-		tnames[i] = non_ff_drivers[i];
+		for (i = 0; non_ff_drivers[i] != NULL; i++)
+			tnames[i] = non_ff_drivers[i];
 
-	    tnames[i] = (char *)kmem_alloc(strlen(s) + 1, KM_NOSLEEP);
-	    if (tnames[i] == NULL) {
-		/* adjust i so that it is the right count to free */
-		kmem_free(tnames, (i + 2) * sizeof (char *));
-		mutex_exit(&non_ff_drv_mutex);
-		return (1);
-	    }
+		tnames[i] = (char *)kmem_alloc(strlen(s) + 1, KM_NOSLEEP);
+		if (tnames[i] == NULL) {
+			/* adjust i so that it is the right count to free */
+			kmem_free(tnames, (i + 2) * sizeof (char *));
+			mutex_exit(&non_ff_drv_mutex);
+			return (1);
+		}
 
-	    (void) strcpy(tnames[i++], s);
-	    tnames[i] = NULL;
+		(void) strcpy(tnames[i++], s);
+		tnames[i] = NULL;
 
-	    tmp = non_ff_drivers;
-	    non_ff_drivers = tnames;
-	    /* i now represents the count we previously alloced */
-	    kmem_free(tmp, i * sizeof (char *));
+		tmp = non_ff_drivers;
+		non_ff_drivers = tnames;
+		/* i now represents the count we previously alloced */
+		kmem_free(tmp, i * sizeof (char *));
 	}
 	mutex_exit(&non_ff_drv_mutex);
 
@@ -918,110 +918,126 @@ mirror_check_failfast(minor_t mnum)
 	mm_unit_t	*un;
 
 	if (md_ff_disable)
-	    return;
+		return;
 
 	un = MD_UNIT(mnum);
 
 	for (i = 0; i < NMIRROR; i++) {
-	    int			ci;
-	    int			cnt;
-	    int			ff = 1;
-	    mm_submirror_t	*sm;
-	    mm_submirror_ic_t	*smic;
-	    void		(*get_dev)();
+		int			ci;
+		int			cnt;
+		int			ff = 1;
+		mm_submirror_t		*sm;
+		mm_submirror_ic_t	*smic;
+		void			(*get_dev)();
 
-	    if (!SMS_BY_INDEX_IS(un, i, SMS_INUSE))
-		continue;
+		if (!SMS_BY_INDEX_IS(un, i, SMS_INUSE))
+			continue;
 
-	    sm = &un->un_sm[i];
-	    smic = &un->un_smic[i];
+		sm = &un->un_sm[i];
+		smic = &un->un_smic[i];
 
-	    get_dev = (void (*)())md_get_named_service(sm->sm_dev, 0,
-		"get device", 0);
+		get_dev = (void (*)())md_get_named_service(sm->sm_dev, 0,
+		    "get device", 0);
 
-	    cnt = (*(smic->sm_get_component_count))(sm->sm_dev, sm);
-	    for (ci = 0; ci < cnt; ci++) {
-		int		found = 0;
-		dev_t		ci_dev;
-		major_t		major;
-		dev_info_t	*devi;
-		ms_cd_info_t	cd;
+		cnt = (*(smic->sm_get_component_count))(sm->sm_dev, sm);
+		for (ci = 0; ci < cnt; ci++) {
+			int		found = 0;
+			dev_t		ci_dev;
+			major_t		major;
+			dev_info_t	*devi;
+			ms_cd_info_t	cd;
 
-		/* this already returns the hs dev if the device is spared */
-		(void) (*get_dev)(sm->sm_dev, sm, ci, &cd);
+			/*
+			 * this already returns the hs
+			 * dev if the device is spared
+			 */
+			(void) (*get_dev)(sm->sm_dev, sm, ci, &cd);
 
-		ci_dev = md_dev64_to_dev(cd.cd_dev);
-		major = getmajor(ci_dev);
+			ci_dev = md_dev64_to_dev(cd.cd_dev);
+			major = getmajor(ci_dev);
 
-		if (major == md_major) {
-		    /* this component must be a soft partition; get real dev */
-		    minor_t	dev_mnum;
-		    mdi_unit_t	*ui;
-		    mp_unit_t	*un;
-		    set_t	setno;
-		    side_t	side;
-		    md_dev64_t	tmpdev;
+			if (major == md_major) {
+				/*
+				 * this component must be a soft
+				 * partition; get the real dev
+				 */
+				minor_t	dev_mnum;
+				mdi_unit_t	*ui;
+				mp_unit_t	*un;
+				set_t	setno;
+				side_t	side;
+				md_dev64_t	tmpdev;
 
-		    ui = MDI_UNIT(getminor(ci_dev));
+				ui = MDI_UNIT(getminor(ci_dev));
 
-		    /* grab necessary lock */
-		    un = (mp_unit_t *)md_unit_readerlock(ui);
+				/* grab necessary lock */
+				un = (mp_unit_t *)md_unit_readerlock(ui);
 
-		    dev_mnum = MD_SID(un);
-		    setno = MD_MIN2SET(dev_mnum);
-		    side = mddb_getsidenum(setno);
+				dev_mnum = MD_SID(un);
+				setno = MD_MIN2SET(dev_mnum);
+				side = mddb_getsidenum(setno);
 
-		    tmpdev = un->un_dev;
+				tmpdev = un->un_dev;
 
-		    /* Get dev by device id */
-		    if (md_devid_found(setno, side, un->un_key) == 1) {
-			tmpdev = md_resolve_bydevid(dev_mnum, tmpdev,
-				un->un_key);
-		    }
+				/* Get dev by device id */
+				if (md_devid_found(setno, side,
+				    un->un_key) == 1) {
+					tmpdev = md_resolve_bydevid(dev_mnum,
+					    tmpdev, un->un_key);
+				}
 
-		    md_unit_readerexit(ui);
+				md_unit_readerexit(ui);
 
-		    ci_dev = md_dev64_to_dev(tmpdev);
-		    major = getmajor(ci_dev);
+				ci_dev = md_dev64_to_dev(tmpdev);
+				major = getmajor(ci_dev);
+			}
+
+			if (ci_dev != NODEV32 &&
+			    (devi = e_ddi_hold_devi_by_dev(ci_dev, 0))
+			    != NULL) {
+				ddi_prop_op_t	prop_op = PROP_LEN_AND_VAL_BUF;
+				int		propvalue = 0;
+				int		proplength = sizeof (int);
+				int		error;
+				struct cb_ops	*cb;
+
+				if ((cb = devopsp[major]->devo_cb_ops) !=
+				    NULL) {
+					error = (*cb->cb_prop_op)
+					    (DDI_DEV_T_ANY, devi, prop_op,
+					    DDI_PROP_NOTPROM|DDI_PROP_DONTPASS,
+					    "ddi-failfast-supported",
+					    (caddr_t)&propvalue, &proplength);
+
+					if (error == DDI_PROP_SUCCESS)
+						found = 1;
+				}
+
+				if (!found && new_non_ff_driver(
+				    ddi_driver_name(devi))) {
+					cmn_err(CE_NOTE, "!md: B_FAILFAST I/O"
+					    "disabled on %s",
+					    ddi_driver_name(devi));
+				}
+
+				ddi_release_devi(devi);
+			}
+
+			/*
+			 * All components must support
+			 * failfast in the submirror.
+			 */
+			if (!found) {
+				ff = 0;
+				break;
+			}
 		}
 
-		if (ci_dev != NODEV32 &&
-		    (devi = e_ddi_hold_devi_by_dev(ci_dev, 0)) != NULL) {
-		    ddi_prop_op_t	prop_op = PROP_LEN_AND_VAL_BUF;
-		    int			propvalue = 0;
-		    int			proplength = sizeof (int);
-		    int			error;
-		    struct cb_ops	*cb;
-
-		    if ((cb = devopsp[major]->devo_cb_ops) != NULL) {
-			error = (*cb->cb_prop_op)(DDI_DEV_T_ANY, devi, prop_op,
-			    DDI_PROP_NOTPROM|DDI_PROP_DONTPASS,
-			    "ddi-failfast-supported",
-			    (caddr_t)&propvalue, &proplength);
-
-			if (error == DDI_PROP_SUCCESS)
-			    found = 1;
-		    }
-
-		    if (!found && new_non_ff_driver(ddi_driver_name(devi)))
-			cmn_err(CE_NOTE, "!md: B_FAILFAST I/O disabled on %s",
-			    ddi_driver_name(devi));
-
-		    ddi_release_devi(devi);
+		if (ff) {
+			sm->sm_flags |= MD_SM_FAILFAST;
+		} else {
+			sm->sm_flags &= ~MD_SM_FAILFAST;
 		}
-
-		/* All components must support failfast in the submirror. */
-		if (!found) {
-		    ff = 0;
-		    break;
-		}
-	    }
-
-	    if (ff) {
-		sm->sm_flags |= MD_SM_FAILFAST;
-	    } else {
-		sm->sm_flags &= ~MD_SM_FAILFAST;
-	    }
 	}
 }
 
@@ -1288,37 +1304,24 @@ mirror_open_all_devs(minor_t mnum, int md_oflags, IOLOCK *lockp)
 }
 
 void
-mirror_overlap_chain_remove(md_mps_t *ps)
+mirror_overlap_tree_remove(md_mps_t *ps)
 {
 	mm_unit_t	*un;
 
 	if (panicstr)
 		return;
 
-	ASSERT(ps->ps_flags & MD_MPS_ON_OVERLAP);
-
+	VERIFY(ps->ps_flags & MD_MPS_ON_OVERLAP);
 	un = ps->ps_un;
 
-	mutex_enter(&un->un_ovrlap_chn_mx);
-	if (ps->ps_ovrlap_prev != &un->un_ovrlap_chn)
-		ps->ps_ovrlap_prev->ps_ovrlap_next = ps->ps_ovrlap_next;
-	else
-		un->un_ovrlap_chn.ps_ovrlap_next = ps->ps_ovrlap_next;
-	if (ps->ps_ovrlap_next != &un->un_ovrlap_chn)
-		ps->ps_ovrlap_next->ps_ovrlap_prev = ps->ps_ovrlap_prev;
-	else
-		un->un_ovrlap_chn.ps_ovrlap_prev = ps->ps_ovrlap_prev;
-	/* Handle empty overlap chain */
-	if (un->un_ovrlap_chn.ps_ovrlap_prev == &un->un_ovrlap_chn) {
-		un->un_ovrlap_chn.ps_ovrlap_prev =
-		    un->un_ovrlap_chn.ps_ovrlap_next = NULL;
-	}
-	if (un->un_ovrlap_chn_flg) {
-		un->un_ovrlap_chn_flg = 0;
-		cv_broadcast(&un->un_ovrlap_chn_cv);
-	}
+	mutex_enter(&un->un_overlap_tree_mx);
+	avl_remove(&un->un_overlap_root, ps);
 	ps->ps_flags &= ~MD_MPS_ON_OVERLAP;
-	mutex_exit(&un->un_ovrlap_chn_mx);
+	if (un->un_overlap_tree_flag != 0) {
+		un->un_overlap_tree_flag = 0;
+		cv_broadcast(&un->un_overlap_tree_cv);
+	}
+	mutex_exit(&un->un_overlap_tree_mx);
 }
 
 
@@ -1328,139 +1331,53 @@ mirror_overlap_chain_remove(md_mps_t *ps)
  * Check that given i/o request does not cause an overlap with already pending
  * i/o. If it does, block until the overlapped i/o completes.
  *
- * Note: the overlap chain is held as a monotonically increasing doubly-linked
- * list with the sentinel contained in un->un_ovrlap_chn. We avoid a linear
- * search of the list by the following logic:
- *	ps->ps_lastblk < un_ovrlap_chn.ps_ovrlap_next->ps_firstblk => No overlap
- *	ps->ps_firstblk > un_ovrlap_chn.ps_ovrlap_prev->ps_lastblk => No overlap
- * otherwise
- *	scan un_ovrlap_chn.ps_ovrlap_next for location where ps->ps_firstblk
- *	> chain->ps_lastblk. This is the insertion point. As the list is
- *	guaranteed to be ordered there is no need to continue scanning.
- *
  * The flag argument has MD_OVERLAP_ALLOW_REPEAT set if it is ok for the parent
- *	structure to be already on the overlap chain and MD_OVERLAP_NO_REPEAT
- *	if it must not already be on the chain
+ * structure to be already in the overlap tree and MD_OVERLAP_NO_REPEAT if
+ * it must not already be in the tree.
  */
 static void
 wait_for_overlaps(md_mps_t *ps, int flags)
 {
 	mm_unit_t	*un;
-	md_mps_t	*ps1, **head, **tail;
+	avl_index_t	where;
+	md_mps_t	*ps1;
 
 	if (panicstr)
 		return;
 
-
 	un = ps->ps_un;
-
-	mutex_enter(&un->un_ovrlap_chn_mx);
+	mutex_enter(&un->un_overlap_tree_mx);
 	if ((flags & MD_OVERLAP_ALLOW_REPEAT) &&
 	    (ps->ps_flags & MD_MPS_ON_OVERLAP)) {
-		mutex_exit(&un->un_ovrlap_chn_mx);
+		mutex_exit(&un->un_overlap_tree_mx);
 		return;
 	}
 
-	ASSERT(!(ps->ps_flags & MD_MPS_ON_OVERLAP));
-	head = &(un->un_ovrlap_chn.ps_ovrlap_next);
-	tail = &(un->un_ovrlap_chn.ps_ovrlap_prev);
-	ps1 = *head;
-	/*
-	 * Check for simple limit cases:
-	 *	*head == NULL
-	 *		insert ps at head of list
-	 *	lastblk < head->firstblk
-	 *		insert at head of list
-	 *	firstblk > tail->lastblk
-	 *		insert at tail of list
-	 */
-	if (ps1 == NULL) {
-		/* Insert at head */
-		ps->ps_ovrlap_next = &un->un_ovrlap_chn;
-		ps->ps_ovrlap_prev = &un->un_ovrlap_chn;
-		*head = ps;
-		*tail = ps;
-		ps->ps_flags |= MD_MPS_ON_OVERLAP;
-		mutex_exit(&un->un_ovrlap_chn_mx);
-		return;
-	} else if (ps->ps_lastblk < (*head)->ps_firstblk) {
-		/* Insert at head */
-		ps->ps_ovrlap_next = (*head);
-		ps->ps_ovrlap_prev = &un->un_ovrlap_chn;
-		(*head)->ps_ovrlap_prev = ps;
-		*head = ps;
-		ps->ps_flags |= MD_MPS_ON_OVERLAP;
-		mutex_exit(&un->un_ovrlap_chn_mx);
-		return;
-	} else if (ps->ps_firstblk > (*tail)->ps_lastblk) {
-		/* Insert at tail */
-		ps->ps_ovrlap_prev = (*tail);
-		ps->ps_ovrlap_next = &un->un_ovrlap_chn;
-		(*tail)->ps_ovrlap_next = ps;
-		*tail = ps;
-		ps->ps_flags |= MD_MPS_ON_OVERLAP;
-		mutex_exit(&un->un_ovrlap_chn_mx);
-		return;
-	}
-	/* Now we have to scan the list for possible overlaps */
-	while (ps1 != NULL) {
-		/*
-		 * If this region has been put on the chain by another thread
-		 * just exit
-		 */
-		if ((flags & MD_OVERLAP_ALLOW_REPEAT) &&
-		    (ps->ps_flags & MD_MPS_ON_OVERLAP)) {
-			mutex_exit(&un->un_ovrlap_chn_mx);
-			return;
+	VERIFY(!(ps->ps_flags & MD_MPS_ON_OVERLAP));
 
-		}
-		for (ps1 = *head; ps1 && (ps1 != &un->un_ovrlap_chn);
-		    ps1 = ps1->ps_ovrlap_next) {
-			if (ps->ps_firstblk > (*tail)->ps_lastblk) {
-				/* Insert at tail */
-				ps->ps_ovrlap_prev = (*tail);
-				ps->ps_ovrlap_next = &un->un_ovrlap_chn;
-				(*tail)->ps_ovrlap_next = ps;
-				*tail = ps;
-				ps->ps_flags |= MD_MPS_ON_OVERLAP;
-				mutex_exit(&un->un_ovrlap_chn_mx);
-				return;
-			}
-			if (ps->ps_firstblk > ps1->ps_lastblk)
-				continue;
-			if (ps->ps_lastblk < ps1->ps_firstblk) {
-				/* Insert into list at current 'ps1' position */
-				ps->ps_ovrlap_next = ps1;
-				ps->ps_ovrlap_prev = ps1->ps_ovrlap_prev;
-				ps1->ps_ovrlap_prev->ps_ovrlap_next = ps;
-				ps1->ps_ovrlap_prev = ps;
-				ps->ps_flags |= MD_MPS_ON_OVERLAP;
-				mutex_exit(&un->un_ovrlap_chn_mx);
-				return;
-			}
-			break;
-		}
-		if (ps1 != NULL) {
-			un->un_ovrlap_chn_flg = 1;
-			cv_wait(&un->un_ovrlap_chn_cv, &un->un_ovrlap_chn_mx);
+	do {
+		ps1 = avl_find(&un->un_overlap_root, ps, &where);
+		if (ps1 == NULL) {
 			/*
-			 * Now ps1 refers to the old insertion point and we
-			 * have to check the whole chain to see if we're still
-			 * overlapping any other i/o.
+			 * The candidate range does not overlap with any
+			 * range in the tree.  Insert it and be done.
 			 */
+			avl_insert(&un->un_overlap_root, ps, where);
+			ps->ps_flags |= MD_MPS_ON_OVERLAP;
+		} else {
+			/*
+			 * The candidate range would overlap.  Set the flag
+			 * indicating we need to be woken up, and sleep
+			 * until another thread removes a range.  If upon
+			 * waking up we find this mps was put on the tree
+			 * by another thread, the loop terminates.
+			 */
+			un->un_overlap_tree_flag = 1;
+			cv_wait(&un->un_overlap_tree_cv,
+			    &un->un_overlap_tree_mx);
 		}
-	}
-
-	/*
-	 * Only get here if we had one overlapping i/o on the list and that
-	 * has now completed. In this case the list is empty so we insert <ps>
-	 * at the head of the chain.
-	 */
-	ASSERT(*head == NULL);
-	*tail = *head = ps;
-	ps->ps_ovrlap_next = ps->ps_ovrlap_prev = &un->un_ovrlap_chn;
-	ps->ps_flags |= MD_MPS_ON_OVERLAP;
-	mutex_exit(&un->un_ovrlap_chn_mx);
+	} while (!(ps->ps_flags & MD_MPS_ON_OVERLAP));
+	mutex_exit(&un->un_overlap_tree_mx);
 }
 
 /*
@@ -1747,7 +1664,7 @@ fast_select_read_unit(md_mps_t *ps, md_mcs_t *cs)
 	ps->ps_allfrom_sm = SMI2BIT(sm_index);
 
 	if (un->un_sm[sm_index].sm_flags & MD_SM_FAILFAST) {
-	    bp->b_flags |= B_FAILFAST;
+		bp->b_flags |= B_FAILFAST;
 	}
 
 	return (0);
@@ -1794,7 +1711,7 @@ build_submirror(mm_unit_t *un, int i, int snarfing)
 		return;
 	if (snarfing) {
 		sm->sm_dev = md_getdevnum(setno, mddb_getsidenum(setno),
-						sm->sm_key, MD_NOTRUST_DEVT);
+		    sm->sm_key, MD_NOTRUST_DEVT);
 	} else {
 		if (md_getmajor(sm->sm_dev) == md_major) {
 			su = MD_UNIT(md_getminor(sm->sm_dev));
@@ -1807,12 +1724,10 @@ build_submirror(mm_unit_t *un, int i, int snarfing)
 	    0, "shared by blk", 0);
 	smic->sm_shared_by_indx = md_get_named_service(sm->sm_dev,
 	    0, "shared by indx", 0);
-	smic->sm_get_component_count =
-	    (int (*)())md_get_named_service(sm->sm_dev, 0,
-		    "get component count", 0);
-	smic->sm_get_bcss =
-	    (int (*)())md_get_named_service(sm->sm_dev, 0,
-		    "get block count skip size", 0);
+	smic->sm_get_component_count = (int (*)())md_get_named_service(
+	    sm->sm_dev, 0, "get component count", 0);
+	smic->sm_get_bcss = (int (*)())md_get_named_service(sm->sm_dev, 0,
+	    "get block count skip size", 0);
 	sm->sm_state &= ~SMS_IGNORE;
 	if (SMS_IS(sm, SMS_OFFLINE))
 		MD_STATUS(un) |= MD_UN_OFFLINE_SM;
@@ -1851,6 +1766,36 @@ mirror_cleanup(mm_unit_t *un)
 	md_rem_names(sv, nsv);
 }
 
+/*
+ * Comparison function for the avl tree which tracks
+ * outstanding writes on submirrors.
+ *
+ * Returns:
+ *	-1: ps1 < ps2
+ *	 0: ps1 and ps2 overlap
+ *	 1: ps1 > ps2
+ */
+static int
+mirror_overlap_compare(const void *p1, const void *p2)
+{
+	const md_mps_t *ps1 = (md_mps_t *)p1;
+	const md_mps_t *ps2 = (md_mps_t *)p2;
+
+	if (ps1->ps_firstblk < ps2->ps_firstblk) {
+		if (ps1->ps_lastblk >= ps2->ps_firstblk)
+			return (0);
+		return (-1);
+	}
+
+	if (ps1->ps_firstblk > ps2->ps_firstblk) {
+		if (ps1->ps_firstblk <= ps2->ps_lastblk)
+			return (0);
+		return (1);
+	}
+
+	return (0);
+}
+
 /* Return a -1 if optimized record unavailable and set should be released */
 int
 mirror_build_incore(mm_unit_t *un, int snarfing)
@@ -1873,8 +1818,9 @@ mirror_build_incore(mm_unit_t *un, int snarfing)
 	/* pre-4.1 didn't define CAN_META_CHILD capability */
 	MD_CAPAB(un) = MD_CAN_META_CHILD | MD_CAN_PARENT | MD_CAN_SP;
 
-	un->un_ovrlap_chn_flg = 0;
-	bzero(&un->un_ovrlap_chn, sizeof (un->un_ovrlap_chn));
+	un->un_overlap_tree_flag = 0;
+	avl_create(&un->un_overlap_root, mirror_overlap_compare,
+	    sizeof (md_mps_t), offsetof(md_mps_t, ps_overlap_node));
 
 	for (i = 0; i < NMIRROR; i++)
 		build_submirror(un, i, snarfing);
@@ -1902,8 +1848,8 @@ mirror_build_incore(mm_unit_t *un, int snarfing)
 			return (1);
 	}
 
-	mutex_init(&un->un_ovrlap_chn_mx, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&un->un_ovrlap_chn_cv, NULL, CV_DEFAULT, NULL);
+	mutex_init(&un->un_overlap_tree_mx, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&un->un_overlap_tree_cv, NULL, CV_DEFAULT, NULL);
 
 	un->un_suspend_wr_flag = 0;
 	mutex_init(&un->un_suspend_wr_mx, NULL, MUTEX_DEFAULT, NULL);
@@ -2001,11 +1947,13 @@ reset_mirror(struct mm_unit *un, minor_t mnum, int removing)
 
 	mirror_commit(un, bits, 0);
 
+	avl_destroy(&un->un_overlap_root);
+
 	/* Destroy all mutexes and condvars before returning. */
 	mutex_destroy(&un->un_suspend_wr_mx);
 	cv_destroy(&un->un_suspend_wr_cv);
-	mutex_destroy(&un->un_ovrlap_chn_mx);
-	cv_destroy(&un->un_ovrlap_chn_cv);
+	mutex_destroy(&un->un_overlap_tree_mx);
+	cv_destroy(&un->un_overlap_tree_cv);
 	mutex_destroy(&un->un_owner_mx);
 	mutex_destroy(&un->un_rs_thread_mx);
 	cv_destroy(&un->un_rs_thread_cv);
@@ -2329,11 +2277,11 @@ set_sm_comp_state(
 	ui_sm = MDI_UNIT(getminor(md_dev64_to_dev(sm->sm_dev)));
 	if (newstate & (CS_ERRED | CS_RESYNC | CS_LAST_ERRED) &&
 	    ui_sm->ui_tstate & MD_INACCESSIBLE) {
-	    ui_sm->ui_tstate &= ~MD_INACCESSIBLE;
+		ui_sm->ui_tstate &= ~MD_INACCESSIBLE;
 	}
 
-	shared = (md_m_shared_t *)
-		(*(smic->sm_shared_by_indx))(sm->sm_dev, sm, ci);
+	shared = (md_m_shared_t *)(*(smic->sm_shared_by_indx))
+	    (sm->sm_dev, sm, ci);
 	origstate = shared->ms_state;
 
 	/*
@@ -2345,9 +2293,8 @@ set_sm_comp_state(
 	if ((! (origstate & (CS_ERRED|CS_LAST_ERRED))) &&
 	    (newstate & (CS_ERRED|CS_LAST_ERRED))) {
 
-		get_dev =
-		    (void (*)())md_get_named_service(sm->sm_dev, 0,
-				"get device", 0);
+		get_dev = (void (*)())md_get_named_service(sm->sm_dev, 0,
+		    "get device", 0);
 		(void) (*get_dev)(sm->sm_dev, sm, ci, &cd);
 
 		err = md_getdevname(setno, mddb_getsidenum(setno), 0,
@@ -2355,7 +2302,7 @@ set_sm_comp_state(
 
 		if (err == ENOENT) {
 			(void) md_devname(setno, cd.cd_dev, devname,
-				sizeof (devname));
+			    sizeof (devname));
 		}
 
 		cmn_err(CE_WARN, "md: %s: %s needs maintenance",
@@ -2480,12 +2427,8 @@ set_sm_comp_state(
 		}
 
 		kresult = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
-		rval = mdmn_ksend_message(setno,
-					msgtype,
-					msgflags,
-					(char *)&stchmsg,
-					sizeof (stchmsg),
-					kresult);
+		rval = mdmn_ksend_message(setno, msgtype, msgflags,
+		    (char *)&stchmsg, sizeof (stchmsg), kresult);
 
 		if (!MDMN_KSEND_MSG_OK(rval, kresult)) {
 			mdmn_ksend_show_error(rval, kresult, "STATE UPDATE");
@@ -2562,8 +2505,8 @@ find_another_logical(
 
 		mcnt = MIN(cnt, lbtodb(1024 * 1024 * 1024));	/* 1 Gig Blks */
 
-		dev = select_read_unit(un, blk, mcnt, &cando, must_be_open, &s,
-			NULL);
+		dev = select_read_unit(un, blk, mcnt, &cando,
+		    must_be_open, &s, NULL);
 		if (dev == (md_dev64_t)0)
 			break;
 
@@ -2617,7 +2560,7 @@ mirror_other_sources(mm_unit_t *un, int smi, int ci, int must_be_open)
 	 * Make sure this component has other sources
 	 */
 	(void) (*(smic->sm_get_bcss))
-		(dev, sm, ci, &block, &count, &skip, &size);
+	    (dev, sm, ci, &block, &count, &skip, &size);
 
 	if (count == 0)
 		return (1);
@@ -2743,7 +2686,7 @@ error_update_unit(md_mps_t *ps)
 
 			/* Never called from ioctl context, so (IOLOCK *)NULL */
 			set_sm_comp_state(un, smi, ci, CS_LAST_ERRED, 0, flags,
-				(IOLOCK *)NULL);
+			    (IOLOCK *)NULL);
 			/*
 			 * For a MN set, the NOTIFY is done when the state
 			 * change is processed on each node
@@ -2756,7 +2699,7 @@ error_update_unit(md_mps_t *ps)
 		}
 		/* Never called from ioctl context, so (IOLOCK *)NULL */
 		set_sm_comp_state(un, smi, ci, CS_ERRED, 0, flags,
-			(IOLOCK *)NULL);
+		    (IOLOCK *)NULL);
 		/*
 		 * For a MN set, the NOTIFY is done when the state
 		 * change is processed on each node
@@ -2797,8 +2740,8 @@ last_err_retry(md_mcs_t *cs)
 
 	/* if we're panicing just let this I/O error out */
 	if (panicstr) {
-	    (void) mirror_done(cb);
-	    return;
+		(void) mirror_done(cb);
+		return;
 	}
 
 	/* reissue the I/O */
@@ -2820,7 +2763,7 @@ last_err_retry(md_mcs_t *cs)
 	clear_retry_error(cb);
 
 	cmn_err(CE_NOTE, "!md: %s: Last Erred, retry I/O without B_FAILFAST",
-		md_shortname(getminor(cb->b_edev)));
+	    md_shortname(getminor(cb->b_edev)));
 
 	md_call_strategy(cb, flags, NULL);
 }
@@ -2837,7 +2780,7 @@ mirror_error(md_mps_t *ps)
 	}
 
 	if (ps->ps_flags & MD_MPS_ON_OVERLAP)
-		mirror_overlap_chain_remove(ps);
+		mirror_overlap_tree_remove(ps);
 
 	smi = 0;
 	ci = 0;
@@ -2937,7 +2880,7 @@ copy_write_cont(wowhdr_t *wowhdr)
 	 * md_biodone().
 	 */
 	(void) md_mirror_strategy(cb, MD_STR_NOTTOP | MD_STR_WOW
-				    | MD_STR_MAPPED, NULL);
+	    | MD_STR_MAPPED, NULL);
 }
 
 static void
@@ -2977,7 +2920,7 @@ handle_wow(md_mps_t *ps)
 	 */
 	if (md_mirror_wow_flg & WOW_NOCOPY)
 		(void) md_mirror_strategy(pb, MD_STR_NOTTOP | MD_STR_WOW |
-					    MD_STR_MAPPED | MD_IO_COUNTED, ps);
+		    MD_STR_MAPPED | MD_IO_COUNTED, ps);
 	else
 		md_mirror_copy_write(ps);
 }
@@ -3144,7 +3087,7 @@ mirror_done_common(struct buf *cb)
 	}
 
 	if (ps->ps_flags & MD_MPS_ON_OVERLAP)
-		mirror_overlap_chain_remove(ps);
+		mirror_overlap_tree_remove(ps);
 
 	/*
 	 * Handle Write-on-Write problem.
@@ -3191,16 +3134,15 @@ clear_retry_error(struct buf *cb)
 	un = cs->cs_ps->ps_un;
 
 	for (smi = 0; smi < NMIRROR; smi++) {
-	    if (!SMS_BY_INDEX_IS(un, smi, SMS_INUSE))
-		continue;
+		if (!SMS_BY_INDEX_IS(un, smi, SMS_INUSE))
+			continue;
 
-	    if (cb->b_edev == md_dev64_to_dev(un->un_sm[smi].sm_dev)) {
-		break;
-	    }
+		if (cb->b_edev == md_dev64_to_dev(un->un_sm[smi].sm_dev))
+			break;
 	}
 
 	if (smi >= NMIRROR)
-	    return;
+		return;
 
 	sm = &un->un_sm[smi];
 	smic = &un->un_smic[smi];
@@ -3213,25 +3155,25 @@ clear_retry_error(struct buf *cb)
 	    cb->b_blkno, &cnt);
 
 	if (shared->ms_flags & MDM_S_IOERR) {
-	    shared->ms_flags &= ~MDM_S_IOERR;
+		shared->ms_flags &= ~MDM_S_IOERR;
 
 	} else {
-	    /* the I/O buf spans components and the first one is not erred */
-	    int	cnt;
-	    int	i;
+		/* the buf spans components and the first one is not erred */
+		int	cnt;
+		int	i;
 
-	    cnt = (*(smic->sm_get_component_count))(sm->sm_dev, un);
-	    for (i = 0; i < cnt; i++) {
-		shared = (md_m_shared_t *)(*(smic->sm_shared_by_indx))
-		    (sm->sm_dev, sm, i);
+		cnt = (*(smic->sm_get_component_count))(sm->sm_dev, un);
+		for (i = 0; i < cnt; i++) {
+			shared = (md_m_shared_t *)(*(smic->sm_shared_by_indx))
+			    (sm->sm_dev, sm, i);
 
-		if (shared->ms_flags & MDM_S_IOERR &&
-		    shared->ms_state == CS_OKAY) {
+			if (shared->ms_flags & MDM_S_IOERR &&
+			    shared->ms_state == CS_OKAY) {
 
-		    shared->ms_flags &= ~MDM_S_IOERR;
-		    break;
+				shared->ms_flags &= ~MDM_S_IOERR;
+				break;
+			}
 		}
-	    }
 	}
 
 	md_unit_writerexit(ui_sm);
@@ -3257,8 +3199,8 @@ mirror_map_read(
 		bp->b_bcount = ldbtob(count);
 		return (0);
 	}
-	bp->b_edev = md_dev64_to_dev(select_read_unit(un, blkno, count, &cando,
-							0, NULL, cs));
+	bp->b_edev = md_dev64_to_dev(select_read_unit(un, blkno,
+	    count, &cando, 0, NULL, cs));
 	bp->b_bcount = ldbtob(cando);
 	if (count != cando)
 		return (cando);
@@ -3634,11 +3576,9 @@ become_owner(daemon_queue_t *dq)
 
 			kres = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 			rval = mdmn_ksend_message(setno,
-						MD_MN_MSG_REQUIRE_OWNER,
-						msg_flags, /* flags */
-						(char *)msg,
-						sizeof (md_mn_req_owner_t),
-						kres);
+			    MD_MN_MSG_REQUIRE_OWNER, msg_flags,
+			    /* flags */ (char *)msg,
+			    sizeof (md_mn_req_owner_t), kres);
 
 			kmem_free(msg, sizeof (md_mn_req_owner_t));
 
@@ -3668,11 +3608,10 @@ become_owner(daemon_queue_t *dq)
 					 * Release the block on the current
 					 * resync region if it is blocked
 					 */
-					ps1 = un->un_rs_prev_ovrlap;
+					ps1 = un->un_rs_prev_overlap;
 					if ((ps1 != NULL) &&
 					    (ps1->ps_flags & MD_MPS_ON_OVERLAP))
-						mirror_overlap_chain_remove(
-						    ps1);
+						mirror_overlap_tree_remove(ps1);
 					mutex_exit(&un->un_owner_mx);
 
 					/*
@@ -3824,14 +3763,14 @@ mirror_write_strategy(buf_t *pb, int flag, void *private)
 
 	/*
 	 * If not MN owner and this is an ABR write, make sure the current
-	 * resync region is on the overlaps chain
+	 * resync region is in the overlaps tree
 	 */
 	mutex_enter(&un->un_owner_mx);
 	if (MD_MNSET_SETNO(setno) && (!(MD_MN_MIRROR_OWNER(un))) &&
 	    ((ui->ui_tstate & MD_ABR_CAP) || (flag & MD_STR_ABR))) {
 		md_mps_t	*ps1;
 		/* Block the current resync region, if not already blocked */
-		ps1 = un->un_rs_prev_ovrlap;
+		ps1 = un->un_rs_prev_overlap;
 
 		if ((ps1 != NULL) && ((ps1->ps_firstblk != 0) ||
 		    (ps1->ps_lastblk != 0))) {
@@ -3845,11 +3784,11 @@ mirror_write_strategy(buf_t *pb, int flag, void *private)
 			/*
 			 * Check to see if we have obtained ownership
 			 * while waiting for overlaps. If we have, remove
-			 * the resync_region entry from the overlap chain
+			 * the resync_region entry from the overlap tree
 			 */
 			if (MD_MN_MIRROR_OWNER(un) &&
 			    (ps1->ps_flags & MD_MPS_ON_OVERLAP)) {
-				mirror_overlap_chain_remove(ps1);
+				mirror_overlap_tree_remove(ps1);
 				rs_on_overlap = 0;
 			}
 		}
@@ -3885,7 +3824,7 @@ mirror_write_strategy(buf_t *pb, int flag, void *private)
 				    MD_SID(un), ps->ps_firstblk);
 #endif
 			if (ps->ps_flags & MD_MPS_ON_OVERLAP)
-				mirror_overlap_chain_remove(ps);
+				mirror_overlap_tree_remove(ps);
 			kmem_cache_free(mirror_parent_cache, ps);
 			md_kstat_waitq_exit(ui);
 			md_unit_readerexit(ui);
@@ -3901,15 +3840,15 @@ mirror_write_strategy(buf_t *pb, int flag, void *private)
 		un = md_unit_readerlock(ui);
 		/*
 		 * For a MN set with an ABR write, if we are now the
-		 * owner and we have a resync region on the overlap
-		 * chain, remove the entry from overlaps and retry the write.
+		 * owner and we have a resync region in the overlap
+		 * tree, remove the entry from overlaps and retry the write.
 		 */
 
 		if (MD_MNSET_SETNO(setno) &&
 		    ((ui->ui_tstate & MD_ABR_CAP) || (flag & MD_STR_ABR))) {
 			mutex_enter(&un->un_owner_mx);
 			if (((MD_MN_MIRROR_OWNER(un))) && rs_on_overlap) {
-				mirror_overlap_chain_remove(ps);
+				mirror_overlap_tree_remove(ps);
 				md_kstat_waitq_exit(ui);
 				mutex_exit(&un->un_owner_mx);
 				md_unit_readerexit(ui);
@@ -3936,7 +3875,7 @@ mirror_write_strategy(buf_t *pb, int flag, void *private)
 	    (flag & MD_STR_ABR)) || (flag & MD_STR_WAR))) {
 		if (!MD_MN_MIRROR_OWNER(un))  {
 			if (ps->ps_flags & MD_MPS_ON_OVERLAP)
-				mirror_overlap_chain_remove(ps);
+				mirror_overlap_tree_remove(ps);
 			md_kstat_waitq_exit(ui);
 			ASSERT(!(flag & MD_STR_WAR));
 			md_unit_readerexit(ui);
@@ -3986,10 +3925,10 @@ mirror_write_strategy(buf_t *pb, int flag, void *private)
 	    (pb->b_flags & B_PHYS) &&
 	    !(ps->ps_flags & MD_MPS_WOW)) {
 		if (ps->ps_flags & MD_MPS_ON_OVERLAP)
-			mirror_overlap_chain_remove(ps);
+			mirror_overlap_tree_remove(ps);
 		md_unit_readerexit(ui);
 		daemon_request(&md_mstr_daemon, handle_wow,
-			(daemon_queue_t *)ps, REQ_OLD);
+		    (daemon_queue_t *)ps, REQ_OLD);
 		return;
 	}
 
@@ -4008,7 +3947,7 @@ mirror_write_strategy(buf_t *pb, int flag, void *private)
 		 */
 		if (more < 0) {
 			if (ps->ps_flags & MD_MPS_ON_OVERLAP)
-				mirror_overlap_chain_remove(ps);
+				mirror_overlap_tree_remove(ps);
 			md_kstat_runq_exit(ui);
 			kmem_cache_free(mirror_child_cache, cs);
 			kmem_cache_free(mirror_parent_cache, ps);
@@ -4205,7 +4144,7 @@ mirror_read_strategy(buf_t *pb, int flag, void *private)
 				 */
 				if (!MD_MN_MIRROR_OWNER(un))  {
 					ps->ps_call = NULL;
-					mirror_overlap_chain_remove(ps);
+					mirror_overlap_tree_remove(ps);
 					md_kstat_waitq_exit(ui);
 					md_unit_readerexit(ui);
 					daemon_request(
@@ -4231,7 +4170,7 @@ mirror_read_strategy(buf_t *pb, int flag, void *private)
 						    MD_SID(un),
 						    ps->ps_firstblk);
 #endif
-					mirror_overlap_chain_remove(ps);
+					mirror_overlap_tree_remove(ps);
 					kmem_cache_free(mirror_parent_cache,
 					    ps);
 					md_kstat_waitq_exit(ui);
@@ -4263,7 +4202,7 @@ mirror_read_strategy(buf_t *pb, int flag, void *private)
 		    current_blkno, mirror_done, cb, KM_NOSLEEP);
 
 		more = mirror_map_read(ps, cs, current_blkno,
-				(u_longlong_t)current_count);
+		    (u_longlong_t)current_count);
 		if (more) {
 			mutex_enter(&ps->ps_mx);
 			ps->ps_frags++;
@@ -4592,12 +4531,12 @@ mirror_resync_message(md_mn_rs_params_t *p, IOLOCK *lockp)
 		if ((p->rs_type == un->un_rs_type) &&
 		    (p->rs_start < un->un_resync_startbl))
 			break;
-		ps = un->un_rs_prev_ovrlap;
+		ps = un->un_rs_prev_overlap;
 
 		/* Allocate previous overlap reference if needed */
 		if (ps == NULL) {
 			ps = kmem_cache_alloc(mirror_parent_cache,
-				MD_ALLOCFLAGS);
+			    MD_ALLOCFLAGS);
 			ps->ps_un = un;
 			ps->ps_ui = ui;
 			ps->ps_firstblk = 0;
@@ -4605,7 +4544,7 @@ mirror_resync_message(md_mn_rs_params_t *p, IOLOCK *lockp)
 			ps->ps_flags = 0;
 			md_ioctl_readerexit(lockp);
 			(void) md_ioctl_writerlock(lockp, ui);
-			un->un_rs_prev_ovrlap = ps;
+			un->un_rs_prev_overlap = ps;
 			md_ioctl_writerexit(lockp);
 		} else
 			md_ioctl_readerexit(lockp);
@@ -4642,7 +4581,7 @@ mirror_resync_message(md_mn_rs_params_t *p, IOLOCK *lockp)
 				    p->rs_size - 1)) {
 					/* Remove previous overlap range */
 					if (ps->ps_flags & MD_MPS_ON_OVERLAP)
-						mirror_overlap_chain_remove(ps);
+						mirror_overlap_tree_remove(ps);
 
 					ps->ps_firstblk = p->rs_start;
 					ps->ps_lastblk = ps->ps_firstblk +
@@ -4660,11 +4599,11 @@ mirror_resync_message(md_mn_rs_params_t *p, IOLOCK *lockp)
 					 * ownership while waiting for
 					 * overlaps. If we have, remove
 					 * the resync_region entry from the
-					 * overlap chain
+					 * overlap tree
 					 */
 					if (MD_MN_MIRROR_OWNER(un) &&
 					    (ps->ps_flags & MD_MPS_ON_OVERLAP))
-						mirror_overlap_chain_remove(ps);
+						mirror_overlap_tree_remove(ps);
 				}
 			}
 			mutex_exit(&un->un_owner_mx);
@@ -4722,15 +4661,15 @@ mirror_resync_message(md_mn_rs_params_t *p, IOLOCK *lockp)
 			mutex_exit(&un->un_owner_mx);
 		}
 		(void) md_ioctl_writerlock(lockp, ui);
-		ps = un->un_rs_prev_ovrlap;
+		ps = un->un_rs_prev_overlap;
 		if (ps != NULL) {
 			/* Remove previous overlap range */
 			if (ps->ps_flags & MD_MPS_ON_OVERLAP)
-				mirror_overlap_chain_remove(ps);
+				mirror_overlap_tree_remove(ps);
 			/*
 			 * Release the overlap range reference
 			 */
-			un->un_rs_prev_ovrlap = NULL;
+			un->un_rs_prev_overlap = NULL;
 			kmem_cache_free(mirror_parent_cache,
 			    ps);
 		}
@@ -5023,9 +4962,9 @@ mirror_snarf(md_snarfcmd_t cmd, set_t setno)
 				    (mm_unit32_od_t *)mddb_getrecaddr(recid);
 				newreqsize = sizeof (mm_unit_t);
 				big_un = (mm_unit_t *)kmem_zalloc(newreqsize,
-					KM_SLEEP);
+				    KM_SLEEP);
 				mirror_convert((caddr_t)small_un,
-					(caddr_t)big_un, SMALL_2_BIG);
+				    (caddr_t)big_un, SMALL_2_BIG);
 				kmem_free(small_un, dep->de_reqsize);
 
 				/*
@@ -5043,7 +4982,7 @@ mirror_snarf(md_snarfcmd_t cmd, set_t setno)
 				 * record address.
 				 */
 				un = (mm_unit_t *)mddb_getrecaddr_resize(recid,
-					sizeof (*un), 0);
+				    sizeof (*un), 0);
 			}
 			un->c.un_revision &= ~MD_64BIT_META_DEV;
 			break;
@@ -5051,7 +4990,7 @@ mirror_snarf(md_snarfcmd_t cmd, set_t setno)
 		case MDDB_REV_RB64FN:
 			/* Big device */
 			un = (mm_unit_t *)mddb_getrecaddr_resize(recid,
-				sizeof (*un), 0);
+			    sizeof (*un), 0);
 			un->c.un_revision |= MD_64BIT_META_DEV;
 			un->c.un_flag |= MD_EFILABEL;
 			break;
@@ -5212,7 +5151,7 @@ static int
 mirror_close(dev_t dev, int flag, int otyp, cred_t *cred_p, int md_cflags)
 {
 	return (mirror_internal_close(getminor(dev), otyp, md_cflags,
-		(IOLOCK *)NULL));
+	    (IOLOCK *)NULL));
 }
 
 
@@ -5301,7 +5240,7 @@ mirror_probe_dev(mdi_unit_t *ui, minor_t mnum)
 		sm_cnt++;
 		tmpdev = un->un_sm[i].sm_dev;
 		(void) md_layered_open(mnum, &tmpdev,
-				MD_OFLG_CONT_ERRS | MD_OFLG_PROBEDEV);
+		    MD_OFLG_CONT_ERRS | MD_OFLG_PROBEDEV);
 		un->un_sm[i].sm_dev = tmpdev;
 
 		sm_ui = MDI_UNIT(getminor(md_dev64_to_dev(tmpdev)));
@@ -5455,13 +5394,13 @@ mirror_imp_set(
 			optrec_id = &(un32->un_rr_dirty_recid);
 
 			for (i = 0; i < un32->un_nsm; i++) {
-			    tmpdev = md_expldev(un32->un_sm[i].sm_dev);
-			    un32->un_sm[i].sm_dev = md_cmpldev
-				(md_makedevice(md_major, MD_MKMIN(setno,
-				MD_MIN2UNIT(md_getminor(tmpdev)))));
+				tmpdev = md_expldev(un32->un_sm[i].sm_dev);
+				un32->un_sm[i].sm_dev = md_cmpldev
+				    (md_makedevice(md_major, MD_MKMIN(setno,
+				    MD_MIN2UNIT(md_getminor(tmpdev)))));
 
-			    if (!md_update_minor(setno, mddb_getsidenum
-				(setno), un32->un_sm[i].sm_key))
+				if (!md_update_minor(setno, mddb_getsidenum
+				    (setno), un32->un_sm[i].sm_key))
 				goto out;
 			}
 			break;
@@ -5474,13 +5413,13 @@ mirror_imp_set(
 			optrec_id = &(un64->un_rr_dirty_recid);
 
 			for (i = 0; i < un64->un_nsm; i++) {
-			    tmpdev = un64->un_sm[i].sm_dev;
-			    un64->un_sm[i].sm_dev = md_makedevice
-				(md_major, MD_MKMIN(setno, MD_MIN2UNIT
-				(md_getminor(tmpdev))));
+				tmpdev = un64->un_sm[i].sm_dev;
+				un64->un_sm[i].sm_dev = md_makedevice
+				    (md_major, MD_MKMIN(setno, MD_MIN2UNIT
+				    (md_getminor(tmpdev))));
 
-			    if (!md_update_minor(setno, mddb_getsidenum
-				(setno), un64->un_sm[i].sm_key))
+				if (!md_update_minor(setno, mddb_getsidenum
+				    (setno), un64->un_sm[i].sm_key))
 				goto out;
 			}
 			break;

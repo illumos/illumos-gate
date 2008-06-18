@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -190,7 +189,7 @@ process_resync_regions(mm_unit_t *un)
 
 		if (un->c.un_status & MD_UN_KEEP_DIRTY)
 			if (IS_KEEPDIRTY(i, un))
-			    continue;
+				continue;
 
 		if (!IS_REGION_DIRTY(i, un))
 			continue;
@@ -308,7 +307,7 @@ md_mirror_timeout(void *throwaway)
 	if (!mirror_timeout.dr_pending) {
 		mirror_timeout.dr_pending = 1;
 		daemon_request(&md_mstr_daemon, check_resync_regions,
-				(daemon_queue_t *)&mirror_timeout, REQ_OLD);
+		    (daemon_queue_t *)&mirror_timeout, REQ_OLD);
 	}
 
 	if (mirror_md_ops.md_head != NULL)
@@ -345,7 +344,7 @@ offlined_to_attached(mm_unit_t *un)
 	for (i = 0; i < NMIRROR; i++) {
 		if (SMS_BY_INDEX_IS(un, i, SMS_OFFLINE)) {
 			mirror_set_sm_state(&un->un_sm[i],
-				&un->un_smic[i], SMS_ATTACHED, 1);
+			    &un->un_smic[i], SMS_ATTACHED, 1);
 			changed++;
 		}
 		if (SMS_BY_INDEX_IS(un, i, SMS_OFFLINE_RESYNC)) {
@@ -415,7 +414,7 @@ create_unit_resync(mm_unit_t *un, int snarfing)
 	    mirror_md_ops.md_driver.md_drivername);
 
 	recid =  mddb_createrec(size, typ1, RESYNC_REC,
-			MD_CRO_OPTIMIZE|MD_CRO_32BIT, setno);
+	    MD_CRO_OPTIMIZE|MD_CRO_32BIT, setno);
 	if (recid < 0) {
 		if (snarfing && !(md_get_setstatus(setno) & MD_SET_STALE)) {
 			md_set_setstatus(setno, MD_SET_STALE);
@@ -497,18 +496,14 @@ unit_setup_resync(mm_unit_t *un, int snarfing)
 			return (err);
 	}
 
-	un->un_goingclean_bm =
-	    (uchar_t *)kmem_zalloc((uint_t)(howmany(un->un_rrd_num, NBBY)),
-		KM_SLEEP);
-	un->un_goingdirty_bm =
-	    (uchar_t *)kmem_zalloc((uint_t)(howmany(un->un_rrd_num, NBBY)),
-		KM_SLEEP);
-	un->un_outstanding_writes =
-	    (short *)kmem_zalloc((uint_t)un->un_rrd_num * sizeof (short),
-		KM_SLEEP);
-	un->un_resync_bm =
-	    (uchar_t *)kmem_zalloc((uint_t)(howmany(un->un_rrd_num, NBBY)),
-		KM_SLEEP);
+	un->un_goingclean_bm = (uchar_t *)kmem_zalloc((uint_t)(howmany(
+	    un->un_rrd_num, NBBY)), KM_SLEEP);
+	un->un_goingdirty_bm = (uchar_t *)kmem_zalloc((uint_t)(howmany(
+	    un->un_rrd_num, NBBY)), KM_SLEEP);
+	un->un_outstanding_writes = (short *)kmem_zalloc(
+	    (uint_t)un->un_rrd_num * sizeof (short), KM_SLEEP);
+	un->un_resync_bm = (uchar_t *)kmem_zalloc((uint_t)(howmany(
+	    un->un_rrd_num, NBBY)), KM_SLEEP);
 
 	if (md_get_setstatus(MD_UN2SET(un)) & MD_SET_STALE)
 		return (0);
@@ -819,7 +814,7 @@ send_mn_resync_next_message(
 	CALLB_CPR_SAFE_BEGIN(&un->un_rs_cprinfo);
 
 	rval = mdmn_ksend_message(setno, MD_MN_MSG_RESYNC_NEXT, MD_MSGF_NO_LOG,
-		(char *)rmsg, sizeof (md_mn_msg_resync_t), kres);
+	    (char *)rmsg, sizeof (md_mn_msg_resync_t), kres);
 
 	CALLB_CPR_SAFE_END(&un->un_rs_cprinfo, &un->un_rs_cpr_mx);
 	mutex_exit(&un->un_rs_cpr_mx);
@@ -830,12 +825,11 @@ send_mn_resync_next_message(
 	}
 	kmem_free(kres, sizeof (md_mn_kresult_t));
 	(void) md_unit_readerlock(ui);
-	ps = un->un_rs_prev_ovrlap;
+	ps = un->un_rs_prev_overlap;
 
 	/* Allocate previous overlap reference if needed */
 	if (ps == NULL) {
-		ps = kmem_cache_alloc(mirror_parent_cache,
-			MD_ALLOCFLAGS);
+		ps = kmem_cache_alloc(mirror_parent_cache, MD_ALLOCFLAGS);
 		ps->ps_un = un;
 		ps->ps_ui = ui;
 		ps->ps_firstblk = 0;
@@ -843,7 +837,7 @@ send_mn_resync_next_message(
 		ps->ps_flags = 0;
 		md_unit_readerexit(ui);
 		(void) md_unit_writerlock(ui);
-		un->un_rs_prev_ovrlap = ps;
+		un->un_rs_prev_overlap = ps;
 		md_unit_writerexit(ui);
 		(void) md_unit_readerlock(ui);
 	}
@@ -910,10 +904,10 @@ resync_read_blk_range(
 			 */
 			if (un->un_rs_type != rs_type)
 				return (0);
-			if (un->un_rs_prev_ovrlap->ps_firstblk >
+			if (un->un_rs_prev_overlap->ps_firstblk >
 			    rs_startblk) {
 				currentblk =
-				    un->un_rs_prev_ovrlap->ps_firstblk;
+				    un->un_rs_prev_overlap->ps_firstblk;
 				continue;
 			}
 		}
@@ -940,10 +934,10 @@ resync_read_blk_range(
 				 */
 				if (un->un_rs_type != rs_type)
 					return (0);
-				if (un->un_rs_prev_ovrlap->ps_firstblk >
+				if (un->un_rs_prev_overlap->ps_firstblk >
 				    rs_startblk)
 					currentblk =
-					    un->un_rs_prev_ovrlap->ps_firstblk;
+					    un->un_rs_prev_overlap->ps_firstblk;
 			}
 		}
 	}
@@ -1623,7 +1617,7 @@ submirror_resync(mm_unit_t *un)
 	 */
 	if (MD_MNSET_SETNO(setno)) {
 		chunk = ((chunk + MD_DEF_RESYNC_BLK_SZ)/MD_DEF_RESYNC_BLK_SZ)
-			* MD_DEF_RESYNC_BLK_SZ;
+		    * MD_DEF_RESYNC_BLK_SZ;
 		if (chunk > un->c.un_total_blocks)
 			chunk = un->c.un_total_blocks;
 	}
@@ -1762,8 +1756,7 @@ component_resync(mm_unit_t *un)
 		smic = &un->un_smic[i];
 		if (!SMS_IS(sm, SMS_RUNNING | SMS_LIMPING))
 			continue;
-		compcnt = (*(smic->sm_get_component_count))
-			(sm->sm_dev, sm);
+		compcnt = (*(smic->sm_get_component_count))(sm->sm_dev, sm);
 		for (ci = 0; ci < compcnt; ci++) {
 			SET_RS_SMI(un->un_rs_type, i);
 			SET_RS_CI(un->un_rs_type, ci);
@@ -1809,8 +1802,7 @@ reset_comp_flags(mm_unit_t *un)
 		smic = &un->un_smic[i];
 		if (!SMS_IS(sm, SMS_INUSE))
 			continue;
-		compcnt = (*(smic->sm_get_component_count))
-			(sm->sm_dev, sm);
+		compcnt = (*(smic->sm_get_component_count))(sm->sm_dev, sm);
 		for (ci = 0; ci < compcnt; ci++) {
 			shared = (md_m_shared_t *)(*(smic->sm_shared_by_indx))
 			    (sm->sm_dev, sm, ci);
@@ -2113,8 +2105,7 @@ resync_restart:
 	 */
 	ASSERT(un->un_rs_resync_to_id == 0);
 	un->un_rs_resync_to_id = timeout(resync_progress, un,
-		(clock_t)(drv_usectohz(60000000) *
-		    md_mirror_resync_update_intvl));
+	    (clock_t)(drv_usectohz(60000000) * md_mirror_resync_update_intvl));
 
 	/*
 	 * Handle resync restart from the last logged position. The contents
@@ -2343,15 +2334,15 @@ bail_out:
 
 			un->c.un_status &= ~(MD_UN_RESYNC_CANCEL |
 			    MD_UN_RESYNC_ACTIVE);
-			ps = un->un_rs_prev_ovrlap;
+			ps = un->un_rs_prev_overlap;
 			if (ps != NULL) {
 				/* Remove previous overlap resync region */
 				if (ps->ps_flags & MD_MPS_ON_OVERLAP)
-				mirror_overlap_chain_remove(ps);
+				mirror_overlap_tree_remove(ps);
 				/*
 				 * Release the overlap range reference
 				 */
-				un->un_rs_prev_ovrlap = NULL;
+				un->un_rs_prev_overlap = NULL;
 				kmem_cache_free(mirror_parent_cache,
 				    ps);
 			}
@@ -2822,7 +2813,7 @@ mirror_resize_resync_regions(mm_unit_t *un, diskaddr_t new_tb)
 	typ1 = (mddb_type_t)md_getshared_key(setno,
 	    mirror_md_ops.md_driver.md_drivername);
 	recid = mddb_createrec(size, typ1, RESYNC_REC,
-			MD_CRO_OPTIMIZE|MD_CRO_32BIT, setno);
+	    MD_CRO_OPTIMIZE|MD_CRO_32BIT, setno);
 	if (recid < 0)
 		return (-1);
 
@@ -2913,7 +2904,7 @@ mirror_add_resync_regions(mm_unit_t *un, diskaddr_t new_tb)
 	    mirror_md_ops.md_driver.md_drivername);
 
 	recid = mddb_createrec(size, typ1, RESYNC_REC,
-			MD_CRO_OPTIMIZE|MD_CRO_32BIT, setno);
+	    MD_CRO_OPTIMIZE|MD_CRO_32BIT, setno);
 	if (recid < 0)
 		return (-1);
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1668,10 +1668,10 @@ mirror_owner_thread(md_mn_req_owner_t *ownp)
 			 * Release the block on the current resync region if it
 			 * is blocked
 			 */
-			ps1 = un->un_rs_prev_ovrlap;
+			ps1 = un->un_rs_prev_overlap;
 			if ((ps1 != NULL) &&
 			    (ps1->ps_flags & MD_MPS_ON_OVERLAP))
-				mirror_overlap_chain_remove(ps1);
+				mirror_overlap_tree_remove(ps1);
 		}
 
 		un->un_owner_state &= ~(MM_MN_OWNER_SENT|MM_MN_BECOME_OWNER);
@@ -1807,7 +1807,7 @@ mirror_set_owner(md_set_mmown_params_t *p, IOLOCK *lock)
 	 * mirror is marked as "Needs Maintenance" and that an optimized
 	 * resync will be done when we resync the mirror, Also clear the
 	 * PREVENT_CHANGE flag and remove the last resync region from the
-	 * overlap chain.
+	 * overlap tree.
 	 */
 	if (p->d.owner == 0) {
 		md_mps_t	*ps;
@@ -1839,9 +1839,9 @@ mirror_set_owner(md_set_mmown_params_t *p, IOLOCK *lock)
 		mutex_enter(&un->un_owner_mx);
 		un->un_owner_state &= ~MD_MN_MM_PREVENT_CHANGE;
 		mutex_exit(&un->un_owner_mx);
-		ps = un->un_rs_prev_ovrlap;
+		ps = un->un_rs_prev_overlap;
 		if ((ps != NULL) && (ps->ps_flags & MD_MPS_ON_OVERLAP)) {
-			mirror_overlap_chain_remove(ps);
+			mirror_overlap_tree_remove(ps);
 			ps->ps_firstblk = 0;
 			ps->ps_lastblk = 0;
 		}

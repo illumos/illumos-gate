@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,9 +67,9 @@ extern "C" {
  * macro to test if the current block is within the current resync region
  */
 #define	IN_RESYNC_REGION(un, ps) \
-	((un->un_rs_prev_ovrlap != NULL) && (ps->ps_firstblk >= \
-	    un->un_rs_prev_ovrlap->ps_firstblk) && \
-	    (ps->ps_lastblk <=  un->un_rs_prev_ovrlap->ps_lastblk))
+	((un->un_rs_prev_overlap != NULL) && (ps->ps_firstblk >= \
+	    un->un_rs_prev_overlap->ps_firstblk) && \
+	    (ps->ps_lastblk <=  un->un_rs_prev_overlap->ps_lastblk))
 /*
  * Default resync update interval (in minutes).
  */
@@ -108,8 +107,8 @@ extern "C" {
 /*
  * Define for argument in function wait_for_overlaps()
  */
-#define	MD_OVERLAP_ALLOW_REPEAT	0x1	/* Allow if ps already on chain */
-#define	MD_OVERLAP_NO_REPEAT	0	/* ps must not already be on chain */
+#define	MD_OVERLAP_ALLOW_REPEAT	0x1	/* Allow if ps already in tree */
+#define	MD_OVERLAP_NO_REPEAT	0	/* ps must not already be in tree */
 
 /*
  * Define for max retries of mirror_owner
@@ -153,10 +152,10 @@ typedef struct mm_unit32_od {
 	uint_t		un_changecnt;
 	ushort_t	un_nsm;			/* number of submirrors */
 	mm_submirror32_od_t un_sm[NMIRROR];
-	int		un_ovrlap_chn_flg;
-	int		xx_un_ovrlap_chn_mx[2];	/* replaces mutex */
-	ushort_t	xx_un_ovrlap_chn_cv;
-	caddr32_t	xx_un_ovrlap_chn;
+	int		un_overlap_tree_flag;
+	int		xx_un_overlap_tree_mx[2];	/* replaces mutex */
+	ushort_t	xx_un_overlap_tree_cv;
+	caddr32_t	xx_un_overlap_root;
 	mm_rd_opt_t	un_read_option;		/* mirror read option */
 	mm_wr_opt_t	un_write_option;	/* mirror write option */
 	mm_pass_num_t	un_pass_num;		/* resync pass number */
@@ -270,10 +269,11 @@ typedef struct md_mps {
 	uint_t		 ps_active_cnt;
 	int		 ps_frags;
 	uint_t		 ps_changecnt;
-	struct md_mps	*ps_ovrlap_next;
-	struct md_mps	*ps_ovrlap_prev;
+	struct md_mps	*ps_unused1;
+	struct md_mps	*ps_unused2;
 	void		 (*ps_call)();
 	kmutex_t	 ps_mx;
+	avl_node_t	ps_overlap_node;
 } md_mps_t;
 
 #define	MD_MPS_ON_OVERLAP	0x0001
@@ -309,9 +309,9 @@ typedef struct md_mcs {
 } md_mcs_t;
 
 typedef struct  mm_mirror_ic {
-	kmutex_t	un_ovrlap_chn_mx;
-	kcondvar_t	un_ovrlap_chn_cv;
-	md_mps_t	un_ovrlap_chn;		/* Sentinel for overlaps */
+	kmutex_t	un_overlap_tree_mx;
+	kcondvar_t	un_overlap_tree_cv;
+	avl_tree_t	un_overlap_root;
 	kmutex_t	un_resync_mx;
 	kcondvar_t	un_resync_cv;
 	short		*un_outstanding_writes; /* outstanding write array */
@@ -348,7 +348,7 @@ typedef struct mm_unit {
 	uint_t		un_changecnt;
 	ushort_t	un_nsm;			/* number of submirrors */
 	mm_submirror_t	un_sm[NMIRROR];
-	int		un_ovrlap_chn_flg;
+	int		un_overlap_tree_flag;
 	mm_rd_opt_t	un_read_option;		/* mirror read option */
 	mm_wr_opt_t	un_write_option;	/* mirror write option */
 	mm_pass_num_t	un_pass_num;		/* resync pass number */
@@ -383,7 +383,7 @@ typedef struct mm_unit {
 	kmutex_t	un_rs_thread_mx;	/* Thread cv mutex */
 	kcondvar_t	un_rs_thread_cv;	/* Cond. Var. for thread */
 	uint_t		un_rs_thread_flags;	/* Thread control flags */
-	md_mps_t	*un_rs_prev_ovrlap;	/* existing overlap request */
+	md_mps_t	*un_rs_prev_overlap;	/* existing overlap request */
 	timeout_id_t	un_rs_resync_to_id;	/* resync progress timeout */
 	kmutex_t	un_rs_progress_mx;	/* Resync progress mutex */
 	kcondvar_t	un_rs_progress_cv;	/* Cond. Var. for progress */
@@ -391,9 +391,9 @@ typedef struct mm_unit {
 	void		*un_rs_msg;		/* Intra-node resync message */
 } mm_unit_t;
 
-#define	un_ovrlap_chn_mx	un_mmic.un_ovrlap_chn_mx
-#define	un_ovrlap_chn_cv	un_mmic.un_ovrlap_chn_cv
-#define	un_ovrlap_chn		un_mmic.un_ovrlap_chn
+#define	un_overlap_tree_mx	un_mmic.un_overlap_tree_mx
+#define	un_overlap_tree_cv	un_mmic.un_overlap_tree_cv
+#define	un_overlap_root		un_mmic.un_overlap_root
 #define	un_resync_mx		un_mmic.un_resync_mx
 #define	un_resync_cv		un_mmic.un_resync_cv
 #define	un_outstanding_writes	un_mmic.un_outstanding_writes
@@ -554,7 +554,7 @@ extern int		mirror_directed_read(dev_t, vol_directed_rd_t *, int);
 extern void		mirror_check_failfast(minor_t mnum);
 extern int		check_comp_4_hotspares(mm_unit_t *, int, int, uint_t,
 			    mddb_recid_t, IOLOCK *);
-extern void		mirror_overlap_chain_remove(md_mps_t *ps);
+extern void		mirror_overlap_tree_remove(md_mps_t *ps);
 extern void		mirror_child_init(md_mcs_t *cs);
 
 /* Externals from mirror_ioctl.c */

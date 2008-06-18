@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,7 +135,7 @@ get_big_stripe_req_size(ms_unit32_od_t *un, int first_comp_only)
 
 	/* Compute the offset of the first component */
 	first_comp = sizeof (ms_unit_t) +
-			sizeof (struct ms_row) * (un->un_nrows - 1);
+	    sizeof (struct ms_row) * (un->un_nrows - 1);
 	first_comp = roundup(first_comp, sizeof (long long));
 	if (first_comp_only == FIRST_COMP_OFFSET)
 		return (first_comp);
@@ -169,7 +168,7 @@ get_small_stripe_req_size(ms_unit_t *un, int first_comp_only)
 
 	/* Compute the size of the new small ms_unit */
 	first_comp = sizeof (ms_unit32_od_t) +
-			sizeof (struct ms_row32_od) * (un->un_nrows - 1);
+	    sizeof (struct ms_row32_od) * (un->un_nrows - 1);
 	first_comp = roundup(first_comp, sizeof (long long));
 	if (first_comp_only == FIRST_COMP_OFFSET)
 		return (first_comp);
@@ -222,9 +221,9 @@ stripe_convert(caddr_t small, caddr_t big, int direction)
 		small_un->un_hsp_id = big_un->un_hsp_id;
 		small_un->un_nrows  = big_un->un_nrows;
 		small_un->c.un_size =
-			get_small_stripe_req_size(big_un, COMPLETE_STRUCTURE);
+		    get_small_stripe_req_size(big_un, COMPLETE_STRUCTURE);
 		small_un->un_ocomp  =
-			get_small_stripe_req_size(big_un, FIRST_COMP_OFFSET);
+		    get_small_stripe_req_size(big_un, FIRST_COMP_OFFSET);
 
 		/* walk through all rows */
 		big_mdr   = &big_un->un_row[0];
@@ -236,10 +235,10 @@ stripe_convert(caddr_t small, caddr_t big, int direction)
 		}
 
 		/* Now copy the components */
-		big_mdcomp   = (ms_comp_t *)(void *)&((char *)big_un)
-				[big_un->un_ocomp];
+		big_mdcomp = (ms_comp_t *)(void *)&((char *)big_un)
+		    [big_un->un_ocomp];
 		small_mdcomp = (ms_comp32_od_t *)(void *)&((char *)small_un)
-				[small_un->un_ocomp];
+		    [small_un->un_ocomp];
 		for (comp = 0; (comp < ncomps); ++comp) {
 			ms_comp_t	*big_mdcp   = &big_mdcomp[comp];
 			ms_comp32_od_t	*small_mdcp = &small_mdcomp[comp];
@@ -255,9 +254,9 @@ stripe_convert(caddr_t small, caddr_t big, int direction)
 		big_un->un_hsp_id = small_un->un_hsp_id;
 		big_un->un_nrows  = small_un->un_nrows;
 		big_un->c.un_size =
-			get_big_stripe_req_size(small_un, COMPLETE_STRUCTURE);
+		    get_big_stripe_req_size(small_un, COMPLETE_STRUCTURE);
 		big_un->un_ocomp  =
-			get_big_stripe_req_size(small_un, FIRST_COMP_OFFSET);
+		    get_big_stripe_req_size(small_un, FIRST_COMP_OFFSET);
 
 
 		/* walk through all rows */
@@ -270,9 +269,9 @@ stripe_convert(caddr_t small, caddr_t big, int direction)
 		}
 		/* Now copy the components */
 		big_mdcomp = (ms_comp_t *)(void *)&((char *)big_un)
-				[big_un->un_ocomp];
+		    [big_un->un_ocomp];
 		small_mdcomp = (ms_comp32_od_t *)(void *)&((char *)small_un)
-				[small_un->un_ocomp];
+		    [small_un->un_ocomp];
 		for (comp = 0; (comp < ncomps); ++comp) {
 			ms_comp_t *big_mdcp = &big_mdcomp[comp];
 			ms_comp32_od_t *small_mdcp = &small_mdcomp[comp];
@@ -320,7 +319,7 @@ mirror_convert(caddr_t small, caddr_t big, int direction)
 			MMSM_BIG2SMALL((&(big_un->un_sm[i])),
 			    (&(small_un->un_sm[i])));
 		}
-		small_un->un_ovrlap_chn_flg = big_un->un_ovrlap_chn_flg;
+		small_un->un_overlap_tree_flag = big_un->un_overlap_tree_flag;
 		small_un->un_read_option = big_un->un_read_option;
 		small_un->un_write_option = big_un->un_write_option;
 		small_un->un_pass_num = big_un->un_pass_num;
@@ -353,7 +352,7 @@ mirror_convert(caddr_t small, caddr_t big, int direction)
 
 
 		/* Now back to the simple things again */
-		big_un->un_ovrlap_chn_flg = small_un->un_ovrlap_chn_flg;
+		big_un->un_overlap_tree_flag = small_un->un_overlap_tree_flag;
 		big_un->un_read_option = small_un->un_read_option;
 		big_un->un_write_option = small_un->un_write_option;
 		big_un->un_pass_num = small_un->un_pass_num;
