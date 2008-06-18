@@ -19,11 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -1450,7 +1450,7 @@ loop2:
 	! this point. No need to deal with it.
 	btst	BCOPY_FLAG, %o5
 	bz,pn	%icc, 2f
-	andcc	%o5, BCOPY_FLAG, %o5
+	andncc	%o5, BCOPY_FLAG, %o5
 	! Here via bcopy. Check to see if the handler was NULL.
 	! If so, just return quietly. Otherwise, reset the
 	! handler and go home.
