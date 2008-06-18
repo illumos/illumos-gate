@@ -846,6 +846,8 @@ vd_build_default_label(size_t disk_size, struct dk_label *label)
 	 *
 	 * if (disk_size < 2MB)
 	 * 	phys_cylinders = disk_size / 100K
+	 * else if (disk_size >= 18.75GB)
+	 *	phys_cylinders = 65535 (maximum number of cylinders)
 	 * else
 	 * 	phys_cylinders = disk_size / 300K
 	 *
@@ -855,12 +857,14 @@ vd_build_default_label(size_t disk_size, struct dk_label *label)
 	 *
 	 * sectors = disk_size / (phys_cylinders * blk_size)
 	 *
-	 * The file size test is an attempt to not have too few cylinders
-	 * for a small file, or so many on a big file that you waste space
-	 * for backup superblocks or cylinder group structures.
+	 * The disk size test is an attempt to not have too few cylinders
+	 * for a small disk image, or so many on a big disk image that you
+	 * waste space for backup superblocks or cylinder group structures.
 	 */
 	if (disk_size < (2 * 1024 * 1024))
 		label->dkl_pcyl = disk_size / (100 * 1024);
+	else if (disk_size >= (UINT16_MAX * 300 * 1024ULL))
+		label->dkl_pcyl = UINT16_MAX;
 	else
 		label->dkl_pcyl = disk_size / (300 * 1024);
 
@@ -5528,7 +5532,6 @@ vd_setup_backend_vnode(vd_t *vd)
 	vattr_t		vattr;
 	dev_t		dev;
 	char		*file_path = vd->device_path;
-	char		dev_path[MAXPATHLEN + 1];
 	ldi_handle_t	lhandle;
 	struct dk_cinfo	dk_cinfo;
 	struct dk_label label;
@@ -5575,30 +5578,27 @@ vd_setup_backend_vnode(vd_t *vd)
 	 * Get max_xfer_sz from the device where the file is or from the device
 	 * itself if we have a volume device.
 	 */
-	dev_path[0] = '\0';
-
 	if (vd->volume) {
 		status = ldi_open_by_name(file_path, FREAD, kcred, &lhandle,
 		    vd->vds->ldi_ident);
 	} else {
 		dev = vd->file_vnode->v_vfsp->vfs_dev;
-		if (ddi_dev_pathname(dev, S_IFBLK, dev_path) == DDI_SUCCESS) {
-			PR0("underlying device = %s\n", dev_path);
-		}
+		PR0("underlying device of %s = (%d, %d)\n", file_path,
+		    getmajor(dev), getminor(dev));
 
 		status = ldi_open_by_dev(&dev, OTYP_BLK, FREAD, kcred, &lhandle,
 		    vd->vds->ldi_ident);
 	}
 
 	if (status != 0) {
-		PR0("ldi_open() returned errno %d for device %s",
-		    status, (dev_path[0] == '\0')? file_path : dev_path);
+		PR0("ldi_open() returned errno %d for underlying device",
+		    status);
 	} else {
 		if ((status = ldi_ioctl(lhandle, DKIOCINFO,
 		    (intptr_t)&dk_cinfo, (vd->open_flags | FKIOCTL), kcred,
 		    &rval)) != 0) {
-			PR0("ldi_ioctl(DKIOCINFO) returned errno %d for %s",
-			    status, dev_path);
+			PR0("ldi_ioctl(DKIOCINFO) returned errno %d for "
+			    "underlying device", status);
 		} else {
 			/*
 			 * Store the device's max transfer size for
@@ -5607,12 +5607,17 @@ vd_setup_backend_vnode(vd_t *vd)
 			vd->max_xfer_sz = dk_cinfo.dki_maxtransfer;
 		}
 
-		PR0("close the device %s", dev_path);
+		PR0("close the underlying device");
 		(void) ldi_close(lhandle, FREAD, kcred);
 	}
 
-	PR0("using file %s, dev %s, max_xfer = %u blks",
-	    file_path, dev_path, vd->max_xfer_sz);
+	if (vd->volume) {
+		PR0("using volume %s, max_xfer = %u blks", file_path,
+		    vd->max_xfer_sz);
+	} else {
+		PR0("using file %s on device (%d, %d), max_xfer = %u blks",
+		    file_path, getmajor(dev), getminor(dev), vd->max_xfer_sz);
+	}
 
 	if (vd->vdisk_type == VD_DISK_TYPE_SLICE) {
 		ASSERT(!vd->volume);
