@@ -466,7 +466,7 @@ scsa2usb_bulk_only_handle_error(scsa2usb_state_t *scsa2usbp,
 
 	USB_DPRINTF_L2(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 	    "scsa2usb_bulk_only_handle_error: req = 0x%p, cr = 0x%x",
-	    req, (req ? req->bulk_completion_reason : 0));
+	    (void *)req, (req ? req->bulk_completion_reason : 0));
 
 	if (req) {
 		SCSA2USB_SET_PKT_DO_COMP_STATE(scsa2usbp);
@@ -514,7 +514,7 @@ scsa2usb_handle_status_start(scsa2usb_state_t *scsa2usbp,
 	int rval;
 
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
-	    "scsa2usb_handle_status_start: req = 0x%p", req);
+	    "scsa2usb_handle_status_start: req = 0x%p", (void *)req);
 
 	ASSERT(mutex_owned(&scsa2usbp->scsa2usb_mutex));
 
@@ -591,8 +591,8 @@ scsa2usb_handle_csw_result(scsa2usb_state_t *scsa2usbp, mblk_t *data)
 	/* check if we got back CSW_LEN or not */
 	if ((data->b_wptr - data->b_rptr) != CSW_LEN) {
 		USB_DPRINTF_L2(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
-		    "scsa2usb_handle_csw_result: no enough data (%d)",
-		    data->b_wptr - data->b_rptr);
+		    "scsa2usb_handle_csw_result: no enough data (%ld)",
+		    (long)(data->b_wptr - data->b_rptr));
 
 		return (USB_FAILURE);
 	}
@@ -768,7 +768,8 @@ scsa2usb_bulk_only_reset_recovery(scsa2usb_state_t *scsa2usbp)
 	usb_cb_flags_t	cb_flags;
 
 	USB_DPRINTF_L2(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
-	    "scsa2usb_bulk_only_reset_recovery: scsa2usbp = 0x%p", scsa2usbp);
+	    "scsa2usb_bulk_only_reset_recovery: scsa2usbp = 0x%p",
+	    (void *)scsa2usbp);
 
 	ASSERT(mutex_owned(&scsa2usbp->scsa2usb_mutex));
 
@@ -863,7 +864,7 @@ scsa2usb_bulk_only_get_max_lun(scsa2usb_state_t *scsa2usbp)
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 		    "get max lun failed, rval=%d cr=%d cb=0x%x data=0x%p",
-		    rval, completion_reason, cb_flags, data);
+		    rval, completion_reason, cb_flags, (void *)data);
 	} else {
 		/*
 		 * This check ensures that we have valid data returned back.

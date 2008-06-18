@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -359,7 +359,7 @@ ehci_allocate_itw(
 	ehci_isoc_xwrapper_t	*itw;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-	    "ehci_allocate_itw: length = 0x%x flags = 0x%x",
+	    "ehci_allocate_itw: length = 0x%lx flags = 0x%x",
 	    length, usb_flags);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
@@ -491,8 +491,8 @@ ehci_allocate_itw(
 	ASSERT(itw->itw_id != NULL);
 
 	USB_DPRINTF_L3(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
-	    "ehci_create_itw: itw = 0x%p real_length = 0x%x",
-	    itw, real_length);
+	    "ehci_create_itw: itw = 0x%p real_length = 0x%lx",
+	    (void *)itw, real_length);
 
 	return (itw);
 }
@@ -513,7 +513,7 @@ ehci_deallocate_itw(
 	ehci_isoc_xwrapper_t	*prev, *next;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
-	    "ehci_deallocate_itw: itw = 0x%p", itw);
+	    "ehci_deallocate_itw: itw = 0x%p", (void *)itw);
 
 	/*
 	 * If the transfer wrapper has no Host Controller (HC)
@@ -582,7 +582,7 @@ ehci_free_itw_dma(
 	int	rval;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
-	    "ehci_free_itw_dma: itw = 0x%p", itw);
+	    "ehci_free_itw_dma: itw = 0x%p", (void *)itw);
 
 	ASSERT(itw != NULL);
 	ASSERT(itw->itw_id != NULL);
@@ -810,7 +810,7 @@ ehci_deallocate_itds_for_itw(
 	ehci_itd_t		*temp_itd = NULL;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
-	    "ehci_free_itw_itd_resources: itw = 0x%p", itw);
+	    "ehci_free_itw_itd_resources: itw = 0x%p", (void *)itw);
 
 	itd = itw->itw_itd_free_list;
 	while (itd != NULL) {
@@ -900,7 +900,7 @@ ehci_remove_itd_from_active_list(
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "ehci_remove_itd_from_active_list: "
 	    "ehci_active_itd_list = 0x%p itd = 0x%p",
-	    ehcip->ehci_active_itd_list, itd);
+	    (void *)ehcip->ehci_active_itd_list, (void *)itd);
 
 	curr_itd = ehcip->ehci_active_itd_list;
 
@@ -1031,7 +1031,7 @@ ehci_insert_isoc_to_pfl(
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "ehci_insert_isoc_to_pfl: "
 	    "isoc flags 0x%x itw = 0x%p",
-	    isoc_reqp->isoc_attributes, itw);
+	    isoc_reqp->isoc_attributes, (void *)itw);
 
 	/*
 	 * Enter critical, while programming the usb frame number
@@ -1152,7 +1152,8 @@ ehci_insert_isoc_to_pfl(
 	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "ehci_insert_isoc_to_pfl: "
 	    "current frame number 0x%llx start frame number 0x%llx num itds %d",
-	    current_frame_number, start_frame_number, itw->itw_num_itds);
+	    (unsigned long long)current_frame_number,
+	    (unsigned long long)start_frame_number, itw->itw_num_itds);
 
 	/*
 	 * Increment this saved frame number by current number
@@ -1206,7 +1207,7 @@ ehci_remove_isoc_from_pfl(
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
 	    "ehci_remove_isoc_from_pfl: itd = 0x%p pfl number 0x%x",
-	    curr_itd, pfl_number);
+	    (void *)curr_itd, pfl_number);
 
 	next_addr = Get_PFLT(periodic_frame_list->
 	    ehci_periodic_frame_list_table[pfl_number]);
@@ -1277,7 +1278,8 @@ ehci_allocate_isoc_in_resource(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "ehci_allocate_isoc_in_resource:"
-	    "pp = 0x%p itw = 0x%p flags = 0x%x", pp, itw, flags);
+	    "pp = 0x%p itw = 0x%p flags = 0x%x", (void *)pp, (void *)itw,
+	    flags);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 	ASSERT(itw->itw_curr_xfer_reqp == NULL);
@@ -1335,7 +1337,7 @@ ehci_deallocate_isoc_in_resource(
 	USB_DPRINTF_L4(PRINT_MASK_LISTS,
 	    ehcip->ehci_log_hdl,
 	    "ehci_deallocate_isoc_in_resource: "
-	    "pp = 0x%p itw = 0x%p", pp, itw);
+	    "pp = 0x%p itw = 0x%p", (void *)pp, (void *)itw);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 	ASSERT((ep_attr & USB_EP_ATTR_MASK) == USB_EP_ATTR_ISOCH);

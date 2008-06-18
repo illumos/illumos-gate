@@ -287,7 +287,7 @@ uhci_hcdi_pipe_open(usba_pipe_handle_data_t *ph, usb_flags_t flags)
 	sema_v(&uhcip->uhci_ocsem);
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
-	    "uhci_hcdi_pipe_open: ph = 0x%p", ph);
+	    "uhci_hcdi_pipe_open: ph = 0x%p", (void *)ph);
 
 	return (USB_SUCCESS);
 }
@@ -436,7 +436,7 @@ uhci_hcdi_pipe_close(usba_pipe_handle_data_t *ph, usb_flags_t usb_flags)
 	mutex_exit(&ph->p_mutex);
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
-	    "uhci_hcdi_pipe_close: ph = 0x%p", ph);
+	    "uhci_hcdi_pipe_close: ph = 0x%p", (void *)ph);
 
 	mutex_exit(&uhcip->uhci_int_mutex);
 	sema_v(&uhcip->uhci_ocsem);
@@ -573,7 +573,7 @@ uhci_hcdi_pipe_ctrl_xfer(
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 	    "uhci_hcdi_pipe_ctrl_xfer: req=0x%p, ph=0x%p, flags=0x%x",
-	    ctrl_reqp, ph, flags);
+	    (void *)ctrl_reqp, (void *)ph, flags);
 
 	mutex_enter(&uhcip->uhci_int_mutex);
 	error = uhci_state_is_operational(uhcip);
@@ -698,7 +698,7 @@ uhci_hcdi_pipe_intr_xfer(
 	    ph->p_usba_device->usb_root_hub_dip);
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
-	    "uhci_hcdi_pipe_intr_xfer: req=0x%p, uf=0x%x", req, flags);
+	    "uhci_hcdi_pipe_intr_xfer: req=0x%p, uf=0x%x", (void *)req, flags);
 
 	if (UHCI_XFER_DIR(&ph->p_ep) == USB_EP_DIR_IN) {
 
@@ -800,7 +800,8 @@ uhci_hcdi_get_current_frame_number(
 	mutex_exit(&uhcip->uhci_int_mutex);
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
-	    "uhci_hcdi_get_current_frame_number: %llx", frame_number);
+	    "uhci_hcdi_get_current_frame_number: %llx",
+	    (unsigned long long)(*frame_number));
 
 	return (rval);
 }
@@ -851,7 +852,8 @@ uhci_hcdi_pipe_isoc_xfer(
 
 	uhcip = uhci_obtain_state(ph->p_usba_device->usb_root_hub_dip);
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
-	    "uhci_hcdi_pipe_isoc_xfer: req=0x%p, uf=0x%x", isoc_reqp, flags);
+	    "uhci_hcdi_pipe_isoc_xfer: req=0x%p, uf=0x%x",
+	    (void *)isoc_reqp, flags);
 
 	if (UHCI_XFER_DIR(&ph->p_ep) == USB_EP_DIR_IN) {
 
@@ -1122,7 +1124,7 @@ uhci_pipe_send_isoc_data(
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 	    "uhci_pipe_send_isoc_data: isoc_req = %p flags = %x",
-	    isoc_req, usb_flags);
+	    (void *)isoc_req, usb_flags);
 
 	ASSERT(isoc_req->isoc_pkts_count < UHCI_MAX_ISOC_PKTS);
 
@@ -1207,7 +1209,7 @@ uhci_update_intr_td_data_toggle(uhci_state_t *uhcip, uhci_pipe_private_t *pp)
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 	    "uhci_update_intr_td_data_toggle: "
 	    "pp %p toggle %x element ptr %x ptail %x",
-	    pp, pp->pp_data_toggle, element_ptr, paddr_tail);
+	    (void *)pp, pp->pp_data_toggle, element_ptr, paddr_tail);
 
 	uhci_save_data_toggle(pp);
 }

@@ -925,7 +925,8 @@ uhci_intr(caddr_t arg1, caddr_t arg2)
 	uhci_state_t	*uhcip = (uhci_state_t *)arg1;
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, uhcip->uhci_log_hdl,
-	    "uhci_intr: Interrupt occurred, arg1 0x%p arg2 0x%p", arg1, arg2);
+	    "uhci_intr: Interrupt occurred, arg1 0x%p arg2 0x%p",
+	    (void *)arg1, (void *)arg2);
 
 	mutex_enter(&uhcip->uhci_int_mutex);
 
@@ -1644,7 +1645,7 @@ uhci_handle_ctrl_td(uhci_state_t *uhcip, uhci_td_t *td)
 		}
 
 		USB_DPRINTF_L3(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
-		    "Status complete: pp 0x%p td 0x%p", pp, td);
+		    "Status complete: pp 0x%p td 0x%p", (void *)pp, (void *)td);
 
 		uhci_delete_td(uhcip, td);
 		uhci_deallocate_tw(uhcip, pp, tw);
@@ -1673,7 +1674,8 @@ uhci_handle_intr_td_errors(uhci_state_t *uhcip, uhci_td_t *td,
 	    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
-	    "uhci_handle_intr_td_errors: td = 0x%p tw = 0x%p", td, tw);
+	    "uhci_handle_intr_td_errors: td = 0x%p tw = 0x%p",
+	    (void *)td, (void *)tw);
 
 	usb_err = uhci_parse_td_error(uhcip, pp, td);
 
@@ -1705,7 +1707,7 @@ uhci_handle_one_xfer_completion(
 	    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
-	    "uhci_handle_one_xfer_completion: td = 0x%p", td);
+	    "uhci_handle_one_xfer_completion: td = 0x%p", (void *)td);
 
 	ASSERT(intr_reqp->intr_attributes & USB_ATTRS_ONE_XFER);
 

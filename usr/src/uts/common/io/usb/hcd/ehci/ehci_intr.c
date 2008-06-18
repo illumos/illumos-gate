@@ -156,8 +156,9 @@ ehci_handle_ue(ehci_state_t	*ehcip)
 
 	USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 	    "ehci_handle_ue: Before Frame Number 0x%llx "
-	    "After Frame Number 0x%llx", before_frame_number,
-	    after_frame_number);
+	    "After Frame Number 0x%llx",
+	    (unsigned long long)before_frame_number,
+	    (unsigned long long)after_frame_number);
 
 	if (after_frame_number > before_frame_number) {
 
@@ -209,7 +210,8 @@ ehci_handle_frame_list_rollover(ehci_state_t *ehcip)
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 	    "ehci_handle_frame_list_rollover:"
-	    "Frame Number Higher Part 0x%llx\n", ehcip->ehci_fno);
+	    "Frame Number Higher Part 0x%llx\n",
+	    (unsigned long long)(ehcip->ehci_fno));
 }
 
 
@@ -247,7 +249,8 @@ ehci_handle_endpoint_reclaimation(ehci_state_t	*ehcip)
 		USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 		    "ehci_handle_endpoint_reclamation:"
 		    "current frame number 0x%llx endpoint frame number 0x%llx",
-		    current_frame_number, endpoint_frame_number);
+		    (unsigned long long)current_frame_number,
+		    (unsigned long long)endpoint_frame_number);
 
 		/*
 		 * Deallocate current endpoint only if endpoint's usb frame
@@ -323,7 +326,7 @@ ehci_traverse_active_qtd_list(
 
 		USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 		    "ehci_traverse_active_qtd_list: "
-		    "PP = 0x%p TW = 0x%p", pp, tw);
+		    "PP = 0x%p TW = 0x%p", (void *)pp, (void *)tw);
 
 		/*
 		 * A QTD that is marked as RECLAIM has already been
@@ -447,7 +450,7 @@ ehci_parse_error(
 	pp = tw->tw_pipe_private;
 
 	USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-	    "ehci_parse_error: PP 0x%p TW 0x%p", pp, tw);
+	    "ehci_parse_error: PP 0x%p TW 0x%p", (void *)pp, (void *)tw);
 
 	ctrl = (uint_t)Get_QTD(qtd->qtd_ctrl);
 
@@ -490,7 +493,7 @@ ehci_check_for_error(
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 	    "ehci_check_for_error: qtd = 0x%p ctrl = 0x%x",
-	    qtd, ctrl);
+	    (void *)qtd, ctrl);
 
 	/*
 	 * Find the usb device speed and get the corresponding
@@ -880,7 +883,8 @@ ehci_cleanup_data_underrun(
 	ehci_qtd_t		*next_qtd, *temp_qtd;
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-	    "ehci_cleanup_data_underrun: qtd=0x%p, tw=0x%p", qtd, tw);
+	    "ehci_cleanup_data_underrun: qtd=0x%p, tw=0x%p",
+	    (void *)qtd, (void *)tw);
 
 	/*
 	 * Check if this transfer doesn't supports short_xfer or
@@ -1123,7 +1127,8 @@ ehci_handle_intr_qtd(
 
 		USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 		    "ehci_handle_intr_qtd: Intr out pipe, intr_reqp=0x%p,"
-		    "data=0x%p", curr_intr_reqp, curr_intr_reqp->intr_data);
+		    "data=0x%p", (void *)curr_intr_reqp,
+		    (void *)curr_intr_reqp->intr_data);
 
 		/* Do the callback */
 		ehci_hcdi_callback(ph, tw, USB_CR_OK);
@@ -1205,7 +1210,7 @@ ehci_handle_one_xfer_completion(
 	    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-	    "ehci_handle_one_xfer_completion: tw = 0x%p", tw);
+	    "ehci_handle_one_xfer_completion: tw = 0x%p", (void *)tw);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 	ASSERT(curr_intr_reqp->intr_attributes & USB_ATTRS_ONE_XFER);

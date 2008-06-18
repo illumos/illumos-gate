@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,7 +159,7 @@ scsa2usb_cbi_transport(scsa2usb_state_t *scsa2usbp, scsa2usb_cmd_t *cmd)
 	usb_intr_req_t		*status_req;
 
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
-	    "scsa2usb_cbi_transport: cmd = 0x%p", cmd);
+	    "scsa2usb_cbi_transport: cmd = 0x%p", (void *)cmd);
 	ASSERT(mutex_owned(&scsa2usbp->scsa2usb_mutex));
 
 Cmd_Phase:
@@ -226,10 +225,10 @@ Cmd_Phase:
 
 		/* start I/O to/from the device */
 		rval = scsa2usb_handle_data_start(scsa2usbp, cmd,
-							data_req);
+		    data_req);
 		/* handle data returned */
 		scsa2usb_handle_data_done(scsa2usbp, cmd,
-							data_req);
+		    data_req);
 		if (rval != USB_SUCCESS) {
 			/*
 			 * we ran into an error and it wasn't a STALL
@@ -237,7 +236,7 @@ Cmd_Phase:
 			if (data_req->bulk_completion_reason == USB_CR_STALL) {
 				if (scsa2usbp->scsa2usb_cur_pkt) {
 					scsa2usbp->scsa2usb_cur_pkt->
-						pkt_reason = CMD_TRAN_ERR;
+					    pkt_reason = CMD_TRAN_ERR;
 				}
 			} else {
 				scsa2usb_cbi_handle_error(scsa2usbp,
@@ -364,7 +363,7 @@ scsa2usb_cbi_start_intr_polling(scsa2usb_state_t *scsa2usbp)
 	req = usb_alloc_intr_req(scsa2usbp->scsa2usb_dip, 0, USB_FLAGS_SLEEP);
 	req->intr_client_private = (usb_opaque_t)scsa2usbp;
 	req->intr_attributes = USB_ATTRS_ONE_XFER | USB_ATTRS_PIPE_RESET |
-						USB_ATTRS_SHORT_XFER_OK;
+	    USB_ATTRS_SHORT_XFER_OK;
 	req->intr_len = scsa2usbp->scsa2usb_intr_ept.wMaxPacketSize;
 	req->intr_timeout = 20;	/* arbitrary large for now */
 	mutex_exit(&scsa2usbp->scsa2usb_mutex);
@@ -441,10 +440,10 @@ scsa2usb_handle_cbi_status(usb_intr_req_t *req)
 	char *msg;
 	scsa2usb_cmd_t *cmd;
 	scsa2usb_state_t *scsa2usbp = (scsa2usb_state_t *)
-						req->intr_client_private;
+	    req->intr_client_private;
 
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
-	    "scsa2usb_handle_cbi_status: req: 0x%p", req);
+	    "scsa2usb_handle_cbi_status: req: 0x%p", (void *)req);
 
 	ASSERT(mutex_owned(&scsa2usbp->scsa2usb_mutex));
 	ASSERT(req->intr_data != NULL);
@@ -484,7 +483,7 @@ scsa2usb_handle_cbi_status(usb_intr_req_t *req)
 	case CBI_STATUS_FAILED:
 	case CBI_STATUS_PERSISTENT_FAIL:
 		msg = (status == CBI_STATUS_PERSISTENT_FAIL) ?
-			"PERSISTENT_FAILURE" : "FAILED";
+		    "PERSISTENT_FAILURE" : "FAILED";
 		*(scsa2usbp->scsa2usb_cur_pkt->pkt_scbp) = STATUS_CHECK;
 		cmd->cmd_done = 1;
 		break;
@@ -519,7 +518,7 @@ scsa2usb_cbi_reset_recovery(scsa2usb_state_t *scsa2usbp)
 	usb_cb_flags_t	cb_flags;
 
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
-	    "scsa2usb_cbi_reset_recovery: (0x%p)", scsa2usbp);
+	    "scsa2usb_cbi_reset_recovery: (0x%p)", (void *)scsa2usbp);
 
 	ASSERT(mutex_owned(&scsa2usbp->scsa2usb_mutex));
 

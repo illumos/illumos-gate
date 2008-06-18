@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -328,7 +328,7 @@ usb_ia_bus_ctl(dev_info_t *dip,
 	USB_DPRINTF_L4(DPRINT_MASK_PM, usb_ia->ia_log_handle,
 	    "usb_ia_bus_ctl:\n\t"
 	    "dip = 0x%p, rdip = 0x%p, op = 0x%x, arg = 0x%p",
-	    dip, rdip, op, arg);
+	    (void *)dip, (void *)rdip, op, arg);
 
 	switch (op) {
 	case DDI_CTLOPS_ATTACH:
@@ -444,8 +444,8 @@ usb_ia_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 		mdip = usb_ia->ia_children_dips[interface];
 
 		/* now search if this dip still exists */
-		for (cdip = ddi_get_child(dip); cdip && (cdip != mdip);
-			cdip = ddi_get_next_sibling(cdip));
+		for (cdip = ddi_get_child(dip); cdip && (cdip != mdip); )
+			cdip = ddi_get_next_sibling(cdip);
 
 		if (cdip != mdip) {
 			/* we lost the dip on this interface */
@@ -481,7 +481,8 @@ usb_ia_power(dev_info_t *dip, int comp, int level)
 	usb_ia = usb_ia_obtain_state(dip);
 
 	USB_DPRINTF_L4(DPRINT_MASK_PM, usb_ia->ia_log_handle,
-	    "usb_ia_power: Begin: usb_ia = %p, level = %d", usb_ia, level);
+	    "usb_ia_power: Begin: usb_ia = %p, level = %d",
+	    (void *)usb_ia, level);
 
 	mutex_enter(&usb_ia->ia_mutex);
 	pm = usb_ia->ia_pm;
@@ -547,9 +548,9 @@ usb_ia_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* allocate handle for logging of messages */
 	usb_ia->ia_log_handle = usb_alloc_log_hdl(dip, "ia",
-				&usb_ia_errlevel,
-				&usb_ia_errmask, &usb_ia_instance_debug,
-				0);
+	    &usb_ia_errlevel,
+	    &usb_ia_errmask, &usb_ia_instance_debug,
+	    0);
 
 	usb_ia->ia_dip	= dip;
 	usb_ia->ia_instance = instance;
@@ -603,13 +604,13 @@ usb_ia_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	usb_ia->ia_children_dips = kmem_zalloc(size, KM_SLEEP);
 	usb_ia->ia_child_events = kmem_zalloc(sizeof (uint8_t) * n_ifs,
-								KM_SLEEP);
+	    KM_SLEEP);
 	/*
 	 * Event handling: definition and registration
 	 * get event handle for events that we have defined
 	 */
 	(void) ndi_event_alloc_hdl(dip, 0, &usb_ia->ia_ndi_event_hdl,
-								NDI_SLEEP);
+	    NDI_SLEEP);
 
 	/* bind event set to the handle */
 	if (ndi_event_bind_set(usb_ia->ia_ndi_event_hdl, &usb_ia_ndi_events,
@@ -765,12 +766,12 @@ usb_ia_cleanup(usb_ia_t *usb_ia)
 	/* free children list */
 	if (usb_ia->ia_children_dips) {
 		kmem_free(usb_ia->ia_children_dips,
-			usb_ia->ia_cd_list_length);
+		    usb_ia->ia_cd_list_length);
 	}
 
 	if (usb_ia->ia_child_events) {
 		kmem_free(usb_ia->ia_child_events, sizeof (uint8_t) *
-			usb_ia->ia_n_ifs);
+		    usb_ia->ia_n_ifs);
 	}
 
 	if (usb_ia->ia_init_state & USB_IA_MINOR_NODE_CREATED) {
@@ -921,8 +922,8 @@ usb_ia_busop_remove_eventcall(dev_info_t *dip, ddi_callback_id_t cb_id)
 
 	USB_DPRINTF_L4(DPRINT_MASK_EVENTS, usb_ia->ia_log_handle,
 	    "usb_ia_busop_remove_eventcall: dip=0x%p, rdip=0x%p "
-	    "cookie=0x%p", (void *)dip, cb->ndi_evtcb_dip,
-	    cb->ndi_evtcb_cookie);
+	    "cookie=0x%p", (void *)dip, (void *)cb->ndi_evtcb_dip,
+	    (void *)cb->ndi_evtcb_cookie);
 	USB_DPRINTF_L3(DPRINT_MASK_EVENTS, usb_ia->ia_log_handle,
 	    "(dip=%s%d rdip=%s%d event=%s)",
 	    ddi_driver_name(dip), ddi_get_instance(dip),
@@ -970,7 +971,7 @@ usb_ia_restore_device_state(dev_info_t *dip, usb_ia_t *usb_ia)
 	usb_common_power_t	*iapm;
 
 	USB_DPRINTF_L4(DPRINT_MASK_EVENTS, usb_ia->ia_log_handle,
-	    "usb_ia_restore_device_state: usb_ia = %p", usb_ia);
+	    "usb_ia_restore_device_state: usb_ia = %p", (void *)usb_ia);
 
 	mutex_enter(&usb_ia->ia_mutex);
 	iapm = usb_ia->ia_pm;

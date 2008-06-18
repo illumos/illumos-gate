@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -121,8 +121,8 @@ usba_hcdi_register(usba_hcdi_register_args_t *args, uint_t flags)
 	 * Create a log_handle
 	 */
 	hcdi->hcdi_log_handle = usb_alloc_log_hdl(hcdi->hcdi_dip, NULL,
-			&hcdi_errlevel, &hcdi_errmask, &hcdi_instance_debug,
-			0);
+	    &hcdi_errlevel, &hcdi_errmask, &hcdi_instance_debug,
+	    0);
 
 	USB_DPRINTF_L4(DPRINT_MASK_HCDI, hcdi->hcdi_log_handle,
 	    "usba_hcdi_register: %s", ddi_node_name(hcdi->hcdi_dip));
@@ -132,7 +132,7 @@ usba_hcdi_register(usba_hcdi_register_args_t *args, uint_t flags)
 	 * by the host controller driver.
 	 */
 	mutex_init(&hcdi->hcdi_mutex, NULL, MUTEX_DRIVER,
-			args->usba_hcdi_register_iblock_cookie);
+	    args->usba_hcdi_register_iblock_cookie);
 
 	/* add soft interrupt */
 	if (ddi_intr_add_softint(hcdi->hcdi_dip, &hcdi->hcdi_softint_hdl,
@@ -178,9 +178,9 @@ usba_hcdi_register(usba_hcdi_register_args_t *args, uint_t flags)
 
 	hcdi->hcdi_min_xfer	= hcdi->hcdi_dma_attr->dma_attr_minxfer;
 	hcdi->hcdi_min_burst_size =
-		(1<<(ddi_ffs(hcdi->hcdi_dma_attr->dma_attr_burstsizes)-1));
+	    (1<<(ddi_ffs(hcdi->hcdi_dma_attr->dma_attr_burstsizes)-1));
 	hcdi->hcdi_max_burst_size =
-		(1<<(ddi_fls(hcdi->hcdi_dma_attr->dma_attr_burstsizes)-1));
+	    (1<<(ddi_fls(hcdi->hcdi_dma_attr->dma_attr_burstsizes)-1));
 
 	usba_hcdi_set_hcdi(hcdi->hcdi_dip, hcdi);
 
@@ -481,7 +481,7 @@ usba_hcdi_cb(usba_pipe_handle_data_t *ph_data,
 
 	usba_device_t		*usba_device = ph_data->p_usba_device;
 	usba_hcdi_t		*hcdi =	usba_hcdi_get_hcdi(
-					usba_device->usb_root_hub_dip);
+	    usba_device->usb_root_hub_dip);
 	usba_req_wrapper_t	*req_wrp = USBA_REQ2WRP(req);
 	usb_ep_descr_t		*eptd = &ph_data->p_ep;
 
@@ -493,7 +493,7 @@ usba_hcdi_cb(usba_pipe_handle_data_t *ph_data,
 	USB_DPRINTF_L4(DPRINT_MASK_HCDI, hcdi->hcdi_log_handle,
 	    "usba_hcdi_cb: "
 	    "ph_data=0x%p req=0x%p state=%d ref=%d cnt=%d cr=%d",
-	    ph_data, req, ph_data->p_ph_impl->usba_ph_state,
+	    (void *)ph_data, (void *)req, ph_data->p_ph_impl->usba_ph_state,
 	    ph_data->p_ph_impl->usba_ph_ref_count, ph_data->p_req_count,
 	    completion_reason);
 
@@ -598,10 +598,10 @@ static void
 hcdi_cb_thread(void *arg)
 {
 	usba_pipe_handle_data_t	*ph_data =
-				(usba_pipe_handle_data_t *)arg;
+	    (usba_pipe_handle_data_t *)arg;
 	usba_ph_impl_t		*ph_impl = ph_data->p_ph_impl;
 	usba_hcdi_t		*hcdi = usba_hcdi_get_hcdi(ph_data->
-				p_usba_device->usb_root_hub_dip);
+	    p_usba_device->usb_root_hub_dip);
 	usba_req_wrapper_t	*req_wrp;
 
 	mutex_enter(&ph_data->p_mutex);
@@ -617,7 +617,7 @@ hcdi_cb_thread(void *arg)
 	ph_impl->usba_ph_ref_count++;
 
 	USB_DPRINTF_L4(DPRINT_MASK_HCDI, hcdi->hcdi_log_handle,
-	    "hcdi_cb_thread: ph_data=0x%p ref=%d", ph_data,
+	    "hcdi_cb_thread: ph_data=0x%p ref=%d", (void *)ph_data,
 	    ph_impl->usba_ph_ref_count);
 
 	mutex_exit(&ph_impl->usba_ph_mutex);
@@ -640,7 +640,7 @@ hcdi_cb_thread(void *arg)
 	mutex_exit(&ph_data->p_mutex);
 
 	USB_DPRINTF_L4(DPRINT_MASK_HCDI, hcdi->hcdi_log_handle,
-	    "hcdi_cb_thread done: ph_data=0x%p", ph_data);
+	    "hcdi_cb_thread done: ph_data=0x%p", (void *)ph_data);
 
 	usba_release_ph_data(ph_impl);
 }
@@ -675,7 +675,7 @@ hcdi_do_cb(usba_pipe_handle_data_t *ph_data, usba_req_wrapper_t *req_wrp,
 	req_wrp->wr_cr = completion_reason;
 
 	USB_DPRINTF_L4(DPRINT_MASK_HCDI, hcdi->hcdi_log_handle,
-	    "hcdi_do_cb: wrp=0x%p cr=0x%x", req_wrp, completion_reason);
+	    "hcdi_do_cb: wrp=0x%p cr=0x%x", (void *)req_wrp, completion_reason);
 
 	/*
 	 * Normal callbacks:
@@ -765,7 +765,7 @@ hcdi_shared_cb_thread(void *arg)
 	usba_pipe_handle_data_t	*ph_data = req_wrp->wr_ph_data;
 	usba_ph_impl_t		*ph_impl = ph_data->p_ph_impl;
 	usba_hcdi_t		*hcdi = usba_hcdi_get_hcdi(ph_data->
-				p_usba_device->usb_root_hub_dip);
+	    p_usba_device->usb_root_hub_dip);
 	/*
 	 * hold the ph_data. we can't use usba_hold_ph_data() since
 	 * it will return NULL if we are closing the pipe which would
@@ -776,7 +776,7 @@ hcdi_shared_cb_thread(void *arg)
 
 	USB_DPRINTF_L4(DPRINT_MASK_HCDI, hcdi->hcdi_log_handle,
 	    "hcdi_shared_cb_thread: ph_data=0x%p ref=%d req=0x%p",
-	    ph_data, ph_impl->usba_ph_ref_count, req_wrp);
+	    (void *)ph_data, ph_impl->usba_ph_ref_count, (void *)req_wrp);
 	mutex_exit(&ph_impl->usba_ph_mutex);
 
 	/* do the callback */
@@ -785,7 +785,7 @@ hcdi_shared_cb_thread(void *arg)
 	mutex_exit(&ph_data->p_mutex);
 
 	USB_DPRINTF_L4(DPRINT_MASK_HCDI, hcdi->hcdi_log_handle,
-	    "hcdi_cb_thread done: ph_data=0x%p", ph_data);
+	    "hcdi_cb_thread done: ph_data=0x%p", (void *)ph_data);
 
 	usba_release_ph_data(ph_impl);
 }
@@ -846,13 +846,13 @@ hcdi_autoclearing(usba_req_wrapper_t *req_wrp)
 	usb_cb_flags_t		cb_flags;
 	int			rval;
 	usba_device_t		*usba_device =
-				    req_wrp->wr_ph_data->p_usba_device;
+	    req_wrp->wr_ph_data->p_usba_device;
 	usba_hcdi_t		*hcdi = usba_hcdi_get_hcdi(
-				    usba_device->usb_root_hub_dip);
+	    usba_device->usb_root_hub_dip);
 	usb_req_attrs_t		attrs = req_wrp->wr_attrs;
 
 	USB_DPRINTF_L4(DPRINT_MASK_HCDI, hcdi->hcdi_log_handle,
-	    "hcdi_autoclearing: wrp=0x%p", req_wrp);
+	    "hcdi_autoclearing: wrp=0x%p", (void *)req_wrp);
 
 	pipe_handle = usba_get_pipe_handle(req_wrp->wr_ph_data);
 	def_pipe_handle = usba_get_dflt_pipe_handle(req_wrp->wr_ph_data->p_dip);
@@ -921,7 +921,7 @@ hcdi_autoclearing(usba_req_wrapper_t *req_wrp)
 				usba_pipe_clear(def_pipe_handle);
 			} else {
 				usba_req_set_cb_flags(req_wrp,
-						USB_CB_STALL_CLEARED);
+				    USB_CB_STALL_CLEARED);
 			}
 		} else {
 			usba_req_set_cb_flags(req_wrp, USB_CB_PROTOCOL_STALL);
@@ -1013,5 +1013,5 @@ usba_pipe_handle_data_t *
 usba_hcdi_get_ph_data(usba_device_t *usba_device, uint8_t ep_addr)
 {
 	return (usba_device->usb_ph_list[usb_get_ep_index(ep_addr)].
-							usba_ph_data);
+	    usba_ph_data);
 }

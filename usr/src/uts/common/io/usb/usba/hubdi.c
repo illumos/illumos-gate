@@ -1150,7 +1150,7 @@ usba_hubdi_bus_ctl(dev_info_t *dip,
 	USB_DPRINTF_L3(DPRINT_MASK_HUBDI, hubd->h_log_handle,
 	    "usba_hubdi_bus_ctl:\n\t"
 	    "dip=0x%p, rdip=0x%p, op=0x%x, arg=0x%p",
-	    dip, rdip, op, arg);
+	    (void *)dip, (void *)rdip, op, arg);
 
 	switch (op) {
 	case DDI_CTLOPS_ATTACH:
@@ -1169,7 +1169,7 @@ usba_hubdi_bus_ctl(dev_info_t *dip,
 		case DDI_PRE:
 			USB_DPRINTF_L4(DPRINT_MASK_PM, hubd->h_log_handle,
 			    "DDI_PRE DDI_CTLOPS_ATTACH: dip=%p, port=%d",
-			    rdip, port);
+			    (void *)rdip, port);
 
 			mutex_enter(HUBD_MUTEX(hubd));
 			hubd->h_port_state[port] |= HUBD_CHILD_ATTACHING;
@@ -1193,7 +1193,7 @@ usba_hubdi_bus_ctl(dev_info_t *dip,
 		case DDI_POST:
 			USB_DPRINTF_L4(DPRINT_MASK_PM, hubd->h_log_handle,
 			    "DDI_POST DDI_CTLOPS_ATTACH: dip=%p, port=%d",
-			    rdip, port);
+			    (void *)rdip, port);
 
 			mutex_enter(HUBD_MUTEX(hubd));
 			hubd->h_port_state[port] &= ~HUBD_CHILD_ATTACHING;
@@ -1226,7 +1226,7 @@ usba_hubdi_bus_ctl(dev_info_t *dip,
 		case DDI_PRE:
 			USB_DPRINTF_L4(DPRINT_MASK_PM, hubd->h_log_handle,
 			    "DDI_PRE DDI_CTLOPS_DETACH: dip=%p port=%d",
-			    rdip, port);
+			    (void *)rdip, port);
 
 			mutex_enter(HUBD_MUTEX(hubd));
 			hubd->h_port_state[port] |= HUBD_CHILD_DETACHING;
@@ -1241,7 +1241,7 @@ usba_hubdi_bus_ctl(dev_info_t *dip,
 		case DDI_POST:
 			USB_DPRINTF_L4(DPRINT_MASK_PM, hubd->h_log_handle,
 			    "DDI_POST DDI_CTLOPS_DETACH: dip=%p port=%d",
-			    rdip, port);
+			    (void *)rdip, port);
 
 			mutex_enter(HUBD_MUTEX(hubd));
 			hubd->h_port_state[port] &= ~HUBD_CHILD_DETACHING;
@@ -1400,7 +1400,7 @@ hubd_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 
 	USB_DPRINTF_L4(DPRINT_MASK_HUBDI, hubd->h_log_handle,
 	    "hubd_bus_power: dip=%p, impl_arg=%p, power_op=%d, arg=%p, "
-	    "result=%d\n", dip, impl_arg, op, arg, *(int *)result);
+	    "result=%d\n", (void *)dip, impl_arg, op, arg, *(int *)result);
 
 	bpc = (pm_bp_child_pwrchg_t *)arg;
 
@@ -2499,7 +2499,7 @@ hubd_restore_device_state(dev_info_t *dip, hubd_t *hubd)
 				    hubd->h_log_handle,
 				    "hubd_restore_device_state: "
 				    "dip=%p on port=%d marked for cleanup",
-				    ch_dip, port);
+				    (void *)ch_dip, port);
 				mutex_enter(&(DEVI(ch_dip)->devi_lock));
 				DEVI_SET_DEVICE_REMOVED(ch_dip);
 				mutex_exit(&(DEVI(ch_dip)->devi_lock));
@@ -3137,7 +3137,7 @@ hubd_open_intr_pipe(hubd_t	*hubd)
 	hubd->h_intr_pipe_state = HUBD_INTR_PIPE_ACTIVE;
 
 	USB_DPRINTF_L4(DPRINT_MASK_HUB, hubd->h_log_handle,
-	    "open intr pipe succeeded, ph=0x%p", hubd->h_ep1_ph);
+	    "open intr pipe succeeded, ph=0x%p", (void *)hubd->h_ep1_ph);
 
 	return (USB_SUCCESS);
 }
@@ -3158,7 +3158,7 @@ hubd_start_polling(hubd_t *hubd, int always)
 	    "start polling: always=%d dev_state=%d pipe_state=%d\n\t"
 	    "thread=%d ep1_ph=0x%p",
 	    always, hubd->h_dev_state, hubd->h_intr_pipe_state,
-	    hubd->h_hotplug_thread, hubd->h_ep1_ph);
+	    hubd->h_hotplug_thread, (void *)hubd->h_ep1_ph);
 
 	/*
 	 * start or restart polling on the intr pipe
@@ -3194,7 +3194,7 @@ hubd_start_polling(hubd_t *hubd, int always)
 			    "intr pipe state=%d, rval=%d", pipe_state, rval);
 		}
 		USB_DPRINTF_L4(DPRINT_MASK_HUB, hubd->h_log_handle,
-		    "start polling request 0x%p", reqp);
+		    "start polling request 0x%p", (void *)reqp);
 
 		mutex_enter(HUBD_MUTEX(hubd));
 	}
@@ -3278,8 +3278,8 @@ hubd_exception_cb(usb_pipe_handle_t pipe, usb_intr_req_t *reqp)
 
 	USB_DPRINTF_L2(DPRINT_MASK_CALLBACK, hubd->h_log_handle,
 	    "hubd_exception_cb: "
-	    "req=0x%p cr=%d data=0x%p cb_flags=0x%x", reqp,
-	    reqp->intr_completion_reason, reqp->intr_data,
+	    "req=0x%p cr=%d data=0x%p cb_flags=0x%x", (void *)reqp,
+	    reqp->intr_completion_reason, (void *)reqp->intr_data,
 	    reqp->intr_cb_flags);
 
 	ASSERT((reqp->intr_cb_flags & USB_CB_INTR_CONTEXT) == 0);
@@ -3356,7 +3356,7 @@ hubd_read_cb(usb_pipe_handle_t pipe, usb_intr_req_t *reqp)
 	hubd_hotplug_arg_t *arg;
 
 	USB_DPRINTF_L4(DPRINT_MASK_HUB, hubd->h_log_handle,
-	    "hubd_read_cb: ph=0x%p req=0x%p", pipe, reqp);
+	    "hubd_read_cb: ph=0x%p req=0x%p", (void *)pipe, (void *)reqp);
 
 	ASSERT((reqp->intr_cb_flags & USB_CB_INTR_CONTEXT) == 0);
 
@@ -4752,7 +4752,7 @@ hubd_determine_port_status(hubd_t *hubd, usb_port_t port,
 	mutex_enter(HUBD_MUTEX(hubd));
 	if ((data->b_wptr - data->b_rptr) != GET_STATUS_LENGTH) {
 		USB_DPRINTF_L2(DPRINT_MASK_PORT, hubd->h_log_handle,
-		    "port %d: length incorrect %d",
+		    "port %d: length incorrect %ld",
 		    port, data->b_wptr - data->b_rptr);
 		freemsg(data);
 		*status = *change = 0;
@@ -5566,8 +5566,8 @@ hubd_ready_device(hubd_t *hubd, dev_info_t *child_dip, usba_device_t *child_ud,
 	usba_pipe_handle_data_t	*ph;
 
 	USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
-	    "hubd_ready_device: dip=0x%p, user_conf_index=%d", child_dip,
-	    config_index);
+	    "hubd_ready_device: dip=0x%p, user_conf_index=%d",
+	    (void *)child_dip, config_index);
 
 	size = usb_parse_cfg_descr(
 	    child_ud->usb_cfg_array[config_index], USB_CFG_DESCR_SIZE,
@@ -6265,14 +6265,14 @@ hubd_delete_child(hubd_t *hubd, usb_port_t port, uint_t flag, boolean_t retry)
 
 	USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 	    "hubd_delete_child: port=%d, dip=0x%p usba_device=0x%p",
-	    port, child_dip, usba_device);
+	    port, (void *)child_dip, (void *)usba_device);
 
 	mutex_exit(HUBD_MUTEX(hubd));
 	if (child_dip) {
 		USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 		    "hubd_delete_child:\n\t"
 		    "dip = 0x%p (%s) at port %d",
-		    child_dip, ddi_node_name(child_dip), port);
+		    (void *)child_dip, ddi_node_name(child_dip), port);
 
 		if (usba_device) {
 			usba_hubdi_incr_power_budget(hubd->h_dip, usba_device);
@@ -6327,7 +6327,7 @@ hubd_free_usba_device(hubd_t *hubd, usba_device_t *usba_device)
 {
 	USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 	    "hubd_free_usba_device: hubd=0x%p, usba_device=0x%p",
-	    hubd, usba_device);
+	    (void *)hubd, (void *)usba_device);
 
 	if (usba_device && (usba_device->usb_addr != ROOT_HUB_ADDR)) {
 		usb_port_t port = usba_device->usb_port;
@@ -6431,8 +6431,8 @@ hubd_busop_remove_eventcall(dev_info_t *dip, ddi_callback_id_t cb_id)
 
 	USB_DPRINTF_L3(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 	    "hubd_busop_remove_eventcall: dip=0x%p, rdip=0x%p "
-	    "cookie=0x%p", (void *)dip, id->ndi_evtcb_dip,
-	    id->ndi_evtcb_cookie);
+	    "cookie=0x%p", (void *)dip, (void *)id->ndi_evtcb_dip,
+	    (void *)id->ndi_evtcb_cookie);
 	USB_DPRINTF_L3(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 	    "(dip=%s%d, rdip=%s%d, event=%s)",
 	    ddi_driver_name(dip), ddi_get_instance(dip),
@@ -7210,7 +7210,7 @@ usba_hubdi_ioctl(dev_info_t *self, dev_t dev, int cmd, intptr_t arg,
 	USB_DPRINTF_L4(DPRINT_MASK_CBOPS, hubd->h_log_handle,
 	    "usba_hubdi_ioctl: "
 	    "cmd=%x, arg=%lx, mode=%x, cred=%p, rval=%p dev=0x%lx",
-	    cmd, arg, mode, credp, rvalp, dev);
+	    cmd, arg, mode, (void *)credp, (void *)rvalp, dev);
 
 	/* read devctl ioctl data */
 	if ((cmd != DEVCTL_AP_CONTROL) &&
@@ -7444,7 +7444,8 @@ usba_hubdi_ioctl(dev_info_t *self, dev_t dev, int cmd, intptr_t arg,
 		USB_DPRINTF_L3(DPRINT_MASK_CBOPS, hubd->h_log_handle,
 		    "DEVCTL_AP_CONTROL: ioc: cmd=0x%x port=%d get_size=%d"
 		    "\n\tbuf=0x%p, bufsiz=%d,  misc_arg=%d", ioc.cmd,
-		    ioc.port, ioc.get_size, ioc.buf, ioc.bufsiz, ioc.misc_arg);
+		    ioc.port, ioc.get_size, (void *)ioc.buf, ioc.bufsiz,
+		    ioc.misc_arg);
 
 		/*
 		 * To avoid BE/LE and 32/64 issues, a get_size always
@@ -7843,7 +7844,7 @@ hubd_get_ancestry_str(hubd_t *hubd)
 	char	*port_list_end = port_list;
 
 	USB_DPRINTF_L4(DPRINT_MASK_ATTA, hubd->h_log_handle,
-	    "hubd_get_ancestry_str: hubd=0x%p", hubd);
+	    "hubd_get_ancestry_str: hubd=0x%p", (void *)hubd);
 
 	dev_path[0] = '\0';
 	(void) ddi_pathname(hubd->h_dip, dev_path);
@@ -7900,7 +7901,7 @@ hubd_get_port_num(hubd_t *hubd, struct devctl_iocdata *dcp)
 	}
 
 	USB_DPRINTF_L4(DPRINT_MASK_CBOPS,  hubd->h_log_handle,
-	    "hubd_get_port_num: hubd=0x%p, port=%d", hubd, port);
+	    "hubd_get_port_num: hubd=0x%p, port=%d", (void *)hubd, port);
 
 	return ((usb_port_t)port);
 }
@@ -7913,7 +7914,7 @@ hubd_get_child_dip(hubd_t *hubd, usb_port_t port)
 	dev_info_t *child_dip = hubd->h_children_dips[port];
 
 	USB_DPRINTF_L4(DPRINT_MASK_CBOPS,  hubd->h_log_handle,
-	    "hubd_get_child_dip: hubd=0x%p, port=%d", hubd, port);
+	    "hubd_get_child_dip: hubd=0x%p, port=%d", (void *)hubd, port);
 
 	ASSERT(mutex_owned(HUBD_MUTEX(hubd)));
 
@@ -7973,7 +7974,7 @@ hubd_cfgadm_state(hubd_t *hubd, usb_port_t port)
 
 	USB_DPRINTF_L4(DPRINT_MASK_CBOPS,  hubd->h_log_handle,
 	    "hubd_cfgadm_state: hubd=0x%p, port=%d state=0x%x",
-	    hubd, port, state);
+	    (void *)hubd, port, state);
 
 	return (state);
 }
@@ -7992,7 +7993,7 @@ hubd_toggle_port(hubd_t *hubd, usb_port_t port)
 	uint16_t	change;
 
 	USB_DPRINTF_L4(DPRINT_MASK_CBOPS,  hubd->h_log_handle,
-	    "hubd_toggle_port: hubd=0x%p, port=%d", hubd, port);
+	    "hubd_toggle_port: hubd=0x%p, port=%d", (void *)hubd, port);
 
 	if ((hubd_disable_port_power(hubd, port)) != USB_SUCCESS) {
 
@@ -8231,8 +8232,8 @@ usba_hubdi_check_power_budget(dev_info_t *dip, usba_device_t *child_ud,
 
 	USB_DPRINTF_L4(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 	    "usba_hubdi_check_power_budget: "
-	    "dip=0x%p child_ud=0x%p conf_index=%d", dip,
-	    child_ud, config_index);
+	    "dip=0x%p child_ud=0x%p conf_index=%d", (void *)dip,
+	    (void *)child_ud, config_index);
 
 	mutex_enter(HUBD_MUTEX(hubd));
 	pwr_limit = hubd->h_pwr_limit;
@@ -8303,7 +8304,7 @@ usba_hubdi_incr_power_budget(dev_info_t *dip, usba_device_t *child_ud)
 
 	USB_DPRINTF_L4(DPRINT_MASK_ATTA, hubd->h_log_handle,
 	    "usba_hubdi_incr_power_budget: "
-	    "dip=0x%p child_ud=0x%p", dip, child_ud);
+	    "dip=0x%p child_ud=0x%p", (void *)dip, (void *)child_ud);
 
 	mutex_enter(HUBD_MUTEX(hubd));
 	if (hubd->h_local_pwr_on == B_TRUE) {
@@ -8364,7 +8365,7 @@ usba_hubdi_decr_power_budget(dev_info_t *dip, usba_device_t *child_ud)
 
 	USB_DPRINTF_L4(DPRINT_MASK_ATTA, hubd->h_log_handle,
 	    "usba_hubdi_decr_power_budget: "
-	    "dip=0x%p child_ud=0x%p", dip, child_ud);
+	    "dip=0x%p child_ud=0x%p", (void *)dip, (void *)child_ud);
 
 	mutex_enter(HUBD_MUTEX(hubd));
 	if (hubd->h_local_pwr_on == B_TRUE) {
@@ -8686,8 +8687,8 @@ usba_hubdi_reset_device(dev_info_t *dip, usb_dev_reset_lvl_t reset_level)
 	    (hubd->h_dev_state == USB_DEV_SUSPENDED)) {
 		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
 		    "usb_reset_device: the state %d of the hub/roothub "
-		    "associated to the device 0x%x is incorrect",
-		    hubd->h_dev_state, dip);
+		    "associated to the device 0x%p is incorrect",
+		    hubd->h_dev_state, (void *)dip);
 		mutex_exit(HUBD_MUTEX(hubd));
 
 		return (USB_INVALID_ARGS);

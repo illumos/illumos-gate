@@ -305,7 +305,7 @@ usba_bus_ctl(dev_info_t	*dip,
 			    "%s%d %s%d op=%d rdip = 0x%p dip = 0x%p",
 			    ddi_node_name(rdip), ddi_get_instance(rdip),
 			    ddi_node_name(dip), ddi_get_instance(dip), op,
-			    rdip, dip);
+			    (void *)rdip, (void *)dip);
 
 			USB_DPRINTF_L2(DPRINT_MASK_USBA, hubdi_log_handle,
 			    "usba_bus_ctl: DDI_NOT_WELL_FORMED (%s (0x%p))",
@@ -372,7 +372,7 @@ usba_bus_ctl(dev_info_t	*dip,
 			USB_DPRINTF_L3(DPRINT_MASK_USBA, hubdi_log_handle,
 			    "usba_hcdi_bus_ctl: uninit usba_device=0x%p "
 			    "ref_count=%d",
-			    usba_device, usba_device->usb_ref_count);
+			    (void *)usba_device, usba_device->usb_ref_count);
 
 			mutex_exit(&usba_device->usb_mutex);
 		}
@@ -691,7 +691,7 @@ usba_free_usba_device(usba_device_t *usba_device)
 		if (usba_device->usb_cfg_array) {
 			USB_DPRINTF_L3(DPRINT_MASK_USBA, usba_log_handle,
 			    "deallocating usb_config_array: 0x%p",
-			    usba_device->usb_cfg_array);
+			    (void *)usba_device->usb_cfg_array);
 			mutex_enter(&usba_device->usb_mutex);
 			for (i = 0;
 			    i < usba_device->usb_dev_descr->bNumConfigurations;
@@ -715,7 +715,7 @@ usba_free_usba_device(usba_device_t *usba_device)
 		if (usba_device->usb_cfg_str_descr) {
 			USB_DPRINTF_L3(DPRINT_MASK_USBA, usba_log_handle,
 			    "deallocating usb_cfg_str_descr: 0x%p",
-			    usba_device->usb_cfg_str_descr);
+			    (void *)usba_device->usb_cfg_str_descr);
 			for (i = 0;
 			    i < usba_device->usb_dev_descr->bNumConfigurations;
 			    i++) {
@@ -835,7 +835,7 @@ usba_create_child_devi(dev_info_t	*dip,
 	    child_dip);
 
 	USB_DPRINTF_L3(DPRINT_MASK_USBA, usba_log_handle,
-	    "child dip=0x%p", *child_dip);
+	    "child dip=0x%p", (void *)*child_dip);
 
 	if (usba_device == NULL) {
 
@@ -869,7 +869,7 @@ usba_create_child_devi(dev_info_t	*dip,
 
 			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 			    "cannot set usb address for dip=0x%p",
-			    *child_dip);
+			    (void *)*child_dip);
 
 			goto fail;
 		}
@@ -882,7 +882,7 @@ usba_create_child_devi(dev_info_t	*dip,
 	if (rval != DDI_PROP_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "cannot set usb address property for dip=0x%p",
-		    *child_dip);
+		    (void *)*child_dip);
 		rval = USB_FAILURE;
 
 		goto fail;
@@ -895,7 +895,8 @@ usba_create_child_devi(dev_info_t	*dip,
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usba_log_handle,
 	    "usba_create_child_devi: devi=0x%p (%s) ud=0x%p",
-	    *child_dip, ddi_driver_name(*child_dip), usba_device);
+	    (void *)*child_dip, ddi_driver_name(*child_dip),
+	    (void *)usba_device);
 
 	return (USB_SUCCESS);
 
@@ -927,7 +928,7 @@ usba_destroy_child_devi(dev_info_t *dip, uint_t flag)
 
 	USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 	    "usba_destroy_child_devi: %s%d (0x%p)",
-	    ddi_driver_name(dip), ddi_get_instance(dip), dip);
+	    ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip);
 
 	usba_device = usba_get_usba_device(dip);
 
@@ -950,7 +951,7 @@ usba_destroy_child_devi(dev_info_t *dip, uint_t flag)
 
 		USB_DPRINTF_L3(DPRINT_MASK_USBA, usba_log_handle,
 		    "usba_destroy_child_devi:\n\t"
-		    "offlining dip 0x%p usba_device=0x%p (%s)", dip,
+		    "offlining dip 0x%p usba_device=0x%p (%s)", (void *)dip,
 		    (void *)usba_device, devnm);
 
 		(void) devfs_clean(pdip, NULL, DV_CLEAN_FORCE);
@@ -1062,7 +1063,7 @@ usba_add_to_list(usba_list_entry_t *head, usba_list_entry_t *element)
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usba_log_handle,
 	    "usba_add_to_list: head=0x%p element=0x%p count=%d",
-	    head, element, head->count);
+	    (void *)head, (void *)element, head->count);
 
 done:
 	mutex_exit(&head->list_mutex);
@@ -1082,7 +1083,7 @@ usba_rm_from_list(usba_list_entry_t *head, usba_list_entry_t *element)
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usba_log_handle,
 	    "usba_rm_from_list: head=0x%p element=0x%p count=%d",
-	    head, element, head->count);
+	    (void *)head, (void *)element, head->count);
 
 	remaining = head->count;
 	e = head->next;
@@ -1142,7 +1143,7 @@ usba_rm_from_list(usba_list_entry_t *head, usba_list_entry_t *element)
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usba_log_handle,
 	    "usba_rm_from_list success: head=0x%p element=0x%p cnt=%d",
-	    head, element, head->count);
+	    (void *)head, (void *)element, head->count);
 
 	mutex_exit(&element->list_mutex);
 	mutex_exit(&head->list_mutex);
@@ -1185,7 +1186,7 @@ usba_rm_first_from_list(usba_list_entry_t *head)
 		}
 		USB_DPRINTF_L4(DPRINT_MASK_USBA, usba_log_handle,
 		    "usba_rm_first_from_list: head=0x%p el=0x%p cnt=%d",
-		    head, element, head->count);
+		    (void *)head, (void *)element, head->count);
 
 		mutex_exit(&head->list_mutex);
 	}
@@ -1278,7 +1279,7 @@ usba_list_entry_leaks(usba_list_entry_t *head, char *what)
 	remaining = head->count;
 	for (next = head->next; next != NULL; next = next->next) {
 		USB_DPRINTF_L2(DPRINT_MASK_HCDI, usba_log_handle,
-		    "leaking %s 0x%p", what, next->private);
+		    "leaking %s 0x%p", what, (void *)next->private);
 		count++;
 
 		remaining--;
@@ -2167,7 +2168,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 	    "%s%d at port %d: %s, dip=0x%p",
 	    ddi_node_name(ddi_get_parent(child_dip)),
 	    ddi_get_instance(ddi_get_parent(child_dip)),
-	    port, ddi_node_name(child_dip), child_dip);
+	    port, ddi_node_name(child_dip), (void *)child_dip);
 
 	usba_set_usba_device(child_dip, usba_device);
 
@@ -2410,7 +2411,7 @@ usba_ready_interface_association_node(dev_info_t	*dip,
 	    "%s%d port %d: %s, dip = 0x%p",
 	    ddi_node_name(ddi_get_parent(dip)),
 	    ddi_get_instance(ddi_get_parent(dip)),
-	    child_ud->usb_port, ddi_node_name(child_dip), child_dip);
+	    child_ud->usb_port, ddi_node_name(child_dip), (void *)child_dip);
 
 	*if_count = ia_descr.bInterfaceCount;
 	usba_set_usba_device(child_dip, child_ud);
@@ -2642,7 +2643,7 @@ usba_ready_interface_node(dev_info_t *dip, uint_t intf)
 	    "%s%d port %d: %s, dip = 0x%p",
 	    ddi_node_name(ddi_get_parent(dip)),
 	    ddi_get_instance(ddi_get_parent(dip)),
-	    child_ud->usb_port, ddi_node_name(child_dip), child_dip);
+	    child_ud->usb_port, ddi_node_name(child_dip), (void *)child_dip);
 
 	usba_set_usba_device(child_dip, child_ud);
 	ASSERT(!mutex_owned(&(usba_get_usba_device(child_dip)->usb_mutex)));
@@ -2922,7 +2923,7 @@ usba_bind_driver(dev_info_t *dip)
 	uint8_t if_num = usba_get_ifno(dip);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usba_log_handle,
-	    "usba_bind_driver: dip = 0x%p, if_num = 0x%x", dip, if_num);
+	    "usba_bind_driver: dip = 0x%p, if_num = 0x%x", (void *)dip, if_num);
 
 	name = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
 
@@ -2995,7 +2996,7 @@ usba_check_for_leaks(usba_device_t *usba_device)
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usba_log_handle,
 	    "usba_check_for_leaks: %s%d usba_device=0x%p",
 	    ddi_driver_name(usba_device->usb_dip),
-	    ddi_get_instance(usba_device->usb_dip), usba_device);
+	    ddi_get_instance(usba_device->usb_dip), (void *)usba_device);
 
 	/*
 	 * default pipe is still open
@@ -3010,8 +3011,8 @@ usba_check_for_leaks(usba_device_t *usba_device)
 			    "%s%d: leaking pipehandle=0x%p (0x%p) ep_addr=0x%x",
 			    ddi_driver_name(ph_impl->usba_ph_data->p_dip),
 			    ddi_get_instance(ph_impl->usba_ph_data->p_dip),
-			    ph_impl,
-			    ph_impl->usba_ph_data,
+			    (void *)ph_impl,
+			    (void *)ph_impl->usba_ph_data,
 			    ph_impl->usba_ph_ep.bEndpointAddress);
 			ph_open_cnt++;
 			leaks++;
@@ -3045,7 +3046,7 @@ usba_check_for_leaks(usba_device_t *usba_device)
 			    "%s%d: leaking request 0x%p",
 			    ddi_driver_name(wrp->wr_dip),
 			    ddi_get_instance(wrp->wr_dip),
-			    wrp->wr_req);
+			    (void *)wrp->wr_req);
 
 			/*
 			 * put it back, usba_req_wrapper_free

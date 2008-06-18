@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -176,7 +175,7 @@ usba_hold_ph_data(usb_pipe_handle_t pipe_handle)
 
 		USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usba_hold_ph_data: ph_impl=0x%p state=%d ref=%d",
-		    ph_impl, ph_impl->usba_ph_state,
+		    (void *)ph_impl, ph_impl->usba_ph_state,
 		    ph_impl->usba_ph_ref_count);
 
 		mutex_exit(&ph_impl->usba_ph_mutex);
@@ -195,7 +194,7 @@ usba_release_ph_data(usba_ph_impl_t *ph_impl)
 		USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usba_release_ph_data: "
 		    "ph_impl=0x%p state=%d ref=%d",
-		    ph_impl, ph_impl->usba_ph_state,
+		    (void *)ph_impl, ph_impl->usba_ph_state,
 		    ph_impl->usba_ph_ref_count);
 
 #ifndef __lock_lint
@@ -267,7 +266,7 @@ usba_pipe_new_state(usba_pipe_handle_data_t *ph_data, usb_pipe_state_t state)
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usba_pipe_new_state: "
 	    "ph_data=0x%p old=%s new=%s ref=%d req=%d",
-	    ph_data, usb_str_pipe_state(ph_impl->usba_ph_state),
+	    (void *)ph_data, usb_str_pipe_state(ph_impl->usba_ph_state),
 	    usb_str_pipe_state(state),
 	    ph_impl->usba_ph_ref_count, ph_data->p_req_count);
 
@@ -322,7 +321,7 @@ usba_pipe_setup_func_call(
 
 	USB_DPRINTF_L3(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usba_pipe_setup_func_call: ph_impl=0x%p, func=0x%p",
-	    ph_impl, sync_func);
+	    (void *)ph_impl, (void *)sync_func);
 
 	if (((usb_flags & USB_FLAGS_SLEEP) == 0) && (callback == NULL)) {
 		usba_release_ph_data(ph_impl);
@@ -356,7 +355,7 @@ usba_pipe_setup_func_call(
 	    (void *)request, USB_FLAGS_SLEEP) != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usb_async_req failed: ph_impl=0x%p, func=0x%p",
-		    ph_impl, sync_func);
+		    (void *)ph_impl, (void *)sync_func);
 
 		if (callback) {
 			callback_flags =
@@ -447,7 +446,8 @@ usba_init_pipe_handle(dev_info_t *dip,
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usba_init_pipe_handle: "
-	    "usba_device=0x%p ep=0x%x", usba_device, ep->bEndpointAddress);
+	    "usba_device=0x%p ep=0x%x", (void *)usba_device,
+	    ep->bEndpointAddress);
 	mutex_init(&ph_data->p_mutex, NULL, MUTEX_DRIVER, iblock_cookie);
 
 	/* just to keep warlock happy, there is no contention yet */
@@ -469,13 +469,13 @@ usba_init_pipe_handle(dev_info_t *dip,
 	}
 
 	ph_data->p_taskq = taskq_create(tq_name,
-		    pipe_policy->pp_max_async_reqs + 1,
-		    ((ep->bmAttributes & USB_EP_ATTR_MASK) ==
-			USB_EP_ATTR_ISOCH) ?
-			(maxclsyspri - 5) : minclsyspri,
-		    2 * (pipe_policy->pp_max_async_reqs + 1),
-		    8 * (pipe_policy->pp_max_async_reqs + 1),
-		    TASKQ_PREPOPULATE);
+	    pipe_policy->pp_max_async_reqs + 1,
+	    ((ep->bmAttributes & USB_EP_ATTR_MASK) ==
+	    USB_EP_ATTR_ISOCH) ?
+	    (maxclsyspri - 5) : minclsyspri,
+	    2 * (pipe_policy->pp_max_async_reqs + 1),
+	    8 * (pipe_policy->pp_max_async_reqs + 1),
+	    TASKQ_PREPOPULATE);
 
 	/*
 	 * Create a shared taskq.
@@ -529,7 +529,7 @@ usba_init_pipe_handle(dev_info_t *dip,
 		    usba_device->usb_dev_descr->bMaxPacketSize0);
 
 		ph_data->p_ep.wMaxPacketSize = usba_device->usb_dev_descr->
-							bMaxPacketSize0;
+		    bMaxPacketSize0;
 	}
 
 	/* now update usba_ph_impl structure */
@@ -541,7 +541,7 @@ usba_init_pipe_handle(dev_info_t *dip,
 
 	usba_init_list(&ph_data->p_queue, (usb_opaque_t)ph_data, iblock_cookie);
 	usba_init_list(&ph_data->p_cb_queue, (usb_opaque_t)ph_data,
-								iblock_cookie);
+	    iblock_cookie);
 	mutex_exit(&usba_device->usb_mutex);
 	mutex_exit(&ph_data->p_mutex);
 
@@ -564,7 +564,7 @@ usba_destroy_pipe_handle(usba_pipe_handle_data_t *ph_data)
 	usba_device_t		*usba_device;
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usba_destroy_pipe_handle: ph_data=0x%p", ph_data);
+	    "usba_destroy_pipe_handle: ph_data=0x%p", (void *)ph_data);
 
 	mutex_enter(&ph_data->p_mutex);
 	mutex_enter(&ph_impl->usba_ph_mutex);
@@ -639,7 +639,8 @@ usba_destroy_pipe_handle(usba_pipe_handle_data_t *ph_data)
 
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usba_destroy_pipe_handle: destroying ph_data=0x%p", ph_data);
+	    "usba_destroy_pipe_handle: destroying ph_data=0x%p",
+	    (void *)ph_data);
 
 	usba_destroy_list(&ph_data->p_queue);
 	usba_destroy_list(&ph_data->p_cb_queue);
@@ -670,7 +671,7 @@ usba_drain_cbs(usba_pipe_handle_data_t *ph_data, usb_cb_flags_t cb_flags,
 	mutex_enter(&ph_impl->usba_ph_mutex);
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usba_drain_cbs: ph_data=0x%p ref=%d req=%d cb=0x%x cr=%d",
-	    ph_data, ph_impl->usba_ph_ref_count, ph_data->p_req_count,
+	    (void *)ph_data, ph_impl->usba_ph_ref_count, ph_data->p_req_count,
 	    cb_flags, cr);
 	ASSERT(ph_data->p_req_count >= 0);
 	mutex_exit(&ph_impl->usba_ph_mutex);
@@ -711,7 +712,7 @@ usba_drain_cbs(usba_pipe_handle_data_t *ph_data, usb_cb_flags_t cb_flags,
 	mutex_enter(&ph_impl->usba_ph_mutex);
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usba_drain_cbs done: ph_data=0x%p ref=%d req=%d",
-	    ph_data, ph_impl->usba_ph_ref_count, ph_data->p_req_count);
+	    (void *)ph_data, ph_impl->usba_ph_ref_count, ph_data->p_req_count);
 	mutex_exit(&ph_impl->usba_ph_mutex);
 
 	if (timeout == usba_drain_timeout) {
@@ -778,7 +779,8 @@ usb_pipe_open(
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usb_pipe_open:\n\t"
 	    "dip=0x%p ep=0x%p pp=0x%p uf=0x%x ph=0x%p",
-	    dip, ep, pipe_policy, usb_flags, pipe_handle);
+	    (void *)dip, (void *)ep, (void *)pipe_policy, usb_flags,
+	    (void *)pipe_handle);
 
 	if ((dip == NULL) || (pipe_handle == NULL)) {
 
@@ -902,7 +904,8 @@ usb_pipe_open(
 	}
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usb_pipe_open: ph_impl=0x%p (0x%p)", ph_impl, ph_data);
+	    "usb_pipe_open: ph_impl=0x%p (0x%p)",
+	    (void *)ph_impl, (void *)ph_data);
 
 	return (rval);
 }
@@ -958,7 +961,7 @@ usb_pipe_close(dev_info_t	*dip,
 	usb_cb_flags_t	callback_flags;
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usb_pipe_close: ph=0x%p", pipe_handle);
+	    "usb_pipe_close: ph=0x%p", (void *)pipe_handle);
 
 	callback_flags = usba_check_intr_context(USB_CB_NO_INFO);
 	if ((dip == NULL) || (pipe_handle == NULL)) {
@@ -1046,7 +1049,7 @@ usba_pipe_sync_close(dev_info_t *dip, usba_ph_impl_t *ph_impl,
 {
 	usba_device_t		*usba_device;
 	usba_pipe_handle_data_t *ph_data = usba_get_ph_data(
-					(usb_pipe_handle_t)ph_impl);
+	    (usb_pipe_handle_t)ph_impl);
 	int			attribute;
 	uchar_t			dir;
 	int			timeout;
@@ -1059,7 +1062,8 @@ usba_pipe_sync_close(dev_info_t *dip, usba_ph_impl_t *ph_impl,
 	mutex_enter(&ph_impl->usba_ph_mutex);
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usba_pipe_sync_close: dip=0x%p ph_data=0x%p state=%d ref=%d",
-	    dip, ph_data, ph_impl->usba_ph_state, ph_impl->usba_ph_ref_count);
+	    (void *)dip, (void *)ph_data, ph_impl->usba_ph_state,
+	    ph_impl->usba_ph_ref_count);
 
 	/*
 	 * if another thread opens the pipe again, this loop could
@@ -1131,14 +1135,14 @@ done:
 
 		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "timeout on draining requests, resetting pipe 0x%p",
-		    ph_impl);
+		    (void *)ph_impl);
 
 		(void) usba_device->usb_hcdi_ops->usba_hcdi_pipe_reset(ph_data,
 		    USB_FLAGS_SLEEP);
 
 		mutex_enter(&ph_data->p_mutex);
 		draining_succeeded = usba_drain_cbs(ph_data, USB_CB_RESET_PIPE,
-						USB_CR_PIPE_RESET);
+		    USB_CR_PIPE_RESET);
 		/* this MUST have succeeded */
 		ASSERT(draining_succeeded == USB_SUCCESS);
 		mutex_exit(&ph_data->p_mutex);
@@ -1247,7 +1251,7 @@ usb_pipe_reset(dev_info_t		*dip,
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usb_pipe_reset: dip=0x%p ph=0x%p uf=0x%x",
-	    dip, pipe_handle, usb_flags);
+	    (void *)dip, (void *)pipe_handle, usb_flags);
 
 	callback_flags = usba_check_intr_context(USB_CB_NO_INFO);
 
@@ -1319,26 +1323,26 @@ usba_pipe_sync_reset(dev_info_t	*dip,
 {
 	int rval, draining_succeeded;
 	usba_pipe_handle_data_t *ph_data = usba_get_ph_data((usb_pipe_handle_t)
-								ph_impl);
+	    ph_impl);
 	usba_device_t		*usba_device;
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usba_pipe_sync_reset: dip=0x%p ph_data=0x%p uf=0x%x",
-	    dip, ph_data, usb_flags);
+	    (void *)dip, (void *)ph_data, usb_flags);
 
 	mutex_enter(&ph_data->p_mutex);
 	usba_device = ph_data->p_usba_device;
 	mutex_exit(&ph_data->p_mutex);
 
 	rval = usba_device->usb_hcdi_ops->usba_hcdi_pipe_reset(ph_data,
-								usb_flags);
+	    usb_flags);
 	mutex_enter(&ph_data->p_mutex);
 
 	/*
 	 * The host controller has stopped polling of the endpoint.
 	 */
 	draining_succeeded = usba_drain_cbs(ph_data, USB_CB_RESET_PIPE,
-							USB_CR_PIPE_RESET);
+	    USB_CR_PIPE_RESET);
 
 	/* this MUST have succeeded */
 	ASSERT(draining_succeeded == USB_SUCCESS);
@@ -1371,7 +1375,7 @@ usba_pipe_clear(usb_pipe_handle_t pipe_handle)
 	int			flush_requests = 1;
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usba_pipe_clear: ph_data=0x%p", ph_data);
+	    "usba_pipe_clear: ph_data=0x%p", (void *)ph_data);
 
 	if (ph_data == NULL) {
 
@@ -1388,7 +1392,7 @@ usba_pipe_clear(usb_pipe_handle_t pipe_handle)
 	mutex_exit(&ph_data->p_mutex);
 
 	(void) usba_device->usb_hcdi_ops->usba_hcdi_pipe_reset(ph_data,
-							USB_FLAGS_SLEEP);
+	    USB_FLAGS_SLEEP);
 
 	mutex_enter(&ph_data->p_mutex);
 	if (ph_data->p_dip) {
@@ -1407,7 +1411,7 @@ usba_pipe_clear(usb_pipe_handle_t pipe_handle)
 		    usba_rm_first_pvt_from_list(&ph_data->p_queue)) != NULL) {
 			mutex_exit(&ph_data->p_mutex);
 			usba_do_req_exc_cb(req_wrp, USB_CR_FLUSHED,
-					USB_CB_RESET_PIPE);
+			    USB_CB_RESET_PIPE);
 			mutex_enter(&ph_data->p_mutex);
 		}
 	}
@@ -1461,7 +1465,7 @@ usb_pipe_drain_reqs(dev_info_t	*dip,
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usb_pipe_drain_reqs: dip=0x%p ph_data=0x%p tm=%d uf=0x%x",
-	    dip, ph_data, time, usb_flags);
+	    (void *)dip, (void *)ph_data, time, usb_flags);
 
 	if (ph_data == NULL) {
 
@@ -1508,7 +1512,7 @@ usba_pipe_sync_drain_reqs(dev_info_t	*dip,
 		usb_flags_t		usb_flags)
 {
 	usba_pipe_handle_data_t *ph_data = usba_get_ph_data((usb_pipe_handle_t)
-								ph_impl);
+	    ph_impl);
 	int		i;
 	int		timeout = 100 * (int)((uintptr_t)(request->arg));
 						/* delay will be 10 ms */
@@ -1518,7 +1522,8 @@ usba_pipe_sync_drain_reqs(dev_info_t	*dip,
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usba_pipe_sync_drain_reqs: "
 	    "dip=0x%p ph_data=0x%p timeout=%d ref=%d req=%d",
-	    dip, ph_data, timeout, usba_get_ph_ref_count(ph_data),
+	    (void *)dip, (void *)ph_data, timeout,
+	    usba_get_ph_ref_count(ph_data),
 	    ph_data->p_req_count);
 
 	ASSERT(ph_data->p_req_count >= 0);
@@ -1535,7 +1540,7 @@ usba_pipe_sync_drain_reqs(dev_info_t	*dip,
 		for (i = 0; (i < timeout) || (request->arg == 0); i++) {
 			usba_list_entry_t *next, *tmpnext;
 			usba_req_wrapper_t *req_wrp = (usba_req_wrapper_t *)
-					    ph_data->p_active_cntrl_req_wrp;
+			    ph_data->p_active_cntrl_req_wrp;
 			int found = 0;
 			int count = 0;
 
@@ -1547,7 +1552,7 @@ usba_pipe_sync_drain_reqs(dev_info_t	*dip,
 				while (next != NULL) {
 					mutex_enter(&next->list_mutex);
 					req_wrp = (usba_req_wrapper_t *)
-							next->private;
+					    next->private;
 					found = (req_wrp->wr_dip == dip);
 					if (found) {
 						mutex_exit(&next->list_mutex);
@@ -1568,7 +1573,7 @@ usba_pipe_sync_drain_reqs(dev_info_t	*dip,
 			USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 			    "usb_pipe_sync_drain_reqs: "
 			    "cnt=%d active_req_wrp=0x%p",
-			    count, ph_data->p_active_cntrl_req_wrp);
+			    count, (void *)ph_data->p_active_cntrl_req_wrp);
 
 			mutex_exit(&ph_data->p_mutex);
 			delay(drv_usectohz(10000));
@@ -1594,7 +1599,7 @@ usba_pipe_sync_drain_reqs(dev_info_t	*dip,
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usb_pipe_sync_drain_reqs: timeout=%d active_req_wrp=0x%p req=%d",
-	    i, ph_data->p_active_cntrl_req_wrp, ph_data->p_req_count);
+	    i, (void *)ph_data->p_active_cntrl_req_wrp, ph_data->p_req_count);
 
 	mutex_exit(&ph_data->p_mutex);
 
@@ -1617,7 +1622,7 @@ usba_persistent_pipe_open(usba_device_t *usba_device)
 	int			rval = USB_SUCCESS;
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usba_persistent_pipe_open: usba_device=0x%p", usba_device);
+	    "usba_persistent_pipe_open: usba_device=0x%p", (void *)usba_device);
 
 	if (usba_device != NULL) {
 		/* default pipe is the first one to be opened */
@@ -1629,7 +1634,7 @@ usba_persistent_pipe_open(usba_device_t *usba_device)
 			mutex_enter(&ph_impl->usba_ph_mutex);
 			if (ph_impl->usba_ph_flags & USBA_PH_DATA_PERSISTENT) {
 				ph_impl->usba_ph_flags &=
-						~USBA_PH_DATA_PERSISTENT;
+				    ~USBA_PH_DATA_PERSISTENT;
 				mutex_exit(&ph_impl->usba_ph_mutex);
 				mutex_exit(&usba_device->usb_mutex);
 
@@ -1667,7 +1672,8 @@ usba_persistent_pipe_close(usba_device_t *usba_device)
 	int			i;
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usba_persistent_pipe_close: usba_device=0x%p", usba_device);
+	    "usba_persistent_pipe_close: usba_device=0x%p",
+	    (void *)usba_device);
 
 	if (usba_device != NULL) {
 		/* default pipe is the last one to be closed */
@@ -1678,7 +1684,7 @@ usba_persistent_pipe_close(usba_device_t *usba_device)
 			if (ph_impl->usba_ph_data != NULL) {
 				mutex_enter(&ph_impl->usba_ph_mutex);
 				ph_impl->usba_ph_flags |=
-						USBA_PH_DATA_PERSISTENT;
+				    USBA_PH_DATA_PERSISTENT;
 				mutex_exit(&ph_impl->usba_ph_mutex);
 				mutex_exit(&usba_device->usb_mutex);
 

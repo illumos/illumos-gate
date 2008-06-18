@@ -2779,7 +2779,7 @@ ohci_hcdi_pipe_ctrl_xfer(
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ohcip->ohci_log_hdl,
 	    "ohci_hcdi_pipe_ctrl_xfer: ph = 0x%p reqp = 0x%p flags = 0x%x",
-	    (void *)ph, ctrl_reqp, usb_flags);
+	    (void *)ph, (void *)ctrl_reqp, usb_flags);
 
 	mutex_enter(&ohcip->ohci_int_mutex);
 	rval = ohci_state_is_operational(ohcip);
@@ -2883,7 +2883,7 @@ ohci_hcdi_pipe_bulk_xfer(
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ohcip->ohci_log_hdl,
 	    "ohci_hcdi_pipe_bulk_xfer: ph = 0x%p reqp = 0x%p flags = 0x%x",
-	    (void *)ph, bulk_reqp, usb_flags);
+	    (void *)ph, (void *)bulk_reqp, usb_flags);
 
 	mutex_enter(&ohcip->ohci_int_mutex);
 	rval = ohci_state_is_operational(ohcip);
@@ -2940,7 +2940,7 @@ ohci_hcdi_pipe_intr_xfer(
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ohcip->ohci_log_hdl,
 	    "ohci_hcdi_pipe_intr_xfer: ph = 0x%p reqp = 0x%p flags = 0x%x",
-	    (void *)ph, intr_reqp, usb_flags);
+	    (void *)ph, (void *)intr_reqp, usb_flags);
 
 	mutex_enter(&ohcip->ohci_int_mutex);
 	rval = ohci_state_is_operational(ohcip);
@@ -2989,7 +2989,7 @@ ohci_hcdi_pipe_stop_intr_polling(
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ohcip->ohci_log_hdl,
 	    "ohci_hcdi_pipe_stop_intr_polling: ph = 0x%p fl = 0x%x",
-	    ph, flags);
+	    (void *)ph, flags);
 
 	mutex_enter(&ohcip->ohci_int_mutex);
 
@@ -3033,7 +3033,7 @@ ohci_hcdi_get_current_frame_number(
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ohcip->ohci_log_hdl,
 	    "ohci_hcdi_get_current_frame_number:"
-	    "Current frame number 0x%llx", frame_number);
+	    "Current frame number 0x%llx", (unsigned long long)(*frame_number));
 
 	return (rval);
 }
@@ -3068,7 +3068,7 @@ ohci_hcdi_get_max_isoc_pkts(
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ohcip->ohci_log_hdl,
 	    "ohci_hcdi_get_max_isoc_pkts: maximum isochronous"
 	    "packets per usb isochronous request = 0x%x",
-	    max_isoc_pkts_per_request);
+	    *max_isoc_pkts_per_request);
 
 	return (rval);
 }
@@ -3091,7 +3091,7 @@ ohci_hcdi_pipe_isoc_xfer(
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ohcip->ohci_log_hdl,
 	    "ohci_hcdi_pipe_isoc_xfer: ph = 0x%p reqp = 0x%p flags = 0x%x",
-	    (void *)ph, isoc_reqp, usb_flags);
+	    (void *)ph, (void *)isoc_reqp, usb_flags);
 
 	mutex_enter(&ohcip->ohci_int_mutex);
 	rval = ohci_state_is_operational(ohcip);
@@ -3107,7 +3107,7 @@ ohci_hcdi_pipe_isoc_xfer(
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ohcip->ohci_log_hdl,
 	    "ohci_hcdi_pipe_isoc_xfer: isoc_reqp = 0x%p, uf = 0x%x",
-	    isoc_reqp, usb_flags);
+	    (void *)isoc_reqp, usb_flags);
 
 	if (pipe_dir == USB_EP_DIR_IN) {
 		error = ohci_start_periodic_pipe_polling(ohcip, ph,
@@ -4946,7 +4946,7 @@ ohci_insert_bulk_req(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
 	    "ohci_insert_bulk_req: bulk_reqp = 0x%p flags = 0x%x",
-	    bulk_reqp, flags);
+	    (void *)bulk_reqp, flags);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -5087,7 +5087,7 @@ ohci_start_periodic_pipe_polling(
 		}
 
 		USB_DPRINTF_L3(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
-		    "ohci_start_periodic_pipe_polling: PP = 0x%p", pp);
+		    "ohci_start_periodic_pipe_polling: PP = 0x%p", (void *)pp);
 
 		ASSERT((pp->pp_tw_head != NULL) && (pp->pp_tw_tail != NULL));
 
@@ -5196,7 +5196,7 @@ ohci_start_pipe_polling(
 		USB_DPRINTF_L3(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
 		    "ohci_start_pipe_polling: max = %d curr = %d tw = %p:",
 		    pp->pp_max_periodic_req_cnt, pp->pp_cur_periodic_req_cnt,
-		    tw_list);
+		    (void *)tw_list);
 
 		tw = tw_list;
 		tw_list = tw->tw_next;
@@ -5573,8 +5573,8 @@ ohci_allocate_isoc_resources(
 
 			USB_DPRINTF_L2(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
 			    "ohci_allocate_isoc_resources: "
-			    "isoc_pkts_length 0x%x is not equal to the sum of "
-			    "all pkt lengths 0x%x in an isoc request",
+			    "isoc_pkts_length 0x%lx is not equal to the sum of "
+			    "all pkt lengths 0x%lx in an isoc request",
 			    isoc_pkts_length, tw_length);
 
 			return (NULL);
@@ -5966,7 +5966,7 @@ ohci_fill_in_td(
 {
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
 	    "ohci_fill_in_td: td 0x%p bufoffs 0x%x len 0x%lx",
-	    td, hctd_dma_offs, hctd_length);
+	    (void *)td, hctd_dma_offs, hctd_length);
 
 	/* Assert that the td to be filled in is a dummy */
 	ASSERT(Get_TD(td->hctd_state) == HC_TD_DUMMY);
@@ -6072,7 +6072,7 @@ ohci_init_td(
 		}
 
 		USB_DPRINTF_L3(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
-		    "ohci_init_td: page_addr 0x%p dmac_size "
+		    "ohci_init_td: page_addr 0x%x dmac_size "
 		    "0x%lx idx %d", page_addr, tw->tw_cookie.dmac_size,
 		    tw->tw_cookie_idx);
 
@@ -6311,7 +6311,8 @@ ohci_insert_td_with_frame_number(
 	USB_DPRINTF_L3(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
 	    "ohci_insert_td_with_frame_number:"
 	    "current frame number 0x%llx start frame number 0x%llx",
-	    current_frame_number, start_frame_number);
+	    (unsigned long long)current_frame_number,
+	    (unsigned long long)start_frame_number);
 
 	/*
 	 * Increment this saved frame number by current number
@@ -6945,7 +6946,7 @@ dmadone:
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
 	    "ohci_create_transfer_wrapper: tw = 0x%p, ncookies = %u",
-	    tw, tw->tw_ncookies);
+	    (void *)tw, tw->tw_ncookies);
 
 	return (tw);
 }
@@ -7178,7 +7179,7 @@ ohci_create_isoc_transfer_wrapper(
 	ASSERT(tw->tw_id != NULL);
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
-	    "ohci_create_isoc_transfer_wrapper: tw = 0x%p", tw);
+	    "ohci_create_isoc_transfer_wrapper: tw = 0x%p", (void *)tw);
 
 	return (tw);
 }
@@ -7198,7 +7199,7 @@ ohci_start_xfer_timer(
 	ohci_trans_wrapper_t	*tw)
 {
 	USB_DPRINTF_L3(PRINT_MASK_LISTS,  ohcip->ohci_log_hdl,
-	    "ohci_start_xfer_timer: tw = 0x%p", tw);
+	    "ohci_start_xfer_timer: tw = 0x%p", (void *)tw);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -7245,7 +7246,7 @@ ohci_stop_xfer_timer(
 	timeout_id_t		timer_id;
 
 	USB_DPRINTF_L3(PRINT_MASK_LISTS,  ohcip->ohci_log_hdl,
-	    "ohci_stop_xfer_timer: tw = 0x%p", tw);
+	    "ohci_stop_xfer_timer: tw = 0x%p", (void *)tw);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -7303,7 +7304,7 @@ ohci_xfer_timeout_handler(void *arg)
 	usb_flags_t		flags;
 
 	USB_DPRINTF_L3(PRINT_MASK_LISTS,  ohcip->ohci_log_hdl,
-	    "ohci_xfer_timeout_handler: ohcip = 0x%p", ohcip);
+	    "ohci_xfer_timeout_handler: ohcip = 0x%p", (void *)ohcip);
 
 	mutex_enter(&ohcip->ohci_int_mutex);
 
@@ -7417,7 +7418,7 @@ ohci_remove_tw_from_timeout_list(
 	ohci_trans_wrapper_t	*prev, *next;
 
 	USB_DPRINTF_L3(PRINT_MASK_LISTS,  ohcip->ohci_log_hdl,
-	    "ohci_remove_tw_from_timeout_list: tw = 0x%p", tw);
+	    "ohci_remove_tw_from_timeout_list: tw = 0x%p", (void *)tw);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -7451,7 +7452,7 @@ static void
 ohci_start_timer(ohci_state_t	*ohcip)
 {
 	USB_DPRINTF_L3(PRINT_MASK_LISTS,  ohcip->ohci_log_hdl,
-	    "ohci_start_timer: ohcip = 0x%p", ohcip);
+	    "ohci_start_timer: ohcip = 0x%p", (void *)ohcip);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -7483,7 +7484,7 @@ ohci_deallocate_tw_resources(
 	ohci_trans_wrapper_t	*prev, *next;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
-	    "ohci_deallocate_tw_resources: tw = 0x%p", tw);
+	    "ohci_deallocate_tw_resources: tw = 0x%p", (void *)tw);
 
 	/*
 	 * If the transfer wrapper has no Host Controller (HC)
@@ -7586,7 +7587,7 @@ ohci_free_tw(
 	int			rval, i;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
-	    "ohci_free_tw: tw = 0x%p", tw);
+	    "ohci_free_tw: tw = 0x%p", (void *)tw);
 
 	ASSERT(tw != NULL);
 	ASSERT(tw->tw_id != NULL);
@@ -7638,7 +7639,8 @@ ohci_intr(caddr_t arg1, caddr_t arg2)
 	ohci_save_intr_sts_t	*ohci_intr_sts = &ohcip->ohci_save_intr_sts;
 
 	USB_DPRINTF_L3(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
-	    "ohci_intr: Interrupt occurred, arg1 0x%p arg2 0x%p", arg1, arg2);
+	    "ohci_intr: Interrupt occurred, arg1 0x%p arg2 0x%p",
+	    (void *)arg1, (void *)arg2);
 
 	mutex_enter(&ohcip->ohci_int_mutex);
 
@@ -8088,7 +8090,8 @@ ohci_handle_ue(ohci_state_t	*ohcip)
 
 	USB_DPRINTF_L3(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 	    "ohci_handle_ue: Before Frm No 0x%llx After Frm No 0x%llx",
-	    before_frame_number, after_frame_number);
+	    (unsigned long long)before_frame_number,
+	    (unsigned long long)after_frame_number);
 
 	if (after_frame_number > before_frame_number) {
 
@@ -8137,7 +8140,8 @@ ohci_handle_frame_number_overflow(ohci_state_t *ohcip)
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 	    "ohci_handle_frame_number_overflow:"
-	    "Frame Number Higher Part 0x%llx\n", ohcip->ohci_fno);
+	    "Frame Number Higher Part 0x%llx\n",
+	    (unsigned long long)(ohcip->ohci_fno));
 }
 
 
@@ -8174,7 +8178,8 @@ ohci_handle_endpoint_reclaimation(ohci_state_t	*ohcip)
 		USB_DPRINTF_L4(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 		    "ohci_handle_endpoint_reclaimation:"
 		    "current frame number 0x%llx endpoint frame number 0x%llx",
-		    current_frame_number, endpoint_frame_number);
+		    (unsigned long long)current_frame_number,
+		    (unsigned long long)endpoint_frame_number);
 
 		/*
 		 * Deallocate current endpoint only if endpoint's usb frame
@@ -8255,7 +8260,7 @@ ohci_traverse_done_list(
 
 			USB_DPRINTF_L3(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 			    "ohci_traverse_done_list: PP = 0x%p TW = 0x%p",
-			    pp, tw);
+			    (void *)pp, (void *)tw);
 		}
 
 		/*
@@ -8405,7 +8410,7 @@ ohci_parse_error(
 	pp = tw->tw_pipe_private;
 
 	USB_DPRINTF_L3(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
-	    "ohci_parse_error: PP 0x%p TW 0x%p", pp, tw);
+	    "ohci_parse_error: PP 0x%p TW 0x%p", (void *)pp, (void *)tw);
 
 	eptd = &pp->pp_pipe_handle->p_ep;
 
@@ -8462,7 +8467,7 @@ ohci_parse_isoc_error(
 	int			i;
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
-	    "ohci_parse_isoc_error: td 0x%p", td);
+	    "ohci_parse_isoc_error: td 0x%p", (void *)td);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -8540,7 +8545,7 @@ ohci_check_for_error(
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 	    "ohci_check_for_error: td = 0x%p ctrl = 0x%x",
-	    td, ctrl);
+	    (void *)td, ctrl);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -8810,7 +8815,8 @@ ohci_cleanup_data_underrun(
 	uint_t			hced_head;
 
 	USB_DPRINTF_L2(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
-	    "ohci_cleanup_data_underrun: td 0x%p, tw 0x%p", td, tw);
+	    "ohci_cleanup_data_underrun: td 0x%p, tw 0x%p",
+	    (void *)td, (void *)tw);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 	ASSERT(tw->tw_hctd_head == td);
@@ -9088,8 +9094,8 @@ ohci_handle_intr_td(
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 	    "ohci_handle_intr_td: pp=0x%p tw=0x%p td=0x%p"
-	    "intr_reqp=0%p data=0x%p", pp, tw, td, curr_intr_reqp,
-	    curr_intr_reqp->intr_data);
+	    "intr_reqp=0%p data=0x%p", (void *)pp, (void *)tw, (void *)td,
+	    (void *)curr_intr_reqp, (void *)curr_intr_reqp->intr_data);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -9103,7 +9109,8 @@ ohci_handle_intr_td(
 
 		USB_DPRINTF_L3(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 		    "ohci_handle_intr_td: Intr out pipe, intr_reqp=0x%p,"
-		    "data=0x%p", curr_intr_reqp, curr_intr_reqp->intr_data);
+		    "data=0x%p", (void *)curr_intr_reqp,
+		    (void *)curr_intr_reqp->intr_data);
 
 		ohci_do_byte_stats(ohcip, tw->tw_length,
 		    eptd->bmAttributes, eptd->bEndpointAddress);
@@ -9189,7 +9196,7 @@ ohci_handle_one_xfer_completion(
 	    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
-	    "ohci_handle_one_xfer_completion: tw = 0x%p", tw);
+	    "ohci_handle_one_xfer_completion: tw = 0x%p", (void *)tw);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 	ASSERT(curr_intr_reqp->intr_attributes & USB_ATTRS_ONE_XFER);
@@ -9241,8 +9248,8 @@ ohci_handle_isoc_td(
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 	    "ohci_handle_isoc_td: pp=0x%p tw=0x%p td=0x%p"
-	    "isoc_reqp=0%p data=0x%p", pp, tw, td, curr_isoc_reqp,
-	    curr_isoc_reqp->isoc_data);
+	    "isoc_reqp=0%p data=0x%p", (void *)pp, (void *)tw, (void *)td,
+	    (void *)curr_isoc_reqp, (void *)curr_isoc_reqp->isoc_data);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -9268,7 +9275,8 @@ ohci_handle_isoc_td(
 	if ((eptd->bEndpointAddress & USB_EP_DIR_MASK) == USB_EP_DIR_OUT) {
 		USB_DPRINTF_L3(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 		    "ohci_handle_isoc_td: Isoc out pipe, isoc_reqp=0x%p,"
-		    "data=0x%p", curr_isoc_reqp, curr_isoc_reqp->isoc_data);
+		    "data=0x%p", (void *)curr_isoc_reqp,
+		    (void *)curr_isoc_reqp->isoc_data);
 
 		ohci_do_byte_stats(ohcip, tw->tw_length,
 		    eptd->bmAttributes, eptd->bEndpointAddress);
@@ -9717,7 +9725,7 @@ ohci_do_soft_reset(ohci_state_t	*ohcip)
 	ohci_save_regs->hcr_ctrl_head = Get_OpReg(hcr_ctrl_head);
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
-	    "ohci_do_soft_reset: Save reg = 0x%p", ohci_save_regs);
+	    "ohci_do_soft_reset: Save reg = 0x%p", (void *)ohci_save_regs);
 
 	/* Disable all list processing and interrupts */
 	Set_OpReg(hcr_control, (Get_OpReg(hcr_control) & ~(HCR_CONTROL_CLE |
@@ -9870,7 +9878,8 @@ ohci_do_soft_reset(ohci_state_t	*ohcip)
 
 	USB_DPRINTF_L3(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 	    "ohci_do_soft_reset: Before Frm No 0x%llx After Frm No 0x%llx",
-	    before_frame_number, after_frame_number);
+	    (unsigned long long)before_frame_number,
+	    (unsigned long long)after_frame_number);
 
 	if (after_frame_number <= before_frame_number) {
 
@@ -10032,7 +10041,7 @@ ohci_allocate_periodic_in_resource(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
 	    "ohci_allocate_periodic_in_resource:"
-	    "pp = 0x%p tw = 0x%p flags = 0x%x", pp, tw, flags);
+	    "pp = 0x%p tw = 0x%p flags = 0x%x", (void *)pp, (void *)tw, flags);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 	ASSERT(tw->tw_curr_xfer_reqp == NULL);
@@ -10174,7 +10183,8 @@ ohci_wait_for_sof(ohci_state_t	*ohcip)
 
 		USB_DPRINTF_L3(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
 		    "ohci_wait_for_sof: before 0x%llx, after 0x%llx",
-		    before_frame_number, after_frame_number);
+		    (unsigned long long)before_frame_number,
+		    (unsigned long long)after_frame_number);
 
 		/*
 		 * Return failure, if we are woken up becuase of timer expired
@@ -10227,7 +10237,7 @@ ohci_pipe_cleanup(
 	uint_t			bit = 0;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
-	    "ohci_pipe_cleanup: ph = 0x%p", ph);
+	    "ohci_pipe_cleanup: ph = 0x%p", (void *)ph);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -10360,7 +10370,7 @@ ohci_wait_for_transfers_completion(
 	int			rval;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
-	    "ohci_wait_for_transfers_completion: pp = 0x%p", pp);
+	    "ohci_wait_for_transfers_completion: pp = 0x%p", (void *)pp);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -10458,7 +10468,7 @@ ohci_check_for_transfers_completion(
 	ohci_pipe_private_t	*pp)
 {
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
-	    "ohci_check_for_transfers_completion: pp = 0x%p", pp);
+	    "ohci_check_for_transfers_completion: pp = 0x%p", (void *)pp);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -10486,7 +10496,8 @@ ohci_check_for_transfers_completion(
 		if (!pp->pp_count_done_tds) {
 			USB_DPRINTF_L3(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
 			    "ohci_check_for_transfers_completion:"
-			    "Sent transfers completion event pp = 0x%p", pp);
+			    "Sent transfers completion event pp = 0x%p",
+			    (void *)pp);
 
 			/* Send the transfer completion signal */
 			cv_signal(&pp->pp_xfer_cmpl_cv);
@@ -10513,7 +10524,7 @@ ohci_save_data_toggle(
 	ohci_td_t		*headp, *tailp;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
-	    "ohci_save_data_toggle: ph = 0x%p", ph);
+	    "ohci_save_data_toggle: ph = 0x%p", (void *)ph);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -10597,7 +10608,7 @@ ohci_restore_data_toggle(
 	uint_t			data_toggle = 0;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
-	    "ohci_restore_data_toggle: ph = 0x%p", ph);
+	    "ohci_restore_data_toggle: ph = 0x%p", (void *)ph);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -10654,7 +10665,7 @@ ohci_handle_outstanding_requests(
 	usb_opaque_t		curr_xfer_reqp;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
-	    "ohci_handle_outstanding_requests: pp = 0x%p", pp);
+	    "ohci_handle_outstanding_requests: pp = 0x%p", (void *)pp);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -10707,7 +10718,7 @@ ohci_deallocate_periodic_in_resource(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
 	    "ohci_deallocate_periodic_in_resource: "
-	    "pp = 0x%p tw = 0x%p", pp, tw);
+	    "pp = 0x%p tw = 0x%p", (void *)pp, (void *)tw);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -10759,7 +10770,7 @@ ohci_do_client_periodic_in_req_callback(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
 	    "ohci_do_client_periodic_in_req_callback: "
-	    "pp = 0x%p cc = 0x%x", pp, completion_reason);
+	    "pp = 0x%p cc = 0x%x", (void *)pp, completion_reason);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 
@@ -10795,7 +10806,7 @@ ohci_hcdi_callback(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
 	    "ohci_hcdi_callback: ph = 0x%p, tw = 0x%p, cr = 0x%x",
-	    ph, tw, completion_reason);
+	    (void *)ph, (void *)tw, completion_reason);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 

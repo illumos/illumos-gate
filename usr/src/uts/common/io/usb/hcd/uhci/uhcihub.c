@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -175,7 +174,7 @@ uhci_init_root_hub(uhci_state_t *uhcip)
 	/* Determine the Power Switching Mode */
 	root_hub_descr->bPwrOn2PwrGood = 10; /* arbitrary number */
 	root_hub_descr->wHubCharacteristics =
-		HUB_CHARS_NO_POWER_SWITCHING|HUB_CHARS_NO_OVER_CURRENT;
+	    HUB_CHARS_NO_POWER_SWITCHING|HUB_CHARS_NO_OVER_CURRENT;
 
 	/* Indicate if the device is removable */
 	root_hub_descr->DeviceRemovable = 0x0;
@@ -259,13 +258,13 @@ uhci_handle_root_hub_request(
 	}
 
 	completion_reason = (error != USB_SUCCESS) ?
-					USB_CR_NOT_SUPPORTED : USB_CR_OK;
+	    USB_CR_NOT_SUPPORTED : USB_CR_OK;
 
 	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, uhcip->uhci_log_hdl,
 	    "uhci_handle_root_hub_request: error = %d", error);
 
 	uhci_rh_hcdi_callback(uhcip, pipe_handle, (usb_opaque_t)req,
-						completion_reason);
+	    completion_reason);
 
 	return (USB_SUCCESS);
 }
@@ -292,7 +291,7 @@ uhci_handle_set_clear_port_feature(
 		switch (wValue) {
 		case CFS_PORT_ENABLE:
 			uhci_handle_port_enable_disable(uhcip,
-							port, UHCI_ENABLE_PORT);
+			    port, UHCI_ENABLE_PORT);
 			break;
 		case CFS_PORT_SUSPEND:
 			uhci_handle_port_suspend(uhcip, port, 1);
@@ -304,7 +303,7 @@ uhci_handle_set_clear_port_feature(
 			break;
 		case CFS_PORT_POWER:
 			uhci_handle_port_power(uhcip, port,
-							UHCI_ENABLE_PORT_PWR);
+			    UHCI_ENABLE_PORT_PWR);
 			break;
 
 		default:
@@ -321,12 +320,12 @@ uhci_handle_set_clear_port_feature(
 		switch (wValue) {
 		case CFS_PORT_ENABLE:
 			uhci_handle_port_enable_disable(uhcip,
-						port, UHCI_DISABLE_PORT);
+			    port, UHCI_DISABLE_PORT);
 
 			break;
 		case CFS_C_PORT_ENABLE:
 			uhci_handle_port_enable_disable(uhcip,
-						port, UHCI_CLEAR_ENDIS_BIT);
+			    port, UHCI_CLEAR_ENDIS_BIT);
 
 			break;
 		case CFS_PORT_SUSPEND:
@@ -339,7 +338,7 @@ uhci_handle_set_clear_port_feature(
 			break;
 		case CFS_PORT_POWER:
 			uhci_handle_port_power(uhcip, port,
-						UHCI_DISABLE_PORT_PWR);
+			    UHCI_DISABLE_PORT_PWR);
 
 			break;
 		case CFS_C_PORT_CONNECTION:
@@ -388,14 +387,14 @@ uhci_handle_port_suspend(
 		if (!(port_status & HCR_PORT_SUSPEND)) {
 			/* suspend the port */
 			Set_OpReg16(PORTSC[port],
-				(port_status | HCR_PORT_SUSPEND));
+			    (port_status | HCR_PORT_SUSPEND));
 		}
 	} else {
 		/* See if the port suspend is already off */
 		if ((port_status & HCR_PORT_SUSPEND)) {
 			/* resume the port */
 			Set_OpReg16(PORTSC[port],
-				(port_status & ~HCR_PORT_SUSPEND));
+			    (port_status & ~HCR_PORT_SUSPEND));
 		}
 	}
 }
@@ -439,14 +438,14 @@ uhci_handle_port_enable_disable(
 		if (!(port_status & HCR_PORT_ENABLE)) {
 			/* Enable the port */
 			Set_OpReg16(PORTSC[port],
-				(port_status | HCR_PORT_ENABLE));
+			    (port_status | HCR_PORT_ENABLE));
 		}
 	} else if (action == UHCI_DISABLE_PORT) {
 		/* See if the port enable is already off */
 		if ((port_status & HCR_PORT_ENABLE)) {
 			/* Disable the port */
 			Set_OpReg16(PORTSC[port],
-				(port_status & ~HCR_PORT_ENABLE));
+			    (port_status & ~HCR_PORT_ENABLE));
 		}
 	} else {
 		/* Clear the Enable/Disable change bit */
@@ -477,7 +476,7 @@ uhci_root_hub_reset_occurred(
 
 	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, uhcip->uhci_log_hdl,
 	    "uhci_root_hub_reset_occurred: intr_reqp = 0x%p data = 0x%p",
-	    intr_reqp, intr_reqp->intr_data);
+	    (void *)intr_reqp, (void *)intr_reqp->intr_data);
 
 	*intr_reqp->intr_data->b_wptr++ = (1 << (port+1));
 
@@ -594,9 +593,9 @@ uhci_handle_get_port_status(
 {
 	uint_t		new_port_status;
 	uint_t		old_port_status =
-				uhcip->uhci_root_hub.rh_port_status[port];
+	    uhcip->uhci_root_hub.rh_port_status[port];
 	uint_t		old_port_changes =
-				uhcip->uhci_root_hub.rh_port_changes[port];
+	    uhcip->uhci_root_hub.rh_port_changes[port];
 	uint_t		change_status;
 	usb_ctrl_req_t	*ctrl_reqp = (usb_ctrl_req_t *)req;
 	uint16_t	wLength = req->ctrl_wLength;
@@ -671,7 +670,7 @@ uhci_handle_get_hub_status(
 
 	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, uhcip->uhci_log_hdl,
 	    "uhci_handle_get_hub_status: wLength = 0x%x",
-						req->ctrl_wLength);
+	    req->ctrl_wLength);
 	ASSERT(req->ctrl_wLength != 0);
 	ASSERT(req->ctrl_data != NULL);
 
@@ -786,7 +785,7 @@ uhci_handle_root_hub_status_change(void *arg)
 
 			/* Do interrupt pipe cleanup */
 			uhci_root_hub_intr_pipe_cleanup(uhcip,
-						USB_CR_NO_RESOURCES);
+			    USB_CR_NO_RESOURCES);
 		}
 	}
 
@@ -876,10 +875,10 @@ uhci_root_hub_allocate_intr_pipe_resource(
 
 	if (uhcip->uhci_timeout_id == 0) {
 		uhcip->uhci_timeout_id = timeout(
-					uhci_handle_root_hub_status_change,
-					(void *)uhcip, UHCI_32_MS);
+		    uhci_handle_root_hub_status_change,
+		    (void *)uhcip, UHCI_32_MS);
 		uhcip->uhci_root_hub.rh_pipe_state =
-						UHCI_PIPE_STATE_ACTIVE;
+		    UHCI_PIPE_STATE_ACTIVE;
 	}
 
 	return (USB_SUCCESS);
@@ -916,7 +915,7 @@ uhci_root_hub_intr_pipe_cleanup(uhci_state_t *uhcip, usb_cr_t cr)
 		/* Reset the timer id to zero */
 		uhcip->uhci_timeout_id = 0;
 		uhcip->uhci_root_hub.rh_pipe_state =
-					UHCI_PIPE_STATE_IDLE;
+		    UHCI_PIPE_STATE_IDLE;
 
 		mutex_exit(&uhcip->uhci_int_mutex);
 		(void) untimeout(timer_id);
@@ -961,7 +960,7 @@ uhci_rh_hcdi_callback(
 {
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 	    "uhci_rh_hcdi_callback: ph=0x%p cr=0x%x req=0x%p",
-	    ph, cr, req);
+	    (void *)ph, cr, (void *)req);
 
 	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
 

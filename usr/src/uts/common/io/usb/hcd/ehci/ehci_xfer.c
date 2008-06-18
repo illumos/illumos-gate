@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -539,7 +539,7 @@ ehci_insert_qh(
 	ehci_pipe_private_t	*pp = (ehci_pipe_private_t *)ph->p_hcd_private;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-	    "ehci_insert_qh: qh=0x%p", pp->pp_qh);
+	    "ehci_insert_qh: qh=0x%p", (void *)pp->pp_qh);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -746,7 +746,7 @@ ehci_modify_qh_status_bit(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "ehci_modify_qh_status_bit: action=0x%x qh=0x%p",
-	    action, qh);
+	    action, (void *)qh);
 
 	ehci_print_qh(ehcip, qh);
 
@@ -822,7 +822,8 @@ ehci_modify_qh_status_bit(
 	status = Get_QH(qh->qh_status);
 	if (!(status & EHCI_QH_STS_HALTED)) {
 		USB_DPRINTF_L1(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "ehci_modify_qh_status_bit: Failed to halt qh=0x%p", qh);
+		    "ehci_modify_qh_status_bit: Failed to halt qh=0x%p",
+		    (void *)qh);
 
 		ehci_print_qh(ehcip, qh);
 
@@ -1099,9 +1100,10 @@ ehci_halt_fls_intr_qh(
 	Sync_QH_QTD_Pool(ehcip);
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-	    "ehci_halt_fls_intr_qh: qh=0x%p frames past=%d, status=0x%x, 0x%x",
-	    qh, ehci_get_current_frame_number(ehcip) - starting_frame,
-	    status, Get_QH(qh->qh_status));
+	    "ehci_halt_fls_intr_qh: qh=0x%p frames past=%llu,"
+	    " status=0x%x, 0x%x", (void *)qh,
+	    (unsigned long long)(ehci_get_current_frame_number(ehcip) -
+	    starting_frame), status, Get_QH(qh->qh_status));
 }
 
 
@@ -1122,7 +1124,7 @@ ehci_remove_qh(
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-	    "ehci_remove_qh: qh=0x%p", pp->pp_qh);
+	    "ehci_remove_qh: qh=0x%p", (void *)pp->pp_qh);
 
 	attributes = pp->pp_pipe_handle->p_ep.bmAttributes & USB_EP_ATTR_MASK;
 
@@ -1705,7 +1707,7 @@ ehci_insert_bulk_req(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "ehci_insert_bulk_req: bulk_reqp = 0x%p flags = 0x%x",
-	    bulk_reqp, flags);
+	    (void *)bulk_reqp, flags);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -1839,7 +1841,7 @@ ehci_start_periodic_pipe_polling(
 		}
 
 		USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-		    "ehci_start_periodic_pipe_polling: PP = 0x%p", pp);
+		    "ehci_start_periodic_pipe_polling: PP = 0x%p", (void *)pp);
 
 #ifdef DEBUG
 		switch (eptd->bmAttributes & USB_EP_ATTR_MASK) {
@@ -1976,7 +1978,7 @@ ehci_start_intr_polling(
 		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 		    "ehci_start_pipe_polling: max = %d curr = %d tw = %p:",
 		    pp->pp_max_periodic_req_cnt, pp->pp_cur_periodic_req_cnt,
-		    tw_list);
+		    (void *)tw_list);
 
 		tw = tw_list;
 		tw_list = tw->tw_next;
@@ -2372,9 +2374,9 @@ ehci_allocate_qtd_from_pool(ehci_state_t	*ehcip)
  *
  * Note:
  * qtd_dma_offs - the starting offset into the TW buffer, where the QTD
- *                should transfer from. It should be 4K aligned. And when
- *                a TW has more than one QTDs, the QTDs must be filled in
- *                increasing order.
+ *		  should transfer from. It should be 4K aligned. And when
+ *		  a TW has more than one QTDs, the QTDs must be filled in
+ *		  increasing order.
  * qtd_length - the total bytes to transfer.
  */
 /*ARGSUSED*/
@@ -2397,7 +2399,7 @@ ehci_fill_in_qtd(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "ehci_fill_in_qtd: qtd 0x%p ctrl 0x%x bufoffs 0x%lx "
-	    "len 0x%lx", qtd, qtd_ctrl, qtd_dma_offs, qtd_length);
+	    "len 0x%lx", (void *)qtd, qtd_ctrl, qtd_dma_offs, qtd_length);
 
 	/* Assert that the qtd to be filled in is a dummy */
 	ASSERT(Get_QTD(qtd->qtd_state) == EHCI_QTD_DUMMY);
@@ -2460,7 +2462,7 @@ ehci_fill_in_qtd(
 		Set_QTD(qtd->qtd_buf[i], buf_addr);
 
 		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-		    "ehci_fill_in_qtd: dmac_addr 0x%p dmac_size "
+		    "ehci_fill_in_qtd: dmac_addr 0x%x dmac_size "
 		    "0x%lx idx %d", buf_addr, tw->tw_cookie.dmac_size,
 		    tw->tw_cookie_idx);
 
@@ -2955,7 +2957,7 @@ ehci_free_tw_td_resources(
 	ehci_qtd_t		*temp_qtd = NULL;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
-	    "ehci_free_tw_td_resources: tw = 0x%p", tw);
+	    "ehci_free_tw_td_resources: tw = 0x%p", (void *)tw);
 
 	qtd = tw->tw_qtd_free_list;
 	while (qtd != NULL) {
@@ -3110,7 +3112,7 @@ dmadone:
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
 	    "ehci_create_transfer_wrapper: tw = 0x%p, ncookies = %u",
-	    tw, tw->tw_ncookies);
+	    (void *)tw, tw->tw_ncookies);
 
 	return (tw);
 }
@@ -3130,7 +3132,7 @@ ehci_start_xfer_timer(
 	ehci_trans_wrapper_t	*tw)
 {
 	USB_DPRINTF_L3(PRINT_MASK_LISTS,  ehcip->ehci_log_hdl,
-	    "ehci_start_xfer_timer: tw = 0x%p", tw);
+	    "ehci_start_xfer_timer: tw = 0x%p", (void *)tw);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -3172,7 +3174,7 @@ ehci_stop_xfer_timer(
 	timeout_id_t		timer_id;
 
 	USB_DPRINTF_L3(PRINT_MASK_LISTS,  ehcip->ehci_log_hdl,
-	    "ehci_stop_xfer_timer: tw = 0x%p", tw);
+	    "ehci_stop_xfer_timer: tw = 0x%p", (void *)tw);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -3233,7 +3235,8 @@ ehci_xfer_timeout_handler(void *arg)
 	ehci_qtd_t		*qtd;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS,  ehcip->ehci_log_hdl,
-	    "ehci_xfer_timeout_handler: ehcip = 0x%p, ph = 0x%p", ehcip, ph);
+	    "ehci_xfer_timeout_handler: ehcip = 0x%p, ph = 0x%p",
+	    (void *)ehcip, (void *)ph);
 
 	mutex_enter(&ehcip->ehci_int_mutex);
 
@@ -3333,7 +3336,7 @@ ehci_remove_tw_from_timeout_list(
 	ehci_trans_wrapper_t	*prev, *next;
 
 	USB_DPRINTF_L3(PRINT_MASK_LISTS,  ehcip->ehci_log_hdl,
-	    "ehci_remove_tw_from_timeout_list: tw = 0x%p", tw);
+	    "ehci_remove_tw_from_timeout_list: tw = 0x%p", (void *)tw);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -3375,7 +3378,8 @@ ehci_start_timer(
 	ehci_pipe_private_t	*pp)
 {
 	USB_DPRINTF_L4(PRINT_MASK_LISTS,  ehcip->ehci_log_hdl,
-	    "ehci_start_timer: ehcip = 0x%p, pp = 0x%p", ehcip, pp);
+	    "ehci_start_timer: ehcip = 0x%p, pp = 0x%p",
+	    (void *)ehcip, (void *)pp);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -3405,7 +3409,7 @@ ehci_deallocate_tw(
 	ehci_trans_wrapper_t	*prev, *next;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
-	    "ehci_deallocate_tw: tw = 0x%p", tw);
+	    "ehci_deallocate_tw: tw = 0x%p", (void *)tw);
 
 	/*
 	 * If the transfer wrapper has no Host Controller (HC)
@@ -3519,7 +3523,7 @@ ehci_free_tw(
 	int	rval;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
-	    "ehci_free_tw: tw = 0x%p", tw);
+	    "ehci_free_tw: tw = 0x%p", (void *)tw);
 
 	ASSERT(tw != NULL);
 	ASSERT(tw->tw_id != NULL);
@@ -3564,7 +3568,7 @@ ehci_allocate_intr_in_resource(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "ehci_allocate_intr_in_resource:"
-	    "pp = 0x%p tw = 0x%p flags = 0x%x", pp, tw, flags);
+	    "pp = 0x%p tw = 0x%p flags = 0x%x", (void *)pp, (void *)tw, flags);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 	ASSERT(tw->tw_curr_xfer_reqp == NULL);
@@ -3637,7 +3641,7 @@ ehci_pipe_cleanup(
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-	    "ehci_pipe_cleanup: ph = 0x%p", ph);
+	    "ehci_pipe_cleanup: ph = 0x%p", (void *)ph);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -3741,7 +3745,7 @@ ehci_wait_for_transfers_completion(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS,
 	    ehcip->ehci_log_hdl,
-	    "ehci_wait_for_transfers_completion: pp = 0x%p", pp);
+	    "ehci_wait_for_transfers_completion: pp = 0x%p", (void *)pp);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -3811,7 +3815,7 @@ ehci_check_for_transfers_completion(
 {
 	USB_DPRINTF_L4(PRINT_MASK_LISTS,
 	    ehcip->ehci_log_hdl,
-	    "ehci_check_for_transfers_completion: pp = 0x%p", pp);
+	    "ehci_check_for_transfers_completion: pp = 0x%p", (void *)pp);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -3840,7 +3844,8 @@ ehci_check_for_transfers_completion(
 
 			USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 			    "ehci_check_for_transfers_completion:"
-			    "Sent transfers completion event pp = 0x%p", pp);
+			    "Sent transfers completion event pp = 0x%p",
+			    (void *)pp);
 
 			/* Send the transfer completion signal */
 			cv_signal(&pp->pp_xfer_cmpl_cv);
@@ -3867,7 +3872,7 @@ ehci_save_data_toggle(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS,
 	    ehcip->ehci_log_hdl,
-	    "ehci_save_data_toggle: ph = 0x%p", ph);
+	    "ehci_save_data_toggle: ph = 0x%p", (void *)ph);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -3920,7 +3925,7 @@ ehci_restore_data_toggle(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS,
 	    ehcip->ehci_log_hdl,
-	    "ehci_restore_data_toggle: ph = 0x%p", ph);
+	    "ehci_restore_data_toggle: ph = 0x%p", (void *)ph);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -3975,7 +3980,7 @@ ehci_handle_outstanding_requests(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS,
 	    ehcip->ehci_log_hdl,
-	    "ehci_handle_outstanding_requests: pp = 0x%p", pp);
+	    "ehci_handle_outstanding_requests: pp = 0x%p", (void *)pp);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -4025,7 +4030,7 @@ ehci_deallocate_intr_in_resource(
 	USB_DPRINTF_L4(PRINT_MASK_LISTS,
 	    ehcip->ehci_log_hdl,
 	    "ehci_deallocate_intr_in_resource: "
-	    "pp = 0x%p tw = 0x%p", pp, tw);
+	    "pp = 0x%p tw = 0x%p", (void *)pp, (void *)tw);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 	ASSERT((ep_attr & USB_EP_ATTR_MASK) == USB_EP_ATTR_INTR);
@@ -4067,7 +4072,7 @@ ehci_do_client_periodic_in_req_callback(
 	USB_DPRINTF_L4(PRINT_MASK_LISTS,
 	    ehcip->ehci_log_hdl,
 	    "ehci_do_client_periodic_in_req_callback: "
-	    "pp = 0x%p cc = 0x%x", pp, completion_reason);
+	    "pp = 0x%p cc = 0x%x", (void *)pp, completion_reason);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -4105,7 +4110,7 @@ ehci_hcdi_callback(
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ehcip->ehci_log_hdl,
 	    "ehci_hcdi_callback: ph = 0x%p, tw = 0x%p, cr = 0x%x",
-	    ph, tw, completion_reason);
+	    (void *)ph, (void *)tw, completion_reason);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 

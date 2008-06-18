@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,7 +117,7 @@ int
 ehci_init_root_hub(ehci_state_t	*ehcip)
 {
 	usb_hub_descr_t		*root_hub_descr =
-				    &ehcip->ehci_root_hub.rh_descr;
+	    &ehcip->ehci_root_hub.rh_descr;
 	uint_t			i, length, port_state;
 	uint32_t		capability;
 
@@ -272,7 +272,7 @@ static uchar_t ehci_root_hub_config_descriptor[] = {
 	0x05,		/* bDescriptorType, Endpoint */
 	0x81,		/* bEndpointAddress */
 	0x03,		/* bmAttributes */
-	0x01, 0x00,	/* wMaxPacketSize, 1 +  (EHCI_MAX_RH_PORTS / 8) */
+	0x01, 0x00,	/* wMaxPacketSize, 1 +	(EHCI_MAX_RH_PORTS / 8) */
 	0xff		/* bInterval */
 };
 
@@ -314,7 +314,7 @@ ehci_handle_root_hub_pipe_open(
 	usb_flags_t		usb_flags)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 
 	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, ehcip->ehci_log_hdl,
@@ -377,7 +377,7 @@ int
 ehci_handle_root_hub_pipe_close(usba_pipe_handle_data_t	*ph)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 
 	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, ehcip->ehci_log_hdl,
@@ -446,7 +446,7 @@ ehci_handle_root_hub_pipe_reset(
 	usb_flags_t		usb_flags)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 	int			error = USB_SUCCESS;
 
@@ -674,7 +674,7 @@ ehci_handle_set_clear_port_feature(
 			error = USB_FAILURE;
 			break;
 		}
-		    break;
+		break;
 	default:
 		USB_DPRINTF_L2(PRINT_MASK_ROOT_HUB, ehcip->ehci_log_hdl,
 		    "ehci_handle_set_clear_port_feature: "
@@ -1094,13 +1094,13 @@ ehci_root_hub_reset_occured(
 	ehci_state_t		*ehcip)
 {
 	usb_intr_req_t		*curr_intr_reqp =
-				    ehcip->ehci_root_hub.rh_curr_intr_reqp;
+	    ehcip->ehci_root_hub.rh_curr_intr_reqp;
 	usb_port_mask_t		port_mask;
 	usba_pipe_handle_data_t	*ph;
 
 	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, ehcip->ehci_log_hdl,
 	    "ehci_root_hub_reset_occured: curr_intr_reqp = 0x%p data = 0x%p",
-	    curr_intr_reqp, curr_intr_reqp->intr_data);
+	    (void *)curr_intr_reqp, (void *)curr_intr_reqp->intr_data);
 
 	/* Get the interrupt pipe handle */
 	ph = ehcip->ehci_root_hub.rh_intr_pipe_handle;
@@ -1290,7 +1290,8 @@ ehci_handle_get_hub_descriptor(
 	length = ctrl_reqp->ctrl_wLength;
 
 	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, ehcip->ehci_log_hdl,
-	    "ehci_handle_get_hub_descriptor: Ctrl Req  = 0x%p", ctrl_reqp);
+	    "ehci_handle_get_hub_descriptor: Ctrl Req  = 0x%p",
+	    (void *)ctrl_reqp);
 
 	message = ctrl_reqp->ctrl_data;
 
@@ -1417,7 +1418,7 @@ ehci_handle_root_hub_pipe_start_intr_polling(
 	usb_flags_t		flags)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 	int			error = USB_SUCCESS;
 	uint_t			pipe_state;
@@ -1500,7 +1501,7 @@ ehci_handle_root_hub_pipe_stop_intr_polling(
 	usb_flags_t		flags)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
@@ -1815,7 +1816,7 @@ ehci_handle_root_hub_status_change(void *arg)
 {
 	ehci_state_t		*ehcip = (ehci_state_t *)arg;
 	usb_hub_descr_t		*root_hub_descr =
-				&ehcip->ehci_root_hub.rh_descr;
+	    &ehcip->ehci_root_hub.rh_descr;
 	usb_intr_req_t		*curr_intr_reqp;
 	usb_port_mask_t		port_mask = 0;
 	uint_t			new_port_status;
@@ -1847,7 +1848,7 @@ ehci_handle_root_hub_status_change(void *arg)
 
 			USB_DPRINTF_L2(PRINT_MASK_ROOT_HUB,
 			    ehcip->ehci_log_hdl,
-			    "ehci_handle_root_hub_status_change:",
+			    "ehci_handle_root_hub_status_change:"
 			    " EHCI have been reset");
 
 			/* Reinitialize the controller */
@@ -2027,15 +2028,15 @@ ehci_root_hub_hcdi_callback(
 	usb_cr_t		completion_reason)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	uchar_t			attributes = ph->p_ep.bmAttributes &
-							USB_EP_ATTR_MASK;
+	    USB_EP_ATTR_MASK;
 	usb_opaque_t		curr_xfer_reqp;
 	uint_t			pipe_state = 0;
 
 	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, ehcip->ehci_log_hdl,
 	    "ehci_root_hub_hcdi_callback: ph = 0x%p, cr = 0x%x",
-	    ph, completion_reason);
+	    (void *)ph, completion_reason);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 

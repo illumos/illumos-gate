@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -146,8 +145,8 @@ usba_devdb_get_conf_rec(struct _buf *file, usba_configrec_t **rec)
 	u_longlong_t	value;
 	enum {
 		USB_NEWVAR, USB_CONFIG_VAR, USB_VAR_EQUAL, USB_VAR_VALUE,
-		USB_ERROR
-	} parse_state = USB_NEWVAR;
+		    USB_ERROR
+		    } parse_state = USB_NEWVAR;
 
 	cfgrec = (usba_configrec_t *)kmem_zalloc(
 	    sizeof (usba_configrec_t), KM_SLEEP);
@@ -329,7 +328,8 @@ usb_devdb_compare_pathnames(char *p1, char *p2)
 	char	*ustr, *hstr;
 
 	USB_DPRINTF_L4(DPRINT_MASK_DEVDB, usba_devdb_log_handle,
-	    "usb_devdb_compare_pathnames: p1=0x%p p2=0x%p", p1, p2);
+	    "usb_devdb_compare_pathnames: p1=0x%p p2=0x%p",
+	    (void *)p1, (void *)p2);
 
 	if (p1 && p2) {
 		if (usba_build_devdb == B_TRUE) {
@@ -415,7 +415,7 @@ usba_devdb_compare(const void *p1, const void *p2)
 
 	USB_DPRINTF_L4(DPRINT_MASK_DEVDB, usba_devdb_log_handle,
 	    "usba_devdb_compare: p1=0x%p u1=0x%p p2=0x%p u2=0x%p",
-	    p1, u1, p2, u2);
+	    p1, (void *)u1, p2, u2);
 
 	/* first match vendor id */
 	if (u1->idVendor < u2->idVendor) {

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -263,7 +263,7 @@ usb_ac_mux_plumbing(dacf_infohdl_t info_hdl, dacf_arghdl_t arg_hdl, int flags)
 
 	uacp->usb_ac_mux_lh = mux_lh;
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "mux_lh=0x%p", mux_lh);
+	    "mux_lh=0x%p", (void *)mux_lh);
 
 	/*
 	 * walk all siblings and create the usb_ac<->usb_as and
@@ -403,7 +403,7 @@ usb_ac_mux_unplumbing(dacf_infohdl_t info_hdl, dacf_arghdl_t arg_hdl, int flags)
 	ASSERT(mux_lh != NULL);
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-	    "usb_ac_mux_unplumbing mux_lh 0x%p", mux_lh);
+	    "usb_ac_mux_unplumbing mux_lh 0x%p", (void *)mux_lh);
 
 	/* unlink and close ac-as and ac-hid streams */
 	maxlinked = uacp->usb_ac_current_plumbed_index + 1;
@@ -505,7 +505,7 @@ usb_ac_mux_walk_siblings(usb_ac_state_t *uacp, ldi_handle_t mux_lh)
 		} else {
 			drv_minor = drv_instance;
 			uacp->usb_ac_plumbed[count].acp_driver =
-								UNKNOWN_PLUMBED;
+			    UNKNOWN_PLUMBED;
 			child_dip = ddi_get_next_sibling(child_dip);
 
 			continue;
@@ -556,7 +556,7 @@ usb_ac_mux_walk_siblings(usb_ac_state_t *uacp, ldi_handle_t mux_lh)
 
 		uacp->usb_ac_plumbed[count].acp_dip = child_dip;
 		uacp->usb_ac_plumbed[count].acp_ifno =
-						usb_get_if_number(child_dip);
+		    usb_get_if_number(child_dip);
 
 		if (uacp->usb_ac_plumbed[count].acp_driver == USB_AS_PLUMBED) {
 			/* get registration data */
@@ -706,7 +706,7 @@ usb_ac_mixer_registration(usb_ac_state_t *uacp, usb_ac_state_space_t *ssp)
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
 	    "usb_ac_mixer_registration: infp=0x%p, dflts=0x%p",
-	    info, dflts);
+	    (void *)info, (void *)dflts);
 
 	ASSERT(dflts != NULL);
 	ASSERT(info != NULL);
@@ -736,7 +736,7 @@ usb_ac_mixer_registration(usb_ac_state_t *uacp, usb_ac_state_space_t *ssp)
 
 	info->ad_int_vers	= AM_VERSION;
 	info->ad_mode		= (uacp->usb_ac_mixer_mode_enable ?
-					AM_MIXER_MODE : AM_COMPAT_MODE);
+	    AM_MIXER_MODE : AM_COMPAT_MODE);
 
 	info->ad_add_mode	= 0;
 	info->ad_codec_type	= AM_TRAD_CODEC;
@@ -793,7 +793,7 @@ usb_ac_mixer_registration(usb_ac_state_t *uacp, usb_ac_state_space_t *ssp)
 			}
 		}
 		default_gain = (id == USB_AC_ID_NONE) ?
-				AUDIO_MAX_GAIN : (AUDIO_MAX_GAIN/2);
+		    AUDIO_MAX_GAIN : (AUDIO_MAX_GAIN/2);
 
 		USB_DPRINTF_L3(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
 		    "mode=%d chs=%d default_gain=%d id=%d",
@@ -813,7 +813,7 @@ usb_ac_mixer_registration(usb_ac_state_t *uacp, usb_ac_state_space_t *ssp)
 			    asreg->reg_formats[0].fmt_encoding;
 			dflts->play.gain	= default_gain;
 			dflts->play.port	= usb_ac_find_default_port(
-						uacp->usb_ac_output_ports);
+			    uacp->usb_ac_output_ports);
 			dflts->play.avail_ports = uacp->usb_ac_output_ports;
 			dflts->play.mod_ports	= 0;
 						/* no support for mixer unit */
@@ -837,14 +837,14 @@ usb_ac_mixer_registration(usb_ac_state_t *uacp, usb_ac_state_space_t *ssp)
 			dflts->record.sample_rate =
 			    asreg->reg_compat_srs.ad_srs[0];
 			dflts->record.channels	=
-						asreg->reg_formats[0].fmt_chns;
+			    asreg->reg_formats[0].fmt_chns;
 			dflts->record.precision =
-					asreg->reg_formats[0].fmt_precision;
+			    asreg->reg_formats[0].fmt_precision;
 			dflts->record.encoding	=
-					asreg->reg_formats[0].fmt_encoding;
+			    asreg->reg_formats[0].fmt_encoding;
 			dflts->record.gain	= default_gain;
 			dflts->record.port	= usb_ac_find_default_port(
-						uacp->usb_ac_input_ports);
+			    uacp->usb_ac_input_ports);
 			dflts->record.avail_ports = uacp->usb_ac_input_ports;
 			dflts->record.mod_ports = uacp->usb_ac_input_ports;
 			dflts->record.buffer_size = 8*1024;
@@ -871,7 +871,7 @@ usb_ac_mixer_registration(usb_ac_state_t *uacp, usb_ac_state_space_t *ssp)
 		 * point
 		 */
 		dflts->hw_features	|= AUDIO_HWFEATURE_DUPLEX |
-						AUDIO_HWFEATURE_IN2OUT;
+		    AUDIO_HWFEATURE_IN2OUT;
 	}
 
 	/* the rest */
@@ -947,7 +947,7 @@ usb_ac_get_reg_data(usb_ac_state_t *uacp, ldi_handle_t drv_lh, int index)
 	USB_DPRINTF_L4(PRINT_MASK_ALL,
 	    uacp->usb_ac_log_handle,
 	    "regdata from usb_as: streams_reg=0x%p, n=%d",
-	    streams_reg, n);
+	    (void *)streams_reg, n);
 
 	mutex_exit(&uacp->usb_ac_mutex);
 
@@ -968,7 +968,7 @@ usb_ac_get_reg_data(usb_ac_state_t *uacp, ldi_handle_t drv_lh, int index)
 		    "usb_ac_streams: index=%d, received_reg_data=%d type=%s",
 		    index, uacp->usb_ac_streams[n].acs_rcvd_reg_data,
 		    ((streams_reg->reg_mode == AUDIO_PLAY) ?
-			"play" : "record"));
+		    "play" : "record"));
 
 		usb_ac_print_reg_data(uacp, streams_reg);
 
@@ -1000,12 +1000,12 @@ usb_ac_setup_plumbed(usb_ac_state_t *uacp, int plb_idx, int str_idx,
 	}
 
 	uacp->usb_ac_plumbed[plb_idx].acp_data =
-					&uacp->usb_ac_streams[str_idx];
+	    &uacp->usb_ac_streams[str_idx];
 	uacp->usb_ac_streams[str_idx].acs_plumbed =
-					&uacp->usb_ac_plumbed[plb_idx];
+	    &uacp->usb_ac_plumbed[plb_idx];
 	uacp->usb_ac_streams[str_idx].acs_rcvd_reg_data = 1;
 	cv_init(&(uacp->usb_ac_streams[str_idx].
-			    acs_ac_to_as_req.acr_cv), NULL, CV_DRIVER, NULL);
+	    acs_ac_to_as_req.acr_cv), NULL, CV_DRIVER, NULL);
 
 	if (reg_idx == -1) {
 		/*
@@ -1029,7 +1029,7 @@ usb_ac_setup_plumbed(usb_ac_state_t *uacp, int plb_idx, int str_idx,
 		reg_idx = i;
 	}
 	uacp-> usb_ac_streams[str_idx].acs_streams_reg =
-					&uacp->usb_ac_streams_reg[reg_idx];
+	    &uacp->usb_ac_streams_reg[reg_idx];
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 	    "usb_ac_setup_plumbed: plb_idx=%d str_idx=%d reg_idx=%d",
@@ -1052,7 +1052,7 @@ usb_ac_print_reg_data(usb_ac_state_t *uacp,
 	    "usb_ac_print_reg_data: Begin valid=%d, play=%d, "
 	    "n_formats=%d, mixer srs ptr=0x%p, compat srs ptr=0x%p",
 	    reg->reg_valid, reg->reg_mode, reg->reg_n_formats,
-	    &reg->reg_mixer_srs, &reg->reg_compat_srs);
+	    (void *)&reg->reg_mixer_srs, (void *)&reg->reg_compat_srs);
 
 	for (n = 0; n < reg->reg_n_formats; n++) {
 		USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
@@ -1073,7 +1073,8 @@ usb_ac_print_reg_data(usb_ac_state_t *uacp,
 
 	for (n = 0; n < USB_AS_N_FORMATS; n++) {
 		USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
-		    "reg_formats[%d] ptr=0x%p", n, &reg->reg_formats[n]);
+		    "reg_formats[%d] ptr=0x%p", n,
+		    (void *)&reg->reg_formats[n]);
 	}
 
 	for (n = 0; n < USB_AS_N_CHANNELS; n++) {
@@ -1084,7 +1085,7 @@ usb_ac_print_reg_data(usb_ac_state_t *uacp,
 	for (n = 0; n < USB_AS_N_COMBINATIONS; n++) {
 		USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 		    "reg_combinations[%d] ptr=0x%p", n,
-		    &reg->reg_combinations[n]);
+		    (void *)&reg->reg_combinations[n]);
 	}
 
 	USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,

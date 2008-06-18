@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,12 +148,12 @@ void
 usba_usbai_register_initialization()
 {
 	usbai_reg_log_handle = usb_alloc_log_hdl(NULL, "usbreg",
-					&usbai_register_errlevel,
-					&usbai_register_errmask, NULL,
-					0);
+	    &usbai_register_errlevel,
+	    &usbai_register_errmask, NULL,
+	    0);
 
 	USB_DPRINTF_L4(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
-			"usba_usbai_register_initialization");
+	    "usba_usbai_register_initialization");
 }
 
 
@@ -225,13 +225,13 @@ usb_client_attach(dev_info_t *dip, uint_t version, usb_flags_t flags)
 	}
 
 	rval = ndi_prop_update_int(DDI_DEV_T_NONE, dip, "driver-major",
-		USBA_GET_MAJOR(version));
+	    USBA_GET_MAJOR(version));
 	if (rval != DDI_PROP_SUCCESS) {
 
 		return (USB_FAILURE);
 	}
 	rval = ndi_prop_update_int(DDI_DEV_T_NONE, dip, "driver-minor",
-		USBA_GET_MINOR(version));
+	    USBA_GET_MINOR(version));
 	if (rval != DDI_PROP_SUCCESS) {
 
 		return (USB_FAILURE);
@@ -240,7 +240,7 @@ usb_client_attach(dev_info_t *dip, uint_t version, usb_flags_t flags)
 	mutex_enter(&usba_device->usb_mutex);
 	if (strcmp(ddi_driver_name(dip), "usb_mid") != 0) {
 		usba_device->usb_client_flags[usba_get_ifno(dip)] |=
-						USBA_CLIENT_FLAG_ATTACH;
+		    USBA_CLIENT_FLAG_ATTACH;
 		usba_device->usb_client_attach_list->dip = dip;
 	}
 	mutex_exit(&usba_device->usb_mutex);
@@ -271,14 +271,14 @@ usb_client_detach(dev_info_t *dip, usb_client_dev_data_t *reg)
 	if (dip) {
 		USB_DPRINTF_L4(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
 		    "Unregistering usb client %s%d: reg=0x%p",
-		    ddi_driver_name(dip), ddi_get_instance(dip), reg);
+		    ddi_driver_name(dip), ddi_get_instance(dip), (void *)reg);
 
 		usb_free_dev_data(dip, reg);
 
 		mutex_enter(&usba_device->usb_mutex);
 		if (strcmp(ddi_driver_name(dip), "usb_mid") != 0) {
 			usba_device->usb_client_flags[usba_get_ifno(dip)] &=
-						~USBA_CLIENT_FLAG_ATTACH;
+			    ~USBA_CLIENT_FLAG_ATTACH;
 		}
 		mutex_exit(&usba_device->usb_mutex);
 	}
@@ -431,30 +431,30 @@ usb_get_dev_data(dev_info_t *dip,
 	    usba_device->usb_root_hub_dip)->hcdi_soft_iblock_cookie;
 
 	USB_DPRINTF_L4(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
-	    "cookie = 0x%p", usb_reg->dev_iblock_cookie);
+	    "cookie = 0x%p", (void *)usb_reg->dev_iblock_cookie);
 
 	tmpbuf = (char *)kmem_zalloc(USB_MAXSTRINGLEN, KM_SLEEP);
 
 	if (usba_device->usb_mfg_str != NULL) {
 		usb_reg->dev_mfg = kmem_zalloc(
-				strlen(usba_device->usb_mfg_str) + 1, KM_SLEEP);
+		    strlen(usba_device->usb_mfg_str) + 1, KM_SLEEP);
 		(void) strcpy(usb_reg->dev_mfg, usba_device->usb_mfg_str);
 	}
 
 	if (usba_device->usb_product_str != NULL) {
 		usb_reg->dev_product = kmem_zalloc(
-				strlen(usba_device->usb_product_str) + 1,
-				KM_SLEEP);
+		    strlen(usba_device->usb_product_str) + 1,
+		    KM_SLEEP);
 		(void) strcpy(usb_reg->dev_product,
-				usba_device->usb_product_str);
+		    usba_device->usb_product_str);
 	}
 
 	if (usba_device->usb_serialno_str != NULL) {
 		usb_reg->dev_serial = kmem_zalloc(
-				strlen(usba_device->usb_serialno_str) + 1,
-				KM_SLEEP);
+		    strlen(usba_device->usb_serialno_str) + 1,
+		    KM_SLEEP);
 		(void) strcpy(usb_reg->dev_serial,
-				usba_device->usb_serialno_str);
+		    usba_device->usb_serialno_str);
 	}
 
 	if ((usb_reg->dev_parse_level = parse_level) == USB_PARSE_LVL_NONE) {
@@ -487,7 +487,7 @@ usb_get_dev_data(dev_info_t *dip,
 		usb_reg->dev_curr_if = usba_get_ifno(dip);
 #ifdef DEBUG
 		(void) usb_log_descr_tree(usb_reg, usbai_reg_log_handle,
-				usbai_register_dump_errlevel, (uint_t)-1);
+		    usbai_register_dump_errlevel, (uint_t)-1);
 #endif
 		/*
 		 * Fail if interface and configuration of dev_curr_if and
@@ -512,18 +512,18 @@ usb_get_dev_data(dev_info_t *dip,
 
 	if (rval == USB_SUCCESS) {
 		usb_client_dev_data_list_t *entry = kmem_zalloc(
-				sizeof (*entry), KM_SLEEP);
+		    sizeof (*entry), KM_SLEEP);
 		mutex_enter(&usba_device->usb_mutex);
 
 		usba_device->usb_client_flags[usba_get_ifno(dip)] |=
-						USBA_CLIENT_FLAG_DEV_DATA;
+		    USBA_CLIENT_FLAG_DEV_DATA;
 
 		entry->cddl_dip = dip;
 		entry->cddl_dev_data = usb_reg;
 		entry->cddl_ifno = usba_get_ifno(dip);
 
 		entry->cddl_next =
-			usba_device->usb_client_dev_data_list.cddl_next;
+		    usba_device->usb_client_dev_data_list.cddl_next;
 		if (entry->cddl_next) {
 			entry->cddl_next->cddl_prev = entry;
 		}
@@ -558,7 +558,7 @@ usb_free_dev_data(dev_info_t *dip, usb_client_dev_data_t *reg)
 
 	USB_DPRINTF_L4(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
 	    "usb_free_dev_data %s%d: reg=0x%p",
-	    ddi_driver_name(dip), ddi_get_instance(dip), reg);
+	    ddi_driver_name(dip), ddi_get_instance(dip), (void *)reg);
 
 	if (reg != NULL) {
 		usba_device_t *usba_device = usba_get_usba_device(dip);
@@ -614,14 +614,14 @@ usb_free_dev_data(dev_info_t *dip, usb_client_dev_data_t *reg)
 		USB_DPRINTF_L3(DPRINT_MASK_REGISTER,
 		    usbai_reg_log_handle,
 		    "usb_free_dev_data: next=0x%p flags[%d]=0x%x",
-		    usba_device->usb_client_dev_data_list.cddl_next,
+		    (void *)usba_device->usb_client_dev_data_list.cddl_next,
 		    usba_get_ifno(dip),
 		    usba_device->usb_client_flags[usba_get_ifno(dip)]);
 
 		if (matches == 0) {
 			usba_device->
 			    usb_client_flags[usba_get_ifno(dip)] &=
-				~USBA_CLIENT_FLAG_DEV_DATA;
+			    ~USBA_CLIENT_FLAG_DEV_DATA;
 		}
 		mutex_exit(&usba_device->usb_mutex);
 
@@ -695,8 +695,8 @@ usba_build_descr_tree(dev_info_t *dip, usba_device_t *usba_device,
 		mutex_exit(&usba_device->usb_mutex);
 	}
 	usb_reg->dev_cfg = state.st_dev_cfg = kmem_zalloc(
-				(usb_reg->dev_n_cfg * sizeof (usb_cfg_data_t)),
-				KM_SLEEP);
+	    (usb_reg->dev_n_cfg * sizeof (usb_cfg_data_t)),
+	    KM_SLEEP);
 	/*
 	 * this_cfg_ndx loops through all configurations presented;
 	 * state.st_dev_n_cfg limits the cfgs checked to the number desired.
@@ -706,7 +706,7 @@ usba_build_descr_tree(dev_info_t *dip, usba_device_t *usba_device,
 	    this_cfg_ndx++) {
 
 		state.st_curr_raw_descr =
-				usba_device->usb_cfg_array[this_cfg_ndx];
+		    usba_device->usb_cfg_array[this_cfg_ndx];
 		ASSERT(state.st_curr_raw_descr != NULL);
 
 		/* Clear the following for config cloud sanity checking. */
@@ -749,7 +749,7 @@ usba_build_descr_tree(dev_info_t *dip, usba_device_t *usba_device,
 			    usbai_reg_log_handle,
 			    "usba_build_descr_tree: Process type %d descr "
 			    "(addr=0x%p)", state.st_curr_raw_descr_type,
-			    state.st_curr_raw_descr);
+			    (void *)state.st_curr_raw_descr);
 
 			switch (state.st_curr_raw_descr_type) {
 			case USB_DESCR_TYPE_CFG:
@@ -757,10 +757,10 @@ usba_build_descr_tree(dev_info_t *dip, usba_device_t *usba_device,
 				process_this_if_tree = B_FALSE;
 
 				state.st_curr_cfg_str = usba_device->
-						usb_cfg_str_descr[this_cfg_ndx];
+				    usb_cfg_str_descr[this_cfg_ndx];
 				usba_process_cfg_descr(&state);
 				state.st_last_processed_descr_type =
-							USB_DESCR_TYPE_CFG;
+				    USB_DESCR_TYPE_CFG;
 				last_byte = state.st_curr_raw_descr +
 				    (state.st_total_cfg_length *
 				    sizeof (uchar_t));
@@ -774,12 +774,12 @@ usba_build_descr_tree(dev_info_t *dip, usba_device_t *usba_device,
 				 * to be processed.
 				 */
 				if (usba_process_if_descr(&state,
-					&process_this_if_tree) != USB_SUCCESS) {
+				    &process_this_if_tree) != USB_SUCCESS) {
 
-				    return (USB_FAILURE);
+					return (USB_FAILURE);
 				}
 				state.st_last_processed_descr_type =
-							USB_DESCR_TYPE_IF;
+				    USB_DESCR_TYPE_IF;
 
 				break;
 
@@ -796,7 +796,7 @@ usba_build_descr_tree(dev_info_t *dip, usba_device_t *usba_device,
 						return (USB_FAILURE);
 					}
 					state.st_last_processed_descr_type =
-							USB_DESCR_TYPE_EP;
+					    USB_DESCR_TYPE_EP;
 				}
 
 				break;
@@ -806,7 +806,7 @@ usba_build_descr_tree(dev_info_t *dip, usba_device_t *usba_device,
 				    usbai_reg_log_handle,
 				    "usb_get_dev_data: "
 				    "Found unexpected str descr at addr 0x%p",
-				    state.st_curr_raw_descr);
+				    (void *)state.st_curr_raw_descr);
 
 				break;	/* Shouldn't be any here.  Skip. */
 
@@ -875,13 +875,13 @@ usba_process_cfg_descr(usba_reg_state_t *state)
 	if (state->st_curr_cfg_str != NULL) {
 		curr_cfg->cfg_strsize = strlen(state->st_curr_cfg_str) + 1;
 		curr_cfg->cfg_str = kmem_zalloc(curr_cfg->cfg_strsize,
-						KM_SLEEP);
+		    KM_SLEEP);
 		(void) strcpy(curr_cfg->cfg_str, state->st_curr_cfg_str);
 	}
 
 	curr_cfg->cfg_n_if = curr_cfg->cfg_descr.bNumInterfaces;
 	curr_cfg->cfg_if = kmem_zalloc((curr_cfg->cfg_n_if *
-					sizeof (usb_if_data_t)), KM_SLEEP);
+	    sizeof (usb_if_data_t)), KM_SLEEP);
 
 	USB_DPRINTF_L4(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
 	    "usba_process_cfg_descr done");
@@ -931,8 +931,8 @@ usba_process_if_descr(usba_reg_state_t *state, boolean_t *requested_if)
 
 	/* Strictly speaking, unpacking is not necessary.  Could use bcopy. */
 	(void) usb_parse_data("9c", state->st_curr_raw_descr,
-			state->st_curr_raw_descr_len,
-			new_if_descr, sizeof (usb_if_descr_t));
+	    state->st_curr_raw_descr_len,
+	    new_if_descr, sizeof (usb_if_descr_t));
 
 	/* Check the interface number in case of a malfunction device */
 	if (new_if_descr->bInterfaceNumber >= state->st_curr_cfg->cfg_n_if) {
@@ -964,7 +964,7 @@ usba_process_if_descr(usba_reg_state_t *state, boolean_t *requested_if)
 		alt_index = state->st_curr_if->if_n_alt;
 		alt_array = state->st_curr_if->if_alt;
 		usba_augment_array((void **)(&alt_array), alt_index,
-				sizeof (usb_alt_if_data_t));
+		    sizeof (usb_alt_if_data_t));
 
 		/* Ptr to the current alt, may be used to attach a c/v to it. */
 		state->st_curr_alt = &alt_array[alt_index];
@@ -1028,14 +1028,14 @@ usba_process_ep_descr(usba_reg_state_t *state)
 	}
 
 	usba_augment_array((void **)(&curr_alt->altif_ep),
-			curr_alt->altif_n_ep, sizeof (usb_ep_data_t));
+	    curr_alt->altif_n_ep, sizeof (usb_ep_data_t));
 
 	/* Ptr to the current endpt, may be used to attach a c/v to it. */
 	state->st_curr_ep = &curr_alt->altif_ep[curr_alt->altif_n_ep++];
 
 	(void) usb_parse_data("4csc", state->st_curr_raw_descr,
-			state->st_curr_raw_descr_len,
-			&state->st_curr_ep->ep_descr, sizeof (usb_ep_descr_t));
+	    state->st_curr_raw_descr_len,
+	    &state->st_curr_ep->ep_descr, sizeof (usb_ep_descr_t));
 
 	USB_DPRINTF_L4(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
 	    "usba_process_ep_descr done");
@@ -1097,11 +1097,11 @@ usba_process_cv_descr(usba_reg_state_t *state)
 	}
 
 	usba_augment_array((void **)cvs_ptr, *n_cvs_ptr,
-			sizeof (usb_cvs_data_t));
+	    sizeof (usb_cvs_data_t));
 	curr_cv_descr = &(*cvs_ptr)[(*n_cvs_ptr)++];
 
 	curr_cv_descr->cvs_buf =
-			kmem_zalloc(state->st_curr_raw_descr_len, KM_SLEEP);
+	    kmem_zalloc(state->st_curr_raw_descr_len, KM_SLEEP);
 	curr_cv_descr->cvs_buf_len = state->st_curr_raw_descr_len;
 	bcopy(state->st_curr_raw_descr, curr_cv_descr->cvs_buf,
 	    state->st_curr_raw_descr_len);
@@ -1232,7 +1232,7 @@ static void
 usba_augment_array(void **addr, uint_t n_elements, uint_t element_size)
 {
 	*addr = usba_kmem_realloc(*addr, (n_elements * element_size),
-					((n_elements + 1) * element_size));
+	    ((n_elements + 1) * element_size));
 }
 
 
@@ -1268,7 +1268,7 @@ usba_make_alts_sparse(usb_alt_if_data_t **array, uint_t *n_elements)
 
 	USB_DPRINTF_L4(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
 	    "make_sparse: array=0x%p, n_orig_elements=%d",
-	    array, n_orig_elements);
+	    (void *)array, n_orig_elements);
 
 	curr_value = orig_addr[0].altif_descr.bAlternateSetting;
 	smallest_value = largest_value = curr_value;
@@ -1284,9 +1284,9 @@ usba_make_alts_sparse(usb_alt_if_data_t **array, uint_t *n_elements)
 		}
 	}
 	USB_DPRINTF_L4(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
-		"make_sparse: largest=%d, smallest=%d, "
-		"order=%d",
-		largest_value, smallest_value, in_order);
+	    "make_sparse: largest=%d, smallest=%d, "
+	    "order=%d",
+	    largest_value, smallest_value, in_order);
 
 	n_repl_elements = largest_value + 1;
 
@@ -1297,14 +1297,14 @@ usba_make_alts_sparse(usb_alt_if_data_t **array, uint_t *n_elements)
 	if ((n_repl_elements == n_orig_elements) &&
 	    ((in_order + 1) == n_orig_elements)) {
 		USB_DPRINTF_L4(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
-				"No holes");
+		    "No holes");
 
 		return;
 	}
 
 	/* Allocate zeroed space for the array. */
 	repl_array = kmem_zalloc(
-		(n_repl_elements * sizeof (usb_alt_if_data_t)), KM_SLEEP);
+	    (n_repl_elements * sizeof (usb_alt_if_data_t)), KM_SLEEP);
 
 	/* Now fill in the array. */
 	for (i = 0; i < n_orig_elements; i++) {
@@ -1312,9 +1312,9 @@ usba_make_alts_sparse(usb_alt_if_data_t **array, uint_t *n_elements)
 
 		/* Place in sparse array based on key. */
 		USB_DPRINTF_L4(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
-		    "move %d bytes (key %d) from 0x%p to 0x%p",
-		    sizeof (usb_alt_if_data_t), curr_value, &orig_addr[i],
-		    &repl_array[curr_value]);
+		    "move %lu bytes (key %d) from 0x%p to 0x%p",
+		    sizeof (usb_alt_if_data_t), curr_value,
+		    (void *)&orig_addr[i], (void *)&repl_array[curr_value]);
 
 		bcopy((char *)&orig_addr[i], (char *)&repl_array[curr_value],
 		    sizeof (usb_alt_if_data_t));
@@ -1352,7 +1352,7 @@ usba_order_tree(usba_reg_state_t *state)
 		for (which_if = 0; which_if < this_cfg->cfg_n_if; which_if++) {
 			this_if = this_cfg->cfg_if;
 			usba_make_alts_sparse(&this_if->if_alt,
-						&this_if->if_n_alt);
+			    &this_if->if_n_alt);
 		}
 	}
 }
@@ -1389,15 +1389,15 @@ usb_free_descr_tree(dev_info_t *dip, usb_client_dev_data_t *dev_data)
 	for (cfg = 0; cfg < n_cfgs; cfg++) {
 		if (cfg_array[cfg].cfg_if) {
 			usba_free_if_array(cfg_array[cfg].cfg_if,
-					cfg_array[cfg].cfg_n_if);
+			    cfg_array[cfg].cfg_n_if);
 		}
 		if (cfg_array[cfg].cfg_cvs) {
 			usba_free_cv_array(cfg_array[cfg].cfg_cvs,
-					cfg_array[cfg].cfg_n_cvs);
+			    cfg_array[cfg].cfg_n_cvs);
 		}
 		if (cfg_array[cfg].cfg_str) {
 			kmem_free(cfg_array[cfg].cfg_str,
-					cfg_array[cfg].cfg_strsize);
+			    cfg_array[cfg].cfg_strsize);
 		}
 	}
 
@@ -1440,7 +1440,7 @@ usba_free_if_array(usb_if_data_t *if_array, uint_t n_ifs)
 			altif = &if_array[which_if].if_alt[which_alt];
 			usba_free_ep_array(altif->altif_ep, altif->altif_n_ep);
 			usba_free_cv_array(altif->altif_cvs,
-					altif->altif_n_cvs);
+			    altif->altif_n_cvs);
 			kmem_free(altif->altif_str, altif->altif_strsize);
 		}
 
@@ -1490,7 +1490,7 @@ usba_free_cv_array(usb_cvs_data_t *cv_array, uint_t n_cvs)
 	/* Free data areas hanging off of each c/v descriptor. */
 	for (cv_node = 0; cv_node < n_cvs; cv_node++) {
 		kmem_free(cv_array[cv_node].cvs_buf,
-				cv_array[cv_node].cvs_buf_len);
+		    cv_array[cv_node].cvs_buf_len);
 	}
 
 	/* Free the array of cv descriptors. */
@@ -1605,15 +1605,15 @@ usba_dump_descr_tree(dev_info_t *dip, usb_client_dev_data_t *usb_reg,
 
 		/* Build device name string. */
 		(void) snprintf(string, USB_MAXSTRINGLEN,
-				"Port%d", usb_get_addr(dip));
+		    "Port%d", usb_get_addr(dip));
 		name_string_size = strlen(string) + 1;
 		name_string = kmem_zalloc(name_string_size, KM_SLEEP);
 		(void) strcpy(name_string, string);
 
 		/* Allocate a log handle specifying the name string. */
 		dump_handle = usb_alloc_log_hdl(NULL, name_string,
-					&dump_level, &dump_mask, NULL,
-					USB_FLAGS_SLEEP);
+		    &dump_level, &dump_mask, NULL,
+		    USB_FLAGS_SLEEP);
 	}
 
 	(void) usb_log(dump_handle, dump_level, dump_mask,
@@ -1640,7 +1640,8 @@ usba_dump_descr_tree(dev_info_t *dip, usb_client_dev_data_t *usb_reg,
 			(void) usb_log(dump_handle, dump_level, dump_mask, " ");
 		}
 		(void) usb_log(dump_handle, dump_level, dump_mask,
-		    "Configuration #%d (Addr= 0x%p)", which_config, config);
+		    "Configuration #%d (Addr= 0x%p)", which_config,
+		    (void *)config);
 		(void) usb_log(dump_handle, dump_level, dump_mask,
 		    "String descr=%s", config->cfg_str);
 		(void) usb_log(dump_handle, dump_level, dump_mask,
@@ -1662,11 +1663,11 @@ usba_dump_descr_tree(dev_info_t *dip, usb_client_dev_data_t *usb_reg,
 
 			if (dump_level == USB_LOG_L0) {
 				(void) usb_log(dump_handle, dump_level,
-					dump_mask, " ");
+				    dump_mask, " ");
 			}
 			(void) usb_log(dump_handle, dump_level, dump_mask,
 			    "	 interface #%d (0x%p)",
-			    which_if, &config->cfg_if[which_if]);
+			    which_if, (void *)&config->cfg_if[which_if]);
 			usba_dump_if(&config->cfg_if[which_if],
 			    dump_handle, dump_level, dump_mask, string);
 		}
@@ -1674,7 +1675,7 @@ usba_dump_descr_tree(dev_info_t *dip, usb_client_dev_data_t *usb_reg,
 		for (which_cv = 0; which_cv < config->cfg_n_cvs; which_cv++) {
 			(void) usb_log(dump_handle, dump_level, dump_mask,
 			    "  config cv descriptor %d (Address=0x%p)",
-			    which_cv, &config->cfg_cvs[which_cv]);
+			    which_cv, (void *)&config->cfg_cvs[which_cv]);
 			usba_dump_cv(&config->cfg_cvs[which_cv],
 			    dump_handle, dump_level, dump_mask, string, 4);
 		}
@@ -1682,7 +1683,7 @@ usba_dump_descr_tree(dev_info_t *dip, usb_client_dev_data_t *usb_reg,
 
 	(void) usb_log(dump_handle, dump_level, dump_mask,
 	    "Returning dev_curr_cfg:0x%p, dev_curr_if:%d",
-	    usb_reg->dev_curr_cfg, usb_reg->dev_curr_if);
+	    (void *)usb_reg->dev_curr_cfg, usb_reg->dev_curr_if);
 
 	if (log_handle == NULL) {
 		usb_free_log_hdl(dump_handle);
@@ -1730,7 +1731,7 @@ usba_dump_if(usb_if_data_t *which_if, usb_log_handle_t dump_handle,
 			(void) usb_log(dump_handle, dump_level, dump_mask, " ");
 		}
 		(void) usb_log(dump_handle, dump_level, dump_mask,
-		    "\tAlt #%d (0x%p)", which_alt, alt);
+		    "\tAlt #%d (0x%p)", which_alt, (void *)alt);
 		(void) usb_log(dump_handle, dump_level, dump_mask,
 		    "\tString descr=%s", alt->altif_str);
 		(void) usb_log(dump_handle, dump_level, dump_mask,
@@ -1757,7 +1758,7 @@ usba_dump_if(usb_if_data_t *which_if, usb_log_handle_t dump_handle,
 			}
 			if (dump_level == USB_LOG_L0) {
 				(void) usb_log(dump_handle, dump_level,
-					dump_mask, " ");
+				    dump_mask, " ");
 			}
 			usba_dump_ep(which_ep, &alt->altif_ep[which_ep],
 			    dump_handle, dump_level, dump_mask, string);
@@ -1766,11 +1767,11 @@ usba_dump_if(usb_if_data_t *which_if, usb_log_handle_t dump_handle,
 		for (which_cv = 0; which_cv < alt->altif_n_cvs; which_cv++) {
 			if (dump_level == USB_LOG_L0) {
 				(void) usb_log(dump_handle, dump_level,
-					dump_mask, " ");
+				    dump_mask, " ");
 			}
 			(void) usb_log(dump_handle, dump_level, dump_mask,
 			    "\talt cv descriptor #%d (0x%p), size=%d",
-			    which_cv, &alt->altif_cvs[which_cv],
+			    which_cv, (void *)&alt->altif_cvs[which_cv],
 			    alt->altif_cvs[which_cv].cvs_buf_len);
 			usba_dump_cv(&alt->altif_cvs[which_cv],
 			    dump_handle, dump_level, dump_mask, string, 2);
@@ -1801,7 +1802,7 @@ usba_dump_ep(uint_t which_ep, usb_ep_data_t *ep, usb_log_handle_t dump_handle,
 
 	(void) usb_log(dump_handle, dump_level, dump_mask,
 	    "\t    endpoint[%d], epaddr=0x%x (0x%p)", which_ep,
-	    ep_descr->bEndpointAddress, ep);
+	    ep_descr->bEndpointAddress, (void *)ep);
 	(void) usb_log(dump_handle, dump_level, dump_mask,
 	    "\t    len=%d type=%d attr=0x%x pktsize=%d interval=%d",
 	    ep_descr->bLength, ep_descr->bDescriptorType,
@@ -1815,11 +1816,11 @@ usba_dump_ep(uint_t which_ep, usb_ep_data_t *ep, usb_log_handle_t dump_handle,
 	for (which_cv = 0; which_cv < ep->ep_n_cvs; which_cv++) {
 		if (dump_level == USB_LOG_L0) {
 			(void) usb_log(dump_handle, dump_level,
-				dump_mask, " ");
+			    dump_mask, " ");
 		}
 		(void) usb_log(dump_handle, dump_level, dump_mask,
 		    "\t    endpoint cv descriptor %d (0x%p), size=%d",
-		    which_cv, &ep->ep_cvs[which_cv],
+		    which_cv, (void *)&ep->ep_cvs[which_cv],
 		    ep->ep_cvs[which_cv].cvs_buf_len);
 		usba_dump_cv(&ep->ep_cvs[which_cv],
 		    dump_handle, dump_level, dump_mask, string, 3);
@@ -1846,8 +1847,8 @@ usba_dump_cv(usb_cvs_data_t *cv_node, usb_log_handle_t dump_handle,
 {
 	if (cv_node) {
 		usba_dump_bin(cv_node->cvs_buf, cv_node->cvs_buf_len, indent,
-				dump_handle, dump_level, dump_mask, string,
-				USB_MAXSTRINGLEN);
+		    dump_handle, dump_level, dump_mask, string,
+		    USB_MAXSTRINGLEN);
 	}
 }
 
@@ -1887,8 +1888,8 @@ usba_dump_bin(uint8_t *data, int max_bytes, int indent,
 
 	/* Assume a tab is 2 four-space units. */
 	for (i = 0; i < indent/2; i++) {
-	    buffer[bufoffset] = '\t';
-	    bufoffset++;
+		buffer[bufoffset] = '\t';
+		bufoffset++;
 	}
 
 	if (indent % 2) {

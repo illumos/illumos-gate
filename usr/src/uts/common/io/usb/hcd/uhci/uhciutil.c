@@ -958,7 +958,8 @@ uhci_alloc_queue_head(uhci_state_t *uhcip)
 
 	queue_head = &uhcip->uhci_qh_pool_addr[index];
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, uhcip->uhci_log_hdl,
-	    "uhci_alloc_queue_head: Allocated address 0x%p", queue_head);
+	    "uhci_alloc_queue_head: Allocated address 0x%p",
+	    (void *)queue_head);
 
 	bzero((void *)queue_head, sizeof (queue_head_t));
 	SetQH32(uhcip, queue_head->link_ptr, HC_END_OF_LIST);
@@ -1540,7 +1541,7 @@ uhci_insert_intr_td(
 	uhci_trans_wrapper_t	*tw;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
-	    "uhci_insert_intr_td: req: 0x%p", req);
+	    "uhci_insert_intr_td: req: 0x%p", (void *)req);
 
 	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
 
@@ -1563,14 +1564,14 @@ uhci_insert_intr_td(
 
 		/* the length shouldn't exceed 8K */
 		USB_DPRINTF_L2(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
-		    "uhci_insert_intr_td: Intr request size 0x%lx is "
+		    "uhci_insert_intr_td: Intr request size 0x%x is "
 		    "more than 0x%x", length, UHCI_MAX_TD_XFER_SIZE);
 
 		return (USB_INVALID_REQUEST);
 	}
 
 	USB_DPRINTF_L3(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
-	    "uhci_insert_intr_td: length: 0x%lx", length);
+	    "uhci_insert_intr_td: length: 0x%x", length);
 
 	/* Allocate a transaction wrapper */
 	if ((tw = uhci_create_transfer_wrapper(uhcip, pp, length, flags)) ==
@@ -1855,7 +1856,7 @@ dmadone:
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
 	    "uhci_create_transfer_wrapper: tw = 0x%p, ncookies = %u",
-	    tw, tw->tw_ncookies);
+	    (void *)tw, tw->tw_ncookies);
 
 	return (tw);
 }
@@ -1888,7 +1889,7 @@ uhci_insert_hc_td(
 	current_dummy = qh->td_tailp;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, uhcip->uhci_log_hdl,
-	    "uhci_insert_hc_td: td %p, attrs = 0x%x", td, attrs);
+	    "uhci_insert_hc_td: td %p, attrs = 0x%x", (void *)td, attrs);
 
 	/*
 	 * Fill in the current dummy td and
@@ -1956,7 +1957,7 @@ uhci_fill_in_td(
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, uhcip->uhci_log_hdl,
 	    "uhci_fill_in_td: td 0x%p buf_offs 0x%x len 0x%lx "
-	    "attrs 0x%x", td, buffer_offset, length, attrs);
+	    "attrs 0x%x", (void *)td, buffer_offset, length, attrs);
 
 	/*
 	 * If this is an isochronous TD, just return
@@ -2074,7 +2075,7 @@ uhci_get_tw_paddr_by_offs(
 	    tw->tw_cookie.dmac_address;
 
 	USB_DPRINTF_L3(PRINT_MASK_ALLOC, uhcip->uhci_log_hdl,
-	    "uhci_get_tw_paddr_by_offs: dmac_addr 0x%p dmac_size "
+	    "uhci_get_tw_paddr_by_offs: dmac_addr 0x%x dmac_size "
 	    "0x%lx idx %d", buf_addr, tw->tw_cookie.dmac_size,
 	    tw->tw_cookie_idx);
 
@@ -2240,7 +2241,8 @@ uhci_create_setup_pkt(
 	}
 
 	USB_DPRINTF_L3(PRINT_MASK_ALLOC, uhcip->uhci_log_hdl,
-	    "Create_setup: pp = 0x%p, attrs = 0x%x", pp, req->ctrl_attributes);
+	    "Create_setup: pp = 0x%p, attrs = 0x%x", (void *)pp,
+	    req->ctrl_attributes);
 
 	/*
 	 * If this control transfer has a data phase, record the
@@ -2798,7 +2800,7 @@ uhci_insert_bulk_td(
 	uhci_bulk_isoc_td_pool_t *td_pool_ptr;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
-	    "uhci_insert_bulk_td: req: 0x%p, flags = 0x%x", req, flags);
+	    "uhci_insert_bulk_td: req: 0x%p, flags = 0x%x", (void *)req, flags);
 
 	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
 
@@ -2972,7 +2974,7 @@ uhci_fill_in_bulk_isoc_td(uhci_state_t *uhcip, uhci_td_t *current_td,
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
 	    "uhci_fill_in_bulk_isoc_td: tw 0x%p offs 0x%x length 0x%x",
-	    tw, offset, length);
+	    (void *)tw, offset, length);
 
 	bzero((char *)current_td, sizeof (uhci_td_t));
 	SetTD32(uhcip, current_td->link_ptr, next_td_paddr | HC_DEPTH_FIRST);
@@ -3070,7 +3072,7 @@ uhci_alloc_bulk_isoc_tds(
 {
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
 	    "uhci_alloc_bulk_isoc_tds: num_tds: 0x%x info: 0x%p",
-	    num_tds, info);
+	    num_tds, (void *)info);
 
 	info->num_pools = 1;
 	/* allocate as a whole pool at the first time */
@@ -3118,7 +3120,7 @@ uhci_alloc_memory_for_tds(
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
 	    "uhci_alloc_memory_for_tds: num_tds: 0x%x info: 0x%p "
-	    "num_pools: %u", num_tds, info, info->num_pools);
+	    "num_pools: %u", num_tds, (void *)info, info->num_pools);
 
 	/* The host controller will be little endian */
 	dev_attr.devacc_attr_version		= DDI_DEVICE_ATTR_V0;
@@ -3278,7 +3280,7 @@ uhci_handle_bulk_td(uhci_state_t *uhcip, uhci_td_t *td)
 	usba_pipe_handle_data_t	*ph;
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
-	    "uhci_handle_bulk_td: td = 0x%p tw = 0x%p", td, tw);
+	    "uhci_handle_bulk_td: td = 0x%p tw = 0x%p", (void *)td, (void *)tw);
 
 	/*
 	 * Update the tw_bytes_pending, and tw_bytes_xfered
@@ -3962,7 +3964,7 @@ uhci_create_isoc_transfer_wrapper(
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
 	    "uhci_create_isoc_transfer_wrapper: tw = 0x%p, ncookies = %u",
-	    tw, tw->tw_ncookies);
+	    (void *)tw, tw->tw_ncookies);
 
 	return (tw);
 }
@@ -3997,7 +3999,7 @@ uhci_insert_isoc_td(
 
 	USB_DPRINTF_L4(PRINT_MASK_ISOC, uhcip->uhci_log_hdl,
 	    "uhci_insert_isoc_td: ph = 0x%p isoc req = %p length = %lu",
-	    ph, (void *)isoc_req, length);
+	    (void *)ph, (void *)isoc_req, length);
 
 	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
 
@@ -4238,7 +4240,8 @@ uhci_insert_isoc_td(
 
 	USB_DPRINTF_L4(PRINT_MASK_ISOC, uhcip->uhci_log_hdl,
 	    "uhci_insert_isoc_td: current frame number 0x%llx, pipe frame num"
-	    " 0x%llx", current_frame, pp->pp_frame_num);
+	    " 0x%llx", (unsigned long long)current_frame,
+	    (unsigned long long)(pp->pp_frame_num));
 
 	return (rval);
 }
@@ -4301,7 +4304,8 @@ uhci_handle_isoc_td(uhci_state_t *uhcip, uhci_td_t *td)
 
 	USB_DPRINTF_L4(PRINT_MASK_ISOC, uhcip->uhci_log_hdl,
 	    "uhci_handle_isoc_td: td = 0x%p, pp = 0x%p, tw = 0x%p, req = 0x%p, "
-	    "index = %x", td, pp, tw, isoc_req, pkt_index);
+	    "index = %x", (void *)td, (void *)pp, (void *)tw, (void *)isoc_req,
+	    pkt_index);
 
 	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
 
@@ -4380,7 +4384,7 @@ uhci_handle_isoc_receive(
 	uhci_trans_wrapper_t	*tw)
 {
 	USB_DPRINTF_L4(PRINT_MASK_ISOC, uhcip->uhci_log_hdl,
-	    "uhci_handle_isoc_receive: tw = 0x%p", tw);
+	    "uhci_handle_isoc_receive: tw = 0x%p", (void *)tw);
 
 	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
 
@@ -4483,8 +4487,8 @@ uhci_start_isoc_receive_polling(
 	if ((isoc_pkts_length) && (isoc_pkts_length != length)) {
 
 		USB_DPRINTF_L2(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
-		    "uhci_start_isoc_receive_polling: isoc_pkts_length 0x%x "
-		    "is not equal to the sum of all pkt lengths 0x%x in "
+		    "uhci_start_isoc_receive_polling: isoc_pkts_length 0x%lx "
+		    "is not equal to the sum of all pkt lengths 0x%lx in "
 		    "an isoc request", isoc_pkts_length, length);
 
 		return (USB_FAILURE);
@@ -4622,8 +4626,9 @@ uhci_get_sw_frame_number(uhci_state_t *uhcip)
 	uhcip->uhci_sw_frnum = current_frnum;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
-	    "uhci_get_sw_frame_number: sw=%ld hd=%ld",
-	    uhcip->uhci_sw_frnum, hw_frnum);
+	    "uhci_get_sw_frame_number: sw=%lld hd=%lld",
+	    (unsigned long long)(uhcip->uhci_sw_frnum),
+	    (unsigned long long)hw_frnum);
 
 	return (current_frnum);
 }
@@ -4751,7 +4756,7 @@ uhci_wait_for_sof(uhci_state_t *uhcip)
 	usb_frame_number_t	before_frame_number, after_frame_number;
 	clock_t	time, rval;
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
-	    "uhci_wait_for_sof: uhcip = %p", uhcip);
+	    "uhci_wait_for_sof: uhcip = %p", (void *)uhcip);
 
 	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
 
@@ -4808,7 +4813,8 @@ uhci_allocate_periodic_in_resource(
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 	    "uhci_allocate_periodic_in_resource:\n\t"
-	    "ph = 0x%p, pp = 0x%p, tw = 0x%p, flags = 0x%x", ph, pp, tw, flags);
+	    "ph = 0x%p, pp = 0x%p, tw = 0x%p, flags = 0x%x",
+	    (void *)ph, (void *)pp, (void *)tw, flags);
 
 	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
 
@@ -4898,7 +4904,7 @@ uhci_deallocate_periodic_in_resource(
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
 	    "uhci_deallocate_periodic_in_resource: "
-	    "pp = 0x%p tw = 0x%p", pp, tw);
+	    "pp = 0x%p tw = 0x%p", (void *)pp, (void *)tw);
 
 	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
 
@@ -4941,7 +4947,8 @@ uhci_hcdi_callback(uhci_state_t *uhcip, uhci_pipe_private_t *pp,
 	usb_opaque_t	curr_xfer_reqp;
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,
-	    "uhci_hcdi_callback: ph = 0x%p, tw = 0x%p, cr = 0x%x", ph, tw, cr);
+	    "uhci_hcdi_callback: ph = 0x%p, tw = 0x%p, cr = 0x%x",
+	    (void *)ph, (void *)tw, cr);
 
 	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
 

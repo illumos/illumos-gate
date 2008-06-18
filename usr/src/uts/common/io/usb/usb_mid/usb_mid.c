@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -276,7 +276,7 @@ usb_mid_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 {
 	usb_mid_t	*usb_mid;
 	int		instance =
-			USB_MID_MINOR_TO_INSTANCE(getminor((dev_t)arg));
+	    USB_MID_MINOR_TO_INSTANCE(getminor((dev_t)arg));
 	int		error = DDI_FAILURE;
 
 	switch (infocmd) {
@@ -341,7 +341,7 @@ usb_mid_post_detach(usb_mid_t *usb_mid, uint8_t ifno, struct detachspec *ds)
 	 */
 	if (ds->result == DDI_SUCCESS) {
 		usba_device_t *usba_device =
-				usba_get_usba_device(usb_mid->mi_dip);
+		    usba_get_usba_device(usb_mid->mi_dip);
 
 		mutex_enter(&usb_mid->mi_mutex);
 
@@ -379,7 +379,7 @@ usb_mid_bus_ctl(dev_info_t *dip,
 	USB_DPRINTF_L2(DPRINT_MASK_PM, usb_mid->mi_log_handle,
 	    "usb_mid_bus_ctl:\n\t"
 	    "dip = 0x%p, rdip = 0x%p, op = 0x%x, arg = 0x%p",
-	    dip, rdip, op, arg);
+	    (void *)dip, (void *)rdip, op, arg);
 
 	switch (op) {
 	case DDI_CTLOPS_ATTACH:
@@ -496,8 +496,8 @@ usb_mid_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 		mdip = usb_mid->mi_children_dips[interface];
 
 		/* now search if this dip still exists */
-		for (cdip = ddi_get_child(dip); cdip && (cdip != mdip);
-			cdip = ddi_get_next_sibling(cdip));
+		for (cdip = ddi_get_child(dip); cdip && (cdip != mdip); )
+			cdip = ddi_get_next_sibling(cdip);
 
 		if (cdip != mdip) {
 			/* we lost the dip on this interface */
@@ -533,7 +533,8 @@ usb_mid_power(dev_info_t *dip, int comp, int level)
 	usb_mid =  usb_mid_obtain_state(dip);
 
 	USB_DPRINTF_L4(DPRINT_MASK_PM, usb_mid->mi_log_handle,
-	    "usb_mid_power: Begin: usb_mid = %p, level = %d", usb_mid, level);
+	    "usb_mid_power: Begin: usb_mid = %p, level = %d",
+	    (void *)usb_mid, level);
 
 	mutex_enter(&usb_mid->mi_mutex);
 	midpm = usb_mid->mi_pm;
@@ -580,7 +581,7 @@ usb_mid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		if (usb_mid->mi_ugen_hdl) {
 			(void) usb_ugen_attach(usb_mid->mi_ugen_hdl,
-						DDI_RESUME);
+			    DDI_RESUME);
 		}
 
 		return (DDI_SUCCESS);
@@ -606,9 +607,9 @@ usb_mid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* allocate handle for logging of messages */
 	usb_mid->mi_log_handle = usb_alloc_log_hdl(dip, "mid",
-				&usb_mid_errlevel,
-				&usb_mid_errmask, &usb_mid_instance_debug,
-				0);
+	    &usb_mid_errlevel,
+	    &usb_mid_errmask, &usb_mid_instance_debug,
+	    0);
 
 	usb_mid->mi_usba_device = usba_get_usba_device(dip);
 	usb_mid->mi_dip	= dip;
@@ -629,7 +630,7 @@ usb_mid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	mutex_init(&usb_mid->mi_mutex, NULL, MUTEX_DRIVER,
-			usb_mid->mi_dev_data->dev_iblock_cookie);
+	    usb_mid->mi_dev_data->dev_iblock_cookie);
 
 	usb_free_dev_data(dip, usb_mid->mi_dev_data);
 	usb_mid->mi_dev_data = NULL;
@@ -654,9 +655,9 @@ usb_mid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	usb_mid->mi_children_dips = kmem_zalloc(size, KM_SLEEP);
 	usb_mid->mi_child_events = kmem_zalloc(sizeof (uint8_t) * n_ifs,
-								KM_SLEEP);
+	    KM_SLEEP);
 	usb_mid->mi_children_ifs = kmem_zalloc(sizeof (uint_t) * n_ifs,
-								KM_SLEEP);
+	    KM_SLEEP);
 	for (i = 0; i < n_ifs; i++) {
 		usb_mid->mi_children_ifs[i] = 1;
 	}
@@ -666,7 +667,7 @@ usb_mid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * get event handle for events that we have defined
 	 */
 	(void) ndi_event_alloc_hdl(dip, 0, &usb_mid->mi_ndi_event_hdl,
-								NDI_SLEEP);
+	    NDI_SLEEP);
 
 	/* bind event set to the handle */
 	if (ndi_event_bind_set(usb_mid->mi_ndi_event_hdl, &usb_mid_ndi_events,
@@ -727,9 +728,9 @@ usb_mid_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		if (usb_mid->mi_ugen_hdl) {
 			int rval = usb_ugen_detach(usb_mid->mi_ugen_hdl,
-						DDI_SUSPEND);
+			    DDI_SUSPEND);
 			return (rval == USB_SUCCESS ? DDI_SUCCESS :
-						DDI_FAILURE);
+			    DDI_FAILURE);
 		}
 
 		return (DDI_SUCCESS);
@@ -827,7 +828,7 @@ usb_mid_cleanup(dev_info_t *dip, usb_mid_t *usb_mid)
 	/* free children list */
 	if (usb_mid->mi_children_dips) {
 		kmem_free(usb_mid->mi_children_dips,
-					usb_mid->mi_cd_list_length);
+		    usb_mid->mi_cd_list_length);
 	}
 
 	if (usb_mid->mi_child_events) {
@@ -874,20 +875,20 @@ usb_mid_ugen_attach(usb_mid_t *usb_mid, boolean_t remove_children)
 		usb_ugen_hdl_t	hdl;
 
 		USB_DPRINTF_L4(DPRINT_MASK_ATTA, usb_mid->mi_log_handle,
-			"usb_mid_ugen_attach: get handle");
+		    "usb_mid_ugen_attach: get handle");
 
 		bzero(&usb_ugen_info, sizeof (usb_ugen_info));
 
 		usb_ugen_info.usb_ugen_flags = (remove_children ?
-				USB_UGEN_REMOVE_CHILDREN : 0);
+		    USB_UGEN_REMOVE_CHILDREN : 0);
 		usb_ugen_info.usb_ugen_minor_node_ugen_bits_mask =
-				(dev_t)USB_MID_MINOR_UGEN_BITS_MASK;
+		    (dev_t)USB_MID_MINOR_UGEN_BITS_MASK;
 		usb_ugen_info.usb_ugen_minor_node_instance_mask =
-				(dev_t)~USB_MID_MINOR_UGEN_BITS_MASK;
+		    (dev_t)~USB_MID_MINOR_UGEN_BITS_MASK;
 
 		mutex_exit(&usb_mid->mi_mutex);
 		hdl = usb_ugen_get_hdl(usb_mid->mi_dip,
-						&usb_ugen_info);
+		    &usb_ugen_info);
 
 		if ((rval = usb_ugen_attach(hdl, DDI_ATTACH)) != USB_SUCCESS) {
 			USB_DPRINTF_L4(DPRINT_MASK_ATTA, usb_mid->mi_log_handle,
@@ -950,8 +951,8 @@ usb_mid_create_children(usb_mid_t *usb_mid)
 
 		if (usb_mid->mi_children_dips[i] != NULL) {
 			if (i_ddi_node_state(
-				usb_mid->mi_children_dips[i]) >=
-				DS_BOUND) {
+			    usb_mid->mi_children_dips[i]) >=
+			    DS_BOUND) {
 					bound_children++;
 			}
 
@@ -1057,7 +1058,7 @@ usb_mid_busop_get_eventcookie(dev_info_t *dip,
 
 	/* return event cookie, iblock cookie, and level */
 	return (ndi_event_retrieve_cookie(usb_mid->mi_ndi_event_hdl,
-		rdip, eventname, cookie, NDI_EVENT_NOPASS));
+	    rdip, eventname, cookie, NDI_EVENT_NOPASS));
 }
 
 
@@ -1105,7 +1106,7 @@ usb_mid_busop_add_eventcall(dev_info_t *dip,
 	}
 	/* add callback (perform registration) */
 	return (ndi_event_add_callback(usb_mid->mi_ndi_event_hdl,
-		rdip, cookie, callback, arg, NDI_SLEEP, cb_id));
+	    rdip, cookie, callback, arg, NDI_SLEEP, cb_id));
 }
 
 
@@ -1119,8 +1120,8 @@ usb_mid_busop_remove_eventcall(dev_info_t *dip, ddi_callback_id_t cb_id)
 
 	USB_DPRINTF_L3(DPRINT_MASK_EVENTS, usb_mid->mi_log_handle,
 	    "usb_mid_busop_remove_eventcall: dip=0x%p, rdip=0x%p "
-	    "cookie=0x%p", (void *)dip, cb->ndi_evtcb_dip,
-	    cb->ndi_evtcb_cookie);
+	    "cookie=0x%p", (void *)dip, (void *)cb->ndi_evtcb_dip,
+	    (void *)cb->ndi_evtcb_cookie);
 	USB_DPRINTF_L3(DPRINT_MASK_EVENTS, usb_mid->mi_log_handle,
 	    "(dip=%s%d rdip=%s%d event=%s)",
 	    ddi_driver_name(dip), ddi_get_instance(dip),
@@ -1154,7 +1155,7 @@ usb_mid_busop_post_event(dev_info_t *dip,
 
 	/* post event to all children registered for this event */
 	return (ndi_event_run_callbacks(usb_mid->mi_ndi_event_hdl, rdip,
-		    cookie, bus_impldata));
+	    cookie, bus_impldata));
 }
 
 
@@ -1168,7 +1169,7 @@ usb_mid_restore_device_state(dev_info_t *dip, usb_mid_t *usb_mid)
 	usb_common_power_t		*midpm;
 
 	USB_DPRINTF_L4(DPRINT_MASK_EVENTS, usb_mid->mi_log_handle,
-	    "usb_mid_restore_device_state: usb_mid = %p", usb_mid);
+	    "usb_mid_restore_device_state: usb_mid = %p", (void *)usb_mid);
 
 	mutex_enter(&usb_mid->mi_mutex);
 	midpm = usb_mid->mi_pm;
@@ -1264,7 +1265,7 @@ usb_mid_event_cb(dev_info_t *dip, ddi_eventcookie_t cookie,
 
 			if (usb_mid->mi_ugen_hdl) {
 				(void) usb_ugen_disconnect_ev_cb(
-						usb_mid->mi_ugen_hdl);
+				    usb_mid->mi_ugen_hdl);
 			}
 			mutex_enter(&usb_mid->mi_mutex);
 		}
@@ -1320,7 +1321,7 @@ usb_mid_event_cb(dev_info_t *dip, ddi_eventcookie_t cookie,
 
 			if (usb_mid->mi_ugen_hdl) {
 				(void) usb_ugen_reconnect_ev_cb(
-						usb_mid->mi_ugen_hdl);
+				    usb_mid->mi_ugen_hdl);
 			}
 		}
 		mutex_enter(&usb_mid->mi_mutex);
@@ -1457,7 +1458,8 @@ usb_mid_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	}
 
 	USB_DPRINTF_L4(DPRINT_MASK_CBOPS, usb_mid->mi_log_handle,
-	    "usb_mid_open: usb_mid = 0x%p *devp = 0x%lx", usb_mid, *devp);
+	    "usb_mid_open: usb_mid = 0x%p *devp = 0x%lx",
+	    (void *)usb_mid, *devp);
 
 	/* First bring the device to full power */
 	(void) pm_busy_component(usb_mid->mi_dip, 0);
@@ -1465,7 +1467,7 @@ usb_mid_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 
 
 	rval = usb_ugen_open(usb_mid->mi_ugen_hdl, devp, flags, otyp,
-								credp);
+	    credp);
 	if (rval) {
 		(void) pm_idle_component(usb_mid->mi_dip, 0);
 	} else {
@@ -1496,7 +1498,7 @@ usb_mid_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	}
 
 	rval = usb_ugen_close(usb_mid->mi_ugen_hdl, dev, flag, otyp,
-								credp);
+	    credp);
 	if (rval == 0) {
 		(void) pm_idle_component(usb_mid->mi_dip, 0);
 		mutex_enter(&usb_mid->mi_mutex);
@@ -1551,5 +1553,5 @@ usb_mid_poll(dev_t dev, short events, int anyyet,  short *reventsp,
 	}
 
 	return (usb_ugen_poll(usb_mid->mi_ugen_hdl, dev, events,
-						anyyet, reventsp, phpp));
+	    anyyet, reventsp, phpp));
 }

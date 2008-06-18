@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -384,8 +384,8 @@ ehci_allocate_isoc_resources(
 
 			USB_DPRINTF_L2(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 			    "ehci_allocate_isoc_resources: "
-			    "isoc_pkts_length 0x%x is not equal to the sum of "
-			    "all pkt lengths 0x%x in an isoc request",
+			    "isoc_pkts_length 0x%lx is not equal to the sum of "
+			    "all pkt lengths 0x%lx in an isoc request",
 			    isoc_pkts_length, itw_xfer_size);
 
 			return (NULL);
@@ -402,14 +402,14 @@ ehci_allocate_isoc_resources(
 
 		USB_DPRINTF_L2(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 		    "ehci_allocate_isoc_resources: Maximum isoc request "
-		    "size 0x%x Given isoc request size 0x%x",
+		    "size 0x%x Given isoc request size 0x%lx",
 		    max_isoc_xfer_size, itw_xfer_size);
 
 		return (NULL);
 	}
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-	    "ehci_allocate_isoc_resources: length = 0x%x", itw_xfer_size);
+	    "ehci_allocate_isoc_resources: length = 0x%lx", itw_xfer_size);
 
 	/* Allocate the itw for this request */
 	if ((itw = ehci_allocate_itw_resources(ehcip, pp, itw_xfer_size,
@@ -571,8 +571,8 @@ ehci_insert_itd_req(
 	ASSERT((page % EHCI_4K_ALIGN) == 0);
 
 	USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-	    "ehci_insert_itd_req: itw_curr_xfer_reqp = 0x%p page = 0x%p,"
-	    " pagesize = 0x%x", itw->itw_curr_xfer_reqp, page,
+	    "ehci_insert_itd_req: itw_curr_xfer_reqp = 0x%p page = 0x%x,"
+	    " pagesize = 0x%lx", (void *)itw->itw_curr_xfer_reqp, page,
 	    itw->itw_cookie.dmac_size);
 
 	/* Insert all the isochronous TDs */
@@ -641,7 +641,7 @@ ehci_insert_itd_req(
 			    ehcip->ehci_log_hdl,
 			    "ehci_insert_itd_req: count = 0x%x multi = %d"
 			    "status = 0x%x page = 0x%x index = %d "
-			    "pageselected = %d isoc_pkt_length = 0x%x",
+			    "pageselected = %d isoc_pkt_length = 0x%lx",
 			    xactcount, multi, xact_status, page,
 			    index, pageselected, isoc_pkt_length);
 
@@ -856,7 +856,7 @@ ehci_remove_isoc_itds(
 	ehci_itd_t		*curr_itd, *next_itd;
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-	    "ehci_remove_isoc_itds: pp = 0x%p", pp);
+	    "ehci_remove_isoc_itds: pp = 0x%p", (void *)pp);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
@@ -864,7 +864,7 @@ ehci_remove_isoc_itds(
 	while (curr_itw) {
 		USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 		    "ehci_remove_isoc_itds: itw = 0x%p num itds = %d",
-		    curr_itw, curr_itw->itw_num_itds);
+		    (void *)curr_itw, curr_itw->itw_num_itds);
 
 		next_itw = curr_itw->itw_next;
 
@@ -904,7 +904,7 @@ ehci_mark_reclaim_isoc(
 	int			i;
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-	    "ehci_mark_reclaim_isoc: pp = 0x%p", pp);
+	    "ehci_mark_reclaim_isoc: pp = 0x%p", (void *)pp);
 
 	if (pp->pp_itw_head == NULL) {
 
@@ -921,7 +921,7 @@ ehci_mark_reclaim_isoc(
 
 		USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 		    "ehci_mark_reclaim_isoc: itw = 0x%p num itds = %d",
-		    curr_itw, curr_itw->itw_num_itds);
+		    (void *)curr_itw, curr_itw->itw_num_itds);
 
 		curr_itd = curr_itw->itw_itd_head;
 		while (curr_itd) {
@@ -988,7 +988,7 @@ ehci_reclaim_isoc(
 	ehci_pipe_private_t	*pp)
 {
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-	    "ehci_reclaim_isoc: itd = 0x%p", itd);
+	    "ehci_reclaim_isoc: itd = 0x%p", (void *)itd);
 
 	/*
 	 * These are itds that were marked "RECLAIM"
@@ -1065,7 +1065,7 @@ ehci_start_isoc_polling(
 		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 		    "ehci_start_isoc_polling: max = %d curr = %d itw = %p:",
 		    pp->pp_max_periodic_req_cnt, pp->pp_cur_periodic_req_cnt,
-		    itw_list);
+		    (void *)itw_list);
 
 		itw = itw_list;
 		itw_list = itw->itw_next;
@@ -1130,7 +1130,8 @@ ehci_traverse_active_isoc_list(
 	/* Traverse the list of done itds */
 	curr_itd = ehci_create_done_itd_list(ehcip);
 	USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-	    "ehci_traverse_active_isoc_list: current itd = 0x%p", curr_itd);
+	    "ehci_traverse_active_isoc_list: current itd = 0x%p",
+	    (void *)curr_itd);
 
 	while (curr_itd) {
 		/* Save the next_itd */
@@ -1172,7 +1173,8 @@ ehci_traverse_active_isoc_list(
 		if (pp->pp_itw_head == NULL) {
 			USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 			    "ehci_traverse_active_isoc_list: "
-			    "Sent transfers completion event pp = 0x%p", pp);
+			    "Sent transfers completion event pp = 0x%p",
+			    (void *)pp);
 			cv_signal(&pp->pp_xfer_cmpl_cv);
 		}
 
@@ -1181,7 +1183,8 @@ ehci_traverse_active_isoc_list(
 		USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 		    "ehci_traverse_active_isoc_list: state = 0x%x "
 		    "pp = 0x%p itw = 0x%p itd = 0x%p next_itd = 0x%p",
-		    state, pp, curr_itw, curr_itd, next_itd);
+		    state, (void *)pp, (void *)curr_itw, (void *)curr_itd,
+		    (void *)next_itd);
 	}
 }
 
@@ -1229,8 +1232,8 @@ ehci_handle_itd(
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 	    "ehci_handle_itd: pp=0x%p itw=0x%p itd=0x%p "
-	    "isoc_reqp=0%p data=0x%p", pp, itw, itd, curr_isoc_reqp,
-	    curr_isoc_reqp->isoc_data);
+	    "isoc_reqp=0%p data=0x%p", (void *)pp, (void *)itw, (void *)itd,
+	    (void *)curr_isoc_reqp, (void *)curr_isoc_reqp->isoc_data);
 
 	if (itw->itw_port_status == USBA_HIGH_SPEED_DEV &&
 	    curr_isoc_reqp != NULL) {
@@ -1268,8 +1271,8 @@ ehci_handle_itd(
 	 */
 	if (itw->itw_direction == USB_EP_DIR_OUT) {
 		USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-		    "ehci_handle_itd: Isoc out pipe, isoc_reqp=0x%p,"
-		    "data=0x%p", curr_isoc_reqp, curr_isoc_reqp->isoc_data);
+		    "ehci_handle_itd: Isoc out pipe, isoc_reqp=0x%p, data=0x%p",
+		    (void *)curr_isoc_reqp, (void *)curr_isoc_reqp->isoc_data);
 
 		/* Do the callback */
 		ehci_hcdi_isoc_callback(ph, itw, USB_CR_OK);
@@ -1371,7 +1374,7 @@ ehci_sendup_itd_message(
 	buf = (uchar_t *)itw->itw_buf;
 
 	USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-	    "ehci_sendup_itd_message: length %d error %d", length, error);
+	    "ehci_sendup_itd_message: length %ld error %d", length, error);
 
 	/* Get the message block */
 	mp = isoc_reqp->isoc_data;
@@ -1416,7 +1419,7 @@ ehci_hcdi_isoc_callback(
 
 	USB_DPRINTF_L4(PRINT_MASK_HCDI, ehcip->ehci_log_hdl,
 	    "ehci_hcdi_isoc_callback: ph = 0x%p, itw = 0x%p, cr = 0x%x",
-	    (void *)ph, itw, completion_reason);
+	    (void *)ph, (void *)itw, completion_reason);
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 

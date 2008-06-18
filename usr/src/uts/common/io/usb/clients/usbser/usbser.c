@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -147,9 +147,9 @@ usb_event_t usbser_usb_events = {
 };
 
 /* debug support */
-uint_t   usbser_errlevel = USB_LOG_L4;
-uint_t   usbser_errmask = DPRINT_MASK_ALL;
-uint_t   usbser_instance_debug = (uint_t)-1;
+uint_t	 usbser_errlevel = USB_LOG_L4;
+uint_t	 usbser_errmask = DPRINT_MASK_ALL;
+uint_t	 usbser_instance_debug = (uint_t)-1;
 
 /* usb serial console */
 static struct usbser_state *usbser_list;
@@ -675,7 +675,8 @@ usbser_power(dev_info_t *dip, int comp, int level)
 	usp = ddi_get_soft_state(statep, ddi_get_instance(dip));
 
 	USB_DPRINTF_L3(DPRINT_EVENTS, usp->us_lh,
-	    "usbser_power: dip=0x%p, comp=%d, level=%d", dip, comp, level);
+	    "usbser_power: dip=0x%p, comp=%d, level=%d",
+	    (void *)dip, comp, level);
 
 	mutex_enter(&usp->us_mutex);
 	new_state = usp->us_dev_state;
@@ -1014,7 +1015,7 @@ usbser_disconnect_cb(dev_info_t *dip)
 	usp = ddi_get_soft_state(statep, ddi_get_instance(dip));
 
 	USB_DPRINTF_L3(DPRINT_EVENTS, usp->us_lh,
-	    "usbser_disconnect_cb: dip=%p", dip);
+	    "usbser_disconnect_cb: dip=%p", (void *)dip);
 
 	mutex_enter(&usp->us_mutex);
 	switch (usp->us_dev_state) {
@@ -1060,7 +1061,7 @@ usbser_reconnect_cb(dev_info_t *dip)
 	usp = ddi_get_soft_state(statep, ddi_get_instance(dip));
 
 	USB_DPRINTF_L3(DPRINT_EVENTS, usp->us_lh,
-	    "usbser_reconnect_cb: dip=%p", dip);
+	    "usbser_reconnect_cb: dip=%p", (void *)dip);
 
 	(void) usbser_restore_device_state(usp);
 
@@ -1543,7 +1544,7 @@ usbser_check_port_props(usbser_port_t *pp)
 {
 	dev_info_t	*dip = pp->port_usp->us_dip;
 	tty_common_t	*tp = &pp->port_ttycommon;
-	struct termios 	*termiosp;
+	struct termios	*termiosp;
 	uint_t		len;
 	char		name[20];
 
@@ -2037,7 +2038,8 @@ usbser_tx_cb(caddr_t arg)
 
 	mutex_enter(&pp->port_mutex);
 	USB_DPRINTF_L4(DPRINT_TX_CB, pp->port_lh,
-	    "usbser_tx_cb: act=%x curthread=%p", pp->port_act, curthread);
+	    "usbser_tx_cb: act=%x curthread=%p", pp->port_act,
+	    (void *)curthread);
 
 	usbser_release_port_act(pp, USBSER_ACT_TX);
 
@@ -2204,8 +2206,9 @@ usbser_rx_massage_data(usbser_port_t *pp, mblk_t *mp)
 				continue;
 			}
 			USB_DPRINTF_L4(DPRINT_RX_CB, pp->port_lh,
-			    "usbser_rx_massage_data: mp=%p off=%d(%d)",
-			    mp, p - mp->b_rptr - 1, MBLKL(mp));
+			    "usbser_rx_massage_data: mp=%p off=%ld(%ld)",
+			    (void *)mp, (long)(p - mp->b_rptr - 1),
+			    (long)MBLKL(mp));
 
 			/*
 			 * insert another 0377 after this one. all data after
@@ -2262,8 +2265,8 @@ usbser_rx_massage_mbreak(usbser_port_t *pp, mblk_t *mp)
 	}
 
 	USB_DPRINTF_L4(DPRINT_RX_CB, pp->port_lh,
-	    "usbser_rx_massage_mbreak: type=%x len=%d [0]=0%o",
-	    DB_TYPE(mp), MBLKL(mp), (MBLKL(mp) > 0) ? *mp->b_rptr : 45);
+	    "usbser_rx_massage_mbreak: type=%x len=%ld [0]=0%o",
+	    DB_TYPE(mp), (long)MBLKL(mp), (MBLKL(mp) > 0) ? *mp->b_rptr : 45);
 }
 
 
@@ -2467,7 +2470,7 @@ usbser_wmsg(usbser_port_t *pp)
 		return;
 	}
 	USB_DPRINTF_L4(DPRINT_WQ, pp->port_lh, "usbser_wmsg: q=%p act=%x 0x%x",
-	    q, pp->port_act, q->q_first ? DB_TYPE(q->q_first) : 0xff);
+	    (void *)q, pp->port_act, q->q_first ? DB_TYPE(q->q_first) : 0xff);
 
 	while ((mp = getq(q)) != NULL) {
 		msgtype = DB_TYPE(mp);
@@ -2589,7 +2592,7 @@ usbser_ioctl(usbser_port_t *pp, mblk_t *mp)
 	cmd = iocp->ioc_cmd;
 
 	USB_DPRINTF_L4(DPRINT_IOCTL, pp->port_lh, "usbser_ioctl: "
-	    "mp=%p %s (0x%x)", mp, usbser_ioctl2str(cmd), cmd);
+	    "mp=%p %s (0x%x)", (void *)mp, usbser_ioctl2str(cmd), cmd);
 
 	if (tp->t_iocpending != NULL) {
 		/*
@@ -3399,7 +3402,7 @@ usbser_ioctl2str(int ioctl)
  * Polled IO support
  */
 
-/* called once  by consconfig() when polledio is opened */
+/* called once	by consconfig() when polledio is opened */
 static int
 usbser_polledio_init(usbser_port_t *pp)
 {
@@ -3440,7 +3443,7 @@ usbser_polledio_init(usbser_port_t *pp)
 	return (USB_SUCCESS);
 }
 
-/* called once  by consconfig() when polledio is closed */
+/* called once	by consconfig() when polledio is closed */
 /*ARGSUSED*/
 static void usbser_polledio_fini(usbser_port_t *pp)
 {

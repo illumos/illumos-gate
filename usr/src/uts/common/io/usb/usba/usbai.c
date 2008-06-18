@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -744,7 +744,7 @@ usba_handle_device_remote_wakeup(dev_info_t *dip, int cmd)
 	usb_pipe_handle_t ph;
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
-	    "usba_handle_device_remote_wakeup: dip = 0x%p", dip);
+	    "usba_handle_device_remote_wakeup: dip = 0x%p", (void *)dip);
 
 	USBA_CHECK_CONTEXT();
 

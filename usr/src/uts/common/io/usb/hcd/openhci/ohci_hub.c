@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,7 @@
  *
  * The USB Open Host Controller driver is a software driver which interfaces
  * to the Universal Serial Bus layer (USBA) and the USB Open Host Controller.
- * The interface to USB Open Host Controller is defined by the OpenHCI  Host
+ * The interface to USB Open Host Controller is defined by the OpenHCI	Host
  * Controller Interface.
  *
  * This module contains the code for root hub related functions.
@@ -106,7 +106,7 @@ int
 ohci_init_root_hub(ohci_state_t	*ohcip)
 {
 	usb_hub_descr_t 	*root_hub_descr =
-				    &ohcip->ohci_root_hub.rh_descr;
+	    &ohcip->ohci_root_hub.rh_descr;
 	uint_t			des_A, des_B, port_state;
 	int			i, length;
 
@@ -286,7 +286,7 @@ static uchar_t ohci_root_hub_config_descriptor[] = {
 	0x05,		/* bDescriptorType, Endpoint */
 	0x81,		/* bEndpointAddress */
 	0x03,		/* bmAttributes */
-	0x01, 0x00,	/* wMaxPacketSize, 1 +  (OHCI_MAX_RH_PORTS / 8) */
+	0x01, 0x00,	/* wMaxPacketSize, 1 +	(OHCI_MAX_RH_PORTS / 8) */
 	0xff		/* bInterval */
 };
 
@@ -328,7 +328,7 @@ ohci_handle_root_hub_pipe_open(
 	usb_flags_t		usb_flags)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 
 	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, ohcip->ohci_log_hdl,
@@ -391,7 +391,7 @@ int
 ohci_handle_root_hub_pipe_close(usba_pipe_handle_data_t	*ph)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 
 	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, ohcip->ohci_log_hdl,
@@ -460,7 +460,7 @@ ohci_handle_root_hub_pipe_reset(
 	usb_flags_t		usb_flags)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 	int			error = USB_SUCCESS;
 
@@ -691,7 +691,7 @@ ohci_handle_set_clear_port_feature(
 			error = USB_FAILURE;
 			break;
 		}
-		    break;
+		break;
 	default:
 		USB_DPRINTF_L2(PRINT_MASK_ROOT_HUB, ohcip->ohci_log_hdl,
 		    "ohci_handle_set_clear_port_feature: "
@@ -777,7 +777,7 @@ ohci_handle_port_power(
 			if ((port_status & HCR_PORT_PPS)) {
 				/* Turn the port OFF by writing LSSA bit  */
 				Set_OpReg(hcr_rh_portstatus[port],
-							HCR_PORT_LSDA);
+				    HCR_PORT_LSDA);
 			}
 
 			rh->rh_port_status[port] = 0;
@@ -1173,7 +1173,7 @@ ohci_handle_get_hub_descriptor(
 
 	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, ohcip->ohci_log_hdl,
 	    "ohci_handle_get_hub_descriptor: Ctrl Req  = 0x%p",
-	    ctrl_reqp);
+	    (void *)ctrl_reqp);
 
 	message = ctrl_reqp->ctrl_data;
 
@@ -1293,7 +1293,7 @@ ohci_handle_root_hub_pipe_start_intr_polling(
 	usb_flags_t		flags)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 	int			error = USB_SUCCESS;
 	uint_t			pipe_state;
@@ -1374,7 +1374,7 @@ ohci_handle_root_hub_pipe_stop_intr_polling(
 	usb_flags_t		flags)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	usb_ep_descr_t		*eptd = &ph->p_ep;
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
@@ -1747,15 +1747,15 @@ ohci_root_hub_hcdi_callback(
 	usb_cr_t		completion_reason)
 {
 	ohci_state_t		*ohcip = ohci_obtain_state(
-				    ph->p_usba_device->usb_root_hub_dip);
+	    ph->p_usba_device->usb_root_hub_dip);
 	uchar_t			attributes = ph->p_ep.bmAttributes &
-							USB_EP_ATTR_MASK;
+	    USB_EP_ATTR_MASK;
 	usb_opaque_t		curr_xfer_reqp;
 	uint_t			pipe_state = 0;
 
 	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, ohcip->ohci_log_hdl,
 	    "ohci_root_hub_hcdi_callback: ph = 0x%p, cr = 0x%x",
-	    ph, completion_reason);
+	    (void *)ph, completion_reason);
 
 	ASSERT(mutex_owned(&ohcip->ohci_int_mutex));
 

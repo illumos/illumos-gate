@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -915,7 +915,7 @@ usbvc_v4l2_set_format(usbvc_state_t *usbvcp, struct v4l2_format *format)
 		strm_if->cur_format_group = &strm_if->format_group[i];
 	} else {
 		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
-			"usbvc_v4l2_set_format: format index out of range");
+		    "usbvc_v4l2_set_format: format index out of range");
 		mutex_exit(&usbvcp->usbvc_mutex);
 
 		return (USB_FAILURE);
@@ -984,7 +984,7 @@ usbvc_v4l2_get_format(usbvc_state_t *usbvcp, struct v4l2_format *format)
 		mutex_exit(&usbvcp->usbvc_mutex);
 		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "usbvc_v4l2_get_format: fail, no current format or frame,"
-		    "fmtgrp=%p", fmtgrp);
+		    "fmtgrp=%p", (void *)fmtgrp);
 
 		return (EINVAL);
 	}
@@ -1157,7 +1157,7 @@ usbvc_v4l2_dequeue_buffer(usbvc_state_t *usbvcp, struct v4l2_buffer *buf,
 
 	/* v4l2 spec: app just set type and memory field */
 	if ((buf->type != V4L2_BUF_TYPE_VIDEO_CAPTURE) ||
-		(buf->memory != V4L2_MEMORY_MMAP)) {
+	    (buf->memory != V4L2_MEMORY_MMAP)) {
 
 		return (EINVAL);
 	}
@@ -1331,7 +1331,7 @@ usbvc_v4l2_query_ctrl(usbvc_state_t *usbvcp, struct v4l2_queryctrl *queryctrl)
 	LE_TO_UINT16(data->b_rptr, 0, queryctrl->minimum);
 	if (usbvc_vc_get_ctrl(usbvcp, GET_MAX, ctrl.entity_id,
 	    ctrl.ctrl_map->selector, ctrl.ctrl_map->len, data) != USB_SUCCESS) {
-	    (void) strncpy(&req[0], "GET_MAX", sizeof (req));
+		(void) strncpy(&req[0], "GET_MAX", sizeof (req));
 
 		goto fail;
 	}
@@ -1339,7 +1339,7 @@ usbvc_v4l2_query_ctrl(usbvc_state_t *usbvcp, struct v4l2_queryctrl *queryctrl)
 
 	if (usbvc_vc_get_ctrl(usbvcp, GET_RES, ctrl.entity_id,
 	    ctrl.ctrl_map->selector, ctrl.ctrl_map->len, data) != USB_SUCCESS) {
-	    (void) strncpy(&req[0], "GET_RES", sizeof (req));
+		(void) strncpy(&req[0], "GET_RES", sizeof (req));
 
 		goto fail;
 	}
@@ -1347,7 +1347,7 @@ usbvc_v4l2_query_ctrl(usbvc_state_t *usbvcp, struct v4l2_queryctrl *queryctrl)
 
 	if (usbvc_vc_get_ctrl(usbvcp, GET_DEF, ctrl.entity_id,
 	    ctrl.ctrl_map->selector, ctrl.ctrl_map->len, data) != USB_SUCCESS) {
-	    (void) strncpy(&req[0], "GET_DEF", sizeof (req));
+		(void) strncpy(&req[0], "GET_DEF", sizeof (req));
 
 		goto fail;
 	}
@@ -1433,8 +1433,8 @@ usbvc_v4l2_set_ctrl(usbvc_state_t *usbvcp, struct v4l2_control *v4l2_ctrl)
 	UINT16_TO_LE(v4l2_ctrl->value, 0, data->b_wptr);
 	data->b_wptr += 2;
 	if (usbvc_vc_set_ctrl(usbvcp, SET_CUR, ctrl.entity_id,
-		ctrl.ctrl_map->selector, ctrl.ctrl_map->len, data) !=
-		    USB_SUCCESS) {
+	    ctrl.ctrl_map->selector, ctrl.ctrl_map->len, data) !=
+	    USB_SUCCESS) {
 		if (data) {
 			freemsg(data);
 		}

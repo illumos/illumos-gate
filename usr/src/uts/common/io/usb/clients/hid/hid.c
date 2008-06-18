@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -377,7 +377,7 @@ hid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	hidp->hid_log_handle = usb_alloc_log_hdl(dip, NULL, &hid_errlevel,
-				&hid_errmask, &hid_instance_debug, 0);
+	    &hid_errmask, &hid_instance_debug, 0);
 
 	hidp->hid_instance = instance;
 	hidp->hid_dip = dip;
@@ -403,13 +403,13 @@ hid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* initialize mutex */
 	mutex_init(&hidp->hid_mutex, NULL, MUTEX_DRIVER,
-					dev_data->dev_iblock_cookie);
+	    dev_data->dev_iblock_cookie);
 
 	hidp->hid_attach_flags	|= HID_LOCK_INIT;
 
 	/* get interface data for alternate 0 */
 	altif_data = &dev_data->dev_curr_cfg->
-			cfg_if[dev_data->dev_curr_if].if_alt[0];
+	    cfg_if[dev_data->dev_curr_if].if_alt[0];
 
 	mutex_enter(&hidp->hid_mutex);
 	hidp->hid_dev_data	= dev_data;
@@ -864,7 +864,7 @@ hid_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		if (!taskq) {
 			USB_DPRINTF_L3(PRINT_MASK_ALL, hidp->hid_log_handle,
 			    "hid_open: device is temporarily unavailable,"
-				" try it later");
+			    " try it later");
 
 			return (EAGAIN);
 		}
@@ -1285,7 +1285,8 @@ hid_interrupt_pipe_callback(usb_pipe_handle_t pipe, usb_intr_req_t *req)
 	queue_t	*q;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, hidp->hid_log_handle,
-	    "hid_interrupt_pipe_callback: ph = 0x%p req = 0x%p", pipe, req);
+	    "hid_interrupt_pipe_callback: ph = 0x%p req = 0x%p",
+	    (void *)pipe, (void *)req);
 
 	hid_pm_busy_component(hidp);
 
@@ -1345,7 +1346,8 @@ hid_default_pipe_callback(usb_pipe_handle_t pipe, usb_ctrl_req_t *req)
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, hidp->hid_log_handle,
 	    "hid_default_pipe_callback: "
-	    "ph = 0x%p, req = 0x%p, data= 0x%p", pipe, req, data);
+	    "ph = 0x%p, req = 0x%p, data= 0x%p",
+	    (void *)pipe, (void *)req, (void *)data);
 
 	ASSERT((req->ctrl_cb_flags & USB_CB_INTR_CONTEXT) == 0);
 
@@ -1518,12 +1520,12 @@ static int
 hid_restore_state_event_callback(dev_info_t *dip)
 {
 	hid_state_t	*hidp = (hid_state_t *)ddi_get_soft_state(hid_statep,
-				ddi_get_instance(dip));
+	    ddi_get_instance(dip));
 
 	ASSERT(hidp != NULL);
 
 	USB_DPRINTF_L3(PRINT_MASK_EVENTS, hidp->hid_log_handle,
-	    "hid_restore_state_event_callback: dip=0x%p", dip);
+	    "hid_restore_state_event_callback: dip=0x%p", (void *)dip);
 
 	hid_restore_device_state(dip, hidp);
 
@@ -1542,7 +1544,7 @@ hid_cpr_suspend(hid_state_t *hidp)
 	int		retval = USB_FAILURE;
 
 	USB_DPRINTF_L4(PRINT_MASK_EVENTS, hidp->hid_log_handle,
-	    "hid_cpr_suspend: dip=0x%p", hidp->hid_dip);
+	    "hid_cpr_suspend: dip=0x%p", (void *)hidp->hid_dip);
 
 	mutex_enter(&hidp->hid_mutex);
 	switch (hidp->hid_dev_state) {
@@ -1591,7 +1593,7 @@ static void
 hid_cpr_resume(hid_state_t *hidp)
 {
 	USB_DPRINTF_L4(PRINT_MASK_EVENTS, hidp->hid_log_handle,
-	    "hid_cpr_resume: dip=0x%p", hidp->hid_dip);
+	    "hid_cpr_resume: dip=0x%p", (void *)hidp->hid_dip);
 
 	hid_restore_device_state(hidp->hid_dip, hidp);
 }
@@ -1612,7 +1614,7 @@ hid_disconnect_event_callback(dev_info_t *dip)
 	ASSERT(hidp != NULL);
 
 	USB_DPRINTF_L4(PRINT_MASK_EVENTS, hidp->hid_log_handle,
-	    "hid_disconnect_event_callback: dip=0x%p", dip);
+	    "hid_disconnect_event_callback: dip=0x%p", (void *)dip);
 
 	mutex_enter(&hidp->hid_mutex);
 	switch (hidp->hid_dev_state) {
@@ -1697,9 +1699,9 @@ hid_parse_hid_descr(
 		}
 		if (cvs->cvs_buf[1] == USB_DESCR_TYPE_HID) {
 			return (usb_parse_data("ccscccs",
-				cvs->cvs_buf, cvs->cvs_buf_len,
-				(void *)ret_descr,
-				(size_t)ret_buf_len));
+			    cvs->cvs_buf, cvs->cvs_buf_len,
+			    (void *)ret_descr,
+			    (size_t)ret_buf_len));
 		}
 	}
 
@@ -1711,9 +1713,9 @@ hid_parse_hid_descr(
 		}
 		if (cvs->cvs_buf[1] == USB_DESCR_TYPE_HID) {
 			return (usb_parse_data("ccscccs",
-				cvs->cvs_buf, cvs->cvs_buf_len,
-				(void *)ret_descr,
-				(size_t)ret_buf_len));
+			    cvs->cvs_buf, cvs->cvs_buf_len,
+			    (void *)ret_descr,
+			    (size_t)ret_buf_len));
 		}
 	}
 
@@ -1746,7 +1748,7 @@ hid_parse_hid_descr_failure(hid_state_t	*hidp)
 
 		/* device is a keyboard */
 		hidp->hid_hid_descr.wReportDescriptorLength =
-				    USB_KB_HID_DESCR_LENGTH;
+		    USB_KB_HID_DESCR_LENGTH;
 
 		hidp->hid_packet_size = USBKPSZ;
 
@@ -1758,7 +1760,7 @@ hid_parse_hid_descr_failure(hid_state_t	*hidp)
 
 		/* device is a mouse */
 		hidp->hid_hid_descr.wReportDescriptorLength =
-				    USB_MS_HID_DESCR_LENGTH;
+		    USB_MS_HID_DESCR_LENGTH;
 
 		hidp->hid_packet_size = USBMSSZ;
 	} else {
@@ -1786,13 +1788,13 @@ hid_handle_report_descriptor(hid_state_t	*hidp,
 	int			i;
 	usb_ctrl_setup_t setup = {
 	    USB_DEV_REQ_DEV_TO_HOST |	/* bmRequestType */
-		USB_DEV_REQ_RCPT_IF,
+	    USB_DEV_REQ_RCPT_IF,
 	    USB_REQ_GET_DESCR,		/* bRequest */
 	    USB_CLASS_DESCR_TYPE_REPORT, /* wValue */
 	    0,				/* wIndex: interface, fill in later */
 	    0,				/* wLength, fill in later  */
 	    0				/* attributes */
-	};
+	    };
 
 	/*
 	 * Parsing hid desciptor was successful earlier.
@@ -1806,7 +1808,7 @@ hid_handle_report_descriptor(hid_state_t	*hidp,
 	    &completion_reason, &cb_flags, 0) != USB_SUCCESS) {
 
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, hidp->hid_log_handle,
-			"Failed to receive the Report Descriptor");
+		    "Failed to receive the Report Descriptor");
 		freemsg(data);
 
 		return (USB_FAILURE);
@@ -1819,8 +1821,8 @@ hid_handle_report_descriptor(hid_state_t	*hidp,
 		/* Print the report descriptor */
 		for (i = 0; i < n; i++) {
 			USB_DPRINTF_L3(PRINT_MASK_ATTA, hidp->hid_log_handle,
-				"Index = %d\tvalue =0x%x", i,
-				(int)(data->b_rptr[i]));
+			    "Index = %d\tvalue =0x%x", i,
+			    (int)(data->b_rptr[i]));
 		}
 
 		/* Get Report Descriptor was successful */
@@ -1869,14 +1871,14 @@ hid_set_idle(hid_state_t	*hidp)
 	usb_cb_flags_t	cb_flags;
 	usb_ctrl_setup_t setup = {
 	    USB_DEV_REQ_HOST_TO_DEV |	/* bmRequestType */
-		USB_DEV_REQ_TYPE_CLASS |
-		USB_DEV_REQ_RCPT_IF,
+	    USB_DEV_REQ_TYPE_CLASS |
+	    USB_DEV_REQ_RCPT_IF,
 	    SET_IDLE,			/* bRequest */
 	    DURATION,			/* wValue */
 	    0,				/* wIndex: interface, fill in later */
 	    0,				/* wLength */
 	    0				/* attributes */
-	};
+	    };
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, hidp->hid_log_handle,
 	    "hid_set_idle: Begin");
@@ -1894,7 +1896,7 @@ hid_set_idle(hid_state_t	*hidp)
 		    completion_reason, cb_flags);
 	}
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, hidp->hid_log_handle,
-		"hid_set_idle: End");
+	    "hid_set_idle: End");
 }
 
 
@@ -1939,7 +1941,7 @@ hid_set_protocol(hid_state_t *hidp, int protocol)
 	}
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, hidp->hid_log_handle,
-		"hid_set_protocol: End");
+	    "hid_set_protocol: End");
 }
 
 
@@ -1976,7 +1978,7 @@ hid_detach_cleanup(dev_info_t *dip, hid_state_t *hidp)
 	hidpm = hidp->hid_pm;
 
 	USB_DPRINTF_L2(PRINT_MASK_ALL, hidp->hid_log_handle,
-	    "hid_detach_cleanup: hidpm=0x%p", hidpm);
+	    "hid_detach_cleanup: hidpm=0x%p", (void *)hidpm);
 
 	if (hidpm && (hidp->hid_dev_state != USB_DEV_DISCONNECTED)) {
 
@@ -2019,7 +2021,7 @@ hid_detach_cleanup(dev_info_t *dip, hid_state_t *hidp)
 
 	if (hidp->hid_report_descr != NULL) {
 		(void) hidparser_free_report_descriptor_handle(
-					hidp->hid_report_descr);
+		    hidp->hid_report_descr);
 	}
 
 	if (flags & HID_MINOR_NODES) {
@@ -2055,7 +2057,7 @@ hid_start_intr_polling(hid_state_t *hidp)
 	    "hid_start_intr_polling: "
 	    "dev_state=%s str_flags=%d ph=0x%p",
 	    usb_str_dev_state(hidp->hid_dev_state), hidp->hid_streams_flags,
-	    hidp->hid_interrupt_pipe);
+	    (void *)hidp->hid_interrupt_pipe);
 
 	if ((hidp->hid_streams_flags == HID_STREAMS_OPEN) &&
 	    (hidp->hid_interrupt_pipe != NULL)) {
@@ -2065,7 +2067,7 @@ hid_start_intr_polling(hid_state_t *hidp)
 		req = usb_alloc_intr_req(hidp->hid_dip, 0, USB_FLAGS_SLEEP);
 		req->intr_client_private = (usb_opaque_t)hidp;
 		req->intr_attributes = USB_ATTRS_SHORT_XFER_OK |
-						USB_ATTRS_AUTOCLEARING;
+		    USB_ATTRS_AUTOCLEARING;
 		req->intr_len = hidp->hid_packet_size;
 		req->intr_cb = hid_interrupt_pipe_callback;
 		req->intr_exc_cb = hid_interrupt_pipe_exception_callback;
@@ -2187,9 +2189,9 @@ hid_mctl_receive(register queue_t *q, register mblk_t *mp)
 			freemsg(mp->b_cont);
 
 			hid_vid_pid.VendorId =
-				hidp->hid_dev_descr->idVendor;
+			    hidp->hid_dev_descr->idVendor;
 			hid_vid_pid.ProductId =
-				hidp->hid_dev_descr->idProduct;
+			    hidp->hid_dev_descr->idProduct;
 
 			mp->b_cont = hid_data2mblk(
 			    (uchar_t *)&hid_vid_pid, sizeof (hid_vid_pid_t));
@@ -2217,14 +2219,14 @@ hid_mctl_receive(register queue_t *q, register mblk_t *mp)
 
 			/* Initialize the structure */
 			hid_polled_input.hid_polled_version =
-					HID_POLLED_INPUT_V0;
+			    HID_POLLED_INPUT_V0;
 			hid_polled_input.hid_polled_read = hid_polled_read;
 			hid_polled_input.hid_polled_input_enter =
-				hid_polled_input_enter;
+			    hid_polled_input_enter;
 			hid_polled_input.hid_polled_input_exit =
-				hid_polled_input_exit;
+			    hid_polled_input_exit;
 			hid_polled_input.hid_polled_input_handle =
-				(hid_polled_handle_t)hidp;
+			    (hid_polled_handle_t)hidp;
 
 			mp->b_cont = hid_data2mblk(
 			    (uchar_t *)&hid_polled_input,
@@ -2361,7 +2363,7 @@ hid_mctl_execute_cmd(hid_state_t *hidp, int request_type,
 
 	iocp = (struct iocblk *)mp->b_rptr;
 	USB_DPRINTF_L4(PRINT_MASK_ALL, hidp->hid_log_handle,
-	    "hid_mctl_execute_cmd: iocp=0x%p", iocp);
+	    "hid_mctl_execute_cmd: iocp=0x%p", (void *)iocp);
 
 	request_index = hidp->hid_if_descr.bInterfaceNumber;
 
@@ -2468,7 +2470,7 @@ hid_send_async_ctrl_request(hid_state_t *hidp, hid_req_t *hid_request,
 			return (USB_FAILURE);
 		}
 		bcopy(hid_request->hid_req_data, pblk->b_wptr,
-				hid_request->hid_req_wLength);
+		    hid_request->hid_req_wLength);
 		pblk->b_wptr += hid_request->hid_req_wLength;
 		ctrl_req->ctrl_data = pblk;
 	}
@@ -2573,7 +2575,7 @@ hid_create_pm_components(dev_info_t *dip, hid_state_t *hidp)
 	}
 
 	USB_DPRINTF_L4(PRINT_MASK_PM, hidp->hid_log_handle,
-		"hid_create_pm_components: END");
+	    "hid_create_pm_components: END");
 }
 
 
@@ -2586,7 +2588,7 @@ static int
 hid_is_pm_enabled(dev_info_t *dip)
 {
 	hid_state_t	*hidp = ddi_get_soft_state(hid_statep,
-							ddi_get_instance(dip));
+	    ddi_get_instance(dip));
 
 	if (strcmp(ddi_node_name(dip), "mouse") == 0) {
 		/* check for overrides first */

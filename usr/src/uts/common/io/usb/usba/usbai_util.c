@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -149,10 +149,10 @@ usb_get_ep_descr(dev_info_t	*dip,
 
 	usb_cfg = usb_get_raw_cfg_data(dip, &cfg_length);
 	size = usb_parse_ep_descr(usb_cfg, cfg_length,
-		if_index,	/* interface index */
-		alt_setting,	/* alt interface index */
-		endpoint_index,		/* ep index */
-		descr, USB_EP_DESCR_SIZE);
+	    if_index,	/* interface index */
+	    alt_setting,	/* alt interface index */
+	    endpoint_index,		/* ep index */
+	    descr, USB_EP_DESCR_SIZE);
 
 	if (size != USB_EP_DESCR_SIZE) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
@@ -207,10 +207,10 @@ usb_lookup_ep_data(dev_info_t	*dip,
 	}
 
 	altif_data = &dev_datap->dev_curr_cfg->
-					cfg_if[interface].if_alt[alternate];
+	    cfg_if[interface].if_alt[alternate];
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
-	    "altif=0x%p n_ep=%d", altif_data, altif_data->altif_n_ep);
+	    "altif=0x%p n_ep=%d", (void *)altif_data, altif_data->altif_n_ep);
 
 	for (i = 0; i < altif_data->altif_n_ep; i++) {
 		usb_ep_descr_t *ept = &altif_data->altif_ep[i].ep_descr;
@@ -227,7 +227,7 @@ usb_lookup_ep_data(dev_info_t	*dip,
 				USB_DPRINTF_L4(DPRINT_MASK_USBA,
 				    usbai_log_handle,
 				    "usb_get_ep_data: data=0x%p",
-				    &altif_data->altif_ep[i]);
+				    (void *)&altif_data->altif_ep[i]);
 
 				return (&altif_data->altif_ep[i]);
 			}
@@ -298,15 +298,15 @@ usb_get_string_descr(dev_info_t *dip,
 	 * determine the length of the descriptor
 	 */
 	rval = usb_pipe_sync_ctrl_xfer(dip,
-		usba_get_dflt_pipe_handle(dip),
-		USB_DEV_REQ_DEV_TO_HOST,
-		USB_REQ_GET_DESCR,
-		USB_DESCR_TYPE_STRING << 8 | index & 0xff,
-		langid,
-		4,
-		&data, USB_ATTRS_SHORT_XFER_OK,
-		&completion_reason,
-		&cb_flags, USB_FLAGS_SLEEP);
+	    usba_get_dflt_pipe_handle(dip),
+	    USB_DEV_REQ_DEV_TO_HOST,
+	    USB_REQ_GET_DESCR,
+	    USB_DESCR_TYPE_STRING << 8 | index & 0xff,
+	    langid,
+	    4,
+	    &data, USB_ATTRS_SHORT_XFER_OK,
+	    &completion_reason,
+	    &cb_flags, USB_FLAGS_SLEEP);
 
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBA, usbai_log_handle,
@@ -342,15 +342,15 @@ usb_get_string_descr(dev_info_t *dip,
 	}
 
 	rval = usb_pipe_sync_ctrl_xfer(dip,
-		usba_get_dflt_pipe_handle(dip),
-		USB_DEV_REQ_DEV_TO_HOST,
-		USB_REQ_GET_DESCR,
-		USB_DESCR_TYPE_STRING << 8 | index & 0xff,
-		langid,
-		length,
-		&data, USB_ATTRS_SHORT_XFER_OK,
-		&completion_reason,
-		&cb_flags, USB_FLAGS_SLEEP);
+	    usba_get_dflt_pipe_handle(dip),
+	    USB_DEV_REQ_DEV_TO_HOST,
+	    USB_REQ_GET_DESCR,
+	    USB_DESCR_TYPE_STRING << 8 | index & 0xff,
+	    langid,
+	    length,
+	    &data, USB_ATTRS_SHORT_XFER_OK,
+	    &completion_reason,
+	    &cb_flags, USB_FLAGS_SLEEP);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "rval=%d, cb_flags=%d, cr=%d", rval, cb_flags, completion_reason);
@@ -365,7 +365,7 @@ usb_get_string_descr(dev_info_t *dip,
 
 	if ((length = data->b_wptr - data->b_rptr) != 0) {
 		len = usba_ascii_string_descr(data->b_rptr, length, buf,
-								buflen);
+		    buflen);
 		USB_DPRINTF_L4(DPRINT_MASK_USBA,
 		    usbai_log_handle, "buf=%s buflen=%lu", buf, len);
 
@@ -619,21 +619,21 @@ usba_sync_set_cfg(dev_info_t	*dip,
 	}
 
 	size = usb_parse_cfg_descr(usba_device->usb_cfg_array[cfg_index],
-			USB_CFG_DESCR_SIZE, &confdescr, USB_CFG_DESCR_SIZE);
+	    USB_CFG_DESCR_SIZE, &confdescr, USB_CFG_DESCR_SIZE);
 
 	/* hubdi should ensure that this descriptor is correct */
 	ASSERT(size == USB_CFG_DESCR_SIZE);
 
 	/* set the configuration */
 	rval = usb_pipe_sync_ctrl_xfer(dip, (usb_pipe_handle_t)ph_impl,
-		USB_DEV_REQ_HOST_TO_DEV,
-		USB_REQ_SET_CFG,
-		confdescr.bConfigurationValue,
-		0,
-		0,
-		NULL, 0,
-		&completion_reason,
-		&cb_flags, flags | USBA_FLAGS_PRIVILEGED | USB_FLAGS_SLEEP);
+	    USB_DEV_REQ_HOST_TO_DEV,
+	    USB_REQ_SET_CFG,
+	    confdescr.bConfigurationValue,
+	    0,
+	    0,
+	    NULL, 0,
+	    &completion_reason,
+	    &cb_flags, flags | USBA_FLAGS_PRIVILEGED | USB_FLAGS_SLEEP);
 
 	if (rval == USB_SUCCESS) {
 		mutex_enter(&usba_device->usb_mutex);
@@ -645,7 +645,7 @@ usba_sync_set_cfg(dev_info_t	*dip,
 
 		/* update the configuration property */
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-			"configuration#", usba_device->usb_cfg_value);
+		    "configuration#", usba_device->usb_cfg_value);
 	}
 
 	/*
@@ -705,14 +705,14 @@ usb_get_cfg(dev_info_t		*dip,
 	 * get the cfg value
 	 */
 	rval = usb_pipe_sync_ctrl_xfer(dip, ph,
-		USB_DEV_REQ_DEV_TO_HOST | USB_DEV_REQ_RCPT_DEV,
-		USB_REQ_GET_CFG,
-		0,
-		0,
-		1,		/* returns one byte of data */
-		&data, 0,
-		&completion_reason,
-		&cb_flags, flags);
+	    USB_DEV_REQ_DEV_TO_HOST | USB_DEV_REQ_RCPT_DEV,
+	    USB_REQ_GET_CFG,
+	    0,
+	    0,
+	    1,		/* returns one byte of data */
+	    &data, 0,
+	    &completion_reason,
+	    &cb_flags, flags);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "rval=%d cb_flags=%d cr=%d", rval, cb_flags, completion_reason);
@@ -776,7 +776,7 @@ usb_get_if_number(dev_info_t *dip)
 	usb_dev_descr_t	*usb_dev_descr;
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
-	    "usb_get_if_number: dip = 0x%p", dip);
+	    "usb_get_if_number: dip = 0x%p", (void *)dip);
 
 	/* not quite right but we can't return a negative return value */
 	if (dip == NULL) {
@@ -824,7 +824,7 @@ usba_check_if_in_ia(dev_info_t *dip, int n_if)
 
 	first_if = usb_get_if_number(dip);
 	if_count = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-		DDI_PROP_DONTPASS, "interface-count", -1);
+	    DDI_PROP_DONTPASS, "interface-count", -1);
 	if_count += first_if;
 
 	return ((n_if >= first_if && n_if < if_count) ? B_TRUE : B_FALSE);
@@ -926,7 +926,7 @@ usba_sync_set_alt_if(dev_info_t	*dip,
 	int		interface = ((uintptr_t)arg >> 8) & 0xff;
 	int		alt_number = (uintptr_t)arg & 0xff;
 	usba_pipe_handle_data_t *ph_data = usba_get_ph_data(
-				(usb_pipe_handle_t)ph_impl);
+	    (usb_pipe_handle_t)ph_impl);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "usb_set_alt_if: %s, interface#=0x%x, alt#=0x%x, "
@@ -943,14 +943,14 @@ usba_sync_set_alt_if(dev_info_t	*dip,
 
 	/* set the alternate setting */
 	rval = usb_pipe_sync_ctrl_xfer(dip, usba_get_dflt_pipe_handle(dip),
-		USB_DEV_REQ_HOST_TO_DEV | USB_DEV_REQ_RCPT_IF,
-		USB_REQ_SET_IF,
-		alt_number,
-		interface,
-		0,
-		NULL, 0,
-		&completion_reason,
-		&cb_flags, flags | USB_FLAGS_SLEEP);
+	    USB_DEV_REQ_HOST_TO_DEV | USB_DEV_REQ_RCPT_IF,
+	    USB_REQ_SET_IF,
+	    alt_number,
+	    interface,
+	    0,
+	    NULL, 0,
+	    &completion_reason,
+	    &cb_flags, flags | USB_FLAGS_SLEEP);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "rval=%d, cb_flags=%d, cr=%d", rval, cb_flags, completion_reason);
@@ -992,7 +992,7 @@ usb_get_alt_if(dev_info_t	*dip,
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "usb_get_alt_if: %s, interface# = 0x%x, altp = 0x%p, "
 	    "uf = 0x%x", ddi_node_name(dip), if_number,
-	    alt_number, flags);
+	    (void *)alt_number, flags);
 
 	if ((alt_number == NULL) || (dip == NULL)) {
 
@@ -1005,14 +1005,14 @@ usb_get_alt_if(dev_info_t	*dip,
 	 * get the alternate setting
 	 */
 	rval = usb_pipe_sync_ctrl_xfer(dip, ph,
-		USB_DEV_REQ_DEV_TO_HOST | USB_DEV_REQ_RCPT_IF,
-		USB_REQ_GET_IF,
-		0,
-		if_number,
-		1,		/* returns one byte of data */
-		&data, 0,
-		&completion_reason,
-		&cb_flags, flags);
+	    USB_DEV_REQ_DEV_TO_HOST | USB_DEV_REQ_RCPT_IF,
+	    USB_REQ_GET_IF,
+	    0,
+	    if_number,
+	    1,		/* returns one byte of data */
+	    &data, 0,
+	    &completion_reason,
+	    &cb_flags, flags);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "rval=%d cb_flags=%d cr=%d", rval, cb_flags, completion_reason);
@@ -1154,15 +1154,15 @@ usb_check_same_device(dev_info_t *dip, usb_log_handle_t log_handle,
 
 	/* get the "new" device descriptor */
 	rval = usb_pipe_sync_ctrl_xfer(dip, def_ph,
-			USB_DEV_REQ_DEV_TO_HOST |
-				USB_DEV_REQ_TYPE_STANDARD,
-			USB_REQ_GET_DESCR,		/* bRequest */
-			USB_DESCR_TYPE_SETUP_DEV,	/* wValue */
-			0,				/* wIndex */
-			length,				/* wLength */
-			&pdata, 0,
-			&completion_reason,
-			&cb_flags, USB_FLAGS_SLEEP);
+	    USB_DEV_REQ_DEV_TO_HOST |
+	    USB_DEV_REQ_TYPE_STANDARD,
+	    USB_REQ_GET_DESCR,		/* bRequest */
+	    USB_DESCR_TYPE_SETUP_DEV,	/* wValue */
+	    0,				/* wIndex */
+	    length,				/* wLength */
+	    &pdata, 0,
+	    &completion_reason,
+	    &cb_flags, USB_FLAGS_SLEEP);
 
 	if (rval != USB_SUCCESS) {
 		if (!((completion_reason == USB_CR_DATA_OVERRUN) && (pdata))) {
@@ -1247,7 +1247,7 @@ usb_check_same_device(dev_info_t *dip, usb_log_handle_t log_handle,
 			device_string =
 			    kmem_zalloc(USB_MAXSTRINGLEN, USB_FLAGS_SLEEP);
 			(void) usba_get_mfg_prod_sn_str(dip, device_string,
-						USB_MAXSTRINGLEN);
+			    USB_MAXSTRINGLEN);
 		}
 		if (device_string[0] != '\0') {
 			(void) usb_log(log_handle, log_level, log_mask,
@@ -1292,7 +1292,8 @@ usb_pipe_get_state(usb_pipe_handle_t	pipe_handle,
 	usba_pipe_handle_data_t *ph_data = usba_hold_ph_data(pipe_handle);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usb_pipe_get_state: ph_data=0x%p uf=0x%x", ph_data, usb_flags);
+	    "usb_pipe_get_state: ph_data=0x%p uf=0x%x", (void *)ph_data,
+	    usb_flags);
 
 	if (pipe_state == NULL) {
 		if (ph_data) {
@@ -1431,13 +1432,13 @@ usb_get_status(dev_info_t		*dip,
 
 	/* get the status */
 	rval = usb_pipe_sync_ctrl_xfer(dip, ph,
-		type,
-		USB_REQ_GET_STATUS,
-		0,
-		what,
-		USB_GET_STATUS_LEN,	/* status is fixed 2 bytes long */
-		&data, 0,
-		&completion_reason, &cb_flags, flags);
+	    type,
+	    USB_REQ_GET_STATUS,
+	    0,
+	    what,
+	    USB_GET_STATUS_LEN,	/* status is fixed 2 bytes long */
+	    &data, 0,
+	    &completion_reason, &cb_flags, flags);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "rval=%d, cb_flags=%d, cr=%d", rval, cb_flags, completion_reason);
@@ -1502,14 +1503,14 @@ usb_clear_feature(dev_info_t		*dip,
 
 	/* issue Clear feature */
 	rval = usb_pipe_sync_ctrl_xfer(dip, ph,
-		type,
-		USB_REQ_CLEAR_FEATURE,
-		feature,
-		what,
-		0,
-		NULL, 0,
-		&completion_reason,
-		&cb_flags, flags | USB_FLAGS_SLEEP);
+	    type,
+	    USB_REQ_CLEAR_FEATURE,
+	    feature,
+	    what,
+	    0,
+	    NULL, 0,
+	    &completion_reason,
+	    &cb_flags, flags | USB_FLAGS_SLEEP);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "rval=%d, cb_flags=%d, cr=%d", rval, cb_flags, completion_reason);
@@ -1589,21 +1590,21 @@ static int
 usba_sync_clear_feature(dev_info_t *dip,
 	usba_ph_impl_t		*ph_impl,
 	usba_pipe_async_req_t	*req,
-	usb_flags_t 		usb_flags)
+	usb_flags_t		usb_flags)
 {
 	uint_t	n = (uint_t)((uintptr_t)(req->arg));
 	uint_t	type = ((uint_t)n >> 16) & 0xff;
 	uint_t	feature = ((uint_t)n >> 8) & 0xff;
 	uint_t	what = (uint_t)n & 0xff;
-	int 	rval;
+	int	rval;
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "usb_sync_clear_feature: "
 	    "dip=0x%p ph=0x%p type=0x%x feature=0x%x what=0x%x fl=0x%x",
-	    dip, ph_impl, type, feature, what, usb_flags);
+	    (void *)dip, (void *)ph_impl, type, feature, what, usb_flags);
 
 	rval = usb_clear_feature(dip, (usb_pipe_handle_t)ph_impl, type,
-					feature, what, usb_flags);
+	    feature, what, usb_flags);
 
 	usba_release_ph_data(ph_impl);
 
@@ -1635,7 +1636,7 @@ usb_async_req(dev_info_t *dip,
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "usb_async_req: dip=0x%p func=0x%p, arg=0x%p flag=0x%x",
-	    dip, func, arg, flag);
+	    (void *)dip, (void *)func, arg, flag);
 
 	if ((dip == NULL) || (func == NULL)) {
 
@@ -1686,7 +1687,7 @@ usba_async_ph_req(usba_pipe_handle_data_t *ph_data,
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "usba_async_ph_req: ph_data=0x%p func=0x%p, arg=0x%p flag=0x%x",
-	    ph_data, func, arg, flag);
+	    (void *)ph_data, (void *)func, arg, flag);
 
 	if (func == NULL) {
 
@@ -1914,7 +1915,7 @@ usb_init_serialization(
 	uint_t		flag)
 {
 	usba_serialization_impl_t *impl_tokenp = kmem_zalloc(
-				sizeof (usba_serialization_impl_t), KM_SLEEP);
+	    sizeof (usba_serialization_impl_t), KM_SLEEP);
 	usba_device_t	*usba_device;
 	ddi_iblock_cookie_t cookie = NULL;
 
@@ -1985,8 +1986,9 @@ usb_serialize_access(
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "usb_serialize_access: tok=0x%p dip=0x%p cnt=%d thr=0x%p, "
 	    "flg=0x%x, abs_tmo=0x%lx",
-	    impl_tokenp, impl_tokenp->s_dip, impl_tokenp->s_count,
-	    impl_tokenp->s_thread, how_to_wait, abs_timeout);
+	    (void *)impl_tokenp, (void *)impl_tokenp->s_dip,
+	    impl_tokenp->s_count, (void *)impl_tokenp->s_thread,
+	    how_to_wait, abs_timeout);
 
 	if ((impl_tokenp->s_flag & USB_INIT_SER_CHECK_SAME_THREAD) == 0 ||
 	    impl_tokenp->s_thread != curthread) {
@@ -2008,7 +2010,8 @@ usb_serialize_access(
 				USB_DPRINTF_L4(DPRINT_MASK_USBA,
 				    usbai_log_handle,
 				    "usb_serialize_access: "
-				    "tok=0x%p exit due to %s", impl_tokenp,
+				    "tok=0x%p exit due to %s",
+				    (void *)impl_tokenp,
 				    ((rval == 0) ? "signal" : "timeout"));
 
 				return (rval);
@@ -2020,19 +2023,19 @@ usb_serialize_access(
 				/* FALLTHROUGH */
 			case USB_WAIT:
 				cv_wait(&impl_tokenp->s_cv,
-					&impl_tokenp->s_mutex);
+				    &impl_tokenp->s_mutex);
 				break;
 			case USB_WAIT_SIG:
 				rval = cv_wait_sig(&impl_tokenp->s_cv,
-						&impl_tokenp->s_mutex);
+				    &impl_tokenp->s_mutex);
 				break;
 			case USB_TIMEDWAIT:
 				rval = cv_timedwait(&impl_tokenp->s_cv,
-					&impl_tokenp->s_mutex, abs_timeout);
+				    &impl_tokenp->s_mutex, abs_timeout);
 				break;
 			case USB_TIMEDWAIT_SIG:
 				rval = cv_timedwait_sig(&impl_tokenp->s_cv,
-					&impl_tokenp->s_mutex, abs_timeout);
+				    &impl_tokenp->s_mutex, abs_timeout);
 				break;
 			}
 		}
@@ -2047,8 +2050,8 @@ usb_serialize_access(
 	mutex_exit(&impl_tokenp->s_mutex);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
-	    "usb_serialize_access exit: tok=0x%p thr=0x%p", impl_tokenp,
-	    curthread);
+	    "usb_serialize_access exit: tok=0x%p thr=0x%p", (void *)impl_tokenp,
+	    (void *)curthread);
 
 	return (1);
 }
@@ -2060,12 +2063,13 @@ usb_try_serialize_access(
 	usb_serialization_t tokenp, uint_t flag)
 {
 	usba_serialization_impl_t *impl_tokenp =
-					(usba_serialization_impl_t *)tokenp;
+	    (usba_serialization_impl_t *)tokenp;
 	mutex_enter(&impl_tokenp->s_mutex);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "usb_try_serialize_access: tok=0x%p dip=0x%p cnt=%d thr=0x%p",
-	    impl_tokenp, impl_tokenp->s_dip, impl_tokenp->s_count, curthread);
+	    (void *)impl_tokenp, (void *)impl_tokenp->s_dip,
+	    impl_tokenp->s_count, (void *)curthread);
 
 	/*
 	 * If lock is not taken (s_count is 0), take it.
@@ -2079,7 +2083,8 @@ usb_try_serialize_access(
 		impl_tokenp->s_count++;
 
 		USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
-		    "usb_try_serialize_access success: tok=0x%p", impl_tokenp);
+		    "usb_try_serialize_access success: tok=0x%p",
+		    (void *)impl_tokenp);
 		mutex_exit(&impl_tokenp->s_mutex);
 
 		return (USB_SUCCESS);
@@ -2088,8 +2093,8 @@ usb_try_serialize_access(
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "usb_try_serialize_access failed: "
 	    "tok=0x%p dip=0x%p cnt=%d thr=0x%p",
-	    impl_tokenp, impl_tokenp->s_dip, impl_tokenp->s_count,
-	    impl_tokenp->s_thread);
+	    (void *)impl_tokenp, (void *)impl_tokenp->s_dip,
+	    impl_tokenp->s_count, (void *)impl_tokenp->s_thread);
 
 	mutex_exit(&impl_tokenp->s_mutex);
 
@@ -2102,12 +2107,13 @@ usb_release_access(
 	usb_serialization_t tokenp)
 {
 	usba_serialization_impl_t *impl_tokenp =
-					(usba_serialization_impl_t *)tokenp;
+	    (usba_serialization_impl_t *)tokenp;
 	mutex_enter(&impl_tokenp->s_mutex);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "usb_release_access: tok=0x%p dip=0x%p count=%d thr=0x%p",
-	    impl_tokenp, impl_tokenp->s_dip, impl_tokenp->s_count, curthread);
+	    (void *)impl_tokenp, (void *)impl_tokenp->s_dip,
+	    impl_tokenp->s_count, (void *)curthread);
 
 	ASSERT(impl_tokenp->s_count > 0);
 
@@ -2336,7 +2342,7 @@ usba_common_register_events(dev_info_t *dip, uint_t if_num,
 
 	/* get event cookie, discard level and icookie for now */
 	rval = ddi_get_eventcookie(dip, DDI_DEVI_REMOVE_EVENT,
-		&cookie);
+	    &cookie);
 
 	if (rval == DDI_SUCCESS) {
 		rval = ddi_add_event_handler(dip,
@@ -2348,7 +2354,7 @@ usba_common_register_events(dev_info_t *dip, uint_t if_num,
 		}
 	}
 	rval = ddi_get_eventcookie(dip, DDI_DEVI_INSERT_EVENT,
-		&cookie);
+	    &cookie);
 	if (rval == DDI_SUCCESS) {
 		rval = ddi_add_event_handler(dip, cookie, event_cb,
 		    NULL, &evdata->ev_ins_cb_id);
@@ -2428,7 +2434,7 @@ usba_common_unregister_events(dev_info_t *dip, uint_t if_num)
 	} else {
 		for (i = 0; i < if_num; i++) {
 			usba_device->usb_client_flags[usba_get_ifno(dip) + i]
-				&= ~USBA_CLIENT_FLAG_EV_CBS;
+			    &= ~USBA_CLIENT_FLAG_EV_CBS;
 		}
 	}
 	mutex_exit(&usba_device->usb_mutex);

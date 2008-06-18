@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,7 @@
  */
 
 uint_t hparser_errmask = (uint_t)PRINT_MASK_ALL;
-uint_t  hparser_errlevel = (uint_t)USB_LOG_L1;
+uint_t	hparser_errlevel = (uint_t)USB_LOG_L1;
 static usb_log_handle_t hparser_log_handle;
 
 /*
@@ -353,7 +353,7 @@ hidparser_get_packet_size_report_des(entity_item_t *parser_handle,
 				    R_ITEM_REPORT_SIZE) {
 					foundsize = 1;
 					temp *= hidparser_find_unsigned_val(
-						attribute);
+					    attribute);
 					if (foundcount == 1) {
 						if (report_id &&
 						    right_report_id) {
@@ -364,7 +364,7 @@ hidparser_get_packet_size_report_des(entity_item_t *parser_handle,
 				    R_ITEM_REPORT_COUNT) {
 					foundcount = 1;
 					temp *= hidparser_find_unsigned_val(
-						attribute);
+					    attribute);
 					if (foundsize == 1) {
 						if (report_id &&
 						    right_report_id) {
@@ -466,7 +466,7 @@ hidparser_get_usage_attribute_report_des(entity_item_t *parser_handle,
 				if (attribute->entity_attribute_tag ==
 				    R_ITEM_USAGE) {
 					usage = hidparser_find_unsigned_val(
-						    attribute);
+					    attribute);
 					if (usage_id == HID_USAGE_ID(usage)) {
 
 						found_usage_id = 1;
@@ -493,7 +493,7 @@ hidparser_get_usage_attribute_report_des(entity_item_t *parser_handle,
 						 */
 						if (HID_USAGE_PAGE(usage) &&
 						    HID_USAGE_PAGE(usage) ==
-							usage_page) {
+						    usage_page) {
 
 							found_page = 1;
 						} else {
@@ -519,7 +519,7 @@ hidparser_get_usage_attribute_report_des(entity_item_t *parser_handle,
 					}
 				}
 				if (attribute->entity_attribute_tag ==
-					    usage_attribute) {
+				    usage_attribute) {
 					/* Match attribute */
 					found_ret_value = 1;
 					*usage_attribute_value =
@@ -527,7 +527,7 @@ hidparser_get_usage_attribute_report_des(entity_item_t *parser_handle,
 					if (attribute->
 					    entity_attribute_length == 2) {
 						attvalue =
-						(attribute->
+						    (attribute->
 						    entity_attribute_value[0] &
 						    0xff) |
 						    (attribute->
@@ -649,22 +649,22 @@ hidparser_get_main_item_data_descr_main(entity_item_t *parser_handle,
 				if (attribute->entity_attribute_tag ==
 				    R_ITEM_USAGE) {
 					usage = hidparser_find_unsigned_val(
-							attribute);
+					    attribute);
 					if (usage_id == HID_USAGE_ID(usage)) {
 						found_usage_id = 1;
 						if (attribute->
 						    entity_attribute_length ==
 						    3) {
 							if (HID_USAGE_PAGE(
-								usage) &&
+							    usage) &&
 							    HID_USAGE_PAGE(
-								usage) ==
+							    usage) ==
 							    usage_page) {
 
 								found_page = 1;
 							} else {
 
-							    found_usage_id = 0;
+							found_usage_id = 0;
 							}
 						}
 
@@ -672,10 +672,10 @@ hidparser_get_main_item_data_descr_main(entity_item_t *parser_handle,
 						    found_page &&
 						    foundreportid &&
 						    right_report_id) {
-							*main_item_descr_value =
-							current->
-							entity_item_params[0];
-							break;
+						*main_item_descr_value =
+						    current->
+						    entity_item_params[0];
+						break;
 						}
 					}
 				} else if ((attribute->entity_attribute_tag ==
@@ -779,7 +779,7 @@ hidparser_get_top_level_collection_usage(hidparser_handle_t parse_handle,
 				return (HIDPARSER_SUCCESS);
 			}
 		} else if (attribute->entity_attribute_tag ==
-			    R_ITEM_USAGE_PAGE) {
+		    R_ITEM_USAGE_PAGE) {
 			found_page = 1;
 			*usage_page = attribute->entity_attribute_value[0];
 			if (found_usage_id && found_page) {
@@ -890,7 +890,7 @@ hidparser_get_usage_list_in_order_internal(entity_item_t *parser_handle,
 			    report_id, main_item_type, rpt);
 			if (rval != HIDPARSER_SUCCESS) {
 
-			    return (rval);
+				return (rval);
 			}
 
 		} else if (current->entity_item_type == main_item_type) {
@@ -1264,7 +1264,7 @@ hidparser_print_report_descr_handle(entity_item_t *handle,
 			hidparser_print_entity(current, indent_level);
 			/* do children */
 			(void) hidparser_print_report_descr_handle(
-				current->info.child, indent_level+1);
+			    current->info.child, indent_level+1);
 		} else /* just a regular entity */ {
 			hidparser_print_entity(current, indent_level);
 		}
@@ -1290,7 +1290,8 @@ hidparser_print_entity(entity_item_t *entity, int indent_level)
 
 	indent_level *= SPACE_PER_LEVEL;
 
-	for (count = 0; indent_level--; indent_space[count++] = ' ');
+	for (count = 0; indent_level--; count++)
+		indent_space[count] = ' ';
 
 	indent_space[count] = 0;
 
@@ -1303,7 +1304,7 @@ hidparser_print_entity(entity_item_t *entity, int indent_level)
 	USB_DPRINTF_L3(PRINT_MASK_ALL, hparser_log_handle, "%s%s(0x%x)",
 	    indent_space, items[entity->entity_item_type],
 	    (entity->entity_item_params_leng ?
-		entity->entity_item_params[0] & 0xFF : 0x00));
+	    entity->entity_item_params[0] & 0xFF : 0x00));
 }
 
 
@@ -1423,7 +1424,7 @@ hidparser_main(unsigned char *descriptor,
 
 	scan_ifp = kmem_zalloc(sizeof (hidparser_tok_t), KM_SLEEP);
 	scan_ifp->hidparser_tok_text =
-		kmem_zalloc(HIDPARSER_TEXT_LENGTH, KM_SLEEP);
+	    kmem_zalloc(HIDPARSER_TEXT_LENGTH, KM_SLEEP);
 	scan_ifp->hidparser_tok_max_bsize = size;
 	scan_ifp->hidparser_tok_entity_descriptor = descriptor;
 
@@ -1515,25 +1516,25 @@ hidparser_ReportDescriptor(entity_item_t ** item_ptr,
  *	Implements the Rule:
  *	ItemList -> Items MainItem ItemList | epsilon
  *
- * 	This function constructs the tree on which depends the "hidparser"
- * 	consumer functions. Basically the structure of the tree is
+ *	This function constructs the tree on which depends the "hidparser"
+ *	consumer functions. Basically the structure of the tree is
  *
  *	C--[RS]->EC--[RS]->C--[RS]->EC..(and so on)
  *	|
  *    [CH] <== This relationship is true for other "C's"
- *      |      also.
- *      v
+ *	|      also.
+ *	v
  *     C/-------------/I/O/F <== [ Any of these ]
- *     |              ------
- *     |                |
- *     v                v
+ *     |	      ------
+ *     |		|
+ *     v		v
  *    [CH      | RS]  [ RS ]
  *     C/I/O/F | EC    I/O/F
  *     |
  *     |
  *    and so on...
  *
- * 	where    C = Collection
+ *	where	 C = Collection
  *		EC = EndCollection
  *		 I = Input
  *		 O = Output
@@ -1561,8 +1562,8 @@ hidparser_ItemList(entity_item_t ** item_ptr, hidparser_tok_t *scan_ifp)
 		    HIDPARSER_FAILURE) {
 			USB_DPRINTF_L2(PRINT_MASK_ALL,
 			    hparser_log_handle,
-		    "Invalid MAIN item 0x%x in input stream",
-		    scan_ifp->hidparser_tok_token);
+			    "Invalid MAIN item 0x%x in input stream",
+			    scan_ifp->hidparser_tok_token);
 
 			return (HIDPARSER_FAILURE);
 		}
@@ -1576,9 +1577,9 @@ hidparser_ItemList(entity_item_t ** item_ptr, hidparser_tok_t *scan_ifp)
 
 				USB_DPRINTF_L3(PRINT_MASK_ALL,
 				    hparser_log_handle,
-				    "Start Collection:cache_ei = 0x%lx,"
-				    " curr_ei = 0x%lx",
-				    cache_ei, curr_ei);
+				    "Start Collection:cache_ei = 0x%p,"
+				    " curr_ei = 0x%p",
+				    (void *)cache_ei, (void *)curr_ei);
 
 			if (prev_ei == NULL) {
 				prev_ei = curr_ei;
@@ -1586,11 +1587,11 @@ hidparser_ItemList(entity_item_t ** item_ptr, hidparser_tok_t *scan_ifp)
 				continue;
 			}
 			if (prev_ei->entity_item_type ==
-				R_ITEM_COLLECTION) {
+			    R_ITEM_COLLECTION) {
 				prev_ei->info.child = curr_ei;
 			} else {
 				prev_ei->entity_item_right_sibling =
-							curr_ei;
+				    curr_ei;
 			}
 		} else if (curr_ei->entity_item_type ==
 		    R_ITEM_END_COLLECTION) {
@@ -1598,9 +1599,9 @@ hidparser_ItemList(entity_item_t ** item_ptr, hidparser_tok_t *scan_ifp)
 			cache_ei->entity_item_right_sibling = curr_ei;
 			USB_DPRINTF_L3(PRINT_MASK_ALL,
 			    hparser_log_handle,
-			    "End Collection: cache_ei = 0x%lx, "
-			    "curr_ei = 0x%lx",
-			    cache_ei, curr_ei);
+			    "End Collection: cache_ei = 0x%p, "
+			    "curr_ei = 0x%p",
+			    (void *)cache_ei, (void *)curr_ei);
 			if (tmp_ei != NULL) {
 				/*
 				 * As will be the case for final end
@@ -1615,23 +1616,25 @@ hidparser_ItemList(entity_item_t ** item_ptr, hidparser_tok_t *scan_ifp)
 				USB_DPRINTF_L3(PRINT_MASK_ALL,
 				    hparser_log_handle,
 				    "Main Item: token = 0x%x, "
-				    "curr_ei = 0x%lx "
+				    "curr_ei = 0x%p "
 				    "will be the child of prev_ei "
-				    "= 0x%lx, "
-				    "cache_ei being 0x%lx",
+				    "= 0x%p, "
+				    "cache_ei being 0x%p",
 				    curr_ei->entity_item_type,
-				    curr_ei, prev_ei, cache_ei);
+				    (void *)curr_ei, (void *)prev_ei,
+				    (void *)cache_ei);
 				prev_ei->info.child = curr_ei;
 			} else {
 				USB_DPRINTF_L3(PRINT_MASK_ALL,
 				    hparser_log_handle,
 				    "Main Item: token = 0x%x, "
-				    "curr_ei = 0x%lx "
+				    "curr_ei = 0x%p "
 				    "will be the right sibling of "
-				    "prev_ei = 0x%lx, "
-				    "cache_ei being 0x%lx",
+				    "prev_ei = 0x%p, "
+				    "cache_ei being 0x%p",
 				    curr_ei->entity_item_type,
-				    curr_ei, prev_ei, cache_ei);
+				    (void *)curr_ei, (void *)prev_ei,
+				    (void *)cache_ei);
 				prev_ei->entity_item_right_sibling =
 				    curr_ei;
 			}
@@ -1673,10 +1676,10 @@ hidparser_MainItem(entity_item_t ** item_ptr,
 		case R_ITEM_END_COLLECTION:
 			*item_ptr = hidparser_allocate_entity(scan_ifp);
 			USB_DPRINTF_L4(PRINT_MASK_ALL, hparser_log_handle,
-			    "hidparser_MainItem:index = 0x%x token = 0x%x",
-				scan_ifp->hidparser_tok_index -
-				(*item_ptr)->entity_item_params_leng - 1,
-				scan_ifp->hidparser_tok_token);
+			    "hidparser_MainItem:index = 0x%lx token = 0x%x",
+			    scan_ifp->hidparser_tok_index -
+			    (*item_ptr)->entity_item_params_leng - 1,
+			    scan_ifp->hidparser_tok_token);
 			hidparser_scan(scan_ifp);
 			hidparser_global_err_check(*item_ptr);
 			hidparser_local_err_check(*item_ptr);
@@ -1716,7 +1719,7 @@ hidparser_Items(hidparser_tok_t *scan_ifp)
 			if (delim_pre == B_FALSE) {
 				if (scan_ifp->hidparser_tok_text[0] != 1) {
 					hidparser_error_delim(NULL,
-						HIDPARSER_DELIM_ERR1);
+					    HIDPARSER_DELIM_ERR1);
 				} else {
 					delim_pre = B_TRUE;
 				}
@@ -1724,7 +1727,7 @@ hidparser_Items(hidparser_tok_t *scan_ifp)
 				if (scan_ifp->hidparser_tok_text[0] !=
 				    0) {
 					hidparser_error_delim(NULL,
-						HIDPARSER_DELIM_ERR2);
+					    HIDPARSER_DELIM_ERR2);
 				} else {
 					delim_pre = B_FALSE;
 				}
@@ -1872,11 +1875,11 @@ hidparser_GlobalItem(hidparser_tok_t	*scan_ifp)
 				    "Data Field size should be zero");
 			} else {
 				elem = (entity_attribute_stack_t *)kmem_zalloc(
-					sizeof (entity_attribute_stack_t),
-					KM_SLEEP);
+				    sizeof (entity_attribute_stack_t),
+				    KM_SLEEP);
 
 				elem->list = hidparser_cp_attribute_list(
-					    scan_ifp->hidparser_tok_gitem_head);
+				    scan_ifp->hidparser_tok_gitem_head);
 				if (scan_ifp->hidparser_head) {
 					elem->next = scan_ifp->hidparser_head;
 				}
@@ -1895,14 +1898,14 @@ hidparser_GlobalItem(hidparser_tok_t	*scan_ifp)
 			} else {
 				/* Free the current global list */
 				hidparser_free_attribute_list(scan_ifp->
-						hidparser_tok_gitem_head);
+				    hidparser_tok_gitem_head);
 				scan_ifp->hidparser_tok_gitem_head =
 				    scan_ifp->hidparser_head->list;
 				scan_ifp->hidparser_head->list = NULL;
 				elem = scan_ifp->hidparser_head;
 				scan_ifp->hidparser_head = elem->next;
 				kmem_free(elem,
-					sizeof (entity_attribute_stack_t));
+				    sizeof (entity_attribute_stack_t));
 			}
 
 			break;
@@ -1915,10 +1918,10 @@ hidparser_GlobalItem(hidparser_tok_t	*scan_ifp)
 
 	hidparser_add_attribute(scan_ifp);
 	USB_DPRINTF_L4(PRINT_MASK_ALL, hparser_log_handle,
-		"hidparser_GlobalItem:index = 0x%x token = 0x%x",
-			scan_ifp->hidparser_tok_index -
-			    scan_ifp->hidparser_tok_leng - 1,
-			    scan_ifp->hidparser_tok_token);
+	    "hidparser_GlobalItem:index = 0x%lx token = 0x%x",
+	    scan_ifp->hidparser_tok_index -
+	    scan_ifp->hidparser_tok_leng - 1,
+	    scan_ifp->hidparser_tok_token);
 	hidparser_scan(scan_ifp);
 
 	return (HIDPARSER_SUCCESS);
@@ -1978,7 +1981,7 @@ hidparser_LocalItem(hidparser_tok_t	*scan_ifp)
 		case R_ITEM_SET_DELIMITER:
 			hidparser_add_attribute(scan_ifp);
 			USB_DPRINTF_L4(PRINT_MASK_ALL, hparser_log_handle,
-			    "hidparser_LocalItem:index = 0x%x token = 0x%x",
+			    "hidparser_LocalItem:index = 0x%lx token = 0x%x",
 			    scan_ifp->hidparser_tok_index -
 			    scan_ifp->hidparser_tok_leng - 1,
 			    scan_ifp->hidparser_tok_token);
@@ -2027,7 +2030,7 @@ hidparser_allocate_entity(hidparser_tok_t	*scan_ifp)
 	 */
 	if (entity_type != R_ITEM_END_COLLECTION) {
 		entity->entity_item_attributes = hidparser_cp_attribute_list(
-			scan_ifp->hidparser_tok_gitem_head);
+		    scan_ifp->hidparser_tok_gitem_head);
 
 		/*
 		 * append the control attributes, then clear out the control
@@ -2035,13 +2038,13 @@ hidparser_allocate_entity(hidparser_tok_t	*scan_ifp)
 		 */
 		if (entity->entity_item_attributes) {
 			aend = hidparser_find_attribute_end(
-				entity->entity_item_attributes);
+			    entity->entity_item_attributes);
 			aend->entity_attribute_next =
-				scan_ifp->hidparser_tok_litem_head;
+			    scan_ifp->hidparser_tok_litem_head;
 			scan_ifp->hidparser_tok_litem_head = NULL;
 		} else {
 			entity->entity_item_attributes =
-				scan_ifp->hidparser_tok_litem_head;
+			    scan_ifp->hidparser_tok_litem_head;
 			scan_ifp->hidparser_tok_litem_head = NULL;
 		}
 	}
@@ -2165,9 +2168,9 @@ hidparser_cp_attribute_list(entity_attribute_t *head)
 
 	while (current_src) {
 		current_dst->entity_attribute_tag =
-			current_src->entity_attribute_tag;
+		    current_src->entity_attribute_tag;
 		current_dst->entity_attribute_length =
-			current_src->entity_attribute_length;
+		    current_src->entity_attribute_length;
 		current_dst->entity_attribute_value = kmem_zalloc(
 		    current_dst->entity_attribute_length, KM_SLEEP);
 		(void) bcopy(current_src->entity_attribute_value,
@@ -2175,7 +2178,7 @@ hidparser_cp_attribute_list(entity_attribute_t *head)
 		    current_src->entity_attribute_length);
 		if (current_src->entity_attribute_next) {
 			current_dst->entity_attribute_next =
-				hidparser_alloc_attrib_list(1);
+			    hidparser_alloc_attrib_list(1);
 		} else {
 			current_dst->entity_attribute_next = NULL;
 		}
@@ -2255,15 +2258,15 @@ hidparser_free_report_descr_handle(entity_item_t *handle)
 		} else {
 			if (current->entity_item_params != NULL) {
 				kmem_free(current->entity_item_params,
-					    current->entity_item_params_leng);
+				    current->entity_item_params_leng);
 			}
 			if (current->entity_item_attributes != NULL) {
 				hidparser_free_attribute_list(
 				    current->entity_item_attributes);
 			}
 			USB_DPRINTF_L4(PRINT_MASK_ALL,
-				    hparser_log_handle, "FREE 2: %s",
-				    items[current->entity_item_type]);
+			    hparser_log_handle, "FREE 2: %s",
+			    items[current->entity_item_type]);
 			kmem_free(current, sizeof (entity_item_t));
 		}
 		current = next;
@@ -2615,7 +2618,7 @@ hidparser_mainitem_err_check(entity_item_t *mainitem)
 	} /* if */
 
 	if ((mainitem->entity_item_type == R_ITEM_COLLECTION) ||
-		(mainitem->entity_item_type == R_ITEM_END_COLLECTION)) {
+	    (mainitem->entity_item_type == R_ITEM_END_COLLECTION)) {
 
 		return;
 	}
@@ -2763,7 +2766,7 @@ hidparser_check_minmax_val(entity_item_t *mainitem,
 	temp2 = hidparser_lookup_attribute(mainitem, item_tag2);
 	if ((temp1 != NULL) && (temp2 != NULL)) {
 		if (hidparser_find_unsigned_val(temp1) >
-			hidparser_find_unsigned_val(temp2)) {
+		    hidparser_find_unsigned_val(temp2)) {
 			if ((item_tag1 == R_ITEM_LOGICAL_MINIMUM) ||
 			    (item_tag1 == R_ITEM_PHYSICAL_MINIMUM)) {
 				hidparser_report_err(
@@ -2782,7 +2785,7 @@ hidparser_check_minmax_val(entity_item_t *mainitem,
 			}
 		}
 		if (hidparser_find_unsigned_val(temp2) <
-			hidparser_find_unsigned_val(temp1)) {
+		    hidparser_find_unsigned_val(temp1)) {
 			if ((item_tag2 == R_ITEM_LOGICAL_MAXIMUM) ||
 			    (item_tag2 == R_ITEM_PHYSICAL_MAXIMUM)) {
 				hidparser_report_err(
@@ -2822,7 +2825,7 @@ hidparser_check_minmax_val_signed(entity_item_t *mainitem,
 	temp2 = hidparser_lookup_attribute(mainitem, item_tag2);
 	if ((temp1 != NULL) && (temp2 != NULL)) {
 		if (hidparser_find_signed_val(temp1) >
-			hidparser_find_signed_val(temp2)) {
+		    hidparser_find_signed_val(temp2)) {
 			if ((item_tag1 == R_ITEM_LOGICAL_MINIMUM) ||
 			    (item_tag1 == R_ITEM_PHYSICAL_MINIMUM)) {
 				hidparser_report_err(
@@ -2841,7 +2844,7 @@ hidparser_check_minmax_val_signed(entity_item_t *mainitem,
 			}
 		}
 		if (hidparser_find_signed_val(temp2) <
-			hidparser_find_signed_val(temp1)) {
+		    hidparser_find_signed_val(temp1)) {
 			if ((item_tag2 == R_ITEM_LOGICAL_MAXIMUM) ||
 			    (item_tag2 == R_ITEM_PHYSICAL_MAXIMUM)) {
 				hidparser_report_err(

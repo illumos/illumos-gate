@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -321,8 +320,8 @@ usbprn_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	usbprnp->usbprn_instance = instance;
 	usbprnp->usbprn_dip	= dip;
 	usbprnp->usbprn_log_handle = usb_alloc_log_hdl(dip,
-				"prn", &usbprn_errlevel,
-				&usbprn_errmask, &usbprn_instance_debug, 0);
+	    "prn", &usbprn_errlevel,
+	    &usbprn_errmask, &usbprn_instance_debug, 0);
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, usbprnp->usbprn_log_handle,
 	    "usbprn_attach: cmd=%x", cmd);
@@ -343,9 +342,9 @@ usbprn_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Initialize locks and conditional variables */
 	mutex_init(&usbprnp->usbprn_mutex, NULL, MUTEX_DRIVER,
-			usbprnp->usbprn_dev_data->dev_iblock_cookie);
+	    usbprnp->usbprn_dev_data->dev_iblock_cookie);
 	usbprnp->usbprn_write_acc = usb_init_serialization(dip,
-					USB_INIT_SER_CHECK_SAME_THREAD);
+	    USB_INIT_SER_CHECK_SAME_THREAD);
 	usbprnp->usbprn_ser_acc = usb_init_serialization(dip,
 	    USB_INIT_SER_CHECK_SAME_THREAD);
 	usbprnp->usbprn_dev_acc = usb_init_serialization(dip, 0);
@@ -432,11 +431,11 @@ usbprn_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		usb_ugen_info.usb_ugen_flags = 0;
 		usb_ugen_info.usb_ugen_minor_node_ugen_bits_mask =
-					(dev_t)USBPRN_MINOR_UGEN_BITS_MASK;
+		    (dev_t)USBPRN_MINOR_UGEN_BITS_MASK;
 		usb_ugen_info.usb_ugen_minor_node_instance_mask =
-					(dev_t)~USBPRN_MINOR_UGEN_BITS_MASK;
+		    (dev_t)~USBPRN_MINOR_UGEN_BITS_MASK;
 		usbprnp->usbprn_ugen_hdl =
-					usb_ugen_get_hdl(dip, &usb_ugen_info);
+		    usb_ugen_get_hdl(dip, &usb_ugen_info);
 
 		if (usb_ugen_attach(usbprnp->usbprn_ugen_hdl, cmd) !=
 		    USB_SUCCESS) {
@@ -635,7 +634,7 @@ usbprn_cpr_suspend(dev_info_t *dip)
 
 	if ((rval == USB_SUCCESS) && usbprnp->usbprn_ugen_hdl) {
 		rval = usb_ugen_detach(usbprnp->usbprn_ugen_hdl,
-			DDI_SUSPEND);
+		    DDI_SUSPEND);
 	}
 
 	return (rval);
@@ -661,7 +660,7 @@ usbprn_cpr_resume(dev_info_t *dip)
 
 	if (usbprnp->usbprn_ugen_hdl) {
 		(void) usb_ugen_attach(usbprnp->usbprn_ugen_hdl,
-			DDI_RESUME);
+		    DDI_RESUME);
 	}
 }
 
@@ -675,7 +674,7 @@ usbprn_get_descriptors(usbprn_state_t *usbprnp)
 {
 	int			interface;
 	usb_client_dev_data_t	*dev_data =
-				    usbprnp->usbprn_dev_data;
+	    usbprnp->usbprn_dev_data;
 	usb_alt_if_data_t	*altif_data;
 	usb_cfg_data_t		*cfg_data;
 	usb_ep_data_t		*ep_data;
@@ -763,14 +762,14 @@ usbprn_get_device_id(usbprn_state_t *usbprnp)
 	int			rval = USB_FAILURE;
 	usb_ctrl_setup_t setup = {
 	    USB_DEV_REQ_DEV_TO_HOST |	/* bmRequestType */
-		USB_DEV_REQ_TYPE_CLASS |
-		USB_DEV_REQ_RCPT_IF,
+	    USB_DEV_REQ_TYPE_CLASS |
+	    USB_DEV_REQ_RCPT_IF,
 	    USB_PRINTER_GET_DEVICE_ID,	/* bRequest */
 	    0,				/* wValue: fill in later */
 	    0,				/* wIndex: fill in later  */
 	    0,				/* wLength: fill in later */
 	    0				/* attributes */
-	};
+	    };
 	void			*ptr;
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, usbprnp->usbprn_log_handle,
@@ -779,7 +778,7 @@ usbprn_get_device_id(usbprn_state_t *usbprnp)
 	ASSERT(!mutex_owned(&usbprnp->usbprn_mutex));
 
 	setup.wIndex = (usbprnp->usbprn_if_descr.bInterfaceNumber << 0x8) |
-			(usbprnp->usbprn_if_descr.bAlternateSetting);
+	    (usbprnp->usbprn_if_descr.bAlternateSetting);
 	setup.wLength = USBPRN_MAX_DEVICE_ID_LENGTH;
 	setup.wValue = usbprnp->usbprn_config_descr.iConfiguration;
 
@@ -852,8 +851,8 @@ usbprn_get_device_id(usbprn_state_t *usbprnp)
 	}
 
 	USB_DPRINTF_L3(PRINT_MASK_ATTA, usbprnp->usbprn_log_handle,
-	    "usbprn_get_device_id: returned data length=%d",
-	    data->b_wptr - data->b_rptr);
+	    "usbprn_get_device_id: returned data length=%ld",
+	    (long)(data->b_wptr - data->b_rptr));
 
 	ptr = kmem_zalloc(len + 1, KM_SLEEP);
 
@@ -862,7 +861,7 @@ usbprn_get_device_id(usbprn_state_t *usbprnp)
 	usbprnp->usbprn_device_id = ptr;
 
 	bcopy(data->b_rptr, usbprnp->usbprn_device_id,
-			usbprnp->usbprn_device_id_len);
+	    usbprnp->usbprn_device_id_len);
 	usbprnp->usbprn_device_id[usbprnp->usbprn_device_id_len] = '\0';
 
 	/* Length is in the first two bytes, dump string in logbuf */
@@ -894,14 +893,14 @@ usbprn_get_port_status(usbprn_state_t  *usbprnp)
 	usb_cb_flags_t		cb_flags;
 	usb_ctrl_setup_t setup = {
 	    USB_DEV_REQ_DEV_TO_HOST |	/* bmRequestType */
-		USB_DEV_REQ_TYPE_CLASS |
-		USB_DEV_REQ_RCPT_IF,
+	    USB_DEV_REQ_TYPE_CLASS |
+	    USB_DEV_REQ_RCPT_IF,
 	    USB_PRINTER_GET_PORT_STATUS, /* bRequest */
 	    0,				/* wValue */
 	    0,				/* wIndex: fill in later  */
 	    1,				/* wLength */
 	    0				/* attributes */
-	};
+	    };
 	ASSERT(!mutex_owned(&usbprnp->usbprn_mutex));
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, usbprnp->usbprn_log_handle,
@@ -947,7 +946,7 @@ static int
 usbprn_open(dev_t *devp, int flag, int sflag, cred_t *credp)
 {
 	usbprn_state_t *usbprnp = ddi_get_soft_state(usbprn_statep,
-				USBPRN_MINOR_TO_INSTANCE(getminor(*devp)));
+	    USBPRN_MINOR_TO_INSTANCE(getminor(*devp)));
 	int rval = 0;
 
 	if (usbprnp == NULL) {
@@ -981,7 +980,7 @@ usbprn_open(dev_t *devp, int flag, int sflag, cred_t *credp)
 		mutex_exit(&usbprnp->usbprn_mutex);
 
 		rval = usb_ugen_open(usbprnp->usbprn_ugen_hdl,
-			devp, flag, sflag, credp);
+		    devp, flag, sflag, credp);
 
 		usb_release_access(usbprnp->usbprn_ser_acc);
 
@@ -1000,11 +999,11 @@ usbprn_open(dev_t *devp, int flag, int sflag, cred_t *credp)
 	/* raise power */
 	usbprn_pm_busy_component(usbprnp);
 	(void) pm_raise_power(usbprnp->usbprn_dip,
-					0, USB_DEV_OS_FULL_PWR);
+	    0, USB_DEV_OS_FULL_PWR);
 	/* initialize some softstate data */
 	mutex_enter(&usbprnp->usbprn_mutex);
 	usbprnp->usbprn_prn_timeouts.tmo_forward =
-			usbprnp->usbprn_setparms.write_timeout;
+	    usbprnp->usbprn_setparms.write_timeout;
 	usbprnp->usbprn_prn_timeouts.tmo_reverse = 0;
 	mutex_exit(&usbprnp->usbprn_mutex);
 
@@ -1044,7 +1043,7 @@ static int
 usbprn_close(dev_t dev, int flag, int otyp, cred_t *credp)
 {
 	usbprn_state_t	*usbprnp = ddi_get_soft_state(usbprn_statep,
-				USBPRN_MINOR_TO_INSTANCE(getminor(dev)));
+	    USBPRN_MINOR_TO_INSTANCE(getminor(dev)));
 	int		rval = 0;
 
 	if (usbprnp == NULL) {
@@ -1057,7 +1056,7 @@ usbprn_close(dev_t dev, int flag, int otyp, cred_t *credp)
 
 	if (getminor(dev) & USBPRN_MINOR_UGEN_BITS_MASK) {
 		rval = usb_ugen_close(usbprnp->usbprn_ugen_hdl,
-			dev, flag, otyp, credp);
+		    dev, flag, otyp, credp);
 
 		return (rval);
 	}
@@ -1095,7 +1094,7 @@ static int
 usbprn_read(dev_t dev, struct uio *uiop, cred_t *credp)
 {
 	usbprn_state_t *usbprnp = ddi_get_soft_state(usbprn_statep,
-				USBPRN_MINOR_TO_INSTANCE(getminor(dev)));
+	    USBPRN_MINOR_TO_INSTANCE(getminor(dev)));
 
 	if (usbprnp == NULL) {
 
@@ -1108,7 +1107,7 @@ usbprn_read(dev_t dev, struct uio *uiop, cred_t *credp)
 		/* raise power */
 		usbprn_pm_busy_component(usbprnp);
 		(void) pm_raise_power(usbprnp->usbprn_dip,
-					0, USB_DEV_OS_FULL_PWR);
+		    0, USB_DEV_OS_FULL_PWR);
 
 		if (usb_serialize_access(usbprnp->usbprn_write_acc,
 		    USB_WAIT_SIG, 0) == 0) {
@@ -1118,7 +1117,7 @@ usbprn_read(dev_t dev, struct uio *uiop, cred_t *credp)
 		}
 
 		rval = usb_ugen_read(usbprnp->usbprn_ugen_hdl, dev,
-							uiop, credp);
+		    uiop, credp);
 
 		usb_release_access(usbprnp->usbprn_write_acc);
 
@@ -1142,7 +1141,7 @@ static int
 usbprn_write(dev_t dev, struct uio *uiop, cred_t *credp)
 {
 	usbprn_state_t *usbprnp = ddi_get_soft_state(usbprn_statep,
-				USBPRN_MINOR_TO_INSTANCE(getminor(dev)));
+	    USBPRN_MINOR_TO_INSTANCE(getminor(dev)));
 	usbprn_ps_t	*bulk_in = &usbprnp->usbprn_bulk_in;
 	usbprn_ps_t	*bulk_out = &usbprnp->usbprn_bulk_out;
 	int		rval;
@@ -1153,13 +1152,13 @@ usbprn_write(dev_t dev, struct uio *uiop, cred_t *credp)
 	}
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, usbprnp->usbprn_log_handle,
-	    "usbprn_write: Begin usbprnp=0x%p ", usbprnp);
+	    "usbprn_write: Begin usbprnp=0x%p ", (void *)usbprnp);
 
 	if (getminor(dev) & USBPRN_MINOR_UGEN_BITS_MASK) {
 		/* raise power */
 		usbprn_pm_busy_component(usbprnp);
 		(void) pm_raise_power(usbprnp->usbprn_dip,
-					0, USB_DEV_OS_FULL_PWR);
+		    0, USB_DEV_OS_FULL_PWR);
 
 		if (usb_serialize_access(usbprnp->usbprn_write_acc,
 		    USB_WAIT_SIG, 0) == 0) {
@@ -1169,7 +1168,7 @@ usbprn_write(dev_t dev, struct uio *uiop, cred_t *credp)
 		}
 
 		rval = usb_ugen_write(usbprnp->usbprn_ugen_hdl, dev,
-							uiop, credp);
+		    uiop, credp);
 
 		usb_release_access(usbprnp->usbprn_write_acc);
 
@@ -1238,7 +1237,7 @@ usbprn_poll(dev_t dev, short events,
     int anyyet,  short *reventsp, struct pollhead **phpp)
 {
 	usbprn_state_t *usbprnp = ddi_get_soft_state(usbprn_statep,
-				USBPRN_MINOR_TO_INSTANCE(getminor(dev)));
+	    USBPRN_MINOR_TO_INSTANCE(getminor(dev)));
 
 	if (usbprnp == NULL) {
 
@@ -1247,7 +1246,7 @@ usbprn_poll(dev_t dev, short events,
 
 	if (getminor(dev) & USBPRN_MINOR_UGEN_BITS_MASK) {
 		return (usb_ugen_poll(usbprnp->usbprn_ugen_hdl, dev, events,
-					anyyet, reventsp, phpp));
+		    anyyet, reventsp, phpp));
 	}
 
 	return (ENXIO);
@@ -1262,7 +1261,7 @@ static int
 usbprn_strategy(struct buf *bp)
 {
 	usbprn_state_t *usbprnp = ddi_get_soft_state(usbprn_statep,
-			USBPRN_MINOR_TO_INSTANCE(getminor(bp->b_edev)));
+	    USBPRN_MINOR_TO_INSTANCE(getminor(bp->b_edev)));
 	usbprn_ps_t	*bulk_out = &usbprnp->usbprn_bulk_out;
 
 	bp_mapin(bp);
@@ -1291,7 +1290,7 @@ usbprn_strategy(struct buf *bp)
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, usbprnp->usbprn_log_handle,
 	    "usbprn_strategy: usbprnp=0x%p bp=0x%p count=%lu",
-	    usbprnp, bp, bp->b_bcount);
+	    (void *)usbprnp, (void *)bp, bp->b_bcount);
 
 	ASSERT(usbprnp->usbprn_bulk_mp == NULL);
 
@@ -1309,7 +1308,7 @@ usbprn_strategy(struct buf *bp)
 	}
 
 	bcopy((caddr_t)bp->b_un.b_addr,
-		usbprnp->usbprn_bulk_mp->b_datap->db_base, bp->b_bcount);
+	    usbprnp->usbprn_bulk_mp->b_datap->db_base, bp->b_bcount);
 	usbprnp->usbprn_bulk_mp->b_wptr += bp->b_bcount;
 	mutex_exit(&usbprnp->usbprn_mutex);
 
@@ -1330,7 +1329,7 @@ usbprn_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 {
 	int		err = 0;
 	usbprn_state_t	*usbprnp = ddi_get_soft_state(usbprn_statep,
-				USBPRN_MINOR_TO_INSTANCE(getminor(dev)));
+	    USBPRN_MINOR_TO_INSTANCE(getminor(dev)));
 	struct ecpp_device_id	usbprn_devid;
 	int		len;
 
@@ -1609,7 +1608,7 @@ static void
 usbprn_minphys(struct buf *bp)
 {
 	usbprn_state_t *usbprnp = ddi_get_soft_state(usbprn_statep,
-			USBPRN_MINOR_TO_INSTANCE(getminor(bp->b_edev)));
+	    USBPRN_MINOR_TO_INSTANCE(getminor(bp->b_edev)));
 
 	mutex_enter(&usbprnp->usbprn_mutex);
 	USB_DPRINTF_L4(PRINT_MASK_ALL, usbprnp->usbprn_log_handle,
@@ -1718,7 +1717,7 @@ usbprn_close_usb_pipes(usbprn_state_t *usbprnp)
 		    "usbprn_close_usb_pipes: Closing bulk out pipe");
 
 		usb_pipe_close(usbprnp->usbprn_dip, bulk_out->ps_handle,
-				USB_FLAGS_SLEEP, NULL, NULL);
+		    USB_FLAGS_SLEEP, NULL, NULL);
 		bulk_out->ps_handle = NULL;
 	}
 	if (bulk_in->ps_handle) {
@@ -1727,7 +1726,7 @@ usbprn_close_usb_pipes(usbprn_state_t *usbprnp)
 		    "usbprn_close_usb_pipes: Closing bulk in pipe");
 
 		usb_pipe_close(usbprnp->usbprn_dip, bulk_in->ps_handle,
-				USB_FLAGS_SLEEP, NULL, NULL);
+		    USB_FLAGS_SLEEP, NULL, NULL);
 		bulk_in->ps_handle = NULL;
 	}
 }
@@ -1965,7 +1964,7 @@ usbprn_prnio_get_1284_status(usbprn_state_t *usbprnp, intptr_t arg, int flag)
 	mutex_enter(&usbprnp->usbprn_mutex);
 
 	status = usbprnp->usbprn_last_status & (USB_PRINTER_PORT_NO_ERROR |
-			USB_PRINTER_PORT_NO_SELECT | USB_PRINTER_PORT_EMPTY);
+	    USB_PRINTER_PORT_NO_SELECT | USB_PRINTER_PORT_EMPTY);
 
 	mutex_exit(&usbprnp->usbprn_mutex);
 
@@ -2302,7 +2301,7 @@ usbprn_send_async_bulk_data(usbprn_state_t *usbprnp)
 	USB_DPRINTF_L4(PRINT_MASK_ALL, usbprnp->usbprn_log_handle,
 	    "usbprn_send_async_bulk_data: req = 0x%p "
 	    "max_bulk_xfer_size=%lu mp=0x%p xfer_cnt=%lu timeout=%x",
-	    req, max_xfer_count, mp, xfer_count, timeout);
+	    (void *)req, max_xfer_count, (void *)mp, xfer_count, timeout);
 
 	ASSERT(xfer_count <= max_xfer_count);
 
@@ -2312,7 +2311,7 @@ usbprn_send_async_bulk_data(usbprn_state_t *usbprnp)
 
 		USB_DPRINTF_L4(PRINT_MASK_ALL, usbprnp->usbprn_log_handle,
 		    "usbprn_send_async_bulk_data: Bulk mp=0x%p "
-		    "rval=%d", mp, rval);
+		    "rval=%d", (void *)mp, rval);
 
 		mutex_enter(&usbprnp->usbprn_mutex);
 		bulk_out->ps_flags = USBPRN_PS_IDLE;
@@ -2346,7 +2345,7 @@ usbprn_bulk_xfer_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	mutex_enter(&usbprnp->usbprn_mutex);
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, usbprnp->usbprn_log_handle,
-	    "usbprn_bulk_xfer_cb: mp=0x%p ", usbprnp->usbprn_bulk_mp);
+	    "usbprn_bulk_xfer_cb: mp=0x%p ", (void *)usbprnp->usbprn_bulk_mp);
 
 	ASSERT(bulk_out->ps_flags == USBPRN_PS_NEED_TO_XFER);
 	ASSERT(usbprnp->usbprn_bp != NULL);
@@ -2400,7 +2399,8 @@ usbprn_bulk_xfer_exc_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	USB_DPRINTF_L4(PRINT_MASK_ALL, usbprnp->usbprn_log_handle,
 	    "usbprn_bulk_xfer_exc_cb: "
 	    "pipe=0x%p req=0x%p cr=%d cb_flags=0x%x data=0x%p",
-	    pipe, req, completion_reason, cb_flags, data);
+	    (void *)pipe, (void *)req, completion_reason, cb_flags,
+	    (void *)data);
 
 	ASSERT((req->bulk_cb_flags & USB_CB_INTR_CONTEXT) == 0);
 	ASSERT(data != NULL);
@@ -2454,8 +2454,8 @@ static int
 usbprn_reconnect_event_cb(dev_info_t *dip)
 {
 	usbprn_state_t	*usbprnp =
-			(usbprn_state_t *)ddi_get_soft_state(usbprn_statep,
-			ddi_get_instance(dip));
+	    (usbprn_state_t *)ddi_get_soft_state(usbprn_statep,
+	    ddi_get_instance(dip));
 
 	ASSERT(usbprnp != NULL);
 
@@ -2490,7 +2490,7 @@ static int
 usbprn_disconnect_event_cb(dev_info_t *dip)
 {
 	usbprn_state_t	*usbprnp = (usbprn_state_t *)ddi_get_soft_state(
-					usbprn_statep, ddi_get_instance(dip));
+	    usbprn_statep, ddi_get_instance(dip));
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, usbprnp->usbprn_log_handle,
 	    "usbprn_disconnect_event_cb: Begin");
@@ -2539,7 +2539,7 @@ usbprn_restore_device_state(dev_info_t *dip, usbprn_state_t *usbprnp)
 
 	mutex_enter(&usbprnp->usbprn_mutex);
 	ASSERT((usbprnp->usbprn_dev_state == USB_DEV_DISCONNECTED) ||
-		(usbprnp->usbprn_dev_state == USB_DEV_SUSPENDED));
+	    (usbprnp->usbprn_dev_state == USB_DEV_SUSPENDED));
 
 	mutex_exit(&usbprnp->usbprn_mutex);
 
@@ -2588,7 +2588,7 @@ usbprn_restore_device_state(dev_info_t *dip, usbprn_state_t *usbprnp)
 
 	/* restore alternate */
 	alt = usbprnp->usbprn_if_descr.bAlternateSetting,
-	mutex_exit(&usbprnp->usbprn_mutex);
+	    mutex_exit(&usbprnp->usbprn_mutex);
 
 	iface = usb_owns_device(dip) ? 0 :  usb_get_if_number(dip);
 	if ((rval = usb_set_alt_if(dip, iface, alt,
@@ -2638,7 +2638,7 @@ usbprn_create_pm_components(dev_info_t *dip, usbprn_state_t *usbprnp)
 
 	/* Allocate the state structure */
 	usbprnpm = kmem_zalloc(sizeof (usbprn_power_t),
-							KM_SLEEP);
+	    KM_SLEEP);
 	usbprnp->usbprn_pm = usbprnpm;
 	usbprnpm->usbprn_pm_capabilities = 0;
 	usbprnpm->usbprn_current_power = USB_DEV_OS_FULL_PWR;
@@ -2656,7 +2656,7 @@ usbprn_create_pm_components(dev_info_t *dip, usbprn_state_t *usbprnp)
 		}
 		usbprnpm->usbprn_pwr_states = (uint8_t)pwr_states;
 		(void) pm_raise_power(usbprnp->usbprn_dip, 0,
-						USB_DEV_OS_FULL_PWR);
+		    USB_DEV_OS_FULL_PWR);
 	} else {
 		USB_DPRINTF_L2(PRINT_MASK_PM,
 		    usbprnp->usbprn_log_handle,
@@ -2694,7 +2694,7 @@ usbprn_pwrlvl0(usbprn_state_t *usbprnp)
 
 		usbprnp->usbprn_dev_state = USB_DEV_PWRED_DOWN;
 		usbprnp->usbprn_pm->usbprn_current_power =
-						USB_DEV_OS_PWR_OFF;
+		    USB_DEV_OS_PWR_OFF;
 		/* FALLTHRU */
 	case USB_DEV_DISCONNECTED:
 	case USB_DEV_SUSPENDED:
@@ -2806,7 +2806,7 @@ usbprn_power(dev_info_t *dip, int comp, int level)
 	int		rval = USB_FAILURE;
 
 	usbprnp = (usbprn_state_t *)ddi_get_soft_state(usbprn_statep,
-						ddi_get_instance(dip));
+	    ddi_get_instance(dip));
 
 	USB_DPRINTF_L3(PRINT_MASK_PM, usbprnp->usbprn_log_handle,
 	    "usbprn_power: Begin: level=%d", level);

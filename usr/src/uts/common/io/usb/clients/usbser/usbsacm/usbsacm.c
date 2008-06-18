@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -685,7 +685,7 @@ usbsacm_ds_register_cb(ds_hdl_t hdl, uint_t port_num, ds_cb_t *cb)
 
 	USB_DPRINTF_L4(PRINT_MASK_OPEN, acmp->acm_lh,
 	    "usbsacm_ds_register_cb: acmp = 0x%p port_num = %d",
-	    acmp, port_num);
+	    (void *)acmp, port_num);
 
 	/* Check if port number is greater than actual port number. */
 	if (port_num >= acmp->acm_port_cnt) {
@@ -790,7 +790,7 @@ usbsacm_ds_close_port(ds_hdl_t hdl, uint_t port_num)
 	int		rval = USB_SUCCESS;
 
 	USB_DPRINTF_L4(PRINT_MASK_CLOSE, acmp->acm_lh,
-	    "usbsacm_ds_close_port: acmp = 0x%p", acmp);
+	    "usbsacm_ds_close_port: acmp = 0x%p", (void *)acmp);
 
 	mutex_enter(&acm_port->acm_port_mutex);
 	acm_port->acm_port_state = USBSACM_PORT_CLOSED;
@@ -1029,7 +1029,7 @@ usbsacm_ds_set_port_params(ds_hdl_t hdl, uint_t port_num, ds_port_params_t *tp)
 	int		ret;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, acmp->acm_lh,
-	    "usbsacm_ds_set_port_params: acmp = 0x%p", acmp);
+	    "usbsacm_ds_set_port_params: acmp = 0x%p", (void *)acmp);
 
 	mutex_enter(&acm_port->acm_port_mutex);
 	/*
@@ -1275,7 +1275,7 @@ usbsacm_ds_tx(ds_hdl_t hdl, uint_t port_num, mblk_t *mp)
 	usbsacm_port_t	*acm_port = &acmp->acm_ports[port_num];
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, acmp->acm_lh,
-	    "usbsacm_ds_tx: mp = 0x%p acmp = 0x%p", mp, acmp);
+	    "usbsacm_ds_tx: mp = 0x%p acmp = 0x%p", (void *)mp, (void *)acmp);
 
 	/* sanity checks */
 	if (mp == NULL) {
@@ -1312,7 +1312,7 @@ usbsacm_ds_rx(ds_hdl_t hdl, uint_t port_num)
 	mblk_t		*mp;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, acmp->acm_lh,
-	    "usbsacm_ds_rx: acmp = 0x%p", acmp);
+	    "usbsacm_ds_rx: acmp = 0x%p", (void *)acmp);
 
 	mutex_enter(&acm_port->acm_port_mutex);
 
@@ -1511,7 +1511,7 @@ usbsacm_init_ports_status(usbsacm_state_t *acmp)
 	usb_if_data_t	*cur_if;
 
 	USB_DPRINTF_L4(PRINT_MASK_OPEN, acmp->acm_lh,
-	    "usbsacm_init_ports_status: acmp = 0x%p", acmp);
+	    "usbsacm_init_ports_status: acmp = 0x%p", (void *)acmp);
 
 	/* Initialize the port status to default value */
 	for (i = 0; i < acmp->acm_port_cnt; i++) {
@@ -1989,7 +1989,7 @@ usbsacm_open_port_pipes(usbsacm_port_t *acm_port)
 	usb_pipe_policy_t policy;
 
 	USB_DPRINTF_L4(PRINT_MASK_OPEN, acmp->acm_lh,
-	    "usbsacm_open_port_pipes: acmp = 0x%p", acmp);
+	    "usbsacm_open_port_pipes: acmp = 0x%p", (void *)acmp);
 
 	/* Get bulk and interrupt endpoint data */
 	intr_pipe = usb_lookup_ep_data(acmp->acm_dip, acmp->acm_dev_data,
@@ -2298,7 +2298,7 @@ usbsacm_bulkout_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	mblk_t		*data = req->bulk_data;
 
 	USB_DPRINTF_L4(PRINT_MASK_EVENTS, acmp->acm_lh,
-	    "usbsacm_bulkout_cb: acmp = 0x%p", acmp);
+	    "usbsacm_bulkout_cb: acmp = 0x%p", (void *)acmp);
 
 	data_len = (req->bulk_data) ? MBLKL(req->bulk_data) : 0;
 
@@ -2340,7 +2340,7 @@ usbsacm_rx_start(usbsacm_port_t *acm_port)
 	int		data_len;
 
 	USB_DPRINTF_L4(PRINT_MASK_EVENTS, acmp->acm_lh,
-	    "usbsacm_rx_start: acm_xfer_sz = 0x%x acm_bulkin_size = 0x%x",
+	    "usbsacm_rx_start: acm_xfer_sz = 0x%lx acm_bulkin_size = 0x%lx",
 	    acmp->acm_xfer_sz, acm_port->acm_bulkin_size);
 
 	acm_port->acm_bulkin_state = USBSACM_PIPE_BUSY;
@@ -2497,7 +2497,7 @@ usbsacm_send_data(usbsacm_port_t *acm_port, mblk_t *data)
 
 	USB_DPRINTF_L4(PRINT_MASK_EVENTS, acmp->acm_lh,
 	    "usbsacm_send_data: data address is 0x%p, length = %d",
-	    data, data_len);
+	    (void *)data, data_len);
 
 	br = usb_alloc_bulk_req(acmp->acm_dip, 0, USB_FLAGS_SLEEP);
 	if (br == NULL) {
@@ -2809,7 +2809,7 @@ usbsacm_pm_set_busy(usbsacm_state_t *acmp)
 	int		rval;
 
 	USB_DPRINTF_L4(PRINT_MASK_PM, acmp->acm_lh,
-	    "usbsacm_pm_set_busy: pm = 0x%p", pm);
+	    "usbsacm_pm_set_busy: pm = 0x%p", (void *)pm);
 
 	if (pm == NULL) {
 

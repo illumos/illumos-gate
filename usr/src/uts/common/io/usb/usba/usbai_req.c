@@ -94,7 +94,7 @@ usba_check_req(usba_pipe_handle_data_t *ph_data, usb_opaque_t req,
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usba_check_req: ph_data=0x%p req=0x%p flags=0%x rval=%d",
-		    ph_data, req, flags, rval);
+		    (void *)ph_data, (void *)req, flags, rval);
 	}
 
 	return (rval);
@@ -123,7 +123,7 @@ _usba_check_req(usba_pipe_handle_data_t *ph_data, usb_opaque_t req,
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usba_check_req: ph_data=0x%p req=0x%p flags=0x%x",
-	    ph_data, req, flags);
+	    (void *)ph_data, (void *)req, flags);
 
 	if (req == NULL) {
 
@@ -537,8 +537,8 @@ usba_start_next_req(usba_pipe_handle_data_t *ph_data)
 		/* only submit to HCD when idle/active */
 
 		USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-		    "usba_start_next_req: ph_data=0x%p state=%d", ph_data,
-		    usba_get_ph_state(ph_data));
+		    "usba_start_next_req: ph_data=0x%p state=%d",
+		    (void *)ph_data, usba_get_ph_state(ph_data));
 
 		if (ep_attrs == USB_EP_ATTR_CONTROL) {
 			ph_data->p_active_cntrl_req_wrp = (usb_opaque_t)wrp;
@@ -549,7 +549,8 @@ usba_start_next_req(usba_pipe_handle_data_t *ph_data)
 			usba_pipe_new_state(ph_data, USB_PIPE_STATE_ACTIVE);
 
 			USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-			    "starting req = 0x%p", USBA_WRP2CTRL_REQ(wrp));
+			    "starting req = 0x%p",
+			    (void *)USBA_WRP2CTRL_REQ(wrp));
 
 			switch (ep_attrs) {
 			case USB_EP_ATTR_CONTROL:
@@ -602,7 +603,7 @@ usba_start_next_req(usba_pipe_handle_data_t *ph_data)
 	}
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usba_start_next_req done: ph_data=0x%p state=%d", ph_data,
+	    "usba_start_next_req done: ph_data=0x%p state=%d", (void *)ph_data,
 	    usba_get_ph_state(ph_data));
 
 	mutex_exit(&ph_data->p_mutex);
@@ -661,7 +662,7 @@ usba_req_wrapper_alloc(dev_info_t	*dip,
 		    &wrp->wr_allocated_list);
 
 		USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-		    "usba_req_wrapper_alloc: wrp = 0x%p", wrp);
+		    "usba_req_wrapper_alloc: wrp = 0x%p", (void *)wrp);
 	}
 
 	return (wrp);
@@ -682,7 +683,7 @@ usba_req_wrapper_free(usba_req_wrapper_t *wrp)
 	usba_pipe_handle_data_t	*ph_data;
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usba_req_wrapper_free: wrp=0x%p", wrp);
+	    "usba_req_wrapper_free: wrp=0x%p", (void *)wrp);
 
 	if (wrp) {
 		/* remove from	queues */
@@ -742,8 +743,8 @@ usba_req_normal_cb(usba_req_wrapper_t *req_wrp)
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usba_req_normal_cb: "
 	    "ph_data=0x%p state=%d wrp=0x%p ref=%d req=%d",
-	    ph_data, pipe_state, req_wrp, usba_get_ph_ref_count(ph_data),
-	    ph_data->p_req_count);
+	    (void *)ph_data, pipe_state, (void *)req_wrp,
+	    usba_get_ph_ref_count(ph_data), ph_data->p_req_count);
 
 	ASSERT((pipe_state == USB_PIPE_STATE_ACTIVE) ||
 	    (pipe_state == USB_PIPE_STATE_CLOSING));
@@ -839,9 +840,10 @@ usba_req_exc_cb(usba_req_wrapper_t *req_wrp, usb_cr_t cr,
 	    "ref=%d reqcnt=%d cr=%d",
 	    ddi_driver_name(req_wrp->wr_dip),
 	    ddi_get_instance(req_wrp->wr_dip),
-	    ph_data, ph_data->p_ep.bEndpointAddress,
-	    usba_get_ph_state(ph_data), req_wrp, usba_get_ph_ref_count(ph_data),
-	    ph_data->p_req_count, req_wrp->wr_cr);
+	    (void *)ph_data, ph_data->p_ep.bEndpointAddress,
+	    usba_get_ph_state(ph_data), (void *)req_wrp,
+	    usba_get_ph_ref_count(ph_data), ph_data->p_req_count,
+	    req_wrp->wr_cr);
 
 	ASSERT(req_wrp->wr_ph_data->p_req_count >= 0);
 
@@ -961,7 +963,7 @@ usba_req_set_cb_flags(usba_req_wrapper_t *req_wrp,
 {
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usba_req_set_cb_flags: wrp=0x%p cb-flags=0x%x",
-	    req_wrp, cb_flags);
+	    (void *)req_wrp, cb_flags);
 
 	cb_flags |= req_wrp->wr_cb_flags;
 	cb_flags = usba_check_intr_context(cb_flags);
@@ -1013,7 +1015,8 @@ usba_pipe_sync_wait(usba_pipe_handle_data_t	*ph_data,
 	mutex_exit(&ph_data->p_mutex);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usba_pipe_sync_wait: ph_data=0x%p cr=0x%x", ph_data, wrp->wr_cr);
+	    "usba_pipe_sync_wait: ph_data=0x%p cr=0x%x", (void *)ph_data,
+	    wrp->wr_cr);
 
 	/* XXX return something better than USB_FAILURE?? */
 
@@ -1043,7 +1046,7 @@ usb_alloc_ctrl_req(dev_info_t	*dip,
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usb_alloc_ctrl_req: dip=0x%p, wlen=0x%lx, flags=0x%x",
-	    dip, len, flags);
+	    (void *)dip, len, flags);
 
 	/* Allocate + Initialize the usba_req_wrapper_t structure */
 	if (dip &&
@@ -1065,7 +1068,7 @@ usb_alloc_ctrl_req(dev_info_t	*dip,
 	}
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usb_alloc_ctrl_req: ctrl_req = 0x%p", ctrl_req);
+	    "usb_alloc_ctrl_req: ctrl_req = 0x%p", (void *)ctrl_req);
 
 	return (ctrl_req);
 }
@@ -1083,7 +1086,7 @@ usb_free_ctrl_req(usb_ctrl_req_t *req)
 {
 	if (req) {
 		USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-		    "usb_free_ctrl_req: req = 0x%p", req);
+		    "usb_free_ctrl_req: req = 0x%p", (void *)req);
 
 		if (req->ctrl_data) {
 			freemsg(req->ctrl_data);
@@ -1122,8 +1125,9 @@ usb_pipe_ctrl_xfer(usb_pipe_handle_t	pipe_handle,
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usb_pipe_ctrl_xfer: req=0x%p, wrp=0x%p\n\t"
 	    "setup = 0x%x 0x%x 0x%x 0x%x 0x%x uf=0x%x",
-	    req, wrp, req->ctrl_bmRequestType, req->ctrl_bRequest,
-	    req->ctrl_wValue, req->ctrl_wIndex, req->ctrl_wLength, usb_flags);
+	    (void *)req, (void *)wrp, req->ctrl_bmRequestType,
+	    req->ctrl_bRequest, req->ctrl_wValue, req->ctrl_wIndex,
+	    req->ctrl_wLength, usb_flags);
 
 	if (ph_data == NULL) {
 
@@ -1166,7 +1170,8 @@ usb_pipe_ctrl_xfer(usb_pipe_handle_t	pipe_handle,
 		if (ph_data->p_queue.next ||
 		    ph_data->p_active_cntrl_req_wrp) {
 			USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-			    "usb_pipe_ctrl_xfer: queue request 0x%p", req);
+			    "usb_pipe_ctrl_xfer: queue request 0x%p",
+			    (void *)req);
 
 			usba_add_to_list(&ph_data->p_queue, &wrp->wr_queue);
 			rval = USB_SUCCESS;
@@ -1183,7 +1188,7 @@ usb_pipe_ctrl_xfer(usb_pipe_handle_t	pipe_handle,
 		break;
 	case USB_PIPE_STATE_ACTIVE:
 		USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-		    "usb_pipe_ctrl_xfer: queue request 0x%p", req);
+		    "usb_pipe_ctrl_xfer: queue request 0x%p", (void *)req);
 
 		usba_add_to_list(&ph_data->p_queue, &wrp->wr_queue);
 		rval = USB_SUCCESS;
@@ -1193,7 +1198,7 @@ usb_pipe_ctrl_xfer(usb_pipe_handle_t	pipe_handle,
 		if (USBA_IS_DEFAULT_PIPE(ph_data)) {
 			USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 			    "usb_pipe_ctrl_xfer: queue request 0x%p on "
-			    "pending def pipe error", req);
+			    "pending def pipe error", (void *)req);
 
 			usba_add_to_list(&ph_data->p_queue, &wrp->wr_queue);
 			rval = USB_SUCCESS;
@@ -1217,7 +1222,7 @@ usb_pipe_ctrl_xfer(usb_pipe_handle_t	pipe_handle,
 	/* if there has been a failure, decrement req count */
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
-		    "usb_pipe_ctrl_xfer: hcd failed req 0x%p", req);
+		    "usb_pipe_ctrl_xfer: hcd failed req 0x%p", (void *)req);
 
 		if (req->ctrl_completion_reason == USB_CR_OK) {
 			req->ctrl_completion_reason = usba_rval2cr(rval);
@@ -1303,7 +1308,7 @@ usb_pipe_sync_ctrl_xfer(dev_info_t *dip,
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usb_pipe_sync_ctrl_xfer: ph=0x%p\n\t"
-	    "setup = 0x%x 0x%x 0x%x 0x%x 0x%x uf = 0x%x", pipe_handle,
+	    "setup = 0x%x 0x%x 0x%x 0x%x 0x%x uf = 0x%x", (void *)pipe_handle,
 	    bmRequestType, bRequest, wValue, wIndex, wLength, flags);
 
 	if ((ph_data = usba_hold_ph_data(pipe_handle)) == NULL) {
@@ -1345,9 +1350,9 @@ usb_pipe_sync_ctrl_xfer(dev_info_t *dip,
 #ifdef DEBUG
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "req=0x%p, cr=%s cb_flags=%s data=0x%p rval=%s",
-	    ctrl_req, usb_str_cr(ctrl_req->ctrl_completion_reason),
+	    (void *)ctrl_req, usb_str_cr(ctrl_req->ctrl_completion_reason),
 	    usb_str_cb_flags(ctrl_req->ctrl_cb_flags, buf, BUFSIZE),
-	    ctrl_req->ctrl_data, usb_str_rval(rval));
+	    (void *)ctrl_req->ctrl_data, usb_str_rval(rval));
 #endif
 
 	/* copy back ctrl_req values */
@@ -1442,7 +1447,7 @@ usb_alloc_bulk_req(dev_info_t	*dip,
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usb_alloc_bulk_req: dip=0x%p wlen=0x%lx flags=0x%x",
-	    dip, len, flags);
+	    (void *)dip, len, flags);
 
 	/* Allocate + Initialize the usba_req_wrapper_t structure */
 	if (dip &&
@@ -1465,7 +1470,7 @@ usb_alloc_bulk_req(dev_info_t	*dip,
 	}
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usb_alloc_bulk_req: bulk_req = 0x%p", bulk_req);
+	    "usb_alloc_bulk_req: bulk_req = 0x%p", (void *)bulk_req);
 
 	return (bulk_req);
 }
@@ -1483,7 +1488,7 @@ usb_free_bulk_req(usb_bulk_req_t *req)
 {
 	if (req) {
 		USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-		    "usb_free_bulk_req: req=0x%p", req);
+		    "usb_free_bulk_req: req=0x%p", (void *)req);
 
 		if (req->bulk_data) {
 			freemsg(req->bulk_data);
@@ -1518,7 +1523,7 @@ usb_pipe_bulk_xfer(usb_pipe_handle_t	pipe_handle,
 	usb_pipe_state_t	pipe_state;
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usb_pipe_bulk_xfer: req=0x%p uf=0x%x", req, usb_flags);
+	    "usb_pipe_bulk_xfer: req=0x%p uf=0x%x", (void *)req, usb_flags);
 
 	if (ph_data == NULL) {
 
@@ -1552,7 +1557,8 @@ usb_pipe_bulk_xfer(usb_pipe_handle_t	pipe_handle,
 	case USB_PIPE_STATE_IDLE:
 		if (ph_data->p_queue.next) {
 			USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-			    "usb_pipe_bulk_xfer: queue request 0x%p", req);
+			    "usb_pipe_bulk_xfer: queue request 0x%p",
+			    (void *)req);
 
 			usba_add_to_list(&ph_data->p_queue, &wrp->wr_queue);
 			rval = USB_SUCCESS;
@@ -1568,7 +1574,7 @@ usb_pipe_bulk_xfer(usb_pipe_handle_t	pipe_handle,
 		break;
 	case USB_PIPE_STATE_ACTIVE:
 		USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-		    "usb_pipe_bulk_xfer: queue request 0x%p", req);
+		    "usb_pipe_bulk_xfer: queue request 0x%p", (void *)req);
 
 		usba_add_to_list(&ph_data->p_queue, &wrp->wr_queue);
 		rval = USB_SUCCESS;
@@ -1642,7 +1648,8 @@ usb_pipe_get_max_bulk_transfer_size(dev_info_t	*dip,
 	usba_device = usba_get_usba_device(dip);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usb_pipe_bulk_transfer_size: usba_device=0x%p", usba_device);
+	    "usb_pipe_bulk_transfer_size: usba_device=0x%p",
+	    (void *)usba_device);
 
 	if ((usba_device) &&
 	    (usba_device->usb_hcdi_ops->usba_hcdi_bulk_transfer_size)) {
@@ -1680,7 +1687,7 @@ usb_alloc_intr_req(dev_info_t	*dip,
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usb_alloc_intr_req: dip=0x%p, len=0x%lx, flags=0x%x",
-	    dip, len, flags);
+	    (void *)dip, len, flags);
 
 	/* Allocate + Initialize the usba_req_wrapper_t structure */
 	if ((dip &&
@@ -1702,7 +1709,7 @@ usb_alloc_intr_req(dev_info_t	*dip,
 	}
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usb_alloc_intr_req: intr_req=0x%p", intr_req);
+	    "usb_alloc_intr_req: intr_req=0x%p", (void *)intr_req);
 
 	return (intr_req);
 }
@@ -1770,7 +1777,7 @@ usb_free_intr_req(usb_intr_req_t *req)
 {
 	if (req) {
 		USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-		    "usb_free_intr_req: req = 0x%p", req);
+		    "usb_free_intr_req: req = 0x%p", (void *)req);
 
 		if (req->intr_data) {
 			freemsg(req->intr_data);
@@ -1809,7 +1816,7 @@ usb_pipe_intr_xfer(usb_pipe_handle_t	pipe_handle,
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usb_pipe_intr_req: req=0x%p uf=0x%x",
-	    req, usb_flags);
+	    (void *)req, usb_flags);
 
 	if (ph_data == NULL) {
 
@@ -2036,7 +2043,7 @@ usba_dummy_callback(
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usba_dummy_callback: "
 	    "ph=0x%p rval=0x%x flags=0x%x cb_arg=0x%p",
-	    ph, rval, flags, arg);
+	    (void *)ph, rval, flags, (void *)arg);
 }
 
 
@@ -2131,7 +2138,7 @@ usb_alloc_isoc_req(dev_info_t		*dip,
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
 	    "usb_alloc_isoc_req: dip=0x%p pkt_cnt=%d len=%lu flags=0x%x",
-	    dip, isoc_pkts_count, len, flags);
+	    (void *)dip, isoc_pkts_count, len, flags);
 
 	/* client needs to set isoc_pks_count */
 	if (dip && isoc_pkts_count) {
@@ -2160,7 +2167,7 @@ usb_alloc_isoc_req(dev_info_t		*dip,
 	}
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usb_alloc_isoc_req: isoc_req = 0x%p", isoc_req);
+	    "usb_alloc_isoc_req: isoc_req = 0x%p", (void *)isoc_req);
 
 	return (isoc_req);
 }
@@ -2245,7 +2252,7 @@ usb_free_isoc_req(usb_isoc_req_t *req)
 {
 	if (req) {
 		USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-		    "usb_free_isoc_req: req=0x%p", req);
+		    "usb_free_isoc_req: req=0x%p", (void *)req);
 
 		if (req->isoc_data) {
 			freemsg(req->isoc_data);
@@ -2271,7 +2278,7 @@ usb_frame_number_t
 usb_get_current_frame_number(dev_info_t	*dip)
 {
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-	    "usb_get_current_frame_number: dip=0x%p", dip);
+	    "usb_get_current_frame_number: dip=0x%p", (void *)dip);
 
 	if (dip) {
 		usba_device_t	*usba_device = usba_get_usba_device(dip);
@@ -2319,7 +2326,8 @@ usb_get_max_pkts_per_isoc_request(dev_info_t *dip)
 		uint_t		max_isoc_pkts_per_request;
 
 		USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,
-		    "usb_get_max_isoc_pkts: usba_device=0x%p", usba_device);
+		    "usb_get_max_isoc_pkts: usba_device=0x%p",
+		    (void *)usba_device);
 
 		if (usba_device->usb_hcdi_ops->usba_hcdi_get_max_isoc_pkts) {
 

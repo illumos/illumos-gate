@@ -639,7 +639,7 @@ ehci_map_regs(ehci_state_t	*ehcip)
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 	    "ehci_map_regs: Capsp 0x%p Regsp 0x%p\n",
-	    ehcip->ehci_capsp, ehcip->ehci_regsp);
+	    (void *)ehcip->ehci_capsp, (void *)ehcip->ehci_regsp);
 
 	return (DDI_SUCCESS);
 }
@@ -2264,7 +2264,8 @@ ehci_allocate_classic_tt_bandwidth(
 
 	USB_DPRINTF_L3(PRINT_MASK_BW, ehcip->ehci_log_hdl,
 	    "ehci_allocate_classic_tt_bandwidth: "
-	    "child_ud 0x%p parent_ud 0x%p", child_ud, parent_ud);
+	    "child_ud 0x%p parent_ud 0x%p",
+	    (void *)child_ud, (void *)parent_ud);
 
 	/*
 	 * Calculate the length in bytes of a transaction on this
@@ -3664,7 +3665,7 @@ ehci_do_soft_reset(ehci_state_t	*ehcip)
 	    Get_OpReg(ehci_periodic_list_base);
 
 	USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-	    "ehci_do_soft_reset: Save reg = 0x%p", ehci_save_regs);
+	    "ehci_do_soft_reset: Save reg = 0x%p", (void *)ehci_save_regs);
 
 	/* Disable all list processing and interrupts */
 	Set_OpReg(ehci_command, Get_OpReg(ehci_command) &
@@ -3775,7 +3776,8 @@ ehci_do_soft_reset(ehci_state_t	*ehcip)
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 	    "ehci_do_soft_reset: Before Frame Number 0x%llx "
 	    "After Frame Number 0x%llx",
-	    before_frame_number, after_frame_number);
+	    (unsigned long long)before_frame_number,
+	    (unsigned long long)after_frame_number);
 
 	if ((after_frame_number <= before_frame_number) &&
 	    (Get_OpReg(ehci_status) & EHCI_STS_HOST_CTRL_HALTED)) {
@@ -3870,7 +3872,8 @@ ehci_get_current_frame_number(ehci_state_t *ehcip)
 	    "ehci_get_current_frame_number: "
 	    "Current usb uframe number = 0x%llx "
 	    "Current usb frame number  = 0x%llx",
-	    micro_frame_number, usb_frame_number);
+	    (unsigned long long)micro_frame_number,
+	    (unsigned long long)usb_frame_number);
 
 	return (usb_frame_number);
 }
@@ -3930,7 +3933,9 @@ ehci_wait_for_sof(ehci_state_t	*ehcip)
 
 	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "ehci_wait_for_sof: framenumber: before 0x%llx "
-	    "after 0x%llx", before_frame_number, after_frame_number);
+	    "after 0x%llx",
+	    (unsigned long long)before_frame_number,
+	    (unsigned long long)after_frame_number);
 
 	/* Return failure, if usb frame number has not been changed */
 	if (after_frame_number <= before_frame_number) {

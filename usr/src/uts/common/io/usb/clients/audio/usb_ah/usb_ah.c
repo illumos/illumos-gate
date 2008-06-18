@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +29,7 @@
  * USB audio hid streams module - processes hid data
  * from HID driver and converts to a format that SADA
  * understands. The stack looks like this :
- * 	hid --> usb_ah --> usb_ac --> audio framework
+ *	hid --> usb_ah --> usb_ac --> audio framework
  * usb_ac just acts as a passthrough layer for the converted data.
  *
  * During open, usb_ah gets the parser handle from hid and gets
@@ -213,10 +212,10 @@ usb_ah_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 	mblk_t		*mctl_ptr;
 
 	if (q->q_ptr) {
-	    USB_DPRINTF_L3(PRINT_MASK_OPEN, usb_ah_log_handle,
-		"usb_ah_open already opened");
+		USB_DPRINTF_L3(PRINT_MASK_OPEN, usb_ah_log_handle,
+		    "usb_ah_open already opened");
 
-	    return (0); /* already opened */
+		return (0); /* already opened */
 	}
 
 	switch (sflag) {
@@ -236,7 +235,7 @@ usb_ah_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 	usb_ahd = kmem_zalloc(sizeof (usb_ah_state_t), KM_SLEEP);
 
 	USB_DPRINTF_L3(PRINT_MASK_OPEN, usb_ah_log_handle,
-	    "usb_ah_state= 0x%p", usb_ahd);
+	    "usb_ah_state= 0x%p", (void *)usb_ahd);
 
 	mutex_init(&usb_ahd->usb_ah_mutex, NULL, MUTEX_DRIVER, NULL);
 
@@ -289,7 +288,7 @@ usb_ah_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 
 	if (usb_ahd->usb_ah_report_descr != NULL) {
 		hidparser_find_max_packet_size_from_report_descriptor(
-		usb_ahd->usb_ah_report_descr, &hpack);
+		    usb_ahd->usb_ah_report_descr, &hpack);
 
 		/* round up to the nearest byte */
 		usb_ahd->usb_ah_packet_size = (hpack.max_packet_size + 7) / 8;
@@ -372,7 +371,7 @@ usb_ah_close(register queue_t *q, int flag, cred_t *crp)
 
 /*
  * usb_ah_wput :
- *	usb_ah  module output queue put procedure: handles M_IOCTL
+ *	usb_ah	module output queue put procedure: handles M_IOCTL
  *	messages.
  */
 static void
@@ -416,7 +415,7 @@ usb_ah_rput(register queue_t *q, register mblk_t *mp)
 
 	USB_DPRINTF_L3(PRINT_MASK_ALL, usb_ah_log_handle,
 	    "usb_ah_rput: Begin, usb_ah state=0x%p, q=0x%p, mp=0x%p",
-	    usb_ahd, q, mp);
+	    (void *)usb_ahd, (void *)q, (void *)mp);
 
 	if (usb_ahd == 0) {
 		freemsg(mp);	/* nobody's listening */
@@ -637,7 +636,7 @@ usb_ah_cp_mblk(mblk_t *mp)
 {
 	mblk_t *bp1, *bp2;
 	int len;
-	struct iocblk   *iocp;
+	struct iocblk	*iocp;
 
 	if ((bp1 = allocb((int)sizeof (struct iocblk), BPRI_HI)) == NULL) {
 		USB_DPRINTF_L4(PRINT_MASK_ALL, usb_ah_log_handle,
@@ -823,11 +822,11 @@ usb_ah_check_usage_send_data(usb_ah_state_t *usb_ahd, mblk_t *mp)
 					    &val, mctlmsg.ioc_count);
 					if (mctl_ptr != NULL) {
 						mutex_exit(&usb_ahd->
-								usb_ah_mutex);
+						    usb_ah_mutex);
 						putnext(usb_ahd->usb_ah_readq,
 						    mctl_ptr);
 						mutex_enter(&usb_ahd->
-								usb_ah_mutex);
+						    usb_ah_mutex);
 					}
 				} else {
 					USB_DPRINTF_L2(PRINT_MASK_ALL,
