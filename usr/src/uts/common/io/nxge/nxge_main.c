@@ -146,7 +146,7 @@ nxge_rxbuf_type_t nxge_rx_buf_size_type = RCR_PKTBUFSZ_0;
 nxge_rxbuf_threshold_t nxge_rx_threshold_lo = NXGE_RX_COPY_3;
 
 /* Use kmem_alloc() to allocate data buffers. */
-#if !defined(__i386)
+#if defined(_BIG_ENDIAN)
 uint32_t	nxge_use_kmem_alloc = 1;
 #else
 uint32_t	nxge_use_kmem_alloc = 0;

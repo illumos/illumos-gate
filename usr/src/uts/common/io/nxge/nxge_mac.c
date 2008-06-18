@@ -81,7 +81,10 @@ static uint32_t nxge_supported_cl45_ids[] = {
 	TN1010_DEV_ID
 };
 
-static uint32_t nxge_supported_cl22_ids[] = {BCM5464R_PHY_ID};
+static uint32_t nxge_supported_cl22_ids[] = {
+    BCM5464R_PHY_ID,
+    BCM5482_PHY_ID
+};
 
 #define	NUM_CLAUSE_45_IDS	(sizeof (nxge_supported_cl45_ids) /	\
 				sizeof (uint32_t))
