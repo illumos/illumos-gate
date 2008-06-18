@@ -80,6 +80,7 @@ extern "C" {
 #define	APIC_LOCAL_TIMER	0xc8
 
 /* Local Interrupt Vector registers */
+#define	APIC_THERM_VECT		0xcc
 #define	APIC_PCINT_VECT		0xd0
 #define	APIC_INT_VECT0		0xd4
 #define	APIC_INT_VECT1		0xd8
@@ -289,8 +290,11 @@ struct apic_io_intr {
 #define	AV_IM_OFF	0x40000000
 
 /* interrupt command register 0-31					*/
+#define	AV_DELIV_MODE	0x700
+
 #define	AV_FIXED	0x000
 #define	AV_LOPRI	0x100
+#define	AV_SMI		0x200
 #define	AV_REMOTE	0x300
 #define	AV_NMI		0x400
 #define	AV_RESET	0x500

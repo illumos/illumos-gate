@@ -249,7 +249,7 @@ static struct	psm_info apic_psm_info = {
 	PSM_OWN_EXCLUSIVE,			/* ownership */
 	(struct psm_ops *)&apic_ops,		/* operation */
 	APIC_PCPLUSMP_NAME,			/* machine name */
-	"pcplusmp v1.4 compatible %I%",
+	"pcplusmp v1.4 compatible",
 };
 
 static void *apic_hdlp;
@@ -510,6 +510,7 @@ static void
 apic_init_intr()
 {
 	processorid_t	cpun = psm_get_cpu_id();
+	uint_t nlvt;
 
 #if defined(__amd64)
 	setcr8((ulong_t)(APIC_MASK_ALL >> APIC_IPL_SHIFT));
@@ -526,37 +527,69 @@ apic_init_intr()
 	/* need to enable APIC before unmasking NMI */
 	apicadr[APIC_SPUR_INT_REG] = AV_UNIT_ENABLE | APIC_SPUR_INTR;
 
-	apicadr[APIC_LOCAL_TIMER] = AV_MASK;
-	apicadr[APIC_INT_VECT0]	= AV_MASK;	/* local intr reg 0 */
+	/*
+	 * Presence of an invalid vector with delivery mode AV_FIXED can
+	 * cause an error interrupt, even if the entry is masked...so
+	 * write a valid vector to LVT entries along with the mask bit
+	 */
+
+	/* All APICs have timer and LINT0/1 */
+	apicadr[APIC_LOCAL_TIMER] = AV_MASK|APIC_RESV_IRQ;
+	apicadr[APIC_INT_VECT0]	= AV_MASK|APIC_RESV_IRQ;
 	apicadr[APIC_INT_VECT1] = AV_NMI;	/* enable NMI */
 
-	if (apic_cpus[cpun].aci_local_ver < APIC_INTEGRATED_VERS)
-		return;
+	/*
+	 * On integrated APICs, the number of LVT entries is
+	 * 'Max LVT entry' + 1; on 82489DX's (non-integrated
+	 * APICs), nlvt is "3" (LINT0, LINT1, and timer)
+	 */
 
-	/* Enable performance counter overflow interrupt */
+	if (apic_cpus[cpun].aci_local_ver < APIC_INTEGRATED_VERS) {
+		nlvt = 3;
+	} else {
+		nlvt = ((apicadr[APIC_VERS_REG] >> 16) & 0xFF) + 1;
+	}
 
-	if ((x86_feature & X86_MSR) != X86_MSR)
-		apic_enable_cpcovf_intr = 0;
-	if (apic_enable_cpcovf_intr) {
-		if (apic_cpcovf_vect == 0) {
-			int ipl = APIC_PCINT_IPL;
-			int irq = apic_get_ipivect(ipl, -1);
+	if (nlvt >= 5) {
+		/* Enable performance counter overflow interrupt */
 
-			ASSERT(irq != -1);
-			apic_cpcovf_vect = apic_irq_table[irq]->airq_vector;
-			ASSERT(apic_cpcovf_vect);
-			(void) add_avintr(NULL, ipl,
-			    (avfunc)kcpc_hw_overflow_intr,
-			    "apic pcint", irq, NULL, NULL, NULL, NULL);
-			kcpc_hw_overflow_intr_installed = 1;
-			kcpc_hw_enable_cpc_intr = apic_cpcovf_mask_clear;
+		if ((x86_feature & X86_MSR) != X86_MSR)
+			apic_enable_cpcovf_intr = 0;
+		if (apic_enable_cpcovf_intr) {
+			if (apic_cpcovf_vect == 0) {
+				int ipl = APIC_PCINT_IPL;
+				int irq = apic_get_ipivect(ipl, -1);
+
+				ASSERT(irq != -1);
+				apic_cpcovf_vect =
+				    apic_irq_table[irq]->airq_vector;
+				ASSERT(apic_cpcovf_vect);
+				(void) add_avintr(NULL, ipl,
+				    (avfunc)kcpc_hw_overflow_intr,
+				    "apic pcint", irq, NULL, NULL, NULL, NULL);
+				kcpc_hw_overflow_intr_installed = 1;
+				kcpc_hw_enable_cpc_intr =
+				    apic_cpcovf_mask_clear;
+			}
+			apicadr[APIC_PCINT_VECT] = apic_cpcovf_vect;
 		}
-		apicadr[APIC_PCINT_VECT] = apic_cpcovf_vect;
+	}
+
+	if (nlvt >= 6) {
+		/* Only mask TM intr if the BIOS apparently doesn't use it */
+
+		uint32_t lvtval;
+
+		lvtval = apicadr[APIC_THERM_VECT];
+		if (((lvtval & AV_MASK) == AV_MASK) ||
+		    ((lvtval & AV_DELIV_MODE) != AV_SMI)) {
+			apicadr[APIC_THERM_VECT] = AV_MASK|APIC_RESV_IRQ;
+		}
 	}
 
 	/* Enable error interrupt */
 
-	if (apic_enable_error_intr) {
+	if (nlvt >= 4 && apic_enable_error_intr) {
 		if (apic_errvect == 0) {
 			int ipl = 0xf;	/* get highest priority intr */
 			int irq = apic_get_ipivect(ipl, -1);
@@ -576,6 +609,7 @@ apic_init_intr()
 		apicadr[APIC_ERROR_STATUS] = 0;
 		apicadr[APIC_ERROR_STATUS] = 0;
 	}
+
 }
 
 static void
@@ -887,6 +921,8 @@ apic_send_ipi(int cpun, int ipl)
 	ulong_t flag;
 
 	vector = apic_resv_vector[ipl];
+
+	ASSERT((vector >= APIC_BASE_VECT) && (vector <= APIC_SPUR_INTR));
 
 	flag = intr_clear();
 
