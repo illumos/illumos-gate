@@ -2200,9 +2200,6 @@ vd_notify(vd_task_t *task)
 	ASSERT(task != NULL);
 	ASSERT(task->vd != NULL);
 
-	if (task->vd->reset_state)
-		return;
-
 	/*
 	 * Send the "ack" or "nack" back to the client; if sending the message
 	 * via LDC fails, arrange to reset both the connection state and LDC
@@ -2271,7 +2268,14 @@ vd_complete_notify(vd_task_t *task)
 		return;
 	}
 
-	vd_notify(task);
+	/*
+	 * We should only send an ACK/NACK here if we are not currently in
+	 * reset as, depending on how we reset, the dring may have been
+	 * blown away and we don't want to ACK/NACK a message that isn't
+	 * there.
+	 */
+	if (!vd->reset_state)
+		vd_notify(task);
 }
 
 /*
