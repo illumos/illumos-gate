@@ -43,6 +43,15 @@ dump_setup()
 	readswapdev $DUMPADM_DEVICE < $vfstab
 
 	#
+	# Make sure that the dump save area has been configured before
+	# proceeding. If the variable has not been defined or does not exist
+	# then bail out early. This will prevent us from configuring a
+	# dump save area before a hostname has been configured (i.e after
+	# sys-unconfig has been invoked).
+	#
+	[ -z "$DUMPADM_SAVDIR" ] && return
+
+	#
 	# If we have a dedicated dump device, then go ahead and configure it.
 	# 
 	if [ "x$special" != "x$DUMPADM_DEVICE" ]; then
