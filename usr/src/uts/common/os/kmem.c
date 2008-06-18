@@ -1057,6 +1057,7 @@ static struct {
 	uint64_t kms_disbelief;
 	uint64_t kms_already_pending;
 	uint64_t kms_callback_alloc_fail;
+	uint64_t kms_callback_taskq_fail;
 	uint64_t kms_endscan_slab_destroyed;
 	uint64_t kms_endscan_nomem;
 	uint64_t kms_endscan_slab_all_used;
@@ -4438,10 +4439,11 @@ kmem_move_begin(kmem_cache_t *cp, kmem_slab_t *sp, void *buf, int flags)
 
 	if (!taskq_dispatch(kmem_move_taskq, (task_func_t *)kmem_move_buffer,
 	    callback, TQ_NOSLEEP)) {
+		KMEM_STAT_ADD(kmem_move_stats.kms_callback_taskq_fail);
 		mutex_enter(&cp->cache_lock);
 		avl_remove(&cp->cache_defrag->kmd_moves_pending, callback);
 		mutex_exit(&cp->cache_lock);
-		kmem_slab_free_constructed(cp, to_buf, B_FALSE);
+		kmem_slab_free(cp, to_buf);
 		kmem_cache_free(kmem_move_cache, callback);
 		return (B_FALSE);
 	}
