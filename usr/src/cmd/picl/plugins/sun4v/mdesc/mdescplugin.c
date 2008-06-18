@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -270,6 +270,13 @@ mdescplugin_init(void)
 	mdp = mdesc_devinit();
 	if (mdp == NULL)
 		return;
+
+	/*
+	 * update the cpu configuration in case the snapshot cache used by the
+	 * devtree plugin is out of date.
+	 */
+	(void) update_devices(OBP_CPU, DEV_ADD);
+	(void) update_devices(OBP_CPU, DEV_REMOVE);
 
 	rootnode = md_root_node(mdp);
 

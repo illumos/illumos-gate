@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -204,6 +204,74 @@ add_cache_props(picl_nodehdl_t node, mde_cookie_t *cachelistp, int ncaches)
 	}
 }
 
+static void
+add_clock_frequency(picl_nodehdl_t pnode, mde_cookie_t mnode)
+{
+	uint64_t	uint64_value;
+	uint32_t	uint32_value;
+
+	if (md_get_prop_val(mdp, mnode, "clock-frequency",
+	    &uint64_value)) {
+		return;
+	}
+	uint32_value = (uint32_t)(uint64_value & UINT32_MAX);
+	add_md_prop(pnode, sizeof (uint32_value), "clock-frequency",
+	    &uint32_value, PICL_PTYPE_UNSIGNED_INT);
+}
+
+/*
+ * Return the number of strings in the buffer
+ */
+static int
+get_string_count(char *strdat, int length)
+{
+	int	count;
+	char	*lastnull;
+	char	*nullptr;
+
+	count = 1;
+	for (lastnull = &strdat[length - 1], nullptr = strchr(strdat, '\0');
+	    nullptr != lastnull; nullptr = strchr(nullptr + 1, '\0'))
+		count++;
+
+	return (count);
+}
+
+static void
+add_compatible(picl_nodehdl_t pnode, mde_cookie_t mnode)
+{
+	char	*compat;
+	int	len;
+	int	count;
+	void	add_string_list_prop(picl_nodehdl_t, char *, char *,
+	    unsigned int);
+
+	if (prop_exists(pnode, "compatible"))
+		return;
+	if (md_get_prop_data(mdp, mnode, "compatible", (uint8_t **)&compat,
+	    &len)) {
+		return;
+	}
+	if (compat[0] == '\0' || compat[len - 1] != '\0')
+		return;
+	count = get_string_count(compat, len);
+	if (count == 1) {
+		add_md_prop(pnode, len, "compatible", compat,
+		    PICL_PTYPE_CHARSTRING);
+		return;
+	}
+	(void) add_string_list_prop(pnode, "compatible", compat, count);
+}
+
+static void
+add_device_type(picl_nodehdl_t pnode)
+{
+	char	*device_type = "cpu";
+
+	add_md_prop(pnode, strlen(device_type) + 1, "device_type", device_type,
+	    PICL_PTYPE_CHARSTRING);
+}
+
 int
 add_cpu_prop(picl_nodehdl_t node, void *args)
 {
@@ -277,6 +345,12 @@ add_cpu_prop(picl_nodehdl_t node, void *args)
 
 		add_md_prop(node, sizeof (int_value), OBP_PROP_PORTID,
 		    &int_value, PICL_PTYPE_INT);
+
+		add_clock_frequency(node, cpulistp[x]);
+
+		add_compatible(node, cpulistp[x]);
+
+		add_device_type(node);
 
 		/* get caches for CPU */
 		ncaches = md_scan_dag(mdp, cpulistp[x],

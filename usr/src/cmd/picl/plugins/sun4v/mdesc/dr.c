@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +43,7 @@ extern md_t *mdesc_devinit(void);
  * This function is identical to the one in the picldevtree plugin.
  * Unfortunately we can't just reuse that code.
  */
-static int
+int
 add_string_list_prop(picl_nodehdl_t nodeh, char *name, char *strlist,
     unsigned int nrows)
 {
@@ -164,7 +164,7 @@ add_devinfo_props(picl_nodehdl_t nodeh, di_node_t di_node)
 
 	for (di_prop = di_prop_next(di_node, DI_PROP_NIL);
 	    di_prop != DI_PROP_NIL;
-		di_prop = di_prop_next(di_node, di_prop)) {
+	    di_prop = di_prop_next(di_node, di_prop)) {
 
 		di_val = di_prop_name(di_prop);
 		di_ptype = di_prop_type(di_prop);
@@ -248,6 +248,36 @@ add_devinfo_props(picl_nodehdl_t nodeh, di_node_t di_node)
 }
 
 /*
+ * add OBP_REG property to picl cpu node if it's not already there.
+ */
+static void
+add_reg_prop(picl_nodehdl_t pn, di_node_t dn)
+{
+	int 			reg_prop[SUN4V_CPU_REGSIZE];
+	int 			status;
+	int 			dlen;
+	int			*pdata;
+	ptree_propinfo_t	propinfo;
+
+	status = ptree_get_propval_by_name(pn, OBP_REG, reg_prop,
+	    sizeof (reg_prop));
+	if (status == PICL_SUCCESS) {
+		return;
+	}
+	dlen = di_prom_prop_lookup_ints(ph, dn, OBP_REG, &pdata);
+	if (dlen < 0) {
+		return;
+	}
+	status = ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
+	    PICL_PTYPE_BYTEARRAY, PICL_READ, dlen * sizeof (int), OBP_REG,
+	    NULL, NULL);
+	if (status != PICL_SUCCESS) {
+		return;
+	}
+	(void) ptree_create_and_add_prop(pn, &propinfo, pdata, NULL);
+}
+
+/*
  * Create a  picl node of type cpu and fill it.
  * properties are filled from both the device tree and the
  * Machine description.
@@ -267,6 +297,7 @@ construct_cpu_node(picl_nodehdl_t plath, di_node_t dn)
 		return (err);
 
 	add_devinfo_props(anodeh, dn);
+	add_reg_prop(anodeh, dn);
 	(void) add_cpu_prop(anodeh, NULL);
 
 	return (err);
