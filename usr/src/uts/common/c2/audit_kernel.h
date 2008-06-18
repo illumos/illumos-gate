@@ -385,20 +385,16 @@ au_buff_t *au_get_buff(void), *au_free_buff(au_buff_t *);
 /*
  * Macro for uniform "subject" token(s) generation
  */
-#define	AUDIT_SETSUBJ_GENERIC(u, c, a, k, p)   	\
-	au_write((u),				\
-	    au_to_subject(crgetuid(c),		\
-		crgetgid(c), crgetruid(c),	\
-		crgetrgid(c), p,		\
-		(a)->ai_auid, (a)->ai_asid,	\
-		&((a)->ai_termid)));		\
-	if (is_system_labeled())		\
-		au_write((u),			\
-		    au_to_label(CR_SL((c)))); 	\
-	if ((k)->auk_policy & AUDIT_GROUP)	\
-		au_write((u),			\
-		    au_to_groups(crgetgroups(c),\
-		    crgetngroups(c)))
+#define	AUDIT_SETSUBJ_GENERIC(u, c, a, k, p)		\
+	(au_write((u), au_to_subject(crgetuid(c),	\
+	    crgetgid(c), crgetruid(c), crgetrgid(c),	\
+	    p, (a)->ai_auid, (a)->ai_asid,		\
+	    &((a)->ai_termid))));			\
+	((is_system_labeled()) ?  au_write((u),		\
+	    au_to_label(CR_SL((c)))) : (void) 0);	\
+	(((k)->auk_policy & AUDIT_GROUP) ? au_write((u),\
+	    au_to_groups(crgetgroups(c),		\
+	    crgetngroups(c))) : (void) 0)
 
 #define	AUDIT_SETSUBJ(u, c, a, k)      		\
 	AUDIT_SETSUBJ_GENERIC(u, c, a, k, curproc->p_pid)
