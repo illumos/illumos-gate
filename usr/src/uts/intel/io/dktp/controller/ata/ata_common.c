@@ -3617,7 +3617,7 @@ ata_power(dev_info_t *dip, int component, int level)
 		if (ata_save_pci_config)
 			(void) pci_restore_config_regs(dip);
 		ata_ctlp->ac_pm_level = PM_LEVEL_D0;
-		cmd = ATC_STANDBY_IM;
+		cmd = ATC_IDLE_IMMED;
 		break;
 	case PM_LEVEL_D3:
 		if (ata_save_pci_config)
