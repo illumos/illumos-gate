@@ -267,7 +267,7 @@ DDI_DEFINE_STREAM_OPS(xnf_dev_ops, nulldev, nulldev, xnf_attach, xnf_detach,
 
 static struct modldrv xnf_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	IDENT " 1.11",		/* short description */
+	IDENT " %I%",		/* short description */
 	&xnf_dev_ops		/* driver specific ops */
 };
 
@@ -475,36 +475,16 @@ xnf_copy_rcv_complete(struct xnf_buffer_desc *bdesc)
 void
 xnf_be_connect(xnf_t *xnfp)
 {
-	char		mac[ETHERADDRL * 3];
 	const char	*message;
 	xenbus_transaction_t xbt;
 	struct		xenbus_device *xsd;
 	char		*xsname;
-	int		err, be_no_cksum_offload;
+	int		err;
 
 	ASSERT(!xnfp->xnf_connected);
 
 	xsd = xvdi_get_xsd(xnfp->xnf_devinfo);
 	xsname = xvdi_get_xsname(xnfp->xnf_devinfo);
-
-	err = xenbus_scanf(XBT_NULL, xvdi_get_oename(xnfp->xnf_devinfo), "mac",
-	    "%s", (char *)&mac[0]);
-	if (err != 0) {
-		/*
-		 * bad: we're supposed to be set up with a proper mac
-		 * addr. at this point
-		 */
-		cmn_err(CE_WARN, "%s%d: no mac address",
-		    ddi_driver_name(xnfp->xnf_devinfo),
-		    ddi_get_instance(xnfp->xnf_devinfo));
-			return;
-	}
-
-	if (ether_aton(mac, xnfp->xnf_mac_addr) != ETHERADDRL) {
-		err = ENOENT;
-		xenbus_dev_error(xsd, ENOENT, "parsing %s/mac", xsname);
-		return;
-	}
 
 	err = xnf_setup_rings(xnfp);
 	if (err != 0) {
@@ -512,22 +492,6 @@ xnf_be_connect(xnf_t *xnfp)
 		xenbus_dev_error(xsd, err, "setting up ring");
 		return;
 	}
-
-	err = xenbus_scanf(XBT_NULL, xvdi_get_oename(xnfp->xnf_devinfo),
-	    "feature-no-csum-offload", "%d", &be_no_cksum_offload);
-	/*
-	 * If we fail to read the store we assume that the key is
-	 * absent, implying an older domain at the far end.  Older
-	 * domains always support checksum offload.
-	 */
-	if (err != 0)
-		be_no_cksum_offload = 0;
-	/*
-	 * If the far end cannot do checksum offload or we do not wish
-	 * to do it, disable it.
-	 */
-	if ((be_no_cksum_offload == 1) || !xnfp->xnf_cksum_offload)
-		xnfp->xnf_cksum_offload = B_FALSE;
 
 again:
 	err = xenbus_transaction_start(&xbt);
@@ -603,6 +567,51 @@ again:
 abort_transaction:
 	(void) xenbus_transaction_end(xbt, 1);
 	xenbus_dev_error(xsd, err, "%s", message);
+}
+
+/*
+ * Read config info from xenstore
+ */
+void
+xnf_read_config(xnf_t *xnfp)
+{
+	char		mac[ETHERADDRL * 3];
+	int		err, be_no_cksum_offload;
+
+	err = xenbus_scanf(XBT_NULL, xvdi_get_oename(xnfp->xnf_devinfo), "mac",
+	    "%s", (char *)&mac[0]);
+	if (err != 0) {
+		/*
+		 * bad: we're supposed to be set up with a proper mac
+		 * addr. at this point
+		 */
+		cmn_err(CE_WARN, "%s%d: no mac address",
+		    ddi_driver_name(xnfp->xnf_devinfo),
+		    ddi_get_instance(xnfp->xnf_devinfo));
+			return;
+	}
+	if (ether_aton(mac, xnfp->xnf_mac_addr) != ETHERADDRL) {
+		err = ENOENT;
+		xenbus_dev_error(xvdi_get_xsd(xnfp->xnf_devinfo), ENOENT,
+		    "parsing %s/mac", xvdi_get_xsname(xnfp->xnf_devinfo));
+		return;
+	}
+
+	err = xenbus_scanf(XBT_NULL, xvdi_get_oename(xnfp->xnf_devinfo),
+	    "feature-no-csum-offload", "%d", &be_no_cksum_offload);
+	/*
+	 * If we fail to read the store we assume that the key is
+	 * absent, implying an older domain at the far end.  Older
+	 * domains always support checksum offload.
+	 */
+	if (err != 0)
+		be_no_cksum_offload = 0;
+	/*
+	 * If the far end cannot do checksum offload or we do not wish
+	 * to do it, disable it.
+	 */
+	if ((be_no_cksum_offload == 1) || !xnfp->xnf_cksum_offload)
+		xnfp->xnf_cksum_offload = B_FALSE;
 }
 
 /*
@@ -718,6 +727,8 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    NULL, MUTEX_DRIVER, xnfp->xnf_icookie);
 	cv_init(&xnfp->xnf_cv, NULL, CV_DEFAULT, NULL);
 
+	xnfp->xnf_gref_tx_head = (grant_ref_t)-1;
+	xnfp->xnf_gref_rx_head = (grant_ref_t)-1;
 	if (gnttab_alloc_grant_references(NET_TX_RING_SIZE,
 	    &xnfp->xnf_gref_tx_head) < 0) {
 		cmn_err(CE_WARN, "xnf%d: can't alloc tx grant refs",
@@ -765,11 +776,7 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	(void) ddi_add_intr(devinfo, 0, NULL, NULL, xnf_intr, (caddr_t)xnfp);
 #endif
 
-	/*
-	 * connect to the backend
-	 */
-	xnf_be_connect(xnfp);
-
+	xnf_read_config(xnfp);
 	err = mac_register(macp, &xnfp->xnf_mh);
 	mac_free(macp);
 	macp = NULL;
@@ -788,13 +795,15 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    "Ethernet controller");
 #endif
 
+	/*
+	 * connect to the backend
+	 */
+	xnf_be_connect(xnfp);
+
 	return (DDI_SUCCESS);
 
 failure_3:
 	kstat_delete(xnfp->xnf_kstat_aux);
-
-failure_2:
-	xvdi_remove_event_handler(devinfo, XS_OE_STATE);
 #ifdef XPV_HVM_DRIVER
 	ec_unbind_evtchn(xnfp->xnf_evtchn);
 	xvdi_free_evtchn(devinfo);
@@ -803,7 +812,14 @@ failure_2:
 #endif
 	xnfp->xnf_evtchn = INVALID_EVTCHN;
 
+failure_2:
+	xvdi_remove_event_handler(devinfo, XS_OE_STATE);
+
 failure_1:
+	if (xnfp->xnf_gref_tx_head != (grant_ref_t)-1)
+		gnttab_free_grant_references(xnfp->xnf_gref_tx_head);
+	if (xnfp->xnf_gref_rx_head != (grant_ref_t)-1)
+		gnttab_free_grant_references(xnfp->xnf_gref_rx_head);
 	xnf_release_dma_resources(xnfp);
 	cv_destroy(&xnfp->xnf_cv);
 	mutex_destroy(&xnfp->xnf_rx_buf_mutex);
@@ -882,10 +898,10 @@ xnf_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	}
 	mutex_exit(&xnfp->xnf_rx_buf_mutex);
 
-	kstat_delete(xnfp->xnf_kstat_aux);
-
 	if (mac_unregister(xnfp->xnf_mh) != 0)
 		return (DDI_FAILURE);
+
+	kstat_delete(xnfp->xnf_kstat_aux);
 
 	/* Stop the receiver */
 	xnf_stop(xnfp);
@@ -1008,9 +1024,11 @@ xnf_clean_tx_ring(xnf_t *xnfp)
 	struct tx_pktinfo	*reap;
 	int			id;
 	grant_ref_t		ref;
+	boolean_t		work_to_do;
 
 	ASSERT(MUTEX_HELD(&xnfp->xnf_txlock));
 
+loop:
 	while (RING_HAS_UNCONSUMED_RESPONSES(&xnfp->xnf_tx_ring)) {
 		/*
 		 * index of next transmission ack
@@ -1047,6 +1065,11 @@ xnf_clean_tx_ring(xnf_t *xnfp)
 		xnfp->xnf_tx_ring.rsp_cons = next_resp;
 		membar_enter();
 	}
+
+	/* LINTED: constant in conditional context */
+	RING_FINAL_CHECK_FOR_RESPONSES(&xnfp->xnf_tx_ring, work_to_do);
+	if (work_to_do)
+		goto loop;
 
 	return (RING_FREE_REQUESTS(&xnfp->xnf_tx_ring));
 }
@@ -1317,11 +1340,8 @@ xnf_intr(caddr_t arg)
 
 	mutex_enter(&xnfp->xnf_intrlock);
 
-	/*
-	 * If not connected to the peer or not started by the upper
-	 * layers we cannot usefully handle interrupts.
-	 */
-	if (!(xnfp->xnf_connected && xnfp->xnf_running)) {
+	/* spurious intr */
+	if (!xnfp->xnf_connected) {
 		mutex_exit(&xnfp->xnf_intrlock);
 		xnfp->xnf_stat_unclaimed_interrupts++;
 		return (DDI_INTR_UNCLAIMED);
@@ -1495,11 +1515,20 @@ loop:
 		/* 3 */
 		xnfp->xnf_rxpkt_bufptr[rxpkt->id] = NULL;
 		ASSERT(bdesc->id == rxpkt->id);
-		if (rxpkt->status <= 0) {
+		mp = NULL;
+		if (!xnfp->xnf_running) {
+			DTRACE_PROBE4(pkt_dropped, int, rxpkt->status,
+			    char *, bdesc->buf, int, rxpkt->offset,
+			    char *, ((char *)bdesc->buf) + rxpkt->offset);
+			xnfp->xnf_stat_drop++;
+			/*
+			 * re-hang the buffer
+			 */
+			rx_buffer_hang(xnfp, bdesc);
+		} else if (rxpkt->status <= 0) {
 			DTRACE_PROBE4(pkt_status_negative, int, rxpkt->status,
 			    char *, bdesc->buf, int, rxpkt->offset,
 			    char *, ((char *)bdesc->buf) + rxpkt->offset);
-			mp = NULL;
 			xnfp->xnf_stat_errrx++;
 			if (rxpkt->status == 0)
 				xnfp->xnf_stat_runt++;
@@ -1645,8 +1674,14 @@ loop:
 		bdesc = xnfp->xnf_rxpkt_bufptr[rxpkt->id];
 		xnfp->xnf_rxpkt_bufptr[rxpkt->id] = NULL;
 		ASSERT(bdesc->id == rxpkt->id);
-		if (rxpkt->status <= 0) {
-			mp = NULL;
+		mp = NULL;
+		if (!xnfp->xnf_running) {
+			xnfp->xnf_stat_drop++;
+			/*
+			 * re-hang the buffer
+			 */
+			rx_buffer_hang(xnfp, bdesc);
+		} else if (rxpkt->status <= 0) {
 			xnfp->xnf_stat_errrx++;
 			if (rxpkt->status == 0)
 				xnfp->xnf_stat_runt++;
@@ -2041,6 +2076,18 @@ xnf_release_dma_resources(xnf_t *xnfp)
 		ddi_dma_free_handle(&xnfp->xnf_tx_ring_dma_handle);
 		xnfp->xnf_tx_ring_dma_acchandle = NULL;
 	}
+
+	/*
+	 * Free handles for mapping (virtual address) pointers to
+	 * transmit data buffers to physical addresses
+	 */
+	for (i = 0; i < xnfp->xnf_n_tx; i++) {
+		if (xnfp->xnf_tx_pkt_info[i].dma_handle != NULL) {
+			ddi_dma_free_handle(
+			    &xnfp->xnf_tx_pkt_info[i].dma_handle);
+		}
+	}
+
 }
 
 static void
@@ -2477,12 +2524,29 @@ oe_state_change(dev_info_t *dip, ddi_eventcookie_t id,
 		mutex_enter(&xnfp->xnf_txlock);
 
 		xnfp->xnf_connected = B_TRUE;
+		/*
+		 * wake up threads wanting to send data to backend,
+		 * but got blocked due to backend is not ready
+		 */
 		cv_broadcast(&xnfp->xnf_cv);
 
 		mutex_exit(&xnfp->xnf_txlock);
 		mutex_exit(&xnfp->xnf_intrlock);
 
+		/*
+		 * kick backend in case it missed any tx request
+		 * in the TX ring buffer
+		 */
 		ec_notify_via_evtchn(xnfp->xnf_evtchn);
+
+		/*
+		 * there maybe already queued rx data in the RX ring
+		 * sent by backend after it gets connected but before
+		 * we see its state change here, so we call our intr
+		 * handling routine to handle them, if any
+		 */
+		(void) xnf_intr((caddr_t)xnfp);
+
 		break;
 
 	default:

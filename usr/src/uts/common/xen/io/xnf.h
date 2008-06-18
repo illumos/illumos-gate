@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,6 +110,7 @@ typedef struct xnf {
 	uint64_t		xnf_stat_interrupts;
 	uint64_t		xnf_stat_unclaimed_interrupts;
 	uint64_t		xnf_stat_norxbuf;
+	uint64_t		xnf_stat_drop;
 	uint64_t		xnf_stat_errrx;
 
 	uint64_t		xnf_stat_tx_attempt;
