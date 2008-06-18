@@ -623,42 +623,42 @@ sess_set_auth(iscsi_sess_t *isp)
 
 	/* Load CHAP name */
 	node = tgt_node_next_child(main_config, XML_ELEMENT_CHAPNAME, NULL);
-	if (node == NULL)
-		return;
-	(void) strcpy(isp->sess_auth.username, node->x_value);
+	if (node != NULL && node->x_value != NULL) {
+		(void) strcpy(isp->sess_auth.username, node->x_value);
+	}
 
 	/* Load CHAP secret */
 	node = tgt_node_next_child(main_config, XML_ELEMENT_CHAPSECRET, NULL);
-	if (node == NULL)
-		return;
-	(void) strcpy((char *)isp->sess_auth.password, node->x_value);
-	isp->sess_auth.password_length = strlen(node->x_value);
-
-	/* Set up authentication buffers only if configured */
-	if ((isp->sess_auth.password_length != 0) ||
-	    (isp->sess_auth.password_length_in != 0)) {
-		isp->sess_auth.num_auth_buffers = 5;
-		isp->sess_auth.auth_buffers[0].address =
-		    &(isp->sess_auth.auth_client_block);
-		isp->sess_auth.auth_buffers[0].length =
-		    sizeof (isp->sess_auth.auth_client_block);
-		isp->sess_auth.auth_buffers[1].address =
-		    &(isp->sess_auth.auth_recv_string_block);
-		isp->sess_auth.auth_buffers[1].length =
-		    sizeof (isp->sess_auth.auth_recv_string_block);
-		isp->sess_auth.auth_buffers[2].address =
-		    &(isp->sess_auth.auth_send_string_block);
-		isp->sess_auth.auth_buffers[2].length =
-		    sizeof (isp->sess_auth.auth_send_string_block);
-		isp->sess_auth.auth_buffers[3].address =
-		    &(isp->sess_auth.auth_recv_binary_block);
-		isp->sess_auth.auth_buffers[3].length =
-		    sizeof (isp->sess_auth.auth_recv_binary_block);
-		isp->sess_auth.auth_buffers[4].address =
-		    &(isp->sess_auth.auth_send_binary_block);
-		isp->sess_auth.auth_buffers[4].length =
-		    sizeof (isp->sess_auth.auth_send_binary_block);
+	if (node != NULL && node->x_value != NULL) {
+		(void) strcpy((char *)isp->sess_auth.password, node->x_value);
+		isp->sess_auth.password_length = strlen(node->x_value);
 	}
+
+	/*
+	 * Set up authentication buffers always.   We don't know if
+	 * initiator will request CHAP until later.
+	 */
+	isp->sess_auth.num_auth_buffers = 5;
+	isp->sess_auth.auth_buffers[0].address =
+	    &(isp->sess_auth.auth_client_block);
+	isp->sess_auth.auth_buffers[0].length =
+	    sizeof (isp->sess_auth.auth_client_block);
+	isp->sess_auth.auth_buffers[1].address =
+	    &(isp->sess_auth.auth_recv_string_block);
+	isp->sess_auth.auth_buffers[1].length =
+	    sizeof (isp->sess_auth.auth_recv_string_block);
+	isp->sess_auth.auth_buffers[2].address =
+	    &(isp->sess_auth.auth_send_string_block);
+	isp->sess_auth.auth_buffers[2].length =
+	    sizeof (isp->sess_auth.auth_send_string_block);
+	isp->sess_auth.auth_buffers[3].address =
+	    &(isp->sess_auth.auth_recv_binary_block);
+	isp->sess_auth.auth_buffers[3].length =
+	    sizeof (isp->sess_auth.auth_recv_binary_block);
+	isp->sess_auth.auth_buffers[4].address =
+	    &(isp->sess_auth.auth_send_binary_block);
+	isp->sess_auth.auth_buffers[4].length =
+	    sizeof (isp->sess_auth.auth_send_binary_block);
 
 	if (isp->sess_auth.auth_buffers &&
 	    isp->sess_auth.num_auth_buffers) {
