@@ -54,6 +54,7 @@
 
 #include "ns_cache_door.h"
 #include "ns_internal.h"
+#include "ns_connmgmt.h"
 
 typedef enum {
 	INFO_SERVER_JUST_INITED	= -1,
@@ -2095,6 +2096,8 @@ __ns_ldap_initStandalone(const ns_standalone_conf_t *sa_conf,
 	}
 
 	__s_api_init_config(cfg);
+	/* Connection management should use the new config now. */
+	__s_api_reinit_conn_mgmt_new_config(cfg);
 	__ns_ldap_setServer(TRUE);
 
 	(void) mutex_lock(&dir_servers.listReplaceLock);

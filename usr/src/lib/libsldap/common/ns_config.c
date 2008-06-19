@@ -837,14 +837,19 @@ __s_api_destroy_config(ns_config_t *cfg)
  */
 
 static ns_config_t *
-get_curr_config_unlocked(ns_config_t *cfg)
+get_curr_config_unlocked(ns_config_t *cfg, boolean_t global)
 {
 	ns_config_t *ret;
 
 	ret = cfg;
 	if (cfg != NULL) {
 		(void) mutex_lock(&cfg->config_mutex);
-		if (cfg->delete)
+		/*
+		 * allow access to per connection management (non-global)
+		 * config so operations on connection being closed can still
+		 * be completed
+		 */
+		if (cfg->delete && global == B_TRUE)
 			ret = NULL;
 		else
 			cfg->nUse++;
@@ -867,7 +872,7 @@ set_curr_config_global(ns_config_t *ptr)
 
 	(void) mutex_lock(&ns_parse_lock);
 	cur_cfg = current_config;
-	cfg = get_curr_config_unlocked(cur_cfg);
+	cfg = get_curr_config_unlocked(cur_cfg, B_TRUE);
 	if (cfg != ptr) {
 		__s_api_destroy_config(cfg);
 		current_config = ptr;
@@ -899,7 +904,7 @@ set_curr_config(ns_config_t *ptr)
 	if (rc == 0 && cmg != NULL && cmg->config != NULL) {
 		(void) mutex_lock(&cmg->cfg_lock);
 		cur_cfg = cmg->config;
-		cfg = get_curr_config_unlocked(cur_cfg);
+		cfg = get_curr_config_unlocked(cur_cfg, B_FALSE);
 		if (cfg != ptr) {
 			__s_api_destroy_config(cfg);
 			cmg->config = ptr;
@@ -989,7 +994,7 @@ __s_api_get_default_config_global(void)
 
 	(void) mutex_lock(&ns_parse_lock);
 	cur_cfg = current_config;
-	cfg = get_curr_config_unlocked(cur_cfg);
+	cfg = get_curr_config_unlocked(cur_cfg, B_TRUE);
 	(void) mutex_unlock(&ns_parse_lock);
 
 	return (cfg);
@@ -1013,7 +1018,7 @@ __s_api_get_default_config(void)
 	if (rc == 0 && cmg != NULL && cmg->config != NULL) {
 		(void) mutex_lock(&cmg->cfg_lock);
 		cur_cfg = cmg->config;
-		cfg = get_curr_config_unlocked(cur_cfg);
+		cfg = get_curr_config_unlocked(cur_cfg, B_FALSE);
 		(void) mutex_unlock(&cmg->cfg_lock);
 		return (cfg);
 	}

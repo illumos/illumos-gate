@@ -465,7 +465,7 @@ __s_api_peruser_proc(void)
 		isPeruserNscd = check_nscd_proc(my_ppid, B_TRUE);
 	}
 
-	/* Remeber for whom isPeruserNscd is. */
+	/* Remember for whom isPeruserNscd is. */
 	checkedPpid = my_ppid;
 
 	(void) mutex_unlock(&nscdLock);
@@ -514,7 +514,7 @@ __s_api_nscd_proc(void)
 	 */
 	isMainNscd = check_nscd_proc(my_pid, B_FALSE);
 
-	/* Remeber for whom isMainNscd is. */
+	/* Remember for whom isMainNscd is. */
 	checkedPid = my_pid;
 
 	(void) mutex_unlock(&nscdLock);
@@ -576,7 +576,7 @@ init_conn_mgmt()
 }
 
 static void
-mark_shutdown_or_reoladed(int op)
+mark_shutdown_or_reloaded(int op)
 {
 	ns_conn_mgmt_t	*cmg = ns_connmgmt;
 
@@ -670,7 +670,7 @@ access_conn_mgmt(int op)
 		ns_connmgmt_shutting_down = B_TRUE;
 		if (ns_connmgmt != NULL) {
 			cmg = ns_connmgmt;
-			mark_shutdown_or_reoladed(op);
+			mark_shutdown_or_reloaded(op);
 			ns_connmgmt = NULL;
 		}
 		(void) mutex_unlock(&ns_connmgmt_lock);
@@ -680,7 +680,7 @@ access_conn_mgmt(int op)
 	if (op == NS_CONN_MGMT_OP_RELOAD_CONFIG ||
 	    op == NS_CONN_MGMT_OP_NEW_CONFIG) {
 		cmg_prev = ns_connmgmt;
-		mark_shutdown_or_reoladed(op);
+		mark_shutdown_or_reloaded(op);
 		/*
 		 * the previous cmg (cmg_prev) will be freed later
 		 * when its ref count reaches zero
@@ -1572,7 +1572,7 @@ __s_api_conn_mt_add(Connection *con, ns_conn_user_t *cu, ns_ldap_error_t **ep)
 }
 
 /*
- * return an MT connection to the pool when a conn user is done usint it
+ * return an MT connection to the pool when a conn user is done using it
  *
  * Input:
  *   cu		: pointer to the conn_user structure
@@ -2237,8 +2237,8 @@ __s_api_shutdown_conn_mgmt()
 
 
 /*
- * reinitialize the libsldap connection management after
- * receiving a new native LDAP configuration from ldap_cachemgr
+ * Reinitialize the libsldap connection management after
+ * a new native LDAP configuration is received.
  */
 void
 __s_api_reinit_conn_mgmt_new_config(ns_config_t *new_cfg)

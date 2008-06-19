@@ -2154,7 +2154,7 @@ createNonTLSSession(const char *serverAddr,
  * OUTPUT:
  *     ldp - a pointer to an LDAP structure which will be used
  *           for all the subsequent operations against the server.
- *     If an error accures, the function returns an NS error code
+ *     If an error occurs, the function returns an NS error code
  *     and provides an additional info pointed by *errorp.
  */
 static
