@@ -163,7 +163,7 @@ t10_aio_done(void *v)
 				break;
 		} else {
 			a = (t10_aio_t *)result;
-			sema_post(&t10_aio_sema);
+			(void) sema_post(&t10_aio_sema);
 		}
 		if ((a != NULL) && (a->a_aio_cmplt != NULL)) {
 			lu = a->a_cmd->c_lu;
@@ -1335,12 +1335,12 @@ trans_aiowrite(t10_cmd_t *cmd, char *data, size_t data_len, off_t offset,
 {
 	taio->a_cmd = cmd;
 
-	sema_wait(&t10_aio_sema);
+	(void) sema_wait(&t10_aio_sema);
 	(void) pthread_mutex_lock(&cmd->c_lu->l_cmd_mutex);
 	if (aiowrite(cmd->c_lu->l_common->l_fd, data, data_len, offset, 0,
 	    &taio->a_aio) == -1) {
 		(void) pthread_mutex_unlock(&cmd->c_lu->l_cmd_mutex);
-		sema_post(&t10_aio_sema);
+		(void) sema_post(&t10_aio_sema);
 		taio->a_aio.aio_return = -1;
 		(*taio->a_aio_cmplt)(taio->a_id);
 	} else {
@@ -1355,12 +1355,12 @@ trans_aioread(t10_cmd_t *cmd, char *data, size_t data_len, off_t offset,
 {
 	taio->a_cmd = cmd;
 
-	sema_wait(&t10_aio_sema);
+	(void) sema_wait(&t10_aio_sema);
 	(void) pthread_mutex_lock(&cmd->c_lu->l_cmd_mutex);
 	if (aioread(cmd->c_lu->l_common->l_fd, data, data_len, offset, 0,
 	    &taio->a_aio) == -1) {
 		(void) pthread_mutex_unlock(&cmd->c_lu->l_cmd_mutex);
-		sema_post(&t10_aio_sema);
+		(void) sema_post(&t10_aio_sema);
 		taio->a_aio.aio_return = -1;
 		(*taio->a_aio_cmplt)(taio->a_id);
 	} else {
