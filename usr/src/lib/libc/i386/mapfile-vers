@@ -256,6 +256,8 @@ SYSVABI_1.3 {
 	_daylight;
 	environ = NODIRECT;
 	_environ = NODIRECT;
+	__flt_rounds;
+	_fp_hw;
 	free = NODIRECT;
 	frexp = FUNCTION FILTER libm.so.2;
 	getdate_err;
@@ -383,7 +385,6 @@ SYSVABI_1.3 {
 	fileno;
 	_fileno;
 	__flsbuf;
-	__flt_rounds;
 	fmtmsg;
 	_fmtmsg;
 	fopen;
@@ -391,7 +392,6 @@ SYSVABI_1.3 {
 	fork;
 	fpathconf;
 	_fpathconf;
-	_fp_hw;
 	fprintf;
 	_fpstart;
 	__fpstart;
@@ -848,6 +848,7 @@ SUNWprivate_1.1 {
 	_dlopen = FUNCTION FILTER /usr/lib/ld.so.1;
 	_dlsym = FUNCTION FILTER /usr/lib/ld.so.1;
 	_ld_libc = FUNCTION FILTER /usr/lib/ld.so.1;
+	_sse_hw;
 	_sys_errlist;
 	_sys_errs;
 	_sys_index;
@@ -881,7 +882,6 @@ SUNWprivate_1.1 {
 	_snprintf_c89;
 	_sprintf_c89;
 	_sscanf_c89;
-	_sse_hw;
 	_strtoimax_c89;
 	_strtoumax_c89;
 	_swprintf_c89;

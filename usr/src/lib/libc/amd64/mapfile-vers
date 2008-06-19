@@ -710,9 +710,10 @@ SUNW_0.7 {
 } SYSVABI_1.3;
 
 SYSVABI_1.3 {
+    global:
+	__flt_rounds;
     protected:
 	_ctermid;
-	__flt_rounds;
 	_fpstart;
 	__fpstart;
 	_getgrgid;
