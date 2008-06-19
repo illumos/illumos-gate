@@ -567,10 +567,12 @@ modify_admin(tgt_node_t *x)
 	char		*msg	= NULL;
 	char		*prop;
 	Boolean_t	changes_made = False;
+	Boolean_t	update_isns = False;
 	admin_table_t	*ap;
 
 	for (ap = admin_prop_list; ap->name; ap++) {
 		if (tgt_find_value_str(x, ap->name, &prop) == True) {
+
 			if ((prop == NULL) || (strlen(prop) == 0))
 				break;
 
@@ -607,6 +609,10 @@ modify_admin(tgt_node_t *x)
 					return (msg);
 				}
 			}
+			if (0 == strcmp(ap->name, XML_ELEMENT_ISNS_ACCESS) ||
+			    0 == strcmp(ap->name, XML_ELEMENT_ISNS_SERV)) {
+				update_isns = True;
+			}
 			free(prop);
 			changes_made = True;
 		}
@@ -614,9 +620,11 @@ modify_admin(tgt_node_t *x)
 
 	if (changes_made == True) {
 		/* isns_update updates isns_access & isns server name */
-		if (isns_update() != 0) {
-			xml_rtn_msg(&msg, ERR_ISNS_ERROR);
-			return (msg);
+		if (update_isns == True) {
+			if (isns_update() != 0) {
+				xml_rtn_msg(&msg, ERR_ISNS_ERROR);
+				return (msg);
+			}
 		}
 		if (mgmt_config_save2scf() == True) {
 			xml_rtn_msg(&msg, ERR_SUCCESS);
