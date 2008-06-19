@@ -117,7 +117,7 @@ extern const char	*dladm_secobjclass2str(dladm_secobj_class_t, char *);
 extern dladm_status_t	dladm_str2secobjclass(const char *,
 			    dladm_secobj_class_t *);
 
-extern dladm_status_t	dladm_init_linkprop(datalink_id_t);
+extern dladm_status_t	dladm_init_linkprop(datalink_id_t, boolean_t);
 extern dladm_status_t	dladm_init_secobj(void);
 
 extern dladm_status_t	dladm_create_datalink_id(const char *, datalink_class_t,

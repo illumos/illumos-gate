@@ -873,6 +873,33 @@ done:
 	dlmgmt_dlconf_table_unlock();
 }
 
+static void
+dlmgmt_upcall_linkprop_init(void *argp, void *retp)
+{
+	dlmgmt_door_linkprop_init_t	*lip = argp;
+	dlmgmt_linkprop_init_retval_t	*retvalp = retp;
+	dlmgmt_link_t			*linkp;
+	boolean_t			do_linkprop = B_FALSE;
+
+	/*
+	 * Ignore wifi links until wifi property ioctls are converted
+	 * to generic property ioctls. This avoids deadlocks due to
+	 * wifi property ioctls using their own /dev/net device,
+	 * not the DLD control device.
+	 */
+	dlmgmt_table_lock(B_FALSE);
+	if ((linkp = link_by_id(lip->ld_linkid)) == NULL)
+		retvalp->lr_err = ENOENT;
+	else if (linkp->ll_media == DL_WIFI)
+		retvalp->lr_err = 0;
+	else
+		do_linkprop = B_TRUE;
+	dlmgmt_table_unlock();
+
+	if (do_linkprop)
+		retvalp->lr_err = dladm_init_linkprop(lip->ld_linkid, B_TRUE);
+}
+
 static dlmgmt_door_info_t i_dlmgmt_door_info_tbl[] = {
 	{ DLMGMT_CMD_DLS_CREATE, B_TRUE, sizeof (dlmgmt_upcall_arg_create_t),
 	    sizeof (dlmgmt_create_retval_t), dlmgmt_upcall_create },
@@ -911,7 +938,11 @@ static dlmgmt_door_info_t i_dlmgmt_door_info_tbl[] = {
 	{ DLMGMT_CMD_DESTROYCONF, B_TRUE, sizeof (dlmgmt_door_destroyconf_t),
 	    sizeof (dlmgmt_destroyconf_retval_t), dlmgmt_destroyconf },
 	{ DLMGMT_CMD_GETATTR, B_FALSE, sizeof (dlmgmt_door_getattr_t),
-	    sizeof (dlmgmt_getattr_retval_t), dlmgmt_getattr }
+	    sizeof (dlmgmt_getattr_retval_t), dlmgmt_getattr },
+	{ DLMGMT_CMD_LINKPROP_INIT, B_TRUE,
+	    sizeof (dlmgmt_door_linkprop_init_t),
+	    sizeof (dlmgmt_linkprop_init_retval_t),
+	    dlmgmt_upcall_linkprop_init }
 };
 
 #define	DLMGMT_INFO_TABLE_SIZE	(sizeof (i_dlmgmt_door_info_tbl) /	\

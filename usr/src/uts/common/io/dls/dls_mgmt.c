@@ -76,7 +76,11 @@ typedef struct dls_devnet_s {
 
 	kmutex_t	dd_zid_mutex;
 	zoneid_t	dd_zid;
+
+	boolean_t	dd_prop_loaded;
+	taskqid_t	dd_prop_taskid;
 } dls_devnet_t;
+
 
 /*ARGSUSED*/
 static int
@@ -518,6 +522,51 @@ dls_mgmt_get_phydev(datalink_id_t linkid, dev_t *devp)
 }
 
 /*
+ * Request the datalink management daemon to push in
+ * all properties associated with the link.
+ * Returns a non-zero error code on failure.
+ */
+int
+dls_mgmt_linkprop_init(datalink_id_t linkid)
+{
+	dlmgmt_door_linkprop_init_t	li;
+	dlmgmt_linkprop_init_retval_t	retval;
+	int				err;
+
+	li.ld_cmd = DLMGMT_CMD_LINKPROP_INIT;
+	li.ld_linkid = linkid;
+
+	err = i_dls_mgmt_upcall(&li, sizeof (li), &retval, sizeof (retval));
+	return (err);
+}
+
+static void
+dls_devnet_prop_task(void *arg)
+{
+	dls_devnet_t		*ddp = arg;
+
+	(void) dls_mgmt_linkprop_init(ddp->dd_vlanid);
+
+	mutex_enter(&ddp->dd_mutex);
+	ddp->dd_prop_loaded = B_TRUE;
+	ddp->dd_prop_taskid = NULL;
+	cv_broadcast(&ddp->dd_cv);
+	mutex_exit(&ddp->dd_mutex);
+}
+
+/*
+ * Ensure property loading task is completed.
+ */
+void
+dls_devnet_prop_task_wait(dls_dl_handle_t ddp)
+{
+	mutex_enter(&ddp->dd_mutex);
+	while (ddp->dd_prop_taskid != NULL)
+		cv_wait(&ddp->dd_cv, &ddp->dd_mutex);
+	mutex_exit(&ddp->dd_mutex);
+}
+
+/*
  * Hold the vanity naming structure (dls_devnet_t) temporarily.  The request to
  * delete the dls_devnet_t will wait until the temporary reference is released.
  */
@@ -765,7 +814,15 @@ newphys:
 		    (mod_hash_val_t)ddp) == 0);
 		devnet_need_rebuild = B_TRUE;
 		dls_devnet_stat_create(ddp);
+
+		mutex_enter(&ddp->dd_mutex);
+		if (!ddp->dd_prop_loaded && (ddp->dd_prop_taskid == NULL)) {
+			ddp->dd_prop_taskid = taskq_dispatch(system_taskq,
+			    dls_devnet_prop_task, ddp, TQ_SLEEP);
+		}
+		mutex_exit(&ddp->dd_mutex);
 	}
+
 	err = 0;
 done:
 	rw_exit(&i_dls_devnet_lock);
@@ -801,8 +858,10 @@ dls_devnet_unset_common(dls_devnet_t *ddp)
 	 * Wait until all temporary references are released.
 	 */
 	mutex_enter(&ddp->dd_mutex);
-	while (ddp->dd_tref != 0)
+	while ((ddp->dd_tref != 0) || (ddp->dd_prop_taskid != NULL))
 		cv_wait(&ddp->dd_cv, &ddp->dd_mutex);
+
+	ddp->dd_prop_loaded = B_FALSE;
 	mutex_exit(&ddp->dd_mutex);
 
 	if (!ddp->dd_explicit) {
@@ -1139,7 +1198,7 @@ dls_devnet_phydev(datalink_id_t vlanid, dev_t *devp)
  *    In this case, the link's kstats need to be updated using the given name.
  *
  * 2. Request to rename a valid link (id1) to the name of a REMOVED
- *    physical link (id2). In this case, check htat id1 and its associated
+ *    physical link (id2). In this case, check that id1 and its associated
  *    mac is not held by any application, and update the link's linkid to id2.
  *
  *    This case does not change the <link name, linkid> mapping, so the link's
@@ -1178,6 +1237,31 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 		ASSERT(err == MH_ERR_NOTFOUND);
 		err = ENOENT;
 		goto done;
+	}
+
+	/*
+	 * Let the property loading thread finish.
+	 * Unfortunately, we have to drop i_dls_devnet_lock temporarily
+	 * to avoid deadlocks, and ensure ddp is still in the hash after
+	 * reacquiring it. Observe lock order as well.
+	 */
+	mutex_enter(&ddp->dd_mutex);
+	if (ddp->dd_prop_taskid != NULL) {
+		rw_exit(&i_dls_devnet_lock);
+		while (ddp->dd_prop_taskid != NULL)
+			cv_wait(&ddp->dd_cv, &ddp->dd_mutex);
+		mutex_exit(&ddp->dd_mutex);
+		rw_enter(&i_dls_devnet_lock, RW_WRITER);
+
+		if ((err = mod_hash_find(i_dls_devnet_id_hash,
+		    (mod_hash_key_t)(uintptr_t)id1,
+		    (mod_hash_val_t *)&ddp)) != 0) {
+			ASSERT(err == MH_ERR_NOTFOUND);
+			err = ENOENT;
+			goto done;
+		}
+	} else {
+		mutex_exit(&ddp->dd_mutex);
 	}
 
 	/*
@@ -1242,6 +1326,13 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 	ddp->dd_vlanid = id2;
 	(void) mod_hash_insert(i_dls_devnet_id_hash,
 	    (mod_hash_key_t)(uintptr_t)ddp->dd_vlanid, (mod_hash_val_t)ddp);
+
+	/* load properties for new id */
+	mutex_enter(&ddp->dd_mutex);
+	ddp->dd_prop_loaded = B_FALSE;
+	ddp->dd_prop_taskid = taskq_dispatch(system_taskq,
+	    dls_devnet_prop_task, ddp, TQ_SLEEP);
+	mutex_exit(&ddp->dd_mutex);
 
 	mac_rele_exclusive(mh);
 
@@ -1346,6 +1437,8 @@ dls_devnet_open(const char *link, dls_dl_handle_t *dhp, dev_t *devp)
 		dls_devnet_rele(ddp);
 		return (err);
 	}
+
+	dls_devnet_prop_task_wait(ddp);
 
 	*dhp = ddp;
 	*devp = dvp->dv_dev;

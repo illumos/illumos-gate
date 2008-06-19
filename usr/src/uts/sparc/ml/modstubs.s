@@ -1214,6 +1214,7 @@ stubs_base:
 	STUB(dls, dls_devnet_mac, nomod_zero);
 	STUB(dls, dls_devnet_hold_tmp, nomod_einval);
 	STUB(dls, dls_devnet_rele_tmp, nomod_void);
+	STUB(dls, dls_devnet_prop_task_wait, nomod_void);
 	STUB(dls, dls_mgmt_get_linkid, nomod_einval);
 	END_MODULE(dls);
 #endif

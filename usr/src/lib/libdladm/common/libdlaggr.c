@@ -733,7 +733,7 @@ i_dladm_aggr_up(datalink_id_t linkid, void *arg)
 	/*
 	 * Reset the active linkprop of this specific link.
 	 */
-	(void) dladm_init_linkprop(linkid);
+	(void) dladm_init_linkprop(linkid, B_FALSE);
 
 done:
 	free(attr.lg_ports);

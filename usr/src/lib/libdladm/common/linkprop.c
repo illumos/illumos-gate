@@ -788,18 +788,24 @@ done:
 static int
 i_dladm_init_linkprop(datalink_id_t linkid, void *arg)
 {
-	(void) dladm_init_linkprop(linkid);
+	(void) dladm_init_linkprop(linkid, B_TRUE);
 	return (DLADM_WALK_CONTINUE);
 }
 
 dladm_status_t
-dladm_init_linkprop(datalink_id_t linkid)
+dladm_init_linkprop(datalink_id_t linkid, boolean_t any_media)
 {
+	datalink_media_t	dmedia;
+	uint32_t		media;
+
+	dmedia = any_media ? DATALINK_ANY_MEDIATYPE : DL_WIFI;
+
 	if (linkid == DATALINK_ALL_LINKID) {
 		(void) dladm_walk_datalink_id(i_dladm_init_linkprop, NULL,
-		    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE,
-		    DLADM_OPT_PERSIST);
-	} else {
+		    DATALINK_CLASS_ALL, dmedia, DLADM_OPT_PERSIST);
+	} else if (any_media || ((dladm_datalink_id2info(linkid, NULL, NULL,
+	    &media, NULL, 0) == DLADM_STATUS_OK) &&
+	    DATALINK_MEDIA_ACCEPTED(dmedia, media))) {
 		(void) dladm_walk_linkprop(linkid, NULL, i_dladm_init_one_prop);
 	}
 	return (DLADM_STATUS_OK);

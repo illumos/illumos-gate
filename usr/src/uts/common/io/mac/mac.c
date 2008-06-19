@@ -563,6 +563,8 @@ mac_open_by_linkid(datalink_id_t linkid, mac_handle_t *mhp)
 		goto done;
 	}
 
+	dls_devnet_prop_task_wait(dlh);
+
 	err = mac_open(dls_devnet_mac(dlh), mhp);
 
 done:

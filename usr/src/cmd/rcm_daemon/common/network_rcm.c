@@ -1078,7 +1078,7 @@ notify_new_link(rcm_handle_t *hd, const char *dev)
 	/*
 	 * Reset the active linkprop of this specific link.
 	 */
-	(void) dladm_init_linkprop(linkid);
+	(void) dladm_init_linkprop(linkid, B_FALSE);
 
 	rcm_log_message(RCM_TRACE1, _("NET: notify new link %u (%s)\n"),
 	    linkid, dev);

@@ -252,7 +252,7 @@ dlmgmt_init_privileges()
 		return (errno);
 
 	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET, UID_DLADM,
-	    GID_SYS, NULL) == -1) {
+	    GID_SYS, PRIV_SYS_NET_CONFIG, NULL) == -1) {
 		(void) close(dld_control_fd);
 		dld_control_fd = -1;
 		return (EPERM);

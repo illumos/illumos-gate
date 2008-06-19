@@ -208,12 +208,13 @@ fi
 
 if smf_is_globalzone; then
 	#
-	# Unfortunately, if a driver unloads and then is subsequently reloaded,
-	# no mechanism currently exists to restore the properties of its
-	# associated links.  Hence, we wait until after interfaces have been
+	# Wifi drivers use special property interfaces that are not supported
+	# by the existing property persistence mechanism, so if a wifi driver
+	# unloads and then is subsequently reloaded, associated links' properties
+	# will not be restored.  For now, wait until after interfaces have been
 	# plumbed (above) to initialize link properties.
 	#
-	/sbin/dladm init-linkprop
+	/sbin/dladm init-linkprop -w
 fi
 
 #

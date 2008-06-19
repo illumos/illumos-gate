@@ -5294,20 +5294,50 @@ do_show_secobj(int argc, char **argv)
 static int
 i_dladm_init_linkprop(datalink_id_t linkid, void *arg)
 {
-	(void) dladm_init_linkprop(linkid);
+	(void) dladm_init_linkprop(linkid, B_TRUE);
 	return (DLADM_WALK_CONTINUE);
 }
 
-/* ARGSUSED */
 static void
 do_init_linkprop(int argc, char **argv)
 {
-	/*
-	 * linkprops of links of other classes have been initialized as a
-	 * part of the dladm up-xxx operation.
-	 */
-	(void) dladm_walk_datalink_id(i_dladm_init_linkprop, NULL,
-	    DATALINK_CLASS_PHYS, DATALINK_ANY_MEDIATYPE, DLADM_OPT_PERSIST);
+	int			option;
+	dladm_status_t		status;
+	datalink_id_t		linkid = DATALINK_ALL_LINKID;
+	datalink_media_t	media = DATALINK_ANY_MEDIATYPE;
+	uint_t			any_media = B_TRUE;
+
+	opterr = 0;
+	while ((option = getopt(argc, argv, ":w")) != -1) {
+		switch (option) {
+		case 'w':
+			media = DL_WIFI;
+			any_media = B_FALSE;
+			break;
+		default:
+			die_opterr(optopt, option);
+			break;
+		}
+	}
+
+	if (optind == (argc - 1)) {
+		if ((status = dladm_name2info(argv[optind], &linkid, NULL, NULL,
+		    NULL)) != DLADM_STATUS_OK)
+			die_dlerr(status, "link %s is not valid", argv[optind]);
+	} else if (optind != argc) {
+		usage();
+	}
+
+	if (linkid == DATALINK_ALL_LINKID) {
+		/*
+		 * linkprops of links of other classes have been initialized as
+		 * part of the dladm up-xxx operation.
+		 */
+		(void) dladm_walk_datalink_id(i_dladm_init_linkprop, NULL,
+		    DATALINK_CLASS_PHYS, media, DLADM_OPT_PERSIST);
+	} else {
+		(void) dladm_init_linkprop(linkid, any_media);
+	}
 }
 
 /* ARGSUSED */

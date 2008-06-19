@@ -315,7 +315,7 @@ i_dladm_vlan_up(datalink_id_t vlanid, void *arg)
 		/*
 		 * Reset the active linkprop of this specific link.
 		 */
-		(void) dladm_init_linkprop(vlanid);
+		(void) dladm_init_linkprop(vlanid, B_FALSE);
 	}
 
 	(void) close(fd);

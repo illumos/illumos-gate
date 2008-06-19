@@ -116,14 +116,15 @@ typedef uint64_t	datalink_media_t;
 /*
  * Door upcall commands.
  */
-#define	DLMGMT_CMD_DLS_CREATE	1
-#define	DLMGMT_CMD_DLS_GETATTR	2
-#define	DLMGMT_CMD_DLS_DESTROY	3
-#define	DLMGMT_CMD_GETNAME	4
-#define	DLMGMT_CMD_GETLINKID	5
-#define	DLMGMT_CMD_GETNEXT	6
-#define	DLMGMT_CMD_DLS_UPDATE	7
-#define	DLMGMT_CMD_BASE		128
+#define	DLMGMT_CMD_DLS_CREATE		1
+#define	DLMGMT_CMD_DLS_GETATTR		2
+#define	DLMGMT_CMD_DLS_DESTROY		3
+#define	DLMGMT_CMD_GETNAME		4
+#define	DLMGMT_CMD_GETLINKID		5
+#define	DLMGMT_CMD_GETNEXT		6
+#define	DLMGMT_CMD_DLS_UPDATE		7
+#define	DLMGMT_CMD_LINKPROP_INIT	8
+#define	DLMGMT_CMD_BASE			128
 
 /*
  * Indicate the link mapping is active or persistent
@@ -190,12 +191,18 @@ typedef struct dlmgmt_door_getnext_s {
 	datalink_media_t	ld_dmedia;
 } dlmgmt_door_getnext_t;
 
+typedef struct dlmgmt_door_linkprop_init {
+	int			ld_cmd;
+	datalink_id_t		ld_linkid;
+} dlmgmt_door_linkprop_init_t;
+
 /* upcall return value */
 typedef struct dlmgmt_retval_s {
 	uint_t			lr_err; /* return error code */
 } dlmgmt_retval_t;
 
-typedef dlmgmt_retval_t	dlmgmt_destroy_retval_t;
+typedef dlmgmt_retval_t	dlmgmt_destroy_retval_t,
+			dlmgmt_linkprop_init_retval_t;
 
 struct dlmgmt_linkid_retval_s {
 	uint_t			lr_err;
@@ -291,6 +298,7 @@ extern int		dls_devnet_create_vlan(datalink_id_t,
 extern int		dls_devnet_destroy_vlan(datalink_id_t);
 extern int		dls_devnet_hold_tmp(datalink_id_t, dls_dl_handle_t *);
 extern void		dls_devnet_rele_tmp(dls_dl_handle_t);
+extern void		dls_devnet_prop_task_wait(dls_dl_handle_t);
 
 extern const char	*dls_devnet_mac(dls_dl_handle_t);
 extern uint16_t		dls_devnet_vid(dls_dl_handle_t);

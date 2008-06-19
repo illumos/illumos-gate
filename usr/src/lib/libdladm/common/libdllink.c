@@ -481,7 +481,7 @@ i_dladm_rename_link_c2(datalink_id_t linkid1, datalink_id_t linkid2)
 	    ((status = dladm_read_conf(linkid2, &conf2)) != DLADM_STATUS_OK)) {
 		dir.dir_linkid1 = linkid2;
 		dir.dir_linkid2 = linkid1;
-		(void) dladm_init_linkprop(linkid1);
+		(void) dladm_init_linkprop(linkid1, B_FALSE);
 		(void) i_dladm_ioctl(fd, DLDIOC_RENAME, &dir, sizeof (dir));
 		(void) close(fd);
 		return (status);
