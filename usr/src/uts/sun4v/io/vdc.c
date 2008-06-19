@@ -181,7 +181,7 @@ static int 	vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr,
 		    void *cb_arg, vio_desc_direction_t dir, boolean_t);
 
 static int	vdc_wait_for_response(vdc_t *vdcp, vio_msg_t *msgp);
-static int	vdc_drain_response(vdc_t *vdcp);
+static int	vdc_drain_response(vdc_t *vdcp, struct buf *buf);
 static int	vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx);
 static int	vdc_populate_mem_hdl(vdc_t *vdcp, vdc_local_desc_t *ldep);
 static int	vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg);
@@ -1388,7 +1388,7 @@ vdc_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	}
 
 	if (ddi_in_panic())
-		(void) vdc_drain_response(vdc);
+		(void) vdc_drain_response(vdc, NULL);
 
 	DMSG(vdc, 0, "[%d] End\n", instance);
 
@@ -1452,6 +1452,8 @@ vdc_strategy(struct buf *buf)
 		DMSG(vdc, 0, "Failed to read/write (err=%d)\n", rv);
 		bioerror(buf, rv);
 		biodone(buf);
+	} else if (ddi_in_panic()) {
+		(void) vdc_drain_response(vdc, buf);
 	}
 
 	return (0);
@@ -3213,22 +3215,26 @@ vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr, size_t nbytes,
  * 	handled differently because interrupts are disabled and vdc
  * 	will not get messages. We have to poll for the messages instead.
  *
- *	Note: since we don't have a buf_t available we cannot implement
- *	the io:::done DTrace probe in this specific case.
+ *	Note: since we are panicking we don't implement	the io:::done
+ *	DTrace probe or update the I/O statistics kstats.
  *
  * Arguments:
  *	vdc	- soft state pointer for this instance of the device driver.
+ *	buf	- if buf is NULL then we drain all responses, otherwise we
+ *		  poll until we receive a ACK/NACK for the specific I/O
+ *		  described by buf.
  *
  * Return Code:
  *	0	- Success
  */
 static int
-vdc_drain_response(vdc_t *vdc)
+vdc_drain_response(vdc_t *vdc, struct buf *buf)
 {
 	int 			rv, idx, retries;
 	size_t			msglen;
 	vdc_local_desc_t 	*ldep = NULL;	/* Local Dring Entry Pointer */
 	vio_dring_msg_t		dmsg;
+	struct buf		*mbuf;
 
 	mutex_enter(&vdc->lock);
 
@@ -3295,6 +3301,17 @@ vdc_drain_response(vdc_t *vdc)
 			continue;
 		}
 
+		if (buf != NULL && ldep->cb_type == CB_STRATEGY) {
+			mbuf = ldep->cb_arg;
+			mbuf->b_resid = mbuf->b_bcount -
+			    ldep->dep->payload.nbytes;
+			bioerror(mbuf, (rv == EAGAIN)? EIO:
+			    ldep->dep->payload.status);
+			biodone(mbuf);
+		} else {
+			mbuf = NULL;
+		}
+
 		DMSG(vdc, 1, "[%d] Depopulating idx=%d state=%d\n",
 		    vdc->instance, idx, ldep->dep->hdr.dstate);
 
@@ -3305,9 +3322,24 @@ vdc_drain_response(vdc_t *vdc)
 			    vdc->instance, idx);
 		}
 
-		/* if this is the last descriptor - break out of loop */
-		if ((idx + 1) % vdc->dring_len == vdc->dring_curr_idx)
+		/* we have received an ACK/NACK for the specified buffer */
+		if (buf != NULL && buf == mbuf) {
+			rv = 0;
 			break;
+		}
+
+		/* if this is the last descriptor - break out of loop */
+		if ((idx + 1) % vdc->dring_len == vdc->dring_curr_idx) {
+			if (buf != NULL) {
+				/*
+				 * We never got a response for the specified
+				 * buffer so we fail the I/O.
+				 */
+				bioerror(buf, EIO);
+				biodone(buf);
+			}
+			break;
+		}
 	}
 
 	mutex_exit(&vdc->lock);
