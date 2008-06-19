@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -77,6 +77,21 @@ CFLAGS += $(CCVERBOSE)
 #
 CPPFLAGS += -DCPU_MODULE
 AS_CPPFLAGS += -DCPU_MODULE
+
+#
+# The ATOMIC_BO_ENABLE_SHIFT enables backoff in atomic routines.
+# It is also used to scale final limit value w.r.t. number of
+# online cpus.
+#
+# In case of generic cpu module, the backoff will be using spin
+# loop as the CPU specific delay routine for atomic backoff will
+# not be available. The ATOMIC_BO_ENABLE_SHIFT value below takes
+# this into account.
+#
+ATOMIC_BO_FLAG = -DATOMIC_BO_ENABLE_SHIFT=7
+CFLAGS += $(ATOMIC_BO_FLAG)
+CPPFLAGS +=$(ATOMIC_BO_FLAG)
+AS_CPPFLAGS += $(ATOMIC_BO_FLAG)
 
 #
 #	Default build targets.
