@@ -282,7 +282,7 @@ typedef enum {
 	MAC_CAPAB_SHARES	= 0x200, /* data is mac_capab_share_t */
 
 	/* The following capabilities are specific to softmac. */
-	MAC_CAPAB_LEGACY	= 0x8001, /* data is mac_capab_legacy_t */
+	MAC_CAPAB_LEGACY	= 0x8000, /* data is mac_capab_legacy_t */
 } mac_capab_t;
 
 typedef int mac_addr_slot_t;

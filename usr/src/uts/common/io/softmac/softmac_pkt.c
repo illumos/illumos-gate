@@ -47,7 +47,7 @@ softmac_m_tx(void *arg, mblk_t *mp)
 	/*
 	 * Optimize for the most common case.
 	 */
-	if (mp->b_cont == NULL) {
+	if (mp->b_next == NULL) {
 		if (!CANPUTNEXT(wq))
 			return (mp);
 

@@ -1099,6 +1099,7 @@ int
 softmac_hold_device(dev_t dev, dls_dev_handle_t *ddhp)
 {
 	dev_info_t	*dip;
+	const char	*drvname;
 	char		devname[MAXNAMELEN];
 	softmac_t	*softmac;
 	int		ppa, err;
@@ -1113,8 +1114,14 @@ softmac_hold_device(dev_t dev, dls_dev_handle_t *ddhp)
 	if ((dip = ddi_hold_devi_by_instance(getmajor(dev), ppa, 0)) == NULL)
 		return (ENOENT);
 
+	drvname = ddi_driver_name(dip);
+
+	/*
+	 * Exclude non-physical network device instances, for example, aggr0.
+	 */
 	if ((ddi_driver_major(dip) != getmajor(dev)) ||
-	    !NETWORK_DRV(getmajor(dev))) {
+	    !NETWORK_DRV(getmajor(dev)) || (strcmp(drvname, "aggr") == 0) ||
+	    (strcmp(drvname, "vnic") == 0)) {
 		ddi_release_devi(dip);
 		return (ENOENT);
 	}
@@ -1122,7 +1129,7 @@ softmac_hold_device(dev_t dev, dls_dev_handle_t *ddhp)
 	/*
 	 * This is a network device; wait for its softmac to be registered.
 	 */
-	(void) snprintf(devname, MAXNAMELEN, "%s%d", ddi_driver_name(dip), ppa);
+	(void) snprintf(devname, MAXNAMELEN, "%s%d", drvname, ppa);
 again:
 	rw_enter(&softmac_hash_lock, RW_READER);
 
