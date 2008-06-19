@@ -226,6 +226,12 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 			goto error;
 		}
 
+		/* deregister zovl target from iSNS server. */
+		if (isns_enabled() == True) {
+			if (isns_dereg(prop) != 0)
+				syslog(LOG_INFO, "ISNS dereg failed\n");
+		}
+
 		tgt_node_remove(targets_config, t, MatchBoth);
 
 		/*
