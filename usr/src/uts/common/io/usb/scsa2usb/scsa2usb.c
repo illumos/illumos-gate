@@ -445,7 +445,7 @@ static struct cb_ops scsa2usb_cbops = {
 	nodev,			/* dump */
 	scsa2usb_ugen_read,	/* read */
 	scsa2usb_ugen_write,	/* write */
-	NULL,			/* ioctl */
+	nodev,			/* ioctl */
 	nodev,			/* devmap */
 	nodev,			/* mmap */
 	nodev,			/* segmap */
