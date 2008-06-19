@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +44,7 @@ extern "C" {
 #include <iscsitgt_impl.h>
 #include "t10.h"
 
-#define	CMD_MAXOUTSTANDING 64
+#define	CMD_MAXOUTSTANDING 16
 
 typedef enum {
 	FindTTT,
@@ -137,6 +137,7 @@ typedef struct iscsi_cmd {
 	 * instead of allocating our own buffer.
 	 */
 	t10_cmd_t		*c_t10_cmd;
+	uint32_t		c_t10_dup;
 
 	/*
 	 * Used by the session layer to send packets out the same
@@ -160,6 +161,7 @@ void iscsi_cmd_remove(struct iscsi_conn *c, uint32_t statsn);
 int iscsi_cmd_window(struct iscsi_conn *c);
 void iscsi_cmd_delayed_store(iscsi_cmd_t *cmd, t10_cmd_t *t);
 void iscsi_cmd_delayed_remove(iscsi_cmd_t *cmd, iscsi_delayed_t *d);
+void iscsi_cancel_dups(iscsi_cmd_t *, t10_cmd_event_t);
 
 #ifdef __cplusplus
 }

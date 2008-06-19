@@ -96,8 +96,9 @@ typedef enum {
 	T10_Cmd_T3,
 	T10_Cmd_T4,
 	T10_Cmd_T5,
-	T10_Cmd_T6,
-	T10_Cmd_T7
+	T10_Cmd_T6,		/* cancel */
+	T10_Cmd_T7,
+	T10_Cmd_T8		/* shutdown */
 } t10_cmd_event_t;
 
 typedef enum {
@@ -256,6 +257,8 @@ typedef struct t10_cmd {
 	 * List of active commands at the ITL level.
 	 */
 	avl_tree_t		c_cmd_avl;
+
+	struct t10_cmd		*c_cmd_next;
 } t10_cmd_t;
 
 /*
@@ -545,8 +548,8 @@ t10_handle_disable(t10_targ_handle_t t);
 /*
  * t10_handle_destroy -- free resources used by handle
  */
-void
-t10_handle_destroy(t10_targ_handle_t t);
+int
+t10_handle_destroy(t10_targ_handle_t t, Boolean_t wait);
 
 Boolean_t
 t10_cmd_create(t10_targ_handle_t t, int lun_number, uint8_t *cdb,

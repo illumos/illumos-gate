@@ -407,12 +407,15 @@ conn_process(void *v)
 		 * Make sure to free the resources that the T10
 		 * layer still has allocated. These are commands which
 		 * the T10 layer couldn't release directly during it's
-		 * shutdown because the state had been changed to
-		 * indicate the commands was now "owned" by the
-		 * transport.
+		 * shutdown.
 		 */
-		if (cmd->c_t10_cmd)
-			t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T6);
+		if (cmd->c_t10_cmd) {
+			if (cmd->c_t10_dup) {
+				iscsi_cancel_dups(cmd, T10_Cmd_T8);
+			} else {
+				t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T8);
+			}
+		}
 
 		/*
 		 * Perform the final clean up which is done during

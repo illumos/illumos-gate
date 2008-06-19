@@ -242,7 +242,19 @@ sess_from_t10(void *v)
 			case msg_shutdown_rsp:
 
 				if (s->s_t10) {
-					t10_handle_destroy(s->s_t10);
+					if (t10_handle_destroy(s->s_t10, False)
+					    != 0) {
+						/*
+						 * Destroy couldn't complete,
+						 * put the message back on our
+						 * own queue to be picked up
+						 * later and tried again.
+						 */
+						queue_message_set(s->s_t10q, 0,
+						    msg_shutdown_rsp,
+						    m->msg_data);
+						break;
+					}
 					s->s_t10 = NULL;
 				}
 

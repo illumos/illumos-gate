@@ -75,11 +75,11 @@ iscsi_full_feature(iscsi_conn_t *c)
 	if ((cc = recv(c->c_fd, &h, sizeof (h), MSG_WAITALL)) != sizeof (h)) {
 		if (errno == ECONNRESET) {
 			(void) snprintf(debug, sizeof (debug),
-			    "CON%x  full_feature -- initiator reset socket",
+			    "CON%x  full_feature -- initiator reset socket\n",
 			    c->c_num);
 		} else {
 			(void) snprintf(debug, sizeof (debug),
-			    "CON%x  full_feature(got-%d, expect-%d), errno=%d",
+			    "CON%x full_feature(got-%d, expect-%d), errno=%d\n",
 			    c->c_num, cc, sizeof (h), errno);
 		}
 		queue_str(c->c_mgmtq, Q_CONN_ERRS, msg_log, debug);
@@ -272,7 +272,9 @@ handle_task_mgt(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 			    c->c_num, hp->rtt);
 			rsp->response = SCSI_TCP_TM_RESP_NO_TASK;
 		} else {
+			(void) pthread_mutex_lock(&c->c_mutex);
 			iscsi_cmd_cancel(c, cmd);
+			(void) pthread_mutex_unlock(&c->c_mutex);
 			rsp->response = SCSI_TCP_TM_RESP_COMPLETE;
 		}
 		break;
@@ -302,21 +304,7 @@ handle_task_mgt(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 			    ISCSI_FLAG_TASK_MGMT_FUNCTION_MASK) ==
 			    ISCSI_TM_FUNC_TARGET_WARM_RESET) ||
 			    (lun == cmd->c_lun)) {
-
-				/*
-				 * Can't call cmd_cancel() here because it
-				 * will attempt to grab the lock which we
-				 * already have held.
-				 */
-				if (cmd->c_state == CmdAlloc) {
-					cmd->c_state = CmdCanceled;
-					if (cmd->c_t10_cmd != NULL) {
-						t10_cmd_shoot_event(
-						    cmd->c_t10_cmd,
-						    T10_Cmd_T6);
-						cmd->c_t10_cmd = NULL;
-					}
-				}
+				iscsi_cmd_cancel(c, cmd);
 
 			}
 		}

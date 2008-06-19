@@ -74,6 +74,8 @@
  * []------------------------------------------------------------------[]
  */
 
+#define	MAX_AIO_CNT	256
+
 /*
  * Forward declarations
  */
@@ -82,11 +84,12 @@ static void *lu_runner(void *v);
 static Boolean_t t10_lu_initialize(t10_lu_common_t *lu, char *basedir);
 static void *t10_aio_done(void *v);
 static Boolean_t lu_remove_cmds(msg_t *m, void *v);
+static void lu_remove_all_cmds(t10_lu_impl_t *);
 static void cmd_common_free(t10_cmd_t *cmd);
 static Boolean_t load_params(t10_lu_common_t *lu, char *basedir);
 static Boolean_t fallocate(int fd, off64_t len);
 static t10_cmd_state_t t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e);
-static void clear_transport(transport_t t);
+static void clear_transport(transport_t t, t10_cmd_t *t10c);
 
 #ifdef FULL_DEBUG
 static char *state_to_str(t10_cmd_state_t s);
@@ -109,6 +112,7 @@ target_queue_t		*mgmtq;
 static pthread_mutex_t	t10_mutex;
 static int		t10_num;
 static sema_t		t10_sema;
+static sema_t		t10_aio_sema;
 
 /*
  * Constants
@@ -129,6 +133,7 @@ t10_init(target_queue_t *q)
 	(void) pthread_mutex_init(&lu_list_mutex, NULL);
 	(void) pthread_mutex_init(&t10_mutex, NULL);
 	(void) sema_init(&t10_sema, 0, USYNC_THREAD, NULL);
+	(void) sema_init(&t10_aio_sema, MAX_AIO_CNT, USYNC_THREAD, NULL);
 	avl_create(&lu_list, find_lu_by_guid, sizeof (t10_lu_common_t),
 	    offsetof(t10_lu_common_t, l_all_luns));
 	(void) pthread_create(&junk, NULL, t10_aio_done, NULL);
@@ -153,18 +158,12 @@ t10_aio_done(void *v)
 			if (errno == EINVAL) {
 				queue_prt(mgmtq, Q_STE_ERRS,
 				    "SAM-  aiowait returned EINVAL\n");
-				/*
-				 * It's possible for aiowait to return
-				 * prematurely. So, post another semaphore,
-				 * nanosleep for a usec, and try the wait again.
-				 */
-				(void) sema_post(&t10_sema);
-				(void) nanosleep(&usec, 0);
 				continue;
 			} else
 				break;
 		} else {
 			a = (t10_aio_t *)result;
+			sema_post(&t10_aio_sema);
 		}
 		if ((a != NULL) && (a->a_aio_cmplt != NULL)) {
 			lu = a->a_cmd->c_lu;
@@ -283,8 +282,8 @@ t10_handle_disable(t10_targ_handle_t tp)
 	(void) pthread_mutex_unlock(&t->s_mutex);
 }
 
-void
-t10_handle_destroy(t10_targ_handle_t tp)
+int
+t10_handle_destroy(t10_targ_handle_t tp, Boolean_t wait)
 {
 	t10_targ_impl_t	*t		= (t10_targ_impl_t *)tp;
 	t10_lu_impl_t	*l;
@@ -295,7 +294,6 @@ t10_handle_destroy(t10_targ_handle_t tp)
 	(void) pthread_mutex_lock(&t->s_mutex);
 	if (avl_numnodes(&t->s_open_lu) != 0) {
 		while ((l = avl_first(&t->s_open_lu)) != NULL) {
-			avl_remove(&t->s_open_lu, l);
 
 			(void) pthread_mutex_lock(&l->l_cmd_mutex);
 			if (avl_numnodes(&l->l_cmds) != 0) {
@@ -304,12 +302,14 @@ t10_handle_destroy(t10_targ_handle_t tp)
 					c2free = c;
 					c = AVL_NEXT(&l->l_cmds, c);
 					/*
-					 * Only remove those commands which
+					 * Remove those commands which
 					 * are waiting for a response from
-					 * the initiator which will not
-					 * arrive since we're shutting down
-					 * the connection or have already
+					 * the initiator or have already
 					 * been canceled by the transport.
+					 * The initiator response won't
+					 * arrive since the connection
+					 * is shutting down.
+					 *
 					 * Other commands will be freed as
 					 * they are processed by the
 					 * transport layer or AIO.
@@ -320,7 +320,7 @@ t10_handle_destroy(t10_targ_handle_t tp)
 					    T10_Cmd_S6_Freeing_In)) {
 						fast_free++;
 						(void) t10_cmd_state_machine(
-						    c2free, T10_Cmd_T6);
+						    c2free, T10_Cmd_T8);
 					}
 				}
 				queue_prt(mgmtq, Q_STE_NONIO,
@@ -328,19 +328,33 @@ t10_handle_destroy(t10_targ_handle_t tp)
 				    "Waiting for %d cmds to drain\n",
 				    t->s_targ_num, fast_free,
 				    avl_numnodes(&l->l_cmds));
+
 				if (avl_numnodes(&l->l_cmds) != 0) {
 					l->l_wait_for_drain = True;
-					while (l->l_wait_for_drain == True) {
-						(void) pthread_cond_wait(
-						    &l->l_cmd_cond,
+					if (wait) {
+						while (l->l_wait_for_drain ==
+						    True) {
+							(void) pthread_cond_wait
+							    (&l->l_cmd_cond,
+							    &l->l_cmd_mutex);
+						}
+						assert(
+						    avl_numnodes(&l->l_cmds)
+						    == 0);
+						queue_prt(mgmtq, Q_STE_NONIO,
+						    "SAM%x  Commands drained\n",
+						    t->s_targ_num);
+					} else {
+						(void) pthread_mutex_unlock(
 						    &l->l_cmd_mutex);
+						(void) pthread_mutex_unlock(
+						    &t->s_mutex);
+						(void) nanosleep(&usec, 0);
+						return (1);
 					}
-					assert(avl_numnodes(&l->l_cmds) == 0);
-					queue_prt(mgmtq, Q_STE_NONIO,
-					    "SAM%x  Commands drained\n",
-					    t->s_targ_num);
 				}
 			}
+			avl_remove(&t->s_open_lu, l);
 			avl_destroy(&l->l_cmds);
 			(void) pthread_mutex_unlock(&l->l_cmd_mutex);
 			free(l);
@@ -352,6 +366,7 @@ t10_handle_destroy(t10_targ_handle_t tp)
 	free(t->s_targ_base);
 	free(t->s_i_name);
 	free(t);
+	return (0);
 }
 
 /*
@@ -478,23 +493,23 @@ t10_cmd_done(t10_cmd_t *cmd)
  *
  * The state transition table is as follows:
  *
- *	   +---------+---+---+---+---+---+---+
- *	   |S1       |S2 |S3 |S4 |S5 |S6 |S7 |
- *	---+---------+---+---+---+---+-------+
- *	 S1|T4/5/6   |T1 | - | - | - | - | - |
- *	---+---------+---+---+---+---+-------+
- *	 S2|T5       | - |T2 |T3 |T7 |T6 | - |
- *	---+---------+---+---+---+---+-------+
- *	 S3|T5       |T4 | - | - |T7 |T6 | - |
- *	---+---------+---+---+---+---+-------+
- *	 S4|T5       |T4 | - | - | - | - |T6 |
- *	---+---------+---+---+---+---+-------+
- *	 S5|         | - |T4 | - | - |T6 | - |
- *	---+---------+---+---+---+---+-------+
- *       S6|T2/4/5/6 | - | - | - | - | - |T3 |
- *	---+---------+---+---+---+---+-------+
- *       S7|T4/5     | - | - | - | - | - |T6 |
- *	---+---------+---+---+---+---+-------+
+ *	   +----------+---+---+---+---+---+----+
+ *	   |S1        |S2 |S3 |S4 |S5 |S6 |S7  |
+ *	---+----------+---+---+---+---+--------+
+ *	 S1|T4/5/6/8  |T1 | - | - | - | - | -  |
+ *	---+----------+---+---+---+---+--------+
+ *	 S2|T5/8      | - |T2 |T3 |T7 |T6 | -  |
+ *	---+----------+---+---+---+---+--------+
+ *	 S3|T5/8      |T4 | - | - |T7 |T6 | -  |
+ *	---+----------+---+---+---+---+--------+
+ *	 S4|T5        |T4 | - | - | - | - |T6/8|
+ *	---+----------+---+---+---+---+--------+
+ *	 S5|T5/8      | - |T4 | - | - |T6 | -  |
+ *	---+----------+---+---+---+---+--------+
+ *	 S6|T2/4/5/6/8| - | - | - | - | - |T3  |
+ *	---+----------+---+---+---+---+--------+
+ *	 S7|T4/5/8    | - | - | - | - | - |T6  |
+ *	---+----------+---+---+---+---+--------+
  *
  * Events definitions:
  * -T1: Command has been placed on LU queue for exection.
@@ -509,6 +524,7 @@ t10_cmd_done(t10_cmd_t *cmd)
  * -T5: Command complete. Free resources.
  * -T6: Cancel command.
  * -T7: Transport has sent command to Initiator.
+ * -T8: Shutting down, cancel or complete as appropriate
  */
 static t10_cmd_state_t
 t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
@@ -530,6 +546,7 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 		case T10_Cmd_T4:
 		case T10_Cmd_T5:
 		case T10_Cmd_T6: /* warm reset */
+		case T10_Cmd_T8: /* shutdown */
 			c->c_state = T10_Cmd_S1_Free;
 			cmd_common_free(c);
 			return (T10_Cmd_S1_Free);
@@ -556,6 +573,7 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 			break;
 
 		case T10_Cmd_T5:
+		case T10_Cmd_T8: /* shutdown */
 			c->c_state = T10_Cmd_S1_Free;
 			cmd_common_free(c);
 			return (T10_Cmd_S1_Free);
@@ -585,6 +603,7 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 			break;
 
 		case T10_Cmd_T5:
+		case T10_Cmd_T8: /* shutdown */
 			c->c_state = T10_Cmd_S1_Free;
 			cmd_common_free(c);
 			return (T10_Cmd_S1_Free);
@@ -617,6 +636,7 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 			return (T10_Cmd_S1_Free);
 
 		case T10_Cmd_T6:
+		case T10_Cmd_T8: /* shutdown */
 			c->c_state = T10_Cmd_S7_Freeing_AIO;
 			break;
 
@@ -633,6 +653,12 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 		case T10_Cmd_T4:
 			c->c_state = T10_Cmd_S3_Trans;
 			break;
+
+		case T10_Cmd_T5:
+		case T10_Cmd_T8: /* shutdown */
+			c->c_state = T10_Cmd_S1_Free;
+			cmd_common_free(c);
+			return (T10_Cmd_S1_Free);
 
 		case T10_Cmd_T6:
 			c->c_state = T10_Cmd_S6_Freeing_In;
@@ -652,6 +678,7 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 		case T10_Cmd_T4: /* AIO complete */
 		case T10_Cmd_T5: /* command complete */
 		case T10_Cmd_T6: /* warm reset */
+		case T10_Cmd_T8: /* shutdown */
 			c->c_state = T10_Cmd_S1_Free;
 			cmd_common_free(c);
 			return (T10_Cmd_S1_Free);
@@ -673,6 +700,7 @@ t10_cmd_state_machine(t10_cmd_t *c, t10_cmd_event_t e)
 		switch (e) {
 		case T10_Cmd_T4:	/* AIO complete */
 		case T10_Cmd_T5:	/* command complete */
+		case T10_Cmd_T8:
 			c->c_state = T10_Cmd_S1_Free;
 			cmd_common_free(c);
 			return (T10_Cmd_S1_Free);
@@ -1037,7 +1065,7 @@ error:
 	}
 	if (t != NULL) {
 		t10_handle_disable(t);
-		t10_handle_destroy(t);
+		(void) t10_handle_destroy(t, True);
 	}
 	if (rq != NULL) {
 		queue_message_set(rq, 0, msg_shutdown_rsp, 0);
@@ -1081,6 +1109,7 @@ trans_cmd_dup(t10_cmd_t *cmd)
 	if ((c = umem_cache_alloc(t10_cmd_cache, UMEM_DEFAULT)) == NULL)
 		return (NULL);
 	bcopy(cmd, c, sizeof (*c));
+	c->c_cmd_next = NULL;
 	if ((c->c_cdb = (uint8_t *)malloc(c->c_cdb_len)) == NULL) {
 		umem_cache_free(t10_cmd_cache, c);
 		return (NULL);
@@ -1306,10 +1335,12 @@ trans_aiowrite(t10_cmd_t *cmd, char *data, size_t data_len, off_t offset,
 {
 	taio->a_cmd = cmd;
 
+	sema_wait(&t10_aio_sema);
 	(void) pthread_mutex_lock(&cmd->c_lu->l_cmd_mutex);
 	if (aiowrite(cmd->c_lu->l_common->l_fd, data, data_len, offset, 0,
 	    &taio->a_aio) == -1) {
 		(void) pthread_mutex_unlock(&cmd->c_lu->l_cmd_mutex);
+		sema_post(&t10_aio_sema);
 		taio->a_aio.aio_return = -1;
 		(*taio->a_aio_cmplt)(taio->a_id);
 	} else {
@@ -1323,10 +1354,13 @@ trans_aioread(t10_cmd_t *cmd, char *data, size_t data_len, off_t offset,
     t10_aio_t *taio)
 {
 	taio->a_cmd = cmd;
+
+	sema_wait(&t10_aio_sema);
 	(void) pthread_mutex_lock(&cmd->c_lu->l_cmd_mutex);
 	if (aioread(cmd->c_lu->l_common->l_fd, data, data_len, offset, 0,
 	    &taio->a_aio) == -1) {
 		(void) pthread_mutex_unlock(&cmd->c_lu->l_cmd_mutex);
+		sema_post(&t10_aio_sema);
 		taio->a_aio.aio_return = -1;
 		(*taio->a_aio_cmplt)(taio->a_id);
 	} else {
@@ -1531,13 +1565,16 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 			 * Get the dataset for this shareiscsi target
 			 */
 			if (tgt_find_value_str(targ, XML_ELEMENT_ALIAS,
-			    &dataset) == False)
+			    &dataset) == False) {
+				(void) pthread_mutex_unlock(&lu_list_mutex);
 				goto error;
+			}
 
 			/*
 			 * Set the ZFS persisted shareiscsi options
 			 */
 			if (put_zfs_shareiscsi(dataset, targ) != ERR_SUCCESS) {
+				(void) pthread_mutex_unlock(&lu_list_mutex);
 				goto error;
 			}
 
@@ -1811,7 +1848,6 @@ lu_runner(void *v)
 			break;
 
 		case msg_reset_lu:
-			queue_reset(lu->l_from_transports);
 			(void) pthread_mutex_lock(&lu->l_common_mutex);
 			itl = avl_first(&lu->l_all_open);
 			do {
@@ -1843,15 +1879,6 @@ lu_runner(void *v)
 			(*sam_emul_table[lu->l_dtype].t_per_fini)(itl);
 			avl_remove(&lu->l_all_open, (void *)itl);
 
-			/*
-			 * Don't remove reference to l_common area until after
-			 * the emulation routines are finished since they
-			 * are likely to reference l_dtype_params.
-			 */
-			(void) pthread_mutex_lock(&itl->l_mutex);
-			itl->l_common = NULL;
-			(void) pthread_mutex_unlock(&itl->l_mutex);
-
 			queue_message_set(s->t_q, 0, msg_shutdown_rsp,
 			    (void *)(uintptr_t)itl->l_targ_lun);
 			if (avl_numnodes(&lu->l_all_open) == 0) {
@@ -1868,6 +1895,9 @@ lu_runner(void *v)
 					    errno);
 				/*CSTYLED*/
 				(*sam_emul_table[lu->l_dtype].t_common_fini)(lu);
+
+				/* shoot all t10_cmd */
+				lu_remove_all_cmds(itl);
 
 				avl_remove(&lu_list, (void *)lu);
 				util_title(mgmtq, Q_STE_NONIO,
@@ -2112,8 +2142,34 @@ lu_buserr_handler(int sig, siginfo_t *sip, void *v)
 }
 
 /*
+ * Remove all t10_cmds, since this is call from shutdown, just shoot a T8
+ * and remove the iscsi command.  This is call from lu_rinner process
+ * msg_shutdown.
+ */
+static void
+lu_remove_all_cmds(t10_lu_impl_t *lu)
+{
+	t10_cmd_t	*c;
+	t10_cmd_t	*cnxt;
+	iscsi_cmd_t	*cmd;
+	iscsi_conn_t	*conn;
+
+	c = avl_first(&lu->l_cmds);
+	while (c != NULL) {
+		cmd = T10_TRANS_ID(c);
+		conn = cmd->c_allegiance;
+		cnxt = AVL_NEXT(&lu->l_cmds, c);
+		(void) pthread_mutex_lock(&conn->c_mutex);
+		(void) t10_cmd_shoot_event(c, T10_Cmd_T8);
+		iscsi_cmd_free(conn, cmd);
+		(void) pthread_mutex_unlock(&conn->c_mutex);
+		c = cnxt;
+	}
+}
+
+/*
  * []----
- * | lu_remove_cmds -- look for and free commands for a given ITL
+ * | lu_remove_cmds -- look for and free commands
  * []----
  */
 static Boolean_t
@@ -2126,6 +2182,13 @@ lu_remove_cmds(msg_t *m, void *v)
 	case msg_cmd_send:
 	case msg_cmd_data_out:
 		c = (t10_cmd_t *)m->msg_data;
+		if (lu == NULL) {
+			queue_prt(mgmtq, Q_STE_NONIO,
+			    "SAM%x  canceled command during lu_remove\n",
+			    c->c_lu->l_targ->s_targ_num);
+			t10_cmd_shoot_event(c, T10_Cmd_T6);
+			return (True);
+		}
 		if (c->c_lu == lu) {
 			queue_prt(mgmtq, Q_STE_NONIO,
 			    "SAM%x  LUN %d, removed command during lu_remove\n",
@@ -2320,7 +2383,7 @@ cmd_common_free(t10_cmd_t *c)
 	c->c_data	= 0;
 	c->c_data_len	= 0;
 
-	clear_transport(c->c_trans_id);
+	clear_transport(c->c_trans_id, c);
 
 	if (c->c_emul_complete != NULL) {
 		(*c->c_emul_complete)(c->c_emul_id);
@@ -2357,12 +2420,34 @@ cmd_common_free(t10_cmd_t *c)
  * thread.
  */
 static void
-clear_transport(transport_t t)
+clear_transport(transport_t t, t10_cmd_t *t10c)
 {
 	iscsi_cmd_t	*c = (iscsi_cmd_t *)t;
 
-	if (c)
-		c->c_t10_cmd = NULL;
+	if (c) {
+		if (c->c_t10_dup != 0) {
+			c->c_t10_dup--;
+		}
+		if (c->c_t10_cmd != NULL) {
+			/*
+			 * Find and unlink the cmd to be freed.
+			 * The last entry's next ptr is NULL.
+			 */
+			if (c->c_t10_cmd == t10c) {
+				c->c_t10_cmd = t10c->c_cmd_next;
+			} else {
+				t10_cmd_t *t10cnxt = c->c_t10_cmd;
+				while (t10cnxt->c_cmd_next != NULL) {
+					if (t10cnxt->c_cmd_next == t10c) {
+						t10cnxt->c_cmd_next =
+						    t10c->c_cmd_next;
+						break;
+					}
+					t10cnxt = t10cnxt->c_cmd_next;
+				}
+			}
+		}
+	}
 }
 
 /*

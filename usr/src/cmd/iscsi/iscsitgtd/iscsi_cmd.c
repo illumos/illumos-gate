@@ -148,6 +148,24 @@ iscsi_cmd_free(iscsi_conn_t *c, iscsi_cmd_t *cmd)
 }
 
 /*
+ * Find all duplicated t10_cmd and shoot an event
+ */
+void
+iscsi_cancel_dups(iscsi_cmd_t *cmd, t10_cmd_event_t e)
+{
+	t10_cmd_t	*c2free;
+	t10_cmd_t	*nc;
+
+	/* Run the list */
+	c2free = cmd->c_t10_cmd;
+	while (c2free != NULL) {
+		nc = c2free->c_cmd_next;
+		t10_cmd_shoot_event(c2free, e);
+		c2free = nc;
+	}
+}
+
+/*
  * []----
  * | iscsi_cmd_cancel -- mark a command as canceled
  * |
@@ -156,22 +174,23 @@ iscsi_cmd_free(iscsi_conn_t *c, iscsi_cmd_t *cmd)
  * | connection layer if a command is canceled nothing will be sent on the
  * | wire and at that point the command is marked CmdFree so that future calls
  * | to cmd_remove will actually free the space.
+ * |
+ * | NOTE: connection mutex must be held during this call.
  * []----
  */
 void
 iscsi_cmd_cancel(iscsi_conn_t *c, iscsi_cmd_t *cmd)
 {
-	(void) pthread_mutex_lock(&c->c_mutex);
-	(void) pthread_mutex_lock(&c->c_state_mutex);
+	assert(pthread_mutex_trylock(&c->c_mutex) != 0);
 	if (cmd->c_state == CmdAlloc) {
 		cmd->c_state = CmdCanceled;
 		if (cmd->c_t10_cmd != NULL) {
-			t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T6);
-			cmd->c_t10_cmd = NULL;
+			if (cmd->c_t10_dup)
+				iscsi_cancel_dups(cmd, T10_Cmd_T6);
+			else
+				t10_cmd_shoot_event(cmd->c_t10_cmd, T10_Cmd_T6);
 		}
 	}
-	(void) pthread_mutex_unlock(&c->c_state_mutex);
-	(void) pthread_mutex_unlock(&c->c_mutex);
 }
 
 /*

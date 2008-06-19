@@ -339,6 +339,7 @@ sbc_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	disk_params_t	*d;
 	uchar_t		addl_sense_len;
 	t10_cmd_t	*c;
+	iscsi_cmd_t	*iscsi = (iscsi_cmd_t *)T10_TRANS_ID(cmd);
 
 	if ((d = (disk_params_t *)T10_PARAMS_AREA(cmd)) == NULL) {
 		trans_send_complete(cmd, STATUS_BUSY);
@@ -456,6 +457,21 @@ sbc_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		} else {
 			c = cmd;
 		}
+
+		(void) pthread_mutex_lock(&cmd->c_lu->l_cmd_mutex);
+		/* dup count include the original cmd */
+		iscsi->c_t10_dup++;
+
+		/*
+		 * Add the cmd to the list of t10 cmds for this iscsi cmd.
+		 * But don't add the original t10 cmd twice.
+		 */
+		if (c != cmd) {
+			c->c_cmd_next = iscsi->c_t10_cmd;
+			iscsi->c_t10_cmd = c;
+		}
+		(void) pthread_mutex_unlock(&cmd->c_lu->l_cmd_mutex);
+
 		io = sbc_io_alloc(c);
 
 		io->da_lba	= addr;
