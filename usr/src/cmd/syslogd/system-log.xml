@@ -20,7 +20,7 @@
    
     CDDL HEADER END
    
-    Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+    Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 
     ident	"%Z%%M%	%I%	%E% SMI"
@@ -129,7 +129,7 @@
 		<propval
 			name='log_from_remote'
 			type='boolean'
-			value='true' />
+			value='false' />
 
 		<!-- authorization to modify the configuration properties -->
 		<propval name='value_authorization' type='astring'
