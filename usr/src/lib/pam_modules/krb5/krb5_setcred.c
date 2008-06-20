@@ -35,7 +35,7 @@
 #include <pwd.h>
 #include <syslog.h>
 #include <libintl.h>
-#include <krb5.h>
+#include <k5-int.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -515,7 +515,7 @@ cleanup_creds:
 		 * We now chown the ccache to the appropriate uid/gid
 		 * combination, if its a FILE based ccache.
 		 */
-		if (strstr(kmd->env, "FILE:")) {
+		if (!kmd->env || strstr(kmd->env, "FILE:")) {
 			uid_t uuid;
 			gid_t ugid;
 			char *username = NULL, *tmpname = NULL;
@@ -540,6 +540,33 @@ cleanup_creds:
 				retval = KRB5KRB_ERR_GENERIC;
 				goto error;
 			}
+
+			if (!kmd->env) {
+				char buffer[512];
+
+				if (snprintf(buffer, sizeof (buffer),
+				    "%s=FILE:/tmp/krb5cc_%d", KRB5_ENV_CCNAME,
+				    (int)uuid) >= sizeof (buffer)) {
+					retval = KRB5KRB_ERR_GENERIC;
+					goto error;
+				}
+
+				/*
+				 * We MUST copy this to the heap for the putenv
+				 * to work!
+				 */
+				kmd->env = strdup(buffer);
+				if (!kmd->env) {
+					retval = ENOMEM;
+					goto error;
+				} else {
+					if (putenv(kmd->env)) {
+						retval = ENOMEM;
+						goto error;
+					}
+				}
+			}
+
 			if (!(filepath = strchr(kmd->env, ':')) ||
 			    !(filepath+1)) {
 				__pam_log(LOG_AUTH | LOG_ERR,
