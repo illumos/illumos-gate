@@ -1092,9 +1092,15 @@ strget(struct stdata *stp, queue_t *q, struct uio *uiop, int first,
 		 * If we have a valid uio, try and use this as a guide for how
 		 * many bytes to retrieve from the queue via getq_noenab().
 		 * Doing this can avoid unneccesary counting of overlong
-		 * messages in putback(). We currently only do this for sockets.
+		 * messages in putback(). We currently only do this for sockets
+		 * and only if there is no sd_rputdatafunc hook.
+		 *
+		 * The sd_rputdatafunc hook transforms the entire message
+		 * before any bytes in it can be given to a client. So, rbytes
+		 * must be 0 if there is a hook.
 		 */
-		if ((uiop != NULL) && (stp->sd_vnode->v_type == VSOCK))
+		if ((uiop != NULL) && (stp->sd_vnode->v_type == VSOCK) &&
+		    (stp->sd_rputdatafunc == NULL))
 			rbytes = uiop->uio_resid;
 	}
 
