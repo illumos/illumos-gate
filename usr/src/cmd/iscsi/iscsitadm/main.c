@@ -1425,6 +1425,19 @@ showAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 	(void) printf("%s%s: %s\n", dospace(1), gettext("iSNS Server"),
 	    n2 ? n2->x_value : gettext("Not set"));
 
+	n2 = tgt_node_next_child(n1, XML_ELEMENT_ISNS_SERVER_STATUS, NULL);
+	if (n2) {
+		/*
+		 * if NULL, that means either the isns discovery is
+		 * disabled or the server address is not set.
+		 */
+		if (n2->x_value != NULL) {
+			(void) printf("%s%s: ", dospace(1),
+			    gettext("iSNS Server Status"));
+			(void) printf("%s\n", n2->x_value);
+		}
+	}
+
 	n2 = tgt_node_next_child(n1, XML_ELEMENT_FAST, NULL);
 	(void) printf("%s%s: ", dospace(1), gettext("Fast Write ACK"));
 	if (n2) {
