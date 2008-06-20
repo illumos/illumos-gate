@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This script takes a file list and a workspace and builds a set of html files
@@ -55,9 +55,9 @@ FRAMEHTML='<?xml version="1.0"?>
     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-frameset.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">\n'
 
-STDHEAD='<meta http-equiv="cache-control" content="no-cache" />
-<meta http-equiv="Pragma" content="no-cache" />
-<meta http-equiv="Expires" content="-1" />
+STDHEAD='<meta http-equiv="cache-control" content="no-cache"></meta>
+<meta http-equiv="Pragma" content="no-cache"></meta>
+<meta http-equiv="Expires" content="-1"></meta>
 <!--
    Note to customizers: the body of the webrev is IDed as SUNWwebrev
    to allow easy overriding by users of webrev via the userContent.css
@@ -207,7 +207,7 @@ strip_unchanged()
 			c -= C
 			inx = 0
 			if (c > C) {
-				print "\n</pre><hr /><pre>"
+				print "\n</pre><hr></hr><pre>"
 				inx = c % C
 				c = C
 			}
@@ -227,7 +227,7 @@ strip_unchanged()
 		c++;
 		print
 	}
-	END	{ if (c > (C * 2)) print "\n</pre><hr />" }
+	END	{ if (c > (C * 2)) print "\n</pre><hr></hr>" }
 
 	' $1
 }
@@ -527,11 +527,11 @@ function framed_sdiff
 	print "$HTML<head>$STDHEAD" > $WDIR/$DIR/$TNAME.lhs.html
 
 	cat >> $WDIR/$DIR/$TNAME.lhs.html <<-EOF
-	    <script type="text/javascript" src="$RTOP/ancnav.js" />
+	    <script type="text/javascript" src="$RTOP/ancnav.js"></script>
 	    </head>
 	    <body id="SUNWwebrev" onkeypress="keypress(event);">
-	    <a name="0" />
-	    <pre>$comments</pre><hr />
+	    <a name="0"></a>
+	    <pre>$comments</pre><hr></hr>
 	EOF
 
 	cp $WDIR/$DIR/$TNAME.lhs.html $WDIR/$DIR/$TNAME.rhs.html
@@ -550,11 +550,11 @@ function framed_sdiff
 	cat >> $WDIR/$DIR/$TNAME.frames.html <<-EOF
 	  <frameset rows="*,60">
 	    <frameset cols="50%,50%">
-	      <frame src="$TNAME.lhs.html" scrolling="auto" name="lhs" />
-	      <frame src="$TNAME.rhs.html" scrolling="auto" name="rhs" />
+	      <frame src="$TNAME.lhs.html" scrolling="auto" name="lhs"></frame>
+	      <frame src="$TNAME.rhs.html" scrolling="auto" name="rhs"></frame>
 	    </frameset>
 	  <frame src="$RTOP/ancnav.html" scrolling="no" marginwidth="0"
-	   marginheight="0" name="nav" />
+	   marginheight="0" name="nav"></frame>
 	  <noframes>
             <body id="SUNWwebrev">
 	      Alas 'frames' webrev requires that your browser supports frames
@@ -648,8 +648,6 @@ function insert_anchors
 {
 	nawk '
 	function ia() {
-		# This should be able to be a singleton <a /> but that
-		# seems to trigger a bug in firefox a:hover rule processing
 		printf "<a name=\"%d\" id=\"anc%d\"></a>", anc, anc++;
 	}
 
@@ -678,8 +676,8 @@ function insert_anchors
         	for(i=0;i<8;i++) printf "\n\n\n\n\n\n\n\n\n\n";
 		printf "</pre>"
 		printf "<form name=\"eof\">";
-		printf "<input name=\"value\" value=\"%d\" type=\"hidden\" />",
-		    anc - 1;
+		printf "<input name=\"value\" value=\"%d\" " \
+		    "type=\"hidden\"></input>", anc - 1;
 		printf "</form>";
 	}
 	' $1
@@ -913,7 +911,7 @@ function frame_navigation
 </style>
 EOF
 
-	print "<script type=\"text/javascript\" src=\"ancnav.js\" />"
+	print "<script type=\"text/javascript\" src=\"ancnav.js\"></script>"
 
 	cat << \EOF
 </head>
@@ -921,7 +919,7 @@ EOF
 	onkeypress="keypress(event);">
     <noscript lang="javascript">
       <center>
-	<p><big>Framed Navigation controls require Javascript</big><br />
+	<p><big>Framed Navigation controls require Javascript</big><br></br>
 	Either this browser is incompatable or javascript is not enabled</p>
       </center>
     </noscript>
@@ -979,8 +977,8 @@ EOF
 	  </td>
 	  <th valign="middle" width="25%">
 	    <form action="" name="diff" onsubmit="return ValidateDiffNum();">
-		<input name="display" value="BOF" size="8" type="text" />
-		<input name="real" value="0" size="8" type="hidden" />
+		<input name="display" value="BOF" size="8" type="text"></input>
+		<input name="real" value="0" size="8" type="hidden"></input>
 	    </form>
 	  </th>
 	</tr>
@@ -1027,11 +1025,11 @@ diff_to_html()
 	/^\*\*\* old/	{ next }
 	/^\*\*\*\*/	{ next }
 	/^-------/	{ printf "<center><h1>%s</h1></center>\n", $0; next }
-	/^\@\@.*\@\@$/	{ printf "</pre><hr /><pre>\n";
+	/^\@\@.*\@\@$/	{ printf "</pre><hr></hr><pre>\n";
 			  printf "<span class=\"newmarker\">%s</span>\n", $0;
 			  next}
 
-	/^\*\*\*/	{ printf "<hr /><span class=\"oldmarker\">%s</span>\n", $0;
+	/^\*\*\*/	{ printf "<hr></hr><span class=\"oldmarker\">%s</span>\n", $0;
 			  next}
 	/^---/		{ printf "<span class=\"newmarker\">%s</span>\n", $0;
 			  next}
@@ -2303,7 +2301,7 @@ done
 
 print
 print
-print "<hr />"
+print "<hr></hr>"
 print "<p style=\"font-size: small\">"
 print "This code review page was prepared using <b>$0</b>"
 print "(vers $WEBREV_UPDATED)."
