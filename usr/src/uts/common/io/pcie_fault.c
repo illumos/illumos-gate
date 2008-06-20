@@ -2492,7 +2492,8 @@ pf_send_ereport(ddi_fm_error_t *derr, pf_impl_t *impl)
 			pf_pcix_ecc_regs_t *ecc_bdg_reg;
 			pf_pcix_ecc_regs_t *ecc_reg;
 
-			ecc_bdg_reg = PCIX_BDG_ECC_REG(pfd_p, 0);
+			if (PCIE_IS_BDG(bus_p))
+				ecc_bdg_reg = PCIX_BDG_ECC_REG(pfd_p, 0);
 			ecc_reg = PCIX_ECC_REG(pfd_p);
 			fm_payload_set(ereport,
 			    "pcix_ecc_control_0", DATA_TYPE_UINT16,
