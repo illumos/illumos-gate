@@ -1320,6 +1320,42 @@ pci_fix_amd8111(uint8_t bus, uint8_t dev, uint8_t fn)
 }
 
 static void
+set_devpm_d0(uchar_t bus, uchar_t dev, uchar_t func)
+{
+	uint16_t status;
+	uint8_t header;
+	uint8_t cap_ptr;
+	uint8_t cap_id;
+	uint16_t pmcsr;
+
+	status = pci_getw(bus, dev, func, PCI_CONF_STAT);
+	if (!(status & PCI_STAT_CAP))
+		return;	/* No capabilities list */
+
+	header = pci_getb(bus, dev, func, PCI_CONF_HEADER) & PCI_HEADER_TYPE_M;
+	if (header == PCI_HEADER_CARDBUS)
+		cap_ptr = pci_getb(bus, dev, func, PCI_CBUS_RESERVED1);
+	else
+		cap_ptr = pci_getb(bus, dev, func, PCI_CONF_CAP_PTR);
+	/*
+	 * Walk the capabilities list searching for a PM entry.
+	 */
+	while (cap_ptr != PCI_CAP_NEXT_PTR_NULL && cap_ptr >= PCI_CAP_PTR_OFF) {
+		cap_ptr &= PCI_CAP_PTR_MASK;
+		cap_id = pci_getb(bus, dev, func, cap_ptr + PCI_CAP_ID);
+		if (cap_id == PCI_CAP_ID_PM) {
+			pmcsr = pci_getw(bus, dev, func, cap_ptr + PCI_PMCSR);
+			pmcsr &= ~(PCI_PMCSR_STATE_MASK);
+			pmcsr |= PCI_PMCSR_D0; /* D0 state */
+			pci_putw(bus, dev, func, cap_ptr + PCI_PMCSR, pmcsr);
+			break;
+		}
+		cap_ptr = pci_getb(bus, dev, func, cap_ptr + PCI_CAP_NEXT_PTR);
+	}
+
+}
+
+static void
 process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
     ushort_t vendorid, int config_op)
 {
@@ -1463,6 +1499,9 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
 	    "power-consumption", power, 2);
+
+	/* Set the device PM state to D0 */
+	set_devpm_d0(bus, dev, func);
 
 	if ((basecl == PCI_CLASS_BRIDGE) && (subcl == PCI_BRIDGE_PCI))
 		add_ppb_props(dip, bus, dev, func, pciex);
@@ -1751,11 +1790,10 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	struct memlist **io_res_used, **mres_used;
 	struct memlist **mem_res_used, **pmem_res_used;
 	uchar_t res_bus;
-	uint16_t cmd_reg;
 
 	pci_regspec_t regs[16] = {{0}};
 	pci_regspec_t assigned[15] = {{0}};
-	int nreg, nasgn, enable = 0;
+	int nreg, nasgn;
 
 	io_res = &pci_bus_res[bus].io_ports;
 	io_res_used = &pci_bus_res[bus].io_ports_used;
@@ -1889,7 +1927,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 					reprogram = 1;
 			} else if ((*io_res && base == 0) ||
 			    pci_bus_res[bus].io_reprogram) {
-				base = (uint_t)memlist_find(io_res, len, 0x4);
+				base = (uint_t)memlist_find(io_res, len, len);
 				if (base != 0) {
 					memlist_insert(io_res_used, base, len);
 					/* XXX need to worry about 64-bit? */
@@ -1903,8 +1941,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 					    " IO space [%d/%d/%d] BAR@0x%x"
 					    " length 0x%x",
 					    bus, dev, func, offset, len);
-				} else
-					enable |= PCI_COMM_IO;
+				}
 			}
 			assigned[nasgn].pci_phys_low = base;
 			nreg++, nasgn++;
@@ -1981,7 +2018,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 					reprogram = 1;
 			} else if ((*mres && base == 0) ||
 			    pci_bus_res[bus].mem_reprogram) {
-				base = (uint_t)memlist_find(mres, len, 0x1000);
+				base = (uint_t)memlist_find(mres, len, len);
 				if (base != NULL) {
 					memlist_insert(mres_used, base, len);
 					pci_putl(bus, dev, func, offset,
@@ -1995,8 +2032,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 					    "mem space [%d/%d/%d] BAR@0x%x"
 					    " length 0x%x",
 					    bus, dev, func, offset, len);
-				} else
-					enable |= PCI_COMM_MAE;
+				}
 			}
 			assigned[nasgn].pci_phys_low = base;
 			nreg++, nasgn++;
@@ -2103,14 +2139,7 @@ done:
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
 	    "assigned-addresses",
 	    (int *)assigned, nasgn * sizeof (pci_regspec_t) / sizeof (int));
-	if ((config_op == CONFIG_NEW) && enable) {
-		cmn_err(CE_NOTE,
-		    "!reprogram PCI device [%x/%x/%x](%s): command = %x.\n",
-		    bus, dev, func, ddi_driver_name(dip), enable);
-		cmd_reg = pci_getw(bus, dev, func, PCI_CONF_COMM);
-		cmd_reg |= (enable | PCI_COMM_ME);
-		pci_putw(bus, dev, func, PCI_CONF_COMM, cmd_reg);
-	}
+
 	return (reprogram);
 }
 
