@@ -142,9 +142,9 @@ npi_rxdma_dump_rdc_regs(npi_handle_t handle, uint8_t rdc)
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    "npi_rxdma_dump_rdc_regs"
-			    " Illegal RDC number %d \n",
-			    rdc));
+		    "npi_rxdma_dump_rdc_regs"
+		    " Illegal RDC number %d \n",
+		    rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 #ifdef NPI_DEBUG
@@ -152,20 +152,20 @@ npi_rxdma_dump_rdc_regs(npi_handle_t handle, uint8_t rdc)
 #endif
 	num_regs = sizeof (rdc_dmc_offset) / sizeof (uint64_t);
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-			    "\nDMC Register Dump for Channel %d\n",
-			    rdc));
+	    "\nDMC Register Dump for Channel %d\n",
+	    rdc));
 	for (i = 0; i < num_regs; i++) {
 		RXDMA_REG_READ64(handle, rdc_dmc_offset[i], rdc, &value);
 		offset = NXGE_RXDMA_OFFSET(rdc_dmc_offset[i], handle.is_vraddr,
-				rdc);
+		    rdc);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-			"%08llx %s\t %08llx \n",
-			offset, rdc_dmc_name[i], value));
+		    "%08llx %s\t %08llx \n",
+		    offset, rdc_dmc_name[i], value));
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-			    "\n Register Dump for Channel %d done\n",
-			    rdc));
+	    "\n Register Dump for Channel %d done\n",
+	    rdc));
 #ifdef NPI_DEBUG
 	npi_debug_level = old_npi_debug_level;
 #endif
@@ -191,18 +191,18 @@ npi_rxdma_dump_fzc_regs(npi_handle_t handle)
 
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-			    "\nFZC_DMC Common Register Dump\n"));
+	    "\nFZC_DMC Common Register Dump\n"));
 	num_regs = sizeof (rx_fzc_offset) / sizeof (uint64_t);
 
 	for (i = 0; i < num_regs; i++) {
 		NXGE_REG_RD64(handle, rx_fzc_offset[i], &value);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-			"0x%08llx %s\t 0x%08llx \n",
-			    rx_fzc_offset[i],
-			rx_fzc_name[i], value));
+		    "0x%08llx %s\t 0x%08llx \n",
+		    rx_fzc_offset[i],
+		    rx_fzc_name[i], value));
 	}
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-			    "\n FZC_DMC Register Dump Done \n"));
+	    "\n FZC_DMC Register Dump Done \n"));
 
 	return (NPI_SUCCESS);
 }
@@ -222,18 +222,18 @@ npi_rxdma_cfg_logical_page_disable(npi_handle_t handle, uint8_t rdc,
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    "rxdma_cfg_logical_page_disable"
-				    " Illegal RDC number %d \n",
-				    rdc));
+		    "rxdma_cfg_logical_page_disable"
+		    " Illegal RDC number %d \n",
+		    rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 
 	ASSERT(RXDMA_PAGE_VALID(page_num));
 	if (!RXDMA_PAGE_VALID(page_num)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    "rxdma_cfg_logical_page_disable"
-				    " Illegal page number %d \n",
-				    page_num));
+		    "rxdma_cfg_logical_page_disable"
+		    " Illegal page number %d \n",
+		    page_num));
 		return (NPI_RXDMA_PAGE_INVALID);
 	}
 
@@ -265,18 +265,18 @@ npi_rxdma_cfg_logical_page(npi_handle_t handle, uint8_t rdc,
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " rxdma_cfg_logical_page"
-				    " Illegal RDC number %d \n",
-				    rdc));
+		    " rxdma_cfg_logical_page"
+		    " Illegal RDC number %d \n",
+		    rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 
 	ASSERT(RXDMA_PAGE_VALID(pg_cfg->page_num));
 	if (!RXDMA_PAGE_VALID(pg_cfg->page_num)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " rxdma_cfg_logical_page"
-				    " Illegal page number %d \n",
-				    pg_cfg->page_num));
+		    " rxdma_cfg_logical_page"
+		    " Illegal page number %d \n",
+		    pg_cfg->page_num));
 		return (NPI_RXDMA_PAGE_INVALID);
 	}
 
@@ -369,8 +369,8 @@ npi_rxdma_cfg_rdc_ctl(npi_handle_t handle, uint8_t rdc, uint8_t op)
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    "npi_rxdma_cfg_rdc_ctl"
-				    " Illegal RDC number %d \n", rdc));
+		    "npi_rxdma_cfg_rdc_ctl"
+		    " Illegal RDC number %d \n", rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 
@@ -378,18 +378,18 @@ npi_rxdma_cfg_rdc_ctl(npi_handle_t handle, uint8_t rdc, uint8_t op)
 	switch (op) {
 		case RXDMA_OP_ENABLE:
 			RXDMA_REG_READ64(handle, RXDMA_CFIG1_REG, rdc,
-						&cfg.value);
+			    &cfg.value);
 			cfg.bits.ldw.en = 1;
 			RXDMA_REG_WRITE64(handle, RXDMA_CFIG1_REG,
-					    rdc, cfg.value);
+			    rdc, cfg.value);
 
 			NXGE_DELAY(delay_time);
 			RXDMA_REG_READ64(handle, RXDMA_CFIG1_REG, rdc,
-						&cfg.value);
+			    &cfg.value);
 			while ((count--) && (cfg.bits.ldw.qst == 0)) {
 				NXGE_DELAY(delay_time);
 				RXDMA_REG_READ64(handle, RXDMA_CFIG1_REG, rdc,
-						&cfg.value);
+				    &cfg.value);
 			}
 
 			if (cfg.bits.ldw.qst == 0) {
@@ -403,18 +403,18 @@ npi_rxdma_cfg_rdc_ctl(npi_handle_t handle, uint8_t rdc, uint8_t op)
 			break;
 		case RXDMA_OP_DISABLE:
 			RXDMA_REG_READ64(handle, RXDMA_CFIG1_REG, rdc,
-						&cfg.value);
+			    &cfg.value);
 			cfg.bits.ldw.en = 0;
 			RXDMA_REG_WRITE64(handle, RXDMA_CFIG1_REG,
-					    rdc, cfg.value);
+			    rdc, cfg.value);
 
 			NXGE_DELAY(delay_time);
 			RXDMA_REG_READ64(handle, RXDMA_CFIG1_REG, rdc,
-						&cfg.value);
+			    &cfg.value);
 			while ((count--) && (cfg.bits.ldw.qst == 0)) {
 				NXGE_DELAY(delay_time);
 				RXDMA_REG_READ64(handle, RXDMA_CFIG1_REG, rdc,
-						&cfg.value);
+				    &cfg.value);
 			}
 			if (cfg.bits.ldw.qst == 0) {
 				NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
@@ -429,21 +429,21 @@ npi_rxdma_cfg_rdc_ctl(npi_handle_t handle, uint8_t rdc, uint8_t op)
 			cfg.value = 0;
 			cfg.bits.ldw.rst = 1;
 			RXDMA_REG_WRITE64(handle,
-					    RXDMA_CFIG1_REG,
-					    rdc, cfg.value);
+			    RXDMA_CFIG1_REG,
+			    rdc, cfg.value);
 			NXGE_DELAY(delay_time);
 			RXDMA_REG_READ64(handle, RXDMA_CFIG1_REG, rdc,
-						&cfg.value);
+			    &cfg.value);
 			while ((count--) && (cfg.bits.ldw.rst)) {
 				NXGE_DELAY(delay_time);
 				RXDMA_REG_READ64(handle, RXDMA_CFIG1_REG, rdc,
-						&cfg.value);
+				    &cfg.value);
 			}
 			if (count == 0) {
 				NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_rxdma_cfg_rdc_ctl"
-					    " Reset Failed for RDC %d \n",
-					    rdc));
+				    " npi_rxdma_cfg_rdc_ctl"
+				    " Reset Failed for RDC %d \n",
+				    rdc));
 				return (error);
 			}
 			break;
@@ -497,18 +497,18 @@ npi_status_t npi_rxdma_cfg_default_port_rdc(npi_handle_t handle,
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    "rxdma_cfg_default_port_rdc"
-				    " Illegal RDC number %d \n",
-				    rdc));
+		    "rxdma_cfg_default_port_rdc"
+		    " Illegal RDC number %d \n",
+		    rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 
 	ASSERT(RXDMA_PORT_VALID(portnm));
 	if (!RXDMA_PORT_VALID(portnm)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    "rxdma_cfg_default_port_rdc"
-				    " Illegal Port number %d \n",
-				    portnm));
+		    "rxdma_cfg_default_port_rdc"
+		    " Illegal Port number %d \n",
+		    portnm));
 		return (NPI_RXDMA_PORT_INVALID);
 	}
 
@@ -528,9 +528,9 @@ npi_rxdma_cfg_rdc_rcr_ctl(npi_handle_t handle, uint8_t rdc,
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    "rxdma_cfg_rdc_rcr_ctl"
-				    " Illegal RDC number %d \n",
-				    rdc));
+		    "rxdma_cfg_rdc_rcr_ctl"
+		    " Illegal RDC number %d \n",
+		    rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 
@@ -553,9 +553,9 @@ npi_rxdma_cfg_rdc_rcr_ctl(npi_handle_t handle, uint8_t rdc,
 
 		default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    "rxdma_cfg_rdc_rcr_ctl"
-				    " Illegal opcode %x \n",
-				    op));
+		    "rxdma_cfg_rdc_rcr_ctl"
+		    " Illegal opcode %x \n",
+		    op));
 		return (NPI_RXDMA_OPCODE_INVALID(rdc));
 	}
 
@@ -606,9 +606,9 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    "rxdma_cfg_rdc_ring"
-				    " Illegal RDC number %d \n",
-				    rdc));
+		    "rxdma_cfg_rdc_ring"
+		    " Illegal RDC number %d \n",
+		    rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 
@@ -623,8 +623,8 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 		    (rdc_desc_cfg->mbox_addr >> 32) & 0xfff;
 		cfg2.bits.ldw.mbaddr =
 		    ((rdc_desc_cfg->mbox_addr &
-			    RXDMA_CFIG2_MBADDR_L_MASK) >>
-			    RXDMA_CFIG2_MBADDR_L_SHIFT);
+		    RXDMA_CFIG2_MBADDR_L_MASK) >>
+		    RXDMA_CFIG2_MBADDR_L_SHIFT);
 
 
 		/*
@@ -649,24 +649,24 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 		/* rbr config */
 
 	cfga.value = (rdc_desc_cfg->rbr_addr & (RBR_CFIG_A_STDADDR_MASK |
-					    RBR_CFIG_A_STDADDR_BASE_MASK));
+	    RBR_CFIG_A_STDADDR_BASE_MASK));
 
 	if ((rdc_desc_cfg->rbr_len < RBR_DEFAULT_MIN_LEN) ||
-		    (rdc_desc_cfg->rbr_len > RBR_DEFAULT_MAX_LEN)) {
+	    (rdc_desc_cfg->rbr_len > RBR_DEFAULT_MAX_LEN)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    "npi_rxdma_cfg_rdc_ring"
-				    " Illegal RBR Queue Length %d \n",
-				    rdc_desc_cfg->rbr_len));
+		    "npi_rxdma_cfg_rdc_ring"
+		    " Illegal RBR Queue Length %d \n",
+		    rdc_desc_cfg->rbr_len));
 		return (NPI_RXDMA_ERROR_ENCODE(NPI_RXDMA_RBRSIZE_INVALID, rdc));
 	}
 
 
 	cfga.bits.hdw.len = rdc_desc_cfg->rbr_len;
 	NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-		"npi_rxdma_cfg_rdc_ring"
-		" CFGA 0x%llx hdw.len %d (RBR LEN %d)\n",
-		cfga.value, cfga.bits.hdw.len,
-		rdc_desc_cfg->rbr_len));
+	    "npi_rxdma_cfg_rdc_ring"
+	    " CFGA 0x%llx hdw.len %d (RBR LEN %d)\n",
+	    cfga.value, cfga.bits.hdw.len,
+	    rdc_desc_cfg->rbr_len));
 
 	if (rdc_desc_cfg->page_size == SIZE_4KB)
 		cfgb.bits.ldw.bksize = RBR_BKSIZE_4K;
@@ -678,9 +678,9 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 		cfgb.bits.ldw.bksize = RBR_BKSIZE_32K;
 	else {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    "rxdma_cfg_rdc_ring"
-			    " blksize: Illegal buffer size %d \n",
-			    rdc_desc_cfg->page_size));
+		    "rxdma_cfg_rdc_ring"
+		    " blksize: Illegal buffer size %d \n",
+		    rdc_desc_cfg->page_size));
 		return (NPI_RXDMA_BUFSIZE_INVALID);
 	}
 
@@ -696,9 +696,9 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 			cfgb.bits.ldw.bufsz0 = RBR_BUFSZ0_2K;
 		else {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " rxdma_cfg_rdc_ring"
-				    " blksize0: Illegal buffer size %x \n",
-				    rdc_desc_cfg->size0));
+			    " rxdma_cfg_rdc_ring"
+			    " blksize0: Illegal buffer size %x \n",
+			    rdc_desc_cfg->size0));
 			return (NPI_RXDMA_BUFSIZE_INVALID);
 		}
 		cfgb.bits.ldw.vld0 = 1;
@@ -718,9 +718,9 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 			cfgb.bits.ldw.bufsz1 = RBR_BUFSZ1_8K;
 		else {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " rxdma_cfg_rdc_ring"
-				    " blksize1: Illegal buffer size %x \n",
-				    rdc_desc_cfg->size1));
+			    " rxdma_cfg_rdc_ring"
+			    " blksize1: Illegal buffer size %x \n",
+			    rdc_desc_cfg->size1));
 			return (NPI_RXDMA_BUFSIZE_INVALID);
 		}
 		cfgb.bits.ldw.vld1 = 1;
@@ -740,9 +740,9 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 			cfgb.bits.ldw.bufsz2 = RBR_BUFSZ2_16K;
 		else {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " rxdma_cfg_rdc_ring"
-				    " blksize2: Illegal buffer size %x \n",
-				    rdc_desc_cfg->size2));
+			    " rxdma_cfg_rdc_ring"
+			    " blksize2: Illegal buffer size %x \n",
+			    rdc_desc_cfg->size2));
 			return (NPI_RXDMA_BUFSIZE_INVALID);
 		}
 		cfgb.bits.ldw.vld2 = 1;
@@ -752,16 +752,16 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 
 
 	rcr_cfga.value = (rdc_desc_cfg->rcr_addr &
-			    (RCRCFIG_A_STADDR_MASK |
-			    RCRCFIG_A_STADDR_BASE_MASK));
+	    (RCRCFIG_A_STADDR_MASK |
+	    RCRCFIG_A_STADDR_BASE_MASK));
 
 
 	if ((rdc_desc_cfg->rcr_len < RCR_DEFAULT_MIN_LEN) ||
-		    (rdc_desc_cfg->rcr_len > NXGE_RCR_MAX)) {
+	    (rdc_desc_cfg->rcr_len > NXGE_RCR_MAX)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " rxdma_cfg_rdc_ring"
-			    " Illegal RCR Queue Length %d \n",
-			    rdc_desc_cfg->rcr_len));
+		    " rxdma_cfg_rdc_ring"
+		    " Illegal RCR Queue Length %d \n",
+		    rdc_desc_cfg->rcr_len));
 		return (NPI_RXDMA_ERROR_ENCODE(NPI_RXDMA_RCRSIZE_INVALID, rdc));
 	}
 
@@ -777,9 +777,9 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 			rcr_cfgb.bits.ldw.entout = 1;
 		} else {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " rxdma_cfg_rdc_ring"
-				    " Illegal RCR Timeout value %d \n",
-				    rdc_desc_cfg->rcr_timeout));
+			    " rxdma_cfg_rdc_ring"
+			    " Illegal RCR Timeout value %d \n",
+			    rdc_desc_cfg->rcr_timeout));
 			rcr_cfgb.bits.ldw.entout = 0;
 		}
 	} else {
@@ -791,9 +791,9 @@ npi_rxdma_cfg_rdc_ring(npi_handle_t handle, uint8_t rdc,
 		rcr_cfgb.bits.ldw.pthres = rdc_desc_cfg->rcr_threshold;
 	} else {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " rxdma_cfg_rdc_ring"
-			    " Illegal RCR Threshold value %d \n",
-			    rdc_desc_cfg->rcr_threshold));
+		    " rxdma_cfg_rdc_ring"
+		    " Illegal RCR Threshold value %d \n",
+		    rdc_desc_cfg->rcr_threshold));
 		rcr_cfgb.bits.ldw.pthres = 1;
 	}
 
@@ -836,9 +836,9 @@ npi_rxdma_red_discard_stat_get(npi_handle_t handle, uint8_t rdc,
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_rxdma_red_discard_stat_get"
-				    " Illegal RDC Number %d \n",
-				    rdc));
+		    " npi_rxdma_red_discard_stat_get"
+		    " Illegal RDC Number %d \n",
+		    rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 
@@ -846,10 +846,10 @@ npi_rxdma_red_discard_stat_get(npi_handle_t handle, uint8_t rdc,
 	NXGE_REG_RD64(handle, offset, &cnt->value);
 	if (cnt->bits.ldw.oflow) {
 		NPI_DEBUG_MSG((handle.function, NPI_ERR_CTL,
-			    " npi_rxdma_red_discard_stat_get"
-			    " Counter overflow for channel %d ",
-			    " ..... clearing \n",
-			    rdc));
+		    " npi_rxdma_red_discard_stat_get"
+		    " Counter overflow for channel %d ",
+		    " ..... clearing \n",
+		    rdc));
 		cnt->bits.ldw.oflow = 0;
 		NXGE_REG_WR64(handle, offset, cnt->value);
 		cnt->bits.ldw.oflow = 1;
@@ -924,19 +924,19 @@ npi_rxdma_misc_discard_stat_get(npi_handle_t handle, uint8_t rdc,
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_rxdma_misc_discard_stat_get"
-				    " Illegal RDC Number %d \n",
-				    rdc));
+		    " npi_rxdma_misc_discard_stat_get"
+		    " Illegal RDC Number %d \n",
+		    rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 
 	RXDMA_REG_READ64(handle, RXMISC_DISCARD_REG, rdc, &cnt->value);
 	if (cnt->bits.ldw.oflow) {
 		NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-			    " npi_rxdma_misc_discard_stat_get"
-			    " Counter overflow for channel %d ",
-			    " ..... clearing \n",
-			    rdc));
+		    " npi_rxdma_misc_discard_stat_get"
+		    " Counter overflow for channel %d ",
+		    " ..... clearing \n",
+		    rdc));
 		cnt->bits.ldw.oflow = 0;
 		RXDMA_REG_WRITE64(handle, RXMISC_DISCARD_REG, rdc, cnt->value);
 		cnt->bits.ldw.oflow = 1;
@@ -968,19 +968,19 @@ npi_rxdma_misc_discard_oflow_clear(npi_handle_t handle, uint8_t rdc)
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " npi_rxdma_misc_discard_oflow_clear"
-			    " Illegal RDC Number %d \n",
-			    rdc));
+		    " npi_rxdma_misc_discard_oflow_clear"
+		    " Illegal RDC Number %d \n",
+		    rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 
 	RXDMA_REG_READ64(handle, RXMISC_DISCARD_REG, rdc, &cnt.value);
 	if (cnt.bits.ldw.oflow) {
 		NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-			    " npi_rxdma_misc_discard_oflow_clear"
-			    " Counter overflow for channel %d ",
-			    " ..... clearing \n",
-			    rdc));
+		    " npi_rxdma_misc_discard_oflow_clear"
+		    " Counter overflow for channel %d ",
+		    " ..... clearing \n",
+		    rdc));
 		cnt.bits.ldw.oflow = 0;
 		RXDMA_REG_WRITE64(handle, RXMISC_DISCARD_REG, rdc, cnt.value);
 	}
@@ -1021,16 +1021,16 @@ npi_rxdma_ring_perr_stat_get(npi_handle_t handle,
 	clr.value = pre_log->value;
 	if (pre_log->bits.ldw.err) {
 		NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-			    " npi_rxdma_ring_perr_stat_get"
-			    " PRE ERR Bit set ..... clearing \n"));
+		    " npi_rxdma_ring_perr_stat_get"
+		    " PRE ERR Bit set ..... clearing \n"));
 		clr.bits.ldw.err = 0;
 		clr_bits++;
 	}
 
 	if (pre_log->bits.ldw.merr) {
 		NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-			    " npi_rxdma_ring_perr_stat_get"
-			    " PRE MERR Bit set ..... clearing \n"));
+		    " npi_rxdma_ring_perr_stat_get"
+		    " PRE MERR Bit set ..... clearing \n"));
 		clr.bits.ldw.merr = 0;
 		clr_bits++;
 	}
@@ -1043,16 +1043,16 @@ npi_rxdma_ring_perr_stat_get(npi_handle_t handle,
 	clr.value = sha_log->value;
 	if (sha_log->bits.ldw.err) {
 		NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-			    " npi_rxdma_ring_perr_stat_get"
-			    " SHA ERR Bit set ..... clearing \n"));
+		    " npi_rxdma_ring_perr_stat_get"
+		    " SHA ERR Bit set ..... clearing \n"));
 		clr.bits.ldw.err = 0;
 		clr_bits++;
 	}
 
 	if (sha_log->bits.ldw.merr) {
 		NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-			    " npi_rxdma_ring_perr_stat_get"
-			    " SHA MERR Bit set ..... clearing \n"));
+		    " npi_rxdma_ring_perr_stat_get"
+		    " SHA MERR Bit set ..... clearing \n"));
 		clr.bits.ldw.merr = 0;
 		clr_bits++;
 	}
@@ -1087,16 +1087,16 @@ npi_rxdma_ring_perr_stat_clear(npi_handle_t handle)
 
 	if (clr.bits.ldw.err) {
 		NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-			    " npi_rxdma_ring_perr_stat_get"
-			    " PRE ERR Bit set ..... clearing \n"));
+		    " npi_rxdma_ring_perr_stat_get"
+		    " PRE ERR Bit set ..... clearing \n"));
 		clr.bits.ldw.err = 0;
 		clr_bits++;
 	}
 
 	if (clr.bits.ldw.merr) {
 		NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-			    " npi_rxdma_ring_perr_stat_get"
-			    " PRE MERR Bit set ..... clearing \n"));
+		    " npi_rxdma_ring_perr_stat_get"
+		    " PRE MERR Bit set ..... clearing \n"));
 		clr.bits.ldw.merr = 0;
 		clr_bits++;
 	}
@@ -1109,16 +1109,16 @@ npi_rxdma_ring_perr_stat_clear(npi_handle_t handle)
 	NXGE_REG_RD64(handle, sha_offset, &clr.value);
 	if (clr.bits.ldw.err) {
 		NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-			    " npi_rxdma_ring_perr_stat_get"
-			    " SHA ERR Bit set ..... clearing \n"));
+		    " npi_rxdma_ring_perr_stat_get"
+		    " SHA ERR Bit set ..... clearing \n"));
 		clr.bits.ldw.err = 0;
 		clr_bits++;
 	}
 
 	if (clr.bits.ldw.merr) {
 		NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-			    " npi_rxdma_ring_perr_stat_get"
-			    " SHA MERR Bit set ..... clearing \n"));
+		    " npi_rxdma_ring_perr_stat_get"
+		    " SHA MERR Bit set ..... clearing \n"));
 		clr.bits.ldw.merr = 0;
 		clr_bits++;
 	}
@@ -1150,11 +1150,11 @@ npi_rxdma_rdmc_memory_io(npi_handle_t handle,
 
 
 	if ((data->location != RDMC_MEM_ADDR_PREFETCH) &&
-		    (data->location != RDMC_MEM_ADDR_SHADOW)) {
+	    (data->location != RDMC_MEM_ADDR_SHADOW)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " npi_rxdma_rdmc_memory_io"
-			    " Illegal memory Type %x \n",
-			    data->location));
+		    " npi_rxdma_rdmc_memory_io"
+		    " Illegal memory Type %x \n",
+		    data->location));
 		return (NPI_RXDMA_OPCODE_INVALID(0));
 	}
 
@@ -1198,9 +1198,9 @@ npi_rxdma_rdmc_memory_io(npi_handle_t handle,
 		data->data[4] = d4.bits.ldw.data;
 	} else {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " npi_rxdma_rdmc_memory_io"
-			    " Illegal opcode %x \n",
-			    op));
+		    " npi_rxdma_rdmc_memory_io"
+		    " Illegal opcode %x \n",
+		    op));
 		return (NPI_RXDMA_OPCODE_INVALID(0));
 
 	}
@@ -1222,9 +1222,9 @@ npi_rxdma_cfg_clock_div_set(npi_handle_t handle, uint16_t count)
 	clk_div.value = 0;
 	clk_div.bits.ldw.cnt = count;
 	NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-		    " npi_rxdma_cfg_clock_div_set: add 0x%llx "
-		    "handle 0x%llx value 0x%llx",
-		    handle.regp, handle.regh, clk_div.value));
+	    " npi_rxdma_cfg_clock_div_set: add 0x%llx "
+	    "handle 0x%llx value 0x%llx",
+	    handle.regp, handle.regh, clk_div.value));
 
 	NXGE_REG_WR64(handle, offset, clk_div.value);
 
@@ -1328,9 +1328,9 @@ npi_rxdma_cfg_port_ddr_weight(npi_handle_t handle,
 	ASSERT(RXDMA_PORT_VALID(portnm));
 	if (!RXDMA_PORT_VALID(portnm)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " rxdma_cfg_port_ddr_weight"
-			    " Illegal Port Number %d \n",
-			    portnm));
+		    " rxdma_cfg_port_ddr_weight"
+		    " Illegal Port Number %d \n",
+		    portnm));
 		return (NPI_RXDMA_PORT_INVALID);
 	}
 
@@ -1352,9 +1352,9 @@ npi_rxdma_port_usage_get(npi_handle_t handle,
 	ASSERT(RXDMA_PORT_VALID(portnm));
 	if (!RXDMA_PORT_VALID(portnm)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " rxdma_port_usage_get"
-			    " Illegal Port Number %d \n",
-			    portnm));
+		    " rxdma_port_usage_get"
+		    " Illegal Port Number %d \n",
+		    portnm));
 		return (NPI_RXDMA_PORT_INVALID);
 	}
 
@@ -1375,9 +1375,9 @@ npi_rxdma_cfg_wred_param(npi_handle_t handle, uint8_t rdc,
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " rxdma_cfg_wred_param"
-			    " Illegal RDC Number %d \n",
-			    rdc));
+		    " rxdma_cfg_wred_param"
+		    " Illegal RDC Number %d \n",
+		    rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 
@@ -1388,14 +1388,14 @@ npi_rxdma_cfg_wred_param(npi_handle_t handle, uint8_t rdc,
 	offset = RDC_RED_RDC_PARA_REG(rdc);
 
 	NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-		" npi_rxdma_cfg_wred_param: "
-		"set RED_PARA: passed value 0x%llx "
-		"win 0x%x thre 0x%x sync 0x%x thre_sync 0x%x",
-		wred_params->value,
-		wred_params->bits.ldw.win,
-		wred_params->bits.ldw.thre,
-		wred_params->bits.ldw.win_syn,
-		wred_params->bits.ldw.thre_sync));
+	    " npi_rxdma_cfg_wred_param: "
+	    "set RED_PARA: passed value 0x%llx "
+	    "win 0x%x thre 0x%x sync 0x%x thre_sync 0x%x",
+	    wred_params->value,
+	    wred_params->bits.ldw.win,
+	    wred_params->bits.ldw.thre,
+	    wred_params->bits.ldw.win_syn,
+	    wred_params->bits.ldw.thre_sync));
 
 	wred_reg.value = 0;
 	wred_reg.bits.ldw.win = wred_params->bits.ldw.win;
@@ -1405,13 +1405,13 @@ npi_rxdma_cfg_wred_param(npi_handle_t handle, uint8_t rdc,
 	NXGE_REG_WR64(handle, offset, wred_reg.value);
 
 	NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-		"set RED_PARA: value 0x%llx "
-		"win 0x%x thre 0x%x sync 0x%x thre_sync 0x%x",
-		wred_reg.value,
-		wred_reg.bits.ldw.win,
-		wred_reg.bits.ldw.thre,
-		wred_reg.bits.ldw.win_syn,
-		wred_reg.bits.ldw.thre_sync));
+	    "set RED_PARA: value 0x%llx "
+	    "win 0x%x thre 0x%x sync 0x%x thre_sync 0x%x",
+	    wred_reg.value,
+	    wred_reg.bits.ldw.win,
+	    wred_reg.bits.ldw.thre,
+	    wred_reg.bits.ldw.win_syn,
+	    wred_reg.bits.ldw.thre_sync));
 
 	return (NPI_SUCCESS);
 }
@@ -1451,9 +1451,9 @@ npi_rxdma_rdc_table_config(
 	ASSERT(RXDMA_TABLE_VALID(table));
 	if (!RXDMA_TABLE_VALID(table)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_rxdma_cfg_rdc_table"
-			" Illegal RDC Table Number %d \n",
-			table));
+		    " npi_rxdma_cfg_rdc_table"
+		    " Illegal RDC Table Number %d \n",
+		    table));
 		return (NPI_RXDMA_TABLE_INVALID);
 	}
 
@@ -1511,9 +1511,9 @@ npi_rxdma_cfg_rdc_table_default_rdc(npi_handle_t handle,
 	ASSERT(RXDMA_TABLE_VALID(table));
 	if (!RXDMA_TABLE_VALID(table)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " npi_rxdma_cfg_rdc_table"
-			    " Illegal RDC table Number %d \n",
-			    rdc));
+		    " npi_rxdma_cfg_rdc_table"
+		    " Illegal RDC table Number %d \n",
+		    rdc));
 		return (NPI_RXDMA_TABLE_INVALID);
 	}
 
@@ -1535,25 +1535,25 @@ npi_rxdma_dump_rdc_table(npi_handle_t handle,
 	ASSERT(RXDMA_TABLE_VALID(table));
 	if (!RXDMA_TABLE_VALID(table)) {
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-			    " npi_rxdma_dump_rdc_table"
-			    " Illegal RDC Rable Number %d \n",
-			    table));
+		    " npi_rxdma_dump_rdc_table"
+		    " Illegal RDC Rable Number %d \n",
+		    table));
 		return (NPI_RXDMA_TABLE_INVALID);
 	}
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-			    "\n Register Dump for RDC Table %d \n",
-			    table));
+	    "\n Register Dump for RDC Table %d \n",
+	    table));
 	offset = REG_RDC_TABLE_OFFSET(table);
 	for (tbl_offset = 0; tbl_offset < NXGE_MAX_RDCS; tbl_offset++) {
 		NXGE_REG_RD64(handle, offset, &value);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-					    " 0x%08llx 0x%08llx \n",
-					    offset, value));
+		    " 0x%08llx 0x%08llx \n",
+		    offset, value));
 		offset += 8;
 	}
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-			    "\n Register Dump for RDC Table %d done\n",
-			    table));
+	    "\n Register Dump for RDC Table %d done\n",
+	    table));
 	return (NPI_SUCCESS);
 
 }
@@ -1566,9 +1566,9 @@ npi_rxdma_rdc_rbr_stat_get(npi_handle_t handle, uint8_t rdc,
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " rxdma_rdc_rbr_stat_get"
-			    " Illegal RDC Number %d \n",
-			    rdc));
+		    " rxdma_rdc_rbr_stat_get"
+		    " Illegal RDC Number %d \n",
+		    rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 
@@ -1599,9 +1599,9 @@ npi_rxdma_rdc_rbr_head_get(npi_handle_t handle,
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " rxdma_rdc_rbr_head_get"
-			    " Illegal RDC Number %d \n",
-			    rdc));
+		    " rxdma_rdc_rbr_head_get"
+		    " Illegal RDC Number %d \n",
+		    rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 	hh_ptr.value = 0;
@@ -1624,18 +1624,18 @@ npi_rxdma_rdc_rcr_qlen_get(npi_handle_t handle, uint8_t rdc,
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " rxdma_rdc_rcr_qlen_get"
-			    " Illegal RDC Number %d \n",
-			    rdc));
+		    " rxdma_rdc_rcr_qlen_get"
+		    " Illegal RDC Number %d \n",
+		    rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 
 	RXDMA_REG_READ64(handle, RCRSTAT_A_REG, rdc, &stats.value);
 	*rcr_qlen =  stats.bits.ldw.qlen;
 	NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-		    " rxdma_rdc_rcr_qlen_get"
-		    " RDC %d qlen %x qlen %x\n",
-		    rdc, *rcr_qlen, stats.bits.ldw.qlen));
+	    " rxdma_rdc_rcr_qlen_get"
+	    " RDC %d qlen %x qlen %x\n",
+	    rdc, *rcr_qlen, stats.bits.ldw.qlen));
 	return (NPI_SUCCESS);
 }
 
@@ -1650,9 +1650,9 @@ npi_rxdma_rdc_rcr_tail_get(npi_handle_t handle,
 	ASSERT(RXDMA_CHANNEL_VALID(rdc));
 	if (!RXDMA_CHANNEL_VALID(rdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " rxdma_rdc_rcr_tail_get"
-				    " Illegal RDC Number %d \n",
-				    rdc));
+		    " rxdma_rdc_rcr_tail_get"
+		    " Illegal RDC Number %d \n",
+		    rdc));
 		return (NPI_RXDMA_RDC_INVALID);
 	}
 	th_ptr.value = 0;
@@ -1662,10 +1662,10 @@ npi_rxdma_rdc_rcr_tail_get(npi_handle_t handle,
 	tail_addr->bits.ldw = tl_ptr.bits.ldw.tlptr_l << 3;
 	tail_addr->bits.hdw = th_ptr.bits.ldw.tlptr_h;
 	NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-			    " rxdma_rdc_rcr_tail_get"
-			    " RDC %d rcr_tail %llx tl %x\n",
-			    rdc, tl_ptr.value,
-			    tl_ptr.bits.ldw.tlptr_l));
+	    " rxdma_rdc_rcr_tail_get"
+	    " RDC %d rcr_tail %llx tl %x\n",
+	    rdc, tl_ptr.value,
+	    tl_ptr.bits.ldw.tlptr_l));
 
 	return (NPI_SUCCESS);
 
@@ -1760,10 +1760,10 @@ npi_rxdma_rdc_rcr_pktread_update(npi_handle_t handle, uint8_t channel,
 	}
 
 	RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel,
-				&cs.value);
+	    &cs.value);
 	cs.bits.ldw.pktread = pkts_read;
 	RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG,
-				    channel, cs.value);
+	    channel, cs.value);
 
 	return (NPI_SUCCESS);
 }
@@ -1792,10 +1792,10 @@ npi_rxdma_rdc_rcr_bufread_update(npi_handle_t handle, uint8_t channel,
 	}
 
 	RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel,
-				&cs.value);
+	    &cs.value);
 	cs.bits.ldw.ptrread = bufs_read;
 	RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG,
-				    channel, cs.value);
+	    channel, cs.value);
 
 	return (NPI_SUCCESS);
 }
@@ -1818,31 +1818,31 @@ npi_rxdma_rdc_rcr_read_update(npi_handle_t handle, uint8_t channel,
 	NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
 	    " npi_rxdma_rdc_rcr_read_update "
 	    " bufs read %d pkt read %d",
-		bufs_read, pkts_read));
+	    bufs_read, pkts_read));
 
 	RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel,
-				&cs.value);
+	    &cs.value);
 
 	NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
-		" npi_rxdma_rdc_rcr_read_update: "
-		" value: 0x%llx bufs read %d pkt read %d",
-		cs.value,
-		cs.bits.ldw.ptrread, cs.bits.ldw.pktread));
+	    " npi_rxdma_rdc_rcr_read_update: "
+	    " value: 0x%llx bufs read %d pkt read %d",
+	    cs.value,
+	    cs.bits.ldw.ptrread, cs.bits.ldw.pktread));
 
 	cs.bits.ldw.pktread = pkts_read;
 	cs.bits.ldw.ptrread = bufs_read;
 
 	RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG,
-				    channel, cs.value);
+	    channel, cs.value);
 
 	RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel,
-				&cs.value);
+	    &cs.value);
 
 	NPI_DEBUG_MSG((handle.function, NPI_RDC_CTL,
 	    " npi_rxdma_rdc_rcr_read_update: read back after update "
 	    " value: 0x%llx bufs read %d pkt read %d",
-		cs.value,
-		cs.bits.ldw.ptrread, cs.bits.ldw.pktread));
+	    cs.value,
+	    cs.bits.ldw.ptrread, cs.bits.ldw.pktread));
 
 	return (NPI_SUCCESS);
 }
@@ -1915,7 +1915,7 @@ npi_status_t
 npi_rxdma_channel_pt_drop_pkt_clear(npi_handle_t handle, uint8_t channel)
 {
 	return (npi_rxdma_channel_control(handle, RXDMA_PT_DROP_PKT_CLEAR,
-			channel));
+	    channel));
 }
 
 /*
@@ -1938,7 +1938,7 @@ npi_status_t
 npi_rxdma_channel_wred_dop_clear(npi_handle_t handle, uint8_t channel)
 {
 	return (npi_rxdma_channel_control(handle, RXDMA_WRED_DROP_CLEAR,
-			channel));
+	    channel));
 }
 
 /*
@@ -1961,7 +1961,7 @@ npi_status_t
 npi_rxdma_channel_rcr_shfull_clear(npi_handle_t handle, uint8_t channel)
 {
 	return (npi_rxdma_channel_control(handle, RXDMA_RCR_SFULL_CLEAR,
-			channel));
+	    channel));
 }
 
 /*
@@ -1984,14 +1984,14 @@ npi_status_t
 npi_rxdma_channel_rcr_full_clear(npi_handle_t handle, uint8_t channel)
 {
 	return (npi_rxdma_channel_control(handle, RXDMA_RCR_FULL_CLEAR,
-			channel));
+	    channel));
 }
 
 npi_status_t
 npi_rxdma_channel_rbr_empty_clear(npi_handle_t handle, uint8_t channel)
 {
 	return (npi_rxdma_channel_control(handle,
-		RXDMA_RBR_EMPTY_CLEAR, channel));
+	    RXDMA_RBR_EMPTY_CLEAR, channel));
 }
 
 npi_status_t
@@ -2044,78 +2044,78 @@ npi_rxdma_channel_control(npi_handle_t handle, rxdma_cs_cntl_t control,
 	switch (control) {
 	case RXDMA_MEX_SET:
 		RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel,
-				&cs.value);
+		    &cs.value);
 		cs.bits.hdw.mex = 1;
 		RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG,
-				channel, cs.value);
+		    channel, cs.value);
 		break;
 
 	case RXDMA_RCRTO_CLEAR:
 		RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel,
-				&cs.value);
+		    &cs.value);
 		cs.bits.hdw.rcrto = 0;
 		RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG, channel,
-				cs.value);
+		    cs.value);
 		break;
 
 	case RXDMA_PT_DROP_PKT_CLEAR:
 		RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel,
-				&cs.value);
+		    &cs.value);
 		cs.bits.hdw.port_drop_pkt = 0;
 		RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG, channel,
-				cs.value);
+		    cs.value);
 		break;
 
 	case RXDMA_WRED_DROP_CLEAR:
 		RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel,
-				&cs.value);
+		    &cs.value);
 		cs.bits.hdw.wred_drop = 0;
 		RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG, channel,
-				cs.value);
+		    cs.value);
 		break;
 
 	case RXDMA_RCR_SFULL_CLEAR:
 		RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel,
-				&cs.value);
+		    &cs.value);
 		cs.bits.hdw.rcr_shadow_full = 0;
 		RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG, channel,
-				cs.value);
+		    cs.value);
 		break;
 
 	case RXDMA_RCR_FULL_CLEAR:
 		RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel,
-				&cs.value);
+		    &cs.value);
 		cs.bits.hdw.rcrfull = 0;
 		RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG, channel,
-				cs.value);
+		    cs.value);
 		break;
 
 	case RXDMA_RBR_PRE_EMPTY_CLEAR:
 		RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel,
-				&cs.value);
+		    &cs.value);
 		cs.bits.hdw.rbr_pre_empty = 0;
 		RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG, channel,
-				cs.value);
+		    cs.value);
 		break;
 
 	case RXDMA_RBR_EMPTY_CLEAR:
 		RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel,
-				&cs.value);
+		    &cs.value);
 		cs.bits.hdw.rbr_empty = 1;
 		RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG, channel,
-				cs.value);
+		    cs.value);
 		break;
 
 	case RXDMA_CS_CLEAR_ALL:
 		cs.value = 0;
 		RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG, channel,
-				cs.value);
+		    cs.value);
 		break;
 
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    "npi_rxdma_channel_control",
-				    "control", control));
+		    "npi_rxdma_channel_control",
+		    "control", control));
 		return (NPI_FAILURE | NPI_RXDMA_OPCODE_INVALID(channel));
 	}
 
@@ -2160,19 +2160,19 @@ npi_rxdma_control_status(npi_handle_t handle, io_op_t op_mode,
 	switch (op_mode) {
 	case OP_GET:
 		RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel,
-				&cs_p->value);
+		    &cs_p->value);
 		break;
 
 	case OP_SET:
 		RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG, channel,
-			cs_p->value);
+		    cs_p->value);
 		break;
 
 	case OP_UPDATE:
 		RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel,
-				&cs.value);
+		    &cs.value);
 		RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG, channel,
-			cs_p->value | cs.value);
+		    cs_p->value | cs.value);
 		break;
 
 	default:
@@ -2222,19 +2222,19 @@ npi_rxdma_event_mask(npi_handle_t handle, io_op_t op_mode,
 	switch (op_mode) {
 	case OP_GET:
 		RXDMA_REG_READ64(handle, RX_DMA_ENT_MSK_REG, channel,
-				&mask_p->value);
+		    &mask_p->value);
 		break;
 
 	case OP_SET:
 		RXDMA_REG_WRITE64(handle, RX_DMA_ENT_MSK_REG, channel,
-				mask_p->value);
+		    mask_p->value);
 		break;
 
 	case OP_UPDATE:
 		RXDMA_REG_READ64(handle, RX_DMA_ENT_MSK_REG, channel,
-				&mask.value);
+		    &mask.value);
 		RXDMA_REG_WRITE64(handle, RX_DMA_ENT_MSK_REG, channel,
-			mask_p->value | mask.value);
+		    mask_p->value | mask.value);
 		break;
 
 	default:

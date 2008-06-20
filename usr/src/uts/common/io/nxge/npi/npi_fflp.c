@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -149,29 +149,29 @@ npi_fflp_dump_regs(npi_handle_t handle)
 
 	num_regs = sizeof (fflp_fzc_offset) / sizeof (uint64_t);
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\nFFLP_FZC Register Dump \n"));
+	    "\nFFLP_FZC Register Dump \n"));
 	for (i = 0; i < num_regs; i++) {
 		REG_PIO_READ64(handle, fflp_fzc_offset[i], &value);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-			" %8llx %s\t %8llx \n",
-			fflp_fzc_offset[i], fflp_fzc_name[i], value));
+		    " %8llx %s\t %8llx \n",
+		    fflp_fzc_offset[i], fflp_fzc_name[i], value));
 
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-					    "\nFFLP Register Dump\n"));
+	    "\nFFLP Register Dump\n"));
 	num_regs = sizeof (fflp_reg_offset) / sizeof (uint64_t);
 
 	for (i = 0; i < num_regs; i++) {
 		REG_PIO_READ64(handle, fflp_reg_offset[i], &value);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-			" %8llx %s\t %8llx \n",
-			fflp_reg_offset[i], fflp_reg_name[i], value));
+		    " %8llx %s\t %8llx \n",
+		    fflp_reg_offset[i], fflp_reg_name[i], value));
 
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-					    "\n FFLP Register Dump done\n"));
+	    "\n FFLP Register Dump done\n"));
 
 	return (NPI_SUCCESS);
 }
@@ -185,16 +185,16 @@ npi_fflp_vlan_tbl_dump(npi_handle_t handle)
 	vlan_id_t start = 0, stop = NXGE_MAX_VLANS;
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\nVlan Table Dump \n"));
+	    "\nVlan Table Dump \n"));
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"VID\t Offset\t Value\n"));
+	    "VID\t Offset\t Value\n"));
 
 	for (vlan_id = start; vlan_id < stop; vlan_id++) {
 		offset = FFLP_VLAN_OFFSET(vlan_id, FFLP_ENET_VLAN_TBL_REG);
 		REG_PIO_READ64(handle, offset, &value);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-			    "%x\t %llx\t %llx\n", vlan_id, offset, value));
+		    "%x\t %llx\t %llx\n", vlan_id, offset, value));
 	}
 
 }
@@ -235,7 +235,7 @@ npi_fflp_tcam_check_completion(npi_handle_t handle, tcam_op_t op_type)
 
 		READ_TCAM_REG_CTL(handle, &tctl.value);
 		while ((try_counter) &&
-				(tctl.bits.ldw.stat != TCAM_CTL_RWC_RWC_STAT)) {
+		    (tctl.bits.ldw.stat != TCAM_CTL_RWC_RWC_STAT)) {
 			try_counter--;
 			NXGE_DELAY(tcam_delay);
 			READ_TCAM_REG_CTL(handle, &tctl.value);
@@ -243,8 +243,8 @@ npi_fflp_tcam_check_completion(npi_handle_t handle, tcam_op_t op_type)
 
 		if (!try_counter) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " TCAM RWC_STAT operation"
-					    " failed to complete \n"));
+			    " TCAM RWC_STAT operation"
+			    " failed to complete \n"));
 			return (NPI_FFLP_TCAM_HW_ERROR);
 		}
 
@@ -255,7 +255,7 @@ npi_fflp_tcam_check_completion(npi_handle_t handle, tcam_op_t op_type)
 		READ_TCAM_REG_CTL(handle, &tctl.value);
 
 		while ((try_counter) &&
-			(tctl.bits.ldw.match != TCAM_CTL_RWC_RWC_MATCH)) {
+		    (tctl.bits.ldw.match != TCAM_CTL_RWC_RWC_MATCH)) {
 			try_counter--;
 			NXGE_DELAY(tcam_delay);
 			READ_TCAM_REG_CTL(handle, &tctl.value);
@@ -263,8 +263,8 @@ npi_fflp_tcam_check_completion(npi_handle_t handle, tcam_op_t op_type)
 
 		if (!try_counter) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " TCAM Match operation"
-				    "failed to find match \n"));
+			    " TCAM Match operation"
+			    "failed to find match \n"));
 			tctl.value = NPI_TCAM_COMP_NO_MATCH;
 		}
 
@@ -369,7 +369,7 @@ npi_fflp_tcam_entry_match(npi_handle_t handle,  tcam_entry_t *tcam_ptr)
 	}
 
 	tctl_stat.value = npi_fflp_tcam_check_completion(handle,
-				TCAM_RWC_MATCH);
+	    TCAM_RWC_MATCH);
 
 	if (tctl_stat.bits.ldw.match == TCAM_CTL_RWC_RWC_MATCH) {
 		return (uint32_t)(tctl_stat.bits.ldw.location);
@@ -466,18 +466,18 @@ npi_fflp_tcam_entry_write(npi_handle_t handle,
 	WRITE_TCAM_REG_KEY3(handle, tcam_ptr->key3);
 
 	NPI_DEBUG_MSG((handle.function, NPI_FFLP_CTL,
-			    " tcam write: location %x\n"
-			    " key:  %llx %llx %llx %llx \n"
-			    " mask: %llx %llx %llx %llx \n",
-			    location, tcam_ptr->key0, tcam_ptr->key1,
-			    tcam_ptr->key2, tcam_ptr->key3,
-			    tcam_ptr->mask0, tcam_ptr->mask1,
-			    tcam_ptr->mask2, tcam_ptr->mask3));
+	    " tcam write: location %x\n"
+	    " key:  %llx %llx %llx %llx \n"
+	    " mask: %llx %llx %llx %llx \n",
+	    location, tcam_ptr->key0, tcam_ptr->key1,
+	    tcam_ptr->key2, tcam_ptr->key3,
+	    tcam_ptr->mask0, tcam_ptr->mask1,
+	    tcam_ptr->mask2, tcam_ptr->mask3));
 	tctl.value = 0;
 	tctl.bits.ldw.location = location;
 	tctl.bits.ldw.rwc = TCAM_CTL_RWC_TCAM_WR;
 	NPI_DEBUG_MSG((handle.function, NPI_FFLP_CTL,
-			    " tcam write: ctl value %llx \n", tctl.value));
+	    " tcam write: ctl value %llx \n", tctl.value));
 	WRITE_TCAM_REG_CTL(handle, tctl.value);
 
 	tcam_stat = npi_fflp_tcam_check_completion(handle, TCAM_RWC_STAT);
@@ -523,8 +523,8 @@ npi_fflp_tcam_asc_ram_entry_write(npi_handle_t handle,
 	tctl.bits.ldw.rwc = TCAM_CTL_RWC_RAM_WR;
 
 	NPI_DEBUG_MSG((handle.function, NPI_FFLP_CTL,
-		    " tcam ascr write: location %x data %llx ctl value %llx \n",
-		    location, ram_data, tctl.value));
+	    " tcam ascr write: location %x data %llx ctl value %llx \n",
+	    location, ram_data, tctl.value));
 	WRITE_TCAM_REG_CTL(handle, tctl.value);
 	tcam_stat = npi_fflp_tcam_check_completion(handle, TCAM_RWC_STAT);
 
@@ -715,9 +715,9 @@ npi_fflp_fcram_entry_read(npi_handle_t handle,  part_id_t partid,
 		case FCRAM_ENTRY_OPTIM:
 			if (location % 8) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				" FCRAM_ENTRY_OOPTIM Read:"
-				" unaligned location %llx \n",
-				location));
+			    " FCRAM_ENTRY_OOPTIM Read:"
+			    " unaligned location %llx \n",
+			    location));
 			/* need to be 8 byte alligned */
 				return (NPI_FFLP_FCRAM_LOC_INVALID);
 			}
@@ -728,9 +728,9 @@ npi_fflp_fcram_entry_read(npi_handle_t handle,  part_id_t partid,
 			if (location % 32) {
 					/* need to be 32 byte alligned */
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					" FCRAM_ENTRY_EX_IP4 READ:"
-					" unaligned location %llx \n",
-					location));
+			    " FCRAM_ENTRY_EX_IP4 READ:"
+			    " unaligned location %llx \n",
+			    location));
 				return (NPI_FFLP_FCRAM_LOC_INVALID);
 			}
 			num_subareas = 4;
@@ -741,9 +741,9 @@ npi_fflp_fcram_entry_read(npi_handle_t handle,  part_id_t partid,
 			if (location % 64) {
 					/* need to be 64 byte alligned */
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				" FCRAM_ENTRY_EX_IP6 READ:"
-				" unaligned location %llx \n",
-				location));
+			    " FCRAM_ENTRY_EX_IP6 READ:"
+			    " unaligned location %llx \n",
+			    location));
 
 				return (NPI_FFLP_FCRAM_LOC_INVALID);
 	}
@@ -753,9 +753,9 @@ npi_fflp_fcram_entry_read(npi_handle_t handle,  part_id_t partid,
 			break;
 		default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" fcram_entry_read:"
-			" unknown format param location %llx\n",
-			location));
+		    " fcram_entry_read:"
+		    " unknown format param location %llx\n",
+		    location));
 		return (NPI_FFLP_SW_PARAM_ERROR);
 	}
 
@@ -763,9 +763,9 @@ npi_fflp_fcram_entry_read(npi_handle_t handle,  part_id_t partid,
 	addr.bits.ldw.autoinc = autoinc;
 	addr.bits.ldw.addr = location;
 	addr_reg = GET_HASHTBL_PART_OFFSET(handle, partid,
-			FFLP_HASH_TBL_ADDR_REG);
+	    FFLP_HASH_TBL_ADDR_REG);
 	data_reg = GET_HASHTBL_PART_OFFSET(handle, partid,
-			FFLP_HASH_TBL_DATA_REG);
+	    FFLP_HASH_TBL_DATA_REG);
 /* write to addr reg */
 	REG_PIO_WRITE64(handle, addr_reg, addr.value);
 /* read data from the data register */
@@ -801,9 +801,9 @@ npi_fflp_fcram_entry_invalidate(npi_handle_t handle, part_id_t partid,
 
 	if (location % 8) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" FCRAM_ENTRY_Invalidate:"
-			" unaligned location %llx \n",
-			location));
+		    " FCRAM_ENTRY_Invalidate:"
+		    " unaligned location %llx \n",
+		    location));
 			/* need to be 8 byte aligned */
 		return (NPI_FFLP_FCRAM_LOC_INVALID);
 	}
@@ -811,9 +811,9 @@ npi_fflp_fcram_entry_invalidate(npi_handle_t handle, part_id_t partid,
 	addr.value = 0;
 	addr.bits.ldw.addr = location;
 	addr_reg = GET_HASHTBL_PART_OFFSET(handle, partid,
-			FFLP_HASH_TBL_ADDR_REG);
+	    FFLP_HASH_TBL_ADDR_REG);
 	data_reg = GET_HASHTBL_PART_OFFSET(handle, partid,
-			FFLP_HASH_TBL_DATA_REG);
+	    FFLP_HASH_TBL_DATA_REG);
 
 /* write to addr reg */
 	REG_PIO_WRITE64(handle, addr_reg, addr.value);
@@ -865,9 +865,9 @@ npi_fflp_fcram_subarea_write(npi_handle_t handle, part_id_t partid,
 
 	if (location % 8) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" fcram_subarea_write:"
-			" unaligned location %llx \n",
-			location));
+		    " fcram_subarea_write:"
+		    " unaligned location %llx \n",
+		    location));
 			/* need to be 8 byte alligned */
 		return (NPI_FFLP_FCRAM_LOC_INVALID);
 	}
@@ -875,9 +875,9 @@ npi_fflp_fcram_subarea_write(npi_handle_t handle, part_id_t partid,
 	addr.value = 0;
 	addr.bits.ldw.addr = location;
 	addr_reg = GET_HASHTBL_PART_OFFSET(handle, partid,
-			FFLP_HASH_TBL_ADDR_REG);
+	    FFLP_HASH_TBL_ADDR_REG);
 	data_reg = GET_HASHTBL_PART_OFFSET(handle, partid,
-			FFLP_HASH_TBL_DATA_REG);
+	    FFLP_HASH_TBL_DATA_REG);
 
 /* write to addr reg */
 	REG_PIO_WRITE64(handle, addr_reg, addr.value);
@@ -1269,14 +1269,14 @@ npi_fflp_fcram_get_pio_err_log(npi_handle_t handle, part_id_t partid,
 	ASSERT(FCRAM_PARTITION_VALID(partid));
 	if (!FCRAM_PARTITION_VALID(partid)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" fcram_get_pio_err_log:"
-			" Invalid Partition %d \n",
-			partid));
+		    " fcram_get_pio_err_log:"
+		    " Invalid Partition %d \n",
+		    partid));
 		return (NPI_FFLP_FCRAM_PART_INVALID);
 	}
 
 	offset = GET_HASHTBL_PART_OFFSET_NVIR(partid,
-			FFLP_HASH_TBL_DATA_LOG_REG);
+	    FFLP_HASH_TBL_DATA_LOG_REG);
 
 	REG_PIO_READ64(handle, offset, &err_log.value);
 
@@ -1319,15 +1319,15 @@ npi_fflp_fcram_clr_pio_err_log(npi_handle_t handle, part_id_t partid)
 	ASSERT(FCRAM_PARTITION_VALID(partid));
 	if (!FCRAM_PARTITION_VALID(partid)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" fcram_clr_pio_err_log:"
-			" Invalid Partition %d \n",
-			partid));
+		    " fcram_clr_pio_err_log:"
+		    " Invalid Partition %d \n",
+		    partid));
 
 		return (NPI_FFLP_FCRAM_PART_INVALID);
 	}
 
 	offset = GET_HASHTBL_PART_OFFSET_NVIR(partid,
-			FFLP_HASH_TBL_DATA_LOG_REG);
+	    FFLP_HASH_TBL_DATA_LOG_REG);
 
 	err_log.value = 0;
 	REG_PIO_WRITE64(handle, offset, err_log.value);
@@ -1523,27 +1523,27 @@ npi_fflp_cfg_enet_vlan_table_assoc(npi_handle_t handle, uint8_t mac_portn,
 	ASSERT(FFLP_VLAN_VALID(vlan_id));
 	if (!FFLP_VLAN_VALID(vlan_id)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" fflp_cfg_enet_vlan_table:"
-			" Invalid vlan ID %d \n",
-			vlan_id));
+		    " fflp_cfg_enet_vlan_table:"
+		    " Invalid vlan ID %d \n",
+		    vlan_id));
 		return (NPI_FFLP_VLAN_INVALID);
 	}
 
 	ASSERT(FFLP_PORT_VALID(mac_portn));
 	if (!FFLP_PORT_VALID(mac_portn)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" fflp_cfg_enet_vlan_table:"
-			" Invalid port num %d \n",
-			mac_portn));
+		    " fflp_cfg_enet_vlan_table:"
+		    " Invalid port num %d \n",
+		    mac_portn));
 		return (NPI_FFLP_PORT_INVALID);
 	}
 
 	ASSERT(FFLP_RDC_TABLE_VALID(rdc_table));
 	if (!FFLP_RDC_TABLE_VALID(rdc_table)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" fflp_cfg_enet_vlan_table:"
-			" Invalid RDC Table %d \n",
-			rdc_table));
+		    " fflp_cfg_enet_vlan_table:"
+		    " Invalid RDC Table %d \n",
+		    rdc_table));
 		return (NPI_FFLP_RDC_TABLE_INVALID);
 	}
 
@@ -1559,8 +1559,8 @@ npi_fflp_cfg_enet_vlan_table_assoc(npi_handle_t handle, uint8_t mac_portn,
 				cfg.bits.ldw.vpr0 = BIT_DISABLE;
 				/* set the parity bits */
 			parity_bit = vlan_parity[cfg.bits.ldw.vlanrdctbln0] +
-				vlan_parity[cfg.bits.ldw.vlanrdctbln1] +
-				cfg.bits.ldw.vpr0 + cfg.bits.ldw.vpr1;
+			    vlan_parity[cfg.bits.ldw.vlanrdctbln1] +
+			    cfg.bits.ldw.vpr0 + cfg.bits.ldw.vpr1;
 			cfg.bits.ldw.parity0 = parity_bit & 0x1;
 			break;
 		case 1:
@@ -1571,8 +1571,8 @@ npi_fflp_cfg_enet_vlan_table_assoc(npi_handle_t handle, uint8_t mac_portn,
 				cfg.bits.ldw.vpr1 = BIT_DISABLE;
 				/* set the parity bits */
 			parity_bit = vlan_parity[cfg.bits.ldw.vlanrdctbln0] +
-				vlan_parity[cfg.bits.ldw.vlanrdctbln1] +
-				cfg.bits.ldw.vpr0 + cfg.bits.ldw.vpr1;
+			    vlan_parity[cfg.bits.ldw.vlanrdctbln1] +
+			    cfg.bits.ldw.vpr0 + cfg.bits.ldw.vpr1;
 				cfg.bits.ldw.parity0 = parity_bit & 0x1;
 
 			break;
@@ -1584,8 +1584,8 @@ npi_fflp_cfg_enet_vlan_table_assoc(npi_handle_t handle, uint8_t mac_portn,
 				cfg.bits.ldw.vpr2 = BIT_DISABLE;
 				/* set the parity bits */
 			parity_bit = vlan_parity[cfg.bits.ldw.vlanrdctbln2] +
-				vlan_parity[cfg.bits.ldw.vlanrdctbln3] +
-				cfg.bits.ldw.vpr2 + cfg.bits.ldw.vpr3;
+			    vlan_parity[cfg.bits.ldw.vlanrdctbln3] +
+			    cfg.bits.ldw.vpr2 + cfg.bits.ldw.vpr3;
 			cfg.bits.ldw.parity1 = parity_bit & 0x1;
 
 			break;
@@ -1597,8 +1597,8 @@ npi_fflp_cfg_enet_vlan_table_assoc(npi_handle_t handle, uint8_t mac_portn,
 				cfg.bits.ldw.vpr3 = BIT_DISABLE;
 				/* set the parity bits */
 			parity_bit = vlan_parity[cfg.bits.ldw.vlanrdctbln2] +
-				vlan_parity[cfg.bits.ldw.vlanrdctbln3] +
-				cfg.bits.ldw.vpr2 + cfg.bits.ldw.vpr3;
+			    vlan_parity[cfg.bits.ldw.vlanrdctbln3] +
+			    cfg.bits.ldw.vpr2 + cfg.bits.ldw.vpr3;
 			cfg.bits.ldw.parity1 = parity_bit & 0x1;
 			break;
 		default:
@@ -1638,18 +1638,18 @@ npi_fflp_cfg_enet_vlan_table_set_pri(npi_handle_t handle, uint8_t mac_portn,
 	ASSERT(FFLP_VLAN_VALID(vlan_id));
 	if (!FFLP_VLAN_VALID(vlan_id)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" enet_vlan_table set pri:"
-			" Invalid vlan ID %d \n",
-			vlan_id));
+		    " enet_vlan_table set pri:"
+		    " Invalid vlan ID %d \n",
+		    vlan_id));
 		return (NPI_FFLP_VLAN_INVALID);
 	}
 
 	ASSERT(FFLP_PORT_VALID(mac_portn));
 	if (!FFLP_PORT_VALID(mac_portn)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" enet_vlan_table set pri:"
-			" Invalid port num %d \n",
-			mac_portn));
+		    " enet_vlan_table set pri:"
+		    " Invalid port num %d \n",
+		    mac_portn));
 		return (NPI_FFLP_PORT_INVALID);
 	}
 
@@ -1719,9 +1719,9 @@ npi_fflp_cfg_vlan_table_clear(npi_handle_t handle, vlan_id_t vlan_id)
 
 	if ((vlan_id < start_vlan) || (vlan_id >= NXGE_MAX_VLANS)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" enet_vlan_table clear:"
-			" Invalid vlan ID %d \n",
-			vlan_id));
+		    " enet_vlan_table clear:"
+		    " Invalid vlan ID %d \n",
+		    vlan_id));
 		return (NPI_FFLP_VLAN_INVALID);
 	}
 
@@ -1835,9 +1835,9 @@ npi_fflp_cfg_enet_usr_cls_set(npi_handle_t handle,
 	ASSERT(TCAM_L2_USR_CLASS_VALID(class));
 	if (!TCAM_L2_USR_CLASS_VALID(class)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_fflp_cfg_enet_usr_cls_set:"
-			" Invalid class %d \n",
-			class));
+		    " npi_fflp_cfg_enet_usr_cls_set:"
+		    " Invalid class %d \n",
+		    class));
 		return (NPI_FFLP_TCAM_CLASS_INVALID);
 	}
 	offset = GET_TCAM_CLASS_OFFSET(class);
@@ -1876,9 +1876,9 @@ npi_fflp_cfg_enet_usr_cls_enable(npi_handle_t handle, tcam_class_t class)
 	ASSERT(TCAM_L2_USR_CLASS_VALID(class));
 	if (!TCAM_L2_USR_CLASS_VALID(class)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_fflp_cfg_enet_usr_cls_enable:"
-			" Invalid class %d \n",
-			class));
+		    " npi_fflp_cfg_enet_usr_cls_enable:"
+		    " Invalid class %d \n",
+		    class));
 		return (NPI_FFLP_TCAM_CLASS_INVALID);
 	}
 
@@ -1911,9 +1911,9 @@ npi_fflp_cfg_enet_usr_cls_disable(npi_handle_t handle, tcam_class_t class)
 	ASSERT(TCAM_L2_USR_CLASS_VALID(class));
 	if (!TCAM_L2_USR_CLASS_VALID(class)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_fflp_cfg_enet_usr_cls_disable:"
-			" Invalid class %d \n",
-			class));
+		    " npi_fflp_cfg_enet_usr_cls_disable:"
+		    " Invalid class %d \n",
+		    class));
 		return (NPI_FFLP_TCAM_CLASS_INVALID);
 	}
 
@@ -1954,9 +1954,9 @@ npi_fflp_cfg_ip_usr_cls_set(npi_handle_t handle, tcam_class_t class,
 	ASSERT(TCAM_L3_USR_CLASS_VALID(class));
 	if (!TCAM_L3_USR_CLASS_VALID(class)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_fflp_cfg_ip_usr_cls_set:"
-			" Invalid class %d \n",
-			class));
+		    " npi_fflp_cfg_ip_usr_cls_set:"
+		    " Invalid class %d \n",
+		    class));
 		return (NPI_FFLP_TCAM_CLASS_INVALID);
 	}
 
@@ -1993,9 +1993,9 @@ npi_fflp_cfg_ip_usr_cls_enable(npi_handle_t handle, tcam_class_t class)
 	ASSERT(TCAM_L3_USR_CLASS_VALID(class));
 	if (!TCAM_L3_USR_CLASS_VALID(class)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_fflp_cfg_ip_usr_cls_enable:"
-			" Invalid class %d \n",
-			class));
+		    " npi_fflp_cfg_ip_usr_cls_enable:"
+		    " Invalid class %d \n",
+		    class));
 		return (NPI_FFLP_TCAM_CLASS_INVALID);
 	}
 
@@ -2029,9 +2029,9 @@ npi_fflp_cfg_ip_usr_cls_disable(npi_handle_t handle, tcam_class_t class)
 	ASSERT(TCAM_L3_USR_CLASS_VALID(class));
 	if (!TCAM_L3_USR_CLASS_VALID(class)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_fflp_cfg_ip_usr_cls_disable:"
-			" Invalid class %d \n",
-			class));
+		    " npi_fflp_cfg_ip_usr_cls_disable:"
+		    " Invalid class %d \n",
+		    class));
 		return (NPI_FFLP_TCAM_CLASS_INVALID);
 	}
 
@@ -2073,18 +2073,18 @@ npi_fflp_cfg_ip_cls_tcam_key(npi_handle_t handle,
 	ASSERT(TCAM_L3_CLASS_VALID(l3_class));
 	if (!(TCAM_L3_CLASS_VALID(l3_class))) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_fflp_cfg_ip_cls_tcam_key:"
-			" Invalid class %d \n",
-			l3_class));
+		    " npi_fflp_cfg_ip_cls_tcam_key:"
+		    " Invalid class %d \n",
+		    l3_class));
 		return (NPI_FFLP_TCAM_CLASS_INVALID);
 	}
 
 	if ((cfg->use_ip_daddr) &&
-		(cfg->use_ip_saddr == cfg->use_ip_daddr)) {
+	    (cfg->use_ip_saddr == cfg->use_ip_daddr)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " npi_fflp_cfg_ip_cls_tcam_key:"
-			    " Invalid configuration %x for class %d \n",
-			    *cfg, l3_class));
+		    " npi_fflp_cfg_ip_cls_tcam_key:"
+		    " Invalid configuration %x for class %d \n",
+		    *cfg, l3_class));
 		return (NPI_FFLP_SW_PARAM_ERROR);
 	}
 
@@ -2148,9 +2148,9 @@ npi_fflp_cfg_ip_cls_flow_key(npi_handle_t handle, tcam_class_t l3_class,
 	ASSERT(TCAM_L3_CLASS_VALID(l3_class));
 	if (!(TCAM_L3_CLASS_VALID(l3_class))) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_fflp_cfg_ip_cls_flow_key:"
-			" Invalid class %d \n",
-			l3_class));
+		    " npi_fflp_cfg_ip_cls_flow_key:"
+		    " Invalid class %d \n",
+		    l3_class));
 		return (NPI_FFLP_TCAM_CLASS_INVALID);
 	}
 
@@ -2210,9 +2210,9 @@ npi_fflp_cfg_ip_cls_flow_key_get(npi_handle_t handle,
 	ASSERT(TCAM_L3_CLASS_VALID(l3_class));
 	if (!(TCAM_L3_CLASS_VALID(l3_class))) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_fflp_cfg_ip_cls_flow_key:"
-				    " Invalid class %d \n",
-				    l3_class));
+		    " npi_fflp_cfg_ip_cls_flow_key:"
+		    " Invalid class %d \n",
+		    l3_class));
 		return (NPI_FFLP_TCAM_CLASS_INVALID);
 	}
 
@@ -2273,8 +2273,8 @@ npi_fflp_cfg_ip_cls_flow_key_get(npi_handle_t handle,
 	}
 
 	NPI_DEBUG_MSG((handle.function, NPI_FFLP_CTL,
-			    " npi_fflp_cfg_ip_cls_flow_get %llx \n",
-			    flow_cfg_reg.value));
+	    " npi_fflp_cfg_ip_cls_flow_get %llx \n",
+	    flow_cfg_reg.value));
 
 	return (NPI_SUCCESS);
 
@@ -2290,9 +2290,9 @@ npi_fflp_cfg_ip_cls_tcam_key_get(npi_handle_t handle,
 	ASSERT(TCAM_L3_CLASS_VALID(l3_class));
 	if (!(TCAM_L3_CLASS_VALID(l3_class))) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_fflp_cfg_ip_cls_tcam_key_get:"
-				    " Invalid class %d \n",
-				    l3_class));
+		    " npi_fflp_cfg_ip_cls_tcam_key_get:"
+		    " Invalid class %d \n",
+		    l3_class));
 		return (NPI_FFLP_TCAM_CLASS_INVALID);
 	}
 
@@ -2319,8 +2319,8 @@ npi_fflp_cfg_ip_cls_tcam_key_get(npi_handle_t handle,
 	}
 
 	NPI_DEBUG_MSG((handle.function, NPI_CTL,
-				    " npi_fflp_cfg_ip_cls_tcam_key_get %llx \n",
-				    tcam_cls_cfg.value));
+	    " npi_fflp_cfg_ip_cls_tcam_key_get %llx \n",
+	    tcam_cls_cfg.value));
 	return (NPI_SUCCESS);
 }
 
@@ -2346,9 +2346,9 @@ npi_fflp_cfg_fcram_access(npi_handle_t handle, uint8_t access_ratio)
 
 	if (access_ratio > 0xf) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_fflp_cfg_fcram_access:"
-			" Invalid access ratio %d \n",
-			access_ratio));
+		    " npi_fflp_cfg_fcram_access:"
+		    " Invalid access ratio %d \n",
+		    access_ratio));
 		return (NPI_FFLP_ERROR | NPI_FFLP_SW_PARAM_ERROR);
 	}
 
@@ -2383,9 +2383,9 @@ npi_fflp_cfg_tcam_access(npi_handle_t handle, uint8_t access_ratio)
 
 	if (access_ratio > 0xf) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_fflp_cfg_tcram_access:"
-			" Invalid access ratio %d \n",
-			access_ratio));
+		    " npi_fflp_cfg_tcram_access:"
+		    " Invalid access ratio %d \n",
+		    access_ratio));
 		return (NPI_FFLP_ERROR | NPI_FFLP_SW_PARAM_ERROR);
 	}
 
@@ -2693,7 +2693,7 @@ npi_fflp_fcram_error_clear(npi_handle_t handle, uint8_t partition)
 	offset = FFLP_HASH_TBL_DATA_LOG_REG + partition * 8192;
 
 	REG_PIO_WRITE64(handle, offset,
-			    p_err.value);
+	    p_err.value);
 
 }
 
@@ -2705,7 +2705,7 @@ npi_fflp_fcram_error_log1_get(npi_handle_t handle,
 			    p_hash_lookup_err_log1_t log1)
 {
 	REG_PIO_READ64(handle, HASH_LKUP_ERR_LOG1_REG,
-				    &log1->value);
+	    &log1->value);
 }
 
 /*
@@ -2716,5 +2716,5 @@ npi_fflp_fcram_error_log2_get(npi_handle_t handle,
 		    p_hash_lookup_err_log2_t log2)
 {
 	REG_PIO_READ64(handle, HASH_LKUP_ERR_LOG2_REG,
-			    &log2->value);
+	    &log2->value);
 }

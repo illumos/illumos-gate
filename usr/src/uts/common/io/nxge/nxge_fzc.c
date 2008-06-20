@@ -55,7 +55,7 @@ nxge_test_and_set(p_nxge_t nxgep, uint8_t tas)
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	if ((rs = npi_dev_func_sr_sr_get_set_clear(handle, tas))
-			!= NPI_SUCCESS) {
+	    != NPI_SUCCESS) {
 		return (NXGE_ERROR | rs);
 	}
 
@@ -82,7 +82,7 @@ nxge_set_fzc_multi_part_ctl(p_nxge_t nxgep, boolean_t mpc)
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	if ((rs = npi_fzc_mpc_set(handle, mpc)) != NPI_SUCCESS) {
 		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-			"<== nxge_set_fzc_multi_part_ctl"));
+		    "<== nxge_set_fzc_multi_part_ctl"));
 		return (NXGE_ERROR | rs);
 	}
 
@@ -102,7 +102,7 @@ nxge_get_fzc_multi_part_ctl(p_nxge_t nxgep, boolean_t *mpc_p)
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	if ((rs = npi_fzc_mpc_get(handle, mpc_p)) != NPI_SUCCESS) {
 		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-			"<== nxge_set_fzc_multi_part_ctl"));
+		    "<== nxge_set_fzc_multi_part_ctl"));
 		return (NXGE_ERROR | rs);
 	}
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "<== nxge_get_fzc_multi_part_ctl"));
@@ -171,24 +171,24 @@ nxge_fzc_intr_ldg_num_set(p_nxge_t nxgep)
 
 	for (i = 0; i < nxgep->ldgvp->ldg_intrs; i++, ldgp++) {
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_fzc_intr_ldg_num_set "
-			"<== nxge_f(Neptune): # ldv %d "
-			"in group %d", ldgp->nldvs, ldgp->ldg));
+		    "==> nxge_fzc_intr_ldg_num_set "
+		    "<== nxge_f(Neptune): # ldv %d "
+		    "in group %d", ldgp->nldvs, ldgp->ldg));
 
 		for (j = 0; j < ldgp->nldvs; j++, ldvp++) {
 			rs = npi_fzc_ldg_num_set(handle, ldvp->ldv,
-				ldvp->ldg_assigned);
+			    ldvp->ldg_assigned);
 			if (rs != NPI_SUCCESS) {
 				NXGE_DEBUG_MSG((nxgep, INT_CTL,
-					"<== nxge_fzc_intr_ldg_num_set failed "
-					" rs 0x%x ldv %d ldg %d",
-					rs, ldvp->ldv, ldvp->ldg_assigned));
+				    "<== nxge_fzc_intr_ldg_num_set failed "
+				    " rs 0x%x ldv %d ldg %d",
+				    rs, ldvp->ldv, ldvp->ldg_assigned));
 				return (NXGE_ERROR | rs);
 			}
 			NXGE_DEBUG_MSG((nxgep, INT_CTL,
-				"<== nxge_fzc_intr_ldg_num_set OK "
-				" ldv %d ldg %d",
-				ldvp->ldv, ldvp->ldg_assigned));
+			    "<== nxge_fzc_intr_ldg_num_set OK "
+			    " ldv %d ldg %d",
+			    ldvp->ldv, ldvp->ldg_assigned));
 		}
 	}
 
@@ -228,27 +228,27 @@ nxge_fzc_intr_sid_set(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_fzc_intr_sid_set"));
 	if (nxgep->ldgvp == NULL) {
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"<== nxge_fzc_intr_sid_set: no ldg"));
+		    "<== nxge_fzc_intr_sid_set: no ldg"));
 		return (NXGE_ERROR);
 	}
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	ldgp = nxgep->ldgvp->ldgp;
 	NXGE_DEBUG_MSG((nxgep, INT_CTL,
-		"==> nxge_fzc_intr_sid_set: #int %d", nxgep->ldgvp->ldg_intrs));
+	    "==> nxge_fzc_intr_sid_set: #int %d", nxgep->ldgvp->ldg_intrs));
 	for (i = 0; i < nxgep->ldgvp->ldg_intrs; i++, ldgp++) {
 		sid.ldg = ldgp->ldg;
 		sid.niu = B_FALSE;
 		sid.func = ldgp->func;
 		sid.vector = ldgp->vector;
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_fzc_intr_sid_set(%d): func %d group %d "
-			"vector %d",
-			i, sid.func, sid.ldg, sid.vector));
+		    "==> nxge_fzc_intr_sid_set(%d): func %d group %d "
+		    "vector %d",
+		    i, sid.func, sid.ldg, sid.vector));
 		rs = npi_fzc_sid_set(handle, sid);
 		if (rs != NPI_SUCCESS) {
 			NXGE_DEBUG_MSG((nxgep, INT_CTL,
-				"<== nxge_fzc_intr_sid_set:failed 0x%x",
-				rs));
+			    "<== nxge_fzc_intr_sid_set:failed 0x%x",
+			    rs));
 			return (NXGE_ERROR | rs);
 		}
 	}
@@ -359,9 +359,9 @@ nxge_init_fzc_rdc(p_nxge_t nxgep, uint16_t channel)
 	    (nxgep->nxge_port_rcr_size - RXDMA_RED_LESS_ENTRIES);
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"==> nxge_init_fzc_rxdma_channel_red(thre_sync %d(%x))",
-		red.bits.ldw.thre_sync,
-		red.bits.ldw.thre_sync));
+	    "==> nxge_init_fzc_rxdma_channel_red(thre_sync %d(%x))",
+	    red.bits.ldw.thre_sync,
+	    red.bits.ldw.thre_sync));
 
 	status |= npi_rxdma_cfg_wred_param(handle, channel, &red);
 
@@ -482,20 +482,20 @@ nxge_init_fzc_rdc_pages(
 	uint64_t page_handle;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"==> nxge_init_fzc_txdma_channel_pages"));
+	    "==> nxge_init_fzc_txdma_channel_pages"));
 
 #ifndef	NIU_HV_WORKAROUND
 	if (nxgep->niu_type == N2_NIU) {
 		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-			"<== nxge_init_fzc_rdc_pages: "
-			"N2_NIU: no need to set rxdma logical pages"));
+		    "<== nxge_init_fzc_rdc_pages: "
+		    "N2_NIU: no need to set rxdma logical pages"));
 		return (NXGE_OK);
 	}
 #else
 	if (nxgep->niu_type == N2_NIU) {
 		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-			"<== nxge_init_fzc_rdc_pages: "
-			"N2_NIU: NEED to set rxdma logical pages"));
+		    "<== nxge_init_fzc_rdc_pages: "
+		    "N2_NIU: NEED to set rxdma logical pages"));
 	}
 #endif
 
@@ -537,7 +537,7 @@ nxge_init_fzc_rxdma_channel_pages(p_nxge_t nxgep,
 	npi_status_t		rs = NPI_SUCCESS;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"==> nxge_init_fzc_rxdma_channel_pages"));
+	    "==> nxge_init_fzc_rxdma_channel_pages"));
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	/*
@@ -550,7 +550,7 @@ nxge_init_fzc_rxdma_channel_pages(p_nxge_t nxgep,
 	cfg.mask = rbrp->page_mask_1.value;
 	cfg.reloc = rbrp->page_reloc_1.value;
 	rs = npi_rxdma_cfg_logical_page(handle, channel,
-			(p_dma_log_page_t)&cfg);
+	    (p_dma_log_page_t)&cfg);
 	if (rs != NPI_SUCCESS) {
 		return (NXGE_ERROR | rs);
 	}
@@ -571,14 +571,14 @@ nxge_init_fzc_rxdma_channel_pages(p_nxge_t nxgep,
 
 	/* Initialize the page handle */
 	rs = npi_rxdma_cfg_logical_page_handle(handle, channel,
-			rbrp->page_hdl.bits.ldw.handle);
+	    rbrp->page_hdl.bits.ldw.handle);
 
 	if (rs != NPI_SUCCESS) {
 		return (NXGE_ERROR | rs);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"<== nxge_init_fzc_rxdma_channel_pages"));
+	    "<== nxge_init_fzc_rxdma_channel_pages"));
 
 	return (NXGE_OK);
 }
@@ -602,9 +602,9 @@ nxge_init_fzc_rxdma_channel_red(p_nxge_t nxgep,
 	red.bits.ldw.thre_sync = (rcr_p->comp_size - RXDMA_RED_LESS_ENTRIES);
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"==> nxge_init_fzc_rxdma_channel_red(thre_sync %d(%x))",
-		red.bits.ldw.thre_sync,
-		red.bits.ldw.thre_sync));
+	    "==> nxge_init_fzc_rxdma_channel_red(thre_sync %d(%x))",
+	    red.bits.ldw.thre_sync,
+	    red.bits.ldw.thre_sync));
 
 	rs = npi_rxdma_cfg_wred_param(handle, channel, &red);
 	if (rs != NPI_SUCCESS) {
@@ -612,7 +612,7 @@ nxge_init_fzc_rxdma_channel_red(p_nxge_t nxgep,
 	}
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"<== nxge_init_fzc_rxdma_channel_red"));
+	    "<== nxge_init_fzc_rxdma_channel_red"));
 
 	return (NXGE_OK);
 }
@@ -698,7 +698,7 @@ nxge_init_fzc_tdc(p_nxge_t nxgep, uint16_t channel)
 	 */
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	(void) npi_txc_dma_max_burst_set(
-		handle, channel, TXC_DMA_MAX_BURST_DEFAULT);
+	    handle, channel, TXC_DMA_MAX_BURST_DEFAULT);
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL, "<== nxge_init_fzc_tdc"));
 
@@ -713,7 +713,7 @@ nxge_init_fzc_txdma_channel(p_nxge_t nxgep, uint16_t channel,
 	nxge_status_t	status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"==> nxge_init_fzc_txdma_channel"));
+	    "==> nxge_init_fzc_txdma_channel"));
 
 	if (nxgep->niu_type == N2_NIU) {
 #ifndef	NIU_HV_WORKAROUND
@@ -751,7 +751,7 @@ nxge_init_fzc_txdma_channel(p_nxge_t nxgep, uint16_t channel,
 	(void) nxge_init_fzc_txdma_channel_drr(nxgep, channel, tx_ring_p);
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"<== nxge_init_fzc_txdma_channel"));
+	    "<== nxge_init_fzc_txdma_channel"));
 	return (status);
 }
 
@@ -780,7 +780,7 @@ nxge_init_fzc_rx_common(p_nxge_t nxgep)
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	if (!handle.regp) {
 		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-			"==> nxge_init_fzc_rx_common null ptr"));
+		    "==> nxge_init_fzc_rx_common null ptr"));
 		return (NXGE_ERROR);
 	}
 
@@ -826,7 +826,7 @@ nxge_init_fzc_rx_common(p_nxge_t nxgep)
 	/* Ethernet Timeout Counter (?) */
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"<== nxge_init_fzc_rx_common:status 0x%08x", status));
+	    "<== nxge_init_fzc_rx_common:status 0x%08x", status));
 
 	return (status);
 }
@@ -1014,19 +1014,19 @@ nxge_init_fzc_rxdma_port(p_nxge_t nxgep)
 		hostinfo.bits.w0.mac_pref = p_cfgp->mac_pref;
 		if (p_class_cfgp->mac_host_info[i].flag) {
 			hostinfo.bits.w0.rdc_tbl_num =
-				p_class_cfgp->mac_host_info[i].rdctbl;
+			    p_class_cfgp->mac_host_info[i].rdctbl;
 			hostinfo.bits.w0.mac_pref =
-				p_class_cfgp->mac_host_info[i].mpr_npr;
+			    p_class_cfgp->mac_host_info[i].mpr_npr;
 		}
 
 		rs = npi_mac_hostinfo_entry(handle, OP_SET,
-				nxgep->function_num, i, &hostinfo);
+		    nxgep->function_num, i, &hostinfo);
 		if (rs != NPI_SUCCESS)
 			return (NXGE_ERROR | rs);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"<== nxge_init_fzc_rxdma_port rs 0x%08x", rs));
+	    "<== nxge_init_fzc_rxdma_port rs 0x%08x", rs));
 
 	return (NXGE_OK);
 
@@ -1037,7 +1037,7 @@ nxge_fzc_dmc_def_port_rdc(p_nxge_t nxgep, uint8_t port, uint16_t rdc)
 {
 	npi_status_t rs = NPI_SUCCESS;
 	rs = npi_rxdma_cfg_default_port_rdc(nxgep->npi_reg_handle,
-				    port, rdc);
+	    port, rdc);
 	if (rs & NPI_FAILURE)
 		return (NXGE_ERROR | rs);
 	return (NXGE_OK);
@@ -1081,20 +1081,20 @@ nxge_init_fzc_tdc_pages(
 	log_page_hdl_t page_handle;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"==> nxge_init_fzc_txdma_channel_pages"));
+	    "==> nxge_init_fzc_txdma_channel_pages"));
 
 #ifndef	NIU_HV_WORKAROUND
 	if (nxgep->niu_type == N2_NIU) {
 		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-			"<== nxge_init_fzc_tdc_pages: "
-			"N2_NIU: no need to set txdma logical pages"));
+		    "<== nxge_init_fzc_tdc_pages: "
+		    "N2_NIU: no need to set txdma logical pages"));
 		return (NXGE_OK);
 	}
 #else
 	if (nxgep->niu_type == N2_NIU) {
 		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-			"<== nxge_init_fzc_tdc_pages: "
-			"N2_NIU: NEED to set txdma logical pages"));
+		    "<== nxge_init_fzc_tdc_pages: "
+		    "N2_NIU: NEED to set txdma logical pages"));
 	}
 #endif
 
@@ -1135,20 +1135,20 @@ nxge_init_fzc_txdma_channel_pages(p_nxge_t nxgep, uint16_t channel,
 	npi_status_t		rs = NPI_SUCCESS;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"==> nxge_init_fzc_txdma_channel_pages"));
+	    "==> nxge_init_fzc_txdma_channel_pages"));
 
 #ifndef	NIU_HV_WORKAROUND
 	if (nxgep->niu_type == N2_NIU) {
 		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-			"<== nxge_init_fzc_txdma_channel_pages: "
-			"N2_NIU: no need to set txdma logical pages"));
+		    "<== nxge_init_fzc_txdma_channel_pages: "
+		    "N2_NIU: no need to set txdma logical pages"));
 		return (NXGE_OK);
 	}
 #else
 	if (nxgep->niu_type == N2_NIU) {
 		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-			"<== nxge_init_fzc_txdma_channel_pages: "
-			"N2_NIU: NEED to set txdma logical pages"));
+		    "<== nxge_init_fzc_txdma_channel_pages: "
+		    "N2_NIU: NEED to set txdma logical pages"));
 	}
 #endif
 
@@ -1164,7 +1164,7 @@ nxge_init_fzc_txdma_channel_pages(p_nxge_t nxgep, uint16_t channel,
 	cfg.reloc = tx_ring_p->page_reloc_1.value;
 
 	rs = npi_txdma_log_page_set(handle, channel,
-		(p_dma_log_page_t)&cfg);
+	    (p_dma_log_page_t)&cfg);
 	if (rs != NPI_SUCCESS) {
 		return (NXGE_ERROR | rs);
 	}
@@ -1185,7 +1185,7 @@ nxge_init_fzc_txdma_channel_pages(p_nxge_t nxgep, uint16_t channel,
 
 	/* Initialize the page handle */
 	rs = npi_txdma_log_page_handle_set(handle, channel,
-			&tx_ring_p->page_hdl);
+	    &tx_ring_p->page_hdl);
 
 	if (rs == NPI_SUCCESS) {
 		return (NXGE_OK);
@@ -1204,7 +1204,7 @@ nxge_init_fzc_txdma_channel_drr(p_nxge_t nxgep, uint16_t channel,
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	rs = npi_txc_dma_max_burst_set(handle, channel,
-			tx_ring_p->max_burst.value);
+	    tx_ring_p->max_burst.value);
 	if (rs == NPI_SUCCESS) {
 		return (NXGE_OK);
 	} else {
@@ -1260,7 +1260,7 @@ nxge_init_hv_fzc_txdma_channel_pages(p_nxge_t nxgep, uint16_t channel,
 #endif
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_init_hv_fzc_txdma_channel_pages"));
+	    "==> nxge_init_hv_fzc_txdma_channel_pages"));
 
 	if (tx_ring_p->hv_set) {
 		return (NXGE_OK);
@@ -1270,123 +1270,123 @@ nxge_init_hv_fzc_txdma_channel_pages(p_nxge_t nxgep, uint16_t channel,
 	 * Initialize logical page 1 for data buffers.
 	 */
 	hverr = hv_niu_tx_logical_page_conf((uint64_t)channel,
-			(uint64_t)0,
-			tx_ring_p->hv_tx_buf_base_ioaddr_pp,
-			tx_ring_p->hv_tx_buf_ioaddr_size);
+	    (uint64_t)0,
+	    tx_ring_p->hv_tx_buf_base_ioaddr_pp,
+	    tx_ring_p->hv_tx_buf_ioaddr_size);
 
 	err = (nxge_status_t)nxge_herr2kerr(hverr);
 	if (err != 0) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_init_hv_fzc_txdma_channel_pages: channel %d "
-			"error status 0x%x "
-			"(page 0 data buf) hverr 0x%llx "
-			"ioaddr_pp $%p "
-			"size 0x%llx ",
-			channel,
-			err,
-			hverr,
-			tx_ring_p->hv_tx_buf_base_ioaddr_pp,
-			tx_ring_p->hv_tx_buf_ioaddr_size));
+		    "<== nxge_init_hv_fzc_txdma_channel_pages: channel %d "
+		    "error status 0x%x "
+		    "(page 0 data buf) hverr 0x%llx "
+		    "ioaddr_pp $%p "
+		    "size 0x%llx ",
+		    channel,
+		    err,
+		    hverr,
+		    tx_ring_p->hv_tx_buf_base_ioaddr_pp,
+		    tx_ring_p->hv_tx_buf_ioaddr_size));
 		return (NXGE_ERROR | err);
 	}
 
 #ifdef	DEBUG
 	ra = size = 0;
 	hverr = hv_niu_tx_logical_page_info((uint64_t)channel,
-			(uint64_t)0,
-			&ra,
-			&size);
+	    (uint64_t)0,
+	    &ra,
+	    &size);
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_init_hv_fzc_txdma_channel_pages: channel %d "
-		"ok status 0x%x "
-		"(page 0 data buf) hverr 0x%llx "
-		"set ioaddr_pp $%p "
-		"set size 0x%llx "
-		"get ra ioaddr_pp $%p "
-		"get size 0x%llx ",
-		channel,
-		err,
-		hverr,
-		tx_ring_p->hv_tx_buf_base_ioaddr_pp,
-		tx_ring_p->hv_tx_buf_ioaddr_size,
-		ra,
-		size));
+	    "==> nxge_init_hv_fzc_txdma_channel_pages: channel %d "
+	    "ok status 0x%x "
+	    "(page 0 data buf) hverr 0x%llx "
+	    "set ioaddr_pp $%p "
+	    "set size 0x%llx "
+	    "get ra ioaddr_pp $%p "
+	    "get size 0x%llx ",
+	    channel,
+	    err,
+	    hverr,
+	    tx_ring_p->hv_tx_buf_base_ioaddr_pp,
+	    tx_ring_p->hv_tx_buf_ioaddr_size,
+	    ra,
+	    size));
 #endif
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_init_hv_fzc_txdma_channel_pages: channel %d "
-		"(page 0 data buf) hverr 0x%llx "
-		"ioaddr_pp $%p "
-		"size 0x%llx ",
-		channel,
-		hverr,
-		tx_ring_p->hv_tx_buf_base_ioaddr_pp,
-		tx_ring_p->hv_tx_buf_ioaddr_size));
+	    "==> nxge_init_hv_fzc_txdma_channel_pages: channel %d "
+	    "(page 0 data buf) hverr 0x%llx "
+	    "ioaddr_pp $%p "
+	    "size 0x%llx ",
+	    channel,
+	    hverr,
+	    tx_ring_p->hv_tx_buf_base_ioaddr_pp,
+	    tx_ring_p->hv_tx_buf_ioaddr_size));
 
 	/*
 	 * Initialize logical page 2 for control buffers.
 	 */
 	hverr = hv_niu_tx_logical_page_conf((uint64_t)channel,
-			(uint64_t)1,
-			tx_ring_p->hv_tx_cntl_base_ioaddr_pp,
-			tx_ring_p->hv_tx_cntl_ioaddr_size);
+	    (uint64_t)1,
+	    tx_ring_p->hv_tx_cntl_base_ioaddr_pp,
+	    tx_ring_p->hv_tx_cntl_ioaddr_size);
 
 	err = (nxge_status_t)nxge_herr2kerr(hverr);
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_init_hv_fzc_txdma_channel_pages: channel %d"
-		"ok status 0x%x "
-		"(page 1 cntl buf) hverr 0x%llx "
-		"ioaddr_pp $%p "
-		"size 0x%llx ",
-		channel,
-		err,
-		hverr,
-		tx_ring_p->hv_tx_cntl_base_ioaddr_pp,
-		tx_ring_p->hv_tx_cntl_ioaddr_size));
+	    "==> nxge_init_hv_fzc_txdma_channel_pages: channel %d"
+	    "ok status 0x%x "
+	    "(page 1 cntl buf) hverr 0x%llx "
+	    "ioaddr_pp $%p "
+	    "size 0x%llx ",
+	    channel,
+	    err,
+	    hverr,
+	    tx_ring_p->hv_tx_cntl_base_ioaddr_pp,
+	    tx_ring_p->hv_tx_cntl_ioaddr_size));
 
 	if (err != 0) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_init_hv_fzc_txdma_channel_pages: channel %d"
-			"error status 0x%x "
-			"(page 1 cntl buf) hverr 0x%llx "
-			"ioaddr_pp $%p "
-			"size 0x%llx ",
-			channel,
-			err,
-			hverr,
-			tx_ring_p->hv_tx_cntl_base_ioaddr_pp,
-			tx_ring_p->hv_tx_cntl_ioaddr_size));
+		    "<== nxge_init_hv_fzc_txdma_channel_pages: channel %d"
+		    "error status 0x%x "
+		    "(page 1 cntl buf) hverr 0x%llx "
+		    "ioaddr_pp $%p "
+		    "size 0x%llx ",
+		    channel,
+		    err,
+		    hverr,
+		    tx_ring_p->hv_tx_cntl_base_ioaddr_pp,
+		    tx_ring_p->hv_tx_cntl_ioaddr_size));
 		return (NXGE_ERROR | err);
 	}
 
 #ifdef	DEBUG
 	ra = size = 0;
 	hverr = hv_niu_tx_logical_page_info((uint64_t)channel,
-			(uint64_t)1,
-			&ra,
-			&size);
+	    (uint64_t)1,
+	    &ra,
+	    &size);
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_init_hv_fzc_txdma_channel_pages: channel %d "
-		"(page 1 cntl buf) hverr 0x%llx "
-		"set ioaddr_pp $%p "
-		"set size 0x%llx "
-		"get ra ioaddr_pp $%p "
-		"get size 0x%llx ",
-		channel,
-		hverr,
-		tx_ring_p->hv_tx_cntl_base_ioaddr_pp,
-		tx_ring_p->hv_tx_cntl_ioaddr_size,
-		ra,
-		size));
+	    "==> nxge_init_hv_fzc_txdma_channel_pages: channel %d "
+	    "(page 1 cntl buf) hverr 0x%llx "
+	    "set ioaddr_pp $%p "
+	    "set size 0x%llx "
+	    "get ra ioaddr_pp $%p "
+	    "get size 0x%llx ",
+	    channel,
+	    hverr,
+	    tx_ring_p->hv_tx_cntl_base_ioaddr_pp,
+	    tx_ring_p->hv_tx_cntl_ioaddr_size,
+	    ra,
+	    size));
 #endif
 
 	tx_ring_p->hv_set = B_TRUE;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"<== nxge_init_hv_fzc_txdma_channel_pages"));
+	    "<== nxge_init_hv_fzc_txdma_channel_pages"));
 
 	return (NXGE_OK);
 }
@@ -1403,7 +1403,7 @@ nxge_init_hv_fzc_rxdma_channel_pages(p_nxge_t nxgep,
 #endif
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		"==> nxge_init_hv_fzc_rxdma_channel_pages"));
+	    "==> nxge_init_hv_fzc_rxdma_channel_pages"));
 
 	if (rbrp->hv_set) {
 		return (NXGE_OK);
@@ -1411,22 +1411,22 @@ nxge_init_hv_fzc_rxdma_channel_pages(p_nxge_t nxgep,
 
 	/* Initialize data buffers for page 0 */
 	hverr = hv_niu_rx_logical_page_conf((uint64_t)channel,
-			(uint64_t)0,
-			rbrp->hv_rx_buf_base_ioaddr_pp,
-			rbrp->hv_rx_buf_ioaddr_size);
+	    (uint64_t)0,
+	    rbrp->hv_rx_buf_base_ioaddr_pp,
+	    rbrp->hv_rx_buf_ioaddr_size);
 	err = (nxge_status_t)nxge_herr2kerr(hverr);
 	if (err != 0) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_init_hv_fzc_rxdma_channel_pages: channel %d"
-			"error status 0x%x "
-			"(page 0 data buf) hverr 0x%llx "
-			"ioaddr_pp $%p "
-			"size 0x%llx ",
-			channel,
-			err,
-			hverr,
-			rbrp->hv_rx_buf_base_ioaddr_pp,
-			rbrp->hv_rx_buf_ioaddr_size));
+		    "<== nxge_init_hv_fzc_rxdma_channel_pages: channel %d"
+		    "error status 0x%x "
+		    "(page 0 data buf) hverr 0x%llx "
+		    "ioaddr_pp $%p "
+		    "size 0x%llx ",
+		    channel,
+		    err,
+		    hverr,
+		    rbrp->hv_rx_buf_base_ioaddr_pp,
+		    rbrp->hv_rx_buf_ioaddr_size));
 
 		return (NXGE_ERROR | err);
 	}
@@ -1434,46 +1434,46 @@ nxge_init_hv_fzc_rxdma_channel_pages(p_nxge_t nxgep,
 #ifdef	DEBUG
 	ra = size = 0;
 	(void) hv_niu_rx_logical_page_info((uint64_t)channel,
-			(uint64_t)0,
-			&ra,
-			&size);
+	    (uint64_t)0,
+	    &ra,
+	    &size);
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		"==> nxge_init_hv_fzc_rxdma_channel_pages: channel %d "
-		"ok status 0x%x "
-		"(page 0 data buf) hverr 0x%llx "
-		"set databuf ioaddr_pp $%p "
-		"set databuf size 0x%llx "
-		"get databuf ra ioaddr_pp %p "
-		"get databuf size 0x%llx",
-		channel,
-		err,
-		hverr,
-		rbrp->hv_rx_buf_base_ioaddr_pp,
-		rbrp->hv_rx_buf_ioaddr_size,
-		ra,
-		size));
+	    "==> nxge_init_hv_fzc_rxdma_channel_pages: channel %d "
+	    "ok status 0x%x "
+	    "(page 0 data buf) hverr 0x%llx "
+	    "set databuf ioaddr_pp $%p "
+	    "set databuf size 0x%llx "
+	    "get databuf ra ioaddr_pp %p "
+	    "get databuf size 0x%llx",
+	    channel,
+	    err,
+	    hverr,
+	    rbrp->hv_rx_buf_base_ioaddr_pp,
+	    rbrp->hv_rx_buf_ioaddr_size,
+	    ra,
+	    size));
 #endif
 
 	/* Initialize control buffers for logical page 1.  */
 	hverr = hv_niu_rx_logical_page_conf((uint64_t)channel,
-			(uint64_t)1,
-			rbrp->hv_rx_cntl_base_ioaddr_pp,
-			rbrp->hv_rx_cntl_ioaddr_size);
+	    (uint64_t)1,
+	    rbrp->hv_rx_cntl_base_ioaddr_pp,
+	    rbrp->hv_rx_cntl_ioaddr_size);
 
 	err = (nxge_status_t)nxge_herr2kerr(hverr);
 	if (err != 0) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_init_hv_fzc_rxdma_channel_pages: channel %d"
-			"error status 0x%x "
-			"(page 1 cntl buf) hverr 0x%llx "
-			"ioaddr_pp $%p "
-			"size 0x%llx ",
-			channel,
-			err,
-			hverr,
-			rbrp->hv_rx_buf_base_ioaddr_pp,
-			rbrp->hv_rx_buf_ioaddr_size));
+		    "<== nxge_init_hv_fzc_rxdma_channel_pages: channel %d"
+		    "error status 0x%x "
+		    "(page 1 cntl buf) hverr 0x%llx "
+		    "ioaddr_pp $%p "
+		    "size 0x%llx ",
+		    channel,
+		    err,
+		    hverr,
+		    rbrp->hv_rx_buf_base_ioaddr_pp,
+		    rbrp->hv_rx_buf_ioaddr_size));
 
 		return (NXGE_ERROR | err);
 	}
@@ -1481,32 +1481,32 @@ nxge_init_hv_fzc_rxdma_channel_pages(p_nxge_t nxgep,
 #ifdef	DEBUG
 	ra = size = 0;
 	(void) hv_niu_rx_logical_page_info((uint64_t)channel,
-			(uint64_t)1,
-			&ra,
-			&size);
+	    (uint64_t)1,
+	    &ra,
+	    &size);
 
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		"==> nxge_init_hv_fzc_rxdma_channel_pages: channel %d "
-		"error status 0x%x "
-		"(page 1 cntl buf) hverr 0x%llx "
-		"set cntl ioaddr_pp $%p "
-		"set cntl size 0x%llx "
-		"get cntl ioaddr_pp $%p "
-		"get cntl size 0x%llx ",
-		channel,
-		err,
-		hverr,
-		rbrp->hv_rx_cntl_base_ioaddr_pp,
-		rbrp->hv_rx_cntl_ioaddr_size,
-		ra,
-		size));
+	    "==> nxge_init_hv_fzc_rxdma_channel_pages: channel %d "
+	    "error status 0x%x "
+	    "(page 1 cntl buf) hverr 0x%llx "
+	    "set cntl ioaddr_pp $%p "
+	    "set cntl size 0x%llx "
+	    "get cntl ioaddr_pp $%p "
+	    "get cntl size 0x%llx ",
+	    channel,
+	    err,
+	    hverr,
+	    rbrp->hv_rx_cntl_base_ioaddr_pp,
+	    rbrp->hv_rx_cntl_ioaddr_size,
+	    ra,
+	    size));
 #endif
 
 	rbrp->hv_set = B_FALSE;
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
-		"<== nxge_init_hv_fzc_rxdma_channel_pages"));
+	    "<== nxge_init_hv_fzc_rxdma_channel_pages"));
 
 	return (NXGE_OK);
 }

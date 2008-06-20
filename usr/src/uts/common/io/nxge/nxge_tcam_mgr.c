@@ -178,9 +178,9 @@ nxge_fflp_tcam_init(
 	/* If this is the first time through... */
 	if (tcam_state == 0) {
 		if ((ddi_soft_state_init(&tcam_state,
-			    sizeof (tcam_control_t), 0)) != 0) {
+		    sizeof (tcam_control_t), 0)) != 0) {
 			NXGE_ERROR_MSG((nxge, FFLP_CTL,
-				"failed to init TCAM soft state"));
+			    "failed to init TCAM soft state"));
 			return (NXGE_ERROR);
 		}
 		if (ddi_soft_state_zalloc(tcam_state, nxge->pci_slot)
@@ -191,9 +191,9 @@ nxge_fflp_tcam_init(
 	}
 
 	if (!(tcam = (tcam_control_t *)ddi_get_soft_state(
-		tcam_state, nxge->pci_slot))) {
+	    tcam_state, nxge->pci_slot))) {
 		NXGE_ERROR_MSG((nxge, FFLP_CTL,
-			"ddi_get_soft_state() failed"));
+		    "ddi_get_soft_state() failed"));
 		return (NXGE_ERROR);
 	}
 
@@ -260,14 +260,14 @@ nxge_tcam_key_get(
 	bzero(&cfg, sizeof (tcam_key_cfg_t));
 
 	rs = npi_fflp_cfg_ip_cls_tcam_key_get(
-		nxge->npi_reg_handle, class, &cfg);
+	    nxge->npi_reg_handle, class, &cfg);
 	if (rs & NPI_FFLP_ERROR) {
 		return (-1);
 	}
 
 	NXGE_DEBUG_MSG((nxge, FFLP_CTL,
-		"TCAM tsel bit for class %d set to %d",
-		class, cfg.lookup_enable));
+	    "TCAM tsel bit for class %d set to %d",
+	    class, cfg.lookup_enable));
 
 	return (cfg.lookup_enable);
 }
@@ -1012,7 +1012,7 @@ nxge_en_key_build(
 	tcam_control_t *tcam = (tcam_control_t *)nxge->nxge_hw_p->tcam;
 
 	/* Almost all of the key is a don't care. */
-	(void)memset(mask, 0, sizeof (*mask));
+	(void) memset(mask, 0, sizeof (*mask));
 	mask->cls_code = CLS_CODE_MASK;
 
 	/* The class code. */
@@ -1166,7 +1166,7 @@ nxge_vid_disable(
 	if (status & NPI_FFLP_ERROR) {
 		NXGE_ERROR_MSG((nxge, FFLP_CTL,
 		    " nxge_vid_disable:"
-			" npi_fflp_cfg_enet_vlan_table_assoc(failed)"));
+		    " npi_fflp_cfg_enet_vlan_table_assoc(failed)"));
 		return (EIO);
 	}
 
@@ -1205,8 +1205,8 @@ nxge_altmac_enable(
 	    i < mmac->num_mmac; i++, address++) {
 		if (address->flags & MMAC_SLOT_USED) {
 			if (bcmp(mac->ether_dhost.ether_addr_octet,
-				address->addr,
-				sizeof (address->addr))) {
+			    address->addr,
+			    sizeof (address->addr))) {
 				continue;
 			}
 			/* We found a match. */
@@ -1348,7 +1348,7 @@ nxge_m_classify_remove(
 	NXGE_DEBUG_MSG((nxge, FFLP_CTL,
 	    "==> nxge_m_classify_remove: "
 	    "arg $%p mrh %p handle %p slot %d",
-		arg, mrh, handle, entry->location));
+	    arg, mrh, handle, entry->location));
 
 
 	MUTEX_ENTER(TCAM_LOCK(nxge));

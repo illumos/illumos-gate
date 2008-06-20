@@ -28,7 +28,7 @@
 
 /*
  * Hypervisor calls called by niu leaf driver.
-*/
+ */
 
 #include <sys/asm_linkage.h>
 #include <sys/hypervisor_api.h>
@@ -57,8 +57,8 @@
 #define	N2NIU_VR_GET_RX_MAP	0x14d
 #define	N2NIU_VR_GET_TX_MAP	0x14e
 
-#define N2NIU_VRRX_SET_INO	0x150
-#define N2NIU_VRTX_SET_INO	0x151
+#define	N2NIU_VRRX_SET_INO	0x150
+#define	N2NIU_VRTX_SET_INO	0x151
 
 #define	N2NIU_VRRX_GET_INFO	0x152
 #define	N2NIU_VRTX_GET_INFO	0x153
@@ -68,11 +68,11 @@
 #define	N2NIU_VRTX_LP_SET	0x156
 #define	N2NIU_VRTX_LP_GET	0x157
 
-#define N2NIU_VRRX_PARAM_GET	0x158
-#define N2NIU_VRRX_PARAM_SET	0x159
+#define	N2NIU_VRRX_PARAM_GET	0x158
+#define	N2NIU_VRRX_PARAM_SET	0x159
 
-#define N2NIU_VRTX_PARAM_GET	0x15a
-#define N2NIU_VRTX_PARAM_SET	0x15b
+#define	N2NIU_VRTX_PARAM_GET	0x15a
+#define	N2NIU_VRTX_PARAM_SET	0x15b
 
 #if defined(lint) || defined(__lint)
 
@@ -269,7 +269,7 @@ hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vridx, uint32_t ino)
 
 	/*
 	 * hv_niu_vr_assign(uint64_t vridx, uint64_t ldc_id,
-	 *     uint32_t *cookie)
+	 *	uint32_t *cookie)
 	 */
 	ENTRY(hv_niu_vr_assign)
 	mov	%o2, %g1
@@ -291,7 +291,7 @@ hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vridx, uint32_t ino)
 
 	/*
 	 * hv_niu_vr_getinfo(uint32_t cookie, uint64_t &real_start,
-	 *     uint64_t &size)
+	 *	uint64_t &size)
 	 */
 	ENTRY(hv_niu_vr_getinfo)
 	mov	%o1, %g1
@@ -327,7 +327,7 @@ hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vridx, uint32_t ino)
 
 	/*
 	 * hv_niu_rx_dma_assign(uint32_t cookie, uint64_t chidx,
-	 *     uint64_t *vchidx)
+	 *	uint64_t *vchidx)
 	 */
 	ENTRY(hv_niu_rx_dma_assign)
 	mov	%o2, %g1
@@ -349,7 +349,7 @@ hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vridx, uint32_t ino)
 
 	/*
 	 * hv_niu_tx_dma_assign(uint32_t cookie, uint64_t chidx,
-	 *    uint64_t *vchidx)
+	 *	uint64_t *vchidx)
 	 */
 	ENTRY(hv_niu_tx_dma_assign)
 	mov	%o2, %g1
@@ -371,7 +371,7 @@ hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vridx, uint32_t ino)
 
 	/*
 	 * hv_niu_vrrx_logical_page_conf(uint32_t cookie, uint64_t chidx,
-	 *     uint64_t pgidx, uint64_t raddr, uint64_t size)
+	 *	uint64_t pgidx, uint64_t raddr, uint64_t size)
 	 */
 	ENTRY(hv_niu_vrrx_logical_page_conf)
 	mov	N2NIU_VRRX_LP_SET, %o5
@@ -382,7 +382,7 @@ hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vridx, uint32_t ino)
 
 	/*
 	 * hv_niu_vrrx_logical_page_info(uint32_t cookie, uint64_t chidx,
-	 *     uint64_t pgidx, uint64_t *raddr, uint64_t *size)
+	 *	uint64_t pgidx, uint64_t *raddr, uint64_t *size)
 	 */
 	ENTRY(hv_niu_vrrx_logical_page_info)
 	mov	%o3, %g1
@@ -396,7 +396,7 @@ hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vridx, uint32_t ino)
 
 	/*
 	 * hv_niu_vrtx_logical_page_conf(uint32_t cookie, uint64_t chidx,
-	 *     uint64_t pgidx, uint64_t raddr, uint64_t size)
+	 *	uint64_t pgidx, uint64_t raddr, uint64_t size)
 	 */
 	ENTRY(hv_niu_vrtx_logical_page_conf)
 	mov	N2NIU_VRTX_LP_SET, %o5
@@ -407,7 +407,7 @@ hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vridx, uint32_t ino)
 
 	/*
 	 * hv_niu_vrtx_logical_page_info(uint32_t cookie, uint64_t chidx,
-	 *     uint64_t pgidx, uint64_t *raddr, uint64_t *size)
+	 *	uint64_t pgidx, uint64_t *raddr, uint64_t *size)
 	 */
 	ENTRY(hv_niu_vrtx_logical_page_info)
 	mov	%o3, %g1
@@ -468,8 +468,8 @@ hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vridx, uint32_t ino)
 	SET_SIZE(hv_niu_vrtx_set_ino)
 
 	/*
-	 * hv_niu_vrrx_param_get(uint32_t cookie, uint64_t vridx, uint64_t param,
-	 *	uint64_t *value)
+	 * hv_niu_vrrx_param_get(uint32_t cookie, uint64_t vridx,
+	 *	uint64_t param, uint64_t *value)
 	 *
 	 */
 	ENTRY(hv_niu_vrrx_param_get)
@@ -481,8 +481,8 @@ hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vridx, uint32_t ino)
 	SET_SIZE(hv_niu_vrrx_param_get)
 
 	/*
-	 * hv_niu_vrrx_param_set(uint32_t cookie, uint64_t vridx, uint64_t param,
-	 *	uint64_t value)
+	 * hv_niu_vrrx_param_set(uint32_t cookie, uint64_t vridx,
+	 *	uint64_t param, uint64_t value)
 	 *
 	 */
 	ENTRY(hv_niu_vrrx_param_set)
@@ -493,8 +493,8 @@ hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vridx, uint32_t ino)
 	SET_SIZE(hv_niu_vrrx_param_set)
 
 	/*
-	 * hv_niu_vrtx_param_get(uint32_t cookie, uint64_t vridx, uint64_t param,
-	 *	uint64_t *value)
+	 * hv_niu_vrtx_param_get(uint32_t cookie, uint64_t vridx,
+	 *	uint64_t param, uint64_t *value)
 	 *
 	 */
 	ENTRY(hv_niu_vrtx_param_get)
@@ -506,8 +506,8 @@ hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vridx, uint32_t ino)
 	SET_SIZE(hv_niu_vrtx_param_get)
 
 	/*
-	 * hv_niu_vrtx_param_set(uint32_t cookie, uint64_t vridx, uint64_t param,
-	 *	uint64_t value)
+	 * hv_niu_vrtx_param_set(uint32_t cookie, uint64_t vridx,
+	 *	uint64_t param, uint64_t value)
 	 *
 	 */
 	ENTRY(hv_niu_vrtx_param_set)

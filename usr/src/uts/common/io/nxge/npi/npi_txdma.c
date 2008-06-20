@@ -135,30 +135,30 @@ npi_txdma_dump_tdc_regs(npi_handle_t handle, uint8_t tdc)
 	ASSERT(TXDMA_CHANNEL_VALID(tdc));
 	if (!TXDMA_CHANNEL_VALID(tdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			"npi_txdma_dump_tdc_regs"
-			" Invalid TDC number %d \n",
-			tdc));
+		    "npi_txdma_dump_tdc_regs"
+		    " Invalid TDC number %d \n",
+		    tdc));
 
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(tdc));
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		    "\nTXDMA DMC Register Dump for Channel %d\n",
-			    tdc));
+	    "\nTXDMA DMC Register Dump for Channel %d\n",
+	    tdc));
 
 	num_regs = NUM_TDC_DMC_REGS;
 	for (i = 0; i < num_regs; i++) {
 		TXDMA_REG_READ64(handle, tdc_dmc_offset[i], tdc, &value);
 		offset = NXGE_TXDMA_OFFSET(tdc_dmc_offset[i], handle.is_vraddr,
-				tdc);
+		    tdc);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
-			"%s\t 0x%016llx \n",
-			offset, tdc_dmc_name[i],
-			value));
+		    "%s\t 0x%016llx \n",
+		    offset, tdc_dmc_name[i],
+		    value));
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\n TXDMA Register Dump for Channel %d done\n", tdc));
+	    "\n TXDMA Register Dump for Channel %d done\n", tdc));
 
 	return (NPI_SUCCESS);
 }
@@ -184,7 +184,7 @@ npi_txdma_dump_fzc_regs(npi_handle_t handle)
 	int num_regs, i;
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\nFZC_DMC Common Register Dump\n"));
+	    "\nFZC_DMC Common Register Dump\n"));
 
 	num_regs = NUM_TX_FZC_REGS;
 	for (i = 0; i < num_regs; i++) {
@@ -194,12 +194,12 @@ npi_txdma_dump_fzc_regs(npi_handle_t handle)
 		NXGE_REG_RD64(handle, tx_fzc_offset[i], &value);
 #endif
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
-			"%s\t 0x%08llx \n",
-			tx_fzc_offset[i],
-			tx_fzc_name[i], value));
+		    "%s\t 0x%08llx \n",
+		    tx_fzc_offset[i],
+		    tx_fzc_name[i], value));
 	}
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\n TXDMA FZC_DMC Register Dump Done \n"));
+	    "\n TXDMA FZC_DMC Register Dump Done \n"));
 
 	return (NPI_SUCCESS);
 }
@@ -213,15 +213,15 @@ npi_txdma_tdc_regs_zero(npi_handle_t handle, uint8_t tdc)
 	ASSERT(TXDMA_CHANNEL_VALID(tdc));
 	if (!TXDMA_CHANNEL_VALID(tdc)) {
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-			"npi_txdma_tdc_regs_zero"
-			" InvaliInvalid TDC number %d \n",
-			tdc));
+		    "npi_txdma_tdc_regs_zero"
+		    " InvaliInvalid TDC number %d \n",
+		    tdc));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(tdc));
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		    "\nTXDMA DMC Register (zero) for Channel %d\n",
-			    tdc));
+	    "\nTXDMA DMC Register (zero) for Channel %d\n",
+	    tdc));
 
 	num_regs = NUM_TDC_DMC_REGS;
 	value = 0;
@@ -230,11 +230,11 @@ npi_txdma_tdc_regs_zero(npi_handle_t handle, uint8_t tdc)
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\nTXDMA FZC_DMC Register clear for Channel %d\n",
-		tdc));
+	    "\nTXDMA FZC_DMC Register clear for Channel %d\n",
+	    tdc));
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\n TXDMA Register Clear to 0s for Channel %d done\n", tdc));
+	    "\n TXDMA Register Clear to 0s for Channel %d done\n", tdc));
 
 	return (NPI_SUCCESS);
 }
@@ -303,11 +303,11 @@ npi_txdma_log_page_set(npi_handle_t handle, uint8_t channel,
 	dma_log_page_t		cfg;
 
 	DMA_LOG_PAGE_FN_VALIDATE(channel, cfgp->page_num, cfgp->func_num,
-		status);
+	    status);
 	if (status) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_log_page_set"
-				    " npi_status <0x%x>", status));
+		    " npi_txdma_log_page_set"
+		    " npi_status <0x%x>", status));
 		return (status);
 	}
 
@@ -315,8 +315,8 @@ npi_txdma_log_page_set(npi_handle_t handle, uint8_t channel,
 	TX_LOG_REG_READ64(handle, TX_LOG_PAGE_VLD_REG, channel, &val);
 
 	NPI_DEBUG_MSG((handle.function, NPI_TDC_CTL,
-			    "\n==> npi_txdma_log_page_set: WRITE 0 and "
-			    " READ back 0x%llx\n ", val));
+	    "\n==> npi_txdma_log_page_set: WRITE 0 and "
+	    " READ back 0x%llx\n ", val));
 
 	vld.value = 0;
 	TX_LOG_REG_READ64(handle, TX_LOG_PAGE_VLD_REG, channel, &val);
@@ -329,29 +329,29 @@ npi_txdma_log_page_set(npi_handle_t handle, uint8_t channel,
 
 	if (!cfgp->page_num) {
 		TX_LOG_REG_WRITE64(handle, TX_LOG_PAGE_MASK1_REG,
-			channel, (cfgp->mask & DMA_LOG_PAGE_MASK_MASK));
+		    channel, (cfgp->mask & DMA_LOG_PAGE_MASK_MASK));
 		TX_LOG_REG_WRITE64(handle, TX_LOG_PAGE_VAL1_REG,
-			channel, (cfgp->value & DMA_LOG_PAGE_VALUE_MASK));
+		    channel, (cfgp->value & DMA_LOG_PAGE_VALUE_MASK));
 		TX_LOG_REG_WRITE64(handle, TX_LOG_PAGE_RELO1_REG,
-			channel, (cfgp->reloc & DMA_LOG_PAGE_RELO_MASK));
+		    channel, (cfgp->reloc & DMA_LOG_PAGE_RELO_MASK));
 	} else {
 		TX_LOG_REG_WRITE64(handle, TX_LOG_PAGE_MASK2_REG,
-			channel, (cfgp->mask & DMA_LOG_PAGE_MASK_MASK));
+		    channel, (cfgp->mask & DMA_LOG_PAGE_MASK_MASK));
 		TX_LOG_REG_WRITE64(handle, TX_LOG_PAGE_VAL2_REG,
-			channel, (cfgp->value & DMA_LOG_PAGE_VALUE_MASK));
+		    channel, (cfgp->value & DMA_LOG_PAGE_VALUE_MASK));
 		TX_LOG_REG_WRITE64(handle, TX_LOG_PAGE_RELO2_REG,
-			channel, (cfgp->reloc & DMA_LOG_PAGE_RELO_MASK));
+		    channel, (cfgp->reloc & DMA_LOG_PAGE_RELO_MASK));
 	}
 
 	TX_LOG_REG_WRITE64(handle, TX_LOG_PAGE_VLD_REG, channel,
-		vld.value | (cfgp->valid << cfgp->page_num));
+	    vld.value | (cfgp->valid << cfgp->page_num));
 
 	NPI_DEBUG_MSG((handle.function, NPI_REG_CTL,
-				    "\n==> npi_txdma_log_page_set: vld value "
-				    " 0x%llx function %d page_valid01 0x%x\n",
-				    vld.value,
-				    vld.bits.ldw.func,
-		(cfgp->valid << cfgp->page_num)));
+	    "\n==> npi_txdma_log_page_set: vld value "
+	    " 0x%llx function %d page_valid01 0x%x\n",
+	    vld.value,
+	    vld.bits.ldw.func,
+	    (cfgp->valid << cfgp->page_num)));
 
 
 	cfg.page_num = 0;
@@ -397,8 +397,8 @@ npi_txdma_log_page_get(npi_handle_t handle, uint8_t channel,
 	DMA_LOG_PAGE_VALIDATE(channel, cfgp->page_num, status);
 	if (status) {
 		NPI_ERROR_MSG((handle.function, NPI_REG_CTL,
-					    " npi_txdma_log_page_get"
-					    " npi_status <0x%x>", status));
+		    " npi_txdma_log_page_get"
+		    " npi_status <0x%x>", status));
 		return (status);
 	}
 
@@ -407,9 +407,9 @@ npi_txdma_log_page_get(npi_handle_t handle, uint8_t channel,
 	TX_LOG_REG_READ64(handle, TX_LOG_PAGE_VLD_REG, channel, &val);
 
 	NPI_DEBUG_MSG((handle.function, NPI_TDC_CTL,
-				    "\n==> npi_txdma_log_page_get: read value "
-				    " function %d  value 0x%llx\n",
-				    cfgp->func_num, val));
+	    "\n==> npi_txdma_log_page_get: read value "
+	    " function %d  value 0x%llx\n",
+	    cfgp->func_num, val));
 
 	vld.value |= val;
 	cfgp->func_num = vld.bits.ldw.func;
@@ -465,14 +465,14 @@ npi_txdma_log_page_handle_set(npi_handle_t handle, uint8_t channel,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_log_page_handle_set"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_log_page_handle_set"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
 	TX_LOG_REG_WRITE64(handle, TX_LOG_PAGE_HDL_REG,
-		channel, hdl_p->value);
+	    channel, hdl_p->value);
 
 	return (status);
 }
@@ -515,9 +515,9 @@ npi_txdma_log_page_config(npi_handle_t handle, io_op_t op_mode,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_log_page_config"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_log_page_config"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
@@ -526,15 +526,15 @@ npi_txdma_log_page_config(npi_handle_t handle, io_op_t op_mode,
 		switch (type) {
 		case TXDMA_LOG_PAGE_ALL:
 			return (npi_txdma_log_page_get(handle, channel,
-					cfgp));
+			    cfgp));
 		case TXDMA_LOG_PAGE_MASK:
 			if (!cfgp->page_num) {
 				TX_LOG_REG_READ64(handle, TX_LOG_PAGE_MASK1_REG,
-						channel, &val);
+				    channel, &val);
 				cfgp->mask = val & DMA_LOG_PAGE_MASK_MASK;
 			} else {
 				TX_LOG_REG_READ64(handle, TX_LOG_PAGE_MASK2_REG,
-						channel, &val);
+				    channel, &val);
 				cfgp->mask = val & DMA_LOG_PAGE_MASK_MASK;
 			}
 			break;
@@ -542,11 +542,11 @@ npi_txdma_log_page_config(npi_handle_t handle, io_op_t op_mode,
 		case TXDMA_LOG_PAGE_VALUE:
 			if (!cfgp->page_num) {
 				TX_LOG_REG_READ64(handle, TX_LOG_PAGE_VAL1_REG,
-						channel, &val);
+				    channel, &val);
 				cfgp->value = val & DMA_LOG_PAGE_VALUE_MASK;
 			} else {
 				TX_LOG_REG_READ64(handle, TX_LOG_PAGE_VAL2_REG,
-						channel, &val);
+				    channel, &val);
 				cfgp->value = val & DMA_LOG_PAGE_VALUE_MASK;
 			}
 			break;
@@ -554,22 +554,22 @@ npi_txdma_log_page_config(npi_handle_t handle, io_op_t op_mode,
 		case TXDMA_LOG_PAGE_RELOC:
 			if (!cfgp->page_num) {
 				TX_LOG_REG_READ64(handle, TX_LOG_PAGE_RELO1_REG,
-						channel, &val);
+				    channel, &val);
 				cfgp->reloc = val & DMA_LOG_PAGE_RELO_MASK;
 			} else {
 				TX_LOG_REG_READ64(handle, TX_LOG_PAGE_VAL2_REG,
-						channel, &val);
+				    channel, &val);
 				cfgp->reloc = val & DMA_LOG_PAGE_RELO_MASK;
 			}
 			break;
 
 		default:
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_txdma_log_page_config"
-					    " Invalid Input: pageconfig <0x%x>",
-					    type));
+			    " npi_txdma_log_page_config"
+			    " Invalid Input: pageconfig <0x%x>",
+			    type));
 			return (NPI_FAILURE |
-				NPI_TXDMA_OPCODE_INVALID(channel));
+			    NPI_TXDMA_OPCODE_INVALID(channel));
 		}
 
 		break;
@@ -584,58 +584,58 @@ npi_txdma_log_page_config(npi_handle_t handle, io_op_t op_mode,
 		switch (type) {
 		case TXDMA_LOG_PAGE_ALL:
 			return (npi_txdma_log_page_set(handle, channel,
-					cfgp));
+			    cfgp));
 		case TXDMA_LOG_PAGE_MASK:
 			if (!cfgp->page_num) {
 				TX_LOG_REG_WRITE64(handle,
-				TX_LOG_PAGE_MASK1_REG, channel,
-				(cfgp->mask & DMA_LOG_PAGE_MASK_MASK));
+				    TX_LOG_PAGE_MASK1_REG, channel,
+				    (cfgp->mask & DMA_LOG_PAGE_MASK_MASK));
 			} else {
 				TX_LOG_REG_WRITE64(handle,
-				TX_LOG_PAGE_MASK2_REG,
-				channel, (cfgp->mask & DMA_LOG_PAGE_MASK_MASK));
+				    TX_LOG_PAGE_MASK2_REG, channel,
+				    (cfgp->mask & DMA_LOG_PAGE_MASK_MASK));
 			}
 			break;
 
 		case TXDMA_LOG_PAGE_VALUE:
 			if (!cfgp->page_num) {
 				TX_LOG_REG_WRITE64(handle,
-				TX_LOG_PAGE_VAL1_REG, channel,
-				(cfgp->value & DMA_LOG_PAGE_VALUE_MASK));
+				    TX_LOG_PAGE_VAL1_REG, channel,
+				    (cfgp->value & DMA_LOG_PAGE_VALUE_MASK));
 			} else {
 				TX_LOG_REG_WRITE64(handle,
-				TX_LOG_PAGE_VAL2_REG, channel,
-				(cfgp->value & DMA_LOG_PAGE_VALUE_MASK));
+				    TX_LOG_PAGE_VAL2_REG, channel,
+				    (cfgp->value & DMA_LOG_PAGE_VALUE_MASK));
 			}
 			break;
 
 		case TXDMA_LOG_PAGE_RELOC:
 			if (!cfgp->page_num) {
 				TX_LOG_REG_WRITE64(handle,
-				TX_LOG_PAGE_RELO1_REG, channel,
-				(cfgp->reloc & DMA_LOG_PAGE_RELO_MASK));
+				    TX_LOG_PAGE_RELO1_REG, channel,
+				    (cfgp->reloc & DMA_LOG_PAGE_RELO_MASK));
 			} else {
 				TX_LOG_REG_WRITE64(handle,
-				TX_LOG_PAGE_RELO2_REG, channel,
-				(cfgp->reloc & DMA_LOG_PAGE_RELO_MASK));
+				    TX_LOG_PAGE_RELO2_REG, channel,
+				    (cfgp->reloc & DMA_LOG_PAGE_RELO_MASK));
 			}
 			break;
 
 		default:
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_txdma_log_page_config"
-					    " Invalid Input: pageconfig <0x%x>",
-					    type));
+			    " npi_txdma_log_page_config"
+			    " Invalid Input: pageconfig <0x%x>",
+			    type));
 			return (NPI_FAILURE |
-				NPI_TXDMA_OPCODE_INVALID(channel));
+			    NPI_TXDMA_OPCODE_INVALID(channel));
 		}
 
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_txdma_log_page_config"
-					    " Invalid Input: op <0x%x>",
-					    op_mode));
+		    " npi_txdma_log_page_config"
+		    " Invalid Input: op <0x%x>",
+		    op_mode));
 		return (NPI_FAILURE | NPI_TXDMA_OPCODE_INVALID(channel));
 	}
 
@@ -674,40 +674,40 @@ npi_txdma_log_page_vld_config(npi_handle_t handle, io_op_t op_mode,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_log_page_vld_config"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_log_page_vld_config"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
 	switch (op_mode) {
 	case OP_GET:
 		TX_LOG_REG_READ64(handle, TX_LOG_PAGE_VLD_REG, channel,
-					&vld_p->value);
+		    &vld_p->value);
 		break;
 
 	case OP_SET:
 		TX_LOG_REG_WRITE64(handle, TX_LOG_PAGE_VLD_REG,
-					channel, vld_p->value);
+		    channel, vld_p->value);
 		break;
 
 	case OP_UPDATE:
 		TX_LOG_REG_READ64(handle, TX_LOG_PAGE_VLD_REG, channel,
-					&vld.value);
+		    &vld.value);
 		TX_LOG_REG_WRITE64(handle, TX_LOG_PAGE_VLD_REG,
-					channel, vld.value | vld_p->value);
+		    channel, vld.value | vld_p->value);
 		break;
 
 	case OP_CLEAR:
 		TX_LOG_REG_WRITE64(handle, TX_LOG_PAGE_VLD_REG,
-					channel, 0);
+		    channel, 0);
 		break;
 
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_log_pag_vld_cofig"
-				    " Invalid Input: pagevld <0x%x>",
-				    op_mode));
+		    " npi_txdma_log_pag_vld_cofig"
+		    " Invalid Input: pagevld <0x%x>",
+		    op_mode));
 		return (NPI_FAILURE | NPI_TXDMA_OPCODE_INVALID(channel));
 	}
 
@@ -739,9 +739,9 @@ npi_status_t
 npi_txdma_channel_reset(npi_handle_t handle, uint8_t channel)
 {
 	NPI_DEBUG_MSG((handle.function, NPI_TDC_CTL,
-			    " npi_txdma_channel_reset"
-			    " RESETTING",
-			    channel));
+	    " npi_txdma_channel_reset"
+	    " RESETTING",
+	    channel));
 	return (npi_txdma_channel_control(handle, TXDMA_RESET, channel));
 }
 
@@ -925,9 +925,9 @@ npi_txdma_channel_control(npi_handle_t handle, txdma_cs_cntl_t control,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_channel_control"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_channel_control"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
@@ -969,8 +969,8 @@ npi_txdma_channel_control(npi_handle_t handle, txdma_cs_cntl_t control,
 		status = npi_txdma_control_stop_wait(handle, channel);
 		if (status) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    "Cannot stop channel %d (TXC hung!)",
-				    channel));
+			    "Cannot stop channel %d (TXC hung!)",
+			    channel));
 		}
 		break;
 
@@ -1001,9 +1001,9 @@ npi_txdma_channel_control(npi_handle_t handle, txdma_cs_cntl_t control,
 	default:
 		status =  (NPI_FAILURE | NPI_TXDMA_OPCODE_INVALID(channel));
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_channel_control"
-				    " Invalid Input: control <0x%x>",
-				    control));
+		    " npi_txdma_channel_control"
+		    " Invalid Input: control <0x%x>",
+		    control));
 	}
 
 	return (status);
@@ -1042,9 +1042,9 @@ npi_txdma_control_status(npi_handle_t handle, io_op_t op_mode,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_control_status"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_control_status"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
@@ -1060,14 +1060,14 @@ npi_txdma_control_status(npi_handle_t handle, io_op_t op_mode,
 	case OP_UPDATE:
 		TXDMA_REG_READ64(handle, TX_CS_REG, channel, &txcs.value);
 		TXDMA_REG_WRITE64(handle, TX_CS_REG, channel,
-			cs_p->value | txcs.value);
+		    cs_p->value | txcs.value);
 		break;
 
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_control_status"
-				    " Invalid Input: control <0x%x>",
-				    op_mode));
+		    " npi_txdma_control_status"
+		    " Invalid Input: control <0x%x>",
+		    op_mode));
 		return (NPI_FAILURE | NPI_TXDMA_OPCODE_INVALID(channel));
 	}
 
@@ -1107,34 +1107,34 @@ npi_txdma_event_mask(npi_handle_t handle, io_op_t op_mode,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_txdma_event_mask"
-					    " Invalid Input: channel <0x%x>",
-					    channel));
+		    " npi_txdma_event_mask"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
 	switch (op_mode) {
 	case OP_GET:
 		TXDMA_REG_READ64(handle, TX_ENT_MSK_REG, channel,
-				&mask_p->value);
+		    &mask_p->value);
 		break;
 
 	case OP_SET:
 		TXDMA_REG_WRITE64(handle, TX_ENT_MSK_REG, channel,
-				mask_p->value);
+		    mask_p->value);
 		break;
 
 	case OP_UPDATE:
 		TXDMA_REG_READ64(handle, TX_ENT_MSK_REG, channel, &mask.value);
 		TXDMA_REG_WRITE64(handle, TX_ENT_MSK_REG, channel,
-			mask_p->value | mask.value);
+		    mask_p->value | mask.value);
 		break;
 
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_event_mask"
-				    " Invalid Input: eventmask <0x%x>",
-				    op_mode));
+		    " npi_txdma_event_mask"
+		    " Invalid Input: eventmask <0x%x>",
+		    op_mode));
 		return (NPI_FAILURE | NPI_TXDMA_OPCODE_INVALID(channel));
 	}
 
@@ -1174,9 +1174,9 @@ npi_txdma_event_mask_config(npi_handle_t handle, io_op_t op_mode,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_event_mask_config"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_event_mask_config"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
@@ -1200,13 +1200,13 @@ npi_txdma_event_mask_config(npi_handle_t handle, io_op_t op_mode,
 
 	case OP_CLEAR:
 		TXDMA_REG_WRITE64(handle, TX_ENT_MSK_REG, channel,
-			CFG_TXDMA_MASK_ALL);
+		    CFG_TXDMA_MASK_ALL);
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_event_mask_config"
-				    " Invalid Input: eventmask <0x%x>",
-				    op_mode));
+		    " npi_txdma_event_mask_config"
+		    " Invalid Input: eventmask <0x%x>",
+		    op_mode));
 		return (NPI_FAILURE | NPI_TXDMA_OPCODE_INVALID(channel));
 	}
 
@@ -1237,15 +1237,15 @@ npi_txdma_event_mask_mk_out(npi_handle_t handle, uint8_t channel)
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_event_mask_mk_out"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_event_mask_mk_out"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
 	TXDMA_REG_READ64(handle, TX_ENT_MSK_REG, channel, &event_mask);
 	TXDMA_REG_WRITE64(handle, TX_ENT_MSK_REG, channel,
-		event_mask & (~TX_ENT_MSK_MK_MASK));
+	    event_mask & (~TX_ENT_MSK_MK_MASK));
 
 	return (status);
 }
@@ -1274,15 +1274,15 @@ npi_txdma_event_mask_mk_in(npi_handle_t handle, uint8_t channel)
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_event_mask_mk_in"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_event_mask_mk_in"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
 	TXDMA_REG_READ64(handle, TX_ENT_MSK_REG, channel, &event_mask);
 	TXDMA_REG_WRITE64(handle, TX_ENT_MSK_REG, channel,
-		event_mask | TX_ENT_MSK_MK_MASK);
+	    event_mask | TX_ENT_MSK_MK_MASK);
 
 	return (status);
 }
@@ -1320,14 +1320,14 @@ npi_txdma_ring_addr_set(npi_handle_t handle, uint8_t channel,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_ring_addr_set"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_ring_addr_set"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
 	cfg.value = ((start_addr & TX_RNG_CFIG_ADDR_MASK) |
-			(((uint64_t)len) << TX_RNG_CFIG_LEN_SHIFT));
+	    (((uint64_t)len) << TX_RNG_CFIG_LEN_SHIFT));
 	TXDMA_REG_WRITE64(handle, TX_RNG_CFIG_REG, channel, cfg.value);
 
 	return (status);
@@ -1365,9 +1365,9 @@ npi_txdma_ring_config(npi_handle_t handle, io_op_t op_mode,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_ring_config"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_ring_config"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
@@ -1378,14 +1378,14 @@ npi_txdma_ring_config(npi_handle_t handle, io_op_t op_mode,
 
 	case OP_SET:
 		TXDMA_REG_WRITE64(handle, TX_RNG_CFIG_REG, channel,
-			*reg_data);
+		    *reg_data);
 		break;
 
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_ring_config"
-				    " Invalid Input: ring_config <0x%x>",
-				    op_mode));
+		    " npi_txdma_ring_config"
+		    " Invalid Input: ring_config <0x%x>",
+		    op_mode));
 		return (NPI_FAILURE | NPI_TXDMA_OPCODE_INVALID(channel));
 	}
 
@@ -1425,9 +1425,9 @@ npi_txdma_mbox_config(npi_handle_t handle, io_op_t op_mode,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_mbox_config"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_mbox_config"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
@@ -1444,19 +1444,19 @@ npi_txdma_mbox_config(npi_handle_t handle, io_op_t op_mode,
 
 	case OP_SET:
 		ml.bits.ldw.mbaddr = ((*mbox_addr & TXDMA_MBL_MASK) >>
-			TXDMA_MBL_SHIFT);
+		    TXDMA_MBL_SHIFT);
 		TXDMA_REG_WRITE64(handle, TXDMA_MBL_REG, channel, ml.value);
 		mh.bits.ldw.mbaddr = ((*mbox_addr >> TXDMA_MBH_ADDR_SHIFT) &
-			TXDMA_MBH_MASK);
+		    TXDMA_MBH_MASK);
 		TXDMA_REG_WRITE64(handle, TXDMA_MBH_REG, channel, mh.value);
 
 		break;
 
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_mbox_config"
-				    " Invalid Input: mbox <0x%x>",
-				    op_mode));
+		    " npi_txdma_mbox_config"
+		    " Invalid Input: mbox <0x%x>",
+		    op_mode));
 		return (NPI_FAILURE | NPI_TXDMA_OPCODE_INVALID(channel));
 	}
 
@@ -1498,17 +1498,17 @@ npi_txdma_desc_gather_set(npi_handle_t handle,
 	status = NPI_TXDMA_GATHER_INDEX(gather_index);
 	if (status) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_desc_gather_set"
-				    " Invalid Input: gather_index <0x%x>",
-				    gather_index));
+		    " npi_txdma_desc_gather_set"
+		    " Invalid Input: gather_index <0x%x>",
+		    gather_index));
 		return (status);
 	}
 
 	if (transfer_len > TX_MAX_TRANSFER_LENGTH) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_desc_gather_set"
-				    " Invalid Input: tr_len <0x%x>",
-				    transfer_len));
+		    " npi_txdma_desc_gather_set"
+		    " Invalid Input: tr_len <0x%x>",
+		    transfer_len));
 		return (NPI_FAILURE | NPI_TXDMA_XFER_LEN_INVALID);
 	}
 
@@ -1517,8 +1517,8 @@ npi_txdma_desc_gather_set(npi_handle_t handle,
 		desc_p->bits.hdw.mark = mark;
 		desc_p->bits.hdw.num_ptr = ngathers;
 		NPI_DEBUG_MSG((handle.function, NPI_TDC_CTL,
-			"npi_txdma_gather_set: SOP len %d (%d)",
-			desc_p->bits.hdw.tr_len, transfer_len));
+		    "npi_txdma_gather_set: SOP len %d (%d)",
+		    desc_p->bits.hdw.tr_len, transfer_len));
 	}
 
 	desc_p->bits.hdw.tr_len = transfer_len;
@@ -1526,8 +1526,8 @@ npi_txdma_desc_gather_set(npi_handle_t handle,
 	desc_p->bits.ldw.sad = dma_ioaddr & 0xffffffff;
 
 	NPI_DEBUG_MSG((handle.function, NPI_TDC_CTL,
-		"npi_txdma_gather_set: xfer len %d to set (%d)",
-		desc_p->bits.hdw.tr_len, transfer_len));
+	    "npi_txdma_gather_set: xfer len %d to set (%d)",
+	    desc_p->bits.hdw.tr_len, transfer_len));
 
 	NXGE_MEM_PIO_WRITE64(handle, desc_p->value);
 
@@ -1594,8 +1594,8 @@ npi_txdma_desc_set_xfer_len(npi_handle_t handle,
 	desc_p->bits.hdw.tr_len = transfer_len;
 
 	NPI_DEBUG_MSG((handle.function, NPI_TDC_CTL,
-		"npi_set_xfer_len: len %d (%d)",
-		desc_p->bits.hdw.tr_len, transfer_len));
+	    "npi_set_xfer_len: len %d (%d)",
+	    desc_p->bits.hdw.tr_len, transfer_len));
 
 	NXGE_MEM_PIO_WRITE64(handle, desc_p->value);
 
@@ -1663,16 +1663,16 @@ npi_txdma_desc_kick_reg_set(npi_handle_t handle, uint8_t channel,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_desc_kick_reg_set"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_desc_kick_reg_set"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
 	NPI_DEBUG_MSG((handle.function, NPI_TDC_CTL,
-		" npi_txdma_desc_kick_reg_set: "
-		" KICKING channel %d",
-		channel));
+	    " npi_txdma_desc_kick_reg_set: "
+	    " KICKING channel %d",
+	    channel));
 
 	/* Toggle the wrap around bit */
 	kick.value = 0;
@@ -1715,9 +1715,9 @@ npi_txdma_desc_kick_reg_get(npi_handle_t handle, uint8_t channel,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_desc_kick_reg_get"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_desc_kick_reg_get"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
@@ -1755,9 +1755,9 @@ npi_txdma_ring_head_get(npi_handle_t handle, uint8_t channel,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_ring_head_get"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_ring_head_get"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
@@ -1786,9 +1786,9 @@ npi_txdma_channel_pre_state_get(npi_handle_t handle, uint8_t channel,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_channel_pre_state_get"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_channel_pre_state_get"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
@@ -1808,9 +1808,9 @@ npi_txdma_ring_error_get(npi_handle_t handle, uint8_t channel,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txdma_ring_error_get"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txdma_ring_error_get"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
@@ -1922,29 +1922,29 @@ npi_txdma_dump_desc_one(npi_handle_t handle, p_tx_desc_t desc_p, int desc_index)
 #endif
 
 	NPI_DEBUG_MSG((handle.function, NPI_TDC_CTL,
-		"\n==> npi_txdma_dump_desc_one: dump "
-		" desc_p $%p descriptor entry %d\n",
-		desc_p, desc_index));
+	    "\n==> npi_txdma_dump_desc_one: dump "
+	    " desc_p $%p descriptor entry %d\n",
+	    desc_p, desc_index));
 	desc.value = 0;
 	desp = ((desc_p != NULL) ? desc_p : (p_tx_desc_t)&desc);
 	desp->value = NXGE_MEM_PIO_READ64(handle);
 #ifdef NXGE_DEBUG
 	sad = (desp->value & TX_PKT_DESC_SAD_MASK);
 	xfer_len = ((desp->value & TX_PKT_DESC_TR_LEN_MASK) >>
-			TX_PKT_DESC_TR_LEN_SHIFT);
+	    TX_PKT_DESC_TR_LEN_SHIFT);
 #endif
 	NPI_DEBUG_MSG((handle.function, NPI_TDC_CTL, "\n\t: value 0x%llx\n"
-		"\t\tsad $%p\ttr_len %d len %d\tnptrs %d\tmark %d sop %d\n",
-		desp->value,
-		sad,
-		desp->bits.hdw.tr_len,
-		xfer_len,
-		desp->bits.hdw.num_ptr,
-		desp->bits.hdw.mark,
-		desp->bits.hdw.sop));
+	    "\t\tsad $%p\ttr_len %d len %d\tnptrs %d\tmark %d sop %d\n",
+	    desp->value,
+	    sad,
+	    desp->bits.hdw.tr_len,
+	    xfer_len,
+	    desp->bits.hdw.num_ptr,
+	    desp->bits.hdw.mark,
+	    desp->bits.hdw.sop));
 
 	NPI_DEBUG_MSG((handle.function, NPI_TDC_CTL,
-			    "\n<== npi_txdma_dump_desc_one: Done \n"));
+	    "\n<== npi_txdma_dump_desc_one: Done \n"));
 
 }
 
@@ -1953,26 +1953,26 @@ void
 npi_txdma_dump_hdr(npi_handle_t handle, p_tx_pkt_header_t hdrp)
 {
 	NPI_DEBUG_MSG((handle.function, NPI_TDC_CTL,
-				    "\n==> npi_txdma_dump_hdr: dump\n"));
+	    "\n==> npi_txdma_dump_hdr: dump\n"));
 	NPI_DEBUG_MSG((handle.function, NPI_TDC_CTL,
-				    "\n\t: value 0x%llx\n"
-		"\t\tpkttype 0x%x\tip_ver %d\tllc %d\tvlan %d \tihl %d\n"
-		"\t\tl3start %d\tl4start %d\tl4stuff %d\n"
-		"\t\txferlen %d\tpad %d\n",
-		hdrp->value,
-		hdrp->bits.hdw.cksum_en_pkt_type,
-		hdrp->bits.hdw.ip_ver,
-		hdrp->bits.hdw.llc,
-		hdrp->bits.hdw.vlan,
-		hdrp->bits.hdw.ihl,
-		hdrp->bits.hdw.l3start,
-		hdrp->bits.hdw.l4start,
-		hdrp->bits.hdw.l4stuff,
-		hdrp->bits.ldw.tot_xfer_len,
-		hdrp->bits.ldw.pad));
+	    "\n\t: value 0x%llx\n"
+	    "\t\tpkttype 0x%x\tip_ver %d\tllc %d\tvlan %d \tihl %d\n"
+	    "\t\tl3start %d\tl4start %d\tl4stuff %d\n"
+	    "\t\txferlen %d\tpad %d\n",
+	    hdrp->value,
+	    hdrp->bits.hdw.cksum_en_pkt_type,
+	    hdrp->bits.hdw.ip_ver,
+	    hdrp->bits.hdw.llc,
+	    hdrp->bits.hdw.vlan,
+	    hdrp->bits.hdw.ihl,
+	    hdrp->bits.hdw.l3start,
+	    hdrp->bits.hdw.l4start,
+	    hdrp->bits.hdw.l4stuff,
+	    hdrp->bits.ldw.tot_xfer_len,
+	    hdrp->bits.ldw.pad));
 
 	NPI_DEBUG_MSG((handle.function, NPI_TDC_CTL,
-			    "\n<== npi_txdma_dump_hdr: Done \n"));
+	    "\n<== npi_txdma_dump_hdr: Done \n"));
 }
 
 npi_status_t
@@ -1984,9 +1984,9 @@ npi_txdma_inj_int_error_set(npi_handle_t handle, uint8_t channel,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_txdma_inj_int_error_set"
-			" Invalid Input: channel <0x%x>",
-					    channel));
+		    " npi_txdma_inj_int_error_set"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXDMA_CHANNEL_INVALID(channel));
 	}
 
@@ -2016,8 +2016,8 @@ npi_txdma_control_reset_wait(npi_handle_t handle, uint8_t channel)
 
 	if (loop == TXDMA_WAIT_LOOP) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    "npi_txdma_control_reset_wait: RST bit not "
-			    "cleared to 0 txcs.bits 0x%llx", txcs.value));
+		    "npi_txdma_control_reset_wait: RST bit not "
+		    "cleared to 0 txcs.bits 0x%llx", txcs.value));
 		return (NPI_FAILURE | NPI_TXDMA_RESET_FAILED);
 	}
 	return (NPI_SUCCESS);
@@ -2040,8 +2040,8 @@ npi_txdma_control_stop_wait(npi_handle_t handle, uint8_t channel)
 
 	if (loop == TXDMA_WAIT_LOOP) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    "npi_txdma_control_stop_wait: SNG_STATE not "
-			    "set to 1 txcs.bits 0x%llx", txcs.value));
+		    "npi_txdma_control_stop_wait: SNG_STATE not "
+		    "set to 1 txcs.bits 0x%llx", txcs.value));
 		return (NPI_FAILURE | NPI_TXDMA_STOP_FAILED);
 	}
 
@@ -2065,8 +2065,8 @@ npi_txdma_control_resume_wait(npi_handle_t handle, uint8_t channel)
 
 	if (loop == TXDMA_WAIT_LOOP) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    "npi_txdma_control_resume_wait: sng_state not "
-			    "set to 0 txcs.bits 0x%llx", txcs.value));
+		    "npi_txdma_control_resume_wait: sng_state not "
+		    "set to 0 txcs.bits 0x%llx", txcs.value));
 		return (NPI_FAILURE | NPI_TXDMA_RESUME_FAILED);
 	}
 

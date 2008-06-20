@@ -64,10 +64,10 @@ nxge_ipp_init(p_nxge_t nxgep)
 
 	for (i = 0; i < dfifo_entries; i++) {
 		if ((rs = npi_ipp_write_dfifo(handle,
-				portn, i, 0, 0, 0, 0, 0)) != NPI_SUCCESS)
+		    portn, i, 0, 0, 0, 0, 0)) != NPI_SUCCESS)
 			goto fail;
 		if ((rs = npi_ipp_read_dfifo(handle, portn,
-				i, &d0, &d1, &d2, &d3, &d4)) != NPI_SUCCESS)
+		    i, &d0, &d1, &d2, &d3, &d4)) != NPI_SUCCESS)
 			goto fail;
 	}
 
@@ -94,12 +94,12 @@ nxge_ipp_init(p_nxge_t nxgep)
 
 	/* Configure IPP port */
 	if ((rs = npi_ipp_iconfig(handle, INIT, portn, ICFG_IPP_ALL))
-			!= NPI_SUCCESS)
+	    != NPI_SUCCESS)
 		goto fail;
 	nxgep->ipp.iconfig = ICFG_IPP_ALL;
 
 	config = CFG_IPP | CFG_IPP_DFIFO_ECC_CORRECT | CFG_IPP_DROP_BAD_CRC |
-		CFG_IPP_TCP_UDP_CKSUM;
+	    CFG_IPP_TCP_UDP_CKSUM;
 	if ((rs = npi_ipp_config(handle, INIT, portn, config)) != NPI_SUCCESS)
 		goto fail;
 	nxgep->ipp.config = config;
@@ -107,7 +107,7 @@ nxge_ipp_init(p_nxge_t nxgep)
 	/* Set max packet size */
 	pkt_size = IPP_MAX_PKT_SIZE;
 	if ((rs = npi_ipp_set_max_pktsize(handle, portn,
-			IPP_MAX_PKT_SIZE)) != NPI_SUCCESS)
+	    IPP_MAX_PKT_SIZE)) != NPI_SUCCESS)
 		goto fail;
 	nxgep->ipp.max_pkt_size = pkt_size;
 
@@ -116,8 +116,8 @@ nxge_ipp_init(p_nxge_t nxgep)
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_ipp_init: Fail to initialize IPP Port #%d\n",
-			portn));
+	    "nxge_ipp_init: Fail to initialize IPP Port #%d\n",
+	    portn));
 	return (NXGE_ERROR | rs);
 }
 
@@ -154,15 +154,15 @@ nxge_ipp_disable(p_nxge_t nxgep)
 	if (try_count == 0) {
 		if ((rd_ptr != 0) && (wr_ptr != 1)) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				" nxge_ipp_disable: port%d failed"
-				" rd_fifo != wr_fifo", portn));
+			    " nxge_ipp_disable: port%d failed"
+			    " rd_fifo != wr_fifo", portn));
 			goto fail;
 		}
 	}
 	/* disable the IPP */
 	config = nxgep->ipp.config;
 	if ((rs = npi_ipp_config(handle, DISABLE,
-			portn, config)) != NPI_SUCCESS)
+	    portn, config)) != NPI_SUCCESS)
 		goto fail;
 
 	/* IPP soft reset */
@@ -173,7 +173,7 @@ nxge_ipp_disable(p_nxge_t nxgep)
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		"nxge_ipp_disable: Fail to disable IPP Port #%d\n", portn));
+	    "nxge_ipp_disable: Fail to disable IPP Port #%d\n", portn));
 	return (NXGE_ERROR | rs);
 }
 
@@ -196,7 +196,7 @@ nxge_ipp_reset(p_nxge_t nxgep)
 	/* disable the IPP */
 	config = nxgep->ipp.config;
 	if ((rs = npi_ipp_config(handle, DISABLE,
-			portn, config)) != NPI_SUCCESS)
+	    portn, config)) != NPI_SUCCESS)
 		goto fail;
 
 	/*
@@ -215,8 +215,8 @@ nxge_ipp_reset(p_nxge_t nxgep)
 	if (try_count == 0) {
 		if ((rd_ptr != 0) && (wr_ptr != 1)) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				" nxge_ipp_disable: port%d failed"
-				" rd_fifo != wr_fifo", portn));
+			    " nxge_ipp_disable: port%d failed"
+			    " rd_fifo != wr_fifo", portn));
 			goto fail;
 		}
 	}
@@ -240,8 +240,8 @@ nxge_ipp_reset(p_nxge_t nxgep)
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_ipp_init: Fail to Reset IPP Port #%d\n",
-			portn));
+	    "nxge_ipp_init: Fail to Reset IPP Port #%d\n",
+	    portn));
 	return (NXGE_ERROR | rs);
 }
 
@@ -261,7 +261,7 @@ nxge_ipp_enable(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, IPP_CTL, "==> nxge_ipp_enable: port%d", portn));
 
 	config = CFG_IPP | CFG_IPP_DFIFO_ECC_CORRECT | CFG_IPP_DROP_BAD_CRC |
-		CFG_IPP_TCP_UDP_CKSUM;
+	    CFG_IPP_TCP_UDP_CKSUM;
 	if ((rs = npi_ipp_config(handle, INIT, portn, config)) != NPI_SUCCESS)
 		goto fail;
 	nxgep->ipp.config = config;
@@ -269,7 +269,7 @@ nxge_ipp_enable(p_nxge_t nxgep)
 	/* Set max packet size */
 	pkt_size = IPP_MAX_PKT_SIZE;
 	if ((rs = npi_ipp_set_max_pktsize(handle, portn,
-			IPP_MAX_PKT_SIZE)) != NPI_SUCCESS)
+	    IPP_MAX_PKT_SIZE)) != NPI_SUCCESS)
 		goto fail;
 	nxgep->ipp.max_pkt_size = pkt_size;
 
@@ -277,7 +277,7 @@ nxge_ipp_enable(p_nxge_t nxgep)
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		"nxge_ipp_init: Fail to Enable IPP Port #%d\n", portn));
+	    "nxge_ipp_init: Fail to Enable IPP Port #%d\n", portn));
 	return (NXGE_ERROR | rs);
 }
 
@@ -360,79 +360,79 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 	if (istatus.bits.w0.dfifo_missed_sop) {
 		statsp->sop_miss++;
 		if ((rs = npi_ipp_get_dfifo_eopm_rdptr(handle, portn,
-					&errlogp->dfifo_rd_ptr)) != NPI_SUCCESS)
+		    &errlogp->dfifo_rd_ptr)) != NPI_SUCCESS)
 			return (NXGE_ERROR | rs);
 		if ((rs = npi_ipp_get_state_mach(handle, portn,
-				&errlogp->state_mach)) != NPI_SUCCESS)
+		    &errlogp->state_mach)) != NPI_SUCCESS)
 			return (NXGE_ERROR | rs);
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-			NXGE_FM_EREPORT_IPP_SOP_MISS);
+		    NXGE_FM_EREPORT_IPP_SOP_MISS);
 		if (statsp->sop_miss < IPP_MAX_ERR_SHOW)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_ipp_err_evnts: fatal error: sop_miss\n"));
+			    "nxge_ipp_err_evnts: fatal error: sop_miss\n"));
 		rxport_fatal = B_TRUE;
 	}
 	if (istatus.bits.w0.dfifo_missed_eop) {
 		statsp->eop_miss++;
 		if ((rs = npi_ipp_get_dfifo_eopm_rdptr(handle, portn,
-				&errlogp->dfifo_rd_ptr)) != NPI_SUCCESS)
+		    &errlogp->dfifo_rd_ptr)) != NPI_SUCCESS)
 			return (NXGE_ERROR | rs);
 		if ((rs = npi_ipp_get_state_mach(handle, portn,
-				&errlogp->state_mach)) != NPI_SUCCESS)
+		    &errlogp->state_mach)) != NPI_SUCCESS)
 			return (NXGE_ERROR | rs);
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-			NXGE_FM_EREPORT_IPP_EOP_MISS);
+		    NXGE_FM_EREPORT_IPP_EOP_MISS);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_ipp_err_evnts: fatal error: eop_miss\n"));
+		    "nxge_ipp_err_evnts: fatal error: eop_miss\n"));
 		rxport_fatal = B_TRUE;
 	}
 	if (istatus.bits.w0.dfifo_uncorr_ecc_err) {
 		boolean_t ue_ecc_valid;
 
 		if ((status = nxge_ipp_eccue_valid_check(nxgep,
-				&ue_ecc_valid)) != NXGE_OK)
+		    &ue_ecc_valid)) != NXGE_OK)
 			return (status);
 
 		if (ue_ecc_valid) {
 			statsp->dfifo_ue++;
 			if ((rs = npi_ipp_get_ecc_syndrome(handle, portn,
-					&errlogp->ecc_syndrome)) != NPI_SUCCESS)
+			    &errlogp->ecc_syndrome)) != NPI_SUCCESS)
 				return (NXGE_ERROR | rs);
 			NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-				NXGE_FM_EREPORT_IPP_DFIFO_UE);
+			    NXGE_FM_EREPORT_IPP_DFIFO_UE);
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_ipp_err_evnts: fatal error: dfifo_ue\n"));
+			    "nxge_ipp_err_evnts: fatal error: dfifo_ue\n"));
 			rxport_fatal = B_TRUE;
 		}
 	}
 	if (istatus.bits.w0.pre_fifo_perr) {
 		statsp->pfifo_perr++;
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-			NXGE_FM_EREPORT_IPP_PFIFO_PERR);
+		    NXGE_FM_EREPORT_IPP_PFIFO_PERR);
 		if (statsp->pfifo_perr < IPP_MAX_ERR_SHOW)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_ipp_err_evnts: "
-				"fatal error: pre_pifo_perr\n"));
+			    "nxge_ipp_err_evnts: "
+			    "fatal error: pre_pifo_perr\n"));
 		rxport_fatal = B_TRUE;
 	}
 	if (istatus.bits.w0.pre_fifo_overrun) {
 		statsp->pfifo_over++;
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-			NXGE_FM_EREPORT_IPP_PFIFO_OVER);
+		    NXGE_FM_EREPORT_IPP_PFIFO_OVER);
 		if (statsp->pfifo_over < IPP_MAX_ERR_SHOW)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_ipp_err_evnts: "
-				"fatal error: pfifo_over\n"));
+			    "nxge_ipp_err_evnts: "
+			    "fatal error: pfifo_over\n"));
 		rxport_fatal = B_TRUE;
 	}
 	if (istatus.bits.w0.pre_fifo_underrun) {
 		statsp->pfifo_und++;
 		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-			NXGE_FM_EREPORT_IPP_PFIFO_UND);
+		    NXGE_FM_EREPORT_IPP_PFIFO_UND);
 		if (statsp->pfifo_und < IPP_MAX_ERR_SHOW)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_ipp_err_evnts: "
-				"fatal error: pfifo_und\n"));
+			    "nxge_ipp_err_evnts: "
+			    "fatal error: pfifo_und\n"));
 		rxport_fatal = B_TRUE;
 	}
 	if (istatus.bits.w0.bad_cksum_cnt_ovfl) {
@@ -491,8 +491,8 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 
 	if (rxport_fatal) {
 		NXGE_DEBUG_MSG((nxgep, IPP_CTL,
-			" nxge_ipp_handle_sys_errors:"
-			" fatal Error on  Port #%d\n", portn));
+		    " nxge_ipp_handle_sys_errors:"
+		    " fatal Error on  Port #%d\n", portn));
 		status = nxge_ipp_fatal_err_recover(nxgep);
 		if (status == NXGE_OK) {
 			FM_SERVICE_RESTORED(nxgep);
@@ -516,9 +516,9 @@ nxge_ipp_inject_err(p_nxge_t nxgep, uint32_t err_id)
 		ecc_ctrl.bits.w0.cor_1 = 1;
 		ecc_ctrl.bits.w0.cor_lst = 1;
 		cmn_err(CE_NOTE, "!Write 0x%llx to IPP_ECC_CTRL_REG\n",
-			(unsigned long long) ecc_ctrl.value);
+		    (unsigned long long) ecc_ctrl.value);
 		IPP_REG_WR(nxgep->npi_handle, portn, IPP_ECC_CTRL_REG,
-			ecc_ctrl.value);
+		    ecc_ctrl.value);
 		break;
 
 	case NXGE_FM_EREPORT_IPP_DFIFO_CE:
@@ -527,9 +527,9 @@ nxge_ipp_inject_err(p_nxge_t nxgep, uint32_t err_id)
 		ecc_ctrl.bits.w0.cor_1 = 1;
 		ecc_ctrl.bits.w0.cor_snd = 1;
 		cmn_err(CE_NOTE, "!Write 0x%llx to IPP_ECC_CTRL_REG\n",
-			(unsigned long long) ecc_ctrl.value);
+		    (unsigned long long) ecc_ctrl.value);
 		IPP_REG_WR(nxgep->npi_handle, portn, IPP_ECC_CTRL_REG,
-			ecc_ctrl.value);
+		    ecc_ctrl.value);
 		break;
 
 	case NXGE_FM_EREPORT_IPP_EOP_MISS:
@@ -542,7 +542,7 @@ nxge_ipp_inject_err(p_nxge_t nxgep, uint32_t err_id)
 	case NXGE_FM_EREPORT_IPP_PKT_DIS_MX:
 	case NXGE_FM_EREPORT_IPP_RESET_FAIL:
 		IPP_REG_RD(nxgep->npi_handle, portn, IPP_INT_STATUS_REG,
-			&ipps.value);
+		    &ipps.value);
 		if (err_id == NXGE_FM_EREPORT_IPP_EOP_MISS)
 			ipps.bits.w0.dfifo_missed_eop = 1;
 		else if (err_id == NXGE_FM_EREPORT_IPP_SOP_MISS)
@@ -584,9 +584,9 @@ nxge_ipp_inject_err(p_nxge_t nxgep, uint32_t err_id)
 			    IPP_DISCARD_PKT_CNT_REG, IPP_PKT_DIS_CNT_MASK);
 		}
 		cmn_err(CE_NOTE, "!Write 0x%llx to IPP_INT_STATUS_REG\n",
-			(unsigned long long) ipps.value);
+		    (unsigned long long) ipps.value);
 		IPP_REG_WR(nxgep->npi_handle, portn, IPP_INT_STATUS_REG,
-			ipps.value);
+		    ipps.value);
 		break;
 	}
 }
@@ -609,7 +609,7 @@ nxge_ipp_fatal_err_recover(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_ipp_fatal_err_recover"));
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		"Recovering from RxPort error..."));
+	    "Recovering from RxPort error..."));
 
 	handle = nxgep->npi_handle;
 	portn = nxgep->mac.portnum;
@@ -645,9 +645,9 @@ nxge_ipp_fatal_err_recover(p_nxge_t nxgep)
 
 	if (try_count == 0) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			" nxge_ipp_reset: port%d IPP stalled..."
-			" rd_fifo_ptr = 0x%x wr_fifo_ptr = 0x%x",
-			portn, rd_ptr, wr_ptr));
+		    " nxge_ipp_reset: port%d IPP stalled..."
+		    " rd_fifo_ptr = 0x%x wr_fifo_ptr = 0x%x",
+		    portn, rd_ptr, wr_ptr));
 		/*
 		 * This means the fatal error occurred on the first line of the
 		 * fifo. In this case, just reset the IPP without draining the
@@ -669,10 +669,10 @@ nxge_ipp_fatal_err_recover(p_nxge_t nxgep)
 	/* Clean up DFIFO SRAM entries */
 	for (i = 0; i < dfifo_entries; i++) {
 		if ((rs = npi_ipp_write_dfifo(handle, portn,
-				i, 0, 0, 0, 0, 0)) != NPI_SUCCESS)
+		    i, 0, 0, 0, 0, 0)) != NPI_SUCCESS)
 			goto fail;
 		if ((rs = npi_ipp_read_dfifo(handle, portn, i,
-				&d0, &d1, &d2, &d3, &d4)) != NPI_SUCCESS)
+		    &d0, &d1, &d2, &d3, &d4)) != NPI_SUCCESS)
 			goto fail;
 	}
 
@@ -700,7 +700,7 @@ nxge_ipp_fatal_err_recover(p_nxge_t nxgep)
 		goto fail;
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		"Recovery successful, RxPort restored"));
+	    "Recovery successful, RxPort restored"));
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_ipp_fatal_err_recover"));
 
 	return (NXGE_OK);
@@ -737,10 +737,10 @@ nxge_ipp_eccue_valid_check(p_nxge_t nxgep, boolean_t *valid)
 	*valid = B_TRUE;
 
 	if ((rs = npi_ipp_get_dfifo_rd_ptr(handle, portn, &rd_ptr))
-		!= NPI_SUCCESS)
+	    != NPI_SUCCESS)
 		goto fail;
 	if ((rs = npi_ipp_get_dfifo_wr_ptr(handle, portn, &wr_ptr))
-		!= NPI_SUCCESS)
+	    != NPI_SUCCESS)
 		goto fail;
 
 	if (rd_ptr == wr_ptr) {
@@ -754,10 +754,10 @@ nxge_ipp_eccue_valid_check(p_nxge_t nxgep, boolean_t *valid)
 		 */
 		while (stall_cnt < 16) {
 			if ((rs = npi_ipp_get_dfifo_rd_ptr(handle,
-					portn, &curr_rd_ptr)) != NPI_SUCCESS)
+			    portn, &curr_rd_ptr)) != NPI_SUCCESS)
 				goto fail;
 			if ((rs = npi_ipp_get_dfifo_wr_ptr(handle,
-					portn, &curr_wr_ptr)) != NPI_SUCCESS)
+			    portn, &curr_wr_ptr)) != NPI_SUCCESS)
 				goto fail;
 
 			if (rd_ptr == curr_rd_ptr && wr_ptr == curr_wr_ptr) {

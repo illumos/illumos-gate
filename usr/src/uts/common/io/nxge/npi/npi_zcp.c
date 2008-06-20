@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,9 +42,9 @@ npi_zcp_config(npi_handle_t handle, config_op_t op, zcp_config_t config)
 	case DISABLE:
 		if ((config == 0) || (config & ~CFG_ZCP_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_zcp_config"
-					    " Invalid Input: config <0x%x>",
-					    config));
+			    " npi_zcp_config"
+			    " Invalid Input: config <0x%x>",
+			    config));
 			return (NPI_FAILURE | NPI_ZCP_CONFIG_INVALID);
 		}
 
@@ -103,9 +103,9 @@ npi_zcp_config(npi_handle_t handle, config_op_t op, zcp_config_t config)
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_zcp_config"
-					    " Invalid Input: config <0x%x>",
-					    config));
+		    " npi_zcp_config"
+		    " Invalid Input: config <0x%x>",
+		    config));
 		return (NPI_FAILURE | NPI_ZCP_OPCODE_INVALID);
 	}
 
@@ -122,9 +122,9 @@ npi_zcp_iconfig(npi_handle_t handle, config_op_t op, zcp_iconfig_t iconfig)
 	case DISABLE:
 		if ((iconfig == 0) || (iconfig & ~ICFG_ZCP_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_zcp_iconfig"
-					    " Invalid Input: iconfig <0x%x>",
-					    iconfig));
+			    " npi_zcp_iconfig"
+			    " Invalid Input: iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_ZCP_CONFIG_INVALID);
 		}
 
@@ -140,9 +140,9 @@ npi_zcp_iconfig(npi_handle_t handle, config_op_t op, zcp_iconfig_t iconfig)
 	case INIT:
 		if ((iconfig & ~ICFG_ZCP_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_zcp_iconfig"
-					    " Invalid Input: iconfig <0x%x>",
-					    iconfig));
+			    " npi_zcp_iconfig"
+			    " Invalid Input: iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_ZCP_CONFIG_INVALID);
 		}
 		val = (uint64_t)iconfig;
@@ -151,9 +151,9 @@ npi_zcp_iconfig(npi_handle_t handle, config_op_t op, zcp_iconfig_t iconfig)
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_iconfig"
-				    " Invalid Input: iconfig <0x%x>",
-				    iconfig));
+		    " npi_zcp_iconfig"
+		    " Invalid Input: iconfig <0x%x>",
+		    iconfig));
 		return (NPI_FAILURE | NPI_ZCP_OPCODE_INVALID);
 	}
 
@@ -189,9 +189,9 @@ npi_zcp_set_dma_thresh(npi_handle_t handle, uint16_t dma_thres)
 
 	if ((dma_thres & ~RDMA_TH_BITS) != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_set_dma_thresh"
-				    " Invalid Input: dma_thres <0x%x>",
-				    dma_thres));
+		    " npi_zcp_set_dma_thresh"
+		    " Invalid Input: dma_thres <0x%x>",
+		    dma_thres));
 		return (NPI_FAILURE | NPI_ZCP_DMA_THRES_INVALID);
 	}
 
@@ -213,9 +213,9 @@ npi_zcp_set_bam_region(npi_handle_t handle, zcp_buf_region_t region,
 	ASSERT(IS_VALID_BAM_REGION(region));
 	if (!IS_VALID_BAM_REGION(region)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_set_bam_region"
-				    " Invalid Input: region <0x%x>",
-				    region));
+		    " npi_zcp_set_bam_region"
+		    " Invalid Input: region <0x%x>",
+		    region));
 		return (NPI_FAILURE | ZCP_BAM_REGION_INVALID);
 	}
 
@@ -246,16 +246,16 @@ npi_zcp_set_dst_region(npi_handle_t handle, zcp_buf_region_t region,
 	ASSERT(IS_VALID_BAM_REGION(region));
 	if (!IS_VALID_BAM_REGION(region)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_set_dst_region"
-				    " Invalid Input: region <0x%x>",
-				    region));
+		    " npi_zcp_set_dst_region"
+		    " Invalid Input: region <0x%x>",
+		    region));
 		return (NPI_FAILURE | NPI_ZCP_BAM_REGION_INVALID);
 	}
 
 	if ((row_idx & ~0x3FF) != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_set_dst_region"
-				    " Invalid Input: row_idx", row_idx));
+		    " npi_zcp_set_dst_region"
+		    " Invalid Input: row_idx", row_idx));
 		return (NPI_FAILURE | NPI_ZCP_ROW_INDEX_INVALID);
 	}
 
@@ -288,46 +288,46 @@ npi_zcp_tt_static_entry(npi_handle_t handle, io_op_t op, uint16_t flow_id,
 
 	if ((op != OP_SET) && (op != OP_GET)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_static_entry"
-				    " Invalid Input: op <0x%x>",
-				    op));
+		    " npi_zcp_tt_static_entry"
+		    " Invalid Input: op <0x%x>",
+		    op));
 		return (NPI_FAILURE | NPI_ZCP_OPCODE_INVALID);
 	}
 
 	if ((mask & TTE_SFLOW_ATTR_ALL) == 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_static_entry"
-				    " Invalid Input: mask <0x%x>",
-				    mask));
+		    " npi_zcp_tt_static_entry"
+		    " Invalid Input: mask <0x%x>",
+		    mask));
 		return (NPI_FAILURE | NPI_ZCP_SFLOW_ATTR_INVALID);
 	}
 
 	if ((flow_id & ~0x0FFF) != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_static_entry"
-				    " Invalid Input: flow_id<0x%x>",
-				    flow_id));
+		    " npi_zcp_tt_static_entry"
+		    " Invalid Input: flow_id<0x%x>",
+		    flow_id));
 		return (NPI_FAILURE | NPI_ZCP_FLOW_ID_INVALID);
 	}
 
 	if (zcp_mem_read(handle, flow_id, ZCP_RAM_SEL_TT_STATIC, NULL,
-			(zcp_ram_unit_t *)&val) != 0) {
+	    (zcp_ram_unit_t *)&val) != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_static_entry"
-				    " HW Error: ZCP_RAM_ACC <0x%x>",
-				    NULL));
+		    " npi_zcp_tt_static_entry"
+		    " HW Error: ZCP_RAM_ACC <0x%x>",
+		    NULL));
 		return (NPI_FAILURE | NPI_ZCP_MEM_READ_FAILED);
 	}
 
 	if (op == OP_SET) {
 		if (mask & TTE_RDC_TBL_OFF) {
 			val.qw0.bits.ldw.rdc_tbl_offset =
-					sflow->qw0.bits.ldw.rdc_tbl_offset;
+			    sflow->qw0.bits.ldw.rdc_tbl_offset;
 			byte_en |= TTE_RDC_TBL_SFLOW_BITS_EN;
 		}
 		if (mask & TTE_BUF_SIZE) {
 			val.qw0.bits.ldw.buf_size =
-					sflow->qw0.bits.ldw.buf_size;
+			    sflow->qw0.bits.ldw.buf_size;
 			byte_en |= TTE_BUF_SIZE_BITS_EN;
 		}
 		if (mask & TTE_NUM_BUF) {
@@ -344,12 +344,12 @@ npi_zcp_tt_static_entry(npi_handle_t handle, io_op_t op, uint16_t flow_id,
 		}
 		if (mask & TTE_ULP_END_EN) {
 			val.qw1.bits.ldw.ulp_end_en =
-				sflow->qw1.bits.ldw.ulp_end_en;
+			    sflow->qw1.bits.ldw.ulp_end_en;
 			byte_en |= TTE_ULP_END_EN_BITS_EN;
 		}
 		if (mask & TTE_UNMAP_ALL_EN) {
 			val.qw1.bits.ldw.unmap_all_en =
-					sflow->qw1.bits.ldw.unmap_all_en;
+			    sflow->qw1.bits.ldw.unmap_all_en;
 			byte_en |= TTE_UNMAP_ALL_EN;
 		}
 		if (mask & TTE_TMODE) {
@@ -362,17 +362,17 @@ npi_zcp_tt_static_entry(npi_handle_t handle, io_op_t op, uint16_t flow_id,
 		}
 		if (mask & TTE_HBM_RING_BASE_ADDR) {
 			val.qw1.bits.ldw.ring_base =
-					sflow->qw1.bits.ldw.ring_base;
+			    sflow->qw1.bits.ldw.ring_base;
 			byte_en |= TTE_RING_BASE_ADDR_BITS_EN;
 		}
 		if (mask & TTE_HBM_RING_BASE_ADDR) {
 			val.qw2.bits.ldw.ring_base =
-					sflow->qw2.bits.ldw.ring_base;
+			    sflow->qw2.bits.ldw.ring_base;
 			byte_en |= TTE_RING_BASE_ADDR_BITS_EN;
 		}
 		if (mask & TTE_HBM_RING_SIZE) {
 			val.qw2.bits.ldw.ring_size =
-					sflow->qw2.bits.ldw.ring_size;
+			    sflow->qw2.bits.ldw.ring_size;
 			byte_en |= TTE_RING_SIZE_BITS_EN;
 		}
 		if (mask & TTE_HBM_BUSY) {
@@ -385,12 +385,12 @@ npi_zcp_tt_static_entry(npi_handle_t handle, io_op_t op, uint16_t flow_id,
 		}
 
 		if (zcp_mem_write(handle, flow_id, ZCP_RAM_SEL_TT_STATIC,
-					byte_en, NULL,
-					(zcp_ram_unit_t *)&val) != 0) {
+		    byte_en, NULL,
+		    (zcp_ram_unit_t *)&val) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_zcp_tt_static_entry"
-					    " HW Error: ZCP_RAM_ACC <0x%x>",
-					    NULL));
+			    " npi_zcp_tt_static_entry"
+			    " HW Error: ZCP_RAM_ACC <0x%x>",
+			    NULL));
 			return (NPI_FAILURE | NPI_ZCP_MEM_WRITE_FAILED);
 		}
 	} else {
@@ -413,33 +413,33 @@ npi_zcp_tt_dynamic_entry(npi_handle_t handle, io_op_t op, uint16_t flow_id,
 
 	if ((op != OP_SET) && (op != OP_GET)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_dynamic_entry"
-				    " Invalid Input: op <0x%x>", op));
+		    " npi_zcp_tt_dynamic_entry"
+		    " Invalid Input: op <0x%x>", op));
 		return (NPI_FAILURE | NPI_ZCP_OPCODE_INVALID);
 	}
 
 	if ((mask & TTE_DFLOW_ATTR_ALL) == 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_dynamic_entry"
-				    " Invalid Input: mask <0x%x>",
-				    mask));
+		    " npi_zcp_tt_dynamic_entry"
+		    " Invalid Input: mask <0x%x>",
+		    mask));
 		return (NPI_FAILURE | NPI_ZCP_DFLOW_ATTR_INVALID);
 	}
 
 	if ((flow_id & ~0x0FFF) != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_dynamic_entry"
-				    " Invalid Input: flow_id <0x%x>",
-				    flow_id));
+		    " npi_zcp_tt_dynamic_entry"
+		    " Invalid Input: flow_id <0x%x>",
+		    flow_id));
 		return (NPI_FAILURE | NPI_ZCP_FLOW_ID_INVALID);
 	}
 
 	if (zcp_mem_read(handle, flow_id, ZCP_RAM_SEL_TT_DYNAMIC, NULL,
-			(zcp_ram_unit_t *)&val) != 0) {
+	    (zcp_ram_unit_t *)&val) != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_dynamic_entry"
-				    " HW Error: ZCP_RAM_ACC <0x%x>",
-				    NULL));
+		    " npi_zcp_tt_dynamic_entry"
+		    " HW Error: ZCP_RAM_ACC <0x%x>",
+		    NULL));
 		return (NPI_FAILURE | NPI_ZCP_MEM_READ_FAILED);
 	}
 
@@ -448,42 +448,42 @@ npi_zcp_tt_dynamic_entry(npi_handle_t handle, io_op_t op, uint16_t flow_id,
 		/* Get data read */
 		if (mask & TTE_MAPPED_IN) {
 			val.qw0.bits.ldw.mapped_in =
-					dflow->qw0.bits.ldw.mapped_in;
+			    dflow->qw0.bits.ldw.mapped_in;
 			byte_en |= TTE_MAPPED_IN_BITS_EN;
 		}
 		if (mask & TTE_ANCHOR_SEQ) {
 			val.qw1.bits.ldw.anchor_seq =
-					dflow->qw1.bits.ldw.anchor_seq;
+			    dflow->qw1.bits.ldw.anchor_seq;
 			byte_en |= TTE_ANCHOR_SEQ_BITS_EN;
 		}
 		if (mask & TTE_ANCHOR_OFFSET) {
 			val.qw2.bits.ldw.anchor_offset =
-					dflow->qw2.bits.ldw.anchor_offset;
+			    dflow->qw2.bits.ldw.anchor_offset;
 			byte_en |= TTE_ANCHOR_OFFSET_BITS_EN;
 		}
 		if (mask & TTE_ANCHOR_BUFFER) {
 			val.qw2.bits.ldw.anchor_buf =
-					dflow->qw2.bits.ldw.anchor_buf;
+			    dflow->qw2.bits.ldw.anchor_buf;
 			byte_en |= TTE_ANCHOR_BUFFER_BITS_EN;
 		}
 		if (mask & TTE_ANCHOR_BUF_FLAG) {
 			val.qw2.bits.ldw.anchor_buf_flag =
-					dflow->qw2.bits.ldw.anchor_buf_flag;
+			    dflow->qw2.bits.ldw.anchor_buf_flag;
 			byte_en |= TTE_ANCHOR_BUF_FLAG_BITS_EN;
 		}
 		if (mask & TTE_UNMAP_ON_LEFT) {
 			val.qw2.bits.ldw.unmap_on_left =
-					dflow->qw2.bits.ldw.unmap_on_left;
+			    dflow->qw2.bits.ldw.unmap_on_left;
 			byte_en |= TTE_UNMAP_ON_LEFT_BITS_EN;
 		}
 		if (mask & TTE_ULP_END_REACHED) {
 			val.qw2.bits.ldw.ulp_end_reached =
-					dflow->qw2.bits.ldw.ulp_end_reached;
+			    dflow->qw2.bits.ldw.ulp_end_reached;
 			byte_en |= TTE_ULP_END_REACHED_BITS_EN;
 		}
 		if (mask & TTE_ERR_STAT) {
 			val.qw3.bits.ldw.err_stat =
-					dflow->qw3.bits.ldw.err_stat;
+			    dflow->qw3.bits.ldw.err_stat;
 			byte_en |= TTE_ERR_STAT_BITS_EN;
 		}
 		if (mask & TTE_HBM_WR_PTR) {
@@ -496,17 +496,17 @@ npi_zcp_tt_dynamic_entry(npi_handle_t handle, io_op_t op, uint16_t flow_id,
 		}
 		if (mask & TTE_HBM_PREFETCH_ON) {
 			val.qw3.bits.ldw.prefetch_on =
-					dflow->qw3.bits.ldw.prefetch_on;
+			    dflow->qw3.bits.ldw.prefetch_on;
 			byte_en |= TTE_PREFETCH_ON_BITS_EN;
 		}
 
 		if (zcp_mem_write(handle, flow_id, ZCP_RAM_SEL_TT_DYNAMIC,
-					byte_en, NULL,
-					(zcp_ram_unit_t *)&val) != 0) {
+		    byte_en, NULL,
+		    (zcp_ram_unit_t *)&val) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_zcp_tt_dynamic_entry"
-					    " HW Error: ZCP_RAM_ACC <0x%x>",
-					    NULL));
+			    " npi_zcp_tt_dynamic_entry"
+			    " HW Error: ZCP_RAM_ACC <0x%x>",
+			    NULL));
 			return (NPI_FAILURE | NPI_ZCP_MEM_WRITE_FAILED);
 		}
 	} else {
@@ -528,52 +528,52 @@ npi_zcp_tt_bam_entry(npi_handle_t handle, io_op_t op, uint16_t flow_id,
 
 	if ((op != OP_SET) && (op != OP_GET)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_bam_entry"
-				    " Invalid Input: op <0x%x>", op));
+		    " npi_zcp_tt_bam_entry"
+		    " Invalid Input: op <0x%x>", op));
 		return (NPI_FAILURE | NPI_ZCP_OPCODE_INVALID);
 	}
 
 	if ((flow_id & ~0x0FFF) != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_dynamic_entry"
-				    " Invalid Input: flow_id <0x%x>",
-				    flow_id));
+		    " npi_zcp_tt_dynamic_entry"
+		    " Invalid Input: flow_id <0x%x>",
+		    flow_id));
 		return (NPI_FAILURE | NPI_ZCP_FLOW_ID_INVALID);
 	}
 
 	if (bankn >= MAX_BAM_BANKS) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_bam_entry"
-				    " Invalid Input: bankn <0x%x>",
-				    bankn));
+		    " npi_zcp_tt_bam_entry"
+		    " Invalid Input: bankn <0x%x>",
+		    bankn));
 		return (NPI_FAILURE | NPI_ZCP_BAM_BANK_INVALID);
 	}
 
 	if ((word_en & ~0xF) != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_bam_entry"
-				    " Invalid Input: word_en <0x%x>",
-				    word_en));
+		    " npi_zcp_tt_bam_entry"
+		    " Invalid Input: word_en <0x%x>",
+		    word_en));
 		return (NPI_FAILURE | NPI_ZCP_BAM_WORD_EN_INVALID);
 	}
 
 	if (zcp_mem_read(handle, flow_id, ZCP_RAM_SEL_BAM0 + bankn, NULL,
-				(zcp_ram_unit_t *)&val) != 0) {
+	    (zcp_ram_unit_t *)&val) != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_bam_entry"
-				    " HW Error: ZCP_RAM_ACC <0x%x>",
-				    NULL));
+		    " npi_zcp_tt_bam_entry"
+		    " HW Error: ZCP_RAM_ACC <0x%x>",
+		    NULL));
 		return (NPI_FAILURE | NPI_ZCP_MEM_READ_FAILED);
 	}
 
 	if (op == OP_SET) {
 		if (zcp_mem_write(handle, flow_id, ZCP_RAM_SEL_BAM0 + bankn,
-					word_en, NULL,
-					(zcp_ram_unit_t *)&val) != 0) {
+		    word_en, NULL,
+		    (zcp_ram_unit_t *)&val) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_zcp_tt_bam_entry"
-					    " HW Error: ZCP_RAM_ACC <0x%x>",
-					    NULL));
+			    " npi_zcp_tt_bam_entry"
+			    " HW Error: ZCP_RAM_ACC <0x%x>",
+			    NULL));
 			return (NPI_FAILURE | NPI_ZCP_MEM_WRITE_FAILED);
 		}
 	} else {
@@ -592,34 +592,34 @@ npi_zcp_tt_cfifo_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
 {
 	if ((op != OP_SET) && (op != OP_GET)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_cfifo_entry"
-				    " Invalid Input: op <0x%x>", op));
+		    " npi_zcp_tt_cfifo_entry"
+		    " Invalid Input: op <0x%x>", op));
 		return (NPI_FAILURE | NPI_ZCP_OPCODE_INVALID);
 	}
 
 	if (portn > 3) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_cfifo_entry"
-				    " Invalid Input: portn <%d>", portn));
+		    " npi_zcp_tt_cfifo_entry"
+		    " Invalid Input: portn <%d>", portn));
 		return (NPI_FAILURE | NPI_ZCP_PORT_INVALID(portn));
 	}
 
 	if (op == OP_SET) {
 		if (zcp_mem_write(handle, NULL, ZCP_RAM_SEL_CFIFO0 + portn,
-					0x1ffff, entryn, data) != 0) {
+		    0x1ffff, entryn, data) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_zcp_tt_cfifo_entry"
-					    " HW Error: ZCP_RAM_ACC <0x%x>",
-					    NULL));
+			    " npi_zcp_tt_cfifo_entry"
+			    " HW Error: ZCP_RAM_ACC <0x%x>",
+			    NULL));
 			return (NPI_FAILURE | NPI_ZCP_MEM_WRITE_FAILED);
 		}
 	} else {
 		if (zcp_mem_read(handle, NULL, ZCP_RAM_SEL_CFIFO0 + portn,
-					entryn, data) != 0) {
+		    entryn, data) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_zcp_tt_cfifo_entry"
-					    " HW Error: ZCP_RAM_ACC  <0x%x>",
-					NULL));
+			    " npi_zcp_tt_cfifo_entry"
+			    " HW Error: ZCP_RAM_ACC  <0x%x>",
+			    NULL));
 			return (NPI_FAILURE | NPI_ZCP_MEM_READ_FAILED);
 		}
 	}
@@ -697,9 +697,9 @@ zcp_mem_read(npi_handle_t handle, uint16_t flow_id, uint8_t ram_sel,
 	ZCP_WAIT_RAM_READY(handle, ram_ctl.value);
 	if (ram_ctl.bits.ldw.busy != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_zcp_tt_static_entry"
-				    " HW Error: ZCP_RAM_ACC <0x%x>",
-				    ram_ctl.value));
+		    " npi_zcp_tt_static_entry"
+		    " HW Error: ZCP_RAM_ACC <0x%x>",
+		    ram_ctl.value));
 		return (-1);
 	}
 

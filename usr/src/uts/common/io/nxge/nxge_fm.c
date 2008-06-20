@@ -361,7 +361,7 @@ nxge_fm_init(p_nxge_t nxgep, ddi_device_acc_attr_t *reg_attr,
 	    DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE);
 
 	NXGE_ERROR_MSG((nxgep, DDI_CTL,
-		"FM capable = %d\n", nxgep->fm_capabilities));
+	    "FM capable = %d\n", nxgep->fm_capabilities));
 
 	if (isLDOMguest(nxgep)) {
 		nxgep->fm_capabilities = DDI_FM_NOT_CAPABLE;
@@ -525,7 +525,7 @@ nxge_fm_ereport(p_nxge_t nxgep, uint8_t err_portn, uint8_t err_chan,
 	p_nxge_stats_t		statsp;
 
 	(void) snprintf(eclass, FM_MAX_CLASS, "%s.%s", DDI_FM_DEVICE,
-			ereport->eclass);
+	    ereport->eclass);
 	err_str = ereport->str;
 	ena = fm_ena_generate(0, FM_ENA_FMT1);
 	statsp = nxgep->statsp;
@@ -632,18 +632,18 @@ nxge_fm_ereport(p_nxge_t nxgep, uint8_t err_portn, uint8_t err_chan,
 
 			for (rdc_grp = 0; rdc_grp < MAX_PARTITION; rdc_grp++) {
 				hash_log.value = nxgep->classifier.fflp_stats->
-						errlog.hash_pio[rdc_grp];
+				    errlog.hash_pio[rdc_grp];
 				if (hash_log.bits.ldw.pio_err) {
 					ddi_fm_ereport_post(nxgep->dip, eclass,
-						ena, DDI_NOSLEEP,
-						FM_VERSION, DATA_TYPE_UINT8,
-						FM_EREPORT_VERS0,
-						ERNAME_DETAILED_ERR_TYPE,
-						DATA_TYPE_STRING, err_str,
-						ERNAME_HASHTAB_ERR_LOG,
-						DATA_TYPE_UINT32,
-						nxgep->classifier.fflp_stats->
-						errlog.hash_pio[rdc_grp], NULL);
+					    ena, DDI_NOSLEEP,
+					    FM_VERSION, DATA_TYPE_UINT8,
+					    FM_EREPORT_VERS0,
+					    ERNAME_DETAILED_ERR_TYPE,
+					    DATA_TYPE_STRING, err_str,
+					    ERNAME_HASHTAB_ERR_LOG,
+					    DATA_TYPE_UINT32,
+					    nxgep->classifier.fflp_stats->
+					    errlog.hash_pio[rdc_grp], NULL);
 				}
 			}
 		}
@@ -689,10 +689,10 @@ nxge_fm_ereport(p_nxge_t nxgep, uint8_t err_portn, uint8_t err_chan,
 			uint32_t err_log;
 			if (ereport->index == NXGE_FM_EREPORT_RDMC_RBR_PRE_PAR)
 				err_log = (uint32_t)statsp->
-				rdc_stats[err_chan].errlog.pre_par.value;
+				    rdc_stats[err_chan].errlog.pre_par.value;
 			else
 				err_log = (uint32_t)statsp->
-				rdc_stats[err_chan].errlog.sha_par.value;
+				    rdc_stats[err_chan].errlog.sha_par.value;
 			ddi_fm_ereport_post(nxgep->dip, eclass, ena,
 			    DDI_NOSLEEP,
 			    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0,
@@ -707,7 +707,7 @@ nxge_fm_ereport(p_nxge_t nxgep, uint8_t err_portn, uint8_t err_chan,
 			{
 			uint8_t err_type;
 			err_type = statsp->
-				rdc_stats[err_chan].errlog.compl_err_type;
+			    rdc_stats[err_chan].errlog.compl_err_type;
 			ddi_fm_ereport_post(nxgep->dip, eclass, ena,
 			    DDI_NOSLEEP,
 			    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0,
@@ -725,7 +725,7 @@ nxge_fm_ereport(p_nxge_t nxgep, uint8_t err_portn, uint8_t err_chan,
 			{
 			uint32_t sm;
 			sm = statsp->
-				zcp_stats.errlog.state_mach.bits.ldw.state;
+			    zcp_stats.errlog.state_mach.bits.ldw.state;
 			ddi_fm_ereport_post(nxgep->dip, eclass, ena,
 			    DDI_NOSLEEP,
 			    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0,

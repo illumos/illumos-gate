@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,7 +116,7 @@ npi_ipp_dump_regs(npi_handle_t handle, uint8_t port)
 	ASSERT(IS_PORT_NUM_VALID(port));
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\nIPP PORT Register Dump for port %d\n", port));
+	    "\nIPP PORT Register Dump for port %d\n", port));
 
 	num_regs = sizeof (ipp_fzc_offset) / sizeof (uint64_t);
 	for (i = 0; i < num_regs; i++) {
@@ -127,12 +127,12 @@ npi_ipp_dump_regs(npi_handle_t handle, uint8_t port)
 		NXGE_REG_RD64(handle, offset, &value);
 #endif
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
-			"%s\t 0x%08llx \n",
-			offset, ipp_fzc_name[i], value));
+		    "%s\t 0x%08llx \n",
+		    offset, ipp_fzc_name[i], value));
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\n IPP FZC Register Dump for port %d done\n", port));
+	    "\n IPP FZC Register Dump for port %d done\n", port));
 
 	return (NPI_SUCCESS);
 }
@@ -146,7 +146,7 @@ npi_ipp_read_regs(npi_handle_t handle, uint8_t port)
 	ASSERT(IS_PORT_NUM_VALID(port));
 
 	NPI_DEBUG_MSG((handle.function, NPI_IPP_CTL,
-		"\nIPP PORT Register read (to clear) for port %d\n", port));
+	    "\nIPP PORT Register read (to clear) for port %d\n", port));
 
 	num_regs = sizeof (ipp_fzc_offset) / sizeof (uint64_t);
 	for (i = 0; i < num_regs; i++) {
@@ -183,8 +183,8 @@ npi_ipp_reset(npi_handle_t handle, uint8_t portn)
 
 	if (cnt == 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_ipp_reset"
-				    " HW Error: IPP_RESET  <0x%x>", val));
+		    " npi_ipp_reset"
+		    " HW Error: IPP_RESET  <0x%x>", val));
 		return (NPI_FAILURE | NPI_IPP_RESET_FAILED(portn));
 	}
 
@@ -209,9 +209,9 @@ npi_ipp_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 	case DISABLE:
 		if ((config == 0) || ((config & ~CFG_IPP_ALL) != 0)) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				" npi_ipp_config",
-				" Invalid Input config <0x%x>",
-				config));
+			    " npi_ipp_config",
+			    " Invalid Input config <0x%x>",
+			    config));
 			return (NPI_FAILURE | NPI_IPP_CONFIG_INVALID(portn));
 		}
 
@@ -226,9 +226,9 @@ npi_ipp_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 	case INIT:
 		if ((config & ~CFG_IPP_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				" npi_ipp_config"
-				" Invalid Input config <0x%x>",
-				config));
+			    " npi_ipp_config"
+			    " Invalid Input config <0x%x>",
+			    config));
 			return (NPI_FAILURE | NPI_IPP_CONFIG_INVALID(portn));
 		}
 		IPP_REG_RD(handle, portn, IPP_CONFIG_REG, &val);
@@ -240,8 +240,8 @@ npi_ipp_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_ipp_config"
-				    " Invalid Input op <0x%x>", op));
+		    " npi_ipp_config"
+		    " Invalid Input op <0x%x>", op));
 		return (NPI_FAILURE | NPI_IPP_OPCODE_INVALID(portn));
 	}
 
@@ -258,9 +258,9 @@ npi_ipp_set_max_pktsize(npi_handle_t handle, uint8_t portn, uint32_t bytes)
 
 	if (bytes > IPP_IP_MAX_PKT_BYTES_MASK) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_set_max_pktsize"
-			" Invalid Input Max bytes <0x%x>",
-			bytes));
+		    " npi_ipp_set_max_pktsize"
+		    " Invalid Input Max bytes <0x%x>",
+		    bytes));
 		return (NPI_FAILURE | NPI_IPP_MAX_PKT_BYTES_INVALID(portn));
 	}
 
@@ -290,9 +290,9 @@ npi_ipp_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 
 		if ((iconfig == 0) || ((iconfig & ~ICFG_IPP_ALL) != 0)) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				" npi_ipp_iconfig"
-				" Invalid Input iconfig <0x%x>",
-				iconfig));
+			    " npi_ipp_iconfig"
+			    " Invalid Input iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_IPP_CONFIG_INVALID(portn));
 		}
 
@@ -308,9 +308,9 @@ npi_ipp_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 
 		if ((iconfig & ~ICFG_IPP_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				" npi_ipp_iconfig"
-				" Invalid Input iconfig <0x%x>",
-				iconfig));
+			    " npi_ipp_iconfig"
+			    " Invalid Input iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_IPP_CONFIG_INVALID(portn));
 		}
 		IPP_REG_WR(handle, portn, IPP_INT_MASK_REG, ~iconfig);
@@ -318,9 +318,9 @@ npi_ipp_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_iconfig"
-			" Invalid Input iconfig <0x%x>",
-			iconfig));
+		    " npi_ipp_iconfig"
+		    " Invalid Input iconfig <0x%x>",
+		    iconfig));
 		return (NPI_FAILURE | NPI_IPP_OPCODE_INVALID(portn));
 	}
 
@@ -373,7 +373,7 @@ npi_ipp_get_dfifo_rd_ptr(npi_handle_t handle, uint8_t portn, uint16_t *rd_ptr)
 
 	IPP_REG_RD(handle, portn, IPP_DFIFO_RD_PTR_REG, &value);
 	*rd_ptr = (uint16_t)(value & ((portn < 2) ? IPP_XMAC_DFIFO_PTR_MASK :
-					IPP_BMAC_DFIFO_PTR_MASK));
+	    IPP_BMAC_DFIFO_PTR_MASK));
 	return (NPI_SUCCESS);
 }
 
@@ -386,7 +386,7 @@ npi_ipp_get_dfifo_wr_ptr(npi_handle_t handle, uint8_t portn, uint16_t *wr_ptr)
 
 	IPP_REG_RD(handle, portn, IPP_DFIFO_WR_PTR_REG, &value);
 	*wr_ptr = (uint16_t)(value & ((portn < 2) ? IPP_XMAC_DFIFO_PTR_MASK :
-					IPP_BMAC_DFIFO_PTR_MASK));
+	    IPP_BMAC_DFIFO_PTR_MASK));
 	return (NPI_SUCCESS);
 }
 
@@ -400,8 +400,8 @@ npi_ipp_write_pfifo(npi_handle_t handle, uint8_t portn, uint8_t addr,
 
 	if (addr >= 64) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_write_pfifo"
-			" Invalid PFIFO address <0x%x>", addr));
+		    " npi_ipp_write_pfifo"
+		    " Invalid PFIFO address <0x%x>", addr));
 		return (NPI_FAILURE | NPI_IPP_FIFO_ADDR_INVALID(portn));
 	}
 
@@ -431,8 +431,8 @@ npi_ipp_read_pfifo(npi_handle_t handle, uint8_t portn, uint8_t addr,
 
 	if (addr >= 64) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_read_pfifo"
-			" Invalid PFIFO address <0x%x>", addr));
+		    " npi_ipp_read_pfifo"
+		    " Invalid PFIFO address <0x%x>", addr));
 		return (NPI_FAILURE | NPI_IPP_FIFO_ADDR_INVALID(portn));
 	}
 
@@ -456,8 +456,8 @@ npi_ipp_write_dfifo(npi_handle_t handle, uint8_t portn, uint16_t addr,
 
 	if (addr >= 2048) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_write_dfifo"
-			" Invalid DFIFO address <0x%x>", addr));
+		    " npi_ipp_write_dfifo"
+		    " Invalid DFIFO address <0x%x>", addr));
 		return (NPI_FAILURE | NPI_IPP_FIFO_ADDR_INVALID(portn));
 	}
 
@@ -487,8 +487,8 @@ npi_ipp_read_dfifo(npi_handle_t handle, uint8_t portn, uint16_t addr,
 
 	if (addr >= 2048) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_ipp_read_dfifo"
-			" Invalid DFIFO address <0x%x>", addr));
+		    " npi_ipp_read_dfifo"
+		    " Invalid DFIFO address <0x%x>", addr));
 		return (NPI_FAILURE | NPI_IPP_FIFO_ADDR_INVALID(portn));
 	}
 

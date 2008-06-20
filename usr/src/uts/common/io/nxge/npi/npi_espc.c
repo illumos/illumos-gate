@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,23 +53,23 @@ npi_espc_eeprom_entry(npi_handle_t handle, io_op_t op, uint32_t addr,
 
 	if ((addr & ~EPC_EEPROM_ADDR_BITS) != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			" npi_espc_eerprom_entry"
-			" Invalid input addr <0x%x>\n",
-			addr));
+		    " npi_espc_eerprom_entry"
+		    " Invalid input addr <0x%x>\n",
+		    addr));
 		return (NPI_FAILURE | NPI_ESPC_EEPROM_ADDR_INVALID);
 	}
 
 	switch (op) {
 	case OP_SET:
 		val = EPC_WRITE_INITIATE | (addr << EPC_EEPROM_ADDR_SHIFT) |
-			*data;
+		    *data;
 		NXGE_REG_WR64(handle, ESPC_REG_ADDR(ESPC_PIO_STATUS_REG), val);
 		EPC_WAIT_RW_COMP(handle, &val, EPC_WRITE_COMPLETE);
 		if ((val & EPC_WRITE_COMPLETE) == 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				" npi_espc_eeprom_entry"
-				" HW Error: EEPROM_WR <0x%x>\n",
-				val));
+			    " npi_espc_eeprom_entry"
+			    " HW Error: EEPROM_WR <0x%x>\n",
+			    val));
 			return (NPI_FAILURE | NPI_ESPC_EEPROM_WRITE_FAILED);
 		}
 		break;
@@ -79,9 +79,9 @@ npi_espc_eeprom_entry(npi_handle_t handle, io_op_t op, uint32_t addr,
 		EPC_WAIT_RW_COMP(handle, &val, EPC_READ_COMPLETE);
 		if ((val & EPC_READ_COMPLETE) == 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				" npi_espc_eeprom_entry"
-				" HW Error: EEPROM_RD <0x%x>",
-				val));
+			    " npi_espc_eeprom_entry"
+			    " HW Error: EEPROM_RD <0x%x>",
+			    val));
 			return (NPI_FAILURE | NPI_ESPC_EEPROM_READ_FAILED);
 		}
 		NXGE_REG_RD64(handle, ESPC_REG_ADDR(ESPC_PIO_STATUS_REG), &val);
@@ -102,8 +102,8 @@ npi_espc_eeprom_entry(npi_handle_t handle, io_op_t op, uint32_t addr,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_espc_eeprom_entry"
-				    " Invalid Input addr <0x%x>\n", addr));
+		    " npi_espc_eeprom_entry"
+		    " Invalid Input addr <0x%x>\n", addr));
 		return (NPI_FAILURE | NPI_ESPC_OPCODE_INVALID);
 	}
 
@@ -167,9 +167,9 @@ npi_espc_model_str_get(npi_handle_t handle, char *data)
 
 	if (str_len > MAX_MOD_STR_LEN) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				" npi_espc_model_str_get"
-				" Model string length %d exceeds max %d\n",
-				str_len, MAX_MOD_STR_LEN));
+		    " npi_espc_model_str_get"
+		    " Model string length %d exceeds max %d\n",
+		    str_len, MAX_MOD_STR_LEN));
 		return (NPI_FAILURE | NPI_ESPC_STR_LEN_INVALID);
 	}
 
@@ -203,10 +203,10 @@ npi_espc_bd_model_str_get(npi_handle_t handle, char *data)
 
 	if (str_len > MAX_BD_MOD_STR_LEN) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				" npi_espc_model_str_get"
-				" Board Model string length %d "
-				"exceeds max %d\n",
-				str_len, MAX_BD_MOD_STR_LEN));
+		    " npi_espc_model_str_get"
+		    " Board Model string length %d "
+		    "exceeds max %d\n",
+		    str_len, MAX_BD_MOD_STR_LEN));
 		return (NPI_FAILURE | NPI_ESPC_STR_LEN_INVALID);
 	}
 
@@ -264,9 +264,9 @@ npi_espc_port_phy_type_get(npi_handle_t handle, uint8_t *data, uint8_t portn)
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				" npi_espc_port_phy_type_get"
-				" Invalid Input: portn <%d>",
-				portn));
+		    " npi_espc_port_phy_type_get"
+		    " Invalid Input: portn <%d>",
+		    portn));
 		return (NPI_FAILURE | NPI_ESPC_PORT_INVALID);
 	}
 
@@ -343,13 +343,13 @@ npi_espc_dump(npi_handle_t handle)
 	uint64_t val = 0;
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-				    "Dumping SEEPROM registers directly:\n\n"));
+	    "Dumping SEEPROM registers directly:\n\n"));
 
 	for (i = 0; i < 23; i++) {
 		NXGE_REG_RD64(handle, ESPC_NCR_REGN(i), &val);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-					    "reg[%d]      0x%llx\n",
-					    i, val & 0xffffffff));
+		    "reg[%d]      0x%llx\n",
+		    i, val & 0xffffffff));
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "\n\n"));

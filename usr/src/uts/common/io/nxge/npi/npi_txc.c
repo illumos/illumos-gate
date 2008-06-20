@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,27 +148,27 @@ npi_txc_dump_tdc_fzc_regs(npi_handle_t handle, uint8_t tdc)
 	ASSERT(TXDMA_CHANNEL_VALID(tdc));
 	if (!TXDMA_CHANNEL_VALID(tdc)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			"npi_txc_dump_tdc_fzc_regs"
-			" Invalid TDC number %d \n",
-			tdc));
+		    "npi_txc_dump_tdc_fzc_regs"
+		    " Invalid TDC number %d \n",
+		    tdc));
 		return (NPI_FAILURE | NPI_TXC_CHANNEL_INVALID(tdc));
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		    "\nTXC FZC DMC Register Dump for Channel %d\n",
-			    tdc));
+	    "\nTXC FZC DMC Register Dump for Channel %d\n",
+	    tdc));
 
 	num_regs = sizeof (txc_fzc_dmc_offset) / sizeof (uint64_t);
 	for (i = 0; i < num_regs; i++) {
 		offset = TXC_FZC_REG_CN_OFFSET(txc_fzc_dmc_offset[i], tdc);
 		NXGE_REG_RD64(handle, offset, &value);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
-			"%s\t 0x%08llx \n",
-			offset, txc_fzc_dmc_name[i], value));
+		    "%s\t 0x%08llx \n",
+		    offset, txc_fzc_dmc_name[i], value));
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\n TXC FZC Register Dump for Channel %d done\n", tdc));
+	    "\n TXC FZC Register Dump for Channel %d done\n", tdc));
 
 	return (NPI_SUCCESS);
 }
@@ -191,17 +191,17 @@ npi_txc_dump_fzc_regs(npi_handle_t handle)
 	int num_regs, i;
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\nTXC FZC Common Register Dump\n"));
+	    "\nTXC FZC Common Register Dump\n"));
 
 	num_regs = sizeof (txc_fzc_offset) / sizeof (uint64_t);
 	for (i = 0; i < num_regs; i++) {
 		NXGE_REG_RD64(handle, txc_fzc_offset[i], &value);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
-			"%s\t 0x%08llx \n",
-			txc_fzc_offset[i], txc_fzc_name[i], value));
+		    "%s\t 0x%08llx \n",
+		    txc_fzc_offset[i], txc_fzc_name[i], value));
 	}
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\n TXC FZC Common Register Dump Done \n"));
+	    "\n TXC FZC Common Register Dump Done \n"));
 
 	return (NPI_SUCCESS);
 }
@@ -228,19 +228,19 @@ npi_txc_dump_port_fzc_regs(npi_handle_t handle, uint8_t port)
 	ASSERT(IS_PORT_NUM_VALID(port));
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\nTXC FZC PORT Register Dump for port %d\n", port));
+	    "\nTXC FZC PORT Register Dump for port %d\n", port));
 
 	num_regs = sizeof (txc_fzc_port_offset) / sizeof (uint64_t);
 	for (i = 0; i < num_regs; i++) {
 		offset = TXC_FZC_REG_PT_OFFSET(txc_fzc_port_offset[i], port);
 		NXGE_REG_RD64(handle, offset, &value);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
-			"%s\t 0x%08llx \n",
-			offset, txc_fzc_port_name[i], value));
+		    "%s\t 0x%08llx \n",
+		    offset, txc_fzc_port_name[i], value));
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\n TXC FZC Register Dump for port %d done\n", port));
+	    "\n TXC FZC Register Dump for port %d done\n", port));
 
 	return (NPI_SUCCESS);
 }
@@ -272,29 +272,29 @@ npi_txc_dma_max_burst(npi_handle_t handle, io_op_t op_mode, uint8_t channel,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_dma_max_burst"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txc_dma_max_burst"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXC_CHANNEL_INVALID(channel));
 	}
 
 	switch (op_mode) {
 	case OP_GET:
 		TXC_FZC_REG_READ64(handle, TXC_DMA_MAX_BURST_REG, channel,
-					&val);
+		    &val);
 		*dma_max_burst_p = (uint32_t)val;
 		break;
 
 	case OP_SET:
 		TXC_FZC_REG_WRITE64(handle,
-			TXC_DMA_MAX_BURST_REG, channel, *dma_max_burst_p);
+		    TXC_DMA_MAX_BURST_REG, channel, *dma_max_burst_p);
 		break;
 
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_dma_max_burst"
-				    " Invalid Input: burst <0x%x>",
-				    op_mode));
+		    " npi_txc_dma_max_burst"
+		    " Invalid Input: burst <0x%x>",
+		    op_mode));
 		return (NPI_FAILURE | NPI_TXC_OPCODE_INVALID(channel));
 	}
 
@@ -322,14 +322,14 @@ npi_txc_dma_max_burst_set(npi_handle_t handle, uint8_t channel,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_dma_max_burst_set"
-				    " Invalid Input: channel <0x%x>",
-				    channel));
+		    " npi_txc_dma_max_burst_set"
+		    " Invalid Input: channel <0x%x>",
+		    channel));
 		return (NPI_FAILURE | NPI_TXC_CHANNEL_INVALID(channel));
 	}
 
 	TXC_FZC_REG_WRITE64(handle, TXC_DMA_MAX_BURST_REG,
-		channel, (uint64_t)max_burst);
+	    channel, (uint64_t)max_burst);
 
 	return (NPI_SUCCESS);
 }
@@ -359,9 +359,9 @@ npi_txc_dma_bytes_transmitted(npi_handle_t handle, uint8_t channel,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_dma_bytes_transmitted"
-				    " Invalid Input: channel %d",
-				    channel));
+		    " npi_txc_dma_bytes_transmitted"
+		    " Invalid Input: channel %d",
+		    channel));
 		return (NPI_FAILURE | NPI_TXC_CHANNEL_INVALID(channel));
 	}
 
@@ -399,14 +399,14 @@ npi_txc_control(npi_handle_t handle, io_op_t op_mode,
 
 	case OP_SET:
 		NXGE_REG_WR64(handle, TXC_CONTROL_REG,
-			txc_control_p->value);
+		    txc_control_p->value);
 		break;
 
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_control"
-				    " Invalid Input:  control 0x%x",
-				    op_mode));
+		    " npi_txc_control"
+		    " Invalid Input:  control 0x%x",
+		    op_mode));
 		return (NPI_FAILURE | NPI_TXC_OPCODE_INVALID(op_mode));
 	}
 
@@ -527,7 +527,7 @@ npi_txc_training_get(npi_handle_t handle, uint32_t *vector_p)
 	uint64_t val;
 
 	NXGE_REG_RD64(handle, (TXC_TRAINING_REG & TXC_TRAINING_VECTOR_MASK),
-			&val);
+	    &val);
 	*vector_p = (uint32_t)val;
 
 	return (NPI_SUCCESS);
@@ -611,7 +611,7 @@ npi_txc_port_dma_enable(npi_handle_t handle, uint8_t port,
 	ASSERT(IS_PORT_NUM_VALID(port));
 
 	TXC_FZC_CNTL_REG_WRITE64(handle, TXC_PORT_DMA_ENABLE_REG, port,
-		port_dma_list_bitmap);
+	    port_dma_list_bitmap);
 	return (NPI_SUCCESS);
 }
 
@@ -655,14 +655,14 @@ npi_txc_port_dma_channel_enable(npi_handle_t handle, uint8_t port,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_port_dma_channel_enable"
-				    " Invalid Input: channel <0x%x>", channel));
+		    " npi_txc_port_dma_channel_enable"
+		    " Invalid Input: channel <0x%x>", channel));
 		return (NPI_FAILURE | NPI_TXC_CHANNEL_INVALID(channel));
 	}
 
 	TXC_FZC_CNTL_REG_READ64(handle, TXC_PORT_DMA_ENABLE_REG, port, &val);
 	TXC_FZC_CNTL_REG_WRITE64(handle, TXC_PORT_DMA_ENABLE_REG, port,
-				(val | (1 << channel)));
+	    (val | (1 << channel)));
 
 	return (NPI_SUCCESS);
 }
@@ -693,14 +693,14 @@ npi_txc_port_dma_channel_disable(npi_handle_t handle, uint8_t port,
 	ASSERT(TXDMA_CHANNEL_VALID(channel));
 	if (!TXDMA_CHANNEL_VALID(channel)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_txc_port_dma_channel_disable"
-				    " Invalid Input: channel <0x%x>", channel));
+		    " npi_txc_port_dma_channel_disable"
+		    " Invalid Input: channel <0x%x>", channel));
 		return (NPI_FAILURE | NPI_TXC_CHANNEL_INVALID(channel));
 	}
 
 	TXC_FZC_CNTL_REG_READ64(handle, TXC_PORT_DMA_ENABLE_REG, port, &val)
 	TXC_FZC_CNTL_REG_WRITE64(handle, TXC_PORT_DMA_ENABLE_REG, port,
-				val & ~(1 << channel));
+	    val & ~(1 << channel));
 
 	return (NPI_SUCCESS);
 }
@@ -791,9 +791,9 @@ npi_txc_pkt_stuffed_get(npi_handle_t handle, uint8_t port,
 
 	TXC_FZC_CNTL_REG_READ64(handle, TXC_PKT_STUFFED_REG, port, &value);
 	*pkt_assy_p = ((uint32_t)((value & TXC_PKT_STUFF_PKTASY_MASK) >>
-		TXC_PKT_STUFF_PKTASY_SHIFT));
+	    TXC_PKT_STUFF_PKTASY_SHIFT));
 	*pkt_reorder_p = ((uint32_t)((value & TXC_PKT_STUFF_REORDER_MASK) >>
-		TXC_PKT_STUFF_REORDER_SHIFT));
+	    TXC_PKT_STUFF_REORDER_SHIFT));
 
 	return (NPI_SUCCESS);
 }
@@ -826,9 +826,9 @@ npi_txc_pkt_xmt_to_mac_get(npi_handle_t handle, uint8_t port,
 
 	TXC_FZC_CNTL_REG_READ64(handle, TXC_PKT_XMIT_REG, port, &value);
 	*mac_pkts_p = ((uint32_t)((value & TXC_PKTS_XMIT_MASK) >>
-		TXC_PKTS_XMIT_SHIFT));
+	    TXC_PKTS_XMIT_SHIFT));
 	*mac_bytes_p = ((uint32_t)((value & TXC_BYTES_XMIT_MASK) >>
-		TXC_BYTES_XMIT_SHIFT));
+	    TXC_BYTES_XMIT_SHIFT));
 
 	return (NPI_SUCCESS);
 }
@@ -871,15 +871,15 @@ npi_txc_ro_states_get(npi_handle_t handle, uint8_t port,
 	TXC_FZC_CNTL_REG_READ64(handle, TXC_ROECC_ST_REG, port, &ecc.value);
 	if ((ecc.bits.ldw.correct_error) || (ecc.bits.ldw.uncorrect_error)) {
 		TXC_FZC_CNTL_REG_READ64(handle, TXC_RO_DATA0_REG, port,
-								&d0.value);
+		    &d0.value);
 		TXC_FZC_CNTL_REG_READ64(handle, TXC_RO_DATA1_REG, port,
-								&d1.value);
+		    &d1.value);
 		TXC_FZC_CNTL_REG_READ64(handle, TXC_RO_DATA2_REG, port,
-								&d2.value);
+		    &d2.value);
 		TXC_FZC_CNTL_REG_READ64(handle, TXC_RO_DATA3_REG, port,
-								&d3.value);
+		    &d3.value);
 		TXC_FZC_CNTL_REG_READ64(handle, TXC_RO_DATA4_REG, port,
-								&d4.value);
+		    &d4.value);
 		states->d0.value = d0.value;
 		states->d1.value = d1.value;
 		states->d2.value = d2.value;
@@ -891,7 +891,7 @@ npi_txc_ro_states_get(npi_handle_t handle, uint8_t port,
 		ecc.bits.ldw.uncorrect_error = 0;
 		ecc.bits.ldw.clr_st = 1;
 		TXC_FZC_CNTL_REG_WRITE64(handle, TXC_ROECC_ST_REG, port,
-						ecc.value);
+		    ecc.value);
 	}
 
 	TXC_FZC_CNTL_REG_READ64(handle, TXC_RO_CTL_REG, port, &ctl.value);
@@ -960,21 +960,21 @@ npi_txc_sf_states_get(npi_handle_t handle, uint8_t port,
 	TXC_FZC_CNTL_REG_READ64(handle, TXC_SFECC_ST_REG, port, &ecc.value);
 	if ((ecc.bits.ldw.correct_error) || (ecc.bits.ldw.uncorrect_error)) {
 		TXC_FZC_CNTL_REG_READ64(handle, TXC_SF_DATA0_REG, port,
-								&d0.value);
+		    &d0.value);
 		TXC_FZC_CNTL_REG_READ64(handle, TXC_SF_DATA1_REG, port,
-								&d1.value);
+		    &d1.value);
 		TXC_FZC_CNTL_REG_READ64(handle, TXC_SF_DATA2_REG, port,
-								&d2.value);
+		    &d2.value);
 		TXC_FZC_CNTL_REG_READ64(handle, TXC_SF_DATA3_REG, port,
-								&d3.value);
+		    &d3.value);
 		TXC_FZC_CNTL_REG_READ64(handle, TXC_SF_DATA4_REG, port,
-								&d4.value);
+		    &d4.value);
 		ecc.bits.ldw.ecc_address = 0;
 		ecc.bits.ldw.correct_error = 0;
 		ecc.bits.ldw.uncorrect_error = 0;
 		ecc.bits.ldw.clr_st = 1;
 		TXC_FZC_CNTL_REG_WRITE64(handle, TXC_SFECC_ST_REG, port,
-						ecc.value);
+		    ecc.value);
 	}
 
 	states->sfecc.value = ecc.value;

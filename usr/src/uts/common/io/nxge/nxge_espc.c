@@ -65,28 +65,25 @@ nxge_espc_mac_addrs_get(p_nxge_t nxgep)
 	uint8_t		mac_addr[ETHERADDRL];
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-			    "==> nxge_espc_mac_addr_get, port[%d]",
-			    port_num));
+	    "==> nxge_espc_mac_addr_get, port[%d]", port_num));
 
 	npi_status = npi_espc_mac_addr_get(handle, mac_addr);
 	if (npi_status != NPI_SUCCESS) {
 		status = (NXGE_ERROR | npi_status);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				    "nxge_espc_mac_addr_get, port[%d] failed",
-				    port_num));
+		    "nxge_espc_mac_addr_get, port[%d] failed", port_num));
 		goto exit;
 	}
 
 	nxge_espc_get_next_mac_addr(mac_addr, port_num, &nxgep->factaddr);
 		NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-			"Got MAC Addr: %2x:%2x:%2x:%2x:%2x%:%2x%c \n",
-			mac_addr[0], mac_addr[1],
-			mac_addr[2], mac_addr[3],
-			mac_addr[4], mac_addr[5]));
+		    "Got MAC Addr: %2x:%2x:%2x:%2x:%2x%:%2x%c \n",
+		    mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3],
+		    mac_addr[4], mac_addr[5]));
 
 exit:
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "<== nxge_espc_mac_addr_get, "
-			"status [0x%x]", status));
+	    "status [0x%x]", status));
 
 	return (status);
 }
@@ -105,7 +102,7 @@ nxge_espc_num_macs_get(p_nxge_t nxgep, uint8_t *nmacs)
 	}
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "<== nxge_espc_num_macs_get, "
-		"status [0x%x]", status));
+	    "status [0x%x]", status));
 
 	return (status);
 }
@@ -125,10 +122,10 @@ nxge_espc_num_ports_get(p_nxge_t nxgep)
 	}
 	nxgep->nports = nports;
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, " nxge_espc_num_ports_get "
-			"ports [0x%x]", nports));
+	    "ports [0x%x]", nports));
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "<== nxge_espc_num_ports_get, "
-			"status [0x%x]", status));
+	    "status [0x%x]", status));
 
 	return (status);
 }
@@ -143,10 +140,9 @@ nxge_espc_phy_type_get(p_nxge_t nxgep)
 	uint8_t		phy_type;
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "==> nxge_espc_phy_type_get, port[%d]",
-			port_num));
+	    port_num));
 
-	npi_status = npi_espc_port_phy_type_get(handle, &phy_type,
-						port_num);
+	npi_status = npi_espc_port_phy_type_get(handle, &phy_type, port_num);
 	if (npi_status != NPI_SUCCESS) {
 		status = (NXGE_ERROR | npi_status);
 		goto exit;
@@ -172,19 +168,19 @@ nxge_espc_phy_type_get(p_nxge_t nxgep)
 	case ESC_PHY_NONE:
 		status = NXGE_ERROR;
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_espc_phy_type_get:"
-				"No phy type set"));
+		    "No phy type set"));
 		break;
 	default:
 		status = NXGE_ERROR;
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_espc_phy_type_get: "
-				"Unknown phy type [%d]", phy_type));
+		    "Unknown phy type [%d]", phy_type));
 		break;
 	}
 
 exit:
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "<== nxge_espc_phy_type_get, "
-			"status [0x%x]", status));
+	    "status [0x%x]", status));
 
 	return (status);
 }
@@ -204,7 +200,7 @@ nxge_espc_max_frame_sz_get(p_nxge_t nxgep)
 	}
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, " nxge_espc_max_frame_sz_get, "
-			    "status [0x%x]", status));
+	    "status [0x%x]", status));
 
 	return (status);
 }

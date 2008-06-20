@@ -205,7 +205,7 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 	}
 
 	hcksum_retrieve(mp, NULL, NULL, &start_offset,
-		&stuff_offset, &end_offset, &value, &cksum_flags);
+	    &stuff_offset, &end_offset, &value, &cksum_flags);
 	if (!NXGE_IS_VLAN_PACKET(mp->b_rptr)) {
 		start_offset += sizeof (ether_header_t);
 		stuff_offset += sizeof (ether_header_t);
@@ -216,9 +216,9 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 
 	if (cksum_flags & HCK_PARTIALCKSUM) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_start: mp $%p len %d "
-			"cksum_flags 0x%x (partial checksum) ",
-			mp, MBLKL(mp), cksum_flags));
+		    "==> nxge_start: mp $%p len %d "
+		    "cksum_flags 0x%x (partial checksum) ",
+		    mp, MBLKL(mp), cksum_flags));
 		cksum_on = B_TRUE;
 	}
 
@@ -254,40 +254,40 @@ start_again:
 #ifdef	NXGE_DEBUG
 	if (tx_ring_p->descs_pending) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: "
-			"desc pending %d ", tx_ring_p->descs_pending));
+		    "desc pending %d ", tx_ring_p->descs_pending));
 	}
 
 	dump_len = (int)(MBLKL(mp));
 	dump_len = (dump_len > 128) ? 128: dump_len;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_start: tdc %d: dumping ...: b_rptr $%p "
-		"(Before header reserve: ORIGINAL LEN %d)",
-		tx_ring_p->tdc,
-		mp->b_rptr,
-		dump_len));
+	    "==> nxge_start: tdc %d: dumping ...: b_rptr $%p "
+	    "(Before header reserve: ORIGINAL LEN %d)",
+	    tx_ring_p->tdc,
+	    mp->b_rptr,
+	    dump_len));
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: dump packets "
-		"(IP ORIGINAL b_rptr $%p): %s", mp->b_rptr,
-		nxge_dump_packet((char *)mp->b_rptr, dump_len)));
+	    "(IP ORIGINAL b_rptr $%p): %s", mp->b_rptr,
+	    nxge_dump_packet((char *)mp->b_rptr, dump_len)));
 #endif
 
 	tdc_stats = tx_ring_p->tdc_stats;
 	mark_mode = (tx_ring_p->descs_pending &&
-		((tx_ring_p->tx_ring_size - tx_ring_p->descs_pending)
-		< nxge_tx_minfree));
+	    ((tx_ring_p->tx_ring_size - tx_ring_p->descs_pending)
+	    < nxge_tx_minfree));
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"TX Descriptor ring is channel %d mark mode %d",
-		tx_ring_p->tdc, mark_mode));
+	    "TX Descriptor ring is channel %d mark mode %d",
+	    tx_ring_p->tdc, mark_mode));
 
 	if (!nxge_txdma_reclaim(nxgep, tx_ring_p, nxge_tx_minfree)) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"TX Descriptor ring is full: channel %d",
-			tx_ring_p->tdc));
+		    "TX Descriptor ring is full: channel %d",
+		    tx_ring_p->tdc));
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"TX Descriptor ring is full: channel %d",
-			tx_ring_p->tdc));
+		    "TX Descriptor ring is full: channel %d",
+		    tx_ring_p->tdc));
 		if (is_lso) {
 			/* free the current mp and mp_chain if not FULL */
 			tdc_stats->tx_no_desc++;
@@ -336,20 +336,20 @@ start_again:
 	desc_area = tx_ring_p->tdc_desc;
 	npi_handle = desc_area.npi_handle;
 	npi_desc_handle.regh = (nxge_os_acc_handle_t)
-			DMA_COMMON_ACC_HANDLE(desc_area);
+	    DMA_COMMON_ACC_HANDLE(desc_area);
 	tx_desc_ring_vp = (p_tx_desc_t)DMA_COMMON_VPTR(desc_area);
 	tx_desc_dma_handle = (nxge_os_dma_handle_t)
-			DMA_COMMON_HANDLE(desc_area);
+	    DMA_COMMON_HANDLE(desc_area);
 	tx_msg_ring = tx_ring_p->tx_msg_ring;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: wr_index %d i %d",
-		sop_index, i));
+	    sop_index, i));
 
 #ifdef	NXGE_DEBUG
 	msgsize = msgdsize(nmp);
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_start(1): wr_index %d i %d msgdsize %d",
-		sop_index, i, msgsize));
+	    "==> nxge_start(1): wr_index %d i %d msgdsize %d",
+	    sop_index, i, msgsize));
 #endif
 	/*
 	 * The first 16 bytes of the premapped buffer are reserved
@@ -372,8 +372,8 @@ start_again:
 		nmblks++;
 
 		NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start(1): nmblks %d "
-			"len %d pkt_len %d pack_len %d",
-			nmblks, len, pkt_len, pack_len));
+		    "len %d pkt_len %d pack_len %d",
+		    nmblks, len, pkt_len, pack_len));
 		/*
 		 * Hardware limits the transfer length to 4K for NIU and
 		 * 4076 (TX_MAX_TRANSFER_LENGTH) for Neptune. But we just
@@ -419,8 +419,8 @@ start_again:
 		npi_desc_handle.regp = (uint64_t)tx_desc_p;
 #endif
 		if (!header_set &&
-			((!nxge_tx_use_bcopy && (len > TX_BCOPY_SIZE)) ||
-				(len >= bcopy_thresh))) {
+		    ((!nxge_tx_use_bcopy && (len > TX_BCOPY_SIZE)) ||
+		    (len >= bcopy_thresh))) {
 			header_set = B_TRUE;
 			bcopy_thresh += TX_PKT_HEADER_SIZE;
 			boff = 0;
@@ -431,8 +431,8 @@ start_again:
 			dma_handle = tx_msg_p->buf_dma_handle;
 			dma_ioaddr = DMA_COMMON_IOADDR(tx_msg_p->buf_dma);
 			(void) ddi_dma_sync(dma_handle,
-				i * nxge_bcopy_thresh, nxge_bcopy_thresh,
-				DDI_DMA_SYNC_FORDEV);
+			    i * nxge_bcopy_thresh, nxge_bcopy_thresh,
+			    DDI_DMA_SYNC_FORDEV);
 
 			tx_msg_p->flags.dma_type = USE_BCOPY;
 			goto nxge_start_control_header_only;
@@ -442,32 +442,32 @@ start_again:
 		pack_len += len;
 
 		NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start(3): "
-			"desc entry %d "
-			"DESC IOADDR $%p "
-			"desc_vp $%p tx_desc_p $%p "
-			"desc_pp $%p tx_desc_pp $%p "
-			"len %d pkt_len %d pack_len %d",
-			i,
-			DMA_COMMON_IOADDR(desc_area),
-			tx_desc_ring_vp, tx_desc_p,
-			tx_desc_ring_pp, tx_desc_pp,
-			len, pkt_len, pack_len));
+		    "desc entry %d "
+		    "DESC IOADDR $%p "
+		    "desc_vp $%p tx_desc_p $%p "
+		    "desc_pp $%p tx_desc_pp $%p "
+		    "len %d pkt_len %d pack_len %d",
+		    i,
+		    DMA_COMMON_IOADDR(desc_area),
+		    tx_desc_ring_vp, tx_desc_p,
+		    tx_desc_ring_pp, tx_desc_pp,
+		    len, pkt_len, pack_len));
 
 		if (len < bcopy_thresh) {
 			NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start(4): "
-				"USE BCOPY: "));
+			    "USE BCOPY: "));
 			if (nxge_tx_tiny_pack) {
 				uint32_t blst =
-					TXDMA_DESC_NEXT_INDEX(i, -1,
-						tx_ring_p->tx_wrap_mask);
+				    TXDMA_DESC_NEXT_INDEX(i, -1,
+				    tx_ring_p->tx_wrap_mask);
 				NXGE_DEBUG_MSG((nxgep, TX_CTL,
-					"==> nxge_start(5): pack"));
+				    "==> nxge_start(5): pack"));
 				if ((pack_len <= bcopy_thresh) &&
-					(last_bidx == blst)) {
+				    (last_bidx == blst)) {
 					NXGE_DEBUG_MSG((nxgep, TX_CTL,
-						"==> nxge_start: pack(6) "
-						"(pkt_len %d pack_len %d)",
-						pkt_len, pack_len));
+					    "==> nxge_start: pack(6) "
+					    "(pkt_len %d pack_len %d)",
+					    pkt_len, pack_len));
 					i = blst;
 					tx_desc_p = &tx_desc_ring_vp[i];
 #ifdef	NXGE_DEBUG
@@ -477,16 +477,16 @@ start_again:
 					boff = pack_len - len;
 					ngathers--;
 				} else if (pack_len > bcopy_thresh &&
-					header_set) {
+				    header_set) {
 					pack_len = len;
 					boff = 0;
 					bcopy_thresh = nxge_bcopy_thresh;
 					NXGE_DEBUG_MSG((nxgep, TX_CTL,
-						"==> nxge_start(7): > max NEW "
-						"bcopy thresh %d "
-						"pkt_len %d pack_len %d(next)",
-						bcopy_thresh,
-						pkt_len, pack_len));
+					    "==> nxge_start(7): > max NEW "
+					    "bcopy thresh %d "
+					    "pkt_len %d pack_len %d(next)",
+					    bcopy_thresh,
+					    pkt_len, pack_len));
 				}
 				last_bidx = i;
 			}
@@ -495,72 +495,72 @@ start_again:
 				hdrp = (p_tx_pkt_header_t)kaddr;
 				header_set = B_TRUE;
 				NXGE_DEBUG_MSG((nxgep, TX_CTL,
-					"==> nxge_start(7_x2): "
-					"pkt_len %d pack_len %d (new hdrp $%p)",
-					pkt_len, pack_len, hdrp));
+				    "==> nxge_start(7_x2): "
+				    "pkt_len %d pack_len %d (new hdrp $%p)",
+				    pkt_len, pack_len, hdrp));
 			}
 			tx_msg_p->flags.dma_type = USE_BCOPY;
 			kaddr += boff;
 			NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start(8): "
-				"USE BCOPY: before bcopy "
-				"DESC IOADDR $%p entry %d "
-				"bcopy packets %d "
-				"bcopy kaddr $%p "
-				"bcopy ioaddr (SAD) $%p "
-				"bcopy clen %d "
-				"bcopy boff %d",
-				DMA_COMMON_IOADDR(desc_area), i,
-				tdc_stats->tx_hdr_pkts,
-				kaddr,
-				dma_ioaddr,
-				clen,
-				boff));
+			    "USE BCOPY: before bcopy "
+			    "DESC IOADDR $%p entry %d "
+			    "bcopy packets %d "
+			    "bcopy kaddr $%p "
+			    "bcopy ioaddr (SAD) $%p "
+			    "bcopy clen %d "
+			    "bcopy boff %d",
+			    DMA_COMMON_IOADDR(desc_area), i,
+			    tdc_stats->tx_hdr_pkts,
+			    kaddr,
+			    dma_ioaddr,
+			    clen,
+			    boff));
 			NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: "
-				"1USE BCOPY: "));
+			    "1USE BCOPY: "));
 			NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: "
-				"2USE BCOPY: "));
+			    "2USE BCOPY: "));
 			NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: "
-				"last USE BCOPY: copy from b_rptr $%p "
-				"to KADDR $%p (len %d offset %d",
-				b_rptr, kaddr, len, boff));
+			    "last USE BCOPY: copy from b_rptr $%p "
+			    "to KADDR $%p (len %d offset %d",
+			    b_rptr, kaddr, len, boff));
 
 			bcopy(b_rptr, kaddr, len);
 
 #ifdef	NXGE_DEBUG
 			dump_len = (len > 128) ? 128: len;
 			NXGE_DEBUG_MSG((nxgep, TX_CTL,
-				"==> nxge_start: dump packets "
-				"(After BCOPY len %d)"
-				"(b_rptr $%p): %s", len, nmp->b_rptr,
-				nxge_dump_packet((char *)nmp->b_rptr,
-				dump_len)));
+			    "==> nxge_start: dump packets "
+			    "(After BCOPY len %d)"
+			    "(b_rptr $%p): %s", len, nmp->b_rptr,
+			    nxge_dump_packet((char *)nmp->b_rptr,
+			    dump_len)));
 #endif
 
 			dma_handle = tx_msg_p->buf_dma_handle;
 			dma_ioaddr = DMA_COMMON_IOADDR(tx_msg_p->buf_dma);
 			(void) ddi_dma_sync(dma_handle,
-				i * nxge_bcopy_thresh, nxge_bcopy_thresh,
-					DDI_DMA_SYNC_FORDEV);
+			    i * nxge_bcopy_thresh, nxge_bcopy_thresh,
+			    DDI_DMA_SYNC_FORDEV);
 			clen = len + boff;
 			tdc_stats->tx_hdr_pkts++;
 			NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start(9): "
-				"USE BCOPY: "
-				"DESC IOADDR $%p entry %d "
-				"bcopy packets %d "
-				"bcopy kaddr $%p "
-				"bcopy ioaddr (SAD) $%p "
-				"bcopy clen %d "
-				"bcopy boff %d",
-				DMA_COMMON_IOADDR(desc_area),
-				i,
-				tdc_stats->tx_hdr_pkts,
-				kaddr,
-				dma_ioaddr,
-				clen,
-				boff));
+			    "USE BCOPY: "
+			    "DESC IOADDR $%p entry %d "
+			    "bcopy packets %d "
+			    "bcopy kaddr $%p "
+			    "bcopy ioaddr (SAD) $%p "
+			    "bcopy clen %d "
+			    "bcopy boff %d",
+			    DMA_COMMON_IOADDR(desc_area),
+			    i,
+			    tdc_stats->tx_hdr_pkts,
+			    kaddr,
+			    dma_ioaddr,
+			    clen,
+			    boff));
 		} else {
 			NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start(12): "
-				"USE DVMA: len %d", len));
+			    "USE DVMA: len %d", len));
 			tx_msg_p->flags.dma_type = USE_DMA;
 			dma_flags = DDI_DMA_WRITE;
 			if (len < nxge_dma_stream_thresh) {
@@ -571,19 +571,19 @@ start_again:
 
 			dma_handle = tx_msg_p->dma_handle;
 			status = ddi_dma_addr_bind_handle(dma_handle, NULL,
-				(caddr_t)b_rptr, len, dma_flags,
-				DDI_DMA_DONTWAIT, NULL,
-				&dma_cookie, &ncookies);
+			    (caddr_t)b_rptr, len, dma_flags,
+			    DDI_DMA_DONTWAIT, NULL,
+			    &dma_cookie, &ncookies);
 			if (status == DDI_DMA_MAPPED) {
 				dma_ioaddr = dma_cookie.dmac_laddress;
 				len = (int)dma_cookie.dmac_size;
 				clen = (uint32_t)dma_cookie.dmac_size;
 				NXGE_DEBUG_MSG((nxgep, TX_CTL,
-					"==> nxge_start(12_1): "
-					"USE DVMA: len %d clen %d "
-					"ngathers %d",
-					len, clen,
-					ngathers));
+				    "==> nxge_start(12_1): "
+				    "USE DVMA: len %d clen %d "
+				    "ngathers %d",
+				    len, clen,
+				    ngathers));
 #if defined(__i386)
 				npi_desc_handle.regp = (uint32_t)tx_desc_p;
 #else
@@ -599,47 +599,48 @@ start_again:
 					 */
 
 					(void) npi_txdma_desc_gather_set(
-						npi_desc_handle,
-						&tx_desc,
-						(ngathers -1),
-						mark_mode,
-						ngathers,
-						dma_ioaddr,
-						clen);
+					    npi_desc_handle,
+					    &tx_desc,
+					    (ngathers -1),
+					    mark_mode,
+					    ngathers,
+					    dma_ioaddr,
+					    clen);
 
 					tx_msg_p->tx_msg_size = clen;
 					NXGE_DEBUG_MSG((nxgep, TX_CTL,
-						"==> nxge_start:  DMA "
-						"ncookie %d "
-						"ngathers %d "
-						"dma_ioaddr $%p len %d"
-						"desc $%p descp $%p (%d)",
-						ncookies,
-						ngathers,
-						dma_ioaddr, clen,
-						*tx_desc_p, tx_desc_p, i));
+					    "==> nxge_start:  DMA "
+					    "ncookie %d "
+					    "ngathers %d "
+					    "dma_ioaddr $%p len %d"
+					    "desc $%p descp $%p (%d)",
+					    ncookies,
+					    ngathers,
+					    dma_ioaddr, clen,
+					    *tx_desc_p, tx_desc_p, i));
 
 					ddi_dma_nextcookie(dma_handle,
-							&dma_cookie);
+					    &dma_cookie);
 					dma_ioaddr =
-						dma_cookie.dmac_laddress;
+					    dma_cookie.dmac_laddress;
 
 					len = (int)dma_cookie.dmac_size;
 					clen = (uint32_t)dma_cookie.dmac_size;
 					NXGE_DEBUG_MSG((nxgep, TX_CTL,
-						"==> nxge_start(12_2): "
-						"USE DVMA: len %d clen %d ",
-						len, clen));
+					    "==> nxge_start(12_2): "
+					    "USE DVMA: len %d clen %d ",
+					    len, clen));
 
 					i = TXDMA_DESC_NEXT_INDEX(i, 1,
-						tx_ring_p->tx_wrap_mask);
+					    tx_ring_p->tx_wrap_mask);
 					tx_desc_p = &tx_desc_ring_vp[i];
 
-					npi_desc_handle.regp =
 #if defined(__i386)
-						(uint32_t)tx_desc_p;
+					npi_desc_handle.regp =
+					    (uint32_t)tx_desc_p;
 #else
-						(uint64_t)tx_desc_p;
+					npi_desc_handle.regp =
+					    (uint64_t)tx_desc_p;
 #endif
 					tx_msg_p = &tx_msg_ring[i];
 					tx_msg_p->flags.dma_type = USE_NONE;
@@ -649,8 +650,8 @@ start_again:
 				}
 				tdc_stats->tx_ddi_pkts++;
 				NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start:"
-					"DMA: ddi packets %d",
-					tdc_stats->tx_ddi_pkts));
+				    "DMA: ddi packets %d",
+				    tdc_stats->tx_ddi_pkts));
 			} else {
 				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 				    "dma mapping failed for %d "
@@ -703,14 +704,14 @@ nxge_start_control_header_only:
 		}
 
 		NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start(13): "
-			"Desc_entry %d ngathers %d "
-			"desc_vp $%p tx_desc_p $%p "
-			"len %d clen %d pkt_len %d pack_len %d nmblks %d "
-			"dma_ioaddr (SAD) $%p mark %d",
-			i, ngathers,
-			tx_desc_ring_vp, tx_desc_p,
-			len, clen, pkt_len, pack_len, nmblks,
-			dma_ioaddr, mark_mode));
+		    "Desc_entry %d ngathers %d "
+		    "desc_vp $%p tx_desc_p $%p "
+		    "len %d clen %d pkt_len %d pack_len %d nmblks %d "
+		    "dma_ioaddr (SAD) $%p mark %d",
+		    i, ngathers,
+		    tx_desc_ring_vp, tx_desc_p,
+		    len, clen, pkt_len, pack_len, nmblks,
+		    dma_ioaddr, mark_mode));
 
 #ifdef NXGE_DEBUG
 		npi_desc_handle.nxgep = nxgep;
@@ -718,19 +719,19 @@ nxge_start_control_header_only:
 		npi_desc_handle.function.instance = nxgep->instance;
 		sad = (save_desc_p->value & TX_PKT_DESC_SAD_MASK);
 		xfer_len = ((save_desc_p->value & TX_PKT_DESC_TR_LEN_MASK) >>
-			TX_PKT_DESC_TR_LEN_SHIFT);
+		    TX_PKT_DESC_TR_LEN_SHIFT);
 
 
 		NXGE_DEBUG_MSG((nxgep, TX_CTL, "\n\t: value 0x%llx\n"
-			"\t\tsad $%p\ttr_len %d len %d\tnptrs %d\t"
-			"mark %d sop %d\n",
-			save_desc_p->value,
-			sad,
-			save_desc_p->bits.hdw.tr_len,
-			xfer_len,
-			save_desc_p->bits.hdw.num_ptr,
-			save_desc_p->bits.hdw.mark,
-			save_desc_p->bits.hdw.sop));
+		    "\t\tsad $%p\ttr_len %d len %d\tnptrs %d\t"
+		    "mark %d sop %d\n",
+		    save_desc_p->value,
+		    sad,
+		    save_desc_p->bits.hdw.tr_len,
+		    xfer_len,
+		    save_desc_p->bits.hdw.num_ptr,
+		    save_desc_p->bits.hdw.mark,
+		    save_desc_p->bits.hdw.sop));
 
 		npi_txdma_dump_desc_one(npi_desc_handle, NULL, i);
 #endif
@@ -740,13 +741,13 @@ nxge_start_control_header_only:
 		if (ngathers > nxge_tx_max_gathers) {
 			good_packet = B_FALSE;
 			hcksum_retrieve(mp, NULL, NULL, &start_offset,
-				&stuff_offset, &end_offset, &value,
-				&cksum_flags);
+			    &stuff_offset, &end_offset, &value,
+			    &cksum_flags);
 
 			NXGE_DEBUG_MSG((NULL, TX_CTL,
-				"==> nxge_start(14): pull msg - "
-				"len %d pkt_len %d ngathers %d",
-				len, pkt_len, ngathers));
+			    "==> nxge_start(14): pull msg - "
+			    "len %d pkt_len %d ngathers %d",
+			    len, pkt_len, ngathers));
 			/* Pull all message blocks from b_cont */
 			if (is_lso) {
 				mp = nmp_lso_save;
@@ -781,9 +782,9 @@ nxge_start_control_header_only:
 		/* Assume we use bcopy to premapped buffers */
 		kaddr = (caddr_t)DMA_COMMON_VPTR(tx_msg_p->buf_dma);
 		NXGE_DEBUG_MSG((NULL, TX_CTL,
-			"==> nxge_start(14-1): < (msg_min + 16)"
-			"len %d pkt_len %d min_len %d bzero %d ngathers %d",
-			len, pkt_len, min_len, (min_len - pkt_len), ngathers));
+		    "==> nxge_start(14-1): < (msg_min + 16)"
+		    "len %d pkt_len %d min_len %d bzero %d ngathers %d",
+		    len, pkt_len, min_len, (min_len - pkt_len), ngathers));
 		bzero((kaddr + pkt_len), (min_len - pkt_len));
 		pkt_len = tx_msg_p->tx_msg_size = min_len;
 
@@ -793,13 +794,13 @@ nxge_start_control_header_only:
 		tx_desc_p->value = sop_tx_desc_p->value;
 
 		NXGE_DEBUG_MSG((NULL, TX_CTL,
-			"==> nxge_start(14-2): < msg_min - "
-			"len %d pkt_len %d min_len %d ngathers %d",
-			len, pkt_len, min_len, ngathers));
+		    "==> nxge_start(14-2): < msg_min - "
+		    "len %d pkt_len %d min_len %d ngathers %d",
+		    len, pkt_len, min_len, ngathers));
 	}
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: cksum_flags 0x%x ",
-		cksum_flags));
+	    cksum_flags));
 	{
 		uint64_t	tmp_len;
 
@@ -807,33 +808,33 @@ nxge_start_control_header_only:
 		/* Update the control header length */
 		tot_xfer_len = (pkt_len - TX_PKT_HEADER_SIZE);
 		tmp_len = hdrp->value |
-			(tot_xfer_len << TX_PKT_HEADER_TOT_XFER_LEN_SHIFT);
+		    (tot_xfer_len << TX_PKT_HEADER_TOT_XFER_LEN_SHIFT);
 
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_start(15_x1): setting SOP "
-			"tot_xfer_len 0x%llx (%d) pkt_len %d tmp_len "
-			"0x%llx hdrp->value 0x%llx",
-			tot_xfer_len, tot_xfer_len, pkt_len,
-			tmp_len, hdrp->value));
+		    "==> nxge_start(15_x1): setting SOP "
+		    "tot_xfer_len 0x%llx (%d) pkt_len %d tmp_len "
+		    "0x%llx hdrp->value 0x%llx",
+		    tot_xfer_len, tot_xfer_len, pkt_len,
+		    tmp_len, hdrp->value));
 #if defined(_BIG_ENDIAN)
 		hdrp->value = ddi_swap64(tmp_len);
 #else
 		hdrp->value = tmp_len;
 #endif
 		NXGE_DEBUG_MSG((nxgep,
-			TX_CTL, "==> nxge_start(15_x2): setting SOP "
-			"after SWAP: tot_xfer_len 0x%llx pkt_len %d "
-			"tmp_len 0x%llx hdrp->value 0x%llx",
-			tot_xfer_len, pkt_len,
-			tmp_len, hdrp->value));
+		    TX_CTL, "==> nxge_start(15_x2): setting SOP "
+		    "after SWAP: tot_xfer_len 0x%llx pkt_len %d "
+		    "tmp_len 0x%llx hdrp->value 0x%llx",
+		    tot_xfer_len, pkt_len,
+		    tmp_len, hdrp->value));
 	}
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start(15): setting SOP "
-		"wr_index %d "
-		"tot_xfer_len (%d) pkt_len %d npads %d",
-		sop_index,
-		tot_xfer_len, pkt_len,
-		npads));
+	    "wr_index %d "
+	    "tot_xfer_len (%d) pkt_len %d npads %d",
+	    sop_index,
+	    tot_xfer_len, pkt_len,
+	    npads));
 
 	sop_tx_desc_p->bits.hdw.sop = 1;
 	sop_tx_desc_p->bits.hdw.mark = mark_mode;
@@ -849,60 +850,60 @@ nxge_start_control_header_only:
 	npi_desc_handle.function.instance = nxgep->instance;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "\n\t: value 0x%llx\n"
-		"\t\tsad $%p\ttr_len %d len %d\tnptrs %d\tmark %d sop %d\n",
-		save_desc_p->value,
-		sad,
-		save_desc_p->bits.hdw.tr_len,
-		xfer_len,
-		save_desc_p->bits.hdw.num_ptr,
-		save_desc_p->bits.hdw.mark,
-		save_desc_p->bits.hdw.sop));
+	    "\t\tsad $%p\ttr_len %d len %d\tnptrs %d\tmark %d sop %d\n",
+	    save_desc_p->value,
+	    sad,
+	    save_desc_p->bits.hdw.tr_len,
+	    xfer_len,
+	    save_desc_p->bits.hdw.num_ptr,
+	    save_desc_p->bits.hdw.mark,
+	    save_desc_p->bits.hdw.sop));
 	(void) npi_txdma_dump_desc_one(npi_desc_handle, NULL, sop_index);
 
 	dump_len = (pkt_len > 128) ? 128: pkt_len;
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_start: dump packets(17) (after sop set, len "
-		" (len/dump_len/pkt_len/tot_xfer_len) %d/%d/%d/%d):\n"
-		"ptr $%p: %s", len, dump_len, pkt_len, tot_xfer_len,
-		(char *)hdrp,
-		nxge_dump_packet((char *)hdrp, dump_len)));
+	    "==> nxge_start: dump packets(17) (after sop set, len "
+	    " (len/dump_len/pkt_len/tot_xfer_len) %d/%d/%d/%d):\n"
+	    "ptr $%p: %s", len, dump_len, pkt_len, tot_xfer_len,
+	    (char *)hdrp,
+	    nxge_dump_packet((char *)hdrp, dump_len)));
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_start(18): TX desc sync: sop_index %d",
-			sop_index));
+	    "==> nxge_start(18): TX desc sync: sop_index %d",
+	    sop_index));
 #endif
 
 	if ((ngathers == 1) || tx_ring_p->wr_index < i) {
 		(void) ddi_dma_sync(tx_desc_dma_handle,
-			sop_index * sizeof (tx_desc_t),
-			ngathers * sizeof (tx_desc_t),
-			DDI_DMA_SYNC_FORDEV);
+		    sop_index * sizeof (tx_desc_t),
+		    ngathers * sizeof (tx_desc_t),
+		    DDI_DMA_SYNC_FORDEV);
 
 		NXGE_DEBUG_MSG((nxgep, TX_CTL, "nxge_start(19): sync 1 "
-			"cs_off = 0x%02X cs_s_off = 0x%02X "
-			"pkt_len %d ngathers %d sop_index %d\n",
-			stuff_offset, start_offset,
-			pkt_len, ngathers, sop_index));
+		    "cs_off = 0x%02X cs_s_off = 0x%02X "
+		    "pkt_len %d ngathers %d sop_index %d\n",
+		    stuff_offset, start_offset,
+		    pkt_len, ngathers, sop_index));
 	} else { /* more than one descriptor and wrap around */
 		uint32_t nsdescs = tx_ring_p->tx_ring_size - sop_index;
 		(void) ddi_dma_sync(tx_desc_dma_handle,
-			sop_index * sizeof (tx_desc_t),
-			nsdescs * sizeof (tx_desc_t),
-			DDI_DMA_SYNC_FORDEV);
+		    sop_index * sizeof (tx_desc_t),
+		    nsdescs * sizeof (tx_desc_t),
+		    DDI_DMA_SYNC_FORDEV);
 		NXGE_DEBUG_MSG((nxgep, TX_CTL, "nxge_start(20): sync 1 "
-			"cs_off = 0x%02X cs_s_off = 0x%02X "
-			"pkt_len %d ngathers %d sop_index %d\n",
-			stuff_offset, start_offset,
-				pkt_len, ngathers, sop_index));
+		    "cs_off = 0x%02X cs_s_off = 0x%02X "
+		    "pkt_len %d ngathers %d sop_index %d\n",
+		    stuff_offset, start_offset,
+		    pkt_len, ngathers, sop_index));
 
 		(void) ddi_dma_sync(tx_desc_dma_handle,
-			0,
-			(ngathers - nsdescs) * sizeof (tx_desc_t),
-			DDI_DMA_SYNC_FORDEV);
+		    0,
+		    (ngathers - nsdescs) * sizeof (tx_desc_t),
+		    DDI_DMA_SYNC_FORDEV);
 		NXGE_DEBUG_MSG((nxgep, TX_CTL, "nxge_start(21): sync 2 "
-			"cs_off = 0x%02X cs_s_off = 0x%02X "
-			"pkt_len %d ngathers %d sop_index %d\n",
-			stuff_offset, start_offset,
-			pkt_len, ngathers, sop_index));
+		    "cs_off = 0x%02X cs_s_off = 0x%02X "
+		    "pkt_len %d ngathers %d sop_index %d\n",
+		    stuff_offset, start_offset,
+		    pkt_len, ngathers, sop_index));
 	}
 
 	tail_index = tx_ring_p->wr_index;
@@ -911,16 +912,16 @@ nxge_start_control_header_only:
 	tx_ring_p->wr_index = i;
 	if (tx_ring_p->wr_index <= tail_index) {
 		tx_ring_p->wr_index_wrap = ((tail_wrap == B_TRUE) ?
-						B_FALSE : B_TRUE);
+		    B_FALSE : B_TRUE);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_start: TX kick: "
-		"channel %d wr_index %d wrap %d ngathers %d desc_pend %d",
-		tx_ring_p->tdc,
-		tx_ring_p->wr_index,
-		tx_ring_p->wr_index_wrap,
-		ngathers,
-		tx_ring_p->descs_pending));
+	    "channel %d wr_index %d wrap %d ngathers %d desc_pend %d",
+	    tx_ring_p->tdc,
+	    tx_ring_p->wr_index,
+	    tx_ring_p->wr_index_wrap,
+	    ngathers,
+	    tx_ring_p->descs_pending));
 
 	if (is_lso) {
 		lso_ngathers += ngathers;
@@ -984,9 +985,9 @@ nxge_start_control_header_only:
 
 		/* Kick start the Transmit kick register */
 		TXDMA_REG_WRITE64(NXGE_DEV_NPI_HANDLE(nxgep),
-			TX_RING_KICK_REG,
-			(uint8_t)tx_ring_p->tdc,
-			kick.value);
+		    TX_RING_KICK_REG,
+		    (uint8_t)tx_ring_p->tdc,
+		    kick.value);
 	}
 
 	tx_ring_p->descs_pending += ngathers;
@@ -1090,7 +1091,7 @@ nxge_start_fail2:
 			}
 			tx_msg_p->flags.dma_type = USE_NONE;
 			cur_index = TXDMA_DESC_NEXT_INDEX(cur_index, 1,
-				tx_ring_p->tx_wrap_mask);
+			    tx_ring_p->tx_wrap_mask);
 
 		}
 
@@ -1166,13 +1167,13 @@ nxge_send(p_nxge_t nxgep, mblk_t *mp, p_mac_tx_hint_t hp)
 	}
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "count %d, tx_rings[%d] = %p",
-		(int)group->count, group->legend[ring_index], tx_ring_p));
+	    (int)group->count, group->legend[ring_index], tx_ring_p));
 
 	switch (nxge_tx_scheme) {
 	case NXGE_USE_START:
 		if (nxge_start(nxgep, tx_ring_p, mp)) {
 			NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_send: failed "
-				"ring index %d", ring_index));
+			    "ring index %d", ring_index));
 			return (B_FALSE);
 		}
 		break;
@@ -1184,7 +1185,7 @@ nxge_send(p_nxge_t nxgep, mblk_t *mp, p_mac_tx_hint_t hp)
 	}
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_send: ring index %d",
-		ring_index));
+	    ring_index));
 
 	return (B_TRUE);
 }
@@ -1252,7 +1253,7 @@ nxge_tx_lb_ring_1(p_mblk_t mp, uint32_t maxtdcs, p_mac_tx_hint_t hp)
 	size_t 			iph_len;
 	size_t 			hdrs_size;
 	uint8_t			hdrs_buf[sizeof (struct  ether_header) +
-					IP_MAX_HDR_LENGTH + sizeof (uint32_t)];
+	    IP_MAX_HDR_LENGTH + sizeof (uint32_t)];
 				/*
 				 * allocate space big enough to cover
 				 * the max ip header length and the first
@@ -1271,15 +1272,15 @@ nxge_tx_lb_ring_1(p_mblk_t mp, uint32_t maxtdcs, p_mac_tx_hint_t hp)
 	default:
 		tcp_port = mp->b_rptr;
 		if (!nxge_no_tx_lb && !qos &&
-			(ntohs(((p_ether_header_t)tcp_port)->ether_type)
-				== ETHERTYPE_IP)) {
+		    (ntohs(((p_ether_header_t)tcp_port)->ether_type)
+		    == ETHERTYPE_IP)) {
 			nmp = mp;
 			mblk_len = MBLKL(nmp);
 			tcp_port = NULL;
 			if (mblk_len > sizeof (struct ether_header) +
-					sizeof (uint8_t)) {
+			    sizeof (uint8_t)) {
 				tcp_port = nmp->b_rptr +
-					sizeof (struct ether_header);
+				    sizeof (struct ether_header);
 				mblk_len -= sizeof (struct ether_header);
 				iph_len = ((*tcp_port) & 0x0f) << 2;
 				if (mblk_len > (iph_len + sizeof (uint32_t))) {
@@ -1292,14 +1293,14 @@ nxge_tx_lb_ring_1(p_mblk_t mp, uint32_t maxtdcs, p_mac_tx_hint_t hp)
 				hdrs_size = 0;
 				((p_ether_header_t)hdrs_buf)->ether_type = 0;
 				while ((nmp) && (hdrs_size <
-						sizeof (hdrs_buf))) {
+				    sizeof (hdrs_buf))) {
 					mblk_len = MBLKL(nmp);
 					if (mblk_len >=
-						(sizeof (hdrs_buf) - hdrs_size))
+					    (sizeof (hdrs_buf) - hdrs_size))
 						mblk_len = sizeof (hdrs_buf) -
-							hdrs_size;
+						    hdrs_size;
 					bcopy(nmp->b_rptr,
-						&hdrs_buf[hdrs_size], mblk_len);
+					    &hdrs_buf[hdrs_size], mblk_len);
 					hdrs_size += mblk_len;
 					nmp = nmp->b_cont;
 				}

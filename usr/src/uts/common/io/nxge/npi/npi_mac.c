@@ -515,48 +515,48 @@ npi_mac_dump_regs(npi_handle_t handle, uint8_t port)
 	case 1:
 		num_regs = sizeof (xmac_offset) / sizeof (uint64_t);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-				    "\nXMAC Register Dump for port %d\n",
-				    port));
+		    "\nXMAC Register Dump for port %d\n",
+		    port));
 		for (i = 0; i < num_regs; i++) {
 #if defined(__i386)
 			XMAC_REG_RD(handle, port, (uint32_t)xmac_offset[i],
-				&value);
+			    &value);
 #else
 			XMAC_REG_RD(handle, port, xmac_offset[i], &value);
 #endif
 			NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-				"%08llx %s\t %08llx \n",
-				(XMAC_REG_ADDR((port), (xmac_offset[i]))),
-				xmac_name[i], value));
+			    "%08llx %s\t %08llx \n",
+			    (XMAC_REG_ADDR((port), (xmac_offset[i]))),
+			    xmac_name[i], value));
 		}
 
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-			    "\n XMAC Register Dump for port %d done\n",
-			    port));
+		    "\n XMAC Register Dump for port %d done\n",
+		    port));
 		break;
 
 	case 2:
 	case 3:
 		num_regs = sizeof (bmac_offset) / sizeof (uint64_t);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-				    "\nBMAC Register Dump for port %d\n",
-				    port));
+		    "\nBMAC Register Dump for port %d\n",
+		    port));
 		for (i = 0; i < num_regs; i++) {
 #if defined(__i386)
 			BMAC_REG_RD(handle, port, (uint32_t)bmac_offset[i],
-				&value);
+			    &value);
 #else
 			BMAC_REG_RD(handle, port, bmac_offset[i], &value);
 #endif
 			NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-				"%08llx %s\t %08llx \n",
-				(BMAC_REG_ADDR((port), (bmac_offset[i]))),
-				bmac_name[i], value));
+			    "%08llx %s\t %08llx \n",
+			    (BMAC_REG_ADDR((port), (bmac_offset[i]))),
+			    bmac_name[i], value));
 		}
 
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-			    "\n BMAC Register Dump for port %d done\n",
-			    port));
+		    "\n BMAC Register Dump for port %d done\n",
+		    port));
 		break;
 	}
 
@@ -650,9 +650,9 @@ npi_mac_hashtab_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
 	ASSERT(entryn < MAC_MAX_HASH_ENTRY);
 	if (entryn >= MAC_MAX_HASH_ENTRY) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_mac_hashtab_entry"
-				    " Invalid Input: entryn <0x%x>",
-				    entryn));
+		    " npi_mac_hashtab_entry"
+		    " Invalid Input: entryn <0x%x>",
+		    entryn));
 		return (NPI_FAILURE | NPI_MAC_HASHTAB_ENTRY_INVALID(portn));
 	}
 
@@ -660,18 +660,18 @@ npi_mac_hashtab_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
 		val = *data;
 		if ((portn == XMAC_PORT_0) || (portn == XMAC_PORT_1)) {
 			XMAC_REG_WR(handle, portn,
-					XMAC_HASH_TBLN_REG_ADDR(entryn), val);
+			    XMAC_HASH_TBLN_REG_ADDR(entryn), val);
 		} else {
 			BMAC_REG_WR(handle, portn,
-					BMAC_HASH_TBLN_REG_ADDR(entryn), val);
+			    BMAC_HASH_TBLN_REG_ADDR(entryn), val);
 		}
 	} else {
 		if ((portn == XMAC_PORT_0) || (portn == XMAC_PORT_1)) {
 			XMAC_REG_RD(handle, portn,
-					XMAC_HASH_TBLN_REG_ADDR(entryn), &val);
+			    XMAC_HASH_TBLN_REG_ADDR(entryn), &val);
 		} else {
 			BMAC_REG_RD(handle, portn,
-					BMAC_HASH_TBLN_REG_ADDR(entryn), &val);
+			    BMAC_HASH_TBLN_REG_ADDR(entryn), &val);
 		}
 		*data = val & 0xFFFF;
 	}
@@ -690,43 +690,43 @@ npi_mac_hostinfo_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
 		ASSERT(entryn < XMAC_MAX_HOST_INFO_ENTRY);
 		if (entryn >= XMAC_MAX_HOST_INFO_ENTRY) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_mac_hostinfo_entry"
-					    " Invalid Input: entryn <0x%x>",
-					    entryn));
+			    " npi_mac_hostinfo_entry"
+			    " Invalid Input: entryn <0x%x>",
+			    entryn));
 			return (NPI_FAILURE |
-				NPI_MAC_HOSTINFO_ENTRY_INVALID(portn));
+			    NPI_MAC_HOSTINFO_ENTRY_INVALID(portn));
 		}
 	} else {
 		ASSERT(entryn < BMAC_MAX_HOST_INFO_ENTRY);
 		if (entryn >= BMAC_MAX_HOST_INFO_ENTRY) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_mac_hostinfo_entry"
-					    " Invalid Input: entryn <0x%x>",
-					    entryn));
+			    " npi_mac_hostinfo_entry"
+			    " Invalid Input: entryn <0x%x>",
+			    entryn));
 			return (NPI_FAILURE |
-				NPI_MAC_HOSTINFO_ENTRY_INVALID(portn));
+			    NPI_MAC_HOSTINFO_ENTRY_INVALID(portn));
 		}
 	}
 
 	if (op == OP_SET) {
 		if ((portn == XMAC_PORT_0) || (portn == XMAC_PORT_1)) {
 			XMAC_REG_WR(handle, portn,
-					XMAC_HOST_INFN_REG_ADDR(entryn),
-					hostinfo->value);
+			    XMAC_HOST_INFN_REG_ADDR(entryn),
+			    hostinfo->value);
 		} else {
 			BMAC_REG_WR(handle, portn,
-					BMAC_HOST_INFN_REG_ADDR(entryn),
-					hostinfo->value);
+			    BMAC_HOST_INFN_REG_ADDR(entryn),
+			    hostinfo->value);
 		}
 	} else {
 		if ((portn == XMAC_PORT_0) || (portn == XMAC_PORT_1)) {
 			XMAC_REG_RD(handle, portn,
-					XMAC_HOST_INFN_REG_ADDR(entryn),
-					&hostinfo->value);
+			    XMAC_HOST_INFN_REG_ADDR(entryn),
+			    &hostinfo->value);
 		} else {
 			BMAC_REG_RD(handle, portn,
-					BMAC_HOST_INFN_REG_ADDR(entryn),
-					&hostinfo->value);
+			    BMAC_HOST_INFN_REG_ADDR(entryn),
+			    &hostinfo->value);
 		}
 	}
 
@@ -744,11 +744,11 @@ npi_mac_altaddr_enable(npi_handle_t handle, uint8_t portn, uint8_t addrn)
 		ASSERT(addrn <= XMAC_MAX_ALT_ADDR_ENTRY);
 		if (addrn > XMAC_MAX_ALT_ADDR_ENTRY) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_mac_altaddr_enable"
-					    " Invalid Input: addrn <0x%x>",
-					    addrn));
+			    " npi_mac_altaddr_enable"
+			    " Invalid Input: addrn <0x%x>",
+			    addrn));
 			return (NPI_FAILURE |
-				NPI_MAC_ALT_ADDR_ENTRY_INVALID(portn));
+			    NPI_MAC_ALT_ADDR_ENTRY_INVALID(portn));
 		}
 		XMAC_REG_RD(handle, portn, XMAC_ADDR_CMPEN_REG, &val);
 		val |= (1 << addrn);
@@ -757,11 +757,11 @@ npi_mac_altaddr_enable(npi_handle_t handle, uint8_t portn, uint8_t addrn)
 		ASSERT(addrn <= BMAC_MAX_ALT_ADDR_ENTRY);
 		if (addrn > BMAC_MAX_ALT_ADDR_ENTRY) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_mac_altaddr_enable"
-					    " Invalid Input: addrn <0x%x>",
-					    addrn));
+			    " npi_mac_altaddr_enable"
+			    " Invalid Input: addrn <0x%x>",
+			    addrn));
 			return (NPI_FAILURE |
-				NPI_MAC_ALT_ADDR_ENTRY_INVALID(portn));
+			    NPI_MAC_ALT_ADDR_ENTRY_INVALID(portn));
 		}
 		BMAC_REG_RD(handle, portn, BMAC_ALTAD_CMPEN_REG, &val);
 		val |= (1 << addrn);
@@ -786,11 +786,11 @@ npi_mac_altaddr_disable(npi_handle_t handle, uint8_t portn, uint8_t addrn)
 		ASSERT(addrn <= XMAC_MAX_ALT_ADDR_ENTRY);
 		if (addrn > XMAC_MAX_ALT_ADDR_ENTRY) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					" npi_mac_altaddr_disable"
-					" Invalid Input: addrn <0x%x>",
-					addrn));
+			    " npi_mac_altaddr_disable"
+			    " Invalid Input: addrn <0x%x>",
+			    addrn));
 			return (NPI_FAILURE |
-				NPI_MAC_ALT_ADDR_ENTRY_INVALID(portn));
+			    NPI_MAC_ALT_ADDR_ENTRY_INVALID(portn));
 		}
 		XMAC_REG_RD(handle, portn, XMAC_ADDR_CMPEN_REG, &val);
 		val &= ~(1 << addrn);
@@ -799,11 +799,11 @@ npi_mac_altaddr_disable(npi_handle_t handle, uint8_t portn, uint8_t addrn)
 		ASSERT(addrn <= BMAC_MAX_ALT_ADDR_ENTRY);
 		if (addrn > BMAC_MAX_ALT_ADDR_ENTRY) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					" npi_mac_altaddr_disable"
-					" Invalid Input: addrn <0x%x>",
-				    addrn));
+			    " npi_mac_altaddr_disable"
+			    " Invalid Input: addrn <0x%x>",
+			    addrn));
 			return (NPI_FAILURE |
-				NPI_MAC_ALT_ADDR_ENTRY_INVALID(portn));
+			    NPI_MAC_ALT_ADDR_ENTRY_INVALID(portn));
 		}
 		BMAC_REG_RD(handle, portn, BMAC_ALTAD_CMPEN_REG, &val);
 		val &= ~(1 << addrn);
@@ -826,29 +826,29 @@ npi_mac_altaddr_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
 		ASSERT(entryn <= XMAC_MAX_ALT_ADDR_ENTRY);
 		if (entryn > XMAC_MAX_ALT_ADDR_ENTRY) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_mac_altaddr_entry"
-					    " Invalid Input: entryn <0x%x>",
-					    entryn));
+			    " npi_mac_altaddr_entry"
+			    " Invalid Input: entryn <0x%x>",
+			    entryn));
 			return (NPI_FAILURE |
-				NPI_MAC_ALT_ADDR_ENTRY_INVALID(portn));
+			    NPI_MAC_ALT_ADDR_ENTRY_INVALID(portn));
 		}
 		if (op == OP_SET) {
 			val0 = data->w0;
 			val1 = data->w1;
 			val2 = data->w2;
 			XMAC_REG_WR(handle, portn,
-				XMAC_ALT_ADDR0N_REG_ADDR(entryn), val0);
+			    XMAC_ALT_ADDR0N_REG_ADDR(entryn), val0);
 			XMAC_REG_WR(handle, portn,
-				XMAC_ALT_ADDR1N_REG_ADDR(entryn), val1);
+			    XMAC_ALT_ADDR1N_REG_ADDR(entryn), val1);
 			XMAC_REG_WR(handle, portn,
-				XMAC_ALT_ADDR2N_REG_ADDR(entryn), val2);
+			    XMAC_ALT_ADDR2N_REG_ADDR(entryn), val2);
 		} else {
 			XMAC_REG_RD(handle, portn,
-				XMAC_ALT_ADDR0N_REG_ADDR(entryn), &val0);
+			    XMAC_ALT_ADDR0N_REG_ADDR(entryn), &val0);
 			XMAC_REG_RD(handle, portn,
-				XMAC_ALT_ADDR1N_REG_ADDR(entryn), &val1);
+			    XMAC_ALT_ADDR1N_REG_ADDR(entryn), &val1);
 			XMAC_REG_RD(handle, portn,
-				XMAC_ALT_ADDR2N_REG_ADDR(entryn), &val2);
+			    XMAC_ALT_ADDR2N_REG_ADDR(entryn), &val2);
 			data->w0 = val0 & 0xFFFF;
 			data->w1 = val1 & 0xFFFF;
 			data->w2 = val2 & 0xFFFF;
@@ -857,29 +857,29 @@ npi_mac_altaddr_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
 		ASSERT(entryn <= BMAC_MAX_ALT_ADDR_ENTRY);
 		if (entryn > BMAC_MAX_ALT_ADDR_ENTRY) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_mac_altaddr_entry"
-					    " Invalid Input: entryn <0x%x>",
-					    entryn));
+			    " npi_mac_altaddr_entry"
+			    " Invalid Input: entryn <0x%x>",
+			    entryn));
 			return (NPI_FAILURE |
-				NPI_MAC_ALT_ADDR_ENTRY_INVALID(portn));
+			    NPI_MAC_ALT_ADDR_ENTRY_INVALID(portn));
 		}
 		if (op == OP_SET) {
 			val0 = data->w0;
 			val1 = data->w1;
 			val2 = data->w2;
 			BMAC_REG_WR(handle, portn,
-				BMAC_ALT_ADDR0N_REG_ADDR(entryn), val0);
+			    BMAC_ALT_ADDR0N_REG_ADDR(entryn), val0);
 			BMAC_REG_WR(handle, portn,
-				BMAC_ALT_ADDR1N_REG_ADDR(entryn), val1);
+			    BMAC_ALT_ADDR1N_REG_ADDR(entryn), val1);
 			BMAC_REG_WR(handle, portn,
-				BMAC_ALT_ADDR2N_REG_ADDR(entryn), val2);
+			    BMAC_ALT_ADDR2N_REG_ADDR(entryn), val2);
 		} else {
 			BMAC_REG_RD(handle, portn,
-				BMAC_ALT_ADDR0N_REG_ADDR(entryn), &val0);
+			    BMAC_ALT_ADDR0N_REG_ADDR(entryn), &val0);
 			BMAC_REG_RD(handle, portn,
-				BMAC_ALT_ADDR1N_REG_ADDR(entryn), &val1);
+			    BMAC_ALT_ADDR1N_REG_ADDR(entryn), &val1);
 			BMAC_REG_RD(handle, portn,
-				BMAC_ALT_ADDR2N_REG_ADDR(entryn), &val2);
+			    BMAC_ALT_ADDR2N_REG_ADDR(entryn), &val2);
 			data->w0 = val0 & 0xFFFF;
 			data->w1 = val1 & 0xFFFF;
 			data->w2 = val2 & 0xFFFF;
@@ -907,45 +907,45 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 			if (op == OP_SET) {
 				attr = attrp->idata[0];
 				ASSERT((attr == MAC_MII_MODE) ||	\
-					(attr == MAC_GMII_MODE) ||	\
-					(attr == MAC_XGMII_MODE));
+				    (attr == MAC_GMII_MODE) ||	\
+				    (attr == MAC_XGMII_MODE));
 				if ((attr != MAC_MII_MODE) &&
-					(attr != MAC_GMII_MODE) &&
-					(attr != MAC_XGMII_MODE)) {
+				    (attr != MAC_GMII_MODE) &&
+				    (attr != MAC_XGMII_MODE)) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " Invalid Input:"
-						    " MAC_PORT_MODE <0x%x>",
-						    attr));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " Invalid Input:"
+					    " MAC_PORT_MODE <0x%x>",
+					    attr));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				XMAC_REG_RD(handle, portn, XMAC_CONFIG_REG,
-						&val);
+				    &val);
 				val &= ~XMAC_XIF_MII_MODE_MASK;
 				switch (attr) {
 				case MAC_MII_MODE:
 					val |= (XMAC_XIF_MII_MODE <<
-						XMAC_XIF_MII_MODE_SHIFT);
+					    XMAC_XIF_MII_MODE_SHIFT);
 					break;
 				case MAC_GMII_MODE:
 					val |= (XMAC_XIF_GMII_MODE <<
-						XMAC_XIF_MII_MODE_SHIFT);
+					    XMAC_XIF_MII_MODE_SHIFT);
 					break;
 				case MAC_XGMII_MODE:
 					val |= (XMAC_XIF_XGMII_MODE <<
-						XMAC_XIF_MII_MODE_SHIFT);
+					    XMAC_XIF_MII_MODE_SHIFT);
 					break;
 				default:
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				XMAC_REG_WR(handle, portn, XMAC_CONFIG_REG,
-						val);
+				    val);
 			} else {
 				XMAC_REG_RD(handle, portn, XMAC_CONFIG_REG,
-						&val);
+				    &val);
 				val &= XMAC_XIF_MII_MODE_MASK;
 				attr = val >> XMAC_XIF_MII_MODE_SHIFT;
 				attrp->odata[0] = attr;
@@ -954,12 +954,12 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 		case BMAC_PORT_0:
 		case BMAC_PORT_1:
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_mac_port_attr"
-					    " Invalid Input:"
-					    " MAC_PORT_MODE <0x%x>",
-					    attrp->type));
+			    " npi_mac_port_attr"
+			    " Invalid Input:"
+			    " MAC_PORT_MODE <0x%x>",
+			    attrp->type));
 			return (NPI_FAILURE |
-				NPI_MAC_PORT_ATTR_INVALID(portn));
+			    NPI_MAC_PORT_ATTR_INVALID(portn));
 		default:
 			return (NPI_FAILURE | NPI_MAC_PORT_INVALID(portn));
 		}
@@ -976,45 +976,45 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 				min_fsize = attrp->idata[0];
 				max_fsize = attrp->idata[1];
 				ASSERT((min_fsize &	\
-					~XMAC_MIN_TX_FRM_SZ_MASK) == 0);
+				    ~XMAC_MIN_TX_FRM_SZ_MASK) == 0);
 				if ((min_fsize & ~XMAC_MIN_TX_FRM_SZ_MASK)
-						!= 0) {
+				    != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_PORT_FRAME_SIZE:"
-						    " Invalid Input:"
-						    " xmac_min_fsize <0x%x>",
-						    min_fsize));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_PORT_FRAME_SIZE:"
+					    " Invalid Input:"
+					    " xmac_min_fsize <0x%x>",
+					    min_fsize));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				ASSERT((max_fsize &	\
-					~XMAC_MAX_FRM_SZ_MASK) == 0);
+				    ~XMAC_MAX_FRM_SZ_MASK) == 0);
 				if ((max_fsize & ~XMAC_MAX_FRM_SZ_MASK)
-						!= 0) {
+				    != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_PORT_FRAME_SIZE:"
-						    " Invalid Input:"
-						    " xmac_max_fsize <0x%x>",
-						    max_fsize));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_PORT_FRAME_SIZE:"
+					    " Invalid Input:"
+					    " xmac_max_fsize <0x%x>",
+					    max_fsize));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				XMAC_REG_RD(handle, portn, XMAC_MIN_REG, &val);
 				val &= ~(XMAC_MIN_TX_FRM_SZ_MASK |
-					XMAC_MIN_RX_FRM_SZ_MASK);
+				    XMAC_MIN_RX_FRM_SZ_MASK);
 				val |= (min_fsize << XMAC_MIN_TX_FRM_SZ_SHIFT);
 				val |= (min_fsize << XMAC_MIN_RX_FRM_SZ_SHIFT);
 				XMAC_REG_WR(handle, portn, XMAC_MIN_REG, val);
 				XMAC_REG_WR(handle, portn, XMAC_MAX_REG,
-						max_fsize);
+				    max_fsize);
 			} else {
 				XMAC_REG_RD(handle, portn, XMAC_MIN_REG, &val);
 				min_fsize = (val & XMAC_MIN_TX_FRM_SZ_MASK)
-						>> XMAC_MIN_TX_FRM_SZ_SHIFT;
+				    >> XMAC_MIN_TX_FRM_SZ_SHIFT;
 				XMAC_REG_RD(handle, portn, XMAC_MAX_REG, &val);
 				attrp->odata[0] = min_fsize;
 				attrp->odata[1] = max_fsize;
@@ -1027,49 +1027,49 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 				max_fsize = attrp->idata[1];
 				ASSERT((min_fsize & ~BMAC_MIN_FRAME_MASK) == 0);
 				if ((min_fsize & ~BMAC_MIN_FRAME_MASK)
-						!= 0) {
+				    != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_FRAME_SIZE:"
-						    " Invalid Input:"
-						    " bmac_min_fsize <0x%x>",
-						    min_fsize));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_FRAME_SIZE:"
+					    " Invalid Input:"
+					    " bmac_min_fsize <0x%x>",
+					    min_fsize));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				ASSERT((max_fsize & ~BMAC_MAX_FRAME_MASK) == 0);
 				if ((max_fsize & ~BMAC_MAX_FRAME_MASK)
-						!= 0) {
+				    != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_FRAME_SIZE:"
-						    " Invalid Input:"
-						    " bmac_max_fsize <0x%x>",
-						    max_fsize));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_FRAME_SIZE:"
+					    " Invalid Input:"
+					    " bmac_max_fsize <0x%x>",
+					    max_fsize));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				BMAC_REG_RD(handle, portn, BMAC_MAX_REG, &val);
 				val &= ~BMAC_MAX_FRAME_MASK;
 				if (max_fsize <= MAX_FRAME_SZ1)
 					val |= MAX_FRAME_SZ1;
 				else if ((max_fsize > MAX_FRAME_SZ1) &&
-					(max_fsize <= MAX_FRAME_SZ2))
+				    (max_fsize <= MAX_FRAME_SZ2))
 					val |= MAX_FRAME_SZ2;
 				else if ((max_fsize > MAX_FRAME_SZ2) &&
-					(max_fsize <= MAX_FRAME_SZ3))
+				    (max_fsize <= MAX_FRAME_SZ3))
 					val |= MAX_FRAME_SZ3;
 				else if ((max_fsize > MAX_FRAME_SZ3) &&
-					(max_fsize <= MAX_FRAME_SZ4))
+				    (max_fsize <= MAX_FRAME_SZ4))
 					val |= MAX_FRAME_SZ4;
 				else if ((max_fsize > MAX_FRAME_SZ4) &&
-					(max_fsize <= MAX_FRAME_SZ5))
+				    (max_fsize <= MAX_FRAME_SZ5))
 					val |= MAX_FRAME_SZ5;
 				BMAC_REG_WR(handle, portn, BMAC_MAX_REG, val);
 				BMAC_REG_WR(handle, portn, BMAC_MIN_REG,
-						min_fsize);
+				    min_fsize);
 			} else {
 				BMAC_REG_RD(handle, portn, BMAC_MIN_REG, &val);
 				min_fsize = val & BMAC_MIN_FRAME_MASK;
@@ -1082,7 +1082,8 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 		default:
 			return (NPI_FAILURE | NPI_MAC_PORT_INVALID(portn));
 		}
-	}	break;
+		break;
+	}
 
 	case BMAC_PORT_MAX_BURST_SIZE: {
 		uint32_t burst_size;
@@ -1090,10 +1091,10 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 		case XMAC_PORT_0:
 		case XMAC_PORT_1:
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_mac_port_attr"
-					    " BMAC_PORT_MAX_BURST_SIZE:"
-					    " Invalid Input: portn <%d>",
-					    portn));
+			    " npi_mac_port_attr"
+			    " BMAC_PORT_MAX_BURST_SIZE:"
+			    " Invalid Input: portn <%d>",
+			    portn));
 			return (NPI_FAILURE | NPI_MAC_PORT_ATTR_INVALID(portn));
 		case BMAC_PORT_0:
 		case BMAC_PORT_1:
@@ -1103,14 +1104,14 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 				ASSERT((burst_size & ~0x7FFF) == 0);
 				if ((burst_size & ~0x7FFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " BMAC_MAX_BURST_SIZE:"
-						    " Invalid Input:"
-						    " burst_size <0x%x>",
-						    burst_size));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " BMAC_MAX_BURST_SIZE:"
+					    " Invalid Input:"
+					    " burst_size <0x%x>",
+					    burst_size));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				BMAC_REG_RD(handle, portn, BMAC_MAX_REG, &val);
 				val &= ~BMAC_MAX_BURST_MASK;
@@ -1119,14 +1120,15 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 			} else {
 				BMAC_REG_RD(handle, portn, BMAC_MAX_REG, &val);
 				burst_size = (val & BMAC_MAX_BURST_MASK)
-						>> BMAC_MAX_BURST_SHIFT;
+				    >> BMAC_MAX_BURST_SHIFT;
 				attrp->odata[0] = burst_size;
 			}
 			break;
 		default:
 			return (NPI_FAILURE | NPI_MAC_PORT_INVALID(portn));
 		}
-	}	break;
+		break;
+	}
 
 	case BMAC_PORT_PA_SIZE: {
 		uint32_t pa_size;
@@ -1134,10 +1136,10 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 		case XMAC_PORT_0:
 		case XMAC_PORT_1:
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_mac_port_attr"
-					    " BMAC_PORT_PA_SIZE:"
-					    " Invalid Input: portn <%d>",
-					    portn));
+			    " npi_mac_port_attr"
+			    " BMAC_PORT_PA_SIZE:"
+			    " Invalid Input: portn <%d>",
+			    portn));
 			return (NPI_FAILURE | NPI_MAC_PORT_ATTR_INVALID(portn));
 		case BMAC_PORT_0:
 		case BMAC_PORT_1:
@@ -1153,17 +1155,17 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 					    pa_size));
 
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				BMAC_REG_RD(handle, portn, MAC_PA_SIZE_REG,
-					    &val);
+				    &val);
 				val &= ~BMAC_PA_SIZE_MASK;
 				val |= (pa_size << 0);
 				BMAC_REG_WR(handle, portn, MAC_PA_SIZE_REG,
-					    val);
+				    val);
 			} else {
 				BMAC_REG_RD(handle, portn, MAC_PA_SIZE_REG,
-					    &val);
+				    &val);
 				pa_size = (val & BMAC_PA_SIZE_MASK) >> 0;
 				attrp->odata[0] = pa_size;
 			}
@@ -1171,7 +1173,8 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 		default:
 			return (NPI_FAILURE | NPI_MAC_PORT_INVALID(portn));
 		}
-	}	break;
+		break;
+	}
 
 	case BMAC_PORT_CTRL_TYPE: {
 		uint32_t ctrl_type;
@@ -1179,10 +1182,10 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 		case XMAC_PORT_0:
 		case XMAC_PORT_1:
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_mac_port_attr"
-					    " BMAC_PORT_CTRL_TYPE:"
-					    " Invalid Input: portn <%d>",
-					    portn));
+			    " npi_mac_port_attr"
+			    " BMAC_PORT_CTRL_TYPE:"
+			    " Invalid Input: portn <%d>",
+			    portn));
 			return (NPI_FAILURE | NPI_MAC_PORT_ATTR_INVALID(portn));
 		case BMAC_PORT_0:
 		case BMAC_PORT_1:
@@ -1191,20 +1194,20 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 				ASSERT((ctrl_type & ~0xFFFF) == 0);
 				if ((ctrl_type & ~0xFFFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " BMAC_PORT_CTRL_TYPE:"
-						    " Invalid Input:"
-						    " ctrl_type <0x%x>",
-						    ctrl_type));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " BMAC_PORT_CTRL_TYPE:"
+					    " Invalid Input:"
+					    " ctrl_type <0x%x>",
+					    ctrl_type));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				BMAC_REG_WR(handle, portn, MAC_CTRL_TYPE_REG,
-						val);
+				    val);
 			} else {
 				BMAC_REG_RD(handle, portn, MAC_CTRL_TYPE_REG,
-						&val);
+				    &val);
 				ctrl_type = (val & 0xFFFF);
 				attrp->odata[0] = ctrl_type;
 			}
@@ -1212,7 +1215,8 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 		default:
 			return (NPI_FAILURE | NPI_MAC_PORT_INVALID(portn));
 		}
-	}	break;
+		break;
+	}
 
 	case XMAC_10G_PORT_IPG:
 		{
@@ -1224,48 +1228,48 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 			if (op == OP_SET) {
 				ipg0 = attrp->idata[0];
 				ASSERT((ipg0 == XGMII_IPG_12_15) ||	\
-					(ipg0 == XGMII_IPG_16_19) ||	\
-					(ipg0 == XGMII_IPG_20_23));
+				    (ipg0 == XGMII_IPG_16_19) ||	\
+				    (ipg0 == XGMII_IPG_20_23));
 				if ((ipg0 != XGMII_IPG_12_15) &&
-					(ipg0 != XGMII_IPG_16_19) &&
-					(ipg0 != XGMII_IPG_20_23)) {
+				    (ipg0 != XGMII_IPG_16_19) &&
+				    (ipg0 != XGMII_IPG_20_23)) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_10G_PORT_IPG:"
-						    " Invalid Input:"
-						    " xgmii_ipg <0x%x>",
-						    ipg0));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_10G_PORT_IPG:"
+					    " Invalid Input:"
+					    " xgmii_ipg <0x%x>",
+					    ipg0));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 
 				XMAC_REG_RD(handle, portn, XMAC_IPG_REG, &val);
 				val &= ~(XMAC_IPG_VALUE_MASK |
-					XMAC_IPG_VALUE1_MASK);
+				    XMAC_IPG_VALUE1_MASK);
 
 				switch (ipg0) {
 				case XGMII_IPG_12_15:
 					val |= (IPG_12_15_BYTE <<
-						XMAC_IPG_VALUE_SHIFT);
+					    XMAC_IPG_VALUE_SHIFT);
 					break;
 				case XGMII_IPG_16_19:
 					val |= (IPG_16_19_BYTE <<
-						XMAC_IPG_VALUE_SHIFT);
+					    XMAC_IPG_VALUE_SHIFT);
 					break;
 				case XGMII_IPG_20_23:
 					val |= (IPG_20_23_BYTE <<
-						XMAC_IPG_VALUE_SHIFT);
+					    XMAC_IPG_VALUE_SHIFT);
 					break;
 				default:
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				XMAC_REG_WR(handle, portn, XMAC_IPG_REG, val);
 			} else {
 				XMAC_REG_RD(handle, portn, XMAC_IPG_REG, &val);
 				ipg0 = (val & XMAC_IPG_VALUE_MASK) >>
-					XMAC_IPG_VALUE_SHIFT;
+				    XMAC_IPG_VALUE_SHIFT;
 				switch (ipg0) {
 				case IPG_12_15_BYTE:
 					attrp->odata[0] = XGMII_IPG_12_15;
@@ -1278,16 +1282,16 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 					break;
 				default:
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 			}
 			break;
 		case BMAC_PORT_0:
 		case BMAC_PORT_1:
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					" npi_mac_port_attr" "MAC_PORT_IPG:"
-					"  Invalid Input: portn <%d>",
-					portn));
+			    " npi_mac_port_attr" "MAC_PORT_IPG:"
+			    "  Invalid Input: portn <%d>",
+			    portn));
 		default:
 			return (NPI_FAILURE | NPI_MAC_PORT_INVALID(portn));
 		}
@@ -1303,60 +1307,60 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 			if (op == OP_SET) {
 				ipg1 = attrp->idata[0];
 				ASSERT((ipg1 == MII_GMII_IPG_12) ||	\
-					(ipg1 == MII_GMII_IPG_13) ||	\
-					(ipg1 == MII_GMII_IPG_14) ||	\
-					(ipg1 == MII_GMII_IPG_15) ||	\
-					(ipg1 == MII_GMII_IPG_16));
+				    (ipg1 == MII_GMII_IPG_13) ||	\
+				    (ipg1 == MII_GMII_IPG_14) ||	\
+				    (ipg1 == MII_GMII_IPG_15) ||	\
+				    (ipg1 == MII_GMII_IPG_16));
 				if ((ipg1 != MII_GMII_IPG_12) &&
-					(ipg1 != MII_GMII_IPG_13) &&
-					(ipg1 != MII_GMII_IPG_14) &&
-					(ipg1 != MII_GMII_IPG_15) &&
-					(ipg1 != MII_GMII_IPG_16)) {
+				    (ipg1 != MII_GMII_IPG_13) &&
+				    (ipg1 != MII_GMII_IPG_14) &&
+				    (ipg1 != MII_GMII_IPG_15) &&
+				    (ipg1 != MII_GMII_IPG_16)) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " XMAC_PORT_IPG:"
-						    " Invalid Input:"
-						    " mii_gmii_ipg <0x%x>",
-						    ipg1));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " XMAC_PORT_IPG:"
+					    " Invalid Input:"
+					    " mii_gmii_ipg <0x%x>",
+					    ipg1));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 
 				XMAC_REG_RD(handle, portn, XMAC_IPG_REG, &val);
 				val &= ~(XMAC_IPG_VALUE_MASK |
-					XMAC_IPG_VALUE1_MASK);
+				    XMAC_IPG_VALUE1_MASK);
 
 				switch (ipg1) {
 				case MII_GMII_IPG_12:
 					val |= (IPG1_12_BYTES <<
-						XMAC_IPG_VALUE1_SHIFT);
+					    XMAC_IPG_VALUE1_SHIFT);
 					break;
 				case MII_GMII_IPG_13:
 					val |= (IPG1_13_BYTES <<
-						XMAC_IPG_VALUE1_SHIFT);
+					    XMAC_IPG_VALUE1_SHIFT);
 					break;
 				case MII_GMII_IPG_14:
 					val |= (IPG1_14_BYTES <<
-						XMAC_IPG_VALUE1_SHIFT);
+					    XMAC_IPG_VALUE1_SHIFT);
 					break;
 				case MII_GMII_IPG_15:
 					val |= (IPG1_15_BYTES <<
-						XMAC_IPG_VALUE1_SHIFT);
+					    XMAC_IPG_VALUE1_SHIFT);
 					break;
 				case MII_GMII_IPG_16:
 					val |= (IPG1_16_BYTES <<
-						XMAC_IPG_VALUE1_SHIFT);
+					    XMAC_IPG_VALUE1_SHIFT);
 					break;
 				default:
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				XMAC_REG_WR(handle, portn, XMAC_IPG_REG, val);
 			} else {
 				XMAC_REG_RD(handle, portn, XMAC_IPG_REG, &val);
 				ipg1 = (val & XMAC_IPG_VALUE1_MASK) >>
-					XMAC_IPG_VALUE1_SHIFT;
+				    XMAC_IPG_VALUE1_SHIFT;
 				switch (ipg1) {
 				case IPG1_12_BYTES:
 					attrp->odata[1] = MII_GMII_IPG_12;
@@ -1375,17 +1379,17 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 					break;
 				default:
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 			}
 			break;
 		case BMAC_PORT_0:
 		case BMAC_PORT_1:
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_mac_port_attr"
-					    " MAC_PORT_IPG:"
-					    " Invalid Input: portn <%d>",
-					    portn));
+			    " npi_mac_port_attr"
+			    " MAC_PORT_IPG:"
+			    " Invalid Input: portn <%d>",
+			    portn));
 		default:
 			return (NPI_FAILURE | NPI_MAC_PORT_INVALID(portn));
 		}
@@ -1407,52 +1411,52 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 				ASSERT((addr0 & ~0xFFFF) == 0);
 				if ((addr0 & ~0xFFFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_PORT_ADDR:"
-						    " Invalid Input:"
-						    " addr0 <0x%x>", addr0));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_PORT_ADDR:"
+					    " Invalid Input:"
+					    " addr0 <0x%x>", addr0));
 
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				ASSERT((addr1 & ~0xFFFF) == 0);
 				if ((addr1 & ~0xFFFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_PORT_ADDR:"
-						    " Invalid Input:"
-						    " addr1 <0x%x>", addr1));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_PORT_ADDR:"
+					    " Invalid Input:"
+					    " addr1 <0x%x>", addr1));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				ASSERT((addr2 & ~0xFFFF) == 0);
 				if ((addr2 & ~0xFFFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_PORT_ADDR:"
-						    " Invalid Input:"
-						    " addr2 <0x%x.",
-						    addr2));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_PORT_ADDR:"
+					    " Invalid Input:"
+					    " addr2 <0x%x.",
+					    addr2));
 
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				XMAC_REG_WR(handle, portn, XMAC_ADDR0_REG,
-						addr0);
+				    addr0);
 				XMAC_REG_WR(handle, portn, XMAC_ADDR1_REG,
-						addr1);
+				    addr1);
 				XMAC_REG_WR(handle, portn, XMAC_ADDR2_REG,
-						addr2);
+				    addr2);
 			} else {
 				XMAC_REG_RD(handle, portn, XMAC_ADDR0_REG,
-						&addr0);
+				    &addr0);
 				XMAC_REG_RD(handle, portn, XMAC_ADDR1_REG,
-						&addr1);
+				    &addr1);
 				XMAC_REG_RD(handle, portn, XMAC_ADDR2_REG,
-						&addr2);
+				    &addr2);
 				attrp->odata[0] = addr0 & MAC_ADDR_REG_MASK;
 				attrp->odata[1] = addr1 & MAC_ADDR_REG_MASK;
 				attrp->odata[2] = addr2 & MAC_ADDR_REG_MASK;
@@ -1467,52 +1471,52 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 				ASSERT((addr0 & ~0xFFFF) == 0);
 				if ((addr0 & ~0xFFFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_PORT_ADDR:"
-						    " Invalid Input:"
-						    " addr0 <0x%x>",
-						    addr0));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_PORT_ADDR:"
+					    " Invalid Input:"
+					    " addr0 <0x%x>",
+					    addr0));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				ASSERT((addr1 & ~0xFFFF) == 0);
 				if ((addr1 & ~0xFFFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_PORT_ADDR:"
-						    " Invalid Input:"
-						    " addr1 <0x%x>",
-						    addr1));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_PORT_ADDR:"
+					    " Invalid Input:"
+					    " addr1 <0x%x>",
+					    addr1));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				ASSERT((addr2 & ~0xFFFF) == 0);
 				if ((addr2 & ~0xFFFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_PORT_ADDR:"
-						    " Invalid Input:"
-						    " addr2 <0x%x>",
-						    addr2));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_PORT_ADDR:"
+					    " Invalid Input:"
+					    " addr2 <0x%x>",
+					    addr2));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				BMAC_REG_WR(handle, portn, BMAC_ADDR0_REG,
-						addr0);
+				    addr0);
 				BMAC_REG_WR(handle, portn, BMAC_ADDR1_REG,
-						addr1);
+				    addr1);
 				BMAC_REG_WR(handle, portn, BMAC_ADDR2_REG,
-						addr2);
+				    addr2);
 			} else {
 				BMAC_REG_RD(handle, portn, BMAC_ADDR0_REG,
-						&addr0);
+				    &addr0);
 				BMAC_REG_RD(handle, portn, BMAC_ADDR1_REG,
-						&addr1);
+				    &addr1);
 				BMAC_REG_RD(handle, portn, BMAC_ADDR2_REG,
-						&addr2);
+				    &addr2);
 				attrp->odata[0] = addr0 & MAC_ADDR_REG_MASK;
 				attrp->odata[1] = addr1 & MAC_ADDR_REG_MASK;
 				attrp->odata[2] = addr2 & MAC_ADDR_REG_MASK;
@@ -1521,7 +1525,8 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 		default:
 			return (NPI_FAILURE | NPI_MAC_PORT_INVALID(portn));
 		}
-	}	break;
+		break;
+	}
 
 	case MAC_PORT_ADDR_FILTER: {
 		uint32_t addr0;
@@ -1538,52 +1543,52 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 				ASSERT((addr0 & ~0xFFFF) == 0);
 				if ((addr0 & ~0xFFFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_PORT_ADDR_FILTER:"
-						    " Invalid Input:"
-						    " addr0 <0x%x>",
-						    addr0));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_PORT_ADDR_FILTER:"
+					    " Invalid Input:"
+					    " addr0 <0x%x>",
+					    addr0));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				ASSERT((addr1 & ~0xFFFF) == 0);
 				if ((addr1 & ~0xFFFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_PORT_ADDR_FILTER:"
-						    " Invalid Input:"
-						    " addr1 <0x%x>",
-						    addr1));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_PORT_ADDR_FILTER:"
+					    " Invalid Input:"
+					    " addr1 <0x%x>",
+					    addr1));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				ASSERT((addr2 & ~0xFFFF) == 0);
 				if ((addr2 & ~0xFFFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_PORT_ADDR_FILTER:"
-						    " Invalid Input:"
-						    " addr2 <0x%x>",
-						    addr2));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_PORT_ADDR_FILTER:"
+					    " Invalid Input:"
+					    " addr2 <0x%x>",
+					    addr2));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				XMAC_REG_WR(handle, portn,
-						XMAC_ADDR_FILT0_REG, addr0);
+				    XMAC_ADDR_FILT0_REG, addr0);
 				XMAC_REG_WR(handle, portn,
-						XMAC_ADDR_FILT1_REG, addr1);
+				    XMAC_ADDR_FILT1_REG, addr1);
 				XMAC_REG_WR(handle, portn,
-						XMAC_ADDR_FILT2_REG, addr2);
+				    XMAC_ADDR_FILT2_REG, addr2);
 			} else {
 				XMAC_REG_RD(handle, portn,
-						XMAC_ADDR_FILT0_REG, &addr0);
+				    XMAC_ADDR_FILT0_REG, &addr0);
 				XMAC_REG_RD(handle, portn,
-						XMAC_ADDR_FILT1_REG, &addr1);
+				    XMAC_ADDR_FILT1_REG, &addr1);
 				XMAC_REG_RD(handle, portn,
-						XMAC_ADDR_FILT2_REG, &addr2);
+				    XMAC_ADDR_FILT2_REG, &addr2);
 				attrp->odata[0] = addr0 & MAC_ADDR_REG_MASK;
 				attrp->odata[1] = addr1 & MAC_ADDR_REG_MASK;
 				attrp->odata[2] = addr2 & MAC_ADDR_REG_MASK;
@@ -1598,51 +1603,51 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 				ASSERT((addr0 & ~0xFFFF) == 0);
 				if ((addr0 & ~0xFFFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_PORT_ADDR_FILTER:"
-						    " addr0",
-						    addr0));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_PORT_ADDR_FILTER:"
+					    " addr0",
+					    addr0));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				ASSERT((addr1 & ~0xFFFF) == 0);
 				if ((addr1 & ~0xFFFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_PORT_ADDR_FILTER:"
-						    " Invalid Input:"
-						    " addr1 <0x%x>",
-						    addr1));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_PORT_ADDR_FILTER:"
+					    " Invalid Input:"
+					    " addr1 <0x%x>",
+					    addr1));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				ASSERT((addr2 & ~0xFFFF) == 0);
 				if ((addr2 & ~0xFFFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_PORT_ADDR_FILTER:"
-						    " Invalid Input:"
-						    " addr2 <0x%x>",
-						    addr2));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_PORT_ADDR_FILTER:"
+					    " Invalid Input:"
+					    " addr2 <0x%x>",
+					    addr2));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				BMAC_REG_WR(handle, portn, MAC_ADDR_FILT0_REG,
-						addr0);
+				    addr0);
 				BMAC_REG_WR(handle, portn, MAC_ADDR_FILT1_REG,
-						addr1);
+				    addr1);
 				BMAC_REG_WR(handle, portn, MAC_ADDR_FILT2_REG,
-						addr2);
+				    addr2);
 			} else {
 				BMAC_REG_RD(handle, portn, MAC_ADDR_FILT0_REG,
-						&addr0);
+				    &addr0);
 				BMAC_REG_RD(handle, portn, MAC_ADDR_FILT1_REG,
-						&addr1);
+				    &addr1);
 				BMAC_REG_RD(handle, portn, MAC_ADDR_FILT2_REG,
-						&addr2);
+				    &addr2);
 				attrp->odata[0] = addr0 & MAC_ADDR_REG_MASK;
 				attrp->odata[1] = addr1 & MAC_ADDR_REG_MASK;
 				attrp->odata[2] = addr2 & MAC_ADDR_REG_MASK;
@@ -1651,7 +1656,8 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 		default:
 			return (NPI_FAILURE | NPI_MAC_PORT_INVALID(portn));
 		}
-	}	break;
+		break;
+	}
 
 	case MAC_PORT_ADDR_FILTER_MASK: {
 		uint32_t mask_1_2;
@@ -1666,36 +1672,36 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 				ASSERT((mask_0 & ~0xFFFF) == 0);
 				if ((mask_0 & ~0xFFFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_ADDR_FILTER_MASK:"
-						    " Invalid Input:"
-						    " mask_0 <0x%x>",
-						    mask_0));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_ADDR_FILTER_MASK:"
+					    " Invalid Input:"
+					    " mask_0 <0x%x>",
+					    mask_0));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				ASSERT((mask_1_2 & ~0xFF) == 0);
 				if ((mask_1_2 & ~0xFF) != 0) {
 					NPI_ERROR_MSG((handle.function,
-						    NPI_ERR_CTL,
-						    " npi_mac_port_attr"
-						    " MAC_ADDR_FILTER_MASK:"
-						    " Invalid Input:"
-						    " mask_1_2 <0x%x>",
-						    mask_1_2));
+					    NPI_ERR_CTL,
+					    " npi_mac_port_attr"
+					    " MAC_ADDR_FILTER_MASK:"
+					    " Invalid Input:"
+					    " mask_1_2 <0x%x>",
+					    mask_1_2));
 					return (NPI_FAILURE |
-					NPI_MAC_PORT_ATTR_INVALID(portn));
+					    NPI_MAC_PORT_ATTR_INVALID(portn));
 				}
 				XMAC_REG_WR(handle, portn,
-					XMAC_ADDR_FILT0_MASK_REG, mask_0);
+				    XMAC_ADDR_FILT0_MASK_REG, mask_0);
 				XMAC_REG_WR(handle, portn,
-					XMAC_ADDR_FILT12_MASK_REG, mask_1_2);
+				    XMAC_ADDR_FILT12_MASK_REG, mask_1_2);
 			} else {
 				XMAC_REG_RD(handle, portn,
-					XMAC_ADDR_FILT0_MASK_REG, &mask_0);
+				    XMAC_ADDR_FILT0_MASK_REG, &mask_0);
 				XMAC_REG_RD(handle, portn,
-					XMAC_ADDR_FILT12_MASK_REG, &mask_1_2);
+				    XMAC_ADDR_FILT12_MASK_REG, &mask_1_2);
 				attrp->odata[0] = mask_0 & 0xFFFF;
 				attrp->odata[1] = mask_1_2 & 0xFF;
 			}
@@ -1706,14 +1712,14 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 				mask_0 = attrp->idata[0];
 				mask_1_2 = attrp->idata[1];
 				BMAC_REG_WR(handle, portn,
-					MAC_ADDR_FILT00_MASK_REG, mask_0);
+				    MAC_ADDR_FILT00_MASK_REG, mask_0);
 				BMAC_REG_WR(handle, portn,
-					MAC_ADDR_FILT12_MASK_REG, mask_1_2);
+				    MAC_ADDR_FILT12_MASK_REG, mask_1_2);
 			} else {
 				BMAC_REG_RD(handle, portn,
-					MAC_ADDR_FILT00_MASK_REG, &mask_0);
+				    MAC_ADDR_FILT00_MASK_REG, &mask_0);
 				BMAC_REG_RD(handle, portn,
-					MAC_ADDR_FILT12_MASK_REG, &mask_1_2);
+				    MAC_ADDR_FILT12_MASK_REG, &mask_1_2);
 				attrp->odata[0] = mask_0;
 				attrp->odata[1] = mask_1_2;
 			}
@@ -1721,13 +1727,14 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 		default:
 			return (NPI_FAILURE | NPI_MAC_PORT_INVALID(portn));
 		}
-	}	break;
+		break;
+	}
 
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_mac_port_attr"
-				    " Invalid Input:"
-				    " attr <0x%x>", attrp->type));
+		    " npi_mac_port_attr"
+		    " Invalid Input:"
+		    " attr <0x%x>", attrp->type));
 		return (NPI_FAILURE | NPI_MAC_PORT_ATTR_INVALID(portn));
 	}
 
@@ -1763,28 +1770,28 @@ npi_xmac_reset(npi_handle_t handle, uint8_t portn, npi_mac_reset_t mode)
 		break;
 	case XTX_MAC_RESET_ALL:
 		XMAC_REG_WR(handle, portn, XTXMAC_SW_RST_REG,
-					XTXMAC_SOFT_RST | XTXMAC_REG_RST);
+		    XTXMAC_SOFT_RST | XTXMAC_REG_RST);
 		XMAC_WAIT_REG(handle, portn, XTXMAC_SW_RST_REG, val);
 		txmac = B_TRUE;
 		break;
 	case XRX_MAC_RESET_ALL:
 		XMAC_REG_WR(handle, portn, XRXMAC_SW_RST_REG,
-					XRXMAC_SOFT_RST | XRXMAC_REG_RST);
+		    XRXMAC_SOFT_RST | XRXMAC_REG_RST);
 		XMAC_WAIT_REG(handle, portn, XRXMAC_SW_RST_REG, val);
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_mac_reset"
-				    " Invalid Input: mode <0x%x>",
-				    mode));
+		    " npi_mac_reset"
+		    " Invalid Input: mode <0x%x>",
+		    mode));
 		return (NPI_FAILURE | NPI_MAC_RESET_MODE_INVALID(portn));
 	}
 
 	if (val != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_xmac_reset"
-				    " HW ERROR: MAC_RESET  failed <0x%x>",
-				    val));
+		    " npi_xmac_reset"
+		    " HW ERROR: MAC_RESET  failed <0x%x>",
+		    val));
 
 		if (txmac)
 			return (NPI_FAILURE | NPI_TXMAC_RESET_FAILED(portn));
@@ -1809,9 +1816,9 @@ npi_xmac_xif_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((config != 0) && ((config & ~CFG_XMAC_XIF_ALL) == 0));
 		if ((config == 0) || (config & ~CFG_XMAC_XIF_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_xmac_xif_config"
-					    " Invalid Input:"
-					    " config <0x%x>", config));
+			    " npi_xmac_xif_config"
+			    " Invalid Input:"
+			    " config <0x%x>", config));
 			return (NPI_FAILURE | NPI_MAC_OPCODE_INVALID(portn));
 		}
 		if (op == ENABLE) {
@@ -1867,9 +1874,9 @@ npi_xmac_xif_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((config & ~CFG_XMAC_XIF_ALL) == 0);
 		if ((config & ~CFG_XMAC_XIF_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_xmac_xif_config"
-					    " Invalid Input: config <0x%x>",
-					    config));
+			    " npi_xmac_xif_config"
+			    " Invalid Input: config <0x%x>",
+			    config));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		XMAC_REG_RD(handle, portn, XMAC_CONFIG_REG, &val);
@@ -1922,8 +1929,8 @@ npi_xmac_xif_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_xmac_xif_config"
-				    " Invalid Input: op <0x%x>", op));
+		    " npi_xmac_xif_config"
+		    " Invalid Input: op <0x%x>", op));
 		return (NPI_FAILURE | NPI_MAC_OPCODE_INVALID(portn));
 	}
 
@@ -1944,9 +1951,9 @@ npi_xmac_tx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((config != 0) && ((config & ~CFG_XMAC_TX_ALL) == 0));
 		if ((config == 0) || (config & ~CFG_XMAC_TX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_xmac_tx_config"
-				    " Invalid Input: config <0x%x>",
-				    config));
+			    " npi_xmac_tx_config"
+			    " Invalid Input: config <0x%x>",
+			    config));
 			return (NPI_FAILURE | NPI_MAC_OPCODE_INVALID(portn));
 		}
 		if (op == ENABLE) {
@@ -1977,9 +1984,9 @@ npi_xmac_tx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((config & ~CFG_XMAC_TX_ALL) == 0);
 		if ((config & ~CFG_XMAC_TX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_xmac_tx_config"
-					    " Invalid Input: config <0x%x>",
-					    config));
+			    " npi_xmac_tx_config"
+			    " Invalid Input: config <0x%x>",
+			    config));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		XMAC_REG_RD(handle, portn, XMAC_CONFIG_REG, &val);
@@ -2004,9 +2011,9 @@ npi_xmac_tx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_xmac_tx_config"
-				    " Invalid Input: op <0x%x>",
-				    op));
+		    " npi_xmac_tx_config"
+		    " Invalid Input: op <0x%x>",
+		    op));
 		return (NPI_FAILURE | NPI_MAC_OPCODE_INVALID(portn));
 	}
 
@@ -2027,9 +2034,9 @@ npi_xmac_rx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((config != 0) && ((config & ~CFG_XMAC_RX_ALL) == 0));
 		if ((config == 0) || (config & ~CFG_XMAC_RX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_xmac_rx_config"
-					    " Invalid Input: config <0x%x>",
-					    config));
+			    " npi_xmac_rx_config"
+			    " Invalid Input: config <0x%x>",
+			    config));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		if (op == ENABLE) {
@@ -2092,9 +2099,9 @@ npi_xmac_rx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((config & ~CFG_XMAC_RX_ALL) == 0);
 		if ((config & ~CFG_XMAC_RX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_xmac_rx_config"
-					    " Invalid Input: config <0x%x>",
-					    config));
+			    " npi_xmac_rx_config"
+			    " Invalid Input: config <0x%x>",
+			    config));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		XMAC_REG_RD(handle, portn, XMAC_CONFIG_REG, &val);
@@ -2151,8 +2158,8 @@ npi_xmac_rx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_xmac_rx_config"
-					    " Invalid Input: op <0x%x>", op));
+		    " npi_xmac_rx_config"
+		    " Invalid Input: op <0x%x>", op));
 		return (NPI_FAILURE | NPI_MAC_OPCODE_INVALID(portn));
 	}
 
@@ -2173,9 +2180,9 @@ npi_xmac_tx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((iconfig != 0) && ((iconfig & ~ICFG_XMAC_TX_ALL) == 0));
 		if ((iconfig == 0) || (iconfig & ~ICFG_XMAC_TX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_xmac_tx_iconfig"
-				    " Invalid Input: iconfig <0x%x>",
-				    iconfig));
+			    " npi_xmac_tx_iconfig"
+			    " Invalid Input: iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		XMAC_REG_RD(handle, portn, XTXMAC_STAT_MSK_REG, &val);
@@ -2190,9 +2197,9 @@ npi_xmac_tx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((iconfig & ~ICFG_XMAC_TX_ALL) == 0);
 		if ((iconfig & ~ICFG_XMAC_TX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_xmac_tx_iconfig"
-				    " Invalid Input: iconfig <0x%x>",
-				    iconfig));
+			    " npi_xmac_tx_iconfig"
+			    " Invalid Input: iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		XMAC_REG_WR(handle, portn, XTXMAC_STAT_MSK_REG, ~iconfig);
@@ -2200,9 +2207,9 @@ npi_xmac_tx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_xmac_tx_iconfig"
-				    " Invalid Input: iconfig <0x%x>",
-				    iconfig));
+		    " npi_xmac_tx_iconfig"
+		    " Invalid Input: iconfig <0x%x>",
+		    iconfig));
 		return (NPI_FAILURE | NPI_MAC_OPCODE_INVALID(portn));
 	}
 
@@ -2223,9 +2230,9 @@ npi_xmac_rx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((iconfig != 0) && ((iconfig & ~ICFG_XMAC_RX_ALL) == 0));
 		if ((iconfig == 0) || (iconfig & ~ICFG_XMAC_RX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_xmac_rx_iconfig"
-					    " Invalid Input: iconfig <0x%x>",
-					    iconfig));
+			    " npi_xmac_rx_iconfig"
+			    " Invalid Input: iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		XMAC_REG_RD(handle, portn, XRXMAC_STAT_MSK_REG, &val);
@@ -2240,9 +2247,9 @@ npi_xmac_rx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((iconfig & ~ICFG_XMAC_RX_ALL) == 0);
 		if ((iconfig & ~ICFG_XMAC_RX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_xmac_rx_iconfig"
-					    " Invalid Input: iconfig <0x%x>",
-					    iconfig));
+			    " npi_xmac_rx_iconfig"
+			    " Invalid Input: iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		XMAC_REG_WR(handle, portn, XRXMAC_STAT_MSK_REG, ~iconfig);
@@ -2250,9 +2257,9 @@ npi_xmac_rx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_xmac_rx_iconfig"
-				    " Invalid Input: iconfig <0x%x>",
-				    iconfig));
+		    " npi_xmac_rx_iconfig"
+		    " Invalid Input: iconfig <0x%x>",
+		    iconfig));
 		return (NPI_FAILURE | NPI_MAC_OPCODE_INVALID(portn));
 	}
 
@@ -2271,12 +2278,12 @@ npi_xmac_ctl_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 	case ENABLE:
 	case DISABLE:
 		ASSERT((iconfig != 0) &&	\
-			((iconfig & ~ICFG_XMAC_CTRL_ALL) == 0));
+		    ((iconfig & ~ICFG_XMAC_CTRL_ALL) == 0));
 		if ((iconfig == 0) || (iconfig & ~ICFG_XMAC_CTRL_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_xmac_ctl_iconfig"
-					    " Invalid Input: iconfig <0x%x>",
-					    iconfig));
+			    " npi_xmac_ctl_iconfig"
+			    " Invalid Input: iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		XMAC_REG_RD(handle, portn, XMAC_C_S_MSK_REG, &val);
@@ -2291,9 +2298,9 @@ npi_xmac_ctl_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((iconfig & ~ICFG_XMAC_CTRL_ALL) == 0);
 		if ((iconfig & ~ICFG_XMAC_CTRL_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_xmac_ctl_iconfig"
-					    " Invalid Input: iconfig <0x%x>",
-					    iconfig));
+			    " npi_xmac_ctl_iconfig"
+			    " Invalid Input: iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		XMAC_REG_WR(handle, portn, XMAC_C_S_MSK_REG, ~iconfig);
@@ -2301,9 +2308,9 @@ npi_xmac_ctl_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_xmac_ctl_iconfig"
-					    " Invalid Input: iconfig <0x%x>",
-					    iconfig));
+		    " npi_xmac_ctl_iconfig"
+		    " Invalid Input: iconfig <0x%x>",
+		    iconfig));
 		return (NPI_FAILURE | NPI_MAC_OPCODE_INVALID(portn));
 	}
 
@@ -2475,9 +2482,9 @@ npi_xmac_xpcs_read(npi_handle_t handle, uint8_t portn, uint8_t xpcs_reg,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_xmac_xpcs_read"
-				    " Invalid Input: xpcs_reg <0x%x>",
-				    xpcs_reg));
+		    " npi_xmac_xpcs_read"
+		    " Invalid Input: xpcs_reg <0x%x>",
+		    xpcs_reg));
 		return (NPI_FAILURE | NPI_MAC_REG_INVALID(portn));
 	}
 	XPCS_REG_RD(handle, portn, reg, &val);
@@ -2522,9 +2529,9 @@ npi_xmac_xpcs_write(npi_handle_t handle, uint8_t portn, uint8_t xpcs_reg,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_xmac_xpcs_write"
-				    " Invalid Input: xpcs_reg <0x%x>",
-				    xpcs_reg));
+		    " npi_xmac_xpcs_write"
+		    " Invalid Input: xpcs_reg <0x%x>",
+		    xpcs_reg));
 		return (NPI_FAILURE | NPI_MAC_PCS_REG_INVALID(portn));
 	}
 	val = value;
@@ -2554,17 +2561,17 @@ npi_bmac_reset(npi_handle_t handle, uint8_t portn, npi_mac_reset_t mode)
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_bmac_reset"
-				    " Invalid Input: mode <0x%x>",
-				    mode));
+		    " npi_bmac_reset"
+		    " Invalid Input: mode <0x%x>",
+		    mode));
 		return (NPI_FAILURE | NPI_MAC_RESET_MODE_INVALID(portn));
 	}
 
 	if (val != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_bmac_reset"
-				    " BMAC_RESET HW Error: ret <0x%x>",
-				    val));
+		    " npi_bmac_reset"
+		    " BMAC_RESET HW Error: ret <0x%x>",
+		    val));
 		if (txmac)
 			return (NPI_FAILURE | NPI_TXMAC_RESET_FAILED(portn));
 		else
@@ -2632,9 +2639,9 @@ npi_bmac_tx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((config != 0) && ((config & ~CFG_BMAC_TX_ALL) == 0));
 		if ((config == 0) || (config & ~CFG_BMAC_TX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_bmac_tx_config"
-					    " Invalid Input: config <0x%x>",
-					    config));
+			    " npi_bmac_tx_config"
+			    " Invalid Input: config <0x%x>",
+			    config));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		if (op == ENABLE) {
@@ -2657,9 +2664,9 @@ npi_bmac_tx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((config & ~CFG_BMAC_TX_ALL) == 0);
 		if ((config & ~CFG_BMAC_TX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_bmac_tx_config"
-					    " Invalid Input: config <0x%x>",
-					    config));
+			    " npi_bmac_tx_config"
+			    " Invalid Input: config <0x%x>",
+			    config));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		BMAC_REG_RD(handle, portn, TXMAC_CONFIG_REG, &val);
@@ -2675,9 +2682,9 @@ npi_bmac_tx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_bmac_tx_config"
-				    " Invalid Input: op <0x%x>",
-				    op));
+		    " npi_bmac_tx_config"
+		    " Invalid Input: op <0x%x>",
+		    op));
 		return (NPI_FAILURE | NPI_MAC_OPCODE_INVALID(portn));
 	}
 
@@ -2698,9 +2705,9 @@ npi_bmac_rx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((config != 0) && ((config & ~CFG_BMAC_RX_ALL) == 0));
 		if ((config == 0) || (config & ~CFG_BMAC_RX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_bmac_rx_config"
-					    " Invalid Input: config <0x%x>",
-					    config));
+			    " npi_bmac_rx_config"
+			    " Invalid Input: config <0x%x>",
+			    config));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		if (op == ENABLE) {
@@ -2747,9 +2754,9 @@ npi_bmac_rx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((config & ~CFG_BMAC_RX_ALL) == 0);
 		if ((config & ~CFG_BMAC_RX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_bmac_rx_config"
-					    " Invalid Input: config <0x%x>",
-					    config));
+			    " npi_bmac_rx_config"
+			    " Invalid Input: config <0x%x>",
+			    config));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		BMAC_REG_RD(handle, portn, RXMAC_CONFIG_REG, &val);
@@ -2790,8 +2797,8 @@ npi_bmac_rx_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_bmac_rx_config"
-					    " Invalid Input: op <0x%x>", op));
+		    " npi_bmac_rx_config"
+		    " Invalid Input: op <0x%x>", op));
 		return (NPI_FAILURE | NPI_MAC_OPCODE_INVALID(portn));
 	}
 
@@ -2812,9 +2819,9 @@ npi_bmac_rx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((iconfig != 0) && ((iconfig & ~ICFG_BMAC_RX_ALL) == 0));
 		if ((iconfig == 0) || (iconfig & ~ICFG_BMAC_RX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_bmac_rx_iconfig"
-					    " Invalid Input: iconfig <0x%x>",
-					    iconfig));
+			    " npi_bmac_rx_iconfig"
+			    " Invalid Input: iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		BMAC_REG_RD(handle, portn, BRXMAC_STAT_MSK_REG, &val);
@@ -2829,9 +2836,9 @@ npi_bmac_rx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((iconfig & ~ICFG_BMAC_RX_ALL) == 0);
 		if ((iconfig & ~ICFG_BMAC_RX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_bmac_rx_iconfig"
-					    " Invalid Input: iconfig <0x%x>",
-					    iconfig));
+			    " npi_bmac_rx_iconfig"
+			    " Invalid Input: iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		BMAC_REG_WR(handle, portn, BRXMAC_STAT_MSK_REG, ~iconfig);
@@ -2839,9 +2846,9 @@ npi_bmac_rx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_bmac_rx_iconfig"
-				    " Invalid Input: iconfig <0x%x>",
-				    iconfig));
+		    " npi_bmac_rx_iconfig"
+		    " Invalid Input: iconfig <0x%x>",
+		    iconfig));
 		return (NPI_FAILURE | NPI_MAC_OPCODE_INVALID(portn));
 	}
 
@@ -2862,9 +2869,9 @@ npi_bmac_xif_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((config != 0) && ((config & ~CFG_BMAC_XIF_ALL) == 0));
 		if ((config == 0) || (config & ~CFG_BMAC_XIF_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_bmac_xif_config"
-					    " Invalid Input: config <0x%x>",
-					    config));
+			    " npi_bmac_xif_config"
+			    " Invalid Input: config <0x%x>",
+			    config));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		if (op == ENABLE) {
@@ -2903,9 +2910,9 @@ npi_bmac_xif_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((config & ~CFG_BMAC_XIF_ALL) == 0);
 		if ((config & ~CFG_BMAC_XIF_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_bmac_xif_config"
-					    " Invalid Input: config <0x%x>",
-					    config));
+			    " npi_bmac_xif_config"
+			    " Invalid Input: config <0x%x>",
+			    config));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		BMAC_REG_RD(handle, portn, MAC_XIF_CONFIG_REG, &val);
@@ -2937,9 +2944,9 @@ npi_bmac_xif_config(npi_handle_t handle, config_op_t op, uint8_t portn,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_bmac_xif_config"
-				    " Invalid Input: op <0x%x>",
-				    op));
+		    " npi_bmac_xif_config"
+		    " Invalid Input: op <0x%x>",
+		    op));
 		return (NPI_FAILURE | NPI_MAC_OPCODE_INVALID(portn));
 	}
 
@@ -2960,9 +2967,9 @@ npi_bmac_tx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((iconfig != 0) && ((iconfig & ~ICFG_XMAC_TX_ALL) == 0));
 		if ((iconfig == 0) || (iconfig & ~ICFG_XMAC_TX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_bmac_tx_iconfig"
-					    " Invalid Input: iconfig <0x%x>",
-					    iconfig));
+			    " npi_bmac_tx_iconfig"
+			    " Invalid Input: iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		BMAC_REG_RD(handle, portn, BTXMAC_STAT_MSK_REG, &val);
@@ -2977,9 +2984,9 @@ npi_bmac_tx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((iconfig & ~ICFG_XMAC_TX_ALL) == 0);
 		if ((iconfig & ~ICFG_XMAC_TX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_bmac_tx_iconfig"
-					    " Invalid Input: iconfig <0x%x>",
-					    iconfig));
+			    " npi_bmac_tx_iconfig"
+			    " Invalid Input: iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		BMAC_REG_WR(handle, portn, BTXMAC_STAT_MSK_REG, ~iconfig);
@@ -2987,9 +2994,9 @@ npi_bmac_tx_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_bmac_tx_iconfig"
-				    " Invalid Input: iconfig <0x%x>",
-				    iconfig));
+		    " npi_bmac_tx_iconfig"
+		    " Invalid Input: iconfig <0x%x>",
+		    iconfig));
 		return (NPI_FAILURE | NPI_MAC_OPCODE_INVALID(portn));
 	}
 
@@ -3010,9 +3017,9 @@ npi_bmac_ctl_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((iconfig != 0) && ((iconfig & ~ICFG_BMAC_CTL_ALL) == 0));
 		if ((iconfig == 0) || (iconfig & ~ICFG_BMAC_CTL_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_bmac_ctl_iconfig"
-					    " Invalid Input: iconfig <0x%x>",
-					    iconfig));
+			    " npi_bmac_ctl_iconfig"
+			    " Invalid Input: iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		BMAC_REG_RD(handle, portn, BMAC_C_S_MSK_REG, &val);
@@ -3027,9 +3034,9 @@ npi_bmac_ctl_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		ASSERT((iconfig & ~ICFG_BMAC_RX_ALL) == 0);
 		if ((iconfig & ~ICFG_BMAC_RX_ALL) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_bmac_ctl_iconfig"
-					    " Invalid Input: iconfig <0x%x>",
-					    iconfig));
+			    " npi_bmac_ctl_iconfig"
+			    " Invalid Input: iconfig <0x%x>",
+			    iconfig));
 			return (NPI_FAILURE | NPI_MAC_CONFIG_INVALID(portn));
 		}
 		BMAC_REG_WR(handle, portn, BMAC_C_S_MSK_REG, ~iconfig);
@@ -3037,9 +3044,9 @@ npi_bmac_ctl_iconfig(npi_handle_t handle, config_op_t op, uint8_t portn,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_bmac_ctl_iconfig"
-				    " Invalid Input: iconfig <0x%x>",
-				    iconfig));
+		    " npi_bmac_ctl_iconfig"
+		    " Invalid Input: iconfig <0x%x>",
+		    iconfig));
 		return (NPI_FAILURE | NPI_MAC_OPCODE_INVALID(portn));
 	}
 
@@ -3105,7 +3112,7 @@ npi_mac_mif_mdio_read(npi_handle_t handle, uint8_t portn, uint8_t device,
 	frame.bits.w0.data = xcvr_reg;	/* register address */
 
 	NPI_DEBUG_MSG((handle.function, MIF_CTL,
-		"mdio read port %d addr val=0x%x\n", portn, frame.value));
+	    "mdio read port %d addr val=0x%x\n", portn, frame.value));
 
 	MIF_REG_WR(handle, MIF_OUTPUT_FRAME_REG, frame.value);
 
@@ -3113,11 +3120,11 @@ npi_mac_mif_mdio_read(npi_handle_t handle, uint8_t portn, uint8_t device,
 	MIF_WAIT_REG(handle, frame, delay, MIF_DELAY, MIF_DELAY);
 
 	NPI_DEBUG_MSG((handle.function, MIF_CTL,
-		"mdio read port %d addr poll=0x%x\n", portn, frame.value));
+	    "mdio read port %d addr poll=0x%x\n", portn, frame.value));
 
 	if (delay == MIF_DELAY) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					"mdio read no response1\n"));
+		    "mdio read no response1\n"));
 	}
 
 	frame.bits.w0.st = FRAME45_ST; /* Clause 45 */
@@ -3128,7 +3135,7 @@ npi_mac_mif_mdio_read(npi_handle_t handle, uint8_t portn, uint8_t device,
 	frame.bits.w0.ta_lsb = 0;
 
 	NPI_DEBUG_MSG((handle.function, MIF_CTL,
-		"mdio read port %d data frame=0x%x\n", portn, frame.value));
+	    "mdio read port %d data frame=0x%x\n", portn, frame.value));
 
 	MIF_REG_WR(handle, MIF_OUTPUT_FRAME_REG, frame.value);
 
@@ -3136,15 +3143,15 @@ npi_mac_mif_mdio_read(npi_handle_t handle, uint8_t portn, uint8_t device,
 	MIF_WAIT_REG(handle, frame, delay, MIF_DELAY, MIF_DELAY);
 
 	NPI_DEBUG_MSG((handle.function, MIF_CTL,
-		"mdio read port %d data poll=0x%x\n", portn, frame.value));
+	    "mdio read port %d data poll=0x%x\n", portn, frame.value));
 
 	*value = frame.bits.w0.data;
 	NPI_DEBUG_MSG((handle.function, MIF_CTL,
-		"mdio read port=%d val=0x%x\n", portn, *value));
+	    "mdio read port=%d val=0x%x\n", portn, *value));
 
 	if (delay == MIF_DELAY) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			"mdio read no response2\n"));
+		    "mdio read no response2\n"));
 	}
 
 	return (NPI_SUCCESS);
@@ -3173,8 +3180,8 @@ npi_mac_mif_mii_read(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 
 	*value = frame.bits.w0.data;
 	NPI_DEBUG_MSG((handle.function, MIF_CTL,
-			"mif mii read port %d reg=0x%x frame=0x%x\n", portn,
-			xcvr_reg, frame.bits.w0.data));
+	    "mif mii read port %d reg=0x%x frame=0x%x\n", portn,
+	    xcvr_reg, frame.bits.w0.data));
 
 	return (NPI_SUCCESS);
 }
@@ -3198,17 +3205,17 @@ npi_mac_mif_mdio_write(npi_handle_t handle, uint8_t portn, uint8_t device,
 	MIF_REG_WR(handle, MIF_OUTPUT_FRAME_REG, frame.value);
 
 	NPI_DEBUG_MSG((handle.function, MIF_CTL,
-		"mdio write port %d addr val=0x%x\n", portn, frame.value));
+	    "mdio write port %d addr val=0x%x\n", portn, frame.value));
 
 	delay = 0;
 	MIF_WAIT_REG(handle, frame, delay, MIF_DELAY, MIF_DELAY);
 
 	NPI_DEBUG_MSG((handle.function, MIF_CTL,
-		"mdio write port %d addr poll=0x%x\n", portn, frame.value));
+	    "mdio write port %d addr poll=0x%x\n", portn, frame.value));
 
 	if (delay == MIF_DELAY) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				"mdio write no response1\n"));
+		    "mdio write no response1\n"));
 	}
 
 	frame.bits.w0.st = FRAME45_ST; /* Clause 45 */
@@ -3221,17 +3228,17 @@ npi_mac_mif_mdio_write(npi_handle_t handle, uint8_t portn, uint8_t device,
 	MIF_REG_WR(handle, MIF_OUTPUT_FRAME_REG, frame.value);
 
 	NPI_DEBUG_MSG((handle.function, MIF_CTL,
-		"mdio write port %d data val=0x%x\n", portn, frame.value));
+	    "mdio write port %d data val=0x%x\n", portn, frame.value));
 
 	delay = 0;
 	MIF_WAIT_REG(handle, frame, delay, MIF_DELAY, MIF_DELAY);
 
 	NPI_DEBUG_MSG((handle.function, MIF_CTL,
-		"mdio write port %d data poll=0x%x\n", portn, frame.value));
+	    "mdio write port %d data poll=0x%x\n", portn, frame.value));
 
 	if (delay == MIF_DELAY) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				"mdio write no response2\n"));
+		    "mdio write no response2\n"));
 	}
 
 	return (NPI_SUCCESS);
@@ -3257,8 +3264,8 @@ npi_mac_mif_mii_write(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 	MIF_WAIT_REG(handle, frame, delay, MIF_DELAY, MAX_PIO_RETRIES);
 
 	NPI_DEBUG_MSG((handle.function, MIF_CTL,
-			"mif mii write port %d reg=0x%x frame=0x%x\n", portn,
-			xcvr_reg, frame.value));
+	    "mif mii write port %d reg=0x%x frame=0x%x\n", portn,
+	    xcvr_reg, frame.value));
 
 	if (delay == MAX_PIO_RETRIES)
 		return (NPI_FAILURE | NPI_MAC_MII_WRITE_FAILED(portn));
@@ -3294,7 +3301,7 @@ npi_mac_pcs_mii_read(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 		PCS_REG_RD(handle, portn, PCS_STATE_MACHINE_REG, &val);
 		pcs_stat_mc.value = val;
 		if ((pcs_stat_mc.bits.w0.link_cfg_stat == 0xB) &&
-			(pcs_stat_mc.bits.w0.word_sync != 0)) {
+		    (pcs_stat_mc.bits.w0.word_sync != 0)) {
 			pcs_stat.bits.w0.link_stat = 1;
 		} else if (pcs_stat_mc.bits.w0.link_cfg_stat != 0xB) {
 			pcs_stat.bits.w0.link_stat = 0;
@@ -3329,7 +3336,7 @@ npi_mac_pcs_mii_read(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 		pcs_anar.value = (uint16_t)val;
 		aner.value = 0;
 		aner.bits.lp_an_able = pcs_anar.bits.w0.full_duplex |
-						pcs_anar.bits.w0.half_duplex;
+		    pcs_anar.bits.w0.half_duplex;
 		*value = aner.value;
 		break;
 	case NXGE_MII_GSR:
@@ -3342,9 +3349,9 @@ npi_mac_pcs_mii_read(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_mac_pcs_mii_read"
-				    " Invalid Input: xcvr_reg <0x%x>",
-				    xcvr_reg));
+		    " npi_mac_pcs_mii_read"
+		    " Invalid Input: xcvr_reg <0x%x>",
+		    xcvr_reg));
 		return (NPI_FAILURE | NPI_MAC_REG_INVALID(portn));
 	}
 
@@ -3387,9 +3394,9 @@ npi_mac_pcs_mii_write(npi_handle_t handle, uint8_t portn, uint8_t xcvr_reg,
 		break;
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_mac_pcs_mii_write"
-				    " Invalid Input: xcvr_reg <0x%x>",
-				    xcvr_reg));
+		    " npi_mac_pcs_mii_write"
+		    " Invalid Input: xcvr_reg <0x%x>",
+		    xcvr_reg));
 		return (NPI_FAILURE | NPI_MAC_REG_INVALID(portn));
 	}
 
@@ -3407,9 +3414,9 @@ npi_mac_mif_link_intr_enable(npi_handle_t handle, uint8_t portn,
 	ASSERT(xcvr_reg <= NXGE_MAX_MII_REGS);
 	if (xcvr_reg > NXGE_MAX_MII_REGS) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_mac_mif_link_intr_enable"
-				    " Invalid Input: xcvr_reg <0x%x>",
-				    xcvr_reg));
+		    " npi_mac_mif_link_intr_enable"
+		    " Invalid Input: xcvr_reg <0x%x>",
+		    xcvr_reg));
 		return (NPI_FAILURE | NPI_MAC_REG_INVALID(portn));
 	}
 

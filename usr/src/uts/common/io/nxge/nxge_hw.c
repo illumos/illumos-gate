@@ -72,14 +72,14 @@ nxge_global_reset(p_nxge_t nxgep)
 	(void) nxge_intr_hw_disable(nxgep);
 
 	if ((nxgep->suspended) ||
-			((nxgep->statsp->port_stats.lb_mode ==
-			nxge_lb_phy1000) ||
-			(nxgep->statsp->port_stats.lb_mode ==
-			nxge_lb_phy10g) ||
-			(nxgep->statsp->port_stats.lb_mode ==
-			nxge_lb_serdes1000) ||
-			(nxgep->statsp->port_stats.lb_mode ==
-			nxge_lb_serdes10g))) {
+	    ((nxgep->statsp->port_stats.lb_mode ==
+	    nxge_lb_phy1000) ||
+	    (nxgep->statsp->port_stats.lb_mode ==
+	    nxge_lb_phy10g) ||
+	    (nxgep->statsp->port_stats.lb_mode ==
+	    nxge_lb_serdes1000) ||
+	    (nxgep->statsp->port_stats.lb_mode ==
+	    nxge_lb_serdes10g))) {
 		if ((status = nxge_link_init(nxgep)) != NXGE_OK)
 			return (status);
 	}
@@ -114,8 +114,8 @@ nxge_hw_id_init(p_nxge_t nxgep)
 		nxgep->mac.is_jumbo = B_TRUE;
 	}
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-		"==> nxge_hw_id_init: maxframesize %d",
-		nxgep->mac.maxframesize));
+	    "==> nxge_hw_id_init: maxframesize %d",
+	    nxgep->mac.maxframesize));
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_hw_id_init"));
 }
@@ -134,17 +134,17 @@ nxge_hw_init_niu_common(p_nxge_t nxgep)
 	MUTEX_ENTER(&hw_p->nxge_cfg_lock);
 	if (hw_p->flags & COMMON_INIT_DONE) {
 		NXGE_DEBUG_MSG((nxgep, MOD_CTL,
-			"nxge_hw_init_niu_common"
-			" already done for dip $%p function %d exiting",
-			hw_p->parent_devp, nxgep->function_num));
+		    "nxge_hw_init_niu_common"
+		    " already done for dip $%p function %d exiting",
+		    hw_p->parent_devp, nxgep->function_num));
 		MUTEX_EXIT(&hw_p->nxge_cfg_lock);
 		return;
 	}
 
 	hw_p->flags = COMMON_INIT_START;
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL, "nxge_hw_init_niu_common"
-		" Started for device id %x with function %d",
-		hw_p->parent_devp, nxgep->function_num));
+	    " Started for device id %x with function %d",
+	    hw_p->parent_devp, nxgep->function_num));
 
 	/* per neptune common block init */
 	(void) nxge_fflp_hw_reset(nxgep);
@@ -153,8 +153,8 @@ nxge_hw_init_niu_common(p_nxge_t nxgep)
 	MUTEX_EXIT(&hw_p->nxge_cfg_lock);
 
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL, "nxge_hw_init_niu_common"
-		" Done for device id %x with function %d",
-		hw_p->parent_devp, nxgep->function_num));
+	    " Done for device id %x with function %d",
+	    hw_p->parent_devp, nxgep->function_num));
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_hw_init_niu_common"));
 }
 
@@ -182,7 +182,7 @@ nxge_intr(void *arg1, void *arg2)
 
 	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
 		NXGE_ERROR_MSG((nxgep, INT_CTL,
-			"<== nxge_intr: not initialized 0x%x", serviced));
+		    "<== nxge_intr: not initialized 0x%x", serviced));
 		return (serviced);
 	}
 
@@ -195,10 +195,10 @@ nxge_intr(void *arg1, void *arg2)
 		ldgp = t_ldgp = ldvp->ldgp;
 	}
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_intr: "
-		"ldgvp $%p ldvp $%p ldgp $%p", ldgvp, ldvp, ldgp));
+	    "ldgvp $%p ldvp $%p ldgp $%p", ldgvp, ldvp, ldgp));
 	if (ldgvp == NULL || ldvp == NULL || ldgp == NULL) {
 		NXGE_ERROR_MSG((nxgep, INT_CTL, "==> nxge_intr: "
-			"ldgvp $%p ldvp $%p ldgp $%p", ldgvp, ldvp, ldgp));
+		    "ldgvp $%p ldvp $%p ldgp $%p", ldgvp, ldvp, ldgp));
 		NXGE_ERROR_MSG((nxgep, INT_CTL, "<== nxge_intr: not ready"));
 		return (DDI_INTR_UNCLAIMED);
 	}
@@ -214,27 +214,27 @@ nxge_intr(void *arg1, void *arg2)
 	nldvs = ldgp->nldvs;
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_intr: #ldvs %d #intrs %d",
-			nldvs, ldgvp->ldg_intrs));
+	    nldvs, ldgvp->ldg_intrs));
 
 	serviced = DDI_INTR_CLAIMED;
 	for (i = 0; i < nintrs; i++, t_ldgp++) {
 		NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_intr(%d): #ldvs %d "
-				" #intrs %d", i, nldvs, nintrs));
+		    " #intrs %d", i, nldvs, nintrs));
 		/* Get this group's flag bits.  */
 		t_ldgp->interrupted = B_FALSE;
 		rs = npi_ldsv_ldfs_get(handle, t_ldgp->ldg,
-			&vector0, &vector1, &vector2);
+		    &vector0, &vector1, &vector2);
 		if (rs) {
 			continue;
 		}
 		if (!vector0 && !vector1 && !vector2) {
 			NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_intr: "
-				"no interrupts on group %d", t_ldgp->ldg));
+			    "no interrupts on group %d", t_ldgp->ldg));
 			continue;
 		}
 		NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_intr: "
-			"vector0 0x%llx vector1 0x%llx vector2 0x%llx",
-			vector0, vector1, vector2));
+		    "vector0 0x%llx vector1 0x%llx vector2 0x%llx",
+		    vector0, vector1, vector2));
 		t_ldgp->interrupted = B_TRUE;
 		nldvs = t_ldgp->nldvs;
 		for (j = 0; j < nldvs; j++, t_ldvp++) {
@@ -243,17 +243,17 @@ nxge_intr(void *arg1, void *arg2)
 			 */
 			ldv = t_ldvp->ldv;
 			if (((ldv < NXGE_MAC_LD_START) &&
-					(LDV_ON(ldv, vector0) |
-					(LDV_ON(ldv, vector1)))) ||
-					(ldv >= NXGE_MAC_LD_START &&
-					((LDV2_ON_1(ldv, vector2)) ||
-					(LDV2_ON_2(ldv, vector2))))) {
+			    (LDV_ON(ldv, vector0) |
+			    (LDV_ON(ldv, vector1)))) ||
+			    (ldv >= NXGE_MAC_LD_START &&
+			    ((LDV2_ON_1(ldv, vector2)) ||
+			    (LDV2_ON_2(ldv, vector2))))) {
 				(void) (t_ldvp->ldv_intr_handler)(
-					(caddr_t)t_ldvp, arg2);
+				    (caddr_t)t_ldvp, arg2);
 				NXGE_DEBUG_MSG((nxgep, INT_CTL,
-					"==> nxge_intr: "
-					"calling device %d #ldvs %d #intrs %d",
-					j, nldvs, nintrs));
+				    "==> nxge_intr: "
+				    "calling device %d #ldvs %d #intrs %d",
+				    j, nldvs, nintrs));
 			}
 		}
 	}
@@ -263,14 +263,14 @@ nxge_intr(void *arg1, void *arg2)
 		/* rearm group interrupts */
 		if (t_ldgp->interrupted) {
 			NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_intr: arm "
-				"group %d", t_ldgp->ldg));
+			    "group %d", t_ldgp->ldg));
 			(void) npi_intr_ldg_mgmt_set(handle, t_ldgp->ldg,
-				t_ldgp->arm, t_ldgp->ldg_timer);
+			    t_ldgp->arm, t_ldgp->ldg_timer);
 		}
 	}
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_intr: serviced 0x%x",
-		serviced));
+	    serviced));
 	return (serviced);
 }
 
@@ -373,13 +373,13 @@ nxge_syserr_intr(void *arg1, void *arg2)
 		}
 	}
 	NXGE_DEBUG_MSG((nxgep, SYSERR_CTL,
-		"==> nxge_syserr_intr: arg2 $%p arg1 $%p", nxgep, ldvp));
+	    "==> nxge_syserr_intr: arg2 $%p arg1 $%p", nxgep, ldvp));
 	if (ldvp != NULL && ldvp->use_timer == B_FALSE) {
 		ldgp = ldvp->ldgp;
 		if (ldgp == NULL) {
 			NXGE_ERROR_MSG((nxgep, SYSERR_CTL,
-				"<== nxge_syserrintr(no logical group): "
-				"arg2 $%p arg1 $%p", nxgep, ldvp));
+			    "<== nxge_syserrintr(no logical group): "
+			    "arg2 $%p arg1 $%p", nxgep, ldvp));
 			return (DDI_INTR_UNCLAIMED);
 		}
 		/*
@@ -392,15 +392,15 @@ nxge_syserr_intr(void *arg1, void *arg2)
 	estat.value = 0;
 	(void) npi_fzc_sys_err_stat_get(handle, &estat);
 	NXGE_DEBUG_MSG((nxgep, SYSERR_CTL,
-		"==> nxge_syserr_intr: device error 0x%016llx", estat.value));
+	    "==> nxge_syserr_intr: device error 0x%016llx", estat.value));
 
 	if (estat.bits.ldw.smx) {
 		/* SMX */
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_syserr_intr: device error - SMX"));
+		    "==> nxge_syserr_intr: device error - SMX"));
 	} else if (estat.bits.ldw.mac) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_syserr_intr: device error - MAC"));
+		    "==> nxge_syserr_intr: device error - MAC"));
 		/*
 		 * There is nothing to be done here. All MAC errors go to per
 		 * MAC port interrupt. MIF interrupt is the only MAC sub-block
@@ -409,17 +409,17 @@ nxge_syserr_intr(void *arg1, void *arg2)
 		 */
 	} else if (estat.bits.ldw.ipp) {
 		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_syserr_intr: device error - IPP"));
+		    "==> nxge_syserr_intr: device error - IPP"));
 		(void) nxge_ipp_handle_sys_errors(nxgep);
 	} else if (estat.bits.ldw.zcp) {
 		/* ZCP */
 		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_syserr_intr: device error - ZCP"));
+		    "==> nxge_syserr_intr: device error - ZCP"));
 		(void) nxge_zcp_handle_sys_errors(nxgep);
 	} else if (estat.bits.ldw.tdmc) {
 		/* TDMC */
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_syserr_intr: device error - TDMC"));
+		    "==> nxge_syserr_intr: device error - TDMC"));
 		/*
 		 * There is no TDMC system errors defined in the PRM. All TDMC
 		 * channel specific errors are reported on a per channel basis.
@@ -427,28 +427,28 @@ nxge_syserr_intr(void *arg1, void *arg2)
 	} else if (estat.bits.ldw.rdmc) {
 		/* RDMC */
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_syserr_intr: device error - RDMC"));
+		    "==> nxge_syserr_intr: device error - RDMC"));
 		(void) nxge_rxdma_handle_sys_errors(nxgep);
 	} else if (estat.bits.ldw.txc) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_syserr_intr: device error - TXC"));
+		    "==> nxge_syserr_intr: device error - TXC"));
 		(void) nxge_txc_handle_sys_errors(nxgep);
 	} else if ((nxgep->niu_type != N2_NIU) && estat.bits.ldw.peu) {
 		/* PCI-E */
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_syserr_intr: device error - PCI-E"));
+		    "==> nxge_syserr_intr: device error - PCI-E"));
 	} else if (estat.bits.ldw.meta1) {
 		/* META1 */
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_syserr_intr: device error - META1"));
+		    "==> nxge_syserr_intr: device error - META1"));
 	} else if (estat.bits.ldw.meta2) {
 		/* META2 */
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_syserr_intr: device error - META2"));
+		    "==> nxge_syserr_intr: device error - META2"));
 	} else if (estat.bits.ldw.fflp) {
 		/* FFLP */
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_syserr_intr: device error - FFLP"));
+		    "==> nxge_syserr_intr: device error - FFLP"));
 		(void) nxge_fflp_handle_sys_errors(nxgep);
 	}
 
@@ -457,9 +457,9 @@ nxge_syserr_intr(void *arg1, void *arg2)
 	 * portmodes, but checks XFP only if portmode == PORT_10G_FIBER.
 	 */
 	if (nxgep->mac.portmode == PORT_10G_FIBER ||
-		nxgep->mac.portmode == PORT_10G_COPPER ||
-		nxgep->mac.portmode == PORT_10G_TN1010 ||
-		nxgep->mac.portmode == PORT_1G_TN1010) {
+	    nxgep->mac.portmode == PORT_10G_COPPER ||
+	    nxgep->mac.portmode == PORT_10G_TN1010 ||
+	    nxgep->mac.portmode == PORT_1G_TN1010) {
 		if (nxge_check_xaui_xfp(nxgep) != NXGE_OK) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "==> nxge_syserr_intr: device error - XAUI"));
@@ -469,9 +469,9 @@ nxge_syserr_intr(void *arg1, void *arg2)
 	serviced = DDI_INTR_CLAIMED;
 
 	if (ldgp != NULL && ldvp != NULL && ldgp->nldvs == 1 &&
-		!ldvp->use_timer) {
+	    !ldvp->use_timer) {
 		(void) npi_intr_ldg_mgmt_set(handle, ldgp->ldg,
-			B_TRUE, ldgp->ldg_timer);
+		    B_TRUE, ldgp->ldg_timer);
 	}
 	NXGE_DEBUG_MSG((nxgep, SYSERR_CTL, "<== nxge_syserr_intr"));
 	return (serviced);
@@ -511,7 +511,7 @@ nxge_rx_hw_blank(void *arg, time_t ticks, uint_t count)
 
 	if ((ldgvp = nxgep->ldgvp) == NULL) {
 		NXGE_ERROR_MSG((nxgep, INT_CTL,
-			"<== nxge_rx_hw_blank (not enabled)"));
+		    "<== nxge_rx_hw_blank (not enabled)"));
 		return;
 	}
 	ldvp = nxgep->ldgvp->ldvp;
@@ -522,9 +522,9 @@ nxge_rx_hw_blank(void *arg, time_t ticks, uint_t count)
 		if (ldvp->is_rxdma) {
 			channel = ldvp->channel;
 			(void) npi_rxdma_cfg_rdc_rcr_threshold(handle,
-				channel, count);
+			    channel, count);
 			(void) npi_rxdma_cfg_rdc_rcr_timeout(handle,
-				channel, ticks);
+			    channel, ticks);
 		}
 	}
 
@@ -632,7 +632,7 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 		NXGE_DEBUG_MSG((nxgep, IOC_CTL, "NXGE_GET_LB_MODE command"));
 		if (nxgep != NULL) {
 			*(lb_info_sz_t *)mp->b_cont->b_rptr =
-				nxgep->statsp->port_stats.lb_mode;
+			    nxgep->statsp->port_stats.lb_mode;
 			miocack(wq, mp, sizeof (nxge_lb_t), 0);
 		} else {
 			miocnak(wq, mp, 0, EINVAL);
@@ -703,7 +703,7 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 			*(lb_info_sz_t *)mp->b_cont->b_rptr = size;
 
 			NXGE_DEBUG_MSG((nxgep, IOC_CTL,
-				"NXGE_GET_LB_INFO command: size %d", size));
+			    "NXGE_GET_LB_INFO command: size %d", size));
 			miocack(wq, mp, sizeof (lb_info_sz_t), 0);
 		} else
 			miocnak(wq, mp, 0, EINVAL);
@@ -756,7 +756,7 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 				size += sizeof (lb_serdes1000);
 
 			NXGE_DEBUG_MSG((nxgep, IOC_CTL,
-				"NXGE_GET_LB_INFO command: size %d", size));
+			    "NXGE_GET_LB_INFO command: size %d", size));
 			if (size == iocp->ioc_count) {
 				i = 0;
 				lb_props = (p_lb_property_t)mp->b_cont->b_rptr;
@@ -811,7 +811,7 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 				    (nxgep->mac.portmode ==
 				    PORT_1G_RGMII_FIBER)) {
 					if (nxgep->statsp->mac_stats.
-						cap_1000fdx)
+					    cap_1000fdx)
 						lb_props[i++] = lb_phy1000;
 				} else if ((nxgep->mac.portmode ==
 				    PORT_1G_FIBER) ||
@@ -825,7 +825,7 @@ nxge_loopback_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 		} else {
 			miocnak(wq, mp, 0, EINVAL);
 			cmn_err(CE_NOTE, "!nxge_hw_ioctl: invalid command 0x%x",
-				iocp->ioc_cmd);
+			    iocp->ioc_cmd);
 		}
 		break;
 	}
@@ -888,10 +888,10 @@ nxge_get32(p_nxge_t nxgep, p_mblk_t mp)
 	nxge_regh = nxgep->dev_regs->nxge_regh;
 
 	*(uint32_t *)mp->b_rptr = NXGE_PIO_READ32(nxge_regh,
-		nxgep->dev_regs->nxge_regp, *(uint32_t *)mp->b_rptr);
+	    nxgep->dev_regs->nxge_regp, *(uint32_t *)mp->b_rptr);
 
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "value = 0x%08X",
-		*(uint32_t *)mp->b_rptr));
+	    *(uint32_t *)mp->b_rptr));
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "nxge_get32"));
 }
 
@@ -909,8 +909,8 @@ nxge_put32(p_nxge_t nxgep, p_mblk_t mp)
 	buf = (uint32_t *)mp->b_rptr;
 	reg = (uint8_t *)(nxgep->dev_regs->nxge_regp) + buf[0];
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL,
-		"reg = 0x%016llX index = 0x%08X value = 0x%08X",
-		reg, buf[0], buf[1]));
+	    "reg = 0x%016llX index = 0x%08X value = 0x%08X",
+	    reg, buf[0], buf[1]));
 	NXGE_PIO_WRITE32(nxge_regh, (uint32_t *)reg, 0, buf[1]);
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "nxge_put32"));
 }
@@ -927,8 +927,8 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 	lb_mode = nxgep->statsp->port_stats.lb_mode;
 	if (lb_mode == *(uint32_t *)mp->b_rptr) {
 		cmn_err(CE_NOTE,
-			"!nxge%d: Loopback mode already set (lb_mode %d).\n",
-			nxgep->instance, lb_mode);
+		    "!nxge%d: Loopback mode already set (lb_mode %d).\n",
+		    nxgep->instance, lb_mode);
 		status = B_FALSE;
 		goto nxge_set_lb_exit;
 	}
@@ -937,21 +937,21 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 	if (lb_mode == lb_normal.value)
 		lb_info = &lb_normal;
 	else if ((lb_mode == lb_external10g.value) &&
-		(nxgep->statsp->mac_stats.cap_10gfdx))
+	    (nxgep->statsp->mac_stats.cap_10gfdx))
 		lb_info = &lb_external10g;
 	else if ((lb_mode == lb_external1000.value) &&
-		(nxgep->statsp->mac_stats.cap_1000fdx))
+	    (nxgep->statsp->mac_stats.cap_1000fdx))
 		lb_info = &lb_external1000;
 	else if ((lb_mode == lb_external100.value) &&
-		(nxgep->statsp->mac_stats.cap_100fdx))
+	    (nxgep->statsp->mac_stats.cap_100fdx))
 		lb_info = &lb_external100;
 	else if ((lb_mode == lb_external10.value) &&
-		(nxgep->statsp->mac_stats.cap_10fdx))
+	    (nxgep->statsp->mac_stats.cap_10fdx))
 		lb_info = &lb_external10;
 	else if ((lb_mode == lb_phy10g.value) &&
-			((nxgep->mac.portmode == PORT_10G_COPPER) ||
-			(nxgep->mac.portmode == PORT_10G_TN1010) ||
-			(nxgep->mac.portmode == PORT_10G_FIBER)))
+	    ((nxgep->mac.portmode == PORT_10G_COPPER) ||
+	    (nxgep->mac.portmode == PORT_10G_TN1010) ||
+	    (nxgep->mac.portmode == PORT_10G_FIBER)))
 		lb_info = &lb_phy10g;
 	else if ((lb_mode == lb_phy1000.value) &&
 	    ((nxgep->mac.portmode == PORT_1G_COPPER) ||
@@ -959,7 +959,7 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 	    (nxgep->mac.portmode == PORT_1G_RGMII_FIBER)))
 		lb_info = &lb_phy1000;
 	else if ((lb_mode == lb_phy.value) &&
-		(nxgep->mac.portmode == PORT_1G_COPPER))
+	    (nxgep->mac.portmode == PORT_1G_COPPER))
 		lb_info = &lb_phy;
 	else if ((lb_mode == lb_serdes10g.value) &&
 	    ((nxgep->mac.portmode == PORT_10G_FIBER) ||
@@ -980,8 +980,8 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 		lb_info = &lb_mac;
 	else {
 		cmn_err(CE_NOTE,
-			"!nxge%d: Loopback mode not supported(mode %d).\n",
-			nxgep->instance, lb_mode);
+		    "!nxge%d: Loopback mode not supported(mode %d).\n",
+		    nxgep->instance, lb_mode);
 		status = B_FALSE;
 		goto nxge_set_lb_exit;
 	}
@@ -989,8 +989,8 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 	if (lb_mode == nxge_lb_normal) {
 		if (nxge_lb_dbg) {
 			cmn_err(CE_NOTE,
-				"!nxge%d: Returning to normal operation",
-				nxgep->instance);
+			    "!nxge%d: Returning to normal operation",
+			    nxgep->instance);
 		}
 		if (nxge_set_lb_normal(nxgep) != NXGE_OK) {
 			status = B_FALSE;
@@ -1004,40 +1004,40 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 
 	if (nxge_lb_dbg)
 		cmn_err(CE_NOTE,
-			"!nxge%d: Adapter now in %s loopback mode",
-			nxgep->instance, lb_info->key);
+		    "!nxge%d: Adapter now in %s loopback mode",
+		    nxgep->instance, lb_info->key);
 	nxgep->param_arr[param_autoneg].value = 0;
 	nxgep->param_arr[param_anar_10gfdx].value =
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_ext10g) ||
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_mac10g) ||
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_phy10g) ||
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_serdes10g);
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_ext10g) ||
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_mac10g) ||
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_phy10g) ||
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_serdes10g);
 	nxgep->param_arr[param_anar_10ghdx].value = 0;
 	nxgep->param_arr[param_anar_1000fdx].value =
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_ext1000) ||
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_mac1000) ||
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_phy1000) ||
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_serdes1000);
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_ext1000) ||
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_mac1000) ||
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_phy1000) ||
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_serdes1000);
 	nxgep->param_arr[param_anar_1000hdx].value = 0;
 	nxgep->param_arr[param_anar_100fdx].value =
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_phy) ||
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_mac) ||
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_ext100);
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_phy) ||
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_mac) ||
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_ext100);
 	nxgep->param_arr[param_anar_100hdx].value = 0;
 	nxgep->param_arr[param_anar_10fdx].value =
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_mac) ||
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_ext10);
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_mac) ||
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_ext10);
 	if (nxgep->statsp->port_stats.lb_mode == nxge_lb_ext1000) {
 		nxgep->param_arr[param_master_cfg_enable].value = 1;
 		nxgep->param_arr[param_master_cfg_value].value = 1;
 	}
 	if ((nxgep->statsp->port_stats.lb_mode == nxge_lb_ext10g) ||
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_ext1000) ||
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_ext100) ||
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_ext10) ||
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_phy10g) ||
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_phy1000) ||
-		(nxgep->statsp->port_stats.lb_mode == nxge_lb_phy)) {
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_ext1000) ||
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_ext100) ||
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_ext10) ||
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_phy10g) ||
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_phy1000) ||
+	    (nxgep->statsp->port_stats.lb_mode == nxge_lb_phy)) {
 
 		if (nxge_link_monitor(nxgep, LINK_MONITOR_STOP) != NXGE_OK)
 			goto nxge_set_lb_err;
@@ -1050,17 +1050,17 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 	}
 	if (lb_info->lb_type == internal) {
 		if ((nxgep->statsp->port_stats.lb_mode == nxge_lb_mac10g) ||
-				(nxgep->statsp->port_stats.lb_mode ==
-				nxge_lb_phy10g) ||
-				(nxgep->statsp->port_stats.lb_mode ==
-				nxge_lb_serdes10g)) {
+		    (nxgep->statsp->port_stats.lb_mode ==
+		    nxge_lb_phy10g) ||
+		    (nxgep->statsp->port_stats.lb_mode ==
+		    nxge_lb_serdes10g)) {
 			nxgep->statsp->mac_stats.link_speed = 10000;
 		} else if ((nxgep->statsp->port_stats.lb_mode
-				== nxge_lb_mac1000) ||
-				(nxgep->statsp->port_stats.lb_mode ==
-				nxge_lb_phy1000) ||
-				(nxgep->statsp->port_stats.lb_mode ==
-				nxge_lb_serdes1000)) {
+		    == nxge_lb_mac1000) ||
+		    (nxgep->statsp->port_stats.lb_mode ==
+		    nxge_lb_phy1000) ||
+		    (nxgep->statsp->port_stats.lb_mode ==
+		    nxge_lb_serdes1000)) {
 			nxgep->statsp->mac_stats.link_speed = 1000;
 		} else {
 			nxgep->statsp->mac_stats.link_speed = 100;
@@ -1073,7 +1073,7 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 
 nxge_set_lb_exit:
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-		"<== nxge_set_lb status = 0x%08x", status));
+	    "<== nxge_set_lb status = 0x%08x", status));
 	return (status);
 nxge_set_lb_err:
 	status = B_FALSE;
@@ -1094,21 +1094,21 @@ nxge_set_lb_normal(p_nxge_t nxgep)
 
 	nxgep->statsp->port_stats.lb_mode = nxge_lb_normal;
 	nxgep->param_arr[param_autoneg].value =
-		nxgep->param_arr[param_autoneg].old_value;
+	    nxgep->param_arr[param_autoneg].old_value;
 	nxgep->param_arr[param_anar_1000fdx].value =
-		nxgep->param_arr[param_anar_1000fdx].old_value;
+	    nxgep->param_arr[param_anar_1000fdx].old_value;
 	nxgep->param_arr[param_anar_1000hdx].value =
-		nxgep->param_arr[param_anar_1000hdx].old_value;
+	    nxgep->param_arr[param_anar_1000hdx].old_value;
 	nxgep->param_arr[param_anar_100fdx].value =
-		nxgep->param_arr[param_anar_100fdx].old_value;
+	    nxgep->param_arr[param_anar_100fdx].old_value;
 	nxgep->param_arr[param_anar_100hdx].value =
-		nxgep->param_arr[param_anar_100hdx].old_value;
+	    nxgep->param_arr[param_anar_100hdx].old_value;
 	nxgep->param_arr[param_anar_10fdx].value =
-		nxgep->param_arr[param_anar_10fdx].old_value;
+	    nxgep->param_arr[param_anar_10fdx].old_value;
 	nxgep->param_arr[param_master_cfg_enable].value =
-		nxgep->param_arr[param_master_cfg_enable].old_value;
+	    nxgep->param_arr[param_master_cfg_enable].old_value;
 	nxgep->param_arr[param_master_cfg_value].value =
-		nxgep->param_arr[param_master_cfg_value].old_value;
+	    nxgep->param_arr[param_master_cfg_value].old_value;
 
 	if ((status = nxge_global_reset(nxgep)) != NXGE_OK)
 		return (status);
@@ -1136,9 +1136,9 @@ nxge_get_mii(p_nxge_t nxgep, p_mblk_t mp)
 
 	reg = *(uint16_t *)mp->b_rptr;
 	(void) nxge_mii_read(nxgep, nxgep->statsp->mac_stats.xcvr_portn, reg,
-		(uint16_t *)mp->b_rptr);
+	    (uint16_t *)mp->b_rptr);
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "reg = 0x%08X value = 0x%04X",
-		reg, *(uint16_t *)mp->b_rptr));
+	    reg, *(uint16_t *)mp->b_rptr));
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "<== nxge_get_mii"));
 }
 
@@ -1153,10 +1153,10 @@ nxge_put_mii(p_nxge_t nxgep, p_mblk_t mp)
 	buf = (uint16_t *)mp->b_rptr;
 	reg = (uint8_t)buf[0];
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL,
-		"reg = 0x%08X index = 0x%08X value = 0x%08X",
-		reg, buf[0], buf[1]));
+	    "reg = 0x%08X index = 0x%08X value = 0x%08X",
+	    reg, buf[0], buf[1]));
 	(void) nxge_mii_write(nxgep, nxgep->statsp->mac_stats.xcvr_portn,
-		reg, buf[1]);
+	    reg, buf[1]);
 	NXGE_DEBUG_MSG((nxgep, IOC_CTL, "<== nxge_put_mii"));
 }
 
@@ -1179,24 +1179,24 @@ nxge_check_hw_state(p_nxge_t nxgep)
 	ldgvp = nxgep->ldgvp;
 	if (ldgvp == NULL || (ldgvp->ldvp_syserr == NULL)) {
 		NXGE_ERROR_MSG((nxgep, SYSERR_CTL, "<== nxge_check_hw_state: "
-				"NULL ldgvp (interrupt not ready)."));
+		    "NULL ldgvp (interrupt not ready)."));
 		goto nxge_check_hw_state_exit;
 	}
 	t_ldvp = ldgvp->ldvp_syserr;
 	if (!t_ldvp->use_timer) {
 		NXGE_DEBUG_MSG((nxgep, SYSERR_CTL, "<== nxge_check_hw_state: "
-				"ldgvp $%p t_ldvp $%p use_timer flag %d",
-				ldgvp, t_ldvp, t_ldvp->use_timer));
+		    "ldgvp $%p t_ldvp $%p use_timer flag %d",
+		    ldgvp, t_ldvp, t_ldvp->use_timer));
 		goto nxge_check_hw_state_exit;
 	}
 	if (fm_check_acc_handle(nxgep->dev_regs->nxge_regh) != DDI_FM_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"port%d Bad register acc handle", nxgep->mac.portnum));
+		    "port%d Bad register acc handle", nxgep->mac.portnum));
 	}
 	(void) nxge_syserr_intr((void *) t_ldvp, (void *) nxgep);
 
 	nxgep->nxge_timerid = nxge_start_timer(nxgep, nxge_check_hw_state,
-		NXGE_CHECK_TIMER);
+	    NXGE_CHECK_TIMER);
 
 nxge_check_hw_state_exit:
 	MUTEX_EXIT(nxgep->genlock);
@@ -1221,8 +1221,8 @@ nxge_rtrace_ioctl(p_nxge_t nxgep, queue_t *wq, mblk_t *mp,
 	size = 1024;
 	if (mp->b_cont == NULL || MBLKL(mp->b_cont) < size) {
 		NXGE_DEBUG_MSG((nxgep, STR_CTL,
-				"malformed M_IOCTL MBLKL = %d size = %d",
-				MBLKL(mp->b_cont), size));
+		    "malformed M_IOCTL MBLKL = %d size = %d",
+		    MBLKL(mp->b_cont), size));
 		miocnak(wq, mp, 0, EINVAL);
 		return;
 	}

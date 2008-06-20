@@ -43,8 +43,8 @@ npi_debug_msg(npi_handle_function_t function, uint64_t level, char *fmt, ...)
 	va_list ap;
 
 	if ((level & npi_debug_level) ||
-		(level & NPI_REG_CTL) ||
-		(level & NPI_ERR_CTL)) {
+	    (level & NPI_REG_CTL) ||
+	    (level & NPI_ERR_CTL)) {
 
 		if (npi_debug_init == 0) {
 			MUTEX_INIT(&npidebuglock, NULL, MUTEX_DRIVER, NULL);
@@ -62,7 +62,7 @@ npi_debug_msg(npi_handle_function_t function, uint64_t level, char *fmt, ...)
 		va_end(ap);
 
 		(void) sprintf(prefix_buffer, "%s%d(%d):", "npi",
-				function.instance, function.function);
+		    function.instance, function.function);
 
 		MUTEX_EXIT(&npidebuglock);
 		cmn_err(cmn_level, "!%s %s\n", prefix_buffer, msg_buffer);
@@ -92,13 +92,13 @@ npi_rtrace_update(npi_handle_t handle, boolean_t wr, rtrace_t *rt,
 	idx = rt->next_idx;
 	if (wr == B_TRUE)
 		rt->buf[idx].ctl_addr = (addr & TRACE_ADDR_MASK)
-						| TRACE_CTL_WR;
+		    | TRACE_CTL_WR;
 	else
 		rt->buf[idx].ctl_addr = (addr & TRACE_ADDR_MASK);
 	rt->buf[idx].ctl_addr |= (((handle.function.function
-				<< TRACE_FUNC_SHIFT) & TRACE_FUNC_MASK) |
-				((handle.function.instance
-				<< TRACE_INST_SHIFT) & TRACE_INST_MASK));
+	    << TRACE_FUNC_SHIFT) & TRACE_FUNC_MASK) |
+	    ((handle.function.instance
+	    << TRACE_INST_SHIFT) & TRACE_INST_MASK));
 	rt->buf[idx].val_l32 = val & 0xFFFFFFFF;
 	rt->buf[idx].val_h32 = (val >> 32) & 0xFFFFFFFF;
 	rt->next_idx++;
@@ -116,7 +116,7 @@ npi_trace_update(npi_handle_t handle, boolean_t wr, rtrace_t *rt,
 	idx = rt->next_idx;
 	if (wr == B_TRUE)
 		rt->buf[idx].ctl_addr = (addr & TRACE_ADDR_MASK)
-						| TRACE_CTL_WR;
+		    | TRACE_CTL_WR;
 	else
 		rt->buf[idx].ctl_addr = (addr & TRACE_ADDR_MASK);
 	/*
@@ -129,9 +129,9 @@ npi_trace_update(npi_handle_t handle, boolean_t wr, rtrace_t *rt,
 	 * Bit 31: Invalid bit
 	 */
 	rt->buf[idx].ctl_addr |= (((handle.function.function
-				<< TRACE_FUNC_SHIFT) & TRACE_FUNC_MASK) |
-				((handle.function.instance
-				<< TRACE_INST_SHIFT) & TRACE_INST_MASK));
+	    << TRACE_FUNC_SHIFT) & TRACE_FUNC_MASK) |
+	    ((handle.function.instance
+	    << TRACE_INST_SHIFT) & TRACE_INST_MASK));
 	rt->buf[idx].val_l32 = val & 0xFFFFFFFF;
 	rt->buf[idx].val_h32 = (val >> 32) & 0xFFFFFFFF;
 	(void) strncpy(rt->buf[idx].name, name, 15);

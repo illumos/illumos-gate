@@ -945,8 +945,7 @@ nxge_mac_init(p_nxge_t nxgep)
 	return (NXGE_OK);
 fail:
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-			"nxge_mac_init: failed to initialize MAC port<%d>",
-			portn));
+	    "nxge_mac_init: failed to initialize MAC port<%d>", portn));
 	return (status);
 }
 
@@ -999,10 +998,8 @@ nxge_link_init(p_nxge_t nxgep)
 	return (NXGE_OK);
 
 fail:
-	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-		"nxge_link_init: ",
-		"failed to initialize Ethernet link on port<%d>",
-		portn));
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "nxge_link_init: ",
+	    "failed to initialize Ethernet link on port<%d>", portn));
 
 	return (status);
 }
@@ -1089,7 +1086,7 @@ nxge_xif_init(p_nxge_t nxgep)
 		    (portmode == PORT_10G_TN1010) ||
 		    (portmode == PORT_10G_SERDES)) {
 			SET_MAC_ATTR1(handle, ap, portn, MAC_PORT_MODE,
-						MAC_XGMII_MODE, rs);
+			    MAC_XGMII_MODE, rs);
 			if (rs != NPI_SUCCESS)
 				goto fail;
 			if (statsp->mac_stats.link_up) {
@@ -1109,17 +1106,17 @@ nxge_xif_init(p_nxge_t nxgep)
 			    portn, portmode, statsp->mac_stats.link_speed));
 			if (statsp->mac_stats.link_speed == 1000) {
 				SET_MAC_ATTR1(handle, ap, portn, MAC_PORT_MODE,
-							MAC_GMII_MODE, rs);
+				    MAC_GMII_MODE, rs);
 			} else {
 				SET_MAC_ATTR1(handle, ap, portn, MAC_PORT_MODE,
-							MAC_MII_MODE, rs);
+				    MAC_MII_MODE, rs);
 			}
 			if (rs != NPI_SUCCESS)
 				goto fail;
 		} else {
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-					"nxge_xif_init: Unknown port mode (%d)"
-					" for port<%d>", portmode, portn));
+			    "nxge_xif_init: Unknown port mode (%d)"
+			    " for port<%d>", portmode, portn));
 			goto fail;
 		}
 
@@ -1152,8 +1149,7 @@ nxge_xif_init(p_nxge_t nxgep)
 	return (NXGE_OK);
 fail:
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-			"nxge_xif_init: Failed to initialize XIF port<%d>",
-			portn));
+	    "nxge_xif_init: Failed to initialize XIF port<%d>", portn));
 	return (NXGE_ERROR | rs);
 }
 
@@ -1235,33 +1231,28 @@ nxge_pcs_init(p_nxge_t nxgep)
 
 		/* Set XPCS Internal Loopback if necessary */
 		if ((rs = npi_xmac_xpcs_read(handle, portn,
-						XPCS_REG_CONTROL1, &val))
-						!= NPI_SUCCESS)
+		    XPCS_REG_CONTROL1, &val)) != NPI_SUCCESS)
 			goto fail;
 
 		if ((statsp->port_stats.lb_mode == nxge_lb_mac10g) ||
-			(statsp->port_stats.lb_mode == nxge_lb_mac1000))
+		    (statsp->port_stats.lb_mode == nxge_lb_mac1000))
 			val |= XPCS_CTRL1_LOOPBK;
 		else
 			val &= ~XPCS_CTRL1_LOOPBK;
 		if ((rs = npi_xmac_xpcs_write(handle, portn,
-						XPCS_REG_CONTROL1, val))
-						!= NPI_SUCCESS)
+		    XPCS_REG_CONTROL1, val)) != NPI_SUCCESS)
 			goto fail;
 
 		/* Clear descw errors */
 		if ((rs = npi_xmac_xpcs_write(handle, portn,
-						XPCS_REG_DESCWERR_COUNTER, 0))
-						!= NPI_SUCCESS)
+		    XPCS_REG_DESCWERR_COUNTER, 0)) != NPI_SUCCESS)
 			goto fail;
 		/* Clear symbol errors */
 		if ((rs = npi_xmac_xpcs_read(handle, portn,
-					XPCS_REG_SYMBOL_ERR_L0_1_COUNTER, &val))
-					!= NPI_SUCCESS)
+		    XPCS_REG_SYMBOL_ERR_L0_1_COUNTER, &val)) != NPI_SUCCESS)
 			goto fail;
 		if ((rs = npi_xmac_xpcs_read(handle, portn,
-					XPCS_REG_SYMBOL_ERR_L2_3_COUNTER, &val))
-					!= NPI_SUCCESS)
+		    XPCS_REG_SYMBOL_ERR_L2_3_COUNTER, &val)) != NPI_SUCCESS)
 			goto fail;
 
 	} else if ((portmode == PORT_1G_COPPER) ||
@@ -1270,7 +1261,7 @@ nxge_pcs_init(p_nxge_t nxgep)
 		    "==> nxge_pcs_init: (1G) copper port<%d>", portn));
 		if (portn < 4) {
 			PCS_REG_WR(handle, portn, PCS_DATAPATH_MODE_REG,
-					PCS_DATAPATH_MODE_MII);
+			    PCS_DATAPATH_MODE_MII);
 		}
 		if ((rs = npi_mac_pcs_reset(handle, portn)) != NPI_SUCCESS)
 			goto fail;
@@ -1283,8 +1274,7 @@ pass:
 	return (NXGE_OK);
 fail:
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-			"nxge_pcs_init: Failed to initialize PCS port<%d>",
-			portn));
+	    "nxge_pcs_init: Failed to initialize PCS port<%d>", portn));
 	return (NXGE_ERROR | rs);
 }
 
@@ -1396,7 +1386,7 @@ nxge_mac_ctrl_init(p_nxge_t nxgep)
 				 * either direction.
 				 */
 				val &= (~MAC_CTRL_CFG_SEND_PAUSE_EN &
-					~MAC_CTRL_CFG_RECV_PAUSE_EN);
+				    ~MAC_CTRL_CFG_RECV_PAUSE_EN);
 			}
 		}
 		BMAC_REG_WR(handle, portn, MAC_CTRL_CONFIG_REG, val);
@@ -1468,7 +1458,7 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 	portn = nxgep->mac.portnum;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_n2_serdes_init port<%d>",
-			portn));
+	    portn));
 
 	tx_cfg_l.value = 0;
 	tx_cfg_h.value = 0;
@@ -1517,9 +1507,8 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 			rx_cfg_l.bits.entest = 1;
 			test_cfg.bits.loopback = TESTCFG_INNER_CML_DIS_LOOPBACK;
 			if ((status = nxge_mdio_write(nxgep, portn,
-				ESR_N2_DEV_ADDR,
-				ESR_N2_TEST_CFG_REG, test_cfg.value))
-				!= NXGE_OK)
+			    ESR_N2_DEV_ADDR,
+			    ESR_N2_TEST_CFG_REG, test_cfg.value)) != NXGE_OK)
 			goto fail;
 		}
 
@@ -1573,8 +1562,7 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 		pll_cfg_l.bits.enpll = 1;
 		pll_sts_l.bits.enpll = 1;
 		if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
-				ESR_N2_PLL_CFG_L_REG, pll_cfg_l.value))
-				!= NXGE_OK)
+		    ESR_N2_PLL_CFG_L_REG, pll_cfg_l.value)) != NXGE_OK)
 			goto fail;
 
 		if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
@@ -1620,13 +1608,11 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 	/* init TX channels */
 	for (chan = 0; chan < 4; chan++) {
 		if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
-				ESR_N2_TX_CFG_L_REG_ADDR(chan), tx_cfg_l.value))
-				!= NXGE_OK)
+		    ESR_N2_TX_CFG_L_REG_ADDR(chan), tx_cfg_l.value)) != NXGE_OK)
 			goto fail;
 
 		if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
-				ESR_N2_TX_CFG_H_REG_ADDR(chan), tx_cfg_h.value))
-				!= NXGE_OK)
+		    ESR_N2_TX_CFG_H_REG_ADDR(chan), tx_cfg_h.value)) != NXGE_OK)
 			goto fail;
 
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
@@ -1640,13 +1626,11 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 	/* init RX channels */
 	for (chan = 0; chan < 4; chan++) {
 		if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
-				ESR_N2_RX_CFG_L_REG_ADDR(chan), rx_cfg_l.value))
-				!= NXGE_OK)
+		    ESR_N2_RX_CFG_L_REG_ADDR(chan), rx_cfg_l.value)) != NXGE_OK)
 			goto fail;
 
 		if ((status = nxge_mdio_write(nxgep, portn, ESR_N2_DEV_ADDR,
-				ESR_N2_RX_CFG_H_REG_ADDR(chan), rx_cfg_h.value))
-				!= NXGE_OK)
+		    ESR_N2_RX_CFG_H_REG_ADDR(chan), rx_cfg_h.value)) != NXGE_OK)
 			goto fail;
 
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
@@ -1659,7 +1643,7 @@ nxge_n2_serdes_init(p_nxge_t nxgep)
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_n2_serdes_init port<%d>",
-			portn));
+	    portn));
 
 	return (NXGE_OK);
 fail:
@@ -2330,23 +2314,17 @@ nxge_BCM8704_xcvr_init(p_nxge_t nxgep)
 		goto fail;
 
 	status = nxge_mdio_read(nxgep, phy_port_addr,
-				BCM8704_USER_DEV3_ADDR,
-				BCM8704_USER_ANALOG_STATUS0_REG,
-				&val);
+	    BCM8704_USER_DEV3_ADDR, BCM8704_USER_ANALOG_STATUS0_REG, &val);
 	if (status != NXGE_OK)
 		goto fail;
 
 	status = nxge_mdio_read(nxgep, phy_port_addr,
-				BCM8704_USER_DEV3_ADDR,
-				BCM8704_USER_TX_ALARM_STATUS_REG,
-				&val1);
+	    BCM8704_USER_DEV3_ADDR, BCM8704_USER_TX_ALARM_STATUS_REG, &val1);
 	if (status != NXGE_OK)
 		goto fail;
 
 	status = nxge_mdio_read(nxgep, phy_port_addr,
-				BCM8704_USER_DEV3_ADDR,
-				BCM8704_USER_TX_ALARM_STATUS_REG,
-				&val1);
+	    BCM8704_USER_DEV3_ADDR, BCM8704_USER_TX_ALARM_STATUS_REG, &val1);
 	if (status != NXGE_OK)
 		goto fail;
 
@@ -2974,7 +2952,7 @@ nxge_tx_mac_init(p_nxge_t nxgep)
 	portmode = nxgep->mac.portmode;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_tx_mac_init: port<%d>",
-			portn));
+	    portn));
 	/* Set Max and Min Frame Size */
 	/*
 	 * Use maxframesize to configure the hardware maxframe size
@@ -2997,7 +2975,7 @@ nxge_tx_mac_init(p_nxge_t nxgep)
 
 	if (portt == PORT_TYPE_XMAC) {
 		if ((rs = npi_xmac_tx_iconfig(handle, INIT, portn,
-				0)) != NPI_SUCCESS)
+		    0)) != NPI_SUCCESS)
 			goto fail;
 		nxgep->mac.tx_iconfig = NXGE_XMAC_TX_INTRS;
 		if ((portmode == PORT_10G_FIBER) ||
@@ -3005,19 +2983,19 @@ nxge_tx_mac_init(p_nxge_t nxgep)
 		    (portmode == PORT_10G_TN1010) ||
 		    (portmode == PORT_10G_SERDES)) {
 			SET_MAC_ATTR1(handle, ap, portn, XMAC_10G_PORT_IPG,
-					XGMII_IPG_12_15, rs);
+			    XGMII_IPG_12_15, rs);
 			if (rs != NPI_SUCCESS)
 				goto fail;
 			nxgep->mac.ipg[0] = XGMII_IPG_12_15;
 		} else {
 			SET_MAC_ATTR1(handle, ap, portn, XMAC_PORT_IPG,
-					MII_GMII_IPG_12, rs);
+			    MII_GMII_IPG_12, rs);
 			if (rs != NPI_SUCCESS)
 				goto fail;
 			nxgep->mac.ipg[0] = MII_GMII_IPG_12;
 		}
 		if ((rs = npi_xmac_tx_config(handle, INIT, portn,
-				CFG_XMAC_TX_CRC | CFG_XMAC_TX)) != NPI_SUCCESS)
+		    CFG_XMAC_TX_CRC | CFG_XMAC_TX)) != NPI_SUCCESS)
 			goto fail;
 		nxgep->mac.tx_config = CFG_XMAC_TX_CRC | CFG_XMAC_TX;
 		nxgep->mac.maxburstsize = 0;	/* not programmable */
@@ -3025,17 +3003,17 @@ nxge_tx_mac_init(p_nxge_t nxgep)
 		nxgep->mac.pa_size = 0;		/* not programmable */
 
 		if ((rs = npi_xmac_zap_tx_counters(handle, portn))
-							!= NPI_SUCCESS)
+		    != NPI_SUCCESS)
 			goto fail;
 
 	} else {
 		if ((rs = npi_bmac_tx_iconfig(handle, INIT, portn,
-				0)) != NPI_SUCCESS)
+		    0)) != NPI_SUCCESS)
 			goto fail;
 		nxgep->mac.tx_iconfig = NXGE_BMAC_TX_INTRS;
 
 		SET_MAC_ATTR1(handle, ap, portn, BMAC_PORT_CTRL_TYPE, 0x8808,
-				rs);
+		    rs);
 		if (rs != NPI_SUCCESS)
 			goto fail;
 		nxgep->mac.ctrltype = 0x8808;
@@ -3046,19 +3024,18 @@ nxge_tx_mac_init(p_nxge_t nxgep)
 		nxgep->mac.pa_size = 0x7;
 
 		if ((rs = npi_bmac_tx_config(handle, INIT, portn,
-				CFG_BMAC_TX_CRC | CFG_BMAC_TX)) != NPI_SUCCESS)
+		    CFG_BMAC_TX_CRC | CFG_BMAC_TX)) != NPI_SUCCESS)
 			goto fail;
 		nxgep->mac.tx_config = CFG_BMAC_TX_CRC | CFG_BMAC_TX;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_tx_mac_init: port<%d>",
-			portn));
+	    portn));
 
 	return (NXGE_OK);
 fail:
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-		"nxge_tx_mac_init: failed to initialize port<%d> TXMAC",
-					portn));
+	    "nxge_tx_mac_init: failed to initialize port<%d> TXMAC", portn));
 
 	return (NXGE_ERROR | rs);
 }
@@ -3200,7 +3177,7 @@ nxge_hio_hostinfo_init(
 
 	/* Program the RDC table. */
 	if ((npi_mac_hostinfo_entry(nxge->npi_handle, OP_SET,
-		nxge->function_num, slot, &mac_rdc)) != NPI_SUCCESS) {
+	    nxge->function_num, slot, &mac_rdc)) != NPI_SUCCESS) {
 		mutex_exit(nxge->genlock);
 		(void) nxge_m_mmac_remove(nxge, vr->slot);
 		return (EIO);
@@ -3212,7 +3189,7 @@ nxge_hio_hostinfo_init(
 
 	/* (Re-)enable the MAC address. */
 	(void) npi_mac_altaddr_enable(
-		nxge->npi_handle, nxge->mac.portnum, slot);
+	    nxge->npi_handle, nxge->mac.portnum, slot);
 
 	bcopy(macaddr, vr->altmac, sizeof (vr->altmac));
 
@@ -3257,7 +3234,7 @@ nxge_hio_hostinfo_uninit(
 	nxge_class_pt_cfg_t *class;
 
 	(void) npi_mac_altaddr_disable(
-		nxge->npi_handle, nxge->mac.portnum, vr->slot);
+	    nxge->npi_handle, nxge->mac.portnum, vr->slot);
 
 	/* Set this variable to its default. */
 	class = (p_nxge_class_pt_cfg_t)&nxge->class_config;
@@ -3292,7 +3269,7 @@ nxge_rx_mac_init(p_nxge_t nxgep)
 	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_rx_mac_init: port<%d>\n",
-			portn));
+	    portn));
 	handle = nxgep->npi_handle;
 	portt = nxgep->mac.porttype;
 
@@ -3301,7 +3278,7 @@ nxge_rx_mac_init(p_nxge_t nxgep)
 	addr1 = ntohs(addr16p[1]);
 	addr2 = ntohs(addr16p[0]);
 	SET_MAC_ATTR3(handle, ap, portn, MAC_PORT_ADDR, addr0, addr1, addr2,
-		rs);
+	    rs);
 
 	if (rs != NPI_SUCCESS)
 		goto fail;
@@ -3319,27 +3296,27 @@ nxge_rx_mac_init(p_nxge_t nxgep)
 	for (i = 0; i < MAC_MAX_HASH_ENTRY; i++) {
 		if (hash_filter != NULL) {
 			hashtab_e = (uint16_t)hash_filter->hash_filter_regs[
-				(NMCFILTER_REGS - 1) - i];
+			    (NMCFILTER_REGS - 1) - i];
 		} else {
 			hashtab_e = 0;
 		}
 
 		if ((rs = npi_mac_hashtab_entry(handle, OP_SET, portn, i,
-					(uint16_t *)&hashtab_e)) != NPI_SUCCESS)
+		    (uint16_t *)&hashtab_e)) != NPI_SUCCESS)
 			goto fail;
 	}
 
 	if (portt == PORT_TYPE_XMAC) {
 		if ((rs = npi_xmac_rx_iconfig(handle, INIT, portn,
-				0)) != NPI_SUCCESS)
+		    0)) != NPI_SUCCESS)
 			goto fail;
 		nxgep->mac.rx_iconfig = NXGE_XMAC_RX_INTRS;
 
 		(void) nxge_fflp_init_hostinfo(nxgep);
 
 		xconfig = CFG_XMAC_RX_ERRCHK | CFG_XMAC_RX_CRC_CHK |
-			CFG_XMAC_RX | CFG_XMAC_RX_CODE_VIO_CHK &
-			~CFG_XMAC_RX_STRIP_CRC;
+		    CFG_XMAC_RX | CFG_XMAC_RX_CODE_VIO_CHK &
+		    ~CFG_XMAC_RX_STRIP_CRC;
 
 		if (nxgep->filter.all_phys_cnt != 0)
 			xconfig |= CFG_XMAC_RX_PROMISCUOUS;
@@ -3350,25 +3327,25 @@ nxge_rx_mac_init(p_nxge_t nxgep)
 		xconfig |= CFG_XMAC_RX_HASH_FILTER;
 
 		if ((rs = npi_xmac_rx_config(handle, INIT, portn,
-					xconfig)) != NPI_SUCCESS)
+		    xconfig)) != NPI_SUCCESS)
 			goto fail;
 		nxgep->mac.rx_config = xconfig;
 
 		/* Comparison of mac unique address is always enabled on XMAC */
 
 		if ((rs = npi_xmac_zap_rx_counters(handle, portn))
-							!= NPI_SUCCESS)
+		    != NPI_SUCCESS)
 			goto fail;
 	} else {
 		(void) nxge_fflp_init_hostinfo(nxgep);
 
 		if (npi_bmac_rx_iconfig(nxgep->npi_handle, INIT, portn,
-					0) != NPI_SUCCESS)
+		    0) != NPI_SUCCESS)
 			goto fail;
 		nxgep->mac.rx_iconfig = NXGE_BMAC_RX_INTRS;
 
 		bconfig = CFG_BMAC_RX_DISCARD_ON_ERR | CFG_BMAC_RX &
-			~CFG_BMAC_RX_STRIP_CRC;
+		    ~CFG_BMAC_RX_STRIP_CRC;
 
 		if (nxgep->filter.all_phys_cnt != 0)
 			bconfig |= CFG_BMAC_RX_PROMISCUOUS;
@@ -3378,25 +3355,24 @@ nxge_rx_mac_init(p_nxge_t nxgep)
 
 		bconfig |= CFG_BMAC_RX_HASH_FILTER;
 		if ((rs = npi_bmac_rx_config(handle, INIT, portn,
-					bconfig)) != NPI_SUCCESS)
+		    bconfig)) != NPI_SUCCESS)
 			goto fail;
 		nxgep->mac.rx_config = bconfig;
 
 		/* Always enable comparison of mac unique address */
 		if ((rs = npi_mac_altaddr_enable(handle, portn, 0))
-					!= NPI_SUCCESS)
+		    != NPI_SUCCESS)
 			goto fail;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_rx_mac_init: port<%d>\n",
-			portn));
+	    portn));
 
 	return (NXGE_OK);
 
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		"nxge_rx_mac_init: Failed to Initialize port<%d> RxMAC",
-				portn));
+	    "nxge_rx_mac_init: Failed to Initialize port<%d> RxMAC", portn));
 
 	return (NXGE_ERROR | rs);
 }
@@ -3413,7 +3389,7 @@ nxge_tx_mac_enable(p_nxge_t nxgep)
 	handle = nxgep->npi_handle;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_tx_mac_enable: port<%d>",
-			nxgep->mac.portnum));
+	    nxgep->mac.portnum));
 
 	if ((status = nxge_tx_mac_init(nxgep)) != NXGE_OK)
 		goto fail;
@@ -3423,22 +3399,22 @@ nxge_tx_mac_enable(p_nxge_t nxgep)
 
 	if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
 		if ((rs = npi_xmac_tx_config(handle, ENABLE, nxgep->mac.portnum,
-						CFG_XMAC_TX)) != NPI_SUCCESS)
+		    CFG_XMAC_TX)) != NPI_SUCCESS)
 			goto fail;
 	} else {
 		if ((rs = npi_bmac_tx_config(handle, ENABLE, nxgep->mac.portnum,
-						CFG_BMAC_TX)) != NPI_SUCCESS)
+		    CFG_BMAC_TX)) != NPI_SUCCESS)
 			goto fail;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_tx_mac_enable: port<%d>",
-			nxgep->mac.portnum));
+	    nxgep->mac.portnum));
 
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxgep_tx_mac_enable: Failed to enable port<%d> TxMAC",
-			nxgep->mac.portnum));
+	    "nxgep_tx_mac_enable: Failed to enable port<%d> TxMAC",
+	    nxgep->mac.portnum));
 	if (rs != NPI_SUCCESS)
 		return (NXGE_ERROR | rs);
 	else
@@ -3459,25 +3435,25 @@ nxge_tx_mac_disable(p_nxge_t nxgep)
 	handle = nxgep->npi_handle;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_tx_mac_disable: port<%d>",
-			nxgep->mac.portnum));
+	    nxgep->mac.portnum));
 
 	if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
 		if ((rs = npi_xmac_tx_config(handle, DISABLE,
-			nxgep->mac.portnum, CFG_XMAC_TX)) != NPI_SUCCESS)
+		    nxgep->mac.portnum, CFG_XMAC_TX)) != NPI_SUCCESS)
 			goto fail;
 	} else {
 		if ((rs = npi_bmac_tx_config(handle, DISABLE,
-			nxgep->mac.portnum, CFG_BMAC_TX)) != NPI_SUCCESS)
+		    nxgep->mac.portnum, CFG_BMAC_TX)) != NPI_SUCCESS)
 			goto fail;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_tx_mac_disable: port<%d>",
-			nxgep->mac.portnum));
+	    nxgep->mac.portnum));
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_tx_mac_disable: Failed to disable port<%d> TxMAC",
-			nxgep->mac.portnum));
+	    "nxge_tx_mac_disable: Failed to disable port<%d> TxMAC",
+	    nxgep->mac.portnum));
 	return (NXGE_ERROR | rs);
 }
 
@@ -3499,7 +3475,7 @@ nxge_rx_mac_enable(p_nxge_t nxgep)
 	portn = nxgep->mac.portnum;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_rx_mac_enable: port<%d>",
-			portn));
+	    portn));
 
 	if ((status = nxge_rx_mac_init(nxgep)) != NXGE_OK)
 		goto fail;
@@ -3545,26 +3521,24 @@ nxge_rx_mac_disable(p_nxge_t nxgep)
 	portn = nxgep->mac.portnum;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_rx_mac_disable: port<%d>",
-			portn));
+	    portn));
 
 	if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
 		if ((rs = npi_xmac_rx_config(handle, DISABLE, portn,
-						CFG_XMAC_RX)) != NPI_SUCCESS)
+		    CFG_XMAC_RX)) != NPI_SUCCESS)
 			goto fail;
 	} else {
 		if ((rs = npi_bmac_rx_config(handle, DISABLE, portn,
-						CFG_BMAC_RX)) != NPI_SUCCESS)
+		    CFG_BMAC_RX)) != NPI_SUCCESS)
 			goto fail;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_rx_mac_disable: port<%d>",
-			portn));
+	    portn));
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxgep_rx_mac_disable: ",
-			"Failed to disable port<%d> RxMAC",
-			portn));
+	    "nxgep_rx_mac_disable: Failed to disable port<%d> RxMAC", portn));
 
 	return (NXGE_ERROR | rs);
 }
@@ -3582,7 +3556,7 @@ nxge_tx_mac_reset(p_nxge_t nxgep)
 	portn = nxgep->mac.portnum;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_tx_mac_reset: port<%d>",
-			portn));
+	    portn));
 
 	if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
 		if ((rs = npi_xmac_reset(handle, portn, XTX_MAC_RESET_ALL))
@@ -3590,18 +3564,17 @@ nxge_tx_mac_reset(p_nxge_t nxgep)
 			goto fail;
 	} else {
 		if ((rs = npi_bmac_reset(handle, portn, TX_MAC_RESET))
-					!= NPI_SUCCESS)
+		    != NPI_SUCCESS)
 			goto fail;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_tx_mac_reset: port<%d>",
-			portn));
+	    portn));
 
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_tx_mac_reset: Failed to Reset TxMAC port<%d>",
-			portn));
+	    "nxge_tx_mac_reset: Failed to Reset TxMAC port<%d>", portn));
 
 	return (NXGE_ERROR | rs);
 }
@@ -3619,7 +3592,7 @@ nxge_rx_mac_reset(p_nxge_t nxgep)
 	portn = nxgep->mac.portnum;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_rx_mac_reset: port<%d>",
-			portn));
+	    portn));
 
 	if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
 		if ((rs = npi_xmac_reset(handle, portn, XRX_MAC_RESET_ALL))
@@ -3627,18 +3600,17 @@ nxge_rx_mac_reset(p_nxge_t nxgep)
 		goto fail;
 	} else {
 		if ((rs = npi_bmac_reset(handle, portn, RX_MAC_RESET))
-					!= NPI_SUCCESS)
+		    != NPI_SUCCESS)
 		goto fail;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_rx_mac_reset: port<%d>",
-			portn));
+	    portn));
 
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_rx_mac_reset: Failed to Reset RxMAC port<%d>",
-			portn));
+	    "nxge_rx_mac_reset: Failed to Reset RxMAC port<%d>", portn));
 	return (NXGE_ERROR | rs);
 }
 
@@ -3764,8 +3736,7 @@ nxge_link_intr(p_nxge_t nxgep, link_intr_enable_t enable)
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_link_intr: Failed to set port<%d> mif intr mode",
-			portn));
+	    "nxge_link_intr: Failed to set port<%d> mif intr mode", portn));
 
 	return (status);
 }
@@ -3798,7 +3769,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	mii_regs = NULL;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-		"nxge_param_autoneg = 0x%02x", param_arr[param_autoneg].value));
+	    "nxge_param_autoneg = 0x%02x", param_arr[param_autoneg].value));
 
 	/*
 	 * The mif phy mode may be connected to either a copper link
@@ -3818,20 +3789,21 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	bmcr.bits.reset = 1;
 	if ((status = nxge_mii_write(nxgep, xcvr_portn,
 #if defined(__i386)
-		(uint8_t)(uint32_t)&mii_regs->bmcr, bmcr.value)) != NXGE_OK)
+	    (uint8_t)(uint32_t)&mii_regs->bmcr,
 #else
-		(uint8_t)(uint64_t)&mii_regs->bmcr, bmcr.value)) != NXGE_OK)
+	    (uint8_t)(uint64_t)&mii_regs->bmcr,
 #endif
+	    bmcr.value)) != NXGE_OK)
 		goto fail;
 	do {
 		drv_usecwait(500);
 		if ((status = nxge_mii_read(nxgep, xcvr_portn,
 #if defined(__i386)
-			(uint8_t)(uint32_t)&mii_regs->bmcr, &bmcr.value))
+		    (uint8_t)(uint32_t)&mii_regs->bmcr,
 #else
-			(uint8_t)(uint64_t)&mii_regs->bmcr, &bmcr.value))
+		    (uint8_t)(uint64_t)&mii_regs->bmcr,
 #endif
-				!= NXGE_OK)
+		    &bmcr.value)) != NXGE_OK)
 			goto fail;
 		delay++;
 	} while ((bmcr.bits.reset) && (delay < 1000));
@@ -3842,11 +3814,11 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 
 	if ((status = nxge_mii_read(nxgep, xcvr_portn,
 #if defined(__i386)
-			(uint8_t)(uint32_t)(&mii_regs->bmsr),
+	    (uint8_t)(uint32_t)(&mii_regs->bmsr),
 #else
-			(uint8_t)(uint64_t)(&mii_regs->bmsr),
+	    (uint8_t)(uint64_t)(&mii_regs->bmsr),
 #endif
-			&bmsr.value)) != NXGE_OK)
+	    &bmsr.value)) != NXGE_OK)
 		goto fail;
 
 	param_arr[param_autoneg].value &= bmsr.bits.auto_neg_able;
@@ -3880,7 +3852,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	statsp->mac_stats.adv_cap_10fdx = param_arr[param_anar_10fdx].value;
 	statsp->mac_stats.adv_cap_10hdx = param_arr[param_anar_10hdx].value;
 	statsp->mac_stats.adv_cap_asmpause =
-					param_arr[param_anar_asmpause].value;
+	    param_arr[param_anar_asmpause].value;
 	statsp->mac_stats.adv_cap_pause = param_arr[param_anar_pause].value;
 
 
@@ -3891,19 +3863,17 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	if (bmsr.bits.extend_status) {
 		if ((status = nxge_mii_read(nxgep, xcvr_portn,
 #if defined(__i386)
-			(uint8_t)(uint32_t)(&mii_regs->esr), &esr.value))
+		    (uint8_t)(uint32_t)(&mii_regs->esr),
 #else
-			(uint8_t)(uint64_t)(&mii_regs->esr), &esr.value))
+		    (uint8_t)(uint64_t)(&mii_regs->esr),
 #endif
-				!= NXGE_OK)
+		    &esr.value)) != NXGE_OK)
 			goto fail;
-		param_arr[param_anar_1000fdx].value &=
-					esr.bits.link_1000fdx;
+		param_arr[param_anar_1000fdx].value &= esr.bits.link_1000fdx;
 		param_arr[param_anar_1000hdx].value = 0;
 
 		statsp->mac_stats.cap_1000fdx =
-			(esr.bits.link_1000Xfdx ||
-				esr.bits.link_1000fdx);
+		    (esr.bits.link_1000Xfdx || esr.bits.link_1000fdx);
 		statsp->mac_stats.cap_1000hdx = 0;
 	} else {
 		param_arr[param_anar_1000fdx].value = 0;
@@ -3932,14 +3902,15 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	bmcr.value = 0;
 	if ((status = nxge_mii_write(nxgep, xcvr_portn,
 #if defined(__i386)
-		(uint8_t)(uint32_t)(&mii_regs->bmcr), bmcr.value)) != NXGE_OK)
+	    (uint8_t)(uint32_t)(&mii_regs->bmcr),
 #else
-		(uint8_t)(uint64_t)(&mii_regs->bmcr), bmcr.value)) != NXGE_OK)
+	    (uint8_t)(uint64_t)(&mii_regs->bmcr),
 #endif
+	    bmcr.value)) != NXGE_OK)
 		goto fail;
 
 	if ((statsp->port_stats.lb_mode == nxge_lb_phy) ||
-			(statsp->port_stats.lb_mode == nxge_lb_phy1000)) {
+	    (statsp->port_stats.lb_mode == nxge_lb_phy1000)) {
 		bmcr.bits.loopback = 1;
 		bmcr.bits.enable_autoneg = 0;
 		if (statsp->port_stats.lb_mode == nxge_lb_phy1000)
@@ -3951,22 +3922,21 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	}
 
 	if ((statsp->port_stats.lb_mode == nxge_lb_ext1000) ||
-		(statsp->port_stats.lb_mode == nxge_lb_ext100) ||
-		(statsp->port_stats.lb_mode == nxge_lb_ext10)) {
+	    (statsp->port_stats.lb_mode == nxge_lb_ext100) ||
+	    (statsp->port_stats.lb_mode == nxge_lb_ext10)) {
 		param_arr[param_autoneg].value = 0;
 		bcm5464r_aux.value = 0;
 		bcm5464r_aux.bits.ext_lb = 1;
 		bcm5464r_aux.bits.write_1 = 1;
 		if ((status = nxge_mii_write(nxgep, xcvr_portn,
-				BCM5464R_AUX_CTL, bcm5464r_aux.value))
-				!= NXGE_OK)
+		    BCM5464R_AUX_CTL, bcm5464r_aux.value)) != NXGE_OK)
 			goto fail;
 	}
 
 	/* If auto-negotiation is desired */
 	if (param_arr[param_autoneg].value) {
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-				"Restarting Auto-negotiation."));
+		    "Restarting Auto-negotiation."));
 		/*
 		 * Setup our Auto-negotiation advertisement register.
 		 */
@@ -3980,8 +3950,8 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 		anar.bits.cap_asmpause = 0;
 		anar.bits.cap_pause = 0;
 		if (param_arr[param_anar_1000fdx].value ||
-			param_arr[param_anar_100fdx].value ||
-			param_arr[param_anar_10fdx].value) {
+		    param_arr[param_anar_100fdx].value ||
+		    param_arr[param_anar_10fdx].value) {
 			anar.bits.cap_asmpause = statsp->mac_stats.cap_asmpause;
 			anar.bits.cap_pause = statsp->mac_stats.cap_pause;
 		}
@@ -3989,29 +3959,29 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 		/* Write to the auto-negotiation advertisement register */
 		if ((status = nxge_mii_write(nxgep, xcvr_portn,
 #if defined(__i386)
-			(uint8_t)(uint32_t)(&mii_regs->anar), anar.value))
+		    (uint8_t)(uint32_t)(&mii_regs->anar),
 #else
-			(uint8_t)(uint64_t)(&mii_regs->anar), anar.value))
+		    (uint8_t)(uint64_t)(&mii_regs->anar),
 #endif
-				!= NXGE_OK)
+		    anar.value)) != NXGE_OK)
 			goto fail;
 		if (bmsr.bits.extend_status) {
 			gcr.value = 0;
 			gcr.bits.ms_mode_en =
-				param_arr[param_master_cfg_enable].value;
+			    param_arr[param_master_cfg_enable].value;
 			gcr.bits.master =
-				param_arr[param_master_cfg_value].value;
+			    param_arr[param_master_cfg_value].value;
 			gcr.bits.link_1000fdx =
-				param_arr[param_anar_1000fdx].value;
+			    param_arr[param_anar_1000fdx].value;
 			gcr.bits.link_1000hdx =
-				param_arr[param_anar_1000hdx].value;
+			    param_arr[param_anar_1000hdx].value;
 			if ((status = nxge_mii_write(nxgep, xcvr_portn,
 #if defined(__i386)
-				(uint8_t)(uint32_t)(&mii_regs->gcr), gcr.value))
+			    (uint8_t)(uint32_t)(&mii_regs->gcr),
 #else
-				(uint8_t)(uint64_t)(&mii_regs->gcr), gcr.value))
+			    (uint8_t)(uint64_t)(&mii_regs->gcr),
 #endif
-				!= NXGE_OK)
+			    gcr.value)) != NXGE_OK)
 				goto fail;
 		}
 
@@ -4021,28 +3991,27 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 	} else {
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "Going into forced mode."));
 		bmcr.bits.speed_1000_sel =
-			param_arr[param_anar_1000fdx].value |
-				param_arr[param_anar_1000hdx].value;
+		    param_arr[param_anar_1000fdx].value |
+		    param_arr[param_anar_1000hdx].value;
 		bmcr.bits.speed_sel = (~bmcr.bits.speed_1000_sel) &
-			(param_arr[param_anar_100fdx].value |
-				param_arr[param_anar_100hdx].value);
+		    (param_arr[param_anar_100fdx].value |
+		    param_arr[param_anar_100hdx].value);
 
 		/* Force to 1G */
 		if (bmcr.bits.speed_1000_sel) {
 			statsp->mac_stats.link_speed = 1000;
 			gcr.value = 0;
 			gcr.bits.ms_mode_en =
-				param_arr[param_master_cfg_enable].value;
+			    param_arr[param_master_cfg_enable].value;
 			gcr.bits.master =
-				param_arr[param_master_cfg_value].value;
+			    param_arr[param_master_cfg_value].value;
 			if ((status = nxge_mii_write(nxgep, xcvr_portn,
 #if defined(__i386)
-				(uint8_t)(uint32_t)(&mii_regs->gcr),
+			    (uint8_t)(uint32_t)(&mii_regs->gcr),
 #else
-				(uint8_t)(uint64_t)(&mii_regs->gcr),
+			    (uint8_t)(uint64_t)(&mii_regs->gcr),
 #endif
-				gcr.value))
-				!= NXGE_OK)
+			    gcr.value)) != NXGE_OK)
 				goto fail;
 			if (param_arr[param_anar_1000fdx].value) {
 				bmcr.bits.duplex_mode = 1;
@@ -4070,14 +4039,14 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 		}
 		if (statsp->mac_stats.link_duplex != 1) {
 			statsp->mac_stats.link_asmpause =
-						statsp->mac_stats.cap_asmpause;
+			    statsp->mac_stats.cap_asmpause;
 			statsp->mac_stats.link_pause =
-						statsp->mac_stats.cap_pause;
+			    statsp->mac_stats.cap_pause;
 		}
 
 		if ((statsp->port_stats.lb_mode == nxge_lb_ext1000) ||
-			(statsp->port_stats.lb_mode == nxge_lb_ext100) ||
-			(statsp->port_stats.lb_mode == nxge_lb_ext10)) {
+		    (statsp->port_stats.lb_mode == nxge_lb_ext100) ||
+		    (statsp->port_stats.lb_mode == nxge_lb_ext10)) {
 			if (statsp->port_stats.lb_mode == nxge_lb_ext1000) {
 				/* BCM5464R 1000mbps external loopback mode */
 				gcr.value = 0;
@@ -4085,12 +4054,11 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 				gcr.bits.master = 1;
 				if ((status = nxge_mii_write(nxgep, xcvr_portn,
 #if defined(__i386)
-					(uint8_t)(uint32_t)(&mii_regs->gcr),
+				    (uint8_t)(uint32_t)(&mii_regs->gcr),
 #else
-					(uint8_t)(uint64_t)(&mii_regs->gcr),
+				    (uint8_t)(uint64_t)(&mii_regs->gcr),
 #endif
-					gcr.value))
-					!= NXGE_OK)
+				    gcr.value)) != NXGE_OK)
 					goto fail;
 				bmcr.value = 0;
 				bmcr.bits.speed_1000_sel = 1;
@@ -4114,19 +4082,20 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 
 	if ((status = nxge_mii_write(nxgep, xcvr_portn,
 #if defined(__i386)
-			(uint8_t)(uint32_t)(&mii_regs->bmcr),
+	    (uint8_t)(uint32_t)(&mii_regs->bmcr),
 #else
-			(uint8_t)(uint64_t)(&mii_regs->bmcr),
+	    (uint8_t)(uint64_t)(&mii_regs->bmcr),
 #endif
-			bmcr.value)) != NXGE_OK)
+	    bmcr.value)) != NXGE_OK)
 		goto fail;
 
 	if ((status = nxge_mii_read(nxgep, xcvr_portn,
 #if defined(__i386)
-		(uint8_t)(uint32_t)(&mii_regs->bmcr), &bmcr.value)) != NXGE_OK)
+	    (uint8_t)(uint32_t)(&mii_regs->bmcr),
 #else
-		(uint8_t)(uint64_t)(&mii_regs->bmcr), &bmcr.value)) != NXGE_OK)
+	    (uint8_t)(uint64_t)(&mii_regs->bmcr),
 #endif
+	    &bmcr.value)) != NXGE_OK)
 		goto fail;
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "bmcr = 0x%04X", bmcr.value));
 
@@ -4137,11 +4106,11 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 
 	if ((status = nxge_mii_read(nxgep, xcvr_portn,
 #if defined(__i386)
-		(uint8_t)(uint32_t)(&mii_regs->bmsr),
+	    (uint8_t)(uint32_t)(&mii_regs->bmsr),
 #else
-		(uint8_t)(uint64_t)(&mii_regs->bmsr),
+	    (uint8_t)(uint64_t)(&mii_regs->bmsr),
 #endif
-			&nxgep->bmsr.value)) != NXGE_OK)
+	    &nxgep->bmsr.value)) != NXGE_OK)
 		goto fail;
 
 	statsp->mac_stats.xcvr_inits++;
@@ -4149,7 +4118,7 @@ nxge_mii_xcvr_init(p_nxge_t nxgep)
 
 fail:
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-			"<== nxge_mii_xcvr_init status 0x%x", status));
+	    "<== nxge_mii_xcvr_init status 0x%x", status));
 	return (status);
 }
 
@@ -4437,19 +4406,19 @@ nxge_mii_read(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t xcvr_reg,
 	npi_status_t rs = NPI_SUCCESS;
 
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "==> nxge_mii_read: xcvr_port<%d>"
-			"xcvr_reg<%d>", xcvr_portn, xcvr_reg));
+	    "xcvr_reg<%d>", xcvr_portn, xcvr_reg));
 
 	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
 	    (nxgep->mac.portmode == PORT_1G_RGMII_FIBER)) {
 		if ((rs = npi_mac_mif_mii_read(nxgep->npi_handle,
-				xcvr_portn, xcvr_reg, value)) != NPI_SUCCESS)
+		    xcvr_portn, xcvr_reg, value)) != NPI_SUCCESS)
 			goto fail;
 	} else if ((nxgep->mac.portmode == PORT_1G_FIBER) ||
 	    (nxgep->mac.portmode == PORT_1G_SERDES)) {
 		if ((rs = npi_mac_pcs_mii_read(nxgep->npi_handle,
-				xcvr_portn, xcvr_reg, value)) != NPI_SUCCESS)
+		    xcvr_portn, xcvr_reg, value)) != NPI_SUCCESS)
 			goto fail;
 	} else
 		goto fail;
@@ -4457,14 +4426,12 @@ nxge_mii_read(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t xcvr_reg,
 	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "<== nxge_mii_read: xcvr_port<%d>"
-			"xcvr_reg<%d> value=0x%x",
-			xcvr_portn, xcvr_reg, *value));
+	    "xcvr_reg<%d> value=0x%x", xcvr_portn, xcvr_reg, *value));
 	return (NXGE_OK);
 fail:
 	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_mii_read: Failed to read mii on xcvr %d",
-			xcvr_portn));
+	    "nxge_mii_read: Failed to read mii on xcvr %d", xcvr_portn));
 
 	return (NXGE_ERROR | rs);
 }
@@ -4478,20 +4445,19 @@ nxge_mii_write(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t xcvr_reg,
 	npi_status_t rs = NPI_SUCCESS;
 
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "==> nxge_mii_write: xcvr_port<%d>"
-			"xcvr_reg<%d> value=0x%x", xcvr_portn, xcvr_reg,
-			value));
+	    "xcvr_reg<%d> value=0x%x", xcvr_portn, xcvr_reg, value));
 
 	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
 	    (nxgep->mac.portmode == PORT_1G_RGMII_FIBER)) {
 		if ((rs = npi_mac_mif_mii_write(nxgep->npi_handle,
-				xcvr_portn, xcvr_reg, value)) != NPI_SUCCESS)
+		    xcvr_portn, xcvr_reg, value)) != NPI_SUCCESS)
 			goto fail;
 	} else if ((nxgep->mac.portmode == PORT_1G_FIBER) ||
 	    (nxgep->mac.portmode == PORT_1G_SERDES)) {
 		if ((rs = npi_mac_pcs_mii_write(nxgep->npi_handle,
-				xcvr_portn, xcvr_reg, value)) != NPI_SUCCESS)
+		    xcvr_portn, xcvr_reg, value)) != NPI_SUCCESS)
 			goto fail;
 	} else
 		goto fail;
@@ -4499,14 +4465,13 @@ nxge_mii_write(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t xcvr_reg,
 	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "<== nxge_mii_write: xcvr_port<%d>"
-			"xcvr_reg<%d>", xcvr_portn, xcvr_reg));
+	    "xcvr_reg<%d>", xcvr_portn, xcvr_reg));
 	return (NXGE_OK);
 fail:
 	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_mii_write: Failed to write mii on xcvr %d",
-			xcvr_portn));
+	    "nxge_mii_write: Failed to write mii on xcvr %d", xcvr_portn));
 
 	return (NXGE_ERROR | rs);
 }
@@ -4532,25 +4497,24 @@ nxge_mdio_read(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t device,
 	npi_status_t rs = NPI_SUCCESS;
 
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "==> nxge_mdio_read: xcvr_port<%d>",
-			xcvr_portn));
+	    xcvr_portn));
 
 	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	if ((rs = npi_mac_mif_mdio_read(nxgep->npi_handle,
-			xcvr_portn, device, xcvr_reg, value)) != NPI_SUCCESS)
+	    xcvr_portn, device, xcvr_reg, value)) != NPI_SUCCESS)
 		goto fail;
 
 	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "<== nxge_mdio_read: xcvr_port<%d>",
-			xcvr_portn));
+	    xcvr_portn));
 	return (NXGE_OK);
 fail:
 	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_mdio_read: Failed to read mdio on xcvr %d",
-			xcvr_portn));
+	    "nxge_mdio_read: Failed to read mdio on xcvr %d", xcvr_portn));
 
 	return (NXGE_ERROR | rs);
 }
@@ -4564,25 +4528,24 @@ nxge_mdio_write(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t device,
 	npi_status_t rs = NPI_SUCCESS;
 
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "==> nxge_mdio_write: xcvr_port<%d>",
-			xcvr_portn));
+	    xcvr_portn));
 
 	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	if ((rs = npi_mac_mif_mdio_write(nxgep->npi_handle,
-			xcvr_portn, device, xcvr_reg, value)) != NPI_SUCCESS)
+	    xcvr_portn, device, xcvr_reg, value)) != NPI_SUCCESS)
 		goto fail;
 
 	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	NXGE_DEBUG_MSG((nxgep, MIF_CTL, "<== nxge_mdio_write: xcvr_port<%d>",
-			xcvr_portn));
+	    xcvr_portn));
 	return (NXGE_OK);
 fail:
 	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_mdio_lock);
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_mdio_write: Failed to write mdio on xcvr %d",
-			xcvr_portn));
+	    "nxge_mdio_write: Failed to write mdio on xcvr %d", xcvr_portn));
 
 	return (NXGE_ERROR | rs);
 }
@@ -4630,7 +4593,7 @@ nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints,
 			statsp->mac_stats.link_up = 0;
 			soft_bmsr->bits.link_status = 0;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-					"Link down cable problem"));
+			    "Link down cable problem"));
 			*link_up = LINK_IS_DOWN;
 		}
 	}
@@ -4666,9 +4629,9 @@ nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints,
 		soft_bmsr->bits.auto_neg_complete = 1;
 
 	if ((bmsr_ints.bits.link_status ||
-		bmsr_ints.bits.auto_neg_complete) &&
-		soft_bmsr->bits.link_status &&
-		soft_bmsr->bits.auto_neg_complete) {
+	    bmsr_ints.bits.auto_neg_complete) &&
+	    soft_bmsr->bits.link_status &&
+	    soft_bmsr->bits.auto_neg_complete) {
 		statsp->mac_stats.link_up = 1;
 
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
@@ -4680,73 +4643,72 @@ nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints,
 		if (nxgep->mac.portmode == PORT_1G_COPPER &&
 		    param_arr[param_autoneg].value) {
 			if ((status = nxge_mii_read(nxgep,
-				statsp->mac_stats.xcvr_portn,
+			    statsp->mac_stats.xcvr_portn,
 #if defined(__i386)
-				(uint8_t)(uint32_t)(&mii_regs->anar),
+			    (uint8_t)(uint32_t)(&mii_regs->anar),
 #else
-				(uint8_t)(uint64_t)(&mii_regs->anar),
+			    (uint8_t)(uint64_t)(&mii_regs->anar),
 #endif
-					&anar.value)) != NXGE_OK)
+			    &anar.value)) != NXGE_OK)
 				goto fail;
 			if ((status = nxge_mii_read(nxgep,
-				statsp->mac_stats.xcvr_portn,
+			    statsp->mac_stats.xcvr_portn,
 #if defined(__i386)
-				(uint8_t)(uint32_t)(&mii_regs->anlpar),
+			    (uint8_t)(uint32_t)(&mii_regs->anlpar),
 #else
-				(uint8_t)(uint64_t)(&mii_regs->anlpar),
+			    (uint8_t)(uint64_t)(&mii_regs->anlpar),
 #endif
-					&anlpar.value)) != NXGE_OK)
+			    &anlpar.value)) != NXGE_OK)
 				goto fail;
 			if ((status = nxge_mii_read(nxgep,
-				statsp->mac_stats.xcvr_portn,
+			    statsp->mac_stats.xcvr_portn,
 #if defined(__i386)
-				(uint8_t)(uint32_t)(&mii_regs->aner),
+			    (uint8_t)(uint32_t)(&mii_regs->aner),
 #else
-				(uint8_t)(uint64_t)(&mii_regs->aner),
+			    (uint8_t)(uint64_t)(&mii_regs->aner),
 #endif
-					&aner.value)) != NXGE_OK)
+			    &aner.value)) != NXGE_OK)
 				goto fail;
 			statsp->mac_stats.lp_cap_autoneg = aner.bits.lp_an_able;
 			statsp->mac_stats.lp_cap_100T4 = anlpar.bits.cap_100T4;
 			statsp->mac_stats.lp_cap_100fdx =
-							anlpar.bits.cap_100fdx;
+			    anlpar.bits.cap_100fdx;
 			statsp->mac_stats.lp_cap_100hdx =
-							anlpar.bits.cap_100hdx;
+			    anlpar.bits.cap_100hdx;
 			statsp->mac_stats.lp_cap_10fdx = anlpar.bits.cap_10fdx;
 			statsp->mac_stats.lp_cap_10hdx = anlpar.bits.cap_10hdx;
 			statsp->mac_stats.lp_cap_asmpause =
-						anlpar.bits.cap_asmpause;
+			    anlpar.bits.cap_asmpause;
 			statsp->mac_stats.lp_cap_pause = anlpar.bits.cap_pause;
 			an_common.value = anar.value & anlpar.value;
 			if (param_arr[param_anar_1000fdx].value ||
-				param_arr[param_anar_1000hdx].value) {
+			    param_arr[param_anar_1000hdx].value) {
 				if ((status = nxge_mii_read(nxgep,
-					statsp->mac_stats.xcvr_portn,
+				    statsp->mac_stats.xcvr_portn,
 #if defined(__i386)
-					(uint8_t)(uint32_t)(&mii_regs->gsr),
+				    (uint8_t)(uint32_t)(&mii_regs->gsr),
 #else
-					(uint8_t)(uint64_t)(&mii_regs->gsr),
+				    (uint8_t)(uint64_t)(&mii_regs->gsr),
 #endif
-						&gsr.value))
-						!= NXGE_OK)
+				    &gsr.value)) != NXGE_OK)
 					goto fail;
 				statsp->mac_stats.lp_cap_1000fdx =
-					gsr.bits.link_1000fdx;
+				    gsr.bits.link_1000fdx;
 				statsp->mac_stats.lp_cap_1000hdx =
-					gsr.bits.link_1000hdx;
+				    gsr.bits.link_1000hdx;
 				if (param_arr[param_anar_1000fdx].value &&
-					gsr.bits.link_1000fdx) {
+				    gsr.bits.link_1000fdx) {
 					statsp->mac_stats.link_speed = 1000;
 					statsp->mac_stats.link_duplex = 2;
 				} else if (
-					param_arr[param_anar_1000hdx].value &&
-						gsr.bits.link_1000hdx) {
+				    param_arr[param_anar_1000hdx].value &&
+				    gsr.bits.link_1000hdx) {
 					statsp->mac_stats.link_speed = 1000;
 					statsp->mac_stats.link_duplex = 1;
 				}
 			}
 			if ((an_common.value != 0) &&
-					!(statsp->mac_stats.link_speed)) {
+			    !(statsp->mac_stats.link_speed)) {
 				if (an_common.bits.cap_100T4) {
 					statsp->mac_stats.link_T4 = 1;
 					statsp->mac_stats.link_speed = 100;
@@ -4768,20 +4730,23 @@ nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints,
 				}
 			}
 			if (statsp->mac_stats.link_duplex != 1) {
+				int	link_pause;
+				int	cp, lcp;
+
 				statsp->mac_stats.link_asmpause =
-					an_common.bits.cap_asmpause;
-				if (statsp->mac_stats.link_asmpause)
-				if ((statsp->mac_stats.cap_pause == 0) &&
-						(statsp->mac_stats.lp_cap_pause
-						== 1))
-						statsp->mac_stats.link_pause
-						= 0;
-					else
-						statsp->mac_stats.link_pause
-						= 1;
-				else
-					statsp->mac_stats.link_pause =
-						an_common.bits.cap_pause;
+				    an_common.bits.cap_asmpause;
+				cp = statsp->mac_stats.cap_pause;
+				lcp = statsp->mac_stats.lp_cap_pause;
+				if (statsp->mac_stats.link_asmpause) {
+					if ((cp == 0) && (lcp == 1)) {
+						link_pause = 0;
+					} else {
+						link_pause = 1;
+					}
+				} else {
+					link_pause = an_common.bits.cap_pause;
+				}
+				statsp->mac_stats.link_pause = link_pause;
 			}
 		} else if (nxgep->mac.portmode == PORT_1G_RGMII_FIBER) {
 			statsp->mac_stats.link_speed = 1000;
@@ -4792,14 +4757,14 @@ nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints,
 
 	if (nxgep->link_notify) {
 		*link_up = ((statsp->mac_stats.link_up) ? LINK_IS_UP :
-				LINK_IS_DOWN);
+		    LINK_IS_DOWN);
 		nxgep->link_notify = B_FALSE;
 	}
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_mii_check"));
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_mii_check: Unable to check MII"));
+	    "nxge_mii_check: Unable to check MII"));
 	return (status);
 }
 
@@ -4860,9 +4825,9 @@ nxge_add_mcast_addr(p_nxge_t nxgep, struct ether_addr *addrp)
 	mchash = crc32_mchash(addrp);
 	if (nxgep->hash_filter == NULL) {
 		NXGE_DEBUG_MSG((NULL, STR_CTL,
-			"Allocating hash filter storage."));
+		    "Allocating hash filter storage."));
 		nxgep->hash_filter = KMEM_ZALLOC(sizeof (hash_filter_t),
-					KM_SLEEP);
+		    KM_SLEEP);
 	}
 	hash_filter = nxgep->hash_filter;
 	j = mchash / HASH_REG_WIDTH;
@@ -4888,7 +4853,7 @@ nxge_add_mcast_addr(p_nxge_t nxgep, struct ether_addr *addrp)
 fail:
 	RW_EXIT(&nxgep->filter_lock);
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_add_mcast_addr: "
-					"Unable to add multicast address"));
+	    "Unable to add multicast address"));
 	return (status);
 }
 
@@ -4909,7 +4874,7 @@ nxge_del_mcast_addr(p_nxge_t nxgep, struct ether_addr *addrp)
 	mchash = crc32_mchash(addrp);
 	if (nxgep->hash_filter == NULL) {
 		NXGE_DEBUG_MSG((NULL, STR_CTL,
-			"Hash filter already de_allocated."));
+		    "Hash filter already de_allocated."));
 		RW_EXIT(&nxgep->filter_lock);
 		NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_del_mcast_addr"));
 		return (NXGE_OK);
@@ -4925,7 +4890,7 @@ nxge_del_mcast_addr(p_nxge_t nxgep, struct ether_addr *addrp)
 	}
 	if (hash_filter->hash_ref_cnt == 0) {
 		NXGE_DEBUG_MSG((NULL, STR_CTL,
-			"De-allocating hash filter storage."));
+		    "De-allocating hash filter storage."));
 		KMEM_FREE(hash_filter, sizeof (hash_filter_t));
 		nxgep->hash_filter = NULL;
 	}
@@ -4943,7 +4908,7 @@ nxge_del_mcast_addr(p_nxge_t nxgep, struct ether_addr *addrp)
 fail:
 	RW_EXIT(&nxgep->filter_lock);
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_del_mcast_addr: "
-			"Unable to remove multicast address"));
+	    "Unable to remove multicast address"));
 
 	return (status);
 }
@@ -4962,8 +4927,8 @@ nxge_set_mac_addr(p_nxge_t nxgep, struct ether_addr *addrp)
 	 * Exit if the address is same as ouraddr or multicast or broadcast
 	 */
 	if (((addrp->ether_addr_octet[0] & 01) == 1) ||
-		(ether_cmp(addrp, &etherbroadcastaddr) == 0) ||
-		(ether_cmp(addrp, &nxgep->ouraddr) == 0)) {
+	    (ether_cmp(addrp, &etherbroadcastaddr) == 0) ||
+	    (ether_cmp(addrp, &nxgep->ouraddr) == 0)) {
 		goto nxge_set_mac_addr_exit;
 	}
 	nxgep->ouraddr = *addrp;
@@ -4990,7 +4955,7 @@ nxge_set_mac_addr_end:
 fail:
 	MUTEX_EXIT(&nxgep->ouraddr_lock);
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_set_mac_addr: "
-			"Unable to set mac address"));
+	    "Unable to set mac address"));
 	return (status);
 }
 
@@ -5073,22 +5038,22 @@ nxge_check_mii_link(p_nxge_t nxgep)
 
 		if (nxgep->param_arr[param_autoneg].value) {
 			if ((status = nxge_mii_read(nxgep,
-				nxgep->statsp->mac_stats.xcvr_portn,
+			    nxgep->statsp->mac_stats.xcvr_portn,
 #if defined(__i386)
-				(uint8_t)(uint32_t)(&mii_regs->gsr),
+			    (uint8_t)(uint32_t)(&mii_regs->gsr),
 #else
-				(uint8_t)(uint64_t)(&mii_regs->gsr),
+			    (uint8_t)(uint64_t)(&mii_regs->gsr),
 #endif
-				&gsr.value)) != NXGE_OK)
+			    &gsr.value)) != NXGE_OK)
 				goto fail;
 			if ((status = nxge_mii_read(nxgep,
-				nxgep->statsp->mac_stats.xcvr_portn,
+			    nxgep->statsp->mac_stats.xcvr_portn,
 #if defined(__i386)
-				(uint8_t)(uint32_t)(&mii_regs->anlpar),
+			    (uint8_t)(uint32_t)(&mii_regs->anlpar),
 #else
-				(uint8_t)(uint64_t)(&mii_regs->anlpar),
+			    (uint8_t)(uint64_t)(&mii_regs->anlpar),
 #endif
-				&anlpar.value)) != NXGE_OK)
+			    &anlpar.value)) != NXGE_OK)
 				goto fail;
 			if (nxgep->mac.portmode != PORT_1G_RGMII_FIBER) {
 
@@ -5160,7 +5125,7 @@ nxge_check_mii_link_exit:
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_check_mii_link port<%d>",
-				portn));
+	    portn));
 	return (NXGE_OK);
 
 fail:
@@ -5168,8 +5133,7 @@ fail:
 
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_check_mii_link: Failed to check link port<%d>",
-			portn));
+	    "nxge_check_mii_link: Failed to check link port<%d>", portn));
 	return (status);
 }
 
@@ -5303,7 +5267,7 @@ phy_check_done:
 
 	if (link_up) {
 		if (nxgep->link_notify ||
-			nxgep->statsp->mac_stats.link_up == 0) {
+		    nxgep->statsp->mac_stats.link_up == 0) {
 			if (nxge_10g_link_led_on(nxgep) != NXGE_OK)
 				goto fail;
 			nxgep->statsp->mac_stats.link_up = 1;
@@ -5315,11 +5279,11 @@ phy_check_done:
 		}
 	} else {
 		if (nxgep->link_notify ||
-			nxgep->statsp->mac_stats.link_up == 1) {
+		    nxgep->statsp->mac_stats.link_up == 1) {
 			if (nxge_10g_link_led_off(nxgep) != NXGE_OK)
 				goto fail;
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-					"Link down cable problem"));
+			    "Link down cable problem"));
 			nxgep->statsp->mac_stats.link_up = 0;
 			nxgep->statsp->mac_stats.link_speed = 0;
 			nxgep->statsp->mac_stats.link_duplex = 0;
@@ -5396,9 +5360,9 @@ nxge_link_is_up(p_nxge_t nxgep)
 	if ((nxgep->mac.portmode == PORT_10G_FIBER) ||
 	    (nxgep->mac.portmode == PORT_10G_SERDES)) {
 		(void) npi_xmac_xpcs_read(nxgep->npi_handle, nxgep->mac.portnum,
-					XPCS_REG_SYMBOL_ERR_L0_1_COUNTER, &val);
+		    XPCS_REG_SYMBOL_ERR_L0_1_COUNTER, &val);
 		(void) npi_xmac_xpcs_read(nxgep->npi_handle, nxgep->mac.portnum,
-					XPCS_REG_SYMBOL_ERR_L2_3_COUNTER, &val);
+		    XPCS_REG_SYMBOL_ERR_L2_3_COUNTER, &val);
 	}
 
 	/*
@@ -5893,14 +5857,14 @@ nxge_mac_intr(void *arg1, void *arg2)
 
 	if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
 		rs = npi_xmac_tx_get_istatus(handle, portn,
-					(xmac_tx_iconfig_t *)&status);
+		    (xmac_tx_iconfig_t *)&status);
 		if (rs != NPI_SUCCESS)
 			goto npi_fail;
 		if (status & ICFG_XMAC_TX_ALL) {
 			if (status & ICFG_XMAC_TX_UNDERRUN) {
 				statsp->xmac_stats.tx_underflow_err++;
 				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_TXMAC_UNDERFLOW);
+				    NXGE_FM_EREPORT_TXMAC_UNDERFLOW);
 			}
 			if (status & ICFG_XMAC_TX_MAX_PACKET_ERR) {
 				statsp->xmac_stats.tx_maxpktsize_err++;
@@ -5912,25 +5876,25 @@ nxge_mac_intr(void *arg1, void *arg2)
 			if (status & ICFG_XMAC_TX_OVERFLOW) {
 				statsp->xmac_stats.tx_overflow_err++;
 				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_TXMAC_OVERFLOW);
+				    NXGE_FM_EREPORT_TXMAC_OVERFLOW);
 			}
 			if (status & ICFG_XMAC_TX_FIFO_XFR_ERR) {
 				statsp->xmac_stats.tx_fifo_xfr_err++;
 				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_TXMAC_TXFIFO_XFR_ERR);
+				    NXGE_FM_EREPORT_TXMAC_TXFIFO_XFR_ERR);
 			}
 			if (status & ICFG_XMAC_TX_BYTE_CNT_EXP) {
 				statsp->xmac_stats.tx_byte_cnt +=
-							XTXMAC_BYTE_CNT_MASK;
+				    XTXMAC_BYTE_CNT_MASK;
 			}
 			if (status & ICFG_XMAC_TX_FRAME_CNT_EXP) {
 				statsp->xmac_stats.tx_frame_cnt +=
-							XTXMAC_FRM_CNT_MASK;
+				    XTXMAC_FRM_CNT_MASK;
 			}
 		}
 
 		rs = npi_xmac_rx_get_istatus(handle, portn,
-					(xmac_rx_iconfig_t *)&status);
+		    (xmac_rx_iconfig_t *)&status);
 		if (rs != NPI_SUCCESS)
 			goto npi_fail;
 		if (status & ICFG_XMAC_RX_ALL) {
@@ -5939,7 +5903,7 @@ nxge_mac_intr(void *arg1, void *arg2)
 			if (status & ICFG_XMAC_RX_UNDERFLOW) {
 				statsp->xmac_stats.rx_underflow_err++;
 				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_RXMAC_UNDERFLOW);
+				    NXGE_FM_EREPORT_RXMAC_UNDERFLOW);
 			}
 			/*
 			 * Do not send FMA ereport for the following 3 errors
@@ -5947,51 +5911,51 @@ nxge_mac_intr(void *arg1, void *arg2)
 			 */
 			if (status & ICFG_XMAC_RX_CRC_ERR_CNT_EXP) {
 				statsp->xmac_stats.rx_crc_err_cnt +=
-							XRXMAC_CRC_ER_CNT_MASK;
+				    XRXMAC_CRC_ER_CNT_MASK;
 			}
 			if (status & ICFG_XMAC_RX_LEN_ERR_CNT_EXP) {
 				statsp->xmac_stats.rx_len_err_cnt +=
-							MAC_LEN_ER_CNT_MASK;
+				    MAC_LEN_ER_CNT_MASK;
 			}
 			if (status & ICFG_XMAC_RX_VIOL_ERR_CNT_EXP) {
 				statsp->xmac_stats.rx_viol_err_cnt +=
-							XRXMAC_CD_VIO_CNT_MASK;
+				    XRXMAC_CD_VIO_CNT_MASK;
 			}
 			if (status & ICFG_XMAC_RX_OCT_CNT_EXP) {
 				statsp->xmac_stats.rx_byte_cnt +=
-							XRXMAC_BT_CNT_MASK;
+				    XRXMAC_BT_CNT_MASK;
 			}
 			if (status & ICFG_XMAC_RX_HST_CNT1_EXP) {
 				statsp->xmac_stats.rx_hist1_cnt +=
-							XRXMAC_HIST_CNT1_MASK;
+				    XRXMAC_HIST_CNT1_MASK;
 			}
 			if (status & ICFG_XMAC_RX_HST_CNT2_EXP) {
 				statsp->xmac_stats.rx_hist2_cnt +=
-							XRXMAC_HIST_CNT2_MASK;
+				    XRXMAC_HIST_CNT2_MASK;
 			}
 			if (status & ICFG_XMAC_RX_HST_CNT3_EXP) {
 				statsp->xmac_stats.rx_hist3_cnt +=
-							XRXMAC_HIST_CNT3_MASK;
+				    XRXMAC_HIST_CNT3_MASK;
 			}
 			if (status & ICFG_XMAC_RX_HST_CNT4_EXP) {
 				statsp->xmac_stats.rx_hist4_cnt +=
-							XRXMAC_HIST_CNT4_MASK;
+				    XRXMAC_HIST_CNT4_MASK;
 			}
 			if (status & ICFG_XMAC_RX_HST_CNT5_EXP) {
 				statsp->xmac_stats.rx_hist5_cnt +=
-							XRXMAC_HIST_CNT5_MASK;
+				    XRXMAC_HIST_CNT5_MASK;
 			}
 			if (status & ICFG_XMAC_RX_HST_CNT6_EXP) {
 				statsp->xmac_stats.rx_hist6_cnt +=
-							XRXMAC_HIST_CNT6_MASK;
+				    XRXMAC_HIST_CNT6_MASK;
 			}
 			if (status & ICFG_XMAC_RX_BCAST_CNT_EXP) {
 				statsp->xmac_stats.rx_broadcast_cnt +=
-							XRXMAC_BC_FRM_CNT_MASK;
+				    XRXMAC_BC_FRM_CNT_MASK;
 			}
 			if (status & ICFG_XMAC_RX_MCAST_CNT_EXP) {
 				statsp->xmac_stats.rx_mult_cnt +=
-							XRXMAC_MC_FRM_CNT_MASK;
+				    XRXMAC_MC_FRM_CNT_MASK;
 			}
 			/*
 			 * Do not send FMA ereport for the following 3 errors
@@ -5999,15 +5963,15 @@ nxge_mac_intr(void *arg1, void *arg2)
 			 */
 			if (status & ICFG_XMAC_RX_FRAG_CNT_EXP) {
 				statsp->xmac_stats.rx_frag_cnt +=
-							XRXMAC_FRAG_CNT_MASK;
+				    XRXMAC_FRAG_CNT_MASK;
 			}
 			if (status & ICFG_XMAC_RX_ALIGNERR_CNT_EXP) {
 				statsp->xmac_stats.rx_frame_align_err_cnt +=
-							XRXMAC_AL_ER_CNT_MASK;
+				    XRXMAC_AL_ER_CNT_MASK;
 			}
 			if (status & ICFG_XMAC_RX_LINK_FLT_CNT_EXP) {
 				statsp->xmac_stats.rx_linkfault_err_cnt +=
-							XMAC_LINK_FLT_CNT_MASK;
+				    XMAC_LINK_FLT_CNT_MASK;
 			}
 			if (status & ICFG_XMAC_RX_REMOTE_FLT_DET) {
 				statsp->xmac_stats.rx_remotefault_err++;
@@ -6018,7 +5982,7 @@ nxge_mac_intr(void *arg1, void *arg2)
 		}
 
 		rs = npi_xmac_ctl_get_istatus(handle, portn,
-						(xmac_ctl_iconfig_t *)&status);
+		    (xmac_ctl_iconfig_t *)&status);
 		if (rs != NPI_SUCCESS)
 			goto npi_fail;
 		if (status & ICFG_XMAC_CTRL_ALL) {
@@ -6031,32 +5995,32 @@ nxge_mac_intr(void *arg1, void *arg2)
 		}
 	} else if (nxgep->mac.porttype == PORT_TYPE_BMAC) {
 		rs = npi_bmac_tx_get_istatus(handle, portn,
-						(bmac_tx_iconfig_t *)&status);
+		    (bmac_tx_iconfig_t *)&status);
 		if (rs != NPI_SUCCESS)
 			goto npi_fail;
 		if (status & ICFG_BMAC_TX_ALL) {
 			if (status & ICFG_BMAC_TX_UNDERFLOW) {
 				statsp->bmac_stats.tx_underrun_err++;
 				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_TXMAC_UNDERFLOW);
+				    NXGE_FM_EREPORT_TXMAC_UNDERFLOW);
 			}
 			if (status & ICFG_BMAC_TX_MAXPKTSZ_ERR) {
 				statsp->bmac_stats.tx_max_pkt_err++;
 				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_TXMAC_MAX_PKT_ERR);
+				    NXGE_FM_EREPORT_TXMAC_MAX_PKT_ERR);
 			}
 			if (status & ICFG_BMAC_TX_BYTE_CNT_EXP) {
 				statsp->bmac_stats.tx_byte_cnt +=
-							BTXMAC_BYTE_CNT_MASK;
+				    BTXMAC_BYTE_CNT_MASK;
 			}
 			if (status & ICFG_BMAC_TX_FRAME_CNT_EXP) {
 				statsp->bmac_stats.tx_frame_cnt +=
-							BTXMAC_FRM_CNT_MASK;
+				    BTXMAC_FRM_CNT_MASK;
 			}
 		}
 
 		rs = npi_bmac_rx_get_istatus(handle, portn,
-						(bmac_rx_iconfig_t *)&status);
+		    (bmac_rx_iconfig_t *)&status);
 		if (rs != NPI_SUCCESS)
 			goto npi_fail;
 		if (status & ICFG_BMAC_RX_ALL) {
@@ -6065,39 +6029,39 @@ nxge_mac_intr(void *arg1, void *arg2)
 			}
 			if (status & ICFG_BMAC_RX_FRAME_CNT_EXP) {
 				statsp->bmac_stats.rx_frame_cnt +=
-							RXMAC_FRM_CNT_MASK;
+				    RXMAC_FRM_CNT_MASK;
 			}
 			if (status & ICFG_BMAC_RX_CRC_ERR_CNT_EXP) {
 				statsp->bmac_stats.rx_crc_err_cnt +=
-							BMAC_CRC_ER_CNT_MASK;
+				    BMAC_CRC_ER_CNT_MASK;
 				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_RXMAC_CRC_ERRCNT_EXP);
+				    NXGE_FM_EREPORT_RXMAC_CRC_ERRCNT_EXP);
 			}
 			if (status & ICFG_BMAC_RX_LEN_ERR_CNT_EXP) {
 				statsp->bmac_stats.rx_len_err_cnt +=
-							MAC_LEN_ER_CNT_MASK;
+				    MAC_LEN_ER_CNT_MASK;
 				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-				NXGE_FM_EREPORT_RXMAC_LENGTH_ERRCNT_EXP);
+				    NXGE_FM_EREPORT_RXMAC_LENGTH_ERRCNT_EXP);
 			}
 			if (status & ICFG_BMAC_RX_VIOL_ERR_CNT_EXP)
 				statsp->bmac_stats.rx_viol_err_cnt +=
-							BMAC_CD_VIO_CNT_MASK;
+				    BMAC_CD_VIO_CNT_MASK;
 				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_RXMAC_VIOL_ERRCNT_EXP);
+				    NXGE_FM_EREPORT_RXMAC_VIOL_ERRCNT_EXP);
 			}
 			if (status & ICFG_BMAC_RX_BYTE_CNT_EXP) {
 				statsp->bmac_stats.rx_byte_cnt +=
-							BRXMAC_BYTE_CNT_MASK;
+				    BRXMAC_BYTE_CNT_MASK;
 			}
 			if (status & ICFG_BMAC_RX_ALIGNERR_CNT_EXP) {
 				statsp->bmac_stats.rx_align_err_cnt +=
-							BMAC_AL_ER_CNT_MASK;
+				    BMAC_AL_ER_CNT_MASK;
 				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_RXMAC_ALIGN_ECNT_EXP);
+				    NXGE_FM_EREPORT_RXMAC_ALIGN_ECNT_EXP);
 			}
 
 			rs = npi_bmac_ctl_get_istatus(handle, portn,
-						(bmac_ctl_iconfig_t *)&status);
+			    (bmac_ctl_iconfig_t *)&status);
 			if (rs != NPI_SUCCESS)
 				goto npi_fail;
 
@@ -6113,7 +6077,7 @@ nxge_mac_intr(void *arg1, void *arg2)
 
 	if (ldgp->nldvs == 1) {
 		(void) npi_intr_ldg_mgmt_set(handle, ldgp->ldg,
-			B_TRUE, ldgp->ldg_timer);
+		    B_TRUE, ldgp->ldg_timer);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_mac_intr"));
@@ -6145,25 +6109,25 @@ nxge_check_bcm8704_link(p_nxge_t nxgep, boolean_t *link_up)
 	(void) nxge_mdio_read(nxgep, phy_port_addr, 0x3, 0xC809, &val_debug);
 	if ((val_debug & ~0x200) != 0) {
 		cmn_err(CE_NOTE, "!Port%d BCM8704 Dev3 Reg 0xc809 = 0x%x\n",
-				nxgep->mac.portnum, val_debug);
+		    nxgep->mac.portnum, val_debug);
 		(void) nxge_mdio_read(nxgep, phy_port_addr, 0x4, 0x18,
-				&val_debug);
+		    &val_debug);
 		cmn_err(CE_NOTE, "!Port%d BCM8704 Dev4 Reg 0x18 = 0x%x\n",
-				nxgep->mac.portnum, val_debug);
+		    nxgep->mac.portnum, val_debug);
 	}
 
 	(void) npi_xmac_xpcs_read(nxgep->npi_handle, nxgep->mac.portnum,
-					XPCS_REG_DESCWERR_COUNTER, &val);
+	    XPCS_REG_DESCWERR_COUNTER, &val);
 	if (val != 0)
 		cmn_err(CE_NOTE, "!XPCS DESCWERR = 0x%x\n", val);
 
 	(void) npi_xmac_xpcs_read(nxgep->npi_handle, nxgep->mac.portnum,
-					XPCS_REG_SYMBOL_ERR_L0_1_COUNTER, &val);
+	    XPCS_REG_SYMBOL_ERR_L0_1_COUNTER, &val);
 	if (val != 0)
 		cmn_err(CE_NOTE, "!XPCS SYMBOL_ERR_L0_1 = 0x%x\n", val);
 
 	(void) npi_xmac_xpcs_read(nxgep->npi_handle, nxgep->mac.portnum,
-					XPCS_REG_SYMBOL_ERR_L2_3_COUNTER, &val);
+	    XPCS_REG_SYMBOL_ERR_L2_3_COUNTER, &val);
 	if (val != 0)
 		cmn_err(CE_NOTE, "!XPCS SYMBOL_ERR_L2_3 = 0x%x\n", val);
 #endif
@@ -6171,27 +6135,21 @@ nxge_check_bcm8704_link(p_nxge_t nxgep, boolean_t *link_up)
 	/* Check from BCM8704 if 10G link is up or down */
 
 	/* Check Device 1 Register 0xA bit0 */
-	status = nxge_mdio_read(nxgep, phy_port_addr,
-			BCM8704_PMA_PMD_DEV_ADDR,
-			BCM8704_PMD_RECEIVE_SIG_DETECT,
-			&val1);
+	status = nxge_mdio_read(nxgep, phy_port_addr, BCM8704_PMA_PMD_DEV_ADDR,
+	    BCM8704_PMD_RECEIVE_SIG_DETECT, &val1);
 	if (status != NXGE_OK)
 		goto fail;
 	rx_sig_ok = ((val1 & GLOB_PMD_RX_SIG_OK) ? B_TRUE : B_FALSE);
 
 	/* Check Device 3 Register 0x20 bit0 */
-	if ((status = nxge_mdio_read(nxgep, phy_port_addr,
-			BCM8704_PCS_DEV_ADDR,
-			BCM8704_10GBASE_R_PCS_STATUS_REG,
-			&val2)) != NPI_SUCCESS)
+	if ((status = nxge_mdio_read(nxgep, phy_port_addr, BCM8704_PCS_DEV_ADDR,
+	    BCM8704_10GBASE_R_PCS_STATUS_REG, &val2)) != NPI_SUCCESS)
 		goto fail;
 	pcs_blk_lock = ((val2 & PCS_10GBASE_R_PCS_BLK_LOCK) ? B_TRUE : B_FALSE);
 
 	/* Check Device 4 Register 0x18 bit12 */
-	status = nxge_mdio_read(nxgep, phy_port_addr,
-			BCM8704_PHYXS_ADDR,
-			BCM8704_PHYXS_XGXS_LANE_STATUS_REG,
-			&val3);
+	status = nxge_mdio_read(nxgep, phy_port_addr, BCM8704_PHYXS_ADDR,
+	    BCM8704_PHYXS_XGXS_LANE_STATUS_REG, &val3);
 	if (status != NXGE_OK)
 		goto fail;
 
@@ -6219,20 +6177,16 @@ nxge_check_bcm8704_link(p_nxge_t nxgep, boolean_t *link_up)
 	if (pcs_blk_lock == B_FALSE) {
 		if (val2 != 0x4) {
 			pcs_blk_lock = B_TRUE;
-			cmn_err(CE_NOTE,
-				"!LINK DEBUG: port%d PHY Dev3 "
-				"Reg 0x20 = 0x%x\n",
-				nxgep->mac.portnum, val2);
+			cmn_err(CE_NOTE, "!LINK DEBUG: port%d PHY Dev3 "
+			    "Reg 0x20 = 0x%x\n", nxgep->mac.portnum, val2);
 		}
 	}
 
 	if (link_align == B_FALSE) {
 		if (val3 != 0x140f) {
 			link_align = B_TRUE;
-			cmn_err(CE_NOTE,
-				"!LINK DEBUG: port%d PHY Dev4 "
-				"Reg 0x18 = 0x%x\n",
-				nxgep->mac.portnum, val3);
+			cmn_err(CE_NOTE, "!LINK DEBUG: port%d PHY Dev4 "
+			    "Reg 0x18 = 0x%x\n", nxgep->mac.portnum, val3);
 		}
 	}
 
@@ -6240,14 +6194,14 @@ nxge_check_bcm8704_link(p_nxge_t nxgep, boolean_t *link_up)
 		if ((val2 == 0) || (val3 == 0)) {
 			rx_sig_ok = B_TRUE;
 			cmn_err(CE_NOTE,
-				"!LINK DEBUG: port %d Dev3 or Dev4 read zero\n",
-				nxgep->mac.portnum);
+			    "!LINK DEBUG: port %d Dev3 or Dev4 read zero\n",
+			    nxgep->mac.portnum);
 		}
 	}
 #endif
 
 	*link_up = ((rx_sig_ok == B_TRUE) && (pcs_blk_lock == B_TRUE) &&
-			(link_align == B_TRUE)) ? B_TRUE : B_FALSE;
+	    (link_align == B_TRUE)) ? B_TRUE : B_FALSE;
 
 	return (NXGE_OK);
 fail:
@@ -6555,7 +6509,7 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 					port_pma_pmd_dev_id[j] = TN1010_DEV_ID;
 				} else {
 					port_pma_pmd_dev_id[j] =
-					pma_pmd_dev_id & BCM_PHY_ID_MASK;
+					    pma_pmd_dev_id & BCM_PHY_ID_MASK;
 				}
 				port_fd_arr[j] = (uint8_t)i;
 				j++;
@@ -6583,7 +6537,7 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			} else {
 				if (j < NXGE_PORTS_NEPTUNE) {
 					if ((pcs_dev_id & TN1010_DEV_ID_MASK)
-						== TN1010_DEV_ID) {
+					    == TN1010_DEV_ID) {
 						port_pcs_dev_id[j] =
 						    TN1010_DEV_ID;
 					} else {
@@ -6634,8 +6588,7 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			    ((port_phy_id[0] == PHY_BCM5482_FAMILY) &&
 			    (port_phy_id[1] == PHY_BCM5482_FAMILY))) {
 
-				hw_p->platform_type =
-					    P_NEPTUNE_GENERIC;
+				hw_p->platform_type = P_NEPTUNE_GENERIC;
 
 				hw_p->niu_type = NEPTUNE_2_10GF_2_1GRF;
 
@@ -6946,84 +6899,84 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 		case 4: /* Maramba always have 4 clause 45 ports */
 
 			/* Maramba with 1 XAUI */
-			if (port_pcs_dev_id[0] == PHY_BCM8704_FAMILY ||
-			    port_pma_pmd_dev_id[0] == PHY_BCM8704_FAMILY ||
+			if ((port_pcs_dev_id[0] != PHY_BCM8704_FAMILY) &&
+			    (port_pma_pmd_dev_id[0] != PHY_BCM8704_FAMILY) &&
 			    ((port_pcs_dev_id[0] & TN1010_DEV_ID_MASK)
-			    == TN1010_DEV_ID) ||
+			    != TN1010_DEV_ID) &&
 			    ((port_pma_pmd_dev_id[0] & TN1010_DEV_ID_MASK)
-			    == TN1010_DEV_ID)) {
-				/*
-				 * Check the first phy port address against
-				 * the known phy start addresses to determine
-				 * the platform type.
-				 */
-				switch (phy_fd_arr[0]) {
-				case MARAMBA_P0_CLAUSE22_PORT_ADDR_BASE:
-					hw_p->platform_type =
-					    P_NEPTUNE_MARAMBA_P0;
-					break;
-				case MARAMBA_P1_CLAUSE22_PORT_ADDR_BASE:
-					hw_p->platform_type =
-					    P_NEPTUNE_MARAMBA_P1;
-					break;
-				default:
-					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-					    "Unknown port %d...Cannot "
-					    "determine platform type 10 - 2",
-					    i));
-					goto error_exit;
-				}
-
-				/*
-				 * Check the clause45 address to determine
-				 * if XAUI is in port 0 or port 1.
-				 */
-				switch (port_fd_arr[0]) {
-				case MARAMBA_CLAUSE45_PORT_ADDR_BASE:
-					if (port_pcs_dev_id[0]
-					    == PHY_BCM8704_FAMILY ||
-					    port_pma_pmd_dev_id[0]
-					    == PHY_BCM8704_FAMILY) {
-						hw_p->niu_type
-						    = NEPTUNE_1_10GF_3_1GC;
-					} else {
-						hw_p->niu_type
-						    = NEPTUNE_1_TN1010_3_1GC;
-					}
-					hw_p->xcvr_addr[0] = port_fd_arr[0];
-					for (i = 1; i < NXGE_MAX_PORTS; i++) {
-						hw_p->xcvr_addr[i] =
-						    phy_fd_arr[i];
-					}
-					break;
-				case (MARAMBA_CLAUSE45_PORT_ADDR_BASE + 1):
-					if (port_pcs_dev_id[0]
-					    == PHY_BCM8704_FAMILY ||
-					    port_pma_pmd_dev_id[0]
-					    == PHY_BCM8704_FAMILY) {
-						hw_p->niu_type =
-						    NEPTUNE_1_1GC_1_10GF_2_1GC;
-					} else {
-						hw_p->niu_type =
-						NEPTUNE_1_1GC_1_TN1010_2_1GC;
-					}
-					hw_p->xcvr_addr[0] = phy_fd_arr[0];
-					hw_p->xcvr_addr[1] = port_fd_arr[0];
-					hw_p->xcvr_addr[2] = phy_fd_arr[2];
-					hw_p->xcvr_addr[3] = phy_fd_arr[3];
-					break;
-				default:
-					NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-					    "Unsupported neptune type 11"));
-					goto error_exit;
-				}
-				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-				    "Maramba with 1 XAUI (fiber or copper)"));
-			} else {
+			    != TN1010_DEV_ID)) {
 				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 				    "Unsupported neptune type 12"));
 				goto error_exit;
 			}
+
+			/*
+			 * Check the first phy port address against
+			 * the known phy start addresses to determine
+			 * the platform type.
+			 */
+			switch (phy_fd_arr[0]) {
+			case MARAMBA_P0_CLAUSE22_PORT_ADDR_BASE:
+				hw_p->platform_type =
+				    P_NEPTUNE_MARAMBA_P0;
+				break;
+			case MARAMBA_P1_CLAUSE22_PORT_ADDR_BASE:
+				hw_p->platform_type =
+				    P_NEPTUNE_MARAMBA_P1;
+				break;
+			default:
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "Unknown port %d...Cannot "
+				    "determine platform type 10 - 2",
+				    i));
+				goto error_exit;
+			}
+
+			/*
+			 * Check the clause45 address to determine
+			 * if XAUI is in port 0 or port 1.
+			 */
+			switch (port_fd_arr[0]) {
+			case MARAMBA_CLAUSE45_PORT_ADDR_BASE:
+				if (port_pcs_dev_id[0]
+				    == PHY_BCM8704_FAMILY ||
+				    port_pma_pmd_dev_id[0]
+				    == PHY_BCM8704_FAMILY) {
+					hw_p->niu_type
+					    = NEPTUNE_1_10GF_3_1GC;
+				} else {
+					hw_p->niu_type
+					    = NEPTUNE_1_TN1010_3_1GC;
+				}
+				hw_p->xcvr_addr[0] = port_fd_arr[0];
+				for (i = 1; i < NXGE_MAX_PORTS; i++) {
+					hw_p->xcvr_addr[i] =
+					    phy_fd_arr[i];
+				}
+				break;
+			case (MARAMBA_CLAUSE45_PORT_ADDR_BASE + 1):
+				if (port_pcs_dev_id[0]
+				    == PHY_BCM8704_FAMILY ||
+				    port_pma_pmd_dev_id[0]
+				    == PHY_BCM8704_FAMILY) {
+					hw_p->niu_type =
+					    NEPTUNE_1_1GC_1_10GF_2_1GC;
+				} else {
+					hw_p->niu_type =
+					    NEPTUNE_1_1GC_1_TN1010_2_1GC;
+				}
+				hw_p->xcvr_addr[0] = phy_fd_arr[0];
+				hw_p->xcvr_addr[1] = port_fd_arr[0];
+				hw_p->xcvr_addr[2] = phy_fd_arr[2];
+				hw_p->xcvr_addr[3] = phy_fd_arr[3];
+				break;
+			default:
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "Unsupported neptune type 11"));
+				goto error_exit;
+			}
+			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+			    "Maramba with 1 XAUI (fiber or copper)"));
 			break;
 		default:
 			NXGE_DEBUG_MSG((nxgep, MAC_CTL,

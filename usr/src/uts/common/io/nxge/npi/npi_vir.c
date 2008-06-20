@@ -113,29 +113,29 @@ npi_vir_dump_pio_fzc_regs_one(npi_handle_t handle)
 	int num_regs, i;
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\nPIO FZC Common Register Dump\n"));
+	    "\nPIO FZC Common Register Dump\n"));
 
 	num_regs = sizeof (pio_offset) / sizeof (uint64_t);
 	for (i = 0; i < num_regs; i++) {
 		value = 0;
 		NXGE_REG_RD64(handle, pio_offset[i], &value);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
-			"%s\t 0x%08llx \n",
-			pio_offset[i],
-			pio_name[i], value));
+		    "%s\t 0x%08llx \n",
+		    pio_offset[i],
+		    pio_name[i], value));
 	}
 
 	num_regs = sizeof (fzc_pio_offset) / sizeof (uint64_t);
 	for (i = 0; i < num_regs; i++) {
 		NXGE_REG_RD64(handle, fzc_pio_offset[i], &value);
 		NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL, "0x%08llx "
-			"%s\t 0x%08llx \n",
-			fzc_pio_offset[i],
-			fzc_pio_name[i], value));
+		    "%s\t 0x%08llx \n",
+		    fzc_pio_offset[i],
+		    fzc_pio_name[i], value));
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\n PIO FZC Register Dump Done \n"));
+	    "\n PIO FZC Register Dump Done \n"));
 	return (NPI_SUCCESS);
 }
 
@@ -146,7 +146,7 @@ npi_vir_dump_ldgnum(npi_handle_t handle)
 	int num_regs, i, ldv;
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\nFZC PIO LDG Number Register Dump\n"));
+	    "\nFZC PIO LDG Number Register Dump\n"));
 
 	num_regs = sizeof (fzc_pio_ldgnum_offset) / sizeof (uint64_t);
 	for (ldv = 0; ldv < NXGE_INT_MAX_LDS; ldv++) {
@@ -155,15 +155,15 @@ npi_vir_dump_ldgnum(npi_handle_t handle)
 			offset = fzc_pio_ldgnum_offset[i] + 8 * ldv;
 			NXGE_REG_RD64(handle, offset, &value);
 			NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-				"Logical Device %d: 0x%08llx "
-				"%s\t %d\n",
-				ldv, offset,
-				fzc_pio_ldgnum_name[i], value));
+			    "Logical Device %d: 0x%08llx "
+			    "%s\t %d\n",
+			    ldv, offset,
+			    fzc_pio_ldgnum_name[i], value));
 		}
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\n FZC PIO LDG Register Dump Done \n"));
+	    "\n FZC PIO LDG Register Dump Done \n"));
 
 	return (NPI_SUCCESS);
 }
@@ -175,7 +175,7 @@ npi_vir_dump_ldsv(npi_handle_t handle)
 	int num_regs, i, ldg;
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\nLD Device State Vector Register Dump\n"));
+	    "\nLD Device State Vector Register Dump\n"));
 
 	num_regs = sizeof (pio_ldsv_offset) / sizeof (uint64_t);
 	for (ldg = 0; ldg < NXGE_INT_MAX_LDGS; ldg++) {
@@ -184,15 +184,15 @@ npi_vir_dump_ldsv(npi_handle_t handle)
 			offset = pio_ldsv_offset[i] + 8192 * ldg;
 			NXGE_REG_RD64(handle, offset, &value);
 			NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-				    "LDG State: group %d: 0x%08llx "
-				    "%s\t 0x%08llx \n",
-				ldg, offset,
-				pio_ldsv_name[i], value));
+			    "LDG State: group %d: 0x%08llx "
+			    "%s\t 0x%08llx \n",
+			    ldg, offset,
+			    pio_ldsv_name[i], value));
 		}
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\n FZC PIO LDG Register Dump Done \n"));
+	    "\n FZC PIO LDG Register Dump Done \n"));
 
 	return (NPI_SUCCESS);
 }
@@ -204,7 +204,7 @@ npi_vir_dump_imask0(npi_handle_t handle)
 	int num_regs, i, ldv;
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\nLD Interrupt Mask Register Dump\n"));
+	    "\nLD Interrupt Mask Register Dump\n"));
 
 	num_regs = sizeof (pio_imask0_offset) / sizeof (uint64_t);
 	for (ldv = 0; ldv < 64; ldv++) {
@@ -212,12 +212,12 @@ npi_vir_dump_imask0(npi_handle_t handle)
 			value = 0;
 			offset = pio_imask0_offset[i] + 8192 * ldv;
 			NXGE_REG_RD64(handle, offset,
-				&value);
+			    &value);
 			NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-				"LD Interrupt Mask %d: 0x%08llx "
-				"%s\t 0x%08llx \n",
-				ldv, offset,
-				pio_imask0_name[i], value));
+			    "LD Interrupt Mask %d: 0x%08llx "
+			    "%s\t 0x%08llx \n",
+			    ldv, offset,
+			    pio_imask0_name[i], value));
 		}
 	}
 	num_regs = sizeof (pio_imask1_offset) / sizeof (uint64_t);
@@ -226,17 +226,17 @@ npi_vir_dump_imask0(npi_handle_t handle)
 			value = 0;
 			offset = pio_imask1_offset[i] + 8192 * (ldv - 64);
 			NXGE_REG_RD64(handle, offset,
-				&value);
+			    &value);
 			NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-				"LD Interrupt Mask %d: 0x%08llx "
-				"%s\t 0x%08llx \n",
-				ldv, offset,
-				pio_imask1_name[i], value));
+			    "LD Interrupt Mask %d: 0x%08llx "
+			    "%s\t 0x%08llx \n",
+			    ldv, offset,
+			    pio_imask1_name[i], value));
 		}
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\n FZC PIO Logical Device Group Register Dump Done \n"));
+	    "\n FZC PIO Logical Device Group Register Dump Done \n"));
 
 	return (NPI_SUCCESS);
 }
@@ -248,7 +248,7 @@ npi_vir_dump_sid(npi_handle_t handle)
 	int num_regs, i, ldg;
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\nSystem Interrupt Data Register Dump\n"));
+	    "\nSystem Interrupt Data Register Dump\n"));
 
 	num_regs = sizeof (fzc_pio_sid_offset) / sizeof (uint64_t);
 	for (ldg = 0; ldg < NXGE_INT_MAX_LDGS; ldg++) {
@@ -256,17 +256,17 @@ npi_vir_dump_sid(npi_handle_t handle)
 			value = 0;
 			offset = fzc_pio_sid_offset[i] + 8 * ldg;
 			NXGE_REG_RD64(handle, offset,
-				&value);
+			    &value);
 			NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-				"SID for group %d: 0x%08llx "
-				"%s\t 0x%08llx \n",
-				ldg, offset,
-				fzc_pio_sid_name[i], value));
+			    "SID for group %d: 0x%08llx "
+			    "%s\t 0x%08llx \n",
+			    ldg, offset,
+			    fzc_pio_sid_name[i], value));
 		}
 	}
 
 	NPI_REG_DUMP_MSG((handle.function, NPI_REG_CTL,
-		"\n FZC PIO SID Register Dump Done \n"));
+	    "\n FZC PIO SID Register Dump Done \n"));
 
 	return (NPI_SUCCESS);
 }
@@ -308,14 +308,14 @@ npi_dev_func_sr_init(npi_handle_t handle)
 		}
 
 		NPI_DEBUG_MSG((handle.function, NPI_VIR_CTL,
-			" npi_dev_func_sr_init"
-			" sr <0x%x>",
-			sr.bits.ldw.sr));
+		    " npi_dev_func_sr_init"
+		    " sr <0x%x>",
+		    sr.bits.ldw.sr));
 	} else {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_dev_func_sr_init"
-				    " tas busy <0x%x>",
-				    sr.bits.ldw));
+		    " npi_dev_func_sr_init"
+		    " tas busy <0x%x>",
+		    sr.bits.ldw));
 		status = NPI_VIR_TAS_BUSY(sr.bits.ldw.funcid);
 	}
 
@@ -359,39 +359,39 @@ npi_dev_func_sr_lock_enter(npi_handle_t handle)
 			 * set it to busy and our function id.
 			 */
 			sr.bits.ldw.sr |= (NPI_DEV_SR_LOCK_ST_BUSY |
-						(sr.bits.ldw.funcid <<
-						NPI_DEV_SR_LOCK_FID_SHIFT));
+			    (sr.bits.ldw.funcid <<
+			    NPI_DEV_SR_LOCK_FID_SHIFT));
 			NXGE_REG_WR64(handle, DEV_FUNC_SR_REG, sr.value);
 			break;
 
 		case NPI_DEV_SR_LOCK_ST_RESET:
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_dev_func_sr_lock_enter"
-					    " reset state <0x%x>",
-					    sr.bits.ldw.sr));
+			    " npi_dev_func_sr_lock_enter"
+			    " reset state <0x%x>",
+			    sr.bits.ldw.sr));
 			status = NPI_VIR_SR_RESET(sr.bits.ldw.funcid);
 			break;
 
 		case NPI_DEV_SR_LOCK_ST_BUSY:
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_dev_func_sr_lock_enter"
-					    " busy <0x%x>",
-					    sr.bits.ldw.sr));
+			    " npi_dev_func_sr_lock_enter"
+			    " busy <0x%x>",
+			    sr.bits.ldw.sr));
 			status = NPI_VIR_SR_BUSY(sr.bits.ldw.funcid);
 			break;
 
 		default:
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_dev_func_sr_lock_enter",
-					    " invalid state",
-					    sr.bits.ldw.sr));
+			    " npi_dev_func_sr_lock_enter",
+			    " invalid state",
+			    sr.bits.ldw.sr));
 			status = NPI_VIR_SR_INVALID(sr.bits.ldw.funcid);
 			break;
 		}
 	} else {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_dev_func_sr_lock_enter",
-				    " tas busy", sr.bits.ldw));
+		    " npi_dev_func_sr_lock_enter",
+		    " tas busy", sr.bits.ldw));
 		status = NPI_VIR_TAS_BUSY(sr.bits.ldw.funcid);
 	}
 
@@ -428,16 +428,16 @@ npi_dev_func_sr_lock_free(npi_handle_t handle)
 			NXGE_REG_WR64(handle, DEV_FUNC_SR_REG, sr.value);
 		} else {
 			NPI_DEBUG_MSG((handle.function, NPI_VIR_CTL,
-					    " npi_dev_func_sr_lock_free"
-					    " not owner <0x%x>",
-					    sr.bits.ldw.sr));
+			    " npi_dev_func_sr_lock_free"
+			    " not owner <0x%x>",
+			    sr.bits.ldw.sr));
 			status = NPI_VIR_SR_NOTOWNER(sr.bits.ldw.funcid);
 		}
 	} else {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_dev_func_sr_lock_free",
-				    " invalid tas state <0x%x>",
-				    sr.bits.ldw.tas));
+		    " npi_dev_func_sr_lock_free",
+		    " invalid tas state <0x%x>",
+		    sr.bits.ldw.tas));
 		status = NPI_VIR_TAS_NOTREAD(sr.bits.ldw.funcid);
 	}
 
@@ -581,9 +581,9 @@ npi_dev_func_sr_sr_get_set_clear(npi_handle_t handle, uint16_t impl_sr)
 	status = npi_dev_func_sr_lock_enter(handle);
 	if (status != NPI_SUCCESS) {
 		NPI_DEBUG_MSG((handle.function, NPI_VIR_CTL,
-				    " npi_dev_func_sr_src_get_set_clear"
-				    " unable to acquire lock:"
-				    " status <0x%x>", status));
+		    " npi_dev_func_sr_src_get_set_clear"
+		    " unable to acquire lock:"
+		    " status <0x%x>", status));
 		return (status);
 	}
 
@@ -622,9 +622,9 @@ npi_dev_func_sr_sr_set_only(npi_handle_t handle, uint16_t impl_sr)
 		NXGE_REG_WR64(handle, DEV_FUNC_SR_REG, sr.value);
 	} else {
 		NPI_DEBUG_MSG((handle.function, NPI_VIR_CTL,
-				    " npi_dev_func_sr_sr_set_only"
-				    " not owner <0x%x>",
-				    sr.bits.ldw.sr));
+		    " npi_dev_func_sr_sr_set_only"
+		    " not owner <0x%x>",
+		    sr.bits.ldw.sr));
 		status = NPI_VIR_SR_NOTOWNER(sr.bits.ldw.funcid);
 	}
 
@@ -851,16 +851,16 @@ npi_fzc_ldg_num_set(npi_handle_t handle, uint8_t ld, uint8_t ldg)
 	ASSERT(LD_VALID(ld));
 	if (!LD_VALID(ld)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_fzc_ldg_num_set"
-				    "ld <0x%x>", ld));
+		    " npi_fzc_ldg_num_set"
+		    "ld <0x%x>", ld));
 		return (NPI_FAILURE | NPI_VIR_LD_INVALID(ld));
 	}
 
 	ASSERT(LDG_VALID(ldg));
 	if (!LDG_VALID(ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_fzc_ldg_num_set"
-				    " ldg <0x%x>", ldg));
+		    " npi_fzc_ldg_num_set"
+		    " ldg <0x%x>", ldg));
 		return (NPI_FAILURE | NPI_VIR_LDG_INVALID(ld));
 	}
 
@@ -868,7 +868,7 @@ npi_fzc_ldg_num_set(npi_handle_t handle, uint8_t ld, uint8_t ldg)
 	gnum.bits.ldw.num = ldg;
 
 	NXGE_REG_WR64(handle, LDG_NUM_REG + LD_NUM_OFFSET(ld),
-		gnum.value);
+	    gnum.value);
 
 	return (NPI_SUCCESS);
 }
@@ -895,9 +895,9 @@ npi_fzc_ldg_num_get(npi_handle_t handle, uint8_t ld, uint8_t *ldg_p)
 	ASSERT(LD_VALID(ld));
 	if (!LD_VALID(ld)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_fzc_ldg_num_get"
-				    " Invalid Input:",
-				    " ld <0x%x>", ld));
+		    " npi_fzc_ldg_num_get"
+		    " Invalid Input:",
+		    " ld <0x%x>", ld));
 		return (NPI_FAILURE | NPI_VIR_LD_INVALID(ld));
 	}
 
@@ -964,9 +964,9 @@ npi_ldsv_get(npi_handle_t handle, uint8_t ldg, ldsv_type_t vector,
 	ASSERT(LDG_VALID(ldg));
 	if (!LDG_VALID(ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_ldsv_get"
-				    " Invalid Input "
-				    " ldg <0x%x>", ldg));
+		    " npi_ldsv_get"
+		    " Invalid Input "
+		    " ldg <0x%x>", ldg));
 		return (NPI_FAILURE | NPI_VIR_LDG_INVALID(ldg));
 	}
 
@@ -985,9 +985,9 @@ npi_ldsv_get(npi_handle_t handle, uint8_t ldg, ldsv_type_t vector,
 
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_ldsv_get"
-				    " Invalid Input: "
-				    " ldsv type <0x%x>", vector));
+		    " npi_ldsv_get"
+		    " Invalid Input: "
+		    " ldsv type <0x%x>", vector));
 		return (NPI_FAILURE | NPI_VIR_LDSV_INVALID(vector));
 	}
 
@@ -1022,22 +1022,22 @@ npi_ldsv_ld_get(npi_handle_t handle, uint8_t ldg, uint8_t ld,
 	ASSERT(LDG_VALID(ldg));
 	if (!LDG_VALID(ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_ldsv_ld_get"
-				    " Invalid Input: "
-				    " ldg <0x%x>", ldg));
+		    " npi_ldsv_ld_get"
+		    " Invalid Input: "
+		    " ldg <0x%x>", ldg));
 		return (NPI_FAILURE | NPI_VIR_LDG_INVALID(ldg));
 	}
 	ASSERT((LD_VALID(ld)) &&	\
-		((vector != VECTOR2) || (ld >= NXGE_MAC_LD_START)));
+	    ((vector != VECTOR2) || (ld >= NXGE_MAC_LD_START)));
 	if (!LD_VALID(ld)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_ldsv_ld_get Invalid Input: "
-				    " ld <9x%x>", ld));
+		    " npi_ldsv_ld_get Invalid Input: "
+		    " ld <9x%x>", ld));
 		return (NPI_FAILURE | NPI_VIR_LD_INVALID(ld));
 	} else if (vector == VECTOR2 && ld < NXGE_MAC_LD_START) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_ldsv_ld_get Invalid Input:"
-				    " ld-vector2 <0x%x>", ld));
+		    " npi_ldsv_ld_get Invalid Input:"
+		    " ld-vector2 <0x%x>", ld));
 		return (NPI_FAILURE | NPI_VIR_LD_INVALID(ld));
 	}
 
@@ -1055,7 +1055,7 @@ npi_ldsv_ld_get(npi_handle_t handle, uint8_t ldg, uint8_t ld,
 
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL, "npi_ldsv_get"
-			"ldsv", vector));
+		    "ldsv", vector));
 		return (NPI_FAILURE | NPI_VIR_LDSV_INVALID(vector));
 	}
 
@@ -1065,10 +1065,10 @@ npi_ldsv_ld_get(npi_handle_t handle, uint8_t ldg, uint8_t ld,
 	} else {
 		if (ldf_type) {
 			*flag_p = (((sv >> LDSV2_LDF1_SHIFT) >>
-				(ld - NXGE_MAC_LD_START)) & LDSV_MASK_ALL);
+			    (ld - NXGE_MAC_LD_START)) & LDSV_MASK_ALL);
 		} else {
 			*flag_p = (((sv >> LDSV2_LDF0_SHIFT) >>
-				(ld - NXGE_MAC_LD_START)) & LDSV_MASK_ALL);
+			    (ld - NXGE_MAC_LD_START)) & LDSV_MASK_ALL);
 		}
 	}
 
@@ -1150,7 +1150,7 @@ npi_intr_mask_set(npi_handle_t handle, uint8_t ld, uint8_t ldf_mask)
 	ASSERT(LD_VALID(ld));
 	if (!LD_VALID(ld)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " npi_intr_mask_set ld", ld));
+		    " npi_intr_mask_set ld", ld));
 		return (NPI_FAILURE | NPI_VIR_LD_INVALID(ld));
 	}
 
@@ -1158,10 +1158,10 @@ npi_intr_mask_set(npi_handle_t handle, uint8_t ld, uint8_t ldf_mask)
 	offset = LDSV_OFFSET_MASK(ld);
 
 	NPI_DEBUG_MSG((handle.function, NPI_VIR_CTL,
-		"npi_intr_mask_set: ld %d "
-		" offset 0x%0llx "
-		" mask 0x%x",
-		ld, offset, ldf_mask));
+	    "npi_intr_mask_set: ld %d "
+	    " offset 0x%0llx "
+	    " mask 0x%x",
+	    ld, offset, ldf_mask));
 
 	NXGE_REG_WR64(handle, offset, (uint64_t)ldf_mask);
 
@@ -1189,7 +1189,7 @@ npi_intr_mask_get(npi_handle_t handle, uint8_t ld, uint8_t *ldf_mask_p)
 	ASSERT(LD_VALID(ld));
 	if (!LD_VALID(ld)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-			    " npi_intr_mask_get ld", ld));
+		    " npi_intr_mask_get ld", ld));
 		return (NPI_FAILURE | NPI_VIR_LD_INVALID(ld));
 	}
 
@@ -1225,15 +1225,15 @@ npi_intr_ldg_mgmt_set(npi_handle_t handle, uint8_t ldg, boolean_t arm,
 	ASSERT((LDG_VALID(ldg)) && (LD_INTTIMER_VALID(timer)));
 	if (!LDG_VALID(ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_intr_ldg_mgmt_set"
-				    " Invalid Input: "
-				    " ldg <0x%x>", ldg));
+		    " npi_intr_ldg_mgmt_set"
+		    " Invalid Input: "
+		    " ldg <0x%x>", ldg));
 		return (NPI_FAILURE | NPI_VIR_LDG_INVALID(ldg));
 	}
 	if (!LD_INTTIMER_VALID(timer)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_intr_ldg_mgmt_set Invalid Input"
-				    " timer <0x%x>", timer));
+		    " npi_intr_ldg_mgmt_set Invalid Input"
+		    " timer <0x%x>", timer));
 		return (NPI_FAILURE | NPI_VIR_INTM_TM_INVALID(ldg));
 	}
 
@@ -1246,12 +1246,12 @@ npi_intr_ldg_mgmt_set(npi_handle_t handle, uint8_t ldg, boolean_t arm,
 
 	mgm.bits.ldw.timer = timer;
 	NXGE_REG_WR64(handle, LDGIMGN_REG + LDSV_OFFSET(ldg),
-		mgm.value);
+	    mgm.value);
 
 	NPI_DEBUG_MSG((handle.function, NPI_VIR_CTL,
-		" npi_intr_ldg_mgmt_set: ldg %d"
-		" reg offset 0x%x",
-		ldg, LDGIMGN_REG + LDSV_OFFSET(ldg)));
+	    " npi_intr_ldg_mgmt_set: ldg %d"
+	    " reg offset 0x%x",
+	    ldg, LDGIMGN_REG + LDSV_OFFSET(ldg)));
 
 	return (NPI_SUCCESS);
 }
@@ -1277,8 +1277,8 @@ npi_intr_ldg_mgmt_timer_get(npi_handle_t handle, uint8_t ldg, uint8_t *timer_p)
 	ASSERT(LDG_VALID(ldg));
 	if (!LDG_VALID(ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_intr_ldg_mgmt_timer_get"
-				    " Invalid Input: ldg <0x%x>", ldg));
+		    " npi_intr_ldg_mgmt_timer_get"
+		    " Invalid Input: ldg <0x%x>", ldg));
 		return (NPI_FAILURE | NPI_VIR_LDG_INVALID(ldg));
 	}
 
@@ -1287,9 +1287,9 @@ npi_intr_ldg_mgmt_timer_get(npi_handle_t handle, uint8_t ldg, uint8_t *timer_p)
 	*timer_p = (uint8_t)(val & LDGIMGM_TIMER_MASK);
 
 	NPI_DEBUG_MSG((handle.function, NPI_VIR_CTL,
-		" npi_intr_ldg_mgmt_timer_get: ldg %d"
-		" reg offset 0x%x",
-		ldg, LDGIMGN_REG + LDSV_OFFSET(ldg)));
+	    " npi_intr_ldg_mgmt_timer_get: ldg %d"
+	    " reg offset 0x%x",
+	    ldg, LDGIMGN_REG + LDSV_OFFSET(ldg)));
 
 	return (NPI_SUCCESS);
 }
@@ -1314,9 +1314,9 @@ npi_intr_ldg_mgmt_arm(npi_handle_t handle, uint8_t ldg)
 	ASSERT(LDG_VALID(ldg));
 	if (!LDG_VALID(ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_intr_ldg_mgmt_arm"
-				    " Invalid Input: ldg <0x%x>",
-				    ldg));
+		    " npi_intr_ldg_mgmt_arm"
+		    " Invalid Input: ldg <0x%x>",
+		    ldg));
 		return (NPI_FAILURE | NPI_VIR_LDG_INVALID(ldg));
 	}
 
@@ -1324,11 +1324,11 @@ npi_intr_ldg_mgmt_arm(npi_handle_t handle, uint8_t ldg)
 	mgm.bits.ldw.arm = 1;
 
 	NXGE_REG_WR64(handle, LDGIMGN_REG + LDSV_OFFSET(ldg),
-			mgm.value);
+	    mgm.value);
 	NPI_DEBUG_MSG((handle.function, NPI_VIR_CTL,
-		" npi_intr_ldg_mgmt_arm: ldg %d"
-		" reg offset 0x%x",
-		ldg, LDGIMGN_REG + LDSV_OFFSET(ldg)));
+	    " npi_intr_ldg_mgmt_arm: ldg %d"
+	    " reg offset 0x%x",
+	    ldg, LDGIMGN_REG + LDSV_OFFSET(ldg)));
 
 	return (NPI_SUCCESS);
 }
@@ -1351,9 +1351,9 @@ npi_fzc_ldg_timer_res_set(npi_handle_t handle, uint32_t res)
 	ASSERT(res <= LDGTITMRES_RES_MASK);
 	if (res > LDGTITMRES_RES_MASK) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_fzc_ldg_timer_res_set"
-				    " Invalid Input: res <0x%x>",
-				    res));
+		    " npi_fzc_ldg_timer_res_set"
+		    " Invalid Input: res <0x%x>",
+		    res));
 		return (NPI_FAILURE | NPI_VIR_TM_RES_INVALID);
 	}
 
@@ -1407,40 +1407,40 @@ npi_fzc_sid_set(npi_handle_t handle, fzc_sid_t sid)
 	ASSERT(LDG_VALID(sid.ldg));
 	if (!LDG_VALID(sid.ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_fzc_sid_set"
-				    " Invalid Input: ldg <0x%x>",
-				    sid.ldg));
+		    " npi_fzc_sid_set"
+		    " Invalid Input: ldg <0x%x>",
+		    sid.ldg));
 		return (NPI_FAILURE | NPI_VIR_LDG_INVALID(sid.ldg));
 	}
 	if (!sid.niu) {
 		ASSERT(FUNC_VALID(sid.func));
 		if (!FUNC_VALID(sid.func)) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_fzc_sid_set"
-					    " Invalid Input: func <0x%x>",
-					    sid.func));
+			    " npi_fzc_sid_set"
+			    " Invalid Input: func <0x%x>",
+			    sid.func));
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				"invalid FUNC: npi_fzc_sid_set(%d)", sid.func));
+			    "invalid FUNC: npi_fzc_sid_set(%d)", sid.func));
 			return (NPI_FAILURE | NPI_VIR_FUNC_INVALID(sid.func));
 		}
 
 		ASSERT(SID_VECTOR_VALID(sid.vector));
 		if (!SID_VECTOR_VALID(sid.vector)) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-					    " npi_fzc_sid_set"
-					    " Invalid Input: vector <0x%x>",
-					    sid.vector));
+			    " npi_fzc_sid_set"
+			    " Invalid Input: vector <0x%x>",
+			    sid.vector));
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " invalid VECTOR: npi_fzc_sid_set(%d)",
-				    sid.vector));
+			    " invalid VECTOR: npi_fzc_sid_set(%d)",
+			    sid.vector));
 			return (NPI_FAILURE |
-				NPI_VIR_SID_VEC_INVALID(sid.vector));
+			    NPI_VIR_SID_VEC_INVALID(sid.vector));
 		}
 	}
 	sd.value = 0;
 	if (!sid.niu) {
 		sd.bits.ldw.data = ((sid.func << SID_DATA_FUNCNUM_SHIFT) |
-				(sid.vector & SID_DATA_INTNUM_MASK));
+		    (sid.vector & SID_DATA_INTNUM_MASK));
 	}
 
 	NPI_DEBUG_MSG((handle.function, NPI_VIR_CTL,
@@ -1472,18 +1472,18 @@ npi_fzc_sid_get(npi_handle_t handle, p_fzc_sid_t sid_p)
 	ASSERT(LDG_VALID(sid_p->ldg));
 	if (!LDG_VALID(sid_p->ldg)) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
-				    " npi_fzc_sid_get"
-				    " Invalid Input: ldg <0x%x>",
-				    sid_p->ldg));
+		    " npi_fzc_sid_get"
+		    " Invalid Input: ldg <0x%x>",
+		    sid_p->ldg));
 		return (NPI_FAILURE | NPI_VIR_LDG_INVALID(sid_p->ldg));
 	}
 	NXGE_REG_RD64(handle, (SID_REG + LDG_SID_OFFSET(sid_p->ldg)),
-		&sd.value);
+	    &sd.value);
 	if (!sid_p->niu) {
 		sid_p->func = ((sd.bits.ldw.data & SID_DATA_FUNCNUM_MASK) >>
-			SID_DATA_FUNCNUM_SHIFT);
+		    SID_DATA_FUNCNUM_SHIFT);
 		sid_p->vector = ((sd.bits.ldw.data & SID_DATA_INTNUM_MASK) >>
-			SID_DATA_INTNUM_SHIFT);
+		    SID_DATA_INTNUM_SHIFT);
 	} else {
 		sid_p->vector = (sd.value & SID_DATA_MASK);
 	}

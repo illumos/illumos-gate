@@ -61,7 +61,7 @@ nxge_txc_init(p_nxge_t nxgep)
 
 	/* Bind DMA channels to this port. */
 	if ((rs = npi_txc_port_dma_enable(handle, port,
-			TXDMA_PORT_BITMAP(nxgep))) != NPI_SUCCESS) {
+	    TXDMA_PORT_BITMAP(nxgep))) != NPI_SUCCESS) {
 		goto fail;
 	}
 
@@ -73,8 +73,8 @@ nxge_txc_init(p_nxge_t nxgep)
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_txc_init: Failed to initialize txc on port %d",
-			port));
+	    "nxge_txc_init: Failed to initialize txc on port %d",
+	    port));
 
 	return (NXGE_ERROR | rs);
 }
@@ -113,8 +113,8 @@ nxge_txc_uninit(p_nxge_t nxgep)
 	return (NXGE_OK);
 fail:
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_txc_init: Failed to initialize txc on port %d",
-			port));
+	    "nxge_txc_init: Failed to initialize txc on port %d",
+	    port));
 
 	return (NXGE_ERROR | rs);
 }
@@ -177,16 +177,16 @@ nxge_txc_tdc_bind(
 	if (bitmap & (1 << channel)) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "nxge_txc_tdc_bind: channel %d already bound on port %d",
-			channel, port));
+		    channel, port));
 	} else {
 		/* Bind the new channel. */
 		bitmap |= (1 << channel);
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_txc_tdc_bind(): bitmap = %lx", bitmap));
+		    "==> nxge_txc_tdc_bind(): bitmap = %lx", bitmap));
 
 		/* Write out the new bitmap. */
 		if ((rs = npi_txc_port_dma_enable(handle, port,
-			(uint32_t)bitmap)) != NPI_SUCCESS) {
+		    (uint32_t)bitmap)) != NPI_SUCCESS) {
 			goto fail;
 		}
 	}
@@ -273,10 +273,10 @@ nxge_txc_tdc_unbind(
 
 	/* Write out the new bitmap. */
 	if ((rs = npi_txc_port_dma_enable(handle, port,
-		(uint32_t)bitmap)) != NPI_SUCCESS) {
+	    (uint32_t)bitmap)) != NPI_SUCCESS) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "npi_txc_port_dma_enable(%d, %d) failed: %x",
-			port, channel, rs));
+		    port, channel, rs));
 	}
 
 	/* Unmask all TXC interrupts on <port> */
@@ -303,7 +303,7 @@ nxge_txc_regs_dump(p_nxge_t nxgep)
 	uint32_t		bitmap = 0;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "\nTXC dump: func # %d:\n",
-		nxgep->function_num));
+	    nxgep->function_num));
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 
@@ -311,24 +311,24 @@ nxge_txc_regs_dump(p_nxge_t nxgep)
 	(void) npi_txc_port_dma_list_get(handle, nxgep->function_num, &bitmap);
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "\n\tTXC port control 0x%0llx",
-		(long long)control.value));
+	    (long long)control.value));
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "\n\tTXC port bitmap 0x%x", bitmap));
 
 	(void) npi_txc_pkt_xmt_to_mac_get(handle, nxgep->function_num,
 	    &cnt1, &cnt2);
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "\n\tTXC bytes to MAC %d "
-		"packets to MAC %d",
-		cnt1, cnt2));
+	    "packets to MAC %d",
+	    cnt1, cnt2));
 
 	(void) npi_txc_pkt_stuffed_get(handle, nxgep->function_num,
-					    &cnt1, &cnt2);
+	    &cnt1, &cnt2);
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"\n\tTXC ass packets %d reorder packets %d",
-		cnt1 & 0xffff, cnt2 & 0xffff));
+	    "\n\tTXC ass packets %d reorder packets %d",
+	    cnt1 & 0xffff, cnt2 & 0xffff));
 
 	(void) npi_txc_reorder_get(handle, nxgep->function_num, &cnt1);
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"\n\tTXC reorder resource %d", cnt1 & 0xff));
+	    "\n\tTXC reorder resource %d", cnt1 & 0xff));
 }
 
 nxge_status_t
@@ -376,8 +376,8 @@ nxge_txc_handle_sys_errors(p_nxge_t nxgep)
 		return (NXGE_ERROR);
 	}
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			    " nxge_txc_handle_sys_errors: errored port %d",
-			    err_portn));
+	    " nxge_txc_handle_sys_errors: errored port %d",
+	    err_portn));
 	if (my_err) {
 		status = nxge_txc_handle_port_errors(nxgep, err_status);
 	}
@@ -402,80 +402,80 @@ nxge_txc_handle_port_errors(p_nxge_t nxgep, uint32_t err_status)
 	istatus.value = 0;
 
 	if ((err_status & TXC_INT_STAT_RO_CORR_ERR) ||
-			(err_status & TXC_INT_STAT_RO_CORR_ERR) ||
-			(err_status & TXC_INT_STAT_RO_UNCORR_ERR) ||
-			(err_status & TXC_INT_STAT_REORDER_ERR)) {
+	    (err_status & TXC_INT_STAT_RO_CORR_ERR) ||
+	    (err_status & TXC_INT_STAT_RO_UNCORR_ERR) ||
+	    (err_status & TXC_INT_STAT_REORDER_ERR)) {
 		if ((rs = npi_txc_ro_states_get(handle, portn,
-				&statsp->errlog.ro_st)) != NPI_SUCCESS) {
+		    &statsp->errlog.ro_st)) != NPI_SUCCESS) {
 			return (NXGE_ERROR | rs);
 		}
 
 		if (err_status & TXC_INT_STAT_RO_CORR_ERR) {
 			statsp->ro_correct_err++;
 			NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_TXC_RO_CORRECT_ERR);
+			    NXGE_FM_EREPORT_TXC_RO_CORRECT_ERR);
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_txc_err_evnts: "
-				"RO FIFO correctable error"));
+			    "nxge_txc_err_evnts: "
+			    "RO FIFO correctable error"));
 		}
 		if (err_status & TXC_INT_STAT_RO_UNCORR_ERR) {
 			statsp->ro_uncorrect_err++;
 			NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_TXC_RO_UNCORRECT_ERR);
+			    NXGE_FM_EREPORT_TXC_RO_UNCORRECT_ERR);
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_txc_err_evnts: "
-				"RO FIFO uncorrectable error"));
+			    "nxge_txc_err_evnts: "
+			    "RO FIFO uncorrectable error"));
 		}
 		if (err_status & TXC_INT_STAT_REORDER_ERR) {
 			statsp->reorder_err++;
 			NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_TXC_REORDER_ERR);
+			    NXGE_FM_EREPORT_TXC_REORDER_ERR);
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_txc_err_evnts: "
-				"fatal error: Reorder error"));
+			    "nxge_txc_err_evnts: "
+			    "fatal error: Reorder error"));
 			txport_fatal = B_TRUE;
 		}
 
 		if ((err_status & TXC_INT_STAT_RO_CORR_ERR) ||
-			(err_status & TXC_INT_STAT_RO_CORR_ERR) ||
-			(err_status & TXC_INT_STAT_RO_UNCORR_ERR)) {
+		    (err_status & TXC_INT_STAT_RO_CORR_ERR) ||
+		    (err_status & TXC_INT_STAT_RO_UNCORR_ERR)) {
 
 			if ((rs = npi_txc_ro_ecc_state_clr(handle, portn))
-							!= NPI_SUCCESS)
+			    != NPI_SUCCESS)
 				return (NXGE_ERROR | rs);
 			/*
 			 * Making sure that error source is cleared if this is
 			 * an injected error.
 			 */
 			TXC_FZC_CNTL_REG_WRITE64(handle, TXC_ROECC_CTL_REG,
-								portn, 0);
+			    portn, 0);
 		}
 	}
 
 	if ((err_status & TXC_INT_STAT_SF_CORR_ERR) ||
-			(err_status & TXC_INT_STAT_SF_UNCORR_ERR)) {
+	    (err_status & TXC_INT_STAT_SF_UNCORR_ERR)) {
 		if ((rs = npi_txc_sf_states_get(handle, portn,
-				&statsp->errlog.sf_st)) != NPI_SUCCESS) {
+		    &statsp->errlog.sf_st)) != NPI_SUCCESS) {
 			return (NXGE_ERROR | rs);
 		}
 		if (err_status & TXC_INT_STAT_SF_CORR_ERR) {
 			statsp->sf_correct_err++;
 			NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_TXC_SF_CORRECT_ERR);
+			    NXGE_FM_EREPORT_TXC_SF_CORRECT_ERR);
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_txc_err_evnts: "
-				"SF FIFO correctable error"));
+			    "nxge_txc_err_evnts: "
+			    "SF FIFO correctable error"));
 		}
 		if (err_status & TXC_INT_STAT_SF_UNCORR_ERR) {
 			statsp->sf_uncorrect_err++;
 			NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
-					NXGE_FM_EREPORT_TXC_SF_UNCORRECT_ERR);
+			    NXGE_FM_EREPORT_TXC_SF_UNCORRECT_ERR);
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_txc_err_evnts: "
-				"SF FIFO uncorrectable error"));
+			    "nxge_txc_err_evnts: "
+			    "SF FIFO uncorrectable error"));
 		}
 		if ((rs = npi_txc_sf_ecc_state_clr(handle, portn))
-							!= NPI_SUCCESS)
+		    != NPI_SUCCESS)
 			return (NXGE_ERROR | rs);
 		/*
 		 * Making sure that error source is cleared if this is
@@ -506,9 +506,9 @@ nxge_txc_handle_port_errors(p_nxge_t nxgep, uint32_t err_status)
 
 	if (txport_fatal) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				" nxge_txc_handle_port_errors:"
-				" fatal Error on Port#%d\n",
-				portn));
+		    " nxge_txc_handle_port_errors:"
+		    " fatal Error on Port#%d\n",
+		    portn));
 		status = nxge_tx_port_fatal_err_recover(nxgep);
 		if (status == NXGE_OK) {
 			FM_SERVICE_RESTORED(nxgep);
@@ -539,13 +539,13 @@ nxge_txc_inject_err(p_nxge_t nxgep, uint32_t err_id)
 			ro_ecc_ctl.bits.ldw.double_bit_err = 1;
 #if defined(__i386)
 		cmn_err(CE_NOTE, "!Write 0x%llx to TXC_ROECC_CTL_REG\n",
-					ro_ecc_ctl.value);
+		    ro_ecc_ctl.value);
 #else
 		cmn_err(CE_NOTE, "!Write 0x%lx to TXC_ROECC_CTL_REG\n",
-					ro_ecc_ctl.value);
+		    ro_ecc_ctl.value);
 #endif
 		TXC_FZC_CNTL_REG_WRITE64(nxgep->npi_handle, TXC_ROECC_CTL_REG,
-					portn, ro_ecc_ctl.value);
+		    portn, ro_ecc_ctl.value);
 		break;
 	case NXGE_FM_EREPORT_TXC_SF_CORRECT_ERR:
 	case NXGE_FM_EREPORT_TXC_SF_UNCORRECT_ERR:
@@ -558,32 +558,32 @@ nxge_txc_inject_err(p_nxge_t nxgep, uint32_t err_id)
 			sf_ecc_ctl.bits.ldw.double_bit_err = 1;
 #if defined(__i386)
 		cmn_err(CE_NOTE, "!Write 0x%llx to TXC_SFECC_CTL_REG\n",
-					sf_ecc_ctl.value);
+		    sf_ecc_ctl.value);
 #else
 		cmn_err(CE_NOTE, "!Write 0x%lx to TXC_SFECC_CTL_REG\n",
-					sf_ecc_ctl.value);
+		    sf_ecc_ctl.value);
 #endif
 		TXC_FZC_CNTL_REG_WRITE64(nxgep->npi_handle, TXC_SFECC_CTL_REG,
-					portn, sf_ecc_ctl.value);
+		    portn, sf_ecc_ctl.value);
 		break;
 	case NXGE_FM_EREPORT_TXC_REORDER_ERR:
 		NXGE_REG_RD64(nxgep->npi_handle, TXC_INT_STAT_DBG_REG,
-					&txcs.value);
+		    &txcs.value);
 		nxge_txc_inject_port_err(portn, &txcs,
-						TXC_INT_STAT_REORDER_ERR);
+		    TXC_INT_STAT_REORDER_ERR);
 #if defined(__i386)
 		cmn_err(CE_NOTE, "!Write 0x%llx to TXC_INT_STAT_DBG_REG\n",
-					txcs.value);
+		    txcs.value);
 #else
 		cmn_err(CE_NOTE, "!Write 0x%lx to TXC_INT_STAT_DBG_REG\n",
-					txcs.value);
+		    txcs.value);
 #endif
 		NXGE_REG_WR64(nxgep->npi_handle, TXC_INT_STAT_DBG_REG,
-					txcs.value);
+		    txcs.value);
 		break;
 	default:
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_txc_inject_err: Unknown err_id"));
+		    "nxge_txc_inject_err: Unknown err_id"));
 	}
 }
 

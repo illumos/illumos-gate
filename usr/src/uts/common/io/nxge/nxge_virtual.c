@@ -188,13 +188,13 @@ nxge_cntlops(dev_info_t *dip, nxge_ctl_enum_t ctlop, void *arg, void *result)
 
 	if (nxge_list == NULL) {
 		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
-				"nxge_cntlops: nxge_list null"));
+		    "nxge_cntlops: nxge_list null"));
 		return (NXGE_ERROR);
 	}
 	nxgep = (p_nxge_t)ddi_get_soft_state(nxge_list, instance);
 	if (nxgep == NULL) {
 		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
-				"nxge_cntlops: nxgep null"));
+		    "nxge_cntlops: nxgep null"));
 		return (NXGE_ERROR);
 	}
 #ifndef NXGE_SHARED_REG_SW_SIM
@@ -213,7 +213,7 @@ nxge_cntlops(dev_info_t *dip, nxge_ctl_enum_t ctlop, void *arg, void *result)
 		status = npi_dev_func_sr_sr_get(handle, &sr16);
 		*(uint16_t *)result = sr16;
 		NXGE_DEBUG_MSG((NULL, VIR_CTL,
-			"nxge_cntlops: NXGE_CTLOPS_GET_SHARED_REG"));
+		    "nxge_cntlops: NXGE_CTLOPS_GET_SHARED_REG"));
 		return (0);
 #endif
 
@@ -230,7 +230,7 @@ nxge_cntlops(dev_info_t *dip, nxge_ctl_enum_t ctlop, void *arg, void *result)
 		status = npi_dev_func_sr_sr_set_only(handle, &sr16);
 		status = npi_dev_func_sr_lock_free(handle);
 		NXGE_DEBUG_MSG((NULL, VIR_CTL,
-			"nxge_cntlops: NXGE_CTLOPS_SET_SHARED_REG"));
+		    "nxge_cntlops: NXGE_CTLOPS_SET_SHARED_REG"));
 		return (0);
 #endif
 
@@ -247,7 +247,7 @@ nxge_cntlops(dev_info_t *dip, nxge_ctl_enum_t ctlop, void *arg, void *result)
 		status = npi_dev_func_sr_sr_set_only(handle, &sr16);
 		status = npi_dev_func_sr_lock_free(handle);
 		NXGE_DEBUG_MSG((NULL, VIR_CTL,
-			"nxge_cntlops: NXGE_CTLOPS_SET_SHARED_REG"));
+		    "nxge_cntlops: NXGE_CTLOPS_SET_SHARED_REG"));
 		return (0);
 #endif
 
@@ -261,7 +261,7 @@ nxge_cntlops(dev_info_t *dip, nxge_ctl_enum_t ctlop, void *arg, void *result)
 		sr16 &= ~cr16;
 		status = npi_dev_func_sr_sr_set_only(handle, &sr16);
 		NXGE_DEBUG_MSG((NULL, VIR_CTL,
-			"nxge_cntlops: NXGE_CTLOPS_SET_SHARED_REG"));
+		    "nxge_cntlops: NXGE_CTLOPS_SET_SHARED_REG"));
 		return (0);
 #endif
 
@@ -279,7 +279,7 @@ nxge_cntlops(dev_info_t *dip, nxge_ctl_enum_t ctlop, void *arg, void *result)
 		status = npi_dev_func_sr_sr_set_only(handle, &sr16);
 		status = npi_dev_func_sr_lock_free(handle);
 		NXGE_DEBUG_MSG((NULL, VIR_CTL,
-			"nxge_cntlops: NXGE_CTLOPS_SET_SHARED_REG"));
+		    "nxge_cntlops: NXGE_CTLOPS_SET_SHARED_REG"));
 		return (0);
 #endif
 
@@ -292,7 +292,7 @@ nxge_cntlops(dev_info_t *dip, nxge_ctl_enum_t ctlop, void *arg, void *result)
 		while (status != NPI_SUCCESS)
 			status = npi_dev_func_sr_lock_enter(handle);
 		NXGE_DEBUG_MSG((NULL, VIR_CTL,
-			"nxge_cntlops: NXGE_CTLOPS_GET_LOCK_BLOCK"));
+		    "nxge_cntlops: NXGE_CTLOPS_GET_LOCK_BLOCK"));
 		return (0);
 #endif
 	case NXGE_CTLOPS_GET_LOCK_TRY:
@@ -302,7 +302,7 @@ nxge_cntlops(dev_info_t *dip, nxge_ctl_enum_t ctlop, void *arg, void *result)
 #else
 		status = npi_dev_func_sr_lock_enter(handle);
 		NXGE_DEBUG_MSG((NULL, VIR_CTL,
-			"nxge_cntlops: NXGE_CTLOPS_GET_LOCK_TRY"));
+		    "nxge_cntlops: NXGE_CTLOPS_GET_LOCK_TRY"));
 		if (status == NPI_SUCCESS)
 			return (NXGE_OK);
 		else
@@ -315,7 +315,7 @@ nxge_cntlops(dev_info_t *dip, nxge_ctl_enum_t ctlop, void *arg, void *result)
 #else
 		status = npi_dev_func_sr_lock_free(handle);
 		NXGE_DEBUG_MSG((NULL, VIR_CTL,
-			"nxge_cntlops: NXGE_CTLOPS_GET_LOCK_FREE"));
+		    "nxge_cntlops: NXGE_CTLOPS_GET_LOCK_FREE"));
 		if (status == NPI_SUCCESS)
 			return (NXGE_OK);
 		else
@@ -364,8 +364,8 @@ nxge_get_niu_property(dev_info_t *dip, niu_type_t *niu_type)
 
 	*niu_type = NIU_TYPE_NONE;
 	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip, 0,
-			"niu-type", (uchar_t **)&prop_val,
-			&prop_len) == DDI_PROP_SUCCESS) {
+	    "niu-type", (uchar_t **)&prop_val,
+	    &prop_len) == DDI_PROP_SUCCESS) {
 		if (strncmp("niu", (caddr_t)prop_val, (size_t)prop_len) == 0) {
 			*niu_type = N2_NIU;
 		}
@@ -414,9 +414,9 @@ nxge_update_rxdma_grp_properties(p_nxge_t nxgep, config_token_t token,
 		cfg_prop = "fair";
 		for (port = 0; port < num_ports; port++) {
 			custom_num_grp[port] =
-				(num_ports == 4) ?
-				p4_rdcgrp_fair[port] :
-				p2_rdcgrp_fair[port];
+			    (num_ports == 4) ?
+			    p4_rdcgrp_fair[port] :
+			    p2_rdcgrp_fair[port];
 			custom_start_grp[port] = start_grp;
 			start_grp += custom_num_grp[port];
 		}
@@ -426,9 +426,9 @@ nxge_update_rxdma_grp_properties(p_nxge_t nxgep, config_token_t token,
 		cfg_prop = "equal";
 		for (port = 0; port < num_ports; port++) {
 			custom_num_grp[port] =
-				(num_ports == 4) ?
-				p4_rdcgrp_equal[port] :
-				p2_rdcgrp_equal[port];
+			    (num_ports == 4) ?
+			    p4_rdcgrp_equal[port] :
+			    p2_rdcgrp_equal[port];
 			custom_start_grp[port] = start_grp;
 			start_grp += custom_num_grp[port];
 		}
@@ -439,7 +439,7 @@ nxge_update_rxdma_grp_properties(p_nxge_t nxgep, config_token_t token,
 		cfg_prop = "classify";
 		for (port = 0; port < num_ports; port++) {
 			custom_num_grp[port] = (num_ports == 4) ?
-				p4_rdcgrp_cls[port] : p2_rdcgrp_cls[port];
+			    p4_rdcgrp_cls[port] : p2_rdcgrp_cls[port];
 			custom_start_grp[port] = start_grp;
 			start_grp += custom_num_grp[port];
 		}
@@ -451,26 +451,26 @@ nxge_update_rxdma_grp_properties(p_nxge_t nxgep, config_token_t token,
 		num_grps = 0;
 		for (port = 0; port < num_ports; port++) {
 			custom_start_grp[port] =
-				ddi_prop_get_int(DDI_DEV_T_NONE, s_dip[port],
-				DDI_PROP_DONTPASS, start_prop, -1);
+			    ddi_prop_get_int(DDI_DEV_T_NONE, s_dip[port],
+			    DDI_PROP_DONTPASS, start_prop, -1);
 			if ((custom_start_grp[port] == -1) ||
-				(custom_start_grp[port] >=
-					NXGE_MAX_RDC_GRPS)) {
+			    (custom_start_grp[port] >=
+			    NXGE_MAX_RDC_GRPS)) {
 				bad_config = B_TRUE;
 				break;
 			}
 			custom_num_grp[port] = ddi_prop_get_int(
-				DDI_DEV_T_NONE,
-				s_dip[port],
-				DDI_PROP_DONTPASS,
-				num_prop, -1);
+			    DDI_DEV_T_NONE,
+			    s_dip[port],
+			    DDI_PROP_DONTPASS,
+			    num_prop, -1);
 
 			if ((custom_num_grp[port] == -1) ||
-				(custom_num_grp[port] >
-					NXGE_MAX_RDC_GRPS) ||
-				((custom_num_grp[port] +
-						custom_start_grp[port]) >=
-					NXGE_MAX_RDC_GRPS)) {
+			    (custom_num_grp[port] >
+			    NXGE_MAX_RDC_GRPS) ||
+			    ((custom_num_grp[port] +
+			    custom_start_grp[port]) >=
+			    NXGE_MAX_RDC_GRPS)) {
 				bad_config = B_TRUE;
 				break;
 			}
@@ -481,10 +481,10 @@ nxge_update_rxdma_grp_properties(p_nxge_t nxgep, config_token_t token,
 			}
 			grp_bitmap[port] = 0;
 			for (bits = 0;
-				bits < custom_num_grp[port];
-				bits++) {
+			    bits < custom_num_grp[port];
+			    bits++) {
 				grp_bitmap[port] |=
-					(1 << (bits + custom_start_grp[port]));
+				    (1 << (bits + custom_start_grp[port]));
 			}
 
 		}
@@ -494,7 +494,7 @@ nxge_update_rxdma_grp_properties(p_nxge_t nxgep, config_token_t token,
 			for (port = 0; port < num_ports - 1; port++) {
 				for (j = port + 1; j < num_ports; j++) {
 					if (grp_bitmap[port] &
-						grp_bitmap[j]) {
+					    grp_bitmap[j]) {
 						bad_config = B_TRUE;
 						break;
 					}
@@ -507,8 +507,8 @@ nxge_update_rxdma_grp_properties(p_nxge_t nxgep, config_token_t token,
 			/* use default config */
 			for (port = 0; port < num_ports; port++) {
 				custom_num_grp[port] =
-					(num_ports == 4) ?
-					p4_rx_fair[port] : p2_rx_fair[port];
+				    (num_ports == 4) ?
+				    p4_rx_fair[port] : p2_rx_fair[port];
 				custom_start_grp[port] = start_grp;
 				start_grp += custom_num_grp[port];
 			}
@@ -520,7 +520,7 @@ nxge_update_rxdma_grp_properties(p_nxge_t nxgep, config_token_t token,
 		cfg_prop = "fair";
 		for (port = 0; port < num_ports; port++) {
 			custom_num_grp[port] = (num_ports == 4) ?
-				p4_rx_fair[port] : p2_rx_fair[port];
+			    p4_rx_fair[port] : p2_rx_fair[port];
 			custom_start_grp[port] = start_grp;
 			start_grp += custom_num_grp[port];
 		}
@@ -530,29 +530,29 @@ nxge_update_rxdma_grp_properties(p_nxge_t nxgep, config_token_t token,
 	/* Now Update the rx properties */
 	for (port = 0; port < num_ports; port++) {
 		ddi_status = ddi_prop_update_string(DDI_DEV_T_NONE, s_dip[port],
-			"rxdma-grp-cfg", cfg_prop);
+		    "rxdma-grp-cfg", cfg_prop);
 		if (ddi_status != DDI_PROP_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-					" property %s not updating",
-					cfg_prop));
+			    " property %s not updating",
+			    cfg_prop));
 			status |= NXGE_DDI_FAILED;
 		}
 		ddi_status = ddi_prop_update_int(DDI_DEV_T_NONE, s_dip[port],
-			num_prop, custom_num_grp[port]);
+		    num_prop, custom_num_grp[port]);
 
 		if (ddi_status != DDI_PROP_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-					" property %s not updating",
-					num_prop));
+			    " property %s not updating",
+			    num_prop));
 			status |= NXGE_DDI_FAILED;
 		}
 		ddi_status = ddi_prop_update_int(DDI_DEV_T_NONE, s_dip[port],
-			start_prop, custom_start_grp[port]);
+		    start_prop, custom_start_grp[port]);
 
 		if (ddi_status != DDI_PROP_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-					" property %s not updating",
-					start_prop));
+			    " property %s not updating",
+			    start_prop));
 			status |= NXGE_DDI_FAILED;
 		}
 	}
@@ -590,7 +590,7 @@ nxge_update_rxdma_properties(p_nxge_t nxgep, config_token_t token,
 		cfg_prop = "fair";
 		for (port = 0; port < num_ports; port++) {
 			custom_num_rdc[port] = (num_ports == 4) ?
-				p4_rx_fair[port] : p2_rx_fair[port];
+			    p4_rx_fair[port] : p2_rx_fair[port];
 			custom_start_rdc[port] = start_rdc;
 			start_rdc += custom_num_rdc[port];
 		}
@@ -600,8 +600,8 @@ nxge_update_rxdma_properties(p_nxge_t nxgep, config_token_t token,
 		cfg_prop = "equal";
 		for (port = 0; port < num_ports; port++) {
 			custom_num_rdc[port] = (num_ports == 4) ?
-				p4_rx_equal[port] :
-				p2_rx_equal[port];
+			    p4_rx_equal[port] :
+			    p2_rx_equal[port];
 			custom_start_rdc[port] = start_rdc;
 			start_rdc += custom_num_rdc[port];
 		}
@@ -613,63 +613,63 @@ nxge_update_rxdma_properties(p_nxge_t nxgep, config_token_t token,
 		num_rdc = 0;
 		for (port = 0; port < num_ports; port++) {
 			ddi_status = ddi_prop_lookup_int_array(
-				DDI_DEV_T_ANY,
-				s_dip[port], 0,
-				start_rdc_prop,
-				&prop_val,
-				&prop_len);
+			    DDI_DEV_T_ANY,
+			    s_dip[port], 0,
+			    start_rdc_prop,
+			    &prop_val,
+			    &prop_len);
 			if (ddi_status == DDI_SUCCESS)
 				custom_start_rdc[port] = *prop_val;
 			else {
 				NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-						" %s custom start port %d"
-						" read failed ",
-						" rxdma-cfg", port));
+				    " %s custom start port %d"
+				    " read failed ",
+				    " rxdma-cfg", port));
 				bad_config = B_TRUE;
 				status |= NXGE_DDI_FAILED;
 			}
 			if ((custom_start_rdc[port] == -1) ||
-				(custom_start_rdc[port] >=
-					NXGE_MAX_RDCS)) {
+			    (custom_start_rdc[port] >=
+			    NXGE_MAX_RDCS)) {
 				NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-						" %s custom start %d"
-						" out of range %x ",
-						" rxdma-cfg",
-						port,
-						custom_start_rdc[port]));
+				    " %s custom start %d"
+				    " out of range %x ",
+				    " rxdma-cfg",
+				    port,
+				    custom_start_rdc[port]));
 				bad_config = B_TRUE;
 				break;
 			}
 			ddi_status = ddi_prop_lookup_int_array(
-				DDI_DEV_T_ANY,
-				s_dip[port],
-				0,
-				num_rdc_prop,
-				&prop_val,
-				&prop_len);
+			    DDI_DEV_T_ANY,
+			    s_dip[port],
+			    0,
+			    num_rdc_prop,
+			    &prop_val,
+			    &prop_len);
 
 			if (ddi_status == DDI_SUCCESS)
 				custom_num_rdc[port] = *prop_val;
 			else {
 				NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-					" %s custom num port %d"
-					" read failed ",
-					"rxdma-cfg", port));
+				    " %s custom num port %d"
+				    " read failed ",
+				    "rxdma-cfg", port));
 				bad_config = B_TRUE;
 				status |= NXGE_DDI_FAILED;
 			}
 
 			if ((custom_num_rdc[port] == -1) ||
-					(custom_num_rdc[port] >
-						NXGE_MAX_RDCS) ||
-					((custom_num_rdc[port] +
-						custom_start_rdc[port]) >
-					NXGE_MAX_RDCS)) {
+			    (custom_num_rdc[port] >
+			    NXGE_MAX_RDCS) ||
+			    ((custom_num_rdc[port] +
+			    custom_start_rdc[port]) >
+			    NXGE_MAX_RDCS)) {
 				NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-					" %s custom num %d"
-					" out of range %x ",
-					" rxdma-cfg",
-					port, custom_num_rdc[port]));
+				    " %s custom num %d"
+				    " out of range %x ",
+				    " rxdma-cfg",
+				    port, custom_num_rdc[port]));
 				bad_config = B_TRUE;
 				break;
 			}
@@ -680,9 +680,9 @@ nxge_update_rxdma_properties(p_nxge_t nxgep, config_token_t token,
 			}
 			rdc_bitmap[port] = 0;
 			for (bits = 0;
-				bits < custom_num_rdc[port]; bits++) {
+			    bits < custom_num_rdc[port]; bits++) {
 				rdc_bitmap[port] |=
-					(1 << (bits + custom_start_rdc[port]));
+				    (1 << (bits + custom_start_rdc[port]));
 			}
 		}
 
@@ -691,14 +691,14 @@ nxge_update_rxdma_properties(p_nxge_t nxgep, config_token_t token,
 			for (port = 0; port < num_ports - 1; port++) {
 				for (j = port + 1; j < num_ports; j++) {
 					if (rdc_bitmap[port] &
-						rdc_bitmap[j]) {
+					    rdc_bitmap[j]) {
 						NXGE_DEBUG_MSG((nxgep,
-							CFG_CTL,
-							" rxdma-cfg"
-							" property custom"
-							" bit overlap"
-							" %d %d ",
-							port, j));
+						    CFG_CTL,
+						    " rxdma-cfg"
+						    " property custom"
+						    " bit overlap"
+						    " %d %d ",
+						    port, j));
 						bad_config = B_TRUE;
 						break;
 					}
@@ -710,14 +710,14 @@ nxge_update_rxdma_properties(p_nxge_t nxgep, config_token_t token,
 		if (bad_config == B_TRUE) {
 			/* use default config */
 			NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-				" rxdma-cfg property:"
-				" bad custom config:"
-				" use default"));
+			    " rxdma-cfg property:"
+			    " bad custom config:"
+			    " use default"));
 			for (port = 0; port < num_ports; port++) {
 				custom_num_rdc[port] =
-					(num_ports == 4) ?
-					p4_rx_fair[port] :
-					p2_rx_fair[port];
+				    (num_ports == 4) ?
+				    p4_rx_fair[port] :
+				    p2_rx_fair[port];
 				custom_start_rdc[port] = start_rdc;
 				start_rdc += custom_num_rdc[port];
 			}
@@ -729,7 +729,7 @@ nxge_update_rxdma_properties(p_nxge_t nxgep, config_token_t token,
 		cfg_prop = "fair";
 		for (port = 0; port < num_ports; port++) {
 			custom_num_rdc[port] = (num_ports == 4) ?
-				p4_rx_fair[port] : p2_rx_fair[port];
+			    p4_rx_fair[port] : p2_rx_fair[port];
 			custom_start_rdc[port] = start_rdc;
 			start_rdc += custom_num_rdc[port];
 		}
@@ -739,36 +739,36 @@ nxge_update_rxdma_properties(p_nxge_t nxgep, config_token_t token,
 	/* Now Update the rx properties */
 	for (port = 0; port < num_ports; port++) {
 		NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-			" update property rxdma-cfg with %s ", cfg_prop));
+		    " update property rxdma-cfg with %s ", cfg_prop));
 		ddi_status = ddi_prop_update_string(DDI_DEV_T_NONE, s_dip[port],
-			"rxdma-cfg", cfg_prop);
+		    "rxdma-cfg", cfg_prop);
 		if (ddi_status != DDI_PROP_SUCCESS) {
 			NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-				" property rxdma-cfg is not updating to %s",
-				cfg_prop));
+			    " property rxdma-cfg is not updating to %s",
+			    cfg_prop));
 			status |= NXGE_DDI_FAILED;
 		}
 		NXGE_DEBUG_MSG((nxgep, CFG_CTL, " update property %s with %d ",
-			num_rdc_prop, custom_num_rdc[port]));
+		    num_rdc_prop, custom_num_rdc[port]));
 
 		ddi_status = ddi_prop_update_int(DDI_DEV_T_NONE, s_dip[port],
-			num_rdc_prop, custom_num_rdc[port]);
+		    num_rdc_prop, custom_num_rdc[port]);
 
 		if (ddi_status != DDI_PROP_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				" property %s not updating with %d",
-				num_rdc_prop, custom_num_rdc[port]));
+			    " property %s not updating with %d",
+			    num_rdc_prop, custom_num_rdc[port]));
 			status |= NXGE_DDI_FAILED;
 		}
 		NXGE_DEBUG_MSG((nxgep, CFG_CTL, " update property %s with %d ",
-			start_rdc_prop, custom_start_rdc[port]));
+		    start_rdc_prop, custom_start_rdc[port]));
 		ddi_status = ddi_prop_update_int(DDI_DEV_T_NONE, s_dip[port],
-			start_rdc_prop, custom_start_rdc[port]);
+		    start_rdc_prop, custom_start_rdc[port]);
 
 		if (ddi_status != DDI_PROP_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				" property %s not updating with %d ",
-				start_rdc_prop, custom_start_rdc[port]));
+			    " property %s not updating with %d ",
+			    start_rdc_prop, custom_start_rdc[port]));
 			status |= NXGE_DDI_FAILED;
 		}
 	}
@@ -805,7 +805,7 @@ nxge_update_txdma_properties(p_nxge_t nxgep, config_token_t token,
 		cfg_prop = "fair";
 		for (port = 0; port < num_ports; port++) {
 			custom_num_tdc[port] = (num_ports == 4) ?
-				p4_tx_fair[port] : p2_tx_fair[port];
+			    p4_tx_fair[port] : p2_tx_fair[port];
 			custom_start_tdc[port] = start_tdc;
 			start_tdc += custom_num_tdc[port];
 		}
@@ -815,7 +815,7 @@ nxge_update_txdma_properties(p_nxge_t nxgep, config_token_t token,
 		cfg_prop = "equal";
 		for (port = 0; port < num_ports; port++) {
 			custom_num_tdc[port] = (num_ports == 4) ?
-				p4_tx_equal[port] : p2_tx_equal[port];
+			    p4_tx_equal[port] : p2_tx_equal[port];
 			custom_start_tdc[port] = start_tdc;
 			start_tdc += custom_num_tdc[port];
 		}
@@ -827,52 +827,52 @@ nxge_update_txdma_properties(p_nxge_t nxgep, config_token_t token,
 		num_tdc = 0;
 		for (port = 0; port < num_ports; port++) {
 			ddi_status = ddi_prop_lookup_int_array(
-				DDI_DEV_T_ANY, s_dip[port], 0, start_tdc_prop,
-				&prop_val, &prop_len);
+			    DDI_DEV_T_ANY, s_dip[port], 0, start_tdc_prop,
+			    &prop_val, &prop_len);
 			if (ddi_status == DDI_SUCCESS)
 				custom_start_tdc[port] = *prop_val;
 			else {
 				NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-					" %s custom start port %d"
-					" read failed ", " txdma-cfg", port));
+				    " %s custom start port %d"
+				    " read failed ", " txdma-cfg", port));
 				bad_config = B_TRUE;
 				status |= NXGE_DDI_FAILED;
 			}
 
 			if ((custom_start_tdc[port] == -1) ||
-					(custom_start_tdc[port] >=
-					NXGE_MAX_RDCS)) {
+			    (custom_start_tdc[port] >=
+			    NXGE_MAX_RDCS)) {
 				NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-					" %s custom start %d"
-					" out of range %x ", " txdma-cfg",
-					port, custom_start_tdc[port]));
+				    " %s custom start %d"
+				    " out of range %x ", " txdma-cfg",
+				    port, custom_start_tdc[port]));
 				bad_config = B_TRUE;
 				break;
 			}
 
 			ddi_status = ddi_prop_lookup_int_array(
-				DDI_DEV_T_ANY, s_dip[port], 0, num_tdc_prop,
-				&prop_val, &prop_len);
+			    DDI_DEV_T_ANY, s_dip[port], 0, num_tdc_prop,
+			    &prop_val, &prop_len);
 			if (ddi_status == DDI_SUCCESS)
 				custom_num_tdc[port] = *prop_val;
 			else {
 				NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-					" %s custom num port %d"
-					" read failed ", " txdma-cfg", port));
+				    " %s custom num port %d"
+				    " read failed ", " txdma-cfg", port));
 				bad_config = B_TRUE;
 				status |= NXGE_DDI_FAILED;
 			}
 
 			if ((custom_num_tdc[port] == -1) ||
-					(custom_num_tdc[port] >
-						NXGE_MAX_TDCS) ||
-					((custom_num_tdc[port] +
-						custom_start_tdc[port]) >
-					NXGE_MAX_TDCS)) {
+			    (custom_num_tdc[port] >
+			    NXGE_MAX_TDCS) ||
+			    ((custom_num_tdc[port] +
+			    custom_start_tdc[port]) >
+			    NXGE_MAX_TDCS)) {
 				NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-					" %s custom num %d"
-					" out of range %x ", " rxdma-cfg",
-					port, custom_num_tdc[port]));
+				    " %s custom num %d"
+				    " out of range %x ", " rxdma-cfg",
+				    port, custom_num_tdc[port]));
 				bad_config = B_TRUE;
 				break;
 			}
@@ -883,10 +883,10 @@ nxge_update_txdma_properties(p_nxge_t nxgep, config_token_t token,
 			}
 			tdc_bitmap[port] = 0;
 			for (bits = 0;
-				bits < custom_num_tdc[port]; bits++) {
+			    bits < custom_num_tdc[port]; bits++) {
 				tdc_bitmap[port] |=
-					(1 <<
-					(bits + custom_start_tdc[port]));
+				    (1 <<
+				    (bits + custom_start_tdc[port]));
 			}
 
 		}
@@ -896,13 +896,13 @@ nxge_update_txdma_properties(p_nxge_t nxgep, config_token_t token,
 			for (port = 0; port < num_ports - 1; port++) {
 				for (j = port + 1; j < num_ports; j++) {
 					if (tdc_bitmap[port] &
-						tdc_bitmap[j]) {
+					    tdc_bitmap[j]) {
 						NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-							" rxdma-cfg"
-							" property custom"
-							" bit overlap"
-							" %d %d ",
-							port, j));
+						    " rxdma-cfg"
+						    " property custom"
+						    " bit overlap"
+						    " %d %d ",
+						    port, j));
 						bad_config = B_TRUE;
 						break;
 					}
@@ -914,12 +914,12 @@ nxge_update_txdma_properties(p_nxge_t nxgep, config_token_t token,
 		if (bad_config == B_TRUE) {
 			/* use default config */
 			NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-				" txdma-cfg property:"
-				" bad custom config:" " use default"));
+			    " txdma-cfg property:"
+			    " bad custom config:" " use default"));
 
 			for (port = 0; port < num_ports; port++) {
 				custom_num_tdc[port] = (num_ports == 4) ?
-					p4_tx_fair[port] : p2_tx_fair[port];
+				    p4_tx_fair[port] : p2_tx_fair[port];
 				custom_start_tdc[port] = start_tdc;
 				start_tdc += custom_num_tdc[port];
 			}
@@ -931,7 +931,7 @@ nxge_update_txdma_properties(p_nxge_t nxgep, config_token_t token,
 		cfg_prop = "fair";
 		for (port = 0; port < num_ports; port++) {
 			custom_num_tdc[port] = (num_ports == 4) ?
-				p4_tx_fair[port] : p2_tx_fair[port];
+			    p4_tx_fair[port] : p2_tx_fair[port];
 			custom_start_tdc[port] = start_tdc;
 			start_tdc += custom_num_tdc[port];
 		}
@@ -941,38 +941,38 @@ nxge_update_txdma_properties(p_nxge_t nxgep, config_token_t token,
 	/* Now Update the tx properties */
 	for (port = 0; port < num_ports; port++) {
 		NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-			" update property txdma-cfg with %s ", cfg_prop));
+		    " update property txdma-cfg with %s ", cfg_prop));
 		ddi_status = ddi_prop_update_string(DDI_DEV_T_NONE, s_dip[port],
-			"txdma-cfg", cfg_prop);
+		    "txdma-cfg", cfg_prop);
 		if (ddi_status != DDI_PROP_SUCCESS) {
 			NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-				" property txdma-cfg is not updating to %s",
-				cfg_prop));
+			    " property txdma-cfg is not updating to %s",
+			    cfg_prop));
 			status |= NXGE_DDI_FAILED;
 		}
 		NXGE_DEBUG_MSG((nxgep, CFG_CTL, " update property %s with %d ",
-			num_tdc_prop, custom_num_tdc[port]));
+		    num_tdc_prop, custom_num_tdc[port]));
 
 		ddi_status = ddi_prop_update_int(DDI_DEV_T_NONE, s_dip[port],
-			num_tdc_prop, custom_num_tdc[port]);
+		    num_tdc_prop, custom_num_tdc[port]);
 
 		if (ddi_status != DDI_PROP_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				" property %s not updating with %d",
-				num_tdc_prop,
-				custom_num_tdc[port]));
+			    " property %s not updating with %d",
+			    num_tdc_prop,
+			    custom_num_tdc[port]));
 			status |= NXGE_DDI_FAILED;
 		}
 
 		NXGE_DEBUG_MSG((nxgep, CFG_CTL, " update property %s with %d ",
-			start_tdc_prop, custom_start_tdc[port]));
+		    start_tdc_prop, custom_start_tdc[port]));
 
 		ddi_status = ddi_prop_update_int(DDI_DEV_T_NONE, s_dip[port],
-			start_tdc_prop, custom_start_tdc[port]);
+		    start_tdc_prop, custom_start_tdc[port]);
 		if (ddi_status != DDI_PROP_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				" property %s not updating with %d ",
-				start_tdc_prop, custom_start_tdc[port]));
+			    " property %s not updating with %d ",
+			    start_tdc_prop, custom_start_tdc[port]));
 			status |= NXGE_DDI_FAILED;
 		}
 	}
@@ -991,17 +991,17 @@ nxge_update_cfg_properties(p_nxge_t nxgep, uint32_t flags,
 	case COMMON_TXDMA_CFG:
 		if (nxge_dma_obp_props_only == 0)
 			status = nxge_update_txdma_properties(nxgep,
-				token, s_dip);
+			    token, s_dip);
 		break;
 	case COMMON_RXDMA_CFG:
 		if (nxge_dma_obp_props_only == 0)
 			status = nxge_update_rxdma_properties(nxgep,
-				token, s_dip);
+			    token, s_dip);
 
 		break;
 	case COMMON_RXDMA_GRP_CFG:
 		status = nxge_update_rxdma_grp_properties(nxgep,
-			token, s_dip);
+		    token, s_dip);
 		break;
 	default:
 		return (NXGE_ERROR);
@@ -1044,11 +1044,11 @@ nxge_cfg_verify_set_classify_prop(p_nxge_t nxgep, char *prop,
 		new_value = known_cfg_value;
 		for (i = 0; i < nxgep->nports; i++) {
 			ddi_status = ddi_prop_update_int(DDI_DEV_T_NONE,
-				c_dip[i], prop, new_value);
+			    c_dip[i], prop, new_value);
 #ifdef NXGE_DEBUG_ERROR
 			if (ddi_status != DDI_PROP_SUCCESS)
 				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-					" property %s failed update ", prop));
+				    " property %s failed update ", prop));
 #endif
 		}
 		if (ddi_status != DDI_PROP_SUCCESS)
@@ -1057,8 +1057,8 @@ nxge_cfg_verify_set_classify_prop(p_nxge_t nxgep, char *prop,
 	for (i = 0; i < nxgep->nports; i++) {
 		cfg_value[i] = known_cfg_value;
 		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, c_dip[i], 0,
-				prop, &cfg_val,
-				&prop_len) == DDI_PROP_SUCCESS) {
+		    prop, &cfg_val,
+		    &prop_len) == DDI_PROP_SUCCESS) {
 			cfg_value[i] = *cfg_val;
 			ddi_prop_free(cfg_val);
 			found++;
@@ -1067,18 +1067,18 @@ nxge_cfg_verify_set_classify_prop(p_nxge_t nxgep, char *prop,
 
 	if (found != i) {
 		NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-			" property %s not specified on all ports", prop));
+		    " property %s not specified on all ports", prop));
 		if (found == 0) {
 			/* not specified: Use default */
 			NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-				" property %s not specified on any port:"
-				" Using default", prop));
+			    " property %s not specified on any port:"
+			    " Using default", prop));
 			new_value = known_cfg_value;
 		} else {
 			/* specified on some */
 			NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-				" property %s not specified"
-				" on some ports: Using default", prop));
+			    " property %s not specified"
+			    " on some ports: Using default", prop));
 			/* ? use p0 value instead ? */
 			new_value = known_cfg_value;
 		}
@@ -1088,8 +1088,8 @@ nxge_cfg_verify_set_classify_prop(p_nxge_t nxgep, char *prop,
 		for (i = 1; i < found; i++) {
 			if (cfg_value[i] != cfg_value[i - 1]) {
 				NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-					" property %s inconsistent:"
-					" Using default", prop));
+				    " property %s inconsistent:"
+				    " Using default", prop));
 				new_value = known_cfg_value;
 				break;
 			}
@@ -1104,13 +1104,13 @@ nxge_cfg_verify_set_classify_prop(p_nxge_t nxgep, char *prop,
 	if (update_prop == B_TRUE) {
 		for (i = 0; i < nxgep->nports; i++) {
 			ddi_status = ddi_prop_update_int(DDI_DEV_T_NONE,
-				c_dip[i], prop, new_value);
+			    c_dip[i], prop, new_value);
 #ifdef NXGE_DEBUG_ERROR
 			if (ddi_status != DDI_SUCCESS)
 				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-					" property %s not updating with %d"
-					" Using default",
-					prop, new_value));
+				    " property %s not updating with %d"
+				    " Using default",
+				    prop, new_value));
 #endif
 			if (ddi_status != DDI_PROP_SUCCESS)
 				status |= NXGE_DDI_FAILED;
@@ -1138,7 +1138,7 @@ nxge_class_get_known_cfg(p_nxge_t nxgep, int class_prop, int rx_quick_cfg)
 	case CFG_L3_WEB:
 	case CFG_L3_DISTRIBUTE:
 		cfg_value = nxge_classify_get_cfg_value(nxgep,
-			rx_quick_cfg, class_prop - start_prop);
+		    rx_quick_cfg, class_prop - start_prop);
 		break;
 	default:
 		cfg_value = param_arr[class_prop].value;
@@ -1178,9 +1178,9 @@ nxge_cfg_verify_set_classify(p_nxge_t nxgep, dev_info_t *c_dip[])
 	for (class_prop = start_prop; class_prop <= end_prop; class_prop++) {
 		prop_name = param_arr[class_prop].fcode_name;
 		cfg_value = nxge_class_get_known_cfg(nxgep,
-			class_prop, rx_quick_cfg);
+		    class_prop, rx_quick_cfg);
 		status = nxge_cfg_verify_set_classify_prop(nxgep, prop_name,
-			cfg_value, override, c_dip);
+		    cfg_value, override, c_dip);
 	}
 
 	/*
@@ -1192,11 +1192,11 @@ nxge_cfg_verify_set_classify(p_nxge_t nxgep, dev_info_t *c_dip[])
 	 */
 	override = B_FALSE;
 	for (class_prop = param_fcram_access_ratio;
-			class_prop <= param_llc_snap_enable; class_prop++) {
+	    class_prop <= param_llc_snap_enable; class_prop++) {
 		prop_name = param_arr[class_prop].fcode_name;
 		cfg_value = param_arr[class_prop].value;
 		status = nxge_cfg_verify_set_classify_prop(nxgep, prop_name,
-			cfg_value, override, c_dip);
+		    cfg_value, override, c_dip);
 	}
 
 	return (status);
@@ -1220,7 +1220,7 @@ nxge_cfg_verify_set(p_nxge_t nxgep, uint32_t flag)
 	c_dip[num_siblings] = ddi_get_child(nxgep->p_dip);
 	while (c_dip[num_siblings]) {
 		c_dip[num_siblings + 1] =
-			ddi_get_next_sibling(c_dip[num_siblings]);
+		    ddi_get_next_sibling(c_dip[num_siblings]);
 		num_siblings++;
 	}
 
@@ -1244,7 +1244,7 @@ nxge_cfg_verify_set(p_nxge_t nxgep, uint32_t flag)
 	i = 0;
 	while (i < num_siblings) {
 		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, c_dip[i], 0, prop,
-				(char **)&prop_val[i]) == DDI_PROP_SUCCESS) {
+		    (char **)&prop_val[i]) == DDI_PROP_SUCCESS) {
 			c_token[i] = nxge_get_config_token(prop_val[i]);
 			ddi_prop_free(prop_val[i]);
 			found++;
@@ -1257,11 +1257,11 @@ nxge_cfg_verify_set(p_nxge_t nxgep, uint32_t flag)
 		if (found == 0) {
 			/* not specified: Use default */
 			NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-				" property %s not specified on any port:"
-					" Using default", prop));
+			    " property %s not specified on any port:"
+			    " Using default", prop));
 
 			status = nxge_update_cfg_properties(nxgep,
-				flag, FAIR, c_dip);
+			    flag, FAIR, c_dip);
 			return (status);
 		} else {
 			/*
@@ -1272,10 +1272,10 @@ nxge_cfg_verify_set(p_nxge_t nxgep, uint32_t flag)
 			 */
 			/* not specified: Use default */
 			NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-				" property %s not specified on some ports:"
-				" Using default", prop));
+			    " property %s not specified on some ports:"
+			    " Using default", prop));
 			status = nxge_update_cfg_properties(nxgep,
-				flag, FAIR, c_dip);
+			    flag, FAIR, c_dip);
 			return (status);
 		}
 	}
@@ -1285,10 +1285,10 @@ nxge_cfg_verify_set(p_nxge_t nxgep, uint32_t flag)
 	for (i = 1; i < found; i++) {
 		if (c_token[i] != c_token[i - 1]) {
 			NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-				" property %s inconsistent:"
-				" Using default", prop));
+			    " property %s inconsistent:"
+			    " Using default", prop));
 			status = nxge_update_cfg_properties(nxgep,
-				flag, FAIR, c_dip);
+			    flag, FAIR, c_dip);
 			return (status);
 		}
 	}
@@ -1325,28 +1325,28 @@ nxge_cfg_verify_set_quick_config(p_nxge_t nxgep)
 	 * "web-server" "generic-server" "l3-classify" "flow-classify"
 	 */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, nxgep->dip, 0,
-			prop, (char **)&prop_val) != DDI_PROP_SUCCESS) {
+	    prop, (char **)&prop_val) != DDI_PROP_SUCCESS) {
 		NXGE_DEBUG_MSG((nxgep, VPD_CTL,
-			" property %s not specified: using default ", prop));
+		    " property %s not specified: using default ", prop));
 		cfg_value = CFG_NOT_SPECIFIED;
 	} else {
 		cfg_value = CFG_L3_DISTRIBUTE;
 		if (strncmp("web-server", (caddr_t)prop_val, 8) == 0) {
 			cfg_value = CFG_L3_WEB;
 			NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-				" %s: web server ", prop));
+			    " %s: web server ", prop));
 		}
 		if (strncmp("generic-server", (caddr_t)prop_val, 8) == 0) {
 			cfg_value = CFG_L3_DISTRIBUTE;
 			NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-				" %s: distribute ", prop));
+			    " %s: distribute ", prop));
 		}
 		/* more */
 		ddi_prop_free(prop_val);
 	}
 
 	ddi_status = ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
-		rx_prop, cfg_value);
+	    rx_prop, cfg_value);
 	if (ddi_status != DDI_PROP_SUCCESS)
 		status |= NXGE_DDI_FAILED;
 
@@ -1387,73 +1387,73 @@ nxge_use_cfg_link_cfg(p_nxge_t nxgep)
 	 */
 	/* add code for card type */
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, "adv-autoneg-cap",
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		ddi_prop_free(prop_val);
 		return;
 	}
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, "adv-10gfdx-cap",
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		ddi_prop_free(prop_val);
 		return;
 	}
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, "adv-1000hdx-cap",
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		ddi_prop_free(prop_val);
 		return;
 	}
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, "adv-1000fdx-cap",
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		ddi_prop_free(prop_val);
 		return;
 	}
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, "adv-100fdx-cap",
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		ddi_prop_free(prop_val);
 		return;
 	}
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, "adv-100hdx-cap",
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		ddi_prop_free(prop_val);
 		return;
 	}
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, "adv-10fdx-cap",
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		ddi_prop_free(prop_val);
 		return;
 	}
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, "adv-10hdx-cap",
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		ddi_prop_free(prop_val);
 		return;
 	}
 
 	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip, 0, "speed",
-			(uchar_t **)&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    (uchar_t **)&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		if (strncmp("10000", (caddr_t)prop_val,
-				(size_t)prop_len) == 0) {
+		    (size_t)prop_len) == 0) {
 			speed = 10000;
 		} else if (strncmp("1000", (caddr_t)prop_val,
-				(size_t)prop_len) == 0) {
+		    (size_t)prop_len) == 0) {
 			speed = 1000;
 		} else if (strncmp("100", (caddr_t)prop_val,
-				(size_t)prop_len) == 0) {
+		    (size_t)prop_len) == 0) {
 			speed = 100;
 		} else if (strncmp("10", (caddr_t)prop_val,
-				(size_t)prop_len) == 0) {
+		    (size_t)prop_len) == 0) {
 			speed = 10;
 		} else if (strncmp("auto", (caddr_t)prop_val,
-				(size_t)prop_len) == 0) {
+		    (size_t)prop_len) == 0) {
 			speed = 0;
 		} else {
 			NXGE_ERROR_MSG((nxgep, NXGE_NOTE,
-				"speed property is invalid reverting to auto"));
+			    "speed property is invalid reverting to auto"));
 			speed = 0;
 		}
 		ddi_prop_free(prop_val);
@@ -1461,20 +1461,20 @@ nxge_use_cfg_link_cfg(p_nxge_t nxgep)
 		speed = 0;
 
 	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip, 0, "duplex",
-			(uchar_t **)&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    (uchar_t **)&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		if (strncmp("full", (caddr_t)prop_val,
-				(size_t)prop_len) == 0) {
+		    (size_t)prop_len) == 0) {
 			duplex = 2;
 		} else if (strncmp("half", (caddr_t)prop_val,
-				(size_t)prop_len) == 0) {
+		    (size_t)prop_len) == 0) {
 			duplex = 1;
 		} else if (strncmp("auto", (caddr_t)prop_val,
-				(size_t)prop_len) == 0) {
+		    (size_t)prop_len) == 0) {
 			duplex = 0;
 		} else {
 			NXGE_ERROR_MSG((nxgep, NXGE_NOTE,
-				"duplex property is invalid"
-				" reverting to auto"));
+			    "duplex property is invalid"
+			    " reverting to auto"));
 			duplex = 0;
 		}
 		ddi_prop_free(prop_val);
@@ -1528,47 +1528,47 @@ nxge_use_cfg_link_cfg(p_nxge_t nxgep)
 		adv_10hdx_cap |= (speed == 10);
 	}
 	status = ddi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		"adv-autoneg-cap", &adv_autoneg_cap, 1);
+	    "adv-autoneg-cap", &adv_autoneg_cap, 1);
 	if (status)
 		return;
 
 	status = ddi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		"adv-10gfdx-cap", &adv_10gfdx_cap, 1);
+	    "adv-10gfdx-cap", &adv_10gfdx_cap, 1);
 	if (status)
 		goto nxge_map_myargs_to_gmii_fail1;
 
 	status = ddi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		"adv-10ghdx-cap", &adv_10ghdx_cap, 1);
+	    "adv-10ghdx-cap", &adv_10ghdx_cap, 1);
 	if (status)
 		goto nxge_map_myargs_to_gmii_fail2;
 
 	status = ddi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		"adv-1000fdx-cap", &adv_1000fdx_cap, 1);
+	    "adv-1000fdx-cap", &adv_1000fdx_cap, 1);
 	if (status)
 		goto nxge_map_myargs_to_gmii_fail3;
 
 	status = ddi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		"adv-1000hdx-cap", &adv_1000hdx_cap, 1);
+	    "adv-1000hdx-cap", &adv_1000hdx_cap, 1);
 	if (status)
 		goto nxge_map_myargs_to_gmii_fail4;
 
 	status = ddi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		"adv-100fdx-cap", &adv_100fdx_cap, 1);
+	    "adv-100fdx-cap", &adv_100fdx_cap, 1);
 	if (status)
 		goto nxge_map_myargs_to_gmii_fail5;
 
 	status = ddi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		"adv-100hdx-cap", &adv_100hdx_cap, 1);
+	    "adv-100hdx-cap", &adv_100hdx_cap, 1);
 	if (status)
 		goto nxge_map_myargs_to_gmii_fail6;
 
 	status = ddi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		"adv-10fdx-cap", &adv_10fdx_cap, 1);
+	    "adv-10fdx-cap", &adv_10fdx_cap, 1);
 	if (status)
 		goto nxge_map_myargs_to_gmii_fail7;
 
 	status = ddi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-		"adv-10hdx-cap", &adv_10hdx_cap, 1);
+	    "adv-10hdx-cap", &adv_10hdx_cap, 1);
 	if (status)
 		goto nxge_map_myargs_to_gmii_fail8;
 
@@ -1612,8 +1612,8 @@ nxge_get_config_properties(p_nxge_t nxgep)
 
 	if ((hw_p = nxgep->nxge_hw_p) == NULL) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			" nxge_get_config_properties:"
-			" common hardware not set", nxgep->niu_type));
+		    " nxge_get_config_properties:"
+		    " common hardware not set", nxgep->niu_type));
 		return (NXGE_ERROR);
 	}
 
@@ -1656,14 +1656,14 @@ nxge_get_config_properties(p_nxge_t nxgep)
 	switch (nxgep->niu_type) {
 	case N2_NIU:
 		NXGE_DEBUG_MSG((nxgep, VPD_CTL,
-			" ==> nxge_get_config_properties: N2"));
+		    " ==> nxge_get_config_properties: N2"));
 		MUTEX_ENTER(&hw_p->nxge_cfg_lock);
 		if ((hw_p->flags & COMMON_CFG_VALID) !=
-			COMMON_CFG_VALID) {
+		    COMMON_CFG_VALID) {
 			status = nxge_cfg_verify_set(nxgep,
-				COMMON_RXDMA_GRP_CFG);
+			    COMMON_RXDMA_GRP_CFG);
 			status = nxge_cfg_verify_set(nxgep,
-				COMMON_CLASS_CFG);
+			    COMMON_CLASS_CFG);
 			hw_p->flags |= COMMON_CFG_VALID;
 		}
 		MUTEX_EXIT(&hw_p->nxge_cfg_lock);
@@ -1678,19 +1678,19 @@ nxge_get_config_properties(p_nxge_t nxgep)
 		}
 
 		NXGE_DEBUG_MSG((nxgep, VPD_CTL,
-			" ==> nxge_get_config_properties: Neptune"));
+		    " ==> nxge_get_config_properties: Neptune"));
 		status = nxge_cfg_verify_set_quick_config(nxgep);
 		MUTEX_ENTER(&hw_p->nxge_cfg_lock);
 		if ((hw_p->flags & COMMON_CFG_VALID) !=
-			COMMON_CFG_VALID) {
+		    COMMON_CFG_VALID) {
 			status = nxge_cfg_verify_set(nxgep,
-				COMMON_TXDMA_CFG);
+			    COMMON_TXDMA_CFG);
 			status = nxge_cfg_verify_set(nxgep,
-				COMMON_RXDMA_CFG);
+			    COMMON_RXDMA_CFG);
 			status = nxge_cfg_verify_set(nxgep,
-				COMMON_RXDMA_GRP_CFG);
+			    COMMON_RXDMA_GRP_CFG);
 			status = nxge_cfg_verify_set(nxgep,
-				COMMON_CLASS_CFG);
+			    COMMON_CLASS_CFG);
 			hw_p->flags |= COMMON_CFG_VALID;
 		}
 		MUTEX_EXIT(&hw_p->nxge_cfg_lock);
@@ -1725,8 +1725,8 @@ nxge_use_cfg_n2niu_properties(p_nxge_t nxgep)
 	status = nxge_use_default_dma_config_n2(nxgep);
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			" ==> nxge_use_cfg_n2niu_properties (err 0x%x)",
-			status));
+		    " ==> nxge_use_cfg_n2niu_properties (err 0x%x)",
+		    status));
 		return (status | NXGE_ERROR);
 	}
 
@@ -1789,22 +1789,22 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 	p_cfgp->function_number = func;
 	ndmas = NXGE_TDMA_PER_NIU_PORT;
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0,
-			"tx-dma-channels", (int **)&prop_val,
-			&prop_len) == DDI_PROP_SUCCESS) {
+	    "tx-dma-channels", (int **)&prop_val,
+	    &prop_len) == DDI_PROP_SUCCESS) {
 		p_cfgp->tdc.start = prop_val[0];
 		NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-			"==> nxge_use_default_dma_config_n2: tdc starts %d "
-			"(#%d)", p_cfgp->tdc.start, prop_len));
+		    "==> nxge_use_default_dma_config_n2: tdc starts %d "
+		    "(#%d)", p_cfgp->tdc.start, prop_len));
 
 		ndmas = prop_val[1];
 		NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-			"==> nxge_use_default_dma_config_n2: #tdc %d (#%d)",
-			ndmas, prop_len));
+		    "==> nxge_use_default_dma_config_n2: #tdc %d (#%d)",
+		    ndmas, prop_len));
 		ddi_prop_free(prop_val);
 	} else {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_use_default_dma_config_n2: "
-			"get tx-dma-channels failed"));
+		    "==> nxge_use_default_dma_config_n2: "
+		    "get tx-dma-channels failed"));
 		return (NXGE_DDI_FAILED);
 	}
 
@@ -1812,27 +1812,27 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 	p_cfgp->tdc.owned = p_cfgp->tdc.count;
 
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL, "==> nxge_use_default_dma_config_n2: "
-		"p_cfgp 0x%llx max_tdcs %d nxgep->max_tdcs %d start %d",
-		p_cfgp, p_cfgp->tdc.count, nxgep->max_tdcs, p_cfgp->tdc.start));
+	    "p_cfgp 0x%llx max_tdcs %d nxgep->max_tdcs %d start %d",
+	    p_cfgp, p_cfgp->tdc.count, nxgep->max_tdcs, p_cfgp->tdc.start));
 
 	/* Receive DMA */
 	ndmas = NXGE_RDMA_PER_NIU_PORT;
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0,
-			"rx-dma-channels", (int **)&prop_val,
-			&prop_len) == DDI_PROP_SUCCESS) {
+	    "rx-dma-channels", (int **)&prop_val,
+	    &prop_len) == DDI_PROP_SUCCESS) {
 		p_cfgp->start_rdc = prop_val[0];
 		NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-			"==> nxge_use_default_dma_config_n2(obp): rdc start %d"
-			" (#%d)", p_cfgp->start_rdc, prop_len));
+		    "==> nxge_use_default_dma_config_n2(obp): rdc start %d"
+		    " (#%d)", p_cfgp->start_rdc, prop_len));
 		ndmas = prop_val[1];
 		NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-			"==> nxge_use_default_dma_config_n2(obp):#rdc %d (#%d)",
-			ndmas, prop_len));
+		    "==> nxge_use_default_dma_config_n2(obp):#rdc %d (#%d)",
+		    ndmas, prop_len));
 		ddi_prop_free(prop_val);
 	} else {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_use_default_dma_config_n2: "
-			"get rx-dma-channel failed"));
+		    "==> nxge_use_default_dma_config_n2: "
+		    "get rx-dma-channel failed"));
 		return (NXGE_DDI_FAILED);
 	}
 
@@ -1845,8 +1845,8 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 	p_cfgp->mif_ldvid = p_cfgp->mac_ldvid = p_cfgp->ser_ldvid = 0;
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0,
-			"interrupts", (int **)&prop_val,
-			&prop_len) == DDI_PROP_SUCCESS) {
+	    "interrupts", (int **)&prop_val,
+	    &prop_len) == DDI_PROP_SUCCESS) {
 		/*
 		 * For each device assigned, the content of each interrupts
 		 * property is its logical device group.
@@ -1863,8 +1863,8 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 		 * tx channels. Function 0 owns MIF and ERROR
 		 */
 		NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-			"==> nxge_use_default_dma_config_n2(obp): "
-			"# interrupts %d", prop_len));
+		    "==> nxge_use_default_dma_config_n2(obp): "
+		    "# interrupts %d", prop_len));
 
 		switch (func) {
 		case 0:
@@ -1890,37 +1890,37 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 		for (i = 0; i < prop_len; i++) {
 			p_cfgp->ldg[i] = prop_val[i];
 			NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-				"==> nxge_use_default_dma_config_n2(obp): "
-				"F%d: interrupt #%d, ldg %d",
-				nxgep->function_num, i, p_cfgp->ldg[i]));
+			    "==> nxge_use_default_dma_config_n2(obp): "
+			    "F%d: interrupt #%d, ldg %d",
+			    nxgep->function_num, i, p_cfgp->ldg[i]));
 		}
 
 		p_cfgp->max_grpids = prop_len;
 		NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-			"==> nxge_use_default_dma_config_n2(obp): %d "
-			"(#%d) maxgrpids %d channel starts %d",
-			p_cfgp->mac_ldvid, i, p_cfgp->max_grpids,
-			p_cfgp->ldg_chn_start));
+		    "==> nxge_use_default_dma_config_n2(obp): %d "
+		    "(#%d) maxgrpids %d channel starts %d",
+		    p_cfgp->mac_ldvid, i, p_cfgp->max_grpids,
+		    p_cfgp->ldg_chn_start));
 		ddi_prop_free(prop_val);
 	} else {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_use_default_dma_config_n2: "
-			"get interrupts failed"));
+		    "==> nxge_use_default_dma_config_n2: "
+		    "get interrupts failed"));
 		return (NXGE_DDI_FAILED);
 	}
 
 	p_cfgp->max_ldgs = p_cfgp->max_grpids;
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-		"==> nxge_use_default_dma_config_n2: "
-		"p_cfgp 0x%llx max_rdcs %d nxgep->max_rdcs %d max_grpids %d"
-		"start_grpid %d macid %d mifid %d serrid %d",
-		p_cfgp, p_cfgp->max_rdcs, nxgep->max_rdcs, p_cfgp->max_grpids,
-		p_cfgp->start_grpid,
-		p_cfgp->mac_ldvid, p_cfgp->mif_ldvid, p_cfgp->ser_ldvid));
+	    "==> nxge_use_default_dma_config_n2: "
+	    "p_cfgp 0x%llx max_rdcs %d nxgep->max_rdcs %d max_grpids %d"
+	    "start_grpid %d macid %d mifid %d serrid %d",
+	    p_cfgp, p_cfgp->max_rdcs, nxgep->max_rdcs, p_cfgp->max_grpids,
+	    p_cfgp->start_grpid,
+	    p_cfgp->mac_ldvid, p_cfgp->mif_ldvid, p_cfgp->ser_ldvid));
 
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL, "==> nxge_use_default_dma_config_n2: "
-		"p_cfgp p%p start_ldg %d nxgep->max_ldgs %d",
-		p_cfgp, p_cfgp->start_ldg, p_cfgp->max_ldgs));
+	    "p_cfgp p%p start_ldg %d nxgep->max_ldgs %d",
+	    p_cfgp, p_cfgp->start_ldg, p_cfgp->max_ldgs));
 
 	/*
 	 * RDC groups and the beginning RDC group assigned to this function.
@@ -1929,7 +1929,7 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 	p_cfgp->def_mac_rxdma_grpid = (nxgep->function_num * 1);
 
 	if ((p_cfgp->def_mac_rxdma_grpid = nxge_fzc_rdc_tbl_bind
-		(nxgep, p_cfgp->def_mac_rxdma_grpid, B_TRUE))
+	    (nxgep, p_cfgp->def_mac_rxdma_grpid, B_TRUE))
 	    >= NXGE_MAX_RDC_GRPS) {
 		NXGE_ERROR_MSG((nxgep, CFG_CTL,
 		    "nxge_use_default_dma_config_n2(): "
@@ -1943,16 +1943,16 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 		return (NXGE_DDI_FAILED);
 	}
 	status = ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
-		"rx-rdc-grps-begin", p_cfgp->def_mac_rxdma_grpid);
+	    "rx-rdc-grps-begin", p_cfgp->def_mac_rxdma_grpid);
 	if (status) {
 		(void) ddi_prop_remove(DDI_DEV_T_NONE, nxgep->dip,
-			"rx-rdc-grps");
+		    "rx-rdc-grps");
 		return (NXGE_DDI_FAILED);
 	}
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL, "==> nxge_use_default_dma_config_n2: "
-		"p_cfgp $%p # rdc groups %d start rdc group id %d",
-		p_cfgp, p_cfgp->max_rdc_grpids,
-		p_cfgp->def_mac_rxdma_grpid));
+	    "p_cfgp $%p # rdc groups %d start rdc group id %d",
+	    p_cfgp, p_cfgp->max_rdc_grpids,
+	    p_cfgp->def_mac_rxdma_grpid));
 
 	nxge_set_hw_dma_config(nxgep);
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL, "<== nxge_use_default_dma_config_n2"));
@@ -1983,7 +1983,7 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 	prop = param_arr[param_txdma_channels_begin].fcode_name;
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, prop,
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		p_cfgp->tdc.start = *prop_val;
 		ddi_prop_free(prop_val);
 	} else {
@@ -2026,7 +2026,7 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 
 	prop = param_arr[param_txdma_channels].fcode_name;
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, prop,
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		tx_ndmas = *prop_val;
 		ddi_prop_free(prop_val);
 	} else {
@@ -2059,19 +2059,19 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 			break;
 		}
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
-			prop, tx_ndmas);
+		    prop, tx_ndmas);
 	}
 
 	p_cfgp->tdc.count = nxgep->max_tdcs = tx_ndmas;
 	p_cfgp->tdc.owned = p_cfgp->tdc.count;
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "==> nxge_use_cfg_dma_config: "
-		"p_cfgp 0x%llx max_tdcs %d nxgep->max_tdcs %d",
-		p_cfgp, p_cfgp->tdc.count, nxgep->max_tdcs));
+	    "p_cfgp 0x%llx max_tdcs %d nxgep->max_tdcs %d",
+	    p_cfgp, p_cfgp->tdc.count, nxgep->max_tdcs));
 
 	prop = param_arr[param_rxdma_channels_begin].fcode_name;
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, prop,
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		p_cfgp->start_rdc = *prop_val;
 		ddi_prop_free(prop_val);
 	} else {
@@ -2115,7 +2115,7 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 	prop = param_arr[param_rxdma_channels].fcode_name;
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, prop,
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		rx_ndmas = *prop_val;
 		ddi_prop_free(prop_val);
 	} else {
@@ -2148,18 +2148,18 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 			break;
 		}
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
-			prop, rx_ndmas);
+		    prop, rx_ndmas);
 	}
 
 	p_cfgp->max_rdcs = nxgep->max_rdcs = rx_ndmas;
 
 	prop = param_arr[param_rdc_grps_start].fcode_name;
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, prop,
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		p_cfgp->def_mac_rxdma_grpid = *prop_val;
 		ddi_prop_free(prop_val);
 		if ((p_cfgp->def_mac_rxdma_grpid = nxge_fzc_rdc_tbl_bind
-			(nxgep, p_cfgp->def_mac_rxdma_grpid, B_TRUE))
+		    (nxgep, p_cfgp->def_mac_rxdma_grpid, B_TRUE))
 		    >= NXGE_MAX_RDC_GRPS) {
 			NXGE_ERROR_MSG((nxgep, CFG_CTL,
 			    "nxge_use_cfg_dma_config(): "
@@ -2172,7 +2172,7 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 		NXGE_DEBUG_MSG((nxgep, CFG_CTL,
 		    "==> nxge_use_default_dma_config: "
 		    "use property " "start_grpid %d ",
-			p_cfgp->start_grpid));
+		    p_cfgp->start_grpid));
 	} else {
 		p_cfgp->def_mac_rxdma_grpid = nxgep->function_num;
 		if ((p_cfgp->def_mac_rxdma_grpid = nxge_fzc_rdc_tbl_bind(
@@ -2183,27 +2183,27 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 			goto nxge_use_cfg_dma_config_exit;
 		}
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
-			prop, p_cfgp->def_mac_rxdma_grpid);
+		    prop, p_cfgp->def_mac_rxdma_grpid);
 		NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-			"==> nxge_use_default_dma_config: "
-			"use default "
-			"start_grpid %d (same as function #)",
-			p_cfgp->start_grpid));
+		    "==> nxge_use_default_dma_config: "
+		    "use default "
+		    "start_grpid %d (same as function #)",
+		    p_cfgp->start_grpid));
 	}
 
 	prop = param_arr[param_rx_rdc_grps].fcode_name;
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, prop,
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		nrxgp = *prop_val;
 		ddi_prop_free(prop_val);
 	} else {
 		nrxgp = 1;
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
-			prop, nrxgp);
+		    prop, nrxgp);
 		NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-			"==> nxge_use_default_dma_config: "
-			"num_rdc_grpid not found: use def:# of "
-			"rdc groups %d\n", nrxgp));
+		    "==> nxge_use_default_dma_config: "
+		    "num_rdc_grpid not found: use def:# of "
+		    "rdc groups %d\n", nrxgp));
 	}
 
 	p_cfgp->max_rdc_grpids = nrxgp;
@@ -2215,34 +2215,34 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 	p_cfgp->max_ldgs = NXGE_LDGRP_PER_4PORTS;
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "==> nxge_use_default_dma_config: "
-		"p_cfgp 0x%llx max_rdcs %d nxgep->max_rdcs %d max_grpids %d"
-		"start_grpid %d",
-		p_cfgp, p_cfgp->max_rdcs, nxgep->max_rdcs, p_cfgp->max_grpids,
-		p_cfgp->start_grpid));
+	    "p_cfgp 0x%llx max_rdcs %d nxgep->max_rdcs %d max_grpids %d"
+	    "start_grpid %d",
+	    p_cfgp, p_cfgp->max_rdcs, nxgep->max_rdcs, p_cfgp->max_grpids,
+	    p_cfgp->start_grpid));
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "==> nxge_use_cfg_dma_config: "
-		"p_cfgp 0x%016llx start_ldg %d nxgep->max_ldgs %d "
-		"def_mac_rxdma_grpid %d",
-		p_cfgp, p_cfgp->start_ldg, p_cfgp->max_ldgs,
-		p_cfgp->def_mac_rxdma_grpid));
+	    "p_cfgp 0x%016llx start_ldg %d nxgep->max_ldgs %d "
+	    "def_mac_rxdma_grpid %d",
+	    p_cfgp, p_cfgp->start_ldg, p_cfgp->max_ldgs,
+	    p_cfgp->def_mac_rxdma_grpid));
 
 	prop = param_arr[param_rxdma_intr_time].fcode_name;
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, prop,
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		if ((prop_len > 0) && (prop_len <= p_cfgp->max_rdcs)) {
 			(void) ddi_prop_update_int_array(DDI_DEV_T_NONE,
-				nxgep->dip, prop, prop_val, prop_len);
+			    nxgep->dip, prop, prop_val, prop_len);
 		}
 		ddi_prop_free(prop_val);
 	}
 	prop = param_arr[param_rxdma_intr_pkts].fcode_name;
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, prop,
-			&prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		if ((prop_len > 0) && (prop_len <= p_cfgp->max_rdcs)) {
 			(void) ddi_prop_update_int_array(DDI_DEV_T_NONE,
-				nxgep->dip, prop, prop_val, prop_len);
+			    nxgep->dip, prop, prop_val, prop_len);
 		}
 		ddi_prop_free(prop_val);
 	}
@@ -2323,10 +2323,10 @@ nxge_use_cfg_vlan_class_config(p_nxge_t nxgep)
 	prop = param_arr[param_vlan_2rdc_grp].fcode_name;
 
 	status = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0, prop,
-		&vlan_cfg_val, &vlan_cnt);
+	    &vlan_cfg_val, &vlan_cnt);
 	if (status == DDI_PROP_SUCCESS) {
 		status = ddi_prop_update_int_array(DDI_DEV_T_NONE,
-			nxgep->dip, prop, vlan_cfg_val, vlan_cnt);
+		    nxgep->dip, prop, vlan_cfg_val, vlan_cnt);
 		ddi_prop_free(vlan_cfg_val);
 	}
 	nxge_set_hw_vlan_class_config(nxgep);
@@ -2367,16 +2367,16 @@ nxge_use_cfg_mac_class_config(p_nxge_t nxgep)
 
 	p_cfgp->mac_pref = 1;
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-		"== nxge_use_cfg_mac_class_config: "
-		" mac_pref bit set def_mac_rxdma_grpid %d",
-		p_cfgp->def_mac_rxdma_grpid));
+	    "== nxge_use_cfg_mac_class_config: "
+	    " mac_pref bit set def_mac_rxdma_grpid %d",
+	    p_cfgp->def_mac_rxdma_grpid));
 
 	status = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0, prop,
-		&mac_cfg_val, &mac_cnt);
+	    &mac_cfg_val, &mac_cnt);
 	if (status == DDI_PROP_SUCCESS) {
 		if (mac_cnt <= p_cfgp->max_macs)
 			status = ddi_prop_update_int_array(DDI_DEV_T_NONE,
-				nxgep->dip, prop, mac_cfg_val, mac_cnt);
+			    nxgep->dip, prop, mac_cfg_val, mac_cnt);
 		ddi_prop_free(mac_cfg_val);
 	}
 	nxge_set_hw_mac_class_config(nxgep);
@@ -2448,10 +2448,10 @@ nxge_set_hw_dma_config(p_nxge_t nxgep)
 	case CFG_NOT_SPECIFIED:
 		prop = "rxdma-grp-cfg";
 		status = ddi_prop_lookup_string(DDI_DEV_T_NONE,
-			nxgep->dip, 0, prop, (char **)&prop_val);
+		    nxgep->dip, 0, prop, (char **)&prop_val);
 		if (status != DDI_PROP_SUCCESS) {
 			NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-				" property %s not found", prop));
+			    " property %s not found", prop));
 			rdcgrp_cfg = CFG_L3_DISTRIBUTE;
 		} else {
 			token = nxge_get_config_token(prop_val);
@@ -2511,7 +2511,7 @@ nxge_set_hw_dma_config(p_nxge_t nxgep)
 		dc_map_t map = 0;
 
 		rdc_grp_p = &p_dma_cfgp->rdc_grps[
-			p_cfgp->def_mac_rxdma_grpid + i];
+		    p_cfgp->def_mac_rxdma_grpid + i];
 		rdc_grp_p->start_rdc = st_rdc + i * rdcs_per_grp;
 		rdc_grp_p->max_rdcs = rdcs_per_grp;
 		rdc_grp_p->def_rdc = rdc_grp_p->start_rdc;
@@ -2593,9 +2593,9 @@ nxge_check_rxdma_rdcgrp_member(p_nxge_t nxgep, uint8_t rdc_grp, uint8_t rdc)
 	p_nxge_rdc_grp_t rdc_grp_p;
 
 	NXGE_DEBUG_MSG((nxgep, CFG2_CTL,
-		" ==> nxge_check_rxdma_rdcgrp_member"));
+	    " ==> nxge_check_rxdma_rdcgrp_member"));
 	NXGE_DEBUG_MSG((nxgep, CFG2_CTL, "  nxge_check_rxdma_rdcgrp_member"
-		" rdc  %d group %d", rdc, rdc_grp));
+	    " rdc  %d group %d", rdc, rdc_grp));
 	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
 
 	rdc_grp_p = &p_dma_cfgp->rdc_grps[rdc_grp];
@@ -2604,7 +2604,7 @@ nxge_check_rxdma_rdcgrp_member(p_nxge_t nxgep, uint8_t rdc_grp, uint8_t rdc)
 		status = B_FALSE;
 	}
 	NXGE_DEBUG_MSG((nxgep, CFG2_CTL,
-		" <== nxge_check_rxdma_rdcgrp_member"));
+	    " <== nxge_check_rxdma_rdcgrp_member"));
 	return (status);
 }
 
@@ -2669,18 +2669,18 @@ nxge_set_hw_vlan_class_config(p_nxge_t nxgep)
 
 	vlan_tbl = (nxge_mv_cfg_t *)&p_class_cfgp->vlan_tbl[0];
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0, prop,
-			&vlan_cfg_val, &vlan_cnt) == DDI_PROP_SUCCESS) {
+	    &vlan_cfg_val, &vlan_cnt) == DDI_PROP_SUCCESS) {
 		for (i = 0; i < vlan_cnt; i++) {
 			vmap = (nxge_param_map_t *)&vlan_cfg_val[i];
 			if ((vmap->param_id) &&
-					(vmap->param_id < NXGE_MAX_VLANS) &&
-					(vmap->map_to <
-						p_cfgp->max_rdc_grpids) &&
-					(vmap->map_to >= (uint8_t)0)) {
+			    (vmap->param_id < NXGE_MAX_VLANS) &&
+			    (vmap->map_to <
+			    p_cfgp->max_rdc_grpids) &&
+			    (vmap->map_to >= (uint8_t)0)) {
 				NXGE_DEBUG_MSG((nxgep, CFG2_CTL,
-					" nxge_vlan_config mapping"
-					" id %d grp %d",
-					vmap->param_id, vmap->map_to));
+				    " nxge_vlan_config mapping"
+				    " id %d grp %d",
+				    vmap->param_id, vmap->map_to));
 				good_cfg[good_count] = vlan_cfg_val[i];
 				if (vlan_tbl[vmap->param_id].flag == 0)
 					good_count++;
@@ -2693,7 +2693,7 @@ nxge_set_hw_vlan_class_config(p_nxge_t nxgep)
 		ddi_prop_free(vlan_cfg_val);
 		if (good_count != vlan_cnt) {
 			(void) ddi_prop_update_int_array(DDI_DEV_T_NONE,
-				nxgep->dip, prop, (int *)good_cfg, good_count);
+			    nxgep->dip, prop, (int *)good_cfg, good_count);
 		}
 	}
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "<== nxge_set_hw_vlan_config"));
@@ -2732,22 +2732,22 @@ nxge_set_hw_mac_class_config(p_nxge_t nxgep)
 	}
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0, prop,
-			&mac_cfg_val, &mac_cnt) == DDI_PROP_SUCCESS) {
+	    &mac_cfg_val, &mac_cnt) == DDI_PROP_SUCCESS) {
 		for (i = 0; i < mac_cnt; i++) {
 			mac_map = (nxge_param_map_t *)&mac_cfg_val[i];
 			if ((mac_map->param_id < p_cfgp->max_macs) &&
-					(mac_map->map_to <
-						p_cfgp->max_rdc_grpids) &&
-					(mac_map->map_to >= (uint8_t)0)) {
+			    (mac_map->map_to <
+			    p_cfgp->max_rdc_grpids) &&
+			    (mac_map->map_to >= (uint8_t)0)) {
 				NXGE_DEBUG_MSG((nxgep, CFG2_CTL,
-					" nxge_mac_config mapping"
-					" id %d grp %d",
-					mac_map->param_id, mac_map->map_to));
+				    " nxge_mac_config mapping"
+				    " id %d grp %d",
+				    mac_map->param_id, mac_map->map_to));
 				mac_host_info[mac_map->param_id].mpr_npr =
-					mac_map->pref;
+				    mac_map->pref;
 				mac_host_info[mac_map->param_id].rdctbl =
-					mac_map->map_to +
-					p_cfgp->def_mac_rxdma_grpid;
+				    mac_map->map_to +
+				    p_cfgp->def_mac_rxdma_grpid;
 				good_cfg[good_count] = mac_cfg_val[i];
 				if (mac_host_info[mac_map->param_id].flag == 0)
 					good_count++;
@@ -2757,7 +2757,7 @@ nxge_set_hw_mac_class_config(p_nxge_t nxgep)
 		ddi_prop_free(mac_cfg_val);
 		if (good_count != mac_cnt) {
 			(void) ddi_prop_update_int_array(DDI_DEV_T_NONE,
-				nxgep->dip, prop, good_cfg, good_count);
+			    nxgep->dip, prop, good_cfg, good_count);
 		}
 	}
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "<== nxge_set_hw_mac_config"));
@@ -2785,8 +2785,8 @@ nxge_set_hw_class_config(p_nxge_t nxgep)
 	for (i = start_prop; i <= end_prop; i++) {
 		prop = param_arr[i].fcode_name;
 		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip,
-				0, prop, &int_prop_val,
-				&prop_cnt) == DDI_PROP_SUCCESS) {
+		    0, prop, &int_prop_val,
+		    &prop_cnt) == DDI_PROP_SUCCESS) {
 			cfg_value = (uint32_t)*int_prop_val;
 			ddi_prop_free(int_prop_val);
 		} else {
@@ -2798,7 +2798,7 @@ nxge_set_hw_class_config(p_nxge_t nxgep)
 	prop = param_arr[param_h1_init_value].fcode_name;
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0, prop,
-			&int_prop_val, &prop_cnt) == DDI_PROP_SUCCESS) {
+	    &int_prop_val, &prop_cnt) == DDI_PROP_SUCCESS) {
 		cfg_value = (uint32_t)*int_prop_val;
 		ddi_prop_free(int_prop_val);
 	} else {
@@ -2809,7 +2809,7 @@ nxge_set_hw_class_config(p_nxge_t nxgep)
 	prop = param_arr[param_h2_init_value].fcode_name;
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0, prop,
-			&int_prop_val, &prop_cnt) == DDI_PROP_SUCCESS) {
+	    &int_prop_val, &prop_cnt) == DDI_PROP_SUCCESS) {
 		cfg_value = (uint32_t)*int_prop_val;
 		ddi_prop_free(int_prop_val);
 	} else {
@@ -2841,7 +2841,7 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	if (!*navail_p) {
 		*nrequired_p = 0;
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_ldgv_init:no avail"));
+		    "<== nxge_ldgv_init:no avail"));
 		return (NXGE_ERROR);
 	}
 	/*
@@ -2854,7 +2854,7 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	if (!maxldgs) {
 		/* No devices configured. */
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "<== nxge_ldgv_init_n2: "
-			"no logical groups configured."));
+		    "no logical groups configured."));
 		return (NXGE_ERROR);
 	} else {
 		maxldvs = maxldgs + 1;
@@ -2869,12 +2869,12 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		own_sys_err = B_TRUE;
 		if (!p_cfgp->ser_ldvid) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_ldgv_init_n2: func 0, ERR ID not set!"));
+			    "nxge_ldgv_init_n2: func 0, ERR ID not set!"));
 		}
 		/* MIF interrupt */
 		if (!p_cfgp->mif_ldvid) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"nxge_ldgv_init_n2: func 0, MIF ID not set!"));
+			    "nxge_ldgv_init_n2: func 0, MIF ID not set!"));
 		}
 	}
 
@@ -2891,9 +2891,9 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		ldgvp->maxldgs = (uint8_t)maxldgs;
 		ldgvp->maxldvs = (uint8_t)maxldvs;
 		ldgp = ldgvp->ldgp = KMEM_ZALLOC(
-			sizeof (nxge_ldg_t) * maxldgs, KM_SLEEP);
+		    sizeof (nxge_ldg_t) * maxldgs, KM_SLEEP);
 		ldvp = ldgvp->ldvp = KMEM_ZALLOC(
-			sizeof (nxge_ldv_t) * maxldvs, KM_SLEEP);
+		    sizeof (nxge_ldv_t) * maxldvs, KM_SLEEP);
 	} else {
 		ldgp = ldgvp->ldgp;
 		ldvp = ldgvp->ldvp;
@@ -2903,8 +2903,8 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	ldgvp->tmres = NXGE_TIMER_RESO;
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL,
-		"==> nxge_ldgv_init_n2: maxldvs %d maxldgs %d",
-		maxldvs, maxldgs));
+	    "==> nxge_ldgv_init_n2: maxldvs %d maxldgs %d",
+	    maxldvs, maxldgs));
 
 	/* logical start_ldg is ldv */
 	ptr = ldgp;
@@ -2919,9 +2919,9 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		ptr->ldvp = NULL;
 		ptr->nxgep = nxgep;
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_ldgv_init_n2: maxldvs %d maxldgs %d "
-			"ldg %d ldgptr $%p",
-			maxldvs, maxldgs, ptr->ldg, ptr));
+		    "==> nxge_ldgv_init_n2: maxldvs %d maxldgs %d "
+		    "ldg %d ldgptr $%p",
+		    maxldvs, maxldgs, ptr->ldg, ptr));
 		ptr++;
 	}
 
@@ -2946,9 +2946,9 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		ldvp->ldv_ldf_masks = 0;
 		ldvp->nxgep = nxgep;
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_ldgv_init_n2(mac): maxldvs %d ldv %d "
-			"ldg %d ldgptr $%p ldvptr $%p",
-			maxldvs, ldv, ldgp->ldg, ldgp, ldvp));
+		    "==> nxge_ldgv_init_n2(mac): maxldvs %d ldv %d "
+		    "ldg %d ldgptr $%p ldvptr $%p",
+		    maxldvs, ldv, ldgp->ldg, ldgp, ldvp));
 		nxge_ldgv_setup(&ldgp, &ldvp, ldv, endldg, nrequired_p);
 		nldvs++;
 	}
@@ -2961,9 +2961,9 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		ldvp->ldv_ldf_masks = 0;
 		ldvp->nxgep = nxgep;
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_ldgv_init_n2(mif): maxldvs %d ldv %d "
-			"ldg %d ldgptr $%p ldvptr $%p",
-			maxldvs, ldv, ldgp->ldg, ldgp, ldvp));
+		    "==> nxge_ldgv_init_n2(mif): maxldvs %d ldv %d "
+		    "ldg %d ldgptr $%p ldvptr $%p",
+		    maxldvs, ldv, ldgp->ldg, ldgp, ldvp));
 		nxge_ldgv_setup(&ldgp, &ldvp, ldv, endldg, nrequired_p);
 		nldvs++;
 	}
@@ -2976,8 +2976,8 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		 * Unmask the system interrupt states.
 		 */
 		(void) nxge_fzc_sys_err_mask_set(nxgep, SYS_ERR_SMX_MASK |
-			SYS_ERR_IPP_MASK | SYS_ERR_TXC_MASK |
-			SYS_ERR_ZCP_MASK);
+		    SYS_ERR_IPP_MASK | SYS_ERR_TXC_MASK |
+		    SYS_ERR_ZCP_MASK);
 	}
 	ldvp->ldv = (uint8_t)ldv;
 	ldvp->is_syserr = B_TRUE;
@@ -2987,9 +2987,9 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	ldgvp->ldvp_syserr = ldvp;
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL,
-		"==> nxge_ldgv_init_n2(syserr): maxldvs %d ldv %d "
-		"ldg %d ldgptr $%p ldvptr p%p",
-		maxldvs, ldv, ldgp->ldg, ldgp, ldvp));
+	    "==> nxge_ldgv_init_n2(syserr): maxldvs %d ldv %d "
+	    "ldg %d ldgptr $%p ldvptr p%p",
+	    maxldvs, ldv, ldgp->ldg, ldgp, ldvp));
 
 	if (own_sys_err && p_cfgp->ser_ldvid) {
 		(void) nxge_ldgv_setup(&ldgp, &ldvp, ldv, endldg, nrequired_p);
@@ -3000,8 +3000,8 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	nldvs++;
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_ldgv_init_n2: "
-		"(before rx) func %d nldvs %d navail %d nrequired %d",
-		func, nldvs, *navail_p, *nrequired_p));
+	    "(before rx) func %d nldvs %d navail %d nrequired %d",
+	    func, nldvs, *navail_p, *nrequired_p));
 
 	/*
 	 * Start with RDC to configure logical devices for each group.
@@ -3031,13 +3031,13 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	}
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_ldgv_init_n2: "
-		"func %d nldvs %d navail %d nrequired %d",
-		func, nldvs, *navail_p, *nrequired_p));
+	    "func %d nldvs %d navail %d nrequired %d",
+	    func, nldvs, *navail_p, *nrequired_p));
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_ldgv_init_n2: "
-		"func %d nldvs %d navail %d nrequired %d ldgp 0x%llx "
-		"ldvp 0x%llx",
-		func, nldvs, *navail_p, *nrequired_p, ldgp, ldvp));
+	    "func %d nldvs %d navail %d nrequired %d ldgp 0x%llx "
+	    "ldvp 0x%llx",
+	    func, nldvs, *navail_p, *nrequired_p, ldgp, ldvp));
 	/*
 	 * Transmit DMA channels.
 	 */
@@ -3068,8 +3068,8 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	ldgvp->nldvs = (uint8_t)nldvs;
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_ldgv_init_n2: "
-		"func %d nldvs %d maxgrps %d navail %d nrequired %d",
-		func, nldvs, maxldgs, *navail_p, *nrequired_p));
+	    "func %d nldvs %d maxgrps %d navail %d nrequired %d",
+	    func, nldvs, maxldgs, *navail_p, *nrequired_p));
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_ldgv_init_n2"));
 	return (status);
@@ -3100,7 +3100,7 @@ nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	if (!*navail_p) {
 		*nrequired_p = 0;
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_ldgv_init:no avail"));
+		    "<== nxge_ldgv_init:no avail"));
 		return (NXGE_ERROR);
 	}
 	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
@@ -3136,7 +3136,7 @@ nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	if (!maxldvs || !maxldgs) {
 		/* No devices configured. */
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "<== nxge_ldgv_init: "
-			"no logical devices or groups configured."));
+		    "no logical devices or groups configured."));
 		return (NXGE_ERROR);
 	}
 	ldgvp = nxgep->ldgvp;
@@ -3146,16 +3146,16 @@ nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		ldgvp->maxldgs = (uint8_t)maxldgs;
 		ldgvp->maxldvs = (uint8_t)maxldvs;
 		ldgp = ldgvp->ldgp = KMEM_ZALLOC(sizeof (nxge_ldg_t) * maxldgs,
-			KM_SLEEP);
+		    KM_SLEEP);
 		ldvp = ldgvp->ldvp = KMEM_ZALLOC(sizeof (nxge_ldv_t) * maxldvs,
-			KM_SLEEP);
+		    KM_SLEEP);
 	}
 	ldgvp->ndma_ldvs = p_cfgp->tdc.owned + p_cfgp->max_rdcs;
 	ldgvp->tmres = NXGE_TIMER_RESO;
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL,
-		"==> nxge_ldgv_init: maxldvs %d maxldgs %d nldvs %d",
-		maxldvs, maxldgs, nldvs));
+	    "==> nxge_ldgv_init: maxldvs %d maxldgs %d nldvs %d",
+	    maxldvs, maxldgs, nldvs));
 	ldg = p_cfgp->start_ldg;
 	ptr = ldgp;
 	for (i = 0; i < maxldgs; i++) {
@@ -3168,8 +3168,8 @@ nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		ptr->nldvs = 0;
 		ptr->nxgep = nxgep;
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_ldgv_init: maxldvs %d maxldgs %d ldg %d",
-			maxldvs, maxldgs, ptr->ldg));
+		    "==> nxge_ldgv_init: maxldvs %d maxldgs %d ldg %d",
+		    maxldvs, maxldgs, ptr->ldg));
 		ptr++;
 	}
 
@@ -3257,8 +3257,8 @@ nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		nldvs++;
 	}
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_ldgv_init: "
-		"func %d nldvs %d navail %d nrequired %d",
-		func, nldvs, *navail_p, *nrequired_p));
+	    "func %d nldvs %d navail %d nrequired %d",
+	    func, nldvs, *navail_p, *nrequired_p));
 	/*
 	 * Function 0 owns system error interrupts.
 	 */
@@ -3275,8 +3275,8 @@ nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		 * Unmask the system interrupt states.
 		 */
 		(void) nxge_fzc_sys_err_mask_set(nxgep, SYS_ERR_SMX_MASK |
-			SYS_ERR_IPP_MASK | SYS_ERR_TXC_MASK |
-			SYS_ERR_ZCP_MASK);
+		    SYS_ERR_IPP_MASK | SYS_ERR_TXC_MASK |
+		    SYS_ERR_ZCP_MASK);
 
 		(void) nxge_ldgv_setup(&ldgp, &ldvp, ldv, endldg, nrequired_p);
 		nldvs++;
@@ -3293,8 +3293,8 @@ nxge_ldgv_init(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	ldgvp->ldg_intrs = *nrequired_p;
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_ldgv_init: "
-		"func %d nldvs %d navail %d nrequired %d",
-		func, nldvs, *navail_p, *nrequired_p));
+	    "func %d nldvs %d navail %d nrequired %d",
+	    func, nldvs, *navail_p, *nrequired_p));
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_ldgv_init"));
 	return (status);
@@ -3309,7 +3309,7 @@ nxge_ldgv_uninit(p_nxge_t nxgep)
 	ldgvp = nxgep->ldgvp;
 	if (ldgvp == NULL) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "<== nxge_ldgv_uninit: "
-				"no logical group configured."));
+		    "no logical group configured."));
 		return (NXGE_OK);
 	}
 	if (ldgvp->ldgp) {
@@ -3360,7 +3360,7 @@ nxge_intr_mask_mgmt(p_nxge_t nxgep)
 
 	if ((ldgvp = nxgep->ldgvp) == NULL) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_intr_mask_mgmt: Null ldgvp"));
+		    "<== nxge_intr_mask_mgmt: Null ldgvp"));
 		return (NXGE_ERROR);
 	}
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
@@ -3368,41 +3368,41 @@ nxge_intr_mask_mgmt(p_nxge_t nxgep)
 	ldvp = ldgvp->ldvp;
 	if (ldgp == NULL || ldvp == NULL) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_intr_mask_mgmt: Null ldgp or ldvp"));
+		    "<== nxge_intr_mask_mgmt: Null ldgp or ldvp"));
 		return (NXGE_ERROR);
 	}
 	NXGE_DEBUG_MSG((nxgep, INT_CTL,
-		"==> nxge_intr_mask_mgmt: # of intrs %d ", ldgvp->ldg_intrs));
+	    "==> nxge_intr_mask_mgmt: # of intrs %d ", ldgvp->ldg_intrs));
 	/* Initialize masks. */
 	if (nxgep->niu_type != N2_NIU) {
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_intr_mask_mgmt(Neptune): # intrs %d ",
-			ldgvp->ldg_intrs));
+		    "==> nxge_intr_mask_mgmt(Neptune): # intrs %d ",
+		    ldgvp->ldg_intrs));
 		for (i = 0; i < ldgvp->ldg_intrs; i++, ldgp++) {
 			NXGE_DEBUG_MSG((nxgep, INT_CTL,
-				"==> nxge_intr_mask_mgmt(Neptune): # ldv %d "
-				"in group %d", ldgp->nldvs, ldgp->ldg));
+			    "==> nxge_intr_mask_mgmt(Neptune): # ldv %d "
+			    "in group %d", ldgp->nldvs, ldgp->ldg));
 			for (j = 0; j < ldgp->nldvs; j++, ldvp++) {
 				NXGE_DEBUG_MSG((nxgep, INT_CTL,
-					"==> nxge_intr_mask_mgmt: set ldv # %d "
-					"for ldg %d", ldvp->ldv, ldgp->ldg));
+				    "==> nxge_intr_mask_mgmt: set ldv # %d "
+				    "for ldg %d", ldvp->ldv, ldgp->ldg));
 				rs = npi_intr_mask_set(handle, ldvp->ldv,
-					ldvp->ldv_ldf_masks);
+				    ldvp->ldv_ldf_masks);
 				if (rs != NPI_SUCCESS) {
 					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-						"<== nxge_intr_mask_mgmt: "
-						"set mask failed "
-						" rs 0x%x ldv %d mask 0x%x",
-						rs, ldvp->ldv,
-						ldvp->ldv_ldf_masks));
+					    "<== nxge_intr_mask_mgmt: "
+					    "set mask failed "
+					    " rs 0x%x ldv %d mask 0x%x",
+					    rs, ldvp->ldv,
+					    ldvp->ldv_ldf_masks));
 					return (NXGE_ERROR | rs);
 				}
 				NXGE_DEBUG_MSG((nxgep, INT_CTL,
-					"==> nxge_intr_mask_mgmt: "
-					"set mask OK "
-					" rs 0x%x ldv %d mask 0x%x",
-					rs, ldvp->ldv,
-					ldvp->ldv_ldf_masks));
+				    "==> nxge_intr_mask_mgmt: "
+				    "set mask OK "
+				    " rs 0x%x ldv %d mask 0x%x",
+				    rs, ldvp->ldv,
+				    ldvp->ldv_ldf_masks));
 			}
 		}
 	}
@@ -3410,20 +3410,20 @@ nxge_intr_mask_mgmt(p_nxge_t nxgep)
 	/* Configure timer and arm bit */
 	for (i = 0; i < nxgep->ldgvp->ldg_intrs; i++, ldgp++) {
 		rs = npi_intr_ldg_mgmt_set(handle, ldgp->ldg,
-			ldgp->arm, ldgp->ldg_timer);
+		    ldgp->arm, ldgp->ldg_timer);
 		if (rs != NPI_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"<== nxge_intr_mask_mgmt: "
-				"set timer failed "
-				" rs 0x%x dg %d timer 0x%x",
-				rs, ldgp->ldg, ldgp->ldg_timer));
+			    "<== nxge_intr_mask_mgmt: "
+			    "set timer failed "
+			    " rs 0x%x dg %d timer 0x%x",
+			    rs, ldgp->ldg, ldgp->ldg_timer));
 			return (NXGE_ERROR | rs);
 		}
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_intr_mask_mgmt: "
-			"set timer OK "
-			" rs 0x%x ldg %d timer 0x%x",
-			rs, ldgp->ldg, ldgp->ldg_timer));
+		    "==> nxge_intr_mask_mgmt: "
+		    "set timer OK "
+		    " rs 0x%x ldg %d timer 0x%x",
+		    rs, ldgp->ldg, ldgp->ldg_timer));
 	}
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_fzc_intr_mask_mgmt"));
@@ -3441,18 +3441,18 @@ nxge_intr_mask_mgmt_set(p_nxge_t nxgep, boolean_t on)
 	npi_status_t rs = NPI_SUCCESS;
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL,
-		"==> nxge_intr_mask_mgmt_set (%d)", on));
+	    "==> nxge_intr_mask_mgmt_set (%d)", on));
 
 	if (nxgep->niu_type == N2_NIU) {
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"<== nxge_intr_mask_mgmt_set (%d) not set (N2/NIU)",
-			on));
+		    "<== nxge_intr_mask_mgmt_set (%d) not set (N2/NIU)",
+		    on));
 		return (NXGE_ERROR);
 	}
 
 	if ((ldgvp = nxgep->ldgvp) == NULL) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_intr_mask_mgmt_set: Null ldgvp"));
+		    "==> nxge_intr_mask_mgmt_set: Null ldgvp"));
 		return (NXGE_ERROR);
 	}
 
@@ -3461,43 +3461,43 @@ nxge_intr_mask_mgmt_set(p_nxge_t nxgep, boolean_t on)
 	ldvp = ldgvp->ldvp;
 	if (ldgp == NULL || ldvp == NULL) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"<== nxge_intr_mask_mgmt_set: Null ldgp or ldvp"));
+		    "<== nxge_intr_mask_mgmt_set: Null ldgp or ldvp"));
 		return (NXGE_ERROR);
 	}
 	/* set masks. */
 	for (i = 0; i < ldgvp->ldg_intrs; i++, ldgp++) {
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_intr_mask_mgmt_set: flag %d ldg %d"
-			"set mask nldvs %d", on, ldgp->ldg, ldgp->nldvs));
+		    "==> nxge_intr_mask_mgmt_set: flag %d ldg %d"
+		    "set mask nldvs %d", on, ldgp->ldg, ldgp->nldvs));
 		for (j = 0; j < ldgp->nldvs; j++, ldvp++) {
 			NXGE_DEBUG_MSG((nxgep, INT_CTL,
-				"==> nxge_intr_mask_mgmt_set: "
-				"for %d %d flag %d", i, j, on));
+			    "==> nxge_intr_mask_mgmt_set: "
+			    "for %d %d flag %d", i, j, on));
 			if (on) {
 				ldvp->ldv_ldf_masks = 0;
 				NXGE_DEBUG_MSG((nxgep, INT_CTL,
-					"==> nxge_intr_mask_mgmt_set: "
-					"ON mask off"));
+				    "==> nxge_intr_mask_mgmt_set: "
+				    "ON mask off"));
 			} else if (!on) {
 				ldvp->ldv_ldf_masks = (uint8_t)LD_IM1_MASK;
 				NXGE_DEBUG_MSG((nxgep, INT_CTL,
-					"==> nxge_intr_mask_mgmt_set:mask on"));
+				    "==> nxge_intr_mask_mgmt_set:mask on"));
 			}
 			rs = npi_intr_mask_set(handle, ldvp->ldv,
-				ldvp->ldv_ldf_masks);
+			    ldvp->ldv_ldf_masks);
 			if (rs != NPI_SUCCESS) {
 				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-					"==> nxge_intr_mask_mgmt_set: "
-					"set mask failed "
-					" rs 0x%x ldv %d mask 0x%x",
-					rs, ldvp->ldv, ldvp->ldv_ldf_masks));
+				    "==> nxge_intr_mask_mgmt_set: "
+				    "set mask failed "
+				    " rs 0x%x ldv %d mask 0x%x",
+				    rs, ldvp->ldv, ldvp->ldv_ldf_masks));
 				return (NXGE_ERROR | rs);
 			}
 			NXGE_DEBUG_MSG((nxgep, INT_CTL,
-				"==> nxge_intr_mask_mgmt_set: flag %d"
-				"set mask OK "
-				" ldv %d mask 0x%x",
-				on, ldvp->ldv, ldvp->ldv_ldf_masks));
+			    "==> nxge_intr_mask_mgmt_set: flag %d"
+			    "set mask OK "
+			    " ldv %d mask 0x%x",
+			    on, ldvp->ldv, ldvp->ldv_ldf_masks));
 		}
 	}
 
@@ -3510,20 +3510,20 @@ nxge_intr_mask_mgmt_set(p_nxge_t nxgep, boolean_t on)
 			ldgp->arm = B_FALSE;
 		}
 		rs = npi_intr_ldg_mgmt_set(handle, ldgp->ldg,
-			ldgp->arm, ldgp->ldg_timer);
+		    ldgp->arm, ldgp->ldg_timer);
 		if (rs != NPI_SUCCESS) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				"<== nxge_intr_mask_mgmt_set: "
-				"set timer failed "
-				" rs 0x%x ldg %d timer 0x%x",
-				rs, ldgp->ldg, ldgp->ldg_timer));
+			    "<== nxge_intr_mask_mgmt_set: "
+			    "set timer failed "
+			    " rs 0x%x ldg %d timer 0x%x",
+			    rs, ldgp->ldg, ldgp->ldg_timer));
 			return (NXGE_ERROR | rs);
 		}
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_intr_mask_mgmt_set: OK (flag %d) "
-			"set timer "
-			" ldg %d timer 0x%x",
-			on, ldgp->ldg, ldgp->ldg_timer));
+		    "==> nxge_intr_mask_mgmt_set: OK (flag %d) "
+		    "set timer "
+		    " ldg %d timer 0x%x",
+		    on, ldgp->ldg, ldgp->ldg_timer));
 	}
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_intr_mask_mgmt_set"));
@@ -3555,24 +3555,24 @@ nxge_get_mac_addr_properties(p_nxge_t nxgep)
 	 * present, override the system mac address.
 	 */
 	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, nxgep->dip, 0,
-			"local-mac-address", &prop_val,
-			&prop_len) == DDI_PROP_SUCCESS) {
+	    "local-mac-address", &prop_val,
+	    &prop_len) == DDI_PROP_SUCCESS) {
 		if (prop_len == ETHERADDRL) {
 			nxgep->factaddr = *(p_ether_addr_t)prop_val;
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL, "Local mac address = "
-				"%02x:%02x:%02x:%02x:%02x:%02x",
-				prop_val[0], prop_val[1], prop_val[2],
-				prop_val[3], prop_val[4], prop_val[5]));
+			    "%02x:%02x:%02x:%02x:%02x:%02x",
+			    prop_val[0], prop_val[1], prop_val[2],
+			    prop_val[3], prop_val[4], prop_val[5]));
 		}
 		ddi_prop_free(prop_val);
 	}
 	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, nxgep->dip, 0,
-			"local-mac-address?", &prop_val,
-			&prop_len) == DDI_PROP_SUCCESS) {
+	    "local-mac-address?", &prop_val,
+	    &prop_len) == DDI_PROP_SUCCESS) {
 		if (strncmp("true", (caddr_t)prop_val, (size_t)prop_len) == 0) {
 			nxgep->ouraddr = nxgep->factaddr;
 			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-				"Using local MAC address"));
+			    "Using local MAC address"));
 		}
 		ddi_prop_free(prop_val);
 	} else {
@@ -3697,7 +3697,7 @@ got_mmac_info:
 
 	for (i = 0; i <= nxgep->nxge_mmac_info.num_mmac; i++) {
 		(void) npi_mac_altaddr_disable(nxgep->npi_handle,
-			NXGE_GET_PORT_NUM(func_num), i);
+		    NXGE_GET_PORT_NUM(func_num), i);
 	}
 
 	(void) nxge_init_mmac(nxgep, compute_macs);
@@ -3717,17 +3717,17 @@ nxge_get_xcvr_properties(p_nxge_t nxgep)
 	 */
 	nxgep->statsp->mac_stats.xcvr_inuse = INT_MII_XCVR;
 	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, nxgep->dip, 0,
-			"phy-type", &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
+	    "phy-type", &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		if (strncmp("pcs", (caddr_t)prop_val,
-				(size_t)prop_len) == 0) {
+		    (size_t)prop_len) == 0) {
 			nxgep->statsp->mac_stats.xcvr_inuse = PCS_XCVR;
 		} else {
 			nxgep->statsp->mac_stats.xcvr_inuse = INT_MII_XCVR;
 		}
 		ddi_prop_free(prop_val);
 	} else if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, nxgep->dip, 0,
-			"phy-interface", &prop_val,
-			&prop_len) == DDI_PROP_SUCCESS) {
+	    "phy-interface", &prop_val,
+	    &prop_len) == DDI_PROP_SUCCESS) {
 		if (strncmp("pcs", (caddr_t)prop_val, (size_t)prop_len) == 0) {
 			nxgep->statsp->mac_stats.xcvr_inuse = PCS_XCVR;
 		} else {
@@ -3752,8 +3752,8 @@ nxge_ldgv_setup(p_nxge_ldg_t *ldgp, p_nxge_ldv_t *ldvp, uint8_t ldv,
 	(*ldvp)->ldv = ldv;
 
 	NXGE_DEBUG_MSG((NULL, INT_CTL, "==> nxge_ldgv_setup: "
-		"ldv %d endldg %d ldg %d, ldvp $%p",
-		ldv, endldg, (*ldgp)->ldg, (*ldgp)->ldvp));
+	    "ldv %d endldg %d ldg %d, ldvp $%p",
+	    ldv, endldg, (*ldgp)->ldg, (*ldgp)->ldvp));
 
 	(*ldgp)->nldvs++;
 	if ((*ldgp)->ldg == (endldg - 1)) {
@@ -3761,27 +3761,27 @@ nxge_ldgv_setup(p_nxge_ldg_t *ldgp, p_nxge_ldv_t *ldvp, uint8_t ldv,
 			(*ldgp)->ldvp = *ldvp;
 			*ngrps += 1;
 			NXGE_DEBUG_MSG((NULL, INT_CTL,
-				"==> nxge_ldgv_setup: ngrps %d", *ngrps));
+			    "==> nxge_ldgv_setup: ngrps %d", *ngrps));
 		}
 		NXGE_DEBUG_MSG((NULL, INT_CTL,
-			"==> nxge_ldgv_setup: ldvp $%p ngrps %d",
-			*ldvp, *ngrps));
+		    "==> nxge_ldgv_setup: ldvp $%p ngrps %d",
+		    *ldvp, *ngrps));
 		++*ldvp;
 	} else {
 		(*ldgp)->ldvp = *ldvp;
 		*ngrps += 1;
 		NXGE_DEBUG_MSG((NULL, INT_CTL, "==> nxge_ldgv_setup(done): "
-			"ldv %d endldg %d ldg %d, ldvp $%p",
-			ldv, endldg, (*ldgp)->ldg, (*ldgp)->ldvp));
+		    "ldv %d endldg %d ldg %d, ldvp $%p",
+		    ldv, endldg, (*ldgp)->ldg, (*ldgp)->ldvp));
 		(*ldvp) = ++*ldvp;
 		(*ldgp) = ++*ldgp;
 		NXGE_DEBUG_MSG((NULL, INT_CTL,
-			"==> nxge_ldgv_setup: new ngrps %d", *ngrps));
+		    "==> nxge_ldgv_setup: new ngrps %d", *ngrps));
 	}
 
 	NXGE_DEBUG_MSG((NULL, INT_CTL, "==> nxge_ldgv_setup: "
-		"ldv %d ldvp $%p endldg %d ngrps %d",
-		ldv, ldvp, endldg, *ngrps));
+	    "ldv %d ldvp $%p endldg %d ngrps %d",
+	    ldv, ldvp, endldg, *ngrps));
 
 	NXGE_DEBUG_MSG((NULL, INT_CTL, "<== nxge_ldgv_setup"));
 }
@@ -3902,7 +3902,7 @@ nxge_init_mmac(p_nxge_t nxgep, boolean_t compute_addrs)
 		 * for the first alternate mac address.
 		 */
 		(void) npi_mac_altaddr_entry(nxgep->npi_handle, OP_SET,
-			NXGE_GET_PORT_NUM(func_num), slot - 1, &mac_addr);
+		    NXGE_GET_PORT_NUM(func_num), slot - 1, &mac_addr);
 	}
 	/* Initialize the first two parameters for mmac kstat */
 	nxgep->statsp->mmac_stats.mmac_max_cnt = mmac_info->num_mmac;

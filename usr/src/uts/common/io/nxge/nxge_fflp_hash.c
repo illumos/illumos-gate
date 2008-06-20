@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -83,7 +83,7 @@ static uint32_t
 flip32(uint32_t w)
 {
 	return (((w >> 24) | ((w >> 8) & 0xff00) |
-		((w << 8) & 0xff0000) | (w << 24)));
+	    ((w << 8) & 0xff0000) | (w << 24)));
 }
 
 /*
@@ -98,8 +98,8 @@ crc_ccitt(uint16_t crcin, uint8_t data)
 	mcrc = (((crcin >> 8) ^ data) & 0xff) << 8;
 	for (bits = 0; bits < 8; bits++) {
 		crc = ((crc ^ mcrc) & 0x8000) ?
-			(crc << 1) ^ CRC_CCITT_POLY :
-			crc << 1;
+		    (crc << 1) ^ CRC_CCITT_POLY :
+		    crc << 1;
 		mcrc <<= 1;
 	}
 	return ((crcin << 8) ^ crc);
@@ -119,7 +119,7 @@ nxge_crc32c_init(void)
 		for (byte = 0; byte < 4; byte++) {
 			for (bit = 0; bit < 8; bit++) {
 				crc = (crc & 0x80000000) ?
-					(crc << 1) ^ SCTP_POLY : crc << 1;
+				    (crc << 1) ^ SCTP_POLY : crc << 1;
 			}
 #ifdef _BIG_ENDIAN
 			crc32c_tab[3 - byte][index] = flip32(reflect_32(crc));
@@ -145,7 +145,7 @@ nxge_crc_ccitt_init(void)
 		for (byte = 0; byte < 4; byte++) {
 			for (bit = 0; bit < 8; bit++) {
 				crc = (crc & 0x8000) ?
-					(crc << 1) ^ CRC_CCITT_POLY : crc << 1;
+				    (crc << 1) ^ CRC_CCITT_POLY : crc << 1;
 			}
 #ifdef _BIG_ENDIAN
 			crc_ccitt_tab[3 - byte][index] = crc;
@@ -216,9 +216,9 @@ nxge_crc32c_word(uint32_t *crcptr, const uint32_t *buf, int len)
 	for (i = 0; i < len; i++) {
 		w = crc ^ buf[i];
 		crc = crc32c_tab[0][w >> 24] ^
-			crc32c_tab[1][(w >> 16) & 0xff] ^
-			crc32c_tab[2][(w >> 8) & 0xff] ^
-			crc32c_tab[3][w & 0xff];
+		    crc32c_tab[1][(w >> 16) & 0xff] ^
+		    crc32c_tab[2][(w >> 8) & 0xff] ^
+		    crc32c_tab[3][w & 0xff];
 	}
 	*crcptr = crc;
 }
@@ -285,7 +285,7 @@ nxge_init_h1_table()
 		for (byte = 0; byte < 4; byte++) {
 			for (bit = 0; bit < 8; bit++) {
 				crc = ((crc & 0x80000000)) ?
-					(crc << 1) ^ CRC_32C_POLY : crc << 1;
+				    (crc << 1) ^ CRC_32C_POLY : crc << 1;
 			}
 			h1table[byte][index] = crc;
 		}
@@ -310,8 +310,8 @@ nxge_compute_h1_serial(uint32_t init_value, uint32_t *flow, uint32_t len)
 	for (byte = 0; byte < len; byte++) {
 		for (bit = 0; bit < 8; bit++) {
 			crc_h1 = (((crc_h1 >> 24) & 0x80) ^
-				((buf[byte] << bit) & 0x80)) ?
-				(crc_h1 << 1) ^ CRC_32C_POLY : crc_h1 << 1;
+			    ((buf[byte] << bit) & 0x80)) ?
+			    (crc_h1 << 1) ^ CRC_32C_POLY : crc_h1 << 1;
 		}
 	}
 
@@ -344,7 +344,7 @@ nxge_compute_h1_table4(uint32_t crcin, uint32_t *flow, uint32_t length)
 #endif
 		w = crch1 ^ fw;
 		crch1 = h1table[3][w >> 24] ^ h1table[2][(w >> 16) & 0xff] ^
-			h1table[1][(w >> 8) & 0xff] ^ h1table[0][w & 0xff];
+		    h1table[1][(w >> 8) & 0xff] ^ h1table[0][w & 0xff];
 	}
 	return (crch1);
 }

@@ -106,8 +106,8 @@ nxge_init_txdma_channels(p_nxge_t nxgep)
 			for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
 				if ((1 << tdc) & group->map) {
 					if ((nxge_grp_dc_add(nxgep,
-						(vr_handle_t)group,
-						VP_BOUND_TX, tdc)))
+					    (vr_handle_t)group,
+					    VP_BOUND_TX, tdc)))
 						return (NXGE_ERROR);
 				}
 			}
@@ -190,7 +190,7 @@ nxge_uninit_txdma_channel(p_nxge_t nxgep, int channel)
 	nxge_unmap_txdma_channel(nxgep, channel);
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"<== nxge_uninit_txdma_channel"));
+	    "<== nxge_uninit_txdma_channel"));
 }
 
 void
@@ -248,7 +248,7 @@ nxge_reset_txdma_channel(p_nxge_t nxgep, uint16_t channel, uint64_t reg_data)
 		rs = npi_txdma_channel_reset(handle, channel);
 	} else {
 		rs = npi_txdma_channel_control(handle, TXDMA_RESET,
-				channel);
+		    channel);
 	}
 
 	if (rs != NPI_SUCCESS) {
@@ -296,7 +296,7 @@ nxge_init_txdma_channel_event_mask(p_nxge_t nxgep, uint16_t channel,
 	nxge_status_t		status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"<== nxge_init_txdma_channel_event_mask"));
+	    "<== nxge_init_txdma_channel_event_mask"));
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	rs = npi_txdma_event_mask(handle, OP_SET, channel, mask_p);
@@ -336,11 +336,11 @@ nxge_init_txdma_channel_cntl_stat(p_nxge_t nxgep, uint16_t channel,
 	nxge_status_t		status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"<== nxge_init_txdma_channel_cntl_stat"));
+	    "<== nxge_init_txdma_channel_cntl_stat"));
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	rs = npi_txdma_control_status(handle, OP_SET, channel,
-			(p_tx_cs_t)&reg_data);
+	    (p_tx_cs_t)&reg_data);
 
 	if (rs != NPI_SUCCESS) {
 		status = NXGE_ERROR | rs;
@@ -406,7 +406,7 @@ nxge_enable_txdma_channel(p_nxge_t nxgep,
 
 	/* Write to hardware the mailbox */
 	rs = npi_txdma_mbox_config(handle, OP_SET, channel,
-		(uint64_t *)&mbox_p->tx_mbox.dma_cookie.dmac_laddress);
+	    (uint64_t *)&mbox_p->tx_mbox.dma_cookie.dmac_laddress);
 
 	if (rs != NPI_SUCCESS) {
 		return (NXGE_ERROR | rs);
@@ -438,7 +438,7 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 	size_t 			iph_len;
 	size_t 			hdrs_size;
 	uint8_t			hdrs_buf[sizeof (struct ether_header) +
-					64 + sizeof (uint32_t)];
+	    64 + sizeof (uint32_t)];
 	uint8_t			*cursor;
 	uint8_t 		*ip_buf;
 	uint16_t		eth_type;
@@ -455,8 +455,8 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 
 	if (fill_len) {
 		NXGE_DEBUG_MSG((NULL, TX_CTL,
-			"==> nxge_fill_tx_hdr: pkt_len %d "
-			"npads %d", pkt_len, npads));
+		    "==> nxge_fill_tx_hdr: pkt_len %d "
+		    "npads %d", pkt_len, npads));
 		tmp = (uint64_t)pkt_len;
 		hdrp->value |= (tmp << TX_PKT_HEADER_TOT_XFER_LEN_SHIFT);
 		goto fill_tx_header_done;
@@ -470,8 +470,8 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 	 */
 	nmp = mp;
 	NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_fill_tx_hdr: "
-		"mp $%p b_rptr $%p len %d",
-		mp, nmp->b_rptr, MBLKL(nmp)));
+	    "mp $%p b_rptr $%p len %d",
+	    mp, nmp->b_rptr, MBLKL(nmp)));
 	/* copy ether_header from mblk to hdrs_buf */
 	cursor = &hdrs_buf[0];
 	tmp = sizeof (struct ether_vlan_header);
@@ -490,20 +490,20 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 	ip_buf = NULL;
 	eth_type = ntohs(((p_ether_header_t)hdrs_buf)->ether_type);
 	NXGE_DEBUG_MSG((NULL, TX_CTL, "==> : nxge_fill_tx_hdr: (value 0x%llx) "
-		"ether type 0x%x", eth_type, hdrp->value));
+	    "ether type 0x%x", eth_type, hdrp->value));
 
 	if (eth_type < ETHERMTU) {
 		tmp = 1ull;
 		hdrp->value |= (tmp << TX_PKT_HEADER_LLC_SHIFT);
 		NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_tx_pkt_hdr_init: LLC "
-			"value 0x%llx", hdrp->value));
+		    "value 0x%llx", hdrp->value));
 		if (*(hdrs_buf + sizeof (struct ether_header))
-				== LLC_SNAP_SAP) {
+		    == LLC_SNAP_SAP) {
 			eth_type = ntohs(*((uint16_t *)(hdrs_buf +
-					sizeof (struct ether_header) + 6)));
+			    sizeof (struct ether_header) + 6)));
 			NXGE_DEBUG_MSG((NULL, TX_CTL,
-				"==> nxge_tx_pkt_hdr_init: LLC ether type 0x%x",
-				eth_type));
+			    "==> nxge_tx_pkt_hdr_init: LLC ether type 0x%x",
+			    eth_type));
 		} else {
 			goto fill_tx_header_done;
 		}
@@ -512,10 +512,10 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 		hdrp->value |= (tmp << TX_PKT_HEADER_VLAN__SHIFT);
 
 		eth_type = ntohs(((struct ether_vlan_header *)
-			hdrs_buf)->ether_type);
+		    hdrs_buf)->ether_type);
 		is_vlan = B_TRUE;
 		NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_tx_pkt_hdr_init: VLAN "
-			"value 0x%llx", hdrp->value));
+		    "value 0x%llx", hdrp->value));
 	}
 
 	if (!is_vlan) {
@@ -542,15 +542,15 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 			hdrs_size = 0;
 			((p_ether_header_t)hdrs_buf)->ether_type = 0;
 			while ((nmp) && (hdrs_size <
-					sizeof (hdrs_buf))) {
+			    sizeof (hdrs_buf))) {
 				mblk_len = (size_t)nmp->b_wptr -
-					(size_t)nmp->b_rptr;
+				    (size_t)nmp->b_rptr;
 				if (mblk_len >=
-					(sizeof (hdrs_buf) - hdrs_size))
+				    (sizeof (hdrs_buf) - hdrs_size))
 					mblk_len = sizeof (hdrs_buf) -
-						hdrs_size;
+					    hdrs_size;
 				bcopy(nmp->b_rptr,
-					&hdrs_buf[hdrs_size], mblk_len);
+				    &hdrs_buf[hdrs_size], mblk_len);
 				hdrs_size += mblk_len;
 				nmp = nmp->b_cont;
 			}
@@ -567,12 +567,12 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 		hdrp->value |= (tmp << TX_PKT_HEADER_L3START_SHIFT);
 
 		NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_fill_tx_hdr: IPv4 "
-			" iph_len %d l3start %d eth_hdr_size %d proto 0x%x"
-			"tmp 0x%x",
-			iph_len, hdrp->bits.hdw.l3start, eth_hdr_size,
-			ipproto, tmp));
+		    " iph_len %d l3start %d eth_hdr_size %d proto 0x%x"
+		    "tmp 0x%x",
+		    iph_len, hdrp->bits.hdw.l3start, eth_hdr_size,
+		    ipproto, tmp));
 		NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_tx_pkt_hdr_init: IP "
-			"value 0x%llx", hdrp->value));
+		    "value 0x%llx", hdrp->value));
 
 		break;
 
@@ -580,14 +580,14 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 		hdrs_size = 0;
 		((p_ether_header_t)hdrs_buf)->ether_type = 0;
 		while ((nmp) && (hdrs_size <
-				sizeof (hdrs_buf))) {
+		    sizeof (hdrs_buf))) {
 			mblk_len = (size_t)nmp->b_wptr - (size_t)nmp->b_rptr;
 			if (mblk_len >=
-				(sizeof (hdrs_buf) - hdrs_size))
+			    (sizeof (hdrs_buf) - hdrs_size))
 				mblk_len = sizeof (hdrs_buf) -
-					hdrs_size;
+				    hdrs_size;
 			bcopy(nmp->b_rptr,
-				&hdrs_buf[hdrs_size], mblk_len);
+			    &hdrs_buf[hdrs_size], mblk_len);
 			hdrs_size += mblk_len;
 			nmp = nmp->b_cont;
 		}
@@ -604,11 +604,11 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 		ipproto = ip_buf[6];
 
 		NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_fill_tx_hdr: IPv6 "
-			" iph_len %d l3start %d eth_hdr_size %d proto 0x%x",
-			iph_len, hdrp->bits.hdw.l3start, eth_hdr_size,
-			ipproto));
+		    " iph_len %d l3start %d eth_hdr_size %d proto 0x%x",
+		    iph_len, hdrp->bits.hdw.l3start, eth_hdr_size,
+		    ipproto));
 		NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_tx_pkt_hdr_init: IPv6 "
-			"value 0x%llx", hdrp->value));
+		    "value 0x%llx", hdrp->value));
 
 		break;
 
@@ -697,8 +697,8 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 		}
 
 		NXGE_DEBUG_MSG((NULL, TX_CTL,
-			"==> nxge_tx_pkt_hdr_init: UDP"
-			"value 0x%llx", hdrp->value));
+		    "==> nxge_tx_pkt_hdr_init: UDP"
+		    "value 0x%llx", hdrp->value));
 		break;
 
 	default:
@@ -707,8 +707,8 @@ nxge_fill_tx_hdr(p_mblk_t mp, boolean_t fill_len,
 
 fill_tx_header_done:
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"==> nxge_fill_tx_hdr: pkt_len %d  "
-		"npads %d value 0x%llx", pkt_len, npads, hdrp->value));
+	    "==> nxge_fill_tx_hdr: pkt_len %d  "
+	    "npads %d value 0x%llx", pkt_len, npads, hdrp->value));
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL, "<== nxge_fill_tx_hdr"));
 }
@@ -721,23 +721,23 @@ nxge_tx_pkt_header_reserve(p_mblk_t mp, uint8_t *npads)
 
 	if ((newmp = allocb(TX_PKT_HEADER_SIZE, BPRI_MED)) == NULL) {
 		NXGE_DEBUG_MSG((NULL, TX_CTL,
-			"<== nxge_tx_pkt_header_reserve: allocb failed"));
+		    "<== nxge_tx_pkt_header_reserve: allocb failed"));
 		return (NULL);
 	}
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"==> nxge_tx_pkt_header_reserve: get new mp"));
+	    "==> nxge_tx_pkt_header_reserve: get new mp"));
 	DB_TYPE(newmp) = M_DATA;
 	newmp->b_rptr = newmp->b_wptr = DB_LIM(newmp);
 	linkb(newmp, mp);
 	newmp->b_rptr -= TX_PKT_HEADER_SIZE;
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL, "==>nxge_tx_pkt_header_reserve: "
-		"b_rptr $%p b_wptr $%p",
-		newmp->b_rptr, newmp->b_wptr));
+	    "b_rptr $%p b_wptr $%p",
+	    newmp->b_rptr, newmp->b_wptr));
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"<== nxge_tx_pkt_header_reserve: use new mp"));
+	    "<== nxge_tx_pkt_header_reserve: use new mp"));
 
 	return (newmp);
 }
@@ -752,8 +752,8 @@ nxge_tx_pkt_nmblocks(p_mblk_t mp, int *tot_xfer_len_p)
 	uint8_t 		*b_wptr;
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"==> nxge_tx_pkt_nmblocks: mp $%p rptr $%p wptr $%p "
-		"len %d", mp, mp->b_rptr, mp->b_wptr, MBLKL(mp)));
+	    "==> nxge_tx_pkt_nmblocks: mp $%p rptr $%p wptr $%p "
+	    "len %d", mp, mp->b_rptr, mp->b_wptr, MBLKL(mp)));
 
 	nmp = mp;
 	bmp = mp;
@@ -764,31 +764,31 @@ nxge_tx_pkt_nmblocks(p_mblk_t mp, int *tot_xfer_len_p)
 	while (nmp) {
 		len = MBLKL(nmp);
 		NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_tx_pkt_nmblocks: "
-			"len %d pkt_len %d nmblks %d tot_xfer_len %d",
-			len, pkt_len, nmblks,
-			*tot_xfer_len_p));
+		    "len %d pkt_len %d nmblks %d tot_xfer_len %d",
+		    len, pkt_len, nmblks,
+		    *tot_xfer_len_p));
 
 		if (len <= 0) {
 			bmp = nmp;
 			nmp = nmp->b_cont;
 			NXGE_DEBUG_MSG((NULL, TX_CTL,
-				"==> nxge_tx_pkt_nmblocks: "
-				"len (0) pkt_len %d nmblks %d",
-				pkt_len, nmblks));
+			    "==> nxge_tx_pkt_nmblocks: "
+			    "len (0) pkt_len %d nmblks %d",
+			    pkt_len, nmblks));
 			continue;
 		}
 
 		*tot_xfer_len_p += len;
 		NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_tx_pkt_nmblocks: "
-			"len %d pkt_len %d nmblks %d tot_xfer_len %d",
-			len, pkt_len, nmblks,
-			*tot_xfer_len_p));
+		    "len %d pkt_len %d nmblks %d tot_xfer_len %d",
+		    len, pkt_len, nmblks,
+		    *tot_xfer_len_p));
 
 		if (len < nxge_bcopy_thresh) {
 			NXGE_DEBUG_MSG((NULL, TX_CTL,
-				"==> nxge_tx_pkt_nmblocks: "
-				"len %d (< thresh) pkt_len %d nmblks %d",
-				len, pkt_len, nmblks));
+			    "==> nxge_tx_pkt_nmblocks: "
+			    "len %d (< thresh) pkt_len %d nmblks %d",
+			    len, pkt_len, nmblks));
 			if (pkt_len == 0)
 				nmblks++;
 			pkt_len += len;
@@ -799,9 +799,9 @@ nxge_tx_pkt_nmblocks(p_mblk_t mp, int *tot_xfer_len_p)
 			}
 		} else {
 			NXGE_DEBUG_MSG((NULL, TX_CTL,
-				"==> nxge_tx_pkt_nmblocks: "
-				"len %d (> thresh) pkt_len %d nmblks %d",
-				len, pkt_len, nmblks));
+			    "==> nxge_tx_pkt_nmblocks: "
+			    "len %d (> thresh) pkt_len %d nmblks %d",
+			    len, pkt_len, nmblks));
 			pkt_len = 0;
 			nmblks++;
 			/*
@@ -814,15 +814,15 @@ nxge_tx_pkt_nmblocks(p_mblk_t mp, int *tot_xfer_len_p)
 
 				nsegs = 1;
 				NXGE_DEBUG_MSG((NULL, TX_CTL,
-					"==> nxge_tx_pkt_nmblocks: "
-					"len %d pkt_len %d nmblks %d nsegs %d",
-					len, pkt_len, nmblks, nsegs));
+				    "==> nxge_tx_pkt_nmblocks: "
+				    "len %d pkt_len %d nmblks %d nsegs %d",
+				    len, pkt_len, nmblks, nsegs));
 				if (len % (TX_MAX_TRANSFER_LENGTH * 2)) {
 					++nsegs;
 				}
 				do {
 					b_wptr = nmp->b_rptr +
-						TX_MAX_TRANSFER_LENGTH;
+					    TX_MAX_TRANSFER_LENGTH;
 					nmp->b_wptr = b_wptr;
 					if ((tmp = dupb(nmp)) == NULL) {
 						return (0);
@@ -844,11 +844,11 @@ nxge_tx_pkt_nmblocks(p_mblk_t mp, int *tot_xfer_len_p)
 		 * Hardware limits the transmit gather pointers to 15.
 		 */
 		if (nmp->b_cont && (nmblks + TX_GATHER_POINTERS_THRESHOLD) >
-				TX_MAX_GATHER_POINTERS) {
+		    TX_MAX_GATHER_POINTERS) {
 			NXGE_DEBUG_MSG((NULL, TX_CTL,
-				"==> nxge_tx_pkt_nmblocks: pull msg - "
-				"len %d pkt_len %d nmblks %d",
-				len, pkt_len, nmblks));
+			    "==> nxge_tx_pkt_nmblocks: pull msg - "
+			    "len %d pkt_len %d nmblks %d",
+			    len, pkt_len, nmblks));
 			/* Pull all message blocks from b_cont */
 			if ((tmp = msgpullup(nmp->b_cont, -1)) == NULL) {
 				return (0);
@@ -862,10 +862,10 @@ nxge_tx_pkt_nmblocks(p_mblk_t mp, int *tot_xfer_len_p)
 	}
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"<== nxge_tx_pkt_nmblocks: rptr $%p wptr $%p "
-		"nmblks %d len %d tot_xfer_len %d",
-		mp->b_rptr, mp->b_wptr, nmblks,
-		MBLKL(mp), *tot_xfer_len_p));
+	    "<== nxge_tx_pkt_nmblocks: rptr $%p wptr $%p "
+	    "nmblks %d len %d tot_xfer_len %d",
+	    mp->b_rptr, mp->b_wptr, nmblks,
+	    MBLKL(mp), *tot_xfer_len_p));
 
 	return (nmblks);
 }
@@ -895,18 +895,18 @@ nxge_txdma_reclaim(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, int nmblks)
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_txdma_reclaim"));
 
 	status = ((tx_ring_p->descs_pending < nxge_reclaim_pending) &&
-			(nmblks != 0));
+	    (nmblks != 0));
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_txdma_reclaim: pending %d  reclaim %d nmblks %d",
-			tx_ring_p->descs_pending, nxge_reclaim_pending,
-			nmblks));
+	    "==> nxge_txdma_reclaim: pending %d  reclaim %d nmblks %d",
+	    tx_ring_p->descs_pending, nxge_reclaim_pending,
+	    nmblks));
 	if (!status) {
 		tx_desc_dma_p = &tx_ring_p->tdc_desc;
 		desc_area = tx_ring_p->tdc_desc;
 		handle = NXGE_DEV_NPI_HANDLE(nxgep);
 		tx_desc_ring_vp = tx_desc_dma_p->kaddrp;
 		tx_desc_ring_vp =
-			(p_tx_desc_t)DMA_COMMON_VPTR(desc_area);
+		    (p_tx_desc_t)DMA_COMMON_VPTR(desc_area);
 		tx_rd_index = tx_ring_p->rd_index;
 		tx_desc_p = &tx_desc_ring_vp[tx_rd_index];
 		tx_msg_ring = tx_ring_p->tx_msg_ring;
@@ -921,11 +921,11 @@ nxge_txdma_reclaim(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, int nmblks)
 		tail_wrap = tx_ring_p->wr_index_wrap;
 
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_txdma_reclaim: tdc %d tx_rd_index %d "
-			"tail_index %d tail_wrap %d "
-			"tx_desc_p $%p ($%p) ",
-			tdc, tx_rd_index, tail_index, tail_wrap,
-			tx_desc_p, (*(uint64_t *)tx_desc_p)));
+		    "==> nxge_txdma_reclaim: tdc %d tx_rd_index %d "
+		    "tail_index %d tail_wrap %d "
+		    "tx_desc_p $%p ($%p) ",
+		    tdc, tx_rd_index, tail_index, tail_wrap,
+		    tx_desc_p, (*(uint64_t *)tx_desc_p)));
 		/*
 		 * Read the hardware maintained transmit head
 		 * and wrap around bit.
@@ -934,107 +934,107 @@ nxge_txdma_reclaim(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, int nmblks)
 		head_index =  tx_head.bits.ldw.head;
 		head_wrap = tx_head.bits.ldw.wrap;
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_txdma_reclaim: "
-			"tx_rd_index %d tail %d tail_wrap %d "
-			"head %d wrap %d",
-			tx_rd_index, tail_index, tail_wrap,
-			head_index, head_wrap));
+		    "==> nxge_txdma_reclaim: "
+		    "tx_rd_index %d tail %d tail_wrap %d "
+		    "head %d wrap %d",
+		    tx_rd_index, tail_index, tail_wrap,
+		    head_index, head_wrap));
 
 		if (head_index == tail_index) {
 			if (TXDMA_RING_EMPTY(head_index, head_wrap,
-					tail_index, tail_wrap) &&
-					(head_index == tx_rd_index)) {
+			    tail_index, tail_wrap) &&
+			    (head_index == tx_rd_index)) {
 				NXGE_DEBUG_MSG((nxgep, TX_CTL,
-					"==> nxge_txdma_reclaim: EMPTY"));
+				    "==> nxge_txdma_reclaim: EMPTY"));
 				return (B_TRUE);
 			}
 
 			NXGE_DEBUG_MSG((nxgep, TX_CTL,
-				"==> nxge_txdma_reclaim: Checking "
-					"if ring full"));
+			    "==> nxge_txdma_reclaim: Checking "
+			    "if ring full"));
 			if (TXDMA_RING_FULL(head_index, head_wrap, tail_index,
-					tail_wrap)) {
+			    tail_wrap)) {
 				NXGE_DEBUG_MSG((nxgep, TX_CTL,
-					"==> nxge_txdma_reclaim: full"));
+				    "==> nxge_txdma_reclaim: full"));
 				return (B_FALSE);
 			}
 		}
 
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_txdma_reclaim: tx_rd_index and head_index"));
+		    "==> nxge_txdma_reclaim: tx_rd_index and head_index"));
 
 		tx_desc_pp = &r_tx_desc;
 		while ((tx_rd_index != head_index) &&
-			(tx_ring_p->descs_pending != 0)) {
+		    (tx_ring_p->descs_pending != 0)) {
 
 			NXGE_DEBUG_MSG((nxgep, TX_CTL,
-				"==> nxge_txdma_reclaim: Checking if pending"));
+			    "==> nxge_txdma_reclaim: Checking if pending"));
 
 			NXGE_DEBUG_MSG((nxgep, TX_CTL,
-				"==> nxge_txdma_reclaim: "
-				"descs_pending %d ",
-				tx_ring_p->descs_pending));
+			    "==> nxge_txdma_reclaim: "
+			    "descs_pending %d ",
+			    tx_ring_p->descs_pending));
 
 			NXGE_DEBUG_MSG((nxgep, TX_CTL,
-				"==> nxge_txdma_reclaim: "
-				"(tx_rd_index %d head_index %d "
-				"(tx_desc_p $%p)",
-				tx_rd_index, head_index,
-				tx_desc_p));
+			    "==> nxge_txdma_reclaim: "
+			    "(tx_rd_index %d head_index %d "
+			    "(tx_desc_p $%p)",
+			    tx_rd_index, head_index,
+			    tx_desc_p));
 
 			tx_desc_pp->value = tx_desc_p->value;
 			NXGE_DEBUG_MSG((nxgep, TX_CTL,
-				"==> nxge_txdma_reclaim: "
-				"(tx_rd_index %d head_index %d "
-				"tx_desc_p $%p (desc value 0x%llx) ",
-				tx_rd_index, head_index,
-				tx_desc_pp, (*(uint64_t *)tx_desc_pp)));
+			    "==> nxge_txdma_reclaim: "
+			    "(tx_rd_index %d head_index %d "
+			    "tx_desc_p $%p (desc value 0x%llx) ",
+			    tx_rd_index, head_index,
+			    tx_desc_pp, (*(uint64_t *)tx_desc_pp)));
 
 			NXGE_DEBUG_MSG((nxgep, TX_CTL,
-				"==> nxge_txdma_reclaim: dump desc:"));
+			    "==> nxge_txdma_reclaim: dump desc:"));
 
 			pkt_len = tx_desc_pp->bits.hdw.tr_len;
 			tdc_stats->obytes += pkt_len;
 			tdc_stats->opackets += tx_desc_pp->bits.hdw.sop;
 			NXGE_DEBUG_MSG((nxgep, TX_CTL,
-				"==> nxge_txdma_reclaim: pkt_len %d "
-				"tdc channel %d opackets %d",
-				pkt_len,
-				tdc,
-				tdc_stats->opackets));
+			    "==> nxge_txdma_reclaim: pkt_len %d "
+			    "tdc channel %d opackets %d",
+			    pkt_len,
+			    tdc,
+			    tdc_stats->opackets));
 
 			if (tx_msg_p->flags.dma_type == USE_DVMA) {
 				NXGE_DEBUG_MSG((nxgep, TX_CTL,
-					"tx_desc_p = $%p "
-					"tx_desc_pp = $%p "
-					"index = %d",
-					tx_desc_p,
-					tx_desc_pp,
-					tx_ring_p->rd_index));
+				    "tx_desc_p = $%p "
+				    "tx_desc_pp = $%p "
+				    "index = %d",
+				    tx_desc_p,
+				    tx_desc_pp,
+				    tx_ring_p->rd_index));
 				(void) dvma_unload(tx_msg_p->dvma_handle,
-					0, -1);
+				    0, -1);
 				tx_msg_p->dvma_handle = NULL;
 				if (tx_ring_p->dvma_wr_index ==
-					tx_ring_p->dvma_wrap_mask) {
+				    tx_ring_p->dvma_wrap_mask) {
 					tx_ring_p->dvma_wr_index = 0;
 				} else {
 					tx_ring_p->dvma_wr_index++;
 				}
 				tx_ring_p->dvma_pending--;
 			} else if (tx_msg_p->flags.dma_type ==
-					USE_DMA) {
+			    USE_DMA) {
 				NXGE_DEBUG_MSG((nxgep, TX_CTL,
-					"==> nxge_txdma_reclaim: "
-					"USE DMA"));
+				    "==> nxge_txdma_reclaim: "
+				    "USE DMA"));
 				if (rc = ddi_dma_unbind_handle
-					(tx_msg_p->dma_handle)) {
+				    (tx_msg_p->dma_handle)) {
 					cmn_err(CE_WARN, "!nxge_reclaim: "
-						"ddi_dma_unbind_handle "
-						"failed. status %d", rc);
+					    "ddi_dma_unbind_handle "
+					    "failed. status %d", rc);
 				}
 			}
 			NXGE_DEBUG_MSG((nxgep, TX_CTL,
-				"==> nxge_txdma_reclaim: count packets"));
+			    "==> nxge_txdma_reclaim: count packets"));
 			/*
 			 * count a chained packet only once.
 			 */
@@ -1046,7 +1046,7 @@ nxge_txdma_reclaim(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, int nmblks)
 			tx_msg_p->flags.dma_type = USE_NONE;
 			tx_rd_index = tx_ring_p->rd_index;
 			tx_rd_index = (tx_rd_index + 1) &
-					tx_ring_p->tx_wrap_mask;
+			    tx_ring_p->tx_wrap_mask;
 			tx_ring_p->rd_index = tx_rd_index;
 			tx_ring_p->descs_pending--;
 			tx_desc_p = &tx_desc_ring_vp[tx_rd_index];
@@ -1054,20 +1054,20 @@ nxge_txdma_reclaim(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, int nmblks)
 		}
 
 		status = (nmblks <= (tx_ring_p->tx_ring_size -
-				tx_ring_p->descs_pending -
-				TX_FULL_MARK));
+		    tx_ring_p->descs_pending -
+		    TX_FULL_MARK));
 		if (status) {
 			cas32((uint32_t *)&tx_ring_p->queueing, 1, 0);
 		}
 	} else {
 		status = (nmblks <=
-			(tx_ring_p->tx_ring_size -
-				tx_ring_p->descs_pending -
-				TX_FULL_MARK));
+		    (tx_ring_p->tx_ring_size -
+		    tx_ring_p->descs_pending -
+		    TX_FULL_MARK));
 	}
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"<== nxge_txdma_reclaim status = 0x%08x", status));
+	    "<== nxge_txdma_reclaim status = 0x%08x", status));
 
 	return (status);
 }
@@ -1115,8 +1115,8 @@ nxge_tx_intr(void *arg1, void *arg2)
 
 	if (ldvp == NULL) {
 		NXGE_DEBUG_MSG((NULL, INT_CTL,
-			"<== nxge_tx_intr: nxgep $%p ldvp $%p",
-			nxgep, ldvp));
+		    "<== nxge_tx_intr: nxgep $%p ldvp $%p",
+		    nxgep, ldvp));
 		return (DDI_INTR_UNCLAIMED);
 	}
 
@@ -1124,8 +1124,8 @@ nxge_tx_intr(void *arg1, void *arg2)
 		nxgep = ldvp->nxgep;
 	}
 	NXGE_DEBUG_MSG((nxgep, INT_CTL,
-		"==> nxge_tx_intr: nxgep(arg2) $%p ldvp(arg1) $%p",
-		nxgep, ldvp));
+	    "==> nxge_tx_intr: nxgep(arg2) $%p ldvp(arg1) $%p",
+	    nxgep, ldvp));
 
 	if ((!(nxgep->drv_state & STATE_HW_INITIALIZED)) ||
 	    (nxgep->nxge_mac_state != NXGE_MAC_STARTED)) {
@@ -1143,26 +1143,26 @@ nxge_tx_intr(void *arg1, void *arg2)
 	channel = ldvp->channel;
 	ldgp = ldvp->ldgp;
 	NXGE_DEBUG_MSG((nxgep, INT_CTL,
-		"==> nxge_tx_intr: nxgep $%p ldvp (ldvp) $%p "
-		"channel %d",
-		nxgep, ldvp, channel));
+	    "==> nxge_tx_intr: nxgep $%p ldvp (ldvp) $%p "
+	    "channel %d",
+	    nxgep, ldvp, channel));
 
 	rs = npi_txdma_control_status(handle, OP_GET, channel, &cs);
 	vindex = ldvp->vdma_index;
 	NXGE_DEBUG_MSG((nxgep, INT_CTL,
-		"==> nxge_tx_intr:channel %d ring index %d status 0x%08x",
-		channel, vindex, rs));
+	    "==> nxge_tx_intr:channel %d ring index %d status 0x%08x",
+	    channel, vindex, rs));
 	if (!rs && cs.bits.ldw.mk) {
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_tx_intr:channel %d ring index %d "
-			"status 0x%08x (mk bit set)",
-			channel, vindex, rs));
+		    "==> nxge_tx_intr:channel %d ring index %d "
+		    "status 0x%08x (mk bit set)",
+		    channel, vindex, rs));
 		tx_rings = nxgep->tx_rings->rings;
 		tx_ring_p = tx_rings[vindex];
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_tx_intr:channel %d ring index %d "
-			"status 0x%08x (mk bit set, calling reclaim)",
-			channel, vindex, rs));
+		    "==> nxge_tx_intr:channel %d ring index %d "
+		    "status 0x%08x (mk bit set, calling reclaim)",
+		    channel, vindex, rs));
 
 		MUTEX_ENTER(&tx_ring_p->lock);
 		(void) nxge_txdma_reclaim(nxgep, tx_rings[vindex], 0);
@@ -1181,7 +1181,7 @@ nxge_tx_intr(void *arg1, void *arg2)
 	 */
 	if (ldgp->nldvs == 1) {
 		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-			"==> nxge_tx_intr: rearm"));
+		    "==> nxge_tx_intr: rearm"));
 		if (status == NXGE_OK) {
 			if (isLDOMguest(nxgep)) {
 				nxge_hio_ldgimgn(nxgep, ldgp);
@@ -1240,24 +1240,24 @@ nxge_txdma_channel_disable(
 	 */
 	rs = npi_txdma_channel_disable(handle, channel);
 	NXGE_DEBUG_MSG((nxge, MEM3_CTL,
-		"==> nxge_txdma_channel_disable(%d) "
-		"rs 0x%x", channel, rs));
+	    "==> nxge_txdma_channel_disable(%d) "
+	    "rs 0x%x", channel, rs));
 	if (rs != NPI_SUCCESS) {
 		/* Inject any error */
 		intr_dbg.value = 0;
 		intr_dbg.bits.ldw.nack_pref = 1;
 		NXGE_DEBUG_MSG((nxge, MEM3_CTL,
-			"==> nxge_txdma_hw_mode: "
-			"channel %d (stop failed 0x%x) "
-			"(inject err)", rs, channel));
+		    "==> nxge_txdma_hw_mode: "
+		    "channel %d (stop failed 0x%x) "
+		    "(inject err)", rs, channel));
 		(void) npi_txdma_inj_int_error_set(
-			handle, channel, &intr_dbg);
+		    handle, channel, &intr_dbg);
 		rs = npi_txdma_channel_disable(handle, channel);
 		NXGE_DEBUG_MSG((nxge, MEM3_CTL,
-			"==> nxge_txdma_hw_mode: "
-			"channel %d (stop again 0x%x) "
-			"(after inject err)",
-			rs, channel));
+		    "==> nxge_txdma_hw_mode: "
+		    "channel %d (stop again 0x%x) "
+		    "(after inject err)",
+		    rs, channel));
 	}
 
 	return (rs);
@@ -1297,11 +1297,11 @@ nxge_txdma_hw_mode(p_nxge_t nxgep, boolean_t enable)
 	int		tdc;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_txdma_hw_mode: enable mode %d", enable));
+	    "==> nxge_txdma_hw_mode: enable mode %d", enable));
 
 	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_mode: not initialized"));
+		    "<== nxge_txdma_mode: not initialized"));
 		return (NXGE_ERROR);
 	}
 
@@ -1337,7 +1337,7 @@ nxge_txdma_hw_mode(p_nxge_t nxgep, boolean_t enable)
 	status = ((rs == NPI_SUCCESS) ? NXGE_OK : NXGE_ERROR | rs);
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"<== nxge_txdma_hw_mode: status 0x%x", status));
+	    "<== nxge_txdma_hw_mode: status 0x%x", status));
 
 	return (status);
 }
@@ -1348,7 +1348,7 @@ nxge_txdma_enable_channel(p_nxge_t nxgep, uint16_t channel)
 	npi_handle_t		handle;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"==> nxge_txdma_enable_channel: channel %d", channel));
+	    "==> nxge_txdma_enable_channel: channel %d", channel));
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	/* enable the transmit dma channels */
@@ -1363,7 +1363,7 @@ nxge_txdma_disable_channel(p_nxge_t nxgep, uint16_t channel)
 	npi_handle_t		handle;
 
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-		"==> nxge_txdma_disable_channel: channel %d", channel));
+	    "==> nxge_txdma_disable_channel: channel %d", channel));
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	/* stop the transmit dma channels */
@@ -1416,14 +1416,14 @@ nxge_txdma_stop_inj_err(p_nxge_t nxgep, int channel)
 	status = ((rs == NPI_SUCCESS) ? NXGE_OK : NXGE_ERROR | rs);
 	if (status == NXGE_OK) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_stop_inj_err (channel %d): "
-			"stopped OK", channel));
+		    "<== nxge_txdma_stop_inj_err (channel %d): "
+		    "stopped OK", channel));
 		return (status);
 	}
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		"==> nxge_txdma_stop_inj_err (channel %d): stop failed (0x%x) "
-		"injecting error", channel, rs));
+	    "==> nxge_txdma_stop_inj_err (channel %d): stop failed (0x%x) "
+	    "injecting error", channel, rs));
 	/* Inject any error */
 	intr_dbg.value = 0;
 	intr_dbg.bits.ldw.nack_pref = 1;
@@ -1434,8 +1434,8 @@ nxge_txdma_stop_inj_err(p_nxge_t nxgep, int channel)
 	status = ((rs == NPI_SUCCESS) ? NXGE_OK : NXGE_ERROR | rs);
 	if (!(rs & NPI_TXDMA_STOP_FAILED)) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_stop_inj_err (channel %d): "
-			"stopped OK ", channel));
+		    "<== nxge_txdma_stop_inj_err (channel %d): "
+		    "stopped OK ", channel));
 		return (status);
 	}
 
@@ -1443,8 +1443,8 @@ nxge_txdma_stop_inj_err(p_nxge_t nxgep, int channel)
 	nxge_txdma_regs_dump_channels(nxgep);
 #endif
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		"==> nxge_txdma_stop_inj_err (channel): stop failed (0x%x) "
-		" (injected error but still not stopped)", channel, rs));
+	    "==> nxge_txdma_stop_inj_err (channel): stop failed (0x%x) "
+	    " (injected error but still not stopped)", channel, rs));
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_stop_inj_err"));
 	return (status);
@@ -1495,9 +1495,9 @@ nxge_txdma_fix_channel(p_nxge_t nxgep, uint16_t channel)
 
 	if (ring_p->tdc != channel) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_fix_channel: channel not matched "
-			"ring tdc %d passed channel",
-			ring_p->tdc, channel));
+		    "<== nxge_txdma_fix_channel: channel not matched "
+		    "ring tdc %d passed channel",
+		    ring_p->tdc, channel));
 		return;
 	}
 
@@ -1514,15 +1514,15 @@ nxge_txdma_fixup_channel(p_nxge_t nxgep, p_tx_ring_t ring_p, uint16_t channel)
 
 	if (ring_p == NULL) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_fixup_channel: NULL ring pointer"));
+		    "<== nxge_txdma_fixup_channel: NULL ring pointer"));
 		return;
 	}
 
 	if (ring_p->tdc != channel) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_fixup_channel: channel not matched "
-			"ring tdc %d passed channel",
-			ring_p->tdc, channel));
+		    "<== nxge_txdma_fixup_channel: channel not matched "
+		    "ring tdc %d passed channel",
+		    ring_p->tdc, channel));
 		return;
 	}
 
@@ -1578,15 +1578,15 @@ nxge_txdma_kick_channel(p_nxge_t nxgep, uint16_t channel)
 	ring_p = nxge_txdma_get_ring(nxgep, channel);
 	if (ring_p == NULL) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			    " nxge_txdma_kick_channel"));
+		    " nxge_txdma_kick_channel"));
 		return;
 	}
 
 	if (ring_p->tdc != channel) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_kick_channel: channel not matched "
-			"ring tdc %d passed channel",
-			ring_p->tdc, channel));
+		    "<== nxge_txdma_kick_channel: channel not matched "
+		    "ring tdc %d passed channel",
+		    ring_p->tdc, channel));
 		return;
 	}
 
@@ -1604,7 +1604,7 @@ nxge_txdma_hw_kick_channel(p_nxge_t nxgep, p_tx_ring_t ring_p, uint16_t channel)
 
 	if (ring_p == NULL) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_hw_kick_channel: NULL ring pointer"));
+		    "<== nxge_txdma_hw_kick_channel: NULL ring pointer"));
 		return;
 	}
 
@@ -1742,7 +1742,7 @@ nxge_txdma_channel_hung(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, uint16_t channel)
 
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_txdma_channel_hung: channel %d", channel));
+	    "==> nxge_txdma_channel_hung: channel %d", channel));
 	MUTEX_ENTER(&tx_ring_p->lock);
 	(void) nxge_txdma_reclaim(nxgep, tx_ring_p, 0);
 
@@ -1752,9 +1752,9 @@ nxge_txdma_channel_hung(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, uint16_t channel)
 	MUTEX_EXIT(&tx_ring_p->lock);
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_txdma_channel_hung: tdc %d tx_rd_index %d "
-		"tail_index %d tail_wrap %d ",
-		channel, tx_rd_index, tail_index, tail_wrap));
+	    "==> nxge_txdma_channel_hung: tdc %d tx_rd_index %d "
+	    "tail_index %d tail_wrap %d ",
+	    channel, tx_rd_index, tail_index, tail_wrap));
 	/*
 	 * Read the hardware maintained transmit head
 	 * and wrap around bit.
@@ -1763,26 +1763,26 @@ nxge_txdma_channel_hung(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, uint16_t channel)
 	head_index =  tx_head.bits.ldw.head;
 	head_wrap = tx_head.bits.ldw.wrap;
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_txdma_channel_hung: "
-		"tx_rd_index %d tail %d tail_wrap %d "
-		"head %d wrap %d",
-		tx_rd_index, tail_index, tail_wrap,
-		head_index, head_wrap));
+	    "==> nxge_txdma_channel_hung: "
+	    "tx_rd_index %d tail %d tail_wrap %d "
+	    "head %d wrap %d",
+	    tx_rd_index, tail_index, tail_wrap,
+	    head_index, head_wrap));
 
 	if (TXDMA_RING_EMPTY(head_index, head_wrap,
-			tail_index, tail_wrap) &&
-			(head_index == tx_rd_index)) {
+	    tail_index, tail_wrap) &&
+	    (head_index == tx_rd_index)) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_txdma_channel_hung: EMPTY"));
+		    "==> nxge_txdma_channel_hung: EMPTY"));
 		return (B_FALSE);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"==> nxge_txdma_channel_hung: Checking if ring full"));
+	    "==> nxge_txdma_channel_hung: Checking if ring full"));
 	if (TXDMA_RING_FULL(head_index, head_wrap, tail_index,
-			tail_wrap)) {
+	    tail_wrap)) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"==> nxge_txdma_channel_hung: full"));
+		    "==> nxge_txdma_channel_hung: full"));
 		return (B_TRUE);
 	}
 
@@ -1880,15 +1880,15 @@ nxge_txdma_fix_hung_channel(p_nxge_t nxgep, uint16_t channel)
 	ring_p = nxge_txdma_get_ring(nxgep, channel);
 	if (ring_p == NULL) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_fix_hung_channel"));
+		    "<== nxge_txdma_fix_hung_channel"));
 		return;
 	}
 
 	if (ring_p->tdc != channel) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_fix_hung_channel: channel not matched "
-			"ring tdc %d passed channel",
-			ring_p->tdc, channel));
+		    "<== nxge_txdma_fix_hung_channel: channel not matched "
+		    "ring tdc %d passed channel",
+		    ring_p->tdc, channel));
 		return;
 	}
 
@@ -1910,16 +1910,16 @@ nxge_txdma_fixup_hung_channel(p_nxge_t nxgep, p_tx_ring_t ring_p,
 
 	if (ring_p == NULL) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_fixup_channel: NULL ring pointer"));
+		    "<== nxge_txdma_fixup_channel: NULL ring pointer"));
 		return;
 	}
 
 	if (ring_p->tdc != channel) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_fixup_hung_channel: channel "
-			"not matched "
-			"ring tdc %d passed channel",
-			ring_p->tdc, channel));
+		    "<== nxge_txdma_fixup_hung_channel: channel "
+		    "not matched "
+		    "ring tdc %d passed channel",
+		    ring_p->tdc, channel));
 		return;
 	}
 
@@ -1937,9 +1937,9 @@ nxge_txdma_fixup_hung_channel(p_nxge_t nxgep, p_tx_ring_t ring_p,
 	status = npi_txdma_channel_disable(handle, channel);
 	if (!(status & NPI_TXDMA_STOP_FAILED)) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_fixup_hung_channel: stopped OK "
-			"ring tdc %d passed channel %d",
-			ring_p->tdc, channel));
+		    "<== nxge_txdma_fixup_hung_channel: stopped OK "
+		    "ring tdc %d passed channel %d",
+		    ring_p->tdc, channel));
 		return;
 	}
 
@@ -1952,16 +1952,16 @@ nxge_txdma_fixup_hung_channel(p_nxge_t nxgep, p_tx_ring_t ring_p,
 	status = npi_txdma_channel_disable(handle, channel);
 	if (!(status & NPI_TXDMA_STOP_FAILED)) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_fixup_hung_channel: stopped again"
-			"ring tdc %d passed channel",
-			ring_p->tdc, channel));
+		    "<== nxge_txdma_fixup_hung_channel: stopped again"
+		    "ring tdc %d passed channel",
+		    ring_p->tdc, channel));
 		return;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"<== nxge_txdma_fixup_hung_channel: stop done still not set!! "
-		"ring tdc %d passed channel",
-		ring_p->tdc, channel));
+	    "<== nxge_txdma_fixup_hung_channel: stop done still not set!! "
+	    "ring tdc %d passed channel",
+	    ring_p->tdc, channel));
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_fixup_hung_channel"));
 }
@@ -2061,24 +2061,24 @@ nxge_txdma_regs_dump(p_nxge_t nxgep, int channel)
 	dma_log_page_t		cfg;
 
 	printf("\n\tfunc # %d tdc %d ",
-		nxgep->function_num, channel);
+	    nxgep->function_num, channel);
 	cfg.page_num = 0;
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	(void) npi_txdma_log_page_get(handle, channel, &cfg);
 	printf("\n\tlog page func %d valid page 0 %d",
-		cfg.func_num, cfg.valid);
+	    cfg.func_num, cfg.valid);
 	cfg.page_num = 1;
 	(void) npi_txdma_log_page_get(handle, channel, &cfg);
 	printf("\n\tlog page func %d valid page 1 %d",
-		cfg.func_num, cfg.valid);
+	    cfg.func_num, cfg.valid);
 
 	(void) npi_txdma_ring_head_get(handle, channel, &hdl);
 	(void) npi_txdma_desc_kick_reg_get(handle, channel, &kick);
 	printf("\n\thead value is 0x%0llx",
-		(long long)hdl.value);
+	    (long long)hdl.value);
 	printf("\n\thead index %d", hdl.bits.ldw.head);
 	printf("\n\tkick value is 0x%0llx",
-		(long long)kick.value);
+	    (long long)kick.value);
 	printf("\n\ttail index %d\n", kick.bits.ldw.tail);
 
 	(void) npi_txdma_control_status(handle, OP_GET, channel, &cs);
@@ -2091,7 +2091,7 @@ nxge_txdma_regs_dump(p_nxge_t nxgep, int channel)
 	(void) npi_txc_dma_bytes_transmitted(handle, channel, &bytes);
 
 	printf("\n\tTXC port control 0x%0llx",
-		(long long)control.value);
+	    (long long)control.value);
 	printf("\n\tTXC port bitmap 0x%x", bitmap);
 	printf("\n\tTXC max burst %d", burst);
 	printf("\n\tTXC bytes xmt %d\n", bytes);
@@ -2145,12 +2145,12 @@ nxge_tdc_hvio_setup(
 	    (uint64_t)data->orig_alength;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_map_txdma_channel: "
-		"hv data buf base io $%p size 0x%llx (%d) buf base io $%p "
-		"orig vatopa base io $%p orig_len 0x%llx (%d)",
-		ring->hv_tx_buf_base_ioaddr_pp,
-		ring->hv_tx_buf_ioaddr_size, ring->hv_tx_buf_ioaddr_size,
-		data->ioaddr_pp, data->orig_vatopa,
-		data->orig_alength, data->orig_alength));
+	    "hv data buf base io $%p size 0x%llx (%d) buf base io $%p "
+	    "orig vatopa base io $%p orig_len 0x%llx (%d)",
+	    ring->hv_tx_buf_base_ioaddr_pp,
+	    ring->hv_tx_buf_ioaddr_size, ring->hv_tx_buf_ioaddr_size,
+	    data->ioaddr_pp, data->orig_vatopa,
+	    data->orig_alength, data->orig_alength));
 
 	control = nxgep->tx_cntl_pool_p->dma_buf_pool_p[channel];
 
@@ -2160,12 +2160,12 @@ nxge_tdc_hvio_setup(
 	    (uint64_t)control->orig_alength;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_map_txdma_channel: "
-		"hv cntl base io $%p orig ioaddr_pp ($%p) "
-		"orig vatopa ($%p) size 0x%llx (%d 0x%x)",
-		ring->hv_tx_cntl_base_ioaddr_pp,
-		control->orig_ioaddr_pp, control->orig_vatopa,
-		ring->hv_tx_cntl_ioaddr_size,
-		control->orig_alength, control->orig_alength));
+	    "hv cntl base io $%p orig ioaddr_pp ($%p) "
+	    "orig vatopa ($%p) size 0x%llx (%d 0x%x)",
+	    ring->hv_tx_cntl_base_ioaddr_pp,
+	    control->orig_ioaddr_pp, control->orig_vatopa,
+	    ring->hv_tx_cntl_ioaddr_size,
+	    control->orig_alength, control->orig_alength));
 }
 #endif
 
@@ -2200,8 +2200,8 @@ nxge_map_txdma(p_nxge_t nxgep, int channel)
 	mailbox = &nxgep->tx_mbox_areas_p->txmbox_areas_p[channel];
 
 	NXGE_ERROR_MSG((nxgep, MEM3_CTL, "==> nxge_map_txdma: "
-		"tx_rings $%p tx_desc_rings $%p",
-		nxgep->tx_rings, nxgep->tx_rings->rings));
+	    "tx_rings $%p tx_desc_rings $%p",
+	    nxgep->tx_rings, nxgep->tx_rings->rings));
 
 	/*
 	 * Map descriptors from the buffer pools for <channel>.
@@ -2215,9 +2215,9 @@ nxge_map_txdma(p_nxge_t nxgep, int channel)
 	    pData, pRing, num_chunks, pControl, mailbox);
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, MEM3_CTL,
-			"==> nxge_map_txdma(%d): nxge_map_txdma_channel() "
-			"returned 0x%x",
-			nxgep, channel, status));
+		    "==> nxge_map_txdma(%d): nxge_map_txdma_channel() "
+		    "returned 0x%x",
+		    nxgep, channel, status));
 		return (status);
 	}
 
@@ -2255,16 +2255,16 @@ nxge_map_txdma_channel(p_nxge_t nxgep, uint16_t channel,
 	 * and mailbox.
 	 */
 	NXGE_ERROR_MSG((nxgep, MEM3_CTL,
-		"==> nxge_map_txdma_channel (channel %d)", channel));
+	    "==> nxge_map_txdma_channel (channel %d)", channel));
 	/*
 	 * Transmit buffer blocks
 	 */
 	status = nxge_map_txdma_channel_buf_ring(nxgep, channel,
-			dma_buf_p, tx_desc_p, num_chunks);
+	    dma_buf_p, tx_desc_p, num_chunks);
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_map_txdma_channel (channel %d): "
-			"map buffer failed 0x%x", channel, status));
+		    "==> nxge_map_txdma_channel (channel %d): "
+		    "map buffer failed 0x%x", channel, status));
 		goto nxge_map_txdma_channel_exit;
 	}
 
@@ -2272,22 +2272,22 @@ nxge_map_txdma_channel(p_nxge_t nxgep, uint16_t channel,
 	 * Transmit block ring, and mailbox.
 	 */
 	nxge_map_txdma_channel_cfg_ring(nxgep, channel, dma_cntl_p, *tx_desc_p,
-					tx_mbox_p);
+	    tx_mbox_p);
 
 	goto nxge_map_txdma_channel_exit;
 
 nxge_map_txdma_channel_fail1:
 	NXGE_ERROR_MSG((nxgep, MEM3_CTL,
-		"==> nxge_map_txdma_channel: unmap buf"
-		"(status 0x%x channel %d)",
-		status, channel));
+	    "==> nxge_map_txdma_channel: unmap buf"
+	    "(status 0x%x channel %d)",
+	    status, channel));
 	nxge_unmap_txdma_channel_buf_ring(nxgep, *tx_desc_p);
 
 nxge_map_txdma_channel_exit:
 	NXGE_ERROR_MSG((nxgep, MEM3_CTL,
-		"<== nxge_map_txdma_channel: "
-		"(status 0x%x channel %d)",
-		status, channel));
+	    "<== nxge_map_txdma_channel: "
+	    "(status 0x%x channel %d)",
+	    status, channel));
 
 	return (status);
 }
@@ -2300,7 +2300,7 @@ nxge_unmap_txdma_channel(p_nxge_t nxgep, uint16_t channel)
 	tx_mbox_t *mailbox;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_unmap_txdma_channel (channel %d)", channel));
+	    "==> nxge_unmap_txdma_channel (channel %d)", channel));
 	/*
 	 * unmap tx block ring, and mailbox.
 	 */
@@ -2360,13 +2360,13 @@ nxge_map_txdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
 	uint64_t		tx_desc_len;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_map_txdma_channel_cfg_ring"));
+	    "==> nxge_map_txdma_channel_cfg_ring"));
 
 	cntl_dmap = *dma_cntl_p;
 
 	dmap = (p_nxge_dma_common_t)&tx_ring_p->tdc_desc;
 	nxge_setup_dma_common(dmap, cntl_dmap, tx_ring_p->tx_ring_size,
-			sizeof (tx_desc_t));
+	    sizeof (tx_desc_t));
 	/*
 	 * Zero out transmit ring descriptors.
 	 */
@@ -2381,26 +2381,26 @@ nxge_map_txdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
 	tx_evmask_p->value = 0;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_map_txdma_channel_cfg_ring: channel %d des $%p",
-		dma_channel,
-		dmap->dma_cookie.dmac_laddress));
+	    "==> nxge_map_txdma_channel_cfg_ring: channel %d des $%p",
+	    dma_channel,
+	    dmap->dma_cookie.dmac_laddress));
 
 	tx_ring_cfig_p->value = 0;
 	tx_desc_len = (uint64_t)(tx_ring_p->tx_ring_size >> 3);
 	tx_ring_cfig_p->value =
-		(dmap->dma_cookie.dmac_laddress & TX_RNG_CFIG_ADDR_MASK) |
-		(tx_desc_len << TX_RNG_CFIG_LEN_SHIFT);
+	    (dmap->dma_cookie.dmac_laddress & TX_RNG_CFIG_ADDR_MASK) |
+	    (tx_desc_len << TX_RNG_CFIG_LEN_SHIFT);
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_map_txdma_channel_cfg_ring: channel %d cfg 0x%llx",
-		dma_channel,
-		tx_ring_cfig_p->value));
+	    "==> nxge_map_txdma_channel_cfg_ring: channel %d cfg 0x%llx",
+	    dma_channel,
+	    tx_ring_cfig_p->value));
 
 	tx_cs_p->bits.ldw.rst = 1;
 
 	/* Map in mailbox */
 	mboxp = (p_tx_mbox_t)
-		KMEM_ZALLOC(sizeof (tx_mbox_t), KM_SLEEP);
+	    KMEM_ZALLOC(sizeof (tx_mbox_t), KM_SLEEP);
 	dmap = (p_nxge_dma_common_t)&mboxp->tx_mbox;
 	nxge_setup_dma_common(dmap, cntl_dmap, 1, sizeof (txdma_mailbox_t));
 	mboxh_p = (p_txdma_mbh_t)&tx_ring_p->tx_mbox_mbh;
@@ -2408,22 +2408,22 @@ nxge_map_txdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
 	mboxh_p->value = mboxl_p->value = 0;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_map_txdma_channel_cfg_ring: mbox 0x%lx",
-		dmap->dma_cookie.dmac_laddress));
+	    "==> nxge_map_txdma_channel_cfg_ring: mbox 0x%lx",
+	    dmap->dma_cookie.dmac_laddress));
 
 	mboxh_p->bits.ldw.mbaddr = ((dmap->dma_cookie.dmac_laddress >>
-				TXDMA_MBH_ADDR_SHIFT) & TXDMA_MBH_MASK);
+	    TXDMA_MBH_ADDR_SHIFT) & TXDMA_MBH_MASK);
 
 	mboxl_p->bits.ldw.mbaddr = ((dmap->dma_cookie.dmac_laddress &
-				TXDMA_MBL_MASK) >> TXDMA_MBL_SHIFT);
+	    TXDMA_MBL_MASK) >> TXDMA_MBL_SHIFT);
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_map_txdma_channel_cfg_ring: mbox 0x%lx",
-		dmap->dma_cookie.dmac_laddress));
+	    "==> nxge_map_txdma_channel_cfg_ring: mbox 0x%lx",
+	    dmap->dma_cookie.dmac_laddress));
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_map_txdma_channel_cfg_ring: hmbox $%p "
-		"mbox $%p",
-		mboxh_p->bits.ldw.mbaddr, mboxl_p->bits.ldw.mbaddr));
+	    "==> nxge_map_txdma_channel_cfg_ring: hmbox $%p "
+	    "mbox $%p",
+	    mboxh_p->bits.ldw.mbaddr, mboxl_p->bits.ldw.mbaddr));
 	tx_ring_p->page_valid.value = 0;
 	tx_ring_p->page_mask_1.value = tx_ring_p->page_mask_2.value = 0;
 	tx_ring_p->page_value_1.value = tx_ring_p->page_value_2.value = 0;
@@ -2439,7 +2439,7 @@ nxge_map_txdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
 	*tx_mbox_p = mboxp;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-				"<== nxge_map_txdma_channel_cfg_ring"));
+	    "<== nxge_map_txdma_channel_cfg_ring"));
 }
 
 /*ARGSUSED*/
@@ -2448,13 +2448,13 @@ nxge_unmap_txdma_channel_cfg_ring(p_nxge_t nxgep,
 	p_tx_ring_t tx_ring_p, p_tx_mbox_t tx_mbox_p)
 {
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_unmap_txdma_channel_cfg_ring: channel %d",
-		tx_ring_p->tdc));
+	    "==> nxge_unmap_txdma_channel_cfg_ring: channel %d",
+	    tx_ring_p->tdc));
 
 	KMEM_FREE(tx_mbox_p, sizeof (tx_mbox_t));
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"<== nxge_unmap_txdma_channel_cfg_ring"));
+	    "<== nxge_unmap_txdma_channel_cfg_ring"));
 }
 
 /*
@@ -2496,41 +2496,41 @@ nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 	uint32_t 		nblocks, nmsgs;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_map_txdma_channel_buf_ring"));
+	    "==> nxge_map_txdma_channel_buf_ring"));
 
 	dma_bufp = tmp_bufp = *dma_buf_p;
 		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
 		" nxge_map_txdma_channel_buf_ring: channel %d to map %d "
 		"chunks bufp $%p",
-		channel, num_chunks, dma_bufp));
+		    channel, num_chunks, dma_bufp));
 
 	nmsgs = 0;
 	for (i = 0; i < num_chunks; i++, tmp_bufp++) {
 		nmsgs += tmp_bufp->nblocks;
 		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-			"==> nxge_map_txdma_channel_buf_ring: channel %d "
-			"bufp $%p nblocks %d nmsgs %d",
-			channel, tmp_bufp, tmp_bufp->nblocks, nmsgs));
+		    "==> nxge_map_txdma_channel_buf_ring: channel %d "
+		    "bufp $%p nblocks %d nmsgs %d",
+		    channel, tmp_bufp, tmp_bufp->nblocks, nmsgs));
 	}
 	if (!nmsgs) {
 		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-			"<== nxge_map_txdma_channel_buf_ring: channel %d "
-			"no msg blocks",
-			channel));
+		    "<== nxge_map_txdma_channel_buf_ring: channel %d "
+		    "no msg blocks",
+		    channel));
 		status = NXGE_ERROR;
 		goto nxge_map_txdma_channel_buf_ring_exit;
 	}
 
 	tx_ring_p = (p_tx_ring_t)
-		KMEM_ZALLOC(sizeof (tx_ring_t), KM_SLEEP);
+	    KMEM_ZALLOC(sizeof (tx_ring_t), KM_SLEEP);
 	MUTEX_INIT(&tx_ring_p->lock, NULL, MUTEX_DRIVER,
-		(void *)nxgep->interrupt_cookie);
+	    (void *)nxgep->interrupt_cookie);
 
 	(void) atomic_swap_32(&tx_ring_p->tx_ring_offline, NXGE_TX_RING_ONLINE);
 	tx_ring_p->tx_ring_busy = B_FALSE;
 	tx_ring_p->nxgep = nxgep;
 	tx_ring_p->serial = nxge_serialize_create(nmsgs,
-				nxge_serial_tx, tx_ring_p);
+	    nxge_serial_tx, tx_ring_p);
 	/*
 	 * Allocate transmit message rings and handles for packets
 	 * not to be copied to premapped buffers.
@@ -2539,8 +2539,8 @@ nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 	tx_msg_ring = KMEM_ZALLOC(size, KM_SLEEP);
 	for (i = 0; i < nmsgs; i++) {
 		ddi_status = ddi_dma_alloc_handle(nxgep->dip, &nxge_tx_dma_attr,
-				DDI_DMA_DONTWAIT, 0,
-				&tx_msg_ring[i].dma_handle);
+		    DDI_DMA_DONTWAIT, 0,
+		    &tx_msg_ring[i].dma_handle);
 		if (ddi_status != DDI_SUCCESS) {
 			status |= NXGE_DDI_FAILED;
 			break;
@@ -2567,11 +2567,11 @@ nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 	tx_ring_p->descs_pending = 0;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_map_txdma_channel_buf_ring: channel %d "
-		"actual tx desc max %d nmsgs %d "
-		"(config nxge_tx_ring_size %d)",
-		channel, tx_ring_p->tx_ring_size, nmsgs,
-		nxge_tx_ring_size));
+	    "==> nxge_map_txdma_channel_buf_ring: channel %d "
+	    "actual tx desc max %d nmsgs %d "
+	    "(config nxge_tx_ring_size %d)",
+	    channel, tx_ring_p->tx_ring_size, nmsgs,
+	    nxge_tx_ring_size));
 
 	/*
 	 * Map in buffers from the buffer pool.
@@ -2580,29 +2580,29 @@ nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 	bsize = dma_bufp->block_size;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_map_txdma_channel_buf_ring: "
-		"dma_bufp $%p tx_rng_p $%p "
-		"tx_msg_rng_p $%p bsize %d",
-		dma_bufp, tx_ring_p, tx_msg_ring, bsize));
+	    "dma_bufp $%p tx_rng_p $%p "
+	    "tx_msg_rng_p $%p bsize %d",
+	    dma_bufp, tx_ring_p, tx_msg_ring, bsize));
 
 	tx_buf_dma_handle = dma_bufp->dma_handle;
 	for (i = 0; i < num_chunks; i++, dma_bufp++) {
 		bsize = dma_bufp->block_size;
 		nblocks = dma_bufp->nblocks;
 		NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-			"==> nxge_map_txdma_channel_buf_ring: dma chunk %d "
-			"size %d dma_bufp $%p",
-			i, sizeof (nxge_dma_common_t), dma_bufp));
+		    "==> nxge_map_txdma_channel_buf_ring: dma chunk %d "
+		    "size %d dma_bufp $%p",
+		    i, sizeof (nxge_dma_common_t), dma_bufp));
 
 		for (j = 0; j < nblocks; j++) {
 			tx_msg_ring[index].buf_dma_handle = tx_buf_dma_handle;
 			dmap = &tx_msg_ring[index++].buf_dma;
 #ifdef TX_MEM_DEBUG
 			NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-				"==> nxge_map_txdma_channel_buf_ring: j %d"
-				"dmap $%p", i, dmap));
+			    "==> nxge_map_txdma_channel_buf_ring: j %d"
+			    "dmap $%p", i, dmap));
 #endif
 			nxge_setup_dma_common(dmap, dma_bufp, 1,
-				bsize);
+			    bsize);
 		}
 	}
 
@@ -2635,7 +2635,7 @@ nxge_map_txdma_channel_buf_ring_fail1:
 
 nxge_map_txdma_channel_buf_ring_exit:
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"<== nxge_map_txdma_channel_buf_ring status 0x%x", status));
+	    "<== nxge_map_txdma_channel_buf_ring status 0x%x", status));
 
 	return (status);
 }
@@ -2649,15 +2649,15 @@ nxge_unmap_txdma_channel_buf_ring(p_nxge_t nxgep, p_tx_ring_t tx_ring_p)
 	int			i;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_unmap_txdma_channel_buf_ring"));
+	    "==> nxge_unmap_txdma_channel_buf_ring"));
 	if (tx_ring_p == NULL) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_unmap_txdma_channel_buf_ring: NULL ringp"));
+		    "<== nxge_unmap_txdma_channel_buf_ring: NULL ringp"));
 		return;
 	}
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_unmap_txdma_channel_buf_ring: channel %d",
-		tx_ring_p->tdc));
+	    "==> nxge_unmap_txdma_channel_buf_ring: channel %d",
+	    tx_ring_p->tdc));
 
 	tx_msg_ring = tx_ring_p->tx_msg_ring;
 
@@ -2702,7 +2702,7 @@ nxge_unmap_txdma_channel_buf_ring(p_nxge_t nxgep, p_tx_ring_t tx_ring_p)
 	KMEM_FREE(tx_ring_p, sizeof (tx_ring_t));
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"<== nxge_unmap_txdma_channel_buf_ring"));
+	    "<== nxge_unmap_txdma_channel_buf_ring"));
 }
 
 static nxge_status_t
@@ -2719,13 +2719,13 @@ nxge_txdma_hw_start(p_nxge_t nxgep, int channel)
 	tx_rings = nxgep->tx_rings;
 	if (tx_rings == NULL) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_hw_start: NULL ring pointer"));
+		    "<== nxge_txdma_hw_start: NULL ring pointer"));
 		return (NXGE_ERROR);
 	}
 	tx_desc_rings = tx_rings->rings;
 	if (tx_desc_rings == NULL) {
 		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			"<== nxge_txdma_hw_start: NULL ring pointers"));
+		    "<== nxge_txdma_hw_start: NULL ring pointers"));
 		return (NXGE_ERROR);
 	}
 
@@ -2743,22 +2743,22 @@ nxge_txdma_hw_start(p_nxge_t nxgep, int channel)
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_txdma_hw_start: "
-		"tx_rings $%p rings $%p",
-		nxgep->tx_rings, nxgep->tx_rings->rings));
+	    "tx_rings $%p rings $%p",
+	    nxgep->tx_rings, nxgep->tx_rings->rings));
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "==> nxge_txdma_hw_start: "
-		"tx_rings $%p tx_desc_rings $%p",
-		nxgep->tx_rings, tx_desc_rings));
+	    "tx_rings $%p tx_desc_rings $%p",
+	    nxgep->tx_rings, tx_desc_rings));
 
 	goto nxge_txdma_hw_start_exit;
 
 nxge_txdma_hw_start_fail1:
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_txdma_hw_start: disable "
-		"(status 0x%x channel %d)", status, channel));
+	    "==> nxge_txdma_hw_start: disable "
+	    "(status 0x%x channel %d)", status, channel));
 
 nxge_txdma_hw_start_exit:
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_txdma_hw_start: (status 0x%x)", status));
+	    "==> nxge_txdma_hw_start: (status 0x%x)", status));
 
 	return (status);
 }
@@ -2889,7 +2889,7 @@ nxge_txdma_stop_channel(p_nxge_t nxgep, uint16_t channel)
 	int status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_txdma_stop_channel: channel %d", channel));
+	    "==> nxge_txdma_stop_channel: channel %d", channel));
 
 	/*
 	 * Stop (disable) TXDMA and TXC (if stop bit is set
@@ -2906,7 +2906,7 @@ nxge_txdma_stop_channel(p_nxge_t nxgep, uint16_t channel)
 	tx_ring_p->tx_cs.value = 0;
 	tx_ring_p->tx_cs.bits.ldw.rst = 1;
 	status = nxge_reset_txdma_channel(nxgep, channel,
-			tx_ring_p->tx_cs.value);
+	    tx_ring_p->tx_cs.value);
 	if (status != NXGE_OK) {
 		goto nxge_txdma_stop_channel_exit;
 	}
@@ -2915,7 +2915,7 @@ nxge_txdma_stop_channel(p_nxge_t nxgep, uint16_t channel)
 	/* Set up the interrupt event masks. */
 	tx_ring_p->tx_evmask.value = 0;
 	status = nxge_init_txdma_channel_event_mask(nxgep,
-			channel, &tx_ring_p->tx_evmask);
+	    channel, &tx_ring_p->tx_evmask);
 	if (status != NXGE_OK) {
 		goto nxge_txdma_stop_channel_exit;
 	}
@@ -2923,7 +2923,7 @@ nxge_txdma_stop_channel(p_nxge_t nxgep, uint16_t channel)
 	/* Initialize the DMA control and status register */
 	tx_ring_p->tx_cs.value = TX_ENT_MSK_MK_ALL;
 	status = nxge_init_txdma_channel_cntl_stat(nxgep, channel,
-			tx_ring_p->tx_cs.value);
+	    tx_ring_p->tx_cs.value);
 	if (status != NXGE_OK) {
 		goto nxge_txdma_stop_channel_exit;
 	}
@@ -2938,7 +2938,7 @@ nxge_txdma_stop_channel(p_nxge_t nxgep, uint16_t channel)
 	}
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
-		"==> nxge_txdma_stop_channel: event done"));
+	    "==> nxge_txdma_stop_channel: event done"));
 
 #endif
 
@@ -2995,7 +2995,7 @@ nxge_txdma_get_ring(p_nxge_t nxgep, uint16_t channel)
 
 return_null:
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_get_ring: "
-		"ring not found"));
+	    "ring not found"));
 
 	return (NULL);
 }
@@ -3058,7 +3058,7 @@ nxge_txdma_get_mbox(p_nxge_t nxgep, uint16_t channel)
 
 return_null:
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_get_mbox: "
-		"mailbox not found"));
+	    "mailbox not found"));
 
 	return (NULL);
 }
@@ -3114,47 +3114,47 @@ nxge_tx_err_evnts(p_nxge_t nxgep, uint_t index, p_nxge_ldv_t ldvp, tx_cs_t cs)
 	tx_ring_p = tx_rings[index];
 	tdc_stats = tx_ring_p->tdc_stats;
 	if ((cs.bits.ldw.pkt_size_err) || (cs.bits.ldw.pref_buf_par_err) ||
-		(cs.bits.ldw.nack_pref) || (cs.bits.ldw.nack_pkt_rd) ||
-		(cs.bits.ldw.conf_part_err) || (cs.bits.ldw.pkt_prt_err)) {
+	    (cs.bits.ldw.nack_pref) || (cs.bits.ldw.nack_pkt_rd) ||
+	    (cs.bits.ldw.conf_part_err) || (cs.bits.ldw.pkt_prt_err)) {
 		if ((rs = npi_txdma_ring_error_get(handle, channel,
-					&tdc_stats->errlog)) != NPI_SUCCESS)
+		    &tdc_stats->errlog)) != NPI_SUCCESS)
 			return (NXGE_ERROR | rs);
 	}
 
 	if (cs.bits.ldw.mbox_err) {
 		tdc_stats->mbox_err++;
 		NXGE_FM_REPORT_ERROR(nxgep, nxgep->mac.portnum, channel,
-					NXGE_FM_EREPORT_TDMC_MBOX_ERR);
+		    NXGE_FM_EREPORT_TDMC_MBOX_ERR);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_tx_err_evnts(channel %d): "
-			"fatal error: mailbox", channel));
+		    "==> nxge_tx_err_evnts(channel %d): "
+		    "fatal error: mailbox", channel));
 		txchan_fatal = B_TRUE;
 	}
 	if (cs.bits.ldw.pkt_size_err) {
 		tdc_stats->pkt_size_err++;
 		NXGE_FM_REPORT_ERROR(nxgep, nxgep->mac.portnum, channel,
-					NXGE_FM_EREPORT_TDMC_PKT_SIZE_ERR);
+		    NXGE_FM_EREPORT_TDMC_PKT_SIZE_ERR);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_tx_err_evnts(channel %d): "
-			"fatal error: pkt_size_err", channel));
+		    "==> nxge_tx_err_evnts(channel %d): "
+		    "fatal error: pkt_size_err", channel));
 		txchan_fatal = B_TRUE;
 	}
 	if (cs.bits.ldw.tx_ring_oflow) {
 		tdc_stats->tx_ring_oflow++;
 		NXGE_FM_REPORT_ERROR(nxgep, nxgep->mac.portnum, channel,
-					NXGE_FM_EREPORT_TDMC_TX_RING_OFLOW);
+		    NXGE_FM_EREPORT_TDMC_TX_RING_OFLOW);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_tx_err_evnts(channel %d): "
-			"fatal error: tx_ring_oflow", channel));
+		    "==> nxge_tx_err_evnts(channel %d): "
+		    "fatal error: tx_ring_oflow", channel));
 		txchan_fatal = B_TRUE;
 	}
 	if (cs.bits.ldw.pref_buf_par_err) {
 		tdc_stats->pre_buf_par_err++;
 		NXGE_FM_REPORT_ERROR(nxgep, nxgep->mac.portnum, channel,
-					NXGE_FM_EREPORT_TDMC_PREF_BUF_PAR_ERR);
+		    NXGE_FM_EREPORT_TDMC_PREF_BUF_PAR_ERR);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_tx_err_evnts(channel %d): "
-			"fatal error: pre_buf_par_err", channel));
+		    "==> nxge_tx_err_evnts(channel %d): "
+		    "fatal error: pre_buf_par_err", channel));
 		/* Clear error injection source for parity error */
 		(void) npi_txdma_inj_par_error_get(handle, &value);
 		par_err.value = value;
@@ -3165,37 +3165,37 @@ nxge_tx_err_evnts(p_nxge_t nxgep, uint_t index, p_nxge_ldv_t ldvp, tx_cs_t cs)
 	if (cs.bits.ldw.nack_pref) {
 		tdc_stats->nack_pref++;
 		NXGE_FM_REPORT_ERROR(nxgep, nxgep->mac.portnum, channel,
-					NXGE_FM_EREPORT_TDMC_NACK_PREF);
+		    NXGE_FM_EREPORT_TDMC_NACK_PREF);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_tx_err_evnts(channel %d): "
-			"fatal error: nack_pref", channel));
+		    "==> nxge_tx_err_evnts(channel %d): "
+		    "fatal error: nack_pref", channel));
 		txchan_fatal = B_TRUE;
 	}
 	if (cs.bits.ldw.nack_pkt_rd) {
 		tdc_stats->nack_pkt_rd++;
 		NXGE_FM_REPORT_ERROR(nxgep, nxgep->mac.portnum, channel,
-					NXGE_FM_EREPORT_TDMC_NACK_PKT_RD);
+		    NXGE_FM_EREPORT_TDMC_NACK_PKT_RD);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_tx_err_evnts(channel %d): "
-			"fatal error: nack_pkt_rd", channel));
+		    "==> nxge_tx_err_evnts(channel %d): "
+		    "fatal error: nack_pkt_rd", channel));
 		txchan_fatal = B_TRUE;
 	}
 	if (cs.bits.ldw.conf_part_err) {
 		tdc_stats->conf_part_err++;
 		NXGE_FM_REPORT_ERROR(nxgep, nxgep->mac.portnum, channel,
-					NXGE_FM_EREPORT_TDMC_CONF_PART_ERR);
+		    NXGE_FM_EREPORT_TDMC_CONF_PART_ERR);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_tx_err_evnts(channel %d): "
-			"fatal error: config_partition_err", channel));
+		    "==> nxge_tx_err_evnts(channel %d): "
+		    "fatal error: config_partition_err", channel));
 		txchan_fatal = B_TRUE;
 	}
 	if (cs.bits.ldw.pkt_prt_err) {
 		tdc_stats->pkt_part_err++;
 		NXGE_FM_REPORT_ERROR(nxgep, nxgep->mac.portnum, channel,
-					NXGE_FM_EREPORT_TDMC_PKT_PRT_ERR);
+		    NXGE_FM_EREPORT_TDMC_PKT_PRT_ERR);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_tx_err_evnts(channel %d): "
-			"fatal error: pkt_prt_err", channel));
+		    "==> nxge_tx_err_evnts(channel %d): "
+		    "fatal error: pkt_prt_err", channel));
 		txchan_fatal = B_TRUE;
 	}
 
@@ -3204,11 +3204,11 @@ nxge_tx_err_evnts(p_nxge_t nxgep, uint_t index, p_nxge_ldv_t ldvp, tx_cs_t cs)
 
 	if (txchan_fatal) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			" nxge_tx_err_evnts: "
-			" fatal error on channel %d cs 0x%llx\n",
-			channel, cs.value));
+		    " nxge_tx_err_evnts: "
+		    " fatal error on channel %d cs 0x%llx\n",
+		    channel, cs.value));
 		status = nxge_txdma_fatal_err_recover(nxgep, channel,
-								tx_ring_p);
+		    tx_ring_p);
 		if (status == NXGE_OK) {
 			FM_SERVICE_RESTORED(nxgep);
 		}
@@ -3232,7 +3232,7 @@ nxge_txdma_fatal_err_recover(
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_fatal_err_recover"));
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"Recovering from TxDMAChannel#%d error...", channel));
+	    "Recovering from TxDMAChannel#%d error...", channel));
 
 	/*
 	 * Stop the dma channel waits for the stop done.
@@ -3246,8 +3246,8 @@ nxge_txdma_fatal_err_recover(
 	rs = npi_txdma_channel_control(handle, TXDMA_STOP, channel);
 	if (rs != NPI_SUCCESS) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_txdma_fatal_err_recover (channel %d): "
-			"stop failed ", channel));
+		    "==> nxge_txdma_fatal_err_recover (channel %d): "
+		    "stop failed ", channel));
 		goto fail;
 	}
 
@@ -3259,10 +3259,10 @@ nxge_txdma_fatal_err_recover(
 	 */
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "TxDMA channel reset..."));
 	if ((rs = npi_txdma_channel_control(handle, TXDMA_RESET, channel)) !=
-						NPI_SUCCESS) {
+	    NPI_SUCCESS) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"==> nxge_txdma_fatal_err_recover (channel %d)"
-			" reset channel failed 0x%x", channel, rs));
+		    "==> nxge_txdma_fatal_err_recover (channel %d)"
+		    " reset channel failed 0x%x", channel, rs));
 		goto fail;
 	}
 
@@ -3296,7 +3296,7 @@ nxge_txdma_fatal_err_recover(
 	 */
 	tx_ring_p->tx_evmask.value = 0;
 	status = nxge_init_txdma_channel_event_mask(nxgep, channel,
-							&tx_ring_p->tx_evmask);
+	    &tx_ring_p->tx_evmask);
 	if (status != NXGE_OK)
 		goto fail;
 
@@ -3311,14 +3311,14 @@ nxge_txdma_fatal_err_recover(
 	 */
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "TxDMA channel enable..."));
 	status = nxge_enable_txdma_channel(nxgep, channel,
-						tx_ring_p, tx_mbox_p);
+	    tx_ring_p, tx_mbox_p);
 	MUTEX_EXIT(&tx_ring_p->lock);
 	if (status != NXGE_OK)
 		goto fail;
 
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"Recovery Successful, TxDMAChannel#%d Restored",
-			channel));
+	    "Recovery Successful, TxDMAChannel#%d Restored",
+	    channel));
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_txdma_fatal_err_recover"));
 
 	return (NXGE_OK);
@@ -3326,8 +3326,8 @@ nxge_txdma_fatal_err_recover(
 fail:
 	MUTEX_EXIT(&tx_ring_p->lock);
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		"nxge_txdma_fatal_err_recover (channel %d): "
-		"failed to recover this txdma channel", channel));
+	    "nxge_txdma_fatal_err_recover (channel %d): "
+	    "failed to recover this txdma channel", channel));
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "Recovery failed"));
 
 	return (status);
@@ -3435,7 +3435,7 @@ nxge_tx_port_fatal_err_recover(p_nxge_t nxgep)
 			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
 			if (ring) {
 				if ((rs = npi_txdma_channel_control
-					(handle, TXDMA_RESET, tdc))
+				    (handle, TXDMA_RESET, tdc))
 				    != NPI_SUCCESS) {
 					NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 					    "nxge_tx_port_fatal_err_recover "
@@ -3578,7 +3578,7 @@ nxge_txdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)
 		par_err.value = value;
 		par_err.bits.ldw.inject_parity_error |= (1 << chan);
 		cmn_err(CE_NOTE, "!Write 0x%llx to TDMC_INJ_PAR_ERR_REG\n",
-				(unsigned long long)par_err.value);
+		    (unsigned long long)par_err.value);
 		(void) npi_txdma_inj_par_error_set(handle, par_err.value);
 		break;
 
@@ -3590,7 +3590,7 @@ nxge_txdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)
 	case NXGE_FM_EREPORT_TDMC_CONF_PART_ERR:
 	case NXGE_FM_EREPORT_TDMC_PKT_PRT_ERR:
 		TXDMA_REG_READ64(nxgep->npi_handle, TDMC_INTR_DBG_REG,
-			chan, &tdi.value);
+		    chan, &tdi.value);
 		if (err_id == NXGE_FM_EREPORT_TDMC_PREF_BUF_PAR_ERR)
 			tdi.bits.ldw.pref_buf_par_err = 1;
 		else if (err_id == NXGE_FM_EREPORT_TDMC_MBOX_ERR)
@@ -3609,13 +3609,13 @@ nxge_txdma_inject_err(p_nxge_t nxgep, uint32_t err_id, uint8_t chan)
 			tdi.bits.ldw.pkt_part_err = 1;
 #if defined(__i386)
 		cmn_err(CE_NOTE, "!Write 0x%llx to TDMC_INTR_DBG_REG\n",
-				tdi.value);
+		    tdi.value);
 #else
 		cmn_err(CE_NOTE, "!Write 0x%lx to TDMC_INTR_DBG_REG\n",
-				tdi.value);
+		    tdi.value);
 #endif
 		TXDMA_REG_WRITE64(nxgep->npi_handle, TDMC_INTR_DBG_REG,
-			chan, tdi.value);
+		    chan, tdi.value);
 
 		break;
 	}

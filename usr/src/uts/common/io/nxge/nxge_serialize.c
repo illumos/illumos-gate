@@ -54,7 +54,7 @@ nxge_serialize_create(int length, onetrack_t *proc, void *cookie)
 	nxge_serialize_t *p;
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"==> nxge_serialize_create:"));
+	    "==> nxge_serialize_create:"));
 
 	p = (nxge_serialize_t *)kmem_alloc(sizeof (nxge_serialize_t), KM_SLEEP);
 	mutex_init(&p->lock, NULL, MUTEX_DEFAULT, NULL);
@@ -80,7 +80,7 @@ nxge_serialize_create(int length, onetrack_t *proc, void *cookie)
 	p->s_state = NXGE_TX_STHREAD_RUNNING;
 
 	p->tx_sthread = thread_create(NULL, 0,
-			nxge_onetrack, p, 0, &p0, TS_RUN, maxclsyspri);
+	    nxge_onetrack, p, 0, &p0, TS_RUN, maxclsyspri);
 	if (p->tx_sthread == NULL) {
 		cv_destroy(&p->serial_cv);
 		cv_destroy(&p->timecv);
@@ -90,14 +90,14 @@ nxge_serialize_create(int length, onetrack_t *proc, void *cookie)
 		kmem_free(p, sizeof (nxge_serialize_t));
 
 		NXGE_DEBUG_MSG((NULL, TX_CTL,
-			"<== nxge_serialize_create: (NULL)"));
+		    "<== nxge_serialize_create: (NULL)"));
 
 		return (NULL);
 	}
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"<== nxge_serialize_create: s %p thread %p",
-		p, p->tx_sthread));
+	    "<== nxge_serialize_create: s %p thread %p",
+	    p, p->tx_sthread));
 
 	return (p);
 }
@@ -109,10 +109,10 @@ nxge_serialize_destroy(nxge_serialize_t *p)
 	mblk_t *mp, *nmp, *t;
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"==> nxge_serialize_destroy: s %p", p));
+	    "==> nxge_serialize_destroy: s %p", p));
 	if (p == NULL) {
 		NXGE_DEBUG_MSG((NULL, TX_CTL,
-			"<== nxge_serialize_destroy:"));
+		    "<== nxge_serialize_destroy:"));
 		return;
 	}
 
@@ -123,16 +123,16 @@ nxge_serialize_destroy(nxge_serialize_t *p)
 	while (p->s_state & NXGE_TX_STHREAD_DESTROY) {
 		cv_wait(&p->serial_cv, &p->serial);
 		NXGE_DEBUG_MSG((NULL, TX_CTL,
-			"==> nxge_serialize_destroy: s %p state %d",
-			p, p->s_state));
+		    "==> nxge_serialize_destroy: s %p state %d",
+		    p, p->s_state));
 		if (p->s_state & NXGE_TX_STHREAD_EXIT) {
 			break;
 		}
 	}
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"==> nxge_serialize_destroy: s %p state %d",
-		p, p->s_state));
+	    "==> nxge_serialize_destroy: s %p state %d",
+	    p, p->s_state));
 
 	n = nxge_serial_getn(p, &mp, &t);
 	for (i = 0; i < n; i++) {
@@ -156,7 +156,7 @@ nxge_serialize_destroy(nxge_serialize_t *p)
 	kmem_free(p, sizeof (nxge_serialize_t));
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"<== nxge_serialize_destroy: s %p", p));
+	    "<== nxge_serialize_destroy: s %p", p));
 }
 
 /*
@@ -173,7 +173,7 @@ nxge_serial_put(nxge_serialize_t *p, void *mp)
 	hrtime_t tns;
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"==> nxge_serial_put: s %p mp %p", p, mp));
+	    "==> nxge_serial_put: s %p mp %p", p, mp));
 
 	mutex_enter(&p->lock);
 	/*
@@ -268,7 +268,7 @@ nxge_onetrack(void *s)
 	nxge_serialize_t *p = (nxge_serialize_t *)s;
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"==> nxge_onetrack: s %p", s));
+	    "==> nxge_onetrack: s %p", s));
 	(void) nxge_tx_s_begin(p);
 	mutex_enter(&p->serial);
 	while (p->s_state & NXGE_TX_STHREAD_RUNNING) {
@@ -281,7 +281,7 @@ nxge_onetrack(void *s)
 			break;
 		}
 		CALLB_CPR_SAFE_END(&p->s_cprinfo,
-					&p->serial)
+		    &p->serial)
 		while (k = nxge_serial_getn(p, &mp, &ignore)) {
 			hrtime_t t0 = gethrtime();
 			for (i = 0; i < k; i++) {
@@ -329,7 +329,7 @@ nxge_onetrack(void *s)
 	mutex_exit(&p->serial);
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"<== nxge_onetrack: s %p", s));
+	    "<== nxge_onetrack: s %p", s));
 	nxge_tx_s_end(s);
 }
 
@@ -346,7 +346,7 @@ nxge_freelance(nxge_serialize_t *s)
 	mblk_t *mp, *t;
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"==> nxge_freelance: s %p", s));
+	    "==> nxge_freelance: s %p", s));
 	while (n = nxge_serial_getn(s, &mp, &t)) {
 		if ((n > nxge_maxhrs) || ((c += n) > nxge_maxhrs)) {
 			nxge_serial_ungetn(s, mp, t, n);
@@ -362,13 +362,13 @@ nxge_freelance(nxge_serialize_t *s)
 			}
 
 			NXGE_DEBUG_MSG((NULL, TX_CTL,
-				"==> nxge_freelance: s %p mp %p", s, mp));
+			    "==> nxge_freelance: s %p mp %p", s, mp));
 
 			mp = next;
 		}
 	}
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"<== nxge_freelance: s %p", s));
+	    "<== nxge_freelance: s %p", s));
 
 	return (0);
 }
@@ -389,7 +389,7 @@ static caddr_t
 nxge_tx_s_begin(nxge_serialize_t *s)
 {
 	CALLB_CPR_INIT(&s->s_cprinfo, &s->serial,
-			callb_generic_cpr, "nxge_tx_serialize");
+	    callb_generic_cpr, "nxge_tx_serialize");
 	return (s->cookie);
 }
 
@@ -399,7 +399,7 @@ nxge_tx_s_end(nxge_serialize_t *s)
 	callb_cpr_t cprinfo;
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"==> nxge_tx_s_end: s %p", s));
+	    "==> nxge_tx_s_end: s %p", s));
 	cprinfo = s->s_cprinfo;
 	mutex_enter(&s->serial);
 	s->s_state |= NXGE_TX_STHREAD_EXIT;
@@ -408,7 +408,7 @@ nxge_tx_s_end(nxge_serialize_t *s)
 	CALLB_CPR_EXIT(&cprinfo);
 
 	NXGE_DEBUG_MSG((NULL, TX_CTL,
-		"<== nxge_tx_s_end: s %p", s));
+	    "<== nxge_tx_s_end: s %p", s));
 
 	thread_exit();
 }
