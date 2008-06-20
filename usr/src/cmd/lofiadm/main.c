@@ -483,11 +483,12 @@ lofi_uncompress(int lfd, const char *filename)
  * Compress a file
  */
 static void
-lofi_compress(int lfd, const char *filename, int compress_index,
+lofi_compress(int *lfd, const char *filename, int compress_index,
     uint32_t segsize)
 {
 	struct lofi_ioctl lic;
 	lofi_compress_info_t *li;
+	struct flock lock;
 	char tmpfilename[MAXPATHLEN];
 	char comp_filename[MAXPATHLEN];
 	char algorithm[MAXALGLEN];
@@ -512,9 +513,16 @@ lofi_compress(int lfd, const char *filename, int compress_index,
 	 */
 	lic.li_minor = 0;
 	(void) strlcpy(lic.li_filename, filename, sizeof (lic.li_filename));
-	if (ioctl(lfd, LOFI_GET_MINOR, &lic) != -1)
+	if (ioctl(*lfd, LOFI_GET_MINOR, &lic) != -1)
 		die(gettext("%s must be unmapped before compressing"),
 		    filename);
+
+	/*
+	 * Close the control device so other operations
+	 * can use it
+	 */
+	(void) close(*lfd);
+	*lfd = -1;
 
 	li = &lofi_compress_table[compress_index];
 
@@ -533,8 +541,24 @@ lofi_compress(int lfd, const char *filename, int compress_index,
 	if (compressed_seg == NULL || uncompressed_seg == NULL)
 		die(gettext("No memory"));
 
-	if ((uncompfd = open64(filename, O_RDONLY|O_LARGEFILE, 0)) == -1)
+	if ((uncompfd = open64(filename, O_RDWR|O_LARGEFILE, 0)) == -1)
 		die(gettext("open: %s"), filename);
+
+	lock.l_type = F_WRLCK;
+	lock.l_whence = SEEK_SET;
+	lock.l_start = 0;
+	lock.l_len = 0;
+
+	/*
+	 * Use an advisory lock to ensure that only a
+	 * single lofiadm process compresses a given
+	 * file at any given time
+	 *
+	 * A close on the file descriptor automatically
+	 * closes all lock state on the file
+	 */
+	if (fcntl(uncompfd, F_SETLKW, &lock) == -1)
+		die(gettext("fcntl: %s"), filename);
 
 	if (fstat64(uncompfd, &statbuf) == -1) {
 		(void) close(uncompfd);
@@ -1008,7 +1032,7 @@ main(int argc, char *argv[])
 	if (addflag)
 		add_mapping(lfd, devicename, filename, NULL, 0);
 	else if (compressflag)
-		lofi_compress(lfd, filename, compress_index, segsize);
+		lofi_compress(&lfd, filename, compress_index, segsize);
 	else if (uncompressflag)
 		lofi_uncompress(lfd, filename);
 	else if (deleteflag)
@@ -1018,7 +1042,8 @@ main(int argc, char *argv[])
 	else
 		print_mappings(lfd);
 
-	(void) close(lfd);
+	if (lfd != -1)
+		(void) close(lfd);
 	closelib();
 	return (E_SUCCESS);
 }
