@@ -27,6 +27,18 @@
 # This file defines the current capabilities of GRUB over and above that
 # supported by the standard distribution
 #
+# The version field contains the version of the associated GRUB software.
+# The version is incremented by .1 (minor version number) each time there
+# is a bugfix or enhancement of GRUB. In addition, the major version number
+# is bumped up by 1 every time a release boundary is crossed. Thus if in S11
+# the starting version is 3, in S12 the starting version will be 4.
+# Note that the first major number in each sequence is a whole integer
+# i.e. 2.0 is truncated to 2 and 3.0 is truncated to 3.
+#
+# This file and the associated version are Solaris specific and are
+# not a part of the open source distribution of GRUB.
+#
+VERSION=3
 dboot
 xVM
 zfs
