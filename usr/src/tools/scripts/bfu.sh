@@ -2124,6 +2124,69 @@ EOF
 	smf_fix_i86pc_profile
 }
 
+tx_check_update() {
+#
+# If a lbl_edition file is found it's a likely sign that old unbundled
+# Trusted Extensions packages are installed and TX is active.  Update
+# etc/system if needed, to complete enabling of the bundled TX.
+#
+	LMOD1=$rootprefix/kernel/sys/lbl_edition
+	LMOD2=$rootprefix/kernel/sys/amd64/lbl_edition
+	LMOD3=$rootprefix/kernel/sys/sparcv9/lbl_edition
+
+	grep "^set sys_labeling=" $rootprefix/bfu.child/etc/system > \
+	    /dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		return
+	fi
+
+	if [ -f $LMOD1 -o -f $LMOD2 -o -f $LMOD3 ]; then
+		echo "set sys_labeling=1" >> $rootprefix/bfu.child/etc/system
+		if [ $? -ne 0 ]; then
+    			echo "cannot set sys_labeling in $rootprefix/bfu.child/etc/system"
+			return
+		fi
+
+		rm -f $LMOD1 $LMOD2 $LMOD3
+	fi
+}
+
+tx_check_bkbfu() {
+#
+# Emit a warning message if bfu'ing a Trusted Extensions-enabled system
+# backwards to pre TX-merge bits.  In this case, unbundled packages must
+# be reinstalled to complete restoration of old TX bits.
+#
+	bsmconv=$rootprefix/etc/security/bsmconv
+
+	# This check is only needed in global zone
+	if [[ $zone != global ]]; then
+		return
+	fi
+
+	# No warning needed if TX is not currently enabled
+	grep "^set sys_labeling=" $rootprefix/bfu.child/etc/system > \
+	    /dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		return
+	fi
+
+	if [ ! -f $bsmconv ]; then
+		return
+	fi
+	grep " -x /usr/bin/plabel " $bsmconv > /dev/null 2>&1
+	if [ $? != 0 ]; then
+		return
+	fi
+
+	print ""
+	print "*************************************************************"
+	print " WARNING: BFU'ing TX backwards across 6533113."
+	print " Must re-install unbundled TX packages to remain Trusted."
+	print "*************************************************************"
+	print ""
+}
+
 #
 # The directboot putback moved the console property from
 # /boot/solaris/bootenv.rc to /boot/grub/menu.lst.  It should be kept in both.
@@ -5553,6 +5616,11 @@ mondo_loop() {
 	#
 	smf_handle_new_services
 
+	#
+	# Handle unbundled TX conversion if needed
+	#
+	tx_check_update
+
       	# Reflect SUNWcsr's pre-install change, ensures
 	# the i.hosts action script works during 'acr'	
 	if [[ -f $rootprefix/etc/inet/ipnodes && \
@@ -7832,6 +7900,8 @@ mondo_loop() {
 	smf_apply_conf
 
 	update_policy_conf
+
+	tx_check_bkbfu
 
 	if [ $target_isa = i386 ]; then
 	    update_mptconf_i386
