@@ -294,9 +294,12 @@ logout_targ(char *targ)
 
 	(void) pthread_mutex_lock(&port_mutex);
 	for (conn = conn_head; conn; conn = conn->c_next) {
-		if ((conn->c_state == S5_LOGGED_IN) &&
-		    (strcmp(conn->c_sess->s_t_name, targ) == 0)) {
+		if (conn->c_state != S5_LOGGED_IN)
+			continue;
+		if (conn->c_sess->s_type == SessionDiscovery)
+			continue;
 
+		if (strcmp(conn->c_sess->s_t_name, targ) == 0) {
 			queue_message_set(conn->c_dataq, 0, msg_mgmt_rqst, &m);
 			msg_sent++;
 		}
