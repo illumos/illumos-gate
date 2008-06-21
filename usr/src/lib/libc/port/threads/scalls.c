@@ -79,6 +79,12 @@
 #endif
 
 /*
+ * These are SUNWprivate, but they are being used by Sun Studio libcollector.
+ */
+#pragma weak _fork1 = fork1
+#pragma weak _forkall = forkall
+
+/*
  * atfork_lock protects the pthread_atfork() data structures.
  *
  * fork_lock does double-duty.  Not only does it (and atfork_lock)

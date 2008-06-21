@@ -1425,6 +1425,8 @@ SUNWprivate_1.1 {
 	__fnmatch_C;
 	__fnmatch_sb;
 	__fnmatch_std;
+	_fork1 =		NODYNSORT;
+	_forkall =		NODYNSORT;
 	_fpclass;
 	_fpgetmask;
 	_fpgetround;
