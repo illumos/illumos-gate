@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -510,6 +510,33 @@ typedef struct event_data_sas_phy_link_status {
 #define	MPI_EVENT_SAS_PLS_LR_RATE_SATA_OOB_COMPLETE		0x03
 #define	MPI_EVENT_SAS_PLS_LR_RATE_1_5				0x08
 #define	MPI_EVENT_SAS_PLS_LR_RATE_3_0				0x09
+
+/*
+ * sas discovery error structure
+ */
+typedef struct event_data_sas_discovery_error {
+	uint32_t	DiscoveryStatus;
+	uint8_t		Port;
+	uint8_t		Reserved[3];
+} event_data_sas_discovery_error_t;
+
+/*
+ * values for DiscoveryStatus field of SAS Discovery Error Event Data
+ */
+
+#define	MPI_EVENT_SAS_DE_DS_LOOP_DETECTED		0x00000001
+#define	MPI_EVENT_SAS_DE_DS_UNADDRESSABLE_DEVICE	0x00000002
+#define	MPI_EVENT_SAS_DE_DS_MULTIPLE_PORTS		0x00000004
+#define	MPI_EVENT_SAS_DE_DS_EXPANDER_ERR		0x00000008
+#define	MPI_EVENT_SAS_DE_DS_SMP_TIMEOUT			0x00000010
+#define	MPI_EVENT_SAS_DE_DS_OUT_ROUTE_ENTRIES		0x00000020
+#define	MPI_EVENT_SAS_DE_DS_INDEX_NOT_EXIST		0x00000040
+#define	MPI_EVENT_SAS_DE_DS_SMP_FUNCTION_FAILED		0x00000080
+#define	MPI_EVENT_SAS_DE_DS_SMP_CRC_ERR			0x00000100
+#define	MPI_EVENT_SAS_DE_DS_MULTIPLE_SUBTRACTIVE	0x00000200
+#define	MPI_EVENT_SAS_DE_DS_TABLE_TO_TABLE		0x00000400
+#define	MPI_EVENT_SAS_DE_DS_MULTIPLE_PATHS		0x00000800
+#define	MPI_EVENT_SAS_DE_DS_MAX_SATA_TARGS		0x00001000
 
 typedef struct event_data_sas_expander_status_change {
 	uint8_t		ReasonCode;
