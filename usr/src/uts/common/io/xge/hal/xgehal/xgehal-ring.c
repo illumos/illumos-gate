@@ -209,7 +209,7 @@ __hal_ring_mempool_item_alloc(xge_hal_mempool_h mempoolh,
 __hal_ring_initial_replenish(xge_hal_channel_t *channel,
 			     xge_hal_channel_reopen_e reopen)
 {
-	xge_hal_dtr_h dtr;
+	xge_hal_dtr_h dtr = NULL;
 
 	while (xge_hal_channel_dtr_count(channel) > 0) {
 		xge_hal_status_e status;
@@ -510,27 +510,33 @@ __hal_ring_hw_initialize(xge_hal_device_h devh)
 	xge_debug_ring(XGE_TRACE, "DRAM configured to 0x"XGE_OS_LLXFMT,
 			(unsigned long long)val64);
 
-    if (!hldev->config.rts_qos_steering_config) {
+	if (!hldev->config.rts_qos_en &&
+	    !hldev->config.rts_port_en &&
+	    !hldev->config.rts_mac_en) {
 
-        /* Activate Rx steering */
-        val64 = xge_os_pio_mem_read64(hldev->pdev, hldev->regh0,
-                                      &bar0->rts_qos_steering);
-        for (j = 0; j < 8 /* QoS max */; j++)
-        {
-            for (i = 0; i < XGE_HAL_MAX_RING_NUM; i++)
-            {
-                if (!hldev->config.ring.queue[i].configured)
-                    continue;
-                if (!hldev->config.ring.queue[i].rth_en)
-                    val64 |= (BIT(i) >> (j*8));
-            }
-        }
-        xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
-                               &bar0->rts_qos_steering);
-        xge_debug_ring(XGE_TRACE, "QoS steering configured to 0x"XGE_OS_LLXFMT,
-                       (unsigned long long)val64);
+		/*
+		 * Activate default (QoS-based) Rx steering
+		 */
 
-    }
+		val64 = xge_os_pio_mem_read64(hldev->pdev, hldev->regh0,
+					      &bar0->rts_qos_steering);
+		for (j = 0; j < 8 /* QoS max */; j++)
+		{
+			for (i = 0; i < XGE_HAL_MAX_RING_NUM; i++)
+			{
+				if (!hldev->config.ring.queue[i].configured)
+					continue;
+				if (!hldev->config.ring.queue[i].rth_en)
+					val64 |= (BIT(i) >> (j*8));
+			}
+		}
+		xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
+				       &bar0->rts_qos_steering);
+		xge_debug_ring(XGE_TRACE, "QoS steering configured to 0x"XGE_OS_LLXFMT,
+			       (unsigned long long)val64);
+
+	}
+
 	/* Note: If a queue does not exist, it should be assigned a maximum
 	 *	 length of zero. Otherwise, packet loss could occur.
 	 *	 P. 4-4 User guide.
@@ -588,6 +594,39 @@ __hal_ring_hw_initialize(xge_hal_device_h devh)
 
 		xge_os_mdelay(1);
 	}
+
+	if (hldev->config.intr_mode != XGE_HAL_INTR_MODE_MSIX)
+		return;
+
+	/*
+	 * Assign MSI-X vectors
+	 */
+	for (i = 0; i < XGE_HAL_MAX_RING_NUM; i++) {
+		xge_list_t *item;
+		xge_hal_channel_t *channel = NULL;
+
+		if (!hldev->config.ring.queue[i].configured ||
+		    !hldev->config.ring.queue[i].intr_vector)
+			continue;
+
+		/* find channel */
+		xge_list_for_each(item, &hldev->free_channels) {
+			xge_hal_channel_t *tmp;
+			tmp = xge_container_of(item, xge_hal_channel_t,
+						   item);
+			if (tmp->type == XGE_HAL_CHANNEL_TYPE_RING &&
+			    tmp->post_qid == i) {
+				channel = tmp;
+				break;
+			}
+		}
+
+		if (channel) {
+			(void) xge_hal_channel_msix_set(channel,
+				hldev->config.ring.queue[i].intr_vector);
+		}
+	}
+
 	xge_debug_ring(XGE_TRACE, "%s", "ring channels initialized");
 }
 

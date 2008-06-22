@@ -183,6 +183,11 @@ __hal_fifo_queue_check (xge_hal_fifo_config_t *new_config,
 		return XGE_HAL_BADCFG_FIFO_QUEUE_INTR;
 	}
 
+	if ((new_queue->intr_vector < XGE_HAL_MIN_FIFO_QUEUE_INTR_VECTOR) ||
+		(new_queue->intr_vector > XGE_HAL_MAX_FIFO_QUEUE_INTR_VECTOR)) {
+		return XGE_HAL_BADCFG_FIFO_QUEUE_INTR_VECTOR;
+	}
+
 	for(i = 0;  i < XGE_HAL_MAX_FIFO_TTI_NUM; i++) {
 		/*
 		 * Validate the tti configuration parameters only if
@@ -269,6 +274,16 @@ __hal_ring_queue_check (xge_hal_ring_queue_t *new_config)
 		return XGE_HAL_BADCFG_RING_RTS_MAC_EN;
 	}
 
+	if ((new_config->rts_mac_en < XGE_HAL_MIN_RING_RTS_PORT_EN) ||
+		(new_config->rts_mac_en > XGE_HAL_MAX_RING_RTS_PORT_EN)) {
+		return XGE_HAL_BADCFG_RING_RTS_PORT_EN;
+	}
+
+	if ((new_config->intr_vector < XGE_HAL_MIN_RING_QUEUE_INTR_VECTOR) ||
+		(new_config->intr_vector > XGE_HAL_MAX_RING_QUEUE_INTR_VECTOR)) {
+		return XGE_HAL_BADCFG_RING_QUEUE_INTR_VECTOR;
+	}
+
 	if (new_config->indicate_max_pkts <
 	XGE_HAL_MIN_RING_INDICATE_MAX_PKTS ||
 	    new_config->indicate_max_pkts >
@@ -352,6 +367,7 @@ static xge_hal_status_e
 __hal_fifo_config_check (xge_hal_fifo_config_t *new_config)
 {
 	int i;
+	int total_fifo_length = 0;
 
 	/*
 	 * recompute max_frags to be multiple of 4,
@@ -386,6 +402,12 @@ __hal_fifo_config_check (xge_hal_fifo_config_t *new_config)
 				     &new_config->queue[i])) != XGE_HAL_OK) {
 			return status;
 		}
+
+	        total_fifo_length += new_config->queue[i].max;
+	}
+
+	if(total_fifo_length > XGE_HAL_MAX_FIFO_QUEUE_LENGTH){
+		return XGE_HAL_BADCFG_FIFO_QUEUE_MAX_LENGTH;
 	}
 
 	return XGE_HAL_OK;
@@ -599,9 +621,14 @@ __hal_device_config_check_common (xge_hal_device_config_t *new_config)
 	        }
         }
 
-	if ((new_config->rts_qos_steering_config < XGE_HAL_RTS_QOS_STEERING_DISABLE) ||
-		(new_config->rts_qos_steering_config > XGE_HAL_RTS_QOS_STEERING_ENABLE)) {
-		return XGE_HAL_BADCFG_RTS_QOS_STEERING_CONFIG;
+	if ((new_config->rts_port_en < XGE_HAL_MIN_RING_RTS_PORT_EN) ||
+		(new_config->rts_port_en > XGE_HAL_MAX_RING_RTS_PORT_EN)) {
+		return XGE_HAL_BADCFG_RTS_PORT_EN;
+	}
+
+	if ((new_config->rts_qos_en < XGE_HAL_RTS_QOS_DISABLE) ||
+		(new_config->rts_qos_en > XGE_HAL_RTS_QOS_ENABLE)) {
+		return XGE_HAL_BADCFG_RTS_QOS_EN;
 	}
 
 #if defined(XGE_HAL_CONFIG_LRO)
@@ -709,6 +736,10 @@ __hal_driver_config_check (xge_hal_driver_config_t *new_config)
 #ifdef XGE_TRACE_INTO_CIRCULAR_ARR
 	if ((new_config->tracebuf_size < XGE_HAL_MIN_CIRCULAR_ARR) ||
 		(new_config->tracebuf_size > XGE_HAL_MAX_CIRCULAR_ARR)) {
+		return XGE_HAL_BADCFG_TRACEBUF_SIZE;
+	}
+	if ((new_config->tracebuf_timestamp_en < XGE_HAL_MIN_TIMESTAMP_EN) ||
+		(new_config->tracebuf_timestamp_en > XGE_HAL_MAX_TIMESTAMP_EN)) {
 		return XGE_HAL_BADCFG_TRACEBUF_SIZE;
 	}
 #endif

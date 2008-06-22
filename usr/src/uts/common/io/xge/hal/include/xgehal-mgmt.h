@@ -52,6 +52,7 @@ __EXTERN_BEGIN_DECLS
  * @ll_minor: Link-layer ULD minor version number.
  * @ll_fix: Link-layer ULD fix version number.
  * @ll_build: Link-layer ULD build number.
+ * @transponder_temperature: TODO
  */
 typedef struct xge_hal_mgmt_about_info_t {
 	u16		vendor;
@@ -74,6 +75,7 @@ typedef struct xge_hal_mgmt_about_info_t {
 } xge_hal_mgmt_about_info_t;
 
 typedef xge_hal_stats_hw_info_t		xge_hal_mgmt_hw_stats_t;
+typedef xge_hal_stats_pcim_info_t	xge_hal_mgmt_pcim_stats_t;
 typedef xge_hal_stats_sw_err_t		xge_hal_mgmt_sw_stats_t;
 typedef xge_hal_stats_device_info_t	xge_hal_mgmt_device_stats_t;
 typedef xge_hal_stats_channel_info_t	xge_hal_mgmt_channel_stats_t;
@@ -91,6 +93,14 @@ xge_hal_mgmt_hw_stats(xge_hal_device_h devh, xge_hal_mgmt_hw_stats_t *hw_stats,
 
 xge_hal_status_e
 xge_hal_mgmt_hw_stats_off(xge_hal_device_h devh, int off, int size, char *out);
+
+xge_hal_status_e
+xge_hal_mgmt_pcim_stats(xge_hal_device_h devh,
+		xge_hal_mgmt_pcim_stats_t *pcim_stats, int size);
+
+xge_hal_status_e
+xge_hal_mgmt_pcim_stats_off(xge_hal_device_h devh, int off, int size,
+		char *out);
 
 xge_hal_status_e
 xge_hal_mgmt_sw_stats(xge_hal_device_h devh, xge_hal_mgmt_sw_stats_t *hw_stats,
@@ -143,8 +153,35 @@ xge_hal_mdio_write( xge_hal_device_h devh, u32 mmd_type, u64 addr, u32 value );
 u32
 xge_hal_read_xfp_current_temp(xge_hal_device_h devh);
 
+xge_hal_status_e
+xge_hal_read_eeprom(xge_hal_device_h devh, int off, u32* data);
+
+xge_hal_status_e
+xge_hal_write_eeprom(xge_hal_device_h devh, int off, u32 data, int cnt);
+
+xge_hal_status_e
+xge_hal_register_test(xge_hal_device_h devh, u64 *data);
+
+xge_hal_status_e
+xge_hal_eeprom_test(xge_hal_device_h devh, u64 *data);
+
+xge_hal_status_e
+xge_hal_bist_test(xge_hal_device_h devh, u64 *data);
+
+xge_hal_status_e
+xge_hal_link_test(xge_hal_device_h devh, u64 *data);
+
+int
+xge_hal_setpause_data(xge_hal_device_h devh, int tx, int rx);
+
+void
+xge_hal_getpause_data(xge_hal_device_h devh, int *tx, int *rx);
+
 void
 __hal_updt_stats_xpak(xge_hal_device_t *hldev);
+
+void
+__hal_chk_xpak_counter(xge_hal_device_t *hldev, int type, u32 value);
 
 #ifdef XGE_TRACE_INTO_CIRCULAR_ARR
 xge_hal_status_e

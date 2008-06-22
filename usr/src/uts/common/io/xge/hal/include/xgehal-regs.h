@@ -24,6 +24,8 @@
 #ifndef XGE_HAL_REGS_H
 #define XGE_HAL_REGS_H
 
+__EXTERN_BEGIN_DECLS
+
 typedef struct {
 
 /* General Control-Status Registers */
@@ -296,6 +298,7 @@ typedef struct {
 
 	/* Automated statistics collection */
 	u64 stat_byte_cnt;
+#define	XGE_HAL_STAT_BYTE_CNT(n)	vBIT(n, 4, 12)
 	u64 stat_cfg;
 #define XGE_HAL_STAT_CFG_STAT_EN           BIT(0)
 #define XGE_HAL_STAT_CFG_ONE_SHOT_EN       BIT(1)
@@ -354,6 +357,7 @@ typedef struct {
 	u64 misc_control;
 #define XGE_HAL_MISC_CONTROL_LINK_STABILITY_PERIOD(val)	vBIT(val,29,3)
 #define XGE_HAL_MISC_CONTROL_EXT_REQ_EN     BIT(1)
+#define XGE_HAL_MISC_CONTROL_LINK_FAULT		BIT(0)
 
 	u64 xfb_control;
 	u64 gpio_control;
@@ -429,30 +433,65 @@ typedef struct {
 #define XGE_HAL_TXDMA_TPA_INT			BIT(5)
 #define XGE_HAL_TXDMA_SM_INT			BIT(6)
 	u64 pfc_err_reg;
+#define XGE_HAL_PFC_ECC_SG_ERR			BIT(7)
+#define XGE_HAL_PFC_ECC_DB_ERR			BIT(15)
+#define XGE_HAL_PFC_SM_ERR_ALARM		BIT(23)
+#define XGE_HAL_PFC_MISC_0_ERR			BIT(31)
+#define XGE_HAL_PFC_MISC_1_ERR			BIT(32)
+#define XGE_HAL_PFC_PCIX_ERR			BIT(39)
 	u64 pfc_err_mask;
 	u64 pfc_err_alarm;
 
 	u64 tda_err_reg;
+#define XGE_HAL_TDA_Fn_ECC_SG_ERR		vBIT(0xff,0,8)
+#define XGE_HAL_TDA_Fn_ECC_DB_ERR		vBIT(0xff,8,8)
+#define XGE_HAL_TDA_SM0_ERR_ALARM		BIT(22)
+#define XGE_HAL_TDA_SM1_ERR_ALARM		BIT(23)
+#define XGE_HAL_TDA_PCIX_ERR			BIT(39)
 	u64 tda_err_mask;
 	u64 tda_err_alarm;
 
 	u64 pcc_err_reg;
+#define XGE_HAL_PCC_FB_ECC_SG_ERR		vBIT(0xFF,0,8)
+#define XGE_HAL_PCC_TXB_ECC_SG_ERR		vBIT(0xFF,8,8)
+#define XGE_HAL_PCC_FB_ECC_DB_ERR		vBIT(0xFF,16, 8)
+#define XGE_HAL_PCC_TXB_ECC_DB_ERR		vBIT(0xff,24,8)
+#define XGE_HAL_PCC_SM_ERR_ALARM		vBIT(0xff,32,8)
+#define XGE_HAL_PCC_WR_ERR_ALARM		vBIT(0xff,40,8)
+#define XGE_HAL_PCC_N_SERR			vBIT(0xff,48,8)
+#define XGE_HAL_PCC_ENABLE_FOUR			vBIT(0x0F,0,8)
+#define XGE_HAL_PCC_6_COF_OV_ERR		BIT(56)
+#define XGE_HAL_PCC_7_COF_OV_ERR		BIT(57)
+#define XGE_HAL_PCC_6_LSO_OV_ERR		BIT(58)
+#define XGE_HAL_PCC_7_LSO_OV_ERR		BIT(59)
 	u64 pcc_err_mask;
 	u64 pcc_err_alarm;
 
 	u64 tti_err_reg;
+#define XGE_HAL_TTI_ECC_SG_ERR			BIT(7)
+#define XGE_HAL_TTI_ECC_DB_ERR			BIT(15)
+#define XGE_HAL_TTI_SM_ERR_ALARM		BIT(23)
 	u64 tti_err_mask;
 	u64 tti_err_alarm;
 
 	u64 lso_err_reg;
+#define XGE_HAL_LSO6_SEND_OFLOW			BIT(12)
+#define XGE_HAL_LSO7_SEND_OFLOW			BIT(13)
+#define XGE_HAL_LSO6_ABORT			BIT(14)
+#define XGE_HAL_LSO7_ABORT			BIT(15)
+#define XGE_HAL_LSO6_SM_ERR_ALARM		BIT(22)
+#define XGE_HAL_LSO7_SM_ERR_ALARM		BIT(23)
 	u64 lso_err_mask;
 	u64 lso_err_alarm;
 
 	u64 tpa_err_reg;
+#define XGE_HAL_TPA_TX_FRM_DROP			BIT(7)
+#define XGE_HAL_TPA_SM_ERR_ALARM		BIT(23)
 	u64 tpa_err_mask;
 	u64 tpa_err_alarm;
 
 	u64 sm_err_reg;
+#define XGE_HAL_SM_SM_ERR_ALARM			BIT(15)
 	u64 sm_err_mask;
 	u64 sm_err_alarm;
 
@@ -563,22 +602,52 @@ typedef struct {
 #define XGE_HAL_RXDMA_INT_RTI_INT_M            BIT(3)
 
 	u64 rda_err_reg;
+#define XGE_HAL_RDA_RXDn_ECC_SG_ERR		vBIT(0xFF,0,8)
+#define XGE_HAL_RDA_RXDn_ECC_DB_ERR		vBIT(0xFF,8,8)
+#define XGE_HAL_RDA_FRM_ECC_SG_ERR		BIT(23)
+#define XGE_HAL_RDA_FRM_ECC_DB_N_AERR		BIT(31)
+#define XGE_HAL_RDA_SM1_ERR_ALARM		BIT(38)
+#define XGE_HAL_RDA_SM0_ERR_ALARM		BIT(39)
+#define XGE_HAL_RDA_MISC_ERR			BIT(47)
+#define XGE_HAL_RDA_PCIX_ERR			BIT(55)
+#define XGE_HAL_RDA_RXD_ECC_DB_SERR		BIT(63)
 	u64 rda_err_mask;
 	u64 rda_err_alarm;
 
 	u64 rc_err_reg;
+#define XGE_HAL_RC_PRCn_ECC_SG_ERR		vBIT(0xFF,0,8)
+#define XGE_HAL_RC_PRCn_ECC_DB_ERR		vBIT(0xFF,8,8)
+#define XGE_HAL_RC_FTC_ECC_SG_ERR		BIT(23)
+#define XGE_HAL_RC_FTC_ECC_DB_ERR		BIT(31)
+#define XGE_HAL_RC_PRCn_SM_ERR_ALARM		vBIT(0xFF,32,8)
+#define XGE_HAL_RC_FTC_SM_ERR_ALARM		BIT(47)
+#define XGE_HAL_RC_RDA_FAIL_WR_Rn		vBIT(0xFF,48,8)
 	u64 rc_err_mask;
 	u64 rc_err_alarm;
 
 	u64 prc_pcix_err_reg;
+#define XGE_HAL_PRC_PCI_AB_RD_Rn		vBIT(0xFF,0,8)
+#define XGE_HAL_PRC_PCI_DP_RD_Rn		vBIT(0xFF,8,8)
+#define XGE_HAL_PRC_PCI_AB_WR_Rn		vBIT(0xFF,16,8)
+#define XGE_HAL_PRC_PCI_DP_WR_Rn		vBIT(0xFF,24,8)
+#define XGE_HAL_PRC_PCI_AB_F_WR_Rn		vBIT(0xFF,32,8)
+#define XGE_HAL_PRC_PCI_DP_F_WR_Rn		vBIT(0xFF,40,8)
 	u64 prc_pcix_err_mask;
 	u64 prc_pcix_err_alarm;
 
 	u64 rpa_err_reg;
+#define XGE_HAL_RPA_ECC_SG_ERR			BIT(7)
+#define XGE_HAL_RPA_ECC_DB_ERR			BIT(15)
+#define XGE_HAL_RPA_FLUSH_REQUEST		BIT(22)
+#define XGE_HAL_RPA_SM_ERR_ALARM		BIT(23)
+#define XGE_HAL_RPA_CREDIT_ERR			BIT(31)
 	u64 rpa_err_mask;
 	u64 rpa_err_alarm;
 
 	u64 rti_err_reg;
+#define XGE_HAL_RTI_ECC_SG_ERR			BIT(7)
+#define XGE_HAL_RTI_ECC_DB_ERR			BIT(15)
+#define XGE_HAL_RTI_SM_ERR_ALARM		BIT(23)
 	u64 rti_err_mask;
 	u64 rti_err_alarm;
 
@@ -692,19 +761,21 @@ typedef struct {
 #define XGE_HAL_MAC_INT_STATUS_RMAC_INT            BIT(1)
 
 	u64 mac_tmac_err_reg;
-#define XGE_HAL_TMAC_ERR_REG_TMAC_ECC_DB_ERR       BIT(15)
-#define XGE_HAL_TMAC_ERR_REG_TMAC_TX_BUF_OVRN      BIT(23)
-#define XGE_HAL_TMAC_ERR_REG_TMAC_TX_CRI_ERR       BIT(31)
+#define XGE_HAL_TMAC_ECC_DB_ERR			BIT(15) 
+#define XGE_HAL_TMAC_TX_BUF_OVRN		BIT(23)
+#define XGE_HAL_TMAC_TX_CRI_ERR		   	BIT(31)
+#define XGE_HAL_TMAC_TX_SM_ERR			BIT(39)
 	u64 mac_tmac_err_mask;
 	u64 mac_tmac_err_alarm;
 
 	u64 mac_rmac_err_reg;
-#define XGE_HAL_RMAC_ERR_REG_RX_BUFF_OVRN          BIT(0)
-#define XGE_HAL_RMAC_ERR_REG_RTH_SPDM_ECC_SG_ERR	 BIT(9)
-#define XGE_HAL_RMAC_ERR_REG_RTS_ECC_DB_ERR        BIT(14)
-#define XGE_HAL_RMAC_ERR_REG_ECC_DB_ERR            BIT(15)
-#define XGE_HAL_RMAC_ERR_REG_RTH_SPDM_ECC_DB_ERR	 BIT(17)
-#define XGE_HAL_RMAC_LINK_STATE_CHANGE_INT         BIT(31)
+#define XGE_HAL_RMAC_RX_BUFF_OVRN		BIT(0)
+#define XGE_HAL_RMAC_RTH_SPDM_ECC_SG_ERR	BIT(0)
+#define XGE_HAL_RMAC_RTS_ECC_DB_ERR		BIT(0)
+#define XGE_HAL_RMAC_ECC_DB_ERR			BIT(0)
+#define XGE_HAL_RMAC_RTH_SPDM_ECC_DB_ERR	BIT(0)
+#define XGE_HAL_RMAC_LINK_STATE_CHANGE_INT	BIT(0)
+#define XGE_HAL_RMAC_RX_SM_ERR			BIT(39)
 	u64 mac_rmac_err_mask;
 	u64 mac_rmac_err_alarm;
 
@@ -1066,19 +1137,24 @@ typedef struct {
 #define XGE_HAL_XGXS_INT_MASK_RXGXS                BIT(1)
 
 	u64 xgxs_txgxs_err_reg;
-#define XGE_HAL_TXGXS_ECC_DB_ERR                   BIT(15)
+#define XGE_HAL_TXGXS_ECC_SG_ERR			BIT(7)
+#define XGE_HAL_TXGXS_ECC_DB_ERR			BIT(15)
+#define XGE_HAL_TXGXS_ESTORE_UFLOW			BIT(31)
+#define XGE_HAL_TXGXS_TX_SM_ERR				BIT(39)
 	u64 xgxs_txgxs_err_mask;
 	u64 xgxs_txgxs_err_alarm;
 
 	u64 xgxs_rxgxs_err_reg;
+#define XGE_HAL_RXGXS_ESTORE_OFLOW			BIT(7)
+#define XGE_HAL_RXGXS_RX_SM_ERR				BIT(39)
 	u64 xgxs_rxgxs_err_mask;
 	u64 xgxs_rxgxs_err_alarm;
 
-	u8 unused28[0x100 - 0x40];
-	
 	u64 spi_err_reg;
 	u64 spi_err_mask;
 	u64 spi_err_alarm;
+
+	u8 unused28[0x100 - 0x58];
 
 	u64 xgxs_cfg;
 	u64 xgxs_status;
@@ -1287,5 +1363,7 @@ typedef struct xge_hal_pci_config_t {
 
 #define XGE_HAL_REG_SPACE	sizeof(xge_hal_pci_bar0_t)
 #define XGE_HAL_EEPROM_SIZE	(0x01 << 11)
+
+__EXTERN_END_DECLS
 
 #endif /* XGE_HAL_REGS_H */

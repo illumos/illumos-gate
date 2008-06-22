@@ -235,7 +235,7 @@ __hal_fifo_open(xge_hal_channel_h channelh, xge_hal_channel_attr_t *attr)
 			__xge_os_cacheline_size) * __xge_os_cacheline_size;
 
 	if (fifo->txdl_size != txdl_size)
-	        xge_debug_fifo(XGE_ERR, "cacheline > 128 (??): %d, %d, %d, %d",
+	        xge_debug_fifo(XGE_ERR, "cacheline > 128 ( ?? ): %d, %d, %d, %d",
 		fifo->config->max_frags, fifo->txdl_size, txdl_size,
 		__xge_os_cacheline_size);
 
@@ -273,7 +273,7 @@ __hal_fifo_open(xge_hal_channel_h channelh, xge_hal_channel_attr_t *attr)
 	xge_debug_fifo(XGE_TRACE,
 		"DTR  reserve_length:%d reserve_top:%d\n"
 		"max_frags:%d reserve_threshold:%d\n"
-		"memblock_size:%d alignment_size:%d max_aligned_frags:%d\n",
+		"memblock_size:%d alignment_size:%d max_aligned_frags:%d",
 		fifo->channel.reserve_length, fifo->channel.reserve_top,
 		fifo->config->max_frags, fifo->config->reserve_threshold,
 		fifo->config->memblock_size, fifo->config->alignment_size,
@@ -282,7 +282,7 @@ __hal_fifo_open(xge_hal_channel_h channelh, xge_hal_channel_attr_t *attr)
 #ifdef XGE_DEBUG_ASSERT
 	for ( i = 0; i < fifo->channel.reserve_length; i++) {
 		xge_debug_fifo(XGE_TRACE, "DTR before reversing index:%d"
-		" handle:%p\n", i, fifo->channel.reserve_arr[i]);
+		" handle:%p", i, fifo->channel.reserve_arr[i]);
 	}
 #endif
 
@@ -293,8 +293,8 @@ __hal_fifo_open(xge_hal_channel_h channelh, xge_hal_channel_attr_t *attr)
 	xge_assert(max_arr_index);
 	mid_point = (fifo->channel.reserve_length - fifo->channel.reserve_top)/2;
 	for (i = 0; i < mid_point; i++) {
-		dtrh = 	fifo->channel.reserve_arr[i];
-		fifo->channel.reserve_arr[i] = 
+		dtrh =	fifo->channel.reserve_arr[i];
+		fifo->channel.reserve_arr[i] =
 			fifo->channel.reserve_arr[max_arr_index - i];
 		fifo->channel.reserve_arr[max_arr_index  - i] = dtrh;
 	}
@@ -302,7 +302,7 @@ __hal_fifo_open(xge_hal_channel_h channelh, xge_hal_channel_attr_t *attr)
 #ifdef XGE_DEBUG_ASSERT
 	for ( i = 0; i < fifo->channel.reserve_length; i++) {
 		xge_debug_fifo(XGE_TRACE, "DTR after reversing index:%d"
-		" handle:%p\n", i, fifo->channel.reserve_arr[i]);
+		" handle:%p", i, fifo->channel.reserve_arr[i]);
 	}
 #endif
 
@@ -340,10 +340,10 @@ void
 __hal_fifo_hw_initialize(xge_hal_device_h devh)
 {
 	xge_hal_device_t *hldev = (xge_hal_device_t *)devh;
-	xge_hal_pci_bar0_t *bar0 = (xge_hal_pci_bar0_t *)(void
-	*)hldev->bar0;
+	xge_hal_pci_bar0_t *bar0 = (xge_hal_pci_bar0_t *)(void *)hldev->bar0;
 	u64* tx_fifo_partitions[4];
 	u64* tx_fifo_wrr[5];
+	u64  tx_fifo_wrr_value[5];
 	u64 val64, part0;
 	int i;
 
@@ -360,19 +360,33 @@ __hal_fifo_hw_initialize(xge_hal_device_h devh)
 	tx_fifo_wrr[3] = &bar0->tx_w_round_robin_3;
 	tx_fifo_wrr[4] = &bar0->tx_w_round_robin_4;
 
+	tx_fifo_wrr_value[0] = XGE_HAL_FIFO_WRR_0;
+	tx_fifo_wrr_value[1] = XGE_HAL_FIFO_WRR_1;
+	tx_fifo_wrr_value[2] = XGE_HAL_FIFO_WRR_2;
+	tx_fifo_wrr_value[3] = XGE_HAL_FIFO_WRR_3;
+	tx_fifo_wrr_value[4] = XGE_HAL_FIFO_WRR_4;
+
 	/* Note: WRR calendar must be configured before the transmit
-	         FIFOs are enabled! page 6-77 user guide */
+	 *       FIFOs are enabled! page 6-77 user guide */
 
-	/* all zeroes for Round-Robin */
-	for (i = 0; i < XGE_HAL_FIFO_MAX_WRR; i++) {
-		xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, 0,
-				tx_fifo_wrr[i]);
-	}
+	if (!hldev->config.rts_qos_en) {
+		/* all zeroes for Round-Robin */
+		for (i = 0; i < XGE_HAL_FIFO_MAX_WRR; i++) {
+			xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, 0,
+					       tx_fifo_wrr[i]);
+		}
 
-	/* reset all of them but '0' */
-	for (i=1; i < XGE_HAL_FIFO_MAX_PARTITION; i++) {
-		xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, 0ULL,
-		                     tx_fifo_partitions[i]);
+		/* reset all of them but '0' */
+		for (i=1; i < XGE_HAL_FIFO_MAX_PARTITION; i++) {
+			xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, 0ULL,
+					       tx_fifo_partitions[i]);
+		}
+	} else { /* Change the default settings */
+
+		for (i = 0; i < XGE_HAL_FIFO_MAX_WRR; i++) {
+			xge_os_pio_mem_write64(hldev->pdev, hldev->regh0,
+				       tx_fifo_wrr_value[i], tx_fifo_wrr[i]);
+		}
 	}
 
 	/* configure only configured FIFOs */
@@ -390,8 +404,8 @@ __hal_fifo_hw_initialize(xge_hal_device_h devh)
 		}
 
 		/* NOTE: do write operation for each second u64 half
-		         or force for first one if configured number
-			 is even */
+		 *       or force for first one if configured number
+		 *	 is even */
 		if (reg_half) {
 			if (reg_num == 0) {
 				/* skip partition '0', must write it once at
@@ -435,6 +449,39 @@ __hal_fifo_hw_initialize(xge_hal_device_h devh)
 		 XGE_HAL_TX_PA_CFG_IGNORE_L2_ERR;
 	xge_os_pio_mem_write64(hldev->pdev, hldev->regh0, val64,
 	                     &bar0->tx_pa_cfg);
+
+	if (hldev->config.intr_mode != XGE_HAL_INTR_MODE_MSIX)
+		return;
+
+	/*
+	 * Assign MSI-X vectors
+	 */
+	for (i = 0; i < XGE_HAL_MAX_FIFO_NUM; i++) {
+		xge_list_t *item;
+		xge_hal_channel_t *channel = NULL;
+
+		if (!hldev->config.fifo.queue[i].configured ||
+		    !hldev->config.fifo.queue[i].intr_vector)
+			continue;
+
+		/* find channel */
+		xge_list_for_each(item, &hldev->free_channels) {
+			xge_hal_channel_t *tmp;
+			tmp = xge_container_of(item, xge_hal_channel_t,
+						   item);
+			if (tmp->type == XGE_HAL_CHANNEL_TYPE_FIFO &&
+			    tmp->post_qid == i) {
+				channel = tmp;
+				break;
+			}
+		}
+
+		if (channel) {
+			(void) xge_hal_channel_msix_set(channel,
+				hldev->config.fifo.queue[i].intr_vector);
+		}
+	}
+
 	xge_debug_fifo(XGE_TRACE, "%s", "fifo channels initialized");
 }
 
@@ -482,7 +529,7 @@ __hal_fifo_dtr_align_alloc_map(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh)
 	txdl_priv = __hal_fifo_txdl_priv(txdp);
 
 	/* allocate alignment DMA-buffer */
-	txdl_priv->align_vaddr = xge_os_dma_malloc(fifo->channel.pdev,
+	txdl_priv->align_vaddr = (char *)xge_os_dma_malloc(fifo->channel.pdev,
 				fifo->align_size,
 				XGE_OS_DMA_CACHELINE_ALIGNED |
 				XGE_OS_DMA_STREAMING,

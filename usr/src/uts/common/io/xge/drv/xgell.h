@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,12 +69,24 @@
 extern "C" {
 #endif
 
-#define	XGELL_DESC		"Xframe I/II 10Gb Ethernet %I%"
+#define	XGELL_DESC		"Xframe I/II 10Gb Ethernet 1.11"
 #define	XGELL_IFNAME		"xge"
 #define	XGELL_TX_LEVEL_LOW	8
 #define	XGELL_TX_LEVEL_HIGH	32
+#define	XGELL_TX_LEVEL_CHECK	3
+#define	XGELL_MAX_RING_DEFAULT	8
+#define	XGELL_MAX_FIFO_DEFAULT	1
 
 #include <xgehal.h>
+
+/*
+ * The definition of XGELL_RX_BUFFER_RECYCLE_CACHE is an experimental value.
+ * With this value, the lock contention between xgell_rx_buffer_recycle()
+ * and xgell_rx_1b_compl() is reduced to great extent. And multiple rx rings
+ * alleviate the lock contention further since each rx ring has its own mutex.
+ */
+#define	XGELL_RX_BUFFER_RECYCLE_CACHE	XGE_HAL_RING_RXDS_PER_BLOCK(1) * 2
+#define	MSG_SIZE	64
 
 /*
  * These default values can be overridden by vaules in xge.conf.
@@ -91,7 +103,7 @@ extern "C" {
 #if defined(__x86)
 #define	XGELL_TX_DMA_LOWAT		128
 #else
-#define	XGELL_TX_DMA_LOWAT		1024
+#define	XGELL_TX_DMA_LOWAT		512
 #endif
 
 /*
@@ -108,22 +120,21 @@ extern "C" {
 #define	XGELL_CONF_DISABLE_BY_DEFAULT		0
 
 /* LRO configuration */
-#define	XGE_HAL_DEFAULT_LRO_SG_SIZE		8 /* <=2 LRO fix not required */
+#define	XGE_HAL_DEFAULT_LRO_SG_SIZE		2 /* <=2 LRO fix not required */
 #define	XGE_HAL_DEFAULT_LRO_FRM_LEN		65535
 
 /*
- * If HAL could provide defualt values to all tunables, we'll remove following
- * macros.
- * Before removing, please refer to xgehal-config.h for more details.
+ * Default values for tunables used in HAL. Please refer to xgehal-config.h
+ * for more details.
  */
 #define	XGE_HAL_DEFAULT_USE_HARDCODE		-1
 
-/* bimodal adaptive schema defaults - ENABLED */
+/* Bimodal adaptive schema defaults - ENABLED */
 #define	XGE_HAL_DEFAULT_BIMODAL_INTERRUPTS	-1
 #define	XGE_HAL_DEFAULT_BIMODAL_TIMER_LO_US	24
 #define	XGE_HAL_DEFAULT_BIMODAL_TIMER_HI_US	256
 
-/* interrupt moderation/utilization defaults */
+/* Interrupt moderation/utilization defaults */
 #define	XGE_HAL_DEFAULT_TX_URANGE_A		5
 #define	XGE_HAL_DEFAULT_TX_URANGE_B		15
 #define	XGE_HAL_DEFAULT_TX_URANGE_C		30
@@ -155,7 +166,7 @@ extern "C" {
 #define	XGE_HAL_DEFAULT_FIFO_MEMBLOCK_SIZE	PAGESIZE
 
 /*
- * this will force HAL to allocate extra copied buffer per TXDL which
+ * This will force HAL to allocate extra copied buffer per TXDL which
  * size calculated by formula:
  *
  *      (ALIGNMENT_SIZE * ALIGNED_FRAGS)
@@ -189,20 +200,28 @@ extern "C" {
 #define	XGE_HAL_DEFAULT_INITIAL_MTU		XGE_HAL_DEFAULT_MTU /* 1500 */
 #define	XGE_HAL_DEFAULT_ISR_POLLING_CNT		0
 #define	XGE_HAL_DEFAULT_LATENCY_TIMER		255
-#define	XGE_HAL_DEFAULT_SPLIT_TRANSACTION	XGE_HAL_TWO_SPLIT_TRANSACTION
-#define	XGE_HAL_DEFAULT_BIOS_MMRB_COUNT		-1
-#define	XGE_HAL_DEFAULT_MMRB_COUNT		1 /* 1k */
-#define	XGE_HAL_DEFAULT_SHARED_SPLITS		1
+#define	XGE_HAL_DEFAULT_SHARED_SPLITS		0
 #define	XGE_HAL_DEFAULT_STATS_REFRESH_TIME	1
+
+#if defined(__sparc)
+#define	XGE_HAL_DEFAULT_MMRB_COUNT		\
+		XGE_HAL_MAX_MMRB_COUNT
+#define	XGE_HAL_DEFAULT_SPLIT_TRANSACTION	\
+		XGE_HAL_EIGHT_SPLIT_TRANSACTION
+#else
+#define	XGE_HAL_DEFAULT_MMRB_COUNT		1 /* 1k */
+#define	XGE_HAL_DEFAULT_SPLIT_TRANSACTION	\
+		XGE_HAL_TWO_SPLIT_TRANSACTION
+#endif
 
 /*
  * default the size of buffers allocated for ndd interface functions
  */
-#define	XGELL_STATS_BUFSIZE			4096
+#define	XGELL_STATS_BUFSIZE			8192
 #define	XGELL_PCICONF_BUFSIZE			2048
 #define	XGELL_ABOUT_BUFSIZE			512
 #define	XGELL_IOCTL_BUFSIZE			64
-#define	XGELL_DEVCONF_BUFSIZE			4096
+#define	XGELL_DEVCONF_BUFSIZE			8192
 
 /*
  * xgell_event_e
@@ -223,9 +242,12 @@ typedef struct {
 	int rx_buffer_post_hiwat;
 	int rx_dma_lowat;
 	int tx_dma_lowat;
-	int msi_enable;
+	int msix_enable;
 	int lso_enable;
 } xgell_config_t;
+
+typedef struct xgell_ring xgell_ring_t;
+typedef struct xgell_fifo xgell_fifo_t;
 
 typedef struct xgell_rx_buffer_t {
 	struct xgell_rx_buffer_t	*next;
@@ -233,7 +255,7 @@ typedef struct xgell_rx_buffer_t {
 	dma_addr_t			dma_addr;
 	ddi_dma_handle_t		dma_handle;
 	ddi_acc_handle_t		dma_acch;
-	void				*lldev;
+	xgell_ring_t			*ring;
 	frtn_t				frtn;
 } xgell_rx_buffer_t;
 
@@ -246,15 +268,26 @@ typedef struct xgell_rx_buffer_pool_t {
 	uint_t			post;		/* posted buffers */
 	uint_t			post_hiwat;	/* hiwat to stop post */
 	spinlock_t		pool_lock;	/* buffer pool lock */
+	xgell_rx_buffer_t	*recycle_head;	/* recycle list's head */
+	xgell_rx_buffer_t	*recycle_tail;	/* recycle list's tail */
+	uint_t			recycle;	/* # of rx buffers recycled */
+	spinlock_t		recycle_lock;	/* buffer recycle lock */
 } xgell_rx_buffer_pool_t;
 
 typedef struct xgelldev xgelldev_t;
 
-typedef struct xgell_ring_t {
+struct xgell_ring {
 	xge_hal_channel_h	channelh;
 	xgelldev_t		*lldev;
 	mac_resource_handle_t	handle;		/* per ring cookie */
-} xgell_ring_t;
+	xgell_rx_buffer_pool_t	bf_pool;
+};
+
+struct xgell_fifo {
+	xge_hal_channel_h	channelh;
+	xgelldev_t		*lldev;
+	int			level_low;
+};
 
 struct xgelldev {
 	caddr_t			ndp;
@@ -262,18 +295,23 @@ struct xgelldev {
 	int			instance;
 	dev_info_t		*dev_info;
 	xge_hal_device_h	devh;
-	xgell_ring_t		ring_main;
-	xgell_rx_buffer_pool_t	bf_pool;
+	xgell_ring_t		rings[XGE_HAL_MAX_RING_NUM];
+	xgell_fifo_t		fifos[XGE_HAL_MAX_FIFO_NUM];
 	int			resched_avail;
 	int			resched_send;
 	int			resched_retry;
 	int			tx_copied_max;
-	xge_hal_channel_h	fifo_channel;
 	volatile int		is_initialized;
 	xgell_config_t		config;
 	volatile int		in_reset;
 	timeout_id_t		timeout_id;
 	kmutex_t		genlock;
+	ddi_intr_handle_t	*intr_table;
+	uint_t			intr_table_size;
+	int			intr_type;
+	int			intr_cnt;
+	uint_t			intr_pri;
+	int			intr_cap;
 };
 
 typedef struct {
@@ -302,6 +340,17 @@ void xgell_callback_link_down(void *userdata);
 int xgell_onerr_reset(xgelldev_t *lldev);
 
 void xge_device_poll_now(void *data);
+
+int xge_add_intrs(xgelldev_t *lldev);
+
+int xge_enable_intrs(xgelldev_t *lldev);
+
+void xge_disable_intrs(xgelldev_t *lldev);
+
+void xge_rem_intrs(xgelldev_t *lldev);
+
+
+
 
 #ifdef __cplusplus
 }

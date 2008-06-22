@@ -171,6 +171,7 @@ typedef void (*xge_uld_after_device_poll_f) (xge_hal_device_h devh);
 /**
  * function xge_uld_xpak_alarm_log_f - ULD "XPAK alarm log" callback.
  * @devh: HAL device handle.
+ * @type: TODO
  *
  * Unless NULL is specified,
  * HAL invokes the callback from inside __hal_chk_xpak_counter()
@@ -187,6 +188,7 @@ typedef void (*xge_uld_xpak_alarm_log_f) (xge_hal_device_h devh, xge_hal_xpak_al
  * @before_device_poll: See xge_uld_before_device_poll_f{}.
  * @after_device_poll: See xge_uld_after_device_poll_f{}.
  * @sched_timer: See xge_uld_sched_timer_cb_f{}.
+ * @xpak_alarm_log: TODO
  *
  * Upper layer driver slow-path (per-driver) callbacks.
  * Implemented by ULD and provided to HAL via
@@ -270,7 +272,7 @@ xge_hal_driver_debug_module_mask_set(u32 new_mask)
 #if (defined(XGE_DEBUG_TRACE_MASK) && XGE_DEBUG_TRACE_MASK > 0) || \
     (defined(XGE_DEBUG_ERR_MASK) && XGE_DEBUG_ERR_MASK > 0)
 	g_xge_hal_driver->debug_module_mask = new_mask;
-	g_module_mask = &g_xge_hal_driver->debug_module_mask;
+	g_module_mask = (unsigned long *)&g_xge_hal_driver->debug_module_mask;
 #endif
 }
 
@@ -287,26 +289,19 @@ xge_hal_driver_debug_level_set(int new_level)
 #endif
 }
 
-static inline void
-xge_hal_driver_module_mask_set(int new_mask) {
-	g_xge_hal_driver->debug_module_mask = new_mask; }
-
 xge_hal_status_e xge_hal_driver_initialize(xge_hal_driver_config_t *config,
 		xge_hal_uld_cbs_t *uld_callbacks);
 
 void xge_hal_driver_terminate(void);
 
 #ifdef XGE_TRACE_INTO_CIRCULAR_ARR
-static inline void
-xge_hal_driver_tracebuf_timestamp(int on)
-{
-	g_xge_os_tracebuf->timestamp = on;
-}
-
 void xge_hal_driver_tracebuf_dump(void);
+
+xge_hal_status_e
+xge_hal_driver_tracebuf_read(int bufsize, char *retbuf, int *retsize);
 #else
-#define xge_hal_driver_tracebuf_timestamp(a)
 #define xge_hal_driver_tracebuf_dump()
+#define xge_hal_driver_tracebuf_read(a, b, c) (0);
 #endif
 
 __EXTERN_END_DECLS

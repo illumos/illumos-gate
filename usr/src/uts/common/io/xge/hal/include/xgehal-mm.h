@@ -156,18 +156,6 @@ xge_hal_mempool_t* __hal_mempool_create(pci_dev_h pdev, int memblock_size,
 void __hal_mempool_destroy(xge_hal_mempool_t *mempool);
 
 
-#ifdef XGEHAL_RNIC
-
-xge_hal_status_e
-__hal_allocate_dma_register(pci_dev_h pdev, int size,
-		void **dma_register, xge_hal_mempool_dma_t *dma_object);
-
-void
-__hal_free_dma_register(pci_dev_h pdev, int size,
-			void *dma_register, xge_hal_mempool_dma_t *dma_object);
-
-#endif
-
 __EXTERN_END_DECLS
 
 #endif /* XGE_HAL_MM_H */

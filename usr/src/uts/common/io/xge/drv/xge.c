@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,15 +74,16 @@ ddi_device_acc_attr_t *p_xge_dev_attr = &xge_dev_attr;
 void
 xge_event(xge_queue_item_t *item)
 {
-	xgelldev_t *lldev = item->context;
+	xgell_fifo_t *fifo = item->context;
+	xgelldev_t *lldev = fifo->lldev;
 
 	switch (item->event_type) {
 	case XGELL_EVENT_RESCHED_NEEDED:
 		if (lldev->is_initialized) {
-			if (xge_hal_channel_dtr_count(lldev->fifo_channel)
+			if (xge_hal_channel_dtr_count(fifo->channelh)
 			    >= XGELL_TX_LEVEL_HIGH) {
 				mac_tx_update(lldev->mh);
-				xge_debug_osdep(XGE_TRACE,
+				xge_debug_osdep(XGE_TRACE, "%s",
 				    "mac_tx_update happened!");
 			}
 		}
@@ -102,6 +103,40 @@ static void
 xge_callback_crit_err(void *userdata, xge_hal_event_e type, u64 serr_data)
 {
 	(void) xgell_onerr_reset(userdata);
+}
+
+/*
+ * xge_xpak_alarm_log
+ * This function called by HAL on XPAK alarms. Upper layer must log the msg
+ * based on the xpak alarm type
+ */
+static void
+xge_xpak_alarm_log(void *userdata, xge_hal_xpak_alarm_type_e type)
+{
+	switch (type) {
+	case XGE_HAL_XPAK_ALARM_EXCESS_TEMP:
+		xge_debug_osdep(XGE_ERR, "%s", "Take Xframe NIC out of "
+		    "service. Excessive temperatures may result in "
+		    "premature transceiver failure \n");
+
+		break;
+	case XGE_HAL_XPAK_ALARM_EXCESS_BIAS_CURRENT:
+		xge_debug_osdep(XGE_ERR, "%s", "Take Xframe NIC out of "
+		    "service Excessive bias currents may indicate "
+		    "imminent laser diode failure \n");
+
+		break;
+	case XGE_HAL_XPAK_ALARM_EXCESS_LASER_OUTPUT:
+		xge_debug_osdep(XGE_ERR, "%s", "Take Xframe NIC out of "
+		    "service Excessive laser output power may saturate "
+		    "far-end receiver\n");
+
+		break;
+	default:
+		xge_debug_osdep(XGE_ERR, "%s", "Undefined Xpak Alarm");
+		break;
+	}
+
 }
 
 /*
@@ -138,6 +173,7 @@ xge_driver_init_hal(void)
 	uld_callbacks.before_device_poll = NULL;
 	uld_callbacks.after_device_poll = NULL;
 	uld_callbacks.sched_timer = NULL;
+	uld_callbacks.xpak_alarm_log = xge_xpak_alarm_log;
 
 	return (xge_hal_driver_initialize(&driver_config, &uld_callbacks));
 
@@ -206,6 +242,7 @@ _info(struct modinfo *pModinfo)
 	return (mod_info(&modlinkage, pModinfo));
 }
 
+/* ARGSUSED */
 /*
  * xge_isr
  * @arg: pointer to device private strucutre(hldev)
@@ -214,20 +251,321 @@ _info(struct modinfo *pModinfo)
  * driver that the receive/transmit operation is completed.
  */
 static uint_t
-xge_isr(caddr_t arg)
+xge_isr(caddr_t arg0, caddr_t arg1)
 {
 	xge_hal_status_e status;
-	xge_hal_device_t *hldev = (xge_hal_device_t *)arg;
+	xge_hal_device_t *hldev = (xge_hal_device_t *)arg0;
 	xgelldev_t *lldev = xge_hal_device_private(hldev);
 
 	if (!lldev->is_initialized) {
-		return (DDI_INTR_CLAIMED);
+		return (DDI_INTR_UNCLAIMED);
 	}
 
 	status = xge_hal_device_handle_irq(hldev);
 
 	return ((status == XGE_HAL_ERR_WRONG_IRQ) ?
 	    DDI_INTR_UNCLAIMED : DDI_INTR_CLAIMED);
+}
+
+/*
+ * Interrupt handler for transmit when MSI-X interrupt mechasnism is used
+ */
+/* ARGSUSED */
+static uint_t
+xge_fifo_msix_isr(caddr_t arg0, caddr_t arg1)
+{
+	int got_tx;
+	xge_hal_channel_t *channel = (xge_hal_channel_t *)arg0;
+	xgelldev_t *lldev = xge_hal_device_private(channel->devh);
+
+	if (!lldev->is_initialized) {
+		return (DDI_INTR_UNCLAIMED);
+	}
+	(void) xge_hal_device_poll_tx_channel(channel, &got_tx);
+
+	return (DDI_INTR_CLAIMED);
+}
+
+/*
+ * Interrupt handler for receive when MSI-X interrupt mechasnism is used
+ */
+/* ARGSUSED */
+static uint_t
+xge_ring_msix_isr(caddr_t arg0, caddr_t arg1)
+{
+	int got_rx;
+	xge_hal_channel_t *channel = (xge_hal_channel_t *)arg0;
+	xgelldev_t *lldev = xge_hal_device_private(channel->devh);
+
+	if (!lldev->is_initialized) {
+		return (DDI_INTR_UNCLAIMED);
+	}
+	(void) xge_hal_device_poll_rx_channel(channel, &got_rx);
+
+	return (DDI_INTR_CLAIMED);
+}
+
+/*
+ * Configure single ring
+ */
+static void
+xge_ring_config(dev_info_t *dev_info,
+    xge_hal_device_config_t *device_config, int num)
+{
+	char msg[MSG_SIZE];
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_configured", num);
+	device_config->ring.queue[num].configured =
+	    ddi_prop_get_int(DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS,
+	    msg, num < XGELL_MAX_RING_DEFAULT ? 1 : 0);
+
+	/* no point to configure it further if unconfigured */
+	if (!device_config->ring.queue[num].configured)
+		return;
+
+#if defined(__sparc)
+	device_config->ring.queue[num].no_snoop_bits = 1;
+#endif
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_max", num);
+	device_config->ring.queue[num].max =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_USE_HARDCODE);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_initial", num);
+	device_config->ring.queue[num].initial =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_USE_HARDCODE);
+
+	if (device_config->ring.queue[num].initial ==
+	    XGE_HAL_DEFAULT_USE_HARDCODE) {
+		if (device_config->mtu > XGE_HAL_DEFAULT_MTU) {
+			device_config->ring.queue[num].initial =
+			    device_config->ring.queue[num].max =
+			    XGE_HAL_DEFAULT_RING_QUEUE_BLOCKS_J;
+		} else {
+			device_config->ring.queue[num].initial =
+			    device_config->ring.queue[num].max =
+			    XGE_HAL_DEFAULT_RING_QUEUE_BLOCKS_N;
+		}
+	}
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_buffer_mode", num);
+	device_config->ring.queue[num].buffer_mode =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_RING_QUEUE_BUFFER_MODE_DEFAULT);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_dram_size_mb", num);
+	device_config->ring.queue[num].dram_size_mb =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_USE_HARDCODE);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE,
+	    "ring%d_backoff_interval_us", num);
+	device_config->ring.queue[num].backoff_interval_us =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_BACKOFF_INTERVAL_US);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_max_frm_len", num);
+	device_config->ring.queue[num].max_frm_len =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_RING_USE_MTU);
+
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_priority", num);
+	device_config->ring.queue[num].priority =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_RING_PRIORITY);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_urange_a", num);
+	device_config->ring.queue[num].rti.urange_a =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_RX_URANGE_A);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_ufc_a", num);
+	device_config->ring.queue[num].rti.ufc_a =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_RX_UFC_A);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_urange_b", num);
+	device_config->ring.queue[num].rti.urange_b =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_RX_URANGE_B);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_ufc_b", num);
+	device_config->ring.queue[num].rti.ufc_b =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    device_config->mtu > XGE_HAL_DEFAULT_MTU ?
+	    XGE_HAL_DEFAULT_RX_UFC_B_J:
+	    XGE_HAL_DEFAULT_RX_UFC_B_N);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_urange_c", num);
+	device_config->ring.queue[num].rti.urange_c =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_RX_URANGE_C);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_ufc_c", num);
+	device_config->ring.queue[num].rti.ufc_c =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    device_config->mtu > XGE_HAL_DEFAULT_MTU ?
+	    XGE_HAL_DEFAULT_RX_UFC_C_J:
+	    XGE_HAL_DEFAULT_RX_UFC_C_N);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_ufc_d", num);
+	device_config->ring.queue[num].rti.ufc_d =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_RX_UFC_D);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_timer_val", num);
+	device_config->ring.queue[num].rti.timer_val_us =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_RX_TIMER_VAL);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_timer_ac_en", num);
+	device_config->ring.queue[num].rti.timer_ac_en =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_RX_TIMER_AC_EN);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "ring%d_indicate_max_pkts", num);
+	device_config->ring.queue[num].indicate_max_pkts =
+	    ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    (device_config->bimodal_interrupts ?
+	    XGE_HAL_DEFAULT_INDICATE_MAX_PKTS_B :
+	    XGE_HAL_DEFAULT_INDICATE_MAX_PKTS_N));
+
+	if (device_config->ring.queue[num].configured) {
+		/* enable RTH steering by default */
+		device_config->ring.queue[num].rth_en = 1;
+		device_config->rth_en = XGE_HAL_RTH_ENABLE;
+		device_config->rth_bucket_size = XGE_HAL_MAX_RTH_BUCKET_SIZE;
+		device_config->rth_spdm_en = XGE_HAL_RTH_SPDM_DISABLE;
+		device_config->rth_spdm_use_l4 = XGE_HAL_RTH_SPDM_USE_L4;
+	}
+}
+
+/*
+ * Configure single fifo
+ */
+static void
+xge_fifo_config(dev_info_t *dev_info,
+    xge_hal_device_config_t *device_config, int num)
+{
+	char msg[MSG_SIZE];
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "fifo%d_configured", num);
+	device_config->fifo.queue[num].configured =
+	    ddi_prop_get_int(DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS,
+	    msg, num < XGELL_MAX_FIFO_DEFAULT ? 1 : 0);
+
+	/* no point to configure it further */
+	if (!device_config->fifo.queue[num].configured)
+		return;
+
+#if defined(__sparc)
+	device_config->fifo.queue[num].no_snoop_bits = 1;
+#endif
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "fifo%d_max", num);
+	device_config->fifo.queue[num].max = ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_USE_HARDCODE);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "fifo%d_initial", num);
+	device_config->fifo.queue[num].initial = ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_USE_HARDCODE);
+
+	if (device_config->fifo.queue[num].initial ==
+	    XGE_HAL_DEFAULT_USE_HARDCODE) {
+		if (device_config->mtu > XGE_HAL_DEFAULT_MTU) {
+			device_config->fifo.queue[num].initial =
+			    device_config->fifo.queue[num].max =
+			    XGE_HAL_DEFAULT_FIFO_QUEUE_LENGTH_J;
+		} else {
+			device_config->fifo.queue[num].initial =
+			    device_config->fifo.queue[num].max =
+			    XGE_HAL_DEFAULT_FIFO_QUEUE_LENGTH_N;
+		}
+	}
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "fifo%d_intr", num);
+	device_config->fifo.queue[num].intr = ddi_prop_get_int(DDI_DEV_T_ANY,
+	    dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_FIFO_QUEUE_INTR);
+
+	/*
+	 * TTI 0 configuration
+	 */
+	(void) xge_os_snprintf(msg, MSG_SIZE, "fifo%d_tti_enable", num);
+	device_config->fifo.queue[num].tti[num].enabled = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, msg, 1);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "fifo%d_tti_urange_a", num);
+	device_config->fifo.queue[num].tti[num].urange_a = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_TX_URANGE_A);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "fifo%d_tti_ufc_a", num);
+	device_config->fifo.queue[num].tti[num].ufc_a = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_TX_UFC_A);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "fifo%d_tti_urange_b", num);
+	device_config->fifo.queue[num].tti[num].urange_b = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_TX_URANGE_B);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "fifo%d_tti_ufc_b", num);
+	device_config->fifo.queue[num].tti[num].ufc_b = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_TX_UFC_B);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "fifo%d_tti_urange_c", num);
+	device_config->fifo.queue[num].tti[num].urange_c = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_TX_URANGE_C);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "fifo%d_tti_ufc_c", num);
+	device_config->fifo.queue[num].tti[num].ufc_c = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_TX_UFC_C);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "fifo%d_tti_ufc_d", num);
+	device_config->fifo.queue[num].tti[num].ufc_d = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_TX_UFC_D);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "fifo%d_timer_ac_en", num);
+	device_config->fifo.queue[num].tti[num].timer_ac_en = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_TX_TIMER_AC_EN);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "fifo%d_tti_timer_val", num);
+	device_config->fifo.queue[num].tti[num].timer_val_us = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_TX_TIMER_VAL);
+
+	(void) xge_os_snprintf(msg, MSG_SIZE, "fifo%d_tti_timer_ci_en", num);
+	device_config->fifo.queue[num].tti[num].timer_ci_en = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, msg,
+	    XGE_HAL_DEFAULT_TX_TIMER_CI_EN);
 }
 
 /*
@@ -242,6 +580,8 @@ static void
 xge_configuration_init(dev_info_t *dev_info,
     xge_hal_device_config_t *device_config, xgell_config_t *ll_config)
 {
+	int i, rings_configured = 0, fifos_configured = 0;
+
 	/*
 	 * Initialize common properties
 	 */
@@ -281,99 +621,37 @@ xge_configuration_init(dev_info_t *dev_info,
 	    XGE_HAL_DEFAULT_RING_MEMBLOCK_SIZE);
 	device_config->ring.strip_vlan_tag = XGE_HAL_RING_DONOT_STRIP_VLAN_TAG;
 
-#if defined(__sparc)
-	device_config->ring.queue[XGELL_RING_MAIN_QID].no_snoop_bits = 1;
-#endif
-	device_config->ring.queue[XGELL_RING_MAIN_QID].max =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_max",
-		XGE_HAL_DEFAULT_USE_HARDCODE);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].initial =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_initial",
-		XGE_HAL_DEFAULT_USE_HARDCODE);
-	if (device_config->ring.queue[XGELL_RING_MAIN_QID].initial ==
-	    XGE_HAL_DEFAULT_USE_HARDCODE) {
-		if (device_config->mtu > XGE_HAL_DEFAULT_MTU) {
-			device_config->ring.queue[XGELL_RING_MAIN_QID].initial =
-			    device_config->ring.queue[XGELL_RING_MAIN_QID].max =
-			    XGE_HAL_DEFAULT_RING_QUEUE_BLOCKS_J;
-		} else {
-			device_config->ring.queue[XGELL_RING_MAIN_QID].initial =
-			    device_config->ring.queue[XGELL_RING_MAIN_QID].max =
-			    XGE_HAL_DEFAULT_RING_QUEUE_BLOCKS_N;
-		}
+	/*
+	 * Bimodal Interrupts - TTI 56 configuration
+	 */
+	device_config->bimodal_interrupts = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "bimodal_interrupts",
+	    XGE_HAL_DEFAULT_BIMODAL_INTERRUPTS);
+	device_config->bimodal_timer_lo_us = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "bimodal_timer_lo_us",
+	    XGE_HAL_DEFAULT_BIMODAL_TIMER_LO_US);
+	device_config->bimodal_timer_hi_us = ddi_prop_get_int(
+	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "bimodal_timer_hi_us",
+	    XGE_HAL_DEFAULT_BIMODAL_TIMER_HI_US);
+
+	/*
+	 * MSI-X switch
+	 */
+	ll_config->msix_enable = ddi_prop_get_int(DDI_DEV_T_ANY, dev_info,
+	    DDI_PROP_DONTPASS, "msix_enable", XGELL_CONF_ENABLE_BY_DEFAULT);
+
+	/*
+	 * Go through all possibly configured rings. Each ring could be
+	 * configured individually. To enable/disable specific ring, just
+	 * set ring->configured = [1|0].
+	 *
+	 * By default *all* rings enabled.
+	 */
+	for (i = 0; i < XGE_HAL_MAX_RING_NUM; i++) {
+		xge_ring_config(dev_info, device_config, i);
+		if (device_config->ring.queue[i].configured)
+			rings_configured++;
 	}
-	device_config->ring.queue[XGELL_RING_MAIN_QID].buffer_mode =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_buffer_mode",
-		XGE_HAL_RING_QUEUE_BUFFER_MODE_DEFAULT);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].dram_size_mb =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_dram_size_mb",
-		XGE_HAL_DEFAULT_USE_HARDCODE);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].backoff_interval_us =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_backoff_interval_us",
-		XGE_HAL_DEFAULT_BACKOFF_INTERVAL_US);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].max_frm_len =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_max_frm_len",
-		XGE_HAL_RING_USE_MTU);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].priority =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_priority",
-		XGE_HAL_DEFAULT_RING_PRIORITY);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].configured =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_configured",
-		1);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].rti.urange_a =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_urange_a",
-		XGE_HAL_DEFAULT_RX_URANGE_A);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].rti.ufc_a =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_ufc_a",
-		XGE_HAL_DEFAULT_RX_UFC_A);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].rti.urange_b =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_urange_b",
-		XGE_HAL_DEFAULT_RX_URANGE_B);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].rti.ufc_b =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_ufc_b",
-		device_config->mtu > XGE_HAL_DEFAULT_MTU ?
-			XGE_HAL_DEFAULT_RX_UFC_B_J :
-			XGE_HAL_DEFAULT_RX_UFC_B_N);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].rti.urange_c =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_urange_c",
-		XGE_HAL_DEFAULT_RX_URANGE_C);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].rti.ufc_c =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_ufc_c",
-		device_config->mtu > XGE_HAL_DEFAULT_MTU ?
-			XGE_HAL_DEFAULT_RX_UFC_C_J :
-			XGE_HAL_DEFAULT_RX_UFC_C_N);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].rti.ufc_d =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_ufc_d",
-		XGE_HAL_DEFAULT_RX_UFC_D);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].rti.timer_val_us =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_timer_val",
-		XGE_HAL_DEFAULT_RX_TIMER_VAL);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].rti.timer_ac_en =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_timer_ac_en",
-		XGE_HAL_DEFAULT_RX_TIMER_AC_EN);
-	device_config->ring.queue[XGELL_RING_MAIN_QID].indicate_max_pkts =
-	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "ring_main_indicate_max_pkts",
-		(device_config->bimodal_interrupts ?
-			XGE_HAL_DEFAULT_INDICATE_MAX_PKTS_B :
-			XGE_HAL_DEFAULT_INDICATE_MAX_PKTS_N));
 
 	/*
 	 * Initialize mac properties
@@ -398,12 +676,12 @@ xge_configuration_init(dev_info_t *dev_info,
 	    XGE_HAL_DEFAULT_RMAC_HIGH_PTIME);
 	device_config->mac.mc_pause_threshold_q0q3 =
 	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "mac_mc_pause_threshold_q0q3",
-		XGE_HAL_DEFAULT_MC_PAUSE_THRESHOLD_Q0Q3);
+	    dev_info, DDI_PROP_DONTPASS, "mac_mc_pause_threshold_q0q3",
+	    XGE_HAL_DEFAULT_MC_PAUSE_THRESHOLD_Q0Q3);
 	device_config->mac.mc_pause_threshold_q4q7 =
 	    ddi_prop_get_int(DDI_DEV_T_ANY,
-		dev_info, DDI_PROP_DONTPASS, "mac_mc_pause_threshold_q4q7",
-		XGE_HAL_DEFAULT_MC_PAUSE_THRESHOLD_Q4Q7);
+	    dev_info, DDI_PROP_DONTPASS, "mac_mc_pause_threshold_q4q7",
+	    XGE_HAL_DEFAULT_MC_PAUSE_THRESHOLD_Q4Q7);
 
 	/*
 	 * Initialize fifo properties
@@ -411,8 +689,6 @@ xge_configuration_init(dev_info_t *dev_info,
 	device_config->fifo.max_frags = ddi_prop_get_int(DDI_DEV_T_ANY,
 	    dev_info, DDI_PROP_DONTPASS, "fifo_max_frags",
 	    XGE_HAL_DEFAULT_FIFO_FRAGS);
-	if (device_config->fifo.max_frags == XGE_HAL_DEFAULT_USE_HARDCODE)
-	    device_config->fifo.max_frags = XGE_HAL_DEFAULT_FIFO_FRAGS;
 	device_config->fifo.reserve_threshold = ddi_prop_get_int(DDI_DEV_T_ANY,
 	    dev_info, DDI_PROP_DONTPASS, "fifo_reserve_threshold",
 	    XGE_HAL_DEFAULT_FIFO_RESERVE_THRESHOLD);
@@ -427,82 +703,19 @@ xge_configuration_init(dev_info_t *dev_info,
 	    dev_info, DDI_PROP_DONTPASS, "fifo_copied_max_frags",
 	    XGE_HAL_DEFAULT_FIFO_MAX_ALIGNED_FRAGS);
 #endif
-#if defined(__sparc)
-	device_config->fifo.queue[0].no_snoop_bits = 1;
-#endif
-	device_config->fifo.queue[0].max = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "fifo0_max",
-	    XGE_HAL_DEFAULT_USE_HARDCODE);
-	device_config->fifo.queue[0].initial = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "fifo0_initial",
-	    XGE_HAL_DEFAULT_USE_HARDCODE);
-	if (device_config->fifo.queue[0].initial ==
-	    XGE_HAL_DEFAULT_USE_HARDCODE) {
-		if (device_config->mtu > XGE_HAL_DEFAULT_MTU) {
-			device_config->fifo.queue[0].initial =
-			    device_config->fifo.queue[0].max =
-			    XGE_HAL_DEFAULT_FIFO_QUEUE_LENGTH_J;
-		} else {
-			device_config->fifo.queue[0].initial =
-			    device_config->fifo.queue[0].max =
-			    XGE_HAL_DEFAULT_FIFO_QUEUE_LENGTH_N;
-		}
+
+	/*
+	 * Go through all possibly configured fifos. Each fifo could be
+	 * configured individually. To enable/disable specific fifo, just
+	 * set fifo->configured = [0|1].
+	 *
+	 * By default *all* fifos enabled.
+	 */
+	for (i = 0; i < XGE_HAL_MAX_FIFO_NUM; i++) {
+		xge_fifo_config(dev_info, device_config, i);
+		if (device_config->fifo.queue[i].configured)
+			fifos_configured++;
 	}
-	device_config->fifo.queue[0].intr = ddi_prop_get_int(DDI_DEV_T_ANY,
-	    dev_info, DDI_PROP_DONTPASS, "fifo0_intr",
-	    XGE_HAL_DEFAULT_FIFO_QUEUE_INTR);
-	device_config->fifo.queue[0].configured =
-	    ddi_prop_get_int(DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS,
-		"fifo0_configured", 1);
-
-	/*
-	 * Bimodal Interrupts - TTI 56 configuration
-	 */
-	device_config->bimodal_interrupts = ddi_prop_get_int(
-	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "bimodal_interrupts",
-	    XGE_HAL_DEFAULT_BIMODAL_INTERRUPTS);
-	device_config->bimodal_timer_lo_us = ddi_prop_get_int(
-	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "bimodal_timer_lo_us",
-	    XGE_HAL_DEFAULT_BIMODAL_TIMER_LO_US);
-	device_config->bimodal_timer_hi_us = ddi_prop_get_int(
-	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "bimodal_timer_hi_us",
-	    XGE_HAL_DEFAULT_BIMODAL_TIMER_HI_US);
-
-	/*
-	 * TTI 0 configuration
-	 */
-	device_config->fifo.queue[0].tti[0].enabled = ddi_prop_get_int(
-	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_enable", 1);
-	device_config->fifo.queue[0].tti[0].urange_a = ddi_prop_get_int(
-	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_urange_a",
-	    XGE_HAL_DEFAULT_TX_URANGE_A);
-	device_config->fifo.queue[0].tti[0].ufc_a = ddi_prop_get_int(
-	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_ufc_a",
-	    XGE_HAL_DEFAULT_TX_UFC_A);
-	device_config->fifo.queue[0].tti[0].urange_b = ddi_prop_get_int(
-	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_urange_b",
-	    XGE_HAL_DEFAULT_TX_URANGE_B);
-	device_config->fifo.queue[0].tti[0].ufc_b = ddi_prop_get_int(
-	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_ufc_b",
-	    XGE_HAL_DEFAULT_TX_UFC_B);
-	device_config->fifo.queue[0].tti[0].urange_c = ddi_prop_get_int(
-	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_urange_c",
-	    XGE_HAL_DEFAULT_TX_URANGE_C);
-	device_config->fifo.queue[0].tti[0].ufc_c = ddi_prop_get_int(
-	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_ufc_c",
-	    XGE_HAL_DEFAULT_TX_UFC_C);
-	device_config->fifo.queue[0].tti[0].ufc_d = ddi_prop_get_int(
-	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_ufc_d",
-	    XGE_HAL_DEFAULT_TX_UFC_D);
-	device_config->fifo.queue[0].tti[0].timer_ac_en = ddi_prop_get_int(
-	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_timer_ac_en",
-	    XGE_HAL_DEFAULT_TX_TIMER_AC_EN);
-	device_config->fifo.queue[0].tti[0].timer_val_us = ddi_prop_get_int(
-	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_timer_val",
-	    XGE_HAL_DEFAULT_TX_TIMER_VAL);
-	device_config->fifo.queue[0].tti[0].timer_ci_en = ddi_prop_get_int(
-	    DDI_DEV_T_ANY, dev_info, DDI_PROP_DONTPASS, "tti_timer_ci_en",
-	    XGE_HAL_DEFAULT_TX_TIMER_CI_EN);
 
 	/*
 	 * Initialize errors dumping
@@ -533,11 +746,13 @@ xge_configuration_init(dev_info_t *dev_info,
 	ll_config->rx_buffer_total = ddi_prop_get_int(DDI_DEV_T_ANY,
 	    dev_info, DDI_PROP_DONTPASS, "rx_buffer_total",
 	    device_config->ring.queue[XGELL_RING_MAIN_QID].initial *
-					XGELL_RX_BUFFER_TOTAL);
+	    XGELL_RX_BUFFER_TOTAL);
+	ll_config->rx_buffer_total += XGELL_RX_BUFFER_RECYCLE_CACHE;
 	ll_config->rx_buffer_post_hiwat = ddi_prop_get_int(DDI_DEV_T_ANY,
 	    dev_info, DDI_PROP_DONTPASS, "rx_buffer_post_hiwat",
 	    device_config->ring.queue[XGELL_RING_MAIN_QID].initial *
-					XGELL_RX_BUFFER_POST_HIWAT);
+	    XGELL_RX_BUFFER_POST_HIWAT);
+	ll_config->rx_buffer_post_hiwat += XGELL_RX_BUFFER_RECYCLE_CACHE;
 	ll_config->rx_pkt_burst = ddi_prop_get_int(DDI_DEV_T_ANY,
 	    dev_info, DDI_PROP_DONTPASS, "rx_pkt_burst",
 	    XGELL_RX_PKT_BURST);
@@ -545,10 +760,305 @@ xge_configuration_init(dev_info_t *dev_info,
 	    DDI_PROP_DONTPASS, "rx_dma_lowat", XGELL_RX_DMA_LOWAT);
 	ll_config->tx_dma_lowat = ddi_prop_get_int(DDI_DEV_T_ANY, dev_info,
 	    DDI_PROP_DONTPASS, "tx_dma_lowat", XGELL_TX_DMA_LOWAT);
-	ll_config->msi_enable = ddi_prop_get_int(DDI_DEV_T_ANY, dev_info,
-	    DDI_PROP_DONTPASS, "msi_enable", XGELL_CONF_ENABLE_BY_DEFAULT);
 	ll_config->lso_enable = ddi_prop_get_int(DDI_DEV_T_ANY, dev_info,
 	    DDI_PROP_DONTPASS, "lso_enable", XGELL_CONF_ENABLE_BY_DEFAULT);
+}
+
+
+/*
+ * xge_alloc_intrs:
+ *
+ * Allocate FIXED or MSIX interrupts.
+ */
+static int
+xge_alloc_intrs(xgelldev_t *lldev)
+{
+	dev_info_t *dip = lldev->dev_info;
+	int avail, actual, count = 0;
+	int i, intr_behavior, ret;
+
+	if (lldev->intr_type == DDI_INTR_TYPE_MSIX) {
+		intr_behavior = DDI_INTR_ALLOC_STRICT;
+		(void) ddi_prop_create(DDI_DEV_T_NONE, dip,
+		    DDI_PROP_CANSLEEP, "#msix-request", NULL, 0);
+	} else {
+		intr_behavior = DDI_INTR_ALLOC_NORMAL;
+	}
+
+	/* Get number of interrupts */
+	ret = ddi_intr_get_nintrs(dip, lldev->intr_type, &count);
+	if ((ret != DDI_SUCCESS) || (count == 0)) {
+		xge_debug_osdep(XGE_ERR, "ddi_intr_get_nintrs() failed, "
+		    "ret: %d, count: %d", ret, count);
+
+		goto _err_exit0;
+	}
+
+	/* Get number of available interrupts */
+	ret = ddi_intr_get_navail(dip, lldev->intr_type, &avail);
+	if ((ret != DDI_SUCCESS) || (avail == 0)) {
+		xge_debug_osdep(XGE_ERR, "ddi_intr_get_navail() failure, "
+		    "ret: %d, avail: %d", ret, avail);
+
+		goto _err_exit0;
+	}
+
+	if (avail < lldev->intr_cnt) {
+		xge_debug_osdep(XGE_ERR, "%d interrupts wanted while only "
+		    "%d available", lldev->intr_cnt, avail);
+		goto _err_exit0;
+	}
+
+	/* Allocate an array of interrupt handles */
+	lldev->intr_table_size = lldev->intr_cnt * sizeof (ddi_intr_handle_t);
+	lldev->intr_table = kmem_alloc(lldev->intr_table_size, KM_SLEEP);
+
+	/* Call ddi_intr_alloc() */
+	ret = ddi_intr_alloc(dip, lldev->intr_table, lldev->intr_type, 0,
+	    lldev->intr_cnt, &actual, intr_behavior);
+	if ((ret != DDI_SUCCESS) || (actual == 0)) {
+		xge_debug_osdep(XGE_ERR, "ddi_intr_alloc() failed %d", ret);
+		goto _err_exit1;
+	}
+
+	xge_debug_osdep(XGE_TRACE, "%s: Requested: %d, Granted: %d",
+	    lldev->intr_type == DDI_INTR_TYPE_MSIX ? "MSI-X" :
+	    "IRQA", count, actual);
+
+	if (lldev->intr_cnt != actual) {
+		xge_debug_osdep(XGE_ERR, "Not enough resources granted");
+		goto _err_exit2;
+	}
+
+	/*
+	 * Get priority for first msi, assume remaining are all the same
+	 */
+	if ((ret = ddi_intr_get_pri(lldev->intr_table[0], &lldev->intr_pri)) !=
+	    DDI_SUCCESS) {
+		xge_debug_osdep(XGE_ERR, "ddi_intr_get_pri() failed %d", ret);
+		goto _err_exit2;
+	}
+
+	return (DDI_SUCCESS);
+
+_err_exit2:
+	/* Free already allocated intr */
+	for (i = 0; i < actual; i++) {
+		(void) ddi_intr_free(lldev->intr_table[i]);
+	}
+_err_exit1:
+	kmem_free(lldev->intr_table, lldev->intr_table_size);
+_err_exit0:
+	if (lldev->intr_type == DDI_INTR_TYPE_MSIX)
+		(void) ddi_prop_remove(DDI_DEV_T_NONE, dip, "#msix-request");
+	return (DDI_FAILURE);
+}
+
+/*
+ * xge_free_intrs:
+ *
+ * Free previously allocated interrupts.
+ */
+static void
+xge_free_intrs(xgelldev_t *lldev)
+{
+	int i;
+	dev_info_t *dip = lldev->dev_info;
+
+	/* Free already allocated intr */
+	for (i = 0; i < lldev->intr_cnt; i++) {
+		(void) ddi_intr_free(lldev->intr_table[i]);
+	}
+	kmem_free(lldev->intr_table, lldev->intr_table_size);
+
+	if (lldev->intr_type == DDI_INTR_TYPE_MSIX)
+		(void) ddi_prop_remove(DDI_DEV_T_NONE, dip, "#msix-request");
+}
+
+/*
+ * xge_add_intrs:
+ *
+ * Register FIXED or MSI interrupts.
+ */
+int
+xge_add_intrs(xgelldev_t *lldev)
+{
+	int i, ret;
+	xge_hal_device_t *hldev = lldev->devh;
+	xge_hal_device_config_t *hal_conf = &hldev->config;
+	xge_hal_ring_config_t *ring_conf = &hal_conf->ring;
+	xge_hal_fifo_config_t *fifo_conf = &hal_conf->fifo;
+	xge_list_t *item;
+	int msix_idx = 1; /* 0 by default is reserved for Alarms. */
+	xge_hal_channel_t *assigned[XGELL_MAX_RING_DEFAULT +
+	    XGELL_MAX_FIFO_DEFAULT + 1];
+
+	switch (lldev->intr_type) {
+	case DDI_INTR_TYPE_FIXED:
+		ret = ddi_intr_add_handler(lldev->intr_table[0],
+		    (ddi_intr_handler_t *)xge_isr,
+		    (caddr_t)hldev, 0);
+		if (ret != DDI_SUCCESS) {
+			xge_debug_osdep(XGE_ERR, "ddi_intr_add_handler(FIXED)"
+			    "failed %d", ret);
+			return (DDI_FAILURE);
+		}
+		break;
+
+	case DDI_INTR_TYPE_MSIX:
+		i = 0;
+		xge_list_for_each(item, &hldev->free_channels) {
+			xge_hal_channel_t *channel = xge_container_of(item,
+			    xge_hal_channel_t, item);
+			i = channel->post_qid;
+			if (channel->type == XGE_HAL_CHANNEL_TYPE_FIFO) {
+				if (fifo_conf->queue[i].configured) {
+					assigned[msix_idx] = channel;
+					msix_idx++;
+				}
+			} else {
+				if (ring_conf->queue[i].configured) {
+					assigned[msix_idx] = channel;
+					msix_idx++;
+				}
+			}
+		}
+		for (i = 0; i < lldev->intr_cnt; i++) {
+			uint_t (*intr)(caddr_t, caddr_t);
+			caddr_t intr_arg;
+
+			/* partition MSIX vectors */
+			if (i == 0) {
+				intr = xge_isr;
+				intr_arg = (caddr_t)hldev;
+				xge_debug_osdep(XGE_TRACE,
+				    "Channel-A: using MSI-X #0");
+			} else if (assigned[i] && assigned[i]->type ==
+			    XGE_HAL_CHANNEL_TYPE_FIFO) {
+				intr = xge_fifo_msix_isr;
+				intr_arg = (caddr_t)assigned[i];
+				xge_debug_osdep(XGE_TRACE, "Channel-Tx%d"
+				    "using MSI-X #%d",
+				    assigned[i]->post_qid, i);
+			} else if (assigned[i] && assigned[i]->type ==
+			    XGE_HAL_CHANNEL_TYPE_RING) {
+				intr = xge_ring_msix_isr;
+				intr_arg = (caddr_t)assigned[i];
+				xge_debug_osdep(XGE_TRACE, "Channel-Rx%d: "
+				    "using MSI-X #%d",
+				    assigned[i]->post_qid, i);
+			}
+			ret = ddi_intr_add_handler(lldev->intr_table[i], intr,
+			    intr_arg, (caddr_t)(uintptr_t)i);
+			if (ret != DDI_SUCCESS) {
+				int j;
+				xge_debug_osdep(XGE_ERR,
+				    "ddi_intr_add_handler()"
+				    " failed %d", ret);
+				for (j = 0; j < i; j++) {
+					(void) ddi_intr_remove_handler(
+					    lldev->intr_table[j]);
+				}
+				return (DDI_FAILURE);
+			}
+		}
+
+		for (i = 1; i < msix_idx; i++)
+			(void) xge_hal_channel_msix_set(assigned[i], i);
+		break;
+
+	default:
+		break;
+	}
+	ret = ddi_intr_get_cap(lldev->intr_table[0], &lldev->intr_cap);
+	if (ret != DDI_SUCCESS) {
+		xge_debug_osdep(XGE_ERR, "ddi_intr_get_cap() failed %d", ret);
+		for (i = 0; i < lldev->intr_cnt; i++) {
+			(void) ddi_intr_remove_handler(lldev->intr_table[i]);
+		}
+		return (DDI_FAILURE);
+	}
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * xge_enable_intrs:
+ *
+ * Enable FIXED or MSI interrupts
+ */
+int
+xge_enable_intrs(xgelldev_t *lldev)
+{
+	int ret, i;
+
+	if (lldev->intr_cap & DDI_INTR_FLAG_BLOCK) {
+		/* Call ddi_intr_block_enable() for MSI(X) interrupts */
+		if ((ret = ddi_intr_block_enable(lldev->intr_table,
+		    lldev->intr_cnt)) != DDI_SUCCESS) {
+			xge_debug_osdep(XGE_ERR, "ddi_intr_enable() failed, "
+			    "ret 0x%x", ret);
+			return (DDI_FAILURE);
+		}
+	} else {
+		/* Call ddi_intr_enable for MSI(X) or FIXED interrupts */
+		for (i = 0; i < lldev->intr_cnt; i++) {
+			if ((ret = ddi_intr_enable(lldev->intr_table[i]))
+			    != DDI_SUCCESS) {
+				int j;
+
+				xge_debug_osdep(XGE_ERR, "ddi_intr_enable() "
+				    "failed, ret 0x%x", ret);
+
+				/* unwind */
+				for (j = 0; j < i; j++) {
+					(void) ddi_intr_disable(
+					    lldev->intr_table[j]);
+				}
+
+				return (DDI_FAILURE);
+			}
+		}
+	}
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * xge_disable_intrs:
+ *
+ * Disable FIXED or MSI interrupts
+ */
+void
+xge_disable_intrs(xgelldev_t *lldev)
+{
+	int i;
+
+	if (lldev->intr_cap & DDI_INTR_FLAG_BLOCK) {
+		/* Call ddi_intr_block_disable() */
+		(void) ddi_intr_block_disable(lldev->intr_table,
+		    lldev->intr_cnt);
+	} else {
+		for (i = 0; i < lldev->intr_cnt; i++) {
+			(void) ddi_intr_disable(lldev->intr_table[i]);
+		}
+	}
+}
+
+/*
+ * xge_rem_intrs:
+ *
+ * Unregister FIXED or MSI interrupts
+ */
+void
+xge_rem_intrs(xgelldev_t *lldev)
+{
+	int i;
+
+	/* Call ddi_intr_remove_handler() */
+	for (i = 0; i < lldev->intr_cnt; i++) {
+		(void) ddi_intr_remove_handler(lldev->intr_table[i]);
+	}
 }
 
 /*
@@ -570,12 +1080,12 @@ static int
 xge_attach(dev_info_t *dev_info, ddi_attach_cmd_t cmd)
 {
 	xgelldev_t *ll;
-	xge_hal_device_config_t device_config;
+	xge_hal_device_config_t *device_config;
 	xge_hal_device_t *hldev;
 	xge_hal_device_attr_t attr;
 	xge_hal_status_e status;
 	xgell_config_t ll_config;
-	int ret;
+	int ret, intr_types, i;
 
 	xge_debug_osdep(XGE_TRACE, "XGE_ATTACH cmd %d", cmd);
 
@@ -595,17 +1105,25 @@ xge_attach(dev_info_t *dev_info, ddi_attach_cmd_t cmd)
 		goto _exit0;
 	}
 
-	xge_os_memzero(&device_config, sizeof (xge_hal_device_config_t));
+	device_config = kmem_zalloc(sizeof (xge_hal_device_config_t), KM_SLEEP);
 
 	/* Init device_config by lookup up properties from .conf file */
-	xge_configuration_init(dev_info, &device_config, &ll_config);
+	xge_configuration_init(dev_info, device_config, &ll_config);
+
+	/* Determine which types of interrupts supported */
+	ret = ddi_intr_get_supported_types(dev_info, &intr_types);
+	if ((ret != DDI_SUCCESS) || (!(intr_types & DDI_INTR_TYPE_FIXED))) {
+		xge_debug_osdep(XGE_ERR, "%s",
+		    "fixed type interrupt is not supported");
+		goto _exit0a;
+	}
 
 	/* map BAR0 */
 	ret = ddi_regs_map_setup(dev_info, 1, (caddr_t *)&attr.bar0,
 	    (offset_t)0, (offset_t)0, &xge_dev_attr, &attr.regh0);
 	if (ret != DDI_SUCCESS) {
 		xge_debug_osdep(XGE_ERR, "unable to map bar0: [%d]", ret);
-		goto _exit0;
+		goto _exit0a;
 	}
 
 	/* map BAR1 */
@@ -616,20 +1134,16 @@ xge_attach(dev_info_t *dev_info, ddi_attach_cmd_t cmd)
 		goto _exit1;
 	}
 
-	/* preallocate memory for new HAL device and private LL part */
-	hldev = kmem_zalloc(sizeof (xge_hal_device_t), KM_SLEEP);
-	if (hldev == NULL) {
-		xge_debug_osdep(XGE_ERR, "%s", "can not allocate memory");
-		ret = DDI_ENOMEM;
-		goto _exit2;
+	/* map BAR2 MSI(X) */
+	ret = ddi_regs_map_setup(dev_info, 2, (caddr_t *)&attr.bar2,
+	    (offset_t)0, (offset_t)0, &xge_dev_attr, &attr.regh2);
+	if (ret != DDI_SUCCESS) {
+		xge_debug_osdep(XGE_ERR, "unable to map bar2: [%d]", ret);
+		goto _exit1a;
 	}
 
-	/* get the interrupt block cookie associated with the interrupt */
-	ret = ddi_get_iblock_cookie(dev_info, 0, &attr.irqh);
-	if (ret != DDI_SUCCESS) {
-		xge_debug_osdep(XGE_ERR, "%s", "can not get interrupt cookie");
-		goto _exit2a;
-	}
+	/* preallocate memory for new HAL device and private LL part */
+	hldev = kmem_zalloc(sizeof (xge_hal_device_t), KM_SLEEP);
 
 	/* Get the PCI Configuartion space handle */
 	ret = pci_config_setup(dev_info, &attr.cfgh);
@@ -648,16 +1162,45 @@ xge_attach(dev_info_t *dev_info, ddi_attach_cmd_t cmd)
 		goto _exit3;
 	}
 
-	/* attach an interrupt handler for handling Xge device interrupts */
-	ret = ddi_add_intr(dev_info, 0, &attr.irqh, NULL, xge_isr,
-	    (caddr_t)hldev);
-	if (ret != DDI_SUCCESS) {
-		xge_debug_osdep(XGE_ERR, "%s", "unable to register ISR");
+	if (ll_config.msix_enable && intr_types & DDI_INTR_TYPE_MSIX) {
+		ll->intr_type = DDI_INTR_TYPE_MSIX;
+		ll->intr_cnt = 1;
+		for (i = 0; i < XGE_HAL_MAX_FIFO_NUM; i++)
+			if (device_config->fifo.queue[i].configured)
+				ll->intr_cnt++;
+		for (i = 0; i < XGE_HAL_MAX_RING_NUM; i++)
+			if (device_config->ring.queue[i].configured)
+				ll->intr_cnt++;
+	} else {
+		ll->intr_type = DDI_INTR_TYPE_FIXED;
+		ll->intr_cnt = 1;
+	}
+
+	while ((ret = xge_alloc_intrs(ll)) != DDI_SUCCESS) {
+		if (ll->intr_type == DDI_INTR_TYPE_MSIX) {
+			ll_config.msix_enable = 0;
+			ll->intr_type = DDI_INTR_TYPE_FIXED;
+			ll->intr_cnt = 1;
+			device_config->intr_mode = XGE_HAL_INTR_MODE_IRQLINE;
+			xge_debug_osdep(XGE_TRACE,
+			    "Unable to allocate MSI-X handlers"
+			    " - defaulting to IRQA");
+			continue;
+		}
 		goto _exit3a;
 	}
 
+	if (ll->intr_type == DDI_INTR_TYPE_MSIX) {
+		device_config->intr_mode = XGE_HAL_INTR_MODE_MSIX;
+		device_config->bimodal_interrupts = 0;
+	} else {
+		device_config->intr_mode = XGE_HAL_INTR_MODE_IRQLINE;
+	}
+
+	attr.irqh = ll->intr_pri;
+
 	/* initialize HW */
-	status = xge_hal_device_initialize(hldev, &attr, &device_config);
+	status = xge_hal_device_initialize(hldev, &attr, device_config);
 	if (status != XGE_HAL_OK) {
 		switch (status) {
 		case XGE_HAL_ERR_DRIVER_NOT_INITIALIZED:
@@ -683,21 +1226,30 @@ xge_attach(dev_info_t *dev_info, ddi_attach_cmd_t cmd)
 		}
 	}
 
+	/* register interrupt handler for handling xge device interrupts */
+	ret = xge_add_intrs(ll);
+	if (ret != DDI_SUCCESS)
+		goto _exit4;
+
 	/* allocate and register Link Layer */
 	ret = xgell_device_register(ll, &ll_config);
 	if (ret != DDI_SUCCESS) {
-		goto _exit4;
+		goto _exit5;
 	}
 
 	/* store ll as a HAL private part */
 	xge_hal_device_private_set(hldev, ll);
 
+	kmem_free(device_config, sizeof (xge_hal_device_config_t));
+
 	return (DDI_SUCCESS);
 
+_exit5:
+	xge_rem_intrs(ll);
 _exit4:
 	xge_hal_device_terminate(hldev);
 _exit3b:
-	ddi_remove_intr(attr.pdev, 0, hldev->irqh);
+	xge_free_intrs(ll);
 _exit3a:
 	xgell_device_free(ll);
 _exit3:
@@ -705,9 +1257,13 @@ _exit3:
 _exit2a:
 	kmem_free(hldev, sizeof (xge_hal_device_t));
 _exit2:
+	ddi_regs_map_free(&attr.regh2);
+_exit1a:
 	ddi_regs_map_free(&attr.regh1);
 _exit1:
 	ddi_regs_map_free(&attr.regh0);
+_exit0a:
+	kmem_free(device_config, sizeof (xge_hal_device_config_t));
 _exit0:
 	return (ret);
 }
@@ -761,9 +1317,11 @@ xge_detach(dev_info_t *dev_info, ddi_detach_cmd_t cmd)
 	}
 	xge_hal_device_terminate(hldev);
 
-	ddi_remove_intr(attr->pdev, 0, attr->irqh);
+	xge_rem_intrs(lldev);
+	xge_free_intrs(lldev);
 	xgell_device_free(lldev);
 	pci_config_teardown(&attr->cfgh);
+	ddi_regs_map_free(&attr->regh2);
 	ddi_regs_map_free(&attr->regh1);
 	ddi_regs_map_free(&attr->regh0);
 	kmem_free(hldev, sizeof (xge_hal_device_t));

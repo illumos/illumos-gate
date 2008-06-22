@@ -29,6 +29,8 @@
 #define XGE_PCI_DEVICE_ID_XENA_2	0x5831
 #define XGE_PCI_DEVICE_ID_HERC_1	0x5732
 #define XGE_PCI_DEVICE_ID_HERC_2	0x5832
+#define XGE_PCI_DEVICE_ID_TITAN_1	0x5733
+#define XGE_PCI_DEVICE_ID_TITAN_2	0x5833
 
 #define XGE_DRIVER_NAME				"Xge driver"
 #define XGE_DRIVER_VENDOR			"Neterion, Inc"
@@ -39,7 +41,7 @@
 
 #if defined(__cplusplus)
 #define __EXTERN_BEGIN_DECLS	extern "C" {
-#define __EXTERN_END_DECLS  	}
+#define __EXTERN_END_DECLS	}
 #else
 #define __EXTERN_BEGIN_DECLS
 #define __EXTERN_END_DECLS
@@ -63,7 +65,7 @@ __EXTERN_BEGIN_DECLS
 /*---------------------------- common stuffs -------------------------------*/
 
 #define XGE_OS_LLXFMT		"%llx"
-
+#define XGE_OS_NEWLINE      "\n"
 #ifdef XGE_OS_MEMORY_CHECK
 typedef struct {
 	void *ptr;
@@ -78,48 +80,48 @@ extern int g_malloc_cnt;
 
 #define XGE_OS_MEMORY_CHECK_MALLOC(_vaddr, _size, _file, _line) { \
 	if (_vaddr) { \
-		int i; \
-		for (i=0; i<g_malloc_cnt; i++) { \
-			if (g_malloc_arr[i].ptr == NULL) { \
+		int index_mem_chk; \
+		for (index_mem_chk=0; index_mem_chk < g_malloc_cnt; index_mem_chk++) { \
+			if (g_malloc_arr[index_mem_chk].ptr == NULL) { \
 				break; \
 			} \
 		} \
-		if (i == g_malloc_cnt) { \
+		if (index_mem_chk == g_malloc_cnt) { \
 			g_malloc_cnt++; \
 			if (g_malloc_cnt >= XGE_OS_MALLOC_CNT_MAX) { \
 			  xge_os_bug("g_malloc_cnt exceed %d", \
 						XGE_OS_MALLOC_CNT_MAX); \
 			} \
 		} \
-		g_malloc_arr[i].ptr = _vaddr; \
-		g_malloc_arr[i].size = _size; \
-		g_malloc_arr[i].file = _file; \
-		g_malloc_arr[i].line = _line; \
-		for (i=0; i<_size; i++) { \
-			*((char *)_vaddr+i) = 0x5a; \
+		g_malloc_arr[index_mem_chk].ptr = _vaddr; \
+		g_malloc_arr[index_mem_chk].size = _size; \
+		g_malloc_arr[index_mem_chk].file = _file; \
+		g_malloc_arr[index_mem_chk].line = _line; \
+		for (index_mem_chk=0; index_mem_chk<_size; index_mem_chk++) { \
+			*((char *)_vaddr+index_mem_chk) = 0x5a; \
 		} \
 	} \
 }
 
 #define XGE_OS_MEMORY_CHECK_FREE(_vaddr, _check_size) { \
-	int i; \
-	for (i=0; i<XGE_OS_MALLOC_CNT_MAX; i++) { \
-		if (g_malloc_arr[i].ptr == _vaddr) { \
-			g_malloc_arr[i].ptr = NULL; \
-			if(_check_size && g_malloc_arr[i].size!=_check_size) { \
+	int index_mem_chk; \
+	for (index_mem_chk=0; index<XGE_OS_MALLOC_CNT_MAX; index++) { \
+		if (g_malloc_arr[index_mem_chk].ptr == _vaddr) { \
+			g_malloc_arr[index_mem_chk].ptr = NULL; \
+			if(_check_size && g_malloc_arr[index].size!=_check_size) { \
 				xge_os_printf("OSPAL: freeing with wrong " \
 				      "size %d! allocated at %s:%d:"XGE_OS_LLXFMT":%d", \
 					 (int)_check_size, \
-					 g_malloc_arr[i].file, \
-					 g_malloc_arr[i].line, \
+					 g_malloc_arr[index_mem_chk].file, \
+					 g_malloc_arr[index_mem_chk].line, \
 					 (unsigned long long)(ulong_t) \
-					    g_malloc_arr[i].ptr, \
-					 g_malloc_arr[i].size); \
+					    g_malloc_arr[index_mem_chk].ptr, \
+					 g_malloc_arr[index_mem_chk].size); \
 			} \
 			break; \
 		} \
 	} \
-	if (i == XGE_OS_MALLOC_CNT_MAX) { \
+	if (index_mem_chk == XGE_OS_MALLOC_CNT_MAX) { \
 		xge_os_printf("OSPAL: ptr "XGE_OS_LLXFMT" not found!", \
 			    (unsigned long long)(ulong_t)_vaddr); \
 	} \

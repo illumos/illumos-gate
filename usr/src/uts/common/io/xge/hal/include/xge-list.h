@@ -168,7 +168,7 @@ static inline void xge_list_insert_before (xge_list_t *new_item,
  * Cast a member of a structure out to the containing structure.
  */
 #define xge_container_of(ptr, type, member) ({			\
-        const __typeof( ((type *)0)->member ) *__mptr = (ptr);	\
+         __typeof( ((type *)0)->member ) *__mptr = (ptr);	\
         (type *)(void *)( (char *)__mptr - ((size_t) &((type *)0)->member) );})
 #else
 /* type unsafe version */

@@ -36,8 +36,8 @@ int g_malloc_cnt = 0;
 /*
  * Runtime tracing support
  */
-static unsigned int g_module_mask_default = 0;
-unsigned int *g_module_mask = &g_module_mask_default;
+static unsigned long g_module_mask_default = 0;
+unsigned long *g_module_mask = &g_module_mask_default;
 static int g_level_default = 0;
 int *g_level = &g_level_default;
 
@@ -54,7 +54,7 @@ void
 xge_hal_driver_tracebuf_dump(void)
 {
 	int i;
-	int off;
+	int off = 0;
 
 	if (g_xge_os_tracebuf == NULL) {
 		return;
@@ -75,6 +75,49 @@ xge_hal_driver_tracebuf_dump(void)
 		off = xge_os_strlen(dmesg + i) + 1;
 	}
 	xge_os_printf("################ Trace dump End ###############");
+}
+
+xge_hal_status_e
+xge_hal_driver_tracebuf_read(int bufsize, char *retbuf, int *retsize)
+{
+	int i;
+	int off = 0, retbuf_off = 0;
+
+	*retsize = 0;
+	*retbuf = 0;
+
+	if (g_xge_os_tracebuf == NULL) {
+		return XGE_HAL_FAIL;
+	}
+
+	if (g_xge_os_tracebuf->wrapped_once) {
+		for (i = 0; i < g_xge_os_tracebuf->size -
+				g_xge_os_tracebuf->offset; i += off) {
+			if (*(dmesg_start + i)) {
+				xge_os_snprintf((retbuf + retbuf_off), (bufsize - retbuf_off),
+				    "%s\n", dmesg_start + i);
+				retbuf_off += xge_os_strlen(dmesg_start + i) + 1;
+				if (retbuf_off > bufsize)
+					return XGE_HAL_ERR_OUT_OF_MEMORY;
+			}
+			off = xge_os_strlen(dmesg_start + i) + 1;
+		}
+	}
+	for (i = 0; i < g_xge_os_tracebuf->offset; i += off) {
+		if (*(dmesg + i)) {
+			xge_os_snprintf((retbuf + retbuf_off), (bufsize - retbuf_off),
+			    "%s\n", dmesg + i);
+			retbuf_off += xge_os_strlen(dmesg + i) + 1;
+			if (retbuf_off > bufsize)
+				return XGE_HAL_ERR_OUT_OF_MEMORY;
+		}
+		off = xge_os_strlen(dmesg + i) + 1;
+	}
+
+	*retsize = retbuf_off;
+	*(retbuf + retbuf_off + 1) = 0;
+
+	return XGE_HAL_OK;
 }
 #endif
 xge_os_tracebuf_t *g_xge_os_tracebuf = NULL;
@@ -149,7 +192,14 @@ xge_hal_driver_initialize(xge_hal_driver_config_t *config,
 
 #ifdef XGE_TRACE_INTO_CIRCULAR_ARR
 	if (config->tracebuf_size == 0)
-		config->tracebuf_size = XGE_HAL_DEF_CIRCULAR_ARR;
+		/*
+		 * Trace buffer implementation is not lock protected.
+		 * The only harm to expect is memcpy() to go beyond of
+		 * allowed boundaries. To make it safe (driver-wise),
+		 * we pre-allocate needed number of extra bytes.
+		 */
+		config->tracebuf_size = XGE_HAL_DEF_CIRCULAR_ARR +
+					XGE_OS_TRACE_MSGBUF_MAX;
 #endif
 
 	status = __hal_driver_config_check(config);
@@ -175,6 +225,14 @@ xge_hal_driver_initialize(xge_hal_driver_config_t *config,
 		xge_os_printf("cannot allocate trace buffer!");
 		return XGE_HAL_ERR_OUT_OF_MEMORY;
 	}
+	/* timestamps disabled by default */
+	g_tracebuf.timestamp = config->tracebuf_timestamp_en;
+	if (g_tracebuf.timestamp) {
+		xge_os_timestamp(g_tracebuf.msg);
+		g_tracebuf.msgbuf_max = XGE_OS_TRACE_MSGBUF_MAX -
+					xge_os_strlen(g_tracebuf.msg);
+	} else
+		g_tracebuf.msgbuf_max = XGE_OS_TRACE_MSGBUF_MAX;
 	g_tracebuf.offset = 0;
 	*g_tracebuf.msg = 0;
 	xge_os_memzero(g_tracebuf.data, g_tracebuf.size);

@@ -163,7 +163,7 @@ xge_hal_device_begin_irq(xge_hal_device_t *hldev, u64 *reason)
 				  hldev->regh0,	&isrbar0->general_int_status);
 	if (xge_os_unlikely(!val64)) {
 		/* not Xframe interrupt	*/
-		hldev->stats.sw_dev_info_stats.not_traffic_intr_cnt++;
+		hldev->stats.sw_dev_info_stats.not_xge_intr_cnt++;
 		*reason	= 0;
 			return XGE_HAL_ERR_WRONG_IRQ;
 	}
@@ -325,6 +325,7 @@ xge_hal_device_clear_tx(xge_hal_device_t *hldev)
  * xge_hal_device_poll_rx_channel -	Poll Rx	channel	for	completed
  * descriptors and process the same.
  * @channel: HAL channel.
+ * @got_rx: Buffer to return the flag set if receive interrupt is occured
  *
  * The function	polls the Rx channel for the completed	descriptors	and	calls
  * the upper-layer driver (ULD)	via	supplied completion	callback.
@@ -373,7 +374,8 @@ xge_hal_device_poll_rx_channel(xge_hal_channel_t *channel, int *got_rx)
 /**
  * xge_hal_device_poll_tx_channel -	Poll Tx	channel	for	completed
  * descriptors and process the same.
- * @hldev: HAL channel.
+ * @channel: HAL channel.
+ * @got_tx: Buffer to return the flag set if transmit interrupt is occured
  *
  * The function	polls the Tx channel for the completed	descriptors	and	calls
  * the upper-layer driver (ULD)	via	supplied completion	callback.
@@ -420,6 +422,7 @@ xge_hal_device_poll_tx_channel(xge_hal_channel_t *channel, int *got_tx)
  * xge_hal_device_poll_rx_channels - Poll Rx channels for completed
  * descriptors and process the same.
  * @hldev: HAL device handle.
+ * @got_rx: Buffer to return flag set if receive is ready
  *
  * The function	polls the Rx channels for the completed	descriptors	and	calls
  * the upper-layer driver (ULD)	via	supplied completion	callback.
@@ -451,6 +454,7 @@ xge_hal_device_poll_rx_channels(xge_hal_device_t *hldev, int *got_rx)
  * xge_hal_device_poll_tx_channels - Poll Tx channels for completed
  * descriptors and process the same.
  * @hldev: HAL device handle.
+ * @got_tx: Buffer to return flag set if transmit is ready
  *
  * The function	polls the Tx channels for the completed	descriptors	and	calls
  * the upper-layer driver (ULD)	via	supplied completion	callback.
@@ -829,7 +833,7 @@ __hal_tcp_lro_capable(iplro_t *ip, tcplro_t	*tcp, lro_t	*lro, int *ts_off)
 		 * LRO.
 		 */
 		if (lro->ts_off	== -1) {
-			xge_debug_ring(XGE_ERR,	"Pkt received with time	stamp after	session	opened with	no time	stamp :	%02x %02x\n", tcp->doff_res, tcp->ctrl);
+			xge_debug_ring(XGE_ERR,	"Pkt received with time	stamp after	session	opened with	no time	stamp :	%02x %02x", tcp->doff_res, tcp->ctrl);
 			return XGE_HAL_FAIL;
 		}
 
@@ -846,7 +850,7 @@ __hal_tcp_lro_capable(iplro_t *ip, tcplro_t	*tcp, lro_t	*lro, int *ts_off)
 			/*
 			 * Probably	contains more options.
 			 */
-			xge_debug_ring(XGE_ERR,	"tcphdr	not	fastpth	: pkt received with	tcp	options	in addition	to time	stamp after	the	session	is opened %02x %02x	\n", tcp->doff_res,	tcp->ctrl);
+			xge_debug_ring(XGE_ERR,	"tcphdr	not	fastpth	: pkt received with	tcp	options	in addition	to time	stamp after	the	session	is opened %02x %02x	", tcp->doff_res,	tcp->ctrl);
 			return XGE_HAL_FAIL;
 		}
 
@@ -856,7 +860,7 @@ __hal_tcp_lro_capable(iplro_t *ip, tcplro_t	*tcp, lro_t	*lro, int *ts_off)
 			/* Ignore No-operation 0x1 */
 			if ((byte == 0x0) || (byte == 0x1))	
 				continue;
-			xge_debug_ring(XGE_ERR,	"tcphdr	not	fastpth	: pkt received with	tcp	options	in addition	to time	stamp after	the	session	is opened %02x %02x	\n", tcp->doff_res,	tcp->ctrl);
+			xge_debug_ring(XGE_ERR,	"tcphdr	not	fastpth	: pkt received with	tcp	options	in addition	to time	stamp after	the	session	is opened %02x %02x	", tcp->doff_res,	tcp->ctrl);
 			return XGE_HAL_FAIL;
 		}
 	
@@ -870,7 +874,7 @@ __hal_tcp_lro_capable(iplro_t *ip, tcplro_t	*tcp, lro_t	*lro, int *ts_off)
 	return XGE_HAL_OK;
 
 _exit_fail:
-	xge_debug_ring(XGE_ERR,	"tcphdr	not	fastpth	%02x %02x\n", tcp->doff_res, tcp->ctrl);
+	xge_debug_ring(XGE_TRACE,	"tcphdr	not	fastpth	%02x %02x", tcp->doff_res, tcp->ctrl);
 	return XGE_HAL_FAIL;
 
 }
@@ -881,14 +885,12 @@ _exit_fail:
  * @ip:	ip frame.
  * @tcp: tcp frame.
  * @ext_info: Descriptor info.
- * @hldev: Hal context.
  */
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL xge_hal_status_e
 __hal_lro_capable( u8 *buffer,
 		   iplro_t **ip,
 		   tcplro_t	**tcp,
-		   xge_hal_dtr_info_t *ext_info,
-		   xge_hal_device_t	*hldev)
+       xge_hal_dtr_info_t *ext_info)
 {
 	u8 ip_off, ip_length;
 
@@ -896,6 +898,9 @@ __hal_lro_capable( u8 *buffer,
 		xge_debug_ring(XGE_ERR,	"Cant do lro %d", ext_info->proto);
 		return XGE_HAL_FAIL;
 	}
+
+  if ( !*ip )
+  {
 #ifdef XGE_LL_DEBUG_DUMP_PKT
 		{
 			u8 ch;
@@ -909,37 +914,38 @@ __hal_lro_capable( u8 *buffer,
 		}
 #endif
 
-	switch (ext_info->frame) {
-	case XGE_HAL_FRAME_TYPE_DIX:
-		ip_off = XGE_HAL_HEADER_ETHERNET_II_802_3_SIZE;
-		break;
-	case XGE_HAL_FRAME_TYPE_LLC:
-		ip_off = (XGE_HAL_HEADER_ETHERNET_II_802_3_SIZE	+
-			  XGE_HAL_HEADER_802_2_SIZE);
-		break;
-	case XGE_HAL_FRAME_TYPE_SNAP:
-		ip_off = (XGE_HAL_HEADER_ETHERNET_II_802_3_SIZE	+
-			  XGE_HAL_HEADER_SNAP_SIZE);
-		break;
-	default: //	XGE_HAL_FRAME_TYPE_IPX,	etc.
-		return XGE_HAL_FAIL;
-	}
+    switch (ext_info->frame) {
+    case XGE_HAL_FRAME_TYPE_DIX:
+      ip_off = XGE_HAL_HEADER_ETHERNET_II_802_3_SIZE;
+      break;
+    case XGE_HAL_FRAME_TYPE_LLC:
+      ip_off = (XGE_HAL_HEADER_ETHERNET_II_802_3_SIZE	+
+                XGE_HAL_HEADER_802_2_SIZE);
+      break;
+    case XGE_HAL_FRAME_TYPE_SNAP:
+      ip_off = (XGE_HAL_HEADER_ETHERNET_II_802_3_SIZE	+
+                XGE_HAL_HEADER_SNAP_SIZE);
+      break;
+    default: //	XGE_HAL_FRAME_TYPE_IPX,	etc.
+      return XGE_HAL_FAIL;
+    }
 
 
-	if (ext_info->proto	& XGE_HAL_FRAME_PROTO_VLAN_TAGGED) {
-		ip_off += XGE_HAL_HEADER_VLAN_SIZE;
-	}
+    if (ext_info->proto	& XGE_HAL_FRAME_PROTO_VLAN_TAGGED) {
+      ip_off += XGE_HAL_HEADER_VLAN_SIZE;
+    }
 
-	/* Grab	ip,	tcp	headers	*/
-	*ip	= (iplro_t *)((char*)buffer	+ ip_off);
+    /* Grab	ip,	tcp	headers	*/
+    *ip	= (iplro_t *)((char*)buffer	+ ip_off);
+  } /* !*ip */
 
 	ip_length =	(u8)((*ip)->version_ihl	& 0x0F);
 	ip_length =	ip_length <<2;
-	*tcp = (tcplro_t *)((unsigned long)*ip + ip_length);
+	*tcp = (tcplro_t *)((char *)*ip + ip_length);
 
 	xge_debug_ring(XGE_TRACE, "ip_length:%d	ip:"XGE_OS_LLXFMT
 		   " tcp:"XGE_OS_LLXFMT"", (int)ip_length,
-		(unsigned long long)(long)*ip, (unsigned long long)(long)*tcp);
+		(unsigned long long)(ulong_t)*ip, (unsigned long long)(ulong_t)*tcp);
 
 	return XGE_HAL_OK;
 
@@ -954,17 +960,18 @@ __hal_lro_capable( u8 *buffer,
  * @lro: lro pointer
  * @ext_info: Descriptor info.
  * @hldev: Hal context.
+ * @ring_lro: LRO descriptor per rx ring.
  * @slot: Bucket no.
  * @tcp_seg_len: Length	of tcp segment.
  * @ts_off:	time stamp offset in the packet.
  */
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL void
 __hal_open_lro_session (u8 *buffer,	iplro_t	*ip, tcplro_t *tcp,	lro_t **lro,
-			xge_hal_device_t *hldev, int slot, u32 tcp_seg_len,
-			int	ts_off)
+			xge_hal_device_t *hldev, xge_hal_lro_desc_t	*ring_lro, int slot,
+      u32 tcp_seg_len, int	ts_off)
 {
 
-	lro_t *lro_new = &hldev->lro_pool[slot];
+	lro_t *lro_new = &ring_lro->lro_pool[slot];
 
 	lro_new->in_use			=	1;
 	lro_new->ll_hdr			=	buffer;
@@ -982,21 +989,20 @@ __hal_open_lro_session (u8 *buffer,	iplro_t	*ip, tcplro_t *tcp,	lro_t **lro,
 	hldev->stats.sw_dev_info_stats.tot_frms_lroised++;
 	hldev->stats.sw_dev_info_stats.tot_lro_sessions++;
 
-	*lro = hldev->lro_recent = lro_new;
+	*lro = ring_lro->lro_recent = lro_new;
 	return;
 }
-
 /*
  * __hal_lro_get_free_slot:	Get	a free LRO bucket.
- * @hldev: Hal context.
+ * @ring_lro: LRO descriptor per ring.
  */
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL int
-__hal_lro_get_free_slot	(xge_hal_device_t *hldev)
+__hal_lro_get_free_slot	(xge_hal_lro_desc_t	*ring_lro)
 {
 	int	i;
 
 	for	(i = 0;	i <	XGE_HAL_LRO_MAX_BUCKETS; i++) {
-		lro_t *lro_temp	= &hldev->lro_pool[i];
+		lro_t *lro_temp	= &ring_lro->lro_pool[i];
 
 		if (!lro_temp->in_use)
 			return i;
@@ -1006,20 +1012,22 @@ __hal_lro_get_free_slot	(xge_hal_device_t *hldev)
 
 /*
  * __hal_get_lro_session: Gets matching	LRO	session	or creates one.
- * @buffer:	Ethernet frame.
+ * @eth_hdr:	Ethernet header.
  * @ip:	ip header.
  * @tcp: tcp header.
  * @lro: lro pointer
  * @ext_info: Descriptor info.
  * @hldev: Hal context.
+ * @ring_lro: LRO descriptor per rx ring
  */
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL xge_hal_status_e
-__hal_get_lro_session (u8 *buffer,
+__hal_get_lro_session (u8 *eth_hdr,
 			   iplro_t *ip,
 			   tcplro_t	*tcp,
 			   lro_t **lro,
 			   xge_hal_dtr_info_t *ext_info,
 			   xge_hal_device_t	*hldev,
+			   xge_hal_lro_desc_t	*ring_lro,
 			   lro_t **lro_end3	/* Valid only when ret=END_3 */)
 {
 	lro_t *lro_match;
@@ -1033,11 +1041,11 @@ __hal_get_lro_session (u8 *buffer,
 	 * previous	call.  There is	a good chance that this	incoming frame
 	 * matches the lro session.
 	 */
-	if (hldev->lro_recent && hldev->lro_recent->in_use)	{
-		if (__hal_lro_check_for_session_match(hldev->lro_recent,
+	if (ring_lro->lro_recent && ring_lro->lro_recent->in_use)	{
+		if (__hal_lro_check_for_session_match(ring_lro->lro_recent,
 							  tcp, ip)
 							== XGE_HAL_OK)
-			lro_match =	hldev->lro_recent;
+			lro_match =	ring_lro->lro_recent;
 	}
 	
 	if (!lro_match)	{
@@ -1046,7 +1054,7 @@ __hal_get_lro_session (u8 *buffer,
 		 * the incoming	frame.
 		 */
 		for	(i = 0;	i <	XGE_HAL_LRO_MAX_BUCKETS; i++) {
-			lro_t *lro_temp	= &hldev->lro_pool[i];
+			lro_t *lro_temp	= &ring_lro->lro_pool[i];
 
 			if (!lro_temp->in_use) {
 				if (free_slot == -1)
@@ -1070,14 +1078,16 @@ __hal_get_lro_session (u8 *buffer,
 		*lro = lro_match;
 
 		if (lro_match->tcp_next_seq_num	!= xge_os_ntohl(tcp->seq)) {
-			xge_debug_ring(XGE_ERR,	"**retransmit  **"
+     xge_debug_ring(XGE_ERR,	"**retransmit  **"
 						"found***");
 			hldev->stats.sw_dev_info_stats.lro_out_of_seq_pkt_cnt++;
 			return XGE_HAL_INF_LRO_END_2;
 		}
 
 		if (XGE_HAL_OK != __hal_ip_lro_capable(ip, ext_info))
+    {
 			return XGE_HAL_INF_LRO_END_2;
+    }
 
 		if (XGE_HAL_OK != __hal_tcp_lro_capable(ip,	tcp, lro_match,
 							&ts_off)) {
@@ -1088,18 +1098,22 @@ __hal_get_lro_session (u8 *buffer,
 			 */	
 			tcp_seg_len	= __hal_tcp_seg_len(ip,	tcp);
 			if (tcp_seg_len	== 0)
+      {
 				return XGE_HAL_INF_LRO_END_2;
+      }
 
 			/* Get a free bucket  */
-			free_slot =	__hal_lro_get_free_slot(hldev);
+			free_slot =	__hal_lro_get_free_slot(ring_lro);
 			if (free_slot == -1)
+      {
 				return XGE_HAL_INF_LRO_END_2;
+      }
 
 			/* 
 			 * Open	a new LRO session
 			 */
-			__hal_open_lro_session (buffer,	ip,	tcp, lro_end3,
-						hldev, free_slot, tcp_seg_len,
+			__hal_open_lro_session (eth_hdr,	ip,	tcp, lro_end3,
+						hldev, ring_lro, free_slot, tcp_seg_len,
 						ts_off);
 
 			return XGE_HAL_INF_LRO_END_3;
@@ -1120,7 +1134,7 @@ __hal_get_lro_session (u8 *buffer,
 		lro_match->tcp_ack_num = tcp->ack_seq;
 		lro_match->frags_len +=	__hal_tcp_seg_len(ip, tcp);
 
-		hldev->lro_recent =	lro_match;
+		ring_lro->lro_recent =	lro_match;
 	
 		return XGE_HAL_INF_LRO_CONT;
 	}
@@ -1144,7 +1158,7 @@ __hal_get_lro_session (u8 *buffer,
 	if (tcp_seg_len	== 0)
 		return XGE_HAL_INF_LRO_UNCAPABLE;
 
-	__hal_open_lro_session (buffer,	ip,	tcp, lro, hldev, free_slot,
+	__hal_open_lro_session (eth_hdr,	ip,	tcp, lro, hldev, ring_lro, free_slot,
 				tcp_seg_len, ts_off);
 
 	return XGE_HAL_INF_LRO_BEGIN;
@@ -1168,14 +1182,14 @@ __hal_lro_under_optimal_thresh (iplro_t	*ip,
 	if ((lro->total_length + __hal_tcp_seg_len(ip, tcp)	) >	
 						hldev->config.lro_frm_len) {
 		xge_debug_ring(XGE_TRACE, "Max LRO frame len exceeded:"
-		 "max length %d	\n", hldev->config.lro_frm_len);
+		 "max length %d	", hldev->config.lro_frm_len);
 		hldev->stats.sw_dev_info_stats.lro_frm_len_exceed_cnt++;
 		return XGE_HAL_FAIL;
 	}
 
 	if (lro->sg_num	== hldev->config.lro_sg_size) {
 		xge_debug_ring(XGE_TRACE, "Max sg count	exceeded:"
-				 "max sg %d	\n", hldev->config.lro_sg_size);
+				 "max sg %d	", hldev->config.lro_sg_size);
 		hldev->stats.sw_dev_info_stats.lro_sg_exceed_cnt++;
 		return XGE_HAL_FAIL;
 	}
@@ -1247,21 +1261,24 @@ __hal_append_lro(iplro_t *ip,
 
 	lro->sg_num++;
 	*seg_len = __hal_tcp_seg_len(ip, *tcp);
-	*tcp = (tcplro_t *)((unsigned long)*tcp	+ (((*tcp)->doff_res)>>2));
+	*tcp = (tcplro_t *)((char *)*tcp	+ (((*tcp)->doff_res)>>2));
 
 	return XGE_HAL_OK;
 
 }
 
 /**
- * xge_hal_accumulate_large_rx:	LRO	a given	frame
+ * __xge_hal_accumulate_large_rx:	LRO	a given	frame
  * frames
- * @buffer:	Ethernet frame.
+ * @ring: rx ring number
+ * @eth_hdr: ethernet header.
+ * @ip_hdr: ip header (optional)
  * @tcp: tcp header.
  * @seglen:	packet length.
  * @p_lro: lro pointer.
  * @ext_info: descriptor info, see xge_hal_dtr_info_t{}.
  * @hldev: HAL device.
+ * @lro_end3: for lro_end3 output
  *
  * LRO the newly received frame, i.e. attach it	(if	possible) to the
  * already accumulated (i.e., already LRO-ed) received frames (if any),
@@ -1269,38 +1286,39 @@ __hal_append_lro(iplro_t *ip,
  * by the stack.
  */
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL xge_hal_status_e
-xge_hal_accumulate_large_rx(u8 *buffer, tcplro_t **tcp, u32 *seglen,
-lro_t **p_lro, xge_hal_dtr_info_t *ext_info, xge_hal_device_t *hldev,
-lro_t **lro_end3)
+xge_hal_lro_process_rx(int ring, u8 *eth_hdr, u8 *ip_hdr, tcplro_t **tcp,
+                       u32 *seglen, lro_t **p_lro,
+                       xge_hal_dtr_info_t *ext_info, xge_hal_device_t *hldev,
+                       lro_t **lro_end3)
 {
-	iplro_t	*ip;
+	iplro_t	*ip = (iplro_t *)ip_hdr;
 	xge_hal_status_e ret;
 	lro_t *lro;
 
 	xge_debug_ring(XGE_TRACE, "Entered accumu lro. ");
-	if (XGE_HAL_OK != __hal_lro_capable(buffer, &ip, (tcplro_t **)tcp,
-						ext_info, hldev))
+	if (XGE_HAL_OK != __hal_lro_capable(eth_hdr, &ip, (tcplro_t **)tcp,
+                                      ext_info))
 		return XGE_HAL_INF_LRO_UNCAPABLE;
 
 	/*
-	 * This	function shall get matching	LRO	or else
+	 * This	function shall get matching LRO or else
 	 * create one and return it
 	 */
-		ret = __hal_get_lro_session(buffer, ip, (tcplro_t *)*tcp,
-					p_lro, ext_info, hldev,	lro_end3);
+	ret = __hal_get_lro_session(eth_hdr, ip, (tcplro_t *)*tcp,
+                              p_lro, ext_info, hldev,	&hldev->lro_desc[ring],
+                              lro_end3);
 	xge_debug_ring(XGE_TRACE, "ret from get_lro:%d ",ret);
 	lro = *p_lro;
 	if (XGE_HAL_INF_LRO_CONT == ret) {
 		if (XGE_HAL_OK == __hal_lro_under_optimal_thresh(ip,
 						(tcplro_t *)*tcp, lro, hldev)) {
 			(void) __hal_append_lro(ip,(tcplro_t **) tcp, seglen,
-							 lro,
-					 hldev);
+							 lro, hldev);
 			hldev->stats.sw_dev_info_stats.tot_frms_lroised++;
 
 			if (lro->sg_num	>= hldev->config.lro_sg_size) {
 				hldev->stats.sw_dev_info_stats.lro_sg_exceed_cnt++;
-				ret	= XGE_HAL_INF_LRO_END_1;
+				ret = XGE_HAL_INF_LRO_END_1;
 			}
 
 		} else ret = XGE_HAL_INF_LRO_END_2;
@@ -1324,6 +1342,32 @@ lro_t **lro_end3)
 }
 
 /**
+ * xge_hal_accumulate_large_rx:	LRO	a given	frame
+ * frames
+ * @buffer:	Ethernet frame.
+ * @tcp: tcp header.
+ * @seglen:	packet length.
+ * @p_lro: lro pointer.
+ * @ext_info: descriptor info, see xge_hal_dtr_info_t{}.
+ * @hldev: HAL device.
+ * @lro_end3: for lro_end3 output
+ *
+ * LRO the newly received frame, i.e. attach it	(if	possible) to the
+ * already accumulated (i.e., already LRO-ed) received frames (if any),
+ * to form one super-sized frame for the subsequent	processing
+ * by the stack.
+ */
+__HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL xge_hal_status_e
+xge_hal_accumulate_large_rx(u8 *buffer, tcplro_t **tcp, u32 *seglen,
+lro_t **p_lro, xge_hal_dtr_info_t *ext_info, xge_hal_device_t *hldev,
+lro_t **lro_end3)
+{
+  int ring = 0;
+  return xge_hal_lro_process_rx(ring, buffer, NULL, tcp, seglen, p_lro,
+                                ext_info, hldev, lro_end3);
+}
+
+/**
  * xge_hal_lro_close_session: Close LRO session
  * @lro: LRO Session.
  * @hldev: HAL Context.
@@ -1335,18 +1379,20 @@ xge_hal_lro_close_session (lro_t *lro)
 }
 
 /**
- * xge_hal_lro_get_next_session: Returns next LRO session in the list or NULL
+ * xge_hal_lro_next_session: Returns next LRO session in the list or NULL
  *					if none	exists.
- * @hldev: Hal context.
+ * @hldev: HAL Context.
+ * @ring: rx ring number.
  */
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL lro_t	*
-xge_hal_lro_get_next_session (xge_hal_device_t *hldev)
+xge_hal_lro_next_session (xge_hal_device_t *hldev, int ring)
 {
+xge_hal_lro_desc_t *ring_lro = &hldev->lro_desc[ring];
 	int	i;
-	int	start_idx =	hldev->lro_next_idx;
+	int	start_idx =	ring_lro->lro_next_idx;
 
 	for(i =	start_idx; i < XGE_HAL_LRO_MAX_BUCKETS;	i++) {
-		lro_t *lro = &hldev->lro_pool[i];
+		lro_t *lro = &ring_lro->lro_pool[i];
 
 		if (!lro->in_use)
 			continue;
@@ -1355,12 +1401,19 @@ xge_hal_lro_get_next_session (xge_hal_device_t *hldev)
 		lro->ip_hdr->check = xge_os_htons(0);
 		lro->ip_hdr->check = XGE_LL_IP_FAST_CSUM(((u8 *)(lro->ip_hdr)),
 								(lro->ip_hdr->version_ihl &	0x0F));
-		hldev->lro_next_idx	= i	+ 1;
+		ring_lro->lro_next_idx	= i	+ 1;
 		return lro;
 	}
 
-	hldev->lro_next_idx	= 0;
+	ring_lro->lro_next_idx	= 0;
 	return NULL;
 
+}
+
+__HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL lro_t *
+xge_hal_lro_get_next_session(xge_hal_device_t *hldev)
+{
+  int ring = 0; /* assume default ring=0 */
+  return xge_hal_lro_next_session(hldev, ring);
 }
 #endif

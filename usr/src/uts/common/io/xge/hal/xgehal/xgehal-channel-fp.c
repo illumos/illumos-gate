@@ -33,6 +33,9 @@ __hal_channel_dtr_alloc(xge_hal_channel_h channelh,	xge_hal_dtr_h *dtrh)
 #if	defined(XGE_HAL_RX_MULTI_FREE_IRQ) || defined(XGE_HAL_TX_MULTI_FREE_IRQ)
 	unsigned long flags	= 0;
 #endif
+	if (channel->terminating) {
+		return XGE_HAL_FAIL;
+	}
 
 	if (channel->reserve_length	- channel->reserve_top >
 						channel->reserve_threshold)	{
@@ -186,9 +189,10 @@ __hal_channel_dtr_free(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh)
 
 /**
  * xge_hal_channel_dtr_count
+ * @channelh: Channel handle. Obtained via xge_hal_channel_open().
  *
  * Retreive number of DTRs available. This function can not be called
- * from data path. ring_initial_replenishi() is the only user.
+ * from data path.
  */
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL int
 xge_hal_channel_dtr_count(xge_hal_channel_h channelh)

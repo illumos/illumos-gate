@@ -37,6 +37,12 @@ __EXTERN_BEGIN_DECLS
 #define XGE_HAL_FIFO_MAX_WRR_STATE		36
 #define XGE_HAL_FIFO_HW_PAIR_OFFSET		0x20000
 
+/* HW FIFO Weight Calender */
+#define XGE_HAL_FIFO_WRR_0      0x0706050407030602ULL
+#define XGE_HAL_FIFO_WRR_1      0x0507040601070503ULL
+#define XGE_HAL_FIFO_WRR_2      0x0604070205060700ULL
+#define XGE_HAL_FIFO_WRR_3      0x0403060705010207ULL
+#define XGE_HAL_FIFO_WRR_4      0x0604050300000000ULL
 /*
  * xge_hal_fifo_hw_pair_t
  *
@@ -140,6 +146,7 @@ typedef xge_hal_fifo_txd_t* xge_hal_fifo_txdl_t;
  * @priv_size: Per-Tx descriptor space reserved for upper-layer driver
  *             usage.
  * @mempool: Memory pool, from which descriptors get allocated.
+ * @align_size: TBD
  *
  * Fifo channel.
  * Note: The structure is cache line aligned.
@@ -182,6 +189,8 @@ typedef struct xge_hal_fifo_t {
  * @align_used_frags: (TODO).
  * @alloc_frags: Total number of fragments allocated.
  * @dang_frags: Number of fragments kept from release until this TxDL is freed.
+ * @bytes_sent: TODO
+ * @unused: TODO
  * @dang_txdl: (TODO).
  * @next_txdl_priv: (TODO).
  * @first_txdp: (TODO).
@@ -276,6 +285,10 @@ __hal_fifo_txdl_restore_many(xge_hal_channel_h channelh,
 
 __HAL_STATIC_FIFO __HAL_INLINE_FIFO xge_hal_status_e
 xge_hal_fifo_dtr_reserve(xge_hal_channel_h channelh, xge_hal_dtr_h *dtrh);
+
+__HAL_STATIC_FIFO __HAL_INLINE_FIFO xge_hal_status_e
+xge_hal_fifo_dtr_reserve_many(xge_hal_channel_h channelh, xge_hal_dtr_h *dtrh,
+    const int frags);
 
 __HAL_STATIC_FIFO __HAL_INLINE_FIFO void*
 xge_hal_fifo_dtr_private(xge_hal_dtr_h dtrh);

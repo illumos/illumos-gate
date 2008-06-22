@@ -152,7 +152,9 @@ xge_queue_produce(xge_queue_h queueh, int event_type, void *context,
 		unsigned char item_buf[sizeof(xge_queue_item_t) +
 				XGE_DEFAULT_EVENT_MAX_DATA_SIZE];
 		xge_queue_item_t *item = (xge_queue_item_t *)(void *)item_buf;
-
+    xge_os_memzero(item_buf, (sizeof(xge_queue_item_t) +
+                             XGE_DEFAULT_EVENT_MAX_DATA_SIZE));  
+	
 	        while (__queue_consume(queue,
 				       XGE_DEFAULT_EVENT_MAX_DATA_SIZE,
 				       item) != XGE_QUEUE_IS_EMPTY)
@@ -196,8 +198,10 @@ try_again:
 			return XGE_QUEUE_IS_FULL;
 		}
 
-		if (queue->has_critical_event)
+		if (queue->has_critical_event) {
+   		xge_os_spin_unlock_irq(&queue->lock, flags);
 			return XGE_QUEUE_IS_FULL;
+    }
 
 		/* grow */
 		status = __io_queue_grow(queueh);
@@ -290,6 +294,7 @@ xge_queue_create(pci_dev_h pdev, pci_irq_h irqh, int pages_initial,
 void xge_queue_destroy(xge_queue_h queueh)
 {
 	xge_queue_t *queue = (xge_queue_t *)queueh;
+	xge_os_spin_lock_destroy_irq(&queue->lock, queue->irqh);
 	if (!xge_list_is_empty(&queue->list_head)) {
 		xge_debug_queue(XGE_ERR, "destroying non-empty queue 0x"
 				XGE_OS_LLXFMT, (u64)(ulong_t)queue);
@@ -410,7 +415,9 @@ void xge_queue_flush(xge_queue_h queueh)
 	unsigned char item_buf[sizeof(xge_queue_item_t) +
 				XGE_DEFAULT_EVENT_MAX_DATA_SIZE];
 	xge_queue_item_t *item = (xge_queue_item_t *)(void *)item_buf;
-
+  xge_os_memzero(item_buf, (sizeof(xge_queue_item_t) +
+                             XGE_DEFAULT_EVENT_MAX_DATA_SIZE));  
+	  
 	/* flush queue by consuming all enqueued items */
 	while (xge_queue_consume(queueh,
 				    XGE_DEFAULT_EVENT_MAX_DATA_SIZE,

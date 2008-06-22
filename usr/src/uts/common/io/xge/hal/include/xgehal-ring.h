@@ -436,6 +436,9 @@ xge_hal_ring_dtr_pre_post(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh);
 __HAL_STATIC_RING __HAL_INLINE_RING void
 xge_hal_ring_dtr_post_post(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh);
 
+__HAL_STATIC_RING __HAL_INLINE_RING void
+xge_hal_ring_dtr_post_post_wmb(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh);
+
 __HAL_STATIC_RING __HAL_INLINE_RING xge_hal_status_e
 xge_hal_ring_dtr_next_completed(xge_hal_channel_h channelh, xge_hal_dtr_h *dtrh,
 			u8 *t_code);

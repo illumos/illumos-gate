@@ -35,13 +35,11 @@ __EXTERN_BEGIN_DECLS
  * enum xge_hal_channel_type_e - Enumerated channel types.
  * @XGE_HAL_CHANNEL_TYPE_FIFO: fifo.
  * @XGE_HAL_CHANNEL_TYPE_RING: ring.
- * @XGE_HAL_CHANNEL_TYPE_SEND_QUEUE: TBD.
- * @XGE_HAL_CHANNEL_TYPE_HW_RECEIVE_QUEUE: TBD.
- * @XGE_HAL_CHANNEL_TYPE_HW_COMPLETION_QUEUE: TBD.
- * @XGE_HAL_CHANNEL_TYPE_LRO_RECEIVE_QUEUE: TBD.
- * @XGE_HAL_CHANNEL_TYPE_LRO_COMPLETION_QUEUE: TBD.
- * @XGE_HAL_CHANNEL_TYPE_UP_MESSAGE_QUEUE: TBD.
- * @XGE_HAL_CHANNEL_TYPE_DOWN_MESSAGE_QUEUE: TBD.
+ * @XGE_HAL_CHANNEL_TYPE_SEND_QUEUE: Send Queue
+ * @XGE_HAL_CHANNEL_TYPE_RECEIVE_QUEUE: Receive Queue
+ * @XGE_HAL_CHANNEL_TYPE_COMPLETION_QUEUE: Receive queue completion queue
+ * @XGE_HAL_CHANNEL_TYPE_UP_MESSAGE_QUEUE: Up message queue
+ * @XGE_HAL_CHANNEL_TYPE_DOWN_MESSAGE_QUEUE: Down message queue
  * @XGE_HAL_CHANNEL_TYPE_MAX: Maximum number of HAL-supported
  * (and recognized) channel types. Currently: two.
  *
@@ -52,10 +50,8 @@ typedef enum xge_hal_channel_type_e {
 	XGE_HAL_CHANNEL_TYPE_FIFO,
 	XGE_HAL_CHANNEL_TYPE_RING,
 	XGE_HAL_CHANNEL_TYPE_SEND_QUEUE,
-	XGE_HAL_CHANNEL_TYPE_HW_RECEIVE_QUEUE,
-	XGE_HAL_CHANNEL_TYPE_HW_COMPLETION_QUEUE,
-	XGE_HAL_CHANNEL_TYPE_LRO_RECEIVE_QUEUE,
-	XGE_HAL_CHANNEL_TYPE_LRO_COMPLETION_QUEUE,
+	XGE_HAL_CHANNEL_TYPE_RECEIVE_QUEUE,
+	XGE_HAL_CHANNEL_TYPE_COMPLETION_QUEUE,
 	XGE_HAL_CHANNEL_TYPE_UP_MESSAGE_QUEUE,
 	XGE_HAL_CHANNEL_TYPE_DOWN_MESSAGE_QUEUE,
 	XGE_HAL_CHANNEL_TYPE_MAX
@@ -220,6 +216,7 @@ typedef void (*xge_hal_channel_dtr_term_f) (xge_hal_channel_h channelh,
 /**
  * struct xge_hal_channel_attr_t - Channel open "template".
  * @type: xge_hal_channel_type_e channel type.
+ * @vp_id: Virtual path id
  * @post_qid: Queue ID to post descriptors. For the link layer this
  *            number should be in the 0..7 range.
  * @compl_qid: Completion queue ID. Must be set to zero for the link layer.
@@ -235,14 +232,6 @@ typedef void (*xge_hal_channel_dtr_term_f) (xge_hal_channel_h channelh,
  *          See also xge_hal_channel_dtr_term_f{}.
  * @userdata: User-defined "context" of _that_ channel. Passed back to the
  *            user as one of the @callback, @dtr_init, and @dtr_term arguments.
- * @sq_config:	Send queue config
- * @hrq_config: HW receive queue config
- * @hcq_config: HW completion queue config
- * @lrq_config: LRO receive queue config
- * @lcq_config: LRO completion queue config
- * @dmq_config: Down Message queue config
- * @umq_config: Up Message queue config
- *	
  * @per_dtr_space: If specified (i.e., greater than zero): extra space
  *              reserved by HAL per each transmit or receive (depending on the
  *              channel type) descriptor. Can be used to store,
@@ -326,6 +315,7 @@ typedef struct xge_hal_channel_attr_t {
  *         (see XGE_HAL_INF_OUT_OF_DESCRIPTORS) condition happened.
  * ------------- "slow" section  ------------------
  * @type: Channel type. See xge_hal_channel_type_e{}.
+ * @vp_id: Virtual path id
  * @post_qid: Identifies Xframe queue used for posting descriptors.
  * @compl_qid: Identifies Xframe completion queue.
  * @flags: Channel flags. See xge_hal_channel_flag_e{}.
@@ -359,9 +349,9 @@ typedef struct {
 	int				compl_index;
 	unsigned int			usage_cnt;
 	unsigned int			poll_bytes;
-	int				unused0;
 
 	/* reserve/post data path section */
+	int				terminating;
 #ifdef __XGE_WIN__
 	int				__xge_os_attr_cacheline_aligned
 					post_index;
@@ -400,18 +390,16 @@ typedef struct {
 	int				per_dtr_space;
 	xge_hal_channel_dtr_term_f	dtr_term;
 	xge_hal_channel_dtr_init_f	dtr_init;
-	xge_hal_msix_vector_t		msix_vect;
-#if defined(XGE_HAL_MSI)
+	/* MSI stuff */
 	u32				msi_msg;
 	u8				rti;
 	u8				tti;
 	u16                             unused2;
-#endif
-#if defined(XGE_HAL_MSI_X)
+	/* MSI-X stuff */
 	u64				msix_address;
 	u32				msix_data;
 	int				msix_idx;
-#endif
+	volatile int			in_interrupt;
         unsigned int			magic;
 #ifdef __XGE_WIN__
 } __xge_os_attr_cacheline_aligned xge_hal_channel_t ;
@@ -433,14 +421,6 @@ __hal_channel_allocate(xge_hal_device_h devh, int post_qid,
 		xge_hal_channel_type_e	type);
 
 void __hal_channel_free(xge_hal_channel_t *channel);
-
-void __hal_channel_xmsi_set(xge_hal_channel_h channelh);
-
-static inline int
-__hal_channel_msix_idx(xge_hal_channel_h channelh)
-{
-	return ((xge_hal_channel_t*)channelh)->msix_vect.idx;
-}
 
 #if defined(XGE_DEBUG_FP) && (XGE_DEBUG_FP & XGE_DEBUG_FP_CHANNEL)
 #define __HAL_STATIC_CHANNEL

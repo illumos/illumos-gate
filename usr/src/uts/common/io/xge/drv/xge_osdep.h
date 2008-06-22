@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,10 +57,6 @@
 extern "C" {
 #endif
 
-#ifdef DEBUG
-#define	XGE_DEBUG_ASSERT
-#endif
-
 /* ------------------------- includes and defines ------------------------- */
 
 #define	XGE_HAL_TX_MULTI_POST_IRQ	1
@@ -81,6 +77,12 @@ extern "C" {
 #define	XGE_OS_HOST_LITTLE_ENDIAN	1
 #endif
 
+#if defined(__sparc)
+#define	XGE_OS_HOST_PAGE_SIZE		8192
+#else
+#define	XGE_OS_HOST_PAGE_SIZE		4096
+#endif
+
 #if defined(_LP64)
 #define	XGE_OS_PLATFORM_64BIT		1
 #else
@@ -90,7 +92,6 @@ extern "C" {
 #define	XGE_OS_HAS_SNPRINTF		1
 
 /* LRO defines */
-#define	XGE_HAL_CONFIG_LRO		0
 #define	XGE_LL_IP_FAST_CSUM(hdr, len)	0 /* ip_ocsum(hdr, len>>1, 0); */
 
 /* ---------------------- fixed size primitive types ----------------------- */
@@ -106,7 +107,7 @@ typedef	kmutex_t		spinlock_t;
 typedef dev_info_t		*pci_dev_h;
 typedef ddi_acc_handle_t	pci_reg_h;
 typedef ddi_acc_handle_t	pci_cfg_h;
-typedef ddi_iblock_cookie_t	pci_irq_h;
+typedef uint_t			pci_irq_h;
 typedef ddi_dma_handle_t	pci_dma_h;
 typedef ddi_acc_handle_t	pci_dma_acc_h;
 
@@ -118,7 +119,7 @@ typedef ddi_acc_handle_t	pci_dma_acc_h;
 
 /* -------------------------- "libc" functionality ------------------------- */
 
-#define	xge_os_strcpy			(void) strcpy
+#define	xge_os_strlcpy			(void) strlcpy
 #define	xge_os_strlen			strlen
 #define	xge_os_snprintf			snprintf
 #define	xge_os_memzero(addr, size)	bzero(addr, size)
@@ -158,7 +159,7 @@ static inline int xge_os_sprintf(char *buf, char *fmt, ...) {
 
 #define	xge_os_timestamp(buf) { \
 	todinfo_t todinfo = utc_to_tod(ddi_get_time()); \
-	(void) xge_os_sprintf(buf, "%2d/%2d/%2d.%2d:%2d:%2d: ", \
+	(void) xge_os_sprintf(buf, "%02d/%02d/%02d.%02d:%02d:%02d: ", \
 	    todinfo.tod_day, todinfo.tod_month, \
 	    (1970 + todinfo.tod_year - 70), \
 	    todinfo.tod_hour, todinfo.tod_min, todinfo.tod_sec); \
@@ -171,7 +172,7 @@ static inline int xge_os_sprintf(char *buf, char *fmt, ...) {
 #define	xge_os_spin_lock_init(lockp, ctxh) \
 	mutex_init(lockp, NULL, MUTEX_DRIVER, NULL)
 #define	xge_os_spin_lock_init_irq(lockp, irqh) \
-	mutex_init(lockp, NULL, MUTEX_DRIVER, irqh)
+	mutex_init(lockp, NULL, MUTEX_DRIVER, DDI_INTR_PRI(irqh))
 #define	xge_os_spin_lock_destroy(lockp, cthx) \
 	(cthx = cthx, mutex_destroy(lockp))
 #define	xge_os_spin_lock_destroy_irq(lockp, cthx) \
@@ -254,11 +255,8 @@ static inline void *__xge_os_dma_malloc(pci_dev_h pdev, unsigned long size,
 	size_t real_size;
 	extern ddi_device_acc_attr_t *p_xge_dev_attr;
 	extern struct ddi_dma_attr *p_hal_dma_attr;
-	extern struct ddi_dma_attr *p_hal_dma_attr_aligned;
 
-	ret = ddi_dma_alloc_handle(pdev,
-	    (dma_flags & XGE_OS_DMA_CACHELINE_ALIGNED ?
-		p_hal_dma_attr_aligned : p_hal_dma_attr),
+	ret = ddi_dma_alloc_handle(pdev, p_hal_dma_attr,
 	    DDI_DMA_DONTWAIT, 0, p_dmah);
 	if (ret != DDI_SUCCESS) {
 		return (NULL);

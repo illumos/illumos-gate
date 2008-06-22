@@ -32,20 +32,20 @@
 #include "xgehal-channel.h"
 #include "xgehal-stats.h"
 #include "xgehal-ring.h"
-#ifdef XGEHAL_RNIC
-#include "xgehal-lbwrapper.h"
-#include "xgehal-blockpool.h"
-#endif
 
 __EXTERN_BEGIN_DECLS
 
+#define XGE_HAL_VPD_LENGTH                              80
+#define XGE_HAL_CARD_XENA_VPD_ADDR                      0x50
+#define XGE_HAL_CARD_HERC_VPD_ADDR                      0x80
+#define XGE_HAL_VPD_READ_COMPLETE                       0x80
+#define XGE_HAL_VPD_BUFFER_SIZE                         128
 #define XGE_HAL_DEVICE_XMSI_WAIT_MAX_MILLIS		500
 #define XGE_HAL_DEVICE_CMDMEM_WAIT_MAX_MILLIS		500
 #define XGE_HAL_DEVICE_QUIESCENT_WAIT_MAX_MILLIS	500
 #define XGE_HAL_DEVICE_FAULT_WAIT_MAX_MILLIS		50
 #define XGE_HAL_DEVICE_RESET_WAIT_MAX_MILLIS		250
 #define XGE_HAL_DEVICE_SPDM_READY_WAIT_MAX_MILLIS	250  /* TODO */
-#define XGE_HAL_MAX_MSIX_MESSAGES 64
 
 #define XGE_HAL_MAGIC					0x12345678
 #define XGE_HAL_DEAD					0xDEADDEAD
@@ -58,6 +58,7 @@ __EXTERN_BEGIN_DECLS
  * @XGE_HAL_CARD_UNKNOWN: Unknown device.
  * @XGE_HAL_CARD_XENA: Xframe I device.
  * @XGE_HAL_CARD_HERC: Xframe II (PCI-266Mhz) device.
+ * @XGE_HAL_CARD_TITAN: Xframe ER (PCI-266Mhz) device.
  *
  * Enumerates Xframe adapter types. The corresponding PCI device
  * IDs are listed in the file xgehal-defs.h.
@@ -69,6 +70,7 @@ typedef enum xge_hal_card_e {
 	XGE_HAL_CARD_UNKNOWN	= 0,
 	XGE_HAL_CARD_XENA	= 1,
 	XGE_HAL_CARD_HERC	= 2,
+	XGE_HAL_CARD_TITAN	= 3,
 } xge_hal_card_e;
 
 /**
@@ -76,10 +78,8 @@ typedef enum xge_hal_card_e {
  * @regh0: BAR0 mapped memory handle (Solaris), or simply PCI device @pdev
  *         (Linux and the rest.)
  * @regh1: BAR1 mapped memory handle. Same comment as above.
- * @regh2: BAR2 mapped memory handle. Same comment as above.
  * @bar0: BAR0 virtual address.
  * @bar1: BAR1 virtual address.
- * @bar2: BAR2 virtual address.
  * @irqh: IRQ handle (Solaris).
  * @cfgh: Configuration space handle (Solaris), or PCI device @pdev (Linux).
  * @pdev: PCI device object.
@@ -161,6 +161,7 @@ typedef enum xge_hal_pci_mode_e {
  * @XGE_HAL_PCI_BUS_FREQUENCY_100MHZ:	PCI bus frequency 100MHZ
  * @XGE_HAL_PCI_BUS_FREQUENCY_133MHZ:	PCI bus frequency 133MHZ
  * @XGE_HAL_PCI_BUS_FREQUENCY_200MHZ:	PCI bus frequency 200MHZ
+ * @XGE_HAL_PCI_BUS_FREQUENCY_250MHZ:	PCI bus frequency 250MHZ
  * @XGE_HAL_PCI_BUS_FREQUENCY_266MHZ:	PCI bus frequency 266MHZ
  * @XGE_HAL_PCI_BUS_FREQUENCY_UNKNOWN:	Unrecognized PCI bus frequency value.
  *
@@ -171,6 +172,7 @@ typedef enum xge_hal_pci_bus_frequency_e {
 	XGE_HAL_PCI_BUS_FREQUENCY_100MHZ	= 100,
 	XGE_HAL_PCI_BUS_FREQUENCY_133MHZ	= 133,
 	XGE_HAL_PCI_BUS_FREQUENCY_200MHZ	= 200,
+	XGE_HAL_PCI_BUS_FREQUENCY_250MHZ	= 250,
 	XGE_HAL_PCI_BUS_FREQUENCY_266MHZ	= 266,
 	XGE_HAL_PCI_BUS_FREQUENCY_UNKNOWN	= 0
 } xge_hal_pci_bus_frequency_e;
@@ -294,23 +296,22 @@ typedef struct xge_hal_spdm_entry_t {
 	u8  tgt_queue;
 } xge_hal_spdm_entry_t;
 
-#ifdef XGEHAL_RNIC
-/*
- * xge_hal_rnic_oid_db_t
- *
- * Database used to allocate object Ids.
- */
-typedef struct xge_hal_rnic_oid_db_t {
-	u8  id_map[4096];
-	u32 id_next_byte;
-	u8  id_inst_number;
-#define XGE_HAL_RNIC_OID_DB_OID_GET(sid,sin)		((sin<<24)|sid)
-#define XGE_HAL_RNIC_OID_DB_SID_GET(id)			(id&0xFFFFFF)
-#define XGE_HAL_RNIC_OID_DB_SIN_GET(id)			((id>>24)&0xFF)
-
-}xge_hal_rnic_oid_db_t;
-
+#if defined(XGE_HAL_CONFIG_LRO)
+typedef struct {
+	lro_t			lro_pool[XGE_HAL_LRO_MAX_BUCKETS];
+	int			lro_next_idx;
+	lro_t			*lro_recent;
+} xge_hal_lro_desc_t;
 #endif
+/*
+ * xge_hal_vpd_data_t
+ * 
+ * Represents vpd capabilty structure
+ */
+typedef struct xge_hal_vpd_data_t {
+        u8      product_name[XGE_HAL_VPD_LENGTH];
+        u8      serial_num[XGE_HAL_VPD_LENGTH];
+} xge_hal_vpd_data_t;
 
 /*
  * xge_hal_device_t
@@ -330,29 +331,11 @@ typedef struct {
 	pci_cfg_h		cfgh;
 	pci_dev_h		pdev;
 	xge_hal_pci_config_t	pci_config_space;
-#if defined(XGE_HAL_MSI_X)
-	u64					msix_vector_table[XGE_HAL_MAX_MSIX_MESSAGES * 2];
-#endif
+	xge_hal_pci_config_t	pci_config_space_bios;
 	xge_hal_device_config_t	config;
 	xge_list_t		free_channels;
 	xge_list_t		fifo_channels;
 	xge_list_t		ring_channels;
-#ifdef XGEHAL_RNIC
-	xge_hal_rnic_oid_db_t	nce_oid_db;
-	xge_list_t		sq_channels;
-	xge_hal_rnic_oid_db_t	sq_oid_db;
-	xge_list_t		hrq_channels;
-	xge_hal_rnic_oid_db_t	hrq_oid_db;
-	xge_list_t		hcq_channels;
-	xge_hal_rnic_oid_db_t	hcq_oid_db;
-	xge_list_t		lrq_channels;
-	xge_hal_rnic_oid_db_t	lrq_oid_db;
-	xge_list_t		lcq_channels;
-	xge_hal_rnic_oid_db_t	lcq_oid_db;
-	xge_list_t		umq_channels;
-	xge_list_t		dmq_channels;
-	xge_hal_blockpool_t	block_pool;
-#endif
 	volatile int		is_initialized;
 	volatile int		terminating;
 	xge_hal_stats_t		stats;
@@ -381,13 +364,8 @@ typedef struct {
 	u16			spdm_max_entries;
 	xge_hal_spdm_entry_t	**spdm_table;
 	spinlock_t		spdm_lock;
-#if defined(XGE_HAL_MSI)
-	u32			msi_mask;
-#endif
 #if defined(XGE_HAL_CONFIG_LRO)
-	lro_t			lro_pool[XGE_HAL_LRO_MAX_BUCKETS];
-	int			lro_next_idx;
-	lro_t			*lro_recent;
+        xge_hal_lro_desc_t      lro_desc[XGE_HAL_MAX_RING_NUM];
 #endif
 	spinlock_t		xena_post_lock;
 
@@ -407,20 +385,42 @@ typedef struct {
 	xge_hal_pci_mode_e	pci_mode;
 	xge_hal_pci_bus_frequency_e bus_frequency;
 	xge_hal_pci_bus_width_e	bus_width;
+	xge_hal_vpd_data_t      vpd_data;
 	volatile int		in_poll;
-#ifdef XGEHAL_RNIC
-	void			*rnic_context;
-#endif
+	u64			msix_vector_table[XGE_HAL_MAX_MSIX_MESSAGES_WITH_ADDR];
 } xge_hal_device_t;
 
 
 /* ========================== PRIVATE API ================================= */
+
+void
+__hal_device_event_queued(void *data, int event_type);
+
+xge_hal_status_e
+__hal_device_set_swapper(xge_hal_device_t *hldev);
+
+xge_hal_status_e
+__hal_device_rth_it_configure(xge_hal_device_t *hldev);
+
+xge_hal_status_e
+__hal_device_rth_spdm_configure(xge_hal_device_t *hldev);
+
+xge_hal_status_e
+__hal_verify_pcc_idle(xge_hal_device_t *hldev, u64 adp_status);
+
+xge_hal_status_e
+__hal_device_handle_pic(xge_hal_device_t *hldev, u64 reason);
+
+xge_hal_status_e
+__hal_read_spdm_entry_line(xge_hal_device_t *hldev, u8 spdm_line,
+                        u16 spdm_entry, u64 *spdm_line_val);
 
 void __hal_pio_mem_write32_upper(pci_dev_h pdev, pci_reg_h regh, u32 val,
 			void *addr);
 
 void __hal_pio_mem_write32_lower(pci_dev_h pdev, pci_reg_h regh, u32 val,
 			void *addr);
+void __hal_device_get_vpd_data(xge_hal_device_t *hldev);
 
 xge_hal_status_e
 __hal_device_handle_txpic(xge_hal_device_t *hldev, u64 reason);
@@ -459,7 +459,17 @@ xge_hal_status_e
 __hal_device_rts_qos_configure(xge_hal_device_t *hldev);
 
 xge_hal_status_e
+__hal_device_rts_port_configure(xge_hal_device_t *hldev);
+
+xge_hal_status_e
 __hal_device_rti_configure(xge_hal_device_t *hldev, int runtime);
+
+void
+__hal_device_msi_intr_endis(xge_hal_device_t *hldev, int flag);
+
+void
+__hal_device_msix_intr_endis(xge_hal_device_t *hldev,
+			      xge_hal_channel_t *channel, int flag);
 
 /* =========================== PUBLIC API ================================= */
 
@@ -495,13 +505,27 @@ xge_hal_device_rts_mac_enable(xge_hal_device_h devh, int index, macaddr_t macadd
 xge_hal_status_e
 xge_hal_device_rts_mac_disable(xge_hal_device_h devh, int index);
 
+int xge_hal_reinitialize_hw(xge_hal_device_t * hldev);
+
+xge_hal_status_e xge_hal_fix_rldram_ecc_error(xge_hal_device_t * hldev);
 /**
  * xge_hal_device_rti_reconfigure
+ * @hldev: Hal Device
  */
 static inline xge_hal_status_e
 xge_hal_device_rti_reconfigure(xge_hal_device_t *hldev)
 {
 	return __hal_device_rti_configure(hldev, 1);
+}
+
+/**
+ * xge_hal_device_rts_port_reconfigure
+ * @hldev: Hal Device
+ */
+static inline xge_hal_status_e
+xge_hal_device_rts_port_reconfigure(xge_hal_device_t *hldev)
+{
+	return __hal_device_rts_port_configure(hldev);
 }
 
 /**
@@ -678,7 +702,7 @@ xge_hal_device_private(xge_hal_device_h devh)
 static inline xge_hal_device_h
 xge_hal_device_from_private(void *info_ptr)
 {
-	return xge_container_of((void * const* ) info_ptr, xge_hal_device_t,
+	return xge_container_of((void ** ) info_ptr, xge_hal_device_t,
 	upper_layer_info);
 }
 
@@ -722,6 +746,9 @@ xge_hal_status_e xge_hal_device_macaddr_get(xge_hal_device_t *hldev,
 
 xge_hal_status_e xge_hal_device_macaddr_set(xge_hal_device_t *hldev,
 		int index,  macaddr_t macaddr);
+
+xge_hal_status_e xge_hal_device_macaddr_clear(xge_hal_device_t *hldev,
+		int index);
 
 int xge_hal_device_macaddr_find(xge_hal_device_t *hldev, macaddr_t wanted);
 
@@ -779,36 +806,42 @@ xge_hal_spdm_entry_remove(xge_hal_device_h devh, xge_hal_ipaddr_t *src_ip,
 xge_hal_status_e
 xge_hal_device_rts_section_enable(xge_hal_device_h devh, int index);
 
-u32 __hal_calc_jhash(u8 *msg, u32 length, u32 golden_ratio, u32 init_value);
-
 int
 xge_hal_device_is_closed (xge_hal_device_h devh);
 
-#ifdef XGEHAL_RNIC
+/* private functions, don't use them in ULD */
 
-xge_hal_status_e
-__hal_device_oid_allocate(xge_hal_rnic_oid_db_t *objdb, u32 *objid);
+void __hal_serial_mem_write64(xge_hal_device_t *hldev, u64 value, u64 *reg);
 
-xge_hal_status_e
-__hal_device_oid_free(xge_hal_rnic_oid_db_t *objdb, u32 objid);
+u64 __hal_serial_mem_read64(xge_hal_device_t *hldev, u64 *reg);
 
-#endif
 
-#if defined(XGE_HAL_MSI)
 /* Some function protoypes for MSI implementation. */
 xge_hal_status_e
-xge_hal_channel_msi_set (xge_hal_channel_h channelh, int msi, u32
-msg_val);
+xge_hal_channel_msi_set (xge_hal_channel_h channelh, int msi,
+			 u32 msg_val);
 void
 xge_hal_mask_msi(xge_hal_device_t *hldev);
+
 void
 xge_hal_unmask_msi(xge_hal_channel_h channelh);
-#endif
-#if defined(XGE_HAL_MSI_X)
+
 xge_hal_status_e
 xge_hal_channel_msix_set(xge_hal_channel_h channelh, int msix_idx);
-#endif
 
+xge_hal_status_e
+xge_hal_mask_msix(xge_hal_device_h devh, int msi_id);
+
+xge_hal_status_e
+xge_hal_unmask_msix(xge_hal_device_h devh, int msi_id);
+
+#if defined(XGE_HAL_CONFIG_LRO)
+xge_hal_status_e
+xge_hal_lro_init(u32 lro_scale, xge_hal_device_t *hldev);
+
+void
+xge_hal_lro_terminate(u32 lro_scale, xge_hal_device_t *hldev);
+#endif
 
 #if defined(XGE_DEBUG_FP) && (XGE_DEBUG_FP & XGE_DEBUG_FP_DEVICE)
 #define __HAL_STATIC_DEVICE
@@ -911,12 +944,12 @@ __hal_tcp_lro_capable(iplro_t *ip, tcplro_t *tcp, lro_t *lro, int *ts_off);
 
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL xge_hal_status_e
 __hal_lro_capable(u8 *buffer, iplro_t **ip, tcplro_t **tcp,
-		xge_hal_dtr_info_t *ext_info, xge_hal_device_t *hldev);
+		xge_hal_dtr_info_t *ext_info);
 
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL xge_hal_status_e
-__hal_get_lro_session(u8 *buffer, iplro_t *ip, tcplro_t *tcp, lro_t **lro,
+__hal_get_lro_session(u8 *eth_hdr, iplro_t *ip, tcplro_t *tcp, lro_t **lro,
 		xge_hal_dtr_info_t *ext_info, xge_hal_device_t *hldev,
-		lro_t **lro_end3);
+		xge_hal_lro_desc_t *ring_lro, lro_t **lro_end3);
 
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL xge_hal_status_e
 __hal_lro_under_optimal_thresh(iplro_t *ip, tcplro_t *tcp, lro_t *lro,
@@ -935,26 +968,29 @@ __hal_append_lro(iplro_t *ip, tcplro_t **tcp, u32 *seg_len, lro_t *lro,
 		xge_hal_device_t *hldev);
 
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL xge_hal_status_e
+xge_hal_lro_process_rx(int ring, u8 *eth_hdr, u8 *ip_hdr, tcplro_t **tcp, 
+                       u32 *seglen, lro_t **p_lro,
+                       xge_hal_dtr_info_t *ext_info, xge_hal_device_t *hldev,
+                       lro_t **lro_end3);
+
+__HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL xge_hal_status_e
 xge_hal_accumulate_large_rx(u8 *buffer, tcplro_t **tcp, u32 *seglen,
 		lro_t **lro, xge_hal_dtr_info_t *ext_info,
 		xge_hal_device_t *hldev, lro_t **lro_end3);
 
-void
-xge_hal_lro_terminate(u32 lro_scale, xge_hal_device_t *hldev);
-
-xge_hal_status_e
-xge_hal_lro_init(u32 lro_scale, xge_hal_device_t *hldev);
+__HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL lro_t	*
+xge_hal_lro_next_session (xge_hal_device_t *hldev, int ring);
 
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL lro_t *
 xge_hal_lro_get_next_session(xge_hal_device_t *hldev);
 
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL void
 __hal_open_lro_session (u8 *buffer, iplro_t *ip, tcplro_t *tcp, lro_t **lro,
-                        xge_hal_device_t *hldev, int slot, u32 tcp_seg_len,
-                        int ts_off);
+                        xge_hal_device_t *hldev, xge_hal_lro_desc_t *ring_lro,
+                        int slot, u32 tcp_seg_len, int ts_off);
 
 __HAL_STATIC_CHANNEL __HAL_INLINE_CHANNEL int
-__hal_lro_get_free_slot (xge_hal_device_t *hldev);
+__hal_lro_get_free_slot (xge_hal_lro_desc_t	*ring_lro);
 #endif
 
 #else /* XGE_FASTPATH_EXTERN */

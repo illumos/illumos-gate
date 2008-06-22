@@ -51,6 +51,7 @@ __EXTERN_BEGIN_DECLS
 #define bVAL7(bits, loc)	((((u64)bits) >> (64-(loc+7))) & 0x7F)
 #define bVAL8(bits, loc)	((((u64)bits) >> (64-(loc+8))) & 0xFF)
 #define bVAL12(bits, loc)	((((u64)bits) >> (64-(loc+12))) & 0xFFF)
+#define bVAL14(bits, loc)	((((u64)bits) >> (64-(loc+14))) & 0x3FFF)
 #define bVAL16(bits, loc)	((((u64)bits) >> (64-(loc+16))) & 0xFFFF)
 #define bVAL20(bits, loc)	((((u64)bits) >> (64-(loc+20))) & 0xFFFFF)
 #define bVAL22(bits, loc)	((((u64)bits) >> (64-(loc+22))) & 0x3FFFFF)
@@ -172,6 +173,9 @@ __EXTERN_BEGIN_DECLS
  * @XGE_HAL_ERR_RESET_FAILED: Failed to soft-reset the device.
  * Returned by xge_hal_device_reset(). One circumstance when it could
  * happen: slot freeze by the system (see @XGE_HAL_ERR_CRITICAL).
+ * @XGE_HAL_ERR_TOO_MANY: This error is returned if there were laready
+ * maximum number of sessions or queues allocated
+ * @XGE_HAL_ERR_PKT_DROP: TBD
  * @XGE_HAL_BADCFG_TX_URANGE_A: Invalid Tx link utilization range A. See
  * the structure xge_hal_tti_config_t{} for valid values.
  * @XGE_HAL_BADCFG_TX_UFC_A: Invalid frame count for Tx link utilization
@@ -328,6 +332,15 @@ __EXTERN_BEGIN_DECLS
  * @XGE_HAL_BADCFG_BIMODAL_INTR: Invalid value to configure bimodal interrupts
  * Enumerates status and error codes returned by HAL public
  * API functions.
+ * @XGE_HAL_BADCFG_BIMODAL_TIMER_LO_US: TBD
+ * @XGE_HAL_BADCFG_BIMODAL_TIMER_HI_US: TBD
+ * @XGE_HAL_BADCFG_BIMODAL_XENA_NOT_ALLOWED: TBD
+ * @XGE_HAL_BADCFG_RTS_QOS_EN: TBD
+ * @XGE_HAL_BADCFG_FIFO_QUEUE_INTR_VECTOR: TBD
+ * @XGE_HAL_BADCFG_RING_QUEUE_INTR_VECTOR: TBD
+ * @XGE_HAL_BADCFG_RTS_PORT_EN: TBD
+ * @XGE_HAL_BADCFG_RING_RTS_PORT_EN: TBD
+ *
  */
 typedef enum xge_hal_status_e {
 	XGE_HAL_OK				= 0,
@@ -377,8 +390,8 @@ typedef enum xge_hal_status_e {
 	XGE_HAL_ERR_INVALID_PCI_INFO		= XGE_HAL_BASE_ERR + 28,
 	XGE_HAL_ERR_CRITICAL		        = XGE_HAL_BASE_ERR + 29,
 	XGE_HAL_ERR_RESET_FAILED		= XGE_HAL_BASE_ERR + 30,
-	XGE_HAL_ERR_INVALID_WR			= XGE_HAL_BASE_ERR + 31,
 	XGE_HAL_ERR_TOO_MANY			= XGE_HAL_BASE_ERR + 32,
+	XGE_HAL_ERR_PKT_DROP		        = XGE_HAL_BASE_ERR + 33,
 
 	XGE_HAL_BADCFG_TX_URANGE_A		= XGE_HAL_BASE_BADCFG + 1,
 	XGE_HAL_BADCFG_TX_UFC_A			= XGE_HAL_BASE_BADCFG + 2,
@@ -456,7 +469,12 @@ typedef enum xge_hal_status_e {
 	XGE_HAL_BADCFG_BIMODAL_TIMER_LO_US	= XGE_HAL_BASE_BADCFG + 76,
 	XGE_HAL_BADCFG_BIMODAL_TIMER_HI_US	= XGE_HAL_BASE_BADCFG + 77,
 	XGE_HAL_BADCFG_BIMODAL_XENA_NOT_ALLOWED	= XGE_HAL_BASE_BADCFG + 78,
-	XGE_HAL_BADCFG_RTS_QOS_STEERING_CONFIG	= XGE_HAL_BASE_BADCFG + 79,
+	XGE_HAL_BADCFG_RTS_QOS_EN		= XGE_HAL_BASE_BADCFG + 79,
+	XGE_HAL_BADCFG_FIFO_QUEUE_INTR_VECTOR	= XGE_HAL_BASE_BADCFG + 80,
+	XGE_HAL_BADCFG_RING_QUEUE_INTR_VECTOR	= XGE_HAL_BASE_BADCFG + 81,
+	XGE_HAL_BADCFG_RTS_PORT_EN		= XGE_HAL_BASE_BADCFG + 82,
+	XGE_HAL_BADCFG_RING_RTS_PORT_EN		= XGE_HAL_BASE_BADCFG + 83,
+	XGE_HAL_BADCFG_TRACEBUF_TIMESTAMP	= XGE_HAL_BASE_BADCFG + 84,
 	XGE_HAL_EOF_TRACE_BUF			= -1
 } xge_hal_status_e;
 
@@ -494,6 +512,8 @@ typedef u8 macaddr_t[XGE_HAL_ETH_ALEN];
 #define XGE_HAL_PCISIZE_XENA			26 /* multiples of dword */
 #define XGE_HAL_PCISIZE_HERC			64 /* multiples of dword */
 
+#define XGE_HAL_MAX_MSIX_MESSAGES	64
+#define XGE_HAL_MAX_MSIX_MESSAGES_WITH_ADDR XGE_HAL_MAX_MSIX_MESSAGES * 2
 /*  Highest level interrupt blocks */
 #define XGE_HAL_TX_PIC_INTR     (0x0001<<0)
 #define XGE_HAL_TX_DMA_INTR     (0x0001<<1)
@@ -539,22 +559,6 @@ typedef u8 macaddr_t[XGE_HAL_ETH_ALEN];
 /* MSI level Interrupts */
 #define XGE_HAL_MAX_MSIX_VECTORS	(16)
 
-/*
- * xge_hal_msix_vector_t
- *
- * Represents MSI-X vector.
- *
- */
-typedef struct xge_hal_msix_vector_t {
-	int			idx;
-	int			num;
-	void			*data;
-	char			desc[16];
-	u64			msi_addr;
-	u64			msi_data;
-} xge_hal_msix_vector_t;
-
-
 typedef struct xge_hal_ipv4 {
 	u32 addr;
 }xge_hal_ipv4;
@@ -579,15 +583,7 @@ full */
 typedef void* xge_hal_device_h;
 typedef void* xge_hal_dtr_h;
 typedef void* xge_hal_channel_h;
-#ifdef XGEHAL_RNIC
-typedef void* xge_hal_towi_h;
-typedef void* xge_hal_hw_wqe_h;
-typedef void* xge_hal_hw_cqe_h;
-typedef void* xge_hal_lro_wqe_h;
-typedef void* xge_hal_lro_cqe_h;
-typedef void* xge_hal_up_msg_h;
-typedef void* xge_hal_down_msg_h;
-#endif
+
 /*
  * I2C device id. Used in I2C control register for accessing EEPROM device
  * memory.

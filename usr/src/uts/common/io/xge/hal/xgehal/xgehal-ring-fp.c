@@ -162,7 +162,7 @@ xge_hal_ring_dtr_reserve(xge_hal_channel_h channelh, xge_hal_dtr_h *dtrh)
 		rxdp->control_1	= rxdp->control_2 =	0;
 
 #if	defined(XGE_OS_MEMORY_CHECK)
-		__hal_ring_rxd_priv(channelh, rxdp)->allocated = 1;
+		__hal_ring_rxd_priv((xge_hal_ring_t *) channelh, rxdp)->allocated = 1;
 #endif
 	}
 
@@ -269,6 +269,11 @@ xge_hal_ring_dtr_1b_set(xge_hal_dtr_h dtrh,	dma_addr_t dma_pointer,	int	size)
 	rxdp->buffer0_ptr =	dma_pointer;
 	rxdp->control_2	&= (~XGE_HAL_RXD_1_MASK_BUFFER0_SIZE);
 	rxdp->control_2	|= XGE_HAL_RXD_1_SET_BUFFER0_SIZE(size);
+
+	xge_debug_ring(XGE_TRACE, "xge_hal_ring_dtr_1b_set: rxdp %p control_2 %p buffer0_ptr %p",
+    			(xge_hal_ring_rxd_1_t *)dtrh,
+                rxdp->control_2,
+    			rxdp->buffer0_ptr);
 }
 
 /**
@@ -482,9 +487,9 @@ xge_hal_ring_dtr_pre_post(xge_hal_channel_h	channelh, xge_hal_dtr_h	dtrh)
 		XGE_HAL_RXD_SET_T_CODE(rxdp->control_1,	XGE_HAL_RXD_T_CODE_UNUSED_C);
 #endif
 
-	xge_debug_ring(XGE_TRACE, "posted %d rxd 0x"XGE_OS_LLXFMT" post_qid	%d",
-			((xge_hal_ring_t *)channelh)->channel.post_index,
+	xge_debug_ring(XGE_TRACE, "xge_hal_ring_dtr_pre_post: rxd 0x"XGE_OS_LLXFMT" posted %d  post_qid	%d",
 			(unsigned long long)(ulong_t)dtrh,
+            ((xge_hal_ring_t *)channelh)->channel.post_index,
 			((xge_hal_ring_t *)channelh)->channel.post_qid);
 
 #if	defined(XGE_HAL_RX_MULTI_POST)
@@ -502,7 +507,7 @@ xge_hal_ring_dtr_pre_post(xge_hal_channel_h	channelh, xge_hal_dtr_h	dtrh)
 			xge_hal_dtr_h prev_dtrh;
 			xge_hal_ring_rxd_priv_t	*rxdp_priv;
 
-			rxdp_priv =	__hal_ring_rxd_priv(channelh, rxdp);
+			rxdp_priv =	__hal_ring_rxd_priv((xge_hal_ring_t*)channel, rxdp);
 			prev_dtrh =	channel->work_arr[channel->post_index -	1];
 
 			if (prev_dtrh != NULL &&
@@ -551,8 +556,51 @@ xge_hal_ring_dtr_post_post(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh)
 			  priv->dma_offset,	ring->rxd_size,
 			  XGE_OS_DMA_DIR_TODEVICE);
 #endif
+
+	xge_debug_ring(XGE_TRACE, "xge_hal_ring_dtr_post_post: rxdp %p control_1 %p",
+        		  (xge_hal_ring_rxd_1_t *)dtrh,
+                  rxdp->control_1);
+
 	if (ring->channel.usage_cnt	> 0)
 		ring->channel.usage_cnt--;
+}
+
+/**
+ * xge_hal_ring_dtr_post_post_wmb.
+ * @channelh: Channel handle.
+ * @dtrh: Descriptor handle.
+ * 
+ * Similar as xge_hal_ring_dtr_post_post, but in addition it does memory barrier.
+ */
+__HAL_STATIC_RING __HAL_INLINE_RING	void
+xge_hal_ring_dtr_post_post_wmb(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh)
+{
+	xge_hal_ring_rxd_1_t *rxdp = (xge_hal_ring_rxd_1_t *)dtrh;
+	xge_hal_ring_t *ring = (xge_hal_ring_t *)channelh;
+#if	defined(XGE_OS_DMA_REQUIRES_SYNC) && defined(XGE_HAL_DMA_DTR_STREAMING)
+	xge_hal_ring_rxd_priv_t	*priv;
+#endif
+    /* Do memory barrier before changing the ownership */
+    xge_os_wmb();
+    
+	/* do POST */
+	rxdp->control_1	|= XGE_HAL_RXD_POSTED_4_XFRAME;
+
+#if	defined(XGE_OS_DMA_REQUIRES_SYNC) && defined(XGE_HAL_DMA_DTR_STREAMING)
+	priv = __hal_ring_rxd_priv(ring, rxdp);
+	xge_os_dma_sync(ring->channel.pdev,
+				  priv->dma_handle,	priv->dma_addr,
+			  priv->dma_offset,	ring->rxd_size,
+			  XGE_OS_DMA_DIR_TODEVICE);
+#endif
+
+	if (ring->channel.usage_cnt	> 0)
+		ring->channel.usage_cnt--;
+
+	xge_debug_ring(XGE_TRACE, "xge_hal_ring_dtr_post_post_wmb: rxdp %p control_1 %p rxds_with_host %d",
+        		  (xge_hal_ring_rxd_1_t *)dtrh,
+                  rxdp->control_1, ring->channel.usage_cnt);
+
 }
 
 /**
@@ -673,9 +721,9 @@ xge_hal_ring_dtr_next_completed(xge_hal_channel_h channelh,	xge_hal_dtr_h *dtrh,
 		xge_assert(*t_code != XGE_HAL_RXD_T_CODE_UNUSED_C);
 
 		xge_debug_ring(XGE_TRACE,
-			"compl_index %d	post_qid %d	rxd	0x"XGE_OS_LLXFMT,
+			"compl_index %d	post_qid %d	t_code %d rxd 0x"XGE_OS_LLXFMT,
 			((xge_hal_channel_t*)ring)->compl_index,
-			((xge_hal_channel_t*)ring)->post_qid,
+			((xge_hal_channel_t*)ring)->post_qid, *t_code,
 			(unsigned long long)(ulong_t)rxdp);
 
 		ring->channel.usage_cnt++;
@@ -733,7 +781,7 @@ xge_hal_ring_dtr_free(xge_hal_channel_h	channelh, xge_hal_dtr_h	dtrh)
 
 	__hal_channel_dtr_free(channelh, dtrh);
 #if	defined(XGE_OS_MEMORY_CHECK)
-	__hal_ring_rxd_priv(channelh, dtrh)->allocated = 0;
+	__hal_ring_rxd_priv((xge_hal_ring_t * ) channelh, dtrh)->allocated = 0;
 #endif
 
 #if	defined(XGE_HAL_RX_MULTI_FREE)
