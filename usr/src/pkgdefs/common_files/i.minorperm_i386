@@ -145,6 +145,11 @@ wpi:*			0600 root sys 0666 root sys	/dev/wpi*
 afe:*			0600 root sys 0666 root sys	/dev/afe*
 dmfe:*			0600 root sys 0666 root sys	/dev/dmfe*
 mxfe:*			0600 root sys 0666 root sys	/dev/mxfe*
+balloon:*		0600 root sys 0444 root sys	/dev/xen/balloon
+domcaps:*		0600 root sys 0444 root sys	/dev/xen/domcaps
+evtchn:*		0600 root sys 0666 root sys	/dev/xen/evtchn
+privcmd:*		0600 root sys 0666 root sys	/dev/xen/privcmd
+xenbus:*		0600 root sys 0666 root sys	/dev/xen/xenbus
 EOF
 }
 
