@@ -260,7 +260,7 @@ function create_ufs
 	newfs $lofidev < /dev/null 2> /dev/null
 	mkdir "$rdmnt"
 	mount -F mntfs mnttab /etc/mnttab > /dev/null 2>&1
-	mount -o nologging $lofidev "$rdmnt"
+	mount -F ufs -o nologging $lofidev "$rdmnt"
 	files=
 
 	# do the actual copy
