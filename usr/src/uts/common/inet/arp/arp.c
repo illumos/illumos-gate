@@ -796,9 +796,14 @@ ar_ce_resolve_all(arl_t *arl, uint32_t proto, const uchar_t *src_haddr,
 		 * If the entry is unverified, then we've just verified that
 		 * someone else already owns this address, because this is a
 		 * message with the same protocol address but different
-		 * hardware address.
+		 * hardware address. Conflicts received via an interface which
+		 * doesn't own the conflict address are not actioned. Multiple
+		 * interfaces on the same segment imply any conflict will also
+		 * be seen via the correct interface, so we can ignore anything
+		 * not matching the arl from the ace.
 		 */
-		if (ace->ace_flags & ACE_F_UNVERIFIED) {
+		if ((ace->ace_flags & ACE_F_UNVERIFIED) &&
+		    arl == ace->ace_arl) {
 			ar_ce_delete(ace);
 			return (AR_FAILED);
 		}
@@ -810,9 +815,14 @@ ar_ce_resolve_all(arl_t *arl, uint32_t proto, const uchar_t *src_haddr,
 		 * that, if we're currently in initial announcement mode, we
 		 * switch back to the lazier defense mode.  Knowing that
 		 * there's at least one duplicate out there, we ought not
-		 * blindly announce.
+		 * blindly announce. Conflicts received via an interface which
+		 * doesn't own the conflict address are not actioned. Multiple
+		 * interfaces on the same segment imply the conflict will also
+		 * be seen via the correct interface, so we can ignore anything
+		 * not matching the arl from the ace.
 		 */
-		if (ace->ace_flags & ACE_F_AUTHORITY) {
+		if ((ace->ace_flags & ACE_F_AUTHORITY) &&
+		    arl == ace->ace_arl) {
 			ace->ace_xmit_count = 0;
 			return (AR_BOGON);
 		}
@@ -3046,6 +3056,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 	uint32_t	proto;
 	uchar_t	*src_haddr;
 	uchar_t	*src_paddr;
+	uchar_t *dst_haddr;
 	boolean_t is_probe;
 	int i;
 	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
@@ -3215,6 +3226,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 	src_haddr = (uchar_t *)arh;
 	src_haddr = &src_haddr[ARH_FIXED_LEN];
 	src_paddr = &src_haddr[hlen];
+	dst_haddr = &src_haddr[hlen + plen];
 	dst_paddr = &src_haddr[hlen + plen + hlen];
 	op = BE16_TO_U16(arh->arh_operation);
 
@@ -3308,7 +3320,45 @@ ar_rput(queue_t *q, mblk_t *mp)
 			    "arp_rput_end: q %p (%S)", q, "reflection");
 			return;
 		}
+		/*
+		 * Conflicts seen via the wrong interface may be bogus.
+		 * Multiple interfaces on the same segment imply any conflict
+		 * will also be seen via the correct interface, so we can ignore
+		 * anything not matching the arl from the ace.
+		 */
+		if (arl != dst_ace->ace_arl) {
+			DTRACE_PROBE3(rput_probe_misdirect, arl_t *, arl,
+			    arh_t *, arh, ace_t *, dst_ace);
+			freeb(mp);
+			freemsg(mp1);
+			return;
+		}
+		/*
+		 * Responses targeting our HW address that are not responses to
+		 * our DAD probe must be ignored as they are related to requests
+		 * sent before DAD was restarted. Note: response to our DAD
+		 * probe will have been handled by ar_ce_resolve_all() above.
+		 */
+		if (op == ARP_RESPONSE &&
+		    (bcmp(dst_haddr, dst_ace->ace_hw_addr, hlen) == 0)) {
+			DTRACE_PROBE3(rput_probe_stale, arl_t *, arl,
+			    arh_t *, arh, ace_t *, dst_ace);
+			freeb(mp);
+			freemsg(mp1);
+			return;
+		}
+		/*
+		 * Responses targeted to HW addresses which are not ours but
+		 * sent to our unverified proto address are also conflicts.
+		 * These may be reported by a proxy rather than the interface
+		 * with the conflicting address, dst_paddr is in conflict
+		 * rather than src_paddr. To ensure IP can locate the correct
+		 * ipif to take down, it is necessary to copy dst_paddr to
+		 * the src_paddr field before sending it to IP. The same is
+		 * required for probes, where src_paddr will be INADDR_ANY.
+		 */
 		if (is_probe || op == ARP_RESPONSE) {
+			bcopy(dst_paddr, src_paddr, plen);
 			ar_client_notify(arl, mp1, AR_CN_FAILED);
 			ar_ce_delete(dst_ace);
 		} else if (err == AR_CHANGED) {

@@ -3791,12 +3791,6 @@ ip_arp_excl(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 	arh = (arh_t *)mp->b_cont->b_rptr;
 	bcopy((char *)&arh[1] + arh->arh_hlen, &src, IP_ADDR_LEN);
 
-	/* Handle failures due to probes */
-	if (src == 0) {
-		bcopy((char *)&arh[1] + 2 * arh->arh_hlen + IP_ADDR_LEN, &src,
-		    IP_ADDR_LEN);
-	}
-
 	(void) mac_colon_addr((uint8_t *)(arh + 1), arh->arh_hlen, hbuf,
 	    sizeof (hbuf));
 	(void) ip_dot_addr(src, sbuf);
