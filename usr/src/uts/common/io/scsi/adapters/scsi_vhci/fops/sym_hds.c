@@ -82,7 +82,7 @@ struct scsi_failover_ops scsi_vhci_failover_ops = {
 };
 
 static struct modlmisc modlmisc = {
-	&mod_miscops, "f_sym_hds 1.1"
+	&mod_miscops, "f_sym_hds %I%"
 };
 
 static struct modlinkage modlinkage = {
@@ -142,7 +142,7 @@ hds_sym_init()
 /* ARGSUSED */
 static int
 hds_sym_device_probe(struct scsi_device *sd, struct scsi_inquiry *stdinq,
-void **ctpriv)
+    void **ctpriv)
 {
 	char	**dt;
 	char	*dftype;

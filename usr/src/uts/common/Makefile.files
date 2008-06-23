@@ -676,7 +676,7 @@ SCSI_OBJS +=	scsi_capabilities.o scsi_confsubr.o scsi_control.o \
 		scsi_resource.o scsi_subr.o scsi_transport.o scsi_watch.o \
 		sas_transport.o
 
-SCSI_VHCI_OBJS +=		scsi_vhci.o mpapi_impl.o
+SCSI_VHCI_OBJS +=		scsi_vhci.o mpapi_impl.o scsi_vhci_tpgs.o
 
 SCSI_VHCI_F_SYM_OBJS +=		sym.o
 
@@ -685,6 +685,10 @@ SCSI_VHCI_F_TPGS_OBJS +=	tpgs.o
 SCSI_VHCI_F_ASYM_SUN_OBJS +=	asym_sun.o
 
 SCSI_VHCI_F_SYM_HDS_OBJS += 	sym_hds.o
+
+SCSI_VHCI_F_TAPE_OBJS +=	tape.o
+
+SCSI_VHCI_F_TPGS_TAPE_OBJS +=	tpgs_tape.o
 
 SGEN_OBJS +=	sgen.o
 

@@ -179,6 +179,8 @@ f none kernel/misc/scsi_vhci/sparcv9/scsi_vhci_f_sym 755 root sys
 f none kernel/misc/scsi_vhci/sparcv9/scsi_vhci_f_sym_emc 755 root sys
 f none kernel/misc/scsi_vhci/sparcv9/scsi_vhci_f_sym_hds 755 root sys
 f none kernel/misc/scsi_vhci/sparcv9/scsi_vhci_f_tpgs 755 root sys
+f none kernel/misc/scsi_vhci/sparcv9/scsi_vhci_f_tape 755 root sys
+f none kernel/misc/scsi_vhci/sparcv9/scsi_vhci_f_tpgs_tape 755 root sys
 d none kernel/misc/sparcv9 755 root sys
 f none kernel/misc/sparcv9/busra 755 root sys
 f none kernel/misc/sparcv9/cardbus 755 root sys

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -330,17 +330,13 @@ extern "C" {
 #define	SCMD_LOCATE_G4		0x92
 
 /*
- * Define for Group 5 command.
+ * Group 5 commands.
  */
 #define	SCMD_GROUP5		0xA0
 #define	SCMD_REPORT_LUNS	0xA0
 #define	SCMD_SECURITY_PROTO_IN	0xA2
 #define	SCMD_MAINTENANCE_IN	0xA3
 #define	SCMD_MAINTENANCE_OUT	0xA4
-#define	SCMD_SET_DEVICE_IDENTIFIER	0x06
-#define	SCMD_SET_PRIORITY		0x0e
-#define	SCMD_SET_TARGET_PORT_GROUPS	0x0a
-#define	SCMD_SET_TIMESTAMP		0x0f
 #define	SCMD_READ_G5		0xA8
 #define	SCMD_WRITE_G5		0xAA
 #define	SCMD_SVC_ACTION_OUT_G5	0xA9
@@ -349,7 +345,26 @@ extern "C" {
 #define	SCMD_VERIFY_G5		0xAF
 #define	SCMD_SECURITY_PROTO_OUT	0xB5
 
+/*
+ * Group 5 Service Actions for Maintenance In (12)
+ */
+#define	SSVC_ACTION_GET_TARGET_PORT_GROUPS	0x0a
+#define	SSVC_ACTION_GET_SUPPORTED_OPERATIONS	0x0c
+#define	SSVC_SCTION_GET_SUPPORTED_MANAGEMENT	0x0d
+#define	SSVC_ACTION_GET_TIMESTAMP		0x0f
 
+/*
+ * Group 5 Service Actions for Maintenance Out (12)
+ */
+#define	SSVC_ACTION_SET_DEVICE_IDENTIFIER	0x06
+#define	SSVC_ACTION_SET_PRIORITY		0x0e
+#define	SSVC_ACTION_SET_TARGET_PORT_GROUPS	0x0a
+#define	SSVC_ACTION_SET_TIMESTAMP		0x0f
+
+/*
+ * Group 5 Service Actions for Service Action In (12)
+ */
+#define	SSVC_ACTION_READ_MEDIA_SERIAL		0x01
 /*
  * scsi_key_strings for SCMD_ definitions
  *	NOTE: see SCSI_CMDS_KEY_STRINGS_CDIO in cdio.h for additional

@@ -34,6 +34,7 @@
 #include <sys/sunddi.h>
 #include <sys/scsi/scsi.h>
 #include <sys/scsi/impl/scsi_reset_notify.h>
+#include <sys/scsi/impl/services.h>
 #include <sys/sunmdi.h>
 #include <sys/mdi_impldefs.h>
 #include <sys/scsi/adapters/scsi_vhci.h>
@@ -196,7 +197,7 @@ static int vhci_bind_transport(struct scsi_address *, struct vhci_pkt *,
 static void vhci_intr(struct scsi_pkt *);
 static int vhci_do_prout(scsi_vhci_priv_t *);
 static void vhci_run_cmd(void *);
-static int vhci_do_prin(struct vhci_pkt **);
+static int vhci_do_prin(struct vhci_pkt *);
 static struct scsi_pkt *vhci_create_retry_pkt(struct vhci_pkt *);
 static struct vhci_pkt *vhci_sync_retry_pkt(struct vhci_pkt *);
 static struct scsi_vhci_lun *vhci_lun_lookup(dev_info_t *);
@@ -209,6 +210,10 @@ void vhci_update_pathstates(void *);
 #ifdef DEBUG
 static void vhci_print_prin_keys(vhci_prin_readkeys_t *, int);
 #endif
+static void vhci_print_cdb(dev_info_t *dip, uint_t level,
+    char *title, uchar_t *cdb);
+static void vhci_clean_print(dev_info_t *dev, uint_t level,
+    char *title, uchar_t *data, int len);
 static void vhci_print_prout_keys(scsi_vhci_lun_t *, char *);
 static void vhci_uscsi_iodone(struct scsi_pkt *pkt);
 
@@ -226,10 +231,7 @@ extern void vhci_mpapi_set_path_state(dev_info_t *, mdi_pathinfo_t *, int);
 extern int vhci_mpapi_update_tpg_acc_state_for_lu(struct scsi_vhci *,
     scsi_vhci_lun_t *);
 
-/* Special export to MP-API of tpgs non-'fops' entry point */
-int (*tpgs_set_target_groups)(struct scsi_address *, int, int);
-
-#define	VHCI_DMA_MAX_XFER_CAP	0xffffffffULL
+#define	VHCI_DMA_MAX_XFER_CAP	INT_MAX
 
 #define	VHCI_MAX_PGR_RETRIES	3
 
@@ -480,23 +482,6 @@ vhci_failover_modopen(struct scsi_vhci *vhci)
 		/* register vid/pid of devices supported with mpapi */
 		for (dt = sf->sf_sfo->sfo_devices; *dt; dt++)
 			vhci_mpapi_add_dev_prod(vhci, *dt);
-
-		/*
-		 * Special processing for SFO_NAME_TPGS module, which contains
-		 * the `tpgs_set_target_groups` implementation needed by the
-		 * MP-API code.
-		 */
-		if (strcmp(sf->sf_sfo->sfo_name, SFO_NAME_TPGS) == 0) {
-			tpgs_set_target_groups =
-			    (int (*)(struct scsi_address *, int, int))
-			    ddi_modsym(sf->sf_mod, "std_set_target_groups", &e);
-			if (tpgs_set_target_groups == NULL) {
-				cmn_err(CE_WARN, "scsi_vhci: "
-				    "unable to import 'std_set_target_groups' "
-				    "from '%s', error %d", module[i], e);
-			}
-		}
-
 		sf++;
 	}
 
@@ -513,7 +498,7 @@ vhci_failover_modopen(struct scsi_vhci *vhci)
 	/* call sfo_init for modules that need it */
 	for (sf = scsi_failover_table; sf->sf_mod; sf++) {
 		if (sf->sf_sfo && sf->sf_sfo->sfo_init)
-			(*sf->sf_sfo->sfo_init)();
+			sf->sf_sfo->sfo_init();
 	}
 
 	ddi_prop_free(module);
@@ -1231,8 +1216,7 @@ vhci_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	 * is reading PR keys which requires filtering on completion.
 	 * Data cache sync must be guaranteed.
 	 */
-	if ((pkt->pkt_cdbp[0] == SCMD_PRIN) &&
-	    (pkt->pkt_cdbp[1] == 0) &&
+	if ((pkt->pkt_cdbp[0] == SCMD_PRIN) && (pkt->pkt_cdbp[1] == 0) &&
 	    (vpkt->vpkt_org_vpkt == NULL)) {
 		vpkt->vpkt_tgt_init_pkt_flags |= PKT_CONSISTENT;
 	}
@@ -1283,8 +1267,7 @@ vhci_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		}
 	}
 
-	svp = (scsi_vhci_priv_t *)mdi_pi_get_vhci_private(
-	    vpkt->vpkt_path);
+	svp = (scsi_vhci_priv_t *)mdi_pi_get_vhci_private(vpkt->vpkt_path);
 	if (svp == NULL || reserve_failed) {
 		if (pkt_reserve_cmd) {
 			VHCI_DEBUG(6, (CE_WARN, vhci->vhci_dip,
@@ -1305,8 +1288,7 @@ pkt_cleanup:
 		}
 		if ((pkt->pkt_cdbp[0] == SCMD_PROUT) &&
 		    (((pkt->pkt_cdbp[1] & 0x1f) == VHCI_PROUT_REGISTER) ||
-		    ((pkt->pkt_cdbp[1] & 0x1f) ==
-		    VHCI_PROUT_R_AND_IGNORE))) {
+		    ((pkt->pkt_cdbp[1] & 0x1f) == VHCI_PROUT_R_AND_IGNORE))) {
 			sema_v(&vlun->svl_pgr_sema);
 		}
 		return (TRAN_BUSY);
@@ -1343,8 +1325,7 @@ pkt_cleanup:
 		mutex_exit(&vlun->svl_mutex);
 		if ((pkt->pkt_cdbp[0] == SCMD_PROUT) &&
 		    (((pkt->pkt_cdbp[1] & 0x1f) == VHCI_PROUT_REGISTER) ||
-		    ((pkt->pkt_cdbp[1] & 0x1f) ==
-		    VHCI_PROUT_R_AND_IGNORE))) {
+		    ((pkt->pkt_cdbp[1] & 0x1f) == VHCI_PROUT_R_AND_IGNORE))) {
 			if (rval = vhci_pgr_register_start(vlun, pkt)) {
 				/* an error */
 				sema_v(&vlun->svl_pgr_sema);
@@ -1404,7 +1385,7 @@ pkt_cleanup:
 			 */
 			ASSERT(vpkt->vpkt_org_vpkt == NULL);
 			if (tpkt->pkt_comp) {
-				(*tpkt->pkt_comp)(tpkt);
+				tpkt->pkt_comp(tpkt);
 			}
 		}
 		return (rval);
@@ -1544,7 +1525,7 @@ vhci_scsi_reset_target(struct scsi_address *ap, int level, uint8_t select_path)
 		if (level == RESET_LUN) {
 			hba = ap->a_hba_tran;
 			ASSERT(hba != NULL);
-			return ((*hba->tran_reset)(ap, RESET_LUN));
+			return (hba->tran_reset(ap, RESET_LUN));
 		}
 		return (scsi_reset(ap, level));
 	}
@@ -1585,7 +1566,7 @@ again:
 	ASSERT(hba != NULL);
 
 	if (hba->tran_reset != NULL) {
-		if ((*hba->tran_reset)(pap, level) == 0) {
+		if (hba->tran_reset(pap, level) == 0) {
 			pdip = mdi_pi_get_phci(pip);
 			vhci_log(CE_WARN, vdip, "!(%s%d):"
 			    " path (%s%d), reset %d failed",
@@ -1722,6 +1703,10 @@ vhci_commoncap(struct scsi_address *ap, char *cap,
 		 */
 		switch (cidx) {
 		case SCSI_CAP_DMA_MAX:
+			/*
+			 * For X86 this capability is caught in scsi_ifgetcap().
+			 * XXX Should this be getting the value from the pHCI?
+			 */
 			rval = (int)VHCI_DMA_MAX_XFER_CAP;
 			break;
 
@@ -1763,6 +1748,18 @@ vhci_commoncap(struct scsi_address *ap, char *cap,
 			mutex_enter(&vlun->svl_mutex);
 			rval = vlun->svl_sector_size;
 			mutex_exit(&vlun->svl_mutex);
+			break;
+
+		case SCSI_CAP_CDB_LEN:
+			rval = VHCI_SCSI_CDB_SIZE;
+			break;
+
+		case SCSI_CAP_DMA_MAX_ARCH:
+			/*
+			 * For X86 this capability is caught in scsi_ifgetcap().
+			 * XXX Should this be getting the value from the pHCI?
+			 */
+			rval = 0;
 			break;
 
 		default:
@@ -2028,7 +2025,7 @@ vhci_scsi_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
  */
 static int
 vhci_scsi_reset_notify(struct scsi_address *ap, int flag,
-	void (*callback)(caddr_t), caddr_t arg)
+    void (*callback)(caddr_t), caddr_t arg)
 {
 	struct scsi_vhci *vhci = ADDR2VHCI(ap);
 	return (scsi_hba_reset_notify_setup(ap, flag, callback, arg,
@@ -2408,8 +2405,7 @@ bind_path:
 	if (pkt == NULL || (vpkt->vpkt_flags & CFLAG_DMA_PARTIAL)) {
 		pkt = scsi_init_pkt(address, pkt,
 		    vpkt->vpkt_tgt_init_bp, vpkt->vpkt_tgt_init_cdblen,
-		    vpkt->vpkt_tgt_init_scblen,
-		    0, flags, func, NULL);
+		    vpkt->vpkt_tgt_init_scblen, 0, flags, func, NULL);
 
 		if (pkt == NULL) {
 			VHCI_DEBUG(4, (CE_NOTE, NULL,
@@ -2461,16 +2457,17 @@ vhci_do_prout(scsi_vhci_priv_t *svp)
 
 	struct scsi_pkt			*new_pkt;
 	struct buf			*bp;
-	scsi_vhci_lun_t			*vlun;
+	scsi_vhci_lun_t			*vlun = svp->svp_svl;
 	int				rval, retry, nr_retry, ua_retry;
 	struct scsi_extended_sense	*sns;
 
 	bp = getrbuf(KM_SLEEP);
 	bp->b_flags = B_WRITE;
 	bp->b_resid = 0;
+	bp->b_un.b_addr = (caddr_t)&vlun->svl_prout;
+	bp->b_bcount = vlun->svl_bcount;
 
 	VHCI_INCR_PATH_CMDCOUNT(svp);
-	vlun = svp->svp_svl;
 
 	new_pkt = scsi_init_pkt(&svp->svp_psd->sd_address, NULL, bp,
 	    CDB_GROUP1, sizeof (struct scsi_arq_status), 0, 0,
@@ -2504,9 +2501,8 @@ again:
 				int max_retry;
 				struct scsi_failover_ops *fops;
 				fops = vlun->svl_fops;
-				rval = (*fops->sfo_analyze_sense)
-				    (svp->svp_psd, sns,
-				    vlun->svl_fops_ctpriv);
+				rval = fops->sfo_analyze_sense(svp->svp_psd,
+				    sns, vlun->svl_fops_ctpriv);
 				if (rval == SCSI_SENSE_NOT_READY) {
 					max_retry = vhci_prout_not_ready_retry;
 					retry = nr_retry++;
@@ -2604,8 +2600,7 @@ vhci_run_cmd(void *arg)
 	vlun->svl_cdb[1] |= VHCI_PROUT_R_AND_IGNORE;
 
 	do {
-		nsvp = (scsi_vhci_priv_t *)
-		    mdi_pi_get_vhci_private(npip);
+		nsvp = (scsi_vhci_priv_t *)mdi_pi_get_vhci_private(npip);
 		if (nsvp == NULL) {
 			VHCI_DEBUG(4, (CE_NOTE, NULL,
 			    "vhci_run_cmd: no "
@@ -2707,14 +2702,14 @@ done:
  * keys to be returned.
  */
 static int
-vhci_do_prin(struct vhci_pkt **vpkt)
+vhci_do_prin(struct vhci_pkt *vpkt)
 {
 	scsi_vhci_priv_t *svp = (scsi_vhci_priv_t *)
-	    mdi_pi_get_vhci_private((*vpkt)->vpkt_path);
+	    mdi_pi_get_vhci_private(vpkt->vpkt_path);
 	vhci_prin_readkeys_t *prin;
 	scsi_vhci_lun_t *vlun = svp->svp_svl;
 	struct scsi_vhci *vhci =
-	    ADDR2VHCI(&((*vpkt)->vpkt_tgt_pkt->pkt_address));
+	    ADDR2VHCI(&(vpkt->vpkt_tgt_pkt->pkt_address));
 
 	struct buf		*new_bp = NULL;
 	struct scsi_pkt		*new_pkt = NULL;
@@ -2725,7 +2720,7 @@ vhci_do_prin(struct vhci_pkt **vpkt)
 	uint32_t		svl_prin_length = 0;
 
 	prin = (vhci_prin_readkeys_t *)
-	    bp_mapin_common((*vpkt)->vpkt_tgt_init_bp, VM_NOSLEEP);
+	    bp_mapin_common(vpkt->vpkt_tgt_init_bp, VM_NOSLEEP);
 
 	if (prin != NULL) {
 		prin_length = BE_32(prin->length);
@@ -2763,10 +2758,10 @@ vhci_do_prin(struct vhci_pkt **vpkt)
 	 * allocated to get all of the available registered keys.
 	 */
 	if (rval != VHCI_CMD_ERROR) {
-		if (((*vpkt)->vpkt_tgt_init_bp->b_bcount - hdr_len) <
+		if ((vpkt->vpkt_tgt_init_bp->b_bcount - hdr_len) <
 		    prin_length) {
-			if ((*vpkt)->vpkt_org_vpkt == NULL) {
-				new_pkt = vhci_create_retry_pkt(*vpkt);
+			if (vpkt->vpkt_org_vpkt == NULL) {
+				new_pkt = vhci_create_retry_pkt(vpkt);
 				if (new_pkt != NULL) {
 					new_vpkt = TGTPKT2VHCIPKT(new_pkt);
 
@@ -2778,7 +2773,7 @@ vhci_do_prin(struct vhci_pkt **vpkt)
 					new_bp = scsi_alloc_consistent_buf(
 					    &svp->svp_psd->sd_address,
 					    NULL, (prin_length + hdr_len),
-					    ((*vpkt)->vpkt_tgt_init_bp->
+					    (vpkt->vpkt_tgt_init_bp->
 					    b_flags & (B_READ | B_WRITE)),
 					    NULL_FUNC, NULL);
 					if (new_bp != NULL) {
@@ -2820,9 +2815,9 @@ vhci_do_prin(struct vhci_pkt **vpkt)
 		 * this command is sent down.  This allows the normal bind
 		 * transport mechanism to be used.
 		 */
-		if ((*vpkt)->vpkt_path != NULL) {
-			mdi_rele_path((*vpkt)->vpkt_path);
-			(*vpkt)->vpkt_path = NULL;
+		if (vpkt->vpkt_path != NULL) {
+			mdi_rele_path(vpkt->vpkt_path);
+			vpkt->vpkt_path = NULL;
 		}
 
 		/*
@@ -2902,12 +2897,12 @@ vhci_do_prin(struct vhci_pkt **vpkt)
 		 * that we put everything back the way it originally was so
 		 * that the target driver can complete the command correctly.
 		 */
-		if ((*vpkt)->vpkt_org_vpkt != NULL) {
-			new_bp = (*vpkt)->vpkt_tgt_init_bp;
+		if (vpkt->vpkt_org_vpkt != NULL) {
+			new_bp = vpkt->vpkt_tgt_init_bp;
 
 			scsi_free_consistent_buf(new_bp);
 
-			*vpkt = vhci_sync_retry_pkt(*vpkt);
+			vpkt = vhci_sync_retry_pkt(vpkt);
 
 			/*
 			 * Make sure the original buffer is mapped into kernel
@@ -2915,7 +2910,7 @@ vhci_do_prin(struct vhci_pkt **vpkt)
 			 * it.
 			 */
 			prin = (vhci_prin_readkeys_t *)bp_mapin_common(
-			    (*vpkt)->vpkt_tgt_init_bp, VM_NOSLEEP);
+			    vpkt->vpkt_tgt_init_bp, VM_NOSLEEP);
 		}
 
 		/*
@@ -2923,7 +2918,7 @@ vhci_do_prin(struct vhci_pkt **vpkt)
 		 * target buffer.
 		 */
 		if (svl_prin_length <=
-		    ((*vpkt)->vpkt_tgt_init_bp->b_bcount - hdr_len)) {
+		    (vpkt->vpkt_tgt_init_bp->b_bcount - hdr_len)) {
 			/*
 			 * It is safe to return all of the available unique
 			 * keys
@@ -2935,7 +2930,7 @@ vhci_do_prin(struct vhci_pkt **vpkt)
 			 * original command.
 			 */
 			bcopy(&vlun->svl_prin, prin,
-			    (*vpkt)->vpkt_tgt_init_bp->b_bcount);
+			    vpkt->vpkt_tgt_init_bp->b_bcount);
 		}
 #ifdef DEBUG
 		VHCI_DEBUG(5, (CE_NOTE, NULL,
@@ -2957,14 +2952,14 @@ vhci_do_prin(struct vhci_pkt **vpkt)
 		 * complete the command correctly.
 		 */
 
-		if ((*vpkt)->vpkt_org_vpkt != NULL) {
-			new_bp = (*vpkt)->vpkt_tgt_init_bp;
+		if (vpkt->vpkt_org_vpkt != NULL) {
+			new_bp = vpkt->vpkt_tgt_init_bp;
 			if (new_bp != NULL) {
 				scsi_free_consistent_buf(new_bp);
 			}
 
-			new_vpkt = *vpkt;
-			*vpkt = (*vpkt)->vpkt_org_vpkt;
+			new_vpkt = vpkt;
+			vpkt = vpkt->vpkt_org_vpkt;
 
 			vhci_scsi_destroy_pkt(&svp->svp_psd->sd_address,
 			    new_vpkt->vpkt_tgt_pkt);
@@ -2975,8 +2970,8 @@ vhci_do_prin(struct vhci_pkt **vpkt)
 		 * ssd will retry the command.
 		 */
 
-		(*vpkt)->vpkt_tgt_pkt->pkt_reason = CMD_ABORTED;
-		(*vpkt)->vpkt_tgt_pkt->pkt_statistics |= STAT_ABORTED;
+		vpkt->vpkt_tgt_pkt->pkt_reason = CMD_ABORTED;
+		vpkt->vpkt_tgt_pkt->pkt_statistics |= STAT_ABORTED;
 
 		rval = VHCI_CMD_CMPLT;
 	}
@@ -3096,8 +3091,8 @@ vhci_intr(struct scsi_pkt *pkt)
 					    vpkt->vpkt_tgt_init_scblen);
 					break;
 				}
-				rval = (*fops->sfo_analyze_sense)
-				    (svp->svp_psd, sns, vlun->svl_fops_ctpriv);
+				rval = fops->sfo_analyze_sense(svp->svp_psd,
+				    sns, vlun->svl_fops_ctpriv);
 				if ((rval == SCSI_SENSE_NOFAILOVER) ||
 				    (rval == SCSI_SENSE_UNKNOWN) ||
 				    (rval == SCSI_SENSE_NOT_READY)) {
@@ -3208,8 +3203,7 @@ vhci_intr(struct scsi_pkt *pkt)
 		 */
 		if ((pkt->pkt_cdbp[0] ==  SCMD_PROUT) &&
 		    (((pkt->pkt_cdbp[1] & 0x1f) == VHCI_PROUT_REGISTER) ||
-		    ((pkt->pkt_cdbp[1] & 0x1f) ==
-		    VHCI_PROUT_R_AND_IGNORE))) {
+		    ((pkt->pkt_cdbp[1] & 0x1f) == VHCI_PROUT_R_AND_IGNORE))) {
 			if (SCBP_C(pkt) == STATUS_GOOD) {
 				ASSERT(vlun->svl_taskq);
 				svp->svp_last_pkt_reason = pkt->pkt_reason;
@@ -3219,8 +3213,7 @@ vhci_intr(struct scsi_pkt *pkt)
 			}
 		}
 		if ((SCBP_C(pkt) == STATUS_GOOD) &&
-		    (pkt->pkt_cdbp[0] == SCMD_PRIN) &&
-		    vpkt->vpkt_tgt_init_bp) {
+		    (pkt->pkt_cdbp[0] == SCMD_PRIN) && vpkt->vpkt_tgt_init_bp) {
 			/*
 			 * If the action (value in byte 1 of the cdb) is zero,
 			 * we're reading keys, and that's the only condition
@@ -3257,7 +3250,7 @@ vhci_intr(struct scsi_pkt *pkt)
 				 * vpkt will contain the address of the
 				 * original vpkt
 				 */
-				if (vhci_do_prin(&vpkt) == VHCI_CMD_RETRY) {
+				if (vhci_do_prin(vpkt) == VHCI_CMD_RETRY) {
 					/*
 					 * The command has been resent to get
 					 * all the keys from the device.  Don't
@@ -3309,6 +3302,8 @@ vhci_intr(struct scsi_pkt *pkt)
 		break;
 
 	case CMD_DEV_GONE:
+		VHCI_DEBUG(1, (CE_NOTE, NULL, "vhci_intr received "
+		    "cmd_dev_gone\n"));
 		tpkt->pkt_reason = CMD_CMPLT;
 		tpkt->pkt_state = STATE_GOT_BUS |
 		    STATE_GOT_TARGET | STATE_SENT_CMD |
@@ -3523,8 +3518,8 @@ vhci_efo_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 		return (0);
 	}
 	if (*((unsigned char *)statusp) == STATUS_CHECK) {
-		rval = (*(vlun->svl_fops->sfo_analyze_sense))
-		    (svp->svp_psd, sensep, vlun->svl_fops_ctpriv);
+		rval = vlun->svl_fops->sfo_analyze_sense(svp->svp_psd, sensep,
+		    vlun->svl_fops_ctpriv);
 		switch (rval) {
 			/*
 			 * Only update path states in case path is definitely
@@ -3654,7 +3649,7 @@ vhci_update_pathstates(void *arg)
 		pip = npip;
 		svp = (scsi_vhci_priv_t *)mdi_pi_get_vhci_private(pip);
 		psd = svp->svp_psd;
-		if ((*fo->sfo_path_get_opinfo)(psd, &opinfo,
+		if (fo->sfo_path_get_opinfo(psd, &opinfo,
 		    vlun->svl_fops_ctpriv) != 0) {
 			sps = mdi_select_path(dip, NULL,
 			    (MDI_SELECT_ONLINE_PATH | MDI_SELECT_STANDBY_PATH),
@@ -4161,8 +4156,8 @@ vhci_pathinfo_state_change(dev_info_t *vdip, mdi_pathinfo_t *pip,
 						 * path-class with class
 						 */
 						fo = vlun->svl_fops;
-						(*fo->sfo_pathclass_next)(NULL,
-						    &best_pclass,
+						(void) fo->sfo_pathclass_next(
+						    NULL, &best_pclass,
 						    vlun->svl_fops_ctpriv);
 						pclass = NULL;
 						rv = mdi_prop_lookup_string(pip,
@@ -4514,8 +4509,7 @@ vhci_update_pathinfo(struct scsi_device *psd,  mdi_pathinfo_t *pip,
 	struct scsi_path_opinfo		opinfo;
 	char				*pclass, *best_pclass;
 
-	if ((*fo->sfo_path_get_opinfo)(psd, &opinfo,
-	    vlun->svl_fops_ctpriv) != 0) {
+	if (fo->sfo_path_get_opinfo(psd, &opinfo, vlun->svl_fops_ctpriv) != 0) {
 		VHCI_DEBUG(1, (CE_NOTE, NULL, "!vhci_update_pathinfo: "
 		    "Failed to get operation info for path:%p\n", (void *)pip));
 		return (MDI_FAILURE);
@@ -4647,7 +4641,7 @@ vhci_update_pathinfo(struct scsi_device *psd,  mdi_pathinfo_t *pip,
 		 * initiate auto-failback as the next IO shall take care of.
 		 * this. See comment above.
 		 */
-		(*fo->sfo_pathclass_next)(NULL, &best_pclass,
+		(void) fo->sfo_pathclass_next(NULL, &best_pclass,
 		    vlun->svl_fops_ctpriv);
 		if (((vhci->vhci_conf_flags & VHCI_CONF_FLAGS_AUTO_FAILBACK) ==
 		    VHCI_CONF_FLAGS_AUTO_FAILBACK) &&
@@ -4934,9 +4928,8 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 		/* NULL: default: select based on sfo_device_probe results */
 		for (sf = scsi_failover_table; sf->sf_mod; sf++) {
 			if ((sf->sf_sfo == NULL) ||
-			    ((*sf->sf_sfo->sfo_device_probe) (psd,
-			    psd->sd_inq, &vlun->svl_fops_ctpriv) ==
-			    SFO_DEVICE_PROBE_PHCI))
+			    sf->sf_sfo->sfo_device_probe(psd, psd->sd_inq,
+			    &vlun->svl_fops_ctpriv) == SFO_DEVICE_PROBE_PHCI)
 				continue;
 
 			/* found failover module, supported under scsi_vhci */
@@ -4945,7 +4938,7 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 			    i_ddi_strdup(sfo->sfo_name, KM_SLEEP);
 			break;
 		}
-	} else if (strcmp(override, "NONE") && strcmp(override, "none")) {
+	} else if (strcasecmp(override, "NONE")) {
 		/* !"NONE": select based on driver.conf specified name */
 		for (sf = scsi_failover_table, sfo = NULL; sf->sf_mod; sf++) {
 			if ((sf->sf_sfo == NULL) ||
@@ -4986,6 +4979,12 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	 * mdi_set_lb_region_size().
 	 */
 	vhci_get_device_type_mpxio_options(vdip, tgt_dip, psd);
+
+	/*
+	 * The device probe or options in conf file may have set/changed the
+	 * lb policy, save the current value.
+	 */
+	vlun->svl_lb_policy_save = mdi_get_lb_policy(tgt_dip);
 
 	/*
 	 * if PGR is active, revalidate key and register on this path also,
@@ -5695,7 +5694,7 @@ vhci_ctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp, int *rval)
 		 * arguments it accepts are PRIMARY and SECONDARY.
 		 */
 		fo = vlun->svl_fops;
-		if ((*fo->sfo_pathclass_next)(PCLASS_PRIMARY, &pclass,
+		if (fo->sfo_pathclass_next(PCLASS_PRIMARY, &pclass,
 		    vlun->svl_fops_ctpriv)) {
 			retval = ENOTSUP;
 			break;
@@ -6717,7 +6716,7 @@ vhci_failover(dev_info_t *vdip, dev_info_t *cdip, int flags)
 
 next_pathclass:
 
-	rval = (*sfo->sfo_pathclass_next)(pclass1, &pclass2,
+	rval = sfo->sfo_pathclass_next(pclass1, &pclass2,
 	    vlun->svl_fops_ctpriv);
 	if (rval == ENOENT) {
 		if (s_pclass == NULL) {
@@ -6725,7 +6724,7 @@ next_pathclass:
 			    "failed, no more pathclasses\n", guid));
 			goto done;
 		} else {
-			(*sfo->sfo_pathclass_next)(NULL, &pclass2,
+			(void) sfo->sfo_pathclass_next(NULL, &pclass2,
 			    vlun->svl_fops_ctpriv);
 		}
 	} else if (rval == EINVAL) {
@@ -6863,7 +6862,7 @@ check_path_again:
 		VHCI_DEBUG(1, (CE_NOTE, NULL, "!vhci_failover(6)(%s): "
 		    "activating path 0x%p(psd:%p)\n", guid, (void *)npip,
 		    (void *)svp->svp_psd));
-		if ((*sfo->sfo_path_activate)(svp->svp_psd, pclass2,
+		if (sfo->sfo_path_activate(svp->svp_psd, pclass2,
 		    vlun->svl_fops_ctpriv) == 0) {
 			activation_done = 1;
 			mdi_rele_path(npip);
@@ -6920,7 +6919,7 @@ check_path_again:
 				    "!vhci_failover(8)(%s): "
 				    "pinging path 0x%p\n",
 				    guid, (void *)npip));
-				if ((*sfo->sfo_path_ping)(svp->svp_psd,
+				if (sfo->sfo_path_ping(svp->svp_psd,
 				    vlun->svl_fops_ctpriv) == 1) {
 					mdi_pi_set_state(npip,
 					    MDI_PATHINFO_STATE_ONLINE);
@@ -7201,6 +7200,11 @@ vhci_do_scsi_cmd(struct scsi_pkt *pkt)
 	int	retry_cnt = 0;
 	struct scsi_extended_sense	*sns;
 
+#ifdef DEBUG
+	vhci_print_cdb(pkt->pkt_address.a_hba_tran->tran_hba_dip, CE_WARN,
+	    "Vhci command", pkt->pkt_cdbp);
+#endif
+
 retry:
 	err = scsi_poll(pkt);
 	if (err) {
@@ -7395,8 +7399,7 @@ vhci_pgr_validate_and_register(scsi_vhci_priv_t *svp)
 	success = 0;
 
 	/* Save the res key */
-	bcopy((const void *)prout->res_key,
-	    (void *)temp_res_key, MHIOC_RESV_KEY_SIZE);
+	bcopy(prout->res_key, temp_res_key, MHIOC_RESV_KEY_SIZE);
 
 	/*
 	 * Sometimes CDB from application can be a Register_And_Ignore.
@@ -7408,8 +7411,7 @@ vhci_pgr_validate_and_register(scsi_vhci_priv_t *svp)
 	vlun->svl_cdb[1] &= 0xe0;
 
 	do {
-		osvp = (scsi_vhci_priv_t *)
-		    mdi_pi_get_vhci_private(npip);
+		osvp = (scsi_vhci_priv_t *)mdi_pi_get_vhci_private(npip);
 		if (osvp == NULL) {
 			VHCI_DEBUG(4, (CE_NOTE, NULL,
 			    "vhci_pgr_validate_and_register: no "
@@ -7433,8 +7435,7 @@ vhci_pgr_validate_and_register(scsi_vhci_priv_t *svp)
 		    (void *)curthread, vlun->svl_cdb[1]));
 		vhci_print_prout_keys(vlun, "v_pgr_val_reg: before bcopy:");
 
-		bcopy((const void *)prout->service_key,
-		    (void *)prout->res_key, MHIOC_RESV_KEY_SIZE);
+		bcopy(prout->service_key, prout->res_key, MHIOC_RESV_KEY_SIZE);
 
 		VHCI_DEBUG(4, (CE_WARN, NULL, "vlun 0x%p After bcopy",
 		    (void *)vlun));
@@ -7472,8 +7473,7 @@ next_path_1:
 	vlun->svl_cdb[1] = cdb_1;
 
 	/* Restore the res_key */
-	bcopy((const void *)temp_res_key,
-	    (void *)prout->res_key, MHIOC_RESV_KEY_SIZE);
+	bcopy(temp_res_key, prout->res_key, MHIOC_RESV_KEY_SIZE);
 
 	/*
 	 * If key could not be registered on any path for the first time,
@@ -7495,10 +7495,9 @@ next_path_1:
 
 	vhci_print_prout_keys(vlun, "v_pgr_val_reg: keys before bcopy: ");
 
-	bcopy((const void *)prout->active_service_key,
-	    (void *)prout->service_key, MHIOC_RESV_KEY_SIZE);
-	bcopy((const void *)prout->active_res_key,
-	    (void *)prout->res_key, MHIOC_RESV_KEY_SIZE);
+	bcopy(prout->active_service_key, prout->service_key,
+	    MHIOC_RESV_KEY_SIZE);
+	bcopy(prout->active_res_key, prout->res_key, MHIOC_RESV_KEY_SIZE);
 
 	vhci_print_prout_keys(vlun, "v_pgr_val_reg:keys after bcopy: ");
 
@@ -7564,8 +7563,7 @@ next_path_1:
 		    (void *)osvp, (void *)vlun, vlun->svl_cdb[1]));
 		vhci_print_prout_keys(vlun, "v_pgr_val_reg: before bcopy: ");
 
-		bcopy((const void *)prout->service_key,
-		    (void *)prout->res_key, MHIOC_RESV_KEY_SIZE);
+		bcopy(prout->service_key, prout->res_key, MHIOC_RESV_KEY_SIZE);
 
 		vhci_print_prout_keys(vlun, "v_pgr_val_reg: after bcopy: ");
 
@@ -7616,9 +7614,8 @@ next_path_2:
 	    " svp 0x%p being done\n", (void *)svp));
 	vhci_print_prout_keys(vlun, "v_pgr_val_reg: before bcopy: ");
 
-	bcopy((const void *)prout->service_key, (void *)prout->res_key,
-	    MHIOC_RESV_KEY_SIZE);
-	bzero((void *)prout->service_key, MHIOC_RESV_KEY_SIZE);
+	bcopy(prout->service_key, prout->res_key, MHIOC_RESV_KEY_SIZE);
+	bzero(prout->service_key, MHIOC_RESV_KEY_SIZE);
 
 	vhci_print_prout_keys(vlun, "v_pgr_val_reg: before bcopy: ");
 
@@ -7673,9 +7670,9 @@ next_path_2:
 static void
 vhci_dispatch_scsi_start(void *arg)
 {
-	struct vhci_pkt *vpkt = (struct vhci_pkt *)arg;
-	struct scsi_pkt *tpkt = vpkt->vpkt_tgt_pkt;
-	int			rval = TRAN_BUSY;
+	struct vhci_pkt *vpkt	= (struct vhci_pkt *)arg;
+	struct scsi_pkt *tpkt	= vpkt->vpkt_tgt_pkt;
+	int rval		= TRAN_BUSY;
 
 	VHCI_DEBUG(6, (CE_NOTE, NULL, "!vhci_dispatch_scsi_start: sending"
 	    " scsi-2 reserve for 0x%p\n",
@@ -7745,7 +7742,7 @@ vhci_dispatch_scsi_start(void *arg)
 	}
 
 	if (tpkt->pkt_comp) {
-		(*tpkt->pkt_comp)(tpkt);
+		tpkt->pkt_comp(tpkt);
 	}
 }
 
@@ -7777,7 +7774,7 @@ vhci_initiate_auto_failback(void *arg)
 
 		fo = vlun->svl_fops;
 
-		(*fo->sfo_pathclass_next)(NULL, &best_pclass,
+		(void) fo->sfo_pathclass_next(NULL, &best_pclass,
 		    vlun->svl_fops_ctpriv);
 		if (strcmp(vlun->svl_active_pclass, best_pclass) == 0) {
 			mutex_exit(&vlun->svl_mutex);
@@ -7806,19 +7803,8 @@ vhci_initiate_auto_failback(void *arg)
 static void
 vhci_print_prin_keys(vhci_prin_readkeys_t *prin, int numkeys)
 {
-	uchar_t index = 0;
-	char buf[100];
-
-	VHCI_DEBUG(5, (CE_NOTE, NULL, "num keys %d\n", numkeys));
-
-	while (index < numkeys) {
-		bcopy(&prin->keylist[index], buf, MHIOC_RESV_KEY_SIZE);
-		VHCI_DEBUG(5, (CE_NOTE, NULL,
-		    "%02x%02x%02x%02x%02x%02x%02x%02x\t",
-		    buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6],
-		    buf[7]));
-		index++;
-	}
+	vhci_clean_print(NULL, 5, "Current PGR Keys",
+	    (uchar_t *)prin, numkeys * 8);
 }
 #endif
 
@@ -8041,9 +8027,7 @@ vhci_create_retry_pkt(struct vhci_pkt *vpkt)
 	 */
 	pkt = vhci_scsi_init_pkt(&svp->svp_psd->sd_address, pkt,
 	    vpkt->vpkt_tgt_init_bp, vpkt->vpkt_tgt_init_cdblen,
-	    vpkt->vpkt_tgt_init_scblen, 0,
-	    PKT_CONSISTENT,
-	    NULL_FUNC, NULL);
+	    vpkt->vpkt_tgt_init_scblen, 0, PKT_CONSISTENT, NULL_FUNC, NULL);
 	if (pkt != NULL) {
 		new_vpkt = TGTPKT2VHCIPKT(pkt);
 
@@ -8443,3 +8427,69 @@ vhci_uscsi_iostart(struct buf *bp)
 	    "vhci_uscsi_iostart: exit: rval: %d", rval));
 	return (rval);
 }
+
+#ifdef DEBUG
+
+extern struct scsi_key_strings scsi_cmds[];
+
+static char *
+vhci_print_scsi_cmd(char cmd)
+{
+	char tmp[64];
+	char *cpnt;
+
+	cpnt = scsi_cmd_name(cmd, scsi_cmds, tmp);
+	/* tmp goes out of scope on return and caller sees garbage */
+	if (cpnt == tmp) {
+		cpnt = "Unknown Command";
+	}
+	return (cpnt);
+}
+
+extern uchar_t	scsi_cdb_size[];
+
+static void
+vhci_print_cdb(dev_info_t *dip, uint_t level, char *title, uchar_t *cdb)
+{
+	int len = scsi_cdb_size[CDB_GROUPID(cdb[0])];
+	char buf[256];
+
+	if (level == CE_NOTE) {
+		vhci_log(level, dip, "path cmd %s\n",
+		    vhci_print_scsi_cmd(*cdb));
+		return;
+	}
+
+	(void) sprintf(buf, "%s for cmd(%s)", title, vhci_print_scsi_cmd(*cdb));
+	vhci_clean_print(dip, level, buf, cdb, len);
+}
+
+static void
+vhci_clean_print(dev_info_t *dev, uint_t level, char *title, uchar_t *data,
+    int len)
+{
+	int	i;
+	int 	c;
+	char	*format;
+	char	buf[256];
+	uchar_t	byte;
+
+	(void) sprintf(buf, "%s:\n", title);
+	vhci_log(level, dev, "%s", buf);
+	level = CE_CONT;
+	for (i = 0; i < len; ) {
+		buf[0] = 0;
+		for (c = 0; c < 8 && i < len; c++, i++) {
+			byte = (uchar_t)data[i];
+			if (byte < 0x10)
+				format = "0x0%x ";
+			else
+				format = "0x%x ";
+			(void) sprintf(&buf[(int)strlen(buf)], format, byte);
+		}
+		(void) sprintf(&buf[(int)strlen(buf)], "\n");
+
+		vhci_log(level, dev, "%s\n", buf);
+	}
+}
+#endif

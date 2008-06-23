@@ -390,6 +390,7 @@ MISC_KMODS	+= tem
 MISC_KMODS	+= pcicfg.e fcodem fcpci
 MISC_KMODS	+= scsi_vhci_f_sym scsi_vhci_f_tpgs scsi_vhci_f_asym_sun
 MISC_KMODS	+= scsi_vhci_f_sym_hds
+MISC_KMODS	+= scsi_vhci_f_tape scsi_vhci_f_tpgs_tape
 
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= amsrc1
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= klmmod klmops

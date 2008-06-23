@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,7 +151,8 @@ static void *vhci_mpapi_get_rel_tport_pair(struct scsi_vhci *vhci,
  */
 extern void	*vhci_softstate;
 extern char	vhci_version_name[];
-extern int	(*tpgs_set_target_groups)(struct scsi_address *, int, int);
+extern int vhci_tpgs_set_target_groups(struct scsi_address *, int, int);
+
 
 extern void mdi_vhci_walk_phcis(dev_info_t *,
     int (*)(dev_info_t *, void *), void *);
@@ -1572,8 +1573,8 @@ vhci_set_tpg_access_state(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 		ap = &svp->svp_psd->sd_address;
 		ASSERT(ap != NULL);
 
-		retval = (*tpgs_set_target_groups)
-		    (ap, desired_state, t10_tpgid);
+		retval = vhci_tpgs_set_target_groups(ap, desired_state,
+		    t10_tpgid);
 		if (retval != 0) {
 			VHCI_DEBUG(1, (CE_WARN, NULL, "vhci_set_tpg_access_"
 			    "state:(ALUA) FAILOVER FAILED: %x", retval));

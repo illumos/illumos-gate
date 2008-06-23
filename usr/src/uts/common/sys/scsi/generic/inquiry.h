@@ -73,8 +73,8 @@ struct scsi_inquiry {
 	uchar_t	inq_len;		/* additional length 		*/
 
 	uchar_t			: 4,	/* reserved 			*/
-		inq_tpgs	: 1,	/* supports Target Port Group set */
-				: 3;
+		inq_tpgs	: 2,	/* supports Target Port Group set */
+				: 2;
 	uchar_t	inq_addr16	: 1,	/* supports 16 bit wide SCSI addr */
 		inq_addr32	: 1,	/* supports 32 bit wide SCSI addr */
 		inq_ackqreqq	: 1,	/* data tranfer on Q cable */
@@ -149,8 +149,8 @@ struct scsi_inquiry {
 
 	uchar_t	inq_len;		/* additional length */
 
-	uchar_t			: 3,	/* reserved */
-		inq_tpgs	: 1,	/* supports Target Port Group Set */
+	uchar_t			: 2,	/* reserved */
+		inq_tpgs	: 2,	/* supports Target Port Group Set */
 				: 4;
 
 	uchar_t	inq_bque	: 1,	/* combined with cmdque */

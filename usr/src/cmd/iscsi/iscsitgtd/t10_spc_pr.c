@@ -134,10 +134,8 @@ spc_pgr_is_conflicting(uint8_t *cdb, uint_t type)
 			 * As per SPC-3, Revision 23, Section 6.23
 			 */
 			switch ((cdb[1] & 0x1f)) {
-				/* SCMD_REPORT_SUPPORTED_OPERATION_CODES */
-				case 0x0c:
-				/* SCMD_REPORT_SUPPORTED_MANAGEMENT_FUNCTIONS */
-				case 0x0d:
+				case SSVC_ACTION_GET_SUPPORTED_OPERATIONS:
+				case SSVC_SCTION_GET_SUPPORTED_MANAGEMENT:
 
 					conflict = True;
 					break;
@@ -149,10 +147,10 @@ spc_pgr_is_conflicting(uint8_t *cdb, uint_t type)
 			 * SPC-3, Revision 23, Section 6.29
 			 */
 			switch ((cdb[1] & 0x1F)) {
-				case SCMD_SET_DEVICE_IDENTIFIER:
-				case SCMD_SET_PRIORITY:
-				case SCMD_SET_TARGET_PORT_GROUPS:
-				case SCMD_SET_TIMESTAMP:
+				case SSVC_ACTION_SET_DEVICE_IDENTIFIER:
+				case SSVC_ACTION_SET_PRIORITY:
+				case SSVC_ACTION_SET_TARGET_PORT_GROUPS:
+				case SSVC_ACTION_SET_TIMESTAMP:
 				conflict = True;
 				break;
 			}

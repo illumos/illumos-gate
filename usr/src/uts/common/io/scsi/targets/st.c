@@ -111,6 +111,14 @@
 
 #define	ONE_K	1024
 
+#define	MAX_SPACE_CNT(cnt) if (cnt >= 0) { \
+		if (cnt > MIN(SP_CNT_MASK, INT32_MAX)) \
+			return (EINVAL); \
+	} else { \
+		if (-(cnt) > MIN(SP_CNT_MASK, INT32_MAX)) \
+			return (EINVAL); \
+	} \
+
 /*
  * Global External Data Definitions
  */
@@ -122,8 +130,11 @@ extern uchar_t	scsi_cdb_size[];
  */
 static void *st_state;
 static char *const st_label = "st";
-static volatile dev_info_t *st_lastdev;
 static volatile int st_recov_sz = sizeof (recov_info);
+static const char mp_misconf[] = {
+	"St Tape is misconfigured, MPxIO enabled and "
+	"tape-command-recovery-disable set in st.conf\n"
+};
 
 #ifdef	__x86
 /*
@@ -241,6 +252,8 @@ extern const char st_conf_version[];
 #ifdef STDEBUG
 static int st_soft_error_report_debug = 0;
 volatile int st_debug = 0;
+static volatile dev_info_t *st_lastdev;
+static kmutex_t st_debug_mutex;
 #endif
 
 #define	ST_MT02_NAME	"Emulex  MT02 QIC-11/24  "
@@ -315,6 +328,23 @@ static const char *load_strs[] = {
 	"load reten EOD"	/* LD_LOAD|LD_RETEN|LD_EOT 7 */
 	"hold",			/* LD_HOLD		8 */
 	"load and hold"		/* LD_LOAD | LD_HOLD	9 */
+};
+
+static const char *errstatenames[] = {
+	"COMMAND_DONE",
+	"COMMAND_DONE_ERROR",
+	"COMMAND_DONE_ERROR_RECOVERED",
+	"QUE_COMMAND",
+	"QUE_BUSY_COMMAND",
+	"QUE_SENSE",
+	"JUST_RETURN",
+	"COMMAND_DONE_EACCES",
+	"QUE_LAST_COMMAND",
+	"COMMAND_TIMEOUT",
+	"PATH_FAILED",
+	"DEVICE_RESET",
+	"DEVICE_TAMPER",
+	"ATTEMPT_RETRY"
 };
 
 const char *bogusID = "Unknown Media ID";
@@ -523,7 +553,7 @@ static void st_update_error_stack(struct scsi_tape *un, struct scsi_pkt *pkt,
     struct scsi_arq_status *cmd);
 static void st_empty_error_stack(struct scsi_tape *un);
 static errstate st_decode_sense(struct scsi_tape *un, struct buf *bp, int amt,
-    struct scsi_status *, tapepos_t *);
+    struct scsi_arq_status *, tapepos_t *);
 static int st_report_soft_errors(dev_t dev, int flag);
 static void st_delayed_cv_broadcast(void *arg);
 static int st_check_media(dev_t dev, enum mtio_state state);
@@ -556,7 +586,7 @@ static int st_reserve_release(struct scsi_tape *un, int command, ubufunc_t ubf);
 static int st_check_cdb_for_need_to_reserve(struct scsi_tape *un, uchar_t *cdb);
 static int st_check_cmd_for_need_to_reserve(struct scsi_tape *un, uchar_t cmd,
     int count);
-static int st_take_ownership(struct scsi_tape *un);
+static int st_take_ownership(struct scsi_tape *un, ubufunc_t ubf);
 static int st_check_asc_ascq(struct scsi_tape *un);
 static int st_check_clean_bit(struct scsi_tape *un);
 static int st_check_alert_flags(struct scsi_tape *un);
@@ -576,20 +606,20 @@ static int st_interpret_read_pos(struct scsi_tape const *un, tapepos_t *dest,
 static int st_get_read_pos(struct scsi_tape *un, buf_t *bp);
 static int st_logical_block_locate(struct scsi_tape *un, ubufunc_t ubf,
     tapepos_t *pos, uint64_t lblk, uchar_t partition);
-static int st_mtfsf_ioctl(struct scsi_tape *un, int files);
-static int st_mtfsr_ioctl(struct scsi_tape *un, int count);
-static int st_mtbsf_ioctl(struct scsi_tape *un, int files);
-static int st_mtnbsf_ioctl(struct scsi_tape *un, int count);
-static int st_mtbsr_ioctl(struct scsi_tape *un, int num);
-static int st_mtfsfm_ioctl(struct scsi_tape *un, int cnt);
-static int st_mtbsfm_ioctl(struct scsi_tape *un, int cnt);
-static int st_backward_space_files(struct scsi_tape *un, int count,
+static int st_mtfsf_ioctl(struct scsi_tape *un, int64_t files);
+static int st_mtfsr_ioctl(struct scsi_tape *un, int64_t count);
+static int st_mtbsf_ioctl(struct scsi_tape *un, int64_t files);
+static int st_mtnbsf_ioctl(struct scsi_tape *un, int64_t count);
+static int st_mtbsr_ioctl(struct scsi_tape *un, int64_t num);
+static int st_mtfsfm_ioctl(struct scsi_tape *un, int64_t cnt);
+static int st_mtbsfm_ioctl(struct scsi_tape *un, int64_t cnt);
+static int st_backward_space_files(struct scsi_tape *un, int64_t count,
     int infront);
-static int st_forward_space_files(struct scsi_tape *un, int files);
+static int st_forward_space_files(struct scsi_tape *un, int64_t files);
 static int st_scenic_route_to_begining_of_file(struct scsi_tape *un,
     int32_t fileno);
 static int st_space_to_begining_of_file(struct scsi_tape *un);
-static int st_space_records(struct scsi_tape *un, int records);
+static int st_space_records(struct scsi_tape *un, int64_t records);
 static int st_get_media_identification(struct scsi_tape *un, ubufunc_t bufunc);
 static errstate st_command_recovery(struct scsi_tape *un, struct scsi_pkt *pkt,
     errstate onentry);
@@ -639,13 +669,14 @@ static int st_validate_tapemarks(struct scsi_tape *un, ubufunc_t ubf,
 
 #ifdef STDEBUG
 static void st_debug_cmds(struct scsi_tape *un, int com, int count, int wait);
-static char *st_dev_name(dev_t dev);
 #endif /* STDEBUG */
+static char *st_dev_name(dev_t dev);
 
 #if !defined(lint)
 _NOTE(SCHEME_PROTECTS_DATA("unique per pkt",
     scsi_pkt buf uio scsi_cdb uscsi_cmd))
 _NOTE(SCHEME_PROTECTS_DATA("unique per pkt", scsi_extended_sense scsi_status))
+_NOTE(SCHEME_PROTECTS_DATA("unique per pkt", recov_info))
 _NOTE(SCHEME_PROTECTS_DATA("stable data", scsi_device))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(st_drivetype scsi_address))
 #endif
@@ -705,20 +736,24 @@ _init(void)
 
 	if ((e = mod_install(&modlinkage)) != 0) {
 		ddi_soft_state_fini(&st_state);
-	}
+	} else {
+#ifdef STDEBUG
+		mutex_init(&st_debug_mutex, NULL, MUTEX_DRIVER, NULL);
+#endif
 
 #if defined(__x86)
-	/* set the max physical address for iob allocs on x86 */
-	st_alloc_attr.dma_attr_addr_hi = st_max_phys_addr;
+		/* set the max physical address for iob allocs on x86 */
+		st_alloc_attr.dma_attr_addr_hi = st_max_phys_addr;
 
-	/*
-	 * set the sgllen for iob allocs on x86. If this is set less than
-	 * the number of pages the buffer will take (taking into account
-	 * alignment), it would force the allocator to try and allocate
-	 * contiguous pages.
-	 */
-	st_alloc_attr.dma_attr_sgllen = st_sgl_size;
+		/*
+		 * set the sgllen for iob allocs on x86. If this is set less
+		 * than the number of pages the buffer will take
+		 * (taking into account alignment), it would force the
+		 * allocator to try and allocate contiguous pages.
+		 */
+		st_alloc_attr.dma_attr_sgllen = st_sgl_size;
 #endif
+	}
 
 	return (e);
 }
@@ -731,6 +766,10 @@ _fini(void)
 	if ((e = mod_remove(&modlinkage)) != 0) {
 		return (e);
 	}
+
+#ifdef STDEBUG
+	mutex_destroy(&st_debug_mutex);
+#endif
 
 	ddi_soft_state_fini(&st_state);
 
@@ -1055,6 +1094,12 @@ st_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		un->un_max_cdb_sz = CDB_GROUP4; /* optimistic default */
 	}
 
+	if (strcmp(ddi_driver_name(ddi_get_parent(ST_DEVINFO)), "scsi_vhci")) {
+		un->un_multipath = 0;
+	} else {
+		un->un_multipath = 1;
+	}
+
 	un->un_maxbsize = MAXBSIZE_UNKNOWN;
 
 	un->un_mediastate = MTIO_NONE;
@@ -1169,7 +1214,8 @@ st_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 static int
 st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
-	int 	instance;
+	int instance;
+	int result;
 	struct scsi_device *devp;
 	struct scsi_tape *un;
 	clock_t wait_cmds_complete;
@@ -1207,6 +1253,7 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		    (void *)un);
 
 		if (((un->un_dp->options & ST_UNLOADABLE) == 0) ||
+		    ((un->un_rsvd_status & ST_APPLICATION_RESERVATIONS) != 0) ||
 		    (un->un_ncmds != 0) || (un->un_quef != NULL) ||
 		    (un->un_state != ST_STATE_CLOSED)) {
 			/*
@@ -1216,6 +1263,7 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			 */
 			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 			    "cannot unload instance %x\n", instance);
+			un->un_unit_attention_flags |= 4;
 			return (DDI_FAILURE);
 		}
 
@@ -1243,7 +1291,7 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			 * to fail the detach till a user command fails
 			 * where after the detach will succead.
 			 */
-			(void) st_cmd(un, SCMD_TEST_UNIT_READY, 0, SYNC_CMD);
+			result = st_cmd(un, SCMD_TEST_UNIT_READY, 0, SYNC_CMD);
 			/*
 			 * After TUR un_state may be set to non-closed,
 			 * so reset it back.
@@ -1260,6 +1308,7 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		 * if we are not at BOT then it is not safe to unload
 		 */
 		if ((un->un_dev) &&		/* Been opened since attach */
+		    (result != EACCES) &&	/* drive is use by somebody */
 		    (((un->un_pos.pmode == legacy) &&
 		    (un->un_pos.fileno > 0) ||	/* Known position not rewound */
 		    (un->un_pos.blkno != 0)) ||	/* Or within first file */
@@ -1271,6 +1320,7 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			    " lgclblkno=0x%"PRIx64"\n", un->un_pos.pmode,
 			    un->un_pos.fileno, un->un_pos.blkno,
 			    un->un_pos.lgclblkno);
+			un->un_unit_attention_flags |= 4;
 			return (DDI_FAILURE);
 		}
 
@@ -1684,6 +1734,8 @@ st_doattach(struct scsi_device *devp, int (*canwait)())
 
 	un->un_suspend_pos.pmode = invalid;
 
+	st_add_recovery_info_to_pkt(un, un->un_rqs_bp, un->un_rqs);
+
 #ifdef	__x86
 	if (ddi_dma_alloc_handle(ST_DEVINFO, &st_contig_mem_dma_attr,
 	    DDI_DMA_SLEEP, NULL, &un->un_contig_mem_hdl) != DDI_SUCCESS) {
@@ -1863,7 +1915,7 @@ st_known_tape_type(struct scsi_tape *un)
 		(void) st_reserve_release(un, reserved, st_uscsi_cmd);
 	}
 
-	un->un_unit_attention_flags = 1;
+	un->un_unit_attention_flags |= 1;
 
 	scsi_log(ST_DEVINFO, st_label, CE_NOTE, "?<%s>\n", dp->name);
 
@@ -2715,11 +2767,9 @@ st_open(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 	 */
 	mutex_enter(ST_MUTEX);
 
-#ifdef	STDEBUG
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
 	    "st_open(node = %s dev = 0x%lx, flag = %d, otyp = %d)\n",
 	    st_dev_name(dev), *dev_p, flag, otyp);
-#endif
 
 	/*
 	 * All device accesss go thru st_strategy() where we check
@@ -2856,7 +2906,6 @@ exit:
 		}
 		un->un_err_resid = 0;
 		un->un_retry_ct = 0;
-		un->un_tran_retry_ct = 0;
 	}
 busy:
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
@@ -3349,6 +3398,8 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	 */
 	if (((minor & (MT_BSD | MT_NOREWIND)) == MT_NOREWIND) &&
 	    (flag & FREAD) &&		/* reading or at least asked to */
+	    (un->un_mediastate == MTIO_INSERTED) &&	/* tape loaded */
+	    (un->un_pos.pmode != invalid) &&		/* XXX position known */
 	    ((un->un_pos.blkno != 0) && 		/* inside a file */
 	    (un->un_lastop != ST_OP_WRITE) &&		/* Didn't just write */
 	    (un->un_lastop != ST_OP_WEOF))) {		/* or write filemarks */
@@ -3369,7 +3420,7 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 					    SCSI_DEBUG,
 					    "st_close : EIO can't space\n");
 					err = EIO;
-					break;
+					goto error_out;
 				}
 				if (un->un_pos.eof >= ST_EOF_PENDING) {
 					un->un_pos.eof = ST_EOT_PENDING;
@@ -3382,6 +3433,7 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 				ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 				    "st_close: EIO can't space #2\n");
 				err = EIO;
+				goto error_out;
 			} else {
 				ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
 				    "st_close2: fileno=%x,blkno=%x,eof=%x\n",
@@ -3401,10 +3453,11 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 
 		case ST_EOT:
 		case ST_EOT_PENDING:
+		case ST_EOM:
 			/* nothing to do */
 			break;
 		default:
-			scsi_log(ST_DEVINFO, st_label, CE_PANIC,
+			ST_DEBUG(ST_DEVINFO, st_label, CE_PANIC,
 			    "Undefined state 0x%x", un->un_pos.eof);
 
 		}
@@ -3441,6 +3494,7 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 				ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 				    "st_close: EIO can't space #3\n");
 				err = EIO;
+				goto error_out;
 			} else {
 				un->un_pos.blkno = 0;
 				un->un_pos.eof = ST_EOT;
@@ -3483,6 +3537,7 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 				ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 				    "st_close : EIO can't wfm\n");
 				err = EIO;
+				goto error_out;
 			}
 			if ((un->un_dp->options & ST_REEL) &&
 			    (minor & MT_NOREWIND)) {
@@ -3491,6 +3546,7 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 					    SCSI_DEBUG,
 					    "st_close : EIO space fmk(-1)\n");
 					err = EIO;
+					goto error_out;
 				}
 				un->un_pos.eof = ST_NO_EOF;
 				/* fix up block number */
@@ -3519,7 +3575,10 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	if (st_report_soft_errors_on_close &&
 	    (un->un_dp->options & ST_SOFT_ERROR_REPORTING) &&
 	    (last_state != ST_STATE_OFFLINE)) {
-		(void) st_report_soft_errors(dev, flag);
+		if (st_report_soft_errors(dev, flag)) {
+			err = EIO;
+			goto error_out;
+		}
 	}
 
 
@@ -3559,11 +3618,32 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 		 * the problems described above.
 		 */
 		if (un->un_sd->sd_inq->inq_ansi < 2) {
-			(void) st_cmd(un, SCMD_REWIND, 0, SYNC_CMD);
+			if (st_cmd(un, SCMD_REWIND, 0, SYNC_CMD)) {
+				err = EIO;
+			}
 		} else {
 			/* flush data for older drives per scsi spec. */
-			(void) st_cmd(un, SCMD_WRITE_FILE_MARK, 0, SYNC_CMD);
-			(void) st_cmd(un, SCMD_REWIND, 1, ASYNC_CMD);
+			if (st_cmd(un, SCMD_WRITE_FILE_MARK, 0, SYNC_CMD)) {
+				err = EIO;
+			} else if (st_cmd(un, SCMD_REWIND, 1, ASYNC_CMD)) {
+				err = EIO;
+			}
+		}
+		/*
+		 * Setting positions invalid in case the rewind doesn't
+		 * happen. Drives don't like to rewind if resets happen
+		 * they will tend to move back to where the rewind was
+		 * issued if a reset or something happens so that if a
+		 * write happens the data doesn't get clobbered.
+		 *
+		 * Not a big deal if the position is invalid when the
+		 * open occures it will do a read position.
+		 */
+		un->un_pos.pmode = invalid;
+		un->un_running.pmode = invalid;
+
+		if (err == EIO) {
+			goto error_out;
 		}
 	}
 
@@ -3575,6 +3655,8 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 		if (st_cmd(un, SCMD_LOAD, LD_UNLOAD, SYNC_CMD)) {
 			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 			    "st_close : can't unload tape\n");
+			err = EIO;
+			goto error_out;
 		} else {
 			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 			    "st_close : tape unloaded \n");
@@ -3590,7 +3672,7 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	    (ST_RESERVE | ST_PRESERVE_RESERVE)) == ST_RESERVE) {
 		(void) st_reserve_release(un, ST_RELEASE, st_uscsi_cmd);
 	}
-
+error_out:
 	/*
 	 * clear up state
 	 */
@@ -3599,7 +3681,6 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	un->un_lastop = ST_OP_NIL;
 	un->un_throttle = 1;	/* assume one request at time, for now */
 	un->un_retry_ct = 0;
-	un->un_tran_retry_ct = 0;
 	un->un_errno = 0;
 	un->un_swr_token = (opaque_t)NULL;
 	un->un_rsvd_status &= ~(ST_INIT_RESERVE);
@@ -3829,6 +3910,11 @@ st_rw(dev_t dev, struct uio *uio, int flag)
 		rval = EINVAL;
 	}
 
+	if (st_recov_sz != sizeof (recov_info) && un->un_multipath) {
+		scsi_log(ST_DEVINFO, st_label, CE_WARN, mp_misconf);
+		rval = EFAULT;
+	}
+
 	if (rval != 0) {
 		un->un_errno = rval;
 		mutex_exit(ST_MUTEX);
@@ -3914,6 +4000,11 @@ st_arw(dev_t dev, struct aio_req *aio, int flag)
 		    "%s: not modulo %d device granularity\n",
 		    (flag == B_WRITE) ? wr_str : rd_str, un->un_data_mod);
 		rval = EINVAL;
+	}
+
+	if (st_recov_sz != sizeof (recov_info) && un->un_multipath) {
+		scsi_log(ST_DEVINFO, st_label, CE_WARN, mp_misconf);
+		rval = EFAULT;
 	}
 
 	if (rval != 0) {
@@ -4061,7 +4152,7 @@ st_queued_strategy(buf_t *bp)
 			un->un_pos.pmode = invalid;
 			goto b_done_err;
 		}
-		/* WTF un_restore_pos make invalid */
+		/* un_restore_pos make invalid */
 		un->un_state = ST_STATE_OPEN_PENDING_IO;
 		un->un_restore_pos = 0;
 	}
@@ -4373,14 +4464,15 @@ st_strategy(struct buf *bp)
  * this routine spaces forward over filemarks
  */
 static int
-st_space_fmks(struct scsi_tape *un, long count)
+st_space_fmks(struct scsi_tape *un, int64_t count)
 {
 	int rval = 0;
 
 	ST_FUNC(ST_DEVINFO, st_space_fmks);
 
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "st_space_fmks(dev = 0x%lx, count = %ld)\n", un->un_dev, count);
+	    "st_space_fmks(dev = 0x%lx, count = %"PRIx64")\n",
+	    un->un_dev, count);
 
 	ASSERT(mutex_owned(ST_MUTEX));
 
@@ -4735,6 +4827,8 @@ st_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 
 	mutex_enter(ST_MUTEX);
 
+	ASSERT(un->un_recov_buf_busy == 0);
+
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
 	    "st_ioctl(): fileno=%x, blkno=%x, eof=%x, state = %d, "
 	    "pe_flag = %d\n",
@@ -4897,6 +4991,15 @@ check_commands:
 		 * persistense. Fake the answer based on previous info.
 		 */
 		if (un->un_persistence) {
+			rval = 0;
+		} else {
+			rval = st_check_clean_bit(un);
+		}
+		if (rval == 0) {
+			/*
+			 * If zero is returned or in persistent mode,
+			 * use the old data.
+			 */
 			if ((un->un_HeadClean & (TAPE_ALERT_SUPPORTED |
 			    TAPE_SEQUENTIAL_SUPPORTED|TAPE_ALERT_NOT_SUPPORTED))
 			    != TAPE_ALERT_NOT_SUPPORTED) {
@@ -4906,13 +5009,6 @@ check_commands:
 			    TAPE_ALERT_STILL_DIRTY)) {
 				mtget->mt_flags |= MTF_TAPE_HEAD_DIRTY;
 			}
-			rval = 0;
-		} else {
-			rval = st_check_clean_bit(un);
-		}
-		if (rval == -1) {
-			rval = EIO;
-			goto exit;
 		} else {
 			mtget->mt_flags |= (ushort_t)rval;
 			rval = 0;
@@ -5239,7 +5335,7 @@ check_commands:
 		 */
 		(void) st_reserve_release(un, ST_RESERVE, st_uscsi_cmd);
 
-		rval = st_take_ownership(un);
+		rval = st_take_ownership(un, st_uscsi_cmd);
 
 		break;
 	}
@@ -5914,30 +6010,37 @@ st_do_mtioctop(struct scsi_tape *un, struct mtlop *mtop)
 		break;
 
 	case MTFSF:
+		MAX_SPACE_CNT(mtop->mt_count);
 		rval = st_mtfsf_ioctl(un, mtop->mt_count);
 		break;
 
 	case MTFSR:
+		MAX_SPACE_CNT(mtop->mt_count);
 		rval = st_mtfsr_ioctl(un, mtop->mt_count);
 		break;
 
 	case MTBSF:
+		MAX_SPACE_CNT(mtop->mt_count);
 		rval = st_mtbsf_ioctl(un, mtop->mt_count);
 		break;
 
 	case MTNBSF:
+		MAX_SPACE_CNT(mtop->mt_count);
 		rval = st_mtnbsf_ioctl(un, mtop->mt_count);
 		break;
 
 	case MTBSR:
+		MAX_SPACE_CNT(mtop->mt_count);
 		rval = st_mtbsr_ioctl(un, mtop->mt_count);
 		break;
 
 	case MTBSSF:
+		MAX_SPACE_CNT(mtop->mt_count);
 		rval = st_mtbsfm_ioctl(un, mtop->mt_count);
 		break;
 
 	case MTFSSF:
+		MAX_SPACE_CNT(mtop->mt_count);
 		rval = st_mtfsfm_ioctl(un, mtop->mt_count);
 		break;
 
@@ -6346,6 +6449,7 @@ st_start(struct scsi_tape *un)
 				    "Sending delayed start to st_runout()\n");
 				mutex_exit(ST_MUTEX);
 				(void) timeout(fnc, un, drv_usectohz(1000000));
+				mutex_enter(ST_MUTEX);
 			}
 			return;
 		}
@@ -6452,39 +6556,54 @@ st_start(struct scsi_tape *un)
 
 	if (status != TRAN_ACCEPT) {
 		ST_DO_KSTATS(bp, kstat_runq_back_to_waitq);
-		mutex_exit(ST_MUTEX);
+		ST_DEBUG(ST_DEVINFO, st_label, CE_WARN,
+		    "Unhappy transport packet status 0x%x\n", status);
 
 		if (status == TRAN_BUSY) {
-			/* if too many retries, fail the transport */
-			if (st_handle_start_busy(un, bp,
-			    ST_TRAN_BUSY_TIMEOUT, queued) == 0)
-				goto done;
+			pkt_info *pkti = BP_PKT(bp)->pkt_private;
+
+			/*
+			 * If command recovery is enabled and this isn't
+			 * a recovery command try command recovery.
+			 */
+			if (pkti->privatelen == sizeof (recov_info) &&
+			    bp != un->un_recov_buf) {
+				ST_RECOV(ST_DEVINFO, st_label, CE_WARN,
+				    "Command Recovery called on busy send\n");
+				if (st_command_recovery(un, BP_PKT(bp),
+				    ATTEMPT_RETRY) == JUST_RETURN) {
+					return;
+				}
+			} else {
+				mutex_exit(ST_MUTEX);
+				if (st_handle_start_busy(un, bp,
+				    ST_TRAN_BUSY_TIMEOUT, queued) == 0) {
+					mutex_enter(ST_MUTEX);
+					return;
+				}
+				/*
+				 * if too many retries, fail the transport
+				 */
+				mutex_enter(ST_MUTEX);
+			}
 		}
 		scsi_log(ST_DEVINFO, st_label, CE_WARN,
 		    "transport rejected %d\n", status);
 		bp->b_resid = bp->b_bcount;
 
-
-#ifndef __lock_lint
-		/*
-		 * warlock doesn't understand this potential
-		 * recursion?
-		 */
-		mutex_enter(ST_MUTEX);
 		ST_DO_KSTATS(bp, kstat_waitq_exit);
 		ST_DO_ERRSTATS(un, st_transerrs);
-		st_bioerror(bp, EIO);
-		st_set_pe_flag(un);
+		if ((bp == un->un_recov_buf) && (status == TRAN_BUSY)) {
+			st_bioerror(bp, EBUSY);
+		} else {
+			st_bioerror(bp, EIO);
+			st_set_pe_flag(un);
+		}
 		st_done_and_mutex_exit(un, bp);
-#endif
-	} else {
-		un->un_tran_retry_ct = 0;
-		mutex_exit(ST_MUTEX);
+		mutex_enter(ST_MUTEX);
 	}
 
-done:
-
-	mutex_enter(ST_MUTEX);
+	ASSERT(mutex_owned(ST_MUTEX));
 }
 
 /*
@@ -6494,6 +6613,8 @@ static int
 st_handle_start_busy(struct scsi_tape *un, struct buf *bp,
     clock_t timeout_interval, int queued)
 {
+
+	pkt_info *pktinfo = BP_PKT(bp)->pkt_private;
 
 	ST_FUNC(ST_DEVINFO, st_handle_start_busy);
 
@@ -6507,7 +6628,7 @@ st_handle_start_busy(struct scsi_tape *un, struct buf *bp,
 	 * making sure this is the last on the runq, if it is not, we have
 	 * to fail
 	 */
-	if (((int)un->un_tran_retry_ct++ > st_retry_count) ||
+	if ((pktinfo->str_retry_cnt++ > st_retry_count) ||
 	    ((queued) && (un->un_runql != bp))) {
 		mutex_exit(ST_MUTEX);
 		return (-1);
@@ -6647,7 +6768,9 @@ st_runout(caddr_t arg)
 static void
 st_done_and_mutex_exit(struct scsi_tape *un, struct buf *bp)
 {
-	int	pe_flagged = 0;
+	int pe_flagged = 0;
+	struct scsi_pkt *pkt = BP_PKT(bp);
+	pkt_info *pktinfo = pkt->pkt_private;
 
 	ASSERT(MUTEX_HELD(&un->un_sd->sd_mutex));
 #if !defined(lint)
@@ -6665,7 +6788,7 @@ st_done_and_mutex_exit(struct scsi_tape *un, struct buf *bp)
 
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
 	    "st_done_and_mutex_exit(): cmd=0x%x count=%ld resid=%ld  flags="
-	    "0x%x\n", (uchar_t)*((caddr_t)(BP_PKT(bp))->pkt_cdbp), bp->b_bcount,
+	    "0x%x\n", pkt->pkt_cdbp[0], bp->b_bcount,
 	    bp->b_resid, bp->b_flags);
 
 
@@ -6701,22 +6824,24 @@ st_done_and_mutex_exit(struct scsi_tape *un, struct buf *bp)
 		st_start(un);
 	}
 
+	un->un_retry_ct = max(pktinfo->pkt_retry_cnt, pktinfo->str_retry_cnt);
+
 	if (bp == un->un_sbufp && (bp->b_flags & B_ASYNC)) {
 		/*
 		 * Since we marked this ourselves as ASYNC,
 		 * there isn't anybody around waiting for
 		 * completion any more.
 		 */
-		uchar_t *cdb = (uchar_t *)bp->b_forw;
-		if (*cdb == SCMD_READ || *cdb == SCMD_WRITE) {
+		uchar_t *cmd = pkt->pkt_cdbp;
+		if (*cmd == SCMD_READ || *cmd == SCMD_WRITE) {
 			bp->b_un.b_addr = (caddr_t)0;
 		}
-		scsi_log(ST_DEVINFO, st_label, CE_NOTE,
+		ST_DEBUG(ST_DEVINFO, st_label, CE_NOTE,
 		    "st_done_and_mutex_exit(async): freeing pkt\n");
 		st_print_cdb(ST_DEVINFO, st_label, CE_NOTE,
-		    "CDB sent with B_ASYNC",  (caddr_t)cdb);
-		if (BP_PKT(bp)) {
-			scsi_destroy_pkt(BP_PKT(bp));
+		    "CDB sent with B_ASYNC",  (caddr_t)cmd);
+		if (pkt) {
+			scsi_destroy_pkt(pkt);
 		}
 		un->un_sbuf_busy = 0;
 		cv_signal(&un->un_sbuf_cv);
@@ -6751,8 +6876,8 @@ st_done_and_mutex_exit(struct scsi_tape *un, struct buf *bp)
 	ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
 	    "st_done_and_mutex_exit: freeing pkt\n");
 
-	if (BP_PKT(bp)) {
-		scsi_destroy_pkt(BP_PKT(bp));
+	if (pkt) {
+		scsi_destroy_pkt(pkt);
 	}
 
 	biodone(bp);
@@ -7117,8 +7242,6 @@ st_get_density(struct scsi_tape *un)
 	int succes = 0, rval = -1, i;
 	uint_t size;
 	uchar_t dens, olddens;
-
-	ST_FUNC(ST_DEVINFO, st_get_density);
 
 	ST_FUNC(ST_DEVINFO, st_get_density);
 
@@ -8128,6 +8251,7 @@ st_gen_mode_sense(struct scsi_tape *un, ubufunc_t ubf, int page,
 	int r;
 	char	cdb[CDB_GROUP0];
 	struct uscsi_cmd *com;
+	struct scsi_arq_status status;
 
 	ST_FUNC(ST_DEVINFO, st_gen_mode_sense);
 
@@ -8142,8 +8266,10 @@ st_gen_mode_sense(struct scsi_tape *un, ubufunc_t ubf, int page,
 	com->uscsi_cdblen = CDB_GROUP0;
 	com->uscsi_bufaddr = (caddr_t)page_data;
 	com->uscsi_buflen = page_size;
+	com->uscsi_rqlen = sizeof (status);
+	com->uscsi_rqbuf = (caddr_t)&status;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
-	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
+	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_RQENABLE | USCSI_READ;
 
 	r = ubf(un, com, FKIOCTL);
 	kmem_free(com, sizeof (*com));
@@ -8163,6 +8289,7 @@ st_gen_mode_select(struct scsi_tape *un, ubufunc_t ubf,
 	int r;
 	char cdb[CDB_GROUP0];
 	struct uscsi_cmd *com;
+	struct scsi_arq_status status;
 
 	ST_FUNC(ST_DEVINFO, st_gen_mode_select);
 
@@ -8193,8 +8320,10 @@ st_gen_mode_select(struct scsi_tape *un, ubufunc_t ubf,
 	com->uscsi_cdblen = CDB_GROUP0;
 	com->uscsi_bufaddr = (caddr_t)page_data;
 	com->uscsi_buflen = page_size;
+	com->uscsi_rqlen = sizeof (status);
+	com->uscsi_rqbuf = (caddr_t)&status;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
-	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT | USCSI_WRITE;
+	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_RQENABLE | USCSI_WRITE;
 
 	r = ubf(un, com, FKIOCTL);
 
@@ -8208,6 +8337,7 @@ st_read_block_limits(struct scsi_tape *un, struct read_blklim *read_blk)
 	int rval;
 	char cdb[CDB_GROUP0];
 	struct uscsi_cmd *com;
+	struct scsi_arq_status status;
 
 	ST_FUNC(ST_DEVINFO, st_read_block_limits);
 
@@ -8220,8 +8350,10 @@ st_read_block_limits(struct scsi_tape *un, struct read_blklim *read_blk)
 	com->uscsi_cdblen = CDB_GROUP0;
 	com->uscsi_bufaddr = (caddr_t)read_blk;
 	com->uscsi_buflen = sizeof (struct read_blklim);
+	com->uscsi_rqlen = sizeof (status);
+	com->uscsi_rqbuf = (caddr_t)&status;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
-	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
+	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_RQENABLE | USCSI_READ;
 
 	rval = st_uscsi_cmd(un, com, FKIOCTL);
 	if (com->uscsi_status || com->uscsi_resid) {
@@ -8239,6 +8371,7 @@ st_report_density_support(struct scsi_tape *un, uchar_t *density_data,
 	int rval;
 	char cdb[CDB_GROUP1];
 	struct uscsi_cmd *com;
+	struct scsi_arq_status status;
 
 	ST_FUNC(ST_DEVINFO, st_report_density_support);
 
@@ -8253,8 +8386,10 @@ st_report_density_support(struct scsi_tape *un, uchar_t *density_data,
 	com->uscsi_cdblen = CDB_GROUP1;
 	com->uscsi_bufaddr = (caddr_t)density_data;
 	com->uscsi_buflen = buflen;
+	com->uscsi_rqlen = sizeof (status);
+	com->uscsi_rqbuf = (caddr_t)&status;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
-	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
+	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_RQENABLE | USCSI_READ;
 
 	rval = st_uscsi_cmd(un, com, FKIOCTL);
 	if (com->uscsi_status || com->uscsi_resid) {
@@ -8272,6 +8407,7 @@ st_report_supported_operation(struct scsi_tape *un, uchar_t *oper_data,
 	int rval;
 	char cdb[CDB_GROUP5];
 	struct uscsi_cmd *com;
+	struct scsi_arq_status status;
 	uint32_t allo_length;
 
 	ST_FUNC(ST_DEVINFO, st_report_supported_operation);
@@ -8282,7 +8418,7 @@ st_report_supported_operation(struct scsi_tape *un, uchar_t *oper_data,
 
 	bzero(cdb, CDB_GROUP5);
 	cdb[0] = (char)SCMD_MAINTENANCE_IN;
-	cdb[1] = 0x0c; /* service action */
+	cdb[1] = SSVC_ACTION_GET_SUPPORTED_OPERATIONS;
 	if (service_action) {
 		cdb[2] = (char)(ONE_COMMAND_DATA_FORMAT | 0x80); /* RCTD */
 		cdb[4] = (service_action & 0xff00) >> 8;
@@ -8301,8 +8437,10 @@ st_report_supported_operation(struct scsi_tape *un, uchar_t *oper_data,
 	com->uscsi_cdblen = CDB_GROUP5;
 	com->uscsi_bufaddr = (caddr_t)oper_data;
 	com->uscsi_buflen = allo_length;
+	com->uscsi_rqlen = sizeof (status);
+	com->uscsi_rqbuf = (caddr_t)&status;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
-	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
+	com->uscsi_flags = USCSI_DIAGNOSE | USCSI_RQENABLE | USCSI_READ;
 
 	rval = st_uscsi_cmd(un, com, FKIOCTL);
 	if (com->uscsi_status) {
@@ -8323,8 +8461,6 @@ st_change_block_size(struct scsi_tape *un, uint32_t nblksz)
 	struct seq_mode *current;
 	int rval;
 	uint32_t oldblksz;
-
-	ST_FUNC(ST_DEVINFO, st_change_block_size);
 
 	ST_FUNC(ST_DEVINFO, st_change_block_size);
 
@@ -8425,13 +8561,16 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)(caddr_t))
 	struct uscsi_cmd *ucmd;
 	recov_info *ri;
 	int tval = 0;
-	uint64_t count;
-	uint32_t additional;
+	int64_t count;
+	uint32_t additional = 0;
+	uint32_t address = 0;
+	union scsi_cdb *ucdb;
 	int flags = 0;
 	int cdb_len = CDB_GROUP0; /* default */
 	uchar_t com;
 	char fixbit;
 	char short_fm = 0;
+	optype prev_op = un->un_lastop;
 	int stat_size =
 	    (un->un_arq_enabled ? sizeof (struct scsi_arq_status) : 1);
 
@@ -8586,7 +8725,22 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)(caddr_t))
 
 		case SCMD_SPACE_G4:
 			cdb_len = CDB_GROUP4;
-		case SCMD_SPACE: /* FALL THROUGH */
+			fixbit = SPACE_TYPE(bp->b_bcount);
+			count = SPACE_CNT(bp->b_bcount);
+			ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
+			    " %s space %s %"PRId64" from file %d blk %d\n",
+			    bp->b_bcount & SP_BACKSP ? "backward" : "forward",
+			    space_strs[fixbit & 7], count,
+			    un->un_pos.fileno, un->un_pos.blkno);
+			address = (count >> 48) & 0x1fff;
+			additional = (count >> 16) & 0xffffffff;
+			count &= 0xffff;
+			count <<= 16;
+			un->un_lastop = ST_OP_CTL;
+			tval = un->un_dp->space_timeout;
+			break;
+
+		case SCMD_SPACE:
 			fixbit = SPACE_TYPE(bp->b_bcount);
 			count = SPACE_CNT(bp->b_bcount);
 			ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
@@ -8594,7 +8748,6 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)(caddr_t))
 			    bp->b_bcount & SP_BACKSP ? "backward" : "forward",
 			    space_strs[fixbit & 7], count,
 			    un->un_pos.fileno, un->un_pos.blkno);
-			additional = count >> 32;
 			count &= 0xffffffff;
 			un->un_lastop = ST_OP_CTL;
 			tval = un->un_dp->space_timeout;
@@ -8729,6 +8882,7 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)(caddr_t))
 			    "Unhandled scsi command 0x%x in st_make_cmd()\n",
 			    com);
 		}
+
 		pkt = scsi_init_pkt(ROUTE, NULL, allocbp, cdb_len, stat_size,
 		    st_recov_sz, 0, func, (caddr_t)un);
 		if (pkt == NULL) {
@@ -8750,15 +8904,15 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)(caddr_t))
 
 	}
 
+	ucdb = (union scsi_cdb *)pkt->pkt_cdbp;
 
-	(void) scsi_setup_cdb((union scsi_cdb *)pkt->pkt_cdbp,
-	    com, 0, (uint_t)count, additional);
+	(void) scsi_setup_cdb(ucdb, com, address, (uint_t)count, additional);
 	FILL_SCSI1_LUN(un->un_sd, pkt);
 	/*
 	 * Initialize the SILI/Fixed bits of the byte 1 of cdb.
 	 */
-	((union scsi_cdb *)(pkt->pkt_cdbp))->t_code = fixbit;
-	((union scsi_cdb *)pkt->pkt_cdbp)->g0_vu_1 = short_fm;
+	ucdb->t_code = fixbit;
+	ucdb->g0_vu_1 = short_fm;
 	pkt->pkt_flags = flags;
 
 	ASSERT(tval);
@@ -8770,6 +8924,24 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)(caddr_t))
 	}
 
 	st_add_recovery_info_to_pkt(un, bp, pkt);
+
+	/*
+	 * If we just write data to tape and did a command that doesn't
+	 * change position, we still need to write a filemark.
+	 */
+	if ((prev_op == ST_OP_WRITE) || (prev_op == ST_OP_WEOF)) {
+		recov_info *rcvi = pkt->pkt_private;
+		cmd_attribute const *atrib;
+
+		if (rcvi->privatelen == sizeof (recov_info)) {
+			atrib = rcvi->cmd_attrib;
+		} else {
+			atrib = st_lookup_cmd_attribute(com);
+		}
+		if (atrib->chg_tape_direction == DIR_NONE) {
+			un->un_lastop = prev_op;
+		}
+	}
 
 exit:
 	ASSERT(mutex_owned(ST_MUTEX));
@@ -8913,7 +9085,6 @@ st_intr_restart(void *arg)
 			 * not good, we don't want to requeue something after
 			 * another.
 			 */
-			mutex_exit(ST_MUTEX);
 			goto done_error;
 		} else {
 			un->un_runqf = bp;
@@ -8930,46 +9101,52 @@ st_intr_restart(void *arg)
 
 	if (status != TRAN_ACCEPT) {
 		ST_DO_KSTATS(bp, kstat_runq_back_to_waitq);
-		mutex_exit(ST_MUTEX);
 
 		if (status == TRAN_BUSY) {
+			pkt_info *pkti = BP_PKT(bp)->pkt_private;
+
+			if (pkti->privatelen == sizeof (recov_info) &&
+			    un->un_unit_attention_flags &&
+			    bp != un->un_recov_buf) {
+			un->un_unit_attention_flags = 0;
+				ST_RECOV(ST_DEVINFO, st_label, CE_WARN,
+				    "Command Recovery called on busy resend\n");
+				if (st_command_recovery(un, BP_PKT(bp),
+				    ATTEMPT_RETRY) == JUST_RETURN) {
+					mutex_exit(ST_MUTEX);
+					return;
+				}
+			}
+			mutex_exit(ST_MUTEX);
 			if (st_handle_intr_busy(un, bp,
 			    ST_TRAN_BUSY_TIMEOUT) == 0)
 				return;	/* timeout is setup again */
+			mutex_enter(ST_MUTEX);
 		}
 
+done_error:
+		ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
+		    "restart transport rejected\n");
+		bp->b_resid = bp->b_bcount;
+
+		if (un->un_last_throttle) {
+			un->un_throttle = un->un_last_throttle;
+		}
+		if (status != TRAN_ACCEPT) {
+			ST_DO_ERRSTATS(un, st_transerrs);
+		}
+		ST_DO_KSTATS(bp, kstat_waitq_exit);
+		ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
+		    "busy restart aborted\n");
+		st_set_pe_flag(un);
+		st_bioerror(bp, EIO);
+		st_done_and_mutex_exit(un, bp);
 	} else {
-		un->un_tran_retry_ct = 0;
 		if (un->un_last_throttle) {
 			un->un_throttle = un->un_last_throttle;
 		}
 		mutex_exit(ST_MUTEX);
-		return;
 	}
-
-done_error:
-	ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
-	    "restart transport rejected\n");
-	bp->b_resid = bp->b_bcount;
-
-#ifndef __lock_lint
-	/*
-	 * warlock doesn't understand this potential
-	 * recursion?
-	 */
-	mutex_enter(ST_MUTEX);
-	if (un->un_last_throttle) {
-		un->un_throttle = un->un_last_throttle;
-	}
-	if (status != TRAN_ACCEPT)
-		ST_DO_ERRSTATS(un, st_transerrs);
-	ST_DO_KSTATS(bp, kstat_waitq_exit);
-	st_set_pe_flag(un);
-	st_bioerror(bp, EIO);
-	st_done_and_mutex_exit(un, bp);
-#endif
-	ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
-	    "busy restart aborted\n");
 }
 
 /*
@@ -9377,8 +9554,7 @@ st_intr(struct scsi_pkt *pkt)
 			ASSERT(pkt == un->un_rqs);
 			ASSERT(un->un_state == ST_STATE_SENSING);
 			un->un_state = un->un_laststate;
-			((recov_info *)un->un_rqs->pkt_private)->cmd_bp =
-			    un->un_rqs_bp;
+			rcv->cmd_bp = un->un_rqs_bp;
 			ST_DO_ERRSTATS(un, st_transerrs);
 			action = COMMAND_DONE_ERROR;
 		} else {
@@ -9406,8 +9582,7 @@ st_intr(struct scsi_pkt *pkt)
 			 * to requeue it
 			 */
 			pkt = BP_PKT(bp);
-			((recov_info *)un->un_rqs->pkt_private)->cmd_bp =
-			    un->un_rqs_bp;
+			rcv->cmd_bp = un->un_rqs_bp;
 			/*
 			 * some actions are based on un_state, hence
 			 * restore the state st was in before ST_STATE_SENSING.
@@ -9456,6 +9631,22 @@ st_intr(struct scsi_pkt *pkt)
 	}
 
 	/*
+	 * check for undetected path failover.
+	 */
+	if ((un->un_multipath) &&
+	    (un->un_last_path_instance != pkt->pkt_path_instance)) {
+		if (un->un_state > ST_STATE_OPENING) {
+			ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
+			    "Failover detected, action is %s\n",
+			    errstatenames[action]);
+			if (action == COMMAND_DONE) {
+				action = PATH_FAILED;
+			}
+		}
+		un->un_last_path_instance = pkt->pkt_path_instance;
+	}
+
+	/*
 	 * Restore old state if we were sensing.
 	 */
 	if (un->un_state == ST_STATE_SENSING && action != QUE_SENSE) {
@@ -9463,8 +9654,8 @@ st_intr(struct scsi_pkt *pkt)
 	}
 
 	ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "st_intr: pkt=%p, bp=%p, action=%x, status=%x\n",
-	    (void *)pkt, (void *)bp, action, SCBP_C(pkt));
+	    "st_intr: pkt=%p, bp=%p, action=%s, status=%x\n",
+	    (void *)pkt, (void *)bp, errstatenames[action], SCBP_C(pkt));
 
 again:
 	switch (action) {
@@ -9628,6 +9819,10 @@ last_command_error:
 	case DEVICE_RESET:
 	case DEVICE_TAMPER:
 	case ATTEMPT_RETRY:
+	case PATH_FAILED:
+		ST_RECOV(ST_DEVINFO, st_label, CE_WARN,
+		    "Command Recovery called on %s status\n",
+		    errstatenames[action]);
 		action = st_command_recovery(un, pkt, action);
 		goto again;
 
@@ -9688,8 +9883,8 @@ st_handle_incomplete(struct scsi_tape *un, struct buf *bp)
 		 * reduce probe time for nonexistant devices.
 		 */
 		if ((un->un_laststate > ST_STATE_OPENING) &&
-		    ((int)un->un_retry_ct < st_selection_retry_count)) {
-/* XXX check retriable? */
+		    (rinfo->pkt_retry_cnt < st_selection_retry_count)) {
+			/* XXX check retriable? */
 			rval = QUE_COMMAND;
 		}
 		ST_DO_ERRSTATS(un, st_transerrs);
@@ -9773,7 +9968,7 @@ reset_target:
 	}
 
 
-	if ((int)un->un_retry_ct++ < st_retry_count) {
+	if (rinfo->pkt_retry_cnt++ < st_retry_count) {
 		if (un->un_pwr_mgmt == ST_PWR_SUSPENDED) {
 			rval = QUE_COMMAND;
 		} else if (bp == un->un_sbufp) {
@@ -9824,6 +10019,7 @@ st_handle_intr_busy(struct scsi_tape *un, struct buf *bp,
 
 	int queued;
 	int rval = 0;
+	pkt_info *pktinfo = BP_PKT(bp)->pkt_private;
 
 	mutex_enter(ST_MUTEX);
 
@@ -9846,7 +10042,7 @@ st_handle_intr_busy(struct scsi_tape *un, struct buf *bp,
 	 * is the last we are in trouble anyway, as we are in the interrupt
 	 * context here.
 	 */
-	if (((int)un->un_tran_retry_ct++ > st_retry_count) ||
+	if ((pktinfo->str_retry_cnt++ > st_retry_count) ||
 	    ((un->un_runqf != bp) && (un->un_runql != bp) && (queued))) {
 		rval = -1;
 		goto exit;
@@ -10188,6 +10384,7 @@ st_handle_sense(struct scsi_tape *un, struct buf *bp, tapepos_t *pos)
 	struct scsi_pkt *pkt = BP_PKT(bp);
 	struct scsi_pkt *rqpkt = un->un_rqs;
 	struct scsi_arq_status arqstat;
+	recov_info *rcif = pkt->pkt_private;
 
 	errstate rval = COMMAND_DONE_ERROR;
 	int amt;
@@ -10200,15 +10397,28 @@ st_handle_sense(struct scsi_tape *un, struct buf *bp, tapepos_t *pos)
 	    "st_handle_sense()\n");
 
 	if (SCBP(rqpkt)->sts_busy) {
-		ST_DEBUG4(ST_DEVINFO, st_label, CE_WARN,
-		    "busy unit on request sense\n");
-		if ((int)un->un_retry_ct++ < st_retry_count) {
+		if (rcif->privatelen == sizeof (recov_info)) {
+			ST_RECOV(ST_DEVINFO, st_label, CE_WARN,
+			    "Attempt recovery of busy unit on request sense\n");
+			rval = ATTEMPT_RETRY;
+		} else if (rcif->pkt_retry_cnt++ < st_retry_count) {
+			ST_DEBUG4(ST_DEVINFO, st_label, CE_WARN,
+			    "Retry busy unit on request sense\n");
 			rval = QUE_BUSY_COMMAND;
 		}
 		return (rval);
 	} else if (SCBP(rqpkt)->sts_chk) {
 		ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
 		    "Check Condition on REQUEST SENSE\n");
+		return (rval);
+	}
+
+	/*
+	 * Make sure there is sense data to look at.
+	 */
+	if ((rqpkt->pkt_state & (STATE_GOT_BUS | STATE_GOT_TARGET |
+	    STATE_SENT_CMD | STATE_GOT_STATUS)) != (STATE_GOT_BUS |
+	    STATE_GOT_TARGET | STATE_SENT_CMD | STATE_GOT_STATUS)) {
 		return (rval);
 	}
 
@@ -10235,7 +10445,7 @@ st_handle_sense(struct scsi_tape *un, struct buf *bp, tapepos_t *pos)
 	 * copy one arqstat entry in the sense data buffer
 	 */
 	st_update_error_stack(un, pkt, &arqstat);
-	return (st_decode_sense(un, bp, amt, SCBP(rqpkt), pos));
+	return (st_decode_sense(un, bp, amt, &arqstat, pos));
 }
 
 static errstate
@@ -10312,15 +10522,15 @@ st_handle_autosense(struct scsi_tape *un, struct buf *bp, tapepos_t *pos)
 	 */
 	st_update_error_stack(un, pkt, arqstat);
 
-	return (st_decode_sense(un, bp, amt, &arqstat->sts_rqpkt_status, pos));
+	return (st_decode_sense(un, bp, amt, arqstat, pos));
 }
 
 static errstate
 st_decode_sense(struct scsi_tape *un, struct buf *bp, int amt,
-    struct scsi_status *statusp, tapepos_t *pos)
+    struct scsi_arq_status *statusp, tapepos_t *pos)
 {
 	struct scsi_pkt *pkt = BP_PKT(bp);
-	recov_info *ri = (recov_info *)pkt->pkt_private;
+	recov_info *ri = pkt->pkt_private;
 	errstate rval = COMMAND_DONE_ERROR;
 	cmd_attribute const *attrib;
 	long resid;
@@ -10372,8 +10582,8 @@ st_decode_sense(struct scsi_tape *un, struct buf *bp, int amt,
 	ST_CDB(ST_DEVINFO, "st_decode_sense failed CDB",
 	    (caddr_t)&CDBP(pkt)->scc_cmd);
 
-	ST_SENSE(ST_DEVINFO, "st_decode_sense sense data", (caddr_t)sensep,
-	    sizeof (*sensep));
+	ST_SENSE(ST_DEVINFO, "st_decode_sense sense data", (caddr_t)statusp,
+	    sizeof (*statusp));
 
 	/* for normal I/O check extract the resid values. */
 	if (bp != un->un_sbufp && bp != un->un_recov_buf) {
@@ -10417,6 +10627,7 @@ st_decode_sense(struct scsi_tape *un, struct buf *bp, int amt,
 		    (CDBP(pkt)->scc_cmd == SCMD_LOCATE) ||
 		    (CDBP(pkt)->scc_cmd == SCMD_LOCATE_G4) ||
 		    (CDBP(pkt)->scc_cmd == SCMD_SPACE) ||
+		    (CDBP(pkt)->scc_cmd == SCMD_SPACE_G4) ||
 		    (CDBP(pkt)->scc_cmd == SCMD_WRITE_FILE_MARK)) {
 			resid =
 			    (sensep->es_info_1 << 24) |
@@ -10593,14 +10804,6 @@ common:
 	case KEY_MEDIUM_ERROR:
 		ST_DO_ERRSTATS(un, st_harderrs);
 		severity = SCSI_ERR_FATAL;
-
-		/*
-		 * for (buffered) writes, a medium error must be fatal
-		 */
-		if (CDBP(pkt)->scc_cmd != SCMD_WRITE) {
-			rval = COMMAND_DONE_ERROR_RECOVERED;
-		}
-
 check_keys:
 		/*
 		 * attempt to process the keys in the presence of
@@ -10676,6 +10879,7 @@ check_keys:
 			un->un_status = SUN_KEY_EOT;
 			pos->eof = ST_EOT;
 			rval = COMMAND_DONE_ERROR;
+			un->un_running.pmode = invalid;
 			st_set_pe_flag(un);
 			goto check_keys;
 		} else if (bp != un->un_sbufp &&
@@ -10724,7 +10928,7 @@ check_keys:
 		ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
 		    "KEY_UNIT_ATTENTION : un_state = %d\n", un->un_state);
 
-		un->un_unit_attention_flags = 1;
+		un->un_unit_attention_flags |= 1;
 		/*
 		 * If we have detected a Bus Reset and the tape
 		 * drive has been reserved.
@@ -10746,7 +10950,7 @@ check_keys:
 		if (bp == un->un_recov_buf) {
 			severity = SCSI_ERR_INFO;
 			if (attrib->retriable &&
-			    (int)un->un_retry_ct++ < st_retry_count) {
+			    ri->pkt_retry_cnt++ < st_retry_count) {
 				rval = QUE_COMMAND;
 			} else {
 				rval = COMMAND_DONE_ERROR;
@@ -10764,11 +10968,18 @@ check_keys:
 		 */
 		if ((un->un_rsvd_status &
 		    ST_APPLICATION_RESERVATIONS) != 0) {
+			/*
+			 * RESERVATIONS PREEMPTED
+			 * With MPxIO this could be a fail over? XXX
+			 */
 			if (ST_RQSENSE->es_add_code == 0x2a &&
 			    ST_RQSENSE->es_qual_code == 0x03) {
 				severity = SCSI_ERR_INFO;
 				rval = COMMAND_DONE_ERROR;
 				pos->pmode = invalid;
+			/*
+			 * RESERVATIONS RELEASED
+			 */
 			} else if (ST_RQSENSE->es_add_code == 0x2a &&
 			    ST_RQSENSE->es_qual_code == 0x04) {
 				rval = COMMAND_DONE;
@@ -10793,7 +11004,7 @@ check_keys:
 			}
 
 			if (attrib->retriable &&
-			    (int)un->un_retry_ct++ < st_retry_count) {
+			    ri->pkt_retry_cnt++ < st_retry_count) {
 				rval = QUE_COMMAND;
 			} else if (rval == DEVICE_RESET) {
 				break;
@@ -10805,7 +11016,8 @@ check_keys:
 		 * This is the result of a reset clearing settings or
 		 * another initiator changing what we set.
 		 */
-		} else if (ST_RQSENSE->es_add_code == 0x2a) {
+		}
+		if (ST_RQSENSE->es_add_code == 0x2a) {
 			if (ST_RQSENSE->es_qual_code == 0x1) {
 				/* Error recovery will modeselect and retry. */
 				rval = DEVICE_TAMPER;
@@ -10867,7 +11079,7 @@ check_keys:
 		 */
 		if (sensep->es_add_code  == 0x04 &&
 		    sensep->es_qual_code == 0x01 &&
-		    un->un_retry_ct++ < st_retry_count) {
+		    ri->pkt_retry_cnt++ < st_retry_count) {
 			rval = QUE_COMMAND;
 			severity = SCSI_ERR_INFO;
 		} else {
@@ -10901,7 +11113,7 @@ check_keys:
 		/* XXX Do drives return this when they see a lost light? */
 		/* Testing would say yes */
 
-		if (un->un_retry_ct++ < st_retry_count) {
+		if (ri->pkt_retry_cnt++ < st_retry_count) {
 			rval = ATTEMPT_RETRY;
 			severity = SCSI_ERR_RETRYABLE;
 			goto check_keys;
@@ -10973,6 +11185,7 @@ static int
 st_handle_intr_retry_lcmd(struct scsi_tape *un, struct buf *bp)
 {
 	int status = TRAN_ACCEPT;
+	pkt_info *pktinfo = BP_PKT(bp)->pkt_private;
 
 	mutex_enter(ST_MUTEX);
 
@@ -10989,7 +11202,7 @@ st_handle_intr_retry_lcmd(struct scsi_tape *un, struct buf *bp)
 	 * is the last we are in trouble anyway, as we are in the interrupt
 	 * context here.
 	 */
-	if (((int)un->un_retry_ct > st_retry_count) ||
+	if ((pktinfo->pkt_retry_cnt > st_retry_count) ||
 	    ((un->un_runqf != bp) && (un->un_runql != bp))) {
 		goto exit;
 	}
@@ -11010,7 +11223,6 @@ st_handle_intr_retry_lcmd(struct scsi_tape *un, struct buf *bp)
 	status = st_transport(un, BP_PKT(bp));
 
 	if (status == TRAN_ACCEPT) {
-		un->un_tran_retry_ct = 0;
 		if (un->un_last_throttle) {
 			un->un_throttle = un->un_last_throttle;
 		}
@@ -11090,6 +11302,9 @@ static errstate
 st_check_error(struct scsi_tape *un, struct scsi_pkt *pkt)
 {
 	errstate action;
+	recov_info *rcvi = pkt->pkt_private;
+	buf_t *bp = rcvi->cmd_bp;
+	struct scsi_arq_status *stat = (struct scsi_arq_status *)pkt->pkt_scbp;
 
 	ST_FUNC(ST_DEVINFO, st_check_error);
 
@@ -11097,12 +11312,47 @@ st_check_error(struct scsi_tape *un, struct scsi_pkt *pkt)
 
 	ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG, "st_check_error()\n");
 
-	if (SCBP_C(pkt) == STATUS_RESERVATION_CONFLICT) {
-		action = COMMAND_DONE_EACCES;
-		un->un_rsvd_status |= ST_RESERVATION_CONFLICT;
-	} else if (SCBP(pkt)->sts_busy) {
+	switch (SCBP_C(pkt)) {
+	case STATUS_RESERVATION_CONFLICT:
+		/*
+		 * Command recovery is enabled, not just opening,
+		 * we had the drive reserved and we thing its ours.
+		 * Call recovery to attempt to take it back.
+		 */
+		if ((rcvi->privatelen == sizeof (recov_info)) &&
+		    (bp != un->un_recov_buf) &&
+		    (un->un_state > ST_STATE_OPEN_PENDING_IO) &&
+		    ((un->un_rsvd_status & (ST_RESERVE |
+		    ST_APPLICATION_RESERVATIONS)) != 0)) {
+			action = ATTEMPT_RETRY;
+			un->un_rsvd_status |= ST_LOST_RESERVE;
+		} else {
+			action = COMMAND_DONE_EACCES;
+			un->un_rsvd_status |= ST_RESERVATION_CONFLICT;
+		}
+		break;
+
+	case STATUS_BUSY:
 		ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG, "unit busy\n");
-		if ((int)un->un_retry_ct++ < st_retry_count) {
+		if (rcvi->privatelen == sizeof (recov_info) &&
+		    un->un_multipath && (pkt->pkt_state == (STATE_GOT_BUS |
+		    STATE_GOT_TARGET | STATE_SENT_CMD | STATE_GOT_STATUS))) {
+			/*
+			 * Status returned by scsi_vhci indicating path
+			 * has failed over.
+			 */
+			action = PATH_FAILED;
+			break;
+		}
+		/* FALLTHRU */
+	case STATUS_QFULL:
+		if (rcvi->privatelen == sizeof (recov_info)) {
+			/*
+			 * If recovery is inabled use it instead of
+			 * blind reties.
+			 */
+			action = ATTEMPT_RETRY;
+		} else if (rcvi->pkt_retry_cnt++ < st_retry_count) {
 			action = QUE_BUSY_COMMAND;
 		} else if ((un->un_rsvd_status &
 		    (ST_RESERVE | ST_APPLICATION_RESERVATIONS)) == 0) {
@@ -11117,21 +11367,45 @@ st_check_error(struct scsi_tape *un, struct scsi_pkt *pkt)
 			(void) st_reset(un, RESET_ALL);
 			action = COMMAND_DONE_ERROR;
 		}
-	} else if (SCBP(pkt)->sts_chk) {
+		break;
+
+	case STATUS_CHECK:
+	case STATUS_TERMINATED:
 		/*
 		 * we should only get here if the auto rqsense failed
 		 * thru a uscsi cmd without autorequest sense
 		 * so we just try again
 		 */
-		action = QUE_SENSE;
-	} else if (SCBP(pkt)->sts_vu7) {
+		if (un->un_arq_enabled &&
+		    stat->sts_rqpkt_reason == CMD_CMPLT &&
+		    (stat->sts_rqpkt_state & (STATE_GOT_BUS |
+		    STATE_GOT_TARGET | STATE_SENT_CMD | STATE_GOT_STATUS)) ==
+		    (STATE_GOT_BUS | STATE_GOT_TARGET | STATE_SENT_CMD |
+		    STATE_GOT_STATUS)) {
+
+			ST_DEBUG2(ST_DEVINFO, st_label, CE_WARN,
+			    "Really got sense data\n");
+			action = st_decode_sense(un, bp, MAX_SENSE_LENGTH -
+			    pkt->pkt_resid, stat, &un->un_pos);
+		} else {
+			ST_DEBUG2(ST_DEVINFO, st_label, CE_WARN,
+			    "Trying to queue sense command\n");
+			action = QUE_SENSE;
+		}
+		break;
+
+	case STATUS_TASK_ABORT:
 		/*
 		 * This is an aborted task. This can be a reset on the other
 		 * port of a multiport drive. Lets try and recover it.
 		 */
 		action = DEVICE_RESET;
-	} else {
+		break;
+
+	default:
 		action = COMMAND_DONE;
+		ST_DEBUG(ST_DEVINFO, st_label, CE_PANIC,
+		    "Unexpected scsi status byte 0x%x\n", SCBP_C(pkt));
 	}
 	return (action);
 }
@@ -11140,8 +11414,9 @@ static void
 st_calc_bnum(struct scsi_tape *un, struct buf *bp, struct scsi_pkt *pkt)
 {
 	int nblks;
+	int nfiles;
 	long count;
-	recov_info *ri = (recov_info *)pkt->pkt_private;
+	recov_info *ri = pkt->pkt_private;
 	cmd_attribute const *attrib;
 
 	ST_FUNC(ST_DEVINFO, st_calc_bnum);
@@ -11159,13 +11434,45 @@ st_calc_bnum(struct scsi_tape *un, struct buf *bp, struct scsi_pkt *pkt)
 
 	count = bp->b_bcount - bp->b_resid;
 
-	/* If variable block mode */
-	if (un->un_bsize == 0) {
-		nblks = ((count == 0) ? 0 : 1);
-		un->un_kbytes_xferred += (count / ONE_K);
+	/* Command reads or writes data */
+	if (attrib->transfers_data != TRAN_NONE) {
+		if (count == 0) {
+			/* failed writes should not make it here */
+			ASSERT(attrib->transfers_data == TRAN_READ);
+			nblks = 0;
+			nfiles = 1;
+		} else if (un->un_bsize == 0) {
+			/*
+			 * If variable block mode.
+			 * Fixed bit in CBD should be zero.
+			 */
+			ASSERT((pkt->pkt_cdbp[1] & 1) == 0);
+			nblks = 1;
+			un->un_kbytes_xferred += (count / ONE_K);
+			nfiles = 0;
+		} else {
+			/*
+			 * If fixed block mode.
+			 * Fixed bit in CBD should be one.
+			 */
+			ASSERT((pkt->pkt_cdbp[1] & 1) == 1);
+			nblks = (count / un->un_bsize);
+			un->un_kbytes_xferred += (nblks * un->un_bsize) / ONE_K;
+			nfiles = 0;
+		}
+		/*
+		 * So its possable to read some blocks and hit a filemark.
+		 * Example reading in fixed block mode where more then one
+		 * block at a time is requested. In this case because the
+		 * filemark is hit something less then the requesed number
+		 * of blocks is read.
+		 */
+		if (un->un_pos.eof == ST_EOF_PENDING && bp->b_resid) {
+			nfiles = 1;
+		}
 	} else {
-		nblks = (count / un->un_bsize);
-		un->un_kbytes_xferred += (nblks * un->un_bsize) / ONE_K;
+		nblks = 0;
+		nfiles = count;
 	}
 
 	/*
@@ -11179,9 +11486,11 @@ st_calc_bnum(struct scsi_tape *un, struct buf *bp, struct scsi_pkt *pkt)
 	if (attrib->chg_tape_direction == DIR_FORW) {
 		un->un_pos.blkno += nblks;
 		un->un_pos.lgclblkno += nblks;
+		un->un_pos.lgclblkno += nfiles;
 	} else if (attrib->chg_tape_direction == DIR_REVC) {
 		un->un_pos.blkno -= nblks;
 		un->un_pos.lgclblkno -= nblks;
+		un->un_pos.lgclblkno -= nfiles;
 	} else {
 		ASSERT(0);
 	}
@@ -11196,7 +11505,7 @@ st_calc_bnum(struct scsi_tape *un, struct buf *bp, struct scsi_pkt *pkt)
 	 * If we didn't just read a filemark.
 	 */
 	if (un->un_pos.eof != ST_EOF_PENDING) {
-		ASSERT(nblks != 0);
+		ASSERT(nblks != 0 && nfiles == 0);
 		/*
 		 * If Previously calulated expected position does not match
 		 * debug the expected position.
@@ -11213,7 +11522,7 @@ st_calc_bnum(struct scsi_tape *un, struct buf *bp, struct scsi_pkt *pkt)
 			un->un_running.pmode = invalid;
 		}
 	} else {
-		ASSERT(nblks == 0);
+		ASSERT(nfiles != 0);
 		if (un->un_running.pmode != invalid) {
 			/*
 			 * blkno and lgclblkno already counted in
@@ -11278,19 +11587,17 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 			un->un_throttle = un->un_max_throttle;
 		}
 	} else {
-		optype new_lastop;
+		optype new_lastop = ST_OP_NIL;
 		uchar_t cmd = (uchar_t)(intptr_t)bp->b_forw;
-
-		un->un_lastop = ST_OP_CTL;
 
 		switch (cmd) {
 		case SCMD_WRITE:
 		case SCMD_WRITE_G4:
 			bp->b_resid = sp->pkt_resid;
+			new_lastop = ST_OP_WRITE;
 			if (geterror(bp) == EIO) {
 				break;
 			}
-			new_lastop = ST_OP_WRITE;
 			st_calc_bnum(un, bp, sp);
 			if (un->un_dp->options & ST_REEL) {
 				un->un_fmneeded = 2;
@@ -11301,10 +11608,10 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 		case SCMD_READ:
 		case SCMD_READ_G4:
 			bp->b_resid = sp->pkt_resid;
+			new_lastop = ST_OP_READ;
 			if (geterror(bp) == EIO) {
 				break;
 			}
-			new_lastop = ST_OP_READ;
 			st_calc_bnum(un, bp, sp);
 			un->un_fmneeded = 0;
 			break;
@@ -11352,7 +11659,7 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 			int64_t resid;
 			int64_t done;
 			cmd_attribute const *attrib;
-			recov_info *ri = (recov_info *)sp->pkt_private;
+			recov_info *ri = sp->pkt_private;
 
 			if (ri->privatelen == sizeof (recov_info)) {
 				attrib = ri->cmd_attrib;
@@ -11375,7 +11682,7 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 				new_lastop = ST_OP_CTL;
 			}
 
-			ST_SPAC(ST_DEVINFO, st_label, SCSI_DEBUG,
+			ST_SPAC(ST_DEVINFO, st_label, CE_WARN,
 			    "space cmd: cdb[1] = %s\n"
 			    "space data:       = 0x%lx\n"
 			    "space count:      = %"PRId64"\n"
@@ -11469,6 +11776,16 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 			} else {
 				un->un_state = ST_STATE_OFFLINE;
 				un->un_pos.pmode = invalid;
+
+			}
+			/*
+			 * If we are loading or unloading we expect the media id
+			 * to change. Lets make it unknown.
+			 */
+			if (un->un_media_id != bogusID && un->un_media_id_len) {
+				kmem_free(un->un_media_id, un->un_media_id_len);
+				un->un_media_id = NULL;
+				un->un_media_id_len = 0;
 			}
 			un->un_density_known = 0;
 			un->un_pos.eof = ST_NO_EOF;
@@ -11489,7 +11806,7 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 			un->un_rsvd_status &=
 			    ~(ST_RELEASE | ST_LOST_RESERVE |
 			    ST_RESERVATION_CONFLICT | ST_INITIATED_RESET);
-			new_lastop = un->un_lastop;
+			new_lastop = ST_OP_CTL;
 			break;
 		case SCMD_RELEASE:
 			un->un_rsvd_status |= ST_RELEASE;
@@ -11501,6 +11818,7 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 		case SCMD_PERSISTENT_RESERVE_IN:
 			ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
 			    "PGR_IN command\n");
+			new_lastop = ST_OP_CTL;
 			break;
 		case SCMD_PERSISTENT_RESERVE_OUT:
 			switch (sp->pkt_cdbp[1] & ST_SA_MASK) {
@@ -11508,20 +11826,34 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 			case ST_SA_SCSI3_PREEMPT:
 			case ST_SA_SCSI3_PREEMPTANDABORT:
 				un->un_rsvd_status |=
-				    ST_APPLICATION_RESERVATIONS;
+				    (ST_APPLICATION_RESERVATIONS | ST_RESERVE);
+				un->un_rsvd_status &= ~(ST_RELEASE |
+				    ST_LOST_RESERVE | ST_RESERVATION_CONFLICT |
+				    ST_INITIATED_RESET);
 				ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
 				    "PGR Reserve and set: entering"
 				    " ST_APPLICATION_RESERVATIONS mode");
 				break;
-			case ST_SA_SCSI3_RELEASE:
+			case ST_SA_SCSI3_REGISTER:
+				ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
+				    "PGR Reserve register key");
+				un->un_rsvd_status |= ST_INIT_RESERVE;
+				break;
 			case ST_SA_SCSI3_CLEAR:
+				un->un_rsvd_status &= ~ST_INIT_RESERVE;
+				/* FALLTHROUGH */
+			case ST_SA_SCSI3_RELEASE:
 				un->un_rsvd_status &=
-				    ~ST_APPLICATION_RESERVATIONS;
+				    ~(ST_APPLICATION_RESERVATIONS | ST_RESERVE |
+				    ST_LOST_RESERVE | ST_RESERVATION_CONFLICT |
+				    ST_INITIATED_RESET);
+				un->un_rsvd_status |= ST_RELEASE;
 				ST_DEBUG6(ST_DEVINFO, st_label, CE_WARN,
 				    "PGR Release and reset: exiting"
 				    " ST_APPLICATION_RESERVATIONS mode");
 				break;
 			}
+			new_lastop = ST_OP_CTL;
 			break;
 		case SCMD_TEST_UNIT_READY:
 		case SCMD_READ_BLKLIM:
@@ -11558,6 +11890,16 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 			/* Locate makes position mode no longer legacy */
 			un->un_lastop = new_lastop = ST_OP_CTL;
 			break;
+		case SCMD_MAINTENANCE_IN:
+			switch (sp->pkt_cdbp[1]) {
+			case SSVC_ACTION_GET_SUPPORTED_OPERATIONS:
+			case SSVC_ACTION_SET_TARGET_PORT_GROUPS:
+				new_lastop = ST_OP_CTL;
+				break;
+			}
+			if (new_lastop != ST_OP_NIL) {
+				break;
+			}
 		default:
 			/*
 			 * Unknown command, If was USCSI and USCSI_SILENT
@@ -11569,6 +11911,12 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 				    "unknown cmd 0x%X caused loss of state\n",
 				    cmd);
 			} else {
+				/*
+				 * keep the old agreement to allow unknown
+				 * commands with the USCSI_SILENT set.
+				 * This prevents ASSERT below.
+				 */
+				new_lastop = ST_OP_CTL;
 				break;
 			}
 			/* FALLTHROUGH */
@@ -11604,7 +11952,6 @@ st_set_state(struct scsi_tape *un, struct buf *bp)
 	 */
 	un->un_err_resid = bp->b_resid;
 	COPY_POS(&un->un_err_pos, &un->un_pos);
-	un->un_retry_ct = 0;
 
 
 	/*
@@ -11781,15 +12128,21 @@ st_print_cdb(dev_info_t *dip, char *label, uint_t level,
 
 	ST_FUNC(dip, st_print_cdb);
 
-#ifdef STDEBUG
+	/* force one line output so repeated commands are printed once */
 	if ((st_debug & 0x180) == 0x100) {
 		scsi_log(dip, label, level, "node %s cmd %s\n",
 		    st_dev_name(un->un_dev), st_print_scsi_cmd(*cdb));
 		return;
 	}
-#endif
-	(void) sprintf(buf, "%s for cmd(%s)", title, st_print_scsi_cmd(*cdb));
-	st_clean_print(dip, label, level, buf, cdb, len);
+
+	/* force one line output so repeated CDB's are printed once */
+	if ((st_debug & 0x180) == 0x80) {
+		st_clean_print(dip, label, level, NULL, cdb, len);
+	} else {
+		(void) sprintf(buf, "%s for cmd(%s)", title,
+		    st_print_scsi_cmd(*cdb));
+		st_clean_print(dip, label, level, buf, cdb, len);
+	}
 }
 
 static void
@@ -11805,9 +12158,12 @@ st_clean_print(dev_info_t *dev, char *label, uint_t level,
 	ST_FUNC(dev, st_clean_print);
 
 
-	(void) sprintf(buf, "%s:\n", title);
-	scsi_log(dev, label, level, "%s", buf);
-	level = CE_CONT;
+	if (title) {
+		(void) sprintf(buf, "%s:\n", title);
+		scsi_log(dev, label, level, "%s", buf);
+		level = CE_CONT;
+	}
+
 	for (i = 0; i < len; ) {
 		buf[0] = 0;
 		for (c = 0; c < 8 && i < len; c++, i++) {
@@ -11821,6 +12177,7 @@ st_clean_print(dev_info_t *dev, char *label, uint_t level,
 		(void) sprintf(&buf[(int)strlen(buf)], "\n");
 
 		scsi_log(dev, label, level, "%s\n", buf);
+		level = CE_CONT;
 	}
 }
 
@@ -11841,6 +12198,7 @@ st_debug_cmds(struct scsi_tape *un, int com, int count, int wait)
 	    count, count,
 	    wait == ASYNC_CMD ? "a" : "");
 }
+#endif	/* STDEBUG */
 
 /*
  * Returns pointer to name of minor node name of device 'dev'.
@@ -11877,7 +12235,6 @@ st_dev_name(dev_t dev)
 
 	return (name);
 }
-#endif	/* STDEBUG */
 
 /*
  * Soft error reporting, so far unique to each drive
@@ -12020,6 +12377,7 @@ st_report_dat_soft_errors(dev_t dev, int flag)
 	int rval = 0;
 	char cdb[CDB_GROUP1], *c = cdb;
 	struct uscsi_cmd *com;
+	struct scsi_arq_status status;
 
 	GET_SOFT_STATE(dev);
 
@@ -12047,7 +12405,9 @@ st_report_dat_soft_errors(dev_t dev, int flag)
 	com->uscsi_cdblen  = CDB_GROUP1;
 	com->uscsi_bufaddr = (caddr_t)sensep;
 	com->uscsi_buflen  = LOG_SENSE_LENGTH;
-	com->uscsi_flags   = USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
+	com->uscsi_rqlen = sizeof (status);
+	com->uscsi_rqbuf = (caddr_t)&status;
+	com->uscsi_flags   = USCSI_DIAGNOSE | USCSI_RQENABLE | USCSI_READ;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
 	rval = st_uscsi_cmd(un, com, FKIOCTL);
 	if (rval) {
@@ -12330,6 +12690,7 @@ static int
 st_do_reserve(struct scsi_tape *un)
 {
 	int rval;
+	int was_lost = un->un_rsvd_status & ST_LOST_RESERVE;
 
 	ST_FUNC(ST_DEVINFO, st_do_reserve);
 
@@ -12359,6 +12720,9 @@ st_do_reserve(struct scsi_tape *un)
 	}
 	if (rval == 0) {
 		un->un_rsvd_status |= ST_INIT_RESERVE;
+	}
+	if (was_lost) {
+		un->un_running.pmode = invalid;
 	}
 
 	return (rval);
@@ -12522,7 +12886,7 @@ st_reserve_release(struct scsi_tape *un, int cmd, ubufunc_t ubf)
 }
 
 static int
-st_take_ownership(struct scsi_tape *un)
+st_take_ownership(struct scsi_tape *un, ubufunc_t ubf)
 {
 	int rval;
 
@@ -12534,7 +12898,7 @@ st_take_ownership(struct scsi_tape *un)
 	    "st_take_ownership: Entering ...\n");
 
 
-	rval = st_reserve_release(un, ST_RESERVE, st_uscsi_cmd);
+	rval = st_reserve_release(un, ST_RESERVE, ubf);
 	/*
 	 * XXX -> Should reset be done only if we get EACCES.
 	 * .
@@ -12552,10 +12916,10 @@ st_take_ownership(struct scsi_tape *un)
 		/*
 		 * remove the check condition.
 		 */
-		(void) st_reserve_release(un, ST_RESERVE, st_uscsi_cmd);
-		rval = st_reserve_release(un, ST_RESERVE, st_uscsi_cmd);
+		(void) st_reserve_release(un, ST_RESERVE, ubf);
+		rval = st_reserve_release(un, ST_RESERVE, ubf);
 		if (rval != 0) {
-			if ((st_reserve_release(un, ST_RESERVE, st_uscsi_cmd))
+			if ((st_reserve_release(un, ST_RESERVE, ubf))
 			    != 0) {
 				rval = (un->un_rsvd_status &
 				    ST_RESERVATION_CONFLICT) ? EACCES : EIO;
@@ -12795,6 +13159,7 @@ st_logpage_supported(struct scsi_tape *un, uchar_t page)
 	uchar_t *sp, *sensep;
 	unsigned length;
 	struct uscsi_cmd *com;
+	struct scsi_arq_status status;
 	int rval;
 	char cdb[CDB_GROUP1] = {
 		SCMD_LOG_SENSE_G1,
@@ -12820,8 +13185,10 @@ st_logpage_supported(struct scsi_tape *un, uchar_t page)
 	com->uscsi_cdblen = CDB_GROUP1;
 	com->uscsi_bufaddr = (caddr_t)sensep;
 	com->uscsi_buflen = LOG_SENSE_LENGTH;
+	com->uscsi_rqlen = sizeof (status);
+	com->uscsi_rqbuf = (caddr_t)&status;
 	com->uscsi_flags =
-	    USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
+	    USCSI_DIAGNOSE | USCSI_RQENABLE | USCSI_READ;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
 	rval = st_uscsi_cmd(un, com, FKIOCTL);
 	if (rval || com->uscsi_status) {
@@ -12879,12 +13246,18 @@ st_check_clean_bit(struct scsi_tape *un)
 	if (un->un_HeadClean == TAPE_ALERT_SUPPORT_UNKNOWN) {
 
 		rval = st_logpage_supported(un, TAPE_SEQUENTIAL_PAGE);
+		if (rval == -1) {
+			return (0);
+		}
 		if (rval == 1) {
 
 			un->un_HeadClean |= TAPE_SEQUENTIAL_SUPPORTED;
 		}
 
 		rval = st_logpage_supported(un, TAPE_ALERT_PAGE);
+		if (rval == -1) {
+			return (0);
+		}
 		if (rval == 1) {
 
 			un->un_HeadClean |= TAPE_ALERT_SUPPORTED;
@@ -12901,20 +13274,25 @@ st_check_clean_bit(struct scsi_tape *un)
 	if (un->un_HeadClean & TAPE_SEQUENTIAL_SUPPORTED) {
 
 		rval = st_check_sequential_clean_bit(un);
+		if (rval == -1) {
+			return (0);
+		}
 	}
 
-	if ((rval <= 0) && (un->un_HeadClean & TAPE_ALERT_SUPPORTED)) {
+	if ((rval == 0) && (un->un_HeadClean & TAPE_ALERT_SUPPORTED)) {
 
 		rval = st_check_alert_flags(un);
+		if (rval == -1) {
+			return (0);
+		}
 	}
 
-	if ((rval <= 0) && (un->un_dp->options & ST_CLN_MASK)) {
+	if ((rval == 0) && (un->un_dp->options & ST_CLN_MASK)) {
 
 		rval = st_check_sense_clean_bit(un);
-	}
-
-	if (rval < 0) {
-		return (rval);
+		if (rval == -1) {
+			return (0);
+		}
 	}
 
 	/*
@@ -12958,6 +13336,7 @@ st_check_sequential_clean_bit(struct scsi_tape *un)
 	struct uscsi_cmd *cmd;
 	struct log_sequential_page *sp;
 	struct log_sequential_page_parameter *prm;
+	struct scsi_arq_status status;
 	char cdb[CDB_GROUP1] = {
 		SCMD_LOG_SENSE_G1,
 		0,
@@ -12977,12 +13356,14 @@ st_check_sequential_clean_bit(struct scsi_tape *un)
 	sp  = kmem_zalloc(sizeof (struct log_sequential_page), KM_SLEEP);
 
 	cmd->uscsi_flags   =
-	    USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
+	    USCSI_DIAGNOSE | USCSI_RQENABLE | USCSI_READ;
 	cmd->uscsi_timeout = un->un_dp->non_motion_timeout;
 	cmd->uscsi_cdb	   = cdb;
 	cmd->uscsi_cdblen  = CDB_GROUP1;
 	cmd->uscsi_bufaddr = (caddr_t)sp;
 	cmd->uscsi_buflen  = sizeof (struct log_sequential_page);
+	cmd->uscsi_rqlen   = sizeof (status);
+	cmd->uscsi_rqbuf   = (caddr_t)&status;
 
 	rval = st_uscsi_cmd(un, cmd, FKIOCTL);
 
@@ -13032,6 +13413,7 @@ st_check_alert_flags(struct scsi_tape *un)
 {
 	struct st_tape_alert *ta;
 	struct uscsi_cmd *com;
+	struct scsi_arq_status status;
 	unsigned ix, length;
 	int rval;
 	tape_alert_flags flag;
@@ -13057,8 +13439,10 @@ st_check_alert_flags(struct scsi_tape *un)
 	com->uscsi_cdblen = CDB_GROUP1;
 	com->uscsi_bufaddr = (caddr_t)ta;
 	com->uscsi_buflen = sizeof (struct st_tape_alert);
+	com->uscsi_rqlen = sizeof (status);
+	com->uscsi_rqbuf = (caddr_t)&status;
 	com->uscsi_flags =
-	    USCSI_DIAGNOSE | USCSI_SILENT | USCSI_READ;
+	    USCSI_DIAGNOSE | USCSI_RQENABLE | USCSI_READ;
 	com->uscsi_timeout = un->un_dp->non_motion_timeout;
 
 	rval = st_uscsi_cmd(un, com, FKIOCTL);
@@ -13857,6 +14241,8 @@ st_read_attributes(struct scsi_tape *un, uint16_t attribute, void *pnt,
 	char cdb[CDB_GROUP4];
 	int result;
 	struct uscsi_cmd *cmd;
+	struct scsi_arq_status status;
+
 	caddr_t buf = (caddr_t)pnt;
 
 	ST_FUNC(ST_DEVINFO, st_read_attributes);
@@ -13885,12 +14271,14 @@ st_read_attributes(struct scsi_tape *un, uint16_t attribute, void *pnt,
 	cdb[15] = 0;
 
 
-	cmd->uscsi_flags = USCSI_READ | USCSI_DIAGNOSE;
+	cmd->uscsi_flags = USCSI_READ | USCSI_RQENABLE | USCSI_DIAGNOSE;
 	cmd->uscsi_timeout = un->un_dp->non_motion_timeout;
 	cmd->uscsi_cdb = &cdb[0];
 	cmd->uscsi_bufaddr = (caddr_t)buf;
 	cmd->uscsi_buflen = size;
 	cmd->uscsi_cdblen = sizeof (cdb);
+	cmd->uscsi_rqlen = sizeof (status);
+	cmd->uscsi_rqbuf = (caddr_t)&status;
 
 	result = bufunc(un, cmd, FKIOCTL);
 
@@ -14547,7 +14935,7 @@ st_interpret_read_pos(struct scsi_tape const *un, tapepos_t *dest,
 		rval = EIO;
 	}
 
-	if ((flag > 1) && (rval == 0)) {
+	if ((flag > 1) && (rval == 0) && (org.pmode != invalid)) {
 		st_print_position(ST_DEVINFO, st_label, CE_NOTE,
 		    "position read in", &org);
 		st_print_position(ST_DEVINFO, st_label, CE_NOTE,
@@ -14569,7 +14957,7 @@ st_logical_block_locate(struct scsi_tape *un, ubufunc_t ubf, tapepos_t *pos,
 
 	ST_FUNC(ST_DEVINFO, st_logical_block_locate);
 	/*
-	 * WTF Not sure what to do when doing recovery and not wanting
+	 * Not sure what to do when doing recovery and not wanting
 	 * to update un_pos
 	 */
 
@@ -14677,7 +15065,7 @@ st_logical_block_locate(struct scsi_tape *un, ubufunc_t ubf, tapepos_t *pos,
 		/* Worked as requested */
 		pos->lgclblkno = lblk;
 
-	} else if (((cmd->uscsi_status & STATUS_MASK) == STATUS_CHECK) &&
+	} else if (((cmd->uscsi_status & ST_STATUS_MASK) == STATUS_CHECK) &&
 	    (cmd->uscsi_resid != 0)) {
 		/* Got part way there but wasn't enough blocks on tape */
 		pos->lgclblkno = lblk - cmd->uscsi_resid;
@@ -14707,7 +15095,7 @@ st_logical_block_locate(struct scsi_tape *un, ubufunc_t ubf, tapepos_t *pos,
 }
 
 static int
-st_mtfsf_ioctl(struct scsi_tape *un, int files)
+st_mtfsf_ioctl(struct scsi_tape *un, int64_t files)
 {
 	int rval;
 
@@ -14715,7 +15103,7 @@ st_mtfsf_ioctl(struct scsi_tape *un, int files)
 
 
 	ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "st_mtfsf_ioctl: count=%x, eof=%x\n", files, un->un_pos.eof);
+	    "st_mtfsf_ioctl: count=%"PRIx64", eof=%x\n", files, un->un_pos.eof);
 #if 0
 	if ((IN_EOF(un->un_pos)) && (files == 1)) {
 		un->un_pos.fileno++;
@@ -14783,14 +15171,14 @@ st_mtfsf_ioctl(struct scsi_tape *un, int files)
 }
 
 static int
-st_forward_space_files(struct scsi_tape *un, int count)
+st_forward_space_files(struct scsi_tape *un, int64_t count)
 {
 	int rval;
 
 	ST_FUNC(ST_DEVINFO, st_forward_space_files);
 
 	ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "fspace: count=%x, eof=%x\n", count, un->un_pos.eof);
+	    "fspace: count=%"PRIx64", eof=%x\n", count, un->un_pos.eof);
 
 	ASSERT(count >= 0);
 	ASSERT(un->un_pos.pmode != invalid);
@@ -14936,7 +15324,7 @@ st_space_to_begining_of_file(struct scsi_tape *un)
 }
 
 static int
-st_mtfsr_ioctl(struct scsi_tape *un, int count)
+st_mtfsr_ioctl(struct scsi_tape *un, int64_t count)
 {
 
 	ST_FUNC(ST_DEVINFO, st_mtfsr_ioctl);
@@ -14947,7 +15335,7 @@ st_mtfsr_ioctl(struct scsi_tape *un, int count)
 	 */
 
 	ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "st_ioctl_fsr: count=%x, eof=%x\n", count, un->un_pos.eof);
+	    "st_ioctl_fsr: count=%"PRIx64", eof=%x\n", count, un->un_pos.eof);
 
 	if (un->un_pos.pmode == legacy) {
 		/*
@@ -15008,15 +15396,16 @@ st_mtfsr_ioctl(struct scsi_tape *un, int count)
 }
 
 static int
-st_space_records(struct scsi_tape *un, int count)
+st_space_records(struct scsi_tape *un, int64_t count)
 {
-	int dblk;
+	int64_t dblk;
 	int rval = 0;
 
 	ST_FUNC(ST_DEVINFO, st_space_records);
 
 	ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "st_space_records: count=%x, eof=%x\n", count, un->un_pos.eof);
+	    "st_space_records: count=%"PRIx64", eof=%x\n",
+	    count, un->un_pos.eof);
 
 	if (un->un_pos.pmode == logical) {
 		rval = st_cmd(un, SCMD_SPACE, Blk(count), SYNC_CMD);
@@ -15026,7 +15415,7 @@ st_space_records(struct scsi_tape *un, int count)
 		return (rval);
 	}
 
-	dblk = un->un_pos.blkno + count;
+	dblk = count + un->un_pos.blkno;
 
 	/* Already there */
 	if (dblk == un->un_pos.blkno) {
@@ -15124,12 +15513,12 @@ st_space_records(struct scsi_tape *un, int count)
 }
 
 static int
-st_mtbsf_ioctl(struct scsi_tape *un, int files)
+st_mtbsf_ioctl(struct scsi_tape *un, int64_t files)
 {
 	ST_FUNC(ST_DEVINFO, st_mtbsf_ioctl);
 
 	ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "st_mtbsf_ioctl: count=%x, eof=%x\n", files, un->un_pos.eof);
+	    "st_mtbsf_ioctl: count=%"PRIx64", eof=%x\n", files, un->un_pos.eof);
 	/*
 	 * backward space of file filemark (1/2" and 8mm)
 	 * tape position will end on the beginning of tape side
@@ -15163,7 +15552,7 @@ st_mtbsf_ioctl(struct scsi_tape *un, int files)
 			un->un_pos.blkno = 0;
 			files++;
 			ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-			    "st_mtbsf_ioctl in eof: count=%d, op=%x\n",
+			    "st_mtbsf_ioctl in eof: count=%"PRIx64", op=%x\n",
 			    files, MTBSF);
 
 		}
@@ -15187,16 +15576,16 @@ st_mtbsf_ioctl(struct scsi_tape *un, int files)
 }
 
 static int
-st_backward_space_files(struct scsi_tape *un, int count, int infront)
+st_backward_space_files(struct scsi_tape *un, int64_t count, int infront)
 {
-	int end_fileno;
-	int skip_cnt;
+	int64_t end_fileno;
+	int64_t skip_cnt;
 	int rval = 0;
 
 	ST_FUNC(ST_DEVINFO, st_backward_space_files);
 
 	ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "st_backward_space_files: count=%x eof=%x\n",
+	    "st_backward_space_files: count=%"PRIx64" eof=%x\n",
 	    count, un->un_pos.eof);
 	/*
 	 * Backspace files (MTNBSF): infront == 0
@@ -15224,7 +15613,7 @@ st_backward_space_files(struct scsi_tape *un, int count, int infront)
 	if (un->un_pos.pmode == logical) {
 
 		ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-		    "st_backward_space_files: mt_op=%x count=%x"
+		    "st_backward_space_files: mt_op=%x count=%"PRIx64
 		    "lgclblkno=%"PRIx64"\n", infront?MTBSF:MTNBSF, count,
 		    un->un_pos.lgclblkno);
 
@@ -15248,7 +15637,8 @@ st_backward_space_files(struct scsi_tape *un, int count, int infront)
 	}
 
 	ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "st_backward_space_files: mt_op=%x count=%x fileno=%x blkno=%x\n",
+	    "st_backward_space_files: mt_op=%x count=%"PRIx64
+	    "fileno=%x blkno=%x\n",
 	    infront?MTBSF:MTNBSF, count, un->un_pos.fileno, un->un_pos.blkno);
 
 
@@ -15301,7 +15691,8 @@ st_backward_space_files(struct scsi_tape *un, int count, int infront)
 		 */
 		end_fileno = -(count + skip_cnt);
 		ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
-		    "skip_cnt=%x, tmp=%x\n", skip_cnt, end_fileno);
+		    "skip_cnt=%"PRIx64", tmp=%"PRIx64"\n",
+		    skip_cnt, end_fileno);
 		if (st_cmd(un, SCMD_SPACE, Fmk(end_fileno), SYNC_CMD)) {
 			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 			    "st_backward_space_files:EIO:back space fm failed");
@@ -15319,7 +15710,7 @@ st_backward_space_files(struct scsi_tape *un, int count, int infront)
 	 * If we have to space forward, do so...
 	 */
 	ST_DEBUG6(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "space forward skip_cnt=%x, rval=%x\n", skip_cnt, rval);
+	    "space forward skip_cnt=%"PRIx64", rval=%x\n", skip_cnt, rval);
 
 	if (rval == 0 && skip_cnt) {
 		if (st_cmd(un, SCMD_SPACE, Fmk(skip_cnt), SYNC_CMD)) {
@@ -15350,14 +15741,14 @@ st_backward_space_files(struct scsi_tape *un, int count, int infront)
 }
 
 static int
-st_mtnbsf_ioctl(struct scsi_tape *un, int count)
+st_mtnbsf_ioctl(struct scsi_tape *un, int64_t count)
 {
 	int rval;
 
 	ST_FUNC(ST_DEVINFO, st_mtnbsf_ioctl);
 
 	ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "nbsf: count=%x, eof=%x\n", count, un->un_pos.eof);
+	    "nbsf: count=%"PRIx64", eof=%x\n", count, un->un_pos.eof);
 
 	if (un->un_pos.pmode == legacy) {
 		/*
@@ -15393,7 +15784,7 @@ st_mtnbsf_ioctl(struct scsi_tape *un, int count)
 	}
 
 	ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "mtnbsf: count=%x, eof=%x\n", count, un->un_pos.eof);
+	    "mtnbsf: count=%"PRIx64", eof=%x\n", count, un->un_pos.eof);
 
 	if (count <= 0) {
 		rval = st_forward_space_files(un, -count);
@@ -15404,12 +15795,12 @@ st_mtnbsf_ioctl(struct scsi_tape *un, int count)
 }
 
 static int
-st_mtbsr_ioctl(struct scsi_tape *un, int num)
+st_mtbsr_ioctl(struct scsi_tape *un, int64_t num)
 {
 	ST_FUNC(ST_DEVINFO, st_mtbsr_ioctl);
 
 	ST_DEBUG4(ST_DEVINFO, st_label, SCSI_DEBUG,
-	    "bsr: count=%x, eof=%x\n", num, un->un_pos.eof);
+	    "bsr: count=%"PRIx64", eof=%x\n", num, un->un_pos.eof);
 
 	if (un->un_pos.pmode == legacy) {
 		/*
@@ -15474,7 +15865,7 @@ st_mtbsr_ioctl(struct scsi_tape *un, int num)
 }
 
 static int
-st_mtfsfm_ioctl(struct scsi_tape *un, int cnt)
+st_mtfsfm_ioctl(struct scsi_tape *un, int64_t cnt)
 {
 	int rval;
 
@@ -15500,7 +15891,7 @@ st_mtfsfm_ioctl(struct scsi_tape *un, int cnt)
 }
 
 static int
-st_mtbsfm_ioctl(struct scsi_tape *un, int cnt)
+st_mtbsfm_ioctl(struct scsi_tape *un, int64_t cnt)
 {
 	int rval;
 
@@ -15938,18 +16329,18 @@ static int
 st_handle_hex_media_id(struct scsi_tape *un, void *pnt, int size)
 {
 	int result;
-	int newsize = (size + 1) << 1;
+	int newsize = (size << 1) + 3; /* extra for leading 0x and null term */
 	int i;
-	char byte;
+	uchar_t byte;
 	char *format;
-	char *data = (char *)pnt;
+	uchar_t *data = (uchar_t *)pnt;
 	char *buf = kmem_alloc(newsize, KM_SLEEP);
 
 	ST_FUNC(ST_DEVINFO, st_handle_hex_media_id);
 
 	(void) sprintf(buf, "0x");
 	for (i = 0; i < size; i++) {
-		byte = (uchar_t)data[i];
+		byte = data[i];
 		if (byte < 0x10)
 			format = "0%x";
 		else
@@ -16035,7 +16426,7 @@ upsize:
 	buf = kmem_alloc(size, KM_SLEEP);
 
 	cdb[0] = (char)SCMD_SVC_ACTION_IN_G5;
-	cdb[1] = 1; /* READ MEDIA SERIAL NUMBER */
+	cdb[1] = SSVC_ACTION_READ_MEDIA_SERIAL;
 	cdb[2] = 0;
 	cdb[3] = 0;
 	cdb[4] = 0;
@@ -16224,6 +16615,7 @@ st_command_recovery(struct scsi_tape *un, struct scsi_pkt *pkt,
 	return (JUST_RETURN); /* release calling thread */
 }
 
+
 static void
 st_recov_ret(struct scsi_tape *un, st_err_info *errinfo, errstate err)
 {
@@ -16234,6 +16626,9 @@ st_recov_ret(struct scsi_tape *un, st_err_info *errinfo, errstate err)
 	ST_FUNC(ST_DEVINFO, st_recov_ret);
 
 	ASSERT(MUTEX_HELD(&un->un_sd->sd_mutex));
+#if !defined(lint)
+	_NOTE(LOCK_RELEASED_AS_SIDE_EFFECT(&un->un_sd->sd_mutex))
+#endif
 
 	bp = errinfo->ei_failing_bp;
 	kmem_free(errinfo, ST_ERR_INFO_SIZE);
@@ -16262,9 +16657,11 @@ st_recov_ret(struct scsi_tape *un, st_err_info *errinfo, errstate err)
 		break;
 
 	}
+
 	st_bioerror(bp, error_number);
 	st_done_and_mutex_exit(un, bp);
 }
+
 
 static void
 st_recover(void *arg)
@@ -16303,9 +16700,12 @@ st_recover(void *arg)
 
 	rval = st_test_path_to_device(un);
 
+	ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
+	    "st_recover called with %s, TUR returned %d\n",
+	    errstatenames[errinfo->ei_error_type], rval);
 	/*
 	 * If the drive responed to the TUR lets try and get it to sync
-	 * any data it have in the buffer.
+	 * any data it might have in the buffer.
 	 */
 	if (rval == 0 && rcv->cmd_attrib->chg_tape_data) {
 		(void) st_rcmd(un, SCMD_WRITE_FILE_MARK, 0, SYNC_CMD);
@@ -16313,49 +16713,63 @@ st_recover(void *arg)
 	switch (errinfo->ei_error_type) {
 	case ATTEMPT_RETRY:
 	case COMMAND_TIMEOUT:
-		ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
-		    "st_recover called with COMMAND_TIMEOUT, TUR returned %d\n",
-		    rval);
-		if (rval != 0) {
-			/* ping failed, we're done. */
+	case DEVICE_RESET:
+	case PATH_FAILED:
+		/*
+		 * For now if we can't talk to the device we are done.
+		 * If the drive is reserved we can try to get it back.
+		 */
+		if (rval != 0 && rval != EACCES) {
 			st_recov_ret(un, errinfo, COMMAND_DONE_ERROR);
 			return;
 		}
 
 		/*
-		 * If a reset occured fall through.
+		 * If scsi II lost reserve try and get it back.
 		 */
-		if (un->un_unit_attention_flags == 0) {
-			break;
+		if ((((un->un_rsvd_status &
+		    (ST_LOST_RESERVE | ST_APPLICATION_RESERVATIONS)) ==
+		    ST_LOST_RESERVE)) &&
+		    (errinfo->ei_failed_pkt.pkt_cdbp[0] != SCMD_RELEASE)) {
+			rval = st_reserve_release(un, ST_RESERVE,
+			    st_uscsi_rcmd);
+			if (rval != 0) {
+				if (st_take_ownership(un, st_uscsi_rcmd) != 0) {
+					st_recov_ret(un, errinfo,
+					    COMMAND_DONE_EACCES);
+					return;
+				}
+			}
+			un->un_rsvd_status |= ST_RESERVE;
+			un->un_rsvd_status &= ~(ST_RELEASE | ST_LOST_RESERVE |
+			    ST_RESERVATION_CONFLICT | ST_INITIATED_RESET);
 		}
-		/* FALLTHROUGH */
-	case DEVICE_RESET:
-		ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
-		    "st_recover called with DEVICE_RESET, TUR returned %d\n",
-		    rval);
-		/*
-		 * For now if we can't talk to the device we are done.
-		 */
+		rval = st_check_mode_for_change(un, st_uscsi_rcmd);
+		if (rval) {
+			rval = st_gen_mode_select(un, st_uscsi_rcmd,
+			    un->un_mspl, sizeof (struct seq_mode));
+		}
 		if (rval) {
 			st_recov_ret(un, errinfo, COMMAND_DONE_ERROR);
 			return;
 		}
-
-		if ((un->un_rsvd_status & ST_LOST_RESERVE) &&
-		    (errinfo->ei_failed_pkt.pkt_cdbp[0] != SCMD_RELEASE)) {
-			rval = st_reserve_release(un, ST_RESERVE,
-			    st_uscsi_rcmd);
-			if (rval == 0) {
-				un->un_rsvd_status |= ST_RESERVE;
-				un->un_rsvd_status &= ~(ST_RELEASE |
-				    ST_LOST_RESERVE | ST_RESERVATION_CONFLICT |
-				    ST_INITIATED_RESET);
-			} else {
-				st_recov_ret(un, errinfo, COMMAND_DONE_EACCES);
-				return;
-			}
+		break;
+	case DEVICE_TAMPER:
+		/*
+		 * Check if the ASC/ASCQ says mode data has changed.
+		 */
+		if ((errinfo->ei_failing_status.sts_sensedata.es_add_code ==
+		    0x2a) &&
+		    (errinfo->ei_failing_status.sts_sensedata.es_qual_code ==
+		    0x01)) {
+			/*
+			 * See if mode sense changed.
+			 */
 			rval = st_check_mode_for_change(un, st_uscsi_rcmd);
 			if (rval) {
+				/*
+				 * If so change it back.
+				 */
 				rval = st_gen_mode_select(un, st_uscsi_rcmd,
 				    un->un_mspl, sizeof (struct seq_mode));
 			}
@@ -16363,51 +16777,6 @@ st_recover(void *arg)
 				st_recov_ret(un, errinfo, COMMAND_DONE_ERROR);
 				return;
 			}
-		}
-		break;
-	case PATH_FAILED:
-		ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
-		    "st_recover called with PATH_FAILED, TUR returned %d\n",
-		    rval);
-		if (rval != 0) {
-			/* ping failed, we're done. */
-			st_recov_ret(un, errinfo, COMMAND_DONE_ERROR);
-			return;
-		}
-		break;
-	case DEVICE_TAMPER:
-		ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
-		    "st_recover called with DEVICE_TAMPER, TUR returned %d\n",
-		    rval);
-		/*
-		 * Check if the ASC/ASCQ says mode data has changed.
-		 */
-		if (errinfo->ei_failing_status.sts_sensedata.es_add_code ==
-		    0x2a &&
-		    errinfo->ei_failing_status.sts_sensedata.es_qual_code ==
-		    0x01) {
-			/*
-			 * See if mode sense changed.
-			 */
-			rval = st_check_mode_for_change(un, st_uscsi_rcmd);
-			/*
-			 * if not cross your fingers and go for it.
-			 */
-			if (rval == 0) {
-				st_recov_ret(un, errinfo, COMMAND_DONE);
-				return;
-			}
-			/*
-			 * If so change it back.
-			 */
-			rval = st_gen_mode_select(un, st_uscsi_rcmd,
-			    un->un_mspl, sizeof (struct seq_mode));
-			if (rval) {
-				st_recov_ret(un, errinfo, COMMAND_DONE_ERROR);
-			} else {
-				st_recov_ret(un, errinfo, COMMAND_DONE);
-			}
-			return;
 		}
 		/*
 		 * if we have a media id and its not bogus.
@@ -16423,13 +16792,24 @@ st_recover(void *arg)
 		break;
 	default:
 		ST_DEBUG(ST_DEVINFO, st_label, CE_PANIC,
-		    "Unhandled error type 0x%x in st_recover()\n", com);
+		    "Unhandled error type %s in st_recover() 0x%x\n",
+		    errstatenames[errinfo->ei_error_type], com);
 	}
 
 	/*
-	 * if command is retriable retry it
+	 * if command is retriable retry it.
+	 * Special case here. The command attribute for SCMD_REQUEST_SENSE
+	 * does not say that it is retriable. That because if you reissue a
+	 * request sense and the target responds the sense data will have
+	 * been consumed and no long be valid. If we get a busy status on
+	 * request sense while the state is ST_STATE_SENSING this will
+	 * reissue that pkt.
+	 *
+	 * XXX If this request sense gets sent to a different port then
+	 * the original command that failed was sent on it will not get
+	 * valid sense data for that command.
 	 */
-	if (rcv->cmd_attrib->retriable) {
+	if (rcv->cmd_attrib->retriable || un->un_rqs_bp == bp) {
 		status = st_recover_reissue_pkt(un, &errinfo->ei_failed_pkt);
 
 	/*
@@ -16472,7 +16852,7 @@ st_recov_cb(struct scsi_pkt *pkt)
 	struct scsi_tape *un;
 	struct buf *bp;
 	recov_info *rcv;
-	errstate action = COMMAND_DONE;
+	errstate action = COMMAND_DONE_ERROR;
 	int timout = ST_TRAN_BUSY_TIMEOUT; /* short (default) timeout */
 
 	/*
@@ -16499,12 +16879,19 @@ st_recov_cb(struct scsi_pkt *pkt)
 	case CMD_CMPLT:
 		if (un->un_arq_enabled && pkt->pkt_state & STATE_ARQ_DONE) {
 			action = st_handle_autosense(un, bp, &rcv->pos);
-		} else if (*pkt->pkt_scbp & (STATUS_BUSY | STATUS_CHECK)) {
+		} else  if ((SCBP(pkt)->sts_busy) ||
+		    (SCBP(pkt)->sts_chk) ||
+		    (SCBP(pkt)->sts_vu7)) {
 			action = st_check_error(un, pkt);
+		} else {
+			action = COMMAND_DONE;
 		}
 		break;
 	case CMD_TIMEOUT:
 		action = COMMAND_TIMEOUT;
+		break;
+	case CMD_TRAN_ERR:
+		action = QUE_COMMAND;
 		break;
 	default:
 		ST_DEBUG(ST_DEVINFO, st_label, CE_PANIC,
@@ -16512,6 +16899,23 @@ st_recov_cb(struct scsi_pkt *pkt)
 		    scsi_rname(pkt->pkt_reason));
 		action = COMMAND_DONE_ERROR;
 	}
+
+	/*
+	 * check for undetected path failover.
+	 */
+	if ((un->un_multipath) &&
+	    (un->un_last_path_instance != pkt->pkt_path_instance)) {
+		if (un->un_state > ST_STATE_OPENING) {
+			ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
+			    "Failover detected in recovery, action is %s\n",
+			    errstatenames[action]);
+		}
+		un->un_last_path_instance = pkt->pkt_path_instance;
+	}
+
+	ST_RECOV(ST_DEVINFO, st_label, CE_WARN,
+	    "Recovery call back got %s status on %s\n",
+	    errstatenames[action], st_print_scsi_cmd(pkt->pkt_cdbp[0]));
 
 	switch (action) {
 	case COMMAND_DONE:
@@ -16521,6 +16925,10 @@ st_recov_cb(struct scsi_pkt *pkt)
 		bioerror(bp, EACCES);
 		break;
 
+	case COMMAND_DONE_ERROR_RECOVERED: /* XXX maybe wrong */
+		ASSERT(0);
+		break;
+
 	case COMMAND_TIMEOUT:
 	case COMMAND_DONE_ERROR:
 		bioerror(bp, EIO);
@@ -16528,6 +16936,7 @@ st_recov_cb(struct scsi_pkt *pkt)
 
 	case DEVICE_RESET:
 	case QUE_BUSY_COMMAND:
+	case PATH_FAILED:
 		/* longish timeout */
 		timout = ST_STATUS_BUSY_TIMEOUT;
 		/* FALLTHRU */
@@ -16972,7 +17381,8 @@ st_check_mode_for_change(struct scsi_tape *un, ubufunc_t ubf)
 static int
 st_test_path_to_device(struct scsi_tape *un)
 {
-	int rval;
+	int rval = 0;
+	int limit = st_retry_count;
 
 	ST_FUNC(ST_DEVINFO, st_test_path_to_device);
 
@@ -16980,8 +17390,19 @@ st_test_path_to_device(struct scsi_tape *un)
 	 * XXX Newer drives may not RESEVATION CONFLICT a TUR.
 	 */
 	do {
+		if (rval != 0) {
+			mutex_exit(ST_MUTEX);
+			delay(drv_usectohz(1000000));
+			mutex_enter(ST_MUTEX);
+		}
 		rval = st_rcmd(un, SCMD_TEST_UNIT_READY, 0, SYNC_CMD);
-	} while (rval == DEVICE_RESET);
+		ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
+		    "ping TUR returned 0x%x", rval);
+		limit--;
+	} while (((rval == EACCES) || (rval == EBUSY)) && limit);
+
+	if (un->un_status == KEY_NOT_READY || un->un_mediastate == MTIO_EJECTED)
+		rval = 0;
 
 	return (rval);
 }
@@ -16996,6 +17417,7 @@ st_recovery_read_pos(struct scsi_tape *un, read_p_types type,
 {
 	int rval;
 	struct uscsi_cmd cmd;
+	struct scsi_arq_status status;
 	char cdb[CDB_GROUP1];
 
 	ST_FUNC(ST_DEVINFO, st_recovery_read_pos);
@@ -17009,13 +17431,15 @@ st_recovery_read_pos(struct scsi_tape *un, read_p_types type,
 	cdb[5] = 0;
 	cdb[6] = 0;
 	cdb[7] = 0;
-	cdb[8] =  (type == EXT_POS) ? 28 : 0;
+	cdb[8] = (type == EXT_POS) ? 28 : 0;
 	cdb[9] = 0;
 
-	cmd.uscsi_flags = USCSI_READ;
+	cmd.uscsi_flags = USCSI_READ | USCSI_RQENABLE;
 	cmd.uscsi_timeout = un->un_dp->non_motion_timeout;
 	cmd.uscsi_cdb = cdb;
 	cmd.uscsi_cdblen = sizeof (cdb);
+	cmd.uscsi_rqlen = sizeof (status);
+	cmd.uscsi_rqbuf = (caddr_t)&status;
 	cmd.uscsi_bufaddr = (caddr_t)raw;
 	switch (type) {
 	case SHORT_POS:
@@ -17047,13 +17471,39 @@ st_recovery_get_position(struct scsi_tape *un, tapepos_t *read,
 
 	ST_FUNC(ST_DEVINFO, st_recovery_get_position);
 
-	rval = st_recovery_read_pos(un, type, raw);
-	if (rval != 0) {
-		return (rval);
-	}
-	rval = st_interpret_read_pos(un, read, type, sizeof (read_pos_data_t),
-	    (caddr_t)raw, 1);
+	do {
+		rval = st_recovery_read_pos(un, type, raw);
+		if (rval != 0) {
+			switch (type) {
+			case SHORT_POS:
+				type = NO_POS;
+				break;
 
+			case LONG_POS:
+				type = EXT_POS;
+				break;
+
+			case EXT_POS:
+				type = SHORT_POS;
+				break;
+
+			default:
+				type = LONG_POS;
+				break;
+
+			}
+		} else {
+			if (type != un->un_read_pos_type) {
+				un->un_read_pos_type = type;
+			}
+			break;
+		}
+	} while (type != NO_POS);
+
+	if (rval == 0) {
+		rval = st_interpret_read_pos(un, read, type,
+		    sizeof (read_pos_data_t), (caddr_t)raw, 1);
+	}
 	return (rval);
 }
 
@@ -17104,26 +17554,54 @@ st_compare_expected_position(struct scsi_tape *un, st_err_info *ei,
 	if (cmd_att->recov_pos_type == POS_EXPECTED) {
 		uint32_t count;
 		int64_t difference;
+		uchar_t reposition = 0;
 
-		/* At expected? */
-		if (read->lgclblkno == ei->ei_expected_pos.lgclblkno) {
-			ST_RECOV(ST_DEVINFO, st_label, SCSI_DEBUG,
-			    "Found drive to be at expected position\n");
-			return (0); /* Good */
-		}
 		ASSERT(cmd_att->get_cnt);
 		count = cmd_att->get_cnt(ei->ei_failed_pkt.pkt_cdbp);
 
-		ST_RECOV(ST_DEVINFO, st_label, SCSI_DEBUG,
+		ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
 		    "Got count from CDB and it was %d\n", count);
+
+		/*
+		 * At expected?
+		 */
+		if (read->lgclblkno == ei->ei_expected_pos.lgclblkno) {
+			ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
+			    "Found drive to be at expected position\n");
+
+			/*
+			 * If the command should move tape and it got a busy
+			 * it shouldn't be in the expected position.
+			 */
+			if (ei->ei_failing_status.sts_status.sts_busy != 0) {
+				reposition = 1;
+
+			/*
+			 * If the command doesn't transfer data should be good.
+			 */
+			} else if (cmd_att->transfers_data == TRAN_NONE) {
+				return (0); /* Good */
+
+			/*
+			 * Command transfers data, should have done so.
+			 */
+			} else if (ei->ei_failed_pkt.pkt_state &
+			    STATE_XFERRED_DATA) {
+				return (0); /* Good */
+			} else {
+				reposition = 1;
+			}
+		}
+
 		if (cmd_att->chg_tape_direction == DIR_FORW) {
 			difference =
 			    ei->ei_expected_pos.lgclblkno - read->lgclblkno;
-			ST_RECOV(ST_DEVINFO, st_label, SCSI_DEBUG,
+
+			ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
 			    "difference between expected and actual is %"
 			    PRId64"\n", difference);
-			if (count == difference) {
-				ST_RECOV(ST_DEVINFO, st_label, SCSI_DEBUG,
+			if (count == difference && reposition == 0) {
+				ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
 				    "Found failed FORW command, retrying\n");
 				return (EAGAIN);
 			}
@@ -17142,20 +17620,24 @@ st_compare_expected_position(struct scsi_tape *un, st_err_info *ei,
 				    ei->ei_expected_pos.partition);
 				if (rval == 0) {
 					ST_RECOV(ST_DEVINFO, st_label,
-					    SCSI_DEBUG, "reestablished FORW"
+					    CE_NOTE, "reestablished FORW"
 					    " command retrying\n");
 					return (EAGAIN);
 				}
-			/* This handles flushed read ahead on the drive */
+			/*
+			 * This handles flushed read ahead on the drive or
+			 * an aborted read that presents as a busy and advanced
+			 * the tape position.
+			 */
 			} else if ((cmd_att->transfers_data == TRAN_READ) &&
-			    (difference < 0)) {
+			    ((difference < 0) || (reposition == 1))) {
 				rval = st_logical_block_locate(un,
 				    st_uscsi_rcmd, read,
 				    ei->ei_expected_pos.lgclblkno - count,
 				    ei->ei_expected_pos.partition);
 				if (rval == 0) {
 					ST_RECOV(ST_DEVINFO, st_label,
-					    SCSI_DEBUG, "reestablished FORW"
+					    CE_NOTE, "reestablished FORW"
 					    " read command retrying\n");
 					return (EAGAIN);
 				}
@@ -17168,23 +17650,23 @@ st_compare_expected_position(struct scsi_tape *un, st_err_info *ei,
 			 * The plot thickens. Now I am attempting to cover a
 			 * count of 1 and a differance of 2 on a write.
 			 */
-			} else if (difference > count) {
+			} else if ((difference > count) || (reposition == 1)) {
 				rval = st_logical_block_locate(un,
 				    st_uscsi_rcmd, read,
 				    ei->ei_expected_pos.lgclblkno - count,
 				    ei->ei_expected_pos.partition);
 				if (rval == 0) {
 					ST_RECOV(ST_DEVINFO, st_label,
-					    SCSI_DEBUG, "reestablished FORW"
+					    CE_NOTE, "reestablished FORW"
 					    " write command retrying\n");
 					return (EAGAIN);
 				}
-				scsi_log(ST_DEVINFO, st_label, CE_NOTE,
+				ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
 				    "Seek to block %"PRId64" returned %d\n",
 				    ei->ei_expected_pos.lgclblkno - count,
 				    rval);
 			} else {
-				scsi_log(ST_DEVINFO, st_label, CE_NOTE,
+				ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
 				    "Not expected transfers_data = %d "
 				    "difference = %"PRId64,
 				    cmd_att->transfers_data, difference);
@@ -17197,11 +17679,11 @@ st_compare_expected_position(struct scsi_tape *un, st_err_info *ei,
 			ASSERT(cmd_att->transfers_data != TRAN_WRTE);
 			difference =
 			    read->lgclblkno - ei->ei_expected_pos.lgclblkno;
-			ST_RECOV(ST_DEVINFO, st_label, SCSI_DEBUG,
+			ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
 			    "difference between expected and actual is %"
 			    PRId64"\n", difference);
-			if (count == difference) {
-				ST_RECOV(ST_DEVINFO, st_label, SCSI_DEBUG,
+			if (count == difference && reposition == 0) {
+				ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
 				    "Found failed REVC command, retrying\n");
 				return (EAGAIN);
 			}
@@ -17213,25 +17695,25 @@ st_compare_expected_position(struct scsi_tape *un, st_err_info *ei,
 				    ei->ei_expected_pos.partition);
 				if (rval == 0) {
 					ST_RECOV(ST_DEVINFO, st_label,
-					    SCSI_DEBUG, "reestablished REVC"
+					    CE_NOTE, "reestablished REVC"
 					    " command retrying\n");
 					return (EAGAIN);
 				}
 			/* This handles read ahead in reverse direction */
 			} else if ((cmd_att->transfers_data == TRAN_READ) &&
-			    (difference < 0)) {
+			    (difference < 0) || (reposition == 1)) {
 				rval = st_logical_block_locate(un,
 				    st_uscsi_rcmd, read,
 				    ei->ei_expected_pos.lgclblkno - count,
 				    ei->ei_expected_pos.partition);
 				if (rval == 0) {
 					ST_RECOV(ST_DEVINFO, st_label,
-					    SCSI_DEBUG, "reestablished REVC"
+					    CE_NOTE, "reestablished REVC"
 					    " read command retrying\n");
 					return (EAGAIN);
 				}
 			} else {
-				scsi_log(ST_DEVINFO, st_label, CE_NOTE,
+				ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
 				    "Not expected transfers_data = %d "
 				    "difference = %"PRId64,
 				    cmd_att->transfers_data, difference);
@@ -17246,7 +17728,7 @@ st_compare_expected_position(struct scsi_tape *un, st_err_info *ei,
 			 */
 			ASSERT(0);
 		}
-		scsi_log(ST_DEVINFO, st_label, CE_NOTE,
+		ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
 		    "Didn't find a recoverable position, Failing\n");
 
 	/*
@@ -17302,7 +17784,9 @@ st_recover_reissue_pkt(struct scsi_tape *un, struct scsi_pkt *oldpkt)
 	cmd_attribute const *attrib;
 	recov_info *rcv = oldpkt->pkt_private;
 	uint_t cdblen;
+	int queued = 0;
 	int rval;
+	int flags = 0;
 	int stat_size =
 	    (un->un_arq_enabled ? sizeof (struct scsi_arq_status) : 1);
 
@@ -17328,6 +17812,7 @@ st_recover_reissue_pkt(struct scsi_tape *un, struct scsi_pkt *oldpkt)
 	} else {
 		pkt_bp = bp;
 	}
+
 	/*
 	 * if this is a queued command make sure it the only one in the
 	 * run queue.
@@ -17335,12 +17820,18 @@ st_recover_reissue_pkt(struct scsi_tape *un, struct scsi_pkt *oldpkt)
 	if (bp != un->un_sbufp && bp != un->un_recov_buf) {
 		ASSERT(un->un_runqf == un->un_runql);
 		ASSERT(un->un_runqf == bp);
+		queued = 1;
 	}
 
 	cdblen = scsi_cdb_size[CDB_GROUPID(oldpkt->pkt_cdbp[0])];
 
+	if (pkt_bp == un->un_rqs_bp) {
+		flags |= PKT_CONSISTENT;
+		stat_size = 1;
+	}
+
 	newpkt = scsi_init_pkt(ROUTE, NULL, pkt_bp, cdblen,
-	    stat_size, rcv->privatelen, 0, NULL_FUNC, NULL);
+	    stat_size, rcv->privatelen, flags, NULL_FUNC, NULL);
 	if (newpkt == NULL) {
 		ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
 		    "Reissue pkt scsi_init_pkt() failure\n");
@@ -17363,7 +17854,16 @@ st_recover_reissue_pkt(struct scsi_tape *un, struct scsi_pkt *oldpkt)
 	newpkt->pkt_state = 0;
 	newpkt->pkt_statistics = 0;
 
+	/*
+	 * oldpkt passed in was a copy of the original.
+	 * to distroy we need the address of the original.
+	 */
 	oldpkt = BP_PKT(bp);
+
+	if (oldpkt == un->un_rqs) {
+		ASSERT(bp == un->un_rqs_bp);
+		un->un_rqs = newpkt;
+	}
 
 	SET_BP_PKT(bp, newpkt);
 
@@ -17379,7 +17879,7 @@ st_recover_reissue_pkt(struct scsi_tape *un, struct scsi_pkt *oldpkt)
 		return (COMMAND_DONE_ERROR);
 	}
 	mutex_exit(ST_MUTEX);
-	rval = st_handle_start_busy(un, bp, ST_TRAN_BUSY_TIMEOUT, 0);
+	rval = st_handle_start_busy(un, bp, ST_TRAN_BUSY_TIMEOUT, queued);
 	mutex_enter(ST_MUTEX);
 	if (rval) {
 		return (COMMAND_DONE_ERROR);
@@ -17594,6 +18094,12 @@ st_get_cdb_g4g5_cnt(uchar_t *cdb)
 }
 
 static const cmd_attribute cmd_attributes[] = {
+	{ SCMD_READ,
+	    1, 0, 1, 0, 0, DIR_FORW, TRAN_READ, POS_EXPECTED,
+	    0, 0, 0, st_get_cdb_g0_rw_count },
+	{ SCMD_WRITE,
+	    1, 0, 1, 1, 0, DIR_FORW, TRAN_WRTE, POS_EXPECTED,
+	    0, 0, 0, st_get_cdb_g0_rw_count },
 	{ SCMD_TEST_UNIT_READY,
 	    0, 1, 0, 0, 0, DIR_NONE, TRAN_NONE, POS_EXPECTED,
 	    0, 0, 0 },
@@ -17606,12 +18112,6 @@ static const cmd_attribute cmd_attributes[] = {
 	{ SCMD_READ_BLKLIM,
 	    0, 1, 0, 0, 0, DIR_NONE, TRAN_READ, POS_EXPECTED,
 	    0, 0, 0 },
-	{ SCMD_READ,
-	    1, 0, 1, 0, 0, DIR_FORW, TRAN_READ, POS_EXPECTED,
-	    0, 0, 0, st_get_cdb_g0_rw_count },
-	{ SCMD_WRITE,
-	    1, 0, 1, 1, 0, DIR_FORW, TRAN_WRTE, POS_EXPECTED,
-	    0, 0, 0, st_get_cdb_g0_rw_count },
 	{ SCMD_READ_G4,
 	    1, 0, 1, 0, 1, DIR_FORW, TRAN_READ, POS_EXPECTED,
 	    0, 0, 0, st_get_cdb_g5_rw_cnt, st_get_cdb_g4g5_cnt },
@@ -17791,7 +18291,7 @@ st_reset_notification(caddr_t arg)
 	ST_FUNC(ST_DEVINFO, st_reset_notification);
 	mutex_enter(ST_MUTEX);
 
-	un->un_unit_attention_flags = 2;
+	un->un_unit_attention_flags |= 2;
 	if ((un->un_rsvd_status & (ST_RESERVE | ST_APPLICATION_RESERVATIONS)) ==
 	    ST_RESERVE) {
 		un->un_rsvd_status |= ST_LOST_RESERVE;

@@ -873,11 +873,15 @@ typedef struct {
 typedef struct {
 	buf_t *cmd_bp;
 	size_t privatelen;
+	int str_retry_cnt;
+	int pkt_retry_cnt;
 }pkt_info;
 
 typedef struct {
 	buf_t *cmd_bp;
 	size_t privatelen;
+	int str_retry_cnt;
+	int pkt_retry_cnt;
 	tapepos_t pos;
 	const cmd_attribute *cmd_attrib;
 }recov_info;
@@ -963,7 +967,6 @@ struct scsi_tape {
 	st_states un_state;		/* current state */
 	uchar_t	un_status;		/* status from last sense */
 	uchar_t	un_retry_ct;		/* retry count */
-	uchar_t	un_tran_retry_ct;	/* transport retry count */
 	writablity un_read_only;	/* RDWR, RDONLY, WORM, RDWORM */
 	uchar_t	un_test_append;		/* check writing at end of tape */
 	uchar_t un_arq_enabled;		/* auto request sense enabled */
@@ -1045,6 +1048,8 @@ struct scsi_tape {
 #endif
 	tapepos_t un_running;
 	uchar_t un_unit_attention_flags;
+	uchar_t un_multipath;
+	ulong_t un_last_path_instance;
 };
 
 typedef int (*bufunc_t)(struct scsi_tape *, int, int64_t, int);
@@ -1269,7 +1274,7 @@ typedef struct {
  * 10 seconds is what we'll wait if we get a Busy Status back
  */
 #define	ST_STATUS_BUSY_TIMEOUT	10*hz	/* seconds Busy Waiting */
-#define	ST_TRAN_BUSY_TIMEOUT	1*hz	/* seconds retry on TRAN_BSY */
+#define	ST_TRAN_BUSY_TIMEOUT	4*hz	/* seconds retry on TRAN_BSY */
 #define	ST_INTERRUPT_CONTEXT	1
 #define	ST_START_CONTEXT	2
 
@@ -1325,8 +1330,9 @@ typedef struct {
 
 #define	BSD_BEHAVIOR	(getminor(un->un_dev) & MT_BSD)
 #define	SVR4_BEHAVIOR	((getminor(un->un_dev) & MT_BSD) == 0)
+#define	ST_STATUS_MASK	(STATUS_MASK | STATUS_TASK_ABORT)
 #define	SCBP(pkt)		((struct scsi_status *)(pkt)->pkt_scbp)
-#define	SCBP_C(pkt)		((*(pkt)->pkt_scbp) & STATUS_MASK)
+#define	SCBP_C(pkt)		((*(pkt)->pkt_scbp) & ST_STATUS_MASK)
 #define	CDBP(pkt)		((union scsi_cdb *)(pkt)->pkt_cdbp)
 #define	BP_PKT(bp)		((struct scsi_pkt *)(bp)->av_back)
 #define	SET_BP_PKT(bp, pkt)	((bp)->av_back = (struct buf *)(pkt))
@@ -1355,7 +1361,16 @@ typedef struct {
  * carried in the next 2 bits. The remaining bits a signed count of
  * how many of that direction and type to do.
  */
-#if (SIZE_MAX < UINT64_MAX)
+
+#if (defined(__lock_lint))
+/*
+ * This is a workaround for warlock not being able to parse an #ULL constant.
+ */
+#undef	UINT64_MAX
+#define	UINT64_MAX	(18446744073709551615UL)
+#endif /* __lock_lint */
+
+#if (defined(__lock_lint) || (SIZE_MAX < UINT64_MAX))
 
 #define	SP_BLK		UINT32_C(0x00000000)
 #define	SP_FLM		UINT32_C(0x20000000)
@@ -1424,7 +1439,11 @@ typedef struct {
 #define	DEBUGGING\
 	((scsi_options & SCSI_DEBUG_TGT) || (st_debug & 0x7))
 
-#define	ST_DARGS(d) st_label, ((d == st_lastdev || d == 0) ?CE_CONT:CE_NOTE)
+#define	DEBLOCK(d) int lev = CE_NOTE; mutex_enter(&st_debug_mutex); \
+    if (d == st_lastdev || d == 0) lev = CE_CONT; mutex_exit(&st_debug_mutex);
+
+#define	DEBUNLOCK(d) mutex_enter(&st_debug_mutex); \
+    if (d != 0 && d != st_lastdev) st_lastdev = d; mutex_exit(&st_debug_mutex);
 
 	/* initialization */
 #define	ST_DEBUG1	if ((st_debug & 0x7) >= 1) scsi_log
@@ -1448,30 +1467,27 @@ typedef struct {
 #define	ST_RECOV	if (st_debug & 0x8) scsi_log
 
 	/* Entry Point Functions */
-#define	ST_ENTR(d, fn)\
-    if (st_debug & 0x10) { scsi_log(d, ST_DARGS(d), #fn);\
-    if (d != 0 && d != st_lastdev) st_lastdev = d; }
+#define	ST_ENTR(d, fn) if (st_debug & 0x10) { DEBLOCK(d) \
+    scsi_log(d, st_label, lev, #fn); DEBUNLOCK(d) }
 
 	/* Non-Entry Point Functions */
-#define	ST_FUNC(d, fn)\
-    if (st_debug & 0x20) { scsi_log(d, ST_DARGS(d), #fn);\
-    if (d != 0 && d != st_lastdev) st_lastdev = d; }
+#define	ST_FUNC(d, fn) if (st_debug & 0x20) { DEBLOCK(d) \
+    scsi_log(d, st_label, lev, #fn); DEBUNLOCK(d) }
 
 	/* Space Information */
 #define	ST_SPAC		if (st_debug & 0x40) scsi_log
 
 	/* CDB's sent */
-#define	ST_CDB(d, cmnt, cdb) if (st_debug & 0x180) { \
-    st_print_cdb(d, ST_DARGS(d), cmnt, cdb);\
-    if (d != 0 && d != st_lastdev) st_lastdev = d; }
+#define	ST_CDB(d, cmnt, cdb) if (st_debug & 0x180) { DEBLOCK(d) \
+    st_print_cdb(d, st_label, lev, cmnt, cdb); DEBUNLOCK(d) }
+
 	/* sense data */
-#define	ST_SENSE(d, cmnt, sense, size) if (st_debug & 0x200) { \
-    st_clean_print(d, ST_DARGS(d), cmnt, sense, size);\
-    if (d != 0 && d != st_lastdev) st_lastdev = d; }
+#define	ST_SENSE(d, cmnt, sense, size) if (st_debug & 0x200) { DEBLOCK(d) \
+    st_clean_print(d, st_label, lev, cmnt, sense, size); DEBUNLOCK(d) }
+
 	/* position data */
-#define	ST_POS(d, cmnt, pdata) if (st_debug & 0x400) { \
-    st_print_position(d, ST_DARGS(d), cmnt, pdata);\
-    if (d != 0 && d != st_lastdev) st_lastdev = d; }
+#define	ST_POS(d, cmnt, pdata) if (st_debug & 0x400) { DEBLOCK(d) \
+    st_print_position(d, st_label, lev, cmnt, pdata); DEBUNLOCK(d) }
 
 
 #else
