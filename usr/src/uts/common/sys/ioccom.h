@@ -2,8 +2,9 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,10 +50,10 @@ extern "C" {
  * Ioctl's have the command encoded in the lower word,
  * and the size of any in or out parameters in the upper
  * word.  The high 2 bits of the upper word are used
- * to encode the in/out status of the parameter;
- * parameters are restricted to at most 8191 bytes.
+ * to encode the in/out status of the parameter; for now
+ * we restrict parameters to at most 255 bytes.
  */
-#define	IOCPARM_MASK	0x1fff		/* parameters must be < 8K bytes */
+#define	IOCPARM_MASK	0xff		/* parameters must be < 256 bytes */
 #define	IOC_VOID	0x20000000	/* no parameters */
 #define	IOC_OUT		0x40000000	/* copy out parameters */
 #define	IOC_IN		0x80000000	/* copy in parameters */

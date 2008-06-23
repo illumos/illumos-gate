@@ -1450,6 +1450,7 @@ putiocd(mblk_t *bp, char *arg, int flag, cred_t *cr)
 {
 	mblk_t *tmp;
 	ssize_t  count;
+	size_t n;
 	int error = 0;
 
 	ASSERT((flag & (U_TO_K | K_TO_K)) == U_TO_K ||
@@ -1467,18 +1468,23 @@ putiocd(mblk_t *bp, char *arg, int flag, cred_t *cr)
 	 */
 	ASSERT(count >= 0);
 
-	if ((tmp = allocb_cred_wait(count, (flag & STR_NOSIG), &error, cr)) ==
-	    NULL) {
-		return (error);
+	while (count > 0) {
+		n = MIN(MAXIOCBSZ, count);
+		if ((tmp = allocb_cred_wait(n, (flag & STR_NOSIG), &error,
+		    cr)) == NULL) {
+			return (error);
+		}
+		error = strcopyin(arg, tmp->b_wptr, n, flag & (U_TO_K|K_TO_K));
+		if (error != 0) {
+			freeb(tmp);
+			return (error);
+		}
+		arg += n;
+		DB_CPID(tmp) = curproc->p_pid;
+		tmp->b_wptr += n;
+		count -= n;
+		bp = (bp->b_cont = tmp);
 	}
-	error = strcopyin(arg, tmp->b_wptr, count, flag & (U_TO_K|K_TO_K));
-	if (error != 0) {
-		freeb(tmp);
-		return (error);
-	}
-	DB_CPID(tmp) = curproc->p_pid;
-	tmp->b_wptr += count;
-	bp->b_cont = tmp;
 
 	return (0);
 }
