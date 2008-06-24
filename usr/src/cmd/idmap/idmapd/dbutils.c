@@ -2581,7 +2581,8 @@ name_based_mapping_sid2pid(lookup_state_t *state,
 	i = 0;
 	if (windomain == NULL)
 		windomain = "";
-	else if (strcasecmp(state->defdom, windomain) == 0)
+	else if (state->defdom != NULL &&
+	    strcasecmp(state->defdom, windomain) == 0)
 		i = 1;
 
 	if ((lower_winname = tolower_u8(winname)) == NULL)
@@ -4196,10 +4197,19 @@ get_w2u_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
 				retcode = IDMAP_ERR_MEMORY;
 		} else if (lookup_wksids_name2sid(winname, NULL, NULL, NULL,
 		    NULL) != IDMAP_SUCCESS) {
-			/* well-known SIDs don't need domain */
-			mapping->id1domain = strdup(state.defdom);
-			if (mapping->id1domain == NULL)
-				retcode = IDMAP_ERR_MEMORY;
+			if (state.defdom == NULL) {
+				/*
+				 * We have a non-qualified winname which is
+				 * neither the name of a well-known SID nor
+				 * there is a default domain with which we can
+				 * qualify it.
+				 */
+				retcode = IDMAP_ERR_DOMAIN_NOTFOUND;
+			} else {
+				mapping->id1domain = strdup(state.defdom);
+				if (mapping->id1domain == NULL)
+					retcode = IDMAP_ERR_MEMORY;
+			}
 		}
 		if (retcode != IDMAP_SUCCESS)
 			goto out;
