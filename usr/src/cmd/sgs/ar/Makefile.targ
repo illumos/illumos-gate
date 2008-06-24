@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 objs/%.o \
@@ -68,6 +68,7 @@ objs objs.xpg4:
 		-@ mkdir -p $@
 
 $(LINTOUT):	$(SRCS)
-		$(LINT.c) $(SRCS) $(LDLIBS) > $(LINTOUT) 2>&1
+		perl ../../tools/lint_hdr.pl $(PROG)	> $(LINTOUT)
+		$(LINT.c) $(SRCS) $(LDLIBS)		2>&1 | tee -a $(LINTOUT)
 
 include		$(SRC)/cmd/Makefile.targ

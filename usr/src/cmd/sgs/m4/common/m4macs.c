@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,33 +176,42 @@ dodump(wchar_t **ap, int c)
 				dump(np->name, np->def);
 }
 
+/*ARGSUSED*/
 static void
 dump(wchar_t *name, wchar_t *defnn)
 {
 	wchar_t	*s = defnn;
 
+#if !defined(__lint)	/* lint doesn't grok "%ws" */
 	(void) fprintf(stderr, "%ws:\t", name);
+#endif
 
-	while (*s++);
+	while (*s++)
+		;
 	--s;
 
 	while (s > defnn) {
 		--s;
-		if (is_builtin(*s))
+		if (is_builtin(*s)) {
+#if !defined(__lint)	/* lint doesn't grok "%ws" */
 			(void) fprintf(stderr, "<%ws>",
-				barray[builtin_idx(*s)].bname);
-		else {
+			    barray[builtin_idx(*s)].bname);
+		} else {
+#endif
 			(void) fputwc(*s, stderr);
 		}
 	}
 	(void) fputc('\n', stderr);
 }
 
+/*ARGSUSED*/
 static void
 doerrp(wchar_t **ap, int c)
 {
+#if !defined(__lint)	/* lint doesn't grok "%ws" */
 	if (c > 0)
 		(void) fprintf(stderr, "%ws", ap[1]);
+#endif
 }
 
 long	evalval;	/* return value from yacc stuff */
@@ -423,8 +431,8 @@ static void
 dosysval(wchar_t **ap, int c)
 {
 	pbnum((long)(sysrval < 0 ? sysrval :
-		(sysrval >> 8) & ((1 << 8) - 1)) |
-		((sysrval & ((1 << 8) - 1)) << 8));
+	    (sysrval >> 8) & ((1 << 8) - 1)) |
+	    ((sysrval & ((1 << 8) - 1)) << 8));
 }
 
 static void

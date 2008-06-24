@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,7 +69,7 @@ callopt()
  *	tempfile can be translated as temporary file.
  */
 		error(gettext(
-			"optimizer cannot open tempfile"));
+		    "optimizer cannot open tempfile"));
 
 	optimmem = tracemem;
 	pgo[0] = 0;
@@ -260,7 +259,7 @@ gin(int i)
 		pgo[i] = p - amem;
 		if (adb > 1)
 			(void) fprintf(ftable,
-				"Nonterminal %d, entry at %d\n", i, pgo[i]);
+			    "Nonterminal %d, entry at %d\n", i, pgo[i]);
 		goto nextgi;
 
 		nextgp:
@@ -319,14 +318,14 @@ stin(int i)
 					 */
 					goto nextn;
 				if (temp1[j+1] + temp1[i] ==
-					temp1[j] + temp1[i+1]) {
+				    temp1[j] + temp1[i+1]) {
 					/* states are equal */
 					indgo[i] = n;
 					if (adb > 1)
 						(void) fprintf(ftable,
-						"State %d: entry at"
-						" %d equals state %d\n",
-						i, n, j);
+						    "State %d: entry at"
+						    " %d equals state %d\n",
+						    i, n, j);
 					return;
 				}
 				goto nextn;  /* we have some disagreement */
@@ -349,14 +348,14 @@ stin(int i)
  *	Leave this untrasnlated. Yacc internal error.
  */
 				error(gettext(
-				"clobber of amem array, pos'n %d, by %d"),
-				s-amem, r[1]);
+				    "clobber of amem array, pos'n %d, by %d"),
+				    s-amem, r[1]);
 			*s = r[1];
 		}
 		indgo[i] = n;
 		if (adb > 1)
 			(void) fprintf(ftable,
-				"State %d: entry at %d\n", i, indgo[i]);
+			    "State %d: entry at %d\n", i, indgo[i]);
 		return;
 		nextn:;
 	}
@@ -409,13 +408,13 @@ osummary()
 	}
 
 	(void) fprintf(foutput,
-		"Optimizer space used: input %" PRIdPTR
-		"/%d, output %" PRIdPTR "/%d\n",
-		optimmem-tracemem + 1, new_memsize, maxa-amem + 1, new_actsize);
+	    "Optimizer space used: input %" PRIdPTR
+	    "/%d, output %" PRIdPTR "/%d\n",
+	    optimmem-tracemem + 1, new_memsize, maxa-amem + 1, new_actsize);
 	(void) fprintf(foutput,
-		"%" PRIdPTR " table entries, %d zero\n", (maxa-amem) + 1, i);
+	    "%" PRIdPTR " table entries, %d zero\n", (maxa-amem) + 1, i);
 	(void) fprintf(foutput,
-		"maximum spread: %d, maximum offset: %d\n", maxspr, maxoff);
+	    "maximum spread: %d, maximum offset: %d\n", maxspr, maxoff);
 
 }
 
@@ -438,7 +437,7 @@ int *v, n;
 {
 	int i;
 
-	(void) fprintf(ftable, "static YYCONST yytabelem %ws[]={\n", s);
+	(void) fprintf(ftable, WSFMT("static YYCONST yytabelem %ws[]={\n"), s);
 	for (i = 0; i < n; ) {
 		if (i % 10 == 0)
 			(void) fprintf(ftable, "\n");

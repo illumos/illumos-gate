@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -87,8 +87,17 @@ clean:
 
 lint:		$(LINTPOUT) $(LINTLIB)
 
+
+LINT_HDR=	perl ../../tools/lint_hdr.pl
+
 $(LINTPOUT):	$(SRCS)
-		$(LINT.c) $(SRCS) > $(LINTPOUT) 2>&1
+	$(LINT_HDR) $(PROG)			 > $(LINTPOUT)
+	$(LINT_HDR) -s yacc			>> $(LINTPOUT)
+	$(LINT.c) $(COMSRCS) $(LDLIBS)		2>&1 | tee -a $(LINTPOUT)
+
+	$(LINT_HDR) -s liby.so.1		>> $(LINTPOUT)
+	$(LINT.c) $(LIBSRCS) $(LDLIBS)		2>&1 | tee -a $(LINTPOUT)
+
 
 $(LINTLIB):	$(LINTSRCS)
-		$(LINT.c) -o $(LIBNAME) $(LINTSRCS) > $(LINTOUT) 2>&1
+		$(LINT.c) -o $(LIBNAME) $(LINTSRCS)

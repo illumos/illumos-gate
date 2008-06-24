@@ -19,11 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+
+PROG=		yacc
 
 COMOBJS=	y1.o y2.o y3.o y4.o
 POBJECTS=	$(COMOBJS)
@@ -42,8 +44,9 @@ SRCDIR =	../common
 # Override default source file derivation rule (in Makefile.lib)
 # from objects
 #
-SRCS=		$(COMOBJS:%.o=../common/%.c) \
-		$(OBJECTS:%.o=../common/%.c)
+COMSRCS=	$(COMOBJS:%.o=../common/%.c)
+LIBSRCS=	$(OBJECTS:%.o=../common/%.c)
+SRCS=		$(COMSRCS) $(LIBSRCS)
 
 LIBS =          $(DYNLIB) $(LINTLIB)
 
@@ -58,8 +61,8 @@ INCLIST=	-I../../include -I../../include/$(MACH)
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 LDLIBS=		$(LDLIBS.cmd)
 BUILD.AR=	$(AR) $(ARFLAGS) $@ `$(LORDER) $(OBJS) | $(TSORT)`
-LINTFLAGS=	-ax
-LINTPOUT=	lintp.out
+LINTFLAGS=	-amux
+LINTPOUT=	lint.out
 
 C99MODE= $(C99_ENABLE)
 CFLAGS += $(CCVERBOSE)
@@ -78,5 +81,5 @@ DYNLINKLIB=	$(LIBLINKS:%=$(DYNLINKLIBDIR)/%)
 
 $(DYNLIB) :=	LDLIBS += -lc
 
-CLEANFILES +=	$(LINTPOUT) $(LINTOUT)
+CLEANFILES +=	$(LINTPOUT)
 CLOBBERFILES +=	$(LIBS) $(LIBRARY)

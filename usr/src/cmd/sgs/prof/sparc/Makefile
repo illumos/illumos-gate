@@ -21,7 +21,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/sgs/prof/sparc/Makefile
@@ -37,14 +37,14 @@ COMOBJS=	prof.o profv.o lookup.o rdelf.o \
 OBJS=		$(COMOBJS)
 
 SRCS=		$(COMOBJS:%.o=../common/%.c)
-		
+
 
 INCLIST=	-I../common -I../../include -I../../include/sparc
 DEFLIST=	-DSPARC -DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 CFLAGS +=	$(CCVERBOSE)
 C99MODE=	$(C99_ENABLE)
-LDLIBS +=	../../sgsdemangler/$(MACH)/libdemangle.a -lelf
+LDLIBS +=	-L../../sgsdemangler/$(MACH) -ldemangle -lelf
 LINTFLAGS +=	$(LDLIBS)
 CLEANFILES +=	$(LINTOUT)
 
@@ -67,6 +67,7 @@ clean:
 lint:		$(LINTOUT)
 
 $(LINTOUT):	$(SRCS)
-		$(LINT.c) $(SRCS) > $(LINTOUT) 2>&1
+		perl ../../tools/lint_hdr.pl $(PROG)	 > $(LINTOUT)
+		$(LINT.c) $(SRCS) 			>> $(LINTOUT) 2>&1
 
 include		../../../Makefile.targ

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -184,10 +184,10 @@ _symintOpen(char *aout_name)
 
 	if (elf32_getshdr(tscn_p) == NULL)
 		_err_exit("%s %s in %s.", fail_shd_s, "header names",
-		aout_name);
+		    aout_name);
 	if ((pfile_p->pf_snmdat_p = elf_getdata(tscn_p, NULL)) == NULL)
 		_err_exit("%s %s in %s.", fail_dat_s, "header names",
-		aout_name);
+		    aout_name);
 
 	DEBUG_EXP(printf("Address of data header = 0x%lx\n",
 	    pfile_p->pf_snmdat_p));
@@ -214,12 +214,13 @@ _symintOpen(char *aout_name)
 	    pfile_p->pf_elfhd_p->e_shnum);
 
 	{
+#ifdef DEBUG
 	char	*shdnms_p = (char *)pfile_p->pf_snmdat_p->d_buf;
+#endif
 
 	char	*dest_p = (char *)pfile_p->pf_shdarr_p;
 	int	shdsize = pfile_p->pf_elfhd_p->e_shentsize;
-	int	i;
-	char	*s;
+	int	i = 0;
 	int		symtab_found = 0;
 
 	tscn_p = 0;
@@ -237,14 +238,15 @@ _symintOpen(char *aout_name)
 	while ((tscn_p = elf_nextscn(telf_p, tscn_p)) != NULL) {
 		if ((tshd_p = elf32_getshdr(tscn_p)) == NULL)
 			_err_exit("%s %d in %s.", fail_shd_s, i, aout_name);
+		i++;
 
 		(void) memcpy(dest_p, tshd_p, shdsize);
 		dest_p += shdsize;
 
-		s = &shdnms_p[tshd_p->sh_name];
 		DEBUG_EXP(printf("index of section name = %d\n",
 		    tshd_p->sh_name));
-		DEBUG_EXP(printf("_symintOpen: reading section %s\n", s));
+		DEBUG_EXP(printf("_symintOpen: reading section %s\n",
+		    &shdnms_p[tshd_p->sh_name]));
 
 		if (symtab_found)
 			continue;

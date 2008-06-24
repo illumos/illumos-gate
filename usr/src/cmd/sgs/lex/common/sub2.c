@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -444,7 +444,7 @@ cgoto(void)
 		else
 			gotof[s] = -1;
 	}
-	ratfor ? fprintf(fout, "end\n") : fprintf(fout, "0};\n");
+	(void) (ratfor ? fprintf(fout, "end\n") : fprintf(fout, "0};\n"));
 }
 
 /*
@@ -547,9 +547,9 @@ packtrans(int st, CHR *tch, int *tst, int cnt, int tryit)
 				go[index] = tst[i];
 				symbol[index] = 0;
 			} else {
-				fprintf(stderr,
+				(void) fprintf(stderr,
 "lex`sub2`packtran: tch[%d] out of bounds (%d)\n",
-				    i, tch[i]);
+				    i, (int)tch[i]);
 			}
 		}
 		for (i = 0; i < cnt; i++) {
@@ -840,10 +840,10 @@ acompute(int s)
 	(void) putc('\n', fout);
 	for (i = 0; i < k; i++)
 		if (temp[i] != 0) {
-			ratfor ?
+			(void) (ratfor ?
 			    fprintf(fout, "data vstop(%d)/%d/\n",
 			    aptr, temp[i]) :
-			    fprintf(fout, "%d,\n", temp[i]);
+			    fprintf(fout, "%d,\n", temp[i]));
 #ifdef DEBUG
 			if (debug)
 				(void) printf("%d ", temp[i]);
@@ -852,8 +852,8 @@ acompute(int s)
 		}
 	for (i = 0; i < n; i++) { /* copy fall back actions - all neg */
 		ratfor ?
-		    fprintf(fout, "data vstop(%d)/%d/\n", aptr, neg[i]) :
-		    fprintf(fout, "%d,\n", neg[i]);
+		    (void) fprintf(fout, "data vstop(%d)/%d/\n", aptr, neg[i]) :
+		    (void) fprintf(fout, "%d,\n", neg[i]);
 		aptr++;
 #ifdef DEBUG
 		if (debug)
@@ -864,8 +864,8 @@ acompute(int s)
 	if (debug)
 		(void) putchar('\n');
 #endif
-	ratfor ? fprintf(fout, "data vstop (%d)/0/\n", aptr) :
-	    fprintf(fout, "0, \n");
+	(void) (ratfor ? fprintf(fout, "data vstop (%d)/0/\n", aptr) :
+	    fprintf(fout, "0, \n"));
 	aptr++;
 }
 
@@ -980,7 +980,7 @@ layout(void)
 				if (ctable[nchar[j]] <= 0)
 					(void) printf(
 					"j %d nchar %d ctable.nch %d\n",
-					    j, nchar[j], ctable[nchar[k]]);
+					    j, (int)nchar[j], ctable[nchar[k]]);
 				verify[k] = i + 1;	/* state number + 1 */
 				advance[k] = nexts[j+1]+1;
 				if (yytop < k)
@@ -1085,12 +1085,13 @@ layout(void)
 				for (j = 0; j < 8; j++) {
 					int fbch;
 					fbch = match[i+j];
-					fprintf(fout, "%3d, ", fbch);
+					(void) fprintf(fout, "%3d, ", fbch);
 				}
 				(void) putc('\n', fout);
 			}
 		} else {
 			int *fbarr;
+			/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 			fbarr = (int *)myalloc(2*MAXNCG, sizeof (*fbarr));
 			if (fbarr == 0)
 				error("No space for char table reverse", 0);
@@ -1100,8 +1101,9 @@ layout(void)
 				fbarr[ctable[i]] = ctable[match[i]];
 			for (i = 0; i < ncg; i += 8) {
 				for (j = 0; j < 8; j++)
-					fprintf(fout, "0%-3o,", fbarr[i+j]);
-				putc('\n', fout);
+					(void) fprintf(fout, "0%-3o,",
+					    fbarr[i+j]);
+				(void) putc('\n', fout);
 			}
 			free(fbarr);
 		}
@@ -1118,18 +1120,18 @@ layout(void)
 	(void) fprintf(fout, "0};\n");
 	if (handleeuc) {
 		/* Put out yycgidtbl */
-		fprintf(fout, "#define YYNCGIDTBL %d\n", ncgidtbl);
-		fprintf(fout, "\tunsigned long yycgidtbl[]={");
+		(void) fprintf(fout, "#define YYNCGIDTBL %d\n", ncgidtbl);
+		(void) fprintf(fout, "\tunsigned long yycgidtbl[]={");
 		/*
 		 * Use "unsigned long" instead of "lchar" to minimize
 		 * the name-space polution for the application program.
 		 */
 		for (i = 0; i < ncgidtbl; ++i) {
 			if (i%8 == 0)
-				fprintf(fout, "\n\t\t");
-			fprintf(fout, "0x%08x, ",  yycgidtbl[i]);
+				(void) fprintf(fout, "\n\t\t");
+			(void) fprintf(fout, "0x%08x, ",  (int)yycgidtbl[i]);
 		}
-		fprintf(fout, "\n\t0};\n");
+		(void) fprintf(fout, "\n\t0};\n");
 	}
 }
 

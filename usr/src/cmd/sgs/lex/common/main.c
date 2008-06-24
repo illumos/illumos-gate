@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,7 +56,7 @@ main(int argc, char **argv)
 
 	sargv = argv;
 	sargc = argc;
-	setlocale(LC_ALL, "");
+	(void) setlocale(LC_ALL, "");
 #ifdef DEBUG
 	while ((c = getopt(argc, argv, "dyctvnewVQ:Y:")) != EOF) {
 #else
@@ -243,14 +243,22 @@ main(int argc, char **argv)
 static void
 get1core(void)
 {
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	ccptr =	ccl = (CHR *)myalloc(CCLSIZE, sizeof (*ccl));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	pcptr = pchar = (CHR *)myalloc(pchlen, sizeof (*pchar));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	def = (CHR **)myalloc(DEFSIZE, sizeof (*def));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	subs = (CHR **)myalloc(DEFSIZE, sizeof (*subs));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	dp = dchar = (CHR *)myalloc(DEFCHAR, sizeof (*dchar));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	sname = (CHR **)myalloc(STARTSIZE, sizeof (*sname));
 	/* XCU4: exclusive start array */
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	exclusive = (int *)myalloc(STARTSIZE, sizeof (*exclusive));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	sp = schar = (CHR *)myalloc(STARTCHAR, sizeof (*schar));
 	if (ccl == 0 || def == 0 ||
 	    pchar == 0 || subs == 0 || dchar == 0 ||
@@ -270,15 +278,24 @@ static void
 get2core(void)
 {
 	int i;
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	gotof = (int *)myalloc(nstates, sizeof (*gotof));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	nexts = (int *)myalloc(ntrans, sizeof (*nexts));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	nchar = (CHR *)myalloc(ntrans, sizeof (*nchar));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	state = (int **)myalloc(nstates, sizeof (*state));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	atable = (int *)myalloc(nstates, sizeof (*atable));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	sfall = (int *)myalloc(nstates, sizeof (*sfall));
 	cpackflg = (Boolean *)myalloc(nstates, sizeof (*cpackflg));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	tmpstat = (CHR *)myalloc(tptr+1, sizeof (*tmpstat));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	foll = (int **)myalloc(tptr+1, sizeof (*foll));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	nxtpos = positions = (int *)myalloc(maxpos, sizeof (*positions));
 	if (tmpstat == 0 || foll == 0 || positions == 0 ||
 	    gotof == 0 || nexts == 0 || nchar == 0 ||
@@ -310,8 +327,11 @@ free2core(void)
 static void
 get3core(void)
 {
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	verify = (int *)myalloc(outsize, sizeof (*verify));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	advance = (int *)myalloc(outsize, sizeof (*advance));
+	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	stoff = (int *)myalloc(stnum+2, sizeof (*stoff));
 	if (verify == 0 || advance == 0 || stoff == 0)
 		error("Too little core for final packing");

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -25,7 +24,7 @@
  * All Rights Reserved
  *
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,7 +118,7 @@ main(int argc, char ** argv, char ** envp)
 	/*
 	 * Check for a binary that better fits this architecture.
 	 */
-	conv_check_native(argv, envp);
+	(void) conv_check_native(argv, envp);
 
 	tool_name = argv[0];
 
@@ -201,35 +200,39 @@ main(int argc, char ** argv, char ** envp)
 			if (elf_kind(arf) == ELF_K_AR) {
 				archive = argv[optind];
 			} else {
-			    archive = "";
+				archive = "";
 			}
 
 			while ((elf = elf_begin(fd, cmd, arf)) != 0) {
-			    if ((arhdr = elf_getarhdr(elf)) == 0) {
-				if (elf_kind(arf) == ELF_K_NONE) {
-					(void) fprintf(stderr,
-					"%s: %s: invalid file type\n",
-					tool_name, fname);
-					exitcode++;
-					break;
-				} else {
-					process(elf);
+				if ((arhdr = elf_getarhdr(elf)) == 0) {
+					if (elf_kind(arf) == ELF_K_NONE) {
+						/* BEGIN CSTYLED */
+						(void) fprintf(stderr,
+						  "%s: %s: invalid file type\n",
+						    tool_name, fname);
+						/* END CSTYLED */
+						exitcode++;
+						break;
+					} else {
+						process(elf);
+					}
+				} else if (arhdr->ar_name[0] != '/') {
+					fname = arhdr->ar_name;
+					if (elf_kind(arf) == ELF_K_NONE) {
+						/* BEGIN CSTYLED */
+						(void) fprintf(stderr,
+					    "%s: %s[%s]: invalid file type\n",
+						    tool_name, archive, fname);
+						/* END CSTYLED */
+						exitcode++;
+						break;
+					} else {
+						is_archive++;
+						process(elf);
+					}
 				}
-			    } else if (arhdr->ar_name[0] != '/') {
-				fname = arhdr->ar_name;
-				if (elf_kind(arf) == ELF_K_NONE) {
-					(void) fprintf(stderr,
-					"%s: %s[%s]: invalid file type\n",
-					tool_name, archive, fname);
-					exitcode++;
-					break;
-				} else {
-					is_archive++;
-					process(elf);
-				}
-			    }
-			    cmd = elf_next(elf);
-			    (void) elf_end(elf);
+				cmd = elf_next(elf);
+				(void) elf_end(elf);
 			}
 			(void) elf_end(arf);
 			(void) close(fd);

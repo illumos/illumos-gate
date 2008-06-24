@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,6 +103,7 @@ int p, d;
 		(void) fprintf(errorf, "line %d: ", yyline);
 	}
 	(void) fprintf(errorf, "Error: ");
+	/*LINTED: E_SEC_PRINTF_VAR_FMT*/
 	(void) fprintf(errorf, s, p, d);
 	(void) putc('\n', errorf);
 	if (fatal)
@@ -141,6 +142,7 @@ int p, d;
 				"line %d: ", yyline);
 		}
 	(void) fprintf(errorf, "Warning: ");
+	/*LINTED: E_SEC_PRINTF_VAR_FMT*/
 	(void) fprintf(errorf, s, p, d);
 	(void) putc('\n', errorf);
 	(void) fflush(errorf);
@@ -149,6 +151,12 @@ int p, d;
 	(void) fflush(stdout);
 }
 
+/*
+ * This function is apparently unused, but lint flags the fact
+ * that it does not have the same signature as the libc function
+ * of the same name. So, take it out of view for lint.
+ */
+#if !defined(__lint)
 int
 index(int a, CHR *s)
 {
@@ -158,6 +166,7 @@ index(int a, CHR *s)
 			return (k);
 	return (-1);
 }
+#endif
 
 int
 alpha(int c)
@@ -201,7 +210,7 @@ scopy(CHR *s, CHR *t)
 	CHR *i;
 	i = t;
 	while (*i++ = *s++)
-		/* EMPTY */;
+		;
 }
 
 /*
@@ -241,7 +250,7 @@ slength(CHR *s)
 	CHR *t;
 	t = s;
 	for (n = 0; *t++; n++)
-		/* EMPTY */;
+		;
 	return (n);
 }
 
@@ -437,7 +446,7 @@ usescape(int c)
 
 	if (handleeuc && !isascii(c)) {
 		char tmpchar = c & 0x00ff;
-		mbtowc((wchar_t *)&c, &tmpchar, sizeof (tmpchar));
+		(void) mbtowc((wchar_t *)&c, &tmpchar, sizeof (tmpchar));
 	}
 	return (c);
 }
@@ -490,7 +499,7 @@ cpycom(CHR *p)
 			(void) putc((char)c, fout);
 			if ((c = gch()) == '/') {
 				while ((c = gch()) == ' ' || c == '\t')
-					/* EMPTY */;
+					;
 				if (!space(c))
 					error("unacceptable statement");
 				prev = '\n';

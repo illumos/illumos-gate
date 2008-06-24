@@ -27,7 +27,6 @@
 # cmd/sgs/yacc/sparc/Makefile
 #
 
-PROG=		yacc
 DEFLIST=	-DELF
 
 include 	../../../Makefile.cmd

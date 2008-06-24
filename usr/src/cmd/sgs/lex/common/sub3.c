@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,6 +129,7 @@ void
 remch(wchar_t c)
 {
 	lchar	lc = linearize(c);
+	size_t	local_ncgidtbl;
 
 	/*
 	 * User-friendliness consideration:
@@ -145,8 +146,14 @@ remch(wchar_t c)
 		return;
 	}
 
-	lsearch(&lc, yycgidtbl,
-	    (size_t *)&ncgidtbl, sizeof (lchar), cmplc);
+	/*
+	 * lsearch wants ncgidtbl to be size_t, but it is int. Hence,
+	 * the use of local_ncgidtbl to satisfy the calling interface.
+	 */
+	local_ncgidtbl = ncgidtbl;
+	(void) lsearch(&lc, yycgidtbl,
+	    &local_ncgidtbl, sizeof (lchar), cmplc);
+	ncgidtbl = (int)local_ncgidtbl;
 }
 
 void

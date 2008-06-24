@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -156,36 +156,63 @@ $(LINTOUT64):	$(LINTSRCS) $(LINTSRCS64)
 	$(LINT.c) -D_ELF64 $(LINTSRCS) $(LINTSRCS64) \
 	    $(LDLIBS) > $(LINTOUT64) 2>&1
 
+#
+# A couple of macros used in the SGSLINTOUT rule below
+#
+#	LINT_HDR - Use sgs/tools/lint_hdr.pl to generate lint output headers
+#	LINT_TEE - Use tee to write output to stdout and also capture it
+#		in the SGSLINT output file.
+#
+# An additional complexity: We produce headers for all the lint
+# output so that we can tell what came from where when we look
+# at the resulting file. We also cat these headers to stdout so that
+# the user of make will see them. However, we don't want the headers
+# to go to stdout if there is only one of LINTOUT32 and LINTOUT64. To
+# the interactive user, the headers are only interesting as a way to
+# separate the two ELF classes. We only bother with this for the
+# non-DYNLIB and non-RTLD case, because at the current time, both of these
+# cases always have both 32 and 64-bit ELFCLASS support.
+#
+LINT_HDR=	perl $(SGSTOOLS)/lint_hdr.pl
+LINT_TEE=	tee -a $(SGSLINTOUT)
+
 $(SGSLINTOUT): FRC
 	@ rm -f $(SGSLINTOUT)
 	@ if [ -r $(LINTOUT1) ]; then			\
-		echo "\n"$(LINTLIB) >> $(SGSLINTOUT);	\
-		echo $(DASHES) >> $(SGSLINTOUT);	\
-		cat $(LINTOUT1) >> $(SGSLINTOUT);	\
+		$(LINT_HDR) $(LINTLIB) | $(LINT_TEE);	\
+		cat $(LINTOUT1) | $(LINT_TEE);	\
 	fi
 	@ if [ -r $(LINTOUT32) ]; then			\
 		if [ -n "$(DYNLIB)" ] ; then		\
-			echo "\nElf32 - $(DYNLIB)" >> $(SGSLINTOUT);	\
+			$(LINT_HDR) $(DYNLIB) 32 | $(LINT_TEE); \
 		elif [ -n "$(RTLD)" ] ; then		\
-			echo "\nElf32 - $(RTLD)" >> $(SGSLINTOUT);	\
-		else echo "\nElf32 - $(PROG)" >> $(SGSLINTOUT);	\
+			$(LINT_HDR) $(RTLD) 32 | $(LINT_TEE); \
+		else \
+			if [ -r $(LINTOUT64) ]; then \
+				$(LINT_HDR) $(PROG) 32 | $(LINT_TEE);	\
+			else \
+				$(LINT_HDR) $(PROG) 32 >> $(SGSLINTOUT); \
+			fi; \
 		fi; \
-		echo $(DASHES) >> $(SGSLINTOUT);	\
-		cat $(LINTOUT32) >> $(SGSLINTOUT);	\
+		cat $(LINTOUT32) | $(LINT_TEE);	\
 	fi
 	@ if [ -r $(LINTOUT64) ]; then			\
 		if [ -n "$(DYNLIB)" ] ; then		\
 			if [ $(DYNLIB) = "libld.so.2" ] ; then \
-				echo "\nElf64 - libld.so.3" >> $(SGSLINTOUT);	\
+				$(LINT_HDR) libld.so.3 64 | $(LINT_TEE); \
 			else \
-				echo "\nElf64 - $(DYNLIB)" >> $(SGSLINTOUT);	\
+				$(LINT_HDR) $(DYNLIB) 64 | $(LINT_TEE); \
 			fi; \
 		elif [ -n "$(RTLD)" ] ; then		\
-			echo "\nElf64 - $(RTLD)" >> $(SGSLINTOUT);	\
-		else echo "\nElf64 - $(PROG)" >> $(SGSLINTOUT);	\
+			$(LINT_HDR) $(RTLD) 64 | $(LINT_TEE); \
+		else \
+			if [ -r $(LINTOUT32) ]; then \
+				$(LINT_HDR) $(PROG) 64 | $(LINT_TEE); \
+			else \
+				$(LINT_HDR) $(PROG) 64 >> $(SGSLINTOUT); \
+			fi; \
 		fi; \
-		echo $(DASHES) >> $(SGSLINTOUT);	\
-		cat $(LINTOUT64) >> $(SGSLINTOUT);	\
+		cat $(LINTOUT64) | $(LINT_TEE);	\
 	fi
 	@ rm -f $(LINTOUT1) $(LINTOUT32) $(LINTOUT64)
 

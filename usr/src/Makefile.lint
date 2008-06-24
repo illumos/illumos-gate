@@ -248,6 +248,7 @@ COMMON_SUBDIRS = \
 	cmd/sdpadm \
 	cmd/setpgrp \
 	cmd/smbios \
+	cmd/sgs \
 	cmd/smbsrv \
 	cmd/smserverd \
 	cmd/sort \

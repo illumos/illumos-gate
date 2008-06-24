@@ -21,7 +21,7 @@
  */
 %}
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,24 @@
 
 %{
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Lint is unable to properly handle formats with wide strings
+ * (e.g. %ws) and misdiagnoses them as being malformed.
+ * This macro is used to work around that, by substituting
+ * a pointer to a null string when compiled by lint. This
+ * trick works because lint is not able to evaluate the
+ * variable.
+ *
+ * When lint is able to handle %ws, it would be appropriate
+ * to come back through and remove the use of this macro.
+ */
+#if defined(__lint)
+static const char *lint_ws_fmt = "";
+#define	WSFMT(_fmt) lint_ws_fmt
+#else
+#define	WSFMT(_fmt) _fmt
+#endif
 
 void yyerror(char *);
 
@@ -303,6 +321,7 @@ yylex(void)
 				case '%':
 					switch(c= *(p+1)){
 					case '%':
+						/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 						if(scomp(p, (CHR *)"%%")) {
 							p++;
 							while(*(++p))
@@ -323,10 +342,14 @@ yylex(void)
 							error("Too little core for parse tree");
 						p = (CHR *)c;
 						free(p);
+						/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 						name = (int *)myalloc(treesize,sizeof(*name));
+						/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 						left = (int *)myalloc(treesize,sizeof(*left));
+						/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 						right = (int *)myalloc(treesize,sizeof(*right));
 						nullstr = myalloc(treesize,sizeof(*nullstr));
+						/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 						parent = (int *)myalloc(treesize,sizeof(*parent));
 						if(name == 0 || left == 0 || right == 0 || parent == 0 || nullstr == 0)
 							error("Too little core for parse tree");
@@ -403,6 +426,7 @@ yylex(void)
 # ifdef DEBUG
 						if (debug) (void) printf( "Size classes (%%k) now %d\n",pchlen);
 # endif
+						/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 						pchar=pcptr=(CHR *)myalloc(pchlen, sizeof(*pchar));
 						if (report==2) report=1;
 						continue;
@@ -470,7 +494,7 @@ Character table (%t) is supported only in ASCII compatibility mode.\n");
 							if(p[0]=='/' && p[1]=='*')
 								cpycom(p);
 							else
-								(void) fprintf(fout,"%ws\n",p);
+								(void) fprintf(fout,WSFMT("%ws\n"),p);
 						if(p[0] == '%') continue;
 						if (*p) error("EOF before %%%%");
 						else error("EOF before %%}");
@@ -500,7 +524,7 @@ start:
 							if (*t == 0) continue;
 							i = sptr*2;
 							if(!ratfor)(void) fprintf(fout,"# ");
-							fprintf(fout,"define %ws %d\n",t,i);
+							(void) fprintf(fout,WSFMT("define %ws %d\n"),t,i);
 							scopy(t,sp);
 							sname[sptr] = sp;
 							/* XCU4: save exclusive flag with start name */
@@ -521,7 +545,7 @@ start:
 				case ' ': case '\t':		/* must be code */
 					lgate();
 					if( p[1]=='/' && p[2]=='*' ) cpycom(p);
-					else (void) fprintf(fout, "%ws\n",p);
+					else (void) fprintf(fout, WSFMT("%ws\n"),p);
 					continue;
 				case '/':	/* look for comments */
 					lgate();
@@ -571,6 +595,7 @@ start:
 				if(sectbegin == TRUE){
 					(void)cpyact();
 					copy_line = FALSE;
+					/*LINTED: E_EQUALITY_NOT_ASSIGNMENT*/
 					while((c=gch()) && c != '\n');
 					continue;
 					}
@@ -582,6 +607,7 @@ start:
 					if(ratfor)(void) fprintf(fout,"goto 30997\n");
 					else (void) fprintf(fout,"break;\n");
 					}
+				/*LINTED: E_EQUALITY_NOT_ASSIGNMENT*/
 				while((c=gch()) && c != '\n') {
 					if (c=='/') {
 						if((c=gch())=='*') {
@@ -617,7 +643,7 @@ start:
 						if(buf[0]=='/' && buf[1]=='*')
 							cpycom(buf);
 						else
-							(void) fprintf(fout,"%ws\n",buf);
+							(void) fprintf(fout,WSFMT("%ws\n"),buf);
 					continue;
 					}
 				if(peek == '%'){
@@ -767,6 +793,7 @@ start:
 				break;
 			case '"':
 				i = 0;
+				/*LINTED: E_EQUALITY_NOT_ASSIGNMENT*/
 				while((c=gch()) && c != '"' && c != '\n'){
 					if(c == '\\') c = usescape(c=gch());
 					remch(c);
@@ -928,9 +955,9 @@ Character range specified between different codesets.");
 		else	
 			(void) fprintf(fout,
 				"\n# line %d \"%s\"\n", yyline-1, sargv[optind]);
-		(void) fprintf(fout,"%ws\n",buf);
+		(void) fprintf(fout,WSFMT("%ws\n"),buf);
 		while(getl(buf) && !eof)
-			(void) fprintf(fout,"%ws\n",buf);
+			(void) fprintf(fout,WSFMT("%ws\n"),buf);
         }
 
 	return(freturn(0));

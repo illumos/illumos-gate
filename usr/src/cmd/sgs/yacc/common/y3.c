@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,11 +63,11 @@ output()
 				WSLOOP(u, v) {
 					if (c == *(v->pitem))
 						putitem(v->pitem + 1,
-							(LOOKSETS *)0);
+						    (LOOKSETS *)0);
 				}
 				temp1[c] = state(c);
 			} else if (c > NTBASE &&
-				temp1[(c -= NTBASE) + ntokens] == 0) {
+			    temp1[(c -= NTBASE) + ntokens] == 0) {
 				temp1[c + ntokens] = amem[indgo[i] + c];
 			}
 		}
@@ -89,15 +88,17 @@ output()
 							 * reduce/reduce
 							 * conflict
 							 */
+							/* BEGIN CSTYLED */
 							if (foutput != NULL)
 					(void) fprintf(foutput,
-				"\n%d: reduce/reduce conflict"
-				" (red'ns %d and %d ) on %ws",
+				WSFMT("\n%d: reduce/reduce conflict"
+				" (red'ns %d and %d ) on %ws"),
 							i, -temp1[k],
 							lastred, symnam(k));
 						    if (-temp1[k] > lastred)
 							temp1[k] = -lastred;
 						    ++zzrrconf;
+							/* END CSTYLED */
 						} else
 							/*
 							 * potentia
@@ -281,9 +282,10 @@ static void go2gen(int c)
 	/* now, we have temp1[c] = 1 if a goto on c in closure of cc */
 
 	if (g2debug && foutput != NULL) {
-		(void) fprintf(foutput, "%ws: gotos on ", nontrst[c].name);
+		(void) fprintf(foutput, WSFMT("%ws: gotos on "),
+		    nontrst[c].name);
 		NTLOOP(i) if (temp1[i])
-			(void) fprintf(foutput, "%ws ", nontrst[i].name);
+			(void) fprintf(foutput, WSFMT("%ws "), nontrst[i].name);
 		(void) fprintf(foutput, "\n");
 	}
 
@@ -321,9 +323,9 @@ precftn(int r, int t, int s)
 		/* conflict */
 		if (foutput != NULL)
 			(void) fprintf(foutput,
-				"\n%d: shift/reduce conflict"
-				" (shift %d, red'n %d) on %ws",
-				s, temp1[t], r, symnam(t));
+			    WSFMT("\n%d: shift/reduce conflict"
+			    " (shift %d, red'n %d) on %ws"),
+			    s, temp1[t], r, symnam(t));
 		++zzsrconf;
 		return;
 	}
@@ -408,11 +410,11 @@ wract(int i)
 				if (flag++ == 0)
 					(void) fprintf(ftable, "-1, %d,\n", i);
 				(void) fprintf(ftable,
-					"\t%d, %d,\n", tokset[p0].value, p1);
+				    "\t%d, %d,\n", tokset[p0].value, p1);
 				++zzexcp;
 			} else {
 				(void) fprintf(ftemp,
-					"%d,%d,", tokset[p0].value, p1);
+				    "%d,%d,", tokset[p0].value, p1);
 				++zzacent;
 			}
 		}
@@ -436,20 +438,20 @@ wrstate(int i)
 		return;
 	(void) fprintf(foutput, "\nstate %d\n", i);
 	ITMLOOP(i, pp, qq) {
-		(void) fprintf(foutput, "\t%ws\n", writem(pp->pitem));
+		(void) fprintf(foutput, WSFMT("\t%ws\n"), writem(pp->pitem));
 	}
 	if (tystate[i] == MUSTLOOKAHEAD) {
 		/* print out empty productions in closure */
 		WSLOOP(wsets + (pstate[i + 1] - pstate[i]), u) {
 			if (*(u->pitem) < 0)
 				(void) fprintf(foutput,
-					"\t%ws\n", writem(u->pitem));
+				    WSFMT("\t%ws\n"), writem(u->pitem));
 		}
 	}
 
 	/* check for state equal to another */
 	TLOOP(j0) if ((j1 = temp1[j0]) != 0) {
-		(void) fprintf(foutput, "\n\t%ws  ", symnam(j0));
+		(void) fprintf(foutput, WSFMT("\n\t%ws  "), symnam(j0));
 		if (j1 > 0) { /* shift, error, or accept */
 			if (j1 == ACCEPTCODE)
 				(void) fprintf(foutput,  "accept");
@@ -473,8 +475,8 @@ wrstate(int i)
 	for (j0 = 1; j0 <= nnonter; ++j0) {
 		if (temp1[++j1])
 			(void) fprintf(foutput,
-				"\t%ws  goto %d\n",
-				symnam(j0 + NTBASE), temp1[j1]);
+			    WSFMT("\t%ws  goto %d\n"),
+			    symnam(j0 + NTBASE), temp1[j1]);
 	}
 }
 
@@ -482,7 +484,7 @@ static void
 wdef(wchar_t *s, int n)
 {
 	/* output a definition of s to the value n */
-	(void) fprintf(ftable, "# define %ws %d\n", s, n);
+	(void) fprintf(ftable, WSFMT("# define %ws %d\n"), s, n);
 }
 
 void
@@ -491,7 +493,7 @@ wchar_t *s;
 int *v, n;
 {
 	int i;
-	(void) fprintf(ftable, "static YYCONST yytabelem %ws[]={\n", s);
+	(void) fprintf(ftable, WSFMT("static YYCONST yytabelem %ws[]={\n"), s);
 	for (i = 0; i < n; ) {
 		if (i % 10 == 0)
 			(void) fprintf(ftable, "\n");
@@ -522,8 +524,8 @@ hideprod()
 			++j;
 			if (foutput != NULL) {
 				(void) fprintf(foutput,
-					"Rule not reduced:   %ws\n",
-					writem(prdptr[i]));
+				    WSFMT("Rule not reduced:   %ws\n"),
+				    writem(prdptr[i]));
 			}
 		}
 		levprd[i] = *prdptr[i] - NTBASE;
@@ -533,9 +535,9 @@ hideprod()
  * TRANSLATION_NOTE  -- This is a message from yacc.
  *	Check how 'reduced' is translated in yacc man page/document.
  */
-		(void) fprintf(stderr, gettext(
-		"%d rules never reduced\n"),
-		j);
+		(void) fprintf(stderr,
+		    gettext("%d rules never reduced\n"),
+		    j);
 }
 
 
@@ -553,13 +555,13 @@ wrmbchars()
 	int i;
 	wdef(L"YYNMBCHARS", nmbchars);
 	qsort(mbchars, nmbchars, sizeof (*mbchars),
-		(int (*)(const void *, const void *))cmpmbchars);
+	    (int (*)(const void *, const void *))cmpmbchars);
 	(void) fprintf(ftable,
-		"static struct{\n\twchar_t character;"
-		"\n\tint tvalue;\n}yymbchars[YYNMBCHARS]={\n");
+	    "static struct{\n\twchar_t character;"
+	    "\n\tint tvalue;\n}yymbchars[YYNMBCHARS]={\n");
 	for (i = 0; i < nmbchars; ++i) {
 		(void) fprintf(ftable, "\t{%#x,%d}",
-			(int)mbchars[i].character, mbchars[i].tvalue);
+		    (int)mbchars[i].character, mbchars[i].tvalue);
 		if (i < nmbchars - 1) {
 			/* Not the last. */
 			(void) fprintf(ftable, ",\n");

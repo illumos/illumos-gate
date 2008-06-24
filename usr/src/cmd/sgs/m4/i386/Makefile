@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,8 +42,12 @@ OBJS=		$(COBJS:%=m4objs/%) $(YOBJS)
 XPG4OBJS=	$(COBJS:%=m4objs.xpg4/%) $(XPG4YOBJS)
 ALLOBJS=	$(OBJS) $(XPG4OBJS)
 
-BLTSRCS=	../common/m4y.c ../common/m4y_xpg4.c
+YBLTSRCS=	../common/m4y.c
+XPG4BLTSRCS=	../common/m4y_xpg4.c
+BLTSRCS=	$(YBLTSRCS) $(XPG4BLTSRCS)
 
+YSRCS=		$(COBJS:%.o=../common/%.c) $(YBLTSRCS)
+XPG4SRCS=	$(COBJS:%.o=../common/%.c) $(XPG4BLTSRCS)
 SRCS=		$(COBJS:%.o=../common/%.c) $(BLTSRCS)
 
 INCLIST=	-I../common
@@ -52,6 +56,7 @@ CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 CFLAGS +=	$(CCVERBOSE)
 C99MODE=	$(C99_ENABLE)
 
+LINTFLAGS +=	$(LDLIBS)
 CLEANFILES +=	$(LINTOUT) $(BLTSRCS)
 
 m4objs.xpg4/%.o := CPPFLAGS += -DXPG4
@@ -85,7 +90,14 @@ clean:
 
 lint:		$(LINTOUT)
 
+LINT_HDR=	perl ../../tools/lint_hdr.pl
+
 $(LINTOUT):	$(SRCS)
-		$(LINT.c) $(SRCS) > $(LINTOUT) 2>&1
+	$(LINT_HDR) $(PROG)		 > $(LINTOUT)
+	$(LINT_HDR) -s m4		>> $(LINTOUT)
+	$(LINT.c) $(YSRCS)		2>&1 | tee -a $(LINTOUT)
+
+	$(LINT_HDR) -s "XPG m4"		>> $(LINTOUT)
+	$(LINT.c) $(XPG4SRCS)		2>&1 | tee -a $(LINTOUT)
 
 include		../../../Makefile.targ

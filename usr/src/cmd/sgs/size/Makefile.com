@@ -4,7 +4,7 @@
 # The contents of this file are subject to the terms of the
 # Common Development and Distribution License (the "License").
 # You may not use this file except in compliance with the License.
-
+#
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
@@ -18,37 +18,32 @@
 #
 # CDDL HEADER END
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/sgs/gprof/Makefile.com
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include 	../../../Makefile.cmd
+PROG=		size
 
-COMOBJS=	gprof.o arcs.o dfn.o lookup.o calls.o \
-		printgprof.o printlist.o readelf.o
+include 	$(SRC)/cmd/Makefile.cmd
+include 	$(SRC)/cmd/sgs/Makefile.com
 
-OBJS=		$(COMOBJS)
-BLURBS=		gprof.callg.blurb gprof.flat.blurb
+COMOBJS=	main.o process.o fcns.o
+
 SRCS=		$(COMOBJS:%.o=../common/%.c)
 
-INCLIST=	-I../common -I../../include -I../../include/$(MACH)
-DEFLIST=	-DELF_OBJ -DELF
-CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
-CFLAGS +=	$(CCVERBOSE)
-C99MODE=	$(C99_ENABLE)
-LDLIBS +=	-L../../sgsdemangler/$(MACH) -ldemangle
-LINTFLAGS +=	$(LDLIBS)
-CLEANFILES +=	$(LINTOUT)
+OBJS =		$(COMOBJS)
+.PARALLEL:	$(OBJS)
 
-ROOTLIBBLURB=	$(BLURBS:%=$(ROOTSHLIBCCS)/%)
+LLDFLAGS =	'$(LDPASS)-R$$ORIGIN/../../lib'
+LLDFLAGS64 =	'$(LDPASS)-R$$ORIGIN/../../../lib/$(MACH64)'
+LDFLAGS +=	$(LLDFLAGS)
 
-$(ROOTLIBBLURB) :=	FILEMODE=	444
+LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
 
-%.o:		../common/%.c
-		$(COMPILE.c) $<
-.PARALLEL: $(OBJS)
+LINTSRCS =	$(SRCS)
+
+CLEANFILES +=	$(OBJS) $(LINTOUTS)

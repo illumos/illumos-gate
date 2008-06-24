@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -67,7 +67,7 @@ do
 	fi
 
 	# Concatinate the lint.out to our log file.
-	echo $ii/$MACH >> $LOG
+#	echo $ii/$MACH >> $LOG
 	echo $DASHES >> $LOG
 	cat $ii/$MACH/lint.out >> $LOG
 	echo "\n" >> $LOG
@@ -75,7 +75,7 @@ do
 	# If there is a 64-bit directory, tack that on as well.
 	if [ -f $ii/$MACH64/lint.out ]
 	then
-		echo $ii/$MACH64 >> $LOG
+#		echo $ii/$MACH64 >> $LOG
 		echo $DASHES >> $LOG
 		cat $ii/$MACH64/lint.out >> $LOG
 		echo "\n" >> $LOG

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +33,10 @@
 #include	<unistd.h>
 #include	<fcntl.h>
 #include	"m4.h"
+
+#if defined(__lint)
+extern int yydebug;
+#endif
 
 #define	match(c, s)	(c == *s && (!s[1] || inpmatch(s+1)))
 
@@ -49,6 +52,7 @@ static void fpath(FILE *);
 static void puttok(wchar_t *);
 static void error3(void);
 static wchar_t itochr(int);
+/*LINTED: E_STATIC_UNUSED*/
 static wchar_t *chkbltin(wchar_t *);
 static wchar_t *inpmatch(wchar_t *);
 static void chkspace(char **, int *, char ***);
@@ -68,6 +72,10 @@ main(int argc, char **argv)
 	wchar_t t;
 	int i, opt_end = 0;
 	int sigs[] = {SIGHUP, SIGINT, SIGPIPE, 0};
+
+#if defined(__lint)
+	yydebug = 0;
+#endif
 
 	for (i = 0; sigs[i]; ++i) {
 		if (signal(sigs[i], SIG_IGN) != SIG_IGN)
@@ -150,12 +158,12 @@ main(int argc, char **argv)
 			struct nlist	*macadd;  /* temp variable */
 
 			while ((*tp = getchr()) != WEOF &&
-				(is_alnum(*tp) || *tp == '_')) {
+			    (is_alnum(*tp) || *tp == '_')) {
 				tp++;
 				if (--tlim <= 0)
 					error2(gettext(
-					"more than %d chars in word"),
-							toksize);
+					    "more than %d chars in word"),
+					    toksize);
 			}
 			putbak(*tp);
 			*tp = EOS;
@@ -166,8 +174,9 @@ main(int argc, char **argv)
 				if ((wchar_t *)(++Ap) >= astklm) {
 					--Ap;
 					error2(gettext(
-					"more than %d items on argument stack"),
-					stksize);
+					    "more than %d items on "
+					    "argument stack"),
+					    stksize);
 				}
 
 				if (Cp++ == NULL)
@@ -212,8 +221,8 @@ main(int argc, char **argv)
 				}
 			}
 		} else if (match(t, lcom) &&
-			((lcom[0] != L'#' || lcom[1] != L'\0') ||
-			prev_char != '$')) {
+		    ((lcom[0] != L'#' || lcom[1] != L'\0') ||
+		    prev_char != '$')) {
 
 			/*
 			 * Don't expand commented macro (between lcom and
@@ -272,8 +281,8 @@ main(int argc, char **argv)
 			if ((wchar_t *)(++Ap) >= astklm) {
 				--Ap;
 				error2(gettext(
-					"more than %d items on argument stack"),
-					stksize);
+				    "more than %d items on argument stack"),
+				    stksize);
 			}
 
 			while ((t = getchr()) != WEOF && is_space(t))
@@ -507,15 +516,19 @@ expand(wchar_t **a1, int c)
 	sp = (struct nlist *)a1[-1];
 
 	if (sp->tflag || trace) {
+#if !defined(__lint)	/* lint doesn't grok "%ws" */
 		int	i;
 
 		(void) fprintf(stderr,
 		    "Trace(%d): %ws", Cp-callst, a1[0]);
+#endif
 
 		if (c > 0) {
+#if !defined(__lint)	/* lint doesn't grok "%ws" */
 			(void) fprintf(stderr, "(%ws", chkbltin(a1[1]));
 			for (i = 2; i <= c; ++i)
 				(void) fprintf(stderr, ",%ws", chkbltin(a1[i]));
+#endif
 			(void) fprintf(stderr, ")");
 		}
 		(void) fprintf(stderr, "\n");

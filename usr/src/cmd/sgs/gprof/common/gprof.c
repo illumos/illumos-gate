@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -173,7 +172,9 @@ asgnsamples(void)
 		ccnt = samples[i];
 		if (ccnt == 0)
 			continue;
+		/*LINTED: E_ASSIGMENT_CAUSE_LOSS_PREC*/
 		pcl = lowpc + scale * i;
+		/*LINTED: E_ASSIGMENT_CAUSE_LOSS_PREC*/
 		pch = lowpc + scale * (i + 1);
 		time = ccnt;
 #ifdef DEBUG
@@ -264,7 +265,7 @@ dump_callgraph(FILE *fp, char *filename, unsigned long tarcs,
 				prof_func.next_to = 0;
 			else {
 				prof_func.next_to = cur_offset +
-						    nlp->ncallers * PROFFUNC_SZ;
+				    nlp->ncallers * PROFFUNC_SZ;
 			}
 
 			/*
@@ -273,7 +274,7 @@ dump_callgraph(FILE *fp, char *filename, unsigned long tarcs,
 			 */
 			caller_id = 1;
 			for (arcp = nlp->parents; arcp;
-					    arcp = arcp->arc_parentlist) {
+			    arcp = arcp->arc_parentlist) {
 				/*
 				 * If no more callers for this callee, set
 				 * next_from to 0
@@ -282,21 +283,20 @@ dump_callgraph(FILE *fp, char *filename, unsigned long tarcs,
 					prof_func.next_from = 0;
 				else {
 					prof_func.next_from = cur_offset +
-								PROFFUNC_SZ;
+					    PROFFUNC_SZ;
 				}
 
 				prof_func.frompc =
-					arcp->arc_parentp->module->load_base +
-					(arcp->arc_parentp->value -
-					arcp->arc_parentp->module->txt_origin);
-				prof_func.topc =
-					mi->load_base +
-						(nlp->value - mi->txt_origin);
+				    arcp->arc_parentp->module->load_base +
+				    (arcp->arc_parentp->value -
+				    arcp->arc_parentp->module->txt_origin);
+				prof_func.topc = mi->load_base +
+				    (nlp->value - mi->txt_origin);
 				prof_func.count = arcp->arc_count;
 
 
 				if (fwrite(&prof_func, sizeof (ProfFunction),
-								1, fp) != 1) {
+				    1, fp) != 1) {
 					perror(filename);
 					exit(EX_IOERR);
 				}
@@ -330,7 +330,7 @@ dump_hits(FILE *fp, char *filename, nltype *nlp)
 
 	if ((p = (Address *) calloc(nelem, sizeof (Address))) == NULL) {
 		(void) fprintf(stderr, "%s: no room for %d pcsamples\n",
-							    whoami, nelem);
+		    whoami, nelem);
 		exit(EX_OSERR);
 	}
 
@@ -389,7 +389,7 @@ dump_pcsamples(FILE *fp, char *filename, unsigned long *tarcs,
 
 			nlp->ncallers = 0;
 			for (arcp = nlp->parents; arcp;
-					    arcp = arcp->arc_parentlist) {
+			    arcp = arcp->arc_parentlist) {
 				(nlp->ncallers)++;
 			}
 
@@ -416,7 +416,7 @@ dump_modules(FILE *fp, char *filename, size_t pbuf_sz)
 	pbuf_sz = CEIL(pbuf_sz, STRUCT_ALIGN);
 	if ((p = pbuf = calloc(pbuf_sz, sizeof (char))) == NULL) {
 		(void) fprintf(stderr, "%s: no room for %d bytes\n",
-					    whoami, pbuf_sz * sizeof (char));
+		    whoami, pbuf_sz * sizeof (char));
 		exit(EX_OSERR);
 	}
 
@@ -425,7 +425,7 @@ dump_modules(FILE *fp, char *filename, size_t pbuf_sz)
 	prof_modlist.version = PROF_MODULES_VER;
 	prof_modlist.modules = PROFMODLIST_SZ;
 	prof_modlist.size = PROFMODLIST_SZ + (n_modules - 1) * PROFMOD_SZ +
-								    pbuf_sz;
+	    pbuf_sz;
 	if (fwrite(&prof_modlist, sizeof (ProfModuleList), 1, fp) != 1) {
 		perror(filename);
 		exit(EX_IOERR);
@@ -577,19 +577,19 @@ dumpsum_ostyle(char *sumfile)
 	 * dump the header; use the last header read in
 	 */
 	if (Bflag) {
-	    if (fwrite(&h, sizeof (h), 1, sfile) != 1) {
-		perror(sumfile);
-		exit(EX_IOERR);
-	    }
+		if (fwrite(&h, sizeof (h), 1, sfile) != 1) {
+			perror(sumfile);
+			exit(EX_IOERR);
+		}
 	} else {
-	    struct hdr32 hdr;
-	    hdr.lowpc  = (pctype32)h.lowpc;
-	    hdr.highpc = (pctype32)h.highpc;
-	    hdr.ncnt   = (pctype32)h.ncnt;
-	    if (fwrite(&hdr, sizeof (hdr), 1, sfile) != 1) {
-		perror(sumfile);
-		exit(EX_IOERR);
-	    }
+		struct hdr32 hdr;
+		hdr.lowpc  = (pctype32)h.lowpc;
+		hdr.highpc = (pctype32)h.highpc;
+		hdr.ncnt   = (pctype32)h.ncnt;
+		if (fwrite(&hdr, sizeof (hdr), 1, sfile) != 1) {
+			perror(sumfile);
+			exit(EX_IOERR);
+		}
 	}
 	/*
 	 * dump the samples
@@ -607,23 +607,24 @@ dumpsum_ostyle(char *sumfile)
 		for (arcp = nlp->children; arcp;
 		    arcp = arcp->arc_childlist) {
 			if (Bflag) {
-			    arc.raw_frompc = arcp->arc_parentp->value;
-			    arc.raw_selfpc = arcp->arc_childp->value;
-			    arc.raw_count = arcp->arc_count;
-			    if (fwrite(&arc, sizeof (arc), 1, sfile) != 1) {
-				    perror(sumfile);
-				    exit(EX_IOERR);
-			    }
+				arc.raw_frompc = arcp->arc_parentp->value;
+				arc.raw_selfpc = arcp->arc_childp->value;
+				arc.raw_count = arcp->arc_count;
+				if (fwrite(&arc, sizeof (arc), 1, sfile) != 1) {
+					perror(sumfile);
+					exit(EX_IOERR);
+				}
 			} else {
-			    arc32.raw_frompc =
-				(pctype32)arcp->arc_parentp->value;
-			    arc32.raw_selfpc =
-				(pctype32)arcp->arc_childp->value;
-			    arc32.raw_count = (actype32)arcp->arc_count;
-			    if (fwrite(&arc32, sizeof (arc32), 1, sfile) != 1) {
-				    perror(sumfile);
-				    exit(EX_IOERR);
-			    }
+				arc32.raw_frompc =
+				    (pctype32)arcp->arc_parentp->value;
+				arc32.raw_selfpc =
+				    (pctype32)arcp->arc_childp->value;
+				arc32.raw_count = (actype32)arcp->arc_count;
+				if (fwrite(&arc32, sizeof (arc32), 1, sfile) !=
+				    1) {
+					perror(sumfile);
+					exit(EX_IOERR);
+				}
 			}
 #ifdef DEBUG
 			if (debug & SAMPLEDEBUG) {
@@ -885,7 +886,7 @@ process_pcsamples(ProfBuffer *bufp)
 	pc_samples = (Address *) calloc(chunk_size, sizeof (Address));
 	if (pc_samples == NULL) {
 		(void) fprintf(stderr, "%s: no room for %d sample pc's\n",
-							whoami, chunk_size);
+		    whoami, chunk_size);
 		exit(EX_OSERR);
 	}
 
@@ -955,7 +956,7 @@ process_cgraph(ProfCallGraph *cgp)
 	 * the loop body is executed atleast once, so this should be ok.
 	 */
 	for (callee_off = cgp->functions; callee_off;
-					    callee_off = calleep->next_to) {
+	    callee_off = calleep->next_to) {
 
 		/* LINTED: pointer cast */
 		calleep = (ProfFunction *)((char *)cgp + callee_off);
@@ -985,12 +986,12 @@ process_cgraph(ProfCallGraph *cgp)
 			arc.raw_selfpc = calleep->topc;
 
 		for (caller_off = callee_off; caller_off;
-					caller_off = callerp->next_from)  {
+		    caller_off = callerp->next_from)  {
 
 			/* LINTED: pointer cast */
 			callerp = (ProfFunction *)((char *)cgp + caller_off);
 			if ((caller_mi = find_module(callerp->frompc)) ==
-									NULL) {
+			    NULL) {
 #ifdef DEBUG
 				if (debug & CGRAPHDEBUG) {
 					(void) printf(
@@ -1045,7 +1046,7 @@ is_same_as_aout(char *modpath, struct stat *buf)
 {
 	if (stat(modpath, buf) == -1) {
 		(void) fprintf(stderr, "%s: can't get info on `%s'\n",
-							whoami, modpath);
+		    whoami, modpath);
 		exit(EX_NOINPUT);
 	}
 
@@ -1067,14 +1068,14 @@ process_modules(ProfModuleList *modlp)
 #ifdef DEBUG
 	if (debug & MODULEDEBUG) {
 		(void) printf("[process_modules] module obj version %u\n",
-							    modlp->version);
+		    modlp->version);
 	}
 #endif /* DEBUG */
 
 	/* Check version of module type object */
 	if (modlp->version > PROF_MODULES_VER) {
 		(void) fprintf(stderr, "%s: version %d for module type objects"
-				"is not supported\n", whoami, modlp->version);
+		    "is not supported\n", whoami, modlp->version);
 		exit(EX_SOFTWARE);
 	}
 
@@ -1094,8 +1095,8 @@ process_modules(ProfModuleList *modlp)
 		 */
 		so_path = (caddr_t)modlp + newmodp->path;
 		if (does_overlap(newmodp, &modules) ||
-				    is_same_as_aout(so_path, &so_statbuf) ||
-						(!is_shared_obj(so_path))) {
+		    is_same_as_aout(so_path, &so_statbuf) ||
+		    (!is_shared_obj(so_path))) {
 
 			if (!newmodp->next)
 				more_modules = FALSE;
@@ -1174,8 +1175,7 @@ process_modules(ProfModuleList *modlp)
 #ifdef DEBUG
 			if (debug & MODULEDEBUG) {
 				(void) printf("[process_modules] base=%#llx, "
-						"end=%#llx\n", mi->load_base,
-						mi->load_end);
+				    "end=%#llx\n", mi->load_base, mi->load_end);
 			}
 #endif /* DEBUG */
 			continue;
@@ -1196,7 +1196,7 @@ process_modules(ProfModuleList *modlp)
 		new_module = malloc(sizeof (mod_info_t));
 		if (new_module == NULL) {
 			(void) fprintf(stderr, "%s: no room for %d bytes\n",
-						whoami, sizeof (mod_info_t));
+			    whoami, sizeof (mod_info_t));
 			exit(EX_OSERR);
 		}
 
@@ -1207,7 +1207,7 @@ process_modules(ProfModuleList *modlp)
 		new_module->name = malloc(strlen(so_path) + 1);
 		if (new_module->name == NULL) {
 			(void) fprintf(stderr, "%s: no room for %d bytes\n",
-						whoami, strlen(so_path) + 1);
+			    whoami, strlen(so_path) + 1);
 			exit(EX_OSERR);
 		}
 		(void) strcpy(new_module->name, so_path);
@@ -1287,7 +1287,7 @@ getpfiledata(caddr_t memp, size_t fsz)
 
 				(void) printf(
 				    "\n[getpfiledata] object %s [%#lx]\n",
-						objname[type], objp->type);
+				    objname[type], objp->type);
 			}
 		}
 #endif /* DEBUG */
@@ -1308,8 +1308,8 @@ getpfiledata(caddr_t memp, size_t fsz)
 
 			default :
 				(void) fprintf(stderr,
-					"%s: unknown prof object type=%d\n",
-							whoami, objp->type);
+				    "%s: unknown prof object type=%d\n",
+				    whoami, objp->type);
 				exit(EX_SOFTWARE);
 		}
 		/* LINTED: pointer cast */
@@ -1318,7 +1318,7 @@ getpfiledata(caddr_t memp, size_t fsz)
 
 	if (!found_cgraph || !found_pcsamples) {
 		(void) fprintf(stderr,
-			"%s: missing callgraph/pcsamples object\n", whoami);
+		    "%s: missing callgraph/pcsamples object\n", whoami);
 		exit(EX_SOFTWARE);
 	}
 
@@ -1352,7 +1352,7 @@ readarcs(FILE *pfile)
 				 * 'converted' to the standard data format.
 				 */
 				if (fread(&rtld_arc64,
-					    sizeof (L_cgarc64), 1, pfile) != 1)
+				    sizeof (L_cgarc64), 1, pfile) != 1)
 					break;
 
 				if (rtld_arc64.cg_from == PRF_OUTADDR64)
@@ -1371,7 +1371,7 @@ readarcs(FILE *pfile)
 				 * 'converted' to the standard data format.
 				 */
 				if (fread(&rtld_arc,
-					    sizeof (L_cgarc), 1, pfile) != 1)
+				    sizeof (L_cgarc), 1, pfile) != 1)
 					break;
 
 				if (rtld_arc.cg_from == PRF_OUTADDR)
@@ -1481,7 +1481,7 @@ handle_versioned(FILE *pfile, char *filename, size_t *fsz)
 
 	if (invalid_version) {
 		(void) fprintf(stderr, "%s: version %d.%d not supported\n",
-			whoami, prof_hdr.h_major_ver, prof_hdr.h_minor_ver);
+		    whoami, prof_hdr.h_major_ver, prof_hdr.h_minor_ver);
 		exit(EX_SOFTWARE);
 	}
 
@@ -1502,8 +1502,8 @@ handle_versioned(FILE *pfile, char *filename, size_t *fsz)
 
 	fmem = mmap(0, *fsz, PROT_READ, MAP_PRIVATE, fd, 0);
 	if (fmem == MAP_FAILED) {
-	    (void) fprintf(stderr, "%s: can't map %s\n", whoami, filename);
-	    exit(EX_IOERR);
+		(void) fprintf(stderr, "%s: can't map %s\n", whoami, filename);
+		exit(EX_IOERR);
 	}
 
 	/*
@@ -1513,7 +1513,7 @@ handle_versioned(FILE *pfile, char *filename, size_t *fsz)
 	 */
 	if (fstat(fd, &buf) == -1) {
 		(void) fprintf(stderr, "%s: can't get info on `%s'\n",
-							whoami, filename);
+		    whoami, filename);
 		exit(EX_NOINPUT);
 	}
 	gmonout_info.dev = buf.st_dev;
@@ -1559,7 +1559,7 @@ openpfile(char *filename, size_t *fsz)
 	if (magic_num == (unsigned int)PROF_MAGIC) {
 		if ((!first_time) && (old_style == TRUE)) {
 			(void) fprintf(stderr, "%s: can't mix old & new format "
-						"profiled files\n", whoami);
+			    "profiled files\n", whoami);
 			exit(EX_SOFTWARE);
 		}
 		first_time = FALSE;
@@ -1569,7 +1569,7 @@ openpfile(char *filename, size_t *fsz)
 
 	if ((!first_time) && (old_style == FALSE)) {
 		(void) fprintf(stderr, "%s: can't mix old & new format "
-						"profiled files\n", whoami);
+		    "profiled files\n", whoami);
 		exit(EX_SOFTWARE);
 	}
 

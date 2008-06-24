@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,7 +110,7 @@ extern int nprodsz;
 int
 main(int argc, char *argv[])
 {
-	setlocale(LC_ALL, "");
+	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
 #define	TEXT_DOMAIN "SYS_TEST"	/* Use this only if it weren't */
 #endif
@@ -283,7 +283,7 @@ others()
 	ZAPFILE(DEBUGNAME);
 
 	if (gen_lines)
-		fprintf(ftable, "# line\t1 \"%s\"\n", parser);
+		(void) fprintf(ftable, "# line\t1 \"%s\"\n", parser);
 	tmpline = 1;
 	/* copy parser text */
 	while ((c = getwc(finput)) != EOF) {
@@ -310,7 +310,7 @@ others()
 					(void) putwc(c, ftable);
 				(void) fclose(faction);
 				if (gen_lines)
-					fprintf(ftable,
+					(void) fprintf(ftable,
 					    "\n# line\t%d \"%s\"",
 					    tmpline,
 					    parser);
@@ -483,6 +483,7 @@ summary()
 }
 
 /* write out error comment */
+/*PRINTFLIKE1*/
 void
 error(char *s, ...)
 {
@@ -523,6 +524,7 @@ error(char *s, ...)
 /*
  * Print out a warning message.
  */
+/*PRINTFLIKE2*/
 void
 warning(int flag, char *s, ...)
 {
@@ -595,7 +597,8 @@ LOOKSETS *p;
 		(void) fprintf(foutput, " { ");
 		TLOOP(j) {
 			if (BIT(pp, j))
-				(void) fprintf(foutput,  "%ws ", symnam(j));
+				(void) fprintf(foutput,  WSFMT("%ws "),
+				    symnam(j));
 		}
 		(void) fprintf(foutput,  "}");
 	}
@@ -728,7 +731,8 @@ cpfir()
 		return;
 	if ((foutput != NULL)) {
 		NTLOOP(i) {
-			(void) fprintf(foutput, "\n%ws: ", nontrst[i].name);
+			(void) fprintf(foutput, WSFMT("\n%ws: "),
+			    nontrst[i].name);
 			prlook(pfirst[i]);
 			(void) fprintf(foutput, " %d\n", pempty[i]);
 		}
@@ -830,7 +834,7 @@ LOOKSETS *lptr;
 
 	if (pidebug && (foutput != NULL))
 		(void) fprintf(foutput,
-			"putitem(%ws), state %d\n", writem(ptr), nstate);
+			WSFMT("putitem(%ws), state %d\n"), writem(ptr), nstate);
 	j = pstate[nstate+1];
 	j->pitem = ptr;
 	if (!nolook)
@@ -927,7 +931,7 @@ again:
 		if (pempty[*prdptr[i]-NTBASE] == WHOKNOWS) {
 			for (p = prdptr[i]+1;
 			    *p >= NTBASE && pempty[*p-NTBASE] == EMPTY; ++p)
-				/* EMPTY */;
+				;
 			/* we have a nontrivially empty nonterminal */
 			if (*p < 0) {
 				pempty[*prdptr[i]-NTBASE] = EMPTY;
@@ -996,7 +1000,7 @@ stagen()
 			NTLOOP(j) {
 				if (temp1[j])
 					(void) fprintf(foutput,
-					    "%ws %d, ", nontrst[j].name,
+					    WSFMT("%ws %d, "), nontrst[j].name,
 					    temp1[j]);
 			}
 			(void) fprintf(foutput, "\n");
@@ -1130,7 +1134,8 @@ closure(int i)
 			if (u->flag)
 				(void) fprintf(foutput, "flag set!\n");
 			u->flag = 0;
-			(void) fprintf(foutput, "\t%ws", writem(u->pitem));
+			(void) fprintf(foutput, WSFMT("\t%ws"),
+			    writem(u->pitem));
 			prlook(&u->ws);
 			(void) fprintf(foutput,  "\n");
 		}

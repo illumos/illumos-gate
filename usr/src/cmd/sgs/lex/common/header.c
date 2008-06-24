@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,41 +46,41 @@ static void
 chd1(void)
 {
 	if (*v_stmp == 'y')
-		(void)  fprintf(fout, "#ident\t\"lex: %s %s\"\n",
+		(void) fprintf(fout, "#ident\t\"lex: %s %s\"\n",
 		    (const char *)SGU_PKG, (const char *)SGU_REL);
 	if (handleeuc) {
-		fprintf(fout, "#ifndef EUC\n");
-		fprintf(fout, "#define EUC\n");
-		fprintf(fout, "#endif\n");
-		fprintf(fout, "#include <stdio.h>\n");
-		fprintf(fout, "#include <stdlib.h>\n");
-		fprintf(fout, "#include <inttypes.h>\n");
-		fprintf(fout, "#include <widec.h>\n");
+		(void) fprintf(fout, "#ifndef EUC\n");
+		(void) fprintf(fout, "#define EUC\n");
+		(void) fprintf(fout, "#endif\n");
+		(void) fprintf(fout, "#include <stdio.h>\n");
+		(void) fprintf(fout, "#include <stdlib.h>\n");
+		(void) fprintf(fout, "#include <inttypes.h>\n");
+		(void) fprintf(fout, "#include <widec.h>\n");
 		if (widecio) { /* -w option */
-			fprintf(fout, "#define YYTEXT yytext\n");
-			fprintf(fout, "#define YYLENG yyleng\n");
-			fprintf(fout, "#ifndef __cplusplus\n");
-			fprintf(fout, "#define YYINPUT input\n");
-			fprintf(fout, "#define YYOUTPUT output\n");
-			fprintf(fout, "#else\n");
-			fprintf(fout, "#define YYINPUT lex_input\n");
-			fprintf(fout, "#define YYOUTPUT lex_output\n");
-			fprintf(fout, "#endif\n");
-			fprintf(fout, "#define YYUNPUT unput\n");
+			(void) fprintf(fout, "#define YYTEXT yytext\n");
+			(void) fprintf(fout, "#define YYLENG yyleng\n");
+			(void) fprintf(fout, "#ifndef __cplusplus\n");
+			(void) fprintf(fout, "#define YYINPUT input\n");
+			(void) fprintf(fout, "#define YYOUTPUT output\n");
+			(void) fprintf(fout, "#else\n");
+			(void) fprintf(fout, "#define YYINPUT lex_input\n");
+			(void) fprintf(fout, "#define YYOUTPUT lex_output\n");
+			(void) fprintf(fout, "#endif\n");
+			(void) fprintf(fout, "#define YYUNPUT unput\n");
 		} else { /* -e option */
-			fprintf(fout, "#include <limits.h>\n");
-			fprintf(fout, "#include <sys/euc.h>\n");
-			fprintf(fout, "#define YYLEX_E 1\n");
-			fprintf(fout, "#define YYTEXT yywtext\n");
-			fprintf(fout, "#define YYLENG yywleng\n");
-			fprintf(fout, "#define YYINPUT yywinput\n");
-			fprintf(fout, "#define YYOUTPUT yywoutput\n");
-			fprintf(fout, "#define YYUNPUT yywunput\n");
+			(void) fprintf(fout, "#include <limits.h>\n");
+			(void) fprintf(fout, "#include <sys/euc.h>\n");
+			(void) fprintf(fout, "#define YYLEX_E 1\n");
+			(void) fprintf(fout, "#define YYTEXT yywtext\n");
+			(void) fprintf(fout, "#define YYLENG yywleng\n");
+			(void) fprintf(fout, "#define YYINPUT yywinput\n");
+			(void) fprintf(fout, "#define YYOUTPUT yywoutput\n");
+			(void) fprintf(fout, "#define YYUNPUT yywunput\n");
 		}
 	} else { /* ASCII compatibility mode. */
-		fprintf(fout, "#include <stdio.h>\n");
-		fprintf(fout, "#include <stdlib.h>\n");
-		fprintf(fout, "#include <inttypes.h>\n");
+		(void) fprintf(fout, "#include <stdio.h>\n");
+		(void) fprintf(fout, "#include <stdlib.h>\n");
+		(void) fprintf(fout, "#include <inttypes.h>\n");
 	}
 	if (ZCH > NCH)
 		(void) fprintf(fout, "# define U(x) ((x)&0377)\n");
@@ -209,7 +209,8 @@ chd1(void)
 		    ctable['\n'],
 "?(yylineno++,yytchar):yytchar)==EOF?0:yytchar)");
 		(void) fprintf(fout, "#endif\n");
-		fprintf(fout, "#define ECHO fprintf(yyout, \"%%s\",yytext)\n");
+		(void) fprintf(fout,
+		    "#define ECHO fprintf(yyout, \"%%s\",yytext)\n");
 		if (handleeuc) {
 			(void) fprintf(fout,
 "# define REJECT { nstr = yyreject_e(); goto yyfussy;}\n");
@@ -370,10 +371,10 @@ statistics(void)
 {
 	(void) fprintf(errorf,
 "%d/%d nodes(%%e), %d/%d positions(%%p), %d/%d (%%n), %ld transitions,\n",
-	    tptr, treesize, nxtpos-positions, maxpos, stnum + 1, nstates,
-	    rcount);
+	    tptr, treesize, (int)(nxtpos-positions), maxpos, stnum + 1,
+	    nstates, rcount);
 	(void) fprintf(errorf,
-	"%d/%d packed char classes(%%k), ", pcptr-pchar, pchlen);
+	"%d/%d packed char classes(%%k), ", (int)(pcptr-pchar), pchlen);
 	if (optim)
 		(void) fprintf(errorf,
 		" %d/%d packed transitions(%%a), ", nptr, ntrans);

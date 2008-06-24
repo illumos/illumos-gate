@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,7 +120,6 @@ _symintLoad(PROF_FILE *proffilePtr)
 {
 	Elf_Data	*symdat_pri_p;
 	Elf_Data	*symdat_aux_p;
-	size_t		nsyms_pri;
 	PROF_SYMBOL	*symlist;
 
 	DEBUG_LOC("_symintLoad: top");
@@ -141,7 +140,6 @@ _symintLoad(PROF_FILE *proffilePtr)
 
 	symdat_pri_p = profPtr->pf_symdat_pri_p;
 	symdat_aux_p = profPtr->pf_symdat_aux_p;
-	nsyms_pri = profPtr->pf_nstsyms - profPtr->pf_nstsyms_aux;
 	DEBUG_EXP(printf("symdat_pri_p->d_size = %x\n", symdat_pri_p->d_size));
 
 	prstsym_size = (symdat_pri_p->d_size / profPtr->pf_nstsyms);

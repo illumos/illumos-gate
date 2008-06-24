@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -94,30 +94,32 @@ $(ROOTCCSLIB):
 $(ROOTCCSLIB64):
 	$(INS.dir)
 
+LINT_HDR=	perl ../../tools/lint_hdr.pl
+
 lint:
-		@echo "\nLint of: truss.so.1"		 > $(LINTOUT)
-		@echo "========================"	>> $(LINTOUT)
+		$(LINT_HDR) link_audit			 > $(LINTOUT)
+		$(LINT_HDR) -s truss.so.1		>> $(LINTOUT)
 		$(LINT.c) ../common/truss.c \
-			../common/env.c 		>> $(LINTOUT) 2>&1
-		@echo "\nLint of: symbindrep.so.1"	>> $(LINTOUT)
-		@echo "========================"	>> $(LINTOUT)
+			../common/env.c 		2>&1 | tee -a $(LINTOUT)
+
+		$(LINT_HDR) -s symbindrep.so.1		>> $(LINTOUT)
 		$(LINT.c) ../common/symbindrep.c \
-			../common/env.c			>> $(LINTOUT) 2>&1
-		@echo "\nLint of: perfcnt.so.1"		>> $(LINTOUT)
-		@echo "========================"	>> $(LINTOUT)
+			../common/env.c			2>&1 | tee -a $(LINTOUT)
+
+		$(LINT_HDR) -s perfcnt.so.1		>> $(LINTOUT)
 		$(LINT.c) ../common/perfcnt.c \
 			../common/hash.c \
-			../common/env.c			>> $(LINTOUT) 2>&1
-		@echo "\nLint of: who.so.1"		>> $(LINTOUT)
-		@echo "========================"	>> $(LINTOUT)
+			../common/env.c			2>&1 | tee -a $(LINTOUT)
+
+		$(LINT_HDR) -s who.so.1			>> $(LINTOUT)
 		$(LINT.c) ../common/who.c \
-			../common/env.c			>> $(LINTOUT) 2>&1
-		@echo "\nLint of: dumpbind"		>> $(LINTOUT)
-		@echo "========================"	>> $(LINTOUT)
-		$(LINT.c) ../common/dumpbind.c		>> $(LINTOUT) 2>&1
-		@echo "\nLint of: bindings.so.1"	>> $(LINTOUT)
-		@echo "========================"	>> $(LINTOUT)
+			../common/env.c			2>&1 | tee -a $(LINTOUT)
+
+		$(LINT_HDR) -s dumpbind			>> $(LINTOUT)
+		$(LINT.c) ../common/dumpbind.c		2>&1 | tee -a $(LINTOUT)
+
+		$(LINT_HDR) -s bindings.so.1		>> $(LINTOUT)
 		$(LINT.c) ../common/bindings.c \
-			../common/env.c			>> $(LINTOUT) 2>&1
+			../common/env.c			2>&1 | tee -a $(LINTOUT)
 
 include		../../../../lib/Makefile.targ

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,46 +27,23 @@
 # cmd/sgs/size/sparcv9/Makefile
 #
 
-PROG=		size
+include 	../Makefile.com
 
-include 	../../../Makefile.cmd
-include 	../../Makefile.com
-
-OBJS=		main.o process.o fcns.o
-
-SRCS=		$(OBJS:%.o=../common/%.c)
-
-LDFLAGS +=	'-R$$ORIGIN/../../../lib/$(MACH64)'
-INCLIST=	-I../common -I../../include -I../../include/sparc \
-		-I$(SRCBASE)/uts/$(ARCH)/sys
 DEFLIST=	-DSPARC -DELF
-CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
-LDLIBS +=	-L../../libconv/sparcv9 -lconv -lelf
-LINTFLAGS64=	-mx -Xarch=v9 $(LDLIBS)
-
-CLEANFILES +=	$(LINTOUT)
-
-%.o:		../common/%.c
-		$(COMPILE.c) $<
 
 .KEEP_STATE:
 
-all:		$(PROG)
+LLDFLAGS =	$(LLDFLAGS64)
+ELFLIBDIR =	$(ELFLIBDIR64)
+CONVLIBDIR =	$(CONVLIBDIR64)
 
-$(PROG):	$(OBJS)
-		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-		$(POST_PROCESS)
+VAR_SGSBINPROG=	$(VAR_SGSBINPROG64)
+VAR_SGSCCSLINK=	$(VAR_SGSCCSLINK64)
 
 package \
 install:	all $(ROOTPROG64) $(ROOTCCSBINLINK64)
 
-clean:
-		$(RM) $(OBJS) $(CLEANFILES)
+lint:		$(LINTOUT64) $(SGSLINTOUT)
 
-lint:		$(LINTOUT)
-
-$(LINTOUT):	$(SRCS)
-		$(LINT.c) $(SRCS) > $(LINTOUT) 2>&1
-
-include		../../../Makefile.targ
+include		../Makefile.targ
 include		../../Makefile.sub.64

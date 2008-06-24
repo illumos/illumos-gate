@@ -19,11 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+
+PROG=		lex
 
 MACHOBJS=	main.o sub1.o sub2.o sub3.o header.o parser.o
 POBJECTS=	$(MACHOBJS)
@@ -48,8 +50,10 @@ C99MODE=	$(C99_ENABLE)
 # Override default source file derivation rule (in Makefile.lib)
 # from objects
 #
-SRCS=		$(MACHOBJS:%.o=../common/%.c) \
-		$(LIBOBJS:%.o=../common/%.c)
+MACHSRCS=	$(MACHOBJS:%.o=../common/%.c)
+LIBSRCS =	$(LIBOBJS:%.o=../common/%.c)
+SRCS=		$(MACHSRCS) $(LIBSRCS)
+		
 
 LIBS =          $(DYNLIB) $(LINTLIB)
 
@@ -71,8 +75,8 @@ pics/%_e.o:=	DEFLIST = -DEUC -DJLSLEX  -DEOPTION -D$*=$*_e
 
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 BUILD.AR=	$(AR) $(ARFLAGS) $@ `$(LORDER) $(OBJS) | $(TSORT)`
-LINTFLAGS=	-ax
-LINTPOUT=	lintp.out
+LINTFLAGS=	-amux
+LINTPOUT=	lint.out
 
 $(LINTLIB):=	LINTFLAGS = -nvx
 $(ROOTPROG):=	FILEMODE = 0555
@@ -91,5 +95,5 @@ $(DYNLIB) :=	CFLAGS64 += $(CCVERBOSE)
 
 $(DYNLIB) :=	LDLIBS += -lc
 
-CLEANFILES +=	../common/parser.c $(LINTPOUT) $(LINTOUT)
+CLEANFILES +=	../common/parser.c $(LINTPOUT)
 CLOBBERFILES +=	$(LIBS) $(LIBRARY)

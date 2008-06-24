@@ -22,7 +22,7 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/sgs/tsort/i386/Makefile
@@ -64,6 +64,7 @@ clean:
 lint:		$(LINTOUT)
 
 $(LINTOUT):	$(SRCS)
-		$(LINT.c) $(SRCS) > $(LINTOUT) 2>&1
+		perl ../../tools/lint_hdr.pl $(PROG)	 > $(LINTOUT)
+		$(LINT.c) $(SRCS)			2>&1 | tee -a $(LINTOUT)
 
 include		../../../Makefile.targ

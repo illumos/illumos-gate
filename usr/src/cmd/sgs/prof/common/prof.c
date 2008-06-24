@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -281,7 +281,8 @@ printSnymNames(struct slist *slp, struct snymEntry *snymp)
 
 	/* for the others: find each, print each. */
 	while (--i >= 0) {
-		while ((++slp)->sl_addr != sharedaddr);
+		while ((++slp)->sl_addr != sharedaddr)
+			;
 		Print(", %s", slp->sl_name);
 	}
 	/* finally.. the trailing newline */
@@ -495,7 +496,7 @@ main(int argc, char **argv)
 	/* Compute the file address of symbol table. Machine-dependent. */
 
 	DEBUG_EXP(printf("number of symbols (pf_nsyms) = %d\n",
-		filhdr.pf_nsyms));
+	    filhdr.pf_nsyms));
 
 		/* Number of symbols in file symbol table. */
 	symttl = filhdr.pf_nsyms;
@@ -585,11 +586,14 @@ main(int argc, char **argv)
 	pc_h = head.hpc;	/* First address past range of profiling. */
 	pc_m = pc_h - pc_l;	/* Range of profiled addresses. */
 
+	/* BEGIN CSTYLED */
 OLD_DEBUG(if (debug_value) Fprint(stderr,
 "low pc = %#o, high pc = %#o, range = %#o = %u\n\
 call counts: %u, %u used; pc counters: %u\n",
 pc_l, pc_h, pc_m, pc_m, head.nfns, n_cc, n_pc));
+	/* END CSTYLED */
 
+	/*LINTED: E_ASSIGMENT_CAUSE_LOSS_PREC*/
 	sf = (BIAS * (double)n_pc)/pc_m;
 	/*
 	 * Now adjust bias and sf so that there is no overflow
@@ -603,6 +607,7 @@ pc_l, pc_h, pc_m, pc_m, head.nfns, n_cc, n_pc));
 	}
 	s_inv = pc_m/n_pc;	/* Range of PCs mapped into one index. */
 
+	/* BEGIN CSTYLED */
 OLD_DEBUG(
 	if (debug_value) {
 		Fprint(
@@ -611,6 +616,7 @@ OLD_DEBUG(
 			(long)sf, s_inv, bias);
 	}
 );
+	/* END CSTYLED */
 
 		/* Prepare to read symbols from "a.out" (or whatever). */
 	n_syms = 0;			/* Init count of qualified symbols. */
@@ -619,11 +625,13 @@ OLD_DEBUG(
 		if (readnl(n))	/* Read and examine symbol, count qualifiers */
 			n_syms++;
 
+	/* BEGIN CSTYLED */
 OLD_DEBUG(
 	if (debug_value) {
 		Fprint(stderr, "%u symbols, %u qualify\n", symttl, n_syms);
 	}
 );
+	/* END CSTYLED */
 
 		/* Allocate space for qualified symbols. */
 
@@ -637,8 +645,8 @@ OLD_DEBUG(
 		 */
 
 	snymCapacity = n_syms/2;
-	snymList = snymp = _prof_Malloc(snymCapacity,
-		sizeof (struct snymEntry));
+	snymList = snymp =
+	    _prof_Malloc(snymCapacity, sizeof (struct snymEntry));
 	n_snyms = 0;
 
 /* OLD_DEBUG(debug_value &= ~020); */
@@ -656,10 +664,12 @@ OLD_DEBUG(
 				/* set other slist fields to zero. */
 			slp->sl_time = 0.0;
 			slp->sl_count = 0;
+	/* BEGIN CSTYLED */
 OLD_DEBUG(
 	if (debug_value & 02)
 		Fprint(stderr, "%-8.8s: %#8o\n", slp->sl_name, slp->sl_addr)
 );
+	/* END CSTYLED */
 
 			slp++;
 			--n;
@@ -700,7 +710,7 @@ OLD_DEBUG(
 		int	sz = slp->sl_size;
 
 		if (sz == 0)
-		    sz = slp[ 1 ].sl_addr - slp->sl_addr;
+			sz = slp[ 1 ].sl_addr - slp->sl_addr;
 		if (slp->sl_addr < ccp->fnpc &&
 		    ccp->fnpc <= slp->sl_addr + sz) {
 					/* got a candidate: find Closest. */
@@ -711,6 +721,7 @@ OLD_DEBUG(
 				--n;
 			} while (n > 0 && slp->sl_addr < ccp->fnpc);
 
+	/* BEGIN CSTYLED */
 OLD_DEBUG(
 if (debug_value & 04) {
 	Fprint(stderr,
@@ -721,6 +732,7 @@ if (debug_value & 04) {
 		ccp->fnpc);
 }
 );
+	/* END CSTYLED */
 			closest_symp->sl_count = ccp->mcnt;  /* Copy count. */
 			++ccp;
 			--vn_cc;
@@ -803,10 +815,12 @@ if (debug_value & 04) {
 			/* Lowest addr for which count maps to pcounts[i1]. */
 		pc10 =  pc_l + (unsigned long)((bias * i1)/sf);
 
+	/* BEGIN CSTYLED */
 OLD_DEBUG(if (debug_value & 010) Fprint(stderr,
 "%-8.8s\ti0 = %4d, pc00 = %#6o, pc0 = %#6o\n\
 \t\ti1 = %4d, pc10 = %#6o, pc1 = %#6o\n\t\t",
 slp[n].sl_name, i0, pc00, pc0, i1, pc10, pc1));
+	/* END CSTYLED */
 		t = 0;			/* Init time for this symbol. */
 		if (i0 == i1) {
 			/* Counter overlaps two areas? (unlikely */
@@ -817,13 +831,16 @@ OLD_DEBUG(if (debug_value & 010) fprintf(stderr, "ticks = %d\n", ticks));
 			    /* Time less that which overlaps adjacent areas */
 			t += PROFSEC(ticks * ((double)(pc1 - pc0) * sf)/bias);
 
+	/* BEGIN CSTYLED */
 OLD_DEBUG(if (debug_value & 010)
 	Fprint(stderr, "%ld/(%.1f)", (pc1 - pc0) * ticks, DBL_ADDRPERCELL)
 );
+	/* END CSTYLED */
 		} else {
 				/* Overlap with previous region? */
 			if (pc00 < pc0) {
 				ticks = pcp[i0];
+	/* BEGIN CSTYLED */
 OLD_DEBUG(if (debug_value & 010)
 	fprintf(stderr, "pc00 < pc0 ticks = %d\n", ticks));
 
@@ -835,9 +852,11 @@ OLD_DEBUG(if (debug_value & 010)
 				/* Do not count this time when summing times */
 				/*		wholly within the region. */
 				i0++;
+	/* BEGIN CSTYLED */
 OLD_DEBUG(if (debug_value & 010)
 	Fprint(stderr, "%ld/(%.1f) + ", (pc0 - pc00) * ticks,
 		DBL_ADDRPERCELL));
+	/* END CSTYLED */
 			}
 
 			/* Init sum of counts for PCs not shared w/other */
@@ -859,11 +878,13 @@ OLD_DEBUG(if (debug_value & 010) Fprint(stderr, "%ld", ticks));
 				/* and accumulate proportion for addresses in */
 				/*		range of this routine */
 				t += PROFSEC(((double)ticks *
-					(pc1 - pc10)*sf)/bias);
+				    (pc1 - pc10)*sf)/bias);
+	/* BEGIN CSTYLED */
 OLD_DEBUG(if (debug_value & 010) fprintf(stderr, "ticks = %d\n", ticks));
 OLD_DEBUG(if (debug_value & 010)
 	Fprint(stderr, " + %ld/(%.1f)", (pc1 - pc10) * ticks, DBL_ADDRPERCELL)
 );
+	/* END CSTYLED */
 			}
 		}		/* End if (i0 == i1) ... else ... */
 
@@ -875,7 +896,8 @@ OLD_DEBUG(if (debug_value & 010) Fprint(stderr, " ticks = %.2f msec\n", t));
 	/* Final pass to total up time. */
 	/* Sum ticks, then convert to seconds. */
 
-	for (n = n_pc, temp = 0; --n >= 0; temp += *(pcp++));
+	for (n = n_pc, temp = 0; --n >= 0; temp += *(pcp++))
+		;
 
 	t_tot = PROFSEC(temp);
 
@@ -913,9 +935,11 @@ OLD_DEBUG(if (debug_value & 010) Fprint(stderr, " ticks = %.2f msec\n", t));
 	int lastWasSnym = 0;	/* 1st can't be snym yet-no aliases seen! */
 	int thisIsSnym;
 
+	/* BEGIN CSTYLED */
 OLD_DEBUG(
 int totsnyms = 0; int totseries = 0; struct slist *lastslp = slist;
 );
+	/* END CSTYLED */
 
 	/* NB loop starts with 2nd symbol, loops over n_syms-1 symbols! */
 	for (n = n_syms-1, slp = slist+1; --n >= 0; slp++) {
@@ -925,6 +949,7 @@ int totsnyms = 0; int totseries = 0; struct slist *lastslp = slist;
 		if (thisIsSnym) {
 			/* gotta synonym */
 			if (!lastWasSnym) {
+	/* BEGIN CSTYLED */
 OLD_DEBUG(
 if (debug_value)  {
 	Fprint(stderr,
@@ -935,6 +960,7 @@ if (debug_value)  {
 	totsnyms++;
 }
 );
+	/* END CSTYLED */
 				/* this is the Second! of a series */
 				snymp = (n_snyms++ == 0 ? snymList : snymp+1);
 				snymp->howMany = 1; /* gotta count 1st one!! */
@@ -945,6 +971,7 @@ if (debug_value)  {
 				/* Offen the Reported flag */
 				snymp->snymReported = 0;
 			}
+	/* BEGIN CSTYLED */
 OLD_DEBUG(
 if (debug_value)  {
 	Fprint(stderr,
@@ -956,6 +983,7 @@ if (debug_value)  {
 	totsnyms++;
 }
 );
+	/* END CSTYLED */
 			/* ok - bump count for snym, and note its Finding */
 			snymp->howMany++;
 			/* and update the summary statistics */
@@ -965,16 +993,20 @@ if (debug_value)  {
 		callTotal += slp->sl_count;
 		lastaddr = thisaddr;
 		lastWasSnym = thisIsSnym;
+	/* BEGIN CSTYLED */
 OLD_DEBUG(
 if (debug_value) lastslp = slp;
 );
+	/* END CSTYLED */
 
 	}
+	/* BEGIN CSTYLED */
 OLD_DEBUG(
 if (debug_value)  {
 	Fprint(stderr, "Total #series %d, #synonyms %d\n", totseries, totsnyms);
 }
 );
+	/* END CSTYLED */
 	}
 	/*
 	 * Most of the heavy work is done now.  Only minor stuff remains.
@@ -993,7 +1025,7 @@ OLD_DEBUG(if (debug_value) Fprint(stderr,
 
 	if (sort)	/* If comparison routine given then use it. */
 		qsort((char *)slist, (unsigned)n_syms,
-			sizeof (struct slist), sort);
+		    sizeof (struct slist), sort);
 
 	if (!(flags & F_NHEAD)) {
 		if (flags & F_PADDR)
@@ -1026,7 +1058,7 @@ OLD_DEBUG(if (debug_value) Fprint(stderr,
 			continue;
 		if ((strcmp(slp->sl_name, "_mcount") == 0) ||
 		    (strcmp(slp->sl_name, "mcount") == 0)) {
-		    count = callTotal;
+			count = callTotal;
 		}
 
 		/* count number of entries (i.e. symbols) printed */
@@ -1076,7 +1108,7 @@ OLD_DEBUG(if (debug_value) Fprint(stderr,
 
 	_symintClose(ldptr);
 	} else {
-	    Fprint(stderr, "prof: no call counts captured\n");
+		Fprint(stderr, "prof: no call counts captured\n");
 	}
 	return (0);
 }
@@ -1099,6 +1131,7 @@ readnl(int symindex)
 {
 	nl = ldptr->pf_symarr_p[symindex];
 
+	/* BEGIN CSTYLED */
 OLD_DEBUG(
 	if (debug_value & 020) {
 		Fprint(stderr,
@@ -1108,15 +1141,16 @@ OLD_DEBUG(
 			nl.ps_sym.st_value);
 	}
 );
+	/* END CSTYLED */
+
 	/*
 	 * TXTSYM accepts global (and local, if "-g" given) T-type symbols.
 	 * Only those in the profiling range are useful.
 	 */
 	return (nl.ps_sym.st_shndx < SHN_LORESERVE &&
-		TXTSYM(nl.ps_sym.st_shndx,
-			nl.ps_sym.st_info) &&
-		(pc_l <= (char *)nl.ps_sym.st_value) &&
-		((char *)nl.ps_sym.st_value < pc_h));
+	    TXTSYM(nl.ps_sym.st_shndx, nl.ps_sym.st_info) &&
+	    (pc_l <= (char *)nl.ps_sym.st_value) &&
+	    ((char *)nl.ps_sym.st_value < pc_h));
 }
 /*
  * Error-checking memory allocators -
@@ -1166,7 +1200,8 @@ basename(char *s)
 	while (p > s && *--p == '/')		/* Trim trailing '/'s. */
 		*p = '\0';
 	p++;					/* New end (+1) of string. */
-	while (p > s && *--p != '/');		/* Break backward on '/'. */
+	while (p > s && *--p != '/')		/* Break backward on '/'. */
+		;
 	if (*p == '/')		/* If found '/', point to 1st following. */
 		p++;
 	if (*p == '\0')
@@ -1282,7 +1317,7 @@ demangled_name(char *s)
 	char *name;
 	size_t	len;
 
-	name = (char *)sgs_demangle(s);
+	name = sgs_demangle(s);
 
 	if (strcmp(name, s) == 0)
 		return (s);

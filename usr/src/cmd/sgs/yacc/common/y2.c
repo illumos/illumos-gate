@@ -272,10 +272,10 @@ char *argv[];
 	 * Open y.output if -v is specified
 	 */
 	if (options & v_FLAG) {
-		strncpy(fname,
+		(void) strncpy(fname,
 			file_prefix,
 			F_NAME_LENGTH-strlen(".output"));
-		strcat(fname, ".output");
+		(void) strcat(fname, ".output");
 		foutput = fopen(fname, "w");
 		if (foutput == NULL)
 			error(gettext(
@@ -286,10 +286,10 @@ char *argv[];
 	 * Open y.tab.h if -d is specified
 	 */
 	if (options & d_FLAG) {
-		strncpy(fname,
+		(void) strncpy(fname,
 			file_prefix,
 			F_NAME_LENGTH-strlen(".tab.h"));
-		strcat(fname, ".tab.h");
+		(void) strcat(fname, ".tab.h");
 		fdefine = fopen(fname, "w");
 		if (fdefine == NULL)
 			error(gettext(
@@ -308,10 +308,10 @@ char *argv[];
 	/*
 	 * Open y.tab.c
 	 */
-	strncpy(fname,
+	(void) strncpy(fname,
 		file_prefix,
 		F_NAME_LENGTH-strlen(".tab.c"));
-	strcat(fname, ".tab.c");
+	(void) strcat(fname, ".tab.c");
 	ftable = fopen(fname, "w");
 	if (ftable == NULL)
 		error(gettext(
@@ -1064,7 +1064,7 @@ defout()
 		cp = tokset[i].name;
 		if (*cp == L' ')	/* literals */
 		{
-			(void) fprintf(fdebug, "\t\"%ws\",\t%d,\n",
+			(void) fprintf(fdebug, WSFMT("\t\"%ws\",\t%d,\n"),
 			    tokset[i].name + 1, tokset[i].value);
 			continue;	/* was cp++ */
 		}
@@ -1078,14 +1078,14 @@ defout()
 		}
 
 		(void) fprintf(fdebug,
-		    "\t\"%ws\",\t%d,\n", tokset[i].name,
+		    WSFMT("\t\"%ws\",\t%d,\n"), tokset[i].name,
 		    tokset[i].value);
 		(void) fprintf(ftable,
-		    "# define %ws %d\n", tokset[i].name,
+		    WSFMT("# define %ws %d\n"), tokset[i].name,
 		    tokset[i].value);
 		if (fdefine != NULL)
 			(void) fprintf(fdefine,
-			    "# define %ws %d\n",
+			    WSFMT("# define %ws %d\n"),
 			    tokset[i].name,
 			    tokset[i].value);
 
@@ -1488,7 +1488,7 @@ swt:
 				if (tok < 0)
 					tok = fdtype(*prdptr[nprod]);
 				(void) fprintf(faction,
-				    ".%ws", typeset[tok]);
+				    WSFMT(".%ws"), typeset[tok]);
 			}
 			goto loop;
 		}
@@ -1553,7 +1553,8 @@ swt:
 								/* CSTYLED */
 								fdtype(prdptr[nprod][i]);
 							(void) fprintf(faction,
-							".%ws", typeset[tok]);
+							    WSFMT(".%ws"),
+							    typeset[tok]);
 						}
 						goto swt;
 					}
@@ -1563,7 +1564,7 @@ swt:
 			 * (Likely id with $ in.)
 			 * If non-terminal is added, remove it from the list.
 			 */
-			fprintf(faction, "$%ws", tokname);
+			(void) fprintf(faction, WSFMT("$%ws"), tokname);
 /*
  * TRANSLATION_NOTE  -- This is a message from yacc.
  *	This message is passed to warning() function.
@@ -1612,7 +1613,7 @@ swt:
 				if (tok < 0)
 					tok = fdtype(prdptr[nprod][j+offset]);
 				(void) fprintf(faction,
-				    ".%ws", typeset[tok]);
+				    WSFMT(".%ws"), typeset[tok]);
 			}
 			goto swt;
 		}
@@ -1857,7 +1858,7 @@ lrprnt()	/* print out the left and right hand sides */
 		else
 			rhs = m_rhs;
 	}
-	(void) fprintf(fdebug, "\t\"%ws :%ws\",\n", lhstext, rhs);
+	(void) fprintf(fdebug, WSFMT("\t\"%ws :%ws\",\n"), lhstext, rhs);
 	if (m_rhs)
 		free(m_rhs);
 }
@@ -2090,6 +2091,6 @@ put_prefix_define(char *pre)
 	int i;
 
 	for (i = 0; syms[i]; i++)
-		fprintf(ftable, "#define\tyy%s\t%s%s\n",
+		(void) fprintf(ftable, "#define\tyy%s\t%s%s\n",
 		    syms[i], pre, syms[i]);
 }

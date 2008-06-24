@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -125,30 +125,33 @@ chkmsg:		$(SRCS)
 		sh $(CHKMSG) -m ../common/sym.msg ../common/sym.c
 		sh $(CHKMSG) -m ../common/syminfo.msg ../common/syminfo.c
 
+
+LINT_HDR=	perl $(SGSTOOLS)/lint_hdr.pl
+
 lint:
-		@echo "\nLint of: cap.so"		 > $(LINTOUT)
-		@echo "========================"	>> $(LINTOUT)
-		$(LINT.c) ../common/cap.c 		>> $(LINTOUT) 2>&1
-		@echo "\nLint of: dyn.so"		>> $(LINTOUT)
-		@echo "========================"	>> $(LINTOUT)
-		$(LINT.c) ../common/dyn.c 		>> $(LINTOUT) 2>&1
-		@echo "\nLint of: ehdr.so"		>> $(LINTOUT)
-		@echo "========================"	>> $(LINTOUT)
-		$(LINT.c) ../common/ehdr.c 		>> $(LINTOUT) 2>&1
-		@echo "\nLint of: phdr.so"		>> $(LINTOUT)
-		@echo "========================"	>> $(LINTOUT)
-		$(LINT.c) ../common/phdr.c 		>> $(LINTOUT) 2>&1
-		@echo "\nLint of: shdr.so"		>> $(LINTOUT)
-		@echo "========================"	>> $(LINTOUT)
-		$(LINT.c) ../common/shdr.c 		>> $(LINTOUT) 2>&1
-		@echo "\nLint of: str.so"		>> $(LINTOUT)
-		@echo "========================"	>> $(LINTOUT)
-		$(LINT.c) ../common/str.c 		>> $(LINTOUT) 2>&1
-		@echo "\nLint of: sym.so"		>> $(LINTOUT)
-		@echo "========================"	>> $(LINTOUT)
-		$(LINT.c) ../common/sym.c 		>> $(LINTOUT) 2>&1
-		@echo "\nLint of: syminfo.so"		>> $(LINTOUT)
-		@echo "========================"	>> $(LINTOUT)
-		$(LINT.c) ../common/syminfo.c 		>> $(LINTOUT) 2>&1
+		$(LINT_HDR) "elfedit modules"		 > $(LINTOUT)
+		$(LINT_HDR) -s "cap.so"			>> $(LINTOUT)
+		$(LINT.c) ../common/cap.c 		2>&1 | tee -a $(LINTOUT)
+
+		$(LINT_HDR) -s "dyn.so"			>> $(LINTOUT)
+		$(LINT.c) ../common/dyn.c 		2>&1 | tee -a $(LINTOUT)
+
+		$(LINT_HDR) -s "ehdr.so"		>> $(LINTOUT)
+		$(LINT.c) ../common/ehdr.c 		2>&1 | tee -a $(LINTOUT)
+
+		$(LINT_HDR) -s "phdr.so"		>> $(LINTOUT)
+		$(LINT.c) ../common/phdr.c 		2>&1 | tee -a $(LINTOUT)
+
+		$(LINT_HDR) -s "shdr.so"		>> $(LINTOUT)
+		$(LINT.c) ../common/shdr.c 		2>&1 | tee -a $(LINTOUT)
+
+		$(LINT_HDR) -s "str.so"			>> $(LINTOUT)
+		$(LINT.c) ../common/str.c 		2>&1 | tee -a $(LINTOUT)
+
+		$(LINT_HDR) -s "sym.so"			>> $(LINTOUT)
+		$(LINT.c) ../common/sym.c 		2>&1 | tee -a $(LINTOUT)
+
+		$(LINT_HDR) -s "syminfo.so"		>> $(LINTOUT)
+		$(LINT.c) ../common/syminfo.c 		2>&1 | tee -a $(LINTOUT)
 
 include		$(SRC)/lib/Makefile.targ

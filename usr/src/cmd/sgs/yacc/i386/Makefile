@@ -26,7 +26,6 @@
 #
 # cmd/sgs/yacc/i386/Makefile
 
-PROG=		yacc
 DEFLIST=	-DELF
 
 include 	../../../Makefile.cmd
