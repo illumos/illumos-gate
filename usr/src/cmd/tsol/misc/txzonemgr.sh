@@ -1,4 +1,4 @@
-#!/bin/pfksh
+#!/bin/ksh
 #
 # CDDL HEADER START
 #
@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -67,7 +67,7 @@ labelCheck() {
 }
 
 snapshotCheck() {
-	filesystem=`zfs list |grep zone/$zonename |cut -d " " -f1`
+	filesystem=`zfs list |grep $ZDSET/$zonename |cut -d " " -f1`
 	if [[ -n $filesystem ]]; then
 		snapshot="Create Snapshot\n"
 	fi
@@ -112,7 +112,7 @@ selectLabel() {
 	    --column="Available Sensitivity Labels")
 
 	if [[ -n $alabel ]]; then
-		newlabel=`atohexlabel "$alabel" 2>null`
+		newlabel=`atohexlabel "$alabel" 2>/dev/null`
 		if [[ -n $newlabel ]]; then
 			echo $zonename:$newlabel:0:: >> /etc/security/tsol/tnzonecfg
 		else
@@ -182,11 +182,13 @@ clone() {
 	        --height=300 \
 		--column="ZFS Zone Snapshots"`
 	if [[ -n $image ]]; then
-		dataset=`zfs list |grep zone/$zonename |cut -d " " -f1`
+		dataset=`zfs list |grep $ZDSET/$zonename |cut -d " " -f1`
 		if [[ -n $dataset ]]; then
-			/usr/sbin/zfs destroy zone/$zonename
+			/usr/sbin/zfs destroy $ZDSET/$zonename
 		fi
-		/usr/sbin/zfs clone $image zone/$zonename
+		/usr/sbin/zfs clone $image $ZDSET/$zonename
+		/usr/sbin/zfs set mountpoint=/zone/$zonename  $ZDSET/$zonename
+
 		/usr/sbin/zoneadm -z $zonename attach -F
 		if [ ! -f /var/ldap/ldap_client_file ]; then
 			if [ $NSCD_PER_LABEL = 0 ] ; then
@@ -300,9 +302,9 @@ install() {
 	# This step is done automatically by zonecfg
 	# in Solaris Express 8/06 or newer
 
-	zp=`zpool list -H zone 2>/dev/null`
-	if [ $? = 0 ]; then
-		zfs create zone/$zonename
+	if [ $ZDSET != none ]; then
+		zfs create -o mountpoint=/zone/$zonename \
+		    $ZDSET/$zonename
 		chmod 700 /zone/$zonename
 	fi
 
@@ -326,6 +328,10 @@ delete() {
 		mv /tmp/tnzonefg.$$ /etc/security/tsol/tnzonecfg
 	fi
 	zonecfg -z $zonename delete -F
+	dataset=`zfs list |grep $ZDSET/$zonename |cut -d " " -f1`
+	if [[ -n $dataset ]]; then
+		/usr/sbin/zfs destroy $ZDSET/$zonename
+	fi
 	zonename=
 }
 
@@ -927,7 +933,7 @@ singleZone() {
 			return ;;
 
 		    " Create Snapshot")
-			zfs snapshot zone/${zonename}@snapshot;;
+			zfs snapshot $ZDSET/${zonename}@snapshot;;
 
 		    " Add Network...")
 			addNet ;;
@@ -948,12 +954,31 @@ singleZone() {
 
 # Main loop for top-level window
 #
-# Always display vni0 since it is useful for cross-zone networking
-#
-ifconfig vni0 > /dev/null 2>&1
-if [ $? != 0 ]; then
-	ifconfig vni0 plumb >/dev/null 2>&1
+
+
+ZDSET=none
+# are there any zfs pools?
+zpool iostat 1>/dev/null 2>&1
+if [ $? = 0 ]; then
+	# is there a zfs pool named "zone"?
+	zpool list -H zone 1>/dev/null 2>&1
+	if [ $? = 0 ]; then
+		# yes
+		ZDSET=zone
+	else
+		# no, but is there a root pool?
+		rootfs=`df -n / | awk '{print $3}'`
+		if [ $rootfs = "zfs" ]; then
+			# yes, use it
+			ZDSET=`zfs list -Ho name / | cut -d/ -f 1`/zones
+			zfs list -H $ZDSET 1>/dev/null 2>&1
+			if [ $? = 1 ]; then
+				zfs create -o mountpoint=/zone $ZDSET
+			fi
+		fi
+	fi
 fi
+
 export NSCD_OPT
 while [ "${command}" != Exit ]; do
 	zonelist=""
