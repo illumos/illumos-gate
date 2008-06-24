@@ -594,24 +594,6 @@ mdb_cpu2cpuid(uintptr_t cpup)
 	return (cpu.cpu_id);
 }
 
-#if defined(__i386)
-/*
- * See uts/common/sys/cpuvar.h.
- * cpuset_t is 1 ulong_t in the i386 32-bit world and an array of ulong_t in
- * the 64-bit world.
- */
-int
-mdb_cpuset_find(uintptr_t cpusetp)
-{
-	size_t cpu;
-
-	for (cpu = 0; cpu < NCPU; cpu++)
-		if (BT_TEST((unsigned long *)cpusetp, cpu))
-			return (cpu);
-
-	return (-1);
-}
-#else	/* All 64 bit */
 int
 mdb_cpuset_find(uintptr_t cpusetp)
 {
@@ -642,7 +624,6 @@ out:
 	mdb_free(cpuset, sz);
 	return (cpu);
 }
-#endif	/* defined(__i386) */
 
 uintptr_t
 mdb_vnode2page(uintptr_t vp, uintptr_t offset)
