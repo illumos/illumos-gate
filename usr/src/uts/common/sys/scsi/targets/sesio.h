@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +69,10 @@ typedef struct {
 #define	SESTYP_SCSI_TGT		0x14
 #define	SESTYP_SCSI_INI		0x15
 #define	SESTYP_SUBENC		0x16
+#define	SESTYP_ARRAY		0x17	/* SES2r19 #7.1 */
+#define	SESTYP_SASEXPANDER	0x18	/* SES2r19 #7.1 */
+#define	SESTYP_SASCONNECTOR	0x19	/* SES2r19 #7.1 */
+
 
 /*
  * Overall Enclosure Status

@@ -323,7 +323,12 @@ is_enc_dev(ses_softc_t *ssc, struct scsi_inquiry *inqp, int iqlen, enctyp *ep)
 		if (strncmp(inqp->inq_vid, SEN_ID, SEN_ID_LEN) == 0) {
 			SES_LOG(ssc, SES_CE_DEBUG3, "SEN device found");
 			*ep = SEN_TYPE;
-		} else if (inqp->inq_rdf > RDF_SCSI2) {
+		} else if (inqp->inq_rdf == RDF_SCSI2) {
+			/*
+			 * Per SPC4 #6.4.2 Standard Inquiry Data, response
+			 * data format (RDF) values of 0 and 1 are Obsolete,
+			 * whereas values greater than 2 are Reserved
+			 */
 			SES_LOG(ssc, SES_CE_DEBUG3, "SES device found");
 			*ep = SES_TYPE;
 		} else {

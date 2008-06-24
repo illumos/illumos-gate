@@ -21,7 +21,7 @@
 /*
  * Enclosure Services Device target driver
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -247,11 +247,12 @@ _NOTE(SCHEME_PROTECTS_DATA("absurdities", ses_objarg))
  */
 #define	SES_IO_TIME		  60 /* standard I/O time (sec.) */
 #define	SES_RESTART_TIME	 100 /* I/O restart time (ms.) */
-#define	SES_BUSY_TIME		5000 /* I/O busy restart time (ms.) */
+#define	SES_BUSY_TIME		500 /* I/O busy restart time (ms.) */
 
 #define	SES_ENABLE_RESTART(ms_time, pkt) { \
 	ssc->ses_restart_id = timeout(ses_restart, (void *) pkt, \
-	    (ms_time)? (ms_time * drv_usectohz(1000)): drv_usectohz(1000)); \
+	    (ms_time)? (drv_usectohz(ms_time * 1000)) : \
+	    drv_usectohz(1000)); \
 }
 
 
@@ -272,7 +273,7 @@ _NOTE(SCHEME_PROTECTS_DATA("absurdities", ses_objarg))
 #define	SES_CMD_RETRY		SES_RETRY_MULTIPLIER
 #define	SES_NO_RETRY		0
 #define	SES_SENSE_RETRY		1
-#define	SES_BUSY_RETRY		2
+#define	SES_BUSY_RETRY		4
 
 /* Retry weight is 1 */
 #define	SES_CMD_RETRY1(retry) \
