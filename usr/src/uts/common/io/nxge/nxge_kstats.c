@@ -542,8 +542,8 @@ nxge_tdc_stat_update(kstat_t *ksp, int rw)
 	statsp = (p_nxge_tx_ring_stats_t)&nxgep->statsp->tdc_stats[channel];
 
 	NXGE_DEBUG_MSG((nxgep, KST_CTL,
-		"nxge_tdc_stat_update data $%p statsp $%p channel %d",
-		ksp->ks_data, statsp, channel));
+	    "nxge_tdc_stat_update data $%p statsp $%p channel %d",
+	    ksp->ks_data, statsp, channel));
 
 	if (rw == KSTAT_WRITE) {
 		statsp->opackets = tdc_kstatsp->opackets.value.ull;
@@ -553,7 +553,7 @@ nxge_tdc_stat_update(kstat_t *ksp, int rw)
 		statsp->pkt_size_err = tdc_kstatsp->pkt_size_err.value.ul;
 		statsp->tx_ring_oflow = tdc_kstatsp->tx_ring_oflow.value.ul;
 		statsp->pre_buf_par_err =
-			tdc_kstatsp->pref_buf_ecc_err.value.ul;
+		    tdc_kstatsp->pref_buf_ecc_err.value.ul;
 		statsp->nack_pref = tdc_kstatsp->nack_pref.value.ul;
 		statsp->nack_pkt_rd = tdc_kstatsp->nack_pkt_rd.value.ul;
 		statsp->conf_part_err = tdc_kstatsp->conf_part_err.value.ul;
@@ -570,7 +570,7 @@ nxge_tdc_stat_update(kstat_t *ksp, int rw)
 		tdc_kstatsp->pkt_size_err.value.ul = statsp->pkt_size_err;
 		tdc_kstatsp->tx_ring_oflow.value.ul = statsp->tx_ring_oflow;
 		tdc_kstatsp->pref_buf_ecc_err.value.ul =
-			statsp->pre_buf_par_err;
+		    statsp->pre_buf_par_err;
 		tdc_kstatsp->nack_pref.value.ul = statsp->nack_pref;
 		tdc_kstatsp->nack_pkt_rd.value.ul = statsp->nack_pkt_rd;
 		tdc_kstatsp->conf_part_err.value.ul = statsp->conf_part_err;
@@ -581,7 +581,7 @@ nxge_tdc_stat_update(kstat_t *ksp, int rw)
 		tdc_kstatsp->tx_allocb_fail.value.ul = statsp->tx_allocb_fail;
 		tdc_kstatsp->tx_no_desc.value.ul = statsp->tx_no_desc;
 		tdc_kstatsp->tx_dma_bind_fail.value.ul =
-			statsp->tx_dma_bind_fail;
+		    statsp->tx_dma_bind_fail;
 	}
 	NXGE_DEBUG_MSG((nxgep, KST_CTL, " <== nxge_tdc_stat_update"));
 	return (0);
@@ -611,8 +611,8 @@ nxge_rdc_stat_update(kstat_t *ksp, int rw)
 	statsp = (p_nxge_rx_ring_stats_t)&nxgep->statsp->rdc_stats[channel];
 
 	NXGE_DEBUG_MSG((nxgep, KST_CTL,
-		"nxge_rdc_stat_update $%p statsp $%p channel %d",
-		ksp->ks_data, statsp, channel));
+	    "nxge_rdc_stat_update $%p statsp $%p channel %d",
+	    ksp->ks_data, statsp, channel));
 
 	if (rw == KSTAT_WRITE) {
 		statsp->dcf_err = rdc_kstatsp->dcf_err.value.ul;
@@ -632,7 +632,7 @@ nxge_rdc_stat_update(kstat_t *ksp, int rw)
 		statsp->l2_err = rdc_kstatsp->compl_l2_err.value.ul;
 		statsp->l4_cksum_err = rdc_kstatsp->compl_l4_cksum_err.value.ul;
 		statsp->fflp_soft_err =
-			rdc_kstatsp->compl_fflp_soft_err.value.ul;
+		    rdc_kstatsp->compl_fflp_soft_err.value.ul;
 		statsp->zcp_soft_err = rdc_kstatsp->compl_zcp_soft_err.value.ul;
 		statsp->config_err = rdc_kstatsp->config_err.value.ul;
 		statsp->rcrincon = rdc_kstatsp->rcrincon.value.ul;
@@ -663,7 +663,7 @@ nxge_rdc_stat_update(kstat_t *ksp, int rw)
 		rdc_kstatsp->compl_l2_err.value.ul = statsp->l2_err;
 		rdc_kstatsp->compl_l4_cksum_err.value.ul = statsp->l4_cksum_err;
 		rdc_kstatsp->compl_fflp_soft_err.value.ul =
-			statsp->fflp_soft_err;
+		    statsp->fflp_soft_err;
 		rdc_kstatsp->compl_zcp_soft_err.value.ul = statsp->zcp_soft_err;
 		rdc_kstatsp->config_err.value.ul = statsp->config_err;
 		rdc_kstatsp->rcrincon.value.ul = statsp->rcrincon;
@@ -696,7 +696,7 @@ nxge_rdc_sys_stat_update(kstat_t *ksp, int rw)
 	statsp = (p_nxge_rdc_sys_stats_t)&nxgep->statsp->rdc_sys_stats;
 
 	NXGE_DEBUG_MSG((nxgep, KST_CTL, "nxge_rdc_sys_stat_update %llx",
-		ksp->ks_data));
+	    ksp->ks_data));
 
 	if (rw == KSTAT_WRITE) {
 		statsp->id_mismatch = rdc_sys_kstatsp->id_mismatch.value.ul;
@@ -734,10 +734,10 @@ nxge_txc_stat_update(kstat_t *ksp, int rw)
 		statsp->pkt_xmit = txc_kstatsp->pkt_xmit.value.ul;
 		statsp->ro_correct_err = txc_kstatsp->ro_correct_err.value.ul;
 		statsp->ro_uncorrect_err =
-			txc_kstatsp->ro_uncorrect_err.value.ul;
+		    txc_kstatsp->ro_uncorrect_err.value.ul;
 		statsp->sf_correct_err = txc_kstatsp->sf_correct_err.value.ul;
 		statsp->sf_uncorrect_err =
-			txc_kstatsp->sf_uncorrect_err.value.ul;
+		    txc_kstatsp->sf_uncorrect_err.value.ul;
 		statsp->address_failed = txc_kstatsp->address_failed.value.ul;
 		statsp->dma_failed = txc_kstatsp->dma_failed.value.ul;
 		statsp->length_failed = txc_kstatsp->length_failed.value.ul;
@@ -748,10 +748,10 @@ nxge_txc_stat_update(kstat_t *ksp, int rw)
 		txc_kstatsp->pkt_xmit.value.ul = statsp->pkt_xmit;
 		txc_kstatsp->ro_correct_err.value.ul = statsp->ro_correct_err;
 		txc_kstatsp->ro_uncorrect_err.value.ul =
-			statsp->ro_uncorrect_err;
+		    statsp->ro_uncorrect_err;
 		txc_kstatsp->sf_correct_err.value.ul = statsp->sf_correct_err;
 		txc_kstatsp->sf_uncorrect_err.value.ul =
-			statsp->sf_uncorrect_err;
+		    statsp->sf_uncorrect_err;
 		txc_kstatsp->address_failed.value.ul = statsp->address_failed;
 		txc_kstatsp->dma_failed.value.ul = statsp->dma_failed;
 		txc_kstatsp->length_failed.value.ul = statsp->length_failed;
@@ -824,22 +824,22 @@ nxge_xmac_stat_update(kstat_t *ksp, int rw)
 	if (rw == KSTAT_WRITE) {
 		statsp->tx_frame_cnt = xmac_kstatsp->tx_frame_cnt.value.ul;
 		statsp->tx_underflow_err =
-			xmac_kstatsp->tx_underflow_err.value.ul;
+		    xmac_kstatsp->tx_underflow_err.value.ul;
 		statsp->tx_maxpktsize_err =
-			xmac_kstatsp->tx_maxpktsize_err.value.ul;
+		    xmac_kstatsp->tx_maxpktsize_err.value.ul;
 		statsp->tx_overflow_err =
-			xmac_kstatsp->tx_overflow_err.value.ul;
+		    xmac_kstatsp->tx_overflow_err.value.ul;
 		statsp->tx_fifo_xfr_err =
-			xmac_kstatsp->tx_fifo_xfr_err.value.ul;
+		    xmac_kstatsp->tx_fifo_xfr_err.value.ul;
 		statsp->tx_byte_cnt = xmac_kstatsp->tx_byte_cnt.value.ul;
 		statsp->rx_underflow_err =
-			xmac_kstatsp->rx_underflow_err.value.ul;
+		    xmac_kstatsp->rx_underflow_err.value.ul;
 		statsp->rx_overflow_err =
-			xmac_kstatsp->rx_overflow_err.value.ul;
+		    xmac_kstatsp->rx_overflow_err.value.ul;
 		statsp->rx_crc_err_cnt = xmac_kstatsp->rx_crc_err_cnt.value.ul;
 		statsp->rx_len_err_cnt = xmac_kstatsp->rx_len_err_cnt.value.ul;
 		statsp->rx_viol_err_cnt =
-			xmac_kstatsp->rx_viol_err_cnt.value.ul;
+		    xmac_kstatsp->rx_viol_err_cnt.value.ul;
 		statsp->rx_byte_cnt = xmac_kstatsp->rx_byte_cnt.value.ul;
 		statsp->rx_frame_cnt = xmac_kstatsp->rx_frame_cnt.value.ul;
 		statsp->rx_hist1_cnt = xmac_kstatsp->rx_hist1_cnt.value.ul;
@@ -852,44 +852,44 @@ nxge_xmac_stat_update(kstat_t *ksp, int rw)
 		statsp->rx_mult_cnt = xmac_kstatsp->rx_mult_cnt.value.ul;
 		statsp->rx_frag_cnt = xmac_kstatsp->rx_frag_cnt.value.ul;
 		statsp->rx_frame_align_err_cnt =
-			xmac_kstatsp->rx_frame_align_err_cnt.value.ul;
+		    xmac_kstatsp->rx_frame_align_err_cnt.value.ul;
 		statsp->rx_linkfault_err_cnt =
-			xmac_kstatsp->rx_linkfault_err_cnt.value.ul;
+		    xmac_kstatsp->rx_linkfault_err_cnt.value.ul;
 		statsp->rx_localfault_err =
-			xmac_kstatsp->rx_local_fault_err_cnt.value.ul;
+		    xmac_kstatsp->rx_local_fault_err_cnt.value.ul;
 		statsp->rx_remotefault_err =
-			xmac_kstatsp->rx_remote_fault_err_cnt.value.ul;
+		    xmac_kstatsp->rx_remote_fault_err_cnt.value.ul;
 		statsp->xpcs_deskew_err_cnt =
-			xmac_kstatsp->xpcs_deskew_err_cnt.value.ul;
+		    xmac_kstatsp->xpcs_deskew_err_cnt.value.ul;
 #ifdef	NXGE_DEBUG_SYMBOL_ERR
 		statsp->xpcs_ln0_symbol_err_cnt =
-			xmac_kstatsp->xpcs_ln0_symbol_err_cnt.value.ul;
+		    xmac_kstatsp->xpcs_ln0_symbol_err_cnt.value.ul;
 		statsp->xpcs_ln1_symbol_err_cnt =
-			xmac_kstatsp->xpcs_ln1_symbol_err_cnt.value.ul;
+		    xmac_kstatsp->xpcs_ln1_symbol_err_cnt.value.ul;
 		statsp->xpcs_ln2_symbol_err_cnt =
-			xmac_kstatsp->xpcs_ln2_symbol_err_cnt.value.ul;
+		    xmac_kstatsp->xpcs_ln2_symbol_err_cnt.value.ul;
 		statsp->xpcs_ln3_symbol_err_cnt =
-			xmac_kstatsp->xpcs_ln3_symbol_err_cnt.value.ul;
+		    xmac_kstatsp->xpcs_ln3_symbol_err_cnt.value.ul;
 #endif
 	} else {
 		xmac_kstatsp->tx_frame_cnt.value.ul = statsp->tx_frame_cnt;
 		xmac_kstatsp->tx_underflow_err.value.ul =
-			statsp->tx_underflow_err;
+		    statsp->tx_underflow_err;
 		xmac_kstatsp->tx_maxpktsize_err.value.ul =
-			statsp->tx_maxpktsize_err;
+		    statsp->tx_maxpktsize_err;
 		xmac_kstatsp->tx_overflow_err.value.ul =
-			statsp->tx_overflow_err;
+		    statsp->tx_overflow_err;
 		xmac_kstatsp->tx_fifo_xfr_err.value.ul =
-			statsp->tx_fifo_xfr_err;
+		    statsp->tx_fifo_xfr_err;
 		xmac_kstatsp->tx_byte_cnt.value.ul = statsp->tx_byte_cnt;
 		xmac_kstatsp->rx_underflow_err.value.ul =
-			statsp->rx_underflow_err;
+		    statsp->rx_underflow_err;
 		xmac_kstatsp->rx_overflow_err.value.ul =
-			statsp->rx_overflow_err;
+		    statsp->rx_overflow_err;
 		xmac_kstatsp->rx_crc_err_cnt.value.ul = statsp->rx_crc_err_cnt;
 		xmac_kstatsp->rx_len_err_cnt.value.ul = statsp->rx_len_err_cnt;
 		xmac_kstatsp->rx_viol_err_cnt.value.ul =
-			statsp->rx_viol_err_cnt;
+		    statsp->rx_viol_err_cnt;
 		xmac_kstatsp->rx_byte_cnt.value.ul = statsp->rx_byte_cnt;
 		xmac_kstatsp->rx_frame_cnt.value.ul = statsp->rx_frame_cnt;
 		xmac_kstatsp->rx_hist1_cnt.value.ul = statsp->rx_hist1_cnt;
@@ -902,24 +902,24 @@ nxge_xmac_stat_update(kstat_t *ksp, int rw)
 		xmac_kstatsp->rx_mult_cnt.value.ul = statsp->rx_mult_cnt;
 		xmac_kstatsp->rx_frag_cnt.value.ul = statsp->rx_frag_cnt;
 		xmac_kstatsp->rx_frame_align_err_cnt.value.ul =
-			statsp->rx_frame_align_err_cnt;
+		    statsp->rx_frame_align_err_cnt;
 		xmac_kstatsp->rx_linkfault_err_cnt.value.ul =
-			statsp->rx_linkfault_err_cnt;
+		    statsp->rx_linkfault_err_cnt;
 		xmac_kstatsp->rx_local_fault_err_cnt.value.ul =
-			statsp->rx_localfault_err;
+		    statsp->rx_localfault_err;
 		xmac_kstatsp->rx_remote_fault_err_cnt.value.ul =
-			statsp->rx_remotefault_err;
+		    statsp->rx_remotefault_err;
 		xmac_kstatsp->xpcs_deskew_err_cnt.value.ul =
-			statsp->xpcs_deskew_err_cnt;
+		    statsp->xpcs_deskew_err_cnt;
 #ifdef	NXGE_DEBUG_SYMBOL_ERR
 		xmac_kstatsp->xpcs_ln0_symbol_err_cnt.value.ul =
-			statsp->xpcs_ln0_symbol_err_cnt;
+		    statsp->xpcs_ln0_symbol_err_cnt;
 		xmac_kstatsp->xpcs_ln1_symbol_err_cnt.value.ul =
-			statsp->xpcs_ln1_symbol_err_cnt;
+		    statsp->xpcs_ln1_symbol_err_cnt;
 		xmac_kstatsp->xpcs_ln2_symbol_err_cnt.value.ul =
-			statsp->xpcs_ln2_symbol_err_cnt;
+		    statsp->xpcs_ln2_symbol_err_cnt;
 		xmac_kstatsp->xpcs_ln3_symbol_err_cnt.value.ul =
-			statsp->xpcs_ln3_symbol_err_cnt;
+		    statsp->xpcs_ln3_symbol_err_cnt;
 #endif
 	}
 	NXGE_DEBUG_MSG((nxgep, KST_CTL, "<== nxge_xmac_stat_update"));
@@ -946,35 +946,35 @@ nxge_bmac_stat_update(kstat_t *ksp, int rw)
 	if (rw == KSTAT_WRITE) {
 		statsp->tx_frame_cnt = bmac_kstatsp->tx_frame_cnt.value.ul;
 		statsp->tx_underrun_err =
-			bmac_kstatsp->tx_underrun_err.value.ul;
+		    bmac_kstatsp->tx_underrun_err.value.ul;
 		statsp->tx_max_pkt_err = bmac_kstatsp->tx_max_pkt_err.value.ul;
 		statsp->tx_byte_cnt = bmac_kstatsp->tx_byte_cnt.value.ul;
 		statsp->rx_frame_cnt = bmac_kstatsp->rx_frame_cnt.value.ul;
 		statsp->rx_byte_cnt = bmac_kstatsp->rx_byte_cnt.value.ul;
 		statsp->rx_overflow_err =
-			bmac_kstatsp->rx_overflow_err.value.ul;
+		    bmac_kstatsp->rx_overflow_err.value.ul;
 		statsp->rx_align_err_cnt =
-			bmac_kstatsp->rx_align_err_cnt.value.ul;
+		    bmac_kstatsp->rx_align_err_cnt.value.ul;
 		statsp->rx_crc_err_cnt = bmac_kstatsp->rx_crc_err_cnt.value.ul;
 		statsp->rx_len_err_cnt = bmac_kstatsp->rx_len_err_cnt.value.ul;
 		statsp->rx_viol_err_cnt =
-			bmac_kstatsp->rx_viol_err_cnt.value.ul;
+		    bmac_kstatsp->rx_viol_err_cnt.value.ul;
 	} else {
 		bmac_kstatsp->tx_frame_cnt.value.ul = statsp->tx_frame_cnt;
 		bmac_kstatsp->tx_underrun_err.value.ul =
-			statsp->tx_underrun_err;
+		    statsp->tx_underrun_err;
 		bmac_kstatsp->tx_max_pkt_err.value.ul = statsp->tx_max_pkt_err;
 		bmac_kstatsp->tx_byte_cnt.value.ul = statsp->tx_byte_cnt;
 		bmac_kstatsp->rx_frame_cnt.value.ul = statsp->rx_frame_cnt;
 		bmac_kstatsp->rx_byte_cnt.value.ul = statsp->rx_byte_cnt;
 		bmac_kstatsp->rx_overflow_err.value.ul =
-			statsp->rx_overflow_err;
+		    statsp->rx_overflow_err;
 		bmac_kstatsp->rx_align_err_cnt.value.ul =
-			statsp->rx_align_err_cnt;
+		    statsp->rx_align_err_cnt;
 		bmac_kstatsp->rx_crc_err_cnt.value.ul = statsp->rx_crc_err_cnt;
 		bmac_kstatsp->rx_len_err_cnt.value.ul = statsp->rx_len_err_cnt;
 		bmac_kstatsp->rx_viol_err_cnt.value.ul =
-			statsp->rx_viol_err_cnt;
+		    statsp->rx_viol_err_cnt;
 	}
 	NXGE_DEBUG_MSG((nxgep, KST_CTL, "<== nxge_bmac_stat_update"));
 	return (0);
@@ -1001,36 +1001,36 @@ nxge_zcp_stat_update(kstat_t *ksp, int rw)
 		statsp->rrfifo_underrun = zcp_kstatsp->rrfifo_underrun.value.ul;
 		statsp->rrfifo_overrun = zcp_kstatsp->rrfifo_overrun.value.ul;
 		statsp->rspfifo_uncorr_err =
-			zcp_kstatsp->rspfifo_uncorr_err.value.ul;
+		    zcp_kstatsp->rspfifo_uncorr_err.value.ul;
 		statsp->buffer_overflow = zcp_kstatsp->buffer_overflow.value.ul;
 		statsp->stat_tbl_perr = zcp_kstatsp->stat_tbl_perr.value.ul;
 		statsp->dyn_tbl_perr = zcp_kstatsp->dyn_tbl_perr.value.ul;
 		statsp->buf_tbl_perr = zcp_kstatsp->buf_tbl_perr.value.ul;
 		statsp->tt_program_err = zcp_kstatsp->tt_program_err.value.ul;
 		statsp->rsp_tt_index_err =
-			zcp_kstatsp->rsp_tt_index_err.value.ul;
+		    zcp_kstatsp->rsp_tt_index_err.value.ul;
 		statsp->slv_tt_index_err =
-			zcp_kstatsp->slv_tt_index_err.value.ul;
+		    zcp_kstatsp->slv_tt_index_err.value.ul;
 		statsp->zcp_tt_index_err =
-			zcp_kstatsp->zcp_tt_index_err.value.ul;
+		    zcp_kstatsp->zcp_tt_index_err.value.ul;
 		statsp->cfifo_ecc = zcp_kstatsp->cfifo_ecc.value.ul;
 	} else {
 		zcp_kstatsp->rrfifo_underrun.value.ul = statsp->rrfifo_underrun;
 		zcp_kstatsp->rrfifo_overrun.value.ul = statsp->rrfifo_overrun;
 		zcp_kstatsp->rspfifo_uncorr_err.value.ul =
-			statsp->rspfifo_uncorr_err;
+		    statsp->rspfifo_uncorr_err;
 		zcp_kstatsp->buffer_overflow.value.ul =
-			statsp->buffer_overflow;
+		    statsp->buffer_overflow;
 		zcp_kstatsp->stat_tbl_perr.value.ul = statsp->stat_tbl_perr;
 		zcp_kstatsp->dyn_tbl_perr.value.ul = statsp->dyn_tbl_perr;
 		zcp_kstatsp->buf_tbl_perr.value.ul = statsp->buf_tbl_perr;
 		zcp_kstatsp->tt_program_err.value.ul = statsp->tt_program_err;
 		zcp_kstatsp->rsp_tt_index_err.value.ul =
-			statsp->rsp_tt_index_err;
+		    statsp->rsp_tt_index_err;
 		zcp_kstatsp->slv_tt_index_err.value.ul =
-			statsp->slv_tt_index_err;
+		    statsp->slv_tt_index_err;
 		zcp_kstatsp->zcp_tt_index_err.value.ul =
-			statsp->zcp_tt_index_err;
+		    statsp->zcp_tt_index_err;
 		zcp_kstatsp->cfifo_ecc.value.ul = statsp->cfifo_ecc;
 	}
 	NXGE_DEBUG_MSG((nxgep, KST_CTL, "<== nxge_zcp_stat_update"));
@@ -1060,22 +1060,22 @@ nxge_fflp_stat_update(kstat_t *ksp, int rw)
 		statsp->tcam_ecc_err = fflp_kstatsp->fflp_tcam_ecc_err.value.ul;
 		statsp->vlan_parity_err = fflp_kstatsp->fflp_vlan_perr.value.ul;
 		statsp->hash_lookup_err =
-			fflp_kstatsp->fflp_hasht_lookup_err.value.ul;
+		    fflp_kstatsp->fflp_hasht_lookup_err.value.ul;
 		for (ldc_grp = 0; ldc_grp < MAX_PARTITION; ldc_grp++) {
 			statsp->hash_pio_err[ldc_grp] =
-				fflp_kstatsp->fflp_hasht_data_err[ldc_grp].
-				value.ul;
+			    fflp_kstatsp->fflp_hasht_data_err[ldc_grp].
+			    value.ul;
 		}
 	} else {
 		fflp_kstatsp->fflp_tcam_perr.value.ul =
-			fflp_kstatsp->fflp_tcam_perr.value.ul;
+		    fflp_kstatsp->fflp_tcam_perr.value.ul;
 		fflp_kstatsp->fflp_tcam_ecc_err.value.ul = statsp->tcam_ecc_err;
 		fflp_kstatsp->fflp_vlan_perr.value.ul = statsp->vlan_parity_err;
 		fflp_kstatsp->fflp_hasht_lookup_err.value.ul =
-			statsp->hash_lookup_err;
+		    statsp->hash_lookup_err;
 		for (ldc_grp = 0; ldc_grp < MAX_PARTITION; ldc_grp++) {
 			fflp_kstatsp->fflp_hasht_data_err[ldc_grp].value.ul =
-				statsp->hash_pio_err[ldc_grp];
+			    statsp->hash_pio_err[ldc_grp];
 		}
 	}
 	NXGE_DEBUG_MSG((nxgep, KST_CTL, "<== nxge_fflp_stat_update"));
@@ -1117,41 +1117,41 @@ nxge_mmac_stat_update(kstat_t *ksp, int rw)
 		cmn_err(CE_WARN, "Can not write mmac stats");
 	} else {
 		mmac_kstatsp->mmac_max_addr_cnt.value.ul =
-			statsp->mmac_max_cnt;
+		    statsp->mmac_max_cnt;
 		mmac_kstatsp->mmac_avail_addr_cnt.value.ul =
-			statsp->mmac_avail_cnt;
+		    statsp->mmac_avail_cnt;
 		mmac_kstatsp->mmac_addr1.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[0]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[0]);
 		mmac_kstatsp->mmac_addr2.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[1]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[1]);
 		mmac_kstatsp->mmac_addr3.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[2]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[2]);
 		mmac_kstatsp->mmac_addr4.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[3]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[3]);
 		mmac_kstatsp->mmac_addr5.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[4]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[4]);
 		mmac_kstatsp->mmac_addr6.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[5]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[5]);
 		mmac_kstatsp->mmac_addr7.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[6]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[6]);
 		mmac_kstatsp->mmac_addr8.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[7]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[7]);
 		mmac_kstatsp->mmac_addr9.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[8]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[8]);
 		mmac_kstatsp->mmac_addr10.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[9]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[9]);
 		mmac_kstatsp->mmac_addr11.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[10]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[10]);
 		mmac_kstatsp->mmac_addr12.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[11]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[11]);
 		mmac_kstatsp->mmac_addr13.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[12]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[12]);
 		mmac_kstatsp->mmac_addr14.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[13]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[13]);
 		mmac_kstatsp->mmac_addr15.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[14]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[14]);
 		mmac_kstatsp->mmac_addr16.value.ul =
-			nxge_mac_octet_to_u64(statsp->mmac_avail_pool[15]);
+		    nxge_mac_octet_to_u64(statsp->mmac_avail_pool[15]);
 	}
 	NXGE_DEBUG_MSG((nxgep, KST_CTL, "<== nxge_mmac_stat_update"));
 	return (0);
@@ -1168,7 +1168,7 @@ nxge_setup_local_kstat(p_nxge_t nxgep, int instance, char *name,
 	int i;
 
 	ksp = kstat_create(NXGE_DRIVER_NAME, instance, name, "net",
-		KSTAT_TYPE_NAMED, count, 0);
+	    KSTAT_TYPE_NAMED, count, 0);
 	if (ksp == NULL)
 		return (NULL);
 
@@ -1202,7 +1202,7 @@ nxge_setup_rdc_kstats(p_nxge_t nxgep, int channel)
 #ifdef	NXGE_DEBUG_ERROR
 	if (nxgep->statsp->rdc_ksp[channel] == NULL)
 		NXGE_DEBUG_MSG((nxgep, KST_CTL,
-			"kstat_create failed for rdc channel %d", channel));
+		    "kstat_create failed for rdc channel %d", channel));
 #endif
 }
 
@@ -1223,7 +1223,7 @@ nxge_setup_tdc_kstats(p_nxge_t nxgep, int channel)
 #ifdef	NXGE_DEBUG_ERROR
 	if (nxgep->statsp->tdc_ksp[channel] == NULL) {
 		NXGE_DEBUG_MSG((nxgep, KST_CTL,
-			"kstat_create failed for tdc channel %d", channel));
+		    "kstat_create failed for tdc channel %d", channel));
 	}
 #endif
 }
@@ -1240,19 +1240,19 @@ nxge_setup_kstats(p_nxge_t nxgep)
 
 	/* Setup RDC System statistics */
 	nxgep->statsp->rdc_sys_ksp = nxge_setup_local_kstat(nxgep,
-		nxgep->instance,
-		"RDC System Stats",
-		&nxge_rdc_sys_stats[0],
-		RDC_SYS_STAT_END,
-		nxge_rdc_sys_stat_update);
+	    nxgep->instance,
+	    "RDC System Stats",
+	    &nxge_rdc_sys_stats[0],
+	    RDC_SYS_STAT_END,
+	    nxge_rdc_sys_stat_update);
 
 	/* Setup IPP statistics */
 	nxgep->statsp->ipp_ksp = nxge_setup_local_kstat(nxgep,
-		nxgep->instance,
-		"IPP Stats",
-		&nxge_ipp_stats[0],
-		IPP_STAT_END,
-		nxge_ipp_stat_update);
+	    nxgep->instance,
+	    "IPP Stats",
+	    &nxge_ipp_stats[0],
+	    IPP_STAT_END,
+	    nxge_ipp_stat_update);
 #ifdef	NXGE_DEBUG_ERROR
 	if (nxgep->istatsp->pp_ksp == NULL)
 		NXGE_DEBUG_MSG((nxgep, KST_CTL, "kstat_create failed for ipp"));
@@ -1260,8 +1260,8 @@ nxge_setup_kstats(p_nxge_t nxgep)
 
 	/* Setup TXC statistics */
 	nxgep->statsp->txc_ksp = nxge_setup_local_kstat(nxgep,
-		nxgep->instance, "TXC Stats", &nxge_txc_stats[0],
-		TXC_STAT_END, nxge_txc_stat_update);
+	    nxgep->instance, "TXC Stats", &nxge_txc_stats[0],
+	    TXC_STAT_END, nxge_txc_stat_update);
 #ifdef	NXGE_DEBUG_ERROR
 	if (nxgep->statsp->txc_ksp == NULL)
 		NXGE_DEBUG_MSG((nxgep, KST_CTL, "kstat_create failed for txc"));
@@ -1269,8 +1269,8 @@ nxge_setup_kstats(p_nxge_t nxgep)
 
 	/* Setup ZCP statistics */
 	nxgep->statsp->zcp_ksp = nxge_setup_local_kstat(nxgep,
-		nxgep->instance, "ZCP Stats", &nxge_zcp_stats[0],
-		ZCP_STAT_END, nxge_zcp_stat_update);
+	    nxgep->instance, "ZCP Stats", &nxge_zcp_stats[0],
+	    ZCP_STAT_END, nxge_zcp_stat_update);
 #ifdef	NXGE_DEBUG_ERROR
 	if (nxgep->statsp->zcp_ksp == NULL)
 		NXGE_DEBUG_MSG((nxgep, KST_CTL, "kstat_create failed for zcp"));
@@ -1278,26 +1278,26 @@ nxge_setup_kstats(p_nxge_t nxgep)
 
 	/* Setup FFLP statistics */
 	nxgep->statsp->fflp_ksp[0] = nxge_setup_local_kstat(nxgep,
-		nxgep->instance, "FFLP Stats", &nxge_fflp_stats[0],
-		FFLP_STAT_END, nxge_fflp_stat_update);
+	    nxgep->instance, "FFLP Stats", &nxge_fflp_stats[0],
+	    FFLP_STAT_END, nxge_fflp_stat_update);
 
 #ifdef	NXGE_DEBUG_ERROR
 	if (nxgep->statsp->fflp_ksp == NULL)
 		NXGE_DEBUG_MSG((nxgep, KST_CTL,
-			"kstat_create failed for fflp"));
+		    "kstat_create failed for fflp"));
 #endif
 
 	(void) sprintf(mmac_name, "MMAC Stats%d", nxgep->instance);
 	nxgep->statsp->mmac_ksp = nxge_setup_local_kstat(nxgep,
-		nxgep->instance, "MMAC Stats", &nxge_mmac_stats[0],
-		MMAC_STATS_END, nxge_mmac_stat_update);
+	    nxgep->instance, "MMAC Stats", &nxge_mmac_stats[0],
+	    MMAC_STATS_END, nxge_mmac_stat_update);
 
 	nxge_kstat_sz = sizeof (nxge_port_kstat_t) +
-		sizeof (nxge_mac_kstat_t) - sizeof (kstat_named_t);
+	    sizeof (nxge_mac_kstat_t) - sizeof (kstat_named_t);
 
 	if ((ksp = kstat_create(NXGE_DRIVER_NAME, nxgep->instance,
-			"Port Stats", "net", KSTAT_TYPE_NAMED,
-			nxge_kstat_sz / sizeof (kstat_named_t), 0)) == NULL) {
+	    "Port Stats", "net", KSTAT_TYPE_NAMED,
+	    nxge_kstat_sz / sizeof (kstat_named_t), 0)) == NULL) {
 		NXGE_DEBUG_MSG((nxgep, KST_CTL, "kstat_create failed"));
 		NXGE_DEBUG_MSG((nxgep, KST_CTL, "<== nxge_setup_kstats"));
 		return;
@@ -1312,127 +1312,127 @@ nxge_setup_kstats(p_nxge_t nxgep)
 	 * transceiver state informations.
 	 */
 	kstat_named_init(&nxgekp->xcvr_inits, "xcvr_inits",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->xcvr_inuse, "xcvr_inuse",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->xcvr_addr, "xcvr_addr",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->xcvr_id, "xcvr_id",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->cap_autoneg, "cap_autoneg",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->cap_10gfdx, "cap_10gfdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->cap_10ghdx, "cap_10ghdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->cap_1000fdx, "cap_1000fdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->cap_1000hdx, "cap_1000hdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->cap_100T4, "cap_100T4",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->cap_100fdx, "cap_100fdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->cap_100hdx, "cap_100hdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->cap_10fdx, "cap_10fdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->cap_10hdx, "cap_10hdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->cap_asmpause, "cap_asmpause",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->cap_pause, "cap_pause",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	/*
 	 * Link partner capabilities.
 	 */
 	kstat_named_init(&nxgekp->lp_cap_autoneg, "lp_cap_autoneg",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->lp_cap_10gfdx, "lp_cap_10gfdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->lp_cap_10ghdx, "lp_cap_10ghdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->lp_cap_1000fdx, "lp_cap_1000fdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->lp_cap_1000hdx, "lp_cap_1000hdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->lp_cap_100T4, "lp_cap_100T4",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->lp_cap_100fdx, "lp_cap_100fdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->lp_cap_100hdx, "lp_cap_100hdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->lp_cap_10fdx, "lp_cap_10fdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->lp_cap_10hdx, "lp_cap_10hdx",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->lp_cap_asmpause, "lp_cap_asmpause",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->lp_cap_pause, "lp_cap_pause",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	/*
 	 * Shared link setup.
 	 */
 	kstat_named_init(&nxgekp->link_T4, "link_T4",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->link_speed, "link_speed",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->link_duplex, "link_duplex",
-		KSTAT_DATA_CHAR);
+	    KSTAT_DATA_CHAR);
 	kstat_named_init(&nxgekp->link_asmpause, "link_asmpause",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->link_pause, "link_pause",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->link_up, "link_up",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	/*
 	 * Let the user know the MTU currently in use by the physical MAC
 	 * port.
 	 */
 	kstat_named_init(&nxgekp->mac_mtu, "mac_mtu",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	/*
 	 * Loopback statistics.
 	 */
 	kstat_named_init(&nxgekp->lb_mode, "lb_mode",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	/*
 	 * This tells the user whether the driver is in QOS mode or not.
 	 */
 	kstat_named_init(&nxgekp->qos_mode, "qos_mode",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	/*
 	 * This tells whether the instance is trunked or not
 	 */
 	kstat_named_init(&nxgekp->trunk_mode, "trunk_mode",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 #if defined MULTI_DATA_TX || defined MULTI_DATA_TXV2
 	kstat_named_init(&nxgekp->mdt_reqs, "mdt_reqs",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->mdt_hdr_bufs, "mdt_hdr_bufs",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->mdt_pld_bufs, "mdt_pld_bufs",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->mdt_pkts, "mdt_pkts",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->mdt_hdrs, "mdt_hdrs",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->mdt_plds, "mdt_plds",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->mdt_hdr_bind_fail, "mdt_hdr_bind_fail",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->mdt_pld_bind_fail, "mdt_pld_bind_fail",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 #endif
 #ifdef ACCEPT_JUMBO
 	kstat_named_init(&nxgekp->tx_jumbo_pkts, "tx_jumbo_pkts",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 #endif
 
 	/*
@@ -1440,15 +1440,15 @@ nxge_setup_kstats(p_nxge_t nxgep)
 	 */
 #ifdef ACCEPT_JUMBO
 	kstat_named_init(&nxgekp->rx_jumbo_pkts, "rx_jumbo_pkts",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 #endif
 	/* General MAC statistics */
 	kstat_named_init(&nxgekp->ifspeed, "ifspeed",
-		KSTAT_DATA_UINT64);
+	    KSTAT_DATA_UINT64);
 	kstat_named_init(&nxgekp->promisc, "promisc",
-		KSTAT_DATA_CHAR);
+	    KSTAT_DATA_CHAR);
 	kstat_named_init(&nxgekp->rev_id, "rev_id",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	ksp->ks_update = nxge_port_kstat_update;
 	ksp->ks_private = (void *) nxgep;
@@ -1473,81 +1473,81 @@ nxge_xmac_init_kstats(struct kstat *ksp)
 	 * Transmit MAC statistics.
 	 */
 	kstat_named_init(&nxgekp->tx_frame_cnt, "txmac_frame_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->tx_underflow_err, "txmac_underflow_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->tx_overflow_err, "txmac_overflow_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->tx_maxpktsize_err, "txmac_maxpktsize_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->tx_fifo_xfr_err, "txmac_fifo_xfr_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->tx_byte_cnt, "txmac_byte_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	/* Receive MAC statistics */
 	kstat_named_init(&nxgekp->rx_frame_cnt, "rxmac_frame_cnt",
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_overflow_err, "rxmac_overflow_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_underflow_err, "rxmac_underflow_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_crc_err_cnt, "rxmac_crc_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_len_err_cnt, "rxmac_length_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_viol_err_cnt, "rxmac_code_violations",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_byte_cnt, "rxmac_byte_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_frame_align_err_cnt,
-		"rxmac_alignment_err",
-		KSTAT_DATA_ULONG);
+	    "rxmac_alignment_err",
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_hist1_cnt, "rxmac_64_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_hist2_cnt, "rxmac_65_127_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_hist3_cnt, "rxmac_128_255_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_hist4_cnt, "rxmac_256_511_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_hist5_cnt, "rxmac_512_1023_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_hist6_cnt, "rxmac_1024_1522_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_hist7_cnt, "rxmac_jumbo_cnt",
 	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_broadcast_cnt, "rxmac_broadcast_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_mult_cnt, "rxmac_multicast_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_frag_cnt, "rxmac_fragment_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_linkfault_err_cnt, "rxmac_linkfault_errs",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_remote_fault_err_cnt,
-		"rxmac_remote_faults",
-		KSTAT_DATA_ULONG);
+	    "rxmac_remote_faults",
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_local_fault_err_cnt, "rxmac_local_faults",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	/* XPCS statistics */
 
 	kstat_named_init(&nxgekp->xpcs_deskew_err_cnt, "xpcs_deskew_err_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 #ifdef	NXGE_DEBUG_SYMBOL_ERR
 	kstat_named_init(&nxgekp->xpcs_ln0_symbol_err_cnt,
-		"xpcs_ln0_symbol_err_cnt",
-		KSTAT_DATA_ULONG);
+	    "xpcs_ln0_symbol_err_cnt",
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->xpcs_ln1_symbol_err_cnt,
-		"xpcs_ln1_symbol_err_cnt",
-		KSTAT_DATA_ULONG);
+	    "xpcs_ln1_symbol_err_cnt",
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->xpcs_ln2_symbol_err_cnt,
-		"xpcs_ln2_symbol_err_cnt",
-		KSTAT_DATA_ULONG);
+	    "xpcs_ln2_symbol_err_cnt",
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->xpcs_ln3_symbol_err_cnt,
-		"xpcs_ln3_symbol_err_cnt",
-		KSTAT_DATA_ULONG);
+	    "xpcs_ln3_symbol_err_cnt",
+	    KSTAT_DATA_ULONG);
 #endif
 }
 
@@ -1563,29 +1563,29 @@ nxge_bmac_init_kstats(struct kstat *ksp)
 	 * Transmit MAC statistics.
 	 */
 	kstat_named_init(&nxgekp->tx_frame_cnt, "txmac_frame_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->tx_underrun_err, "txmac_underflow_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->tx_max_pkt_err, "txmac_maxpktsize_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->tx_byte_cnt, "txmac_byte_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	/* Receive MAC statistics */
 	kstat_named_init(&nxgekp->rx_overflow_err, "rxmac_overflow_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_crc_err_cnt, "rxmac_crc_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_len_err_cnt, "rxmac_length_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_viol_err_cnt, "rxmac_code_violations",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_byte_cnt, "rxmac_byte_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_align_err_cnt, "rxmac_alignment_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_frame_cnt, "rxmac_frame_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 }
 
 /* ARGSUSED */
@@ -1600,69 +1600,69 @@ nxge_mac_init_kstats(p_nxge_t nxgep, struct kstat *ksp)
 	 * Transmit MAC statistics.
 	 */
 	kstat_named_init(&nxgekp->tx_frame_cnt, "txmac_frame_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->tx_underflow_err, "txmac_underflow_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->tx_overflow_err, "txmac_overflow_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->tx_maxpktsize_err, "txmac_maxpktsize_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->tx_fifo_xfr_err, "txmac_fifo_xfr_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->tx_byte_cnt, "txmac_byte_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	/*
 	 * Receive MAC statistics
 	 */
 	kstat_named_init(&nxgekp->rx_overflow_err, "rxmac_overflow_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_underflow_err, "rxmac_underflow_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_crc_err_cnt, "rxmac_crc_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_len_err_cnt, "rxmac_length_err",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_viol_err_cnt, "rxmac_code_violations",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_byte_cnt, "rxmac_byte_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_frame_align_err_cnt,
-		"rxmac_alignment_err",
-		KSTAT_DATA_ULONG);
+	    "rxmac_alignment_err",
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&nxgekp->rx_frame_cnt, "rxmac_frame_cnt",
 	    KSTAT_DATA_ULONG);
 	if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
 		kstat_named_init(&nxgekp->rx_hist1_cnt, "rxmac_64_cnt",
-			KSTAT_DATA_ULONG);
+		    KSTAT_DATA_ULONG);
 		kstat_named_init(&nxgekp->rx_hist2_cnt, "rxmac_65_127_cnt",
-			KSTAT_DATA_ULONG);
+		    KSTAT_DATA_ULONG);
 		kstat_named_init(&nxgekp->rx_hist3_cnt, "rxmac_128_255_cnt",
-			KSTAT_DATA_ULONG);
+		    KSTAT_DATA_ULONG);
 		kstat_named_init(&nxgekp->rx_hist4_cnt, "rxmac_256_511_cnt",
-			KSTAT_DATA_ULONG);
+		    KSTAT_DATA_ULONG);
 		kstat_named_init(&nxgekp->rx_hist5_cnt, "rxmac_512_1023_cnt",
-			KSTAT_DATA_ULONG);
+		    KSTAT_DATA_ULONG);
 		kstat_named_init(&nxgekp->rx_hist6_cnt, "rxmac_1024_1522_cnt",
-			KSTAT_DATA_ULONG);
+		    KSTAT_DATA_ULONG);
 		kstat_named_init(&nxgekp->rx_hist7_cnt, "rxmac_jumbo_cnt",
 		    KSTAT_DATA_ULONG);
 		kstat_named_init(&nxgekp->rx_broadcast_cnt,
-			"rxmac_broadcast_cnt",
-			KSTAT_DATA_ULONG);
+		    "rxmac_broadcast_cnt",
+		    KSTAT_DATA_ULONG);
 		kstat_named_init(&nxgekp->rx_mult_cnt, "rxmac_multicast_cnt",
-			KSTAT_DATA_ULONG);
+		    KSTAT_DATA_ULONG);
 		kstat_named_init(&nxgekp->rx_frag_cnt, "rxmac_fragment_cnt",
-			KSTAT_DATA_ULONG);
+		    KSTAT_DATA_ULONG);
 		kstat_named_init(&nxgekp->rx_linkfault_err_cnt,
-			"rxmac_linkfault_errs",
-			KSTAT_DATA_ULONG);
+		    "rxmac_linkfault_errs",
+		    KSTAT_DATA_ULONG);
 		kstat_named_init(&nxgekp->rx_remote_fault_err_cnt,
-			"rxmac_remote_faults",
-			KSTAT_DATA_ULONG);
+		    "rxmac_remote_faults",
+		    KSTAT_DATA_ULONG);
 		kstat_named_init(&nxgekp->rx_local_fault_err_cnt,
-			"rxmac_local_faults",
-			KSTAT_DATA_ULONG);
+		    "rxmac_local_faults",
+		    KSTAT_DATA_ULONG);
 	}
 }
 
@@ -1733,20 +1733,20 @@ nxge_port_kstat_update(kstat_t *ksp, int rw)
 		statsp->port_stats.mdt_hdrs = nxgekp->mdt_hdrs.value.ul;
 		statsp->port_stats.mdt_plds = nxgekp->mdt_plds.value.ul;
 		statsp->port_stats.mdt_hdr_bind_fail =
-			nxgekp->mdt_hdr_bind_fail.value.ul;
+		    nxgekp->mdt_hdr_bind_fail.value.ul;
 		statsp->port_stats.mdt_pld_bind_fail =
-			nxgekp->mdt_pld_bind_fail.value.ul;
+		    nxgekp->mdt_pld_bind_fail.value.ul;
 #endif
 #ifdef ACCEPT_JUMBO
 		statsp->port_stats.tx_jumbo_pkts =
-			nxgekp->tx_jumbo_pkts.value.ul;
+		    nxgekp->tx_jumbo_pkts.value.ul;
 #endif
 		/*
 		 * Rx Statistics.
 		 */
 #ifdef ACCEPT_JUMBO
 		statsp->port_stats.rx_jumbo_pkts =
-			nxgekp->rx_jumbo_pkts.value.ul;
+		    nxgekp->rx_jumbo_pkts.value.ul;
 #endif
 		if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
 			(void) nxge_xmac_stat_update(ksp, KSTAT_WRITE);
@@ -1762,7 +1762,7 @@ nxge_port_kstat_update(kstat_t *ksp, int rw)
 		else
 			(void) strcpy(nxgekp->promisc.value.c, "off");
 		nxgekp->ifspeed.value.ul =
-			statsp->mac_stats.link_speed * 1000000ULL;
+		    statsp->mac_stats.link_speed * 1000000ULL;
 		nxgekp->rev_id.value.ul = statsp->mac_stats.rev_id;
 
 		/*
@@ -1783,36 +1783,36 @@ nxge_port_kstat_update(kstat_t *ksp, int rw)
 		nxgekp->cap_10fdx.value.ul = statsp->mac_stats.cap_10fdx;
 		nxgekp->cap_10hdx.value.ul = statsp->mac_stats.cap_10hdx;
 		nxgekp->cap_asmpause.value.ul =
-			statsp->mac_stats.cap_asmpause;
+		    statsp->mac_stats.cap_asmpause;
 		nxgekp->cap_pause.value.ul = statsp->mac_stats.cap_pause;
 
 		/*
 		 * Link partner capabilities.
 		 */
 		nxgekp->lp_cap_autoneg.value.ul =
-			statsp->mac_stats.lp_cap_autoneg;
+		    statsp->mac_stats.lp_cap_autoneg;
 		nxgekp->lp_cap_10gfdx.value.ul =
-			statsp->mac_stats.lp_cap_10gfdx;
+		    statsp->mac_stats.lp_cap_10gfdx;
 		nxgekp->lp_cap_10ghdx.value.ul =
-			statsp->mac_stats.lp_cap_10ghdx;
+		    statsp->mac_stats.lp_cap_10ghdx;
 		nxgekp->lp_cap_1000fdx.value.ul =
-			statsp->mac_stats.lp_cap_1000fdx;
+		    statsp->mac_stats.lp_cap_1000fdx;
 		nxgekp->lp_cap_1000hdx.value.ul =
-			statsp->mac_stats.lp_cap_1000hdx;
+		    statsp->mac_stats.lp_cap_1000hdx;
 		nxgekp->lp_cap_100T4.value.ul =
-			statsp->mac_stats.lp_cap_100T4;
+		    statsp->mac_stats.lp_cap_100T4;
 		nxgekp->lp_cap_100fdx.value.ul =
-			statsp->mac_stats.lp_cap_100fdx;
+		    statsp->mac_stats.lp_cap_100fdx;
 		nxgekp->lp_cap_100hdx.value.ul =
-			statsp->mac_stats.lp_cap_100hdx;
+		    statsp->mac_stats.lp_cap_100hdx;
 		nxgekp->lp_cap_10fdx.value.ul =
-			statsp->mac_stats.lp_cap_10fdx;
+		    statsp->mac_stats.lp_cap_10fdx;
 		nxgekp->lp_cap_10hdx.value.ul =
-			statsp->mac_stats.lp_cap_10hdx;
+		    statsp->mac_stats.lp_cap_10hdx;
 		nxgekp->lp_cap_asmpause.value.ul =
-			statsp->mac_stats.lp_cap_asmpause;
+		    statsp->mac_stats.lp_cap_asmpause;
 		nxgekp->lp_cap_pause.value.ul =
-			statsp->mac_stats.lp_cap_pause;
+		    statsp->mac_stats.lp_cap_pause;
 
 		/*
 		 * Physical link statistics.
@@ -1826,7 +1826,7 @@ nxge_port_kstat_update(kstat_t *ksp, int rw)
 		else
 			(void) strcpy(nxgekp->link_duplex.value.c, "unknown");
 		nxgekp->link_asmpause.value.ul =
-			statsp->mac_stats.link_asmpause;
+		    statsp->mac_stats.link_asmpause;
 		nxgekp->link_pause.value.ul = statsp->mac_stats.link_pause;
 		nxgekp->link_up.value.ul = statsp->mac_stats.link_up;
 
@@ -1855,20 +1855,20 @@ nxge_port_kstat_update(kstat_t *ksp, int rw)
 #if defined MULTI_DATA_TX || defined MULTI_DATA_TXV2
 		nxgekp->mdt_reqs.value.ul = statsp->port_stats.mdt_reqs;
 		nxgekp->mdt_hdr_bufs.value.ul =
-			statsp->port_stats.mdt_hdr_bufs;
+		    statsp->port_stats.mdt_hdr_bufs;
 		nxgekp->mdt_pld_bufs.value.ul =
-			statsp->port_stats.mdt_pld_bufs;
+		    statsp->port_stats.mdt_pld_bufs;
 		nxgekp->mdt_pkts.value.ul = statsp->port_stats.mdt_pkts;
 		nxgekp->mdt_hdrs.value.ul = statsp->port_stats.mdt_hdrs;
 		nxgekp->mdt_plds.value.ul = statsp->port_stats.mdt_plds;
 		nxgekp->mdt_hdr_bind_fail.value.ul =
-			statsp->port_stats.mdt_hdr_bind_fail;
+		    statsp->port_stats.mdt_hdr_bind_fail;
 		nxgekp->mdt_pld_bind_fail.value.ul =
-			statsp->port_stats.mdt_pld_bind_fail;
+		    statsp->port_stats.mdt_pld_bind_fail;
 #endif
 #ifdef ACCEPT_JUMBO
 		nxgekp->tx_jumbo_pkts.value.ul =
-			statsp->port_stats.tx_jumbo_pkts;
+		    statsp->port_stats.tx_jumbo_pkts;
 #endif
 #ifdef TX_MBLK_DEST
 		nxgekp->tx_1_desc.value.ul = statsp->port_stats.tx_1_desc;
@@ -1880,14 +1880,14 @@ nxge_port_kstat_update(kstat_t *ksp, int rw)
 		nxgekp->tx_7_desc.value.ul = statsp->port_stats.tx_7_desc;
 		nxgekp->tx_8_desc.value.ul = statsp->port_stats.tx_8_desc;
 		nxgekp->tx_max_desc.value.ul =
-			statsp->port_stats.tx_max_desc;
+		    statsp->port_stats.tx_max_desc;
 #endif
 		/*
 		 * Rx Statistics.
 		 */
 #ifdef ACCEPT_JUMBO
 		nxgekp->rx_jumbo_pkts.value.ul =
-			statsp->port_stats.rx_jumbo_pkts;
+		    statsp->port_stats.rx_jumbo_pkts;
 #endif
 		if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
 			(void) nxge_xmac_stat_update(ksp, KSTAT_READ);
@@ -1937,52 +1937,52 @@ nxge_save_cntrs(p_nxge_t nxgep)
 		 */
 		XMAC_REG_RD(handle, portn, XRXMAC_CRC_ER_CNT_REG, &val);
 		statsp->xmac_stats.rx_crc_err_cnt +=
-			(val & XRXMAC_CRC_ER_CNT_MASK);
+		    (val & XRXMAC_CRC_ER_CNT_MASK);
 
 		XMAC_REG_RD(handle, portn, XRXMAC_MPSZER_CNT_REG, &val);
 		statsp->xmac_stats.rx_len_err_cnt +=
-			(val & XRXMAC_MPSZER_CNT_MASK);
+		    (val & XRXMAC_MPSZER_CNT_MASK);
 
 		XMAC_REG_RD(handle, portn, XRXMAC_CD_VIO_CNT_REG, &val);
 		statsp->xmac_stats.rx_viol_err_cnt +=
-			(val & XRXMAC_CD_VIO_CNT_MASK);
+		    (val & XRXMAC_CD_VIO_CNT_MASK);
 
 		XMAC_REG_RD(handle, portn, XRXMAC_BT_CNT_REG, &val);
 		statsp->xmac_stats.rx_byte_cnt += (val & XRXMAC_BT_CNT_MASK);
 
 		XMAC_REG_RD(handle, portn, XRXMAC_HIST_CNT1_REG, &val);
 		statsp->xmac_stats.rx_hist1_cnt +=
-			(val & XRXMAC_HIST_CNT1_MASK);
+		    (val & XRXMAC_HIST_CNT1_MASK);
 		statsp->xmac_stats.rx_frame_cnt +=
 		    (val & XRXMAC_HIST_CNT1_MASK);
 
 		XMAC_REG_RD(handle, portn, XRXMAC_HIST_CNT2_REG, &val);
 		statsp->xmac_stats.rx_hist2_cnt +=
-			(val & XRXMAC_HIST_CNT2_MASK);
+		    (val & XRXMAC_HIST_CNT2_MASK);
 		statsp->xmac_stats.rx_frame_cnt +=
 		    (val & XRXMAC_HIST_CNT2_MASK);
 
 		XMAC_REG_RD(handle, portn, XRXMAC_HIST_CNT3_REG, &val);
 		statsp->xmac_stats.rx_hist3_cnt +=
-			(val & XRXMAC_HIST_CNT3_MASK);
+		    (val & XRXMAC_HIST_CNT3_MASK);
 		statsp->xmac_stats.rx_frame_cnt +=
 		    (val & XRXMAC_HIST_CNT3_MASK);
 
 		XMAC_REG_RD(handle, portn, XRXMAC_HIST_CNT4_REG, &val);
 		statsp->xmac_stats.rx_hist4_cnt +=
-			(val & XRXMAC_HIST_CNT4_MASK);
+		    (val & XRXMAC_HIST_CNT4_MASK);
 		statsp->xmac_stats.rx_frame_cnt +=
 		    (val & XRXMAC_HIST_CNT4_MASK);
 
 		XMAC_REG_RD(handle, portn, XRXMAC_HIST_CNT5_REG, &val);
 		statsp->xmac_stats.rx_hist5_cnt +=
-			(val & XRXMAC_HIST_CNT5_MASK);
+		    (val & XRXMAC_HIST_CNT5_MASK);
 		statsp->xmac_stats.rx_frame_cnt +=
 		    (val & XRXMAC_HIST_CNT5_MASK);
 
 		XMAC_REG_RD(handle, portn, XRXMAC_HIST_CNT6_REG, &val);
 		statsp->xmac_stats.rx_hist6_cnt +=
-			(val & XRXMAC_HIST_CNT6_MASK);
+		    (val & XRXMAC_HIST_CNT6_MASK);
 		statsp->xmac_stats.rx_frame_cnt +=
 		    (val & XRXMAC_HIST_CNT6_MASK);
 
@@ -1994,43 +1994,43 @@ nxge_save_cntrs(p_nxge_t nxgep)
 
 		XMAC_REG_RD(handle, portn, XRXMAC_BC_FRM_CNT_REG, &val);
 		statsp->xmac_stats.rx_broadcast_cnt +=
-			(val & XRXMAC_BC_FRM_CNT_MASK);
+		    (val & XRXMAC_BC_FRM_CNT_MASK);
 
 		XMAC_REG_RD(handle, portn, XRXMAC_MC_FRM_CNT_REG, &val);
 		statsp->xmac_stats.rx_mult_cnt +=
-			(val & XRXMAC_MC_FRM_CNT_MASK);
+		    (val & XRXMAC_MC_FRM_CNT_MASK);
 
 		XMAC_REG_RD(handle, portn, XRXMAC_FRAG_CNT_REG, &val);
 		statsp->xmac_stats.rx_frag_cnt += (val & XRXMAC_FRAG_CNT_MASK);
 
 		XMAC_REG_RD(handle, portn, XRXMAC_AL_ER_CNT_REG, &val);
 		statsp->xmac_stats.rx_frame_align_err_cnt +=
-			(val & XRXMAC_AL_ER_CNT_MASK);
+		    (val & XRXMAC_AL_ER_CNT_MASK);
 
 		XMAC_REG_RD(handle, portn, XMAC_LINK_FLT_CNT_REG, &val);
 		statsp->xmac_stats.rx_linkfault_err_cnt +=
-			(val & XMAC_LINK_FLT_CNT_MASK);
+		    (val & XMAC_LINK_FLT_CNT_MASK);
 
 		(void) npi_xmac_xpcs_read(handle, portn,
-			XPCS_REG_DESCWERR_COUNTER, &cnt32);
+		    XPCS_REG_DESCWERR_COUNTER, &cnt32);
 		statsp->xmac_stats.xpcs_deskew_err_cnt +=
-			(val & XMAC_XPCS_DESKEW_ERR_CNT_MASK);
+		    (val & XMAC_XPCS_DESKEW_ERR_CNT_MASK);
 
 #ifdef	NXGE_DEBUG_SYMBOL_ERR
 		(void) npi_xmac_xpcs_read(handle, portn,
-			XPCS_REG_SYMBOL_ERR_L0_1_COUNTER, &cnt32);
+		    XPCS_REG_SYMBOL_ERR_L0_1_COUNTER, &cnt32);
 		statsp->xmac_stats.xpcs_ln0_symbol_err_cnt +=
-			(cnt32 & XMAC_XPCS_SYM_ERR_CNT_L0_MASK);
+		    (cnt32 & XMAC_XPCS_SYM_ERR_CNT_L0_MASK);
 		statsp->xmac_stats.xpcs_ln1_symbol_err_cnt +=
-			((cnt32 & XMAC_XPCS_SYM_ERR_CNT_L1_MASK) >>
-			XMAC_XPCS_SYM_ERR_CNT_L1_SHIFT);
+		    ((cnt32 & XMAC_XPCS_SYM_ERR_CNT_L1_MASK) >>
+		    XMAC_XPCS_SYM_ERR_CNT_L1_SHIFT);
 		(void) npi_xmac_xpcs_read(handle, portn,
-			XPCS_REG_SYMBOL_ERR_L2_3_COUNTER, &cnt32);
+		    XPCS_REG_SYMBOL_ERR_L2_3_COUNTER, &cnt32);
 		statsp->xmac_stats.xpcs_ln2_symbol_err_cnt +=
-			(cnt32 & XMAC_XPCS_SYM_ERR_CNT_L2_MASK);
+		    (cnt32 & XMAC_XPCS_SYM_ERR_CNT_L2_MASK);
 		statsp->xmac_stats.xpcs_ln3_symbol_err_cnt +=
-			((cnt32 & XMAC_XPCS_SYM_ERR_CNT_L3_MASK) >>
-			XMAC_XPCS_SYM_ERR_CNT_L3_SHIFT);
+		    ((cnt32 & XMAC_XPCS_SYM_ERR_CNT_L3_MASK) >>
+		    XMAC_XPCS_SYM_ERR_CNT_L3_SHIFT);
 #endif
 	} else if (nxgep->mac.porttype == PORT_TYPE_BMAC) {
 		/*
@@ -2061,25 +2061,25 @@ nxge_save_cntrs(p_nxge_t nxgep)
 
 		BMAC_REG_RD(handle, portn, BMAC_AL_ER_CNT_REG, &val);
 		statsp->bmac_stats.rx_align_err_cnt +=
-			(val & BMAC_AL_ER_CNT_MASK);
+		    (val & BMAC_AL_ER_CNT_MASK);
 		/* Clear register as it is not auto clear on read */
 		BMAC_REG_WR(handle, portn, BMAC_AL_ER_CNT_REG, 0);
 
 		BMAC_REG_RD(handle, portn, MAC_LEN_ER_CNT_REG, &val);
 		statsp->bmac_stats.rx_len_err_cnt +=
-			(val & MAC_LEN_ER_CNT_MASK);
+		    (val & MAC_LEN_ER_CNT_MASK);
 		/* Clear register as it is not auto clear on read */
 		BMAC_REG_WR(handle, portn, MAC_LEN_ER_CNT_REG, 0);
 
 		BMAC_REG_RD(handle, portn, BMAC_CRC_ER_CNT_REG, &val);
 		statsp->bmac_stats.rx_crc_err_cnt +=
-			(val & BMAC_CRC_ER_CNT_MASK);
+		    (val & BMAC_CRC_ER_CNT_MASK);
 		/* Clear register as it is not auto clear on read */
 		BMAC_REG_WR(handle, portn, BMAC_CRC_ER_CNT_REG, 0);
 
 		BMAC_REG_RD(handle, portn, BMAC_CD_VIO_CNT_REG, &val);
 		statsp->bmac_stats.rx_viol_err_cnt +=
-			(val & BMAC_CD_VIO_CNT_MASK);
+		    (val & BMAC_CD_VIO_CNT_MASK);
 		/* Clear register as it is not auto clear on read */
 		BMAC_REG_WR(handle, portn, BMAC_CD_VIO_CNT_REG, 0);
 	}
@@ -2314,12 +2314,12 @@ nxge_m_stat(void *arg, uint_t stat, uint64_t *value)
 	case ETHER_STAT_MACXMT_ERRORS:
 		if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
 			val = statsp->xmac_stats.tx_underflow_err +
-				statsp->xmac_stats.tx_maxpktsize_err +
-				statsp->xmac_stats.tx_overflow_err +
-				statsp->xmac_stats.tx_fifo_xfr_err;
+			    statsp->xmac_stats.tx_maxpktsize_err +
+			    statsp->xmac_stats.tx_overflow_err +
+			    statsp->xmac_stats.tx_fifo_xfr_err;
 		} else {
 			val = statsp->bmac_stats.tx_underrun_err +
-				statsp->bmac_stats.tx_max_pkt_err;
+			    statsp->bmac_stats.tx_max_pkt_err;
 		}
 		break;
 
@@ -2328,18 +2328,18 @@ nxge_m_stat(void *arg, uint_t stat, uint64_t *value)
 			val = statsp->xmac_stats.rx_linkfault_err_cnt;
 		} else {
 			val = statsp->mac_stats.xcvr_inits +
-				statsp->mac_stats.serdes_inits;
+			    statsp->mac_stats.serdes_inits;
 		}
 		break;
 
 	case ETHER_STAT_TOOLONG_ERRORS:
 		if (nxgep->mac.porttype == PORT_TYPE_XMAC) {
 			val = statsp->xmac_stats.tx_maxpktsize_err +
-				statsp->xmac_stats.rx_len_err_cnt;
+			    statsp->xmac_stats.rx_len_err_cnt;
 
 		} else {
 			val = statsp->bmac_stats.rx_len_err_cnt +
-				statsp->bmac_stats.tx_max_pkt_err;
+			    statsp->bmac_stats.tx_max_pkt_err;
 		}
 		break;
 
@@ -2486,8 +2486,8 @@ nxge_m_stat(void *arg, uint_t stat, uint64_t *value)
 		 */
 #ifdef NXGE_DEBUG
 		NXGE_ERROR_MSG((nxgep, KST_CTL,
-			"nxge_m_stat: unrecognized parameter value = 0x%x",
-			stat));
+		    "nxge_m_stat: unrecognized parameter value = 0x%x",
+		    stat));
 #endif
 
 		return (ENOTSUP);
