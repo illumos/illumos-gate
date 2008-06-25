@@ -980,7 +980,7 @@ zpool_find_import_activeok(libzfs_handle_t *hdl, int argc, char **argv)
  */
 nvlist_t *
 zpool_find_import_cached(libzfs_handle_t *hdl, const char *cachefile,
-    boolean_t active_ok, char *poolname, uint64_t guid)
+    char *poolname, uint64_t guid)
 {
 	char *buf;
 	int fd;
@@ -1063,40 +1063,29 @@ zpool_find_import_cached(libzfs_handle_t *hdl, const char *cachefile,
 				continue;
 		}
 
-		if (!active_ok) {
-			if (pool_active(hdl, name, this_guid, &active) != 0) {
-				nvlist_free(raw);
-				nvlist_free(pools);
-				return (NULL);
-			}
-
-			if (active)
-				continue;
-
-			if ((dst = refresh_config(hdl, src)) == NULL) {
-				nvlist_free(raw);
-				nvlist_free(pools);
-				return (NULL);
-			}
-
-			if (nvlist_add_nvlist(pools, nvpair_name(elem), dst)
-			    != 0) {
-				(void) no_memory(hdl);
-				nvlist_free(dst);
-				nvlist_free(raw);
-				nvlist_free(pools);
-				return (NULL);
-			}
-			nvlist_free(dst);
-		} else {
-			if (nvlist_add_nvlist(pools, nvpair_name(elem), src)
-			    != 0) {
-				(void) no_memory(hdl);
-				nvlist_free(raw);
-				nvlist_free(pools);
-				return (NULL);
-			}
+		if (pool_active(hdl, name, this_guid, &active) != 0) {
+			nvlist_free(raw);
+			nvlist_free(pools);
+			return (NULL);
 		}
+
+		if (active)
+			continue;
+
+		if ((dst = refresh_config(hdl, src)) == NULL) {
+			nvlist_free(raw);
+			nvlist_free(pools);
+			return (NULL);
+		}
+
+		if (nvlist_add_nvlist(pools, nvpair_name(elem), dst) != 0) {
+			(void) no_memory(hdl);
+			nvlist_free(dst);
+			nvlist_free(raw);
+			nvlist_free(pools);
+			return (NULL);
+		}
+		nvlist_free(dst);
 	}
 
 	nvlist_free(raw);

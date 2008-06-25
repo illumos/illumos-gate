@@ -2315,21 +2315,16 @@ pool_match(nvlist_t *config, char *tgt)
 }
 
 static int
-find_exported_zpool(char *pool_id, nvlist_t **configp, char *vdev_dir,
-    char *cachefile)
+find_exported_zpool(char *pool_id, nvlist_t **configp, char *vdev_dir)
 {
 	nvlist_t *pools;
 	int error = ENOENT;
 	nvlist_t *match = NULL;
 
-	if (vdev_dir != NULL) {
+	if (vdev_dir != NULL)
 		pools = zpool_find_import_activeok(g_zfs, 1, &vdev_dir);
-	} else if (cachefile != NULL) {
-		pools = zpool_find_import_cached(g_zfs, cachefile, B_TRUE,
-		    NULL, 0);
-	} else {
+	else
 		pools = zpool_find_import_activeok(g_zfs, 0, NULL);
-	}
 
 	if (pools != NULL) {
 		nvpair_t *elem = NULL;
@@ -2368,7 +2363,6 @@ main(int argc, char **argv)
 	int flag, set;
 	int exported = 0;
 	char *vdev_dir = NULL;
-	char *cachefile = NULL;
 
 	(void) setrlimit(RLIMIT_NOFILE, &rl);
 	(void) enable_extended_FILE_stdio(-1, -1);
@@ -2436,7 +2430,7 @@ main(int argc, char **argv)
 			verbose++;
 			break;
 		case 'U':
-			cachefile = optarg;
+			spa_config_path = optarg;
 			break;
 		case 'e':
 			exported = 1;
@@ -2493,10 +2487,7 @@ main(int argc, char **argv)
 
 	if (argc < 1) {
 		if (dump_opt['C']) {
-			if (cachefile != NULL)
-				dump_cachefile(cachefile);
-			else
-				dump_config(NULL);
+			dump_cachefile(spa_config_path);
 			return (0);
 		}
 		usage();
@@ -2532,7 +2523,7 @@ main(int argc, char **argv)
 		dump_config(argv[0]);
 
 	error = 0;
-	if (exported || cachefile != NULL) {
+	if (exported) {
 		/*
 		 * Check to see if the name refers to an exported zpool
 		 */
@@ -2542,8 +2533,7 @@ main(int argc, char **argv)
 		if ((slash = strchr(argv[0], '/')) != NULL)
 			*slash = '\0';
 
-		error = find_exported_zpool(argv[0], &exported_conf, vdev_dir,
-		    cachefile);
+		error = find_exported_zpool(argv[0], &exported_conf, vdev_dir);
 		if (error == 0) {
 			nvlist_t *nvl = NULL;
 
