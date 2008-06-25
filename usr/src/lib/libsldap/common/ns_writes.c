@@ -3423,7 +3423,7 @@ __s_cvt_tnrhtp(const void *data, char **rdn,
 	/* Convert the structure */
 	ptr = (tsol_tpstr_t *)data;
 
-	if ((ptr->template == NULL) || (strlen(ptr->template) <= 1)) {
+	if (ptr->template == NULL || *ptr->template == '\0') {
 		__ns_ldap_freeEntry(e);
 		*entry = NULL;
 		return (NS_LDAP_INVALID_PARAM);
@@ -3484,8 +3484,8 @@ __s_cvt_tnrhdb(const void *data, char **rdn,
 	/* Convert the structure */
 	ptr = (tsol_rhstr_t *)data;
 
-	if ((ptr->address == NULL) || (strlen(ptr->address) <= 1) ||
-	    (ptr->template == NULL) || (strlen(ptr->template) <= 1)) {
+	if (ptr->address == NULL || *ptr->address == '\0' ||
+	    ptr->template == NULL || *ptr->template == '\0') {
 		__ns_ldap_freeEntry(e);
 		*entry = NULL;
 		return (NS_LDAP_INVALID_PARAM);
