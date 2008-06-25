@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -377,8 +377,11 @@ pelton_hw_rev_callback(picl_nodehdl_t pcih, void *args)
 		else
 			log_printf("%39s", device_path);
 		/* Print Compatible # */
-		log_printf("%31s", compatible);
-		free(compatible);
+		if (err == PICL_SUCCESS) {
+			log_printf("%31s", compatible);
+			free(compatible);
+		} else
+			log_printf("%31s", " ");
 		/* Print Revision */
 		log_printf("%6d", revision);
 		log_printf("\n");

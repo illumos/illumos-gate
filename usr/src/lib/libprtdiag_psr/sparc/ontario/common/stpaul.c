@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -352,8 +352,11 @@ stpaul_hw_rev_callback(picl_nodehdl_t pcih, void *args)
 		else
 			log_printf("%39s", device_path);
 		/* Print Compatible # */
-		log_printf("%31s", compatible);
-		free(compatible);
+		if (err == PICL_SUCCESS) {
+			log_printf("%31s", compatible);
+			free(compatible);
+		} else
+			log_printf("%31s", " ");
 		/* Print Revision */
 		log_printf("%6d", revision);
 		log_printf("\n");
@@ -408,10 +411,10 @@ static int
 stpaul_get_network_instance(char *path)
 {
 	if (strncmp(path, SPL_NETWORK_1_PATH,
-		strlen(SPL_NETWORK_1_PATH)) == 0)
+	    strlen(SPL_NETWORK_1_PATH)) == 0)
 		return (1);
 	else if (strncmp(path, SPL_NETWORK_0_PATH,
-		    strlen(SPL_NETWORK_0_PATH)) == 0)
+	    strlen(SPL_NETWORK_0_PATH)) == 0)
 		return (0);
 	else
 		return (-1);
@@ -464,7 +467,7 @@ stpaul_get_first_compatible_value(picl_nodehdl_t nodeh, char **outbuf)
 	err = picl_get_propinfo_by_name(nodeh, OBP_PROP_COMPATIBLE,
 	    &pinfo, &proph);
 	if (err != PICL_SUCCESS)
-	    return (err);
+		return (err);
 
 	if (pinfo.type == PICL_PTYPE_CHARSTRING) {
 		pval = malloc(pinfo.size);
@@ -493,7 +496,7 @@ stpaul_get_first_compatible_value(picl_nodehdl_t nodeh, char **outbuf)
 
 	err = picl_get_propinfo(rowproph, &pinfo);
 	if (err != PICL_SUCCESS)
-	    return (err);
+		return (err);
 
 	pval = malloc(pinfo.size);
 	if (pval == NULL)
@@ -530,8 +533,8 @@ stpaul_get_int_propval(picl_nodehdl_t modh, char *prop_name, int *ret)
 	 * If it is not an int, uint or byte array prop, return failure
 	 */
 	if ((pinfo.type != PICL_PTYPE_INT) &&
-		(pinfo.type != PICL_PTYPE_UNSIGNED_INT) &&
-		(pinfo.type != PICL_PTYPE_BYTEARRAY)) {
+	    (pinfo.type != PICL_PTYPE_UNSIGNED_INT) &&
+	    (pinfo.type != PICL_PTYPE_BYTEARRAY)) {
 		*ret = PICL_FAILURE;
 		return (0);
 	}

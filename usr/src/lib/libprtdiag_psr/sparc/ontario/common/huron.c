@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,27 +77,27 @@ huron_get_slot_number(char *path, struct io_card *card)
 		(void) strcpy(card->slot_str, "1");
 		card->slot = 1;
 	} else if (strncmp(path, HURON_PCIE_SLOT0,
-		strlen(HURON_PCIE_SLOT0)) == 0) {
+	    strlen(HURON_PCIE_SLOT0)) == 0) {
 		(void) strcpy(card->slot_str, "0");
 		card->slot = 0;
 	} else if (strncmp(path, HURON_PCIE_SLOT1,
-		strlen(HURON_PCIE_SLOT1)) == 0) {
+	    strlen(HURON_PCIE_SLOT1)) == 0) {
 		(void) strcpy(card->slot_str, "1");
 		card->slot = 1;
 	} else if (strncmp(path, HURON_PCIE_SLOT2,
-		strlen(HURON_PCIE_SLOT2)) == 0) {
+	    strlen(HURON_PCIE_SLOT2)) == 0) {
 		(void) strcpy(card->slot_str, "2");
 		card->slot = 2;
 	} else if (strncmp(path, HURON_PCIE_SLOT3,
-		strlen(HURON_PCIE_SLOT3)) == 0) {
+	    strlen(HURON_PCIE_SLOT3)) == 0) {
 		(void) strcpy(card->slot_str, "3");
 		card->slot = 3;
 	} else if (strncmp(path, HURON_PCIE_SLOT4,
-		strlen(HURON_PCIE_SLOT4)) == 0) {
+	    strlen(HURON_PCIE_SLOT4)) == 0) {
 		(void) strcpy(card->slot_str, "4");
 		card->slot = 4;
 	} else if (strncmp(path, HURON_PCIE_SLOT5,
-		strlen(HURON_PCIE_SLOT5)) == 0) {
+	    strlen(HURON_PCIE_SLOT5)) == 0) {
 		(void) strcpy(card->slot_str, "5");
 		card->slot = 5;
 	} else {
@@ -310,7 +310,7 @@ huron_hw_rev_callback(picl_nodehdl_t pcih, void *args)
 	    (strcmp(path, HURON_NETWORK_1) == 0)) {
 		device_found = 1;
 		(void) snprintf(NAC, sizeof (NAC), "%s/%s%d",
-			MOTHERBOARD, OPHIR, 0);
+		    MOTHERBOARD, OPHIR, 0);
 		revision = huron_get_int_propval(pcih, OBP_PROP_REVISION_ID,
 		    &err);
 	}
@@ -319,7 +319,7 @@ huron_hw_rev_callback(picl_nodehdl_t pcih, void *args)
 	    (strcmp(path, HURON_NETWORK_3) == 0)) {
 		device_found = 1;
 		(void) snprintf(NAC, sizeof (NAC), "%s/%s%d", MOTHERBOARD,
-			OPHIR, 1);
+		    OPHIR, 1);
 		revision = huron_get_int_propval(pcih, OBP_PROP_REVISION_ID,
 		    &err);
 	}
@@ -327,7 +327,7 @@ huron_hw_rev_callback(picl_nodehdl_t pcih, void *args)
 	if (strcmp(path, HURON_SWITCH_A_PATH) == 0) {
 		device_found = 1;
 		(void) snprintf(NAC, sizeof (NAC), "%s/%s",
-			MOTHERBOARD, HURON_SWITCH_A);
+		    MOTHERBOARD, HURON_SWITCH_A);
 		revision = huron_get_int_propval(pcih, OBP_PROP_REVISION_ID,
 		    &err);
 	}
@@ -335,7 +335,7 @@ huron_hw_rev_callback(picl_nodehdl_t pcih, void *args)
 	if (strcmp(path, HURON_SWITCH_B_PATH) == 0) {
 		device_found = 1;
 		(void) snprintf(NAC, sizeof (NAC), "%s/%s", MOTHERBOARD,
-			HURON_SWITCH_B);
+		    HURON_SWITCH_B);
 		revision = huron_get_int_propval(pcih, OBP_PROP_REVISION_ID,
 		    &err);
 	}
@@ -343,7 +343,7 @@ huron_hw_rev_callback(picl_nodehdl_t pcih, void *args)
 	if (strcmp(path, HURON_SWITCH_C_PATH) == 0) {
 		device_found = 1;
 		(void) snprintf(NAC, sizeof (NAC), "%s/%s", MOTHERBOARD,
-			HURON_SWITCH_C);
+		    HURON_SWITCH_C);
 		revision = huron_get_int_propval(pcih, OBP_PROP_REVISION_ID,
 		    &err);
 	}
@@ -367,8 +367,11 @@ huron_hw_rev_callback(picl_nodehdl_t pcih, void *args)
 		else
 			log_printf("%46s", device_path);
 		/* Print Compatible # */
-		log_printf("%31s", compatible);
-		free(compatible);
+		if (err == PICL_SUCCESS) {
+			log_printf("%31s", compatible);
+			free(compatible);
+		} else
+			log_printf("%31s", " ");
 		/* Print Revision */
 		log_printf("%6d", revision);
 		log_printf("\n");
@@ -393,7 +396,7 @@ huron_get_first_compatible_value(picl_nodehdl_t nodeh, char **outbuf)
 	err = picl_get_propinfo_by_name(nodeh, OBP_PROP_COMPATIBLE,
 	    &pinfo, &proph);
 	if (err != PICL_SUCCESS)
-	    return (err);
+		return (err);
 
 	if (pinfo.type == PICL_PTYPE_CHARSTRING) {
 		pval = malloc(pinfo.size);
@@ -422,7 +425,7 @@ huron_get_first_compatible_value(picl_nodehdl_t nodeh, char **outbuf)
 
 	err = picl_get_propinfo(rowproph, &pinfo);
 	if (err != PICL_SUCCESS)
-	    return (err);
+		return (err);
 
 	pval = malloc(pinfo.size);
 	if (pval == NULL)
@@ -459,8 +462,8 @@ huron_get_int_propval(picl_nodehdl_t modh, char *prop_name, int *ret)
 	 * If it is not an int, uint or byte array prop, return failure
 	 */
 	if ((pinfo.type != PICL_PTYPE_INT) &&
-		(pinfo.type != PICL_PTYPE_UNSIGNED_INT) &&
-		(pinfo.type != PICL_PTYPE_BYTEARRAY)) {
+	    (pinfo.type != PICL_PTYPE_UNSIGNED_INT) &&
+	    (pinfo.type != PICL_PTYPE_BYTEARRAY)) {
 		*ret = PICL_FAILURE;
 		return (0);
 	}
