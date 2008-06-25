@@ -1746,16 +1746,20 @@ vdev_clear(spa_t *spa, vdev_t *vd, boolean_t reopen_wanted)
 		vdev_clear(spa, vd->vdev_child[c], reopen_wanted);
 
 	/*
-	 * If we're in the FAULTED state, then clear the persistent state and
-	 * attempt to reopen the device.  We also mark the vdev config dirty, so
-	 * that the new faulted state is written out to disk.
+	 * If we're in the FAULTED state or have experienced failed I/O, then
+	 * clear the persistent state and attempt to reopen the device.  We
+	 * also mark the vdev config dirty, so that the new faulted state is
+	 * written out to disk.
 	 */
-	if (reopen_wanted && (vd->vdev_faulted || vd->vdev_degraded)) {
+	if (reopen_wanted && (vd->vdev_faulted || vd->vdev_degraded ||
+	    vd->vdev_stat.vs_aux == VDEV_AUX_IO_FAILURE)) {
+		boolean_t resilver = (vd->vdev_faulted || vd->vdev_degraded);
+
 		vd->vdev_faulted = vd->vdev_degraded = 0;
 		vdev_reopen(vd);
 		vdev_config_dirty(vd->vdev_top);
 
-		if (vd->vdev_faulted && vd->vdev_aux == NULL)
+		if (resilver && vd->vdev_aux == NULL && !vdev_is_dead(vd))
 			spa_async_request(spa, SPA_ASYNC_RESILVER);
 
 		spa_event_notify(spa, vd, ESC_ZFS_VDEV_CLEAR);

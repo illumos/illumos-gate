@@ -3094,7 +3094,7 @@ status_callback(zpool_handle_t *zhp, void *data)
 	case ZPOOL_STATUS_IO_FAILURE_WAIT:
 	case ZPOOL_STATUS_IO_FAILURE_CONTINUE:
 		(void) printf(gettext("status: One or more devices are "
-		    "faultd in response to IO failures.\n"));
+		    "faulted in response to IO failures.\n"));
 		(void) printf(gettext("action: Make sure the affected devices "
 		    "are connected, then run 'zpool clear'.\n"));
 		break;
