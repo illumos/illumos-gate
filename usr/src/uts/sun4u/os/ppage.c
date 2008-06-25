@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,9 +43,11 @@
 #include <vm/page.h>
 #include <vm/seg.h>
 #include <vm/seg_kmem.h>
+#include <vm/seg_kpm.h>
 #include <vm/hat_sfmmu.h>
 #include <sys/debug.h>
 #include <sys/cpu_module.h>
+#include <sys/mem_cage.h>
 
 /*
  * A quick way to generate a cache consistent address to map in a page.
@@ -190,8 +192,8 @@ ppmapin(page_t *pp, uint_t vprot, caddr_t hint)
 				if (casptr(&ppmap_vaddrs[index],
 				    va, NULL) == va) {
 					hat_memload(kas.a_hat, va, pp,
-						vprot | HAT_NOSYNC,
-						HAT_LOAD_LOCK);
+					    vprot | HAT_NOSYNC,
+					    HAT_LOAD_LOCK);
 					return (va);
 				}
 			}
@@ -369,8 +371,8 @@ ppcopy_common(page_t *fm_pp, page_t *to_pp)
 	label_t ljb;
 	int ret = 1;
 
-	ASSERT(PAGE_LOCKED(fm_pp));
-	ASSERT(PAGE_LOCKED(to_pp));
+	ASSERT(fm_pp != NULL && PAGE_LOCKED(fm_pp));
+	ASSERT(to_pp != NULL && PAGE_LOCKED(to_pp));
 
 	/*
 	 * If we can't use VIS block loads and stores we can't use
@@ -442,23 +444,51 @@ ppcopy(page_t *fm_pp, page_t *to_pp)
 	caddr_t fm_va, to_va;
 	label_t ljb;
 	int ret = 1;
+	boolean_t	use_kpm = B_FALSE;
 
 	/* Try the fast path first */
 	if (ppcopy_common(fm_pp, to_pp))
 		return (1);
 
-	/* Fast path failed, so we need to do the slow path. */
-	fm_va = ppmapin(fm_pp, PROT_READ, (caddr_t)-1);
-	to_va = ppmapin(to_pp, PROT_READ | PROT_WRITE, fm_va);
-	if (on_fault(&ljb)) {
-		ret = 0;
-		goto faulted;
+	/*
+	 * Try to map using KPM if enabled and we are the cageout thread.
+	 * If it fails, fall back to ppmapin/ppmaput
+	 */
+
+	if (kpm_enable) {
+		if (curthread == kcage_cageout_thread)
+			use_kpm = B_TRUE;
+	}
+
+	if (use_kpm) {
+		if ((fm_va = hat_kpm_mapin(fm_pp, NULL)) == NULL ||
+		    (to_va = hat_kpm_mapin(to_pp, NULL)) == NULL) {
+			if (fm_va != NULL)
+				hat_kpm_mapout(fm_pp, NULL, fm_va);
+			use_kpm = B_FALSE;
+		}
+	}
+
+	if (use_kpm == B_FALSE) {
+		/* do the slow path */
+		fm_va = ppmapin(fm_pp, PROT_READ, (caddr_t)-1);
+		to_va = ppmapin(to_pp, PROT_READ | PROT_WRITE, fm_va);
+		if (on_fault(&ljb)) {
+			ret = 0;
+			goto faulted;
+		}
 	}
 	bcopy(fm_va, to_va, PAGESIZE);
 	no_fault();
 faulted:
-	ppmapout(fm_va);
-	ppmapout(to_va);
+	/* unmap */
+	if (use_kpm == B_TRUE) {
+		hat_kpm_mapout(fm_pp, NULL, fm_va);
+		hat_kpm_mapout(to_pp, NULL, to_va);
+	} else {
+		ppmapout(fm_va);
+		ppmapout(to_va);
+	}
 	return (ret);
 }
 
