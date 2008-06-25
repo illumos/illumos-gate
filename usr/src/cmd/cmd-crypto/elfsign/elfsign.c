@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -454,7 +454,7 @@ setcertpath(void)
 		ret = EXIT_BAD_CERT;
 		break;
 	default:
-		es_error(gettext("unusable certificate: %d"), cmd_info.cert);
+		es_error(gettext("unusable certificate: %s"), cmd_info.cert);
 		if (cmd_info.cmd == ES_SIGN) {
 			ret = EXIT_SIGN_FAILED;
 		} else if (cmd_info.cmd == ES_VERIFY) {
