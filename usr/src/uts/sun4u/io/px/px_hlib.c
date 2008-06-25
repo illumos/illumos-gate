@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -221,7 +221,7 @@ jbc_init(caddr_t xbc_csr_base, pxu_t *pxu_p)
 	    (1 << JBC_FATAL_RESET_ENABLE_JTCEER_P_INT_EN);
 	CSR_XS(xbc_csr_base, JBC_FATAL_RESET_ENABLE, val);
 	DBG(DBG_CB, NULL, "jbc_init, JBC_FATAL_RESET_ENABLE: 0x%llx\n",
-		CSR_XR(xbc_csr_base, JBC_FATAL_RESET_ENABLE));
+	    CSR_XR(xbc_csr_base, JBC_FATAL_RESET_ENABLE));
 
 	/*
 	 * Enable merge, jbc and dmc interrupts.
@@ -1345,7 +1345,7 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * CSR_V LPU_TRANSMIT_PHY_STATUS Expect HW 0x0
 	 */
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_TRANSMIT_PHY_STATUS: 0x%llx\n",
-		CSR_XR(csr_base, LPU_TRANSMIT_PHY_STATUS));
+	    CSR_XR(csr_base, LPU_TRANSMIT_PHY_STATUS));
 
 	/*
 	 * CSR_V LPU_TRANSMIT_PHY_INTERRUPT_AND_STATUS_TEST Expect HW 0x0
@@ -1413,8 +1413,8 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 */
 	val = ((LPU_LTSSM_CONFIG4_DATA_RATE_DEFAULT <<
 	    LPU_LTSSM_CONFIG4_DATA_RATE) |
-		(LPU_LTSSM_CONFIG4_N_FTS_DEFAULT <<
-		LPU_LTSSM_CONFIG4_N_FTS));
+	    (LPU_LTSSM_CONFIG4_N_FTS_DEFAULT <<
+	    LPU_LTSSM_CONFIG4_N_FTS));
 	CSR_XS(csr_base, LPU_LTSSM_CONFIG4, val);
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_LTSSM_CONFIG4: 0x%llx\n",
 	    CSR_XR(csr_base, LPU_LTSSM_CONFIG4));
@@ -1736,7 +1736,7 @@ hvio_mmu_init(caddr_t csr_base, pxu_t *pxu_p)
 	obp_tsb_entries = mmu_tsb_entries(csr_base, pxu_p);
 
 	base_tte_addr = pxu_p->tsb_vaddr +
-		((pxu_p->tsb_size >> 3) - obp_tsb_entries);
+	    ((pxu_p->tsb_size >> 3) - obp_tsb_entries);
 
 	for (i = 0; i < obp_tsb_entries; i++) {
 		uint64_t tte = lddphys(obp_tsb_pa + i * 8);
@@ -1760,7 +1760,7 @@ hvio_mmu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * Write the most significant 30 bits of the TSB physical address
 	 * and the encoded TSB table size.
 	 */
-	for (i = 8; i && (pxu_p->tsb_size < (0x2000 << i)); i--);
+	for (i = 8; i && (pxu_p->tsb_size < (0x2000 << i)); i--) {}
 
 	val = (((((va_to_pa(pxu_p->tsb_vaddr)) >> 13) << 13) |
 	    ((MMU_PAGE_SHIFT == 13) ? 0 : 1) << 8) | i);
@@ -2366,13 +2366,13 @@ hvio_msi_init(devhandle_t dev_hdl, uint64_t addr32, uint64_t addr64)
 	/* PCI MEM 32 resources to perform 32 bit MSI transactions */
 	CSRA_FS((caddr_t)dev_hdl, MSI_32_BIT_ADDRESS, 0,
 	    ADDR, (uint64_t)addr32 >> MSI_32_BIT_ADDRESS_ADDR);
-	DBG(DBG_IB, NULL, "hvio_msiq_init: MSI_32_BIT_ADDRESS: 0x%llx\n",
+	DBG(DBG_IB, NULL, "hvio_msi_init: MSI_32_BIT_ADDRESS: 0x%llx\n",
 	    CSR_XR((caddr_t)dev_hdl, MSI_32_BIT_ADDRESS));
 
 	/* Reserve PCI MEM 64 resources to perform 64 bit MSI transactions */
 	CSRA_FS((caddr_t)dev_hdl, MSI_64_BIT_ADDRESS, 0,
 	    ADDR, (uint64_t)addr64 >> MSI_64_BIT_ADDRESS_ADDR);
-	DBG(DBG_IB, NULL, "hvio_msiq_init: MSI_64_BIT_ADDRESS: 0x%llx\n",
+	DBG(DBG_IB, NULL, "hvio_msi_init: MSI_64_BIT_ADDRESS: 0x%llx\n",
 	    CSR_XR((caddr_t)dev_hdl, MSI_64_BIT_ADDRESS));
 
 	return (H_EOK);
@@ -2657,7 +2657,7 @@ hvio_suspend(devhandle_t dev_hdl, pxu_t *pxu_p)
 			pxu_p->pec_config_state[i] =
 			    CSR_XR((caddr_t)dev_hdl,
 			    pec_config_state_regs[i].reg);
-		    }
+		}
 	}
 
 	/* Save the MMU configuration states */
@@ -2731,7 +2731,7 @@ hvio_resume(devhandle_t dev_hdl, devino_t devino, pxu_t *pxu_p)
 		    (pec_config_state_regs[i].chip == PX_CHIP_UNIDENTIFIED)) {
 			CSR_XS((caddr_t)dev_hdl, pec_config_state_regs[i].reg,
 			    pxu_p->pec_config_state[i]);
-		    }
+		}
 	}
 
 	/* Enable PCI-E interrupt */
@@ -3012,7 +3012,7 @@ oberon_hp_pwron(caddr_t csr_base)
 	/* Check HP Capable */
 	if (!CSR_BR(csr_base, TLU_SLOT_CAPABILITIES, HP)) {
 		DBG(DBG_HP, NULL, "oberon_hp_pwron fails: leaf not "
-			"hotplugable\n");
+		    "hotplugable\n");
 		goto fail;
 	}
 
@@ -3057,10 +3057,10 @@ oberon_hp_pwron(caddr_t csr_base)
 	link_retry = B_FALSE;
 
 	for (loop = 0; (loop < link_retry_count) && (link_up == B_FALSE);
-		loop++) {
+	    loop++) {
 		if (link_retry == B_TRUE) {
 			DBG(DBG_HP, NULL, "oberon_hp_pwron : retry link loop "
-				"%d\n", loop);
+			    "%d\n", loop);
 			CSR_BS(csr_base, TLU_CONTROL, DRN_TR_DIS);
 			CSR_XS(csr_base, FLP_PORT_CONTROL, 0x1);
 			delay(drv_usectohz(10000));
@@ -3085,6 +3085,7 @@ oberon_hp_pwron(caddr_t csr_base)
 		CSR_XS(csr_base, FLP_PORT_CONTROL, 0x20);
 
 		/* wait for the link up */
+		/* BEGIN CSTYLED */
 		for (i = 0; (i < 2) && (link_up == B_FALSE); i++) {
 			delay(drv_usectohz(link_status_check));
 			reg = CSR_XR(csr_base, DLU_LINK_LAYER_STATUS);
@@ -3101,6 +3102,7 @@ oberon_hp_pwron(caddr_t csr_base)
 		    } else
 			link_retry = B_TRUE;
 		}
+		/* END CSTYLED */
 	}
 
 	if (link_up == B_FALSE) {
@@ -3392,9 +3394,9 @@ hvio_hotplug_init(dev_info_t *dip, void *arg)
 
 		/* For empty or disconnected slot, disable LUP/LDN */
 		if (!CSR_BR((caddr_t)pxu_p->px_address[PX_REG_CSR],
-			TLU_SLOT_STATUS, PSD) ||
+		    TLU_SLOT_STATUS, PSD) ||
 		    !CSR_BR((caddr_t)pxu_p->px_address[PX_REG_CSR],
-			HOTPLUG_CONTROL, PWREN)) {
+		    HOTPLUG_CONTROL, PWREN)) {
 
 			reg = CSR_XR((caddr_t)pxu_p->px_address[PX_REG_CSR],
 			    TLU_OTHER_EVENT_LOG_ENABLE);
