@@ -1666,11 +1666,11 @@ vdc_init_attr_negotiation(vdc_t *vdc)
 	status = vdc_send(vdc, (caddr_t)&pkt, &msglen);
 	DMSG(vdc, 0, "Attr info sent (status = %d)\n", status);
 
-	if ((status != 0) || (msglen != sizeof (vio_ver_msg_t))) {
+	if ((status != 0) || (msglen != sizeof (vd_attr_msg_t))) {
 		DMSG(vdc, 0, "[%d] Failed to send Attr negotiation info: "
 		    "id(%lx) rv(%d) size(%ld)", vdc->instance,
 		    vdc->curr_server->ldc_handle, status, msglen);
-		if (msglen != sizeof (vio_ver_msg_t))
+		if (msglen != sizeof (vd_attr_msg_t))
 			status = ENOMSG;
 	}
 
