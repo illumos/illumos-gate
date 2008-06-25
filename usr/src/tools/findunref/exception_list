@@ -218,14 +218,6 @@
 ./src/cmd/vscan/vscand/vscan.d
 
 #
-# Ignore files only used by lint.  Eventually, linting in these areas should
-# be tied into nightly, at which point these exceptions should be removed.
-#
-./src/cmd/sgs/*/*/lintsup.c
-./src/cmd/sgs/lib*/common/llib-*
-./src/cmd/sgs/sgsdemangler/common/llib-ldemangle
-
-#
 # Ignore sample source code.
 #
 ./src/cmd/sendmail/libmilter/example.c
