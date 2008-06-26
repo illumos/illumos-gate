@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -221,6 +221,32 @@ kidmap_cache_delete(idmap_cache_t *cache)
 	}
 	avl_destroy(&cache->sidbygid.tree);
 	mutex_destroy(&cache->sidbygid.mutex);
+}
+
+
+void
+kidmap_cache_get_data(idmap_cache_t *cache, size_t *uidbysid, size_t *gidbysid,
+	size_t *pidbysid, size_t *sidbyuid, size_t *sidbygid)
+{
+	mutex_enter(&cache->uidbysid.mutex);
+	*uidbysid = avl_numnodes(&cache->uidbysid.tree);
+	mutex_exit(&cache->uidbysid.mutex);
+
+	mutex_enter(&cache->gidbysid.mutex);
+	*gidbysid = avl_numnodes(&cache->gidbysid.tree);
+	mutex_exit(&cache->gidbysid.mutex);
+
+	mutex_enter(&cache->pidbysid.mutex);
+	*pidbysid = avl_numnodes(&cache->pidbysid.tree);
+	mutex_exit(&cache->pidbysid.mutex);
+
+	mutex_enter(&cache->sidbyuid.mutex);
+	*sidbyuid = avl_numnodes(&cache->sidbyuid.tree);
+	mutex_exit(&cache->sidbyuid.mutex);
+
+	mutex_enter(&cache->sidbygid.mutex);
+	*sidbygid = avl_numnodes(&cache->sidbygid.tree);
+	mutex_exit(&cache->sidbygid.mutex);
 }
 
 
@@ -670,6 +696,7 @@ kidmap_cache_purge_avl(idmap_avl_cache_t *cache)
 		if (curr->ttl < now) {
 			/* Old entry to remove */
 			avl_remove(&cache->tree, curr);
+			kmem_free(curr, sizeof (entry_t));
 			curr = prev;
 			if (curr == NULL) {
 				/* We removed the first entery */

@@ -1761,6 +1761,10 @@ idmap_get_w2u_mapping(idmap_handle_t *handle,
 		retcode = rc;
 
 out:
+	if (request.id1name != NULL)
+		free(request.id1name);
+	if (request.id1domain != NULL)
+		free(request.id1domain);
 	xdr_free(xdr_idmap_mappings_res, (caddr_t)&result);
 	if (retcode != IDMAP_SUCCESS)
 		errno = idmap_stat2errno(retcode);

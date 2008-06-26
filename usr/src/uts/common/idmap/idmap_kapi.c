@@ -86,6 +86,7 @@ struct idmap_get_handle {
 
 /* Zone specific data */
 typedef struct idmap_zone_specific {
+	zoneid_t	zone_id;
 	kmutex_t	zone_mutex;
 	idmap_cache_t	cache;
 	door_handle_t 	door_handle;
@@ -160,12 +161,7 @@ idmap_unreg_dh(zone_t *zone, door_handle_t dh)
 
 	mutex_enter(&zs->zone_mutex);
 
-	if (!zs->door_valid) {
-		mutex_exit(&zs->zone_mutex);
-		return (EINVAL);
-	}
-
-	if (zs->door_handle != dh) {
+	if (!zs->door_valid || zs->door_handle != dh) {
 		mutex_exit(&zs->zone_mutex);
 		return (EINVAL);
 	}
@@ -179,44 +175,114 @@ idmap_unreg_dh(zone_t *zone, door_handle_t dh)
 }
 
 
+/*
+ * IMPORTANT. This function idmap_get_cache_data() is project
+ * private and is for use of the test system only and should
+ * not be used for other purposes.
+ */
+void
+idmap_get_cache_data(zone_t *zone, size_t *uidbysid, size_t *gidbysid,
+	size_t *pidbysid, size_t *sidbyuid, size_t *sidbygid)
+{
+	idmap_zone_specific_t *zs;
+
+	zs = idmap_get_zone_specific(zone);
+
+	kidmap_cache_get_data(&zs->cache, uidbysid, gidbysid,
+	    pidbysid, sidbyuid, sidbygid);
+}
+
 static int
 kidmap_call_door(idmap_zone_specific_t *zs, door_arg_t *arg)
 {
-	door_handle_t dh;
-	int status = 0;
+	door_handle_t 	dh;
+	door_info_t	di;
+	int		status = 0;
+	int		nretries = 0;
 
+retry:
+	dh = NULL;
 	mutex_enter(&zs->zone_mutex);
-	if (!zs->door_valid) {
-		mutex_exit(&zs->zone_mutex);
+	if (zs->door_valid) {
+		dh = zs->door_handle;
+		door_ki_hold(dh);
+	}
+	mutex_exit(&zs->zone_mutex);
+
+	if (dh == NULL) {
+		/*
+		 * There is no door handle yet. Give
+		 * smf a chance to restarts the idmap daemon
+		 */
+		if (nretries++ < 5) {
+			delay(hz);
+			goto retry;
+		}
+#ifdef	DEBUG
+		zcmn_err(zs->zone_id, CE_WARN,
+		    "idmap: Error no registered door to call the "
+		    "idmap daemon\n");
+#endif
 		return (-1);
 	}
-	dh = zs->door_handle;
-	door_ki_hold(dh);
-	mutex_exit(&zs->zone_mutex);
 
 	status = door_ki_upcall(dh, arg);
 
-#ifdef	DEBUG
-	if (status != 0)
-		cmn_err(CE_WARN, "idmap: Door call failed %d\n", status);
-#endif	/* DEBUG */
+	switch (status) {
+	case 0:	/* Success */
+		door_ki_rele(dh);
+		return (0);
 
-	door_ki_rele(dh);
-
-	if (status == EBADF) {
+	case EINTR:
+		/* If we took an interrupt we have to bail out. */
+		if (ttolwp(curthread) && ISSIG(curthread, JUSTLOOKING)) {
+			door_ki_rele(dh);
+			zcmn_err(zs->zone_id, CE_WARN,
+			    "idmap: Interrupted\n");
+			return (-1);
+		}
 		/*
-		 * If we get EBADF we will most likely not get an
-		 * idmap_unreg_dh().
+		 * Just retry and see what happens.
 		 */
+		/* FALLTHROUGH */
+
+	case EAGAIN:
+		/* A resouce problem */
+		door_ki_rele(dh);
+		/* Back off before retrying */
+#ifdef	DEBUG
+		zcmn_err(zs->zone_id, CE_WARN,
+		    "idmap: Door call returned error %d. Retrying\n", status);
+#endif	/* DEBUG */
+		delay(hz);
+		goto retry;
+
+	case EBADF:
+		/* Stale door handle. See if smf restarts the daemon. */
+		door_ki_rele(dh);
 		mutex_enter(&zs->zone_mutex);
-		if (zs->door_valid) {
+		if (zs->door_valid && dh == zs->door_handle) {
 			zs->door_valid = 0;
 			door_ki_rele(zs->door_handle);
 		}
 		mutex_exit(&zs->zone_mutex);
-	}
+		/* Back off before retrying */
+#ifdef	DEBUG
+		zcmn_err(zs->zone_id, CE_WARN,
+		    "idmap: Door call returned error %d. Retrying\n", status);
+#endif	/* DEBUG */
+		delay(hz);
+		goto retry;
 
-	return (status);
+	default:
+		/* Unknown error */
+#ifdef	DEBUG
+		zcmn_err(zs->zone_id, CE_WARN,
+		    "idmap: Door call returned error %d.\n", status);
+#endif	/* DEBUG */
+		door_ki_rele(dh);
+		return (-1);
+	}
 }
 
 
@@ -237,6 +303,7 @@ idmap_get_zone_specific(zone_t *zone)
 		zs = kmem_zalloc(sizeof (idmap_zone_specific_t), KM_SLEEP);
 		mutex_init(&zs->zone_mutex, NULL, MUTEX_DEFAULT, NULL);
 		kidmap_cache_create(&zs->cache);
+		zs->zone_id = zone->zone_id;
 		(void) zone_setspecific(idmap_zone_key, zone, zs);
 		mutex_exit(&idmap_zone_mutex);
 		return (zs);
@@ -1162,10 +1229,10 @@ kidmap_get_mappings(idmap_get_handle_t *get_handle)
 				    mapping->id1.idmap_id_u.sid.rid,
 				    id->idmap_id_u.uid);
 			else if (*result->stat == IDMAP_SUCCESS && result->pid)
-				kidmap_cache_add_uidbysid(
+				kidmap_cache_add_pidbysid(
 				    cache, sid_prefix,
 				    mapping->id1.idmap_id_u.sid.rid,
-				    id->idmap_id_u.uid);
+				    id->idmap_id_u.uid, 1);
 			break;
 
 		case IDMAP_GID:
@@ -1183,10 +1250,10 @@ kidmap_get_mappings(idmap_get_handle_t *get_handle)
 				    mapping->id1.idmap_id_u.sid.rid,
 				    id->idmap_id_u.gid);
 			else if (*result->stat == IDMAP_SUCCESS && result->pid)
-				kidmap_cache_add_gidbysid(
+				kidmap_cache_add_pidbysid(
 				    cache, sid_prefix,
 				    mapping->id1.idmap_id_u.sid.rid,
-				    id->idmap_id_u.gid);
+				    id->idmap_id_u.gid, 0);
 			break;
 
 		case IDMAP_SID:
@@ -1312,7 +1379,8 @@ retry:
 
 	if (!xdr_callhdr(&xdr_ctx, &call_msg)) {
 #ifdef	DEBUG
-		cmn_err(CE_WARN, "idmap: xdr encoding header error");
+		zcmn_err(zs->zone_id, CE_WARN,
+		    "idmap: xdr encoding header error");
 #endif	/* DEBUG */
 		status = -1;
 		goto exit;
@@ -1325,7 +1393,7 @@ retry:
 	    /* RPC args */
 	    !xdr_args(&xdr_ctx, args)) {
 #ifdef	DEBUG
-		cmn_err(CE_WARN, "idmap: xdr encoding error");
+		zcmn_err(zs->zone_id, CE_WARN, "idmap: xdr encoding error");
 #endif	/* DEBUG */
 		if (retry > 2) {
 			status = -1;
@@ -1342,7 +1410,8 @@ retry:
 		}
 		if ((size = xdr_sizeof(xdr_args, args)) == 0) {
 #ifdef	DEBUG
-			cmn_err(CE_WARN, "idmap: xdr_sizeof error");
+			zcmn_err(zs->zone_id, CE_WARN,
+			    "idmap: xdr_sizeof error");
 #endif	/* DEBUG */
 			status = -1;
 			goto exit;
@@ -1376,7 +1445,8 @@ retry:
 		}
 	} else {
 #ifdef	DEBUG
-		cmn_err(CE_WARN, "idmap: xdr decoding reply message error");
+		zcmn_err(zs->zone_id, CE_WARN,
+		    "idmap: xdr decoding reply message error");
 #endif	/* DEBUG */
 		status = -1;
 	}

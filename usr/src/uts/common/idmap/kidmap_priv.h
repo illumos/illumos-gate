@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,6 +113,9 @@ void
 kidmap_cache_add_sidbygid(idmap_cache_t *cache, const char *sid_prefix,
 			uint32_t rid, gid_t gid);
 
+void
+kidmap_cache_get_data(idmap_cache_t *cache, size_t *uidbysid, size_t *gidbysid,
+			size_t *pidbysid, size_t *sidbyuid, size_t *sidbygid);
 int
 kidmap_start(void);
 
