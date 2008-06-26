@@ -209,11 +209,11 @@ void vhci_update_pathstates(void *);
 
 #ifdef DEBUG
 static void vhci_print_prin_keys(vhci_prin_readkeys_t *, int);
-#endif
 static void vhci_print_cdb(dev_info_t *dip, uint_t level,
     char *title, uchar_t *cdb);
 static void vhci_clean_print(dev_info_t *dev, uint_t level,
     char *title, uchar_t *data, int len);
+#endif
 static void vhci_print_prout_keys(scsi_vhci_lun_t *, char *);
 static void vhci_uscsi_iodone(struct scsi_pkt *pkt);
 
@@ -7201,8 +7201,10 @@ vhci_do_scsi_cmd(struct scsi_pkt *pkt)
 	struct scsi_extended_sense	*sns;
 
 #ifdef DEBUG
-	vhci_print_cdb(pkt->pkt_address.a_hba_tran->tran_hba_dip, CE_WARN,
-	    "Vhci command", pkt->pkt_cdbp);
+	if (vhci_debug > 5) {
+		vhci_print_cdb(pkt->pkt_address.a_hba_tran->tran_hba_dip,
+		    CE_WARN, "Vhci command", pkt->pkt_cdbp);
+	}
 #endif
 
 retry:
