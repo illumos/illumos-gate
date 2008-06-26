@@ -7200,9 +7200,18 @@ rc_notify_info_add_watch(rc_notify_info_t *rnip, const char **arr,
 	while (rnip->rni_flags & RC_NOTIFY_EMPTYING)
 		(void) pthread_cond_wait(&rnip->rni_cv, &rc_pg_notify_lock);
 
-	for (i = 0; i < RC_NOTIFY_MAX_NAMES; i++)
+	for (i = 0; i < RC_NOTIFY_MAX_NAMES; i++) {
 		if (arr[i] == NULL)
 			break;
+
+		/*
+		 * Don't add name if it's already being tracked.
+		 */
+		if (strcmp(arr[i], f) == 0) {
+			free(f);
+			goto out;
+		}
+	}
 
 	if (i == RC_NOTIFY_MAX_NAMES) {
 		(void) pthread_mutex_unlock(&rc_pg_notify_lock);
@@ -7211,6 +7220,8 @@ rc_notify_info_add_watch(rc_notify_info_t *rnip, const char **arr,
 	}
 
 	arr[i] = f;
+
+out:
 	if (!(rnip->rni_flags & RC_NOTIFY_ACTIVE))
 		rc_notify_info_insert_locked(rnip);
 
