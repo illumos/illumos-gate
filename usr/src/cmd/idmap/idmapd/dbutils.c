@@ -1828,6 +1828,19 @@ ad_lookup_batch(lookup_state_t *state, idmap_mapping_batch *batch,
 	if (state->ad_nqueries == 0)
 		return (IDMAP_SUCCESS);
 
+	for (i = 0; i < batch->idmap_mapping_batch_len; i++) {
+		req = &batch->idmap_mapping_batch_val[i];
+		res = &result->ids.ids_val[i];
+
+		/* Skip if not marked for AD lookup or already in error. */
+		if (!(req->direction & _IDMAP_F_LOOKUP_AD) ||
+		    res->retcode != IDMAP_SUCCESS)
+			continue;
+
+		/* Init status */
+		res->retcode = IDMAP_ERR_RETRIABLE_NET_ERR;
+	}
+
 retry:
 	retcode = idmap_lookup_batch_start(_idmapdstate.ad, state->ad_nqueries,
 	    &qs);
@@ -1855,9 +1868,7 @@ retry:
 		if (!(req->direction & _IDMAP_F_LOOKUP_AD))
 			continue;
 
-		if (retries == 0)
-			res->retcode = IDMAP_ERR_RETRIABLE_NET_ERR;
-		else if (res->retcode != IDMAP_ERR_RETRIABLE_NET_ERR)
+		if (res->retcode != IDMAP_ERR_RETRIABLE_NET_ERR)
 			continue;
 
 		if (IS_REQUEST_SID(*req, 1)) {
@@ -1998,8 +2009,13 @@ retry:
 		}
 	}
 
-	if (retcode == IDMAP_SUCCESS && add)
-		retcode = idmap_lookup_batch_end(&qs);
+	if (retcode == IDMAP_SUCCESS) {
+		/* add keeps track if we added an entry to the batch */
+		if (add)
+			retcode = idmap_lookup_batch_end(&qs);
+		else
+			idmap_lookup_release_batch(&qs);
+	}
 
 	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR && retries++ < 2)
 		goto retry;
