@@ -35,7 +35,6 @@ sparc_SUBDIRS =	sun4u \
 		SUNW,Sun-Blade-T6320 \
 		SUNW,SPARC-Enterprise-T5120 \
 		SUNW,T5140 \
-		SUNW,Netra-T2000 \
 		SUNW,Netra-CP3060 \
 		SUNW,Netra-CP3260 \
 		SUNW,USBRDT-5240 \
