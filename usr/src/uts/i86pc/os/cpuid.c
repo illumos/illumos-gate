@@ -2932,6 +2932,7 @@ static const char l2_cache_str[] = "l2-cache";
 static const char l3_cache_str[] = "l3-cache";
 static const char itlb4k_str[] = "itlb-4K";
 static const char dtlb4k_str[] = "dtlb-4K";
+static const char itlb2M_str[] = "itlb-2M";
 static const char itlb4M_str[] = "itlb-4M";
 static const char dtlb4M_str[] = "dtlb-4M";
 static const char dtlb24_str[] = "dtlb0-2M-4M";
@@ -2951,7 +2952,14 @@ static const struct cachetab {
 	size_t		ct_size;
 	const char	*ct_label;
 } intel_ctab[] = {
-	/* maintain descending order! */
+	/*
+	 * maintain descending order!
+	 *
+	 * Codes ignored - Reason
+	 * ----------------------
+	 * 40H - intel_cpuid_4_cache_info() disambiguates l2/l3 cache
+	 * f0H/f1H - Currently we do not interpret prefetch size by design
+	 */
 	{ 0xe4, 16, 64, 8*1024*1024, l3_cache_str},
 	{ 0xe3, 16, 64, 4*1024*1024, l3_cache_str},
 	{ 0xe2, 16, 64, 2*1024*1024, l3_cache_str},
@@ -2965,6 +2973,8 @@ static const struct cachetab {
 	{ 0xd1, 4, 64, 1*1024*1024, l3_cache_str},
 	{ 0xd0, 4, 64, 512*1024, l3_cache_str},
 	{ 0xca, 4, 0, 512, sh_l2_tlb4k_str},
+	{ 0xc0, 4, 0, 8, dtlb44_str },
+	{ 0xba, 4, 0, 64, dtlb4k_str },
 	{ 0xb4, 4, 0, 256, dtlb4k_str },
 	{ 0xb3, 4, 0, 128, dtlb4k_str },
 	{ 0xb2, 4, 0, 64, itlb4k_str },
@@ -2975,6 +2985,7 @@ static const struct cachetab {
 	{ 0x84, 8, 32, 1024*1024, l2_cache_str},
 	{ 0x83, 8, 32, 512*1024, l2_cache_str},
 	{ 0x82, 8, 32, 256*1024, l2_cache_str},
+	{ 0x80, 8, 64, 512*1024, l2_cache_str},
 	{ 0x7f, 2, 64, 512*1024, l2_cache_str},
 	{ 0x7d, 8, 64, 2*1024*1024, sl2_cache_str},
 	{ 0x7c, 8, 64, 1024*1024, sl2_cache_str},
@@ -2994,15 +3005,21 @@ static const struct cachetab {
 	{ 0x5c, 0, 0, 128, dtlb44_str},
 	{ 0x5b, 0, 0, 64, dtlb44_str},
 	{ 0x5a, 4, 0, 32, dtlb24_str},
+	{ 0x59, 0, 0, 16, dtlb4k_str},
+	{ 0x57, 4, 0, 16, dtlb4k_str},
+	{ 0x56, 4, 0, 16, dtlb4M_str},
 	{ 0x55, 0, 0, 7, itlb24_str},
 	{ 0x52, 0, 0, 256, itlb424_str},
 	{ 0x51, 0, 0, 128, itlb424_str},
 	{ 0x50, 0, 0, 64, itlb424_str},
+	{ 0x4f, 0, 0, 32, itlb4k_str},
+	{ 0x4e, 24, 64, 6*1024*1024, l2_cache_str},
 	{ 0x4d, 16, 64, 16*1024*1024, l3_cache_str},
 	{ 0x4c, 12, 64, 12*1024*1024, l3_cache_str},
 	{ 0x4b, 16, 64, 8*1024*1024, l3_cache_str},
 	{ 0x4a, 12, 64, 6*1024*1024, l3_cache_str},
 	{ 0x49, 16, 64, 4*1024*1024, l3_cache_str},
+	{ 0x48, 12, 64, 3*1024*1024, l2_cache_str},
 	{ 0x47, 8, 64, 8*1024*1024, l3_cache_str},
 	{ 0x46, 4, 64, 4*1024*1024, l3_cache_str},
 	{ 0x45, 4, 32, 2*1024*1024, l2_cache_str},
@@ -3022,12 +3039,14 @@ static const struct cachetab {
 	{ 0x25, 8, 64, 2048*1024, sl3_cache_str},
 	{ 0x23, 8, 64, 1024*1024, sl3_cache_str},
 	{ 0x22, 4, 64, 512*1024, sl3_cache_str},
+	{ 0x0e, 6, 64, 24*1024, l1_dcache_str},
 	{ 0x0d, 4, 32, 16*1024, l1_dcache_str},
 	{ 0x0c, 4, 32, 16*1024, l1_dcache_str},
 	{ 0x0b, 4, 0, 4, itlb4M_str},
 	{ 0x0a, 2, 32, 8*1024, l1_dcache_str},
 	{ 0x08, 4, 32, 16*1024, l1_icache_str},
 	{ 0x06, 4, 32, 8*1024, l1_icache_str},
+	{ 0x05, 4, 0, 32, dtlb4M_str},
 	{ 0x04, 4, 0, 8, dtlb4M_str},
 	{ 0x03, 4, 0, 64, dtlb4k_str},
 	{ 0x02, 4, 0, 2, itlb4M_str},
@@ -3102,7 +3121,7 @@ intel_walk_cacheinfo(struct cpuid_info *cpi,
     void *arg, int (*func)(void *, const struct cachetab *))
 {
 	const struct cachetab *ct;
-	struct cachetab des_49_ct;
+	struct cachetab des_49_ct, des_b1_ct;
 	uint8_t *dp;
 	int i;
 
@@ -3113,10 +3132,24 @@ intel_walk_cacheinfo(struct cpuid_info *cpi,
 		 * For overloaded descriptor 0x49 we use cpuid function 4
 		 * if supported by the current processor, to create
 		 * cache information.
+		 * For overloaded descriptor 0xb1 we use X86_PAE flag
+		 * to disambiguate the cache information.
 		 */
 		if (*dp == 0x49 && cpi->cpi_maxeax >= 0x4 &&
 		    intel_cpuid_4_cache_info(&des_49_ct, cpi) == 1) {
 				ct = &des_49_ct;
+		} else if (*dp == 0xb1) {
+			des_b1_ct.ct_code = 0xb1;
+			des_b1_ct.ct_assoc = 4;
+			des_b1_ct.ct_line_size = 0;
+			if (x86_feature & X86_PAE) {
+				des_b1_ct.ct_size = 8;
+				des_b1_ct.ct_label = itlb2M_str;
+			} else {
+				des_b1_ct.ct_size = 4;
+				des_b1_ct.ct_label = itlb4M_str;
+			}
+			ct = &des_b1_ct;
 		} else {
 			if ((ct = find_cacheent(intel_ctab, *dp)) == NULL) {
 				continue;
