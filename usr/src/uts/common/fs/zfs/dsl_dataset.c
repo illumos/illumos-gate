@@ -978,17 +978,6 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag)
 	if (err != ESRCH)
 		goto out;
 
-	if (ds->ds_user_ptr) {
-		/*
-		 * We need to sync out all in-flight IO before we try
-		 * to evict (the dataset evict func is trying to clear
-		 * the cached entries for this dataset in the ARC).
-		 */
-		txg_wait_synced(dd->dd_pool, 0);
-		ds->ds_user_evict_func(ds, ds->ds_user_ptr);
-		ds->ds_user_ptr = NULL;
-	}
-
 	rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
 	err = dsl_dir_open_obj(dd->dd_pool, dd->dd_object, NULL, FTAG, &dd);
 	rw_exit(&dd->dd_pool->dp_config_rwlock);
@@ -996,10 +985,23 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag)
 	if (err)
 		goto out;
 
+	if (ds->ds_user_ptr) {
+		/*
+		 * We need to sync out all in-flight IO before we try
+		 * to evict (the dataset evict func is trying to clear
+		 * the cached entries for this dataset in the ARC).
+		 */
+		txg_wait_synced(dd->dd_pool, 0);
+	}
+
 	/*
 	 * Blow away the dsl_dir + head dataset.
 	 */
 	dsl_dataset_make_exclusive(ds, tag);
+	if (ds->ds_user_ptr) {
+		ds->ds_user_evict_func(ds, ds->ds_user_ptr);
+		ds->ds_user_ptr = NULL;
+	}
 	dstg = dsl_sync_task_group_create(ds->ds_dir->dd_pool);
 	dsl_sync_task_create(dstg, dsl_dataset_destroy_check,
 	    dsl_dataset_destroy_sync, ds, tag, 0);
