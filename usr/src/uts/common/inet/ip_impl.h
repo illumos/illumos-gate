@@ -450,9 +450,23 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
 	mutex_exit(&stp->sd_lock);					\
 }
 
-#define	STR_SENDSIG(stp) {						\
+/*
+ * Combined wakeup and sendsig to avoid dropping and reacquiring the
+ * sd_lock. The list of messages waiting at the synchronous barrier is
+ * supplied in order to determine whether a wakeup needs to occur. We
+ * only send a wakeup to the application when necessary, i.e. during
+ * the first enqueue when the received messages list will be NULL.
+ */
+#define	STR_WAKEUP_SENDSIG(stp, rcv_list) {				\
 	int _events;							\
 	mutex_enter(&stp->sd_lock);					\
+	if (rcv_list == NULL) {						\
+		if (stp->sd_flag & RSLEEP) {				\
+			stp->sd_flag &= ~RSLEEP;			\
+			cv_broadcast(&_RD(stp->sd_wrq)->q_wait);	\
+		}							\
+		stp->sd_wakeq |= RSLEEP;				\
+	}								\
 	if ((_events = stp->sd_sigflags & (S_INPUT | S_RDNORM)) != 0)	\
 		strsendsig(stp->sd_siglist, _events, 0, 0);		\
 	if (stp->sd_rput_opt & SR_POLLIN) {				\

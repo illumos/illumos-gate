@@ -11766,6 +11766,12 @@ tcp_rcv_drain(queue_t *q, tcp_t *tcp)
 	/* Can't be sodirect enabled */
 	ASSERT(SOD_NOT_ENABLED(tcp));
 
+	/* No need for the push timer now. */
+	if (tcp->tcp_push_tid != 0) {
+		(void) TCP_TIMER_CANCEL(tcp, tcp->tcp_push_tid);
+		tcp->tcp_push_tid = 0;
+	}
+
 	/*
 	 * Handle two cases here: we are currently fused or we were
 	 * previously fused and have some urgent data to be delivered
@@ -11822,11 +11828,6 @@ tcp_rcv_drain(queue_t *q, tcp_t *tcp)
 			ret = TH_ACK_NEEDED;
 		}
 		tcp->tcp_rwnd = q->q_hiwat;
-	}
-	/* No need for the push timer now. */
-	if (tcp->tcp_push_tid != 0) {
-		(void) TCP_TIMER_CANCEL(tcp, tcp->tcp_push_tid);
-		tcp->tcp_push_tid = 0;
 	}
 	return (ret);
 }
@@ -18435,20 +18436,26 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 		/* There is some data, add them back to get the max. */
 		tcp->tcp_rq->q_hiwat = tcp->tcp_rwnd + tcp->tcp_rcv_cnt;
 	}
-
-	stropt->so_flags = SO_HIWAT;
-	stropt->so_hiwat = MAX(q->q_hiwat, tcps->tcps_sth_rcv_hiwat);
-
-	stropt->so_flags |= SO_MAXBLK;
-	stropt->so_maxblk = tcp_maxpsz_set(tcp, B_FALSE);
-
 	/*
 	 * This is the first time we run on the correct
 	 * queue after tcp_accept. So fix all the q parameters
 	 * here.
 	 */
-	/* Allocate room for SACK options if needed. */
-	stropt->so_flags |= SO_WROFF;
+	stropt->so_flags = SO_HIWAT | SO_MAXBLK | SO_WROFF;
+	stropt->so_maxblk = tcp_maxpsz_set(tcp, B_FALSE);
+
+	/*
+	 * Record the stream head's high water mark for this endpoint;
+	 * this is used for flow-control purposes.
+	 */
+	stropt->so_hiwat = tcp->tcp_fused ?
+	    tcp_fuse_set_rcv_hiwat(tcp, q->q_hiwat) :
+	    MAX(q->q_hiwat, tcps->tcps_sth_rcv_hiwat);
+
+	/*
+	 * Determine what write offset value to use depending on SACK and
+	 * whether the endpoint is fused or not.
+	 */
 	if (tcp->tcp_fused) {
 		ASSERT(tcp->tcp_loopback);
 		ASSERT(tcp->tcp_loopback_peer != NULL);
@@ -18460,11 +18467,6 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 		 * Non-fused tcp loopback case is handled separately below.
 		 */
 		stropt->so_wroff = 0;
-		/*
-		 * Record the stream head's high water mark for this endpoint;
-		 * this is used for flow-control purposes in tcp_fuse_output().
-		 */
-		stropt->so_hiwat = tcp_fuse_set_rcv_hiwat(tcp, q->q_hiwat);
 		/*
 		 * Update the peer's transmit parameters according to
 		 * our recently calculated high water mark value.
@@ -18609,8 +18611,6 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 		tcp->tcp_hard_binding = B_FALSE;
 		tcp->tcp_hard_bound = B_TRUE;
 	}
-
-	tcp->tcp_detached = B_FALSE;
 
 	/* We can enable synchronous streams now */
 	if (tcp->tcp_fused) {
@@ -18923,8 +18923,11 @@ no_more_eagers:
 		 * but we still have an extra refs on eager (apart from the
 		 * usual tcp references). The ref was placed in tcp_rput_data
 		 * before sending the conn_ind in tcp_send_conn_ind.
-		 * The ref will be dropped in tcp_accept_finish().
+		 * The ref will be dropped in tcp_accept_finish(). As sockfs
+		 * has already established this tcp with it's own stream,
+		 * it's OK to set tcp_detached to B_FALSE.
 		 */
+		econnp->conn_tcp->tcp_detached = B_FALSE;
 		squeue_enter_nodrain(econnp->conn_sqp, opt_mp,
 		    tcp_accept_finish, econnp, SQTAG_TCP_ACCEPT_FINISH_Q0);
 		return;

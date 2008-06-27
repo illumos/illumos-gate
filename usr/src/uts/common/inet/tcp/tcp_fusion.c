@@ -123,9 +123,9 @@ boolean_t do_tcp_direct_sockfs = B_TRUE;
 #define	TCP_FUSION_RCV_UNREAD_MIN	8
 uint_t tcp_fusion_rcv_unread_min = TCP_FUSION_RCV_UNREAD_MIN;
 
-static void	tcp_fuse_syncstr_enable(tcp_t *);
-static void	tcp_fuse_syncstr_disable(tcp_t *);
-static void	strrput_sig(queue_t *, boolean_t);
+static void		tcp_fuse_syncstr_enable(tcp_t *);
+static void		tcp_fuse_syncstr_disable(tcp_t *);
+static boolean_t	strrput_sig(queue_t *, boolean_t);
 
 /*
  * Return true if this connection needs some IP functionality
@@ -531,7 +531,6 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	ASSERT(DB_TYPE(mp) == M_DATA || DB_TYPE(mp) == M_PROTO ||
 	    DB_TYPE(mp) == M_PCPROTO);
 
-	max_unread = peer_tcp->tcp_fuse_rcv_unread_hiwater;
 
 	/* If this connection requires IP, unfuse and use regular path */
 	if (tcp_loopback_needs_ip(tcp, ns) ||
@@ -545,6 +544,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 		freemsg(mp);
 		return (B_TRUE);
 	}
+	max_unread = peer_tcp->tcp_fuse_rcv_unread_hiwater;
 
 	/*
 	 * Handle urgent data; we either send up SIGURG to the peer now
@@ -666,10 +666,9 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	 */
 	if (peer_tcp->tcp_direct_sockfs && !urgent &&
 	    !TCP_IS_DETACHED(peer_tcp)) {
-		if (peer_tcp->tcp_rcv_list == NULL)
-			STR_WAKEUP_SET(STREAM(peer_tcp->tcp_rq));
 		/* Update poll events and send SIGPOLL/SIGIO if necessary */
-		STR_SENDSIG(STREAM(peer_tcp->tcp_rq));
+		STR_WAKEUP_SENDSIG(STREAM(peer_tcp->tcp_rq),
+		    peer_tcp->tcp_rcv_list);
 	}
 
 	/*
@@ -680,6 +679,14 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 
 	/* In case it wrapped around and also to keep it constant */
 	peer_tcp->tcp_rwnd += recv_size;
+	/*
+	 * We increase the peer's unread message count here whilst still
+	 * holding it's tcp_non_sq_lock. This ensures that the increment
+	 * occurs in the same lock acquisition perimeter as the enqueue.
+	 * Depending on lock hierarchy, we can release these locks which
+	 * creates a window in which we can race with tcp_fuse_rrw()
+	 */
+	peer_tcp->tcp_fuse_rcv_unread_cnt++;
 
 	/*
 	 * Exercise flow-control when needed; we will get back-enabled
@@ -714,9 +721,9 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	flow_stopped = tcp->tcp_flow_stopped;
 	if (((peer_tcp->tcp_direct_sockfs || TCP_IS_DETACHED(peer_tcp)) &&
 	    (peer_tcp->tcp_rcv_cnt >= peer_tcp->tcp_fuse_rcv_hiwater ||
-	    ++peer_tcp->tcp_fuse_rcv_unread_cnt >= max_unread)) ||
-	    (!peer_tcp->tcp_direct_sockfs &&
-	    !TCP_IS_DETACHED(peer_tcp) && !canputnext(peer_tcp->tcp_rq))) {
+	    peer_tcp->tcp_fuse_rcv_unread_cnt >= max_unread)) ||
+	    (!peer_tcp->tcp_direct_sockfs && !TCP_IS_DETACHED(peer_tcp) &&
+	    !canputnext(peer_tcp->tcp_rq))) {
 		peer_data_queued = B_TRUE;
 	}
 
@@ -731,9 +738,26 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	} else if (flow_stopped && !peer_data_queued &&
 	    (TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater)) {
 		tcp_clrqfull(tcp);
+		TCP_STAT(tcps, tcp_fusion_backenabled);
 		flow_stopped = B_FALSE;
 	}
 	mutex_exit(&tcp->tcp_non_sq_lock);
+
+	/*
+	 * If we are in synchronous streams mode and the peer read queue is
+	 * not full then schedule a push timer if one is not scheduled
+	 * already. This is needed for applications which use MSG_PEEK to
+	 * determine the number of bytes available before issuing a 'real'
+	 * read. It also makes flow control more deterministic, particularly
+	 * for smaller message sizes.
+	 */
+	if (!urgent && peer_tcp->tcp_direct_sockfs &&
+	    peer_tcp->tcp_push_tid == 0 && !TCP_IS_DETACHED(peer_tcp) &&
+	    canputnext(peer_tcp->tcp_rq)) {
+		peer_tcp->tcp_push_tid = TCP_TIMER(peer_tcp, tcp_push_timer,
+		    MSEC_TO_TICK(tcps->tcps_push_timer_interval));
+	}
+	mutex_exit(&peer_tcp->tcp_non_sq_lock);
 	ipst->ips_loopback_packets++;
 	tcp->tcp_last_sent_len = send_size;
 
@@ -752,8 +776,6 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 
 	BUMP_LOCAL(tcp->tcp_obsegs);
 	BUMP_LOCAL(peer_tcp->tcp_ibsegs);
-
-	mutex_exit(&peer_tcp->tcp_non_sq_lock);
 
 	DTRACE_PROBE2(tcp__fuse__output, tcp_t *, tcp, uint_t, send_size);
 
@@ -805,6 +827,8 @@ tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 	uint_t cnt = 0;
 #endif
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	tcp_t		*peer_tcp = tcp->tcp_loopback_peer;
+	boolean_t	sd_rd_eof = B_FALSE;
 
 	ASSERT(tcp->tcp_loopback);
 	ASSERT(tcp->tcp_fused || tcp->tcp_fused_sigurg);
@@ -866,10 +890,14 @@ tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 	 * to avoid extraneous signal generation from strrput(), we set
 	 * STRGETINPROG flag at the stream head prior to the draining and
 	 * restore it afterwards.  This masks out signal generation only
-	 * for M_DATA messages and does not affect urgent data.
+	 * for M_DATA messages and does not affect urgent data. We only do
+	 * this if the STREOF flag is not set which can happen if the
+	 * application shuts down the read side of a stream. In this case
+	 * we simply free these messages to approximate the flushq behavior
+	 * which normally occurs when STREOF is on the stream head read queue.
 	 */
 	if (tcp->tcp_direct_sockfs)
-		strrput_sig(q, B_FALSE);
+		sd_rd_eof = strrput_sig(q, B_FALSE);
 
 	/* Drain the data */
 	while ((mp = tcp->tcp_rcv_list) != NULL) {
@@ -878,12 +906,16 @@ tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 #ifdef DEBUG
 		cnt += msgdsize(mp);
 #endif
-		putnext(q, mp);
-		TCP_STAT(tcps, tcp_fusion_putnext);
+		if (sd_rd_eof) {
+			freemsg(mp);
+		} else {
+			putnext(q, mp);
+			TCP_STAT(tcps, tcp_fusion_putnext);
+		}
 	}
 
-	if (tcp->tcp_direct_sockfs)
-		strrput_sig(q, B_TRUE);
+	if (tcp->tcp_direct_sockfs && !sd_rd_eof)
+		(void) strrput_sig(q, B_TRUE);
 
 	ASSERT(cnt == tcp->tcp_rcv_cnt);
 	tcp->tcp_rcv_last_head = NULL;
@@ -891,6 +923,12 @@ tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 	tcp->tcp_rcv_cnt = 0;
 	tcp->tcp_fuse_rcv_unread_cnt = 0;
 	tcp->tcp_rwnd = q->q_hiwat;
+
+	if (peer_tcp->tcp_flow_stopped && (TCP_UNSENT_BYTES(peer_tcp) <=
+	    peer_tcp->tcp_xmit_lowater)) {
+		tcp_clrqfull(peer_tcp);
+		TCP_STAT(tcps, tcp_fusion_backenabled);
+	}
 
 	return (B_TRUE);
 }
@@ -1198,19 +1236,28 @@ tcp_fuse_syncstr_enable_pair(tcp_t *tcp)
 }
 
 /*
- * Allow or disallow signals to be generated by strrput().
+ * Used to enable/disable signal generation at the stream head. We already
+ * generated the signal(s) for these messages when they were enqueued on the
+ * receiver. We also check if STREOF is set here. If it is, we return false
+ * and let the caller decide what to do.
  */
-static void
+static boolean_t
 strrput_sig(queue_t *q, boolean_t on)
 {
 	struct stdata *stp = STREAM(q);
 
 	mutex_enter(&stp->sd_lock);
+	if (stp->sd_flag == STREOF) {
+		mutex_exit(&stp->sd_lock);
+		return (B_TRUE);
+	}
 	if (on)
 		stp->sd_flag &= ~STRGETINPROG;
 	else
 		stp->sd_flag |= STRGETINPROG;
 	mutex_exit(&stp->sd_lock);
+
+	return (B_FALSE);
 }
 
 /*
@@ -1233,6 +1280,18 @@ tcp_fuse_disable_pair(tcp_t *tcp, boolean_t unfusing)
 	 */
 	TCP_FUSE_SYNCSTR_PLUG_DRAIN(tcp);
 	TCP_FUSE_SYNCSTR_PLUG_DRAIN(peer_tcp);
+
+	/*
+	 * Cancel any pending push timers.
+	 */
+	if (tcp->tcp_push_tid != 0) {
+		(void) TCP_TIMER_CANCEL(tcp, tcp->tcp_push_tid);
+		tcp->tcp_push_tid = 0;
+	}
+	if (peer_tcp->tcp_push_tid != 0) {
+		(void) TCP_TIMER_CANCEL(peer_tcp, peer_tcp->tcp_push_tid);
+		peer_tcp->tcp_push_tid = 0;
+	}
 
 	/*
 	 * Drain any pending data; the detached check is needed because
