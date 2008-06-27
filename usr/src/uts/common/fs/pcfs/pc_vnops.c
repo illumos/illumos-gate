@@ -1953,59 +1953,15 @@ pcfs_pathconf(
 	struct cred *cr,
 	caller_context_t *ct)
 {
-	ulong_t val;
-	int error = 0;
-	struct statvfs64 vfsbuf;
 	struct pcfs *fsp = VFSTOPCFS(vp->v_vfsp);
 
 	switch (cmd) {
-
 	case _PC_LINK_MAX:
-		val = 1;
-		break;
+		*valp = 1;
+		return (0);
 
-	case _PC_MAX_CANON:
-		val = MAX_CANON;
-		break;
-
-	case _PC_MAX_INPUT:
-		val = MAX_INPUT;
-		break;
-
-	case _PC_NAME_MAX:
-		bzero(&vfsbuf, sizeof (vfsbuf));
-		if (error = VFS_STATVFS(vp->v_vfsp, &vfsbuf))
-			break;
-		val = vfsbuf.f_namemax;
-		break;
-
-	case _PC_PATH_MAX:
-	case _PC_SYMLINK_MAX:
-		val = PCMAXPATHLEN;
-		break;
-
-	case _PC_PIPE_BUF:
-		val = PIPE_BUF;
-		break;
-
-	case _PC_NO_TRUNC:
-		val = (ulong_t)-1; 	/* Will truncate long file name */
-		break;
-
-	case _PC_VDISABLE:
-		val = _POSIX_VDISABLE;
-		break;
-
-	case _PC_CHOWN_RESTRICTED:
-		if (rstchown)
-			val = rstchown;		/* chown restricted enabled */
-		else
-			val = (ulong_t)-1;
-		break;
-
-	case _PC_ACL_ENABLED:
-		val = 0;
-		break;
+	case _PC_CASE_BEHAVIOR:
+		return (EINVAL);
 
 	case _PC_FILESIZEBITS:
 		/*
@@ -2013,16 +1969,13 @@ pcfs_pathconf(
 		 * FAT12 can only go up to the maximum filesystem capacity
 		 * which is ~509MB.
 		 */
-		val = IS_FAT12(fsp) ? 30 : 33;
-		break;
+		*valp = IS_FAT12(fsp) ? 30 : 33;
+		return (0);
+
 	default:
-		error = EINVAL;
-		break;
+		return (fs_pathconf(vp, cmd, valp, cr, ct));
 	}
 
-	if (error == 0)
-		*valp = val;
-	return (error);
 }
 
 /* ARGSUSED */

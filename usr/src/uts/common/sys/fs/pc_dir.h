@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,6 @@ extern "C" {
 
 #define	PCFNAMESIZE	8
 #define	PCFEXTSIZE	3
-#define	PCMAXPATHLEN	MAXPATHLEN
 #define	PCMAXNAMLEN	255
 #define	PCMAXNAM_UTF16	(256 * sizeof (uint16_t))	/* for UTF-16 */
 #define	PCLFNCHUNKSIZE	13

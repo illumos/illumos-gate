@@ -919,7 +919,7 @@ pcfs_statvfs(
 	sp->f_fsid = d32;
 	(void) strcpy(sp->f_basetype, vfssw[vfsp->vfs_fstype].vsw_name);
 	sp->f_flag = vf_to_stf(vfsp->vfs_flag);
-	sp->f_namemax = PCFNAMESIZE;
+	sp->f_namemax = PCMAXNAMLEN;
 	return (0);
 }
 
