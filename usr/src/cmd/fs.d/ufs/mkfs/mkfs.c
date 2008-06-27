@@ -646,7 +646,7 @@ main(int argc, char *argv[])
 	uint64_t nbytes64;
 	int remaining_cg;
 	int do_dot = 0;
-	int use_efi_dflts = 0, retry = 0, isremovable = 0;
+	int use_efi_dflts = 0, retry = 0, isremovable = 0, ishotpluggable = 0;
 	int invalid_sb_cnt, ret, skip_this_sb, cg_too_small;
 	int geom_nsect, geom_ntrack, geom_cpg;
 
@@ -1149,8 +1149,14 @@ main(int argc, char *argv[])
 				    " determined parameters.\n", fsys));
 				isremovable = 0;
 			}
+			if (ioctl(fsi, DKIOCHOTPLUGGABLE, &ishotpluggable)) {
+				dprintf(("DeBuG Unable to determine if %s is"
+				    " Hotpluggable Media. Proceeding with "
+				    "system determined parameters.\n", fsys));
+				ishotpluggable = 0;
+			}
 			if (((dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect)
-			    > CHSLIMIT) || isremovable) {
+			    > CHSLIMIT) || isremovable || ishotpluggable) {
 				use_efi_dflts = 1;
 				retry = 1;
 			}
@@ -1158,8 +1164,9 @@ main(int argc, char *argv[])
 	}
 	dprintf(("DeBuG CHSLIMIT = %d geom = %ld\n", CHSLIMIT,
 	    dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect));
-	dprintf(("DeBuG label_type = %d isremovable = %d use_efi_dflts = %d\n",
-	    label_type, isremovable, use_efi_dflts));
+	dprintf(("DeBuG label_type = %d isremovable = %d ishotpluggable = %d "
+	    "use_efi_dflts = %d\n", label_type, isremovable, ishotpluggable,
+	    use_efi_dflts));
 
 	/*
 	 * For the newfs -N case, even if the disksize is > CHSLIMIT, do not

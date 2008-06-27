@@ -147,6 +147,7 @@ static int	label_type;	/* see types below */
  */
 static int	use_efi_dflts = 0;
 static int	isremovable = 0;
+static int	ishotpluggable = 0;
 
 static char	device[MAXPATHLEN];
 static char	cmd[BUFSIZ];
@@ -731,16 +732,27 @@ getdiskbydev(char *disk)
 	actual_size = get_device_size(fd, disk);
 
 	if (label_type == LABEL_TYPE_VTOC) {
+
 		/*
-		 * Geometry information does not make sense for removable media
-		 * anyway, so indicate mkfs to use EFI default parameters.
+		 * Geometry information does not make sense for removable or
+		 * hotpluggable media anyway, so indicate mkfs to use EFI
+		 * default parameters.
 		 */
 		if (ioctl(fd, DKIOCREMOVABLE, &isremovable)) {
 			dprintf(("DeBuG newfs : Unable to determine if %s is"
 			    " Removable Media. Proceeding with system"
 			    " determined parameters.\n", disk));
 			isremovable = 0;
-		} else if (isremovable && !Tflag)
+		}
+
+		if (ioctl(fd, DKIOCHOTPLUGGABLE, &ishotpluggable)) {
+			dprintf(("DeBuG newfs : Unable to determine if %s is"
+			    " Hotpluggable Media. Proceeding with system"
+			    " determined parameters.\n", disk));
+			ishotpluggable = 0;
+		}
+
+		if ((isremovable || ishotpluggable) && !Tflag)
 			use_efi_dflts = 1;
 
 		if (ioctl(fd, DKIOCGGEOM, &g))
@@ -751,9 +763,9 @@ getdiskbydev(char *disk)
 			use_efi_dflts = 1;
 		}
 		dprintf(("DeBuG newfs : geom=%ld, CHSLIMIT=%d "
-		    "isremovable = %d use_efi_dflts = %d\n",
+		    "isremovable = %d ishotpluggable = %d use_efi_dflts = %d\n",
 		    g.dkg_ncyl * g.dkg_nhead * g.dkg_nsect, CHSLIMIT,
-		    isremovable, use_efi_dflts));
+		    isremovable, ishotpluggable, use_efi_dflts));
 		/*
 		 * The ntracks that is passed to mkfs is decided here based
 		 * on 'use_efi_dflts' and whether ntracks was specified as a
