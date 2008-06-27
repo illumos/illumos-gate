@@ -721,11 +721,6 @@ typedef struct cmdblk {
 #define	STRLOW	1024
 
 /*
- * Block allocation parameters
- */
-#define	MAXIOCBSZ	1024		/* max ioctl data block size */
-
-/*
  * qwriter perimeter types
  */
 #define	PERIM_INNER	1		/* The inner perimeter */
