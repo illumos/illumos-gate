@@ -4038,6 +4038,13 @@ kobj_segbrk(caddr_t *spp, size_t size, size_t align, caddr_t limit)
 		alloc_align = lg_pagesize;
 		alloc_pgsz = lg_pagesize;
 	}
+
+#if defined(__sparc)
+	/* account for redzone */
+	if (limit)
+		limit -= alloc_pgsz;
+#endif	/* __sparc */
+
 	va = ALIGN((uintptr_t)*spp, align);
 	pva = P2ROUNDUP((uintptr_t)*spp, alloc_pgsz);
 	/*
