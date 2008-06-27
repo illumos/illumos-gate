@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -252,8 +252,7 @@ cpu_acpi_cache_pstates(cpu_acpi_handle_t handle)
 	 * Does the package look coherent?
 	 */
 	cnt = 0;
-	l = NULL;
-	for (i = 0; i < obj->Package.Count; i++) {
+	for (i = 0, l = NULL; i < obj->Package.Count; i++, l = q) {
 		if (obj->Package.Elements[i].Type != ACPI_TYPE_PACKAGE ||
 		    obj->Package.Elements[i].Package.Count !=
 		    CPU_ACPI_PSS_SIZE) {
@@ -272,22 +271,25 @@ cpu_acpi_cache_pstates(cpu_acpi_handle_t handle)
 		}
 
 		/*
+		 * Ignore duplicate entries.
+		 */
+		if (l != NULL && l[0].Integer.Value == q[0].Integer.Value)
+			continue;
+
+		/*
 		 * Some _PSS tables are larger than required
 		 * and unused elements are filled with patterns
 		 * of 0xff.  Simply check here for frequency = 0xffff
-		 * and stop counting if found. And still some other
-		 * _PSS tables fill unused elements with a copy of the
-		 * lowest pstate entry.
+		 * and stop counting if found.
 		 */
-		if ((q[0].Integer.Value == 0xffff) ||
-		    (l != NULL && l[0].Integer.Value == q[0].Integer.Value)) {
+		if (q[0].Integer.Value == 0xffff) {
 			eot = B_TRUE;
 			continue;
 		}
 
 		/*
-		 * We should never find a valid entry after we've hit one
-		 * of the end-of-table entries above.
+		 * We should never find a valid entry after we've hit
+		 * an end-of-table entry.
 		 */
 		if (eot) {
 			cmn_err(CE_NOTE, "!cpu_acpi: "
@@ -307,7 +309,6 @@ cpu_acpi_cache_pstates(cpu_acpi_handle_t handle)
 		/*
 		 * This entry passes.
 		 */
-		l = q;
 		cnt++;
 	}
 	if (cnt == 0)
@@ -321,14 +322,22 @@ cpu_acpi_cache_pstates(cpu_acpi_handle_t handle)
 	CPU_ACPI_PSTATES(handle) = kmem_zalloc(CPU_ACPI_PSTATES_SIZE(cnt),
 	    KM_SLEEP);
 	pstate = CPU_ACPI_PSTATES(handle);
-	for (i = 0; i < cnt; i++) {
+	for (i = 0, l = NULL; i < obj->Package.Count && cnt > 0; i++, l = q) {
 		uint32_t *up;
 
 		q = obj->Package.Elements[i].Package.Elements;
+
+		/*
+		 * Skip duplicate entries.
+		 */
+		if (l != NULL && l[0].Integer.Value == q[0].Integer.Value)
+			continue;
+
 		up = (uint32_t *)pstate;
 		for (j = 0; j < CPU_ACPI_PSS_SIZE; j++)
 			up[j] = q[j].Integer.Value;
 		pstate++;
+		cnt--;
 	}
 	CPU_ACPI_OBJ_IS_CACHED(handle, CPU_ACPI_PSS_CACHED);
 	ret = 0;
