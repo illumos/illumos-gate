@@ -450,7 +450,7 @@ build() {
 
 	echo "\n==== SCCS Noise ($LABEL) ====\n" >> $mail_msg_file
 
-	egrep 'sccs(check|  get)' $SRC/${INSTALLOG}.out >> $mail_msg_file
+	egrep 'sccs(check:|  get)' $SRC/${INSTALLOG}.out >> $mail_msg_file
 
 	echo "\n==== Build errors ($LABEL) ====\n" >> $mail_msg_file
 	egrep ":" $SRC/${INSTALLOG}.out |
