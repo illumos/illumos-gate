@@ -1889,9 +1889,30 @@ as_gap_aligned(struct as *as, size_t minlen, caddr_t *basep, size_t *lenp,
 	int forward;
 	caddr_t save_base;
 	size_t save_len;
+	size_t save_minlen;
+	size_t save_redzone;
+	int fast_path = 1;
 
 	save_base = *basep;
 	save_len = *lenp;
+	save_minlen = minlen;
+	save_redzone = redzone;
+
+	/*
+	 * For the first pass/fast_path, just add align and redzone into
+	 * minlen since if we get an allocation, we can guarantee that it
+	 * will fit the alignment and redzone requested.
+	 * This increases the chance that hibound will be adjusted to
+	 * a_lastgap->s_base which will likely allow us to find an
+	 * acceptable hole in the address space quicker.
+	 * If we can't find a hole with this fast_path, then we look for
+	 * smaller holes in which the alignment and offset may allow
+	 * the allocation to fit.
+	 */
+	minlen += align;
+	minlen += 2 * redzone;
+	redzone = 0;
+
 	AS_LOCK_ENTER(as, &as->a_lock, RW_READER);
 	if (AS_SEGFIRST(as) == NULL) {
 		if (valid_va_range_aligned(basep, lenp, minlen, flags & AH_DIR,
@@ -1906,6 +1927,7 @@ as_gap_aligned(struct as *as, size_t minlen, caddr_t *basep, size_t *lenp,
 		}
 	}
 
+retry:
 	/*
 	 * Set up to iterate over all the inter-segment holes in the given
 	 * direction.  lseg is NULL for the lowest-addressed hole and hseg is
@@ -1964,12 +1986,13 @@ as_gap_aligned(struct as *as, size_t minlen, caddr_t *basep, size_t *lenp,
 			hi = hibound;
 		/*
 		 * Verify that the candidate hole is big enough and meets
-		 * hardware constraints.
+		 * hardware constraints.  If the hole is too small, no need
+		 * to do the further checks since they will fail.
 		 */
 		*basep = lo;
 		*lenp = hi - lo;
-		if (valid_va_range_aligned(basep, lenp, minlen,
-		    forward ? AH_LO : AH_HI, align, redzone, off) &&
+		if (*lenp >= minlen && valid_va_range_aligned(basep, lenp,
+		    minlen, forward ? AH_LO : AH_HI, align, redzone, off) &&
 		    ((flags & AH_CONTAIN) == 0 ||
 		    (*basep <= addr && *basep + *lenp > addr))) {
 			if (!forward)
@@ -1996,6 +2019,12 @@ as_gap_aligned(struct as *as, size_t minlen, caddr_t *basep, size_t *lenp,
 				break;
 			lseg = AS_SEGPREV(as, lseg);
 		}
+	}
+	if (fast_path && (align != 0 || save_redzone != 0)) {
+		fast_path = 0;
+		minlen = save_minlen;
+		redzone = save_redzone;
+		goto retry;
 	}
 	*basep = save_base;
 	*lenp = save_len;
