@@ -10977,14 +10977,16 @@ check_keys:
 				severity = SCSI_ERR_INFO;
 				rval = COMMAND_DONE_ERROR;
 				pos->pmode = invalid;
+				break;
 			/*
 			 * RESERVATIONS RELEASED
 			 */
 			} else if (ST_RQSENSE->es_add_code == 0x2a &&
 			    ST_RQSENSE->es_qual_code == 0x04) {
+				severity = SCSI_ERR_INFO;
 				rval = COMMAND_DONE;
+				break;
 			}
-			break;
 		}
 
 		if (un->un_state <= ST_STATE_OPENING) {
