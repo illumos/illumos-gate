@@ -15451,91 +15451,75 @@ ip_rput_dlpi(queue_t *q, mblk_t *mp)
 {
 	dl_ok_ack_t	*dloa = (dl_ok_ack_t *)mp->b_rptr;
 	dl_error_ack_t	*dlea = (dl_error_ack_t *)dloa;
-	ill_t		*ill = (ill_t *)q->q_ptr;
-	boolean_t	pending;
+	ill_t		*ill = q->q_ptr;
+	t_uscalar_t	prim = dloa->dl_primitive;
+	t_uscalar_t	reqprim = DL_PRIM_INVAL;
 
 	ip1dbg(("ip_rput_dlpi"));
-	if (dloa->dl_primitive == DL_ERROR_ACK) {
-		ip2dbg(("ip_rput_dlpi(%s): DL_ERROR_ACK %s (0x%x): "
-		    "%s (0x%x), unix %u\n", ill->ill_name,
-		    dl_primstr(dlea->dl_error_primitive),
-		    dlea->dl_error_primitive,
-		    dl_errstr(dlea->dl_errno),
-		    dlea->dl_errno,
-		    dlea->dl_unix_errno));
-	}
 
 	/*
 	 * If we received an ACK but didn't send a request for it, then it
 	 * can't be part of any pending operation; discard up-front.
 	 */
-	switch (dloa->dl_primitive) {
-	case DL_NOTIFY_IND:
-		pending = B_TRUE;
-		break;
+	switch (prim) {
 	case DL_ERROR_ACK:
-		pending = ill_dlpi_pending(ill, dlea->dl_error_primitive);
+		reqprim = dlea->dl_error_primitive;
+		ip2dbg(("ip_rput_dlpi(%s): DL_ERROR_ACK for %s (0x%x): %s "
+		    "(0x%x), unix %u\n", ill->ill_name, dl_primstr(reqprim),
+		    reqprim, dl_errstr(dlea->dl_errno), dlea->dl_errno,
+		    dlea->dl_unix_errno));
 		break;
 	case DL_OK_ACK:
-		pending = ill_dlpi_pending(ill, dloa->dl_correct_primitive);
+		reqprim = dloa->dl_correct_primitive;
 		break;
 	case DL_INFO_ACK:
-		pending = ill_dlpi_pending(ill, DL_INFO_REQ);
+		reqprim = DL_INFO_REQ;
 		break;
 	case DL_BIND_ACK:
-		pending = ill_dlpi_pending(ill, DL_BIND_REQ);
+		reqprim = DL_BIND_REQ;
 		break;
 	case DL_PHYS_ADDR_ACK:
-		pending = ill_dlpi_pending(ill, DL_PHYS_ADDR_REQ);
+		reqprim = DL_PHYS_ADDR_REQ;
 		break;
 	case DL_NOTIFY_ACK:
-		pending = ill_dlpi_pending(ill, DL_NOTIFY_REQ);
+		reqprim = DL_NOTIFY_REQ;
 		break;
 	case DL_CONTROL_ACK:
-		pending = ill_dlpi_pending(ill, DL_CONTROL_REQ);
+		reqprim = DL_CONTROL_REQ;
 		break;
 	case DL_CAPABILITY_ACK:
-		pending = ill_dlpi_pending(ill, DL_CAPABILITY_REQ);
+		reqprim = DL_CAPABILITY_REQ;
 		break;
-	default:
-		/* Not a DLPI message we support or were expecting */
-		freemsg(mp);
-		return;
 	}
 
-	if (!pending) {
-		freemsg(mp);
-		return;
-	}
-
-	switch (dloa->dl_primitive) {
-	case DL_ERROR_ACK:
-		if (dlea->dl_error_primitive == DL_UNBIND_REQ) {
-			mutex_enter(&ill->ill_lock);
-			ill->ill_state_flags &= ~ILL_DL_UNBIND_IN_PROGRESS;
-			cv_signal(&ill->ill_cv);
-			mutex_exit(&ill->ill_lock);
+	if (prim != DL_NOTIFY_IND) {
+		if (reqprim == DL_PRIM_INVAL ||
+		    !ill_dlpi_pending(ill, reqprim)) {
+			/* Not a DLPI message we support or expected */
+			freemsg(mp);
+			return;
 		}
+		ip1dbg(("ip_rput: received %s for %s\n", dl_primstr(prim),
+		    dl_primstr(reqprim)));
+	}
+
+	switch (reqprim) {
+	case DL_UNBIND_REQ:
+		/*
+		 * NOTE: we mark the unbind as complete even if we got a
+		 * DL_ERROR_ACK, since there's not much else we can do.
+		 */
+		mutex_enter(&ill->ill_lock);
+		ill->ill_state_flags &= ~ILL_DL_UNBIND_IN_PROGRESS;
+		cv_signal(&ill->ill_cv);
+		mutex_exit(&ill->ill_lock);
 		break;
 
-	case DL_OK_ACK:
-		ip1dbg(("ip_rput: DL_OK_ACK for %s\n",
-		    dl_primstr((int)dloa->dl_correct_primitive)));
-		switch (dloa->dl_correct_primitive) {
-		case DL_UNBIND_REQ:
-			mutex_enter(&ill->ill_lock);
-			ill->ill_state_flags &= ~ILL_DL_UNBIND_IN_PROGRESS;
-			cv_signal(&ill->ill_cv);
-			mutex_exit(&ill->ill_lock);
-			break;
-
-		case DL_ENABMULTI_REQ:
+	case DL_ENABMULTI_REQ:
+		if (prim == DL_OK_ACK) {
 			if (ill->ill_dlpi_multicast_state == IDS_INPROGRESS)
 				ill->ill_dlpi_multicast_state = IDS_OK;
-			break;
 		}
-		break;
-	default:
 		break;
 	}
 
@@ -15551,7 +15535,7 @@ ip_rput_dlpi(queue_t *q, mblk_t *mp)
 	 * refcount without doing ILL_CAN_LOOKUP().
 	 */
 	ill_refhold(ill);
-	if (dloa->dl_primitive == DL_NOTIFY_IND)
+	if (prim == DL_NOTIFY_IND)
 		qwriter_ip(ill, q, mp, ip_rput_dlpi_writer, NEW_OP, B_FALSE);
 	else
 		qwriter_ip(ill, q, mp, ip_rput_dlpi_writer, CUR_OP, B_FALSE);
@@ -15610,9 +15594,13 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		    dl_primstr(dlea->dl_error_primitive)));
 
 		switch (dlea->dl_error_primitive) {
+		case DL_DISABMULTI_REQ:
+			if (!ill->ill_isv6)
+				ipsq_current_finish(ipsq);
+			ill_dlpi_done(ill, dlea->dl_error_primitive);
+			break;
 		case DL_PROMISCON_REQ:
 		case DL_PROMISCOFF_REQ:
-		case DL_DISABMULTI_REQ:
 		case DL_UNBIND_REQ:
 		case DL_ATTACH_REQ:
 		case DL_INFO_REQ:
@@ -15697,6 +15685,8 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			}
 			break;
 		case DL_ENABMULTI_REQ:
+			if (!ill->ill_isv6)
+				ipsq_current_finish(ipsq);
 			ill_dlpi_done(ill, DL_ENABMULTI_REQ);
 
 			if (ill->ill_dlpi_multicast_state == IDS_INPROGRESS)
@@ -16214,10 +16204,14 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		    dl_primstr((int)dloa->dl_correct_primitive),
 		    dloa->dl_correct_primitive));
 		switch (dloa->dl_correct_primitive) {
-		case DL_PROMISCON_REQ:
-		case DL_PROMISCOFF_REQ:
 		case DL_ENABMULTI_REQ:
 		case DL_DISABMULTI_REQ:
+			if (!ill->ill_isv6)
+				ipsq_current_finish(ipsq);
+			ill_dlpi_done(ill, dloa->dl_correct_primitive);
+			break;
+		case DL_PROMISCON_REQ:
+		case DL_PROMISCOFF_REQ:
 		case DL_UNBIND_REQ:
 		case DL_ATTACH_REQ:
 			ill_dlpi_done(ill, dloa->dl_correct_primitive);

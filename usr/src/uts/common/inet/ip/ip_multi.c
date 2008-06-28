@@ -1331,9 +1331,8 @@ ill_create_squery(ill_t *ill, ipaddr_t ipaddr, uint32_t addrlen,
 }
 
 /*
- * Create a dlpi message with room for phys+sap. When we come back in
- * ip_wput_ctl() we will strip the sap for those primitives which
- * only need a physical address.
+ * Create a DLPI message; for DL_{ENAB,DISAB}MULTI_REQ, room is left for
+ * the hardware address.
  */
 static mblk_t *
 ill_create_dl(ill_t *ill, uint32_t dl_primitive, uint32_t length,
@@ -1407,41 +1406,61 @@ ill_create_dl(ill_t *ill, uint32_t dl_primitive, uint32_t length,
 	return (mp);
 }
 
-void
-ip_wput_ctl(queue_t *q, mblk_t *mp_orig)
+/*
+ * Writer processing for ip_wput_ctl(): send the DL_{ENAB,DISAB}MULTI_REQ
+ * messages that had been delayed until we'd heard back from ARP.  One catch:
+ * we need to ensure that no one else becomes writer on the IPSQ before we've
+ * received the replies, or they'll incorrectly process our replies as part of
+ * their unrelated IPSQ operation.  To do this, we start a new IPSQ operation,
+ * which will complete when we process the reply in ip_rput_dlpi_writer().
+ */
+/* ARGSUSED */
+static void
+ip_wput_ctl_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 {
-	ill_t	*ill = (ill_t *)q->q_ptr;
-	mblk_t	*mp = mp_orig;
-	area_t	*area = (area_t *)mp->b_rptr;
+	ill_t *ill = q->q_ptr;
+	t_uscalar_t prim = ((union DL_primitives *)mp->b_rptr)->dl_primitive;
 
-	/* Check that we have a AR_ENTRY_SQUERY with a tacked on mblk */
-	if (MBLKL(mp) < sizeof (area_t) || mp->b_cont == NULL ||
-	    area->area_cmd != AR_ENTRY_SQUERY) {
-		putnext(q, mp);
-		return;
-	}
-	mp = mp->b_cont;
+	ASSERT(IAM_WRITER_ILL(ill));
+	ASSERT(prim == DL_ENABMULTI_REQ || prim == DL_DISABMULTI_REQ);
+	ip1dbg(("ip_wput_ctl_writer: %s\n", dl_primstr(prim)));
 
-	/*
-	 * Update dl_addr_length and dl_addr_offset for primitives that
-	 * have physical addresses as opposed to full saps
-	 */
-	switch (((union DL_primitives *)mp->b_rptr)->dl_primitive) {
-	case DL_ENABMULTI_REQ:
+	if (prim == DL_ENABMULTI_REQ) {
 		/* Track the state if this is the first enabmulti */
 		if (ill->ill_dlpi_multicast_state == IDS_UNKNOWN)
 			ill->ill_dlpi_multicast_state = IDS_INPROGRESS;
-		ip1dbg(("ip_wput_ctl: ENABMULTI\n"));
-		break;
-	case DL_DISABMULTI_REQ:
-		ip1dbg(("ip_wput_ctl: DISABMULTI\n"));
-		break;
-	default:
-		ip1dbg(("ip_wput_ctl: default\n"));
-		break;
 	}
-	freeb(mp_orig);
+
+	ipsq_current_start(ipsq, ill->ill_ipif, 0);
 	ill_dlpi_send(ill, mp);
+}
+
+void
+ip_wput_ctl(queue_t *q, mblk_t *mp)
+{
+	ill_t	*ill = q->q_ptr;
+	mblk_t	*dlmp = mp->b_cont;
+	area_t	*area = (area_t *)mp->b_rptr;
+	t_uscalar_t prim;
+
+	/* Check that we have an AR_ENTRY_SQUERY with a tacked on mblk */
+	if (MBLKL(mp) < sizeof (area_t) || area->area_cmd != AR_ENTRY_SQUERY ||
+	    dlmp == NULL) {
+		putnext(q, mp);
+		return;
+	}
+
+	/* Check that the tacked on mblk is a DL_{DISAB,ENAB}MULTI_REQ */
+	prim = ((union DL_primitives *)dlmp->b_rptr)->dl_primitive;
+	if (prim != DL_DISABMULTI_REQ && prim != DL_ENABMULTI_REQ) {
+		putnext(q, mp);
+		return;
+	}
+	freeb(mp);
+
+	/* See comments above ip_wput_ctl_writer() for details */
+	ill_refhold(ill);
+	qwriter_ip(ill, ill->ill_wq, dlmp, ip_wput_ctl_writer, NEW_OP, B_FALSE);
 }
 
 /*
