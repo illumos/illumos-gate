@@ -1834,8 +1834,12 @@ zio_should_retry(zio_t *zio)
 		return (B_FALSE);
 	if (zio->io_delegate_list != NULL)
 		return (B_FALSE);
-	if (vd && vd != vd->vdev_top)
-		return (B_FALSE);
+	if (vd != NULL) {
+		if (vd != vd->vdev_top)
+			return (B_FALSE);
+		if (vd->vdev_is_failing)
+			return (B_FALSE);
+	}
 	if (zio->io_flags & ZIO_FLAG_DONT_RETRY)
 		return (B_FALSE);
 	if (zio->io_retries > 0)

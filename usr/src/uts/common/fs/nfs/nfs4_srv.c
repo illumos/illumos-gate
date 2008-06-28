@@ -4325,18 +4325,8 @@ rfs4_op_rename(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			VN_RELE(tvp);
 		}
 	}
-	if (error == 0) {
-		char *tmp;
-
-		/* fix the path name for the renamed file */
-		mutex_enter(&srcvp->v_lock);
-		tmp = srcvp->v_path;
-		srcvp->v_path = NULL;
-		mutex_exit(&srcvp->v_lock);
-		vn_setpath(rootdir, ndvp, srcvp, nnm, nlen - 1);
-		if (tmp != NULL)
-			kmem_free(tmp, strlen(tmp) + 1);
-	}
+	if (error == 0)
+		vn_renamepath(ndvp, srcvp, nnm, nlen - 1);
 
 	if (in_crit_src)
 		nbl_end_crit(srcvp);

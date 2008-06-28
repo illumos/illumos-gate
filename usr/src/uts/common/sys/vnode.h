@@ -1225,6 +1225,7 @@ void vn_copypath(struct vnode *src, struct vnode *dst);
 void vn_setpath_str(struct vnode *vp, const char *str, size_t len);
 void vn_setpath(vnode_t *rootvp, struct vnode *startvp, struct vnode *vp,
     const char *path, size_t plen);
+void vn_renamepath(vnode_t *dvp, vnode_t *vp, const char *nm, size_t len);
 
 /* Vnode event notification */
 void	vnevent_rename_src(vnode_t *, vnode_t *, char *, caller_context_t *);

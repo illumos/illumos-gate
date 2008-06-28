@@ -1038,14 +1038,15 @@ vdev_validate(vdev_t *vd)
 		if (spa->spa_load_state == SPA_LOAD_OPEN &&
 		    state != POOL_STATE_ACTIVE)
 			return (EBADF);
-	}
 
-	/*
-	 * If we were able to open and validate a vdev that was previously
-	 * marked permanently unavailable, clear that state now.
-	 */
-	if (vd->vdev_not_present)
-		vd->vdev_not_present = 0;
+		/*
+		 * If we were able to open and validate a vdev that was
+		 * previously marked permanently unavailable, clear that state
+		 * now.
+		 */
+		if (vd->vdev_not_present)
+			vd->vdev_not_present = 0;
+	}
 
 	return (0);
 }
@@ -2102,12 +2103,21 @@ vdev_propagate_state(vdev_t *vd)
 	if (vd->vdev_children > 0) {
 		for (c = 0; c < vd->vdev_children; c++) {
 			child = vd->vdev_child[c];
-			if (vdev_is_dead(child) && !vdev_readable(child))
-				faulted++;
-			else if (child->vdev_stat.vs_aux == VDEV_AUX_IO_FAILURE)
-				faulted++;
-			else if (child->vdev_state <= VDEV_STATE_DEGRADED)
+
+			if ((vdev_is_dead(child) && !vdev_readable(child)) ||
+			    child->vdev_stat.vs_aux == VDEV_AUX_IO_FAILURE) {
+				/*
+				 * Root special: if there is a top-level log
+				 * device, treat the root vdev as if it were
+				 * degraded.
+				 */
+				if (child->vdev_islog && vd == rvd)
+					degraded++;
+				else
+					faulted++;
+			} else if (child->vdev_state <= VDEV_STATE_DEGRADED) {
 				degraded++;
+			}
 
 			if (child->vdev_stat.vs_aux == VDEV_AUX_CORRUPT_DATA)
 				corrupted++;
@@ -2127,7 +2137,7 @@ vdev_propagate_state(vdev_t *vd)
 			    VDEV_AUX_CORRUPT_DATA);
 	}
 
-	if (vd->vdev_parent && !vd->vdev_islog)
+	if (vd->vdev_parent)
 		vdev_propagate_state(vd->vdev_parent);
 }
 

@@ -913,6 +913,15 @@ vdev_label_sync_top_done(zio_t *zio)
 }
 
 /*
+ * We ignore errors for log devices, simply free the private data.
+ */
+static void
+vdev_label_sync_log_done(zio_t *zio)
+{
+	kmem_free(zio->io_private, sizeof (uint64_t));
+}
+
+/*
  * Write all even or odd labels to all leaves of the specified vdev.
  */
 static void
@@ -984,7 +993,8 @@ vdev_label_sync_list(spa_t *spa, int l, int flags, uint64_t txg)
 	for (vd = list_head(dl); vd != NULL; vd = list_next(dl, vd)) {
 		uint64_t *good_writes = kmem_zalloc(sizeof (uint64_t),
 		    KM_SLEEP);
-		zio_t *vio = zio_null(nio, spa, vdev_label_sync_top_done,
+		zio_t *vio = zio_null(nio, spa, vd->vdev_islog ?
+		    vdev_label_sync_log_done : vdev_label_sync_top_done,
 		    good_writes, flags);
 		vdev_label_sync(vio, vd, l, txg);
 		zio_nowait(vio);

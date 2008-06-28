@@ -33,6 +33,7 @@
 #include <sys/fs/zfs.h>
 #include <sys/zio.h>
 #include <sys/sunldi.h>
+#include <sys/fm/fs/zfs.h>
 
 /*
  * Virtual device vector for disks.
@@ -405,7 +406,14 @@ vdev_disk_io_intr(buf_t *bp)
 	vdev_disk_buf_t *vdb = (vdev_disk_buf_t *)bp;
 	zio_t *zio = vdb->vdb_io;
 
-	if ((zio->io_error = geterror(bp)) == 0 && bp->b_resid != 0)
+	/*
+	 * The rest of the zio stack only deals with EIO, ECKSUM, and ENXIO.
+	 * Rather than teach the rest of the stack about other error
+	 * possibilities (EFAULT, etc), we normalize the error value here.
+	 */
+	zio->io_error = (geterror(bp) != 0 ? EIO : 0);
+
+	if (zio->io_error == 0 && bp->b_resid != 0)
 		zio->io_error = EIO;
 
 	kmem_free(vdb, sizeof (vdev_disk_buf_t));
@@ -564,7 +572,11 @@ vdev_disk_io_done(zio_t *zio)
 			spa_async_request(zio->io_spa, SPA_ASYNC_REMOVE);
 		} else if (vdev_probe(vd) != 0) {
 			ASSERT(vd->vdev_ops->vdev_op_leaf);
-			vd->vdev_is_failing = B_TRUE;
+			if (!vd->vdev_is_failing) {
+				vd->vdev_is_failing = B_TRUE;
+				zfs_ereport_post(FM_EREPORT_ZFS_PROBE_FAILURE,
+				    vd->vdev_spa, vd, zio, 0, 0);
+			}
 		}
 	}
 

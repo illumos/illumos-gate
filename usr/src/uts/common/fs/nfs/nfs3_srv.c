@@ -2819,19 +2819,9 @@ rfs3_rename(RENAME3args *args, RENAME3res *resp, struct exportinfo *exi,
 		}
 		nbl_end_crit(srcvp);
 	}
-	if (error == 0) {
-		char *tmp;
-
-		/* fix the path name for the renamed file */
-		mutex_enter(&srcvp->v_lock);
-		tmp = srcvp->v_path;
-		srcvp->v_path = NULL;
-		mutex_exit(&srcvp->v_lock);
-		vn_setpath(rootdir, tvp, srcvp, args->to.name,
+	if (error == 0)
+		vn_renamepath(tvp, srcvp, args->to.name,
 		    strlen(args->to.name));
-		if (tmp != NULL)
-			kmem_free(tmp, strlen(tmp) + 1);
-	}
 	VN_RELE(srcvp);
 	srcvp = NULL;
 

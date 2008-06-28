@@ -273,7 +273,7 @@ enc_parse_subnick(ses_plugin_t *sp, ses_node_t *np)
 		return (0);
 
 	for (dip = &spip->sspci_subnicks[0], i = 0;
-	    i < spip->sspci_n_subenclosures;
+	    i <= spip->sspci_n_subenclosures;
 	    i++, dip++) {
 		if (!SES_WITHIN_PAGE_STRUCT(dip, spip, len))
 			break;

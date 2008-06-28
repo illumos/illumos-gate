@@ -3140,6 +3140,9 @@ top:
 			zfs_log_rename(zilog, tx,
 			    TX_RENAME | (flags & FIGNORECASE ? TX_CI : 0),
 			    sdzp, sdl->dl_name, tdzp, tdl->dl_name, szp);
+
+			/* Update path information for the target vnode */
+			vn_renamepath(tdvp, ZTOV(szp), tnm, strlen(tnm));
 		}
 	}
 

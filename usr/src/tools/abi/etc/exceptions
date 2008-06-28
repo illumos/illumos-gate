@@ -239,6 +239,7 @@ PSARC 2004/619: RULE W1: usr/lib/iconv/amd64/geniconvtbl.so
 4773624: RULE W1: usr/lib/locale/iso_8859_1/
 4773624: RULE W1: usr/lib/fm/topo/
 6233613: RULE W1: usr/platform/sun4v/lib/mdb/
+6705649: RULE W1: usr/lib/scsi/plugins/
 
 #############################################
 # WARNINGs exempted from RULE W2 (See RULES section of intf_check manpage) 

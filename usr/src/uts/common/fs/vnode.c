@@ -2939,6 +2939,24 @@ vn_setpath_str(struct vnode *vp, const char *str, size_t len)
 }
 
 /*
+ * Called from within filesystem's vop_rename() to handle renames once the
+ * target vnode is available.
+ */
+void
+vn_renamepath(vnode_t *dvp, vnode_t *vp, const char *nm, size_t len)
+{
+	char *tmp;
+
+	mutex_enter(&vp->v_lock);
+	tmp = vp->v_path;
+	vp->v_path = NULL;
+	mutex_exit(&vp->v_lock);
+	vn_setpath(rootdir, dvp, vp, nm, len);
+	if (tmp != NULL)
+		kmem_free(tmp, strlen(tmp) + 1);
+}
+
+/*
  * Similar to vn_setpath_str(), this function sets the path of the destination
  * vnode to the be the same as the source vnode.
  */

@@ -46,6 +46,7 @@ extern "C" {
 #define	FM_EREPORT_ZFS_DEVICE_TOO_SMALL		"vdev.too_small"
 #define	FM_EREPORT_ZFS_DEVICE_BAD_LABEL		"vdev.bad_label"
 #define	FM_EREPORT_ZFS_IO_FAILURE		"io_failure"
+#define	FM_EREPORT_ZFS_PROBE_FAILURE		"probe_failure"
 
 #define	FM_EREPORT_PAYLOAD_ZFS_POOL		"pool"
 #define	FM_EREPORT_PAYLOAD_ZFS_POOL_FAILMODE	"pool_failmode"

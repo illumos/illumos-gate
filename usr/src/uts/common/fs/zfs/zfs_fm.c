@@ -141,6 +141,16 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 		 */
 		if (zio->io_flags & ZIO_FLAG_SPECULATIVE)
 			return;
+
+		/*
+		 * If the vdev has already been marked as failing due to a
+		 * failed probe, then ignore any subsequent I/O errors, as the
+		 * DE will automatically fault the vdev on the first such
+		 * failure.
+		 */
+		if (vd != NULL && vd->vdev_is_failing &&
+		    strcmp(subclass, FM_EREPORT_ZFS_PROBE_FAILURE) != 0)
+			return;
 	}
 
 	if ((ereport = fm_nvlist_create(NULL)) == NULL)

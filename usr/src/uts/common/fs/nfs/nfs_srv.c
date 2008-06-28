@@ -2236,19 +2236,9 @@ rfs_rename(struct nfsrnmargs *args, enum nfsstat *status,
 	    tovp, args->rna_to.da_name, cr, NULL, 0);
 	TRACE_0(TR_FAC_NFS, TR_VOP_RENAME_END, "vop_rename_end:");
 
-	if (error == 0) {
-		char *tmp;
-
-		/* fix the path name for the renamed file */
-		mutex_enter(&srcvp->v_lock);
-		tmp = srcvp->v_path;
-		srcvp->v_path = NULL;
-		mutex_exit(&srcvp->v_lock);
-		vn_setpath(rootdir, tovp, srcvp, args->rna_to.da_name,
+	if (error == 0)
+		vn_renamepath(tovp, srcvp, args->rna_to.da_name,
 		    strlen(args->rna_to.da_name));
-		if (tmp != NULL)
-			kmem_free(tmp, strlen(tmp) + 1);
-	}
 
 	/*
 	 * Force modified data and metadata out to stable storage.

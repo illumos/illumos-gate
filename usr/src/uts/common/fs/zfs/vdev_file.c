@@ -31,6 +31,7 @@
 #include <sys/vdev_impl.h>
 #include <sys/zio.h>
 #include <sys/fs/zfs.h>
+#include <sys/fm/fs/zfs.h>
 
 /*
  * Virtual device vector for files.
@@ -144,9 +145,14 @@ vdev_file_probe_io(vdev_t *vd, caddr_t data, size_t size, uint64_t offset,
 
 	error = vn_rdwr(rw, vf->vf_vnode, data, size, offset, UIO_SYSSPACE,
 	    0, RLIM64_INFINITY, kcred, &resid);
+
 	if (error || resid != 0)
 		return (EIO);
-	return (0);
+
+	if (zio_injection_enabled)
+		error = zio_handle_device_injection(vd, EIO);
+
+	return (error);
 }
 
 /*
@@ -189,10 +195,10 @@ vdev_file_probe(vdev_t *vd)
 		nvd = kmem_zalloc(sizeof (vdev_t), KM_SLEEP);
 		if (vd->vdev_path)
 			nvd->vdev_path = spa_strdup(vd->vdev_path);
+		nvd->vdev_guid = vd->vdev_guid;
 		retries++;
 
-		error = vdev_file_open_common(nvd);
-		if (error)
+		if (vdev_file_open_common(nvd) != 0)
 			break;
 	}
 
@@ -295,8 +301,13 @@ vdev_file_io_done(zio_t *zio)
 	 * If an error has been encountered then attempt to probe the device
 	 * to determine if it's still accessible.
 	 */
-	if (zio->io_error == EIO && vdev_probe(vd) != 0)
-		vd->vdev_is_failing = B_TRUE;
+	if (zio->io_error == EIO && vdev_probe(vd) != 0) {
+		if (!vd->vdev_is_failing) {
+			vd->vdev_is_failing = B_TRUE;
+			zfs_ereport_post(FM_EREPORT_ZFS_PROBE_FAILURE,
+			    vd->vdev_spa, vd, zio, 0, 0);
+		}
+	}
 
 	vdev_queue_io_done(zio);
 
