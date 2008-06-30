@@ -27,6 +27,7 @@
 
 #include <sys/fm/protocol.h>
 #include <sys/strlog.h>
+#include <sys/log.h>
 #include <fm/fmd_api.h>
 #include <fm/fmd_msg.h>
 
@@ -138,6 +139,7 @@ static int syslog_cons;		/* log to syslog_msgfd */
  * set in the log_ctl_t.  The log driver allows us to set SL_LOGONLY when we
  * construct messages ourself, indicating that syslogd should only emit the
  * message to /var/adm/messages and any remote hosts, and skip the console.
+ * Note: the log driver packet size limit for output via putmsg is LOGMAX_PS.
  * Then we emit the message a second time, without the special prefix, to the
  * sysmsg(7D) device, which handles console redirection and also permits us
  * to output any characters we like to the console, including \n and \r.
@@ -151,7 +153,7 @@ syslog_emit(fmd_hdl_t *hdl, const char *msgformat, ...)
 
 	char *format, c;
 	char *buf = NULL;
-	size_t formatlen;
+	size_t formatlen, logmsglen;
 	int len;
 	va_list ap;
 
@@ -179,7 +181,16 @@ syslog_emit(fmd_hdl_t *hdl, const char *msgformat, ...)
 	ctl.len = sizeof (syslog_ctl);
 
 	dat.buf = buf;
-	dat.len = strlen(buf) + 1;
+	logmsglen = strlen(buf) + 1;
+
+	/*
+	 * The underlying log driver won't accept (ERANGE) messages
+	 * longer than LOG_MAXPS bytes so don't putmsg more than that.
+	 */
+	if (logmsglen > LOG_MAXPS)
+		dat.len = LOG_MAXPS;
+	else
+		dat.len = logmsglen;
 
 	if (syslog_file && putmsg(syslog_logfd, &ctl, &dat, 0) != 0) {
 		fmd_hdl_debug(hdl, "putmsg failed: %s\n", strerror(errno));
@@ -187,7 +198,7 @@ syslog_emit(fmd_hdl_t *hdl, const char *msgformat, ...)
 	}
 
 	dat.buf = strchr(buf, ']');
-	dat.len -= (size_t)(dat.buf - buf);
+	dat.len = (size_t)(logmsglen - (dat.buf - buf));
 
 	dat.buf[0] = '\r'; /* overwrite ']' with carriage return */
 	dat.buf[1] = '\n'; /* overwrite ' ' with newline */
