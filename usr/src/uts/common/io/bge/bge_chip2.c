@@ -1871,6 +1871,8 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5705_2:
 	case DEVICE_ID_5706:
 	case DEVICE_ID_5782:
+	case DEVICE_ID_5787:
+	case DEVICE_ID_5787M:
 	case DEVICE_ID_5788:
 	case DEVICE_ID_5789:
 	case DEVICE_ID_5751:
@@ -2098,6 +2100,24 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
 		cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
+		cidp->statistic_type = BGE_STAT_REG;
+		dev_ok = B_TRUE;
+		break;
+
+	case DEVICE_ID_5787:
+	case DEVICE_ID_5787M:
+		cidp->chip_label = 5787;
+		cidp->pci_type = BGE_PCI_E;
+		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
+		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
+		cidp->mbuf_hi_water = MBUF_HIWAT_5705;
+		cidp->mbuf_base = bge_mbuf_pool_base_5705;
+		cidp->mbuf_length = bge_mbuf_pool_len_5705;
+		cidp->recv_slots = BGE_RECV_SLOTS_5705;
+		cidp->bge_mlcr_default |= MLCR_MISC_PINS_OUTPUT_ENABLE_1;
+		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
+		cidp->flags |= CHIP_FLAG_NO_JUMBO;
 		cidp->statistic_type = BGE_STAT_REG;
 		dev_ok = B_TRUE;
 		break;

@@ -165,6 +165,8 @@ then
 	"pciex14e4,167a"
 	"pciex14e4,167b"
 	"pci14e4,167d"
+	"pci14e4,1693"
+	"pci14e4,169b"
 	"pciex14e4,16fd"
 	"pciex14e4,169d"' \
 	-b "$BASEDIR" bge

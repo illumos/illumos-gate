@@ -71,6 +71,8 @@ extern "C" {
 #define	DEVICE_ID_5705F			0x166e
 #define	DEVICE_ID_5706			0x164a
 #define	DEVICE_ID_5782			0x1696
+#define	DEVICE_ID_5787			0x169b
+#define	DEVICE_ID_5787M			0x1693
 #define	DEVICE_ID_5788			0x169c
 #define	DEVICE_ID_5789			0x169d
 #define	DEVICE_ID_5751			0x1677
@@ -262,6 +264,10 @@ extern "C" {
 #define	MHCR_CHIP_REV_5754_A0		0xb0000000
 #define	MHCR_CHIP_REV_5754_A1		0xb0010000
 
+#define	MHCR_CHIP_REV_5787_A0		0xb0000000
+#define	MHCR_CHIP_REV_5787_A1		0xb0010000
+#define	MHCR_CHIP_REV_5787_A2		0xb0020000
+
 #define	MHCR_CHIP_REV_5755_A0		0xa0000000
 #define	MHCR_CHIP_REV_5755_A1		0xa0010000
 
@@ -275,6 +281,7 @@ extern "C" {
 #define	MHCR_CHIP_ASIC_REV_5714 	(0x5 << 28)
 #define	MHCR_CHIP_ASIC_REV_5752		(0x6 << 28)
 #define	MHCR_CHIP_ASIC_REV_5754		(0xb << 28)
+#define	MHCR_CHIP_ASIC_REV_5787		((uint32_t)0xb << 28)
 #define	MHCR_CHIP_ASIC_REV_5755		((uint32_t)0xa << 28)
 #define	MHCR_CHIP_ASIC_REV_5715 	((uint32_t)0x9 << 28)
 
