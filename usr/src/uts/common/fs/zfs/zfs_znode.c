@@ -1046,14 +1046,14 @@ void
 zfs_znode_delete(znode_t *zp, dmu_tx_t *tx)
 {
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
+	objset_t *os = zfsvfs->z_os;
 	uint64_t obj = zp->z_id;
+	uint64_t acl_obj = zp->z_phys->zp_acl.z_acl_extern_obj;
 
 	ZFS_OBJ_HOLD_ENTER(zfsvfs, obj);
-	if (zp->z_phys->zp_acl.z_acl_extern_obj) {
-		VERIFY(0 == dmu_object_free(zfsvfs->z_os,
-		    zp->z_phys->zp_acl.z_acl_extern_obj, tx));
-	}
-	VERIFY(0 == dmu_object_free(zfsvfs->z_os, obj, tx));
+	if (acl_obj)
+		VERIFY(0 == dmu_object_free(os, acl_obj, tx));
+	VERIFY(0 == dmu_object_free(os, obj, tx));
 	zfs_znode_dmu_fini(zp);
 	ZFS_OBJ_HOLD_EXIT(zfsvfs, obj);
 	zfs_znode_free(zp);
@@ -1233,136 +1233,176 @@ zfs_no_putpage(vnode_t *vp, page_t *pp, u_offset_t *offp, size_t *lenp,
 }
 
 /*
- * Free space in a file.
+ * Increase the file length
  *
  *	IN:	zp	- znode of file to free data in.
- *		off	- start of section to free.
- *		len	- length of section to free (0 => to EOF).
- *		flag	- current file open mode flags.
+ *		end	- new end-of-file
  *
  * 	RETURN:	0 if success
  *		error code if failure
  */
-int
-zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
+static int
+zfs_extend(znode_t *zp, uint64_t end)
 {
-	vnode_t *vp = ZTOV(zp);
-	dmu_tx_t *tx;
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
-	zilog_t *zilog = zfsvfs->z_log;
+	dmu_tx_t *tx;
 	rl_t *rl;
-	uint64_t end = off + len;
-	uint64_t size, new_blksz;
-	uint64_t pflags = zp->z_phys->zp_flags;
+	uint64_t newblksz;
 	int error;
 
-	if ((pflags & (ZFS_IMMUTABLE|ZFS_READONLY)) ||
-	    off < zp->z_phys->zp_size && (pflags & ZFS_APPENDONLY))
-		return (EPERM);
-
-	if (ZTOV(zp)->v_type == VFIFO)
-		return (0);
-
 	/*
-	 * If we will change zp_size then lock the whole file,
-	 * otherwise just lock the range being freed.
+	 * We will change zp_size, lock the whole file.
 	 */
-	if (len == 0 || off + len > zp->z_phys->zp_size) {
-		rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
-	} else {
-		rl = zfs_range_lock(zp, off, len, RL_WRITER);
-		/* recheck, in case zp_size changed */
-		if (off + len > zp->z_phys->zp_size) {
-			/* lost race: file size changed, lock whole file */
-			zfs_range_unlock(rl);
-			rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
-		}
-	}
+	rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
 
 	/*
 	 * Nothing to do if file already at desired length.
 	 */
-	size = zp->z_phys->zp_size;
-	if (len == 0 && size == off && off != 0) {
+	if (end <= zp->z_phys->zp_size) {
 		zfs_range_unlock(rl);
 		return (0);
 	}
-
-	/*
-	 * Check for any locks in the region to be freed.
-	 */
-	if (MANDLOCK(vp, (mode_t)zp->z_phys->zp_mode)) {
-		uint64_t start = off;
-		uint64_t extent = len;
-
-		if (off > size) {
-			start = size;
-			extent += off - size;
-		} else if (len == 0) {
-			extent = size - off;
-		}
-		if (error = chklock(vp, FWRITE, start, extent, flag, NULL)) {
-			zfs_range_unlock(rl);
-			return (error);
-		}
-	}
-
+top:
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_bonus(tx, zp->z_id);
-	new_blksz = 0;
-	if (end > size &&
+	if (end > zp->z_blksz &&
 	    (!ISP2(zp->z_blksz) || zp->z_blksz < zfsvfs->z_max_blksz)) {
 		/*
 		 * We are growing the file past the current block size.
 		 */
 		if (zp->z_blksz > zp->z_zfsvfs->z_max_blksz) {
 			ASSERT(!ISP2(zp->z_blksz));
-			new_blksz = MIN(end, SPA_MAXBLOCKSIZE);
+			newblksz = MIN(end, SPA_MAXBLOCKSIZE);
 		} else {
-			new_blksz = MIN(end, zp->z_zfsvfs->z_max_blksz);
+			newblksz = MIN(end, zp->z_zfsvfs->z_max_blksz);
 		}
-		dmu_tx_hold_write(tx, zp->z_id, 0, MIN(end, new_blksz));
-	} else if (off < size) {
-		/*
-		 * If len == 0, we are truncating the file.
-		 */
-		dmu_tx_hold_free(tx, zp->z_id, off, len ? len : DMU_OBJECT_END);
+		dmu_tx_hold_write(tx, zp->z_id, 0, newblksz);
+	} else {
+		newblksz = 0;
 	}
 
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
-		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT)
+		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
 			dmu_tx_wait(tx);
+			dmu_tx_abort(tx);
+			goto top;
+		}
 		dmu_tx_abort(tx);
 		zfs_range_unlock(rl);
 		return (error);
 	}
+	dmu_buf_will_dirty(zp->z_dbuf, tx);
 
-	if (new_blksz)
-		zfs_grow_blocksize(zp, new_blksz, tx);
+	if (newblksz)
+		zfs_grow_blocksize(zp, newblksz, tx);
 
-	if (end > size || len == 0)
-		zp->z_phys->zp_size = end;
-
-	if (off < size) {
-		objset_t *os = zfsvfs->z_os;
-		uint64_t rlen = len;
-
-		if (len == 0)
-			rlen = -1;
-		else if (end > size)
-			rlen = size - off;
-		VERIFY(0 == dmu_free_range(os, zp->z_id, off, rlen, tx));
-	}
-
-	if (log) {
-		zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
-		zfs_log_truncate(zilog, tx, TX_TRUNCATE, zp, off, len);
-	}
+	zp->z_phys->zp_size = end;
 
 	zfs_range_unlock(rl);
 
 	dmu_tx_commit(tx);
+
+	return (0);
+}
+
+/*
+ * Free space in a file.
+ *
+ *	IN:	zp	- znode of file to free data in.
+ *		off	- start of section to free.
+ *		len	- length of section to free.
+ *
+ * 	RETURN:	0 if success
+ *		error code if failure
+ */
+static int
+zfs_free_range(znode_t *zp, uint64_t off, uint64_t len)
+{
+	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
+	rl_t *rl;
+	int error;
+
+	/*
+	 * Lock the range being freed.
+	 */
+	rl = zfs_range_lock(zp, off, len, RL_WRITER);
+
+	/*
+	 * Nothing to do if file already at desired length.
+	 */
+	if (off >= zp->z_phys->zp_size) {
+		zfs_range_unlock(rl);
+		return (0);
+	}
+
+	if (off + len > zp->z_phys->zp_size)
+		len = zp->z_phys->zp_size - off;
+
+	error = dmu_free_long_range(zfsvfs->z_os, zp->z_id, off, len);
+
+	zfs_range_unlock(rl);
+
+	return (error);
+}
+
+/*
+ * Truncate a file
+ *
+ *	IN:	zp	- znode of file to free data in.
+ *		end	- new end-of-file.
+ *
+ * 	RETURN:	0 if success
+ *		error code if failure
+ */
+static int
+zfs_trunc(znode_t *zp, uint64_t end)
+{
+	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
+	vnode_t *vp = ZTOV(zp);
+	dmu_tx_t *tx;
+	rl_t *rl;
+	int error;
+
+	/*
+	 * We will change zp_size, lock the whole file.
+	 */
+	rl = zfs_range_lock(zp, 0, UINT64_MAX, RL_WRITER);
+
+	/*
+	 * Nothing to do if file already at desired length.
+	 */
+	if (end >= zp->z_phys->zp_size) {
+		zfs_range_unlock(rl);
+		return (0);
+	}
+
+	error = dmu_free_long_range(zfsvfs->z_os, zp->z_id, end,  -1);
+	if (error) {
+		zfs_range_unlock(rl);
+		return (error);
+	}
+top:
+	tx = dmu_tx_create(zfsvfs->z_os);
+	dmu_tx_hold_bonus(tx, zp->z_id);
+	error = dmu_tx_assign(tx, zfsvfs->z_assign);
+	if (error) {
+		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
+			dmu_tx_wait(tx);
+			dmu_tx_abort(tx);
+			goto top;
+		}
+		dmu_tx_abort(tx);
+		zfs_range_unlock(rl);
+		return (error);
+	}
+	dmu_buf_will_dirty(zp->z_dbuf, tx);
+
+	zp->z_phys->zp_size = end;
+
+	dmu_tx_commit(tx);
+
+	zfs_range_unlock(rl);
 
 	/*
 	 * Clear any mapped pages in the truncated region.  This has to
@@ -1371,10 +1411,10 @@ zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 	 * about to invalidate.
 	 */
 	rw_enter(&zp->z_map_lock, RW_WRITER);
-	if (off < size && vn_has_cached_data(vp)) {
+	if (vn_has_cached_data(vp)) {
 		page_t *pp;
-		uint64_t start = off & PAGEMASK;
-		int poff = off & PAGEOFFSET;
+		uint64_t start = end & PAGEMASK;
+		int poff = end & PAGEOFFSET;
 
 		if (poff != 0 && (pp = page_lookup(vp, start, SE_SHARED))) {
 			/*
@@ -1390,6 +1430,74 @@ zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 	}
 	rw_exit(&zp->z_map_lock);
 
+	return (0);
+}
+
+/*
+ * Free space in a file
+ *
+ *	IN:	zp	- znode of file to free data in.
+ *		off	- start of range
+ *		len	- end of range (0 => EOF)
+ *		flag	- current file open mode flags.
+ *		log	- TRUE if this action should be logged
+ *
+ * 	RETURN:	0 if success
+ *		error code if failure
+ */
+int
+zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
+{
+	vnode_t *vp = ZTOV(zp);
+	dmu_tx_t *tx;
+	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
+	zilog_t *zilog = zfsvfs->z_log;
+	int error;
+
+	if (off > zp->z_phys->zp_size) {
+		error =  zfs_extend(zp, off+len);
+		if (error == 0 && log)
+			goto log;
+		else
+			return (error);
+	}
+
+	/*
+	 * Check for any locks in the region to be freed.
+	 */
+	if (MANDLOCK(vp, (mode_t)zp->z_phys->zp_mode)) {
+		uint64_t length = (len ? len : zp->z_phys->zp_size - off);
+		if (error = chklock(vp, FWRITE, off, length, flag, NULL))
+			return (error);
+	}
+
+	if (len == 0) {
+		error = zfs_trunc(zp, off);
+	} else {
+		if ((error = zfs_free_range(zp, off, len)) == 0 &&
+		    off + len > zp->z_phys->zp_size)
+			error = zfs_extend(zp, off+len);
+	}
+	if (error || !log)
+		return (error);
+log:
+	tx = dmu_tx_create(zfsvfs->z_os);
+	dmu_tx_hold_bonus(tx, zp->z_id);
+	error = dmu_tx_assign(tx, zfsvfs->z_assign);
+	if (error) {
+		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
+			dmu_tx_wait(tx);
+			dmu_tx_abort(tx);
+			goto log;
+		}
+		dmu_tx_abort(tx);
+		return (error);
+	}
+
+	zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
+	zfs_log_truncate(zilog, tx, TX_TRUNCATE, zp, off, len);
+
+	dmu_tx_commit(tx);
 	return (0);
 }
 

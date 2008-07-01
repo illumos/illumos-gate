@@ -774,24 +774,6 @@ zvol_remove_minor(const char *name)
 	return (0);
 }
 
-static int
-zvol_truncate(zvol_state_t *zv, uint64_t offset, uint64_t size)
-{
-	dmu_tx_t *tx;
-	int error;
-
-	tx = dmu_tx_create(zv->zv_objset);
-	dmu_tx_hold_free(tx, ZVOL_OBJ, offset, size);
-	error = dmu_tx_assign(tx, TXG_WAIT);
-	if (error) {
-		dmu_tx_abort(tx);
-		return (error);
-	}
-	error = dmu_free_range(zv->zv_objset, ZVOL_OBJ, offset, size, tx);
-	dmu_tx_commit(tx);
-	return (0);
-}
-
 int
 zvol_prealloc(zvol_state_t *zv)
 {
@@ -823,7 +805,7 @@ zvol_prealloc(zvol_state_t *zv)
 		if (error) {
 			dmu_tx_abort(tx);
 			kmem_free(data, SPA_MAXBLOCKSIZE);
-			(void) zvol_truncate(zv, 0, off);
+			(void) dmu_free_long_range(os, ZVOL_OBJ, 0, off);
 			return (error);
 		}
 		dmu_write(os, ZVOL_OBJ, off, bytes, data, tx);
@@ -847,7 +829,6 @@ zvol_update_volsize(zvol_state_t *zv, major_t maj, uint64_t volsize)
 
 	tx = dmu_tx_create(zv->zv_objset);
 	dmu_tx_hold_zap(tx, ZVOL_ZAP_OBJ, TRUE, NULL);
-	dmu_tx_hold_free(tx, ZVOL_OBJ, volsize, DMU_OBJECT_END);
 	error = dmu_tx_assign(tx, TXG_WAIT);
 	if (error) {
 		dmu_tx_abort(tx);
@@ -859,7 +840,8 @@ zvol_update_volsize(zvol_state_t *zv, major_t maj, uint64_t volsize)
 	dmu_tx_commit(tx);
 
 	if (error == 0)
-		error = zvol_truncate(zv, volsize, DMU_OBJECT_END);
+		error = dmu_free_long_range(zv->zv_objset,
+		    ZVOL_OBJ, volsize, DMU_OBJECT_END);
 
 	if (error == 0) {
 		zv->zv_volsize = volsize;
@@ -1651,7 +1633,6 @@ zvol_dump_init(zvol_state_t *zv, boolean_t resize)
 	ASSERT(MUTEX_HELD(&zvol_state_lock));
 
 	tx = dmu_tx_create(os);
-	dmu_tx_hold_free(tx, ZVOL_OBJ, 0, DMU_OBJECT_END);
 	dmu_tx_hold_zap(tx, ZVOL_ZAP_OBJ, TRUE, NULL);
 	error = dmu_tx_assign(tx, TXG_WAIT);
 	if (error) {
@@ -1690,7 +1671,8 @@ zvol_dump_init(zvol_state_t *zv, boolean_t resize)
 
 	/* Truncate the file */
 	if (!error)
-		error = zvol_truncate(zv, 0, DMU_OBJECT_END);
+		error = dmu_free_long_range(zv->zv_objset,
+		    ZVOL_OBJ, 0, DMU_OBJECT_END);
 
 	if (error)
 		return (error);
@@ -1813,7 +1795,7 @@ zvol_dump_fini(zvol_state_t *zv)
 
 	(void) zap_remove(os, ZVOL_ZAP_OBJ, ZVOL_DUMPSIZE, tx);
 	zvol_free_extents(zv);
-	(void) zvol_truncate(zv, 0, DMU_OBJECT_END);
+	(void) dmu_free_long_range(os, ZVOL_OBJ, 0, DMU_OBJECT_END);
 	zv->zv_flags &= ~ZVOL_DUMPIFIED;
 	dmu_tx_commit(tx);
 

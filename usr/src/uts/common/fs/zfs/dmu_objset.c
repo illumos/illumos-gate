@@ -829,7 +829,7 @@ ready(zio_t *zio, arc_buf_t *abuf, void *arg)
 	if (!DVA_EQUAL(BP_IDENTITY(bp),
 	    BP_IDENTITY(&zio->io_bp_orig))) {
 		if (zio->io_bp_orig.blk_birth == os->os_synctx->tx_txg)
-			dsl_dataset_block_kill(os->os_dsl_dataset,
+			(void) dsl_dataset_block_kill(os->os_dsl_dataset,
 			    &zio->io_bp_orig, NULL, os->os_synctx);
 		dsl_dataset_block_born(os->os_dsl_dataset, bp, os->os_synctx);
 	}
@@ -878,7 +878,7 @@ dmu_objset_sync(objset_impl_t *os, zio_t *pio, dmu_tx_t *tx)
 	zb.zb_level = -1;
 	zb.zb_blkid = 0;
 	if (BP_IS_OLDER(os->os_rootbp, tx->tx_txg)) {
-		dsl_dataset_block_kill(os->os_dsl_dataset,
+		(void) dsl_dataset_block_kill(os->os_dsl_dataset,
 		    os->os_rootbp, pio, tx);
 	}
 	zio = arc_write(pio, os->os_spa, os->os_md_checksum,

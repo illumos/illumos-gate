@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -362,6 +362,152 @@ dmu_prefetch(objset_t *os, uint64_t object, uint64_t offset, uint64_t len)
 	rw_exit(&dn->dn_struct_rwlock);
 
 	dnode_rele(dn, FTAG);
+}
+
+static int
+get_next_chunk(dnode_t *dn, uint64_t *offset, uint64_t limit)
+{
+	uint64_t len = limit - *offset;
+	uint64_t chunk_len = dn->dn_datablksz * DMU_MAX_DELETEBLKCNT;
+	uint64_t dn_used;
+	int err;
+
+	ASSERT(limit <= *offset);
+
+	dn_used = dn->dn_phys->dn_used <<
+	    (dn->dn_phys->dn_flags & DNODE_FLAG_USED_BYTES ? 0 : DEV_BSHIFT);
+	if (len <= chunk_len || dn_used <= chunk_len) {
+		*offset = limit;
+		return (0);
+	}
+
+	while (*offset > limit) {
+		uint64_t initial_offset = *offset;
+		uint64_t delta;
+
+		/* skip over allocated data */
+		err = dnode_next_offset(dn,
+		    DNODE_FIND_HOLE|DNODE_FIND_BACKWARDS, offset, 1, 1, 0);
+		if (err == ESRCH)
+			*offset = limit;
+		else if (err)
+			return (err);
+
+		ASSERT3U(*offset, <=, initial_offset);
+		delta = initial_offset - *offset;
+		if (delta >= chunk_len) {
+			*offset += delta - chunk_len;
+			return (0);
+		}
+		chunk_len -= delta;
+
+		/* skip over unallocated data */
+		err = dnode_next_offset(dn,
+		    DNODE_FIND_BACKWARDS, offset, 1, 1, 0);
+		if (err == ESRCH)
+			*offset = limit;
+		else if (err)
+			return (err);
+
+		if (*offset < limit)
+			*offset = limit;
+		ASSERT3U(*offset, <, initial_offset);
+	}
+	return (0);
+}
+
+static int
+dmu_free_long_range_impl(objset_t *os, dnode_t *dn, uint64_t offset,
+    uint64_t length, boolean_t free_dnode)
+{
+	dmu_tx_t *tx;
+	uint64_t object_size, start, end, len;
+	boolean_t trunc = (length == DMU_OBJECT_END);
+	int align, err;
+
+	align = 1 << dn->dn_datablkshift;
+	ASSERT(align > 0);
+	object_size = align == 1 ? dn->dn_datablksz :
+	    (dn->dn_maxblkid + 1) << dn->dn_datablkshift;
+
+	if (trunc || (end = offset + length) > object_size)
+		end = object_size;
+	if (end <= offset)
+		return (0);
+	length = end - offset;
+
+	while (length) {
+		start = end;
+		err = get_next_chunk(dn, &start, offset);
+		if (err)
+			return (err);
+		len = trunc ? DMU_OBJECT_END : end - start;
+
+		tx = dmu_tx_create(os);
+		dmu_tx_hold_free(tx, dn->dn_object, start, len);
+		err = dmu_tx_assign(tx, TXG_WAIT);
+		if (err) {
+			dmu_tx_abort(tx);
+			return (err);
+		}
+
+		dnode_free_range(dn, start, trunc ? -1 : len, tx);
+
+		if (start == 0 && trunc && free_dnode)
+			dnode_free(dn, tx);
+
+		length -= end - start;
+
+		dmu_tx_commit(tx);
+		end = start;
+		trunc = FALSE;
+	}
+	return (0);
+}
+
+int
+dmu_free_long_range(objset_t *os, uint64_t object,
+    uint64_t offset, uint64_t length)
+{
+	dnode_t *dn;
+	int err;
+
+	err = dnode_hold(os->os, object, FTAG, &dn);
+	if (err != 0)
+		return (err);
+	err = dmu_free_long_range_impl(os, dn, offset, length, FALSE);
+	dnode_rele(dn, FTAG);
+	return (err);
+}
+
+int
+dmu_free_object(objset_t *os, uint64_t object)
+{
+	dnode_t *dn;
+	dmu_tx_t *tx;
+	int err;
+
+	err = dnode_hold_impl(os->os, object, DNODE_MUST_BE_ALLOCATED,
+	    FTAG, &dn);
+	if (err != 0)
+		return (err);
+	if (dn->dn_nlevels == 1) {
+		tx = dmu_tx_create(os);
+		dmu_tx_hold_bonus(tx, object);
+		dmu_tx_hold_free(tx, dn->dn_object, 0, DMU_OBJECT_END);
+		err = dmu_tx_assign(tx, TXG_WAIT);
+		if (err == 0) {
+			dnode_free_range(dn, 0, DMU_OBJECT_END, tx);
+			dnode_free(dn, tx);
+			dmu_tx_commit(tx);
+		} else {
+			dmu_tx_abort(tx);
+		}
+	} else {
+		err = dmu_free_long_range_impl(os, dn, 0, DMU_OBJECT_END, TRUE);
+	}
+	dnode_rele(dn, FTAG);
+	return (err);
 }
 
 int
@@ -912,7 +1058,7 @@ dmu_offset_next(objset_t *os, uint64_t object, boolean_t hole, uint64_t *off)
 			return (err);
 	}
 
-	err = dnode_next_offset(dn, hole, off, 1, 1, 0);
+	err = dnode_next_offset(dn, (hole ? DNODE_FIND_HOLE : 0), off, 1, 1, 0);
 	dnode_rele(dn, FTAG);
 
 	return (err);

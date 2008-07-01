@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,6 +89,7 @@ typedef struct dmu_tx_hold {
 	uint64_t txh_space_tofree;
 	uint64_t txh_space_tooverwrite;
 	uint64_t txh_space_tounref;
+	uint64_t txh_memory_tohold;
 #ifdef ZFS_DEBUG
 	enum dmu_tx_hold_type txh_type;
 	uint64_t txh_arg1;

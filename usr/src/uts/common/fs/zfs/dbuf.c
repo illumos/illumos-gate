@@ -705,22 +705,50 @@ dbuf_unoverride(dbuf_dirty_record_t *dr)
 	arc_release(dr->dt.dl.dr_data, db);
 }
 
+/*
+ * Evict (if its unreferenced) or clear (if its referenced) any level-0
+ * data blocks in the free range, so that any future readers will find
+ * empty blocks.  Also, if we happen accross any level-1 dbufs in the
+ * range that have not already been marked dirty, mark them dirty so
+ * they stay in memory.
+ */
 void
-dbuf_free_range(dnode_t *dn, uint64_t blkid, uint64_t nblks, dmu_tx_t *tx)
+dbuf_free_range(dnode_t *dn, uint64_t start, uint64_t end, dmu_tx_t *tx)
 {
 	dmu_buf_impl_t *db, *db_next;
 	uint64_t txg = tx->tx_txg;
+	int epbs = dn->dn_indblkshift - SPA_BLKPTRSHIFT;
+	uint64_t first_l1 = start >> epbs;
+	uint64_t last_l1 = end >> epbs;
 
-	dprintf_dnode(dn, "blkid=%llu nblks=%llu\n", blkid, nblks);
+	if (end > dn->dn_maxblkid) {
+		end = dn->dn_maxblkid;
+		last_l1 = end >> epbs;
+	}
+	dprintf_dnode(dn, "start=%llu end=%llu\n", start, end);
 	mutex_enter(&dn->dn_dbufs_mtx);
 	for (db = list_head(&dn->dn_dbufs); db; db = db_next) {
 		db_next = list_next(&dn->dn_dbufs, db);
 		ASSERT(db->db_blkid != DB_BONUS_BLKID);
+
+		if (db->db_level == 1 &&
+		    db->db_blkid >= first_l1 && db->db_blkid <= last_l1) {
+			mutex_enter(&db->db_mtx);
+			if (db->db_last_dirty &&
+			    db->db_last_dirty->dr_txg < txg) {
+				dbuf_add_ref(db, FTAG);
+				mutex_exit(&db->db_mtx);
+				dbuf_will_dirty(db, tx);
+				dbuf_rele(db, FTAG);
+			} else {
+				mutex_exit(&db->db_mtx);
+			}
+		}
+
 		if (db->db_level != 0)
 			continue;
 		dprintf_dbuf(db, "found buf %s\n", "");
-		if (db->db_blkid < blkid ||
-		    db->db_blkid >= blkid+nblks)
+		if (db->db_blkid < start || db->db_blkid > end)
 			continue;
 
 		/* found a level 0 buffer in the range */
@@ -1161,7 +1189,7 @@ dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 		list_remove(&dr->dr_parent->dt.di.dr_children, dr);
 		mutex_exit(&dr->dr_parent->dt.di.dr_mtx);
 	} else if (db->db_level+1 == dn->dn_nlevels) {
-		ASSERT3P(db->db_parent, ==, dn->dn_dbuf);
+		ASSERT(db->db_blkptr == NULL || db->db_parent == dn->dn_dbuf);
 		mutex_enter(&dn->dn_mtx);
 		list_remove(&dn->dn_dirty_records[txg & TXG_MASK], dr);
 		mutex_exit(&dn->dn_mtx);
@@ -1976,7 +2004,7 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 		mutex_exit(&db->db_mtx);
 
 		if (BP_IS_OLDER(&zio_fake.io_bp_orig, txg))
-			dsl_dataset_block_kill(os->os_dsl_dataset,
+			(void) dsl_dataset_block_kill(os->os_dsl_dataset,
 			    &zio_fake.io_bp_orig, dn->dn_zio, tx);
 
 		dbuf_write_ready(&zio_fake, db->db_buf, db);
@@ -2105,7 +2133,7 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, int checksum,
 	if (dmu_ot[dn->dn_type].ot_metadata || zb.zb_level != 0)
 		zio_flags |= ZIO_FLAG_METADATA;
 	if (BP_IS_OLDER(db->db_blkptr, txg))
-		dsl_dataset_block_kill(
+		(void) dsl_dataset_block_kill(
 		    os->os_dsl_dataset, db->db_blkptr, zio, tx);
 
 	dr->dr_zio = arc_write(zio, os->os_spa, checksum, compress,
@@ -2137,7 +2165,7 @@ dbuf_write_ready(zio_t *zio, arc_buf_t *buf, void *vdb)
 		dmu_tx_t *tx = os->os_synctx;
 
 		if (bp_orig->blk_birth == tx->tx_txg)
-			dsl_dataset_block_kill(ds, bp_orig, NULL, tx);
+			(void) dsl_dataset_block_kill(ds, bp_orig, NULL, tx);
 		ASSERT3U(db->db_blkptr->blk_fill, ==, 0);
 		return;
 	}
@@ -2185,7 +2213,7 @@ dbuf_write_ready(zio_t *zio, arc_buf_t *buf, void *vdb)
 		dmu_tx_t *tx = os->os_synctx;
 
 		if (bp_orig->blk_birth == tx->tx_txg)
-			dsl_dataset_block_kill(ds, bp_orig, NULL, tx);
+			(void) dsl_dataset_block_kill(ds, bp_orig, NULL, tx);
 		dsl_dataset_block_born(ds, zio->io_bp, tx);
 	}
 }

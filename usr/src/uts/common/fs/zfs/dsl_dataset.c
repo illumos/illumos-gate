@@ -115,7 +115,7 @@ dsl_dataset_block_born(dsl_dataset_t *ds, blkptr_t *bp, dmu_tx_t *tx)
 	dsl_dir_diduse_space(ds->ds_dir, delta, compressed, uncompressed, tx);
 }
 
-void
+int
 dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, zio_t *pio,
     dmu_tx_t *tx)
 {
@@ -126,7 +126,7 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, zio_t *pio,
 	ASSERT(dmu_tx_is_syncing(tx));
 	/* No block pointer => nothing to free */
 	if (BP_IS_HOLE(bp))
-		return;
+		return (0);
 
 	ASSERT(used > 0);
 	if (ds == NULL) {
@@ -142,7 +142,7 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, zio_t *pio,
 		dsl_dir_diduse_space(tx->tx_pool->dp_mos_dir,
 		    -used, -compressed, -uncompressed, tx);
 		dsl_dir_dirty(tx->tx_pool->dp_mos_dir, tx);
-		return;
+		return (used);
 	}
 	ASSERT3P(tx->tx_pool, ==, ds->ds_dir->dd_pool);
 
@@ -189,6 +189,8 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, zio_t *pio,
 	ASSERT3U(ds->ds_phys->ds_uncompressed_bytes, >=, uncompressed);
 	ds->ds_phys->ds_uncompressed_bytes -= uncompressed;
 	mutex_exit(&ds->ds_lock);
+
+	return (used);
 }
 
 uint64_t
@@ -957,21 +959,11 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag)
 	 */
 	for (obj = 0; err == 0; err = dmu_object_next(os, &obj, FALSE,
 	    ds->ds_phys->ds_prev_snap_txg)) {
-		dmu_tx_t *tx = dmu_tx_create(os);
-		dmu_tx_hold_free(tx, obj, 0, DMU_OBJECT_END);
-		dmu_tx_hold_bonus(tx, obj);
-		err = dmu_tx_assign(tx, TXG_WAIT);
-		if (err) {
-			/*
-			 * Perhaps there is not enough disk
-			 * space.  Just deal with it from
-			 * dsl_dataset_destroy_sync().
-			 */
-			dmu_tx_abort(tx);
-			continue;
-		}
-		VERIFY(0 == dmu_object_free(os, obj, tx));
-		dmu_tx_commit(tx);
+		/*
+		 * Ignore errors, if there is not enough disk space
+		 * we will deal with it in dsl_dataset_destroy_sync().
+		 */
+		(void) dmu_free_object(os, obj);
 	}
 
 	dmu_objset_close(os);

@@ -877,23 +877,14 @@ restore_freeobjects(struct restorearg *ra, objset_t *os,
 	for (obj = drrfo->drr_firstobj;
 	    obj < drrfo->drr_firstobj + drrfo->drr_numobjs;
 	    (void) dmu_object_next(os, &obj, FALSE, 0)) {
-		dmu_tx_t *tx;
 		int err;
 
 		if (dmu_object_info(os, obj, NULL) != 0)
 			continue;
 
-		tx = dmu_tx_create(os);
-		dmu_tx_hold_bonus(tx, obj);
-		err = dmu_tx_assign(tx, TXG_WAIT);
-		if (err) {
-			dmu_tx_abort(tx);
+		err = dmu_free_object(os, obj);
+		if (err)
 			return (err);
-		}
-		err = dmu_object_free(os, obj, tx);
-		dmu_tx_commit(tx);
-		if (err && err != ENOENT)
-			return (EINVAL);
 	}
 	return (0);
 }
@@ -939,7 +930,6 @@ static int
 restore_free(struct restorearg *ra, objset_t *os,
     struct drr_free *drrf)
 {
-	dmu_tx_t *tx;
 	int err;
 
 	if (drrf->drr_length != -1ULL &&
@@ -949,18 +939,8 @@ restore_free(struct restorearg *ra, objset_t *os,
 	if (dmu_object_info(os, drrf->drr_object, NULL) != 0)
 		return (EINVAL);
 
-	tx = dmu_tx_create(os);
-
-	dmu_tx_hold_free(tx, drrf->drr_object,
+	err = dmu_free_long_range(os, drrf->drr_object,
 	    drrf->drr_offset, drrf->drr_length);
-	err = dmu_tx_assign(tx, TXG_WAIT);
-	if (err) {
-		dmu_tx_abort(tx);
-		return (err);
-	}
-	err = dmu_free_range(os, drrf->drr_object,
-	    drrf->drr_offset, drrf->drr_length, tx);
-	dmu_tx_commit(tx);
 	return (err);
 }
 
