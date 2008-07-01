@@ -1178,6 +1178,7 @@ is_pciide(uchar_t basecl, uchar_t subcl, uchar_t revid,
 		{0x1095, 0x3112},
 		{0x1095, 0x3114},
 		{0x1095, 0x3512},
+		{0x1095, 0x680},	/* Sil0680 */
 		{0x1283, 0x8211},	/* ITE 8211F is subcl PCI_MASS_OTHER */
 		{0, 0}
 	};
@@ -1189,6 +1190,9 @@ is_pciide(uchar_t basecl, uchar_t subcl, uchar_t revid,
 		return (1);
 	}
 
+	if (check_pciide_prop(revid, venid, devid, subvenid, subdevid))
+		return (1);
+
 	if (subcl != PCI_MASS_OTHER && subcl != PCI_MASS_SATA) {
 		return (0);
 	}
@@ -1199,7 +1203,7 @@ is_pciide(uchar_t basecl, uchar_t subcl, uchar_t revid,
 			return (1);
 		entry++;
 	}
-	return (check_pciide_prop(revid, venid, devid, subvenid, subdevid));
+	return (0);
 }
 
 static int
