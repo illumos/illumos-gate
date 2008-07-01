@@ -3192,7 +3192,6 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 	vd = spa_lookup_by_guid(spa, guid, B_FALSE);
 
 	if (spa->spa_spares.sav_vdevs != NULL &&
-//	    spa_spare_exists(guid, NULL) &&
 	    nvlist_lookup_nvlist_array(spa->spa_spares.sav_config,
 	    ZPOOL_CONFIG_SPARES, &spares, &nspares) == 0) {
 		if ((error = spa_remove_spares(&spa->spa_spares, guid, unspare,
@@ -3204,7 +3203,6 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 	}
 
 	if (spa->spa_l2cache.sav_vdevs != NULL &&
-//	    spa_l2cache_exists(guid, NULL) &&
 	    nvlist_lookup_nvlist_array(spa->spa_l2cache.sav_config,
 	    ZPOOL_CONFIG_L2CACHE, &l2cache, &nl2cache) == 0) {
 		if ((error = spa_remove_l2cache(&spa->spa_l2cache, guid,
