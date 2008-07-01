@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -187,9 +186,9 @@ dhcp_offer(dsvc_clnt_t *pcd, PKT_LIST *plp)
 	PKT 		*rep_pktp = NULL;
 	uchar_t		*optp;
 	ENCODE		*ecp, *vecp, *macro_ecp, *macro_vecp,
-			*class_ecp, *class_vecp,
-			*cid_ecp, *cid_vecp,
-			*net_ecp, *net_vecp;
+	    *class_ecp, *class_vecp,
+	    *cid_ecp, *cid_vecp,
+	    *net_ecp, *net_vecp;
 	MACRO		*net_mp, *pkt_mp, *class_mp, *cid_mp;
 	char		*class_id;
 	time_t		now = time(NULL);
@@ -574,8 +573,8 @@ static void
 dhcp_req_ack(dsvc_clnt_t *pcd, PKT_LIST *plp)
 {
 	dn_rec_t	dn, ndn, *dnp;
-	struct in_addr	serverid, ciaddr, claddr, nreqaddr, cipaddr, ncipaddr,
-			sipaddr;
+	struct in_addr	serverid, ciaddr, claddr, nreqaddr, cipaddr,
+	    ncipaddr, sipaddr;
 	struct in_addr	dest_in;
 	dsvc_dnet_t	*pnd = pcd->pnd;
 	uint_t		replen;
@@ -585,10 +584,10 @@ dhcp_req_ack(dsvc_clnt_t *pcd, PKT_LIST *plp)
 	PKT 		*rep_pktp = NULL;
 	uchar_t		*optp;
 	ENCODE		*ecp, *vecp,
-			*class_ecp, *class_vecp,
-			*net_ecp, *net_vecp,
-			*macro_ecp, *macro_vecp,
-			*cid_ecp, *cid_vecp;
+	    *class_ecp, *class_vecp,
+	    *net_ecp, *net_vecp,
+	    *macro_ecp, *macro_vecp,
+	    *cid_ecp, *cid_vecp;
 	MACRO		*class_mp, *pkt_mp, *net_mp, *cid_mp;
 	char		*class_id;
 	char		nak_mesg[DHCP_SCRATCH];
@@ -599,7 +598,7 @@ dhcp_req_ack(dsvc_clnt_t *pcd, PKT_LIST *plp)
 	int		write_error = DSVC_SUCCESS, clnt_state;
 	ushort_t	boot_secs;
 	char		ntoaa[INET_ADDRSTRLEN], ntoab[INET_ADDRSTRLEN],
-			ntoac[INET_ADDRSTRLEN];
+	    ntoac[INET_ADDRSTRLEN];
 	char		class_idbuf[DSYM_CLASS_SIZE];
 	boolean_t	hostname_update = B_FALSE;
 	dn_rec_list_t	*nlp, *dncp = NULL, *dnlp = NULL;
@@ -636,8 +635,8 @@ dhcp_req_ack(dsvc_clnt_t *pcd, PKT_LIST *plp)
 		if (plp->opts[CD_REQUESTED_IP_ADDR] == NULL) {
 			if (verbose) {
 				dhcpmsg(LOG_NOTICE, "%1$s: REQUEST on %2$s is "
-				"missing requested IP option.\n", pcd->cidbuf,
-				pcd->pnd->network);
+				    "missing requested IP option.\n",
+				    pcd->cidbuf, pcd->pnd->network);
 			}
 			goto leave_ack;
 		}
@@ -897,14 +896,16 @@ dhcp_req_ack(dsvc_clnt_t *pcd, PKT_LIST *plp)
 					    "network: %s", pnd->network);
 					pkt_type = NAK;
 				} else {
-				    if (verbose) {
-					dhcpmsg(LOG_INFO,
-					    "Client: %1$s is not recorded as "
-					    "having address: %2$s\n",
-					    pcd->cidbuf, inet_ntop(AF_INET,
-					    &ciaddr, ntoab, sizeof (ntoab)));
-				    }
-				    goto leave_ack;
+					if (verbose) {
+						dhcpmsg(LOG_INFO,
+						    "Client: %1$s is not "
+						    "recorded as having "
+						    "address: %2$s\n",
+						    pcd->cidbuf,
+						    inet_ntop(AF_INET, &ciaddr,
+						    ntoab, sizeof (ntoab)));
+					}
+					goto leave_ack;
 				}
 			}
 		}
@@ -1195,11 +1196,12 @@ dhcp_req_ack(dsvc_clnt_t *pcd, PKT_LIST *plp)
 			}
 		} else {
 			if (verbose) {
-			    dhcpmsg(LOG_INFO,
-				"Database write unnecessary for DHCP client: "
-				"%1$s, %2$s\n", pcd->cidbuf,
-				inet_ntop(AF_INET, &ncipaddr,
-				ntoab, sizeof (ntoab)));
+				dhcpmsg(LOG_INFO,
+				    "Database write unnecessary for "
+				    "DHCP client: "
+				    "%1$s, %2$s\n", pcd->cidbuf,
+				    inet_ntop(AF_INET, &ncipaddr,
+				    ntoab, sizeof (ntoab)));
 			}
 		}
 		if (write_error == DSVC_SUCCESS ||
@@ -1302,10 +1304,10 @@ dhcp_dec_rel(dsvc_clnt_t *pcd, PKT_LIST *plp, int type)
 		if (verbose) {
 			if (type == DECLINE) {
 				fmtp = "Unregistered client: %1$s is "
-					"DECLINEing address: %2$s.\n";
+				    "DECLINEing address: %2$s.\n";
 			} else {
 				fmtp = "Unregistered client: %1$s is "
-					"RELEASEing address: %2$s.\n";
+				    "RELEASEing address: %2$s.\n";
 			}
 			dhcpmsg(LOG_INFO, fmtp, pcd->cidbuf, ipb);
 		}
@@ -1355,7 +1357,7 @@ dhcp_dec_rel(dsvc_clnt_t *pcd, PKT_LIST *plp, int type)
 				dhcpmsg(LOG_INFO,
 				    "RELEASE: client message: %s\n",
 				    disp_clnt_msg(plp, clnt_msg,
-					sizeof (clnt_msg)));
+				    sizeof (clnt_msg)));
 			}
 		}
 	}
@@ -1413,7 +1415,7 @@ dhcp_inform(dsvc_clnt_t *pcd, PKT_LIST *plp)
 	PKT 		*rep_pktp = NULL;
 	uchar_t		*optp;
 	ENCODE		*ecp, *vecp, *class_ecp, *class_vecp,
-			*cid_ecp, *cid_vecp, *net_ecp, *net_vecp;
+	    *cid_ecp, *cid_vecp, *net_ecp, *net_vecp;
 	MACRO		*net_mp, *class_mp, *cid_mp;
 	dsvc_dnet_t	*pnd;
 	char		*class_id;
@@ -1740,7 +1742,7 @@ config_lease(PKT_LIST *plp, dn_rec_t *dnp, ENCODE **ecpp, lease_t oldlease,
 	if (ecpp != NULL && (lease_ecp = find_encode(*ecpp, DSYM_STANDARD,
 	    CD_LEASE_TIME)) != NULL && lease_ecp->len == sizeof (lease_t)) {
 		(void) memcpy((void *)&rel_current, lease_ecp->data,
-			sizeof (lease_t));
+		    sizeof (lease_t));
 		rel_current = htonl(rel_current);
 	} else
 		rel_current = (lease_t)DEFAULT_LEASE;
@@ -2482,7 +2484,7 @@ addr_avail(dsvc_dnet_t *pnd, dsvc_clnt_t *pcd, dn_rec_list_t **dnlpp,
 		    check_offer(pnd, &req_ip) == B_FALSE) {
 			/* Offered to someone else. Sorry. */
 			dhcpmsg(LOG_DEBUG, "name_avail(F):"
-				"  check_offer failed\n");
+			    "  check_offer failed\n");
 			return (B_FALSE);
 		}
 	} else {
@@ -2490,7 +2492,7 @@ addr_avail(dsvc_dnet_t *pnd, dsvc_clnt_t *pcd, dn_rec_list_t **dnlpp,
 			/* Offered to someone else. Sorry. */
 			if (isname) {
 				dhcpmsg(LOG_DEBUG, "name_avail(F):"
-					"  check_other_offers failed\n");
+				    "  check_other_offers failed\n");
 			}
 			return (B_FALSE);
 		}
@@ -2660,8 +2662,8 @@ name_avail(char *name, dsvc_clnt_t *pcd, PKT_LIST *plp, dn_rec_list_t **dnlpp,
 			return (B_TRUE);
 		} else {
 			dhcpmsg(LOG_DEBUG,
-			"name_avail(F):  gethostbyaddr_r failed\n");
-			    return (B_FALSE);
+			    "name_avail(F):  gethostbyaddr_r failed\n");
+			return (B_FALSE);
 		}
 	}
 
@@ -2673,15 +2675,15 @@ name_avail(char *name, dsvc_clnt_t *pcd, PKT_LIST *plp, dn_rec_list_t **dnlpp,
 			(void) strcat(owner, ".");
 	} else {
 		if ((resolv_conf.defdname == NULL) ||
-			(qualify_hostname(owner, owner_hp->h_name,
-			resolv_conf.defdname,
-			strlen(owner_hp->h_name),
-			strlen(resolv_conf.defdname)) == -1))
+		    (qualify_hostname(owner, owner_hp->h_name,
+		    resolv_conf.defdname,
+		    strlen(owner_hp->h_name),
+		    strlen(resolv_conf.defdname)) == -1))
 			return (B_FALSE);
 
 		dhcpmsg(LOG_DEBUG,
-			"name_avail: address owner qualified with %s\n",
-			resolv_conf.defdname);
+		    "name_avail: address owner qualified with %s\n",
+		    resolv_conf.defdname);
 	}
 
 	if ((strncmp(owner, fqname, NS_MAXDNAME)) != 0) {
@@ -2726,19 +2728,42 @@ name_avail(char *name, dsvc_clnt_t *pcd, PKT_LIST *plp, dn_rec_list_t **dnlpp,
 static boolean_t
 entry_available(dsvc_clnt_t *pcd, dn_rec_t *dnp)
 {
-	boolean_t isme = dnp->dn_cid_len == pcd->cid_len &&
+	char		ntoab[INET_ADDRSTRLEN];
+	boolean_t	isme = dnp->dn_cid_len == pcd->cid_len &&
 	    memcmp(pcd->cid, dnp->dn_cid, pcd->cid_len) == 0;
+	(void) inet_ntop(AF_INET, &(dnp->dn_sip), ntoab, sizeof (ntoab));
 
-	if ((dnp->dn_flags & (DN_FMANUAL|DN_FUNUSABLE)) != 0)
+	if ((dnp->dn_flags & (DN_FMANUAL|DN_FUNUSABLE)) != 0) {
+		dhcpmsg(LOG_DEBUG, "entry_available():"
+		    "  %s is manually allocated or not usable\n",
+		    ntoab);
 		return (B_FALSE);
+	}
+
 	if (dnp->dn_cid_len != 0 && isme == B_FALSE &&
-	    (dnp->dn_flags & (DN_FAUTOMATIC|DN_FBOOTP_ONLY)))
+	    (dnp->dn_flags & (DN_FAUTOMATIC|DN_FBOOTP_ONLY))) {
+		dhcpmsg(LOG_DEBUG, "entry_available():"
+		    "  %s is a permanent address or reserved for BOOTP\n",
+		    ntoab);
 		return (B_FALSE);
+	}
+
 	if (dnp->dn_cid_len != 0 && isme == B_FALSE &&
-	    (lease_t)time(NULL) < (lease_t)ntohl(dnp->dn_lease))
+	    (lease_t)time(NULL) < (lease_t)ntohl(dnp->dn_lease)) {
+		dhcpmsg(LOG_DEBUG, "entry_available():"
+		    "  lease on %s has not expired\n",
+		    ntoab);
 		return (B_FALSE);
-	if (match_ownerip(htonl(dnp->dn_sip.s_addr)) == NULL)
+	}
+
+	if (match_ownerip(htonl(dnp->dn_sip.s_addr)) == NULL) {
+		dhcpmsg(LOG_DEBUG, "entry_available():"
+		    "  %s does not match owner_ip\n",
+		    ntoab);
 		return (B_FALSE);
+	}
+
+	/* Input IP is good. */
 	return (B_TRUE);
 }
 
@@ -2853,7 +2878,7 @@ do_nsupdate(struct in_addr ia, ENCODE *ecp, PKT_LIST *plp)
 		if (((get_class_id(plp, class_idbuf,
 		    sizeof (class_idbuf))) != NULL) &&
 		    (strncmp(msft_classid, class_idbuf,
-			sizeof (msft_classid)) == 0)) {
+		    sizeof (msft_classid)) == 0)) {
 			dhcpmsg(LOG_DEBUG, "do_nsupdate:  class ID \"%s\"\n",
 			    class_idbuf);
 			return (B_TRUE);
