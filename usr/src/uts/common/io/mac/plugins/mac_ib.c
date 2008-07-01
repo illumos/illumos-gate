@@ -186,7 +186,7 @@ mac_ib_header(const void *saddr, const void *daddr, uint32_t sap,
 	if (mp == NULL)
 		return (NULL);
 
-	ibhp = (ib_header_info_t *)mp->b_rptr;
+	ibhp = (void *)mp->b_rptr;
 	ibhp->ipib_rhdr.ipoib_type = htons(sap);
 	ibhp->ipib_rhdr.ipoib_mbz = 0;
 	bcopy(daddr, &ibhp->ib_dst, IPOIB_ADDRL);
@@ -203,7 +203,7 @@ mac_ib_header_info(mblk_t *mp, void *mac_pdata, mac_header_info_t *hdr_info)
 	if (MBLKL(mp) < sizeof (ib_header_info_t))
 		return (EINVAL);
 
-	ibhp = (ib_header_info_t *)mp->b_rptr;
+	ibhp = (void *)mp->b_rptr;
 
 	hdr_info->mhi_hdrsize = sizeof (ib_header_info_t);
 	hdr_info->mhi_daddr = (const uint8_t *)&(ibhp->ib_dst);
@@ -242,7 +242,7 @@ mac_ib_header_cook(mblk_t *mp, void *pdata)
 	if (MBLKL(mp) < sizeof (ipoib_ptxhdr_t))
 		return (NULL);
 
-	orig_hp = (ipoib_ptxhdr_t *)mp->b_rptr;
+	orig_hp = (void *)mp->b_rptr;
 	llmp = mac_ib_header(NULL, &orig_hp->ipoib_dest,
 	    ntohs(orig_hp->ipoib_rhdr.ipoib_type), pdata, NULL, 0);
 	if (llmp == NULL)

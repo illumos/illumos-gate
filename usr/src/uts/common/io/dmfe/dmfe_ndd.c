@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,7 +111,7 @@ dmfe_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *credp)
 
 	_NOTE(ARGUNUSED(q, credp))
 
-	ndp = (nd_param_t *)cp;
+	ndp = (void *)cp;
 	(void) mi_mpprintf(mp, "%d", ndp->ndp_val);
 
 	return (0);
@@ -132,7 +132,7 @@ dmfe_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *credp)
 
 	_NOTE(ARGUNUSED(q, mp, credp))
 
-	ndp = (nd_param_t *)cp;
+	ndp = (void *)cp;
 	if (ndp->ndp_name[0] == '-')
 		return (EACCES);	/* shouldn't happen!	*/
 
@@ -145,7 +145,7 @@ dmfe_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *credp)
 	    (ndp->ndp_val != new_value)) {
 		ndp->ndp_dmfe->link_reset = B_TRUE;
 	}
-	ndp->ndp_val = new_value;
+	ndp->ndp_val = (uint32_t)new_value;
 	return (0);
 }
 

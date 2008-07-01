@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -366,13 +366,13 @@ wcopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 			 * consconfig_dacf asks us with CONSOPENPOLLED I/O.
 			 */
 			wscons.wc_polledio.cons_polledio_version =
-				CONSPOLLEDIO_V0;
+			    CONSPOLLEDIO_V0;
 			wscons.wc_polledio.cons_polledio_argument =
-				(cons_polledio_arg_t)&wscons;
+			    (cons_polledio_arg_t)&wscons;
 			wscons.wc_polledio.cons_polledio_enter =
-				wc_polled_enter;
+			    wc_polled_enter;
 			wscons.wc_polledio.cons_polledio_exit =
-				wc_polled_exit;
+			    wc_polled_exit;
 
 #ifdef _HAVE_TEM_FIRMWARE
 			/*
@@ -442,7 +442,7 @@ wcuwput(queue_t *q, mblk_t *mp)
 		struct iocblk *iocp;
 		struct linkblk *linkp;
 
-		iocp = (struct iocblk *)mp->b_rptr;
+		iocp = (void *)mp->b_rptr;
 		switch (iocp->ioc_cmd) {
 
 		case I_LINK:	/* stupid, but permitted */
@@ -452,7 +452,7 @@ wcuwput(queue_t *q, mblk_t *mp)
 				miocnak(q, mp, 0, EINVAL);
 				return (0);
 			}
-			linkp = (struct linkblk *)mp->b_cont->b_rptr;
+			linkp = (void *)mp->b_cont->b_rptr;
 			wscons.wc_kbdqueue = WR(linkp->l_qbot);
 			mp->b_datap->db_type = M_IOCACK;
 			iocp->ioc_count = 0;
@@ -461,7 +461,7 @@ wcuwput(queue_t *q, mblk_t *mp)
 
 		case I_UNLINK:	/* stupid, but permitted */
 		case I_PUNLINK:
-			linkp = (struct linkblk *)mp->b_cont->b_rptr;
+			linkp = (void *)mp->b_cont->b_rptr;
 			if (wscons.wc_kbdqueue != WR(linkp->l_qbot)) {
 				/* not us */
 				miocnak(q, mp, 0, EINVAL);
@@ -578,12 +578,12 @@ wc_getterm(mblk_t *mp)
 {
 	char *term;
 	intptr_t arg;
-	int flag = ((struct iocblk *)mp->b_rptr)->ioc_flag;
+	int flag = ((struct iocblk *)(void *)mp->b_rptr)->ioc_flag;
 
 	STRUCT_DECL(cons_getterm, wcterm);
 	STRUCT_INIT(wcterm, flag);
 
-	arg = *((intptr_t *)mp->b_cont->b_rptr);
+	arg = *((intptr_t *)(void *)mp->b_cont->b_rptr);
 
 	if (ddi_copyin((void *)arg, STRUCT_BUF(wcterm),
 	    STRUCT_SIZE(wcterm), flag) != 0) {
@@ -624,7 +624,7 @@ wcioctl(queue_t *q, mblk_t *mp)
 	int error;
 	long len;
 
-	iocp = (struct iocblk *)mp->b_rptr;
+	iocp = (void *)mp->b_rptr;
 
 	switch (iocp->ioc_cmd) {
 	case TIOCSWINSZ:
@@ -646,7 +646,7 @@ wcioctl(queue_t *q, mblk_t *mp)
 
 	case CONSOPENPOLLEDIO:
 		DPRINTF(PRINT_L1, PRINT_MASK_ALL,
-			("wcioctl: CONSOPENPOLLEDIO\n"));
+		    ("wcioctl: CONSOPENPOLLEDIO\n"));
 
 		error = miocpullup(mp, sizeof (struct cons_polledio *));
 		if (error != 0) {
@@ -661,8 +661,8 @@ wcioctl(queue_t *q, mblk_t *mp)
 		if (consmode == CONS_KFB)
 			wscons.wc_polledio.cons_polledio_putchar =
 			    wc_polled_putchar;
-		*(struct cons_polledio **)mp->b_cont->b_rptr =
-			&wscons.wc_polledio;
+		*(struct cons_polledio **)(void *)mp->b_cont->b_rptr =
+		    &wscons.wc_polledio;
 
 		mp->b_datap->db_type = M_IOCACK;
 
@@ -707,14 +707,13 @@ wcioctl(queue_t *q, mblk_t *mp)
 		/*
 		 * If we don't have exactly one continuation block, fail.
 		 */
-		if (mp->b_cont == NULL ||
-		    mp->b_cont->b_cont != NULL)
+		if (mp->b_cont == NULL || mp->b_cont->b_cont != NULL)
 			goto open_fail;
 
 		/*
 		 * If there's no null terminator in the string, fail.
 		 */
-		len = mp->b_cont->b_wptr - mp->b_cont->b_rptr;
+		len = MBLKL(mp->b_cont);
 		if (memchr(mp->b_cont->b_rptr, 0, len) == NULL)
 			goto open_fail;
 
@@ -723,7 +722,7 @@ wcioctl(queue_t *q, mblk_t *mp)
 		 * dimensions from a property, e.g. screen-#rows.
 		 */
 		iocp->ioc_error = tem_init(&wscons.wc_tem,
-			(char *)mp->b_cont->b_rptr, iocp->ioc_cr);
+		    (char *)mp->b_cont->b_rptr, iocp->ioc_cr);
 		/*
 		 * Of course, if the terminal emulator initialization
 		 * failed, fail.
@@ -732,7 +731,7 @@ wcioctl(queue_t *q, mblk_t *mp)
 			goto open_fail;
 
 		tem_register_modechg_cb(wscons.wc_tem, wc_modechg_cb,
-			(tem_modechg_cb_arg_t)&wscons);
+		    (tem_modechg_cb_arg_t)&wscons);
 
 		/*
 		 * Refresh terminal size with info from terminal emulator.
@@ -818,7 +817,7 @@ wc_open_kb_polledio(struct wscons *wscons, queue_t *q, mblk_t *mp)
 	struct iocblk *iocp;
 
 	DPRINTF(PRINT_L1, PRINT_MASK_ALL,
-		("wc_open_kb_polledio: sending CONSOPENPOLLEDIO\n"));
+	    ("wc_open_kb_polledio: sending CONSOPENPOLLEDIO\n"));
 
 	mp2 = mkiocb(CONSOPENPOLLEDIO);
 
@@ -840,11 +839,11 @@ wc_open_kb_polledio(struct wscons *wscons, queue_t *q, mblk_t *mp)
 		goto nomem;
 	}
 
-	iocp = (struct iocblk *)mp2->b_rptr;
+	iocp = (void *)mp2->b_rptr;
 
 	iocp->ioc_count = sizeof (struct cons_polledio *);
 	mp2->b_cont->b_wptr = mp2->b_cont->b_rptr +
-		sizeof (struct cons_polledio *);
+	    sizeof (struct cons_polledio *);
 
 	wscons->wc_pending_link = mp;
 	wscons->wc_kb_getpolledio_id = iocp->ioc_id;
@@ -854,7 +853,7 @@ wc_open_kb_polledio(struct wscons *wscons, queue_t *q, mblk_t *mp)
 	return;
 
 nomem:
-	iocp = (struct iocblk *)mp->b_rptr;
+	iocp = (void *)mp->b_rptr;
 	iocp->ioc_error = ENOMEM;
 	mp->b_datap->db_type = M_IOCNAK;
 	qreply(q, mp);
@@ -873,7 +872,7 @@ wc_close_kb_polledio(struct wscons *wscons, queue_t *q, mblk_t *mp)
 	struct iocblk *iocp;
 
 	DPRINTF(PRINT_L1, PRINT_MASK_ALL,
-		("wc_close_kb_polledio: sending CONSCLOSEPOLLEDIO\n"));
+	    ("wc_close_kb_polledio: sending CONSCLOSEPOLLEDIO\n"));
 
 	mp2 = mkiocb(CONSCLOSEPOLLEDIO);
 
@@ -896,7 +895,7 @@ wc_close_kb_polledio(struct wscons *wscons, queue_t *q, mblk_t *mp)
 		goto nomem;
 	}
 
-	iocp = (struct iocblk *)mp2->b_rptr;
+	iocp = (void *)mp2->b_rptr;
 
 	iocp->ioc_count = 0;
 
@@ -908,7 +907,7 @@ wc_close_kb_polledio(struct wscons *wscons, queue_t *q, mblk_t *mp)
 	return;
 
 nomem:
-	iocp = (struct iocblk *)mp->b_rptr;
+	iocp = (void *)mp->b_rptr;
 	iocp->ioc_error = ENOMEM;
 	mp->b_datap->db_type = M_IOCNAK;
 	qreply(q, mp);
@@ -1021,7 +1020,7 @@ wcstart(void)
 					if (nbp->b_wptr > nbp->b_rptr) {
 						(void) tem_write(wscons.wc_tem,
 						    nbp->b_rptr,
-						    nbp->b_wptr - nbp->b_rptr,
+						    MBLKL(nbp),
 						    kcred);
 					}
 				}
@@ -1032,7 +1031,7 @@ wcstart(void)
 		}
 
 		/* consmode = CONS_FW */
-		if ((cc = bp->b_wptr - bp->b_rptr) == 0) {
+		if ((cc = MBLKL(bp)) == 0) {
 			freemsg(bp);
 			continue;
 		}
@@ -1081,7 +1080,7 @@ wcstart(void)
 				freeb(nbp);
 				if (bp == NULL)
 					return;
-				cc = bp->b_wptr - bp->b_rptr;
+				cc = MBLKL(bp);
 			}
 		}
 #endif /* _HAVE_TEM_FIRMWARE */
@@ -1128,7 +1127,7 @@ wconsout(void *dummy)
 
 		do {
 			cp = bp->b_rptr;
-			cc = bp->b_wptr - cp;
+			cc = MBLKL(bp);
 			while (cc != 0) {
 				if (bytes_left == 0) {
 					/*
@@ -1170,7 +1169,7 @@ wclrput(queue_t *q, mblk_t *mp)
 	struct iocblk *iocp;
 
 	DPRINTF(PRINT_L1, PRINT_MASK_ALL,
-		("wclrput: wclrput type = 0x%x\n", mp->b_datap->db_type));
+	    ("wclrput: wclrput type = 0x%x\n", mp->b_datap->db_type));
 
 	switch (mp->b_datap->db_type) {
 
@@ -1205,7 +1204,7 @@ wclrput(queue_t *q, mblk_t *mp)
 
 	case M_IOCACK:
 	case M_IOCNAK:
-		iocp = (struct iocblk *)mp->b_rptr;
+		iocp = (void *)mp->b_rptr;
 		if (wscons.wc_pending_link != NULL &&
 		    iocp->ioc_id == wscons.wc_kb_getpolledio_id) {
 			switch (mp->b_datap->db_type) {
@@ -1216,23 +1215,23 @@ wclrput(queue_t *q, mblk_t *mp)
 
 				case CONSOPENPOLLEDIO:
 					DPRINTF(PRINT_L1, PRINT_MASK_ALL,
-						("wclrput: "
-						"ACK CONSOPENPOLLEDIO\n"));
+					    ("wclrput: "
+					    "ACK CONSOPENPOLLEDIO\n"));
 					wscons.wc_kb_polledio =
-					    *(struct cons_polledio **)
+					    *(struct cons_polledio **)(void *)
 					    mp->b_cont->b_rptr;
 					wscons.wc_polledio.
 					    cons_polledio_getchar =
-						wc_polled_getchar;
+					    wc_polled_getchar;
 					wscons.wc_polledio.
 					    cons_polledio_ischar =
-						wc_polled_ischar;
+					    wc_polled_ischar;
 					break;
 
 				case CONSCLOSEPOLLEDIO:
 					DPRINTF(PRINT_L1, PRINT_MASK_ALL,
-						("wclrput: "
-						"ACK CONSCLOSEPOLLEDIO\n"));
+					    ("wclrput: "
+					    "ACK CONSCLOSEPOLLEDIO\n"));
 					wscons.wc_kb_polledio = NULL;
 					wscons.wc_kbdqueue = NULL;
 					wscons.wc_polledio.
@@ -1242,8 +1241,7 @@ wclrput(queue_t *q, mblk_t *mp)
 					break;
 				default:
 					DPRINTF(PRINT_L1, PRINT_MASK_ALL,
-						("wclrput: "
-						"ACK UNKNOWN\n"));
+					    ("wclrput: ACK UNKNOWN\n"));
 				}
 
 				break;
@@ -1256,7 +1254,7 @@ wclrput(queue_t *q, mblk_t *mp)
 				 * underneath conskbd yet.
 				 */
 				DPRINTF(PRINT_L1, PRINT_MASK_ALL,
-					("wclrput: NAK\n"));
+				    ("wclrput: NAK\n"));
 
 				switch (iocp->ioc_cmd) {
 
@@ -1286,7 +1284,7 @@ wclrput(queue_t *q, mblk_t *mp)
 
 	default:	/* inc M_ERROR, M_HANGUP, M_IOCACK, M_IOCNAK, ... */
 		DPRINTF(PRINT_L1, PRINT_MASK_ALL,
-			("wclrput: Message DISCARDED\n"));
+		    ("wclrput: Message DISCARDED\n"));
 		if ((upq = wscons.wc_ttycommon.t_readq) != NULL) {
 			putnext(upq, mp);
 		} else {

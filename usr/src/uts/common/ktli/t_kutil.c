@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +63,7 @@
 #include <sys/timod.h>
 #include <sys/tiuser.h>
 #include <sys/t_kuser.h>
+#include <sys/strsun.h>
 #include <inet/common.h>
 #include <inet/mi.h>
 #include <netinet/ip6.h>
@@ -129,12 +129,12 @@ get_ok_ack(TIUSER *tiptr, int type, int fmode)
 	if ((error = tli_recv(tiptr, &bp, fmode)) != 0)
 		return (error);
 
-	if ((msgsz = (int)(bp->b_wptr - bp->b_rptr)) < sizeof (int)) {
+	if ((msgsz = (int)MBLKL(bp)) < sizeof (int)) {
 		freemsg(bp);
 		return (EPROTO);
 	}
 
-	pptr = (union T_primitives *)bp->b_rptr;
+	pptr = (void *)bp->b_rptr;
 	switch (pptr->type) {
 	case T_OK_ACK:
 		if (msgsz < TOKACKSZ || pptr->ok_ack.CORRECT_prim != type)
@@ -216,7 +216,7 @@ t_kadvise(TIUSER *tiptr, uchar_t *addr, int addr_len)
 	if (!mp)
 		return;
 
-	iocp = (struct iocblk *)mp->b_rptr;
+	iocp = (void *)mp->b_rptr;
 	iocp->ioc_count = sizeof (ipid_t) + addr_len;
 
 	mp->b_cont = allocb(iocp->ioc_count, BPRI_HI);
@@ -225,7 +225,7 @@ t_kadvise(TIUSER *tiptr, uchar_t *addr, int addr_len)
 		return;
 	}
 
-	ipid = (ipid_t *)mp->b_cont->b_rptr;
+	ipid = (void *)mp->b_cont->b_rptr;
 	mp->b_cont->b_wptr += iocp->ioc_count;
 
 	bzero(ipid, sizeof (*ipid));

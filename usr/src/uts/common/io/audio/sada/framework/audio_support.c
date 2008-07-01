@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1056,7 +1055,7 @@ audio_sup_wput(queue_t *q, mblk_t *mp)
 			break;
 		default:
 			ATRACE("audio_sup_wput() IOCTL calling ch_wput()",
-				chptr);
+			    chptr);
 			rc = chptr->ch_wput(q, mp);
 		}
 		break;
@@ -2454,7 +2453,7 @@ audio_sup_construct_minor(audiohdl_t handle, audio_device_type_e device_type)
 	ATRACE_32("in audio_sup_construct_minor()", device_type);
 
 	minor = (ddi_get_instance(dip) * minors_per_inst) +
-		    audio_sup_type_to_minor(device_type);
+	    audio_sup_type_to_minor(device_type);
 
 	ATRACE_32("audio_sup_construct_minor() returning", minor);
 
@@ -2659,7 +2658,7 @@ audio_sup_devt_to_ch_type(audio_state_t *statep, dev_t dev)
 		ATRACE("audio_sup_devt_to_ch_type() statep", statep);
 
 		chptr = &statep->as_channels[audio_sup_minor_to_ch(
-							statep, minor)];
+		    statep, minor)];
 
 		ATRACE("audio_sup_devt_to_ch_type() chptr", chptr);
 
@@ -2851,7 +2850,7 @@ audio_sup_mblk_alloc(mblk_t *mp, size_t size)
 	}
 
 	/* no memory leak, time to allocate the new message */
-	mp->b_cont = (struct msgb *)allocb((size), BPRI_HI);
+	mp->b_cont = allocb((size), BPRI_HI);
 	if (mp->b_cont == NULL) {
 		return (AUDIO_FAILURE);
 	}
@@ -3194,8 +3193,10 @@ audio_sup_get_qptr_instance(queue_t *q)
 	dev_t		dev = audio_sup_get_qptr_dev(q);
 	audio_state_t	*statep = audio_sup_devt_to_state(dev);
 	int		minor = getminor(dev);
-	int		instance = minor / audio_sup_get_minors_per_inst(
-			    AUDIO_STATE2HDL(statep));
+	int		instance;
+
+	instance = minor / audio_sup_get_minors_per_inst(
+	    AUDIO_STATE2HDL(statep));
 
 	ATRACE("in audio_sup_get_qptr_instance()", q);
 	ATRACE_32("in audio_sup_get_qptr_instance() returning", instance);
@@ -3247,7 +3248,7 @@ audio_sup_devt_to_state(dev_t dev)
 		my_dip = statep->as_dip;
 		my_major = statep->as_major;
 		instance = getminor(dev) /
-			audio_sup_get_minors_per_inst(AUDIO_STATE2HDL(statep));
+		    audio_sup_get_minors_per_inst(AUDIO_STATE2HDL(statep));
 
 		if ((my_major == major) &&
 		    (instance == ddi_get_instance(my_dip))) {
@@ -3964,7 +3965,7 @@ audio_sup_wioctl(queue_t *q, mblk_t *mp, audio_ch_t *chptr)
 	/* make sure this is a transparent ioctl */
 	if (iocbp->ioc_count != TRANSPARENT) {
 		ATRACE_32("audio_sup_wioctl() not TRANSPARENT",
-			iocbp->ioc_count);
+		    iocbp->ioc_count);
 		error = EINVAL;
 		goto nack;
 	}
@@ -3999,7 +4000,7 @@ audio_sup_wioctl(queue_t *q, mblk_t *mp, audio_ch_t *chptr)
 		qreply(q, mp);
 
 		ATRACE("audio_sup_wioctl() AUDIO_GET_CH_NUMBER returning",
-			chptr);
+		    chptr);
 
 		return (0);
 
@@ -4069,10 +4070,9 @@ audio_sup_wioctl(queue_t *q, mblk_t *mp, audio_ch_t *chptr)
 		    state->ais_address, NULL);
 
 		/* put the data in the buffer, but try to reuse it first */
-		if ((mp->b_cont->b_datap->db_lim -
-		    mp->b_cont->b_datap->db_base) < sizeof (audio_device_t)) {
+		if (MBLKSIZE(mp->b_cont) < sizeof (audio_device_t)) {
 			freemsg(mp->b_cont);
-			mp->b_cont = (struct msgb *)allocb(
+			mp->b_cont = allocb(
 			    sizeof (*chptr->ch_dev_info), BPRI_MED);
 			if (mp->b_cont == NULL) {
 				error = EAGAIN;
@@ -4112,12 +4112,10 @@ audio_sup_wioctl(queue_t *q, mblk_t *mp, audio_ch_t *chptr)
 		    state->ais_address, NULL);
 
 		/* put the data in the buffer, but try to reuse it first */
-		if ((mp->b_cont->b_datap->db_lim -
-		    mp->b_cont->b_datap->db_base) <
-		    sizeof (*chptr->ch_dev_info)) {
+		if (MBLKSIZE(mp->b_cont) < sizeof (*chptr->ch_dev_info)) {
 			freemsg(mp->b_cont);
-			mp->b_cont = (struct msgb *)allocb(
-				sizeof (*chptr->ch_dev_info), BPRI_MED);
+			mp->b_cont = allocb(
+			    sizeof (*chptr->ch_dev_info), BPRI_MED);
 			if (mp->b_cont == NULL) {
 				error = EAGAIN;
 				goto nack;
@@ -4157,11 +4155,9 @@ audio_sup_wioctl(queue_t *q, mblk_t *mp, audio_ch_t *chptr)
 		    state->ais_address, NULL);
 
 		/* put the data in the buffer, but try to reuse it first */
-		if ((mp->b_cont->b_datap->db_lim -
-		    mp->b_cont->b_datap->db_base) <
-		    sizeof (*chptr->ch_dev_info)) {
+		if (MBLKSIZE(mp->b_cont) < sizeof (*chptr->ch_dev_info)) {
 			freemsg(mp->b_cont);
-			mp->b_cont = (struct msgb *)allocb(
+			mp->b_cont = allocb(
 			    sizeof (*chptr->ch_dev_info), BPRI_MED);
 			if (mp->b_cont == NULL) {
 				error = EAGAIN;

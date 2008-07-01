@@ -1078,7 +1078,7 @@ ar_cmd_dispatch(queue_t *q, mblk_t *mp_orig, boolean_t from_wput)
 		if (!mp)
 			return (ENOENT);
 	}
-	len = mp->b_wptr - mp->b_rptr;
+	len = MBLKL(mp);
 	if (len < sizeof (uint32_t) || !OK_32PTR(mp->b_rptr))
 		return (ENOENT);
 	if (mp_orig == mp)
@@ -3094,7 +3094,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 		ioc = (struct iocblk *)mp->b_rptr;
 		ioc->ioc_error = err;
 		if ((mp1 = mp->b_cont) != 0)
-			ioc->ioc_count = mp1->b_wptr - mp1->b_rptr;
+			ioc->ioc_count = MBLKL(mp1);
 		else
 			ioc->ioc_count = 0;
 		qreply(q, mp);

@@ -425,7 +425,7 @@ amd8111s_loopback_ioctl(struct LayerPointers *adapter, struct iocblk *iocp,
 			    "wrong LB_GET_INFO_SIZE size");
 			return (IOC_INVAL);
 		}
-		lbsp = (lb_info_sz_t *)mp->b_cont->b_rptr;
+		lbsp = (void *)mp->b_cont->b_rptr;
 		*lbsp = sizeof (loopmodes);
 		break;
 
@@ -435,7 +435,7 @@ amd8111s_loopback_ioctl(struct LayerPointers *adapter, struct iocblk *iocp,
 			    "Wrong LB_GET_INFO size");
 			return (IOC_INVAL);
 		}
-		lbpp = (lb_property_t *)mp->b_cont->b_rptr;
+		lbpp = (void *)mp->b_cont->b_rptr;
 		bcopy(loopmodes, lbpp, sizeof (loopmodes));
 		break;
 
@@ -445,7 +445,7 @@ amd8111s_loopback_ioctl(struct LayerPointers *adapter, struct iocblk *iocp,
 			    "Wrong LB_GET_MODE size");
 			return (IOC_INVAL);
 		}
-		lbmp = (uint32_t *)mp->b_cont->b_rptr;
+		lbmp = (void *)mp->b_cont->b_rptr;
 		*lbmp = adapter->pOdl->loopback_mode;
 		break;
 
@@ -455,7 +455,7 @@ amd8111s_loopback_ioctl(struct LayerPointers *adapter, struct iocblk *iocp,
 			    "Wrong LB_SET_MODE size");
 			return (IOC_INVAL);
 		}
-		lbmp = (uint32_t *)mp->b_cont->b_rptr;
+		lbmp = (void *)mp->b_cont->b_rptr;
 		amd8111s_set_loop_mode(adapter, *lbmp);
 		break;
 	}
@@ -469,9 +469,9 @@ amd8111s_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
 	struct LayerPointers *adapter;
 	enum ioc_reply status;
 
-	iocp = (struct iocblk *)mp->b_rptr;
+	iocp = (void *)mp->b_rptr;
 	iocp->ioc_error = 0;
-	adapter = (struct LayerPointers *)arg;
+	adapter = arg;
 
 	ASSERT(adapter);
 	if (adapter == NULL) {
@@ -1264,7 +1264,7 @@ amd8111s_send_serial(struct LayerPointers *pLayerPointers)
 static uint_t
 amd8111s_send_drain(caddr_t arg)
 {
-	struct LayerPointers *pLayerPointers = (struct LayerPointers *)arg;
+	struct LayerPointers *pLayerPointers = (void *)arg;
 
 	amd8111s_send_serial(pLayerPointers);
 
@@ -1373,7 +1373,7 @@ static uint_t
 amd8111s_intr(caddr_t arg)
 {
 	unsigned int intrCauses;
-	struct LayerPointers *pLayerPointers = (struct LayerPointers *)arg;
+	struct LayerPointers *pLayerPointers = (void *)arg;
 
 	/* Read the interrupt status from mdl */
 	intrCauses = mdlReadInterrupt(pLayerPointers);

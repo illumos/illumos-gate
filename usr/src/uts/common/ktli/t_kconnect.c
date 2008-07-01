@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +64,7 @@
 #include <sys/t_kuser.h>
 #include <sys/strsubr.h>
 #include <sys/sysmacros.h>
+#include <sys/strsun.h>
 
 
 int
@@ -159,7 +159,7 @@ t_kconnect(TIUSER *tiptr, struct t_call *sndcall, struct t_call *rcvcall)
 	pptr = (union T_primitives *)bp->b_rptr;
 	switch (pptr->type) {
 	case T_CONN_CON:
-		hdrsz = bp->b_wptr -  bp->b_rptr;
+		hdrsz = MBLKL(bp);
 
 		/*
 		 * check everything for consistency
@@ -193,7 +193,7 @@ t_kconnect(TIUSER *tiptr, struct t_call *sndcall, struct t_call *rcvcall)
 			if (bp->b_cont) {
 				nbp = bp;
 				bp = bp->b_cont;
-				msgsz = (int)(bp->b_wptr - bp->b_rptr);
+				msgsz = (int)MBLKL(bp);
 				len = MIN(msgsz, rcvcall->udata.maxlen);
 				bcopy(bp->b_rptr, rcvcall->udata.buf, len);
 				rcvcall->udata.len = len;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,7 +90,6 @@ static struct modlinkage modlinkage = {
 	MODREV_1, &modldrv, NULL
 };
 
-static dev_info_t *vni_dev_info;
 static vni_str_t *vni_strlist_head;
 
 /*
@@ -153,7 +151,6 @@ vniattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	vni_dev_info = devi;
 	return (DDI_SUCCESS);
 }
 
@@ -256,7 +253,7 @@ vniwput(queue_t *q, mblk_t *mp)
 			dlerrorack(q, mp, DL_PRIM_INVAL, DL_UNSUPPORTED, 0);
 			return (0);
 		}
-		dlp = (union DL_primitives *)mp->b_rptr;
+		dlp = (void *)mp->b_rptr;
 		prim = dlp->dl_primitive;
 		switch (prim) {
 		case DL_ATTACH_REQ:
@@ -294,7 +291,7 @@ vniwput(queue_t *q, mblk_t *mp)
 			    M_PCPROTO, DL_INFO_ACK)) == NULL) {
 				return (0);
 			}
-			dlip = (dl_info_ack_t *)mp->b_rptr;
+			dlip = (void *)mp->b_rptr;
 			*dlip = dlvni_infoack;
 			dlip->dl_current_state = stp->st_state;
 			qreply(q, mp);

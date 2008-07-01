@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -297,14 +297,16 @@ mac_wifi_header_info(mblk_t *mp, void *pdata, mac_header_info_t *mhp)
 			llcp += IEEE80211_WEP_EXTIVLEN;
 	}
 
-	if (mp->b_wptr - llcp < sizeof (struct ieee80211_llc))
+	if ((uintptr_t)mp->b_wptr - (uintptr_t)llcp <
+	    sizeof (struct ieee80211_llc))
 		return (EINVAL);
 
 	llc = (struct ieee80211_llc *)llcp;
 	mhp->mhi_origsap = ntohs(llc->illc_ether_type);
 	mhp->mhi_bindsap = mhp->mhi_origsap;
 	mhp->mhi_pktsize = 0;
-	mhp->mhi_hdrsize = llcp + sizeof (*llc) - mp->b_rptr;
+	mhp->mhi_hdrsize = (uintptr_t)llcp + sizeof (*llc) -
+	    (uintptr_t)mp->b_rptr;
 
 	/*
 	 * Verify the LLC header is one of the known formats.  As per MSFT's
@@ -367,7 +369,7 @@ mac_wifi_header_cook(mblk_t *mp, void *pdata)
 	if (MBLKL(mp) < sizeof (struct ether_header))
 		return (NULL);
 
-	ehp = (struct ether_header *)mp->b_rptr;
+	ehp = (void *)mp->b_rptr;
 	llmp = mac_wifi_header(&ehp->ether_shost, &ehp->ether_dhost,
 	    ntohs(ehp->ether_type), pdata, NULL, 0);
 	if (llmp == NULL)

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -59,11 +59,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -dy -Nmisc/mac
-#
-# STREAMS API limitations force us to turn off these lint checks.
-#
-LINTTAGS        += -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS        += -erroff=E_PTRDIFF_OVERFLOW
 
 #
 #	Default build targets.

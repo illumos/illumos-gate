@@ -943,7 +943,7 @@ pcwl_send(pcwl_maci_t *pcwl_p, mblk_t *mblk_p)
 #ifdef DEBUG
 	if (pcwl_debug & PCWL_DBG_SEND) {
 		cmn_err(CE_NOTE, "pcwl send: packet");
-		for (i = 0; i < mblk_p->b_wptr - mblk_p->b_rptr; i++)
+		for (i = 0; i < MBLKL(mblk_p); i++)
 			cmn_err(CE_NOTE, "%x: %x\n", i,
 			    *((unsigned char *)mblk_p->b_rptr + i));
 	}

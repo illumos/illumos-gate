@@ -31,6 +31,10 @@
  *
  * $Id: smb_trantcp.c,v 1.39 2005/03/02 01:27:44 lindak Exp $
  */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -104,7 +108,6 @@ nb_wait_ack(TIUSER *tiptr, t_scalar_t ack_prim, int fmode)
 	if ((error = tli_recv(tiptr, &bp, fmode)) != 0)
 		return (error);
 
-	/*LINTED*/
 	diff = MBLKL(bp);
 	ASSERT(diff == (ptrdiff_t)((int)diff));
 	msgsz = (int)diff;
@@ -1075,7 +1078,6 @@ smb_nbst_send(struct smb_vc *vcp, mblk_t *m, struct proc *p)
 	 * (That's arguably a driver bug.)
 	 */
 
-	/* LINTED */
 	diff = MBLKHEAD(m);
 	if (diff == 4 && DB_REF(m) == 1) {
 		/* We can use the first dblk. */

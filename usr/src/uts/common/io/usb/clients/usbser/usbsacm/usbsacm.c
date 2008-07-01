@@ -1282,7 +1282,7 @@ usbsacm_ds_tx(ds_hdl_t hdl, uint_t port_num, mblk_t *mp)
 
 		return (USB_SUCCESS);
 	}
-	if (MBLKL(mp) <= 0) {
+	if (MBLKL(mp) < 1) {
 		freemsg(mp);
 
 		return (USB_SUCCESS);
@@ -2450,7 +2450,7 @@ usbsacm_tx_start(usbsacm_port_t *acm_port)
 		data->b_wptr += copylen;
 		data_len += copylen;
 
-		if (MBLKL(mp) <= 0) {
+		if (MBLKL(mp) < 1) {
 			acm_port->acm_tx_mp = unlinkb(mp);
 			freeb(mp);
 		} else {

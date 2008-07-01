@@ -130,38 +130,6 @@ rge_reg_put16(rge_t *rgep, uintptr_t regno, uint16_t data)
 	ddi_put16(rgep->io_handle, REG16(rgep, regno), data);
 }
 
-static void rge_reg_set16(rge_t *rgep, uintptr_t regno, uint16_t bits);
-#pragma	inline(rge_reg_set16)
-
-static void
-rge_reg_set16(rge_t *rgep, uintptr_t regno, uint16_t bits)
-{
-	uint16_t regval;
-
-	RGE_TRACE(("rge_reg_set16($%p, 0x%lx, 0x%x)",
-	    (void *)rgep, regno, bits));
-
-	regval = rge_reg_get16(rgep, regno);
-	regval |= bits;
-	rge_reg_put16(rgep, regno, regval);
-}
-
-static void rge_reg_clr16(rge_t *rgep, uintptr_t regno, uint16_t bits);
-#pragma	inline(rge_reg_clr16)
-
-static void
-rge_reg_clr16(rge_t *rgep, uintptr_t regno, uint16_t bits)
-{
-	uint16_t regval;
-
-	RGE_TRACE(("rge_reg_clr16($%p, 0x%lx, 0x%x)",
-	    (void *)rgep, regno, bits));
-
-	regval = rge_reg_get16(rgep, regno);
-	regval &= ~bits;
-	rge_reg_put16(rgep, regno, regval);
-}
-
 static uint8_t rge_reg_get8(rge_t *rgep, uintptr_t regno);
 #pragma	inline(rge_reg_get8)
 
@@ -328,7 +296,7 @@ rge_atomic_shl32(uint32_t *sp, uint_t count)
  */
 #if	RGE_DEBUGGING
 
-static void
+void
 rge_phydump(rge_t *rgep)
 {
 	uint16_t regs[32];
@@ -348,44 +316,6 @@ rge_phydump(rge_t *rgep)
 }
 
 #endif	/* RGE_DEBUGGING */
-
-/*
- * Basic low-level function to probe for a PHY
- *
- * Returns TRUE if the PHY responds with valid data, FALSE otherwise
- */
-static boolean_t
-rge_phy_probe(rge_t *rgep)
-{
-	uint16_t phy_status;
-
-	ASSERT(mutex_owned(rgep->genlock));
-
-	/*
-	 * Read the MII_STATUS register twice, in
-	 * order to clear any sticky bits (but they should
-	 * have been cleared by the RESET, I think).
-	 */
-	phy_status = rge_mii_get16(rgep, MII_STATUS);
-	phy_status = rge_mii_get16(rgep, MII_STATUS);
-	RGE_DEBUG(("rge_phy_probe: status 0x%x", phy_status));
-
-	/*
-	 * Now check the value read; it should have at least one bit set
-	 * (for the device capabilities) and at least one clear (one of
-	 * the error bits). So if we see all 0s or all 1s, there's a
-	 * problem.  In particular, rge_mii_get16() returns all 1s if
-	 * communications fails ...
-	 */
-	switch (phy_status) {
-	case 0x0000:
-	case 0xffff:
-		return (B_FALSE);
-
-	default :
-		return (B_TRUE);
-	}
-}
 
 static void
 rge_phy_check(rge_t *rgep)

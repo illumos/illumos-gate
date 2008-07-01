@@ -24,7 +24,7 @@
 /*	  All Rights Reserved					*/
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3124,7 +3124,7 @@ async_nstart(struct asyncline *async, int mode)
 			continue;
 		}
 
-		while (bp != NULL && (cc = bp->b_wptr - bp->b_rptr) == 0) {
+		while (bp != NULL && ((cc = MBLKL(bp)) == 0)) {
 			nbp = bp->b_cont;
 			freeb(bp);
 			bp = nbp;

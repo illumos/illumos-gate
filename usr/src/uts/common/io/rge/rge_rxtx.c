@@ -525,7 +525,7 @@ rge_send_copy(rge_t *rgep, mblk_t *mp, uint16_t tci)
 		bcopy(bp->b_rptr, txb, 2 * ETHERADDRL);
 		txb += 2 * ETHERADDRL;
 		totlen += 2 * ETHERADDRL;
-		mblen = bp->b_wptr - bp->b_rptr;
+		mblen = MBLKL(bp);
 		ASSERT(mblen >= 2 * ETHERADDRL + VLAN_TAGSZ);
 		mblen -= 2 * ETHERADDRL + VLAN_TAGSZ;
 		if ((totlen += mblen) <= rgep->ethmax_size) {
@@ -537,7 +537,7 @@ rge_send_copy(rge_t *rgep, mblk_t *mp, uint16_t tci)
 		rgep->stats.obytes += VLAN_TAGSZ;
 	}
 	for (; bp != NULL; bp = bp->b_cont) {
-		mblen = bp->b_wptr - bp->b_rptr;
+		mblen = MBLKL(bp);
 		if ((totlen += mblen) <= rgep->ethmax_size) {
 			bcopy(bp->b_rptr, txb, mblen);
 			txb += mblen;

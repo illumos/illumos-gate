@@ -63,7 +63,6 @@ LDFLAGS 	+= -dy -Ndrv/dld -Nmisc/mac -Nmisc/strplumb -Nmisc/dls
 # lint coverage.
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
 #
 #	Default build targets.

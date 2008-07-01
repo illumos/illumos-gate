@@ -39,7 +39,6 @@ static int aggr_ioc_delete(mblk_t *, int);
 static int aggr_ioc_info(mblk_t *, int);
 static int aggr_ioc_add(mblk_t *, int);
 static int aggr_ioc_remove(mblk_t *, int);
-static int aggr_ioc_status(mblk_t *, int);
 static int aggr_ioc_modify(mblk_t *, int);
 
 typedef struct ioc_cmd_s {

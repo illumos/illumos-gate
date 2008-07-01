@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -137,13 +137,11 @@ ibcm_arp_query_arp(ibcm_arp_prwqn_t *wqnp)
 	}
 
 	mp1->b_wptr += sizeof (void *);
-	/* LINTED */
-	*(uintptr_t *)mp1->b_rptr = (uintptr_t)wqnp;	/* store wqnp */
+	*(uintptr_t *)(void *)mp1->b_rptr = (uintptr_t)wqnp;	/* store wqnp */
 
 	cp = (char *)mp->b_rptr;
 	bcopy(&ibcm_arp_areq_template, cp, sizeof (areq_t));
-	/* LINTED */
-	areqp = (areq_t *)cp;
+	areqp = (void *)cp;
 	areqp->areq_name_length = name_len;
 
 	cp = (char *)areqp + areqp->areq_name_offset;
@@ -207,16 +205,14 @@ ibcm_arp_squery_arp(ibcm_arp_prwqn_t *wqnp)
 	bzero(mp->b_rptr, len);
 	mp->b_wptr += len + sizeof (uintptr_t);
 
-	/* LINTED */
-	*(uintptr_t *)mp->b_rptr = (uintptr_t)wqnp;	/* store wqnp */
+	*(uintptr_t *)(void *)mp->b_rptr = (uintptr_t)wqnp;	/* store wqnp */
 	mp->b_rptr += sizeof (uintptr_t);
 
 
 	cp = (char *)mp->b_rptr;
 	bcopy(&ibcm_arp_area_template, cp, sizeof (area_t));
 
-	/* LINTED */
-	areap = (area_t *)cp;
+	areap = (void *)cp;
 	areap->area_cmd = AR_ENTRY_SQUERY;
 	areap->area_name_length = name_len;
 	cp = (char *)areap + areap->area_name_offset;
@@ -233,8 +229,7 @@ ibcm_arp_squery_arp(ibcm_arp_prwqn_t *wqnp)
 		freeb(mp);
 		return (ENOMEM);
 	}
-	/* LINTED */
-	ioc = (struct iocblk *)mp1->b_rptr;
+	ioc = (void *)mp1->b_rptr;
 	ioc->ioc_cmd = AR_ENTRY_SQUERY;
 	ioc->ioc_error = 0;
 	ioc->ioc_cr = NULL;
@@ -285,8 +280,7 @@ ibcm_arp_add(ibcm_arp_prwqn_t *wqnp)
 	cp = (char *)mp->b_rptr;
 	bcopy(&ibcm_arp_area_template, cp, sizeof (area_t));
 
-	/* LINTED */
-	areap = (area_t *)mp->b_rptr;
+	areap = (void *)mp->b_rptr;
 	areap->area_name_length = name_len;
 	cp = (char *)areap + areap->area_name_offset;
 	bcopy(wqnp->ifname, cp, name_len);
@@ -547,14 +541,12 @@ ibcm_arp_pr_arp_query_ack(mblk_t *mp)
 	/*
 	 * the first mblk contains the wqnp pointer for the request
 	 */
-	/* LINTED */
 	if (MBLKL(mp) != sizeof (void *)) {
 		freemsg(mp);
 		return;
 	}
 
-	/* LINTED */
-	wqnp = *(ibcm_arp_prwqn_t **)mp->b_rptr;	/* retrieve wqnp */
+	wqnp = *(ibcm_arp_prwqn_t **)(void *)mp->b_rptr; /* retrieve wqnp */
 	ib_s = (ibcm_arp_streams_t *)wqnp->arg;
 
 	mutex_enter(&ib_s->lock);
@@ -572,15 +564,13 @@ ibcm_arp_pr_arp_query_ack(mblk_t *mp)
 		rc = EPROTO;
 		goto user_callback;
 	}
-	/* LINTED */
 	if (MBLKL(mp->b_cont) < (sizeof (dl_unitdata_req_t) + IPOIB_ADDRL)) {
 		IBTF_DPRINTF_L2(cmlog, "areq_ack: invalid len in "
 		    "dl_unitdatareq_t block\n");
 		rc = EPROTO;
 		goto user_callback;
 	}
-	/* LINTED */
-	dlreq = (dl_unitdata_req_t *)mp->b_cont->b_rptr;
+	dlreq = (void *)mp->b_cont->b_rptr;
 	if (dlreq->dl_primitive != DL_UNITDATA_REQ) {
 		IBTF_DPRINTF_L2(cmlog, "areq_ack: invalid dl_primitive "
 		    "in dl_unitdatareq_t block\n");
@@ -639,14 +629,12 @@ ibcm_arp_pr_arp_squery_ack(mblk_t *mp)
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_pr_arp_squery_ack(%p)", mp);
 
-	/* LINTED */
 	if (MBLKL(mp) < sizeof (struct iocblk)) {
 		freemsg(mp);
 		return;
 	}
 
-	/* LINTED */
-	ioc = (struct iocblk *)mp->b_rptr;
+	ioc = (void *)mp->b_rptr;
 	if ((ioc->ioc_cmd != AR_ENTRY_SQUERY) || (mp->b_cont == NULL)) {
 		freemsg(mp);
 		return;
@@ -675,8 +663,7 @@ ibcm_arp_pr_arp_squery_ack(mblk_t *mp)
 		return;
 	}
 
-	/* LINTED */
-	areap = (area_t *)mp1->b_rptr;
+	areap = (void *)mp1->b_rptr;
 	cp = (char *)areap + areap->area_hw_addr_offset;
 	bcopy(cp, &wqnp->dst_mac, IPOIB_ADDRL);
 

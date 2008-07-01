@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -916,7 +916,7 @@ pl2303_tx(ds_hdl_t hdl, uint_t port_num, mblk_t *mp)
 
 		return (USB_SUCCESS);
 	}
-	if (MBLKL(mp) <= 0) {
+	if (MBLKL(mp) < 1) {
 		USB_DPRINTF_L3(DPRINT_CTLOP, plp->pl_lh, "pl2303_tx: len<=0");
 		freemsg(mp);
 
@@ -1738,7 +1738,7 @@ pl2303_tx_start(pl2303_state_t *plp, int *xferd)
 		data->b_wptr += copylen;
 		data_len += copylen;
 
-		if (MBLKL(mp) <= 0) {
+		if (MBLKL(mp) < 1) {
 			plp->pl_tx_mp = unlinkb(mp);
 			freeb(mp);
 		} else {

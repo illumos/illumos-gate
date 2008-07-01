@@ -342,7 +342,6 @@ mb_reserve(struct mbchain *mbp, int size)
 	 * If the requested size is more than the space left.
 	 * Allocate and appenad a new mblk.
 	 */
-	/*LINTED*/
 	if (MBLKTAIL(m) < size) {
 		mn = m_getblk(size, 1);
 		if (mn == NULL)
@@ -447,7 +446,6 @@ mb_put_mem(struct mbchain *mbp, c_caddr_t source, int size, int type)
 
 	m = mbp->mb_cur;
 
-	/*LINTED*/
 	diff = MBLKTAIL(m);
 	ASSERT(diff == (uint64_t)((int)diff));
 	mleft = (int)diff;
@@ -466,7 +464,6 @@ mb_put_mem(struct mbchain *mbp, c_caddr_t source, int size, int type)
 				m->b_cont = n;
 			}
 			m = m->b_cont;
-			/*LINTED*/
 			diff = MBLKTAIL(m);
 			ASSERT(diff == (uint64_t)((int)diff));
 			mleft = (int)diff;
@@ -921,7 +918,6 @@ m_pullup(
 {
 	ptrdiff_t diff;
 
-	/*LINTED*/
 	diff = MBLKL(m);
 	ASSERT(diff == (ptrdiff_t)((int)diff));
 	if ((int)diff < rqlen) {
@@ -959,7 +955,6 @@ m_split(
 		len -= MBLKL(m);
 #else /* but with LP64 and picky lint we have: */
 	for (m = m0; m; m = m->b_cont) {
-		/*LINTED*/
 		diff = MBLKL(m);
 		ASSERT(diff == (ptrdiff_t)((int)diff));
 		mbl = (int)diff;
@@ -976,7 +971,6 @@ m_split(
 	if ((n = dupb(m)) == 0)
 		return (0);
 
-	/*LINTED*/
 	ASSERT(len <= MBLKL(m));
 
 	m->b_wptr = m->b_rptr + len;

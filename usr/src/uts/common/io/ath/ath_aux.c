@@ -560,7 +560,7 @@ ath_beacon_config(ath_t *asc)
 		bs.bs_bmissthreshold = ic->ic_bmissthreshold;
 		if (bs.bs_bmissthreshold > 10)
 			bs.bs_bmissthreshold = 10;
-		else if (bs.bs_bmissthreshold <= 0)
+		else if (bs.bs_bmissthreshold < 1)
 			bs.bs_bmissthreshold = 1;
 		/*
 		 * Calculate sleep duration.  The configuration is

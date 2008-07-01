@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -255,7 +255,7 @@ static uint16_t
 dmfe_mii_response(dmfe_t *dmfep)
 {
 	boolean_t ack;
-	uint32_t data;
+	uint16_t data;
 	uint32_t tmp;
 	int i;
 

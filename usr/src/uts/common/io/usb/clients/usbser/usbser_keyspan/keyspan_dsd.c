@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2505,7 +2505,7 @@ keyspan_tx_copy_data(keyspan_port_t *kp, mblk_t *data, int len)
 		data->b_wptr += copylen;
 		data_len += copylen;
 
-		if (MBLKL(mp) <= 0) {
+		if (MBLKL(mp) < 1) {
 			kp->kp_tx_mp = unlinkb(mp);
 			freeb(mp);
 		} else {

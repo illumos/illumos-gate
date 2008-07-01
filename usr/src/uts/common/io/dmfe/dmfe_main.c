@@ -278,19 +278,19 @@ static uchar_t dmfe_broadcast_addr[ETHERADDRL] = {
 uint32_t
 dmfe_chip_get32(dmfe_t *dmfep, off_t offset)
 {
-	caddr_t addr;
+	uint32_t *addr;
 
-	addr = dmfep->io_reg + offset;
-	return (ddi_get32(dmfep->io_handle, (uint32_t *)addr));
+	addr = (void *)(dmfep->io_reg + offset);
+	return (ddi_get32(dmfep->io_handle, addr));
 }
 
 void
 dmfe_chip_put32(dmfe_t *dmfep, off_t offset, uint32_t value)
 {
-	caddr_t addr;
+	uint32_t *addr;
 
-	addr = dmfep->io_reg + offset;
-	ddi_put32(dmfep->io_handle, (uint32_t *)addr, value);
+	addr = (void *)(dmfep->io_reg + offset);
+	ddi_put32(dmfep->io_handle, addr, value);
 }
 
 /*
@@ -301,7 +301,7 @@ dmfe_ring_get32(dma_area_t *dma_p, uint_t index, uint_t offset)
 {
 	uint32_t *addr;
 
-	addr = (uint32_t *)dma_p->mem_va;
+	addr = (void *)dma_p->mem_va;
 	return (ddi_get32(dma_p->acc_hdl, addr + index*DESC_SIZE + offset));
 }
 
@@ -310,7 +310,7 @@ dmfe_ring_put32(dma_area_t *dma_p, uint_t index, uint_t offset, uint32_t value)
 {
 	uint32_t *addr;
 
-	addr = (uint32_t *)dma_p->mem_va;
+	addr = (void *)dma_p->mem_va;
 	ddi_put32(dma_p->acc_hdl, addr + index*DESC_SIZE + offset, value);
 }
 
@@ -322,7 +322,7 @@ dmfe_setup_get32(dma_area_t *dma_p, uint_t index)
 {
 	uint32_t *addr;
 
-	addr = (uint32_t *)dma_p->setup_va;
+	addr = (void *)dma_p->setup_va;
 	return (ddi_get32(dma_p->acc_hdl, addr + index));
 }
 
@@ -331,7 +331,7 @@ dmfe_setup_put32(dma_area_t *dma_p, uint_t index, uint32_t value)
 {
 	uint32_t *addr;
 
-	addr = (uint32_t *)dma_p->setup_va;
+	addr = (void *)dma_p->setup_va;
 	ddi_put32(dma_p->acc_hdl, addr + index, value);
 }
 
@@ -1145,7 +1145,7 @@ dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp)
 		 * Copy all (remaining) mblks in the message ...
 		 */
 		for (; bp != NULL; bp = bp->b_cont) {
-			mblen = bp->b_wptr - bp->b_rptr;
+			mblen = MBLKL(bp);
 			if ((totlen += mblen) <= DMFE_MAX_PKT_SIZE) {
 				bcopy(bp->b_rptr, txb, mblen);
 				txb += mblen;
@@ -1683,7 +1683,7 @@ dmfe_factotum(caddr_t arg)
 {
 	dmfe_t *dmfep;
 
-	dmfep = (dmfe_t *)arg;
+	dmfep = (void *)arg;
 	ASSERT(dmfep->dmfe_guard == DMFE_GUARD);
 
 	mutex_enter(dmfep->oplock);
@@ -1939,7 +1939,7 @@ dmfe_interrupt(caddr_t arg)
 	mblk_t *mp;
 	boolean_t warning_msg = B_TRUE;
 
-	dmfep = (dmfe_t *)arg;
+	dmfep = (void *)arg;
 
 	/*
 	 * A quick check as to whether the interrupt was from this
@@ -2394,7 +2394,7 @@ dmfe_loop_ioctl(dmfe_t *dmfep, queue_t *wq, mblk_t *mp, int cmd)
 	if (mp->b_cont == NULL || MBLKL(mp->b_cont) < sizeof (loopback_t))
 		return (IOC_INVAL);
 
-	loop_req_p = (loopback_t *)mp->b_cont->b_rptr;
+	loop_req_p = (void *)mp->b_cont->b_rptr;
 
 	switch (cmd) {
 	default:
@@ -2465,7 +2465,7 @@ dmfe_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	/*
 	 * Validate the command before bothering with the mutexen ...
 	 */
-	iocp = (struct iocblk *)mp->b_rptr;
+	iocp = (void *)mp->b_rptr;
 	cmd = iocp->ioc_cmd;
 	switch (cmd) {
 	default:

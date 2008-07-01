@@ -36,6 +36,7 @@
 #include <sys/usb/hcd/uhci/uhcid.h>
 #include <sys/usb/hcd/uhci/uhcitgt.h>
 #include <sys/usb/hcd/uhci/uhciutil.h>
+#include <sys/strsun.h>
 
 /* function prototypes */
 static int	uhci_pipe_send_isoc_data(uhci_state_t *uhcip,
@@ -1133,7 +1134,7 @@ uhci_pipe_send_isoc_data(
 
 	/* Check the size of isochronous request */
 	ASSERT(isoc_req->isoc_data != NULL);
-	length = isoc_req->isoc_data->b_wptr - isoc_req->isoc_data->b_rptr;
+	length = MBLKL(isoc_req->isoc_data);
 
 	if (length > max_isoc_xfer_sz) {
 		USB_DPRINTF_L2(PRINT_MASK_HCDI, uhcip->uhci_log_hdl,

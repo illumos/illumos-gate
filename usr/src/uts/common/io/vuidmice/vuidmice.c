@@ -327,7 +327,7 @@ vuidmice_wput(queue_t *const qp, mblk_t *mp)
 		return (0);
 
 	case M_IOCTL: {
-		struct iocblk *iocbp = (struct iocblk *)mp->b_rptr;
+		struct iocblk *iocbp = (void *)mp->b_rptr;
 
 		switch (iocbp->ioc_cmd) {
 		case VUIDSFORMAT:
@@ -348,7 +348,8 @@ vuidmice_wput(queue_t *const qp, mblk_t *mp)
 					return (0);
 				}
 
-				format_type = *(int *)mp->b_cont->b_rptr;
+				format_type =
+				    *(int *)(void *)mp->b_cont->b_rptr;
 				STATEP->format = (uchar_t)format_type;
 				iocbp->ioc_rval = 0;
 				iocbp->ioc_count = 0;
@@ -388,7 +389,8 @@ vuidmice_wput(queue_t *const qp, mblk_t *mp)
 				return (0);
 			}
 
-			*(int *)mp->b_cont->b_rptr = (int)STATEP->format;
+			*(int *)(void *)mp->b_cont->b_rptr =
+			    (int)STATEP->format;
 			mp->b_cont->b_wptr += sizeof (int);
 
 			iocbp->ioc_count = sizeof (int);
@@ -430,7 +432,8 @@ vuidmice_wput(queue_t *const qp, mblk_t *mp)
 				return (0);
 			}
 
-			*(int *)mp->b_cont->b_rptr = (int)STATEP->nbuttons;
+			*(int *)(void *)mp->b_cont->b_rptr =
+			    (int)STATEP->nbuttons;
 			mp->b_cont->b_wptr += sizeof (int);
 
 			iocbp->ioc_count = sizeof (int);
@@ -494,7 +497,7 @@ VUID_PUTNEXT(queue_t *const qp, uchar_t event_id, uchar_t event_pair_type,
 		drv_usecwait(10);
 	}
 
-	fep = (Firm_event *)bp->b_wptr;
+	fep = (void *)bp->b_wptr;
 	fep->id = vuid_id_addr(VKEY_FIRST) | vuid_id_offset(event_id);
 
 	fep->pair_type	= event_pair_type;
@@ -527,8 +530,8 @@ vuidmice_miocdata(queue_t *qp, mblk_t  *mp)
 	int			err = 0;
 
 
-	copyresp = (struct copyresp *)mp->b_rptr;
-	iocbp = (struct iocblk *)mp->b_rptr;
+	copyresp = (void *)mp->b_rptr;
+	iocbp = (void *)mp->b_rptr;
 
 	if (copyresp->cp_rval) {
 		err = EAGAIN;
@@ -550,8 +553,8 @@ vuidmice_miocdata(queue_t *qp, mblk_t  *mp)
 		break;
 	case VUIDGWHEELINFO:
 	case VUIDGWHEELSTATE:
-		ioctmp = (mblk_t *)copyresp->cp_private;
-		Mouseioc = (Mouse_iocstate_t *)ioctmp->b_rptr;
+		ioctmp = copyresp->cp_private;
+		Mouseioc = (void *)ioctmp->b_rptr;
 		if (Mouseioc->ioc_state == GETSTRUCT) {
 			if (mp->b_cont == NULL) {
 				err = EINVAL;
@@ -594,8 +597,8 @@ vuidmice_miocdata(queue_t *qp, mblk_t  *mp)
 		break;
 	case VUIDSWHEELSTATE:
 	case MSIOSRESOLUTION:
-		ioctmp = (mblk_t *)copyresp->cp_private;
-		Mouseioc = (Mouse_iocstate_t *)ioctmp->b_rptr;
+		ioctmp = copyresp->cp_private;
+		Mouseioc = (void *)ioctmp->b_rptr;
 		if (mp->b_cont == NULL) {
 			err = EINVAL;
 
@@ -614,7 +617,7 @@ vuidmice_miocdata(queue_t *qp, mblk_t  *mp)
 
 		if (mp->b_cont) {
 			freemsg(mp->b_cont);
-			mp->b_cont = (mblk_t *)NULL;
+			mp->b_cont = NULL;
 		}
 		freemsg(ioctmp);
 		iocbp->ioc_count = 0;
@@ -634,11 +637,11 @@ err:
 		mp->b_datap->db_type = M_IOCNAK;
 		if (mp->b_cont) {
 			freemsg(mp->b_cont);
-			mp->b_cont = (mblk_t *)NULL;
+			mp->b_cont = NULL;
 		}
 		if (copyresp->cp_private) {
-			freemsg((mblk_t *)copyresp->cp_private);
-			copyresp->cp_private = (mblk_t *)NULL;
+			freemsg(copyresp->cp_private);
+			copyresp->cp_private = NULL;
 		}
 		iocbp->ioc_count = 0;
 		iocbp->ioc_error = err;
@@ -665,18 +668,19 @@ vuidmice_handle_wheel_resolution_ioctl(queue_t *qp, mblk_t *mp, int cmd)
 	mblk_t			*ioctmp;
 	mblk_t			*datap;
 
-	struct iocblk *iocbp = (struct iocblk *)mp->b_rptr;
+	struct iocblk *iocbp = (void *)mp->b_rptr;
 
 	if (iocbp->ioc_count == TRANSPARENT) {
 		if (mp->b_cont == NULL)
 			return (EINVAL);
-		useraddr = (caddr_t)*((caddr_t *)mp->b_cont->b_rptr);
+		useraddr = *((caddr_t *)(void *)mp->b_cont->b_rptr);
 		switch (cmd) {
 		case VUIDGWHEELCOUNT:
 			size = sizeof (int);
 			if ((datap = allocb(sizeof (int), BPRI_HI)) == NULL)
 				return (EAGAIN);
-			*((int *)datap->b_wptr) = STATEP->vuid_mouse_mode;
+			*((int *)(void *)datap->b_wptr) =
+			    STATEP->vuid_mouse_mode;
 			mcopyout(mp, NULL, size, NULL, datap);
 			qreply(qp, mp);
 
@@ -695,10 +699,10 @@ vuidmice_handle_wheel_resolution_ioctl(queue_t *qp, mblk_t *mp, int cmd)
 			break;
 		}
 
-		if ((ioctmp = (mblk_t *)allocb(sizeof (Mouse_iocstate_t),
+		if ((ioctmp = allocb(sizeof (Mouse_iocstate_t),
 		    BPRI_MED)) == NULL)
 			return (EAGAIN);
-		Mouseioc = (Mouse_iocstate_t *)ioctmp->b_rptr;
+		Mouseioc = (void *)ioctmp->b_rptr;
 		Mouseioc->ioc_state = GETSTRUCT;
 		Mouseioc->u_addr = useraddr;
 		ioctmp->b_wptr = ioctmp->b_rptr + sizeof (Mouse_iocstate_t);
@@ -717,7 +721,8 @@ vuidmice_handle_wheel_resolution_ioctl(queue_t *qp, mblk_t *mp, int cmd)
 				err = EAGAIN;
 				break;
 			}
-			*((int *)datap->b_wptr) = STATEP->vuid_mouse_mode;
+			*((int *)(void *)datap->b_wptr) =
+			    STATEP->vuid_mouse_mode;
 			datap->b_wptr +=  sizeof (int);
 			mp->b_cont = datap;
 			break;
@@ -771,7 +776,7 @@ vuidmice_service_wheel_info(register mblk_t *datap)
 	wheel_info		*wi;
 	int			err = 0;
 
-	wi = (wheel_info *)datap->b_rptr;
+	wi = (void *)datap->b_rptr;
 	if (wi->vers != VUID_WHEEL_INFO_VERS) {
 		err = EINVAL;
 		return (err);
@@ -796,7 +801,7 @@ vuidmice_service_wheel_state(register queue_t	*qp,
 	wheel_state	*ws;
 	uint_t		err = 0;
 
-	ws = (wheel_state *)datap->b_rptr;
+	ws = (void *)datap->b_rptr;
 	if (ws->vers != VUID_WHEEL_STATE_VERS) {
 		err = EINVAL;
 		return (err);

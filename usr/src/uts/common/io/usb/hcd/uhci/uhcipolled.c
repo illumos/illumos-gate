@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,7 +104,7 @@ uhci_hcdi_polled_input_init(usba_pipe_handle_data_t *ph,
 	 * copied into at this layer, so we need to keep track of it.
 	 */
 	uhci_polledp->uhci_polled_buf =
-		(uchar_t *)kmem_zalloc(POLLED_RAW_BUF_SIZE, KM_SLEEP);
+	    (uchar_t *)kmem_zalloc(POLLED_RAW_BUF_SIZE, KM_SLEEP);
 
 	*polled_buf = uhci_polledp->uhci_polled_buf;
 
@@ -253,10 +253,9 @@ uhci_hcdi_polled_read(usb_console_info_impl_t *info, uint_t *num_characters)
 
 			/* Copy the data into the message */
 			ddi_rep_get8(tw->tw_accesshandle,
-				(uint8_t *)uhci_polledp->uhci_polled_buf,
-				(uint8_t *)td->tw->tw_buf,
-				*num_characters,
-				DDI_DEV_AUTOINCR);
+			    (uint8_t *)uhci_polledp->uhci_polled_buf,
+			    (uint8_t *)td->tw->tw_buf,
+			    *num_characters, DDI_DEV_AUTOINCR);
 		}
 
 		/*
@@ -380,8 +379,6 @@ uhci_hcdi_polled_output_exit(usb_console_info_impl_t *info)
 	return (USB_SUCCESS);
 }
 
-static int uhci_polled_status;
-
 /*
  * uhci_hcdi_polled_write:
  *	Put a key character -- rewrite this!
@@ -432,7 +429,7 @@ uhci_hcdi_polled_write(usb_console_info_impl_t *info, uchar_t *buf,
 	ADJ_DATA_TOGGLE(pp);
 	SetTD_devaddr(uhcip, td, ph->p_usba_device->usb_addr);
 	SetTD_endpt(uhcip, td, ph->p_ep.bEndpointAddress &
-							END_POINT_ADDRESS_MASK);
+	    END_POINT_ADDRESS_MASK);
 	SetTD_PID(uhcip, td, PID_OUT);
 	SetTD32(uhcip, td->buffer_address, tw->tw_cookie.dmac_address);
 
@@ -497,8 +494,7 @@ uhci_polled_init(usba_pipe_handle_data_t	*ph,
 	}
 
 	/* Allocate and intitialize a polled mode state structure */
-	uhci_polledp = (uhci_polled_t *)kmem_zalloc(sizeof (uhci_polled_t),
-								KM_SLEEP);
+	uhci_polledp = kmem_zalloc(sizeof (uhci_polled_t), KM_SLEEP);
 
 	/*
 	 * Keep a copy of normal mode state structure and pipe handle.
@@ -745,12 +741,12 @@ uhci_polled_restore_state(uhci_polled_t	*uhci_polledp)
 	 * Adjust data toggle
 	 */
 	pp = (uhci_pipe_private_t *)
-		uhci_polledp->uhci_polled_ph->p_hcd_private;
+	    uhci_polledp->uhci_polled_ph->p_hcd_private;
 
 	polled_td = uhci_polledp->uhci_polled_td;
 	real_data_toggle = (GetTD_status(uhcip, polled_td) & UHCI_TD_ACTIVE) ?
-		GetTD_dtogg(uhcip, polled_td) :
-		!GetTD_dtogg(uhcip, polled_td);
+	    GetTD_dtogg(uhcip, polled_td) :
+	    !GetTD_dtogg(uhcip, polled_td);
 
 	td = uhcip->uhci_outst_tds_head;
 	while (td != NULL) {

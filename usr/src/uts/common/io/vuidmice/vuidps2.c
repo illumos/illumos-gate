@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,7 @@
 #include <sys/vuidmice.h>
 #include <sys/vuid_wheel.h>
 #include <sys/mouse.h>
+#include <sys/strsun.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
@@ -172,7 +172,7 @@ vuidmice_send_wheel_event(queue_t *const qp, uchar_t event_id,
 		return;
 	}
 
-	fep = (Firm_event *)bp->b_wptr;
+	fep = (void *)bp->b_wptr;
 	fep->id = vuid_id_addr(vuid_first(VUID_WHEEL)) |
 	    vuid_id_offset(event_id);
 	fep->pair_type = event_pair_type;
@@ -201,7 +201,7 @@ sendButtonEvent(queue_t *const qp)
 
 		if ((STATEP->buttons & mask) != (STATEP->oldbuttons & mask))
 			VUID_PUTNEXT(qp, (uchar_t)BUT(bmap[b]), FE_PAIR_NONE, 0,
-				(STATEP->buttons & mask ? 1 : 0));
+			    (STATEP->buttons & mask ? 1 : 0));
 	}
 }
 
@@ -463,7 +463,7 @@ restart:
 			code &= 0xf;
 
 			if (STATEP->wheel_state_bf & (1 <<
-				VUIDMICE_VERTICAL_WHEEL_ID)) {
+			    VUIDMICE_VERTICAL_WHEEL_ID)) {
 				/*
 				 * PS/2 mouse reports -ve values
 				 * when the wheel is scrolled up. So
@@ -516,7 +516,7 @@ packet_complete:
 			 * its not the start of the next packet, don't use
 			 * this packet.
 			 */
-			if ((mp->b_wptr - mp->b_rptr) > 0 &&
+			if (mp->b_wptr > mp->b_rptr &&
 			    ((mp->b_rptr[0] ^ STATEP->sync_byte) & 0x08)) {
 				/*
 				 * bit 3 not set

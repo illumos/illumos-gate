@@ -410,7 +410,7 @@ ath_desc_alloc(dev_info_t *devinfo, ath_t *asc)
 	for (i = 0; i < ATH_RXBUF; i++, bf++, ds++) {
 		bf->bf_desc = ds;
 		bf->bf_daddr = asc->asc_desc_dma.cookie.dmac_address +
-		    ((caddr_t)ds - (caddr_t)asc->asc_desc);
+		    ((uintptr_t)ds - (uintptr_t)asc->asc_desc);
 		list_insert_tail(&asc->asc_rxbuf_list, bf);
 
 		/* alloc DMA memory */
@@ -428,7 +428,7 @@ ath_desc_alloc(dev_info_t *devinfo, ath_t *asc)
 	for (i = 0; i < ATH_TXBUF; i++, bf++, ds++) {
 		bf->bf_desc = ds;
 		bf->bf_daddr = asc->asc_desc_dma.cookie.dmac_address +
-		    ((caddr_t)ds - (caddr_t)asc->asc_desc);
+		    ((uintptr_t)ds - (uintptr_t)asc->asc_desc);
 		list_insert_tail(&asc->asc_txbuf_list, bf);
 
 		/* alloc DMA memory */
@@ -698,7 +698,7 @@ ath_tx_start(ath_t *asc, struct ieee80211_node *in, struct ath_buf *bf,
 		bcopy(mp->b_rptr, dest, mblen);
 		dest += mblen;
 	}
-	mbslen = dest - bf->bf_dma.mem_va;
+	mbslen = (uintptr_t)dest - (uintptr_t)bf->bf_dma.mem_va;
 	pktlen += mbslen;
 
 	bf->bf_in = in;

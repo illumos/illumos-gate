@@ -266,8 +266,7 @@ static mac_callbacks_t eri_m_callbacks = {
 	type = get_ether_type(bp->b_rptr);			\
 	if (type == ETHERTYPE_IP || type == ETHERTYPE_IPV6) {	\
 		start_offset = 0;				\
-		end_offset = bp->b_wptr - 			\
-			(bp->b_rptr + ETHERHEADER_SIZE);	\
+		end_offset = MBLKL(bp) - ETHERHEADER_SIZE;	\
 		(void) hcksum_assoc(bp, NULL, NULL,		\
 			start_offset, 0, end_offset, sum, 	\
 			HCK_PARTIALCKSUM, 0);			\
@@ -1163,7 +1162,6 @@ eri_loopback(struct eri *erip, queue_t *wq, mblk_t *mp)
 	struct	iocblk	*iocp = (void *)mp->b_rptr;
 	loopback_t	*al;
 
-	/*LINTED E_PTRDIFF_OVERFLOW*/
 	if (mp->b_cont == NULL || MBLKL(mp->b_cont) < sizeof (loopback_t)) {
 		miocnak(wq, mp, 0, EINVAL);
 		return;
@@ -3626,8 +3624,7 @@ eri_send_msg(struct eri *erip, mblk_t *mp)
 
 	for (j = 0; j < nmblks; j++) { /* for one or two mb cases */
 
-		/*LINTED E_PTRDIFF_OVERFLOW*/
-		len = nmp->b_wptr - nmp->b_rptr;
+		len = MBLKL(nmp);
 		i = tmdp - tbasep; /* index */
 
 		if (len_msg < eri_tx_bcopy_max) { /* tb-all mb */
@@ -3969,10 +3966,8 @@ eri_read_dma(struct eri *erip, volatile struct rmd *rmdp,
 
 #ifdef ERI_RCV_CKSUM
 			sum = ~(uint16_t)(flags & ERI_RMD_CKSUM);
-			/*LINTED E_PTRDIFF_OVERFLOW*/
 			ERI_PROCESS_READ(erip, nbp, sum);
 #else
-			/*LINTED E_PTRDIFF_OVERFLOW*/
 			ERI_PROCESS_READ(erip, nbp);
 #endif
 			retmp = nbp;
@@ -4020,10 +4015,8 @@ eri_read_dma(struct eri *erip, volatile struct rmd *rmdp,
 
 #ifdef ERI_RCV_CKSUM
 			sum = ~(uint16_t)(flags & ERI_RMD_CKSUM);
-			/*LINTED E_PTRDIFF_OVERFLOW*/
 			ERI_PROCESS_READ(erip, bp, sum);
 #else
-			/*LINTED E_PTRDIFF_OVERFLOW*/
 			ERI_PROCESS_READ(erip, bp);
 #endif
 			retmp = bp;
@@ -4524,7 +4517,6 @@ eri_mk_mblk_tail_space(mblk_t *mp, mblk_t **nmp, size_t sz)
 	while (tmp->b_cont)
 		tmp = tmp->b_cont;
 
-	/*LINTED E_BAD_PTR_CAST_ALIGN*/
 	if (MBLKTAIL(tmp) < sz) {
 		if ((tmp->b_cont = allocb(1024, BPRI_HI)) == NULL)
 			return (ENOMEM);

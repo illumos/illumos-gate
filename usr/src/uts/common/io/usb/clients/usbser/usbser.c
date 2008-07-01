@@ -2553,7 +2553,7 @@ usbser_data(usbser_port_t *pp, mblk_t *mp)
 
 		return (USB_FAILURE);
 	}
-	if ((MBLKL(mp) <= 0)) {
+	if ((MBLKL(mp) <= 1)) {
 		freemsg(mp);
 
 		return (USB_SUCCESS);

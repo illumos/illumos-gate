@@ -331,7 +331,7 @@ mac_ether_header(const void *saddr, const void *daddr, uint32_t sap,
 	if (mp == NULL)
 		return (NULL);
 
-	ehp = (struct ether_header *)mp->b_rptr;
+	ehp = (void *)mp->b_rptr;
 	bcopy(daddr, &(ehp->ether_dhost), ETHERADDRL);
 	bcopy(saddr, &(ehp->ether_shost), ETHERADDRL);
 
@@ -357,7 +357,7 @@ mac_ether_header_info(mblk_t *mp, void *mac_pdata, mac_header_info_t *hdr_info)
 	if (MBLKL(mp) < sizeof (struct ether_header))
 		return (EINVAL);
 
-	ehp = (struct ether_header *)mp->b_rptr;
+	ehp = (void *)mp->b_rptr;
 	ether_type = ntohs(ehp->ether_type);
 
 	hdr_info->mhi_hdrsize = sizeof (struct ether_header);
