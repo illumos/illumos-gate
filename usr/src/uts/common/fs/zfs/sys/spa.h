@@ -380,6 +380,9 @@ extern void spa_scrub_restart(spa_t *spa, uint64_t txg);
 extern void spa_sync(spa_t *spa, uint64_t txg); /* only for DMU use */
 extern void spa_sync_allpools(void);
 
+/* spa namespace global mutex */
+extern kmutex_t spa_namespace_lock;
+
 /*
  * SPA configuration functions in spa_config.c
  */

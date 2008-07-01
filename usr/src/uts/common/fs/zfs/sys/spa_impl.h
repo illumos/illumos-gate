@@ -175,7 +175,6 @@ struct spa {
 };
 
 extern const char *spa_config_path;
-extern kmutex_t spa_namespace_lock;
 
 #ifdef	__cplusplus
 }
