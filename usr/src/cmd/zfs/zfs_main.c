@@ -2166,7 +2166,8 @@ zfs_do_set(int argc, char **argv)
 
 	/* validate property=value argument */
 	cb.cb_propname = argv[1];
-	if ((cb.cb_value = strchr(cb.cb_propname, '=')) == NULL) {
+	if (((cb.cb_value = strchr(cb.cb_propname, '=')) == NULL) ||
+	    (cb.cb_value[1] == '\0')) {
 		(void) fprintf(stderr, gettext("missing value in "
 		    "property=value argument\n"));
 		usage(B_FALSE);
@@ -2180,7 +2181,6 @@ zfs_do_set(int argc, char **argv)
 		    gettext("missing property in property=value argument\n"));
 		usage(B_FALSE);
 	}
-
 
 	ret = zfs_for_each(argc - 2, argv + 2, B_FALSE,
 	    ZFS_TYPE_DATASET, NULL, NULL, set_callback, &cb, B_FALSE);
