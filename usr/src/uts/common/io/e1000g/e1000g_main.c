@@ -46,9 +46,9 @@
 #include "e1000g_sw.h"
 #include "e1000g_debug.h"
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.2.9";
+static char ident[] = "Intel PRO/1000 Ethernet 5.2.10";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.2.9";
+static char e1000g_version[] = "Driver Ver. 5.2.10";
 
 /*
  * Proto types for DDI entry points
@@ -686,7 +686,6 @@ static int
 e1000g_set_driver_params(struct e1000g *Adapter)
 {
 	struct e1000_hw *hw;
-	e1000g_tx_ring_t *tx_ring;
 	uint32_t mem_bar, io_bar, bar64;
 
 	hw = &Adapter->shared;
@@ -789,12 +788,6 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 	Adapter->tx_intr_delay = DEFAULT_TX_INTR_DELAY;
 	Adapter->tx_intr_abs_delay = DEFAULT_TX_INTR_ABS_DELAY;
 
-	tx_ring = Adapter->tx_ring;
-	tx_ring->frags_limit =
-	    (Adapter->max_frame_size / Adapter->tx_bcopy_thresh) + 2;
-	if (tx_ring->frags_limit > (MAX_TX_DESC_PER_PACKET >> 1))
-		tx_ring->frags_limit = (MAX_TX_DESC_PER_PACKET >> 1);
-
 	/* Initialize rx parameters */
 	Adapter->rx_bcopy_thresh = DEFAULT_RX_BCOPY_THRESHOLD;
 
@@ -824,8 +817,13 @@ e1000g_set_bufsize(struct e1000g *Adapter)
 				Adapter->sys_page_sz = iommu_pagesize;
 		}
 	}
-	Adapter->dvma_page_num = Adapter->max_frame_size /
-	    Adapter->sys_page_sz + E1000G_DEFAULT_DVMA_PAGE_NUM;
+	if (Adapter->lso_enable) {
+		Adapter->dvma_page_num = E1000_LSO_MAXLEN /
+		    Adapter->sys_page_sz + E1000G_DEFAULT_DVMA_PAGE_NUM;
+	} else {
+		Adapter->dvma_page_num = Adapter->max_frame_size /
+		    Adapter->sys_page_sz + E1000G_DEFAULT_DVMA_PAGE_NUM;
+	}
 	ASSERT(Adapter->dvma_page_num >= E1000G_DEFAULT_DVMA_PAGE_NUM);
 #endif
 
@@ -2503,52 +2501,12 @@ e1000g_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM: {
 		uint32_t *txflags = cap_data;
-		/*
-		 * Checksum on/off selection via global parameters.
-		 *
-		 * If the chip is flagged as not capable of (correctly)
-		 * handling checksumming, we don't enable it on either
-		 * Rx or Tx side.  Otherwise, we take this chip's settings
-		 * from the patchable global defaults.
-		 *
-		 * We advertise our capabilities only if TX offload is
-		 * enabled.  On receive, the stack will accept checksummed
-		 * packets anyway, even if we haven't said we can deliver
-		 * them.
-		 */
-		switch (hw->mac.type) {
-		case e1000_82540:
-		case e1000_82544:
-		case e1000_82545:
-		case e1000_82545_rev_3:
-		case e1000_82546:
-		case e1000_82546_rev_3:
-		case e1000_82571:
-		case e1000_82572:
-		case e1000_82573:
-		case e1000_80003es2lan:
-			if (Adapter->tx_hcksum_enabled)
-				*txflags = HCKSUM_IPHDRCKSUM |
-				    HCKSUM_INET_PARTIAL;
-			else
-				return (B_FALSE);
-			break;
 
-		/*
-		 * For the following Intel PRO/1000 chipsets, we have not
-		 * tested the hardware checksum offload capability, so we
-		 * disable the capability for them.
-		 *	e1000_82542,
-		 *	e1000_82543,
-		 *	e1000_82541,
-		 *	e1000_82541_rev_2,
-		 *	e1000_82547,
-		 *	e1000_82547_rev_2,
-		 */
-		default:
+		if (Adapter->tx_hcksum_enable)
+			*txflags = HCKSUM_IPHDRCKSUM |
+			    HCKSUM_INET_PARTIAL;
+		else
 			return (B_FALSE);
-		}
-
 		break;
 	}
 	case MAC_CAPAB_POLL:
@@ -2579,6 +2537,19 @@ e1000g_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		mmacp->maddr_reserve = NULL;
 		break;
 	}
+
+	case MAC_CAPAB_LSO: {
+		mac_capab_lso_t *cap_lso = cap_data;
+
+		if (Adapter->lso_enable) {
+			cap_lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
+			cap_lso->lso_basic_tcp_ipv4.lso_max =
+			    E1000_LSO_MAXLEN;
+		} else
+			return (B_FALSE);
+		break;
+	}
+
 	default:
 		return (B_FALSE);
 	}
@@ -2617,7 +2588,6 @@ e1000g_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	struct e1000_mac_info *mac = &Adapter->shared.mac;
 	struct e1000_phy_info *phy = &Adapter->shared.phy;
 	struct e1000_fc_info *fc = &Adapter->shared.fc;
-	e1000g_tx_ring_t *tx_ring;
 	int err = 0;
 	link_flowctrl_t flowctrl;
 	uint32_t cur_mtu, new_mtu;
@@ -2739,14 +2709,6 @@ reset:
 				Adapter->max_frame_size = tmp;
 				Adapter->default_mtu = new_mtu;
 				e1000g_set_bufsize(Adapter);
-				tx_ring = Adapter->tx_ring;
-				tx_ring->frags_limit =
-				    (Adapter->max_frame_size /
-				    Adapter->tx_bcopy_thresh) + 2;
-				if (tx_ring->frags_limit >
-				    (MAX_TX_DESC_PER_PACKET >> 1))
-				tx_ring->frags_limit =
-				    (MAX_TX_DESC_PER_PACKET >> 1);
 			}
 			break;
 		case MAC_PROP_PRIVATE:
@@ -2877,7 +2839,6 @@ e1000g_set_priv_prop(struct e1000g *Adapter, const char *pr_name,
 {
 	int err = 0;
 	long result;
-	e1000g_tx_ring_t *tx_ring = Adapter->tx_ring;
 	struct e1000_hw *hw = &Adapter->shared;
 
 	if (strcmp(pr_name, "_tx_bcopy_threshold") == 0) {
@@ -2891,13 +2852,6 @@ e1000g_set_priv_prop(struct e1000g *Adapter, const char *pr_name,
 			err = EINVAL;
 		else {
 			Adapter->tx_bcopy_thresh = (uint32_t)result;
-			tx_ring->frags_limit =
-			    (Adapter->max_frame_size /
-			    Adapter->tx_bcopy_thresh) + 2;
-			if (tx_ring->frags_limit >
-			    (MAX_TX_DESC_PER_PACKET >> 1))
-				tx_ring->frags_limit =
-				    (MAX_TX_DESC_PER_PACKET >> 1);
 		}
 		return (err);
 	}
@@ -3292,7 +3246,7 @@ e1000g_get_conf(struct e1000g *Adapter)
 	/*
 	 * MSI Enable
 	 */
-	Adapter->msi_enabled =
+	Adapter->msi_enable =
 	    e1000g_get_prop(Adapter, "MSIEnable",
 	    0, 1, DEFAULT_MSI_ENABLE);
 
@@ -3331,10 +3285,75 @@ e1000g_get_conf(struct e1000g *Adapter)
 	/*
 	 * Hardware checksum enable/disable parameter
 	 */
-	Adapter->tx_hcksum_enabled =
-	    e1000g_get_prop(Adapter, "tx_hcksum_enabled",
+	Adapter->tx_hcksum_enable =
+	    e1000g_get_prop(Adapter, "tx_hcksum_enable",
 	    0, 1, DEFAULT_TX_HCKSUM_ENABLE);
+	/*
+	 * Checksum on/off selection via global parameters.
+	 *
+	 * If the chip is flagged as not capable of (correctly)
+	 * handling checksumming, we don't enable it on either
+	 * Rx or Tx side.  Otherwise, we take this chip's settings
+	 * from the patchable global defaults.
+	 *
+	 * We advertise our capabilities only if TX offload is
+	 * enabled.  On receive, the stack will accept checksummed
+	 * packets anyway, even if we haven't said we can deliver
+	 * them.
+	 */
+	switch (hw->mac.type) {
+		case e1000_82540:
+		case e1000_82544:
+		case e1000_82545:
+		case e1000_82545_rev_3:
+		case e1000_82546:
+		case e1000_82546_rev_3:
+		case e1000_82571:
+		case e1000_82572:
+		case e1000_82573:
+		case e1000_80003es2lan:
+			break;
+		/*
+		 * For the following Intel PRO/1000 chipsets, we have not
+		 * tested the hardware checksum offload capability, so we
+		 * disable the capability for them.
+		 *	e1000_82542,
+		 *	e1000_82543,
+		 *	e1000_82541,
+		 *	e1000_82541_rev_2,
+		 *	e1000_82547,
+		 *	e1000_82547_rev_2,
+		 */
+		default:
+			Adapter->tx_hcksum_enable = B_FALSE;
+	}
 
+	/*
+	 * Large Send Offloading(LSO) Enable/Disable
+	 * If the tx hardware checksum is not enabled, LSO should be
+	 * disabled.
+	 */
+	Adapter->lso_enable =
+	    e1000g_get_prop(Adapter, "lso_enable",
+	    0, 1, DEFAULT_LSO_ENABLE);
+
+	switch (hw->mac.type) {
+		case e1000_82546:
+		case e1000_82546_rev_3:
+			if (Adapter->lso_enable)
+				Adapter->lso_premature_issue = B_TRUE;
+		case e1000_82571:
+		case e1000_82572:
+		case e1000_82573:
+			break;
+		default:
+			Adapter->lso_enable = B_FALSE;
+	}
+
+	if (!Adapter->tx_hcksum_enable) {
+		Adapter->lso_premature_issue = B_FALSE;
+		Adapter->lso_enable = B_FALSE;
+	}
 }
 
 /*
@@ -4917,9 +4936,9 @@ e1000g_add_intrs(struct e1000g *Adapter)
 	 * PCI/PCI-X NICs.
 	 */
 	if (Adapter->shared.mac.type < e1000_82571)
-		Adapter->msi_enabled = B_FALSE;
+		Adapter->msi_enable = B_FALSE;
 
-	if ((intr_types & DDI_INTR_TYPE_MSI) && Adapter->msi_enabled) {
+	if ((intr_types & DDI_INTR_TYPE_MSI) && Adapter->msi_enable) {
 		rc = e1000g_intr_add(Adapter, DDI_INTR_TYPE_MSI);
 
 		if (rc != DDI_SUCCESS) {

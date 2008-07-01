@@ -584,3 +584,9 @@ Notes on packaging:
 ======
    6665738 e1000g issues with some Ethernet controllers
    6713685 e1000g:one device id macro should be renamed
+
+5.2.10
+======
+  This version has the following fixes:
+   6335837 e1000g needs to support LSO
+   6637659 e1000g has problem on transmit hardware checksum support

@@ -70,6 +70,7 @@ extern "C" {
 #include <sys/netlb.h>
 #include <inet/common.h>
 #include <inet/ip.h>
+#include <inet/tcp.h>
 #include <inet/mi.h>
 #include <inet/nd.h>
 #include <sys/ddifm.h>
@@ -78,14 +79,18 @@ extern "C" {
 #include <sys/fm/io/ddi.h>
 #include "e1000_api.h"
 
-
 #define	JUMBO_FRAG_LENGTH		4096
 
 #define	LAST_RAR_ENTRY			(E1000_RAR_ENTRIES - 1)
 #define	MAX_NUM_UNICAST_ADDRESSES	E1000_RAR_ENTRIES
 #define	MAX_NUM_MULTICAST_ADDRESSES	256
 
-#define	MAX_TX_DESC_PER_PACKET		16
+/*
+ * MAX_TX_DESC_PER_PACKET = max_packet_size/page_size +
+ * one for cross page split + one for the context descriptor +
+ * two for the workaround of the 82546 chip
+ */
+#define	MAX_TX_DESC_PER_PACKET		20
 
 /*
  * constants used in setting flow control thresholds
@@ -158,7 +163,7 @@ extern "C" {
 #define	DEFAULT_TX_BCOPY_THRESHOLD	512
 #define	DEFAULT_TX_RECYCLE_NUM		64
 #define	DEFAULT_TX_UPDATE_THRESHOLD	256
-#define	DEFAULT_TX_NO_RESOURCE		6
+#define	DEFAULT_TX_NO_RESOURCE		MAX_TX_DESC_PER_PACKET
 
 #define	DEFAULT_TX_INTR_ENABLE		1
 #define	DEFAULT_FLOW_CONTROL		3
@@ -167,6 +172,7 @@ extern "C" {
 #define	DEFAULT_TBI_COMPAT_ENABLE	1	/* Enable SBP workaround */
 #define	DEFAULT_MSI_ENABLE		1	/* MSI Enable */
 #define	DEFAULT_TX_HCKSUM_ENABLE	1	/* Hardware checksum enable */
+#define	DEFAULT_LSO_ENABLE		1	/* LSO enable */
 
 #define	TX_DRAIN_TIME		(200)	/* # milliseconds xmit drain */
 
@@ -183,8 +189,7 @@ extern "C" {
 #define	E1000_TX_BUFFER_SIZE_8K		(8192)
 #define	E1000_TX_BUFFER_SIZE_16K	(16384)
 
-#define	FORCE_BCOPY_EXCEED_FRAGS	0x1
-#define	FORCE_BCOPY_UNDER_SIZE		0x2
+#define	E1000_TX_BUFFER_OEVRRUN_THRESHOLD	(2015)
 
 #define	E1000G_RX_SW_FREE		0x0
 #define	E1000G_RX_SW_SENDUP		0x1
@@ -263,6 +268,8 @@ extern "C" {
 #define	MAXIMUM_FRAME_SIZE	\
 	(MAXIMUM_MTU + sizeof (struct ether_vlan_header) + ETHERFCSL)
 
+#define	E1000_LSO_MAXLEN	65535
+
 /* Defines for Tx stall check */
 #define	E1000G_STALL_WATCHDOG_COUNT	8
 
@@ -287,6 +294,11 @@ extern "C" {
  */
 #define	E1000G_PRIV_DEVI_ATTACH	0x0
 #define	E1000G_PRIV_DEVI_DETACH	0x1
+
+/*
+ * Tx descriptor LENGTH field mask
+ */
+#define	E1000G_TBD_LENGTH_MASK		0x000fffff
 
 /*
  * QUEUE_INIT_LIST -- Macro which will init ialize a queue to NULL.
@@ -550,12 +562,16 @@ typedef struct _mblk_list {
 	mblk_t *tail;
 } mblk_list_t, *p_mblk_list_t;
 
-typedef struct _cksum_data {
+typedef struct _context_data {
 	uint32_t ether_header_size;
 	uint32_t cksum_flags;
 	uint32_t cksum_start;
 	uint32_t cksum_stuff;
-} cksum_data_t;
+	uint16_t mss;
+	uint8_t hdr_len;
+	uint32_t pay_len;
+	boolean_t lso_flag;
+} context_data_t;
 
 typedef union _e1000g_ether_addr {
 	struct {
@@ -690,9 +706,9 @@ typedef struct _e1000g_tx_ring {
 	LIST_DESCRIBER used_list;
 	LIST_DESCRIBER free_list;
 	/*
-	 * TCP/UDP checksum offload
+	 * TCP/UDP Context Data Information
 	 */
-	cksum_data_t cksum_data;
+	context_data_t pre_context;
 	/*
 	 * Timer definitions for 82547
 	 */
@@ -702,7 +718,6 @@ typedef struct _e1000g_tx_ring {
 	 * reschedule when tx resource is available
 	 */
 	boolean_t resched_needed;
-	uint32_t frags_limit;
 	uint32_t stall_watchdog;
 	uint32_t recycle_fail;
 	mblk_list_t mblks;
@@ -876,8 +891,10 @@ typedef struct e1000g {
 	uint_t dvma_page_num;
 #endif
 
-	boolean_t msi_enabled;
-	boolean_t tx_hcksum_enabled;
+	boolean_t msi_enable;
+	boolean_t tx_hcksum_enable;
+	boolean_t lso_enable;
+	boolean_t lso_premature_issue;
 	int intr_type;
 	int intr_cnt;
 	int intr_cap;

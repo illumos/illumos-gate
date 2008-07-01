@@ -44,13 +44,14 @@
 
 static boolean_t e1000g_send(struct e1000g *, mblk_t *);
 static int e1000g_tx_copy(e1000g_tx_ring_t *,
-    p_tx_sw_packet_t, mblk_t *, uint32_t);
+    p_tx_sw_packet_t, mblk_t *, boolean_t);
 static int e1000g_tx_bind(e1000g_tx_ring_t *,
     p_tx_sw_packet_t, mblk_t *);
-static boolean_t check_cksum_context(e1000g_tx_ring_t *, cksum_data_t *);
+static boolean_t e1000g_retreive_context(mblk_t *, context_data_t *, size_t);
+static boolean_t e1000g_check_context(e1000g_tx_ring_t *, context_data_t *);
 static int e1000g_fill_tx_ring(e1000g_tx_ring_t *, LIST_DESCRIBER *,
-    cksum_data_t *);
-static void e1000g_fill_context_descriptor(cksum_data_t *,
+    context_data_t *);
+static void e1000g_fill_context_descriptor(context_data_t *,
     struct e1000_context_desc *);
 static int e1000g_fill_tx_desc(e1000g_tx_ring_t *,
     p_tx_sw_packet_t, uint64_t, size_t);
@@ -65,7 +66,8 @@ static void e1000g_82547_tx_move_tail_work(e1000g_tx_ring_t *);
 #ifndef E1000G_DEBUG
 #pragma inline(e1000g_tx_copy)
 #pragma inline(e1000g_tx_bind)
-#pragma inline(check_cksum_context)
+#pragma inline(e1000g_retreive_context)
+#pragma inline(e1000g_check_context)
 #pragma inline(e1000g_fill_tx_ring)
 #pragma inline(e1000g_fill_context_descriptor)
 #pragma inline(e1000g_fill_tx_desc)
@@ -160,17 +162,17 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	uint32_t frag_count;
 	int desc_count;
 	uint32_t desc_total;
-	uint32_t force_bcopy;
+	boolean_t tx_undersize_flag;
 	mblk_t *nmp;
 	mblk_t *tmp;
 	e1000g_tx_ring_t *tx_ring;
-	cksum_data_t cksum;
+	context_data_t cur_context;
 
 	hw = &Adapter->shared;
 	tx_ring = Adapter->tx_ring;
 
 	/* Get the total size and frags number of the message */
-	force_bcopy = 0;
+	tx_undersize_flag = B_FALSE;
 	frag_count = 0;
 	msg_size = 0;
 	for (nmp = mp; nmp; nmp = nmp->b_cont) {
@@ -178,8 +180,17 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 		msg_size += MBLKL(nmp);
 	}
 
-	/* Make sure packet is less than the max frame size */
-	if (msg_size > Adapter->max_frame_size - ETHERFCSL) {
+	/* retreive and compute information for context descriptor */
+	if (!e1000g_retreive_context(mp, &cur_context, msg_size)) {
+		freemsg(mp);
+		return (B_TRUE);
+	}
+
+	/*
+	 * Make sure the packet is less than the allowed size
+	 */
+	if (!cur_context.lso_flag &&
+	    (msg_size > Adapter->max_frame_size - ETHERFCSL)) {
 		/*
 		 * For the over size packet, we'll just drop it.
 		 * So we return B_TRUE here.
@@ -211,38 +222,18 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	}
 
 	/*
-	 * If there are many frags of the message, then bcopy them
-	 * into one tx descriptor buffer will get better performance.
-	 */
-	if ((frag_count >= tx_ring->frags_limit) &&
-	    (msg_size <= Adapter->tx_buffer_size)) {
-		E1000G_DEBUG_STAT(tx_ring->stat_exceed_frags);
-		force_bcopy |= FORCE_BCOPY_EXCEED_FRAGS;
-	}
-
-	/*
 	 * If the message size is less than the minimum ethernet packet size,
 	 * we'll use bcopy to send it, and padd it to 60 bytes later.
 	 */
 	if (msg_size < ETHERMIN) {
 		E1000G_DEBUG_STAT(tx_ring->stat_under_size);
-		force_bcopy |= FORCE_BCOPY_UNDER_SIZE;
+		tx_undersize_flag = B_TRUE;
 	}
 
 	/* Initialize variables */
 	desc_count = 1;	/* The initial value should be greater than 0 */
 	desc_total = 0;
 	QUEUE_INIT_LIST(&pending_list);
-
-	/* Retrieve checksum info */
-	hcksum_retrieve(mp, NULL, NULL, &cksum.cksum_start, &cksum.cksum_stuff,
-	    NULL, NULL, &cksum.cksum_flags);
-
-	if (((struct ether_vlan_header *)mp->b_rptr)->ether_tpid ==
-	    htons(ETHERTYPE_VLAN))
-		cksum.ether_header_size = sizeof (struct ether_vlan_header);
-	else
-		cksum.ether_header_size = sizeof (struct ether_header);
 
 	/* Process each mblk fragment and fill tx descriptors */
 	packet = NULL;
@@ -290,9 +281,10 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 		 * If the size of the fragment is less than the tx_bcopy_thresh
 		 * we'll use bcopy; Otherwise, we'll use DMA binding.
 		 */
-		if ((len <= Adapter->tx_bcopy_thresh) || force_bcopy) {
+		if ((len <= Adapter->tx_bcopy_thresh) || tx_undersize_flag) {
 			desc_count =
-			    e1000g_tx_copy(tx_ring, packet, nmp, force_bcopy);
+			    e1000g_tx_copy(tx_ring, packet, nmp,
+			    tx_undersize_flag);
 			E1000G_DEBUG_STAT(tx_ring->stat_copy);
 		} else {
 			desc_count =
@@ -334,7 +326,7 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 		goto tx_send_failed;
 	}
 
-	desc_count = e1000g_fill_tx_ring(tx_ring, &pending_list, &cksum);
+	desc_count = e1000g_fill_tx_ring(tx_ring, &pending_list, &cur_context);
 
 	mutex_exit(&tx_ring->tx_lock);
 
@@ -385,40 +377,136 @@ tx_no_resource:
 }
 
 static boolean_t
-check_cksum_context(e1000g_tx_ring_t *tx_ring, cksum_data_t *cksum)
+e1000g_retreive_context(mblk_t *mp, context_data_t *cur_context,
+    size_t msg_size)
 {
-	boolean_t cksum_load;
-	cksum_data_t *last;
+	uintptr_t ip_start;
+	uintptr_t tcp_start;
+	mblk_t *nmp;
 
-	cksum_load = B_FALSE;
-	last = &tx_ring->cksum_data;
+	bzero(cur_context, sizeof (context_data_t));
 
-	if (cksum->cksum_flags != 0) {
-		if ((cksum->ether_header_size != last->ether_header_size) ||
-		    (cksum->cksum_flags != last->cksum_flags) ||
-		    (cksum->cksum_stuff != last->cksum_stuff) ||
-		    (cksum->cksum_start != last->cksum_start)) {
+	/* retrieve checksum info */
+	hcksum_retrieve(mp, NULL, NULL, &cur_context->cksum_start,
+	    &cur_context->cksum_stuff, NULL, NULL, &cur_context->cksum_flags);
+	/* retreive ethernet header size */
+	if (((struct ether_vlan_header *)mp->b_rptr)->ether_tpid ==
+	    htons(ETHERTYPE_VLAN))
+		cur_context->ether_header_size =
+		    sizeof (struct ether_vlan_header);
+	else
+		cur_context->ether_header_size =
+		    sizeof (struct ether_header);
 
-			cksum_load = B_TRUE;
+	if (cur_context->cksum_flags & HW_LSO) {
+		if ((cur_context->mss = DB_LSOMSS(mp)) != 0) {
+			/* free the invaid packet */
+			if (!((cur_context->cksum_flags & HCK_PARTIALCKSUM) &&
+			    (cur_context->cksum_flags & HCK_IPV4_HDRCKSUM))) {
+				return (B_FALSE);
+			}
+			cur_context->lso_flag = B_TRUE;
+			/*
+			 * Some fields are cleared for the hardware to fill
+			 * in. We don't assume Ethernet header, IP header and
+			 * TCP header are always in the same mblk fragment,
+			 * while we assume each header is always within one
+			 * mblk fragment and Ethernet header is always in the
+			 * first mblk fragment.
+			 */
+			nmp = mp;
+			ip_start = (uintptr_t)(nmp->b_rptr)
+			    + cur_context->ether_header_size;
+			if (ip_start >= (uintptr_t)(nmp->b_wptr)) {
+				ip_start = (uintptr_t)nmp->b_cont->b_rptr
+				    + (ip_start - (uintptr_t)(nmp->b_wptr));
+				nmp = nmp->b_cont;
+			}
+			tcp_start = ip_start +
+			    IPH_HDR_LENGTH((ipha_t *)ip_start);
+			if (tcp_start >= (uintptr_t)(nmp->b_wptr)) {
+				tcp_start = (uintptr_t)nmp->b_cont->b_rptr
+				    + (tcp_start - (uintptr_t)(nmp->b_wptr));
+				nmp = nmp->b_cont;
+			}
+			cur_context->hdr_len = cur_context->ether_header_size
+			    + IPH_HDR_LENGTH((ipha_t *)ip_start)
+			    + TCP_HDR_LENGTH((tcph_t *)tcp_start);
+			((ipha_t *)ip_start)->ipha_length = 0;
+			((ipha_t *)ip_start)->ipha_hdr_checksum = 0;
+			/* calculate the TCP packet payload length */
+			cur_context->pay_len = msg_size - cur_context->hdr_len;
+		}
+	}
+	return (B_TRUE);
+}
+
+static boolean_t
+e1000g_check_context(e1000g_tx_ring_t *tx_ring, context_data_t *cur_context)
+{
+	boolean_t context_reload;
+	context_data_t *pre_context;
+	struct e1000g *Adapter;
+
+	context_reload = B_FALSE;
+	pre_context = &tx_ring->pre_context;
+	Adapter = tx_ring->adapter;
+
+	/*
+	 * The following code determine if the context descriptor is
+	 * needed to be reloaded. The sequence of the conditions is
+	 * made by their possibilities of changing.
+	 */
+	/*
+	 * workaround for 82546EB, context descriptor must be reloaded
+	 * per LSO/hw_cksum packet if LSO is enabled.
+	 */
+	if (Adapter->lso_premature_issue &&
+	    Adapter->lso_enable &&
+	    (cur_context->cksum_flags != 0)) {
+
+		context_reload = B_TRUE;
+	} else if (cur_context->lso_flag) {
+		if ((cur_context->cksum_flags != pre_context->cksum_flags) ||
+		    (cur_context->pay_len != pre_context->pay_len) ||
+		    (cur_context->mss != pre_context->mss) ||
+		    (cur_context->hdr_len != pre_context->hdr_len) ||
+		    (cur_context->cksum_stuff != pre_context->cksum_stuff) ||
+		    (cur_context->cksum_start != pre_context->cksum_start) ||
+		    (cur_context->ether_header_size !=
+		    pre_context->ether_header_size)) {
+
+			context_reload = B_TRUE;
+		}
+	} else if (cur_context->cksum_flags != 0) {
+		if ((cur_context->cksum_flags != pre_context->cksum_flags) ||
+		    (cur_context->cksum_stuff != pre_context->cksum_stuff) ||
+		    (cur_context->cksum_start != pre_context->cksum_start) ||
+		    (cur_context->ether_header_size !=
+		    pre_context->ether_header_size)) {
+
+			context_reload = B_TRUE;
 		}
 	}
 
-	return (cksum_load);
+	return (context_reload);
 }
 
 static int
 e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
-    cksum_data_t *cksum)
+    context_data_t *cur_context)
 {
 	struct e1000g *Adapter;
 	struct e1000_hw *hw;
 	p_tx_sw_packet_t first_packet;
 	p_tx_sw_packet_t packet;
-	boolean_t cksum_load;
+	p_tx_sw_packet_t previous_packet;
+	boolean_t context_reload;
 	struct e1000_tx_desc *first_data_desc;
 	struct e1000_tx_desc *next_desc;
 	struct e1000_tx_desc *descriptor;
 	int desc_count;
+	boolean_t buff_overrun_flag;
 	int i;
 
 	Adapter = tx_ring->adapter;
@@ -428,18 +516,21 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 	first_packet = NULL;
 	first_data_desc = NULL;
 	descriptor = NULL;
+	first_packet = NULL;
+	packet = NULL;
+	buff_overrun_flag = B_FALSE;
 
 	next_desc = tx_ring->tbd_next;
 
-	/* IP Head/TCP/UDP checksum offload */
-	cksum_load = check_cksum_context(tx_ring, cksum);
+	/* Context descriptor reload check */
+	context_reload = e1000g_check_context(tx_ring, cur_context);
 
-	if (cksum_load) {
+	if (context_reload) {
 		first_packet = (p_tx_sw_packet_t)QUEUE_GET_HEAD(pending_list);
 
 		descriptor = next_desc;
 
-		e1000g_fill_context_descriptor(cksum,
+		e1000g_fill_context_descriptor(cur_context,
 		    (struct e1000_context_desc *)descriptor);
 
 		/* Check the wrap-around case */
@@ -475,6 +566,9 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 			descriptor->lower.data |=
 			    E1000_TXD_CMD_RS;
 
+			if (cur_context->lso_flag)
+				descriptor->lower.data |= E1000_TXD_CMD_TSE;
+
 			/* Check the wrap-around case */
 			if (descriptor == tx_ring->tbd_last)
 				next_desc = tx_ring->tbd_first;
@@ -482,6 +576,61 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 				next_desc++;
 
 			desc_count++;
+
+			/*
+			 * workaround for 82546EB errata 33, hang in PCI-X
+			 * systems due to 2k Buffer Overrun during Transmit
+			 * Operation. The workaround applies to all the Intel
+			 * PCI-X chips.
+			 */
+			if (hw->bus.type == e1000_bus_type_pcix &&
+			    descriptor == first_data_desc &&
+			    ((descriptor->lower.data & E1000G_TBD_LENGTH_MASK)
+			    > E1000_TX_BUFFER_OEVRRUN_THRESHOLD)) {
+				/* modified the first descriptor */
+				descriptor->lower.data &=
+				    ~E1000G_TBD_LENGTH_MASK;
+				descriptor->lower.flags.length =
+				    E1000_TX_BUFFER_OEVRRUN_THRESHOLD;
+
+				/* insert a new descriptor */
+				ASSERT(tx_ring->tbd_avail > 0);
+				next_desc->buffer_addr =
+				    packet->desc[0].address +
+				    E1000_TX_BUFFER_OEVRRUN_THRESHOLD;
+				next_desc->lower.data =
+				    packet->desc[0].length -
+				    E1000_TX_BUFFER_OEVRRUN_THRESHOLD;
+
+				/* Zero out status */
+				next_desc->upper.data = 0;
+
+				next_desc->lower.data |=
+				    E1000_TXD_CMD_DEXT | E1000_TXD_DTYP_D;
+				/* must set RS on every outgoing descriptor */
+				next_desc->lower.data |=
+				    E1000_TXD_CMD_RS;
+
+				if (cur_context->lso_flag)
+					next_desc->lower.data |=
+					    E1000_TXD_CMD_TSE;
+
+				descriptor = next_desc;
+
+				/* Check the wrap-around case */
+				if (next_desc == tx_ring->tbd_last)
+					next_desc = tx_ring->tbd_first;
+				else
+					next_desc++;
+
+				desc_count++;
+				buff_overrun_flag = B_TRUE;
+			}
+		}
+
+		if (buff_overrun_flag) {
+			packet->num_desc++;
+			buff_overrun_flag = B_FALSE;
 		}
 
 		if (first_packet != NULL) {
@@ -493,31 +642,74 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 			first_packet = NULL;
 		}
 
+		previous_packet = packet;
 		packet = (p_tx_sw_packet_t)
 		    QUEUE_GET_NEXT(pending_list, &packet->Link);
 	}
 
+	/*
+	 * workaround for 82546EB errata 21, LSO Premature Descriptor Write Back
+	 */
+	if (Adapter->lso_premature_issue && cur_context->lso_flag &&
+	    ((descriptor->lower.data & E1000G_TBD_LENGTH_MASK) > 8)) {
+		/* modified the previous descriptor */
+		descriptor->lower.data -= 4;
+
+		/* insert a new descriptor */
+		ASSERT(tx_ring->tbd_avail > 0);
+		/* the lower 20 bits of lower.data is the length field */
+		next_desc->buffer_addr =
+		    descriptor->buffer_addr +
+		    (descriptor->lower.data & E1000G_TBD_LENGTH_MASK);
+		next_desc->lower.data = 4;
+
+		/* Zero out status */
+		next_desc->upper.data = 0;
+		/* It must be part of a LSO packet */
+		next_desc->lower.data |=
+		    E1000_TXD_CMD_DEXT | E1000_TXD_DTYP_D |
+		    E1000_TXD_CMD_RS | E1000_TXD_CMD_TSE;
+
+		descriptor = next_desc;
+
+		/* Check the wrap-around case */
+		if (descriptor == tx_ring->tbd_last)
+			next_desc = tx_ring->tbd_first;
+		else
+			next_desc++;
+
+		desc_count++;
+		/* update the number of descriptors */
+		previous_packet->num_desc++;
+	}
+
 	ASSERT(descriptor);
 
-	if (cksum->cksum_flags) {
-		if (cksum->cksum_flags & HCK_IPV4_HDRCKSUM)
+	if (cur_context->cksum_flags) {
+		if (cur_context->cksum_flags & HCK_IPV4_HDRCKSUM)
 			((struct e1000_data_desc *)first_data_desc)->
 			    upper.fields.popts |= E1000_TXD_POPTS_IXSM;
-		if (cksum->cksum_flags & HCK_PARTIALCKSUM)
+		if (cur_context->cksum_flags & HCK_PARTIALCKSUM)
 			((struct e1000_data_desc *)first_data_desc)->
 			    upper.fields.popts |= E1000_TXD_POPTS_TXSM;
 	}
 
 	/*
 	 * Last Descriptor of Packet needs End Of Packet (EOP), Report
-	 * Status (RS) and append Ethernet CRC (IFCS) bits set.
+	 * Status (RS) set.
 	 */
 	if (Adapter->tx_intr_delay) {
 		descriptor->lower.data |= E1000_TXD_CMD_IDE |
-		    E1000_TXD_CMD_EOP | E1000_TXD_CMD_IFCS;
+		    E1000_TXD_CMD_EOP;
 	} else {
-		descriptor->lower.data |=
-		    E1000_TXD_CMD_EOP | E1000_TXD_CMD_IFCS;
+		descriptor->lower.data |= E1000_TXD_CMD_EOP;
+	}
+
+	/* Set append Ethernet CRC (IFCS) bits */
+	if (cur_context->lso_flag) {
+		first_data_desc->lower.data |= E1000_TXD_CMD_IFCS;
+	} else {
+		descriptor->lower.data |= E1000_TXD_CMD_IFCS;
 	}
 
 	/*
@@ -549,9 +741,9 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 	tx_ring->tbd_avail -= desc_count;
 	mutex_exit(&tx_ring->usedlist_lock);
 
-	/* Store the cksum data */
-	if (cksum_load)
-		tx_ring->cksum_data = *cksum;
+	/* update LSO related data */
+	if (context_reload)
+		tx_ring->pre_context = *cur_context;
 
 	return (desc_count);
 }
@@ -699,11 +891,8 @@ e1000g_tx_setup(struct e1000g *Adapter)
 
 	tx_ring->tbd_avail = Adapter->tx_desc_num;
 
-	/* For TCP/UDP checksum offload */
-	tx_ring->cksum_data.cksum_stuff = 0;
-	tx_ring->cksum_data.cksum_start = 0;
-	tx_ring->cksum_data.cksum_flags = 0;
-	tx_ring->cksum_data.ether_header_size = 0;
+	/* Initialize stored context information */
+	bzero(&(tx_ring->pre_context), sizeof (context_data_t));
 }
 
 /*
@@ -951,7 +1140,7 @@ e1000g_fill_82544_desc(uint64_t address,
 
 static int
 e1000g_tx_copy(e1000g_tx_ring_t *tx_ring, p_tx_sw_packet_t packet,
-    mblk_t *mp, uint32_t force_bcopy)
+    mblk_t *mp, boolean_t tx_undersize_flag)
 {
 	size_t len;
 	size_t len1;
@@ -982,7 +1171,7 @@ e1000g_tx_copy(e1000g_tx_ring_t *tx_ring, p_tx_sw_packet_t packet,
 		len1 = MBLKL(nmp);
 		if ((tx_buf->len + len1) > tx_buf->size)
 			finished = B_TRUE;
-		else if (force_bcopy)
+		else if (tx_undersize_flag)
 			finished = B_FALSE;
 		else if (len1 > tx_ring->adapter->tx_bcopy_thresh)
 			finished = B_TRUE;
@@ -1000,7 +1189,7 @@ e1000g_tx_copy(e1000g_tx_ring_t *tx_ring, p_tx_sw_packet_t packet,
 		 * it at least 60 bytes. The hardware will add 4 bytes
 		 * for CRC.
 		 */
-		if (force_bcopy & FORCE_BCOPY_UNDER_SIZE) {
+		if (tx_undersize_flag) {
 			ASSERT(tx_buf->len < ETHERMIN);
 
 			bzero(tx_buf->address + tx_buf->len,
@@ -1155,22 +1344,22 @@ e1000g_tx_bind(e1000g_tx_ring_t *tx_ring, p_tx_sw_packet_t packet, mblk_t *mp)
 }
 
 static void
-e1000g_fill_context_descriptor(cksum_data_t *cksum,
-    struct e1000_context_desc *cksum_desc)
+e1000g_fill_context_descriptor(context_data_t *cur_context,
+    struct e1000_context_desc *context_desc)
 {
-	if (cksum->cksum_flags & HCK_IPV4_HDRCKSUM) {
-		cksum_desc->lower_setup.ip_fields.ipcss =
-		    cksum->ether_header_size;
-		cksum_desc->lower_setup.ip_fields.ipcso =
-		    cksum->ether_header_size +
+	if (cur_context->cksum_flags & HCK_IPV4_HDRCKSUM) {
+		context_desc->lower_setup.ip_fields.ipcss =
+		    cur_context->ether_header_size;
+		context_desc->lower_setup.ip_fields.ipcso =
+		    cur_context->ether_header_size +
 		    offsetof(struct ip, ip_sum);
-		cksum_desc->lower_setup.ip_fields.ipcse =
-		    cksum->ether_header_size +
-		    sizeof (struct ip) - 1;
+		context_desc->lower_setup.ip_fields.ipcse =
+		    cur_context->ether_header_size +
+		    cur_context->cksum_start - 1;
 	} else
-		cksum_desc->lower_setup.ip_config = 0;
+		context_desc->lower_setup.ip_config = 0;
 
-	if (cksum->cksum_flags & HCK_PARTIALCKSUM) {
+	if (cur_context->cksum_flags & HCK_PARTIALCKSUM) {
 		/*
 		 * The packet with same protocol has the following
 		 * stuff and start offset:
@@ -1181,21 +1370,34 @@ e1000g_fill_context_descriptor(cksum_data_t *cksum,
 		 * | IPv6 + TCP |  0x20  |  0x10  |  No
 		 * | IPv6 + UDP |  0x14  |  0x10  |  No
 		 */
-		cksum_desc->upper_setup.tcp_fields.tucss =
-		    cksum->cksum_start + cksum->ether_header_size;
-		cksum_desc->upper_setup.tcp_fields.tucso =
-		    cksum->cksum_stuff + cksum->ether_header_size;
-		cksum_desc->upper_setup.tcp_fields.tucse = 0;
+		context_desc->upper_setup.tcp_fields.tucss =
+		    cur_context->cksum_start + cur_context->ether_header_size;
+		context_desc->upper_setup.tcp_fields.tucso =
+		    cur_context->cksum_stuff + cur_context->ether_header_size;
+		context_desc->upper_setup.tcp_fields.tucse = 0;
 	} else
-		cksum_desc->upper_setup.tcp_config = 0;
+		context_desc->upper_setup.tcp_config = 0;
 
-	cksum_desc->cmd_and_length = E1000_TXD_CMD_DEXT;
-
-	/*
-	 * Zero out the options for TCP Segmentation Offload,
-	 * since we don't support it in this version
-	 */
-	cksum_desc->tcp_seg_setup.data = 0;
+	if (cur_context->lso_flag) {
+		context_desc->tcp_seg_setup.fields.mss = cur_context->mss;
+		context_desc->tcp_seg_setup.fields.hdr_len =
+		    cur_context->hdr_len;
+		/*
+		 * workaround for 82546EB errata 23, status-writeback
+		 * reporting (RS) should not be set on context or
+		 * Null descriptors
+		 */
+		context_desc->cmd_and_length = E1000_TXD_CMD_DEXT
+		    | E1000_TXD_CMD_TSE | E1000_TXD_CMD_IP | E1000_TXD_CMD_TCP
+		    | E1000_TXD_DTYP_C | cur_context->pay_len;
+	} else {
+		context_desc->cmd_and_length = E1000_TXD_CMD_DEXT
+		    | E1000_TXD_DTYP_C;
+		/*
+		 * Zero out the options for TCP Segmentation Offload
+		 */
+		context_desc->tcp_seg_setup.data = 0;
+	}
 }
 
 static int
