@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,6 +127,7 @@ extern brand_t	*brand_find_name(char *);
 extern void	brand_unregister_zone(brand_t *);
 extern int	brand_zone_count(brand_t *);
 extern void	brand_setbrand(proc_t *);
+extern void	brand_clearbrand(proc_t *);
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

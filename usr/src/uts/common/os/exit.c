@@ -375,8 +375,10 @@ proc_exit(int why, int what)
 	 * is always the last lwp, will also perform lwp_exit and free brand
 	 * data
 	 */
-	if (PROC_IS_BRANDED(p))
-		BROP(p)->b_proc_exit(p, lwp);
+	if (PROC_IS_BRANDED(p)) {
+		lwp_detach_brand_hdlrs(lwp);
+		brand_clearbrand(p);
+	}
 
 	/*
 	 * Don't let init exit unless zone_start_init() failed its exec, or

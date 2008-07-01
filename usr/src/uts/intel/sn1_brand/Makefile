@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,7 +53,19 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-INC_PATH   += -I$(UTSBASE)/common/brand/sn1
+INC_PATH	+= -I$(UTSBASE)/common/brand/sn1
+AS_INC_PATH	+= -I$(UTSBASE)/i86pc/genassym/$(OBJS_DIR)
+
+#
+# Ugh, this is a gross hack.  Sn1_brand_asm.s uses lots of defines
+# to simplify variable access.  All these defines work fine for amd64
+# compiles because when compiling for amd64 we use the GNU assembler,
+# gas.  For 32-bit code we use the Sun assembler, as.  Unfortunatly
+# as does not handle certian constructs that gas does.  So rather than
+# make our code less readable, we'll just use gas to compile our 32-bit
+# code as well.
+#
+i386_AS		= $(amd64_AS)
 
 #
 #	Default build targets.

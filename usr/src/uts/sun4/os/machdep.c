@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -263,11 +263,16 @@ lwp_freeregs(klwp_t *lwp, int isexec)
 }
 
 /*
- * This function is currently unused on sparc.
+ * These function are currently unused on sparc.
  */
 /*ARGSUSED*/
 void
 lwp_attach_brand_hdlrs(klwp_t *lwp)
+{}
+
+/*ARGSUSED*/
+void
+lwp_detach_brand_hdlrs(klwp_t *lwp)
 {}
 
 /*

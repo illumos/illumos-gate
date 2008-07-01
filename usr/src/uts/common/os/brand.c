@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -333,10 +333,25 @@ brand_setbrand(proc_t *p)
 	ASSERT(p->p_tlist == p->p_tlist->t_forw);
 
 	p->p_brand = bp;
-	if (PROC_IS_BRANDED(p)) {
-		BROP(p)->b_setbrand(p);
-		lwp_attach_brand_hdlrs(p->p_tlist->t_lwp);
-	}
+	ASSERT(PROC_IS_BRANDED(p));
+	BROP(p)->b_setbrand(p);
+}
+
+void
+brand_clearbrand(proc_t *p)
+{
+	brand_t *bp = p->p_zone->zone_brand;
+	ASSERT(bp != NULL);
+
+	/*
+	 * We should only be called from exec_common() or proc_exit(),
+	 * when we know the process is single-threaded.
+	 */
+	ASSERT(p->p_tlist == p->p_tlist->t_forw);
+
+	ASSERT(PROC_IS_BRANDED(p));
+	BROP(p)->b_proc_exit(p, p->p_tlist->t_lwp);
+	p->p_brand = &native_brand;
 }
 
 #if defined(__sparcv9)

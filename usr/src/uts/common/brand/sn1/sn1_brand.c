@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,8 +133,16 @@ static struct modlinkage modlinkage = {
 void
 sn1_setbrand(proc_t *p)
 {
+	ASSERT(p->p_brand == &sn1_brand);
+	ASSERT(p->p_brand_data == NULL);
 	p->p_brand_data = NULL;
-	p->p_brand = &sn1_brand;
+
+	/*
+	 * We should only be called from exec(), when we know the process
+	 * is single-threaded.
+	 */
+	ASSERT(p->p_tlist == p->p_tlist->t_forw);
+	(void) sn1_initlwp(p->p_tlist->t_lwp);
 }
 
 /* ARGSUSED */
@@ -163,13 +171,27 @@ sn1_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 	proc_t *p = curproc;
 	*rval = 0;
 
-	if (cmd == B_REGISTER) {
-		p->p_brand = &sn1_brand;
-		p->p_brand_data = (void *) arg1;
-		return (0);
-	}
+	/*
+	 * There is one operation that is suppored for non-branded
+	 * process.  B_EXEC_BRAND.  This brand operaion is redundant
+	 * since the kernel assumes a native process doing an exec
+	 * in a branded zone is going to run a branded processes.
+	 * hence we don't support this operation.
+	 */
+	if (cmd == B_EXEC_BRAND)
+		return (ENOSYS);
+
+	/* For all other operations this must be a branded process. */
+	if (p->p_brand == &native_brand)
+		return (ENOSYS);
 
 	ASSERT(p->p_brand == &sn1_brand);
+
+	if (cmd == B_REGISTER) {
+		ASSERT(p->p_brand_data == NULL);
+		p->p_brand_data = (void *)arg1;
+		return (0);
+	}
 
 	return (EINVAL);
 }
@@ -182,20 +204,41 @@ sn1_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 void
 sn1_copy_procdata(proc_t *child, proc_t *parent)
 {
-	child->p_brand_data = parent->p_brand_data;
+	ASSERT(parent->p_brand == &sn1_brand);
+	ASSERT(child->p_brand == &sn1_brand);
+
+	child->p_brand_data = NULL;
 }
 
 /*ARGSUSED*/
 void
 sn1_proc_exit(struct proc *p, klwp_t *l)
 {
+	ASSERT(p->p_brand == &sn1_brand);
+
+	/*
+	 * We should only be called from proc_exit(), when we know that
+	 * process is single-threaded.
+	 */
+	ASSERT(p->p_tlist == p->p_tlist->t_forw);
+
 	p->p_brand_data = NULL;
-	p->p_brand = &native_brand;
+	l->lwp_brand = NULL;
 }
 
 void
 sn1_exec()
 {
+	ASSERT(curproc->p_brand == &sn1_brand);
+	ASSERT(ttolwp(curthread)->lwp_brand != NULL);
+
+	/*
+	 * We should only be called from exec(), when we know the process
+	 * is single-threaded.
+	 */
+	ASSERT(curproc->p_tlist == curproc->p_tlist->t_forw);
+
+	/* upon exec, reset our user-land handler callback entry point */
 	curproc->p_brand_data = NULL;
 }
 
@@ -203,7 +246,51 @@ sn1_exec()
 int
 sn1_initlwp(klwp_t *l)
 {
+	ASSERT(l->lwp_procp->p_brand == &sn1_brand);
+	ASSERT(l->lwp_brand == NULL);
+	l->lwp_brand = (void *)-1;
 	return (0);
+}
+
+/*ARGSUSED*/
+void
+sn1_forklwp(klwp_t *p, klwp_t *c)
+{
+	ASSERT(p->lwp_procp->p_brand == &sn1_brand);
+	ASSERT(c->lwp_procp->p_brand == &sn1_brand);
+
+	/* Both LWPs have already had been initialized via sn1_initlwp() */
+	ASSERT(p->lwp_brand != NULL);
+	ASSERT(c->lwp_brand != NULL);
+}
+
+/*ARGSUSED*/
+void
+sn1_freelwp(klwp_t *l)
+{
+	/* This lwp died during birth */
+	ASSERT(l->lwp_procp->p_brand == &sn1_brand);
+	ASSERT(l->lwp_brand != NULL);
+	l->lwp_brand = NULL;
+}
+
+/*ARGSUSED*/
+void
+sn1_lwpexit(klwp_t *l)
+{
+	proc_t	*p = l->lwp_procp;
+
+	ASSERT(l->lwp_procp->p_brand == &sn1_brand);
+	ASSERT(l->lwp_brand != NULL);
+
+	/*
+	 * We should never be called for the last thread in a process.
+	 * (That case is handled by sn1_proc_exit().)  There for this lwp
+	 * must be exiting from a multi-threaded process.
+	 */
+	ASSERT(p->p_tlist != p->p_tlist->t_forw);
+
+	l->lwp_brand = NULL;
 }
 
 /*ARGSUSED*/
@@ -215,24 +302,6 @@ sn1_init_brand_data(zone_t *zone)
 /*ARGSUSED*/
 void
 sn1_free_brand_data(zone_t *zone)
-{
-}
-
-/*ARGSUSED*/
-void
-sn1_forklwp(klwp_t *p, klwp_t *c)
-{
-}
-
-/*ARGSUSED*/
-void
-sn1_freelwp(klwp_t *l)
-{
-}
-
-/*ARGSUSED*/
-void
-sn1_lwpexit(klwp_t *l)
 {
 }
 

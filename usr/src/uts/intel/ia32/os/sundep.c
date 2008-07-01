@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -738,10 +738,10 @@ lwp_attach_brand_hdlrs(klwp_t *lwp)
 	kthread_t *t = lwptot(lwp);
 
 	ASSERT(PROC_IS_BRANDED(lwptoproc(lwp)));
+
 	ASSERT(removectx(t, NULL, brand_interpositioning_disable,
 	    brand_interpositioning_enable, NULL, NULL,
 	    brand_interpositioning_disable, NULL) == 0);
-
 	installctx(t, NULL, brand_interpositioning_disable,
 	    brand_interpositioning_enable, NULL, NULL,
 	    brand_interpositioning_disable, NULL);
@@ -749,6 +749,32 @@ lwp_attach_brand_hdlrs(klwp_t *lwp)
 	if (t == curthread) {
 		kpreempt_disable();
 		brand_interpositioning_enable();
+		kpreempt_enable();
+	}
+}
+
+/*
+ * If this is a process in a branded zone, then we want it to disable the
+ * brand syscall entry points.  This routine must be called when the last
+ * lwp in a process is exiting in proc_exit().
+ */
+void
+lwp_detach_brand_hdlrs(klwp_t *lwp)
+{
+	kthread_t *t = lwptot(lwp);
+
+	ASSERT(PROC_IS_BRANDED(lwptoproc(lwp)));
+	if (t == curthread)
+		kpreempt_disable();
+
+	/* Remove the original context handlers */
+	VERIFY(removectx(t, NULL, brand_interpositioning_disable,
+	    brand_interpositioning_enable, NULL, NULL,
+	    brand_interpositioning_disable, NULL) != 0);
+
+	if (t == curthread) {
+		/* Cleanup our MSR and IDT entries. */
+		brand_interpositioning_disable();
 		kpreempt_enable();
 	}
 }

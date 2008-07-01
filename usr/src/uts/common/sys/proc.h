@@ -748,6 +748,7 @@ extern	void	lwp_rtt_initial(void);
 extern	int	lwp_setprivate(klwp_t *, int, uintptr_t);
 extern	void	lwp_stat_update(lwp_stat_id_t, long);
 extern	void	lwp_attach_brand_hdlrs(klwp_t *);
+extern	void	lwp_detach_brand_hdlrs(klwp_t *);
 
 /*
  * Signal queue function prototypes. Must be here due to header ordering

@@ -138,7 +138,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	lwpdir_t **old_tidhash;
 	uint_t old_tidhash_sz;
 	lwpent_t *lep;
-	int brandme = 0;
+	boolean_t brandme = B_FALSE;
 
 	/*
 	 * exec() is not supported for the /proc agent lwp.
@@ -162,7 +162,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 			/* Only unbranded processes can be branded */
 			if (PROC_IS_BRANDED(p))
 				return (ENOTSUP);
-			brandme = 1;
+			brandme = B_TRUE;
 		}
 	} else {
 		/*
@@ -172,7 +172,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 		 * process as it exec()s the new binary.
 		 */
 		if (ZONE_IS_BRANDED(p->p_zone) && !PROC_IS_BRANDED(p))
-			brandme = 1;
+			brandme = B_TRUE;
 	}
 
 	/*
@@ -276,13 +276,13 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	ua.envp = envp;
 
 	/* If necessary, brand this process before we start the exec. */
-	if (brandme != 0)
+	if (brandme)
 		brand_setbrand(p);
 
 	if ((error = gexec(&vp, &ua, &args, NULL, 0, &execsz,
 	    exec_file, p->p_cred, brand_action)) != 0) {
-		if (brandme != 0)
-			BROP(p)->b_proc_exit(p, lwp);
+		if (brandme)
+			brand_clearbrand(p);
 		VN_RELE(vp);
 		if (dir != NULL)
 			VN_RELE(dir);
@@ -396,10 +396,9 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	close_exec(P_FINFO(p));
 	TRACE_2(TR_FAC_PROC, TR_PROC_EXEC, "proc_exec:p %p up %p", p, up);
 
-	/* Unbrand ourself if requested. */
-	if (brand_action == EBA_NATIVE)
-		BROP(p)->b_proc_exit(p, lwp);
-	ASSERT((brand_action != EBA_NATIVE) || !PROC_IS_BRANDED(p));
+	/* Unbrand ourself if necessary. */
+	if (PROC_IS_BRANDED(p) && (brand_action == EBA_NATIVE))
+		brand_clearbrand(p);
 
 	setregs(&args);
 
