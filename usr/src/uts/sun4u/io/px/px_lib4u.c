@@ -697,7 +697,8 @@ px_lib_msiq_init(dev_info_t *dip)
 	    MMU_BTOP(size), PCI_MAP_ATTR_WRITE, msiq_state_p->msiq_buf_p,
 	    0, MMU_MAP_BUF)) != DDI_SUCCESS) {
 		DBG(DBG_LIB_MSIQ, dip,
-		    "hvio_msiq_init failed, ret 0x%lx\n", ret);
+		    "px_lib_msiq_init: px_lib_iommu_map failed, "
+		    "ret 0x%lx\n", ret);
 
 		(void) px_lib_msiq_fini(dip);
 		return (DDI_FAILURE);
