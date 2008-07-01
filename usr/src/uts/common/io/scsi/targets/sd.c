@@ -617,6 +617,8 @@ static sd_disk_config_t sd_disk_table[] = {
 	{ "IBM     1814",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "IBM     1814-200",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "IBM     1818",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
+	{ "DELL    MD3000",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
+	{ "DELL    MD3000i",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "LSI     INF",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "ENGENIO INF",	SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "SGI     TP",		SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
