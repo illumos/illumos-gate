@@ -547,6 +547,7 @@ pepb_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 		    ddi_ctlops, &pepb->pepb_err_mutex,
 		    &pepb->pepb_peek_poke_mutex,
 		    pepb_peekpoke_cb));
+
 	case DDI_CTLOPS_ATTACH:
 		if (!pcie_is_child(dip, rdip))
 			return (DDI_SUCCESS);
@@ -565,7 +566,12 @@ pepb_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 			pepb_intel_rber_workaround(rdip);
 		}
 
+		if (as->cmd == DDI_RESUME && as->when == DDI_PRE)
+			if (pci_pre_resume(rdip) != DDI_SUCCESS)
+				return (DDI_FAILURE);
+
 		return (DDI_SUCCESS);
+
 	case DDI_CTLOPS_DETACH:
 		if (!pcie_is_child(dip, rdip))
 			return (DDI_SUCCESS);
@@ -573,6 +579,10 @@ pepb_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 		ds = (struct detachspec *)arg;
 		if (ds->when == DDI_PRE)
 			pf_fini(rdip, ds->cmd);
+
+		if (ds->cmd == DDI_SUSPEND && ds->when == DDI_POST)
+			if (pci_post_suspend(rdip) != DDI_SUCCESS)
+				return (DDI_FAILURE);
 
 		return (DDI_SUCCESS);
 	default:

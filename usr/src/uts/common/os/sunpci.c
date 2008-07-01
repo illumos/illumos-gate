@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -322,6 +322,7 @@ static pci_cap_entry_t pci_cap_table[] = {
 int
 pci_save_config_regs(dev_info_t *dip)
 {
+	peekpoke_ctlops_t cautacc_ctlops_arg;
 	ddi_acc_handle_t confhdl;
 	pci_config_header_state_t *chsp;
 	pci_cap_save_desc_t *pci_cap_descp;
@@ -376,9 +377,17 @@ pci_save_config_regs(dev_info_t *dip)
 		    INDEX_SHIFT);
 		maskbuf = (uint8_t *)kmem_zalloc(maskbufsz, KM_SLEEP);
 		hp = impl_acc_hdl_get(confhdl);
+		cautacc_ctlops_arg.size = sizeof (uint32_t);
+		cautacc_ctlops_arg.handle = confhdl;
+		cautacc_ctlops_arg.repcount = 1;
+		cautacc_ctlops_arg.flags = 0;
 		for (i = 0; i < (PCIE_CONF_HDR_SIZE / sizeof (uint32_t)); i++) {
-			if (ddi_peek32(dip, (int32_t *)(hp->ah_addr + offset),
-			    (int32_t *)p) == DDI_SUCCESS) {
+			cautacc_ctlops_arg.dev_addr = (uintptr_t)(hp->ah_addr +
+			    offset);
+			cautacc_ctlops_arg.host_addr = (uintptr_t)p;
+			ret = ddi_ctlops(dip, dip, DDI_CTLOPS_PEEK,
+			    &cautacc_ctlops_arg, NULL);
+			if (ret == DDI_SUCCESS) {
 				/* it is readable register. set the bit */
 				maskbuf[i >> INDEX_SHIFT] |=
 				    (uint8_t)(1 << (i & BITMASK));
@@ -697,7 +706,7 @@ pci_restore_config_regs(dev_info_t *dip)
 		    (uchar_t **)&regbuf, &elements) != DDI_PROP_SUCCESS) {
 
 			pci_config_teardown(&confhdl);
-			return (DDI_FAILURE);
+			return (DDI_SUCCESS);
 		}
 
 		chs_p = (pci_config_header_state_t *)regbuf;
@@ -1014,9 +1023,8 @@ pci_pre_resume(dev_info_t *dip)
 	suspend_level = p->ppc_suspend_level;
 #endif
 	ddi_prop_free(p);
-	if ((flags & PPCF_NOPMCAP) != 0) {
-		return (DDI_SUCCESS);
-	}
+	if ((flags & PPCF_NOPMCAP) != 0)
+		goto done;
 #if defined(__x86)
 	/*
 	 * Turn platform wake enable back off
@@ -1037,6 +1045,7 @@ pci_pre_resume(dev_info_t *dip)
 	pci_config_put16(hdl, pmcap + PCI_PMCSR, pmcsr);
 	delay(drv_usectohz(10000));	/* PCI PM spec D3->D0 (10ms) */
 	pci_config_teardown(&hdl);
+done:
 	(void) pci_restore_config_regs(dip);	/* fudges D-state! */
 	return (DDI_SUCCESS);
 }
