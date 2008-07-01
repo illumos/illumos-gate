@@ -319,9 +319,7 @@ sdt_getarg(void *arg, dtrace_id_t id, void *parg, int argno, int aframes)
 			 * If we pass through the invalid op handler, we will
 			 * use the pointer that it passed to the stack as the
 			 * second argument to dtrace_invop() as the pointer to
-			 * the stack.  When using this stack, we must step
-			 * beyond the EIP/RIP that was pushed when the trap was
-			 * taken -- hence the "+ 1" below.
+			 * the stack.
 			 */
 			stack = ((uintptr_t **)&fp[1])[1];
 #else
@@ -329,17 +327,15 @@ sdt_getarg(void *arg, dtrace_id_t id, void *parg, int argno, int aframes)
 			 * In the case of amd64, we will use the pointer to the
 			 * regs structure that was pushed when we took the
 			 * trap.  To get this structure, we must increment
-			 * beyond the frame structure, and then again beyond
-			 * the calling RIP stored in dtrace_invop().  If the
-			 * argument that we're seeking is passed on the stack,
-			 * we'll pull the true stack pointer out of the saved
-			 * registers and decrement our argument by the number
-			 * of arguments passed in registers; if the argument
+			 * beyond the frame structure.  If the argument that
+			 * we're seeking is passed on the stack, we'll pull
+			 * the true stack pointer out of the saved registers
+			 * and decrement our argument by the number of
+			 * arguments passed in registers; if the argument
 			 * we're seeking is passed in regsiters, we can just
 			 * load it directly.
 			 */
-			struct regs *rp = (struct regs *)((uintptr_t)&fp[1] +
-			    sizeof (uintptr_t));
+			struct regs *rp = (struct regs *)&fp[1];
 
 			if (argno <= inreg) {
 				stack = (uintptr_t *)&rp->r_rdi;
@@ -351,6 +347,31 @@ sdt_getarg(void *arg, dtrace_id_t id, void *parg, int argno, int aframes)
 			goto load;
 		}
 	}
+
+	/*
+	 * We know that we did not come through a trap to get into
+	 * dtrace_probe() -- the provider simply called dtrace_probe()
+	 * directly.  As this is the case, we need to shift the argument
+	 * that we're looking for:  the probe ID is the first argument to
+	 * dtrace_probe(), so the argument n will actually be found where
+	 * one would expect to find argument (n + 1).
+	 */
+	argno++;
+
+#if defined(__amd64)
+	if (argno <= inreg) {
+		/*
+		 * This shouldn't happen.  If the argument is passed in a
+		 * register then it should have been, well, passed in a
+		 * register...
+		 */
+		DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
+		return (0);
+	}
+
+	argno -= (inreg + 1);
+#endif
+	stack = (uintptr_t *)&fp[1];
 
 load:
 	DTRACE_CPUFLAG_SET(CPU_DTRACE_NOFAULT);
