@@ -1295,7 +1295,7 @@ xnb_rx_schedule_unmop(xnb_t *xnbp, gnttab_map_grant_ref_t *mop,
 	 * so we directly call into the actual unmap function.
 	 */
 	if (xnbp->xnb_connected) {
-		reqs_on_ring = RING_HAS_UNCONSUMED_REQUESTS(&xnbp->xnb_rx_ring);
+		reqs_on_ring = RING_HAS_UNCONSUMED_REQUESTS(&xnbp->xnb_tx_ring);
 
 		/*
 		 * By tuning xnb_unmop_hiwat to N, we can emulate "N per batch"
@@ -1843,6 +1843,10 @@ xnb_oe_state_change(dev_info_t *dip, ddi_eventcookie_t id,
 
 	switch (new_state) {
 	case XenbusStateConnected:
+		/* spurious state change */
+		if (xnbp->xnb_connected)
+			return;
+
 		if (xnb_connect_rings(dip)) {
 			xnbp->xnb_flavour->xf_peer_connected(xnbp);
 		} else {
@@ -1909,6 +1913,10 @@ xnb_hp_state_change(dev_info_t *dip, ddi_eventcookie_t id,
 
 	switch (state) {
 	case Connected:
+
+		/* spurious hotplug event */
+		if (xnbp->xnb_hotplugged)
+			return;
 
 		success = xnbp->xnb_flavour->xf_hotplug_connected(xnbp);
 
