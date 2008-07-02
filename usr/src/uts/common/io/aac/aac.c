@@ -219,6 +219,9 @@ static int aac_reset(dev_info_t *, ddi_reset_cmd_t);
 /*
  * Interrupt handler functions
  */
+static int aac_query_intrs(struct aac_softstate *, int);
+static int aac_add_intrs(struct aac_softstate *);
+static void aac_remove_intrs(struct aac_softstate *);
 static uint_t aac_intr_old(caddr_t);
 static uint_t aac_intr_new(caddr_t);
 static uint_t aac_softintr(caddr_t);
@@ -700,6 +703,7 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int instance, i;
 	struct aac_softstate *softs = NULL;
 	int attach_state = 0;
+	int intr_types;
 
 	DBCALLED(NULL, 1);
 
@@ -761,28 +765,48 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	AAC_DISABLE_INTR(softs);
 
-	if (ddi_intr_hilevel(dip, 0)) {
+	/* Get the type of device intrrupts */
+	if (ddi_intr_get_supported_types(dip, &intr_types) != DDI_SUCCESS) {
 		AACDB_PRINT(softs, CE_WARN,
-		    "High level interrupt is not supported!");
+		    "ddi_intr_get_supported_types() failed");
+		goto error;
+	}
+	AACDB_PRINT(softs, CE_NOTE,
+	    "ddi_intr_get_supported_types() ret: 0x%x", intr_types);
+
+	/* Query interrupt, and alloc/init all needed struct */
+	if (intr_types & DDI_INTR_TYPE_MSI) {
+		if (aac_query_intrs(softs, DDI_INTR_TYPE_MSI)
+		    != DDI_SUCCESS) {
+			AACDB_PRINT(softs, CE_WARN,
+			    "MSI interrupt query failed");
+			goto error;
+		}
+		softs->intr_type = DDI_INTR_TYPE_MSI;
+	} else if (intr_types & DDI_INTR_TYPE_FIXED) {
+		if (aac_query_intrs(softs, DDI_INTR_TYPE_FIXED)
+		    != DDI_SUCCESS) {
+			AACDB_PRINT(softs, CE_WARN,
+			    "FIXED interrupt query failed");
+			goto error;
+		}
+		softs->intr_type = DDI_INTR_TYPE_FIXED;
+	} else {
+		AACDB_PRINT(softs, CE_WARN,
+		    "Device cannot suppport both FIXED and MSI interrupts");
 		goto error;
 	}
 
 	/* Init mutexes */
-	if (ddi_get_iblock_cookie(dip, 0, &softs->iblock_cookie) !=
-	    DDI_SUCCESS) {
-		AACDB_PRINT(softs, CE_WARN,
-		    "Can not get interrupt block cookie!");
-		goto error;
-	}
 	mutex_init(&softs->q_comp_mutex, NULL,
-	    MUTEX_DRIVER, (void *)softs->iblock_cookie);
+	    MUTEX_DRIVER, DDI_INTR_PRI(softs->intr_pri));
 	cv_init(&softs->event, NULL, CV_DRIVER, NULL);
 	mutex_init(&softs->aifq_mutex, NULL,
-	    MUTEX_DRIVER, (void *)softs->iblock_cookie);
+	    MUTEX_DRIVER, DDI_INTR_PRI(softs->intr_pri));
 	cv_init(&softs->aifv, NULL, CV_DRIVER, NULL);
 	cv_init(&softs->drain_cv, NULL, CV_DRIVER, NULL);
 	mutex_init(&softs->io_lock, NULL, MUTEX_DRIVER,
-	    (void *)softs->iblock_cookie);
+	    DDI_INTR_PRI(softs->intr_pri));
 	attach_state |= AAC_ATTACH_KMUTEX_INITED;
 
 	/*
@@ -812,11 +836,10 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	attach_state |= AAC_ATTACH_SOFT_INTR_SETUP;
 
-	if (ddi_add_intr(dip, 0, &softs->iblock_cookie,
-	    (ddi_idevice_cookie_t *)0,
-	    (softs->flags & AAC_FLAGS_NEW_COMM) ?
-	    aac_intr_new : aac_intr_old, (caddr_t)softs) != DDI_SUCCESS) {
-		AACDB_PRINT(softs, CE_WARN, "Can not setup interrupt handler!");
+	if (aac_add_intrs(softs) != DDI_SUCCESS) {
+		AACDB_PRINT(softs, CE_WARN,
+		    "Interrupt registration failed, intr type: %s",
+		    softs->intr_type == DDI_INTR_TYPE_MSI ? "MSI" : "FIXED");
 		goto error;
 	}
 	attach_state |= AAC_ATTACH_HARD_INTR_SETUP;
@@ -868,7 +891,7 @@ error:
 		scsi_hba_tran_free(AAC_DIP2TRAN(dip));
 	}
 	if (attach_state & AAC_ATTACH_HARD_INTR_SETUP)
-		ddi_remove_intr(dip, 0, softs->iblock_cookie);
+		aac_remove_intrs(softs);
 	if (attach_state & AAC_ATTACH_SOFT_INTR_SETUP)
 		ddi_remove_softintr(softs->softint_id);
 	if (attach_state & AAC_ATTACH_KMUTEX_INITED) {
@@ -920,7 +943,7 @@ aac_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	ddi_remove_minor_node(dip, "devctl");
 
 	mutex_exit(&softs->io_lock);
-	ddi_remove_intr(dip, 0, softs->iblock_cookie);
+	aac_remove_intrs(softs);
 	ddi_remove_softintr(softs->softint_id);
 
 	aac_common_detach(softs);
@@ -1438,6 +1461,179 @@ aac_intr_old(caddr_t arg)
 
 	aac_drain_comp_q(softs);
 	return (rval);
+}
+
+/*
+ * Query FIXED or MSI interrupts
+ */
+static int
+aac_query_intrs(struct aac_softstate *softs, int intr_type)
+{
+	dev_info_t *dip = softs->devinfo_p;
+	int avail, actual, intr_size, count;
+	int i, flag, ret;
+
+	AACDB_PRINT(softs, CE_NOTE,
+	    "aac_query_intrs:interrupt type 0x%x", intr_type);
+
+	/* Get number of interrupts */
+	ret = ddi_intr_get_nintrs(dip, intr_type, &count);
+	if ((ret != DDI_SUCCESS) || (count == 0)) {
+		AACDB_PRINT(softs, CE_WARN,
+		    "ddi_intr_get_nintrs() failed, ret %d count %d",
+		    ret, count);
+		return (DDI_FAILURE);
+	}
+
+	/* Get number of available interrupts */
+	ret = ddi_intr_get_navail(dip, intr_type, &avail);
+	if ((ret != DDI_SUCCESS) || (avail == 0)) {
+		AACDB_PRINT(softs, CE_WARN,
+		    "ddi_intr_get_navail() failed, ret %d avail %d",
+		    ret, avail);
+		return (DDI_FAILURE);
+	}
+
+	AACDB_PRINT(softs, CE_NOTE,
+	    "ddi_intr_get_nvail returned %d, navail() returned %d",
+	    count, avail);
+
+	/* Allocate an array of interrupt handles */
+	intr_size = count * sizeof (ddi_intr_handle_t);
+	softs->htable = kmem_alloc(intr_size, KM_SLEEP);
+
+	if (intr_type == DDI_INTR_TYPE_MSI) {
+		count = 1; /* only one vector needed by now */
+		flag = DDI_INTR_ALLOC_STRICT;
+	} else { /* must be DDI_INTR_TYPE_FIXED */
+		flag = DDI_INTR_ALLOC_NORMAL;
+	}
+
+	/* Call ddi_intr_alloc() */
+	ret = ddi_intr_alloc(dip, softs->htable, intr_type, 0,
+	    count, &actual, flag);
+
+	if ((ret != DDI_SUCCESS) || (actual == 0)) {
+		AACDB_PRINT(softs, CE_WARN,
+		    "ddi_intr_alloc() failed, ret = %d", ret);
+		actual = 0;
+		goto error;
+	}
+
+	if (actual < count) {
+		AACDB_PRINT(softs, CE_NOTE,
+		    "Requested: %d, Received: %d", count, actual);
+		goto error;
+	}
+
+	softs->intr_cnt = actual;
+
+	/* Get priority for first msi, assume remaining are all the same */
+	if ((ret = ddi_intr_get_pri(softs->htable[0],
+	    &softs->intr_pri)) != DDI_SUCCESS) {
+		AACDB_PRINT(softs, CE_WARN,
+		    "ddi_intr_get_pri() failed, ret = %d", ret);
+		goto error;
+	}
+
+	/* Test for high level mutex */
+	if (softs->intr_pri >= ddi_intr_get_hilevel_pri()) {
+		AACDB_PRINT(softs, CE_WARN,
+		    "aac_query_intrs: Hi level interrupt not supported");
+		goto error;
+	}
+
+	return (DDI_SUCCESS);
+
+error:
+	/* Free already allocated intr */
+	for (i = 0; i < actual; i++)
+		(void) ddi_intr_free(softs->htable[i]);
+
+	kmem_free(softs->htable, intr_size);
+	return (DDI_FAILURE);
+}
+
+/*
+ * Register FIXED or MSI interrupts, and enable them
+ */
+static int
+aac_add_intrs(struct aac_softstate *softs)
+{
+	int i, ret;
+	int intr_size, actual;
+	ddi_intr_handler_t *aac_intr;
+
+	actual = softs->intr_cnt;
+	intr_size = actual * sizeof (ddi_intr_handle_t);
+	aac_intr = (ddi_intr_handler_t *)((softs->flags & AAC_FLAGS_NEW_COMM) ?
+	    aac_intr_new : aac_intr_old);
+
+	/* Call ddi_intr_add_handler() */
+	for (i = 0; i < actual; i++) {
+		if ((ret = ddi_intr_add_handler(softs->htable[i],
+		    aac_intr, (caddr_t)softs, NULL)) != DDI_SUCCESS) {
+			cmn_err(CE_WARN,
+			    "ddi_intr_add_handler() failed ret = %d", ret);
+
+			/* Free already allocated intr */
+			for (i = 0; i < actual; i++)
+				(void) ddi_intr_free(softs->htable[i]);
+
+			kmem_free(softs->htable, intr_size);
+			return (DDI_FAILURE);
+		}
+	}
+
+	if ((ret = ddi_intr_get_cap(softs->htable[0], &softs->intr_cap))
+	    != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "ddi_intr_get_cap() failed, ret = %d", ret);
+
+		/* Free already allocated intr */
+		for (i = 0; i < actual; i++)
+			(void) ddi_intr_free(softs->htable[i]);
+
+		kmem_free(softs->htable, intr_size);
+		return (DDI_FAILURE);
+	}
+
+	/* Enable interrupts */
+	if (softs->intr_cap & DDI_INTR_FLAG_BLOCK) {
+		/* for MSI block enable */
+		(void) ddi_intr_block_enable(softs->htable, softs->intr_cnt);
+	} else {
+		/* Call ddi_intr_enable() for legacy/MSI non block enable */
+		for (i = 0; i < softs->intr_cnt; i++)
+			(void) ddi_intr_enable(softs->htable[i]);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Unregister FIXED or MSI interrupts
+ */
+static void
+aac_remove_intrs(struct aac_softstate *softs)
+{
+	int i;
+
+	/* Disable all interrupts */
+	if (softs->intr_cap & DDI_INTR_FLAG_BLOCK) {
+		/* Call ddi_intr_block_disable() */
+		(void) ddi_intr_block_disable(softs->htable, softs->intr_cnt);
+	} else {
+		for (i = 0; i < softs->intr_cnt; i++)
+			(void) ddi_intr_disable(softs->htable[i]);
+	}
+
+	/* Call ddi_intr_remove_handler() */
+	for (i = 0; i < softs->intr_cnt; i++) {
+		(void) ddi_intr_remove_handler(softs->htable[i]);
+		(void) ddi_intr_free(softs->htable[i]);
+	}
+
+	kmem_free(softs->htable, softs->intr_cnt * sizeof (ddi_intr_handle_t));
 }
 
 /*
@@ -3200,8 +3396,8 @@ aac_mode_sense(struct aac_softstate *softs, struct scsi_pkt *pkt,
 		next_page = sense_data + sizeof (struct mode_header);
 	} else {
 		g1_headerp = (struct mode_header_g1 *)sense_data;
-		headerp->length = BE_16(MODE_HEADER_LENGTH_G1 + pages_size -
-		    sizeof (headerp->length));
+		g1_headerp->length = BE_16(MODE_HEADER_LENGTH_G1 + pages_size -
+		    sizeof (g1_headerp->length));
 		g1_headerp->bdesc_length = 0;
 		next_page = sense_data + sizeof (struct mode_header_g1);
 	}
@@ -3814,7 +4010,7 @@ aac_tran_start_ld(struct aac_softstate *softs, struct aac_cmd *acp)
 				int cap_len = sizeof (struct scsi_capacity_16);
 
 				bzero(&cap16, cap_len);
-				cap16.sc_capacity = BE_64(dvp->size);
+				cap16.sc_capacity = BE_64(dvp->size - 1);
 				cap16.sc_lbasize = BE_32(AAC_SECTOR_SIZE);
 
 				aac_free_dmamap(acp);

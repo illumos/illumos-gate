@@ -57,7 +57,7 @@ extern "C" {
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	2
-#define	AAC_DRIVER_BUGFIX_LEVEL		2
+#define	AAC_DRIVER_BUGFIX_LEVEL		3
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -286,7 +286,6 @@ struct aac_softstate {
 	aac_cmd_fib_t aac_cmd_fib;	/* IO cmd FIB construct function */
 	aac_cmd_fib_t aac_cmd_fib_scsi;	/* SRB construct function */
 
-	ddi_iblock_cookie_t iblock_cookie;
 	ddi_softintr_t softint_id;	/* soft intr */
 
 	kmutex_t io_lock;
@@ -331,6 +330,13 @@ struct aac_softstate {
 	int devcfg_wait_on;		/* AIF event waited for rescan */
 
 	int fm_capabilities;
+
+	/* MSI specific fields */
+	ddi_intr_handle_t *htable;	/* For array of interrupts */
+	int intr_type;			/* What type of interrupt */
+	int intr_cnt;			/* # of intrs count returned */
+	uint_t intr_pri;		/* Interrupt priority   */
+	int intr_cap;			/* Interrupt capabilities */
 
 #ifdef DEBUG
 	/* UART trace printf variables */

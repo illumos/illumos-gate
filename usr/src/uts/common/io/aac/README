@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -68,3 +68,12 @@ SPARC platform support is added in this release:
 	To support SPARC, the driver is modified for DDI compliance. The driver
 	now uses DDI compliant functions to access the device's IO and memory
 	spaces for DMA transfers.
+
+aac driver 2.2.23
+==================
+MSI interrupts supporting is added in this release:
+	Instead of supporting fixed interrupt only, the driver added the MSI
+	interrupt whenever the HBA card has this feature. In the same time, the
+	driver has replaced all legacy interrupt ddi interfaces callings by 
+	the according ddi_intr_* ones.
+
