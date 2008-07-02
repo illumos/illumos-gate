@@ -21,7 +21,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,21 +225,30 @@ vntsd_read(vntsd_client_t *clientp)
 		}
 
 		assert(clientp->cons);
+
+		/*
+		 * Only keyboard inputs from first connection to a
+		 * guest console should be accepted.  Check to see if
+		 * this client is the first connection in console
+		 * queue
+		 */
 		if (clientp->cons->clientpq->handle != clientp) {
-			/* reader - print  error message */
-			if ((c != CR) && (c != LF)) {
-				rv = vntsd_write_line(clientp,
-				    gettext(VNTSD_NO_WRITE_ACCESS_MSG));
+			/*
+			 * Since this console connection is not the first
+			 * connection in the console queue,
+			 * it is operating in 'reader'
+			 * mode, print warning and ignore the input.
+			 */
+			rv = vntsd_write_line(clientp,
+			    gettext(VNTSD_NO_WRITE_ACCESS_MSG));
 
-				/* check errors and may exit */
-				if (rv == VNTSD_STATUS_INTR) {
-					rv = vntsd_cons_chk_intr(clientp);
-				}
+			/* check errors and interrupts */
+			if (rv == VNTSD_STATUS_INTR) {
+				rv = vntsd_cons_chk_intr(clientp);
+			}
 
-				if (rv != VNTSD_SUCCESS) {
-					return (rv);
-				}
-
+			if (rv != VNTSD_SUCCESS) {
+				return (rv);
 			}
 
 			continue;
