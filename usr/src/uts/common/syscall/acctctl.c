@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -232,7 +232,7 @@ ac_file_set(ac_info_t *info, void *ubuf, size_t bufsz)
 	mutex_enter(&info->ac_lock);
 
 	if ((error = vn_open(namebuf, UIO_SYSSPACE,
-	    FCREAT | FWRITE | FTRUNC, 0600, &vp, CRCREAT, 0)) != 0) {
+	    FCREAT | FWRITE | FTRUNC | FOFFMAX, 0600, &vp, CRCREAT, 0)) != 0) {
 		mutex_exit(&info->ac_lock);
 		kmem_free(namebuf, namelen);
 		return (error);
