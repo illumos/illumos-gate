@@ -5603,7 +5603,8 @@ zone_ki_call_zoneadmd(struct zarg *zargp)
 		}
 		ASSERT(door != NULL);
 
-		if ((error = door_ki_upcall(door, &darg)) == 0) {
+		if ((error = door_ki_upcall_limited(door, &darg, NULL,
+		    SIZE_MAX, 0)) == 0) {
 			break;
 		}
 		switch (error) {

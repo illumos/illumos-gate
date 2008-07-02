@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -341,7 +341,7 @@ retry:
 	da.rbuf = (char *)rbuf;
 	da.rsize = rbsz;
 
-	switch (door_ki_upcall(dh, &da)) {
+	switch (door_ki_upcall_limited(dh, &da, NULL, SIZE_MAX, 0)) {
 		case 0:				/* Success */
 			if (da.data_ptr != da.rbuf && da.data_size == 0) {
 				/*

@@ -98,7 +98,7 @@ smb_kshare_getinfo(door_handle_t dhdl, char *share_name, lmshare_info_t *si)
 	arg.rbuf = buf;
 	arg.rsize = LMSHR_DOOR_SIZE;
 
-	if (door_ki_upcall(dhdl, &arg) != 0) {
+	if (door_ki_upcall_limited(dhdl, &arg, NULL, SIZE_MAX, 0) != 0) {
 		cmn_err(CE_WARN, "smb_kshare_getinfo: Door call failed");
 		kmem_free(buf, LMSHR_DOOR_SIZE);
 		return (NERR_InternalError);
@@ -159,7 +159,7 @@ smb_kshare_enum(door_handle_t dhdl, smb_enumshare_info_t *enuminfo)
 	arg.rbuf = door_buf;
 	arg.rsize = door_bufsz;
 
-	if (door_ki_upcall(dhdl, &arg) != 0) {
+	if (door_ki_upcall_limited(dhdl, &arg, NULL, SIZE_MAX, 0) != 0) {
 		cmn_err(CE_WARN, "smb_kshare_enum: Door call failed");
 		kmem_free(door_buf, door_bufsz);
 		return (NERR_InternalError);
@@ -253,7 +253,7 @@ smb_kshare_upcall(door_handle_t dhdl, void *arg, boolean_t add_share)
 	doorarg.rbuf = buf;
 	doorarg.rsize = LMSHR_DOOR_SIZE;
 
-	error = door_ki_upcall(dhdl, &doorarg);
+	error = door_ki_upcall_limited(dhdl, &doorarg, NULL, SIZE_MAX, 0);
 
 	if (error) {
 		kmem_free(buf, LMSHR_DOOR_SIZE);

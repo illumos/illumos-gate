@@ -165,7 +165,7 @@ ieee80211_event_thread(void *arg)
 	darg.rbuf = NULL;
 	darg.rsize = 0;
 
-	if (door_ki_upcall(event_door, &darg) != 0) {
+	if (door_ki_upcall_limited(event_door, &darg, NULL, SIZE_MAX, 0) != 0) {
 		ieee80211_err("ieee80211_event: door_ki_upcall() failed\n");
 	}
 

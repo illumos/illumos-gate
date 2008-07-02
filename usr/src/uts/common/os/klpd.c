@@ -306,7 +306,8 @@ klpd_do_call(klpd_reg_t *p, const priv_set_t *req, va_list ap)
 	da.rbuf = (char *)&res;
 	da.rsize = sizeof (res);
 
-	while ((dres = door_ki_upcall(p->klpd_door, &da)) != 0) {
+	while ((dres = door_ki_upcall_limited(p->klpd_door, &da, NULL,
+	    SIZE_MAX, 0)) != 0) {
 		switch (dres) {
 		case EAGAIN:
 			delay(1);

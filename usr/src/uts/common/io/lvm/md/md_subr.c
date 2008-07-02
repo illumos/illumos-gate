@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3898,7 +3898,8 @@ mdmn_ksend_message(
 	}
 	retry_cnt = 0;
 
-	while ((rval = door_ki_upcall(mdmn_door_handle, &da)) != 0) {
+	while ((rval = door_ki_upcall_limited(mdmn_door_handle, &da, NULL,
+	    SIZE_MAX, 0)) != 0) {
 		if (rval == EAGAIN)  {
 			if ((++retry_cnt % MD_MN_WARN_INTVL) == 0) {
 				cmn_err(CE_WARN, "door call failed. "

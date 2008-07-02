@@ -274,7 +274,7 @@ struct file;
 int	door_insert(struct file *, door_desc_t *);
 int	door_finish_dispatch(caddr_t);
 uintptr_t door_final_sp(uintptr_t, size_t, int);
-int	door_upcall(vnode_t *, door_arg_t *, struct cred *);
+int	door_upcall(vnode_t *, door_arg_t *, struct cred *, size_t, uint_t);
 void	door_slam(void);
 void	door_exit(void);
 void	door_revoke_all(void);
@@ -293,7 +293,8 @@ extern size_t door_max_arg;
  * and may change incompatibly in a minor release of Solaris.
  */
 int	door_ki_upcall(door_handle_t, door_arg_t *);
-int	door_ki_upcall_cred(door_handle_t, door_arg_t *, struct cred *);
+int	door_ki_upcall_limited(door_handle_t, door_arg_t *, struct cred *,
+    size_t, uint_t);
 int	door_ki_create(void (*)(void *, door_arg_t *,
     void (**)(void *, void *), void **, int *), void *, door_attr_t,
     door_handle_t *);

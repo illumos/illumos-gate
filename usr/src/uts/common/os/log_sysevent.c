@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -250,7 +250,8 @@ log_event_upcall(log_event_upcall_arg_t *arg)
 
 	save_arg = darg;
 	for (retry = 0; ; retry++) {
-		if ((error = door_ki_upcall(event_door, &darg)) == 0) {
+		if ((error = door_ki_upcall_limited(event_door, &darg, NULL,
+		    SIZE_MAX, 0)) == 0) {
 			break;
 		}
 		switch (error) {

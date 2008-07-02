@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -324,7 +324,8 @@ sdev_ki_call_devfsadmd(sdev_door_arg_t *argp, sdev_door_res_t *resultp)
 	save_arg = darg;
 	for (retry = 0; ; retry++) {
 		sdcmn_err6(("call devfsadm: upcall lookup, retry %d\n", retry));
-		if ((error = door_ki_upcall(sdev_upcall_door, &darg)) == 0) {
+		if ((error = door_ki_upcall_limited(sdev_upcall_door, &darg,
+		    NULL, SIZE_MAX, 0)) == 0) {
 			sdcmn_err6(("call devfsadm: upcall lookup ok\n"));
 			break;
 		}

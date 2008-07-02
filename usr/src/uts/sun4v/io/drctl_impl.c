@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,7 +98,7 @@ retry:
 	DR_DBG_CTL("%s: msg %p size %ld obufp %p osize %p\n",
 	    me, msg, size, (void *)obufp, (void *)osize);
 
-	up_err = door_ki_upcall(dh, &door_args);
+	up_err = door_ki_upcall_limited(dh, &door_args, NULL, SIZE_MAX, 0);
 	if (up_err == 0) {
 		if (door_args.rbuf == NULL)
 			goto done;

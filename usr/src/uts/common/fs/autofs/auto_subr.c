@@ -449,7 +449,8 @@ auto_calldaemon(
 		door_args.rsize = orl;
 
 		sigintr(&smask, 1);
-		error = door_ki_upcall(dh, &door_args);
+		error =
+		    door_ki_upcall_limited(dh, &door_args, NULL, SIZE_MAX, 0);
 		sigunintr(&smask);
 
 		door_ki_rele(dh);

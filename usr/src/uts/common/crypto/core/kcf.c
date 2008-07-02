@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -307,7 +307,7 @@ kcf_verify_signature(void *arg)
 	/*
 	 * Make door upcall. door_ki_upcall() checks for validity of the handle.
 	 */
-	rv = door_ki_upcall(ldh, &darg);
+	rv = door_ki_upcall_limited(ldh, &darg, NULL, SIZE_MAX, 0);
 
 	if (rv == 0) {
 		kcf_door_arg_t *rkda =  (kcf_door_arg_t *)darg.rbuf;

@@ -286,7 +286,8 @@ smb_winpipe_upcall(mlsvc_pipe_t *pipe_info,
 	da.rbuf = (char *)lbuf;
 	da.rsize = START_UPDOOR_SIZE;
 
-	if (door_ki_upcall(smb_winpipe_dh, &da) != 0) {
+	if (door_ki_upcall_limited(smb_winpipe_dh, &da, NULL,
+	    SIZE_MAX, 0) != 0) {
 		return (-1);
 	}
 	/* RPC_WRITE just queues the data and returns */

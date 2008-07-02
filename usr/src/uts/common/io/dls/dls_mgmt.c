@@ -234,7 +234,8 @@ retry:
 
 	for (;;) {
 		retry++;
-		if ((err = door_ki_upcall_cred(dh, &darg, kcred)) == 0)
+		if ((err = door_ki_upcall_limited(dh, &darg, kcred,
+		    SIZE_MAX, 0)) == 0)
 			break;
 
 		/*

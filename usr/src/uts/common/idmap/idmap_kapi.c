@@ -226,7 +226,7 @@ retry:
 		return (-1);
 	}
 
-	status = door_ki_upcall(dh, arg);
+	status = door_ki_upcall_limited(dh, arg, NULL, SIZE_MAX, 0);
 
 	switch (status) {
 	case 0:	/* Success */

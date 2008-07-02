@@ -537,7 +537,8 @@ au_door_upcall(au_kcontext_t *kctx, au_dbuf_t *aubuf)
 
 		retry = 0;
 		mutex_enter(&(kctx->auk_svc_lock));
-		rc = door_upcall(kctx->auk_current_vp, &darg, NULL);
+		rc = door_upcall(kctx->auk_current_vp, &darg, NULL,
+		    SIZE_MAX, 0);
 		if (rc != 0) {
 			mutex_exit(&(kctx->auk_svc_lock));
 			if (rc == EAGAIN)

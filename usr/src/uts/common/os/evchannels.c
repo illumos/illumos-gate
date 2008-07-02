@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -864,7 +864,8 @@ evch_door_deliver(void *evp, void *cookie)
 	darg.desc_num = 0;
 
 	for (;;) {
-		if ((error = door_ki_upcall(sdp->sd_door, &darg)) == 0) {
+		if ((error = door_ki_upcall_limited(sdp->sd_door, &darg,
+		    NULL, SIZE_MAX, 0)) == 0) {
 			break;
 		}
 		switch (error) {

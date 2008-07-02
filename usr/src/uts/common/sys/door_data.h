@@ -50,6 +50,13 @@ typedef struct door_layout {
 	caddr_t		dl_sp;		/* final stack pointer (non-biased) */
 } door_layout_t;
 
+/* upcall invocation information */
+typedef struct door_upcall_data {
+	cred_t		*du_cred;	/* Credential associated w/ upcall */
+	size_t		du_max_data;	/* Maximum amount of reply data */
+	uint_t		du_max_descs;	/* Maximum number of reply descs */
+} door_upcall_t;
+
 /*
  * Per-thread data associated with door invocations.  Each door invocation
  * effects the client structure of one thread and the server structure of
@@ -58,7 +65,7 @@ typedef struct door_layout {
  */
 typedef struct door_client {
 	door_arg_t	d_args;		/* Door arg/results */
-	struct cred	*d_cred;	/* Cred overridden by the client */
+	door_upcall_t	*d_upcall;	/* upcall information */
 	caddr_t		d_buf;		/* Temp buffer for data transfer */
 	int		d_bufsize;	/* Size of temp buffer */
 	int		d_fpp_size;	/* Number of File ptrs */
@@ -67,7 +74,6 @@ typedef struct door_client {
 	kcondvar_t	d_cv;
 	uchar_t		d_args_done;	/* server has processed client's args */
 	uchar_t		d_hold;		/* Thread needs to stick around */
-	uchar_t		d_upcall;	/* Kernel level upcall */
 	uchar_t		d_noresults;	/* No results allowed */
 	uchar_t		d_overflow;	/* Result overflow occurred */
 	uchar_t		d_kernel;	/* Kernel door server */

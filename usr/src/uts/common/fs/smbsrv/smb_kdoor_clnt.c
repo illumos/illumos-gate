@@ -125,7 +125,8 @@ smb_kdoor_clnt_upcall(char *argp, size_t arg_size, door_desc_t *dp,
 	door_arg.rbuf = argp;
 	door_arg.rsize = arg_size;
 
-	if ((err = door_ki_upcall(smb_kdoor_clnt_dh, &door_arg)) != 0) {
+	if ((err = door_ki_upcall_limited(smb_kdoor_clnt_dh, &door_arg, NULL,
+	    SIZE_MAX, 0)) != 0) {
 		cmn_err(CE_WARN, "smb_kdoor_clnt_upcall: failed(%d)", err);
 		kmem_free(argp, arg_size);
 		argp = NULL;

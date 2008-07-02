@@ -148,7 +148,8 @@ vscan_door_scan_file(vs_scan_req_t *scan_req)
 	arg.rbuf = (char *)&result;
 	arg.rsize = sizeof (uint32_t);
 
-	if ((err = door_ki_upcall(vscan_door_handle, &arg)) != 0) {
+	if ((err = door_ki_upcall_limited(vscan_door_handle, &arg, NULL,
+	    SIZE_MAX, 0)) != 0) {
 		cmn_err(CE_WARN, "Internal communication error (%d)"
 		    "- failed to send scan request to vscand", err);
 		result = VS_STATUS_ERROR;
