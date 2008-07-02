@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3490,7 +3490,7 @@ ldi_ev_notify(dev_info_t *dip, minor_t minor, int spec_type,
 	}
 
 	major = ddi_driver_major(dip);
-	if (major == (major_t)-1) {
+	if (major == DDI_MAJOR_T_NONE) {
 		char *path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 		(void) ddi_pathname(dip, path);
 		cmn_err(CE_WARN, "ldi_ev_notify: cannot derive major number "
@@ -3649,7 +3649,7 @@ ldi_ev_finalize(dev_info_t *dip, minor_t minor, int spec_type, int ldi_result,
 	LDI_EVDBG((CE_NOTE, "ldi_ev_finalize: entered: dip=%p", (void *)dip));
 
 	major = ddi_driver_major(dip);
-	if (major == (major_t)-1) {
+	if (major == DDI_MAJOR_T_NONE) {
 		char *path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 		(void) ddi_pathname(dip, path);
 		cmn_err(CE_WARN, "ldi_ev_finalize: cannot derive major number "

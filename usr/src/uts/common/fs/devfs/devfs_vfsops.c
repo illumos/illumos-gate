@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -162,7 +162,7 @@ devfsinit(int fstype, char *name)
 	/*
 	 * Invent a dev_t (sigh).
 	 */
-	if ((dev = getudev()) == (major_t)-1) {
+	if ((dev = getudev()) == DDI_MAJOR_T_NONE) {
 		cmn_err(CE_NOTE, "%s: can't get unique dev", devfs_vfssw.name);
 		dev = 0;
 	}
@@ -404,7 +404,7 @@ devfs_clean(dev_info_t *dip, char *devnm, uint_t flags)
 	struct dv_node		*dvp;
 
 	dcmn_err(("devfs_unconfigure: dip = 0x%p, flags = 0x%x",
-		(void *)dip, flags));
+	    (void *)dip, flags));
 
 	/* avoid recursion back into the device tree */
 	(void) tsd_set(devfs_clean_key, (void *)1);

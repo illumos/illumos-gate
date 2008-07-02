@@ -1595,7 +1595,7 @@ kb_ms_config(dacf_infohdl_t minor_hdl, dacf_arghdl_t arg_hdl, int type)
 
 	dip = dacf_devinfo_node(minor_hdl);
 	major = ddi_driver_major(dip);
-	ASSERT(major != (major_t)-1);
+	ASSERT(major != DDI_MAJOR_T_NONE);
 	minor = dacf_minor_number(minor_hdl);
 	dev = makedevice(major, minor);
 	ASSERT(dev != NODEV);
@@ -1676,7 +1676,7 @@ kb_ms_unconfig(dacf_infohdl_t minor_hdl, dacf_arghdl_t arg_hdl)
 
 	dip = dacf_devinfo_node(minor_hdl);
 	major = ddi_driver_major(dip);
-	ASSERT(major != (major_t)-1);
+	ASSERT(major != DDI_MAJOR_T_NONE);
 	minor = dacf_minor_number(minor_hdl);
 	dev = makedevice(major, minor);
 	ASSERT(dev != NODEV);

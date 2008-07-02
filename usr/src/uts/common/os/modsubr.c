@@ -157,7 +157,7 @@ mod_hold_dev_by_devi(dev_info_t *devi)
 	char *name;
 
 	name = ddi_get_name(devi);
-	if ((major = mod_name_to_major(name)) == (major_t)-1)
+	if ((major = mod_name_to_major(name)) == DDI_MAJOR_T_NONE)
 		return (NULL);
 	return (mod_hold_dev_by_major(major));
 }
@@ -169,7 +169,7 @@ mod_rele_dev_by_devi(dev_info_t *devi)
 	char *name;
 
 	name = ddi_get_name(devi);
-	if ((major = mod_name_to_major(name)) == (major_t)-1)
+	if ((major = mod_name_to_major(name)) == DDI_MAJOR_T_NONE)
 		return;
 	mod_rele_dev_by_major(major);
 }
@@ -587,7 +587,7 @@ mod_name_to_major(char *name)
 	if ((mbind = find_mbind(name, mb_hashtab)) != NULL)
 		return ((major_t)mbind->b_num);
 
-	return ((major_t)-1);
+	return (DDI_MAJOR_T_NONE);
 }
 
 char *
@@ -957,7 +957,7 @@ hwc_spec_add(struct hwc_spec **listp, struct hwc_spec *entry,
 	while (entry) {
 		struct hwc_spec *spec;
 
-		if ((match_major != (major_t)-1) &&
+		if ((match_major != DDI_MAJOR_T_NONE) &&
 		    (match_major != entry->hwc_major)) {
 			entry = entry->hwc_hash_next;
 			continue;

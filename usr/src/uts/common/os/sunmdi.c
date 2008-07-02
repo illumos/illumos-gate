@@ -8663,7 +8663,8 @@ attach_phci_drivers(char *vhci_class)
 	for (i = 0; i < cur_elements; i++) {
 		if (modrootloaded || root_support_list[i]) {
 			m = ddi_name_to_major(driver_list[i]);
-			if (m != (major_t)-1 && ddi_hold_installed_driver(m))
+			if (m != DDI_MAJOR_T_NONE &&
+			    ddi_hold_installed_driver(m))
 				ddi_rele_driver(m);
 		}
 	}
@@ -8705,7 +8706,7 @@ build_vhci_cache(mdi_vhci_t *vh)
 
 	attach_phci_drivers(vh->vh_class);
 	bus_config_all_phcis(vhcache, NDI_DRV_CONF_REPROBE | NDI_NO_EVENT,
-	    BUS_CONFIG_ALL, (major_t)-1);
+	    BUS_CONFIG_ALL, DDI_MAJOR_T_NONE);
 
 	rw_enter(&vhcache->vhcache_lock, RW_WRITER);
 	vhcache->vhcache_flags |= MDI_VHCI_CACHE_SETUP_DONE;
@@ -8770,7 +8771,7 @@ vhcache_discover_paths(mdi_vhci_t *vh)
 	if (vhcache_do_discovery(vhc)) {
 		attach_phci_drivers(vh->vh_class);
 		bus_config_all_phcis(vhcache, NDI_DRV_CONF_REPROBE |
-		    NDI_NO_EVENT, BUS_CONFIG_ALL, (major_t)-1);
+		    NDI_NO_EVENT, BUS_CONFIG_ALL, DDI_MAJOR_T_NONE);
 
 		mutex_enter(&vhc->vhc_lock);
 		vhc->vhc_path_discovery_cutoff_time = lbolt64 +

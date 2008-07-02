@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -397,7 +397,7 @@ mod_info(struct modlinkage *modlp, struct modinfo *modinfop)
 /*
  * Get module name.
  */
-char *
+const char *
 mod_modname(struct modlinkage *modlp)
 {
 	struct modctl	*mcp;
@@ -598,7 +598,7 @@ mod_installdrv(struct modldrv *modl, struct modlinkage *modlp)
 	modname = mcp->mod_modname;
 
 	/* Sanity check modname */
-	if ((major = ddi_name_to_major(modname)) == (major_t)-1) {
+	if ((major = ddi_name_to_major(modname)) == DDI_MAJOR_T_NONE) {
 #ifdef DEBUG
 		cmn_err(CE_WARN,
 		    "mod_installdrv: no major number for %s", modname);

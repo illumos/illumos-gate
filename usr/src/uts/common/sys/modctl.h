@@ -612,7 +612,7 @@ extern int mod_getsysnum(char *);
 
 extern char *mod_containing_pc(caddr_t);
 extern int mod_in_autounload(void);
-extern char	*mod_modname(struct modlinkage *);
+extern const char *mod_modname(struct modlinkage *);
 
 extern int dev_minorperm(dev_info_t *, char *, mperm_t *);
 extern void dev_devices_cleanup(void);

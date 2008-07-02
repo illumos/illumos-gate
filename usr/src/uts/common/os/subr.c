@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,7 +130,7 @@ getudev()
 			UNLOCK_DEV_OPS(&devnamesp[i].dn_lock);
 			ret = (major_t)i;
 		} else {
-			ret = (major_t)-1;
+			ret = DDI_MAJOR_T_NONE;
 		}
 	}
 	mutex_exit(&udevlock);

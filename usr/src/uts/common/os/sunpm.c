@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -7180,7 +7180,7 @@ pm_record_invol_path(char *path, int flags, int noinvolpm, int volpmd,
 	 * out its major.  If we could hold the node by path, we would be much
 	 * happier here.
 	 */
-	if (major == (major_t)-1) {
+	if (major == DDI_MAJOR_T_NONE) {
 		np->ni_major = pm_path_to_major(path);
 	} else {
 		np->ni_major = major;
@@ -7646,7 +7646,7 @@ pm_cfb_setup(const char *stdout_path)
 		PMD(PMD_CFB, ("%s: pntd %s failed\n", pmf, devname))
 		pm_record_invol_path(devname,
 		    (PMC_CONSOLE_FB | PMC_NO_INVOL), 1, 0, 0,
-		    (major_t)-1);
+		    DDI_MAJOR_T_NONE);
 		for (ep = strrchr(devname, '/'); ep != devname;
 		    ep = strrchr(devname, '/')) {
 			PMD(PMD_CFB, ("%s: devname %s\n", pmf, devname))
@@ -7662,7 +7662,7 @@ pm_cfb_setup(const char *stdout_path)
 				break;
 			} else {
 				pm_record_invol_path(devname,
-				    PMC_NO_INVOL, 1, 0, 0, (major_t)-1);
+				    PMC_NO_INVOL, 1, 0, 0, DDI_MAJOR_T_NONE);
 			}
 		}
 	}
@@ -8069,7 +8069,7 @@ i_path_to_major(char *path, char *leaf_name)
 	extern major_t path_to_major(char *pathname);
 	major_t maj;
 
-	if ((maj = path_to_major(path)) == (major_t)-1) {
+	if ((maj = path_to_major(path)) == DDI_MAJOR_T_NONE) {
 		maj = ddi_name_to_major(leaf_name);
 	}
 
@@ -8109,7 +8109,7 @@ i_pm_driver_removed(major_t major)
 	static void pm_noinvol_process_ancestors(char *);
 	pm_noinvol_t *ip, *pp = NULL;
 	int wasvolpmd;
-	ASSERT(major != (major_t)-1);
+	ASSERT(major != DDI_MAJOR_T_NONE);
 	PMD(PMD_NOINVOL, ("%s: %s\n", pmf, ddi_major_to_name(major)))
 again:
 	rw_enter(&pm_noinvol_rwlock, RW_WRITER);
@@ -8191,7 +8191,7 @@ adjust_ancestors(char *path, int wasvolpmd)
 	char *cp;
 	pm_noinvol_t *lp;
 	pm_noinvol_t *pp = NULL;
-	major_t locked = (major_t)UINT_MAX;
+	major_t locked = DDI_MAJOR_T_NONE;
 	dev_info_t *dip;
 	char	*pathbuf;
 	size_t pathbuflen = strlen(path) + 1;
@@ -8217,7 +8217,7 @@ adjust_ancestors(char *path, int wasvolpmd)
 		(void) pm_noinvol_update(PM_BP_NOINVOL_REMDRV, 0, wasvolpmd,
 		    path, dip);
 
-		if (locked != (major_t)UINT_MAX)
+		if (locked != DDI_MAJOR_T_NONE)
 			ddi_release_devi(dip);
 	} else {
 		char *apath;

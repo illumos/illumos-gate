@@ -43,6 +43,9 @@
 #include <sys/scsi/scsi.h>
 #include <sys/scsi/targets/sgendef.h>
 
+/* The name of the driver, established from the module name in _init. */
+static	char *sgen_label	= NULL;
+
 #define	DDI_NT_SGEN		"ddi_generic:scsi"
 
 static char *sgen_devtypes[] = {
@@ -205,6 +208,9 @@ int
 _init(void)
 {
 	int err;
+
+	/* establish driver name from module name */
+	sgen_label = (char *)mod_modname(&modlinkage);
 
 	sgen_log(NULL, SGEN_DIAG2, "in sgen_init()");
 	if ((err = ddi_soft_state_init(&sgen_soft_state,
@@ -780,7 +786,8 @@ sgen_create_errstats(sgen_state_t *sg_state, int instance)
 	char kstatname[KSTAT_STRLEN];
 	struct sgen_errstats *stp;
 
-	(void) snprintf(kstatname, KSTAT_STRLEN, "sgen%d,err", instance);
+	(void) snprintf(kstatname, KSTAT_STRLEN, "%s%d,err",
+	    sgen_label, instance);
 	sg_state->sgen_kstats = kstat_create("sgenerr", instance,
 	    kstatname, "device_error", KSTAT_TYPE_NAMED,
 	    sizeof (struct sgen_errstats) / sizeof (kstat_named_t),
@@ -2017,7 +2024,7 @@ sgen_log(sgen_state_t *sg_state, int level, const char *fmt, ...)
 		if (sg_state == (sgen_state_t *)NULL) {
 			cmn_err(level, "%s", buf);
 		} else {
-			scsi_log(sg_state->sgen_devinfo, "sgen", level,
+			scsi_log(sg_state->sgen_devinfo, sgen_label, level,
 			    "%s", buf);
 		}
 		break;
@@ -2026,9 +2033,9 @@ sgen_log(sgen_state_t *sg_state, int level, const char *fmt, ...)
 	case SGEN_DIAG3:
 	default:
 		if (sg_state == (sgen_state_t *)NULL) {
-			scsi_log(NULL, "sgen", CE_CONT, "%s", buf);
+			scsi_log(NULL, sgen_label, CE_CONT, "%s", buf);
 		} else {
-			scsi_log(sg_state->sgen_devinfo, "sgen", CE_CONT,
+			scsi_log(sg_state->sgen_devinfo, sgen_label, CE_CONT,
 			    "%s", buf);
 		}
 	}

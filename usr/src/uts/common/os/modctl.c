@@ -682,7 +682,7 @@ modctl_load_drvconf(major_t major)
 {
 	int ret;
 
-	if (major != (major_t)-1) {
+	if (major != DDI_MAJOR_T_NONE) {
 		ret = i_ddi_load_drvconf(major);
 		if (ret == 0)
 			i_ddi_bind_devs();
@@ -698,7 +698,7 @@ modctl_load_drvconf(major_t major)
 	 * boot performance.
 	 */
 	if (new_vfs_in_modpath()) {
-		(void) i_ddi_load_drvconf((major_t)-1);
+		(void) i_ddi_load_drvconf(DDI_MAJOR_T_NONE);
 		/*
 		 * If we are still initializing io subsystem,
 		 * load drivers with ddi-forceattach property
@@ -789,7 +789,7 @@ modctl_getmaj(char *uname, uint_t ulen, int *umajorp)
 	if ((retval = copyinstr(uname, name,
 	    (ulen < 256) ? ulen : 256, 0)) != 0)
 		return (retval);
-	if ((major = mod_name_to_major(name)) == (major_t)-1)
+	if ((major = mod_name_to_major(name)) == DDI_MAJOR_T_NONE)
 		return (ENODEV);
 	if (copyout(&major, umajorp, sizeof (major_t)) != 0)
 		return (EFAULT);
@@ -1692,7 +1692,7 @@ process_minorperm(int cmd, nvlist_t *nvl)
 		is_clone = 0;
 		(void) nvpair_value_string(nvp, &minor);
 		major = ddi_name_to_major(name);
-		if (major != (major_t)-1) {
+		if (major != DDI_MAJOR_T_NONE) {
 			mp = kmem_zalloc(sizeof (*mp), KM_SLEEP);
 			if (minor == NULL || strlen(minor) == 0) {
 				if (moddebug & MODDEBUG_MINORPERM) {
@@ -1714,7 +1714,7 @@ process_minorperm(int cmd, nvlist_t *nvl)
 			 */
 			if (strcmp(name, "clone") == 0) {
 				minmaj = ddi_name_to_major(minor);
-				if (minmaj != (major_t)-1) {
+				if (minmaj != DDI_MAJOR_T_NONE) {
 					if (moddebug & MODDEBUG_MINORPERM) {
 						cmn_err(CE_CONT,
 						    "mapping %s:%s to %s:*\n",
@@ -3463,7 +3463,7 @@ detach_driver(char *name)
 		return (0);
 
 	major = ddi_name_to_major(name);
-	if (major == (major_t)-1)
+	if (major == DDI_MAJOR_T_NONE)
 		return (0);
 
 	error = ndi_devi_unconfig_driver(ddi_root_node(),
@@ -4333,7 +4333,7 @@ dev_alias_minorperm(dev_info_t *dip, char *minor_name, mperm_t *rmp)
 	major = ddi_name_to_major(minor_name);
 
 	ASSERT(dip == clone_dip);
-	ASSERT(major != (major_t)-1);
+	ASSERT(major != DDI_MAJOR_T_NONE);
 
 	/*
 	 * Attach the driver named by the minor node, then
@@ -4427,7 +4427,7 @@ dev_minorperm(dev_info_t *dip, char *name, mperm_t *rmp)
 	 */
 	if (dip == clone_dip) {
 		major = ddi_name_to_major(minor_name);
-		if (major == (major_t)-1) {
+		if (major == DDI_MAJOR_T_NONE) {
 			if (moddebug & MODDEBUG_MINORPERM)
 				cmn_err(CE_CONT, "dev_minorperm: "
 				    "%s: no such driver\n", minor_name);
@@ -4436,7 +4436,7 @@ dev_minorperm(dev_info_t *dip, char *name, mperm_t *rmp)
 		is_clone = 1;
 	} else {
 		major = ddi_driver_major(dip);
-		ASSERT(major != (major_t)-1);
+		ASSERT(major != DDI_MAJOR_T_NONE);
 	}
 
 	dnp = &devnamesp[major];

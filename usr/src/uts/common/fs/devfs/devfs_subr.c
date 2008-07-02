@@ -891,7 +891,7 @@ dv_clone_mknod(struct dv_node *ddv, char *drvname)
 	 * relatively cheap.
 	 */
 	major = ddi_name_to_major(drvname);
-	if (major == (major_t)-1)
+	if (major == DDI_MAJOR_T_NONE)
 		return (NULL);
 
 	if (ddi_hold_driver(major) == NULL)

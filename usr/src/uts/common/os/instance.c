@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -559,7 +559,7 @@ e_ddi_assign_instance(dev_info_t *dip)
 		dp = in_alloc_drv(bname);
 		ASSERT(dp != NULL);
 		major = ddi_driver_major(dip);
-		ASSERT(major != (major_t)-1);
+		ASSERT(major != DDI_MAJOR_T_NONE);
 		in_endrv(np, dp);
 		in_set_instance(dip, dp, major);
 		dp->ind_state = IN_PROVISIONAL;
@@ -653,7 +653,7 @@ in_next_instance_block(major_t major, int block_size)
 	int		hole;
 
 	dnp = &devnamesp[major];
-	ASSERT(major != (major_t)-1);
+	ASSERT(major != DDI_MAJOR_T_NONE);
 	ASSERT(e_ddi_inst_state.ins_busy);
 	ASSERT(block_size);
 
@@ -731,7 +731,7 @@ e_ddi_free_instance(dev_info_t *dip, char *addr)
 
 	name = (char *)ddi_driver_name(dip);
 	major = ddi_driver_major(dip);
-	ASSERT(major != (major_t)-1);
+	ASSERT(major != DDI_MAJOR_T_NONE);
 	dnp = &devnamesp[major];
 	/*
 	 * Only one thread is allowed to change the state of the instance
@@ -1212,7 +1212,7 @@ in_inuse(int instance, char *name)
 	 * XXX could do the weaker search through the nomajor list checking
 	 * XXX for the same name
 	 */
-	if ((major = ddi_name_to_major(name)) == (major_t)-1)
+	if ((major = ddi_name_to_major(name)) == DDI_MAJOR_T_NONE)
 		return (0);
 	dnp = &devnamesp[major];
 
@@ -1233,7 +1233,8 @@ in_hashdrv(in_drv_t *dp)
 	major_t major;
 
 	/* hash to no major list */
-	if ((major = ddi_name_to_major(dp->ind_driver_name)) == (major_t)-1) {
+	major = ddi_name_to_major(dp->ind_driver_name);
+	if (major == DDI_MAJOR_T_NONE) {
 		dp->ind_next = e_ddi_inst_state.ins_no_major;
 		e_ddi_inst_state.ins_no_major = dp;
 		return;

@@ -4878,7 +4878,7 @@ ddi_driver_name(dev_info_t *devi)
 {
 	major_t major;
 
-	if ((major = ddi_driver_major(devi)) != (major_t)-1)
+	if ((major = ddi_driver_major(devi)) != DDI_MAJOR_T_NONE)
 		return (ddi_major_to_name(major));
 
 	return (ddi_node_name(devi));
@@ -5969,7 +5969,7 @@ ddi_create_minor_common(dev_info_t *dip, char *name, int spec_type,
 
 	/* dip must be bound and attached */
 	major = ddi_driver_major(dip);
-	ASSERT(major != (major_t)-1);
+	ASSERT(major != DDI_MAJOR_T_NONE);
 
 	/*
 	 * Default node_type to DDI_PSEUDO and issue notice in debug mode
@@ -7394,7 +7394,7 @@ i_ddi_minorname_to_devtspectype(dev_info_t *dip, char *minor_name,
 		 */
 
 		major = ddi_name_to_major(minor_name);
-		if (major == (major_t)-1)
+		if (major == DDI_MAJOR_T_NONE)
 			return (DDI_FAILURE);
 
 		if (ddi_hold_driver(major) == NULL)
@@ -7514,7 +7514,7 @@ i_ddi_devid_register(dev_info_t *dip, ddi_devid_t devid)
 	major_t		major;
 
 	if ((dip == NULL) ||
-	    ((major = ddi_driver_major(dip)) == (major_t)-1))
+	    ((major = ddi_driver_major(dip)) == DDI_MAJOR_T_NONE))
 		return (DDI_FAILURE);
 
 	/* verify that the devid is valid */

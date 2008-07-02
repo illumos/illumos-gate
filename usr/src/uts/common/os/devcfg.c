@@ -248,7 +248,7 @@ i_ddi_alloc_node(dev_info_t *pdip, char *node_name, pnode_t nodeid,
 
 	/* default binding name is node name */
 	devi->devi_binding_name = devi->devi_node_name;
-	devi->devi_major = (major_t)-1;		/* unbound by default */
+	devi->devi_major = DDI_MAJOR_T_NONE;	/* unbound by default */
 
 	/*
 	 * Make a copy of system property
@@ -712,7 +712,7 @@ static int
 bind_node(dev_info_t *dip)
 {
 	char *p = NULL;
-	major_t major = (major_t)(major_t)-1;
+	major_t major = DDI_MAJOR_T_NONE;
 	struct dev_info *devi = DEVI(dip);
 	dev_info_t *parent = ddi_get_parent(dip);
 
@@ -730,7 +730,7 @@ bind_node(dev_info_t *dip)
 
 	/* find the driver with most specific binding using compatible */
 	major = ddi_compatible_driver_major(dip, &p);
-	if (major == (major_t)-1)
+	if (major == DDI_MAJOR_T_NONE)
 		return (DDI_FAILURE);
 
 	devi->devi_major = major;
@@ -763,7 +763,7 @@ static int
 unbind_node(dev_info_t *dip)
 {
 	ASSERT(DEVI(dip)->devi_node_state == DS_BOUND);
-	ASSERT(DEVI(dip)->devi_major != (major_t)-1);
+	ASSERT(DEVI(dip)->devi_major != DDI_MAJOR_T_NONE);
 
 	/* check references */
 	if (DEVI(dip)->devi_ref)
@@ -774,7 +774,7 @@ unbind_node(dev_info_t *dip)
 
 	unlink_from_driver_list(dip);
 
-	DEVI(dip)->devi_major = (major_t)-1;
+	DEVI(dip)->devi_major = DDI_MAJOR_T_NONE;
 	DEVI(dip)->devi_binding_name = DEVI(dip)->devi_node_name;
 	return (DDI_SUCCESS);
 }
@@ -871,7 +871,7 @@ init_node(dev_info_t *dip)
 	 * to add a path-oriented alias for both paths.
 	 */
 	major = ddi_name_to_major(path);
-	if ((major != (major_t)-1) &&
+	if ((major != DDI_MAJOR_T_NONE) &&
 	    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED) &&
 	    (major != DEVI(dip)->devi_major) &&
 	    (ndi_dev_is_persistent_node(dip) || driver_conf_allow_path_alias)) {
@@ -2091,7 +2091,7 @@ find_sibling(dev_info_t *head, char *cname, char *caddr, uint_t flag,
 
 	if (by == FIND_NODE_BY_DRIVER) {
 		major = ddi_name_to_major(cname);
-		if (major == (major_t)-1)
+		if (major == DDI_MAJOR_T_NONE)
 			return (NULL);
 	}
 
@@ -2432,7 +2432,7 @@ i_ddi_load_drvconf(major_t major)
 
 	major_t low, high, m;
 
-	if (major == (major_t)-1) {
+	if (major == DDI_MAJOR_T_NONE) {
 		low = 0;
 		high = devcnt - 1;
 	} else {
@@ -2581,7 +2581,7 @@ ndi_merge_wildcard_node(dev_info_t *dip)
 	/* never attempt to merge a hw node */
 	ASSERT(ndi_dev_is_persistent_node(dip) == 0);
 	/* must be bound to a driver major number */
-	ASSERT(major != (major_t)-1);
+	ASSERT(major != DDI_MAJOR_T_NONE);
 
 	/*
 	 * Walk the child list to find all nodes bound to major
@@ -2639,7 +2639,7 @@ ddi_compatible_driver_major(dev_info_t *dip, char **formp)
 	void		*compat;
 	size_t		len;
 	char		*p = NULL;
-	major_t		major = (major_t)-1;
+	major_t		major = DDI_MAJOR_T_NONE;
 
 	if (formp)
 		*formp = NULL;
@@ -2656,7 +2656,7 @@ ddi_compatible_driver_major(dev_info_t *dip, char **formp)
 	if (devi->devi_flags & DEVI_REBIND) {
 		p = devi->devi_rebinding_name;
 		major = ddi_name_to_major(p);
-		if ((major != (major_t)-1) &&
+		if ((major != DDI_MAJOR_T_NONE) &&
 		    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED)) {
 			if (formp)
 				*formp = p;
@@ -2680,7 +2680,7 @@ ddi_compatible_driver_major(dev_info_t *dip, char **formp)
 	/* find the highest precedence compatible form with a driver binding */
 	while ((p = prom_decode_composite_string(compat, len, p)) != NULL) {
 		major = ddi_name_to_major(p);
-		if ((major != (major_t)-1) &&
+		if ((major != DDI_MAJOR_T_NONE) &&
 		    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED)) {
 			if (formp)
 				*formp = p;
@@ -2693,12 +2693,12 @@ ddi_compatible_driver_major(dev_info_t *dip, char **formp)
 	 * the node name has a driver binding.
 	 */
 	major = ddi_name_to_major(ddi_node_name(dip));
-	if ((major != (major_t)-1) &&
+	if ((major != DDI_MAJOR_T_NONE) &&
 	    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED))
 		return (major);
 
 	/* no driver */
-	return ((major_t)-1);
+	return (DDI_MAJOR_T_NONE);
 }
 
 /*
@@ -2811,7 +2811,7 @@ link_to_driver_list(dev_info_t *dip)
 	major_t major = DEVI(dip)->devi_major;
 	struct devnames *dnp;
 
-	ASSERT(major != (major_t)-1);
+	ASSERT(major != DDI_MAJOR_T_NONE);
 
 	/*
 	 * Remove from orphan list
@@ -2834,7 +2834,7 @@ unlink_from_driver_list(dev_info_t *dip)
 	major_t major = DEVI(dip)->devi_major;
 	struct devnames *dnp;
 
-	ASSERT(major != (major_t)-1);
+	ASSERT(major != DDI_MAJOR_T_NONE);
 
 	/*
 	 * Remove from per-driver list
@@ -2967,7 +2967,7 @@ add_global_props(dev_info_t *dip)
 	ddi_prop_list_t *plist;
 
 	ASSERT(DEVI(dip)->devi_global_prop_list == NULL);
-	ASSERT(DEVI(dip)->devi_major != (major_t)-1);
+	ASSERT(DEVI(dip)->devi_major != DDI_MAJOR_T_NONE);
 
 	dnp = &devnamesp[DEVI(dip)->devi_major];
 	LOCK_DEV_OPS(&dnp->dn_lock);
@@ -2999,7 +2999,7 @@ remove_global_props(dev_info_t *dip)
 		struct devnames *dnp;
 
 		major = ddi_driver_major(dip);
-		ASSERT(major != (major_t)-1);
+		ASSERT(major != DDI_MAJOR_T_NONE);
 		dnp = &devnamesp[major];
 		LOCK_DEV_OPS(&dnp->dn_lock);
 		i_ddi_prop_list_rele(proplist, dnp);
@@ -3482,7 +3482,7 @@ e_ddi_walk_driver(char *drv, int (*f)(dev_info_t *, void *), void *arg)
 	dev_info_t *dip;
 
 	major = ddi_name_to_major(drv);
-	if (major == (major_t)-1)
+	if (major == DDI_MAJOR_T_NONE)
 		return;
 
 	dnp = &devnamesp[major];
@@ -3608,7 +3608,7 @@ child_path_to_driver(dev_info_t *parent, char *child_name, char *unit_address)
 
 	kmem_free(p, MAXPATHLEN);
 
-	if (maj != (major_t)-1)
+	if (maj != DDI_MAJOR_T_NONE)
 		drvname = ddi_major_to_name(maj);
 	if (drvname == NULL)
 		drvname = child_name;
@@ -3992,14 +3992,14 @@ bind_dip(dev_info_t *dip, void *arg)
 			path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 			(void) ddi_pathname(dip, path);
 			pmajor = ddi_name_to_major(path);
-			if ((pmajor != (major_t)-1) &&
+			if ((pmajor != DDI_MAJOR_T_NONE) &&
 			    !(devnamesp[pmajor].dn_flags & DN_DRIVER_REMOVED))
 				major = pmajor;
 			kmem_free(path, MAXPATHLEN);
 		}
 
 		/* attempt unbind if current driver is incorrect */
-		if ((major != (major_t)-1) &&
+		if ((major != DDI_MAJOR_T_NONE) &&
 		    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED) &&
 		    (major != DEVI(dip)->devi_major))
 			(void) ndi_devi_unbind_driver(dip);
@@ -4076,7 +4076,7 @@ init_spec_child(dev_info_t *pdip, struct hwc_spec *specp, uint_t flags)
 	char *node_name;
 
 	if (((node_name = specp->hwc_devi_name) == NULL) ||
-	    (ddi_name_to_major(node_name) == (major_t)-1)) {
+	    (ddi_name_to_major(node_name) == DDI_MAJOR_T_NONE)) {
 		char *tmp = node_name;
 		if (tmp == NULL)
 			tmp = "<none>";
@@ -4116,7 +4116,7 @@ i_ndi_make_spec_children(dev_info_t *pdip, uint_t flags)
 		return (DDI_SUCCESS);
 	}
 
-	list = hwc_get_child_spec(pdip, (major_t)-1);
+	list = hwc_get_child_spec(pdip, DDI_MAJOR_T_NONE);
 	for (spec = list; spec != NULL; spec = spec->hwc_next) {
 		init_spec_child(pdip, spec, flags);
 	}
@@ -4671,7 +4671,7 @@ devi_unconfig_branch(dev_info_t *dip, dev_info_t **dipp, int flags,
 		flags |= NDI_BRANCH_EVENT_OP;
 
 	if (flags & NDI_BRANCH_EVENT_OP) {
-		rval = devi_unconfig_common(dip, dipp, flags, (major_t)-1,
+		rval = devi_unconfig_common(dip, dipp, flags, DDI_MAJOR_T_NONE,
 		    brevqp);
 
 		if (rval != NDI_SUCCESS && (*brevqp)) {
@@ -4679,7 +4679,7 @@ devi_unconfig_branch(dev_info_t *dip, dev_info_t **dipp, int flags,
 			*brevqp = NULL;
 		}
 	} else
-		rval = devi_unconfig_common(dip, dipp, flags, (major_t)-1,
+		rval = devi_unconfig_common(dip, dipp, flags, DDI_MAJOR_T_NONE,
 		    NULL);
 
 	return (rval);
@@ -4796,7 +4796,7 @@ config_immediate_children(dev_info_t *pdip, uint_t flags, major_t major)
 		 * Configure all nexus nodes or leaf nodes with
 		 * matching driver major
 		 */
-		if ((major == (major_t)-1) ||
+		if ((major == DDI_MAJOR_T_NONE) ||
 		    (major == ddi_driver_major(child)) ||
 		    ((flags & NDI_CONFIG) && (is_leaf_node(child) == 0)))
 			(void) devi_attach_node(child, flags);
@@ -4845,7 +4845,7 @@ devi_config_common(dev_info_t *dip, int flags, major_t major)
 		error = config_immediate_children(dip, flags, major);
 	} else {
 		/* call bus_config entry point */
-		ddi_bus_config_op_t bus_op = (major == (major_t)-1) ?
+		ddi_bus_config_op_t bus_op = (major == DDI_MAJOR_T_NONE) ?
 		    BUS_CONFIG_ALL : BUS_CONFIG_DRIVER;
 		error = (*f)(dip,
 		    flags, bus_op, (void *)(uintptr_t)major, NULL, 0);
@@ -4881,7 +4881,7 @@ ndi_devi_config(dev_info_t *dip, int flags)
 	    "ndi_devi_config: par = %s%d (%p), flags = 0x%x\n",
 	    ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip, flags));
 
-	return (devi_config_common(dip, flags, (major_t)-1));
+	return (devi_config_common(dip, flags, DDI_MAJOR_T_NONE));
 }
 
 /*
@@ -4891,7 +4891,7 @@ int
 ndi_devi_config_driver(dev_info_t *dip, int flags, major_t major)
 {
 	/* don't abuse this function */
-	ASSERT(major != (major_t)-1);
+	ASSERT(major != DDI_MAJOR_T_NONE);
 
 	NDI_CONFIG_DEBUG((CE_CONT,
 	    "ndi_devi_config_driver: par = %s%d (%p), flags = 0x%x\n",
@@ -5118,7 +5118,7 @@ ndi_devi_config_one(dev_info_t *dip, char *devnm, dev_info_t **dipp, int flags)
 	 */
 	ASSERT(*dipp);
 
-	error = devi_config_common(*dipp, flags, (major_t)-1);
+	error = devi_config_common(*dipp, flags, DDI_MAJOR_T_NONE);
 
 	pm_post_config(dip, devnm);
 
@@ -5456,7 +5456,7 @@ unconfig_immediate_children(
 	for (child = ddi_get_child(dip); child;
 	    child = ddi_get_next_sibling(child)) {
 		/* skip same nodes we skip below */
-		if (((major != (major_t)-1) &&
+		if (((major != DDI_MAJOR_T_NONE) &&
 		    (major != ddi_driver_major(child))) ||
 		    ((flags & NDI_AUTODETACH) && !is_leaf_node(child)))
 			continue;
@@ -5483,7 +5483,7 @@ unconfig_immediate_children(
 	while (child) {
 		next = ddi_get_next_sibling(child);
 
-		if ((major != (major_t)-1) &&
+		if ((major != DDI_MAJOR_T_NONE) &&
 		    (major != ddi_driver_major(child))) {
 			child = next;
 			continue;
@@ -5613,7 +5613,7 @@ devi_unconfig_common(
 		 * call bus_unconfig entry point
 		 * It should reset nexus flags if unconfigure succeeds.
 		 */
-		bus_op = (major == (major_t)-1) ?
+		bus_op = (major == DDI_MAJOR_T_NONE) ?
 		    BUS_UNCONFIG_ALL : BUS_UNCONFIG_DRIVER;
 		rv = (*f)(dip, flags, bus_op, (void *)(uintptr_t)major);
 	}
@@ -5648,7 +5648,7 @@ ndi_devi_unconfig(dev_info_t *dip, int flags)
 	    "ndi_devi_unconfig: par = %s%d (%p), flags = 0x%x\n",
 	    ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip, flags));
 
-	return (devi_unconfig_common(dip, NULL, flags, (major_t)-1, NULL));
+	return (devi_unconfig_common(dip, NULL, flags, DDI_MAJOR_T_NONE, NULL));
 }
 
 int
@@ -5658,7 +5658,7 @@ e_ddi_devi_unconfig(dev_info_t *dip, dev_info_t **dipp, int flags)
 	    "e_ddi_devi_unconfig: par = %s%d (%p), flags = 0x%x\n",
 	    ddi_driver_name(dip), ddi_get_instance(dip), (void *)dip, flags));
 
-	return (devi_unconfig_common(dip, dipp, flags, (major_t)-1, NULL));
+	return (devi_unconfig_common(dip, dipp, flags, DDI_MAJOR_T_NONE, NULL));
 }
 
 /*
@@ -6143,7 +6143,7 @@ reset_nexus_flags(dev_info_t *dip, void *arg)
  * for platforms that can't do this (ie: x86 or any platform that
  * does not have prom_finddevice functionality, which matches
  * nodenames and unit-addresses without the drivers participation)
- * is to return (major_t)-1.
+ * is to return DDI_MAJOR_T_NONE.
  *
  * Used in loadrootmodules() in the swapgeneric module to
  * associate a given pathname with a given leaf driver.
@@ -6159,7 +6159,7 @@ path_to_major(char *path)
 
 	/* check for path-oriented alias */
 	major = ddi_name_to_major(path);
-	if ((major != (major_t)-1) &&
+	if ((major != DDI_MAJOR_T_NONE) &&
 	    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED)) {
 		NDI_CONFIG_DEBUG((CE_NOTE, "path_to_major: %s path bound %s\n",
 		    path, ddi_major_to_name(major)));
@@ -6182,7 +6182,7 @@ path_to_major(char *path)
 	if (dip == NULL) {
 		NDI_CONFIG_DEBUG((CE_WARN,
 		    "path_to_major: can't bind <%s>\n", path));
-		return ((major_t)-1);
+		return (DDI_MAJOR_T_NONE);
 	}
 
 	/*
@@ -6440,7 +6440,7 @@ ddi_install_driver(char *name)
 {
 	major_t major = ddi_name_to_major(name);
 
-	if ((major == (major_t)-1) ||
+	if ((major == DDI_MAJOR_T_NONE) ||
 	    (ddi_hold_installed_driver(major) == NULL)) {
 		return (DDI_FAILURE);
 	}
@@ -6539,7 +6539,7 @@ i_ddi_attach_hw_nodes(char *driver)
 	major_t major;
 
 	major = ddi_name_to_major(driver);
-	if (major == (major_t)-1)
+	if (major == DDI_MAJOR_T_NONE)
 		return (DDI_FAILURE);
 
 	return (attach_driver_nodes(major));
@@ -6561,7 +6561,7 @@ i_ddi_attach_pseudo_node(char *driver)
 	dev_info_t *dip;
 
 	major = ddi_name_to_major(driver);
-	if (major == (major_t)-1)
+	if (major == DDI_MAJOR_T_NONE)
 		return (NULL);
 
 	if (attach_driver_nodes(major) != DDI_SUCCESS)
@@ -6583,7 +6583,7 @@ diplist_to_parent_major(dev_info_t *head, char parents[])
 		pdip = ddi_get_parent(dip);
 		ASSERT(pdip);	/* disallow rootnex.conf nodes */
 		major = ddi_driver_major(pdip);
-		if ((major != (major_t)-1) && parents[major] == 0)
+		if ((major != DDI_MAJOR_T_NONE) && parents[major] == 0)
 			parents[major] = 1;
 	}
 }
@@ -6777,7 +6777,7 @@ ndi_busop_bus_config(dev_info_t *pdip, uint_t flags, ddi_bus_config_op_t op,
 	 */
 	ASSERT(timeout < SEC_TO_TICK(1800));
 
-	major = (major_t)-1;
+	major = DDI_MAJOR_T_NONE;
 	switch (op) {
 	case BUS_CONFIG_ONE:
 		NDI_DEBUG(flags, (CE_CONT, "%s%d: bus config %s timeout=%ld\n",
@@ -6817,7 +6817,7 @@ ndi_busop_bus_unconfig(dev_info_t *pdip, uint_t flags, ddi_bus_config_op_t op,
 {
 	major_t major;
 
-	major = (major_t)-1;
+	major = DDI_MAJOR_T_NONE;
 	switch (op) {
 	case BUS_UNCONFIG_ONE:
 		NDI_DEBUG(flags, (CE_CONT, "%s%d: bus unconfig %s\n",
@@ -6857,7 +6857,7 @@ is_leaf_node(dev_info_t *dip)
 {
 	major_t major = ddi_driver_major(dip);
 
-	if (major == (major_t)-1)
+	if (major == DDI_MAJOR_T_NONE)
 		return (0);
 
 	return (devnamesp[major].dn_flags & DN_LEAF_DRIVER);
@@ -6876,7 +6876,7 @@ mt_config_init(dev_info_t *pdip, dev_info_t **dipp, int flags,
 	cv_init(&hdl->mtc_cv, NULL, CV_DEFAULT, NULL);
 	hdl->mtc_pdip = pdip;
 	hdl->mtc_fdip = dipp;
-	hdl->mtc_parmajor = (major_t)-1;
+	hdl->mtc_parmajor = DDI_MAJOR_T_NONE;
 	hdl->mtc_flags = flags;
 	hdl->mtc_major = major;
 	hdl->mtc_thr_count = 0;
@@ -6996,7 +6996,7 @@ mt_config_thread(void *arg)
 	if ((rv != NDI_SUCCESS) && (hdl->mtc_error == 0)) {
 		hdl->mtc_error = rv;
 #ifdef	DEBUG
-		if ((ddidebug & DDI_DEBUG) && (major != (major_t)-1)) {
+		if ((ddidebug & DDI_DEBUG) && (major != DDI_MAJOR_T_NONE)) {
 			char	*path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 
 			(void) ddi_pathname(dip, path);
@@ -7094,8 +7094,9 @@ mt_config_children(struct mt_config_handle *hdl)
 		 * Switch a 'driver' operation to an 'all' operation below a
 		 * node bound to the driver.
 		 */
-		if ((major == (major_t)-1) || (major == ddi_driver_major(dip)))
-			mcd->mtc_major = (major_t)-1;
+		if ((major == DDI_MAJOR_T_NONE) ||
+		    (major == ddi_driver_major(dip)))
+			mcd->mtc_major = DDI_MAJOR_T_NONE;
 		else
 			mcd->mtc_major = major;
 
@@ -7157,8 +7158,8 @@ mt_config_driver(struct mt_config_handle *hdl)
 	gethrestime(&end_time);
 	hdl->total_time += time_diff_in_msec(hdl->start_time, end_time);
 #endif
-	ASSERT(par_major != (major_t)-1);
-	ASSERT(major != (major_t)-1);
+	ASSERT(par_major != DDI_MAJOR_T_NONE);
+	ASSERT(major != DDI_MAJOR_T_NONE);
 
 	LOCK_DEV_OPS(&dnp->dn_lock);
 	dip = devnamesp[par_major].dn_head;

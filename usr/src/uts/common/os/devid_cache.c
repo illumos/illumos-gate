@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -264,7 +264,7 @@ devid_cache_unpack_nvlist(nvf_handle_t fd, nvlist_t *nvl, char *name)
 	 * check path for a devid
 	 */
 	rval = nvlist_lookup_byte_array(nvl,
-		DP_DEVID_ID, (uchar_t **)&devidp, &n);
+	    DP_DEVID_ID, (uchar_t **)&devidp, &n);
 	if (rval == 0) {
 		if (ddi_devid_valid(devidp) == DDI_SUCCESS) {
 			ASSERT(n == ddi_devid_sizeof(devidp));
@@ -303,26 +303,26 @@ devid_cache_pack_list(nvf_handle_t fd, nvlist_t **ret_nvl)
 	rval = nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP);
 	if (rval != 0) {
 		nvf_error("%s: nvlist alloc error %d\n",
-			nvf_cache_name(fd), rval);
+		    nvf_cache_name(fd), rval);
 		return (DDI_FAILURE);
 	}
 
 	listp = nvf_list(fd);
 	for (np = list_head(listp); np; np = list_next(listp, np)) {
 		if (np->nvp_devid == NULL)
-		    continue;
+			continue;
 		NVP_DEVID_DEBUG_PATH(np->nvp_devpath);
 		rval = nvlist_alloc(&sub_nvl, NV_UNIQUE_NAME, KM_SLEEP);
 		if (rval != 0) {
 			nvf_error("%s: nvlist alloc error %d\n",
-				nvf_cache_name(fd), rval);
+			    nvf_cache_name(fd), rval);
 			sub_nvl = NULL;
 			goto err;
 		}
 
 		rval = nvlist_add_byte_array(sub_nvl, DP_DEVID_ID,
-			(uchar_t *)np->nvp_devid,
-			ddi_devid_sizeof(np->nvp_devid));
+		    (uchar_t *)np->nvp_devid,
+		    ddi_devid_sizeof(np->nvp_devid));
 		if (rval == 0) {
 			NVP_DEVID_DEBUG_DEVID(np->nvp_devid);
 		} else {
@@ -419,14 +419,14 @@ e_ddi_devid_hold_installed_driver(ddi_devid_t devid)
 
 	/* search for the devid using the hint driver */
 	hint_major = ddi_name_to_major(hint);
-	if (hint_major != (major_t)-1) {
+	if (hint_major != DDI_MAJOR_T_NONE) {
 		e_ddi_devid_hold_by_major(hint_major);
 	}
 
 	drvp = e_ddi_devid_hold_driver_list;
 	for (i = 0; i < N_DRIVERS_TO_HOLD; i++, drvp++) {
 		major = ddi_name_to_major(*drvp);
-		if (major != (major_t)-1 && major != hint_major) {
+		if (major != DDI_MAJOR_T_NONE && major != hint_major) {
 			e_ddi_devid_hold_by_major(major);
 		}
 	}
@@ -523,10 +523,9 @@ e_devid_cache_register(dev_info_t *dip, ddi_devid_t devid)
 			DEVID_DEBUG2((CE_CONT,
 			    "register: %s path match\n", path));
 			if (np->nvp_devid == NULL) {
-			    replace:
-				np->nvp_devid = new_devid;
+replace:			np->nvp_devid = new_devid;
 				np->nvp_flags |=
-					NVP_DEVID_DIP | NVP_DEVID_REGISTERED;
+				    NVP_DEVID_DIP | NVP_DEVID_REGISTERED;
 				np->nvp_dip = dip;
 				if (!devid_cache_write_disable) {
 					nvf_mark_dirty(dcfd_handle);
@@ -562,7 +561,7 @@ e_devid_cache_register(dev_info_t *dip, ddi_devid_t devid)
 				DEVID_DEBUG2((CE_CONT,
 				    "devid register: %s devid match\n", path));
 				np->nvp_flags |=
-					NVP_DEVID_DIP | NVP_DEVID_REGISTERED;
+				    NVP_DEVID_DIP | NVP_DEVID_REGISTERED;
 				np->nvp_dip = dip;
 				rw_exit(nvf_lock(dcfd_handle));
 				kmem_free(new_nvp, sizeof (nvp_devid_t));
@@ -621,7 +620,7 @@ e_devid_cache_unregister(dev_info_t *dip)
 			continue;
 		if ((np->nvp_flags & NVP_DEVID_DIP) && np->nvp_dip == dip) {
 			DEVID_LOG_UNREG((CE_CONT,
-				"unregister: %s\n", np->nvp_devpath));
+			    "unregister: %s\n", np->nvp_devpath));
 			np->nvp_flags &= ~NVP_DEVID_DIP;
 			np->nvp_dip = NULL;
 			break;
@@ -650,7 +649,7 @@ devid_cache_cleanup(void)
 			continue;
 		if ((np->nvp_flags & NVP_DEVID_REGISTERED) == 0) {
 			DEVID_LOG_REMOVE((CE_CONT,
-				    "cleanup: %s\n", np->nvp_devpath));
+			    "cleanup: %s\n", np->nvp_devpath));
 			if (!devid_cache_write_disable) {
 				nvf_mark_dirty(dcfd_handle);
 				is_dirty = 0;
@@ -841,7 +840,7 @@ e_devid_cache_to_devt_list(ddi_devid_t devid, char *minor_name,
 
 		rw_enter(nvf_lock(dcfd_handle), RW_READER);
 		n = e_devid_cache_devi_path_lists(devid, nalloced,
-			&ndevis, devis, &npaths, paths);
+		    &ndevis, devis, &npaths, paths);
 		if (n <= nalloced)
 			break;
 		rw_exit(nvf_lock(dcfd_handle));
@@ -873,7 +872,7 @@ restart:
 		ASSERT(!DEVI_IS_ATTACHING(devis[i]));
 		ASSERT(!DEVI_IS_DETACHING(devis[i]));
 		e_devid_minor_to_devlist(devis[i], minor_name,
-			ndevts_alloced, &ndevts, devts);
+		    ndevts_alloced, &ndevts, devts);
 		if (ndevts > ndevts_alloced) {
 			kmem_free(devts, ndevts_alloced * sizeof (dev_t));
 			ndevts_alloced += 128;
@@ -910,7 +909,7 @@ restart:
 		ddi_devid_free(match_devid);
 
 		e_devid_minor_to_devlist(devi, minor_name,
-			ndevts_alloced, &ndevts, devts);
+		    ndevts_alloced, &ndevts, devts);
 		ddi_release_devi(devi);
 		if (ndevts > ndevts_alloced) {
 			kmem_free(devts,

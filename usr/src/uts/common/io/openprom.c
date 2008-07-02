@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4 */
 
 /*
@@ -371,15 +369,15 @@ opromioctl_cb(void *avp, int has_changed)
 		    sizeof (uint_t) + 1, KM_SLEEP);
 		opp->oprom_size = valsize;
 		if (copyout(opp, (void *)arg, (sizeof (uint_t))) != 0)
-		    error = EFAULT;
+			error = EFAULT;
 		kmem_free(opp, sizeof (uint_t) + 1);
 		break;
 	case OPROMLISTKEYS:
 		valsize = prom_asr_list_keys_len();
 		if (copyin((void *)arg, &userbufsize, sizeof (uint_t)) != 0)
-		    return (EFAULT);
+			return (EFAULT);
 		if (valsize > userbufsize)
-		    return (EINVAL);
+			return (EINVAL);
 		valbuf = (char *)kmem_zalloc(valsize + 1, KM_SLEEP);
 		if (prom_asr_list_keys((caddr_t)valbuf) == -1) {
 			kmem_free(valbuf, valsize + 1);
@@ -390,16 +388,16 @@ opromioctl_cb(void *avp, int has_changed)
 		opp->oprom_size = valsize;
 		bcopy(valbuf, opp->oprom_array, valsize);
 		if (copyout(opp, (void *)arg, (valsize + sizeof (uint_t))) != 0)
-		    error = EFAULT;
+			error = EFAULT;
 		kmem_free(valbuf, valsize + 1);
 		kmem_free(opp, valsize + sizeof (uint_t) + 1);
 		break;
 	case OPROMEXPORT:
 		valsize = prom_asr_export_len();
 		if (copyin((void *)arg, &userbufsize, sizeof (uint_t)) != 0)
-		    return (EFAULT);
+			return (EFAULT);
 		if (valsize > userbufsize)
-		    return (EINVAL);
+			return (EINVAL);
 		valbuf = (char *)kmem_zalloc(valsize + 1, KM_SLEEP);
 		if (prom_asr_export((caddr_t)valbuf) == -1) {
 			kmem_free(valbuf, valsize + 1);
@@ -410,7 +408,7 @@ opromioctl_cb(void *avp, int has_changed)
 		opp->oprom_size = valsize;
 		bcopy(valbuf, opp->oprom_array, valsize);
 		if (copyout(opp, (void *)arg, (valsize + sizeof (uint_t))) != 0)
-		    error = EFAULT;
+			error = EFAULT;
 		kmem_free(valbuf, valsize + 1);
 		kmem_free(opp, valsize + sizeof (uint_t) + 1);
 		break;
@@ -420,7 +418,7 @@ opromioctl_cb(void *avp, int has_changed)
 		    sizeof (uint_t) + 1, KM_SLEEP);
 		opp->oprom_size = valsize;
 		if (copyout(opp, (void *)arg, (sizeof (uint_t))) != 0)
-		    error = EFAULT;
+			error = EFAULT;
 		kmem_free(opp, sizeof (uint_t) + 1);
 		break;
 #endif
@@ -709,7 +707,8 @@ opromioctl_cb(void *avp, int has_changed)
 
 		if (copyout(opp, (void *)arg, valsize + sizeof (uint_t)) != 0)
 			error = EFAULT;
-	}	break;
+		break;
+	}
 
 	/*
 	 * convert a prom device path to an equivalent devfs path
@@ -743,7 +742,8 @@ opromioctl_cb(void *avp, int has_changed)
 			error = EFAULT;
 
 		kmem_free(dev_name, MAXPATHLEN);
-	}	break;
+		break;
+	}
 
 	/*
 	 * Convert a prom device path name to a driver name
@@ -764,7 +764,7 @@ opromioctl_cb(void *avp, int has_changed)
 		 * convert path to a driver binding name
 		 */
 		maj = path_to_major((char *)opp->oprom_array);
-		if (maj == (major_t)-1) {
+		if (maj == DDI_MAJOR_T_NONE) {
 			error = EINVAL;
 			break;
 		}
@@ -782,7 +782,8 @@ opromioctl_cb(void *avp, int has_changed)
 		if (copyout(opp, (void *)arg,
 		    sizeof (uint_t) + opp->oprom_size + 1) != 0)
 			error = EFAULT;
-	}	break;
+		break;
+	}
 
 	case OPROMGETVERSION:
 		/*
@@ -874,7 +875,8 @@ opromioctl_cb(void *avp, int has_changed)
 		if (copyout(opp, (void *)arg, sizeof (uint_t) + valsize) != 0)
 			error = EFAULT;
 
-	}	break;
+		break;
+	}
 
 	case OPROMSETOPT:
 	case OPROMSETOPT2: {
@@ -923,7 +925,8 @@ opromioctl_cb(void *avp, int has_changed)
 		    valbuf, valsize) < 0)
 			error = EINVAL;
 
-	}	break;
+		break;
+	}
 
 	case OPROMREADY64: {
 		struct openprom_opr64 *opr =

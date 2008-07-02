@@ -90,7 +90,7 @@ setup_ddi(void)
 	log_event_init();
 	fm_init();
 
-	(void) i_ddi_load_drvconf((major_t)-1);
+	(void) i_ddi_load_drvconf(DDI_MAJOR_T_NONE);
 
 	ldi_init();
 
@@ -132,7 +132,7 @@ impl_create_root_class(void)
 	 * The name for the root nexus is exactly as the manufacturer
 	 * placed it in the prom name property.  No translation.
 	 */
-	if ((major = ddi_name_to_major("rootnex")) == (major_t)-1)
+	if ((major = ddi_name_to_major("rootnex")) == DDI_MAJOR_T_NONE)
 		panic("Couldn't find major number for 'rootnex'");
 
 	/*
@@ -376,7 +376,7 @@ create_devinfo_tree(void)
 	 * This code is special because root node has no parent
 	 */
 	major = ddi_name_to_major("rootnex");
-	ASSERT(major != (major_t)-1);
+	ASSERT(major != DDI_MAJOR_T_NONE);
 	DEVI(top_devinfo)->devi_major = major;
 	devnamesp[major].dn_head = top_devinfo;
 	i_ddi_set_binding_name(top_devinfo, rootname);

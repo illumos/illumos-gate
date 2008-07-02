@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -313,7 +313,7 @@ ptms_attach_slave(void)
 major_t
 ptms_slave_attached(void)
 {
-	major_t maj = (major_t)-1;
+	major_t maj = DDI_MAJOR_T_NONE;
 
 	mutex_enter(&ptms_lock);
 	if (pts_dip)

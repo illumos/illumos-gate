@@ -715,7 +715,7 @@ load_boot_driver(char *drv)
 	int		mlen;
 #endif	/* sparc */
 
-	if ((major = ddi_name_to_major(drv)) == (major_t)-1) {
+	if ((major = ddi_name_to_major(drv)) == DDI_MAJOR_T_NONE) {
 		cmn_err(CE_CONT, "%s: no major number\n", drv);
 		return (-1);
 	}
@@ -791,7 +791,7 @@ static int
 load_parent_drivers(dev_info_t *dip, char *path)
 {
 	int	rval = 0;
-	major_t	major = (major_t)-1;
+	major_t	major = DDI_MAJOR_T_NONE;
 	char	*drv;
 	char	*p;
 
@@ -800,9 +800,9 @@ load_parent_drivers(dev_info_t *dip, char *path)
 		if (path)
 			major = ddi_name_to_major(path);
 		else
-			major = (major_t)-1;
+			major = DDI_MAJOR_T_NONE;
 
-		if (major != (major_t)-1)
+		if (major != DDI_MAJOR_T_NONE)
 			drv = ddi_major_to_name(major);
 		else
 			drv = ddi_binding_name(dip);
@@ -950,7 +950,7 @@ load_boot_platform_modules(char *drv)
 	char	*drvname;
 	int	rval = 0;
 
-	if ((major = ddi_name_to_major(drv)) == (major_t)-1) {
+	if ((major = ddi_name_to_major(drv)) == DDI_MAJOR_T_NONE) {
 		cmn_err(CE_CONT, "%s: no major number\n", drv);
 		return (-1);
 	}
@@ -959,7 +959,7 @@ load_boot_platform_modules(char *drv)
 	 * resolve aliases
 	 */
 	drvname = ddi_major_to_name(major);
-	if ((major = ddi_name_to_major(drvname)) == (major_t)-1)
+	if ((major = ddi_name_to_major(drvname)) == DDI_MAJOR_T_NONE)
 		return (-1);
 
 #ifdef	DEBUG

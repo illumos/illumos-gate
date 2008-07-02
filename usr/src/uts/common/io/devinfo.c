@@ -1197,7 +1197,8 @@ di_dkey_cmp(struct di_dkey *dk1, struct di_dkey *dk2)
 	if (dk1->dk_dip !=  dk2->dk_dip)
 		return (dk1->dk_dip > dk2->dk_dip ? 1 : -1);
 
-	if (dk1->dk_major != (major_t)-1 && dk2->dk_major != (major_t)-1) {
+	if (dk1->dk_major != DDI_MAJOR_T_NONE &&
+	    dk2->dk_major != DDI_MAJOR_T_NONE) {
 		if (dk1->dk_major !=  dk2->dk_major)
 			return (dk1->dk_major > dk2->dk_major ? 1 : -1);
 
@@ -2314,8 +2315,8 @@ i_lnode_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 	me->self = i_lnode->self;
 
 	if (i_lnode->devt == DDI_DEV_T_NONE) {
-		me->dev_major = (major_t)-1;
-		me->dev_minor = (minor_t)-1;
+		me->dev_major = DDI_MAJOR_T_NONE;
+		me->dev_minor = DDI_MAJOR_T_NONE;
 	} else {
 		me->dev_major = getmajor(i_lnode->devt);
 		me->dev_minor = getminor(i_lnode->devt);

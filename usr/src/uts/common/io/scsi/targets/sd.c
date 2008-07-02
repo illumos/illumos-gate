@@ -2148,7 +2148,7 @@ _init(void)
 	int	err;
 
 	/* establish driver name from module name */
-	sd_label = mod_modname(&modlinkage);
+	sd_label = (char *)mod_modname(&modlinkage);
 
 	err = ddi_soft_state_init(&sd_state, sizeof (struct sd_lun),
 	    SD_MAXUNIT);
