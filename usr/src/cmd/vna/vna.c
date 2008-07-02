@@ -32,13 +32,12 @@
  */
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <sys/types.h>
 #include <sys/ethernet.h>
 #include <libdllink.h>
 #include <libdlvnic.h>
+#include <libdlpi.h>
 
 typedef struct vnic_attr {
 	dladm_vnic_attr_sys_t attr;
@@ -124,6 +123,59 @@ v_find(datalink_id_t vnic_id, void *arg)
 	return (DLADM_WALK_TERMINATE);
 }
 
+#define	ETHERTYPE_LOOPBACK	(0x9000)	/* loopback packet */
+
+/*
+ * Broadcasst a loopback ethernet packet via "link"
+ */
+static int
+v_broadcast(char *link)
+{
+	int rval;
+	dlpi_handle_t dh;
+	dlpi_info_t dlinfo;
+	struct ether_header eh;
+
+	if ((rval = dlpi_open(link, &dh, DLPI_RAW)) != DLPI_SUCCESS) {
+		(void) fprintf(stderr,
+		    "dlpi_open failed, link name: %s, err=%d\n", link, rval);
+		return (-1);
+	}
+
+	if ((rval = dlpi_bind(dh, DLPI_ANY_SAP, NULL)) != DLPI_SUCCESS) {
+		(void) fprintf(stderr, "dlpi_bind failed, err=%d\n", rval);
+		dlpi_close(dh);
+		return (-1);
+	}
+
+	if ((rval = dlpi_info(dh, &dlinfo, 0)) != DLPI_SUCCESS) {
+		(void) fprintf(stderr, "dlpi_info failed, err=%d\n", rval);
+		dlpi_close(dh);
+		return (-1);
+	}
+
+	if (dlinfo.di_bcastaddrlen == 0) {
+		(void) fprintf(stderr,
+		    "no broadcast address for link: %s\n", link);
+		dlpi_close(dh);
+		return (-1);
+	}
+
+	(void) memcpy(&eh.ether_dhost, dlinfo.di_bcastaddr, ETHERADDRL);
+	(void) memcpy(&eh.ether_shost, dlinfo.di_physaddr, ETHERADDRL);
+	eh.ether_type = htons(ETHERTYPE_LOOPBACK);
+
+	rval = dlpi_send(dh, NULL, 0, &eh, sizeof (struct ether_header), NULL);
+	if (rval != DLPI_SUCCESS) {
+		(void) fprintf(stderr, "dlpi_send failed, err=%d\n", rval);
+		dlpi_close(dh);
+		return (-1);
+	}
+
+	dlpi_close(dh);
+	return (0);
+}
+
 /*
  * Print out the link name of the VNIC.
  */
@@ -136,6 +188,7 @@ v_add(char *link, char *addr, char *name)
 	char vnic[MAXLINKNAMELEN];
 	dladm_status_t status;
 	char buf[DLADM_STRSIZE];
+	boolean_t created = B_FALSE;
 
 	ea = ether_aton(addr);
 	if (ea == NULL) {
@@ -174,6 +227,7 @@ v_add(char *link, char *addr, char *name)
 			    dladm_status2str(status, buf));
 			return (-1);
 		}
+		created = B_TRUE;
 	} else {
 		vnic_id = vattr.attr.va_vnic_id;
 	}
@@ -186,6 +240,14 @@ v_add(char *link, char *addr, char *name)
 			(void) dladm_vnic_delete(vnic_id, DLADM_OPT_ACTIVE);
 		return (-1);
 	}
+
+	/*
+	 * Before we hand this newly created vnic over to caller, we want to
+	 * broadcast its MAC address to make sure that the <MAC,port> mapping
+	 * in the switch is correct.
+	 */
+	if (created)
+		(void) v_broadcast(vnic);
 
 	(void) printf("%s\n", vnic);
 
