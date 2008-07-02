@@ -29,6 +29,7 @@
  * Convert Algorithm names as strings to PKCS#11 Mech numbers and vice versa.
  */
 
+#include <limits.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -41,10 +42,16 @@
  * This table is a one-to-one mapping between mechanism names and numbers.
  * As such, it should not contain deprecated mechanism names (aliases).
  */
-static const struct {
-	const char *str;
-	CK_MECHANISM_TYPE mech;
-} mapping[] = {
+typedef struct {
+	const char		*str;
+	CK_MECHANISM_TYPE	mech;
+} pkcs11_mapping_t;
+
+/*
+ * Note: elements in this table MUST be in numeric order,
+ * since bsearch(3C) is used to search this table.
+ */
+static const pkcs11_mapping_t mapping[] = {
 	{ "CKM_RSA_PKCS_KEY_PAIR_GEN", CKM_RSA_PKCS_KEY_PAIR_GEN },
 	{ "CKM_RSA_PKCS", CKM_RSA_PKCS },
 	{ "CKM_RSA_9796", CKM_RSA_9796 },
@@ -293,31 +300,52 @@ static const struct {
 	{ "CKM_DSA_PARAMETER_GEN", CKM_DSA_PARAMETER_GEN },
 	{ "CKM_DH_PKCS_PARAMETER_GEN", CKM_DH_PKCS_PARAMETER_GEN },
 	{ "CKM_X9_42_DH_PARAMETER_GEN", CKM_X9_42_DH_PARAMETER_GEN },
-	{ "CKM_VENDOR_DEFINED", CKM_VENDOR_DEFINED },
+	/*
+	 * Values above 0x8000000 (CKM_VENDOR_DEFINED) are represented
+	 * as strings with hexadecimal numbers (e.g., "0x8123456").
+	 */
 	{ NULL, 0 }
 };
+
+
+/*
+ * pkcs11_mech_comp - compare two pkcs11_mapping_t structures
+ *
+ * Return a strcmp-like result (positive, zero, or negative).
+ * For use with bsearch(3C) in pkcs11_mech2str().
+ */
+static int
+pkcs11_mech_comp(const void *mapping1, const void *mapping2) {
+	return (((pkcs11_mapping_t *)mapping1)->mech -
+		((pkcs11_mapping_t *)mapping2)->mech);
+}
+
 
 /*
  * pkcs11_mech2str - convert PKCS#11 mech to a string
  *
  * Anything below CKM_VENDOR_DEFINED that wasn't in the mapping table
  * at build time causes NULL to be returned.  Anything above it also
- * returns NULL since we have no way to know what its real name is.
+ * returns NULL since we have no way to know its real name.
  */
-char
+const char
 *pkcs11_mech2str(CK_MECHANISM_TYPE mech)
 {
-	int i;
-	char buf[11];	/* Num chars for representing ulong in ASCII */
+	pkcs11_mapping_t	target;
+	pkcs11_mapping_t	*result = NULL;
 
 	if (mech > CKM_VENDOR_DEFINED) {
-		(void) snprintf(buf, sizeof (buf), "%#lx", mech);
-		return (strdup(buf));
+		return (NULL);
 	}
 
-	for (i = 0; mapping[i].str; i++) {
-		if (mapping[i].mech == mech)
-			return (strdup(mapping[i].str));
+	/* Search for the mechanism number using bsearch(3C) */
+	target.mech = mech;
+	target.str = NULL;
+	result = (pkcs11_mapping_t *)bsearch((void *)&target, (void *)mapping,
+	    (sizeof (mapping) / sizeof (pkcs11_mapping_t)) - 1,
+	    sizeof (pkcs11_mapping_t), pkcs11_mech_comp);
+	if (result != NULL) {
+		return (result->str);
 	}
 
 	return (NULL);
@@ -326,46 +354,46 @@ char
 /*
  * pkcs11_str2mech - convert a string into a PKCS#11 mech number.
  *
- * Since there isn't reserved value for an invalid mech we return
+ * Since there isn't a reserved value for an invalid mech we return
  * CKR_MECHANISM_INVALID for anything we don't recognise.
  * The value in mech isn't meaningful in these cases.
  */
 CK_RV
 pkcs11_str2mech(char *mech_str, CK_MECHANISM_TYPE_PTR mech)
 {
-	int i;
-	char *tmech_str;
+	int	i;
+	int	compare_off = 0;
 
 	if (mech_str == NULL)
 		return (CKR_MECHANISM_INVALID);
 
-	if (strncasecmp(mech_str, "0x8", 3) == 0) {
+	if (strncasecmp(mech_str, "0x", 2) == 0) {
+		long long llnum;
 		cryptodebug("pkcs11_str2mech: hex string passed in: %s",
 		    mech_str);
-		*mech = strtoll(mech_str, NULL, 16);
-		return (CKR_OK);
+		llnum = strtoll(mech_str, NULL, 16);
+		if ((llnum >= CKM_VENDOR_DEFINED) && (llnum <= UINT_MAX)) {
+			*mech = llnum;
+			return (CKR_OK);
+		} else {
+			return (CKR_MECHANISM_INVALID);
+		}
 	}
 
+	/* If there's no CKM_ prefix, then ignore it in comparisons */
 	if (strncasecmp(mech_str, "CKM_", 4) != 0) {
-		size_t tmech_strlen = strlen(mech_str) + 4 + 1;
 		cryptodebug("pkcs11_str2mech: no CKM_ prefix: %s", mech_str);
-		tmech_str = malloc(tmech_strlen * sizeof (char));
-		(void) snprintf(tmech_str, tmech_strlen, "CKM_%s", mech_str);
-		cryptodebug("pkcs11_str2mech: with prefix: %s", tmech_str);
-	} else {
-		tmech_str = mech_str;
+		cryptodebug("pkcs11_str2mech: with prefix: CKM_%s", mech_str);
+		compare_off = 4;
 	}
 
+	/* Linear search for a matching string */
 	for (i = 0; mapping[i].str; i++) {
-		if (strcasecmp(mapping[i].str, tmech_str) == 0) {
+		if (strcasecmp(&mapping[i].str[compare_off], mech_str) == 0) {
 			*mech = mapping[i].mech;
-			if (tmech_str != mech_str)
-				free(tmech_str);
 			return (CKR_OK);
 		}
 	}
-	if (tmech_str != mech_str)
-		free(tmech_str);
 
 	return (CKR_MECHANISM_INVALID);
 }

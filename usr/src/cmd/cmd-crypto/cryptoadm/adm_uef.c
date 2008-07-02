@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,31 +115,31 @@ void
 display_mech_info(CK_MECHANISM_INFO *mechInfo)
 {
 	CK_FLAGS ec_flags = CKF_EC_F_P | CKF_EC_F_2M | CKF_EC_ECPARAMETERS |
-		CKF_EC_NAMEDCURVE | CKF_EC_UNCOMPRESS | CKF_EC_COMPRESS;
+	    CKF_EC_NAMEDCURVE | CKF_EC_UNCOMPRESS | CKF_EC_COMPRESS;
 
 	(void) printf("%-4ld %-4ld ", mechInfo->ulMinKeySize,
-		mechInfo->ulMaxKeySize);
+	    mechInfo->ulMaxKeySize);
 	(void) printf("%s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  %s  "
-		"%s  %s",
-		(mechInfo->flags & CKF_HW) ? "X" : ".",
-		(mechInfo->flags & CKF_ENCRYPT) ? "X" : ".",
-		(mechInfo->flags & CKF_DECRYPT) ? "X" : ".",
-		(mechInfo->flags & CKF_DIGEST) ? "X" : ".",
-		(mechInfo->flags & CKF_SIGN) ? "X" : ".",
-		(mechInfo->flags & CKF_SIGN_RECOVER) ? "X" : ".",
-		(mechInfo->flags & CKF_VERIFY) ? "X" : ".",
-		(mechInfo->flags & CKF_VERIFY_RECOVER) ? "X" : ".",
-		(mechInfo->flags & CKF_GENERATE) ? "X" : ".",
-		(mechInfo->flags & CKF_GENERATE_KEY_PAIR) ? "X" : ".",
-		(mechInfo->flags & CKF_WRAP) ? "X" : ".",
-		(mechInfo->flags & CKF_UNWRAP) ? "X" : ".",
-		(mechInfo->flags & CKF_DERIVE) ? "X" : ".",
-		(mechInfo->flags & ec_flags) ? "X" : ".");
+	    "%s  %s",
+	    (mechInfo->flags & CKF_HW) ? "X" : ".",
+	    (mechInfo->flags & CKF_ENCRYPT) ? "X" : ".",
+	    (mechInfo->flags & CKF_DECRYPT) ? "X" : ".",
+	    (mechInfo->flags & CKF_DIGEST) ? "X" : ".",
+	    (mechInfo->flags & CKF_SIGN) ? "X" : ".",
+	    (mechInfo->flags & CKF_SIGN_RECOVER) ? "X" : ".",
+	    (mechInfo->flags & CKF_VERIFY) ? "X" : ".",
+	    (mechInfo->flags & CKF_VERIFY_RECOVER) ? "X" : ".",
+	    (mechInfo->flags & CKF_GENERATE) ? "X" : ".",
+	    (mechInfo->flags & CKF_GENERATE_KEY_PAIR) ? "X" : ".",
+	    (mechInfo->flags & CKF_WRAP) ? "X" : ".",
+	    (mechInfo->flags & CKF_UNWRAP) ? "X" : ".",
+	    (mechInfo->flags & CKF_DERIVE) ? "X" : ".",
+	    (mechInfo->flags & ec_flags) ? "X" : ".");
 }
 
 /*
  * Converts the provided list of mechanism names in their string format to
- * their corrsponding PKCS#11 mechanism IDs.
+ * their corresponding PKCS#11 mechanism IDs.
  *
  * The list of mechanism names to be converted is provided in the
  * "mlist" argument.  The list of converted mechanism IDs is returned
@@ -194,15 +194,15 @@ list_mechlist_for_lib(char *libname, mechlist_t *mlist,
 	CK_ULONG	slot_count;
 	CK_ULONG	mech_count;
 	uentry_t	*puent = NULL;
-	boolean_t lib_initialized = B_FALSE;
-	void	*dldesc = NULL;
-	char	*dl_error;
-	char 	*mech_name;
-	char	*isa;
-	char	libpath[MAXPATHLEN];
-	char	buf[MAXPATHLEN];
-	int	i, j;
-	int	rc = SUCCESS;
+	boolean_t	lib_initialized = B_FALSE;
+	void		*dldesc = NULL;
+	char		*dl_error;
+	const char 	*mech_name;
+	char		*isa;
+	char		libpath[MAXPATHLEN];
+	char		buf[MAXPATHLEN];
+	int		i, j;
+	int		rc = SUCCESS;
 
 	if (libname == NULL) {
 		/* should not happen */
@@ -285,7 +285,7 @@ list_mechlist_for_lib(char *libname, mechlist_t *mlist,
 	} else if (slot_count == 0) {
 		if (!no_warn)
 			(void) printf(gettext("%s: no slots presented.\n"),
-				libname);
+			    libname);
 		rc = SUCCESS;
 		goto clean_exit;
 	}
@@ -341,65 +341,65 @@ list_mechlist_for_lib(char *libname, mechlist_t *mlist,
 			CK_TOKEN_INFO tokeninfo;
 
 			(void) printf(gettext("Description: %.64s\n"
-				"Manufacturer: %.32s\n"
-				"PKCS#11 Version: %d.%d\n"),
-				slotinfo.slotDescription,
-				slotinfo.manufacturerID,
-				prov_funcs->version.major,
-				prov_funcs->version.minor);
+			    "Manufacturer: %.32s\n"
+			    "PKCS#11 Version: %d.%d\n"),
+			    slotinfo.slotDescription,
+			    slotinfo.manufacturerID,
+			    prov_funcs->version.major,
+			    prov_funcs->version.minor);
 
 			(void) printf(gettext("Hardware Version: %d.%d\n"
-				"Firmware Version: %d.%d\n"),
-				slotinfo.hardwareVersion.major,
-				slotinfo.hardwareVersion.minor,
-				slotinfo.firmwareVersion.major,
-				slotinfo.firmwareVersion.minor);
+			    "Firmware Version: %d.%d\n"),
+			    slotinfo.hardwareVersion.major,
+			    slotinfo.hardwareVersion.minor,
+			    slotinfo.firmwareVersion.major,
+			    slotinfo.firmwareVersion.minor);
 
 			(void) printf(gettext("Token Present: %s\n"),
-				(slotinfo.flags & CKF_TOKEN_PRESENT ?
-				gettext("True") : gettext("False")));
+			    (slotinfo.flags & CKF_TOKEN_PRESENT ?
+			    gettext("True") : gettext("False")));
 
 			display_slot_flags(slotinfo.flags);
 
 			rv = prov_funcs->C_GetTokenInfo(prov_slots[i],
-				&tokeninfo);
+			    &tokeninfo);
 			if (rv != CKR_OK) {
 				cryptodebug("Failed to get "
-					"token info from %s", libname);
+				    "token info from %s", libname);
 				rc = FAILURE;
 				break;
 			}
 
 			(void) printf(gettext("Token Label: %.32s\n"
-				"Manufacturer ID: %.32s\n"
-				"Model: %.16s\n"
-				"Serial Number: %.16s\n"
-				"Hardware Version: %d.%d\n"
-				"Firmware Version: %d.%d\n"
-				"UTC Time: %.16s\n"
-				"PIN Length: %d-%d\n"),
-				tokeninfo.label,
-				tokeninfo.manufacturerID,
-				tokeninfo.model,
-				tokeninfo.serialNumber,
-				tokeninfo.hardwareVersion.major,
-				tokeninfo.hardwareVersion.minor,
-				tokeninfo.firmwareVersion.major,
-				tokeninfo.firmwareVersion.minor,
-				tokeninfo.utcTime,
-				tokeninfo.ulMinPinLen,
-				tokeninfo.ulMaxPinLen);
+			    "Manufacturer ID: %.32s\n"
+			    "Model: %.16s\n"
+			    "Serial Number: %.16s\n"
+			    "Hardware Version: %d.%d\n"
+			    "Firmware Version: %d.%d\n"
+			    "UTC Time: %.16s\n"
+			    "PIN Length: %d-%d\n"),
+			    tokeninfo.label,
+			    tokeninfo.manufacturerID,
+			    tokeninfo.model,
+			    tokeninfo.serialNumber,
+			    tokeninfo.hardwareVersion.major,
+			    tokeninfo.hardwareVersion.minor,
+			    tokeninfo.firmwareVersion.major,
+			    tokeninfo.firmwareVersion.minor,
+			    tokeninfo.utcTime,
+			    tokeninfo.ulMinPinLen,
+			    tokeninfo.ulMaxPinLen);
 
 			display_token_flags(tokeninfo.flags);
 		}
 
 		if (mlist == NULL) {
 			rv = prov_funcs->C_GetMechanismList(prov_slots[i],
-				NULL_PTR, &mech_count);
+			    NULL_PTR, &mech_count);
 			if (rv != CKR_OK) {
 				cryptodebug(
-					"failed to call C_GetMechanismList() "
-					"from %s.", libname);
+				    "failed to call C_GetMechanismList() "
+				    "from %s.", libname);
 				rc = FAILURE;
 				break;
 			}
@@ -410,7 +410,7 @@ list_mechlist_for_lib(char *libname, mechlist_t *mlist,
 			}
 
 			pmech_list = malloc(mech_count *
-					sizeof (CK_MECHANISM_TYPE));
+			    sizeof (CK_MECHANISM_TYPE));
 			if (pmech_list == NULL) {
 				cryptodebug("out of memory");
 				rc = FAILURE;
@@ -419,11 +419,11 @@ list_mechlist_for_lib(char *libname, mechlist_t *mlist,
 
 			/* Get the actual mechanism list */
 			rv = prov_funcs->C_GetMechanismList(prov_slots[i],
-				pmech_list, &mech_count);
+			    pmech_list, &mech_count);
 			if (rv != CKR_OK) {
 				cryptodebug(
-					"failed to call C_GetMechanismList() "
-					"from %s.", libname);
+				    "failed to call C_GetMechanismList() "
+				    "from %s.", libname);
 				(void) free(pmech_list);
 				rc = FAILURE;
 				break;
@@ -446,12 +446,19 @@ list_mechlist_for_lib(char *libname, mechlist_t *mlist,
 		 * mechanism list.
 		 */
 		for (j = 0; show_mechs && j < mech_count; j++) {
-			mech_name = pkcs11_mech2str(pmech_list[j]);
-			(void) printf("%-29s", mech_name);
+			CK_MECHANISM_TYPE	mech = pmech_list[j];
+
+			if (mech > CKM_VENDOR_DEFINED) {
+				(void) printf("%#lx", mech);
+			} else {
+				mech_name = pkcs11_mech2str(mech);
+				(void) printf("%-29s", mech_name);
+			}
+
 			if (verbose) {
 				CK_MECHANISM_INFO mech_info;
 				rv = prov_funcs->C_GetMechanismInfo(
-				    prov_slots[i], pmech_list[j], &mech_info);
+				    prov_slots[i], mech, &mech_info);
 				if (rv != CKR_OK) {
 					cryptodebug(
 					    "failed to call "
@@ -1114,9 +1121,9 @@ uninstall_uef_lib(char *libname)
 int
 display_policy(uentry_t *puent)
 {
-	CK_MECHANISM_TYPE  mech_id;
-	char *mech_name;
-	umechlist_t *ptr;
+	CK_MECHANISM_TYPE	mech_id;
+	const char		*mech_name;
+	umechlist_t		*ptr;
 
 	if (puent == NULL) {
 		return (SUCCESS);
@@ -1136,12 +1143,16 @@ display_policy(uentry_t *puent)
 					/* vendor defined mechanism */
 					(void) printf("%s", ptr->name);
 				} else {
-					mech_name = pkcs11_mech2str(mech_id);
-					if (mech_name == NULL) {
-						return (FAILURE);
+					if (mech_id > CKM_VENDOR_DEFINED) {
+						(void) printf("%#lx", mech_id);
+					} else {
+						mech_name = pkcs11_mech2str(
+						    mech_id);
+						if (mech_name == NULL) {
+							return (FAILURE);
+						}
+						(void) printf("%s", mech_name);
 					}
-					(void) printf("%s", mech_name);
-					free(mech_name);
 				}
 
 				ptr = ptr->next;
@@ -1171,7 +1182,6 @@ display_policy(uentry_t *puent)
 						return (FAILURE);
 					}
 					(void) printf("%s", mech_name);
-					free(mech_name);
 				}
 				ptr = ptr->next;
 				if (ptr == NULL) {
@@ -1201,7 +1211,7 @@ print_uef_policy(uentry_t *puent)
 
 	rng_flag = NO_RNG;
 	if (list_mechlist_for_lib(puent->name, NULL, &rng_flag, B_TRUE,
-		B_FALSE, B_FALSE) != SUCCESS) {
+	    B_FALSE, B_FALSE) != SUCCESS) {
 		cryptoerror(LOG_STDERR,
 		    gettext("%s internal error."), puent->name);
 		return (FAILURE);
@@ -1298,7 +1308,7 @@ update_pkcs11conf(uentry_t *puent)
 		err = errno;
 		cryptoerror(LOG_STDERR,
 		    gettext("failed to update the configuration - %s"),
-			strerror(err));
+		    strerror(err));
 		(void) fclose(pfile);
 		return (FAILURE);
 	}

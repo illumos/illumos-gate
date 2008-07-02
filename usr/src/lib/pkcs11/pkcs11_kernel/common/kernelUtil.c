@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <stdio.h>
 #include <cryptoutil.h>
 #include <errno.h>
 #include <security/cryptoki.h>
@@ -192,11 +193,12 @@ CK_RV
 kernel_mech(CK_MECHANISM_TYPE type, crypto_mech_type_t *k_number)
 {
 	crypto_get_mechanism_number_t get_number;
-	char *string;
+	const char *string;
 	CK_RV rv;
 	int r;
 	kmh_elem_t *elem;
 	uint_t h;
+	char buf[11];   /* Num chars for representing ulong in ASCII */
 
 	/*
 	 * Search for an existing entry. No need to lock since we are
@@ -210,11 +212,17 @@ kernel_mech(CK_MECHANISM_TYPE type, crypto_mech_type_t *k_number)
 		}
 	}
 
-	string = pkcs11_mech2str(type);
+	if (type > CKM_VENDOR_DEFINED) {
+		(void) snprintf(buf, sizeof (buf), "%#lx", type);
+		string = buf;
+	} else {
+		string = pkcs11_mech2str(type);
+	}
+
 	if (string == NULL)
 		return (CKR_MECHANISM_INVALID);
 
-	get_number.pn_mechanism_string = string;
+	get_number.pn_mechanism_string = (char *)string;
 	get_number.pn_mechanism_len = strlen(string) + 1;
 
 	while ((r = ioctl(kernel_fd, CRYPTO_GET_MECHANISM_NUMBER,
@@ -239,7 +247,6 @@ kernel_mech(CK_MECHANISM_TYPE type, crypto_mech_type_t *k_number)
 		(void) kmech_hash_insert(type, *k_number);
 	}
 
-	free(string);
 	return (rv);
 }
 
@@ -1174,7 +1181,7 @@ failed_exit:
  * Get the value of the CKA_PRIVATE attribute for the object just returned
  * from the HW provider.  This function will be called by any function
  * that creates a new object, because the CKA_PRIVATE value of an object is
- * token sepecific.  The CKA_PRIVATE attribute value of the new object will be
+ * token specific.  The CKA_PRIVATE attribute value of the new object will be
  * stored in the object structure in the library, which will be used later at
  * C_Logout to clean up all private objects.
  */
@@ -1221,12 +1228,20 @@ get_mechanism_info(kernel_slot_t *pslot, CK_MECHANISM_TYPE type,
     CK_MECHANISM_INFO_PTR pInfo, uint32_t *k_mi_flags)
 {
 	crypto_get_provider_mechanism_info_t mechanism_info;
-	char *string;
+	const char *string;
 	CK_FLAGS flags, mi_flags;
 	CK_RV rv;
 	int r;
+	char buf[11];   /* Num chars for representing ulong in ASCII */
 
-	string = pkcs11_mech2str(type);
+	if (type > CKM_VENDOR_DEFINED) {
+		/* allocate/build a string containing the mechanism number */
+		(void) snprintf(buf, sizeof (buf), "%#lx", type);
+		string = buf;
+	} else {
+		string = pkcs11_mech2str(type);
+	}
+
 	if (string == NULL)
 		return (CKR_MECHANISM_INVALID);
 
@@ -1246,7 +1261,7 @@ get_mechanism_info(kernel_slot_t *pslot, CK_MECHANISM_TYPE type,
 	}
 
 	if (rv != CKR_OK) {
-		goto out;
+		return (rv);
 	}
 
 	/*
@@ -1263,8 +1278,7 @@ get_mechanism_info(kernel_slot_t *pslot, CK_MECHANISM_TYPE type,
 	    CRYPTO_FG_MAC_DECRYPT_ATOMIC);
 
 	if (mi_flags == 0) {
-		rv = CKR_MECHANISM_INVALID;
-		goto out;
+		return (CKR_MECHANISM_INVALID);
 	}
 
 	if (rv == CKR_OK) {
@@ -1310,7 +1324,5 @@ get_mechanism_info(kernel_slot_t *pslot, CK_MECHANISM_TYPE type,
 
 	}
 
-out:
-	free(string);
 	return (rv);
 }

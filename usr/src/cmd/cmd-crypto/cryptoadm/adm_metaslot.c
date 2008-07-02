@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -169,7 +168,7 @@ list_metaslot_info(boolean_t show_mechs, boolean_t verbose,
 	/*
 	 * We know for sure that metaslot is slot 0 in the framework,
 	 * so, we will do a C_GetSlotInfo() trying to see if it works.
-	 * If it failes with CKR_SLOT_ID_INVALID, we know that metaslot
+	 * If it fails with CKR_SLOT_ID_INVALID, we know that metaslot
 	 * is not really enabled.
 	 */
 	rv = funcs->C_GetSlotInfo(METASLOT_ID, &slot_info);
@@ -284,11 +283,18 @@ display_mechs:
 	}
 
 	for (i = 0; i < mech_count; i++) {
-		(void) printf("%-29s", pkcs11_mech2str(pmech_list[i]));
+		CK_MECHANISM_TYPE	mech = pmech_list[i];
+
+		if (mech > CKM_VENDOR_DEFINED) {
+			(void) printf("%#lx", mech);
+		} else {
+			(void) printf("%-29s", pkcs11_mech2str(mech));
+		}
+
 		if (verbose) {
 			CK_MECHANISM_INFO mech_info;
 			rv = funcs->C_GetMechanismInfo(METASLOT_ID,
-			    pmech_list[i], &mech_info);
+			    mech, &mech_info);
 			if (rv != CKR_OK) {
 				cryptodebug("C_GetMechanismInfo failed with "
 				    "error code 0x%x\n", rv);

@@ -114,7 +114,7 @@ extern void cryptodebug(const char *fmt, ...);
 extern void cryptoerror(int priority, const char *fmt, ...);
 extern void cryptodebug_init(const char *prefix);
 
-extern char *pkcs11_mech2str(CK_MECHANISM_TYPE mech);
+extern const char *pkcs11_mech2str(CK_MECHANISM_TYPE mech);
 extern CK_RV pkcs11_str2mech(char *mech_str, CK_MECHANISM_TYPE_PTR mech);
 
 extern int get_pkcs11conf_info(uentrylist_t **);
