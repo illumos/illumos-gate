@@ -10778,7 +10778,8 @@ dtrace_enabling_matchall(void)
 	for (enab = dtrace_retained; enab != NULL; enab = enab->dten_next) {
 		cred_t *cr = enab->dten_vstate->dtvs_state->dts_cred.dcr_cred;
 
-		if (INGLOBALZONE(curproc) || getzoneid() == crgetzoneid(cr))
+		if (INGLOBALZONE(curproc) ||
+		    cr != NULL && getzoneid() == crgetzoneid(cr))
 			(void) dtrace_enabling_match(enab, NULL);
 	}
 
