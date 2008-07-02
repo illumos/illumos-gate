@@ -415,7 +415,11 @@ cpu_idle(void)
 		return;
 	}
 
+	DTRACE_PROBE1(idle__state__transition, uint_t, IDLE_STATE_C1);
+
 	mach_cpu_idle();
+
+	DTRACE_PROBE1(idle__state__transition, uint_t, IDLE_STATE_C0);
 
 	/*
 	 * We're no longer halted
