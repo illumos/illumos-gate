@@ -335,13 +335,14 @@ sdt_getarg(void *arg, dtrace_id_t id, void *parg, int argno, int aframes)
 			 * we're seeking is passed in regsiters, we can just
 			 * load it directly.
 			 */
-			struct regs *rp = (struct regs *)&fp[1];
+			struct regs *rp = (struct regs *)((uintptr_t)&fp[1] +
+			    sizeof (uintptr_t));
 
 			if (argno <= inreg) {
 				stack = (uintptr_t *)&rp->r_rdi;
 			} else {
 				stack = (uintptr_t *)(rp->r_rsp);
-				argno -= inreg;
+				argno -= (inreg + 1);
 			}
 #endif
 			goto load;

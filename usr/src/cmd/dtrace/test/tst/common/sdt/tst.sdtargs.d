@@ -37,6 +37,12 @@ BEGIN
 	ignore = $1;
 }
 
+ERROR
+{
+	printf("sdt:::test failed.\n");
+	exit(1);
+}
+
 sdt:::test
 /arg0 != 1 || arg1 != 2 || arg2 != 3 || arg3 != 4 || arg4 != 5 || arg5 != 6 ||
     arg6 != 7/
