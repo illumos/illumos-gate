@@ -1025,14 +1025,9 @@ sa_fini(sa_handle_t handle)
 		 */
 		if (impl_handle->doc != NULL)
 			xmlFreeDoc(impl_handle->doc);
-		sa_scf_fini(impl_handle->scfhandle);
-		sa_zfs_fini(impl_handle);
 
 		/* Remove and free the entry in the global list. */
 		remove_handle_for_root(impl_handle->tree);
-
-		/* Make sure we free the handle */
-		free(impl_handle);
 
 		/*
 		 * If this was the last handle to release, unload the
@@ -1043,6 +1038,12 @@ sa_fini(sa_handle_t handle)
 		if (sa_global_handles == NULL)
 			(void) proto_plugin_fini();
 		(void) mutex_unlock(&sa_global_lock);
+
+		sa_scf_fini(impl_handle->scfhandle);
+		sa_zfs_fini(impl_handle);
+
+		/* Make sure we free the handle */
+		free(impl_handle);
 
 	}
 }

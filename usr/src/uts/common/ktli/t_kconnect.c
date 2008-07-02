@@ -204,6 +204,15 @@ t_kconnect(TIUSER *tiptr, struct t_call *sndcall, struct t_call *rcvcall)
 		}
 		break;
 
+	case T_DISCON_IND:
+		/*
+		 * TCP puts the errno here, i.e.
+		 * ETIMEDOUT, ECONNREFUSED
+		 */
+		error = pptr->discon_ind.DISCON_reason;
+		freemsg(bp);
+		break;
+
 	default:
 		error = EPROTO;
 		freemsg(bp);

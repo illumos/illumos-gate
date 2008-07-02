@@ -187,19 +187,22 @@ proto_plugin_init()
 void
 proto_plugin_fini()
 {
-	/*
-	 * Free up all the protocols, calling their fini, if there is
-	 * one.
-	 */
-	while (sap_proto_list != NULL) {
-		struct sa_proto_plugin *next;
+	struct sa_proto_plugin *p;
 
-		next = sap_proto_list->plugin_next;
-		sap_proto_list->plugin_ops->sa_fini();
-		if (sap_proto_list->plugin_handle != NULL)
-			(void) dlclose(sap_proto_list->plugin_handle);
-		free(sap_proto_list);
-		sap_proto_list = next;
+	/*
+	 * Protocols may call this framework during _fini
+	 * (the smbfs plugin is known to do this) so do
+	 * two passes: 1st call _fini; 2nd free, dlclose.
+	 */
+	for (p = sap_proto_list; p != NULL; p = p->plugin_next)
+		p->plugin_ops->sa_fini();
+
+	while ((p = sap_proto_list) != NULL) {
+		sap_proto_list = p->plugin_next;
+
+		if (p->plugin_handle != NULL)
+			(void) dlclose(p->plugin_handle);
+		free(p);
 	}
 	if (sa_proto_handle.sa_ops != NULL) {
 		free(sa_proto_handle.sa_ops);
