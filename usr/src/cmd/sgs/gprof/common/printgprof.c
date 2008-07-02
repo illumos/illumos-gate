@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,7 @@
 #include <string.h>
 #include <sys/param.h>
 #include <stdlib.h>
+#include "conv.h"
 #include "gprof.h"
 
 void print_demangled_name(int, nltype *);
@@ -49,15 +50,13 @@ char *splsym[] = {
 
 static bool is_special_sym(nltype *nlp);
 
-char *
+const char *
 demangled_name(nltype *selfp)
 {
-	char *name;
 	if (!Cflag)
 		return (selfp->name);
 
-	name = (char *)sgs_demangle(selfp->name);
-	return (name);
+	return (conv_demangle_name(selfp->name));
 }
 
 void
@@ -497,7 +496,7 @@ printchildren(nltype *parentp)
 void
 printname(nltype *selfp)
 {
-	char  *c;
+	const char  *c;
 	c = demangled_name(selfp);
 
 	if (selfp->name != 0) {
@@ -883,7 +882,8 @@ namecmp(const void *arg1, const void *arg2)
 void
 striped_name(char *s, nltype **npp)
 {
-	char *d, *c;
+	const char *d;
+	char *c;
 
 	c = (char *)s;
 	d = demangled_name(*npp);
@@ -1033,7 +1033,7 @@ printindex()
 				(void) sprintf(peterbuffer, "(%d)", nlp->index);
 
 			if (i < nnames) {
-				char *d = demangled_name(nlp);
+				const char *d = demangled_name(nlp);
 
 				if (does_clash(namesortnlp, i, nnames)) {
 					(void) printf("%6.6s %d:%s\n",

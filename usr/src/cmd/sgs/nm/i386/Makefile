@@ -21,7 +21,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/sgs/nm/i386/Makefile
@@ -47,11 +47,10 @@ INCLIST=	-I../../include -I../../include/i386 \
 		-I$(SRCBASE)/uts/$(ARCH)/sys
 DEFLIST=	-DTARGET=I386 -DI386=1 -D$(ARFORMAT) -DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
-LDLIBS +=	-L ../../sgsdemangler/i386 -ldemangle \
-		$(CONVLIBDIR) $(CONV_LIB) -lelf
+LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
 LINTFLAGS +=	-x $(LDLIBS)
 LINTSRCS=	$(SRCS)
-CLEANFILES +=	$(LINTOUT)
+CLEANFILES +=	$(LINTOUTS)
 objs.xpg4/%.o := CPPFLAGS += -DXPG4
 
 $(DEMOBJS):=	DEFLIST = -DELF_OBJ
@@ -73,11 +72,11 @@ objs.xpg4/%.o:	../common/%.c
 
 all:		$(PROG) $(XPG4)
 
-$(PROG):	$(OBJS) ../../sgsdemangler/i386/libdemangle.a
+$(PROG):	$(OBJS)
 		$(LINK.c) $(OBJS) -o $@ $(LLDFLAGS) $(LDLIBS)
 		$(POST_PROCESS)
 
-$(XPG4):	$(XPG4OBJS) ../../sgsdemangler/i386/libdemangle.a
+$(XPG4):	$(XPG4OBJS)
 		$(LINK.c) $(XPG4OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 

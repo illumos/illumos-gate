@@ -24,7 +24,7 @@
  * Copyright (c) 1989 AT&T
  * All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,6 +157,7 @@ static char d_buf[512];
 static char p_buf[512];
 static int exotic(char *s);
 static void set_A_header(char *);
+static char *FormatName(char *, const char *);
 
 
 
@@ -215,15 +216,15 @@ main(int argc, char *argv[], char *envp[])
 					fmt_flag = FMT_T_OCT;
 				else
 					(void) fprintf(stderr, gettext(
-					"%s: -x or -t set, -o ignored\n"),
-					prog_name);
+					    "%s: -x or -t set, -o ignored\n"),
+					    prog_name);
 				break;
 		case 'x':	if (COMPAT_FMT_FLAG(FMT_T_HEX))
 					fmt_flag = FMT_T_HEX;
 				else
 					(void) fprintf(stderr, gettext(
-					"%s: -o or -t set, -x ignored\n"),
-					prog_name);
+					    "%s: -o or -t set, -x ignored\n"),
+					    prog_name);
 				break;
 		case 'h':	h_flag = 1;
 				break;
@@ -231,42 +232,42 @@ main(int argc, char *argv[], char *envp[])
 					v_flag = 1;
 				else
 					(void) fprintf(stderr, gettext(
-					"%s: -n set, -v ignored\n"),
-					prog_name);
+					    "%s: -n set, -v ignored\n"),
+					    prog_name);
 				break;
 		case 'n':	if (!v_flag)
 					n_flag = 1;
 				else
 					(void) fprintf(stderr, gettext(
-					"%s: -v set, -n ignored\n"),
-					prog_name);
+					    "%s: -v set, -n ignored\n"),
+					    prog_name);
 				break;
 		case 'u':	if (!e_flag && !g_flag)
 					u_flag = 1;
 				else
 					(void) fprintf(stderr, gettext(
-					"%s: -e or -g set, -u ignored\n"),
-					prog_name);
+					    "%s: -e or -g set, -u ignored\n"),
+					    prog_name);
 				break;
 		case 'e':	if (!u_flag && !g_flag)
 					e_flag = 1;
 				else
 					(void) fprintf(stderr, gettext(
-					"%s: -u or -g set, -e ignored\n"),
-					prog_name);
+					    "%s: -u or -g set, -e ignored\n"),
+					    prog_name);
 				break;
 		case 'g':	if (!u_flag && !e_flag)
 					g_flag = 1;
 				else
 					(void) fprintf(stderr, gettext(
-					"%s: -u or -e set, -g ignored\n"),
-					prog_name);
+					    "%s: -u or -e set, -g ignored\n"),
+					    prog_name);
 				break;
 		case 'r': 	if (R_flag) {
 					R_flag = 0;
 					(void) fprintf(stderr, gettext(
-						"%s: -r set, -R ignored\n"),
-						prog_name);
+					    "%s: -r set, -R ignored\n"),
+					    prog_name);
 				}
 				r_flag = 1;
 				break;
@@ -274,13 +275,13 @@ main(int argc, char *argv[], char *envp[])
 				break;
 		case 'p':	if (P_flag == 1) {
 					(void) fprintf(stderr, gettext(
-					"nm: -P set. -p ignored\n"));
+					    "nm: -P set. -p ignored\n"));
 				} else
 					p_flag = 1;
 				break;
 		case 'P':	if (p_flag == 1) {
 					(void) fprintf(stderr, gettext(
-					"nm: -p set. -P ignored\n"));
+					    "nm: -p set. -P ignored\n"));
 				} else
 					P_flag = 1;
 				break;
@@ -288,13 +289,13 @@ main(int argc, char *argv[], char *envp[])
 				break;
 		case 'L':	if (D_flag == 1) {
 					(void) fprintf(stderr, gettext(
-					"nm: -D set. -L ignored\n"));
+					    "nm: -D set. -L ignored\n"));
 				} else
 					L_flag = 1;
 				break;
 		case 'D':	if (L_flag == 1) {
 					(void) fprintf(stderr, gettext(
-					"nm: -L set. -D ignored\n"));
+					    "nm: -L set. -D ignored\n"));
 				} else
 					D_flag = 1;
 				break;
@@ -304,10 +305,9 @@ main(int argc, char *argv[], char *envp[])
 		case 'A':	A_flag = 1;
 				break;
 		case 'V':	V_flag = 1;
-				(void) fprintf(stderr,
-					"nm: %s %s\n",
-					(const char *)SGU_PKG,
-					(const char *)SGU_REL);
+				(void) fprintf(stderr, "nm: %s %s\n",
+				    (const char *)SGU_PKG,
+				    (const char *)SGU_REL);
 				break;
 		case 'f':	/* -f is a noop, see man page */
 				break;
@@ -315,8 +315,8 @@ main(int argc, char *argv[], char *envp[])
 					R_flag = 1;
 				else
 					(void) fprintf(stderr, gettext(
-						"%s: -r set, -R ignored\n"),
-						prog_name);
+					    "%s: -r set, -R ignored\n"),
+					    prog_name);
 				break;
 		case 'T':
 				break;
@@ -341,8 +341,7 @@ main(int argc, char *argv[], char *envp[])
 				break;
 		case ':':	errflag += 1;
 				(void) fprintf(stderr, gettext(
-					"nm: %c requires operand\n"),
-					optopt);
+				    "nm: %c requires operand\n"), optopt);
 				break;
 		case '?':	errflag += 1;
 				break;
@@ -411,30 +410,28 @@ each_file(char *filename)
 	Elf_Cmd cmd;
 	errno = 0;
 	if (stat64(filename, &buf) == -1)	{
-		(void) fprintf(stderr,
-			"%s: ", prog_name);
+		(void) fprintf(stderr, "%s: ", prog_name);
 		perror(filename);
 		errflag++;
 		return;
 	}
 	if (elf_version(EV_CURRENT) == EV_NONE)	{
 		(void) fprintf(stderr, gettext(
-			"%s: %s: Libelf is out of date\n"),
-			prog_name, filename);
+		    "%s: %s: Libelf is out of date\n"),
+		    prog_name, filename);
 		exit(BADELF);
 	}
 
 	if ((fd = open((filename), O_RDONLY)) == -1) {
-		(void) fprintf(stderr, gettext(
-		"%s: %s: cannot read file\n"),
-		prog_name, filename);
+		(void) fprintf(stderr, gettext("%s: %s: cannot read file\n"),
+		    prog_name, filename);
 		errflag++;
 		return;
 	}
 	cmd = ELF_C_READ;
 	if ((elf_file = elf_begin(fd, cmd, (Elf *) 0)) == NULL)	{
 		(void) fprintf(stderr,
-		"%s: %s: %s\n", prog_name, filename, elf_errmsg(-1));
+		    "%s: %s: %s\n", prog_name, filename, elf_errmsg(-1));
 		errflag++;
 		(void) close(fd);
 		return;
@@ -450,40 +447,33 @@ each_file(char *filename)
 				 * u_flag is specified.
 				 */
 				if (p_flag)
-					(void) printf(
-						"\n\n%s:\n\n",
-						filename);
+					(void) printf("\n\n%s:\n\n", filename);
 				else
 					(void) printf(gettext(
 				"\n\nUndefined symbols from %s:\n\n"),
-				filename);
+					    filename);
 			} else if (!h_flag & !P_flag)
 #else
 			if (!h_flag & !P_flag)
 #endif
 			{
 				if (p_flag)
-					(void) printf(
-						"\n\n%s:\n",
-						filename);
+					(void) printf("\n\n%s:\n", filename);
 				else {
 					if (A_flag != 0)
-						(void) printf(
-						"\n\n%s%s:\n",
-						A_header,
-						filename);
+						(void) printf("\n\n%s%s:\n",
+						    A_header, filename);
 					else
-						(void) printf(
-						"\n\n%s:\n",
-						filename);
+						(void) printf("\n\n%s:\n",
+						    filename);
 				}
 			}
 			archive_name = (char *)0;
 			process(elf_file, filename);
 		} else {
 			(void) fprintf(stderr, gettext(
-				"%s: %s: invalid file type\n"),
-				prog_name, filename);
+			    "%s: %s: invalid file type\n"),
+			    prog_name, filename);
 			errflag++;
 		}
 	}
@@ -503,7 +493,7 @@ process(Elf *elf_file, char *filename)
 
 	if (gelf_getehdr(elf_file, &ehdr) == NULL) {
 		(void) fprintf(stderr,
-			"%s: %s: %s\n", prog_name, filename, elf_errmsg(-1));
+		    "%s: %s: %s\n", prog_name, filename, elf_errmsg(-1));
 		return;
 	}
 
@@ -561,16 +551,16 @@ get_symtab(Elf *elf_file, char *filename)
 	scnfd = get_scnfd(elf_file, shstrndx, SHT_STRTAB);
 	if (scnfd == NULL) {
 		(void) fprintf(stderr, gettext(
-			"%s: %s: could not get string table\n"),
-			prog_name, filename);
+		    "%s: %s: could not get string table\n"),
+		    prog_name, filename);
 		return;
 	}
 
 	data = elf_getdata(scnfd, NULL);
 	if (data->d_size == 0) {
 		(void) fprintf(stderr, gettext(
-			"%s: %s: no data in string table\n"),
-			prog_name, filename);
+		    "%s: %s: no data in string table\n"),
+		    prog_name, filename);
 		return;
 	}
 
@@ -586,16 +576,14 @@ get_symtab(Elf *elf_file, char *filename)
 		GElf_Shdr shdr;
 
 		if (gelf_getshdr(scn, &shdr) == NULL) {
-			(void) fprintf(stderr,
-				"%s: %s: %s:\n",
-				prog_name,
-				filename, elf_errmsg(-1));
+			(void) fprintf(stderr, "%s: %s: %s:\n",
+			    prog_name, filename, elf_errmsg(-1));
 			return;
 		}
 
 		if (shdr.sh_type == symtabtype)	{
 			print_symtab(elf_file, shstrndx, scn,
-				&shdr, filename);
+			    &shdr, filename);
 		}
 	} /* end while */
 }
@@ -619,11 +607,8 @@ print_ar_files(int fd, Elf * elf_file, char *filename)
 	while ((arf = elf_begin(fd, cmd, elf_file)) != 0) {
 		p_ar = elf_getarhdr(arf);
 		if (p_ar == NULL) {
-			(void) fprintf(stderr,
-				"%s: %s: %s\n",
-				prog_name,
-				filename,
-				elf_errmsg(-1));
+			(void) fprintf(stderr, "%s: %s: %s\n",
+			    prog_name, filename, elf_errmsg(-1));
 			return;
 		}
 		if ((int)strncmp(p_ar->ar_name, "/", 1) == 0) {
@@ -635,17 +620,14 @@ print_ar_files(int fd, Elf * elf_file, char *filename)
 		if (!h_flag & !P_flag) {
 			if (p_flag)
 				(void) printf("\n\n%s[%s]:\n",
-				filename, p_ar->ar_name);
+				    filename, p_ar->ar_name);
 			else {
 				if (A_flag != 0)
-					(void) printf(
-					"\n\n%s%s[%s]:\n",
-					A_header,
-					filename, p_ar->ar_name);
+					(void) printf("\n\n%s%s[%s]:\n",
+					    A_header, filename, p_ar->ar_name);
 				else
-					(void) printf(
-					"\n\n%s[%s]:\n",
-					filename, p_ar->ar_name);
+					(void) printf("\n\n%s[%s]:\n",
+					    filename, p_ar->ar_name);
 			}
 		}
 		file_type = elf_kind(arf);
@@ -653,8 +635,8 @@ print_ar_files(int fd, Elf * elf_file, char *filename)
 			process(arf, p_ar->ar_name);
 		} else {
 			(void) fprintf(stderr, gettext(
-				"%s: %s: invalid file type\n"),
-				prog_name, p_ar->ar_name);
+			    "%s: %s: invalid file type\n"),
+			    prog_name, p_ar->ar_name);
 			cmd = elf_next(arf);
 			(void) elf_end(arf);
 			errflag++;
@@ -698,7 +680,7 @@ print_symtab(Elf *elf_file, unsigned int shstrndx,
 	static void print_with_pflag(int, Elf *, unsigned int, SYM *, char *);
 	static void print_with_Pflag(int, Elf *, unsigned int, SYM *);
 	static void print_with_otherflags(int, Elf *, unsigned int,
-		SYM *, char *);
+	    SYM *, char *);
 
 	/*
 	 * Determine # of digits to use for each numeric value.
@@ -716,9 +698,8 @@ print_symtab(Elf *elf_file, unsigned int shstrndx,
 	 * get symbol table data
 	 */
 	if (((sd = elf_getdata(p_sd, NULL)) == NULL) || (sd->d_size == 0)) {
-		(void) printf(gettext(
-			"%s: %s - No symbol table data\n"),
-			prog_name, filename);
+		(void) printf(gettext("%s: %s - No symbol table data\n"),
+		    prog_name, filename);
 		return;
 	}
 	count = shdr->sh_size / shdr->sh_entsize;
@@ -727,16 +708,15 @@ print_symtab(Elf *elf_file, unsigned int shstrndx,
 	 * translate symbol table data
 	 */
 	sym_data = readsyms(sd, count, elf_file, shdr->sh_link,
-		(unsigned int)elf_ndxscn(p_sd));
+	    (unsigned int)elf_ndxscn(p_sd));
 	if (sym_data == NULL) {
 		(void) fprintf(stderr, gettext(
-			"%s: %s: problem reading symbol data\n"),
-			prog_name, filename);
+		    "%s: %s: problem reading symbol data\n"),
+		    prog_name, filename);
 		return;
 	}
-	qsort((char *)sym_data,
-		count-1, sizeof (SYM),
-		(int (*)(const void *, const void *))compare);
+	qsort((char *)sym_data, count-1, sizeof (SYM),
+	    (int (*)(const void *, const void *))compare);
 	s = sym_data;
 	while (count > 1) {
 #ifndef XPG4
@@ -750,13 +730,13 @@ print_symtab(Elf *elf_file, unsigned int shstrndx,
 		if (p_flag)
 #endif
 			print_with_pflag(ndigits, elf_file, shstrndx,
-				sym_data, filename);
+			    sym_data, filename);
 		else if (P_flag)
 			print_with_Pflag(ndigits, elf_file, shstrndx,
-				sym_data);
+			    sym_data);
 		else
 			print_with_otherflags(ndigits, elf_file,
-				shstrndx, sym_data, filename);
+			    shstrndx, sym_data, filename);
 		sym_data++;
 		count--;
 	}
@@ -788,8 +768,7 @@ is_bss_section(unsigned int shndx, Elf * elf_file, unsigned int shstrndx)
 	if (scn != NULL) {
 		GElf_Shdr shdr;
 		(void) gelf_getshdr(scn, &shdr);
-		sym_name = elf_strptr(elf_file, shstrndx,
-			shdr.sh_name);
+		sym_name = elf_strptr(elf_file, shstrndx, shdr.sh_name);
 		if (strcmp(BSS_SECN, sym_name) == 0)
 			return (1);
 	}
@@ -805,7 +784,6 @@ static SYM *
 readsyms(Elf_Data * data, GElf_Sxword num, Elf *elf,
 	unsigned int link, unsigned int symscnndx)
 {
-	static char *FormatName(char *, char *);
 	SYM		*s, *buf;
 	GElf_Sym	sym;
 	Elf32_Word	*symshndx = 0;
@@ -813,8 +791,7 @@ readsyms(Elf_Data * data, GElf_Sxword num, Elf *elf,
 	int		i;
 
 	if ((buf = calloc(num, sizeof (SYM))) == NULL) {
-		(void) fprintf(stderr,
-			"%s: cannot calloc space\n", prog_name);
+		(void) fprintf(stderr, "%s: cannot calloc space\n", prog_name);
 		return (NULL);
 	}
 
@@ -828,10 +805,9 @@ readsyms(Elf_Data * data, GElf_Sxword num, Elf *elf,
 		if (sym.st_name == 0)
 			buf->name = "";
 		else if (C_flag) {
-			char *dn;
-			char *name = (char *)elf_strptr(elf, link,
-					sym.st_name);
-			dn = sgs_demangle(name);
+			const char *dn;
+			char *name = (char *)elf_strptr(elf, link, sym.st_name);
+			dn = conv_demangle_name(name);
 			if (strcmp(dn, name) == 0) {	/* Not demangled */
 				if (exotic(name)) {
 					name = FormatName(name, d_buf);
@@ -842,9 +818,7 @@ readsyms(Elf_Data * data, GElf_Sxword num, Elf *elf,
 			buf->name = name;
 		}
 		else
-			buf->name = (char *)elf_strptr(elf,
-					link,
-					sym.st_name);
+			buf->name = (char *)elf_strptr(elf, link, sym.st_name);
 
 		buf->value	= sym.st_value;
 		buf->size	= sym.st_size;
@@ -913,7 +887,7 @@ set_A_header(char *fname)
 		(void) snprintf(A_header, sizeof (A_header), "%s: ", fname);
 	} else {
 		(void) snprintf(A_header, sizeof (A_header), "%s[%s]: ",
-			archive_name, fname);
+		    archive_name, fname);
 	}
 }
 
@@ -957,8 +931,8 @@ print_header(int ndigits)
 			(void) printf("%s", A_header);
 		ndigits += pad[fmt_flag];
 		(void) printf(fmt, "[Index]", ndigits, " Value",
-			ndigits, " Size", "Type", "Bind",
-			"Other", section_title, "Name");
+		    ndigits, " Size", "Type", "Bind",
+		    "Other", section_title, "Name");
 	}
 }
 
@@ -975,7 +949,7 @@ is_sym_print(SYM *sym_data)
 	 */
 	if (u_flag != 0) {
 		if ((sym_data->shndx == SHN_UNDEF) &&
-			(strlen(sym_data->name) != 0))
+		    (strlen(sym_data->name) != 0))
 			return (1);
 		else
 			return (0);
@@ -1045,31 +1019,22 @@ print_with_uflag(
 	char *filename
 )
 {
-	if ((sym_data->shndx == SHN_UNDEF) &&
-		(strlen(sym_data->name))) {
+	if ((sym_data->shndx == SHN_UNDEF) && (strlen(sym_data->name))) {
 		if (!r_flag) {
 			if (R_flag) {
 				if (archive_name != (char *)0)
-					(void) printf(
-					"   %s:%s:%s\n",
-					archive_name,
-					filename,
-					sym_data->name);
+					(void) printf("   %s:%s:%s\n",
+					    archive_name, filename,
+					    sym_data->name);
 				else
-					(void) printf(
-					"    %s:%s\n",
-					filename,
-					sym_data->name);
+					(void) printf("    %s:%s\n",
+					    filename, sym_data->name);
 			}
 			else
-				(void) printf(
-					"    %s\n",
-					sym_data->name);
+				(void) printf("    %s\n", sym_data->name);
 		}
 		else
-			(void) printf("    %s:%s\n",
-				filename,
-				sym_data->name);
+			(void) printf("    %s:%s\n", filename, sym_data->name);
 	}
 }
 #endif
@@ -1110,8 +1075,7 @@ print_with_pflag(
 	/*
 	 * Symbol Type.
 	 */
-	if ((sym_data->shndx == SHN_UNDEF) &&
-		(strlen(sym_data->name)))
+	if ((sym_data->shndx == SHN_UNDEF) && (strlen(sym_data->name)))
 		sym_key = UNDEFINED;
 	else if (sym_data->type == STT_SPARC_REGISTER) {
 		switch (sym_data->bind) {
@@ -1139,8 +1103,7 @@ print_with_pflag(
 
 	}
 	else
-		sym_key = lookup(sym_data->type,
-			sym_data->bind);
+		sym_key = lookup(sym_data->type, sym_data->bind);
 
 	if (sym_key != NULL) {
 		if (!l_flag)
@@ -1156,24 +1119,17 @@ print_with_pflag(
 	if (!r_flag) {
 		if (R_flag) {
 			if (archive_name != (char *)0)
-				(void) printf(
-				"%s:%s:%s\n",
-				archive_name,
-				filename,
-				sym_data->name);
+				(void) printf("%s:%s:%s\n", archive_name,
+				    filename, sym_data->name);
 			else
-				(void) printf(
-				"%s:%s\n",
-				filename,
-				sym_data->name);
+				(void) printf("%s:%s\n", filename,
+				    sym_data->name);
 		}
 		else
 			(void) printf("%s\n", sym_data->name);
 	}
 	else
-		(void) printf("%s:%s\n",
-			filename,
-			sym_data->name);
+		(void) printf("%s:%s\n", filename, sym_data->name);
 }
 
 /*
@@ -1219,8 +1175,7 @@ print_with_Pflag(
 	/*
 	 * Symbol Type.
 	 */
-	if ((sym_data->shndx == SHN_UNDEF) &&
-		(strlen(sym_data->name)))
+	if ((sym_data->shndx == SHN_UNDEF) && (strlen(sym_data->name)))
 		sym_key = UNDEFINED;
 	else if (sym_data->type == STT_SPARC_REGISTER) {
 		switch (sym_data->bind) {
@@ -1234,8 +1189,7 @@ print_with_Pflag(
 					break;
 		}
 	} else if (((sym_data->flags & FLG_SYM_SPECSEC) == 0) &&
-	    is_bss_section((int)sym_data->shndx,
-		elf_file, shstrndx)) {
+	    is_bss_section((int)sym_data->shndx, elf_file, shstrndx)) {
 		switch (sym_data->bind) {
 			case STB_LOCAL  : sym_key = BSS_LOCL;
 					break;
@@ -1248,8 +1202,7 @@ print_with_Pflag(
 		}
 
 	} else
-		sym_key = lookup(sym_data->type,
-			sym_data->bind);
+		sym_key = lookup(sym_data->type, sym_data->bind);
 
 	if (sym_key != NULL) {
 		if (!l_flag)
@@ -1268,7 +1221,7 @@ print_with_Pflag(
 	 *	(hex/octal/decimal)
 	 */
 	(void) printf(fmt[fmt_flag], ndigits, EC_ADDR(sym_data->value),
-		ndigits, EC_XWORD(sym_data->size));
+	    ndigits, EC_XWORD(sym_data->size));
 }
 
 /*
@@ -1299,7 +1252,7 @@ print_with_otherflags(
 	(void) printf("%s", A_header);
 	(void) printf("[%d]\t|", sym_data->indx);
 	(void) printf(fmt_value_size[fmt_flag], ndigits,
-		EC_ADDR(sym_data->value), ndigits, EC_XWORD(sym_data->size));
+	    EC_ADDR(sym_data->value), ndigits, EC_XWORD(sym_data->size));
 
 	switch (sym_data->type) {
 	case STT_NOTYPE:(void) printf("%-5s", "NOTY"); break;
@@ -1328,34 +1281,26 @@ print_with_otherflags(
 
 	if (sym_data->shndx == SHN_UNDEF) {
 		if (!s_flag)
-			(void) printf("%-7s",
-				"UNDEF");
+			(void) printf("%-7s", "UNDEF");
 		else
-			(void) printf("%-14s",
-				"UNDEF");
+			(void) printf("%-14s", "UNDEF");
 	} else if (sym_data->shndx == SHN_SUNW_IGNORE) {
 		if (!s_flag)
-			(void) printf("%-7s",
-				"IGNORE");
+			(void) printf("%-7s", "IGNORE");
 		else
-			(void) printf("%-14s",
-				"IGNORE");
+			(void) printf("%-14s", "IGNORE");
 	} else if ((sym_data->flags & FLG_SYM_SPECSEC) &&
 	    (sym_data->shndx == SHN_ABS)) {
 		if (!s_flag)
-			(void) printf("%-7s",
-				"ABS");
+			(void) printf("%-7s", "ABS");
 		else
-			(void) printf("%-14s",
-				"ABS");
+			(void) printf("%-14s", "ABS");
 	} else if ((sym_data->flags & FLG_SYM_SPECSEC) &&
 	    (sym_data->shndx == SHN_COMMON)) {
 		if (!s_flag)
-			(void) printf("%-7s",
-				"COMMON");
+			(void) printf("%-7s", "COMMON");
 		else
-			(void) printf("%-14s",
-				"COMMON");
+			(void) printf("%-14s", "COMMON");
 	} else {
 		if (s_flag) {
 			Elf_Scn *scn = elf_getscn(elf_file, sym_data->shndx);
@@ -1364,8 +1309,8 @@ print_with_otherflags(
 			if ((gelf_getshdr(scn, &shdr) != 0) &&
 			    (shdr.sh_name != 0)) {
 				(void) printf("%-14s",
-				(char *)elf_strptr(elf_file,
-				shstrndx, shdr.sh_name));
+				    (char *)elf_strptr(elf_file,
+				    shstrndx, shdr.sh_name));
 			} else {
 				(void) printf("%-14d", sym_data->shndx);
 			}
@@ -1377,21 +1322,17 @@ print_with_otherflags(
 	if (!r_flag) {
 		if (R_flag) {
 			if (archive_name != (char *)0)
-				(void) printf("%s:%s:%s\n",
-					archive_name,
-					filename,
-					sym_data->name);
+				(void) printf("%s:%s:%s\n", archive_name,
+				    filename, sym_data->name);
 			else
-				(void) printf("%s:%s\n",
-					filename,
-					sym_data->name);
+				(void) printf("%s:%s\n", filename,
+				    sym_data->name);
 		}
 		else
 			(void) printf("%s\n", sym_data->name);
 	}
 	else
-		(void) printf("%s:%s\n",
-			filename, sym_data->name);
+		(void) printf("%s:%s\n", filename, sym_data->name);
 }
 
 /*
@@ -1407,11 +1348,11 @@ static const char *vtbl_str = "virtual table for %s";
  * Return name string
  */
 static char *
-FormatName(char *OldName, char *NewName)
+FormatName(char *OldName, const char *NewName)
 {
 	char *s = p_flag ?
-		"%s\n             [%s]" :
-		"%s\n\t\t\t\t\t\t       [%s]";
+	    "%s\n             [%s]" :
+	    "%s\n\t\t\t\t\t\t       [%s]";
 	size_t length = strlen(s)+strlen(NewName)+strlen(OldName)-3;
 	char *hold = OldName;
 	OldName = malloc(length);
@@ -1478,7 +1419,8 @@ parsename(char *s)
 			(void) strcat(p_buf, root);
 			*(root + len) = c;
 			(void) strcat(p_buf, " in ");
-			for (p = child; *p != '_'; ++p);
+			for (p = child; *p != '_'; ++p)
+				;
 			c = *p;
 			*p = '.';
 			(void) strcat(p_buf, child);
@@ -1514,7 +1456,8 @@ parsename(char *s)
 			(void) strcat(p_buf, root);
 			*(root + len) = c;
 			(void) strcat(p_buf, " in ");
-			for (p = child + child_len + 2; *p != '_'; ++p);
+			for (p = child + child_len + 2; *p != '_'; ++p)
+				;
 			c = *p;
 			*p = '.';
 			(void) strcat(p_buf, child + child_len + 2);
@@ -1551,7 +1494,7 @@ parse_fn_and_print(const char *str, char *s)
 
 	if (buff == NULL) {
 		(void) fprintf(stderr, gettext(
-			"%s: cannot malloc space\n"), prog_name);
+		    "%s: cannot malloc space\n"), prog_name);
 		exit(NOALLOC);
 	}
 	s = strcpy(buff, s);
@@ -1560,8 +1503,8 @@ parse_fn_and_print(const char *str, char *s)
 		if ((p1 = p2 =  strstr(s, "_C_")) == NULL)
 			if ((p1 = p2 =  strstr(s, "_cc_")) == NULL)
 				if ((p1 = p2 =  strstr(s, "_cxx_")) == NULL)
-					if (
-					(p1 = p2 = strstr(s, "_h_")) == NULL)
+					if ((p1 = p2 = strstr(s, "_h_")) ==
+					    NULL)
 			yes = 0;
 			else
 						p2 += 2;
@@ -1580,7 +1523,8 @@ parse_fn_and_print(const char *str, char *s)
 		*p2 = '\0';
 	}
 
-	for (s = p1;  *s != '_';  --s);
+	for (s = p1;  *s != '_';  --s)
+		;
 	++s;
 
 	(void) sprintf(d_buf, str, s);

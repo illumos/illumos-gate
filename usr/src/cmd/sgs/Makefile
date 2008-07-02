@@ -45,7 +45,6 @@ SUBDIRS-common= libconv		\
 		libldstab	\
 		librtld		\
 		libcrle		\
-		sgsdemangler	\
 		.WAIT		\
 		0@0		\
 		ld		\

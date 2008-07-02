@@ -1363,3 +1363,4 @@ Bugid   Risk Synopsis
 6713830 mdb dumped core reading a gcore
 6712292 ld.so.1 should fall back to an interposer for failed direct bindings
 6716350 usr/src/cmd/sgs should be linted by nightly builds
+6720509 usr/src/cmd/sgs/sgsdemangler should be removed

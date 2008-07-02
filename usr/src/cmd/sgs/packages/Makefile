@@ -161,7 +161,6 @@ package_dep_:	FRC
 		@ cd ../libconv; pwd; $(MAKE) all
 		@ cd ../link_audit; pwd; $(MAKE) package
 		@ cd ../messages/$(MACH); pwd; $(MAKE) test
-		@ cd ../sgsdemangler; pwd; $(MAKE) all
 
 lint: FRC
 	$(MAKE) -f Makefile.lint lint

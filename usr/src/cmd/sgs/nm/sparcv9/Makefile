@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,11 +45,10 @@ INCLIST=	-I../../include -I../../include/sparc \
 		-I$(SRCBASE)/uts/$(ARCH)/sys
 DEFLIST=	-DTARGET=SPARC -DSPARC=1 -D$(ARFORMAT) -DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
-LDLIBS +=	-L ../../sgsdemangler/sparcv9 -ldemangle \
-		$(CONVLIBDIR64) $(CONV_LIB) -lelf
+LDLIBS +=	$(CONVLIBDIR64) $(CONV_LIB) $(ELFLIBDIR) -lelf
 LINTFLAGS64=	-x $(LDLIBS) -Xarch=v9
 LINTSRCS=	$(SRCS)
-CLEANFILES +=	$(LINTOUT)
+CLEANFILES +=	$(LINTOUTS)
 
 
 %.o:		../common/%.c
@@ -62,7 +61,7 @@ $(ROOTCCSBIN64)/%: %
 
 all:		$(PROG)
 
-$(PROG):	$(OBJS) ../../sgsdemangler/sparcv9/libdemangle.a
+$(PROG):	$(OBJS)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 

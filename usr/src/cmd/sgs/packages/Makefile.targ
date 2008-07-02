@@ -29,7 +29,7 @@ pkginfo: ../common/pkginfo.tmpl awk_pkginfo
 
 pkg: FRC
 	@ $(RM) -r $(PACKAGE)
-	pkgmk -l 18000 -f prototype_$(MACH) -d $(PKGARCHIVE) -r $(ROOT) \
+	pkgmk -l 20000 -f prototype_$(MACH) -d $(PKGARCHIVE) -r $(ROOT) \
 		-o $(PACKAGE) 2>&1 | egrep -v "$(SRC)|parametric paths may"
 	pkgtrans -o -s $(PKGARCHIVE) $(PACKAGE).tmp $(PACKAGE)
 	$(RM) -r $(PKGARCHIVE)/$(PACKAGE)

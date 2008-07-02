@@ -487,10 +487,10 @@ static char *
 demangled_name(char *s)
 {
 	static char	*buf = NULL;
-	char		*dn;
+	const char	*dn;
 	size_t		len;
 
-	dn = sgs_demangle(s);
+	dn = conv_demangle_name(s);
 
 	/*
 	 * If not demangled, just return the symbol name

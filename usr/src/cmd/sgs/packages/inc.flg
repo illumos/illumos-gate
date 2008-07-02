@@ -58,7 +58,6 @@ find_files "s.*" \
 	usr/src/cmd/sgs/rtld.4.x \
 	usr/src/cmd/sgs/tools \
 	usr/src/cmd/sgs/0@0 \
-	usr/src/cmd/sgs/sgsdemangler \
 	usr/src/common/avl \
 	usr/src/common/dtrace \
 	usr/src/common/elfcap \

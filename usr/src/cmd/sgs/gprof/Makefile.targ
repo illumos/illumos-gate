@@ -35,10 +35,6 @@ $(PROG):	$(OBJS)
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)
 
-lint:		$(LINTOUT)
+include		$(SRC)/cmd/Makefile.targ
+include		$(SRC)/cmd/sgs/Makefile.targ
 
-$(LINTOUT):	$(SRCS)
-		perl ../../tools/lint_hdr.pl $(PROG)	> $(LINTOUT)
-		$(LINT.c) $(SRCS)			2>&1 | tee -a $(LINTOUT)
-
-include		../../../Makefile.targ

@@ -67,7 +67,7 @@
 #include <errno.h>
 #include <dlfcn.h>
 #include <ctype.h>
-#include "sgs.h"
+#include "conv.h"
 #include "symint.h"
 #include "sys/param.h"			/* for HZ */
 #include "mon.h"
@@ -1314,10 +1314,10 @@ char *format_buf;
 static char *
 demangled_name(char *s)
 {
-	char *name;
+	const char *name;
 	size_t	len;
 
-	name = sgs_demangle(s);
+	name = conv_demangle_name(s);
 
 	if (strcmp(name, s) == 0)
 		return (s);

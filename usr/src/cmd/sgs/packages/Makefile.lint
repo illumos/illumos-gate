@@ -56,7 +56,6 @@ LSUBDIRS2 =	../rtld \
 		../rtld/mdbmod
 
 LINTLDIRS=	../libld \
-		../sgsdemangler \
 		../elfdump \
 		../elfedit \
 		../elfedit/modules \

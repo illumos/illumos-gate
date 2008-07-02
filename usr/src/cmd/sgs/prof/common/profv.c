@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +34,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "conv.h"
 #include "profv.h"
 
 bool		time_in_ticks = FALSE;
@@ -59,13 +59,14 @@ cmp_by_name(const void *arg1, const void *arg2)
 static void
 setup_demangled_names(void)
 {
-	char	*p, *nbp, *nbe, *namebuf;
+	const char	*p;
+	char	*nbp, *nbe, *namebuf;
 	size_t	cur_len = 0, namebuf_sz = BUCKET_SZ;
 	size_t	i, namelen;
 
 	if ((namebuf = malloc(namebuf_sz)) == NULL) {
 		(void) fprintf(stderr, "%s: can't allocate %d bytes\n",
-						    cmdname, namebuf_sz);
+		    cmdname, namebuf_sz);
 		exit(ERR_MEMORY);
 	}
 
@@ -73,7 +74,7 @@ setup_demangled_names(void)
 	nbe = namebuf + namebuf_sz;
 
 	for (i = 0; i < total_funcs; i++) {
-		if ((p = sgs_demangle(profsym[i].name)) == NULL)
+		if ((p = conv_demangle_name(profsym[i].name)) == NULL)
 			continue;
 
 		namelen = strlen(p);
@@ -176,11 +177,11 @@ print_profile_data(void)
 			 * same as previous or next (if there's one) ?
 			 */
 			if (i && (strcmp(profsym[i].demangled_name,
-					profsym[i-1].demangled_name) == 0)) {
+			    profsym[i-1].demangled_name) == 0)) {
 				profsym[i].print_mid = TRUE;
 			} else if ((i < (total_funcs - 1)) &&
-					(strcmp(profsym[i].demangled_name,
-					profsym[i+1].demangled_name) == 0)) {
+			    (strcmp(profsym[i].demangled_name,
+			    profsym[i+1].demangled_name) == 0)) {
 				profsym[i].print_mid = TRUE;
 			}
 		}
@@ -229,10 +230,10 @@ print_profile_data(void)
 
 		cumsecs += profsym[i].seconds;
 		(void) printf("%6.1f%8.2f%8.2f", profsym[i].percent_time,
-						profsym[i].seconds, cumsecs);
+		    profsym[i].seconds, cumsecs);
 
 		(void) printf("%8d%12.4f  ",
-				profsym[i].ncalls, profsym[i].msecs_per_call);
+		    profsym[i].ncalls, profsym[i].msecs_per_call);
 
 		if (profsym[i].print_mid)
 			(void) printf("%d:", (profsym[i].module)->id);
@@ -248,21 +249,21 @@ print_profile_data(void)
 	if (flags & F_VERBOSE) {
 		(void) puts("\n");
 		(void) printf("%s   Total Object Modules     %7d\n",
-						filler, n_modules);
+		    filler, n_modules);
 		(void) printf("%s   Qualified Symbols        %7d\n",
-						filler, total_funcs);
+		    filler, total_funcs);
 		(void) printf("%s   Symbols with zero usage  %7d\n",
-						filler, n_zeros);
+		    filler, n_zeros);
 		(void) printf("%s   Total pc-hits            %7d\n",
-						filler, n_pcsamples);
+		    filler, n_pcsamples);
 		(void) printf("%s   Accounted pc-hits        %7d\n",
-						filler, n_accounted_ticks);
+		    filler, n_accounted_ticks);
 		if ((!gflag) && (n_pcsamples - n_accounted_ticks)) {
 			(void) printf("%s   Missed pc-hits (try -g)  %7d\n\n",
-				    filler, n_pcsamples - n_accounted_ticks);
+			    filler, n_pcsamples - n_accounted_ticks);
 		} else {
 			(void) printf("%s   Missed pc-hits           %7d\n\n",
-				    filler, n_pcsamples - n_accounted_ticks);
+			    filler, n_pcsamples - n_accounted_ticks);
 		}
 		(void) printf("%s   Module info\n", filler);
 		for (mi = &modules; mi; mi = mi->next)
@@ -307,7 +308,7 @@ check_dupnames(void)
 		if (i && (strcmp(pn[i].name, pn[i-1].name) == 0))
 			(pn[i].pfrec)->print_mid = TRUE;
 		else if ((i < (total_funcs - 1)) &&
-				    (strcmp(pn[i].name, pn[i+1].name) == 0)) {
+		    (strcmp(pn[i].name, pn[i+1].name) == 0)) {
 			(pn[i].pfrec)->print_mid = TRUE;
 		}
 	}
@@ -330,10 +331,10 @@ compute_times(nltype *nl, profrec_t *psym)
 	if (time_in_ticks) {
 		psym->seconds = (double)nl->nticks;
 		if (nl->ncalls) {
-		    psym->msecs_per_call = (double)nl->nticks /
-			(double)nl->ncalls;
+			psym->msecs_per_call = (double)nl->nticks /
+			    (double)nl->ncalls;
 		} else
-		    psym->msecs_per_call = (double)0.0;
+			psym->msecs_per_call = (double)0.0;
 	} else {
 		psym->seconds = (double)nl->nticks / (double)hz;
 		if (nl->ncalls) {
@@ -512,7 +513,7 @@ process_cgraph(ProfCallGraph *cgp)
 	nltype		*nl;
 
 	for (callee_off = cgp->functions; callee_off;
-					    callee_off = calleep->next_to) {
+	    callee_off = calleep->next_to) {
 
 		/* LINTED: pointer cast */
 		calleep = (ProfFunction *)((char *)cgp + callee_off);
@@ -528,7 +529,7 @@ process_cgraph(ProfCallGraph *cgp)
 				continue;
 
 			if (calleep->topc >= mi->load_base &&
-					    calleep->topc < mi->load_end) {
+			    calleep->topc < mi->load_end) {
 				/*
 				 * nllookup() returns the next lower entry
 				 * point on a miss. So just make sure the
@@ -536,7 +537,7 @@ process_cgraph(ProfCallGraph *cgp)
 				 */
 				if (nl = nllookup(mi, calleep->topc, 0)) {
 					f_end = mi->load_base + (nl->value -
-						    mi->txt_origin) + nl->size;
+					    mi->txt_origin) + nl->size;
 					if (calleep->topc < f_end)
 						nl->ncalls += calleep->count;
 				}
@@ -607,7 +608,7 @@ is_same_as_aout(char *modpath, struct stat *buf)
 	}
 
 	if ((buf->st_dev == aout_stat.st_dev) &&
-				    (buf->st_ino == aout_stat.st_ino)) {
+	    (buf->st_ino == aout_stat.st_ino)) {
 		return (TRUE);
 	} else
 		return (FALSE);
@@ -646,8 +647,8 @@ process_modules(ProfModuleList *modlp)
 		 */
 		so_path = (caddr_t)modlp + newmodp->path;
 		if (does_overlap(newmodp, &modules) ||
-				    is_same_as_aout(so_path, &so_statbuf) ||
-						(!is_shared_obj(so_path))) {
+		    is_same_as_aout(so_path, &so_statbuf) ||
+		    (!is_shared_obj(so_path))) {
 			if (!newmodp->next)
 				more_modules = FALSE;
 
@@ -710,7 +711,7 @@ process_modules(ProfModuleList *modlp)
 
 		/* Create this module's nameslist */
 		new_module = get_shobj_syms(so_path,
-					newmodp->startaddr, newmodp->endaddr);
+		    newmodp->startaddr, newmodp->endaddr);
 
 		/* Add it to the tail of active module list */
 		last->next = new_module;
@@ -759,8 +760,8 @@ process_mon_out(caddr_t memp, size_t fsz)
 
 			default :
 				(void) fprintf(stderr,
-					"%s: unknown prof object type=%d\n",
-							cmdname, objp->type);
+				    "%s: unknown prof object type=%d\n",
+				    cmdname, objp->type);
 				exit(ERR_INPUT);
 		}
 		/* LINTED: pointer cast */
@@ -863,7 +864,7 @@ profver(void)
 		exit(ERR_SYSCALL);
 	}
 	if ((fmem = mmap(0, monout_stat.st_size,
-			PROT_READ, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
+	    PROT_READ, MAP_PRIVATE, fd, 0)) == MAP_FAILED) {
 		perror("mmap");
 		exit(ERR_SYSCALL);
 	}

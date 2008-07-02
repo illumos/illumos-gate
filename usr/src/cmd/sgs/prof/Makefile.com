@@ -4,7 +4,7 @@
 # The contents of this file are subject to the terms of the
 # Common Development and Distribution License (the "License").
 # You may not use this file except in compliance with the License.
-#
+
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
@@ -18,29 +18,36 @@
 #
 # CDDL HEADER END
 #
-
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# cmd/sgs/prof/Makefile.com
 #
 
-include		../Makefile.com
+PROG=		prof
 
-.KEEP_STATE:
+include 	$(SRC)/cmd/Makefile.cmd
+include 	$(SRC)/cmd/sgs/Makefile.com
 
-LLDFLAGS =	$(LLDFLAGS64)
-ELFLIBDIR =	$(ELFLIBDIR64)
-CONVLIBDIR =	$(CONVLIBDIR64)
+COMOBJS=	prof.o profv.o lookup.o rdelf.o \
+		symintOpen.o symintClose.o symintUtil.o symintErr.o symintLoad.o
 
-VAR_SGSBINPROG= $(VAR_SGSBINPROG64)
-VAR_SGSCCSLINK= $(VAR_SGSCCSLINK64)
+OBJS=		$(COMOBJS)
 
-include		../Makefile.targ
-include		../../Makefile.sub.64
+SRCS=		$(COMOBJS:%.o=../common/%.c)
 
-lint:		$(LINTOUT64) $(SGSLINTOUT)
+INCLIST=	-I../common -I../../include -I../../include/$(MACH)
 
-install \
-package:	$(VAR_SGSBINPROG64)
+CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
+CFLAGS +=	$(CCVERBOSE)
+C99MODE=	$(C99_ENABLE)
+LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
+LINTSRCS =	$(SRCS)
+LINTFLAGS +=	-x
+CLEANFILES +=	$(LINTOUTS)
+
+%.o:		../common/%.c
+		$(COMPILE.c) $<

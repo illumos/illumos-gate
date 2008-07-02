@@ -27,7 +27,10 @@
 # cmd/sgs/gprof/Makefile.com
 #
 
-include 	../../../Makefile.cmd
+PROG=		gprof
+
+include 	$(SRC)/cmd/Makefile.cmd
+include 	$(SRC)/cmd/sgs/Makefile.com
 
 COMOBJS=	gprof.o arcs.o dfn.o lookup.o calls.o \
 		printgprof.o printlist.o readelf.o
@@ -41,9 +44,10 @@ DEFLIST=	-DELF_OBJ -DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 CFLAGS +=	$(CCVERBOSE)
 C99MODE=	$(C99_ENABLE)
-LDLIBS +=	-L../../sgsdemangler/$(MACH) -ldemangle
-LINTFLAGS +=	$(LDLIBS)
-CLEANFILES +=	$(LINTOUT)
+LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
+LINTSRCS =	$(SRCS)
+LINTFLAGS +=	-x
+CLEANFILES +=	$(LINTOUTS)
 
 ROOTLIBBLURB=	$(BLURBS:%=$(ROOTSHLIBCCS)/%)
 

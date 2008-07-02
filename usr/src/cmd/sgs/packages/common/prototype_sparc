@@ -102,3 +102,20 @@ f none opt/SUNWonld/lib/sparcv9/libldmake.so.1 755 root bin
 f none opt/SUNWonld/lib/sparcv9/bindings.so.1 755 root bin
 f none opt/SUNWonld/lib/sparcv9/perfcnt.so.1 755 root bin
 f none opt/SUNWonld/lib/sparcv9/symbindrep.so.1 755 root bin
+
+#
+# The following commented items are for things that exist within
+# usr/src/cmd/sgs, but which are not normally considered to be
+# part of the SUNWonld package. It is possible to add these items
+# to a special-purpose SUNWonld by uncommenting the appropriate lines.
+#
+#f none $SGSDIR/usr/lib/sparcv9/libl.so.1=usr/lib/sparcv9/libl.so.1 755 root bin
+#s none $SGSDIR/usr/lib/sparcv9/libl.so=./libl.so.1
+#f none $SGSDIR/usr/lib/sparcv9/llib-ll.ln=usr/lib/sparcv9/llib-ll.ln 644 root bin
+
+#f none $SGSDIR/usr/bin/sparcv9/size=usr/bin/sparcv9/size 555 root bin
+#s none $SGSDIR/usr/ccs/bin/sparcv9/size=../../../bin/sparcv9/size
+
+#f none $SGSDIR/usr/lib/sparcv9/liby.so.1=usr/lib/sparcv9/liby.so.1 755 root bin
+#s none $SGSDIR/usr/lib/sparcv9/liby.so=./liby.so.1
+#f none $SGSDIR/usr/lib/sparcv9/llib-ly.ln=usr/lib/sparcv9/llib-ly.ln 644 root bin

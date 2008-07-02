@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,11 +43,8 @@ LLDFLAGS =	'$(LDPASS)-R$$ORIGIN/../../lib'
 LLDFLAGS64 =	'$(LDPASS)-R$$ORIGIN/../../../lib/$(MACH64)'
 LDFLAGS +=	$(LLDFLAGS)
 
-DEMLIB=		-L../../sgsdemangler/$(MACH)
-DEMLIB64=	-L../../sgsdemangler/$(MACH64)
-LDLIBS +=	$(DEMLIB) -ldemangle $(CONVLIBDIR) $(CONV_LIB) \
-		$(ELFLIBDIR) -lelf
-
+LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
+LINTFLAGS +=	-x
 LINTSRCS =	$(SRCS)
 
-CLEANFILES +=	$(LINTOUT)
+CLEANFILES +=	$(LINTOUTS)

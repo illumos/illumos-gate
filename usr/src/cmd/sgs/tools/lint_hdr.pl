@@ -66,6 +66,7 @@ $script = 'lint_hdr';
 $usage = "usage: $script target [elfclass]\n";
 
 $sub = 0;
+die $usage if (scalar(@ARGV) == 0);
 while ($_ = $ARGV[0],/^-/) {
 	ARG: {
 	    if (/^-s$/) {

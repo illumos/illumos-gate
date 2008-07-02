@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,7 +32,6 @@ include		../Makefile.com
 
 LLDFLAGS =	$(LLDFLAGS64)
 ELFLIBDIR =	$(ELFLIBDIR64)
-DEMLIB =	$(DEMLIB64)
 CONVLIBDIR =	$(CONVLIBDIR64)
 
 VAR_SGSBINPROG=	$(VAR_SGSBINPROG64)

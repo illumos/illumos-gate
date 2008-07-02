@@ -279,7 +279,6 @@ typedef struct lm_list32	Lm_list32;
  */
 extern int	assfail(const char *, const char *, int);
 extern void	eprintf(Lm_list *, Error, const char *, ...);
-extern char	*sgs_demangle(char *);
 extern uint_t	sgs_str_hash(const char *);
 extern uint_t	findprime(uint_t);
 

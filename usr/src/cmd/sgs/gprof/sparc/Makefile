@@ -21,24 +21,22 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/sgs/gprof/sparc/Makefile
 
-PROG=		gprof
-
 include 	../Makefile.com
 
 DEFLIST +=	-DSPARC
-
-LDLIBS	+=	-lelf
 
 .KEEP_STATE:
 
 all:		$(PROG)
 
 install:	all .WAIT $(ROOTPROG) $(ROOTLIBBLURB) $(ROOTCCSBINLINK)
+
+lint:           $(LINTOUT32) $(SGSLINTOUT)
 
 include		../Makefile.targ
 

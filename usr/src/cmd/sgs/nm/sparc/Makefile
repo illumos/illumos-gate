@@ -21,7 +21,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/sgs/nm/sparc/Makefile
@@ -47,11 +47,10 @@ INCLIST=	-I../../include -I../../include/sparc \
 		-I$(SRCBASE)/uts/$(ARCH)/sys
 DEFLIST=	-DTARGET=SPARC -DSPARC=1 -D$(ARFORMAT) -DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
-LDLIBS +=	-L ../../sgsdemangler/sparc -ldemangle \
-		$(CONVLIBDIR) $(CONV_LIB) -lelf
+LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
 LINTFLAGS=	-x $(LDLIBS)
 LINTSRCS=	$(SRCS)
-CLEANFILES +=	$(LINTOUT)
+CLEANFILES +=	$(LINTOUTS)
 objs.xpg4/%.o := CPPFLAGS += -DXPG4
 
 
@@ -72,7 +71,7 @@ objs.xpg4/%.o:	../common/%.c
 
 all:		$(PROG) $(XPG4)
 
-$(PROG):	$(OBJS) ../../sgsdemangler/sparc/libdemangle.a
+$(PROG):	$(OBJS)
 		$(LINK.c) $(OBJS) -o $@ $(LLDFLAGS) $(LDLIBS)
 		$(POST_PROCESS)
 

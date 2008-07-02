@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,11 +42,10 @@ LDFLAGS +=	'-R$$ORIGIN/../../../lib/$(MACH64)'
 INCLIST=	-I../../include -I../../include/i386 \
 		-I$(SRCBASE)/uts/$(ARCH)/sys
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
-LDLIBS +=	-L ../../sgsdemangler/amd64 -ldemangle \
-		$(CONVLIBDIR64) $(CONV_LIB) -lelf
+LDLIBS +=	$(CONVLIBDIR64) $(CONV_LIB) $(ELFLIBDIR) -lelf
 LINTFLAGS64 +=	-x $(LDLIBS) -Xarch=amd64
 LINTSRCS=	$(SRCS)
-CLEANFILES +=	$(LINTOUT)
+CLEANFILES +=	$(LINTOUTS)
 
 
 %.o:		../common/%.c
@@ -59,7 +58,7 @@ $(ROOTCCSBIN64)/%: %
 
 all:		$(PROG)
 
-$(PROG):	$(OBJS) ../../sgsdemangler/amd64/libdemangle.a
+$(PROG):	$(OBJS)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 

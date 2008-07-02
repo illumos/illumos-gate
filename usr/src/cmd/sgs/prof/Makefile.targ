@@ -18,29 +18,23 @@
 #
 # CDDL HEADER END
 #
-
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# cmd/sgs/prof/Makefile.targ
 #
 
-include		../Makefile.com
 
-.KEEP_STATE:
+$(PROG):	$(OBJS)
+		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+		$(POST_PROCESS)
 
-LLDFLAGS =	$(LLDFLAGS64)
-ELFLIBDIR =	$(ELFLIBDIR64)
-CONVLIBDIR =	$(CONVLIBDIR64)
+clean:
+		$(RM) $(OBJS) $(CLEANFILES)
 
-VAR_SGSBINPROG= $(VAR_SGSBINPROG64)
-VAR_SGSCCSLINK= $(VAR_SGSCCSLINK64)
+include		$(SRC)/cmd/Makefile.targ
+include		$(SRC)/cmd/sgs/Makefile.targ
 
-include		../Makefile.targ
-include		../../Makefile.sub.64
-
-lint:		$(LINTOUT64) $(SGSLINTOUT)
-
-install \
-package:	$(VAR_SGSBINPROG64)
