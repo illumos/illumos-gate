@@ -488,6 +488,7 @@ errout0:
 	if (vdp->xdf_vd_lbl != NULL) {
 		cmlb_detach(vdp->xdf_vd_lbl, NULL);
 		cmlb_free_handle(&vdp->xdf_vd_lbl);
+		vdp->xdf_vd_lbl = NULL;
 	}
 #if !defined(XPV_HVM_DRIVER)
 	xdf_kstat_delete(devi);
@@ -2126,8 +2127,11 @@ xdf_oe_change(dev_info_t *dip, ddi_eventcookie_t id, void *arg, void *impl_data)
 		xdf_iostart(vdp);
 	} else if ((status == XD_CLOSED) && !unexpect_die) {
 		/* interface is closed successfully, remove all minor nodes */
-		cmlb_detach(vdp->xdf_vd_lbl, NULL);
-		cmlb_free_handle(&vdp->xdf_vd_lbl);
+		if (vdp->xdf_vd_lbl != NULL) {
+			cmlb_detach(vdp->xdf_vd_lbl, NULL);
+			cmlb_free_handle(&vdp->xdf_vd_lbl);
+			vdp->xdf_vd_lbl = NULL;
+		}
 	}
 }
 
