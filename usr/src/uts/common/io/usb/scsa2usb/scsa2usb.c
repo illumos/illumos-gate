@@ -475,7 +475,7 @@ static struct dev_ops scsa2usb_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* Module type. This one is a driver */
-	"SCSA to USB Driver %I%",	/* Name of the module. */
+	"SCSA to USB Driver",	/* Name of the module. */
 	&scsa2usb_ops,			/* driver ops */
 };
 
@@ -2714,6 +2714,17 @@ scsa2usb_scsi_getcap(struct scsi_address *ap, char *cap, int whom)
 	cidx =	scsi_hba_lookup_capstr(cap);
 	switch (cidx) {
 	case SCSI_CAP_GEOMETRY:
+		/* Just check and fail immediately if zero, rarely happens */
+		if (scsa2usbp->scsa2usb_secsz[ap->a_lun] == 0) {
+			USB_DPRINTF_L2(DPRINT_MASK_SCSA,
+			    scsa2usbp->scsa2usb_log_handle,
+			    "scsa2usb_scsi_getcap failed:"
+			    "scsa2usbp->scsa2usb_secsz[ap->a_lun] == 0");
+			mutex_exit(&scsa2usbp->scsa2usb_mutex);
+
+			return (rval);
+		}
+
 		dev_bsize_cap = scsa2usbp->scsa2usb_totalsec[ap->a_lun];
 
 		if (scsa2usbp->scsa2usb_secsz[ap->a_lun] > DEV_BSIZE) {

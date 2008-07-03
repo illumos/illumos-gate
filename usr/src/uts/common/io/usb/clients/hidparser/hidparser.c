@@ -54,7 +54,7 @@ extern struct mod_ops mod_miscops;
 
 static struct modlmisc modlmisc	= {
 	&mod_miscops,	/* Type	of module */
-	"HID PARSER %I%"
+	"HID Parser"
 };
 
 static struct modlinkage modlinkage = {
@@ -1611,6 +1611,14 @@ hidparser_ItemList(entity_item_t ** item_ptr, hidparser_tok_t *scan_ifp)
 			}
 			tmp_ei = NULL;
 		} else {
+			if (prev_ei == NULL) {
+				USB_DPRINTF_L2(PRINT_MASK_ALL,
+				    hparser_log_handle,
+				    "Invalid First MAIN item 0x%x",
+				    scan_ifp->hidparser_tok_token);
+
+				return (HIDPARSER_FAILURE);
+			}
 			if (prev_ei->entity_item_type ==
 			    R_ITEM_COLLECTION) {
 				USB_DPRINTF_L3(PRINT_MASK_ALL,
