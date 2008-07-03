@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,8 +52,8 @@
 #include <sys/aggr.h>
 #include <sys/aggr_impl.h>
 
-#define	HASH32(x) (((x) >> 24) ^ ((x) >> 16) ^ ((x) >> 8) ^ (x))
-#define	HASH_MAC(x) (x[0] ^ x[1] ^ x[2] ^ x[3] ^ x[4] ^ x[5])
+#define	HASH_4BYTES(x) ((x)[0] ^ (x)[1] ^ (x)[2] ^ (x)[3])
+#define	HASH_MAC(x) ((x)[0] ^ (x)[1] ^ (x)[2] ^ (x)[3] ^ (x)[4] ^ (x)[5])
 
 static uint16_t aggr_send_ip6_hdr_len(mblk_t *, ip6_t *);
 
@@ -118,9 +118,10 @@ aggr_send_port(aggr_grp_t *grp, mblk_t *mp)
 		skip_len += IPH_HDR_LENGTH(iphp);
 
 		if (policy & AGGR_POLICY_L3) {
-			uint32_t ip_src = iphp->ipha_src;
-			uint32_t ip_dst = iphp->ipha_dst;
-			hash ^= (HASH32(htonl(ip_src)) ^ HASH32(htonl(ip_dst)));
+			uint8_t *ip_src = (uint8_t *)&(iphp->ipha_src);
+			uint8_t *ip_dst = (uint8_t *)&(iphp->ipha_dst);
+
+			hash ^= (HASH_4BYTES(ip_src) ^ HASH_4BYTES(ip_dst));
 			policy &= ~AGGR_POLICY_L3;
 		}
 		break;
@@ -139,9 +140,10 @@ aggr_send_port(aggr_grp_t *grp, mblk_t *mp)
 		skip_len += aggr_send_ip6_hdr_len(mp, ip6hp);
 
 		if (policy & AGGR_POLICY_L3) {
-			uint32_t ip_src = ip6hp->ip6_src.s6_addr32[3];
-			uint32_t ip_dst = ip6hp->ip6_dst.s6_addr32[3];
-			hash ^= (HASH32(htonl(ip_src)) ^ HASH32(htonl(ip_dst)));
+			uint8_t *ip_src = &(ip6hp->ip6_src.s6_addr8[12]);
+			uint8_t *ip_dst = &(ip6hp->ip6_dst.s6_addr8[12]);
+
+			hash ^= (HASH_4BYTES(ip_src) ^ HASH_4BYTES(ip_dst));
 			policy &= ~AGGR_POLICY_L3;
 		}
 		break;
@@ -171,7 +173,7 @@ again:
 		 * for hashing from the git-go.  Port numbers are in the first
 		 * word for transports, SPI is first for ESP.
 		 */
-		hash ^= HASH32(*(uint32_t *)(mp->b_rptr + skip_len));
+		hash ^= HASH_4BYTES((mp->b_rptr + skip_len));
 		break;
 
 	case IPPROTO_AH: {
