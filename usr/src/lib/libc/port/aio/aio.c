@@ -689,7 +689,7 @@ int
 aiocancel_all(int fd)
 {
 	aio_req_t *reqp;
-	aio_req_t **reqpp;
+	aio_req_t **reqpp, *last;
 	aio_worker_t *first;
 	aio_worker_t *next;
 	int canceled = 0;
@@ -719,15 +719,27 @@ aiocancel_all(int fd)
 	if (fd < 0)
 		cancelall = 1;
 	reqpp = &_aio_done_tail;
+	last = _aio_done_tail;
 	while ((reqp = *reqpp) != NULL) {
 		if (cancelall || reqp->req_args.fd == fd) {
 			*reqpp = reqp->req_next;
+			if (last == reqp) {
+				last = reqp->req_next;
+			}
+			if (_aio_done_head == reqp) {
+				/* this should be the last req in list */
+				_aio_done_head = last;
+			}
 			_aio_donecnt--;
+			_aio_set_result(reqp, -1, ECANCELED);
 			(void) _aio_hash_del(reqp->req_resultp);
 			_aio_req_free(reqp);
-		} else
+		} else {
 			reqpp = &reqp->req_next;
+			last = reqp;
+		}
 	}
+
 	if (cancelall) {
 		ASSERT(_aio_donecnt == 0);
 		_aio_done_head = NULL;
@@ -796,6 +808,23 @@ _aio_cancel_req(aio_worker_t *aiowp, aio_req_t *reqp, int *canceled, int *done)
 	ASSERT(MUTEX_HELD(&aiowp->work_qlock1));
 	if (ostate == AIO_REQ_CANCELED)
 		return (0);
+	if (ostate == AIO_REQ_DONE && !POSIX_AIO(reqp) &&
+	    aiowp->work_prev1 == reqp) {
+		ASSERT(aiowp->work_done1 != 0);
+		/*
+		 * If not on the done queue yet, just mark it CANCELED,
+		 * _aio_work_done() will do the necessary clean up.
+		 * This is required to ensure that aiocancel_all() cancels
+		 * all the outstanding requests, including this one which
+		 * is not yet on done queue but has been marked done.
+		 */
+		_aio_set_result(reqp, -1, ECANCELED);
+		(void) _aio_hash_del(reqp->req_resultp);
+		reqp->req_state = AIO_REQ_CANCELED;
+		(*canceled)++;
+		return (0);
+	}
+
 	if (ostate == AIO_REQ_DONE || ostate == AIO_REQ_DONEQ) {
 		(*done)++;
 		return (0);
@@ -830,6 +859,7 @@ _aio_cancel_req(aio_worker_t *aiowp, aio_req_t *reqp, int *canceled, int *done)
 	if (!POSIX_AIO(reqp)) {
 		_aio_outstand_cnt--;
 		_aio_set_result(reqp, -1, ECANCELED);
+		_aio_req_free(reqp);
 		return (0);
 	}
 	sig_mutex_unlock(&aiowp->work_qlock1);
@@ -1189,10 +1219,12 @@ _aio_finish_request(aio_worker_t *aiowp, ssize_t retval, int error)
 		}
 		if (!POSIX_AIO(reqp)) {
 			int notify;
+			if (reqp->req_state == AIO_REQ_INPROGRESS) {
+				reqp->req_state = AIO_REQ_DONE;
+				_aio_set_result(reqp, retval, error);
+			}
 			sig_mutex_unlock(&aiowp->work_qlock1);
 			sig_mutex_lock(&__aio_mutex);
-			if (reqp->req_state == AIO_REQ_INPROGRESS)
-				reqp->req_state = AIO_REQ_DONE;
 			/*
 			 * If it was canceled, this request will not be
 			 * added to done list. Just free it.
@@ -1201,7 +1233,6 @@ _aio_finish_request(aio_worker_t *aiowp, ssize_t retval, int error)
 				_aio_outstand_cnt--;
 				_aio_req_free(reqp);
 			} else {
-				_aio_set_result(reqp, retval, error);
 				_aio_req_done_cnt++;
 			}
 			/*
@@ -1562,6 +1593,7 @@ _aio_work_done(aio_worker_t *aiowp)
 {
 	aio_req_t *reqp;
 
+	sig_mutex_lock(&__aio_mutex);
 	sig_mutex_lock(&aiowp->work_qlock1);
 	reqp = aiowp->work_prev1;
 	reqp->req_next = NULL;
@@ -1570,11 +1602,27 @@ _aio_work_done(aio_worker_t *aiowp)
 	if (aiowp->work_tail1 == NULL)
 		aiowp->work_head1 = NULL;
 	aiowp->work_prev1 = NULL;
-	sig_mutex_unlock(&aiowp->work_qlock1);
-	sig_mutex_lock(&__aio_mutex);
-	_aio_donecnt++;
 	_aio_outstand_cnt--;
 	_aio_req_done_cnt--;
+	if (reqp->req_state == AIO_REQ_CANCELED) {
+		/*
+		 * Request got cancelled after it was marked done. This can
+		 * happen because _aio_finish_request() marks it AIO_REQ_DONE
+		 * and drops all locks. Don't add the request to the done
+		 * queue and just discard it.
+		 */
+		sig_mutex_unlock(&aiowp->work_qlock1);
+		_aio_req_free(reqp);
+		if (_aio_outstand_cnt == 0 && _aiowait_flag) {
+			sig_mutex_unlock(&__aio_mutex);
+			(void) _kaio(AIONOTIFY);
+		} else {
+			sig_mutex_unlock(&__aio_mutex);
+		}
+		return;
+	}
+	sig_mutex_unlock(&aiowp->work_qlock1);
+	_aio_donecnt++;
 	ASSERT(_aio_donecnt > 0 &&
 	    _aio_outstand_cnt >= 0 &&
 	    _aio_req_done_cnt >= 0);
@@ -1885,17 +1933,36 @@ _aio_req_del(aio_worker_t *aiowp, aio_req_t *reqp, int ostate)
 			if (aiowp->work_next1 == next)
 				aiowp->work_next1 = next->req_next;
 
-			if ((next->req_next != NULL) ||
-			    (aiowp->work_done1 == 0)) {
-				if (aiowp->work_head1 == next)
-					aiowp->work_head1 = next->req_next;
-				if (aiowp->work_prev1 == next)
-					aiowp->work_prev1 = next->req_next;
-			} else {
-				if (aiowp->work_head1 == next)
-					aiowp->work_head1 = lastrp;
-				if (aiowp->work_prev1 == next)
-					aiowp->work_prev1 = lastrp;
+			/*
+			 * if this is the first request on the queue, move
+			 * the lastrp pointer forward.
+			 */
+			if (lastrp == next)
+				lastrp = next->req_next;
+
+			/*
+			 * if this request is pointed by work_head1, then
+			 * make work_head1 point to the last request that is
+			 * present on the queue.
+			 */
+			if (aiowp->work_head1 == next)
+				aiowp->work_head1 = lastrp;
+
+			/*
+			 * work_prev1 is used only in non posix case and it
+			 * points to the current AIO_REQ_INPROGRESS request.
+			 * If work_prev1 points to this request which is being
+			 * deleted, make work_prev1 NULL and set  work_done1
+			 * to 0.
+			 *
+			 * A worker thread can be processing only one request
+			 * at a time.
+			 */
+			if (aiowp->work_prev1 == next) {
+				ASSERT(ostate == AIO_REQ_INPROGRESS &&
+				    !POSIX_AIO(reqp) && aiowp->work_done1 > 0);
+					aiowp->work_prev1 = NULL;
+					aiowp->work_done1--;
 			}
 
 			if (ostate == AIO_REQ_QUEUED) {
@@ -1903,10 +1970,6 @@ _aio_req_del(aio_worker_t *aiowp, aio_req_t *reqp, int ostate)
 				aiowp->work_count1--;
 				ASSERT(aiowp->work_minload1 >= 1);
 				aiowp->work_minload1--;
-			} else {
-				ASSERT(ostate == AIO_REQ_INPROGRESS &&
-				    !POSIX_AIO(reqp));
-				aiowp->work_done1--;
 			}
 			return;
 		}
