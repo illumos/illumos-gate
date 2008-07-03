@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -221,14 +221,14 @@ pc_pcttotv(
 	*unixtime = (int64_t)sec;
 	*unixtime += 60 * (int64_t)min;
 	*unixtime += 3600 * (int64_t)hour;
-	*unixtime += 86400 * (int64_t)day;
+	*unixtime += 86400 * (int64_t)(day -1);
 	while (month > 1) {
 		month--;
 		*unixtime += 86400 * (int64_t)days_in_month(month, year);
 	}
 	while (year > YEAR_ZERO) {
-		*unixtime += 86400 * (int64_t)days_in_year(year);
 		year--;
+		*unixtime += 86400 * (int64_t)days_in_year(year);
 	}
 	/*
 	 * For FAT, the beginning of all time is 01/01/1980,
