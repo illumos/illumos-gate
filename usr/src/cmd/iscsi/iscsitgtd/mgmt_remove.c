@@ -173,7 +173,7 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 		    NULL) {
 			tgt_node_remove(list, c, MatchBoth);
 			if (list->x_child == NULL)
-				(void) tgt_node_remove(t, list, MatchName);
+				(void) tgt_node_remove(n, list, MatchName);
 		}
 		tgt_node_free(c);
 
@@ -212,7 +212,7 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 		    NULL) {
 			tgt_node_remove(list, c, MatchBoth);
 			if (list->x_child == NULL)
-				(void) tgt_node_remove(t, list, MatchName);
+				(void) tgt_node_remove(n, list, MatchName);
 		}
 		tgt_node_free(c);
 		free(prop);
