@@ -374,13 +374,14 @@ dmu_tx_count_free(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 	}
 
 	/*
-	 * Add in memory requirements of higher-level indirects
+	 * Add in memory requirements of higher-level indirects.
+	 * This assumes a worst-possible scenario for dn_nlevels.
 	 */
-	if (nblks && dn->dn_nlevels > 2) {
+	{
 		uint64_t blkcnt = 1 + ((nblks >> epbs) >> epbs);
-		int level = 2;
+		int level = dn->dn_nlevels > 1 ? 2 : 1;
 
-		while (level++ < dn->dn_nlevels) {
+		while (level++ < DN_MAX_LEVELS) {
 			txh->txh_memory_tohold += blkcnt << dn->dn_indblkshift;
 			blkcnt = 1 + (blkcnt >> epbs);
 		}
@@ -450,6 +451,7 @@ dmu_tx_count_free(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 
 	/* account for new level 1 indirect blocks that might show up */
 	if (skipped) {
+		txh->txh_fudge += skipped << dn->dn_indblkshift;
 		skipped = MIN(skipped, DMU_MAX_DELETEBLKCNT >> epbs);
 		txh->txh_memory_tohold += skipped << dn->dn_indblkshift;
 	}
@@ -762,7 +764,7 @@ dmu_tx_try_assign(dmu_tx_t *tx, uint64_t txg_how)
 	dmu_tx_hold_t *txh;
 	spa_t *spa = tx->tx_pool->dp_spa;
 	uint64_t memory, asize, fsize, usize;
-	uint64_t towrite, tofree, tooverwrite, tounref, tohold;
+	uint64_t towrite, tofree, tooverwrite, tounref, tohold, fudge;
 
 	ASSERT3U(tx->tx_txg, ==, 0);
 
@@ -795,7 +797,7 @@ dmu_tx_try_assign(dmu_tx_t *tx, uint64_t txg_how)
 	 * dmu_tx_unassign() logic.
 	 */
 
-	towrite = tofree = tooverwrite = tounref = tohold = 0;
+	towrite = tofree = tooverwrite = tounref = tohold = fudge = 0;
 	for (txh = list_head(&tx->tx_holds); txh;
 	    txh = list_next(&tx->tx_holds, txh)) {
 		dnode_t *dn = txh->txh_dnode;
@@ -817,6 +819,7 @@ dmu_tx_try_assign(dmu_tx_t *tx, uint64_t txg_how)
 		tooverwrite += txh->txh_space_tooverwrite;
 		tounref += txh->txh_space_tounref;
 		tohold += txh->txh_memory_tohold;
+		fudge += txh->txh_fudge;
 	}
 
 	/*
@@ -847,9 +850,13 @@ dmu_tx_try_assign(dmu_tx_t *tx, uint64_t txg_how)
 	memory = towrite + tooverwrite + tohold;
 
 #ifdef ZFS_DEBUG
-	/* add in 'tohold' to account for our dirty holds on this memory */
+	/*
+	 * Add in 'tohold' to account for our dirty holds on this memory
+	 * XXX - the "fudge" factor is to account for skipped blocks that
+	 * we missed because dnode_next_offset() misses in-core-only blocks.
+	 */
 	tx->tx_space_towrite = asize +
-	    spa_get_asize(tx->tx_pool->dp_spa, tohold);
+	    spa_get_asize(tx->tx_pool->dp_spa, tohold + fudge);
 	tx->tx_space_tofree = tofree;
 	tx->tx_space_tooverwrite = tooverwrite;
 	tx->tx_space_tounref = tounref;

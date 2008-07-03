@@ -90,6 +90,7 @@ typedef struct dmu_tx_hold {
 	uint64_t txh_space_tooverwrite;
 	uint64_t txh_space_tounref;
 	uint64_t txh_memory_tohold;
+	uint64_t txh_fudge;
 #ifdef ZFS_DEBUG
 	enum dmu_tx_hold_type txh_type;
 	uint64_t txh_arg1;
