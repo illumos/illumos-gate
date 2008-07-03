@@ -211,6 +211,13 @@ uint64_t vsw_pri_eth_type = 0;
  */
 uint32_t vsw_pri_tx_nmblks = 64;
 
+/*
+ * Number of RARP packets sent to announce macaddr to the physical switch,
+ * after vsw's physical device is changed dynamically or after a guest (client
+ * vnet) is live migrated in.
+ */
+uint32_t vsw_publish_macaddr_count = 3;
+
 boolean_t vsw_hio_enabled = B_TRUE;	/* Enable/disable HybridIO */
 int vsw_hio_max_cleanup_retries = 10;	/* Max retries for HybridIO cleanp */
 int vsw_hio_cleanup_delay = 10000;	/* 10ms */

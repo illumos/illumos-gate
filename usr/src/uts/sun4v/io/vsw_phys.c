@@ -51,6 +51,8 @@
 #include <sys/dlpi.h>
 #include <sys/ethernet.h>
 #include <net/if.h>
+#include <netinet/arp.h>
+#include <inet/arp.h>
 #include <sys/varargs.h>
 #include <sys/machsystm.h>
 #include <sys/modctl.h>
@@ -96,6 +98,7 @@ void vsw_unset_addrs(vsw_t *vswp);
 void vsw_set_addrs(vsw_t *vswp);
 int vsw_get_hw_maddr(vsw_t *);
 mblk_t *vsw_tx_msg(vsw_t *, mblk_t *);
+void vsw_publish_macaddr(vsw_t *vswp, uint8_t *addr);
 
 /*
  * Tunables used in this file.
@@ -103,6 +106,7 @@ mblk_t *vsw_tx_msg(vsw_t *, mblk_t *);
 extern int vsw_mac_open_retries;
 extern boolean_t vsw_multi_ring_enable;
 extern int vsw_mac_rx_rings;
+extern uint32_t vsw_publish_macaddr_count;
 
 /*
  * Check to see if the card supports the setting of multiple unicst
@@ -224,6 +228,13 @@ vsw_set_addrs(vsw_t *vswp)
 		}
 		RW_EXIT(&vswp->mac_rwlock);
 		mutex_exit(&port->mca_lock);
+	}
+
+	/* announce macaddr of vnets to the physical switch */
+	if (vsw_publish_macaddr_count != 0) {	/* enabled */
+		for (port = plist->head; port != NULL; port = port->p_next) {
+			vsw_publish_macaddr(vswp, (uint8_t *)&port->p_macaddr);
+		}
 	}
 
 	RW_EXIT(&plist->lockrw);
@@ -1351,4 +1362,84 @@ vsw_tx_msg(vsw_t *vswp, mblk_t *mp)
 	RW_EXIT(&vswp->mac_rwlock);
 
 	return (mp);
+}
+
+#define	ARH_FIXED_LEN	8    /* Length of fixed part of ARP header(see arp.h) */
+
+/*
+ * Send a gratuitous RARP packet to notify the physical switch to update its
+ * Layer2 forwarding table for the given mac address. This is done to allow the
+ * switch to quickly learn the macaddr-port association when a guest is live
+ * migrated or when vsw's physical device is changed dynamically. Any protocol
+ * packet would serve this purpose, but we choose RARP, as it allows us to
+ * accomplish this within L2 (ie, no need to specify IP addr etc in the packet)
+ * The macaddr of vnet is retained across migration. Hence, we don't need to
+ * update the arp cache of other hosts within the broadcast domain. Note that
+ * it is harmless to send these RARP packets during normal port attach of a
+ * client vnet. This can can be turned off if needed, by setting
+ * vsw_publish_macaddr_count to zero in /etc/system.
+ */
+void
+vsw_publish_macaddr(vsw_t *vswp, uint8_t *addr)
+{
+	mblk_t			*mp;
+	mblk_t			*bp;
+	struct arphdr		*arh;
+	struct	ether_header 	*ehp;
+	int			count = 0;
+	int			plen = 4;
+	uint8_t			*cp;
+
+	mp = allocb(ETHERMIN, BPRI_MED);
+	if (mp == NULL) {
+		return;
+	}
+
+	/* Initialize eth header */
+	ehp = (struct  ether_header *)mp->b_rptr;
+	bcopy(&etherbroadcastaddr, &ehp->ether_dhost, ETHERADDRL);
+	bcopy(addr, &ehp->ether_shost, ETHERADDRL);
+	ehp->ether_type = htons(ETHERTYPE_REVARP);
+
+	/* Initialize arp packet */
+	arh = (struct arphdr *)(mp->b_rptr + sizeof (struct ether_header));
+	cp = (uint8_t *)arh;
+
+	arh->ar_hrd = htons(ARPHRD_ETHER);	/* Hardware type:  ethernet */
+	arh->ar_pro = htons(ETHERTYPE_IP);	/* Protocol type:  IP */
+	arh->ar_hln = ETHERADDRL;	/* Length of hardware address:  6 */
+	arh->ar_pln = plen;		/* Length of protocol address:  4 */
+	arh->ar_op = htons(REVARP_REQUEST);	/* Opcode: REVARP Request */
+
+	cp += ARH_FIXED_LEN;
+
+	/* Sender's hardware address and protocol address */
+	bcopy(addr, cp, ETHERADDRL);
+	cp += ETHERADDRL;
+	bzero(cp, plen);	/* INADDR_ANY */
+	cp += plen;
+
+	/* Target hardware address and protocol address */
+	bcopy(addr, cp, ETHERADDRL);
+	cp += ETHERADDRL;
+	bzero(cp, plen);	/* INADDR_ANY */
+	cp += plen;
+
+	mp->b_wptr += ETHERMIN;	/* total size is 42; round up to ETHERMIN */
+
+	for (count = 0; count < vsw_publish_macaddr_count; count++) {
+
+		bp = dupmsg(mp);
+		if (bp == NULL) {
+			continue;
+		}
+
+		/* transmit the packet */
+		bp = vsw_tx_msg(vswp, bp);
+		if (bp != NULL) {
+			freemsg(bp);
+		}
+	}
+
+	freemsg(mp);
 }

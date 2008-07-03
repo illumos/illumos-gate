@@ -205,6 +205,7 @@ extern void vsw_hio_start(vsw_t *vswp, vsw_ldc_t *ldcp);
 extern void vsw_hio_stop(vsw_t *vswp, vsw_ldc_t *ldcp);
 extern void vsw_process_dds_msg(vsw_t *vswp, vsw_ldc_t *ldcp, void *msg);
 extern void vsw_hio_stop_port(vsw_port_t *portp);
+extern void vsw_publish_macaddr(vsw_t *vswp, uint8_t *addr);
 
 #define	VSW_NUM_VMPOOLS		3	/* number of vio mblk pools */
 
@@ -229,6 +230,7 @@ extern uint32_t vsw_num_mblks1;
 extern uint32_t vsw_num_mblks2;
 extern uint32_t vsw_num_mblks3;
 extern boolean_t vsw_obp_ver_proto_workaround;
+extern uint32_t vsw_publish_macaddr_count;
 
 #define	LDC_ENTER_LOCK(ldcp)	\
 				mutex_enter(&((ldcp)->ldc_cblock));\
@@ -378,6 +380,11 @@ vsw_port_attach(vsw_port_t *port)
 	 * Initialise the port and any ldc's under it.
 	 */
 	(void) vsw_init_ldcs(port);
+
+	/* announce macaddr of vnet to the physical switch */
+	if (vsw_publish_macaddr_count != 0) {	/* enabled */
+		vsw_publish_macaddr(vswp, (uint8_t *)&(port->p_macaddr));
+	}
 
 	D1(vswp, "%s: exit", __func__);
 	return (0);
