@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,36 +112,31 @@ write_image(void)
 				    "address\n"));
 				exit(1);
 			}
-		if (use_media_stated_capacity) {
-			cap = get_last_possible_lba(target);
-			if (cap <= 0) {
-				cap = read_format_capacity(target->d_fd,
-				    &bsize);
+		if (device_type == CD_RW) {
+			if ((cap = get_last_possible_lba(target)) <= 0) {
+				if ((cap = read_format_capacity(target->d_fd,
+				    &bsize)) <= 0) {
+					err_msg(gettext("Unable to determine "
+					    "media capacity.  Defaulting to "
+					    "650 MB (74 minute) disc.\n"));
+					cap = MAX_CD_BLKS;
+				}
 			}
 		} else {
 			/*
-			 * For DVD drives use read_format_capacity to retrieve
-			 * the media size, it could be 3.6, 3.9, 4.2, 4.7, 9.2
+			 * For DVD drives use read_format_capacity to
+			 * find media size, it can be 3.6, 3.9, 4.2,
+			 * 4.7, 9.2
 			 */
-			if (device_type == CD_RW) {
-				cap = MAX_CD_BLKS;
-			} else {
-				/*
-				 * For DVD drives use read_format_capacity to
-				 * find media size, it can be 3.6, 3.9, 4.2,
-				 * 4.7, 9.2
-				 */
-				cap = read_format_capacity(target->d_fd,
-				    &bsize);
-				/* sanity if not reasonable default to 4.7 GB */
-				if (cap < MAX_CD_BLKS)
-					cap = MAX_DVD_BLKS;
-			}
+			cap = read_format_capacity(target->d_fd,
+			    &bsize);
+			/*
+			 * Sanity check; Default to 4.7 GB if cap unreasonable
+			 */
+			if (cap < MAX_CD_BLKS)
+				cap = MAX_DVD_BLKS;
 		}
-		if (cap == 0) {
-			err_msg(gettext("Unable to find out media capacity\n"));
-			exit(1);
-		}
+
 		if (device_type == CD_RW)
 			cap = (cap + 1 - ti->ti_start_address) * 2048;
 		else

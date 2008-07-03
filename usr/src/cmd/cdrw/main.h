@@ -37,7 +37,6 @@ extern "C" {
 
 extern int debug;
 
-extern int		use_media_stated_capacity;
 extern int		keep_disc_open;
 extern int		requested_speed;
 extern int		simulation;

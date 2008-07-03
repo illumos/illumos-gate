@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,7 +140,7 @@ ensure_media_space(uint32_t total_nblks, uchar_t end_tno)
 
 	get_media_type(target->d_fd);
 
-	if (use_media_stated_capacity) {
+	if (device_type == CD_RW) {
 		nblks_avail = get_last_possible_lba(target);
 
 		if (nblks_avail == 0) {
@@ -149,31 +149,26 @@ ensure_media_space(uint32_t total_nblks, uchar_t end_tno)
 			nblks_avail = read_format_capacity(target->d_fd,
 			    &bsize);
 
-			/* if both methods fail no choice but to bail out */
+			/* if both methods fail, fall back on defaults */
 			if (nblks_avail == 0) {
-
-				err_msg(gettext(
-				    "Cannot find out media capacity.\n"));
-				exit(1);
+				err_msg(gettext("Unable to determine media "
+				    "capacity. Defaulting to 650 MB (74 minute)"
+				    " disc.\n"));
+				nblks_avail = MAX_CD_BLKS;
 			}
 		leadin_size = end_tno*300;
 		}
 	} else {
-		if (device_type == CD_RW) {
-			nblks_avail = MAX_CD_BLKS;
-		} else {
-			/*
-			 * For DVD drives use read_format_capacity as default
-			 * retrieve the media size, it can be 3.6, 3.9, 4.2,
-			 * 4.7, or 9.2 GB
-			 */
-			nblks_avail =
-			    read_format_capacity(target->d_fd, &bsize);
+		/*
+		 * For DVD drives use read_format_capacity as default
+		 * retrieve the media size, it can be 3.6, 3.9, 4.2,
+		 * 4.7, or 9.2 GB
+		 */
+		nblks_avail = read_format_capacity(target->d_fd, &bsize);
 
-			/* sanity check. if not reasonable default to 4.7 GB */
-			if (nblks_avail < MAX_CD_BLKS) {
-				nblks_avail = MAX_DVD_BLKS;
-			}
+		/* sanity check. if not reasonable default to 4.7 GB */
+		if (nblks_avail < MAX_CD_BLKS) {
+			nblks_avail = MAX_DVD_BLKS;
 		}
 	}
 

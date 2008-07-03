@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,16 +112,13 @@ write_audio(char **argv, int start_argc, int argc)
 		    "Cannot get writable address for the media.\n"));
 		exit(1);
 	}
-	if (use_media_stated_capacity) {
-		blks_avail = get_last_possible_lba(target);
-		if (blks_avail == 0) {
-			err_msg(gettext("Cannot find out media capacity\n"));
-			exit(1);
-		}
+	if ((blks_avail = get_last_possible_lba(target)) == 0) {
+		err_msg(gettext("Unable to determine media capacity. "
+		    "Defaulting to 650 MB (74 minute) disc.\n"));
+		blks_avail = MAX_CD_BLKS;
+	} else {
 		/* LBA is always one less */
 		blks_avail++;
-	} else {
-		blks_avail = MAX_CD_BLKS;
 	}
 	/*
 	 * Actual number of blocks available based on nwa (next writable

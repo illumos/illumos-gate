@@ -47,7 +47,6 @@
  * global flags
  */
 int	debug = 0;
-int	use_media_stated_capacity = 0;
 int	keep_disc_open = 0;
 int	requested_speed = 0;
 int	simulation = 0;
@@ -267,7 +266,12 @@ main(int argc, char **argv)
 			operations++;
 			break;
 		case 'C':
-			use_media_stated_capacity = 1;
+			/*
+			 * cdrw now attempts to use the stated medium capacity
+			 * by default, so this option no longer has any effect.
+			 * It remains in the interface for backwards
+			 * compatibility only.
+			 */
 			break;
 		case 'd':
 			tgtdev = optarg;
