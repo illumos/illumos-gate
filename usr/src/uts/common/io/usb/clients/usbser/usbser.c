@@ -212,7 +212,7 @@ extern struct mod_ops mod_miscops;
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,	/* Type of module */
-	"USB generic serial module %I%"
+	"USB generic serial module"
 };
 
 static struct modlinkage modlinkage = {
@@ -2553,7 +2553,7 @@ usbser_data(usbser_port_t *pp, mblk_t *mp)
 
 		return (USB_FAILURE);
 	}
-	if ((MBLKL(mp) <= 1)) {
+	if (MBLKL(mp) <= 0) {
 		freemsg(mp);
 
 		return (USB_SUCCESS);
