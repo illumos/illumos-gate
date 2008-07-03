@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -228,7 +227,7 @@ _icv_open(const char	*itm)
 			return ((void *)(-1));
 		}
 		(void) memset(ist->regs, 0,
-			(sizeof (itm_num_t)) * hdr->reg_num);
+		    (sizeof (itm_num_t)) * hdr->reg_num);
 	}
 
 
@@ -238,11 +237,8 @@ _icv_open(const char	*itm)
 		size_t			ileft = 0;
 		unsigned char		*op = NULL;
 		size_t			oleft = 0;
-		(void) eval_op_tbl(ist,
-			    ist->itm_hdr->op_init_tbl,
-			    &ip,
-			    &ileft,
-			    &op, &oleft);
+		(void) eval_op_tbl(ist, ist->itm_hdr->op_init_tbl, &ip,
+		    &ileft, &op, &oleft);
 	} else {
 		op_init_default(ist);
 	}
@@ -304,11 +300,10 @@ _icv_iconv(
 	retval = 0;
 
 	TRACE_MESSAGE('i', ("_icv_iconv(inbuf=%p inbytesleft=%ld "
-			    "outbuf=%p outbytesleft=%ld)\n",
-			    (NULL == inbuf) ? 0 : *inbuf,
-			    (NULL == inbytesleft) ? 0 : *inbytesleft,
-			    (NULL == outbuf) ? 0 : *outbuf,
-			    (NULL == outbytesleft) ? 0 : *outbytesleft));
+	    "outbuf=%p outbytesleft=%ld)\n", (NULL == inbuf) ? 0 : *inbuf,
+	    (NULL == inbytesleft) ? 0 : *inbytesleft,
+	    (NULL == outbuf) ? 0 : *outbuf,
+	    (NULL == outbytesleft) ? 0 : *outbytesleft));
 
 	/*
 	 * If (NULL == inbuf || NULL == *inbuf) then this conversion is
@@ -317,10 +312,8 @@ _icv_iconv(
 	if ((NULL == inbuf) || (NULL == *inbuf)) {
 		if (0 != hdr->op_reset_tbl.itm_ptr) {
 			ist->direc = ADDR(hdr->direc_init_tbl);
-			retval = eval_op_tbl(ist,
-						hdr->op_reset_tbl,
-						inbuf, inbytesleft,
-						outbuf, outbytesleft);
+			retval = eval_op_tbl(ist, hdr->op_reset_tbl, inbuf,
+			    inbytesleft, outbuf, outbytesleft);
 			if ((size_t)(-1) == retval) {
 				return	(retval);
 			}
@@ -342,9 +335,8 @@ _icv_iconv(
 		map = (char *)(map_hdr + 1);
 
 		if (1 == map_hdr->default_error) {
-			retval = map_i_f(ist->direc,
-					inbuf, inbytesleft,
-					outbuf, outbytesleft, 0);
+			retval = map_i_f(ist->direc, inbuf, inbytesleft,
+			    outbuf, outbytesleft, 0);
 			return	(retval);
 		}
 
@@ -358,7 +350,7 @@ _icv_iconv(
 				UPDATE_ARGS();
 				errno = E2BIG;
 				TRACE_MESSAGE('e', ("_icv_iconv: error=%d\n",
-						errno));
+				    errno));
 				return ((size_t)-1);
 			}
 			*(op++) = *(map + *(ip++));
@@ -369,24 +361,20 @@ _icv_iconv(
 		UPDATE_ARGS();
 		return (0);
 	} else if (ITM_TBL_MAP_INDEX_FIXED == ist->direc->type) {
-		retval = map_i_f(ist->direc,
-				inbuf, inbytesleft,
-				outbuf, outbytesleft, 0);
+		retval = map_i_f(ist->direc, inbuf, inbytesleft,
+		    outbuf, outbytesleft, 0);
 		return	(retval);
 	} else if (ITM_TBL_MAP_HASH == ist->direc->type) {
-		retval = map_h_l(ist->direc,
-				inbuf, inbytesleft,
-				outbuf, outbytesleft, 0);
+		retval = map_h_l(ist->direc, inbuf, inbytesleft,
+		    outbuf, outbytesleft, 0);
 		return	(retval);
 	} else if (ITM_TBL_MAP_DENSE_ENC == ist->direc->type) {
-		retval = map_d_e_l(ist->direc,
-				inbuf, inbytesleft,
-				outbuf, outbytesleft, 0);
+		retval = map_d_e_l(ist->direc, inbuf, inbytesleft,
+		    outbuf, outbytesleft, 0);
 		return	(retval);
 	} else if (ITM_TBL_MAP_LOOKUP == ist->direc->type) {
-		retval = map_l_f(ist->direc,
-				inbuf, inbytesleft,
-				outbuf, outbytesleft, 0);
+		retval = map_l_f(ist->direc, inbuf, inbytesleft,
+		    outbuf, outbytesleft, 0);
 		return	(retval);
 	}
 
@@ -411,8 +399,7 @@ retry_cond_eval:
 				if (0 == ist->default_action.itm_ptr) {
 					errno = EILSEQ;
 					TRACE_MESSAGE('e',
-						("_icv_iconv:error=%d\n",
-						errno));
+					    ("_icv_iconv:error=%d\n", errno));
 					return ((size_t)(-1));
 				}
 
@@ -421,13 +408,12 @@ retry_cond_eval:
 				action = ist->default_action;
 				type = ((itm_tbl_hdr_t *)(ADDR(action)))->type;
 				TRACE_MESSAGE('E',
-				("escape seq (default action=%6p, type=%ld) "
-				"excuting\n", action.itm_ptr, type));
+				    ("escape seq (default action=%6p, "
+				    "type=%ld) executing\n",
+				    action.itm_ptr, type));
 			} else if (0 != direc->condition.itm_ptr) {
 				retval = eval_cond_tbl(ist, direc->condition,
-							inbuf, inbytesleft,
-							*outbytesleft,
-							direc);
+				    inbuf, inbytesleft, *outbytesleft, direc);
 				if ((size_t)(0) == retval) {
 					continue;
 				} else if ((size_t)(-1) == retval) {
@@ -443,13 +429,12 @@ retry_cond_eval:
 			}
 
 			TRACE_MESSAGE('a',
-				("inbytesleft=%ld; type=%ld:action=%p\n",
-				*inbytesleft, type, action.itm_ptr));
+			    ("inbytesleft=%ld; type=%ld:action=%p\n",
+			    *inbytesleft, type, action.itm_ptr));
 			switch (ITM_TBL_MASK & type) {
 			case ITM_TBL_OP:
 				retval = eval_op_tbl(ist, action,
-						inbuf, inbytesleft,
-						outbuf, outbytesleft);
+				    inbuf, inbytesleft, outbuf, outbytesleft);
 				if ((size_t)(-1) == retval) {
 					return	(retval);
 				}
@@ -461,33 +446,29 @@ retry_cond_eval:
 				switch (type) {
 				case ITM_TBL_MAP_INDEX_FIXED_1_1:
 				case ITM_TBL_MAP_INDEX_FIXED:
-					retval = map_i_f(
-						    ADDR(action),
-						    inbuf, inbytesleft,
-						    outbuf, outbytesleft,
-						    1);
+					retval = map_i_f(ADDR(action),
+					    inbuf, inbytesleft,
+					    outbuf, outbytesleft, 1);
 					break;
 				case ITM_TBL_MAP_HASH:
 					retval = map_h_l(ADDR(action),
-						    inbuf, inbytesleft,
-						    outbuf, outbytesleft, 1);
+					    inbuf, inbytesleft,
+					    outbuf, outbytesleft, 1);
 					break;
 				case ITM_TBL_MAP_DENSE_ENC:
 					retval = map_d_e_l(ADDR(action),
-						    inbuf, inbytesleft,
-						    outbuf, outbytesleft, 1);
+					    inbuf, inbytesleft,
+					    outbuf, outbytesleft, 1);
 					break;
 				case ITM_TBL_MAP_LOOKUP:
-					retval = map_l_f(
-						    ADDR(action),
-						    inbuf, inbytesleft,
-						    outbuf, outbytesleft,
-						    1);
+					retval = map_l_f(ADDR(action),
+					    inbuf, inbytesleft,
+					    outbuf, outbytesleft, 1);
 					break;
 				default:
 					errno = ELIBBAD;
 					TRACE_MESSAGE('e',
-					("_icv_iconv:error=%d\n", errno));
+					    ("_icv_iconv:error=%d\n", errno));
 					return ((size_t)(-1));
 
 				}
@@ -498,7 +479,7 @@ retry_cond_eval:
 			default:	/* never */
 				errno = ELIBBAD;
 				TRACE_MESSAGE('e',
-				("_icv_iconv:error=%d\n", errno));
+				    ("_icv_iconv:error=%d\n", errno));
 				return ((size_t)(-1));
 			}
 			break;
@@ -545,7 +526,7 @@ map_i_f(
 		}
 
 		if (((j < map_hdr->start.itm_ptr) ||
-			(map_hdr->end.itm_ptr < j)) &&
+		    (map_hdr->end.itm_ptr < j)) &&
 		    (0 < map_hdr->default_error)) {
 			errno = EILSEQ;
 			(*inbuf) = (void*) ((*inbuf) - map_hdr->source_len);
@@ -563,11 +544,10 @@ map_i_f(
 		}
 
 		if ((j < map_hdr->start.itm_ptr) ||
-			(map_hdr->end.itm_ptr < j)) {
+		    (map_hdr->end.itm_ptr < j)) {
 			if (0 == map_hdr->default_error) {
 				p = (((unsigned char *)(map_hdr + 1)) +
-					(map_hdr->result_len *
-					(tbl_hdr->number)));
+				    (map_hdr->result_len * (tbl_hdr->number)));
 				for (i = 0; i < map_hdr->result_len; i++) {
 					PUT(*(p + i));
 				}
@@ -580,27 +560,26 @@ map_i_f(
 		} else {
 			char	*map_error;
 			map_error = (((char *)(map_hdr + 1)) +
-				    (map_hdr->result_len *
-				    (tbl_hdr->number)) +
-				    (j - map_hdr->start.itm_ptr));
+			    (map_hdr->result_len * (tbl_hdr->number)) +
+			    (j - map_hdr->start.itm_ptr));
 			if (0 == map_hdr->default_error) {
 				map_error = (void *)
-					(map_error + map_hdr->result_len);
+				    (map_error + map_hdr->result_len);
 			}
 			if (((1 == map_hdr->default_error) ||
 			    (0 < map_hdr->error_num)) &&
 			    (0 != *(map_error))) {
 				errno = EILSEQ;
 				(*inbuf) = (void *)
-					((*inbuf) - map_hdr->source_len);
+				    ((*inbuf) - map_hdr->source_len);
 				(*inbytesleft) += map_hdr->source_len;
 				TRACE_MESSAGE('e',
-				("map_i_f:error=%d\n", errno));
+				    ("map_i_f:error=%d\n", errno));
 				return ((size_t)(-1));
 			}
 			p = (((unsigned char *)(map_hdr + 1)) +
-				(map_hdr->result_len *
-				(j - map_hdr->start.itm_ptr)));
+			    (map_hdr->result_len *
+			    (j - map_hdr->start.itm_ptr)));
 			for (i = 0; i < map_hdr->result_len; i++) {
 				PUT(*(p + i));
 			}
@@ -674,18 +653,18 @@ map_l_f(
 				p = *inbuf;
 			} else if (0 == map_hdr->default_error) {
 				p = map + (pair_size * tbl_hdr->number) +
-					map_hdr->source_len + 1;
+				    map_hdr->source_len + 1;
 			} else if (0 < map_hdr->default_error) {
 				errno = EILSEQ;
 				TRACE_MESSAGE('e', ("map_l_f:error=%d\n",
-				errno));
+				    errno));
 				return ((size_t)(-1));
 			}
 		} else {
 			if (0 != (*p)) {
 				errno = EILSEQ;
 				TRACE_MESSAGE('e', ("map_l_f:error=%d\n",
-				errno));
+				    errno));
 				return ((size_t)(-1));
 			}
 			p++;
@@ -754,8 +733,8 @@ map_h_l(
 
 		result = 1;
 		q = *inbuf;
-		hash_value = hash((const char *)(q),
-				source_len, map_hdr->hash_tbl_num);
+		hash_value = hash((const char *)(q), source_len,
+		    map_hdr->hash_tbl_num);
 		p = map_hash + (pair_size * hash_value);
 		if (1 == *(map_error + hash_value)) {
 			for (i = 0, result = 0; i < source_len; i++) {
@@ -765,12 +744,10 @@ map_h_l(
 				}
 			}
 			TRACE_MESSAGE('G',
-			("(h=%d): find pair without conflict\n",
-			hash_value));
+			    ("(h=%d): find pair without conflict\n",
+			    hash_value));
 		} else if (0 == *(map_error + hash_value)) {
-			TRACE_MESSAGE('G',
-			("(h=%d): No Pair\n",
-			hash_value));
+			TRACE_MESSAGE('G', ("(h=%d): No Pair\n", hash_value));
 			result = -3;
 		} else /* if (0 < *(map_error + hash_value)) */ {
 			for (i = 0, result = 0; i < source_len; i++) {
@@ -801,11 +778,10 @@ map_h_l(
 					} else if (0 < result) {
 						low = mid + 1;
 					} else { /* 0 == result */
-						TRACE_MESSAGE('G',
-						("(h=%d): "
-						"find data on out ot "
-						"hashtable with CONFLICT\n",
-						hash_value));
+						TRACE_MESSAGE('G', ("(h=%d): "
+						    "find data on out of "
+						    "hashtable with CONFLICT\n",
+						    hash_value));
 						break;
 					}
 				}
@@ -817,21 +793,18 @@ map_h_l(
 			} else if (0 == map_hdr->default_error) {
 				p = map_of + map_hdr->hash_of_size;
 			} else if (0 < map_hdr->default_error) {
-				TRACE_MESSAGE('G',
-				("(h=%d): NO PAIR\n",
-				hash_value));
+				TRACE_MESSAGE('G', ("(h=%d): NO PAIR\n",
+				    hash_value));
 				errno = EILSEQ;
 				TRACE_MESSAGE('e',
-				("map_h_l:error=%d\n", errno));
+				    ("map_h_l:error=%d\n", errno));
 				return ((size_t)(-1));
 			}
 		} else {
 			if (0 != (*p)) {
 				errno = EILSEQ;
-				TRACE_MESSAGE('G',
-				("	      : error pair\n"));
-				TRACE_MESSAGE('e', ("map_l_f:error\n",
-				errno));
+				TRACE_MESSAGE('G', ("	      : error pair\n"));
+				TRACE_MESSAGE('e', ("map_l_f:error\n", errno));
 				return ((size_t)(-1));
 			}
 			p++;
@@ -877,8 +850,8 @@ map_d_e_l(
 	TRACE_MESSAGE('i', ("map_d_e_l\n"));
 
 	map_hdr = (itm_map_dense_enc_hdr_t *)(tbl_hdr + 1);
-	map_ptr = ((unsigned char *)(map_hdr + 1) +
-			map_hdr->source_len + map_hdr->source_len);
+	map_ptr = ((unsigned char *)(map_hdr + 1) + map_hdr->source_len +
+	    map_hdr->source_len);
 	map_error = (map_ptr + (tbl_hdr->number * map_hdr->result_len));
 	if (0 == map_hdr->default_error) {
 		map_error = (void *)(map_error + map_hdr->result_len);
@@ -894,7 +867,7 @@ map_d_e_l(
 		}
 
 		j = hash_dense_encoding(*inbuf, map_hdr->source_len,
-					byte_seq_min, byte_seq_max);
+		    byte_seq_min, byte_seq_max);
 
 		if (((j < 0) || (tbl_hdr->number < j)) &&
 		    (0 < map_hdr->default_error)) {
@@ -911,8 +884,8 @@ map_d_e_l(
 
 		if ((j < 0) || (tbl_hdr->number < j)) {
 			if (0 == map_hdr->default_error) {
-				p = (map_ptr +
-				(tbl_hdr->number * map_hdr->result_len));
+				p = (map_ptr + (tbl_hdr->number *
+				    map_hdr->result_len));
 				for (i = 0; i < map_hdr->result_len; i++) {
 					PUT(*(p + i));
 				}
@@ -928,7 +901,7 @@ map_d_e_l(
 				if (0 != *(map_error + j)) {
 					errno = EILSEQ;
 					TRACE_MESSAGE('e',
-					("map_d_e_l:error=%d\n", errno));
+					    ("map_d_e_l:error=%d\n", errno));
 					return ((size_t)(-1));
 				}
 			}
@@ -986,8 +959,8 @@ eval_cond_tbl(
 			rtsh = (itm_range_hdr_t *)(rth + 1);
 			if (ileft < rtsh->len) {
 				errno = EINVAL;
-				TRACE_MESSAGE('e',
-				("eval_cond_tbl:error=%d\n", errno));
+				TRACE_MESSAGE('e', ("eval_cond_tbl:error=%d\n",
+				    errno));
 				retval = ((size_t)(-1));
 				goto eval_cond_return;
 			}
@@ -1010,8 +983,8 @@ eval_cond_tbl(
 			}
 			if (0 == retval) {
 				TRACE_MESSAGE('b',
-				("out of between (%p) len= rtsh=%ld\n",
-				*ip, rtsh->len));
+				    ("out of between (%p) len= rtsh=%ld\n",
+				    *ip, rtsh->len));
 				goto eval_cond_return;
 			}
 			break; /* continue */
@@ -1027,11 +1000,10 @@ eval_cond_tbl(
 			if (NULL == ist->default_action.itm_ptr) {
 				ist->default_action = direc->action;
 				TRACE_MESSAGE('E',
-				("escape seq (default action=%6p, "
-				"type=%ld) set\n",
-				direc->action.itm_ptr,
-				((itm_tbl_hdr_t *)(ADDR(direc->action)))
-				->type));
+				    ("escape seq (default action=%6p, "
+				    "type=%ld) set\n",
+				    direc->action.itm_ptr, ((itm_tbl_hdr_t *)
+				    (ADDR(direc->action)))->type));
 			}
 			retval = 0;
 			if (*inbytesleft < eh->len_min) {
@@ -1045,14 +1017,14 @@ eval_cond_tbl(
 				}
 				if (0 == memcmp(*inbuf, DADDR(d), d->size)) {
 					TRACE_MESSAGE('E',
-					("escape seq: discard=%ld chars\n",
-					d->size));
-					TRACE_MESSAGE('E', (
-					"escape seq (default action=%6p, "
-					"type=%ld) set\n",
-					direc->action.itm_ptr,
-					((itm_tbl_hdr_t *)
-					(ADDR(direc->action)))->type));
+					    ("escape seq: discard=%ld chars\n",
+					    d->size));
+					TRACE_MESSAGE('E',
+					    ("escape seq (default "
+					    "action=%6p, type=%ld) set\n",
+					    direc->action.itm_ptr,
+					    ((itm_tbl_hdr_t *)
+					    (ADDR(direc->action)))->type));
 					ist->default_action = direc->action;
 					DISCARD(d->size);
 					retval = 2;
@@ -1065,7 +1037,7 @@ eval_cond_tbl(
 			break; /* continue */
 		case ITM_COND_EXPR:
 			retval = eval_expr(ist, cond->operand.place,
-					*inbytesleft, ip, outbytesleft);
+			    *inbytesleft, ip, outbytesleft);
 			if (0 == retval) {
 				goto eval_cond_return;
 			} else {
@@ -1074,7 +1046,7 @@ eval_cond_tbl(
 			break; /* continue */
 		default:
 			TRACE_MESSAGE('e', ("eval_cond_tbl:illegal cond=%d\n",
-			cond->type));
+			    cond->type));
 			retval = (size_t)-1;
 			goto eval_cond_return;
 		}
@@ -1121,9 +1093,8 @@ eval_op_tbl(
 	for (i = 0; i < op_hdr->number; i++, operation++,
 	    op_place += (sizeof (itm_op_t))) {
 		TRACE_MESSAGE('O', ("eval_op_tbl: %ld %p\n", i, op_place));
-		retval = eval_op(ist, op_place,
-				inbuf, inbytesleft,
-				outbuf, outbytesleft);
+		retval = eval_op(ist, op_place, inbuf, inbytesleft,
+		    outbuf, outbytesleft);
 		if (((long)(retval)) < 0) {
 #if defined(OP_DEPTH_MAX)
 			ist->op_depth -= 1;
@@ -1169,10 +1140,12 @@ eval_op(
 	itm_size_t		z;
 	unsigned char		*p;
 	itm_expr_t		*expr0;
+	itm_tbl_hdr_t		*h;
+	itm_type_t		t;
 
 #define	EVAL_EXPR(n)							\
 	(expr0 = ADDR(operation->data.operand[(n)]),			\
-	(itm_num_t)((expr0->type == ITM_EXPR_INT) ?		       	\
+		(itm_num_t)((expr0->type == ITM_EXPR_INT) ?		\
 		expr0->data.itm_exnum :					\
 		((expr0->type == ITM_EXPR_REG) ?			\
 		REG(expr0->data.itm_exnum) :				\
@@ -1191,12 +1164,12 @@ eval_op(
 	switch (operation->type) {
 	case ITM_OP_EXPR:
 		num = eval_expr(ist, operation->data.operand[0],
-				*inbytesleft, *inbuf, *outbytesleft);
+		    *inbytesleft, *inbuf, *outbytesleft);
 		TRACE_MESSAGE('o', ("ITM_OP_EXPR: %ld\n", retval));
 		break;
 	case ITM_OP_ERROR:
 		num = eval_expr(ist, operation->data.operand[0],
-				*inbytesleft, *inbuf, *outbytesleft);
+		    *inbytesleft, *inbuf, *outbytesleft);
 		errno = (int)num;
 		TRACE_MESSAGE('o', ("ITM_OP_ERROR: %ld\n", num));
 		retval = (size_t)(-1);
@@ -1214,7 +1187,7 @@ eval_op(
 			return ((size_t)(-1));
 		}
 		c = eval_expr(ist, operation->data.operand[0],
-				*inbytesleft, *inbuf, *outbytesleft);
+		    *inbytesleft, *inbuf, *outbytesleft);
 		PUT((uchar_t)c);
 		retval = *inbytesleft;
 		TRACE_MESSAGE('o', ("ITM_OP_OUT: %ld %ld\n", c, *inbytesleft));
@@ -1264,9 +1237,9 @@ eval_op(
 			return ((size_t)(-1));
 		}
 		z = (((0 <= expr->data.itm_exnum) &&
-			(expr->data.itm_exnum < *inbytesleft)) ?
-			(*((unsigned char *)(*inbuf + expr->data.itm_exnum))) :
-			(((-1) == expr->data.itm_exnum) ? *inbytesleft : 0));
+		    (expr->data.itm_exnum < *inbytesleft)) ?
+		    (*((unsigned char *)(*inbuf + expr->data.itm_exnum))) :
+		    (((-1) == expr->data.itm_exnum) ? *inbytesleft : 0));
 		PUT((uchar_t)z);
 		break;
 	case ITM_OP_DISCARD:
@@ -1274,12 +1247,11 @@ eval_op(
 		num = EVAL_EXPR(0);
 #else /* !defined(EVAL_EXPR) */
 		num = eval_expr(ist, operation->data.operand[0],
-				*inbytesleft, *inbuf, *outbytesleft);
+		    *inbytesleft, *inbuf, *outbytesleft);
 #endif /* defined(EVAL_EXPR) */
 		TRACE_MESSAGE('o', ("ITM_OP_DISCARD: %ld\n", num));
 #if defined(DISCARD)
-		DISCARD((num <= *inbytesleft) ? ((ulong_t)num) :
-						*inbytesleft);
+		DISCARD((num <= *inbytesleft) ? ((ulong_t)num) : *inbytesleft);
 #else /* defined(DISCARD) */
 		for (num = ((num <= *inbytesleft) ? num : *inbytesleft);
 		    0 < num; --num) {
@@ -1301,54 +1273,82 @@ eval_op(
 		break;
 	case ITM_OP_IF:
 		c = eval_expr(ist, operation->data.operand[0],
-				*inbytesleft, *inbuf, *outbytesleft);
+		    *inbytesleft, *inbuf, *outbytesleft);
 		TRACE_MESSAGE('o', ("ITM_OP_IF: %ld\n", c));
 		if (c) {
-			retval = eval_op_tbl(ist,
-					    operation->data.operand[1],
-					    inbuf, inbytesleft,
-					    outbuf, outbytesleft);
+			retval = eval_op_tbl(ist, operation->data.operand[1],
+			    inbuf, inbytesleft, outbuf, outbytesleft);
 		}
 		break;
 	case ITM_OP_IF_ELSE:
 		c = eval_expr(ist, operation->data.operand[0],
-				*inbytesleft, *inbuf, *outbytesleft);
+		    *inbytesleft, *inbuf, *outbytesleft);
 		TRACE_MESSAGE('o', ("ITM_OP_IF_ELSE: %ld\n", c));
 		if (c) {
-			retval = eval_op_tbl(ist,
-						operation->data.operand[1],
-						inbuf, inbytesleft,
-						outbuf, outbytesleft);
+			retval = eval_op_tbl(ist, operation->data.operand[1],
+			    inbuf, inbytesleft, outbuf, outbytesleft);
 		} else {
-			retval = eval_op_tbl(ist,
-						operation->data.operand[2],
-						inbuf, inbytesleft,
-						outbuf, outbytesleft);
+			retval = eval_op_tbl(ist, operation->data.operand[2],
+			    inbuf, inbytesleft, outbuf, outbytesleft);
 		}
 		break;
 	case ITM_OP_DIRECTION:
 		TRACE_MESSAGE('o', ("ITM_OP_DIRECTION: %p\n",
-			operation->data.operand[0].itm_ptr));
+		    operation->data.operand[0].itm_ptr));
 		ist->direc = ADDR(operation->data.operand[0]);
 		return ((size_t)(-2));
 	case ITM_OP_MAP:
 		TRACE_MESSAGE('o', ("ITM_OP_MAP: %p\n",
-				operation->data.operand[0].itm_ptr));
+		    operation->data.operand[0].itm_ptr));
 		i = 0;
 		if (0 != operation->data.operand[1].itm_ptr) {
 #if defined(EVAL_EXPR)
 			i = EVAL_EXPR(1);
 #else /* !defined(EVAL_EXPR) */
 			i = eval_expr(ist, operation->data.operand[1],
-				*inbytesleft, *inbuf, *outbytesleft);
+			    *inbytesleft, *inbuf, *outbytesleft);
 #endif /* defined(EVAL_EXPR) */
 			(*inbytesleft) -= i;
 			(*inbuf) += i;
 		}
 
-		retval = map_i_f(ADDR(operation->data.operand[0]),
-				inbuf, inbytesleft,
-				outbuf, outbytesleft, 1);
+		/*
+		 * Based on what is the maptype, we call the corresponding
+		 * mapping function.
+		 */
+		h = ADDR(operation->data.operand[0]);
+		t = h->type;
+		switch (t) {
+		case ITM_TBL_MAP_INDEX_FIXED:
+		case ITM_TBL_MAP_INDEX_FIXED_1_1:
+			retval = map_i_f(h, inbuf, inbytesleft,
+			    outbuf, outbytesleft, 1);
+			break;
+		case ITM_TBL_MAP_HASH:
+			retval = map_h_l(h, inbuf, inbytesleft,
+			    outbuf, outbytesleft, 1);
+			break;
+		case ITM_TBL_MAP_DENSE_ENC:
+			retval = map_d_e_l(h, inbuf, inbytesleft,
+			    outbuf, outbytesleft, 1);
+			break;
+		case ITM_TBL_MAP_LOOKUP:
+			retval = map_l_f(h, inbuf, inbytesleft,
+			    outbuf, outbytesleft, 1);
+			break;
+		default:
+			/*
+			 * This should not be possible, but in case we
+			 * have an incorrect maptype, don't fall back to
+			 * map_i_f(). Instead, because it is an error, return
+			 * an error. See CR 6622765.
+			 */
+			errno = EBADF;
+			TRACE_MESSAGE('e', ("eval_op:error=%d\n", errno));
+			retval = (size_t)-1;
+			break;
+		}
+
 		if ((size_t)(-1) == retval) {
 			(*outbytesleft) += i;
 			(*outbuf) -= i;
@@ -1356,21 +1356,17 @@ eval_op(
 		break;
 	case ITM_OP_OPERATION:
 		TRACE_MESSAGE('o', ("ITM_OP_OPERATION: %p\n",
-				operation->data.operand[0].itm_ptr));
-		retval = eval_op_tbl(ist,
-				operation->data.operand[0],
-				inbuf, inbytesleft,
-				outbuf, outbytesleft);
+		    operation->data.operand[0].itm_ptr));
+		retval = eval_op_tbl(ist, operation->data.operand[0],
+		    inbuf, inbytesleft, outbuf, outbytesleft);
 
 		break;
 	case ITM_OP_INIT:
 		TRACE_MESSAGE('o', ("ITM_OP_INIT: %p\n",
-				ist->itm_hdr->op_init_tbl));
+		    ist->itm_hdr->op_init_tbl));
 		if (0 != ist->itm_hdr->op_init_tbl.itm_ptr) {
-			retval = eval_op_tbl(ist,
-						ist->itm_hdr->op_init_tbl,
-						inbuf, inbytesleft,
-						outbuf, outbytesleft);
+			retval = eval_op_tbl(ist, ist->itm_hdr->op_init_tbl,
+			    inbuf, inbytesleft, outbuf, outbytesleft);
 		} else {
 			op_init_default(ist);
 			retval = (size_t)-2;
@@ -1378,12 +1374,10 @@ eval_op(
 		break;
 	case ITM_OP_RESET:
 		TRACE_MESSAGE('o', ("ITM_OP_RESET: %p\n",
-				ist->itm_hdr->op_reset_tbl));
+		    ist->itm_hdr->op_reset_tbl));
 		if (0 != ist->itm_hdr->op_reset_tbl.itm_ptr) {
-			retval = eval_op_tbl(ist,
-						ist->itm_hdr->op_reset_tbl,
-						inbuf, inbytesleft,
-						outbuf, outbytesleft);
+			retval = eval_op_tbl(ist, ist->itm_hdr->op_reset_tbl,
+			    inbuf, inbytesleft, outbuf, outbytesleft);
 		} else {
 			op_reset_default(ist);
 			retval = (size_t)-2;
@@ -1396,25 +1390,25 @@ eval_op(
 		TRACE_MESSAGE('o', ("ITM_OP_RETURN\n"));
 		return	(RETVALRET);
 	case ITM_OP_PRINTCHR:
-		c = eval_expr(ist, operation->data.operand[0],
-				*inbytesleft, *inbuf, *outbytesleft);
+		c = eval_expr(ist, operation->data.operand[0], *inbytesleft,
+		    *inbuf, *outbytesleft);
 		(void) fputc((uchar_t)c, stderr);
-		TRACE_MESSAGE('o',
-		("ITM_OP_PRINTCHR: %ld %ld\n", c, *inbytesleft));
+		TRACE_MESSAGE('o', ("ITM_OP_PRINTCHR: %ld %ld\n",
+		    c, *inbytesleft));
 		break;
 	case ITM_OP_PRINTHD:
-		c = eval_expr(ist, operation->data.operand[0],
-				 *inbytesleft, *inbuf, *outbytesleft);
+		c = eval_expr(ist, operation->data.operand[0], *inbytesleft,
+		    *inbuf, *outbytesleft);
 		(void) fprintf(stderr, "%lx", c);
-		TRACE_MESSAGE('o',
-		("ITM_OP_PRINTHD: %ld %ld\n", c, *inbytesleft));
+		TRACE_MESSAGE('o', ("ITM_OP_PRINTHD: %ld %ld\n",
+		    c, *inbytesleft));
 		break;
 	case ITM_OP_PRINTINT:
-		c = eval_expr(ist, operation->data.operand[0],
-				*inbytesleft, *inbuf, *outbytesleft);
+		c = eval_expr(ist, operation->data.operand[0], *inbytesleft,
+		    *inbuf, *outbytesleft);
 		(void) fprintf(stderr, "%ld", c);
-		TRACE_MESSAGE('o',
-		("ITM_OP_PRINTINT: %ld %ld\n", c, *inbytesleft));
+		TRACE_MESSAGE('o', ("ITM_OP_PRINTINT: %ld %ld\n",
+		    c, *inbytesleft));
 		break;
 	default: /* never */
 		errno = ELIBBAD;
@@ -1448,28 +1442,28 @@ eval_expr(
 	itm_num_t		num01;
 
 #define	EVAL_EXPR_E(n) (eval_expr(ist, expr->data.operand[(n)],		\
-					inbytesleft, inbuf, outbytesleft))
+	inbytesleft, inbuf, outbytesleft))
 #define	EVAL_EXPR_D(n)	((itm_num_t)(expr->data.operand[(n)].itm_ptr))
 #define	EVAL_EXPR_R(n)	(REG((itm_num_t)(expr->data.operand[(n)].itm_ptr)))
 #define	EVAL_EXPR_INVD(n)						\
 	((num0 ## n) = ((itm_num_t)(expr->data.operand[(n)].itm_ptr)),	\
-	((num0 ## n) < 0) ?						\
-	(((-1) == (num0 ## n)) ? inbytesleft : 0) :			\
-	(((num0 ## n) < inbytesleft) ?					\
-	(*(unsigned char *)(inbuf + (num0 ## n))) : 0))
+		((num0 ## n) < 0) ?					\
+		(((-1) == (num0 ## n)) ? inbytesleft : 0) :		\
+		(((num0 ## n) < inbytesleft) ?				\
+		(*(unsigned char *)(inbuf + (num0 ## n))) : 0))
 #define	EVAL_EXPR(n)							\
 	(expr0 = ADDR(expr->data.operand[(n)]),				\
-	(itm_num_t)((expr0->type == ITM_EXPR_INT) ?		       	\
-	expr0->data.itm_exnum :						\
-	((expr0->type == ITM_EXPR_REG) ?				\
-	REG(expr0->data.itm_exnum) :					\
-	((expr0->type == ITM_EXPR_IN_VECTOR_D) ?			\
-	((expr0->data.itm_exnum < 0) ?					\
-	(((-1) == expr0->data.itm_exnum) ? inbytesleft : 0) :		\
-	((expr0->data.itm_exnum < inbytesleft) ?			\
-	(*(uchar_t *)(inbuf + expr0->data.itm_exnum)) : 0)) :		\
-	eval_expr(ist, expr->data.operand[(n)],				\
-	inbytesleft, inbuf, outbytesleft)))))
+		(itm_num_t)((expr0->type == ITM_EXPR_INT) ?		\
+		expr0->data.itm_exnum :					\
+		((expr0->type == ITM_EXPR_REG) ?			\
+		REG(expr0->data.itm_exnum) :				\
+		((expr0->type == ITM_EXPR_IN_VECTOR_D) ?		\
+		((expr0->data.itm_exnum < 0) ?				\
+		(((-1) == expr0->data.itm_exnum) ? inbytesleft : 0) :	\
+		((expr0->data.itm_exnum < inbytesleft) ?		\
+		(*(uchar_t *)(inbuf + expr0->data.itm_exnum)) : 0)) :	\
+		eval_expr(ist, expr->data.operand[(n)],			\
+		inbytesleft, inbuf, outbytesleft)))))
 
 #define	EVAL_OP_BIN_PROTO(op, name, name0, name1)			\
 	case ITM_EXPR_##name##_##name0##_##name1:			\
@@ -1697,7 +1691,7 @@ eval_expr(
 		num = EVAL_EXPR(1);
 		if (expr->data.operand[0].itm_ptr < ist->itm_hdr->reg_num) {
 			return (*(ist->regs + expr->data.operand[0].itm_ptr)
-				= num);
+			    = num);
 		} else {
 			return (0);
 		}
@@ -1819,8 +1813,7 @@ itm_ref_inc(const char		*itm)
 	    (hdr->version[2] != ITM_VER_2) ||
 	    (hdr->version[3] != ITM_VER_3) ||
 	    (((size_t)(hdr->itm_size.itm_ptr)) != st.st_size)) {
-		itm_ref_free(-1, ref, ref->name,
-				ref->hdr, ref->len);
+		itm_ref_free(-1, ref, ref->name, ref->hdr, ref->len);
 		errno = ELIBBAD;
 		TRACE_MESSAGE('e', ("itm_ref_inc:error=%d\n", errno));
 		return	(NULL);
@@ -1860,7 +1853,7 @@ regs_init(icv_state_t	*ist)
 {
 	if (0 < ist->itm_hdr->reg_num) {
 		(void) memset(ist->regs, 0,
-			(sizeof (itm_num_t)) * ist->itm_hdr->reg_num);
+		    (sizeof (itm_num_t)) * ist->itm_hdr->reg_num);
 	}
 }
 

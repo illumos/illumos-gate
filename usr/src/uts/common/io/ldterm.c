@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -521,160 +520,14 @@ static const ldterm_cs_data_t default_cs_data = {
 };
 
 /*
- * The byte length of a UTF-8 character can be decided by looking at the
- * first byte:
- *
- * Binary enc	Code range	Byte length
- *
- * 0xxx xxxx	0x00 ~ 0x7F	1
- * 110x xxxx	0xC0 ~ 0xDF	2
- * 1110 xxxx	0xE0 ~ 0xEF	3
- * 1111 0xxx	0xF0 ~ 0xF7	4
- * 1111 10xx	0xF8 ~ 0xFB	5
- * 1111 110x	0xFC ~ 0xFD	6
- *
- * Invalid leading bytes, esp., 0x80 ~ 0xBF, 0xFE, and, 0xFF, will be treated
- * as a single byte, single display column character.
+ * The following tables are from either u8_textprep.c or uconv.c at
+ * usr/src/common/unicode/. The tables are used to figure out corresponding
+ * UTF-8 character byte lengths and also the validity of given character bytes.
  */
-static const uchar_t utf8_byte_length_tbl[0x100] = {
-	1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-	1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-	1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-	1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-	1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-	1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-	1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-	1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-	1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-	1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-	1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-	1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-
-/*	C0  C1  C2  C3  C4  C5  C6  C7  C8  C9  CA  CB  CC  CD  CE  CF */
-	1,  1,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-
-/*	D0  D1  D2  D3  D4  D5  D6  D7  D8  D9  DA  DB  DC  DD  DE  DF */
-	2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,  2,
-
-/* 	E0  E1  E2  E3  E4  E5  E6  E7  E8  E9  EA  EB  EC  ED  EE  EF */
-	3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,  3,
-
-/*	F0  F1  F2  F3  F4  F5  F6  F7  F8  F9  FA  FB  FC  FD  FE  FF */
-	4,  4,  4,  4,  4,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,
-};
-
-/*
- * Following is a vector of bit-masks to get used bits in the first byte of
- * a UTF-8 character.  Index is remaining bytes of the UTF-8 character.
- */
-static const char masks_tbl[6] = { 0x00, 0x1f, 0x0f, 0x07, 0x03, 0x01 };
-
-/*
- * The following two vectors are to provide valid minimum and
- * maximum values for the 2'nd byte of a multibyte UTF-8 character for
- * better illegal sequence checking as defined in the "UTF-8 Corrigendum" of
- * the Unicode 3.1 standard. The index value must be the value of
- * the first byte of an UTF-8 character.
- */
-static const uchar_t valid_min_2nd_byte[0x100] = {
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-
-/*	C0    C1    C2    C3    C4    C5    C6    C7  */
-	0,    0,    0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
-
-/*	C8    C9    CA    CB    CC    CD    CE    CF  */
-	0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
-
-/*	D0    D1    D2    D3    D4    D5    D6    D7  */
-	0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
-
-/*	D8    D9    DA    DB    DC    DD    DE    DF  */
-	0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
-
-/*	E0    E1    E2    E3    E4    E5    E6    E7  */
-	0xa0, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
-
-/*	E8    E9    EA    EB    EC    ED    EE    EF  */
-	0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
-
-/*	F0    F1    F2    F3    F4    F5    F6    F7  */
-	0x90, 0x80, 0x80, 0x80, 0x80, 0,    0,    0,
-
-	0,    0,    0,    0,    0,    0,    0,    0,
-};
-
-static const uchar_t valid_max_2nd_byte[0x100] = {
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    0,    0,    0,
-
-/*	C0    C1    C2    C3    C4    C5    C6    C7  */
-	0,    0,    0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf,
-
-/*	C8    C9    CA    CB    CC    CD    CE    CF  */
-	0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf,
-
-/*	D0    D1    D2    D3    D4    D5    D6    D7  */
-	0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf,
-
-/*	D8    D9    DA    DB    DC    DD    DE    DF  */
-	0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf,
-
-/*	E0    E1    E2    E3    E4    E5    E6    E7  */
-	0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf,
-
-/*	E8    E9    EA    EB    EC    ED    EE    EF  */
-	0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf, 0xbf,
-
-/*	F0    F1    F2    F3    F4    F5    F6    F7  */
-	0xbf, 0xbf, 0xbf, 0xbf, 0x8f, 0,    0,    0,
-
-	0,    0,    0,    0,    0,    0,    0,    0,
-};
+extern const int8_t u8_number_of_bytes[];
+extern const uchar_t u8_masks_tbl[];
+extern const uint8_t u8_valid_min_2nd_byte[];
+extern const uint8_t u8_valid_max_2nd_byte[];
 
 /*
  * Unicode character width definition tables from uwidth.c:
@@ -826,7 +679,7 @@ ldtermopen(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 	}
 
 	tp = (ldtermstd_state_t *)kmem_zalloc(sizeof (ldtermstd_state_t),
-				KM_SLEEP);
+	    KM_SLEEP);
 
 	/*
 	 * Get termios defaults.  These are stored as
@@ -1192,7 +1045,7 @@ ldtermrput(queue_t *q, mblk_t *mp)
 				freemsg(mp);
 				if ((mp = allocb(3, BPRI_HI)) == NULL) {
 					cmn_err(CE_WARN,
-						"ldtermrput: no blocks");
+					    "ldtermrput: no blocks");
 					return;
 				}
 				mp->b_datap->db_type = M_DATA;
@@ -1207,7 +1060,7 @@ ldtermrput(queue_t *q, mblk_t *mp)
 				freemsg(mp);
 				if ((mp = allocb(1, BPRI_HI)) == NULL) {
 					cmn_err(CE_WARN,
-						"ldtermrput: no blocks");
+					    "ldtermrput: no blocks");
 					return;
 				}
 				mp->b_datap->db_type = M_DATA;
@@ -1424,7 +1277,8 @@ ldtermrput(queue_t *q, mblk_t *mp)
 						    tp->t_modes.c_iflag &
 						    IXANY)) {
 							tp->t_state &=
-						    ~(TS_TTSTOP|TS_OFBLOCK);
+							    ~(TS_TTSTOP |
+							    TS_OFBLOCK);
 							(void) putnextctl(wrq,
 							    M_START);
 						}
@@ -1568,7 +1422,7 @@ ldtermrput(queue_t *q, mblk_t *mp)
 	 */
 
 	if (q->q_first != NULL || !bcanputnext(q, mp->b_band) ||
-		(tp->t_state & TS_RESCAN))
+	    (tp->t_state & TS_RESCAN))
 		(void) putq(q, mp);
 	else
 		(void) ldtermrmsg(q, mp);
@@ -1831,8 +1685,7 @@ ldtermrmsg(queue_t *q, mblk_t *mp)
 					break;
 				}
 			} else
-				bpt = ldterm_dononcanon(bp, bpt,
-					ebsize, q, tp);
+				bpt = ldterm_dononcanon(bp, bpt, ebsize, q, tp);
 			if (bpt == NULL) {
 				cmn_err(CE_WARN,
 				    "ldtermrsrv: out of blocks");
@@ -1894,7 +1747,7 @@ ldterm_docanon(uchar_t c, mblk_t *bpt, size_t ebsize, queue_t *q,
 	if ((tp->t_modes.c_lflag & IEXTEN) && c == tp->t_modes.c_cc[VLNEXT]) {
 		if (tp->t_modes.c_lflag & ECHO)
 			ldterm_outstring((unsigned char *)"^\b", 2, wrq,
-					ebsize, tp);
+			    ebsize, tp);
 		tp->t_state |= TS_SLNCH;
 		goto out;
 	}
@@ -2107,20 +1960,18 @@ escaped:
 		} else { /* is the first byte of a multi-byte, or is ASCII */
 			if (ISASCII(c)) {
 				*tp->t_eucp++ =
-					tp->t_csmethods.ldterm_dispwidth(c,
-						(void *)tp,
-						tp->t_modes.c_lflag & ECHOCTL);
+				    tp->t_csmethods.ldterm_dispwidth(c,
+				    (void *)tp, tp->t_modes.c_lflag & ECHOCTL);
 				tp->t_codeset = 0;
 			} else {
 				*tp->t_eucp++ =
-					tp->t_csmethods.ldterm_dispwidth(c,
-						(void *)tp,
-						tp->t_modes.c_lflag & ECHOCTL);
+				    tp->t_csmethods.ldterm_dispwidth(c,
+				    (void *)tp, tp->t_modes.c_lflag & ECHOCTL);
 				tp->t_eucleft =
-					tp->t_csmethods.ldterm_memwidth(c,
-						(void *)tp) - 1;
+				    tp->t_csmethods.ldterm_memwidth(c,
+				    (void *)tp) - 1;
 				tp->t_codeset = ldterm_codeset(
-						tp->t_csdata.codeset_type, c);
+				    tp->t_csdata.codeset_type, c);
 			}
 		}
 	}
@@ -2278,7 +2129,7 @@ ldterm_rubout(uchar_t c, queue_t *q, size_t ebsize, ldtermstd_state_t *tp)
 				if ((tp->t_modes.c_lflag & XCASE) &&
 				    omaptab[c])
 					ldterm_outstring(RUBOUT1, 3, q, ebsize,
-							tp);
+					    tp);
 				ldterm_outstring(RUBOUT1, 3, q, ebsize, tp);
 				break;
 
@@ -2290,7 +2141,7 @@ ldterm_rubout(uchar_t c, queue_t *q, size_t ebsize, ldtermstd_state_t *tp)
 				if ((tp->t_modes.c_lflag & ECHOCTL) &&
 				    (tp->t_modes.c_lflag & IEXTEN))
 					ldterm_outstring(RUBOUT2, 6, q, ebsize,
-							tp);
+					    tp);
 				break;
 
 			case TAB:
@@ -2313,7 +2164,7 @@ ldterm_rubout(uchar_t c, queue_t *q, size_t ebsize, ldtermstd_state_t *tp)
 			}
 		}
 	} else if ((tp->t_modes.c_lflag & ECHOPRT) &&
-		    (tp->t_modes.c_lflag & IEXTEN)) {
+	    (tp->t_modes.c_lflag & IEXTEN)) {
 		/*
 		 * "Printing rubout"; echo it between \ and /.
 		 */
@@ -2389,14 +2240,14 @@ ldterm_tabcols(ldtermstd_state_t *tp)
 				 */
 				u8[0] = *startp;
 				for (i = 1; (i < LDTERM_CS_MAX_BYTE_LENGTH) &&
-					(*(readp + i) == 0);
-						i++) {
+				    (*(readp + i) == 0); i++) {
 					startp++;
 					if (startp >= bp->b_datap->db_lim) {
 						if (bp->b_cont) {
 							bp = bp->b_cont;
 							startp =
-							bp->b_datap->db_base;
+							    bp->b_datap->
+							    db_base;
 						} else {
 							*readp = 1;
 							col++;
@@ -2705,7 +2556,7 @@ ldterm_kill(queue_t *q, size_t ebsize, ldtermstd_state_t *tp)
 				if ((*ip == 1 || *ip == 2 ||
 				    *ip > UNKNOWN_WIDTH) && ISASCII(c)) {
 					ldterm_rubout((unsigned char) c, q,
-							ebsize, tp);
+					    ebsize, tp);
 					len = 0;
 				} else if (*ip) {
 					if (*ip == UNKNOWN_WIDTH) {
@@ -2716,7 +2567,7 @@ ldterm_kill(queue_t *q, size_t ebsize, ldtermstd_state_t *tp)
 								u8_2[i] =
 								    u8[len-i-1];
 							*ip = ldterm_utf8_width(
-								u8_2, len);
+							    u8_2, len);
 						} else {
 							*ip = 1;
 						}
@@ -2827,7 +2678,7 @@ ldterm_dononcanon(mblk_t *bp, mblk_t *bpt, size_t ebsize, queue_t *q,
 				if (tp->t_modes.c_lflag & ECHO)
 					ldterm_outstring(
 					    (unsigned char *)"^\b",
-						2, wrq, ebsize, tp);
+					    2, wrq, ebsize, tp);
 				tp->t_state |= TS_SLNCH;
 				continue;	/* and ignore it */
 			}
@@ -2850,8 +2701,7 @@ ldterm_dononcanon(mblk_t *bp, mblk_t *bpt, size_t ebsize, queue_t *q,
 				 * set.
 				 */
 				if (c == '\n')
-					ldterm_outchar('\n',
-							wrq, 1, tp);
+					ldterm_outchar('\n', wrq, 1, tp);
 			}
 		}
 		bp->b_wptr = wptr;
@@ -2890,7 +2740,7 @@ ldterm_dononcanon(mblk_t *bp, mblk_t *bpt, size_t ebsize, queue_t *q,
 			roomleft = IBSIZE;
 		}
 		DEBUG5(("roomleft=%d, bytes_in_bp=%d, tp->t_rd_request=%d\n",
-			roomleft, bytes_in_bp, tp->t_rd_request));
+		    roomleft, bytes_in_bp, tp->t_rd_request));
 		/*
 		 * if there is a read pending before this data got
 		 * here move bytes according to the minimum of room
@@ -3019,8 +2869,8 @@ ldterm_echo(uchar_t c, queue_t *q, size_t ebsize, ldtermstd_state_t *tp)
 		return (i + 1);
 		/* echo only special control character and the Bell */
 	} else if ((c > 037 && c != 0177) || c == '\t' || c == '\n' ||
-		    c == '\r' || c == '\b' || c == 007 ||
-		    c == tp->t_modes.c_cc[VKILL]) {
+	    c == '\r' || c == '\b' || c == 007 ||
+	    c == tp->t_modes.c_cc[VKILL]) {
 		ldterm_outchar(c, q, ebsize, tp);
 		return (i + 1);
 	}
@@ -3209,11 +3059,12 @@ ldtermwput(queue_t *q, mblk_t *mp)
 			 * eventually.
 			 */
 			if (*mp->b_rptr & FLUSHW) {
-			    if ((tp->t_state & TS_ISPTSTTY) &&
-					(*mp->b_rptr & FLUSHBAND))
-				flushband(q, *(mp->b_rptr + 1), FLUSHDATA);
-			    else
-				flushq(q, FLUSHDATA);
+				if ((tp->t_state & TS_ISPTSTTY) &&
+				    (*mp->b_rptr & FLUSHBAND))
+					flushband(q, *(mp->b_rptr + 1),
+					    FLUSHDATA);
+				else
+					flushq(q, FLUSHDATA);
 			}
 
 			putnext(q, mp);
@@ -3465,7 +3316,7 @@ ldtermwmsg(queue_t *q, mblk_t *mp)
 				short flag = mp->b_flag;
 
 				residmp = ldterm_output_msg(q, mp, &omp,
-							tp, OBSIZE, 0);
+				    tp, OBSIZE, 0);
 				if ((mp = omp) == NULL)
 					break;
 				mp->b_band |= band;
@@ -3612,14 +3463,19 @@ ldterm_output_msg(queue_t *q, mblk_t *imp, mblk_t **omp,
 				if ((tp->t_state & TS_MEUC) &&
 				    tp->t_eucign == 0 && NOTASCII(c)) {
 					tp->t_eucign =
-						tp->t_csmethods.ldterm_memwidth(
-							c, (void *)tp);
+					    tp->t_csmethods.ldterm_memwidth(
+					    c, (void *)tp);
 					tp->t_scratch_len = tp->t_eucign;
 
 					if (tp->t_csdata.codeset_type !=
 					    LDTERM_CS_TYPE_UTF8) {
 						tp->t_col +=
-tp->t_csmethods.ldterm_dispwidth(c, (void *)tp, tp->t_modes.c_lflag & ECHOCTL);
+						    tp->
+						    t_csmethods.
+						    ldterm_dispwidth(c,
+						    (void *)tp,
+						    tp->t_modes.c_lflag &
+						    ECHOCTL);
 					}
 				}
 
@@ -3708,9 +3564,9 @@ tp->t_csmethods.ldterm_dispwidth(c, (void *)tp, tp->t_modes.c_lflag & ECHOCTL);
 					bytes_to_move = bytes_left;
 				if (tp->t_state & TS_MEUC) {
 					bytes_moved = movtuc(bytes_to_move,
-						ibp->b_rptr, obp->b_wptr,
-						(tp->t_modes.c_oflag & OLCUC ?
-						elcuctab : enotrantab));
+					    ibp->b_rptr, obp->b_wptr,
+					    (tp->t_modes.c_oflag & OLCUC ?
+					    elcuctab : enotrantab));
 				} else {
 					bytes_moved = movtuc(bytes_to_move,
 					    ibp->b_rptr, obp->b_wptr,
@@ -3754,15 +3610,15 @@ tp->t_csmethods.ldterm_dispwidth(c, (void *)tp, tp->t_modes.c_lflag & ECHOCTL);
 			if ((tp->t_state & TS_MEUC) && tp->t_eucign == 0 &&
 			    NOTASCII(c)) {
 				tp->t_eucign = tp->t_csmethods.ldterm_memwidth(
-							c, (void *)tp);
+				    c, (void *)tp);
 				tp->t_scratch_len = tp->t_eucign;
 
 				if (tp->t_csdata.codeset_type !=
 				    LDTERM_CS_TYPE_UTF8) {
 					tp->t_col +=
 					    tp->t_csmethods.ldterm_dispwidth(c,
-						(void *)tp,
-						tp->t_modes.c_lflag & ECHOCTL);
+					    (void *)tp,
+					    tp->t_modes.c_lflag & ECHOCTL);
 				}
 			}
 
@@ -4077,7 +3933,7 @@ tp->t_csmethods.ldterm_dispwidth(c, (void *)tp, tp->t_modes.c_lflag & ECHOCTL);
 							bp->b_datap->db_type =
 							    M_DELAY;
 							*bp->b_wptr++ =
-								(uchar_t)count;
+							    (uchar_t)count;
 							putnext(q, bp);
 						}
 					}
@@ -4311,17 +4167,13 @@ ldterm_do_ioctl(queue_t *q, mblk_t *mp)
 
 			oldmodes = tp->t_amodes;
 			tp->t_amodes.c_iflag =
-				(tp->t_amodes.c_iflag & 0xffff0000 |
-				    cb->c_iflag);
+			    (tp->t_amodes.c_iflag & 0xffff0000 | cb->c_iflag);
 			tp->t_amodes.c_oflag =
-				(tp->t_amodes.c_oflag & 0xffff0000 |
-				    cb->c_oflag);
+			    (tp->t_amodes.c_oflag & 0xffff0000 | cb->c_oflag);
 			tp->t_amodes.c_cflag =
-				(tp->t_amodes.c_cflag & 0xffff0000 |
-				    cb->c_cflag);
+			    (tp->t_amodes.c_cflag & 0xffff0000 | cb->c_cflag);
 			tp->t_amodes.c_lflag =
-				(tp->t_amodes.c_lflag & 0xffff0000 |
-				    cb->c_lflag);
+			    (tp->t_amodes.c_lflag & 0xffff0000 | cb->c_lflag);
 
 			bcopy(cb->c_cc, tp->t_modes.c_cc, NCC);
 			/* TCGETS returns amodes, so update that too */
@@ -4543,11 +4395,14 @@ ldterm_do_ioctl(queue_t *q, mblk_t *mp)
 					 * this line!
 					 */
 					if (tp->t_msglen) {
-					    tp->t_eucp = tp->t_eucp_mp->b_rptr;
+						tp->t_eucp =
+						    tp->t_eucp_mp->b_rptr;
 						for (i = tp->t_msglen; i; i--)
 							*tp->t_eucp++ = 1;
-					} else
-					    tp->t_eucp = tp->t_eucp_mp->b_rptr;
+					} else {
+						tp->t_eucp =
+						    tp->t_eucp_mp->b_rptr;
+					}
 				}
 				/* doing multi-byte handling */
 				tp->t_state |= TS_MEUC;
@@ -4566,19 +4421,19 @@ ldterm_do_ioctl(queue_t *q, mblk_t *mp)
 			 */
 			bzero(&tp->t_csdata.eucpc_data,
 			    (sizeof (ldterm_eucpc_data_t) *
-				LDTERM_CS_MAX_CODESETS));
+			    LDTERM_CS_MAX_CODESETS));
 			tp->t_csdata.eucpc_data[0].byte_length =
-							tp->eucwioc.eucw[1];
+			    tp->eucwioc.eucw[1];
 			tp->t_csdata.eucpc_data[0].screen_width =
-							tp->eucwioc.scrw[1];
+			    tp->eucwioc.scrw[1];
 			tp->t_csdata.eucpc_data[1].byte_length =
-							tp->eucwioc.eucw[2];
+			    tp->eucwioc.eucw[2];
 			tp->t_csdata.eucpc_data[1].screen_width =
-							tp->eucwioc.scrw[2];
+			    tp->eucwioc.scrw[2];
 			tp->t_csdata.eucpc_data[2].byte_length =
-							tp->eucwioc.eucw[3];
+			    tp->eucwioc.eucw[3];
 			tp->t_csdata.eucpc_data[2].screen_width =
-							tp->eucwioc.scrw[3];
+			    tp->eucwioc.scrw[3];
 			tp->t_csdata.version = LDTERM_DATA_VERSION;
 			tp->t_csdata.codeset_type = LDTERM_CS_TYPE_EUC;
 			/*
@@ -4587,7 +4442,7 @@ ldterm_do_ioctl(queue_t *q, mblk_t *mp)
 			 * the maximum possible.
 			 */
 			tp->t_csdata.csinfo_num =
-				LDTERM_CS_TYPE_EUC_MAX_SUBCS;
+			    LDTERM_CS_TYPE_EUC_MAX_SUBCS;
 			if (tp->t_csdata.locale_name != (char *)NULL) {
 				kmem_free(tp->t_csdata.locale_name,
 				    strlen(tp->t_csdata.locale_name) + 1);
@@ -4664,10 +4519,10 @@ ldterm_do_ioctl(queue_t *q, mblk_t *mp)
 		}
 
 		if ((csdp->codeset_type == LDTERM_CS_TYPE_EUC &&
-			csdp->csinfo_num > LDTERM_CS_TYPE_EUC_MAX_SUBCS) ||
+		    csdp->csinfo_num > LDTERM_CS_TYPE_EUC_MAX_SUBCS) ||
 		    (csdp->codeset_type == LDTERM_CS_TYPE_PCCS &&
-			(csdp->csinfo_num < LDTERM_CS_TYPE_PCCS_MIN_SUBCS ||
-			csdp->csinfo_num > LDTERM_CS_TYPE_PCCS_MAX_SUBCS))) {
+		    (csdp->csinfo_num < LDTERM_CS_TYPE_PCCS_MIN_SUBCS ||
+		    csdp->csinfo_num > LDTERM_CS_TYPE_PCCS_MAX_SUBCS))) {
 			miocnak(q, mp, 0, ERANGE);
 			return;
 		}
@@ -4750,7 +4605,7 @@ ldterm_do_ioctl(queue_t *q, mblk_t *mp)
 				if (!(tp->t_eucp_mp = allocb(CANBSIZ,
 				    BPRI_HI))) {
 					cmn_err(CE_WARN,
-						"Can't allocate eucp_mp");
+					    "Can't allocate eucp_mp");
 					miocnak(q, mp, 0, ENOSR);
 					return;
 				}
@@ -4781,8 +4636,8 @@ ldterm_do_ioctl(queue_t *q, mblk_t *mp)
 			tp->t_csdata.codeset_type = csdp->codeset_type;
 			tp->t_csdata.csinfo_num = csdp->csinfo_num;
 			bcopy(csdp->eucpc_data, tp->t_csdata.eucpc_data,
-				sizeof (ldterm_eucpc_data_t) *
-				LDTERM_CS_MAX_CODESETS);
+			    sizeof (ldterm_eucpc_data_t) *
+			    LDTERM_CS_MAX_CODESETS);
 			tp->t_csmethods = cs_methods[csdp->codeset_type];
 
 			if (csdp->codeset_type == LDTERM_CS_TYPE_EUC) {
@@ -4790,19 +4645,19 @@ ldterm_do_ioctl(queue_t *q, mblk_t *mp)
 				tp->eucwioc.scrw[0] = 1;
 
 				tp->eucwioc.eucw[1] =
-					csdp->eucpc_data[0].byte_length;
+				    csdp->eucpc_data[0].byte_length;
 				tp->eucwioc.scrw[1] =
-					csdp->eucpc_data[0].screen_width;
+				    csdp->eucpc_data[0].screen_width;
 
 				tp->eucwioc.eucw[2] =
-					csdp->eucpc_data[1].byte_length + 1;
+				    csdp->eucpc_data[1].byte_length + 1;
 				tp->eucwioc.scrw[2] =
-					csdp->eucpc_data[1].screen_width;
+				    csdp->eucpc_data[1].screen_width;
 
 				tp->eucwioc.eucw[3] =
-					csdp->eucpc_data[2].byte_length + 1;
+				    csdp->eucpc_data[2].byte_length + 1;
 				tp->eucwioc.scrw[3] =
-					csdp->eucpc_data[2].screen_width;
+				    csdp->eucpc_data[2].screen_width;
 			} else {
 				/*
 				 * We are not going to use this data
@@ -4844,7 +4699,7 @@ ldterm_do_ioctl(queue_t *q, mblk_t *mp)
 		}
 		if (locale_name_sz > 1) {
 			tp->t_csdata.locale_name = (char *)kmem_alloc(
-						locale_name_sz, KM_SLEEP);
+			    locale_name_sz, KM_SLEEP);
 			(void) strcpy(tp->t_csdata.locale_name,
 			    csdp->locale_name);
 		} else {
@@ -4873,12 +4728,12 @@ ldterm_do_ioctl(queue_t *q, mblk_t *mp)
 		csdp->pad = tp->t_csdata.pad;
 		if (tp->t_csdata.locale_name) {
 			(void) strcpy(csdp->locale_name,
-					tp->t_csdata.locale_name);
+			    tp->t_csdata.locale_name);
 		} else {
 			csdp->locale_name[0] = '\0';
 		}
 		bcopy(tp->t_csdata.eucpc_data, csdp->eucpc_data,
-			sizeof (ldterm_eucpc_data_t) * LDTERM_CS_MAX_CODESETS);
+		    sizeof (ldterm_eucpc_data_t) * LDTERM_CS_MAX_CODESETS);
 		/*
 		 * If the codeset is an EUC codeset and if it has 2nd and/or
 		 * 3rd supplementary codesets, we subtract one from each
@@ -4993,7 +4848,7 @@ ldterm_ioctl_reply(queue_t *q, mblk_t *mp)
 			 * stream head eventually.
 			 */
 			struct termios *cb =
-			(struct termios *)mp->b_cont->b_rptr;
+			    (struct termios *)mp->b_cont->b_rptr;
 
 			/*
 			 * cflag has cflags sent upstream by the
@@ -5015,7 +4870,7 @@ ldterm_ioctl_reply(queue_t *q, mblk_t *mp)
 			 * eventually.
 			 */
 			struct termio *cb =
-			(struct termio *)mp->b_cont->b_rptr;
+			    (struct termio *)mp->b_cont->b_rptr;
 
 			cb->c_iflag = tp->t_amodes.c_iflag; /* all except the */
 			cb->c_oflag = tp->t_amodes.c_oflag; /* cb->c_cflag */
@@ -5043,8 +4898,7 @@ vmin_satisfied(queue_t *q, ldtermstd_state_t *tp, int sendup)
 {
 	ASSERT(q);
 	if (tp->t_vtid != 0)  {
-		DEBUG4(("vmin_satisfied: cancelled timer id %d\n",
-			tp->t_vtid));
+		DEBUG4(("vmin_satisfied: cancelled timer id %d\n", tp->t_vtid));
 		(void) quntimeout(q, tp->t_vtid);
 		tp->t_vtid = 0;
 	}
@@ -5088,11 +4942,11 @@ vmin_settimer(queue_t *q)
 		if (V_MIN && V_TIME) {
 			/* EMPTY */
 			DEBUG4(("vmin_settimer: timer restarted, old tid=%d\n",
-				tp->t_vtid));
+			    tp->t_vtid));
 		} else {
 			/* EMPTY */
 			DEBUG4(("vmin_settimer: tid = %d was still active!\n",
-				tp->t_vtid));
+			    tp->t_vtid));
 		}
 		(void) quntimeout(q, tp->t_vtid);
 		tp->t_vtid = 0;
@@ -5499,12 +5353,22 @@ static int
 __ldterm_memwidth_utf8(uchar_t c, void *p)
 {
 	ldtermstd_state_t *tp = (ldtermstd_state_t *)p;
+	int len;
 
-	/* This is to silence the lint. */
+	/*
+	 * If the codeset type doesn't match, we treat them as
+	 * an illegal character and return 1.
+	 */
 	if (tp->t_csdata.codeset_type != LDTERM_CS_TYPE_UTF8)
 		return (1);
 
-	return ((int)utf8_byte_length_tbl[c]);
+	len = u8_number_of_bytes[c];
+
+	/*
+	 * If this is a start of an illegal character, we treat
+	 * such as an 1 byte character and screen out.
+	 */
+	return ((len <= 0) ? 1 : len);
 }
 
 static uchar_t
@@ -5517,29 +5381,29 @@ ldterm_utf8_width(uchar_t *u8, int length)
 	if (length == 0)
 		return ('\0');
 
-	j = utf8_byte_length_tbl[u8[0]] - 1;
+	j = u8_number_of_bytes[u8[0]] - 1;
 
 	/*
 	 * If the UTF-8 character is out of UTF-16 code range, or,
 	 * if it is either an ASCII character or an invalid leading byte for
 	 * a UTF-8 character, return 1.
 	 */
-	if (length > 4 || j == 0)
+	if (length > 4 || j <= 0)
 		return ('\1');
 
-	intcode = u8[0] & masks_tbl[j];
+	intcode = u8[0] & u8_masks_tbl[j];
 	for (i = 1; j > 0; j--, i++) {
 		/*
-		 * The following additional checking is needed to
-		 * conform to the "UTF-8 Corrigendum" of the Unicode 3.1
-		 * standard.
+		 * The following additional checking is needed to conform to
+		 * the "UTF-8 Corrigendum" introduced at the Unicode 3.1 and
+		 * then updated one more time at the Unicode 3.2.
 		 */
 		if (i == 1) {
-			if (u8[i] < valid_min_2nd_byte[u8[0]] ||
-			    u8[i] > valid_max_2nd_byte[u8[0]])
+			if (u8[i] < u8_valid_min_2nd_byte[u8[0]] ||
+			    u8[i] > u8_valid_max_2nd_byte[u8[0]])
 				return ('\1');
 		} else if (u8[i] < (uchar_t)LDTERM_CS_TYPE_UTF8_MIN_BYTE ||
-			    u8[i] > (uchar_t)LDTERM_CS_TYPE_UTF8_MAX_BYTE)
+		    u8[i] > (uchar_t)LDTERM_CS_TYPE_UTF8_MAX_BYTE)
 			return ('\1');
 
 		/*
@@ -5552,22 +5416,27 @@ ldterm_utf8_width(uchar_t *u8, int length)
 		 * six bits from the new byte.
 		 */
 		intcode = (intcode << LDTERM_CS_TYPE_UTF8_SHIFT_BITS) |
-				(u8[i] & LDTERM_CS_TYPE_UTF8_BIT_MASK);
+		    (u8[i] & LDTERM_CS_TYPE_UTF8_BIT_MASK);
 	}
 
+	i = 0;
 	if (intcode <= LDTERM_CS_TYPE_UTF8_MAX_P00) {
 		/* Basic Multilingual Plane. */
 		i = intcode / 4;
 		j = intcode % 4;
 		switch (j) {
 		case 0:
-			return (ldterm_ucode[0][i].u0);
+			i = ldterm_ucode[0][i].u0;
+			break;
 		case 1:
-			return (ldterm_ucode[0][i].u1);
+			i = ldterm_ucode[0][i].u1;
+			break;
 		case 2:
-			return (ldterm_ucode[0][i].u2);
+			i = ldterm_ucode[0][i].u2;
+			break;
 		case 3:
-			return (ldterm_ucode[0][i].u3);
+			i = ldterm_ucode[0][i].u3;
+			break;
 		}
 	} else if (intcode <= LDTERM_CS_TYPE_UTF8_MAX_P01) {
 		/* Secondary Multilingual Plane. */
@@ -5576,35 +5445,55 @@ ldterm_utf8_width(uchar_t *u8, int length)
 		j = intcode % 4;
 		switch (j) {
 		case 0:
-			return (ldterm_ucode[1][i].u0);
+			i = ldterm_ucode[1][i].u0;
+			break;
 		case 1:
-			return (ldterm_ucode[1][i].u1);
+			i = ldterm_ucode[1][i].u1;
+			break;
 		case 2:
-			return (ldterm_ucode[1][i].u2);
+			i = ldterm_ucode[1][i].u2;
+			break;
 		case 3:
-			return (ldterm_ucode[1][i].u3);
+			i = ldterm_ucode[1][i].u3;
+			break;
 		}
 	} else if ((intcode >= LDTERM_CS_TYPE_UTF8_MIN_CJKEXTB &&
-		    intcode <= LDTERM_CS_TYPE_UTF8_MAX_CJKEXTB) ||
-		    (intcode >= LDTERM_CS_TYPE_UTF8_MIN_CJKCOMP &&
-		    intcode <= LDTERM_CS_TYPE_UTF8_MAX_CJKCOMP) ||
-		    (intcode >= LDTERM_CS_TYPE_UTF8_MIN_P15 &&
-		    intcode <= LDTERM_CS_TYPE_UTF8_MAX_P15) ||
-		    (intcode >= LDTERM_CS_TYPE_UTF8_MIN_P16 &&
-		    intcode <= LDTERM_CS_TYPE_UTF8_MAX_P16)) {
+	    intcode <= LDTERM_CS_TYPE_UTF8_MAX_CJKEXTB) ||
+	    (intcode >= LDTERM_CS_TYPE_UTF8_MIN_CJKCOMP &&
+	    intcode <= LDTERM_CS_TYPE_UTF8_MAX_CJKCOMP) ||
+	    (intcode >= LDTERM_CS_TYPE_UTF8_MIN_P15 &&
+	    intcode <= LDTERM_CS_TYPE_UTF8_MAX_P15) ||
+	    (intcode >= LDTERM_CS_TYPE_UTF8_MIN_P16 &&
+	    intcode <= LDTERM_CS_TYPE_UTF8_MAX_P16)) {
 		/*
 		 * Supplementary Plane for CJK Ideographs and
 		 * Private Use Planes.
 		 */
 		return ('\2');
 	} else if ((intcode >= LDTERM_CS_TYPE_UTF8_MIN_P14 &&
-		    intcode <= LDTERM_CS_TYPE_UTF8_MAX_P14) ||
-		    (intcode >= LDTERM_CS_TYPE_UTF8_MIN_VARSEL &&
-		    intcode <= LDTERM_CS_TYPE_UTF8_MAX_VARSEL)) {
-		/* Special Purpose Plane. */
+	    intcode <= LDTERM_CS_TYPE_UTF8_MAX_P14) ||
+	    (intcode >= LDTERM_CS_TYPE_UTF8_MIN_VARSEL &&
+	    intcode <= LDTERM_CS_TYPE_UTF8_MAX_VARSEL)) {
+		/*
+		 * Some Special Purpose Plane characters:
+		 * These are like control characters and not printable.
+		 */
 		return ('\0');
 	}
 
-	/* Anything else including invalid characters, we return 1. */
-	return ('\1');
+	/*
+	 * We return the display width of 1 for all character code points
+	 * that we didn't catch from the above logic and also for combining
+	 * and conjoining characters with width value of zero.
+	 *
+	 * In particular, the reason why we are returning 1 for combining
+	 * and conjoining characters is because the GUI-based terminal
+	 * emulators are not yet capable of properly handling such characters
+	 * and in most of the cases, they just treat such characters as if
+	 * they occupy a display cell. If the terminal emulators are capable of
+	 * handling the characters correctly, then, this logic of returning
+	 * 1 should be revisited and changed. See CR 6660526 for more
+	 * details on this.
+	 */
+	return ((i == 0) ? '\1' : (uchar_t)i);
 }
