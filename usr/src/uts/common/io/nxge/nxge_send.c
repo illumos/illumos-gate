@@ -281,45 +281,50 @@ start_again:
 	    "TX Descriptor ring is channel %d mark mode %d",
 	    tx_ring_p->tdc, mark_mode));
 
-	if (!nxge_txdma_reclaim(nxgep, tx_ring_p, nxge_tx_minfree)) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		    "TX Descriptor ring is full: channel %d",
-		    tx_ring_p->tdc));
-		NXGE_DEBUG_MSG((nxgep, TX_CTL,
-		    "TX Descriptor ring is full: channel %d",
-		    tx_ring_p->tdc));
-		if (is_lso) {
-			/* free the current mp and mp_chain if not FULL */
-			tdc_stats->tx_no_desc++;
+	if ((tx_ring_p->descs_pending + lso_ngathers) >= nxge_reclaim_pending) {
+		if (!nxge_txdma_reclaim(nxgep, tx_ring_p,
+		    (nxge_tx_minfree + lso_ngathers))) {
 			NXGE_DEBUG_MSG((nxgep, TX_CTL,
-			    "LSO packet: TX Descriptor ring is full: "
-			    "channel %d",
+			    "TX Descriptor ring is full: channel %d",
 			    tx_ring_p->tdc));
-			goto nxge_start_fail_lso;
-		} else {
-			boolean_t skip_sched = B_FALSE;
+			NXGE_DEBUG_MSG((nxgep, TX_CTL,
+			    "TX Descriptor ring is full: channel %d",
+			    tx_ring_p->tdc));
+			if (is_lso) {
+				/*
+				 * free the current mp and mp_chain if not FULL.
+				 */
+				tdc_stats->tx_no_desc++;
+				NXGE_DEBUG_MSG((nxgep, TX_CTL,
+				    "LSO packet: TX Descriptor ring is full: "
+				    "channel %d",
+				    tx_ring_p->tdc));
+				goto nxge_start_fail_lso;
+			} else {
+				boolean_t skip_sched = B_FALSE;
 
-			cas32((uint32_t *)&tx_ring_p->queueing, 0, 1);
-			tdc_stats->tx_no_desc++;
+				cas32((uint32_t *)&tx_ring_p->queueing, 0, 1);
+				tdc_stats->tx_no_desc++;
 
-			if (isLDOMservice(nxgep)) {
-				tx_ring_p->tx_ring_busy = B_FALSE;
-				if (tx_ring_p->tx_ring_offline) {
-					(void) atomic_swap_32(
-					    &tx_ring_p->tx_ring_offline,
-					    NXGE_TX_RING_OFFLINED);
-					skip_sched = B_TRUE;
+				if (isLDOMservice(nxgep)) {
+					tx_ring_p->tx_ring_busy = B_FALSE;
+					if (tx_ring_p->tx_ring_offline) {
+						(void) atomic_swap_32(
+						    &tx_ring_p->tx_ring_offline,
+						    NXGE_TX_RING_OFFLINED);
+						skip_sched = B_TRUE;
+					}
 				}
-			}
 
-			MUTEX_EXIT(&tx_ring_p->lock);
-			if (nxgep->resched_needed &&
-			    !nxgep->resched_running && !skip_sched) {
-				nxgep->resched_running = B_TRUE;
-				ddi_trigger_softintr(nxgep->resched_id);
+				MUTEX_EXIT(&tx_ring_p->lock);
+				if (nxgep->resched_needed &&
+				    !nxgep->resched_running && !skip_sched) {
+					nxgep->resched_running = B_TRUE;
+					ddi_trigger_softintr(nxgep->resched_id);
+				}
+				status = 1;
+				goto nxge_start_fail1;
 			}
-			status = 1;
-			goto nxge_start_fail1;
 		}
 	}
 
