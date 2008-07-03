@@ -76,6 +76,7 @@ static	int	num_reg = 0;
 static	pthread_t	scn_tid = 0;
 static	pthread_t	isns_tid = 0;
 static	Boolean_t	isns_shutdown = False;
+static	Boolean_t	connection_thr_bail_out = False;
 static int ISNS_SLEEP_SECS = 20;
 Boolean_t	isns_server_connection_thr_running = False;
 target_queue_t	*mgmtq = NULL;
@@ -400,10 +401,13 @@ is_isns_server_up(char *server) {
 static void *
 isns_server_connection_thr(void *arg)
 {
-	char *server = isns_args.server;
 	Boolean_t registered_targets = False;
+	char server[MAXHOSTNAMELEN + 1] = {0};
 
-	while (isns_shutdown == False) {
+	while (isns_shutdown == False &&
+	    connection_thr_bail_out == False) {
+		/* current server */
+		strcpy(server, isns_args.server);
 
 		if (is_isns_server_up(server) == 0) {
 			if (registered_targets == False) {
@@ -431,7 +435,8 @@ isns_server_connection_thr(void *arg)
 			}
 		} else {
 			syslog(LOG_INFO,
-			    "isns server %s is not reachable", server);
+			    "isns server %s is not reachable",
+			    server);
 			registered_targets = False;
 		}
 		(void) sleep(ISNS_SLEEP_SECS);
@@ -595,8 +600,16 @@ isns_op_all(uint16_t op)
 	tgt_node_t	*tgt = NULL;
 	char		*iname;
 
+	if (isns_server_connection_thr_running == False) {
+		syslog(LOG_ERR,
+		    "isns_op_all: iSNS discovery is not running."
+		    " Check the previous iSNS initialization error.");
+		return (-1);
+	}
+
 	if ((so = isns_open(isns_args.server)) == -1) {
-		syslog(LOG_ERR, "isns_reg failed");
+		syslog(LOG_ERR, "isns_op_all: failed to open isns server %s",
+		    isns_args.server);
 		return (-1);
 	}
 
@@ -673,7 +686,7 @@ isns_populate_and_update_server_info(Boolean_t update) {
 			    "Detected a new isns server, deregistering"
 			    " %s", isns_args.server);
 			(void) isns_dereg_all();
-			bcopy(isns_srv, isns_args.server, MAXHOSTNAMELEN);
+			strcpy(isns_args.server, isns_srv);
 			/* Register with the new server */
 			if (isns_reg_all() == 0) {
 				/* scn register all targets */
@@ -686,7 +699,7 @@ isns_populate_and_update_server_info(Boolean_t update) {
 			}
 		}
 	} else {
-		bcopy(isns_srv, isns_args.server, MAXHOSTNAMELEN);
+		strcpy(isns_args.server, isns_srv);
 	}
 	free(isns_srv);
 	return (retcode);
@@ -709,9 +722,11 @@ isns_init(target_queue_t *q)
 	/* get local hostname for entity usage */
 	if ((gethostname(isns_args.entity, MAXHOSTNAMELEN) < 0) ||
 	    (get_ip_addr(isns_args.entity, &eid_ip) < 0)) {
-			syslog(LOG_ERR, "ISNS fails to get ENTITY properties");
-			return (-1);
+		syslog(LOG_ERR, "isns_init: failed to get host name or host ip"
+		    " address for ENTITY properties");
+		return (-1);
 	}
+
 	(void) isns_populate_and_update_server_info(False);
 	if (pthread_create(&scn_tid, NULL,
 	    esi_scn_thr, (void *)&isns_args) !=
@@ -747,8 +762,11 @@ isns_update()
 	 */
 	if (isns_server_connection_thr_running == False) {
 		if (is_isns_enabled == True) {
-			(void) isns_init(NULL);
-			return (0);
+			if (isns_init(NULL) != 0) {
+				return (-1);
+			} else {
+				return (0);
+			}
 		} else {
 			syslog(LOG_INFO,
 			    "isns_update: isns is disabled");
@@ -764,6 +782,14 @@ isns_update()
 			pthread_join(scn_tid, NULL);
 			isns_server_connection_thr_running = False;
 		} else {
+			/*
+			 * Incase the original thread is still running
+			 * we should reap it
+			 */
+			connection_thr_bail_out = True;
+			pthread_join(isns_tid, NULL);
+			connection_thr_bail_out = False;
+
 			/*
 			 * Read the configuration file incase the server
 			 * has changed.
@@ -796,9 +822,11 @@ isns_fini()
 static int
 get_addr_family(char *node) {
 	struct addrinfo		*ai = NULL;
+	int ret;
 
-	if (getaddrinfo(node, NULL, NULL, &ai) != 0) {
-		syslog(LOG_ALERT, "get_addr_family: server %s not found", node);
+	if ((ret = getaddrinfo(node, NULL, NULL, &ai)) != 0) {
+		syslog(LOG_ALERT, "get_addr_family: server %s not found : %s",
+		    node, gai_strerror(ret));
 		return (-1);
 	}
 	return (ai->ai_family);
@@ -810,9 +838,11 @@ get_ip_addr(char *node, ip_t *sa)
 	struct addrinfo		*ai = NULL, *aip;
 	struct sockaddr_in	*sin;
 	struct sockaddr_in6	*sin6;
+	int	ret;
 
-	if (getaddrinfo(node, NULL, NULL, &ai) != 0) {
-		syslog(LOG_ALERT, "get_ip_addr: server %s not found", node);
+	if ((ret = getaddrinfo(node, NULL, NULL, &ai)) != 0) {
+		syslog(LOG_ALERT, "get_ip_addr: %s not found : %s",
+		    node, gai_strerror(ret));
 		return (-1);
 	}
 
@@ -926,7 +956,15 @@ isns_dev_attr_dereg(int so, char *node)
 
 	/* process response */
 	if (process_rsp(cmd, rsp) == 0) {
-		num_reg--;
+		/*
+		 * Keep the num_reg to a non-negative number.
+		 * num_reg is used to keep track of whether there was
+		 * any registration occurred or not. Deregstration should
+		 * be followed by registration but in case dereg occurs
+		 * and somehow it is succeeded keeping num_reg to 0 prevent
+		 * any negative effect on subsequent registration.
+		 */
+		if (num_reg > 0) num_reg--;
 		ret = 0;
 	}
 
@@ -987,6 +1025,7 @@ isns_dev_attr_reg(int so, tgt_node_t *tgt, char *node, char *alias)
 			}
 			if (tgt == src) {
 				free(src_nm);
+				src_nm = NULL;
 				continue;
 			} else {
 				found = True;
@@ -1349,6 +1388,13 @@ isns_reg(char *targ)
 	tgt_node_t	*tgt;
 	char		*iqn;
 
+	if (isns_server_connection_thr_running == False) {
+		syslog(LOG_ERR,
+		    "isns_reg: iSNS discovery is not running."
+		    " Check the previous iSNS initialization error.");
+		return (-1);
+	}
+
 	if ((so = isns_open(isns_args.server)) == -1) {
 		syslog(LOG_ERR, "isns_reg failed with server: %s",
 		    isns_args.server);
@@ -1383,8 +1429,8 @@ isns_reg_all()
 {
 	int so;
 	uint32_t	flags = ISNS_FLAG_REPLACE_REG;
-	isns_pdu_t	*cmd;
-	isns_rsp_t	*rsp;
+	isns_pdu_t	*cmd = NULL;
+	isns_rsp_t	*rsp = NULL;
 	char		*n = NULL;
 	char		*a = NULL;
 	char		alias[MAXNAMELEN];
@@ -1392,6 +1438,13 @@ isns_reg_all()
 	tgt_node_t	*tgt = NULL;
 	int		ret = -1;
 	int		tgt_cnt = 0;
+
+	if (isns_server_connection_thr_running == False) {
+		syslog(LOG_ERR,
+		    "isns_reg_all: iSNS discovery is not running."
+		    " Check the previous iSNS initialization error.");
+		return (-1);
+	}
 
 	/*
 	 * get the 1st target and use it for the source attribute
@@ -1568,6 +1621,13 @@ isns_dereg(char *name)
 	int so;
 	int ret;
 
+	if (isns_server_connection_thr_running == False) {
+		syslog(LOG_ERR,
+		    "isns_dereg: iSNS discovery is not running."
+		    " Check the previous iSNS initialization error.");
+		return (-1);
+	}
+
 	if ((so = isns_open(isns_args.server)) == -1) {
 		return (-1);
 	}
@@ -1596,6 +1656,13 @@ isns_dev_update(char *targ, uint32_t mods)
 
 	if (mods == 0)
 		return (0);
+
+	if (isns_server_connection_thr_running == False) {
+		syslog(LOG_ERR,
+		    "isns_dev_update: iSNS discovery is not running."
+		    " Check the previous iSNS initialization error.");
+		return (-1);
+	}
 
 	if ((tgt = find_tgt_by_name(targ, &iname)) != NULL) {
 		if (tgt_find_value_str(tgt, XML_ELEMENT_ALIAS, &dummy) ==
@@ -1713,6 +1780,13 @@ isns_qry_initiator(char *target, char *initiator)
 {
 	int so;
 	int ret;
+
+	if (isns_server_connection_thr_running == False) {
+		syslog(LOG_ERR,
+		    "isns_qry_initiator: iSNS discovery is not running"
+		    " Check the previous iSNS initialization error.");
+		return (-1);
+	}
 
 	if ((so = isns_open(isns_args.server)) == -1) {
 		syslog(LOG_ERR, "isns_qry failed");

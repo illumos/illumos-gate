@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,10 @@
 #define	_ISNS_CLIENT_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <netdb.h>
 #include "queue.h"
@@ -94,8 +98,8 @@
 #define	STRLEN(x)	(strlen(x) + 1)
 
 typedef struct esi_scn_arg {
-	char		entity[MAXHOSTNAMELEN];	/* iscsi target entity */
-	char		server[MAXHOSTNAMELEN];	/* isns server */
+	char		entity[MAXHOSTNAMELEN + 1]; /* iscsi target entity */
+	char		server[MAXHOSTNAMELEN + 1]; /* isns server */
 	int		isns_port;		/* isns server port */
 } esi_scn_arg_t;
 
@@ -163,5 +167,13 @@ void		ntoh_tlv(isns_tlv_t *);
 void		print_ntoh_tlv(isns_tlv_t *);
 void		print_attr(isns_tlv_t *attr, void *pval, uint32_t ival);
 void		print_isns_hdr(isns_hdr_t *);
+int		setsocknonblocking(int so);
+int		setsockblocking(int so);
+Boolean_t	is_socket_ready(int so,
+		    fd_set *rfdset, fd_set *wfdset, fd_set *errfdset);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif	/* _ISNS_CLIENT_H */

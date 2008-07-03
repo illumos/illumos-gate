@@ -42,6 +42,7 @@
 #include <libintl.h>
 #include <errno.h>
 #include <assert.h>
+#include <fcntl.h>
 #include <sys/byteorder.h>
 
 #include "isns_protocol.h"
@@ -381,6 +382,14 @@ isns_open(char *server)
 	size_t	sa_len;
 	int	so;
 	int	ret;
+	fd_set rfdset;
+	fd_set wfdset;
+	fd_set errfdset;
+	struct timeval timeout;
+	Boolean_t shouldsockblock = False;
+	int socket_ready = 0;
+	timeout.tv_sec = 5;   /* 5 Secs Timeout */
+	timeout.tv_usec = 0;   /* 0 uSecs Timeout */
 
 	if (server == NULL) {
 		syslog(LOG_ERR, "ISNS server ID required");
@@ -389,8 +398,9 @@ isns_open(char *server)
 
 	bzero(&hints, sizeof (struct addrinfo));
 	hints.ai_family = AF_UNSPEC;
-	if (getaddrinfo(server, NULL, NULL, &ai) != 0) {
-		syslog(LOG_ALERT, "ISNS server %s not found", server);
+	if ((ret = getaddrinfo(server, NULL, NULL, &ai)) != 0) {
+		syslog(LOG_ALERT, "getaddrinfo failed on server %s: %s", server,
+		    gai_strerror(ret));
 		return (-1);
 	}
 
@@ -398,6 +408,13 @@ isns_open(char *server)
 	do {
 		so = socket(aip->ai_family, SOCK_STREAM, 0);
 		if (so != -1) {
+
+			/* set it to non blocking so connect wont hang */
+			if (setsocknonblocking(so) == -1) {
+				(void) close(so);
+				continue;
+			}
+
 			sa_len = aip->ai_addrlen;
 			switch (aip->ai_family) {
 				case PF_INET:
@@ -417,18 +434,69 @@ isns_open(char *server)
 					    htons(ISNS_DEFAULT_SERVER_PORT);
 					break;
 				default:
+					syslog(LOG_ALERT, "Bad protocol");
+					(void) close(so);
 					continue;
 			}
-			while (((ret = connect(so, sa, sa_len)) == -1) &&
-			    (errno == EINTR))
-				;
+
+			ret = connect(so, sa, sa_len);
 			if (ret == 0) {
-				freeaddrinfo(ai);
-				return (so);
-			} else {
-				syslog(LOG_ALERT, "Connect failed");
-				(void) close(so);
+				/*
+				 * connection succeeded with out
+				 * blocking
+				 */
+				shouldsockblock = True;
 			}
+
+			if (ret < 0) {
+				if (errno == EINPROGRESS) {
+					FD_ZERO(&rfdset);
+					FD_ZERO(&wfdset);
+					FD_ZERO(&errfdset);
+					FD_SET(so, &rfdset);
+					FD_SET(so, &wfdset);
+					FD_SET(so, &errfdset);
+					socket_ready =
+					    select(so + 1, &rfdset, &wfdset,
+					    &errfdset, &timeout);
+					if (socket_ready < 0) {
+						syslog(LOG_ALERT,
+						    "failed to connect with"
+						" isns, err=%d", errno);
+						(void) close(so);
+					} else if (socket_ready == 0) {
+						syslog(LOG_ALERT,
+						    "time out failed"
+						    " to connect with isns");
+						(void) close(so);
+					} else { /* Socket is ready */
+						/*
+						 * Check if socket is ready
+						 */
+						if (is_socket_ready(so,
+						    &rfdset, &wfdset,
+						    &errfdset) == True)
+							shouldsockblock = True;
+						else
+							(void) close(so);
+					}
+				} else {
+					syslog(LOG_WARNING,
+					    "Connect failed no progress");
+					(void) close(so);
+				}
+			}
+
+			if (shouldsockblock == True) {
+				if (-1 == setsockblocking(so)) {
+					(void) close(so);
+					shouldsockblock = False;
+				} else {
+					freeaddrinfo(ai);
+					return (so);
+				}
+			}
+
 		}
 	} while ((aip = aip->ai_next) != NULL);
 
@@ -436,6 +504,67 @@ isns_open(char *server)
 		freeaddrinfo(ai);
 	return (-1);
 }
+
+/*
+ * According to:
+ * UNIX Network Programming Volume 1, Third Edition:
+ * The Sockets Networking APIBOOK:
+ *
+ * When the connection completes successfully, the descriptor becomes
+ * writable (p. 531 of TCPv2).
+ * When the connection establishment encounters an error, the descriptor
+ * becomes both readable and writable (p. 530 of TCPv2).
+ */
+Boolean_t
+is_socket_ready(int so, fd_set *rfdset, fd_set *wfdset,
+		    fd_set *errfdset)
+{
+	if ((FD_ISSET(so, wfdset) &&
+	    FD_ISSET(so, rfdset)) ||
+	    FD_ISSET(so, errfdset)) {
+		return (False);
+	} else {
+		return (True);
+	}
+}
+
+int
+setsocknonblocking(int so)
+{
+	int flags;
+	/* set it to non blocking */
+	if (-1 == (flags = fcntl(so, F_GETFL, 0))) {
+		syslog(LOG_WARNING,
+		    "Failed to get socket flags. Blocking..");
+		return (-1);
+	}
+
+	if (fcntl(so, F_SETFL, flags | O_NONBLOCK) == -1) {
+		syslog(LOG_WARNING,
+		    "Failed to set socket in non blocking mode");
+		return (-1);
+	}
+	return (0);
+}
+
+int
+setsockblocking(int so)
+{
+	int flags;
+	/* set it to non blocking */
+	if (-1 == (flags = fcntl(so, F_GETFL, 0))) {
+		syslog(LOG_WARNING, " Failed to get flags on socket..");
+		return (-1);
+	}
+
+	flags &= ~O_NONBLOCK;
+	if (fcntl(so, F_SETFL, flags) == -1) {
+		syslog(LOG_WARNING, " failed to set socket to blocking");
+		return (-1);
+	}
+	return (0);
+}
+
 
 void
 isns_close(int so)

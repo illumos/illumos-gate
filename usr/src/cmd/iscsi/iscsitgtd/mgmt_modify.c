@@ -40,6 +40,7 @@
 #include <netdb.h>
 #include <libgen.h>
 #include <libzfs.h>
+#include <syslog.h>
 
 #include <iscsitgt_impl.h>
 #include "queue.h"
@@ -427,7 +428,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		}
 		if (isns_enabled() == True) {
 			if (isns_dev_update(t->x_value, isns_mods) != 0) {
-				xml_rtn_msg(&msg, ERR_UPDATE_TARGCFG_FAILED);
+				xml_rtn_msg(&msg, ERR_ISNS_ERROR);
 				return (msg);
 			}
 		}
@@ -1107,6 +1108,11 @@ valid_isns_srv(char *name, char *prop)
 	int		so;
 	int		port;
 
+	if (strlen(prop) > MAXHOSTNAMELEN) {
+		xml_rtn_msg(&msg, ERR_INVALID_ISNS_SRV);
+		return (msg);
+	}
+
 	if ((sp = strdup(prop)) == NULL) {
 		xml_rtn_msg(&msg, ERR_NO_MEM);
 		return (msg);
@@ -1122,11 +1128,16 @@ valid_isns_srv(char *name, char *prop)
 	}
 
 	so = isns_open(sp);
-	if (so < 0)
-		xml_rtn_msg(&msg, ERR_INVALID_ISNS_SRV);
-	else
+	if (so < 0) {
+		if (isns_enabled() == True) {
+			xml_rtn_msg(&msg, ERR_INVALID_ISNS_SRV);
+		} else { /* Just print a warning and accept the server */
+			syslog(LOG_ALERT,
+			    "Check if the server:%s is valid", sp);
+		}
+	} else {
 		isns_close(so);
-
+	}
 	free(sp);
 	return (msg);
 }

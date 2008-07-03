@@ -38,6 +38,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <zone.h>
+#include <netdb.h>
 
 #include <iscsitgt_impl.h>
 #include "cmdparse.h"
@@ -841,6 +842,13 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 				}
 				break;
 			case 's': /* iSNS server */
+				if (strlen(optionList->optarg) >
+				    MAXHOSTNAMELEN) {
+					(void) fprintf(stderr, "%s: %s\n",
+					    cmdName,
+					    gettext("option too long"));
+					return (1);
+				}
 				tgt_buf_add(&first_str, XML_ELEMENT_ISNS_SERV,
 				    optionList->optarg);
 				break;
