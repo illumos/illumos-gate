@@ -79,6 +79,7 @@ typedef struct idmapd_state {
 	uid_t		limit_uid;
 	gid_t		limit_gid;
 	int		new_eph_db;	/* was the ephem ID db [re-]created? */
+	bool_t		eph_map_unres_sids;
 	ad_t		*ad;
 } idmapd_state_t;
 extern idmapd_state_t	_idmapdstate;
@@ -100,6 +101,7 @@ typedef struct lookup_state {
 	bool_t			pid2sid_done;
 	int			ad_nqueries;
 	int			nldap_nqueries;
+	bool_t			eph_map_unres_sids;
 	uint_t			curpos;
 	hashentry_t		*sid_history;
 	uint_t			sid_history_size;

@@ -43,7 +43,7 @@
 #include <net/route.h>
 #include "addisc.h"
 
-#define	MACHINE_SID_LEN		(9 + UUID_LEN/4 * 11)
+#define	MACHINE_SID_LEN		(9 + 3 * 11)
 #define	FMRI_BASE		"svc:/system/idmap"
 #define	CONFIG_PG		"config"
 #define	GENERAL_PG		"general"
@@ -67,10 +67,13 @@ generate_machine_sid(char **machine_sid)
 	uint32_t rid;
 
 	/*
-	 * Generate and split 128-bit UUID into four 32-bit RIDs
-	 * The machine_sid will be of the form S-1-5-N1-N2-N3-N4
-	 * We depart from Windows here, which instead of 128
-	 * bits worth of random numbers uses 96 bits.
+	 * Generate and split 128-bit UUID into three 32-bit RIDs The
+	 * machine_sid will be of the form S-1-5-21-N1-N2-N3 (that's
+	 * four RIDs altogether).
+	 *
+	 * Technically we could use upto 14 random RIDs here, but it
+	 * turns out that with some versions of Windows using SIDs with
+	 * more than  five RIDs in security descriptors causes problems.
 	 */
 
 	*machine_sid = calloc(1, MACHINE_SID_LEN);
@@ -85,7 +88,11 @@ generate_machine_sid(char **machine_sid)
 	uuid_clear(uu);
 	uuid_generate_random(uu);
 
-	for (i = 0; i < UUID_LEN/4; i++) {
+#if UUID_LEN != 16
+#error UUID size is not 16!
+#endif
+
+	for (i = 0; i < 3; i++) {
 		j = i * 4;
 		rid = (uu[j] << 24) | (uu[j + 1] << 16) |
 		    (uu[j + 2] << 8) | (uu[j + 3]);
@@ -141,6 +148,22 @@ get_val_int(idmap_cfg_handles_t *handles, char *name,
 	scf_property_t *scf_prop;
 	scf_value_t *value;
 
+	switch (type) {
+	case SCF_TYPE_BOOLEAN:
+		*(uint8_t *)val = 0;
+		break;
+	case SCF_TYPE_COUNT:
+		*(uint64_t *)val = 0;
+		break;
+	case SCF_TYPE_INTEGER:
+		*(int64_t *)val = 0;
+		break;
+	default:
+		idmapdlog(LOG_ERR, "Invalid scf integer type (%d)",
+		    type);
+		abort();
+	}
+
 	scf_prop = scf_property_create(handles->main);
 	if (scf_prop == NULL) {
 		idmapdlog(LOG_ERR, "scf_property_create() failed: %s",
@@ -173,11 +196,6 @@ get_val_int(idmap_cfg_handles_t *handles, char *name,
 		break;
 	case SCF_TYPE_INTEGER:
 		rc = scf_value_get_integer(value, val);
-		break;
-	default:
-		idmapdlog(LOG_ERR, "Invalid scf integer type (%d)",
-		    type);
-		rc = -1;
 		break;
 	}
 
@@ -490,7 +508,18 @@ destruction:
 }
 
 static int
-update_value(char **value, char **new, char *name)
+update_bool(bool_t *value, bool_t *new, char *name)
+{
+	if (*value == *new)
+		return (0);
+
+	idmapdlog(LOG_INFO, "change %s=%s", name, *new ? "true" : "false");
+	*value = *new;
+	return (1);
+}
+
+static int
+update_string(char **value, char **new, char *name)
 {
 	if (*new == NULL)
 		return (0);
@@ -811,19 +840,24 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	if (_idmapdstate.debug_mode != new_debug_mode) {
 		if (_idmapdstate.debug_mode == FALSE) {
 			_idmapdstate.debug_mode = new_debug_mode;
+			idmap_log_stderr(LOG_DEBUG);
 			idmapdlog(LOG_DEBUG, "debug mode enabled");
 		} else {
 			idmapdlog(LOG_DEBUG, "debug mode disabled");
+			idmap_log_stderr(-1);
 			_idmapdstate.debug_mode = new_debug_mode;
 		}
 	}
 
+	rc = get_val_int(handles, "unresolvable_sid_mapping",
+	    &pgcfg->eph_map_unres_sids, SCF_TYPE_BOOLEAN);
+	if (rc != 0)
+		errors++;
+
 	rc = get_val_int(handles, "list_size_limit",
 	    &pgcfg->list_size_limit, SCF_TYPE_COUNT);
-	if (rc != 0) {
-		pgcfg->list_size_limit = 0;
+	if (rc != 0)
 		errors++;
-	}
 
 	rc = get_val_astring(handles, "domain_name",
 	    &pgcfg->domain_name);
@@ -927,7 +961,6 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	/*
 	 * Read directory-based name mappings related SMF properties
 	 */
-	bool_val = 0;
 	rc = get_val_int(handles, "ds_name_mapping_enabled",
 	    &bool_val, SCF_TYPE_BOOLEAN);
 	if (rc != 0)
@@ -1081,38 +1114,41 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 	}
 
 	/* Non-discoverable props updated here */
-	changed += update_value(&live_pgcfg->machine_sid,
+	changed += update_string(&live_pgcfg->machine_sid,
 	    &new_pgcfg.machine_sid, "machine_sid");
+
+	changed += update_bool(&live_pgcfg->eph_map_unres_sids,
+	    &new_pgcfg.eph_map_unres_sids, "unresolvable_sid_mapping");
 
 	changed += live_pgcfg->ds_name_mapping_enabled !=
 	    new_pgcfg.ds_name_mapping_enabled;
 	live_pgcfg->ds_name_mapping_enabled =
 	    new_pgcfg.ds_name_mapping_enabled;
 
-	changed += update_value(&live_pgcfg->ad_unixuser_attr,
+	changed += update_string(&live_pgcfg->ad_unixuser_attr,
 	    &new_pgcfg.ad_unixuser_attr, "ad_unixuser_attr");
 
-	changed += update_value(&live_pgcfg->ad_unixgroup_attr,
+	changed += update_string(&live_pgcfg->ad_unixgroup_attr,
 	    &new_pgcfg.ad_unixgroup_attr, "ad_unixgroup_attr");
 
-	changed += update_value(&live_pgcfg->nldap_winname_attr,
+	changed += update_string(&live_pgcfg->nldap_winname_attr,
 	    &new_pgcfg.nldap_winname_attr, "nldap_winname_attr");
 
 	/* Props that can be discovered and set in SMF updated here */
 	if (live_pgcfg->dflt_dom_set_in_smf == FALSE)
-		changed += update_value(&live_pgcfg->default_domain,
+		changed += update_string(&live_pgcfg->default_domain,
 		    &new_pgcfg.default_domain, "default_domain");
 
-	changed += update_value(&live_pgcfg->domain_name,
+	changed += update_string(&live_pgcfg->domain_name,
 	    &new_pgcfg.domain_name, "domain_name");
 
 	changed += update_dirs(&live_pgcfg->domain_controller,
 	    &new_pgcfg.domain_controller, "domain_controller");
 
-	changed += update_value(&live_pgcfg->forest_name,
+	changed += update_string(&live_pgcfg->forest_name,
 	    &new_pgcfg.forest_name, "forest_name");
 
-	changed += update_value(&live_pgcfg->site_name,
+	changed += update_string(&live_pgcfg->site_name,
 	    &new_pgcfg.site_name, "site_name");
 
 	if (update_dirs(&live_pgcfg->global_catalog,

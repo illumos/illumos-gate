@@ -1077,6 +1077,10 @@ load_cfg_in_state(lookup_state_t *state)
 	state->nm_sidgid = IDMAP_NM_NONE;
 	RDLOCK_CONFIG();
 
+	state->eph_map_unres_sids = 0;
+	if (_idmapdstate.cfg->pgcfg.eph_map_unres_sids)
+		state->eph_map_unres_sids = 1;
+
 	if (_idmapdstate.cfg->pgcfg.default_domain != NULL) {
 		state->defdom =
 		    strdup(_idmapdstate.cfg->pgcfg.default_domain);
@@ -2907,6 +2911,19 @@ sid2pid_second_pass(lookup_state_t *state,
 
 	/* Get status from previous pass */
 	retcode = res->retcode;
+	if (retcode != IDMAP_SUCCESS && state->eph_map_unres_sids &&
+	    !EMPTY_STRING(req->id1.idmap_id_u.sid.prefix) &&
+	    EMPTY_STRING(req->id1name)) {
+		/*
+		 * We are asked to map an unresolvable SID to a UID or
+		 * GID, but, which?  We'll treat all unresolvable SIDs
+		 * as users unless the caller specified which of a UID
+		 * or GID they want.
+		 */
+		if (res->id.idtype == IDMAP_POSIXID)
+			res->id.idtype = IDMAP_UID;
+		goto do_eph;
+	}
 	if (retcode != IDMAP_SUCCESS)
 		goto out;
 
@@ -3004,6 +3021,7 @@ sid2pid_second_pass(lookup_state_t *state,
 	if (retcode != IDMAP_ERR_NOTFOUND)
 		goto out;
 
+do_eph:
 	/* If not found, do ephemeral mapping */
 	retcode = dynamic_ephemeral_mapping(state, req, res);
 
