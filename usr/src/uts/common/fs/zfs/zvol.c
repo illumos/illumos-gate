@@ -1234,6 +1234,9 @@ zvol_strategy(buf_t *bp)
 	addr = bp->b_un.b_addr;
 	resid = bp->b_bcount;
 
+	if (resid > 0 && (off < 0 || off >= volsize))
+		return (EIO);
+
 	/*
 	 * There must be no buffer changes when doing a dmu_sync() because
 	 * we can't change the data whilst calculating the checksum.
@@ -1345,6 +1348,7 @@ zvol_read(dev_t dev, uio_t *uio, cred_t *cr)
 {
 	minor_t minor = getminor(dev);
 	zvol_state_t *zv;
+	uint64_t volsize;
 	rl_t *rl;
 	int error = 0;
 
@@ -1355,10 +1359,19 @@ zvol_read(dev_t dev, uio_t *uio, cred_t *cr)
 	if (zv == NULL)
 		return (ENXIO);
 
+	volsize = zv->zv_volsize;
+	if (uio->uio_resid > 0 &&
+	    (uio->uio_loffset < 0 || uio->uio_loffset >= volsize))
+		return (EIO);
+
 	rl = zfs_range_lock(&zv->zv_znode, uio->uio_loffset, uio->uio_resid,
 	    RL_READER);
-	while (uio->uio_resid > 0) {
+	while (uio->uio_resid > 0 && uio->uio_loffset < volsize) {
 		uint64_t bytes = MIN(uio->uio_resid, DMU_MAX_ACCESS >> 1);
+
+		/* don't read past the end */
+		if (bytes > volsize - uio->uio_loffset)
+			bytes = volsize - uio->uio_loffset;
 
 		error =  dmu_read_uio(zv->zv_objset, ZVOL_OBJ, uio, bytes);
 		if (error)
@@ -1374,6 +1387,7 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 {
 	minor_t minor = getminor(dev);
 	zvol_state_t *zv;
+	uint64_t volsize;
 	rl_t *rl;
 	int error = 0;
 
@@ -1384,6 +1398,11 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 	if (zv == NULL)
 		return (ENXIO);
 
+	volsize = zv->zv_volsize;
+	if (uio->uio_resid > 0 &&
+	    (uio->uio_loffset < 0 || uio->uio_loffset >= volsize))
+		return (EIO);
+
 	if (zv->zv_flags & ZVOL_DUMPIFIED) {
 		error = physio(zvol_strategy, NULL, dev, B_WRITE,
 		    zvol_minphys, uio);
@@ -1392,11 +1411,14 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 
 	rl = zfs_range_lock(&zv->zv_znode, uio->uio_loffset, uio->uio_resid,
 	    RL_WRITER);
-	while (uio->uio_resid > 0) {
+	while (uio->uio_resid > 0 && uio->uio_loffset < volsize) {
 		uint64_t bytes = MIN(uio->uio_resid, DMU_MAX_ACCESS >> 1);
 		uint64_t off = uio->uio_loffset;
-
 		dmu_tx_t *tx = dmu_tx_create(zv->zv_objset);
+
+		if (bytes > volsize - off)	/* don't write past the end */
+			bytes = volsize - off;
+
 		dmu_tx_hold_write(tx, ZVOL_OBJ, off, bytes);
 		error = dmu_tx_assign(tx, TXG_WAIT);
 		if (error) {
