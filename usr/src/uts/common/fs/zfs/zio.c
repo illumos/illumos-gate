@@ -527,14 +527,13 @@ zio_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
 }
 
 zio_t *
-zio_rewrite(zio_t *pio, spa_t *spa, int checksum,
-    uint64_t txg, blkptr_t *bp, void *data, uint64_t size,
-    zio_done_func_t *done, void *private, int priority, int flags,
-    zbookmark_t *zb)
+zio_rewrite(zio_t *pio, spa_t *spa, int checksum, blkptr_t *bp, void *data,
+    uint64_t size, zio_done_func_t *done, void *private, int priority,
+    int flags, zbookmark_t *zb)
 {
 	zio_t *zio;
 
-	zio = zio_create(pio, spa, txg, bp, data, size, done, private,
+	zio = zio_create(pio, spa, bp->blk_birth, bp, data, size, done, private,
 	    ZIO_TYPE_WRITE, priority, flags | ZIO_FLAG_USER,
 	    ZIO_STAGE_OPEN, ZIO_REWRITE_PIPELINE(bp));
 
@@ -1506,10 +1505,10 @@ zio_rewrite_gang_members(zio_t *zio)
 		ASSERT(i < SPA_GBH_NBLKPTRS);
 		ASSERT(!BP_IS_HOLE(gbp));
 
-		zio_nowait(zio_rewrite(zio, zio->io_spa, zio->io_checksum,
-		    zio->io_txg, gbp, (char *)zio->io_data + loff, lsize,
-		    NULL, NULL, zio->io_priority,
-		    zio->io_flags & ZIO_FLAG_GANG_INHERIT, &zio->io_bookmark));
+		zio_nowait(zio_rewrite(zio, zio->io_spa, zio->io_checksum, gbp,
+		    (char *)zio->io_data + loff, lsize, NULL, NULL,
+		    zio->io_priority, zio->io_flags & ZIO_FLAG_GANG_INHERIT,
+		    &zio->io_bookmark));
 	}
 
 	zio_push_transform(zio, gbh, gsize, gbufsize);
@@ -1655,8 +1654,7 @@ zio_write_allocate_gang_members(zio_t *zio, metaslab_class_t *mc)
 			BP_SET_PSIZE(gbp, lsize);
 			BP_SET_COMPRESS(gbp, ZIO_COMPRESS_OFF);
 			gbp->blk_birth = txg;
-			zio_nowait(zio_rewrite(zio, spa,
-			    zio->io_checksum, txg, gbp,
+			zio_nowait(zio_rewrite(zio, spa, zio->io_checksum, gbp,
 			    (char *)zio->io_data + loff, lsize,
 			    zio_write_allocate_gang_member_done, NULL,
 			    zio->io_priority,

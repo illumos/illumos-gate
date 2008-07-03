@@ -658,7 +658,7 @@ zil_lwb_write_init(zilog_t *zilog, lwb_t *lwb)
 	}
 	if (lwb->lwb_zio == NULL) {
 		lwb->lwb_zio = zio_rewrite(zilog->zl_root_zio, zilog->zl_spa,
-		    ZIO_CHECKSUM_ZILOG, 0, &lwb->lwb_blk, lwb->lwb_buf,
+		    ZIO_CHECKSUM_ZILOG, &lwb->lwb_blk, lwb->lwb_buf,
 		    lwb->lwb_sz, zil_lwb_write_done, lwb,
 		    ZIO_PRIORITY_LOG_WRITE, ZIO_FLAG_CANFAIL, &zb);
 	}
