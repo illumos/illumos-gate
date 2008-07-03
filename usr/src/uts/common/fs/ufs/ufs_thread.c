@@ -254,12 +254,6 @@ ufs_delete(struct ufsvfs *ufsvfsp, struct inode *ip, int dolockfs)
 	struct ufs_delq_info *delq_info = &ufsvfsp->vfs_delete_info;
 
 	/*
-	 * not on a trans device or not part of a transaction
-	 */
-	ASSERT(!TRANS_ISTRANS(ufsvfsp) ||
-	    ((curthread->t_flag & T_DONTBLOCK) == 0));
-
-	/*
 	 * Ignore if deletes are not allowed (wlock/hlock)
 	 */
 	if (ULOCKFS_IS_NOIDEL(ITOUL(ip))) {
