@@ -2171,7 +2171,7 @@ cpu_mp_init(void)
 	mutex_exit(&cpu_lock);
 }
 
-int heaplp_use_stlb = -1;
+int heaplp_use_stlb = 0;
 
 void
 mmu_init_kernel_pgsz(struct hat *hat)
