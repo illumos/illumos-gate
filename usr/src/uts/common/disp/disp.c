@@ -2383,6 +2383,29 @@ disp_getbest(disp_t *dp)
 
 	cp->cpu_dispthread = tp;		/* protected by spl only */
 	cp->cpu_dispatch_pri = pri;
+
+	/*
+	 * There can be a memory synchronization race between disp_getbest()
+	 * and disp_ratify() vs cpu_resched() where cpu_resched() is trying
+	 * to preempt the current thread to run the enqueued thread while
+	 * disp_getbest() and disp_ratify() are changing the current thread
+	 * to the stolen thread. This may lead to a situation where
+	 * cpu_resched() tries to preempt the wrong thread and the
+	 * stolen thread continues to run on the CPU which has been tagged
+	 * for preemption.
+	 * Later the clock thread gets enqueued but doesn't get to run on the
+	 * CPU causing the system to hang.
+	 *
+	 * To avoid this, grabbing and dropping the disp_lock (which does
+	 * a memory barrier) is needed to synchronize the execution of
+	 * cpu_resched() with disp_getbest() and disp_ratify() and
+	 * synchronize the memory read and written by cpu_resched(),
+	 * disp_getbest(), and disp_ratify() with each other.
+	 *  (see CR#6482861 for more details).
+	 */
+	disp_lock_enter_high(&cp->cpu_disp->disp_lock);
+	disp_lock_exit_high(&cp->cpu_disp->disp_lock);
+
 	ASSERT(pri == DISP_PRIO(tp));
 
 	DTRACE_PROBE3(steal, kthread_t *, tp, cpu_t *, tcp, cpu_t *, cp);
