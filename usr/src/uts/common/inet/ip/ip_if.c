@@ -16936,6 +16936,12 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 					 */
 					*ilmp = ilm->ilm_next;
 					ilm->ilm_next = NULL;
+					DTRACE_PROBE3(ill__decr__cnt,
+					    (ill_t *), from_ill,
+					    (char *), "ilm", (void *), ilm);
+					ASSERT(from_ill->ill_ilm_cnt > 0);
+					from_ill->ill_ilm_cnt--;
+
 					new_ilm = ilm;
 				}
 
@@ -17139,6 +17145,12 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 					new_ilm->ilm_filter = NULL;
 				} else {
 					*ilmp = ilm->ilm_next;
+					DTRACE_PROBE3(ill__decr__cnt,
+					    (ill_t *), from_ill,
+					    (char *), "ilm", (void *), ilm);
+					ASSERT(from_ill->ill_ilm_cnt > 0);
+					from_ill->ill_ilm_cnt--;
+
 					new_ilm = ilm;
 				}
 				/*
