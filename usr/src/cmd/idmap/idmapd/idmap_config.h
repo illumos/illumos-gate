@@ -83,6 +83,7 @@ typedef struct idmap_pg_config {
 	char		*ad_unixgroup_attr;
 	char		*nldap_winname_attr;
 	bool_t		ds_name_mapping_enabled;
+	bool_t		eph_map_unres_sids;
 } idmap_pg_config_t;
 
 typedef struct idmap_cfg {
