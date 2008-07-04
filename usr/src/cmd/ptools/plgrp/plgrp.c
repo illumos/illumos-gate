@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1009,7 +1009,12 @@ do_op(plgrp_args_t *plgrp_args, id_t pid, id_t lwpid,
 			(void) fprintf(stderr, gettext("%s: out of memory\n"),
 			    progname);
 			Prelease(Ph, PRELEASE_RETAIN);
-			exit(EXIT_NONFATAL);
+			if (init_affs != NULL)
+				free(init_affs);
+			if (cur_affs != NULL)
+				free(cur_affs);
+			nerrors++;
+			return (EXIT_NONFATAL);
 		}
 
 		/*
@@ -1578,9 +1583,14 @@ main(int argc, char *argv[])
 	 * Print heading and process each [pid | core]/lwps argument
 	 */
 	print_heading(plgrp_todo.op);
+	(void) proc_initstdio();
+
 	for (i = optind; i < argc && !interrupt; i++) {
+		(void) proc_flushstdio();
 		do_process(argv[i], &plgrp_todo, Fflag);
 	}
+
+	(void) proc_finistdio();
 
 	if (plgrp_todo.nthreads == 0) {
 		(void) fprintf(stderr, gettext("%s: no matching LWPs found\n"),

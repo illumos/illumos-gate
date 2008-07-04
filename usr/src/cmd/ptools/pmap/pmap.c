@@ -229,6 +229,9 @@ main(int argc, char **argv)
 	struct stat64 statbuf;
 	char buf[128];
 	int mapfd;
+	int prg_gflags = PGRAB_RDONLY;
+	int prr_flags = 0;
+	boolean_t use_agent_lwp = B_FALSE;
 
 	if ((command = strrchr(argv[0], '/')) != NULL)
 		command++;
@@ -257,6 +260,7 @@ main(int argc, char **argv)
 			break;
 		case 'L':		/* show lgroup information */
 			Lflag = 1;
+			use_agent_lwp = B_TRUE;
 			break;
 		case 'F':		/* force grabbing (no O_EXCL) */
 			Fflag = PGRAB_FORCE;
@@ -327,18 +331,43 @@ main(int argc, char **argv)
 		(void) enable_extended_FILE_stdio(-1, -1);
 	}
 
+	/*
+	 * The implementation of -L option creates an agent LWP in the target
+	 * process address space. The agent LWP issues meminfo(2) system calls
+	 * on behalf of the target process. If we are interrupted prematurely,
+	 * the target process remains in the stopped state with the agent still
+	 * attached to it. To prevent such situation we catch signals from
+	 * terminal and terminate gracefully.
+	 */
+	if (use_agent_lwp) {
+		/*
+		 * Buffer output to stdout, stderr while process is grabbed.
+		 * Prevents infamous deadlocks due to pmap `pgrep xterm` and
+		 * other variants.
+		 */
+		(void) proc_initstdio();
+
+		prg_gflags = PGRAB_RETAIN | Fflag;
+		prr_flags = PRELEASE_RETAIN;
+
+		if (sigset(SIGHUP, SIG_IGN) == SIG_DFL)
+			(void) sigset(SIGHUP, intr);
+		if (sigset(SIGINT, SIG_IGN) == SIG_DFL)
+			(void) sigset(SIGINT, intr);
+		if (sigset(SIGQUIT, SIG_IGN) == SIG_DFL)
+			(void) sigset(SIGQUIT, intr);
+		(void) sigset(SIGPIPE, intr);
+		(void) sigset(SIGTERM, intr);
+	}
+
 	while (argc-- > 0) {
 		char *arg;
 		int gcode;
 		psinfo_t psinfo;
 		int tries = 0;
-		int prg_gflags = PGRAB_RDONLY;
-		int prr_flags = 0;
 
-		if (Lflag) {
-			prg_gflags = PGRAB_RETAIN | Fflag;
-			prr_flags = PRELEASE_RETAIN;
-		}
+		if (use_agent_lwp)
+			(void) proc_flushstdio();
 
 		if ((Pr = proc_arg_grab(arg = *argv++, PR_ARG_ANY,
 		    prg_gflags, &gcode)) == NULL) {
@@ -391,27 +420,6 @@ again:
 		} else {
 			(void) printf("%d:\t%.70s\n",
 			    (int)psinfo.pr_pid, psinfo.pr_psargs);
-		}
-
-		if (Lflag) {
-			/*
-			 * The implementation of -L option creates an agent LWP
-			 * in the target process address space. The agent LWP
-			 * issues meminfo(2) system calls on behalf of the
-			 * target process. If we are interrupted prematurely,
-			 * the target process remains in the stopped state with
-			 * the agent still attached to it. To prevent such
-			 * situation we catch signals from terminal and
-			 * terminate gracefully.
-			 */
-			if (sigset(SIGHUP, SIG_IGN) == SIG_DFL)
-				(void) sigset(SIGHUP, intr);
-			if (sigset(SIGINT, SIG_IGN) == SIG_DFL)
-				(void) sigset(SIGINT, intr);
-			if (sigset(SIGQUIT, SIG_IGN) == SIG_DFL)
-				(void) sigset(SIGQUIT, intr);
-			(void) sigset(SIGPIPE, intr);
-			(void) sigset(SIGTERM, intr);
 		}
 
 		if (!(Pstatus(Pr)->pr_flags & PR_ISSYS)) {
@@ -591,6 +599,9 @@ again:
 		if (mapfd != -1)
 			(void) close(mapfd);
 	}
+
+	if (use_agent_lwp)
+		(void) proc_finistdio();
 
 	return (rc);
 }

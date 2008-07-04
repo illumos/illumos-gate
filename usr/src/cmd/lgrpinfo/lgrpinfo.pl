@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -678,14 +678,15 @@ sub number_to_scaled_string
 	my $uom = shift(@measurement);
 	my $result;
 
+	my $save = $number;
+
 	# Get size in K.
 	$number /= KB;
 
-	my $save = $number;
 	while (($number >= $scale) && $uom ne 'E') {
 		$uom = shift(@measurement);
 		$save = $number;
-		$number = ($number + ($scale / 2)) / $scale;
+		$number /= $scale;
 	}
 
 	# check if we should output a decimal place after the point

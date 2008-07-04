@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1146,6 +1146,8 @@ main(int argc, char **argv)
 		usage();
 	}
 
+	(void) proc_initstdio();
+
 	/*
 	 * Iterate through all pid arguments, create new merged_list, maplist,
 	 * (and chopped_list if using verbose output) based on each process'
@@ -1156,6 +1158,8 @@ main(int argc, char **argv)
 		char *arg;
 		int gcode;
 		psinfo_t psinfo;
+
+		(void) proc_flushstdio();
 
 		if ((Pr = proc_arg_grab(arg = *argv++, PR_ARG_PIDS,
 		    PGRAB_RETAIN | Fflag, &gcode)) == NULL) {
@@ -1264,6 +1268,8 @@ main(int argc, char **argv)
 
 		Prelease(Pr, 0);
 	}
+
+	(void) proc_finistdio();
 
 	return (rc);
 }
