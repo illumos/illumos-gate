@@ -1502,7 +1502,7 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 	nvlist_t *tgt;
 	boolean_t avail_spare, l2cache;
 	uint64_t val, is_log;
-	char *path;
+	char *path, *newname;
 	nvlist_t **child;
 	uint_t children;
 	nvlist_t *config_root;
@@ -1538,17 +1538,20 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 	verify(nvlist_lookup_nvlist(zpool_get_config(zhp, NULL),
 	    ZPOOL_CONFIG_VDEV_TREE, &config_root) == 0);
 
+	if ((newname = zpool_vdev_name(NULL, NULL, child[0])) == NULL)
+		return (-1);
+
 	/*
 	 * If the target is a hot spare that has been swapped in, we can only
 	 * replace it with another hot spare.
 	 */
 	if (replacing &&
 	    nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_IS_SPARE, &val) == 0 &&
-	    nvlist_lookup_string(child[0], ZPOOL_CONFIG_PATH, &path) == 0 &&
-	    (zpool_find_vdev(zhp, path, &avail_spare, &l2cache) == NULL ||
+	    (zpool_find_vdev(zhp, newname, &avail_spare, &l2cache) == NULL ||
 	    !avail_spare) && is_replacing_spare(config_root, tgt, 1)) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "can only be replaced by another hot spare"));
+		free(newname);
 		return (zfs_error(hdl, EZFS_BADTARGET, msg));
 	}
 
@@ -1558,12 +1561,15 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 	 */
 	if (replacing &&
 	    nvlist_lookup_string(child[0], ZPOOL_CONFIG_PATH, &path) == 0 &&
-	    zpool_find_vdev(zhp, path, &avail_spare, &l2cache) != NULL &&
+	    zpool_find_vdev(zhp, newname, &avail_spare, &l2cache) != NULL &&
 	    avail_spare && is_replacing_spare(config_root, tgt, 0)) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "device has already been replaced with a spare"));
+		free(newname);
 		return (zfs_error(hdl, EZFS_BADTARGET, msg));
 	}
+
+	free(newname);
 
 	if (zcmd_write_conf_nvlist(hdl, &zc, nvroot) != 0)
 		return (-1);

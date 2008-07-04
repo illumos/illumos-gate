@@ -166,7 +166,19 @@ zfs_mark_vdev(uint64_t pool_guid, nvlist_t *vd)
 	 * Iterate over all children.
 	 */
 	if (nvlist_lookup_nvlist_array(vd, ZPOOL_CONFIG_CHILDREN, &child,
-	    &children) != 0) {
+	    &children) == 0) {
+		for (c = 0; c < children; c++)
+			zfs_mark_vdev(pool_guid, child[c]);
+	}
+
+	if (nvlist_lookup_nvlist_array(vd, ZPOOL_CONFIG_L2CACHE, &child,
+	    &children) == 0) {
+		for (c = 0; c < children; c++)
+			zfs_mark_vdev(pool_guid, child[c]);
+	}
+
+	if (nvlist_lookup_nvlist_array(vd, ZPOOL_CONFIG_SPARES, &child,
+	    &children) == 0) {
 		for (c = 0; c < children; c++)
 			zfs_mark_vdev(pool_guid, child[c]);
 	}
@@ -341,7 +353,7 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	uint64_t ena, pool_guid, vdev_guid;
 	nvlist_t *detector;
 	boolean_t isresource;
-	boolean_t checkremove;
+	char *type;
 
 	isresource = fmd_nvl_class_match(hdl, nvl, "resource.fs.zfs.*");
 
@@ -375,9 +387,23 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	 * Device I/O errors are ignored during pool open.
 	 */
 	if (pool_state == SPA_LOAD_OPEN &&
-	    (fmd_nvl_class_match(hdl, nvl, "ereport.fs.zfs.checksum") ||
-	    fmd_nvl_class_match(hdl, nvl, "ereport.fs.zfs.io")))
+	    (fmd_nvl_class_match(hdl, nvl,
+	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_CHECKSUM)) ||
+	    fmd_nvl_class_match(hdl, nvl,
+	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_IO)) ||
+	    fmd_nvl_class_match(hdl, nvl,
+	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_PROBE_FAILURE))))
 		return;
+
+	/*
+	 * We ignore ereports for anything except disks and files.
+	 */
+	if (nvlist_lookup_string(nvl, FM_EREPORT_PAYLOAD_ZFS_VDEV_TYPE,
+	    &type) == 0) {
+		if (strcmp(type, VDEV_TYPE_DISK) != 0 &&
+		    strcmp(type, VDEV_TYPE_FILE) != 0)
+			return;
+	}
 
 	/*
 	 * Determine if this ereport corresponds to an open case.  Cases are
@@ -555,6 +581,7 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	    fmd_nvl_class_match(hdl, nvl,
 	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_PROBE_FAILURE))) {
 		char *failmode = NULL;
+		boolean_t checkremove = B_FALSE;
 
 		/*
 		 * If this is a checksum or I/O error, then toss it into the
