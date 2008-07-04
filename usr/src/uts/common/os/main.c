@@ -359,6 +359,7 @@ main(void)
 	extern int	swaploaded;
 	extern int	netboot;
 	extern void	vm_init(void);
+	extern void	cbe_init_pre(void);
 	extern void	cbe_init(void);
 	extern void	clock_tick_init_pre(void);
 	extern void	clock_tick_init_post(void);
@@ -399,6 +400,7 @@ main(void)
 	segkmem_gc();
 	callb_init();
 	callout_init();	/* callout table MUST be init'd before clock starts */
+	cbe_init_pre();	/* x86 must initialize gethrtimef before timer_init */
 	timer_init();	/* timer must be initialized before cyclic starts */
 	cbe_init();
 	clock_tick_init_pre();

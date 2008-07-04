@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,7 @@ static ddi_softint_hdl_impl_t cbe_clock_hdl =
 
 cyclic_id_t cbe_hres_cyclic;
 int cbe_psm_timer_mode = TIMER_ONESHOT;
+static hrtime_t cbe_timer_resolution;
 
 extern int tsc_gethrtime_enable;
 
@@ -300,6 +301,16 @@ cbe_hres_tick(void)
 }
 
 void
+cbe_init_pre(void)
+{
+	cbe_vector = (*psm_get_clockirq)(CBE_HIGH_PIL);
+
+	CPUSET_ZERO(cbe_enabled);
+
+	cbe_timer_resolution = (*clkinitf)(TIMER_ONESHOT, &cbe_psm_timer_mode);
+}
+
+void
 cbe_init(void)
 {
 	cyc_backend_t cbe = {
@@ -315,18 +326,12 @@ cbe_init(void)
 		cbe_suspend,		/* cyb_suspend */
 		cbe_resume		/* cyb_resume */
 	};
-	hrtime_t resolution;
 	cyc_handler_t hdlr;
 	cyc_time_t when;
 
-	cbe_vector = (*psm_get_clockirq)(CBE_HIGH_PIL);
-
-	CPUSET_ZERO(cbe_enabled);
-
-	resolution = (*clkinitf)(TIMER_ONESHOT, &cbe_psm_timer_mode);
 
 	mutex_enter(&cpu_lock);
-	cyclic_init(&cbe, resolution);
+	cyclic_init(&cbe, cbe_timer_resolution);
 	mutex_exit(&cpu_lock);
 
 	(void) add_avintr(NULL, CBE_HIGH_PIL, (avfunc)cbe_fire,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -255,6 +255,12 @@ cbe_hres_tick(void)
 {
 	dtrace_hres_tick();
 	hres_tick();
+}
+
+void
+cbe_init_pre(void)
+{
+	/* Nothing to do on sparc */
 }
 
 void
