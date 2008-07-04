@@ -371,7 +371,7 @@ fmd_case_mkevent(fmd_case_t *cp, const char *class)
 		cip->ci_flags |= FMD_CF_INVISIBLE;
 
 	nvl = fmd_protocol_list(class, cip->ci_mod->mod_fmri, cip->ci_uuid,
-	    code, cip->ci_nsuspects, nva, ba, msg, &cip->ci_tv);
+	    code, count, nva, ba, msg, &cip->ci_tv);
 
 	(void) pthread_mutex_unlock(&cip->ci_lock);
 	return (nvl);
