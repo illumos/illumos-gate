@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2443,8 +2443,15 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 		}
 
 		if ((ui = MDI_UNIT(mnum)) == NULL) {
-			(void) mdmderror(&p->mde, MDE_UNIT_NOT_SETUP, mnum);
-			err = EINVAL;
+			/*
+			 * If the incore unit does not exist then rather
+			 * than set err we need to set it to 0 because the
+			 * multi-node code is expecting a return of
+			 * 0 (from mdmderror() but with the mde structure
+			 * filled with particular information
+			 * (MDE_UNIT_NOT_SETUP).
+			 */
+			err = mdmderror(&p->mde, MDE_UNIT_NOT_SETUP, mnum);
 			break;
 		}
 
