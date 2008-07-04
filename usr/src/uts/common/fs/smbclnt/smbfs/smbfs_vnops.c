@@ -69,11 +69,14 @@
 /*
  * These characters are illegal in NTFS file names.
  * ref: http://support.microsoft.com/kb/147438
+ *
+ * Careful!  The check in the XATTR case skips the
+ * first character to allow colon in XATTR names.
  */
 static const char illegal_chars[] = {
+	':',	/* colon - keep this first! */
 	'\\',	/* back slash */
 	'/',	/* slash */
-	':',	/* colon */
 	'*',	/* asterisk */
 	'?',	/* question mark */
 	'"',	/* double quote */
@@ -91,6 +94,10 @@ static const char illegal_chars[] = {
 
 /* local static function defines */
 
+#ifdef USE_DNLC
+static int	smbfslookup_dnlc(vnode_t *dvp, char *nm, vnode_t **vpp,
+			cred_t *cr);
+#endif
 static int	smbfslookup(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr,
 			int dnlc, caller_context_t *);
 static int	smbfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm,
@@ -266,6 +273,23 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	smb_credinit(&scred, curproc, cr);
 
 	/*
+	 * Keep track of the vnode type at first open.
+	 * It may change later, and we need close to do
+	 * cleanup for the type we opened.  Also deny
+	 * open of new types until old type is closed.
+	 * XXX: Per-open instance nodes whould help.
+	 */
+	if (np->n_ovtype == VNON) {
+		ASSERT(np->n_dirrefs == 0);
+		ASSERT(np->n_fidrefs == 0);
+	} else if (np->n_ovtype != vp->v_type) {
+		SMBVDEBUG("open n_ovtype=%d v_type=%d\n",
+		    np->n_ovtype, vp->v_type);
+		error = EACCES;
+		goto out;
+	}
+
+	/*
 	 * Directory open is easy.
 	 */
 	if (vp->v_type == VDIR) {
@@ -311,10 +335,11 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 
 	/*
 	 * we always ask for READ_CONTROL so we can always get the
-	 * owner/group IDs to satisfy a stat.
+	 * owner/group IDs to satisfy a stat.  Ditto attributes.
 	 * XXX: verify that works with "drop boxes"
 	 */
-	rights |= STD_RIGHT_READ_CONTROL_ACCESS;
+	rights |= (STD_RIGHT_READ_CONTROL_ACCESS |
+	    SA_RIGHT_FILE_READ_ATTRIBUTES);
 	if ((flag & FREAD))
 		rights |= SA_RIGHT_FILE_READ_DATA;
 	if ((flag & FWRITE))
@@ -359,8 +384,14 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	mutex_exit(&np->r_statelock);
 
 have_fid:
-	/* Get attributes (maybe). */
+	/*
+	 * Keep track of the vnode type at first open.
+	 * (see comments above)
+	 */
+	if (np->n_ovtype == VNON)
+		np->n_ovtype = vp->v_type;
 
+	/* Get attributes (maybe). */
 
 	/* Darwin (derived) code. */
 
@@ -459,7 +490,15 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 	smb_credinit(&scred, curproc, cr);
 
 	error = 0;
-	if (vp->v_type == VDIR) {
+
+	/*
+	 * Note that vp->v_type may change if a remote node
+	 * is deleted and recreated as a different type, and
+	 * our getattr may change v_type accordingly.
+	 * Now use n_ovtype to keep track of the v_type
+	 * we had during open (see comments above).
+	 */
+	if (np->n_ovtype == VDIR) {
 		struct smbfs_fctx *fctx;
 		ASSERT(np->n_dirrefs > 0);
 		if (--np->n_dirrefs)
@@ -483,6 +522,9 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 		SMBERROR("error %d closing %s\n",
 		    error, np->n_rpath);
 	}
+
+	/* Allow next open to use any v_type. */
+	np->n_ovtype = VNON;
 
 	if (np->n_flag & NATTRCHANGED)
 		smbfs_attr_cacheremove(np);
@@ -744,6 +786,7 @@ smbfsgetattr(vnode_t *vp, struct vattr *vap, cred_t *cr)
 		return (EINTR);
 	smb_credinit(&scred, curproc, cr);
 
+	bzero(&fattr, sizeof (fattr));
 	error = smbfs_smb_getfattr(np, &fattr, &scred);
 
 	smb_credrele(&scred);
@@ -816,6 +859,19 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 	uint32_t rights = 0;
 
 	ASSERT(curproc->p_zone == smi->smi_zone);
+
+	/*
+	 * There are no settable attributes on the XATTR dir,
+	 * so just silently ignore these.  On XATTR files,
+	 * you can set the size but nothing else.
+	 */
+	if (vp->v_flag & V_XATTRDIR)
+		return (0);
+	if (np->n_flag & N_XATTR) {
+		if (mask & AT_TIMES)
+			SMBVDEBUG("ignore set time on xattr\n");
+		mask &= AT_SIZE;
+	}
 
 	/*
 	 * If our caller is trying to set multiple attributes, they
@@ -1181,19 +1237,45 @@ smbfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	int flags, vnode_t *rdir, cred_t *cr, caller_context_t *ct,
 	int *direntflags, pathname_t *realpnp)
 {
-	int		error;
-	smbnode_t	*dnp;
+	vfs_t		*vfs;
 	smbmntinfo_t	*smi;
+	smbnode_t	*dnp;
+	int		error;
 
-	smi = VTOSMI(dvp);
+	vfs = dvp->v_vfsp;
+	smi = VFTOSMI(vfs);
 
 	if (curproc->p_zone != smi->smi_zone)
 		return (EPERM);
 
-	if (smi->smi_flags & SMI_DEAD || dvp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
+	if (smi->smi_flags & SMI_DEAD || vfs->vfs_flag & VFS_UNMOUNTED)
 		return (EIO);
 
 	dnp = VTOSMB(dvp);
+
+	/*
+	 * Are we looking up extended attributes?  If so, "dvp" is
+	 * the file or directory for which we want attributes, and
+	 * we need a lookup of the (faked up) attribute directory
+	 * before we lookup the rest of the path.
+	 */
+	if (flags & LOOKUP_XATTR) {
+		/*
+		 * Require the xattr mount option.
+		 */
+		if ((vfs->vfs_flag & VFS_XATTR) == 0)
+			return (EINVAL);
+
+		/*
+		 * We don't allow recursive attributes.
+		 */
+		if (dnp->n_flag & N_XATTR)
+			return (EINVAL);
+
+		error = smbfs_get_xattrdir(dvp, vpp, cr, flags);
+		return (error);
+	}
+
 	if (smbfs_rw_enter_sig(&dnp->r_rwlock, RW_READER, SMBINTR(dvp))) {
 		error = EINTR;
 		goto out;
@@ -1218,6 +1300,7 @@ smbfslookup(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr, int dnlc,
 	smbnode_t	*dnp;
 	smbmntinfo_t	*smi;
 	/* struct smb_vc	*vcp; */
+	const char	*ill;
 	const char	*name = (const char *)nm;
 	int 		nmlen = strlen(nm);
 	int 		rplen;
@@ -1256,23 +1339,15 @@ smbfslookup(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr, int dnlc,
 		return (0);
 	}
 
-	/* if the name is longer that what is supported, return an error */
-	if (nmlen > supplen)
-		return (ENAMETOOLONG);
-
 	/*
-	 * Avoid surprises with characters that are
-	 * illegal in Windows file names.
-	 * Todo: CATIA mappings  XXX
+	 * Can't do lookups in non-directories.
 	 */
-	if (strpbrk(nm, illegal_chars))
-		return (EINVAL);
-
-	/* if the dvp is not a directory, return an error */
 	if (dvp->v_type != VDIR)
 		return (ENOTDIR);
 
-	/* Need search permission in the directory. */
+	/*
+	 * Need search permission in the directory.
+	 */
 	error = smbfs_access(dvp, VEXEC, 0, cr, ct);
 	if (error)
 		return (error);
@@ -1288,13 +1363,35 @@ smbfslookup(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr, int dnlc,
 		return (0);
 	}
 
-#ifdef NOT_YET
-	if (dnlc) {
 	/*
-	 * NOTE: search the dnlc here
+	 * Now some sanity checks on the name.
+	 * First check the length.
 	 */
+	if (nmlen > supplen)
+		return (ENAMETOOLONG);
+
+	/*
+	 * Avoid surprises with characters that are
+	 * illegal in Windows file names.
+	 * Todo: CATIA mappings  XXX
+	 */
+	ill = illegal_chars;
+	if (dnp->n_flag & N_XATTR)
+		ill++; /* allow colon */
+	if (strpbrk(nm, ill))
+		return (EINVAL);
+
+#ifdef USE_DNLC
+	if (dnlc) {
+		/*
+		 * Lookup this name in the DNLC.  If there was a valid entry,
+		 * then return the results of the lookup.
+		 */
+		error = smbfslookup_dnlc(dvp, nm, vpp, cr);
+		if (error || *vpp != NULL)
+			return (error);
 	}
-#endif
+#endif	/* USE_DNLC */
 
 	/*
 	 * Handle lookup of ".." which is quite tricky,
@@ -1327,6 +1424,15 @@ smbfslookup(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr, int dnlc,
 		}
 
 		/*
+		 * Special case for XATTR directory
+		 */
+		if (dvp->v_flag & V_XATTRDIR) {
+			error = smbfs_xa_parent(dvp, vpp);
+			/* Intentionally no dnlc_update */
+			return (error);
+		}
+
+		/*
 		 * Find the parent path length.
 		 */
 		rplen = dnp->n_rplen;
@@ -1344,11 +1450,12 @@ smbfslookup(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr, int dnlc,
 		}
 		vp = smbfs_make_node(dvp->v_vfsp,
 		    dnp->n_rpath, rplen,
-		    NULL, 0, NULL);
-		if (vp == NULL) {
-			return (ENOENT);
-		}
+		    NULL, 0, 0, NULL);
+		ASSERT(vp);
 		vp->v_type = VDIR;
+#ifdef USE_DNLC
+		dnlc_update(dvp, nm, vp);
+#endif
 
 		/* Success! */
 		*vpp = vp;
@@ -1366,6 +1473,10 @@ smbfslookup(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr, int dnlc,
 	/* Note: this can allocate a new "name" */
 	error = smbfs_smb_lookup(dnp, &name, &nmlen, &fa, &scred);
 	smb_credrele(&scred);
+#ifdef USE_DNLC
+	if (error == ENOENT)
+		dnlc_enter(dvp, nm, DNLC_NO_VNODE);
+#endif
 	if (error)
 		goto out;
 
@@ -1375,6 +1486,10 @@ smbfslookup(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr, int dnlc,
 	error = smbfs_nget(dvp, name, nmlen, &fa, &vp);
 	if (error)
 		goto out;
+
+#ifdef USE_DNLC
+	dnlc_update(dvp, nm, vp);
+#endif
 
 	/* Success! */
 	*vpp = vp;
@@ -1386,6 +1501,84 @@ out:
 
 	return (error);
 }
+
+#ifdef USE_DNLC
+#ifdef DEBUG
+static int smbfs_lookup_dnlc_hits = 0;
+static int smbfs_lookup_dnlc_misses = 0;
+static int smbfs_lookup_dnlc_neg_hits = 0;
+static int smbfs_lookup_dnlc_disappears = 0;
+static int smbfs_lookup_dnlc_lookups = 0;
+#endif
+
+/* ARGSUSED */
+static int
+smbfslookup_dnlc(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr)
+{
+	int error;
+	vnode_t *vp;
+	struct vattr va;
+	smbnode_t *dnp;
+
+	dnp = VTOSMB(dvp);
+
+	ASSERT(*nm != '\0');
+	ASSERT(curproc->p_zone == VTOSMI(dvp)->smi_zone);
+
+	/*
+	 * Lookup this name in the DNLC.  If successful, then validate
+	 * the caches and then recheck the DNLC.  The DNLC is rechecked
+	 * just in case this entry got invalidated during the call
+	 * to smbfsgetattr().
+	 * An assumption is being made that it is safe to say that a
+	 * file exists which may not on the server.  Any operations to
+	 * the server will fail with ESTALE.
+	 */
+
+#ifdef DEBUG
+	smbfs_lookup_dnlc_lookups++;
+#endif
+	vp = dnlc_lookup(dvp, nm);
+	if (vp != NULL) {
+		if (vp == DNLC_NO_VNODE && !vn_is_readonly(dvp))
+			smbfs_attr_cacheremove(dnp);
+		VN_RELE(vp);
+		error = smbfsgetattr(dvp, &va, cr);
+		if (error)
+			return (error);
+		vp = dnlc_lookup(dvp, nm);
+		if (vp != NULL) {
+			/*
+			 * NFS checks VEXEC access here,
+			 * but we've already done that
+			 * in the caller.
+			 */
+			if (vp == DNLC_NO_VNODE) {
+				VN_RELE(vp);
+#ifdef DEBUG
+				smbfs_lookup_dnlc_neg_hits++;
+#endif
+				return (ENOENT);
+			}
+			*vpp = vp;
+#ifdef DEBUG
+			smbfs_lookup_dnlc_hits++;
+#endif
+			return (0);
+		}
+#ifdef DEBUG
+		smbfs_lookup_dnlc_disappears++;
+#endif
+	}
+#ifdef DEBUG
+	else
+		smbfs_lookup_dnlc_misses++;
+#endif
+	*vpp = NULL;
+
+	return (0);
+}
+#endif /* USE_DNLC */
 
 /*
  * XXX
@@ -1417,6 +1610,7 @@ smbfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 	int		nmlen = strlen(nm);
 	uint32_t	disp;
 	uint16_t	fid;
+	int		xattr;
 
 	vfsp = dvp->v_vfsp;
 	smi = VFTOSMI(vfsp);
@@ -1528,10 +1722,8 @@ smbfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 	if (error)
 		goto out;
 
-#ifdef NOT_YET
-	/* remove the entry from the negative entry from the dnlc */
-	dnlc_remove(dvp, name);
-#endif
+	/* remove possible negative entry from the dnlc */
+	dnlc_remove(dvp, nm);
 
 	/*
 	 * Now the code derived from Darwin,
@@ -1553,7 +1745,8 @@ smbfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 		else
 			disp = NTCREATEX_DISP_OPEN_IF;
 	}
-	error = smbfs_smb_create(dnp, name, nmlen, &scred, &fid, disp, 0);
+	xattr = (dnp->n_flag & N_XATTR) ? 1 : 0;
+	error = smbfs_smb_create(dnp, name, nmlen, &scred, &fid, disp, xattr);
 	if (error)
 		goto out;
 
@@ -1617,10 +1810,11 @@ smbfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 	if (error)
 		goto out;
 
-#ifdef NOT_YET
-	dnlc_update(dvp, name, vp);
-	/* XXX invalidate pages if we truncated? */
+#ifdef USE_DNLC
+	dnlc_update(dvp, nm, vp);
 #endif
+
+	/* XXX invalidate pages if we truncated? */
 
 	/* Success! */
 	*vpp = vp;
@@ -1688,7 +1882,6 @@ smbfs_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct,
 		goto out;
 	}
 
-#ifdef NOT_YET
 	/*
 	 * First just remove the entry from the name cache, as it
 	 * is most likely the only entry for this vp.
@@ -1703,7 +1896,6 @@ smbfs_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct,
 	 */
 	if (vp->v_count > 1)
 		dnlc_purge_vp(vp);
-#endif /* NOT_YET */
 
 	/*
 	 * Now we have the real reference count on the vnode
@@ -1721,7 +1913,6 @@ smbfs_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct,
 		 */
 		mutex_exit(&np->r_statelock);
 		error = EBUSY;
-		goto out;
 	} else {
 		mutex_exit(&np->r_statelock);
 
@@ -1778,6 +1969,7 @@ smbfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 	vnode_t		*nvp = NULL;
 	vnode_t		*ovp = NULL;
 	smbnode_t	*onp;
+	smbnode_t	*nnp;
 	smbnode_t	*odnp;
 	smbnode_t	*ndnp;
 	struct smb_cred	scred;
@@ -1897,7 +2089,6 @@ smbfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 			goto out;
 		}
 
-#ifdef NOT_YET
 		/*
 		 * Purge the name cache of all references to this vnode
 		 * so that we can check the reference count to infer
@@ -1916,26 +2107,69 @@ smbfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 		 */
 		if (nvp->v_count > 1)
 			dnlc_purge_vp(nvp);
-#endif
+		/*
+		 * when renaming directories to be a subdirectory of a
+		 * different parent, the dnlc entry for ".." will no
+		 * longer be valid, so it must be removed
+		 */
+		if (ndvp != odvp) {
+			if (ovp->v_type == VDIR) {
+				dnlc_remove(ovp, "..");
+			}
+		}
 
-		if (nvp->v_count > 1 && nvp->v_type != VDIR) {
+		/*
+		 * CIFS gives a SHARING_VIOLATION error when
+		 * trying to rename onto an exising object,
+		 * so try to remove the target first.
+		 * (Only for files, not directories.)
+		 */
+		if (nvp->v_type == VDIR) {
+			error = EEXIST;
+			goto out;
+		}
+
+		/*
+		 * Nodes that are "not active" here appear to have
+		 * v_count=2 (should be 1. XXX investigate later)
+		 * Code here is similar to smbfs_remove.
+		 */
+		nnp = VTOSMB(nvp);
+		mutex_enter(&nnp->r_statelock);
+		if (nvp->v_count > 2) {
 			/*
 			 * The target file exists, is not the same as
 			 * the source file, and is active.  Other FS
 			 * implementations unlink the target here.
 			 * For SMB, we don't assume we can remove an
 			 * open file.  Return an error instead.
-			 * Darwin returned an error here too.
 			 */
-			error = EEXIST;
+			mutex_exit(&nnp->r_statelock);
+			error = EBUSY;
 			goto out;
 		}
+		mutex_exit(&nnp->r_statelock);
+
+		/*
+		 * Target file is not active. Try to remove it.
+		 */
+		smb_credinit(&scred, curproc, cr);
+		error = smbfs_smb_delete(nnp, &scred, NULL, 0, 0);
+		smb_credrele(&scred);
+		if (error)
+			goto out;
+		/*
+		 * OK, removed the target file.  Continue as if
+		 * lookup target had failed (nvp == NULL).
+		 */
+		vn_vfsunlock(nvp);
+		nvp_locked = 0;
+		VN_RELE(nvp);
+		nvp = NULL;
 	} /* nvp */
 
-#ifdef NOT_YET
 	dnlc_remove(odvp, onm);
 	dnlc_remove(ndvp, nnm);
-#endif
 
 	onp = VTOSMB(ovp);
 	smb_credinit(&scred, curproc, cr);
@@ -1990,6 +2224,10 @@ smbfs_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp,
 	    (nmlen == 2 && name[0] == '.' && name[1] == '.'))
 		return (EEXIST);
 
+	/* Only plain files are allowed in V_XATTRDIR. */
+	if (dvp->v_flag & V_XATTRDIR)
+		return (EINVAL);
+
 	if (smbfs_rw_enter_sig(&dnp->r_rwlock, RW_WRITER, SMBINTR(dvp)))
 		return (EINTR);
 	smb_credinit(&scred, curproc, cr);
@@ -2006,6 +2244,9 @@ smbfs_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp,
 	if (error)
 		goto out;
 
+	/* remove possible negative entry from the dnlc */
+	dnlc_remove(dvp, nm);
+
 	error = smbfs_smb_mkdir(dnp, name, nmlen, &scred);
 	if (error)
 		goto out;
@@ -2020,8 +2261,8 @@ smbfs_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp,
 	if (error)
 		goto out;
 
-#ifdef NOT_YET
-	dnlc_update(dvp, name, vp);
+#ifdef USE_DNLC
+	dnlc_update(dvp, nm, vp);
 #endif
 
 	if (name[0] == '.')
@@ -2108,6 +2349,27 @@ smbfs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
 		goto out;
 	}
 
+	/*
+	 * First just remove the entry from the name cache, as it
+	 * is most likely an entry for this vp.
+	 */
+	dnlc_remove(dvp, nm);
+
+	/*
+	 * If there vnode reference count is greater than one, then
+	 * there may be additional references in the DNLC which will
+	 * need to be purged.  First, trying removing the entry for
+	 * the parent directory and see if that removes the additional
+	 * reference(s).  If that doesn't do it, then use dnlc_purge_vp
+	 * to completely remove any references to the directory which
+	 * might still exist in the DNLC.
+	 */
+	if (vp->v_count > 1) {
+		dnlc_remove(vp, "..");
+		if (vp->v_count > 1)
+			dnlc_purge_vp(vp);
+	}
+
 	error = smbfs_smb_rmdir(np, &scred);
 	if (error)
 		goto out;
@@ -2116,10 +2378,6 @@ smbfs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
 	dnp->n_flag |= NMODIFIED;
 	mutex_exit(&np->r_statelock);
 	smbfs_attr_touchdir(dnp);
-#ifdef NOT_YET
-	dnlc_remove(dvp, nm);
-	dnlc_purge_vp(vp);
-#endif
 	smb_rmhash(np);
 
 out:
@@ -2466,6 +2724,7 @@ smbfs_space(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 	if (smi->smi_flags & SMI_DEAD || vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
 		return (EIO);
 
+	/* Caller (fcntl) has checked v_type */
 	ASSERT(vp->v_type == VREG);
 	if (cmd != F_FREESP)
 		return (EINVAL);
@@ -2506,10 +2765,12 @@ static int
 smbfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 	caller_context_t *ct)
 {
+	vfs_t *vfs;
 	smbmntinfo_t *smi;
 	struct smb_share *ssp;
 
-	smi = VTOSMI(vp);
+	vfs = vp->v_vfsp;
+	smi = VFTOSMI(vfs);
 
 	if (curproc->p_zone != smi->smi_zone)
 		return (EIO);
@@ -2541,9 +2802,15 @@ smbfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 		break;
 
 	case _PC_SYMLINK_MAX:	/* No symlinks until we do Unix extensions */
-	case _PC_XATTR_EXISTS:	/* No xattrs yet */
 		*valp = 0;
 		break;
+
+	case _PC_XATTR_EXISTS:
+		if (vfs->vfs_flag & VFS_XATTR) {
+			*valp = smbfs_xa_exists(vp, cr);
+			break;
+		}
+		return (EINVAL);
 
 	default:
 		return (fs_pathconf(vp, cmd, valp, cr, ct));

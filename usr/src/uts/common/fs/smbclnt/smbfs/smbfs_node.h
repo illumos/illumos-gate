@@ -175,6 +175,7 @@ struct mntinfo;		/* defined in smbfs/smbfs_clnt.h */
 #define	NATTRCHANGED	0x02000 /* use smbfs_attr_cacheremove at close */
 #define	NALLOC		0x04000 /* being created */
 #define	NWALLOC		0x08000 /* awaiting creation */
+#define	N_XATTR 	0x10000 /* extended attribute (dir or file) */
 
 typedef struct smbnode {
 	/* from Sun NFS struct rnode (XXX: cleanup needed) */
@@ -218,7 +219,8 @@ typedef struct smbnode {
 	uint32_t	n_flag;
 	smbmntinfo_t	*n_mount;
 	ino64_t		n_ino;
-	/* Lock for the next 7 is r_lkserlock */
+	/* Lock for the next 8 is r_lkserlock */
+	enum vtype	n_ovtype;	/* vnode type opened */
 	int		n_dirrefs;
 	struct smbfs_fctx	*n_dirseq;	/* ff context */
 	long		n_dirofs;	/* last ff offset */

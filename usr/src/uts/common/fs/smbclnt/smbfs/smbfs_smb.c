@@ -200,6 +200,14 @@ smbfs_smb_getfattr(
 	 */
 	ASSERT(np->r_lkserlock.count != 0);
 
+	/*
+	 * Extended attribute directory or file.
+	 */
+	if (np->n_flag & N_XATTR) {
+		error = smbfs_xa_getfattr(np, fap, scrp);
+		return (error);
+	}
+
 	if (np->n_fidrefs)
 		error = smbfs_smb_qfileinfo(np, fap, scrp, 0);
 	else
@@ -210,10 +218,13 @@ smbfs_smb_getfattr(
 		error = smbfs_smb_query_info(np, NULL, 0, fap, scrp);
 	}
 
-#if 0	/* Moved this part to caller. */
-	if (!error && fap->fa_mtime.tv_sec == 0)
-		smbfs_attr_touchdir(dnp);
-#endif
+	/*
+	 * Note directory size is not provided by
+	 * windows servers (they leave it as zero)
+	 */
+	if ((fap->fa_attr & SMB_FA_DIR) &&
+	    (fap->fa_size < DEV_BSIZE))
+		fap->fa_size = DEV_BSIZE;
 
 	return (error);
 }
@@ -488,198 +499,8 @@ top:
 
 /*
  * Support functions for _qstreaminfo
- * Todo: show NT file streams as
- * Solaris named attributes.
+ * See smbfs_xattr.c
  */
-#ifdef APPLE
-
-static char *
-sfm2xattr(char *sfm)
-{
-	if (!strncasecmp(sfm, SFM_RESOURCEFORK_NAME,
-	    sizeof (SFM_RESOURCEFORK_NAME)))
-		return (XATTR_RESOURCEFORK_NAME);
-	if (!strncasecmp(sfm, SFM_FINDERINFO_NAME,
-	    sizeof (SFM_FINDERINFO_NAME)))
-		return (XATTR_FINDERINFO_NAME);
-	return (NULL);
-}
-
-static int
-smbfs_smb_undollardata(struct smbnode *np, struct smbfs_fctx *ctx)
-{
-	char *cp;
-	int len = strlen(SMB_DATASTREAM);
-
-	if (!ctx->f_name)	/* sanity check */
-		goto bad;
-	if (ctx->f_nmlen < len + 1)	/* "::$DATA" at a minimum */
-		goto bad;
-	if (*ctx->f_name != ':')	/* leading colon - "always" */
-		goto bad;
-	cp =  &ctx->f_name[ctx->f_nmlen - len]; /* point to 2nd colon */
-	if (bcmp(cp, SMB_DATASTREAM, len))
-		goto bad;
-	if (ctx->f_nmlen == len + 1)	/* merely the data fork? */
-		return (0);		/* skip it */
-	/*
-	 * XXX here we should be calling KPI to validate the stream name
-	 */
-	if (ctx->f_nmlen >= 18 &&
-	    !(bcmp(ctx->f_name, ":com.apple.system.", 18) == 0))
-		return (0);	/* skip protected system attrs */
-	if (ctx->f_nmlen - len > XATTR_MAXNAMELEN + 1)
-		goto bad;	/* mustnt return more than 128 bytes */
-	/*
-	 * Un-count a colon and the $DATA, then the
-	 * 2nd colon is replaced by a terminating null.
-	 */
-	ctx->f_nmlen -= len;
-	*cp = '\0';
-	return (1);
-bad:
-	SMBSDEBUG("file \"%.*s\" has bad stream \"%.*s\"\n",
-	    np->n_nmlen, np->n_name, ctx->f_nmlen, ctx->f_name);
-	return (0); /* skip it */
-}
-
-PRIVSYM int
-smbfs_smb_qstreaminfo(struct smbnode *np, struct smb_cred *scrp,
-			uio_t uio, size_t *sizep)
-{
-	struct smb_share *ssp = np->n_mount->smi_share;
-	struct smb_vc *vcp = SSTOVC(ssp);
-	struct smb_t2rq *t2p;
-	int error;
-	struct mbchain *mbp;
-	struct mdchain *mdp;
-	uint32_t next, nlen, used;
-	struct smbfs_fctx ctx;
-
-	*sizep = 0;
-	ctx.f_ssp = ssp;
-	ctx.f_name = NULL;
-
-	error = smb_t2_alloc(SSTOCP(ssp), SMB_TRANS2_QUERY_PATH_INFORMATION,
-	    scrp, &t2p);
-	if (error)
-		return (error);
-	mbp = &t2p->t2_tparam;
-	mb_init(mbp);
-	/*
-	 * SMB_QFILEINFO_STREAM_INFORMATION is an option to consider
-	 * here.  Samba declined to support the older info level with
-	 * a comment claiming doing so caused a BSOD.
-	 */
-	mb_put_uint16le(mbp, SMB_QFILEINFO_STREAM_INFO);
-	mb_put_uint32le(mbp, 0);
-	/* mb_put_uint8(mbp, SMB_DT_ASCII); specs are wrong */
-	error = smbfs_fullpath(mbp, vcp, np, NULL, NULL, '\\');
-	if (error)
-		goto out;
-	t2p->t2_maxpcount = 2;
-	t2p->t2_maxdcount = vcp->vc_txmax;
-	error = smb_t2_request(t2p);
-	if (error) {
-		if (smb_t2_err(t2p) == NT_STATUS_INVALID_PARAMETER)
-			error = ENOTSUP;
-		goto out;
-	}
-	mdp = &t2p->t2_rdata;
-	/*
-	 * On a directory Windows is likely to return a zero data count.
-	 * Check for that now to avoid EBADRPC from md_get_uint32le
-	 */
-	if (mdp->md_cur == NULL)
-		goto out;
-	do {
-		if ((error = md_get_uint32le(mdp, &next)))
-			goto out;
-		if ((error = md_get_uint32le(mdp, &nlen))) /* name length */
-			goto out;
-		if ((error = md_get_uint64le(mdp, NULL))) /* stream size */
-			goto out;
-		if ((error = md_get_uint64le(mdp, NULL))) /* allocated size */
-			goto out;
-		/*
-		 * Sanity check to limit DoS or buffer overrun attempts.
-		 * The arbitrary 16384 is sufficient for all legit packets.
-		 */
-		if (nlen > 16384) {
-			SMBVDEBUG("huge name length in packet!\n");
-			error = EBADRPC;
-			goto out;
-		}
-		ctx.f_name = kmem_zalloc(nlen, KM_SLEEP);
-		ctx.f_namesz = nlen;
-		if ((error = md_get_mem(mdp, ctx.f_name, nlen, MB_MSYSTEM)))
-			goto out;
-		/*
-		 * skip pad bytes and/or tail of overlong name
-		 */
-		used = 4 + 4 + 8 + 8 + nlen;
-		if (next && next > used) {
-			if (next - used > 16384) {
-				SMBVDEBUG("huge offset in packet!\n");
-				error = EBADRPC;
-				goto out;
-			}
-			md_get_mem(mdp, NULL, next - used, MB_MSYSTEM);
-		}
-		/* ignore a trailing null, not that we expect them */
-		if (SMB_UNICODE_STRINGS(vcp)) {
-			if (nlen > 1 && !ctx.f_name[nlen - 1] &&
-			    !ctx.f_name[nlen - 2])
-				nlen -= 2;
-		} else {
-			if (nlen && !ctx.f_name[nlen - 1])
-				nlen -= 1;
-		}
-		ctx.f_nmlen = nlen;
-		smbfs_fname_tolocal(&ctx); /* converts from UCS2LE */
-		/*
-		 * We should now have a name in the form
-		 * : <foo> :$DATA
-		 * Where <foo> is UTF-8 w/o null termination
-		 * If it isn't in that form we want to LOG it and skip it.
-		 * Note we want to skip w/o logging the "data fork" entry,
-		 * which is simply ::$DATA
-		 * Otherwise we want to uiomove out <foo> with a null added.
-		 */
-		if (smbfs_smb_undollardata(np, &ctx)) {
-			char *s;
-
-			/* the "+ 1" skips over the leading colon */
-			s = sfm2xattr(ctx.f_name + 1);
-#ifndef DUAL_EAS	/* XXX */
-	/*
-	 * In Tiger Carbon still accesses dot-underscore files directly, so...
-	 * For Tiger we preserve the SFM/Thursby AFP_* stream names rather
-	 * than mapping them to com.apple.*.  This means our copy engines
-	 * will preserve SFM/Thursby resource-fork and finder-info.
-	 */
-			s = NULL;
-#endif
-			if (s)
-				ctx.f_nmlen = strlen(s) + 1;
-			else
-				s = ctx.f_name + 1;
-			if (uio)
-				uiomove(s, ctx.f_nmlen, uio);
-			else
-				*sizep += ctx.f_nmlen;
-		}
-		kmem_free(ctx.f_name, ctx.f_namesz);
-		ctx.f_name = NULL;
-	} while (next && !error);
-out:
-	if (ctx.f_name)
-		kmem_free(ctx.f_name, ctx.f_namesz);
-	smb_t2_done(t2p);
-	return (error);
-}
-
-#endif /* APPLE */
 
 int
 smbfs_smb_qfsattr(struct smb_share *ssp, uint32_t *attrp,
@@ -2150,6 +1971,7 @@ smbfs_smb_rename(struct smbnode *src, struct smbnode *tdnp,
 	struct mbchain *mbp;
 	int error;
 	uint16_t fa;
+	char sep;
 
 	error = smb_rq_init(rqp, SSTOCP(ssp), SMB_COM_RENAME, scrp);
 	if (error)
@@ -2162,20 +1984,28 @@ smbfs_smb_rename(struct smbnode *src, struct smbnode *tdnp,
 	mb_put_uint16le(mbp, fa);
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
+
+	/*
+	 * When we're not adding any component name, the
+	 * passed sep is ignored, so just pass sep=0.
+	 */
 	mb_put_uint8(mbp, SMB_DT_ASCII);
-	do {
-		error = smbfs_fullpath(mbp, SSTOVC(ssp), src, NULL, NULL, '\\');
-		if (error)
-			break;
-		mb_put_uint8(mbp, SMB_DT_ASCII);
-		error = smbfs_fullpath(mbp, SSTOVC(ssp), tdnp, tname, &tnmlen,
-		    '\\');
-		if (error)
-			break;
-		smb_rq_bend(rqp);
-		error = smb_rq_simple(rqp);
-		/*LINTED*/
-	} while (0);
+	error = smbfs_fullpath(mbp, SSTOVC(ssp), src, NULL, NULL, 0);
+	if (error)
+		goto out;
+
+	/*
+	 * After XATTR directories, separator is ":"
+	 */
+	sep = (src->n_flag & N_XATTR) ? ':' : '\\';
+	mb_put_uint8(mbp, SMB_DT_ASCII);
+	error = smbfs_fullpath(mbp, SSTOVC(ssp), tdnp, tname, &tnmlen, sep);
+	if (error)
+		goto out;
+
+	smb_rq_bend(rqp);
+	error = smb_rq_simple(rqp);
+out:
 	smb_rq_done(rqp);
 	return (error);
 }
@@ -2376,9 +2206,10 @@ smbfs_smb_search(struct smbfs_fctx *ctx)
 /*ARGSUSED*/
 static int
 smbfs_smb_findopenLM1(struct smbfs_fctx *ctx, struct smbnode *dnp,
-    const char *wildcard, int wclen, uint16_t attr, struct smb_cred *scrp)
+    const char *wildcard, int wclen, uint16_t attr)
 {
-	/* #pragma unused(dnp, scrp) */
+
+	ctx->f_type = ft_LM1;
 	ctx->f_attrmask = attr;
 	if (wildcard) {
 		if (wclen == 1 && wildcard[0] == '*') {
@@ -2607,8 +2438,10 @@ smbfs_smb_findclose2(struct smbfs_fctx *ctx)
 /*ARGSUSED*/
 static int
 smbfs_smb_findopenLM2(struct smbfs_fctx *ctx, struct smbnode *dnp,
-    const char *wildcard, int wclen, uint16_t attr, struct smb_cred *scrp)
+    const char *wildcard, int wclen, uint16_t attr)
 {
+
+	ctx->f_type = ft_LM2;
 	ctx->f_namesz = SMB_MAXFNAMELEN;
 	if (SMB_UNICODE_STRINGS(SSTOVC(ctx->f_ssp)))
 		ctx->f_namesz *= 2;
@@ -2808,6 +2641,8 @@ again:
 	ctx->f_eofs = next;
 	ctx->f_ecnt--;
 	ctx->f_left--;
+
+	smbfs_fname_tolocal(ctx);
 	return (0);
 }
 
@@ -2825,7 +2660,7 @@ smbfs_smb_findcloseLM2(struct smbfs_fctx *ctx)
 }
 
 int
-smbfs_smb_findopen(struct smbnode *dnp, const char *wildcard, int wclen,
+smbfs_smb_findopen(struct smbnode *dnp, const char *wild, int wlen,
 			int attr, struct smb_cred *scrp,
 			struct smbfs_fctx **ctxpp)
 {
@@ -2836,20 +2671,25 @@ smbfs_smb_findopen(struct smbnode *dnp, const char *wildcard, int wclen,
 	if (ctx == NULL)
 		return (ENOMEM);
 	bzero(ctx, sizeof (*ctx));
-	if (dnp->n_mount->smi_share) {
-		ctx->f_ssp = dnp->n_mount->smi_share;
-	}
-	ctx->f_dnp = dnp;
+
 	ctx->f_flags = SMBFS_RDD_FINDFIRST;
+	ctx->f_dnp = dnp;
 	ctx->f_scred = scrp;
+	ctx->f_ssp = dnp->n_mount->smi_share;
+
+	if (dnp->n_flag & N_XATTR) {
+		error = smbfs_xa_findopen(ctx, dnp, wild, wlen);
+		goto out;
+	}
+
 	if (SMB_DIALECT(SSTOVC(ctx->f_ssp)) < SMB_DIALECT_LANMAN2_0 ||
 	    (dnp->n_mount->smi_args.flags & SMBFS_MOUNT_NO_LONG)) {
-		ctx->f_flags |= SMBFS_RDD_USESEARCH;
-		error = smbfs_smb_findopenLM1(ctx, dnp, wildcard, wclen,
-		    attr, scrp);
-	} else
-		error = smbfs_smb_findopenLM2(ctx, dnp, wildcard, wclen,
-		    attr, scrp);
+		error = smbfs_smb_findopenLM1(ctx, dnp, wild, wlen, attr);
+	} else {
+		error = smbfs_smb_findopenLM2(ctx, dnp, wild, wlen, attr);
+	}
+
+out:
 	if (error)
 		(void) smbfs_smb_findclose(ctx, scrp);
 	else
@@ -2883,30 +2723,40 @@ smbfs_smb_findnext(struct smbfs_fctx *ctx, int limit, struct smb_cred *scrp)
 
 	ctx->f_scred = scrp;
 	for (;;) {
-		if (ctx->f_flags & SMBFS_RDD_USESEARCH) {
+		bzero(&ctx->f_attr, sizeof (ctx->f_attr));
+		switch (ctx->f_type) {
+		case ft_LM1:
 			error = smbfs_smb_findnextLM1(ctx, (uint16_t)limit);
-		} else
+			break;
+		case ft_LM2:
 			error = smbfs_smb_findnextLM2(ctx, (uint16_t)limit);
+			break;
+		case ft_XA:
+			error = smbfs_xa_findnext(ctx, (uint16_t)limit);
+			break;
+		default:
+			ASSERT(0);
+			error = EINVAL;
+			break;
+		}
 		if (error)
 			return (error);
-		if (SMB_UNICODE_STRINGS(SSTOVC(ctx->f_ssp))) {
-			/*LINTED*/
-			uint16_t *up = (uint16_t *)ctx->f_name;
-
-			/* Do comparisons on UCS-2LE characters */
-			if ((ctx->f_nmlen == 2 && up[0] == htoles('.')) ||
-			    (ctx->f_nmlen == 4 && up[0] == htoles('.') &&
-			    up[1] == htoles('.')))
-				continue;
-		} else {
-			if ((ctx->f_nmlen == 1 && ctx->f_name[0] == '.') ||
-			    (ctx->f_nmlen == 2 && ctx->f_name[0] == '.' &&
-			    ctx->f_name[1] == '.'))
-				continue;
-		}
+		/*
+		 * Skip "." or ".." - easy now that ctx->f_name
+		 * has already been converted to utf-8 format.
+		 */
+		if ((ctx->f_nmlen == 1 && ctx->f_name[0] == '.') ||
+		    (ctx->f_nmlen == 2 && ctx->f_name[0] == '.' &&
+		    ctx->f_name[1] == '.'))
+			continue;
 		break;
 	}
-	smbfs_fname_tolocal(ctx);
+
+	/*
+	 * Moved the smbfs_fname_tolocal(ctx) call into
+	 * the ..._findnext functions above.
+	 */
+
 	ctx->f_attr.fa_ino = smbfs_getino(ctx->f_dnp, ctx->f_name,
 	    ctx->f_nmlen);
 	return (0);
@@ -2917,11 +2767,19 @@ int
 smbfs_smb_findclose(struct smbfs_fctx *ctx, struct smb_cred *scrp)
 {
 	int error;
+
 	ctx->f_scred = scrp;
-	if (ctx->f_flags & SMBFS_RDD_USESEARCH) {
+	switch (ctx->f_type) {
+	case ft_LM1:
 		error = smbfs_smb_findcloseLM1(ctx);
-	} else
+		break;
+	case ft_LM2:
 		error = smbfs_smb_findcloseLM2(ctx);
+		break;
+	case ft_XA:
+		error = smbfs_xa_findclose(ctx);
+		break;
+	}
 	if (ctx->f_rname)
 		kmem_free(ctx->f_rname, ctx->f_rnamelen);
 	if (ctx->f_firstnm)
@@ -2966,8 +2824,6 @@ smbfs_smb_lookup(struct smbnode *dnp, const char **namep, int *nmlenp,
 	intr = dnp->n_mount->smi_flags & SMI_INT;
 	if (smbfs_rw_enter_sig(&dnp->r_lkserlock, RW_READER, intr))
 		return (EINTR);
-
-	bzero(fap, sizeof (*fap));
 
 	/*
 	 * This hides a server bug observable in Win98:

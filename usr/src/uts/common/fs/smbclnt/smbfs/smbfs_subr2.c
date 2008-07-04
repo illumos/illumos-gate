@@ -174,6 +174,7 @@ smbfs_make_node(
 	int dirlen,
 	const char *name,
 	int nmlen,
+	char sep,
 	struct smbfattr *fap)
 {
 	char *rpath;
@@ -189,26 +190,33 @@ smbfs_make_node(
 
 	/*
 	 * Build the full path name in allocated memory
-	 * so we have it for lookup, etc.
+	 * so we have it for lookup, etc.  Note the
+	 * special case at the root (dir=="\\", dirlen==1)
+	 * where this does not add a slash separator.
+	 * To do that would make a double slash, which
+	 * has special meaning in CIFS.
 	 *
 	 * ToDo:  Would prefer to allocate a remote path
 	 * only when we will create a new node.
 	 */
+	if (dirlen <= 1 && sep == '\\')
+		sep = '\0';	/* no slash */
+
+	/* Compute the length of rpath and allocate. */
 	rplen = dirlen;
-	if (name) {
-		/* If not at root, we'll add a slash. */
-		if (dirlen > 1)
-			rplen++;
+	if (sep)
+		rplen++;
+	if (name)
 		rplen += nmlen;
-	}
+
 	rpath = kmem_alloc(rplen + 1, KM_SLEEP);
 
+	/* Fill in rpath */
 	bcopy(dir, rpath, dirlen);
-	if (name) {
-		if (dirlen > 1)
-			rpath[dirlen++] = '\\';
+	if (sep)
+		rpath[dirlen++] = sep;
+	if (name)
 		bcopy(name, &rpath[dirlen], nmlen);
-	}
 	rpath[rplen] = 0;
 
 	hash = smbfs_hash(rpath, rplen);

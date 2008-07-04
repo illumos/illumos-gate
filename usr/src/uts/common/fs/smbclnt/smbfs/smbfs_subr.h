@@ -78,6 +78,14 @@ struct smb_vc;
 struct statvfs;
 struct timespec;
 
+/*
+ * Types of find_first, find_next context objects
+ */
+typedef enum {
+	ft_LM1 = 1,
+	ft_LM2,
+	ft_XA
+} smbfs_fctx_type_t;
 
 /*
  * Context to perform findfirst/findnext/findclose operations
@@ -85,7 +93,7 @@ struct timespec;
 #define	SMBFS_RDD_FINDFIRST	0x01
 #define	SMBFS_RDD_EOF		0x02
 #define	SMBFS_RDD_FINDSINGLE	0x04
-#define	SMBFS_RDD_USESEARCH	0x08
+/* note	SMBFS_RDD_USESEARCH	0x08 replaced by smbfs_fctx_type */
 #define	SMBFS_RDD_NOCLOSE	0x10
 #define	SMBFS_RDD_GOTRNAME	0x1000
 
@@ -99,6 +107,7 @@ struct smbfs_fctx {
 	/*
 	 * Setable values
 	 */
+	smbfs_fctx_type_t	f_type;
 	int		f_flags;	/* SMBFS_RDD_ */
 	/*
 	 * Return values
@@ -248,7 +257,7 @@ void smb_dos2unixtime(uint_t dd, uint_t dt, uint_t dh, int tzoff,
 vnode_t *smbfs_make_node(vfs_t *vfsp,
     const char *dir, int dirlen,
     const char *name, int nmlen,
-    struct smbfattr *fap);
+    char sep, struct smbfattr *fap);
 void smb_addfree(smbnode_t *sp);
 void smb_addhash(smbnode_t *sp);
 void smb_rmhash(smbnode_t *);
@@ -264,6 +273,17 @@ int smbfs_readvnode(vnode_t *, uio_t *, cred_t *, struct vattr *);
 int smbfs_writevnode(vnode_t *vp, uio_t *uiop, cred_t *cr,
 			int ioflag, int timo);
 int smbfsgetattr(vnode_t *vp, struct vattr *vap, cred_t *cr);
+
+/* smbfs_xattr.c */
+int smbfs_get_xattrdir(vnode_t *dvp, vnode_t **vpp, cred_t *cr, int);
+int smbfs_xa_parent(vnode_t *vp, vnode_t **vpp);
+int smbfs_xa_exists(vnode_t *vp, cred_t *cr);
+int smbfs_xa_getfattr(struct smbnode *np, struct smbfattr *fap,
+	struct smb_cred *scrp);
+int smbfs_xa_findopen(struct smbfs_fctx *ctx, struct smbnode *dnp,
+	const char *name, int nmlen);
+int smbfs_xa_findnext(struct smbfs_fctx *ctx, uint16_t limit);
+int smbfs_xa_findclose(struct smbfs_fctx *ctx);
 
 /* For Solaris, interruptible rwlock */
 int smbfs_rw_enter_sig(smbfs_rwlock_t *l, krw_t rw, int intr);

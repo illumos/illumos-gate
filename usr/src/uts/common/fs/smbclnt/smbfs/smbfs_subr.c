@@ -289,12 +289,34 @@ smbfs_fullpath(struct mbchain *mbp, struct smb_vc *vcp, struct smbnode *dnp,
 		if (error)
 			return (error);
 	}
+
 	error = smb_put_dmem(mbp, vcp,
 	    dnp->n_rpath, dnp->n_rplen,
 	    caseopt, lenp);
 	if (name) {
-		/* If not at root, put separator */
-		if (dnp->n_rplen > 1) {
+		/*
+		 * Special case at share root:
+		 * Don't put another slash.
+		 */
+		if (dnp->n_rplen <= 1 && sep == '\\')
+			sep = 0;
+		/*
+		 * More special cases, now for XATTR:
+		 * Our "faked up" XATTR directories use a
+		 * full path name ending with ":" so as to
+		 * avoid conflicts with any real paths.
+		 * (It is not a valid CIFS path name.)
+		 * Therefore, when we're composing a full
+		 * path name from an XATTR directory, we
+		 * need to _ommit_ the ":" separator and
+		 * instead copy the one from the "fake"
+		 * parent node's path name.
+		 */
+		if (dnp->n_flag & N_XATTR)
+			sep = 0;
+
+		if (sep) {
+			/* Put the separator */
 			if (unicode)
 				error = mb_put_uint16le(mbp, sep);
 			else

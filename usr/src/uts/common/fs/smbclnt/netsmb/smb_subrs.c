@@ -373,6 +373,7 @@ static struct {
 	{NT_STATUS_NO_SUCH_FILE,		ENOENT},
 	{NT_STATUS_OBJECT_NAME_COLLISION,	EEXIST},
 	{NT_STATUS_OBJECT_NAME_NOT_FOUND,	ENOENT},
+	{NT_STATUS_OBJECT_NAME_INVALID,		EINVAL},
 	{NT_STATUS_OBJECT_PATH_INVALID,		ENOTDIR},
 	{NT_STATUS_PAGEFILE_QUOTA,		EDQUOT},
 	{NT_STATUS_PASSWORD_EXPIRED,		EACCES},
@@ -978,6 +979,7 @@ smb_maperror(int eclass, int eno)
 		case ERRbadformat:
 		case ERRremcd:
 		case ERRrmuns:
+		case ERRunknownlevel:
 			return (EINVAL);
 		case ERRbadfile:
 		case ERRbadpath:

@@ -80,12 +80,51 @@ int		smbfsinit(int fstyp, char *name);
 void		smbfsfini();
 static int	smbfs_mount_label_policy(vfs_t *, void *, int, cred_t *);
 
+/*
+ * SMBFS Mount options table for MS_OPTIONSTR
+ * Note: These are not all the options.
+ * Some options come in via MS_DATA.
+ * Others are generic (see vfs.c)
+ */
+static char *intr_cancel[] = { MNTOPT_NOINTR, NULL };
+static char *nointr_cancel[] = { MNTOPT_INTR, NULL };
+#ifdef NOT_YET
+static char *force_dio_cancel[] = { MNTOPT_NOFORCEDIRECTIO, NULL };
+static char *noforce_dio_cancel[] = { MNTOPT_FORCEDIRECTIO, NULL };
+static char *largefiles_cancel[] = { MNTOPT_NOLARGEFILES, NULL };
+static char *nolargefiles_cancel[] = { MNTOPT_LARGEFILES, NULL };
+#endif
+static char *xattr_cancel[] = { MNTOPT_NOXATTR, NULL };
+static char *noxattr_cancel[] = { MNTOPT_XATTR, NULL };
+
+static mntopt_t mntopts[] = {
+/*
+ *	option name		cancel option	default arg	flags
+ *		ufs arg flag
+ */
+	{ MNTOPT_INTR,		intr_cancel,	NULL,	MO_DEFAULT, 0 },
+	{ MNTOPT_NOINTR,	nointr_cancel,	NULL,	0,	0 },
+#ifdef NOT_YET
+	{ MNTOPT_FORCEDIRECTIO,	force_dio_cancel, NULL, 0,	0 },
+	{ MNTOPT_NOFORCEDIRECTIO, noforce_dio_cancel, NULL, 0, 0 },
+	{ MNTOPT_LARGEFILES,	largefiles_cancel, NULL, MO_DEFAULT, 0 },
+	{ MNTOPT_NOLARGEFILES,	nolargefiles_cancel, NULL, 0,	0 },
+#endif
+	{ MNTOPT_XATTR,		xattr_cancel,	NULL,	MO_DEFAULT, 0 },
+	{ MNTOPT_NOXATTR,	noxattr_cancel, NULL,	0,	0 }
+};
+
+static mntopts_t smbfs_mntopts = {
+	sizeof (mntopts) / sizeof (mntopt_t),
+	mntopts
+};
+
 static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"smbfs",		/* type name string */
 	smbfsinit,		/* init routine */
-	VSW_NOTZONESAFE,	/* flags */
-	NULL			/* mount options table prototype */
+	VSW_HASPROTO|VSW_NOTZONESAFE,	/* flags */
+	&smbfs_mntopts			/* mount options table prototype */
 };
 
 static struct modlfs modlfs = {
@@ -297,6 +336,8 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 *
 	 * uap->datalen might be different from sizeof (args)
 	 * in a compatible situation.
+	 *
+	 * XXX - todo: handle mount options string
 	 */
 	STRUCT_INIT(args, get_udatamodel());
 	bzero(STRUCT_BUF(args), SIZEOF_STRUCT(smbfs_args, DATAMODEL_NATIVE));
@@ -419,6 +460,14 @@ proceed:
 	smi->smi_share	= ssp;
 	ssp->ss_mount	= smi;
 	smi->smi_zone	= mntzone;
+	smi->smi_flags	= SMI_LLOCK;
+
+	/*
+	 * Handle mount options.  See also XATTR below.
+	 * XXX: forcedirectio, largefiles (later)
+	 */
+	if (vfs_optionisset(vfsp, MNTOPT_INTR, NULL))
+		smi->smi_flags |= SMI_INT;
 
 	/*
 	 * XXX If not root, get uid/gid from the covered vnode.
@@ -428,19 +477,23 @@ proceed:
 	smi->smi_args.uid 	= STRUCT_FGET(args, uid);
 	smi->smi_args.gid 	= STRUCT_FGET(args, gid);
 
+	/*
+	 * Get attributes of the remote file system,
+	 * i.e. ACL support, named streams, etc.
+	 */
 	error = smbfs_smb_qfsattr(ssp, &smi->smi_fsattr, &scred);
 	if (error) {
 		SMBVDEBUG("smbfs_smb_qfsattr error %d\n", error);
 	}
 
-#ifdef NOT_YET
-	/* Once acls are implemented, remove the ifdefs */
-	else if (smbfs_aclsflunksniff(smi, &scred)) {
-		mutex_enter(&smi->smi_lock);
-		smi->smi_fsattr &= ~FILE_PERSISTENT_ACLS;
-		mutex_exit(&smi->smi_lock);
-	}
-#endif /* NOT_YET */
+	/*
+	 * We enable XATTR by default (via smbfs_mntopts)
+	 * but if the share does not support named streams,
+	 * force the NOXATTR option (also clears XATTR).
+	 * Caller will set or clear VFS_XATTR after this.
+	 */
+	if ((smi->smi_fsattr & FILE_NAMED_STREAMS) == 0)
+		vfs_setmntopt(vfsp, MNTOPT_NOXATTR, NULL, 0);
 
 	/*
 	 * Assign a unique device id to the mount
@@ -459,7 +512,6 @@ proceed:
 	vfsp->vfs_bsize = MAXBSIZE;
 	vfsp->vfs_bcount = 0;
 
-	smi->smi_flags	= SMI_INT | SMI_LLOCK;
 	smi->smi_vfsp	= vfsp;
 	smbfs_zonelist_add(smi);
 
@@ -467,7 +519,7 @@ proceed:
 	 * Create the root vnode, which we need in unmount
 	 * for the call to smb_check_table(), etc.
 	 */
-	rtvp = smbfs_make_node(vfsp, "\\", 1, NULL, 0, NULL);
+	rtvp = smbfs_make_node(vfsp, "\\", 1, NULL, 0, 0, NULL);
 	if (!rtvp) {
 		cmn_err(CE_WARN, "smbfs_mount: make_node failed\n");
 		return (ENOENT);
@@ -723,7 +775,7 @@ recheck:
 	stvfs.f_frsize = stvfs.f_bsize;
 	stvfs.f_favail = stvfs.f_ffree;
 	stvfs.f_fsid = (unsigned long)vfsp->vfs_fsid.val[0];
-	strncpy(stvfs.f_basetype, vfw.name, FSTYPSZ);
+	(void) strncpy(stvfs.f_basetype, vfw.name, FSTYPSZ);
 	stvfs.f_flag	= vf_to_stf(vfsp->vfs_flag);
 	stvfs.f_namemax	= (uint32_t)MAXNAMELEN - 1;
 

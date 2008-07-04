@@ -224,7 +224,9 @@ smbfs_nget(vnode_t *dvp, const char *name, int nmlen,
     struct smbfattr *fap, vnode_t **vpp)
 {
 	struct smbnode *dnp = VTOSMB(dvp);
+	struct smbnode *np;
 	vnode_t *vp;
+	char sep;
 
 	*vpp = NULL;
 
@@ -235,10 +237,16 @@ smbfs_nget(vnode_t *dvp, const char *name, int nmlen,
 		return (EINVAL);
 	}
 
-	/* The real work is in this call... */
+	/*
+	 * See the comment near the top of smbfs_xattr.c about
+	 * the logic for what separators to use where.
+	 */
+	sep = (dnp->n_flag & N_XATTR) ? 0 : '\\';
+
+	/* Find or create the node. */
 	vp = smbfs_make_node(dvp->v_vfsp,
 	    dnp->n_rpath, dnp->n_rplen,
-	    name, nmlen, fap);
+	    name, nmlen, sep, fap);
 
 	/*
 	 * We always have a vp now, because
@@ -246,6 +254,16 @@ smbfs_nget(vnode_t *dvp, const char *name, int nmlen,
 	 * calls kmem_alloc with KM_SLEEP.
 	 */
 	ASSERT(vp);
+	np = VTOSMB(vp);
+
+	/*
+	 * Files in an XATTR dir are also XATTR.
+	 */
+	if (dnp->n_flag & N_XATTR) {
+		mutex_enter(&np->r_statelock);
+		np->n_flag |= N_XATTR;
+		mutex_exit(&np->r_statelock);
+	}
 
 #ifdef NOT_YET
 	/* update the attr_cache info if the file is clean */
@@ -287,7 +305,12 @@ smbfs_attr_cacheenter(vnode_t *vp, struct smbfattr *fap)
 
 	mutex_enter(&np->r_statelock);
 
-	vtype = vp->v_type;
+	vtype = (fap->fa_attr & SMB_FA_DIR) ? VDIR : VREG;
+	if (vp->v_type != vtype)
+		SMBVDEBUG("vtype change %d to %d\n",
+		    vp->v_type, vtype);
+	vp->v_type = vtype;
+
 	if (vtype == VREG) {
 		if (np->n_size != fap->fa_size) {
 			/*
