@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
@@ -259,7 +258,7 @@ int
 main(int argc, char **argv)
 {
 	unsigned long program;
-	struct stat sbuf;
+	struct stat64 sbuf;
 
 	get_command_line_args(argc, argv);
 
@@ -279,11 +278,11 @@ main(int argc, char **argv)
 	/* check to see if the map exists in this domain */
 	if (is_yptol_mode())
 		sprintf(ypmapname, "%s/%s/%s%s.dir", ypdbpath, domain_alias,
-						NTOL_PREFIX, map_alias);
+		    NTOL_PREFIX, map_alias);
 	else
 		sprintf(ypmapname, "%s/%s/%s.dir", ypdbpath, domain_alias,
-								map_alias);
-	if (stat(ypmapname, &sbuf) < 0) {
+		    map_alias);
+	if (stat64(ypmapname, &sbuf) < 0) {
 		fprintf(stderr, "yppush: Map does not exist.\n");
 		exit(1);
 	}
@@ -340,10 +339,10 @@ get_command_line_args(int argc, char **argv)
 					domain = *argv;
 					argv++;
 					if (((int)strlen(domain)) >
-								YPMAXDOMAIN) {
+					    YPMAXDOMAIN) {
 						fprintf(stderr,
-							err_bad_args,
-							err_bad_domainname);
+						    err_bad_args,
+						    err_bad_domainname);
 						exit(1);
 					}
 				} else {
@@ -452,7 +451,7 @@ one_host_list(void)
 	keylen = strlen(host);
 
 	if (yp_match(domain_alias, ypservers, host, keylen,
-			&val, &vallen)) {
+	    &val, &vallen)) {
 		fprintf(stderr, err_cant_find_host, host);
 		exit(1);
 	}
@@ -490,7 +489,7 @@ make_server_list(void)
 	}
 
 	if (err = yp_first(domain_alias, ypservers, &outkey, &outkeylen,
-				&val, &vallen)) {
+	    &val, &vallen)) {
 		fprintf(stderr, err_cant_build_serverlist, yperr_string(err));
 		exit(1);
 	}
@@ -510,15 +509,15 @@ make_server_list(void)
 		keylen = outkeylen;
 
 		if (err = yp_next(domain_alias, ypservers, key, keylen,
-				&outkey, &outkeylen, &val, &vallen)) {
+		    &outkey, &outkeylen, &val, &vallen)) {
 
-		    if (err == YPERR_NOMORE) {
-			break;
-		    } else {
-			fprintf(stderr, err_cant_build_serverlist,
-				yperr_string(err));
-			exit(1);
-		    }
+			if (err == YPERR_NOMORE) {
+				break;
+			} else {
+				fprintf(stderr, err_cant_build_serverlist,
+				    yperr_string(err));
+				exit(1);
+			}
 		}
 
 		free(key);
@@ -600,7 +599,7 @@ generate_callback(unsigned long *program)
 	nc6 = getnetconfigent("udp6");
 	if (nc4 == 0 && nc6 == 0) {
 		fprintf(stderr,
-			"yppush: Could not get udp or udp6 netconfig entry\n");
+		    "yppush: Could not get udp or udp6 netconfig entry\n");
 		exit(1);
 	}
 
@@ -624,7 +623,7 @@ generate_callback(unsigned long *program)
 		nc = nc6;
 	}
 	while (prognum < maxprognum && (ret =
-		rpcb_set(prognum, YPPUSHVERS, nc, &trans->xp_ltaddr)) == 0)
+	    rpcb_set(prognum, YPPUSHVERS, nc, &trans->xp_ltaddr)) == 0)
 		prognum++;
 
 	if (ret == 0) {
@@ -633,7 +632,7 @@ generate_callback(unsigned long *program)
 	} else {
 		if (trans == transport4 && transport6 != 0) {
 			ret = rpcb_set(prognum, YPPUSHVERS, nc6,
-					&transport6->xp_ltaddr);
+			    &transport6->xp_ltaddr);
 			if (ret == 0) {
 				fprintf(stderr,
 			"yppush: Could not create udp6 callback service\n");
@@ -860,7 +859,7 @@ listener_dispatch(struct svc_req *rqstp, SVCXPRT *transp)
 
 	case YPPUSHPROC_NULL:
 		if (!svc_sendreply(transp, xdr_void, 0)) {
-		    fprintf(stderr, "Can't reply to rpc call.\n");
+			fprintf(stderr, "Can't reply to rpc call.\n");
 		}
 		break;
 
@@ -888,7 +887,7 @@ print_state_msg(struct server *s, long e)
 		return;			/* already printed */
 
 	if (!verbose && (s->state == SSTAT_RESPONDED ||
-				s->state == SSTAT_CALLED))
+	    s->state == SSTAT_CALLED))
 		return;
 
 	for (sd = state_duples; sd->state_msg; sd++) {
@@ -918,8 +917,8 @@ print_callback_msg(struct server *s)
 	register struct status_duple *sd;
 
 	if (!verbose &&
-		(s->status == YPPUSH_AGE) ||
-		(s->status == YPPUSH_SUCC))
+	    (s->status == YPPUSH_AGE) ||
+	    (s->status == YPPUSH_SUCC))
 
 		return;
 
@@ -927,15 +926,15 @@ print_callback_msg(struct server *s)
 
 		if (sd->status == s->status) {
 			printf("Status received from ypxfr on %s:\n\t%s\n",
-				s->svc_name, sd->status_msg);
+			    s->svc_name, sd->status_msg);
 			fflush(stdout);
 			return;
 		}
 	}
 
 	fprintf(stderr, "yppush listener: Garbage transaction "
-			"status (value %d) from ypxfr on %s.\n",
-			(int)s->status, s->svc_name);
+	    "status (value %d) from ypxfr on %s.\n",
+	    (int)s->status, s->svc_name);
 }
 
 /*
@@ -970,7 +969,7 @@ get_xfr_response(SVCXPRT *transp)
 	register struct server *s;
 
 	if (!svc_getargs(transp, (xdrproc_t)xdr_yppushresp_xfr,
-			(caddr_t)&resp)) {
+	    (caddr_t)&resp)) {
 		svcerr_decode(transp);
 		return;
 	}
@@ -1006,9 +1005,7 @@ send_message(struct server *ps, unsigned long program, long *err)
 	struct rpc_err rpcerr;
 
 	if ((ps->domb.dom_client = __yp_clnt_create_rsvdport(ps->svc_name,
-							YPPROG, YPVERS,
-							(char *)NULL,
-							0, 0))  == NULL) {
+	    YPPROG, YPVERS, (char *)NULL, 0, 0))  == NULL) {
 
 		if (rpc_createerr.cf_stat == RPC_PROGNOTREGISTERED) {
 			return (SSTAT_PROGNOTREG);
@@ -1040,10 +1037,8 @@ send_message(struct server *ps, unsigned long program, long *err)
 		req.transid = ps->xactid;
 		req.proto = program;
 		s = (enum clnt_stat) clnt_call(ps->domb.dom_client,
-						YPPROC_NEWXFR,
-						(xdrproc_t)xdr_ypreq_newxfr,
-						(caddr_t)&req,
-						xdr_void, 0, timeout);
+		    YPPROC_NEWXFR, (xdrproc_t)xdr_ypreq_newxfr, (caddr_t)&req,
+		    xdr_void, 0, timeout);
 	}
 
 	clnt_geterr(ps->domb.dom_client, &rpcerr);
@@ -1057,10 +1052,8 @@ send_message(struct server *ps, unsigned long program, long *err)
 		oldreq.proto = program;
 		oldreq.port = 0;
 		s = (enum clnt_stat) clnt_call(ps->domb.dom_client,
-						YPPROC_XFR,
-						(xdrproc_t)xdr_ypreq_xfr,
-						(caddr_t)&oldreq,
-						xdr_void, 0, timeout);
+		    YPPROC_XFR, (xdrproc_t)xdr_ypreq_xfr, (caddr_t)&oldreq,
+		    xdr_void, 0, timeout);
 		clnt_geterr(ps->domb.dom_client, &rpcerr);
 	}
 

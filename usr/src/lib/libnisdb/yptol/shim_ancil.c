@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -220,7 +220,7 @@ bool
 ypcheck_map_existence_yptol(char *pname)
 {
 	char dbfile[MAXNAMLEN + sizeof (TTL_POSTFIX) + 1];
-	struct stat filestat;
+	struct stat64 filestat;
 	int len;
 
 	if (!pname || ((len = (int)strlen(pname)) == 0) ||
@@ -235,11 +235,11 @@ ypcheck_map_existence_yptol(char *pname)
 	(void) strcpy(dbfile, pname);
 	(void) strcat(dbfile, dbm_dir);
 
-	if (stat(dbfile, &filestat) == -1) {
+	if (stat64(dbfile, &filestat) == -1) {
 		if (errno != ENOENT) {
 			(void) fprintf(stderr,
-				"ypserv:  Stat error on map file %s.\n",
-				dbfile);
+			    "ypserv:  Stat error on map file %s.\n",
+			    dbfile);
 		}
 		return (FALSE);
 	}
@@ -248,11 +248,11 @@ ypcheck_map_existence_yptol(char *pname)
 	(void) strcpy(dbfile, pname);
 	(void) strcat(dbfile, dbm_pag);
 
-	if (stat(dbfile, &filestat) == -1) {
+	if (stat64(dbfile, &filestat) == -1) {
 		if (errno != ENOENT) {
 			(void) fprintf(stderr,
-				"ypserv:  Stat error on map file %s.\n",
-				dbfile);
+			    "ypserv:  Stat error on map file %s.\n",
+			    dbfile);
 		}
 		return (FALSE);
 	}
@@ -263,11 +263,11 @@ ypcheck_map_existence_yptol(char *pname)
 		(void) strcat(dbfile, TTL_POSTFIX);
 		(void) strcat(dbfile, dbm_dir);
 
-		if (stat(dbfile, &filestat) == -1) {
+		if (stat64(dbfile, &filestat) == -1) {
 			if (errno != ENOENT) {
 				(void) fprintf(stderr,
-					"ypserv:  Stat error on map file %s.\n",
-					dbfile);
+				    "ypserv:  Stat error on map file %s.\n",
+				    dbfile);
 			}
 			return (FALSE);
 		}
@@ -277,11 +277,11 @@ ypcheck_map_existence_yptol(char *pname)
 		(void) strcat(dbfile, TTL_POSTFIX);
 		(void) strcat(dbfile, dbm_pag);
 
-		if (stat(dbfile, &filestat) == -1) {
+		if (stat64(dbfile, &filestat) == -1) {
 			if (errno != ENOENT) {
 				(void) fprintf(stderr,
-					"ypserv:  Stat error on map file %s.\n",
-					dbfile);
+				    "ypserv:  Stat error on map file %s.\n",
+				    dbfile);
 			}
 			return (FALSE);
 		}
