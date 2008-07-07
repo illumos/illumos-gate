@@ -11865,15 +11865,7 @@ sd_initpkt_for_buf(struct buf *bp, struct scsi_pkt **pktpp)
 	startblock = xp->xb_blkno;	/* Absolute block num. */
 	blockcount = SD_BYTES2TGTBLOCKS(un, bp->b_bcount);
 
-#if defined(__i386) || defined(__amd64)	/* DMAFREE for x86 only */
-
 	cmd_flags = un->un_pkt_flags | (xp->xb_pkt_flags & SD_XB_INITPKT_MASK);
-
-#else
-
-	cmd_flags = un->un_pkt_flags | xp->xb_pkt_flags;
-
-#endif
 
 	/*
 	 * sd_setup_rw_pkt will determine the appropriate CDB group to use,

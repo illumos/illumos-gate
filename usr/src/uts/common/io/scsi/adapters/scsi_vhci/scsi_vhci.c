@@ -2191,12 +2191,14 @@ vhci_bind_transport(struct scsi_address *ap, struct vhci_pkt *vpkt, int flags,
 	}
 
 	/*
-	 * Get path_instance. Non-zero indicates that mdi_select_path should
-	 * be called to select a specific instance.
+	 * Get path_instance. Non-zero with FLAG_PKT_PATH_INSTANCE set
+	 * indicates that mdi_select_path should be called to select a
+	 * specific instance.
 	 *
 	 * NB: Condition pkt_path_instance reference on proper allocation.
 	 */
-	if (scsi_pkt_allocated_correctly(vpkt->vpkt_tgt_pkt))
+	if (scsi_pkt_allocated_correctly(vpkt->vpkt_tgt_pkt) &&
+	    (vpkt->vpkt_tgt_pkt->pkt_flags & FLAG_PKT_PATH_INSTANCE))
 		path_instance = vpkt->vpkt_tgt_pkt->pkt_path_instance;
 	else
 		path_instance = 0;

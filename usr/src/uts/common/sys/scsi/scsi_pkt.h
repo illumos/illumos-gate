@@ -163,10 +163,17 @@ struct scsi_pkt {
 
 /*
  * Following define is for scsi_vhci.
- * If pHCI cannot transport the command to the device, do not queue the pkt
- * in pHCI. Return immediately with TRAN_BUSY.
+ *   NOQUEUE            If pHCI cannot transport the command to the device,
+ *                      do not queue the pkt in pHCI. Return immediately with
+ *                      TRAN_BUSY.
+ *   PATH_INSTANCE      Select specific path (pkt_path_instance).
+ *                      We need both a pkt_path_instance field and flag bit so
+ *                      that a retry after a path failure, which sets
+ *                      pkt_path_instance to failed path, does not select the
+ *                      failed path.
  */
-#define	FLAG_NOQUEUE	0x80000000
+#define	FLAG_NOQUEUE		0x80000000
+#define	FLAG_PKT_PATH_INSTANCE	0x40000000	/* Tell vhci the path to use */
 
 /*
  * Definitions for the pkt_reason field.

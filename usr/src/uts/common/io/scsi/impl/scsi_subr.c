@@ -2340,6 +2340,8 @@ scsi_uscsi_pktinit(struct uscsi_cmd *uscmd, struct scsi_pkt *pkt)
 		return (0);		/* failure */
 	}
 
+	/* set path_instance */
+	pkt->pkt_flags |= FLAG_PKT_PATH_INSTANCE;
 	pkt->pkt_path_instance = path_instance;
 	return (1);			/* success */
 }
@@ -2374,6 +2376,8 @@ scsi_uscsi_pktfini(struct scsi_pkt *pkt, struct uscsi_cmd *uscmd)
 	}
 
 	uscmd->uscsi_path_instance = pkt->pkt_path_instance;
+	/* reset path_instance */
+	pkt->pkt_flags &= ~FLAG_PKT_PATH_INSTANCE;
 	pkt->pkt_path_instance = 0;
 	return (1);			/* success */
 }
