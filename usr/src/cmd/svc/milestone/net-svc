@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,10 +54,54 @@ case "$1" in
 	;;
 esac
 
+NWAM_FMRI="svc:/network/physical:nwam"
+NETSVC_FMRI="svc:/network/service:default"
+
 interface=$2
 
 # If boot variables are not set, set variables we use
 [ -z "$_INIT_UTS_NODENAME" ] && _INIT_UTS_NODENAME=`/usr/bin/uname -n`
+
+#
+# This function removes the instance portion of the passed-in FMRI; for
+# example, 'svc:/network/service:default' becomes 'svc:/network/service'.
+#
+remove_fmri_inst () {
+	echo $1 | awk -F: ' { printf "%s:%s", $1, $2 } '
+}
+
+#
+# This function returns true if this script was *not* invoked
+# by an instance of svc:/network/service.
+#
+fmri_is_not_netsvc () {
+	FMRI_1=`remove_fmri_inst $SMF_FMRI`
+	FMRI_2=`remove_fmri_inst $NETSVC_FMRI`
+	[ "$FMRI_1" = "$FMRI_2" ] && return 1
+	return 0
+}
+
+#
+# This function returns true if this script was *not* invoked
+# by the nwam instance of the network/physical service.
+#
+fmri_is_not_nwam () {
+	[ "&SMF_FMRI" = "$NWAM_FMRI" ] && return 1
+	return 0
+}
+
+#
+# This function returns true if the nwam service is not running, false
+# if it is.  "running" is defined as "current state is online or next
+# state is online".
+#
+nwam_is_not_running() {
+	state=`/usr/bin/svcprop -p restarter/state $NWAM_FMRI`
+	nstate=`/usr/bin/svcprop -p restarter/next_state $NWAM_FMRI`
+
+	[ "$state" = "online" -o "$nextstate" = "online" ] && return 1
+	return 0
+}
 
 #
 # wait_nis
@@ -93,6 +137,75 @@ mv_file ()
 	else
 		/usr/bin/rm $1
 	fi
+}
+
+#
+# This function takes a DHCP parameter (as defined in /etc/dhcp/inittab)
+# and returns the value for that parameter returned by the DHCP server.
+# If the global 'interface' is defined, it will request the value learned
+# on that interface, else it will request the value learned on the primary
+# interface.
+#
+get_dhcp_var ()
+{
+	if [ -n "$interface" ]; then
+		/sbin/dhcpinfo -i $interface $1
+	else
+		/sbin/dhcpinfo $1
+	fi
+}
+
+#
+# This function returns true if the string "# Added by DHCP$" occurs in
+# the passed-in file, false otherwise.
+#
+dhcp_edits ()
+{
+	/usr/bin/grep '# Added by DHCP$' $1 >/dev/null 2>&1
+	return $?
+}
+
+#
+# update_resolv()
+# Go through /etc/resolv.conf and replace any existing domain or
+# nameserver entries with new ones derived from DHCP.  Note that
+# it is important to preserve order of domain entries vs. search
+# entries; the search entries are reserved for administrator
+# customization and if placed after the domain entry will override
+# it.  See resolv.conf(4).
+#
+# The first arg should be the dns servers string, the second
+# should be the dns domain.
+#
+update_resolv ()
+{
+	dnsservers=$1
+	dnsdomain=$2
+
+	if [ ! -f /etc/resolv.conf ]; then
+		/usr/bin/touch /etc/resolv.conf
+	fi
+	export dnsservers dnsdomain
+	/usr/bin/nawk </etc/resolv.conf >/tmp/resolv.conf.$$ '
+		function writedomain() {
+			if (updated == 0) {
+			    	# Use only first domain, not a search list
+			    	split(ENVIRON["dnsdomain"], d)
+				if(length(d[1]) != 0)
+					printf("domain %s\n", d[1])
+			}
+			++updated
+		}
+		$1 == "domain" { writedomain(); next }
+		$1 != "nameserver" { print $0 }
+		END {
+			writedomain()
+			n = split(ENVIRON["dnsservers"], s)
+			for (i = 1; i <= n; ++i)
+				printf("nameserver %s\n", s[i])
+		}'
+	unset dnsservers dnsdomain
+	mv_file /tmp/resolv.conf.$$ /etc/resolv.conf 644
 }
 
 #
@@ -135,88 +248,12 @@ update_nss ()
 }
 
 #
-# We now need to reset the netmask and broadcast address for our network
-# interfaces.  Since this may result in a name service lookup, we want to
-# now wait for NIS to come up if we previously started it.
+# Remove any lines with the "# Added by DHCP" tag from /etc/nsswitch.conf;
+# also uncomment hosts and ipnodes entries which were previously commented
+# out by this script.
 #
-domain=`/usr/bin/domainname 2>/dev/null`
-
-[ -z "$domain" ] || [ ! -d /var/yp/binding/$domain ] || wait_nis || \
-    echo "WARNING: Timed out waiting for NIS to come up" >& 2
-
-#
-# Re-set the netmask and broadcast addr for all IP interfaces.  This ifconfig
-# is run here, after waiting for name services, so that "netmask +" will find
-# the netmask if it lives in a NIS map. The 'D' in -auD tells ifconfig NOT to
-# mess with the interface if it is under DHCP control
-#
-/usr/sbin/ifconfig -auD4 netmask + broadcast +
-
-# Uncomment these lines to print complete network interface configuration
-# echo "network interface configuration:"
-# /usr/sbin/ifconfig -a
-
-smf_netstrategy
-
-if [ "$_INIT_NET_STRATEGY" = "dhcp" ]; then
-	if [ -n "$interface" ]; then
-		dnsservers=`/sbin/dhcpinfo -i $interface DNSserv`
-	else
-		dnsservers=`/sbin/dhcpinfo DNSserv`
-	fi
-else
-	dnsservers=""
-fi
-
-if [ -n "$dnsservers" ]; then
-	#
-	# Go through /etc/resolv.conf and replace any existing
-	# domain or nameserver entries with new ones derived
-	# from DHCP.  Note that it is important to preserve
-	# order of domain entries vs. search entries; the search
-	# entries are reserved for administrator customization
-	# and if placed after the domain entry will override it.
-	# See resolv.conf(4).
-	#
-	if [ ! -f /etc/resolv.conf ]; then
-		/usr/bin/touch /etc/resolv.conf
-	fi
-	if [ -n "$interface" ]; then
-		dnsdomain=`/sbin/dhcpinfo -i $interface DNSdmain`
-	else
-		dnsdomain=`/sbin/dhcpinfo DNSdmain`
-	fi
-	export dnsservers dnsdomain
-	/usr/bin/nawk </etc/resolv.conf >/tmp/resolv.conf.$$ '
-		function writedomain() {
-			if (updated == 0) {
-			    	# Use only first domain, not a search list
-			    	split(ENVIRON["dnsdomain"], d)
-				if(length(d[1]) != 0)
-					printf("domain %s\n", d[1])
-			}
-			++updated
-		}
-		$1 == "domain" { writedomain(); next }
-		$1 != "nameserver" { print $0 }
-		END {
-			writedomain()
-			n = split(ENVIRON["dnsservers"], s)
-			for (i = 1; i <= n; ++i)
-				printf("nameserver %s\n", s[i])
-		}'
-	unset dnsservers dnsdomain
-	mv_file /tmp/resolv.conf.$$ /etc/resolv.conf 644
-	#
-	# Add dns to the nsswitch file, if it isn't already there.
-	#
-	update_nss hosts
-	update_nss ipnodes
-
-elif /usr/bin/grep '# Added by DHCP$' /etc/nsswitch.conf >/dev/null 2>&1; then
-
-	# If we added DNS to the hosts and ipnodes policy in the nsswitch,
-	# remove it.
+cleanup_nss ()
+{
 	/usr/bin/sed \
 	    -e '/# Added by DHCP$/d' \
 	    -e 's/^\(#hosts:\)\(.*[^#]\)\(#.*\)$/hosts: \2/' \
@@ -224,10 +261,13 @@ elif /usr/bin/grep '# Added by DHCP$' /etc/nsswitch.conf >/dev/null 2>&1; then
 	    /etc/nsswitch.conf >/tmp/nsswitch.conf.$$
 
 	mv_file /tmp/nsswitch.conf.$$ /etc/nsswitch.conf 644
-fi
+}
 
-# Clean up any old DHCP-added entries (except loopback) in the hosts file.
-if /usr/bin/grep '# Added by DHCP$' /etc/inet/hosts >/dev/null 2>&1; then
+#
+# Remove any lines with the "# Added by DHCP" tag from /etc/inet/hosts.
+#
+cleanup_hosts ()
+{
 	/usr/bin/nawk '{
 		if (index($0, "# Added by DHCP") == 0 ||
 		    $1 == "127.0.0.1" || $1 == "::1") {
@@ -235,9 +275,85 @@ if /usr/bin/grep '# Added by DHCP$' /etc/inet/hosts >/dev/null 2>&1; then
 		}
 	}' /etc/inet/hosts > /tmp/hosts.$$
 	mv_file /tmp/hosts.$$ /etc/inet/hosts 444
+}
+
+#
+# We now need to reset the netmask and broadcast address for our network
+# interfaces.  Since this may result in a name service lookup, we want to
+# now wait for NIS to come up if we previously started it.
+#
+# Only do this in the non-nwam case.
+#
+if fmri_is_not_nwam; then
+	domain=`/usr/bin/domainname 2>/dev/null`
+
+	[ -z "$domain" ] || [ ! -d /var/yp/binding/$domain ] || wait_nis || \
+    		echo "WARNING: Timed out waiting for NIS to come up" >& 2
+
+	#
+	# Re-set the netmask and broadcast addr for all IP interfaces.  This
+	# ifconfig is run here, after waiting for name services, so that
+	# "netmask +" will find the netmask if it lives in a NIS map. The 'D'
+	# in -auD tells ifconfig NOT to mess with the interface if it is
+	# under DHCP control
+	#
+	/usr/sbin/ifconfig -auD4 netmask + broadcast +
 fi
 
-if [ -z "$SMF_FMRI" ] || [ "$SMF_FMRI" = "svc:/network/physical:nwam" ]; then
+# Uncomment these lines to print complete network interface configuration
+# echo "network interface configuration:"
+# /usr/sbin/ifconfig -a
+
+#
+# If our network configuration strategy is DHCP, check for DNS
+# configuration parameters obtained from the DHCP server.
+#
+# If NWAM is enabled, it will invoke this script to do this configuration
+# whenever a DHCP lease is obtained; in that case, this configuration
+# should *not* happen when svc:network/service is starting, as it will
+# interfere with the configuration performed by NWAM.
+#
+if nwam_is_not_running || fmri_is_not_netsvc; then
+
+	smf_netstrategy
+
+	if [ "$_INIT_NET_STRATEGY" = "dhcp" ]; then
+		dnsservers=`get_dhcp_var DNSserv`
+		dnsdomain=`get_dhcp_var DNSdmain`
+	else
+		dnsservers=""
+		dnsdomain=""
+	fi
+
+	if [ -n "$dnsservers" ]; then
+		#
+		# add settings retrieved from dhcp server to /etc/resolv.conf
+		#
+		update_resolv "$dnsservers" "$dnsdomain"
+
+		#
+		# Add dns to the nsswitch file, if it isn't already there.
+		#
+		update_nss hosts
+		update_nss ipnodes
+
+	elif dhcp_edits /etc/nsswitch.conf; then
+		# If we added DNS to the hosts and ipnodes
+		# policy in the nsswitch, remove it.
+		cleanup_nss
+	fi
+fi
+
+if dhcp_edits /etc/inet/hosts; then
+	# Clean up any old DHCP-added entries
+	# (except loopback) in the hosts file.
+	cleanup_hosts
+fi
+
+#
+# If we were invoked by NWAM, can exit now (skipping the ipqos config)
+#
+if [ -z "$SMF_FMRI" ] || [ "$SMF_FMRI" = "$NWAM_FMRI" ]; then
         exit 0
 fi
 

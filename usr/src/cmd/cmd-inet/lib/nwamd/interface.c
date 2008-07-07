@@ -436,23 +436,19 @@ activate_upper_layer_profile(boolean_t do_dhcp, const char *ifname)
 	boolean_t should;
 	int res;
 
-	res = lookup_boolean_property(OUR_PG, "use_net_svc", &should);
 	/*
-	 * If the look-up failed, try anyway: only avoid this if we
-	 * know for sure not to.
+	 * exec the net-svc script to update local config with
+	 * any DNS information learned from the DHCP server.
 	 */
-	if ((res == 0 && should) || (res == -1)) {
-		if (check_svc_up(NET_SVC_FMRI, 5)) {
-			/*
-			 * If doing dhcp, pass in specific interface
-			 * name to net-svc so dhcpinfo can specify it.
-			 */
-			(void) start_child(NET_SVC_METHOD, "start",
-			    do_dhcp ? ifname : NULL, NULL);
-		} else {
-			syslog(LOG_WARNING, "timed out when waiting "
-			    "for %s to come up, start method %s not "
-			    "executed", NET_SVC_FMRI, NET_SVC_METHOD);
+	if (do_dhcp) {
+		res = lookup_boolean_property(OUR_PG, "use_net_svc", &should);
+		/*
+		 * If the look-up failed, try anyway: only avoid this if we
+		 * know for sure not to.
+		 */
+		if ((res == 0 && should) || (res == -1)) {
+			(void) start_child(NET_SVC_METHOD, "start", ifname,
+			    NULL);
 		}
 	}
 	f = popen(ULP_DIR "/check-conditions", "r");
