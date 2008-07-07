@@ -1078,24 +1078,34 @@ dnode_free_range(dnode_t *dn, uint64_t off, uint64_t len, dmu_tx_t *tx)
 	/*
 	 * Read in and mark all the level-1 indirects dirty,
 	 * so that they will stay in memory until syncing phase.
+	 * Always dirty the first and last indirect to make sure
+	 * we dirty all the partial indirects.
 	 */
 	if (dn->dn_nlevels > 1) {
 		uint64_t i, first, last;
 		int shift = epbs + dn->dn_datablkshift;
 
 		first = blkid >> epbs;
+		if (db = dbuf_hold_level(dn, 1, first, FTAG)) {
+			dbuf_will_dirty(db, tx);
+			dbuf_rele(db, FTAG);
+		}
 		if (trunc)
 			last = dn->dn_maxblkid >> epbs;
 		else
 			last = (blkid + nblks - 1) >> epbs;
-		for (i = first; i <= last; i++) {
+		if (last > first && (db = dbuf_hold_level(dn, 1, last, FTAG))) {
+			dbuf_will_dirty(db, tx);
+			dbuf_rele(db, FTAG);
+		}
+		for (i = first + 1; i < last; i++) {
 			uint64_t ibyte = i << shift;
 			int err;
 
 			err = dnode_next_offset(dn,
 			    DNODE_FIND_HAVELOCK, &ibyte, 1, 1, 0);
 			i = ibyte >> shift;
-			if (err == ESRCH || i > last)
+			if (err == ESRCH || i >= last)
 				break;
 			ASSERT(err == 0);
 			db = dbuf_hold_level(dn, 1, i, FTAG);
