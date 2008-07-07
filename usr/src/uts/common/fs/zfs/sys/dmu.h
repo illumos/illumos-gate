@@ -114,6 +114,8 @@ typedef enum dmu_object_type {
 	DMU_OT_SYSACL,			/* SYSACL */
 	DMU_OT_FUID,			/* FUID table (Packed NVLIST UINT8) */
 	DMU_OT_FUID_SIZE,		/* FUID table size UINT64 */
+	DMU_OT_NEXT_CLONES,		/* ZAP */
+	DMU_OT_SCRUB_QUEUE,		/* ZAP */
 	DMU_OT_NUMTYPES
 } dmu_object_type_t;
 
@@ -201,6 +203,19 @@ typedef void dmu_buf_evict_func_t(struct dmu_buf *db, void *user_ptr);
 #define	DMU_POOL_HISTORY		"history"
 #define	DMU_POOL_PROPS			"pool_props"
 #define	DMU_POOL_L2CACHE		"l2cache"
+
+/* 4x8 zbookmark_t */
+#define	DMU_POOL_SCRUB_BOOKMARK		"scrub_bookmark"
+/* 1x8 zap obj DMU_OT_SCRUB_QUEUE */
+#define	DMU_POOL_SCRUB_QUEUE		"scrub_queue"
+/* 1x8 txg */
+#define	DMU_POOL_SCRUB_MIN_TXG		"scrub_min_txg"
+/* 1x8 txg */
+#define	DMU_POOL_SCRUB_MAX_TXG		"scrub_max_txg"
+/* 1x4 enum scrub_func */
+#define	DMU_POOL_SCRUB_FUNC		"scrub_func"
+/* 1x8 count */
+#define	DMU_POOL_SCRUB_ERRORS		"scrub_errors"
 
 /*
  * Allocate an object from this objset.  The range of object numbers

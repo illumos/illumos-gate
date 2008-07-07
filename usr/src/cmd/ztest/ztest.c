@@ -205,14 +205,14 @@ ztest_info_t ztest_info[] = {
 	{ ztest_zap_parallel,			100,	&zopt_always	},
 	{ ztest_traverse,			1,	&zopt_often	},
 	{ ztest_dsl_prop_get_set,		1,	&zopt_sometimes	},
-	{ ztest_dmu_objset_create_destroy,	1,	&zopt_sometimes	},
-	{ ztest_dmu_snapshot_create_destroy,	1,	&zopt_rarely	},
-	{ ztest_spa_create_destroy,		1,	&zopt_sometimes	},
+	{ ztest_dmu_objset_create_destroy,	1,	&zopt_sometimes },
+	{ ztest_dmu_snapshot_create_destroy,	1,	&zopt_rarely },
+	{ ztest_spa_create_destroy,		1,	&zopt_sometimes },
 	{ ztest_fault_inject,			1,	&zopt_sometimes	},
 	{ ztest_spa_rename,			1,	&zopt_rarely	},
-	{ ztest_vdev_attach_detach,		1,	&zopt_rarely	},
-	{ ztest_vdev_LUN_growth,		1,	&zopt_rarely	},
-	{ ztest_vdev_add_remove,		1,	&zopt_vdevtime	},
+	{ ztest_vdev_attach_detach,		1,	&zopt_rarely },
+	{ ztest_vdev_LUN_growth,		1,	&zopt_rarely },
+	{ ztest_vdev_add_remove,		1,	&zopt_vdevtime },
 	{ ztest_scrub,				1,	&zopt_vdevtime	},
 };
 
@@ -1046,12 +1046,15 @@ ztest_vdev_attach_detach(ztest_args_t *za)
 	/*
 	 * If someone grew the LUN, the replacement may be too small.
 	 */
-	if (error == EOVERFLOW)
+	if (error == EOVERFLOW || error == EBUSY)
 		expected_error = error;
 
-	if (error != expected_error) {
-		fatal(0, "attach (%s, %s, %d) returned %d, expected %d",
-		    oldpath, newpath, replacing, error, expected_error);
+	/* XXX workaround 6690467 */
+	if (error != expected_error && expected_error != EBUSY) {
+		fatal(0, "attach (%s %llu, %s %llu, %d) "
+		    "returned %d, expected %d",
+		    oldpath, (longlong_t)oldsize, newpath,
+		    (longlong_t)newsize, replacing, error, expected_error);
 	}
 
 	(void) mutex_unlock(&ztest_shared->zs_vdev_lock);
@@ -1551,7 +1554,7 @@ ztest_dmu_object_alloc_free(ztest_args_t *za)
 	 * Destroy the previous batch of objects.
 	 */
 	for (b = 0; b < batchsize; b++) {
-		VERIFY(0 == dmu_read(os, batchobj, b * sizeof (uint64_t),
+		VERIFY3U(0, ==, dmu_read(os, batchobj, b * sizeof (uint64_t),
 		    sizeof (uint64_t), &object));
 		if (object == 0)
 			continue;
@@ -2681,13 +2684,9 @@ ztest_scrub(ztest_args_t *za)
 {
 	spa_t *spa = za->za_spa;
 
-	mutex_enter(&spa_namespace_lock);
-	(void) spa_scrub(spa, POOL_SCRUB_EVERYTHING, B_FALSE);
-	mutex_exit(&spa_namespace_lock);
+	(void) spa_scrub(spa, POOL_SCRUB_EVERYTHING);
 	(void) poll(NULL, 0, 1000); /* wait a second, then force a restart */
-	mutex_enter(&spa_namespace_lock);
-	(void) spa_scrub(spa, POOL_SCRUB_EVERYTHING, B_FALSE);
-	mutex_exit(&spa_namespace_lock);
+	(void) spa_scrub(spa, POOL_SCRUB_EVERYTHING);
 }
 
 /*

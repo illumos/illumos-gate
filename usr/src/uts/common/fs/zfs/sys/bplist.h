@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,8 +75,8 @@ extern int bplist_open(bplist_t *bpl, objset_t *mos, uint64_t object);
 extern void bplist_close(bplist_t *bpl);
 extern boolean_t bplist_empty(bplist_t *bpl);
 extern int bplist_iterate(bplist_t *bpl, uint64_t *itorp, blkptr_t *bp);
-extern int bplist_enqueue(bplist_t *bpl, blkptr_t *bp, dmu_tx_t *tx);
-extern void bplist_enqueue_deferred(bplist_t *bpl, blkptr_t *bp);
+extern int bplist_enqueue(bplist_t *bpl, const blkptr_t *bp, dmu_tx_t *tx);
+extern void bplist_enqueue_deferred(bplist_t *bpl, const blkptr_t *bp);
 extern void bplist_sync(bplist_t *bpl, dmu_tx_t *tx);
 extern void bplist_vacate(bplist_t *bpl, dmu_tx_t *tx);
 extern int bplist_space(bplist_t *bpl,

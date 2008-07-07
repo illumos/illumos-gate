@@ -39,7 +39,8 @@
 #define	SPA_VERSION_8			8ULL
 #define	SPA_VERSION_9			9ULL
 #define	SPA_VERSION_10			10ULL
-#define	SPA_VERSION			SPA_VERSION_10
+#define	SPA_VERSION_11			11ULL
+#define	SPA_VERSION			SPA_VERSION_11
 
 /*
  * The following are configuration names used in the nvlist describing a pool's

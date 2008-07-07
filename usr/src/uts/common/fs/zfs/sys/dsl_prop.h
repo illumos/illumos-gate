@@ -55,6 +55,8 @@ int dsl_prop_unregister(struct dsl_dataset *ds, const char *propname,
     dsl_prop_changed_cb_t *callback, void *cbarg);
 int dsl_prop_numcb(struct dsl_dataset *ds);
 
+int dsl_prop_get_dd(dsl_dir_t *dd, const char *propname,
+    int intsz, int numints, void *buf, char *setpoint);
 int dsl_prop_get(const char *ddname, const char *propname,
     int intsz, int numints, void *buf, char *setpoint);
 int dsl_prop_get_integer(const char *ddname, const char *propname,

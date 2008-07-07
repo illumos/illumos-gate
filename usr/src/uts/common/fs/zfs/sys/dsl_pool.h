@@ -32,6 +32,7 @@
 #include <sys/txg.h>
 #include <sys/txg_impl.h>
 #include <sys/zfs_context.h>
+#include <sys/zio.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -39,6 +40,16 @@ extern "C" {
 
 struct objset;
 struct dsl_dir;
+struct dsl_dataset;
+struct dsl_pool;
+struct dmu_tx;
+
+enum scrub_func {
+	SCRUB_FUNC_NONE,
+	SCRUB_FUNC_CLEAN,
+	SCRUB_FUNC_NUMFUNCS
+};
+
 
 typedef struct dsl_pool {
 	/* Immutable */
@@ -46,6 +57,7 @@ typedef struct dsl_pool {
 	struct objset *dp_meta_objset;
 	struct dsl_dir *dp_root_dir;
 	struct dsl_dir *dp_mos_dir;
+	struct dsl_dataset *dp_origin_snap;
 	uint64_t dp_root_dir_obj;
 
 	/* No lock needed - sync context only */
@@ -57,6 +69,17 @@ typedef struct dsl_pool {
 	kmutex_t dp_lock;
 	uint64_t dp_space_towrite[TXG_SIZE];
 	uint64_t dp_tempreserved[TXG_SIZE];
+
+	enum scrub_func dp_scrub_func;
+	uint64_t dp_scrub_queue_obj;
+	uint64_t dp_scrub_min_txg;
+	uint64_t dp_scrub_max_txg;
+	zbookmark_t dp_scrub_bookmark;
+	boolean_t dp_scrub_pausing;
+	boolean_t dp_scrub_isresilver;
+	uint64_t dp_scrub_start_time;
+	kmutex_t dp_scrub_cancel_lock; /* protects dp_scrub_restart */
+	boolean_t dp_scrub_restart;
 
 	/* Has its own locking */
 	tx_state_t dp_tx;
@@ -84,6 +107,17 @@ int dsl_pool_tempreserve_space(dsl_pool_t *dp, uint64_t space, dmu_tx_t *tx);
 void dsl_pool_tempreserve_clear(dsl_pool_t *dp, int64_t space, dmu_tx_t *tx);
 void dsl_pool_memory_pressure(dsl_pool_t *dp);
 void dsl_pool_willuse_space(dsl_pool_t *dp, int64_t space, dmu_tx_t *tx);
+int dsl_free(zio_t *pio, dsl_pool_t *dp, uint64_t txg, const blkptr_t *bpp,
+    zio_done_func_t *done, void *private, uint32_t arc_flags);
+void dsl_pool_ds_destroyed(struct dsl_dataset *ds, struct dmu_tx *tx);
+void dsl_pool_ds_snapshotted(struct dsl_dataset *ds, struct dmu_tx *tx);
+void dsl_pool_create_origin(dsl_pool_t *dp, dmu_tx_t *tx);
+void dsl_pool_upgrade_clones(dsl_pool_t *dp, dmu_tx_t *tx);
+
+int dsl_pool_scrub_cancel(dsl_pool_t *dp);
+int dsl_pool_scrub_clean(dsl_pool_t *dp);
+void dsl_pool_scrub_sync(dsl_pool_t *dp, dmu_tx_t *tx);
+void dsl_pool_scrub_restart(dsl_pool_t *dp);
 
 #ifdef	__cplusplus
 }

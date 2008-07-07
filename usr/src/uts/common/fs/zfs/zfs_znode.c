@@ -422,44 +422,16 @@ zfs_create_op_tables()
  *	incore "master" object.  Verify version compatibility.
  */
 int
-zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
+zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp)
 {
 	extern int zfsfstype;
 
 	objset_t	*os = zfsvfs->z_os;
 	int		i, error;
-	dmu_object_info_t doi;
 	uint64_t fsid_guid;
 	uint64_t zval;
 
 	*zpp = NULL;
-
-	/*
-	 * XXX - hack to auto-create the pool root filesystem at
-	 * the first attempted mount.
-	 */
-	if (dmu_object_info(os, MASTER_NODE_OBJ, &doi) == ENOENT) {
-		dmu_tx_t *tx = dmu_tx_create(os);
-		uint64_t zpl_version;
-		nvlist_t *zprops;
-
-		dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, TRUE, NULL); /* master */
-		dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, TRUE, NULL); /* del queue */
-		dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT); /* root node */
-		error = dmu_tx_assign(tx, TXG_WAIT);
-		ASSERT3U(error, ==, 0);
-		if (spa_version(dmu_objset_spa(os)) >= SPA_VERSION_FUID)
-			zpl_version = ZPL_VERSION;
-		else
-			zpl_version = ZPL_VERSION_FUID - 1;
-
-		VERIFY(nvlist_alloc(&zprops, NV_UNIQUE_NAME, KM_SLEEP) == 0);
-		VERIFY(nvlist_add_uint64(zprops,
-		    zfs_prop_to_name(ZFS_PROP_VERSION), zpl_version) == 0);
-		zfs_create_fs(os, cr, zprops, tx);
-		nvlist_free(zprops);
-		dmu_tx_commit(tx);
-	}
 
 	error = zfs_get_zplprop(os, ZFS_PROP_VERSION, &zfsvfs->z_version);
 	if (error) {
@@ -1505,8 +1477,7 @@ void
 zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 {
 	zfsvfs_t	zfsvfs;
-	uint64_t	moid, doid;
-	uint64_t	version = 0;
+	uint64_t	moid, doid, version;
 	uint64_t	sense = ZFS_CASE_SENSITIVE;
 	uint64_t	norm = 0;
 	nvpair_t	*elem;
@@ -1531,6 +1502,12 @@ zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *zplprops, dmu_tx_t *tx)
 	/*
 	 * Set starting attributes.
 	 */
+	if (spa_version(dmu_objset_spa(os)) >= SPA_VERSION_FUID)
+		version = ZPL_VERSION;
+	else
+		version = ZPL_VERSION_FUID - 1;
+	error = zap_update(os, moid, ZPL_VERSION_STR,
+	    8, 1, &version, tx);
 	elem = NULL;
 	while ((elem = nvlist_next_nvpair(zplprops, elem)) != NULL) {
 		/* For the moment we expect all zpl props to be uint64_ts */

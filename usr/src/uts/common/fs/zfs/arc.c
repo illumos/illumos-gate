@@ -173,6 +173,7 @@ static boolean_t arc_warm;
 uint64_t zfs_arc_max;
 uint64_t zfs_arc_min;
 uint64_t zfs_arc_meta_limit = 0;
+int zfs_mdcomp_disable = 0;
 
 /*
  * Note that buffers can be in one of 6 states:
@@ -392,7 +393,6 @@ typedef struct arc_callback arc_callback_t;
 struct arc_callback {
 	void			*acb_private;
 	arc_done_func_t		*acb_done;
-	arc_byteswap_func_t	*acb_byteswap;
 	arc_buf_t		*acb_buf;
 	zio_t			*acb_zio_dummy;
 	arc_callback_t		*acb_next;
@@ -441,6 +441,11 @@ struct arc_buf_hdr {
 
 	l2arc_buf_hdr_t		*b_l2hdr;
 	list_node_t		b_l2node;
+	/*
+	 * scrub code can lockout access to the buf while it changes
+	 * bp's contained within it.
+	 */
+	krwlock_t		b_datalock;
 };
 
 static arc_buf_t *arc_eviction_list;
@@ -474,6 +479,7 @@ static void arc_evict_ghost(arc_state_t *state, spa_t *spa, int64_t bytes);
 #define	ARC_L2_WRITING		(1 << 17)	/* L2ARC write in progress */
 #define	ARC_L2_EVICTED		(1 << 18)	/* evicted during I/O */
 #define	ARC_L2_WRITE_HEAD	(1 << 19)	/* head of write list */
+#define	ARC_STORED		(1 << 20)	/* has been store()d to */
 
 #define	HDR_IN_HASH_TABLE(hdr)	((hdr)->b_flags & ARC_IN_HASH_TABLE)
 #define	HDR_IO_IN_PROGRESS(hdr)	((hdr)->b_flags & ARC_IO_IN_PROGRESS)
@@ -609,7 +615,7 @@ static void l2arc_hdr_stat_add(void);
 static void l2arc_hdr_stat_remove(void);
 
 static uint64_t
-buf_hash(spa_t *spa, dva_t *dva, uint64_t birth)
+buf_hash(spa_t *spa, const dva_t *dva, uint64_t birth)
 {
 	uintptr_t spav = (uintptr_t)spa;
 	uint8_t *vdva = (uint8_t *)dva;
@@ -637,7 +643,7 @@ buf_hash(spa_t *spa, dva_t *dva, uint64_t birth)
 	((buf)->b_birth == birth) && ((buf)->b_spa == spa)
 
 static arc_buf_hdr_t *
-buf_hash_find(spa_t *spa, dva_t *dva, uint64_t birth, kmutex_t **lockp)
+buf_hash_find(spa_t *spa, const dva_t *dva, uint64_t birth, kmutex_t **lockp)
 {
 	uint64_t idx = BUF_HASH_INDEX(spa, dva, birth);
 	kmutex_t *hash_lock = BUF_HASH_LOCK(idx);
@@ -757,6 +763,7 @@ hdr_cons(void *vbuf, void *unused, int kmflag)
 	refcount_create(&buf->b_refcnt);
 	cv_init(&buf->b_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&buf->b_freeze_lock, NULL, MUTEX_DEFAULT, NULL);
+	rw_init(&buf->b_datalock, NULL, RW_DEFAULT, NULL);
 
 	ARCSTAT_INCR(arcstat_hdr_size, HDR_SIZE);
 	return (0);
@@ -775,6 +782,7 @@ hdr_dest(void *vbuf, void *unused)
 	refcount_destroy(&buf->b_refcnt);
 	cv_destroy(&buf->b_cv);
 	mutex_destroy(&buf->b_freeze_lock);
+	rw_destroy(&buf->b_datalock);
 
 	ARCSTAT_INCR(arcstat_hdr_size, -HDR_SIZE);
 }
@@ -941,7 +949,7 @@ add_reference(arc_buf_hdr_t *ab, kmutex_t *hash_lock, void *tag)
 		ASSERT3U(*size, >=, delta);
 		atomic_add_64(size, -delta);
 		mutex_exit(&ab->b_state->arcs_mtx);
-		/* remove the prefetch flag is we get a reference */
+		/* remove the prefetch flag if we get a reference */
 		if (ab->b_flags & ARC_PREFETCH)
 			ab->b_flags &= ~ARC_PREFETCH;
 	}
@@ -1271,6 +1279,7 @@ arc_hdr_destroy(arc_buf_hdr_t *hdr)
 	ASSERT(refcount_is_zero(&hdr->b_refcnt));
 	ASSERT3P(hdr->b_state, ==, arc_anon);
 	ASSERT(!HDR_IO_IN_PROGRESS(hdr));
+	ASSERT(!(hdr->b_flags & ARC_STORED));
 
 	if (hdr->b_l2hdr != NULL) {
 		if (!MUTEX_HELD(&l2arc_buflist_mtx)) {
@@ -2296,8 +2305,12 @@ arc_read_done(zio_t *zio)
 	/* byteswap if necessary */
 	callback_list = hdr->b_acb;
 	ASSERT(callback_list != NULL);
-	if (BP_SHOULD_BYTESWAP(zio->io_bp) && callback_list->acb_byteswap)
-		callback_list->acb_byteswap(buf->b_data, hdr->b_size);
+	if (BP_SHOULD_BYTESWAP(zio->io_bp)) {
+		arc_byteswap_func_t *func = BP_GET_LEVEL(zio->io_bp) > 0 ?
+		    byteswap_uint64_array :
+		    dmu_ot[BP_GET_TYPE(zio->io_bp)].ot_byteswap;
+		func(buf->b_data, hdr->b_size);
+	}
 
 	arc_cksum_compute(buf, B_FALSE);
 
@@ -2394,11 +2407,33 @@ arc_read_done(zio_t *zio)
  *
  * arc_read_done() will invoke all the requested "done" functions
  * for readers of this block.
+ *
+ * Normal callers should use arc_read and pass the arc buffer and offset
+ * for the bp.  But if you know you don't need locking, you can use
+ * arc_read_bp.
  */
 int
-arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_byteswap_func_t *swap,
+arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_buf_t *pbuf,
     arc_done_func_t *done, void *private, int priority, int flags,
-    uint32_t *arc_flags, zbookmark_t *zb)
+    uint32_t *arc_flags, const zbookmark_t *zb)
+{
+	int err;
+
+	ASSERT(!refcount_is_zero(&pbuf->b_hdr->b_refcnt));
+	ASSERT3U((char *)bp - (char *)pbuf->b_data, <, pbuf->b_hdr->b_size);
+	rw_enter(&pbuf->b_hdr->b_datalock, RW_READER);
+
+	err = arc_read_nolock(pio, spa, bp, done, private, priority,
+	    flags, arc_flags, zb);
+
+	rw_exit(&pbuf->b_hdr->b_datalock);
+	return (err);
+}
+
+int
+arc_read_nolock(zio_t *pio, spa_t *spa, blkptr_t *bp,
+    arc_done_func_t *done, void *private, int priority, int flags,
+    uint32_t *arc_flags, const zbookmark_t *zb)
 {
 	arc_buf_hdr_t *hdr;
 	arc_buf_t *buf;
@@ -2427,7 +2462,6 @@ top:
 				    KM_SLEEP);
 				acb->acb_done = done;
 				acb->acb_private = private;
-				acb->acb_byteswap = swap;
 				if (pio != NULL)
 					acb->acb_zio_dummy = zio_null(pio,
 					    spa, NULL, NULL, flags);
@@ -2536,7 +2570,6 @@ top:
 		acb = kmem_zalloc(sizeof (arc_callback_t), KM_SLEEP);
 		acb->acb_done = done;
 		acb->acb_private = private;
-		acb->acb_byteswap = swap;
 
 		ASSERT(hdr->b_acb == NULL);
 		hdr->b_acb = acb;
@@ -2790,7 +2823,7 @@ arc_buf_evict(arc_buf_t *buf)
  * Release this buffer from the cache.  This must be done
  * after a read and prior to modifying the buffer contents.
  * If the buffer has more than one reference, we must make
- * make a new hdr for the buffer.
+ * a new hdr for the buffer.
  */
 void
 arc_release(arc_buf_t *buf, void *tag)
@@ -2802,6 +2835,7 @@ arc_release(arc_buf_t *buf, void *tag)
 
 	/* this buffer is not on any list */
 	ASSERT(refcount_count(&hdr->b_refcnt) > 0);
+	ASSERT(!(hdr->b_flags & ARC_STORED));
 
 	if (hdr->b_state == arc_anon) {
 		/* this buffer is already released */
@@ -2964,9 +2998,6 @@ arc_write_done(zio_t *zio)
 
 	hdr->b_acb = NULL;
 
-	/* this buffer is on no lists and is not in the hash table */
-	ASSERT3P(hdr->b_state, ==, arc_anon);
-
 	hdr->b_dva = *BP_IDENTITY(zio->io_bp);
 	hdr->b_birth = zio->io_bp->blk_birth;
 	hdr->b_cksum0 = zio->io_bp->blk_cksum.zc_word[0];
@@ -3002,7 +3033,9 @@ arc_write_done(zio_t *zio)
 			ASSERT3P(exists, ==, NULL);
 		}
 		hdr->b_flags &= ~ARC_IO_IN_PROGRESS;
-		arc_access(hdr, hash_lock);
+		/* if it's not anon, we are doing a scrub */
+		if (hdr->b_state == arc_anon)
+			arc_access(hdr, hash_lock);
 		mutex_exit(hash_lock);
 	} else if (callback->awcb_done == NULL) {
 		int destroy_hdr;
@@ -3019,6 +3052,7 @@ arc_write_done(zio_t *zio)
 	} else {
 		hdr->b_flags &= ~ARC_IO_IN_PROGRESS;
 	}
+	hdr->b_flags &= ~ARC_STORED;
 
 	if (callback->awcb_done) {
 		ASSERT(!refcount_is_zero(&hdr->b_refcnt));
@@ -3028,19 +3062,62 @@ arc_write_done(zio_t *zio)
 	kmem_free(callback, sizeof (arc_write_callback_t));
 }
 
+static void
+write_policy(spa_t *spa, const writeprops_t *wp,
+    int *cksump, int *compp, int *copiesp)
+{
+	int copies = wp->wp_copies;
+	boolean_t ismd = (wp->wp_level > 0 || dmu_ot[wp->wp_type].ot_metadata);
+
+	/* Determine copies setting */
+	if (ismd)
+		copies++;
+	*copiesp = MIN(copies, spa_max_replication(spa));
+
+	/* Determine checksum setting */
+	if (ismd) {
+		/*
+		 * Metadata always gets checksummed.  If the data
+		 * checksum is multi-bit correctable, and it's not a
+		 * ZBT-style checksum, then it's suitable for metadata
+		 * as well.  Otherwise, the metadata checksum defaults
+		 * to fletcher4.
+		 */
+		if (zio_checksum_table[wp->wp_oschecksum].ci_correctable &&
+		    !zio_checksum_table[wp->wp_oschecksum].ci_zbt)
+			*cksump = wp->wp_oschecksum;
+		else
+			*cksump = ZIO_CHECKSUM_FLETCHER_4;
+	} else {
+		*cksump = zio_checksum_select(wp->wp_dnchecksum,
+		    wp->wp_oschecksum);
+	}
+
+	/* Determine compression setting */
+	if (ismd) {
+		/*
+		 * XXX -- we should design a compression algorithm
+		 * that specializes in arrays of bps.
+		 */
+		*compp = zfs_mdcomp_disable ? ZIO_COMPRESS_EMPTY :
+		    ZIO_COMPRESS_LZJB;
+	} else {
+		*compp = zio_compress_select(wp->wp_dncompress,
+		    wp->wp_oscompress);
+	}
+}
+
 zio_t *
-arc_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
+arc_write(zio_t *pio, spa_t *spa, const writeprops_t *wp,
     uint64_t txg, blkptr_t *bp, arc_buf_t *buf,
     arc_done_func_t *ready, arc_done_func_t *done, void *private, int priority,
-    int flags, zbookmark_t *zb)
+    int flags, const zbookmark_t *zb)
 {
 	arc_buf_hdr_t *hdr = buf->b_hdr;
 	arc_write_callback_t *callback;
 	zio_t	*zio;
+	int cksum, comp, copies;
 
-	/* this is a private buffer - no locking required */
-	ASSERT3P(hdr->b_state, ==, arc_anon);
-	ASSERT(BUF_EMPTY(hdr));
 	ASSERT(!HDR_IO_ERROR(hdr));
 	ASSERT((hdr->b_flags & ARC_IO_IN_PROGRESS) == 0);
 	ASSERT(hdr->b_acb == 0);
@@ -3049,9 +3126,11 @@ arc_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
 	callback->awcb_done = done;
 	callback->awcb_private = private;
 	callback->awcb_buf = buf;
-	zio = zio_write(pio, spa, checksum, compress, ncopies, txg, bp,
-	    buf->b_data, hdr->b_size, arc_write_ready, arc_write_done, callback,
-	    priority, flags, zb);
+
+	write_policy(spa, wp, &cksum, &comp, &copies);
+	zio = zio_write(pio, spa, cksum, comp, copies, txg, bp,
+	    buf->b_data, hdr->b_size, arc_write_ready, arc_write_done,
+	    callback, priority, flags, zb);
 
 	return (zio);
 }

@@ -84,6 +84,8 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	byteswap_uint8_array,	TRUE,	"ZFS SYSACL"		},
 	{	byteswap_uint8_array,	TRUE,	"FUID table"		},
 	{	byteswap_uint64_array,	TRUE,	"FUID table size"	},
+	{	zap_byteswap,		TRUE,	"DSL dataset next clones"},
+	{	zap_byteswap,		TRUE,	"scrub work queue"	},
 };
 
 int
@@ -843,6 +845,7 @@ dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
 	dbuf_dirty_record_t *dr;
 	dmu_sync_arg_t *in;
 	zbookmark_t zb;
+	writeprops_t wp = { 0 };
 	zio_t *zio;
 	int zio_flags;
 	int err;
@@ -958,10 +961,14 @@ dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
 	zio_flags = ZIO_FLAG_MUSTSUCCEED;
 	if (dmu_ot[db->db_dnode->dn_type].ot_metadata || zb.zb_level != 0)
 		zio_flags |= ZIO_FLAG_METADATA;
-	zio = arc_write(pio, os->os_spa,
-	    zio_checksum_select(db->db_dnode->dn_checksum, os->os_checksum),
-	    zio_compress_select(db->db_dnode->dn_compress, os->os_compress),
-	    dmu_get_replication_level(os, &zb, db->db_dnode->dn_type),
+	wp.wp_type = db->db_dnode->dn_type;
+	wp.wp_copies = os->os_copies;
+	wp.wp_level = db->db_level;
+	wp.wp_dnchecksum = db->db_dnode->dn_checksum;
+	wp.wp_oschecksum = os->os_checksum;
+	wp.wp_dncompress = db->db_dnode->dn_compress;
+	wp.wp_oscompress = os->os_compress;
+	zio = arc_write(pio, os->os_spa, &wp,
 	    txg, bp, dr->dt.dl.dr_data, NULL, dmu_sync_done, in,
 	    ZIO_PRIORITY_SYNC_WRITE, zio_flags, &zb);
 
@@ -1016,21 +1023,6 @@ dmu_object_set_compress(objset_t *os, uint64_t object, uint8_t compress,
 	dn->dn_compress = compress;
 	dnode_setdirty(dn, tx);
 	dnode_rele(dn, FTAG);
-}
-
-int
-dmu_get_replication_level(objset_impl_t *os,
-    zbookmark_t *zb, dmu_object_type_t ot)
-{
-	int ncopies = os->os_copies;
-
-	/* If it's the mos, it should have max copies set. */
-	ASSERT(zb->zb_objset != 0 ||
-	    ncopies == spa_max_replication(os->os_spa));
-
-	if (dmu_ot[ot].ot_metadata || zb->zb_level != 0)
-		ncopies++;
-	return (MIN(ncopies, spa_max_replication(os->os_spa)));
 }
 
 int

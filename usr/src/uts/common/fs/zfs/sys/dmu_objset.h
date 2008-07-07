@@ -69,12 +69,11 @@ typedef struct objset_impl {
 	uint8_t os_checksum;	/* can change, under dsl_dir's locks */
 	uint8_t os_compress;	/* can change, under dsl_dir's locks */
 	uint8_t os_copies;	/* can change, under dsl_dir's locks */
-	uint8_t os_md_checksum;
-	uint8_t os_md_compress;
 
 	/* no lock needed: */
 	struct dmu_tx *os_synctx; /* XXX sketchy */
 	blkptr_t *os_rootbp;
+	zil_header_t os_zil_header;
 
 	/* Protected by os_obj_lock */
 	kmutex_t os_obj_lock;
@@ -111,6 +110,8 @@ void dmu_objset_space(objset_t *os, uint64_t *refdbytesp, uint64_t *availbytesp,
 uint64_t dmu_objset_fsid_guid(objset_t *os);
 int dmu_objset_find(char *name, int func(char *, void *), void *arg,
     int flags);
+int dmu_objset_find_spa(spa_t *spa, const char *name,
+    int func(spa_t *, uint64_t, const char *, void *), void *arg, int flags);
 void dmu_objset_byteswap(void *buf, size_t size);
 int dmu_objset_evict_dbufs(objset_t *os);
 

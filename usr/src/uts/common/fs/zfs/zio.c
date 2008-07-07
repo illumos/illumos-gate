@@ -340,6 +340,9 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 	ASSERT3U(size, <=, SPA_MAXBLOCKSIZE);
 	ASSERT(P2PHASE(size, SPA_MINBLOCKSIZE) == 0);
 
+	/* Only we should set CONFIG_GRABBED */
+	ASSERT(!(flags & ZIO_FLAG_CONFIG_GRABBED));
+
 	zio = kmem_cache_alloc(zio_cache, KM_SLEEP);
 	bzero(zio, sizeof (zio_t));
 	zio->io_parent = pio;
@@ -418,6 +421,18 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 	zio->io_orig_pipeline = zio->io_pipeline;
 	zio->io_orig_flags = zio->io_flags;
 
+	/*
+	 * If this is not a null zio, and config is not already held,
+	 * then the root zio should have grabbed the config lock.
+	 * If this is not a root zio, it should not have grabbed the
+	 * config lock.
+	 */
+	ASSERT((zio->io_root->io_flags & ZIO_FLAG_CONFIG_HELD) ||
+	    zio->io_type == ZIO_TYPE_NULL ||
+	    (zio->io_root->io_flags & ZIO_FLAG_CONFIG_GRABBED));
+	ASSERT(zio->io_root == zio ||
+	    !(zio->io_flags & ZIO_FLAG_CONFIG_GRABBED));
+
 	return (zio);
 }
 
@@ -452,9 +467,9 @@ zio_root(spa_t *spa, zio_done_func_t *done, void *private, int flags)
 }
 
 zio_t *
-zio_read(zio_t *pio, spa_t *spa, blkptr_t *bp, void *data,
+zio_read(zio_t *pio, spa_t *spa, const blkptr_t *bp, void *data,
     uint64_t size, zio_done_func_t *done, void *private,
-    int priority, int flags, zbookmark_t *zb)
+    int priority, int flags, const zbookmark_t *zb)
 {
 	zio_t *zio;
 
@@ -467,7 +482,8 @@ zio_read(zio_t *pio, spa_t *spa, blkptr_t *bp, void *data,
 	if (spa_get_failmode(spa) != ZIO_FAILURE_MODE_CONTINUE)
 		ZIO_ENTER(spa);
 
-	zio = zio_create(pio, spa, bp->blk_birth, bp, data, size, done, private,
+	zio = zio_create(pio, spa, bp->blk_birth, (blkptr_t *)bp,
+	    data, size, done, private,
 	    ZIO_TYPE_READ, priority, flags | ZIO_FLAG_USER,
 	    ZIO_STAGE_OPEN, ZIO_READ_PIPELINE);
 	zio->io_bookmark = *zb;
@@ -486,7 +502,7 @@ zio_t *
 zio_write(zio_t *pio, spa_t *spa, int checksum, int compress, int ncopies,
     uint64_t txg, blkptr_t *bp, void *data, uint64_t size,
     zio_done_func_t *ready, zio_done_func_t *done, void *private, int priority,
-    int flags, zbookmark_t *zb)
+    int flags, const zbookmark_t *zb)
 {
 	zio_t *zio;
 

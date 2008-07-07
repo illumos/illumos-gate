@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -242,6 +242,21 @@ int zap_count(objset_t *ds, uint64_t zapobj, uint64_t *count);
  */
 int zap_value_search(objset_t *os, uint64_t zapobj,
     uint64_t value, uint64_t mask, char *name);
+
+/*
+ * Transfer all the entries from fromobj into intoobj.  Only works on
+ * int_size=8 num_integers=1 values.  Fails if there are any duplicated
+ * entries.
+ */
+int zap_join(objset_t *os, uint64_t fromobj, uint64_t intoobj, dmu_tx_t *tx);
+
+/*
+ * Manipulate entries where the name + value are the "same" (the name is
+ * a stringified version of the value).
+ */
+int zap_add_int(objset_t *os, uint64_t obj, uint64_t value, dmu_tx_t *tx);
+int zap_remove_int(objset_t *os, uint64_t obj, uint64_t value, dmu_tx_t *tx);
+int zap_lookup_int(objset_t *os, uint64_t obj, uint64_t value);
 
 struct zap;
 struct zap_leaf;

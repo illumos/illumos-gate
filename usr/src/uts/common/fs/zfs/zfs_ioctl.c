@@ -900,9 +900,7 @@ zfs_ioc_pool_scrub(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
-	mutex_enter(&spa_namespace_lock);
-	error = spa_scrub(spa, zc->zc_cookie, B_FALSE);
-	mutex_exit(&spa_namespace_lock);
+	error = spa_scrub(spa, zc->zc_cookie);
 
 	spa_close(spa, FTAG);
 

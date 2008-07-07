@@ -406,23 +406,31 @@ dsl_dir_open(const char *name, void *tag, dsl_dir_t **ddp, const char **tailp)
 }
 
 uint64_t
-dsl_dir_create_sync(dsl_dir_t *pds, const char *name, dmu_tx_t *tx)
+dsl_dir_create_sync(dsl_pool_t *dp, dsl_dir_t *pds, const char *name,
+    dmu_tx_t *tx)
 {
-	objset_t *mos = pds->dd_pool->dp_meta_objset;
+	objset_t *mos = dp->dp_meta_objset;
 	uint64_t ddobj;
 	dsl_dir_phys_t *dsphys;
 	dmu_buf_t *dbuf;
 
 	ddobj = dmu_object_alloc(mos, DMU_OT_DSL_DIR, 0,
 	    DMU_OT_DSL_DIR, sizeof (dsl_dir_phys_t), tx);
-	VERIFY(0 == zap_add(mos, pds->dd_phys->dd_child_dir_zapobj,
-	    name, sizeof (uint64_t), 1, &ddobj, tx));
+	if (pds) {
+		VERIFY(0 == zap_add(mos, pds->dd_phys->dd_child_dir_zapobj,
+		    name, sizeof (uint64_t), 1, &ddobj, tx));
+	} else {
+		/* it's the root dir */
+		VERIFY(0 == zap_add(mos, DMU_POOL_DIRECTORY_OBJECT,
+		    DMU_POOL_ROOT_DATASET, sizeof (uint64_t), 1, &ddobj, tx));
+	}
 	VERIFY(0 == dmu_bonus_hold(mos, ddobj, FTAG, &dbuf));
 	dmu_buf_will_dirty(dbuf, tx);
 	dsphys = dbuf->db_data;
 
 	dsphys->dd_creation_time = gethrestime_sec();
-	dsphys->dd_parent_obj = pds->dd_object;
+	if (pds)
+		dsphys->dd_parent_obj = pds->dd_object;
 	dsphys->dd_props_zapobj = zap_create(mos,
 	    DMU_OT_DSL_PROPS, DMU_OT_NONE, 0, tx);
 	dsphys->dd_child_dir_zapobj = zap_create(mos,
@@ -489,31 +497,13 @@ dsl_dir_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 	VERIFY(0 == dmu_object_free(mos, obj, tx));
 }
 
-void
-dsl_dir_create_root(objset_t *mos, uint64_t *ddobjp, dmu_tx_t *tx)
+boolean_t
+dsl_dir_is_clone(dsl_dir_t *dd)
 {
-	dsl_dir_phys_t *dsp;
-	dmu_buf_t *dbuf;
-	int error;
-
-	*ddobjp = dmu_object_alloc(mos, DMU_OT_DSL_DIR, 0,
-	    DMU_OT_DSL_DIR, sizeof (dsl_dir_phys_t), tx);
-
-	error = zap_add(mos, DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_ROOT_DATASET,
-	    sizeof (uint64_t), 1, ddobjp, tx);
-	ASSERT3U(error, ==, 0);
-
-	VERIFY(0 == dmu_bonus_hold(mos, *ddobjp, FTAG, &dbuf));
-	dmu_buf_will_dirty(dbuf, tx);
-	dsp = dbuf->db_data;
-
-	dsp->dd_creation_time = gethrestime_sec();
-	dsp->dd_props_zapobj = zap_create(mos,
-	    DMU_OT_DSL_PROPS, DMU_OT_NONE, 0, tx);
-	dsp->dd_child_dir_zapobj = zap_create(mos,
-	    DMU_OT_DSL_DIR_CHILD_MAP, DMU_OT_NONE, 0, tx);
-
-	dmu_buf_rele(dbuf, FTAG);
+	return (dd->dd_phys->dd_origin_obj &&
+	    (dd->dd_pool->dp_origin_snap == NULL ||
+	    dd->dd_phys->dd_origin_obj !=
+	    dd->dd_pool->dp_origin_snap->ds_object));
 }
 
 void
@@ -531,7 +521,7 @@ dsl_dir_stats(dsl_dir_t *dd, nvlist_t *nv)
 	mutex_exit(&dd->dd_lock);
 
 	rw_enter(&dd->dd_pool->dp_config_rwlock, RW_READER);
-	if (dd->dd_phys->dd_origin_obj) {
+	if (dsl_dir_is_clone(dd)) {
 		dsl_dataset_t *ds;
 		char buf[MAXNAMELEN];
 

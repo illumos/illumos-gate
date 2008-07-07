@@ -200,10 +200,9 @@ backup_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 			zb.zb_object = object;
 			zb.zb_level = level;
 			zb.zb_blkid = blkid;
-			(void) arc_read(NULL, spa, bp,
-			    dmu_ot[type].ot_byteswap, arc_getbuf_func, &abuf,
-			    ZIO_PRIORITY_ASYNC_READ, ZIO_FLAG_MUSTSUCCEED,
-			    &aflags, &zb);
+			(void) arc_read_nolock(NULL, spa, bp,
+			    arc_getbuf_func, &abuf, ZIO_PRIORITY_ASYNC_READ,
+			    ZIO_FLAG_MUSTSUCCEED, &aflags, &zb);
 
 			if (abuf) {
 				err = dump_data(ba, type, object, blkid * blksz,
@@ -241,11 +240,12 @@ dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, boolean_t fromorigin,
 		return (EXDEV);
 
 	if (fromorigin) {
+		dsl_pool_t *dp = ds->ds_dir->dd_pool;
+
 		if (fromsnap)
 			return (EINVAL);
 
-		if (ds->ds_dir->dd_phys->dd_origin_obj != NULL) {
-			dsl_pool_t *dp = ds->ds_dir->dd_pool;
+		if (dsl_dir_is_clone(ds->ds_dir)) {
 			rw_enter(&dp->dp_config_rwlock, RW_READER);
 			err = dsl_dataset_hold_obj(dp,
 			    ds->ds_dir->dd_phys->dd_origin_obj, FTAG, &fromds);
@@ -407,7 +407,7 @@ recv_full_existing_check(void *arg1, void *arg2, dmu_tx_t *tx)
 		return (EINVAL);
 
 	/* must not be a clone ds */
-	if (ds->ds_prev != NULL)
+	if (dsl_dir_is_clone(ds->ds_dir))
 		return (EINVAL);
 
 	err = dsl_dataset_destroy_check(ds, rbsa->tag, tx);
@@ -443,7 +443,7 @@ recv_full_existing_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	 */
 	dsl_dataset_destroy_sync(ds, rbsa->tag, cr, tx);
 
-	dsobj = dsl_dataset_create_sync_impl(dd, rbsa->origin, flags, tx);
+	dsobj = dsl_dataset_create_sync_dd(dd, rbsa->origin, flags, tx);
 
 	rbsa->ds = recv_full_sync_impl(dd->dd_pool, dsobj,
 	    rbsa->origin ? DMU_OST_NONE : rbsa->type, cr, tx);

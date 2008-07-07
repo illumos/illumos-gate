@@ -387,7 +387,6 @@ dnode_evict_dbufs(dnode_t *dn)
 				mutex_exit(&db->db_mtx);
 			} else if (refcount_is_zero(&db->db_holds)) {
 				progress = TRUE;
-				ASSERT(!arc_released(db->db_buf));
 				dbuf_clear(db); /* exits db_mtx for us */
 			} else {
 				mutex_exit(&db->db_mtx);

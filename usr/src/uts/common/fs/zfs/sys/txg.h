@@ -102,7 +102,10 @@ extern void txg_wait_open(struct dsl_pool *dp, uint64_t txg);
  * Returns TRUE if we are "backed up" waiting for the syncing
  * transaction to complete; otherwise returns FALSE.
  */
-extern int txg_stalled(struct dsl_pool *dp);
+extern boolean_t txg_stalled(struct dsl_pool *dp);
+
+/* returns TRUE if someone is waiting for the next txg to sync */
+extern boolean_t txg_sync_waiting(struct dsl_pool *dp);
 
 /*
  * Per-txg object lists.

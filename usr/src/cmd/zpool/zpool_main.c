@@ -3430,6 +3430,7 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 9   refquota and refreservation "
 		    "properties\n"));
 		(void) printf(gettext(" 10  Cache devices\n"));
+		(void) printf(gettext(" 11  Improved scrub performance\n"));
 		(void) printf(gettext("For more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"
@@ -3514,6 +3515,7 @@ char *hist_event_table[LOG_END] = {
 	"filesystem version upgrade",
 	"refquota set",
 	"refreservation set",
+	"pool scrub done",
 };
 
 /*
@@ -3568,7 +3570,7 @@ get_history_one(zpool_handle_t *zhp, void *data)
 			    ZPOOL_HIST_TXG, &txg) == 0);
 			verify(nvlist_lookup_string(records[i],
 			    ZPOOL_HIST_INT_STR, &pathstr) == 0);
-			if (ievent > LOG_END)
+			if (ievent >= LOG_END)
 				continue;
 			(void) snprintf(internalstr,
 			    sizeof (internalstr),

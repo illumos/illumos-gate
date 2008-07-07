@@ -71,15 +71,15 @@ typedef void dsl_dataset_evict_func_t(struct dsl_dataset *, void *);
 #define	DS_FLAG_CI_DATASET	(1ULL<<16)
 
 typedef struct dsl_dataset_phys {
-	uint64_t ds_dir_obj;
-	uint64_t ds_prev_snap_obj;
+	uint64_t ds_dir_obj;		/* DMU_OT_DSL_DIR */
+	uint64_t ds_prev_snap_obj;	/* DMU_OT_DSL_DATASET */
 	uint64_t ds_prev_snap_txg;
-	uint64_t ds_next_snap_obj;
-	uint64_t ds_snapnames_zapobj;	/* zap obj of snaps; ==0 for snaps */
+	uint64_t ds_next_snap_obj;	/* DMU_OT_DSL_DATASET */
+	uint64_t ds_snapnames_zapobj;	/* DMU_OT_DSL_DS_SNAP_MAP 0 for snaps */
 	uint64_t ds_num_children;	/* clone/snap children; ==0 for head */
 	uint64_t ds_creation_time;	/* seconds since 1970 */
 	uint64_t ds_creation_txg;
-	uint64_t ds_deadlist_obj;
+	uint64_t ds_deadlist_obj;	/* DMU_OT_BPLIST */
 	uint64_t ds_used_bytes;
 	uint64_t ds_compressed_bytes;
 	uint64_t ds_uncompressed_bytes;
@@ -91,9 +91,10 @@ typedef struct dsl_dataset_phys {
 	 */
 	uint64_t ds_fsid_guid;
 	uint64_t ds_guid;
-	uint64_t ds_flags;
+	uint64_t ds_flags;		/* DS_FLAG_* */
 	blkptr_t ds_bp;
-	uint64_t ds_pad[8]; /* pad out to 320 bytes for good measure */
+	uint64_t ds_next_clones_obj;	/* DMU_OT_DSL_NEXT_CLONES */
+	uint64_t ds_pad[7]; /* pad out to 320 bytes for good measure */
 } dsl_dataset_phys_t;
 
 typedef struct dsl_dataset {
@@ -158,13 +159,14 @@ int dsl_dataset_own_obj(struct dsl_pool *dp, uint64_t dsobj,
 void dsl_dataset_name(dsl_dataset_t *ds, char *name);
 void dsl_dataset_rele(dsl_dataset_t *ds, void *tag);
 void dsl_dataset_disown(dsl_dataset_t *ds, void *owner);
+void dsl_dataset_drop_ref(dsl_dataset_t *ds, void *tag);
 boolean_t dsl_dataset_tryown(dsl_dataset_t *ds, boolean_t inconsistentok,
     void *owner);
 void dsl_dataset_make_exclusive(dsl_dataset_t *ds, void *owner);
-uint64_t dsl_dataset_create_sync_impl(dsl_dir_t *dd, dsl_dataset_t *origin,
-    uint64_t flags, dmu_tx_t *tx);
 uint64_t dsl_dataset_create_sync(dsl_dir_t *pds, const char *lastname,
     dsl_dataset_t *origin, uint64_t flags, cred_t *, dmu_tx_t *);
+uint64_t dsl_dataset_create_sync_dd(dsl_dir_t *dd, dsl_dataset_t *origin,
+    uint64_t flags, dmu_tx_t *tx);
 int dsl_dataset_destroy(dsl_dataset_t *ds, void *tag);
 int dsl_snapshots_destroy(char *fsname, char *snapname);
 dsl_checkfunc_t dsl_dataset_destroy_check;
@@ -203,9 +205,6 @@ void dsl_dataset_space(dsl_dataset_t *ds,
     uint64_t *refdbytesp, uint64_t *availbytesp,
     uint64_t *usedobjsp, uint64_t *availobjsp);
 uint64_t dsl_dataset_fsid_guid(dsl_dataset_t *ds);
-
-void dsl_dataset_create_root(struct dsl_pool *dp, uint64_t *ddobjp,
-    dmu_tx_t *tx);
 
 int dsl_dsobj_to_dsname(char *pname, uint64_t obj, char *buf);
 

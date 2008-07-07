@@ -290,7 +290,7 @@ typedef struct znode {
 	if ((zfsvfs)->z_atime && !((zfsvfs)->z_vfs->vfs_flag & VFS_RDONLY)) \
 		zfs_time_stamper(zp, ACCESSED, NULL)
 
-extern int	zfs_init_fs(zfsvfs_t *, znode_t **, cred_t *);
+extern int	zfs_init_fs(zfsvfs_t *, znode_t **);
 extern void	zfs_set_dataprop(objset_t *);
 extern void	zfs_create_fs(objset_t *os, cred_t *cr, nvlist_t *,
     dmu_tx_t *tx);

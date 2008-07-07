@@ -121,7 +121,12 @@ txg_sync_start(dsl_pool_t *dp)
 	tx->tx_quiesce_thread = thread_create(NULL, 0, txg_quiesce_thread,
 	    dp, 0, &p0, TS_RUN, minclsyspri);
 
-	tx->tx_sync_thread = thread_create(NULL, 0, txg_sync_thread,
+	/*
+	 * The sync thread can need a larger-than-default stack size on
+	 * 32-bit x86.  This is due in part to nested pools and
+	 * scrub_visitbp() recursion.
+	 */
+	tx->tx_sync_thread = thread_create(NULL, 12<<10, txg_sync_thread,
 	    dp, 0, &p0, TS_RUN, minclsyspri);
 
 	mutex_exit(&tx->tx_sync_lock);
@@ -502,11 +507,20 @@ txg_wait_open(dsl_pool_t *dp, uint64_t txg)
 	mutex_exit(&tx->tx_sync_lock);
 }
 
-int
+boolean_t
 txg_stalled(dsl_pool_t *dp)
 {
 	tx_state_t *tx = &dp->dp_tx;
 	return (tx->tx_quiesce_txg_waiting > tx->tx_open_txg);
+}
+
+boolean_t
+txg_sync_waiting(dsl_pool_t *dp)
+{
+	tx_state_t *tx = &dp->dp_tx;
+
+	return (tx->tx_syncing_txg <= tx->tx_sync_txg_waiting ||
+	    tx->tx_quiesced_txg != 0);
 }
 
 void

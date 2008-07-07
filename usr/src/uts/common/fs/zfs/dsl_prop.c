@@ -156,7 +156,7 @@ dsl_prop_register(dsl_dataset_t *ds, const char *propname,
 }
 
 int
-dsl_prop_get_ds(dsl_dir_t *dd, const char *propname,
+dsl_prop_get_dd(dsl_dir_t *dd, const char *propname,
     int intsz, int numints, void *buf, char *setpoint)
 {
 	int err;
@@ -194,7 +194,7 @@ dsl_prop_get(const char *ddname, const char *propname,
 		return (ENOENT);
 	}
 
-	err = dsl_prop_get_ds(dd, propname, intsz, numints, buf, setpoint);
+	err = dsl_prop_get_dd(dd, propname, intsz, numints, buf, setpoint);
 
 	dsl_dir_close(dd, FTAG);
 	return (err);

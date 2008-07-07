@@ -74,7 +74,7 @@
  *	This reference count keep track of any active users of the spa_t.  The
  *	spa_t cannot be destroyed or freed while this is non-zero.  Internally,
  *	the refcount is never really 'zero' - opening a pool implicitly keeps
- *	some references in the DMU.  Internally we check against SPA_MINREF, but
+ *	some references in the DMU.  Internally we check against spa_minref, but
  *	present the image of a zero/non-zero value to consumers.
  *
  * spa_config_lock (per-spa read-priority rwlock)
@@ -191,7 +191,6 @@ int zfs_flags = 0;
  */
 int zfs_recover = 0;
 
-#define	SPA_MINREF	5	/* spa_refcnt for an open-but-idle pool */
 
 /*
  * ==========================================================================
@@ -334,7 +333,6 @@ spa_add(const char *name, const char *altroot)
 	mutex_init(&spa->spa_props_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	cv_init(&spa->spa_async_cv, NULL, CV_DEFAULT, NULL);
-	cv_init(&spa->spa_scrub_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_scrub_io_cv, NULL, CV_DEFAULT, NULL);
 
 	spa->spa_name = spa_strdup(name);
@@ -382,7 +380,6 @@ spa_remove(spa_t *spa)
 
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 	ASSERT(spa->spa_state == POOL_STATE_UNINITIALIZED);
-	ASSERT(spa->spa_scrub_thread == NULL);
 
 	avl_remove(&spa_namespace_avl, spa);
 	cv_broadcast(&spa_namespace_cv);
@@ -413,7 +410,6 @@ spa_remove(spa_t *spa)
 	rw_destroy(&spa->spa_traverse_lock);
 
 	cv_destroy(&spa->spa_async_cv);
-	cv_destroy(&spa->spa_scrub_cv);
 	cv_destroy(&spa->spa_scrub_io_cv);
 
 	mutex_destroy(&spa->spa_uberblock_lock);
@@ -458,9 +454,8 @@ spa_next(spa_t *prev)
 void
 spa_open_ref(spa_t *spa, void *tag)
 {
-	ASSERT(refcount_count(&spa->spa_refcount) > SPA_MINREF ||
+	ASSERT(refcount_count(&spa->spa_refcount) >= spa->spa_minref ||
 	    MUTEX_HELD(&spa_namespace_lock));
-
 	(void) refcount_add(&spa->spa_refcount, tag);
 }
 
@@ -471,15 +466,14 @@ spa_open_ref(spa_t *spa, void *tag)
 void
 spa_close(spa_t *spa, void *tag)
 {
-	ASSERT(refcount_count(&spa->spa_refcount) > SPA_MINREF ||
+	ASSERT(refcount_count(&spa->spa_refcount) > spa->spa_minref ||
 	    MUTEX_HELD(&spa_namespace_lock));
-
 	(void) refcount_remove(&spa->spa_refcount, tag);
 }
 
 /*
  * Check to see if the spa refcount is zero.  Must be called with
- * spa_namespace_lock held.  We really compare against SPA_MINREF, which is the
+ * spa_namespace_lock held.  We really compare against spa_minref, which is the
  * number of references acquired when opening a pool
  */
 boolean_t
@@ -487,7 +481,7 @@ spa_refcount_zero(spa_t *spa)
 {
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 
-	return (refcount_count(&spa->spa_refcount) == SPA_MINREF);
+	return (refcount_count(&spa->spa_refcount) == spa->spa_minref);
 }
 
 /*
@@ -737,13 +731,6 @@ spa_vdev_enter(spa_t *spa)
 {
 	mutex_enter(&spa_namespace_lock);
 
-	/*
-	 * Suspend scrub activity while we mess with the config.  We must do
-	 * this after acquiring the namespace lock to avoid a 3-way deadlock
-	 * with spa_scrub_stop() and the scrub thread.
-	 */
-	spa_scrub_suspend(spa);
-
 	spa_config_enter(spa, RW_WRITER, spa);
 
 	return (spa_last_synced_txg(spa) + 1);
@@ -771,16 +758,11 @@ spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
 	 * If the config changed, notify the scrub thread that it must restart.
 	 */
 	if (error == 0 && !list_is_empty(&spa->spa_dirty_list)) {
+		dsl_pool_scrub_restart(spa->spa_dsl_pool);
 		config_changed = B_TRUE;
-		spa_scrub_restart(spa, txg);
 	}
 
 	spa_config_exit(spa, spa);
-
-	/*
-	 * Allow scrubbing to resume.
-	 */
-	spa_scrub_resume(spa);
 
 	/*
 	 * Note: this txg_wait_synced() is important because it ensures
@@ -1017,7 +999,7 @@ spa_traverse_rwlock(spa_t *spa)
 	return (&spa->spa_traverse_lock);
 }
 
-int
+boolean_t
 spa_traverse_wanted(spa_t *spa)
 {
 	return (spa->spa_traverse_wanted);

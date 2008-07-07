@@ -167,7 +167,11 @@ zil_read_log_block(zilog_t *zilog, const blkptr_t *bp, arc_buf_t **abufpp)
 
 	*abufpp = NULL;
 
-	error = arc_read(NULL, zilog->zl_spa, &blk, byteswap_uint64_array,
+	/*
+	 * We shouldn't be doing any scrubbing while we're doing log
+	 * replay, it's OK to not lock.
+	 */
+	error = arc_read_nolock(NULL, zilog->zl_spa, &blk,
 	    arc_getbuf_func, abufpp, ZIO_PRIORITY_SYNC_READ, ZIO_FLAG_CANFAIL |
 	    ZIO_FLAG_SPECULATIVE | ZIO_FLAG_SCRUB, &aflags, &zb);
 

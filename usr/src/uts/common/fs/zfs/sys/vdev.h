@@ -63,6 +63,8 @@ extern void vdev_dtl_dirty(space_map_t *sm, uint64_t txg, uint64_t size);
 extern int vdev_dtl_contains(space_map_t *sm, uint64_t txg, uint64_t size);
 extern void vdev_dtl_reassess(vdev_t *vd, uint64_t txg, uint64_t scrub_txg,
     int scrub_done);
+extern boolean_t vdev_resilver_needed(vdev_t *vd,
+    uint64_t *minp, uint64_t *maxp);
 
 extern const char *vdev_description(vdev_t *vd);
 

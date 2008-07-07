@@ -1096,6 +1096,7 @@ ZFS_COMMON_OBJS +=		\
 	dmu_zfetch.o		\
 	dsl_deleg.o		\
 	dsl_prop.o		\
+	dsl_scrub.o		\
 	fletcher.o		\
 	gzip.o			\
 	lzjb.o			\

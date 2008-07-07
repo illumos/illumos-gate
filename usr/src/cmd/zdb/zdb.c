@@ -773,7 +773,7 @@ dump_dsl_dataset(objset_t *os, uint64_t object, void *data, size_t size)
 	nicenum(ds->ds_unique_bytes, unique);
 	sprintf_blkptr(blkbuf, BP_SPRINTF_LEN, &ds->ds_bp);
 
-	(void) printf("\t\tdataset_obj = %llu\n",
+	(void) printf("\t\tdir_obj = %llu\n",
 	    (u_longlong_t)ds->ds_dir_obj);
 	(void) printf("\t\tprev_snap_obj = %llu\n",
 	    (u_longlong_t)ds->ds_prev_snap_obj);
@@ -800,6 +800,8 @@ dump_dsl_dataset(objset_t *os, uint64_t object, void *data, size_t size)
 	    (u_longlong_t)ds->ds_guid);
 	(void) printf("\t\tflags = %llx\n",
 	    (u_longlong_t)ds->ds_flags);
+	(void) printf("\t\tnext_clones_obj = %llu\n",
+	    (u_longlong_t)ds->ds_next_clones_obj);
 	(void) printf("\t\tbp = %s\n", blkbuf);
 }
 
@@ -1007,6 +1009,8 @@ static object_viewer_t *object_viewer[DMU_OT_NUMTYPES] = {
 	dump_uint8,		/* ZFS SYSACL			*/
 	dump_none,		/* FUID nvlist			*/
 	dump_packed_nvlist,	/* FUID nvlist size		*/
+	dump_zap,		/* DSL dataset next clones	*/
+	dump_zap,		/* DSL scrub queue		*/
 };
 
 static void
@@ -1172,6 +1176,9 @@ dump_dir(objset_t *os)
 		    dmu_objset_ds(os)->ds_phys->ds_deadlist_obj, "Deadlist");
 
 	if (verbosity < 2)
+		return;
+
+	if (os->os->os_rootbp->blk_birth == 0)
 		return;
 
 	if (zopt_objects != 0) {

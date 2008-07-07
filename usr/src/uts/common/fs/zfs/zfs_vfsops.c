@@ -638,7 +638,7 @@ zfs_freezfsvfs(zfsvfs_t *zfsvfs)
 }
 
 static int
-zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
+zfs_domount(vfs_t *vfsp, char *osname)
 {
 	dev_t mount_dev;
 	uint64_t recordsize, readonly;
@@ -707,7 +707,7 @@ zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 	if (error)
 		goto out;
 
-	if (error = zfs_init_fs(zfsvfs, &zp, cr))
+	if (error = zfs_init_fs(zfsvfs, &zp))
 		goto out;
 
 	/* The call to zfs_init_fs leaves the vnode held, release it here. */
@@ -910,7 +910,7 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 		if (error = vfs_lock(vfsp))
 			return (error);
 
-		if (error = zfs_domount(vfsp, rootfs.bo_name, CRED())) {
+		if (error = zfs_domount(vfsp, rootfs.bo_name)) {
 			cmn_err(CE_NOTE, "\nzfs_domount: error %d\n", error);
 			goto out;
 		}
@@ -1054,7 +1054,7 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 		goto out;
 	}
 
-	error = zfs_domount(vfsp, osname, cr);
+	error = zfs_domount(vfsp, osname);
 
 out:
 	pn_free(&spn);

@@ -614,7 +614,10 @@ traverse_segment(traverse_handle_t *th, zseg_t *zseg, blkptr_t *mosbp)
 			th->th_locked = 0;
 		}
 
-		rc = traverse_read(th, bc, &dsp->ds_bp, dn);
+		if (BP_IS_HOLE(&dsp->ds_bp))
+			rc = ERESTART;
+		else
+			rc = traverse_read(th, bc, &dsp->ds_bp, dn);
 
 		if (rc != 0) {
 			if (rc == ERESTART)

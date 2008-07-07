@@ -86,13 +86,24 @@ void arc_buf_thaw(arc_buf_t *buf);
 int arc_referenced(arc_buf_t *buf);
 #endif
 
-int arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_byteswap_func_t *swap,
+typedef struct writeprops {
+	dmu_object_type_t wp_type;
+	uint8_t wp_copies;
+	uint8_t wp_level;
+	uint8_t wp_dncompress, wp_oscompress;
+	uint8_t wp_dnchecksum, wp_oschecksum;
+} writeprops_t;
+
+int arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_buf_t *pbuf,
     arc_done_func_t *done, void *private, int priority, int flags,
-    uint32_t *arc_flags, zbookmark_t *zb);
-zio_t *arc_write(zio_t *pio, spa_t *spa, int checksum, int compress,
-    int ncopies, uint64_t txg, blkptr_t *bp, arc_buf_t *buf,
+    uint32_t *arc_flags, const zbookmark_t *zb);
+int arc_read_nolock(zio_t *pio, spa_t *spa, blkptr_t *bp,
+    arc_done_func_t *done, void *private, int priority, int flags,
+    uint32_t *arc_flags, const zbookmark_t *zb);
+zio_t *arc_write(zio_t *pio, spa_t *spa, const writeprops_t *wp,
+    uint64_t txg, blkptr_t *bp, arc_buf_t *buf,
     arc_done_func_t *ready, arc_done_func_t *done, void *private, int priority,
-    int flags, zbookmark_t *zb);
+    int flags, const zbookmark_t *zb);
 int arc_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
     zio_done_func_t *done, void *private, uint32_t arc_flags);
 int arc_tryread(spa_t *spa, blkptr_t *bp, void *data);

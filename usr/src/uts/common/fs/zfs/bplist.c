@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -181,7 +181,7 @@ bplist_iterate(bplist_t *bpl, uint64_t *itorp, blkptr_t *bp)
 }
 
 int
-bplist_enqueue(bplist_t *bpl, blkptr_t *bp, dmu_tx_t *tx)
+bplist_enqueue(bplist_t *bpl, const blkptr_t *bp, dmu_tx_t *tx)
 {
 	uint64_t blk, off;
 	blkptr_t *bparray;
@@ -229,7 +229,7 @@ bplist_enqueue(bplist_t *bpl, blkptr_t *bp, dmu_tx_t *tx)
  * Deferred entry; will be written later by bplist_sync().
  */
 void
-bplist_enqueue_deferred(bplist_t *bpl, blkptr_t *bp)
+bplist_enqueue_deferred(bplist_t *bpl, const blkptr_t *bp)
 {
 	bplist_q_t *bpq = kmem_alloc(sizeof (*bpq), KM_SLEEP);
 

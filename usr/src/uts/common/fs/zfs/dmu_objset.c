@@ -149,7 +149,7 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
     objset_impl_t **osip)
 {
 	objset_impl_t *osi;
-	int i, err, checksum;
+	int i, err;
 
 	ASSERT(ds == NULL || MUTEX_HELD(&ds->ds_opening_lock));
 
@@ -167,8 +167,12 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 		zb.zb_blkid = 0;
 
 		dprintf_bp(osi->os_rootbp, "reading %s", "");
-		err = arc_read(NULL, spa, osi->os_rootbp,
-		    dmu_ot[DMU_OT_OBJSET].ot_byteswap,
+		/*
+		 * NB: when bprewrite scrub can change the bp,
+		 * and this is called from dmu_objset_open_ds_os, the bp
+		 * could change, and we'll need a lock.
+		 */
+		err = arc_read_nolock(NULL, spa, osi->os_rootbp,
 		    arc_getbuf_func, &osi->os_phys_buf,
 		    ZIO_PRIORITY_SYNC_READ, ZIO_FLAG_CANFAIL, &aflags, &zb);
 		if (err) {
@@ -176,8 +180,6 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 			return (err);
 		}
 		osi->os_phys = osi->os_phys_buf->b_data;
-		if (ds == NULL || dsl_dataset_is_snapshot(ds) == 0)
-			arc_release(osi->os_phys_buf, &osi->os_phys_buf);
 	} else {
 		osi->os_phys_buf = arc_buf_alloc(spa, sizeof (objset_phys_t),
 		    &osi->os_phys_buf, ARC_BUFC_METADATA);
@@ -213,22 +215,8 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 		osi->os_copies = spa_max_replication(spa);
 	}
 
-	osi->os_zil = zil_alloc(&osi->os, &osi->os_phys->os_zil_header);
-
-	/*
-	 * Metadata always gets compressed and checksummed.
-	 * If the data checksum is multi-bit correctable, and it's not
-	 * a ZBT-style checksum, then it's suitable for metadata as well.
-	 * Otherwise, the metadata checksum defaults to fletcher4.
-	 */
-	checksum = osi->os_checksum;
-
-	if (zio_checksum_table[checksum].ci_correctable &&
-	    !zio_checksum_table[checksum].ci_zbt)
-		osi->os_md_checksum = checksum;
-	else
-		osi->os_md_checksum = ZIO_CHECKSUM_FLETCHER_4;
-	osi->os_md_compress = ZIO_COMPRESS_LZJB;
+	osi->os_zil_header = osi->os_phys->os_zil_header;
+	osi->os_zil = zil_alloc(&osi->os, &osi->os_zil_header);
 
 	for (i = 0; i < TXG_SIZE; i++) {
 		list_create(&osi->os_dirty_dnodes[i], sizeof (dnode_t),
@@ -835,22 +823,13 @@ ready(zio_t *zio, arc_buf_t *abuf, void *arg)
 	}
 }
 
-/* ARGSUSED */
-static void
-killer(zio_t *zio, arc_buf_t *abuf, void *arg)
-{
-	objset_impl_t *os = arg;
-
-	ASSERT3U(zio->io_error, ==, 0);
-	arc_release(os->os_phys_buf, &os->os_phys_buf);
-}
-
 /* called from dsl */
 void
 dmu_objset_sync(objset_impl_t *os, zio_t *pio, dmu_tx_t *tx)
 {
 	int txgoff;
 	zbookmark_t zb;
+	writeprops_t wp = { 0 };
 	zio_t *zio;
 	list_t *list;
 	dbuf_dirty_record_t *dr;
@@ -881,10 +860,14 @@ dmu_objset_sync(objset_impl_t *os, zio_t *pio, dmu_tx_t *tx)
 		(void) dsl_dataset_block_kill(os->os_dsl_dataset,
 		    os->os_rootbp, pio, tx);
 	}
-	zio = arc_write(pio, os->os_spa, os->os_md_checksum,
-	    os->os_md_compress,
-	    dmu_get_replication_level(os, &zb, DMU_OT_OBJSET),
-	    tx->tx_txg, os->os_rootbp, os->os_phys_buf, ready, killer, os,
+	wp.wp_type = DMU_OT_OBJSET;
+	wp.wp_copies = os->os_copies;
+	wp.wp_level = (uint8_t)-1;
+	wp.wp_oschecksum = os->os_checksum;
+	wp.wp_oscompress = os->os_compress;
+	arc_release(os->os_phys_buf, &os->os_phys_buf);
+	zio = arc_write(pio, os->os_spa, &wp,
+	    tx->tx_txg, os->os_rootbp, os->os_phys_buf, ready, NULL, os,
 	    ZIO_PRIORITY_ASYNC_WRITE, ZIO_FLAG_MUSTSUCCEED | ZIO_FLAG_METADATA,
 	    &zb);
 
@@ -910,6 +893,7 @@ dmu_objset_sync(objset_impl_t *os, zio_t *pio, dmu_tx_t *tx)
 	 * Free intent log blocks up to this tx.
 	 */
 	zil_sync(os->os_zil, tx);
+	os->os_phys->os_zil_header = os->os_zil_header;
 	zio_nowait(zio);
 }
 
@@ -1046,48 +1030,80 @@ dmu_dir_list_next(objset_t *os, int namelen, char *name,
 	return (0);
 }
 
+struct findarg {
+	int (*func)(char *, void *);
+	void *arg;
+};
+
+/* ARGSUSED */
+static int
+findfunc(spa_t *spa, uint64_t dsobj, const char *dsname, void *arg)
+{
+	struct findarg *fa = arg;
+	return (fa->func((char *)dsname, fa->arg));
+}
+
 /*
  * Find all objsets under name, and for each, call 'func(child_name, arg)'.
+ * Perhaps change all callers to use dmu_objset_find_spa()?
  */
 int
 dmu_objset_find(char *name, int func(char *, void *), void *arg, int flags)
 {
+	struct findarg fa;
+	fa.func = func;
+	fa.arg = arg;
+	return (dmu_objset_find_spa(NULL, name, findfunc, &fa, flags));
+}
+
+/*
+ * Find all objsets under name, call func on each
+ */
+int
+dmu_objset_find_spa(spa_t *spa, const char *name,
+    int func(spa_t *, uint64_t, const char *, void *), void *arg, int flags)
+{
 	dsl_dir_t *dd;
-	objset_t *os;
-	uint64_t snapobj;
+	dsl_pool_t *dp;
+	dsl_dataset_t *ds;
 	zap_cursor_t zc;
 	zap_attribute_t *attr;
 	char *child;
-	int do_self, err;
+	uint64_t thisobj;
+	int err;
 
-	err = dsl_dir_open(name, FTAG, &dd, NULL);
+	if (name == NULL)
+		name = spa_name(spa);
+	err = dsl_dir_open_spa(spa, name, FTAG, &dd, NULL);
 	if (err)
 		return (err);
 
-	/* NB: the $MOS dir doesn't have a head dataset */
-	do_self = (dd->dd_phys->dd_head_dataset_obj != 0);
+	/* Don't visit hidden ($MOS & $ORIGIN) objsets. */
+	if (dd->dd_myname[0] == '$') {
+		dsl_dir_close(dd, FTAG);
+		return (0);
+	}
+
+	thisobj = dd->dd_phys->dd_head_dataset_obj;
 	attr = kmem_alloc(sizeof (zap_attribute_t), KM_SLEEP);
+	dp = dd->dd_pool;
 
 	/*
 	 * Iterate over all children.
 	 */
 	if (flags & DS_FIND_CHILDREN) {
-		for (zap_cursor_init(&zc, dd->dd_pool->dp_meta_objset,
+		for (zap_cursor_init(&zc, dp->dp_meta_objset,
 		    dd->dd_phys->dd_child_dir_zapobj);
 		    zap_cursor_retrieve(&zc, attr) == 0;
 		    (void) zap_cursor_advance(&zc)) {
 			ASSERT(attr->za_integer_length == sizeof (uint64_t));
 			ASSERT(attr->za_num_integers == 1);
 
-			/*
-			 * No separating '/' because parent's name ends in /.
-			 */
 			child = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-			/* XXX could probably just use name here */
-			dsl_dir_name(dd, child);
+			(void) strcpy(child, name);
 			(void) strcat(child, "/");
 			(void) strcat(child, attr->za_name);
-			err = dmu_objset_find(child, func, arg, flags);
+			err = dmu_objset_find_spa(spa, child, func, arg, flags);
 			kmem_free(child, MAXPATHLEN);
 			if (err)
 				break;
@@ -1104,30 +1120,36 @@ dmu_objset_find(char *name, int func(char *, void *), void *arg, int flags)
 	/*
 	 * Iterate over all snapshots.
 	 */
-	if ((flags & DS_FIND_SNAPSHOTS) &&
-	    dmu_objset_open(name, DMU_OST_ANY,
-	    DS_MODE_USER | DS_MODE_READONLY, &os) == 0) {
+	if (flags & DS_FIND_SNAPSHOTS) {
+		if (!dsl_pool_sync_context(dp))
+			rw_enter(&dp->dp_config_rwlock, RW_READER);
+		err = dsl_dataset_hold_obj(dp, thisobj, FTAG, &ds);
+		if (!dsl_pool_sync_context(dp))
+			rw_exit(&dp->dp_config_rwlock);
 
-		snapobj = os->os->os_dsl_dataset->ds_phys->ds_snapnames_zapobj;
-		dmu_objset_close(os);
+		if (err == 0) {
+			uint64_t snapobj = ds->ds_phys->ds_snapnames_zapobj;
+			dsl_dataset_rele(ds, FTAG);
 
-		for (zap_cursor_init(&zc, dd->dd_pool->dp_meta_objset, snapobj);
-		    zap_cursor_retrieve(&zc, attr) == 0;
-		    (void) zap_cursor_advance(&zc)) {
-			ASSERT(attr->za_integer_length == sizeof (uint64_t));
-			ASSERT(attr->za_num_integers == 1);
+			for (zap_cursor_init(&zc, dp->dp_meta_objset, snapobj);
+			    zap_cursor_retrieve(&zc, attr) == 0;
+			    (void) zap_cursor_advance(&zc)) {
+				ASSERT(attr->za_integer_length ==
+				    sizeof (uint64_t));
+				ASSERT(attr->za_num_integers == 1);
 
-			child = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-			/* XXX could probably just use name here */
-			dsl_dir_name(dd, child);
-			(void) strcat(child, "@");
-			(void) strcat(child, attr->za_name);
-			err = func(child, arg);
-			kmem_free(child, MAXPATHLEN);
-			if (err)
-				break;
+				child = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+				(void) strcpy(child, name);
+				(void) strcat(child, "@");
+				(void) strcat(child, attr->za_name);
+				err = func(spa, attr->za_first_integer,
+				    child, arg);
+				kmem_free(child, MAXPATHLEN);
+				if (err)
+					break;
+			}
+			zap_cursor_fini(&zc);
 		}
-		zap_cursor_fini(&zc);
 	}
 
 	dsl_dir_close(dd, FTAG);
@@ -1139,8 +1161,7 @@ dmu_objset_find(char *name, int func(char *, void *), void *arg, int flags)
 	/*
 	 * Apply to self if appropriate.
 	 */
-	if (do_self)
-		err = func(name, arg);
+	err = func(spa, thisobj, name, arg);
 	return (err);
 }
 

@@ -39,12 +39,9 @@
 
 static void dbuf_destroy(dmu_buf_impl_t *db);
 static int dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
-static void dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, int checksum,
-    int compress, dmu_tx_t *tx);
+static void dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, dmu_tx_t *tx);
 static arc_done_func_t dbuf_write_ready;
 static arc_done_func_t dbuf_write_done;
-
-int zfs_mdcomp_disable = 0;
 
 /*
  * Global data structures and functions for the dbuf cache.
@@ -456,26 +453,27 @@ dbuf_read_done(zio_t *zio, arc_buf_t *buf, void *vdb)
 static void
 dbuf_read_impl(dmu_buf_impl_t *db, zio_t *zio, uint32_t *flags)
 {
-	blkptr_t *bp;
+	dnode_t *dn = db->db_dnode;
 	zbookmark_t zb;
 	uint32_t aflags = ARC_NOWAIT;
+	arc_buf_t *pbuf;
 
 	ASSERT(!refcount_is_zero(&db->db_holds));
 	/* We need the struct_rwlock to prevent db_blkptr from changing. */
-	ASSERT(RW_LOCK_HELD(&db->db_dnode->dn_struct_rwlock));
+	ASSERT(RW_LOCK_HELD(&dn->dn_struct_rwlock));
 	ASSERT(MUTEX_HELD(&db->db_mtx));
 	ASSERT(db->db_state == DB_UNCACHED);
 	ASSERT(db->db_buf == NULL);
 
 	if (db->db_blkid == DB_BONUS_BLKID) {
-		int bonuslen = db->db_dnode->dn_bonuslen;
+		int bonuslen = dn->dn_bonuslen;
 
 		ASSERT3U(bonuslen, <=, db->db.db_size);
 		db->db.db_data = zio_buf_alloc(DN_MAX_BONUSLEN);
 		arc_space_consume(DN_MAX_BONUSLEN);
 		if (bonuslen < DN_MAX_BONUSLEN)
 			bzero(db->db.db_data, DN_MAX_BONUSLEN);
-		bcopy(DN_BONUS(db->db_dnode->dn_phys), db->db.db_data,
+		bcopy(DN_BONUS(dn->dn_phys), db->db.db_data,
 		    bonuslen);
 		dbuf_update_data(db);
 		db->db_state = DB_CACHED;
@@ -483,21 +481,11 @@ dbuf_read_impl(dmu_buf_impl_t *db, zio_t *zio, uint32_t *flags)
 		return;
 	}
 
-	if (db->db_level == 0 && dnode_block_freed(db->db_dnode, db->db_blkid))
-		bp = NULL;
-	else
-		bp = db->db_blkptr;
-
-	if (bp == NULL)
-		dprintf_dbuf(db, "blkptr: %s\n", "NULL");
-	else
-		dprintf_dbuf_bp(db, bp, "%s", "blkptr:");
-
-	if (bp == NULL || BP_IS_HOLE(bp)) {
+	if (db->db_blkptr == NULL || BP_IS_HOLE(db->db_blkptr) ||
+	    (db->db_level == 0 && dnode_block_freed(dn, db->db_blkid))) {
 		arc_buf_contents_t type = DBUF_GET_BUFC_TYPE(db);
 
-		ASSERT(bp == NULL || BP_IS_HOLE(bp));
-		dbuf_set_data(db, arc_buf_alloc(db->db_dnode->dn_objset->os_spa,
+		dbuf_set_data(db, arc_buf_alloc(dn->dn_objset->os_spa,
 		    db->db.db_size, db, type));
 		bzero(db->db.db_data, db->db.db_size);
 		db->db_state = DB_CACHED;
@@ -517,10 +505,13 @@ dbuf_read_impl(dmu_buf_impl_t *db, zio_t *zio, uint32_t *flags)
 
 	dbuf_add_ref(db, NULL);
 	/* ZIO_FLAG_CANFAIL callers have to check the parent zio's error */
-	ASSERT3U(db->db_dnode->dn_type, <, DMU_OT_NUMTYPES);
-	(void) arc_read(zio, db->db_dnode->dn_objset->os_spa, bp,
-	    db->db_level > 0 ? byteswap_uint64_array :
-	    dmu_ot[db->db_dnode->dn_type].ot_byteswap,
+
+	if (db->db_parent)
+		pbuf = db->db_parent->db_buf;
+	else
+		pbuf = db->db_objset->os_phys_buf;
+
+	(void) arc_read(zio, dn->dn_objset->os_spa, db->db_blkptr, pbuf,
 	    dbuf_read_done, db, ZIO_PRIORITY_SYNC_READ,
 	    (*flags & DB_RF_CANFAIL) ? ZIO_FLAG_CANFAIL : ZIO_FLAG_MUSTSUCCEED,
 	    &aflags, &zb);
@@ -690,7 +681,8 @@ dbuf_unoverride(dbuf_dirty_record_t *dr)
 	/* free this block */
 	if (!BP_IS_HOLE(&dr->dt.dl.dr_overridden_by)) {
 		/* XXX can get silent EIO here */
-		(void) arc_free(NULL, db->db_dnode->dn_objset->os_spa,
+		(void) dsl_free(NULL,
+		    spa_get_dsl(db->db_dnode->dn_objset->os_spa),
 		    txg, &dr->dt.dl.dr_overridden_by, NULL, NULL, ARC_WAIT);
 	}
 	dr->dt.dl.dr_override_state = DR_NOT_OVERRIDDEN;
@@ -1561,6 +1553,7 @@ dbuf_prefetch(dnode_t *dn, uint64_t blkid)
 
 	if (dbuf_findbp(dn, 0, blkid, TRUE, &db, &bp) == 0) {
 		if (bp && !BP_IS_HOLE(bp)) {
+			arc_buf_t *pbuf;
 			uint32_t aflags = ARC_NOWAIT | ARC_PREFETCH;
 			zbookmark_t zb;
 			zb.zb_objset = dn->dn_objset->os_dsl_dataset ?
@@ -1569,9 +1562,13 @@ dbuf_prefetch(dnode_t *dn, uint64_t blkid)
 			zb.zb_level = 0;
 			zb.zb_blkid = blkid;
 
-			(void) arc_read(NULL, dn->dn_objset->os_spa, bp,
-			    dmu_ot[dn->dn_type].ot_byteswap,
-			    NULL, NULL, ZIO_PRIORITY_ASYNC_READ,
+			if (db)
+				pbuf = db->db_buf;
+			else
+				pbuf = dn->dn_objset->os_phys_buf;
+
+			(void) arc_read(NULL, dn->dn_objset->os_spa,
+			    bp, pbuf, NULL, NULL, ZIO_PRIORITY_ASYNC_READ,
 			    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE,
 			    &aflags, &zb);
 		}
@@ -1885,15 +1882,8 @@ dbuf_sync_indirect(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 
 	db->db_data_pending = dr;
 
-	arc_release(db->db_buf, db);
 	mutex_exit(&db->db_mtx);
-
-	/*
-	 * XXX -- we should design a compression algorithm
-	 * that specializes in arrays of bps.
-	 */
-	dbuf_write(dr, db->db_buf, ZIO_CHECKSUM_FLETCHER_4,
-	    zfs_mdcomp_disable ? ZIO_COMPRESS_EMPTY : ZIO_COMPRESS_LZJB, tx);
+	dbuf_write(dr, db->db_buf, tx);
 
 	zio = dr->dr_zio;
 	mutex_enter(&dr->dt.di.dr_mtx);
@@ -1911,7 +1901,6 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 	dnode_t *dn = db->db_dnode;
 	objset_impl_t *os = dn->dn_objset;
 	uint64_t txg = tx->tx_txg;
-	int checksum, compress;
 	int blksz;
 
 	ASSERT(dmu_tx_is_syncing(tx));
@@ -2030,14 +2019,6 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 			*datap = arc_buf_alloc(os->os_spa, blksz, db, type);
 			bcopy(db->db.db_data, (*datap)->b_data, blksz);
 		}
-	} else {
-		/*
-		 * Private object buffers are released here rather
-		 * than in dbuf_dirty() since they are only modified
-		 * in the syncing context and we don't want the
-		 * overhead of making multiple copies of the data.
-		 */
-		arc_release(db->db_buf, db);
 	}
 
 	ASSERT(*datap != NULL);
@@ -2045,22 +2026,7 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 
 	mutex_exit(&db->db_mtx);
 
-	/*
-	 * Allow dnode settings to override objset settings,
-	 * except for metadata checksums.
-	 */
-	if (dmu_ot[dn->dn_type].ot_metadata) {
-		checksum = os->os_md_checksum;
-		compress = zio_compress_select(dn->dn_compress,
-		    os->os_md_compress);
-	} else {
-		checksum = zio_checksum_select(dn->dn_checksum,
-		    os->os_checksum);
-		compress = zio_compress_select(dn->dn_compress,
-		    os->os_compress);
-	}
-
-	dbuf_write(dr, *datap, checksum, compress, tx);
+	dbuf_write(dr, *datap, tx);
 
 	ASSERT(!list_link_active(&dr->dr_dirty_node));
 	if (dn->dn_object == DMU_META_DNODE_OBJECT)
@@ -2096,8 +2062,7 @@ dbuf_sync_list(list_t *list, dmu_tx_t *tx)
 }
 
 static void
-dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, int checksum,
-    int compress, dmu_tx_t *tx)
+dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, dmu_tx_t *tx)
 {
 	dmu_buf_impl_t *db = dr->dr_dbuf;
 	dnode_t *dn = db->db_dnode;
@@ -2105,8 +2070,24 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, int checksum,
 	dmu_buf_impl_t *parent = db->db_parent;
 	uint64_t txg = tx->tx_txg;
 	zbookmark_t zb;
+	writeprops_t wp = { 0 };
 	zio_t *zio;
 	int zio_flags;
+
+	if (!BP_IS_HOLE(db->db_blkptr) &&
+	    (db->db_level > 0 || dn->dn_type == DMU_OT_DNODE)) {
+		/*
+		 * Private object buffers are released here rather
+		 * than in dbuf_dirty() since they are only modified
+		 * in the syncing context and we don't want the
+		 * overhead of making multiple copies of the data.
+		 */
+		arc_release(data, db);
+	} else {
+		ASSERT(arc_released(data));
+		/* XXX why do we need to thaw here? */
+		arc_buf_thaw(data);
+	}
 
 	if (parent != dn->dn_dbuf) {
 		ASSERT(parent && parent->db_data_pending);
@@ -2132,13 +2113,20 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, int checksum,
 	zio_flags = ZIO_FLAG_MUSTSUCCEED;
 	if (dmu_ot[dn->dn_type].ot_metadata || zb.zb_level != 0)
 		zio_flags |= ZIO_FLAG_METADATA;
+	wp.wp_type = dn->dn_type;
+	wp.wp_level = db->db_level;
+	wp.wp_copies = os->os_copies;
+	wp.wp_dncompress = dn->dn_compress;
+	wp.wp_oscompress = os->os_compress;
+	wp.wp_dnchecksum = dn->dn_checksum;
+	wp.wp_oschecksum = os->os_checksum;
+
 	if (BP_IS_OLDER(db->db_blkptr, txg))
 		(void) dsl_dataset_block_kill(
 		    os->os_dsl_dataset, db->db_blkptr, zio, tx);
 
-	dr->dr_zio = arc_write(zio, os->os_spa, checksum, compress,
-	    dmu_get_replication_level(os, &zb, dn->dn_type), txg,
-	    db->db_blkptr, data, dbuf_write_ready, dbuf_write_done, db,
+	dr->dr_zio = arc_write(zio, os->os_spa, &wp,
+	    txg, db->db_blkptr, data, dbuf_write_ready, dbuf_write_done, db,
 	    ZIO_PRIORITY_ASYNC_WRITE, zio_flags, &zb);
 }
 

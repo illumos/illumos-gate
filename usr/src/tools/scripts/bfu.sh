@@ -7463,6 +7463,10 @@ mondo_loop() {
 			fi
 			;;
 		    i386)
+			print "Extracting grub for boot " \
+			    "block ... \c" | tee -a $EXTRACT_LOG
+			do_extraction $cpiodir/$karch.boot$ZFIX  | \
+				tee -a $EXTRACT_LOG
 			$rootprefix/boot/solaris/bin/update_grub -R $root
 			;;
 		    *)
