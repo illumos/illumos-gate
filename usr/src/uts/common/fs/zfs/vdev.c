@@ -2264,3 +2264,35 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 	if (!isopen)
 		vdev_propagate_state(vd);
 }
+
+/*
+ * Check the vdev configuration to ensure that it's capable of supporting
+ * a root pool. Currently, we do not support RAID-Z or partial configuration.
+ * In addition, only a single top-level vdev is allowed and none of the leaves
+ * can be wholedisks.
+ */
+boolean_t
+vdev_is_bootable(vdev_t *vd)
+{
+	int c;
+
+	if (!vd->vdev_ops->vdev_op_leaf) {
+		char *vdev_type = vd->vdev_ops->vdev_op_type;
+
+		if (strcmp(vdev_type, VDEV_TYPE_ROOT) == 0 &&
+		    vd->vdev_children > 1) {
+			return (B_FALSE);
+		} else if (strcmp(vdev_type, VDEV_TYPE_RAIDZ) == 0 ||
+		    strcmp(vdev_type, VDEV_TYPE_MISSING) == 0) {
+			return (B_FALSE);
+		}
+	} else if (vd->vdev_wholedisk == 1) {
+		return (B_FALSE);
+	}
+
+	for (c = 0; c < vd->vdev_children; c++) {
+		if (!vdev_is_bootable(vd->vdev_child[c]))
+			return (B_FALSE);
+	}
+	return (B_TRUE);
+}

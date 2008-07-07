@@ -48,6 +48,7 @@
 #include "zfs_prop.h"
 #include "libzfs_impl.h"
 
+static int read_efi_label(nvlist_t *config, diskaddr_t *sb);
 
 /*
  * ====================================================================
@@ -284,6 +285,27 @@ bootfs_name_valid(const char *pool, char *bootfs)
 }
 
 /*
+ * Inspect the configuration to determine if any of the devices contain
+ * an EFI label.
+ */
+static boolean_t
+pool_uses_efi(nvlist_t *config)
+{
+	nvlist_t **child;
+	uint_t c, children;
+
+	if (nvlist_lookup_nvlist_array(config, ZPOOL_CONFIG_CHILDREN,
+	    &child, &children) != 0)
+		return (read_efi_label(config, NULL) >= 0);
+
+	for (c = 0; c < children; c++) {
+		if (pool_uses_efi(child[c]))
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/*
  * Given an nvlist of zpool properties to be set, validate that they are
  * correct, and parse any numeric properties (index, boolean, etc) if they are
  * specified as strings.
@@ -299,6 +321,8 @@ zpool_validate_properties(libzfs_handle_t *hdl, const char *poolname,
 	uint64_t intval;
 	char *slash;
 	struct stat64 statbuf;
+	zpool_handle_t *zhp;
+	nvlist_t *nvroot;
 
 	if (nvlist_alloc(&retprops, NV_UNIQUE_NAME, 0) != 0) {
 		(void) no_memory(hdl);
@@ -372,6 +396,29 @@ zpool_validate_properties(libzfs_handle_t *hdl, const char *poolname,
 				(void) zfs_error(hdl, EZFS_INVALIDNAME, errbuf);
 				goto error;
 			}
+
+			if ((zhp = zpool_open_canfail(hdl, poolname)) == NULL) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "could not open pool '%s'"), poolname);
+				(void) zfs_error(hdl, EZFS_OPENFAILED, errbuf);
+				goto error;
+			}
+			verify(nvlist_lookup_nvlist(zpool_get_config(zhp, NULL),
+			    ZPOOL_CONFIG_VDEV_TREE, &nvroot) == 0);
+
+			/*
+			 * bootfs property cannot be set on a disk which has
+			 * been EFI labeled.
+			 */
+			if (pool_uses_efi(nvroot)) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "property '%s' not supported on "
+				    "EFI labeled devices"), propname);
+				(void) zfs_error(hdl, EZFS_POOL_NOTSUP, errbuf);
+				zpool_close(zhp);
+				goto error;
+			}
+			zpool_close(zhp);
 			break;
 
 		case ZPOOL_PROP_ALTROOT:
@@ -2502,6 +2549,38 @@ zpool_obj_to_path(zpool_handle_t *zhp, uint64_t dsobj, uint64_t obj,
 #define	NEW_START_BLOCK	256
 
 /*
+ * Read the EFI label from the config, if a label does not exist then
+ * pass back the error to the caller. If the caller has passed a non-NULL
+ * diskaddr argument then we set it to the starting address of the EFI
+ * partition.
+ */
+static int
+read_efi_label(nvlist_t *config, diskaddr_t *sb)
+{
+	char *path;
+	int fd;
+	char diskname[MAXPATHLEN];
+	int err = -1;
+
+	if (nvlist_lookup_string(config, ZPOOL_CONFIG_PATH, &path) != 0)
+		return (err);
+
+	(void) snprintf(diskname, sizeof (diskname), "%s%s", RDISK_ROOT,
+	    strrchr(path, '/'));
+	if ((fd = open(diskname, O_RDONLY|O_NDELAY)) >= 0) {
+		struct dk_gpt *vtoc;
+
+		if ((err = efi_alloc_and_read(fd, &vtoc)) >= 0) {
+			if (sb != NULL)
+				*sb = vtoc->efi_parts[0].p_start;
+			efi_free(vtoc);
+		}
+		(void) close(fd);
+	}
+	return (err);
+}
+
+/*
  * determine where a partition starts on a disk in the current
  * configuration
  */
@@ -2510,10 +2589,7 @@ find_start_block(nvlist_t *config)
 {
 	nvlist_t **child;
 	uint_t c, children;
-	char *path;
 	diskaddr_t sb = MAXOFFSET_T;
-	int fd;
-	char diskname[MAXPATHLEN];
 	uint64_t wholedisk;
 
 	if (nvlist_lookup_nvlist_array(config,
@@ -2523,21 +2599,8 @@ find_start_block(nvlist_t *config)
 		    &wholedisk) != 0 || !wholedisk) {
 			return (MAXOFFSET_T);
 		}
-		if (nvlist_lookup_string(config,
-		    ZPOOL_CONFIG_PATH, &path) != 0) {
-			return (MAXOFFSET_T);
-		}
-
-		(void) snprintf(diskname, sizeof (diskname), "%s%s",
-		    RDISK_ROOT, strrchr(path, '/'));
-		if ((fd = open(diskname, O_RDONLY|O_NDELAY)) >= 0) {
-			struct dk_gpt *vtoc;
-			if (efi_alloc_and_read(fd, &vtoc) >= 0) {
-				sb = vtoc->efi_parts[0].p_start;
-				efi_free(vtoc);
-			}
-			(void) close(fd);
-		}
+		if (read_efi_label(config, &sb) < 0)
+			sb = MAXOFFSET_T;
 		return (sb);
 	}
 

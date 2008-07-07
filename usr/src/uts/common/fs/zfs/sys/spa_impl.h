@@ -176,6 +176,12 @@ struct spa {
 
 extern const char *spa_config_path;
 
+#define	BOOTFS_COMPRESS_VALID(compress) \
+	((compress) == ZIO_COMPRESS_LZJB || \
+	((compress) == ZIO_COMPRESS_ON && \
+	ZIO_COMPRESS_ON_VALUE == ZIO_COMPRESS_LZJB) || \
+	(compress) == ZIO_COMPRESS_OFF)
+
 #ifdef	__cplusplus
 }
 #endif

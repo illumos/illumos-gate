@@ -271,8 +271,6 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 		zpool_prop_t prop;
 		char *propname, *strval;
 		uint64_t intval;
-		vdev_t *rvdev;
-		char *vdev_type;
 		objset_t *os;
 		char *slash;
 
@@ -303,15 +301,9 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 			}
 
 			/*
-			 * A bootable filesystem can not be on a RAIDZ pool
-			 * nor a striped pool with more than 1 device.
+			 * Make sure the vdev config is bootable
 			 */
-			rvdev = spa->spa_root_vdev;
-			vdev_type =
-			    rvdev->vdev_child[0]->vdev_ops->vdev_op_type;
-			if (rvdev->vdev_children > 1 ||
-			    strcmp(vdev_type, VDEV_TYPE_RAIDZ) == 0 ||
-			    strcmp(vdev_type, VDEV_TYPE_MISSING) == 0) {
+			if (!vdev_is_bootable(spa->spa_root_vdev)) {
 				error = ENOTSUP;
 				break;
 			}
@@ -321,6 +313,8 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 			error = nvpair_value_string(elem, &strval);
 
 			if (!error) {
+				uint64_t compress;
+
 				if (strval == NULL || strval[0] == '\0') {
 					objnum = zpool_prop_default_numeric(
 					    ZPOOL_PROP_BOOTFS);
@@ -330,7 +324,16 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 				if (error = dmu_objset_open(strval, DMU_OST_ZFS,
 				    DS_MODE_USER | DS_MODE_READONLY, &os))
 					break;
-				objnum = dmu_objset_id(os);
+
+				/* We don't support gzip bootable datasets */
+				if ((error = dsl_prop_get_integer(strval,
+				    zfs_prop_to_name(ZFS_PROP_COMPRESSION),
+				    &compress, NULL)) == 0 &&
+				    !BOOTFS_COMPRESS_VALID(compress)) {
+					error = ENOTSUP;
+				} else {
+					objnum = dmu_objset_id(os);
+				}
 				dmu_objset_close(os);
 			}
 			break;

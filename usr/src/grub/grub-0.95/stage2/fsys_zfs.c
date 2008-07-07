@@ -64,10 +64,11 @@ static char *stackbase;
 
 decomp_entry_t decomp_table[ZIO_COMPRESS_FUNCTIONS] =
 {
-	{"noop", 0},
+	{"inherit", 0},			/* ZIO_COMPRESS_INHERIT */
 	{"on", lzjb_decompress}, 	/* ZIO_COMPRESS_ON */
-	{"off", 0},
-	{"lzjb", lzjb_decompress}	/* ZIO_COMPRESS_LZJB */
+	{"off", 0},			/* ZIO_COMPRESS_OFF */
+	{"lzjb", lzjb_decompress},	/* ZIO_COMPRESS_LZJB */
+	{"empty", 0}			/* ZIO_COMPRESS_EMPTY */
 };
 
 /*

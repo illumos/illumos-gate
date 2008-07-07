@@ -1868,6 +1868,17 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 			(void) zfs_error(hdl, EZFS_BADVERSION, errbuf);
 			break;
 
+		case ERANGE:
+			if (prop == ZFS_PROP_COMPRESSION) {
+				(void) zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "property setting is not allowed on "
+				    "bootable datasets"));
+				(void) zfs_error(hdl, EZFS_NOTSUP, errbuf);
+			} else {
+				(void) zfs_standard_error(hdl, errno, errbuf);
+			}
+			break;
+
 		case EOVERFLOW:
 			/*
 			 * This platform can't address a volume this big.

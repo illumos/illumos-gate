@@ -155,6 +155,30 @@ history_str_get(zfs_cmd_t *zc)
 }
 
 /*
+ * Check to see if the named dataset is currently defined as bootable
+ */
+static boolean_t
+zfs_is_bootfs(const char *name)
+{
+	spa_t *spa;
+	boolean_t ret = B_FALSE;
+
+	if (spa_open(name, &spa, FTAG) == 0) {
+		if (spa->spa_bootfs) {
+			objset_t *os;
+
+			if (dmu_objset_open(name, DMU_OST_ZFS,
+			    DS_MODE_USER | DS_MODE_READONLY, &os) == 0) {
+				ret = (dmu_objset_id(os) == spa->spa_bootfs);
+				dmu_objset_close(os);
+			}
+		}
+		spa_close(spa, FTAG);
+	}
+	return (ret);
+}
+
+/*
  * zfs_check_version
  *
  *	Return non-zero if the spa version is less than requested version.
@@ -1370,12 +1394,23 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 			 * we'll catch them later.
 			 */
 			if (nvpair_type(elem) == DATA_TYPE_UINT64 &&
-			    nvpair_value_uint64(elem, &intval) == 0 &&
-			    intval >= ZIO_COMPRESS_GZIP_1 &&
-			    intval <= ZIO_COMPRESS_GZIP_9) {
-				if (zfs_check_version(name,
+			    nvpair_value_uint64(elem, &intval) == 0) {
+				if (intval >= ZIO_COMPRESS_GZIP_1 &&
+				    intval <= ZIO_COMPRESS_GZIP_9 &&
+				    zfs_check_version(name,
 				    SPA_VERSION_GZIP_COMPRESSION))
 					return (ENOTSUP);
+
+				/*
+				 * If this is a bootable dataset then
+				 * verify that the compression algorithm
+				 * is supported for booting. We must return
+				 * something other than ENOTSUP since it
+				 * implies a downrev pool version.
+				 */
+				if (zfs_is_bootfs(name) &&
+				    !BOOTFS_COMPRESS_VALID(intval))
+					return (ERANGE);
 			}
 			break;
 

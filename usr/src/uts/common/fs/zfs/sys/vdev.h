@@ -56,6 +56,7 @@ extern void vdev_reopen(vdev_t *);
 extern int vdev_validate_aux(vdev_t *vd);
 extern int vdev_probe(vdev_t *);
 
+extern boolean_t vdev_is_bootable(vdev_t *vd);
 extern vdev_t *vdev_lookup_top(spa_t *spa, uint64_t vdev);
 extern vdev_t *vdev_lookup_by_guid(vdev_t *vd, uint64_t guid);
 extern void vdev_dtl_dirty(space_map_t *sm, uint64_t txg, uint64_t size);

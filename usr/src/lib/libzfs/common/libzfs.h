@@ -115,6 +115,7 @@ enum {
 	EZFS_BADCACHE,		/* bad cache file */
 	EZFS_ISL2CACHE,		/* device is for the level 2 ARC */
 	EZFS_VDEVNOTSUP,	/* unsupported vdev type */
+	EZFS_NOTSUP,		/* ops not supported on this dataset */
 	EZFS_UNKNOWN
 };
 

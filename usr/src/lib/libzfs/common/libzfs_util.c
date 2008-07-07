@@ -206,6 +206,9 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	case EZFS_VDEVNOTSUP:
 		return (dgettext(TEXT_DOMAIN, "vdev specification is not "
 		    "supported"));
+	case EZFS_NOTSUP:
+		return (dgettext(TEXT_DOMAIN, "operation not supported "
+		    "on this dataset"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:
