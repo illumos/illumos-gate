@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -374,6 +375,122 @@ clnt_med_null(
 
 	return (0);
 }
+
+/*
+ * Update the mediator information on the mediator.
+ * This function does the same functionality as
+ * clnt_med_upd_data() except that it takes different
+ * argument so that host which is just a mediator, can
+ * still update its mediator record.
+ */
+int
+clnt_user_med_upd_data(
+	md_h_t	*mdhp,
+	bool_t	obandiskset,
+	char	*setname,
+	uint_t	setnum,
+	med_data_t	*meddp,
+	md_error_t	*ep
+)
+{
+	med_handle_t    	*hp;
+	med_upd_data_args_t	args;
+	med_err_t		res;
+
+	/* Initialize */
+	mdclrerror(ep);
+	(void) memset(&args, 0, sizeof (args));
+	(void) memset(&res, 0, sizeof (res));
+
+	/* Build args */
+	if (obandiskset)
+		args.med.med_caller = Strdup(MED_MN_CALLER);
+	else
+		args.med.med_caller = Strdup(mynode());
+
+	args.med.med_setname = Strdup(setname);
+	args.med.med_setno = setnum;
+	args.med_data = *meddp;
+
+	if ((hp = open_medd_wrap(mdhp, CL_DEF_TMO, ep)) == NULL)
+		return (-1);
+
+	if (med_upd_data_1(&args, &res, hp->clntp) != RPC_SUCCESS)
+		(void) mdrpcerror(ep, hp->clntp, hp->hostname,
+		    dgettext(TEXT_DOMAIN, "medd get record"));
+	else
+		(void) meddstealerror(ep, &res);
+
+	close_medd(hp);
+
+	xdr_free(xdr_med_upd_data_args_t, (char *)&args);
+	xdr_free(xdr_med_err_t, (char *)&res);
+
+	if (! mdisok(ep))
+		return (-1);
+
+	return (0);
+}
+
+/*
+ * Get the mediator information from the client.
+ * The code does same functinality as clnt_med_get_data()
+ * except that it takes different arguments so that
+ * host which doesn't have set information, can still
+ * get access to mediator information
+ */
+int
+clnt_user_med_get_data(
+	md_h_t	*mdhp,
+	bool_t	obandiskset,
+	char	*setname,
+	uint_t	setnum,
+	med_data_t	*meddp,
+	md_error_t	*ep
+)
+{
+	int			rval = -1;
+	med_handle_t		*hp;
+	med_args_t		args;
+	med_get_data_res_t	res;
+
+	/* Initialize */
+	mdclrerror(ep);
+	(void) memset(&args, 0, sizeof (args));
+	(void) memset(&res, 0, sizeof (res));
+
+	/* Build args */
+	if (obandiskset)
+		args.med.med_caller = Strdup(MED_MN_CALLER);
+	else
+		args.med.med_caller = Strdup(mynode());
+
+	args.med.med_setname = Strdup(setname);
+	args.med.med_setno = setnum;
+
+	if ((hp = open_medd_wrap(mdhp, CL_DEF_TMO, ep)) == NULL)
+		return (-1);
+
+	if (med_get_data_1(&args, &res, hp->clntp) != RPC_SUCCESS)
+		(void) mdrpcerror(ep, hp->clntp, hp->hostname,
+		    dgettext(TEXT_DOMAIN, "medd get record"));
+	else
+		(void) meddstealerror(ep, &res.med_status);
+
+	close_medd(hp);
+
+	if (mdisok(ep)) {
+		/* copy the mediator data in meddp */
+		(void) memmove(meddp, &res.med_data, sizeof (med_data_t));
+		rval = 0;
+	}
+
+	xdr_free(xdr_med_args_t, (char *)&args);
+	xdr_free(xdr_med_get_data_res_t, (char *)&res);
+
+	return (rval);
+}
+
 
 /*
  * Update the mediator information on the mediator.
@@ -848,4 +965,211 @@ setup_med_cfg(
 		Free(hostname);
 	}
 	return (0);
+}
+
+/*
+ * This is a general routine to get mediator information from
+ * file /etc/lvm/meddb. Commands medstat and metainit use this
+ * routine to get mediator information from all mediator hosts or update
+ * its mediator record respectively.
+ */
+int
+meta_mediator_info_from_file(char *sname, int verbose, md_error_t *ep)
+{
+	uint_t		c;
+	int		i;
+	int		j;
+	int		fd;
+	int		rec_size;
+	char		*setname;
+	uint_t		setnum;
+	med_rec_t	*rec_buf = NULL;
+	med_db_hdr_t	*dbhbr;
+	med_rec_t	*medrecp;
+	med_data_t	medd;
+	med_data_t	*save_medd;
+	md_h_t		mdh;
+	uint_t		latest_med_dat_cc = 0;
+	int		retval;
+	int		medok = 0;
+	int		golden = 0;
+	bool_t		obandiskset;
+
+	/* Open the meddb file */
+	if ((fd = open(MED_DB_FILE, O_RDONLY, 0)) == -1) {
+		mde_perror(ep, "Error in opening meddb file");
+		return (1);
+	}
+
+	/* Initialize rec_size */
+	rec_size = roundup(sizeof (med_rec_t), DEV_BSIZE);
+
+	/* Allocate a record buffer */
+	if ((rec_buf = malloc(rec_size)) == NULL) {
+		mde_perror(ep, "Error in allocating memory");
+		goto out;
+	}
+
+	/* read the file header */
+	if ((read(fd, rec_buf, rec_size)) != rec_size) {
+		mde_perror(ep, "Error in reading mediator record");
+		goto out;
+	}
+
+	dbhbr = (med_db_hdr_t *)rec_buf;
+
+	/* Number of records in the mediator file */
+	c = dbhbr->med_dbh_nm;
+
+	for (i = 0; i < c; i++) {
+		(void) memset(rec_buf, 0, rec_size);
+
+		if (read(fd, rec_buf, rec_size) == -1) {
+			mde_perror(ep, "Error in reading mediator record");
+			goto out;
+		}
+
+		medrecp = (med_rec_t *)rec_buf;
+
+		/*
+		 * For oban diskset first entry in the rec_nodes field is
+		 * "multiowner" and all other entries are null
+		 * Check if this is really multiowner diskset.
+		 */
+
+		if ((strcmp(medrecp->med_rec_nodes[0], MED_MN_CALLER) == 0) &&
+		    (medrecp->med_rec_nodes[1] == NULL))
+			obandiskset = TRUE;
+		else
+			obandiskset = FALSE;
+
+		if (sname != NULL) {
+			/*
+			 * Continue if the set name is not in our interest.
+			 * This is required when this routine is called
+			 * from medstat
+			 */
+
+			if (strcmp(sname, medrecp->med_rec_snm) != 0) {
+				continue;
+			}
+
+			if (verbose)
+				(void) printf("%8.8s\t\t%6.6s\t%6.6s\n",
+				    gettext("Mediator"), gettext("Status"),
+				    gettext("Golden"));
+
+			if (medrecp->med_rec_meds.n_cnt == 0) {
+				if (verbose)
+					(void) printf(gettext(
+					    "No mediator hosts configured for"
+					    " set \"%s\".\n"),
+					    sname);
+				goto out;
+			}
+			setname = sname;
+		} else {
+			setname = medrecp->med_rec_snm;
+		}
+		setnum = medrecp->med_rec_sn;
+
+		for (j = 0; j < medrecp->med_rec_meds.n_cnt; j ++) {
+			(void) memset(&medd, 0, sizeof (medd));
+			(void) memset(&mdh, 0, sizeof (mdh));
+			mdh = medrecp->med_rec_meds.n_lst[j];
+
+			if ((sname != NULL) && (verbose))
+				(void) printf("%-17.17s\t",
+					medrecp->med_rec_meds.n_lst[j].a_nm[0]);
+
+			if (clnt_user_med_get_data(&mdh, obandiskset,
+			    setname, setnum, &medd, ep) == -1) {
+				if (sname == NULL) {
+					continue;
+				} else {
+					if (mdanyrpcerror(ep)) {
+						if (verbose)
+							(void) printf("%s\n",
+							    gettext("Unreach"
+							    "able"));
+						continue;
+					} else if (mdiserror(ep,
+						MDE_MED_ERROR)) {
+						if (verbose)
+							(void) printf("%s\n",
+							    gettext("Bad"));
+					} else {
+						if (verbose)
+							(void) printf("%s\n",
+							    gettext("Fatal"));
+					}
+					mde_perror(ep, "");
+					if (mdiserror(ep, MDE_MED_ERROR))
+						continue;
+					goto out;
+				}
+			} else {
+				if (sname == NULL) {
+					if (latest_med_dat_cc <
+					    medd.med_dat_cc) {
+						latest_med_dat_cc =
+						    medd.med_dat_cc;
+						save_medd = &medd;
+					}
+				} else {
+					if (verbose)
+						(void) printf("%s",
+						    gettext("Ok"));
+					if (medd.med_dat_fl & MED_DFL_GOLDEN) {
+						if (verbose)
+							(void) printf("\t%s",
+							    gettext("Yes"));
+						golden++;
+					} else {
+						if (verbose)
+							(void) printf("\t%s",
+							    gettext("No"));
+					}
+					if (verbose)
+						(void) printf("\n");
+						medok++;
+				}
+			}
+		}
+		if (sname == NULL) {
+			/*
+			 * Update the latest mediator information
+			 * on this node
+			 */
+			(void) strlcpy(mdh.a_nm[0], mynode(),
+			    sizeof (mdh.a_nm[0]));
+			if (clnt_user_med_upd_data(&mdh, obandiskset,
+			    setname, setnum, save_medd, ep) == -1) {
+				/*
+				 * We had some errors while updaing the
+				 * record. This means this metaset is
+				 * not updated with latest mediator
+				 * information.
+				 */
+				mde_perror(ep, "");
+				continue;
+			}
+		} else {
+			if (golden) {
+				retval = 0;
+				goto out;
+			}
+			if (medok < ((medrecp->med_rec_meds.n_cnt / 2) + 1))
+				retval = 1;
+		}
+	}
+
+out:
+	if (rec_buf != NULL)
+		Free(rec_buf);
+	if (close(fd) < 0) {
+		mde_perror(ep, "Error in closing meddb file");
+		return (1);
+	}
+	return (retval);
 }

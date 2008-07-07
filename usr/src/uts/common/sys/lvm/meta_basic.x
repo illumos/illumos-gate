@@ -20,7 +20,7 @@
 % */
 %
 %/*
-% * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+% * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 % * Use is subject to license terms.
 % */
 %
@@ -228,7 +228,7 @@ const	MAX_HOST_ADDRS	= 3;
 const	MD_MAX_MNNODENAME = 256;
 
 const	MED_MAX_HOSTS	= 3;
-const	MED_DEF_HOSTS	= 2;
+const	MED_DEF_HOSTS	= 3;
 
 const	MD_MAXSIDES = 8;
 const	MD_LOCAL_SET = 0;

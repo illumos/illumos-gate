@@ -82,6 +82,8 @@ SUNWprivate_1.1 {
 	clnt_updmeds;
 	clnt_upd_nr_flags;
 	clnt_upd_sr_flags;
+	clnt_user_med_get_data;
+	clnt_user_med_upd_data;
 	close_admin;
 	close_mnttab;
 	cl_set_setkey;
@@ -483,6 +485,7 @@ SUNWprivate_1.1 {
 	meta_match_enclosure;
 	meta_mc_log;
 	meta_med_hnm2ip;
+	meta_mediator_info_from_file;
 	meta_mirror_anycomp_is_err;
 	meta_mirror_attach;
 	meta_mirror_detach;

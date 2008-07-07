@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -864,6 +864,12 @@ extern	int		clnt_med_upd_rec(md_h_t *mdhp, mdsetname_t *sp,
 			    med_rec_t *medrp, md_error_t *ep);
 extern	int		clnt_med_hostname(char *hostname, char **ret_hostname,
 			    md_error_t *ep);
+extern	int		clnt_user_med_upd_data(md_h_t *mdhp, bool_t obandiskset,
+			    char *setname, uint_t setnum, med_data_t *meddp,
+			    md_error_t *ep);
+extern	int		clnt_user_med_get_data(md_h_t *mdhp, bool_t obandiskset,
+			    char *setname, uint_t setnum, med_data_t  *meddp,
+			    md_error_t *ep);
 
 extern	int		meta_med_hnm2ip(md_hi_arr_t *mp, md_error_t *ep);
 extern	int		meta_h2hi(md_h_arr_t *mdhp, md_hi_arr_t *mdhip,
@@ -872,6 +878,8 @@ extern	int		meta_hi2h(md_hi_arr_t *mdhip, md_h_arr_t *mdhp,
 			    md_error_t *ep);
 extern	int		setup_med_cfg(mdsetname_t *sp, mddb_config_t *cp,
 			    int force, md_error_t *ep);
+extern	int		meta_mediator_info_from_file(char *sname, int verbose,
+			    md_error_t *ep);
 
 /* meta_mem.c */
 #ifdef	_DEBUG_MALLOC_INC

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -724,6 +724,7 @@ main(
 	int		error;
 	bool_t		called_thru_rpc = FALSE;
 	char		*cp;
+	pid_t		pid;
 
 	/*
 	 * Get the locale set up before calling any other routines
@@ -830,7 +831,40 @@ main(
 	}
 	if (todo == INIT) {		/* load and take auto-take sets */
 		auto_take_sets();
-		md_exit(sp, 0);
+
+		/*
+		 * During the boot sequence we need to update the mediator
+		 * records, however this depends upon the rpc.metamedd
+		 * running. So, in order to not introduce a delay in the
+		 * boot time, fork a new process to do this work in the
+		 * background.
+		 */
+		pid = fork1();
+		if (pid == (pid_t)-1) {
+			/*
+			 * We could not fork a child process to udpate mediator
+			 * information on this node. There is no need to panic.
+			 * We shall simply return 1.
+			 */
+			mde_perror(ep, "Could not fork a child process to"
+			    " update mediator record");
+			md_exit(sp, 1);
+		} else if (pid == (pid_t)0) {
+			/* child */
+			if (meta_mediator_info_from_file(NULL, 0, ep) == 1) {
+				/*
+				 * No need to print any error messages.
+				 * All the errors messages are printed in the
+				 * library routine itself.
+				 */
+				md_exit(sp, 1);
+			} else {
+				md_exit(sp, 0);
+			}
+		} else {
+			/* Parent process */
+			md_exit(sp, 0);
+		}
 	} else if (todo == ALL) {	/* initialize all devices in md.tab */
 		eval = init_all(&sp, options, called_thru_rpc, ep);
 	} else {			/* initialize the named device */

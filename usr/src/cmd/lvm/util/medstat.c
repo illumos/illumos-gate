@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,15 +60,7 @@ main(
 	md_error_t		status = mdnullerror;
 	md_error_t		*ep = &status;
 	mdsetname_t		*sp = NULL;
-	md_set_desc		*sd;
-	int			i;
-	int			max_meds;
-	md_h_t			mdh;
-	med_data_t		medd;
-	int			medok = 0;
-	int			golden = 0;
 	int			verbose = 1;
-	int			error;
 
 	/*
 	 * Get the locale set up before calling any other routines
@@ -82,10 +74,17 @@ main(
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	if ((sdssc_bind_library() == SDSSC_OKAY) &&
-		(sdssc_cmd_proxy(argc, argv, SDSSC_PROXY_PRIMARY,
-		    &error) == SDSSC_PROXY_DONE))
-			exit(error);
+	/*
+	 * There is no need to proxy the command to owner of the set
+	 * to get the mediator information as the /etc/lvm/meddb file
+	 * contains the required information and so it can be used.
+	 */
+	if ((sdssc_bind_library() == SDSSC_ERROR))  {
+		(void) fprintf(stderr,
+		    "Failed to initialised libscsds.so.1\n");
+		exit(1);
+	}
+
 
 	/* initialize */
 	if (md_init(argc, argv, 0, 1, ep) != 0) {
@@ -105,13 +104,12 @@ main(
 			    break;
 		    case '?':
 			    if (optopt == '?')
-				    usage(sp, NULL);
+			    usage(sp, NULL);
 			    /*FALLTHROUGH*/
 		    default:
 			usage(sp, gettext("unknown command"));
 		}
 	}
-
 	/* must have set for everything else */
 	if (strcmp(sname, MD_LOCAL_NAME) == 0)
 		usage(sp, gettext("setname must be specified"));
@@ -122,93 +120,16 @@ main(
 		md_exit(sp, 1);
 	}
 
-	if ((sp = metasetname(sname, ep)) == NULL) {
-		mde_perror(ep, "");
+	/*
+	 * Get the mediator information from file
+	 * /etc/lvm/meddb and print it.
+	 */
+
+	if (meta_mediator_info_from_file(sname, verbose, ep)) {
 		md_exit(sp, 1);
 	}
-
-	if ((sd = metaget_setdesc(sp, ep)) == NULL) {
-		mde_perror(ep, "");
-		md_exit(sp, 1);
-	}
-
-	if (sd->sd_med.n_cnt == 0) {
-		if (verbose)
-			(void) printf(gettext(
-			    "No mediator hosts configured for set \"%s\".\n"),
-			    sname);
-		md_exit(sp, 2);
-	}
-
-	if ((max_meds = get_max_meds(ep)) == 0)
-		return (-1);
-
-	if (verbose)
-		(void) printf("%8.8s\t\t%6.6s\t%6.6s\n",
-		    gettext("Mediator"), gettext("Status"),
-		    gettext("Golden"));
-
-	for (i = 0; i < max_meds; i++) {
-
-		if (sd->sd_med.n_lst[i].a_cnt == 0)
-			continue;
-
-		(void) memset(&medd, '\0', sizeof (medd));
-		(void) memset(&mdh, '\0', sizeof (mdh));
-		mdh = sd->sd_med.n_lst[i];	/* structure assignment */
-
-		if (verbose)
-			(void) printf("%-17.17s\t",
-			    sd->sd_med.n_lst[i].a_nm[0]);
-
-		if (clnt_med_get_data(&mdh, sp, &medd, ep) == -1) {
-			if (mdanyrpcerror(ep)) {
-				if (verbose)
-					(void) printf("%s\n",
-					    gettext("Unreachable"));
-				continue;
-			} else if (mdiserror(ep, MDE_MED_ERROR)) {
-				if (verbose)
-					(void) printf("%s\n",
-					    gettext("Bad"));
-			} else {
-				if (verbose)
-					(void) printf("%s\n",
-					    gettext("Fatal"));
-			}
-			mde_perror(ep, "");
-			if (mdiserror(ep, MDE_MED_ERROR))
-				continue;
-			md_exit(sp, 1);
-		}
-
-		if (verbose)
-			(void) printf("%s", gettext("Ok"));
-
-		if (medd.med_dat_fl & MED_DFL_GOLDEN) {
-			if (verbose)
-				(void) printf("\t%s",
-				    gettext("Yes"));
-			golden++;
-		} else {
-			if (verbose)
-				(void) printf("\t%s",
-				    gettext("No"));
-		}
-
-		if (verbose)
-			(void) printf("\n");
-
-		medok++;
-	}
-
-	if (golden)
-		md_exit(sp, 0);
-
-	if (medok < ((sd->sd_med.n_cnt / 2) + 1))
-		md_exit(sp, 1);
 
 	md_exit(sp, 0);
-	/*NOTREACHED*/
+	/* NOTREACHED */
 	return (0);
 }
