@@ -895,10 +895,11 @@ zpool_find_import_impl(libzfs_handle_t *hdl, int argc, char **argv,
 					    strcmp(poolname, pname) == 0;
 				} else if (guid != 0) {
 					uint64_t this_guid;
-					verify(nvlist_lookup_uint64(config,
+
+					matched = nvlist_lookup_uint64(config,
 					    ZPOOL_CONFIG_POOL_GUID,
-					    &this_guid) == 0);
-					matched = guid == this_guid;
+					    &this_guid) == 0 &&
+					    guid == this_guid;
 				}
 				if (!matched) {
 					nvlist_free(config);
