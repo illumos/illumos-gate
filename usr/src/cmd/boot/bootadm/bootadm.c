@@ -2263,7 +2263,7 @@ menu_sync:
 	bam_print(PROP_GRUB_MENU);
 
 	(void) snprintf(cmdline, sizeof (cmdline),
-	    "/bin/sh -c '. %s; %s %s yes'",
+	    "/bin/sh -c '. %s > /dev/null; %s %s yes > /dev/null'",
 	    LULIB, LULIB_PROPAGATE_FILE, GRUB_MENU);
 	ret = exec_cmd(cmdline, NULL);
 	INJECT_ERROR1("PROPAGATE_MENU", ret = 1);
@@ -2273,7 +2273,7 @@ menu_sync:
 	}
 	BAM_DPRINTF((D_PROPAGATED_MENU, fcn));
 
-	(void) snprintf(cmdline, sizeof (cmdline), "/bin/cp %s %s",
+	(void) snprintf(cmdline, sizeof (cmdline), "/bin/cp %s %s > /dev/null",
 	    GRUB_MENU, GRUB_BACKUP_MENU);
 	ret = exec_cmd(cmdline, NULL);
 	INJECT_ERROR1("CREATE_BACKUP", ret = 1);
@@ -2284,7 +2284,7 @@ menu_sync:
 	BAM_DPRINTF((D_CREATED_BACKUP, fcn, GRUB_BACKUP_MENU));
 
 	(void) snprintf(cmdline, sizeof (cmdline),
-	    "/bin/sh -c '. %s; %s %s no'",
+	    "/bin/sh -c '. %s > /dev/null; %s %s no > /dev/null'",
 	    LULIB, LULIB_PROPAGATE_FILE, GRUB_BACKUP_MENU);
 	ret = exec_cmd(cmdline, NULL);
 	INJECT_ERROR1("PROPAGATE_BACKUP", ret = 1);
@@ -2305,7 +2305,7 @@ menu_sync:
 	BAM_DPRINTF((D_CREATED_CKSUM_FILE, fcn, LU_MENU_CKSUM));
 
 	(void) snprintf(cmdline, sizeof (cmdline),
-	    "/bin/sh -c '. %s; %s %s no'",
+	    "/bin/sh -c '. %s > /dev/null; %s %s no > /dev/null'",
 	    LULIB, LULIB_PROPAGATE_FILE, LU_MENU_CKSUM);
 	ret = exec_cmd(cmdline, NULL);
 	INJECT_ERROR1("PROPAGATE_MENU_CKSUM_FILE", ret = 1);
@@ -2316,7 +2316,7 @@ menu_sync:
 	BAM_DPRINTF((D_PROPAGATED_CKSUM_FILE, fcn, LU_MENU_CKSUM));
 
 	(void) snprintf(cmdline, sizeof (cmdline),
-	    "/bin/sh -c '. %s; %s %s no'",
+	    "/bin/sh -c '. %s > /dev/null; %s %s no > /dev/null'",
 	    LULIB, LULIB_PROPAGATE_FILE, BOOTADM);
 	ret = exec_cmd(cmdline, NULL);
 	INJECT_ERROR1("PROPAGATE_BOOTADM_FILE", ret = 1);
