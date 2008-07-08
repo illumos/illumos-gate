@@ -37,6 +37,7 @@
 #include <sys/stat.h>
 #include <sys/acl.h>
 #include <aclutils.h>
+#include <idmap.h>
 
 #define	ID_STR_MAX	20	/* digits in LONG_MAX */
 
@@ -52,15 +53,18 @@ char	*yybuf;
 
 extern acl_t *acl_alloc(enum acl_type);
 
+/*
+ * dynamic string that will increase in size on an
+ * as needed basis.
+ */
+typedef struct dynaclstr {
+	size_t d_bufsize;		/* current size of aclexport */
+	char *d_aclexport;
+	int d_pos;
+} dynaclstr_t;
 
-struct dynaclstr {
-	size_t bufsize;		/* current size of aclexport */
-	char *aclexport;
-};
-
-static char *strappend(char *, char *);
-static char *convert_perm(char *, o_mode_t);
-static int increase_length(struct dynaclstr *, size_t);
+static int str_append(dynaclstr_t *, char *);
+static int aclent_perm_txt(dynaclstr_t *, o_mode_t);
 
 static void
 aclent_perms(int perm, char *txt_perms)
@@ -111,6 +115,67 @@ prgname(gid_t gid, char *gidp, size_t buflen, int noresolve)
 	}
 	return (gidp);
 }
+
+static char *
+prsidname(uid_t who, boolean_t user, char **sidp, int noresolve)
+{
+	idmap_handle_t *idmap_hdl = NULL;
+	idmap_get_handle_t *get_hdl = NULL;
+	idmap_stat status;
+	idmap_rid_t rid;
+	int error = 1;
+	int len;
+	char *domain;
+	char *name;
+
+	if (noresolve) {
+		len = snprintf(NULL, 0, "%u", who);
+		*sidp = malloc(len + 1);
+		(void) snprintf(*sidp, len + 1, "%u", who);
+		return (*sidp);
+	}
+
+	/*
+	 * First try and get windows name
+	 */
+
+	if (user)
+		error = idmap_getwinnamebyuid(who, &name, &domain);
+	else
+		error = idmap_getwinnamebygid(who, &name, &domain);
+
+	if (error) {
+		if (idmap_init(&idmap_hdl) == 0 &&
+		    idmap_get_create(idmap_hdl, &get_hdl) == 0) {
+			if (user)
+				error = idmap_get_sidbyuid(get_hdl, who,
+				    0, &domain, &rid, &status);
+			else
+				error = idmap_get_sidbygid(get_hdl, who,
+				    0, &domain, &rid, &status);
+			if (error == 0)
+				error = idmap_get_mappings(get_hdl);
+		}
+		if (error == 0) {
+			len = snprintf(NULL, 0, "%s-%d", domain, rid);
+			*sidp = malloc(len + 1);
+			(void) snprintf(*sidp, len + 1, "%s-%d", domain, rid);
+		} else {
+			*sidp = NULL;
+		}
+		if (get_hdl)
+			idmap_get_destroy(get_hdl);
+		if (idmap_hdl)
+			(void) idmap_fini(idmap_hdl);
+	} else {
+		int len;
+		len = snprintf(NULL, 0, "%s@%d", name, domain);
+		*sidp = malloc(len + 1);
+		(void) snprintf(*sidp, len + 1, "%s@%s", name, domain);
+	}
+	return (*sidp);
+}
+
 static void
 aclent_printacl(acl_t *aclp)
 {
@@ -234,59 +299,163 @@ split_line(char *str, int cols)
 	}
 }
 
-char *
-ace_type_txt(char *buf, char **endp, ace_t *acep, int flags)
+/*
+ * compute entry type string, such as user:joe, group:staff,...
+ */
+static int
+aclent_type_txt(dynaclstr_t *dstr, aclent_t *aclp, int flags)
 {
-
 	char idp[ID_STR_MAX];
+	int error;
 
-	if (buf == NULL)
-		return (NULL);
-
-	switch (acep->a_flags & ACE_TYPE_FLAGS) {
-	case ACE_OWNER:
-		strcpy(buf, OWNERAT_TXT);
-		*endp = buf + sizeof (OWNERAT_TXT) - 1;
+	switch (aclp->a_type) {
+	case DEF_USER_OBJ:
+	case USER_OBJ:
+		if (aclp->a_type == USER_OBJ)
+			error = str_append(dstr, "user::");
+		else
+			error = str_append(dstr, "defaultuser::");
 		break;
 
-	case ACE_GROUP|ACE_IDENTIFIER_GROUP:
-		strcpy(buf, GROUPAT_TXT);
-		*endp = buf + sizeof (GROUPAT_TXT) - 1;
-		break;
-
-	case ACE_IDENTIFIER_GROUP:
-		strcpy(buf, GROUP_TXT);
-		strcat(buf, prgname(acep->a_who, idp,
+	case DEF_USER:
+	case USER:
+		if (aclp->a_type == USER)
+			error = str_append(dstr, "user:");
+		else
+			error = str_append(dstr, "defaultuser:");
+		if (error)
+			break;
+		error = str_append(dstr, pruname(aclp->a_id, idp,
 		    sizeof (idp), flags & ACL_NORESOLVE));
-		*endp = buf + strlen(buf);
+		if (error == 0)
+			error = str_append(dstr, ":");
 		break;
 
-	case ACE_EVERYONE:
-		strcpy(buf, EVERYONEAT_TXT);
-		*endp = buf + sizeof (EVERYONEAT_TXT) - 1;
+	case DEF_GROUP_OBJ:
+	case GROUP_OBJ:
+		if (aclp->a_type == GROUP_OBJ)
+			error = str_append(dstr, "group::");
+		else
+			error = str_append(dstr, "defaultgroup::");
 		break;
 
-	case 0:
-		strcpy(buf, USER_TXT);
-		strcat(buf, pruname(acep->a_who, idp,
+	case DEF_GROUP:
+	case GROUP:
+		if (aclp->a_type == GROUP)
+			error = str_append(dstr, "group:");
+		else
+			error = str_append(dstr, "defaultgroup:");
+		if (error)
+			break;
+		error = str_append(dstr, prgname(aclp->a_id, idp,
 		    sizeof (idp), flags & ACL_NORESOLVE));
-		*endp = buf + strlen(buf);
+		if (error == 0)
+			error = str_append(dstr, ":");
+		break;
+
+	case DEF_CLASS_OBJ:
+	case CLASS_OBJ:
+		if (aclp->a_type == CLASS_OBJ)
+			error = str_append(dstr, "mask:");
+		else
+			error = str_append(dstr, "defaultmask:");
+		break;
+
+	case DEF_OTHER_OBJ:
+	case OTHER_OBJ:
+		if (aclp->a_type == OTHER_OBJ)
+			error = str_append(dstr, "other:");
+		else
+			error = str_append(dstr, "defaultother:");
+		break;
+
+	default:
+		error = 1;
 		break;
 	}
 
-	return (buf);
+	return (error);
 }
 
-char *
-ace_perm_txt(char *buf, char **endp, uint32_t mask,
+/*
+ * compute entry type string such as, owner@:, user:joe, group:staff,...
+ */
+static int
+ace_type_txt(dynaclstr_t *dynstr, ace_t *acep, int flags)
+{
+	char idp[ID_STR_MAX];
+	int error;
+	char *sidp = NULL;
+
+	switch (acep->a_flags & ACE_TYPE_FLAGS) {
+	case ACE_OWNER:
+		error = str_append(dynstr, OWNERAT_TXT);
+		break;
+
+	case ACE_GROUP|ACE_IDENTIFIER_GROUP:
+		error = str_append(dynstr, GROUPAT_TXT);
+		break;
+
+	case ACE_IDENTIFIER_GROUP:
+		if ((flags & ACL_SID_FMT) && acep->a_who > MAXUID) {
+			if (error = str_append(dynstr,
+			    GROUPSID_TXT))
+				break;
+			error = str_append(dynstr, prsidname(acep->a_who,
+			    B_FALSE, &sidp, flags & ACL_NORESOLVE));
+		} else {
+			if (error = str_append(dynstr, GROUP_TXT))
+				break;
+			error = str_append(dynstr, prgname(acep->a_who, idp,
+			    sizeof (idp), flags & ACL_NORESOLVE));
+		}
+		if (error == 0)
+			error = str_append(dynstr, ":");
+		break;
+
+	case ACE_EVERYONE:
+		error = str_append(dynstr, EVERYONEAT_TXT);
+		break;
+
+	case 0:
+		if ((flags & ACL_SID_FMT) && acep->a_who > MAXUID) {
+			if (error = str_append(dynstr, USERSID_TXT))
+				break;
+			error = str_append(dynstr, prsidname(acep->a_who,
+			    B_TRUE, &sidp, flags & ACL_NORESOLVE));
+		} else {
+			if (error = str_append(dynstr, USER_TXT))
+				break;
+			error = str_append(dynstr, pruname(acep->a_who, idp,
+			    sizeof (idp), flags & ACL_NORESOLVE));
+		}
+		if (error == 0)
+			error = str_append(dynstr, ":");
+		break;
+	default:
+		error = 0;
+		break;
+	}
+
+	if (sidp)
+		free(sidp);
+	return (error);
+}
+
+/*
+ * compute string of permissions, such as read_data/write_data or
+ * rwxp,...
+ * The format depends on the flags field which indicates whether the compact
+ * or verbose format should be used.
+ */
+static int
+ace_perm_txt(dynaclstr_t *dstr, uint32_t mask,
     uint32_t iflags, int isdir, int flags)
 {
-	char *lend = buf;		/* local end */
-
-	if (buf == NULL)
-		return (NULL);
+	int error = 0;
 
 	if (flags & ACL_COMPACT_FMT) {
+		char buf[16];
 
 		if (mask & ACE_READ_DATA)
 			buf[0] = 'r';
@@ -344,9 +513,9 @@ ace_perm_txt(char *buf, char **endp, uint32_t mask,
 			buf[13] = 's';
 		else
 			buf[13] = '-';
-		buf[14] = '\0';
-		*endp = buf + 14;
-		return (buf);
+		buf[14] = ':';
+		buf[15] = '\0';
+		error = str_append(dstr, buf);
 	} else {
 		/*
 		 * If ACE is a directory, but inheritance indicates its
@@ -356,137 +525,114 @@ ace_perm_txt(char *buf, char **endp, uint32_t mask,
 		if (isdir) {
 			if (mask & ACE_LIST_DIRECTORY) {
 				if (iflags == ACE_FILE_INHERIT_ACE) {
-					strcpy(lend, READ_DATA_TXT);
-					lend += sizeof (READ_DATA_TXT) - 1;
+					error = str_append(dstr,
+					    READ_DATA_TXT);
 				} else {
-					strcpy(lend, READ_DIR_TXT);
-					lend += sizeof (READ_DIR_TXT) - 1;
+					error =
+					    str_append(dstr, READ_DIR_TXT);
 				}
 			}
-			if (mask & ACE_ADD_FILE) {
+			if (error == 0 && (mask & ACE_ADD_FILE)) {
 				if (iflags == ACE_FILE_INHERIT_ACE) {
-					strcpy(lend, WRITE_DATA_TXT);
-					lend += sizeof (WRITE_DATA_TXT) - 1;
+					error =
+					    str_append(dstr, WRITE_DATA_TXT);
 				} else {
-					strcpy(lend, ADD_FILE_TXT);
-					lend +=
-					    sizeof (ADD_FILE_TXT) -1;
+					error =
+					    str_append(dstr, ADD_FILE_TXT);
 				}
 			}
-			if (mask & ACE_ADD_SUBDIRECTORY) {
+			if (error == 0 && (mask & ACE_ADD_SUBDIRECTORY)) {
 				if (iflags == ACE_FILE_INHERIT_ACE) {
-					strcpy(lend, APPEND_DATA_TXT);
-					lend += sizeof (APPEND_DATA_TXT) - 1;
+					error = str_append(dstr,
+					    APPEND_DATA_TXT);
 				} else {
-					strcpy(lend, ADD_DIR_TXT);
-					lend += sizeof (ADD_DIR_TXT) - 1;
+					error = str_append(dstr,
+					    ADD_DIR_TXT);
 				}
 			}
 		} else {
 			if (mask & ACE_READ_DATA) {
-				strcpy(lend, READ_DATA_TXT);
-				lend += sizeof (READ_DATA_TXT) - 1;
+				error = str_append(dstr, READ_DATA_TXT);
 			}
-			if (mask & ACE_WRITE_DATA) {
-				strcpy(lend, WRITE_DATA_TXT);
-				lend += sizeof (WRITE_DATA_TXT) - 1;
+			if (error == 0 && (mask & ACE_WRITE_DATA)) {
+				error = str_append(dstr, WRITE_DATA_TXT);
 			}
-			if (mask & ACE_APPEND_DATA) {
-				strcpy(lend, APPEND_DATA_TXT);
-				lend += sizeof (APPEND_DATA_TXT) - 1;
+			if (error == 0 && (mask & ACE_APPEND_DATA)) {
+				error = str_append(dstr, APPEND_DATA_TXT);
 			}
 		}
-		if (mask & ACE_READ_NAMED_ATTRS) {
-			strcpy(lend, READ_XATTR_TXT);
-			lend += sizeof (READ_XATTR_TXT) - 1;
+		if (error == 0 && (mask & ACE_READ_NAMED_ATTRS)) {
+			error = str_append(dstr, READ_XATTR_TXT);
 		}
-		if (mask & ACE_WRITE_NAMED_ATTRS) {
-			strcpy(lend, WRITE_XATTR_TXT);
-			lend += sizeof (WRITE_XATTR_TXT) - 1;
+		if (error == 0 && (mask & ACE_WRITE_NAMED_ATTRS)) {
+			error = str_append(dstr, WRITE_XATTR_TXT);
 		}
-		if (mask & ACE_EXECUTE) {
-			strcpy(lend, EXECUTE_TXT);
-			lend += sizeof (EXECUTE_TXT) - 1;
+		if (error == 0 && (mask & ACE_EXECUTE)) {
+			error = str_append(dstr, EXECUTE_TXT);
 		}
-		if (mask & ACE_DELETE_CHILD) {
-			strcpy(lend, DELETE_CHILD_TXT);
-			lend += sizeof (DELETE_CHILD_TXT) - 1;
+		if (error == 0 && (mask & ACE_DELETE_CHILD)) {
+			error = str_append(dstr, DELETE_CHILD_TXT);
 		}
-		if (mask & ACE_READ_ATTRIBUTES) {
-			strcpy(lend, READ_ATTRIBUTES_TXT);
-			lend += sizeof (READ_ATTRIBUTES_TXT) - 1;
+		if (error == 0 && (mask & ACE_READ_ATTRIBUTES)) {
+			error = str_append(dstr, READ_ATTRIBUTES_TXT);
 		}
-		if (mask & ACE_WRITE_ATTRIBUTES) {
-			strcpy(lend, WRITE_ATTRIBUTES_TXT);
-			lend += sizeof (WRITE_ATTRIBUTES_TXT) - 1;
+		if (error == 0 && (mask & ACE_WRITE_ATTRIBUTES)) {
+			error = str_append(dstr, WRITE_ATTRIBUTES_TXT);
 		}
-		if (mask & ACE_DELETE) {
-			strcpy(lend, DELETE_TXT);
-			lend += sizeof (DELETE_TXT) - 1;
+		if (error == 0 && (mask & ACE_DELETE)) {
+			error = str_append(dstr, DELETE_TXT);
 		}
-		if (mask & ACE_READ_ACL) {
-			strcpy(lend, READ_ACL_TXT);
-			lend += sizeof (READ_ACL_TXT) - 1;
+		if (error == 0 && (mask & ACE_READ_ACL)) {
+			error = str_append(dstr, READ_ACL_TXT);
 		}
-		if (mask & ACE_WRITE_ACL) {
-			strcpy(lend, WRITE_ACL_TXT);
-			lend += sizeof (WRITE_ACL_TXT) - 1;
+		if (error == 0 && (mask & ACE_WRITE_ACL)) {
+			error = str_append(dstr, WRITE_ACL_TXT);
 		}
-		if (mask & ACE_WRITE_OWNER) {
-			strcpy(lend, WRITE_OWNER_TXT);
-			lend += sizeof (WRITE_OWNER_TXT) - 1;
+		if (error == 0 && (mask & ACE_WRITE_OWNER)) {
+			error = str_append(dstr, WRITE_OWNER_TXT);
 		}
-		if (mask & ACE_SYNCHRONIZE) {
-			strcpy(lend, SYNCHRONIZE_TXT);
-			lend += sizeof (SYNCHRONIZE_TXT) - 1;
+		if (error == 0 && (mask & ACE_SYNCHRONIZE)) {
+			error = str_append(dstr, SYNCHRONIZE_TXT);
 		}
-
-		if (*(lend - 1) == '/')
-			*--lend = '\0';
+		if (error == 0 && dstr->d_aclexport[dstr->d_pos-1] == '/') {
+			dstr->d_aclexport[--dstr->d_pos] = '\0';
+		}
+		if (error == 0)
+			error = str_append(dstr, ":");
 	}
-
-	*endp = lend;
-	return (buf);
+	return (error);
 }
 
-char *
-ace_access_txt(char *buf, char **endp, int type)
+/*
+ * compute string of access type, such as allow, deny, ...
+ */
+static int
+ace_access_txt(dynaclstr_t *dstr, int type)
 {
+	int error;
 
-	if (buf == NULL)
-		return (NULL);
+	if (type == ACE_ACCESS_ALLOWED_ACE_TYPE)
+		error = str_append(dstr, ALLOW_TXT);
+	else if (type == ACE_ACCESS_DENIED_ACE_TYPE)
+		error = str_append(dstr, DENY_TXT);
+	else if (type == ACE_SYSTEM_AUDIT_ACE_TYPE)
+		error = str_append(dstr, AUDIT_TXT);
+	else if (type == ACE_SYSTEM_ALARM_ACE_TYPE)
+		error = str_append(dstr, ALARM_TXT);
+	else
+		error = str_append(dstr, UNKNOWN_TXT);
 
-	if (type == ACE_ACCESS_ALLOWED_ACE_TYPE) {
-		strcpy(buf, ALLOW_TXT);
-		*endp += sizeof (ALLOW_TXT) - 1;
-	} else if (type == ACE_ACCESS_DENIED_ACE_TYPE) {
-		strcpy(buf, DENY_TXT);
-		*endp += sizeof (DENY_TXT) - 1;
-	} else if (type == ACE_SYSTEM_AUDIT_ACE_TYPE) {
-		strcpy(buf, AUDIT_TXT);
-		*endp += sizeof (AUDIT_TXT) - 1;
-	} else if (type == ACE_SYSTEM_ALARM_ACE_TYPE) {
-		strcpy(buf, ALARM_TXT);
-		*endp += sizeof (ALARM_TXT) - 1;
-	} else {
-		strcpy(buf, UNKNOWN_TXT);
-		*endp += sizeof (UNKNOWN_TXT) - 1;
-	}
-
-	return (buf);
+	return (error);
 }
 
-static char *
-ace_inherit_txt(char *buf, char **endp, uint32_t iflags, int flags)
+static int
+ace_inherit_txt(dynaclstr_t *dstr, uint32_t iflags, int flags)
 {
-
-	char *lend = buf;
-
-	if (buf == NULL) {
-		return (NULL);
-	}
+	int error = 0;
 
 	if (flags & ACL_COMPACT_FMT) {
+		char buf[9];
+
 		if (iflags & ACE_FILE_INHERIT_ACE)
 			buf[0] = 'f';
 		else
@@ -515,44 +661,38 @@ ace_inherit_txt(char *buf, char **endp, uint32_t iflags, int flags)
 			buf[6] = 'I';
 		else
 			buf[6] = '-';
-		buf[7] = '\0';
-		*endp = buf + 7;
+		buf[7] = ':';
+		buf[8] = '\0';
+		error = str_append(dstr, buf);
 	} else {
 		if (iflags & ACE_FILE_INHERIT_ACE) {
-			strcpy(lend, "file_inherit/");
-			lend += sizeof ("file_inherit/") - 1;
+			error = str_append(dstr, FILE_INHERIT_TXT);
 		}
-		if (iflags & ACE_DIRECTORY_INHERIT_ACE) {
-			strcpy(lend, "dir_inherit/");
-			lend += sizeof ("dir_inherit/") - 1;
+		if (error == 0 && (iflags & ACE_DIRECTORY_INHERIT_ACE)) {
+			error = str_append(dstr, DIR_INHERIT_TXT);
 		}
-		if (iflags & ACE_NO_PROPAGATE_INHERIT_ACE) {
-			strcpy(lend, "no_propagate/");
-			lend += sizeof ("no_propagate/") - 1;
+		if (error == 0 && (iflags & ACE_NO_PROPAGATE_INHERIT_ACE)) {
+			error = str_append(dstr, NO_PROPAGATE_TXT);
 		}
-		if (iflags & ACE_INHERIT_ONLY_ACE) {
-			strcpy(lend, "inherit_only/");
-			lend += sizeof ("inherit_only/") - 1;
+		if (error == 0 && (iflags & ACE_INHERIT_ONLY_ACE)) {
+			error = str_append(dstr, INHERIT_ONLY_TXT);
 		}
-		if (iflags & ACE_SUCCESSFUL_ACCESS_ACE_FLAG) {
-			strcpy(lend, "successful_access/");
-			lend += sizeof ("successful_access/") - 1;
+		if (error == 0 && (iflags & ACE_SUCCESSFUL_ACCESS_ACE_FLAG)) {
+			error = str_append(dstr, SUCCESSFUL_ACCESS_TXT);
 		}
-		if (iflags & ACE_FAILED_ACCESS_ACE_FLAG) {
-			strcpy(lend, "failed_access/");
-			lend += sizeof ("failed_access/") - 1;
+		if (error == 0 && (iflags & ACE_FAILED_ACCESS_ACE_FLAG)) {
+			error = str_append(dstr, FAILED_ACCESS_TXT);
 		}
-		if (iflags & ACE_INHERITED_ACE) {
-			strcpy(lend, "inherited/");
-			lend += sizeof ("inherited/") - 1;
+		if (error == 0 && (iflags & ACE_INHERITED_ACE)) {
+			error = str_append(dstr, INHERITED_ACE_TXT);
 		}
-
-		if (*(lend - 1) == '/')
-			*--lend = '\0';
-		*endp = lend;
+		if (error == 0 && dstr->d_aclexport[dstr->d_pos-1] == '/') {
+			dstr->d_aclexport[--dstr->d_pos] = '\0';
+			error = str_append(dstr, ":");
+		}
 	}
 
-	return (buf);
+	return (error);
 }
 
 /*
@@ -585,149 +725,57 @@ ace_inherit_txt(char *buf, char **endp, uint32_t iflags, int flags)
 #define	ENTRYTYPELEN	14
 #define	PERMS		4
 #define	ACL_ENTRY_SIZE	(ENTRYTYPELEN + ID_STR_MAX + PERMS + APPENDED_ID_MAX)
-#define	UPDATE_WHERE	where = dstr->aclexport + strlen(dstr->aclexport)
 
 char *
 aclent_acltotext(aclent_t  *aclp, int aclcnt, int flags)
 {
+	dynaclstr_t 	*dstr;
 	char		*aclexport;
-	char		*where;
-	struct group	*groupp = NULL;
-	struct passwd	*passwdp = NULL;
-	struct dynaclstr *dstr;
-	int		i, rtn;
-	size_t		excess = 0;
-	char		id[ID_STR_MAX], *idstr;
+	int		i;
+	int 		error = 0;
 
 	if (aclp == NULL)
 		return (NULL);
-	if ((dstr = malloc(sizeof (struct dynaclstr))) == NULL)
+	if ((dstr = malloc(sizeof (dynaclstr_t))) == NULL)
 		return (NULL);
-	dstr->bufsize = aclcnt * ACL_ENTRY_SIZE;
-	if ((dstr->aclexport = malloc(dstr->bufsize)) == NULL) {
+	dstr->d_bufsize = aclcnt * ACL_ENTRY_SIZE;
+	if ((dstr->d_aclexport = malloc(dstr->d_bufsize)) == NULL) {
 		free(dstr);
 		return (NULL);
 	}
-	*dstr->aclexport = '\0';
-	where = dstr->aclexport;
+	*dstr->d_aclexport = '\0';
+	dstr->d_pos = 0;
 
 	for (i = 0; i < aclcnt; i++, aclp++) {
-		switch (aclp->a_type) {
-		case DEF_USER_OBJ:
-		case USER_OBJ:
-			if (aclp->a_type == USER_OBJ)
-				where = strappend(where, "user::");
-			else
-				where = strappend(where, "defaultuser::");
-			where = convert_perm(where, aclp->a_perm);
+		if (error = aclent_type_txt(dstr, aclp, flags))
 			break;
-		case DEF_USER:
-		case USER:
-			if (aclp->a_type == USER)
-				where = strappend(where, "user:");
-			else
-				where = strappend(where, "defaultuser:");
-			if ((flags & ACL_NORESOLVE) == 0)
-				passwdp = getpwuid(aclp->a_id);
-			if (passwdp == (struct passwd *)NULL) {
-				/* put in uid instead */
-				(void) sprintf(where, "%d", aclp->a_id);
-				UPDATE_WHERE;
-			} else {
-				excess = strlen(passwdp->pw_name) - LOGNAME_MAX;
-				if (excess > 0) {
-					rtn = increase_length(dstr, excess);
-					if (rtn == 1) {
-						UPDATE_WHERE;
-					} else {
-						free(dstr->aclexport);
-						free(dstr);
-						return (NULL);
-					}
-				}
-				where = strappend(where, passwdp->pw_name);
-			}
-			where = strappend(where, ":");
-			where = convert_perm(where, aclp->a_perm);
+		if (error = aclent_perm_txt(dstr, aclp->a_perm))
 			break;
-		case DEF_GROUP_OBJ:
-		case GROUP_OBJ:
-			if (aclp->a_type == GROUP_OBJ)
-				where = strappend(where, "group::");
-			else
-				where = strappend(where, "defaultgroup::");
-			where = convert_perm(where, aclp->a_perm);
-			break;
-		case DEF_GROUP:
-		case GROUP:
-			if (aclp->a_type == GROUP)
-				where = strappend(where, "group:");
-			else
-				where = strappend(where, "defaultgroup:");
-			if ((flags & ACL_NORESOLVE) == 0)
-				groupp = getgrgid(aclp->a_id);
-			if (groupp == (struct group *)NULL) {
-				/* put in gid instead */
-				(void) sprintf(where, "%d", aclp->a_id);
-				UPDATE_WHERE;
-			} else {
-				excess = strlen(groupp->gr_name) - LOGNAME_MAX;
-				if (excess > 0) {
-					rtn = increase_length(dstr, excess);
-					if (rtn == 1) {
-						UPDATE_WHERE;
-					} else {
-						free(dstr->aclexport);
-						free(dstr);
-						return (NULL);
-					}
-				}
-				where = strappend(where, groupp->gr_name);
-			}
-			where = strappend(where, ":");
-			where = convert_perm(where, aclp->a_perm);
-			break;
-		case DEF_CLASS_OBJ:
-		case CLASS_OBJ:
-			if (aclp->a_type == CLASS_OBJ)
-				where = strappend(where, "mask:");
-			else
-				where = strappend(where, "defaultmask:");
-			where = convert_perm(where, aclp->a_perm);
-			break;
-		case DEF_OTHER_OBJ:
-		case OTHER_OBJ:
-			if (aclp->a_type == OTHER_OBJ)
-				where = strappend(where, "other:");
-			else
-				where = strappend(where, "defaultother:");
-			where = convert_perm(where, aclp->a_perm);
-			break;
-		default:
-			free(dstr->aclexport);
-			free(dstr);
-			return (NULL);
-
-		}
 
 		if ((flags & ACL_APPEND_ID) && ((aclp->a_type == USER) ||
 		    (aclp->a_type == DEF_USER) || (aclp->a_type == GROUP) ||
 		    (aclp->a_type == DEF_GROUP))) {
-			where = strappend(where, ":");
+			char id[ID_STR_MAX], *idstr;
+
+			if (error = str_append(dstr, ":"))
+				break;
 			id[ID_STR_MAX - 1] = '\0'; /* null terminate buffer */
 			idstr = lltostr(aclp->a_id, &id[ID_STR_MAX - 1]);
-			where = strappend(where, idstr);
+			if (error = str_append(dstr, idstr))
+				break;
 		}
 		if (i < aclcnt - 1)
-			where = strappend(where, ",");
+			if (error = str_append(dstr, ","))
+				break;
 	}
-	aclexport = dstr->aclexport;
+	if (error) {
+		if (dstr->d_aclexport)
+			free(dstr->d_aclexport);
+	} else {
+		aclexport = dstr->d_aclexport;
+	}
 	free(dstr);
 	return (aclexport);
-
-
-
-
 }
 
 char *
@@ -757,50 +805,46 @@ aclfromtext(char *aclstr, int *aclcnt)
 }
 
 
-static char *
-strappend(char *where, char *newstr)
-{
-	(void) strcat(where, newstr);
-	return (where + strlen(newstr));
-}
-
-static char *
-convert_perm(char *where, o_mode_t perm)
-{
-	if (perm & S_IROTH)
-		where = strappend(where, "r");
-	else
-		where = strappend(where, "-");
-	if (perm & S_IWOTH)
-		where = strappend(where, "w");
-	else
-		where = strappend(where, "-");
-	if (perm & S_IXOTH)
-		where = strappend(where, "x");
-	else
-		where = strappend(where, "-");
-	/* perm is the last field */
-	return (where);
-}
-
 /*
- * Callers should check the return code as this routine may change the string
- * pointer in dynaclstr.
+ * returns a character position index of the start of the newly
+ * appended string.  Returns -1 if operation couldn't be completed.
  */
 static int
-increase_length(struct dynaclstr *dacl, size_t increase)
+str_append(dynaclstr_t *dstr, char *newstr)
 {
-	char *tptr;
-	size_t newsize;
+	size_t len = strlen(newstr);
 
-	newsize = dacl->bufsize + increase;
-	tptr = realloc(dacl->aclexport, newsize);
-	if (tptr != NULL) {
-		dacl->aclexport = tptr;
-		dacl->bufsize = newsize;
-		return (1);
-	} else
-		return (0);
+	if ((len + dstr->d_pos) >= dstr->d_bufsize) {
+		dstr->d_aclexport = realloc(dstr->d_aclexport,
+		    dstr->d_bufsize + len + 1);
+		if (dstr->d_aclexport == NULL)
+			return (1);
+		dstr->d_bufsize += len;
+	}
+	(void) strcat(&dstr->d_aclexport[dstr->d_pos], newstr);
+	dstr->d_pos += len;
+	return (0);
+}
+
+static int
+aclent_perm_txt(dynaclstr_t *dstr, o_mode_t perm)
+{
+	char buf[4];
+
+	if (perm & S_IROTH)
+		buf[0] = 'r';
+	else
+		buf[0] = '-';
+	if (perm & S_IWOTH)
+		buf[1] = 'w';
+	else
+		buf[1] = '-';
+	if (perm & S_IXOTH)
+		buf[2] = 'x';
+	else
+		buf[2] = '-';
+	buf[3] = '\0';
+	return (str_append(dstr, buf));
 }
 
 /*
@@ -836,62 +880,70 @@ ace_acltotext(acl_t *aceaclp, int flags)
 {
 	ace_t		*aclp = aceaclp->acl_aclp;
 	int		aclcnt = aceaclp->acl_cnt;
-	char		*aclexport;
-	char		*endp;
 	int		i;
-	char		id[ID_STR_MAX], *idstr;
+	int		error = 0;
 	int		isdir = (aceaclp->acl_flags & ACL_IS_DIR);
+	dynaclstr_t 	*dstr;
+	char		*aclexport;
 
 	if (aclp == NULL)
 		return (NULL);
-	if ((aclexport = malloc(aclcnt * ACE_ENTRY_SIZE)) == NULL)
-		return (NULL);
 
-	aclexport[0] = '\0';
-	endp = aclexport;
+	if ((dstr = malloc(sizeof (dynaclstr_t))) == NULL)
+		return (NULL);
+	dstr->d_bufsize = aclcnt * ACL_ENTRY_SIZE;
+	if ((dstr->d_aclexport = malloc(dstr->d_bufsize)) == NULL) {
+		free(dstr);
+		return (NULL);
+	}
+	*dstr->d_aclexport = '\0';
+	dstr->d_pos = 0;
+
 	for (i = 0; i < aclcnt; i++, aclp++) {
 
-		(void) ace_type_txt(endp, &endp, aclp, flags);
-		*endp++ = ':';
-		*endp = '\0';
-		(void) ace_perm_txt(endp, &endp, aclp->a_access_mask,
-		    aclp->a_flags, isdir, flags);
-		*endp++ = ':';
-		*endp = '\0';
-		(void) ace_inherit_txt(endp, &endp, aclp->a_flags, flags);
-		if (flags & ACL_COMPACT_FMT || aclp->a_flags &
-		    (ACE_FILE_INHERIT_ACE | ACE_DIRECTORY_INHERIT_ACE |
-		    (ACE_INHERIT_ONLY_ACE | ACE_NO_PROPAGATE_INHERIT_ACE |
-		    ACE_INHERITED_ACE | ACE_SUCCESSFUL_ACCESS_ACE_FLAG |
-		    ACE_FAILED_ACCESS_ACE_FLAG))) {
-			*endp++ = ':';
-			*endp = '\0';
-		}
-		(void) ace_access_txt(endp, &endp, aclp->a_type);
+		if (error = ace_type_txt(dstr, aclp, flags))
+			break;
+		if (error = ace_perm_txt(dstr, aclp->a_access_mask,
+		    aclp->a_flags, isdir, flags))
+			break;
+		if (error = ace_inherit_txt(dstr, aclp->a_flags, flags))
+			break;
+		if (error = ace_access_txt(dstr, aclp->a_type))
+			break;
 
 		if ((flags & ACL_APPEND_ID) &&
 		    (((aclp->a_flags & ACE_TYPE_FLAGS) == 0) ||
 		    ((aclp->a_flags & ACE_TYPE_FLAGS) ==
 		    ACE_IDENTIFIER_GROUP))) {
-			*endp++ = ':';
-			*endp = '\0';
+			char id[ID_STR_MAX], *idstr;
+
+			if (error = str_append(dstr, ":"))
+				break;
 			id[ID_STR_MAX -1] = '\0'; /* null terminate buffer */
-			idstr = lltostr(aclp->a_who, &id[ID_STR_MAX - 1]);
-			strcpy(endp, idstr);
-			endp += strlen(idstr);
+			idstr = lltostr((aclp->a_who > MAXUID &&
+			    !(flags & ACL_NORESOLVE)) ? UID_NOBODY :
+			    aclp->a_who, &id[ID_STR_MAX - 1]);
+			if (error = str_append(dstr, idstr))
+				break;
 		}
 		if (i < aclcnt - 1) {
-			*endp++ = ',';
-			*(endp + 1) = '\0';
+			if (error = str_append(dstr, ","))
+				break;
 		}
 	}
+	if (error) {
+		if (dstr->d_aclexport)
+			free(dstr->d_aclexport);
+	} else {
+		aclexport = dstr->d_aclexport;
+	}
+	free(dstr);
 	return (aclexport);
 }
 
 char *
 acl_totext(acl_t *aclp, int flags)
 {
-
 	char *txtp;
 
 	if (aclp == NULL)
@@ -952,22 +1004,41 @@ ace_compact_printacl(acl_t *aclp)
 {
 	int cnt;
 	ace_t *acep;
-	char *endp;
-	char buf[ACE_ENTRY_SIZE];
+	dynaclstr_t *dstr;
+	int len;
 
+	if ((dstr = malloc(sizeof (dynaclstr_t))) == NULL)
+		return;
+	dstr->d_bufsize = ACE_ENTRY_SIZE;
+	if ((dstr->d_aclexport = malloc(dstr->d_bufsize)) == NULL) {
+		free(dstr);
+		return;
+	}
+	*dstr->d_aclexport = '\0';
+
+	dstr->d_pos = 0;
 	for (cnt = 0, acep = aclp->acl_aclp;
 	    cnt != aclp->acl_cnt; cnt++, acep++) {
-		buf[0] = '\0';
-		(void) printf("    %14s:", ace_type_txt(buf, &endp, acep, 0));
-		(void) printf("%s:", ace_perm_txt(endp, &endp,
-		    acep->a_access_mask, acep->a_flags,
-		    aclp->acl_flags & ACL_IS_DIR, ACL_COMPACT_FMT));
-		(void) printf("%s:",
-		    ace_inherit_txt(endp, &endp, acep->a_flags,
-		    ACL_COMPACT_FMT));
-		(void) printf("%s\n", ace_access_txt(endp, &endp,
-		    acep->a_type));
+		dstr->d_aclexport[0] = '\0';
+		dstr->d_pos = 0;
+
+		if (ace_type_txt(dstr, acep, 0))
+			break;
+		len = strlen(&dstr->d_aclexport[0]);
+		if (ace_perm_txt(dstr, acep->a_access_mask, acep->a_flags,
+		    aclp->acl_flags & ACL_IS_DIR, ACL_COMPACT_FMT))
+			break;
+		if (ace_inherit_txt(dstr, acep->a_flags, ACL_COMPACT_FMT))
+			break;
+		if (ace_access_txt(dstr, acep->a_type) == -1)
+			break;
+		(void) printf("    %20.*s%s\n", len, dstr->d_aclexport,
+		    &dstr->d_aclexport[len]);
 	}
+
+	if (dstr->d_aclexport)
+		free(dstr->d_aclexport);
+	free(dstr);
 }
 
 static void

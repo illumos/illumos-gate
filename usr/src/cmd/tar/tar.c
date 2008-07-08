@@ -7962,8 +7962,9 @@ put_extra_attributes(char *longname, char *shortname, char *longattrname,
 		/* append security attributes if any */
 		if (aclp != NULL) {
 			(void) append_secattr(&secinfo, &len, acl_cnt(aclp),
-			    acl_totext(aclp, ACL_APPEND_ID | ACL_COMPACT_FMT),
-			    (acl_type(aclp) == ACLENT_T) ? UFSD_ACL : ACE_ACL);
+			    acl_totext(aclp, ACL_APPEND_ID | ACL_COMPACT_FMT |
+			    ACL_SID_FMT), (acl_type(aclp) == ACLENT_T) ?
+			    UFSD_ACL : ACE_ACL);
 		}
 
 		if (Tflag) {

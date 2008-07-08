@@ -74,7 +74,7 @@
     ACE_WRITE_ACL|ACE_DELETE|ACE_DELETE_CHILD|ACE_SYNCHRONIZE)
 
 #define	WRITE_MASK (WRITE_MASK_DATA|ACE_WRITE_ATTRIBUTES|ACE_WRITE_ACL|\
-    ACE_WRITE_OWNER)
+    ACE_WRITE_OWNER|ACE_DELETE|ACE_DELETE_CHILD)
 
 #define	OGE_CLEAR	(ACE_READ_DATA|ACE_LIST_DIRECTORY|ACE_WRITE_DATA| \
     ACE_ADD_FILE|ACE_APPEND_DATA|ACE_ADD_SUBDIRECTORY|ACE_EXECUTE)
@@ -432,16 +432,8 @@ zfs_ace_valid(vtype_t obj_type, zfs_acl_t *aclp, uint16_t type, uint16_t iflags)
 		aclp->z_hints |= ZFS_ACL_OBJ_ACE;
 	}
 
-	/*
-	 * Only directories should have inheritance flags.
-	 */
-	if (obj_type != VDIR && (iflags &
-	    (ACE_FILE_INHERIT_ACE|ACE_DIRECTORY_INHERIT_ACE|
-	    ACE_INHERIT_ONLY_ACE|ACE_NO_PROPAGATE_INHERIT_ACE))) {
-		return (B_FALSE);
-	}
-
-	if (iflags & (ACE_FILE_INHERIT_ACE|ACE_DIRECTORY_INHERIT_ACE))
+	if (obj_type == VDIR &&
+	    (iflags & (ACE_FILE_INHERIT_ACE|ACE_DIRECTORY_INHERIT_ACE)))
 		aclp->z_hints |= ZFS_INHERIT_ACE;
 
 	if (iflags & (ACE_INHERIT_ONLY_ACE|ACE_NO_PROPAGATE_INHERIT_ACE)) {
@@ -1844,7 +1836,8 @@ zfs_perm_init(znode_t *zp, znode_t *parent, int flag,
 
 	if (aclp == NULL) {
 		mutex_enter(&parent->z_lock);
-		if (parent->z_phys->zp_flags & ZFS_INHERIT_ACE) {
+		if ((ZTOV(parent)->v_type == VDIR &&
+		    parent->z_phys->zp_flags & ZFS_INHERIT_ACE)) {
 			mutex_enter(&parent->z_acl_lock);
 			VERIFY(0 == zfs_acl_node_read(parent, &paclp, B_FALSE));
 			mutex_exit(&parent->z_acl_lock);
@@ -2230,7 +2223,7 @@ zfs_zaccess_common(znode_t *zp, uint32_t v4_mode, uint32_t *working_mode,
 	while (acep = zfs_acl_next_ace(aclp, acep, &who, &access_mask,
 	    &iflags, &type)) {
 
-		if (iflags & ACE_INHERIT_ONLY_ACE)
+		if (ZTOV(zp)->v_type == VDIR && (iflags & ACE_INHERIT_ONLY_ACE))
 			continue;
 
 		entry_type = (iflags & ACE_TYPE_FLAGS);

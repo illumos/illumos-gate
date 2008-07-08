@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,6 +156,16 @@ typedef struct ace_object {
     ACE_WRITE_ATTRIBUTES|ACE_DELETE|ACE_READ_ACL|ACE_WRITE_ACL| \
     ACE_WRITE_OWNER|ACE_SYNCHRONIZE)
 
+#define	ACE_READ_PERMS	(ACE_READ_DATA|ACE_READ_ACL|ACE_READ_ATTRIBUTES| \
+    ACE_READ_NAMED_ATTRS)
+
+#define	ACE_WRITE_PERMS	(ACE_WRITE_DATA|ACE_APPEND_DATA|ACE_WRITE_ATTRIBUTES| \
+    ACE_WRITE_NAMED_ATTRS)
+
+#define	ACE_MODIFY_PERMS (ACE_READ_DATA|ACE_LIST_DIRECTORY|ACE_WRITE_DATA| \
+    ACE_ADD_FILE|ACE_APPEND_DATA|ACE_ADD_SUBDIRECTORY|ACE_READ_NAMED_ATTRS| \
+    ACE_WRITE_NAMED_ATTRS|ACE_EXECUTE|ACE_DELETE_CHILD|ACE_READ_ATTRIBUTES| \
+    ACE_WRITE_ATTRIBUTES|ACE_DELETE|ACE_READ_ACL|ACE_SYNCHRONIZE)
 /*
  * The following flags are supported by both NFSv4 ACLs and ace_t.
  */
@@ -219,6 +229,7 @@ typedef struct ace_object {
 #define	ACL_APPEND_ID	0x1 	/* append uid/gid to user/group entries */
 #define	ACL_COMPACT_FMT	0x2 	/* build ACL in ls -V format */
 #define	ACL_NORESOLVE	0x4	/* don't do name service lookups */
+#define	ACL_SID_FMT	0x8	/* use usersid/groupsid when appropriate */
 
 /*
  * Legacy aclcheck errors for aclent_t ACLs

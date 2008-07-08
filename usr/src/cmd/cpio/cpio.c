@@ -7568,7 +7568,8 @@ append_secattr(
 	case ACLENT_T:
 	case ACE_T:
 		/* LINTED alignment */
-		attrtext = acl_totext(aclp, ACL_APPEND_ID | ACL_COMPACT_FMT);
+		attrtext = acl_totext(aclp, ACL_APPEND_ID | ACL_COMPACT_FMT |
+		    ACL_SID_FMT);
 		if (attrtext == NULL) {
 			(void) fprintf(stderr, "acltotext failed\n");
 			return (-1);

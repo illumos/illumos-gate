@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,8 @@
 /*
  * chgrp [-fhR] gid file ...
  * chgrp -R [-f] [-H|-L|-P] gid file ...
+ * chgrp -s [-fhR] groupsid file ...
+ * chgrp -s -R [-f] [-H|-L|-P] groupsid file ...
  */
 
 #include <stdio.h>
@@ -58,6 +60,7 @@
 #include <libcmdutils.h>
 #include <errno.h>
 #include <strings.h>
+#include <aclutils.h>
 
 static struct group	*gr;
 static struct stat	stbuf;
@@ -68,7 +71,8 @@ static int		hflag = 0,
 			rflag = 0,
 			Hflag = 0,
 			Lflag = 0,
-			Pflag = 0;
+			Pflag = 0,
+			sflag = 0;
 static int		status = 0;	/* total number of errors received */
 
 static avl_tree_t	*tree;		/* search tree to store inode data */
@@ -145,7 +149,7 @@ main(int argc, char *argv[])
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "RhfHLP")) != EOF)
+	while ((c = getopt(argc, argv, "RhfHLPs")) != EOF)
 		switch (c) {
 			case 'R':
 				rflag++;
@@ -175,6 +179,9 @@ main(int argc, char *argv[])
 				Hflag = Lflag = 0;
 				Pflag++;
 				break;
+			case 's':
+				sflag++;
+				break;
 			default:
 				usage();
 		}
@@ -192,13 +199,19 @@ main(int argc, char *argv[])
 		usage();
 	}
 
-	if ((gr = getgrnam(argv[0])) != NULL) {
+	if (sflag) {
+		if (sid_to_id(argv[0], B_FALSE, &gid)) {
+			(void) fprintf(stderr, gettext(
+			    "chgrp: invalid group sid %s\n"), argv[0]);
+			exit(2);
+		}
+	} else if ((gr = getgrnam(argv[0])) != NULL) {
 		gid = gr->gr_gid;
 	} else {
 		if (isnumber(argv[0])) {
 			errno = 0;
 			/* gid is an int */
-			gid = (gid_t)strtol(argv[0], NULL, 10);
+			gid = (gid_t)strtoul(argv[0], NULL, 10);
 			if (errno != 0) {
 				if (errno == ERANGE) {
 					(void) fprintf(stderr, gettext(
@@ -213,7 +226,7 @@ main(int argc, char *argv[])
 		} else {
 			(void) fprintf(stderr, "chgrp: ");
 			(void) fprintf(stderr, gettext("unknown group: %s\n"),
-				argv[0]);
+			    argv[0]);
 			exit(2);
 		}
 	}
@@ -539,6 +552,8 @@ usage(void)
 	(void) fprintf(stderr, gettext(
 	    "usage:\n"
 	    "\tchgrp [-fhR] group file ...\n"
-	    "\tchgrp -R [-f] [-H|-L|-P] group file ...\n"));
+	    "\tchgrp -R [-f] [-H|-L|-P] group file ...\n"
+	    "\tchgrp -s [-fhR] groupsid file ...\n"
+	    "\tchgrp -s -R [-f] [-H|-L|-P] groupsid file ...\n"));
 	exit(2);
 }

@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,9 +42,10 @@ extern acl_t *yyacl;
 }
 
 
-%token USER_TOK GROUP_TOK MASK_TOK OTHER_TOK OWNERAT_TOK 
-%token GROUPAT_TOK EVERYONEAT_TOK DEFAULT_USER_TOK DEFAULT_GROUP_TOK
-%token DEFAULT_MASK_TOK DEFAULT_OTHER_TOK COLON COMMA NL SLASH 
+%token USER_TOK USER_SID_TOK GROUP_TOK GROUP_SID_TOK MASK_TOK OTHER_TOK
+%token OWNERAT_TOK GROUPAT_TOK EVERYONEAT_TOK DEFAULT_USER_TOK 
+%token DEFAULT_GROUP_TOK DEFAULT_MASK_TOK DEFAULT_OTHER_TOK
+%token COLON COMMA NL SLASH
 %token <str> IDNAME PERM_TOK INHERIT_TOK
 %token <val> ID ERROR ACE_PERM ACE_INHERIT ENTRY_TYPE ACCESS_TYPE
 
@@ -151,13 +152,12 @@ acl_entry: ace
 ace:	entry_type idname ace_perms access_type
 	{
 		int error;
-		int id;
+		uid_t id;
 		int mask;
 
 		error = get_id($1, $2, &id);
 		if (error) {
-			acl_error(dgettext(TEXT_DOMAIN,
-			    "Invalid user %s specified.\n"), $2);
+			bad_entry_type($1, $2);
 			yycleanup();
 			return (EACL_INVALID_USER_GROUP);
 		}
@@ -175,7 +175,7 @@ ace:	entry_type idname ace_perms access_type
 	| entry_type idname ace_perms access_type COLON id
 	{
 		int error;
-		int id;
+		uid_t id;
 
 		if (yyinteractive) {
 			acl_error(dgettext(TEXT_DOMAIN,
@@ -201,12 +201,11 @@ ace:	entry_type idname ace_perms access_type
 	| entry_type idname ace_perms iflags access_type 
 	{
 		int error;
-		int id;
+		uid_t id;
 
 		error = get_id($1, $2, &id);
 		if (error) {
-			acl_error(dgettext(TEXT_DOMAIN,
-			    "Invalid user %s specified.\n"), $2);
+			bad_entry_type($1, $2);
 			yycleanup();
 			return (EACL_INVALID_USER_GROUP);
 		}
@@ -224,7 +223,7 @@ ace:	entry_type idname ace_perms access_type
 	| entry_type idname ace_perms iflags access_type COLON id
 	{
 		int error;
-		int  id;
+		uid_t  id;
 
 		if (yyinteractive) {
 			acl_error(dgettext(TEXT_DOMAIN,
@@ -305,12 +304,11 @@ ace:	entry_type idname ace_perms access_type
 aclent: entry_type idname aclent_perm	/* user or group */
 	{
 		int error;
-		int id;
+		uid_t id;
 
 		error = get_id($1, $2, &id);
 		if (error) {
-			acl_error(dgettext(TEXT_DOMAIN,
-			    "Invalid user '%s' specified.\n"), $2);
+			bad_entry_type($1, $2);
 			yycleanup();
 			return (EACL_INVALID_USER_GROUP);
 		}
@@ -368,7 +366,7 @@ aclent: entry_type idname aclent_perm	/* user or group */
 	| entry_type idname aclent_perm COLON id 	/* user or group */
 	{	
 		int error;
-		int id;
+		uid_t id;
 
 		if (yyinteractive) {
 			acl_error(dgettext(TEXT_DOMAIN,
@@ -565,3 +563,32 @@ entry_type: ENTRY_TYPE {$$ = $1;}
 		yycleanup();
 		return ($1);
 	}
+
+%%
+static void
+bad_entry_type(int toketype, char *str)
+{
+	switch(toketype) {
+	case USER_TOK:
+	case DEFAULT_USER_TOK:
+		acl_error(dgettext(TEXT_DOMAIN,
+		    "Invalid user %s specified.\n"), str);
+		break;
+
+	case GROUP_TOK:
+	case DEFAULT_GROUP_TOK:
+		acl_error(dgettext(TEXT_DOMAIN,
+		    "Invalid group %s specified.\n"), str);
+		break;
+	
+	case USER_SID_TOK:
+		acl_error(dgettext(TEXT_DOMAIN,
+		    "Invalid user SID %s specified.\n"), str);
+		break;
+
+	case GROUP_SID_TOK:
+		acl_error(dgettext(TEXT_DOMAIN,
+		    "Invalid group SID %s specified.\n"), str);
+	}
+
+}

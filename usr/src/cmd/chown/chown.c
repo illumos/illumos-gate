@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,8 +34,10 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * chown [-fhR] uid [:gid] file ...
- * chown -R [-f] [-H|-L|-P] uid [:gid] file ...
+ * chown [-fhR] uid[:gid] file ...
+ * chown -R [-f] [-H|-L|-P] uid[:gid] file ...
+ * chown -s [-fhR] ownersid[:groupsid] file ...
+ * chown -s -R [-f] [-H|-L|-P] ownersid[:groupsid] file ...
  */
 
 #include <stdio.h>
@@ -52,6 +54,7 @@
 #include <locale.h>
 #include <errno.h>
 #include <libcmdutils.h>
+#include <aclutils.h>
 
 static struct		passwd	*pwd;
 static struct		group	*grp;
@@ -64,7 +67,8 @@ static int		hflag = 0,
 			fflag = 0,
 			Hflag = 0,
 			Lflag = 0,
-			Pflag = 0;
+			Pflag = 0,
+			sflag = 0;
 static avl_tree_t	*tree;
 
 static int		Perror(char *);
@@ -131,7 +135,7 @@ main(int argc, char *argv[])
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((ch = getopt(argc, argv, "hRfHLP")) != EOF) {
+	while ((ch = getopt(argc, argv, "hRfHLPs")) != EOF) {
 		switch (ch) {
 		case 'h':
 			hflag++;
@@ -166,6 +170,10 @@ main(int argc, char *argv[])
 			Pflag++;
 			break;
 
+		case 's':
+			sflag++;
+			break;
+
 		default:
 			errflg++;
 			break;
@@ -191,7 +199,15 @@ main(int argc, char *argv[])
 	 */
 	if ((grpp = strchr(argv[0], ':')) != NULL) {
 		*grpp++ = 0;
-		if ((grp = getgrnam(grpp)) != NULL) {
+
+		if (sflag) {
+			if (sid_to_id(grpp, B_FALSE, &gid)) {
+				(void) fprintf(stderr, gettext(
+				    "chown: invalid owning group sid %s\n"),
+				    grpp);
+				exit(2);
+			}
+		} else if ((grp = getgrnam(grpp)) != NULL) {
 			gid = grp->gr_gid;
 		} else {
 			if (isnumber(grpp)) {
@@ -210,13 +226,19 @@ main(int argc, char *argv[])
 				}
 			} else {
 				(void) fprintf(stderr, gettext(
-					"chown: unknown group id %s\n"), grpp);
+				    "chown: unknown group id %s\n"), grpp);
 				exit(2);
 			}
 		}
 	}
 
-	if ((pwd = getpwnam(argv[0])) != NULL) {
+	if (sflag) {
+		if (sid_to_id(argv[0], B_TRUE, &uid)) {
+			(void) fprintf(stderr, gettext(
+			    "chown: invalid owner sid %s\n"), argv[0]);
+			exit(2);
+		}
+	} else if ((pwd = getpwnam(argv[0])) != NULL) {
 		uid = pwd->pw_uid;
 	} else {
 		if (isnumber(argv[0])) {
@@ -483,7 +505,7 @@ chownr(char *dir, uid_t uid, gid_t gid)
 	(void) closedir(dirp);
 	if (chdir(savedir) < 0) {
 		(void) fprintf(stderr, gettext(
-			"chown: can't change back to %s\n"), savedir);
+		    "chown: can't change back to %s\n"), savedir);
 		exit(255);
 	}
 }
@@ -515,6 +537,8 @@ usage()
 	(void) fprintf(stderr, gettext(
 	    "usage:\n"
 	    "\tchown [-fhR] owner[:group] file...\n"
-	    "\tchown -R [-f] [-H|-L|-P] owner[:group] file...\n"));
+	    "\tchown -R [-f] [-H|-L|-P] owner[:group] file...\n"
+	    "\tchown -s [-fhR] ownersid[:groupsid] file...\n"
+	    "\tchown -s -R [-f] [-H|-L|-P] ownersid[:groupsid] file...\n"));
 	exit(2);
 }

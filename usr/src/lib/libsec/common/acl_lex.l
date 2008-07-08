@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,6 +27,7 @@
 %{
 #include <sys/acl.h>
 #include <aclutils.h>
+#include <idmap.h>
 #include <errno.h>
 #include "acl.tab.h"
 
@@ -70,6 +71,8 @@ struct yystrings {
 
 %e 1500
 %s TS NS PS AIS AS US ES
+%p 5000
+
 /*
  * TS = type state
  * NS = name state
@@ -92,6 +95,11 @@ INHERIT_STR [fdinFSI-]+
 				yylval.val = USER_TOK;
 				return (ENTRY_TYPE);
 			}
+<TS>usersid:		{
+				BEGIN NS;
+				yylval.val = USER_SID_TOK;
+				return (ENTRY_TYPE);
+			}
 <TS>owner@:		{
 				BEGIN PS;
 				yylval.val = OWNERAT_TOK;
@@ -110,6 +118,16 @@ INHERIT_STR [fdinFSI-]+
 <TS>group:		{
 				BEGIN NS;
 				yylval.val = GROUP_TOK;
+				return (ENTRY_TYPE);
+			}
+<TS>groupsid:		{
+				BEGIN NS;
+				yylval.val = GROUP_SID_TOK;
+				return (ENTRY_TYPE);
+			}
+<TS>sid:		{
+				BEGIN NS;
+				yylval.val = GROUP_SID_TOK;
 				return (ENTRY_TYPE);
 			}
 <TS>mask:		{
@@ -307,6 +325,22 @@ INHERIT_STR [fdinFSI-]+
 			}
 <PS>synchronize/[:/,]	{
 				yylval.val = ACE_SYNCHRONIZE;
+				return (ACE_PERM);
+			}
+<PS>read_set/[:/,]	{
+				yylval.val = ACE_READ_PERMS;
+				return (ACE_PERM);
+			}
+<PS>write_set/[:/,]	{
+				yylval.val = ACE_WRITE_PERMS;
+				return (ACE_PERM);
+			}
+<PS>modify_set/[:/,]	{
+				yylval.val = ACE_MODIFY_PERMS;
+				return (ACE_PERM);
+			}
+<PS>full_set/[:/,]	{
+				yylval.val = ACE_ALL_PERMS;
 				return (ACE_PERM);
 			}
 <PS>{PERM_STR}/[:,\n]	{
@@ -792,9 +826,11 @@ ace_entry_type(int type)
 	int ret = -1;
 	switch (type) {
 		case USER_TOK:
+		case USER_SID_TOK:
 			ret = 0;
 			break;
 		case GROUP_TOK:
+		case GROUP_SID_TOK:
 			ret = ACE_IDENTIFIER_GROUP;
 			break;
 		case OWNERAT_TOK:
@@ -856,7 +892,7 @@ aclent_entry_type(int type, int owning, int *ret)
  * convert string into numeric id.
  */
 static int
-acl_str_to_id(char *str, int *id)
+acl_str_to_id(char *str, uid_t *id)
 {
 	char *end;
 	uid_t value;
@@ -876,36 +912,48 @@ acl_str_to_id(char *str, int *id)
  * determine either uid/gid for given entry type
  */
 int
-get_id(int entry_type, char *name, int *id)
+get_id(int entry_type, char *name, uid_t *id)
 {
 	struct passwd *pw;
 	struct group *gr;
-	int error;
+	int error = 0;
 
-	/*
-	 * First see if uid/gid is an all-numeric value
-	 * otherwise, try getpwnam/getgrnam.
-	 */
-	error = acl_str_to_id(name, id);
+	switch (entry_type) {
+	case USER_TOK:
+	case DEFAULT_USER_TOK:
+		if ((error = acl_str_to_id(name, id)) == 0)
+			break;
+		pw = getpwnam(name);
+		if (pw) {
+			*id = pw->pw_uid;
+			error = 0;
+		} 
+		break;
 
-	if (error != 0) {
-		if (entry_type == USER_TOK || entry_type == DEFAULT_USER_TOK) {
-			pw = getpwnam(name);
-			if (pw) {
-				*id = pw->pw_uid;
-				error = 0;
-			} 
-		} else {
-			gr = getgrnam(name);
-			if (gr) {
-				*id = gr->gr_gid;
-				error = 0;
-			} 
-		}
-	} 
+	case GROUP_TOK:
+	case DEFAULT_GROUP_TOK:
+		if ((error = acl_str_to_id(name, id)) == 0)
+			break;
+		gr = getgrnam(name);
+		if (gr) {
+			*id = gr->gr_gid;
+			error = 0;
+		} 
+		break;
+	case USER_SID_TOK:
+		if (sid_to_id(name, B_TRUE, id))
+			error = EACL_INVALID_USER_GROUP;
+		break;
+
+	case GROUP_SID_TOK:
+		if (sid_to_id(name, B_FALSE, id))
+			error = EACL_INVALID_USER_GROUP;
+		break;
+	}
 
 	return (error);
 }
+
 /*
  * reset beginning state to TS and set character position
  * back to zero.

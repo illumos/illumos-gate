@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,7 +46,7 @@ LIBS =		$(DYNLIB) $(LINTLIB)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR) -I. -I../../../common/acl
-LDLIBS += -lc -lavl
+LDLIBS += -lc -lavl -lidmap
 
 # install this library in the root filesystem
 include ../../Makefile.rootfs

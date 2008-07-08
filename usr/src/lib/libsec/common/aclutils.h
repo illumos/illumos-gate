@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,16 +81,18 @@ struct acl_perm_type {
 #define	READ_DIR_TXT	"list_directory/read_data/"
 #define	ADD_DIR_TXT	"add_subdirectory/append_data/"
 #define	ADD_FILE_TXT	"add_file/write_data/"
-#define	SYNCHRONIZE_TXT "synchronize"	/* not slash on this one */
+#define	SYNCHRONIZE_TXT "synchronize/"
 
 /*
- * ace_t's flags
+ * ace_t's entry types
  */
-#define	OWNERAT_TXT	"owner@"
-#define	GROUPAT_TXT	"group@"
-#define	EVERYONEAT_TXT	"everyone@"
+#define	OWNERAT_TXT	"owner@:"
+#define	GROUPAT_TXT	"group@:"
+#define	EVERYONEAT_TXT	"everyone@:"
 #define	GROUP_TXT	"group:"
 #define	USER_TXT	"user:"
+#define	USERSID_TXT	"usersid:"
+#define	GROUPSID_TXT	"groupsid:"
 
 /*
  * ace_t's access types
@@ -101,11 +103,23 @@ struct acl_perm_type {
 #define	AUDIT_TXT	"audit"
 #define	UNKNOWN_TXT	"unknown"
 
+/*
+ * ace_t's inheritance types
+ */
+
+#define	FILE_INHERIT_TXT	"file_inherit/"
+#define	DIR_INHERIT_TXT		"dir_inherit/"
+#define	NO_PROPAGATE_TXT	"no_propagate/"
+#define	INHERIT_ONLY_TXT	"inherit_only/"
+#define	INHERITED_ACE_TXT	"inherited/"
+#define	SUCCESSFUL_ACCESS_TXT	"successful_access/"
+#define	FAILED_ACCESS_TXT	"failed_access/"
+
 extern char *yybuf;
 extern acl_t *yyacl;
 
 extern int yyerror(const char *);
-extern int get_id(int entry_type, char *name, int *id);
+extern int get_id(int entry_type, char *name, uid_t *id);
 extern int ace_entry_type(int entry_type);
 extern int aclent_entry_type(int type, int owning, int *ret);
 extern int ace_perm_mask(struct acl_perm_type *, uint32_t *mask);
@@ -127,6 +141,7 @@ extern int yyparse(void);
 extern void yyreset(void);
 extern void yycleanup(void);
 extern acl_t *acl_to_aclp(enum acl_type, void *, int);
+extern int sid_to_id(char *, boolean_t, uid_t *);
 
 #ifdef	__cplusplus
 }

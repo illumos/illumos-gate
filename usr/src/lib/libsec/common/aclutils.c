@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@
 #include <aclutils.h>
 #include <sys/avl.h>
 #include <acl_common.h>
+#include <idmap.h>
 
 #define	ACL_PATH	0
 #define	ACL_FD		1
@@ -518,11 +519,9 @@ acl_removeentries(acl_t *acl, acl_t *removeacl, int start_slot, int flag)
 				if (flag == ACL_REMOVE_FIRST)
 					break;
 				/*
-				 * List has changed, restart search from
-				 * beginning.
+				 * List has changed, just continue so this
+				 * slot gets checked with it's new contents.
 				 */
-				acl_entry = acl->acl_aclp;
-				j = 0;
 				continue;
 			}
 			acl_entry = ((char *)acl_entry + acl->acl_entry_size);
@@ -530,6 +529,7 @@ acl_removeentries(acl_t *acl, acl_t *removeacl, int start_slot, int flag)
 				break;
 			}
 		}
+		remove_entry = (char *)remove_entry + removeacl->acl_entry_size;
 	}
 
 	return ((found == 0) ? EACL_NO_ACL_ENTRY : 0);
@@ -735,4 +735,61 @@ acl_error(const char *fmt, ...)
 	va_start(va, fmt);
 	(void) vfprintf(stderr, fmt, va);
 	va_end(va);
+}
+
+int
+sid_to_id(char *sid, boolean_t user, uid_t *id)
+{
+	idmap_handle_t *idmap_hdl = NULL;
+	idmap_get_handle_t *get_hdl = NULL;
+	char *rid_start = NULL;
+	idmap_stat status;
+	char *end;
+	int error = 0;
+	char *domain_start;
+
+
+	if ((domain_start = strchr(sid, '@')) == NULL) {
+		idmap_rid_t rid;
+
+		if ((rid_start = strrchr(sid, '-')) == NULL)
+			return (-1);
+		*rid_start++ = '\0';
+		errno = 0;
+		rid = strtoul(rid_start--, &end, 10);
+		if (errno == 0 && *end == '\0') {
+			if (idmap_init(&idmap_hdl) == 0 &&
+			    idmap_get_create(idmap_hdl, &get_hdl) == 0) {
+				if (user)
+					error = idmap_get_uidbysid(get_hdl,
+					    sid, rid, 0, id, &status);
+				else
+					error = idmap_get_gidbysid(get_hdl,
+					    sid, rid, 0, id, &status);
+			}
+		} else {
+			error = -1;
+		}
+		if (error == 0) {
+			error = idmap_get_mappings(get_hdl);
+			if (error == 0 && status != 0)
+				error = -1;
+		}
+		if (get_hdl)
+			idmap_get_destroy(get_hdl);
+		if (idmap_hdl)
+			(void) idmap_fini(idmap_hdl);
+		*rid_start = '-'; /* putback character removed earlier */
+	} else {
+		char *name = sid;
+		*domain_start++ = '\0';
+
+		if (user)
+			error = idmap_getuidbywinname(name, domain_start, id);
+		else
+			error = idmap_getgidbywinname(name, domain_start, id);
+		*--domain_start = '@';
+	}
+
+	return (error);
 }
