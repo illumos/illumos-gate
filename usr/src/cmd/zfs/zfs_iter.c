@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -296,7 +296,7 @@ zfs_sort(const void *larg, const void *rarg, void *data)
 
 		if (lstr)
 			ret = strcmp(lstr, rstr);
-		if (lnum < rnum)
+		else if (lnum < rnum)
 			ret = -1;
 		else if (lnum > rnum)
 			ret = 1;
