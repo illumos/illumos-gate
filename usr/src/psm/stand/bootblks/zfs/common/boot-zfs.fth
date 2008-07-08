@@ -33,7 +33,9 @@ copyright: Copyright 2006 Sun Microsystems, Inc. All Rights Reserved
 create doheaders
 create bigbootblk
 d# 8192  constant  /fs-fcode
-d# 8192  constant  fs-offset
+
+\ Set the offset to the correct zfs boot block area. This area is at offset 512K
+d# 512 d# 1024 * constant  fs-offset
 
 \ for [ifdef] zfs
 create zfs

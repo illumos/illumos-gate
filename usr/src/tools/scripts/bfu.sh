@@ -7442,11 +7442,18 @@ mondo_loop() {
 		case $target_isa in
 		    sparc)
 			if [[ "$rootfstype" = zfs ]]; then
+				print "Extracting usr/sbin/installboot for " \
+				    "zfs boot block installation ... \c" |
+				    tee -a $EXTRACT_LOG
+				do_extraction $cpiodir/generic.usr$ZFIX \
+				    'usr/sbin/installboot' | \
+				    tee -a $EXTRACT_LOG
 				cd $usr/platform/$karch/lib/fs/zfs
 				get_rootdev_list | while read physlice
 				do
 					print "Installing bootblk on $physlice."
-                                        installboot -F zfs ./bootblk $physlice
+                                        $usr/sbin/installboot -F zfs ./bootblk \
+					    $physlice
                                 done
 			elif [[ "$rootslice" = /dev/rdsk/* ]]; then
 				print "Installing boot block on $rootslice."
