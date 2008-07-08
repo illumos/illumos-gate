@@ -35,6 +35,7 @@
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_share.h>
 
 /* SMB kernel module's door operation table */
 smb_kdr_op_t smb_kdoorsrv_optab[] =
@@ -97,7 +98,7 @@ smb_kdr_op_users(char *argp, size_t arg_size, size_t *rbufsize, int *errno)
 		*rbufsize = 0;
 	}
 
-	smb_dr_ulist_free(ulist);
+	smb_user_list_free(ulist);
 	kmem_free(ulist, sizeof (smb_dr_ulist_t));
 	return (rbuf);
 }
@@ -128,10 +129,10 @@ smb_kdr_op_share(char *argp, size_t arg_size, size_t *rbufsize, int *errno)
 	}
 
 	switch (kshare->k_op) {
-	case LMSHR_ADD:
+	case SMB_SHROP_ADD:
 		error = smb_server_share_export(kshare->k_path);
 		break;
-	case LMSHR_DELETE:
+	case SMB_SHROP_DELETE:
 		error = smb_server_share_unexport(kshare->k_path,
 		    kshare->k_sharename);
 		break;

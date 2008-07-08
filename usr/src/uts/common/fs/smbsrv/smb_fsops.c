@@ -1420,7 +1420,7 @@ smb_fsop_write(
     uio_t *uio,
     uint32_t *lcount,
     smb_attr_t *ret_attr,
-    uint32_t *flag)
+    int ioflag)
 {
 	smb_node_t *unnamed_node;
 	vnode_t *unnamed_vp = NULL;
@@ -1474,7 +1474,7 @@ smb_fsop_write(
 		smb_node_end_crit(snode);
 		return (ERANGE);
 	}
-	rc = smb_vop_write(snode->vp, uio, flag, lcount, cr);
+	rc = smb_vop_write(snode->vp, uio, ioflag, lcount, cr);
 
 	if (rc == 0 && ret_attr) {
 		/*

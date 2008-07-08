@@ -438,3 +438,49 @@ mlrpc_new_binding(struct mlrpc_xaction *mxa)
 
 	return (mbind);
 }
+
+/*
+ * Move bytes between a buffer and a uio structure.
+ * The transfer direction is controlled by rw:
+ *	UIO_READ:  transfer from buf to uio
+ *	UIO_WRITE: transfer from uio to buf
+ *
+ * Returns the number of bytes moved.
+ */
+ssize_t
+ndr_uiomove(caddr_t buf, size_t buflen, enum uio_rw rw, struct uio *uio)
+{
+	struct iovec *iov;
+	int reading = (rw == UIO_READ);
+	size_t nbytes;
+	size_t nxfer = 0;
+
+	assert(rw == UIO_READ || rw == UIO_WRITE);
+
+	while (buflen && uio->uio_resid && uio->uio_iovcnt) {
+		iov = uio->uio_iov;
+		if ((nbytes = iov->iov_len) == 0) {
+			uio->uio_iov++;
+			uio->uio_iovcnt--;
+			continue;
+		}
+
+		if (nbytes > buflen)
+			nbytes = buflen;
+
+		if (reading)
+			bcopy(buf, iov->iov_base, nbytes);
+		else
+			bcopy(iov->iov_base, buf, nbytes);
+
+		iov->iov_base += nbytes;
+		iov->iov_len -= nbytes;
+		uio->uio_resid -= nbytes;
+		uio->uio_offset += nbytes;
+		buf += nbytes;
+		buflen -= nbytes;
+		nxfer += nbytes;
+	}
+
+	return (nxfer);
+}

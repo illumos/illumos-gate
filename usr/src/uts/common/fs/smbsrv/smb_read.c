@@ -459,7 +459,7 @@ smb_common_read(smb_request_t *sr, smb_rw_param_t *param)
 		break;
 
 	case STYPE_IPC:
-		rc = smb_rpc_read(sr, &vdb->uio);
+		rc = smb_opipe_read(sr, &vdb->uio);
 		break;
 
 	default:

@@ -547,9 +547,12 @@ struct user_acct_info {
 };
 
 struct user_disp_info {
+	OUT DWORD total_size;
+	OUT DWORD returned_size;
+	OUT WORD switch_value;
 	DWORD count;
-	/* right now we just need two entries */
-	struct user_acct_info acct[2];
+	SIZE_IS(count)
+	struct user_acct_info *acct;
 };
 
 OPERATION(SAMR_OPNUM_QueryDispInfo)
@@ -559,11 +562,7 @@ struct samr_QueryDispInfo {
 	IN	DWORD start_idx;
 	IN	DWORD max_entries;
 	IN	DWORD pref_maxsize;
-	OUT DWORD total_size;
-	OUT DWORD returned_size;
-	OUT WORD switch_value;
-	OUT DWORD count;
-	OUT struct user_disp_info *users;
+	OUT struct user_disp_info users;
 	OUT	DWORD status;
 };
 

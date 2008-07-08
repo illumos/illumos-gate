@@ -30,6 +30,8 @@
  */
 
 #include <sys/byteorder.h>
+#include <sys/errno.h>
+#include <sys/uio.h>
 #include <thread.h>
 #include <synch.h>
 #include <stdlib.h>
@@ -43,7 +45,9 @@
 #include <smbsrv/ndr.h>
 #include <smbsrv/mlrpc.h>
 #include <smbsrv/mlsvc_util.h>
-#include <smbsrv/smb_winpipe.h>
+
+
+#define	SMB_CTXT_BUFSZ		65536
 
 /*
  * Fragment size (5680: NT style).
@@ -52,11 +56,19 @@
 static unsigned long mlrpc_frag_size = MLRPC_FRAG_SZ;
 
 /*
- * Context table.
+ * Service context table.
  */
 #define	CTXT_TABLE_ENTRIES	128
 static struct mlsvc_rpc_context context_table[CTXT_TABLE_ENTRIES];
 static mutex_t mlrpc_context_lock;
+
+static int ndr_s_transact(struct mlsvc_rpc_context *);
+static struct mlsvc_rpc_context *ndr_s_lookup(int);
+static void ndr_s_release(struct mlsvc_rpc_context *);
+static struct mlsvc_rpc_context *ndr_s_allocate(int);
+static void ndr_s_deallocate(struct mlsvc_rpc_context *);
+static void ndr_s_rewind(struct mlsvc_rpc_context *);
+static void ndr_s_flush(struct mlsvc_rpc_context *);
 
 static int mlrpc_s_process(struct mlrpc_xaction *);
 static int mlrpc_s_bind(struct mlrpc_xaction *);
@@ -69,144 +81,344 @@ static int mlrpc_build_reply(struct mlrpc_xaction *);
 static void mlrpc_build_frag(struct mlndr_stream *, uint8_t *, uint32_t);
 
 /*
- * This is the RPC service server-side entry point.  All MSRPC encoded
- * messages should be passed through here.  We use the same context
- * structure as the client side but we don't need to set up the client
- * side info.
+ * Allocate and associate a service context with a fid.
  */
-struct mlsvc_rpc_context *
-mlrpc_process(int fid, smb_dr_user_ctx_t *user_ctx)
+int
+ndr_s_open(int fid, uint8_t *data, uint32_t datalen)
 {
-	struct mlsvc_rpc_context	*context;
-	struct mlrpc_xaction		*mxa;
+	struct mlsvc_rpc_context *svc;
+
+	(void) mutex_lock(&mlrpc_context_lock);
+
+	if ((svc = ndr_s_lookup(fid)) != NULL) {
+		ndr_s_release(svc);
+		(void) mutex_unlock(&mlrpc_context_lock);
+		return (EEXIST);
+	}
+
+	if ((svc = ndr_s_allocate(fid)) == NULL) {
+		(void) mutex_unlock(&mlrpc_context_lock);
+		return (ENOMEM);
+	}
+
+	if (smb_opipe_context_decode(&svc->svc_ctx, data, datalen) == -1) {
+		ndr_s_release(svc);
+		(void) mutex_unlock(&mlrpc_context_lock);
+		return (EINVAL);
+	}
+
+	mlrpc_binding_pool_initialize(&svc->binding, svc->binding_pool,
+	    CTXT_N_BINDING_POOL);
+
+	(void) mutex_unlock(&mlrpc_context_lock);
+	return (0);
+}
+
+/*
+ * Release the context associated with a fid when an opipe is closed.
+ */
+int
+ndr_s_close(int fid)
+{
+	struct mlsvc_rpc_context *svc;
+
+	(void) mutex_lock(&mlrpc_context_lock);
+
+	if ((svc = ndr_s_lookup(fid)) == NULL) {
+		(void) mutex_unlock(&mlrpc_context_lock);
+		return (ENOENT);
+	}
+
+	/*
+	 * Release twice: once for the lookup above
+	 * and again to close the fid.
+	 */
+	ndr_s_release(svc);
+	ndr_s_release(svc);
+	(void) mutex_unlock(&mlrpc_context_lock);
+	return (0);
+}
+
+/*
+ * Write RPC request data to the input stream.  Input data is buffered
+ * until the response is requested.
+ */
+int
+ndr_s_write(int fid, uint8_t *buf, uint32_t len)
+{
+	struct mlsvc_rpc_context *svc;
+	ssize_t nbytes;
+
+	if (len == 0)
+		return (0);
+
+	(void) mutex_lock(&mlrpc_context_lock);
+
+	if ((svc = ndr_s_lookup(fid)) == NULL) {
+		(void) mutex_unlock(&mlrpc_context_lock);
+		return (ENOENT);
+	}
+
+	nbytes = ndr_uiomove((caddr_t)buf, len, UIO_READ, &svc->in_uio);
+
+	ndr_s_release(svc);
+	(void) mutex_unlock(&mlrpc_context_lock);
+	return ((nbytes == len) ? 0 : EIO);
+}
+
+/*
+ * Read RPC response data.  If the input stream contains an RPC request,
+ * we need to process the RPC transaction, which will place the RPC
+ * response in the output (frags) stream.  Otherwise, read data from
+ * the output stream.
+ */
+int
+ndr_s_read(int fid, uint8_t *buf, uint32_t *len, uint32_t *resid)
+{
+	struct mlsvc_rpc_context *svc;
+	ssize_t nbytes = *len;
+	int rc;
+
+	if (nbytes == 0) {
+		*resid = 0;
+		return (0);
+	}
+
+	(void) mutex_lock(&mlrpc_context_lock);
+	if ((svc = ndr_s_lookup(fid)) == NULL) {
+		(void) mutex_unlock(&mlrpc_context_lock);
+		return (ENOENT);
+	}
+	(void) mutex_unlock(&mlrpc_context_lock);
+
+	if (svc->in_uio.uio_offset) {
+		if ((rc = ndr_s_transact(svc)) != 0) {
+			ndr_s_flush(svc);
+			(void) mutex_lock(&mlrpc_context_lock);
+			ndr_s_release(svc);
+			(void) mutex_unlock(&mlrpc_context_lock);
+			return (rc);
+		}
+
+	}
+
+	*len = ndr_uiomove((caddr_t)buf, nbytes, UIO_WRITE, &svc->frags.uio);
+	*resid = svc->frags.uio.uio_resid;
+
+	if (*resid == 0) {
+		/*
+		 * Nothing left, cleanup the output stream.
+		 */
+		ndr_s_flush(svc);
+	}
+
+	(void) mutex_lock(&mlrpc_context_lock);
+	ndr_s_release(svc);
+	(void) mutex_unlock(&mlrpc_context_lock);
+	return (0);
+}
+
+/*
+ * Process a server-side RPC request.
+ */
+static int
+ndr_s_transact(struct mlsvc_rpc_context *svc)
+{
+	ndr_xa_t			*mxa;
 	struct mlndr_stream		*recv_mlnds;
 	struct mlndr_stream		*send_mlnds;
 	char				*data;
 	int				datalen;
 
-	if ((context = mlrpc_lookup(fid)) == NULL)
-		return (NULL);
+	data = svc->in_buf;
+	datalen = svc->in_uio.uio_offset;
 
-	context->user_ctx = user_ctx;
-	data = context->inpipe->sp_data;
-	datalen = context->inpipe->sp_datalen;
-
-	mxa = (struct mlrpc_xaction *)malloc(sizeof (struct mlrpc_xaction));
-	if (mxa == NULL)
-		return (NULL);
+	if ((mxa = (ndr_xa_t *)malloc(sizeof (ndr_xa_t))) == NULL)
+		return (ENOMEM);
 
 	bzero(mxa, sizeof (struct mlrpc_xaction));
-	mxa->fid = fid;
-	mxa->context = context;
-	mxa->binding_list = context->binding;
+	mxa->fid = svc->fid;
+	mxa->context = svc;
+	mxa->binding_list = svc->binding;
 
 	if ((mxa->heap = mlrpc_heap_create()) == NULL) {
 		free(mxa);
-		return (NULL);
+		return (ENOMEM);
 	}
 
 	recv_mlnds = &mxa->recv_mlnds;
-	(void) mlnds_initialize(recv_mlnds, datalen, NDR_MODE_CALL_RECV,
-	    mxa->heap);
+	mlnds_initialize(recv_mlnds, datalen, NDR_MODE_CALL_RECV, mxa->heap);
 
+	/*
+	 * Copy the input data and reset the input stream.
+	 */
 	bcopy(data, recv_mlnds->pdu_base_addr, datalen);
+	ndr_s_rewind(svc);
 
 	send_mlnds = &mxa->send_mlnds;
-	(void) mlnds_initialize(send_mlnds, 0, NDR_MODE_RETURN_SEND, mxa->heap);
+	mlnds_initialize(send_mlnds, 0, NDR_MODE_RETURN_SEND, mxa->heap);
 
 	(void) mlrpc_s_process(mxa);
 
-	context->outpipe->sp_datalen = mlnds_finalize(send_mlnds,
-	    (uint8_t *)context->outpipe->sp_data,
-	    SMB_CTXT_PIPE_SZ - sizeof (smb_pipe_t));
-
+	mlnds_finalize(send_mlnds, &svc->frags);
 	mlnds_destruct(&mxa->recv_mlnds);
 	mlnds_destruct(&mxa->send_mlnds);
 	mlrpc_heap_destroy(mxa->heap);
 	free(mxa);
-	return (context);
+	return (0);
 }
 
 /*
- * Lookup the context for pipeid. If one exists, return a pointer to it.
- * Otherwise attempt to allocate a new context and return it. If the
- * context table is full, return a null pointer.
+ * Must be called with mlrpc_context_lock held.
  */
-struct mlsvc_rpc_context *
-mlrpc_lookup(int fid)
+static struct mlsvc_rpc_context *
+ndr_s_lookup(int fid)
 {
-	struct mlsvc_rpc_context *context;
-	struct mlsvc_rpc_context *available = NULL;
+	struct mlsvc_rpc_context *svc;
 	int i;
 
-	(void) mutex_lock(&mlrpc_context_lock);
-
 	for (i = 0; i < CTXT_TABLE_ENTRIES; ++i) {
-		context = &context_table[i];
+		svc = &context_table[i];
 
-		if (available == NULL && context->fid == 0) {
-			available = context;
-			continue;
-		}
+		if (svc->fid == fid) {
+			if (svc->refcnt == 0)
+				return (NULL);
 
-		if (context->fid == fid) {
-			(void) mutex_unlock(&mlrpc_context_lock);
-			return (context);
+			svc->refcnt++;
+			return (svc);
 		}
 	}
 
-	if (available) {
-		bzero(available, sizeof (struct mlsvc_rpc_context));
-		available->inpipe = malloc(SMB_CTXT_PIPE_SZ);
-		available->outpipe = malloc(SMB_CTXT_PIPE_SZ);
-
-		if (available->inpipe == NULL || available->outpipe == NULL) {
-			free(available->inpipe);
-			free(available->outpipe);
-			bzero(available, sizeof (struct mlsvc_rpc_context));
-			(void) mutex_unlock(&mlrpc_context_lock);
-			return (NULL);
-		}
-
-		bzero(available->inpipe, sizeof (smb_pipe_t));
-		bzero(available->outpipe, sizeof (smb_pipe_t));
-		available->fid = fid;
-		available->inpipe->sp_pipeid = fid;
-		available->outpipe->sp_pipeid = fid;
-
-		mlrpc_binding_pool_initialize(&available->binding,
-		    available->binding_pool, CTXT_N_BINDING_POOL);
-	}
-
-	(void) mutex_unlock(&mlrpc_context_lock);
-	return (available);
+	return (NULL);
 }
 
 /*
- * This function should be called to release the context associated
- * with a fid when the client performs a close file.
+ * Must be called with mlrpc_context_lock held.
  */
-void
-mlrpc_release(int fid)
+static void
+ndr_s_release(struct mlsvc_rpc_context *svc)
 {
-	struct mlsvc_rpc_context *context;
+	svc->refcnt--;
+	ndr_s_deallocate(svc);
+}
+
+/*
+ * Must be called with mlrpc_context_lock held.
+ */
+static struct mlsvc_rpc_context *
+ndr_s_allocate(int fid)
+{
+	struct mlsvc_rpc_context *svc = NULL;
 	int i;
 
-	(void) mutex_lock(&mlrpc_context_lock);
-
 	for (i = 0; i < CTXT_TABLE_ENTRIES; ++i) {
-		context = &context_table[i];
+		svc = &context_table[i];
 
-		if (context->fid == fid) {
-			ndr_hdclose(fid);
-			free(context->inpipe);
-			free(context->outpipe);
-			bzero(context, sizeof (struct mlsvc_rpc_context));
-			break;
+		if (svc->fid == 0) {
+			bzero(svc, sizeof (struct mlsvc_rpc_context));
+
+			if ((svc->in_buf = malloc(SMB_CTXT_BUFSZ)) == NULL)
+				return (NULL);
+
+			ndr_s_rewind(svc);
+			svc->fid = fid;
+			svc->refcnt = 1;
+			return (svc);
 		}
 	}
 
-	(void) mutex_unlock(&mlrpc_context_lock);
+	return (NULL);
+}
+
+/*
+ * Must be called with mlrpc_context_lock held.
+ */
+static void
+ndr_s_deallocate(struct mlsvc_rpc_context *svc)
+{
+	if (svc->refcnt == 0) {
+		/*
+		 * Ensure that there are no RPC service policy handles
+		 * (associated with this fid) left around.
+		 */
+		ndr_hdclose(svc->fid);
+
+		ndr_s_rewind(svc);
+		ndr_s_flush(svc);
+		free(svc->in_buf);
+		free(svc->svc_ctx.oc_domain);
+		free(svc->svc_ctx.oc_account);
+		free(svc->svc_ctx.oc_workstation);
+		bzero(svc, sizeof (struct mlsvc_rpc_context));
+	}
+}
+
+/*
+ * Rewind the input data stream, ready for the next write.
+ */
+static void
+ndr_s_rewind(struct mlsvc_rpc_context *svc)
+{
+	svc->in_uio.uio_iov = &svc->in_iov;
+	svc->in_uio.uio_iovcnt = 1;
+	svc->in_uio.uio_offset = 0;
+	svc->in_uio.uio_segflg = UIO_USERSPACE;
+	svc->in_uio.uio_resid = SMB_CTXT_BUFSZ;
+	svc->in_iov.iov_base = svc->in_buf;
+	svc->in_iov.iov_len = SMB_CTXT_BUFSZ;
+}
+
+/*
+ * Flush the output data stream.
+ */
+static void
+ndr_s_flush(struct mlsvc_rpc_context *svc)
+{
+	ndr_frag_t *frag;
+
+	while ((frag = svc->frags.head) != NULL) {
+		svc->frags.head = frag->next;
+		free(frag);
+	}
+
+	free(svc->frags.iov);
+	bzero(&svc->frags, sizeof (ndr_fraglist_t));
+}
+
+/*
+ * Check whether or not the specified user has administrator privileges,
+ * i.e. is a member of Domain Admins or Administrators.
+ * Returns true if the user is an administrator, otherwise returns false.
+ */
+boolean_t
+ndr_is_admin(ndr_xa_t *xa)
+{
+	smb_opipe_context_t *svc = &xa->context->svc_ctx;
+
+	return (svc->oc_flags & SMB_ATF_ADMIN);
+}
+
+/*
+ * Check whether or not the specified user has power-user privileges,
+ * i.e. is a member of Domain Admins, Administrators or Power Users.
+ * This is typically required for operations such as managing shares.
+ * Returns true if the user is a power user, otherwise returns false.
+ */
+boolean_t
+ndr_is_poweruser(ndr_xa_t *xa)
+{
+	smb_opipe_context_t *svc = &xa->context->svc_ctx;
+
+	return ((svc->oc_flags & SMB_ATF_ADMIN) ||
+	    (svc->oc_flags & SMB_ATF_POWERUSER));
+}
+
+int32_t
+ndr_native_os(ndr_xa_t *xa)
+{
+	smb_opipe_context_t *svc = &xa->context->svc_ctx;
+
+	return (svc->oc_native_os);
 }
 
 /*
@@ -815,13 +1027,13 @@ mlrpc_build_frag(struct mlndr_stream *mlnds, uint8_t *buf, uint32_t len)
 	frag->len = len;
 	bcopy(buf, frag->buf, len);
 
-	if (mlnds->head == NULL) {
-		mlnds->head = frag;
-		mlnds->tail = frag;
-		mlnds->nfrag = 1;
+	if (mlnds->frags.head == NULL) {
+		mlnds->frags.head = frag;
+		mlnds->frags.tail = frag;
+		mlnds->frags.nfrag = 1;
 	} else {
-		mlnds->tail->next = frag;
-		mlnds->tail = frag;
-		++mlnds->nfrag;
+		mlnds->frags.tail->next = frag;
+		mlnds->frags.tail = frag;
+		++mlnds->frags.nfrag;
 	}
 }

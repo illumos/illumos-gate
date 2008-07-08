@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,12 +54,21 @@ extern "C" {
 
 /*
  * Negotiation flags for challenge/response authentication.
- * The extra flag (0x40000000) was added in SP4.
  */
-#define	NETR_NEGOTIATE_FLAGS			0x000001FF
-#define	NETR_NEGOTIATE_SP4_FLAG			0x40000000
+#define	NETR_NEGOTIATE_STRONG_KEY		1
 
+#ifdef NETR_NEGOTIATE_STRONG_KEY
+#define	NETR_NEGOTIATE_FLAGS			0x000041FF
+#else
+#define	NETR_NEGOTIATE_FLAGS			0x000001FF
+#endif
+
+#ifdef NETR_NEGOTIATE_STRONG_KEY
+#define	NETR_SESSION_KEY_SZ			16
+#else
 #define	NETR_SESSION_KEY_SZ			8
+#endif
+
 #define	NETR_CRED_DATA_SZ			8
 #define	NETR_OWF_PASSWORD_SZ			16
 

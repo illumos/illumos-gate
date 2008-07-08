@@ -112,7 +112,7 @@ smb_com_trans2_set_file_information(struct smb_request *sr, struct smb_xa *xa)
 	info = kmem_zalloc(sizeof (smb_trans2_setinfo_t), KM_SLEEP);
 	info->ts_xa = xa;
 
-	rc = smb_decode_mbc(&xa->req_param_mb, "ww", &sr->smb_fid,
+	rc = smb_mbc_decodef(&xa->req_param_mb, "ww", &sr->smb_fid,
 	    &info->level);
 	if (rc != 0) {
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));

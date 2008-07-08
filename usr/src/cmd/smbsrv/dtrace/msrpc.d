@@ -110,9 +110,9 @@ smb_com_logoff_andx:entry,
 smb_tree_connect:return,
 smb_tree_disconnect:entry,
 smb_tree_disconnect:return,
-smb_winpipe_open:entry,
-smb_winpipe_call:entry,
-smb_winpipe_upcall:entry,
+smb_opipe_open:entry,
+smb_opipe_door_call:entry,
+smb_opipe_door_upcall:entry,
 door_ki_upcall:entry
 {
 }
@@ -121,9 +121,9 @@ smb_com_session_setup_andx:return,
 smb_session*:return,
 smb_user*:return,
 smb_tree*:return,
-smb_winpipe_open:return,
-smb_winpipe_call:return,
-smb_winpipe_upcall:return,
+smb_opipe_open:return,
+smb_opipe_door_call:return,
+smb_opipe_door_upcall:return,
 door_ki_upcall:return
 {
 	printf("rc=0x%08x", arg1);

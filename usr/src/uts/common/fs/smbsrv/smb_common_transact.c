@@ -28,6 +28,7 @@
 
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
+#include <smbsrv/smb_share.h>
 #include <smbsrv/oem.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/mailslot.h>
@@ -504,7 +505,7 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	total_bytes = param_pad + n_param + data_pad + n_data;
 
 	rc = smbsr_encode_result(sr, 18+n_setup, total_bytes,
-	    "b 3. llllllllb C w #. C #. C",
+	    "b3.llllllllbCw#.C#.C",
 	    18 + n_setup,		/* wct */
 	    n_param,			/* Total Parameter Bytes */
 	    n_data,			/* Total Data Bytes */
@@ -536,7 +537,7 @@ smb_nt_transact_query_quota(struct smb_request *sr, struct smb_xa *xa)
 	uint16_t fid;
 	uint16_t flags;
 
-	if (smb_decode_mbc(&xa->req_param_mb, "%ww", sr, &fid, &flags))
+	if (smb_mbc_decodef(&xa->req_param_mb, "%ww", sr, &fid, &flags))
 		return (SDRC_ERROR);
 
 	return (SDRC_SUCCESS);
@@ -719,10 +720,10 @@ static void
 smb_encode_SHARE_INFO_1(struct mbuf_chain *output, struct mbuf_chain *text,
     char *oem_name, uint16_t type, char *comment)
 {
-	(void) smb_encode_mbc(output, "13c.wl", oem_name,
+	(void) smb_mbc_encodef(output, "13c.wl", oem_name,
 	    type, MBC_LENGTH(text));
 
-	(void) smb_encode_mbc(text, "s", comment ? comment : "");
+	(void) smb_mbc_encodef(text, "s", comment ? comment : "");
 }
 
 static void
@@ -735,13 +736,13 @@ smb_encode_SHARE_INFO_2(struct mbuf_chain *output, struct mbuf_chain *text,
 	bzero(pword, sizeof (pword));
 	(void) strncpy((char *)pword, password, sizeof (pword));
 	smb_encode_SHARE_INFO_1(output, text, oem_name, type, comment);
-	(void) smb_encode_mbc(output, "wwwl9c.",
+	(void) smb_mbc_encodef(output, "wwwl9c.",
 	    access,
 	    sr->sr_cfg->skc_maxconnections,
 	    smb_server_get_session_count(),
 	    MBC_LENGTH(text),
 	    pword);
-	(void) smb_encode_mbc(text, "s", path);
+	(void) smb_mbc_encodef(text, "s", path);
 }
 
 int
@@ -804,7 +805,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 	 */
 	bzero(&reply, sizeof (struct mbuf_chain));
 
-	if (smb_decode_mbc(&xa->req_param_mb, "ww", &level,
+	if (smb_mbc_decodef(&xa->req_param_mb, "ww", &level,
 	    &esi.es_bufsize) != 0)
 		return (SDRC_NOT_IMPLEMENTED);
 
@@ -814,7 +815,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		 * None of the error codes in the spec are meaningful
 		 * here. This error code is returned by Windows.
 		 */
-		(void) smb_encode_mbc(&xa->rep_param_mb, "wwww",
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "wwww",
 		    ERROR_INVALID_LEVEL, 0, 0, 0);
 		return (SDRC_SUCCESS);
 	}
@@ -825,7 +826,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 
 	/* client buffer size is not big enough to hold any shares */
 	if (esi.es_nsent == 0) {
-		(void) smb_encode_mbc(&xa->rep_param_mb, "wwww",
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "wwww",
 		    ERROR_MORE_DATA, 0, esi.es_nsent, esi.es_ntotal);
 		kmem_free(esi.es_buf, esi.es_bufsize);
 		return (SDRC_SUCCESS);
@@ -857,7 +858,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		MBC_INIT(&xa->rep_data_mb, data_scnt);
 
 		(void) sprintf(fmt, "%dc", data_scnt);
-		(void) smb_encode_mbc(&xa->rep_data_mb, fmt, sent_buf);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, fmt, sent_buf);
 
 		sent_buf += data_scnt;
 		tot_data_scnt += data_scnt;
@@ -873,7 +874,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 
 		if (first_resp) {
 			first_resp = B_FALSE;
-			(void) smb_encode_mbc(&xa->rep_param_mb, "wwww",
+			(void) smb_mbc_encodef(&xa->rep_param_mb, "wwww",
 			    (esi.es_ntotal > esi.es_nsent)
 			    ? ERROR_MORE_DATA : 0,
 			    0, esi.es_nsent, esi.es_ntotal);
@@ -900,7 +901,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		    + sizeof (uint16_t)		/* total data byte count */
 		    + tot_packet_bytes);
 
-		(void) smb_encode_mbc(&reply, SMB_HEADER_ED_FMT,
+		(void) smb_mbc_encodef(&reply, SMB_HEADER_ED_FMT,
 		    sr->first_smb_com,
 		    sr->smb_rcls,
 		    sr->smb_reh,
@@ -914,8 +915,8 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		    sr->smb_uid,
 		    sr->smb_mid);
 
-		(void) smb_encode_mbc(&reply,
-		    "b ww 2. www www b . C w #. C #. C",
+		(void) smb_mbc_encodef(&reply,
+		    "bww2.wwwwwwb.Cw#.C#.C",
 		    10 + n_setup,	/* wct */
 		    n_param,		/* Total Parameter Bytes */
 		    esi.es_datasize,	/* Total Data Bytes */
@@ -950,17 +951,17 @@ smb_trans_net_share_getinfo(smb_request_t *sr, struct smb_xa *xa)
 	struct mbuf_chain	str_mb;
 	char			*share;
 	char			*password;
-	lmshare_info_t		si;
+	smb_share_t		si;
 	int			rc;
 
-	if (smb_decode_mbc(&xa->req_param_mb, "%sww", sr,
+	if (smb_mbc_decodef(&xa->req_param_mb, "%sww", sr,
 	    &share, &level, &max_bytes) != 0)
 		return (SDRC_NOT_IMPLEMENTED);
 
 	(void) utf8_strlwr(share);
 	rc = smb_kshare_getinfo(sr->sr_server->sv_lmshrd, share, &si);
-	if ((rc != NERR_Success) || (si.mode & LMSHRM_LONGNAME)) {
-		(void) smb_encode_mbc(&xa->rep_param_mb, "www",
+	if ((rc != NERR_Success) || (si.shr_flags & SMB_SHRF_LONGNAME)) {
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "www",
 		    NERR_NetNameNotFound, 0, 0);
 		return (SDRC_SUCCESS);
 	}
@@ -972,31 +973,31 @@ smb_trans_net_share_getinfo(smb_request_t *sr, struct smb_xa *xa)
 
 	switch (level) {
 	case 0 :
-		(void) smb_encode_mbc(&xa->rep_data_mb, "13c", si.oem_name);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "13c", si.shr_oemname);
 		break;
 
 	case 1 :
 		smb_encode_SHARE_INFO_1(&xa->rep_data_mb, &str_mb,
-		    si.oem_name, si.stype, si.comment);
+		    si.shr_oemname, si.shr_type, si.shr_cmnt);
 		break;
 
 	case 2 :
 		smb_encode_SHARE_INFO_2(&xa->rep_data_mb, &str_mb, sr,
-		    si.oem_name, si.stype, si.comment, access, si.directory,
-		    password);
+		    si.shr_oemname, si.shr_type, si.shr_cmnt, access,
+		    si.shr_path, password);
 		break;
 
 	default:
-		(void) smb_encode_mbc(&xa->rep_param_mb, "www",
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "www",
 		    ERROR_INVALID_LEVEL, 0, 0);
 		m_freem(str_mb.chain);
 		return (SDRC_NOT_IMPLEMENTED);
 	}
 
-	(void) smb_encode_mbc(&xa->rep_param_mb, "www", NERR_Success,
+	(void) smb_mbc_encodef(&xa->rep_param_mb, "www", NERR_Success,
 	    -MBC_LENGTH(&xa->rep_data_mb),
 	    MBC_LENGTH(&xa->rep_data_mb) + MBC_LENGTH(&str_mb));
-	(void) smb_encode_mbc(&xa->rep_data_mb, "C", &str_mb);
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "C", &str_mb);
 	m_freem(str_mb.chain);
 	return (SDRC_SUCCESS);
 }
@@ -1009,10 +1010,10 @@ smb_trans_net_workstation_getinfo(struct smb_request *sr, struct smb_xa *xa)
 	char *domain;
 	char *hostname;
 
-	if ((smb_decode_mbc(&xa->req_param_mb, "ww",
+	if ((smb_mbc_decodef(&xa->req_param_mb, "ww",
 	    &level, &max_bytes) != 0) ||
 	    (level != 10)) {
-		(void) smb_encode_mbc(&xa->rep_param_mb, "wwww",
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "wwww",
 		    NERR_BadTransactConfig, 0, 0, 0);
 		return (SDRC_SUCCESS);
 	}
@@ -1022,24 +1023,24 @@ smb_trans_net_workstation_getinfo(struct smb_request *sr, struct smb_xa *xa)
 
 	MBC_INIT(&str_mb, max_bytes);
 
-	(void) smb_encode_mbc(&str_mb, "."); /* Prevent NULL pointers */
+	(void) smb_mbc_encodef(&str_mb, "."); /* Prevent NULL pointers */
 
-	(void) smb_encode_mbc(&xa->rep_data_mb, "l", MBC_LENGTH(&str_mb));
-	(void) smb_encode_mbc(&str_mb, "s", hostname);
-	(void) smb_encode_mbc(&xa->rep_data_mb, "l", MBC_LENGTH(&str_mb));
-	(void) smb_encode_mbc(&str_mb, "s", "nobody");
-	(void) smb_encode_mbc(&xa->rep_data_mb, "l", MBC_LENGTH(&str_mb));
-	(void) smb_encode_mbc(&str_mb, "s", domain);
-	(void) smb_encode_mbc(&xa->rep_data_mb, "bbl",
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "l", MBC_LENGTH(&str_mb));
+	(void) smb_mbc_encodef(&str_mb, "s", hostname);
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "l", MBC_LENGTH(&str_mb));
+	(void) smb_mbc_encodef(&str_mb, "s", "nobody");
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "l", MBC_LENGTH(&str_mb));
+	(void) smb_mbc_encodef(&str_mb, "s", domain);
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "bbl",
 	    SMB_VERSION_MAJOR, SMB_VERSION_MINOR, MBC_LENGTH(&str_mb));
-	(void) smb_encode_mbc(&str_mb, "s", domain);
-	(void) smb_encode_mbc(&xa->rep_data_mb, "l", MBC_LENGTH(&str_mb));
-	(void) smb_encode_mbc(&str_mb, "s", domain);
+	(void) smb_mbc_encodef(&str_mb, "s", domain);
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "l", MBC_LENGTH(&str_mb));
+	(void) smb_mbc_encodef(&str_mb, "s", domain);
 
-	(void) smb_encode_mbc(&xa->rep_param_mb, "www", 0,
+	(void) smb_mbc_encodef(&xa->rep_param_mb, "www", 0,
 	    -MBC_LENGTH(&xa->rep_data_mb),
 	    MBC_LENGTH(&xa->rep_data_mb) + MBC_LENGTH(&str_mb));
-	(void) smb_encode_mbc(&xa->rep_data_mb, "C", &str_mb);
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "C", &str_mb);
 	m_freem(str_mb.chain);
 	return (SDRC_SUCCESS);
 }
@@ -1051,7 +1052,7 @@ smb_trans_net_user_getinfo(struct smb_request *sr, struct smb_xa *xa)
 	unsigned char		*user;
 	int rc;
 
-	rc = smb_decode_mbc(&xa->req_param_mb, "%sww", sr,
+	rc = smb_mbc_decodef(&xa->req_param_mb, "%sww", sr,
 	    &user,
 	    &level,
 	    &max_bytes);
@@ -1059,7 +1060,7 @@ smb_trans_net_user_getinfo(struct smb_request *sr, struct smb_xa *xa)
 	if (rc != 0)
 		return (SDRC_NOT_IMPLEMENTED);
 
-	(void) smb_encode_mbc(&xa->rep_param_mb, "www",
+	(void) smb_mbc_encodef(&xa->rep_param_mb, "www",
 	    NERR_UserNotFound, 0, 0);
 	return (SDRC_SUCCESS);
 }
@@ -1072,7 +1073,7 @@ smb_trans_net_server_getinfo(struct smb_request *sr, struct smb_xa *xa)
 	char			server_name[16];
 	struct mbuf_chain	str_mb;
 
-	if (smb_decode_mbc(&xa->req_param_mb, "ww", &level, &buf_size) != 0)
+	if (smb_mbc_decodef(&xa->req_param_mb, "ww", &level, &buf_size) != 0)
 		return (SDRC_ERROR);
 
 	max_data = MBC_MAXBYTES(&xa->rep_data_mb);
@@ -1086,28 +1087,28 @@ smb_trans_net_server_getinfo(struct smb_request *sr, struct smb_xa *xa)
 	/* valid levels are 0 and 1 */
 	switch (level) {
 	case 0:
-		(void) smb_encode_mbc(&xa->rep_data_mb, "16c", server_name);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "16c", server_name);
 		break;
 
 	case 1:
-		(void) smb_encode_mbc(&str_mb, "s",
+		(void) smb_mbc_encodef(&str_mb, "s",
 		    sr->sr_cfg->skc_system_comment);
-		(void) smb_encode_mbc(&xa->rep_data_mb, "16cbbll", server_name,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "16cbbll", server_name,
 		    SMB_VERSION_MAJOR, SMB_VERSION_MINOR,
 		    MY_SERVER_TYPE, max_data - MBC_LENGTH(&str_mb));
 		break;
 
 	default:
-		(void) smb_encode_mbc(&xa->rep_param_mb, "www",
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "www",
 		    ERROR_INVALID_LEVEL, 0, 0);
 		m_freem(str_mb.chain);
 		return (SDRC_SUCCESS);
 	}
 
 	avail_data = MBC_LENGTH(&xa->rep_data_mb) + MBC_LENGTH(&str_mb);
-	(void) smb_encode_mbc(&xa->rep_param_mb, "www",
+	(void) smb_mbc_encodef(&xa->rep_param_mb, "www",
 	    NERR_Success, max_data - avail_data, avail_data);
-	(void) smb_encode_mbc(&xa->rep_data_mb, "C", &str_mb);
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "C", &str_mb);
 	m_freem(str_mb.chain);
 	return (SDRC_SUCCESS);
 }
@@ -1313,20 +1314,20 @@ smb_trans_net_server_enum2(struct smb_request *sr, struct smb_xa *xa)
 	char *hostname, *s;
 	smb_kmod_cfg_t *si;
 
-	if (smb_decode_mbc(&xa->req_param_mb,
-	    "%w s(request format) s(reply format) wwls", sr, &opcode, &s, &s,
+	if (smb_mbc_decodef(&xa->req_param_mb,
+	    "%wsswwls", sr, &opcode, &s, &s,
 	    &level, &max_bytes, &server_type, &domain) != 0)
 		return (SDRC_NOT_IMPLEMENTED);
 
 	si = sr->sr_cfg;
 
 	if (utf8_strcasecmp(si->skc_resource_domain, (char *)domain) != 0) {
-		(void) smb_encode_mbc(&xa->rep_param_mb, "wwww", 0, 0, 0, 0);
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "wwww", 0, 0, 0, 0);
 		return (SDRC_SUCCESS);
 	}
 
 	if ((server_type & MY_SERVER_TYPE) == 0) {
-		(void) smb_encode_mbc(&xa->rep_param_mb, "wwww", 0, 0, 0, 0);
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "wwww", 0, 0, 0, 0);
 		return (SDRC_SUCCESS);
 	}
 
@@ -1334,17 +1335,17 @@ smb_trans_net_server_enum2(struct smb_request *sr, struct smb_xa *xa)
 
 	hostname = si->skc_hostname;
 
-	(void) smb_encode_mbc(&xa->rep_data_mb, "16c", hostname);
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "16c", hostname);
 	if (level == 1) {
-		(void) smb_encode_mbc(&xa->rep_data_mb, "bbll",
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "bbll",
 		    SMB_VERSION_MAJOR, SMB_VERSION_MINOR,
 		    MY_SERVER_TYPE, MBC_LENGTH(&str_mb));
-		(void) smb_encode_mbc(&str_mb, "s", si->skc_system_comment);
+		(void) smb_mbc_encodef(&str_mb, "s", si->skc_system_comment);
 	}
 
-	(void) smb_encode_mbc(&xa->rep_param_mb, "wwww", 0,
+	(void) smb_mbc_encodef(&xa->rep_param_mb, "wwww", 0,
 	    -MBC_LENGTH(&xa->rep_data_mb), 1, 1);
-	(void) smb_encode_mbc(&xa->rep_data_mb, "m", str_mb.chain);
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "m", str_mb.chain);
 	return (SDRC_SUCCESS);
 }
 
@@ -1389,13 +1390,13 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	MBC_INIT(&xa->rep_data_mb, n_data);
 
 	if (xa->smb_suwcnt > 0 && STYPE_ISIPC(sr->tid_tree->t_res_type)) {
-		rc = smb_decode_mbc(&xa->req_setup_mb, "ww", &opcode,
+		rc = smb_mbc_decodef(&xa->req_setup_mb, "ww", &opcode,
 		    &sr->smb_fid);
 		if (rc != 0)
 			goto trans_err_not_supported;
 		switch (opcode) {
 		case TRANS_SET_NMPIPE_STATE:
-			if ((rc = smb_decode_mbc(&xa->req_param_mb, "w",
+			if ((rc = smb_mbc_decodef(&xa->req_param_mb, "w",
 			    &devstate)) != 0)
 				goto trans_err_not_supported;
 
@@ -1411,12 +1412,12 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 				return (SDRC_ERROR);
 			}
 
-			rc = smb_decode_mbc(&xa->req_data_mb, "#B",
+			rc = smb_mbc_decodef(&xa->req_data_mb, "#B",
 			    xa->smb_tdscnt, &vdb);
 			if (rc != 0)
 				goto trans_err_not_supported;
 
-			rc = smb_rpc_transact(sr, &vdb.uio);
+			rc = smb_opipe_transact(sr, &vdb.uio);
 			break;
 
 		case TRANS_WAIT_NMPIPE:
@@ -1441,7 +1442,7 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 		    xa->xa_smb_trans_name, MAILSLOT_MSBROWSE) != 0))
 			goto trans_err_not_supported;
 
-		if ((rc = smb_decode_mbc(&xa->req_param_mb, "%wss", sr,
+		if ((rc = smb_mbc_decodef(&xa->req_param_mb, "%wss", sr,
 		    &opcode, &req_fmt, &rep_fmt)) != 0)
 			goto trans_err_not_supported;
 
@@ -1512,7 +1513,7 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	total_bytes = param_pad + n_param + data_pad + n_data;
 
 	rc = smbsr_encode_result(sr, 10+n_setup, total_bytes,
-	    "b ww 2. www www b . C w #. C #. C",
+	    "bww2.wwwwwwb.Cw#.C#.C",
 	    10 + n_setup,		/* wct */
 	    n_param,			/* Total Parameter Bytes */
 	    n_data,			/* Total Data Bytes */
@@ -1541,7 +1542,7 @@ trans_err_not_supported:
 
 trans_err:
 	pos = MBC_LENGTH(&sr->reply) + 23;
-	rc = smbsr_encode_result(sr, 10, 4, "b ww 2. www www b . w ww",
+	rc = smbsr_encode_result(sr, 10, 4, "bww2.wwwwwwb.www",
 	    10,		/* wct */
 	    4, 0,	/* tpscnt tdscnt */
 	    4, pos, 0,	/* pscnt psoff psdisp */
@@ -1576,7 +1577,7 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	MBC_INIT(&xa->rep_param_mb, n_param);
 	MBC_INIT(&xa->rep_data_mb, n_data);
 
-	if (smb_decode_mbc(&xa->req_setup_mb, "w", &opcode) != 0)
+	if (smb_mbc_decodef(&xa->req_setup_mb, "w", &opcode) != 0)
 		goto trans_err_not_supported;
 
 	/*
@@ -1707,7 +1708,7 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	    opcode == TRANS2_QUERY_PATH_INFORMATION) {
 		data_pad = sizeof (uint16_t);
 		data_off = param_off + n_param + data_pad;
-		fmt = "b ww 2. www www b . C w #. C w C";
+		fmt = "bww2.wwwwwwb.Cw#.CwC";
 		nt_unknown_secret = 0x0100;
 	}
 	else
@@ -1715,7 +1716,7 @@ smb_trans2_dispatch(struct smb_request *sr, struct smb_xa *xa)
 		data_pad = (param_off + n_param) & 1; /* Pad to short */
 		/* Param off from hdr start */
 		data_off = param_off + n_param + data_pad;
-		fmt = "b ww 2. www www b . C w #. C #. C";
+		fmt = "bww2.wwwwwwb.Cw#.C#.C";
 		/*LINTED E_ASSIGN_NARROW_CONV*/
 		nt_unknown_secret = data_pad;
 	}
@@ -1752,7 +1753,7 @@ trans_err_not_supported:
 
 trans_err:
 	pos = MBC_LENGTH(&sr->reply) + 23;
-	rc = smbsr_encode_result(sr, 10, 4, "b ww 2. www www b . w ww",
+	rc = smbsr_encode_result(sr, 10, 4, "bww2.wwwwwwb.www",
 	    10,		/* wct */
 	    4, 0,	/* tpscnt tdscnt */
 	    4, pos, 0,	/* pscnt psoff psdisp */

@@ -50,11 +50,11 @@ OBJS_COMMON =		\
 	samlib.o	\
 	samr_open.o	\
 	samr_lookup.o	\
-	secdb.o	\
-	srvsvc_client.o	\
-	lmshare.o	\
+	secdb.o		\
+	smb_autohome.o	\
+	smb_share.o	\
 	smb_share_util.o \
-	smb_autohome.o
+	srvsvc_client.o
 
 # Automatically generated from .ndl files
 NDLLIST =		\
@@ -77,7 +77,7 @@ include ../../Makefile.lib
 INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS += -lmlrpc -lsmbrdr -lsmb -lsmbns -lshare -lnsl -lc
+LDLIBS += -lmlrpc -lsmbrdr -lsmb -lsmbns -lshare -lnsl -lpkcs11 -lc
 
 SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)        	\
         $(OBJS_SHARED:%.o=$(SRC)/common/smbsrv/%.c)

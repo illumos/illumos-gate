@@ -190,6 +190,13 @@ smb_rdir_next(
 		}
 
 		pc->dc_dattr = smb_node_get_dosattr(fnode);
+
+		/* Obey search attributes */
+		if (!smb_sattr_check(&fnode->attr, pc->dc_name, dir->d_sattr)) {
+			smb_node_release(fnode);
+			return (ENOENT);
+		}
+
 		/*
 		 * If name not already mangled, do it.
 		 *
@@ -207,8 +214,9 @@ smb_rdir_next(
 
 		pc->dc_cookie = (uint32_t)-1;
 		return (0);
-	} /* No wild card search */
+	}
 
+	/* There are wildcards in pattern */
 	for (;;) {
 		if (dir->d_state == SMB_ODIR_STATE_CLOSED) {
 			return (ENOENT);
@@ -229,14 +237,12 @@ smb_rdir_next(
 		pc->dc_name[n_name] = '\0';
 
 		/*
-		 * Don't return "." or ".." unless SMB_FA_HIDDEN bit is set
-		 * We have to code these specially since we cannot set the
-		 * SMB_FA_HIDDEN bits in these because they are simply links to
-		 * the real directory and the real directory is NOT hidden.
+		 * Don't return "." or ".." unless FILE_ATTRIBUTE_HIDDEN
+		 * is set.  We have to code this by hand because these are
+		 * virtual directory entries and they are not hidden.
 		 */
-		if (((dir->d_sattr & SMB_FA_HIDDEN) == 0) &&
-		    ((strcmp(pc->dc_name,  ".") == 0) ||
-		    ((strcmp(pc->dc_name, "..") == 0)))) {
+		if (((dir->d_sattr & FILE_ATTRIBUTE_HIDDEN) == 0) &&
+		    smb_is_dot_or_dotdot(pc->dc_name)) {
 			continue;
 		}
 
@@ -287,20 +293,7 @@ smb_rdir_next(
 		pc->dc_dattr = smb_node_get_dosattr(fnode);
 
 		/* Obey search attributes */
-		if ((pc->dc_dattr & SMB_FA_DIRECTORY) &&
-		    !(dir->d_sattr & SMB_FA_DIRECTORY)) {
-			smb_node_release(fnode);
-			continue;
-		}
-
-		if ((pc->dc_dattr & SMB_FA_HIDDEN) &&
-		    !(dir->d_sattr & SMB_FA_HIDDEN)) {
-			smb_node_release(fnode);
-			continue;
-		}
-
-		if ((pc->dc_dattr & SMB_FA_SYSTEM) &&
-		    !(dir->d_sattr & SMB_FA_SYSTEM)) {
+		if (!smb_sattr_check(&fnode->attr, NULL, dir->d_sattr)) {
 			smb_node_release(fnode);
 			continue;
 		}

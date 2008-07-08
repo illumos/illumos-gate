@@ -78,7 +78,7 @@ include ../../Makefile.lib
 INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS +=	-lscf -lmd -lnsl -lpkcs11 -lc -lsocket -lresolv -lidmap
+LDLIBS +=	-lscf -lmd -lnsl -lpkcs11 -lc -lsocket -lresolv -lidmap -lavl
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
 SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\

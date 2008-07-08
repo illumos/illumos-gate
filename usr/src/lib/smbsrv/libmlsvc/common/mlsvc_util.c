@@ -387,9 +387,9 @@ mlsvc_join(char *server, char *domain, char *plain_user, char *plain_text)
 			if (smb_resolve_fqdn(domain, fqdn, MAXHOSTNAMELEN) != 1)
 				return (NT_STATUS_INVALID_PARAMETER);
 
-			if (ads_join(fqdn, plain_user, plain_text,
+			if (smb_ads_join(fqdn, plain_user, plain_text,
 			    machine_passwd, sizeof (machine_passwd))
-			    == ADJOIN_SUCCESS)
+			    == SMB_ADJOIN_SUCCESS)
 				status = NT_STATUS_SUCCESS;
 			else
 				status = NT_STATUS_UNSUCCESSFUL;

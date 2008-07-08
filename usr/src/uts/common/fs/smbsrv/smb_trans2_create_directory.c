@@ -73,7 +73,7 @@ smb_com_trans2_create_directory(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_ERROR);
 	}
 
-	if (smb_decode_mbc(&xa->req_param_mb, "%4.s",
+	if (smb_mbc_decodef(&xa->req_param_mb, "%4.s",
 	    sr, &sr->arg.dirop.fqi.path) != 0) {
 		return (SDRC_ERROR);
 	}
@@ -88,7 +88,7 @@ smb_com_trans2_create_directory(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_ERROR);
 	}
 
-	if (smb_encode_mbc(&xa->rep_param_mb, "w", 0) < 0)
+	if (smb_mbc_encodef(&xa->rep_param_mb, "w", 0) < 0)
 		return (SDRC_ERROR);
 
 	return (SDRC_SUCCESS);

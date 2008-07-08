@@ -111,28 +111,14 @@ smb_com_delete(smb_request_t *sr)
 {
 	struct smb_fqi *fqi = &sr->arg.dirop.fqi;
 	int	rc;
-	int	od = 0;
 	int	deleted = 0;
-	struct smb_node *dir_snode;
-	struct smb_node *node = 0;
-	char *name;
-	char *fname;
-	char *sname;
-	char *fullname;
-	int is_stream;
+	struct smb_node *node = NULL;
 	smb_odir_context_t *pc;
 
 	if (smb_rdir_open(sr, fqi->path, fqi->srch_attr) != 0)
 		return (SDRC_ERROR);
 
 	pc = kmem_zalloc(sizeof (*pc), KM_SLEEP);
-	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	fullname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-
-	is_stream = smb_stream_parse_name(fqi->path, fname, sname);
-	dir_snode = sr->sid_odir->d_dir_snode;
 
 	/*
 	 * This while loop is meant to deal with wildcards.
@@ -142,16 +128,15 @@ smb_com_delete(smb_request_t *sr)
 	 */
 
 	while ((rc = smb_rdir_next(sr, &node, pc)) == 0) {
-		(void) strlcpy(name, pc->dc_name, MAXNAMELEN);
 
-		if (pc->dc_dattr & SMB_FA_DIRECTORY) {
+		if (pc->dc_dattr & FILE_ATTRIBUTE_DIRECTORY) {
 			smbsr_error(sr, NT_STATUS_FILE_IS_A_DIRECTORY,
 			    ERRDOS, ERROR_ACCESS_DENIED);
 			smb_node_release(node);
 			goto delete_error;
 		}
 
-		if ((pc->dc_dattr & SMB_FA_READONLY) ||
+		if ((pc->dc_dattr & FILE_ATTRIBUTE_READONLY) ||
 		    (node->flags & NODE_CREATED_READONLY)) {
 			smbsr_error(sr, NT_STATUS_CANNOT_DELETE,
 			    ERRDOS, ERROR_ACCESS_DENIED);
@@ -178,28 +163,15 @@ smb_com_delete(smb_request_t *sr)
 			goto delete_error;
 		}
 
-		if (is_stream) {
-			/*
-			 * It is assumed that fname does not contain
-			 * any wildcards .
-			 * smb_fsop_remove() requires filename+streamname
-			 */
-			(void) snprintf(fullname, MAXPATHLEN, "%s%s",
-			    fname, sname);
-			rc = smb_fsop_remove(sr, sr->user_cr, dir_snode,
-			    fullname, 0);
-		} else {
-			/*
-			 * name (i.e. pc->dc_name) is the on-disk name
-			 * unless there is a case collision, in which
-			 * case readdir will have returned a mangled name.
-			 */
-			if (smb_maybe_mangled_name(name) == 0)
-				od = 1;
-
-			rc = smb_fsop_remove(sr, sr->user_cr, dir_snode,
-			    name, od);
-		}
+		/*
+		 * Use node->od_name so as to skip mangle checks and
+		 * stream processing (which have already been done in
+		 * smb_rdir_next()).
+		 * Use node->dir_snode to obtain the correct parent node
+		 * (especially for streams).
+		 */
+		rc = smb_fsop_remove(sr, sr->user_cr, node->dir_snode,
+		    node->od_name, 1);
 
 		smb_node_end_crit(node);
 		smb_node_release(node);
@@ -232,10 +204,6 @@ smb_com_delete(smb_request_t *sr)
 
 	smb_rdir_close(sr);
 	kmem_free(pc, sizeof (*pc));
-	kmem_free(name, MAXNAMELEN);
-	kmem_free(fname, MAXNAMELEN);
-	kmem_free(sname, MAXNAMELEN);
-	kmem_free(fullname, MAXPATHLEN);
 
 	rc = smbsr_encode_empty_result(sr);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
@@ -243,10 +211,6 @@ smb_com_delete(smb_request_t *sr)
 delete_error:
 	smb_rdir_close(sr);
 	kmem_free(pc, sizeof (*pc));
-	kmem_free(name, MAXNAMELEN);
-	kmem_free(fname, MAXNAMELEN);
-	kmem_free(sname, MAXNAMELEN);
-	kmem_free(fullname, MAXPATHLEN);
 	return (SDRC_ERROR);
 }
 

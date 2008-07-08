@@ -35,6 +35,7 @@
 #include <smbsrv/mlsvc.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_door_svc.h>
+#include <smbsrv/smb_share.h>
 
 
 #define	SMB_TREE_EMSZ		64
@@ -182,7 +183,7 @@ smbsr_setup_share(struct smb_request *sr, char *sharename, int32_t stype,
 	char			*resource;
 	uint16_t		access = SMB_TREE_READ_WRITE;
 	int			rc;
-	lmshare_info_t 		si;
+	smb_share_t 		si;
 	smb_sid_t		*sid;
 	fsvol_attr_t		vol_attr;
 	smb_attr_t		attr;
@@ -193,7 +194,7 @@ smbsr_setup_share(struct smb_request *sr, char *sharename, int32_t stype,
 	u_cred = user->u_cred;
 	ASSERT(u_cred);
 
-	bzero(&si, sizeof (lmshare_info_t));
+	bzero(&si, sizeof (smb_share_t));
 
 	/*
 	 * XXX Host based access control check to go here.
@@ -243,7 +244,7 @@ smbsr_setup_share(struct smb_request *sr, char *sharename, int32_t stype,
 	 * Only a user with admin rights is allowed to map these
 	 * shares.
 	 */
-	if (si.mode & LMSHRM_ADMIN) {
+	if (si.shr_flags & SMB_SHRF_ADMIN) {
 		sid = smb_sid_fromstr(ADMINISTRATORS_SID);
 		if (sid) {
 			rc = smb_cred_is_member(u_cred, sid);
@@ -257,7 +258,7 @@ smbsr_setup_share(struct smb_request *sr, char *sharename, int32_t stype,
 	}
 
 
-	resource = si.directory;
+	resource = si.shr_path;
 	sr->arg.tcon.service = "A:";
 
 #ifdef HOST_ACCESS

@@ -111,6 +111,7 @@ main(int argc, char *argv[])
 	sigset_t		set;
 	uid_t			uid;
 	int			pfd = -1;
+	int			sigval;
 
 	smbd.s_pname = basename(argv[0]);
 	openlog(smbd.s_pname, LOG_PID | LOG_NOWAIT, LOG_DAEMON);
@@ -182,12 +183,14 @@ main(int argc, char *argv[])
 	(void) atexit(smbd_service_fini);
 
 	while (!smbd.s_shutdown_flag) {
-		(void) sigsuspend(&set);
+		if (smbd.s_sigval == 0)
+			(void) sigsuspend(&set);
 
-		switch (smbd.s_sigval) {
+		sigval = smbd.s_sigval;
+		smbd.s_sigval = 0;
+
+		switch (sigval) {
 		case 0:
-			break;
-
 		case SIGPIPE:
 			break;
 
@@ -205,8 +208,6 @@ main(int argc, char *argv[])
 			smbd.s_shutdown_flag = 1;
 			break;
 		}
-
-		smbd.s_sigval = 0;
 	}
 
 	smbd_service_fini();
@@ -392,7 +393,7 @@ smbd_service_init(void)
 		}
 	}
 
-	ads_init();
+	smb_ads_init();
 	if ((rc = mlsvc_init()) != 0) {
 		smbd_report("msrpc initialization failed");
 		return (rc);
@@ -424,16 +425,16 @@ smbd_service_init(void)
 
 	(void) smbd_localtime_init();
 
-	smbd.s_door_winpipe = smb_winpipe_doorsvc_start();
-	if (smbd.s_door_winpipe < 0) {
-		smbd_report("winpipe initialization failed %s",
+	smbd.s_door_opipe = smbd_opipe_dsrv_start();
+	if (smbd.s_door_opipe < 0) {
+		smbd_report("opipe initialization failed %s",
 		    strerror(errno));
 		return (rc);
 	}
 
 	(void) smb_lgrp_start();
 
-	(void) smb_pwd_init();
+	smb_pwd_init(B_TRUE);
 
 	rc = smbd_kernel_bind();
 	if (rc != 0) {
@@ -441,7 +442,7 @@ smbd_service_init(void)
 		return (rc);
 	}
 
-	return (lmshare_start());
+	return (smb_shr_start());
 }
 
 /*
@@ -452,13 +453,13 @@ smbd_service_init(void)
 static void
 smbd_service_fini(void)
 {
-	smb_winpipe_doorsvc_stop();
+	smbd_opipe_dsrv_stop();
 	smb_wka_fini();
 	smbd_refresh_fini();
 	smbd_kernel_unbind();
 	smb_door_srv_stop();
 	smb_share_dsrv_stop();
-	lmshare_stop();
+	smb_shr_stop();
 	smb_nicmon_stop();
 	smb_idmap_stop();
 	smb_lgrp_stop();
@@ -538,7 +539,7 @@ smbd_refresh_monitor(void *arg)
 		 * We've been woken up by a refresh event so go do
 		 * what is necessary.
 		 */
-		ads_refresh();
+		smb_ads_refresh();
 		smb_ccache_remove(SMB_CCACHE_PATH);
 
 		if ((rc = smb_getfqdomainname(fqdn, MAXHOSTNAMELEN)) != 0)
@@ -655,7 +656,7 @@ smbd_kernel_bind(void)
 		smbd.s_drv_fd = -1;
 		return (errno);
 	}
-	smb_io.sio_data.start.winpipe = smbd.s_door_winpipe;
+	smb_io.sio_data.start.opipe = smbd.s_door_opipe;
 	smb_io.sio_data.start.lmshrd = smbd.s_door_lmshr;
 	smb_io.sio_data.start.udoor = smbd.s_door_srv;
 	if (ioctl(smbd.s_drv_fd, SMB_IOC_START, &smb_io) < 0) {

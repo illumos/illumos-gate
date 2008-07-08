@@ -45,8 +45,6 @@ HDRS=	alloc.h			\
 	lm.h			\
 	lmdfs.h			\
 	lmerr.h			\
-	lmshare.h		\
-	lmshare_door.h		\
 	lsalib.h		\
 	mac_cifs.h		\
 	mailslot.h		\
@@ -80,9 +78,9 @@ HDRS=	alloc.h			\
 	smb_kstat.h		\
 	smb_ktypes.h		\
 	smb_privilege.h		\
+	smb_share.h		\
 	smb_token.h		\
 	smb_vops.h		\
-	smb_winpipe.h		\
 	smb_xdr.h		\
 	smbfmt.h		\
 	smbinfo.h		\

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,7 @@
 extern "C" {
 #endif
 
-#include <smbsrv/lmshare.h>
+#include <smbsrv/smb_share.h>
 
 /*
  * defined options types. These should be in a file rather than

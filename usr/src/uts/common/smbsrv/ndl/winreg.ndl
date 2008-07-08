@@ -30,10 +30,24 @@
 
 /*
  * Windows Registry (WINREG) RPC interface definition.
+ *
+ * The Windows registry is split into a number of hives, which are divided
+ * by function.  The hive names are abbreviated and prefixed by HKEY or HK.
+ *
+ * HKEY_CLASSES_ROOT     (HKCR)	Information about registered applications
+ * HKEY_CURRENT_USER     (HKCU)	Settings for the current logged in user.
+ * HKEY_LOCAL_MACHINE    (HKLM)	Settings for all users on the computer.
+ * HKEY_USERS            (HKU)	HKEY_CURRENT_USER subkeys for user accounts.
+ * HKEY_CURRENT_CONFIG   (HKCC)	Runtime configuration information.
+ * HKEY_PERFORMANCE_DATA (HKPD)	Runtime performance data.
+ * HKEY_DYN_DATA         (HKDD)	Runtime data for Windows 9x applications.
+ * HKEY_PERFORMANCE_TEXT (HKPT)	Runtime performance information.
+ * HKEY_PERFORMANCE_NLS  (HKPN)	Runtime performance information.
  */
 
 #include "ndrtypes.ndl"
 
+/* Windows NT */
 #define WINREG_OPNUM_OpenHKCR		0x00
 #define WINREG_OPNUM_OpenHKCU		0x01
 #define WINREG_OPNUM_OpenHKLM		0x02
@@ -56,11 +70,48 @@
 #define WINREG_OPNUM_RestoreKey		0x13
 #define WINREG_OPNUM_SaveKey		0x14
 #define WINREG_OPNUM_SetKeySec		0x15
+
+/* Windows 2000 */
 #define WINREG_OPNUM_CreateValue	0x16
 #define WINREG_OPNUM_UnloadKey		0x17
 #define WINREG_OPNUM_Shutdown		0x18
 #define WINREG_OPNUM_AbortShutdown	0x19
 #define WINREG_OPNUM_GetVersion		0x1a
+#define WINREG_OPNUM_OpenHKCC		0x1b
+#define WINREG_OPNUM_OpenHKDD		0x1c
+#define WINREG_OPNUM_QueryMultiValues	0x1d
+#define WINREG_OPNUM_ShutdownEx		0x1e
+
+/* Windows XP and Windows Server 2003 */
+#define WINREG_OPNUM_SavekeyEx		0x1f
+#define WINREG_OPNUM_OpenHKPT		0x20
+#define WINREG_OPNUM_OpenHKPN		0x21
+
+/* Windows 2003 SP1 */
+#define WINREG_OPNUM_QueryMultiValues2	0x22
+#define WINREG_OPNUM_DeleteKeyEx	0x23
+
+#define	WINREG_TYPE_NONE		0
+#define WINREG_SZ			1
+#define WINREG_EXPAND_SZ		2
+#define WINREG_BINARY			3
+#define WINREG_DWORD			4
+#define WINREG_DWORD_BIG_ENDIAN		5
+#define WINREG_LINK			6
+#define WINREG_MULTI_SZ			7
+#define WINREG_RESOURCE_LIST		8
+#define WINREG_RESOURCE_DESC		9
+#define WINREG_RESOURCE_REQ_LIST	10
+#define WINREG_QWORD			11
+
+#define	WINREG_ACCESS_QUERY_VALUE	0x00000001
+#define WINREG_ACCESS_SET_VALUE		0x00000002
+#define WINREG_ACCESS_CREATE_KEY	0x00000004
+#define WINREG_ACCESS_ENUMERATE		0x00000008
+#define WINREG_ACCESS_NOTIFY		0x00000010
+#define WINREG_ACCESS_CREATE_LINK	0x00000020
+#define WINREG_ACCESS_KEY64		0x00000100
+#define WINREG_ACCESS_KEY32		0x00000200
 
 struct winreg_handle {
 	DWORD hand1;
@@ -87,11 +138,24 @@ struct winreg_value {
 	BYTE	value[ANY_SIZE_ARRAY];
 };
 
+struct winreg_vcbuf {
+	WORD wclen;
+	WORD wcsize;
+	struct winreg_value *buf;
+};
+typedef struct winreg_vcbuf winreg_vcbuf_t;
+
 struct file_time {
 	DWORD	low;
 	DWORD	high;
 };
 typedef struct file_time file_time_t;
+
+struct winreg_secdesc {
+	DWORD	sd_length_is;
+  SIZE_IS(sd_length_is)
+	BYTE	value[ANY_SIZE_ARRAY];
+};
 
 OPERATION(WINREG_OPNUM_OpenHKCR)
 struct winreg_OpenHKCR {
@@ -141,13 +205,20 @@ struct winreg_Close {
 	OUT DWORD		status;
 };
 
+#define	WINREG_ACTION_NONE		0
+#define	WINREG_ACTION_NEW_KEY		1
+#define	WINREG_ACTION_EXISTING_KEY	2
 
 OPERATION(WINREG_OPNUM_CreateKey)
 struct winreg_CreateKey {
 	IN winreg_handle_t	handle;
 	IN winreg_string_t	subkey;
-	/* IN	ignore the remaining input data */
-
+	IN winreg_string_t	keyclass;
+	IN DWORD		options;
+	IN DWORD		access_mask;
+	IN DWORD		*sd;
+	OUT winreg_handle_t	result_handle;
+	OUT DWORD		*action;
 	OUT DWORD		status;
 };
 
@@ -156,8 +227,6 @@ OPERATION(WINREG_OPNUM_DeleteKey)
 struct winreg_DeleteKey {
 	IN winreg_handle_t	handle;
 	IN winreg_string_t	subkey;
-	/* IN	ignore the remaining input data */
-
 	OUT DWORD		status;
 };
 
@@ -166,11 +235,28 @@ OPERATION(WINREG_OPNUM_DeleteValue)
 struct winreg_DeleteValue {
 	IN winreg_handle_t	handle;
 	IN winreg_string_t	name;
-	/* IN	ignore the remaining input data */
-
 	OUT DWORD		status;
 };
 
+/*
+ * Some of the OUT parameters are also supplied
+ * as IN parameters but we can ignore them.
+ */
+OPERATION(WINREG_OPNUM_EnumKey)
+struct winreg_EnumKey {
+	IN	winreg_handle_t	handle;
+	IN	DWORD		index;
+	/* IN	ignore the remaining input data */
+/*
+	INOUT	winreg_vcbuf_t	name;
+	INOUT	winreg_vcbuf_t	*class;
+	INOUT	file_time_t	*change_time;
+*/
+	OUT	winreg_vcbuf_t	name;
+	OUT	winreg_vcbuf_t	*class;
+	OUT	file_time_t	*change_time;
+	OUT	DWORD		status;
+};
 
 /*
  * Some of the OUT parameters are also supplied
@@ -182,7 +268,7 @@ struct winreg_EnumValue {
 	IN DWORD		index;
 	/* IN	ignore the remaining input data */
 
-	OUT winreg_string_t	name;
+	OUT winreg_vcbuf_t	name;
 	OUT DWORD		*type;
 	OUT struct winreg_value *value;
 	OUT DWORD		*value_size;
@@ -200,7 +286,12 @@ OPERATION(WINREG_OPNUM_GetKeySec)
 struct winreg_GetKeySec {
 	IN winreg_handle_t	handle;
 	IN DWORD		sec_info;
-	OUT DWORD		*sd;
+/*
+	OUT struct winreg_secdesc	sd;
+*/
+	OUT DWORD		sd_length_is;
+	OUT DWORD		sd_size_is;
+	OUT DWORD		sd_array;
 	OUT DWORD		status;
 };
 
@@ -216,41 +307,24 @@ OPERATION(WINREG_OPNUM_OpenKey)
 struct winreg_OpenKey {
 	IN  winreg_handle_t	handle;
 	IN  winreg_string_t	name;
-	IN  DWORD		unknown;
+	IN  DWORD		options;
 	IN  DWORD		access_mask;
 	OUT winreg_handle_t	result_handle;
 	OUT DWORD		status;
 };
 
 
-/*
- * 000000A0                    00 00 00 00 C1 F9 C0 86 18 B1       ..........
- * 000000B0  D5 11 99 C8 00 C0 F0 1F 42 26 00 00 10 04 CC ED ........B&......
- * 000000C0  12 00 08 02 00 00 00 00 00 00 00 00 00 00       ..............  
-	DWORD unknown_0x04100000;
-	DWORD unkown_ptr;
-	DWORD unknown_0x00000208;
-	DWORD unknown2;
-	DWORD unknown3;
- */
-
 OPERATION(WINREG_OPNUM_QueryKey)
 struct winreg_QueryKey {
 	IN  winreg_handle_t	handle;
-	/*
-	 * Ignore the remaining input data
-	 * (2 * DWORD, possibly winreg_string_t).
-	 */
-
-	OUT winreg_string_t	name;
-	OUT DWORD		unknown;
-	OUT DWORD 		sub_keys;
+	INOUT winreg_string_t	name;
+	OUT DWORD 		num_subkeys;
 	OUT DWORD 		max_subkey_len;
 	OUT DWORD 		max_class_len;
-	OUT DWORD 		values;
+	OUT DWORD 		num_values;
 	OUT DWORD 		max_value_namelen;
 	OUT DWORD 		max_value_len;
-	OUT DWORD 		security_desc;
+	OUT DWORD 		secdesc_size;
 	OUT file_time_t 	last_write_time;
 	OUT DWORD		status;
 };
@@ -286,6 +360,8 @@ OPERATION(WINREG_OPNUM_CreateValue)
 struct winreg_CreateValue {
 	IN winreg_handle_t	handle;
 	IN winreg_string_t	name;
+	IN winreg_string_t	class;
+	IN DWORD		options;
 	/* IN	ignore the remaining input data */
 
 	OUT DWORD		status;
@@ -303,6 +379,11 @@ struct winreg_Shutdown {
 	OUT DWORD		status;
 };
 
+OPERATION(WINREG_OPNUM_AbortShutdown)
+struct winreg_AbortShutdown {
+	IN DWORD		ignored;
+	OUT DWORD		status;
+};
 
 OPERATION(WINREG_OPNUM_GetVersion)
 struct winreg_GetVersion {
@@ -311,6 +392,37 @@ struct winreg_GetVersion {
 	OUT DWORD		status;
 };
 
+OPERATION(WINREG_OPNUM_OpenHKCC)
+struct winreg_OpenHKCC {
+	IN  DWORD		*server;
+	IN  DWORD		access_mask;
+	OUT winreg_handle_t	handle;
+	OUT DWORD		status;
+};
+
+OPERATION(WINREG_OPNUM_OpenHKDD)
+struct winreg_OpenHKDD {
+	IN  DWORD		*server;
+	IN  DWORD		access_mask;
+	OUT winreg_handle_t	handle;
+	OUT DWORD		status;
+};
+
+OPERATION(WINREG_OPNUM_OpenHKPT)
+struct winreg_OpenHKPT {
+	IN  DWORD		*server;
+	IN  DWORD		access_mask;
+	OUT winreg_handle_t	handle;
+	OUT DWORD		status;
+};
+
+OPERATION(WINREG_OPNUM_OpenHKPN)
+struct winreg_OpenHKPN {
+	IN  DWORD		*server;
+	IN  DWORD		access_mask;
+	OUT winreg_handle_t	handle;
+	OUT DWORD		status;
+};
 
 /*
  * The WINREG interface.
@@ -335,6 +447,10 @@ union winreg_interface {
 		struct winreg_DeleteKey		DeleteKey;
 	CASE(WINREG_OPNUM_DeleteValue)
 		struct winreg_DeleteValue	DeleteValue;
+	CASE(WINREG_OPNUM_EnumKey)
+		struct winreg_EnumKey		EnumKey;
+	CASE(WINREG_OPNUM_EnumValue)
+		struct winreg_EnumValue		EnumValue;
 	CASE(WINREG_OPNUM_FlushKey)
 		struct winreg_FlushKey		FlushKey;
 	CASE(WINREG_OPNUM_GetKeySec)
@@ -353,8 +469,18 @@ union winreg_interface {
 		struct winreg_CreateValue	CreateValue;
 	CASE(WINREG_OPNUM_Shutdown)
 		struct winreg_Shutdown		Shutdown;
+	CASE(WINREG_OPNUM_AbortShutdown)
+		struct winreg_AbortShutdown	AbortShutdown;
 	CASE(WINREG_OPNUM_GetVersion)
 		struct winreg_GetVersion	GetVersion;
+	CASE(WINREG_OPNUM_OpenHKCC)
+		struct winreg_OpenHKCC		OpenHKCC;
+	CASE(WINREG_OPNUM_OpenHKDD)
+		struct winreg_OpenHKDD		OpenHKDD;
+	CASE(WINREG_OPNUM_OpenHKPT)
+		struct winreg_OpenHKPT		OpenHKPT;
+	CASE(WINREG_OPNUM_OpenHKPN)
+		struct winreg_OpenHKPN		OpenHKPN;
 };
 typedef union winreg_interface	winreg_interface_t;
 EXTERNTYPEINFO(winreg_interface)

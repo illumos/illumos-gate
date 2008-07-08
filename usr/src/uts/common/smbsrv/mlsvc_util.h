@@ -99,12 +99,12 @@ struct mlsvc_rpc_context {
 	struct mlrpc_client	cli;
 	int fid;
 	ms_handle_t *handle;
-	smb_dr_user_ctx_t *user_ctx;
-	smb_pipe_t *inpipe;	/* used for winpipe */
-	uint32_t inlen;		/* inpipes */
-	smb_pipe_t *outpipe;	/* used for winpipe */
-	uint32_t outcookie;	/* for rpc_read and transact */
-	uint32_t outlen;	/* outpipes */
+	smb_opipe_context_t svc_ctx;
+	char *in_buf;
+	struct uio in_uio;
+	iovec_t in_iov;
+	ndr_fraglist_t frags;
+	int refcnt;
 	int server_os;
 	int server_pdc;
 	WORD max_xmit_frag;

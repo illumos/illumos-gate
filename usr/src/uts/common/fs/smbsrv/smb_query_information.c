@@ -104,7 +104,7 @@ smb_com_query_information(smb_request_t *sr)
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		rc = smbsr_encode_result(sr, 10, 0, "bwll10.w",
-		    10, SMB_FA_NORMAL, 0, 0, 0);
+		    10, FILE_ATTRIBUTE_NORMAL, 0, 0, 0);
 		return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 	}
 

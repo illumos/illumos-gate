@@ -266,7 +266,7 @@ smb_session_request(struct smb_session *session)
 
 		kmem_free(names, hdr.xh_length);
 		MBC_INIT(&mbc, MAX_DATAGRAM_LENGTH);
-		(void) smb_encode_mbc(&mbc, "b",
+		(void) smb_mbc_encodef(&mbc, "b",
 		    DATAGRAM_INVALID_SOURCE_NAME_FORMAT);
 		(void) smb_session_send(session, NEGATIVE_SESSION_RESPONSE,
 		    &mbc);

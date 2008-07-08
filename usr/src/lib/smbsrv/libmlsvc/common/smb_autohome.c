@@ -70,35 +70,38 @@ static smb_autohome_t *smb_autohome_getent(const char *);
 void
 smb_autohome_add(const char *username)
 {
-	lmshare_info_t si;
+	smb_share_t si;
 	smb_autohome_t *ai;
 
 	assert(username);
 
+	if (smb_shr_get((char *)username, &si) == NERR_Success) {
+		/*
+		 * autohome shares will be added for each login attempt
+		 * even if they already exist
+		 */
+		if ((si.shr_flags & SMB_SHRF_AUTOHOME) == 0)
+			return;
+
+		(void) smb_shr_add(&si, 0);
+		return;
+	}
+
 	if ((ai = smb_autohome_lookup(username)) == NULL)
 		return;
 
-	bzero(&si, sizeof (lmshare_info_t));
-	(void) strlcpy(si.directory, ai->ah_path, MAXPATHLEN);
-	(void) strsubst(si.directory, '\\', '/');
-	(void) strlcpy(si.container, ai->ah_container, MAXPATHLEN);
+	bzero(&si, sizeof (smb_share_t));
+	(void) strlcpy(si.shr_path, ai->ah_path, MAXPATHLEN);
+	(void) strsubst(si.shr_path, '\\', '/');
 
-	if (lmshare_is_dir(si.directory) == 0)
+	if (smb_shr_is_dir(si.shr_path) == 0)
 		return;
 
-	if (lmshare_getinfo((char *)username, &si) == NERR_Success) {
-		/*
-		 * autohome shares will be added for each login attemp
-		 * even if they already exist
-		 */
-		if ((si.mode & LMSHRM_AUTOHOME) == 0)
-			return;
-	} else {
-		(void) strlcpy(si.share_name, username, MAXNAMELEN);
-		si.mode = LMSHRM_TRANS | LMSHRM_AUTOHOME;
-	}
+	(void) strlcpy(si.shr_name, username, MAXNAMELEN);
+	(void) strlcpy(si.shr_container, ai->ah_container, MAXPATHLEN);
+	si.shr_flags = SMB_SHRF_TRANS | SMB_SHRF_AUTOHOME;
 
-	(void) lmshare_add(&si, 0);
+	(void) smb_shr_add(&si, 0);
 }
 
 /*
@@ -107,13 +110,13 @@ smb_autohome_add(const char *username)
 void
 smb_autohome_remove(const char *username)
 {
-	lmshare_info_t si;
+	smb_share_t si;
 
 	assert(username);
 
-	if (lmshare_getinfo((char *)username, &si) == NERR_Success) {
-		if (si.mode & LMSHRM_AUTOHOME) {
-			(void) lmshare_delete((char *)username, 0);
+	if (smb_shr_get((char *)username, &si) == NERR_Success) {
+		if (si.shr_flags & SMB_SHRF_AUTOHOME) {
+			(void) smb_shr_del((char *)username, 0);
 		}
 	}
 }
@@ -122,9 +125,9 @@ smb_autohome_remove(const char *username)
  * Find out if a share is an autohome share.
  */
 boolean_t
-smb_is_autohome(const lmshare_info_t *si)
+smb_is_autohome(const smb_share_t *si)
 {
-	return (si && (si->mode & LMSHRM_AUTOHOME));
+	return (si && (si->shr_flags & SMB_SHRF_AUTOHOME));
 }
 
 /*

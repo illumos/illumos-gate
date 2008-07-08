@@ -266,7 +266,7 @@ smb_com_negotiate(smb_request_t *sr)
 	for (pos = 0;
 	    sr->smb_data.chain_offset < sr->smb_data.max_bytes;
 	    pos++) {
-		if (smb_decode_mbc(&sr->smb_data, "%L", sr, &p) != 0) {
+		if (smb_mbc_decodef(&sr->smb_data, "%L", sr, &p) != 0) {
 			smbsr_error(sr, 0, ERRSRV, ERRerror);
 			return (SDRC_ERROR);
 		}
@@ -314,10 +314,7 @@ smb_com_negotiate(smb_request_t *sr)
 		    sizeof (smb_dos_tcp_rcvbuf));
 		sr->smb_flg |= SMB_FLAGS_LOCK_AND_READ_OK;
 		rc = smbsr_encode_result(sr, 13, VAR_BCC,
-		    "(wct) b" "(dix) w" "(sec) w" "(mbs) w"
-		    "(mmc) w" "(mnv) w" "(raw) w" "(key) l"
-		    "(tim/dat) Y"       "(tz)  w" "(ekl) w"
-		    "(mbz) 2.""(bcc) w" "(key) #c",
+		    "bwwwwwwlYww2.w#c",
 		    13,		/* wct */
 		    sel_pos,	/* dialect index */
 		    secmode,		/* security mode */
@@ -342,10 +339,7 @@ smb_com_negotiate(smb_request_t *sr)
 		    sizeof (smb_dos_tcp_rcvbuf));
 		sr->smb_flg |= SMB_FLAGS_LOCK_AND_READ_OK;
 		rc = smbsr_encode_result(sr, 13, VAR_BCC,
-		    "(wct) b" "(dix) w" "(sec) w" "(mbs) w"
-		    "(mmc) w" "(mnv) w" "(raw) w" "(key) l"
-		    "(tim/dat) Y"       "(tz)  w" "(ekl) w"
-		    "(mbz) 2.""(bcc) w" "(key) #c" "(dom) s",
+		    "bwwwwwwlYww2.w#cs",
 		    13,		/* wct */
 		    sel_pos,	/* dialect index */
 		    secmode,		/* security mode */
@@ -410,10 +404,7 @@ smb_com_negotiate(smb_request_t *sr)
 		max_mpx_count = sr->sr_cfg->skc_maxworkers;
 
 		rc = smbsr_encode_result(sr, 17, VAR_BCC,
-		    "(wct) b" "(dix) w" "(sec) b" "(mmc) w"
-		    "(mnv) w" "(mbs) l" "(raw) l" "(key) l"
-		    "(cap) l" "(tim) T" "(tz) w" "(ekl) b"
-		    "(bcc) w" "(key) #c" "(dom) Z",
+		    "bwbwwllllTwbw#cZ",
 		    17,		/* wct */
 		    sel_pos,	/* dialect index */
 		    secmode,	/* security mode */

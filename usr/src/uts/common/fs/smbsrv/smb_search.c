@@ -177,18 +177,18 @@ smb_com_search(smb_request_t *sr)
 
 	count = 0;
 
-	if ((sattr == SMB_FA_VOLUME) && (key_len != 21)) {
+	if ((sattr == FILE_ATTRIBUTE_VOLUME) && (key_len != 21)) {
 		(void) memset(name, ' ', sizeof (name));
 		(void) strncpy(name, vol_attr.name, sizeof (name));
 
 		if (key_len >= 21) {
-			(void) smb_decode_mbc(&sr->smb_data, "17.l",
+			(void) smb_mbc_decodef(&sr->smb_data, "17.l",
 			    &resume_key);
 		} else {
 			resume_key = 0;
 		}
 
-		(void) smb_encode_mbc(&sr->reply, "bwwbwb11c5.lb8.13c",
+		(void) smb_mbc_encodef(&sr->reply, "bwwbwb11c5.lb8.13c",
 		    1, 0, VAR_BCC, 5, 0, 0, path+1,
 		    resume_key, sattr, name);
 		count++;
@@ -206,13 +206,13 @@ smb_com_search(smb_request_t *sr)
 				return (SDRC_ERROR);
 			if (rc == -2) {
 				sr->reply.chain_offset = sr->cur_reply_offset;
-				(void) smb_encode_mbc(&sr->reply, "bw", 0, 0);
+				(void) smb_mbc_encodef(&sr->reply, "bw", 0, 0);
 				return (SDRC_SUCCESS);
 			}
 			resume_char = 0;
 			resume_key = 0;
 		} else if (key_len == 21) {
-			if (smb_decode_mbc(&sr->smb_data, "b12.wwl",
+			if (smb_mbc_decodef(&sr->smb_data, "b12.wwl",
 			    &resume_char, &cookie, &sr->smb_sid,
 			    &resume_key) != 0) {
 				/* We don't know which search to close! */
@@ -231,7 +231,8 @@ smb_com_search(smb_request_t *sr)
 			return (SDRC_ERROR);
 		}
 
-		(void) smb_encode_mbc(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
+		(void) smb_mbc_encodef(&sr->reply, "bwwbw", 1, 0,
+		    VAR_BCC, 5, 0);
 
 		pc = kmem_zalloc(sizeof (smb_odir_context_t), KM_SLEEP);
 		pc->dc_cookie = cookie;
@@ -261,7 +262,7 @@ smb_com_search(smb_request_t *sr)
 					(void) utf8_strupr(name);
 			}
 
-			(void) smb_encode_mbc(&sr->reply, "b8c3c.wwlbYl13c",
+			(void) smb_mbc_encodef(&sr->reply, "b8c3c.wwlbYl13c",
 			    resume_char,
 			    pc->dc_name83, pc->dc_name83+9,
 			    pc->dc_cookie, sr->smb_sid,
@@ -292,7 +293,7 @@ smb_com_search(smb_request_t *sr)
 	}
 
 	rc = (sr->reply.chain_offset - sr->cur_reply_offset) - 8;
-	(void) smb_poke_mbc(&sr->reply, sr->cur_reply_offset, "bwwbw",
+	(void) smb_mbc_poke(&sr->reply, sr->cur_reply_offset, "bwwbw",
 	    1, count, rc+3, 5, rc);
 
 	return (SDRC_SUCCESS);

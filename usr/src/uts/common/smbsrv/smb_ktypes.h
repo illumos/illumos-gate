@@ -42,6 +42,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/synch.h>
 #include <sys/taskq.h>
+#include <sys/socket.h>
 #include <sys/acl.h>
 #include <sys/sdt.h>
 #include <sys/vnode.h>
@@ -49,11 +50,10 @@ extern "C" {
 #include <sys/fem.h>
 #include <sys/door.h>
 #include <smbsrv/smb.h>
-#include <smbsrv/lmshare.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/mbuf.h>
 #include <smbsrv/smb_sid.h>
-
+#include <smbsrv/smb_xdr.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb_fsd.h>
@@ -836,6 +836,21 @@ typedef struct smb_tree {
 #define	PIPE_STATE_AUTH_VERIFY	0x00000001
 
 /*
+ * Data structure for SMB_FTYPE_MESG_PIPE ofiles, which is used
+ * at the interface between SMB and NDR RPC.
+ */
+typedef struct smb_opipe {
+	kmutex_t p_mutex;
+	kcondvar_t p_cv;
+	char *p_name;
+	uint32_t p_busy;
+	smb_opipe_hdr_t p_hdr;
+	smb_opipe_context_t p_context;
+	uint8_t *p_doorbuf;
+	uint8_t *p_data;
+} smb_opipe_t;
+
+/*
  * The of_ftype	of an open file should contain the SMB_FTYPE value
  * (cifs.h) returned when the file/pipe was opened. The following
  * assumptions are currently made:
@@ -883,8 +898,7 @@ typedef struct smb_ofile {
 	smb_user_t		*f_user;
 	smb_tree_t		*f_tree;
 	smb_node_t		*f_node;
-
-	mlsvc_pipe_t		*f_pipe_info;
+	smb_opipe_t		*f_pipe;
 
 	uint32_t		f_uniqid;
 	uint32_t		f_refcnt;

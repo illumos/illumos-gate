@@ -793,27 +793,11 @@ smb_node_get_mtime(smb_node_t *node)
  * smb_sync_fsattr() call to write the attribute changes to filesystem.
  */
 void
-smb_node_set_dosattr(smb_node_t *node, uint32_t dos_attr)
+smb_node_set_dosattr(smb_node_t *node, uint32_t dosattr)
 {
-	unsigned int mode;  /* New mode */
-
-	mode = 0;
-
-	/* Handle the archive bit */
-	if (dos_attr & SMB_FA_ARCHIVE)
-		mode |= FILE_ATTRIBUTE_ARCHIVE;
-
-	/* Handle the readonly bit */
-	if (dos_attr & SMB_FA_READONLY)
-		mode |= FILE_ATTRIBUTE_READONLY;
-
-	/* Handle the hidden bit */
-	if (dos_attr & SMB_FA_HIDDEN)
-		mode |= FILE_ATTRIBUTE_HIDDEN;
-
-	/* Handle the system bit */
-	if (dos_attr & SMB_FA_SYSTEM)
-		mode |= FILE_ATTRIBUTE_SYSTEM;
+	uint32_t mode = dosattr & (FILE_ATTRIBUTE_ARCHIVE |
+	    FILE_ATTRIBUTE_READONLY |
+	    FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM);
 
 	smb_rwx_xenter(&node->n_lock);
 	if (node->attr.sa_dosattr != mode) {

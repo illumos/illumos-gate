@@ -37,7 +37,6 @@
 #include <sys/ksynch.h>
 
 #include <smbsrv/wintypes.h>
-#include <smbsrv/smb_winpipe.h>
 #include <smbsrv/smb_xdr.h>
 
 
@@ -186,9 +185,6 @@ typedef struct mlsvc_pipe {
 	int32_t outlen;
 } mlsvc_pipe_t;
 
-struct mlsvc_rpc_context *mlrpc_process(int, smb_dr_user_ctx_t *);
-struct mlsvc_rpc_context *mlrpc_lookup(int fid);
-void mlrpc_release(int);
 void mlsvc_rpc_report_status(int opnum, DWORD status);
 
 #ifdef __cplusplus

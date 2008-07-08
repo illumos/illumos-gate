@@ -46,6 +46,22 @@ extern "C" {
 #endif
 
 /*
+ * Account Control Flags
+ * Use in SAMR Query Display Information RPC
+ */
+#define	ACF_DISABLED	0x001	/* account disable */
+#define	ACF_HOMEDIRREQ	0x002	/* home dir required */
+#define	ACF_PWDNOTREQ	0x004	/* password not required */
+#define	ACF_TEMPDUP	0x008	/* temp dup account */
+#define	ACF_NORMUSER	0x010	/* normal user */
+#define	ACF_MNS		0x020	/* MNS account */
+#define	ACF_DOMTRUST	0x040	/* Domain trust acct */
+#define	ACF_WSTRUST	0x080	/* WKST trust acct */
+#define	ACF_SVRTRUST	0x100	/* Server trust acct */
+#define	ACF_PWDNOEXP	0x200	/* password no expire */
+#define	ACF_AUTOLOCK	0x400	/* acct auto lock */
+
+/*
  * samlib.c
  */
 int sam_lookup_user_info(char *server, char *domain_name, char *username,

@@ -310,7 +310,7 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 		return (SDRC_ERROR);
 	}
 
-	if (smb_decode_mbc(&xa->req_param_mb, "%wwww4.u", sr,
+	if (smb_mbc_decodef(&xa->req_param_mb, "%wwww4.u", sr,
 	    &sattr, &maxcount, &fflag, &infolev, &path) != 0) {
 		return (SDRC_ERROR);
 	}
@@ -361,11 +361,7 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 	if (rc) {
 		smb_rdir_close(sr);
 		kmem_free(pattern, MAXNAMELEN);
-		if (rc == ENOENT)
-			smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
-			    ERRDOS, ERROR_INVALID_NAME);
-		else
-			smbsr_errno(sr, rc);
+		smbsr_errno(sr, rc);
 		return (SDRC_ERROR);
 	}
 
@@ -386,7 +382,7 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 		mutex_exit(&sr->sid_odir->d_mutex);
 	}
 
-	(void) smb_encode_mbc(&xa->rep_param_mb, "wwwww",
+	(void) smb_mbc_encodef(&xa->rep_param_mb, "wwwww",
 	    sid, count, (more ? 0 : 1), 0, 0);
 
 	kmem_free(pattern, MAXNAMELEN);
@@ -457,14 +453,14 @@ smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 	 * The last parameter in the request is a path, which is a
 	 * null-terminated unicode string.
 	 *
-	 * smb_decode_mbc(&xa->req_param_mb, "%www lwu", sr,
+	 * smb_mbc_decodef(&xa->req_param_mb, "%www lwu", sr,
 	 *    &sr->smb_sid, &maxcount, &infolev, &cookie, &fflag, &path)
 	 *
 	 * We don't reference this parameter and it is not currently
 	 * decoded because we a expect 2-byte null but Mac OS 10
 	 * clients send a 1-byte null, which leads to a decode error.
 	 */
-	if (smb_decode_mbc(&xa->req_param_mb, "%www lw", sr,
+	if (smb_mbc_decodef(&xa->req_param_mb, "%wwwlw", sr,
 	    &sr->smb_sid, &maxcount, &infolev, &cookie, &fflag) != 0) {
 		return (SDRC_ERROR);
 	}
@@ -526,7 +522,7 @@ smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 		mutex_exit(&sr->sid_odir->d_mutex);
 	}
 
-	(void) smb_encode_mbc(&xa->rep_param_mb, "wwww",
+	(void) smb_mbc_encodef(&xa->rep_param_mb, "wwww",
 	    count, (more ? 0 : 1), 0, 0);
 
 	kmem_free(pattern, MAXNAMELEN);
@@ -1012,10 +1008,10 @@ smb_trans2_find_mbc_encode(
 	switch (infolev) {
 	case SMB_INFO_STANDARD:
 		if (fflag & SMB_FIND_RETURN_RESUME_KEYS)
-			(void) smb_encode_mbc(&xa->rep_data_mb, "l",
+			(void) smb_mbc_encodef(&xa->rep_data_mb, "l",
 			    ient->cookie);
 
-		(void) smb_encode_mbc(&xa->rep_data_mb, "%yyyllwbu", sr,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%yyyllwbu", sr,
 		    ient->attr.sa_crtime.tv_sec ? ient->attr.sa_crtime.tv_sec :
 		    ient->attr.sa_vattr.va_mtime.tv_sec,
 		    ient->attr.sa_vattr.va_atime.tv_sec,
@@ -1029,10 +1025,10 @@ smb_trans2_find_mbc_encode(
 
 	case SMB_INFO_QUERY_EA_SIZE:
 		if (fflag & SMB_FIND_RETURN_RESUME_KEYS)
-			(void) smb_encode_mbc(&xa->rep_data_mb, "l",
+			(void) smb_mbc_encodef(&xa->rep_data_mb, "l",
 			    ient->cookie);
 
-		(void) smb_encode_mbc(&xa->rep_data_mb, "%yyyllwlbu", sr,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%yyyllwlbu", sr,
 		    ient->attr.sa_crtime.tv_sec ? ient->attr.sa_crtime.tv_sec :
 		    ient->attr.sa_vattr.va_mtime.tv_sec,
 		    ient->attr.sa_vattr.va_atime.tv_sec,
@@ -1046,7 +1042,7 @@ smb_trans2_find_mbc_encode(
 		break;
 
 	case SMB_FIND_FILE_DIRECTORY_INFO:
-		(void) smb_encode_mbc(&xa->rep_data_mb, "%llTTTTqqllu", sr,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqllu", sr,
 		    next_entry_offset,
 		    ient->cookie,
 		    ient->attr.sa_crtime.tv_sec ? &ient->attr.sa_crtime :
@@ -1071,7 +1067,7 @@ smb_trans2_find_mbc_encode(
 		}
 		shortlen = smb_ascii_or_unicode_strlen(sr, ient->shortname);
 
-		(void) smb_encode_mbc(&xa->rep_data_mb, "%llTTTTqqlllb.24cu",
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqlllb.24cu",
 		    sr,
 		    next_entry_offset,
 		    ient->cookie,
@@ -1093,7 +1089,7 @@ smb_trans2_find_mbc_encode(
 		break;
 
 	case SMB_FIND_FILE_NAMES_INFO:
-		(void) smb_encode_mbc(&xa->rep_data_mb, "%lllu", sr,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lllu", sr,
 		    next_entry_offset,
 		    ient->cookie,
 		    uni_namelen,

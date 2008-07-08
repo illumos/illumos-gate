@@ -316,7 +316,7 @@ struct mslm_infonres {
 #define SRVSVC_OPNUM_NetServerTransportDel       0x1b
 #define SRVSVC_OPNUM_NetRemoteTOD                0x1c
 #define SRVSVC_OPNUM_NetServerSetServiceBits     0x1d
-#define SRVSVC_OPNUM_NetPathType NetPathType     0x1e
+#define SRVSVC_OPNUM_NetPathType                 0x1e
 #define SRVSVC_OPNUM_NetPathCanonicalize         0x1f
 #define SRVSVC_OPNUM_NetPathCompare              0x20
 #define SRVSVC_OPNUM_NetNameValidate             0x21
@@ -353,15 +353,7 @@ struct mslm_infonres {
 
 /*
  ***********************************************************************
- * NetConnectEnum: 
- *
- * Description:
- * 
- * Request for mslm_NetConnectEnum  returns
- * info of resources in MLRPC server connected
- * to network. Correctly level 0 and level 1 information 
- * are supported.
- *
+ * NetConnectEnum
  ***********************************************************************
  */
 
@@ -374,7 +366,7 @@ struct mslm_NetConnectInfoBuf0 {
 
 struct mslm_NetConnectInfo0 {
 	DWORD entries_read;
- SIZE_IS(entries_read)
+  SIZE_IS(entries_read)
         struct mslm_NetConnectInfoBuf0 *ci0;
 };
 
@@ -424,9 +416,19 @@ struct mslm_NetConnectEnum {
 
 /*
  ***********************************************************************
- * NetFileEnum: under construction.
+ * NetFileEnum
  ***********************************************************************
  */
+struct mslm_NetFileInfoBuf2 {
+	DWORD fi2_id;
+};
+
+struct mslm_NetFileInfo2 {
+	DWORD entries_read;
+  SIZE_IS(entries_read)
+	struct mslm_NetFileInfoBuf2 *fi2;
+};
+
 struct mslm_NetFileInfoBuf3 {
 	DWORD fi3_id;
 	DWORD fi3_permissions;
@@ -435,19 +437,17 @@ struct mslm_NetFileInfoBuf3 {
 	LPTSTR fi3_username;
 };
 
-
 struct mslm_NetFileInfo3 {
 	DWORD entries_read;
   SIZE_IS(entries_read)
 	struct mslm_NetFileInfoBuf3 *fi3;
 };
 
-
 union mslm_NetFileInfoResUnion {
+	CASE(2)	struct mslm_NetFileInfo2 *info2;
 	CASE(3)	struct mslm_NetFileInfo3 *info3;
 	DEFAULT	char *nullptr;
 };
-
 
 struct mslm_NetFileInfo {
 	DWORD level;
@@ -456,12 +456,11 @@ struct mslm_NetFileInfo {
 	union mslm_NetFileInfoResUnion ru;
 };
 
-
 OPERATION(SRVSVC_OPNUM_NetFileEnum)
 struct mslm_NetFileEnum {
 	IN	LPTSTR servername;
-	IN	DWORD unknown1;
-	IN	DWORD unknown2;
+	IN	DWORD basepath;
+	IN	DWORD username;
 	INOUT	struct mslm_NetFileInfo info;
 	IN	DWORD pref_max_len;
 	OUT	DWORD total_entries;
@@ -474,9 +473,7 @@ struct mslm_NetFileEnum {
  ***********************************************************************
  * NetFileClose
  *
- * I think this definition is complete but as it doesn't do anything
- * it probably isn't a big issue. It is used to close files reported
- * via NetFileEnum (i.e. the file id).
+ * Close files using a file id reported by NetFileEnum.
  ***********************************************************************
  */
 OPERATION(SRVSVC_OPNUM_NetFileClose)
@@ -490,6 +487,59 @@ struct mslm_NetFileClose {
 /*
  ***********************************************************************
  * NetShareGetInfo: netname is the name of a share.
+ *
+ * Levels:
+ *  1      Sets information about the shared resource: name, type
+ *         of resource and a comment.
+ *  2      Sets information about the shared resource: name, type,
+ *         permissions, password and number of connections.
+ *  501    Sets information about the shared resource: name, type
+ *         of resource and a comment.
+ *  502    Sets information about the shared resource, including
+ *         the name, type, permissions, number of connections etc.
+ *  1004   Specifies a comment for the shared resource.
+ *  1005   Specifies a set of flags describing the shared resource.
+ *  1006   Specifies the maximum number of concurrent connections
+ *         that the shared resource can accommodate.
+ *  1501   Specifies the SECURITY_DESCRIPTOR for the share.
+ *
+ * Windows Me/98/95 supports level 50, which is similar to level 1.
+ *
+ * shi1005_flags: SHI1005_VALID_FLAGS_SET defines the set of flags that
+ * can be set with the NetShareSetInfo function. SHI1005_FLAGS_DFS and
+ * SHI1005_FLAGS_DFS_ROOT can only be returned, but not set.
+ *
+ * 0x01    SHI1005_FLAGS_DFS
+ *         The specified share is present in a Dfs tree structure.
+ *         This flag cannot be set with NetShareSetInfo. 
+ *
+ * 0x02    SHI1005_FLAGS_DFS_ROOT
+ *         The specified share is the root volume in a Dfs tree.
+ *         This flag cannot be set with NetShareSetInfo. 
+ *
+ * 0x30    CSC_MASK               Client-side caching (CSC) state:
+ *   0x00  CSC_CACHE_MANUAL_REINT Automatic file-by-file
+ *                                reintegration not allowed. 
+ *   0x10  CSC_CACHE_AUTO_REINT   File-by-file reintegration allowed. 
+ *   0x20  CSC_CACHE_VDO          File opens do not need to be flowed. 
+ *   0x30  CSC_CACHE_NONE         CSC is disabled for this share.  
+ *
+ * 0x0100  SHI1005_FLAGS_RESTRICT_EXCLUSIVE_OPENS
+ *         The specified share disallows exclusive file opens,
+ *         where reads to an open file are disallowed. 
+ *
+ * 0x0200  SHI1005_FLAGS_FORCE_SHARED_DELETE
+ *         Shared files in the specified share can be forcibly deleted. 
+ *
+ * 0x0400  SHI1005_FLAGS_ALLOW_NAMESPACE_CACHING
+ *         Clients are allowed to cache the namespace of the share. 
+ *
+ * 0x0800  SHI1005_FLAGS_ACCESS_BASED_DIRECTORY_ENUM
+ *         The server will filter directory entries based on the access
+ *         permissions of the client. This flag is only supported on
+ *         servers running Windows Server 2003 SP1.
+ *         Note: The access-based enumeration (ABE) flag may also
+ *         appear as SHI1005_FLAGS_ENFORCE_NAMESPACE_ACCESS.
  ***********************************************************************
  */
 struct mslm_NetShareGetInfo0 {
@@ -515,6 +565,13 @@ struct mslm_NetShareGetInfo2 {
 	LPTSTR shi2_passwd;
 };
 
+struct mslm_NetShareGetInfo501 {
+	LPTSTR shi501_netname;
+	DWORD shi501_type;
+	LPTSTR shi501_comment;
+	DWORD shi501_reserved;
+};
+
 struct mslm_NetShareGetInfo502 {
 	LPTSTR shi502_netname;
 	DWORD shi502_type;
@@ -536,6 +593,7 @@ union mlsm_NetShareGetInfoResUnion {
 	CASE(0)		struct mslm_NetShareGetInfo0 *info0;
 	CASE(1)		struct mslm_NetShareGetInfo1 *info1;
 	CASE(2)		struct mslm_NetShareGetInfo2 *info2;
+	CASE(501)	struct mslm_NetShareGetInfo501 *info501;
 	CASE(502)	struct mslm_NetShareGetInfo502 *info502;
 	CASE(1005)	struct mslm_NetShareGetInfo1005 *info1005;
 	DEFAULT	char *nullptr;
@@ -562,6 +620,14 @@ struct mlsm_NetShareGetInfo {
 /*
  ***********************************************************************
  * NetShareSetInfo: netname is the name of a share.
+ * The levels and shi1005_flags are as described for NetShareGetInfo.
+ *
+ * Support for Access-based Enumeration (ABE) was added to Windows in
+ * Windows Server 2003 Service Pack 1. ABE filters directory contents
+ * (and other shared resources) returned via a share based on a user's
+ * access rights, i.e. a user would not see objects that are
+ * inaccessible to that user. ABE requests are made using info level
+ * 1005 with the value 0x0800 in the flags field (see NetShareGetInfo).
  ***********************************************************************
  */
 OPERATION(SRVSVC_OPNUM_NetShareSetInfo)
@@ -996,15 +1062,20 @@ struct mslm_NetRemoteTOD {
 	OUT DWORD	status;
 };
 
-/*  
- * SRVSVC_NetNameValidate (
- *	IN  LPTSTR		servername;
- *	IN  REFERENCE LPTSTR 	pathname;
- * 	IN  DWORD		type;
- * 	IN  DWORD		flags;
- *	OUT DWORD		status;  
- *	)
- */
+#define	NAMETYPE_USER		1
+#define	NAMETYPE_PASSWORD	2
+#define	NAMETYPE_GROUP		3
+#define	NAMETYPE_COMPUTER	4
+#define	NAMETYPE_EVENT		5
+#define	NAMETYPE_DOMAIN		6
+#define	NAMETYPE_SERVICE	7
+#define	NAMETYPE_NET		8
+#define	NAMETYPE_SHARE		9
+#define	NAMETYPE_MESSAGE	10
+#define	NAMETYPE_MESSAGEDEST	11
+#define	NAMETYPE_SHAREPASSWORD	12
+#define	NAMETYPE_WORKGROUP	13
+
 OPERATION(SRVSVC_OPNUM_NetNameValidate)
 struct mslm_NetNameValidate {
  	IN  LPTSTR		servername;

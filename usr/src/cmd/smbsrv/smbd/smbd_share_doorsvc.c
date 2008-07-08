@@ -42,16 +42,17 @@
 
 #include <smbsrv/libsmb.h>
 
-#include <smbsrv/lmshare.h>
-#include <smbsrv/lmshare_door.h>
+#include <smbsrv/smb_share.h>
 #include <smbsrv/smbinfo.h>
+
+#define	SMB_SHARE_DSRV_VERSION	1
+#define	SMB_SHARE_DSRV_COOKIE	((void*)(0xdeadbeef^SMB_SHARE_DSRV_VERSION))
 
 static int smb_share_dsrv_fd = -1;
 static pthread_mutex_t smb_share_dsrv_mtx = PTHREAD_MUTEX_INITIALIZER;
 
 static void smb_share_dsrv_dispatch(void *, char *, size_t, door_desc_t *,
     uint_t);
-static int smb_share_dsrv_check(int, char *);
 static int smb_share_dsrv_enum(smb_enumshare_info_t *esi);
 
 /*
@@ -74,16 +75,16 @@ smb_share_dsrv_start(void)
 	}
 
 	if ((smb_share_dsrv_fd = door_create(smb_share_dsrv_dispatch,
-	    LMSHR_DOOR_COOKIE, (DOOR_UNREF | DOOR_REFUSE_DESC))) < 0) {
+	    SMB_SHARE_DSRV_COOKIE, (DOOR_UNREF | DOOR_REFUSE_DESC))) < 0) {
 		syslog(LOG_ERR, "smb_share_dsrv_start: door_create: %s",
 		    strerror(errno));
 		(void) pthread_mutex_unlock(&smb_share_dsrv_mtx);
 		return (-1);
 	}
 
-	(void) unlink(LMSHR_DOOR_NAME);
+	(void) unlink(SMB_SHARE_DNAME);
 
-	if ((newfd = creat(LMSHR_DOOR_NAME, 0644)) < 0) {
+	if ((newfd = creat(SMB_SHARE_DNAME, 0644)) < 0) {
 		syslog(LOG_ERR, "smb_share_dsrv_start: open: %s",
 		    strerror(errno));
 		(void) door_revoke(smb_share_dsrv_fd);
@@ -93,9 +94,9 @@ smb_share_dsrv_start(void)
 	}
 
 	(void) close(newfd);
-	(void) fdetach(LMSHR_DOOR_NAME);
+	(void) fdetach(SMB_SHARE_DNAME);
 
-	if (fattach(smb_share_dsrv_fd, LMSHR_DOOR_NAME) < 0) {
+	if (fattach(smb_share_dsrv_fd, SMB_SHARE_DNAME) < 0) {
 		syslog(LOG_ERR, "smb_share_dsrv_start: fattach: %s",
 		    strerror(errno));
 		(void) door_revoke(smb_share_dsrv_fd);
@@ -119,7 +120,7 @@ smb_share_dsrv_stop(void)
 	(void) pthread_mutex_lock(&smb_share_dsrv_mtx);
 
 	if (smb_share_dsrv_fd != -1) {
-		(void) fdetach(LMSHR_DOOR_NAME);
+		(void) fdetach(SMB_SHARE_DNAME);
 		(void) door_revoke(smb_share_dsrv_fd);
 		smb_share_dsrv_fd = -1;
 	}
@@ -139,21 +140,21 @@ static void
 smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
     uint_t n_desc)
 {
-	DWORD rc;
-	int req_type, rc2;
-	char buf[LMSHR_DOOR_SIZE];
+	uint32_t rc;
+	int req_type;
+	char buf[SMB_SHARE_DSIZE];
 	unsigned int used;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
 	unsigned int dec_status;
 	unsigned int enc_status;
 	char *sharename, *sharename2;
-	lmshare_info_t lmshr_info;
-	lmshare_list_t lmshr_list;
+	smb_share_t lmshr_info;
+	smb_shrlist_t lmshr_list;
 	smb_enumshare_info_t esi;
 	int offset;
 
-	if ((cookie != LMSHR_DOOR_COOKIE) || (ptr == NULL) ||
+	if ((cookie != SMB_SHARE_DSRV_COOKIE) || (ptr == NULL) ||
 	    (size < sizeof (uint32_t))) {
 		(void) door_return(NULL, 0, NULL, 0);
 	}
@@ -163,16 +164,16 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 	req_type = smb_dr_get_uint32(dec_ctx);
 
 	switch (req_type) {
-	case LMSHR_DOOR_NUM_SHARES:
+	case SMB_SHROP_NUM_SHARES:
 		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
 			goto decode_error;
 
-		rc = lmshare_num_shares();
-		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
+		rc = smb_shr_count();
+		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
 		break;
 
-	case LMSHR_DOOR_DELETE:
+	case SMB_SHROP_DELETE:
 		sharename = smb_dr_get_string(dec_ctx);
 
 		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0) {
@@ -180,13 +181,13 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 			goto decode_error;
 		}
 
-		rc = lmshare_delete(sharename, 0);
-		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
+		rc = smb_shr_del(sharename, 0);
+		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
 		smb_dr_free_string(sharename);
 		break;
 
-	case LMSHR_DOOR_RENAME:
+	case SMB_SHROP_RENAME:
 		sharename = smb_dr_get_string(dec_ctx);
 		sharename2 = smb_dr_get_string(dec_ctx);
 
@@ -196,77 +197,59 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 			goto decode_error;
 		}
 
-		rc = lmshare_rename(sharename, sharename2, 0);
-		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
+		rc = smb_shr_ren(sharename, sharename2, 0);
+		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
 		smb_dr_free_string(sharename);
 		smb_dr_free_string(sharename2);
 		break;
 
-	case LMSHR_DOOR_GETINFO:
+	case SMB_SHROP_GETINFO:
 		sharename = smb_dr_get_string(dec_ctx);
 		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0) {
 			smb_dr_free_string(sharename);
 			goto decode_error;
 		}
 
-		rc = lmshare_getinfo(sharename, &lmshr_info);
-		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
+		rc = smb_shr_get(sharename, &lmshr_info);
+		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
-		smb_dr_put_lmshare(enc_ctx, &lmshr_info);
+		smb_dr_put_share(enc_ctx, &lmshr_info);
 		smb_dr_free_string(sharename);
 		break;
 
-	case LMSHR_DOOR_ADD:
-		smb_dr_get_lmshare(dec_ctx, &lmshr_info);
+	case SMB_SHROP_ADD:
+		smb_dr_get_share(dec_ctx, &lmshr_info);
 		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
 			goto decode_error;
 
-		rc = lmshare_add(&lmshr_info, 0);
-		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
+		rc = smb_shr_add(&lmshr_info, 0);
+		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
-		smb_dr_put_lmshare(enc_ctx, &lmshr_info);
+		smb_dr_put_share(enc_ctx, &lmshr_info);
 		break;
 
-	case LMSHR_DOOR_SETINFO:
-		smb_dr_get_lmshare(dec_ctx, &lmshr_info);
+	case SMB_SHROP_SETINFO:
+		smb_dr_get_share(dec_ctx, &lmshr_info);
 		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
 			goto decode_error;
 
-		rc = lmshare_setinfo(&lmshr_info, 0);
-		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
+		rc = smb_shr_set(&lmshr_info, 0);
+		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
 		break;
 
-	case LMSHR_DOOR_EXISTS:
-	case LMSHR_DOOR_IS_SPECIAL:
-	case LMSHR_DOOR_IS_RESTRICTED:
-	case LMSHR_DOOR_IS_ADMIN:
-	case LMSHR_DOOR_IS_VALID:
-	case LMSHR_DOOR_IS_DIR:
-		sharename = smb_dr_get_string(dec_ctx);
-		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0) {
-			smb_dr_free_string(sharename);
-			goto decode_error;
-		}
-
-		rc2 = smb_share_dsrv_check(req_type, sharename);
-		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
-		smb_dr_put_uint32(enc_ctx, rc2);
-		smb_dr_free_string(sharename);
-		break;
-
-	case LMSHR_DOOR_LIST:
+	case SMB_SHROP_LIST:
 		offset = smb_dr_get_int32(dec_ctx);
 		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
 			goto decode_error;
 
-		lmshare_list(offset, &lmshr_list);
-		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
-		smb_dr_put_lmshr_list(enc_ctx, &lmshr_list);
+		smb_shr_list(offset, &lmshr_list);
+		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
+		smb_dr_put_shrlist(enc_ctx, &lmshr_list);
 		break;
 
-	case LMSHR_DOOR_ENUM:
+	case SMB_SHROP_ENUM:
 		esi.es_bufsize = smb_dr_get_ushort(dec_ctx);
 		esi.es_username = smb_dr_get_string(dec_ctx);
 		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0) {
@@ -278,7 +261,7 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 
 		smb_dr_free_string(esi.es_username);
 
-		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_SUCCESS);
+		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
 		if (rc == NERR_Success) {
 			smb_dr_put_ushort(enc_ctx, esi.es_ntotal);
@@ -297,7 +280,7 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 
 	if ((enc_status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
 		enc_ctx = smb_dr_encode_start(buf, sizeof (buf));
-		smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_ERROR);
+		smb_dr_put_int32(enc_ctx, SMB_SHARE_DERROR);
 		smb_dr_put_uint32(enc_ctx, enc_status);
 		(void) smb_dr_encode_finish(enc_ctx, &used);
 	}
@@ -306,50 +289,10 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 	return;
 
 decode_error:
-	smb_dr_put_int32(enc_ctx, LMSHR_DOOR_SRV_ERROR);
+	smb_dr_put_int32(enc_ctx, SMB_SHARE_DERROR);
 	smb_dr_put_uint32(enc_ctx, dec_status);
 	(void) smb_dr_encode_finish(enc_ctx, &used);
 	(void) door_return(buf, used, NULL, 0);
-}
-
-/*
- * smb_share_dsrv_check
- *
- * Depending upon the opcode, this function will
- * either check the existence of a share/dir or
- * the the type of the specified share.
- */
-static int
-smb_share_dsrv_check(int opcode, char *sharename)
-{
-	int rc;
-
-	switch (opcode) {
-	case LMSHR_DOOR_EXISTS:
-		rc = lmshare_exists(sharename);
-		break;
-
-	case LMSHR_DOOR_IS_SPECIAL:
-		rc = lmshare_is_special(sharename);
-		break;
-
-	case LMSHR_DOOR_IS_RESTRICTED:
-		rc = lmshare_is_restricted(sharename);
-		break;
-
-	case LMSHR_DOOR_IS_ADMIN:
-		rc = lmshare_is_admin(sharename);
-		break;
-
-	case LMSHR_DOOR_IS_VALID:
-		rc = lmshare_is_valid(sharename);
-		break;
-
-	case LMSHR_DOOR_IS_DIR:
-		rc = lmshare_is_dir(sharename);
-	}
-
-	return (rc);
 }
 
 /*
@@ -372,8 +315,8 @@ smb_share_dsrv_check(int opcode, char *sharename)
 static int
 smb_share_dsrv_enum(smb_enumshare_info_t *esi)
 {
-	lmshare_iterator_t shi;
-	lmshare_info_t *si;
+	smb_shriter_t shi;
+	smb_share_t *si;
 	int remained;
 	uint16_t infolen = 0;
 	uint16_t cmntlen = 0;
@@ -393,14 +336,14 @@ smb_share_dsrv_enum(smb_enumshare_info_t *esi)
 	remained = esi->es_bufsize;
 
 	/* Do the necessary calculations in the first round */
-	lmshare_init_iterator(&shi, LMSHRM_ALL);
+	smb_shr_iterinit(&shi, SMB_SHRF_ALL);
 
-	while ((si = lmshare_iterate(&shi)) != NULL) {
-		if (si->mode & LMSHRM_LONGNAME)
+	while ((si = smb_shr_iterate(&shi)) != NULL) {
+		if (si->shr_flags & SMB_SHRF_LONGNAME)
 			continue;
 
-		if ((si->mode & LMSHRM_AUTOHOME) && !autohome_added) {
-			if (strcasecmp(esi->es_username, si->share_name) == 0)
+		if ((si->shr_flags & SMB_SHRF_AUTOHOME) && !autohome_added) {
+			if (strcasecmp(esi->es_username, si->shr_name) == 0)
 				autohome_added = B_TRUE;
 			else
 				continue;
@@ -411,7 +354,7 @@ smb_share_dsrv_enum(smb_enumshare_info_t *esi)
 		if (remained <= 0)
 			continue;
 
-		clen = strlen(si->comment) + 1;
+		clen = strlen(si->shr_cmnt) + 1;
 		sharelen = SHARE_INFO_1_SIZE + clen;
 
 		if (sharelen <= remained) {
@@ -429,28 +372,28 @@ smb_share_dsrv_enum(smb_enumshare_info_t *esi)
 	cmnt_offs = infolen;
 
 	/* Encode the data in the second round */
-	lmshare_init_iterator(&shi, LMSHRM_ALL);
+	smb_shr_iterinit(&shi, SMB_SHRF_ALL);
 	autohome_added = B_FALSE;
 
-	while ((si = lmshare_iterate(&shi)) != NULL) {
-		if (si->mode & LMSHRM_LONGNAME)
+	while ((si = smb_shr_iterate(&shi)) != NULL) {
+		if (si->shr_flags & SMB_SHRF_LONGNAME)
 			continue;
 
-		if ((si->mode & LMSHRM_AUTOHOME) && !autohome_added) {
-			if (strcasecmp(esi->es_username, si->share_name) == 0)
+		if ((si->shr_flags & SMB_SHRF_AUTOHOME) && !autohome_added) {
+			if (strcasecmp(esi->es_username, si->shr_name) == 0)
 				autohome_added = B_TRUE;
 			else
 				continue;
 		}
 
 		if (smb_msgbuf_encode(&info_mb, "13c.wl",
-		    si->oem_name, si->stype, cmnt_offs) < 0)
+		    si->shr_oemname, si->shr_type, cmnt_offs) < 0)
 			break;
 
-		if (smb_msgbuf_encode(&cmnt_mb, "s", si->comment) < 0)
+		if (smb_msgbuf_encode(&cmnt_mb, "s", si->shr_cmnt) < 0)
 			break;
 
-		cmnt_offs += strlen(si->comment) + 1;
+		cmnt_offs += strlen(si->shr_cmnt) + 1;
 		esi->es_nsent++;
 	}
 

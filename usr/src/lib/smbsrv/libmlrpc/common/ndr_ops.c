@@ -126,7 +126,7 @@ mlnds_bswap(void *srcbuf, void *dstbuf, size_t len)
  * operations and the reference to the heap. An external heap is provided
  * to the stream, rather than each stream creating its own heap.
  */
-int
+void
 mlnds_initialize(struct mlndr_stream *mlnds, unsigned pdu_size_hint,
     int composite_op, mlrpc_heap_t *heap)
 {
@@ -138,7 +138,7 @@ mlnds_initialize(struct mlndr_stream *mlnds, unsigned pdu_size_hint,
 	bzero(mlnds, sizeof (*mlnds));
 
 	if (pdu_size_hint > NDR_PDU_MAX_SIZE)
-		return (0);
+		return;
 
 	size = (pdu_size_hint == 0) ? NDR_PDU_BLOCK_SIZE : pdu_size_hint;
 	mlnds->pdu_base_addr = malloc(size);
@@ -155,27 +155,44 @@ mlnds_initialize(struct mlndr_stream *mlnds, unsigned pdu_size_hint,
 	mlnds->dir  = composite_op & 0xF0;
 
 	mlnds->outer_queue_tailp = &mlnds->outer_queue_head;
-	return (1);
 }
 
-int
-mlnds_finalize(struct mlndr_stream *mlnds, uint8_t *buf, uint32_t buflen)
+void
+mlnds_finalize(struct mlndr_stream *mlnds, ndr_fraglist_t *frags)
 {
+	iovec_t *iov;
 	ndr_frag_t *frag;
 	uint32_t size = 0;
 
-	for (frag = mlnds->head; frag; frag = frag->next)
+	bzero(frags, sizeof (ndr_fraglist_t));
+
+	for (frag = mlnds->frags.head; frag; frag = frag->next)
 		size += frag->len;
 
-	if (size == 0 || size >= NDR_PDU_MAX_SIZE || size > buflen)
-		return (0);
+	if (size == 0 || size >= NDR_PDU_MAX_SIZE)
+		return;
 
-	for (frag = mlnds->head; frag; frag = frag->next) {
-		bcopy(frag->buf, buf, frag->len);
-		buf += frag->len;
+	frags->iov = malloc(mlnds->frags.nfrag * sizeof (iovec_t));
+	if (frags->iov == NULL)
+		return;
+
+	frags->head = mlnds->frags.head;
+	frags->tail = mlnds->frags.tail;
+	frags->nfrag = mlnds->frags.nfrag;
+	bzero(&mlnds->frags, sizeof (ndr_fraglist_t));
+
+	frags->uio.uio_iov = frags->iov;
+	frags->uio.uio_iovcnt = frags->nfrag;
+	frags->uio.uio_offset = 0;
+	frags->uio.uio_segflg = UIO_USERSPACE;
+	frags->uio.uio_resid = size;
+
+	iov = frags->uio.uio_iov;
+	for (frag = frags->head; frag; frag = frag->next) {
+		iov->iov_base = (caddr_t)frag->buf;
+		iov->iov_len = frag->len;
+		++iov;
 	}
-
-	return (size);
 }
 
 /*
@@ -396,13 +413,13 @@ mlndo_destruct(struct mlndr_stream *mlnds)
 		mlnds->pdu_base_offset = 0;
 	}
 
-	while ((frag = mlnds->head) != NULL) {
-		mlnds->head = frag->next;
+	while ((frag = mlnds->frags.head) != NULL) {
+		mlnds->frags.head = frag->next;
 		free(frag);
 	}
 
-	mlnds->head = NULL;
-	mlnds->tail = NULL;
+	bzero(&mlnds->frags, sizeof (ndr_fraglist_t));
+
 	mlnds->outer_queue_head = 0;
 	mlnds->outer_current = 0;
 	mlnds->outer_queue_tailp = &mlnds->outer_queue_head;

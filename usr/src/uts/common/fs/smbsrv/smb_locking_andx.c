@@ -309,7 +309,7 @@ smb_com_locking_andx(smb_request_t *sr)
 		}
 
 		for (i = 0; i < unlock_num; i++) {
-			rc = smb_decode_mbc(&sr->smb_data, "w2.QQ",
+			rc = smb_mbc_decodef(&sr->smb_data, "w2.QQ",
 			    &sr->smb_pid, &offset64, &length64);
 			if (rc) {
 				/*
@@ -330,7 +330,7 @@ smb_com_locking_andx(smb_request_t *sr)
 		}
 
 		for (i = 0; i < lock_num; i++) {
-			rc = smb_decode_mbc(&sr->smb_data, "w2.QQ",
+			rc = smb_mbc_decodef(&sr->smb_data, "w2.QQ",
 			    &sr->smb_pid, &offset64, &length64);
 			if (rc) {
 				smbsr_error(sr, 0, ERRSRV, ERRerror);
@@ -346,7 +346,7 @@ smb_com_locking_andx(smb_request_t *sr)
 		}
 	} else {
 		for (i = 0; i < unlock_num; i++) {
-			rc = smb_decode_mbc(&sr->smb_data, "wll", &sr->smb_pid,
+			rc = smb_mbc_decodef(&sr->smb_data, "wll", &sr->smb_pid,
 			    &offset32, &length32);
 			if (rc) {
 				smbsr_error(sr, 0, ERRSRV, ERRerror);
@@ -363,7 +363,7 @@ smb_com_locking_andx(smb_request_t *sr)
 		}
 
 		for (i = 0; i < lock_num; i++) {
-			rc = smb_decode_mbc(&sr->smb_data, "wll", &sr->smb_pid,
+			rc = smb_mbc_decodef(&sr->smb_data, "wll", &sr->smb_pid,
 			    &offset32, &length32);
 			if (rc) {
 				smbsr_error(sr, 0, ERRSRV, ERRerror);

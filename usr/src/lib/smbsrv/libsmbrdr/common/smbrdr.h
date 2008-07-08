@@ -190,7 +190,7 @@ typedef struct smbrdr_handle {
 void nb_lock(void);
 void nb_unlock(void);
 void nb_close(int);
-int nb_keep_alive(int);
+int nb_keep_alive(int, short);
 
 int nb_send(int, unsigned char *, unsigned);
 int nb_rcv(int, unsigned char *, unsigned, long);
@@ -213,7 +213,7 @@ int smbrdr_logoffx(struct sdb_logon *);
 /* smbrdr_netuse.c */
 void smbrdr_netuse_logoff(unsigned short);
 struct sdb_netuse *smbrdr_netuse_get(int);
-unsigned short smbrdr_tree_connect(char *, char *, char *);
+DWORD smbrdr_tree_connect(char *, char *, char *, unsigned short *);
 int smbrdr_tree_disconnect(unsigned short);
 void smbrdr_netuse_put(struct sdb_netuse *);
 

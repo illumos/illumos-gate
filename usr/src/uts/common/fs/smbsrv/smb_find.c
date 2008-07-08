@@ -248,7 +248,7 @@ smb_com_find(smb_request_t *sr)
 		cookie = 0;
 	} else if (key_len == 21) {
 		sr->smb_sid = 0;
-		if (smb_decode_mbc(&sr->smb_data, SMB_RESUME_KEY_FMT,
+		if (smb_mbc_decodef(&sr->smb_data, SMB_RESUME_KEY_FMT,
 		    filename, &sr->smb_sid, &cookie) != 0) {
 			/* We don't know which rdir to close */
 			return (SDRC_ERROR);
@@ -268,7 +268,7 @@ smb_com_find(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	(void) smb_encode_mbc(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
+	(void) smb_mbc_encodef(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
 
 	pc = kmem_zalloc(sizeof (smb_odir_context_t), KM_SLEEP);
 	pc->dc_cookie = cookie;
@@ -280,7 +280,7 @@ smb_com_find(smb_request_t *sr)
 		if ((rc = smb_rdir_next(sr, &node, pc)) != 0)
 			break;
 
-		(void) smb_encode_mbc(&sr->reply, ".8c3cbl4.bYl13c",
+		(void) smb_mbc_encodef(&sr->reply, ".8c3cbl4.bYl13c",
 		    pc->dc_name83, pc->dc_name83+9, sr->smb_sid,
 		    pc->dc_cookie+1, pc->dc_dattr,
 		    smb_gmt2local(sr, pc->dc_attr.sa_vattr.va_mtime.tv_sec),
@@ -307,7 +307,7 @@ smb_com_find(smb_request_t *sr)
 	}
 
 	rc = (MBC_LENGTH(&sr->reply) - sr->cur_reply_offset) - 8;
-	if (smb_poke_mbc(&sr->reply, sr->cur_reply_offset, "bwwbw",
+	if (smb_mbc_poke(&sr->reply, sr->cur_reply_offset, "bwwbw",
 	    1, count, rc+3, 5, rc) < 0) {
 		smb_rdir_close(sr);
 		return (SDRC_ERROR);
@@ -432,7 +432,7 @@ smb_com_find_close(smb_request_t *sr)
 
 	if (key_len == 21) {
 		sr->smb_sid = 0;
-		if (smb_decode_mbc(&sr->smb_data, SMB_RESUME_KEY_FMT,
+		if (smb_mbc_decodef(&sr->smb_data, SMB_RESUME_KEY_FMT,
 		    filename, &sr->smb_sid, &cookie) != 0) {
 			return (SDRC_ERROR);
 		}

@@ -39,9 +39,12 @@ smb_com_session_setup_andx:return
 {
 }
 
-sdt:smbsrv::smb-dispatch-com
+smb_com_*:entry
 {
-    printf("command=%d", ((smb_request_t *)arg0)->smb_com);
+	sr = (struct smb_request *)arg0;
+
+	printf("cmd=%d [uid=%d tid=%d]",
+	    sr->smb_com, sr->smb_uid, sr->smb_tid);
 }
 
 sdt:smbsrv::smb-sessionsetup-clntinfo

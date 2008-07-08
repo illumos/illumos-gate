@@ -156,7 +156,7 @@ smbd_join(smb_joininfo_t *info)
 		if ((smb_config_get_secmode() == SMB_SECMODE_DOMAIN) &&
 		    kpasswd_domain == '\0') {
 
-			if (ads_domain_change_cleanup("") != 0) {
+			if (smb_ads_domain_change_cleanup("") != 0) {
 				syslog(LOG_ERR, "smbd: unable to remove the"
 				    " old keys from the Kerberos keytab. "
 				    "Please remove the old keys for your "
@@ -195,7 +195,7 @@ smbd_join(smb_joininfo_t *info)
 		return (NT_STATUS_INVALID_PARAMETER);
 	}
 
-	if (ads_domain_change_cleanup(fqdn)) {
+	if (smb_ads_domain_change_cleanup(fqdn)) {
 		syslog(LOG_ERR, "smbd: unable to remove the old keys from the"
 		    " Kerberos keytab. Please remove the old keys for your "
 		    "host principal.");
@@ -379,7 +379,7 @@ smb_netlogon_dc_browser(void *arg)
 		(void) strlcpy(dc, smb_netlogon_info.snli_dc, MAXHOSTNAMELEN);
 
 		smb_setdomaininfo(NULL, NULL, 0);
-		if ((msdcs_lookup_ads(resource_domain, dc) == 0) &&
+		if ((smb_msdcs_lookup_ads(resource_domain, dc) == 0) &&
 		    (nt4_domain_support)) {
 			/* Try to locate a DC via NetBIOS */
 			smb_browser_netlogon(resource_domain);

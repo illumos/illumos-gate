@@ -191,7 +191,7 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 	unsigned char		WatchTree;
 	smb_node_t		*node;
 
-	if (smb_decode_mbc(&xa->req_setup_mb, "lwb",
+	if (smb_mbc_decodef(&xa->req_setup_mb, "lwb",
 	    &CompletionFilter, &sr->smb_fid, &WatchTree) != 0)
 		return (SDRC_NOT_IMPLEMENTED);
 
@@ -298,7 +298,7 @@ smb_reply_notify_change_request(smb_request_t *sr)
 
 		/* many things changed */
 
-		(void) smb_encode_mbc(&xa->rep_data_mb, "l", 0L);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "l", 0L);
 
 		/* setup the NT transact reply */
 
@@ -316,7 +316,7 @@ smb_reply_notify_change_request(smb_request_t *sr)
 		total_bytes = param_pad + n_param + data_pad + n_data;
 
 		(void) smbsr_encode_result(sr, 18+n_setup, total_bytes,
-		    "b 3. llllllllb C w #. C #. C",
+		    "b3.llllllllbCw#.C#.C",
 		    18 + n_setup,	/* wct */
 		    n_param,		/* Total Parameter Bytes */
 		    n_data,		/* Total Data Bytes */
@@ -342,7 +342,7 @@ smb_reply_notify_change_request(smb_request_t *sr)
 		err.errcode  = ERROR_OPERATION_ABORTED;
 		smbsr_set_error(sr, &err);
 
-		(void) smb_encode_mbc(&sr->reply, "bwbw",
+		(void) smb_mbc_encodef(&sr->reply, "bwbw",
 		    (short)0, 0L, (short)0, 0L);
 		sr->smb_wct = 0;
 		sr->smb_bcc = 0;
@@ -353,7 +353,7 @@ smb_reply_notify_change_request(smb_request_t *sr)
 	mutex_exit(&sr->sr_mutex);
 
 	/* Setup the header */
-	(void) smb_poke_mbc(&sr->reply, 0, SMB_HEADER_ED_FMT,
+	(void) smb_mbc_poke(&sr->reply, 0, SMB_HEADER_ED_FMT,
 	    sr->first_smb_com,
 	    sr->smb_rcls,
 	    sr->smb_reh,

@@ -49,8 +49,7 @@
 #include <strings.h>
 #include "libshare_smb.h"
 #include <rpcsvc/daemon_utils.h>
-#include <smbsrv/lmshare.h>
-#include <smbsrv/lmshare_door.h>
+#include <smbsrv/smb_share.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/libsmb.h>
 
@@ -83,8 +82,6 @@ static int smb_enable_resource(sa_resource_t);
 static int smb_disable_resource(sa_resource_t);
 static uint64_t smb_share_features(void);
 static int smb_list_transient(sa_handle_t);
-
-extern void lmshrd_door_close(void);
 
 /* size of basic format allocation */
 #define	OPT_CHUNK	1024
@@ -143,8 +140,8 @@ struct sa_plugin_ops sa_plugin_ops = {
  */
 
 struct option_defs optdefs[] = {
-	{SHOPT_AD_CONTAINER, OPT_TYPE_STRING},
-	{SHOPT_NAME, OPT_TYPE_NAME},
+	{SMB_SHROPT_AD_CONTAINER, OPT_TYPE_STRING},
+	{SMB_SHROPT_NAME, OPT_TYPE_NAME},
 	{NULL, NULL},
 };
 
@@ -322,7 +319,7 @@ smb_enable_share(sa_share_t share)
 {
 	char *path;
 	char *rname;
-	lmshare_info_t si;
+	smb_share_t si;
 	sa_resource_t resource;
 	boolean_t iszfs;
 	boolean_t privileged;
@@ -413,7 +410,7 @@ smb_enable_share(sa_share_t share)
 	for (resource = sa_get_share_resource(share, NULL);
 	    resource != NULL;
 	    resource = sa_get_next_resource(resource)) {
-		bzero(&si, sizeof (lmshare_info_t));
+		bzero(&si, sizeof (smb_share_t));
 		rname = sa_get_resource_attr(resource, "name");
 		if (rname == NULL) {
 			sa_free_attr_string(path);
@@ -424,7 +421,7 @@ smb_enable_share(sa_share_t share)
 		sa_free_attr_string(rname);
 
 		if (!iszfs) {
-			err = lmshrd_add(&si);
+			err = smb_share_add(&si);
 		} else {
 			share_t sh;
 
@@ -456,7 +453,7 @@ smb_enable_resource(sa_resource_t resource)
 	char *path;
 	char *rname;
 	sa_share_t share;
-	lmshare_info_t si;
+	smb_share_t si;
 	int ret = SA_OK;
 	int err;
 	boolean_t isonline;
@@ -500,7 +497,7 @@ smb_enable_resource(sa_resource_t resource)
 	 * to the attempt to enable.
 	 */
 
-	err = lmshrd_add(&si);
+	err = smb_share_add(&si);
 	if (err == NERR_Success || !(!isonline && err == NERR_DuplicateName))
 		(void) sa_update_sharetab(share, "smb");
 	else
@@ -517,7 +514,7 @@ static int
 smb_disable_resource(sa_resource_t resource)
 {
 	char *rname;
-	DWORD res;
+	uint32_t res;
 	sa_share_t share;
 
 	rname = sa_get_resource_attr(resource, "name");
@@ -525,7 +522,7 @@ smb_disable_resource(sa_resource_t resource)
 		return (SA_NO_SUCH_RESOURCE);
 
 	if (smb_isonline()) {
-		res = lmshrd_delete(rname);
+		res = smb_share_del(rname);
 		if (res != NERR_Success) {
 			sa_free_attr_string(rname);
 			return (SA_CONFIG_ERR);
@@ -585,9 +582,9 @@ smb_share_changed(sa_share_t share)
 static int
 smb_resource_changed(sa_resource_t resource)
 {
-	DWORD res;
-	lmshare_info_t si;
-	lmshare_info_t new_si;
+	uint32_t res;
+	smb_share_t si;
+	smb_share_t new_si;
 	char *rname, *path;
 	sa_share_t share;
 
@@ -613,7 +610,7 @@ smb_resource_changed(sa_resource_t resource)
 	}
 
 	/* Update the share cache in smb/server */
-	res = lmshrd_getinfo(rname, &si);
+	res = smb_share_get(rname, &si);
 	if (res != NERR_Success) {
 		sa_free_attr_string(path);
 		sa_free_attr_string(rname);
@@ -628,7 +625,7 @@ smb_resource_changed(sa_resource_t resource)
 	 * Update all fields from sa_share_t
 	 * Get derived values.
 	 */
-	if (lmshrd_setinfo(&new_si) != LMSHR_DOOR_SRV_SUCCESS)
+	if (smb_share_set(&new_si) != SMB_SHARE_DSUCCESS)
 		return (SA_CONFIG_ERR);
 	return (smb_enable_service());
 }
@@ -673,7 +670,7 @@ smb_disable_share(sa_share_t share, char *path)
 			continue;
 		}
 		if (!iszfs) {
-			err = lmshrd_delete(rname);
+			err = smb_share_del(rname);
 			switch (err) {
 			case NERR_NetNameNotFound:
 			case NERR_Success:
@@ -1078,7 +1075,7 @@ smb_share_fini(void)
 	xmlFreeNode(protoset);
 	protoset = NULL;
 
-	(void) lmshrd_door_close();
+	(void) smb_share_dclose();
 }
 
 /*
@@ -1381,7 +1378,7 @@ smb_share_features(void)
  * supplied to sharemanager to display temp shares.
  */
 static int
-smb_build_tmp_sa_resource(sa_handle_t handle, lmshare_info_t *si)
+smb_build_tmp_sa_resource(sa_handle_t handle, smb_share_t *si)
 {
 	int err;
 	sa_share_t share;
@@ -1398,16 +1395,16 @@ smb_build_tmp_sa_resource(sa_handle_t handle, lmshare_info_t *si)
 	 * group. If it doesn't exist, it needs to land in "smb".
 	 */
 
-	share = sa_find_share(handle, si->directory);
+	share = sa_find_share(handle, si->shr_path);
 	if (share != NULL) {
 		group = sa_get_parent_group(share);
 	} else {
 		group = smb_get_smb_share_group(handle);
 		if (group == NULL)
 			return (SA_NO_SUCH_GROUP);
-		share = sa_get_share(group, si->directory);
+		share = sa_get_share(group, si->shr_path);
 		if (share == NULL) {
-			share = sa_add_share(group, si->directory,
+			share = sa_add_share(group, si->shr_path,
 			    SA_SHARE_TRANSIENT, &err);
 			if (share == NULL)
 				return (SA_NO_SUCH_PATH);
@@ -1418,18 +1415,18 @@ smb_build_tmp_sa_resource(sa_handle_t handle, lmshare_info_t *si)
 	 * Now handle the resource. Make sure that the resource is
 	 * transient and added to the share.
 	 */
-	resource = sa_get_share_resource(share, si->share_name);
+	resource = sa_get_share_resource(share, si->shr_name);
 	if (resource == NULL) {
 		resource = sa_add_resource(share,
-		    si->share_name, SA_SHARE_TRANSIENT, &err);
+		    si->shr_name, SA_SHARE_TRANSIENT, &err);
 		if (resource == NULL)
 			return (SA_NO_SUCH_RESOURCE);
 	}
 
 	/* set resource attributes now */
-	(void) sa_set_resource_attr(resource, "description", si->comment);
-	(void) sa_set_resource_attr(resource, SHOPT_AD_CONTAINER,
-	    si->container);
+	(void) sa_set_resource_attr(resource, "description", si->shr_cmnt);
+	(void) sa_set_resource_attr(resource, SMB_SHROPT_AD_CONTAINER,
+	    si->shr_container);
 
 	return (SA_OK);
 }
@@ -1445,14 +1442,14 @@ static int
 smb_list_transient(sa_handle_t handle)
 {
 	int i, offset, num;
-	lmshare_list_t list;
+	smb_shrlist_t list;
 	int res;
 
-	num = lmshrd_num_shares();
+	num = smb_share_count();
 	if (num <= 0)
 		return (SA_OK);
 	offset = 0;
-	while (lmshrd_list(offset, &list) != NERR_InternalError) {
+	while (smb_share_list(offset, &list) != NERR_InternalError) {
 		if (list.no == 0)
 			break;
 		for (i = 0; i < list.no; i++) {
@@ -1848,7 +1845,7 @@ smb_rename_resource(sa_handle_t handle, sa_resource_t resource, char *newname)
 	if (oldname == NULL)
 		return (SA_NO_SUCH_RESOURCE);
 
-	err = lmshrd_rename(oldname, newname);
+	err = smb_share_ren(oldname, newname);
 
 	/* improve error values somewhat */
 	switch (err) {

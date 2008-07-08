@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,20 +38,43 @@ extern "C" {
 #endif
 
 /*
- * File creation flags must start at the high end since they
- * are combined with the attributes
+ * The Volume and Directory bits are for SMB rather than NT.
+ * NT has an explicit Normal bit; this bit is implied in SMB
+ * when the Hidden, System and Directory bits are not set.
+ *
+ * File attributes and creation flags share the same 32-bit
+ * space.
  */
-
-#define	FILE_FLAG_WRITE_THROUGH			0x80000000
-#define	FILE_FLAG_OVERLAPPED			0x40000000
-#define	FILE_FLAG_NO_BUFFERING			0x20000000
-#define	FILE_FLAG_RANDOM_ACCESS			0x10000000
-#define	FILE_FLAG_SEQUENTIAL_SCAN		0x08000000
-#define	FILE_FLAG_DELETE_ON_CLOSE		0x04000000
-#define	FILE_FLAG_BACKUP_SEMANTICS		0x02000000
-#define	FILE_FLAG_POSIX_SEMANTICS		0x01000000
-#define	FILE_FLAG_OPEN_REPARSE_POINT		0x00200000
+#define	FILE_ATTRIBUTE_READONLY			0x00000001
+#define	FILE_ATTRIBUTE_HIDDEN			0x00000002
+#define	FILE_ATTRIBUTE_SYSTEM			0x00000004
+#define	FILE_ATTRIBUTE_VOLUME			0x00000008
+#define	FILE_ATTRIBUTE_DIRECTORY		0x00000010
+#define	FILE_ATTRIBUTE_ARCHIVE			0x00000020
+#define	FILE_ATTRIBUTE_DEVICE			0x00000040
+#define	FILE_ATTRIBUTE_NORMAL			0x00000080
+#define	FILE_ATTRIBUTE_TEMPORARY		0x00000100
+#define	FILE_ATTRIBUTE_SPARSE_FILE		0x00000200
+#define	FILE_ATTRIBUTE_REPARSE_POINT		0x00000400
+#define	FILE_ATTRIBUTE_COMPRESSED		0x00000800
+#define	FILE_ATTRIBUTE_OFFLINE			0x00001000
+#define	FILE_ATTRIBUTE_NOT_CONTENT_INDEXED	0x00002000
+#define	FILE_ATTRIBUTE_ENCRYPTED		0x00004000
+#define	FILE_ATTRIBUTE_VIRTUAL			0x00010000
 #define	FILE_FLAG_OPEN_NO_RECALL		0x00100000
+#define	FILE_FLAG_OPEN_REPARSE_POINT		0x00200000
+#define	FILE_FLAG_POSIX_SEMANTICS		0x01000000
+#define	FILE_FLAG_BACKUP_SEMANTICS		0x02000000
+#define	FILE_FLAG_DELETE_ON_CLOSE		0x04000000
+#define	FILE_FLAG_SEQUENTIAL_SCAN		0x08000000
+#define	FILE_FLAG_RANDOM_ACCESS			0x10000000
+#define	FILE_FLAG_NO_BUFFERING			0x20000000
+#define	FILE_FLAG_OVERLAPPED			0x40000000
+#define	FILE_FLAG_WRITE_THROUGH			0x80000000
+
+#define	FILE_ATTRIBUTE_VALID_FLAGS		0x00001fb7
+#define	FILE_ATTRIBUTE_VALID_SET_FLAGS		0x00001fa7
+#define	FILE_ATTRIBUTE_MASK			0x00003FFF
 
 /*
  * The create/open option flags: used in NtCreateAndx and NtTransactCreate

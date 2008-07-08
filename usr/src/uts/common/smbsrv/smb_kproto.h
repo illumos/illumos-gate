@@ -277,19 +277,16 @@ void	smbsr_errno(struct smb_request *, int);
 void	smbsr_warn(struct smb_request *, DWORD, uint16_t, uint16_t);
 void	smbsr_error(struct smb_request *, DWORD, uint16_t, uint16_t);
 
-int	smb_mbc_encode(struct mbuf_chain *mbc, char *fmt, va_list ap);
-int	smb_mbc_decode(struct mbuf_chain *mbc, char *fmt, va_list ap);
-
 int	clock_get_milli_uptime(void);
 int	dosfs_dos_to_ux_time(int, int);
 int	dosfs_ux_to_dos_time(int, short int *, short int *);
 
-int	smb_decode_mbc(struct  mbuf_chain *mbc, char *fmt, ...);
-int	smb_decode_buf(unsigned char *buf, int n_buf, char *fmt, ...);
-int	smb_encode_mbc(struct mbuf_chain *mbc, char *fmt, ...);
-int	smb_encode_buf(unsigned char *buf, int n_buf, char *fmt, ...);
-int	smb_peek_mbc(struct mbuf_chain *buf, int offset, char *fmt, ...);
-int	smb_poke_mbc(struct mbuf_chain *buf, int offset, char *fmt, ...);
+int	smb_mbc_vencodef(mbuf_chain_t *, char *, va_list);
+int	smb_mbc_vdecodef(mbuf_chain_t *, char *, va_list);
+int	smb_mbc_decodef(mbuf_chain_t *, char *, ...);
+int	smb_mbc_encodef(mbuf_chain_t *, char *, ...);
+int	smb_mbc_peek(mbuf_chain_t *, int, char *, ...);
+int	smb_mbc_poke(mbuf_chain_t *, int, char *, ...);
 
 void	smbsr_encode_header(struct smb_request *sr, int wct,
 		    int bcc, char *fmt, ...);
@@ -328,11 +325,18 @@ int smb_net_txr_send(struct sonode *, smb_txlst_t *, smb_txreq_t *);
 /*
  * SMB RPC interface
  */
-int smb_rpc_open(struct smb_request *);
-void smb_rpc_close(struct smb_ofile *);
-smb_sdrc_t smb_rpc_transact(struct smb_request *, struct uio *);
-int smb_rpc_read(struct smb_request *, struct uio *);
-int smb_rpc_write(struct smb_request *, struct uio *);
+int smb_opipe_open(smb_request_t *);
+void smb_opipe_close(smb_ofile_t *);
+smb_sdrc_t smb_opipe_transact(smb_request_t *, struct uio *);
+int smb_opipe_read(smb_request_t *, struct uio *);
+int smb_opipe_write(smb_request_t *, struct uio *);
+
+void smb_opipe_door_init(void);
+void smb_opipe_door_fini(void);
+int smb_opipe_door_open(int);
+void smb_opipe_door_close(void);
+void smb_user_context_init(smb_user_t *, smb_opipe_context_t *);
+void smb_user_list_free(smb_dr_ulist_t *);
 
 /*
  * SMB server functions (file smb_server.c)
@@ -482,7 +486,7 @@ int smb_sign_check_secondary(struct smb_request *req, unsigned int seqnum);
 void smb_sign_reply(struct smb_request *req, struct mbuf_chain *reply);
 
 uint32_t smb_mode_to_dos_attributes(smb_attr_t *ap);
-int smb_sattr_check(smb_attr_t *ap, char *name, unsigned short sattr);
+boolean_t smb_sattr_check(smb_attr_t *, char *, unsigned short);
 
 void smb_request_cancel(smb_request_t *sr);
 
@@ -516,10 +520,8 @@ void smb_request_free(smb_request_t *);
  * ofile functions (file smb_ofile.c)
  */
 smb_ofile_t *smb_ofile_lookup_by_fid(smb_tree_t *tree, uint16_t fid);
-smb_ofile_t *smb_ofile_open(smb_tree_t *tree, smb_node_t *node, uint16_t pid,
-    uint32_t access_granted, uint32_t create_options, uint32_t share_access,
-    uint16_t ftype, char *pipe_name, uint32_t rpc_fid, uint32_t uniqid,
-    smb_error_t *err);
+smb_ofile_t *smb_ofile_open(smb_tree_t *, smb_node_t *, uint16_t, uint32_t,
+    uint32_t, uint32_t, uint16_t, uint32_t, smb_error_t *);
 int smb_ofile_close(smb_ofile_t *ofile, uint32_t last_wtime);
 uint32_t smb_ofile_access(smb_ofile_t *ofile, cred_t *cr, uint32_t access);
 int smb_ofile_seek(smb_ofile_t *of, ushort_t mode, int32_t off,
@@ -578,11 +580,7 @@ smb_tree_t *smb_tree_lookup_by_name(smb_user_t *, char *, smb_tree_t *);
 smb_tree_t *smb_tree_lookup_by_fsd(smb_user_t *, fs_desc_t *, smb_tree_t *);
 void smb_tree_release(smb_tree_t *tree);
 
-void smb_dr_user_free(smb_dr_user_ctx_t *uinfo);
 void smb_dr_ulist_free(smb_dr_ulist_t *ulist);
-int smb_dr_user_create(smb_dr_user_ctx_t *, uint64_t, uint16_t, char *, char *,
-    char *, uint32_t, int32_t, time_t, uint32_t);
-
 
 /*
  * SMB user's credential functions
@@ -610,13 +608,6 @@ void smb_mbuf_trim(struct mbuf *mhead, int nbytes);
 void smb_check_status(void);
 int smb_handle_write_raw(smb_session_t *session, smb_request_t *sr);
 
-void smb_winpipe_init(void);
-void smb_winpipe_fini(void);
-int smb_winpipe_open(int door_id);
-void smb_winpipe_close(void);
-int smb_winpipe_call(smb_request_t *, mlsvc_pipe_t *, mlsvc_stream_t *,
-    uint16_t, uint32_t *, boolean_t *);
-
 void smb_reconnection_check(struct smb_session *session);
 
 uint32_t nt_to_unix_time(uint64_t nt_time, timestruc_t *unix_time);
@@ -635,7 +626,7 @@ int uioxfer(struct uio *src_uio, struct uio *dst_uio, int n);
 
 int smb_match_name(ino64_t fileid, char *name, char *shortname,
     char *name83, char *pattern, int ignore_case);
-int is_dot_or_dotdot(char *name);
+boolean_t smb_is_dot_or_dotdot(const char *);
 int token2buf(smb_token_t *token, char *buf);
 
 /*

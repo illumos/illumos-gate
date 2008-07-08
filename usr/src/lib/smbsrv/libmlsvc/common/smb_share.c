@@ -54,66 +54,70 @@
 #include <libshare.h>
 
 #include <smbsrv/lm.h>
-#include <smbsrv/lmshare.h>
+#include <smbsrv/smb_share.h>
 #include <smbsrv/cifs.h>
 
 #include <smbsrv/ctype.h>
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb_fsd.h>
 
-#define	LMSHR_HASHTAB_SZ	1024
+#define	SMB_SHARE_HTAB_SZ	1024
 
-static HT_HANDLE *lmshare_handle = NULL;
+#define	SMB_SHARE_PUBLISH	0
+#define	SMB_SHARE_UNPUBLISH	1
 
-static rwlock_t lmshare_lock;
-static pthread_t lmshare_load_thread;
-static void *lmshare_load(void *);
-static DWORD lmshare_create_table(void);
-static int lmshare_delete_shmgr(struct lmshare_info *);
-static int lmshare_setinfo_shmgr(struct lmshare_info *);
-static DWORD lmshare_set_refcnt(char *, int);
-static void lmshare_set_oemname(lmshare_info_t *);
+static HT_HANDLE *smb_shr_handle = NULL;
+static rwlock_t smb_shr_lock;
+static pthread_t smb_shr_cache_populatethr;
 
-typedef struct lmshare_ad_item {
-	TAILQ_ENTRY(lmshare_ad_item) next;
+static uint32_t smb_shr_cache_create(void);
+static void *smb_shr_cache_populate(void *);
+static int smb_shr_del_shmgr(smb_share_t *);
+static int smb_shr_set_shmgr(smb_share_t *);
+static uint32_t smb_shr_set_refcnt(char *, int);
+static void smb_shr_set_oemname(smb_share_t *);
+
+typedef struct smb_shr_adinfo {
+	TAILQ_ENTRY(smb_shr_adinfo) next;
 	char name[MAXNAMELEN];
 	char container[MAXPATHLEN];
 	char flag;
-} lmshare_ad_item_t;
+} smb_shr_adinfo_t;
 
-typedef struct lmshare_ad_queue {
+typedef struct smb_shr_adqueue {
 	int nentries;
-	TAILQ_HEAD(adqueue, lmshare_ad_item) adlist;
-} lmshare_ad_queue_t;
+	TAILQ_HEAD(adqueue, smb_shr_adinfo) adlist;
+} smb_shr_adqueue_t;
 
-static lmshare_ad_queue_t ad_queue;
+static smb_shr_adqueue_t ad_queue;
 static int publish_on = 0;
 
-static pthread_t lmshare_publish_thread;
-static mutex_t lmshare_publish_mutex = PTHREAD_MUTEX_INITIALIZER;
-static cond_t lmshare_publish_cv = DEFAULTCV;
+static pthread_t smb_shr_publish_thr;
+static mutex_t smb_shr_publish_mtx = PTHREAD_MUTEX_INITIALIZER;
+static cond_t smb_shr_publish_cv = DEFAULTCV;
 
-static void *lmshare_publisher(void *);
-static void lmshare_stop_publish();
+static void *smb_shr_publisher(void *);
+static void smb_shr_stop_publish(void);
+static void smb_shr_publish(smb_share_t *, char, int);
 
 /*
  * Start loading lmshare information from sharemanager
  * and create the cache.
  */
 int
-lmshare_start()
+smb_shr_start(void)
 {
 	int rc;
 
-	rc = pthread_create(&lmshare_publish_thread, NULL,
-	    lmshare_publisher, 0);
+	rc = pthread_create(&smb_shr_publish_thr, NULL,
+	    smb_shr_publisher, 0);
 	if (rc != 0) {
 		syslog(LOG_ERR, "Failed to start publisher thread, "
 		    "share publishing is disabled");
 	}
 
-	rc = pthread_create(&lmshare_load_thread, NULL,
-	    lmshare_load, 0);
+	rc = pthread_create(&smb_shr_cache_populatethr, NULL,
+	    smb_shr_cache_populate, 0);
 	if (rc != 0) {
 		syslog(LOG_ERR, "Failed to start share loading, "
 		    "existing shares will not be available");
@@ -123,15 +127,15 @@ lmshare_start()
 }
 
 void
-lmshare_stop()
+smb_shr_stop(void)
 {
-	lmshare_stop_publish();
+	smb_shr_stop_publish();
 }
 
 /*
  * lmshare_load_shares
  *
- * Helper function for lmshare_load. It attempts to load the shares
+ * Helper function for smb_shr_cache_populate. It attempts to load the shares
  * contained in the group.
  */
 
@@ -140,7 +144,7 @@ lmshare_load_shares(sa_group_t group)
 {
 	sa_share_t share;
 	sa_resource_t resource;
-	lmshare_info_t si;
+	smb_share_t si;
 	char *path, *rname;
 
 	/* Don't bother if "smb" isn't set on the group */
@@ -164,9 +168,9 @@ lmshare_load_shares(sa_group_t group)
 			}
 			smb_build_lmshare_info(rname, path, resource, &si);
 			sa_free_attr_string(rname);
-			if (lmshare_add(&si, 0) != NERR_Success) {
+			if (smb_shr_add(&si, 0) != NERR_Success) {
 				syslog(LOG_ERR, "Failed to load "
-				    "share %s", si.share_name);
+				    "share %s", si.shr_name);
 			}
 		}
 		/* We are done with all shares for same path */
@@ -175,7 +179,7 @@ lmshare_load_shares(sa_group_t group)
 }
 
 /*
- * lmshare_load
+ * smb_shr_cache_populate
  *
  * Load shares from sharemanager.  The args argument is currently not
  * used. The function walks through all the groups in libshare and
@@ -185,13 +189,13 @@ lmshare_load_shares(sa_group_t group)
 
 /*ARGSUSED*/
 static void *
-lmshare_load(void *args)
+smb_shr_cache_populate(void *args)
 {
 	sa_handle_t handle;
 	sa_group_t group, subgroup;
 	char *gstate;
 
-	if (lmshare_create_table() != NERR_Success) {
+	if (smb_shr_cache_create() != NERR_Success) {
 		syslog(LOG_ERR, "Failed to create share hash table");
 		return (NULL);
 	}
@@ -251,68 +255,68 @@ lmshare_callback(HT_ITEM *item)
 }
 
 /*
- * lmshare_create_table
+ * smb_shr_cache_create
  *
  * Create the share hash table.
  */
-static DWORD
-lmshare_create_table(void)
+static uint32_t
+smb_shr_cache_create(void)
 {
-	if (lmshare_handle == NULL) {
-		(void) rwlock_init(&lmshare_lock, USYNC_THREAD, 0);
-		(void) rw_wrlock(&lmshare_lock);
+	if (smb_shr_handle == NULL) {
+		(void) rwlock_init(&smb_shr_lock, USYNC_THREAD, 0);
+		(void) rw_wrlock(&smb_shr_lock);
 
-		lmshare_handle = ht_create_table(LMSHR_HASHTAB_SZ,
+		smb_shr_handle = ht_create_table(SMB_SHARE_HTAB_SZ,
 		    MAXNAMELEN, 0);
-		if (lmshare_handle == NULL) {
-			syslog(LOG_ERR, "lmshare_create_table:"
+		if (smb_shr_handle == NULL) {
+			syslog(LOG_ERR, "smb_shr_cache_create:"
 			    " unable to create share table");
-			(void) rw_unlock(&lmshare_lock);
+			(void) rw_unlock(&smb_shr_lock);
 			return (NERR_InternalError);
 		}
-		(void) ht_register_callback(lmshare_handle, lmshare_callback);
-		(void) rw_unlock(&lmshare_lock);
+		(void) ht_register_callback(smb_shr_handle, lmshare_callback);
+		(void) rw_unlock(&smb_shr_lock);
 	}
 
 	return (NERR_Success);
 }
 
 /*
- * lmshare_add_adminshare
+ * smb_shr_add_adminshare
  *
  * add the admin share for the volume when the share database
  * for that volume is going to be loaded.
  */
-DWORD
-lmshare_add_adminshare(char *volname, unsigned char drive)
+uint32_t
+smb_shr_add_adminshare(char *volname, unsigned char drive)
 {
-	struct lmshare_info si;
-	DWORD rc;
+	smb_share_t si;
+	uint32_t rc;
 
 	if (drive == 0)
 		return (NERR_InvalidDevice);
 
-	bzero(&si, sizeof (lmshare_info_t));
-	(void) strcpy(si.directory, volname);
-	si.mode = LMSHRM_TRANS | LMSHRM_ADMIN;
-	(void) snprintf(si.share_name, sizeof (si.share_name), "%c$", drive);
-	rc = lmshare_add(&si, 0);
+	bzero(&si, sizeof (smb_share_t));
+	(void) strcpy(si.shr_path, volname);
+	si.shr_flags = SMB_SHRF_TRANS | SMB_SHRF_ADMIN;
+	(void) snprintf(si.shr_name, sizeof (si.shr_name), "%c$", drive);
+	rc = smb_shr_add(&si, 0);
 
 	return (rc);
 }
 
 /*
- * lmshare_num_shares
+ * smb_shr_count
  *
  * Return the total number of shares, which should be the same value
  * that would be returned from a share enum request.
  */
 int
-lmshare_num_shares(void)
+smb_shr_count(void)
 {
 	int n_shares;
 
-	n_shares = ht_get_total_items(lmshare_handle);
+	n_shares = ht_get_total_items(smb_shr_handle);
 
 	/* If we don't store IPC$ in hash table we should do this */
 	n_shares++;
@@ -321,20 +325,20 @@ lmshare_num_shares(void)
 }
 
 /*
- * lmshare_init_iterator
+ * smb_shr_iterinit
  *
  * Initialize an iterator for traversing hash table.
  * 'mode' is used for filtering shares when iterating.
  */
 void
-lmshare_init_iterator(lmshare_iterator_t *shi, uint32_t mode)
+smb_shr_iterinit(smb_shriter_t *shi, uint32_t mode)
 {
-	bzero(shi, sizeof (lmshare_iterator_t));
-	shi->mode = mode;
+	bzero(shi, sizeof (smb_shriter_t));
+	shi->si_mode = mode;
 }
 
 /*
- * lmshare_iterate
+ * smb_shr_iterate
  *
  * Iterate on the shares in the hash table. The iterator must be initialized
  * before the first iteration. On subsequent calls, the iterator must be
@@ -346,48 +350,48 @@ lmshare_init_iterator(lmshare_iterator_t *shi, uint32_t mode)
  * Note that there are some special shares, i.e. IPC$, that must also
  * be processed.
  */
-lmshare_info_t *
-lmshare_iterate(lmshare_iterator_t *shi)
+smb_share_t *
+smb_shr_iterate(smb_shriter_t *shi)
 {
 	HT_ITEM *item;
-	lmshare_info_t *si;
+	smb_share_t *si;
 
-	if (lmshare_handle == NULL || shi == NULL)
+	if (smb_shr_handle == NULL || shi == NULL)
 		return (NULL);
 
-	if (shi->iteration == 0) {
+	if (shi->si_counter == 0) {
 		/*
 		 * IPC$ is always first.
 		 */
-		(void) strcpy(shi->si.share_name, "IPC$");
-		lmshare_set_oemname(&shi->si);
-		shi->si.mode = LMSHRM_TRANS;
-		shi->si.stype = (int)(STYPE_IPC | STYPE_SPECIAL);
-		shi->iteration = 1;
-		return (&(shi->si));
+		(void) strcpy(shi->si_share.shr_name, "IPC$");
+		smb_shr_set_oemname(&shi->si_share);
+		shi->si_share.shr_flags = SMB_SHRF_TRANS;
+		shi->si_share.shr_type = (int)(STYPE_IPC | STYPE_SPECIAL);
+		shi->si_counter = 1;
+		return (&(shi->si_share));
 	}
 
-	if (shi->iteration == 1) {
+	if (shi->si_counter == 1) {
 		if ((item = ht_findfirst(
-		    lmshare_handle, &shi->iterator)) == NULL) {
+		    smb_shr_handle, &shi->si_hashiter)) == NULL) {
 			return (NULL);
 		}
 
-		si = (lmshare_info_t *)(item->hi_data);
-		++shi->iteration;
+		si = (smb_share_t *)(item->hi_data);
+		++shi->si_counter;
 
-		if (si->mode & shi->mode) {
-			(void) memcpy(&(shi->si), si, sizeof (lmshare_info_t));
-			return (&(shi->si));
+		if (si->shr_flags & shi->si_mode) {
+			bcopy(si, &(shi->si_share), sizeof (smb_share_t));
+			return (&(shi->si_share));
 		}
 	}
 
-	while ((item = ht_findnext(&shi->iterator)) != NULL) {
-		si = (lmshare_info_t *)(item->hi_data);
-		++shi->iteration;
-		if (si->mode & shi->mode) {
-			(void) memcpy(&(shi->si), si, sizeof (lmshare_info_t));
-			return (&(shi->si));
+	while ((item = ht_findnext(&shi->si_hashiter)) != NULL) {
+		si = (smb_share_t *)(item->hi_data);
+		++shi->si_counter;
+		if (si->shr_flags & shi->si_mode) {
+			bcopy(si, &(shi->si_share), sizeof (smb_share_t));
+			return (&(shi->si_share));
 		}
 	}
 
@@ -395,207 +399,208 @@ lmshare_iterate(lmshare_iterator_t *shi)
 }
 
 /*
- * lmshare_add
+ * smb_shr_add
  *
- * Add a share. This is a wrapper round lmshare_setinfo that checks
+ * Add a share. This is a wrapper round smb_shr_set that checks
  * whether or not the share already exists. If the share exists, an
  * error is returned.
  *
- * Don't check lmshare_is_dir here: it causes rootfs to recurse.
+ * Don't check smb_shr_is_dir here: it causes rootfs to recurse.
  */
-DWORD
-lmshare_add(lmshare_info_t *si, int doshm)
+uint32_t
+smb_shr_add(smb_share_t *si, int doshm)
 {
-	DWORD status = NERR_Success;
+	uint32_t status = NERR_Success;
 
-	if (si == 0 || lmshare_is_valid(si->share_name) == 0)
+	if (si == 0 || smb_shr_is_valid(si->shr_name) == 0)
 		return (NERR_InvalidDevice);
 
-	(void) utf8_strlwr(si->share_name);
+	(void) utf8_strlwr(si->shr_name);
 
-	if (lmshare_exists(si->share_name)) {
+	if (smb_shr_exists(si->shr_name)) {
 		/*
 		 * Only autohome shares can be added multiple times
 		 */
-		if ((si->mode & LMSHRM_AUTOHOME) == 0)
+		if ((si->shr_flags & SMB_SHRF_AUTOHOME) == 0)
 			return (NERR_DuplicateShare);
 	}
 
-	if (si->refcnt == 0) {
-		status = lmshare_setinfo(si, doshm);
-		lmshare_do_publish(si, LMSHR_PUBLISH, 1);
+	if (si->shr_refcnt == 0) {
+		status = smb_shr_set(si, doshm);
+		smb_shr_publish(si, SMB_SHARE_PUBLISH, 1);
 	}
 
-	if ((si->mode & LMSHRM_AUTOHOME) && (status == NERR_Success)) {
-		si->refcnt++;
-		status = lmshare_set_refcnt(si->share_name, si->refcnt);
+	if ((si->shr_flags & SMB_SHRF_AUTOHOME) && (status == NERR_Success)) {
+		si->shr_refcnt++;
+		status = smb_shr_set_refcnt(si->shr_name, si->shr_refcnt);
 	}
 
 	if (status)
 		return (status);
 
-	return (smb_dwncall_share(LMSHR_ADD, si->directory, si->share_name));
+	return (smb_dwncall_share(SMB_SHROP_ADD, si->shr_path, si->shr_name));
 }
 
 /*
- * lmshare_delete
+ * smb_shr_del
  *
  * Remove a share. Ensure that all SMB trees associated with this share
  * are disconnected. If the share does not exist, an error is returned.
  */
-DWORD
-lmshare_delete(char *share_name, int doshm)
+uint32_t
+smb_shr_del(char *share_name, int doshm)
 {
-	lmshare_info_t *si;
+	smb_share_t *si;
 	HT_ITEM *item;
-	DWORD status;
+	uint32_t status;
 	char path[MAXPATHLEN];
 
 	if (share_name)
 		(void) utf8_strlwr(share_name);
 
-	if (lmshare_is_valid(share_name) == 0 ||
-	    lmshare_exists(share_name) == 0) {
+	if (smb_shr_is_valid(share_name) == 0 ||
+	    smb_shr_exists(share_name) == 0) {
 		return (NERR_NetNameNotFound);
 	}
 
-	(void) rw_wrlock(&lmshare_lock);
-	item = ht_find_item(lmshare_handle, share_name);
+	(void) rw_wrlock(&smb_shr_lock);
+	item = ht_find_item(smb_shr_handle, share_name);
 
 	if (item == NULL) {
-		(void) rw_unlock(&lmshare_lock);
+		(void) rw_unlock(&smb_shr_lock);
 		return (NERR_ItemNotFound);
 	}
 
-	si = (lmshare_info_t *)item->hi_data;
+	si = (smb_share_t *)item->hi_data;
 	if (si == NULL) {
-		(void) rw_unlock(&lmshare_lock);
+		(void) rw_unlock(&smb_shr_lock);
 		return (NERR_InternalError);
 	}
 
-	if ((si->mode & LMSHRM_AUTOHOME) == LMSHRM_AUTOHOME) {
-		si->refcnt--;
-		if (si->refcnt > 0) {
-			status = lmshare_set_refcnt(si->share_name, si->refcnt);
-			(void) rw_unlock(&lmshare_lock);
+	if ((si->shr_flags & SMB_SHRF_AUTOHOME) == SMB_SHRF_AUTOHOME) {
+		si->shr_refcnt--;
+		if (si->shr_refcnt > 0) {
+			status = smb_shr_set_refcnt(si->shr_name,
+			    si->shr_refcnt);
+			(void) rw_unlock(&smb_shr_lock);
 			return (status);
 		}
 	}
 
-	if (doshm && (lmshare_delete_shmgr(si) != 0)) {
-		(void) rw_unlock(&lmshare_lock);
+	if (doshm && (smb_shr_del_shmgr(si) != 0)) {
+		(void) rw_unlock(&smb_shr_lock);
 		return (NERR_InternalError);
 	}
 
-	lmshare_do_publish(si, LMSHR_UNPUBLISH, 1);
+	smb_shr_publish(si, SMB_SHARE_UNPUBLISH, 1);
 
 	/*
 	 * Copy the path before the entry is removed from the hash table
 	 */
 
-	(void) strlcpy(path, si->directory, MAXPATHLEN);
+	(void) strlcpy(path, si->shr_path, MAXPATHLEN);
 
 	/* Delete from hash table */
 
-	(void) ht_remove_item(lmshare_handle, share_name);
-	(void) rw_unlock(&lmshare_lock);
+	(void) ht_remove_item(smb_shr_handle, share_name);
+	(void) rw_unlock(&smb_shr_lock);
 
-	return (smb_dwncall_share(LMSHR_DELETE, path, share_name));
+	return (smb_dwncall_share(SMB_SHROP_DELETE, path, share_name));
 }
 
 /*
- * lmshare_set_refcnt
+ * smb_shr_set_refcnt
  *
- * sets the autohome refcnt for a share
+ * sets the autohome shr_refcnt for a share
  */
-static DWORD
-lmshare_set_refcnt(char *share_name, int refcnt)
+static uint32_t
+smb_shr_set_refcnt(char *share_name, int refcnt)
 {
-	lmshare_info_t *si;
+	smb_share_t *si;
 	HT_ITEM *item;
 
 	if (share_name) {
 		(void) utf8_strlwr(share_name);
 	}
-	(void) rw_wrlock(&lmshare_lock);
-	item = ht_find_item(lmshare_handle, share_name);
+	(void) rw_wrlock(&smb_shr_lock);
+	item = ht_find_item(smb_shr_handle, share_name);
 	if (item == NULL) {
-		(void) rw_unlock(&lmshare_lock);
+		(void) rw_unlock(&smb_shr_lock);
 		return (NERR_ItemNotFound);
 	}
 
-	si = (lmshare_info_t *)item->hi_data;
+	si = (smb_share_t *)item->hi_data;
 	if (si == NULL) {
-		(void) rw_unlock(&lmshare_lock);
+		(void) rw_unlock(&smb_shr_lock);
 		return (NERR_InternalError);
 	}
-	si->refcnt = refcnt;
-	(void) rw_unlock(&lmshare_lock);
+	si->shr_refcnt = refcnt;
+	(void) rw_unlock(&smb_shr_lock);
 	return (NERR_Success);
 }
 
 /*
- * lmshare_rename
+ * smb_shr_ren
  *
  * Rename a share. Check that the current name exists and the new name
  * doesn't exist. The rename is performed by deleting the current share
  * definition and creating a new share with the new name.
  */
-DWORD
-lmshare_rename(char *from_name, char *to_name, int doshm)
+uint32_t
+smb_shr_ren(char *from_name, char *to_name, int doshm)
 {
-	struct lmshare_info si;
-	DWORD nerr;
+	smb_share_t si;
+	uint32_t nerr;
 
-	if (lmshare_is_valid(from_name) == 0 ||
-	    lmshare_is_valid(to_name) == 0)
+	if (smb_shr_is_valid(from_name) == 0 ||
+	    smb_shr_is_valid(to_name) == 0)
 		return (NERR_InvalidDevice);
 
 	(void) utf8_strlwr(from_name);
 	(void) utf8_strlwr(to_name);
 
-	if (lmshare_exists(from_name) == 0)
+	if (smb_shr_exists(from_name) == 0)
 		return (NERR_NetNameNotFound);
 
-	if (lmshare_exists(to_name))
+	if (smb_shr_exists(to_name))
 		return (NERR_DuplicateShare);
 
-	if ((nerr = lmshare_getinfo(from_name, &si)) != NERR_Success)
+	if ((nerr = smb_shr_get(from_name, &si)) != NERR_Success)
 		return (nerr);
 
-	if ((nerr = lmshare_delete(from_name, doshm)) != NERR_Success)
+	if ((nerr = smb_shr_del(from_name, doshm)) != NERR_Success)
 		return (nerr);
 
-	(void) strlcpy(si.share_name, to_name, MAXNAMELEN);
-	return (lmshare_add(&si, 1));
+	(void) strlcpy(si.shr_name, to_name, MAXNAMELEN);
+	return (smb_shr_add(&si, 1));
 }
 
 /*
- * lmshare_exists
+ * smb_shr_exists
  *
  * Returns 1 if the share exists. Otherwise returns 0.
  */
 int
-lmshare_exists(char *share_name)
+smb_shr_exists(char *share_name)
 {
 	if (share_name == 0 || *share_name == 0)
 		return (0);
 
-	if (ht_find_item(lmshare_handle, share_name) == NULL)
+	if (ht_find_item(smb_shr_handle, share_name) == NULL)
 		return (0);
 	else
 		return (1);
 }
 
 /*
- * lmshare_is_special
+ * smb_shr_is_special
  *
  * Simple check to determine if share name represents a special share,
  * i.e. the last character of the name is a '$'. Returns STYPE_SPECIAL
  * if the name is special. Otherwise returns 0.
  */
 int
-lmshare_is_special(char *share_name)
+smb_shr_is_special(char *share_name)
 {
 	int len;
 
@@ -613,7 +618,7 @@ lmshare_is_special(char *share_name)
 
 
 /*
- * lmshare_is_restricted
+ * smb_shr_is_restricted
  *
  * Check whether or not there is a restriction on a share. Restricted
  * shares are generally STYPE_SPECIAL, for example, IPC$. All the
@@ -622,7 +627,7 @@ lmshare_is_special(char *share_name)
  * that there are no restrictions.
  */
 int
-lmshare_is_restricted(char *share_name)
+smb_shr_is_restricted(char *share_name)
 {
 	static char *restricted[] = {
 		"IPC$"
@@ -635,7 +640,7 @@ lmshare_is_restricted(char *share_name)
 			return (1);
 	}
 
-	if (lmshare_is_admin(share_name))
+	if (smb_shr_is_admin(share_name))
 		return (1);
 
 	return (0);
@@ -643,18 +648,18 @@ lmshare_is_restricted(char *share_name)
 
 
 /*
- * lmshare_is_admin
+ * smb_shr_is_admin
  *
  * Check whether or not access to the share should be restricted to
  * administrators. This is a bit of a hack because what we're doing
  * is checking for the default admin shares: C$, D$ etc.. There are
- * other shares that have restrictions: see lmshare_is_restricted().
+ * other shares that have restrictions: see smb_shr_is_restricted().
  *
  * Returns 1 if the shares is an admin share. Otherwise 0 is returned
  * to indicate that there are no restrictions.
  */
 int
-lmshare_is_admin(char *share_name)
+smb_shr_is_admin(char *share_name)
 {
 	if (share_name == 0)
 		return (0);
@@ -669,7 +674,7 @@ lmshare_is_admin(char *share_name)
 
 
 /*
- * lmshare_is_valid
+ * smb_shr_is_valid
  *
  * Check if any invalid char is present in share name. According to
  * MSDN article #236388: "Err Msg: The Share Name Contains Invalid
@@ -682,7 +687,7 @@ lmshare_is_admin(char *share_name)
  * If the sharename is valid, return (1). Otherwise return (0).
  */
 int
-lmshare_is_valid(char *share_name)
+smb_shr_is_valid(char *share_name)
 {
 	char *invalid = "\"/\\[]:|<>+;,?*=";
 	char *cp;
@@ -701,14 +706,14 @@ lmshare_is_valid(char *share_name)
 }
 
 /*
- * lmshare_is_dir
+ * smb_shr_is_dir
  *
  * Check to determine if a share object represents a directory.
  *
  * Returns 1 if the path leads to a directory. Otherwise returns 0.
  */
 int
-lmshare_is_dir(char *path)
+smb_shr_is_dir(char *path)
 {
 	struct stat stat_info;
 
@@ -721,42 +726,42 @@ lmshare_is_dir(char *path)
 }
 
 /*
- * lmshare_getinfo
+ * smb_shr_get
  *
  * Load the information for the specified share into the supplied share
  * info structure. If the shared directory does not begin with a /, one
  * will be inserted as a prefix.
  */
-DWORD
-lmshare_getinfo(char *share_name, struct lmshare_info *si)
+uint32_t
+smb_shr_get(char *share_name, smb_share_t *si)
 {
 	int i, endidx;
 	int dirlen;
 	HT_ITEM *item;
 
-	(void) rw_rdlock(&lmshare_lock);
+	(void) rw_rdlock(&smb_shr_lock);
 
 	(void) utf8_strlwr(share_name);
-	if ((item = ht_find_item(lmshare_handle, share_name)) == NULL) {
-		bzero(si, sizeof (lmshare_info_t));
-		(void) rw_unlock(&lmshare_lock);
+	if ((item = ht_find_item(smb_shr_handle, share_name)) == NULL) {
+		bzero(si, sizeof (smb_share_t));
+		(void) rw_unlock(&smb_shr_lock);
 		return (NERR_NetNameNotFound);
 	}
 
-	(void) memcpy(si, item->hi_data, sizeof (lmshare_info_t));
-	(void) rw_unlock(&lmshare_lock);
+	(void) memcpy(si, item->hi_data, sizeof (smb_share_t));
+	(void) rw_unlock(&smb_shr_lock);
 
-	if (si->directory[0] == '\0')
+	if (si->shr_path[0] == '\0')
 		return (NERR_NetNameNotFound);
 
-	if (si->directory[0] != '/') {
-		dirlen = strlen(si->directory) + 1;
+	if (si->shr_path[0] != '/') {
+		dirlen = strlen(si->shr_path) + 1;
 		endidx = (dirlen < MAXPATHLEN-1) ?
 		    dirlen : MAXPATHLEN - 2;
 		for (i = endidx; i >= 0; i--)
-			si->directory[i+1] = si->directory[i];
-		si->directory[MAXPATHLEN-1] = '\0';
-		si->directory[0] = '/';
+			si->shr_path[i+1] = si->shr_path[i];
+		si->shr_path[MAXPATHLEN-1] = '\0';
+		si->shr_path[0] = '/';
 	}
 
 	return (NERR_Success);
@@ -766,7 +771,7 @@ lmshare_getinfo(char *share_name, struct lmshare_info *si)
  * Remove share from sharemanager repository.
  */
 static int
-lmshare_delete_shmgr(struct lmshare_info *si)
+smb_shr_del_shmgr(smb_share_t *si)
 {
 	sa_handle_t handle;
 	sa_share_t share;
@@ -778,13 +783,13 @@ lmshare_delete_shmgr(struct lmshare_info *si)
 		    "share lib");
 		return (1);
 	}
-	share = sa_find_share(handle, si->directory);
+	share = sa_find_share(handle, si->shr_path);
 	if (share == NULL) {
 		syslog(LOG_ERR, "Failed to get share to delete");
 		sa_fini(handle);
 		return (1);
 	}
-	resource = sa_get_share_resource(share, si->share_name);
+	resource = sa_get_share_resource(share, si->shr_name);
 	if (resource == NULL) {
 		syslog(LOG_ERR, "Failed to get share resource to delete");
 		sa_fini(handle);
@@ -800,7 +805,7 @@ lmshare_delete_shmgr(struct lmshare_info *si)
 }
 
 static int
-lmshare_setinfo_shmgr(struct lmshare_info *si)
+smb_shr_set_shmgr(smb_share_t *si)
 {
 	sa_handle_t handle;
 	sa_share_t share;
@@ -815,36 +820,36 @@ lmshare_setinfo_shmgr(struct lmshare_info *si)
 		syslog(LOG_ERR, "Failed to get handle to share lib");
 		return (1);
 	}
-	share = sa_find_share(handle, si->directory);
+	share = sa_find_share(handle, si->shr_path);
 	if (share == NULL) {
 		group = smb_get_smb_share_group(handle);
 		if (group == NULL) {
 			sa_fini(handle);
 			return (1);
 		}
-		share = sa_add_share(group, si->directory, 0, &err);
+		share = sa_add_share(group, si->shr_path, 0, &err);
 		if (share == NULL) {
 			sa_fini(handle);
 			return (1);
 		}
 		share_created = 1;
 	}
-	resource = sa_get_share_resource(share, si->share_name);
+	resource = sa_get_share_resource(share, si->shr_name);
 	if (resource == NULL) {
-		resource = sa_add_resource(share, si->share_name,
+		resource = sa_add_resource(share, si->shr_name,
 		    SA_SHARE_PERMANENT, &err);
 		if (resource == NULL) {
 			goto failure;
 		}
 	}
 	if (sa_set_resource_attr(resource,
-	    "description", si->comment) != SA_OK) {
+	    "description", si->shr_cmnt) != SA_OK) {
 		syslog(LOG_ERR, "Falied to set resource "
 		    "description in sharemgr");
 		goto failure;
 	}
 	if (sa_set_resource_attr(resource,
-	    SHOPT_AD_CONTAINER, si->container) != SA_OK) {
+	    SMB_SHROPT_AD_CONTAINER, si->shr_container) != SA_OK) {
 		syslog(LOG_ERR, "Falied to set ad-container in sharemgr");
 		goto failure;
 	}
@@ -867,63 +872,63 @@ failure:
 }
 
 /*
- * del_fromhash
+ * smb_shr_cache_delshare
  *
  * Delete the given share only from hash table
  */
-static DWORD
-del_fromhash(char *share_name)
+static uint32_t
+smb_shr_cache_delshare(char *share_name)
 {
 	if (share_name == 0)
 		return (NERR_NetNameNotFound);
 
 	(void) utf8_strlwr(share_name);
 
-	if (lmshare_is_valid(share_name) == 0 ||
-	    lmshare_exists(share_name) == 0) {
+	if (smb_shr_is_valid(share_name) == 0 ||
+	    smb_shr_exists(share_name) == 0) {
 		return (NERR_NetNameNotFound);
 	}
 
-	(void) rw_wrlock(&lmshare_lock);
-	(void) ht_remove_item(lmshare_handle, share_name);
-	(void) rw_unlock(&lmshare_lock);
+	(void) rw_wrlock(&smb_shr_lock);
+	(void) ht_remove_item(smb_shr_handle, share_name);
+	(void) rw_unlock(&smb_shr_lock);
 
 	return (NERR_Success);
 }
 
 /*
- * lmshare_setinfo
+ * smb_shr_set
  *
  * Adds the specified share into the system hash table
  * and also store its info in the corresponding disk
- * structure if it is not a temporary (LMSHRM_TRANS) share.
+ * structure if it is not a temporary (SMB_SHRF_TRANS) share.
  * when the first share is going to be added, create shares
  * hash table if it is not already created.
  * If the share already exists, it will be replaced. If the
  * new share directory name does not begin with a /, one will be
  * inserted as a prefix.
  */
-DWORD
-lmshare_setinfo(lmshare_info_t *si, int doshm)
+uint32_t
+smb_shr_set(smb_share_t *si, int doshm)
 {
 	int i, endidx;
 	int dirlen;
-	lmshare_info_t *add_si;
+	smb_share_t *add_si;
 	int res = NERR_Success;
-	lmshare_info_t old_si;
+	smb_share_t old_si;
 
-	if (si->directory[0] != '/') {
-		dirlen = strlen(si->directory) + 1;
+	if (si->shr_path[0] != '/') {
+		dirlen = strlen(si->shr_path) + 1;
 		endidx = (dirlen < MAXPATHLEN - 1) ?
 		    dirlen : MAXPATHLEN - 2;
 		for (i = endidx; i >= 0; i--)
-			si->directory[i+1] = si->directory[i];
-		si->directory[MAXPATHLEN-1] = '\0';
-		si->directory[0] = '/';
+			si->shr_path[i+1] = si->shr_path[i];
+		si->shr_path[MAXPATHLEN-1] = '\0';
+		si->shr_path[0] = '/';
 	}
 
 	/* XXX Do we need to translate the directory here? to real path */
-	if (lmshare_is_dir(si->directory) == 0)
+	if (smb_shr_is_dir(si->shr_path) == 0)
 		return (NERR_UnknownDevDir);
 
 	/*
@@ -934,24 +939,24 @@ lmshare_setinfo(lmshare_info_t *si, int doshm)
 	 * Hash table doesn't do any allocation for the data that
 	 * is being added.
 	 */
-	add_si = malloc(sizeof (lmshare_info_t));
+	add_si = malloc(sizeof (smb_share_t));
 	if (add_si == NULL) {
 		syslog(LOG_ERR, "LmshareSetinfo: resource shortage");
 		return (NERR_NoRoom);
 	}
 
-	(void) memcpy(add_si, si, sizeof (lmshare_info_t));
+	(void) memcpy(add_si, si, sizeof (smb_share_t));
 
 	/*
 	 * If we can't find it, use the new one to get things in sync,
 	 * but if there is an existing one, that is the one to
 	 * unpublish.
 	 */
-	if (lmshare_getinfo(si->share_name, &old_si) != NERR_Success)
-		(void) memcpy(&old_si, si, sizeof (lmshare_info_t));
+	if (smb_shr_get(si->shr_name, &old_si) != NERR_Success)
+		(void) memcpy(&old_si, si, sizeof (smb_share_t));
 
 	if (doshm) {
-		res = lmshare_delete(si->share_name, doshm);
+		res = smb_shr_del(si->shr_name, doshm);
 		if (res != NERR_Success) {
 			free(add_si);
 			syslog(LOG_ERR, "LmshareSetinfo: delete failed", res);
@@ -959,62 +964,62 @@ lmshare_setinfo(lmshare_info_t *si, int doshm)
 		}
 	} else {
 		/* Unpublish old share from AD */
-		if ((add_si->mode & LMSHRM_PERM) == LMSHRM_PERM)
-			lmshare_do_publish(&old_si, LMSHR_UNPUBLISH, 1);
-		(void) del_fromhash(si->share_name);
+		if ((add_si->shr_flags & SMB_SHRF_PERM) == SMB_SHRF_PERM)
+			smb_shr_publish(&old_si, SMB_SHARE_UNPUBLISH, 1);
+		(void) smb_shr_cache_delshare(si->shr_name);
 	}
 
-	lmshare_set_oemname(add_si);
+	smb_shr_set_oemname(add_si);
 
 	/* if it's not transient it should be permanent */
-	if ((add_si->mode & LMSHRM_TRANS) == 0)
-		add_si->mode |= LMSHRM_PERM;
+	if ((add_si->shr_flags & SMB_SHRF_TRANS) == 0)
+		add_si->shr_flags |= SMB_SHRF_PERM;
 
 
-	add_si->stype = STYPE_DISKTREE;
-	add_si->stype |= lmshare_is_special(add_si->share_name);
+	add_si->shr_type = STYPE_DISKTREE;
+	add_si->shr_type |= smb_shr_is_special(add_si->shr_name);
 
-	(void) rw_wrlock(&lmshare_lock);
-	if (ht_add_item(lmshare_handle, add_si->share_name, add_si) == NULL) {
-		syslog(LOG_ERR, "lmshare_setinfo[%s]: error in adding share",
-		    add_si->share_name);
-		(void) rw_unlock(&lmshare_lock);
+	(void) rw_wrlock(&smb_shr_lock);
+	if (ht_add_item(smb_shr_handle, add_si->shr_name, add_si) == NULL) {
+		syslog(LOG_ERR, "smb_shr_set[%s]: error in adding share",
+		    add_si->shr_name);
+		(void) rw_unlock(&smb_shr_lock);
 		free(add_si);
 		return (NERR_InternalError);
 	}
-	(void) rw_unlock(&lmshare_lock);
+	(void) rw_unlock(&smb_shr_lock);
 
-	if ((add_si->mode & LMSHRM_PERM) == LMSHRM_PERM) {
-		if (doshm && (lmshare_setinfo_shmgr(add_si) != 0)) {
+	if ((add_si->shr_flags & SMB_SHRF_PERM) == SMB_SHRF_PERM) {
+		if (doshm && (smb_shr_set_shmgr(add_si) != 0)) {
 			syslog(LOG_ERR, "Update share %s in sharemgr failed",
-			    add_si->share_name);
+			    add_si->shr_name);
 			return (NERR_InternalError);
 		}
-		lmshare_do_publish(add_si, LMSHR_PUBLISH, 1);
+		smb_shr_publish(add_si, SMB_SHARE_PUBLISH, 1);
 	}
 
 	return (res);
 }
 
 void
-lmshare_list(int offset, lmshare_list_t *list)
+smb_shr_list(int offset, smb_shrlist_t *list)
 {
-	lmshare_iterator_t iterator;
-	lmshare_info_t *si;
+	smb_shriter_t iterator;
+	smb_share_t *si;
 	int list_idx = 0;
 	int i = 0;
 
-	bzero(list, sizeof (lmshare_list_t));
-	lmshare_init_iterator(&iterator, LMSHRM_ALL);
+	bzero(list, sizeof (smb_shrlist_t));
+	smb_shr_iterinit(&iterator, SMB_SHRF_ALL);
 
-	(void) lmshare_iterate(&iterator);	/* To skip IPC$ */
+	(void) smb_shr_iterate(&iterator);	/* To skip IPC$ */
 
-	while ((si = lmshare_iterate(&iterator)) != NULL) {
-		if (lmshare_is_special(si->share_name)) {
+	while ((si = smb_shr_iterate(&iterator)) != NULL) {
+		if (smb_shr_is_special(si->shr_name)) {
 			/*
 			 * Don't return restricted shares.
 			 */
-			if (lmshare_is_restricted(si->share_name))
+			if (smb_shr_is_restricted(si->shr_name))
 				continue;
 		}
 
@@ -1022,7 +1027,7 @@ lmshare_list(int offset, lmshare_list_t *list)
 			continue;
 
 		(void) memcpy(&list->smbshr[list_idx], si,
-		    sizeof (lmshare_info_t));
+		    sizeof (smb_share_t));
 		if (++list_idx == LMSHARES_PER_REQUEST)
 			break;
 	}
@@ -1033,56 +1038,56 @@ lmshare_list(int offset, lmshare_list_t *list)
 /*
  * Put the share on publish queue.
  */
-void
-lmshare_do_publish(lmshare_info_t *si, char flag, int poke)
+static void
+smb_shr_publish(smb_share_t *si, char flag, int poke)
 {
-	lmshare_ad_item_t *item = NULL;
+	smb_shr_adinfo_t *item = NULL;
 
 	if (publish_on == 0)
 		return;
 
-	if ((si == NULL) || (si->container[0] == '\0'))
+	if ((si == NULL) || (si->shr_container[0] == '\0'))
 		return;
 
-	(void) mutex_lock(&lmshare_publish_mutex);
-	item = (lmshare_ad_item_t *)malloc(sizeof (lmshare_ad_item_t));
+	(void) mutex_lock(&smb_shr_publish_mtx);
+	item = (smb_shr_adinfo_t *)malloc(sizeof (smb_shr_adinfo_t));
 	if (item == NULL) {
 		syslog(LOG_ERR, "Failed to allocate share publish item");
-		(void) mutex_unlock(&lmshare_publish_mutex);
+		(void) mutex_unlock(&smb_shr_publish_mtx);
 		return;
 	}
 	item->flag = flag;
-	(void) strlcpy(item->name, si->share_name, sizeof (item->name));
-	(void) strlcpy(item->container, si->container,
+	(void) strlcpy(item->name, si->shr_name, sizeof (item->name));
+	(void) strlcpy(item->container, si->shr_container,
 	    sizeof (item->container));
 	/*LINTED - E_CONSTANT_CONDITION*/
 	TAILQ_INSERT_TAIL(&ad_queue.adlist, item, next);
 	ad_queue.nentries++;
 	if (poke)
-		(void) cond_signal(&lmshare_publish_cv);
-	(void) mutex_unlock(&lmshare_publish_mutex);
+		(void) cond_signal(&smb_shr_publish_cv);
+	(void) mutex_unlock(&smb_shr_publish_mtx);
 }
 
 void
-lmshare_stop_publish()
+smb_shr_stop_publish()
 {
-	(void) mutex_lock(&lmshare_publish_mutex);
+	(void) mutex_lock(&smb_shr_publish_mtx);
 	publish_on = 0;
-	(void) cond_signal(&lmshare_publish_cv);
-	(void) mutex_unlock(&lmshare_publish_mutex);
+	(void) cond_signal(&smb_shr_publish_cv);
+	(void) mutex_unlock(&smb_shr_publish_mtx);
 }
 
 /*
  * This functions waits to be signaled and once running
  * will publish/unpublish any items on list.
- * lmshare_stop_publish when called will exit this thread.
+ * smb_shr_stop_publish when called will exit this thread.
  */
 /*ARGSUSED*/
 static void *
-lmshare_publisher(void *arg)
+smb_shr_publisher(void *arg)
 {
-	ADS_HANDLE *ah;
-	lmshare_ad_item_t *item;
+	smb_ads_handle_t *ah;
+	smb_shr_adinfo_t *item;
 	char hostname[MAXHOSTNAMELEN];
 	char name[MAXNAMELEN];
 	char container[MAXPATHLEN];
@@ -1095,8 +1100,8 @@ lmshare_publisher(void *arg)
 	hostname[0] = '\0';
 
 	for (;;) {
-		(void) cond_wait(&lmshare_publish_cv,
-		    &lmshare_publish_mutex);
+		(void) cond_wait(&smb_shr_publish_cv,
+		    &smb_shr_publish_mtx);
 
 		if (hostname[0] == '\0') {
 			if (smb_gethostname(hostname, MAXHOSTNAMELEN, 0) != 0)
@@ -1106,7 +1111,7 @@ lmshare_publisher(void *arg)
 		if (publish_on == 0) {
 			syslog(LOG_DEBUG, "lmshare: publisher exit");
 			if (ad_queue.nentries == 0) {
-				(void) mutex_unlock(&lmshare_publish_mutex);
+				(void) mutex_unlock(&smb_shr_publish_mtx);
 				break;
 			}
 			for (item = TAILQ_FIRST(&ad_queue.adlist); item;
@@ -1116,12 +1121,12 @@ lmshare_publisher(void *arg)
 				(void) free(item);
 			}
 			ad_queue.nentries = 0;
-			(void) mutex_unlock(&lmshare_publish_mutex);
+			(void) mutex_unlock(&smb_shr_publish_mtx);
 			break;
 		}
 		if (ad_queue.nentries == 0)
 			continue;
-		ah = ads_open();
+		ah = smb_ads_open();
 		if (ah == NULL) {
 			/* We mostly have no AD config so just clear the list */
 			for (item = TAILQ_FIRST(&ad_queue.adlist); item;
@@ -1139,11 +1144,11 @@ lmshare_publisher(void *arg)
 			    sizeof (container));
 			flag = item->flag;
 
-			if (flag == LMSHR_UNPUBLISH)
-				(void) ads_remove_share(ah, name, NULL,
+			if (flag == SMB_SHARE_UNPUBLISH)
+				(void) smb_ads_remove_share(ah, name, NULL,
 				    container, hostname);
 			else
-				(void) ads_publish_share(ah, name, NULL,
+				(void) smb_ads_publish_share(ah, name, NULL,
 				    container, hostname);
 		}
 		for (item = TAILQ_FIRST(&ad_queue.adlist); item;
@@ -1154,7 +1159,7 @@ lmshare_publisher(void *arg)
 		}
 		ad_queue.nentries = 0;
 		if (ah != NULL) {
-			ads_close(ah);
+			smb_ads_close(ah);
 			ah = NULL;
 		}
 	}
@@ -1164,7 +1169,7 @@ lmshare_publisher(void *arg)
 }
 
 /*
- * lmshare_get_realpath
+ * smb_shr_get_realpath
  *
  * Derive the real path of a share from the path provided by a
  * Windows client application during the share addition.
@@ -1175,36 +1180,36 @@ lmshare_publisher(void *arg)
  * clipath  - path provided by the Windows client is in the
  *            format of <drive letter>:\<dir>
  * realpath - path that will be stored as the directory field of
- *            the lmshare_info_t structure of the share.
+ *            the smb_share_t structure of the share.
  * maxlen   - maximum length fo the realpath buffer
  *
  * Return LAN Manager network error code.
  */
 /*ARGSUSED*/
-DWORD
-lmshare_get_realpath(const char *clipath, char *realpath, int maxlen)
+uint32_t
+smb_shr_get_realpath(const char *clipath, char *realpath, int maxlen)
 {
 	/* XXX do this translation */
 	return (NERR_Success);
 }
 
 /*
- * lmshare_set_oemname
+ * smb_shr_set_oemname
  *
  * Generates the OEM name of the given share. If it's
- * shorter than 13 chars it'll be saved in si->oem_name.
- * Otherwise si->oem_name will be empty and LMSHRM_LONGNAME
- * will be set in si->mode.
+ * shorter than 13 chars it'll be saved in si->shr_oemname.
+ * Otherwise si->shr_oemname will be empty and SMB_SHRF_LONGNAME
+ * will be set in si->shr_flags.
  */
 static void
-lmshare_set_oemname(lmshare_info_t *si)
+smb_shr_set_oemname(smb_share_t *si)
 {
 	unsigned int cpid = oem_get_smb_cpid();
 	mts_wchar_t *unibuf;
 	char *oem_name;
 	int length;
 
-	length = strlen(si->share_name) + 1;
+	length = strlen(si->shr_name) + 1;
 
 	oem_name = malloc(length);
 	unibuf = malloc(length * sizeof (mts_wchar_t));
@@ -1214,19 +1219,20 @@ lmshare_set_oemname(lmshare_info_t *si)
 		return;
 	}
 
-	(void) mts_mbstowcs(unibuf, si->share_name, length);
+	(void) mts_mbstowcs(unibuf, si->shr_name, length);
 
 	if (unicodestooems(oem_name, unibuf, length, cpid) == 0)
-		(void) strcpy(oem_name, si->share_name);
+		(void) strcpy(oem_name, si->shr_name);
 
 	free(unibuf);
 
-	if (strlen(oem_name) + 1 > LMSHR_OEM_NAME_MAX) {
-		si->mode |= LMSHRM_LONGNAME;
-		*si->oem_name = '\0';
+	if (strlen(oem_name) + 1 > SMB_SHARE_OEMNAME_MAX) {
+		si->shr_flags |= SMB_SHRF_LONGNAME;
+		*si->shr_oemname = '\0';
 	} else {
-		si->mode &= ~LMSHRM_LONGNAME;
-		(void) strlcpy(si->oem_name, oem_name, LMSHR_OEM_NAME_MAX);
+		si->shr_flags &= ~SMB_SHRF_LONGNAME;
+		(void) strlcpy(si->shr_oemname, oem_name,
+		    SMB_SHARE_OEMNAME_MAX);
 	}
 
 	free(oem_name);

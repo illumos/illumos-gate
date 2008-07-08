@@ -191,11 +191,9 @@
 
 extern uint32_t smb_keep_alive;
 
-static int smb_write_raw_helper(struct smb_request *sr, struct uio *uiop,
-    unsigned int stability, offset_t *offp, uint32_t *lcountp);
-
-static int smb_transfer_write_raw_data(smb_request_t *sr,
-    uint16_t addl_xfer_count);
+static int smb_write_raw_helper(smb_request_t *, struct uio *, int,
+    offset_t *, uint32_t *);
+static int smb_transfer_write_raw_data(smb_request_t *, uint16_t);
 
 #define	WR_MODE_WR_THRU	1
 
@@ -231,7 +229,7 @@ smb_com_write_raw(struct smb_request *sr)
 	uint32_t		addl_lcount = 0;
 	struct uio		uio;
 	iovec_t			iovec;
-	unsigned int		stability;
+	int			stability;
 	struct mbuf_chain	reply;
 	smb_node_t		*fnode;
 	smb_error_t		err;
@@ -266,8 +264,7 @@ smb_com_write_raw(struct smb_request *sr)
 
 	fnode = sr->fid_ofile->f_node;
 	stability = ((write_mode & WR_MODE_WR_THRU) ||
-	    (fnode->flags & NODE_FLAGS_WRITE_THROUGH)) ?
-	    FSSTAB_FILE_SYNC : FSSTAB_UNSTABLE;
+	    (fnode->flags & NODE_FLAGS_WRITE_THROUGH)) ? FSYNC : 0;
 
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		/*
@@ -307,7 +304,7 @@ smb_com_write_raw(struct smb_request *sr)
 	 */
 	if (addl_xfer_count != 0) {
 		MBC_INIT(&reply, MLEN);
-		(void) smb_encode_mbc(&reply, SMB_HEADER_ED_FMT "bww",
+		(void) smb_mbc_encodef(&reply, SMB_HEADER_ED_FMT "bww",
 		    sr->first_smb_com,
 		    sr->smb_rcls,
 		    sr->smb_reh,
@@ -333,8 +330,7 @@ smb_com_write_raw(struct smb_request *sr)
 		 * response failed.  If it failed, we need to force the
 		 * stability level to "write-through".
 		 */
-		stability =
-		    (session_send_rc == 0) ? stability : FSSTAB_FILE_SYNC;
+		stability = (session_send_rc == 0) ? stability : FSYNC;
 	}
 
 	/*
@@ -348,7 +344,7 @@ smb_com_write_raw(struct smb_request *sr)
 	uio.uio_resid = data_length;
 
 	/*
-	 * smb_write_raw_helper will call smb_rpc_write or
+	 * smb_write_raw_helper will call smb_opipe_write or
 	 * smb_fsop_write as appropriate, handle the NODE_FLAGS_SET_SIZE
 	 * flag (if set) and update the other f_node fields.  It's possible
 	 * that data_length may be 0 for this transfer but we still want
@@ -475,7 +471,7 @@ notify_write_raw_complete:
 /*
  * smb_write_raw_helper
  *
- * This function will call smb_rpc_write or smb_fsop_write as appropriate,
+ * This function will call smb_opipe_write or smb_fsop_write as appropriate,
  * handle the NODE_FLAGS_SET_SIZE flag (if set) and update the other f_node
  * fields.  It's possible that data_length may be 0 for this transfer but
  * we still want process it since it will update the file state (seek
@@ -485,7 +481,7 @@ notify_write_raw_complete:
  */
 static int
 smb_write_raw_helper(struct smb_request *sr, struct uio *uiop,
-    unsigned int stability, offset_t *offp, uint32_t *lcountp)
+    int stability, offset_t *offp, uint32_t *lcountp)
 {
 	smb_node_t *fnode;
 	int rc = 0;
@@ -493,12 +489,12 @@ smb_write_raw_helper(struct smb_request *sr, struct uio *uiop,
 	if (STYPE_ISIPC(sr->tid_tree->t_res_type)) {
 		*lcountp = uiop->uio_resid;
 
-		if ((rc = smb_rpc_write(sr, uiop)) != 0)
+		if ((rc = smb_opipe_write(sr, uiop)) != 0)
 			*lcountp = 0;
 	} else {
 		fnode = sr->fid_ofile->f_node;
 		rc = smb_fsop_write(sr, sr->user_cr, fnode,
-		    uiop, lcountp, &fnode->attr, &stability);
+		    uiop, lcountp, &fnode->attr, stability);
 
 		if (rc == 0) {
 

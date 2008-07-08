@@ -32,6 +32,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <assert.h>
 #include <pwd.h>
 #include <grp.h>
 
@@ -40,6 +41,7 @@
 #include <smbsrv/libmlsvc.h>
 
 #include <smbsrv/ntstatus.h>
+#include <smbsrv/nterror.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/mlsvc_util.h>
@@ -66,6 +68,36 @@ typedef struct samr_keydata {
 	nt_domain_type_t kd_type;
 	DWORD kd_rid;
 } samr_keydata_t;
+
+/*
+ * DomainDisplayUser	All user objects (or those derived from user) with
+ * 			userAccountControl containing the UF_NORMAL_ACCOUNT bit.
+ *
+ * DomainDisplayMachine	All user objects (or those derived from user) with
+ * 			userAccountControl containing the
+ * 			UF_WORKSTATION_TRUST_ACCOUNT or UF_SERVER_TRUST_ACCOUNT
+ * 			bit.
+ *
+ * DomainDisplayGroup	All group objects (or those derived from group) with
+ * 			groupType equal to GROUP_TYPE_SECURITY_UNIVERSAL or
+ * 			GROUP_TYPE_SECURITY_ACCOUNT.
+ *
+ * DomainDisplayOemUser	Same as DomainDisplayUser with OEM strings
+ *
+ * DomainDisplayOemGroup Same as DomainDisplayGroup with OEM strings
+ */
+typedef enum {
+	DomainDisplayUser = 1,
+	DomainDisplayMachine,
+	DomainDispalyGroup,
+	DomainDisplayOemUser,
+	DomainDisplayOemGroup
+} samr_displvl_t;
+
+#define	SAMR_VALID_DISPLEVEL(lvl) \
+	(((lvl) >= DomainDisplayUser) && ((lvl) <= DomainDisplayOemGroup))
+
+#define	SAMR_SUPPORTED_DISPLEVEL(lvl) (lvl == DomainDisplayUser)
 
 static ndr_hdid_t *samr_hdalloc(ndr_xa_t *, samr_key_t, nt_domain_type_t,
     DWORD);
@@ -413,8 +445,8 @@ samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 	samr_keydata_t *data;
 	char *domain;
 	char hostname[MAXHOSTNAMELEN];
-	int alias_cnt;
-	int rc;
+	int alias_cnt, user_cnt;
+	int rc = 0;
 
 	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_DOMAIN)) == NULL) {
 		bzero(param, sizeof (struct samr_QueryDomainInfo));
@@ -436,21 +468,28 @@ samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 	switch (data->kd_type) {
 	case NT_DOMAIN_BUILTIN:
 		domain = "BUILTIN";
+		user_cnt = 0;
+		rc = smb_lgrp_numbydomain(SMB_LGRP_BUILTIN, &alias_cnt);
 		break;
 
 	case NT_DOMAIN_LOCAL:
 		rc = smb_gethostname(hostname, MAXHOSTNAMELEN, 1);
-		if (rc != 0) {
-			bzero(param, sizeof (struct samr_QueryDomainInfo));
-			param->status = NT_SC_ERROR(NT_STATUS_INTERNAL_ERROR);
-			return (MLRPC_DRC_OK);
+		if (rc == 0) {
+			domain = hostname;
+			user_cnt = smb_pwd_num();
+			rc = smb_lgrp_numbydomain(SMB_LGRP_LOCAL, &alias_cnt);
 		}
-		domain = hostname;
 		break;
 
 	default:
 		bzero(param, sizeof (struct samr_QueryDomainInfo));
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
+		return (MLRPC_DRC_OK);
+	}
+
+	if (rc != 0) {
+		bzero(param, sizeof (struct samr_QueryDomainInfo));
+		param->status = NT_SC_ERROR(NT_STATUS_INTERNAL_ERROR);
 		return (MLRPC_DRC_OK);
 	}
 
@@ -470,15 +509,6 @@ samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 		break;
 
 	case SAMR_QUERY_DOMAIN_INFO_2:
-		rc = (data->kd_type == NT_DOMAIN_BUILTIN)
-		    ? smb_lgrp_numbydomain(SMB_LGRP_BUILTIN, &alias_cnt)
-		    : smb_lgrp_numbydomain(SMB_LGRP_LOCAL, &alias_cnt);
-		if (rc != SMB_LGRP_SUCCESS) {
-			bzero(param, sizeof (struct samr_QueryDomainInfo));
-			param->status = NT_SC_ERROR(NT_STATUS_INTERNAL_ERROR);
-			return (MLRPC_DRC_OK);
-		}
-
 		info->ru.info2.unknown1 = 0x00000000;
 		info->ru.info2.unknown2 = 0x80000000;
 
@@ -496,7 +526,7 @@ samr_s_QueryDomainInfo(void *arg, struct mlrpc_xaction *mxa)
 		info->ru.info2.unknown4 = 0x00000001;
 		info->ru.info2.unknown5 = 0x00000003;
 		info->ru.info2.unknown6 = 0x00000001;
-		info->ru.info2.num_users = 0;
+		info->ru.info2.num_users = user_cnt;
 		info->ru.info2.num_groups = 0;
 		info->ru.info2.num_aliases = alias_cnt;
 		param->status = NT_STATUS_SUCCESS;
@@ -930,80 +960,126 @@ samr_s_SetUserInfo(void *arg, struct mlrpc_xaction *mxa)
 /*
  * samr_s_QueryDispInfo
  *
- * This function is supposed to return local user information.
- * As we don't support local users, this function dosen't send
- * back any information.
+ * This function currently return local users' information only.
+ * This RPC is called repeatedly until all the users info are
+ * retrieved.
  *
- * Added template that returns information for Administrator and Guest
- * builtin users.  All information is hard-coded from packet captures.
+ * The total count and the returned count are returned as total size
+ * and returned size.  The client doesn't seem to care.
  */
 static int
 samr_s_QueryDispInfo(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct samr_QueryDispInfo *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->domain_handle;
-	DWORD status = 0;
+	ndr_handle_t *hd;
+	samr_keydata_t *data;
+	DWORD status = NT_STATUS_SUCCESS;
+	struct user_acct_info *user;
+	smb_pwditer_t pwi;
+	smb_luser_t *uinfo;
+	int num_users;
+	int start_idx, idx;
+	int ret_cnt;
 
-	if (samr_hdlookup(mxa, id, SAMR_KEY_DOMAIN) == NULL) {
-		bzero(param, sizeof (struct samr_QueryDispInfo));
-		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
-		return (MLRPC_DRC_OK);
+	if ((hd = samr_hdlookup(mxa, id, SAMR_KEY_DOMAIN)) == NULL) {
+		status = NT_STATUS_INVALID_HANDLE;
+		goto error;
 	}
 
-#ifdef SAMR_SUPPORT_USER
-	if ((desc->discrim != SAMR_LOCAL_DOMAIN) || (param->start_idx != 0)) {
-		param->total_size = 0;
-		param->returned_size = 0;
-		param->switch_value = 1;
-		param->count = 0;
-		param->users = 0;
-	} else {
-		param->total_size = 328;
-		param->returned_size = 328;
-		param->switch_value = 1;
-		param->count = 2;
-		param->users = (struct user_disp_info *)MLRPC_HEAP_MALLOC(mxa,
-		    sizeof (struct user_disp_info));
-
-		param->users->count = 2;
-		param->users->acct[0].index = 1;
-		param->users->acct[0].rid = 500;
-		param->users->acct[0].ctrl = 0x210;
-
-		(void) mlsvc_string_save(
-		    (ms_string_t *)&param->users->acct[0].name,
-		    "Administrator", mxa);
-
-		(void) mlsvc_string_save(
-		    (ms_string_t *)&param->users->acct[0].fullname,
-		    "Built-in account for administering the computer/domain",
-		    mxa);
-
-		bzero(&param->users->acct[0].desc, sizeof (samr_string_t));
-
-		param->users->acct[1].index = 2;
-		param->users->acct[1].rid = 501;
-		param->users->acct[1].ctrl = 0x211;
-
-		(void) mlsvc_string_save(
-		    (ms_string_t *)&param->users->acct[1].name,
-		    "Guest", mxa);
-
-		(void) mlsvc_string_save(
-		    (ms_string_t *)&param->users->acct[1].fullname,
-		    "Built-in account for guest access to the computer/domain",
-		    mxa);
-
-		bzero(&param->users->acct[1].desc, sizeof (samr_string_t));
+	if (!SAMR_VALID_DISPLEVEL(param->level)) {
+		status = NT_STATUS_INVALID_INFO_CLASS;
+		goto error;
 	}
-#else
-	param->total_size = 0;
-	param->returned_size = 0;
-	param->switch_value = 1;
-	param->count = 0;
-	param->users = 0;
-#endif
+
+	if (!SAMR_SUPPORTED_DISPLEVEL(param->level)) {
+		status = NT_STATUS_NOT_IMPLEMENTED;
+		goto error;
+	}
+
+	data = (samr_keydata_t *)hd->nh_data;
+
+	switch (data->kd_type) {
+	case NT_DOMAIN_BUILTIN:
+		goto no_info;
+
+	case NT_DOMAIN_LOCAL:
+		num_users = smb_pwd_num();
+		start_idx = param->start_idx;
+		if ((num_users == 0) || (start_idx >= num_users))
+			goto no_info;
+
+		ret_cnt = num_users - start_idx;
+		if (ret_cnt > param->max_entries)
+			ret_cnt = param->max_entries;
+		param->users.acct = MLRPC_HEAP_MALLOC(mxa,
+		    ret_cnt * sizeof (struct user_acct_info));
+		user = param->users.acct;
+		if (user == NULL) {
+			status = NT_STATUS_NO_MEMORY;
+			goto error;
+		}
+		bzero(user, ret_cnt * sizeof (struct user_acct_info));
+
+		ret_cnt = idx = 0;
+		if (smb_pwd_iteropen(&pwi) != SMB_PWE_SUCCESS)
+			goto no_info;
+
+		while ((uinfo = smb_pwd_iterate(&pwi)) != NULL) {
+			if (idx++ < start_idx)
+				continue;
+
+			assert(uinfo->su_name != NULL);
+
+			user->index = start_idx + ret_cnt + 1;
+			user->rid = uinfo->su_rid;
+			user->ctrl = ACF_NORMUSER | ACF_PWDNOEXP;
+			if (uinfo->su_ctrl & SMB_PWF_DISABLE)
+				user->ctrl |= ACF_DISABLED;
+			if (mlsvc_string_save((ms_string_t *)&user->name,
+			    uinfo->su_name, mxa) == 0) {
+				smb_pwd_iterclose(&pwi);
+				status = NT_STATUS_NO_MEMORY;
+				goto error;
+			}
+			(void) mlsvc_string_save((ms_string_t *)&user->fullname,
+			    uinfo->su_fullname, mxa);
+			(void) mlsvc_string_save((ms_string_t *)&user->desc,
+			    uinfo->su_desc, mxa);
+			user++;
+			ret_cnt++;
+		}
+		smb_pwd_iterclose(&pwi);
+
+		param->users.total_size = num_users;
+		param->users.returned_size = ret_cnt;
+		param->users.switch_value = param->level;
+		param->users.count = ret_cnt;
+
+		if (ret_cnt < (num_users - start_idx))
+			param->status = ERROR_MORE_ENTRIES;
+		break;
+
+	default:
+		status = NT_STATUS_INVALID_HANDLE;
+		goto error;
+	}
+
 	param->status = status;
+	return (MLRPC_DRC_OK);
+
+no_info:
+	param->users.total_size = 0;
+	param->users.returned_size = 0;
+	param->users.switch_value = param->level;
+	param->users.count = 0;
+	param->users.acct = NULL;
+	param->status = status;
+	return (MLRPC_DRC_OK);
+
+error:
+	bzero(param, sizeof (struct samr_QueryDispInfo));
+	param->status = NT_SC_ERROR(status);
 	return (MLRPC_DRC_OK);
 }
 
@@ -1358,6 +1434,12 @@ samr_s_EnumDomainAliases(void *arg, struct mlrpc_xaction *mxa)
 		param->aliases = (struct aliases_info *)MLRPC_HEAP_MALLOC(mxa,
 		    sizeof (struct aliases_info));
 
+		if (param->aliases == NULL) {
+			bzero(param, sizeof (struct samr_EnumDomainAliases));
+			param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+			return (MLRPC_DRC_OK);
+		}
+
 		bzero(param->aliases, sizeof (struct aliases_info));
 		param->out_resume = 0;
 		param->entries = 0;
@@ -1368,6 +1450,12 @@ samr_s_EnumDomainAliases(void *arg, struct mlrpc_xaction *mxa)
 	cnt -= param->resume_handle;
 	param->aliases = (struct aliases_info *)MLRPC_HEAP_MALLOC(mxa,
 	    sizeof (struct aliases_info) + (cnt-1) * sizeof (struct name_rid));
+
+	if (param->aliases == NULL) {
+		bzero(param, sizeof (struct samr_EnumDomainAliases));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+		return (MLRPC_DRC_OK);
+	}
 
 	if (smb_lgrp_iteropen(&gi) != SMB_LGRP_SUCCESS) {
 		bzero(param, sizeof (struct samr_EnumDomainAliases));

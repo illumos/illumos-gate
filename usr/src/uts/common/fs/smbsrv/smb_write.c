@@ -424,7 +424,7 @@ smb_write_common(smb_request_t *sr, smb_rw_param_t *param)
 {
 	struct smb_ofile *ofile = sr->fid_ofile;
 	smb_node_t *node;
-	uint32_t stability = FSSTAB_UNSTABLE;
+	int stability = 0;
 	uint32_t lcount;
 	int rc = 0;
 
@@ -444,11 +444,11 @@ smb_write_common(smb_request_t *sr, smb_rw_param_t *param)
 
 		if (SMB_WRMODE_IS_STABLE(param->rw_mode) ||
 		    (node->flags & NODE_FLAGS_WRITE_THROUGH)) {
-			stability = FSSTAB_FILE_SYNC;
+			stability = FSYNC;
 		}
 
 		rc = smb_fsop_write(sr, sr->user_cr, node,
-		    &param->rw_vdb.uio, &lcount, &node->attr, &stability);
+		    &param->rw_vdb.uio, &lcount, &node->attr, stability);
 
 		if (rc)
 			return (rc);
@@ -468,7 +468,7 @@ smb_write_common(smb_request_t *sr, smb_rw_param_t *param)
 	case STYPE_IPC:
 		param->rw_count = (uint16_t)param->rw_vdb.uio.uio_resid;
 
-		if ((rc = smb_rpc_write(sr, &param->rw_vdb.uio)) != 0)
+		if ((rc = smb_opipe_write(sr, &param->rw_vdb.uio)) != 0)
 			param->rw_count = 0;
 		break;
 
@@ -578,7 +578,7 @@ smb_set_file_size(smb_request_t *sr, smb_node_t *node)
 
 	dosattr = smb_node_get_dosattr(node);
 
-	if (dosattr & SMB_FA_READONLY) {
+	if (dosattr & FILE_ATTRIBUTE_READONLY) {
 		if (((node->flags & NODE_FLAGS_CREATED) == 0) ||
 		    (sr->session->s_kid != node->n_orig_session_id))
 			return (EACCES);

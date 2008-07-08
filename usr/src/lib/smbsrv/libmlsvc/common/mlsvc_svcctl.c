@@ -29,6 +29,9 @@
  * NT Service Control Services (SVCCTL) RPC interface definition.
  * This interface provides remote access to add, remove, start and
  * stop services.
+ *
+ * SVCCTL access is restricted to administrators: members of the
+ * Domain Admins or Administrators groups.
  */
 
 #include <stdio.h>
@@ -68,6 +71,7 @@ static svc_info_t svc_info[] = {
 	{ "EventLog",	"EventLog",				NULL },
 	{ "Netlogon",	"Net Logon",				NULL },
 	{ "WebAdmin",	"Web Administration",			"httpd" },
+#if 0
 	{ "RlgnSvr",	"Remote Login",				"rlogin" },
 	{ "RpcSs",	"Remote Procedure Call (RPC) Service",	NULL },
 	{ "RshSvr",	"Remote Shell",				"rsh" },
@@ -79,14 +83,15 @@ static svc_info_t svc_info[] = {
 	{ "Samss",	"Security Accounts Manager",		NULL },
 	{ "UPS",	"Uninterruptible Power Supply",		"ups" },
 	{ "TftpSvr",	"TFTP",					"tftp" }
+#endif
 };
 
 #define	SVCCTL_NUM_SVCS		(sizeof (svc_info)/sizeof (svc_info[0]))
 
 
 static DWORD svcctl_get_status(const char *);
-static DWORD svcctl_validate_service(char *);
-static int svcctl_is_admin(struct mlrpc_xaction *);
+static DWORD svcctl_validate_service(const char *);
+static svc_info_t *svcctl_find_service(const char *);
 
 static int svcctl_s_Close(void *, struct mlrpc_xaction *);
 static int svcctl_s_OpenManager(void *, struct mlrpc_xaction *);
@@ -94,6 +99,8 @@ static int svcctl_s_OpenService(void *, struct mlrpc_xaction *);
 static int svcctl_s_QueryServiceStatus(void *, struct mlrpc_xaction *);
 static int svcctl_s_QueryServiceConfig(void *, struct mlrpc_xaction *);
 static int svcctl_s_EnumServicesStatus(void *, struct mlrpc_xaction *);
+static int svcctl_s_GetServiceDisplayNameW(void *, struct mlrpc_xaction *);
+static int svcctl_s_GetServiceKeyNameW(void *, struct mlrpc_xaction *);
 
 static mlrpc_stub_table_t svcctl_stub_table[] = {
 	{ svcctl_s_Close,		SVCCTL_OPNUM_Close },
@@ -102,6 +109,9 @@ static mlrpc_stub_table_t svcctl_stub_table[] = {
 	{ svcctl_s_QueryServiceStatus,	SVCCTL_OPNUM_QueryServiceStatus },
 	{ svcctl_s_QueryServiceConfig,	SVCCTL_OPNUM_QueryServiceConfig },
 	{ svcctl_s_EnumServicesStatus,	SVCCTL_OPNUM_EnumServicesStatus },
+	{ svcctl_s_GetServiceDisplayNameW,
+		SVCCTL_OPNUM_GetServiceDisplayNameW },
+	{ svcctl_s_GetServiceKeyNameW,	SVCCTL_OPNUM_GetServiceKeyNameW },
 	{0}
 };
 
@@ -177,7 +187,7 @@ svcctl_s_OpenManager(void *arg, struct mlrpc_xaction *mxa)
 	ndr_hdid_t *id;
 	int rc;
 
-	rc = svcctl_is_admin(mxa);
+	rc = ndr_is_admin(mxa);
 
 	if ((rc == 0) || (param->desired_access & SC_MANAGER_LOCK) != 0) {
 		bzero(&param->handle, sizeof (svcctl_handle_t));
@@ -392,6 +402,92 @@ svcctl_s_QueryServiceConfig(void *arg, struct mlrpc_xaction *mxa)
 }
 
 /*
+ * svcctl_s_GetServiceDisplayNameW
+ *
+ * Returns:
+ *	ERROR_SUCCESS
+ *	ERROR_INVALID_HANDLE
+ *	ERROR_SERVICE_DOES_NOT_EXIST
+ */
+static int
+svcctl_s_GetServiceDisplayNameW(void *arg, struct mlrpc_xaction *mxa)
+{
+	struct svcctl_GetServiceDisplayNameW *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->service_handle;
+	ndr_handle_t *hd;
+	svc_info_t *svc;
+
+	hd = ndr_hdlookup(mxa, id);
+	if ((hd == NULL) || (hd->nh_data != &svcctl_key_service)) {
+		bzero(param, sizeof (struct svcctl_GetServiceDisplayNameW));
+		param->status = ERROR_INVALID_HANDLE;
+		return (MLRPC_DRC_OK);
+	}
+
+	svc = svcctl_find_service((char *)param->service_name);
+
+	if (svc == NULL || svc->display_name == NULL) {
+		bzero(param, sizeof (struct svcctl_GetServiceDisplayNameW));
+		param->status = ERROR_SERVICE_DOES_NOT_EXIST;
+		return (MLRPC_DRC_OK);
+	}
+
+	param->display_name = MLRPC_HEAP_STRSAVE(mxa, svc->display_name);
+	if (param->display_name == NULL) {
+		bzero(param, sizeof (struct svcctl_GetServiceDisplayNameW));
+		param->status = ERROR_NOT_ENOUGH_MEMORY;
+		return (MLRPC_DRC_OK);
+	}
+
+	param->buf_size = strlen(svc->display_name) + 1;
+	param->status = ERROR_SUCCESS;
+	return (MLRPC_DRC_OK);
+}
+
+/*
+ * svcctl_s_GetServiceKeyNameW
+ *
+ * Returns:
+ *	ERROR_SUCCESS
+ *	ERROR_INVALID_HANDLE
+ *	ERROR_SERVICE_DOES_NOT_EXIST
+ */
+static int
+svcctl_s_GetServiceKeyNameW(void *arg, struct mlrpc_xaction *mxa)
+{
+	struct svcctl_GetServiceKeyNameW *param = arg;
+	ndr_hdid_t *id = (ndr_hdid_t *)&param->service_handle;
+	ndr_handle_t *hd;
+	svc_info_t *svc;
+
+	hd = ndr_hdlookup(mxa, id);
+	if ((hd == NULL) || (hd->nh_data != &svcctl_key_service)) {
+		bzero(param, sizeof (struct svcctl_GetServiceKeyNameW));
+		param->status = ERROR_INVALID_HANDLE;
+		return (MLRPC_DRC_OK);
+	}
+
+	svc = svcctl_find_service((char *)param->service_name);
+
+	if (svc == NULL || svc->local_name == NULL) {
+		bzero(param, sizeof (struct svcctl_GetServiceKeyNameW));
+		param->status = ERROR_SERVICE_DOES_NOT_EXIST;
+		return (MLRPC_DRC_OK);
+	}
+
+	param->key_name = MLRPC_HEAP_STRSAVE(mxa, svc->local_name);
+	if (param->key_name == NULL) {
+		bzero(param, sizeof (struct svcctl_GetServiceKeyNameW));
+		param->status = ERROR_NOT_ENOUGH_MEMORY;
+		return (MLRPC_DRC_OK);
+	}
+
+	param->buf_size = strlen(svc->local_name) + 1;
+	param->status = ERROR_SUCCESS;
+	return (MLRPC_DRC_OK);
+}
+
+/*
  * Check to see whether or not a service is supported. The check is
  * case-insensitive to avoid any naming issues due to the different
  * versions of Windows.
@@ -401,7 +497,7 @@ svcctl_s_QueryServiceConfig(void *arg, struct mlrpc_xaction *mxa)
  *	ERROR_SERVICE_DOES_NOT_EXIST
  */
 static DWORD
-svcctl_validate_service(char *svc_name)
+svcctl_validate_service(const char *svc_name)
 {
 	int i;
 
@@ -417,6 +513,25 @@ svcctl_validate_service(char *svc_name)
 }
 
 /*
+ * Lookup a service.
+ */
+static svc_info_t *
+svcctl_find_service(const char *svc_name)
+{
+	int i;
+
+	if (svc_name == NULL)
+		return (NULL);
+
+	for (i = 0; i < SVCCTL_NUM_SVCS; i++) {
+		if (strcasecmp(svc_name, svc_info[i].svc_name) == 0)
+			return (&svc_info[i]);
+	}
+
+	return (NULL);
+}
+
+/*
  * Report the service status: SERVICE_PAUSED or SERVICE_RUNNING.
  */
 /*ARGSUSED*/
@@ -424,21 +539,4 @@ static DWORD
 svcctl_get_status(const char *name)
 {
 	return (SERVICE_RUNNING);
-}
-
-/*
- * SVCCTL access is restricted to administrators: members of
- * the Domain Admins or Administrators groups.
- *
- * Returns 1 if the user has admin rights.  Otherwise returns 0.
- */
-static int
-svcctl_is_admin(struct mlrpc_xaction *mxa)
-{
-	smb_dr_user_ctx_t *user_ctx = mxa->context->user_ctx;
-
-	if (user_ctx == NULL)
-		return (0);
-
-	return (user_ctx->du_flags & SMB_ATF_ADMIN);
 }

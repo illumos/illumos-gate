@@ -85,7 +85,7 @@ smb_nt_transact_ioctl(struct smb_request *sr, struct smb_xa *xa)
 	unsigned char is_flags;
 	int i;
 
-	if (smb_decode_mbc(&xa->req_setup_mb, "lwbb",
+	if (smb_mbc_decodef(&xa->req_setup_mb, "lwbb",
 	    &fcode, &fid, &is_fsctl, &is_flags) != 0) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
 		return (SDRC_ERROR);
@@ -104,6 +104,6 @@ smb_nt_transact_ioctl(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_ERROR);
 	}
 
-	(void) smb_encode_mbc(&xa->rep_param_mb, "l", 0);
+	(void) smb_mbc_encodef(&xa->rep_param_mb, "l", 0);
 	return (SDRC_SUCCESS);
 }

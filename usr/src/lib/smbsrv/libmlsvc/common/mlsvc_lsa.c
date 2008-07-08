@@ -510,17 +510,10 @@ static int
 lsarpc_s_GetConnectedUser(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct mslsa_GetConnectedUser *param = arg;
-	smb_dr_user_ctx_t *user_ctx = mxa->context->user_ctx;
+	smb_opipe_context_t *svc = &mxa->context->svc_ctx;
 	DWORD status = NT_STATUS_SUCCESS;
 	int rc1;
 	int rc2;
-
-	if (user_ctx == NULL) {
-		bzero(param, sizeof (struct mslsa_GetConnectedUser));
-		status = NT_SC_ERROR(NT_STATUS_NO_TOKEN);
-		param->status = status;
-		return (MLRPC_DRC_OK);
-	}
 
 	if (smb_getdomaininfo(0) == NULL) {
 		bzero(param, sizeof (struct mslsa_GetConnectedUser));
@@ -545,10 +538,10 @@ lsarpc_s_GetConnectedUser(void *arg, struct mlrpc_xaction *mxa)
 	}
 
 	rc1 = mlsvc_string_save((ms_string_t *)param->owner,
-	    user_ctx->du_account, mxa);
+	    svc->oc_account, mxa);
 
 	rc2 = mlsvc_string_save((ms_string_t *)param->domain->name,
-	    user_ctx->du_domain, mxa);
+	    svc->oc_domain, mxa);
 
 	if (rc1 == 0 || rc2 == 0)
 		status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);

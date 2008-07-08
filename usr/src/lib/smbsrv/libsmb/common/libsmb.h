@@ -46,15 +46,7 @@ extern "C" {
 #include <smbsrv/string.h>
 #include <smbsrv/smb_idmap.h>
 #include <smbsrv/netbios.h>
-
-/*
- * XXX - These header files are here, only because other libraries
- * can compile. Move the header files in to the internal header files
- * of other libraries, once the restructure is complete. libsmb.h does not
- * need these header files.
- */
-#include <smbsrv/lmshare.h>
-#include <smbsrv/lmshare_door.h>
+#include <smbsrv/smb_share.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/alloc.h>
@@ -64,12 +56,10 @@ extern "C" {
 #include <smbsrv/hash_table.h>
 #include <smbsrv/msgbuf.h>
 #include <smbsrv/oem.h>
-#include <smbsrv/string.h>
 #include <smbsrv/smb_i18n.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smbinfo.h>
-/* End of header files to be removed. */
 
 #define	SMB_VARRUN_DIR "/var/run/smb"
 #define	SMB_CCACHE_FILE "ccache"
@@ -440,13 +430,32 @@ typedef struct smb_passwd {
 #define	SMB_PWE_BUSY		9
 #define	SMB_PWE_DENIED		10
 #define	SMB_PWE_SYSTEM_ERROR	11
-#define	SMB_PWE_MAX		12
+#define	SMB_PWE_INVALID_PARAM	12
+#define	SMB_PWE_NO_MEMORY	13
+#define	SMB_PWE_MAX		14
 
-extern void smb_pwd_init(void);
+typedef struct smb_pwditer {
+	void *spi_next;
+} smb_pwditer_t;
+
+typedef struct smb_luser {
+	char *su_name;
+	char *su_fullname;
+	char *su_desc;
+	uint32_t su_rid;
+	uint32_t su_ctrl;
+} smb_luser_t;
+
+extern void smb_pwd_init(boolean_t);
 extern void smb_pwd_fini(void);
 extern smb_passwd_t *smb_pwd_getpasswd(const char *, smb_passwd_t *);
 extern int smb_pwd_setpasswd(const char *, const char *);
 extern int smb_pwd_setcntl(const char *, int);
+extern int smb_pwd_num(void);
+
+extern int smb_pwd_iteropen(smb_pwditer_t *);
+extern smb_luser_t *smb_pwd_iterate(smb_pwditer_t *);
+extern void smb_pwd_iterclose(smb_pwditer_t *);
 
 extern int smb_auth_qnd_unicode(mts_wchar_t *dst, char *src, int length);
 extern int smb_auth_hmac_md5(unsigned char *data, int data_len,

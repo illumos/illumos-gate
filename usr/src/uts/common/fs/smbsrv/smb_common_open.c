@@ -324,7 +324,7 @@ smb_open_subr(smb_request_t *sr)
 		 * No further processing for IPC, we need to either
 		 * raise an exception or return success here.
 		 */
-		if ((status = smb_rpc_open(sr)) != NT_STATUS_SUCCESS)
+		if ((status = smb_opipe_open(sr)) != NT_STATUS_SUCCESS)
 			smbsr_error(sr, status, 0, 0);
 		return (status);
 
@@ -675,7 +675,7 @@ smb_open_subr(smb_request_t *sr)
 			 * to prevent write and delete access.
 			 */
 
-			if (op->dattr & SMB_FA_READONLY)
+			if (op->dattr & FILE_ATTRIBUTE_READONLY)
 				share_access &= ~(FILE_SHARE_WRITE |
 				    FILE_SHARE_DELETE);
 
@@ -697,7 +697,7 @@ smb_open_subr(smb_request_t *sr)
 			op->fqi.last_attr = node->attr;
 
 		} else {
-			op->dattr |= SMB_FA_DIRECTORY;
+			op->dattr |= FILE_ATTRIBUTE_DIRECTORY;
 			new_attr.sa_vattr.va_type = VDIR;
 			new_attr.sa_vattr.va_mode = 0777;
 			new_attr.sa_mask = SMB_AT_TYPE | SMB_AT_MODE;
@@ -732,8 +732,7 @@ smb_open_subr(smb_request_t *sr)
 	 */
 
 	of = smb_ofile_open(sr->tid_tree, node, sr->smb_pid, op->desired_access,
-	    op->create_options, share_access, SMB_FTYPE_DISK, NULL, 0,
-	    uniq_fid, &err);
+	    op->create_options, share_access, SMB_FTYPE_DISK, uniq_fid, &err);
 
 	if (of == NULL) {
 		smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
@@ -797,9 +796,9 @@ smb_open_subr(smb_request_t *sr)
 		 * will act as the indicator to set the DOS readonly bit on
 		 * close.
 		 */
-		if (op->dattr & SMB_FA_READONLY) {
+		if (op->dattr & FILE_ATTRIBUTE_READONLY) {
 			node->flags |= NODE_CREATED_READONLY;
-			op->dattr &= ~SMB_FA_READONLY;
+			op->dattr &= ~FILE_ATTRIBUTE_READONLY;
 		}
 		smb_node_set_dosattr(node, op->dattr);
 		if ((op->crtime.tv_sec != 0) && (op->crtime.tv_sec != UINT_MAX))

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,12 +39,25 @@
 #include "ndrtypes.ndl"
 
 
+#define NETR_OPNUM_UasLogon			0x00
+#define NETR_OPNUM_UasLogoff			0x01
 #define NETR_OPNUM_SamLogon			0x02
 #define NETR_OPNUM_SamLogoff			0x03
 #define NETR_OPNUM_ServerReqChallenge		0x04
+#define NETR_OPNUM_ServerAuthenticate		0x05
 #define NETR_OPNUM_ServerPasswordSet		0x06
+#define NETR_OPNUM_DatabaseDeltas		0x07
+#define NETR_OPNUM_DatabaseSync			0x08
+#define NETR_OPNUM_AccountDeltas		0x09
+#define NETR_OPNUM_AccountSync			0x0a
+#define NETR_OPNUM_GetDCName			0x0b
+#define NETR_OPNUM_LogonControl			0x0c
+#define NETR_OPNUM_GetAnyDCName			0x0d
 #define NETR_OPNUM_LogonControl2		0x0E
 #define NETR_OPNUM_ServerAuthenticate2		0x0F
+#define NETR_OPNUM_DatabaseSync2		0x10
+#define NETR_OPNUM_DatabaseRedo			0x11
+#define NETR_OPNUM_LogonControl2Ex		0x12
 #define NETR_OPNUM_TrustDomainList		0x13
 
 

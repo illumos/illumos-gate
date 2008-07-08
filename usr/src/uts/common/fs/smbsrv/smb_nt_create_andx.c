@@ -338,7 +338,7 @@ smb_com_nt_create_andx(struct smb_request *sr)
 		    0LL,
 		    0LL,
 		    0LL,
-		    SMB_FA_NORMAL,
+		    FILE_ATTRIBUTE_NORMAL,
 		    0x1000LL,
 		    0LL,
 		    op->ftype,

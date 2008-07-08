@@ -36,9 +36,9 @@ extern "C" {
 #endif
 
 /* ADS typedef/data structures and functions */
-#define	ADS_MAXBUFLEN 100
+#define	SMB_ADS_MAXBUFLEN 100
 
-typedef struct ads_handle_s {
+typedef struct smb_ads_handle {
 	char *user;		/* admin user to create share in ADS */
 	char *pwd;		/* user password */
 	char *domain;		/* ADS domain */
@@ -47,45 +47,47 @@ typedef struct ads_handle_s {
 	char *hostname;		/* fully qualified hostname */
 	char *site;		/* local ADS site */
 	LDAP *ld;		/* LDAP handle */
-} ADS_HANDLE;
+} smb_ads_handle_t;
 
 /*
  * The possible return status of the adjoin routine.
  */
-typedef enum adjoin_status {
-	ADJOIN_SUCCESS = 0,
-	ADJOIN_ERR_GET_HANDLE,
-	ADJOIN_ERR_GEN_PASSWD,
-	ADJOIN_ERR_ADD_TRUST_ACCT,
-	ADJOIN_ERR_MOD_TRUST_ACCT,
-	ADJOIN_ERR_GET_ENCTYPES,
-	ADJOIN_ERR_INIT_KRB_CTX,
-	ADJOIN_ERR_GET_SPNS,
-	ADJOIN_ERR_KSETPWD,
-	ADJOIN_ERR_UPDATE_CNTRL_ATTR,
-	ADJOIN_ERR_WRITE_KEYTAB,
-	ADJOIN_ERR_IDMAP_SET_DOMAIN,
-	ADJOIN_ERR_IDMAP_REFRESH,
-	ADJOIN_NUM_STATUS
-} adjoin_status_t;
+typedef enum smb_adjoin_status {
+	SMB_ADJOIN_SUCCESS = 0,
+	SMB_ADJOIN_ERR_GET_HANDLE,
+	SMB_ADJOIN_ERR_GEN_PASSWD,
+	SMB_ADJOIN_ERR_GET_DCLEVEL,
+	SMB_ADJOIN_ERR_ADD_TRUST_ACCT,
+	SMB_ADJOIN_ERR_MOD_TRUST_ACCT,
+	SMB_ADJOIN_ERR_GET_ENCTYPES,
+	SMB_ADJOIN_ERR_INIT_KRB_CTX,
+	SMB_ADJOIN_ERR_GET_SPNS,
+	SMB_ADJOIN_ERR_KSETPWD,
+	SMB_ADJOIN_ERR_UPDATE_CNTRL_ATTR,
+	SMB_ADJOIN_ERR_WRITE_KEYTAB,
+	SMB_ADJOIN_ERR_IDMAP_SET_DOMAIN,
+	SMB_ADJOIN_ERR_IDMAP_REFRESH,
+	SMB_ADJOIN_NUM_STATUS
+} smb_adjoin_status_t;
 
 /* ADS functions */
-extern void ads_init(void);
-extern void ads_refresh(void);
-extern ADS_HANDLE *ads_open(void);
-extern void ads_close(ADS_HANDLE *);
-extern int ads_publish_share(ADS_HANDLE *, const char *, const char *,
+extern void smb_ads_init(void);
+extern void smb_ads_refresh(void);
+extern smb_ads_handle_t *smb_ads_open(void);
+extern void smb_ads_close(smb_ads_handle_t *);
+extern int smb_ads_publish_share(smb_ads_handle_t *, const char *, const char *,
     const char *, const char *);
-extern int ads_remove_share(ADS_HANDLE *, const char *, const char *,
+extern int smb_ads_remove_share(smb_ads_handle_t *, const char *, const char *,
     const char *, const char *);
-extern int ads_build_unc_name(char *, int, const char *, const char *);
-extern int ads_lookup_share(ADS_HANDLE *, const char *, const char *, char *);
-extern int ads_add_share(ADS_HANDLE *, const char *, const char *,
+extern int smb_ads_build_unc_name(char *, int, const char *, const char *);
+extern int smb_ads_lookup_share(smb_ads_handle_t *, const char *, const char *,
+    char *);
+extern int smb_ads_add_share(smb_ads_handle_t *, const char *, const char *,
     const char *);
-extern adjoin_status_t ads_join(char *, char *, char *, char *, int);
-extern char *adjoin_report_err(adjoin_status_t);
-extern int ads_domain_change_cleanup(char *);
-extern int ads_update_attrs(void);
+extern smb_adjoin_status_t smb_ads_join(char *, char *, char *, char *, int);
+extern char *smb_adjoin_report_err(smb_adjoin_status_t);
+extern int smb_ads_domain_change_cleanup(char *);
+extern int smb_ads_update_attrs(void);
 
 /* DYNDNS functions */
 extern int dns_msgid_init(void);
@@ -99,7 +101,7 @@ extern int smb_ccache_init(char *, char *);
 extern void smb_ccache_remove(char *);
 
 /* NETBIOS Functions */
-extern int msdcs_lookup_ads(char *, char *);
+extern int smb_msdcs_lookup_ads(char *, char *);
 extern int smb_netbios_start(void);
 extern void smb_netbios_shutdown(void);
 extern void smb_netbios_name_reconfig(void);

@@ -53,18 +53,56 @@
 #include <smbns_dyndns.h>
 #include <smbns_krb.h>
 
-#define	ADS_DN_MAX	300
-#define	ADS_MAXMSGLEN 512
-#define	ADS_COMPUTERS_CN "Computers"
-#define	ADS_COMPUTER_NUM_ATTR 7
-#define	ADS_SHARE_NUM_ATTR 3
-#define	ADS_SITE_MAX MAXHOSTNAMELEN
+#define	SMB_ADS_DN_MAX	300
+#define	SMB_ADS_MAXMSGLEN 512
+#define	SMB_ADS_COMPUTERS_CN "Computers"
+#define	SMB_ADS_COMPUTER_NUM_ATTR 8
+#define	SMB_ADS_SHARE_NUM_ATTR 3
+#define	SMB_ADS_SITE_MAX MAXHOSTNAMELEN
+
+#define	SMB_ADS_MSDCS_SRV_DC_RR		"_ldap._tcp.dc._msdcs"
+#define	SMB_ADS_MSDCS_SRV_SITE_RR	"_ldap._tcp.%s._sites.dc._msdcs"
+
+/*
+ * domainControllerFunctionality
+ *
+ * This rootDSE attribute indicates the functional level of the DC.
+ */
+#define	SMB_ADS_ATTR_DCLEVEL	"domainControllerFunctionality"
+#define	SMB_ADS_DCLEVEL_W2K	0
+#define	SMB_ADS_DCLEVEL_W2K3	2
+#define	SMB_ADS_DCLEVEL_W2K8	3
+
+/*
+ * msDs-supportedEncryptionTypes (Windows Server 2008 only)
+ *
+ * This attribute defines the encryption types supported by the system.
+ * Encryption Types:
+ *  - DES cbc mode with CRC-32
+ *  - DES cbc mode with RSA-MD5
+ *  - ArcFour with HMAC/md5
+ *  - AES-128
+ *  - AES-256
+ */
+#define	SMB_ADS_ATTR_ENCTYPES	"msDs-supportedEncryptionTypes"
+#define	SMB_ADS_ENC_DES_CRC	1
+#define	SMB_ADS_ENC_DES_MD5	2
+#define	SMB_ADS_ENC_RC4		4
+#define	SMB_ADS_ENC_AES128	8
+#define	SMB_ADS_ENC_AES256	16
+
+#define	SMB_ADS_ATTR_SAMACCT	"sAMAccountName"
+#define	SMB_ADS_ATTR_UPN	"userPrincipalName"
+#define	SMB_ADS_ATTR_SPN	"servicePrincipalName"
+#define	SMB_ADS_ATTR_CTL	"userAccountControl"
+#define	SMB_ADS_ATTR_DNSHOST	"dNSHostName"
+#define	SMB_ADS_ATTR_KVNO	"msDS-KeyVersionNumber"
 
 /* current ADS server to communicate with */
-ADS_HOST_INFO *ads_host_info = NULL;
-mutex_t ads_host_mtx;
-char ads_site[ADS_SITE_MAX];
-mutex_t ads_site_mtx;
+static smb_ads_host_info_t *ads_host_info = NULL;
+static mutex_t ads_host_mtx;
+static char ads_site[SMB_ADS_SITE_MAX];
+static mutex_t ads_site_mtx;
 
 /*
  * adjoin_errmsg
@@ -88,33 +126,35 @@ static char *adjoin_errmsg[] = {
 	"ADJOIN failed to refresh idmap service."
 };
 
-static ADS_HANDLE *ads_open_main(char *domain, char *user, char *password);
-static int ads_bind(ADS_HANDLE *);
-static void ads_get_computer_dn(ADS_HANDLE *, char *, size_t);
-static int ads_add_computer(ADS_HANDLE *ah);
-static int ads_modify_computer(ADS_HANDLE *ah);
-static void ads_del_computer(ADS_HANDLE *ah);
-static int ads_computer_op(ADS_HANDLE *ah, int op);
-static int ads_lookup_computer_n_attr(ADS_HANDLE *ah, char *attr, char **val);
-static int ads_update_computer_cntrl_attr(ADS_HANDLE *ah, int des_only);
-static krb5_kvno ads_lookup_computer_attr_kvno(ADS_HANDLE *ah);
-static int ads_gen_machine_passwd(char *machine_passwd, int bufsz);
-static ADS_HOST_INFO *ads_get_host_info(void);
-static void ads_set_host_info(ADS_HOST_INFO *host);
-static void ads_free_host_info(void);
-static int ads_get_spnset(char *fqhost, char **spn_set);
-static void ads_free_spnset(char **spn_set);
-static int ads_alloc_attr(LDAPMod *attrs[], int num);
-static void ads_free_attr(LDAPMod *attrs[]);
+static smb_ads_handle_t *smb_ads_open_main(char *domain, char *user,
+    char *password);
+static int smb_ads_bind(smb_ads_handle_t *);
+static int smb_ads_add_computer(smb_ads_handle_t *ah, int dclevel);
+static int smb_ads_modify_computer(smb_ads_handle_t *ah, int dclevel);
+static int smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel);
+static int smb_ads_lookup_computer_n_attr(smb_ads_handle_t *ah, char *attr,
+    char **val);
+static int smb_ads_update_computer_cntrl_attr(smb_ads_handle_t *ah,
+    int des_only);
+static krb5_kvno smb_ads_lookup_computer_attr_kvno(smb_ads_handle_t *ah);
+static int smb_ads_gen_machine_passwd(char *machine_passwd, int bufsz);
+static smb_ads_host_info_t *smb_ads_get_host_info(void);
+static void smb_ads_set_host_info(smb_ads_host_info_t *host);
+static void smb_ads_free_host_info(void);
+static int smb_ads_get_spnset(char *fqhost, char **spn_set);
+static void smb_ads_free_spnset(char **spn_set);
+static int smb_ads_alloc_attr(LDAPMod *attrs[], int num);
+static void smb_ads_free_attr(LDAPMod *attrs[]);
+static int smb_ads_get_dc_level(smb_ads_handle_t *ah);
 
 
 /*
- * ads_init
+ * smb_ads_init
  *
  * Initializes the ads_site global variable.
  */
 void
-ads_init(void)
+smb_ads_init(void)
 {
 	(void) mutex_lock(&ads_site_mtx);
 	(void) smb_config_getstr(SMB_CI_ADS_SITE, ads_site, sizeof (ads_site));
@@ -122,26 +162,26 @@ ads_init(void)
 }
 
 /*
- * ads_refresh
+ * smb_ads_refresh
  *
  * If the ads_site has changed, clear the ads_host_info cache.
  */
 void
-ads_refresh(void)
+smb_ads_refresh(void)
 {
-	char new_site[ADS_SITE_MAX];
+	char new_site[SMB_ADS_SITE_MAX];
 
 	(void) smb_config_getstr(SMB_CI_ADS_SITE, new_site, sizeof (new_site));
 	(void) mutex_lock(&ads_site_mtx);
 	if (strcasecmp(ads_site, new_site)) {
 		(void) strlcpy(ads_site, new_site, sizeof (ads_site));
-		ads_free_host_info();
+		smb_ads_free_host_info();
 	}
 	(void) mutex_unlock(&ads_site_mtx);
 }
 
 /*
- * ads_build_unc_name
+ * smb_ads_build_unc_name
  *
  * Construct the UNC name of the share object in the format of
  * \\hostname.domain\shareUNC
@@ -149,7 +189,7 @@ ads_refresh(void)
  * Returns 0 on success, -1 on error.
  */
 int
-ads_build_unc_name(char *unc_name, int maxlen,
+smb_ads_build_unc_name(char *unc_name, int maxlen,
     const char *hostname, const char *shareUNC)
 {
 	char my_domain[MAXHOSTNAMELEN];
@@ -163,145 +203,10 @@ ads_build_unc_name(char *unc_name, int maxlen,
 }
 
 /*
- * ads_skip_domain_name
- * Skip domain name format in DNS message.  The format is a sequence of
- * ascii labels with each label having a length byte at the beginning.
- * The domain name is terminated with a NULL character.
- * i.e. 3sun3com0
- * Parameters:
- *   bufptr: address of pointer of buffer that contains domain name
- * Returns:
- *   bufptr: points to the data after the domain name label
- */
-static void
-ads_skip_domain_name(char **bufptr)
-{
-	int i = 0;
-	unsigned char c, d;
-
-	c = (*bufptr)[i++];
-	d = c & 0xC0;
-	while (c != 0 && (d != 0xC0)) {	/* do nothing */
-		c = (*bufptr)[i++];
-		d = c & 0xC0;
-	}
-
-	if (d == 0xC0)
-		/* skip 2nd byte in 2 byte ptr info */
-		i++;
-	*bufptr += i;
-}
-
-static int
-ads_is_ptr(char *buf, int len, char *offset_ptr, char **new_loc)
-{
-	uint16_t offset;
-	unsigned char c;
-
-	c = len & 0xC0;
-	if (c == 0xC0) {
-		offset_ptr = dyndns_get_nshort(offset_ptr, &offset);
-		offset &= 0x3FFF;
-		if (offset > NS_PACKETSZ) {
-			return (-1);
-		}
-		*new_loc = buf + offset;
-		return (1);
-	}
-	return (0);
-}
-
-/*
- * ads_get_domain_name
- * Converts the domain name format in DNS message back to string format.
- * The format is a sequence of ascii labels with each label having a length
- * byte at the beginning.  The domain name is terminated with a NULL
- * character.
- * i.e. 6procom3com0 -> procom.com
- * Parameters:
- *   bufptr   : address of pointer to buffer that contains domain name
- *   dname_len: length of domain name in label format
- * Returns:
- *   NULL       : error
- *   domain name: in string format using allocated memory
- *   bufptr     : points to the data after the domain name label
- */
-static char *
-ads_get_domain_name(char *buf, char **bufptr)
-{
-	char str[256], *ptr, *new_loc;
-	int i, j, k, len, ret;
-	int skip = 0;
-	i = 0;
-	k = 0;
-	ptr = *bufptr;
-
-	/* get len of first label */
-	len = ptr[i++];
-	if ((ret = ads_is_ptr(buf, len, &ptr[i-1], &new_loc)) == 1) {
-		if (skip == 0) {
-			/* skip up to first ptr */
-			skip = i;
-		}
-
-		i = 0;
-		ptr = new_loc;
-
-		/* get len of first label */
-		len = ptr[i++];
-	} else {
-		if (ret == -1) {
-			return (NULL);
-		}
-	}
-
-	while (len) {
-		if ((len > 63) || (k >= 255))
-			return (NULL);
-
-		for (j = 0; j < len; j++)
-			str[k++] = ptr[i++];
-
-		/* get len of next label */
-		len = ptr[i++];
-		if ((ret = ads_is_ptr(buf, len, &ptr[i-1], &new_loc)) == 1) {
-			if (skip == 0) {
-				/* skip up to first ptr */
-				skip = i;
-			}
-			i = 0;
-			ptr = new_loc;
-
-			/* get len of first label */
-			len = ptr[i++];
-		} else if (ret == -1) {
-			return (NULL);
-		}
-
-		if (len) {
-			/* replace label len or ptr with '.' */
-			str[k++] = '.';
-		}
-	}
-
-	str[k] = 0;
-
-	if (skip) {
-		/* skip name with ptr or just ptr */
-		*bufptr += skip + 1;
-	} else {
-		/* skip name */
-		*bufptr += i;
-	}
-
-	return (strdup(str));
-}
-
-/*
- * ads_ping
+ * smb_ads_ping
  * Ping IP without displaying log.  This is used to ping an ADS server to see
  * if it is still alive before connecting to it with TCP.
- * Taken from os/service/ping.c
+ *
  * Parameters:
  *   hostinetaddr: 4 bytes IP address in network byte order
  * Returns:
@@ -310,30 +215,17 @@ ads_get_domain_name(char *buf, char **bufptr)
  */
 /*ARGSUSED*/
 static int
-ads_ping(unsigned long hostinetaddr)
+smb_ads_ping(unsigned long hostinetaddr)
 {
 	return (0);
 }
 
 /*
- * ads_free_host_list
- */
-static void
-ads_free_host_list(ADS_HOST_INFO *host_list, int count)
-{
-	int i;
-	for (i = 0; i < count; i++) {
-		free(host_list[i].name);
-	}
-	free(host_list);
-}
-
-/*
- * ads_set_host_info
+ * smb_ads_set_host_info
  * Cache the result of the ADS discovery if the cache is empty.
  */
 static void
-ads_set_host_info(ADS_HOST_INFO *host)
+smb_ads_set_host_info(smb_ads_host_info_t *host)
 {
 	(void) mutex_lock(&ads_host_mtx);
 	if (!ads_host_info)
@@ -342,41 +234,190 @@ ads_set_host_info(ADS_HOST_INFO *host)
 }
 
 /*
- * ads_get_host_info
+ * smb_ads_get_host_info
  * Get the cached ADS host info.
  */
-static ADS_HOST_INFO *
-ads_get_host_info(void)
+static smb_ads_host_info_t *
+smb_ads_get_host_info(void)
 {
-	ADS_HOST_INFO *host;
+	smb_ads_host_info_t *host;
 
 	(void) mutex_lock(&ads_host_mtx);
 	host = ads_host_info;
 	(void) mutex_unlock(&ads_host_mtx);
 	return (host);
 }
+
 /*
- * ads_find_host
- * This routine builds a DNS service location message and sends it to the
- * DNS server via UDP to query it for a list of ADS server(s).  Once a reply
- * is received, the reply message is parsed to get the hostname and IP
- * addresses of the ADS server(s).  One ADS server will be selected from the
- * list.  A ping is sent to each host at a time and the one that respond will
- * be selected.
+ * smb_ads_skip_ques_sec
+ * Skips the question section.
+ */
+static int
+smb_ads_skip_ques_sec(int qcnt, uchar_t **ptr, uchar_t *eom)
+{
+	int i, len;
+
+	for (i = 0; i < qcnt; i++) {
+		if ((len = dn_skipname(*ptr, eom)) < 0) {
+			syslog(LOG_ERR, "DNS query invalid message format");
+			return (-1);
+		}
+		*ptr += len + QFIXEDSZ;
+	}
+
+	return (0);
+}
+
+/*
+ * smb_ads_decode_host_ans_sec
+ * Decodes ADS hosts and port number from the answer section based
+ * on the current buffer pointer.
+ */
+static int
+smb_ads_decode_host_ans_sec(int ans_cnt, uchar_t **ptr, uchar_t *eom,
+    uchar_t *buf, smb_ads_host_info_t *ads_host_list)
+{
+	int i, len;
+	smb_ads_host_info_t *ads_host;
+
+	for (i = 0; i < ans_cnt; i++) {
+		ads_host = &ads_host_list[i];
+
+		if ((len = dn_skipname(*ptr, eom)) < 0) {
+			syslog(LOG_ERR, "DNS query invalid message format");
+			return (-1);
+		}
+
+		*ptr += len;
+
+		/* skip type, class, ttl */
+		*ptr += 8;
+		/* data size */
+		*ptr += 2;
+
+		/* skip priority, weight */
+		*ptr += 4;
+		/* port */
+		/* LINTED: E_CONSTANT_CONDITION */
+		NS_GET16(ads_host->port, *ptr);
+		/* domain name */
+		len = dn_expand(buf, eom, *ptr, ads_host->name, MAXHOSTNAMELEN);
+		if (len < 0) {
+			syslog(LOG_ERR, "DNS query invalid SRV record");
+			return (-1);
+		}
+
+		*ptr += len;
+	}
+
+	return (0);
+}
+
+/*
+ * smb_ads_skip_auth_sec
+ * Skips the authority section.
+ */
+static int
+smb_ads_skip_auth_sec(int ns_cnt, uchar_t **ptr, uchar_t *eom)
+{
+	int i, len;
+	uint16_t size;
+
+	for (i = 0; i < ns_cnt; i++) {
+		if ((len = dn_skipname(*ptr, eom)) < 0) {
+			syslog(LOG_ERR, "DNS query invalid message format");
+			return (-1);
+		}
+		*ptr += len;
+		/* skip type, class, ttl */
+		*ptr += 8;
+		/* get len of data */
+		/* LINTED: E_CONSTANT_CONDITION */
+		NS_GET16(size, *ptr);
+		if ((*ptr + size) > eom) {
+			syslog(LOG_ERR, "DNS query invalid message format");
+			return (-1);
+		}
+
+		*ptr += size;
+	}
+
+	return (0);
+}
+
+/*
+ * smb_ads_decode_host_addi_sec
+ * Decodes ADS hosts and IP Addresses from the additional section based
+ * on the current buffer pointer.
+ */
+static int
+smb_ads_decode_host_addi_sec(int addit_cnt, uchar_t **ptr, uchar_t *eom,
+    uchar_t *buf, smb_ads_host_info_t *ads_host_list)
+{
+	int i, len;
+	in_addr_t ipaddr;
+	smb_ads_host_info_t *ads_host;
+
+	for (i = 0; i < addit_cnt; i++) {
+		ads_host = &ads_host_list[i];
+
+		/* domain name */
+		len = dn_expand(buf, eom, *ptr, ads_host->name, MAXHOSTNAMELEN);
+		if (len < 0) {
+			syslog(LOG_ERR, "DNS query invalid SRV record");
+			return (-1);
+		}
+		*ptr += len;
+
+		/* skip type, class, TTL, data len */
+		*ptr += 10;
+
+		/* LINTED: E_CONSTANT_CONDITION */
+		NS_GET32(ipaddr, *ptr);
+
+		ads_host->ip_addr = htonl(ipaddr);
+	}
+
+	return (0);
+}
+
+static smb_ads_host_info_t *
+smb_ads_init_host_info(char *name, in_addr_t ipaddr, int port)
+{
+	smb_ads_host_info_t *ads_host;
+
+	ads_host = (smb_ads_host_info_t *)
+	    malloc(sizeof (smb_ads_host_info_t));
+	if (ads_host == NULL)
+		return (NULL);
+
+	(void) strlcpy(ads_host->name, name, MAXHOSTNAMELEN);
+	ads_host->ip_addr = ipaddr;
+	ads_host->port = port;
+
+	return (ads_host);
+}
+
+/*
+ * smb_ads_find_host
+ * This routine sends a DNS service location (SRV) query message to the
+ * DNS server via TCP to query it for a list of ADS server(s).  Once a reply
+ * is received, the reply message is parsed to get the hostname.  A host
+ * lookup by name is done to get the IP address if the additional section of
+ * the reply packet does not contain any IP addresses.  If there are IP
+ * addresses populated in the additional section then the additional section
+ * is parsed to obtain the IP addresses.
  *
  * The service location of _ldap._tcp.dc.msdcs.<ADS domain> is used to
  * guarantee that Microsoft domain controllers are returned.  Microsoft domain
  * controllers are also ADS servers.
  *
  * The ADS hostnames are stored in the answer section of the DNS reply message.
- * The IP addresses are stored in the additional section.  If the additional
- * section does not contain any IP addresses then do a host lookup by name
- * to get the IP address of the hostname.
+ * The IP addresses are stored in the additional section.
  *
  * The DNS reply message may be in compress formed.  The compression is done
  * on repeating domain name label in the message.  i.e hostname.
  * Parameters:
- *   ns: Nameserver to use to find the ADS host
  *   domain: domain of ADS host.
  *   sought: the ADS host to be sought. It can be set to empty string to find
  *           any ADS hosts in that domain.
@@ -386,37 +427,33 @@ ads_get_host_info(void)
  *   port    : LDAP port of ADS host
  */
 /*ARGSUSED*/
-ADS_HOST_INFO *
-ads_find_host(char *ns, char *domain, char *sought, int *port, char *service,
-    int *go_next)
+smb_ads_host_info_t *
+smb_ads_find_host(char *domain, char *sought, int *port)
 {
-	int s;
-	uint16_t id, rid, data_len, eport;
-	int ipaddr;
+	int i, error;
 	struct hostent *h;
-	char buf[NS_PACKETSZ], buf2[NS_PACKETSZ];
-	char *bufptr, *str;
-	int i, ret;
-	int queryReq;
-	uint16_t query_cnt, ans_cnt, namser_cnt, addit_cnt;
-	int quest_type, quest_class;
-	int dns_ip;
 	struct in_addr addr;
-	uint16_t flags = 0;
-	int force_recurs = 0;
-	ADS_HOST_INFO *ads_hosts_list = NULL, *ads_host;
-	ADS_HOST_INFO *ads_hosts_list2 = NULL;
+	smb_ads_host_info_t *ads_host, *ads_hosts_list_ans,
+	    *ads_hosts_list_addi, *ahi;
 	char *curdom = NULL;
-	boolean_t same_domain;
+	boolean_t same_domain, istrunc = B_FALSE;
+	int len, qcnt, ans_cnt, ns_cnt, addit_cnt;
+	uchar_t *ptr, *eom;
+	struct __res_state res_state;
+	union {
+		HEADER hdr;
+		uchar_t buf[NS_MAXMSG];
+	} msg;
+	char site_service[MAXHOSTNAMELEN];
+	char *svc_name[2] = {site_service, SMB_ADS_MSDCS_SRV_DC_RR};
 
-	*go_next = 0;
 
 	/*
 	 * If we have already found an ADS server in the given domain, return
 	 * the cached ADS host if either the sought host is not specified or
 	 * the cached ADS host matches the sought host.
 	 */
-	ads_host = ads_get_host_info();
+	ads_host = smb_ads_get_host_info();
 	if (ads_host) {
 		curdom = strchr(ads_host->name, '.');
 		same_domain = (curdom && !strcasecmp(++curdom, domain));
@@ -425,280 +462,232 @@ ads_find_host(char *ns, char *domain, char *sought, int *port, char *service,
 		    strlen(sought)))))
 			return (ads_host);
 
-		ads_free_host_info();
+		smb_ads_free_host_info();
 	}
 
-	if (ns == NULL || *ns == 0) {
-		return (NULL);
-	}
-	dns_ip = inet_addr(ns);
-
-	if ((s = dyndns_open_init_socket(SOCK_DGRAM, dns_ip, 53)) < 0)
+	bzero(&res_state, sizeof (struct __res_state));
+	if (res_ninit(&res_state) < 0)
 		return (NULL);
 
-retry:
-	/* build query request */
-	queryReq = REQ_QUERY;
-	query_cnt = 1;
-	ans_cnt = 0;
-	namser_cnt = 0;
-	addit_cnt = 0;
+	/* use TCP */
+	res_state.options |= RES_USEVC;
 
-	(void) memset(buf, 0, NS_PACKETSZ);
-	bufptr = buf;
-	id = dns_get_msgid();
-	if (dyndns_build_header(&bufptr, BUFLEN_UDP(bufptr, buf), id, queryReq,
-	    query_cnt, ans_cnt, namser_cnt, addit_cnt, flags) == -1) {
-		(void) close(s);
-		return (NULL);
-	}
-
-	quest_type = ns_t_srv;
-	quest_class = ns_c_in;
-
-	if (dyndns_build_quest_zone(&bufptr, BUFLEN_UDP(bufptr, buf), service,
-	    quest_type, quest_class) == -1) {
-		(void) close(s);
-		return (NULL);
-	}
-
-	if (dyndns_udp_send_recv(s, buf, bufptr - buf, buf2) == -1) {
-		(void) close(s);
-		syslog(LOG_ERR, "smb_ads: send/receive error");
-		*go_next = 1;
-		return (NULL);
-	}
-	(void) close(s);
-
-	(void) dyndns_get_nshort(buf2, &rid);
-	if (id != rid)
-		return (NULL);
+	(void) mutex_lock(&ads_site_mtx);
+	if (*ads_site == '\0')
+		*site_service = '\0';
+	else
+		(void) snprintf(site_service, sizeof (site_service),
+		    SMB_ADS_MSDCS_SRV_SITE_RR, ads_site);
+	(void) mutex_unlock(&ads_site_mtx);
 
 	/*
-	 * check if query is successful by checking error
-	 * field in UDP
+	 * First look for ADS hosts in ADS site if configured.  Then try
+	 * without ADS site info.
 	 */
-	ret = buf2[3] & 0xf;
-	if (ret != NOERROR) {
-		syslog(LOG_ERR, "smb_ads: DNS query for ADS host error: %d: ",
-		    ret);
-		dyndns_msg_err(ret);
-		*go_next = 1;
-		return (NULL);
-	}
+	for (i = 0; i < 2; i++) {
+		if (*svc_name[i] == '\0')
+			continue;
 
-	bufptr = buf2;
-	bufptr += 2;		/* Skip ID section */
-	bufptr = dyndns_get_nshort(bufptr, &flags);
-	bufptr = dyndns_get_nshort(bufptr, &query_cnt);
-	bufptr = dyndns_get_nshort(bufptr, &ans_cnt);
-	bufptr = dyndns_get_nshort(bufptr, &namser_cnt);
-	bufptr = dyndns_get_nshort(bufptr, &addit_cnt);
+		len = res_nquerydomain(&res_state, svc_name[i], domain,
+		    C_IN, T_SRV, msg.buf, sizeof (msg.buf));
 
-	if (ans_cnt == 0) {
-		/* Check if the server supports recursive queries */
-		if (force_recurs++ == 0 && (flags & DNSF_RECUR_SUPP) != 0) {
-			flags = DNSF_RECUR_QRY;
-			goto retry;
+		smb_tracef("Querying DNS for SRV RRs named '%s'", svc_name[i]);
+
+		if (len < 0) {
+			smb_tracef("DNS query for '%s' failed (%s)",
+			    svc_name[i], hstrerror(res_state.res_h_errno));
+			continue;
+		}
+		if (len > sizeof (msg.buf)) {
+			syslog(LOG_ERR, "DNS query %ib message doesn't fit"
+			    " into %ib buffer",
+			    len, sizeof (msg.buf));
+			continue;
 		}
 
-		syslog(LOG_DEBUG, "smb_ads: No ADS host found: "
-		    "No answer section\n");
-		return (NULL);
-	}
+		/* 2. parse the reply, skip header and question sections */
 
-	/* skip question section */
-	if (query_cnt == 1) {
-		ads_skip_domain_name(&bufptr);
-		bufptr += 4;
-	} else {
-		syslog(LOG_ERR, "smb_ads: No ADS host found, malformed "
-		    "question section, query_cnt: %d???\n", query_cnt);
-		return (NULL);
-	}
+		ptr = msg.buf + sizeof (msg.hdr);
+		eom = msg.buf + len;
 
-	ads_hosts_list = (ADS_HOST_INFO *)
-	    malloc(sizeof (ADS_HOST_INFO)*ans_cnt);
-	if (ads_hosts_list == NULL)
-		return (NULL);
+		/* check truncated message bit */
+		if (msg.hdr.tc)
+			istrunc = B_TRUE;
 
-	bzero(ads_hosts_list, sizeof (ADS_HOST_INFO) * ans_cnt);
+		qcnt = ntohs(msg.hdr.qdcount);
+		ans_cnt = ntohs(msg.hdr.ancount);
+		ns_cnt = ntohs(msg.hdr.nscount);
+		addit_cnt = ntohs(msg.hdr.arcount);
 
-	/* check answer section */
-	for (i = 0; i < ans_cnt; i++) {
-		ads_skip_domain_name(&bufptr);
-
-		/* skip type, class, ttl */
-		bufptr += 8;
-
-		/* len of data after this point */
-		bufptr = dyndns_get_nshort(bufptr, &data_len);
-
-		/* skip priority, weight */
-		bufptr += 4;
-		bufptr = dyndns_get_nshort(bufptr, &eport);
-		ads_hosts_list[i].port = eport;
-
-		if ((str = ads_get_domain_name(buf2, &bufptr)) == NULL) {
-			syslog(LOG_ERR, "smb_ads: No ADS host found, "
-			    "error decoding DNS answer section\n");
-			ads_free_host_list(ads_hosts_list, ans_cnt);
-			return (NULL);
-		}
-		ads_hosts_list[i].name = str;
-	}
-
-	/* check authority section */
-	for (i = 0; i < namser_cnt; i++) {
-		ads_skip_domain_name(&bufptr);
-
-		/* skip type, class, ttl */
-		bufptr += 8;
-
-		/* get len of data */
-		bufptr = dyndns_get_nshort(bufptr, &data_len);
-
-		/* skip data */
-		bufptr += data_len;
-	}
-
-	/*
-	 * Check additional section to get IP address of ADS host.
-	 * If additional section contains no IP address(es) then
-	 * do a host lookup by hostname to get the IP address.
-	 */
-	if (addit_cnt > 0) {
-		int j;
-
-		ads_hosts_list2 = (ADS_HOST_INFO *)
-		    malloc(sizeof (ADS_HOST_INFO) * addit_cnt);
-		if (ads_hosts_list2 == NULL) {
-			ads_free_host_list(ads_hosts_list, ans_cnt);
+		if (smb_ads_skip_ques_sec(qcnt, &ptr, eom) != 0) {
+			res_ndestroy(&res_state);
 			return (NULL);
 		}
 
-		bzero(ads_hosts_list2, sizeof (ADS_HOST_INFO) * addit_cnt);
-
-		for (i = 0; i < addit_cnt; i++) {
-
-			if ((str = ads_get_domain_name(buf2,
-			    &bufptr)) == NULL) {
-				syslog(LOG_ERR, "smb_ads: No ADS host found, "
-				    "error decoding DNS additional section\n");
-				ads_free_host_list(ads_hosts_list, ans_cnt);
-				ads_free_host_list(ads_hosts_list2, addit_cnt);
-				return (NULL);
-			}
-
-			ads_hosts_list2[i].name = str;
-
-			bufptr += 10;
-			bufptr = dyndns_get_int(bufptr, &ipaddr);
-			ads_hosts_list2[i].ip_addr = ipaddr;
+		ads_hosts_list_ans = (smb_ads_host_info_t *)
+		    malloc(sizeof (smb_ads_host_info_t) * ans_cnt);
+		if (ads_hosts_list_ans == NULL) {
+			res_ndestroy(&res_state);
+			return (NULL);
 		}
 
-		/* pick a host that is up */
-		for (i = 0; i < addit_cnt; i++) {
-			if ((sought) &&
-			    (strncasecmp(sought, ads_hosts_list2[i].name,
-			    strlen(sought)) != 0))
-				continue;
+		bzero(ads_hosts_list_ans, sizeof (smb_ads_host_info_t)
+		    * ans_cnt);
 
-			if (ads_ping(ads_hosts_list2[i].ip_addr) != 0) {
-				continue;
-			}
-			for (j = 0; j < ans_cnt; j++)
-				if (strcmp(ads_hosts_list2[i].name,
-				    ads_hosts_list[j].name) == 0)
-					break;
+		/* 3. walk through the answer section */
 
-			if (j == ans_cnt) {
-				ads_free_host_list(ads_hosts_list, ans_cnt);
-				ads_free_host_list(ads_hosts_list2, addit_cnt);
-				return (NULL);
-			}
-
-			ads_host = (ADS_HOST_INFO *)
-			    malloc(sizeof (ADS_HOST_INFO));
-			if (ads_host == NULL) {
-				ads_free_host_list(ads_hosts_list, ans_cnt);
-				ads_free_host_list(ads_hosts_list2, addit_cnt);
-				return (NULL);
-			}
-			bzero(ads_host, sizeof (ADS_HOST_INFO));
-			ads_host->name = strdup(ads_hosts_list[j].name);
-			if (ads_host->name == NULL) {
-				free(ads_host);
-				ads_free_host_list(ads_hosts_list, ans_cnt);
-				ads_free_host_list(ads_hosts_list2, addit_cnt);
-				return (NULL);
-			}
-			ads_host->ip_addr = ads_hosts_list2[i].ip_addr;
-			ads_host->port = ads_hosts_list[j].port;
-			*port = ads_host->port;
-			addr.s_addr = ads_host->ip_addr;
-			syslog(LOG_DEBUG, "smb_ads: Found ADS server: %s (%s)"
-			    " from %s\n", ads_host->name, inet_ntoa(addr), ns);
-			ads_free_host_list(ads_hosts_list, ans_cnt);
-			ads_free_host_list(ads_hosts_list2, addit_cnt);
-			ads_set_host_info(ads_host);
-			return (ads_host);
+		if (smb_ads_decode_host_ans_sec(ans_cnt, &ptr, eom, msg.buf,
+		    ads_hosts_list_ans) != 0) {
+			free(ads_hosts_list_ans);
+			res_ndestroy(&res_state);
+			return (NULL);
 		}
-		ads_free_host_list(ads_hosts_list2, addit_cnt);
-	} else {
+
+		/* check authority section */
+		if (ns_cnt > 0)
+			if (smb_ads_skip_auth_sec(ns_cnt, &ptr, eom) != 0) {
+				free(ads_hosts_list_ans);
+				res_ndestroy(&res_state);
+				return (NULL);
+			}
+
 		/*
-		 * Shouldn't get here unless entries exist in DNS but
-		 * DNS server did not put them in additional section of
-		 * DNS reply packet.
+		 * Check additional section to get IP address of ADS host.
+		 * If additional section contains no IP address(es) then
+		 * do a host lookup by hostname to get the IP address.
 		 */
-		for (i = 0; i < ans_cnt; i++) {
-			if ((sought) &&
-			    (strncasecmp(sought, ads_hosts_list[i].name,
-			    strlen(sought)) != 0))
-				continue;
+		if (addit_cnt > 0) {
+			int j;
 
-			h = gethostbyname(ads_hosts_list[i].name);
-			if (h == NULL || h->h_addr == NULL)
-				continue;
-
-			(void) memcpy(&ads_hosts_list[i].ip_addr,
-			    h->h_addr, sizeof (addr.s_addr));
-
-			ads_host = (ADS_HOST_INFO *)
-			    malloc(sizeof (ADS_HOST_INFO));
-			if (ads_host == NULL) {
-				ads_free_host_list(ads_hosts_list, ans_cnt);
+			ads_hosts_list_addi = (smb_ads_host_info_t *)
+			    malloc(sizeof (smb_ads_host_info_t) * addit_cnt);
+			if (ads_hosts_list_addi == NULL) {
+				free(ads_hosts_list_ans);
+				res_ndestroy(&res_state);
 				return (NULL);
 			}
-			bzero(ads_host, sizeof (ADS_HOST_INFO));
-			ads_host->name = strdup(ads_hosts_list[i].name);
-			if (ads_host->name == NULL) {
-				free(ads_host);
-				ads_free_host_list(ads_hosts_list, ans_cnt);
+
+			bzero(ads_hosts_list_addi,
+			    sizeof (smb_ads_host_info_t) * addit_cnt);
+
+			if (smb_ads_decode_host_addi_sec(addit_cnt, &ptr, eom,
+			    msg.buf, ads_hosts_list_addi) != 0) {
+				free(ads_hosts_list_ans);
+				free(ads_hosts_list_addi);
+				res_ndestroy(&res_state);
 				return (NULL);
 			}
-			ads_host->ip_addr = ads_hosts_list[i].ip_addr;
-			ads_host->port = ads_hosts_list[i].port;
-			*port = ads_host->port;
-			addr.s_addr = ads_host->ip_addr;
-			syslog(LOG_DEBUG, "smb_ads: Found ADS server: %s (%s)"
-			    " from %s\n", ads_host->name, inet_ntoa(addr), ns);
-			ads_free_host_list(ads_hosts_list, ans_cnt);
-			ads_set_host_info(ads_host);
-			return (ads_host);
+
+			/* pick a host that is up */
+			for (i = 0; i < addit_cnt; i++) {
+				if ((sought) &&
+				    (strncasecmp(sought,
+				    ads_hosts_list_addi[i].name,
+				    strlen(sought)) != 0))
+					continue;
+
+				if (smb_ads_ping(ads_hosts_list_addi[i].ip_addr)
+				    != 0)
+					continue;
+
+				/*
+				 * find the host in the list of hosts from
+				 * the answer section to get the port number.
+				 */
+				for (j = 0; j < ans_cnt; j++)
+					if (strcmp(ads_hosts_list_addi[i].name,
+					    ads_hosts_list_ans[j].name) == 0)
+						break;
+
+				if (j == ans_cnt) {
+					free(ads_hosts_list_ans);
+					free(ads_hosts_list_addi);
+					res_ndestroy(&res_state);
+					return (NULL);
+				}
+
+				ahi = &ads_hosts_list_addi[i];
+				if ((ads_host = smb_ads_init_host_info(
+				    ahi->name, ahi->ip_addr,
+				    ads_hosts_list_ans[j].port)) == NULL) {
+					free(ads_hosts_list_ans);
+					free(ads_hosts_list_addi);
+					res_ndestroy(&res_state);
+					return (NULL);
+				}
+
+				*port = ads_host->port;
+				addr.s_addr = ads_host->ip_addr;
+				smb_tracef("smb_ads: Found ADS server: %s (%s)",
+				    ads_host->name, inet_ntoa(addr));
+				free(ads_hosts_list_ans);
+				free(ads_hosts_list_addi);
+				smb_ads_set_host_info(ads_host);
+				res_ndestroy(&res_state);
+				return (ads_host);
+			}
+			free(ads_hosts_list_ans);
+			free(ads_hosts_list_addi);
+		} else {
+			/*
+			 * Shouldn't get here unless entries exist in DNS but
+			 * DNS server did not put them in additional section of
+			 * DNS reply packet.
+			 */
+			for (i = 0; i < ans_cnt; i++) {
+				if ((sought) &&
+				    (strncasecmp(sought,
+				    ads_hosts_list_ans[i].name,
+				    strlen(sought)) != 0))
+					continue;
+
+				h = getipnodebyname(ads_hosts_list_ans[i].name,
+				    AF_INET, 0, &error);
+
+				if (h == NULL || h->h_addr == NULL)
+					continue;
+
+				(void) memcpy(&ads_hosts_list_ans[i].ip_addr,
+				    h->h_addr, sizeof (addr.s_addr));
+
+				freehostent(h);
+
+				if (smb_ads_ping(addr.s_addr) != 0)
+					continue;
+
+				ahi = &ads_hosts_list_ans[i];
+				if ((ads_host = smb_ads_init_host_info(
+				    ahi->name, ahi->ip_addr, ahi->port)) ==
+				    NULL) {
+					free(ads_hosts_list_ans);
+					res_ndestroy(&res_state);
+					return (NULL);
+				}
+
+				*port = ads_host->port;
+				addr.s_addr = ads_host->ip_addr;
+				smb_tracef("smb_ads: Found ADS server: %s (%s)",
+				    ads_host->name, inet_ntoa(addr));
+				free(ads_hosts_list_ans);
+				smb_ads_set_host_info(ads_host);
+				res_ndestroy(&res_state);
+				return (ads_host);
+			}
+			free(ads_hosts_list_ans);
 		}
 	}
+	res_ndestroy(&res_state);
+	syslog(LOG_ERR, "smb_ads: ADS server is either not found or offline.");
 
-	syslog(LOG_ERR, "smb_ads: Can't get IP for "
-	    "ADS host or ADS host is down.\n");
-	ads_free_host_list(ads_hosts_list, ans_cnt);
+	if (istrunc && sought && *sought != 0)
+		syslog(LOG_WARNING, "smb_ads: Truncated TCP reply message is "
+		    "detected for DNS query (SRV) of ADS hosts.\n");
 
-	*go_next = 1;
 	return (NULL);
 }
 
 /*
- * ads_convert_domain
+ * smb_ads_convert_domain
  * Converts a domain string into its distinguished name i.e. a unique
  * name for an entry in the Directory Service.
  * Memory is allocated
@@ -711,7 +700,7 @@ retry:
  *   DNS domain in LDAP DN string format
  */
 static char *
-ads_convert_domain(char *s)
+smb_ads_convert_domain(char *s)
 {
 	char *t, *s2, *t2;
 	int len, cnt;
@@ -742,7 +731,7 @@ ads_convert_domain(char *s)
 	while (*s) {
 		if (*s == '.') {
 			if (t + 3 >= s2 + len - 1) {
-				syslog(LOG_ERR, "[ads_convert_domain] "
+				syslog(LOG_ERR, "[smb_ads_convert_domain] "
 				    "buffer overrun for string "
 				    "conversion of %s: tot buf "
 				    "sz alloc: %d, last "
@@ -756,7 +745,7 @@ ads_convert_domain(char *s)
 			s++;
 		} else {
 			if (t >= s2 + len - 1) {
-				syslog(LOG_ERR, "[ads_convert_domain] "
+				syslog(LOG_ERR, "[smb_ads_convert_domain] "
 				    "buffer overrun for string "
 				    "conversion of %s: tot buf "
 				    "sz alloc: %d, last "
@@ -773,15 +762,14 @@ ads_convert_domain(char *s)
 }
 
 /*
- * ads_free_host_info
+ * smb_ads_free_host_info
  * Free the memory use by the global ads_host_info and set it to NULL.
  */
 static void
-ads_free_host_info(void)
+smb_ads_free_host_info(void)
 {
 	(void) mutex_lock(&ads_host_mtx);
 	if (ads_host_info) {
-		free(ads_host_info->name);
 		free(ads_host_info);
 		ads_host_info = NULL;
 	}
@@ -789,15 +777,15 @@ ads_free_host_info(void)
 }
 
 /*
- * ads_open
+ * smb_ads_open
  * Open a LDAP connection to an ADS server if the system is in domain mode.
  * Acquire both Kerberos TGT and LDAP service tickets for the host principal.
  *
  * This function should only be called after the system is successfully joined
  * to a domain.
  */
-ADS_HANDLE *
-ads_open(void)
+smb_ads_handle_t *
+smb_ads_open(void)
 {
 	char domain[MAXHOSTNAMELEN];
 
@@ -807,27 +795,24 @@ ads_open(void)
 	if (smb_getfqdomainname(domain, MAXHOSTNAMELEN) != 0)
 		return (NULL);
 
-	return (ads_open_main(domain, NULL, NULL));
+	return (smb_ads_open_main(domain, NULL, NULL));
 }
 
 /*
- * ads_open_main
+ * smb_ads_open_main
  * Open a LDAP connection to an ADS server.
  * If ADS is enabled and the administrative username, password, and
  * ADS domain are defined then query DNS to find an ADS server if this is the
  * very first call to this routine.  After an ADS server is found then this
  * server will be used everytime this routine is called until the system is
  * rebooted or the ADS server becomes unavailable then an ADS server will
- * be queried again.  The ADS server is always ping before an LDAP connection
- * is made to it.  If the pings fail then DNS is used once more to find an
- * available ADS server.  If the ping is successful then an LDAP connection
- * is made to the ADS server.  After the connection is made then an ADS handle
+ * be queried again.  After the connection is made then an ADS handle
  * is created to be returned.
  *
  * After the LDAP connection, the LDAP version will be set to 3 using
  * ldap_set_option().
  *
- * The ads_bind() routine is also called before the ADS handle is returned.
+ * The smb_ads_bind() routine is also called before the ADS handle is returned.
  * Parameters:
  *   domain - fully-qualified domain name
  *   user   - the user account for whom the Kerberos TGT ticket and ADS
@@ -835,96 +820,42 @@ ads_open(void)
  *   password - password of the specified user
  *
  * Returns:
- *   NULL        : can't connect to ADS server or other errors
- *   ADS_HANDLE* : handle to ADS server
+ *   NULL              : can't connect to ADS server or other errors
+ *   smb_ads_handle_t* : handle to ADS server
  */
-static ADS_HANDLE *
-ads_open_main(char *domain, char *user, char *password)
+static smb_ads_handle_t *
+smb_ads_open_main(char *domain, char *user, char *password)
 {
-	ADS_HANDLE *ah;
+	smb_ads_handle_t *ah;
 	LDAP *ld;
-	int version = 3, ads_port, find_ads_retry;
-	ADS_HOST_INFO *ads_host = NULL;
+	int version = 3, ads_port;
+	smb_ads_host_info_t *ads_host = NULL;
 	struct in_addr addr;
-	char site[ADS_SITE_MAX];
-	char service[MAXHOSTNAMELEN];
-	char site_service[MAXHOSTNAMELEN];
-	struct in_addr ns_list[MAXNS];
-	int i, cnt, go_next;
 
-
-	(void) mutex_lock(&ads_site_mtx);
-	(void) strlcpy(site, ads_site, sizeof (site));
-	(void) mutex_unlock(&ads_site_mtx);
-
-	find_ads_retry = 0;
-find_ads_host:
-
-	ads_host = ads_get_host_info();
+	ads_host = smb_ads_get_host_info();
 	if (!ads_host) {
-		if (*site != '\0') {
-			(void) snprintf(site_service, sizeof (site_service),
-			    "_ldap._tcp.%s._sites.dc._msdcs.%s", site, domain);
-		} else {
-			*site_service = '\0';
-		}
-		(void) snprintf(service, sizeof (service),
-		    "_ldap._tcp.dc._msdcs.%s", domain);
+		ads_host = smb_ads_find_host(domain, NULL, &ads_port);
 
-		cnt = smb_get_nameservers(ns_list, MAXNS);
-
-		ads_host = NULL;
-		go_next = 0;
-		for (i = 0; i < cnt; i++) {
-			if (*site_service != '\0') {
-				ads_host = ads_find_host(inet_ntoa(ns_list[i]),
-				    domain, NULL, &ads_port, site_service,
-				    &go_next);
-			}
-			if (ads_host == NULL) {
-				ads_host = ads_find_host(inet_ntoa(ns_list[i]),
-				    domain, NULL, &ads_port, service, &go_next);
-			}
-			if (ads_host != NULL)
-				break;
-			if (go_next == 0)
-				break;
+		if (ads_host == NULL) {
+			syslog(LOG_ERR, "smb_ads: No ADS host found from "
+			    "configured nameservers");
+			return (NULL);
 		}
 	}
 
-	if (ads_host == NULL) {
-		syslog(LOG_ERR, "smb_ads: No ADS host found from "
-		    "configured nameservers");
-		return (NULL);
-	}
-
-	if (ads_ping(ads_host->ip_addr) != 0) {
-		ads_free_host_info();
-		ads_host = NULL;
-		if (find_ads_retry == 0) {
-			find_ads_retry = 1;
-			goto find_ads_host;
-		}
-		return (NULL);
-	}
-
-	ah = (ADS_HANDLE *)malloc(sizeof (ADS_HANDLE));
+	ah = (smb_ads_handle_t *)malloc(sizeof (smb_ads_handle_t));
 	if (ah == NULL) {
 		return (NULL);
 	}
-	(void) memset(ah, 0, sizeof (ADS_HANDLE));
+	(void) memset(ah, 0, sizeof (smb_ads_handle_t));
 
 	addr.s_addr = ads_host->ip_addr;
 	if ((ld = ldap_init((char *)inet_ntoa(addr), ads_host->port)) == NULL) {
 		syslog(LOG_ERR, "smb_ads: Could not open connection "
 		    "to host: %s\n", ads_host->name);
-		ads_free_host_info();
+		smb_ads_free_host_info();
 		ads_host = NULL;
 		free(ah);
-		if (find_ads_retry == 0) {
-			find_ads_retry = 1;
-			goto find_ads_host;
-		}
 		return (NULL);
 	}
 
@@ -932,7 +863,7 @@ find_ads_host:
 	    != LDAP_SUCCESS) {
 		syslog(LOG_ERR, "smb_ads: Could not set "
 		    "LDAP_OPT_PROTOCOL_VERSION %d\n", version);
-		ads_free_host_info();
+		smb_ads_free_host_info();
 		free(ah);
 		(void) ldap_unbind(ld);
 		return (NULL);
@@ -944,33 +875,35 @@ find_ads_host:
 	ah->domain = strdup(domain);
 
 	if (ah->domain == NULL) {
-		ads_close(ah);
+		smb_ads_close(ah);
 		return (NULL);
 	}
 
-	ah->domain_dn = ads_convert_domain(domain);
+	ah->domain_dn = smb_ads_convert_domain(domain);
 	if (ah->domain_dn == NULL) {
-		ads_close(ah);
+		smb_ads_close(ah);
 		return (NULL);
 	}
 
 	ah->hostname = strdup(ads_host->name);
 	if (ah->hostname == NULL) {
-		ads_close(ah);
+		smb_ads_close(ah);
 		return (NULL);
 	}
-	if (site) {
-		ah->site = strdup(site);
-		if (ah->site == NULL) {
-			ads_close(ah);
+	(void) mutex_lock(&ads_site_mtx);
+	if (*ads_site != '\0') {
+		if ((ah->site = strdup(ads_site)) == NULL) {
+			smb_ads_close(ah);
+			(void) mutex_unlock(&ads_site_mtx);
 			return (NULL);
 		}
 	} else {
 		ah->site = NULL;
 	}
+	(void) mutex_unlock(&ads_site_mtx);
 
-	if (ads_bind(ah) == -1) {
-		ads_close(ah);
+	if (smb_ads_bind(ah) == -1) {
+		smb_ads_close(ah);
 		return (NULL);
 	}
 
@@ -978,7 +911,7 @@ find_ads_host:
 }
 
 /*
- * ads_close
+ * smb_ads_close
  * Close connection to ADS server and free memory allocated for ADS handle.
  * LDAP unbind is called here.
  * Parameters:
@@ -987,7 +920,7 @@ find_ads_host:
  *   void
  */
 void
-ads_close(ADS_HANDLE *ah)
+smb_ads_close(smb_ads_handle_t *ah)
 {
 	int len;
 
@@ -1013,7 +946,7 @@ ads_close(ADS_HANDLE *ah)
 }
 
 /*
- * ads_display_stat
+ * smb_ads_display_stat
  * Display error message for GSS-API routines.
  * Parameters:
  *   maj:  GSS major status
@@ -1022,7 +955,7 @@ ads_close(ADS_HANDLE *ah)
  *   None
  */
 static void
-ads_display_stat(OM_uint32 maj, OM_uint32 min)
+smb_ads_display_stat(OM_uint32 maj, OM_uint32 min)
 {
 	gss_buffer_desc msg;
 	OM_uint32 msg_ctx = 0;
@@ -1036,14 +969,14 @@ ads_display_stat(OM_uint32 maj, OM_uint32 min)
 }
 
 /*
- * ads_alloc_attr
+ * smb_ads_alloc_attr
  *
  * Since the attrs is a null-terminated array, all elements
  * in the array (except the last one) will point to allocated
  * memory.
  */
 static int
-ads_alloc_attr(LDAPMod *attrs[], int num)
+smb_ads_alloc_attr(LDAPMod *attrs[], int num)
 {
 	int i;
 
@@ -1051,7 +984,7 @@ ads_alloc_attr(LDAPMod *attrs[], int num)
 	for (i = 0; i < (num - 1); i++) {
 		attrs[i] = (LDAPMod *)malloc(sizeof (LDAPMod));
 		if (attrs[i] == NULL) {
-			ads_free_attr(attrs);
+			smb_ads_free_attr(attrs);
 			return (-1);
 		}
 	}
@@ -1060,7 +993,7 @@ ads_alloc_attr(LDAPMod *attrs[], int num)
 }
 
 /*
- * ads_free_attr
+ * smb_ads_free_attr
  * Free memory allocated when publishing a share.
  * Parameters:
  *   attrs: an array of LDAPMod pointers
@@ -1068,7 +1001,7 @@ ads_alloc_attr(LDAPMod *attrs[], int num)
  *   None
  */
 static void
-ads_free_attr(LDAPMod *attrs[])
+smb_ads_free_attr(LDAPMod *attrs[])
 {
 	int i;
 	for (i = 0; attrs[i]; i++) {
@@ -1077,7 +1010,7 @@ ads_free_attr(LDAPMod *attrs[])
 }
 
 /*
- * ads_get_spnset
+ * smb_ads_get_spnset
  *
  * Derives the core set of SPNs based on the FQHN.
  * The spn_set is a null-terminated array of char pointers.
@@ -1085,14 +1018,14 @@ ads_free_attr(LDAPMod *attrs[])
  * Returns 0 upon success. Otherwise, returns -1.
  */
 static int
-ads_get_spnset(char *fqhost, char **spn_set)
+smb_ads_get_spnset(char *fqhost, char **spn_set)
 {
 	int i;
 
 	bzero(spn_set, (SMBKRB5_SPN_IDX_MAX + 1) * sizeof (char *));
 	for (i = 0; i < SMBKRB5_SPN_IDX_MAX; i++) {
 		if ((spn_set[i] = smb_krb5_get_spn(i, fqhost)) == NULL) {
-			ads_free_spnset(spn_set);
+			smb_ads_free_spnset(spn_set);
 			return (-1);
 		}
 	}
@@ -1101,12 +1034,12 @@ ads_get_spnset(char *fqhost, char **spn_set)
 }
 
 /*
- * ads_free_spnset
+ * smb_ads_free_spnset
  *
  * Free the memory allocated for the set of SPNs.
  */
 static void
-ads_free_spnset(char **spn_set)
+smb_ads_free_spnset(char **spn_set)
 {
 	int i;
 	for (i = 0; spn_set[i]; i++)
@@ -1114,12 +1047,12 @@ ads_free_spnset(char **spn_set)
 }
 
 /*
- * ads_acquire_cred
- * Called by ads_bind() to get a handle to administrative user's credential
+ * smb_ads_acquire_cred
+ * Called by smb_ads_bind() to get a handle to administrative user's credential
  * stored locally on the system.  The credential is the TGT.  If the attempt at
  * getting handle fails then a second attempt will be made after getting a
  * new TGT.
- * Please look at ads_bind() for more information.
+ * Please look at smb_ads_bind() for more information.
  *
  * Paramters:
  *   ah         : handle to ADS server
@@ -1134,20 +1067,20 @@ ads_free_spnset(char **spn_set)
  *    0         : success
  */
 static int
-ads_acquire_cred(ADS_HANDLE *ah, gss_cred_id_t *cred_handle, gss_OID *oid,
-	int *kinit_retry)
+smb_ads_acquire_cred(smb_ads_handle_t *ah, gss_cred_id_t *cred_handle,
+    gss_OID *oid, int *kinit_retry)
 {
 	return (krb5_acquire_cred_kinit(ah->user, ah->pwd, cred_handle, oid,
 	    kinit_retry, "ads"));
 }
 
 /*
- * ads_establish_sec_context
- * Called by ads_bind() to establish a security context to an LDAP service on
- * an ADS server. If the attempt at establishing the security context fails
- * then a second attempt will be made by ads_bind() if a new TGT has not been
- * already obtained in ads_acquire_cred.  The second attempt, if allowed, will
- * obtained a new TGT here and a new handle to the credential will also be
+ * smb_ads_establish_sec_context
+ * Called by smb_ads_bind() to establish a security context to an LDAP service
+ * on an ADS server. If the attempt at establishing the security context fails
+ * then a second attempt will be made by smb_ads_bind() if a new TGT has not
+ * been already obtained in ads_acquire_cred.  The second attempt, if allowed,
+ * will obtained a new TGT here and a new handle to the credential will also be
  * obtained in ads_acquire_cred.  LDAP SASL bind is used to send and receive
  * the GSS tokens to and from the ADS server.
  * Please look at ads_bind for more information.
@@ -1169,12 +1102,12 @@ ads_acquire_cred(ADS_HANDLE *ah, gss_cred_id_t *cred_handle, gss_OID *oid,
  *    0             : success
  */
 static int
-ads_establish_sec_context(ADS_HANDLE *ah, gss_ctx_id_t *gss_context,
+smb_ads_establish_sec_context(smb_ads_handle_t *ah, gss_ctx_id_t *gss_context,
     gss_cred_id_t cred_handle, gss_OID oid, struct berval **sercred,
     int *kinit_retry, int *do_acquire_cred)
 {
 	OM_uint32 maj, min, time_rec;
-	char service_name[ADS_MAXBUFLEN];
+	char service_name[SMB_ADS_MAXBUFLEN];
 	gss_buffer_desc send_tok, service_buf;
 	gss_name_t target_name;
 	gss_buffer_desc input;
@@ -1184,13 +1117,14 @@ ads_establish_sec_context(ADS_HANDLE *ah, gss_ctx_id_t *gss_context,
 	int stat;
 	int gss_flags;
 
-	(void) snprintf(service_name, ADS_MAXBUFLEN, "ldap@%s", ah->hostname);
+	(void) snprintf(service_name, SMB_ADS_MAXBUFLEN, "ldap@%s",
+	    ah->hostname);
 	service_buf.value = service_name;
 	service_buf.length = strlen(service_name)+1;
 	if ((maj = gss_import_name(&min, &service_buf,
 	    (gss_OID) gss_nt_service_name,
 	    &target_name)) != GSS_S_COMPLETE) {
-		ads_display_stat(maj, min);
+		smb_ads_display_stat(maj, min);
 		if (oid != GSS_C_NO_OID)
 			(void) gss_release_oid(&min, &oid);
 		return (-1);
@@ -1245,14 +1179,14 @@ ads_establish_sec_context(ADS_HANDLE *ah, gss_ctx_id_t *gss_context,
 }
 
 /*
- * ads_negotiate_sec_layer
- * Call by ads_bind() to negotiate additional security layer for further
+ * smb_ads_negotiate_sec_layer
+ * Call by smb_ads_bind() to negotiate additional security layer for further
  * communication after security context establishment.  No additional security
  * is needed so a "no security layer" is negotiated.  The security layer is
  * described in the SASL RFC 2478 and this step is needed for secure LDAP
  * binding.  LDAP SASL bind is used to send and receive the GSS tokens to and
  * from the ADS server.
- * Please look at ads_bind for more information.
+ * Please look at smb_ads_bind for more information.
  *
  * Paramters:
  *   ah         : handle to ADS server
@@ -1263,7 +1197,7 @@ ads_establish_sec_context(ADS_HANDLE *ah, gss_ctx_id_t *gss_context,
  *    0         : success
  */
 static int
-ads_negotiate_sec_layer(ADS_HANDLE *ah, gss_ctx_id_t gss_context,
+smb_ads_negotiate_sec_layer(smb_ads_handle_t *ah, gss_ctx_id_t gss_context,
     struct berval *sercred)
 {
 	OM_uint32 maj, min;
@@ -1281,7 +1215,7 @@ ads_negotiate_sec_layer(ADS_HANDLE *ah, gss_ctx_id_t gss_context,
 	if ((maj = gss_unwrap(&min, gss_context,
 	    &unwrap_inbuf, &unwrap_outbuf,
 	    &conf_state, &qt)) != GSS_S_COMPLETE) {
-		ads_display_stat(maj, min);
+		smb_ads_display_stat(maj, min);
 		if (sercred)
 			ber_bvfree(sercred);
 		return (-1);
@@ -1308,7 +1242,7 @@ ads_negotiate_sec_layer(ADS_HANDLE *ah, gss_ctx_id_t gss_context,
 	conf_state = 0;
 	if ((maj = gss_wrap(&min, gss_context, conf_state, 0, &wrap_inbuf,
 	    &conf_state, &wrap_outbuf)) != GSS_S_COMPLETE) {
-		ads_display_stat(maj, min);
+		smb_ads_display_stat(maj, min);
 		return (-1);
 	}
 
@@ -1332,7 +1266,7 @@ ads_negotiate_sec_layer(ADS_HANDLE *ah, gss_ctx_id_t gss_context,
 }
 
 /*
- * ads_bind
+ * smb_ads_bind
  * Use secure binding to bind to ADS server.
  * Use GSS-API with Kerberos 5 as the security mechanism and LDAP SASL with
  * Kerberos 5 as the security mechanisn to authenticate, obtain a security
@@ -1361,7 +1295,7 @@ ads_negotiate_sec_layer(ADS_HANDLE *ah, gss_ctx_id_t gss_context,
  *   0: success
  */
 static int
-ads_bind(ADS_HANDLE *ah)
+smb_ads_bind(smb_ads_handle_t *ah)
 {
 	OM_uint32 min;
 	gss_cred_id_t cred_handle;
@@ -1376,10 +1310,10 @@ ads_bind(ADS_HANDLE *ah)
 
 acquire_cred:
 
-	if (ads_acquire_cred(ah, &cred_handle, &oid, &kinit_retry))
+	if (smb_ads_acquire_cred(ah, &cred_handle, &oid, &kinit_retry))
 		return (-1);
 
-	if (ads_establish_sec_context(ah, &gss_context, cred_handle,
+	if (smb_ads_establish_sec_context(ah, &gss_context, cred_handle,
 	    oid, &sercred, &kinit_retry, &do_acquire_cred)) {
 		(void) gss_release_cred(&min, &cred_handle);
 		if (do_acquire_cred) {
@@ -1388,7 +1322,7 @@ acquire_cred:
 		}
 		return (-1);
 	}
-	rc = ads_negotiate_sec_layer(ah, gss_context, sercred);
+	rc = smb_ads_negotiate_sec_layer(ah, gss_context, sercred);
 
 	if (cred_handle != GSS_C_NO_CREDENTIAL)
 		(void) gss_release_cred(&min, &cred_handle);
@@ -1398,8 +1332,8 @@ acquire_cred:
 }
 
 /*
- * ads_add_share
- * Call by ads_publish_share to create share object in ADS.
+ * smb_ads_add_share
+ * Call by smb_ads_publish_share to create share object in ADS.
  * This routine specifies the attributes of an ADS LDAP share object. The first
  * attribute and values define the type of ADS object, the share object.  The
  * second attribute and value define the UNC of the share data for the share
@@ -1416,14 +1350,14 @@ acquire_cred:
  *    0          : success
  */
 int
-ads_add_share(ADS_HANDLE *ah, const char *adsShareName,
+smb_ads_add_share(smb_ads_handle_t *ah, const char *adsShareName,
     const char *unc_name, const char *adsContainer)
 {
-	LDAPMod *attrs[ADS_SHARE_NUM_ATTR];
+	LDAPMod *attrs[SMB_ADS_SHARE_NUM_ATTR];
 	char *tmp1[5], *tmp2[5];
 	int j = 0;
 	char *share_dn;
-	char buf[ADS_MAXMSGLEN];
+	char buf[SMB_ADS_MAXMSGLEN];
 	int len, ret;
 
 	len = 5 + strlen(adsShareName) + strlen(adsContainer) +
@@ -1436,7 +1370,7 @@ ads_add_share(ADS_HANDLE *ah, const char *adsShareName,
 	(void) snprintf(share_dn, len, "cn=%s,%s,%s", adsShareName,
 	    adsContainer, ah->domain_dn);
 
-	if (ads_alloc_attr(attrs, ADS_SHARE_NUM_ATTR) != 0) {
+	if (smb_ads_alloc_attr(attrs, SMB_ADS_SHARE_NUM_ATTR) != 0) {
 		free(share_dn);
 		return (-1);
 	}
@@ -1457,28 +1391,28 @@ ads_add_share(ADS_HANDLE *ah, const char *adsShareName,
 	attrs[j]->mod_values = tmp2;
 
 	if ((ret = ldap_add_s(ah->ld, share_dn, attrs)) != LDAP_SUCCESS) {
-		(void) snprintf(buf, ADS_MAXMSGLEN,
-		    "ads_add_share: %s:", share_dn);
+		(void) snprintf(buf, SMB_ADS_MAXMSGLEN,
+		    "smb_ads_add_share: %s:", share_dn);
 		/* LINTED - E_SEC_PRINTF_VAR_FMT */
 		syslog(LOG_ERR, ldap_err2string(ret));
-		ads_free_attr(attrs);
+		smb_ads_free_attr(attrs);
 		free(share_dn);
 		return (ret);
 	}
 	free(share_dn);
-	ads_free_attr(attrs);
+	smb_ads_free_attr(attrs);
 
-	(void) snprintf(buf, ADS_MAXMSGLEN,
+	(void) snprintf(buf, SMB_ADS_MAXMSGLEN,
 	    "Share %s has been added to ADS container: %s.\n", adsShareName,
 	    adsContainer);
-	syslog(LOG_DEBUG, "smb_ads: %s", buf);
+	smb_tracef("smb_ads: %s", buf);
 
 	return (0);
 }
 
 /*
- * ads_del_share
- * Call by ads_remove_share to remove share object from ADS.  The container
+ * smb_ads_del_share
+ * Call by smb_ads_remove_share to remove share object from ADS.  The container
  * location to remove the object needs to specified.  The LDAP synchronous
  * delete command is used.
  * Parameters:
@@ -1490,10 +1424,10 @@ ads_add_share(ADS_HANDLE *ah, const char *adsShareName,
  *    0          : success
  */
 static int
-ads_del_share(ADS_HANDLE *ah, const char *adsShareName,
+smb_ads_del_share(smb_ads_handle_t *ah, const char *adsShareName,
     const char *adsContainer)
 {
-	char *share_dn, buf[ADS_MAXMSGLEN];
+	char *share_dn, buf[SMB_ADS_MAXMSGLEN];
 	int len, ret;
 
 	len = 5 + strlen(adsShareName) + strlen(adsContainer) +
@@ -1513,17 +1447,17 @@ ads_del_share(ADS_HANDLE *ah, const char *adsShareName,
 	}
 	free(share_dn);
 
-	(void) snprintf(buf, ADS_MAXMSGLEN,
+	(void) snprintf(buf, SMB_ADS_MAXMSGLEN,
 	    "Share %s has been removed from ADS container: %s.\n",
 	    adsShareName, adsContainer);
-	syslog(LOG_DEBUG, "smb_ads: %s", buf);
+	smb_tracef("smb_ads: %s", buf);
 
 	return (0);
 }
 
 
 /*
- * ads_escape_search_filter_chars
+ * smb_ads_escape_search_filter_chars
  *
  * This routine will escape the special characters found in a string
  * that will later be passed to the ldap search filter.
@@ -1540,9 +1474,9 @@ ads_del_share(ADS_HANDLE *ah, const char *adsShareName,
  * it should occur in that string.
  */
 static int
-ads_escape_search_filter_chars(const char *src, char *dst)
+smb_ads_escape_search_filter_chars(const char *src, char *dst)
 {
-	int avail = ADS_MAXBUFLEN - 1; /* reserve a space for NULL char */
+	int avail = SMB_ADS_MAXBUFLEN - 1; /* reserve a space for NULL char */
 
 	if (src == NULL || dst == NULL)
 		return (-1);
@@ -1577,7 +1511,7 @@ ads_escape_search_filter_chars(const char *src, char *dst)
 }
 
 /*
- * ads_lookup_share
+ * smb_ads_lookup_share
  * The search filter is set to search for a specific share name in the
  * specified ADS container.  The LDSAP synchronous search command is used.
  * Parameters:
@@ -1590,14 +1524,14 @@ ads_escape_search_filter_chars(const char *src, char *dst)
  *    1          : found
  */
 int
-ads_lookup_share(ADS_HANDLE *ah, const char *adsShareName,
+smb_ads_lookup_share(smb_ads_handle_t *ah, const char *adsShareName,
     const char *adsContainer, char *unc_name)
 {
-	char *attrs[4], filter[ADS_MAXBUFLEN];
+	char *attrs[4], filter[SMB_ADS_MAXBUFLEN];
 	char *share_dn;
 	int len, ret;
 	LDAPMessage *res;
-	char tmpbuf[ADS_MAXBUFLEN];
+	char tmpbuf[SMB_ADS_MAXBUFLEN];
 
 	if (adsShareName == NULL || adsContainer == NULL)
 		return (-1);
@@ -1618,7 +1552,7 @@ ads_lookup_share(ADS_HANDLE *ah, const char *adsShareName,
 	attrs[2] = "uNCName";
 	attrs[3] = NULL;
 
-	if (ads_escape_search_filter_chars(unc_name, tmpbuf) != 0) {
+	if (smb_ads_escape_search_filter_chars(unc_name, tmpbuf) != 0) {
 		free(share_dn);
 		return (-1);
 	}
@@ -1650,12 +1584,12 @@ ads_lookup_share(ADS_HANDLE *ah, const char *adsShareName,
 }
 
 /*
- * ads_convert_directory
+ * smb_ads_convert_directory
  * Convert relative share directory to UNC to be appended to hostname.
  * i.e. cvol/a/b -> cvol\a\b
  */
 char *
-ads_convert_directory(char *rel_dir)
+smb_ads_convert_directory(char *rel_dir)
 {
 	char *t, *s2;
 	int len;
@@ -1682,12 +1616,12 @@ ads_convert_directory(char *rel_dir)
 }
 
 /*
- * ads_publish_share
+ * smb_ads_publish_share
  * Publish share into ADS.  If a share name already exist in ADS in the same
  * container then the existing share object is removed before adding the new
  * share object.
  * Parameters:
- *   ah          : handle return from ads_open
+ *   ah          : handle return from smb_ads_open
  *   adsShareName: name of share to be added to ADS directory
  *   shareUNC    : name of share on client, can be NULL to use the same name
  *                 as adsShareName
@@ -1700,11 +1634,11 @@ ads_convert_directory(char *rel_dir)
  *    0          : success
  */
 int
-ads_publish_share(ADS_HANDLE *ah, const char *adsShareName,
+smb_ads_publish_share(smb_ads_handle_t *ah, const char *adsShareName,
     const char *shareUNC, const char *adsContainer, const char *hostname)
 {
 	int ret;
-	char unc_name[ADS_MAXBUFLEN];
+	char unc_name[SMB_ADS_MAXBUFLEN];
 
 	if (adsShareName == NULL || adsContainer == NULL)
 		return (-1);
@@ -1712,25 +1646,27 @@ ads_publish_share(ADS_HANDLE *ah, const char *adsShareName,
 	if (shareUNC == 0 || *shareUNC == 0)
 		shareUNC = adsShareName;
 
-	if (ads_build_unc_name(unc_name, sizeof (unc_name),
+	if (smb_ads_build_unc_name(unc_name, sizeof (unc_name),
 	    hostname, shareUNC) < 0) {
-		syslog(LOG_DEBUG, "smb_ads: Cannot publish share '%s' "
+		smb_tracef("smb_ads: Cannot publish share '%s' "
 		    "[missing UNC name]", shareUNC);
 		return (-1);
 	}
 
-	ret = ads_lookup_share(ah, adsShareName, adsContainer, unc_name);
+	ret = smb_ads_lookup_share(ah, adsShareName, adsContainer, unc_name);
 
 	switch (ret) {
 	case 1:
-		(void) ads_del_share(ah, adsShareName, adsContainer);
-		ret = ads_add_share(ah, adsShareName, unc_name, adsContainer);
+		(void) smb_ads_del_share(ah, adsShareName, adsContainer);
+		ret = smb_ads_add_share(ah, adsShareName, unc_name,
+		    adsContainer);
 		break;
 
 	case 0:
-		ret = ads_add_share(ah, adsShareName, unc_name, adsContainer);
+		ret = smb_ads_add_share(ah, adsShareName, unc_name,
+		    adsContainer);
 		if (ret == LDAP_ALREADY_EXISTS) {
-			syslog(LOG_DEBUG, "smb_ads: Cannot publish share '%s' "
+			smb_tracef("smb_ads: Cannot publish share '%s' "
 			    "[name is already in use]", adsShareName);
 			ret = -1;
 		}
@@ -1746,11 +1682,11 @@ ads_publish_share(ADS_HANDLE *ah, const char *adsShareName,
 }
 
 /*
- * ads_remove_share
+ * smb_ads_remove_share
  * Remove share from ADS.  A search is done first before explicitly removing
  * the share.
  * Parameters:
- *   ah          : handle return from ads_open
+ *   ah          : handle return from smb_ads_open
  *   adsShareName: name of share to be removed from ADS directory
  *   adsContainer: location for share to be removed from ADS directory, ie
  *                   ou=share_folder
@@ -1759,83 +1695,136 @@ ads_publish_share(ADS_HANDLE *ah, const char *adsShareName,
  *    0          : success
  */
 int
-ads_remove_share(ADS_HANDLE *ah, const char *adsShareName, const char *shareUNC,
-    const char *adsContainer, const char *hostname)
+smb_ads_remove_share(smb_ads_handle_t *ah, const char *adsShareName,
+    const char *shareUNC, const char *adsContainer, const char *hostname)
 {
 	int ret;
-	char unc_name[ADS_MAXBUFLEN];
+	char unc_name[SMB_ADS_MAXBUFLEN];
 
 	if (adsShareName == NULL || adsContainer == NULL)
 		return (-1);
 	if (shareUNC == 0 || *shareUNC == 0)
 		shareUNC = adsShareName;
 
-	if (ads_build_unc_name(unc_name, sizeof (unc_name),
+	if (smb_ads_build_unc_name(unc_name, sizeof (unc_name),
 	    hostname, shareUNC) < 0) {
-		syslog(LOG_DEBUG, "smb_ads: Unable to remove share '%s' from "
+		smb_tracef("smb_ads: Unable to remove share '%s' from "
 		    "ADS [missing UNC name]", shareUNC);
 		return (-1);
 	}
 
-	ret = ads_lookup_share(ah, adsShareName, adsContainer, unc_name);
+	ret = smb_ads_lookup_share(ah, adsShareName, adsContainer, unc_name);
 	if (ret == 0)
 		return (0);
 	if (ret == -1)
 		return (-1);
 
-	return (ads_del_share(ah, adsShareName, adsContainer));
+	return (smb_ads_del_share(ah, adsShareName, adsContainer));
 }
 
 /*
- * ads_get_computer_dn
+ * smb_ads_get_computer_dn
  *
  * Build the distinguish name for this system.
  */
 static void
-ads_get_computer_dn(ADS_HANDLE *ah, char *buf, size_t buflen)
+smb_ads_get_computer_dn(smb_ads_handle_t *ah, char *buf, size_t buflen)
 {
 	char hostname[MAXHOSTNAMELEN];
 
 	(void) smb_gethostname(hostname, MAXHOSTNAMELEN, 0);
 	(void) snprintf(buf, buflen, "cn=%s,cn=%s,%s",
-	    hostname, ADS_COMPUTERS_CN, ah->domain_dn);
+	    hostname, SMB_ADS_COMPUTERS_CN, ah->domain_dn);
 }
 
 /*
- * ads_add_computer
+ * smb_ads_add_computer
  *
  * Returns 0 upon success. Otherwise, returns -1.
  */
 static int
-ads_add_computer(ADS_HANDLE *ah)
+smb_ads_add_computer(smb_ads_handle_t *ah, int dclevel)
 {
-	return (ads_computer_op(ah, LDAP_MOD_ADD));
+	return (smb_ads_computer_op(ah, LDAP_MOD_ADD, dclevel));
 }
 
 /*
- * ads_modify_computer
+ * smb_ads_modify_computer
  *
  * Returns 0 upon success. Otherwise, returns -1.
  */
 static int
-ads_modify_computer(ADS_HANDLE *ah)
+smb_ads_modify_computer(smb_ads_handle_t *ah, int dclevel)
 {
-	return (ads_computer_op(ah, LDAP_MOD_REPLACE));
+	return (smb_ads_computer_op(ah, LDAP_MOD_REPLACE, dclevel));
+}
+
+/*
+ * smb_ads_get_dc_level
+ *
+ * Returns the functional level of the DC upon success.
+ * Otherwise, -1 is returned.
+ */
+static int
+smb_ads_get_dc_level(smb_ads_handle_t *ah)
+{
+	LDAPMessage *res, *entry;
+	char *attr[2];
+	char **vals;
+	int rc = -1;
+
+	res = NULL;
+	attr[0] = SMB_ADS_ATTR_DCLEVEL;
+	attr[1] = NULL;
+	if (ldap_search_s(ah->ld, "", LDAP_SCOPE_BASE, NULL, attr,
+	    0, &res) != LDAP_SUCCESS) {
+		(void) ldap_msgfree(res);
+		return (-1);
+	}
+
+	/* no match for the specified attribute is found */
+	if (ldap_count_entries(ah->ld, res) == 0) {
+		(void) ldap_msgfree(res);
+		return (-1);
+	}
+
+	entry = ldap_first_entry(ah->ld, res);
+	if (entry) {
+		if ((vals = ldap_get_values(ah->ld, entry,
+		    SMB_ADS_ATTR_DCLEVEL)) == NULL) {
+			/*
+			 * Observed the values aren't populated
+			 * by the Windows 2000 server.
+			 */
+			(void) ldap_msgfree(res);
+			return (SMB_ADS_DCLEVEL_W2K);
+		}
+
+		if (vals[0] != NULL)
+			rc = atoi(vals[0]);
+
+		ldap_value_free(vals);
+	}
+
+	(void) ldap_msgfree(res);
+	return (rc);
 }
 
 static int
-ads_computer_op(ADS_HANDLE *ah, int op)
+smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel)
 {
-	LDAPMod *attrs[ADS_COMPUTER_NUM_ATTR];
+	LDAPMod *attrs[SMB_ADS_COMPUTER_NUM_ATTR];
 	char *oc_vals[6], *sam_val[2], *usr_val[2];
 	char *spn_set[SMBKRB5_SPN_IDX_MAX + 1], *ctl_val[2], *fqh_val[2];
+	char *encrypt_val[2];
 	int j = -1;
 	int ret, usrctl_flags = 0;
 	char sam_acct[MAXHOSTNAMELEN + 1];
 	char fqhost[MAXHOSTNAMELEN];
-	char dn[ADS_DN_MAX];
+	char dn[SMB_ADS_DN_MAX];
 	char *user_principal;
 	char usrctl_buf[16];
+	char encrypt_buf[16];
 	int max;
 
 	if (smb_gethostname(fqhost, MAXHOSTNAMELEN, 0) != 0)
@@ -1846,24 +1835,32 @@ ads_computer_op(ADS_HANDLE *ah, int op)
 	(void) snprintf(fqhost, MAXHOSTNAMELEN, "%s.%s", fqhost,
 	    ah->domain);
 
-	if (ads_get_spnset(fqhost, spn_set) != 0)
+	if (smb_ads_get_spnset(fqhost, spn_set) != 0)
 		return (-1);
 
-	user_principal = smb_krb5_get_upn(spn_set[SMBKRB5_SPN_IDX_HOST],
-	    ah->domain);
+	/*
+	 * Windows 2008 DC expects the UPN attribute to be host/fqhn while
+	 * both Windows 2000 & 2003 expect it to be host/fqhn@realm.
+	 */
+	if (dclevel == SMB_ADS_DCLEVEL_W2K8)
+		user_principal = smb_krb5_get_spn(SMBKRB5_SPN_IDX_HOST, fqhost);
+	else
+		user_principal = smb_krb5_get_upn(spn_set[SMBKRB5_SPN_IDX_HOST],
+		    ah->domain);
 
 	if (user_principal == NULL) {
-		ads_free_spnset(spn_set);
+		smb_ads_free_spnset(spn_set);
 		return (-1);
 	}
 
-	ads_get_computer_dn(ah, dn, ADS_DN_MAX);
+	smb_ads_get_computer_dn(ah, dn, SMB_ADS_DN_MAX);
 
-	max = (ADS_COMPUTER_NUM_ATTR - ((op != LDAP_MOD_ADD) ? 1 : 0));
+	max = (SMB_ADS_COMPUTER_NUM_ATTR - ((op != LDAP_MOD_ADD) ? 1 : 0))
+	    - (dclevel == SMB_ADS_DCLEVEL_W2K8 ?  0 : 1);
 
-	if (ads_alloc_attr(attrs, max) != 0) {
+	if (smb_ads_alloc_attr(attrs, max) != 0) {
 		free(user_principal);
-		ads_free_spnset(spn_set);
+		smb_ads_free_spnset(spn_set);
 		return (-1);
 	}
 
@@ -1881,41 +1878,53 @@ ads_computer_op(ADS_HANDLE *ah, int op)
 	}
 
 	attrs[++j]->mod_op = op;
-	attrs[j]->mod_type = "sAMAccountName";
+	attrs[j]->mod_type = SMB_ADS_ATTR_SAMACCT;
 	sam_val[0] = sam_acct;
 	sam_val[1] = 0;
 	attrs[j]->mod_values = sam_val;
 
 	attrs[++j]->mod_op = op;
-	attrs[j]->mod_type = "userPrincipalName";
+	attrs[j]->mod_type = SMB_ADS_ATTR_UPN;
 	usr_val[0] = user_principal;
 	usr_val[1] = 0;
 	attrs[j]->mod_values = usr_val;
 
 	attrs[++j]->mod_op = op;
-	attrs[j]->mod_type = "servicePrincipalName";
+	attrs[j]->mod_type = SMB_ADS_ATTR_SPN;
 	attrs[j]->mod_values = spn_set;
 
 	attrs[++j]->mod_op = op;
-	attrs[j]->mod_type = "userAccountControl";
-	usrctl_flags |= (ADS_USER_ACCT_CTL_WKSTATION_TRUST_ACCT |
-	    ADS_USER_ACCT_CTL_PASSWD_NOTREQD |
-	    ADS_USER_ACCT_CTL_ACCOUNTDISABLE);
+	attrs[j]->mod_type = SMB_ADS_ATTR_CTL;
+	usrctl_flags |= (SMB_ADS_USER_ACCT_CTL_WKSTATION_TRUST_ACCT |
+	    SMB_ADS_USER_ACCT_CTL_PASSWD_NOTREQD |
+	    SMB_ADS_USER_ACCT_CTL_ACCOUNTDISABLE);
 	(void) snprintf(usrctl_buf, sizeof (usrctl_buf), "%d", usrctl_flags);
 	ctl_val[0] = usrctl_buf;
 	ctl_val[1] = 0;
 	attrs[j]->mod_values = ctl_val;
 
 	attrs[++j]->mod_op = op;
-	attrs[j]->mod_type = "dNSHostName";
+	attrs[j]->mod_type = SMB_ADS_ATTR_DNSHOST;
 	fqh_val[0] = fqhost;
 	fqh_val[1] = 0;
 	attrs[j]->mod_values = fqh_val;
 
+	/* enctypes support starting in Windows Server 2008 */
+	if (dclevel > SMB_ADS_DCLEVEL_W2K3) {
+		attrs[++j]->mod_op = op;
+		attrs[j]->mod_type = SMB_ADS_ATTR_ENCTYPES;
+		(void) snprintf(encrypt_buf, sizeof (encrypt_buf), "%d",
+		    SMB_ADS_ENC_AES256 + SMB_ADS_ENC_AES128 + SMB_ADS_ENC_RC4 +
+		    SMB_ADS_ENC_DES_MD5 + SMB_ADS_ENC_DES_CRC);
+		encrypt_val[0] = encrypt_buf;
+		encrypt_val[1] = 0;
+		attrs[j]->mod_values = encrypt_val;
+	}
+
 	switch (op) {
 	case LDAP_MOD_ADD:
 		if ((ret = ldap_add_s(ah->ld, dn, attrs)) != LDAP_SUCCESS) {
-			syslog(LOG_ERR, "ads_add_computer: %s",
+			syslog(LOG_ERR, "smb_ads_add_computer: %s",
 			    ldap_err2string(ret));
 			ret = -1;
 		}
@@ -1923,7 +1932,7 @@ ads_computer_op(ADS_HANDLE *ah, int op)
 
 	case LDAP_MOD_REPLACE:
 		if ((ret = ldap_modify_s(ah->ld, dn, attrs)) != LDAP_SUCCESS) {
-			syslog(LOG_ERR, "ads_modify_computer: %s",
+			syslog(LOG_ERR, "smb_ads_modify_computer: %s",
 			    ldap_err2string(ret));
 			ret = -1;
 		}
@@ -1934,9 +1943,9 @@ ads_computer_op(ADS_HANDLE *ah, int op)
 
 	}
 
-	ads_free_attr(attrs);
+	smb_ads_free_attr(attrs);
 	free(user_principal);
-	ads_free_spnset(spn_set);
+	smb_ads_free_spnset(spn_set);
 
 	return (ret);
 }
@@ -1945,21 +1954,19 @@ ads_computer_op(ADS_HANDLE *ah, int op)
  * Delete an ADS computer account.
  */
 static void
-ads_del_computer(ADS_HANDLE *ah)
+smb_ads_del_computer(smb_ads_handle_t *ah)
 {
-	char dn[ADS_DN_MAX];
+	char dn[SMB_ADS_DN_MAX];
 	int rc;
 
-	ads_get_computer_dn(ah, dn, ADS_DN_MAX);
+	smb_ads_get_computer_dn(ah, dn, SMB_ADS_DN_MAX);
 
-	if ((rc = ldap_delete_s(ah->ld, dn)) != LDAP_SUCCESS) {
-		syslog(LOG_DEBUG, "ads_del_computer: %s",
-		    ldap_err2string(rc));
-	}
+	if ((rc = ldap_delete_s(ah->ld, dn)) != LDAP_SUCCESS)
+		smb_tracef("smb_ads_del_computer: %s", ldap_err2string(rc));
 }
 
 /*
- * ads_lookup_computer_n_attr
+ * smb_ads_lookup_computer_n_attr
  *
  * Lookup the value of the specified attribute on the computer
  * object. If the specified attribute can be found, its value is returned
@@ -1974,26 +1981,26 @@ ads_del_computer(ADS_HANDLE *ah)
  * -1 on error.
  */
 static int
-ads_lookup_computer_n_attr(ADS_HANDLE *ah, char *attr, char **val)
+smb_ads_lookup_computer_n_attr(smb_ads_handle_t *ah, char *attr, char **val)
 {
-	char *attrs[2], filter[ADS_MAXBUFLEN];
+	char *attrs[2], filter[SMB_ADS_MAXBUFLEN];
 	LDAPMessage *res, *entry;
 	char **vals;
-	char tmpbuf[ADS_MAXBUFLEN];
+	char tmpbuf[SMB_ADS_MAXBUFLEN];
 	char my_hostname[MAXHOSTNAMELEN], sam_acct[MAXHOSTNAMELEN + 1];
-	char dn[ADS_DN_MAX];
+	char dn[SMB_ADS_DN_MAX];
 
 	if (smb_gethostname(my_hostname, MAXHOSTNAMELEN, 0) != 0)
 		return (-1);
 
 	(void) snprintf(sam_acct, sizeof (sam_acct), "%s$", my_hostname);
-	ads_get_computer_dn(ah, dn, ADS_DN_MAX);
+	smb_ads_get_computer_dn(ah, dn, SMB_ADS_DN_MAX);
 
 	res = NULL;
 	attrs[0] = attr;
 	attrs[1] = NULL;
 
-	if (ads_escape_search_filter_chars(sam_acct, tmpbuf) != 0) {
+	if (smb_ads_escape_search_filter_chars(sam_acct, tmpbuf) != 0) {
 		return (-1);
 	}
 
@@ -2038,20 +2045,20 @@ ads_lookup_computer_n_attr(ADS_HANDLE *ah, char *attr, char **val)
 }
 
 /*
- * ads_find_computer
+ * smb_ads_find_computer
  *
  * Return:
  *  1 if found.
  *  0 if not found or encounters error.
  */
 static int
-ads_find_computer(ADS_HANDLE *ah)
+smb_ads_find_computer(smb_ads_handle_t *ah)
 {
-	return (ads_lookup_computer_n_attr(ah, NULL, NULL) == 1);
+	return (smb_ads_lookup_computer_n_attr(ah, NULL, NULL) == 1);
 }
 
 /*
- * ads_update_computer_cntrl_attr
+ * smb_ads_update_computer_cntrl_attr
  *
  * Modify the user account control attribute of an existing computer
  * object on AD.
@@ -2059,29 +2066,29 @@ ads_find_computer(ADS_HANDLE *ah)
  * Returns 0 on success. Otherwise, returns -1.
  */
 static int
-ads_update_computer_cntrl_attr(ADS_HANDLE *ah, int des_only)
+smb_ads_update_computer_cntrl_attr(smb_ads_handle_t *ah, int des_only)
 {
 	LDAPMod *attrs[2];
 	char *ctl_val[2];
 	int ret, usrctl_flags = 0;
-	char dn[ADS_DN_MAX];
+	char dn[SMB_ADS_DN_MAX];
 	char usrctl_buf[16];
 
-	ads_get_computer_dn(ah, dn, ADS_DN_MAX);
+	smb_ads_get_computer_dn(ah, dn, SMB_ADS_DN_MAX);
 
 
-	if (ads_alloc_attr(attrs, sizeof (attrs) / sizeof (LDAPMod *)) != 0)
+	if (smb_ads_alloc_attr(attrs, sizeof (attrs) / sizeof (LDAPMod *)) != 0)
 		return (-1);
 
 	attrs[0]->mod_op = LDAP_MOD_REPLACE;
-	attrs[0]->mod_type = "userAccountControl";
+	attrs[0]->mod_type = SMB_ADS_ATTR_CTL;
 
-	usrctl_flags |= (ADS_USER_ACCT_CTL_WKSTATION_TRUST_ACCT |
-	    ADS_USER_ACCT_CTL_TRUSTED_FOR_DELEGATION |
-	    ADS_USER_ACCT_CTL_DONT_EXPIRE_PASSWD);
+	usrctl_flags |= (SMB_ADS_USER_ACCT_CTL_WKSTATION_TRUST_ACCT |
+	    SMB_ADS_USER_ACCT_CTL_TRUSTED_FOR_DELEGATION |
+	    SMB_ADS_USER_ACCT_CTL_DONT_EXPIRE_PASSWD);
 
 	if (des_only)
-		usrctl_flags |= ADS_USER_ACCT_CTL_USE_DES_KEY_ONLY;
+		usrctl_flags |= SMB_ADS_USER_ACCT_CTL_USE_DES_KEY_ONLY;
 
 	(void) snprintf(usrctl_buf, sizeof (usrctl_buf), "%d", usrctl_flags);
 	ctl_val[0] = usrctl_buf;
@@ -2089,91 +2096,91 @@ ads_update_computer_cntrl_attr(ADS_HANDLE *ah, int des_only)
 	attrs[0]->mod_values = ctl_val;
 
 	if ((ret = ldap_modify_s(ah->ld, dn, attrs)) != LDAP_SUCCESS) {
-		syslog(LOG_ERR, "ads_modify_computer: %s",
+		syslog(LOG_ERR, "smb_ads_modify_computer: %s",
 		    ldap_err2string(ret));
 		ret = -1;
 	}
 
-	ads_free_attr(attrs);
+	smb_ads_free_attr(attrs);
 	return (ret);
 }
 
 /*
- * ads_update_attrs
+ * smb_ads_update_attrs
  *
  * Updates the servicePrincipalName and dNSHostName attributes of the
  * system's AD computer object.
  */
 int
-ads_update_attrs(void)
+smb_ads_update_attrs(void)
 {
-	ADS_HANDLE *ah;
+	smb_ads_handle_t *ah;
 	LDAPMod *attrs[3];
 	char *fqh_val[2];
 	int i = 0;
 	int ret;
 	char fqhost[MAXHOSTNAMELEN];
-	char dn[ADS_DN_MAX];
+	char dn[SMB_ADS_DN_MAX];
 	char *spn_set[SMBKRB5_SPN_IDX_MAX + 1];
 
-	if ((ah = ads_open()) == NULL)
+	if ((ah = smb_ads_open()) == NULL)
 		return (-1);
 
 	if (smb_getfqhostname(fqhost, MAXHOSTNAMELEN) != 0) {
-		ads_close(ah);
+		smb_ads_close(ah);
 		return (-1);
 	}
 
-	if (ads_get_spnset(fqhost, spn_set) != 0) {
-		ads_close(ah);
+	if (smb_ads_get_spnset(fqhost, spn_set) != 0) {
+		smb_ads_close(ah);
 		return (-1);
 	}
 
-	ads_get_computer_dn(ah, dn, ADS_DN_MAX);
-	if (ads_alloc_attr(attrs, sizeof (attrs) / sizeof (LDAPMod *)) != 0) {
-		ads_free_spnset(spn_set);
-		ads_close(ah);
+	smb_ads_get_computer_dn(ah, dn, SMB_ADS_DN_MAX);
+	if (smb_ads_alloc_attr(attrs, sizeof (attrs) / sizeof (LDAPMod *))
+	    != 0) {
+		smb_ads_free_spnset(spn_set);
+		smb_ads_close(ah);
 		return (-1);
 	}
 
 	attrs[i]->mod_op = LDAP_MOD_REPLACE;
-	attrs[i]->mod_type = "servicePrincipalName";
+	attrs[i]->mod_type = SMB_ADS_ATTR_SPN;
 	attrs[i]->mod_values = spn_set;
 
 	attrs[++i]->mod_op = LDAP_MOD_REPLACE;
-	attrs[i]->mod_type = "dNSHostName";
+	attrs[i]->mod_type = SMB_ADS_ATTR_DNSHOST;
 	fqh_val[0] = fqhost;
 	fqh_val[1] = 0;
 	attrs[i]->mod_values = fqh_val;
 
 	if ((ret = ldap_modify_s(ah->ld, dn, attrs)) != LDAP_SUCCESS) {
-		syslog(LOG_ERR, "ads_update_attrs: %s",
+		syslog(LOG_ERR, "smb_ads_update_attrs: %s",
 		    ldap_err2string(ret));
 		ret = -1;
 	}
 
-	ads_free_attr(attrs);
-	ads_free_spnset(spn_set);
-	ads_close(ah);
+	smb_ads_free_attr(attrs);
+	smb_ads_free_spnset(spn_set);
+	smb_ads_close(ah);
 
 	return (ret);
 
 }
 
 /*
- * ads_lookup_computer_attr_kvno
+ * smb_ads_lookup_computer_attr_kvno
  *
  * Lookup the value of the Kerberos version number attribute of the computer
  * account.
  */
 static krb5_kvno
-ads_lookup_computer_attr_kvno(ADS_HANDLE *ah)
+smb_ads_lookup_computer_attr_kvno(smb_ads_handle_t *ah)
 {
 	char *val = NULL;
 	int kvno = 1;
 
-	if (ads_lookup_computer_n_attr(ah, "msDS-KeyVersionNumber",
-	    &val) == 1) {
+	if (smb_ads_lookup_computer_n_attr(ah, SMB_ADS_ATTR_KVNO, &val) == 1) {
 		if (val) {
 			kvno = atoi(val);
 			free(val);
@@ -2184,7 +2191,7 @@ ads_lookup_computer_attr_kvno(ADS_HANDLE *ah)
 }
 
 /*
- * ads_gen_machine_passwd
+ * smb_ads_gen_machine_passwd
  *
  * Returned a null-terminated machine password generated randomly
  * from [0-9a-zA-Z] character set. In order to pass the password
@@ -2192,7 +2199,7 @@ ads_lookup_computer_attr_kvno(ADS_HANDLE *ah)
  * used as the first character of the machine password.
  */
 static int
-ads_gen_machine_passwd(char *machine_passwd, int bufsz)
+smb_ads_gen_machine_passwd(char *machine_passwd, int bufsz)
 {
 	char *data = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJK"
 	    "LMNOPQRSTUVWXYZ";
@@ -2217,7 +2224,7 @@ ads_gen_machine_passwd(char *machine_passwd, int bufsz)
 }
 
 /*
- * ads_domain_change_cleanup
+ * smb_ads_domain_change_cleanup
  *
  * If we're attempting to join the system to a new domain, the keys for
  * the host principal regarding the old domain should be removed from
@@ -2227,7 +2234,7 @@ ads_gen_machine_passwd(char *machine_passwd, int bufsz)
  * if user attempts to switch to workgroup mode.
  */
 int
-ads_domain_change_cleanup(char *newdom)
+smb_ads_domain_change_cleanup(char *newdom)
 {
 	char origdom[MAXHOSTNAMELEN];
 	krb5_context ctx = NULL;
@@ -2237,7 +2244,7 @@ ads_domain_change_cleanup(char *newdom)
 	if (smb_getfqdomainname(origdom, MAXHOSTNAMELEN)) {
 		if (smb_getdomainname(origdom, MAXHOSTNAMELEN) == 0)
 			if (strncasecmp(origdom, newdom, strlen(origdom)))
-				ads_free_host_info();
+				smb_ads_free_host_info();
 
 		return (0);
 	}
@@ -2245,7 +2252,7 @@ ads_domain_change_cleanup(char *newdom)
 	if (strcasecmp(origdom, newdom) == 0)
 		return (0);
 
-	ads_free_host_info();
+	smb_ads_free_host_info();
 
 	if (smb_krb5_ctx_init(&ctx) != 0)
 		return (-1);
@@ -2268,7 +2275,7 @@ ads_domain_change_cleanup(char *newdom)
 
 
 /*
- * ads_join
+ * smb_ads_join
  *
  * Besides the NT-4 style domain join (using MS-RPC), CIFS server also
  * provides the domain join using Kerberos Authentication, Keberos
@@ -2284,7 +2291,7 @@ ads_domain_change_cleanup(char *newdom)
  * or not the workstation trust account already exists in the Active Directory.
  * The existing computer object for this workstation will be removed and
  * a new one will be added. The machine account password is randomly
- * generated and set for the newly created computer object using KPASSD
+ * generated and set for the newly created computer object using KPASSWD
  * protocol (See RFC 3244). Once the password is set, our ADS client
  * finalizes the machine account by modifying the user acount control
  * attribute of the computer object. Kerberos keys derived from the machine
@@ -2292,17 +2299,18 @@ ads_domain_change_cleanup(char *newdom)
  * That would be needed while acquiring Kerberos TGT ticket for the host
  * principal after the domain join operation.
  */
-adjoin_status_t
-ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
+smb_adjoin_status_t
+smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
     int len)
 {
-	ADS_HANDLE *ah = NULL;
+	smb_ads_handle_t *ah = NULL;
 	krb5_context ctx = NULL;
 	krb5_principal krb5princs[SMBKRB5_SPN_IDX_MAX];
 	krb5_kvno kvno;
 	boolean_t des_only, delete = B_TRUE;
-	adjoin_status_t rc = ADJOIN_SUCCESS;
+	smb_adjoin_status_t rc = SMB_ADJOIN_SUCCESS;
 	boolean_t new_acct;
+	int dclevel, num;
 
 	/*
 	 * Call library functions that can be used to get
@@ -2313,117 +2321,127 @@ ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 	 * list of algorithms available on any system running Nevada
 	 * by default.
 	 */
-	krb5_enctype enctypes[] = {ENCTYPE_DES_CBC_CRC, ENCTYPE_DES_CBC_MD5,
-	    ENCTYPE_ARCFOUR_HMAC, ENCTYPE_AES128_CTS_HMAC_SHA1_96};
+	krb5_enctype w2k8enctypes[] = {ENCTYPE_AES256_CTS_HMAC_SHA1_96,
+	    ENCTYPE_AES128_CTS_HMAC_SHA1_96, ENCTYPE_ARCFOUR_HMAC,
+	    ENCTYPE_DES_CBC_CRC, ENCTYPE_DES_CBC_MD5,
+	};
 
-	if ((ah = ads_open_main(domain, user, usr_passwd)) == NULL) {
+	krb5_enctype pre_w2k8enctypes[] = {ENCTYPE_ARCFOUR_HMAC,
+	    ENCTYPE_DES_CBC_CRC, ENCTYPE_DES_CBC_MD5,
+	};
+
+	krb5_enctype *encptr;
+
+	if ((ah = smb_ads_open_main(domain, user, usr_passwd)) == NULL) {
 		smb_ccache_remove(SMB_CCACHE_PATH);
-		return (ADJOIN_ERR_GET_HANDLE);
+		return (SMB_ADJOIN_ERR_GET_HANDLE);
 	}
 
-	if (ads_gen_machine_passwd(machine_passwd, len) != 0) {
-		ads_close(ah);
+	if (smb_ads_gen_machine_passwd(machine_passwd, len) != 0) {
+		smb_ads_close(ah);
 		smb_ccache_remove(SMB_CCACHE_PATH);
-		return (ADJOIN_ERR_GEN_PASSWD);
+		return (SMB_ADJOIN_ERR_GEN_PASSWD);
 	}
 
-	if (ads_find_computer(ah)) {
+	if ((dclevel = smb_ads_get_dc_level(ah)) == -1) {
+		smb_ads_close(ah);
+		smb_ccache_remove(SMB_CCACHE_PATH);
+		return (SMB_ADJOIN_ERR_GET_DCLEVEL);
+	}
+
+	if (smb_ads_find_computer(ah)) {
 		new_acct = B_FALSE;
-		if (ads_modify_computer(ah) != 0) {
-			ads_close(ah);
+		if (smb_ads_modify_computer(ah, dclevel) != 0) {
+			smb_ads_close(ah);
 			smb_ccache_remove(SMB_CCACHE_PATH);
-			return (ADJOIN_ERR_MOD_TRUST_ACCT);
+			return (SMB_ADJOIN_ERR_MOD_TRUST_ACCT);
 		}
 	} else {
 		new_acct = B_TRUE;
-		if (ads_add_computer(ah) != 0) {
-			ads_close(ah);
+		if (smb_ads_add_computer(ah, dclevel) != 0) {
+			smb_ads_close(ah);
 			smb_ccache_remove(SMB_CCACHE_PATH);
-			return (ADJOIN_ERR_ADD_TRUST_ACCT);
+			return (SMB_ADJOIN_ERR_ADD_TRUST_ACCT);
 		}
 	}
 
 	des_only = B_FALSE;
 
-	/*
-	 * If we are talking to a Longhorn server, we need to set up
-	 * the msDS-SupportedEncryptionTypes attribute of the computer
-	 * object accordingly
-	 *
-	 * The code to modify the msDS-SupportedEncryptionTypes can be
-	 * added once we figure out why the Longhorn server rejects the
-	 * SmbSessionSetup request sent by SMB redirector.
-	 */
-
-
 	if (smb_krb5_ctx_init(&ctx) != 0) {
-		rc = ADJOIN_ERR_INIT_KRB_CTX;
+		rc = SMB_ADJOIN_ERR_INIT_KRB_CTX;
 		goto adjoin_cleanup;
 	}
 
 	if (smb_krb5_get_principals(ah->domain, ctx, krb5princs) != 0) {
-		rc = ADJOIN_ERR_GET_SPNS;
+		rc = SMB_ADJOIN_ERR_GET_SPNS;
 		goto adjoin_cleanup;
 	}
 
 	if (smb_krb5_setpwd(ctx, krb5princs[SMBKRB5_SPN_IDX_HOST],
 	    machine_passwd) != 0) {
-		rc = ADJOIN_ERR_KSETPWD;
+		rc = SMB_ADJOIN_ERR_KSETPWD;
 		goto adjoin_cleanup;
 	}
 
-	kvno = ads_lookup_computer_attr_kvno(ah);
+	kvno = smb_ads_lookup_computer_attr_kvno(ah);
 
-	if (ads_update_computer_cntrl_attr(ah, des_only) != 0) {
-		rc = ADJOIN_ERR_UPDATE_CNTRL_ATTR;
+	if (smb_ads_update_computer_cntrl_attr(ah, des_only) != 0) {
+		rc = SMB_ADJOIN_ERR_UPDATE_CNTRL_ATTR;
 		goto adjoin_cleanup;
+	}
+
+	if (dclevel == SMB_ADS_DCLEVEL_W2K8) {
+		num = sizeof (w2k8enctypes) / sizeof (krb5_enctype);
+		encptr = w2k8enctypes;
+	} else {
+		num = sizeof (pre_w2k8enctypes) / sizeof (krb5_enctype);
+		encptr = pre_w2k8enctypes;
 	}
 
 	if (smb_krb5_update_keytab_entries(ctx, krb5princs, SMBNS_KRB5_KEYTAB,
-	    kvno, machine_passwd, enctypes,
-	    (sizeof (enctypes) / sizeof (krb5_enctype))) != 0) {
-		rc = ADJOIN_ERR_WRITE_KEYTAB;
+	    kvno, machine_passwd, encptr, num) != 0) {
+		rc = SMB_ADJOIN_ERR_WRITE_KEYTAB;
 		goto adjoin_cleanup;
 	}
 
 	/* Set IDMAP config */
 	if (smb_config_set_idmap_domain(ah->domain) != 0) {
-		rc = ADJOIN_ERR_IDMAP_SET_DOMAIN;
+		rc = SMB_ADJOIN_ERR_IDMAP_SET_DOMAIN;
 		goto adjoin_cleanup;
 	}
 
 	/* Refresh IDMAP service */
 	if (smb_config_refresh_idmap() != 0) {
-		rc = ADJOIN_ERR_IDMAP_REFRESH;
+		rc = SMB_ADJOIN_ERR_IDMAP_REFRESH;
 		goto adjoin_cleanup;
 	}
 
 	delete = B_FALSE;
 adjoin_cleanup:
 	if (new_acct && delete)
-		ads_del_computer(ah);
+		smb_ads_del_computer(ah);
 
-	if (rc != ADJOIN_ERR_INIT_KRB_CTX) {
-		if (rc != ADJOIN_ERR_GET_SPNS)
+	if (rc != SMB_ADJOIN_ERR_INIT_KRB_CTX) {
+		if (rc != SMB_ADJOIN_ERR_GET_SPNS)
 			smb_krb5_free_principals(ctx, krb5princs,
 			    SMBKRB5_SPN_IDX_MAX);
 		smb_krb5_ctx_fini(ctx);
 	}
 
-	ads_close(ah);
+	smb_ads_close(ah);
 	smb_ccache_remove(SMB_CCACHE_PATH);
 	return (rc);
 }
 
 /*
- * adjoin_report_err
+ * smb_adjoin_report_err
  *
  * Display error message for the specific adjoin error code.
  */
 char *
-adjoin_report_err(adjoin_status_t status)
+smb_adjoin_report_err(smb_adjoin_status_t status)
 {
-	if (status < 0 || status >= ADJOIN_NUM_STATUS)
+	if (status < 0 || status >= SMB_ADJOIN_NUM_STATUS)
 		return ("ADJOIN: unknown status");
 
 	return (adjoin_errmsg[status]);

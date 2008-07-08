@@ -48,7 +48,7 @@
  */
 static struct sdb_netuse netuse_table[N_NETUSE_TABLE];
 
-static int smbrdr_tree_connectx(struct sdb_session *session,
+static DWORD smbrdr_tree_connectx(struct sdb_session *session,
     struct sdb_netuse *netuse, char *path, int path_len);
 
 static struct sdb_netuse *smbrdr_netuse_alloc(struct sdb_session *session,
@@ -80,13 +80,17 @@ smbrdr_netuse_free(struct sdb_netuse *netuse)
  * On success, a pointer to the netuse is returned. Otherwise the
  * netuse is cleared and a null pointer is returned.
  */
-unsigned short
-smbrdr_tree_connect(char *hostname, char *username, char *sharename)
+DWORD
+smbrdr_tree_connect(char *hostname, char *username, char *sharename,
+    unsigned short *tid)
 {
 	struct sdb_session *session;
 	struct sdb_netuse *netuse;
 	char *path;
 	int path_len;
+	DWORD status;
+
+	*tid = 0;
 
 	/*
 	 * Make sure there is a session & logon for given info
@@ -95,14 +99,14 @@ smbrdr_tree_connect(char *hostname, char *username, char *sharename)
 	if (session == NULL) {
 		syslog(LOG_DEBUG, "smbrdr_tree_connect: no session for %s@%s",
 		    username, hostname);
-		return (0);
+		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
 
 	if ((netuse = smbrdr_netuse_alloc(session, sharename)) == 0) {
 		syslog(LOG_DEBUG, "smbrdr_tree_connect: init failed");
 		smbrdr_session_unlock(session);
-		return (0);
+		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
 	/*
@@ -115,7 +119,7 @@ smbrdr_tree_connect(char *hostname, char *username, char *sharename)
 		smbrdr_netuse_free(netuse);
 		smbrdr_session_unlock(session);
 		syslog(LOG_DEBUG, "smbrdr_tree_connect: %s", strerror(ENOMEM));
-		return (0);
+		return (NT_STATUS_NO_MEMORY);
 	}
 
 	bzero(path, path_len);
@@ -125,18 +129,20 @@ smbrdr_tree_connect(char *hostname, char *username, char *sharename)
 	else
 		path_len = strlen(path);
 
-	if (smbrdr_tree_connectx(session, netuse, path, path_len) < 0) {
+	if ((status = smbrdr_tree_connectx(session, netuse, path, path_len))
+	    != NT_STATUS_SUCCESS) {
 		smbrdr_netuse_free(netuse);
 		smbrdr_session_unlock(session);
 		free(path);
 		syslog(LOG_DEBUG, "smbrdr_tree_connect: %s failed", path);
-		return (0);
+		return (status);
 	}
 
 	free(path);
 	(void) mutex_unlock(&netuse->mtx);
 	smbrdr_session_unlock(session);
-	return (netuse->tid);
+	*tid = netuse->tid;
+	return (NT_STATUS_SUCCESS);
 }
 
 
@@ -150,7 +156,7 @@ smbrdr_tree_connect(char *hostname, char *username, char *sharename)
  *
  * Returns 0 on success. Otherwise returns a -ve error code.
  */
-static int
+static DWORD
 smbrdr_tree_connectx(struct sdb_session *session, struct sdb_netuse *netuse,
     char *path, int path_len)
 {
@@ -172,7 +178,7 @@ smbrdr_tree_connectx(struct sdb_session *session, struct sdb_netuse *netuse,
 	if (status != NT_STATUS_SUCCESS) {
 		syslog(LOG_DEBUG, "smbrdr_tree_connectx: %s",
 		    xlate_nt_status(status));
-		return (-1);
+		return (status);
 	}
 
 	mb = &srh.srh_mbuf;
@@ -205,7 +211,7 @@ smbrdr_tree_connectx(struct sdb_session *session, struct sdb_netuse *netuse,
 	if (rc <= 0) {
 		syslog(LOG_DEBUG, "smbrdr_tree_connectx: encode failed");
 		smbrdr_handle_free(&srh);
-		return (-1);
+		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
 	status = smbrdr_exchange(&srh, &smb_hdr, 0);
@@ -213,13 +219,13 @@ smbrdr_tree_connectx(struct sdb_session *session, struct sdb_netuse *netuse,
 		syslog(LOG_DEBUG, "smbrdr_tree_connectx: %s",
 		    xlate_nt_status(status));
 		smbrdr_handle_free(&srh);
-		return (-1);
+		return (status);
 	}
 
 	netuse->tid = smb_hdr.tid;
 	netuse->state = SDB_NSTATE_CONNECTED;
 	smbrdr_handle_free(&srh);
-	return (0);
+	return (NT_STATUS_SUCCESS);
 }
 
 /*

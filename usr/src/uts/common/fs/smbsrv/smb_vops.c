@@ -51,7 +51,7 @@ void
 smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr);
 
 static int
-smb_vop_readdir_readpage(vnode_t *, void *, uint32_t, int *, cred_t *, int);
+smb_vop_readdir_readpage(vnode_t *, void *, uint32_t, int *, cred_t *);
 
 static int
 smb_vop_readdir_entry(vnode_t *, uint32_t *, char *, int *,
@@ -200,16 +200,12 @@ smb_vop_read(vnode_t *vp, uio_t *uiop, cred_t *cr)
 }
 
 int
-smb_vop_write(vnode_t *vp, uio_t *uiop, uint32_t *flag, uint32_t *lcount,
+smb_vop_write(vnode_t *vp, uio_t *uiop, int ioflag, uint32_t *lcount,
     cred_t *cr)
 {
 	int error;
-	int ioflag = 0;
 
 	*lcount = uiop->uio_resid;
-
-	if (*flag == FSSTAB_FILE_SYNC)
-		ioflag = FSYNC;
 
 	uiop->uio_llimit = MAXOFFSET_T;
 
@@ -842,7 +838,7 @@ smb_vop_readdir(vnode_t *dvp, uint32_t *cookiep, char *name, int *namelen,
 	 */
 
 	while ((error = smb_vop_readdir_readpage(dvp, dirbuf, *cookiep,
-	    &num_bytes, cr, flags)) == 0) {
+	    &num_bytes, cr)) == 0) {
 
 		if (num_bytes <= 0)
 			break;
@@ -897,7 +893,7 @@ smb_vop_readdir(vnode_t *dvp, uint32_t *cookiep, char *name, int *namelen,
 
 static int
 smb_vop_readdir_readpage(vnode_t *vp, void *buf, uint32_t offset, int *count,
-    cred_t *cr, int flags)
+    cred_t *cr)
 {
 	int error = 0;
 	int rdirent_flags = 0;
@@ -908,9 +904,7 @@ smb_vop_readdir_readpage(vnode_t *vp, void *buf, uint32_t offset, int *count,
 	if (vp->v_type != VDIR)
 		return (ENOTDIR);
 
-	/* entflags not working for streams so don't try to use them */
-	if (!(flags & SMB_STREAM_RDDIR) &&
-	    (vfs_has_feature(vp->v_vfsp, VFSFT_DIRENTFLAGS))) {
+	if (vfs_has_feature(vp->v_vfsp, VFSFT_DIRENTFLAGS)) {
 		/*
 		 * Setting V_RDDIR_ENTFLAGS will cause the buffer to
 		 * be filled with edirent_t structures (instead of
@@ -1009,10 +1003,8 @@ smb_vop_readdir_entry(
 
 	/*
 	 * Use edirent_t structure for both
-	 * entflags not working for streams so don't try to use them
 	 */
-	if (!(flags & SMB_STREAM_RDDIR) &&
-	    (vfs_has_feature(dvp->v_vfsp, VFSFT_DIRENTFLAGS))) {
+	if (vfs_has_feature(dvp->v_vfsp, VFSFT_DIRENTFLAGS)) {
 		/*LINTED E_BAD_PTR_CAST_ALIGN*/
 		edp = (edirent_t *)dirbuf;
 	} else {
@@ -1197,7 +1189,7 @@ smb_vop_getdents(
 
 		num_bytes = SMB_MINLEN_RDDIR_BUF;
 		error = smb_vop_readdir_readpage(dvp, dirbuf, *cookiep,
-		    &num_bytes, cr, flags);
+		    &num_bytes, cr);
 
 		if (error || (num_bytes <= 0))
 			break;
@@ -1558,7 +1550,7 @@ smb_vop_stream_readdir(vnode_t *fvp, uint32_t *cookiep,
 	for (;;) {
 		nsize = MAXNAMELEN-1;
 		error = smb_vop_readdir(xattrdirvp, cookiep, tmp_name, &nsize,
-		    &ino, &vp, NULL, flags | SMB_STREAM_RDDIR, cr);
+		    &ino, &vp, NULL, flags, cr);
 
 		if (error || (*cookiep == SMB_EOF))
 			break;

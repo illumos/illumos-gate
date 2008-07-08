@@ -49,6 +49,8 @@
 #include <stdio.h>
 #include <pthread.h>
 
+#include <smbsrv/cifs.h>
+
 #define	MAX_NETBIOS_NAME_SIZE	16
 
 #define	SESSION_MESSAGE				0x00
@@ -80,7 +82,7 @@ static int nb_first_level_name_encode(char *name, char *scope,
 /*
  * nb_lock
  *
- * Acquire semaphore for doing netbios operations
+ * Acquire mutex for doing netbios operations
  */
 void
 nb_lock()
@@ -91,7 +93,7 @@ nb_lock()
 /*
  * nb_lock
  *
- * Release netbios semaphore.
+ * Release netbios mutex.
  */
 void
 nb_unlock()
@@ -113,16 +115,19 @@ nb_close(int fd)
 /*
  * nb_keep_alive
  *
- * Send the NetBIOS keep alive message. No response is expected but we
- * do need to ignore keep-alive messages in nb_exchange. The semaphore
- * ensures compatibility/serialization with nb_exchange to allow us to
- * call this function from a separate thread.
+ * Send the NetBIOS keep alive message only if smbrdr is connected on port 139.
+ * No response is expected but we do need to ignore keep-alive messages in
+ * nb_exchange. The mutex ensures compatibility/serialization with
+ * nb_exchange to allow us to call this function from a separate thread.
  */
 int
-nb_keep_alive(int fd)
+nb_keep_alive(int fd, short port)
 {
 	int nothing;
 	int rc;
+
+	if (port == SMB_SRVC_TCP_PORT)
+		return (0);
 
 	(void) mutex_lock(&nb_mutex);
 
@@ -175,7 +180,7 @@ nb_rcv(int fd, unsigned char *recv_buf, unsigned recv_max, long timeout)
  * nb_exchange
  *
  * This is the NetBIOS workhorse function where we do the send/receive
- * message exchange. A semaphore is used to serialize access because
+ * message exchange. A mutex is used to serialize access because
  * we may get swapped out between the send and receive operations and
  * another thread could enter here and collect our response. If a
  * keep-alive message is received, just discard it and go back to look

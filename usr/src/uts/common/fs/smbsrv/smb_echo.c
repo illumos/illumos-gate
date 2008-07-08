@@ -64,13 +64,13 @@ smb_com_echo(struct smb_request *sr)
 	nbytes = sr->smb_bcc;
 	data = smbsr_malloc(&sr->request_storage, nbytes);
 
-	if (smb_decode_mbc(&sr->smb_data, "#c", nbytes, data))
+	if (smb_mbc_decodef(&sr->smb_data, "#c", nbytes, data))
 		return (SDRC_ERROR);
 
 	for (i = 1; i <= necho; ++i) {
 		MBC_INIT(&reply, SMB_HEADER_ED_LEN + 10 + nbytes);
 
-		(void) smb_encode_mbc(&reply, SMB_HEADER_ED_FMT,
+		(void) smb_mbc_encodef(&reply, SMB_HEADER_ED_FMT,
 		    sr->first_smb_com,
 		    sr->smb_rcls,
 		    sr->smb_reh,
@@ -84,7 +84,7 @@ smb_com_echo(struct smb_request *sr)
 		    sr->smb_uid,
 		    sr->smb_mid);
 
-		(void) smb_encode_mbc(&reply, "bww#c", 1, i,
+		(void) smb_mbc_encodef(&reply, "bww#c", 1, i,
 		    nbytes, nbytes, data);
 
 		if (sr->session->signing.flags & SMB_SIGNING_ENABLED)

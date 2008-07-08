@@ -145,7 +145,7 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		return (PAM_SYSTEM_ERR);
 	}
 
-	smb_pwd_init();
+	smb_pwd_init(B_FALSE);
 
 	res = smb_pwd_setpasswd(user, newpw);
 

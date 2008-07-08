@@ -182,17 +182,6 @@ extern "C" {
 #define	BUFLEN_TCP(x, y) (MAX_TCP_SIZE-(x-y))
 #define	BUFLEN_UDP(x, y) (NS_PACKETSZ-(x-y))
 
-extern int dns_get_msgid(void);
-extern char *dyndns_get_nshort(char *, uint16_t *);
-extern char *dyndns_get_int(char *, int *);
-extern int dyndns_build_header(char **, int, uint16_t, int,
-    uint16_t, uint16_t, uint16_t, uint16_t, int);
-extern int dyndns_build_quest_zone(char **, int, char *, int, int);
-extern int dyndns_open_init_socket(int sock_type, unsigned long dest_addr,
-    int port);
-extern int dyndns_udp_send_recv(int, char *, int, char *);
-extern void dyndns_msg_err(int);
-
 /*
  * DDNS_TTL is the time to live in DNS caches. Note that this
  * does not affect the entry in the authoritative DNS database.

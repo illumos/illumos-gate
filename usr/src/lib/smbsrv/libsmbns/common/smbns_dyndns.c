@@ -77,7 +77,7 @@ dns_msgid_init(void)
 	return (0);
 }
 
-int
+static int
 dns_get_msgid(void)
 {
 	uint16_t id;
@@ -113,7 +113,7 @@ dns_get_msgid(void)
  * Returns:
  *   None
  */
-void
+static void
 dyndns_msg_err(int err)
 {
 	switch (err) {
@@ -205,7 +205,7 @@ dyndns_put_nshort(char *buf, uint16_t val)
 	return (buf);
 }
 
-char *
+static char *
 dyndns_get_nshort(char *buf, uint16_t *val)
 {
 	uint16_t nval;
@@ -242,15 +242,6 @@ dyndns_put_int(char *buf, int val)
 	buf += sizeof (int);
 	return (buf);
 }
-
-char *
-dyndns_get_int(char *buf, int *val)
-{
-	(void) memcpy(val, buf, sizeof (int));
-	buf += sizeof (int);
-	return (buf);
-}
-
 
 /*
  * dyndns_stuff_str
@@ -312,7 +303,7 @@ dyndns_stuff_str(char **ptr, char *zone)
  *   -1 : error
  *    0 : success
  */
-int
+static int
 dyndns_build_header(char **ptr, int buf_len, uint16_t msg_id, int query_req,
     uint16_t quest_zone_cnt, uint16_t ans_prereq_cnt,
     uint16_t nameser_update_cnt, uint16_t addit_cnt, int flags)
@@ -359,7 +350,7 @@ dyndns_build_header(char **ptr, int buf_len, uint16_t msg_id, int query_req,
  *   -1 : error
  *    0 : success
  */
-int
+static int
 dyndns_build_quest_zone(char **ptr, int buf_len, char *name, int type,
 	int class)
 {
@@ -593,7 +584,7 @@ dyndns_build_tsig(char **ptr, int buf_len, int msg_id, char *name,
  *   descriptor: descriptor referencing the created socket
  *   -1        : error
  */
-int
+static int
 dyndns_open_init_socket(int sock_type, unsigned long dest_addr, int port)
 {
 	int s;
@@ -1152,7 +1143,7 @@ dyndns_build_signed_tsig_msg(char *buf, int update_zone, const char *hostname,
  *   rec_buf: reply dat
  *    0     : success
  */
-int
+static int
 dyndns_udp_send_recv(int s, char *buf, int buf_sz, char *rec_buf)
 {
 	int i, retval, addr_len;

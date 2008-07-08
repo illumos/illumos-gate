@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +34,7 @@
 #include <cryptoutil.h>
 #include <smbsrv/libsmb.h>
 
-static void smb_auth_keyprep(const unsigned char *pwstr, unsigned char *keystr);
+static void smb_initlmkey(unsigned char *keyin, unsigned char *keyout);
 
 /*
  * smb_auth_md4
@@ -63,7 +63,7 @@ smb_auth_hmac_md5(unsigned char *data,
 	CK_MECHANISM mechanism;
 	CK_OBJECT_HANDLE hKey;
 	CK_SESSION_HANDLE hSession;
-	unsigned long diglen = MD_DIGEST_LEN;
+	CK_ULONG diglen = MD_DIGEST_LEN;
 
 	mechanism.mechanism = CKM_MD5_HMAC;
 	mechanism.pParameter = 0;
@@ -144,7 +144,7 @@ smb_auth_DES(unsigned char *Result, int ResultLen,
 	}
 
 	for (k = 0; k < K; k++) {
-		smb_auth_keyprep(&Key[k * 7], des_key);
+		smb_initlmkey(&Key[k * 7], des_key);
 		rv = SUNW_C_KeyToObject(hSession, mechanism.mechanism,
 		    des_key, 8, &hKey);
 		if (rv != CKR_OK) {
@@ -185,20 +185,22 @@ exit_session:
 }
 
 /*
- * smb_auth_keyprep
- *
- * Takes 7  bytes of keying material and expands it into 8 bytes with
- * the keying material in the upper 7 bits of each byte.
+ * See "Netlogon Credential Computation" section of MS-NRPC document.
  */
 static void
-smb_auth_keyprep(const unsigned char *pwstr, unsigned char *keystr)
+smb_initlmkey(unsigned char *keyin, unsigned char *keyout)
 {
-	keystr[0] = pwstr[0];
-	keystr[1] = (pwstr[0] << 7) | (pwstr[1] >> 1);
-	keystr[2] = (pwstr[1] << 6) | (pwstr[2] >> 2);
-	keystr[3] = (pwstr[2] << 5) | (pwstr[3] >> 3);
-	keystr[4] = (pwstr[3] << 4) | (pwstr[4] >> 4);
-	keystr[5] = (pwstr[4] << 3) | (pwstr[5] >> 5);
-	keystr[6] = (pwstr[5] << 2) | (pwstr[6] >> 6);
-	keystr[7] = pwstr[6] << 1;
+	int i;
+
+	keyout[0] = keyin[0] >> 0x01;
+	keyout[1] = ((keyin[0] & 0x01) << 6) | (keyin[1] >> 2);
+	keyout[2] = ((keyin[1] & 0x03) << 5) | (keyin[2] >> 3);
+	keyout[3] = ((keyin[2] & 0x07) << 4) | (keyin[3] >> 4);
+	keyout[4] = ((keyin[3] & 0x0f) << 3) | (keyin[4] >> 5);
+	keyout[5] = ((keyin[4] & 0x1f) << 2) | (keyin[5] >> 6);
+	keyout[6] = ((keyin[5] & 0x3f) << 1) | (keyin[6] >> 7);
+	keyout[7] = keyin[6] & 0x7f;
+
+	for (i = 0; i < 8; i++)
+		keyout[i] = (keyout[i] << 1) & 0xfe;
 }

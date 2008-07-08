@@ -920,7 +920,6 @@ SMBSRV_SHARED_OBJS += \
 SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_acl.o				\
 		smb_alloc.o				\
-		smb_books.o				\
 		smb_check_directory.o			\
 		smb_close.o				\
 		smb_common_open.o			\
@@ -965,6 +964,7 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
                 smb_odir.o				\
 		smb_ofile.o				\
 		smb_open_andx.o				\
+		smb_opipe.o				\
 		smb_oplock.o				\
 		smb_path_name_reduction.o		\
 		smb_print.o				\
@@ -974,7 +974,6 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_query_information_disk.o		\
 		smb_read.o				\
 		smb_rename.o				\
-		smb_rpc.o				\
 		smb_sd.o				\
 		smb_search.o				\
 		smb_seek.o				\
@@ -1003,7 +1002,6 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
                 smb_util.o				\
 		smb_vfs.o				\
 		smb_vops.o				\
-		smb_winpipe.o				\
 		smb_write.o				\
 		smb_write_raw.o				\
 		smb_xlate.o

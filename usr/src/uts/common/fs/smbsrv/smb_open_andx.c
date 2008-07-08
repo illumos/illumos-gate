@@ -399,7 +399,7 @@ smb_com_open_andx(smb_request_t *sr)
 	if (STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smb_node_t *node = sr->fid_ofile->f_node;
 		rc = smbsr_encode_result(sr, 15, 0,
-		    "b b.w w wll www wl 2. w",
+		    "bb.wwwllwwwwl2.w",
 		    15,
 		    sr->andx_com, VAR_BCC,
 		    sr->smb_fid,
@@ -412,7 +412,7 @@ smb_com_open_andx(smb_request_t *sr)
 		    0);
 	} else {
 		rc = smbsr_encode_result(sr, 15, 0,
-		    "b b.w w wll www wl 2. w",
+		    "bb.wwwllwwwwl2.w",
 		    15,
 		    sr->andx_com, VAR_BCC,
 		    sr->smb_fid,

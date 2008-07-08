@@ -243,7 +243,7 @@ smb_com_find_unique(struct smb_request *sr)
 		return (SDRC_ERROR);
 	}
 
-	(void) smb_encode_mbc(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
+	(void) smb_mbc_encodef(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
 
 	/* begin search */
 	if (smb_rdir_open(sr, path, sattr) != 0) {
@@ -260,7 +260,7 @@ smb_com_find_unique(struct smb_request *sr)
 		if ((rc = smb_rdir_next(sr, &node, pc)) != 0)
 			break;
 
-		(void) smb_encode_mbc(&sr->reply, ".8c3cbl4.bYl13c",
+		(void) smb_mbc_encodef(&sr->reply, ".8c3cbl4.bYl13c",
 		    pc->dc_name83, pc->dc_name83+9, sr->smb_sid,
 		    pc->dc_cookie+1, pc->dc_dattr,
 		    smb_gmt2local(sr, pc->dc_attr.sa_vattr.va_mtime.tv_sec),
@@ -288,7 +288,7 @@ smb_com_find_unique(struct smb_request *sr)
 	}
 
 	rc = (MBC_LENGTH(&sr->reply) - sr->cur_reply_offset) - 8;
-	if (smb_poke_mbc(&sr->reply, sr->cur_reply_offset,
+	if (smb_mbc_poke(&sr->reply, sr->cur_reply_offset,
 	    "bwwbw", 1, count, rc+3, 5, rc) < 0) {
 		kmem_free(vdb, sizeof (struct vardata_block));
 		return (SDRC_ERROR);

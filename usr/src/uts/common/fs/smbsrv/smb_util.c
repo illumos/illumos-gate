@@ -173,79 +173,89 @@ smb_convert_unicode_wildcards(char *path)
 uint32_t
 smb_mode_to_dos_attributes(smb_attr_t *ap)
 {
-	uint32_t dos_attr = 0;
+	uint32_t dos_attr = ap->sa_dosattr;
 
-	dos_attr = ap->sa_dosattr;
 	if (dos_attr == 0)
-		dos_attr = SMB_FA_NORMAL;
+		dos_attr = FILE_ATTRIBUTE_NORMAL;
 
 	return (dos_attr);
 }
 
 
+/*
+ * smb_is_dot_or_dotdot
+ *
+ * Use when checking for the "." and ".." entries in a directory.
+ * Returns B_TRUE if the name is "." or "..". Otherwise returns B_FALSE.
+ */
+boolean_t
+smb_is_dot_or_dotdot(const char *name)
+{
+	if (*name != '.')
+		return (B_FALSE);
+
+	if ((name[1] == 0) || (name[1] == '.' && name[2] == 0))
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
 
 /*
  * smb_sattr_check
  *
- * This function checks if the file has the attributes indicated by
- * the search attribute, "sattr". The normal files, which includes
- * FSA_READONLY and FSA_ARCHIVE, should always pass the check. If the
- * special attributes: SMB_FA_DIRECTORY, SMB_FA_HIDDEN or
- * SMB_FA_SYSTEM are set, then the special mode FSA_DIR, FSA_HIDDEN,
- * and FSA_SYSTEM will also pass accordingly. The following
- * examples will show how this works:
+ * Check file attributes against a search attribute (sattr) mask.
  *
- *		fileA:	FSA_READONLY
+ * Normal files, which includes READONLY and ARCHIVE, always pass
+ * this check.  If the DIRECTORY, HIDDEN or SYSTEM special attributes
+ * are set then they must appear in the search mask.  The special
+ * attributes are inclusive, i.e. all special attributes that appear
+ * in sattr must also appear in the file attributes for the check to
+ * pass.
+ *
+ * The following examples show how this works:
+ *
+ *		fileA:	READONLY
  *		fileB:	0 (no attributes = normal file)
- *		fileC:	FSA_READONLY, FSA_ARCHIVE
- *		fileD:	FSA_HIDDEN
- *		fileE:	FSA_READONLY, FSA_HIDDEN, FSA_SYSTEM
- *		dirA:	FSA_DIRECTORY
+ *		fileC:	READONLY, ARCHIVE
+ *		fileD:	HIDDEN
+ *		fileE:	READONLY, HIDDEN, SYSTEM
+ *		dirA:	DIRECTORY
  *
- * *search attribute: 0
+ * search attribute: 0
  *		Returns: fileA, fileB and fileC.
- * *search attribute: SMB_FA_HIDDEN
+ * search attribute: HIDDEN
  *		Returns: fileA, fileB, fileC and fileD.
- * *search attribute: SMB_FA_SYSTEM
+ * search attribute: SYSTEM
  *		Returns: fileA, fileB and fileC.
- * *search attribute: SMB_FA_DIRECTORY
+ * search attribute: DIRECTORY
  *		Returns: fileA, fileB, fileC and dirA.
- * *search attribute: SMB_FA_HIDDEN and SMB_FA_SYSTEM
+ * search attribute: HIDDEN and SYSTEM
  *		Returns: fileA, fileB, fileC, fileD and fileE.
  *
- * As you can see, the special attributes are inclusive, which means the
- * files that has all their special attributes included in the search
- * attribute and normal files will be returned. The FSA_READONLY and
- * FSA_ARCHIVE attributes are completely ignored since they are being
- * treated as normal file.
- *
- * If check passed, 1 is returned; otherwise, 0 is returned.
+ * Returns true if the file and sattr match; otherwise, returns false.
  */
-int
+boolean_t
 smb_sattr_check(smb_attr_t *ap, char *name, unsigned short sattr)
 {
 	if (name) {
-		if (is_dot_or_dotdot(name) && !(sattr & SMB_FA_HIDDEN))
-			return (0);
+		if (smb_is_dot_or_dotdot(name) &&
+		    !(sattr & FILE_ATTRIBUTE_HIDDEN))
+			return (B_FALSE);
 	}
 
-	/*
-	 * The FSA_READONLY and FSA_ARCHIVE bits are being treated
-	 * as normal file; therefore, they are ignored.
-	 */
-
-	if ((ap->sa_vattr.va_type == VDIR) && !(sattr & SMB_FA_DIRECTORY))
-		return (0);
+	if ((ap->sa_vattr.va_type == VDIR) &&
+	    !(sattr & FILE_ATTRIBUTE_DIRECTORY))
+		return (B_FALSE);
 
 	if ((ap->sa_dosattr & FILE_ATTRIBUTE_HIDDEN) &&
-	    !(sattr & SMB_FA_HIDDEN))
-		return (0);
+	    !(sattr & FILE_ATTRIBUTE_HIDDEN))
+		return (B_FALSE);
 
 	if ((ap->sa_dosattr & FILE_ATTRIBUTE_SYSTEM) &&
-	    !(sattr & SMB_FA_SYSTEM))
-		return (0);
+	    !(sattr & FILE_ATTRIBUTE_SYSTEM))
+		return (B_FALSE);
 
-	return (1);
+	return (B_TRUE);
 }
 
 
@@ -1985,7 +1995,7 @@ smb_kstrdup(const char *s, size_t n)
 	ASSERT(s);
 	ASSERT(n);
 	s2 = kmem_alloc(n, KM_SLEEP);
-	(void) strcpy(s2, s);
+	(void) strlcpy(s2, s, n);
 	return (s2);
 }
 

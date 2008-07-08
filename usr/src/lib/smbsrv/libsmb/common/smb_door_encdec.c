@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -295,7 +295,7 @@ void
 smb_dr_ulist_free(smb_dr_ulist_t *ulist)
 {
 	int i;
-	smb_dr_user_ctx_t *uinfo;
+	smb_opipe_context_t *uinfo;
 
 	if (!ulist)
 		return;

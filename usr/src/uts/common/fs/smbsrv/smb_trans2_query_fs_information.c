@@ -238,26 +238,6 @@
 
 char ntfs[] = "NTFS";
 
-
-/*
- * is_dot_or_dotdot
- *
- * Inline function to detect the "." and ".." entries in a directory.
- * Returns 1 is the name is "." or "..". Otherwise returns 0.
- */
-int
-is_dot_or_dotdot(char *name)
-{
-	if (*name != '.')
-		return (0);
-
-	if ((name[1] == 0) || (name[1] == '.' && name[2] == 0))
-		return (1);
-
-	return (0);
-}
-
-
 /*
  * smb_com_trans2_query_fs_information
  */
@@ -281,7 +261,7 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_ERROR);
 	}
 
-	if (smb_decode_mbc(&xa->req_param_mb, "w", &infolev) != 0)
+	if (smb_mbc_decodef(&xa->req_param_mb, "w", &infolev) != 0)
 		return (SDRC_ERROR);
 
 	snode = sr->tid_tree->t_snode;
@@ -313,7 +293,7 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 		if (avail_units > total_units)
 			avail_units = 0;
 
-		(void) smb_encode_mbc(&xa->rep_data_mb, "llllw",
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "llllw",
 		    0,			/* file system ID. NT rets 0 */
 		    sect_per_unit,	/* sectors/unit */
 		    total_units,	/* total units */
@@ -332,7 +312,7 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 		 * comprises a system-wide unique file system ID.
 		 */
 
-		(void) smb_encode_mbc(&xa->rep_data_mb, encode_str, sr,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, encode_str, sr,
 		    snode->tree_fsd.val[0], length, vol_attr.name);
 		break;
 
@@ -358,7 +338,7 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 		 * comprises a system-wide unique file system ID.
 		 */
 
-		(void) smb_encode_mbc(&xa->rep_data_mb, encode_str, sr,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, encode_str, sr,
 		    0ll,			/* Volume creation time */
 		    snode->tree_fsd.val[0],	/* Volume serial number */
 		    length,			/* label length */
@@ -378,14 +358,14 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 		if (df.f_bavail > df.f_blocks)
 			df.f_bavail = 0;
 
-		(void) smb_encode_mbc(&xa->rep_data_mb, "qqll",
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "qqll",
 		    df.f_blocks,	/* total units */
 		    df.f_bavail,	/* avail units */
 		    sect_per_unit,	/* sectors/unit */
 		    length);		/* bytes/sector */
 		break;
 	case SMB_QUERY_FS_DEVICE_INFO:
-		(void) smb_encode_mbc(&xa->rep_data_mb, "ll",
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "ll",
 		    FILE_DEVICE_FILE_SYSTEM,
 		    FILE_DEVICE_IS_MOUNTED);
 		break;
@@ -419,7 +399,7 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 		if (smb_announce_quota)
 			flags |= FILE_VOLUME_QUOTAS;
 
-		(void) smb_encode_mbc(&xa->rep_data_mb, encode_str, sr,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, encode_str, sr,
 		    flags,
 		    MAXNAMELEN,			/* max name */
 		    length,			/* label length */

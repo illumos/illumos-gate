@@ -89,9 +89,8 @@ int smb_fsop_setattr(struct smb_request *sr, cred_t *cr, smb_node_t *snode,
 int smb_fsop_read(struct smb_request *sr, cred_t *cr,
     smb_node_t *snode, uio_t *uio, smb_attr_t *ret_attr);
 
-int smb_fsop_write(struct smb_request *sr, cred_t *cr, smb_node_t *snode,
-    uio_t *uio, uint32_t *lcount, smb_attr_t *ret_attr,
-    uint32_t *stability);
+int smb_fsop_write(smb_request_t *, cred_t *, smb_node_t *, uio_t *,
+    uint32_t *, smb_attr_t *, int);
 
 int smb_fsop_statfs(cred_t *cr, struct smb_node *snode,
     struct statvfs64 *statp);
@@ -137,17 +136,10 @@ int smb_fsop_frlock(smb_node_t *, smb_lock_t *, boolean_t, cred_t *);
  *
  * SMB_FOLLOW_LINKS	Follow symbolic links.
  * SMB_IGNORE_CASE	Perform case-insensitive lookup.
- *
- * Misc flags
- *
- * SMB_STREAM_RDDIR	use eflags=0 for streams readdirs this
- *			is currently a workaround because the
- *			vfs isn't filling in this flag
  */
 
 #define	SMB_FOLLOW_LINKS	0x00000001
 #define	SMB_IGNORE_CASE		0x00000002
-#define	SMB_STREAM_RDDIR	0x00000004
 
 #ifdef	__cplusplus
 }

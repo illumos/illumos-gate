@@ -33,6 +33,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include <smbsrv/smb_ioctl.h>
 
@@ -57,8 +58,15 @@ smbd_nbt_receiver(void *arg)
 void *
 smbd_nbt_listener(void *arg)
 {
+	sigset_t	set;
+	sigset_t	oset;
 	smb_io_t	smb_io;
 	pthread_t	tid;
+
+	(void) sigfillset(&set);
+	(void) sigdelset(&set, SIGTERM);
+	(void) sigdelset(&set, SIGINT);
+	(void) pthread_sigmask(SIG_SETMASK, &set, &oset);
 
 	bzero(&smb_io, sizeof (smb_io));
 	smb_io.sio_version = SMB_IOC_VERSION;
@@ -87,8 +95,15 @@ smbd_tcp_receiver(void *arg)
 void *
 smbd_tcp_listener(void *arg)
 {
+	sigset_t	set;
+	sigset_t	oset;
 	smb_io_t	smb_io;
 	pthread_t	tid;
+
+	(void) sigfillset(&set);
+	(void) sigdelset(&set, SIGTERM);
+	(void) sigdelset(&set, SIGINT);
+	(void) pthread_sigmask(SIG_SETMASK, &set, &oset);
 
 	bzero(&smb_io, sizeof (smb_io));
 	smb_io.sio_version = SMB_IOC_VERSION;

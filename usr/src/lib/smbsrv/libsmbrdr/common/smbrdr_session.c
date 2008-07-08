@@ -143,7 +143,7 @@ smbrdr_negotiate(char *domain)
 	while (retry > 0) {
 		session = smbrdr_session_lock(di->server, 0, SDB_SLCK_WRITE);
 		if (session != 0) {
-			if (nb_keep_alive(session->sock) == 0) {
+			if (nb_keep_alive(session->sock, session->port) == 0) {
 				/* session is good, use it */
 				smbrdr_session_unlock(session);
 				break;

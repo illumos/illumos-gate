@@ -64,7 +64,7 @@
 
 #define	SV_TYPE_SENT_BY_ME (SV_TYPE_WORKSTATION | SV_TYPE_SERVER | SV_TYPE_NT)
 
-#define	SMB_SRVSVC_MAXBUFLEN	(8 * 1024)
+#define	SMB_SRVSVC_MAXBUFLEN	(8 * 1024 * 1024)
 #define	SMB_SRVSVC_MAXPREFLEN	((uint32_t)(-1))
 
 /*
@@ -85,6 +85,11 @@ typedef struct srvsvc_enum {
 	uint32_t se_n_read;
 } srvsvc_enum_t;
 
+static DWORD srvsvc_NetFileEnum2(struct mlrpc_xaction *,
+    struct mslm_NetFileEnum *);
+static DWORD srvsvc_NetFileEnum3(struct mlrpc_xaction *,
+    struct mslm_NetFileEnum *);
+
 static DWORD mlsvc_NetSessionEnumLevel0(struct mslm_infonres *, DWORD,
     struct mlrpc_xaction *);
 static DWORD mlsvc_NetSessionEnumLevel1(struct mslm_infonres *, DWORD,
@@ -101,14 +106,12 @@ static DWORD mlsvc_NetShareEnumLevel501(struct mlrpc_xaction *,
 static DWORD mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *,
     struct mslm_infonres *, srvsvc_enum_t *, int);
 static DWORD mlsvc_NetShareEnumCommon(struct mlrpc_xaction *,
-    srvsvc_enum_t *, lmshare_info_t *, void *);
+    srvsvc_enum_t *, smb_share_t *, void *);
 static boolean_t srvsvc_add_autohome(struct mlrpc_xaction *, srvsvc_enum_t *,
     void *);
 static char *srvsvc_share_mkpath(struct mlrpc_xaction *, char *);
 
 static uint32_t srvsvc_estimate_objcnt(uint32_t, uint32_t, uint32_t);
-static boolean_t srvsvc_is_administrator(struct mlrpc_xaction *);
-static boolean_t srvsvc_is_poweruser(struct mlrpc_xaction *);
 
 static char empty_string[1];
 
@@ -229,77 +232,195 @@ srvsvc_s_NetConnectEnum(void *arg, struct mlrpc_xaction *mxa)
 	return (MLRPC_DRC_OK);
 }
 
-
 /*
  * srvsvc_s_NetFileEnum
  *
- * Under construction. The values used here are fictional values and
- * bear no relation to any real values, living or otherwise. I just
- * made them up to get the interface working.
+ * Return information on open files or named pipes. Only members of the
+ * Administrators or Server Operators local groups are allowed to make
+ * this call. Currently, we only support Administrators.
+ *
+ * If basepath is null, all open resources are enumerated. If basepath
+ * is non-null, only resources that have basepath as a prefix should
+ * be returned.
+ *
+ * If username is specified (non-null), only files opened by username
+ * should be returned.
+ *
+ * Notes:
+ * 1. We don't validate the servername because we would have to check
+ * all primary IPs and the ROI seems unlikely to be worth it.
+ * 2. Both basepath and username are currently ignored because both
+ * Server Manger (NT 4.0) and CMI (Windows 2000) always set them to null.
+ *
+ * The level of information requested may be one of:
+ *
+ *  2   Return the file identification number.
+ *      This level is not supported on Windows Me/98/95.
+ *
+ *  3   Return information about the file.
+ *      This level is not supported on Windows Me/98/95.
+ *
+ *  50  Windows Me/98/95:  Return information about the file.
+ *
+ * Note:
+ * If pref_max_len is unlimited and resume_handle is null, the client
+ * expects to receive all data in a single call.
+ * If we are unable to do fit all data in a single response, we would
+ * normally return ERROR_MORE_DATA with a partial list.
+ *
+ * Unfortunately, when both of these conditions occur, Server Manager
+ * pops up an error box with the message "more data available" and
+ * doesn't display any of the returned data. In this case, it is
+ * probably better to return ERROR_SUCCESS with the partial list.
+ * Windows 2000 doesn't have this problem because it always sends a
+ * non-null resume_handle.
+ *
+ * Return Values:
+ * ERROR_SUCCESS            Success
+ * ERROR_ACCESS_DENIED      Caller does not have access to this call.
+ * ERROR_INVALID_PARAMETER  One of the parameters is invalid.
+ * ERROR_INVALID_LEVEL      Unknown information level specified.
+ * ERROR_MORE_DATA          Partial date returned, more entries available.
+ * ERROR_NOT_ENOUGH_MEMORY  Insufficient memory is available.
+ * NERR_BufTooSmall         The supplied buffer is too small.
  */
 static int
 srvsvc_s_NetFileEnum(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct mslm_NetFileEnum *param = arg;
-	struct mslm_NetFileInfoBuf3 *fi3;
+	DWORD status;
 
-	if (!srvsvc_is_administrator(mxa)) {
+	if (!ndr_is_admin(mxa)) {
 		bzero(param, sizeof (struct mslm_NetFileEnum));
 		param->status = ERROR_ACCESS_DENIED;
 		return (MLRPC_DRC_OK);
 	}
 
-	if (param->info.switch_value != 3) {
-		bzero(param, sizeof (struct mslm_NetFileEnum));
-		param->status = ERROR_INVALID_LEVEL;
-		return (MLRPC_DRC_OK);
+	switch (param->info.switch_value) {
+	case 2:
+		status = srvsvc_NetFileEnum2(mxa, param);
+		break;
+
+	case 3:
+		status = srvsvc_NetFileEnum3(mxa, param);
+		break;
+
+	case 50:
+		status = ERROR_NOT_SUPPORTED;
+		break;
+
+	default:
+		status = ERROR_INVALID_LEVEL;
+		break;
 	}
 
-	fi3 = MLRPC_HEAP_NEW(mxa, struct mslm_NetFileInfoBuf3);
-	if (fi3 == 0) {
+	if (status != ERROR_SUCCESS) {
 		bzero(param, sizeof (struct mslm_NetFileEnum));
-		param->status = ERROR_NOT_ENOUGH_MEMORY;
+		param->status = status;
 		return (MLRPC_DRC_OK);
 	}
-
-	fi3->fi3_id = 0xF5;
-	fi3->fi3_permissions = 0x23;
-	fi3->fi3_num_locks = 0;
-	fi3->fi3_pathname =
-	    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, "\\PIPE\\srvsvc");
-
-	fi3->fi3_username =
-	    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, "Administrator");
-
-	param->info.ru.info3 = MLRPC_HEAP_NEW(mxa, struct mslm_NetFileInfo3);
-	if (param->info.ru.info3 == 0) {
-		bzero(param, sizeof (struct mslm_NetFileEnum));
-		param->status = ERROR_NOT_ENOUGH_MEMORY;
-		return (MLRPC_DRC_OK);
-	}
-
-	param->info.ru.info3->fi3 = fi3;
-	param->info.ru.info3->entries_read = 1;
-	param->total_entries = 1;
 
 	if (param->resume_handle)
-		*param->resume_handle = 0x5F;
+		*param->resume_handle = 0;
 
 	param->status = ERROR_SUCCESS;
 	return (MLRPC_DRC_OK);
 }
 
+/*
+ * Build level 2 file information.
+ *
+ * On success, the caller expects that the info2, fi2 and entries_read
+ * fields have been set up.
+ */
+static DWORD
+srvsvc_NetFileEnum2(struct mlrpc_xaction *mxa, struct mslm_NetFileEnum *param)
+{
+	struct mslm_NetFileInfoBuf2 *fi2;
+
+	fi2 = MLRPC_HEAP_NEW(mxa, struct mslm_NetFileInfoBuf2);
+	if (fi2 == NULL)
+		return (ERROR_NOT_ENOUGH_MEMORY);
+
+	/*
+	 * Temporary dummy value - should be a unique identifier
+	 * representing an ofile.
+	 */
+	fi2->fi2_id = 0xF5;
+
+	param->info.ru.info2 = MLRPC_HEAP_NEW(mxa, struct mslm_NetFileInfo2);
+	if (param->info.ru.info3 == NULL)
+		return (ERROR_NOT_ENOUGH_MEMORY);
+
+	param->info.ru.info2->fi2 = fi2;
+	param->info.ru.info2->entries_read = 1;
+	param->total_entries = 1;
+	return (ERROR_SUCCESS);
+}
+
+/*
+ * Build level 3 file information.
+ *
+ * On success, the caller expects that the info3, fi3 and entries_read
+ * fields have been set up.
+ */
+static DWORD
+srvsvc_NetFileEnum3(struct mlrpc_xaction *mxa, struct mslm_NetFileEnum *param)
+{
+	struct mslm_NetFileInfoBuf3 *fi3;
+
+	fi3 = MLRPC_HEAP_NEW(mxa, struct mslm_NetFileInfoBuf3);
+	if (fi3 == NULL)
+		return (ERROR_NOT_ENOUGH_MEMORY);
+
+	/*
+	 * Temporary dummy values - should be values representing an ofile.
+	 */
+	fi3->fi3_id = 0xF5;
+	fi3->fi3_permissions = 0x23;
+	fi3->fi3_num_locks = 0;
+	fi3->fi3_pathname =
+	    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, "\\PIPE\\srvsvc");
+	fi3->fi3_username =
+	    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, "Administrator");
+
+	param->info.ru.info3 = MLRPC_HEAP_NEW(mxa, struct mslm_NetFileInfo3);
+	if (param->info.ru.info3 == NULL)
+		return (ERROR_NOT_ENOUGH_MEMORY);
+
+	param->info.ru.info3->fi3 = fi3;
+	param->info.ru.info3->entries_read = 1;
+	param->total_entries = 1;
+	return (ERROR_SUCCESS);
+}
 
 /*
  * srvsvc_s_NetFileClose
  *
- * Under construction. This is just enough to get the interface working.
+ * NetFileClose forces a file to close. This function can be used when
+ * an error prevents closure by any other means.  Use NetFileClose with
+ * caution because it does not flush data, cached on a client, to the
+ * file before closing the file.
+ *
+ * Return Values
+ * ERROR_SUCCESS            Operation succeeded.
+ * ERROR_ACCESS_DENIED      Operation denied.
+ * NERR_FileIdNotFound      No open file with the specified id.
+ *
+ * Note: MSDN suggests that the error code should be ERROR_FILE_NOT_FOUND
+ * but network captures using NT show NERR_FileIdNotFound.
+ * The NetFileClose2 MSDN page has the right error code.
  */
-/*ARGSUSED*/
 static int
 srvsvc_s_NetFileClose(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct mslm_NetFileClose *param = arg;
+
+	if (!ndr_is_admin(mxa)) {
+		bzero(param, sizeof (struct mslm_NetFileClose));
+		param->status = ERROR_ACCESS_DENIED;
+		return (MLRPC_DRC_OK);
+	}
 
 	bzero(param, sizeof (struct mslm_NetFileClose));
 	param->status = ERROR_SUCCESS;
@@ -323,22 +444,23 @@ srvsvc_s_NetShareGetInfo(void *arg, struct mlrpc_xaction *mxa)
 	struct mslm_NetShareGetInfo0 *info0;
 	struct mslm_NetShareGetInfo1 *info1;
 	struct mslm_NetShareGetInfo2 *info2;
+	struct mslm_NetShareGetInfo501 *info501;
 	struct mslm_NetShareGetInfo502 *info502;
 	struct mslm_NetShareGetInfo1005 *info1005;
-	struct lmshare_info si;
-	char shr_comment[LMSHR_COMMENT_MAX];
+	smb_share_t si;
+	char shr_comment[SMB_SHARE_CMNT_MAX];
 	DWORD status;
 
-	status = lmshare_getinfo((char *)param->netname, &si);
+	status = smb_shr_get((char *)param->netname, &si);
 	if (status != NERR_Success) {
 		if (strcasecmp((const char *)param->netname, "IPC$") == 0) {
 			/*
 			 * Windows clients don't send the \\PIPE path for IPC$.
 			 */
-			(void) memset(&si, 0, sizeof (lmshare_info_t));
-			(void) strcpy(si.share_name, "IPC$");
-			(void) strcpy(si.comment, "Remote IPC");
-			si.stype = (int)(STYPE_IPC | STYPE_SPECIAL);
+			(void) memset(&si, 0, sizeof (smb_share_t));
+			(void) strcpy(si.shr_name, "IPC$");
+			(void) strcpy(si.shr_cmnt, "Remote IPC");
+			si.shr_type = (int)(STYPE_IPC | STYPE_SPECIAL);
 		} else {
 			bzero(param, sizeof (struct mlsm_NetShareGetInfo));
 			param->status = status;
@@ -346,56 +468,73 @@ srvsvc_s_NetShareGetInfo(void *arg, struct mlrpc_xaction *mxa)
 		}
 	}
 
-	if (si.comment && strlen(si.comment))
-		(void) snprintf(shr_comment, sizeof (shr_comment), "%s %s",
-		    si.directory, si.comment);
+	if (strlen(si.shr_cmnt))
+		(void) strlcpy(shr_comment, si.shr_cmnt, SMB_SHARE_CMNT_MAX);
 	else
-		(void) strcpy(shr_comment, si.directory);
+		shr_comment[0] = '\0';
 
 	status = ERROR_SUCCESS;
 
 	switch (param->level) {
 	case 0:
 		info0 = MLRPC_HEAP_NEW(mxa, struct mslm_NetShareGetInfo0);
-		if (info0 == 0) {
-
+		if (info0 == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
 			break;
 		}
+
 		info0->shi0_netname
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si.share_name);
+		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si.shr_name);
+		if (info0->shi0_netname == NULL) {
+			status = ERROR_NOT_ENOUGH_MEMORY;
+			break;
+		}
 
 		param->result.ru.info0 = info0;
 		break;
 
 	case 1:
 		info1 = MLRPC_HEAP_NEW(mxa, struct mslm_NetShareGetInfo1);
-		if (info1 == 0) {
+		if (info1 == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
 			break;
 		}
+
 		info1->shi1_netname =
-		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si.share_name);
+		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si.shr_name);
 		info1->shi1_comment =
 		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
-		info1->shi1_type = si.stype;
+		if (info1->shi1_netname == NULL ||
+		    info1->shi1_comment == NULL) {
+			status = ERROR_NOT_ENOUGH_MEMORY;
+			break;
+		}
+
+		info1->shi1_type = si.shr_type;
 		param->result.ru.info1 = info1;
 		break;
 
 	case 2:
 		info2 = MLRPC_HEAP_NEW(mxa, struct mslm_NetShareGetInfo2);
-		if (info2 == 0) {
+		if (info2 == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
 			break;
 		}
+
 		info2->shi2_netname =
-		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si.share_name);
+		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si.shr_name);
 		info2->shi2_comment =
 		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
+		if (info2->shi2_netname == NULL ||
+		    info2->shi2_comment == NULL) {
+			status = ERROR_NOT_ENOUGH_MEMORY;
+			break;
+		}
+
 		info2->shi2_path =
-		    (unsigned char *)srvsvc_share_mkpath(mxa, si.directory);
+		    (unsigned char *)srvsvc_share_mkpath(mxa, si.shr_path);
 		info2->shi2_passwd = 0;
-		info2->shi2_type = si.stype;
+		info2->shi2_type = si.shr_type;
 		info2->shi2_permissions = 0;
 		info2->shi2_max_uses = SHI_USES_UNLIMITED;
 		info2->shi2_current_uses = 0;
@@ -404,13 +543,37 @@ srvsvc_s_NetShareGetInfo(void *arg, struct mlrpc_xaction *mxa)
 
 	case 1005:
 		info1005 = MLRPC_HEAP_NEW(mxa, struct mslm_NetShareGetInfo1005);
-		if (info1005 == 0) {
-
+		if (info1005 == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
 			break;
 		}
 		info1005->shi1005_flags = 0;
 		param->result.ru.info1005 = info1005;
+		break;
+
+	case 501:
+		/*
+		 * Level 501 provides level 1 information.
+		 */
+		info501 = MLRPC_HEAP_NEW(mxa, struct mslm_NetShareGetInfo501);
+		if (info501 == NULL) {
+			status = ERROR_NOT_ENOUGH_MEMORY;
+			break;
+		}
+
+		info501->shi501_netname =
+		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si.shr_name);
+		info501->shi501_comment =
+		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
+		if (info501->shi501_netname == NULL ||
+		    info501->shi501_comment == NULL) {
+			status = ERROR_NOT_ENOUGH_MEMORY;
+			break;
+		}
+
+		info501->shi501_type = si.shr_type;
+		info501->shi501_reserved = 0;
+		param->result.ru.info501 = info501;
 		break;
 
 	case 502:
@@ -420,18 +583,25 @@ srvsvc_s_NetShareGetInfo(void *arg, struct mlrpc_xaction *mxa)
 		 * descriptors on shares yet.
 		 */
 		info502 = MLRPC_HEAP_NEW(mxa, struct mslm_NetShareGetInfo502);
-		if (info502 == 0) {
+		if (info502 == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
 			break;
 		}
+
 		info502->shi502_netname =
-		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si.share_name);
+		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si.shr_name);
 		info502->shi502_comment =
 		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
+		if (info502->shi502_netname == NULL ||
+		    info502->shi502_comment == NULL) {
+			status = ERROR_NOT_ENOUGH_MEMORY;
+			break;
+		}
+
 		info502->shi502_path =
-		    (unsigned char *)srvsvc_share_mkpath(mxa, si.directory);
+		    (unsigned char *)srvsvc_share_mkpath(mxa, si.shr_path);
 		info502->shi502_passwd = 0;
-		info502->shi502_type = si.stype;
+		info502->shi502_type = si.shr_type;
 		info502->shi502_permissions = 0;
 		info502->shi502_max_uses = SHI_USES_UNLIMITED;
 		info502->shi502_current_uses = 0;
@@ -567,7 +737,7 @@ mlsvc_NetSessionEnumLevel0(struct mslm_infonres *infonres, DWORD n_sessions,
 {
 	struct mslm_SESSION_INFO_0 *info0;
 	smb_dr_ulist_t *ulist;
-	smb_dr_user_ctx_t *user;
+	smb_opipe_context_t *user;
 	char *workstation;
 	char ipaddr_buf[INET_ADDRSTRLEN];
 	int i, offset, cnt, total;
@@ -588,7 +758,7 @@ mlsvc_NetSessionEnumLevel0(struct mslm_infonres *infonres, DWORD n_sessions,
 			/*
 			 * Ignore local tokens (IP address is zero).
 			 */
-			if (user->du_ipaddr == 0) {
+			if (user->oc_ipaddr == 0) {
 				total--;
 				smb_dr_ulist_free(ulist);
 				ulist = malloc(sizeof (smb_dr_ulist_t));
@@ -597,9 +767,9 @@ mlsvc_NetSessionEnumLevel0(struct mslm_infonres *infonres, DWORD n_sessions,
 				continue;
 			}
 
-			if ((workstation = user->du_workstation) == 0) {
+			if ((workstation = user->oc_workstation) == 0) {
 				(void) inet_ntop(AF_INET,
-				    (char *)&user->du_ipaddr, ipaddr_buf,
+				    (char *)&user->oc_ipaddr, ipaddr_buf,
 				    sizeof (ipaddr_buf));
 				workstation = ipaddr_buf;
 			}
@@ -637,7 +807,7 @@ mlsvc_NetSessionEnumLevel1(struct mslm_infonres *infonres, DWORD n_sessions,
 {
 	struct mslm_SESSION_INFO_1 *info1;
 	smb_dr_ulist_t *ulist;
-	smb_dr_user_ctx_t *user;
+	smb_opipe_context_t *user;
 	char *workstation;
 	char *account;
 	char ipaddr_buf[INET_ADDRSTRLEN];
@@ -657,9 +827,9 @@ mlsvc_NetSessionEnumLevel1(struct mslm_infonres *infonres, DWORD n_sessions,
 		for (i = 0; i < cnt && total < n_sessions; i++, total++) {
 			user = &ulist->dul_users[i];
 			/*
-			 * Ignore local user_ctxs (IP address is zero).
+			 * Ignore local context (IP address is zero).
 			 */
-			if (user->du_ipaddr == 0) {
+			if (user->oc_ipaddr == 0) {
 				total--;
 				smb_dr_ulist_free(ulist);
 				ulist = malloc(sizeof (smb_dr_ulist_t));
@@ -668,14 +838,14 @@ mlsvc_NetSessionEnumLevel1(struct mslm_infonres *infonres, DWORD n_sessions,
 				continue;
 			}
 
-			if ((workstation = user->du_workstation) == 0) {
+			if ((workstation = user->oc_workstation) == 0) {
 				(void) inet_ntop(AF_INET,
-				    (char *)&user->du_ipaddr,
+				    (char *)&user->oc_ipaddr,
 				    ipaddr_buf, sizeof (ipaddr_buf));
 				workstation = ipaddr_buf;
 			}
 
-			if ((account = user->du_account) == 0)
+			if ((account = user->oc_account) == 0)
 				account = "Unknown";
 
 			info1[total].sesi1_cname = MLRPC_HEAP_STRSAVE(mxa,
@@ -691,10 +861,10 @@ mlsvc_NetSessionEnumLevel1(struct mslm_infonres *infonres, DWORD n_sessions,
 
 			info1[total].sesi1_nopens = 1;
 			info1[total].sesi1_time = time(0) -
-			    user->du_logon_time;
+			    user->oc_logon_time;
 			info1[total].sesi1_itime = 0;
 			info1[total].sesi1_uflags =
-			    (user->du_flags & SMB_ATF_GUEST) ? SESS_GUEST : 0;
+			    (user->oc_flags & SMB_ATF_GUEST) ? SESS_GUEST : 0;
 		}
 		smb_dr_ulist_free(ulist);
 		ulist = malloc(sizeof (smb_dr_ulist_t));
@@ -731,7 +901,7 @@ srvsvc_s_NetSessionDel(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct mslm_NetSessionDel *param = arg;
 
-	if (!srvsvc_is_poweruser(mxa)) {
+	if (!ndr_is_poweruser(mxa)) {
 		param->status = ERROR_ACCESS_DENIED;
 		return (MLRPC_DRC_OK);
 	}
@@ -927,17 +1097,11 @@ srvsvc_s_NetRemoteTOD(void *arg, struct mlrpc_xaction *mxa)
  * srvsvc_s_NetNameValidate
  *
  * Perform name validation.
- * I've observed that the Computer Management Windows Application
- * always send this request with type=0x09 and the flags=0 when
- * attempting to validate a share name.
  *
- * The share name is consider invalid if it contains any of the
- * following character (as mentioned in MSDN article #236388).
+ * The share name is considered invalid if it contains any of the
+ * following character (MSDN 236388).
  *
  * " / \ [ ] : | < > + ; , ? * =
- *
- *
- * For now, if the type is other than 0x09, return access denied.
  *
  * Returns Win32 error codes.
  */
@@ -946,15 +1110,47 @@ static int
 srvsvc_s_NetNameValidate(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct mslm_NetNameValidate *param = arg;
+	char *name;
+	int len;
+
+	if ((name = (char *)param->pathname) == NULL) {
+		param->status = ERROR_INVALID_PARAMETER;
+		return (MLRPC_DRC_OK);
+	}
+
+	len = strlen(name);
+
+	if ((param->flags == 0 && len > 81) ||
+	    (param->flags == 0x80000000 && len > 13)) {
+		param->status = ERROR_INVALID_NAME;
+		return (MLRPC_DRC_OK);
+	}
 
 	switch (param->type) {
-	case 0x09:
-		param->status = lmshare_is_valid((char *)param->pathname) ?
-		    ERROR_SUCCESS : ERROR_INVALID_NAME;
+	case NAMETYPE_SHARE:
+		if (smb_shr_is_valid(name))
+			param->status = ERROR_SUCCESS;
+		else
+			param->status = ERROR_INVALID_NAME;
+		break;
+
+	case NAMETYPE_USER:
+	case NAMETYPE_PASSWORD:
+	case NAMETYPE_GROUP:
+	case NAMETYPE_COMPUTER:
+	case NAMETYPE_EVENT:
+	case NAMETYPE_DOMAIN:
+	case NAMETYPE_SERVICE:
+	case NAMETYPE_NET:
+	case NAMETYPE_MESSAGE:
+	case NAMETYPE_MESSAGEDEST:
+	case NAMETYPE_SHAREPASSWORD:
+	case NAMETYPE_WORKGROUP:
+		param->status = ERROR_NOT_SUPPORTED;
 		break;
 
 	default:
-		param->status = ERROR_ACCESS_DENIED;
+		param->status = ERROR_INVALID_PARAMETER;
 		break;
 	}
 
@@ -986,14 +1182,14 @@ srvsvc_s_NetShareAdd(void *arg, struct mlrpc_xaction *mxa)
 	static DWORD parm_err = 0;
 	DWORD parm_stat;
 	struct mslm_NetShareAdd *param = arg;
-	smb_dr_user_ctx_t *user_ctx;
 	struct mslm_SHARE_INFO_2 *info2;
-	struct lmshare_info si;
+	smb_share_t si;
 	char realpath[MAXPATHLEN];
+	int32_t native_os;
 
-	user_ctx = mxa->context->user_ctx;
+	native_os = ndr_native_os(mxa);
 
-	if (!srvsvc_is_poweruser(mxa)) {
+	if (!ndr_is_poweruser(mxa)) {
 		bzero(param, sizeof (struct mslm_NetShareAdd));
 		param->status = ERROR_ACCESS_DENIED;
 		return (MLRPC_DRC_OK);
@@ -1020,7 +1216,7 @@ srvsvc_s_NetShareAdd(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_OK);
 	}
 
-	if (lmshare_is_restricted((char *)info2->shi2_netname)) {
+	if (smb_shr_is_restricted((char *)info2->shi2_netname)) {
 		bzero(param, sizeof (struct mslm_NetShareAdd));
 		param->status = ERROR_ACCESS_DENIED;
 		return (MLRPC_DRC_OK);
@@ -1031,34 +1227,32 @@ srvsvc_s_NetShareAdd(void *arg, struct mlrpc_xaction *mxa)
 
 	/*
 	 * Derive the real path which will be stored in the
-	 * directory field of the lmshare_info_t structure
+	 * directory field of the smb_share_t structure
 	 * from the path field in this RPC request.
 	 */
-	parm_stat = lmshare_get_realpath((const char *)info2->shi2_path,
+	parm_stat = smb_shr_get_realpath((const char *)info2->shi2_path,
 	    realpath, MAXPATHLEN);
 
 	if (parm_stat != NERR_Success) {
 		bzero(param, sizeof (struct mslm_NetShareAdd));
 		param->status = parm_stat;
 		param->parm_err
-		    = (user_ctx->du_native_os == NATIVE_OS_WIN95) ?
-		    0 : &parm_err;
+		    = (native_os == NATIVE_OS_WIN95) ? 0 : &parm_err;
 		return (MLRPC_DRC_OK);
 	}
 
-	(void) memset(&si, 0, sizeof (lmshare_info_t));
-	(void) strlcpy(si.share_name, (const char *)info2->shi2_netname,
+	(void) memset(&si, 0, sizeof (smb_share_t));
+	(void) strlcpy(si.shr_name, (const char *)info2->shi2_netname,
 	    MAXNAMELEN);
 
-	(void) strlcpy(si.directory, realpath, MAXPATHLEN);
-	(void) strlcpy(si.comment, (const char *)info2->shi2_remark,
-	    LMSHR_COMMENT_MAX);
+	(void) strlcpy(si.shr_path, realpath, MAXPATHLEN);
+	(void) strlcpy(si.shr_cmnt, (const char *)info2->shi2_remark,
+	    SMB_SHARE_CMNT_MAX);
 
-	si.mode = LMSHRM_PERM;
+	si.shr_flags = SMB_SHRF_PERM;
 
-	param->status = lmshare_add(&si, 1);
-	param->parm_err = (user_ctx->du_native_os == NATIVE_OS_WIN95) ?
-	    0 : &parm_err;
+	param->status = smb_shr_add(&si, 1);
+	param->parm_err = (native_os == NATIVE_OS_WIN95) ? 0 : &parm_err;
 	return (MLRPC_DRC_OK);
 }
 
@@ -1082,39 +1276,6 @@ srvsvc_estimate_objcnt(uint32_t prefmaxlen, uint32_t n_obj, uint32_t obj_size)
 		n_obj = max_cnt;
 
 	return (n_obj);
-}
-
-/*
- * srvsvc_is_administrator
- *
- * Check whether or not the specified user has administrator privileges,
- * i.e. is a member of the Domain Admins or Administrators groups.
- */
-static boolean_t
-srvsvc_is_administrator(struct mlrpc_xaction *mxa)
-{
-	smb_dr_user_ctx_t *user = mxa->context->user_ctx;
-
-	return (user->du_flags & SMB_ATF_ADMIN);
-}
-
-/*
- * srvsvc_is_poweruser
- *
- * Check whether or not the specified user has power-user privileges,
- * i.e. is a member of the Domain Admins, Administrators or Power
- * Users groups. This is typically required for operations such as
- * adding/deleting shares.
- *
- * Returns 1 if the user is a power user, otherwise returns 0.
- */
-static boolean_t
-srvsvc_is_poweruser(struct mlrpc_xaction *mxa)
-{
-	smb_dr_user_ctx_t *user = mxa->context->user_ctx;
-
-	return ((user->du_flags & SMB_ATF_ADMIN) ||
-	    (user->du_flags & SMB_ATF_POWERUSER));
 }
 
 /*
@@ -1151,7 +1312,7 @@ srvsvc_s_NetShareEnum(void *arg, struct mlrpc_xaction *mxa)
 
 	bzero(&se, sizeof (srvsvc_enum_t));
 	se.se_level = param->level;
-	se.se_n_total = lmshare_num_shares();
+	se.se_n_total = smb_shr_count();
 
 	if (param->prefmaxlen == SMB_SRVSVC_MAXPREFLEN ||
 	    param->prefmaxlen > SMB_SRVSVC_MAXBUFLEN)
@@ -1257,7 +1418,7 @@ srvsvc_s_NetShareEnumSticky(void *arg, struct mlrpc_xaction *mxa)
 
 	bzero(&se, sizeof (srvsvc_enum_t));
 	se.se_level = param->level;
-	se.se_n_total = lmshare_num_shares();
+	se.se_n_total = smb_shr_count();
 
 	if (param->prefmaxlen == SMB_SRVSVC_MAXPREFLEN ||
 	    param->prefmaxlen > SMB_SRVSVC_MAXBUFLEN)
@@ -1328,12 +1489,12 @@ mlsvc_NetShareEnumLevel0(struct mlrpc_xaction *mxa,
     struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_0 *info0;
-	lmshare_iterator_t iterator;
-	lmshare_info_t *si;
+	smb_shriter_t iterator;
+	smb_share_t *si;
 	DWORD status;
 
 	se->se_n_enum = srvsvc_estimate_objcnt(se->se_prefmaxlen,
-	    se->se_n_total, sizeof (struct mslm_SHARE_INFO_0));
+	    se->se_n_total, sizeof (struct mslm_SHARE_INFO_0) + MAXNAMELEN);
 	if (se->se_n_enum == 0)
 		return (ERROR_SUCCESS);
 
@@ -1341,10 +1502,10 @@ mlsvc_NetShareEnumLevel0(struct mlrpc_xaction *mxa,
 	if (info0 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	lmshare_init_iterator(&iterator, LMSHRM_ALL);
+	smb_shr_iterinit(&iterator, SMB_SHRF_ALL);
 
 	se->se_n_read = 0;
-	while ((si = lmshare_iterate(&iterator)) != NULL) {
+	while ((si = smb_shr_iterate(&iterator)) != NULL) {
 		if (se->se_n_skip > 0) {
 			--se->se_n_skip;
 			continue;
@@ -1352,7 +1513,7 @@ mlsvc_NetShareEnumLevel0(struct mlrpc_xaction *mxa,
 
 		++se->se_resume_handle;
 
-		if (sticky && (si->stype & STYPE_SPECIAL))
+		if (sticky && (si->shr_type & STYPE_SPECIAL))
 			continue;
 
 		if (smb_is_autohome(si))
@@ -1388,12 +1549,12 @@ mlsvc_NetShareEnumLevel1(struct mlrpc_xaction *mxa,
     struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_1 *info1;
-	lmshare_iterator_t iterator;
-	lmshare_info_t *si;
+	smb_shriter_t iterator;
+	smb_share_t *si;
 	DWORD status;
 
 	se->se_n_enum = srvsvc_estimate_objcnt(se->se_prefmaxlen,
-	    se->se_n_total, sizeof (struct mslm_SHARE_INFO_1));
+	    se->se_n_total, sizeof (struct mslm_SHARE_INFO_1) + MAXNAMELEN);
 	if (se->se_n_enum == 0)
 		return (ERROR_SUCCESS);
 
@@ -1401,10 +1562,10 @@ mlsvc_NetShareEnumLevel1(struct mlrpc_xaction *mxa,
 	if (info1 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	lmshare_init_iterator(&iterator, LMSHRM_ALL);
+	smb_shr_iterinit(&iterator, SMB_SHRF_ALL);
 
 	se->se_n_read = 0;
-	while ((si = lmshare_iterate(&iterator)) != 0) {
+	while ((si = smb_shr_iterate(&iterator)) != 0) {
 		if (se->se_n_skip > 0) {
 			--se->se_n_skip;
 			continue;
@@ -1412,7 +1573,7 @@ mlsvc_NetShareEnumLevel1(struct mlrpc_xaction *mxa,
 
 		++se->se_resume_handle;
 
-		if (sticky && (si->stype & STYPE_SPECIAL))
+		if (sticky && (si->shr_type & STYPE_SPECIAL))
 			continue;
 
 		if (smb_is_autohome(si))
@@ -1448,12 +1609,12 @@ mlsvc_NetShareEnumLevel2(struct mlrpc_xaction *mxa,
     struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_2 *info2;
-	lmshare_iterator_t iterator;
-	lmshare_info_t *si;
+	smb_shriter_t iterator;
+	smb_share_t *si;
 	DWORD status;
 
 	se->se_n_enum = srvsvc_estimate_objcnt(se->se_prefmaxlen,
-	    se->se_n_total, sizeof (struct mslm_SHARE_INFO_2));
+	    se->se_n_total, sizeof (struct mslm_SHARE_INFO_2) + MAXNAMELEN);
 	if (se->se_n_enum == 0)
 		return (ERROR_SUCCESS);
 
@@ -1461,10 +1622,10 @@ mlsvc_NetShareEnumLevel2(struct mlrpc_xaction *mxa,
 	if (info2 == 0)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	lmshare_init_iterator(&iterator, LMSHRM_ALL);
+	smb_shr_iterinit(&iterator, SMB_SHRF_ALL);
 
 	se->se_n_read = 0;
-	while ((si = lmshare_iterate(&iterator)) != 0) {
+	while ((si = smb_shr_iterate(&iterator)) != 0) {
 		if (se->se_n_skip > 0) {
 			--se->se_n_skip;
 			continue;
@@ -1472,7 +1633,7 @@ mlsvc_NetShareEnumLevel2(struct mlrpc_xaction *mxa,
 
 		++se->se_resume_handle;
 
-		if (sticky && (si->stype & STYPE_SPECIAL))
+		if (sticky && (si->shr_type & STYPE_SPECIAL))
 			continue;
 
 		if (smb_is_autohome(si))
@@ -1508,12 +1669,12 @@ mlsvc_NetShareEnumLevel501(struct mlrpc_xaction *mxa,
     struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_501 *info501;
-	lmshare_iterator_t iterator;
-	lmshare_info_t *si;
+	smb_shriter_t iterator;
+	smb_share_t *si;
 	DWORD status;
 
 	se->se_n_enum = srvsvc_estimate_objcnt(se->se_prefmaxlen,
-	    se->se_n_total, sizeof (struct mslm_SHARE_INFO_501));
+	    se->se_n_total, sizeof (struct mslm_SHARE_INFO_501) + MAXNAMELEN);
 	if (se->se_n_enum == 0)
 		return (ERROR_SUCCESS);
 
@@ -1522,10 +1683,10 @@ mlsvc_NetShareEnumLevel501(struct mlrpc_xaction *mxa,
 	if (info501 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	lmshare_init_iterator(&iterator, LMSHRM_ALL);
+	smb_shr_iterinit(&iterator, SMB_SHRF_ALL);
 
 	se->se_n_read = 0;
-	while ((si = lmshare_iterate(&iterator)) != 0) {
+	while ((si = smb_shr_iterate(&iterator)) != 0) {
 		if (se->se_n_skip > 0) {
 			--se->se_n_skip;
 			continue;
@@ -1533,7 +1694,7 @@ mlsvc_NetShareEnumLevel501(struct mlrpc_xaction *mxa,
 
 		++se->se_resume_handle;
 
-		if (sticky && (si->stype & STYPE_SPECIAL))
+		if (sticky && (si->shr_type & STYPE_SPECIAL))
 			continue;
 
 		if (smb_is_autohome(si))
@@ -1569,12 +1730,12 @@ mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *mxa,
     struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_502 *info502;
-	lmshare_iterator_t iterator;
-	lmshare_info_t *si;
+	smb_shriter_t iterator;
+	smb_share_t *si;
 	DWORD status;
 
 	se->se_n_enum = srvsvc_estimate_objcnt(se->se_prefmaxlen,
-	    se->se_n_total, sizeof (struct mslm_SHARE_INFO_502));
+	    se->se_n_total, sizeof (struct mslm_SHARE_INFO_502) + MAXNAMELEN);
 	if (se->se_n_enum == 0)
 		return (ERROR_SUCCESS);
 
@@ -1583,10 +1744,10 @@ mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *mxa,
 	if (info502 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	lmshare_init_iterator(&iterator, LMSHRM_ALL);
+	smb_shr_iterinit(&iterator, SMB_SHRF_ALL);
 
 	se->se_n_read = 0;
-	while ((si = lmshare_iterate(&iterator)) != NULL) {
+	while ((si = smb_shr_iterate(&iterator)) != NULL) {
 		if (se->se_n_skip > 0) {
 			--se->se_n_skip;
 			continue;
@@ -1594,7 +1755,7 @@ mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *mxa,
 
 		++se->se_resume_handle;
 
-		if (sticky && (si->stype & STYPE_SPECIAL))
+		if (sticky && (si->shr_type & STYPE_SPECIAL))
 			continue;
 
 		if (smb_is_autohome(si))
@@ -1639,35 +1800,34 @@ mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *mxa,
  */
 static DWORD
 mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
-    lmshare_info_t *si, void *infop)
+    smb_share_t *si, void *infop)
 {
 	struct mslm_SHARE_INFO_0 *info0;
 	struct mslm_SHARE_INFO_1 *info1;
 	struct mslm_SHARE_INFO_2 *info2;
 	struct mslm_SHARE_INFO_501 *info501;
 	struct mslm_SHARE_INFO_502 *info502;
-	char shr_comment[LMSHR_COMMENT_MAX];
+	char shr_comment[SMB_SHARE_CMNT_MAX];
 	int i = se->se_n_read;
 
-	if ((si->stype & STYPE_MASK) == STYPE_IPC) {
+	if ((si->shr_type & STYPE_MASK) == STYPE_IPC) {
 		/*
 		 * Windows clients don't send the \\PIPE path for IPC$.
 		 */
-		si->directory[0] = '\0';
-		(void) strcpy(si->comment, "Remote IPC");
+		si->shr_path[0] = '\0';
+		(void) strcpy(si->shr_cmnt, "Remote IPC");
 	}
 
-	if (si->comment && strlen(si->comment))
-		(void) snprintf(shr_comment, sizeof (shr_comment), "%s (%s)",
-		    si->directory, si->comment);
+	if (strlen(si->shr_cmnt))
+		(void) strlcpy(shr_comment, si->shr_cmnt, SMB_SHARE_CMNT_MAX);
 	else
-		(void) strlcpy(shr_comment, si->directory, LMSHR_COMMENT_MAX);
+		shr_comment[0] = '\0';
 
 	switch (se->se_level) {
 	case 0:
 		info0 = (struct mslm_SHARE_INFO_0 *)infop;
 		info0[i].shi0_netname
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->share_name);
+		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->shr_name);
 
 		if (info0[i].shi0_netname == NULL)
 			return (ERROR_NOT_ENOUGH_MEMORY);
@@ -1676,12 +1836,12 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
 	case 1:
 		info1 = (struct mslm_SHARE_INFO_1 *)infop;
 		info1[i].shi1_netname
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->share_name);
+		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->shr_name);
 
 		info1[i].shi1_remark
 		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
 
-		info1[i].shi1_type = si->stype;
+		info1[i].shi1_type = si->shr_type;
 
 		if (!info1[i].shi1_netname || !info1[i].shi1_remark)
 			return (ERROR_NOT_ENOUGH_MEMORY);
@@ -1690,15 +1850,15 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
 	case 2:
 		info2 = (struct mslm_SHARE_INFO_2 *)infop;
 		info2[i].shi2_netname
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->share_name);
+		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->shr_name);
 
 		info2[i].shi2_remark
 		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
 
 		info2[i].shi2_path
-		    = (unsigned char *)srvsvc_share_mkpath(mxa, si->directory);
+		    = (unsigned char *)srvsvc_share_mkpath(mxa, si->shr_path);
 
-		info2[i].shi2_type = si->stype;
+		info2[i].shi2_type = si->shr_type;
 		info2[i].shi2_permissions = 0;
 		info2[i].shi2_max_uses = SHI_USES_UNLIMITED;
 		info2[i].shi2_current_uses = 0;
@@ -1714,12 +1874,12 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
 	case 501:
 		info501 = (struct mslm_SHARE_INFO_501 *)infop;
 		info501[i].shi501_netname
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->share_name);
+		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->shr_name);
 
 		info501[i].shi501_remark
 		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
 
-		info501[i].shi501_type = si->stype;
+		info501[i].shi501_type = si->shr_type;
 		info501[i].shi501_flags = 0;
 
 		if (!info501[i].shi501_netname || !info501[i].shi501_remark)
@@ -1729,15 +1889,15 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
 	case 502:
 		info502 = (struct mslm_SHARE_INFO_502 *)infop;
 		info502[i].shi502_netname
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->share_name);
+		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->shr_name);
 
 		info502[i].shi502_remark
 		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
 
 		info502[i].shi502_path
-		    = (unsigned char *)srvsvc_share_mkpath(mxa, si->directory);
+		    = (unsigned char *)srvsvc_share_mkpath(mxa, si->shr_path);
 
-		info502[i].shi502_type = si->stype;
+		info502[i].shi502_type = si->shr_type;
 		info502[i].shi502_permissions = 0;
 		info502[i].shi502_max_uses = SHI_USES_UNLIMITED;
 		info502[i].shi502_current_uses = 0;
@@ -1768,15 +1928,15 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
 static boolean_t
 srvsvc_add_autohome(struct mlrpc_xaction *mxa, srvsvc_enum_t *se, void *infop)
 {
-	smb_dr_user_ctx_t *user_ctx = mxa->context->user_ctx;
-	char *username = user_ctx->du_account;
-	lmshare_info_t si;
+	smb_opipe_context_t *svc = &mxa->context->svc_ctx;
+	char *username = svc->oc_account;
+	smb_share_t si;
 	DWORD status;
 
-	if (lmshare_getinfo(username, &si) != NERR_Success)
+	if (smb_shr_get(username, &si) != NERR_Success)
 		return (B_FALSE);
 
-	if ((si.mode & LMSHRM_AUTOHOME) == 0)
+	if ((si.shr_flags & SMB_SHRF_AUTOHOME) == 0)
 		return (B_FALSE);
 
 	status = mlsvc_NetShareEnumCommon(mxa, se, &si, infop);
@@ -1837,13 +1997,13 @@ srvsvc_s_NetShareDel(void *arg, struct mlrpc_xaction *mxa)
 {
 	struct mslm_NetShareDel *param = arg;
 
-	if (!srvsvc_is_poweruser(mxa) ||
-	    lmshare_is_restricted((char *)param->netname)) {
+	if (!ndr_is_poweruser(mxa) ||
+	    smb_shr_is_restricted((char *)param->netname)) {
 		param->status = ERROR_ACCESS_DENIED;
 		return (MLRPC_DRC_OK);
 	}
 
-	param->status = lmshare_delete((char *)param->netname, 1);
+	param->status = smb_shr_del((char *)param->netname, 1);
 	return (MLRPC_DRC_OK);
 }
 

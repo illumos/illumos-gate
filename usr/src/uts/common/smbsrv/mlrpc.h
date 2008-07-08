@@ -104,6 +104,7 @@
  */
 
 #include <smbsrv/ndl/rpcpdu.ndl>
+#include <sys/types.h>
 #include <sys/uio.h>
 #include <smbsrv/mlsvc.h>
 #include <smbsrv/ndr.h>
@@ -295,7 +296,7 @@ struct mlrpc_binding {
  * of the first heap block.
  */
 #define	MLRPC_HEAP_MAXIOV		384
-#define	MLRPC_HEAP_BLKSZ		4096
+#define	MLRPC_HEAP_BLKSZ		8192
 
 typedef struct mlrpc_heap {
 	struct iovec iovec[MLRPC_HEAP_MAXIOV];
@@ -388,8 +389,8 @@ struct mlrpc_client {
 };
 
 /* ndr_ops.c */
-int mlnds_initialize(struct mlndr_stream *, unsigned, int, mlrpc_heap_t *);
-int mlnds_finalize(struct mlndr_stream *, uint8_t *, uint32_t);
+void mlnds_initialize(struct mlndr_stream *, unsigned, int, mlrpc_heap_t *);
+void mlnds_finalize(struct mlndr_stream *, ndr_fraglist_t *);
 void mlnds_destruct(struct mlndr_stream *);
 
 /* ndr_client.c */
@@ -412,6 +413,10 @@ unsigned mlrpc_bind_ack_hdr_size(struct mlrpcconn_bind_ack_hdr *);
 /* ndr_server.c */
 int mlrpc_generic_call_stub(struct mlrpc_xaction *);
 
+boolean_t ndr_is_admin(ndr_xa_t *);
+boolean_t ndr_is_poweruser(ndr_xa_t *);
+int32_t ndr_native_os(ndr_xa_t *);
+
 /* ndr_svc.c */
 struct mlrpc_stub_table *mlrpc_find_stub_in_svc(mlrpc_service_t *, int);
 mlrpc_service_t *mlrpc_find_service_by_name(const char *);
@@ -432,6 +437,7 @@ void ndr_hdfree(const ndr_xa_t *, const ndr_hdid_t *);
 ndr_handle_t *ndr_hdlookup(const ndr_xa_t *, const ndr_hdid_t *);
 void ndr_hdclose(int fid);
 
+ssize_t ndr_uiomove(caddr_t, size_t, enum uio_rw, struct uio *);
 
 #ifdef __cplusplus
 }

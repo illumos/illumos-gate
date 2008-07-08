@@ -43,11 +43,9 @@
  */
 #include <smbsrv/ntifs.h>
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 
 
 /*
@@ -287,24 +285,6 @@ extern "C" {
 /* SMB_TREE_CONNECT_ANDX flags */
 #define	SMB_TREE_SUPPORT_SEARCH_BITS	0x01
 #define	SMB_TREE_SHARE_IS_IN_DFS	0x02
-
-#define	SMB_FA_READONLY		0x01	/* Read only file */
-#define	SMB_FA_HIDDEN		0x02	/* Hidden file */
-#define	SMB_FA_SYSTEM		0x04	/* System file */
-#define	SMB_FA_VOLUME		0x08	/* Volume */
-#define	SMB_FA_DIRECTORY	0x10	/* Directory */
-#define	SMB_FA_ARCHIVE		0x20	/* Archive file */
-#define	SMB_FA_NORMAL		0x80	/* Normal pipe */
-#define	SMB_FA_TEMPORARY	0x100	/* Is a temporary file */
-#define	SMB_FA_ATOMIC_WRITE	0x200	/* Do atomic writes */
-#define	SMB_FA_XACTION_WRITE	0x400	/* XACTION write */
-
-/*
- * Mask to match the definitions in section 3.7 File Attribute Encoding.
- * The other bits are reserved.
- */
-#define	SMB_FA_MASK			0x3F
-
 
 /*
  * The subcommand codes, placed in SETUP[0], for named pipe operations are:

@@ -41,6 +41,8 @@
  */
 
 #ifndef _KERNEL
+#include <sys/types.h>
+#include <sys/uio.h>
 #include <syslog.h>
 #include <stdlib.h>
 #include <string.h>
@@ -252,16 +254,22 @@ typedef struct ndr_frag {
 	uint32_t len;
 } ndr_frag_t;
 
+typedef struct ndr_fraglist {
+	struct uio	uio;
+	iovec_t		*iov;
+	ndr_frag_t	*head;
+	ndr_frag_t	*tail;
+	uint32_t	nfrag;
+} ndr_fraglist_t;
+
 struct mlndr_stream {
 	unsigned long		pdu_size;
 	unsigned long		pdu_max_size;
 	unsigned long		pdu_base_offset;
 	unsigned long		pdu_scan_offset;
 	unsigned char		*pdu_base_addr;
-	ndr_frag_t		*head;
-	ndr_frag_t		*tail;
-	uint32_t		nfrag;
 
+	ndr_fraglist_t		frags;
 	struct mlndr_stream_ops *mlndo;
 
 	unsigned char		m_op;

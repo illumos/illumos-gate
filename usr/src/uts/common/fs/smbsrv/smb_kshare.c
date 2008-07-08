@@ -33,10 +33,9 @@
 #include <sys/sunddi.h>
 #include <sys/cmn_err.h>
 #include <sys/door.h>
-#include <smbsrv/lmshare.h>
 #include <smbsrv/lmerr.h>
+#include <smbsrv/smb_share.h>
 #include <smbsrv/smb_common_door.h>
-#include <smbsrv/lmshare_door.h>
 #include <smbsrv/smbinfo.h>
 
 static int smb_kshare_chk_dsrv_status(int, smb_dr_ctx_t *);
@@ -67,7 +66,7 @@ smb_kshare_fini(door_handle_t dhdl)
 }
 
 uint32_t
-smb_kshare_getinfo(door_handle_t dhdl, char *share_name, lmshare_info_t *si)
+smb_kshare_getinfo(door_handle_t dhdl, char *share_name, smb_share_t *si)
 {
 	door_arg_t arg;
 	char *buf;
@@ -76,18 +75,18 @@ smb_kshare_getinfo(door_handle_t dhdl, char *share_name, lmshare_info_t *si)
 	smb_dr_ctx_t *enc_ctx;
 	int status;
 	uint32_t rc;
-	int opcode = LMSHR_DOOR_GETINFO;
+	int opcode = SMB_SHROP_GETINFO;
 
-	buf = kmem_alloc(LMSHR_DOOR_SIZE, KM_SLEEP);
+	buf = kmem_alloc(SMB_SHARE_DSIZE, KM_SLEEP);
 
-	enc_ctx = smb_dr_encode_start(buf, LMSHR_DOOR_SIZE);
+	enc_ctx = smb_dr_encode_start(buf, SMB_SHARE_DSIZE);
 	smb_dr_put_uint32(enc_ctx, opcode);
 	smb_dr_put_string(enc_ctx, share_name);
 
 	if ((status = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
 		cmn_err(CE_WARN, "smb_kshare_getinfo: Encode error %d",
 		    status);
-		kmem_free(buf, LMSHR_DOOR_SIZE);
+		kmem_free(buf, SMB_SHARE_DSIZE);
 		return (NERR_InternalError);
 	}
 
@@ -96,29 +95,29 @@ smb_kshare_getinfo(door_handle_t dhdl, char *share_name, lmshare_info_t *si)
 	arg.desc_ptr = NULL;
 	arg.desc_num = 0;
 	arg.rbuf = buf;
-	arg.rsize = LMSHR_DOOR_SIZE;
+	arg.rsize = SMB_SHARE_DSIZE;
 
 	if (door_ki_upcall_limited(dhdl, &arg, NULL, SIZE_MAX, 0) != 0) {
 		cmn_err(CE_WARN, "smb_kshare_getinfo: Door call failed");
-		kmem_free(buf, LMSHR_DOOR_SIZE);
+		kmem_free(buf, SMB_SHARE_DSIZE);
 		return (NERR_InternalError);
 	}
 
 	dec_ctx = smb_dr_decode_start(arg.data_ptr, arg.data_size);
 	if (smb_kshare_chk_dsrv_status(opcode, dec_ctx) != 0) {
-		kmem_free(buf, LMSHR_DOOR_SIZE);
+		kmem_free(buf, SMB_SHARE_DSIZE);
 		return (NERR_InternalError);
 	}
 
 	rc = smb_dr_get_uint32(dec_ctx);
-	smb_dr_get_lmshare(dec_ctx, si);
+	smb_dr_get_share(dec_ctx, si);
 	if ((status = smb_dr_decode_finish(dec_ctx)) != 0) {
 		cmn_err(CE_WARN, "smb_kshare_getinfo: Decode error %d",
 		    status);
 		rc = NERR_InternalError;
 	}
 
-	kmem_free(buf, LMSHR_DOOR_SIZE);
+	kmem_free(buf, SMB_SHARE_DSIZE);
 	return (rc);
 }
 
@@ -133,7 +132,7 @@ smb_kshare_enum(door_handle_t dhdl, smb_enumshare_info_t *enuminfo)
 	smb_dr_ctx_t *enc_ctx;
 	int status;
 	uint32_t rc;
-	int opcode = LMSHR_DOOR_ENUM;
+	int opcode = SMB_SHROP_ENUM;
 
 	enuminfo->es_ntotal = enuminfo->es_nsent = 0;
 
@@ -194,8 +193,8 @@ smb_kshare_enum(door_handle_t dhdl, smb_enumshare_info_t *enuminfo)
  * This is a special interface that will be utilized by ZFS to cause
  * a share to be added/removed
  *
- * arg is either a lmshare_info_t or share_name from userspace.
- * It will need to be copied into the kernel.   It is lmshare_info_t
+ * arg is either a smb_share_t or share_name from userspace.
+ * It will need to be copied into the kernel.   It is smb_share_t
  * for add operations and share_name for delete operations.
  */
 int
@@ -209,31 +208,31 @@ smb_kshare_upcall(door_handle_t dhdl, void *arg, boolean_t add_share)
 	unsigned int	used;
 	smb_dr_ctx_t	*dec_ctx;
 	smb_dr_ctx_t	*enc_ctx;
-	lmshare_info_t	*lmshare = NULL;
+	smb_share_t	*lmshare = NULL;
 	int		opcode;
 
-	opcode = add_share == B_TRUE ? LMSHR_DOOR_ADD : LMSHR_DOOR_DELETE;
+	opcode = (add_share) ? SMB_SHROP_ADD : SMB_SHROP_DELETE;
 
-	buf = kmem_alloc(LMSHR_DOOR_SIZE, KM_SLEEP);
-	enc_ctx = smb_dr_encode_start(buf, LMSHR_DOOR_SIZE);
+	buf = kmem_alloc(SMB_SHARE_DSIZE, KM_SLEEP);
+	enc_ctx = smb_dr_encode_start(buf, SMB_SHARE_DSIZE);
 	smb_dr_put_uint32(enc_ctx, opcode);
 
 	switch (opcode) {
-	case LMSHR_DOOR_ADD:
-		lmshare = kmem_alloc(sizeof (lmshare_info_t), KM_SLEEP);
-		if (error = xcopyin(arg, lmshare, sizeof (lmshare_info_t))) {
-			kmem_free(lmshare, sizeof (lmshare_info_t));
-			kmem_free(buf, LMSHR_DOOR_SIZE);
+	case SMB_SHROP_ADD:
+		lmshare = kmem_alloc(sizeof (smb_share_t), KM_SLEEP);
+		if (error = xcopyin(arg, lmshare, sizeof (smb_share_t))) {
+			kmem_free(lmshare, sizeof (smb_share_t));
+			kmem_free(buf, SMB_SHARE_DSIZE);
 			return (error);
 		}
-		smb_dr_put_lmshare(enc_ctx, lmshare);
+		smb_dr_put_share(enc_ctx, lmshare);
 		break;
 
-	case LMSHR_DOOR_DELETE:
+	case SMB_SHROP_DELETE:
 		str = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 		if (error = copyinstr(arg, str, MAXPATHLEN, NULL)) {
 			kmem_free(str, MAXPATHLEN);
-			kmem_free(buf, LMSHR_DOOR_SIZE);
+			kmem_free(buf, SMB_SHARE_DSIZE);
 			return (error);
 		}
 		smb_dr_put_string(enc_ctx, str);
@@ -242,44 +241,44 @@ smb_kshare_upcall(door_handle_t dhdl, void *arg, boolean_t add_share)
 	}
 
 	if ((error = smb_dr_encode_finish(enc_ctx, &used)) != 0) {
-		kmem_free(buf, LMSHR_DOOR_SIZE);
+		kmem_free(buf, SMB_SHARE_DSIZE);
 		if (lmshare)
-			kmem_free(lmshare, sizeof (lmshare_info_t));
+			kmem_free(lmshare, sizeof (smb_share_t));
 		return (NERR_InternalError);
 	}
 
 	doorarg.data_ptr = buf;
 	doorarg.data_size = used;
 	doorarg.rbuf = buf;
-	doorarg.rsize = LMSHR_DOOR_SIZE;
+	doorarg.rsize = SMB_SHARE_DSIZE;
 
 	error = door_ki_upcall_limited(dhdl, &doorarg, NULL, SIZE_MAX, 0);
 
 	if (error) {
-		kmem_free(buf, LMSHR_DOOR_SIZE);
+		kmem_free(buf, SMB_SHARE_DSIZE);
 		if (lmshare)
-			kmem_free(lmshare, sizeof (lmshare_info_t));
+			kmem_free(lmshare, sizeof (smb_share_t));
 		return (error);
 	}
 
 	dec_ctx = smb_dr_decode_start(doorarg.data_ptr, doorarg.data_size);
 	if (smb_kshare_chk_dsrv_status(opcode, dec_ctx) != 0) {
-		kmem_free(buf, LMSHR_DOOR_SIZE);
+		kmem_free(buf, SMB_SHARE_DSIZE);
 		if (lmshare)
-			kmem_free(lmshare, sizeof (lmshare_info_t));
+			kmem_free(lmshare, sizeof (smb_share_t));
 		return (NERR_InternalError);
 	}
 
 	rc = smb_dr_get_uint32(dec_ctx);
-	if (opcode == LMSHR_DOOR_ADD)
-		smb_dr_get_lmshare(dec_ctx, lmshare);
+	if (opcode == SMB_SHROP_ADD)
+		smb_dr_get_share(dec_ctx, lmshare);
 
 	if (smb_dr_decode_finish(dec_ctx))
 		rc = NERR_InternalError;
 
-	kmem_free(buf, LMSHR_DOOR_SIZE);
+	kmem_free(buf, SMB_SHARE_DSIZE);
 	if (lmshare)
-		kmem_free(lmshare, sizeof (lmshare_info_t));
+		kmem_free(lmshare, sizeof (smb_share_t));
 
 	return ((rc == NERR_DuplicateShare && add_share) ? 0 : rc);
 }
@@ -294,10 +293,10 @@ smb_kshare_chk_dsrv_status(int opcode, smb_dr_ctx_t *dec_ctx)
 	int err;
 
 	switch (status) {
-	case LMSHR_DOOR_SRV_SUCCESS:
+	case SMB_SHARE_DSUCCESS:
 		return (0);
 
-	case LMSHR_DOOR_SRV_ERROR:
+	case SMB_SHARE_DERROR:
 		err = smb_dr_get_uint32(dec_ctx);
 		cmn_err(CE_WARN, "%d: Encountered door server error %d",
 		    opcode, err);

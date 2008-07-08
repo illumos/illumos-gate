@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,42 +67,65 @@ typedef struct smb_dr_bytes {
 	uint8_t *bytes_val;
 } smb_dr_bytes_t;
 
-/*
- * smb_dr_user_ctx/smb_dr_ulist data structures are defined to transfer
- * the necessary information for all connected users via door to
- * mlsvc. The smb_dr_user_ctx provides user context that will be part
- * of the MLSVC rpc context.
- *
- * Both SMB session ID and SMB UID of smb_dr_user_ctx_t are used to
- * uniquely identified the corresponding in-kernel SMB user object.
- */
 #define	SMB_DR_MAX_USERS	50
-typedef struct smb_dr_user_ctx {
-	uint64_t du_session_id;
-	uint16_t du_uid;
-	uint16_t du_domain_len;
-	char *du_domain;
-	uint16_t du_account_len;
-	char *du_account;
-	uint16_t du_workstation_len;
-	char *du_workstation;
-	uint32_t du_ipaddr;
-	int32_t du_native_os;
-	int64_t du_logon_time;
-	uint32_t du_flags;
-} smb_dr_user_ctx_t;
+
+#define	SMB_OPIPE_HDR_MAGIC	0x4F484452	/* OHDR */
+#define	SMB_OPIPE_DOOR_BUFSIZE	(30 * 1024)
+
+/*
+ * Door operations for opipes.
+ */
+typedef enum {
+	SMB_OPIPE_NULL = 0,
+	SMB_OPIPE_LOOKUP,
+	SMB_OPIPE_OPEN,
+	SMB_OPIPE_CLOSE,
+	SMB_OPIPE_READ,
+	SMB_OPIPE_WRITE,
+	SMB_OPIPE_STAT
+} smb_opipe_op_t;
+
+typedef struct smb_opipe_hdr {
+	uint32_t oh_magic;
+	uint32_t oh_fid;
+	uint32_t oh_op;
+	uint32_t oh_datalen;
+	uint32_t oh_resid;
+	uint32_t oh_status;
+} smb_opipe_hdr_t;
+
+typedef struct smb_opipe_context {
+	uint64_t oc_session_id;
+	uint16_t oc_uid;
+	uint16_t oc_domain_len;
+	char *oc_domain;
+	uint16_t oc_account_len;
+	char *oc_account;
+	uint16_t oc_workstation_len;
+	char *oc_workstation;
+	uint32_t oc_ipaddr;
+	int32_t oc_native_os;
+	int64_t oc_logon_time;
+	uint32_t oc_flags;
+} smb_opipe_context_t;
 
 typedef struct smb_dr_ulist {
 	uint32_t dul_cnt;
-	smb_dr_user_ctx_t dul_users[SMB_DR_MAX_USERS];
+	smb_opipe_context_t dul_users[SMB_DR_MAX_USERS];
 } smb_dr_ulist_t;
 
 /* xdr routines for common door arguments/results */
 extern bool_t xdr_smb_dr_string_t(XDR *, smb_dr_string_t *);
 extern bool_t xdr_smb_dr_bytes_t(XDR *, smb_dr_bytes_t *);
-extern bool_t xdr_smb_dr_user_ctx_t(XDR *, smb_dr_user_ctx_t *);
 extern bool_t xdr_smb_dr_ulist_t(XDR *, smb_dr_ulist_t *);
 extern bool_t xdr_smb_dr_kshare_t(XDR *, smb_dr_kshare_t *);
+
+int smb_opipe_hdr_encode(smb_opipe_hdr_t *, uint8_t *, uint32_t);
+int smb_opipe_hdr_decode(smb_opipe_hdr_t *, uint8_t *, uint32_t);
+bool_t smb_opipe_hdr_xdr(XDR *xdrs, smb_opipe_hdr_t *objp);
+int smb_opipe_context_encode(smb_opipe_context_t *, uint8_t *, uint32_t);
+int smb_opipe_context_decode(smb_opipe_context_t *, uint8_t *, uint32_t);
+bool_t smb_opipe_context_xdr(XDR *, smb_opipe_context_t *);
 
 #ifdef	__cplusplus
 }

@@ -176,77 +176,6 @@ typedef struct smb_attr {
 			SMB_AT_BLKSIZE|SMB_AT_NBLOCKS|SMB_AT_SEQ|SMB_AT_SMB)
 
 /*
- * DOS Attributes
- * Previously defined in smbsrv/ntaccess.h
- */
-
-#define	FILE_ATTRIBUTE_READONLY			0x00000001
-#define	FILE_ATTRIBUTE_HIDDEN			0x00000002
-#define	FILE_ATTRIBUTE_SYSTEM			0x00000004
-#define	FILE_ATTRIBUTE_DIRECTORY		0x00000010
-#define	FILE_ATTRIBUTE_ARCHIVE			0x00000020
-#define	FILE_ATTRIBUTE_ENCRYPTED		0x00000040
-#define	FILE_ATTRIBUTE_NORMAL			0x00000080
-#define	FILE_ATTRIBUTE_TEMPORARY		0x00000100
-#define	FILE_ATTRIBUTE_SPARSE_FILE		0x00000200
-#define	FILE_ATTRIBUTE_REPARSE_POINT		0x00000400
-#define	FILE_ATTRIBUTE_COMPRESSED		0x00000800
-#define	FILE_ATTRIBUTE_OFFLINE			0x00001000
-#define	FILE_ATTRIBUTE_NOT_CONTENT_INDEXED	0x00002000
-#define	FILE_ATTRIBUTE_MODIFIED			0x00004000
-#define	FILE_ATTRIBUTE_QUARANTINED		0x00008000
-#define	FILE_ATTRIBUTE_VALID_FLAGS		0x0000dfb7
-#define	FILE_ATTRIBUTE_VALID_SET_FLAGS		0x0000dfa7
-#define	FILE_ATTRIBUTE_MASK			0x00003FFF
-
-
-#ifndef PBSHORTCUT
-/* remove from libsmbbase */
-#define	FHF_SMB			0x02
-#endif
-
-/* DOS specific attribute bits */
-#define	FSA_DOSATTR	(FILE_ATTRIBUTE_ARCHIVE | FILE_ATTRIBUTE_SYSTEM | \
-			FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN)
-
-/*
- * File types (FSA_FMT) and permissions (FSA_MODMASK).
- * Restricted to lower 16-bits due to FS inode definitions.
- */
-#define	FSA_MTIME_SEQ	0x10000000
-/* #define FSA_USTREAM_SKIPSEQ	0x10000000 */
-#define	FSA_UNDEF	0007000
-#define	FSA_SUID	0004000
-#define	FSA_SGID	0002000
-#define	FSA_STICKY	0001000
-#define	FSA_UPERM	0000700
-#define	FSA_UREAD	0000400
-#define	FSA_UWRITE	0000200
-#define	FSA_UEXEC	0000100
-#define	FSA_GPERM	0000070
-#define	FSA_GREAD	0000040
-#define	FSA_GWRITE	0000020
-#define	FSA_GEXEC	0000010
-#define	FSA_OPERM	0000007
-#define	FSA_OREAD	0000004
-#define	FSA_OWRITE	0000002
-#define	FSA_OEXEC	0000001
-
-
-#define	FSA_PERM_MASK		(FSA_UPERM | FSA_GPERM | FSA_OPERM)
-#define	FSA_MODMASK		0007777	/* mutable by fs_setaddr() */
-#define	FSA_DIR_PERM		0777	/* default permission for new */
-					/* directories */
-#define	FSA_FILE_PERM		0666	/* default permission for new files */
-
-#define	FCM_CREATEVERFSIZE	8
-
-/* stability for write */
-#define	FSSTAB_UNSTABLE		0
-#define	FSSTAB_DATA_SYNC	1
-#define	FSSTAB_FILE_SYNC	2
-
-/*
  * fs_online flags (meaning when set):
  *
  * FSOLF_NOMON		Do not monitor this FS.
@@ -325,7 +254,7 @@ void smb_vop_start(void);
 int smb_vop_open(vnode_t **, int, cred_t *);
 int smb_vop_close(vnode_t *, int, cred_t *);
 int smb_vop_read(vnode_t *, uio_t *, cred_t *);
-int smb_vop_write(vnode_t *, uio_t *, unsigned int *, uint32_t *, cred_t *);
+int smb_vop_write(vnode_t *, uio_t *, int, uint32_t *, cred_t *);
 int smb_vop_getattr(vnode_t *, vnode_t *, smb_attr_t *, int, cred_t *);
 int smb_vop_setattr(vnode_t *, vnode_t *, smb_attr_t *, int, cred_t *,
     boolean_t);

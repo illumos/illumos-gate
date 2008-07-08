@@ -222,7 +222,7 @@
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/cifs.h>
 #include <smbsrv/smb_fsops.h>
-#include <smbsrv/lmshare.h>
+#include <smbsrv/smb_share.h>
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_kstat.h>
 
@@ -238,8 +238,8 @@ static int smb_server_listen(smb_server_t *, smb_listener_daemon_t *,
     in_port_t, int);
 static int smb_server_lookup(smb_server_t **);
 static void smb_server_release(smb_server_t *);
-static int smb_server_ulist_geti(smb_session_list_t *, int, smb_dr_user_ctx_t *,
-    int);
+static int smb_server_ulist_geti(smb_session_list_t *, int,
+    smb_opipe_context_t *, int);
 static void smb_server_store_cfg(smb_server_t *, smb_kmod_cfg_t *);
 static void smb_server_stop(smb_server_t *);
 static int smb_server_fsop_start(smb_server_t *);
@@ -374,7 +374,7 @@ smb_server_create(void)
 
 	sv->sv_pid = curproc->p_pid;
 
-	smb_winpipe_init();
+	smb_opipe_door_init();
 	(void) smb_server_kstat_init(sv);
 
 	mutex_init(&sv->sv_mutex, NULL, MUTEX_DEFAULT, NULL);
@@ -453,7 +453,7 @@ smb_server_delete(void)
 
 	smb_server_stop(sv);
 	rw_destroy(&sv->sv_cfg_lock);
-	smb_winpipe_fini();
+	smb_opipe_door_fini();
 	smb_server_kstat_fini(sv);
 	smb_llist_destructor(&sv->sv_vfs_list);
 	kmem_cache_destroy(sv->si_cache_vfs);
@@ -576,8 +576,8 @@ smb_server_start(struct smb_io_start *io_start)
 			    "Cannot remove NET_MAC_AWARE privilege");
 			break;
 		}
-		if (rc = smb_winpipe_open(io_start->winpipe)) {
-			cmn_err(CE_WARN, "Cannot open winpipe door");
+		if (rc = smb_opipe_door_open(io_start->opipe)) {
+			cmn_err(CE_WARN, "Cannot open opipe door");
 			break;
 		}
 		sv->sv_state = SMB_SERVER_STATE_RUNNING;
@@ -1169,7 +1169,7 @@ smb_server_stop(smb_server_t *sv)
 {
 	ASSERT(sv->sv_magic == SMB_SERVER_MAGIC);
 
-	smb_winpipe_close();
+	smb_opipe_door_close();
 	smb_thread_stop(&sv->si_thread_timers);
 	smb_kdoor_clnt_stop();
 	smb_kshare_fini(sv->sv_lmshrd);
@@ -1340,7 +1340,7 @@ static int
 smb_server_ulist_geti(
     smb_session_list_t	*se,
     int			offset,
-    smb_dr_user_ctx_t	*uinfo,
+    smb_opipe_context_t	*ctx,
     int			max_cnt)
 {
 	smb_session_t	*sn = NULL;
@@ -1365,15 +1365,8 @@ smb_server_ulist_geti(
 					continue;
 				}
 
-				if (smb_dr_user_create(uinfo, sn->s_kid,
-				    user->u_uid, user->u_domain, user->u_name,
-				    sn->workstation, sn->ipaddr, sn->native_os,
-				    user->u_logon_time, user->u_flags) != 0) {
-					mutex_exit(&user->u_mutex);
-					user = smb_llist_next(ulist, user);
-					continue;
-				}
-				uinfo++;
+				smb_user_context_init(user, ctx);
+				ctx++;
 				cnt++;
 			}
 			mutex_exit(&user->u_mutex);
@@ -1395,23 +1388,6 @@ smb_server_store_cfg(smb_server_t *sv, smb_kmod_cfg_t *cfg)
 	    &sv->sv_nbt_daemon.ld_session_list, cfg->skc_keepalive);
 	smb_session_correct_keep_alive_values(
 	    &sv->sv_tcp_daemon.ld_session_list, cfg->skc_keepalive);
-
-	/*
-	 * XXX The following code was pulled from smb_oplock_init.
-	 * It should be combined with with the config process if
-	 * this info will be stored with the configuration or with
-	 * the smb_fsop_start function if the data will be stored
-	 * in the root of the fs.
-	 */
-
-	/*
-	 * XXX oplock enable flag.
-	 * Should be stored in extended attribute in root of fs
-	 * or a ZFS user-defined property.
-	 */
-	if (cfg->skc_oplock_enable == 0) {
-		cmn_err(CE_NOTE, "SmbOplocks: disabled");
-	}
 
 	bcopy(cfg, &sv->sv_cfg, sizeof (sv->sv_cfg));
 }

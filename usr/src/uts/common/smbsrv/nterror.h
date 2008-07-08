@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -272,6 +272,7 @@ extern "C" {
 #define	ERROR_INVALID_EA_NAME		254
 #define	ERROR_EA_LIST_INCONSISTENT	255
 #define	ERROR_NO_MORE_ITEMS		259
+#define	ERROR_MORE_ENTRIES		261
 #define	ERROR_CANNOT_COPY		266
 #define	ERROR_DIRECTORY			267
 #define	ERROR_EAS_DIDNT_FIT		275

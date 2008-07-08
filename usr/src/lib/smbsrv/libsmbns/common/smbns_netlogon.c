@@ -58,7 +58,7 @@ static void smb_netlogon_send(struct name_entry *name, char *domain,
     unsigned char *buffer, int count);
 
 static void smb_netlogon_rdc_rsp(char *src_name, uint32_t src_ipaddr);
-static int better_dc(uint32_t cur_ip, uint32_t new_ip);
+static int smb_better_dc(uint32_t cur_ip, uint32_t new_ip);
 
 static char resource_domain[SMB_PI_MAX_DOMAIN];
 
@@ -503,7 +503,7 @@ smb_netlogon_rdc_rsp(char *src_name, uint32_t src_ipaddr)
 	} else
 		ipaddr = 0;
 
-	if (better_dc(ipaddr, src_ipaddr) ||
+	if (smb_better_dc(ipaddr, src_ipaddr) ||
 	    (prefer_ipaddr != 0 && prefer_ipaddr == src_ipaddr)) {
 		smb_setdomaininfo(resource_domain, src_name,
 		    src_ipaddr);
@@ -513,7 +513,7 @@ smb_netlogon_rdc_rsp(char *src_name, uint32_t src_ipaddr)
 }
 
 static int
-better_dc(uint32_t cur_ip, uint32_t new_ip)
+smb_better_dc(uint32_t cur_ip, uint32_t new_ip)
 {
 	/*
 	 * If we don't have any current DC,
@@ -546,19 +546,14 @@ better_dc(uint32_t cur_ip, uint32_t new_ip)
  * have been updated. Otherwise returns 0.
  */
 int
-msdcs_lookup_ads(char *nbt_domain, char *server)
+smb_msdcs_lookup_ads(char *nbt_domain, char *server)
 {
-	ADS_HOST_INFO *hinfo = 0;
+	smb_ads_host_info_t *hinfo = 0;
 	int ads_port = 0;
 	char ads_domain[MAXHOSTNAMELEN];
-	char site_service[MAXHOSTNAMELEN];
-	char service[MAXHOSTNAMELEN];
-	char site[MAXHOSTNAMELEN];
 	char *p;
-	char *ip_addr;
 	char *nbt_hostname;
-	struct in_addr ns_list[MAXNS];
-	int i, cnt, go_next;
+	struct in_addr addr;
 
 	if (!nbt_domain)
 		return (0);
@@ -567,41 +562,15 @@ msdcs_lookup_ads(char *nbt_domain, char *server)
 	if (smb_resolve_fqdn(nbt_domain, ads_domain, MAXHOSTNAMELEN) != 1)
 		return (0);
 
-	(void) smb_config_getstr(SMB_CI_ADS_SITE, site, sizeof (site));
-	if (*site != '\0') {
-		(void) snprintf(site_service, MAXHOSTNAMELEN,
-		    "_ldap._tcp.%s._sites.dc._msdcs.%s",
-		    site, ads_domain);
-	}
-
-	(void) snprintf(service, MAXHOSTNAMELEN,
-	    "_ldap._tcp.dc._msdcs.%s", ads_domain);
-
-	cnt = smb_get_nameservers(ns_list, MAXNS);
-
-	go_next = 0;
-	for (i = 0; i < cnt; i++) {
-		ip_addr = inet_ntoa(ns_list[i]);
-
-		hinfo = ads_find_host(ip_addr, ads_domain, server, &ads_port,
-		    site_service, &go_next);
-
-		if (hinfo == NULL) {
-			hinfo = ads_find_host(ip_addr, ads_domain, server,
-			    &ads_port, service, &go_next);
-		}
-
-		if ((hinfo != NULL) || (go_next == 0))
-			break;
-	}
-
-	if (hinfo == NULL) {
+	if ((hinfo = smb_ads_find_host(ads_domain, server, &ads_port))
+	    == NULL) {
 		syslog(LOG_DEBUG, "msdcsLookupADS: unable to find host");
 		return (0);
 	}
 
-	syslog(LOG_DEBUG, "msdcsLookupADS: %s [%I]", hinfo->name,
-	    hinfo->ip_addr);
+	addr.s_addr = hinfo->ip_addr;
+	syslog(LOG_DEBUG, "msdcsLookupADS: %s [%s]", hinfo->name,
+	    inet_ntoa(addr));
 
 	/*
 	 * Remove the domain extension - the

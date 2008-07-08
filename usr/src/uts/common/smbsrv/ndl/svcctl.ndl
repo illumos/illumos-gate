@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,18 +36,72 @@
 
 #include "ndrtypes.ndl"
 
+/* Windows NT */
 #define SVCCTL_OPNUM_Close			0x00
+#define	SVCCTL_OPNUM_ControlService		0x01
+#define	SVCCTL_OPNUM_DeleteService		0x02
+#define	SVCCTL_OPNUM_LockServiceDatabase	0x03
+#define	SVCCTL_OPNUM_QueryServiceSecurity	0x04
+#define	SVCCTL_OPNUM_SetServiceSecurity		0x05
 #define SVCCTL_OPNUM_QueryServiceStatus		0x06
+#define	SVCCTL_OPNUM_SetServiceStatus		0x07
+#define	SVCCTL_OPNUM_UnlockServiceDatabase	0x08
+#define	SVCCTL_OPNUM_NotifyBootConfigStatus	0x09
+#define	SVCCTL_OPNUM_SetServiceBits		0x0a
+#define	SVCCTL_OPNUM_ChangeServiceConfig	0x0b
+#define	SVCCTL_OPNUM_CreateService		0x0c
+#define	SVCCTL_OPNUM_EnumDependentServices	0x0d
 #define SVCCTL_OPNUM_EnumServicesStatus		0x0E
 #define SVCCTL_OPNUM_OpenManager		0x0F
 #define SVCCTL_OPNUM_OpenService		0x10
 #define SVCCTL_OPNUM_QueryServiceConfig		0x11
+#define	SVCCTL_OPNUM_QueryServiceLockStatus	0x12
+#define	SVCCTL_OPNUM_StartService		0x13
+#define	SVCCTL_OPNUM_GetServiceDisplayNameW	0x14
+#define	SVCCTL_OPNUM_GetServiceKeyNameW		0x15
+#define	SVCCTL_OPNUM_SetServiceBitsA		0x16
+#define	SVCCTL_OPNUM_ChangeServiceConfigA	0x17
+#define	SVCCTL_OPNUM_CreateServiceA		0x18
+#define	SVCCTL_OPNUM_EnumDependentServicesA	0x19
+#define	SVCCTL_OPNUM_EnumServiceStatusA		0x1a
+#define	SVCCTL_OPNUM_OpenSCManagerA		0x1b
+#define	SVCCTL_OPNUM_OpenServiceA		0x1c
+#define	SVCCTL_OPNUM_QueryServiceConfigA	0x1d
+#define	SVCCTL_OPNUM_QueryServiceLockStatusA	0x1e
+#define	SVCCTL_OPNUM_StartServiceA		0x1f
+#define	SVCCTL_OPNUM_GetServiceDisplayNameA	0x20
+#define	SVCCTL_OPNUM_GetServiceKeyNameA		0x21
+#define	SVCCTL_OPNUM_GetCurrentGroupStateW	0x22
+#define	SVCCTL_OPNUM_EnumServiceGroupW		0x23
+#define	SVCCTL_OPNUM_ChangeServiceConfig2A	0x24
+#define	SVCCTL_OPNUM_ChangeServiceConfig2W	0x25
+#define	SVCCTL_OPNUM_QueryServiceConfig2A	0x26
+
+/* Windows 2000 */
+#define	SVCCTL_OPNUM_QueryServiceConfig2W	0x27
+#define	SVCCTL_OPNUM_QueryServiceStatusEx	0x28
+#define	SVCCTL_OPNUM_EnumServiceStatusExA	0x29
+#define	SVCCTL_OPNUM_EnumServiceStatusExW	0x2a
+
+/* Windows XP and Windows Server 2003 */
+#define	SVCCTL_OPNUM_SendTSMessage		0x2b
+
+/* Windows Vista */
+#define	SVCCTL_OPNUM_CreateServiceWOW64A	0x2c
+#define	SVCCTL_OPNUM_CreateServiceWOW64W	0x2d
+#define	SVCCTL_OPNUM_QueryServiceTagInfo	0x2e
+#define	SVCCTL_OPNUM_NotifyServiceStatusChange	0x2f
+#define	SVCCTL_OPNUM_GetNotifyResult		0x30
+#define	SVCCTL_OPNUM_CloseNotifyHandle		0x31
+#define	SVCCTL_OPNUM_ControlServiceExA		0x32
+#define	SVCCTL_OPNUM_ControlServiceExW		0x33
+#define	SVCCTL_OPNUM_SendPnPMessage		0x34
+#define	SVCCTL_OPNUM_ValidatePnPService		0x35
+#define	SVCCTL_OPNUM_OpenServiceStatusHandle	0x36
 
 /*
  * Standard opaque 20 byte RPC handle.
  */
-
-
 struct svcctl_handle {
 	DWORD hand1;
 	DWORD hand2;
@@ -229,6 +283,16 @@ struct svcctl_QueryServiceStatus {
 /*
  ***********************************************************************
  * EnumServicesStatus
+ *
+ * This should probably be:
+ *	...
+ *	INOUT	DWORD buf_size;
+ *    SIZE_IS(buf_size)
+ *	OUT	BYTE *services;
+ *	OUT	DWORD bytes_needed;
+ *	OUT	DWORD svc_num;
+ *	INOUT	DWORD *resume_handle;
+ *	...
  ***********************************************************************
  */
 OPERATION(SVCCTL_OPNUM_EnumServicesStatus)
@@ -237,7 +301,7 @@ struct svcctl_EnumServicesStatus {
 	IN		DWORD svc_type;
 	IN		DWORD svc_state;
 	INOUT		DWORD buf_size;
-	IN		DWORD unknown;
+	IN		DWORD address;
 	OUT		BYTE services[1024];
 	OUT		DWORD bytes_needed;
 	OUT		DWORD svc_num;
@@ -261,6 +325,34 @@ struct svcctl_QueryServiceConfig {
 
 /*
  ***********************************************************************
+ * GetServiceDisplayNameW       
+ ***********************************************************************
+ */
+OPERATION(SVCCTL_OPNUM_GetServiceDisplayNameW)
+struct svcctl_GetServiceDisplayNameW {
+	IN		svcctl_handle_t service_handle;
+	IN		LPTSTR service_name;
+	OUT		LPTSTR display_name;
+	INOUT		DWORD buf_size;
+	OUT		DWORD status;
+};
+
+/*
+ ***********************************************************************
+ * GetServiceKeyNameW   
+ ***********************************************************************
+ */
+OPERATION(SVCCTL_OPNUM_GetServiceKeyNameW)
+struct svcctl_GetServiceKeyNameW {
+	IN		svcctl_handle_t service_handle;
+	IN		LPTSTR service_name;
+	OUT		LPTSTR key_name;
+	INOUT		DWORD buf_size;
+	OUT		DWORD status;
+};
+
+/*
+ ***********************************************************************
  * The SVCCTL interface definition.
  ***********************************************************************
  */
@@ -278,6 +370,10 @@ union svcctl_interface {
 		struct svcctl_EnumServicesStatus	SvcEnumServicesStatus;
 	CASE(SVCCTL_OPNUM_QueryServiceConfig)
 		struct svcctl_QueryServiceConfig	SvcQueryServiceConfig;
+	CASE(SVCCTL_OPNUM_GetServiceDisplayNameW)
+		struct svcctl_GetServiceDisplayNameW SvcGetServiceDisplayNameW;
+	CASE(SVCCTL_OPNUM_GetServiceKeyNameW)
+		struct svcctl_GetServiceKeyNameW	SvcGetServiceKeyNameW;
 };
 
 typedef union svcctl_interface	svcctl_interface_t;

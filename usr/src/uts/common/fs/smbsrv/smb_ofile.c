@@ -184,8 +184,6 @@ smb_ofile_open(
     uint32_t		create_options,
     uint32_t		share_access,
     uint16_t		ftype,
-    char		*pipe_name,
-    uint32_t		rpc_fid,
     uint32_t		uniqid,
     smb_error_t		*err)
 {
@@ -221,12 +219,7 @@ smb_ofile_open(
 	of->f_state = SMB_OFILE_STATE_OPEN;
 
 	if (ftype == SMB_FTYPE_MESG_PIPE) {
-		of->f_pipe_info = kmem_alloc(sizeof (mlsvc_pipe_t), KM_SLEEP);
-		bzero(of->f_pipe_info, sizeof (mlsvc_pipe_t));
-		of->f_pipe_info->pipe_name = pipe_name;
-		of->f_pipe_info->fid = rpc_fid;
-		mutex_init(&of->f_pipe_info->mutex, NULL, MUTEX_DEFAULT, NULL);
-		cv_init(&of->f_pipe_info->cv, NULL, CV_DEFAULT, NULL);
+		of->f_pipe = kmem_zalloc(sizeof (smb_opipe_t), KM_SLEEP);
 	} else {
 		ASSERT(ftype == SMB_FTYPE_DISK); /* Regular file, not a pipe */
 		ASSERT(node);
@@ -294,12 +287,12 @@ smb_ofile_close(
 		mutex_exit(&of->f_mutex);
 
 		if (of->f_ftype == SMB_FTYPE_MESG_PIPE) {
-			smb_rpc_close(of);
+			smb_opipe_close(of);
 		} else {
 			if (of->f_node->flags & NODE_CREATED_READONLY) {
 				smb_node_set_dosattr(of->f_node,
 				    of->f_node->attr.sa_dosattr |
-				    SMB_FA_READONLY);
+				    FILE_ATTRIBUTE_READONLY);
 				of->f_node->flags &= ~NODE_CREATED_READONLY;
 			}
 
@@ -701,8 +694,8 @@ smb_ofile_delete(
 	atomic_dec_32(&of->f_session->s_file_cnt);
 
 	if (of->f_ftype == SMB_FTYPE_MESG_PIPE) {
-		kmem_free(of->f_pipe_info, sizeof (mlsvc_pipe_t));
-		of->f_pipe_info = NULL;
+		kmem_free(of->f_pipe, sizeof (smb_opipe_t));
+		of->f_pipe = NULL;
 	} else {
 		ASSERT(of->f_ftype == SMB_FTYPE_DISK);
 		ASSERT(of->f_node != NULL);

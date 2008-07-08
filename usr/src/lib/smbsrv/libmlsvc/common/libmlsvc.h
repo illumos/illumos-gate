@@ -33,7 +33,7 @@
 #include <smbsrv/hash_table.h>
 #include <smbsrv/smb_token.h>
 #include <smbsrv/smb_privilege.h>
-#include <smbsrv/lmshare.h>
+#include <smbsrv/smb_share.h>
 #include <smbsrv/libsmb.h>
 
 #ifdef	__cplusplus
@@ -64,7 +64,7 @@ typedef struct smb_autohome {
 
 extern void smb_autohome_add(const char *);
 extern void smb_autohome_remove(const char *);
-extern boolean_t smb_is_autohome(const lmshare_info_t *);
+extern boolean_t smb_is_autohome(const smb_share_t *);
 
 #ifdef	__cplusplus
 }

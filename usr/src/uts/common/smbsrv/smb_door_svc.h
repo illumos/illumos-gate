@@ -28,6 +28,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/door.h>
 #include <smbsrv/smb_token.h>
 
 #ifdef	__cplusplus

@@ -320,7 +320,7 @@ smb_oplock_break(smb_node_t *node)
 	max_time = MSEC_TO_TICK(smb_oplock_timeout);
 	do {
 		MBC_INIT(&mbc, MLEN);
-		(void) smb_encode_mbc(&mbc, "Mb19.wwwwbb3.ww10.",
+		(void) smb_mbc_encodef(&mbc, "Mb19.wwwwbb3.ww10.",
 		    SMB_COM_LOCKING_ANDX, oplock_ofile->f_tree->t_tid,
 		    0xffff, 0, 0xffff, 8, 0xff, oplock_ofile->f_fid,
 		    LOCKING_ANDX_OPLOCK_RELEASE);

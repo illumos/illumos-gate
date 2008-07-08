@@ -57,7 +57,7 @@ typedef struct {
 		smb_kmod_cfg_t	cfg;
 
 		struct smb_io_start {
-			int	winpipe;
+			int	opipe;
 			int	lmshrd;
 			int	udoor;
 		} start;

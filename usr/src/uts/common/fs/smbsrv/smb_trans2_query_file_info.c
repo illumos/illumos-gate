@@ -97,7 +97,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 	 */
 	char *mangled_name = 0;
 
-	if (smb_decode_mbc(&xa->req_param_mb, "ww", &sr->smb_fid,
+	if (smb_mbc_decodef(&xa->req_param_mb, "ww", &sr->smb_fid,
 	    &infolev) != 0) {
 		return (SDRC_ERROR);
 	}
@@ -156,15 +156,13 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		/*
 		 * The pipe is only valid for SMB_FTYPE_MESG_PIPE files.
 		 */
-		mlsvc_pipe_t *pipe_info = sr->fid_ofile->f_pipe_info;
-		namep = pipe_info->pipe_name;
-
+		namep = sr->fid_ofile->f_pipe->p_name;
 		filename = namep;
 		filename_len = smb_ascii_or_unicode_strlen(sr, filename);
 
 		ap = &pipe_attr;
 		creation_time = (timestruc_t *)&ap->sa_vattr.va_ctime;
-		dattr = SMB_FA_NORMAL;
+		dattr = FILE_ATTRIBUTE_NORMAL;
 		datasz = allocsz = 0;
 
 		delete_on_close = 0;
@@ -185,7 +183,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 
 	switch (infolev) {
 	case FileAccessInformation:
-		(void) smb_encode_mbc(&xa->rep_data_mb, "l",
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "l",
 		    sr->fid_ofile->f_granted_access);
 		break;
 
@@ -195,8 +193,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		if (allocsz > UINT_MAX)
 			allocsz = UINT_MAX;
 
-		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
-		(void) smb_encode_mbc(&xa->rep_data_mb,
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb,
 		    ((sr->session->native_os == NATIVE_OS_WIN95)
 		    ? "YYYllw" : "yyyllw"),
 		    smb_gmt2local(sr, creation_time->tv_sec),
@@ -213,8 +211,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		if (allocsz > UINT_MAX)
 			allocsz = UINT_MAX;
 
-		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
-		(void) smb_encode_mbc(&xa->rep_data_mb,
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb,
 		    ((sr->session->native_os == NATIVE_OS_WIN95)
 		    ? "YYYllwl" : "yyyllwl"),
 		    smb_gmt2local(sr, creation_time->tv_sec),
@@ -227,8 +225,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 
 	case SMB_INFO_QUERY_EAS_FROM_LIST:
 	case SMB_INFO_QUERY_ALL_EAS:
-		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
-		(void) smb_encode_mbc(&xa->rep_data_mb, "l", 0);
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "l", 0);
 		break;
 
 	case SMB_INFO_IS_NAME_VALID:
@@ -240,8 +238,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		 * response, which are required by NetBench 5.01.
 		 * Similar change in smb_trans2_query_path_information.c.
 		 */
-		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
-		(void) smb_encode_mbc(&xa->rep_data_mb, "TTTTw6.",
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "TTTTw6.",
 		    creation_time,
 		    &ap->sa_vattr.va_atime,
 		    &ap->sa_vattr.va_mtime,
@@ -250,13 +248,13 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_QUERY_FILE_STANDARD_INFO:
-		(void) smb_encode_mbc(&xa->rep_param_mb, "w",
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w",
 		    SMB_QUERY_FILE_STANDARD_INFO);
 		/*
 		 * Add 2 bytes to pad data to long. It is
 		 * necessary because Win2k expects the padded bytes.
 		 */
-		(void) smb_encode_mbc(&xa->rep_data_mb, "qqlbb2.",
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "qqlbb2.",
 		    (uint64_t)allocsz,
 		    (uint64_t)datasz,
 		    ap->sa_vattr.va_nlink,
@@ -265,8 +263,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_QUERY_FILE_EA_INFO:
-		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
-		(void) smb_encode_mbc(&xa->rep_data_mb, "l", 0);
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "l", 0);
 		break;
 
 	case SMB_QUERY_FILE_NAME_INFO:
@@ -291,8 +289,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 			    smb_ascii_or_unicode_strlen(sr, filename);
 		}
 
-		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
-		(void) smb_encode_mbc(&xa->rep_data_mb, "%lu", sr,
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lu", sr,
 		    filename_len, filename);
 		break;
 
@@ -311,8 +309,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		 * AlignmentRequirement in spec. that aren't sent
 		 * on the wire.
 		 */
-		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
-		(void) smb_encode_mbc(&xa->rep_data_mb, "TTTTw6.qqlbb2.l",
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "TTTTw6.qqlbb2.l",
 		    creation_time,
 		    &ap->sa_vattr.va_atime,
 		    &ap->sa_vattr.va_mtime,
@@ -324,7 +322,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		    delete_on_close,
 		    is_dir,
 		    0);
-		(void) smb_encode_mbc(&xa->rep_data_mb, "%lu",
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lu",
 		    sr, filename_len, filename);
 		break;
 
@@ -344,8 +342,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		 */
 		alt_nm_ptr = (*mangled_name == 0) ?
 		    utf8_strupr(filename) : mangled_name;
-		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
-		(void) smb_encode_mbc(&xa->rep_data_mb, "%lu", sr,
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lu", sr,
 		    smb_ascii_or_unicode_strlen(sr, alt_nm_ptr), alt_nm_ptr);
 		break;
 
@@ -358,7 +356,7 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 			smbsr_error(sr, 0, ERRDOS, ERRbadfile);
 			return (SDRC_ERROR);
 		}
-		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
 		if (SMB_IS_STREAM(node)) {
 			ASSERT(node->unnamed_stream_node);
 			ASSERT(node->unnamed_stream_node->n_magic ==
@@ -374,8 +372,8 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 		}
 	case SMB_QUERY_FILE_COMPRESSION_INFO:
-		(void) smb_encode_mbc(&xa->rep_param_mb, "w", 0);
-		(void) smb_encode_mbc(&xa->rep_data_mb, "qwbbb3.",
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "w", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "qwbbb3.",
 		    datasz, 0, 0, 0, 0);
 		break;
 
@@ -472,7 +470,7 @@ smb_encode_stream_info(
 			    smb_ascii_or_unicode_strlen(sr, stream_name);
 			next_offset = 0;
 
-			(void) smb_encode_mbc(&xa->rep_data_mb, "%llqqu",
+			(void) smb_mbc_encodef(&xa->rep_data_mb, "%llqqu",
 			    sr, next_offset, stream_nlen, datasz, datasz,
 			    stream_name);
 		}
@@ -493,7 +491,7 @@ smb_encode_stream_info(
 		next_offset = 24 + stream_nlen +
 		    smb_ascii_or_unicode_null_len(sr);
 
-		(void) smb_encode_mbc(&xa->rep_data_mb, "%llqqu", sr,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llqqu", sr,
 		    next_offset, stream_nlen, datasz, datasz, stream_name);
 	}
 
@@ -525,7 +523,7 @@ smb_encode_stream_info(
 			pad = smb_pad_align(next_offset, 8);
 			next_offset += pad;
 		}
-		(void) smb_encode_mbc(&xa->rep_data_mb, "%llqqu#.",
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llqqu#.",
 		    sr, next_offset, stream_nlen,
 		    stream_info->size, stream_info->size,
 		    stream_info->name, pad);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,8 +160,8 @@ smb_dwncall_share(int op, char *path, char *sharename)
 	smb_dr_kshare_t kshare;
 	int fd, rc = -1;
 
-	if ((op != LMSHR_ADD) &&
-	    (op != LMSHR_DELETE))
+	if ((op != SMB_SHROP_ADD) &&
+	    (op != SMB_SHROP_DELETE))
 		return (-1);
 
 	if ((fd = smb_dwncall_init_fd(opcode)) < 0) {

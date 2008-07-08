@@ -189,7 +189,7 @@ smb_set_standard_info(
 	struct smb_node *node = info->node;
 	int rc;
 
-	if (smb_decode_mbc(&info->ts_xa->req_data_mb, "yyyllw",
+	if (smb_mbc_decodef(&info->ts_xa->req_data_mb, "yyyllw",
 	    &Creation,			/* CreationDate/Time */
 	    &LastAccess,		/* LastAccessDate/Time */
 	    &LastWrite,			/* LastWriteDate/Time */
@@ -258,7 +258,7 @@ smb_set_basic_info(
 	DWORD status = NT_STATUS_SUCCESS;
 	int rc;
 
-	if (smb_decode_mbc(&info->ts_xa->req_data_mb, "qqqqw",
+	if (smb_mbc_decodef(&info->ts_xa->req_data_mb, "qqqqw",
 	    &NT_Creation,		/* CreationDate/Time */
 	    &NT_LastAccess,		/* LastAccessDate/Time */
 	    &NT_LastWrite,		/* LastWriteDate/Time */
@@ -323,7 +323,7 @@ smb_set_alloc_info(
 	struct smb_node *node = info->node;
 	int rc;
 
-	if (smb_decode_mbc(&info->ts_xa->req_data_mb, "q", &DataSize) != 0)
+	if (smb_mbc_decodef(&info->ts_xa->req_data_mb, "q", &DataSize) != 0)
 		return (NT_STATUS_DATA_ERROR);
 
 	if (node->attr.sa_vattr.va_size != DataSize) {
@@ -385,7 +385,7 @@ smb_set_disposition_info(
 {
 	unsigned char		mark_delete;
 
-	if (smb_decode_mbc(&info->ts_xa->req_data_mb, "b", &mark_delete) != 0)
+	if (smb_mbc_decodef(&info->ts_xa->req_data_mb, "b", &mark_delete) != 0)
 		return (NT_STATUS_DATA_ERROR);
 
 	if ((sr->fid_ofile == NULL) ||

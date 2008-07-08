@@ -590,7 +590,7 @@ smb_dispatch_request(struct smb_request *sr)
 	sr->orig_request_hdr = sr->command.chain_offset;
 
 	/* If this connection is shutting down just kill request */
-	if (smb_decode_mbc(&sr->command, SMB_HEADER_ED_FMT,
+	if (smb_mbc_decodef(&sr->command, SMB_HEADER_ED_FMT,
 	    &sr->smb_com,
 	    &sr->smb_rcls,
 	    &sr->smb_reh,
@@ -623,7 +623,7 @@ smb_dispatch_request(struct smb_request *sr)
 	sr->smb_err = 0;
 	sr->smb_flg2 &= ~SMB_FLAGS2_NT_STATUS;
 
-	(void) smb_encode_mbc(&sr->reply, SMB_HEADER_ED_FMT,
+	(void) smb_mbc_encodef(&sr->reply, SMB_HEADER_ED_FMT,
 	    sr->smb_com,
 	    sr->smb_rcls,
 	    sr->smb_reh,
@@ -658,7 +658,7 @@ andx_more:
 
 	smb_rwx_rwenter(&sr->session->s_lock, sdd->sdt_slock_mode);
 
-	if (smb_decode_mbc(&sr->command, "b", &sr->smb_wct) != 0) {
+	if (smb_mbc_decodef(&sr->command, "b", &sr->smb_wct) != 0) {
 		disconnect = B_TRUE;
 		goto report_error;
 	}
@@ -666,7 +666,7 @@ andx_more:
 	(void) MBC_SHADOW_CHAIN(&sr->smb_vwv, &sr->command,
 	    sr->command.chain_offset, sr->smb_wct * 2);
 
-	if (smb_decode_mbc(&sr->command, "#.w", sr->smb_wct*2, &sr->smb_bcc)) {
+	if (smb_mbc_decodef(&sr->command, "#.w", sr->smb_wct*2, &sr->smb_bcc)) {
 		disconnect = B_TRUE;
 		goto report_error;
 	}
@@ -685,7 +685,7 @@ andx_more:
 
 	if (is_andx_com(sr->smb_com)) {
 		/* Peek ahead and don't disturb vwv */
-		if (smb_peek_mbc(&sr->smb_vwv, sr->smb_vwv.chain_offset, "b.w",
+		if (smb_mbc_peek(&sr->smb_vwv, sr->smb_vwv.chain_offset, "b.w",
 		    &sr->andx_com, &sr->andx_off) < 0) {
 			disconnect = B_TRUE;
 			goto report_error;
@@ -829,7 +829,7 @@ andx_more:
 	 * and continue processing.
 	 */
 	sr->andx_prev_wct = sr->cur_reply_offset;
-	(void) smb_poke_mbc(&sr->reply, sr->andx_prev_wct + 1, "b.w",
+	(void) smb_mbc_poke(&sr->reply, sr->andx_prev_wct + 1, "b.w",
 	    sr->andx_com, MBC_LENGTH(&sr->reply));
 
 	smb_rwx_rwexit(&sr->session->s_lock);
@@ -840,7 +840,7 @@ andx_more:
 
 report_error:
 	sr->reply.chain_offset = sr->cur_reply_offset;
-	(void) smb_encode_mbc(&sr->reply, "bw", 0, 0);
+	(void) smb_mbc_encodef(&sr->reply, "bw", 0, 0);
 
 	sr->smb_wct = 0;
 	sr->smb_bcc = 0;
@@ -882,7 +882,7 @@ smbsr_encode_result(struct smb_request *sr, int wct, int bcc, char *fmt, ...)
 		return (-1);
 
 	va_start(ap, fmt);
-	(void) smb_mbc_encode(&sr->reply, fmt, ap);
+	(void) smb_mbc_vencodef(&sr->reply, fmt, ap);
 	va_end(ap);
 
 	sr->smb_wct = (unsigned char)wct;
@@ -912,7 +912,7 @@ smbsr_check_result(struct smb_request *sr, int wct, int bcc)
 	if ((offset + 3) > total_bytes)
 		return (-1);
 
-	(void) smb_peek_mbc(&sr->reply, offset, "b", &temp);
+	(void) smb_mbc_peek(&sr->reply, offset, "b", &temp);
 	if (temp != wct)
 		return (-1);
 
@@ -925,13 +925,13 @@ smbsr_check_result(struct smb_request *sr, int wct, int bcc)
 	if ((offset + 2) > total_bytes)
 		return (-1);
 
-	(void) smb_peek_mbc(&sr->reply, offset, "bb", &temp, &temp1);
+	(void) smb_mbc_peek(&sr->reply, offset, "bb", &temp, &temp1);
 	if (bcc == VAR_BCC) {
 		if ((temp != 0xFF) || (temp1 != 0xFF)) {
 			return (-1);
 		} else {
 			bcc = (total_bytes - offset) - 2;
-			(void) smb_poke_mbc(&sr->reply, offset, "bb",
+			(void) smb_mbc_poke(&sr->reply, offset, "bb",
 			    bcc, bcc >> 8);
 		}
 	} else {
@@ -956,7 +956,7 @@ smbsr_decode_vwv(struct smb_request *sr, char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	rc = smb_mbc_decode(&sr->smb_vwv, fmt, ap);
+	rc = smb_mbc_vdecodef(&sr->smb_vwv, fmt, ap);
 	va_end(ap);
 
 	if (rc)
@@ -971,7 +971,7 @@ smbsr_decode_data(struct smb_request *sr, char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	rc = smb_mbc_decode(&sr->smb_data, fmt, ap);
+	rc = smb_mbc_vdecodef(&sr->smb_data, fmt, ap);
 	va_end(ap);
 
 	if (rc)
@@ -987,7 +987,7 @@ smbsr_send_reply(struct smb_request *sr)
 	else
 		sr->smb_flg &= ~SMB_FLAGS_CASE_INSENSITIVE;
 
-	(void) smb_poke_mbc(&sr->reply, 0, SMB_HEADER_ED_FMT,
+	(void) smb_mbc_poke(&sr->reply, 0, SMB_HEADER_ED_FMT,
 	    sr->first_smb_com,
 	    sr->smb_rcls,
 	    sr->smb_reh,

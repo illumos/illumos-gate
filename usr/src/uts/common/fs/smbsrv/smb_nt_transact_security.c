@@ -75,7 +75,7 @@ smb_nt_transact_query_security_info(struct smb_request *sr, struct smb_xa *xa)
 	uint32_t status;
 	smb_error_t err;
 
-	if (smb_decode_mbc(&xa->req_param_mb, "w2.l",
+	if (smb_mbc_decodef(&xa->req_param_mb, "w2.l",
 	    &sr->smb_fid, &secinfo) != 0) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
 		return (SDRC_ERROR);
@@ -123,7 +123,7 @@ smb_nt_transact_query_security_info(struct smb_request *sr, struct smb_xa *xa)
 		 * descriptor. We have to return an error but we
 		 * should provide a buffer size hint for the client.
 		 */
-		(void) smb_encode_mbc(&xa->rep_param_mb, "l", sdlen);
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "l", sdlen);
 		err.severity = ERROR_SEVERITY_ERROR;
 		err.status   = NT_STATUS_BUFFER_TOO_SMALL;
 		err.errcls   = ERRDOS;
@@ -134,7 +134,7 @@ smb_nt_transact_query_security_info(struct smb_request *sr, struct smb_xa *xa)
 	}
 
 	smb_encode_sd(xa, &sd, secinfo);
-	(void) smb_encode_mbc(&xa->rep_param_mb, "l", sdlen);
+	(void) smb_mbc_encodef(&xa->rep_param_mb, "l", sdlen);
 	smb_sd_term(&sd);
 	return (SDRC_SUCCESS);
 }
@@ -165,7 +165,7 @@ smb_nt_transact_set_security_info(struct smb_request *sr, struct smb_xa *xa)
 	uint32_t secinfo;
 	uint32_t status;
 
-	if (smb_decode_mbc(&xa->req_param_mb, "w2.l",
+	if (smb_mbc_decodef(&xa->req_param_mb, "w2.l",
 	    &sr->smb_fid, &secinfo) != 0) {
 		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER, 0, 0);
 		return (SDRC_ERROR);
@@ -233,40 +233,40 @@ smb_encode_sd(struct smb_xa *xa, smb_sd_t *sd, uint32_t secinfo)
 	uint32_t offset = SMB_SD_HDRSIZE;
 
 	/* encode header */
-	(void) smb_encode_mbc(&xa->rep_data_mb, "b.w",
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "b.w",
 	    sd->sd_revision, sd->sd_control | SE_SELF_RELATIVE);
 
 	/* owner offset */
 	if (secinfo & SMB_OWNER_SECINFO) {
 		ASSERT(sd->sd_owner);
-		(void) smb_encode_mbc(&xa->rep_data_mb, "l", offset);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "l", offset);
 		offset += smb_sid_len(sd->sd_owner);
 	} else {
-		(void) smb_encode_mbc(&xa->rep_data_mb, "l", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "l", 0);
 	}
 
 	/* group offset */
 	if (secinfo & SMB_GROUP_SECINFO) {
 		ASSERT(sd->sd_group);
-		(void) smb_encode_mbc(&xa->rep_data_mb, "l", offset);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "l", offset);
 		offset += smb_sid_len(sd->sd_group);
 	} else {
-		(void) smb_encode_mbc(&xa->rep_data_mb, "l", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "l", 0);
 	}
 
 	/* SACL offset */
 	if ((secinfo & SMB_SACL_SECINFO) && (sd->sd_sacl)) {
-		(void) smb_encode_mbc(&xa->rep_data_mb, "l", offset);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "l", offset);
 		offset += smb_acl_len(sd->sd_sacl);
 	} else {
-		(void) smb_encode_mbc(&xa->rep_data_mb, "l", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "l", 0);
 	}
 
 	/* DACL offset */
 	if ((secinfo & SMB_DACL_SECINFO) && (sd->sd_dacl))
-		(void) smb_encode_mbc(&xa->rep_data_mb, "l", offset);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "l", offset);
 	else
-		(void) smb_encode_mbc(&xa->rep_data_mb, "l", 0);
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "l", 0);
 
 	if (secinfo & SMB_OWNER_SECINFO)
 		smb_encode_sid(xa, sd->sd_owner);
@@ -291,16 +291,16 @@ smb_encode_sid(struct smb_xa *xa, smb_sid_t *sid)
 {
 	int i;
 
-	(void) smb_encode_mbc(&xa->rep_data_mb, "bb",
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "bb",
 	    sid->sid_revision, sid->sid_subauthcnt);
 
 	for (i = 0; i < NT_SID_AUTH_MAX; i++) {
-		(void) smb_encode_mbc(&xa->rep_data_mb, "b",
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "b",
 		    sid->sid_authority[i]);
 	}
 
 	for (i = 0; i < sid->sid_subauthcnt; i++) {
-		(void) smb_encode_mbc(&xa->rep_data_mb, "l",
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "l",
 		    sid->sid_subauth[i]);
 	}
 }
@@ -320,11 +320,11 @@ smb_encode_sacl(struct smb_xa *xa, smb_acl_t *acl)
 		return;
 
 	/* encode header */
-	(void) smb_encode_mbc(&xa->rep_data_mb, "b.ww2.", acl->sl_revision,
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "b.ww2.", acl->sl_revision,
 	    acl->sl_bsize, acl->sl_acecnt);
 
 	for (i = 0, ace = acl->sl_aces; i < acl->sl_acecnt; i++, ace++) {
-		(void) smb_encode_mbc(&xa->rep_data_mb, "bbwl",
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "bbwl",
 		    ace->se_hdr.se_type, ace->se_hdr.se_flags,
 		    ace->se_hdr.se_bsize, ace->se_mask);
 
@@ -346,12 +346,12 @@ smb_encode_dacl(struct smb_xa *xa, smb_acl_t *acl)
 		return;
 
 	/* encode header */
-	(void) smb_encode_mbc(&xa->rep_data_mb, "b.ww2.", acl->sl_revision,
+	(void) smb_mbc_encodef(&xa->rep_data_mb, "b.ww2.", acl->sl_revision,
 	    acl->sl_bsize, acl->sl_acecnt);
 
 	ace = list_head(&acl->sl_sorted);
 	while (ace) {
-		(void) smb_encode_mbc(&xa->rep_data_mb, "bbwl",
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "bbwl",
 		    ace->se_hdr.se_type, ace->se_hdr.se_flags,
 		    ace->se_hdr.se_bsize, ace->se_mask);
 
@@ -383,7 +383,7 @@ smb_decode_sd(struct smb_xa *xa, smb_sd_t *sd)
 	    xa->req_data_mb.chain_offset,
 	    xa->req_data_mb.max_bytes - xa->req_data_mb.chain_offset);
 
-	if (smb_decode_mbc(&sdbuf, "b.wllll",
+	if (smb_mbc_decodef(&sdbuf, "b.wllll",
 	    &sd->sd_revision, &sd->sd_control,
 	    &owner_offs, &group_offs, &sacl_offs, &dacl_offs))
 		goto decode_error;
@@ -464,7 +464,7 @@ smb_decode_sid(struct smb_xa *xa, uint32_t offset)
 
 	(void) MBC_SHADOW_CHAIN(&sidbuf, &xa->req_data_mb, offset, bytes_left);
 
-	if (smb_decode_mbc(&sidbuf, "bb", &revision, &subauth_cnt))
+	if (smb_mbc_decodef(&sidbuf, "bb", &revision, &subauth_cnt))
 		return (NULL);
 
 	sidlen = sizeof (smb_sid_t) - sizeof (uint32_t) +
@@ -475,12 +475,12 @@ smb_decode_sid(struct smb_xa *xa, uint32_t offset)
 	sid->sid_subauthcnt = subauth_cnt;
 
 	for (i = 0; i < NT_SID_AUTH_MAX; i++) {
-		if (smb_decode_mbc(&sidbuf, "b", &sid->sid_authority[i]))
+		if (smb_mbc_decodef(&sidbuf, "b", &sid->sid_authority[i]))
 			goto decode_err;
 	}
 
 	for (i = 0; i < sid->sid_subauthcnt; i++) {
-		if (smb_decode_mbc(&sidbuf, "l", &sid->sid_subauth[i]))
+		if (smb_mbc_decodef(&sidbuf, "l", &sid->sid_subauth[i]))
 			goto decode_err;
 	}
 
@@ -519,7 +519,7 @@ smb_decode_acl(struct smb_xa *xa, uint32_t offset)
 
 	(void) MBC_SHADOW_CHAIN(&aclbuf, &xa->req_data_mb, offset, bytes_left);
 
-	if (smb_decode_mbc(&aclbuf, "b.ww2.", &revision, &size, &acecnt))
+	if (smb_mbc_decodef(&aclbuf, "b.ww2.", &revision, &size, &acecnt))
 		return (NULL);
 
 	if (size == 0)
@@ -529,7 +529,7 @@ smb_decode_acl(struct smb_xa *xa, uint32_t offset)
 
 	sid_offs += SMB_ACL_HDRSIZE;
 	for (i = 0, ace = acl->sl_aces; i < acl->sl_acecnt; i++, ace++) {
-		if (smb_decode_mbc(&aclbuf, "bbwl",
+		if (smb_mbc_decodef(&aclbuf, "bbwl",
 		    &ace->se_hdr.se_type, &ace->se_hdr.se_flags,
 		    &ace->se_hdr.se_bsize, &ace->se_mask))
 			goto decode_error;

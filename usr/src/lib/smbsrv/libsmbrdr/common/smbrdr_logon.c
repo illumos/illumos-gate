@@ -613,7 +613,7 @@ smbrdr_logon_validate(char *server, char *username)
 
 	session = smbrdr_session_lock(server, username, SDB_SLCK_WRITE);
 	if (session) {
-		if (nb_keep_alive(session->sock) == 0) {
+		if (nb_keep_alive(session->sock, session->port) == 0) {
 			valid = B_TRUE;
 		} else {
 			session->state = SDB_SSTATE_STALE;

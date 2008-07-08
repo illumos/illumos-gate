@@ -19,14 +19,16 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/sunddi.h>
 #ifndef _KERNEL
 #include <string.h>
+#include <strings.h>
 #endif /* _KERNEL */
 #include <smbsrv/smb_xdr.h>
 
@@ -104,34 +106,126 @@ xdr_smb_dr_bytes_t(xdrs, objp)
 	return (TRUE);
 }
 
-bool_t
-xdr_smb_dr_user_ctx_t(xdrs, objp)
-	XDR *xdrs;
-	smb_dr_user_ctx_t *objp;
+/*
+ * Encode an opipe header structure into a buffer.
+ */
+int
+smb_opipe_hdr_encode(smb_opipe_hdr_t *hdr, uint8_t *buf, uint32_t buflen)
 {
-	if (!xdr_uint64_t(xdrs, &objp->du_session_id))
+	XDR xdrs;
+	int rc = 0;
+
+	xdrmem_create(&xdrs, (const caddr_t)buf, buflen, XDR_ENCODE);
+
+	if (!smb_opipe_hdr_xdr(&xdrs, hdr))
+		rc = -1;
+
+	xdr_destroy(&xdrs);
+	return (rc);
+}
+
+/*
+ * Decode an XDR buffer into an opipe header structure.
+ */
+int
+smb_opipe_hdr_decode(smb_opipe_hdr_t *hdr, uint8_t *buf, uint32_t buflen)
+{
+	XDR xdrs;
+	int rc = 0;
+
+	bzero(hdr, sizeof (smb_opipe_hdr_t));
+	xdrmem_create(&xdrs, (const caddr_t)buf, buflen, XDR_DECODE);
+
+	if (!smb_opipe_hdr_xdr(&xdrs, hdr))
+		rc = -1;
+
+	xdr_destroy(&xdrs);
+	return (rc);
+}
+
+bool_t
+smb_opipe_hdr_xdr(XDR *xdrs, smb_opipe_hdr_t *objp)
+{
+	if (!xdr_uint32_t(xdrs, &objp->oh_magic))
 		return (FALSE);
-	if (!xdr_uint16_t(xdrs, &objp->du_uid))
+	if (!xdr_uint32_t(xdrs, &objp->oh_fid))
 		return (FALSE);
-	if (!xdr_uint16_t(xdrs, &objp->du_domain_len))
+	if (!xdr_uint32_t(xdrs, &objp->oh_op))
 		return (FALSE);
-	if (!xdr_string(xdrs, &objp->du_domain, ~0))
+	if (!xdr_uint32_t(xdrs, &objp->oh_datalen))
 		return (FALSE);
-	if (!xdr_uint16_t(xdrs, &objp->du_account_len))
+	if (!xdr_uint32_t(xdrs, &objp->oh_resid))
 		return (FALSE);
-	if (!xdr_string(xdrs, &objp->du_account, ~0))
+	if (!xdr_uint32_t(xdrs, &objp->oh_status))
 		return (FALSE);
-	if (!xdr_uint16_t(xdrs, &objp->du_workstation_len))
+	return (TRUE);
+}
+
+/*
+ * Encode an opipe context structure into a buffer.
+ */
+int
+smb_opipe_context_encode(smb_opipe_context_t *ctx, uint8_t *buf,
+    uint32_t buflen)
+{
+	XDR xdrs;
+	int rc = 0;
+
+	xdrmem_create(&xdrs, (const caddr_t)buf, buflen, XDR_ENCODE);
+
+	if (!smb_opipe_context_xdr(&xdrs, ctx))
+		rc = -1;
+
+	xdr_destroy(&xdrs);
+	return (rc);
+}
+
+/*
+ * Decode an XDR buffer into an opipe context structure.
+ */
+int
+smb_opipe_context_decode(smb_opipe_context_t *ctx, uint8_t *buf,
+    uint32_t buflen)
+{
+	XDR xdrs;
+	int rc = 0;
+
+	bzero(ctx, sizeof (smb_opipe_context_t));
+	xdrmem_create(&xdrs, (const caddr_t)buf, buflen, XDR_DECODE);
+
+	if (!smb_opipe_context_xdr(&xdrs, ctx))
+		rc = -1;
+
+	xdr_destroy(&xdrs);
+	return (rc);
+}
+
+bool_t
+smb_opipe_context_xdr(XDR *xdrs, smb_opipe_context_t *objp)
+{
+	if (!xdr_uint64_t(xdrs, &objp->oc_session_id))
 		return (FALSE);
-	if (!xdr_string(xdrs, &objp->du_workstation, ~0))
+	if (!xdr_uint16_t(xdrs, &objp->oc_uid))
 		return (FALSE);
-	if (!xdr_uint32_t(xdrs, &objp->du_ipaddr))
+	if (!xdr_uint16_t(xdrs, &objp->oc_domain_len))
 		return (FALSE);
-	if (!xdr_int32_t(xdrs, &objp->du_native_os))
+	if (!xdr_string(xdrs, &objp->oc_domain, ~0))
 		return (FALSE);
-	if (!xdr_int64_t(xdrs, &objp->du_logon_time))
+	if (!xdr_uint16_t(xdrs, &objp->oc_account_len))
 		return (FALSE);
-	if (!xdr_uint32_t(xdrs, &objp->du_flags))
+	if (!xdr_string(xdrs, &objp->oc_account, ~0))
+		return (FALSE);
+	if (!xdr_uint16_t(xdrs, &objp->oc_workstation_len))
+		return (FALSE);
+	if (!xdr_string(xdrs, &objp->oc_workstation, ~0))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->oc_ipaddr))
+		return (FALSE);
+	if (!xdr_int32_t(xdrs, &objp->oc_native_os))
+		return (FALSE);
+	if (!xdr_int64_t(xdrs, &objp->oc_logon_time))
+		return (FALSE);
+	if (!xdr_uint32_t(xdrs, &objp->oc_flags))
 		return (FALSE);
 	return (TRUE);
 }
@@ -145,7 +239,7 @@ xdr_smb_dr_ulist_t(xdrs, objp)
 	if (!xdr_uint32_t(xdrs, &objp->dul_cnt))
 		return (FALSE);
 	if (!xdr_vector(xdrs, (char *)objp->dul_users, SMB_DR_MAX_USERS,
-		sizeof (smb_dr_user_ctx_t), (xdrproc_t)xdr_smb_dr_user_ctx_t))
+		sizeof (smb_opipe_context_t), (xdrproc_t)smb_opipe_context_xdr))
 		return (FALSE);
 	return (TRUE);
 }

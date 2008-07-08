@@ -53,11 +53,13 @@ typedef enum {
 	HELP_RENAME,
 	HELP_SET,
 	HELP_SHOW,
-	HELP_UDISABLE,
-	HELP_UENABLE
+	HELP_USER_DISABLE,
+	HELP_USER_ENABLE
 } smbadm_help_t;
 
-#define	SMBADM_CMDF_GROUP	0x01
+#define	SMBADM_CMDF_USER	0x01
+#define	SMBADM_CMDF_GROUP	0x02
+#define	SMBADM_CMDF_TYPEMASK	0x0F
 
 typedef struct smbadm_cmdinfo {
 	char *name;
@@ -90,8 +92,10 @@ static smbadm_cmdinfo_t smbadm_cmdtable[] =
 	SMBADM_CMDF_GROUP },
 	{ "delete",		smbadm_group_delete,	HELP_DELETE,
 	SMBADM_CMDF_GROUP },
-	{ "disable-user",	smbadm_user_disable,	HELP_UDISABLE,	0 },
-	{ "enable-user",	smbadm_user_enable,	HELP_UENABLE,	0 },
+	{ "disable-user",	smbadm_user_disable,	HELP_USER_DISABLE,
+	SMBADM_CMDF_USER },
+	{ "enable-user",	smbadm_user_enable,	HELP_USER_ENABLE,
+	SMBADM_CMDF_USER },
 	{ "get",		smbadm_group_getprop,	HELP_GET,
 	SMBADM_CMDF_GROUP },
 	{ "join",		smbadm_join,		HELP_JOIN,	0 },
@@ -146,8 +150,8 @@ static smbadm_prop_handle_t smbadm_ptable[] = {
 	smbadm_getprop_desc,	NULL			},
 };
 
-static int smbadm_grpcmd_init(void);
-static void smbadm_grpcmd_fini(void);
+static int smbadm_init(void);
+static void smbadm_fini(void);
 static const char *smbadm_pwd_strerror(int error);
 
 /*
@@ -174,8 +178,8 @@ smbadm_cmdusage(FILE *fp, smbadm_cmdinfo_t *cmd)
 		(void) fprintf(fp, gettext("\t%s group\n"), cmd->name);
 		return;
 
-	case HELP_UDISABLE:
-	case HELP_UENABLE:
+	case HELP_USER_DISABLE:
+	case HELP_USER_ENABLE:
 		(void) fprintf(fp, gettext("\t%s user\n"), cmd->name);
 		return;
 
@@ -214,6 +218,8 @@ smbadm_cmdusage(FILE *fp, smbadm_cmdinfo_t *cmd)
 		    cmd->name);
 		return;
 
+	default:
+		break;
 	}
 
 	abort();
@@ -1090,12 +1096,12 @@ main(int argc, char **argv)
 					smbadm_usage(B_TRUE);
 			}
 
-			if ((ret = smbadm_grpcmd_init()) != 0)
+			if ((ret = smbadm_init()) != 0)
 				return (ret);
 
 			ret = curcmd->func(argc - 1, &argv[1]);
 
-			smbadm_grpcmd_fini();
+			smbadm_fini();
 			return (ret);
 		}
 	}
@@ -1107,11 +1113,12 @@ main(int argc, char **argv)
 }
 
 static int
-smbadm_grpcmd_init(void)
+smbadm_init(void)
 {
 	int rc;
 
-	if (curcmd->flags & SMBADM_CMDF_GROUP) {
+	switch (curcmd->flags & SMBADM_CMDF_TYPEMASK) {
+	case SMBADM_CMDF_GROUP:
 		if (smb_idmap_start() != 0) {
 			(void) fprintf(stderr,
 			    gettext("failed to contact idmap service\n"));
@@ -1125,17 +1132,34 @@ smbadm_grpcmd_init(void)
 			smb_idmap_stop();
 			return (1);
 		}
+		break;
+
+	case SMBADM_CMDF_USER:
+		smb_pwd_init(B_FALSE);
+		break;
+
+	default:
+		break;
 	}
 
 	return (0);
 }
 
 static void
-smbadm_grpcmd_fini(void)
+smbadm_fini(void)
 {
-	if (curcmd->flags & SMBADM_CMDF_GROUP) {
+	switch (curcmd->flags & SMBADM_CMDF_TYPEMASK) {
+	case SMBADM_CMDF_GROUP:
 		smb_lgrp_stop();
 		smb_idmap_stop();
+		break;
+
+	case SMBADM_CMDF_USER:
+		smb_pwd_fini();
+		break;
+
+	default:
+		break;
 	}
 }
 
@@ -1381,6 +1405,9 @@ smbadm_pwd_strerror(int error)
 
 	case SMB_PWE_SYSTEM_ERROR:
 		return (gettext("System error."));
+
+	default:
+		break;
 	}
 
 	return (gettext("Unknown error code."));

@@ -83,13 +83,29 @@ mlsvc_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 	DWORD status;
 	int retry;
 	struct timespec st;
+	int i;
 
-	tid = smbrdr_tree_connect(hostname, username, "IPC$");
-	if (tid == 0) {
-		syslog(LOG_DEBUG, "smbrdr: (open) %s %s %s %s %s",
-		    hostname, domain, username, pipename,
-		    xlate_nt_status(NT_STATUS_UNEXPECTED_NETWORK_ERROR));
-		return (-1);
+	/*
+	 * If a stale session is detected, we will attempt to establish a new
+	 * session.
+	 */
+	for (i = 0; i < 2; i++) {
+		status = smbrdr_tree_connect(hostname, username, "IPC$", &tid);
+		if (i == 0 && status == NT_STATUS_UNEXPECTED_NETWORK_ERROR) {
+			if (mlsvc_logon(hostname, domain, username) != 0)
+				return (-1);
+			continue;
+		}
+
+		if (status != NT_STATUS_SUCCESS) {
+			syslog(LOG_DEBUG, "smbrdr: (open) %s %s %s %s %s",
+			    hostname, domain, username, pipename,
+			    xlate_nt_status(status));
+			return (-1);
+		}
+
+		break;
+
 	}
 
 	netuse = smbrdr_netuse_get(tid);

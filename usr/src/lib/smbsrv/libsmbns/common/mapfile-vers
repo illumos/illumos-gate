@@ -27,29 +27,29 @@
 
 SUNWprivate {
     global:
-	adjoin_report_err;
-	ads_add_share;
-	ads_build_unc_name;
-	ads_close;
-	ads_domain_change_cleanup;
-	ads_init;
-	ads_join;
-	ads_lookup_share;
-	ads_open;
-	ads_publish_share;
-	ads_refresh;
-	ads_remove_share;
-	ads_update_attrs;
 	dns_msgid_init;
 	dyndns_clear_rev_zone;
 	dyndns_update;
 	dyndns_update_core;
-	msdcs_lookup_ads;
+	smb_adjoin_report_err;
+	smb_ads_add_share;
+	smb_ads_build_unc_name;
+	smb_ads_close;
+	smb_ads_domain_change_cleanup;
+	smb_ads_init;
+	smb_ads_join;
+	smb_ads_lookup_share;
+	smb_ads_open;
+	smb_ads_publish_share;
+	smb_ads_refresh;
+	smb_ads_remove_share;
+	smb_ads_update_attrs;
 	smb_browser_netlogon;
 	smb_browser_reconfig;
 	smb_ccache_init;
 	smb_ccache_remove;
 	smb_kinit;
+	smb_msdcs_lookup_ads;
 	smb_netbios_name_reconfig;
 	smb_netbios_start;
 	smb_netbios_shutdown;

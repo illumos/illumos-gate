@@ -42,103 +42,82 @@
 #include <synch.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/lmshare.h>
+#include <smbsrv/smb_share.h>
 #include <smbsrv/lmerr.h>
-#include <smbsrv/lmshare_door.h>
 #include <smbsrv/cifs.h>
 
-static int lmshrd_fildes = -1;
-static uint64_t lmshrd_door_ncall = 0;
-static mutex_t lmshrd_mutex;
-static cond_t lmshrd_cv;
-
-char *lmshrd_desc[] = {
-	"",
-	"LmshrdNumShares",
-	"LmshrdDelete",
-	"LmshrdRename",
-	"LmshrdGetinfo",
-	"LmshrdAdd",
-	"LmshrdSetinfo",
-	"LmshrdExists",
-	"LmshrdIsSpecial",
-	"LmshrdIsRestricted",
-	"LmshrdIsAdmin",
-	"LmshrdIsValid",
-	"LmshrdIsDir",
-	"LmshrdList",
-	"LmshrdNumTrans",
-	"N/A",
-	0
-};
+static int smb_share_dfd = -1;
+static uint64_t smb_share_dncall = 0;
+static mutex_t smb_share_dmtx;
+static cond_t smb_share_dcv;
 
 /*
  * Open the lmshrd door.  This is a private call for use by
- * lmshrd_door_enter() and must be called with lmshrd_mutex held.
+ * smb_share_denter() and must be called with smb_share_dmtx held.
  *
  * Returns the door fd on success.  Otherwise, -1.
  */
 static int
-lmshrd_door_open(void)
+smb_share_dopen(void)
 {
-	if (lmshrd_fildes == -1) {
-		if ((lmshrd_fildes = open(LMSHR_DOOR_NAME, O_RDONLY)) < 0)
-			lmshrd_fildes = -1;
+	if (smb_share_dfd == -1) {
+		if ((smb_share_dfd = open(SMB_SHARE_DNAME, O_RDONLY)) < 0)
+			smb_share_dfd = -1;
 		else
-			lmshrd_door_ncall = 0;
+			smb_share_dncall = 0;
 	}
 
-	return (lmshrd_fildes);
+	return (smb_share_dfd);
 }
 
 /*
  * Close the lmshrd door.
  */
 void
-lmshrd_door_close(void)
+smb_share_dclose(void)
 {
-	(void) mutex_lock(&lmshrd_mutex);
+	(void) mutex_lock(&smb_share_dmtx);
 
-	if (lmshrd_fildes != -1) {
-		while (lmshrd_door_ncall > 0)
-			(void) cond_wait(&lmshrd_cv, &lmshrd_mutex);
+	if (smb_share_dfd != -1) {
+		while (smb_share_dncall > 0)
+			(void) cond_wait(&smb_share_dcv, &smb_share_dmtx);
 
-		if (lmshrd_fildes != -1) {
-			(void) close(lmshrd_fildes);
-			lmshrd_fildes = -1;
+		if (smb_share_dfd != -1) {
+			(void) close(smb_share_dfd);
+			smb_share_dfd = -1;
 		}
 	}
 
-	(void) mutex_unlock(&lmshrd_mutex);
+	(void) mutex_unlock(&smb_share_dmtx);
 }
 
 /*
  * Entry handler for lmshrd door calls.
  */
 static door_arg_t *
-lmshrd_door_enter(void)
+smb_share_denter(void)
 {
 	door_arg_t *arg;
 	char *buf;
 
-	(void) mutex_lock(&lmshrd_mutex);
+	(void) mutex_lock(&smb_share_dmtx);
 
-	if (lmshrd_door_open() == -1) {
-		(void) mutex_unlock(&lmshrd_mutex);
+	if (smb_share_dopen() == -1) {
+		(void) mutex_unlock(&smb_share_dmtx);
 		return (NULL);
 	}
 
-	if ((arg = malloc(sizeof (door_arg_t) + LMSHR_DOOR_SIZE)) != NULL) {
+	if ((arg = malloc(sizeof (door_arg_t) + SMB_SHARE_DSIZE)) != NULL) {
 		buf = ((char *)arg) + sizeof (door_arg_t);
 		bzero(arg, sizeof (door_arg_t));
 		arg->data_ptr = buf;
 		arg->rbuf = buf;
-		arg->rsize = LMSHR_DOOR_SIZE;
+		arg->rsize = SMB_SHARE_DSIZE;
 
-		++lmshrd_door_ncall;
+		++smb_share_dncall;
 	}
 
-	(void) mutex_unlock(&lmshrd_mutex);
+	(void) mutex_unlock(&smb_share_dmtx);
 	return (arg);
 }
 
@@ -146,28 +125,28 @@ lmshrd_door_enter(void)
  * Exit handler for lmshrd door calls.
  */
 static void
-lmshrd_door_exit(door_arg_t *arg, char *errmsg)
+smb_share_dexit(door_arg_t *arg, char *errmsg)
 {
 	if (errmsg)
 		syslog(LOG_DEBUG, "lmshrd_door: %s", errmsg);
 
-	(void) mutex_lock(&lmshrd_mutex);
+	(void) mutex_lock(&smb_share_dmtx);
 	free(arg);
-	--lmshrd_door_ncall;
-	(void) cond_signal(&lmshrd_cv);
-	(void) mutex_unlock(&lmshrd_mutex);
+	--smb_share_dncall;
+	(void) cond_signal(&smb_share_dcv);
+	(void) mutex_unlock(&smb_share_dmtx);
 }
 
 /*
  * Return 0 upon success. Otherwise, -1.
  */
 static int
-lmshrd_door_check_status(smb_dr_ctx_t *dec_ctx)
+smb_share_dchk(smb_dr_ctx_t *dec_ctx)
 {
 	int status = smb_dr_get_int32(dec_ctx);
 
-	if (status != LMSHR_DOOR_SRV_SUCCESS) {
-		if (status == LMSHR_DOOR_SRV_ERROR)
+	if (status != SMB_SHARE_DSUCCESS) {
+		if (status == SMB_SHARE_DERROR)
 			(void) smb_dr_get_uint32(dec_ctx);
 		return (-1);
 	}
@@ -175,394 +154,314 @@ lmshrd_door_check_status(smb_dr_ctx_t *dec_ctx)
 	return (0);
 }
 
-DWORD
-lmshrd_list(int offset, lmshare_list_t *list)
+uint32_t
+smb_share_list(int offset, smb_shrlist_t *list)
 {
 	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	DWORD rc;
+	uint32_t rc;
 
-	if ((arg = lmshrd_door_enter()) == NULL)
+	if ((arg = smb_share_denter()) == NULL)
 		return (NERR_InternalError);
 
-	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_LIST);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, SMB_SHARE_DSIZE);
+	smb_dr_put_uint32(enc_ctx, SMB_SHROP_LIST);
 	smb_dr_put_int32(enc_ctx, offset);
 
 	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
 	if (rc != 0) {
-		lmshrd_door_exit(arg, "encode error");
+		smb_share_dexit(arg, "encode error");
 		return (NERR_InternalError);
 	}
 
-	if (door_call(lmshrd_fildes, arg) < 0) {
-		lmshrd_door_exit(arg, "door call error");
-		lmshrd_door_close();
+	if (door_call(smb_share_dfd, arg) < 0) {
+		smb_share_dexit(arg, "door call error");
+		smb_share_dclose();
 		return (NERR_InternalError);
 	}
 
 	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (lmshrd_door_check_status(dec_ctx) != 0) {
+	if (smb_share_dchk(dec_ctx) != 0) {
 		(void) smb_dr_decode_finish(dec_ctx);
-		lmshrd_door_exit(arg, "decode error");
+		smb_share_dexit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	smb_dr_get_lmshr_list(dec_ctx, list);
+	smb_dr_get_shrlist(dec_ctx, list);
 	if (smb_dr_decode_finish(dec_ctx) != 0) {
-		lmshrd_door_exit(arg, "decode error");
+		smb_share_dexit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	lmshrd_door_exit(arg, NULL);
+	smb_share_dexit(arg, NULL);
 	return (NERR_Success);
 }
 
 int
-lmshrd_num_shares(void)
+smb_share_count(void)
 {
 	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	DWORD num_shares;
+	uint32_t num_shares;
 	int rc;
 
-	if ((arg = lmshrd_door_enter()) == NULL)
+	if ((arg = smb_share_denter()) == NULL)
 		return (-1);
 
-	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_NUM_SHARES);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, SMB_SHARE_DSIZE);
+	smb_dr_put_uint32(enc_ctx, SMB_SHROP_NUM_SHARES);
 
 	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
 	if (rc != 0) {
-		lmshrd_door_exit(arg, "encode error");
+		smb_share_dexit(arg, "encode error");
 		return (-1);
 	}
 
-	if (door_call(lmshrd_fildes, arg) < 0) {
-		lmshrd_door_exit(arg, "door call error");
-		lmshrd_door_close();
+	if (door_call(smb_share_dfd, arg) < 0) {
+		smb_share_dexit(arg, "door call error");
+		smb_share_dclose();
 		return (-1);
 	}
 
 	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (lmshrd_door_check_status(dec_ctx) != 0) {
+	if (smb_share_dchk(dec_ctx) != 0) {
 		(void) smb_dr_decode_finish(dec_ctx);
-		lmshrd_door_exit(arg, "decode error");
+		smb_share_dexit(arg, "decode error");
 		return (-1);
 	}
 
 	num_shares = smb_dr_get_uint32(dec_ctx);
 	if (smb_dr_decode_finish(dec_ctx) != 0) {
-		lmshrd_door_exit(arg, "decode error");
+		smb_share_dexit(arg, "decode error");
 		return (-1);
 	}
 
-	lmshrd_door_exit(arg, NULL);
+	smb_share_dexit(arg, NULL);
 	return (num_shares);
 }
 
-DWORD
-lmshrd_delete(char *share_name)
+uint32_t
+smb_share_del(char *share_name)
 {
 	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	DWORD rc;
+	uint32_t rc;
 
-	if ((arg = lmshrd_door_enter()) == NULL)
+	if ((arg = smb_share_denter()) == NULL)
 		return (NERR_InternalError);
 
-	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_DELETE);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, SMB_SHARE_DSIZE);
+	smb_dr_put_uint32(enc_ctx, SMB_SHROP_DELETE);
 	smb_dr_put_string(enc_ctx, share_name);
 
 	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
 	if (rc != 0) {
-		lmshrd_door_exit(arg, "encode error");
+		smb_share_dexit(arg, "encode error");
 		return (NERR_InternalError);
 	}
 
-	if (door_call(lmshrd_fildes, arg) < 0) {
-		lmshrd_door_exit(arg, "door call error");
-		lmshrd_door_close();
+	if (door_call(smb_share_dfd, arg) < 0) {
+		smb_share_dexit(arg, "door call error");
+		smb_share_dclose();
 		return (NERR_InternalError);
 	}
 
 	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (lmshrd_door_check_status(dec_ctx) != 0) {
+	if (smb_share_dchk(dec_ctx) != 0) {
 		(void) smb_dr_decode_finish(dec_ctx);
-		lmshrd_door_exit(arg, "decode error");
+		smb_share_dexit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
 	rc = smb_dr_get_uint32(dec_ctx);
 	if (smb_dr_decode_finish(dec_ctx) != 0) {
-		lmshrd_door_exit(arg, "decode error");
+		smb_share_dexit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	lmshrd_door_exit(arg, NULL);
+	smb_share_dexit(arg, NULL);
 	return (rc);
 
 }
 
-DWORD
-lmshrd_rename(char *from, char *to)
+uint32_t
+smb_share_ren(char *from, char *to)
 {
 	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	DWORD rc;
+	uint32_t rc;
 
-	if ((arg = lmshrd_door_enter()) == NULL)
+	if ((arg = smb_share_denter()) == NULL)
 		return (NERR_InternalError);
 
-	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_RENAME);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, SMB_SHARE_DSIZE);
+	smb_dr_put_uint32(enc_ctx, SMB_SHROP_RENAME);
 	smb_dr_put_string(enc_ctx, from);
 	smb_dr_put_string(enc_ctx, to);
 
 	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
 	if (rc != 0) {
-		lmshrd_door_exit(arg, "encode error");
+		smb_share_dexit(arg, "encode error");
 		return (NERR_InternalError);
 	}
 
-	if (door_call(lmshrd_fildes, arg) < 0) {
-		lmshrd_door_exit(arg, "door call error");
-		lmshrd_door_close();
+	if (door_call(smb_share_dfd, arg) < 0) {
+		smb_share_dexit(arg, "door call error");
+		smb_share_dclose();
 		return (NERR_InternalError);
 	}
 
 	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (lmshrd_door_check_status(dec_ctx) != 0) {
+	if (smb_share_dchk(dec_ctx) != 0) {
 		(void) smb_dr_decode_finish(dec_ctx);
-		lmshrd_door_exit(arg, "decode error");
+		smb_share_dexit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
 	rc = smb_dr_get_uint32(dec_ctx);
 	if (smb_dr_decode_finish(dec_ctx) != 0) {
-		lmshrd_door_exit(arg, "decode error");
+		smb_share_dexit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	lmshrd_door_exit(arg, NULL);
+	smb_share_dexit(arg, NULL);
 	return (rc);
 }
 
-DWORD
-lmshrd_getinfo(char *share_name, lmshare_info_t *si)
+uint32_t
+smb_share_get(char *share_name, smb_share_t *si)
 {
 	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	DWORD rc;
+	uint32_t rc;
 
-	if ((arg = lmshrd_door_enter()) == NULL)
+	if ((arg = smb_share_denter()) == NULL)
 		return (NERR_InternalError);
 
-	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_GETINFO);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, SMB_SHARE_DSIZE);
+	smb_dr_put_uint32(enc_ctx, SMB_SHROP_GETINFO);
 	smb_dr_put_string(enc_ctx, share_name);
 
 	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
 	if (rc != 0) {
-		lmshrd_door_exit(arg, "encode error");
+		smb_share_dexit(arg, "encode error");
 		return (NERR_InternalError);
 	}
 
-	if (door_call(lmshrd_fildes, arg) < 0) {
-		lmshrd_door_exit(arg, "door call error");
-		lmshrd_door_close();
+	if (door_call(smb_share_dfd, arg) < 0) {
+		smb_share_dexit(arg, "door call error");
+		smb_share_dclose();
 		return (NERR_InternalError);
 	}
 
 	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (lmshrd_door_check_status(dec_ctx) != 0) {
+	if (smb_share_dchk(dec_ctx) != 0) {
 		(void) smb_dr_decode_finish(dec_ctx);
-		lmshrd_door_exit(arg, "decode error");
+		smb_share_dexit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
 	rc = smb_dr_get_uint32(dec_ctx);
-	smb_dr_get_lmshare(dec_ctx, si);
+	smb_dr_get_share(dec_ctx, si);
 	if (smb_dr_decode_finish(dec_ctx) != 0) {
-		lmshrd_door_exit(arg, "decode error");
+		smb_share_dexit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	lmshrd_door_exit(arg, NULL);
+	smb_share_dexit(arg, NULL);
 	return (rc);
 }
 
-DWORD
-lmshrd_add(lmshare_info_t *si)
+uint32_t
+smb_share_add(smb_share_t *si)
 {
 	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	DWORD rc;
+	uint32_t rc;
 
-	if ((arg = lmshrd_door_enter()) == NULL)
+	if ((arg = smb_share_denter()) == NULL)
 		return (NERR_InternalError);
 
-	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_ADD);
-	smb_dr_put_lmshare(enc_ctx, si);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, SMB_SHARE_DSIZE);
+	smb_dr_put_uint32(enc_ctx, SMB_SHROP_ADD);
+	smb_dr_put_share(enc_ctx, si);
 
 	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
 	if (rc != 0) {
-		lmshrd_door_exit(arg, "encode error");
+		smb_share_dexit(arg, "encode error");
 		return (NERR_InternalError);
 	}
 
-	if (door_call(lmshrd_fildes, arg) < 0) {
-		lmshrd_door_exit(arg, "door call error");
-		lmshrd_door_close();
+	if (door_call(smb_share_dfd, arg) < 0) {
+		smb_share_dexit(arg, "door call error");
+		smb_share_dclose();
 		return (NERR_InternalError);
 	}
 
 	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (lmshrd_door_check_status(dec_ctx) != 0) {
+	if (smb_share_dchk(dec_ctx) != 0) {
 		(void) smb_dr_decode_finish(dec_ctx);
-		lmshrd_door_exit(arg, "decode error");
+		smb_share_dexit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
 	rc = smb_dr_get_uint32(dec_ctx);
-	smb_dr_get_lmshare(dec_ctx, si);
+	smb_dr_get_share(dec_ctx, si);
 	if (smb_dr_decode_finish(dec_ctx) != 0) {
-		lmshrd_door_exit(arg, "decode error");
+		smb_share_dexit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	lmshrd_door_exit(arg, NULL);
+	smb_share_dexit(arg, NULL);
 	return (rc);
 }
 
-DWORD
-lmshrd_setinfo(lmshare_info_t *si)
+uint32_t
+smb_share_set(smb_share_t *si)
 {
 	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
 	smb_dr_ctx_t *enc_ctx;
-	DWORD rc;
+	uint32_t rc;
 
-	if ((arg = lmshrd_door_enter()) == NULL)
+	if ((arg = smb_share_denter()) == NULL)
 		return (NERR_InternalError);
 
-	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, LMSHR_DOOR_SETINFO);
-	smb_dr_put_lmshare(enc_ctx, si);
+	enc_ctx = smb_dr_encode_start(arg->data_ptr, SMB_SHARE_DSIZE);
+	smb_dr_put_uint32(enc_ctx, SMB_SHROP_SETINFO);
+	smb_dr_put_share(enc_ctx, si);
 
 	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
 	if (rc != 0) {
-		lmshrd_door_exit(arg, "encode error");
+		smb_share_dexit(arg, "encode error");
 		return (NERR_InternalError);
 	}
 
-	if (door_call(lmshrd_fildes, arg) < 0) {
-		lmshrd_door_exit(arg, "door call error");
-		lmshrd_door_close();
+	if (door_call(smb_share_dfd, arg) < 0) {
+		smb_share_dexit(arg, "door call error");
+		smb_share_dclose();
 		return (NERR_InternalError);
 	}
 
 	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (lmshrd_door_check_status(dec_ctx) != 0) {
+	if (smb_share_dchk(dec_ctx) != 0) {
 		(void) smb_dr_decode_finish(dec_ctx);
-		lmshrd_door_exit(arg, "decode error");
+		smb_share_dexit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
 	rc = smb_dr_get_uint32(dec_ctx);
 	if (smb_dr_decode_finish(dec_ctx) != 0) {
-		lmshrd_door_exit(arg, "decode error");
+		smb_share_dexit(arg, "decode error");
 		return (NERR_InternalError);
 	}
 
-	lmshrd_door_exit(arg, NULL);
+	smb_share_dexit(arg, NULL);
 	return (rc);
-}
-
-static int
-lmshrd_check(char *share_name, int opcode)
-{
-	door_arg_t *arg;
-	smb_dr_ctx_t *dec_ctx;
-	smb_dr_ctx_t *enc_ctx;
-	int rc;
-
-	if ((arg = lmshrd_door_enter()) == NULL)
-		return (NERR_InternalError);
-
-	enc_ctx = smb_dr_encode_start(arg->data_ptr, LMSHR_DOOR_SIZE);
-	smb_dr_put_uint32(enc_ctx, opcode);
-	smb_dr_put_string(enc_ctx, share_name);
-
-	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
-	if (rc != 0) {
-		lmshrd_door_exit(arg, "encode error");
-		return (NERR_InternalError);
-	}
-
-	if (door_call(lmshrd_fildes, arg) < 0) {
-		lmshrd_door_exit(arg, "door call error");
-		lmshrd_door_close();
-		return (NERR_InternalError);
-	}
-
-	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (lmshrd_door_check_status(dec_ctx) != 0) {
-		(void) smb_dr_decode_finish(dec_ctx);
-		lmshrd_door_exit(arg, "decode error");
-		return (NERR_InternalError);
-	}
-
-	rc = smb_dr_get_int32(dec_ctx);
-	if (smb_dr_decode_finish(dec_ctx) != 0) {
-		lmshrd_door_exit(arg, "decode error");
-		return (NERR_InternalError);
-	}
-
-	lmshrd_door_exit(arg, NULL);
-	return (rc);
-}
-
-int
-lmshrd_exists(char *share_name)
-{
-	return (lmshrd_check(share_name, LMSHR_DOOR_EXISTS));
-}
-
-int
-lmshrd_is_special(char *share_name)
-{
-	return (lmshrd_check(share_name, LMSHR_DOOR_IS_SPECIAL));
-}
-
-int
-lmshrd_is_restricted(char *share_name)
-{
-	return (lmshrd_check(share_name, LMSHR_DOOR_IS_RESTRICTED));
-}
-
-int
-lmshrd_is_admin(char *share_name)
-{
-	return (lmshrd_check(share_name, LMSHR_DOOR_IS_ADMIN));
-}
-
-int
-lmshrd_is_valid(char *share_name)
-{
-	return (lmshrd_check(share_name, LMSHR_DOOR_IS_VALID));
-}
-
-int
-lmshrd_is_dir(char *path)
-{
-	return (lmshrd_check(path, LMSHR_DOOR_IS_DIR));
 }

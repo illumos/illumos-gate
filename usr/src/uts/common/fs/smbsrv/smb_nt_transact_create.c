@@ -40,7 +40,6 @@
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/ntaccess.h>
 #include <smbsrv/nterror.h>
-#include <smbsrv/ntifs.h>
 #include <smbsrv/cifs.h>
 #include <smbsrv/doserror.h>
 
@@ -73,7 +72,7 @@ smb_pre_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 
 	bzero(op, sizeof (sr->arg.open));
 
-	rc = smb_decode_mbc(&xa->req_param_mb, "%lllqllllllllb",
+	rc = smb_mbc_decodef(&xa->req_param_mb, "%lllqllllllllb",
 	    sr,
 	    &Flags,
 	    &op->rootdirfid,
@@ -97,7 +96,7 @@ smb_pre_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 			    ERRDOS, ERROR_PATH_NOT_FOUND);
 			rc = -1;
 		} else {
-			rc = smb_decode_mbc(&xa->req_param_mb, "%#u",
+			rc = smb_mbc_decodef(&xa->req_param_mb, "%#u",
 			    sr, NameLength, &op->fqi.path);
 		}
 	}
@@ -224,7 +223,7 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 			node->attr.sa_vattr.va_size = new_attr.sa_vattr.va_size;
 		}
 
-		(void) smb_encode_mbc(&xa->rep_param_mb, "b.wllTTTTlqqwwb",
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "b.wllTTTTlqqwwb",
 		    OplockLevel,
 		    sr->smb_fid,
 		    op->action_taken,
@@ -242,7 +241,7 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 	} else {
 		/* Named PIPE */
 		bzero(&new_attr, sizeof (smb_attr_t));
-		(void) smb_encode_mbc(&xa->rep_param_mb, "b.wllTTTTlqqwwb",
+		(void) smb_mbc_encodef(&xa->rep_param_mb, "b.wllTTTTlqqwwb",
 		    0,
 		    sr->smb_fid,
 		    op->action_taken,

@@ -38,6 +38,8 @@
 #include <strings.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <security/cryptoki.h>
+#include <security/pkcs11.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbrdr.h>
@@ -48,6 +50,9 @@
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/mlsvc.h>
 #include <smbsrv/netrauth.h>
+
+#define	NETR_SESSKEY_ZEROBUF_SZ		4
+#define	NETR_DESKEY_LEN			7
 
 int netr_setup_authenticator(netr_info_t *, struct netr_authenticator *,
     struct netr_authenticator *);
@@ -118,7 +123,7 @@ netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
 	 * Later, when NT4 domain controller is supported, we need to
 	 * find a way to disable the following code.
 	 */
-	if (ads_update_attrs() == -1)
+	if (smb_ads_update_attrs() == -1)
 		syslog(LOG_DEBUG, "netlogon_auth: ServerPrincipalName"
 		    " and dNSHostName attributes might have been unset.");
 
@@ -305,6 +310,79 @@ netr_server_authenticate2(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
  * function returns SMBAUTH_FAILURE.  Otherwise SMBAUTH_SUCCESS is
  * returned.
  */
+#ifdef NETR_NEGOTIATE_STRONG_KEY
+int
+netr_gen_session_key(netr_info_t *netr_info)
+{
+	unsigned char ntlmhash[SMBAUTH_HASH_SZ];
+	int rc = SMBAUTH_FAILURE;
+	CK_RV rv;
+	CK_MECHANISM mechanism;
+	CK_SESSION_HANDLE hSession;
+	CK_ULONG diglen = MD_DIGEST_LEN;
+	unsigned char md5digest[MD_DIGEST_LEN];
+	unsigned char zerobuf[NETR_SESSKEY_ZEROBUF_SZ];
+
+	bzero(ntlmhash, SMBAUTH_HASH_SZ);
+	/*
+	 * We should check (netr_info->flags & NETR_FLG_INIT) and use
+	 * the appropriate password but it isn't working yet.  So we
+	 * always use the default one for now.
+	 */
+	bzero(netr_info->password, sizeof (netr_info->password));
+	rc = smb_config_getstr(SMB_CI_MACHINE_PASSWD,
+	    (char *)netr_info->password, sizeof (netr_info->password));
+
+	if ((rc != SMBD_SMF_OK) || *netr_info->password == '\0') {
+		return (SMBAUTH_FAILURE);
+	}
+
+	rc = smb_auth_ntlm_hash((char *)netr_info->password, ntlmhash);
+	if (rc != SMBAUTH_SUCCESS)
+		return (SMBAUTH_FAILURE);
+
+	bzero(zerobuf, NETR_SESSKEY_ZEROBUF_SZ);
+
+	mechanism.mechanism = CKM_MD5;
+	mechanism.pParameter = 0;
+	mechanism.ulParameterLen = 0;
+
+	rv = SUNW_C_GetMechSession(mechanism.mechanism, &hSession);
+	if (rv != CKR_OK)
+		return (SMBAUTH_FAILURE);
+
+	rv = C_DigestInit(hSession, &mechanism);
+	if (rv != CKR_OK)
+		goto cleanup;
+
+	rv = C_DigestUpdate(hSession, (CK_BYTE_PTR)zerobuf,
+	    NETR_SESSKEY_ZEROBUF_SZ);
+	if (rv != CKR_OK)
+		goto cleanup;
+
+	rv = C_DigestUpdate(hSession,
+	    (CK_BYTE_PTR)netr_info->client_challenge.data, NETR_CRED_DATA_SZ);
+	if (rv != CKR_OK)
+		goto cleanup;
+
+	rv = C_DigestUpdate(hSession,
+	    (CK_BYTE_PTR)netr_info->server_challenge.data, NETR_CRED_DATA_SZ);
+	if (rv != CKR_OK)
+		goto cleanup;
+
+	rv = C_DigestFinal(hSession, (CK_BYTE_PTR)md5digest, &diglen);
+	if (rv != CKR_OK)
+		goto cleanup;
+
+	rc = smb_auth_hmac_md5(md5digest, diglen, ntlmhash, SMBAUTH_HASH_SZ,
+	    netr_info->session_key);
+
+cleanup:
+	(void) C_CloseSession(hSession);
+	return (rc);
+
+}
+#else
 int
 netr_gen_session_key(netr_info_t *netr_info)
 {
@@ -330,7 +408,7 @@ netr_gen_session_key(netr_info_t *netr_info)
 	    (char *)netr_info->password, sizeof (netr_info->password));
 
 	if ((rc != SMBD_SMF_OK) || *netr_info->password == '\0') {
-		return (-1);
+		return (SMBAUTH_FAILURE);
 	}
 
 	rc = smb_auth_ntlm_hash((char *)netr_info->password, md4hash);
@@ -350,6 +428,7 @@ netr_gen_session_key(netr_info_t *netr_info)
 	rc = smb_auth_DES(netr_info->session_key, 8, &md4hash[9], 8, buffer, 8);
 	return (rc);
 }
+#endif
 
 /*
  * netr_gen_credentials
@@ -383,7 +462,6 @@ netr_gen_credentials(BYTE *session_key, netr_cred_t *challenge,
     DWORD timestamp, netr_cred_t *out_cred)
 {
 	unsigned char buffer[8];
-	unsigned char partial_key[8];
 	DWORD data[2];
 	DWORD le_data[2];
 	DWORD *p;
@@ -396,15 +474,13 @@ netr_gen_credentials(BYTE *session_key, netr_cred_t *challenge,
 	LE_OUT32(&le_data[0], data[0]);
 	LE_OUT32(&le_data[1], data[1]);
 
-	if (smb_auth_DES(buffer, 8, session_key, 8,
+	if (smb_auth_DES(buffer, 8, session_key, NETR_DESKEY_LEN,
 	    (unsigned char *)le_data, 8) != SMBAUTH_SUCCESS)
 		return (SMBAUTH_FAILURE);
 
-	bzero(partial_key, 8);
-	partial_key[0] = session_key[7];
+	rc = smb_auth_DES(out_cred->data, 8, &session_key[NETR_DESKEY_LEN],
+	    NETR_DESKEY_LEN, buffer, 8);
 
-	rc = smb_auth_DES((unsigned char *)out_cred, 8, partial_key, 8,
-	    buffer, 8);
 	return (rc);
 }
 
@@ -506,17 +582,14 @@ netr_server_password_set(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 static int
 netr_gen_password(BYTE *session_key, BYTE *old_password, BYTE *new_password)
 {
-	unsigned char partial_key[8];
 	int rv;
 
-	rv = smb_auth_DES(new_password, 8, session_key, 8, old_password, 8);
+	rv = smb_auth_DES(new_password, 8, session_key, NETR_DESKEY_LEN,
+	    old_password, 8);
 	if (rv != SMBAUTH_SUCCESS)
 		return (rv);
 
-	bzero(partial_key, 8);
-	partial_key[0] = session_key[7];
-
-	rv = smb_auth_DES(&new_password[8], 8, partial_key, 8,
-	    &old_password[8], 8);
+	rv = smb_auth_DES(&new_password[8], 8, &session_key[NETR_DESKEY_LEN],
+	    NETR_DESKEY_LEN, &old_password[8], 8);
 	return (rv);
 }
