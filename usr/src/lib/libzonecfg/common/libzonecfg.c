@@ -7283,7 +7283,7 @@ save_obs_patch(char *num, uu_avl_pool_t *patches_pool, uu_avl_t *obs_patches)
  * Keep a list of patches for a pkg.  If we see a newer version of a patch,
  * we only keep track of the newer version.
  */
-static void
+static boolean_t
 save_patch(patch_node_t *patch, uu_avl_t *patches_avl)
 {
 	patch_node_t *existing;
@@ -7301,18 +7301,40 @@ save_patch(patch_node_t *patch, uu_avl_t *patches_avl)
 		pvers = strtoul(patch->patch_vers, &endptr, 10);
 		evers = strtoul(existing->patch_vers, &endptr, 10);
 
-		if (pvers > evers) {
-			free(existing->patch_vers);
-			existing->patch_vers = patch->patch_vers;
-		} else {
-			free(patch->patch_vers);
+		if (pvers <= evers)
+			return (B_FALSE);
+
+		/*
+		 * Remove the lower version patch from the tree so we can
+		 * insert the new higher version one.  We also discard the
+		 * obsolete patch list from the old version since the new
+		 * version will have its own, likely different, list.
+		 */
+		uu_avl_remove(patches_avl, existing);
+		free(existing->patch_num);
+		free(existing->patch_vers);
+		if (existing->obs_patches != NULL) {
+			obs_patch_node_t *op;
+			void *cookie2 = NULL;
+
+			while ((op = uu_list_teardown(existing->obs_patches,
+			    &cookie2)) != NULL) {
+				free(op->patch_num);
+				free(op);
+			}
+			uu_list_destroy(existing->obs_patches);
 		}
-		free(patch->patch_num);
-		free(patch);
-		return;
+		free(existing);
+
+		/*
+		 * Now that the old one is gone, find the new location
+		 * in the tree.
+		 */
+		(void) uu_avl_find(patches_avl, patch, NULL, &where);
 	}
 
 	uu_avl_insert(patches_avl, patch, where);
+	return (B_TRUE);
 }
 
 /*
@@ -7413,7 +7435,13 @@ parse_info(char *patchinfo, uu_avl_pool_t *patches_pool, uu_avl_t *patches_avl,
 	patch->obs_patches = NULL;
 
 	uu_avl_node_init(patch, &patch->patch_node, patches_pool);
-	save_patch(patch, patches_avl);
+	if (!save_patch(patch, patches_avl)) {
+		free(patch->patch_num);
+		free(patch->patch_vers);
+		assert(patch->obs_patches == NULL);
+		free(patch);
+		return (Z_OK);
+	}
 
 	/*
 	 * Start with the first token.  This will probably be "Installed:".
