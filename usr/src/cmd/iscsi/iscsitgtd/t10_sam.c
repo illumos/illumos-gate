@@ -1545,7 +1545,11 @@ t10_find_lun(t10_targ_impl_t *t, int lun, t10_cmd_t *cmd)
 
 	if ((strcmp(guid, "0") == 0) || (strcmp(guid, "0x0") == 0)) {
 		free(guid);
-		if (util_create_guid(&guid) == False) {
+		/*
+		 * Create the GUID with NAA IEEE Registered Extended
+		 * designator format.
+		 */
+		if (util_create_guid(&guid, SPC_INQUIRY_ID_TYPE_NAA) == False) {
 			(void) pthread_mutex_unlock(&lu_list_mutex);
 			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
 			goto error;

@@ -49,6 +49,7 @@
 #include "isns_client.h"
 #include <sys/scsi/generic/commands.h>
 #include "mgmt_scf.h"
+#include "t10_spc.h"
 
 #define	CRC32_STR	"CRC32C"
 #define	NONE_STR	"None"
@@ -58,6 +59,7 @@ static thick_provo_t	*thick_head,
 pthread_mutex_t		thick_mutex;
 
 static Boolean_t connection_parameters_get(iscsi_conn_t *c, char *targ_name);
+static Boolean_t util_create_guid_naa(char **guid);
 
 void
 util_init()
@@ -1077,10 +1079,102 @@ sna_lte(uint32_t n1, uint32_t n2)
 	    ((n1 > n2) && ((n1 - n2) > SNA32_CHECK))));
 }
 
+/*
+ * util_create_guid -- generate GUID based on the guid type
+ * id_type:	SPC_INQUIRY_ID_TYPE_EUI -
+ *		EUI-64 based 16-byte designator format;
+ *		SPC_INQUIRY_ID_TYPE_NAA -
+ *		NAA IEEE Registered Extended designator format.
+ *
+ * SPC-4 revision 11 section 7.6.3.5.4 and 7.6.3.6.5.
+ *
+ * Note that now this function is always called with parameter
+ * id_type SPC_INQUIRY_ID_TYPE_NAA, therefore the code for creating
+ * EUI-64 based 16-byte format GUID is no longer used. But in order
+ * to keep backward compatiability and for future extension, all the
+ * code that has been used for creating old GUIDs should be kept, to
+ * make the format clear for all possible GUIDs targets might have.
+ */
 Boolean_t
-util_create_guid(char **guid)
+util_create_guid(char **guid, uchar_t id_type)
 {
 	eui_16_t	eui;
+	/*
+	 * We only have room for 32bits of data in the GUID. The hiword/loword
+	 * macros will not work on 64bit variables. The work, but produce
+	 * invalid results on Big Endian based machines.
+	 */
+	uint32_t	tval = (uint_t)time((time_t *)0);
+	size_t		guid_size;
+	int		i, fd;
+
+	/*
+	 * Create the NAA (6) GUID.
+	 */
+	if (id_type == SPC_INQUIRY_ID_TYPE_NAA) {
+		return (util_create_guid_naa(guid));
+	}
+
+	if ((mac_len == 0) && (if_find_mac(NULL) == False)) {
+
+		/*
+		 * By default strict GUID generation is enforced. This can
+		 * be disabled by using the correct XML tag in the configuration
+		 * file.
+		 */
+		if (enforce_strict_guid == True)
+			return (False);
+
+		/*
+		 * There's no MAC address available and we've even tried
+		 * a second time to get one. So fallback to using a random
+		 * number for the MAC address.
+		 */
+		if ((fd = open("/dev/random", O_RDONLY)) < 0)
+			return (False);
+		if (read(fd, &eui, sizeof (eui)) != sizeof (eui))
+			return (False);
+		(void) close(fd);
+
+		eui.e_vers		= SUN_EUI_16_VERS;
+		eui.e_company_id[0]	= (SUN_EN >> 16) & 0xff;
+		eui.e_company_id[1]	= (SUN_EN >> 8) & 0xff;
+		eui.e_company_id[2]	= SUN_EN & 0xff;
+
+	} else {
+		bzero(&eui, sizeof (eui));
+
+		eui.e_vers	= SUN_EUI_16_VERS;
+		eui.e_company_id[0]	= (SUN_EN >> 16) & 0xff;
+		eui.e_company_id[1]	= (SUN_EN >> 8) & 0xff;
+		eui.e_company_id[2]	= SUN_EN & 0xff;
+		eui.e_timestamp[0]	= hibyte(hiword(tval));
+		eui.e_timestamp[1]	= lobyte(hiword(tval));
+		eui.e_timestamp[2]	= hibyte(loword(tval));
+		eui.e_timestamp[3]	= lobyte(loword(tval));
+		for (i = 0; i < min(mac_len, sizeof (eui.e_mac)); i++) {
+			eui.e_mac[i] = mac_addr[i];
+		}
+
+		/*
+		 * To prevent duplicate GUIDs we need to sleep for one
+		 * second here since part of the GUID is a time stamp with
+		 * a one second resolution.
+		 */
+		(void) sleep(1);
+	}
+
+	if (tgt_xml_encode((uint8_t *)&eui, sizeof (eui), guid,
+	    &guid_size) == False) {
+		return (False);
+	} else
+		return (True);
+}
+
+Boolean_t
+util_create_guid_naa(char **guid)
+{
+	naa_16_t	naa;
 	/*
 	 * We only have room for 32bits of data in the GUID. The hiword/loword
 	 * macros will not work on 64bit variables. The work, but produce
@@ -1107,27 +1201,22 @@ util_create_guid(char **guid)
 		 */
 		if ((fd = open("/dev/random", O_RDONLY)) < 0)
 			return (False);
-		if (read(fd, &eui, sizeof (eui)) != sizeof (eui))
+		if (read(fd, &naa, sizeof (naa)) != sizeof (naa))
 			return (False);
 		(void) close(fd);
 
-		eui.e_vers		= SUN_EUI_16_VERS;
-		eui.e_company_id[0]	= 0;
-		eui.e_company_id[1]	= 0;
-		eui.e_company_id[2]	= SUN_EN;
-
 	} else {
-		bzero(&eui, sizeof (eui));
+		bzero(&naa, sizeof (naa));
 
-		eui.e_vers	= SUN_EUI_16_VERS;
-		/* ---- [0] & [1] are zero for Sun's IEEE identifier ---- */
-		eui.e_company_id[2]	= SUN_EN;
-		eui.e_timestamp[0]	= hibyte(hiword(tval));
-		eui.e_timestamp[1]	= lobyte(hiword(tval));
-		eui.e_timestamp[2]	= hibyte(loword(tval));
-		eui.e_timestamp[3]	= lobyte(loword(tval));
-		for (i = 0; i < min(mac_len, sizeof (eui.e_mac)); i++) {
-			eui.e_mac[i] = mac_addr[i];
+		/*
+		 * Set vendor specific identifier and extension.
+		 */
+		naa.n_timestamp[0]	= hibyte(hiword(tval));
+		naa.n_timestamp[1]	= lobyte(hiword(tval));
+		naa.n_timestamp[2]	= hibyte(loword(tval));
+		naa.n_timestamp[3]	= lobyte(loword(tval));
+		for (i = 0; i < min(mac_len, sizeof (naa.n_mac)); i++) {
+			naa.n_mac[i] = mac_addr[i];
 		}
 
 		/*
@@ -1138,7 +1227,15 @@ util_create_guid(char **guid)
 		(void) sleep(1);
 	}
 
-	if (tgt_xml_encode((uint8_t *)&eui, sizeof (eui), guid,
+	/*
+	 * Set NAA (6) and IEEE Company_ID.
+	 */
+	naa.n_naa		= SUN_NAA_16_TYPE;
+	naa.n_company_id_hi	= (SUN_EN >> 20) & 0x0f;
+	naa.n_company_id_b1	= (SUN_EN >> 12) & 0xff;
+	naa.n_company_id_b2	= (SUN_EN >> 4) & 0xff;
+	naa.n_company_id_lo	= SUN_EN & 0x0f;
+	if (tgt_xml_encode((uint8_t *)&naa, sizeof (naa), guid,
 	    &guid_size) == False) {
 		return (False);
 	} else

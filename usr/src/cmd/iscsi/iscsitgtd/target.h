@@ -158,9 +158,45 @@ typedef struct eui_16 {
 		e_timestamp[4];
 } eui_16_t;
 
-#define	SUN_EUI_16_VERS		1
+/*
+ * SPC-4 revision 11, section 7.6.3.6.5
+ * NAA IEEE Registered Extended designator format
+ */
+typedef struct naa_16 {
+#if defined(_BIT_FIELDS_LTOH)
+	uchar_t	n_company_id_hi	: 4,
+		n_naa		: 4;
+#elif defined(_BIT_FIELDS_HTOL)
+	uchar_t	n_naa		: 4,
+		n_company_id_hi	: 4;
+#else
+#error One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif
+	uchar_t	n_company_id_b1,
+		n_company_id_b2;
+#if defined(_BIT_FIELDS_LTOH)
+	uchar_t	n_resv1		: 4,
+		n_company_id_lo	: 4;
+#elif defined(_BIT_FIELDS_HTOL)
+	uchar_t	n_company_id_lo	: 4,
+		n_resv1		: 4;
+#else
+#error One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif
+	uchar_t	n_timestamp[4];
+	uchar_t	n_resv2;
+	uchar_t	n_mac[6];
+	uchar_t	n_resv3;
+} naa_16_t;
 
-#define	SUN_EN			0x2a;
+#define	SUN_EUI_16_VERS		1
+#define	SUN_NAA_16_TYPE		6
+
+#define	SUN_INQUIRY_ID_TYPE(GUID)	\
+	(((naa_16_t *)(GUID))->n_naa == SUN_NAA_16_TYPE ? \
+	SPC_INQUIRY_ID_TYPE_NAA : SPC_INQUIRY_ID_TYPE_EUI)
+
+#define	SUN_EN			0x144f
 #define	MIN_VAL			4
 
 #ifndef min

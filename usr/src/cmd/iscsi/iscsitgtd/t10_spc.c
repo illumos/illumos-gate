@@ -40,6 +40,7 @@
 #include <sys/param.h>
 #include <strings.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include <sys/scsi/generic/sense.h>
 #include <sys/scsi/generic/status.h>
@@ -50,8 +51,6 @@
 #include "t10.h"
 #include "t10_spc.h"
 #include "target.h"
-
-#define	VMWARE_I_NAME	"iqn.1998-01.com.vmware"
 
 void spc_free(emul_handle_t id);
 
@@ -138,6 +137,7 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 {
 	uint8_t			*rsp_buf;
 	uint8_t			*rbp;		/* temporary var */
+	uint8_t			evpd;
 	struct scsi_inquiry	*inq;
 	uint32_t		len;
 	uint32_t		page83_len;
@@ -162,8 +162,15 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	 *    (2) If any bit other than EVPD is set.
 	 *    (3) If any of the reserved bits in the CONTROL byte are set.
 	 */
-	if (((cdb[1] == 0) && (cdb[2] != 0)) || (cdb[1] & ~1) ||
-	    SAM_CONTROL_BYTE_RESERVED(cdb[5])) {
+	/*
+	 * SPC-3,4 keyword reserved:
+	 * ...Receipts are not required to check reserved bits, bytes, words
+	 * or fields for zero values.
+	 *
+	 * Ignore the check for reserved fields in the CDB byte 1.
+	 */
+	evpd = cdb[1] & 1;
+	if ((evpd == 0 && (cdb[2] != 0)) || SAM_CONTROL_BYTE_RESERVED(cdb[5])) {
 		spc_sense_create(cmd, KEY_ILLEGAL_REQUEST, 0);
 		spc_sense_ascq(cmd, SPC_ASC_INVALID_CDB, 0x00);
 		trans_send_complete(cmd, STATUS_CHECK);
@@ -213,7 +220,7 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 	/*
 	 * EVPD not set returns the standard inquiry data.
 	 */
-	if (cdb[1] == 0) {
+	if (evpd == 0) {
 		/*
 		 * Return whatever is the smallest amount between the
 		 * INQUIRY data or the amount requested.
@@ -321,23 +328,11 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			 * page length as defined by (n - 3) where 'n' is
 			 * the last valid byte. In this case 5.
 			 */
-			/*
-			 * do not provide inquiry of page 80 for vmware
-			 * iscsi initiator, see CR 6597310.
-			 */
-			if (strncmp(cmd->c_lu->l_targ->s_i_name,
-			    VMWARE_I_NAME, strlen(VMWARE_I_NAME)) != 0) {
-				rsp_buf[3]	= 4;
-				rsp_buf[4]	= SPC_INQ_PAGE0;
-				rsp_buf[5]	= SPC_INQ_PAGE80;
-				rsp_buf[6]	= SPC_INQ_PAGE83;
-				rsp_buf[7]	= SPC_INQ_PAGE86;
-			} else {
-				rsp_buf[3]	= 3;
-				rsp_buf[4]	= SPC_INQ_PAGE0;
-				rsp_buf[5]	= SPC_INQ_PAGE83;
-				rsp_buf[6]	= SPC_INQ_PAGE86;
-			}
+			rsp_buf[3]	= 4;
+			rsp_buf[4]	= SPC_INQ_PAGE0;
+			rsp_buf[5]	= SPC_INQ_PAGE80;
+			rsp_buf[6]	= SPC_INQ_PAGE83;
+			rsp_buf[7]	= SPC_INQ_PAGE86;
 
 			/*
 			 * Return the smallest amount of data between the
@@ -422,12 +417,18 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 			rbp[3]	= lobyte(loword(cmd->c_lu->l_targ->s_tpgt));
 			rbp	+= vd.len;
 
+			assert(lu->l_guid != NULL);
 			/* ---- VPD descriptor ---- */
 			vd.code_set	= SPC_INQUIRY_CODE_SET_BINARY;
-			vd.id_type	= SPC_INQUIRY_ID_TYPE_EUI;
+			vd.id_type	= SUN_INQUIRY_ID_TYPE(lu->l_guid);
 			vd.proto_id	= SPC_INQUIRY_PROTOCOL_ISCSI;
 			vd.association	= SPC_INQUIRY_ASSOC_LUN;
-			vd.piv		= 1;
+			/*
+			 * If the ASSOCIATION field contains a value other
+			 * than 01b or 10b, then the PIV bit contents are
+			 * reserved. SPC-4 revision 11 section 7.6.3.1.
+			 */
+			vd.piv		= 0;
 			vd.len		= lu->l_guid_len;
 			bcopy(&vd, rbp, sizeof (vd));
 			rbp		+= sizeof (vd);
@@ -457,7 +458,7 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 			/* ---- VPD descriptor ---- */
 			vd.code_set	= SPC_INQUIRY_CODE_SET_BINARY;
-			vd.id_type	= SPC_INQUIRY_ID_TYPE_EUI;
+			vd.id_type	= SUN_INQUIRY_ID_TYPE(lu->l_guid);
 			vd.proto_id	= SPC_INQUIRY_PROTOCOL_ISCSI;
 			vd.association	= SPC_INQUIRY_ASSOC_TARG;
 			vd.piv		= 1;
@@ -474,7 +475,7 @@ spc_inquiry(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 			/* ---- VPD descriptor ---- */
 			vd.code_set	= SPC_INQUIRY_CODE_SET_BINARY;
-			vd.id_type	= SPC_INQUIRY_ID_TYPE_EUI;
+			vd.id_type	= SUN_INQUIRY_ID_TYPE(lu->l_guid);
 			vd.proto_id	= SPC_INQUIRY_PROTOCOL_ISCSI;
 			vd.association	= SPC_INQUIRY_ASSOC_TARGPORT;
 			vd.piv		= 1;

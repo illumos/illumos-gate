@@ -465,6 +465,9 @@ tgt_xml_encode(uint8_t *ip, size_t ip_size, char **buf, size_t *buf_size)
 		bp += 2;
 	}
 
+	/* make it null terminated */
+	*bp = 0;
+
 	return (True);
 }
 

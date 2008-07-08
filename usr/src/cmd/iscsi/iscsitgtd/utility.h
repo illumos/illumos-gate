@@ -89,7 +89,7 @@ Boolean_t check_access(tgt_node_t *targ, char *initiator_name,
     Boolean_t req_chap);
 tgt_node_t *find_target_node(char *targ_name);
 void util_title(target_queue_t *q, int type, int num, char *title);
-Boolean_t util_create_guid(char **guid);
+Boolean_t util_create_guid(char **guid, uchar_t id_type);
 Boolean_t strtoll_multiplier(char *str, uint64_t *sp);
 void thick_provo_stop(char *targ, int lun);
 void *thick_provo_start(void *v);
