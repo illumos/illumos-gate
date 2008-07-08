@@ -67,7 +67,6 @@
 
 #define	ACPI_DRV_MAX_BAT_NUM		8
 #define	ACPI_DRV_MAX_AC_NUM		10
-#define	ACPI_DRV_MAX_OUTPUT_NUM		5
 
 #define	BST_FLAG_DISCHARGING		(0x1)
 #define	BST_FLAG_CHARGING		(0x2)
@@ -77,7 +76,6 @@
 #define	STA_FLAG_BATT_PRESENT		(0x10)
 
 #define	ACPI_DEVNAME_CBAT		"PNP0C0A"
-#define	ACPI_DEVNAME_SBAT		"ACPI0002"
 #define	ACPI_DEVNAME_AC			"ACPI0003"
 #define	ACPI_DEVNAME_LID		"PNP0C0D"
 
@@ -119,7 +117,6 @@ enum acpi_drv_type {
 	ACPI_DRV_TYPE_UNKNOWN,
 	ACPI_DRV_TYPE_CBAT,
 	ACPI_DRV_TYPE_AC,
-	ACPI_DRV_TYPE_SBAT,
 	ACPI_DRV_TYPE_LID,
 	ACPI_DRV_TYPE_DISPLAY,
 	ACPI_DRV_TYPE_OUTPUT
@@ -176,7 +173,7 @@ struct acpi_drv_cbat_state {
 	kstat_t *bat_bif_ksp;
 	kstat_t *bat_bst_ksp;
 } acpi_drv_cbat[ACPI_DRV_MAX_BAT_NUM];
-static int nbat;
+static int nbat = 0;
 
 /*
  * Synthesis battery state
@@ -203,7 +200,7 @@ static uint32_t acpi_drv_syn_last_level;
 static struct acpi_drv_ac_state {
 	struct acpi_drv_dev dev;
 } acpi_drv_ac[ACPI_DRV_MAX_AC_NUM];
-static int nac;
+static int nac = 0;
 
 /*
  * Current power source device
@@ -211,11 +208,6 @@ static int nac;
  */
 static int acpi_drv_psr_type = ACPI_DRV_TYPE_UNKNOWN;
 static struct acpi_drv_dev *acpi_drv_psr_devp = NULL;
-
-/* Smart Battery state */
-static struct acpi_drv_sbat_state {
-	struct acpi_drv_dev dev;
-} acpi_drv_sbat;
 
 struct obj_desc {
 	char *name;
@@ -301,6 +293,7 @@ struct acpi_drv_lid_state {
 	enum acpi_drv_notify state_ok;
 	int state;
 } lid;
+static int nlid = 0;
 
 /* Output device status */
 #define	ACPI_DRV_DCS_CONNECTOR_EXIST	(1 << 0)
@@ -328,7 +321,9 @@ struct acpi_drv_output_state {
 	int cur_level;
 	int cur_level_index;
 	int state;
-} outputs[ACPI_DRV_MAX_OUTPUT_NUM];
+	struct acpi_drv_output_state *next;
+};
+static struct acpi_drv_output_state *outputs = NULL;
 static int noutput = 0;
 
 struct acpi_drv_display_state {
@@ -510,7 +505,7 @@ acpi_drv_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	/* Create minor node for each output. */
-	for (op = &outputs[0]; op < &outputs[ACPI_DRV_MAX_OUTPUT_NUM]; op++) {
+	for (op = outputs; op != NULL; op = op->next) {
 		if (op->dev.valid) {
 			(void) snprintf(name, sizeof (name), "output%d",
 			    op->dev.index);
@@ -1743,11 +1738,9 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 		ntf_handler = acpi_drv_ac_notify;
 		ACPI_DRV_DBG(CE_NOTE, p, "AC %s",
 		    (p->present ? "on-line" : "off-line"));
-	} else if (strcmp(p->hid, ACPI_DEVNAME_SBAT) == 0) {
-		p->type = ACPI_DRV_TYPE_SBAT;
-		ACPI_DRV_DBG(CE_NOTE, p, "added");
 	} else if (strcmp(p->hid, ACPI_DEVNAME_LID) == 0) {
 		p->type = ACPI_DRV_TYPE_LID;
+		p->index = 0;
 		lid.state_ok = ACPI_DRV_NTF_UNKNOWN;
 		(void) acpi_drv_update_lid(p);
 		ntf_handler = acpi_drv_lid_notify;
@@ -1755,6 +1748,7 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 	} else if (info->Valid & ACPI_VALID_ADR) {
 		p->adr = info->Address;
 		if (p->type == ACPI_DRV_TYPE_DISPLAY) {
+			p->index = 0;
 			/* Enable display control by OS */
 			display.mode = ACPI_DRV_DOS_SWITCH_OS_EVENT |
 			    ACPI_DRV_DOS_BRIGHT_OS;
@@ -1794,9 +1788,10 @@ static ACPI_STATUS
 acpi_drv_find_cb(ACPI_HANDLE ObjHandle, UINT32 NestingLevel, void *Context,
     void **ReturnValue)
 {
-	struct acpi_drv_dev *devp = (struct acpi_drv_dev *)Context;
+	struct acpi_drv_dev *devp;
+	int *type = (int *)Context;
 
-	if (devp == &acpi_drv_cbat[0].dev) {
+	if (*type == ACPI_DRV_TYPE_CBAT) {
 		struct acpi_drv_cbat_state *bp;
 
 		if (nbat == ACPI_DRV_MAX_BAT_NUM) {
@@ -1807,7 +1802,7 @@ acpi_drv_find_cb(ACPI_HANDLE ObjHandle, UINT32 NestingLevel, void *Context,
 		}
 		bp = &acpi_drv_cbat[nbat++];
 		devp = (struct acpi_drv_dev *)bp;
-	} else if (devp == &acpi_drv_ac[0].dev) {
+	} else if (*type == ACPI_DRV_TYPE_AC) {
 		struct acpi_drv_ac_state *ap;
 
 		if (nac == ACPI_DRV_MAX_AC_NUM) {
@@ -1817,19 +1812,20 @@ acpi_drv_find_cb(ACPI_HANDLE ObjHandle, UINT32 NestingLevel, void *Context,
 		}
 		ap = &acpi_drv_ac[nac++];
 		devp = (struct acpi_drv_dev *)ap;
-	} else if (devp == &lid.dev) {
+	} else if (*type == ACPI_DRV_TYPE_LID) {
 		struct acpi_drv_lid_state *lp;
 
+		nlid++;
 		lp = &lid;
 		devp = (struct acpi_drv_dev *)lp;
-	} else if (devp == &outputs[0].dev) {
+	} else if (*type == ACPI_DRV_TYPE_OUTPUT) {
 		int adr = 0;
 		ACPI_BUFFER buf1 = {ACPI_ALLOCATE_BUFFER, NULL};
 		ACPI_BUFFER buf2;
 		char str[256];
 		ACPI_HANDLE ohl = NULL;
 		struct acpi_drv_display_state *dp;
-		struct acpi_drv_output_state *op;
+		struct acpi_drv_output_state *op, *tail;
 
 		/*
 		 * Reduce the search by checking for support of _ADR
@@ -1858,7 +1854,6 @@ acpi_drv_find_cb(ACPI_HANDLE ObjHandle, UINT32 NestingLevel, void *Context,
 			dp = &display;
 			devp = (struct acpi_drv_dev *)dp;
 			devp->hdl = ObjHandle;
-			devp->index = 1;
 			devp->type = ACPI_DRV_TYPE_DISPLAY;
 			(void) acpi_drv_obj_init(devp);
 
@@ -1867,8 +1862,18 @@ acpi_drv_find_cb(ACPI_HANDLE ObjHandle, UINT32 NestingLevel, void *Context,
 			 */
 			while (ACPI_SUCCESS(AcpiGetNextObject(ACPI_TYPE_DEVICE,
 			    ObjHandle, ohl, &ohl))) {
-				op = &outputs[noutput++];
+				op = kmem_zalloc
+				    (sizeof (struct acpi_drv_output_state),
+				    KM_SLEEP);
+				if (outputs == NULL) {
+					outputs = tail = op;
+				} else {
+					tail->next = op;
+					tail = op;
+				}
+				noutput++;
 				devp = (struct acpi_drv_dev *)op;
+				devp->op = op;
 				devp->hdl = ohl;
 				(void) acpi_drv_obj_init(devp);
 			}
@@ -1891,51 +1896,46 @@ acpi_drv_find_cb(ACPI_HANDLE ObjHandle, UINT32 NestingLevel, void *Context,
 static int
 acpi_drv_acpi_init()
 {
-	int *retp;
+	int *retp, type;
+	int status = ACPI_DRV_ERR;
 
 	/* Check to see if ACPI CA services are available */
 	if (AcpiSubsystemStatus() != AE_OK) {
 		ACPI_DRV_DBG(CE_WARN, NULL, "ACPI CA not ready");
-		return (ACPI_DRV_ERR);
+		return (status);
 	}
 
 	/* Init Control Method Batterys */
-	if (ACPI_FAILURE(AcpiGetDevices(ACPI_DEVNAME_CBAT, acpi_drv_find_cb,
-	    acpi_drv_cbat, (void *)&retp))) {
-		return (ACPI_DRV_ERR);
-	}
-
-	if (nbat == 0) {
-		return (ACPI_DRV_ERR);
+	type = ACPI_DRV_TYPE_CBAT;
+	if (ACPI_SUCCESS(AcpiGetDevices(ACPI_DEVNAME_CBAT, acpi_drv_find_cb,
+	    &type, (void *)&retp)) && nbat) {
+		status = ACPI_DRV_OK;
 	}
 
 	/* Init AC */
-	if (ACPI_FAILURE(AcpiGetDevices(ACPI_DEVNAME_AC, acpi_drv_find_cb,
-	    acpi_drv_ac, (void *)&retp))) {
-		return (ACPI_DRV_ERR);
+	type = ACPI_DRV_TYPE_AC;
+	if (ACPI_SUCCESS(AcpiGetDevices(ACPI_DEVNAME_AC, acpi_drv_find_cb,
+	    &type, (void *)&retp)) && nac) {
+		status = ACPI_DRV_OK;
 	}
 
 	/* Init LID */
-	if (ACPI_FAILURE(AcpiGetDevices(ACPI_DEVNAME_LID, acpi_drv_find_cb,
-	    &lid, (void *)&retp))) {
-		return (ACPI_DRV_ERR);
+	type = ACPI_DRV_TYPE_LID;
+	if (ACPI_SUCCESS(AcpiGetDevices(ACPI_DEVNAME_LID, acpi_drv_find_cb,
+	    &type, (void *)&retp)) && nlid) {
+		status = ACPI_DRV_OK;
 	}
 
 	/* Init Output Devices */
-	if (ACPI_FAILURE(AcpiGetDevices(NULL, acpi_drv_find_cb,
-	    outputs, (void *)&retp))) {
-		return (ACPI_DRV_ERR);
-	}
-
-	/* Init Smart Battery */
-	if (ACPI_FAILURE(AcpiGetDevices(ACPI_DEVNAME_SBAT, acpi_drv_find_cb,
-	    &acpi_drv_sbat, (void *)&retp))) {
-		return (ACPI_DRV_ERR);
+	type = ACPI_DRV_TYPE_OUTPUT;
+	if (ACPI_SUCCESS(AcpiGetDevices(NULL, acpi_drv_find_cb,
+	    &type, (void *)&retp)) && noutput) {
+		status = ACPI_DRV_OK;
 	}
 
 	acpi_drv_update_cap(1);
 
-	return (ACPI_DRV_OK);
+	return (status);
 }
 
 static void
@@ -1958,7 +1958,7 @@ acpi_drv_acpi_fini(void)
 	}
 	AcpiRemoveNotifyHandler(lid.dev.hdl, ACPI_DEVICE_NOTIFY,
 	    acpi_drv_lid_notify);
-	for (op = &outputs[0]; op < &outputs[ACPI_DRV_MAX_OUTPUT_NUM]; op++) {
+	for (op = outputs; op != NULL; op = op->next) {
 		if (op->dev.valid) {
 			if (op->levels) {
 				kmem_free(op->levels,
@@ -1967,6 +1967,7 @@ acpi_drv_acpi_fini(void)
 			AcpiRemoveNotifyHandler(op->dev.hdl, ACPI_DEVICE_NOTIFY,
 			    acpi_drv_output_notify);
 		}
+		kmem_free(op, sizeof (struct acpi_drv_output_state));
 	}
 }
 
@@ -2265,14 +2266,7 @@ acpi_drv_output_init(ACPI_HANDLE hdl, struct acpi_drv_dev *dev)
 		return (ACPI_DRV_ERR);
 	}
 
-	/* Allocate object */
-	if (noutput == ACPI_DRV_MAX_OUTPUT_NUM) {
-		ACPI_DRV_DBG(CE_WARN, NULL,
-		    "Need to support more output devices: "
-		    "AC_MAX = %d", ACPI_DRV_MAX_OUTPUT_NUM);
-		return (ACPI_DRV_ERR);
-	}
-	op = dev->op = &outputs[noutput - 1];
+	op = dev->op;
 	op->adr = adr;
 
 	buf1.Pointer = str;
@@ -2435,10 +2429,12 @@ acpi_drv_output_ioctl(int index, int cmd, intptr_t arg, int mode, cred_t *cr,
 static struct acpi_drv_output_state *
 acpi_drv_idx2output(int idx)
 {
-	if (idx >= ACPI_DRV_MAX_OUTPUT_NUM) {
-		return (NULL);
+	struct acpi_drv_output_state *op = outputs;
+
+	while ((op != NULL) && (op->dev.index != idx)) {
+		op = op->next;
 	}
-	return (&outputs[idx]);
+	return (op);
 }
 
 /*
