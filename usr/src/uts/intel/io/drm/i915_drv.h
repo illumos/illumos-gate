@@ -238,7 +238,7 @@ extern int i915_move(drm_buffer_object_t *bo, int evict,
 } while (*"\0")
 
 #define OUT_RING(n) do {					\
-	*(volatile unsigned int *)(virt + outring) = (n);		\
+	*(volatile unsigned int *)(void *)(virt + outring) = (n);		\
         outcount++;						\
 	outring += 4;						\
 	outring &= ringmask;					\

@@ -220,7 +220,7 @@ static void i915_vblank_tasklet(drm_device_t *dev)
 
 irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 {
-	drm_device_t *dev = (drm_device_t *) arg;
+	drm_device_t *dev = (drm_device_t *) (void *)arg;
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 	u16 temp;
 	u32 pipea_stats, pipeb_stats;

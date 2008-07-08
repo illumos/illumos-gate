@@ -159,7 +159,7 @@ static int i915_initialize(drm_device_t * dev,
 		return (EINVAL);
 	}
 
-	dev_priv->sarea_priv = (drm_i915_sarea_t *)
+	dev_priv->sarea_priv = (drm_i915_sarea_t *)(void *)
 	    ((u8 *) dev_priv->sarea->handle + init->sarea_priv_offset);
 
 	dev_priv->ring.Start = init->ring_start;
@@ -425,7 +425,7 @@ static int i915_emit_box(drm_device_t * dev,
 		return (EFAULT);
 	}
 
-	if (box.y2 <= box.y1 || box.x2 <= box.x1 || box.y2 <= 0 || box.x2 <= 0) {
+	if (box.y2 <= box.y1 || box.x2 <= box.x1) {
 		DRM_ERROR("Bad box %d,%d..%d,%d\n",
 			  box.x1, box.y1, box.x2, box.y2);
 		return (EINVAL);
@@ -518,7 +518,7 @@ static int i915_dispatch_cmdbuffer(drm_device_t * dev,
 				return ret;
 		}
 
-		ret = i915_emit_cmds(dev, (int __user *)cmd->buf, cmd->sz / 4);
+		ret = i915_emit_cmds(dev, (int __user *)(void *)cmd->buf, cmd->sz / 4);
 		if (ret)
 			return ret;
 	}

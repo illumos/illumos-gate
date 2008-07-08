@@ -73,7 +73,7 @@ radeon_check_and_fixup_offset(drm_radeon_private_t *dev_priv,
 	 * framebuffer or the GART mapped space
 	 */
 
-	if (radeon_check_offset(dev_priv, off))
+	if (RADEON_CHECK_OFFSET(dev_priv, off))
 		return (0);
 
 	/*
@@ -91,7 +91,7 @@ radeon_check_and_fixup_offset(drm_radeon_private_t *dev_priv,
 		off = off - fb_end - 1 + dev_priv->gart_vm_start;
 
 	/* Now recheck and fail if out of bounds */
-	if (radeon_check_offset(dev_priv, off)) {
+	if (RADEON_CHECK_OFFSET(dev_priv, off)) {
 		DRM_DEBUG("offset fixed up to 0x%x\n", off);
 		*offset = (uint32_t)off;
 		return (0);

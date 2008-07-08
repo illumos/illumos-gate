@@ -77,7 +77,7 @@ void mark_block(drm_device_t * dev, struct mem_block *p, int in_use)
 	 * them to head of list to preserve LRU semantics.
 	 */
 	for (i = start; i <= end; i++) {
-		list[i].in_use = in_use;
+		list[i].in_use = (unsigned char)in_use;
 		list[i].age = age;
 
 		/* remove_from_list(i)
@@ -87,10 +87,10 @@ void mark_block(drm_device_t * dev, struct mem_block *p, int in_use)
 
 		/* insert_at_head(list, i)
 		 */
-		list[i].prev = nr;
+		list[i].prev = (unsigned char)nr;
 		list[i].next = list[nr].next;
-		list[(unsigned)list[nr].next].prev = i;
-		list[nr].next = i;
+		list[(unsigned)list[nr].next].prev = (unsigned char)i;
+		list[nr].next = (unsigned char)i;
 	}
 }
 

@@ -332,17 +332,11 @@ extern int radeon_max_ioctl;
  * Check whether the given hardware address is inside the framebuffer or the
  * GART area.
  */
-static inline int
-radeon_check_offset(drm_radeon_private_t *dev_priv, uint64_t off)
-{
-	u32 fb_start = dev_priv->fb_location;
-	u32 fb_end = fb_start + dev_priv->fb_size - 1;
-	u32 gart_start = dev_priv->gart_vm_start;
-	u32 gart_end = gart_start + dev_priv->gart_size - 1;
-
-	return ((off >= fb_start && off <= fb_end) ||
-	    (off >= gart_start && off <= gart_end));
-}
+#define	RADEON_CHECK_OFFSET(dev_priv, off) \
+	(((off >= dev_priv->fb_location) && \
+	(off <= (dev_priv->fb_location + dev_priv->fb_size - 1))) || \
+	((off >= dev_priv->gart_vm_start) && \
+	(off <= (dev_priv->gart_vm_start + dev_priv->gart_size - 1))))
 
 				/* radeon_cp.c */
 extern int radeon_cp_init(DRM_IOCTL_ARGS);

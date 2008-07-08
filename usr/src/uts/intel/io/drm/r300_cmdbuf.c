@@ -280,7 +280,7 @@ r300_emit_carefully_checked_packet0(drm_radeon_private_t *dev_priv,
 		case MARK_SAFE:
 			break;
 		case MARK_CHECK_OFFSET:
-			if (!radeon_check_offset(dev_priv, (u32) values[i])) {
+			if (!RADEON_CHECK_OFFSET(dev_priv, (u32) values[i])) {
 				DRM_ERROR("Offset failed range check "
 				    "(reg=%04x sz=%d)\n", reg, sz);
 				return (EINVAL);
@@ -444,7 +444,7 @@ static inline int r300_emit_3d_load_vbpntr(drm_radeon_private_t *dev_priv,
 	i = 1;
 	while ((k < narrays) && (i < (count + 1))) {
 		i++;		/* skip attribute field */
-		if (!radeon_check_offset(dev_priv, payload[i])) {
+		if (!RADEON_CHECK_OFFSET(dev_priv, payload[i])) {
 			DRM_ERROR("Offset failed range check (k=%d i=%d) "
 			    "while processing 3D_LOAD_VBPNTR packet.\n",
 			    k, i);
@@ -455,7 +455,7 @@ static inline int r300_emit_3d_load_vbpntr(drm_radeon_private_t *dev_priv,
 		if (k == narrays)
 			break;
 		/* have one more to process, they come in pairs */
-		if (!radeon_check_offset(dev_priv, payload[i])) {
+		if (!RADEON_CHECK_OFFSET(dev_priv, payload[i])) {
 			DRM_ERROR("Offset failed range check (k=%d i=%d) "
 			    "while processing 3D_LOAD_VBPNTR packet.\n",
 			    k, i);
@@ -500,7 +500,7 @@ static inline int r300_emit_bitblt_multi(drm_radeon_private_t *dev_priv,
 		if (cmd[1] & (RADEON_GMC_SRC_PITCH_OFFSET_CNTL |
 		    RADEON_GMC_DST_PITCH_OFFSET_CNTL)) {
 			offset = cmd[2] << 10;
-			ret = !radeon_check_offset(dev_priv, offset);
+			ret = !RADEON_CHECK_OFFSET(dev_priv, offset);
 			if (ret) {
 				DRM_ERROR("Invalid bitblt first offset "
 				    "is %08X\n", offset);
@@ -511,7 +511,7 @@ static inline int r300_emit_bitblt_multi(drm_radeon_private_t *dev_priv,
 		if ((cmd[1] & RADEON_GMC_SRC_PITCH_OFFSET_CNTL) &&
 		    (cmd[1] & RADEON_GMC_DST_PITCH_OFFSET_CNTL)) {
 			offset = cmd[3] << 10;
-			ret = !radeon_check_offset(dev_priv, offset);
+			ret = !RADEON_CHECK_OFFSET(dev_priv, offset);
 			if (ret) {
 				DRM_ERROR("Invalid bitblt second offset "
 				    "is %08X\n", offset);
@@ -546,7 +546,7 @@ static inline int r300_emit_indx_buffer(drm_radeon_private_t *dev_priv,
 		DRM_ERROR("Invalid indx_buffer reg address %08X\n", cmd[1]);
 		return (EINVAL);
 	}
-	ret = !radeon_check_offset(dev_priv, cmd[2]);
+	ret = !RADEON_CHECK_OFFSET(dev_priv, cmd[2]);
 	if (ret) {
 		DRM_ERROR("Invalid indx_buffer offset is %08X\n", cmd[2]);
 		return (EINVAL);
