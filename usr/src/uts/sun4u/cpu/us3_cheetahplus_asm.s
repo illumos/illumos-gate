@@ -359,18 +359,23 @@ skip_traptrace:
 	/*
 	 * If a UCU or L3_UCU followed by a WDU has occurred go ahead
 	 * and panic since a UE will occur (on the retry) before the
-	 * UCU and WDU messages are enqueued.
+	 * UCU and WDU messages are enqueued.  On a Panther processor, 
+	 * we need to also see an L3_WDU before panicking.  Note that
+	 * we avoid accessing the _EXT ASIs if not on a Panther.
 	 */
 	ldxa	[%g1 + CH_ERR_TL1_SDW_AFSR]%asi, %g3
 	set	1, %g4
 	sllx	%g4, C_AFSR_UCU_SHIFT, %g4
 	btst	%g4, %g3		! UCU in original shadow AFSR?
 	bnz	%xcc, 5f
-	  mov	1, %g4
+	  nop
+	GET_CPU_IMPL(%g6)
+	cmp	%g6, PANTHER_IMPL
+	bne	%xcc, 6f		! not Panther, no UCU, skip the rest
+	  nop
 	ldxa	[%g1 + CH_ERR_TL1_SDW_AFSR_EXT]%asi, %g3
-	sllx	%g4, C_AFSR_L3_UCU_SHIFT, %g4
-	btst	%g4, %g3		! L3_UCU in original shadow AFSR_EXT?
-	bz	%xcc, 6f
+	btst	C_AFSR_L3_UCU, %g3	! L3_UCU in original shadow AFSR_EXT?
+	bz	%xcc, 6f		! neither UCU nor L3_UCU was seen
 	  nop
 5:
 	ldxa	[%g1 + CH_ERR_TL1_AFSR]%asi, %g4	! original AFSR
@@ -379,9 +384,19 @@ skip_traptrace:
 	set	1, %g4
 	sllx	%g4, C_AFSR_WDU_SHIFT, %g4
 	btst	%g4, %g3		! WDU in original or current AFSR?
-	bnz	%xcc, fecc_tl1_err
+	bz	%xcc, 6f                ! no WDU, skip remaining tests
 	  nop
-
+	GET_CPU_IMPL(%g6)
+	cmp	%g6, PANTHER_IMPL
+	bne	%xcc, fecc_tl1_err	! if not Panther, panic (saw UCU, WDU)
+	  nop
+	ldxa	[%g1 + CH_ERR_TL1_SDW_AFSR_EXT]%asi, %g4 ! original AFSR_EXT
+	set	ASI_AFSR_EXT_VA, %g6	! ASI of current AFSR_EXT
+	ldxa	[%g6]ASI_AFSR, %g3	! value of current AFSR_EXT
+	or	%g3, %g4, %g3		! %g3 = original + current AFSR_EXT
+	btst	C_AFSR_L3_WDU, %g3	! L3_WDU in original or current AFSR?
+	bnz	%xcc, fecc_tl1_err	! panic (saw L3_WDU and UCU or L3_UCU)
+	  nop
 6:
 	/*
 	 * We fall into this macro if we've successfully logged the error in

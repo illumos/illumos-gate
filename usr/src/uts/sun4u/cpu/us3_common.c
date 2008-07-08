@@ -1415,10 +1415,21 @@ cpu_log_fast_ecc_error(caddr_t tpc, int priv, int tl, uint64_t ceen,
 	    aflt->flt_panic == 0 && aflt->flt_priv != 0 &&
 	    curthread->t_ontrap == NULL && curthread->t_lofault == NULL) {
 		get_cpu_error_state(&cpu_error_regs);
-		aflt->flt_panic |= ((cpu_error_regs.afsr & C_AFSR_WDU) &&
-		    (cpu_error_regs.afar == t_afar));
-		aflt->flt_panic |= ((clop == NULL) &&
-		    (t_afsr_errs & C_AFSR_WDU));
+		if (IS_PANTHER(cpunodes[CPU->cpu_id].implementation)) {
+			aflt->flt_panic |=
+			    ((cpu_error_regs.afsr & C_AFSR_WDU) &&
+			    (cpu_error_regs.afsr_ext & C_AFSR_L3_WDU) &&
+			    (cpu_error_regs.afar == t_afar));
+			aflt->flt_panic |= ((clop == NULL) &&
+			    (t_afsr_errs & C_AFSR_WDU) &&
+			    (t_afsr_errs & C_AFSR_L3_WDU));
+		} else {
+			aflt->flt_panic |=
+			    ((cpu_error_regs.afsr & C_AFSR_WDU) &&
+			    (cpu_error_regs.afar == t_afar));
+			aflt->flt_panic |= ((clop == NULL) &&
+			    (t_afsr_errs & C_AFSR_WDU));
+		}
 	}
 
 	/*
