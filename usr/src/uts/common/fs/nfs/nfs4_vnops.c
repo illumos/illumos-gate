@@ -11192,6 +11192,21 @@ fattr4_maxfilesize_to_bits(uint64_t ll)
 	return (l);
 }
 
+static int
+nfs4_have_xattrs(vnode_t *vp, ulong_t *valp, cred_t *cr)
+{
+	vnode_t *avp = NULL;
+	int error;
+
+	if ((error = nfs4lookup_xattr(vp, "", &avp,
+	    LOOKUP_XATTR, cr)) == 0)
+		error = do_xattr_exists_check(avp, valp, cr);
+	if (avp)
+		VN_RELE(avp);
+
+	return (error);
+}
+
 /* ARGSUSED */
 int
 nfs4_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
@@ -11219,12 +11234,11 @@ nfs4_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 	rp = VTOR4(vp);
 	if (cmd == _PC_XATTR_EXISTS) {
 		/*
-		 * Eventually should attempt small client readdir before
-		 * going otw with GETATTR(FATTR4_NAMED_ATTR).  For now
-		 * just drive the OTW getattr.  This is required because
-		 * _PC_XATTR_EXISTS can only return true if attributes
-		 * exist -- simply checking for existence of the attrdir
-		 * is not sufficient.
+		 * The existence of the xattr directory is not sufficient
+		 * for determining whether generic user attributes exists.
+		 * The attribute directory could only be a transient directory
+		 * used for Solaris sysattr support.  Do a small readdir
+		 * to verify if the only entries are sysattrs or not.
 		 *
 		 * pc4_xattr_valid can be only be trusted when r_xattr_dir
 		 * is NULL.  Once the xadir vp exists, we can create xattrs,
@@ -11234,8 +11248,7 @@ nfs4_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 		 */
 		if (ATTRCACHE4_VALID(vp) && rp->r_pathconf.pc4_xattr_valid &&
 		    rp->r_xattr_dir == NULL) {
-			*valp = rp->r_pathconf.pc4_xattr_exists;
-			return (0);
+			return (nfs4_have_xattrs(vp, valp, cr));
 		}
 	} else {  /* OLD CODE */
 		if (ATTRCACHE4_VALID(vp)) {
@@ -11316,7 +11329,10 @@ nfs4_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 		*valp = gar.n4g_ext_res->n4g_pc4.pc4_no_trunc;
 		break;
 	case _PC_XATTR_EXISTS:
-		*valp = gar.n4g_ext_res->n4g_pc4.pc4_xattr_exists;
+		if (gar.n4g_ext_res->n4g_pc4.pc4_xattr_exists) {
+			if (error = nfs4_have_xattrs(vp, valp, cr))
+				return (error);
+		}
 		break;
 	default:
 		return (EINVAL);

@@ -417,7 +417,7 @@ nfs3_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 	if ((flag & FWRITE) && vn_has_cached_data(vp)) {
 		if (VTOMI(vp)->mi_flags & MI_NOCTO) {
 			error = nfs3_putpage(vp, (offset_t)0, 0, B_ASYNC,
-					cr, ct);
+			    cr, ct);
 			if (error == EAGAIN)
 				error = 0;
 		} else
@@ -492,9 +492,9 @@ nfs3_directio_read(vnode_t *vp, struct uio *uiop, cred_t *cr)
 			args.count = (count3)tsize;
 			res.size = (uint_t)tsize;
 			error = rfs3call(mi, NFSPROC3_READ,
-				    xdr_READ3args, (caddr_t)&args,
-				    xdr_READ3uiores, (caddr_t)&res, cr,
-				    &douprintf, &res.status, 0, &fi);
+			    xdr_READ3args, (caddr_t)&args,
+			    xdr_READ3uiores, (caddr_t)&res, cr,
+			    &douprintf, &res.status, 0, &fi);
 		} while (error == ENFS_TRYAGAIN);
 
 		if (mi->mi_io_kstats) {
@@ -513,7 +513,7 @@ nfs3_directio_read(vnode_t *vp, struct uio *uiop, cred_t *cr)
 		if (res.count != res.size) {
 			zcmn_err(getzoneid(), CE_WARN,
 "nfs3_directio_read: server %s returned incorrect amount",
-					sv_hostname);
+			    sv_hostname);
 			return (EIO);
 		}
 		count -= res.count;
@@ -601,10 +601,10 @@ nfs3_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 			 * Copy data.
 			 */
 			error = vpm_data_copy(vp, off + on, n, uiop,
-						1, NULL, 0, S_READ);
+			    1, NULL, 0, S_READ);
 		} else {
 			base = segmap_getmapflt(segkmap, vp, off + on, n, 1,
-							S_READ);
+			    S_READ);
 
 			error = uiomove(base + on, n, UIO_READ, uiop);
 		}
@@ -806,23 +806,23 @@ nfs3_fwrite:
 			if (segmap_kpm) {
 				int pon = uiop->uio_loffset & PAGEOFFSET;
 				size_t pn = MIN(PAGESIZE - pon,
-							uiop->uio_resid);
+				    uiop->uio_resid);
 				int pagecreate;
 
 				mutex_enter(&rp->r_statelock);
 				pagecreate = (pon == 0) && (pn == PAGESIZE ||
-					uiop->uio_loffset + pn >= rp->r_size);
+				    uiop->uio_loffset + pn >= rp->r_size);
 				mutex_exit(&rp->r_statelock);
 
 				base = segmap_getmapflt(segkmap, vp, off + on,
-						pn, !pagecreate, S_WRITE);
+				    pn, !pagecreate, S_WRITE);
 
 				error = writerp(rp, base + pon, n, uiop,
-								pagecreate);
+				    pagecreate);
 
 			} else {
 				base = segmap_getmapflt(segkmap, vp, off + on,
-							n, 0, S_READ);
+				    n, 0, S_READ);
 				error = writerp(rp, base + on, n, uiop, 0);
 			}
 		}
@@ -1152,8 +1152,8 @@ nfs3read(vnode_t *vp, caddr_t base, offset_t offset, int count,
 
 		if (res.count != res.data.data_len) {
 			zcmn_err(getzoneid(), CE_WARN,
-				"nfs3read: server %s returned incorrect amount",
-				rp->r_server->sv_hostname);
+			    "nfs3read: server %s returned incorrect amount",
+			    rp->r_server->sv_hostname);
 			return (EIO);
 		}
 
@@ -1281,7 +1281,7 @@ nfs3_setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 		return (error);
 
 	error = secpolicy_vnode_setattr(cr, vp, vap, &va, flags, nfs3_accessx,
-		vp);
+	    vp);
 	if (error)
 		return (error);
 
@@ -1809,7 +1809,7 @@ redo:
 			    ((rp->r_flags & RDIRTY) || rp->r_count > 0)) {
 				ASSERT(vp->v_type != VCHR);
 				error = nfs3_putpage(vp, (offset_t)0, 0, 0,
-						cr, ct);
+				    cr, ct);
 				if (error) {
 					mutex_enter(&rp->r_statelock);
 					if (!rp->r_error)
@@ -2140,10 +2140,10 @@ nfs3lookup_otw(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr,
 
 	if (res.obj_attributes.attributes) {
 		vp = makenfs3node_va(&res.object, res.obj_attributes.fres.vap,
-				dvp->v_vfsp, t, cr, VTOR(dvp)->r_path, nm);
+		    dvp->v_vfsp, t, cr, VTOR(dvp)->r_path, nm);
 	} else {
 		vp = makenfs3node_va(&res.object, NULL,
-				dvp->v_vfsp, t, cr, VTOR(dvp)->r_path, nm);
+		    dvp->v_vfsp, t, cr, VTOR(dvp)->r_path, nm);
 		if (vp->v_type == VNON) {
 			vattr.va_mask = AT_TYPE;
 			error = nfs3getattr(vp, &vattr, cr);
@@ -2400,7 +2400,7 @@ nfs3create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 		 */
 		args.how.mode = GUARDED;
 		error = vattr_to_sattr3(va,
-				&args.how.createhow3_u.obj_attributes);
+		    &args.how.createhow3_u.obj_attributes);
 		if (error) {
 			/* req time field(s) overflow - return immediately */
 			return (error);
@@ -2466,8 +2466,8 @@ nfs3create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 				 */
 				if (exclusive == EXCL) {
 					if (error =
-						nfs3excl_create_settimes(vp,
-							va, cr)) {
+					    nfs3excl_create_settimes(vp,
+					    va, cr)) {
 						/*
 						 * Setting the times failed.
 						 * Remove the file and return
@@ -2475,7 +2475,7 @@ nfs3create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 						 */
 						VN_RELE(vp);
 						(void) nfs3_remove(dvp,
-							nm, cr, NULL, 0);
+						    nm, cr, NULL, 0);
 						return (error);
 					}
 				}
@@ -2516,7 +2516,7 @@ nfs3create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 		}
 
 		if (exclusive == EXCL &&
-			(va->va_mask & ~(AT_GID | AT_SIZE))) {
+		    (va->va_mask & ~(AT_GID | AT_SIZE))) {
 			/*
 			 * If doing an exclusive create, then generate
 			 * a SETATTR to set the initial attributes.
@@ -2692,7 +2692,7 @@ nfs3mknod(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 		setdiropargs3(&args.where, nm, dvp);
 		args.what.type = (va->va_type == VFIFO) ? NF3FIFO : NF3SOCK;
 		error = vattr_to_sattr3(va,
-				&args.what.mknoddata3_u.pipe_attributes);
+		    &args.what.mknoddata3_u.pipe_attributes);
 		if (error) {
 			/* req time field(s) overflow - return immediately */
 			return (error);
@@ -3615,7 +3615,7 @@ nfs3_symlink(vnode_t *dvp, char *lnm, struct vattr *tva, char *tnm, cred_t *cr,
 					} else {
 						mutex_exit(&rp->r_statelock);
 						kmem_free((void *)contents,
-							    MAXPATHLEN);
+						    MAXPATHLEN);
 					}
 				}
 			}
@@ -3768,7 +3768,7 @@ top:
 				 */
 				mutex_exit(&rp->r_statelock);
 				(void) nfs_rw_enter_sig(&rp->r_rwlock,
-					RW_READER, FALSE);
+				    RW_READER, FALSE);
 				rddir_cache_rele(rdc);
 				if (nrdc != NULL)
 					rddir_cache_rele(nrdc);
@@ -3776,7 +3776,7 @@ top:
 			}
 			mutex_exit(&rp->r_statelock);
 			(void) nfs_rw_enter_sig(&rp->r_rwlock,
-				RW_READER, FALSE);
+			    RW_READER, FALSE);
 			rddir_cache_rele(rdc);
 			goto top;
 		}
@@ -4613,8 +4613,8 @@ reread:
 		else if (blkoff == rp->r_nextr)
 			readahead = nfs3_nra;
 		else if (rp->r_nextr > blkoff &&
-				((ra_window = (rp->r_nextr - blkoff) / bsize)
-					<= (nfs3_nra - 1)))
+		    ((ra_window = (rp->r_nextr - blkoff) / bsize)
+		    <= (nfs3_nra - 1)))
 			readahead = nfs3_nra - ra_window;
 		else
 			readahead = 0;
@@ -4688,7 +4688,7 @@ again:
 				} else
 					blksize = rp->r_size - blkoff;
 			} else if ((off == 0) ||
-				(off != rp->r_nextr && !readahead_issued)) {
+			    (off != rp->r_nextr && !readahead_issued)) {
 				blksize = PAGESIZE;
 				blkoff = off; /* block = page here */
 			} else
@@ -5359,21 +5359,22 @@ nfs3_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 	if (cmd != F_GETLK) {
 		mutex_enter(&rp->r_statelock);
 		while (rp->r_count > 0) {
-		    if (intr) {
-			klwp_t *lwp = ttolwp(curthread);
+			if (intr) {
+				klwp_t *lwp = ttolwp(curthread);
 
-			if (lwp != NULL)
-				lwp->lwp_nostop++;
-			if (cv_wait_sig(&rp->r_cv, &rp->r_statelock) == 0) {
+				if (lwp != NULL)
+					lwp->lwp_nostop++;
+				if (cv_wait_sig(&rp->r_cv,
+				    &rp->r_statelock) == 0) {
+					if (lwp != NULL)
+						lwp->lwp_nostop--;
+					rc = EINTR;
+					break;
+				}
 				if (lwp != NULL)
 					lwp->lwp_nostop--;
-				rc = EINTR;
-				break;
-			}
-			if (lwp != NULL)
-				lwp->lwp_nostop--;
-		    } else
-			cv_wait(&rp->r_cv, &rp->r_statelock);
+			} else
+				cv_wait(&rp->r_cv, &rp->r_statelock);
 		}
 		mutex_exit(&rp->r_statelock);
 		if (rc != 0)
@@ -5562,7 +5563,7 @@ nfs3_delmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
 	dmapp->caller = delmap_call;
 
 	error = as_add_callback(as, nfs3_delmap_callback, dmapp,
-	AS_UNMAP_EVENT, addr, len, KM_SLEEP);
+	    AS_UNMAP_EVENT, addr, len, KM_SLEEP);
 
 	return (error ? error : EAGAIN);
 }
@@ -5720,10 +5721,12 @@ nfs3_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 			nfs_rw_exit(&rp->r_rwlock);
 
 			if (error == 0 && avp != NULL) {
+				error = do_xattr_exists_check(avp, valp, cr);
 				VN_RELE(avp);
-				*valp = 1;
-			} else if (error == ENOENT)
+			} else if (error == ENOENT) {
 				error = 0;
+				*valp = 0;
+			}
 		}
 		return (error);
 	}
@@ -6280,7 +6283,7 @@ nfs3_get_commit(vnode_t *vp)
 			    (offset3)pp->p_offset + rp->r_commit.c_commlen;
 			rp->r_commit.c_commbase = (offset3)pp->p_offset;
 		} else if ((rp->r_commit.c_commbase + rp->r_commit.c_commlen)
-			    <= pp->p_offset) {
+		    <= pp->p_offset) {
 			rp->r_commit.c_commlen = (offset3)pp->p_offset -
 			    rp->r_commit.c_commbase + PAGESIZE;
 		}
@@ -6356,7 +6359,7 @@ nfs3_get_commit_range(vnode_t *vp, u_offset_t soff, size_t len)
 			rp->r_commit.c_commlen = PAGESIZE;
 		} else {
 			rp->r_commit.c_commlen = (offset3)pp->p_offset -
-					rp->r_commit.c_commbase + PAGESIZE;
+			    rp->r_commit.c_commbase + PAGESIZE;
 		}
 		page_add(&rp->r_commit.c_pages, pp);
 	}

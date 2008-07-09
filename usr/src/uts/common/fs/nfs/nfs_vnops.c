@@ -4827,8 +4827,8 @@ nfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr,
 			nfs_rw_exit(&rp->r_rwlock);
 
 			if (error == 0 && avp != NULL) {
+				error = do_xattr_exists_check(avp, valp, cr);
 				VN_RELE(avp);
-				*valp = 1;
 			}
 		}
 		return (error ? EINVAL : 0);

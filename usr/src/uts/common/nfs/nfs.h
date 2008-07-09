@@ -2278,6 +2278,9 @@ extern bool_t rfs4_check_delegated(int mode, vnode_t *, bool_t trunc);
 extern int rfs4_delegated_getattr(vnode_t *, vattr_t *, int, cred_t *);
 extern void rfs4_hold_deleg_policy(void);
 extern void rfs4_rele_deleg_policy(void);
+
+extern int do_xattr_exists_check(vnode_t *, ulong_t *, cred_t *);
+
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

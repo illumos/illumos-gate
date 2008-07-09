@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -311,7 +311,7 @@ fattr4_get_fh_expire_type(struct exportinfo *exi, uint32_t *fh_expire_typep)
 		return (ESTALE);
 	ex_flags = exi->exi_export.ex_flags;
 	if ((ex_flags & (EX_VOLFH | EX_VOLRNM | EX_VOLMIG | EX_NOEXPOPEN))
-		== 0) {
+	    == 0) {
 		*fh_expire_typep = FH4_PERSISTENT;
 		return (0);
 	}
@@ -364,7 +364,7 @@ rfs4_fattr4_fh_expire_type(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		break;		/* this attr is supported */
 	case NFS4ATTR_GETIT:
 		error = fattr4_get_fh_expire_type(sarg->cs->exi,
-				&na->fh_expire_type);
+		    &na->fh_expire_type);
 		break;
 	case NFS4ATTR_SETIT:
 		/*
@@ -374,7 +374,7 @@ rfs4_fattr4_fh_expire_type(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		break;
 	case NFS4ATTR_VERIT:
 		error = fattr4_get_fh_expire_type(sarg->cs->exi,
-				&fh_expire_type);
+		    &fh_expire_type);
 		if (!error && (na->fh_expire_type != fh_expire_type))
 			error = -1;	/* no match */
 		break;
@@ -570,16 +570,24 @@ rfs4_fattr4_named_attr(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 
 		/*
 		 * Solaris xattr model requires that VFS_XATTR is set
-		 * in file systems enabled for xattr.  If VFS_XATTR
-		 * not set, no need to call pathconf.
+		 * in file systems enabled for generic xattr.  If VFS_XATTR
+		 * not set, no need to call pathconf for _PC_XATTR_EXISTS..
+		 *
+		 * However the VFS_XATTR flag doesn't indicate sysattr support
+		 * so always check for sysattrs and then only do the
+		 * _PC_XATTR_EXISTS pathconf if needed.
 		 */
-		if (sarg->cs->vp->v_vfsp->vfs_flag & VFS_XATTR) {
-			error = VOP_PATHCONF(sarg->cs->vp, _PC_XATTR_EXISTS,
-					&val, sarg->cs->cr, NULL);
+
+		val = 0;
+		error = VOP_PATHCONF(sarg->cs->vp, _PC_SATTR_EXISTS,
+		    &val, sarg->cs->cr, NULL);
+		if ((error || val == 0) &&
+		    sarg->cs->vp->v_vfsp->vfs_flag & VFS_XATTR) {
+			error = VOP_PATHCONF(sarg->cs->vp,
+			    _PC_XATTR_EXISTS, &val, sarg->cs->cr, NULL);
 			if (error)
 				break;
-		} else
-			val = 0;
+		}
 		na->named_attr = (val ? TRUE : FALSE);
 		break;
 	case NFS4ATTR_SETIT:
@@ -592,7 +600,7 @@ rfs4_fattr4_named_attr(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		ASSERT(sarg->cs->vp != NULL);
 		if (sarg->cs->vp->v_vfsp->vfs_flag & VFS_XATTR) {
 			error = VOP_PATHCONF(sarg->cs->vp, _PC_XATTR_EXISTS,
-					&val, sarg->cs->cr, NULL);
+			    &val, sarg->cs->cr, NULL);
 			if (error)
 				break;
 		} else
@@ -732,7 +740,7 @@ rfs4_fattr4_rdattr_error(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	switch (cmd) {
 	case NFS4ATTR_SUPPORTED:
 		if ((sarg->op == NFS4ATTR_SETIT) ||
-			(sarg->op == NFS4ATTR_VERIT))
+		    (sarg->op == NFS4ATTR_VERIT))
 			error = EINVAL;
 		break;		/* this attr is supported */
 	case NFS4ATTR_GETIT:
@@ -1191,7 +1199,7 @@ rfs4_fattr4_chown_restricted(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		}
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp,
-				_PC_CHOWN_RESTRICTED, &val, sarg->cs->cr, NULL);
+		    _PC_CHOWN_RESTRICTED, &val, sarg->cs->cr, NULL);
 		if (error)
 			break;
 
@@ -1206,7 +1214,7 @@ rfs4_fattr4_chown_restricted(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	case NFS4ATTR_VERIT:
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp,
-				_PC_CHOWN_RESTRICTED, &val, sarg->cs->cr, NULL);
+		    _PC_CHOWN_RESTRICTED, &val, sarg->cs->cr, NULL);
 		if (error)
 			break;
 		if (na->chown_restricted != (val == 1))
@@ -1559,7 +1567,7 @@ rfs4_fattr4_maxfilesize(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		}
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp, _PC_FILESIZEBITS, &val,
-				sarg->cs->cr, NULL);
+		    sarg->cs->cr, NULL);
 		if (error)
 			break;
 		if (val >= (sizeof (uint64_t) * 8))
@@ -1576,7 +1584,7 @@ rfs4_fattr4_maxfilesize(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	case NFS4ATTR_VERIT:
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp, _PC_FILESIZEBITS, &val,
-				sarg->cs->cr, NULL);
+		    sarg->cs->cr, NULL);
 		if (error)
 			break;
 		if (val >= (sizeof (uint64_t) * 8))
@@ -1615,7 +1623,7 @@ rfs4_fattr4_maxlink(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		}
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp, _PC_LINK_MAX, &val,
-				sarg->cs->cr, NULL);
+		    sarg->cs->cr, NULL);
 		if (error == 0) {
 			na->maxlink = val;
 		}
@@ -1629,7 +1637,7 @@ rfs4_fattr4_maxlink(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	case NFS4ATTR_VERIT:
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp, _PC_LINK_MAX, &val,
-				sarg->cs->cr, NULL);
+		    sarg->cs->cr, NULL);
 		if (!error && (na->maxlink != (uint32_t)val))
 			error = -1;	/* no match */
 		break;
@@ -1662,7 +1670,7 @@ rfs4_fattr4_maxname(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		}
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp, _PC_NAME_MAX, &val,
-				sarg->cs->cr, NULL);
+		    sarg->cs->cr, NULL);
 		if (error == 0) {
 			na->maxname = val;
 		}
@@ -1676,7 +1684,7 @@ rfs4_fattr4_maxname(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	case NFS4ATTR_VERIT:
 		ASSERT(sarg->cs->vp != NULL);
 		error = VOP_PATHCONF(sarg->cs->vp, _PC_NAME_MAX, &val,
-				sarg->cs->cr, NULL);
+		    sarg->cs->cr, NULL);
 		if (!error && (na->maxname != val))
 			error = -1;	/* no match */
 		break;
@@ -1791,7 +1799,7 @@ rfs4_fattr4_mode(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		 * the setuid and setgid bits.
 		 */
 		if (sarg->cs->vp->v_type == VREG &&
-			(sarg->cs->exi->exi_export.ex_flags & EX_NOSUID))
+		    (sarg->cs->exi->exi_export.ex_flags & EX_NOSUID))
 			sarg->vap->va_mode &= ~(VSUID | VSGID);
 		break;
 	case NFS4ATTR_VERIT:
@@ -2098,7 +2106,7 @@ rfs4_fattr4_owner_group(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 			if (na->owner_group.utf8string_val) {
 				UTF8STRING_FREE(na->owner_group)
 				bzero(&na->owner_group,
-					sizeof (na->owner_group));
+				    sizeof (na->owner_group));
 			}
 		}
 		break;
@@ -2164,9 +2172,9 @@ rfs4_fattr4_rawdev(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	case NFS4ATTR_VERIT:
 		ASSERT(sarg->vap->va_mask & AT_RDEV);
 		if ((na->rawdev.specdata1 !=
-			(uint32)getmajor(sarg->vap->va_rdev)) ||
+		    (uint32)getmajor(sarg->vap->va_rdev)) ||
 		    (na->rawdev.specdata2 !=
-			(uint32)getminor(sarg->vap->va_rdev)))
+		    (uint32)getminor(sarg->vap->va_rdev)))
 			error = -1;	/* no match */
 		break;
 	case NFS4ATTR_FREEIT:
@@ -2198,11 +2206,11 @@ rfs4_fattr4_space_avail(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		ASSERT(sarg->sbp != NULL);
 		if (sarg->sbp->f_bavail != (fsblkcnt64_t)-1) {
 			na->space_avail =
-				(fattr4_space_avail) sarg->sbp->f_frsize *
-				(fattr4_space_avail) sarg->sbp->f_bavail;
+			    (fattr4_space_avail) sarg->sbp->f_frsize *
+			    (fattr4_space_avail) sarg->sbp->f_bavail;
 		} else {
 			na->space_avail =
-				(fattr4_space_avail) sarg->sbp->f_bavail;
+			    (fattr4_space_avail) sarg->sbp->f_bavail;
 		}
 		break;
 	case NFS4ATTR_SETIT:
@@ -2245,11 +2253,11 @@ rfs4_fattr4_space_free(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		ASSERT(sarg->sbp != NULL);
 		if (sarg->sbp->f_bfree != (fsblkcnt64_t)-1) {
 			na->space_free =
-				(fattr4_space_free) sarg->sbp->f_frsize *
-				(fattr4_space_free) sarg->sbp->f_bfree;
+			    (fattr4_space_free) sarg->sbp->f_frsize *
+			    (fattr4_space_free) sarg->sbp->f_bfree;
 		} else {
 			na->space_free =
-				(fattr4_space_free) sarg->sbp->f_bfree;
+			    (fattr4_space_free) sarg->sbp->f_bfree;
 		}
 		break;
 	case NFS4ATTR_SETIT:
@@ -2292,11 +2300,11 @@ rfs4_fattr4_space_total(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		ASSERT(sarg->sbp != NULL);
 		if (sarg->sbp->f_blocks != (fsblkcnt64_t)-1) {
 			na->space_total =
-				(fattr4_space_total) sarg->sbp->f_frsize *
-				(fattr4_space_total) sarg->sbp->f_blocks;
+			    (fattr4_space_total) sarg->sbp->f_frsize *
+			    (fattr4_space_total) sarg->sbp->f_blocks;
 		} else {
 			na->space_total =
-				(fattr4_space_total) sarg->sbp->f_blocks;
+			    (fattr4_space_total) sarg->sbp->f_blocks;
 		}
 		break;
 	case NFS4ATTR_SETIT:
@@ -2338,7 +2346,7 @@ rfs4_fattr4_space_used(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		}
 		ASSERT(sarg->vap->va_mask & AT_NBLOCKS);
 		na->space_used =  (fattr4_space_used) DEV_BSIZE *
-			(fattr4_space_used) sarg->vap->va_nblocks;
+		    (fattr4_space_used) sarg->vap->va_nblocks;
 		break;
 	case NFS4ATTR_SETIT:
 		/*
@@ -2531,7 +2539,7 @@ rfs4_fattr4_time_metadata(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		}
 		ASSERT(sarg->vap->va_mask & AT_CTIME);
 		error = nfs4_time_vton(&sarg->vap->va_ctime,
-				&na->time_metadata);
+		    &na->time_metadata);
 		break;
 	case NFS4ATTR_SETIT:
 		/*

@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -399,11 +398,15 @@ acl2_getxattrdir(GETXATTRDIR2args *args, GETXATTRDIR2res *resp,
 		flags |= CREATE_XATTR_DIR;
 	else {
 		ulong_t val = 0;
-		error = VOP_PATHCONF(vp, _PC_XATTR_EXISTS, &val, cr, NULL);
+		error = VOP_PATHCONF(vp, _PC_SATTR_EXISTS, &val, cr, NULL);
 		if (!error && val == 0) {
-			VN_RELE(vp);
-			resp->status = NFSERR_NOENT;
-			return;
+			error = VOP_PATHCONF(vp, _PC_XATTR_EXISTS,
+			    &val, cr, NULL);
+			if (!error && val == 0) {
+				VN_RELE(vp);
+				resp->status = NFSERR_NOENT;
+				return;
+			}
 		}
 	}
 
@@ -667,11 +670,16 @@ acl3_getxattrdir(GETXATTRDIR3args *args, GETXATTRDIR3res *resp,
 		flags |= CREATE_XATTR_DIR;
 	else {
 		ulong_t val = 0;
-		error = VOP_PATHCONF(vp, _PC_XATTR_EXISTS, &val, cr, NULL);
+
+		error = VOP_PATHCONF(vp, _PC_SATTR_EXISTS, &val, cr, NULL);
 		if (!error && val == 0) {
-			VN_RELE(vp);
-			resp->status = NFS3ERR_NOENT;
-			return;
+			error = VOP_PATHCONF(vp, _PC_XATTR_EXISTS,
+			    &val, cr, NULL);
+			if (!error && val == 0) {
+				VN_RELE(vp);
+				resp->status = NFS3ERR_NOENT;
+				return;
+			}
 		}
 	}
 

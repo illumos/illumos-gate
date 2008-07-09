@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
- *	All rights reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -63,6 +60,7 @@
 #include <sys/tsol/tnet.h>
 #include <sys/priv.h>
 #include <sys/sdt.h>
+#include <sys/attr.h>
 
 #include <inet/ip6.h>
 
@@ -5157,4 +5155,59 @@ do_rfs_label_check(bslabel_t *clabel, vnode_t *vp, int flag)
 		result = bldominates(clabel, slabel);
 	label_rele(tslabel);
 	return (result);
+}
+
+/*
+ * See if xattr directory to see if it has any generic user attributes
+ */
+int
+do_xattr_exists_check(vnode_t *vp, ulong_t *valp, cred_t *cr)
+{
+	struct uio uio;
+	struct iovec iov;
+	char *dbuf;
+	struct dirent64 *dp;
+	size_t dlen = 8 * 1024;
+	size_t dbuflen;
+	int eof = 0;
+	int error;
+
+	*valp = 0;
+	dbuf = kmem_alloc(dlen, KM_SLEEP);
+	uio.uio_iov = &iov;
+	uio.uio_iovcnt = 1;
+	uio.uio_segflg = UIO_SYSSPACE;
+	uio.uio_fmode = 0;
+	uio.uio_extflg = UIO_COPY_CACHED;
+	uio.uio_loffset = 0;
+	uio.uio_resid = dlen;
+	iov.iov_base = dbuf;
+	iov.iov_len = dlen;
+	(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, NULL);
+	error = VOP_READDIR(vp, &uio, cr, &eof, NULL, 0);
+	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
+
+	dbuflen = dlen - uio.uio_resid;
+
+	if (error || dbuflen == 0) {
+		kmem_free(dbuf, dlen);
+		return (error);
+	}
+
+	dp = (dirent64_t *)dbuf;
+
+	while ((intptr_t)dp < (intptr_t)dbuf + dbuflen) {
+		if (strcmp(dp->d_name, ".") == 0 ||
+		    strcmp(dp->d_name, "..") == 0 || strcmp(dp->d_name,
+		    VIEW_READWRITE) == 0 || strcmp(dp->d_name,
+		    VIEW_READONLY) == 0) {
+			dp = (dirent64_t *)((intptr_t)dp + dp->d_reclen);
+			continue;
+		}
+
+		*valp = 1;
+		break;
+	}
+	kmem_free(dbuf, dlen);
+	return (0);
 }

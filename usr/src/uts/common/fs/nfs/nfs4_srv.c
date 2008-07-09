@@ -2907,9 +2907,20 @@ rfs4_op_openattr(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		goto out;
 	}
 
-	if ((VOP_ACCESS(cs->vp, VREAD, 0, cs->cr, NULL) != 0) &&
-	    (VOP_ACCESS(cs->vp, VWRITE, 0, cs->cr, NULL) != 0) &&
-	    (VOP_ACCESS(cs->vp, VEXEC, 0, cs->cr, NULL) != 0)) {
+	/*
+	 * If file system supports passing ACE mask to VOP_ACCESS then
+	 * check for ACE_READ_NAMED_ATTRS, otherwise do legacy checks
+	 */
+
+	if (vfs_has_feature(cs->vp->v_vfsp, VFSFT_ACEMASKONACCESS))
+		error = VOP_ACCESS(cs->vp, ACE_READ_NAMED_ATTRS,
+		    V_ACE_MASK, cs->cr, NULL);
+	else
+		error = ((VOP_ACCESS(cs->vp, VREAD, 0, cs->cr, NULL) != 0) &&
+		    (VOP_ACCESS(cs->vp, VWRITE, 0, cs->cr, NULL) != 0) &&
+		    (VOP_ACCESS(cs->vp, VEXEC, 0, cs->cr, NULL) != 0));
+
+	if (error) {
 		*cs->statusp = resp->status = puterrno4(EACCES);
 		goto out;
 	}
