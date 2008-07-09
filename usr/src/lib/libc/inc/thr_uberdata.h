@@ -717,8 +717,8 @@ typedef struct robust {
 /*
  * Parameters of the lock registration hash table.
  */
-#define	LOCKSHIFT	9			/* number of hashing bits */
-#define	LOCKHASHSZ	(1 << LOCKSHIFT)	/* power of 2 (1<<9 == 512) */
+#define	LOCKSHIFT	15			/* number of hashing bits */
+#define	LOCKHASHSZ	(1 << LOCKSHIFT)	/* power of 2 (1<<15 == 32K) */
 #define	LOCK_HASH(addr)	(uint_t)			\
 	((((uintptr_t)(addr) >> 3)			\
 	^ ((uintptr_t)(addr) >> (LOCKSHIFT + 3)))	\
