@@ -4628,19 +4628,6 @@ scsa2usb_read_cd_blk_size(uchar_t expected_sector_type)
 }
 
 
-/* needed for esballoc_wait() */
-/*ARGSUSED*/
-static void
-scsa2usb_null_free(char *arg)
-{
-}
-
-static frtn_t fr = {
-	scsa2usb_null_free,
-	NULL
-};
-
-
 /*
  * scsa2usb_bp_to_mblk:
  *	Convert a bp to mblk_t. USBA framework understands mblk_t.
@@ -4670,7 +4657,7 @@ scsa2usb_bp_to_mblk(scsa2usb_state_t *scsa2usbp)
 	}
 
 	mp = esballoc_wait((uchar_t *)bp->b_un.b_addr + cmd->cmd_offset,
-	    size, BPRI_LO, &fr);
+	    size, BPRI_LO, &frnop);
 
 	USB_DPRINTF_L3(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 	    "scsa2usb_bp_to_mblk: "
@@ -4802,7 +4789,7 @@ scsa2usb_handle_data_start(scsa2usb_state_t *scsa2usbp,
 		req->bulk_data = esballoc_wait(
 		    (uchar_t *)cmd->cmd_bp->b_un.b_addr +
 		    cmd->cmd_offset,
-		    req->bulk_len, BPRI_LO, &fr);
+		    req->bulk_len, BPRI_LO, &frnop);
 
 		ASSERT(req->bulk_timeout);
 		rval = usb_pipe_bulk_xfer(scsa2usbp->scsa2usb_bulkin_pipe,
