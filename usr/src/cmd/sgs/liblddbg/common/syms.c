@@ -216,6 +216,23 @@ Dbg_syms_discarded(Lm_list *lml, Sym_desc *sdp)
 }
 
 void
+Dbg_syms_dup_discarded(Lm_list *lml, Word ndx, Sym_desc *sdp)
+{
+	const char	*file;
+
+	if (DBG_NOTCLASS(DBG_C_SYMBOLS | DBG_C_UNUSED))
+		return;
+	if (DBG_NOTDETAIL())
+		return;
+
+	if ((sdp->sd_file == NULL) || ((file = sdp->sd_file->ifl_name) == NULL))
+		file = MSG_INTL(MSG_STR_UNKNOWN);
+
+	dbg_print(lml, MSG_INTL(MSG_SYM_DISCARD_DUP), EC_WORD(ndx),
+	    Dbg_demangle_name(sdp->sd_name), file);
+}
+
+void
 Dbg_syms_entered(Ofl_desc *ofl, Sym *sym, Sym_desc *sdp)
 {
 	Conv_inv_buf_t	inv_buf;

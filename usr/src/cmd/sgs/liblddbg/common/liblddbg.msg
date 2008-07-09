@@ -658,6 +658,8 @@
 			 discarded section=%s from file=%s"
 @ MSG_SYM_DISCARD_FILE	"symbol=%s;  discarded: originates from unused or \
 			 discarded file=%s"
+@ MSG_SYM_DISCARD_DUP	"symbol[%d]=%s;  discarded duplicate: originates from \
+			 file=%s"
 
 @ MSG_SYM_AOUT		"symbol=%s;  (original AOUT name)"
 @ MSG_SYM_LOOKUP	"symbol=%s;  lookup in file=%s  [ %s ]"

@@ -128,9 +128,6 @@ if ($debug == 0) {
 }
 
 # For debug mode, add diagnostic data
-#
-# Note: CODEMGR_WS is a Teamware dependent environment variable. This
-#	will need to change to accommodate other revision control systems.
 # 
 ($wsname = $ENV{'CODEMGR_WS'}) ne '' || ($wsname = 'unknown');
 @wsname = split /\//, $wsname;

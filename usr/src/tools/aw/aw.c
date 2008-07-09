@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +53,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/param.h>
 
 static const char *progname;
 static int verbose;
@@ -147,6 +147,101 @@ copyuntil(FILE *in, FILE *out, int termchar)
 }
 
 /*
+ * Variant of copyuntil(), used for copying the path used
+ * for .file directives. This version removes the workspace
+ * from the head of the path, or failing that, attempts to remove
+ * /usr/include. This is a workaround for the way gas handles
+ * these directives. The objects produced by gas contain STT_FILE
+ * symbols for every .file directive. These FILE symbols contain our
+ * workspace paths, leading to wsdiff incorrectly flagging them as
+ * having changed. By clipping off the workspace from these paths,
+ * we eliminate these false positives.
+ */
+static void
+copyuntil_path(FILE *in, FILE *out, int termchar,
+    const char *wspace, size_t wspace_len)
+{
+#define	PROTO_INC "/proto/root_i386/usr/include/"
+#define	SYS_INC "/usr/include/"
+
+	static const proto_inc_len = sizeof (PROTO_INC) - 1;
+	static const sys_inc_len = sizeof (SYS_INC) - 1;
+
+	/*
+	 * Dynamically sized buffer for reading paths. Retained
+	 * and reused between calls.
+	 */
+	static char *buf = NULL;
+	static char bufsize = 0;
+
+	int	bufcnt = 0;
+	char	*bufptr;
+	int	c;
+
+	/* Read the path into the buffer */
+	while ((c = fgetc(in)) != EOF) {
+		/*
+		 * If we need a buffer, or need a larger buffer,
+		 * fix that here.
+		 */
+		if (bufcnt >= bufsize) {
+			bufsize = (bufsize == 0) ? MAXPATHLEN : (bufsize *= 2);
+			buf = realloc(buf, bufsize + 1); /* + room for NULL */
+			if (buf == NULL) {
+				perror("realloc");
+				exit(1);
+			}
+		}
+
+		buf[bufcnt++] = c;
+		if (c == termchar)
+			break;
+	}
+	if (bufcnt == 0)
+		return;
+
+	/*
+	 * We have a non-empty buffer, and thus the opportunity
+	 * to do some surgery on it before passing it to the output.
+	 */
+	buf[bufcnt] = '\0';
+	bufptr = buf;
+
+	/*
+	 * If our workspace is at the start, remove it.
+	 * If not, then look for the system /usr/include instead.
+	 */
+	if ((wspace_len > 0) && (wspace_len < bufcnt) &&
+	    (strncmp(bufptr, wspace, wspace_len) == 0)) {
+		bufptr += wspace_len;
+		bufcnt -= wspace_len;
+
+		/*
+		 * Further opportunity: Also clip the prefix
+		 * that leads to /usr/include in the proto.
+		 */
+		if ((proto_inc_len < bufcnt) &&
+		    (strncmp(bufptr, PROTO_INC, proto_inc_len) == 0)) {
+			bufptr += proto_inc_len;
+			bufcnt -= proto_inc_len;
+		}
+	} else if ((sys_inc_len < bufcnt) &&
+	    (strncmp(bufptr, SYS_INC, sys_inc_len) == 0)) {
+		bufptr += sys_inc_len;
+		bufcnt -= sys_inc_len;
+	}
+
+	/* Output whatever is left */
+	if (out && (fwrite(bufptr, 1, bufcnt, out) != bufcnt)) {
+		perror("fwrite");
+		exit(1);
+	}
+
+#undef PROTO_INC
+#undef SYS_INC
+}
+
+/*
  * The idea here is to take directives like this emitted
  * by cpp:
  *
@@ -174,6 +269,8 @@ filter(int pipein, int pipeout)
 {
 	pid_t pid;
 	FILE *in, *out;
+	char *wspace;
+	size_t wspace_len;
 
 	if (verbose)
 		(void) fprintf(stderr, "{#line filter} ");
@@ -195,6 +292,15 @@ filter(int pipein, int pipeout)
 
 	in = fdopen(0, "r");
 	out = fdopen(1, "w");
+
+	/*
+	 * Key off the CODEMGR_WS environment variable to detect
+	 * if we're in an activated workspace, and to get the
+	 * path to the workspace.
+	 */
+	wspace = getenv("CODEMGR_WS");
+	if (wspace != NULL)
+		wspace_len = strlen(wspace);
 
 	while (!feof(in)) {
 		int c, num;
@@ -221,10 +327,22 @@ filter(int pipein, int pipeout)
 				 * This line has a number at the beginning;
 				 * if it has a string after the number, then
 				 * it's a filename.
+				 *
+				 * If this is an activated workspace, use
+				 * copyuntil_path() to do path rewriting
+				 * that will prevent workspace paths from
+				 * being burned into the resulting object.
+				 * If not in an activated workspace, then
+				 * copy the existing path straight through
+				 * without interpretation.
 				 */
 				if (fgetc(in) == ' ' && fgetc(in) == '"') {
 					(void) fprintf(out, "\t.file \"");
-					copyuntil(in, out, '"');
+					if (wspace != NULL)
+						copyuntil_path(in, out, '"',
+						    wspace, wspace_len);
+					else
+						copyuntil(in, out, '"');
 					(void) fputc('\n', out);
 				}
 				(void) fprintf(out, "\t.line %d\n", num - 1);
@@ -371,6 +489,7 @@ main(int argc, char *argv[])
 	char *srcfile = NULL;
 	const char *as_dir, *as64_dir, *m4_dir, *m4_lib_dir, *cpp_dir;
 	char *as_pgm, *as64_pgm, *m4_pgm, *m4_cmdefs, *cpp_pgm;
+	size_t bufsize;
 	int as64 = 0;
 	int code;
 
@@ -384,28 +503,33 @@ main(int argc, char *argv[])
 	 */
 	if ((as_dir = getenv("AW_AS_DIR")) == NULL)
 		as_dir = DEFAULT_AS_DIR;	/* /usr/sfw/bin */
-	as_pgm = malloc(strlen(as_dir) + strlen("/gas") + 1);
-	(void) sprintf(as_pgm, "%s/gas", as_dir);
+	bufsize = strlen(as_dir) + strlen("/gas") + 1;
+	as_pgm = malloc(bufsize);
+	(void) snprintf(as_pgm, bufsize, "%s/gas", as_dir);
 
 	if ((as64_dir = getenv("AW_AS64_DIR")) == NULL)
 		as64_dir = DEFAULT_AS64_DIR;	/* /usr/sfw/bin */
-	as64_pgm = malloc(strlen(as64_dir) + strlen("/gas") + 1);
-	(void) sprintf(as64_pgm, "%s/gas", as64_dir);
+	bufsize = strlen(as64_dir) + strlen("/gas") + 1;
+	as64_pgm = malloc(bufsize);
+	(void) snprintf(as64_pgm, bufsize, "%s/gas", as64_dir);
 
 	if ((m4_dir = getenv("AW_M4_DIR")) == NULL)
 		m4_dir = DEFAULT_M4_DIR;	/* /usr/ccs/bin */
-	m4_pgm = malloc(strlen(m4_dir) + strlen("/m4") + 1);
-	(void) sprintf(m4_pgm, "%s/m4", m4_dir);
+	bufsize = strlen(m4_dir) + strlen("/m4") + 1;
+	m4_pgm = malloc(bufsize);
+	(void) snprintf(m4_pgm, bufsize, "%s/m4", m4_dir);
 
 	if ((m4_lib_dir = getenv("AW_M4LIB_DIR")) == NULL)
 		m4_lib_dir = DEFAULT_M4LIB_DIR;	/* /usr/ccs/lib */
-	m4_cmdefs = malloc(strlen(m4_lib_dir) + strlen("/cmdefs") + 1);
-	(void) sprintf(m4_cmdefs, "%s/cmdefs", m4_lib_dir);
+	bufsize = strlen(m4_lib_dir) + strlen("/cmdefs") + 1;
+	m4_cmdefs = malloc(bufsize);
+	(void) snprintf(m4_cmdefs, bufsize, "%s/cmdefs", m4_lib_dir);
 
 	if ((cpp_dir = getenv("AW_CPP_DIR")) == NULL)
 		cpp_dir = DEFAULT_CPP_DIR;	/* /usr/ccs/lib */
-	cpp_pgm = malloc(strlen(cpp_dir) + strlen("/cpp") + 1);
-	(void) sprintf(cpp_pgm, "%s/cpp", cpp_dir);
+	bufsize = strlen(cpp_dir) + strlen("/cpp") + 1;
+	cpp_pgm = malloc(bufsize);
+	(void) snprintf(cpp_pgm, bufsize, "%s/cpp", cpp_dir);
 
 	newae(as, as_pgm);
 	newae(as, "--warn");

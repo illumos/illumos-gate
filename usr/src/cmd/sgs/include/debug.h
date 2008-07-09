@@ -364,6 +364,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_syms_created	Dbg64_syms_created
 #define	Dbg_syms_discarded	Dbg64_syms_discarded
 #define	Dbg_syms_dlsym		Dbg64_syms_dlsym
+#define	Dbg_syms_dup_discarded	Dbg64_syms_dup_discarded
 #define	Dbg_syms_dup_sort_addr	Dbg64_syms_dup_sort_addr
 #define	Dbg_syms_entered	Dbg64_syms_entered
 #define	Dbg_syms_entry		Dbg64_syms_entry
@@ -566,6 +567,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_syms_created	Dbg32_syms_created
 #define	Dbg_syms_discarded	Dbg32_syms_discarded
 #define	Dbg_syms_dlsym		Dbg32_syms_dlsym
+#define	Dbg_syms_dup_discarded	Dbg32_syms_dup_discarded
 #define	Dbg_syms_dup_sort_addr	Dbg32_syms_dup_sort_addr
 #define	Dbg_syms_entered	Dbg32_syms_entered
 #define	Dbg_syms_entry		Dbg32_syms_entry
@@ -809,6 +811,7 @@ extern	void	Dbg_syms_created(Lm_list *, const char *);
 extern	void	Dbg_syms_discarded(Lm_list *, Sym_desc *);
 extern	void	Dbg_syms_dlsym(Rt_map *, const char *, int *, const char *,
 		    int);
+extern	void	Dbg_syms_dup_discarded(Lm_list *, Word ndx, Sym_desc *);
 extern	void	Dbg_syms_dup_sort_addr(Lm_list *, const char *, const char *,
 		    const char *, Addr);
 extern	void	Dbg_syms_entered(Ofl_desc *, Sym *, Sym_desc *);

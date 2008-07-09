@@ -1910,7 +1910,10 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * index array.
 	 */
 	if (local) {
-		int allow_ldynsym = OFL_ALLOW_LDYNSYM(ofl);
+		int		allow_ldynsym = OFL_ALLOW_LDYNSYM(ofl);
+		Sym_desc	*last_file_sdp = NULL;
+		int		last_file_ndx = 0;
+
 		for (sym++, ndx = 1; ndx < local; sym++, ndx++) {
 			Word		shndx, sdflags = FLG_SY_CLEAN;
 			const char	*name;
@@ -2082,10 +2085,41 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * to make sure the section boundaries encompass it.
 			 * If they don't, the ELF file is corrupt.
 			 */
-			if (etype_rel && SYM_LOC_BADADDR(sdp, sym, type)) {
-				issue_badaddr_msg(ifl, ofl, sdp, sym, shndx);
-				continue;
+			if (etype_rel) {
+				if (SYM_LOC_BADADDR(sdp, sym, type)) {
+					issue_badaddr_msg(ifl, ofl, sdp,
+					    sym, shndx);
+					continue;
+				}
+
+				/*
+				 * We have observed relocatable objects
+				 * containing identical adjacent STT_FILE
+				 * symbols. Discard any other than the first,
+				 * as they are all equivalent and the extras
+				 * do not add information.
+				 *
+				 * For the purpose of this test, we assume
+				 * that only the symbol type and the string
+				 * table offset (st_name) matter.
+				 */
+				if (type == STT_FILE) {
+					int toss = (last_file_sdp != NULL) &&
+					    ((ndx - 1) == last_file_ndx) &&
+					    (sym->st_name ==
+					    last_file_sdp->sd_sym->st_name);
+
+					last_file_sdp = sdp;
+					last_file_ndx = ndx;
+					if (toss) {
+						sdp->sd_flags |= FLG_SY_INVALID;
+						DBG_CALL(Dbg_syms_dup_discarded(
+						    ofl->ofl_lml, ndx, sdp));
+						continue;
+					}
+				}
 			}
+
 
 			/*
 			 * Sanity check for TLS
