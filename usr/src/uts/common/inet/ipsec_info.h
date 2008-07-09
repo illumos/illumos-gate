@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,6 +124,7 @@ typedef struct ipsec_in_s {
 	int    ipsec_in_ill_index;	/* interface on which ipha_dst was */
 					/* configured when pkt was recv'd  */
 	int    ipsec_in_rill_index;	/* interface on which pkt was recv'd */
+	uint32_t ipsec_in_esp_udp_ports;	/* For an ESP-in-UDP packet. */
 	mblk_t *ipsec_in_da;		/* data attr. for accelerated pkts */
 
 	/*

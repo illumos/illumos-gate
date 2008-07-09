@@ -204,6 +204,7 @@ typedef struct esp_kstats_s {
 	kstat_named_t esp_stat_crypto_failures;
 	kstat_named_t esp_stat_num_ealgs;
 	kstat_named_t esp_stat_bad_decrypt;
+	kstat_named_t esp_stat_sa_port_renumbers;
 } esp_kstats_t;
 
 /*
@@ -267,6 +268,7 @@ esp_kstat_init(ipsecesp_stack_t *espstack, netstackid_t stackid)
 	KI(crypto_async);
 	KI(crypto_failures);
 	KI(bad_decrypt);
+	KI(sa_port_renumbers);
 
 #undef KI
 #undef K64
@@ -1640,6 +1642,100 @@ esp_insert_esp(mblk_t *mp, mblk_t *esp_mp, uint_t divpoint,
 }
 
 /*
+ * Section 7 of RFC 3947 says:
+ *
+ * 7.  Recovering from the Expiring NAT Mappings
+ *
+ *    There are cases where NAT box decides to remove mappings that are still
+ *    alive (for example, when the keepalive interval is too long, or when the
+ *    NAT box is rebooted).  To recover from this, ends that are NOT behind
+ *    NAT SHOULD use the last valid UDP encapsulated IKE or IPsec packet from
+ *    the other end to determine which IP and port addresses should be used.
+ *    The host behind dynamic NAT MUST NOT do this, as otherwise it opens a
+ *    DoS attack possibility because the IP address or port of the other host
+ *    will not change (it is not behind NAT).
+ *
+ *    Keepalives cannot be used for these purposes, as they are not
+ *    authenticated, but any IKE authenticated IKE packet or ESP packet can be
+ *    used to detect whether the IP address or the port has changed.
+ *
+ * The following function will check an SA and its explicitly-set pair to see
+ * if the NAT-T remote port matches the received packet (which must have
+ * passed ESP authentication, see esp_in_done() for the caller context).  If
+ * there is a mismatch, the SAs are updated.  It is not important if we race
+ * with a transmitting thread, as if there is a transmitting thread, it will
+ * merely emit a packet that will most-likely be dropped.
+ *
+ * "ports" are ordered src,dst, and assoc is an inbound SA, where src should
+ * match ipsa_remote_nat_port and dst should match ipsa_local_nat_port.
+ */
+#ifdef _LITTLE_ENDIAN
+#define	FIRST_16(x) ((x) & 0xFFFF)
+#define	NEXT_16(x) (((x) >> 16) & 0xFFFF)
+#else
+#define	FIRST_16(x) (((x) >> 16) & 0xFFFF)
+#define	NEXT_16(x) ((x) & 0xFFFF)
+#endif
+static void
+esp_port_freshness(uint32_t ports, ipsa_t *assoc)
+{
+	uint16_t remote = FIRST_16(ports);
+	uint16_t local = NEXT_16(ports);
+	ipsa_t *outbound_peer;
+	isaf_t *bucket;
+	ipsecesp_stack_t *espstack = assoc->ipsa_netstack->netstack_ipsecesp;
+
+	/* We found a conn_t, therefore local != 0. */
+	ASSERT(local != 0);
+	/* Assume an IPv4 SA. */
+	ASSERT(assoc->ipsa_addrfam == AF_INET);
+
+	/*
+	 * On-the-wire rport == 0 means something's very wrong.
+	 * An unpaired SA is also useless to us.
+	 * If we are behind the NAT, don't bother.
+	 * A zero local NAT port defaults to 4500, so check that too.
+	 * And, of course, if the ports already match, we don't need to
+	 * bother.
+	 */
+	if (remote == 0 || assoc->ipsa_otherspi == 0 ||
+	    (assoc->ipsa_flags & IPSA_F_BEHIND_NAT) ||
+	    (assoc->ipsa_remote_nat_port == 0 &&
+	    remote == htons(IPPORT_IKE_NATT)) ||
+	    remote == assoc->ipsa_remote_nat_port)
+		return;
+
+	/* Try and snag the peer.   NOTE:  Assume IPv4 for now. */
+	bucket = OUTBOUND_BUCKET_V4(&(espstack->esp_sadb.s_v4),
+	    assoc->ipsa_srcaddr[0]);
+	mutex_enter(&bucket->isaf_lock);
+	outbound_peer = ipsec_getassocbyspi(bucket, assoc->ipsa_otherspi,
+	    assoc->ipsa_dstaddr, assoc->ipsa_srcaddr, AF_INET);
+	mutex_exit(&bucket->isaf_lock);
+
+	/* We probably lost a race to a deleting or expiring thread. */
+	if (outbound_peer == NULL)
+		return;
+
+	/*
+	 * Hold the mutexes for both SAs so we don't race another inbound
+	 * thread.  A lock-entry order shouldn't matter, since all other
+	 * per-ipsa locks are individually held-then-released.
+	 *
+	 * Luckily, this has nothing to do with the remote-NAT address,
+	 * so we don't have to re-scribble the cached-checksum differential.
+	 */
+	mutex_enter(&outbound_peer->ipsa_lock);
+	mutex_enter(&assoc->ipsa_lock);
+	outbound_peer->ipsa_remote_nat_port = assoc->ipsa_remote_nat_port =
+	    remote;
+	mutex_exit(&assoc->ipsa_lock);
+	mutex_exit(&outbound_peer->ipsa_lock);
+	IPSA_REFRELE(outbound_peer);
+	ESP_BUMP_STAT(espstack, sa_port_renumbers);
+}
+
+/*
  * Finish processing of an inbound ESP packet after processing by the
  * crypto framework.
  * - Remove the ESP header.
@@ -1724,6 +1820,9 @@ esp_in_done(mblk_t *ipsec_in_mp)
 			counter = DROPPER(ipss, ipds_esp_replay);
 			goto drop_and_bail;
 		}
+
+		if (is_natt)
+			esp_port_freshness(ii->ipsec_in_esp_udp_ports, assoc);
 	}
 
 	esp_set_usetime(assoc, B_TRUE);

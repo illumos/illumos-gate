@@ -6836,8 +6836,9 @@ zero_spi_check(queue_t *q, mblk_t *mp, ire_t *ire, ill_t *recv_ill,
 	ipha_t *ipha;
 	udpha_t *udpha;
 	uint32_t *spi;
+	uint32_t esp_ports;
 	uint8_t *orptr;
-	boolean_t udp_pkt, free_ire;
+	boolean_t free_ire;
 
 	if (DB_TYPE(mp) == M_CTL) {
 		/*
@@ -6902,17 +6903,18 @@ zero_spi_check(queue_t *q, mblk_t *mp, ire_t *ire, ill_t *recv_ill,
 	orptr = mp->b_rptr;
 	mp->b_rptr += shift;
 
+	udpha = (udpha_t *)(orptr + iph_len);
 	if (*spi == 0) {
 		ASSERT((uint8_t *)ipha == orptr);
-		udpha = (udpha_t *)(orptr + iph_len);
 		udpha->uha_length = htons(plen - shift - iph_len);
 		iph_len += sizeof (udpha_t);	/* For the call to ovbcopy(). */
-		udp_pkt = B_TRUE;
+		esp_ports = 0;
 	} else {
-		udp_pkt = B_FALSE;
+		esp_ports = *((uint32_t *)udpha);
+		ASSERT(esp_ports != 0);
 	}
 	ovbcopy(orptr, orptr + shift, iph_len);
-	if (!udp_pkt) /* Punt up for ESP processing. */ {
+	if (esp_ports != 0) /* Punt up for ESP processing. */ {
 		ipha = (ipha_t *)(orptr + shift);
 
 		free_ire = (ire == NULL);
@@ -6931,12 +6933,12 @@ zero_spi_check(queue_t *q, mblk_t *mp, ire_t *ire, ill_t *recv_ill,
 			}
 		}
 
-		ip_proto_input(q, mp, ipha, ire, recv_ill, B_TRUE);
+		ip_proto_input(q, mp, ipha, ire, recv_ill, esp_ports);
 		if (free_ire)
 			ire_refrele(ire);
 	}
 
-	return (udp_pkt);
+	return (esp_ports == 0);
 }
 
 /*
@@ -14391,7 +14393,7 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 					break;
 				default:
 					ip_proto_input(q, mp1, ipha, ire, ill,
-					    B_FALSE);
+					    0);
 					break;
 				}
 			}
@@ -15385,7 +15387,7 @@ local:
 			ire = NULL;
 			continue;
 		default:
-			ip_proto_input(q, first_mp, ipha, ire, ill, B_FALSE);
+			ip_proto_input(q, first_mp, ipha, ire, ill, 0);
 			continue;
 		}
 	}
@@ -17011,7 +17013,7 @@ ip_fanout_proto_again(mblk_t *ipsec_mp, ill_t *ill, ill_t *recv_ill, ire_t *ire)
 				break;
 			default:
 				ip_proto_input(ill->ill_rq, ipsec_mp, ipha, ire,
-				    recv_ill, B_FALSE);
+				    recv_ill, 0);
 				if (ire_need_rele)
 					ire_refrele(ire);
 				break;
@@ -17121,8 +17123,9 @@ ill_frag_timer_start(ill_t *ill)
  */
 void
 ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
-    ill_t *recv_ill, boolean_t esp_in_udp_packet)
+    ill_t *recv_ill, uint32_t esp_udp_ports)
 {
+	boolean_t esp_in_udp_packet = (esp_udp_ports != 0);
 	ill_t	*ill = (ill_t *)q->q_ptr;
 	uint32_t	sum;
 	uint32_t	u1;
@@ -17600,6 +17603,8 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		} else {
 			ii = (ipsec_in_t *)first_mp->b_rptr;
 		}
+
+		ii->ipsec_in_esp_udp_ports = esp_udp_ports;
 
 		if (!ipsec_loaded(ipss)) {
 			ip_proto_not_sup(q, first_mp, IP_FF_SEND_ICMP,

@@ -1561,6 +1561,8 @@ print_sa(FILE *file, char *prefix, struct sadb_sa *assoc)
 		(void) fprintf(file, "X_NATT_REM ");
 	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_TUNNEL)
 		(void) fprintf(file, "X_TUNNEL ");
+	if (assoc->sadb_sa_flags & SADB_X_SAFLAGS_NATTED)
+		(void) fprintf(file, "X_NATTED ");
 	/* END Solaris-specific flags. */
 
 	(void) fprintf(file, ">\n");

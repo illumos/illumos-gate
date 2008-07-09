@@ -544,6 +544,7 @@ typedef struct sadb_x_pair {
 #define	SADB_X_SAFLAGS_PAIRED	   0x10000	/* inbound/outbound pair */
 #define	SADB_X_SAFLAGS_OUTBOUND	    0x8000	/* SA direction bit */
 #define	SADB_X_SAFLAGS_INBOUND	    0x4000	/* SA direction bit */
+#define	SADB_X_SAFLAGS_NATTED	    0x1000	/* Local node is behind a NAT */
 
 #define	SADB_X_SAFLAGS_KRES	\
 	SADB_X_SAFLAGS_KRES1 | SADB_X_SAFLAGS_KRES2
