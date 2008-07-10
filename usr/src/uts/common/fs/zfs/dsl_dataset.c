@@ -441,7 +441,7 @@ dsl_dataset_get_ref(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 	ASSERT3P(ds->ds_phys, ==, dbuf->db_data);
 	ASSERT(ds->ds_phys->ds_prev_snap_obj != 0 ||
 	    spa_version(dp->dp_spa) < SPA_VERSION_ORIGIN ||
-	    ds == dp->dp_origin_snap);
+	    dp->dp_origin_snap == NULL || ds == dp->dp_origin_snap);
 	mutex_enter(&ds->ds_lock);
 	if (!dsl_pool_sync_context(dp) && DSL_DATASET_IS_DESTROYED(ds)) {
 		mutex_exit(&ds->ds_lock);
