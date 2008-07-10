@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 extern "C" {
 #endif
 
+#include <assert.h>
 #include <pthread.h>
 #include <synch.h>
 #include <unistd.h>
@@ -147,6 +148,7 @@ extern "C" {
  */
 #define	REMOVE_FROM_LIST(list, item) 				\
 {								\
+	/* item is at the beginning of the list */		\
 	if ((list) == item) {					\
 		if ((item)->next == NULL) {			\
 			(list) = NULL;				\
@@ -155,10 +157,16 @@ extern "C" {
 			(list) = (item)->next;			\
 		}						\
 	} else {						\
+		/*						\
+		 * let the items which are initialized and not	\
+		 * connected to the list trip over the asserts	\
+		 */						\
 		if ((item)->next) {				\
 			(item)->next->prev = item->prev;	\
+			assert((item)->prev != NULL);		\
 			(item)->prev->next = (item)->next;	\
 		} else {					\
+			assert((item)->prev != NULL);		\
 			(item)->prev->next = NULL;		\
 		}						\
 	}							\

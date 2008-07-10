@@ -288,7 +288,8 @@ int pk11_active_delete(CK_OBJECT_HANDLE h)
 		if ((prev_entry = entry->prev) != NULL)
 			{
 			prev_entry->next = entry->next;
-			entry->next->prev = prev_entry;
+			if (entry->next != NULL)
+				entry->next->prev = prev_entry;
 			}
 		else
 			{
