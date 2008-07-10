@@ -1430,14 +1430,17 @@ esp_send_acquire(ipsacq_t *acqrec, mblk_t *extended, netstack_t *ns)
 
 	ESP_BUMP_STAT(espstack, acquire_requests);
 
-	if (espstack->esp_pfkey_q == NULL)
+	if (espstack->esp_pfkey_q == NULL) {
+		mutex_exit(&acqrec->ipsacq_lock);
 		return;
+	}
 
 	/* Set up ACQUIRE. */
 	pfkeymp = sadb_setup_acquire(acqrec, SADB_SATYPE_ESP,
 	    ns->netstack_ipsec);
 	if (pfkeymp == NULL) {
 		esp0dbg(("sadb_setup_acquire failed.\n"));
+		mutex_exit(&acqrec->ipsacq_lock);
 		return;
 	}
 	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
