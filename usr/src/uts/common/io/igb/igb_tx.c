@@ -32,7 +32,7 @@
 
 static boolean_t igb_tx(igb_tx_ring_t *, mblk_t *);
 static int igb_tx_copy(igb_tx_ring_t *, tx_control_block_t *, mblk_t *,
-    uint32_t, boolean_t, boolean_t);
+    uint32_t, boolean_t);
 static int igb_tx_bind(igb_tx_ring_t *, tx_control_block_t *, mblk_t *,
     uint32_t);
 static int igb_tx_fill_ring(igb_tx_ring_t *, link_list_t *, hcksum_context_t *);
@@ -303,7 +303,7 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 			}
 
 			desc_num = igb_tx_copy(tx_ring, tcb, current_mp,
-			    current_len, copy_done, eop);
+			    current_len, copy_done);
 		} else {
 			/*
 			 * Check whether to use bcopy or DMA binding to process
@@ -410,7 +410,7 @@ tx_failure:
  */
 static int
 igb_tx_copy(igb_tx_ring_t *tx_ring, tx_control_block_t *tcb, mblk_t *mp,
-    uint32_t len, boolean_t copy_done, boolean_t eop)
+    uint32_t len, boolean_t copy_done)
 {
 	dma_buffer_t *tx_buf;
 	uint32_t desc_num;
@@ -445,17 +445,6 @@ igb_tx_copy(igb_tx_ring_t *tx_ring, tx_control_block_t *tcb, mblk_t *mp,
 	 * DMA buffer and saving the descriptor data.
 	 */
 	if (copy_done) {
-		/*
-		 * For the packet smaller than 64 bytes, we need to
-		 * pad it to 60 bytes. The NIC hardware will add 4
-		 * bytes of CRC.
-		 */
-		if (eop && (tx_buf->len < ETHERMIN)) {
-			bzero(tx_buf->address + tx_buf->len,
-			    ETHERMIN - tx_buf->len);
-			tx_buf->len = ETHERMIN;
-		}
-
 		/*
 		 * Sync the DMA buffer of the packet data
 		 */

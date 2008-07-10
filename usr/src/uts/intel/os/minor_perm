@@ -120,6 +120,7 @@ kssl:* 0666 root sys
 lx_ptm:lx_ptmajor 0666 root sys
 lx_systrace:* 0644 root sys
 clone:bge 0666 root sys
+clone:igb 0666 root sys
 clone:ixgbe 0666 root sys
 clone:rge 0666 root sys
 clone:xge 0666 root sys
@@ -143,6 +144,7 @@ clone:dmfe 0666 root sys
 clone:afe 0666 root sys
 clone:mxfe 0666 root sys
 bge:* 0666 root sys
+igb:* 0666 root sys
 ixgbe:* 0666 root sys
 rge:* 0666 root sys
 xge:* 0666 root sys

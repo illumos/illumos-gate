@@ -30,7 +30,7 @@
 
 #include "igb_sw.h"
 
-static char ident[] = "Intel 1Gb Ethernet 1.1.2";
+static char ident[] = "Intel 1Gb Ethernet 1.1.3";
 
 /*
  * Local function protoypes
@@ -82,9 +82,7 @@ static void igb_set_internal_phy_loopback(igb_t *);
 static void igb_set_internal_serdes_loopback(igb_t *);
 static boolean_t igb_find_mac_address(igb_t *);
 static int igb_alloc_intrs(igb_t *);
-static int igb_alloc_intrs_msix(igb_t *);
-static int igb_alloc_intrs_msi(igb_t *);
-static int igb_alloc_intrs_legacy(igb_t *);
+static int igb_alloc_intr_handles(igb_t *, int);
 static int igb_add_intr_handlers(igb_t *);
 static void igb_rem_intr_handlers(igb_t *);
 static void igb_rem_intrs(igb_t *);
@@ -1378,10 +1376,13 @@ igb_tx_clean(igb_t *igb)
 			ASSERT(tx_ring->tbd_free == tx_ring->ring_size);
 
 			/*
-			 * Reset the head and tail pointers of the tbd ring
+			 * Reset the head and tail pointers of the tbd ring;
+			 * Reset the head write-back if it is enabled.
 			 */
 			tx_ring->tbd_head = 0;
 			tx_ring->tbd_tail = 0;
+			if (igb->tx_head_wb_enable)
+				*tx_ring->tbd_head_wb = 0;
 
 			E1000_WRITE_REG(&igb->hw, E1000_TDH(tx_ring->index), 0);
 			E1000_WRITE_REG(&igb->hw, E1000_TDT(tx_ring->index), 0);
@@ -1828,6 +1829,7 @@ igb_setup_tx_ring(igb_tx_ring_t *tx_ring)
 		 */
 		tx_ring->tbd_head_wb = (uint32_t *)
 		    ((uintptr_t)tx_ring->tbd_area.address + size);
+		*tx_ring->tbd_head_wb = 0;
 
 		buf_low = (uint32_t)
 		    (tx_ring->tbd_area.dma_address + size);
@@ -3399,7 +3401,7 @@ igb_alloc_intrs(igb_t *igb)
 	/* Install MSI-X interrupts */
 	if ((intr_types & DDI_INTR_TYPE_MSIX) &&
 	    (igb->intr_force <= IGB_INTR_MSIX)) {
-		rc = igb_alloc_intrs_msix(igb);
+		rc = igb_alloc_intr_handles(igb, DDI_INTR_TYPE_MSIX);
 
 		if (rc == IGB_SUCCESS)
 			return (IGB_SUCCESS);
@@ -3417,7 +3419,7 @@ igb_alloc_intrs(igb_t *igb)
 	/* Install MSI interrupts */
 	if ((intr_types & DDI_INTR_TYPE_MSI) &&
 	    (igb->intr_force <= IGB_INTR_MSI)) {
-		rc = igb_alloc_intrs_msi(igb);
+		rc = igb_alloc_intr_handles(igb, DDI_INTR_TYPE_MSI);
 
 		if (rc == IGB_SUCCESS)
 			return (IGB_SUCCESS);
@@ -3428,7 +3430,7 @@ igb_alloc_intrs(igb_t *igb)
 
 	/* Install legacy interrupts */
 	if (intr_types & DDI_INTR_TYPE_FIXED) {
-		rc = igb_alloc_intrs_legacy(igb);
+		rc = igb_alloc_intr_handles(igb, DDI_INTR_TYPE_FIXED);
 
 		if (rc == IGB_SUCCESS)
 			return (IGB_SUCCESS);
@@ -3442,18 +3444,19 @@ igb_alloc_intrs(igb_t *igb)
 }
 
 /*
- * igb_alloc_intrs_msix - Allocate the MSIX interrupts
+ * igb_alloc_intr_handles - Allocate interrupt handles.
  *
- * If fewer than 2 vectors are available, return failure.
+ * For legacy and MSI, only 1 handle is needed.  For MSI-X,
+ * if fewer than 2 handles are available, return failure.
  * Upon success, this sets the number of Rx rings to a number that
- * matches the vectors available for Rx interrupts.
+ * matches the handles available for Rx interrupts.
  */
 static int
-igb_alloc_intrs_msix(igb_t *igb)
+igb_alloc_intr_handles(igb_t *igb, int intr_type)
 {
 	dev_info_t *devinfo;
 	int request, count, avail, actual;
-	int rx_rings;
+	int rx_rings, minimum;
 	int rc;
 
 	devinfo = igb->dip;
@@ -3469,38 +3472,66 @@ igb_alloc_intrs_msix(igb_t *igb)
 		    "force tx queue number to 1");
 	}
 
-	/*
-	 * Best number of vectors for the adapter is
-	 * # rx rings + # tx rings + 1 for other
-	 * But currently we only support number of vectors of
-	 * # rx rings + 1 for tx & other
-	 */
-	request = igb->num_rx_rings + 1;
-	IGB_DEBUGLOG_1(igb, "MSI-X interrupts requested: %d", request);
+	switch (intr_type) {
+	case DDI_INTR_TYPE_FIXED:
+		request = 1;	/* Request 1 legacy interrupt handle */
+		minimum = 1;
+		IGB_DEBUGLOG_0(igb, "interrupt type: legacy");
+		break;
 
-	/* Get number of supported interrupts */
-	rc = ddi_intr_get_nintrs(devinfo, DDI_INTR_TYPE_MSIX, &count);
-	if ((rc != DDI_SUCCESS) || (count == 0)) {
+	case DDI_INTR_TYPE_MSI:
+		request = 1;	/* Request 1 MSI interrupt handle */
+		minimum = 1;
+		IGB_DEBUGLOG_0(igb, "interrupt type: MSI");
+		break;
+
+	case DDI_INTR_TYPE_MSIX:
+		/*
+		 * Best number of vectors for the adapter is
+		 * # rx rings + # tx rings + 1 for other
+		 * But currently we only support number of vectors of
+		 * # rx rings + 1 for tx & other
+		 */
+		request = igb->num_rx_rings + 1;
+		minimum = 2;
+		IGB_DEBUGLOG_0(igb, "interrupt type: MSI-X");
+		break;
+
+	default:
 		igb_log(igb,
-		    "Get interrupt number failed. Return: %d, count: %d",
-		    rc, count);
+		    "invalid call to igb_alloc_intr_handles(): %d\n",
+		    intr_type);
 		return (IGB_FAILURE);
 	}
-	IGB_DEBUGLOG_1(igb, "MSI-X interrupts supported: %d", count);
+	IGB_DEBUGLOG_2(igb, "interrupt handles requested: %d  minimum: %d",
+	    request, minimum);
 
-	/* Get number of available interrupts */
-	rc = ddi_intr_get_navail(devinfo, DDI_INTR_TYPE_MSIX, &avail);
-	if ((rc != DDI_SUCCESS) || (avail == 0)) {
+	/*
+	 * Get number of supported interrupts
+	 */
+	rc = ddi_intr_get_nintrs(devinfo, intr_type, &count);
+	if ((rc != DDI_SUCCESS) || (count < minimum)) {
 		igb_log(igb,
-		    "Get interrupt available number failed. "
+		    "Get supported interrupt number failed. "
+		    "Return: %d, count: %d", rc, count);
+		return (IGB_FAILURE);
+	}
+	IGB_DEBUGLOG_1(igb, "interrupts supported: %d", count);
+
+	/*
+	 * Get number of available interrupts
+	 */
+	rc = ddi_intr_get_navail(devinfo, intr_type, &avail);
+	if ((rc != DDI_SUCCESS) || (avail < minimum)) {
+		igb_log(igb,
+		    "Get available interrupt number failed. "
 		    "Return: %d, available: %d", rc, avail);
 		return (IGB_FAILURE);
 	}
-	IGB_DEBUGLOG_1(igb, "MSI-X interrupts available: %d", avail);
+	IGB_DEBUGLOG_1(igb, "interrupts available: %d", avail);
 
 	if (avail < request) {
-		igb_log(igb,
-		    "Request %d MSI-X vectors, %d available",
+		igb_log(igb, "Request %d handles, %d available",
 		    request, avail);
 		request = avail;
 	}
@@ -3508,222 +3539,65 @@ igb_alloc_intrs_msix(igb_t *igb)
 	actual = 0;
 	igb->intr_cnt = 0;
 
-	/* Allocate an array of interrupt handles */
+	/*
+	 * Allocate an array of interrupt handles
+	 */
 	igb->intr_size = request * sizeof (ddi_intr_handle_t);
 	igb->htable = kmem_alloc(igb->intr_size, KM_SLEEP);
 
-	/* Call ddi_intr_alloc() */
-	rc = ddi_intr_alloc(devinfo, igb->htable, DDI_INTR_TYPE_MSIX, 0,
+	rc = ddi_intr_alloc(devinfo, igb->htable, intr_type, 0,
 	    request, &actual, DDI_INTR_ALLOC_NORMAL);
 	if (rc != DDI_SUCCESS) {
-		igb_log(igb, "Allocate MSI-X interrupts failed. "
+		igb_log(igb, "Allocate interrupts failed. "
 		    "return: %d, request: %d, actual: %d",
 		    rc, request, actual);
-		goto alloc_msix_fail;
+		goto alloc_handle_fail;
 	}
-	IGB_DEBUGLOG_1(igb, "MSI-X interrupts actually allocated: %d", actual);
+	IGB_DEBUGLOG_1(igb, "interrupts actually allocated: %d", actual);
 
 	igb->intr_cnt = actual;
 
-	/*
-	 * Now we know the actual number of vectors.  Here we assume that
-	 * tx and other will share 1 vector and all remaining (must be at
-	 * least 1 remaining) will be used for rx.
-	 */
-	if (actual < 2) {
-		igb_log(igb, "Insufficient MSI-X interrupts available: %d",
+	if (actual < minimum) {
+		igb_log(igb, "Insufficient interrupt handles allocated: %d",
 		    actual);
-		goto alloc_msix_fail;
+		goto alloc_handle_fail;
 	}
 
-	rx_rings = actual - 1;
-	if (rx_rings < igb->num_rx_rings) {
-		igb_log(igb, "MSI-X vectors force Rx queue number to %d",
-		    rx_rings);
-		igb->num_rx_rings = rx_rings;
+	/*
+	 * For MSI-X, actual might force us to reduce number of rx rings
+	 */
+	if (intr_type == DDI_INTR_TYPE_MSIX) {
+		rx_rings = actual - 1;
+		if (rx_rings < igb->num_rx_rings) {
+			igb_log(igb,
+			    "MSI-X vectors force Rx queue number to %d",
+			    rx_rings);
+			igb->num_rx_rings = rx_rings;
+		}
 	}
 
-	/* Get priority for first vector, assume remaining are all the same */
+	/*
+	 * Get priority for first vector, assume remaining are all the same
+	 */
 	rc = ddi_intr_get_pri(igb->htable[0], &igb->intr_pri);
 	if (rc != DDI_SUCCESS) {
 		igb_log(igb,
 		    "Get interrupt priority failed: %d", rc);
-		goto alloc_msix_fail;
+		goto alloc_handle_fail;
 	}
 
 	rc = ddi_intr_get_cap(igb->htable[0], &igb->intr_cap);
 	if (rc != DDI_SUCCESS) {
 		igb_log(igb,
 		    "Get interrupt cap failed: %d", rc);
-		goto alloc_msix_fail;
+		goto alloc_handle_fail;
 	}
 
-	igb->intr_type = DDI_INTR_TYPE_MSIX;
+	igb->intr_type = intr_type;
 
 	return (IGB_SUCCESS);
 
-alloc_msix_fail:
-	igb_rem_intrs(igb);
-
-	return (IGB_FAILURE);
-}
-
-/*
- * igb_alloc_intrs_msi - Allocate the MSI interrupts
- */
-static int
-igb_alloc_intrs_msi(igb_t *igb)
-{
-	dev_info_t *devinfo;
-	int request, count, avail, actual;
-	int rc;
-
-	devinfo = igb->dip;
-
-	/* Request 1 MSI interrupt vector */
-	request = 1;
-	IGB_DEBUGLOG_1(igb, "MSI interrupts requested: %d", request);
-
-	/* Get number of supported interrupts */
-	rc = ddi_intr_get_nintrs(devinfo, DDI_INTR_TYPE_MSI, &count);
-	if ((rc != DDI_SUCCESS) || (count == 0)) {
-		igb_log(igb,
-		    "Get MSI supported number failed. Return: %d, count: %d",
-		    rc, count);
-		return (IGB_FAILURE);
-	}
-	IGB_DEBUGLOG_1(igb, "MSI interrupts supported: %d", count);
-
-	/* Get number of available interrupts */
-	rc = ddi_intr_get_navail(devinfo, DDI_INTR_TYPE_MSI, &avail);
-	if ((rc != DDI_SUCCESS) || (avail == 0)) {
-		igb_log(igb,
-		    "Get MSI available number failed. "
-		    "Return: %d, available: %d", rc, avail);
-		return (IGB_FAILURE);
-	}
-	IGB_DEBUGLOG_1(igb, "MSI interrupts available: %d", avail);
-
-	actual = 0;
-	igb->intr_cnt = 0;
-
-	/* Allocate an array of interrupt handles */
-	igb->intr_size = request * sizeof (ddi_intr_handle_t);
-	igb->htable = kmem_alloc(igb->intr_size, KM_SLEEP);
-
-	/* Call ddi_intr_alloc() */
-	rc = ddi_intr_alloc(devinfo, igb->htable, DDI_INTR_TYPE_MSI, 0,
-	    request, &actual, DDI_INTR_ALLOC_NORMAL);
-	if ((rc != DDI_SUCCESS) || (actual == 0)) {
-		igb_log(igb,
-		    "Allocate MSI interrupts failed: %d", rc);
-		goto alloc_msi_fail;
-	}
-
-	ASSERT(actual == 1);
-	igb->intr_cnt = actual;
-
-	/* Get priority for first msi, assume remaining are all the same */
-	rc = ddi_intr_get_pri(igb->htable[0], &igb->intr_pri);
-	if (rc != DDI_SUCCESS) {
-		igb_log(igb,
-		    "Get interrupt priority failed: %d", rc);
-		goto alloc_msi_fail;
-	}
-
-	rc = ddi_intr_get_cap(igb->htable[0], &igb->intr_cap);
-	if (rc != DDI_SUCCESS) {
-		igb_log(igb,
-		    "Get interrupt cap failed: %d\n", rc);
-		goto alloc_msi_fail;
-
-	}
-
-	igb->intr_type = DDI_INTR_TYPE_MSI;
-
-	return (IGB_SUCCESS);
-
-alloc_msi_fail:
-	igb_rem_intrs(igb);
-
-	return (IGB_FAILURE);
-}
-
-/*
- * igb_alloc_intrs_legacy - Allocate the Legacy interrupts
- */
-static int
-igb_alloc_intrs_legacy(igb_t *igb)
-{
-	dev_info_t *devinfo;
-	int request, count, avail, actual;
-	int rc;
-
-	devinfo = igb->dip;
-
-	/* Request 1 Legacy interrupt vector */
-	request = 1;
-	IGB_DEBUGLOG_1(igb, "Legacy interrupts requested: %d", request);
-
-	/* Get number of supported interrupts */
-	rc = ddi_intr_get_nintrs(devinfo, DDI_INTR_TYPE_FIXED, &count);
-	if ((rc != DDI_SUCCESS) || (count == 0)) {
-		igb_log(igb,
-		    "Get Legacy supported number failed. Return: %d, count: %d",
-		    rc, count);
-		return (IGB_FAILURE);
-	}
-	IGB_DEBUGLOG_1(igb, "Legacy interrupts supported: %d", count);
-
-	/* Get number of available interrupts */
-	rc = ddi_intr_get_navail(devinfo, DDI_INTR_TYPE_FIXED, &avail);
-	if ((rc != DDI_SUCCESS) || (avail == 0)) {
-		igb_log(igb,
-		    "Get Legacy available number failed. "
-		    "Return: %d, available: %d", rc, avail);
-		return (IGB_FAILURE);
-	}
-	IGB_DEBUGLOG_1(igb, "Legacy interrupts available: %d", avail);
-
-	actual = 0;
-	igb->intr_cnt = 0;
-
-	/* Allocate an array of interrupt handles */
-	igb->intr_size = request * sizeof (ddi_intr_handle_t);
-	igb->htable = kmem_alloc(igb->intr_size, KM_SLEEP);
-
-	/* Call ddi_intr_alloc() */
-	rc = ddi_intr_alloc(devinfo, igb->htable, DDI_INTR_TYPE_FIXED, 0,
-	    request, &actual, DDI_INTR_ALLOC_NORMAL);
-	if ((rc != DDI_SUCCESS) || (actual == 0)) {
-		igb_log(igb,
-		    "Allocate Legacy interrupts failed: %d", rc);
-		goto alloc_legacy_fail;
-	}
-
-	ASSERT(actual == 1);
-	igb->intr_cnt = actual;
-
-	/* Get priority for first msi, assume remaining are all the same */
-	rc = ddi_intr_get_pri(igb->htable[0], &igb->intr_pri);
-	if (rc != DDI_SUCCESS) {
-		igb_log(igb,
-		    "Get interrupt priority failed: %d", rc);
-		goto alloc_legacy_fail;
-	}
-
-	rc = ddi_intr_get_cap(igb->htable[0], &igb->intr_cap);
-	if (rc != DDI_SUCCESS) {
-		igb_log(igb,
-		    "Get interrupt cap failed: %d\n", rc);
-		goto alloc_legacy_fail;
-	}
-
-	igb->intr_type = DDI_INTR_TYPE_FIXED;
-
-	return (IGB_SUCCESS);
-
-alloc_legacy_fail:
+alloc_handle_fail:
 	igb_rem_intrs(igb);
 
 	return (IGB_FAILURE);

@@ -693,25 +693,20 @@ igb_m_unicst_add(void *arg, mac_multi_addr_t *maddr)
 	 * MAC address resides in slot 1.
 	 */
 	for (slot = 1; slot < igb->unicst_total; slot++) {
-		if (igb->unicst_addr[slot].mac.set == 0) {
-			igb->unicst_addr[slot].mac.set = 1;
+		if (igb->unicst_addr[slot].mac.set == 0)
 			break;
-		}
 	}
 
 	ASSERT((slot > 0) && (slot < igb->unicst_total));
 
-	igb->unicst_avail--;
-	mutex_exit(&igb->gen_lock);
-
 	maddr->mma_slot = slot;
 
-	if ((err = igb_unicst_set(igb, maddr->mma_addr, slot)) != 0) {
-		mutex_enter(&igb->gen_lock);
-		igb->unicst_addr[slot].mac.set = 0;
-		igb->unicst_avail++;
-		mutex_exit(&igb->gen_lock);
+	if ((err = igb_unicst_set(igb, maddr->mma_addr, slot)) == 0) {
+		igb->unicst_addr[slot].mac.set = 1;
+		igb->unicst_avail--;
 	}
+
+	mutex_exit(&igb->gen_lock);
 
 	return (err);
 }
@@ -738,24 +733,21 @@ igb_m_unicst_remove(void *arg, mac_addr_slot_t slot)
 		return (EINVAL);
 	}
 
-	if (igb->unicst_addr[slot].mac.set == 1) {
+	if (igb->unicst_addr[slot].mac.set == 0) {
+		mutex_exit(&igb->gen_lock);
+		return (EINVAL);
+	}
+
+	/* Copy the default address to the passed slot */
+	if ((err = igb_unicst_set(igb,
+	    igb->unicst_addr[0].mac.addr, slot)) == 0) {
 		igb->unicst_addr[slot].mac.set = 0;
 		igb->unicst_avail++;
-
-		/* Copy the default address to the passed slot */
-		if ((err = igb_unicst_set(igb,
-		    igb->unicst_addr[0].mac.addr, slot)) != 0) {
-			igb->unicst_addr[slot].mac.set = 1;
-			igb->unicst_avail--;
-		}
-
-		mutex_exit(&igb->gen_lock);
-
-		return (err);
 	}
+
 	mutex_exit(&igb->gen_lock);
 
-	return (EINVAL);
+	return (err);
 }
 
 /*
@@ -770,6 +762,7 @@ igb_m_unicst_modify(void *arg, mac_multi_addr_t *maddr)
 {
 	igb_t *igb = (igb_t *)arg;
 	mac_addr_slot_t slot;
+	int err;
 
 	mutex_enter(&igb->gen_lock);
 
@@ -791,14 +784,16 @@ igb_m_unicst_modify(void *arg, mac_multi_addr_t *maddr)
 		return (EINVAL);
 	}
 
-	if (igb->unicst_addr[slot].mac.set == 1) {
+	if (igb->unicst_addr[slot].mac.set == 0) {
 		mutex_exit(&igb->gen_lock);
-
-		return (igb_unicst_set(igb, maddr->mma_addr, slot));
+		return (EINVAL);
 	}
+
+	err = igb_unicst_set(igb, maddr->mma_addr, slot);
+
 	mutex_exit(&igb->gen_lock);
 
-	return (EINVAL);
+	return (err);
 }
 
 /*

@@ -29,7 +29,7 @@
 #	This makefile drives the production of the igb
 #	network driver kernel module.
 #
-#	intel architecture dependent
+#	SPARC architecture dependent
 #
 
 #

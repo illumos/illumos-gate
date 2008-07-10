@@ -95,6 +95,7 @@ clone:ge			0600 root sys 0666 root sys	/dev/ge
 clone:hme			0600 root sys 0666 root sys	/dev/hme
 clone:qfe			0600 root sys 0666 root sys	/dev/qfe
 clone:bge			0600 root sys 0666 root sys	/dev/bge
+clone:igb			0600 root sys 0666 root sys	/dev/igb
 clone:ixgbe			0600 root sys 0666 root sys	/dev/ixgbe
 clone:rge			0600 root sys 0666 root sys	/dev/rge
 clone:xge			0600 root sys 0666 root sys	/dev/xge
@@ -109,6 +110,7 @@ clone:afe			0600 root sys 0666 root sys     /dev/afe
 clone:mxfe			0600 root sys 0666 root sys     /dev/mxfe
 clone:rtls			0600 root sys 0666 root sys     /dev/rtls
 bge:*				0600 root sys 0666 root sys	/dev/bge*
+igb:*				0600 root sys 0666 root sys	/dev/igb*
 ixgbe:*				0600 root sys 0666 root sys	/dev/ixgbe*
 rge:*				0600 root sys 0666 root sys	/dev/rge*
 xge:*				0600 root sys 0666 root sys	/dev/xge*
@@ -276,6 +278,7 @@ mm:allkmem
 ssm:*
 bscv:*
 clone:bge
+clone:igb
 clone:ixgbe
 clone:rge
 clone:xge
@@ -290,6 +293,7 @@ clone:afe
 clone:mxfe
 clone:rtls
 bge:*
+igb:*
 ixgbe:*
 rge:*
 xge:*

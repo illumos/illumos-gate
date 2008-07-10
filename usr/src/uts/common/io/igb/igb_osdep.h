@@ -132,26 +132,7 @@ typedef uint8_t		u8;
 typedef	uint16_t 	u16;
 typedef	uint32_t	u32;
 typedef	uint64_t	u64;
-
-typedef uint8_t		UCHAR;	/* 8-bit unsigned */
-typedef UCHAR		UINT8;	/* 8-bit unsigned */
-typedef uint16_t	USHORT;	/* 16-bit unsigned */
-typedef uint16_t	UINT16;	/* 16-bit unsigned */
-typedef uint32_t	ULONG;	/* 32-bit unsigned */
-typedef uint32_t	UINT32;
-typedef uint32_t	UINT;	/* 32-bit unsigned */
-typedef UCHAR		BOOLEAN;
-typedef	BOOLEAN		bool;
-typedef UCHAR		*PUCHAR;
-typedef UINT		*PUINT;
-typedef ULONG		*PLONG;
-typedef ULONG		NDIS_STATUS;
-typedef USHORT		*PUSHORT;
-typedef PUSHORT		PUINT16; /* 16-bit unsigned pointer */
-typedef ULONG		E1000_32_BIT_PHYSICAL_ADDRESS,
-	*PFX_32_BIT_PHYSICAL_ADDRESS;
-typedef uint64_t	E1000_64_BIT_PHYSICAL_ADDRESS,
-	*PFX_64_BIT_PHYSICAL_ADDRESS;
+typedef	boolean_t	bool;
 
 struct igb_osdep {
 	ddi_acc_handle_t reg_handle;
