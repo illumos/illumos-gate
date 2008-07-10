@@ -1532,7 +1532,6 @@ page_coloring_init(uint_t l2_sz, int l2_linesz, int l2_assoc)
 
 	ASSERT(mmu_page_sizes <= MMU_PAGE_SIZES);
 
-	ASSERT(ISP2(l2_sz));
 	ASSERT(ISP2(l2_linesz));
 	ASSERT(l2_sz > MMU_PAGESIZE);
 
@@ -1541,6 +1540,8 @@ page_coloring_init(uint_t l2_sz, int l2_linesz, int l2_assoc)
 		l2_colors = MAX(1, l2_sz / (l2_assoc * MMU_PAGESIZE));
 	else
 		l2_colors = 1;
+
+	ASSERT(ISP2(l2_colors));
 
 	/* for scalability, configure at least PAGE_COLORS_MIN color bins */
 	page_colors = MAX(l2_colors, PAGE_COLORS_MIN);
