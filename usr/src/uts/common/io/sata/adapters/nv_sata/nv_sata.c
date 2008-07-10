@@ -1245,8 +1245,8 @@ nv_start_sync(nv_port_t *nvp, sata_pkt_t *spkt)
 	if (!(spkt->satapkt_op_mode & SATA_OPMODE_POLLING) &&
 	    servicing_interrupt()) {
 		spkt->satapkt_reason = SATA_PKT_BUSY;
-		nv_cmn_err(CE_WARN, nvp->nvp_ctlp, nvp,
-		    "SYNC mode not allowed during interrupt");
+		NVLOG((NVDBG_SYNC, nvp->nvp_ctlp, nvp,
+		    "SYNC mode not allowed during interrupt"));
 
 		return (SATA_TRAN_BUSY);
 
