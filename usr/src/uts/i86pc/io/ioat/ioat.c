@@ -410,6 +410,15 @@ ioat_chip_init(ioat_state_t *state)
 	/* save away ioat chip info */
 	state->is_num_channels = (uint_t)ddi_get8(state->is_reg_handle,
 	    &state->is_genregs[IOAT_CHANCNT]);
+
+	/*
+	 * If we get a bogus value, something is wrong with the H/W, fail to
+	 * attach.
+	 */
+	if (state->is_num_channels == 0) {
+		goto chipinitfail_numchan;
+	}
+
 	state->is_maxxfer = (uint_t)ddi_get8(state->is_reg_handle,
 	    &state->is_genregs[IOAT_XFERCAP]);
 	state->is_chanoff = (uintptr_t)ddi_get16(state->is_reg_handle,
@@ -434,6 +443,7 @@ ioat_chip_init(ioat_state_t *state)
 	return (DDI_SUCCESS);
 
 chipinitfail_version:
+chipinitfail_numchan:
 	ddi_regs_map_free(&state->is_reg_handle);
 chipinitfail_regsmap:
 	return (DDI_FAILURE);
