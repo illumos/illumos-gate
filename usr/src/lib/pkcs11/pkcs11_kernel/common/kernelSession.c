@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,12 +225,21 @@ kernel_get_operationstate(kernel_session_t *session_p, CK_STATE ses_state,
 	CK_BYTE_PTR dst;
 	digest_buf_t *bufp;
 
-	/*
-	 * We return CKR_FUNCTION_NOT_SUPPORTED because some clients
-	 * check for this code and work around the lack of this routine.
-	 */
 	if (!(session_p->digest.flags & CRYPTO_EMULATE)) {
-		return (CKR_FUNCTION_NOT_SUPPORTED);
+		/*
+		 * Return CKR_OPERATION_NOT_INITIALIZED if the slot
+		 * is capable of C_GetOperationState(). Return
+		 * CKR_FUNCTION_NOT_SUPPORTED otherwise.
+		 *
+		 * We return these codes because some clients
+		 * check the return code to determine if C_GetOperationState()
+		 * is supported.
+		 */
+		if (slot_table[session_p->ses_slotid]->sl_flags &
+		    CRYPTO_LIMITED_HASH_SUPPORT)
+			return (CKR_OPERATION_NOT_INITIALIZED);
+		else
+			return (CKR_FUNCTION_NOT_SUPPORTED);
 	}
 
 	/*
