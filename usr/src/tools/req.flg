@@ -32,6 +32,7 @@ echo_file usr/src/pkgdefs/bld_awk_pkginfo.ksh
 echo_file usr/src/pkgdefs/build_copyright.sh
 echo_file usr/src/pkgdefs/license_files/cr_Sun
 echo_file usr/src/pkgdefs/license_files/lic_CDDL
+echo_file usr/src/pkgdefs/license_files/lic_GPLv2
 echo_file usr/src/tools/Makefile
 echo_file usr/src/tools/Makefile.targ
 echo_file usr/src/tools/Makefile.tools
