@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -441,8 +441,7 @@ deliver_hosts() {
 		# Remove redundant header lines from ipnodes file 
 		/usr/bin/sed -e '
 		/^# CDDL HEADER START$/,/^# CDDL HEADER END$/ d
-		/^# ident[ \t]*/ d
-		/^# Copyright 1999 Sun Microsystems, Inc/ d
+		/^# Copyright .* Sun Microsystems, Inc/ d
 		/^# Use is subject to license terms/ d
 		/^# Internet host table$/ d
 		' $saved_ipnodes_file | /usr/bin/sed -e ' /^#$/ {

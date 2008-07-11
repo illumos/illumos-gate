@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,6 +37,7 @@ ROOTONBLDBIN=		$(ROOTONBLD)/bin
 ROOTONBLDBINMACH=	$(ROOTONBLD)/bin/$(MACH)
 ROOTONBLDLIB=		$(ROOTONBLD)/lib
 ROOTONBLDLIBMACH=	$(ROOTONBLD)/lib/$(MACH)
+ROOTONBLDLIBPY=		$(ROOTONBLD)/lib/python
 ROOTONBLDENV=		$(ROOTONBLD)/env
 ROOTONBLDGK=		$(ROOTONBLD)/gk
 ROOTONBLDMAN=		$(ROOTONBLD)/man

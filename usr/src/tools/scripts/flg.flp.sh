@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,10 +20,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1991, 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 #
 # Generates the list of source files that would get brought over with the
 # specified subtree as a result of inc.flg and req.flg files.  If no subtree
@@ -33,7 +33,10 @@
 # Based loosely on ON's version of Teamware's def.dir.flp.
 #
 
-PATH=/usr/bin export PATH
+ONBLDDIR=$(dirname $(whence $0))
+
+PATH=/usr/bin:${BUILD_TOOLS:-/opt}/teamware/bin:$ONBLDDIR
+export PATH
 PROG=`basename $0`
 
 #
@@ -61,7 +64,6 @@ fail()
 	exit 1
 }
 
-#
 # Find the files matching the pattern specified by the first argument in the
 # directories named by the remaining arguments.  Unlike def.dir.flp, print
 # the name of the source file since we want to make a list of source files,
@@ -72,13 +74,27 @@ find_files()
    	pat=$1
    	shift
 
-	for dir; do
-		if [ -d $CODEMGR_WS/$dir ]; then
-			cd $CODEMGR_WS
-    			find $dir -name "$pat" | sed -n s:/SCCS/s.:/:p | prpath
- 			cd - > /dev/null
-		fi
-	done
+	if [ "$SCM_MODE" = "teamware" ] ; then
+		for dir; do
+			if [ -d $CODEMGR_WS/$dir ]; then
+				cd $CODEMGR_WS
+				find $dir -name "$pat" | \
+					sed -n s:/SCCS/s.:/:p | prpath
+				cd - > /dev/null
+			fi
+		done
+	elif [ "$SCM_MODE" = "mercurial" ]; then
+		dirs=""
+		for dir; do
+			if [ -d $CODEMGR_WS/$dir ]; then
+				dirs="$dirs|${dir%/}"
+			fi
+		done
+
+		# Remove leading pipe before it can confuse egrep
+		dirs=${dirs#\|}
+		echo "$FILELIST" | egrep "^($dirs)/.*/${pat#s.}\$" | prpath
+	fi
 }
 
 #
@@ -134,7 +150,14 @@ incflg()
 #
 prpath()
 {
-	reltree=${CURTREE##$CODEMGR_WS/}
+	#
+	# $CURTREE may be a subdirectory of $CODEMGR_WS, or it
+	# may be the root of $CODEMGR_WS.  We want to strip it
+	# and end up with a relative path in either case, so the
+	# ?(/) pattern is important.  If we don't do that, the
+	# dots/tree loop will go on forever.
+	#
+	reltree=${CURTREE##$CODEMGR_WS?(/)}
 
 	while read srcfile; do
 		if [ "$RELPATHS" != y ]; then
@@ -152,7 +175,15 @@ prpath()
 	done
 }
 
-[ -z "$CODEMGR_WS" ] && fail "No active workspace; run \"ws <workspace_name>\""
+which_scm | read SCM_MODE CODEMGR_WS || exit 1
+
+if [[ $SCM_MODE == "unknown" ]]; then
+	fail "Unable to determine SCM type currently in use."
+elif [[ $SCM_MODE == "mercurial" ]]; then
+	FILELIST=`hg manifest`
+elif [[ $SCM_MODE != "teamware" ]]; then
+	fail "Unsupported SCM in use: $SCM_MODE"
+fi
 
 while getopts r flag; do
 	case $flag in

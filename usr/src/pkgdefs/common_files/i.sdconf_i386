@@ -45,13 +45,6 @@ do
 	if [ ! -f $dest ] ; then
 		cp $src $dest
 	else
-		# update the SCCS id
-		grep '^#pragma ident[	]*"@(#)sd.conf' $src \
-		    > /tmp/newident.$$ 2>/dev/null
-		egrep -v '^#(pragma ident|ident)[	]*"@\(#\)sd.conf' \
-			$dest  > /tmp/rest.$$ 2>/dev/null
-		cat /tmp/newident.$$ /tmp/rest.$$ > /tmp/d.$$
-
 		#
 		# remove entries for eol'ed blogic drivers
 		# remove entries for eol'ed flashpt drivers
@@ -104,9 +97,9 @@ do
 		-e '/^name="sd" parent="ahci";$/d' \
 		-e '/^name="sd" parent="si3124";$/d' \
 		-e '/^name="sd" parent="marvell88sx";$/d' \
-			/tmp/d.$$ > /tmp/d2.$$
+			$dest > /tmp/d2.$$
 
-		if cmp -s /tmp/d.$$ /tmp/d2.$$  > /dev/null 2>&1
+		if cmp -s $dest /tmp/d2.$$  > /dev/null 2>&1
 		then
 			: # Do not modify file unless changes are required.
 		else
@@ -117,8 +110,8 @@ do
 		if [ $? -ne 0 ]; then
 			add_self_identifying_entry
 		fi
-		# remove temporary files
-		rm -f /tmp/d.$$ /tmp/d2.$$ /tmp/newident.$$ /tmp/rest.$$
+		# remove temporary file
+		rm -f /tmp/d2.$$
 	fi
 done
 

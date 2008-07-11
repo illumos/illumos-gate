@@ -1,0 +1,91 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+#
+# common exception list
+#
+# See README.exception_lists for details
+#
+
+#
+# Ignore text files.
+#
+*.[1-9]
+*.memo
+*.mm
+*.txt
+*/*[Rr][Ee][Aa][Dd][Mm][Ee]*
+*/BUGS
+*/COMPATIBILITY
+*/COPYRIGHT
+*/CREDITS
+*/ChangeLog
+*/DESIGN
+*/HISTORY
+*/NOTES
+*/OBSOLETE
+*/READ_ME
+*/RELEASE*
+*/TODO
+
+#
+# Ignore warlock-related goop; not used during a nightly.
+#
+*.wlc
+*.wlcmd
+*/wlcmd
+*/warlock
+
+#
+# Ignore internal test directories and test programs.
+#
+*/tests
+*/test
+*Test.java
+*_test.[ch]
+
+#
+# Ignore internal packages, scripts, and tools that are intentionally not
+# built or used during a nightly.
+#
+*/tools
+
+#
+# Ignore license files. This should be temporary, and these lines
+# should be removed once we start generating the opensolaris.org
+# deliverables from the nightly gate builds.
+#
+*/COPYING*
+*/LICENSE*
+*/THIRDPARTYLICENSE*
+*/OPENSOLARIS.LICENSE
+
+#
+# Ignore file list generators
+#
+*.flg

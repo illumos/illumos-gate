@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -98,17 +98,6 @@ update_mptconf()
 	
 	# replace old copyright with new one	
 	HEADER="^#.* Copyright.*Sun Microsystems.*$"
-	if grep "$HEADER" $1 > $NEWHDR1 2>/dev/null; then
-		# replace / by \/
-		sed "s/\\//\\\\\\//g" $NEWHDR1 > $NEWHDR2 2>/dev/null
-		if sed "s/$HEADER/`cat $NEWHDR2`/" $2 > $TMPFILE 2>/dev/null
-		then
-			cp $TMPFILE $2
-		fi
-	fi
-
-	# replace old ident with new ident
-	HEADER="^#.*ident.*SMI\"$"
 	if grep "$HEADER" $1 > $NEWHDR1 2>/dev/null; then
 		# replace / by \/
 		sed "s/\\//\\\\\\//g" $NEWHDR1 > $NEWHDR2 2>/dev/null

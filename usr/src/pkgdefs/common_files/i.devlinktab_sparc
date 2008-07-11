@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -35,11 +34,6 @@ do
 	if [ ! -f $dest ] ; then
 		cp $src $dest
 	else
-		grep '^#ident[	]*"@(#)devlink.tab' $src \
-		    > /tmp/newident.$$ 2>/dev/null
-		egrep -v '^#(pragma ident|ident)[	]*"@\(#\)devlink.tab' $dest \
-		    > /tmp/rest.$$ 2>/dev/null
-		cat /tmp/newident.$$ /tmp/rest.$$ > $dest
 		sed -e '/^type=ddi_pseudo;name=app	/d' \
 		    -e '/^type=ddi_pseudo;name=sw	/d' \
 		    -e '/^type=ddi_pseudo;name=consfb;minor=consfb	/d' \
@@ -145,9 +139,8 @@ do
 		    -e '/^type=ddi_pseudo;name=se	/d' \
 		    -e 's,sys/obpdefs.h,<sys/sunddi.h>,' $dest > /tmp/d.$$
 		cp /tmp/d.$$ $dest
-		rm -f /tmp/d.$$ /tmp/newident.$$ /tmp/rest.$$
+		rm -f /tmp/d.$$
 	fi
 done
 
 exit 0
-

@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
@@ -44,11 +44,6 @@ do
 			echo "$rtc" >> $dest
 		fi 
 	else
-		grep '^#ident[ 	]*\"@(#)root' $src \
-		    > /tmp/newident.$$ 2>/dev/null
-		grep -v '^#ident[ 	]*\"@(#)root' $dest \
-		    > /tmp/rest.$$ 2>/dev/null
-		cat /tmp/newident.$$ /tmp/rest.$$ > $dest
 		#
 		# 2.1 version of this file had a trailing blank line.
 		# Remove it.
@@ -99,7 +94,6 @@ do
 			fi	
 				
 		fi
-#		rm -f /tmp/d.$$ /tmp/newident.$$ /tmp/rest.$$
 		#
 		# take nptdate out of crontab. It was added in Beta 2.6.
 		# Make sure it is gone evermore.

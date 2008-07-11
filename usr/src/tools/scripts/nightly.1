@@ -20,7 +20,7 @@
 .\" "
 .\" "Copyright 2008 Sun Microsystems, Inc.  All rights reserved."
 .\" "Use is subject to license terms."
-.TH nightly 1 "06 Jan 2008"
+.TH nightly 1 "18 June 2008"
 .SH NAME
 .I nightly
 \- build an OS-Net consolidation overnight
@@ -271,33 +271,68 @@ references and the meaning of each variable.
 .RE
 .B CODEMGR_WS
 .RS 5
-The root of your Teamware workspace, which is the directory
-containing Codemgr_wsdata. This is the source to be built
-.LP
+The root of your workspace, including whatever metadata is kept by
+the source code management system.  This is the workspace in which the
+build will be done. 
 .RE
+.LP
 .B PARENT_WS
 .RS 5
-The root of the Teamware workspace which is the parent of the
-one being built;
-.I nightly
-uses this for the bringover if $CLONE_WS is not defined
-.LP
+The root of the workspace that is the parent of the
+one being built.  This is particularly relevant for configurations
+with a main
+workspace and build workspaces underneath it; see the 
+\-u and \-U
+options, and the CPIODIR and PKGARCHIVE environment variables, for more
+information.
 .RE
+.LP
+.B BRINGOVER_WS
+.RS 5
+This is the workspace from which
+.I nightly
+will fetch sources to either populate or update your workspace;
+it defaults to $CLONE_WS.
+.RE
+.LP
+.B CLOSED_BRINGOVER_WS
+.RS 5
+A full Mercurial workspace has two repositories: one for open source
+and one for closed source.  If this variable is non-null, 
+.I nightly
+will pull from the repository that it names to get the closed source.
+It defaults to $CLOSED_CLONE_WS.
+.LP
+If $CODEMGR_WS already exists and contains only the open repository,
+.I nightly
+will ignore this variable; you'll need to pull the closed repository
+by hand if you want it.
+.RE
+.LP
 .B CLONE_WS
 .RS 5
-The clone of the parent Teamware workspace;
+This is the workspace from which
 .I nightly
-uses this for the bringover if it is defined, to avoid locking out
-updates to the parent for the duration of the bringover
-.LP
+will fetch sources by default.  This is
+often distinct from the parent, particularly if the parent is a gate.
 .RE
+.LP
+.B CLOSED_CLONE_WS
+.RS 5
+This is the default closed-source Mercurial repository that 
+.I nightly
+might pull from (see
+.B CLOSED_BRINGOVER_WS
+for details).
+.RE
+.LP
 .B SRC
 .RS 5
 Root of OS-Net source code, referenced by the Makefiles.  It is
 the starting point of build activity.  It should be expressed
-in terms of $CODEMGR_WS
-.LP
+in terms of $CODEMGR_WS.
 .RE
+.LP
 .B ROOT
 .RS 5
 Root of the proto area for the build.  The makefiles direct
@@ -312,188 +347,191 @@ $ROOT-nd contains the non-DEBUG build.
 For OpenSolaris deliveries (\fB\-O\fR), $ROOT-open contains the DEBUG
 build of just the open source tree, and $ROOT-open-nd contains the
 non-DEBUG build.
-.LP
 .RE
+.LP
 .B MACH
 .RS 5
 The instruction set architecture of the build machine as given
-by \fIuname -p\fP, e.g. sparc, i386
-.LP
+by \fIuname -p\fP, e.g. sparc, i386.
 .RE
+.LP
 .B LOCKNAME
 .RS 5
 The name of the file used to lock out multiple runs of
 .I nightly.
-This should generally be left to the default setting
-.LP
+This should generally be left to the default setting.
 .RE
+.LP
 .B ATLOG
 .RS 5
 The location of the log directory maintained by
 .I nightly
-This should generally be left to the default setting
-.LP
+This should generally be left to the default setting.
 .RE
+.LP
 .B LOGFILE
 .RS 5
 The name of the log file in the $ATLOG directory maintained by
 .I nightly
-This should generally be left to the default setting
-.LP
+This should generally be left to the default setting.
 .RE
+.LP
 .B STAFFER
 .RS 5
-The non-root user identity to use for the bringover from the
-clone or parent workspace
-.LP
+The non-root account to use on the build machine for the
+bringover from the clone or parent workspace.
+This may not be the same identify used by the SCM.
 .RE
+.LP
 .B MAILTO
 .RS 5
 The address to be used to send completion e-mail at the end of
-the build (for the -m option)
-.LP
+the build (for the \-m option).
 .RE
+.LP
 .B REF_PROTO_LIST
 .RS 5
-Name of file used with protocmp to compare proto area contents
-.LP
+Name of file used with protocmp to compare proto area contents.
 .RE
+.LP
 .B CPIODIR
 .RS 5
 The destination for cpio archives.  This may be relative to
 $CODEMGR_WS for private archives or relative to $PARENT_WS
 if you have different workspaces for different architectures
-but want one hierarchy of BFU archives
-.LP
+but want one hierarchy of BFU archives.
 .RE
+.LP
 .B PARENT_ROOT
 .RS 5
 The parent root, which is the destination for updated headers and
-libraries when using the -U option
-.LP
+libraries when using the \-U option.
 .RE
+.LP
 .B RELEASE
 .RS 5
 The release version number to be used; e.g., 5.10.1 (Note: this is set
-in Makefile.master and should not normally be overridden)
-.LP
+in Makefile.master and should not normally be overridden).
 .RE
+.LP
 .B VERSION
 .RS 5
-The version text string to be used; e.g., "onnv:`date '+%Y-%m-%d'`"
-.LP
+The version text string to be used; e.g., "onnv:`date '+%Y-%m-%d'`".
 .RE
+.LP
 .B RELEASE_DATE
 .RS 5
-The release date text to be used; e.g., October 2007
-.LP
+The release date text to be used; e.g., October 2007.
 .RE
+.LP
 .B INTERNAL_RELEASE_BUILD
 .RS 5
 See Makefile.master - but it mostly controls id strings. Generally,
 let
 .I nightly
 set this for you.
-.LP
 .RE
+.LP
 .B RELEASE_BUILD
 .RS 5
 Define this to build a release with a non-DEBUG kernel. 
 Generally, let
 .I nightly
 set this for you based on its options.
-.LP
 .RE
+.LP
 .B PKGDEFS
 .RS 5
 Points to "$SRC/pkgdefs."  Not used these days.
-.LP
 .RE
+.LP
 .B PKGARCHIVE
 .RS 5
 The destination for packages.  This may be relative to
 $CODEMGR_WS for private archives or relative to $PARENT_WS
 if you have different workspaces for different architectures
-but want one hierarchy of BFU archives
-.LP
+but want one hierarchy of BFU archives.
 .RE
+.LP
 .B MAKEFLAGS
 .RS 5
 Set default flags to make; e.g., -k to build all targets regardless of errors.
-.LP
 .RE
+.LP
 .B UT_NO_USAGE_TRACKING
 .RS 5
 Disables usage reporting by listed Devpro tools. Otherwise it sends mail
 to some Devpro machine every time the tools are used.
-.LP
 .RE
+.LP
 .B LINTDIRS
 .RS 5
-Directories to lint with the -l option
-.LP
+Directories to lint with the \-l option.
 .RE
+.LP
 .B BUILD_TOOLS
 .RS 5
 BUILD_TOOLS is the root of all tools including the compilers; e.g.,
 /ws/onnv-tools.  It is used by the makefile system, but not nightly.
-.LP
 .RE
+.LP
 .B ONBLD_TOOLS
 .RS 5
 ONBLD_TOOLS is the root of all the tools that are part of SUNWonbld; e.g.,
 /ws/onnv-tools/onbld.  By default, it is derived from
 .BR BUILD_TOOLS .
 It is used by the makefile system, but not nightly.
-.LP
 .RE
+.LP
 .B SPRO_ROOT
 .RS 5
 The gate-defined default location for the Sun compilers, e.g.
 /ws/onnv-tools/SUNWspro.  By default, it is derived from
 .BR BUILD_TOOLS .
 It is used by the makefile system, but not nightly.
-.LP
 .RE
+.LP
 .B JAVA_ROOT
 .RS 5
 The location for the java compilers for the build, generally /usr/java.
-.LP
 .RE
+.LP
 .B OPTHOME
 .RS 5
 The gate-defined default location of things formerly in /opt; e.g.,
 /ws/onnv-tools.  This is used by nightly, but not the makefiles.
-.LP
 .RE
+.LP
 .B TEAMWARE
 .RS 5
 The gate-defined default location for the Teamware tools; e.g.,
 /ws/onnv-tools/SUNWspro.  By default, it is derived from
 .BR OPTHOME .
-This is used by nightly, but not the makefiles.
-.LP
+This is used by nightly, but not the makefiles.  There is no
+corresponding variable for Mercurial or Subversion, which are assumed
+to be installed in the default path.
 .RE
+.LP
 .B EXPORT_SRC
 .RS 5
 The source product has no SCCS history, and is modified to remove source
 that cannot be shipped. EXPORT_SRC is where the clear files are copied, then
-modified with 'make EXPORT_SRC'
-.LP
+modified with 'make EXPORT_SRC'.
 .RE
+.LP
 .B CRYPT_SRC
 .RS 5
 CRYPT_SRC is similar to EXPORT_SRC, but after 'make CRYPT_SRC' the files in
 xmod/cry_files are saved. They are dropped on the exportable source to create
-the domestic build
-.RE
+the domestic build.
 .LP
+.RE
 .B OPEN_SRCDIR
 .RS 5
 The open source tree is copied to this directory when simulating an
 OpenSolaris build (\fB\-S O\fR).  It defaults to $CODEMGR_WS/open_src.
-.RE
 .LP
+.RE
 .B ON_CLOSED_BINS
 .RS 5
 OpenSolaris builds do not contain the closed source tree.  Instead,
@@ -502,8 +540,8 @@ the developer downloads a closed binaries tree and unpacks it.
 tells nightly
 where to find these closed binaries, so that it can add them into the
 build.
-.RE
 .LP
+.RE
 .B CHECK_PATHS
 .RS 5
 Normally, nightly runs the 'checkpaths' script to check for
@@ -564,7 +602,7 @@ Run just after bringover completes; not run if no bringover is done.
 .RS 5
 Run after the build completes, with the return status of nightly - one
 of "Completed", "Interrupted", or "Failed" - available in the
-environment variable NIGHTLY_STATUS
+environment variable NIGHTLY_STATUS.
 .RE
 .LP
 .B SYS_POST_NIGHTLY

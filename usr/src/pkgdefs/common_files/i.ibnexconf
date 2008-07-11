@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,27 +52,13 @@ search_ibconf()
 }
 
 #
-# Update ib.conf does two things :
-# 1. Replace the old ident with new ident
-# 2. Add the line containing :
+# Update ib.conf just adds the line containing :
 #	name="ib" class="root";
 #    and the adjoining comments in target ib.conf file.
 #
 update_ibconf()
 {
-	PKG_IBCONFFILE=$1
 	TGT_IBCONFFILE=$2
-
-	# Replace old ident with new ident
-	ident_pattern="^#.*ident.*SMI\"$"
-	ident_var=`grep $ident_pattern $PKG_IBCONFFILE`
-	ed -s $TGT_IBCONFFILE <<-EOF
-	/$ident_pattern/c
-	$ident_var
-	.
-	w
-	q
-	EOF
 
 	echo $IB_STR1 >> $TGT_IBCONFFILE
 	echo $IB_STR2 >> $TGT_IBCONFFILE

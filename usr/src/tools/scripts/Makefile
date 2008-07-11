@@ -42,6 +42,7 @@ SHFILES= \
 	elfcmp \
 	flg.flp \
 	genoffsets \
+	hgsetup \
 	keywords \
 	makebfu \
 	mkacr \
@@ -57,14 +58,14 @@ SHFILES= \
 	sccsrm \
 	sdrop \
 	webrev \
+	which_scm \
 	ws \
 	wx \
+	wx2hg \
 	xref
 
 PERLFILES= \
-	cddlchk \
 	check_rtime \
-	hdrchk \
 	jstyle \
 	mkreadme_osol \
 	mktpl \
@@ -73,6 +74,11 @@ PERLFILES= \
 	wdiff
 
 PYFILES= \
+	cddlchk \
+	copyrightchk \
+	hdrchk \
+	hg-active \
+	rtichk \
 	wsdiff
 
 MAN1FILES= \
@@ -85,6 +91,8 @@ MAN1FILES= \
 	check_rtime.1 \
 	cstyle.1 \
 	flg.flp.1 \
+	hdrchk.1 \
+	hgsetup.1 \
 	jstyle.1 \
 	mkacr.1 \
 	nightly.1 \
@@ -93,15 +101,17 @@ MAN1FILES= \
 	sccsmv.1 \
 	sccsrm.1 \
 	webrev.1 \
+	which_scm.1 \
 	ws.1 \
 	wsdiff.1 \
 	wx.1 \
+	wx2hg.1 \
 	xref.1
 
 MAKEFILES= \
 	xref.mk
 
-CLEANFILES = $(SHFILES) $(PERLFILES) $(PYFILES) bldenv.1 cddlchk.1
+CLEANFILES = $(SHFILES) $(PERLFILES) $(PYFILES) bldenv.1
 
 include ../Makefile.tools
 
@@ -138,10 +148,6 @@ nightly: nightly.sh stdenv.sh
 	$(RM) "$@"
 	sed -e '/# STDENV_START/ r stdenv.sh' nightly.sh > nightly
 	$(CHMOD) +x "$@" 
-
-cddlchk.1: cddlchk.pl
-	/usr/perl5/bin/pod2man --center='User Commands' --name=cddlchk \
-	--section=1 --release='SunOS $(RELEASE)' $? > "$@"
 
 include ../Makefile.targ
 

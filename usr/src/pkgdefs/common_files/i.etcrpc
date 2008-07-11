@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1994-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,25 +34,9 @@ do
 	if [ ! -f $dest ] ; then
 		cp $src $dest
 	else
-		#
-		# determine whether existing /etc/rpc file is based on
-		# the same one being installed.  If so, no need to update it.
-		#
-		newrev=`sed -n 's/^.*\(@(#)rpc.*\)\".*/\1/p' $src`
-		oldrev=`sed -n 's/^.*\(@(#)rpc.*\)\".*/\1/p' $dest`
-		if [ "$oldrev" != "$newrev" ] ; then
-			grep '^#ident[ 	]*\"@(#)rpc' $src \
-						> /tmp/newident.$$ 2>/dev/null
-			grep -v '^#ident[ 	]*\"@(#)rpc' $dest \
-						> /tmp/rest.$$ 2>/dev/null
-			cat /tmp/newident.$$ /tmp/rest.$$ > $dest
-			rm -f /tmp/newident.$$ /tmp/rest.$$
-		fi
-
-		# add the entry for nispasswd used by rpc.nispasswdd
-		# even if sccsid is wrong it might still be there
-		# we do not get fancy and try to add it at the "right"
-		# location.  putting it on the end works just fine.
+		# Add the entry for nispasswd used by rpc.nispasswdd.
+		# We do not get fancy and try to add it at the "right"
+		# location.  Putting it on the end works just fine.
 
 		grep 'nispasswd' $dest > /dev/null 2>&1
 		if [ $? -ne 0 ] ; then

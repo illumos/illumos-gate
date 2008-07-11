@@ -1,11 +1,10 @@
-#!/bin/sh
+#!/bin/ksh -p
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,26 +55,38 @@
 # The workspace name can have hostname:pathname format.
 #
 
-fmtwsname(){
+fmtwsname()
+{
 	awk -F: '$1 != $0 { print "/net/"$1$2 } \
 		 $1 == $0 { print $0 }'
 }
 
 #
-# function to check to see if a proto area is new or old format
+# Return a valid proto area, if one exists.
 #
 check_proto()
 {
-	# Check for problematic parent specification and adjust
-	proto=`echo $1|fmtwsname`
-	# 
-	# if proto contains a /usr/include directory we assume
-	# that this is an old style proto area 
-	#
-	if [ -d $proto/usr/include ]; then
-		echo $proto
-	else
+	if [[ -z $1 ]]; then
+		return
+	fi
+
+	if [ "$SCM_MODE" = "teamware" ]; then
+		# Check for problematic parent specification and adjust
+		proto=`echo $1|fmtwsname`
 		echo "${proto}/root_${MACH}"
+	elif [ "$SCM_MODE" = "mercurial" ]; then
+		proto=$1
+		#
+		# If the proto is a local repository then we can use it
+		# to point to the parents proto area. Don't bother to
+		# check if it exists or not, we never did for Teamware,
+		# since it might appear later anyway.
+		#
+		if [ "${proto##ssh://}" == "$proto" -a \
+		     "${proto##http://}" == "$proto" -a \
+		     "${proto##https://}" == "$proto" ]; then
+			echo "${proto}/root_${MACH}"
+		fi
 	fi
 }
 
@@ -94,29 +105,45 @@ else
 	setenv=false
 fi
 
-if [ $# -lt 1 ]; then
-	set -- `workspace name`
-	[ $# -eq 1 ] && echo "Defaulting to workspace $1"
-fi
+WHICH_SCM=$(dirname $(whence $0))/which_scm
 
+#
+# No workspace/repository path was given, so try and detect one from our
+# current directory we're in
+#
 if [ $# -lt 1 ]; then
-	echo "usage: ws [-e] [workspace_name]" >&2
-	if $setenv; then
-		cleanup_env
-		return 1
+	if $WHICH_SCM | read SCM_MODE tmpwsname && \
+	    [[ $SCM_MODE != unknown ]]; then
+		echo "Defaulting to $SCM_MODE repository $tmpwsname"
 	else
-		exit 1
+		echo "usage: ws [-e] [workspace_name]" >&2
+		if $setenv; then
+			cleanup_env
+			return 1
+		else
+			exit 1
+		fi
 	fi
+else
+	#
+	# A workspace/repository path was passed in, grab it and pop
+	# it off the stack
+	#
+	tmpwsname=$1
+	shift
 fi
 
 #
 #	This variable displays the nested activations of workspaces.
 #	This is done here to get the exact name the user entered.
 #
-WS_STACK="$1 $WS_STACK"; export WS_STACK
+WS_STACK="$tmpwsname $WS_STACK"; export WS_STACK
 
-wsname=`echo $1|fmtwsname`
-shift
+#
+# Set the workspace name and unset tmpwsname (as we reuse it later)
+#
+wsname=`echo $tmpwsname|fmtwsname`
+unset tmpwsname
 
 #
 # Checking for CODEMGR_WSPATH
@@ -136,6 +163,7 @@ then
 	IFS=$ofs
 fi
 
+#
 # to translate it to an absolute pathname.  We need an
 # absolute pathname in order to set CODEMGR_WS.
 #
@@ -144,28 +172,6 @@ then
 	pwd=`pwd`
 	wsname="$pwd/$wsname"
 fi
-
-if [ ! -d $wsname/Codemgr_wsdata ]; then
-	echo "Error: $wsname is not a workspace" >&2
-	if $setenv; then
-		cleanup_env
-		return 1
-	else
-		exit 1
-	fi
-fi
-
-tmpwsname=`(cd $wsname >/dev/null && workspace name)`
-if [ -z "$tmpwsname" ]; then
-	echo "Error: $wsname is not a workspace" >&2
-	if $setenv; then
-		cleanup_env
-		return 1
-	else
-		exit 1
-	fi
-fi
-wsname=$tmpwsname
 
 #
 #	Check to see if this is a valid workspace
@@ -179,10 +185,14 @@ if [ ! -d $wsname ]; then
 		exit 1
 	fi
 fi
-if [ -d ${wsname}/Codemgr_wsdata ]; then
-	CM_DATA=Codemgr_wsdata
-else
-	echo "$wsname is not a workspace" >&2
+
+#
+# This catches the case of a passed in workspace path
+# Check which type of SCM is in use by $wsname.
+#
+(cd $wsname && $WHICH_SCM) | read SCM_MODE tmpwsname
+if [[ $? != 0 || "$SCM_MODE" == unknown ]]; then
+	echo "Error: Unable to detect a supported SCM repository in $wsname"
 	if $setenv; then
 		cleanup_env
 		return 1
@@ -191,12 +201,28 @@ else
 	fi
 fi
 
-CODEMGR_WS=$wsname; export CODEMGR_WS
-SRC=$CODEMGR_WS/usr/src; export SRC
-TSRC=$CODEMGR_WS/usr/ontest; export TSRC
+wsname=$tmpwsname
+CODEMGR_WS=$wsname ; export CODEMGR_WS
+SRC=$wsname/usr/src; export SRC
+TSRC=$wsname/usr/ontest; export TSRC
 
-wsosdir=$CODEMGR_WS/$CM_DATA/sunos
-protofile=$wsosdir/protodefs
+if [ "$SCM_MODE" = "teamware" -a -d ${wsname}/Codemgr_wsdata ]; then
+	CM_DATA="Codemgr_wsdata"
+	wsosdir=$CODEMGR_WS/$CM_DATA/sunos
+	protofile=$wsosdir/protodefs
+elif [ "$SCM_MODE" = "mercurial" -a -d ${wsname}/.hg ]; then
+	CM_DATA=".hg"
+	wsosdir=$CODEMGR_WS/$CM_DATA
+	protofile=$wsosdir/org.opensolaris.protodefs
+else
+	echo "$wsname is not a supported workspace; type is $SCM_MODE" >&2
+	if $setenv; then
+		cleanup_env
+		return 1
+	else
+		exit 1
+	fi
+fi
 
 if [ ! -f $protofile ]; then
 	if [ ! -w $CODEMGR_WS/$CM_DATA ]; then
@@ -241,19 +267,29 @@ if [ ! -f $protofile ]; then
 #
 
 PROTO1=\$CODEMGR_WS/proto
-
+PROTOFILE_EoF
+	
+	if [ "$SCM_MODE" = "teamware" ]; then
+		cat << PROTOFILE_EoF >> $protofile
 if [ -f "\$CODEMGR_WS/Codemgr_wsdata/parent" ]; then
    #
    # If this workspace has an codemgr parent then set PROTO2 to
    # point to the parents proto space.
    #
    parent=\`workspace parent \$CODEMGR_WS\`
-   if [ -n \$parent ]; then
+   if [[ -n \$parent ]]; then
 	   PROTO2=\$parent/proto
    fi
 fi
 PROTOFILE_EoF
-
+	elif [ "$SCM_MODE" = "mercurial" ]; then
+		cat << PROTOFILE_EoF >> $protofile
+parent=\`(cd \$CODEMGR_WS && hg path default 2>/dev/null)\`
+if [[ \$? -eq 0 && -n \$parent ]]; then
+   PROTO2=\$(check_proto \$parent/proto)
+fi
+PROTOFILE_EoF
+	fi
 fi
 
 . $protofile
@@ -268,7 +304,6 @@ MAKEFLAGS=e; export MAKEFLAGS
 MACH=`uname -p`
 ROOT=/proto/root_${MACH}	# default
 
-
 ENVCPPFLAGS1=
 ENVCPPFLAGS2=
 ENVCPPFLAGS3=
@@ -277,22 +312,23 @@ ENVLDLIBS1=
 ENVLDLIBS2=
 ENVLDLIBS3=
 
-if [ "$PROTO1" != "" ]; then	# first proto area specifed
-	PROTO1=`check_proto $PROTO1`
+PROTO1=`check_proto $PROTO1`
+if [[ -n "$PROTO1" ]]; then	# first proto area specifed
 	ROOT=$PROTO1
 	ENVCPPFLAGS1=-I$ROOT/usr/include
 	export ENVCPPFLAGS1
 	ENVLDLIBS1="-L$ROOT/lib -L$ROOT/usr/lib"
 	export ENVLDLIBS1
 
-	if [ "$PROTO2" != "" ]; then	# second proto area specifed
-		PROTO2=`check_proto $PROTO2`
+	PROTO2=`check_proto $PROTO2`
+	if [[ -n "$PROTO2" ]]; then	# second proto area specifed
 		ENVCPPFLAGS2=-I$PROTO2/usr/include
 		export ENVCPPFLAGS2
 		ENVLDLIBS2="-L$PROTO2/lib -L$PROTO2/usr/lib"
 		export ENVLDLIBS2
 
-		if [ "$PROTO3" != "" ]; then	# third proto area specifed
+		PROTO3=`check_proto $PROTO3`
+		if [[ -n "$PROTO3" ]]; then	# third proto area specifed
 			PROTO3=`check_proto $PROTO3`
 			ENVCPPFLAGS3=-I$PROTO3/usr/include
 			export ENVCPPFLAGS3
@@ -304,7 +340,7 @@ fi
 
 export ROOT
 
-if [ "$TERMPROTO" != "" ]; then	# fallback area specifed
+if [[ -n "$TERMPROTO" ]]; then	# fallback area specifed
 	TERMPROTO=`check_proto $TERMPROTO`
 	ENVCPPFLAGS4="-Y I,$TERMPROTO/usr/include"
 	export ENVCPPFLAGS4
@@ -312,57 +348,43 @@ if [ "$TERMPROTO" != "" ]; then	# fallback area specifed
 	export ENVLDLIBS3
 fi
 
-#
-# Now let's set those variables which are either 4.1.x specific
-# or 5.0 specific
-#
-os_rev=`uname -r`
 osbld_flag=0
 
-if [ `expr $os_rev : "4\.1"` = "3" ]; then # This is a 4.1.x machine
-   # 
-   # Enable all of the DOUBLECROSS_ROOT components for the 4.1.x compile
-   #
-   DOUBLECROSS_ROOT=${DOUBLECROSS_ROOT="/crossroot"}
-   PATH=$DOUBLECROSS_ROOT/usr/ccs/bin:$DOUBLECROSS_ROOT/usr/bin:$DOUBLECROSS_ROOT/usr/sbin:$PATH
-   export DOUBLECROSS_ROOT PATH
-elif [ `expr $os_rev : "5\."` = "2" ]; then
-   # 
-   # Enable any 5.x specific variables here
-   #
-   if [ ${ONBLD_DIR:-NULL} = "NULL" ]; then
-      if [ -d /opt/onbld/bin ]; then
-	 ONBLD_DIR=/opt/onbld/bin
-      elif [ -d /usr/onbld/bin ]; then
-	 ONBLD_DIR=/usr/onbld/bin
-      fi
-   fi
-   if [ -d ${ONBLD_DIR:-\\NULL} ] ; then
-      PATH=${ONBLD_DIR}:${PATH}
-      osbld_flag=1
-      export PATH
-   fi
-   if [ "$PROTO2" != "" ]; then
-      # This should point to the parent's proto
-      PARENT_ROOT=$PROTO2
-      export PARENT_ROOT
-   else
-      # Clear it in case it's already in the env.
-      PARENT_ROOT=
-   fi
-   export ONBLD_DIR
-   export MACH
+if [[ -z "$ONBLD_DIR" ]]; then
+	ONBLD_DIR=$(dirname $(whence $0))
+fi
+
+if ! echo ":$PATH:" | grep ":${ONBLD_DIR}:" > /dev/null; then
+	PATH="${ONBLD_DIR}:${ONBLD_DIR}/${MACH}:${PATH}"
+	osbld_flag=1
+fi
+
+export PATH
+
+if [[ -n "$PROTO2" ]]; then
+   # This should point to the parent's proto
+   PARENT_ROOT=$PROTO2
+   export PARENT_ROOT
 else
+   # Clear it in case it's already in the env.
+   PARENT_ROOT=
+fi
+export ONBLD_DIR
+export MACH
+
+os_rev=`uname -r`
+os_name=`uname -s`
+
+if [[ $os_name != "SunOS" || `expr $os_rev : "5\."` != "2" ]]; then
    #
-   # This is neither a 5.x machine nor a 4.1.x machine - something is wrong
+   # This is not a SunOS 5.x machine - something is wrong
    #
-   echo "***WARNING: this script is meant to be run on a 4.1.x and/or a 5.x"
-   echo "            operating system.  This machine appears to be running:"
-   echo "                          $os_rev "
+   echo "***WARNING: this script is meant to be run on SunOS 5.x."
+   echo "            This machine appears to be running: $os_name $os_rev"
 fi
 
 echo ""
-echo "Workspace (\$CODEMGR_WS)      : $CODEMGR_WS"
+echo "Workspace                    : $wsname"
 if [ -n "$parent" ]; then
    echo "Workspace Parent             : $parent"
 fi
@@ -375,10 +397,10 @@ echo "Root of test source (\$TSRC)  : $TSRC"
 if [ $osbld_flag = "1" ]; then
    echo "Prepended to PATH            : $ONBLD_DIR"
 fi
-echo "Current directory (\$PWD)     : $CODEMGR_WS"
+echo "Current directory (\$PWD)     : $wsname"
 echo ""
 
-cd $CODEMGR_WS
+cd $wsname
 
 if $setenv; then
 	cleanup_env

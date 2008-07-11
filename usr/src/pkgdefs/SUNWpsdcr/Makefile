@@ -26,7 +26,7 @@
 
 include ../Makefile.com
 
-DATAFILES += i.preserve i.confupdate
+DATAFILES += i.preserve
 LICENSEFILES += $(OSBL)
 
 .KEEP_STATE:

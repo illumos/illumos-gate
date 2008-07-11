@@ -44,6 +44,7 @@ COMMON_SUBDIRS= \
 	fastfs \
 	findunref \
 	ndrgen \
+	onbld \
 	pmodes \
 	gk \
 	install.bin \
@@ -103,6 +104,11 @@ ROOTDIRS= \
 	$(ROOTONBLD)/bin/$(MACH) \
 	$(ROOTONBLD)/lib \
 	$(ROOTONBLD)/lib/$(MACH) \
+	$(ROOTONBLD)/lib/python \
+	$(ROOTONBLD)/lib/python/onbld \
+	$(ROOTONBLD)/lib/python/onbld/Checks \
+	$(ROOTONBLD)/lib/python/onbld/hgext \
+	$(ROOTONBLD)/lib/python/onbld/Scm \
 	$(ROOTONBLD)/env \
 	$(ROOTONBLD)/etc \
 	$(ROOTONBLD)/etc/abi \

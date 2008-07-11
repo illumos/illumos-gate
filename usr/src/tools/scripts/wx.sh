@@ -597,7 +597,7 @@ wx_usage() {
 
 	cat << EOF
 
-See <http://onnv.eng/wx.html> for usage tips.
+See <http://www.opensolaris.org/os/community/on/wx/> for usage tips.
 
 Usage:  $ME command [-D] [args]
 
@@ -2295,7 +2295,7 @@ for more info.  Note, pay attention to the tabs.
 			fi
 		fi
 
-		if ! wx_copyright; then
+		if ! copyrightchk $file; then
 			# Sound bell
 			ring_bell
 			cat >&2 <<-EOF
@@ -2986,51 +2986,6 @@ wx_info() {
 		echo "New file (does not exist in parent ws)."
 	fi
 	echo
-}
-
-wx_copyright() {
-	typeset _problem=0
-	case $file in
-		*.adb)	return;;
-		*.fdbg)	return;;
-		*.in)	return;;
-	esac
-	year=`date +%Y`
-	oldcopyright1='Copyright \(c\).* Sun Microsystems, Inc.'
-	# The backslash on the next line is just a hack so that
-	# 'wx copyright' on itself doesn't trigger a false positive.
-	oldcopyright2='Copyright\ .* by Sun Microsystems, Inc.'
-	copyright='Copyright '$year' Sun Microsystems, Inc.'
-	reserved='All rights reserved.'
-	license='Use is subject to license terms.'
-	if egrep -s ''"$oldcopyright1"'' $file ; then
-		echo "old copyright with '(c)' in $filepath"
-				_problem=1
-	fi
-	if egrep -s ''"$oldcopyright2"'' $file; then
-		echo "old copyright with 'by' in $filepath" 
-				_problem=1
-	fi
-	if egrep -s ''"$copyright"' '"$reserved"'' $file; then
-		echo "Need two spaces between copyright and all rights "\
-			 "reserved phrases in $filepath"
-				_problem=1
-	fi
-	if ! egrep -s ''"$copyright"'' $file; then
-		echo "Proper $year copyright missing in $filepath."
-		echo "Only the current year should appear."
-				_problem=1
-	fi
-	if ! egrep -s ''"$reserved"'' $file; then
-		echo "'$reserved' message missing in $filepath" 
-				_problem=1
-	fi
-	if ! egrep -s ''"$license"'' $file ; then
-		echo "'$license' message missing in $filepath" 
-				_problem=1
-	fi
-
-	return $_problem
 }
 
 get_multi_deltas() {
@@ -4187,13 +4142,11 @@ wx_fullreview() {
 # Check on RTI status for bug ID's found in active list comments.
 #
 
-rtichk() {
-	typeset bug bugs[] rtidir rtifile suffix rtitype='MarketingRelease'
-	typeset rtibug rti project release state gatetype='MarketingRelease'
+wx_rtichk() {
+	typeset bugs[]
 	# gate contains the gate dir, not full path
-	typeset gate=${parent##*/} usewebrti='false'
-	typeset webrticli=$(whence webrticli 2>/dev/null)
-	typeset -i i j rc=0 warnhdr=0
+	typeset gate=${parent##*/}
+	typeset -i rc=0
 	typeset nolookup opt
 
 	if [[ -f $wxdir/rtichk.NOT ]]; then
@@ -4210,199 +4163,19 @@ rtichk() {
 		esac
 	done
 
-	# Is the parent a patch gate?
-	if [[ $parent == *-patch* ]]; then
-		rtitype='Patch'
-		suffix='P'
-		RTIDIRS=$PRTIDIRS
-		gatetype='Patch'
-	fi
-
-	# Is the parent a test gate?
-	if [[ $parent == *-stc2 ||  $parent == *-test ]]; then
-		rtitype='RTI'
-		gatetype='RTI'
-	fi
-
-	# Use new RTI query tool if there's a gate and there is an
-	# executable webrticli.
-	# Note, webrticli needs a gate arg to correctly determine status.
+	# Note, rtichk needs a gate arg to correctly determine status.
 	if [[ -z $gate ]]; then
 		cat >&2 <<-EOF
-Warning: cannot find a parent gate, skipping webrticli checking.  Will
-check RTI status using old style checking...
+Warning: cannot find a parent gate, skipping RTI checking.
 		EOF
-	else
-		if [[ -z $webrticli ]]; then
-			# if webrticli isn't in the PATH, try default path
-			webrticli=/net/webrti.sfbay/export/home/bin/webrticli
-		fi
-		if [[ -x $webrticli ]]; then
-			usewebrti='true'
-		else
-			cat >&2 <<-EOF
-Warning: cannot find webrticli, skipping webrticli checking.  Will check
-RTI status using old style checking...
-			EOF
-		fi
 	fi
 
 	# Use wx_summary to output bug ID's in active list comments,
 	# redirecting warnings about non-bug ID's to file for later use.
 	set -A bugs $(wx_summary -ao $nolookup 2>$wxtmp/bugwarnings|cut -f1 -d' ')
+	rtichk -g $gate ${bugs[@]}
+	rc=$?
 
-	((i = 0)) # init bugs array index
-	for bug in ${bugs[@]}; do
-		if [[ $bug == 'accept' ]]; then
-			# skip this bug since it's accepted.
-			# Increment bugs[] index.
-			((i = i + 1))
-			continue
-		fi
-
-		if $usewebrti; then
-			# try new RTI query interface
-			$webrticli -g $gate RTIstatus $bug > $wxtmp/webrticli.out 2>&1
-			rc=$?
-
-			case $rc in
-				0)	if [[ $(wc -l < $wxtmp/webrticli.out) -ne 1 ]]; then
-						# paranoid: should only have 1 line
-						cat <<-EOF
-
-Warning: for bug $bug the RTI status can not be determined using webrtcli.
-Please contact the gatekeeper.  The output of webrtcli is:
-
-						EOF
-						cat $wxtmp/webrticli.out
-					else
-						IFS=':' read rtibug rti project \
-							release state rtitype \
-							< $wxtmp/webrticli.out
-
-						if [[ $gatetype != $rtitype ]]; then
-							cat <<-EOF
-
-Warning: for bug $bug the RTI $rti is a $rtitype type but the parent gate
-$gate is a $gatetype gate.  A $gatetype RTI must be submitted to putback
-bug $bug to $gate.
-							EOF
-						elif [[ $state == 'S_ACCEPTED' ]]; then
-							# found accepted bug
-							bugs[i]='accept'
-						fi
-					fi
-					# skip old-style checking
-					((i = i + 1))
-					continue ;;
-
-				1)	# Serious system related problem has occured
-					cat <<-EOF
-
-Warning: for bug $bug the RTI status can not be determined using webrtcli.
-Please contact the gatekeeper.  The output of webrtcli is:
-
-					EOF
-					cat $wxtmp/webrticli.out
-					# skip old-style checking
-					((i = i + 1))
-					continue ;;
-
-				5)	# Incorrect gate name specified.
-					# See if bug can be found at all.
-					$webrticli RTIstatus $bug > /dev/null 2>&1
-					if [[ $? -ne 3 ]]; then
-						# If the return is something
-						# other than the CR
-						# can't be found (3), issue
-						# a warning.
-						cat <<-EOF
-
-Warning: for bug $bug webrticli was unable to map current parent gate $gate
-to a RTI release.  Please contact the gatekeeper.  The output of webrtcli is:
-
-						EOF
-						cat $wxtmp/webrticli.out
-						# skip old-style checking
-						((i = i + 1))
-						continue
-					fi ;;
-				# Dealing with other error codes is
-				# tricky because the user may be using
-				# the old school rtitool and we don't
-				# want to needlessly warn.
-			esac
-		fi # end if $usewebrti
-
-		# If bug wasn't found above then fall back to old school rti lookup...
-		# XXX if it is determined at some point that everyone is
-		# using the new web RTI tool then the fallback code can
-		# be removed.
-
-		# Old style RTI lookup...
-		# See if there is an accepted rti (the filename indicates state)
-		for rtidir in $RTIDIRS; do
-			# make sure the rti dir is mounted
-			ls -d $rtidir >/dev/null
-
-			if [[ ! (-d $rtidir && -r $rtidir) ]]; then
-				cat <<-EOF
-
-Warning: cannot check status of RTI's.  Check with the gatekeepers to see why
-$rtidir
-is not accessible.
-
-				EOF
-				return 1
-			fi
-
-			rtifile="${rtidir}/${suffix}${bug}.accept"
-
-			if [[ -f "$rtifile" ]]; then 
-				# This bug was accepted since the
-				# rtifile exists
-
-				bugs[i]='accept'
-				((j = 0))
-				while (( j < ${#bugs[@]} )); do
-
-					# Let's see if any other bugs
-					# were accepted in the rti file
-					if [[ ${bugs[j]} != 'accept' ]] &&
-						grep -q "^${bugs[j]} " $rtifile
-					then
-						bugs[j]='accept'
-					fi
-					((j = j + 1))
-				done # while [[ j -lt ${#bugs[@]} ]]
-				# stop checking in rtidirs and go to next bug
-				break 
-			fi # if [[ -f "$rtifile" ]]
-		done # rtidir in set of rtidirs
-
-		# Increment bugs[] index.
-		((i = i + 1))
-	done # for bug in ${bugs[@]}
-
-	for bug in ${bugs[@]}; do
-		if [[ $bug != 'accept' ]]; then
-			if [[ $warnhdr -ne 1 ]]; then
-				cat <<-EOF
-
-Warning: there doesn't seem to be an approved $rtitype RTI for the
-following bug IDs listed in your active list comments (see '$ME bugs').
-Make sure your $rtitype RTI is approved before putting back to an
-official ON gate (hint, use either <http://webrti.sfbay> or 'rtitool'
-depending on the project to submit an $rtitype RTI):
-
-				EOF
-				((warnhdr = 1))
-				# set return code to indicate problem
-				[[ $rc -eq 0 ]] && ((rc = 1))
-			fi
-			print $bug
-		fi
-	done
 	if [[ -s $wxtmp/bugwarnings ]]; then
 		cat <<-EOF
 
@@ -4414,7 +4187,7 @@ Please fix the following and run rtichk again:
 		cat $wxtmp/bugwarnings
 		((rc = 1))
 	fi
-	if [[ $i -eq 0 ]]; then
+	if [[ ${#bugs} -eq 0 ]]; then
 		print "\nWarning: no bug ID's in active list."
 	fi
 	return $rc
@@ -4499,7 +4272,7 @@ ARC case associated with your putback.
 			print "========== End of putback comments ======="
 
 			# Output warning if RTI isn't approved.
-			rtichk $nolookup
+			wx_rtichk $nolookup
 			print "========== End of RTI check output ======="
 
 			cat <<-EOF
@@ -4646,6 +4419,14 @@ if [[ "$1" == version ]]; then
 	exit 0
 fi
 
+#
+# Check to make sure we're not being run from within a Mercurial repo
+#
+if hg root >/dev/null 2>&1; then
+	fail "Error: wx does not support Mercurial repositories.\n"\
+"Please see http://opensolaris.org/os/community/tools/hg"
+fi
+
 whence workspace >/dev/null || fail "Error: cannot find workspace command in \$PATH."
 
 # Note, PUTBACK can be set to "cm_env -g -o putback" to use Casper Dik's
@@ -4682,9 +4463,10 @@ else
 	fi
 fi
 
-[[ -z "$workspace" ]] &&
+if [[ -z "$workspace" ]]; then
 	fail "No active workspace, run \"ws <workspace>\" or"\
 		"\"cd <workspace>\"."
+fi
 
 workspace_basename=`basename $workspace`
 wxdir=${WXDIR:-$workspace/wx}
@@ -5198,10 +4980,24 @@ case $command in
 
 	rmdelchk) echo "\nDoing sccs rmdel check:"; wx_eval rmdelchk;;
 
-	rtichk) rtichk;;
+	rtichk) wx_rtichk;;
 
 	deltachk)  echo "\nDoing multi delta check:"; wx_eval deltachk;;
-	copyright) echo "\nDoing copyright check:"; wx_eval wx_copyright;;
+	copyright) echo "\nDoing copyright check:"; 
+		cd $workspace;
+		copyright_files=;
+		for filepath in $file_list; do
+			if [[ -s $wxdir/${command}.NOT ]] &&
+				grep -q "^$(escape_re $filepath)$" \
+					$wxdir/${command}.NOT
+			then
+				echo "$filepath (skipping)"
+			else
+				copyright_files="$copyright_files $filepath"
+			fi
+		done
+		copyrightchk $copyright_files;;
+
 	cddlchk)
 		echo "\nDoing CDDL block check:";
 		cd $workspace;

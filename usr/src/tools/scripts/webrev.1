@@ -1,28 +1,29 @@
-.\" "
-.\" " Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-.\" " Use is subject to license terms.
-.\" "
-.\" " CDDL HEADER START
-.\" "
-.\" " The contents of this file are subject to the terms of the
-.\" " Common Development and Distribution License (the "License").
-.\" " You may not use this file except in compliance with the License.
-.\" "
-.\" " You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-.\" " or http://www.opensolaris.org/os/licensing.
-.\" " See the License for the specific language governing permissions
-.\" " and limitations under the License.
-.\" "
-.\" " When distributing Covered Code, include this CDDL HEADER in each
-.\" " file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-.\" " If applicable, add the following below this CDDL HEADER, with the
-.\" " fields enclosed by brackets "[]" replaced with your own identifying
-.\" " information: Portions Copyright [yyyy] [name of copyright owner]
-.\" "
-.\" " CDDL HEADER END
-.\" "
+.\"
+.\" CDDL HEADER START
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" CDDL HEADER END
+.\"
+.\" Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+.\" Use is subject to license terms.
+.\"
 .\" ident	"%Z%%M%	%I%	%E% SMI"
-.TH webrev 1 "1 December 2006"
+.\"
+.TH webrev 1 "02 July 2008"
 .SH NAME
 webrev \- Generate HTML codereview materials
 .SH SYNOPSIS
@@ -53,12 +54,15 @@ webrev \- Generate HTML codereview materials
 .B -l
 .I arguments to 'putback'
 
-See OPTIONS for common-options.
+See OPTIONS for common-options.  
+Note that the -l option is only applicable to TeamWare workspaces.
 
 .SH DESCRIPTION
 .B webrev
 builds a set of HTML files suitable for performing code review of
-source changes in a web browser.  At its most basic, usage is:
+source changes in a web browser.
+It supports Mercurial, Subversion and Teamware repositories.
+At its most basic, usage is:
 .nf
         $ webrev
 .fi
@@ -128,33 +132,59 @@ will also attempt to auto-discover.  In all cases,
 .B webrev
 must either discover the list of files which have changed, or else this list
 must be manually specified, either in "webrev file list" format or in "wx"
-format.  See FILE LIST for more details.
-
-.SS Teamware
-In the case of Teamware, if the user has already activated the workspace
-with the
+format.
+See FILE LIST for more details.
+.PP
+In all cases, if the user has activated the workspace with the
 .BR ws (1)
-command or set the
-.B CODEMGR_WS
-environment variable, then
-.B webrev
-will use the
-.B CODEMGR_WS
-environment variable.  To manually set the basis for
-comparison, use the -p option, or specify the
-.B CODEMGR_PARENT
-variable in the file list.
+or
+.BR bldenv (1)
+commands, \fBwebrev\fR will use the \fBCODEMGR_PARENT\fR and
+\fBCODEMGR_WS\fR environment variables to identify parent and child
+workspaces respectively.
+To manually specify the basis for comparison, use the -p option or
+specify the \fBCODEMGR_PARENT\fR variable in either the file list or
+the environment.
 
-To direct \fBwebrev\fR to determine the file list from
-.BR putback (1),
+.SS Discovering the SCM in use.
+.B webrev
+makes use of
+.BR which_scm (1)
+to determine the SCM in use for a given workspace.
+
+.SS TeamWare
+In the case of TeamWare \fBwebrev\fR will use the output of "workspace
+name" to discover the workspace root, if not otherwise specified.
+.PP
+\fBwebrev\fR will attempt to use a 
+.BR wx (1) 
+active list in
+\fBCODEMGR_WS/wx/active\fR.
+To direct \fBwebrev\fR to determine the file list from the output of
+.BR putback "(1),"
 use the -l option.  (Note that \fBwebrev\fR may also elect to use
 \fBputback\fR if it cannot determine the file list from
-.BR wx (1)).
+.BR wx "(1))."
 The -l option indicates that subsequent arguments should be
 treated as arguments to
-.BR putback (1).
+.BR putback "(1)."
 This can be used to prune the set of files which putback examines,
 or to reference a teamware flp (file list program).
+
+.SS Mercurial
+In the case of Mercurial \fBwebrev\fR will attempt to use the output
+from the
+.BR hg (1)
+"hg root" to identify the workspace root, and the
+"hg path default" command to identify the parent workspace.
+
+.SS Subversion
+In the case of Subversion \fBwebrev\fR will attempt to use the output
+from the
+.BR svn (1)
+"svn info" to find the workspace root and subversion repository URL.
+.PP
+The file list will be created from the output of the "svn status" command.
 
 .SH OPTIONS
 .TP 10
@@ -166,8 +196,8 @@ format expected by the \fIwx\fR package.  See FILE LIST, below.
 .BI "-l " putback-args
 Extract the file list from the output of 
 .I putback -n.
-Any arguments supplied will be passed to
-.BR putback (1).
+Any arguments supplied will be passed to 
+.BR putback "(1)."
 See SCM INTERACTIONS.  For more information about file
 lists, see FILE LIST.  This argument should appear last.
 .TP 10
@@ -198,8 +228,8 @@ needs to be told or to discover which files have changed in a
 given workspace.  By default,
 .B webrev
 will attempt to autodetect the
-list of changed files by first consulting
-.BR wx(1).
+list of changed files by first consulting 
+.BR wx "(1)."
 If this information is not available, webrev tries to consult the SCM (Source
 Code Manager) currently in use.  If that fails, the user must intervene by
 specifying either a file list or additional options specific to the SCM in use.
@@ -304,6 +334,13 @@ sections of code may be expanded and collapsed.  It also provides a
 other.  The default path for this script is
 /ws/onnv-gate/public/bin/wdiff but WDIFF may be set to customize this
 to use a more convenient location.
+
+.SH SEE ALSO
+.BR putback "(1),"
+.BR workspace "(1),"
+.BR hg "(1),"
+.BR svn "(1),"
+.BR which_scm "(1)"
 
 .SH ACKNOWLEDGEMENTS
 Acknowledgements to Rob Thurlow, Mike Eisler, Lin Ling,

@@ -24,7 +24,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 # Quis custodiet ipsos custodies?
 
@@ -93,12 +94,12 @@ done
 # disabling all checks of them.  The assumption is that the entries
 # marked with ISUSED are always known to be good, thus the Latin quote
 # at the top of the file.
+#
+# The exception_list is generated from whichever input files are appropriate
+# for this workspace, so checking it obviates the need to check the inputs.
+elist=""
 if [ -r $SRC/tools/findunref/exception_list ]; then
-	# If the closed source is not present, then don't validate it.
-	if [ "$CLOSED_IS_PRESENT" = no ]; then
-		excl="-e ^\./closed"
-	fi
-	validate_paths -k ISUSED -r -e '^\*' $excl -b $SRC/.. \
+	validate_paths -k ISUSED -r -e '^\*' -b $SRC/.. \
 		$SRC/tools/findunref/exception_list
 fi
 

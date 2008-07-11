@@ -23,11 +23,14 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Source drop generator.  Based on clone_source function in nightly(1).
+# Source drop generator.
 #
+
+PATH=$(dirname $(whence $0)):$PATH
+export PATH
 
 tmpdir=$(mktemp -dt sdropXXXXX)
 
@@ -47,16 +50,29 @@ fail() {
 tarfile=$CODEMGR_WS/on-src.tar
 
 cd $CODEMGR_WS
+which_scm | read SCM_TYPE junk || exit 1
 
 #
-# Copy anything that's registered with SCCS, except for deleted files,
+# Copy anything that's registered with source control, except for deleted files,
 # into a temp directory.  Then tar that up.
 #
-
-find usr/src -name 's\.*' -a -type f -print | \
-    sed -e 's,SCCS\/s.,,' | \
-    grep -v '/\.del-*' | \
-    cpio -pd $tmpdir
+case "$SCM_TYPE" in
+mercurial)
+	hg locate -X deleted_files/ | cpio -pd $tmpdir
+	;;
+teamware)
+	find usr/src -name 's\.*' -a -type f -print | \
+    	sed -e 's,SCCS\/s.,,' | \
+    	grep -v '/\.del-*' | \
+    	cpio -pd $tmpdir
+	;;
+unknown)
+	fail "Unknown type of SCM in use."
+	;;
+*)
+	fail "Unsupported SCM type: $SCM_TYPE"
+	;;
+esac
 [ $? -eq 0 ] || fail "Couldn't populate temp directory $tmpdir."
 
 cp README.opensolaris $tmpdir || fail "Couldn't copy README.opensolaris."

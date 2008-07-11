@@ -23,7 +23,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # jstyle - check for some common stylistic errors.
@@ -49,7 +49,7 @@ my %opts;
 # anymore.
 if (!getopts("chpstvC", \%opts)) {
 	print $usage;
-	exit 1;
+	exit 2;
 }
 
 my $check_continuation = $opts{'c'};
@@ -60,6 +60,7 @@ my $verbose = $opts{'v'};
 my $ignore_hdr_comment = $opts{'C'};
 
 my ($filename, $line, $prev);
+my $err_stat = 0;		# Exit status
 
 my $fmt;
 
@@ -94,9 +95,11 @@ if ($#ARGV >= 0) {
 } else {
 	&jstyle("<stdin>");
 }
+exit $err_stat;
 
 sub err($) {
 	printf $fmt, $filename, $., $_[0], $line;
+	$err_stat = 1;
 }
 
 sub jstyle($) {

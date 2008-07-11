@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1993 by Sun Microsystems, Inc.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
@@ -34,22 +34,36 @@ do
 	if [ ! -f $dest ] ; then
 		cp $src $dest
 	else
+		# This updates the header information.  Note that there's a
+		# long-standing bug that was introduced by the fix for CR
+		# 1094626.  All systems that have been upgraded at least once
+		# since 1993 are missing the "nobody" entry.  There's no good
+		# way to know, though, whether a missing entry is due to that
+		# bug or due to intentional configuration, so we don't
+		# correct it here.  We just don't make it worse.
 		#
-		# determine whether existing etc/system file is based on
-		# the same one being installed.  If so, no need to update it.
-		#
-		newrev=`sed -n 's/^.*\(@(#)publickey.*\)\".*/\1/p' $src`
-		oldrev=`sed -n 's/^.*\(@(#)publickey.*\)\".*/\1/p' $dest`
-		if [ "$oldrev" != "$newrev" ] ; then
-			grep '^[ 	]*#' $src > /tmp/newcomment.$$ \
-			   2>/dev/null
-			sed '1,/# a new one/d' $dest > /tmp/oldcontent.$$ \
-			   2>/dev/null
-			cat /tmp/newcomment.$$ /tmp/oldcontent.$$ > $dest
-			rm -f /tmp/newcomment.$$ /tmp/oldcontent.$$
-		fi
+		# From the source file, take everything before the "nobody"
+		# line.  If there's no "nobody" line, take the whole thing.
+		# From the destination, take everything after the initial
+		# comment block.  The "netname" comment is the end of the
+		# traditional comment block, so start after there if present
+		# (keeping the user's added comments, if any), or with the
+		# first non-comment line.
+		tmpfile=/tmp/policyconf.$$
+		(
+			cat $src
+			echo SWITCH
+			cat $dest
+		) | nawk '
+			/^nobody / && state == 0 { state=1 }
+			/^SWITCH$/ { state=2; next }
+			/^[^#]/ && state == 2 { state=3 }
+			/^# netname	/ && state == 2 { state=3; next }
+			state == 0 || state == 3 { print $0 }
+		' > $tmpfile
+		cmp -s $tmpfile $dest || cp $tmpfile $dest
+		rm -f $tmpfile
 	fi
 done
 
 exit 0
-

@@ -324,6 +324,16 @@ if "${flags.s.o}" ; then
 	SRC="${OPEN_SRCDIR}/usr/src"
 fi
  
+#
+# Keep track of this now, before we manipulate $PATH
+#
+WHICH_SCM=$(dirname $(whence $0))/which_scm
+if [[ ! -x $WHICH_SCM ]]; then
+	WHICH_SCM=which_scm
+fi
+$WHICH_SCM | read SCM_TYPE junk
+
+
 # 	Set PATH for a build
 PATH="/opt/onbld/bin:/opt/onbld/bin/${MACH}:/opt/SUNWspro/bin:/usr/ccs/bin:/usr/bin:/usr/sbin:/usr/ucb:/usr/etc:/usr/openwin/bin:/usr/sfw/bin:/opt/sfw/bin:."
 if [[ "${SUNWSPRO}" != "" ]]; then 
@@ -416,7 +426,8 @@ export \
         ENVCPPFLAGS3 \
 	ENVCPPFLAGS4 \
         MAKEFLAGS \
-        PARENT_ROOT
+        PARENT_ROOT \
+	SCM_TYPE
 
 printf 'RELEASE      is %s\n'   "$RELEASE"
 printf 'VERSION      is %s\n'   "$VERSION"

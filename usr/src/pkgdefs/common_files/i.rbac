@@ -24,7 +24,7 @@
 #
 # i.rbac
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # class action script for "rbac" class files
@@ -65,17 +65,6 @@ sort_cmd=sort
 #
 dbmerge() {
 #
-# If the new file has an ident string, remove the ident string from the old
-# file.
-#
-	newident=`${egrep_cmd} '^#[pragma 	]*ident' $3 \
-	    2>/dev/null`
-	if [ -n "${newident}" ]; then
-		${egrep_cmd} -v '^#[pragma 	]*ident' $2 > $4.old 2>/dev/null
-	else
-		$cp_cmd $2 $4.old
-	fi
-#
 # If the new file has a Sun copyright, remove the Sun copyright from the old
 # file.
 #
@@ -85,8 +74,9 @@ dbmerge() {
 		$sed_cmd -e '/^# Copyright.*Sun Microsystems, Inc./d' \
 		    -e '/^# All rights reserved./d' \
 		    -e '/^# Use is subject to license terms./d' \
-		    $4.old > $4.$$ 2>/dev/null
-		$mv_cmd $4.$$ $4.old
+		    $2 > $4.old
+	else
+		$cp_cmd $2 $4.old
 	fi
 #
 # If the new file has the CDDL, remove it from the old file.

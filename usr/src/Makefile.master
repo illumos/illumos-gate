@@ -177,6 +177,7 @@ CTFFINDMOD=	$(ONBLD_TOOLS)/bin/ctffindmod
 XREF=		$(ONBLD_TOOLS)/bin/xref
 FIND=		/usr/bin/find
 PERL=		/usr/bin/perl
+PYTHON=		/usr/bin/python
 SORT=		/usr/bin/sort
 TOUCH=		/usr/bin/touch
 WC=		/usr/bin/wc
@@ -209,11 +210,11 @@ $(PATCH_BUILD)PMTMO_FILE=$(SRC)/patch_makeup_table.mo
 # Note that the X and C checks are not used at this time and may need
 # modification when they are actually used.
 #
-CSTYLE=		cstyle
+CSTYLE=		$(ONBLD_TOOLS)/bin/cstyle
 CSTYLE_TAIL=
-HDRCHK=		hdrchk
+HDRCHK=		$(ONBLD_TOOLS)/bin/hdrchk
 HDRCHK_TAIL=
-JSTYLE=		jstyle
+JSTYLE=		$(ONBLD_TOOLS)/bin/jstyle
 
 DOT_H_CHECK=	\
 	@$(ECHO) "checking $<"; $(CSTYLE) $< $(CSTYLE_TAIL); \
@@ -240,6 +241,14 @@ INS.rename=	$(INS.file); $(MV) $(@D)/$(<F) $@
 # install a link
 INSLINKTARGET=	$<
 INS.link=	$(RM) $@; $(LN) $(INSLINKTARGET) $@
+#
+# Python bakes the mtime of the .py file into the compiled .pyc and
+# rebuilds if the baked-in mtime != the mtime of the source file
+# (rather than only if it's less than), thus when installing python
+# files we must make certain to not adjust the mtime of the source
+# (.py) file.
+#
+INS.pyfile=	$(INS.file); $(TOUCH) -r $< $@
 
 # MACH must be set in the shell environment per uname -p on the build host
 # More specific architecture variables should be set in lower makefiles.
@@ -998,7 +1007,7 @@ PKGARCHIVE=$(SRC)/../../packages/$(MACH)/nightly$(PKGARCHIVESUFFIX)
 # Note that Python i18n isn't supported by this rule set yet,
 # as it requires a special build tool (pygettext.py).
 #
-.SUFFIXES: .pl .pm .py
+.SUFFIXES: .pl .pm .py .pyc
 
 .pl:
 	$(RM) $@;
@@ -1007,6 +1016,11 @@ PKGARCHIVE=$(SRC)/../../packages/$(MACH)/nightly$(PKGARCHIVESUFFIX)
 
 .py:
 	$(RM) $@; $(CAT) $< > $@; $(CHMOD) +x $@
+
+.py.pyc:
+	$(RM) $@
+	$(PYTHON) -mpy_compile $<
+	@[ $(<)c = $@ ] || $(MV) $(<)c $@
 
 .pl.po .pm.po:
 	$(XGETTEXT) $(XGETFLAGS) -d $(<F) $< ;

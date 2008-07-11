@@ -19,11 +19,12 @@
 #
 # CDDL HEADER END
 #
-#
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+
 #
 # This script takes a file list and a workspace and builds a set of html files
 # suitable for doing a code review of source changes via a web page.
@@ -114,6 +115,10 @@ span.new {
     color: blue;
     font-weight: bold;
 }
+span.chmod {
+    font-size: 0.7em;
+    color: #db7800;
+}
 a.print { font-size: x-small; }
 a:hover { background-color: #ffcc99; }
 </style>
@@ -191,7 +196,7 @@ sac2url()
 # Deleted lines of text are replaced by a horizontal rule. Some
 # identical lines are retained before and after the changed lines to
 # provide some context.  The number of these lines is controlled by the
-# variable C in the nawk script below.
+# variable C in the $AWK script below.
 #
 # The script detects changed lines as any line that has a "<span class="
 # string embedded (unchanged lines have no particular class and are not
@@ -200,9 +205,9 @@ sac2url()
 #
 strip_unchanged()
 {
-	nawk '
+	$AWK '
 	BEGIN	{ C = c = 20 }
-	NF == 0 || /span class=/ {
+	NF == 0 || /<span class="/ {
 		if (c > C) {
 			c -= C
 			inx = 0
@@ -304,7 +309,7 @@ sdiff_to_html()
 	#
 	#  Now we have the diffs, generate the HTML for the old file.
 	#
-	nawk '
+	$AWK '
 	BEGIN	{
 		printf "function sp(n) {for (i=0;i<n;i++)printf \"\\n\"}\n"
 		printf "function removed() "
@@ -386,7 +391,7 @@ sdiff_to_html()
 	#
 	#  Now generate the HTML for the new file
 	#
-	nawk '
+	$AWK '
 	BEGIN	{
 		printf "function sp(n) {for (i=0;i<n;i++)printf \"\\n\"}\n"
 		printf "function new() "
@@ -466,17 +471,17 @@ sdiff_to_html()
 	' /tmp/$$.diffs > /tmp/$$.file2
 
 	#
-	# Post-process the HTML files by running them back through nawk
+	# Post-process the HTML files by running them back through $AWK
 	#
-	html_quote < $1 | nawk -f /tmp/$$.file1 > /tmp/$$.file1.html
+	html_quote < $1 | $AWK -f /tmp/$$.file1 > /tmp/$$.file1.html
 
-	html_quote < $2 | nawk -f /tmp/$$.file2 > /tmp/$$.file2.html
+	html_quote < $2 | $AWK -f /tmp/$$.file2 > /tmp/$$.file2.html
 
 	#
 	# Now combine into a valid HTML file and side-by-side into a table
 	#
 	print "$HTML<head>$STDHEAD"
-	print "<title>$WNAME Sdiff $TPATH </title>"
+	print "<title>$WNAME Sdiff $TPATH/$TNAME</title>"
 	print "</head><body id=\"SUNWwebrev\">"
         print "<a class=\"print\" href=\"javascript:print()\">Print this page</a>"
 	print "<pre>$COMMENT</pre>\n"
@@ -646,7 +651,7 @@ EOF
 #
 function insert_anchors
 {
-	nawk '
+	$AWK '
 	function ia() {
 		printf "<a name=\"%d\" id=\"anc%d\"></a>", anc, anc++;
 	}
@@ -1018,7 +1023,7 @@ diff_to_html()
         <pre>
 	EOF
 
-	html_quote | nawk '
+	html_quote | $AWK '
 	/^--- new/	{ next }
 	/^\+\+\+ new/	{ next }
 	/^--- old/	{ next }
@@ -1054,15 +1059,15 @@ source_to_html()
 	TNAME=$2
 
 	print "$HTML<head>$STDHEAD"
-	print "<title>$WHICH $TNAME</title>"
+	print "<title>$WNAME $WHICH $TNAME</title>"
 	print "<body id=\"SUNWwebrev\">"
 	print "<pre>"
-	html_quote | nawk '{line += 1 ; printf "%4d %s\n", line, $0 }'
+	html_quote | $AWK '{line += 1 ; printf "%4d %s\n", line, $0 }'
 	print "</pre></body></html>"
 }
 
 #
-# teamwarecomments {text|html} parent-file child-file
+# comments_from_teamware {text|html} parent-file child-file
 #
 # Find the first delta in the child that's not in the parent.  Get the
 # newest delta from the parent, get all deltas from the child starting
@@ -1077,13 +1082,17 @@ comments_from_teamware()
 	pfile=$PWS/$2
 	cfile=$CWS/$3
 
+	if [[ ! -f $PWS/${2%/*}/SCCS/s.${2##*/} && -n $RWS ]]; then
+		pfile=$RWS/$2
+	fi
+
 	if [[ -f $pfile ]]; then
-		psid=$(sccs prs -d:I: $pfile 2>/dev/null)
+		psid=$($SCCS prs -d:I: $pfile 2>/dev/null)
 	else
 		psid=1.1
 	fi
 
-	set -A sids $(sccs prs -l -r$psid -d:I: $cfile 2>/dev/null)
+	set -A sids $($SCCS prs -l -r$psid -d:I: $cfile 2>/dev/null)
 	N=${#sids[@]}
 
 	nawkprg='
@@ -1096,30 +1105,32 @@ comments_from_teamware()
 		sid1=${sids[$((N-2))]}	# Gets 2nd to last sid
 
 		if [[ $fmt == "text" ]]; then
-			sccs prs -l -r$sid1 $cfile  2>/dev/null | \
-			    nawk "$nawkprg"
+			$SCCS prs -l -r$sid1 $cfile  2>/dev/null | \
+			    $AWK "$nawkprg"
 			return
 		fi
 
-		sccs prs -l -r$sid1 $cfile  2>/dev/null | \
-		    html_quote | bug2url | sac2url | nawk "$nawkprg"
+		$SCCS prs -l -r$sid1 $cfile  2>/dev/null | \
+		    html_quote | bug2url | sac2url | $AWK "$nawkprg"
 	fi
 }
 
 #
-# wxcomments {text|html} filepath
+# comments_from_wx {text|html} filepath
 #
-# Given the pathname of a file, find its location in a "wx" active file
-# list and print the following sccs comment.  Output is either text or
-# HTML; if the latter, embedded bugids (sequence of 5 or more digits) are
-# turned into URLs.
+# Given the pathname of a file, find its location in a "wx" active
+# file list and print the following comment.  Output is either text or
+# HTML; if the latter, embedded bugids (sequence of 5 or more digits)
+# are turned into URLs.
+#
+# This is also used with Mercurial and the file list provided by hg-active.
 #
 comments_from_wx()
 {
 	typeset fmt=$1
 	typeset p=$2
 
-	comm=`nawk '
+	comm=`$AWK '
 	$1 == "'$p'" {
 		do getline ; while (NF > 0)
 		getline
@@ -1127,12 +1138,17 @@ comments_from_wx()
 		exit
 	}' < $wxfile`
 
+	if [[ -z $comm ]]; then
+		comm="*** NO COMMENTS ***"
+	fi
+
 	if [[ $fmt == "text" ]]; then
-		print "$comm"
+		print -- "$comm"
 		return
 	fi
 
-	print "$comm" | html_quote | bug2url | sac2url
+	print -- "$comm" | html_quote | bug2url | sac2url
+
 }
 
 #
@@ -1146,6 +1162,10 @@ getcomments()
 	typeset p=$2
 	typeset pp=$3
 
+	#
+	# Mercurial support uses a file list in wx format, so this
+	# will be used there, too
+	#
 	if [[ -n $wxfile ]]; then
 		comments_from_wx $fmt $p
 	else
@@ -1185,7 +1205,7 @@ function difflines
 	integer tot mod del ins unc err
 	typeset filename
 
-	diff -e $1 $2 | eval $( nawk '
+	eval $( diff -e $1 $2 | $AWK '
 	# Change range of lines: N,Nc
 	/^[0-9]*,[0-9]*c$/ {
 		n=split(substr($1,1,length($1)-1), counts, ",");
@@ -1275,7 +1295,7 @@ function difflines
 		    (c+d+a), c, d, a, error);
 	}' )
 
-	# End of nawk, Check to see if any trouble occurred.
+	# End of $AWK, Check to see if any trouble occurred.
 	if (( $? > 0 || err > 0 )); then
 		print "Unexpected Error occurred reading" \
 		    "\`diff -e $1 $2\`: \$?=$?, err=" $err
@@ -1288,7 +1308,7 @@ function difflines
 	(( TDEL += del ))
 	(( TINS += ins ))
 	# Calculate unchanged lines
-	wc -l $1 | read unc filename
+	unc=`wc -l < $1`
 	if (( unc > 0 )); then
 		(( unc -= del + mod ))
 		(( TUNC += unc ))
@@ -1319,7 +1339,7 @@ function flist_from_wx
 		wxfile=$argfile
 	fi
 
-	nawk '{ c = 1; print;
+	$AWK '{ c = 1; print;
 	  while (getline) {
 		if (NF == 0) { c = -c; continue }
 		if (c > 0) print
@@ -1340,7 +1360,7 @@ function flist_from_wx
 #
 function flist_from_teamware
 {
-	if [[ -n $codemgr_parent ]]; then
+	if [[ -n $codemgr_parent && -z $parent_webrev ]]; then
 		if [[ ! -d $codemgr_parent/Codemgr_wsdata ]]; then
 			print -u2 "parent $codemgr_parent doesn't look like a" \
 			    "valid teamware workspace"
@@ -1352,7 +1372,7 @@ function flist_from_teamware
 	print " File list from: 'putback -n $parent_args $*' ... \c"
 
 	putback -n $parent_args $* 2>&1 |
-	    nawk '
+	    $AWK '
 		/^update:|^create:/	{print $2}
 		/^Parent workspace:/	{printf("CODEMGR_PARENT=%s\n",$3)}
 		/^Child workspace:/	{printf("CODEMGR_WS=%s\n",$3)}
@@ -1367,6 +1387,59 @@ function flist_from_teamware
 	print " Done."
 }
 
+#
+# Call hg-active to get the active list output in the wx active list format
+#
+function hg_active_wxfile
+{
+	typeset child=$1
+	typeset parent=$2
+
+	TMPFLIST=/tmp/$$.active
+	$HG_ACTIVE -w $child -p $parent > $TMPFLIST
+	wxfile=$TMPFLIST
+}
+
+#
+# flist_from_mercurial
+# Call hg-active to get a wx-style active list, and hand it off to
+# flist_from_wx
+#
+function flist_from_mercurial 
+{
+	typeset child=$1
+	typeset parent=$2
+
+	print " File list from: hg-active -p $parent ...\c"
+
+	if [[ ! -x $HG_ACTIVE ]]; then
+		print		# Blank line for the \c above
+		print -u2 "Error: hg-active tool not found.  Exiting"
+		exit 1
+	fi
+	hg_active_wxfile $child $parent
+	
+	# flist_from_wx prints the Done, so we don't have to.
+	flist_from_wx $TMPFLIST
+}
+
+#
+# flist_from_subversion
+#
+# Generate the file list by extracting file names from svn status.
+#
+function flist_from_subversion
+{
+	CWS=$1
+	OLDPWD=$2
+
+	cd $CWS
+	print -u2 " File list from: svn status ... \c"
+	svn status | $AWK '/^[ACDMR]/ { print $NF }' > $FLIST
+	print -u2 " Done."
+	cd $OLDPWD
+}
+
 function env_from_flist
 {
 	[[ -r $FLIST ]] || return
@@ -1378,42 +1451,17 @@ function env_from_flist
 	#
 	eval `sed -e "s/#.*$//" $FLIST | grep = `
 
-	[[ -z $codemgr_ws && -n $CODEMGR_WS ]] && codemgr_ws=$CODEMGR_WS
+	if [[ -z $codemgr_ws && -n $CODEMGR_WS ]]; then
+		codemgr_ws=$CODEMGR_WS
+		export CODEMGR_WS
+	fi
 
 	#
 	# Check to see if CODEMGR_PARENT is set in the flist file.
 	#
-	[[ -z $codemgr_parent && -n $CODEMGR_PARENT ]] && \
-	    codemgr_parent=$CODEMGR_PARENT
-}
-
-#
-# detect_scm
-#
-# We dynamically test the SCM type; this allows future extensions to
-# new SCM types
-#
-function detect_scm
-{
-	#
-	# If CODEMGR_WS is specified in the flist file, we assume teamware.
-	#
-	if [[ -r $FLIST ]]; then
-		egrep '^CODEMGR_WS=' $FLIST > /dev/null 2>&1
-		if [[ $? -eq 0 ]]; then
-			print "teamware"
-			return
-		fi
-	fi
-
-	#
-	# The presence of $CODEMGR_WS and a Codemgr_wsdata directory
-	# is our clue that this is a teamware workspace.
-	#
-	if [[ -n $CODEMGR_WS && -d "$CODEMGR_WS/Codemgr_wsdata" ]]; then
-		print "teamware"
-	else
-		print "unknown"
+	if [[ -z $codemgr_parent && -n $CODEMGR_PARENT ]]; then
+		codemgr_parent=$CODEMGR_PARENT
+		export CODEMGR_PARENT
 	fi
 }
 
@@ -1426,13 +1474,248 @@ function look_for_prog
 	ppath=$PATH
 	ppath=$ppath:/usr/sfw/bin:/usr/bin:/usr/sbin
 	ppath=$ppath:/opt/teamware/bin:/opt/onbld/bin
-	ppath=$ppath:/opt/onbld/bin/`/usr/bin/uname -p`
+	ppath=$ppath:/opt/onbld/bin/`uname -p`
 
 	PATH=$ppath prog=`whence $progname`
 	if [[ -n $prog ]]; then
 		print $prog
 	fi
 }
+
+function get_file_mode
+{
+	$PERL -e '
+		if (@stat = stat($ARGV[0])) {
+			$mode = $stat[2] & 0777;
+			printf "%03o\n", $mode;
+			exit 0;
+		} else {
+			exit 1;
+		}
+	    ' $1
+}
+
+function build_old_new_teamware
+{
+	typeset olddir="$1"
+	typeset newdir="$2"
+
+	# If the child's version doesn't exist then
+	# get a readonly copy.
+
+	if [[ ! -f $CWS/$DIR/$F && -f $CWS/$DIR/SCCS/s.$F ]]; then
+		$SCCS get -s -p $CWS/$DIR/$F > $CWS/$DIR/$F
+	fi
+
+	# The following two sections propagate file permissions the
+	# same way SCCS does.  If the file is already under version
+	# control, always use permissions from the SCCS/s.file.  If
+	# the file is not under SCCS control, use permissions from the
+	# working copy.  In all cases, the file copied to the webrev
+	# is set to read only, and group/other permissions are set to
+	# match those of the file owner.  This way, even if the file
+	# is currently checked out, the webrev will display the final
+	# permissions that would result after check in.
+
+	#
+	# Snag new version of file.
+	#
+	rm -f $newdir/$DIR/$F
+	cp $CWS/$DIR/$F $newdir/$DIR/$F
+	if [[ -f $CWS/$DIR/SCCS/s.$F ]]; then
+		chmod `get_file_mode $CWS/$DIR/SCCS/s.$F` \
+		    $newdir/$DIR/$F
+	fi
+	chmod u-w,go=u $newdir/$DIR/$F
+
+	#
+	# Get the parent's version of the file. First see whether the
+	# child's version is checked out and get the parent's version
+	# with keywords expanded or unexpanded as appropriate.
+	#
+	if [[ -f $PWS/$PDIR/$PF && ! -f $PWS/$PDIR/SCCS/s.$PF && \
+	    ! -f $PWS/$PDIR/SCCS/p.$PF ]]; then
+		# Parent is not a real workspace, but just a raw
+		# directory tree - use the file that's there as
+		# the old file.
+
+		rm -f $olddir/$PDIR/$PF
+		cp $PWS/$PDIR/$PF $olddir/$PDIR/$PF
+	else
+		if [[ -f $PWS/$PDIR/SCCS/s.$PF ]]; then
+			real_parent=$PWS
+		else
+			real_parent=$RWS
+		fi
+
+		rm -f $olddir/$PDIR/$PF
+
+		if [[ -f $real_parent/$PDIR/$PF ]]; then
+			if [ -f $CWS/$DIR/SCCS/p.$F ]; then
+				$SCCS get -s -p -k $real_parent/$PDIR/$PF > \
+				    $olddir/$PDIR/$PF
+			else
+				$SCCS get -s -p    $real_parent/$PDIR/$PF > \
+				    $olddir/$PDIR/$PF
+			fi
+			chmod `get_file_mode $real_parent/$PDIR/SCCS/s.$PF` \
+			    $olddir/$PDIR/$PF
+		fi
+	fi
+	if [[ -f $olddir/$PDIR/$PF ]]; then
+		chmod u-w,go=u $olddir/$PDIR/$PF
+	fi
+}
+
+function build_old_new_mercurial
+{
+	typeset olddir="$1"
+	typeset newdir="$2"
+	typeset old_mode=
+	typeset new_mode=
+	typeset file
+
+	#
+	# Get old file mode, from the parent revision manifest entry.
+	# Mercurial only stores a "file is executable" flag, but the
+	# manifest will display an octal mode "644" or "755".
+	#
+	if [[ "$PDIR" == "." ]]; then
+		file="$PF"
+	else
+		file="$PDIR/$PF"
+	fi
+	file=`echo $file | sed 's#/#\\\/#g'`
+	# match the exact filename, and return only the permission digits
+	old_mode=`sed -n -e "/^\\(...\\) . ${file}$/s//\\1/p" \
+	    < $HG_PARENT_MANIFEST`
+
+	#
+	# Get new file mode, directly from the filesystem.
+	# Normalize the mode to match Mercurial's behavior.
+	#
+	new_mode=`get_file_mode $CWS/$DIR/$F`
+	if [[ -n "$new_mode" ]]; then
+		if [[ "$new_mode" = *[1357]* ]]; then
+			new_mode=755
+		else
+			new_mode=644
+		fi
+	fi
+
+	#
+	# new version of the file.
+	#
+	rm -rf $newdir/$DIR/$F
+	if [[ -e $CWS/$DIR/$F ]]; then
+		cp $CWS/$DIR/$F $newdir/$DIR/$F
+		if [[ -n $new_mode ]]; then
+			chmod $new_mode $newdir/$DIR/$F
+		else
+			# should never happen
+			print -u2 "ERROR: set mode of $newdir/$DIR/$F"
+		fi
+	fi
+
+	#
+	# parent's version of the file
+	#
+	# Note that we get this from the last version common to both
+	# ourselves and the parent.  References are via $CWS since we have no
+	# guarantee that the parent workspace is reachable via the filesystem.
+	#
+	if [[ -n $parent_webrev && -e $PWS/$PDIR/$PF ]]; then
+		cp $PWS/$PDIR/$PF $olddir/$PDIR/$PF
+	elif [[ -n $HG_PARENT ]]; then
+		hg cat -R $CWS -r $HG_PARENT $CWS/$PDIR/$PF > \
+		    $olddir/$PDIR/$PF 2>/dev/null
+
+		if [ $? -ne 0 ]; then
+			rm -f $olddir/$PDIR/$PF
+		else
+			if [[ -n $old_mode ]]; then
+				chmod $old_mode $olddir/$PDIR/$PF
+			else
+				# should never happen
+				print -u2 "ERROR: set mode of $olddir/$PDIR/$PF"
+			fi
+		fi
+	fi
+}
+
+function build_old_new_subversion
+{
+	typeset olddir="$1"
+	typeset newdir="$2"
+
+	# Snag new version of file.
+	rm -f $newdir/$DIR/$F
+	[[ -e $CWS/$DIR/$F ]] && cp $CWS/$DIR/$F $newdir/$DIR/$F
+
+	if [[ -n $PWS && -e $PWS/$PDIR/$PF ]]; then
+		cp $PWS/$PDIR/$PF $olddir/$PDIR/$PF
+	else
+		# Get the parent's version of the file.
+		svn status $CWS/$DIR/$F | read stat file
+		if [[ $stat != "A" ]]; then
+			svn cat -r BASE $CWS/$DIR/$F > $olddir/$PDIR/$PF
+		fi
+	fi
+}
+
+function build_old_new_unknown
+{
+	typeset olddir="$1"
+	typeset newdir="$2"
+
+	#
+	# Snag new version of file.
+	#
+	rm -f $newdir/$DIR/$F
+	[[ -e $CWS/$DIR/$F ]] && cp $CWS/$DIR/$F $newdir/$DIR/$F
+
+	#
+	# Snag the parent's version of the file.
+	# 
+	if [[ -f $PWS/$PDIR/$PF ]]; then
+		rm -f $olddir/$PDIR/$PF
+		cp $PWS/$PDIR/$PF $olddir/$PDIR/$PF
+	fi
+}
+
+function build_old_new
+{
+	typeset WDIR=$1
+	typeset PWS=$2
+	typeset PDIR=$3
+	typeset PF=$4
+	typeset CWS=$5
+	typeset DIR=$6
+	typeset F=$7
+
+	typeset olddir="$WDIR/raw_files/old"
+	typeset newdir="$WDIR/raw_files/new"
+
+	mkdir -p $olddir/$PDIR
+	mkdir -p $newdir/$DIR
+
+	if [[ $SCM_MODE == "teamware" ]]; then
+		build_old_new_teamware "$olddir" "$newdir"
+	elif [[ $SCM_MODE == "mercurial" ]]; then
+		build_old_new_mercurial "$olddir" "$newdir"
+	elif [[ $SCM_MODE == "subversion" ]]; then
+		build_old_new_subversion "$olddir" "$newdir"
+	elif [[ $SCM_MODE == "unknown" ]]; then
+		build_old_new_unknown "$olddir" "$newdir"
+	fi
+
+	if [[ ! -f $olddir/$PDIR/$PF && ! -f $newdir/$DIR/$F ]]; then
+		print "*** Error: file not in parent or child"
+		return 1
+	fi
+	return 0
+}
+
 
 #
 # Usage message.
@@ -1442,7 +1725,6 @@ function usage
 	print 'Usage:\twebrev [common-options]
 	webrev [common-options] ( <file> | - )
 	webrev [common-options] -w <wx file>
-	webrev [common-options] -l [arguments to 'putback']
 
 Options:
 	-O: Print bugids/arc cases suitable for OpenSolaris.
@@ -1456,9 +1738,12 @@ Environment:
 	WEBREV_BUGURL: Control the URL prefix for bugids.
 	WEBREV_SACURL: Control the URL prefix for ARC cases.
 
+SCM Specific Options:
+	TeamWare: webrev [common-options] -l [arguments to 'putback']
+
 SCM Environment:
-	Teamware: CODEMGR_WS: Workspace location.
-	Teamware: CODEMGR_PARENT: Parent workspace location.
+	CODEMGR_WS: Workspace location.
+	CODEMGR_PARENT: Parent workspace location.
 '
 
 	exit 2
@@ -1474,14 +1759,28 @@ trap "rm -f /tmp/$$.* ; exit" 0 1 2 3 15
 
 set +o noclobber
 
+PATH=$(dirname $(whence $0)):$PATH
+
 [[ -z $WDIFF ]] && WDIFF=`look_for_prog wdiff`
 [[ -z $WX ]] && WX=`look_for_prog wx`
+[[ -z $HG_ACTIVE ]] && HG_ACTIVE=`look_for_prog hg-active`
+[[ -z $WHICH_SCM ]] && WHICH_SCM=`look_for_prog which_scm`
 [[ -z $CODEREVIEW ]] && CODEREVIEW=`look_for_prog codereview`
 [[ -z $PS2PDF ]] && PS2PDF=`look_for_prog ps2pdf`
 [[ -z $PERL ]] && PERL=`look_for_prog perl`
+[[ -z $SCCS ]] && SCCS=`look_for_prog sccs`
+[[ -z $AWK ]] && AWK=`look_for_prog nawk`
+[[ -z $AWK ]] && AWK=`look_for_prog gawk`
+[[ -z $AWK ]] && AWK=`look_for_prog awk`
+
 
 if [[ ! -x $PERL ]]; then
 	print -u2 "Error: No perl interpreter found.  Exiting."
+	exit 1
+fi
+
+if [[ ! -x $WHICH_SCM ]]; then
+	print -u2 "Error: Could not find which_scm.  Exiting."
 	exit 1
 fi
 
@@ -1575,13 +1874,24 @@ fi
 # Before we go on to further consider -l and -w, work out which SCM we think
 # is in use.
 #
-SCM_MODE=`detect_scm $FLIST`
-if [[ $SCM_MODE == "unknown" ]]; then
-	print -u2 "Unable to determine SCM type currently in use."
-	print -u2 "For teamware: webrev looks for \$CODEMGR_WS either in"
-	print -u2 "              the environment or in the file list."
-	exit 1
-fi
+$WHICH_SCM | read SCM_MODE junk || exit 1
+case "$SCM_MODE" in
+teamware|mercurial|subversion)
+	;;
+unknown)
+	if [[ $flist_mode == "auto" ]]; then
+		print -u2 "Unable to determine SCM in use and file list not specified"
+		print -u2 "See which_scm(1) for SCM detection information."
+		exit 1
+	fi
+	;;
+*)
+	if [[ $flist_mode == "auto" ]]; then
+		print -u2 "Unsupported SCM in use ($SCM_MODE) and file list not specified"
+		exit 1
+	fi
+	;;
+esac
 
 print -u2 "   SCM detected: $SCM_MODE"
 
@@ -1592,10 +1902,14 @@ if [[ -n $lflag ]]; then
 	# putback -n.
 	#
 	shift $(($OPTIND - 1))
-	flist_from_teamware "$*"
+	if [[ $SCM_MODE == "teamware" ]]; then
+		flist_from_teamware "$*"
+	else
+		print -u2 -- "Error: -l option only applies to TeamWare"
+		exit 1
+	fi
 	flist_done=1
 	shift $#
-
 elif [[ -n $wflag ]]; then
 	#
 	# If the -w is given then assume the file list is in Bonwick's "wx"
@@ -1613,6 +1927,11 @@ elif [[ -n $wflag ]]; then
 
 	[[ -z $wxfile ]] && print -u2 "wx file not specified, and could not " \
 	    "be auto-detected (check \$CODEMGR_WS)" && exit 1
+
+	if [[ ! -r $wxfile ]]; then
+		print -u2 "$wxfile: no such file or not readable"
+		usage
+	fi
 
 	print -u2 " File list from: wx 'active' file '$wxfile' ... \c"
 	flist_from_wx $wxfile
@@ -1698,15 +2017,10 @@ if [[ $SCM_MODE == "teamware" ]]; then
 	fi
 
 	#
-	# Observe true directory name of CODEMGR_WS, as used later in
-	# webrev title.
-	#
-	codemgr_ws=$(cd $codemgr_ws;print $PWD)
-
-	#
 	# (4) If we still don't have a value for codemgr_parent, get it
 	# from workspace.
 	#
+	[[ -z $codemgr_ws ]] && codemgr_ws=`workspace name`
 	[[ -z $codemgr_parent ]] && codemgr_parent=`workspace parent`
 	if [[ ! -d $codemgr_parent ]]; then
 		print -u2 "$CODEMGR_PARENT: no such parent workspace"
@@ -1714,11 +2028,151 @@ if [[ $SCM_MODE == "teamware" ]]; then
 	fi
 
 	#
+	# Observe true directory name of CODEMGR_WS, as used later in
+	# webrev title.
+	#
+	codemgr_ws=$(cd $codemgr_ws;print $PWD)
+
+	#
 	# Reset CODEMGR_WS to make sure teamware commands are happy.
 	#
 	CODEMGR_WS=$codemgr_ws
 	CWS=$codemgr_ws
 	PWS=$codemgr_parent
+
+	[[ -n $parent_webrev ]] && RWS=$(workspace parent $CWS)
+
+elif [[ $SCM_MODE == "mercurial" ]]; then
+	[[ -z $codemgr_ws && -n $CODEMGR_WS ]] && \
+	    codemgr_ws=`hg root -R $CODEMGR_WS 2>/dev/null`
+
+	[[ -z $codemgr_ws ]] && codemgr_ws=`hg root 2>/dev/null`
+
+	#
+	# Parent can either be specified with -p
+	# Specified with CODEMGR_PARENT in the environment
+	# or taken from hg's default path.
+	#
+
+	if [[ -z $codemgr_parent && -n $CODEMGR_PARENT ]]; then
+		codemgr_parent=$CODEMGR_PARENT
+	fi
+
+	if [[ -z $codemgr_parent ]]; then
+		codemgr_parent=`hg path -R $codemgr_ws default 2>/dev/null`
+	fi
+
+	CWS_REV=`hg parent -R $codemgr_ws --template '{node|short}' 2>/dev/null`
+	CWS=$codemgr_ws
+	PWS=$codemgr_parent
+
+	# 
+	# If the parent is a webrev, we want to do some things against
+	# the natural workspace parent (file list, comments, etc)
+	#
+	if [[ -n $parent_webrev ]]; then
+		real_parent=$(hg path -R $codemgr_ws default 2>/dev/null)
+	else
+		real_parent=$PWS
+	fi
+
+	#
+	# If hg-active exists, then we run it.  In the case of no explicit
+	# flist given, we'll use it for our comments.  In the case of an
+	# explicit flist given we'll try to use it for comments for any
+	# files mentioned in the flist.
+	#
+	if [[ -z $flist_done ]]; then
+		flist_from_mercurial $CWS $real_parent
+		flist_done=1
+	fi
+
+	#
+	# If we have a file list now, pull out any variables set
+	# therein.  We do this now (rather than when we possibly use
+	# hg-active to find comments) to avoid stomping specifications
+	# in the user-specified flist.
+	# 
+	if [[ -n $flist_done ]]; then
+		env_from_flist
+	fi
+
+	#
+	# Only call hg-active if we don't have a wx formatted file already
+	#
+	if [[ -x $HG_ACTIVE && -z $wxfile ]]; then
+		print "  Comments from: hg-active -p $real_parent ...\c"
+		hg_active_wxfile $CWS $real_parent
+		print " Done."
+	fi
+	
+	#
+	# At this point we must have a wx flist either from hg-active,
+	# or in general.  Use it to try and find our parent revision,
+	# if we don't have one.
+	#
+	if [[ -z $HG_PARENT ]]; then
+		eval `sed -e "s/#.*$//" $wxfile | grep HG_PARENT=`
+	fi
+
+	#
+	# If we still don't have a parent, we must have been given a
+	# wx-style active list with no HG_PARENT specification, run
+	# hg-active and pull an HG_PARENT out of it, ignore the rest.
+	#
+	if [[ -z $HG_PARENT && -x $HG_ACTIVE ]]; then
+		$HG_ACTIVE -w $codemgr_ws -p $real_parent | \
+		    eval `sed -e "s/#.*$//" | grep HG_PARENT=`
+	elif [[ -z $HG_PARENT ]]; then
+		print -u2 "Error: Cannot discover parent revision"
+		exit 1
+	fi
+elif [[ $SCM_MODE == "subversion" ]]; then
+	if [[ -n $CODEMGR_WS && -d $CODEMGR_WS/.svn ]]; then
+		CWS=$CODEMGR_WS
+	else
+		svn info | while read line; do
+			if [[ $line == "URL: "* ]]; then
+				url=${line#URL: }
+			elif [[ $line == "Repository Root: "* ]]; then
+				repo=${line#Repository Root: }
+			fi
+		done
+
+		rel=${url#$repo} 
+		CWS=${PWD%$rel}
+	fi
+
+	#
+	# We only will have a real parent workspace in the case one
+	# was specified (be it an older webrev, or another checkout).
+	#
+	[[ -n $codemgr_parent ]] && PWS=$codemgr_parent
+
+	if [[ -z $flist_done && $flist_mode == "auto" ]]; then
+		flist_from_subversion $CWS $OLDPWD
+	fi
+else
+    if [[ $SCM_MODE == "unknown" ]]; then
+	print -u2 "    Unknown type of SCM in use"
+    else
+	print -u2 "    Unsupported SCM in use: $SCM_MODE"
+    fi
+
+    env_from_flist
+
+    if [[ -z $CODEMGR_WS ]]; then
+	print -u2 "SCM not detected/supported and CODEMGR_WS not specified"
+	exit 1
+    fi
+
+    if [[ -z $CODEMGR_PARENT ]]; then
+	print -u2 "SCM not detected/supported and CODEMGR_PARENT not specified"
+	exit 1
+    fi
+
+    CWS=$CODEMGR_WS
+    PWS=$CODEMGR_PARENT
 fi
 
 #
@@ -1767,11 +2221,21 @@ fi
 #
 # Summarize what we're going to do.
 #
-print "      Workspace: $CWS"
+if [[ -n $CWS_REV ]]; then
+	print "      Workspace: $CWS (at $CWS_REV)"
+else
+	print "      Workspace: $CWS"
+fi
 if [[ -n $parent_webrev ]]; then
 	print "Compare against: webrev at $parent_webrev"
 else
-	print "Compare against: $PWS"
+	if [[ -n $HG_PARENT ]]; then
+		hg_parent_short=`echo $HG_PARENT \
+			| sed -e 's/\([0-9a-f]\{12\}\).*/\1/'`
+		print "Compare against: $PWS (at $hg_parent_short)"
+	else
+		print "Compare against: $PWS"
+	fi
 fi
 
 [[ -n $INCLUDE_FILE ]] && print "      Including: $INCLUDE_FILE"
@@ -1816,6 +2280,38 @@ print "   Output Files:"
 #
 sed -e "s/#.*$//" -e "/=/d" -e "/^[   ]*$/d" $FLIST > /tmp/$$.flist.clean
 FLIST=/tmp/$$.flist.clean
+
+#
+# For Mercurial, create a cache of manifest entries.
+#
+if [[ $SCM_MODE == "mercurial" ]]; then
+	#
+	# Transform the FLIST into a temporary sed script that matches
+	# relevant entries in the Mercurial manifest as follows:
+	# 1) The script will be used against the parent revision manifest,
+	#    so for FLIST lines that have two filenames (a renamed file)
+	#    keep only the old name.
+	# 2) Escape all forward slashes the filename.
+	# 3) Change the filename into another sed command that matches
+	#    that file in "hg manifest -v" output:  start of line, three
+	#    octal digits for file permissions, space, a file type flag
+	#    character, space, the filename, end of line.
+	#
+	SEDFILE=/tmp/$$.manifest.sed
+	sed '
+		s#^[^ ]* ##
+		s#/#\\\/#g
+		s#^.*$#/^... . &$/p#
+	' < $FLIST > $SEDFILE
+
+	#
+	# Apply the generated script to the output of "hg manifest -v"
+	# to get the relevant subset for this webrev.
+	#
+	HG_PARENT_MANIFEST=/tmp/$$.manifest
+	hg -R $CWS manifest -v -r $HG_PARENT |
+	    sed -n -f $SEDFILE > $HG_PARENT_MANIFEST
+fi
 
 #
 # First pass through the files: generate the per-file webrev HTML-files.
@@ -1868,18 +2364,10 @@ do
 
 	COMM=`getcomments html $P $PP`
 
-	if [[ ! -d $CWS/$DIR ]]; then
-		print "  $CWS/$DIR: no such directory"
-		continue
-	fi
-
 	print "\t$P$oldname\n\t\t\c"
 
 	# Make the webrev mirror directory if necessary
 	mkdir -p $WDIR/$DIR
-
-	# cd to the directory so the names are short
-	cd $CWS/$DIR
 
 	#
 	# If we're in OpenSolaris mode, we enforce a minor policy:
@@ -1897,63 +2385,20 @@ do
 	fi
 
 	#
-	# We stash old and new files into parallel directories in /tmp
+	# We stash old and new files into parallel directories in $WDIR
 	# and do our diffs there.  This makes it possible to generate
 	# clean looking diffs which don't have absolute paths present.
 	#
-	olddir=$WDIR/raw_files/old
-	newdir=$WDIR/raw_files/new
-	mkdir -p $olddir
-	mkdir -p $newdir
-	mkdir -p $olddir/$PDIR
-	mkdir -p $newdir/$DIR
 
-	if [[ $SCM_MODE == "teamware" ]]; then
-		# If the child's version doesn't exist then
-		# get a readonly copy.
+	build_old_new "$WDIR" "$PWS" "$PDIR" "$PF" "$CWS" "$DIR" "$F" || \
+	    continue
 
-		if [[ ! -f $F && -f SCCS/s.$F ]]; then
-			sccs get -s $F
-		fi
-
-		#
-		# Snag new version of file.
-		#
-		rm -f $newdir/$DIR/$F
-		cp $F $newdir/$DIR/$F
-
-		#
-		# Get the parent's version of the file. First see whether the
-		# child's version is checked out and get the parent's version
-		# with keywords expanded or unexpanded as appropriate.
-		#
-		if [ -f "$PWS/$PDIR/SCCS/s.$PF" -o \
-		    -f "$PWS/$PDIR/SCCS/p.$PF" ]; then
-			rm -f $olddir/$PDIR/$PF
-			if [ -f "SCCS/p.$F" ]; then
-				sccs get -s -p -k $PWS/$PDIR/$PF \
-				    > $olddir/$PDIR/$PF
-			else
-				sccs get -s -p    $PWS/$PDIR/$PF \
-				    > $olddir/$PDIR/$PF
-			fi
-		else
-			if [[ -f $PWS/$PDIR/$PF ]]; then
-				# Parent is not a real workspace, but just a raw
-				# directory tree - use the file that's there as
-				# the old file.
-
-				rm -f $olddir/$DIR/$F
-				cp $PWS/$PDIR/$PF $olddir/$DIR/$F
-			fi
-		fi
-	fi
-
-	if [[ ! -f $F && ! -f $olddir/$DIR/$F ]]; then
-		print "*** Error: file not in parent or child"
-		continue
-	fi
-
+	#
+	# Keep the old PWD around, so we can safely switch back after
+	# diff generation, such that build_old_new runs in a
+	# consistent environment.
+	#
+	OWD=$PWD
 	cd $WDIR/raw_files
 	ofile=old/$PDIR/$PF
 	nfile=new/$DIR/$F
@@ -2081,8 +2526,8 @@ do
 		fi
 	fi
 
-	if [[ -f $ofile && -z $mv_but_nodiff ]]; then
-		source_to_html Old $P < $ofile > $WDIR/$DIR/$F-.html
+	if [[ -f $ofile ]]; then
+		source_to_html Old $PP < $ofile > $WDIR/$DIR/$F-.html
 		print " old\c"
 	fi
 
@@ -2090,6 +2535,8 @@ do
 		source_to_html New $P < $nfile > $WDIR/$DIR/$F.html
 		print " new\c"
 	fi
+
+	cd $OWD
 
 	print
 done
@@ -2102,7 +2549,6 @@ if [[ ! -f $WDIR/$WNAME.ps ]]; then
 elif [[ -x $CODEREVIEW && -x $PS2PDF ]]; then
 	print " Generating PDF: \c"
 	fix_postscript $WDIR/$WNAME.ps | $PS2PDF - > $WDIR/$WNAME.pdf
-	rm -f $WDIR/$WNAME.ps
 	print "Done."
 else
 	print " Generating PDF: Skipped: missing 'ps2pdf' or 'codereview'"
@@ -2139,28 +2585,49 @@ print "<h2>Code Review for $WNAME</h2>"
 print "<table>"
 
 #
-# Figure out the username and gcos name.  To maintain compatibility
-# with passwd(4), we must support '&' substitutions.
+# Get the preparer's name:
 #
-username=`id | cut -d '(' -f 2 | cut -d ')' -f 1`
-realname=`getent passwd $username | cut -d':' -f 5`
-userupper=`$PERL -e "print ucfirst $username"`
-realname=`print $realname | sed s/\&/$userupper/`
-date="on `date`"
-
-if [[ -n "$username" && -n "$realname" ]]; then
-	print "<tr><th>Prepared by:</th>"
-	print "<td>$realname ($username) $date</td></tr>"
-elif [[ -n "$username" ]]; then
-	print "<tr><th>Prepared by:</th><td>$username $date</td></tr>"
+# If the SCM detected is Mercurial, and the configuration property
+# ui.username is available, use that, but be careful to properly escape
+# angle brackets (HTML syntax characters) in the email address.
+#
+# Otherwise, use the current userid in the form "John Doe (jdoe)", but
+# to maintain compatibility with passwd(4), we must support '&' substitutions.
+#
+preparer=
+if [[ "$SCM_MODE" == mercurial ]]; then
+	preparer=`hg showconfig ui.username 2>/dev/null`
+	if [[ -n "$preparer" ]]; then
+		preparer="$(echo "$preparer" | html_quote)"
+	fi
+fi
+if [[ -z "$preparer" ]]; then
+	preparer=$(
+	    $PERL -e '
+	        ($login, $pw, $uid, $gid, $quota, $cmt, $gcos) = getpwuid($<);
+	        if ($login) {
+	            $gcos =~ s/\&/ucfirst($login)/e;
+	            printf "%s (%s)\n", $gcos, $login;
+	        } else {
+	            printf "(unknown)\n";
+	        }
+	')
 fi
 
-print "<tr><th>Workspace:</th><td>$CWS</td></tr>"
+print "<tr><th>Prepared by:</th><td>$preparer on `date`</td></tr>"
+print "<tr><th>Workspace:</th><td>$CWS"
+if [[ -n $CWS_REV ]]; then
+	print "(at $CWS_REV)"
+fi
+print "</td></tr>"
 print "<tr><th>Compare against:</th><td>"
 if [[ -n $parent_webrev ]]; then
 	print "webrev at $parent_webrev"
 else
 	print "$PWS"
+	if [[ -n $hg_parent_short ]]; then
+		print "(at $hg_parent_short)"
+	fi
 fi
 print "</td></tr>"
 print "<tr><th>Summary of changes:</th><td>"
@@ -2184,7 +2651,6 @@ fi
 print "</table>"
 print "</div>"
 
-
 #
 # Second pass through the files: generate the rest of the index file
 #
@@ -2195,11 +2661,16 @@ do
 
 	if [[ $# == 2 ]]; then
 		PP=$2
-		oldname=" <i>(was $PP)</i>"
-
+		oldname="$PP"
 	else
 		PP=$P
 		oldname=""
+	fi
+
+	mv_but_nodiff=
+	cmp $WDIR/raw_files/old/$PP $WDIR/raw_files/new/$P > /dev/null 2>&1
+	if [[ $? == 0 && -n "$oldname" ]]; then
+		mv_but_nodiff=1
 	fi
 
 	DIR=${P%/*}
@@ -2266,7 +2737,21 @@ do
 		print " ---"
 	fi
 
-	print "<b>$P</b> $oldname"
+	print "<b>$P</b>"
+
+	# For renamed files, clearly state whether or not they are modified
+	if [[ -n "$oldname" ]]; then
+		if [[ -n "$mv_but_nodiff" ]]; then
+			print "<i>(renamed only, was $oldname)</i>"
+		else
+			print "<i>(modified and renamed, was $oldname)</i>"
+		fi
+	fi
+
+	# If there's an old file, but no new file, the file was deleted
+	if [[ -f $F-.html && ! -f $F.html ]]; then
+		print " <i>(deleted)</i>"
+	fi
 
 	#
 	# Check for usr/closed and deleted_files/usr/closed
@@ -2296,6 +2781,42 @@ do
 	    cat $F.count
 	    rm $F.count
 	fi
+
+	if [[ $SCM_MODE == "teamware" ||
+	    $SCM_MODE == "mercurial" ||
+	    $SCM_MODE == "unknown" ]]; then
+
+		# Include warnings for important file mode situations:
+		# 1) New executable files
+		# 2) Permission changes of any kind
+		# 3) Existing executable files
+
+		old_mode=
+		if [[ -f $WDIR/raw_files/old/$PP ]]; then
+			old_mode=`get_file_mode $WDIR/raw_files/old/$PP`
+		fi
+
+		new_mode=
+		if [[ -f $WDIR/raw_files/new/$P ]]; then
+			new_mode=`get_file_mode $WDIR/raw_files/new/$P`
+		fi
+
+		if [[ -z "$old_mode" && "$new_mode" = *[1357]* ]]; then
+			print "<span class=\"chmod\">"
+			print "<p>new executable file: mode $new_mode</p>"
+			print "</span>"
+		elif [[ -n "$old_mode" && -n "$new_mode" &&
+		    "$old_mode" != "$new_mode" ]]; then
+			print "<span class=\"chmod\">"
+			print "<p>mode change: $old_mode to $new_mode</p>"
+			print "</span>"
+		elif [[ "$new_mode" = *[1357]* ]]; then
+			print "<span class=\"chmod\">"
+			print "<p>executable file: mode $new_mode</p>"
+			print "</span>"
+		fi
+	fi
+
 	print "</blockquote>"
 done
 

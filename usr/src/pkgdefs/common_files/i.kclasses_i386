@@ -45,7 +45,6 @@ do
 		cp /tmp/odc.$$.tmp $dest
 		rm -f /dev/odc.$$.tmp
 
-		grep '^#pragma' $src > /tmp/newident.$$ 2>/dev/null
 		sed -e '/^aha[	].*scsi/d' \
 		    -e '/^aic[	].*scsi/d' \
 		    -e '/^blogic[	].*scsi/d' \
@@ -68,15 +67,9 @@ do
 		    -e '/^pci_to_i2o[	].*i2o/d' \
 		    -e '/^i2o_scsi[	].*scsi/d' \
 		$dest > /tmp/c.$$
-		if cmp -s /tmp/c.$$ $dest  > /dev/null 2>&1
-		then
-			:
-		else
-			cat /tmp/newident.$$ > /tmp/rest.$$
-			sed '/^#pragma.*/d' /tmp/c.$$ >> /tmp/rest.$$
-			cp /tmp/rest.$$ $dest
-		fi
-		rm -f /tmp/rest.$$ /tmp/newident.$$ /tmp/c.$$
+		cmp -s /tmp/c.$$ $dest > /dev/null 2>&1 ||
+			cp /tmp/c.$$ $dest
+		rm -f /tmp/c.$$
 
 		grep '^pci[ 	].*pci' $dest > /dev/null 2>&1
 		if [ $? != 0 ] ; then

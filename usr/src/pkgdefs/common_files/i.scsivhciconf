@@ -186,20 +186,10 @@ update_scsi_vhci()
 {
 	TMPSCSIVHCI=$PREFIX.conf
 	SEDSCRIPT=$PREFIX.sed
-	NEWIDENT1=$PREFIX.ident1
-	NEWIDENT2=$PREFIX.ident2
 	FMBFILE=$PREFIX.fb
 
 	# make sed script to do most of the work of upgrading
 	make_sed_script $1 $2
-
-	# make sed script to replace old ident with new ident
-	IDENT="^#.*ident.*SMI\"$"
-	if grep "$IDENT" $1 > $NEWIDENT1 2>/dev/null; then
-		# replace / by \/
-		sed "s/\\//\\\\\\//g" $NEWIDENT1 > $NEWIDENT2 2>/dev/null
-		echo "s/$IDENT/`cat $NEWIDENT2`/" >> $SEDSCRIPT
-	fi
 
 	sed -f $SEDSCRIPT $2 > $TMPSCSIVHCI 2>/dev/null
 	retval=$?
@@ -212,7 +202,7 @@ update_scsi_vhci()
 		fi
 	fi
 
-	rm -f $NEWIDENT1 $NEWIDENT2 $SEDSCRIPT $TMPSCSIVHCI $FMBFILE
+	rm -f $SEDSCRIPT $TMPSCSIVHCI $FMBFILE
 	return $retval
 }
 

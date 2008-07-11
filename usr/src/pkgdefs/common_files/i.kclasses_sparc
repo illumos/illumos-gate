@@ -45,16 +45,13 @@ do
 		cp /tmp/odc.$$.tmp $dest
 		rm -f /dev/odc.$$.tmp
 
-		grep '^#ident[ 	]*\"@(#)driver_classes' $src \
-		    > /tmp/newident.$$ 2>/dev/null
-		sed -e '/^#ident[ 	]*\"@(#)driver_classes.*$/d' \
-		    -e '/^\"QLGC,isp\"[	]*scsi$/d' \
+		sed -e '/^\"QLGC,isp\"[	]*scsi$/d' \
 		    -e '/^\"SUNW,isp\"[	]*scsi$/d' \
 		    -e '/^ncr[	]*scsi$/d' \
 		    -e '/^vme[ 	]*vme$/d' \
 		    -e '/^pci[ 	]*pci$/d' \
 		    $dest > /tmp/rest.$$ 2>/dev/null
-		cat /tmp/newident.$$ /tmp/rest.$$ > $dest
+		cp /tmp/rest.$$ $dest
 		grep '^isp	scsi' $dest > /dev/null 2>&1
 		if [ $? != 0 ] ; then
 			echo 'isp	scsi' >> $dest
@@ -105,6 +102,6 @@ do
 		fi
 	fi
 done
-rm -f /tmp/newident.$$ /tmp/rest.$$
+rm -f /tmp/rest.$$
 
 exit 0

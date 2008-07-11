@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # @(#)cstyle 1.58 98/09/09 (from shannon)
@@ -74,7 +73,7 @@ my %opts;
 
 if (!getopts("cho:pvCP", \%opts)) {
 	print $usage;
-	exit 1;
+	exit 2;
 }
 
 my $check_continuation = $opts{'c'};
@@ -96,7 +95,7 @@ if (defined($opts{'o'})) {
 		} else {
 			print "cstyle: unrecognized construct \"$x\"\n";
 			print $usage;
-			exit 1;
+			exit 2;
 		}
 	}
 }
@@ -170,6 +169,8 @@ my $warlock_re = qr/\/\*\s*(?:
 	LOCK\ ORDER:
     )/x;
 
+my $err_stat = 0;		# exit status
+
 if ($#ARGV >= 0) {
 	foreach my $arg (@ARGV) {
 		my $fh = new IO::File $arg, "r";
@@ -183,23 +184,33 @@ if ($#ARGV >= 0) {
 } else {
 	&cstyle("<stdin>", *STDIN);
 }
+exit $err_stat;
 
 my $no_errs = 0;		# set for CSTYLED-protected lines
 
 sub err($) {
 	my ($error) = @_;
-	printf $fmt, $filename, $., $error, $line	unless ($no_errs);
+	unless ($no_errs) {
+		printf $fmt, $filename, $., $error, $line;
+		$err_stat = 1;
+	}
 }
 
 sub err_prefix($$) {
 	my ($prevline, $error) = @_;
 	my $out = $prevline."\n".$line;
-	printf $fmt, $filename, $., $error, $out	unless ($no_errs);
+	unless ($no_errs) {
+		printf $fmt, $filename, $., $error, $out;
+		$err_stat = 1;
+	}
 }
 
 sub err_prev($) {
 	my ($error) = @_;
-	printf $fmt, $filename, $. - 1, $error, $prev	unless ($no_errs);
+	unless ($no_errs) {
+		printf $fmt, $filename, $. - 1, $error, $prev;
+		$err_stat = 1;
+	}
 }
 
 sub cstyle($$) {

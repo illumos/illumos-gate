@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,6 +54,15 @@ Layout of /opt/onbld
 /opt/onbld/env
 	build environment files.
 
+/opt/onbld/lib
+	libraries used by the build tools.
+
+/opt/onbld/lib/python
+	python modules used by the build tools.
+
+/opt/onbld/lib/python/onbld/hgext
+	Mercurial extensions.
+
 /opt/onbld/man
 	rudimentary man pages for some of the tools.
 
@@ -87,6 +96,10 @@ build_cscope
 	builds cscope databases in the uts, the platform subdirectories
 	of uts, and in usr/src. Uses cscope-fast.
 
+cdm 
+	A Mercurial extension providing various commands useful for ON
+	development
+
 check_rtime
 	checks ELF attributes used by ELF dynamic objects in the proto area.
 	Used by 'nightly's -r option, to check a number of ELF runtime
@@ -114,6 +127,10 @@ codesign
 	signit; and codesign_server.pl, the code that runs on the
 	server. The codesign_server code is not used on an ON
 	build machine but is kept here for source control purposes.
+
+copyrightchk
+	Checks that files have appropriate SMI copyright notices.
+	Primarily used by wx
 
 cscope-fast
 	The fast version of cscope that we use internally. Seems to work,
@@ -182,6 +199,13 @@ hdrchk
 	checks headers for compliance with OS/Net standards (form, includes,
 	C++ guards).
 
+hgsetup
+	creates a basic Mercurial configuration for the user.
+
+hg-active
+	helper used by webrev to generate file lists for Mercurial
+	workspaces.
+
 install.bin
 	binary version of /usr/sbin/install. Used to be vastly faster
 	(since /usr/sbin/install is a shell script), but may only be a bit
@@ -233,6 +257,10 @@ protocmp.terse
 protolist
 	create a list of what's in the proto area, to feed to protocmp.
 
+rtichk
+	checks that a set of CRs have approved RTIs.  Primarily used
+	by wx
+
 sccscp
 	copy a file under SCCS control to another location in a workspace.
 	also updates teamware's nametable.
@@ -261,6 +289,10 @@ wx
 	A great workspace tool by bonwick. See wx.README for information
 	and warnings.
 
+wx2hg
+	Converts a TeamWare workspace under the control of wx to a
+	Mercurial workspace, discarding intermediate deltas.
+
 tokenize
 	Used to build the sun4u boot block.
 
@@ -270,6 +302,10 @@ webrev
 	review materials.  Can automagically find edited files or use a
 	manually-generated list; knows how to use wx's active file for
 	lists of checked-out files and proposed SCCS comments.
+
+which_scm
+	Reports the current Source Code Management (SCM) system in use
+	and the top-level directory of the workspace.
 
 wsdiff
 	Detect object differences between two ON proto areas. Used by

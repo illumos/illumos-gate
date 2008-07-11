@@ -33,13 +33,6 @@
 #
 t=/tmp/mstr$$
 
-cannot_merge()
-{
-	echo "EXISTING_FILE_RENAMED: $dest $dest.prev" >> /tmp/CLEANUP
-	mv $dest $dest.prev
-	cp $src $dest
-}
-
 while read src dest
 do
 	if [ ! -f $dest ] ; then
@@ -47,37 +40,14 @@ do
 		cp $src $dest
 	else
 		#
-		#  If the installed version of the master file is too old
-		#  we're going to just have to punt on merging, and use the
-		#  install version.
-		#
-		existvers=`grep \#ident $dest | awk '{ print $3 }'`
-		exmaj=`echo $existvers | awk 'BEGIN {FS="."} {print $1}'`
-		exmin=`echo $existvers | awk 'BEGIN {FS="."} {print $2}'`
-
-		majormatch=`expr $exmaj = "1"`
-		tooold=`expr $exmin \< "156"`
-
-		if [ "$majormatch" != "1" ]
-		then
-			cannot_merge
-			continue
-		elif [ "$tooold" = "1" ]
-		then
-			cannot_merge
-			continue
-		fi
-
-		#
 		# Preserve the installed version of
 		# /boot/solaris/devicedb/master during upgrade
 		#
-		# Master file entries added after the release of
-		# Solaris 2.6 need to be duplicated here so that upgrade
-		# of an installed version of the master file include any
-		# changes while preserving any user applied changes.
-		# (Which would most likely come from third-party driver
-		# additions.)
+		# New master file entries need to be duplicated here so
+		# that upgrade of an installed version of the master file
+		# includes any changes while preserving any user applied
+		# changes, which would most likely come from third-party driver
+		# additions.
 		#
 
 		#
@@ -619,16 +589,6 @@ PNP0F23 mouse ptr all none "Reserved by Microsoft Input Device Group"
 PNP0FFF mouse ptr all none "Reserved by Microsoft Systems"
 SYN010B mouse ptr all none "Synaptics mouse pad"
 EOF
-
-		#
-		#  Replace Copyright year and SCCS id if it seems appropriate
-		#
-		if grep '^#ident' $dest > /dev/null 2>&1
-		then
-		    sed -n -e '1,/^#ident/p' $src > $t
-		    sed -e '1,/^#ident/d' $dest >> $t
-		    cp $t $dest
-		fi
 
 		rm -f $t
 	fi

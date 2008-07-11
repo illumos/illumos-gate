@@ -28,7 +28,7 @@ include ../../Makefile.master
 include $(PKGDEFS)/Makefile.com
 include ../Makefile.tools
 
-LICENSEFILES += ../ctf/dwarf/THIRDPARTYLICENSE
+LICENSEFILES += ../ctf/dwarf/THIRDPARTYLICENSE $(GPLV2)
 
 .KEEP_STATE:
 

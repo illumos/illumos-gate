@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -18,11 +19,9 @@
 #
 # CDDL HEADER END
 #
-#!/bin/sh
-#
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # class action script for devalloc_defaults installed by pkgadd
@@ -56,17 +55,6 @@ sort_cmd=/usr/bin/sort
 #
 dbmerge() {
 #
-# If the new file has an ident string, remove the ident string from the old
-# file.
-#
-	newident=`${egrep_cmd} '^#[pragma 	]*ident' $2 \
-	    2>/dev/null`
-	if [ -n "${newident}" ]; then
-		${egrep_cmd} -v '^#[pragma 	]*ident' $1 > $3.old 2>/dev/null
-	else
-		$cp_cmd $1 $3.old
-	fi
-#
 # If the new file has a Sun copyright, remove the Sun copyright from the old
 # file.
 #
@@ -76,8 +64,9 @@ dbmerge() {
 		$sed_cmd -e '/^# Copyright.*Sun Microsystems, Inc./d' \
 		    -e '/^# All rights reserved./d' \
 		    -e '/^# Use is subject to license terms./d' \
-		    $3.old > $3.$$ 2>/dev/null
-		$mv_cmd $3.$$ $3.old
+		    $1 > $3.old 2>/dev/null
+	else
+		$cp_cmd $1 $3.old
 	fi
 #
 # Remove empty lines and multiple instances of these comments:

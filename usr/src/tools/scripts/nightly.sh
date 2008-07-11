@@ -59,6 +59,21 @@
 #
 unset CDPATH
 
+# Get the absolute path of the nightly script that the user invoked.  This
+# may be a relative path, and we need to do this before changing directory.
+nightly_path=`whence $0`
+
+#
+# Keep track of where we found nightly so we can invoke the matching
+# which_scm script.  If that doesn't work, don't go guessing, just rely
+# on the $PATH settings, which will generally give us either /opt/onbld
+# or the user's workspace.
+#
+WHICH_SCM=$(dirname $nightly_path)/which_scm
+if [[ ! -x $WHICH_SCM ]]; then
+	WHICH_SCM=which_scm
+fi
+
 #
 # Print the tag string used to identify a build (e.g., "DEBUG
 # open-only")
@@ -268,6 +283,9 @@ rename_files() {
 
 #
 # Copy some or all of the source tree.
+#
+# Returns 0 for success, non-zero for failure.
+#
 # usage: copy_source CODEMGR_WS DESTDIR LABEL SRCROOT
 #
 copy_source() {
@@ -276,20 +294,123 @@ copy_source() {
 	label=$3
 	srcroot=$4
 
-	echo "\n==== Creating ${DEST} source from ${WS} ($label) ====\n" | \
-	    tee -a $mail_msg_file >> $LOGFILE
+	printf "\n==== Creating %s source from %s (%s) ====\n\n" \
+	    "$DEST" "$WS" "$label" | tee -a $mail_msg_file >> $LOGFILE
 
-	echo "cleaning out ${DEST}." >> $LOGFILE
-	rm -rf "${DEST}" >> $LOGFILE 2>&1
+	printf "cleaning out %s\n" "$DEST." >> $LOGFILE
+	rm -rf "$DEST" >> $LOGFILE 2>&1
 
-	mkdir -p ${DEST}
-	cd ${WS}
+	printf "creating %s\n" "$DEST." >> $LOGFILE
+	mkdir -p "$DEST" 2>> $LOGFILE
 
-	echo "creating ${DEST}." >> $LOGFILE
-	find $srcroot -name 's\.*' -a -type f -print | \
-	    sed -e 's,SCCS\/s.,,' | \
-	    grep -v '/\.del-*' | \
-	    cpio -pd ${DEST} >>$LOGFILE 2>&1
+	if (( $? != 0 )) ; then
+		printf "failed to create %s\n" "$DEST" |
+		    tee -a $mail_msg_file >> $LOGFILE
+		build_ok=n
+		return 1
+	fi
+	cd "$WS"
+
+	printf "populating %s\n" "$DEST." >> $LOGFILE
+
+	case "$SCM_TYPE" in
+	teamware)
+		find $srcroot -name 's\.*' -a -type f -print | \
+		    sed -e 's,SCCS\/s.,,' | \
+		    grep -v '/\.del-*' | \
+		    cpio -pd $DEST >>$LOGFILE 2>&1
+		if (( $? != 0 )) ; then
+		    printf "cpio failed for %s\n" "$DEST" |
+			tee -a $mail_msg_file >> $LOGFILE
+		    build_ok=n
+		    return 1
+		fi
+		;;
+	mercurial)
+		copy_source_mercurial $DEST $srcroot
+		if (( $? != 0 )) ; then
+		    build_ok=n
+		    return 1
+		fi
+		;;
+	*)
+		build_ok=n
+		echo "Tree copy is not supported for workspace type" \
+		    "$SCM_TYPE" | tee -a $mail_msg_file >> $LOGFILE
+		return 1
+		;;
+	esac
+
+	return 0
+}
+
+#
+# Mercurial-specific copy code for copy_source().  Handles the
+# combined open and closed trees.
+#
+# Returns 0 for success, non-zero for failure.
+#
+# usage: copy_source_mercurial destdir srcroot
+#
+function copy_source_mercurial {
+	typeset dest=$1
+	typeset srcroot=$2
+	typeset open_top closed_top
+
+	case $srcroot in
+	usr)
+		open_top=usr
+		if [[ "$CLOSED_IS_PRESENT" = yes ]]; then
+			closed_top=usr/closed
+		fi
+		;;
+	usr/closed*)
+		if [[ "$CLOSED_IS_PRESENT" = no ]]; then
+			printf "can't copy %s: closed tree not present.\n" \
+			    "$srcroot" | tee -a $mail_msg_file >> $LOGFILE
+			return 1
+		fi
+		closed_top="$srcroot"
+		;;
+	*)
+		open_top="$srcroot"
+		;;
+	esac		
+
+	if [[ -n "$open_top" ]]; then
+		hg locate -I "$open_top" | cpio -pd "$dest" >>$LOGFILE 2>&1
+		if (( $? != 0 )) ; then
+		    printf "cpio failed for %s\n" "$dest" |
+			tee -a $mail_msg_file >> $LOGFILE
+		    return 1
+		fi
+	fi
+
+	if [[ -n "$closed_top" ]]; then
+		mkdir -p "$dest/usr/closed" || return 1
+		if [[ "$closed_top" = usr/closed ]]; then
+			(cd usr/closed; hg locate |
+			    cpio -pd "$dest/usr/closed") >>$LOGFILE 2>&1
+			if (( $? != 0 )) ; then
+			    printf "cpio failed for %s/usr/closed\n" \
+				"$dest" | tee -a $mail_msg_file >> $LOGFILE
+			    return 1
+			fi
+		else
+			# copy subtree of usr/closed
+			closed_top=${closed_top#usr/closed/}
+			(cd usr/closed; hg locate -I "$closed_top" |
+			    cpio -pd "$dest/usr/closed") >>$LOGFILE 2>&1
+			if (( $? != 0 )) ; then
+			    printf "cpio failed for %s/usr/closed/%s\n" \
+				"$dest" "$closed_top" |
+				tee -a $mail_msg_file >> $LOGFILE
+			    return 1
+			fi
+		fi
+	fi
+
+	return 0
 }
 
 #
@@ -304,6 +425,13 @@ set_up_source_build() {
 	MAKETARG=$3
 
 	copy_source $WS $DEST $MAKETARG usr
+	if (( $? != 0 )); then
+	    echo "\nCould not copy source tree for source build." |
+		tee -a $mail_msg_file >> $LOGFILE
+	    build_ok=n
+	    return
+	fi
+
 	SRC=${DEST}/usr/src
 
 	cd $SRC
@@ -448,9 +576,11 @@ build() {
 	/bin/time $MAKE -e install 2>&1 | \
 	    tee -a $SRC/${INSTALLOG}.out >> $LOGFILE
 
-	echo "\n==== SCCS Noise ($LABEL) ====\n" >> $mail_msg_file
-
-	egrep 'sccs(check:|  get)' $SRC/${INSTALLOG}.out >> $mail_msg_file
+	if [[ "$SCM_TYPE" = teamware ]]; then
+		echo "\n==== SCCS Noise ($LABEL) ====\n" >> $mail_msg_file
+		egrep 'sccs(check:| *get)' $SRC/${INSTALLOG}.out >> \
+			$mail_msg_file
+	fi
 
 	echo "\n==== Build errors ($LABEL) ====\n" >> $mail_msg_file
 	egrep ":" $SRC/${INSTALLOG}.out |
@@ -565,7 +695,7 @@ build() {
 		echo "\n==== Crypto module signing errors ($LABEL) ====\n" \
 		    >> $mail_msg_file
 		egrep 'WARNING|ERROR' ${signing_file} >> $mail_msg_file
-		if [ $? = 0 ]; then
+		if (( $? == 0 )) ; then
 			build_ok=n
 			this_build_ok=n
 		fi
@@ -671,7 +801,8 @@ dolint() {
 	# Remove all .ln files to ensure a full reference file
 	#
 	rm -f Nothing_to_remove \
-	    `find . -name SCCS -prune -o -type f -name '*.ln' -print `
+	    `find . \( -name SCCS -o -name .hg -o -name .svn \) \
+	    	-prune -o -type f -name '*.ln' -print `
 
 	/bin/time $MAKE -ek lint 2>&1 | \
 	    tee -a $LINTOUT >> $LOGFILE
@@ -895,6 +1026,7 @@ check_closed_tree() {
 			echo "If the closed sources are not present," \
 			    "ON_CLOSED_BINS"
 			echo "must point to the closed binaries tree."
+			build_ok=n
 			exit 1
 		fi
 	fi
@@ -1217,6 +1349,13 @@ if [ "$BRINGOVER_WS" = "" ]; then
 fi
 
 #
+# If CLOSED_BRINGOVER_WS was not specified, let it default to CLOSED_CLONE_WS
+#
+if [ "$CLOSED_BRINGOVER_WS" = "" ]; then
+	CLOSED_BRINGOVER_WS=$CLOSED_CLONE_WS
+fi
+
+#
 # If BRINGOVER_FILES was not specified, default to usr
 #
 if [ "$BRINGOVER_FILES" = "" ]; then
@@ -1279,7 +1418,7 @@ do
 		;;
 	  o )	o_FLAG=y
 		;;
-	  P )	P_FLAG=y 
+	  P )	P_FLAG=y
 		;; # obsolete
 	  p )	p_FLAG=y
 		;;
@@ -1613,10 +1752,10 @@ logshuffle() {
 	run_hook POST_NIGHTLY $state
 	run_hook SYS_POST_NIGHTLY $state
 
-	cat $build_time_file $mail_msg_file > ${LLOG}/mail_msg
+	cat $build_time_file $build_environ_file $mail_msg_file \
+	    > ${LLOG}/mail_msg
 	if [ "$m_FLAG" = "y" ]; then
-	    	cat $build_time_file $mail_msg_file |
-		    /usr/bin/mailx -s \
+	    	cat ${LLOG}/mail_msg | /usr/bin/mailx -s \
 	"Nightly ${MACH} Build of `basename ${CODEMGR_WS}` ${state}." \
 			${MAILTO}
 	fi
@@ -1663,6 +1802,7 @@ trap cleanup_signal 1 2 3 15
 # doesn't, then make sure we can create it.  Clean up locks that are
 # known to be stale (assumes host name is unique among build systems
 # for the workspace).
+#
 create_lock() {
 	lockf=$1
 	lockvar=$2
@@ -1743,6 +1883,8 @@ newdirlist=
 mail_msg_file="${TMPDIR}/mail_msg"
 touch $mail_msg_file
 build_time_file="${TMPDIR}/build_time"
+build_environ_file="${TMPDIR}/build_environ"
+touch $build_environ_file
 #
 #	Move old LOGFILE aside
 #	ATLOG directory already made by 'create_lock' above
@@ -1757,6 +1899,9 @@ START_DATE=`date`
 SECONDS=0
 echo "\n==== Nightly $maketype build started:   $START_DATE ====" \
     | tee -a $LOGFILE > $build_time_file
+
+echo "\nBuild project:  $build_project\nBuild taskid:   $build_taskid" | \
+    tee -a $mail_msg_file >> $LOGFILE
 
 # make sure we log only to the nightly build file
 build_noise_file="${TMPDIR}/build_noise"
@@ -1894,81 +2039,6 @@ yes|no)	;;
 	;;
 esac
 
-echo "==== Build environment ====\n" | tee -a $mail_msg_file >> $LOGFILE
-
-# System
-whence uname | tee -a $mail_msg_file >> $LOGFILE
-uname -a 2>&1 | tee -a $mail_msg_file >> $LOGFILE
-echo | tee -a $mail_msg_file >> $LOGFILE
-
-# nightly (will fail in year 2100 due to SCCS flaw)
-echo "$0 $@" | tee -a $mail_msg_file >> $LOGFILE
-echo "%M% version %I% 20%E%\n" | tee -a $mail_msg_file >> $LOGFILE
-
-# make
-whence $MAKE | tee -a $mail_msg_file >> $LOGFILE
-$MAKE -v | tee -a $mail_msg_file >> $LOGFILE
-echo "number of concurrent jobs = $DMAKE_MAX_JOBS" |
-    tee -a $mail_msg_file >> $LOGFILE
-
-#
-# Report the compiler versions.
-#
-if [ -f $SRC/Makefile ]; then
-	srcroot=$SRC
-elif [ -f $BRINGOVER_WS/usr/src/Makefile ]; then
-	srcroot=$BRINGOVER_WS/usr/src
-else
-	echo "\nUnable to find \"Makefile\" in $BRINGOVER_WS/usr/src or $SRC." |
-	    tee -a $mail_msg_file >> $LOGFILE
-	exit 1
-fi
-
-( cd $srcroot
-  for target in cc-version cc64-version java-version; do
-	echo
-	#
-	# Put statefile somewhere we know we can write to rather than trip
-	# over a read-only $srcroot.
-	#
-	rm -f $TMPDIR/make-state
-	export SRC=$srcroot
-	if $MAKE -K $TMPDIR/make-state -e $target 2>/dev/null; then
-		continue
-	fi
-	touch $TMPDIR/nocompiler
-  done
-  echo
-) | tee -a $mail_msg_file >> $LOGFILE
-
-if [ -f $TMPDIR/nocompiler ]; then
-	rm -f $TMPDIR/nocompiler
-	build_ok=n
-	echo "Aborting due to missing compiler." |
-		tee -a $mail_msg_file >> $LOGFILE
-	exit 1
-fi
-
-# as
-whence as | tee -a $mail_msg_file >> $LOGFILE
-as -V 2>&1 | head -1 | tee -a $mail_msg_file >> $LOGFILE
-echo | tee -a $mail_msg_file >> $LOGFILE
-
-# Check that we're running a capable link-editor
-whence ld | tee -a $mail_msg_file >> $LOGFILE
-LDVER=`ld -V 2>&1`
-echo $LDVER | tee -a $mail_msg_file >> $LOGFILE
-LDVER=`echo $LDVER | sed -e "s/.*-1\.//" -e "s/:.*//"`
-if [ `expr $LDVER \< 422` -eq 1 ]; then
-	echo "The link-editor needs to be at version 422 or higher to build" | \
-	    tee -a $mail_msg_file >> $LOGFILE
-	echo "the latest stuff, hope your build works." | \
-	    tee -a $mail_msg_file >> $LOGFILE
-fi
-
-echo "\nBuild project:  $build_project\nBuild taskid:   $build_taskid" | \
-    tee -a $mail_msg_file >> $LOGFILE
-
 echo "\n==== Build version ====\n" | tee -a $mail_msg_file >> $LOGFILE
 echo $VERSION | tee -a $mail_msg_file >> $LOGFILE
 
@@ -2001,8 +2071,9 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 
 	# Remove all .make.state* files, just in case we are restarting
 	# the build after having interrupted a previous 'make clobber'.
-	find . \( -name SCCS -o -name 'interfaces.*' \) -prune \
-	    -o -name '.make.*' -print | xargs rm -f
+	find . \( -name SCCS -o -name .hg -o -name .svn \
+		-o -name 'interfaces.*' \) -prune \
+		-o -name '.make.*' -print | xargs rm -f
 
 	$MAKE -ek clobber 2>&1 | tee -a $SRC/clobber-${MACH}.out >> $LOGFILE
 	echo "\n==== Make clobber ERRORS ====\n" >> $mail_msg_file
@@ -2030,10 +2101,11 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 	# problems that only occur on fresh workspaces.
 	# Remove all .make.state* files, libraries, and .o's that may
 	# have been omitted from clobber.  A couple of libraries are
-	# under SCCS, so leave them alone.
+	# under source code control, so leave them alone.
 	# We should probably blow away temporary directories too.
 	cd $SRC
-	find $relsrcdirs \( -name SCCS -o -name 'interfaces.*' \) -prune -o \
+	find $relsrcdirs \( -name SCCS -o -name .hg -o -name .svn \
+	    -o -name 'interfaces.*' \) -prune -o \
 	    \( -name '.make.*' -o -name 'lib*.a' -o -name 'lib*.so*' -o \
 	       -name '*.o' \) -print | \
 	    grep -v 'tools/ctf/dwarf/.*/libdwarf' | xargs rm -f
@@ -2041,13 +2113,7 @@ else
 	echo "\n==== No clobber at `date` ====\n" >> $LOGFILE
 fi
 
-#
-#	Decide whether to bringover to the codemgr workspace
-#
-if [ "$n_FLAG" = "n" ]; then
-	run_hook PRE_BRINGOVER
-
-	echo "\n==== bringover to $CODEMGR_WS at `date` ====\n" >> $LOGFILE
+type bringover_teamware > /dev/null 2>&1 || bringover_teamware() {
 	# sleep on the parent workspace's lock
 	while egrep -s write $BRINGOVER_WS/Codemgr_wsdata/locks
 	do
@@ -2057,20 +2123,246 @@ if [ "$n_FLAG" = "n" ]; then
 	if [[ -z $BRINGOVER ]]; then
 		BRINGOVER=$TEAMWARE/bin/bringover
 	fi
-	echo "\n==== BRINGOVER LOG ====\n" >> $mail_msg_file
 
-	(staffer $BRINGOVER -c "nightly update" -p $BRINGOVER_WS \
+	staffer $BRINGOVER -c "nightly update" -p $BRINGOVER_WS \
 	    -w $CODEMGR_WS $BRINGOVER_FILES < /dev/null 2>&1 ||
 		touch $TMPDIR/bringover_failed
 
-         staffer bringovercheck $CODEMGR_WS >$TMPDIR/bringovercheck.out 2>&1
-
-	 if [ -s $TMPDIR/bringovercheck.out ]; then
+        staffer bringovercheck $CODEMGR_WS >$TMPDIR/bringovercheck.out 2>&1
+	if [ -s $TMPDIR/bringovercheck.out ]; then
 		echo "\n==== POST-BRINGOVER CLEANUP NOISE ====\n"
 		cat $TMPDIR/bringovercheck.out
-	 fi
+	fi
+}
 
-	) | tee -a  $mail_msg_file >> $LOGFILE
+type bringover_mercurial > /dev/null 2>&1 || bringover_mercurial() {
+	typeset -x PATH=$PATH
+
+	# If the repository doesn't exist yet, then we want to populate it.
+	# We only initially populate the closed repository if the open
+	# repository doesn't also exist (e.g.: don't bringover closed if
+	# only usr/src exists)
+	if [[ ! -d $CODEMGR_WS/.hg ]]; then
+		staffer hg init $CODEMGR_WS
+		# If the user set CLOSED_BRINGOVER_WS, then we'll want to
+		# initialise the closed repository
+		if [[ -n $CLOSED_BRINGOVER_WS ]]; then
+			staffer mkdir -p $CODEMGR_WS/usr
+			staffer hg init $CODEMGR_WS/usr/closed
+			CLOSED_IS_PRESENT="yes"
+		fi
+	fi
+
+	typeset -x HGMERGE="/bin/false"
+
+	# Do the bringover, along with an update.  If a merge is necessary,
+	# this will not fail properly:
+	#     http://www.selenic.com/mercurial/bts/issue186
+	# so we grep through the output for signs of a merge.
+	#
+	# Note that pulling even non-conflicting changes on top of local
+	# changes (committed or not) requires a merge.
+	staffer hg --cwd $CODEMGR_WS pull -u $BRINGOVER_WS 2>&1 | \
+	    tee $TMPDIR/pull_open.out
+	hgstatus=$?
+	if [ $hgstatus -ne 0 ]; then
+		touch $TMPDIR/bringover_failed
+		return
+	fi
+
+	# We never want to clone usr/closed by default.  If the usr/closed
+	# repository exists already and CLOSED_BRINGOVER_WS is set, then
+	# we update (pull -u).
+	if [[ -d $SRC/../closed && -n $CLOSED_BRINGOVER_WS ]]; then
+		staffer hg --cwd $SRC/../closed pull -u \
+			$CLOSED_BRINGOVER_WS 2>&1 | 
+			tee -a $TMPDIR/pull_closed.out
+		hgstatus=$?
+		if [ $hgstatus -ne 0 ]; then
+			touch $TMPDIR/bringover_failed
+			return
+		fi
+	fi
+
+	# If there were uncommitted changes, the pull -u would have
+	# attempted a merge.  In the likely event that it failed, fail the
+	# bringover.
+	if grep "^merging.*failed" $TMPDIR/pull_open.out > /dev/null 2>&1 || \
+		grep "^merging.*failed" $TMPDIR/pull_closed.out >/dev/null 2>&1;
+       	then
+		touch $TMPDIR/bringover_failed
+		return
+	fi
+
+	# If heads were added, then a merge is required.  We attempt the
+	# merge, in case the branches touch different files (something that
+	# teamware wouldn't balk at).  If the merge fails, fail the
+	# bringover, leaving the conflicts unresolved.
+	#
+	# Note that even if the merge succeeds, the result of the merge
+	# will need to be committed, and not doing so will block any
+	# further pulls.
+	if grep "not updating" $TMPDIR/pull_open.out > /dev/null 2>&1; then
+		hg --cwd $CODEMGR_WS merge 2>&1 | tee $TMPDIR/merge.out
+		if grep "^merging.*failed" $TMPDIR/merge.out >/dev/null 2>&1;
+		then
+			touch $TMPDIR/bringover_failed
+		fi
+	fi
+	if grep "not updating" $TMPDIR/pull_closed.out > /dev/null 2>&1; then
+		hg --cwd $SRC/../closed merge 2>&1 | tee $TMPDIR/merge.out
+		if grep "^merging.*failed" $TMPDIR/merge.out >/dev/null 2>&1;
+		then
+			touch $TMPDIR/bringover_failed
+		fi
+	fi
+}
+
+type bringover_subversion > /dev/null 2>&1 || bringover_subversion() {
+	typeset -x PATH=$PATH
+
+	if [[ ! -d $CODEMGR_WS/.svn ]]; then
+		staffer svn checkout $BRINGOVER_WS $CODEMGR_WS ||
+			touch $TMPDIR/bringover_failed
+	else
+		typeset root
+		root=$(staffer svn info $CODEMGR_WS |
+			nawk '/^Repository Root:/ {print $NF}')
+		if [[ $root != $BRINGOVER_WS ]]; then
+			# We fail here because there's no way to update
+			# from a named repo.
+			cat <<-EOF
+			\$BRINGOVER_WS doesn't match repository root:
+			  \$BRINGOVER_WS:  $BRINGOVER_WS
+			  Repository root: $root
+			EOF
+			touch $TMPDIR/bringover_failed
+		else
+			# If a conflict happens, svn still exits 0.
+			staffer svn update $CODEMGR_WS | tee $TMPDIR/pull.out ||
+				touch $TMPDIR/bringover_failed
+			if grep "^C" $TMPDIR/pull.out > /dev/null 2>&1; then
+				touch $TMPDIR/bringover_failed
+			fi
+		fi
+	fi
+}
+
+type bringover_none > /dev/null 2>&1 || bringover_none() {
+	echo "Couldn't figure out what kind of SCM to use for $BRINGOVER_WS."
+	touch $TMPDIR/bringover_failed
+}
+
+# Parse the URL.
+# The other way to deal with empty components is to echo a string that can
+# be eval'ed by the caller to associate values (possibly empty) with
+# variables.  In that case, passing in a printf string would let the caller
+# choose the variable names.
+parse_url() {
+	typeset url method host port path
+
+	url=$1
+	method=${url%%://*}
+	host=${url#$method://}
+	path=${host#*/}
+	host=${host%%/*}
+	if [[ $host == *:* ]]; then
+		port=${host#*:}
+		host=${host%:*}
+	fi
+
+	# method can never be empty.  host can only be empty if method is
+	# file, and that implies it's localhost.  path can default to / if
+	# it's otherwise empty, leaving port as the only component without
+	# a default, so it has to go last.
+	echo $method ${host:-localhost} ${path:-/} $port
+}
+
+http_get() {
+	typeset url method host port path
+
+	url=$1
+
+	if [[ -n $http_proxy ]]; then
+		parse_url $http_proxy | read method host path port
+		echo "GET $url HTTP/1.0\r\n" |
+			mconnect -p ${port:-8080} $host
+	else
+		parse_url $url | read method host path port
+		echo "GET $path HTTP/1.0\r\n" |
+			mconnect -p ${port:-80} $host
+	fi
+}
+
+# Echo a string name for the workspace SCM (teamware, hg, or svn).
+function wstype {
+	typeset rtype ltype
+
+	env CODEMGR_WS=$BRINGOVER_WS $WHICH_SCM 2>/dev/null | read rtype junk
+	if [[ -z "$rtype" || "$rtype" == unknown ]]; then
+		# Probe BRINGOVER_WS to determine its type
+		if [[ $BRINGOVER_WS == svn*://* ]]; then
+			rtype="subversion"
+		elif [[ $BRINGOVER_WS == file://* ]] &&
+		    egrep -s "This is a Subversion repository" \
+		    ${BRINGOVER_WS#file://}/README.txt 2> /dev/null; then
+			rtype="subversion"
+		elif [[ $BRINGOVER_WS == ssh://* ]]; then
+			rtype="mercurial"
+		elif svn info $BRINGOVER_WS > /dev/null 2>&1; then
+			rtype="subversion"
+		elif [[ $BRINGOVER_WS == http://* ]] && \
+		    http_get "$BRINGOVER_WS/?cmd=heads" | \
+		    egrep -s "application/mercurial" 2> /dev/null; then
+			rtype="mercurial"
+		else
+			rtype="none"
+		fi
+	fi
+
+	# Make sure that the repository is one we support.  If not, then
+	# call it "none."
+	case "$rtype" in
+	none|subversion|teamware|mercurial)
+		;;
+	*)	rtype=none
+		;;
+	esac
+
+	# Probe CODEMGR_WS to determine its type
+	if [[ -d $CODEMGR_WS ]]; then
+		$WHICH_SCM | read ltype junk || exit 1
+		# This occurs when we have an empty build directory and nightly
+		# itself creates the directory.  It's not an error, as long as
+		# we'll be doing a bringover.
+		if [[ "$ltype" == unknown ]]; then
+			ltype=$rtype
+		fi
+	fi
+
+	# If BRINGOVER_WS and CODEMGR_WS don't match, doing a bringover
+	# will be problematic!
+	if [[ -n $ltype && $rtype != $ltype ]]; then
+		echo "none"
+	else
+		echo $rtype
+	fi
+}
+
+SCM_TYPE=$(wstype)
+export SCM_TYPE
+
+#
+#	Decide whether to bringover to the codemgr workspace
+#
+if [ "$n_FLAG" = "n" ]; then
+	run_hook PRE_BRINGOVER
+
+	echo "\n==== bringover to $CODEMGR_WS at `date` ====\n" >> $LOGFILE
+	echo "\n==== BRINGOVER LOG ====\n" >> $mail_msg_file
+
+	eval "bringover_$SCM_TYPE" 2>&1 |
+		tee -a $mail_msg_file >> $LOGFILE
 
 	if [ -f $TMPDIR/bringover_failed ]; then
 		rm -f $TMPDIR/bringover_failed
@@ -2090,6 +2382,82 @@ if [ "$n_FLAG" = "n" ]; then
 	check_closed_tree
 else
 	echo "\n==== No bringover to $CODEMGR_WS ====\n" >> $LOGFILE
+fi
+
+echo "\n==== Build environment ====\n" | tee -a $build_environ_file >> $LOGFILE
+
+# System
+whence uname | tee -a $build_environ_file >> $LOGFILE
+uname -a 2>&1 | tee -a $build_environ_file >> $LOGFILE
+echo | tee -a $build_environ_file >> $LOGFILE
+
+# nightly
+echo "$0 $@" | tee -a $build_environ_file >> $LOGFILE
+if [[ $nightly_path = "/opt/onbld/bin/nightly" ]] &&
+    pkginfo SUNWonbld > /dev/null 2>&1 ; then
+	pkginfo -l SUNWonbld | egrep "PKGINST:|VERSION:|PSTAMP:"
+else
+	ls -l "$nightly_path"
+fi | tee -a $build_environ_file >> $LOGFILE
+echo | tee -a $build_environ_file >> $LOGFILE
+
+# make
+whence $MAKE | tee -a $build_environ_file >> $LOGFILE
+$MAKE -v | tee -a $build_environ_file >> $LOGFILE
+echo "number of concurrent jobs = $DMAKE_MAX_JOBS" |
+    tee -a $build_environ_file >> $LOGFILE
+
+#
+# Report the compiler versions.
+#
+
+if [[ ! -f $SRC/Makefile ]]; then
+	build_ok=n
+	echo "\nUnable to find \"Makefile\" in $SRC." | \
+	    tee -a $build_environ_file >> $LOGFILE
+	exit 1
+fi
+
+( cd $SRC
+  for target in cc-version cc64-version java-version; do
+	echo
+	#
+	# Put statefile somewhere we know we can write to rather than trip
+	# over a read-only $srcroot.
+	#
+	rm -f $TMPDIR/make-state
+	export SRC
+	if $MAKE -K $TMPDIR/make-state -e $target 2>/dev/null; then
+		continue
+	fi
+	touch $TMPDIR/nocompiler
+  done
+  echo
+) | tee -a $build_environ_file >> $LOGFILE
+
+if [ -f $TMPDIR/nocompiler ]; then
+	rm -f $TMPDIR/nocompiler
+	build_ok=n
+	echo "Aborting due to missing compiler." |
+		tee -a $build_environ_file >> $LOGFILE
+	exit 1
+fi
+
+# as
+whence as | tee -a $build_environ_file >> $LOGFILE
+as -V 2>&1 | head -1 | tee -a $build_environ_file >> $LOGFILE
+echo | tee -a $build_environ_file >> $LOGFILE
+
+# Check that we're running a capable link-editor
+whence ld | tee -a $build_environ_file >> $LOGFILE
+LDVER=`ld -V 2>&1`
+echo $LDVER | tee -a $build_environ_file >> $LOGFILE
+LDVER=`echo $LDVER | sed -e "s/.*-1\.//" -e "s/:.*//"`
+if [ `expr $LDVER \< 422` -eq 1 ]; then
+	echo "The link-editor needs to be at version 422 or higher to build" | \
+	    tee -a $build_environ_file >> $LOGFILE
+	echo "the latest stuff.  Hope your build works." | \
+	    tee -a $build_environ_file >> $LOGFILE
 fi
 
 #
@@ -2133,7 +2501,7 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	    tee -a $mail_msg_file >> $LOGFILE
 
 	mktpl usr/src/tools/opensolaris/license-list >>$LOGFILE 2>&1
-	if [ $? -ne 0 ]; then
+	if (( $? != 0 )) ; then
 		echo "Couldn't create THIRDPARTYLICENSE files" |
 		    tee -a $mail_msg_file >> $LOGFILE
 	fi
@@ -2161,7 +2529,7 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	if [ "$D_FLAG" = y ]; then
 		mkclosed $MACH $ROOT $CODEMGR_WS/closed.skel/root_$MACH \
 		    >>$LOGFILE 2>&1
-		if [ $? -ne 0 ]; then
+		if (( $? != 0 )) ; then
 			echo "Couldn't create skeleton DEBUG closed binaries." |
 			    tee -a $mail_msg_file >> $LOGFILE
 		fi
@@ -2169,7 +2537,7 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	if [ "$F_FLAG" = n ]; then
 		mkclosed $MACH $ROOT-nd $CODEMGR_WS/closed.skel/root_$MACH-nd \
 		    >>$LOGFILE 2>&1
-		if [ $? -ne 0 ]; then
+		if (( $? != 0 )) ; then
 			echo "Couldn't create skeleton non-DEBUG closed binaries." |
 			    tee -a $mail_msg_file >> $LOGFILE
 		fi
@@ -2190,39 +2558,25 @@ fi
 ORIG_SRC=$SRC
 BINARCHIVE=${CODEMGR_WS}/bin-${MACH}.cpio.Z
 
-#
-# For the "open" build, we don't mung any source files, so skip this
-# step.
-#
 if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
 	save_binaries
-
-	echo "\n==== Retrieving SCCS files at `date` ====\n" >> $LOGFILE
-	SCCSHELPER=${TMPDIR}/sccs-helper
-	rm -f ${SCCSHELPER}
-cat >${SCCSHELPER} <<EOF
-#!/bin/ksh
-cd \$1
-cd ..
-sccs get SCCS >/dev/null 2>&1
-EOF
-	cd $SRC
-	chmod +x ${SCCSHELPER}
-	find $relsrcdirs -name SCCS | xargs -L 1 ${SCCSHELPER}
-	rm -f ${SCCSHELPER}
 fi
 
-if [ "$SD_FLAG" = "y" ]; then
-	set_up_source_build ${CODEMGR_WS} ${CRYPT_SRC} CRYPT_SRC
-fi
 
 # EXPORT_SRC comes after CRYPT_SRC since a domestic build will need
 # $SRC pointing to the export_source usr/src.
+
 if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
-	set_up_source_build ${CODEMGR_WS} ${EXPORT_SRC} EXPORT_SRC
+	if [ "$SD_FLAG" = "y" -a $build_ok = y ]; then
+	    set_up_source_build ${CODEMGR_WS} ${CRYPT_SRC} CRYPT_SRC
+	fi
+
+	if [ $build_ok = y ]; then
+	    set_up_source_build ${CODEMGR_WS} ${EXPORT_SRC} EXPORT_SRC
+	fi
 fi
 
-if [ "$SD_FLAG" = "y" ]; then
+if [ "$SD_FLAG" = "y" -a $build_ok = y ]; then
 	# drop the crypt files in place.
 	cd ${EXPORT_SRC}
 	echo "\nextracting crypt_files.cpio.Z onto export_source.\n" \
@@ -2239,14 +2593,21 @@ if [ "$SD_FLAG" = "y" ]; then
 
 fi
 
-if [ "$SO_FLAG" = "y" ]; then
+if [ "$SO_FLAG" = "y" -a $build_ok = y ]; then
 	#
 	# Copy the open sources into their own tree, set up the closed
 	# binaries, and set up the environment.  The build looks for
 	# the closed binaries in a location that depends on whether
 	# it's a DEBUG build, so we might need to make two copies.
 	#
+	# If copy_source fails, it will have already generated an
+	# error message and set build_ok=n, so we don't need to worry
+	# about that here.
+	#
 	copy_source $CODEMGR_WS $OPEN_SRCDIR OPEN_SOURCE usr/src
+fi
+
+if [ "$SO_FLAG" = "y" -a $build_ok = y ]; then
 	SRC=$OPEN_SRCDIR/usr/src
 
 	# Try not to clobber any user-provided closed binaries.
@@ -2258,7 +2619,7 @@ if [ "$SO_FLAG" = "y" ]; then
 
 	if [ "$D_FLAG" = y ]; then
 		mkclosed $MACH $ROOT $ON_CLOSED_BINS/root_$MACH >>$LOGFILE 2>&1
-		if [ $? -ne 0 ]; then
+		if (( $? != 0 )) ; then
 			build_ok=n
 			echo "Couldn't create DEBUG closed binaries." |
 			    tee -a $mail_msg_file >> $LOGFILE
@@ -2269,7 +2630,7 @@ if [ "$SO_FLAG" = "y" ]; then
 		[ "$MULTI_PROTO" = yes ] && root=$ROOT-nd
 		mkclosed $MACH $root $ON_CLOSED_BINS/root_$MACH-nd \
 		    >>$LOGFILE 2>&1
-		if [ $? -ne 0 ]; then
+		if (( $? != 0 )) ; then
 			build_ok=n
 			echo "Couldn't create non-DEBUG closed binaries." |
 			    tee -a $mail_msg_file >> $LOGFILE
@@ -2421,19 +2782,19 @@ if [ "$U_FLAG" = "y" -a "$build_ok" = "y" ]; then
 	# pattern, and we still want to catch other errors here, we
 	# take the unusal step of moving aside 'nightly' from that
 	# directory (if we're using it).
-	mypath=${0##*/root_$MACH/}
-	if [ "$mypath" = $0 ]; then
-		mypath=opt/onbld/bin/${0##*/}
+	mypath=${nightly_path##*/root_$MACH/}
+	if [ "$mypath" = $nightly_path ]; then
+		mypath=opt/onbld/bin/${nightly_path##*/}
 	fi
-	if [ $0 -ef $PARENT_WS/proto/root_$MACH/$mypath ]; then
-		mv -f $0 $PARENT_WS/proto/root_$MACH
+	if [ $nightly_path -ef $PARENT_WS/proto/root_$MACH/$mypath ]; then
+		mv -f $nightly_path $PARENT_WS/proto/root_$MACH
 	fi
 	rm -rf $PARENT_WS/proto/root_$MACH/*
 	unset Ulockfile
 	mkdir -p $NIGHTLY_PARENT_ROOT
 	if [[ "$MULTI_PROTO" = no || "$D_FLAG" = y ]]; then
 		cd $ROOT
-		( tar cf - . | 
+		( tar cf - . |
 		    ( cd $NIGHTLY_PARENT_ROOT;  umask 0; tar xpf - ) ) 2>&1 |
 		    tee -a $mail_msg_file >> $LOGFILE
 	fi
@@ -2524,14 +2885,14 @@ if [ "$r_FLAG" = "y" -a "$build_ok" = "y" ]; then
 	# Determine any processing errors that will affect the final output
 	# and display these first.
 	grep -l "$LDDUSAGE" $RUNTIMEOUT > /dev/null
-	if [ $? -eq 0 ]; then
+	if (( $? == 0 )) ; then
 	    echo "WARNING: ldd(1) does not support -e.  The version of ldd(1)" | \
 		tee -a $LOGFILE >> $mail_msg_file
 	    echo "on your system is old - 4390308 (s81_30) is required.\n" | \
 		tee -a $LOGFILE >> $mail_msg_file
 	fi
 	grep -l "$LDDWRONG" $RUNTIMEOUT > /dev/null
-	if [ $? -eq 0 ]; then
+	if (( $? == 0 )) ; then
 	    echo "WARNING: wrong class message detected.  ldd(1) was unable" | \
 		tee -a $LOGFILE >> $mail_msg_file
 	    echo "to execute an object, thus it could not be checked fully." | \
@@ -2542,7 +2903,7 @@ if [ "$r_FLAG" = "y" -a "$build_ok" = "y" ]; then
 		tee -a $LOGFILE >> $mail_msg_file
 	fi
 	grep -l "$CRLECONF" $RUNTIMEOUT > /dev/null
-	if [ $? -eq 0 ]; then
+	if (( $? == 0 )) ; then
 	    echo "WARNING: creation of an alternative dependency cache failed." | \
 		tee -a $LOGFILE >> $mail_msg_file
 	    echo "Dependencies will bind to the base system libraries.\n" | \
@@ -2622,10 +2983,18 @@ if [ "$f_FLAG" = "y" -a "$build_ok" = "y" ]; then
 		mv $SRC/unref-${MACH}.out $SRC/unref-${MACH}.ref
 	fi
 
-	findunref -t $SRC/.build.tstamp $SRC/.. \
-	    ${TOOLS}/findunref/exception_list \
-	    2>> $mail_msg_file | sort | \
-	    sed -e s=^./src/=./= -e s=^./closed/=../closed/= \
+	#
+	# For any SCM other than teamware, we want to disable the
+	# managed-by-SCCS test in findunref
+	#
+	findunref_all=""
+	if [ "$SCM_TYPE" != teamware ]; then
+		findunref_all="-a"
+	fi
+ 
+	findunref $findunref_all -t $SRC/.build.tstamp $SRC/.. \
+	    ${TOOLS}/findunref/exception_list 2>> $mail_msg_file | \
+	    sort | sed -e s=^./src/=./= -e s=^./closed/=../closed/= \
 	    > $SRC/unref-${MACH}.out
 
 	if [ ! -f $SRC/unref-${MACH}.ref ]; then
@@ -2654,7 +3023,7 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	if [ "$D_FLAG" = y ]; then
 		bindrop "$ROOT" "$ROOT-open" "$closed_basename" \
 		    >>"$LOGFILE" 2>&1
-		if [ $? -ne 0 ]; then
+		if (( $? != 0 )) ; then
 			echo "Couldn't create DEBUG closed binaries." |
 			    tee -a $mail_msg_file >> $LOGFILE
 		fi
@@ -2662,7 +3031,7 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	if [ "$F_FLAG" = n ]; then
 		bindrop -n "$ROOT-nd" "$ROOT-open-nd" "$closed_basename-nd" \
 		    >>"$LOGFILE" 2>&1
-		if [ $? -ne 0 ]; then
+		if (( $? != 0 )) ; then
 			echo "Couldn't create non-DEBUG closed binaries." |
 			    tee -a $mail_msg_file >> $LOGFILE
 		fi
@@ -2671,7 +3040,7 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	echo "Generating SUNWonbld tarball..." >> $LOGFILE
 	PKGARCHIVE=$PKGARCHIVE_ORIG
 	onblddrop >> $LOGFILE 2>&1
-	if [ $? -ne 0 ]; then
+	if (( $? != 0 )) ; then
 		echo "Couldn't create SUNWonbld tarball." |
 		    tee -a $mail_msg_file >> $LOGFILE
 	fi
@@ -2679,7 +3048,7 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	echo "Generating README.opensolaris..." >> $LOGFILE
 	cat $SRC/tools/opensolaris/README.opensolaris.tmpl | \
 	    mkreadme_osol $CODEMGR_WS/README.opensolaris >> $LOGFILE 2>&1
-	if [ $? -ne 0 ]; then
+	if (( $? != 0 )) ; then
 		echo "Couldn't create README.opensolaris." |
 		    tee -a $mail_msg_file >> $LOGFILE
 	fi
@@ -2688,7 +3057,7 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	# findunref.  It depends on README.opensolaris.
 	echo "Generating source tarball..." >> $LOGFILE
 	sdrop >>$LOGFILE 2>&1
-	if [ $? -ne 0 ]; then
+	if (( $? != 0 )) ; then
 		echo "Couldn't create source tarball." |
 		    tee -a "$mail_msg_file" >> "$LOGFILE"
 	fi
@@ -2698,7 +3067,7 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	if [ "$D_FLAG" = y ]; then
 		makebfu_filt bfudrop "$ROOT-open" \
 		    "$closed_basename.$MACH.tar.bz2" nightly-osol
-		if [ $? -ne 0 ]; then
+		if (( $? != 0 )) ; then
 			echo "Couldn't create DEBUG archives tarball." |
 			    tee -a $mail_msg_file >> $LOGFILE
 		fi
@@ -2706,7 +3075,7 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	if [ "$F_FLAG" = n ]; then
 		makebfu_filt bfudrop -n "$ROOT-open-nd" \
 		    "$closed_basename-nd.$MACH.tar.bz2" nightly-osol-nd
-		if [ $? -ne 0 ]; then
+		if (( $? != 0 )) ; then
 			echo "Couldn't create non-DEBUG archives tarball." |
 			    tee -a $mail_msg_file >> $LOGFILE
 		fi

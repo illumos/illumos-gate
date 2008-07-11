@@ -25,32 +25,12 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Exception list for the findunref tool.  Files in this list are by definition
-# intentionally never used during a standard nightly build.  Since very few
-# files fall into this category (that will not match the existing filename
-# globs), you should clear any additions to this file with the gatekeepers.
-#
 
 #
-# Ignore text files.
+# open-tree exception list
 #
-*.[1-9]
-*.memo
-*.mm
-*.txt
-*/*[Rr][Ee][Aa][Dd][Mm][Ee]*
-*/BUGS
-*/COMPATIBILITY
-*/COPYRIGHT
-*/CREDITS
-*/ChangeLog
-*/DESIGN
-*/HISTORY
-*/NOTES
-*/OBSOLETE
-*/READ_ME
-*/RELEASE*
-*/TODO
+# See README.exception_lists for details
+#
 
 #
 # Ignore oddly-named text files scattered about -- someday these should be
@@ -59,7 +39,7 @@
 ./src/cmd/oawk/EXPLAIN
 ./src/cmd/rpcsvc/nis/rpc.nisd/resolv_server/DNS_FWD
 ./src/cmd/vi/port/ex.news
-./src/cmd/ssh/doc/*
+./src/cmd/ssh/doc
 
 #
 # Ignore everything under trees that may be resynched from outside ON.
@@ -76,24 +56,24 @@
 # Ignore ksh93/ast-related files that are only used to resync our build
 # configuration with upstream.
 #
-./src/lib/libast/*/src/lib/libast/FEATURE/*
+./src/lib/libast/*/src/lib/libast/FEATURE
 ./src/lib/libast/common/comp/conf.*
-./src/lib/libast/common/features/*
+./src/lib/libast/common/features
 ./src/lib/libast/common/include/ast_windows.h
 ./src/lib/libast/common/port/lc.tab
 ./src/lib/libast/common/port/lcgen.c
-./src/lib/libcmd/*/src/lib/libcmd/FEATURE/*
-./src/lib/libcmd/common/features/*
-./src/lib/libdll/*/src/lib/libdll/FEATURE/*
-./src/lib/libdll/common/features/*
+./src/lib/libcmd/*/src/lib/libcmd/FEATURE
+./src/lib/libcmd/common/features
+./src/lib/libdll/*/src/lib/libdll/FEATURE
+./src/lib/libdll/common/features
 ./src/lib/libpp/*/pp.*
 ./src/lib/libpp/common/gentab.sh
 ./src/lib/libpp/common/ppsym.c
 ./src/lib/libpp/i386/ppdebug.h
 ./src/lib/libpp/sparc/ppdebug.h
-./src/lib/libshell/*/src/cmd/ksh93/FEATURE/*
+./src/lib/libshell/*/src/cmd/ksh93/FEATURE
 ./src/lib/libshell/common/data/math.tab
-./src/lib/libshell/common/features/*
+./src/lib/libshell/common/features
 ./src/lib/libshell/misc/buildksh93.ksh
 ./src/lib/libshell/misc/buildksh93.readme
 
@@ -130,10 +110,6 @@
 #
 # Ignore warlock-related goop; not used during a nightly.
 #
-*.wlc
-*.wlcmd
-*/wlcmd
-*/warlock
 ./src/uts/sparc/amsrc*/main.c
 
 #
@@ -167,10 +143,7 @@
 ./src/cmd/mdb/packages
 ./src/cmd/sgs/packages
 ./src/cmd/sgs/rtld.4.x
-./closed/cmd/zic/makefile.tzpkg
-./closed/cmd/zic/tzpkg.awk
 ./src/prototypes
-*/tools
 ./src/cmd/pools/poold/com/sun/solaris/*/*/package.html
 ./src/uts/intel/io/acpica/cmp_ca.sh
 
@@ -182,8 +155,6 @@
 #
 # Ignore files that get used during a EXPORT_SRC or CRYPT_SRC build only.
 #
-./closed/uts/sun4v/io/n2cp/Makefile
-./closed/uts/sun4v/io/ncp/Makefile
 ./src/common/crypto/aes/Makefile
 ./src/common/crypto/arcfour/Makefile
 ./src/common/crypto/blowfish/Makefile
@@ -262,12 +233,11 @@
 ./src/common/bignum/mont_mulf.c
 
 #
-# Ignore the sparc Makefiles for sata, si3124, marvell88sx, nv_sata, ahci
-# and audioixp.  These are used for warlock purposes only.
+# Ignore the sparc Makefiles for x86-only drivers;
+# they're used to build warlock only.
 #
 ./src/uts/sparc/sata/Makefile
 ./src/uts/sparc/si3124/Makefile
-./closed/uts/sparc/marvell88sx/Makefile
 ./src/uts/sparc/nv_sata/Makefile
 ./src/uts/sparc/ahci/Makefile
 ./src/uts/sparc/audioixp/Makefile
@@ -284,13 +254,3 @@
 ./src/cmd/fps/fptest/singdoub*
 ./src/pkgdefs/SUNWfsu/prototype_gcc_sparc
 ./src/pkgdefs/SUNWfsu/prototype_cc_sparc
-
-#
-# Ignore license files.  This should be temporary, and these lines
-# should be removed once we start generating the opensolaris.org
-# deliverables from the nightly gate builds.
-#
-*/COPYING*
-*/LICENSE*
-*/THIRDPARTYLICENSE*
-*/OPENSOLARIS.LICENSE

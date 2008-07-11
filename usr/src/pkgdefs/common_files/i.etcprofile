@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -23,8 +22,8 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1999,2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 PATH="/usr/bin:/usr/sbin:${PATH}" export PATH
@@ -34,19 +33,12 @@ do
 	if [ ! -f $dest ] ; then
 		cp $src $dest
 	else
-		(
-			# Get the SCCS ID from the source.
-			grep '^#.*ident.*@(#)profile' $src
-
-			# Remove the SCCS ID from the destination.
-			# Solaris/Intel console type now "sun-color".
-			# Add -bash to shell case
-			SHELLS='-sh | -ksh | -jsh'
-			sed -e '/^#.*ident.*@(#)profile/d' \
-			    -e "s/^${SHELLS})$/${SHELLS} | -bash)/" \
-			    -e 's/TERM=AT386/TERM=sun-color/' \
-			    $dest
-		) > /tmp/prof.$$
+		# Solaris/Intel console type now "sun-color".
+		# Add -bash to shell case
+		SHELLS='-sh | -ksh | -jsh'
+		sed -e "s/^${SHELLS})$/${SHELLS} | -bash)/" \
+		    -e 's/TERM=AT386/TERM=sun-color/' \
+		    $dest > /tmp/prof.$$
 		cp /tmp/prof.$$ $dest
 		rm -f /tmp/prof.$$
 	fi
