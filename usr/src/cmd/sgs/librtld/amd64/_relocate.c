@@ -42,10 +42,7 @@ void
 undo_reloc(void *vrel, uchar_t *oaddr, uchar_t *iaddr, Reloc *reloc)
 {
 	Rela		*rel = vrel;
-	const Rel_entry	*rep;
 	Xword		rtype = ELF_R_TYPE(rel->r_info, M_MACH);
-	ulong_t		*_oaddr;
-	ulong_t		*_iaddr;
 
 	switch (rtype) {
 	case R_AMD64_NONE:
@@ -54,33 +51,34 @@ undo_reloc(void *vrel, uchar_t *oaddr, uchar_t *iaddr, Reloc *reloc)
 		(void) memset((void *)oaddr, 0, (size_t)reloc->r_size);
 		break;
 	case R_AMD64_JUMP_SLOT:
-		/* LINTED */
-		_oaddr = (unsigned long *)oaddr;
-		/* LINTED */
-		_iaddr = (unsigned long *)iaddr;
+		{
+			/* LINTED */
+			ulong_t *_oaddr = (ulong_t *)oaddr;
+			/* LINTED */
+			ulong_t *_iaddr = (ulong_t *)iaddr;
 
-		if (_iaddr) {
-			*_oaddr++ = *_iaddr++;
-			*_oaddr++ = *_iaddr++;
-			*_oaddr = *_iaddr;
-		} else {
-			*_oaddr++ = 0;
-			*_oaddr++ = 0;
-			*_oaddr = 0;
+			if (_iaddr)
+				*_oaddr = *_iaddr + reloc->r_value;
+			else
+				*_oaddr = reloc->r_value;
 		}
 		break;
 	default:
-		rep = &reloc_table[rtype];
-		if (iaddr)
-			(void) memcpy(oaddr, iaddr, rep->re_fsize);
-		else
-			(void) memset(oaddr, 0, rep->re_fsize);
+		{
+			size_t re_fsize = reloc_table[rtype].re_fsize;
+
+			if (iaddr)
+				(void) memcpy(oaddr, iaddr, re_fsize);
+			else
+				(void) memset(oaddr, 0, re_fsize);
+		}
 	}
 }
 
 /*
  * Copy a relocation record and increment its value.  The record must reflect
- * the new address to which this image is fixed.
+ * the new address to which this image is fixed. Note that .got entries
+ * associated with .plt's must be fixed to the new base address.
  */
 /* ARGSUSED3 */
 void
@@ -89,6 +87,18 @@ inc_reloc(void *vnrel, void *vorel, Reloc *reloc, uchar_t *oaddr,
 {
 	Rela	*nrel = vnrel;
 	Rela	*orel = vorel;
+
+	if (ELF_R_TYPE(nrel->r_info, M_MACH) == R_AMD64_JUMP_SLOT) {
+		/* LINTED */
+		ulong_t	*_oaddr = (ulong_t *)oaddr;
+		/* LINTED */
+		ulong_t	*_iaddr = (ulong_t *)iaddr;
+
+		if (_iaddr)
+			*_oaddr = *_iaddr + reloc->r_value;
+		else
+			*_oaddr = reloc->r_value;
+	}
 
 	*nrel = *orel;
 	nrel->r_offset += reloc->r_value;

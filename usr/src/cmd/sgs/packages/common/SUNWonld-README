@@ -1366,3 +1366,4 @@ Bugid   Risk Synopsis
 6720509 usr/src/cmd/sgs/sgsdemangler should be removed
 6617475 gas creates erroneous FILE symbols [was: ld.so.1 is reported as
 	false positive by wsdiff]
+6724311 dldump() mishandles R_AMD64_JUMP_SLOT relocations
