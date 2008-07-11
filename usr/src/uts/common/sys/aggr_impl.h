@@ -84,6 +84,12 @@ typedef struct aggr_port_s {
 	uint32_t	lp_margin;
 } aggr_port_t;
 
+typedef struct lg_mcst_addr_s	lg_mcst_addr_t;
+struct lg_mcst_addr_s {
+	lg_mcst_addr_t	*lg_mcst_nextp;
+	uint8_t		lg_mcst_addr[MAXMACADDRLEN];
+};
+
 /*
  * A link aggregation group.
  *
@@ -136,6 +142,7 @@ typedef struct aggr_grp_s {
 	uint32_t	lg_hcksum_txflags;
 	uint_t		lg_max_sdu;
 	uint32_t	lg_margin;
+	lg_mcst_addr_t	*lg_mcst_list; /* A list of multicast addresses */
 } aggr_grp_t;
 
 #define	AGGR_LACP_LOCK(grp)	mutex_enter(&(grp)->aggr.gl_lock);

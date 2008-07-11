@@ -78,6 +78,8 @@ static uint_t aggr_grp_max_sdu(aggr_grp_t *);
 static uint32_t aggr_grp_max_margin(aggr_grp_t *);
 static boolean_t aggr_grp_sdu_check(aggr_grp_t *, aggr_port_t *);
 static boolean_t aggr_grp_margin_check(aggr_grp_t *, aggr_port_t *);
+static int aggr_grp_multicst(aggr_grp_t *grp, boolean_t add,
+    const uint8_t *addrp);
 
 static kmem_cache_t	*aggr_grp_cache;
 static mod_hash_t	*aggr_grp_hash;
@@ -722,6 +724,7 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 		goto bail;
 	}
 	grp->lg_key = key;
+	grp->lg_mcst_list = NULL;
 
 	for (i = 0; i < nports; i++) {
 		err = aggr_grp_add_port(grp, ports[i].lp_linkid, force, NULL);
@@ -1029,6 +1032,7 @@ aggr_grp_delete(datalink_id_t linkid)
 {
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port, *cport;
+	lg_mcst_addr_t *mcst, *mcst_nextp;
 	datalink_id_t tmpid;
 	mod_hash_val_t val;
 	int err;
@@ -1071,6 +1075,15 @@ aggr_grp_delete(datalink_id_t linkid)
 		rw_exit(&aggr_grp_lock);
 		return (err);
 	}
+
+	/*
+	 * Free the list of multicast addresses.
+	 */
+	for (mcst = grp->lg_mcst_list; mcst != NULL; mcst = mcst_nextp) {
+		mcst_nextp = mcst->lg_mcst_nextp;
+		kmem_free(mcst, sizeof (lg_mcst_addr_t));
+	}
+	grp->lg_mcst_list = NULL;
 
 	/* detach and free MAC ports associated with group */
 	port = grp->lg_ports;
@@ -1381,6 +1394,36 @@ aggr_m_capab_get(void *arg, mac_capab_t cap, void *cap_data)
 	return (B_TRUE);
 }
 
+static int
+aggr_grp_multicst(aggr_grp_t *grp, boolean_t add, const uint8_t *addrp)
+{
+	lg_mcst_addr_t	*mcst, **ppmcst;
+
+	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
+
+	for (ppmcst = &(grp->lg_mcst_list); (mcst = *ppmcst) != NULL;
+	    ppmcst = &(mcst->lg_mcst_nextp)) {
+		if (bcmp(mcst->lg_mcst_addr, addrp, MAXMACADDRLEN) == 0)
+			break;
+	}
+
+	if (add) {
+		if (mcst != NULL)
+			return (0);
+		mcst = kmem_zalloc(sizeof (lg_mcst_addr_t), KM_NOSLEEP);
+		if (mcst == NULL)
+			return (ENOMEM);
+		bcopy(addrp, mcst->lg_mcst_addr, MAXMACADDRLEN);
+		*ppmcst = mcst;
+	} else {
+		if (mcst == NULL)
+			return (ENOENT);
+		*ppmcst = mcst->lg_mcst_nextp;
+		kmem_free(mcst, sizeof (lg_mcst_addr_t));
+	}
+	return (0);
+}
+
 /*
  * Add or remove the multicast addresses that are defined for the group
  * to or from the specified port.
@@ -1391,6 +1434,7 @@ void
 aggr_grp_multicst_port(aggr_port_t *port, boolean_t add)
 {
 	aggr_grp_t *grp = port->lp_grp;
+	lg_mcst_addr_t	*mcst;
 
 	ASSERT(RW_WRITE_HELD(&port->lp_lock));
 	ASSERT(RW_WRITE_HELD(&grp->lg_lock) || RW_READ_HELD(&grp->lg_lock));
@@ -1398,7 +1442,9 @@ aggr_grp_multicst_port(aggr_port_t *port, boolean_t add)
 	if (!port->lp_started)
 		return;
 
-	mac_multicst_refresh(grp->lg_mh, aggr_port_multicst, port, add);
+	for (mcst = grp->lg_mcst_list; mcst != NULL;
+	    mcst = mcst->lg_mcst_nextp)
+		(void) aggr_port_multicst(port, add, mcst->lg_mcst_addr);
 }
 
 static int
@@ -1413,6 +1459,8 @@ aggr_m_multicst(void *arg, boolean_t add, const uint8_t *addrp)
 		if (port->lp_state != AGGR_PORT_STATE_ATTACHED)
 			continue;
 		cerr = aggr_port_multicst(port, add, addrp);
+		if (cerr == 0)
+			(void) aggr_grp_multicst(grp, add, addrp);
 		if (cerr != 0 && err == 0)
 			err = cerr;
 	}
