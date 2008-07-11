@@ -11844,6 +11844,8 @@ sd_initpkt_for_buf(struct buf *bp, struct scsi_pkt **pktpp)
 	SD_TRACE(SD_LOG_IO_CORE, un,
 	    "sd_initpkt_for_buf: entry: buf:0x%p\n", bp);
 
+	mutex_exit(SD_MUTEX(un));
+
 #if defined(__i386) || defined(__amd64)	/* DMAFREE for x86 only */
 	if (xp->xb_pkt_flags & SD_XB_DMA_FREED) {
 		/*
@@ -11912,6 +11914,7 @@ sd_initpkt_for_buf(struct buf *bp, struct scsi_pkt **pktpp)
 		xp->xb_pkt_flags &= ~SD_XB_DMA_FREED;
 #endif
 
+		mutex_enter(SD_MUTEX(un));
 		return (SD_PKT_ALLOC_SUCCESS);
 
 	}
@@ -11929,6 +11932,7 @@ sd_initpkt_for_buf(struct buf *bp, struct scsi_pkt **pktpp)
 		 * is waiting on resource allocations. The driver will not
 		 * suspend, pm_suspend, or detatch while the state is RWAIT.
 		 */
+		mutex_enter(SD_MUTEX(un));
 		New_state(un, SD_STATE_RWAIT);
 
 		SD_ERROR(SD_LOG_IO_CORE, un,
@@ -11950,6 +11954,7 @@ sd_initpkt_for_buf(struct buf *bp, struct scsi_pkt **pktpp)
 		    "lba:0x%08lx  len:0x%08lx\n", startblock, blockcount);
 		SD_ERROR(SD_LOG_IO_CORE, un,
 		    "sd_initpkt_for_buf: No cp. exit bp:0x%p\n", bp);
+		mutex_enter(SD_MUTEX(un));
 		return (SD_PKT_ALLOC_FAILURE_CDB_TOO_SMALL);
 
 	}

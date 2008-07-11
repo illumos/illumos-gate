@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -623,7 +623,9 @@ _NOTE(SCHEME_PROTECTS_DATA("stable data",
 	sd_lun::un_uscsi_chain_type
 	sd_lun::un_direct_chain_type
 	sd_lun::un_priority_chain_type
-	sd_lun::un_xbuf_attr))
+	sd_lun::un_xbuf_attr
+	sd_lun::un_cmd_timeout
+	sd_lun::un_pkt_flags))
 
 _NOTE(SCHEME_PROTECTS_DATA("Unshared data",
 	block_descriptor
