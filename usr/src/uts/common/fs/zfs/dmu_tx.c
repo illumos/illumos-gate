@@ -379,7 +379,7 @@ dmu_tx_count_free(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 	 */
 	{
 		uint64_t blkcnt = 1 + ((nblks >> epbs) >> epbs);
-		int level = dn->dn_nlevels > 1 ? 2 : 1;
+		int level = (dn->dn_nlevels > 1) ? 2 : 1;
 
 		while (level++ < DN_MAX_LEVELS) {
 			txh->txh_memory_tohold += blkcnt << dn->dn_indblkshift;
@@ -400,17 +400,22 @@ dmu_tx_count_free(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 		err = dnode_next_offset(dn,
 		    DNODE_FIND_HAVELOCK, &ibyte, 2, 1, 0);
 		new_blkid = ibyte >> dn->dn_datablkshift;
-		if (err == ESRCH)
+		if (err == ESRCH) {
+			skipped += (lastblk >> epbs) - (blkid >> epbs) + 1;
 			break;
+		}
 		if (err) {
 			txh->txh_tx->tx_err = err;
 			break;
 		}
-		if (new_blkid > lastblk)
+		if (new_blkid > lastblk) {
+			skipped += (lastblk >> epbs) - (blkid >> epbs) + 1;
 			break;
+		}
 
 		if (new_blkid > blkid) {
-			skipped += new_blkid - blkid - 1;
+			ASSERT((new_blkid >> epbs) > (blkid >> epbs));
+			skipped += (new_blkid >> epbs) - (blkid >> epbs) - 1;
 			nblks -= new_blkid - blkid;
 			blkid = new_blkid;
 		}
@@ -450,7 +455,7 @@ dmu_tx_count_free(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 	rw_exit(&dn->dn_struct_rwlock);
 
 	/* account for new level 1 indirect blocks that might show up */
-	if (skipped) {
+	if (skipped > 0) {
 		txh->txh_fudge += skipped << dn->dn_indblkshift;
 		skipped = MIN(skipped, DMU_MAX_DELETEBLKCNT >> epbs);
 		txh->txh_memory_tohold += skipped << dn->dn_indblkshift;

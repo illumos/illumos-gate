@@ -1794,6 +1794,13 @@ zvol_dump_fini(zvol_state_t *zv)
 	int error = 0;
 	uint64_t checksum, compress, refresrv;
 
+	/*
+	 * Attempt to restore the zvol back to its pre-dumpified state.
+	 * This is a best-effort attempt as it's possible that not all
+	 * of these properties were initialized during the dumpify process
+	 * (i.e. error during zvol_dump_init).
+	 */
+
 	tx = dmu_tx_create(os);
 	dmu_tx_hold_zap(tx, ZVOL_ZAP_OBJ, TRUE, NULL);
 	error = dmu_tx_assign(tx, TXG_WAIT);
@@ -1801,25 +1808,15 @@ zvol_dump_fini(zvol_state_t *zv)
 		dmu_tx_abort(tx);
 		return (error);
 	}
+	(void) zap_remove(os, ZVOL_ZAP_OBJ, ZVOL_DUMPSIZE, tx);
+	dmu_tx_commit(tx);
 
-	/*
-	 * Attempt to restore the zvol back to its pre-dumpified state.
-	 * This is a best-effort attempt as it's possible that not all
-	 * of these properties were initialized during the dumpify process
-	 * (i.e. error during zvol_dump_init).
-	 */
 	(void) zap_lookup(zv->zv_objset, ZVOL_ZAP_OBJ,
 	    zfs_prop_to_name(ZFS_PROP_CHECKSUM), 8, 1, &checksum);
 	(void) zap_lookup(zv->zv_objset, ZVOL_ZAP_OBJ,
 	    zfs_prop_to_name(ZFS_PROP_COMPRESSION), 8, 1, &compress);
 	(void) zap_lookup(zv->zv_objset, ZVOL_ZAP_OBJ,
 	    zfs_prop_to_name(ZFS_PROP_REFRESERVATION), 8, 1, &refresrv);
-
-	(void) zap_remove(os, ZVOL_ZAP_OBJ, ZVOL_DUMPSIZE, tx);
-	zvol_free_extents(zv);
-	(void) dmu_free_long_range(os, ZVOL_OBJ, 0, DMU_OBJECT_END);
-	zv->zv_flags &= ~ZVOL_DUMPIFIED;
-	dmu_tx_commit(tx);
 
 	VERIFY(nvlist_alloc(&nv, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 	(void) nvlist_add_uint64(nv,
@@ -1830,6 +1827,10 @@ zvol_dump_fini(zvol_state_t *zv)
 	    zfs_prop_to_name(ZFS_PROP_REFRESERVATION), refresrv);
 	(void) zfs_set_prop_nvlist(zv->zv_name, nv);
 	nvlist_free(nv);
+
+	zvol_free_extents(zv);
+	zv->zv_flags &= ~ZVOL_DUMPIFIED;
+	(void) dmu_free_long_range(os, ZVOL_OBJ, 0, DMU_OBJECT_END);
 
 	return (0);
 }
