@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,3 +54,4 @@ P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
 P SUNWldomr	Solaris Logical Domains (Root)
+P SUNWperl584core	Perl 5.8.4 (core)

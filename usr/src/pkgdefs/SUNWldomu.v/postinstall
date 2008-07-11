@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -20,30 +21,16 @@
 #
 
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# This required package information file contains a list of package contents.
-# The 'pkgmk' command uses this file to identify the contents of a package
-# and their location on the development machine when building the package.
-# Can be created via a text editor or through use of the 'pkgproto' command.
-#
-
-#!search <pathname pathname ...>	# where to find pkg objects
-#!include <filename>			# include another 'prototype' file
-#!default <mode> <owner> <group>	# default used if not specified on entry
-#!<param>=<value>			# puts parameter in pkg environment
-
-# packaging files
-i pkginfo
-i copyright
-i depend
-i postinstall
 
 #
-# source locations relative to the prototype file
+# After installation of a new script into /usr/lib/rcm/scripts, we must
+# force rcm_daemon to reinitialize, which makes it aware of the new script.
 #
-# SUNWldomu.v
-#
+/usr/bin/pkill -HUP -x -u root rcm_daemon
+
+exit 0
