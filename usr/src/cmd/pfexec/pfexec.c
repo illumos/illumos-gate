@@ -30,6 +30,7 @@
 #include <locale.h>
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/stat.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <ctype.h>
@@ -163,7 +164,9 @@ main(int argc, char *argv[])
 		(void) adt_end_session(ah);
 		(void) setreuid(uid, uid);
 		(void) execvp(cmd, cmdargs);
-		perror(cmd);
+		(void) fprintf(stderr,
+		    gettext("pfexec: can't execute %s: %s\n"),
+		    cmd, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
@@ -180,7 +183,8 @@ main(int argc, char *argv[])
 	/*
 	 * We'd be here only if execv fails.
 	 */
-	perror("pfexec");
+	(void) fprintf(stderr, gettext("pfexec: can't execute %s: %s\n"),
+	    cmd, strerror(errno));
 	exit(EXIT_FAILURE);
 /* LINTED */
 }
@@ -519,14 +523,20 @@ get_profile_privs(char *profiles, char **profArray, int *profcnt,
 }
 
 /*
+ * True if someone (user, group, other) can execute this file.
+ */
+#define	S_ISEXEC(mode)	(((mode)&(S_IXUSR|S_IXGRP|S_IXOTH)) != 0)
+
+/*
  * This function can return either the first argument or dynamically
  * allocated memory.  Reuse with care.
  */
 static char *
 pathsearch(char *cmd)
 {
-	char *path, *dir;
+	char *path, *dir, *result;
 	char buf[MAXPATHLEN];
+	struct stat stbuf;
 
 	/*
 	 * Implement shell like PATH searching; if the pathname contains
@@ -550,17 +560,30 @@ pathsearch(char *cmd)
 		exit(EXIT_FAILURE);
 	}
 
+	result = NULL;
 	for (dir = strtok(path, ":"); dir; dir = strtok(NULL, ":")) {
 		if (snprintf(buf, sizeof (buf), "%s/%s", dir, cmd) >=
 		    sizeof (buf)) {
 			continue;
 		}
-		if (access(buf, X_OK) == 0) {
-			free(path);
-			return (strdup(buf));
+		if (stat(buf, &stbuf) < 0)
+			continue;
+		/*
+		 * Shells typically call access() with E_OK flag
+		 * to determine if the effective uid can execute
+		 * the file. We don't know what the eventual euid
+		 * will be; it is determined by the exec_attr
+		 * attributes which depend on the full pathname of
+		 * the command. Therefore, we match the first regular
+		 * file we find that is executable by someone.
+		 */
+		if (S_ISREG(stbuf.st_mode) && S_ISEXEC(stbuf.st_mode)) {
+			result = strdup(buf);
+			break;
 		}
 	}
 	free(path);
-	(void) fprintf(stderr, gettext("%s: Command not found\n"), cmd);
-	return (NULL);
+	if (result == NULL)
+		(void) fprintf(stderr, gettext("%s: Command not found\n"), cmd);
+	return (result);
 }
