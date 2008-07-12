@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1362,7 +1362,7 @@ meta_sp_alloc_by_len(
 			 */
 			align = (alignment > 0) &&
 			    (((alloc_ext->ext_offset + MD_SP_WMSIZE) %
-				alignment) == 0);
+			    alignment) == 0);
 
 			/*
 			 * If we decided not to align here, we should
@@ -1434,7 +1434,7 @@ meta_sp_alloc_by_len(
 		 * that doesn't have a highly fragmented corner case.
 		 */
 		for (free_ext = *head; free_ext != NULL;
-			free_ext = free_ext->ext_next) {
+		    free_ext = free_ext->ext_next) {
 			sp_ext_offset_t	a_offset;
 			sp_ext_offset_t	a_length;
 
@@ -1483,13 +1483,13 @@ meta_sp_alloc_by_len(
 				 * the space lost above (if any)
 				 */
 				a_length -=
-					(a_offset - free_ext->ext_offset);
+				    (a_offset - free_ext->ext_offset);
 			}
 
 			if (a_length >= len + MD_SP_WMSIZE) {
 				meta_sp_alloc_by_ext(sp, np, head,
-					free_ext, a_offset,
-					len + MD_SP_WMSIZE, last_seq);
+				    free_ext, a_offset,
+				    len + MD_SP_WMSIZE, last_seq);
 
 				len = 0LL;
 				numexts++;
@@ -1508,7 +1508,7 @@ meta_sp_alloc_by_len(
 		 * is satisfied.
 		 */
 		for (free_ext = *head; (free_ext != NULL) && (len > 0);
-			free_ext = free_ext->ext_next) {
+		    free_ext = free_ext->ext_next) {
 			sp_ext_offset_t a_offset;
 			sp_ext_length_t a_length;
 
@@ -1534,7 +1534,7 @@ meta_sp_alloc_by_len(
 				 * on a properly aligned boundary.
 				 */
 				a_offset += alignment -
-					(a_offset % alignment) - MD_SP_WMSIZE;
+				    (a_offset % alignment) - MD_SP_WMSIZE;
 
 				/*
 				 * This is only necessary in case the
@@ -1552,7 +1552,7 @@ meta_sp_alloc_by_len(
 				 * the space lost above (if any)
 				 */
 				a_length -=
-					(a_offset - free_ext->ext_offset);
+				    (a_offset - free_ext->ext_offset);
 
 				/*
 				 * Adjust the length to be properly
@@ -1561,8 +1561,8 @@ meta_sp_alloc_by_len(
 				 */
 				if ((a_length - MD_SP_WMSIZE) < len)
 					a_length -=
-						(a_length - MD_SP_WMSIZE)
-						% alignment;
+					    (a_length - MD_SP_WMSIZE)
+					    % alignment;
 			}
 
 			alloc_len = MIN(len, a_length - MD_SP_WMSIZE);
@@ -1576,8 +1576,8 @@ meta_sp_alloc_by_len(
 			 * alloc_len here.
 			 */
 			meta_sp_alloc_by_ext(sp, np, head, free_ext,
-				a_offset, MIN(len + MD_SP_WMSIZE, a_length),
-				last_seq);
+			    a_offset, MIN(len + MD_SP_WMSIZE, a_length),
+			    last_seq);
 
 			len -= alloc_len;
 			numexts++;
@@ -1603,14 +1603,14 @@ meta_sp_alloc_by_len(
 		/* First, extend the last extent if this is a grow */
 		if (last_off != 0LL) {
 			alloc_ext =
-				meta_sp_list_find(*head, last_off);
+			    meta_sp_list_find(*head, last_off);
 			assert(alloc_ext != NULL);
 
 			last_seq = alloc_ext->ext_seq;
 
 			free_ext = meta_sp_list_find(*head,
-				alloc_ext->ext_offset +
-				alloc_ext->ext_length);
+			    alloc_ext->ext_offset +
+			    alloc_ext->ext_length);
 
 			/*
 			 * If a free extent follows our last allocated
@@ -1652,7 +1652,7 @@ meta_sp_alloc_by_len(
 
 		/* Next, grab all remaining free space */
 		for (free_ext = *head; free_ext != NULL;
-			free_ext = free_ext->ext_next) {
+		    free_ext = free_ext->ext_next) {
 
 			if (free_ext->ext_type == EXTTYP_FREE) {
 				alloc_len =
@@ -1883,56 +1883,57 @@ meta_sp_extlist_from_wm(
 		 */
 		if (strcmp(wm.wm_mdname, MD_SP_FREEWMNAME) != 0) {
 
-		    if (!metaislocalset(sp) && MD_MNSET_DESC(sd)) {
-			md_mn_msg_addmdname_t	*send_params;
-			int			result;
-			md_mn_result_t		*resp = NULL;
-			int			message_size;
+			if (!metaislocalset(sp) && MD_MNSET_DESC(sd)) {
+				md_mn_msg_addmdname_t	*send_params;
+				int			result;
+				md_mn_result_t		*resp = NULL;
+				int			message_size;
 
-			message_size =  sizeof (*send_params) +
-			    strlen(wm.wm_mdname) + 1;
-			send_params = Zalloc(message_size);
-			send_params->addmdname_setno = sp->setno;
-			(void) strcpy(&send_params->addmdname_name[0],
-			    wm.wm_mdname);
-			result = mdmn_send_message(sp->setno,
-			    MD_MN_MSG_ADDMDNAME,
-			    MD_MSGF_PANIC_WHEN_INCONSISTENT,
-			    (char *)send_params, message_size, &resp,
-			    ep);
-			Free(send_params);
-			if (resp != NULL) {
-				if (resp->mmr_exitval != 0) {
+				message_size =  sizeof (*send_params) +
+				    strlen(wm.wm_mdname) + 1;
+				send_params = Zalloc(message_size);
+				send_params->addmdname_setno = sp->setno;
+				(void) strcpy(&send_params->addmdname_name[0],
+				    wm.wm_mdname);
+				result = mdmn_send_message(sp->setno,
+				    MD_MN_MSG_ADDMDNAME,
+				    MD_MSGF_PANIC_WHEN_INCONSISTENT,
+				    (char *)send_params, message_size, &resp,
+				    ep);
+				Free(send_params);
+				if (resp != NULL) {
+					if (resp->mmr_exitval != 0) {
+						free_result(resp);
+						return (-1);
+					}
 					free_result(resp);
-					return (-1);
 				}
-				free_result(resp);
+				if (result != 0)
+					return (-1);
+			} else {
+
+				if (!is_existing_meta_hsp(sp, wm.wm_mdname)) {
+					if ((key = meta_init_make_device(&sp,
+					    wm.wm_mdname, ep)) <= 0) {
+						return (-1);
+					}
+					init = 1;
+				}
 			}
-			if (result != 0)
+
+			np = metaname(&spsetp, wm.wm_mdname, META_DEVICE, ep);
+			if (np == NULL) {
+				if (init) {
+					if (meta_getnmentbykey(sp->setno,
+					    MD_SIDEWILD, key, NULL, &mnum,
+					    NULL, ep) != NULL) {
+						(void) metaioctl(MD_IOCREM_DEV,
+						    &mnum, ep, NULL);
+					}
+					(void) del_self_name(sp, key, ep);
+				}
 				return (-1);
-		    } else {
-
-			if (!is_existing_meta_hsp(sp, wm.wm_mdname)) {
-			    if ((key = meta_init_make_device(&sp,
-				wm.wm_mdname, ep)) <= 0) {
-					return (-1);
-				}
-				init = 1;
 			}
-		    }
-
-		    np = metaname(&spsetp, wm.wm_mdname, META_DEVICE, ep);
-		    if (np == NULL) {
-			if (init) {
-			    if (meta_getnmentbykey(sp->setno, MD_SIDEWILD,
-				key, NULL, &mnum, NULL, ep) != NULL) {
-				    (void) metaioctl(MD_IOCREM_DEV, &mnum,
-						ep, NULL);
-			    }
-			    (void) del_self_name(sp, key, ep);
-			}
-			return (-1);
-		    }
 		}
 
 		/* insert watermark into extent list */
@@ -2207,8 +2208,8 @@ meta_sp_report(
 
 		/* determine if devid does NOT exist */
 		if (options & PRINT_DEVID) {
-		    if ((dtp = meta_getdidbykey(sp->setno, getmyside(sp, ep),
-					didnp->key, ep)) == NULL)
+			if ((dtp = meta_getdidbykey(sp->setno,
+			    getmyside(sp, ep), didnp->key, ep)) == NULL)
 				devid = dgettext(TEXT_DOMAIN, "No ");
 			else {
 				devid = dgettext(TEXT_DOMAIN, "Yes");
@@ -2664,7 +2665,7 @@ meta_sp_enough_space(
 	enough_space = B_TRUE;
 	number_of_sps = 0;
 	while ((enough_space == B_TRUE) &&
-		(number_of_sps < desired_number_of_sps)) {
+	    (number_of_sps < desired_number_of_sps)) {
 		/*
 		 * Use the extent allocation algorithm implemented by
 		 * meta_sp_alloc_by_len() to test whether the free
@@ -2679,12 +2680,9 @@ meta_sp_enough_space(
 		 * creating the soft partition.
 		 */
 		number_of_extents_used = meta_sp_alloc_by_len(
-						TEST_SETNAMEP,
-						TEST_SOFT_PARTITION_NAMEP,
-						extent_listpp,
-						&desired_ext_length,
-						NO_OFFSET,
-						alignment);
+		    TEST_SETNAMEP, TEST_SOFT_PARTITION_NAMEP,
+		    extent_listpp, &desired_ext_length,
+		    NO_OFFSET, alignment);
 		if (number_of_extents_used == -1) {
 			enough_space = B_FALSE;
 		} else {
@@ -2732,22 +2730,22 @@ meta_sp_get_extent_list(
 	sp_name_listp = NULL;
 
 	start_block_address_in_blocks = meta_sp_get_start(mdsetnamep,
-						device_mdnamep,
-						ep);
+	    device_mdnamep, ep);
 	if (start_block_address_in_blocks == MD_DISKADDR_ERROR) {
-	    if (getenv(META_SP_DEBUG)) {
-		mde_perror(ep, "meta_sp_get_extent_list:meta_sp_get_start");
-	    }
-	    return (B_FALSE);
+		if (getenv(META_SP_DEBUG)) {
+			mde_perror(ep,
+			    "meta_sp_get_extent_list:meta_sp_get_start");
+		}
+		return (B_FALSE);
 	}
 
 	device_size_in_blocks = metagetsize(device_mdnamep, ep);
 	if (device_size_in_blocks == MD_DISKADDR_ERROR) {
-	    if (getenv(META_SP_DEBUG)) {
-		mde_perror(ep,
-		    "meta_sp_get_extent_list:metagetsize");
-	    }
-	    return (B_FALSE);
+		if (getenv(META_SP_DEBUG)) {
+			mde_perror(ep,
+			    "meta_sp_get_extent_list:metagetsize");
+		}
+		return (B_FALSE);
 	}
 
 	/*
@@ -2758,8 +2756,8 @@ meta_sp_get_extent_list(
 	 */
 	if (device_size_in_blocks <=
 	    (start_block_address_in_blocks + MD_SP_WMSIZE)) {
-	    (void) mdmderror(ep, MDE_SP_NOSPACE, 0, device_mdnamep->cname);
-	    return (B_FALSE);
+		(void) mdmderror(ep, MDE_SP_NOSPACE, 0, device_mdnamep->cname);
+		return (B_FALSE);
 	}
 
 	/*
@@ -2773,25 +2771,15 @@ meta_sp_get_extent_list(
 	 * the start block of the device and ends one watermark before
 	 * the end of the device.
 	 */
-	meta_sp_list_insert(TEST_SETNAMEP,
-			    TEST_SOFT_PARTITION_NAMEP,
-			    extent_listpp,
-			    NO_OFFSET,
-			    (sp_ext_length_t)start_block_address_in_blocks,
-			    EXTTYP_RESERVED,
-			    NO_SEQUENCE_NUMBER,
-			    NO_FLAGS,
-			    meta_sp_cmp_by_offset);
-	meta_sp_list_insert(TEST_SETNAMEP,
-			    TEST_SOFT_PARTITION_NAMEP,
-			    extent_listpp,
-			    (sp_ext_offset_t)(device_size_in_blocks -
-				MD_SP_WMSIZE),
-			    MD_SP_WMSIZE,
-			    EXTTYP_END,
-			    NO_SEQUENCE_NUMBER,
-			    NO_FLAGS,
-			    meta_sp_cmp_by_offset);
+	meta_sp_list_insert(TEST_SETNAMEP, TEST_SOFT_PARTITION_NAMEP,
+	    extent_listpp, NO_OFFSET,
+	    (sp_ext_length_t)start_block_address_in_blocks,
+	    EXTTYP_RESERVED, NO_SEQUENCE_NUMBER, NO_FLAGS,
+	    meta_sp_cmp_by_offset);
+	meta_sp_list_insert(TEST_SETNAMEP, TEST_SOFT_PARTITION_NAMEP,
+	    extent_listpp, (sp_ext_offset_t)(device_size_in_blocks -
+	    MD_SP_WMSIZE), MD_SP_WMSIZE, EXTTYP_END, NO_SEQUENCE_NUMBER,
+	    NO_FLAGS, meta_sp_cmp_by_offset);
 
 	/*
 	 * Get the list of soft partitions that are already on the
@@ -2885,7 +2873,7 @@ meta_sp_get_extent_list_for_drive(
 	*extent_listpp = NULL;
 	mderror = mdnullerror;
 	test_sp_struct.compnamep = metaslicename(mddrivenamep, MD_SLICE0,
-					&mderror);
+	    &mderror);
 	if (test_sp_struct.compnamep == NULL) {
 		can_use = B_FALSE;
 	}
@@ -2894,8 +2882,7 @@ meta_sp_get_extent_list_for_drive(
 		mderror = mdnullerror;
 		repartition_options = 0;
 		return_value = meta_check_sp(mdsetnamep, &test_sp_struct,
-				MDCMD_USE_WHOLE_DISK, &repartition_options,
-				&mderror);
+		    MDCMD_USE_WHOLE_DISK, &repartition_options, &mderror);
 		if (return_value != 0) {
 			can_use = B_FALSE;
 		}
@@ -2904,9 +2891,9 @@ meta_sp_get_extent_list_for_drive(
 	if (can_use == B_TRUE) {
 		mderror = mdnullerror;
 		repartition_options = repartition_options |
-			(MD_REPART_FORCE | MD_REPART_DONT_LABEL);
+		    (MD_REPART_FORCE | MD_REPART_DONT_LABEL);
 		return_value = meta_repartition_drive(mdsetnamep, mddrivenamep,
-				repartition_options, &proposed_vtoc, &mderror);
+		    repartition_options, &proposed_vtoc, &mderror);
 		if (return_value != 0) {
 			can_use = B_FALSE;
 		}
@@ -2955,24 +2942,14 @@ meta_sp_get_extent_list_for_drive(
 		 * reserves space for a watermark at the end of
 		 * slice zero.
 		 */
-		meta_sp_list_insert(TEST_SETNAMEP,
-			TEST_SOFT_PARTITION_NAMEP,
-			extent_listpp,
-			NO_OFFSET,
-			(sp_ext_length_t)(MD_SP_START),
-			EXTTYP_RESERVED,
-			NO_SEQUENCE_NUMBER,
-			NO_FLAGS,
-			meta_sp_cmp_by_offset);
-		meta_sp_list_insert(TEST_SETNAMEP,
-			TEST_SOFT_PARTITION_NAMEP,
-			extent_listpp,
-			(sp_ext_offset_t)(free_space - MD_SP_WMSIZE),
-			MD_SP_WMSIZE,
-			EXTTYP_END,
-			NO_SEQUENCE_NUMBER,
-			NO_FLAGS,
-			meta_sp_cmp_by_offset);
+		meta_sp_list_insert(TEST_SETNAMEP, TEST_SOFT_PARTITION_NAMEP,
+		    extent_listpp, NO_OFFSET, (sp_ext_length_t)(MD_SP_START),
+		    EXTTYP_RESERVED, NO_SEQUENCE_NUMBER, NO_FLAGS,
+		    meta_sp_cmp_by_offset);
+		meta_sp_list_insert(TEST_SETNAMEP, TEST_SOFT_PARTITION_NAMEP,
+		    extent_listpp, (sp_ext_offset_t)(free_space - MD_SP_WMSIZE),
+		    MD_SP_WMSIZE, EXTTYP_END, NO_SEQUENCE_NUMBER, NO_FLAGS,
+		    meta_sp_cmp_by_offset);
 		meta_sp_list_freefill(extent_listpp, free_space);
 	}
 	return (can_use);
@@ -3007,7 +2984,7 @@ meta_sp_can_create_sps(
 
 	if ((number_of_sps > 0) && (sp_size > 0)) {
 		succeeded = meta_sp_get_extent_list(mdsetnamep, mdnamep,
-						    &extent_listp, &mde);
+		    &extent_listp, &mde);
 	} else {
 		succeeded = B_FALSE;
 	}
@@ -3055,8 +3032,7 @@ meta_sp_can_create_sps_on_drive(
 
 	if ((number_of_sps > 0) && (sp_size > 0)) {
 		succeeded = meta_sp_get_extent_list_for_drive(mdsetnamep,
-							mddrivenamep,
-							&extent_listp);
+		    mddrivenamep, &extent_listp);
 	} else {
 		succeeded = B_FALSE;
 	}
@@ -3100,7 +3076,7 @@ meta_sp_get_free_space(
 	extent_listp = NULL;
 	free_blocks = 0;
 	succeeded = meta_sp_get_extent_list(mdsetnamep, mdnamep,
-					    &extent_listp, &mde);
+	    &extent_listp, &mde);
 	if (succeeded == B_TRUE) {
 		free_blocks = meta_sp_list_size(extent_listp,
 		    EXTTYP_FREE, INCLUDE_WM);
@@ -3123,7 +3099,7 @@ meta_sp_get_free_space(
 			free_blocks = 0;
 		}
 	} else {
-	    mdclrerror(&mde);
+		mdclrerror(&mde);
 	}
 
 	return (free_blocks);
@@ -3155,7 +3131,7 @@ meta_sp_get_free_space_on_drive(
 	extent_listp = NULL;
 	free_blocks = 0;
 	succeeded = meta_sp_get_extent_list_for_drive(mdsetnamep,
-			mddrivenamep, &extent_listp);
+	    mddrivenamep, &extent_listp);
 	if (succeeded == B_TRUE) {
 		free_blocks = meta_sp_list_size(extent_listp,
 		    EXTTYP_FREE, INCLUDE_WM);
@@ -3212,9 +3188,9 @@ meta_sp_get_number_of_possible_sps(
 	extent_listp = NULL;
 	number_of_possible_sps = 0;
 	if (sp_size > 0) {
-	    if ((succeeded = meta_sp_get_extent_list(mdsetnamep,
-		mdnamep, &extent_listp, &mde)) == B_FALSE)
-		mdclrerror(&mde);
+		if ((succeeded = meta_sp_get_extent_list(mdsetnamep,
+		    mdnamep, &extent_listp, &mde)) == B_FALSE)
+			mdclrerror(&mde);
 	} else {
 		succeeded = B_FALSE;
 	}
@@ -3278,7 +3254,7 @@ meta_sp_get_number_of_possible_sps_on_drive(
 	number_of_possible_sps = 0;
 	if (sp_size > 0) {
 		succeeded = meta_sp_get_extent_list_for_drive(mdsetnamep,
-					mddrivenamep, &extent_listp);
+		    mddrivenamep, &extent_listp);
 	} else {
 		succeeded = B_FALSE;
 	}
@@ -3338,7 +3314,7 @@ meta_sp_get_possible_sp_size(
 		free_blocks = meta_sp_get_free_space(mdsetnamep, mdnamep);
 		sp_size = free_blocks / number_of_sps;
 		succeeded = meta_sp_can_create_sps(mdsetnamep, mdnamep,
-						number_of_sps, sp_size);
+		    number_of_sps, sp_size);
 		while ((succeeded == B_FALSE) && (sp_size > 0)) {
 			/*
 			 * To compensate for space that may have been
@@ -3350,7 +3326,7 @@ meta_sp_get_possible_sp_size(
 			 */
 			sp_size = sp_size - ((blkcnt_t)number_of_sps);
 			succeeded = meta_sp_can_create_sps(mdsetnamep, mdnamep,
-							number_of_sps, sp_size);
+			    number_of_sps, sp_size);
 		}
 		if (sp_size < 0) {
 			sp_size = 0;
@@ -3389,11 +3365,10 @@ meta_sp_get_possible_sp_size_on_drive(
 	sp_size = 0;
 	if (number_of_sps > 0) {
 		free_blocks = meta_sp_get_free_space_on_drive(mdsetnamep,
-								mddrivenamep);
+		    mddrivenamep);
 		sp_size = free_blocks / number_of_sps;
 		succeeded = meta_sp_can_create_sps_on_drive(mdsetnamep,
-						mddrivenamep,
-						number_of_sps, sp_size);
+		    mddrivenamep, number_of_sps, sp_size);
 		while ((succeeded == B_FALSE) && (sp_size > 0)) {
 			/*
 			 * To compensate for space that may have been
@@ -3405,8 +3380,7 @@ meta_sp_get_possible_sp_size_on_drive(
 			 */
 			sp_size = sp_size - ((blkcnt_t)number_of_sps);
 			succeeded = meta_sp_can_create_sps_on_drive(mdsetnamep,
-							mddrivenamep,
-							number_of_sps, sp_size);
+			    mddrivenamep, number_of_sps, sp_size);
 		}
 		if (sp_size < 0) {
 			sp_size = 0;
@@ -3851,7 +3825,7 @@ meta_init_sp(
 			switch (c) {
 			case 'A':	/* data alignment */
 				if (meta_sp_parsesizestring(optarg,
-					&alignment) == -1) {
+				    &alignment) == -1) {
 					failed = 1;
 				}
 				break;
@@ -3885,10 +3859,10 @@ meta_init_sp(
 
 						/* we have a pair of values */
 						meta_sp_list_insert(*spp, np,
-							&extlist, offset,
-							length, EXTTYP_ALLOC,
-							seq++, EXTFLG_UPDATE,
-							meta_sp_cmp_by_offset);
+						    &extlist, offset, length,
+						    EXTTYP_ALLOC, seq++,
+						    EXTFLG_UPDATE,
+						    meta_sp_cmp_by_offset);
 						len += length;
 					}
 				}
@@ -4451,10 +4425,10 @@ meta_create_sp(
 				goto out;
 			} else {
 				rval = meta_mn_change_owner(&ownpar, sp->setno,
-					meta_getminor(compnp->dev),
-					sd->sd_mn_mynode->nd_nodeid,
-					MD_MN_MM_PREVENT_CHANGE |
-					    MD_MN_MM_SPAWN_THREAD);
+				    meta_getminor(compnp->dev),
+				    sd->sd_mn_mynode->nd_nodeid,
+				    MD_MN_MM_PREVENT_CHANGE |
+				    MD_MN_MM_SPAWN_THREAD);
 				if (rval == -1)
 					goto out;
 			}
@@ -4554,14 +4528,14 @@ meta_sp_reset_common(
 	/* make sure that nobody owns us */
 	if (MD_HAS_PARENT(msp->common.parent))
 		return (mdmderror(ep, MDE_IN_USE, meta_getminor(np->dev),
-					np->cname));
+		    np->cname));
 
 	/* make sure that the soft partition isn't open */
 	if ((is_open = meta_isopen(sp, np, ep, options)) < 0)
 		return (-1);
 	else if (is_open)
 		return (mdmderror(ep, MDE_IS_OPEN, meta_getminor(np->dev),
-					np->cname));
+		    np->cname));
 
 	/* get miscname */
 	if ((miscname = metagetmiscname(np, ep)) == NULL)
@@ -4740,7 +4714,7 @@ meta_sp_reset(
 			/* have to reparent this metadevice */
 			for (nlp = spnlp; nlp != NULL; nlp = nlp->next) {
 				if (meta_getminor(nlp->namep->dev) ==
-					meta_getminor(np->dev))
+				    meta_getminor(np->dev))
 					continue;
 				/*
 				 * this isn't the softpart we are deleting,
@@ -5228,7 +5202,7 @@ meta_sp_checkseq(sp_ext_node_t *extlist)
 	    ext = ext->ext_next) {
 		if (ext->ext_next->ext_namep != NULL &&
 		    strcmp(ext->ext_next->ext_namep->cname,
-			ext->ext_namep->cname) != 0)
+		    ext->ext_namep->cname) != 0)
 				continue;
 
 		if (ext->ext_next->ext_seq != ext->ext_seq + 1) {
@@ -5431,7 +5405,7 @@ meta_sp_validate_wm(
 		if (ext->ext_next != NULL &&
 		    ext->ext_next->ext_namep != NULL &&
 		    strcmp(ext->ext_next->ext_namep->cname,
-			ext->ext_namep->cname) == 0)
+		    ext->ext_namep->cname) == 0)
 				continue;
 		num_sps++;
 	}
@@ -5972,7 +5946,7 @@ meta_sp_recover_from_wm(
 		if (ext->ext_next != NULL &&
 		    ext->ext_next->ext_namep != NULL &&
 		    strcmp(ext->ext_next->ext_namep->cname,
-			ext->ext_namep->cname) == 0)
+		    ext->ext_namep->cname) == 0)
 				continue;
 		num_sps++;
 	}
@@ -5997,7 +5971,7 @@ meta_sp_recover_from_wm(
 		if (ext->ext_next != NULL &&
 		    ext->ext_next->ext_namep != NULL &&
 		    strcmp(ext->ext_next->ext_namep->cname,
-			ext->ext_namep->cname) == 0)
+		    ext->ext_namep->cname) == 0)
 				continue;
 
 		/*
@@ -6148,7 +6122,7 @@ meta_sp_recover_from_wm(
 		set_params.size = (un_array[i])->c.un_size;
 		set_params.mdp = (uintptr_t)(un_array[i]);
 		set_params.options =
-				meta_check_devicesize(un_array[i]->un_length);
+		    meta_check_devicesize(un_array[i]->un_length);
 		if (set_params.options == MD_CRO_64BIT) {
 			un_array[i]->c.un_revision |= MD_64BIT_META_DEV;
 		} else {
@@ -6242,11 +6216,11 @@ meta_sp_recover_from_wm(
 					goto out;
 				} else {
 					err = meta_mn_change_owner(&ownpar,
-						sp->setno,
-						meta_getminor(compnp->dev),
-						sd->sd_mn_mynode->nd_nodeid,
-						MD_MN_MM_PREVENT_CHANGE |
-						    MD_MN_MM_SPAWN_THREAD);
+					    sp->setno,
+					    meta_getminor(compnp->dev),
+					    sd->sd_mn_mynode->nd_nodeid,
+					    MD_MN_MM_PREVENT_CHANGE |
+					    MD_MN_MM_SPAWN_THREAD);
 					if (err != 0)
 						goto out;
 				}
@@ -6708,4 +6682,117 @@ meta_mn_sp_update_abr(void *arg)
 	md_exit(sp, 0);
 	/*NOTREACHED*/
 	return (NULL);
+}
+
+int
+meta_sp_check_component(
+	mdsetname_t	*sp,
+	mdname_t	*np,
+	md_error_t	*ep
+)
+{
+	md_sp_t	*msp;
+	minor_t	mnum = 0;
+	md_dev64_t	dev = 0;
+	mdnm_params_t	nm;
+	md_getdevs_params_t	mgd;
+	side_t	sideno;
+	char	*miscname;
+	md_dev64_t	*mydev = NULL;
+	char	*pname, *t;
+	char	*ctd_name;
+	char	*devname;
+	int	len;
+	int	rval = -1;
+
+	(void) memset(&nm, '\0', sizeof (nm));
+	if ((msp = meta_get_sp_common(sp, np, 0, ep)) == NULL)
+		return (-1);
+
+	if ((miscname = metagetmiscname(np, ep)) == NULL)
+		return (-1);
+
+	sideno = getmyside(sp, ep);
+
+	meta_sp_debug("meta_sp_check_component: %s is on %s key: %d"
+	    " dev: %llu\n",
+	    np->cname, msp->compnamep->cname, msp->compnamep->key,
+	    msp->compnamep->dev);
+
+	/*
+	 * Now get the data from the unit structure. The compnamep stuff
+	 * contains the data from the namespace and we need the un_dev
+	 * from the unit structure.
+	 */
+	(void) memset(&mgd, '\0', sizeof (mgd));
+	MD_SETDRIVERNAME(&mgd, miscname, sp->setno);
+	mgd.cnt = 1;		    /* sp's only have one subdevice */
+	mgd.mnum = meta_getminor(np->dev);
+
+	mydev = Zalloc(sizeof (*mydev));
+	mgd.devs = (uintptr_t)mydev;
+
+	if (metaioctl(MD_IOCGET_DEVS, &mgd, &mgd.mde, np->cname) != 0) {
+		meta_sp_debug("meta_sp_check_component: ioctl failed\n");
+		(void) mdstealerror(ep, &mgd.mde);
+		rval = 0;
+		goto out;
+	} else if (mgd.cnt <= 0) {
+		assert(mgd.cnt >= 0);
+		rval = 0;
+		goto out;
+	}
+
+	/* Get the devname from the name space. */
+	if ((devname = meta_getnmentbykey(sp->setno, sideno,
+	    msp->compnamep->key, NULL, &mnum, &dev, ep)) == NULL) {
+		meta_sp_debug("meta_sp_check_component: key %d not"
+		    "found\n", msp->compnamep->key);
+		goto out;
+	}
+
+	meta_sp_debug("dev %s from component: (%lu, %lu)\n",
+	    devname,
+	    meta_getmajor(*mydev),
+	    meta_getminor(*mydev));
+	meta_sp_debug("minor from the namespace: %lu\n", mnum);
+
+	if (mnum != meta_getminor(*mydev)) {
+		/*
+		 * The minor numbers are different. Update the namespace
+		 * with the information from the component.
+		 */
+
+		t = strrchr(devname, '/');
+		t++;
+		ctd_name = Strdup(t);
+
+		meta_sp_debug("meta_sp_check_component: ctd_name: %s\n",
+		    ctd_name);
+
+		len = strlen(devname);
+		t = strrchr(devname, '/');
+		t++;
+		pname = Zalloc((len - strlen(t)) + 1);
+		(void) strncpy(pname, devname, (len - strlen(t)));
+		meta_sp_debug("pathname: %s\n", pname);
+
+		meta_sp_debug("updating the minor number to %lu\n", nm.mnum);
+
+		if (meta_update_namespace(sp->setno, sideno,
+		    ctd_name, *mydev, msp->compnamep->key, pname,
+		    ep) != 0) {
+			goto out;
+		}
+	}
+out:
+	if (pname != NULL)
+		Free(pname);
+	if (ctd_name != NULL)
+		Free(ctd_name);
+	if (devname != NULL)
+		Free(devname);
+	if (mydev != NULL)
+		Free(mydev);
+	return (rval);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -649,7 +649,7 @@ display_raid_device_info(
 )
 {
 	mdname_t	*namep = ((colp->hsnamep != NULL) ?
-				    colp->hsnamep : colp->colnamep);
+	    colp->hsnamep : colp->colnamep);
 	char 		*devid = "";
 	char		*cname = colp->colnamep->cname;
 	diskaddr_t	start_blk;
@@ -658,7 +658,7 @@ display_raid_device_info(
 	char		*col_state;
 	md_timeval32_t	tv;
 	char		*hsname = ((colp->hsnamep != NULL) ?
-			    colp->hsnamep->cname : "");
+	    colp->hsnamep->cname : "");
 	int		rval = -1;
 	mdname_t	*didnp = NULL;
 	ddi_devid_t	dtp;
@@ -698,7 +698,7 @@ display_raid_device_info(
 	/* determine if devid does NOT exist */
 	if (options & PRINT_DEVID) {
 		if ((dtp = meta_getdidbykey(sp->setno, getmyside(sp, ep),
-			didnp->key, ep)) == NULL)
+		    didnp->key, ep)) == NULL)
 			devid = dgettext(TEXT_DOMAIN, "No ");
 		else {
 			devid = dgettext(TEXT_DOMAIN, "Yes");
@@ -753,7 +753,7 @@ meta_print_raid_options(
 )
 {
 	char		*hspname = ((hspnamep != NULL) ? hspnamep->hspname :
-					dgettext(TEXT_DOMAIN, "none"));
+	    dgettext(TEXT_DOMAIN, "none"));
 	int		rval = -1;
 
 	/* print options */
@@ -1793,7 +1793,7 @@ meta_raid_enable(
 		 * Don't do it if meta_raid_replace returns an error
 		 */
 		if (!err && (devnm = meta_getnmentbydev(sp->setno, MD_SIDEWILD,
-			del_dev, NULL, NULL, &colnp->key, ep)) != NULL) {
+		    del_dev, NULL, NULL, &colnp->key, ep)) != NULL) {
 			(void) del_key_name(sp, colnp, ep);
 			Free(devnm);
 		}
@@ -2108,15 +2108,15 @@ meta_raid_valid(md_raid_t *raidp, mr_unit_t *mr)
 		if (rpw->rpw_magic_ext == RAID_PWMAGIC) {
 			/* 4.1 prewrite header */
 			if ((rpw->rpw_origcolumncnt != mr->un_origcolumncnt) ||
-			    (rpw->rpw_totalcolumncnt
-				!= mr->un_totalcolumncnt) ||
+			    (rpw->rpw_totalcolumncnt !=
+			    mr->un_totalcolumncnt) ||
 			    (rpw->rpw_segsize != mr->un_segsize) ||
 			    (rpw->rpw_segsincolumn != mr->un_segsincolumn) ||
 			    (rpw->rpw_pwcnt != mr->un_pwcnt) ||
 			    (rpw->rpw_pwstart !=
-				mr->un_column[col].un_pwstart) ||
+			    mr->un_column[col].un_pwstart) ||
 			    (rpw->rpw_devstart !=
-				mr->un_column[col].un_devstart) ||
+			    mr->un_column[col].un_devstart) ||
 			    (rpw->rpw_pwsize != mr->un_pwsize))
 				goto error_exit;
 		}
@@ -2440,7 +2440,7 @@ meta_init_raid(
 			goto out;
 		if (MD_MNSET_DESC(sd)) {
 			rval = meta_cook_syntax(ep, MDE_MNSET_NORAID, uname,
-						argc, argv);
+			    argc, argv);
 			goto out;
 		}
 	}
@@ -2775,4 +2775,121 @@ meta_raid_regen_byname(mdsetname_t *sp, mdname_t *raidnp, diskaddr_t size,
 
 	/* return success */
 	return (0);
+}
+
+int
+meta_raid_check_component(
+	mdsetname_t	*sp,
+	mdname_t	*np,
+	md_dev64_t	mydevs,
+	md_error_t	*ep
+)
+{
+	md_raid_t	 *raid;
+	mdnm_params_t	nm;
+	md_getdevs_params_t	mgd;
+	side_t	sideno;
+	char	*miscname;
+	md_dev64_t	*mydev = NULL;
+	mdkey_t	key;
+	char	*pname, *t;
+	char	*ctd_name;
+	char	*devname;
+	int	len;
+	int	i;
+	int	rval = -1;
+
+	(void) memset(&nm, '\0', sizeof (nm));
+	if ((raid = meta_get_raid_common(sp, np, 0, ep)) == NULL)
+		return (-1);
+
+	if ((miscname = metagetmiscname(np, ep)) == NULL)
+		return (-1);
+
+	sideno = getmyside(sp, ep);
+
+	/* get count of underlying devices */
+
+	(void) memset(&mgd, '\0', sizeof (mgd));
+	MD_SETDRIVERNAME(&mgd, miscname, sp->setno);
+	mgd.mnum = meta_getminor(np->dev);
+	mgd.cnt = 0;
+	mgd.devs = NULL;
+	if (metaioctl(MD_IOCGET_DEVS, &mgd, &mgd.mde, np->cname) != 0) {
+		(void) mdstealerror(ep, &mgd.mde);
+		rval = 0;
+		goto out;
+	} else if (mgd.cnt <= 0) {
+		assert(mgd.cnt >= 0);
+		rval = 0;
+		goto out;
+	}
+
+	/*
+	 * Now get the data from the unit structure.
+	 * The compnamep stuff contains the data from
+	 * the namespace and we need the un_dev
+	 * from the unit structure.
+	 */
+	mydev = Zalloc(sizeof (*mydev) * mgd.cnt);
+	mgd.devs = (uintptr_t)mydev;
+	if (metaioctl(MD_IOCGET_DEVS, &mgd, &mgd.mde, np->cname) != 0) {
+		(void) mdstealerror(ep, &mgd.mde);
+		rval = 0;
+		goto out;
+	} else if (mgd.cnt <= 0) {
+		assert(mgd.cnt >= 0);
+		rval = 0;
+		goto out;
+	}
+
+	for (i = 0; i < raid->orig_ncol; i++) {
+		md_raidcol_t	*colp = &raid->cols.cols_val[i];
+		mdname_t	*compnp = colp->colnamep;
+
+		if (mydevs == mydev[i]) {
+			/* Get the devname from the name space. */
+			if ((devname = meta_getnmentbydev(sp->setno, sideno,
+			    compnp->dev, NULL, NULL, &key, ep)) == NULL) {
+				goto out;
+			}
+
+			if (compnp->dev != meta_getminor(mydev[i])) {
+				/*
+				 * The minor numbers are different. Update
+				 * the namespace with the information from
+				 * the component.
+				 */
+
+				t = strrchr(devname, '/');
+				t++;
+				ctd_name = Strdup(t);
+
+				len = strlen(devname);
+				t = strrchr(devname, '/');
+				t++;
+				pname = Zalloc((len - strlen(t)) + 1);
+				(void) strncpy(pname, devname,
+				    (len - strlen(t)));
+
+				if (meta_update_namespace(sp->setno, sideno,
+				    ctd_name, mydev[i], key, pname,
+				    ep) != 0) {
+					goto out;
+				}
+			}
+			rval = 0;
+			break;
+		} /* End of if (mydevs == mydev[i]) */
+	} /* end of for loop */
+out:
+	if (pname != NULL)
+		Free(pname);
+	if (ctd_name != NULL)
+		Free(ctd_name);
+	if (devname != NULL)
+		Free(devname);
+	if (mydev != NULL)
+		Free(mydev);
+	return (rval);
 }

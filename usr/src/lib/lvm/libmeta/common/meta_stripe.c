@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,13 +60,9 @@ meta_stripe_replace(
 )
 {
 	replace_params_t	params;
-	md_dev64_t		old_dev,
-				new_dev;
-	diskaddr_t		new_start_blk,
-				new_end_blk,
-				label,
-				size,
-				start_blk;
+	md_dev64_t	old_dev, new_dev;
+	diskaddr_t	new_start_blk;
+	diskaddr_t	new_end_blk, label, size, start_blk;
 
 	/* should have same set */
 	assert(sp != NULL);
@@ -228,7 +224,7 @@ meta_get_stripe_common(
 		return (NULL);
 	if (strcmp(miscname, MD_STRIPE) != 0) {
 		(void) mdmderror(ep, MDE_NOT_STRIPE,
-			    meta_getminor(stripenp->dev), stripenp->cname);
+		    meta_getminor(stripenp->dev), stripenp->cname);
 		return (NULL);
 	}
 	if ((ms = (ms_unit_t *)meta_get_mdunit(sp, stripenp, ep)) == NULL)
@@ -307,17 +303,21 @@ meta_get_stripe_common(
 					if ((cp->hsnamep->start_blk == 0) &&
 					    (hs_start_blk != 0))
 						md_eprintf(dgettext(TEXT_DOMAIN,
-					    "%s: suspected bad start block,"
-					    " seems labelled [stripe/hs]\n"),
-					    cp->hsnamep->cname);
+						    "%s: suspected bad"
+						    "start block,"
+						    " seems labelled"
+						    "[stripe/hs]\n"),
+						    cp->hsnamep->cname);
 
 					if ((cp->hsnamep->start_blk > 0) &&
 					    (hs_start_blk == 0) &&
 					    ! ((row == 0) && (comp == 0)))
 						md_eprintf(dgettext(TEXT_DOMAIN,
-					    "%s: suspected bad start block, "
-					    "seems unlabelled [stripe/hs]\n"),
-					    cp->hsnamep->cname);
+						    "%s: suspected bad"
+						    "start block, "
+						    "seems unlabelled"
+						    "[stripe/hs]\n"),
+						    cp->hsnamep->cname);
 				}
 				/* override any start_blk */
 				cp->hsnamep->start_blk = hs_start_blk;
@@ -333,17 +333,21 @@ meta_get_stripe_common(
 					if ((cp->compnamep->start_blk == 0) &&
 					    (comp_start_blk != 0))
 						md_eprintf(dgettext(TEXT_DOMAIN,
-					    "%s: suspected bad start block,"
-					    " seems labelled [stripe]"),
-					    cp->compnamep->cname);
+						    "%s: suspected bad"
+						    "start block,"
+						    " seems labelled"
+						    "[stripe]"),
+						    cp->compnamep->cname);
 
 					if ((cp->compnamep->start_blk > 0) &&
 					    (comp_start_blk == 0) &&
 					    ! ((row == 0) && (comp == 0)))
 						md_eprintf(dgettext(TEXT_DOMAIN,
-					    "%s: suspected bad start block, "
-					    "seems unlabelled [stripe]"),
-					    cp->compnamep->cname);
+						    "%s: suspected bad"
+						    "start block, "
+						    "seems unlabelled"
+						    "[stripe]"),
+						    cp->compnamep->cname);
 				}
 			}
 
@@ -704,7 +708,7 @@ subdev_row_report(
 		    dgettext(TEXT_DOMAIN, "Dbase"),
 		    dgettext(TEXT_DOMAIN, "State"),
 		    dgettext(TEXT_DOMAIN, "Reloc"),
-			dgettext(TEXT_DOMAIN, "Hot Spare")) == EOF) {
+		    dgettext(TEXT_DOMAIN, "Hot Spare")) == EOF) {
 			goto out;
 		}
 	} else {
@@ -717,7 +721,7 @@ subdev_row_report(
 		    dgettext(TEXT_DOMAIN, "State"),
 		    dgettext(TEXT_DOMAIN, "Reloc"),
 		    dgettext(TEXT_DOMAIN, "Hot Spare"),
-			dgettext(TEXT_DOMAIN, "Time")) == EOF) {
+		    dgettext(TEXT_DOMAIN, "Time")) == EOF) {
 			goto out;
 		}
 	}
@@ -734,7 +738,7 @@ subdev_row_report(
 		char		*comp_state;
 		md_timeval32_t	tv;
 		char		*hsname = ((cp->hsnamep != NULL) ?
-					    cp->hsnamep->cname : "");
+		    cp->hsnamep->cname : "");
 		char		*devid = " ";
 		mdname_t	*didnp = NULL;
 		uint_t		tstate = 0;
@@ -778,14 +782,14 @@ subdev_row_report(
 
 		/* populate the key in the name_p structure */
 		if ((didnp = metadevname(&sp, namep->dev, ep))
-				== NULL) {
+		    == NULL) {
 			return (-1);
 		}
 
 	    /* determine if devid does NOT exist */
 		if (options & PRINT_DEVID) {
-		    if ((dtp = meta_getdidbykey(sp->setno, getmyside(sp, ep),
-				didnp->key, ep)) == NULL)
+			if ((dtp = meta_getdidbykey(sp->setno,
+			    getmyside(sp, ep), didnp->key, ep)) == NULL)
 				devid = dgettext(TEXT_DOMAIN, "No ");
 			else {
 				devid = dgettext(TEXT_DOMAIN, "Yes");
@@ -865,7 +869,7 @@ toplev_row_report(
 	    dgettext(TEXT_DOMAIN, "Device"),
 	    dgettext(TEXT_DOMAIN, "Start Block"),
 	    dgettext(TEXT_DOMAIN, "Dbase"),
-		dgettext(TEXT_DOMAIN, "Reloc")) == EOF) {
+	    dgettext(TEXT_DOMAIN, "Reloc")) == EOF) {
 		goto out;
 	}
 
@@ -894,14 +898,14 @@ toplev_row_report(
 
 		/* populate the key in the name_p structure */
 		if ((didnp = metadevname(&sp, namep->dev, ep))
-				== NULL) {
+		    == NULL) {
 			return (-1);
 		}
 
-	    /* determine if devid does NOT exist */
-	    if (options & PRINT_DEVID) {
-		if ((dtp = meta_getdidbykey(sp->setno, getmyside(sp, ep),
-				didnp->key, ep)) == NULL) {
+		/* determine if devid does NOT exist */
+		if (options & PRINT_DEVID) {
+			if ((dtp = meta_getdidbykey(sp->setno,
+			    getmyside(sp, ep), didnp->key, ep)) == NULL) {
 				devid = dgettext(TEXT_DOMAIN, "No ");
 			} else {
 				devid = dgettext(TEXT_DOMAIN, "Yes");
@@ -942,7 +946,7 @@ meta_print_stripe_options(
 )
 {
 	char		*hspname = ((hspnamep != NULL) ? hspnamep->hspname :
-					dgettext(TEXT_DOMAIN, "none"));
+	    dgettext(TEXT_DOMAIN, "none"));
 	int		rval = -1;
 
 	/* print options */
@@ -1475,12 +1479,12 @@ meta_stripe_attach(
 		if (options & MDCMD_PRINT) {
 			if (newcomps == 1) {
 				(void) printf(dgettext(TEXT_DOMAIN,
-				"%s: attaching component would suceed\n"),
-				stripenp->cname);
+				    "%s: attaching component would suceed\n"),
+				    stripenp->cname);
 			} else {
 				(void) printf(dgettext(TEXT_DOMAIN,
-				"%s: attaching components would suceed\n"),
-				stripenp->cname);
+				    "%s: attaching components would suceed\n"),
+				    stripenp->cname);
 			}
 		}
 		rval = 0; /* success */
@@ -1681,7 +1685,7 @@ meta_stripe_check_interlace(
 )
 {
 	if ((interlace < btodb(MININTERLACE)) ||
-		(interlace > btodb(MAXINTERLACE))) {
+	    (interlace > btodb(MAXINTERLACE))) {
 		return (mderror(ep, MDE_BAD_INTERLACE, uname));
 	}
 	return (0);
@@ -1740,7 +1744,7 @@ meta_check_stripe(
 			/* check component */
 			if (!updateit) {
 				if (meta_check_component(sp, compnp,
-					force, ep) != 0)
+				    force, ep) != 0)
 					return (-1);
 				if (((start_blk = metagetstart(sp, compnp,
 				    ep)) == MD_DISKADDR_ERROR) ||
@@ -1750,12 +1754,12 @@ meta_check_stripe(
 				}
 				if (start_blk >= size)
 					return (mdsyserror(ep, ENOSPC,
-						compnp->cname));
+					    compnp->cname));
 				size -= start_blk;
 				size = rounddown(size, rp->interlace);
 				if (size == 0)
 					return (mdsyserror(ep, ENOSPC,
-						compnp->cname));
+					    compnp->cname));
 			}
 
 			/* check this stripe too */
@@ -2205,13 +2209,13 @@ meta_init_stripe(
 	/* allocate and parse rows */
 	if (argc < 1) {
 		(void) mdmderror(ep, MDE_NROWS, meta_getminor(stripenp->dev),
-				uname);
+		    uname);
 		goto out;
 	} else if ((sscanf(argv[0], "%u", &nrow) != 1) || ((int)nrow < 0)) {
 		goto syntax;
 	} else if (nrow < 1) {
 		(void) mdmderror(ep, MDE_NROWS, meta_getminor(stripenp->dev),
-				uname);
+		    uname);
 		goto out;
 	}
 	--argc, ++argv;
@@ -2225,14 +2229,14 @@ meta_init_stripe(
 		/* allocate and parse components */
 		if (argc < 1) {
 			(void) mdmderror(ep, MDE_NROWS,
-					meta_getminor(stripenp->dev), uname);
+			    meta_getminor(stripenp->dev), uname);
 			goto out;
 		} else if ((sscanf(argv[0], "%u", &ncomp) != 1) ||
 		    ((int)ncomp < 0)) {
 			goto syntax;
 		} else if (ncomp < 1) {
 			(void) mdmderror(ep, MDE_NCOMPS,
-					meta_getminor(stripenp->dev), uname);
+			    meta_getminor(stripenp->dev), uname);
 			goto out;
 		}
 		--argc, ++argv;
@@ -2275,7 +2279,7 @@ meta_init_stripe(
 					goto out;
 				}
 				if (meta_stripe_check_interlace(mdr->interlace,
-					uname, ep))
+				    uname, ep))
 					goto out;
 				break;
 
@@ -2509,4 +2513,128 @@ out:
 		mdclrerror(ep);
 
 	return (any_errs);
+}
+
+int
+meta_stripe_check_component(
+	mdsetname_t	*sp,
+	mdname_t	*np,
+	md_dev64_t	mydevs,
+	md_error_t	*ep
+)
+{
+	md_stripe_t	*stripe;
+	mdnm_params_t	nm;
+	md_getdevs_params_t	mgd;
+	side_t	sideno;
+	char	*miscname;
+	md_dev64_t	*mydev = NULL;
+	mdkey_t	key;
+	char	*pname, *t;
+	char	*ctd_name;
+	char	*devname;
+	int	len;
+	int	cnt, i;
+	int	rval = -1;
+
+	(void) memset(&nm, '\0', sizeof (nm));
+	if ((stripe = meta_get_stripe_common(sp, np, 0, ep)) == NULL)
+		return (-1);
+
+	if ((miscname = metagetmiscname(np, ep)) == NULL)
+		return (-1);
+
+	sideno = getmyside(sp, ep);
+
+
+	/* get count of underlying devices */
+
+	(void) memset(&mgd, '\0', sizeof (mgd));
+	MD_SETDRIVERNAME(&mgd, miscname, sp->setno);
+	mgd.mnum = meta_getminor(np->dev);
+	mgd.cnt = 0;
+	mgd.devs = NULL;
+	if (metaioctl(MD_IOCGET_DEVS, &mgd, &mgd.mde, np->cname) != 0) {
+		(void) mdstealerror(ep, &mgd.mde);
+		rval = 0;
+		goto out;
+	} else if (mgd.cnt <= 0) {
+		assert(mgd.cnt >= 0);
+		rval = 0;
+		goto out;
+	}
+
+	/*
+	 * Now get the data from the unit structure.
+	 * The compnamep stuff contains the data from
+	 * the namespace and we need the un_dev
+	 * from the unit structure.
+	 */
+	mydev = Zalloc(sizeof (*mydev) * mgd.cnt);
+	mgd.devs = (uintptr_t)mydev;
+	if (metaioctl(MD_IOCGET_DEVS, &mgd, &mgd.mde, np->cname) != 0) {
+		(void) mdstealerror(ep, &mgd.mde);
+		rval = 0;
+		goto out;
+	} else if (mgd.cnt <= 0) {
+		assert(mgd.cnt >= 0);
+		rval = 0;
+		goto out;
+	}
+
+	for (cnt = 0, i = 0; i < stripe->rows.rows_len; i++) {
+		md_row_t	*rp = &stripe->rows.rows_val[i];
+		uint_t	comp;
+		for (comp = 0; (comp < rp->comps.comps_len); ++comp) {
+			md_comp_t	*cp = &rp->comps.comps_val[comp];
+			mdname_t	*compnp = cp->compnamep;
+
+			if (mydevs == mydev[cnt]) {
+				/* Get the devname from the name space. */
+				if ((devname = meta_getnmentbydev(sp->setno,
+				    sideno, compnp->dev, NULL, NULL,
+				    &key, ep)) == NULL) {
+					goto out;
+				}
+
+				if (compnp->dev != meta_getminor(mydev[cnt])) {
+					/*
+					 * The minor numbers are different.
+					 * Update the namespace with the
+					 * information from the component.
+					 */
+
+					t = strrchr(devname, '/');
+					t++;
+					ctd_name = Strdup(t);
+
+					len = strlen(devname);
+					t = strrchr(devname, '/');
+					t++;
+					pname = Zalloc((len - strlen(t)) + 1);
+					(void) strncpy(pname, devname,
+					    (len - strlen(t)));
+
+					if (meta_update_namespace(sp->setno,
+					    sideno, ctd_name, mydev[i],
+					    key, pname, ep) != 0) {
+						goto out;
+					}
+				}
+				rval = 0;
+				break;
+			} /*  End of if (mydevs == mydev[i]) */
+			cnt++;
+		} /* End of second for loop */
+	} /* End of first for loop */
+out:
+	if (pname != NULL)
+		Free(pname);
+	if (ctd_name != NULL)
+		Free(ctd_name);
+	if (devname != NULL)
+		Free(devname);
+	if (mydev != NULL)
+		Free(mydev);
+	return (rval);
 }

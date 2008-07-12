@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -205,6 +205,19 @@ meta_getdevs(
 			continue;
 		}
 		if ((devnp = metadevname(&sp, mydevs[i], ep)) == NULL) {
+			if (mdissyserror(ep, ENOENT)) {
+				mdclrerror(ep);
+				/*
+				 * If the device doesn't exist, it could be
+				 * that we have a wrong dev_t/name
+				 * combination in the namespace, so
+				 * meta_fix_compnames try to check this
+				 * with the unit structure and fix this.
+				 */
+				if (meta_fix_compnames(sp, namep,
+				    mydevs[i], ep) == 0)
+					continue;
+			}
 			goto out;
 		}
 		if (meta_getdevs(sp, devnp, nlpp, ep) != 0)
@@ -611,4 +624,46 @@ meta_deviceid_to_nmlist(char *search_path, ddi_devid_t devid, char *minor_name,
 	devid_free_nmlist (*retlist);
 	*retlist = tmp_retlist;
 	return (res);
+}
+
+/*
+ * Check each real device that makes up a metadevice so that
+ * un_dev entries can be matched against the entries in the
+ * namespace.
+ *
+ * RETURN:
+ *      -1      error
+ *       0      success
+ */
+int
+meta_fix_compnames(
+	mdsetname_t	*sp,
+	mdname_t	*namep,
+	md_dev64_t	dev,
+	md_error_t	*ep
+)
+{
+	int	ret = 0;
+	char	*miscname;
+
+	/* get miscname and unit */
+	if ((miscname = metagetmiscname(namep, ep)) == NULL)
+		return (-1);
+	if (strcmp(miscname, MD_STRIPE) == 0) {
+		if (meta_stripe_check_component(sp, namep, dev, ep) < 0) {
+			ret = -1;
+		}
+	} else if (strcmp(miscname, MD_SP) == 0) {
+		if (meta_sp_check_component(sp, namep, ep) < 0) {
+			ret = -1;
+		}
+	} else if (strcmp(miscname, MD_RAID) == 0) {
+		if (meta_raid_check_component(sp, namep, dev, ep) < 0) {
+			ret = -1;
+		}
+	} else {
+		(void) mdmderror(ep, MDE_INVAL_UNIT, 0, namep->cname);
+		return (-1);
+	}
+	return (ret);
 }

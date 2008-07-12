@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -265,15 +265,15 @@ update_locator_namespace(
 }
 
 /*
- * update_namespace -- Contains the ioctl call that will update the
+ * meta_update_namespace -- Contains the ioctl call that will update the
  * 	device name and pathname in the namespace area.
  *
  * RETURN
  *	METADEVADM_ERR		ioctl failed and ep is updated with the error
  *	METADEVADM_SUCCESS	success
  */
-static int
-update_namespace(
+int
+meta_update_namespace(
 	set_t		setno,
 	side_t		sideno,
 	char		*devname,
@@ -472,7 +472,7 @@ fix_replicanames(
 			continue;
 		}
 		mda_debug("replica update: current %s (%p)\n",
-			r->r_namep->bname, (void *) small_dev);
+		    r->r_namep->bname, (void *) small_dev);
 
 		/*
 		 * Check to see if the returned disk matches the stored one
@@ -733,7 +733,7 @@ pathname_reload(
 
 		small_dev = meta_cmpldev(dev);
 		mda_debug("Old device lookup: %s (%p)\n",
-			(char *)(uintptr_t)nm.devname, (void *)small_dev);
+		    (char *)(uintptr_t)nm.devname, (void *)small_dev);
 
 		/*
 		 * Check to see if the returned disk matches the stored one
@@ -741,8 +741,8 @@ pathname_reload(
 		for (i = 0; disklist[i].dev != NODEV; i++) {
 			match_type = 0;
 			mda_debug("From devid lookup: %s (%p)\n",
-				(char *)disklist[i].devname,
-				(void *)disklist[i].dev);
+			    (char *)disklist[i].devname,
+			    (void *)disklist[i].dev);
 
 			if (disklist[i].dev == small_dev) {
 				match_type |= DEV_MATCH;
@@ -821,7 +821,7 @@ pathname_reload(
 
 		if (!(dev_options & DEV_NOACTION)) {
 			/* Something has changed so update the namespace */
-			if (update_namespace(setno, sideno, ctds_name,
+			if (meta_update_namespace(setno, sideno, ctds_name,
 			    meta_expldev(disklist[i].dev), nm.key, path,
 			    ep) != 0) {
 				mda_debug("Failed to update namespace\n");
@@ -1126,7 +1126,7 @@ devid_update(
 
 			pathname = mda_getpath(np->bname);
 
-			if (update_namespace(MD_LOCAL_SET, side + SKEW,
+			if (meta_update_namespace(MD_LOCAL_SET, side + SKEW,
 			    np->cname, np->dev, ddp->dd_dnp->side_names_key,
 			    pathname, ep) != 0) {
 				goto out;
@@ -1135,7 +1135,7 @@ devid_update(
 			/*
 			 * Now update the devid entry as well, this works
 			 * correctly because the prior call to
-			 * update_namespace() above puts the correct dev_t
+			 * meta_update_namespace() above puts the correct dev_t
 			 * in the namespace which will then be resolved
 			 * to the new devid by the ioctl now called.
 			 */
@@ -1216,9 +1216,9 @@ devid_update(
 			    (char *)(uintptr_t)nm.devname);
 			if (dev_options & DEV_VERBOSE) {
 				mda_print(dgettext(TEXT_DOMAIN,
-				"SVM has no device id for "
-				"%s, cannot update.\n"),
-				(char *)(uintptr_t)nm.devname);
+				    "SVM has no device id for "
+				    "%s, cannot update.\n"),
+				    (char *)(uintptr_t)nm.devname);
 			}
 			continue; /* no devid. go on to next */
 		}
@@ -1247,7 +1247,7 @@ devid_update(
 			 * fail with NODEVID.
 			 */
 			if (metaioctl(MD_SETNMDID, &nm,
-					&nm.mde, NULL) != 0) {
+			    &nm.mde, NULL) != 0) {
 				if (dev_options & DEV_VERBOSE) {
 					mda_print(dgettext(TEXT_DOMAIN,
 					    "SVM failed to update the device "
@@ -1269,8 +1269,8 @@ devid_update(
 	} /* end while */
 
 	mda_print(dgettext(TEXT_DOMAIN,
-		    "Updating Solaris Volume Manager device relocation "
-		    "information for %s\n"), ctd);
+	    "Updating Solaris Volume Manager device relocation "
+	    "information for %s\n"), ctd);
 
 	mda_print(dgettext(TEXT_DOMAIN,
 	    "Old device reloc information:\n\t%s\n"), old_cdevidp);
@@ -1490,14 +1490,14 @@ meta_upd_ctdnames(
 
 	small_dev = meta_cmpldev(dev);
 	mda_debug("Old device lookup: %s (%p)\n",
-			(char *)(uintptr_t)nm.devname, (void *)small_dev);
+	    (char *)(uintptr_t)nm.devname, (void *)small_dev);
 	/*
 	 * Check to see if the returned disk matches the stored one
 	 */
 	for (i = 0; disklist[i].dev != NODEV; i++) {
 		match_type = 0;
 		mda_debug("From devid lookup: %s (%p)\n",
-				disklist[i].devname, (void *)disklist[i].dev);
+		    disklist[i].devname, (void *)disklist[i].dev);
 
 		if (disklist[i].dev == small_dev) {
 			match_type |= DEV_MATCH;
@@ -1579,7 +1579,7 @@ meta_upd_ctdnames(
 		/* get the block path */
 		pathname = mda_getpath(np->bname);
 
-		if (update_namespace(setno, sideno, np->cname,
+		if (meta_update_namespace(setno, sideno, np->cname,
 		    dev, dnp->side_names_key, pathname, ep) != 0) {
 			/* finished with the list so return the memory */
 			Free(pathname);
