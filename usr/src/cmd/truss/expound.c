@@ -107,7 +107,7 @@ prtime(private_t *pri, const char *name, time_t value)
 	char str[80];
 
 	(void) strftime(str, sizeof (str), "%b %e %H:%M:%S %Z %Y",
-		localtime(&value));
+	    localtime(&value));
 	(void) printf("%s\t%s%s  [ %llu ]\n",
 	    pri->pname,
 	    name,
@@ -372,13 +372,13 @@ show_uname(private_t *pri, long offset)
 	if (offset != NULL &&
 	    Pread(Proc, &ubuf, sizeof (ubuf), offset) == sizeof (ubuf)) {
 		(void) printf(
-		"%s\tsys=%-9.9snod=%-9.9srel=%-9.9sver=%-9.9smch=%.9s\n",
-			pri->pname,
-			ubuf.sysname,
-			ubuf.nodename,
-			ubuf.release,
-			ubuf.version,
-			ubuf.machine);
+		    "%s\tsys=%-9.9snod=%-9.9srel=%-9.9sver=%-9.9smch=%.9s\n",
+		    pri->pname,
+		    ubuf.sysname,
+		    ubuf.nodename,
+		    ubuf.release,
+		    ubuf.version,
+		    ubuf.machine);
 	}
 }
 
@@ -391,12 +391,12 @@ show_ustat(private_t *pri, long offset)
 	if (offset != NULL &&
 	    Pread(Proc, &ubuf, sizeof (ubuf), offset) == sizeof (ubuf)) {
 		(void) printf(
-		"%s\ttfree=%-6ld tinode=%-5lu fname=%-6.6s fpack=%-.6s\n",
-			pri->pname,
-			ubuf.f_tfree,
-			ubuf.f_tinode,
-			ubuf.f_fname,
-			ubuf.f_fpack);
+		    "%s\ttfree=%-6ld tinode=%-5lu fname=%-6.6s fpack=%-.6s\n",
+		    pri->pname,
+		    ubuf.f_tfree,
+		    ubuf.f_tinode,
+		    ubuf.f_fname,
+		    ubuf.f_fpack);
 	}
 }
 
@@ -409,12 +409,12 @@ show_ustat32(private_t *pri, long offset)
 	if (offset != NULL &&
 	    Pread(Proc, &ubuf, sizeof (ubuf), offset) == sizeof (ubuf)) {
 		(void) printf(
-		"%s\ttfree=%-6d tinode=%-5u fname=%-6.6s fpack=%-.6s\n",
-			pri->pname,
-			ubuf.f_tfree,
-			ubuf.f_tinode,
-			ubuf.f_fname,
-			ubuf.f_fpack);
+		    "%s\ttfree=%-6d tinode=%-5u fname=%-6.6s fpack=%-.6s\n",
+		    pri->pname,
+		    ubuf.f_tfree,
+		    ubuf.f_tinode,
+		    ubuf.f_fname,
+		    ubuf.f_fpack);
 	}
 }
 #endif	/* _LP64 */
@@ -513,7 +513,7 @@ show_cladm(private_t *pri, int code, int function, long offset)
 			if (Pread(Proc, &arg, sizeof (arg), offset)
 			    == sizeof (arg))
 				(void) printf("%s\tnodeid=%d\n",
-					pri->pname, arg);
+				    pri->pname, arg);
 		}
 		break;
 	}
@@ -561,8 +561,8 @@ show_mutex(private_t *pri, long offset)
 
 	if (Pread(Proc, &mutex, sizeof (mutex), offset) == sizeof (mutex)) {
 		(void) printf("%s\tmutex type: %s\n",
-			pri->pname,
-			synch_type(pri, mutex.mutex_type));
+		    pri->pname,
+		    synch_type(pri, mutex.mutex_type));
 	}
 }
 
@@ -574,8 +574,8 @@ show_condvar(private_t *pri, long offset)
 	if (Pread(Proc, &condvar, sizeof (condvar), offset)
 	    == sizeof (condvar)) {
 		(void) printf("%s\tcondvar type: %s\n",
-			pri->pname,
-			synch_type(pri, condvar.cond_type));
+		    pri->pname,
+		    synch_type(pri, condvar.cond_type));
 	}
 }
 
@@ -586,9 +586,9 @@ show_sema(private_t *pri, long offset)
 
 	if (Pread(Proc, &sema, sizeof (sema), offset) == sizeof (sema)) {
 		(void) printf("%s\tsema type: %s  count = %u\n",
-			pri->pname,
-			synch_type(pri, sema.sema_type),
-			sema.sema_count);
+		    pri->pname,
+		    synch_type(pri, sema.sema_type),
+		    sema.sema_count);
 	}
 }
 
@@ -599,9 +599,9 @@ show_rwlock(private_t *pri, long offset)
 
 	if (Pread(Proc, &rwlock, sizeof (rwlock), offset) == sizeof (rwlock)) {
 		(void) printf("%s\trwlock type: %s  readers = %d\n",
-			pri->pname,
-			synch_type(pri, rwlock.rwlock_type),
-			rwlock.rwlock_readers);
+		    pri->pname,
+		    synch_type(pri, rwlock.rwlock_type),
+		    rwlock.rwlock_readers);
 	}
 }
 
@@ -630,16 +630,16 @@ show_termio(private_t *pri, long offset)
 	if (Pread(Proc, &termio, sizeof (termio), offset) == sizeof (termio)) {
 		(void) printf(
 		"%s\tiflag=0%.6o oflag=0%.6o cflag=0%.6o lflag=0%.6o line=%d\n",
-			pri->pname,
-			termio.c_iflag,
-			termio.c_oflag,
-			termio.c_cflag,
-			termio.c_lflag,
-			termio.c_line);
+		    pri->pname,
+		    termio.c_iflag,
+		    termio.c_oflag,
+		    termio.c_cflag,
+		    termio.c_lflag,
+		    termio.c_line);
 		(void) printf("%s\t    cc: ", pri->pname);
 		for (i = 0; i < NCC; i++)
 			(void) printf(" %s",
-				show_char(cbuf, (int)termio.c_cc[i]));
+			    show_char(cbuf, (int)termio.c_cc[i]));
 		(void) fputc('\n', stdout);
 	}
 }
@@ -654,18 +654,18 @@ show_termios(private_t *pri, long offset)
 	if (Pread(Proc, &termios, sizeof (termios), offset)
 	    == sizeof (termios)) {
 		(void) printf(
-		"%s\tiflag=0%.6o oflag=0%.6o cflag=0%.6o lflag=0%.6o\n",
-			pri->pname,
-			termios.c_iflag,
-			termios.c_oflag,
-			termios.c_cflag,
-			termios.c_lflag);
+		    "%s\tiflag=0%.6o oflag=0%.6o cflag=0%.6o lflag=0%.6o\n",
+		    pri->pname,
+		    termios.c_iflag,
+		    termios.c_oflag,
+		    termios.c_cflag,
+		    termios.c_lflag);
 		(void) printf("%s\t    cc: ", pri->pname);
 		for (i = 0; i < NCCS; i++) {
 			if (i == NCC)	/* show new chars on new line */
 				(void) printf("\n%s\t\t", pri->pname);
 			(void) printf(" %s",
-				show_char(cbuf, (int)termios.c_cc[i]));
+			    show_char(cbuf, (int)termios.c_cc[i]));
 		}
 		(void) fputc('\n', stdout);
 	}
@@ -680,14 +680,14 @@ show_termiox(private_t *pri, long offset)
 	if (Pread(Proc, &termiox, sizeof (termiox), offset)
 	    == sizeof (termiox)) {
 		(void) printf("%s\thflag=0%.3o cflag=0%.3o rflag=0%.3o",
-			pri->pname,
-			termiox.x_hflag,
-			termiox.x_cflag,
-			termiox.x_rflag[0]);
+		    pri->pname,
+		    termiox.x_hflag,
+		    termiox.x_cflag,
+		    termiox.x_rflag[0]);
 		for (i = 1; i < NFF; i++)
 			(void) printf(",0%.3o", termiox.x_rflag[i]);
 		(void) printf(" sflag=0%.3o\n",
-			termiox.x_sflag);
+		    termiox.x_sflag);
 	}
 }
 
@@ -702,12 +702,12 @@ show_sgttyb(private_t *pri, long offset)
 
 		(void) printf(
 		"%s\tispeed=%-2d ospeed=%-2d erase=%s kill=%s flags=0x%.8x\n",
-			pri->pname,
-			sgttyb.sg_ispeed&0xff,
-			sgttyb.sg_ospeed&0xff,
-			show_char(erase, sgttyb.sg_erase),
-			show_char(kill, sgttyb.sg_kill),
-			sgttyb.sg_flags);
+		    pri->pname,
+		    sgttyb.sg_ispeed&0xff,
+		    sgttyb.sg_ospeed&0xff,
+		    show_char(erase, sgttyb.sg_erase),
+		    show_char(kill, sgttyb.sg_kill),
+		    sgttyb.sg_flags);
 	}
 }
 
@@ -751,14 +751,14 @@ show_termcb(private_t *pri, long offset)
 
 	if (Pread(Proc, &termcb, sizeof (termcb), offset) == sizeof (termcb)) {
 		(void) printf(
-		"%s\tflgs=0%.2o termt=%d crow=%d ccol=%d vrow=%d lrow=%d\n",
-			pri->pname,
-			termcb.st_flgs&0xff,
-			termcb.st_termt&0xff,
-			termcb.st_crow&0xff,
-			termcb.st_ccol&0xff,
-			termcb.st_vrow&0xff,
-			termcb.st_lrow&0xff);
+		    "%s\tflgs=0%.2o termt=%d crow=%d ccol=%d vrow=%d lrow=%d\n",
+		    pri->pname,
+		    termcb.st_flgs&0xff,
+		    termcb.st_termt&0xff,
+		    termcb.st_crow&0xff,
+		    termcb.st_ccol&0xff,
+		    termcb.st_vrow&0xff,
+		    termcb.st_lrow&0xff);
 	}
 }
 
@@ -785,10 +785,10 @@ show_strint(private_t *pri, int code, long offset)
 
 		if (s == NULL)
 			(void) printf("%s\t0x%.8lX: %d\n",
-				pri->pname, offset, val);
+			    pri->pname, offset, val);
 		else
 			(void) printf("%s\t0x%.8lX: %s\n",
-				pri->pname, offset, s);
+			    pri->pname, offset, s);
 	}
 }
 
@@ -800,16 +800,16 @@ show_strioctl(private_t *pri, long offset)
 	if (Pread(Proc, &strioctl, sizeof (strioctl), offset) ==
 	    sizeof (strioctl)) {
 		(void) printf(
-			"%s\tcmd=%s timout=%d len=%d dp=0x%.8lX\n",
-			pri->pname,
-			ioctlname(pri, strioctl.ic_cmd),
-			strioctl.ic_timout,
-			strioctl.ic_len,
-			(long)strioctl.ic_dp);
+		    "%s\tcmd=%s timout=%d len=%d dp=0x%.8lX\n",
+		    pri->pname,
+		    ioctlname(pri, strioctl.ic_cmd),
+		    strioctl.ic_timout,
+		    strioctl.ic_len,
+		    (long)strioctl.ic_dp);
 
 		if (pri->recur++ == 0)	/* avoid indefinite recursion */
 			show_ioctl(pri, strioctl.ic_cmd,
-				(long)strioctl.ic_dp);
+			    (long)strioctl.ic_dp);
 		--pri->recur;
 	}
 }
@@ -823,16 +823,16 @@ show_strioctl32(private_t *pri, long offset)
 	if (Pread(Proc, &strioctl, sizeof (strioctl), offset) ==
 	    sizeof (strioctl)) {
 		(void) printf(
-			"%s\tcmd=%s timout=%d len=%d dp=0x%.8lX\n",
-			pri->pname,
-			ioctlname(pri, strioctl.ic_cmd),
-			strioctl.ic_timout,
-			strioctl.ic_len,
-			(long)strioctl.ic_dp);
+		    "%s\tcmd=%s timout=%d len=%d dp=0x%.8lX\n",
+		    pri->pname,
+		    ioctlname(pri, strioctl.ic_cmd),
+		    strioctl.ic_timout,
+		    strioctl.ic_len,
+		    (long)strioctl.ic_dp);
 
 		if (pri->recur++ == 0)	/* avoid indefinite recursion */
 			show_ioctl(pri, strioctl.ic_cmd,
-				(long)strioctl.ic_dp);
+			    (long)strioctl.ic_dp);
 		--pri->recur;
 	}
 }
@@ -842,12 +842,12 @@ void
 print_strbuf(private_t *pri, struct strbuf *sp, const char *name, int dump)
 {
 	(void) printf(
-		"%s\t%s:  maxlen=%-4d len=%-4d buf=0x%.8lX",
-		pri->pname,
-		name,
-		sp->maxlen,
-		sp->len,
-		(long)sp->buf);
+	    "%s\t%s:  maxlen=%-4d len=%-4d buf=0x%.8lX",
+	    pri->pname,
+	    name,
+	    sp->maxlen,
+	    sp->len,
+	    (long)sp->buf);
 	/*
 	 * Should we show the buffer contents?
 	 * Keyed to the '-r fds' and '-w fds' options?
@@ -863,8 +863,8 @@ print_strbuf(private_t *pri, struct strbuf *sp, const char *name, int dump)
 			(void) strcpy(obuf, ": \"");
 			showbytes(buffer, nb, obuf+3);
 			(void) strcat(obuf,
-				(nb == sp->len)?
-				    (const char *)"\"" : (const char *)"\"..");
+			    (nb == sp->len)?
+			    (const char *)"\"" : (const char *)"\"..");
 			(void) fputs(obuf, stdout);
 		}
 		(void) fputc('\n', stdout);
@@ -878,12 +878,12 @@ void
 print_strbuf32(private_t *pri, struct strbuf32 *sp, const char *name, int dump)
 {
 	(void) printf(
-		"%s\t%s:  maxlen=%-4d len=%-4d buf=0x%.8lX",
-		pri->pname,
-		name,
-		sp->maxlen,
-		sp->len,
-		(long)sp->buf);
+	    "%s\t%s:  maxlen=%-4d len=%-4d buf=0x%.8lX",
+	    pri->pname,
+	    name,
+	    sp->maxlen,
+	    sp->len,
+	    (long)sp->buf);
 	/*
 	 * Should we show the buffer contents?
 	 * Keyed to the '-r fds' and '-w fds' options?
@@ -899,8 +899,8 @@ print_strbuf32(private_t *pri, struct strbuf32 *sp, const char *name, int dump)
 			(void) strcpy(obuf, ": \"");
 			showbytes(buffer, nb, obuf+3);
 			(void) strcat(obuf,
-				(nb == sp->len)?
-				    (const char *)"\"" : (const char *)"\"..");
+			    (nb == sp->len)?
+			    (const char *)"\"" : (const char *)"\"..");
 			(void) fputs(obuf, stdout);
 		}
 		(void) fputc('\n', stdout);
@@ -943,8 +943,8 @@ show_strpeek(private_t *pri, long offset)
 		print_strbuf(pri, &strpeek.databuf, "dat", FALSE);
 
 		(void) printf("%s\tflags=%s\n",
-			pri->pname,
-			strflags(pri, strpeek.flags));
+		    pri->pname,
+		    strflags(pri, strpeek.flags));
 	}
 }
 
@@ -961,8 +961,8 @@ show_strpeek32(private_t *pri, long offset)
 		print_strbuf32(pri, &strpeek.databuf, "dat", FALSE);
 
 		(void) printf("%s\tflags=%s\n",
-			pri->pname,
-			strflags(pri, strpeek.flags));
+		    pri->pname,
+		    strflags(pri, strpeek.flags));
 	}
 }
 #endif	/* _LP64 */
@@ -979,10 +979,10 @@ show_strfdinsert(private_t *pri, long offset)
 		print_strbuf(pri, &strfdinsert.databuf, "dat", FALSE);
 
 		(void) printf("%s\tflags=%s fildes=%d offset=%d\n",
-			pri->pname,
-			strflags(pri, strfdinsert.flags),
-			strfdinsert.fildes,
-			strfdinsert.offset);
+		    pri->pname,
+		    strflags(pri, strfdinsert.flags),
+		    strfdinsert.fildes,
+		    strfdinsert.offset);
 	}
 }
 
@@ -999,10 +999,10 @@ show_strfdinsert32(private_t *pri, long offset)
 		print_strbuf32(pri, &strfdinsert.databuf, "dat", FALSE);
 
 		(void) printf("%s\tflags=%s fildes=%d offset=%d\n",
-			pri->pname,
-			strflags(pri, strfdinsert.flags),
-			strfdinsert.fildes,
-			strfdinsert.offset);
+		    pri->pname,
+		    strflags(pri, strfdinsert.flags),
+		    strfdinsert.fildes,
+		    strfdinsert.offset);
 	}
 }
 #endif	/* _LP64 */
@@ -1015,11 +1015,11 @@ show_strrecvfd(private_t *pri, long offset)
 	if (Pread(Proc, &strrecvfd, sizeof (strrecvfd), offset) ==
 	    sizeof (strrecvfd)) {
 		(void) printf(
-			"%s\tfd=%-5d uid=%-5u gid=%u\n",
-			pri->pname,
-			strrecvfd.fd,
-			strrecvfd.uid,
-			strrecvfd.gid);
+		    "%s\tfd=%-5d uid=%-5u gid=%u\n",
+		    pri->pname,
+		    strrecvfd.fd,
+		    strrecvfd.uid,
+		    strrecvfd.gid);
 	}
 }
 
@@ -1033,9 +1033,9 @@ show_strlist(private_t *pri, long offset)
 	if (Pread(Proc, &strlist, sizeof (strlist), offset) ==
 	    sizeof (strlist)) {
 		(void) printf("%s\tnmods=%d  modlist=0x%.8lX\n",
-			pri->pname,
-			strlist.sl_nmods,
-			(long)strlist.sl_modlist);
+		    pri->pname,
+		    strlist.sl_nmods,
+		    (long)strlist.sl_modlist);
 
 		count = strlist.sl_nmods;
 		offset = (long)strlist.sl_modlist;
@@ -1044,9 +1044,9 @@ show_strlist(private_t *pri, long offset)
 			    sizeof (list))
 				break;
 			(void) printf("%s\t\t\"%.*s\"\n",
-				pri->pname,
-				(int)sizeof (list.l_name),
-				list.l_name);
+			    pri->pname,
+			    (int)sizeof (list.l_name),
+			    list.l_name);
 			offset += sizeof (struct str_mlist);
 		}
 	}
@@ -1063,9 +1063,9 @@ show_strlist32(private_t *pri, long offset)
 	if (Pread(Proc, &strlist, sizeof (strlist), offset) ==
 	    sizeof (strlist)) {
 		(void) printf("%s\tnmods=%d  modlist=0x%.8lX\n",
-			pri->pname,
-			strlist.sl_nmods,
-			(long)strlist.sl_modlist);
+		    pri->pname,
+		    strlist.sl_nmods,
+		    (long)strlist.sl_modlist);
 
 		count = strlist.sl_nmods;
 		offset = (long)strlist.sl_modlist;
@@ -1074,9 +1074,9 @@ show_strlist32(private_t *pri, long offset)
 			    sizeof (list))
 				break;
 			(void) printf("%s\t\t\"%.*s\"\n",
-				pri->pname,
-				(int)sizeof (list.l_name),
-				list.l_name);
+			    pri->pname,
+			    (int)sizeof (list.l_name),
+			    list.l_name);
 			offset += sizeof (struct str_mlist);
 		}
 	}
@@ -1091,12 +1091,12 @@ show_jwinsize(private_t *pri, long offset)
 	if (Pread(Proc, &jwinsize, sizeof (jwinsize), offset) ==
 	    sizeof (jwinsize)) {
 		(void) printf(
-			"%s\tbytesx=%-3u bytesy=%-3u bitsx=%-3u bitsy=%-3u\n",
-			pri->pname,
-			(unsigned)jwinsize.bytesx,
-			(unsigned)jwinsize.bytesy,
-			(unsigned)jwinsize.bitsx,
-			(unsigned)jwinsize.bitsy);
+		    "%s\tbytesx=%-3u bytesy=%-3u bitsx=%-3u bitsy=%-3u\n",
+		    pri->pname,
+		    (unsigned)jwinsize.bytesx,
+		    (unsigned)jwinsize.bytesy,
+		    (unsigned)jwinsize.bitsx,
+		    (unsigned)jwinsize.bitsy);
 	}
 }
 
@@ -1108,12 +1108,12 @@ show_winsize(private_t *pri, long offset)
 	if (Pread(Proc, &winsize, sizeof (winsize), offset)
 	    == sizeof (winsize)) {
 		(void) printf(
-			"%s\trow=%-3d col=%-3d xpixel=%-3d ypixel=%-3d\n",
-			pri->pname,
-			winsize.ws_row,
-			winsize.ws_col,
-			winsize.ws_xpixel,
-			winsize.ws_ypixel);
+		    "%s\trow=%-3d col=%-3d xpixel=%-3d ypixel=%-3d\n",
+		    pri->pname,
+		    winsize.ws_row,
+		    winsize.ws_col,
+		    winsize.ws_xpixel,
+		    winsize.ws_ypixel);
 	}
 }
 
@@ -1220,10 +1220,10 @@ show_audio_prinfo(private_t *pri, const char *mode, struct audio_prinfo *au_pr)
 	 */
 
 	(void) printf("%s\t%s\tsample_rate=%u channels=%u precision=%u\n",
-		pri->pname, mode,
-		au_pr->sample_rate,
-		au_pr->channels,
-		au_pr->precision);
+	    pri->pname, mode,
+	    au_pr->sample_rate,
+	    au_pr->channels,
+	    au_pr->precision);
 
 	s = NULL;
 	switch (au_pr->encoding) {
@@ -1238,7 +1238,7 @@ show_audio_prinfo(private_t *pri, const char *mode, struct audio_prinfo *au_pr)
 		(void) printf("%s\t%s\tencoding=%s\n", pri->pname, mode, s);
 	else {
 		(void) printf("%s\t%s\tencoding=%u\n",
-			pri->pname, mode, au_pr->encoding);
+		    pri->pname, mode, au_pr->encoding);
 	}
 
 	/*
@@ -1246,10 +1246,10 @@ show_audio_prinfo(private_t *pri, const char *mode, struct audio_prinfo *au_pr)
 	 */
 
 	(void) printf(
-	"%s\t%s\tgain=%u buffer_size=%u\n",
-		pri->pname, mode,
-		au_pr->gain,
-		au_pr->buffer_size);
+	    "%s\t%s\tgain=%u buffer_size=%u\n",
+	    pri->pname, mode,
+	    au_pr->gain,
+	    au_pr->buffer_size);
 	show_audio_ports(pri, mode, "port", au_pr->port);
 	show_audio_ports(pri, mode, "avail_ports", au_pr->avail_ports);
 	show_audio_ports(pri, mode, "mod_ports", au_pr->mod_ports);
@@ -1259,24 +1259,24 @@ show_audio_prinfo(private_t *pri, const char *mode, struct audio_prinfo *au_pr)
 	 */
 
 	(void) printf("%s\t%s\tsamples=%u eof=%u pause=%u error=%u\n",
-		pri->pname, mode,
-		au_pr->samples,
-		au_pr->eof,
-		au_pr->pause,
-		au_pr->error);
+	    pri->pname, mode,
+	    au_pr->samples,
+	    au_pr->eof,
+	    au_pr->pause,
+	    au_pr->error);
 	(void) printf("%s\t%s\twaiting=%u balance=%u minordev=%u\n",
-		pri->pname, mode,
-		au_pr->waiting,
-		au_pr->balance,
-		au_pr->minordev);
+	    pri->pname, mode,
+	    au_pr->waiting,
+	    au_pr->balance,
+	    au_pr->minordev);
 
 	/*
 	 * The following values are read-only state flags
 	 */
 	(void) printf("%s\t%s\topen=%u active=%u\n",
-		pri->pname, mode,
-		au_pr->open,
-		au_pr->active);
+	    pri->pname, mode,
+	    au_pr->open,
+	    au_pr->active);
 }
 
 void
@@ -1288,7 +1288,7 @@ show_audio_info(private_t *pri, long offset)
 		show_audio_prinfo(pri, "play", &au.play);
 		show_audio_prinfo(pri, "record", &au.record);
 		(void) printf("%s\tmonitor_gain=%u output_muted=%u\n",
-			pri->pname, au.monitor_gain, au.output_muted);
+		    pri->pname, au.monitor_gain, au.output_muted);
 		show_audio_features(pri, audio_hw_features, au.hw_features,
 		    "hw_features");
 		show_audio_features(pri, audio_sw_features, au.sw_features,
@@ -1504,36 +1504,36 @@ show_statvfs(private_t *pri)
 	    == sizeof (statvfs)) {
 		(void) printf(
 		"%s\tbsize=%-10lu frsize=%-9lu blocks=%-8llu bfree=%-9llu\n",
-			pri->pname,
-			statvfs.f_bsize,
-			statvfs.f_frsize,
-			(u_longlong_t)statvfs.f_blocks,
-			(u_longlong_t)statvfs.f_bfree);
+		    pri->pname,
+		    statvfs.f_bsize,
+		    statvfs.f_frsize,
+		    (u_longlong_t)statvfs.f_blocks,
+		    (u_longlong_t)statvfs.f_bfree);
 		(void) printf(
 		"%s\tbavail=%-9llu files=%-10llu ffree=%-9llu favail=%-9llu\n",
-			pri->pname,
-			(u_longlong_t)statvfs.f_bavail,
-			(u_longlong_t)statvfs.f_files,
-			(u_longlong_t)statvfs.f_ffree,
-			(u_longlong_t)statvfs.f_favail);
+		    pri->pname,
+		    (u_longlong_t)statvfs.f_bavail,
+		    (u_longlong_t)statvfs.f_files,
+		    (u_longlong_t)statvfs.f_ffree,
+		    (u_longlong_t)statvfs.f_favail);
 		(void) printf(
-		"%s\tfsid=0x%-9.4lX basetype=%-7.16s namemax=%ld\n",
-			pri->pname,
-			statvfs.f_fsid,
-			statvfs.f_basetype,
-			(long)statvfs.f_namemax);
+		    "%s\tfsid=0x%-9.4lX basetype=%-7.16s namemax=%ld\n",
+		    pri->pname,
+		    statvfs.f_fsid,
+		    statvfs.f_basetype,
+		    (long)statvfs.f_namemax);
 		(void) printf(
-		"%s\tflag=%s\n",
-			pri->pname,
-			svfsflags(pri, (ulong_t)statvfs.f_flag));
+		    "%s\tflag=%s\n",
+		    pri->pname,
+		    svfsflags(pri, (ulong_t)statvfs.f_flag));
 		cp = statvfs.f_fstr + strlen(statvfs.f_fstr);
 		if (cp < statvfs.f_fstr + sizeof (statvfs.f_fstr) - 1 &&
 		    *(cp+1) != '\0')
 			*cp = ' ';
 		(void) printf("%s\tfstr=\"%.*s\"\n",
-			pri->pname,
-			(int)sizeof (statvfs.f_fstr),
-			statvfs.f_fstr);
+		    pri->pname,
+		    (int)sizeof (statvfs.f_fstr),
+		    statvfs.f_fstr);
 	}
 }
 
@@ -1549,37 +1549,37 @@ show_statvfs32(private_t *pri)
 	    Pread(Proc, &statvfs, sizeof (statvfs), offset)
 	    == sizeof (statvfs)) {
 		(void) printf(
-		"%s\tbsize=%-10u frsize=%-9u blocks=%-8u bfree=%-9u\n",
-			pri->pname,
-			statvfs.f_bsize,
-			statvfs.f_frsize,
-			statvfs.f_blocks,
-			statvfs.f_bfree);
+		    "%s\tbsize=%-10u frsize=%-9u blocks=%-8u bfree=%-9u\n",
+		    pri->pname,
+		    statvfs.f_bsize,
+		    statvfs.f_frsize,
+		    statvfs.f_blocks,
+		    statvfs.f_bfree);
 		(void) printf(
-		"%s\tbavail=%-9u files=%-10u ffree=%-9u favail=%-9u\n",
-			pri->pname,
-			statvfs.f_bavail,
-			statvfs.f_files,
-			statvfs.f_ffree,
-			statvfs.f_favail);
+		    "%s\tbavail=%-9u files=%-10u ffree=%-9u favail=%-9u\n",
+		    pri->pname,
+		    statvfs.f_bavail,
+		    statvfs.f_files,
+		    statvfs.f_ffree,
+		    statvfs.f_favail);
 		(void) printf(
-		"%s\tfsid=0x%-9.4X basetype=%-7.16s namemax=%d\n",
-			pri->pname,
-			statvfs.f_fsid,
-			statvfs.f_basetype,
-			(int)statvfs.f_namemax);
+		    "%s\tfsid=0x%-9.4X basetype=%-7.16s namemax=%d\n",
+		    pri->pname,
+		    statvfs.f_fsid,
+		    statvfs.f_basetype,
+		    (int)statvfs.f_namemax);
 		(void) printf(
-		"%s\tflag=%s\n",
-			pri->pname,
-			svfsflags(pri, (ulong_t)statvfs.f_flag));
+		    "%s\tflag=%s\n",
+		    pri->pname,
+		    svfsflags(pri, (ulong_t)statvfs.f_flag));
 		cp = statvfs.f_fstr + strlen(statvfs.f_fstr);
 		if (cp < statvfs.f_fstr + sizeof (statvfs.f_fstr) - 1 &&
 		    *(cp+1) != '\0')
 			*cp = ' ';
 		(void) printf("%s\tfstr=\"%.*s\"\n",
-			pri->pname,
-			(int)sizeof (statvfs.f_fstr),
-			statvfs.f_fstr);
+		    pri->pname,
+		    (int)sizeof (statvfs.f_fstr),
+		    statvfs.f_fstr);
 	}
 }
 #endif	/* _LP64 */
@@ -1595,37 +1595,37 @@ show_statvfs64(private_t *pri)
 	    Pread(Proc, &statvfs, sizeof (statvfs), offset)
 	    == sizeof (statvfs)) {
 		(void) printf(
-		"%s\tbsize=%-10u frsize=%-9u blocks=%-8llu bfree=%-9llu\n",
-			pri->pname,
-			statvfs.f_bsize,
-			statvfs.f_frsize,
-			(u_longlong_t)statvfs.f_blocks,
-			(u_longlong_t)statvfs.f_bfree);
+		    "%s\tbsize=%-10u frsize=%-9u blocks=%-8llu bfree=%-9llu\n",
+		    pri->pname,
+		    statvfs.f_bsize,
+		    statvfs.f_frsize,
+		    (u_longlong_t)statvfs.f_blocks,
+		    (u_longlong_t)statvfs.f_bfree);
 		(void) printf(
 		"%s\tbavail=%-9llu files=%-10llu ffree=%-9llu favail=%-9llu\n",
-			pri->pname,
-			(u_longlong_t)statvfs.f_bavail,
-			(u_longlong_t)statvfs.f_files,
-			(u_longlong_t)statvfs.f_ffree,
-			(u_longlong_t)statvfs.f_favail);
+		    pri->pname,
+		    (u_longlong_t)statvfs.f_bavail,
+		    (u_longlong_t)statvfs.f_files,
+		    (u_longlong_t)statvfs.f_ffree,
+		    (u_longlong_t)statvfs.f_favail);
 		(void) printf(
-		"%s\tfsid=0x%-9.4X basetype=%-7.16s namemax=%d\n",
-			pri->pname,
-			statvfs.f_fsid,
-			statvfs.f_basetype,
-			(int)statvfs.f_namemax);
+		    "%s\tfsid=0x%-9.4X basetype=%-7.16s namemax=%d\n",
+		    pri->pname,
+		    statvfs.f_fsid,
+		    statvfs.f_basetype,
+		    (int)statvfs.f_namemax);
 		(void) printf(
-		"%s\tflag=%s\n",
-			pri->pname,
-			svfsflags(pri, (ulong_t)statvfs.f_flag));
+		    "%s\tflag=%s\n",
+		    pri->pname,
+		    svfsflags(pri, (ulong_t)statvfs.f_flag));
 		cp = statvfs.f_fstr + strlen(statvfs.f_fstr);
 		if (cp < statvfs.f_fstr + sizeof (statvfs.f_fstr) - 1 &&
 		    *(cp+1) != '\0')
 			*cp = ' ';
 		(void) printf("%s\tfstr=\"%.*s\"\n",
-			pri->pname,
-			(int)sizeof (statvfs.f_fstr),
-			statvfs.f_fstr);
+		    pri->pname,
+		    (int)sizeof (statvfs.f_fstr),
+		    statvfs.f_fstr);
 	}
 }
 
@@ -1639,18 +1639,18 @@ show_statfs(private_t *pri)
 	    Pread(Proc, &statfs, sizeof (statfs), offset) == sizeof (statfs)) {
 		(void) printf(
 		"%s\tfty=%d bsz=%ld fsz=%ld blk=%ld bfr=%ld fil=%lu ffr=%lu\n",
-			pri->pname,
-			statfs.f_fstyp,
-			statfs.f_bsize,
-			statfs.f_frsize,
-			statfs.f_blocks,
-			statfs.f_bfree,
-			statfs.f_files,
-			statfs.f_ffree);
+		    pri->pname,
+		    statfs.f_fstyp,
+		    statfs.f_bsize,
+		    statfs.f_frsize,
+		    statfs.f_blocks,
+		    statfs.f_bfree,
+		    statfs.f_files,
+		    statfs.f_ffree);
 		(void) printf("%s\t    fname=%.6s fpack=%.6s\n",
-			pri->pname,
-			statfs.f_fname,
-			statfs.f_fpack);
+		    pri->pname,
+		    statfs.f_fname,
+		    statfs.f_fpack);
 	}
 }
 
@@ -1664,19 +1664,19 @@ show_statfs32(private_t *pri)
 	if (pri->sys_nargs >= 2 && (offset = pri->sys_args[1]) != NULL &&
 	    Pread(Proc, &statfs, sizeof (statfs), offset) == sizeof (statfs)) {
 		(void) printf(
-		"%s\tfty=%d bsz=%d fsz=%d blk=%d bfr=%d fil=%u ffr=%u\n",
-			pri->pname,
-			statfs.f_fstyp,
-			statfs.f_bsize,
-			statfs.f_frsize,
-			statfs.f_blocks,
-			statfs.f_bfree,
-			statfs.f_files,
-			statfs.f_ffree);
+		    "%s\tfty=%d bsz=%d fsz=%d blk=%d bfr=%d fil=%u ffr=%u\n",
+		    pri->pname,
+		    statfs.f_fstyp,
+		    statfs.f_bsize,
+		    statfs.f_frsize,
+		    statfs.f_blocks,
+		    statfs.f_bfree,
+		    statfs.f_files,
+		    statfs.f_ffree);
 		(void) printf("%s\t    fname=%.6s fpack=%.6s\n",
-			pri->pname,
-			statfs.f_fname,
-			statfs.f_fpack);
+		    pri->pname,
+		    statfs.f_fname,
+		    statfs.f_fpack);
 	}
 }
 #endif	/* _LP64 */
@@ -1714,11 +1714,11 @@ show_flock32(private_t *pri, long offset)
 			(void) printf("  whence=%-8u", flock.l_whence);
 
 		(void) printf(
-			" start=%-5d len=%-5d sys=%-2u pid=%d\n",
-			flock.l_start,
-			flock.l_len,
-			flock.l_sysid,
-			flock.l_pid);
+		    " start=%-5d len=%-5d sys=%-2u pid=%d\n",
+		    flock.l_start,
+		    flock.l_len,
+		    flock.l_sysid,
+		    flock.l_pid);
 	}
 }
 
@@ -1755,11 +1755,11 @@ show_flock64(private_t *pri, long offset)
 			(void) printf("  whence=%-8u", flock.l_whence);
 
 		(void) printf(
-			" start=%-5lld len=%-5lld sys=%-2u pid=%d\n",
-			(long long)flock.l_start,
-			(long long)flock.l_len,
-			flock.l_sysid,
-			(int)flock.l_pid);
+		    " start=%-5lld len=%-5lld sys=%-2u pid=%d\n",
+		    (long long)flock.l_start,
+		    (long long)flock.l_len,
+		    flock.l_sysid,
+		    (int)flock.l_pid);
 	}
 }
 
@@ -1819,7 +1819,7 @@ show_share(private_t *pri, long offset)
 				(void) printf("  deny=%s", str);
 		} else {
 			(void) printf("  deny=0x%x", manddny?
-				fshare.f_deny | F_MANDDNY : fshare.f_deny);
+			    fshare.f_deny | F_MANDDNY : fshare.f_deny);
 		}
 
 		(void) printf("  id=%x\n", fshare.f_id);
@@ -1866,6 +1866,7 @@ show_fcntl(private_t *pri)
 	case 34:	/* F_SETLK64 */
 	case 35:	/* F_SETLKW64 */
 	case 27:	/* F_FREESP64 */
+	case 28:	/* F_ALLOCSP64 */
 	case 44:	/* F_SETLK64_NBMAND */
 		show_flock64(pri, offset);
 		break;
@@ -1882,6 +1883,7 @@ show_fcntl(private_t *pri)
 	case F_SETLK64:
 	case F_SETLKW64:
 	case F_FREESP64:
+	case F_ALLOCSP64:
 	case F_SETLK64_NBMAND:
 		show_flock64(pri, offset);
 		break;
@@ -1970,9 +1972,9 @@ show_int(private_t *pri, long offset, const char *name)
 	if (offset != 0 &&
 	    Pread(Proc, &value, sizeof (value), offset) == sizeof (value))
 		(void) printf("%s\t%s:\t%d\n",
-			pri->pname,
-			name,
-			value);
+		    pri->pname,
+		    name,
+		    value);
 }
 
 void
@@ -1982,9 +1984,9 @@ show_hhex_int(private_t *pri, long offset, const char *name)
 
 	if (Pread(Proc, &value, sizeof (value), offset) == sizeof (value))
 		(void) printf("%s\t%s:\t0x%.4X\n",
-			pri->pname,
-			name,
-			value);
+		    pri->pname,
+		    name,
+		    value);
 }
 
 #define	ALL_POLL_FLAGS	(POLLIN|POLLPRI|POLLOUT| \
@@ -2148,15 +2150,15 @@ void
 show_perm(private_t *pri, struct ipc_perm *ip)
 {
 	(void) printf(
-	"%s\tu=%-5u g=%-5u cu=%-5u cg=%-5u m=0%.6o seq=%u key=%d\n",
-		pri->pname,
-		ip->uid,
-		ip->gid,
-		ip->cuid,
-		ip->cgid,
-		(int)ip->mode,
-		ip->seq,
-		ip->key);
+	    "%s\tu=%-5u g=%-5u cu=%-5u cg=%-5u m=0%.6o seq=%u key=%d\n",
+	    pri->pname,
+	    ip->uid,
+	    ip->gid,
+	    ip->cuid,
+	    ip->cgid,
+	    (int)ip->mode,
+	    ip->seq,
+	    ip->key);
 }
 
 #ifdef _LP64
@@ -2164,15 +2166,15 @@ void
 show_perm32(private_t *pri, struct ipc_perm32 *ip)
 {
 	(void) printf(
-	"%s\tu=%-5u g=%-5u cu=%-5u cg=%-5u m=0%.6o seq=%u key=%d\n",
-		pri->pname,
-		ip->uid,
-		ip->gid,
-		ip->cuid,
-		ip->cgid,
-		ip->mode,
-		ip->seq,
-		ip->key);
+	    "%s\tu=%-5u g=%-5u cu=%-5u cg=%-5u m=0%.6o seq=%u key=%d\n",
+	    pri->pname,
+	    ip->uid,
+	    ip->gid,
+	    ip->cuid,
+	    ip->cgid,
+	    ip->mode,
+	    ip->seq,
+	    ip->key);
 }
 #endif	/* _LP64 */
 
@@ -2210,12 +2212,12 @@ show_msgctl(private_t *pri, long offset)
 
 		(void) printf(
 	"%s\tbytes=%-5lu msgs=%-5lu maxby=%-5lu lspid=%-5u lrpid=%-5u\n",
-			pri->pname,
-			msgq.msg_cbytes,
-			msgq.msg_qnum,
-			msgq.msg_qbytes,
-			(int)msgq.msg_lspid,
-			(int)msgq.msg_lrpid);
+		    pri->pname,
+		    msgq.msg_cbytes,
+		    msgq.msg_qnum,
+		    msgq.msg_qbytes,
+		    (int)msgq.msg_lspid,
+		    (int)msgq.msg_lrpid);
 
 		prtime(pri, "    st = ", msgq.msg_stime);
 		prtime(pri, "    rt = ", msgq.msg_rtime);
@@ -2235,12 +2237,12 @@ show_msgctl32(private_t *pri, long offset)
 
 		(void) printf(
 	"%s\tbytes=%-5u msgs=%-5u maxby=%-5u lspid=%-5u lrpid=%-5u\n",
-			pri->pname,
-			msgq.msg_cbytes,
-			msgq.msg_qnum,
-			msgq.msg_qbytes,
-			msgq.msg_lspid,
-			msgq.msg_lrpid);
+		    pri->pname,
+		    msgq.msg_cbytes,
+		    msgq.msg_qnum,
+		    msgq.msg_qbytes,
+		    msgq.msg_lspid,
+		    msgq.msg_lrpid);
 
 		prtime(pri, "    st = ", msgq.msg_stime);
 		prtime(pri, "    rt = ", msgq.msg_rtime);
@@ -2262,10 +2264,10 @@ show_msgbuf(private_t *pri, long offset, long msgsz)
 			Eserialize();
 
 		(void) printf("%s\tmtype=%lu  mtext[]=\n",
-			pri->pname,
-			msgb.mtype);
+		    pri->pname,
+		    msgb.mtype);
 		showbuffer(pri,
-			(long)(offset + sizeof (msgb.mtype)), msgsz);
+		    (long)(offset + sizeof (msgb.mtype)), msgsz);
 
 		/* exit region of lengthy output */
 		if (msgsz > MYBUFSIZ / 4)
@@ -2287,10 +2289,10 @@ show_msgbuf32(private_t *pri, long offset, long msgsz)
 			Eserialize();
 
 		(void) printf("%s\tmtype=%u  mtext[]=\n",
-			pri->pname,
-			msgb.mtype);
+		    pri->pname,
+		    msgb.mtype);
 		showbuffer(pri,
-			(long)(offset + sizeof (msgb.mtype)), msgsz);
+		    (long)(offset + sizeof (msgb.mtype)), msgsz);
 
 		/* exit region of lengthy output */
 		if (msgsz > MYBUFSIZ / 4)
@@ -2316,10 +2318,10 @@ show_msgsys(private_t *pri, long msgsz)
 			case IPC_SET:
 				if (data_model == PR_MODEL_LP64)
 					show_msgctl(pri,
-						(long)pri->sys_args[3]);
+					    (long)pri->sys_args[3]);
 				else
 					show_msgctl32(pri,
-						(long)pri->sys_args[3]);
+					    (long)pri->sys_args[3]);
 				break;
 			case IPC_STAT64:
 				if (pri->Errno)
@@ -2343,10 +2345,10 @@ show_msgsys(private_t *pri, long msgsz)
 		if (pri->sys_nargs > 3) {
 			if (data_model == PR_MODEL_LP64)
 				show_msgbuf(pri, pri->sys_args[2],
-					pri->sys_args[3]);
+				    pri->sys_args[3]);
 			else
 				show_msgbuf32(pri, pri->sys_args[2],
-					pri->sys_args[3]);
+				    pri->sys_args[3]);
 		}
 		break;
 	case 4:			/* msgids() */
@@ -2389,7 +2391,7 @@ show_msgsys(private_t *pri, long msgsz)
 	case 3:			/* msgsnd() */
 		if (pri->sys_nargs > 3)
 			show_msgbuf(pri, pri->sys_args[2],
-				pri->sys_args[3]);
+			    pri->sys_args[3]);
 		break;
 	case 4:			/* msgids() */
 	case 5:			/* msgsnap() */
@@ -2425,8 +2427,8 @@ show_semctl(private_t *pri, long offset)
 		show_perm(pri, &semds.sem_perm);
 
 		(void) printf("%s\tnsems=%u\n",
-			pri->pname,
-			semds.sem_nsems);
+		    pri->pname,
+		    semds.sem_nsems);
 
 		prtime(pri, "    ot = ", semds.sem_otime);
 		prtime(pri, "    ct = ", semds.sem_ctime);
@@ -2444,8 +2446,8 @@ show_semctl32(private_t *pri, long offset)
 		show_perm32(pri, &semds.sem_perm);
 
 		(void) printf("%s\tnsems=%u\n",
-			pri->pname,
-			semds.sem_nsems);
+		    pri->pname,
+		    semds.sem_nsems);
 
 		prtime(pri, "    ot = ", semds.sem_otime);
 		prtime(pri, "    ct = ", semds.sem_ctime);
@@ -2471,9 +2473,9 @@ show_semop(private_t *pri, long offset, long nsops, long timeout)
 			break;
 
 		(void) printf("%s\tsemnum=%-5u semop=%-5d semflg=",
-			pri->pname,
-			sembuf.sem_num,
-			sembuf.sem_op);
+		    pri->pname,
+		    sembuf.sem_num,
+		    sembuf.sem_op);
 
 		if (sembuf.sem_flg == 0)
 			(void) printf("0\n");
@@ -2501,10 +2503,10 @@ show_semsys(private_t *pri)
 #ifdef _LP64
 				if (data_model == PR_MODEL_LP64)
 					show_semctl(pri,
-						(long)pri->sys_args[4]);
+					    (long)pri->sys_args[4]);
 				else
 					show_semctl32(pri,
-						(long)pri->sys_args[4]);
+					    (long)pri->sys_args[4]);
 #else
 				show_semctl(pri, (long)pri->sys_args[4]);
 #endif
@@ -2524,14 +2526,14 @@ show_semsys(private_t *pri)
 	case 2:			/* semop() */
 		if (pri->sys_nargs > 3)
 			show_semop(pri, (long)pri->sys_args[2],
-				pri->sys_args[3], 0);
+			    pri->sys_args[3], 0);
 		break;
 	case 3:			/* semids() */
 		break;
 	case 4:			/* semtimedop() */
 		if (pri->sys_nargs > 4)
 			show_semop(pri, (long)pri->sys_args[2],
-				pri->sys_args[3], pri->sys_args[4]);
+			    pri->sys_args[3], pri->sys_args[4]);
 		break;
 	default:		/* unexpected subcode */
 		break;
@@ -2572,13 +2574,13 @@ show_shmctl(private_t *pri, long offset)
 		show_perm(pri, &shmds.shm_perm);
 
 		(void) printf(
-		"%s\tsize=%-6lu lpid=%-5u cpid=%-5u na=%-5lu cna=%lu\n",
-			pri->pname,
-			(ulong_t)shmds.shm_segsz,
-			(int)shmds.shm_lpid,
-			(int)shmds.shm_cpid,
-			shmds.shm_nattch,
-			shmds.shm_cnattch);
+		    "%s\tsize=%-6lu lpid=%-5u cpid=%-5u na=%-5lu cna=%lu\n",
+		    pri->pname,
+		    (ulong_t)shmds.shm_segsz,
+		    (int)shmds.shm_lpid,
+		    (int)shmds.shm_cpid,
+		    shmds.shm_nattch,
+		    shmds.shm_cnattch);
 
 		prtime(pri, "    at = ", shmds.shm_atime);
 		prtime(pri, "    dt = ", shmds.shm_dtime);
@@ -2597,13 +2599,13 @@ show_shmctl32(private_t *pri, long offset)
 		show_perm32(pri, &shmds.shm_perm);
 
 		(void) printf(
-		"%s\tsize=%-6u lpid=%-5u cpid=%-5u na=%-5u cna=%u\n",
-			pri->pname,
-			shmds.shm_segsz,
-			shmds.shm_lpid,
-			shmds.shm_cpid,
-			shmds.shm_nattch,
-			shmds.shm_cnattch);
+		    "%s\tsize=%-6u lpid=%-5u cpid=%-5u na=%-5u cna=%u\n",
+		    pri->pname,
+		    shmds.shm_segsz,
+		    shmds.shm_lpid,
+		    shmds.shm_cpid,
+		    shmds.shm_nattch,
+		    shmds.shm_cnattch);
 
 		prtime(pri, "    at = ", shmds.shm_atime);
 		prtime(pri, "    dt = ", shmds.shm_dtime);
@@ -2629,10 +2631,10 @@ show_shmsys(private_t *pri)
 #ifdef _LP64
 				if (data_model == PR_MODEL_LP64)
 					show_shmctl(pri,
-						(long)pri->sys_args[3]);
+					    (long)pri->sys_args[3]);
 				else
 					show_shmctl32(pri,
-						(long)pri->sys_args[3]);
+					    (long)pri->sys_args[3]);
 #else
 				show_shmctl(pri, (long)pri->sys_args[3]);
 #endif
@@ -2708,7 +2710,7 @@ show_sigset(private_t *pri, long offset, const char *name)
 	if (offset != NULL &&
 	    Pread(Proc, &sigset, sizeof (sigset), offset) == sizeof (sigset)) {
 		(void) printf("%s\t%s =%s\n",
-			pri->pname, name, sigset_string(pri, &sigset));
+		    pri->pname, name, sigset_string(pri, &sigset));
 	}
 }
 
@@ -2722,11 +2724,11 @@ show_sigaltstack32(private_t *pri, long offset, const char *name)
 	    Pread(Proc, &altstack, sizeof (altstack), offset) ==
 	    sizeof (altstack)) {
 		(void) printf("%s\t%s: sp=0x%.8X size=%u flags=0x%.4X\n",
-			pri->pname,
-			name,
-			altstack.ss_sp,
-			altstack.ss_size,
-			altstack.ss_flags);
+		    pri->pname,
+		    name,
+		    altstack.ss_sp,
+		    altstack.ss_size,
+		    altstack.ss_flags);
 	}
 }
 #endif	/* _LP64 */
@@ -2746,11 +2748,11 @@ show_sigaltstack(private_t *pri, long offset, const char *name)
 	    Pread(Proc, &altstack, sizeof (altstack), offset) ==
 	    sizeof (altstack)) {
 		(void) printf("%s\t%s: sp=0x%.8lX size=%lu flags=0x%.4X\n",
-			pri->pname,
-			name,
-			(ulong_t)altstack.ss_sp,
-			(ulong_t)altstack.ss_size,
-			altstack.ss_flags);
+		    pri->pname,
+		    name,
+		    (ulong_t)altstack.ss_sp,
+		    (ulong_t)altstack.ss_size,
+		    altstack.ss_flags);
 	}
 }
 
@@ -2767,12 +2769,12 @@ show_sigaction32(private_t *pri, long offset, const char *name, long odisp)
 		if (odisp != NULL)
 			sigaction.sa_handler = (caddr32_t)odisp;
 		(void) printf(
-			"%s    %s: hand = 0x%.8X mask =%s flags = 0x%.4X\n",
-			pri->pname,
-			name,
-			sigaction.sa_handler,
-			sigset_string(pri, (sigset_t *)&sigaction.sa_mask),
-			sigaction.sa_flags);
+		    "%s    %s: hand = 0x%.8X mask =%s flags = 0x%.4X\n",
+		    pri->pname,
+		    name,
+		    sigaction.sa_handler,
+		    sigset_string(pri, (sigset_t *)&sigaction.sa_mask),
+		    sigaction.sa_flags);
 	}
 }
 #endif	/* _LP64 */
@@ -2795,12 +2797,12 @@ show_sigaction(private_t *pri, long offset, const char *name, long odisp)
 		if (odisp != NULL)
 			sigaction.sa_handler = (void (*)())odisp;
 		(void) printf(
-			"%s    %s: hand = 0x%.8lX mask =%s flags = 0x%.4X\n",
-			pri->pname,
-			name,
-			(long)sigaction.sa_handler,
-			sigset_string(pri, &sigaction.sa_mask),
-			sigaction.sa_flags);
+		    "%s    %s: hand = 0x%.8lX mask =%s flags = 0x%.4X\n",
+		    pri->pname,
+		    name,
+		    (long)sigaction.sa_handler,
+		    sigset_string(pri, &sigaction.sa_mask),
+		    sigaction.sa_flags);
 	}
 }
 
@@ -2811,7 +2813,7 @@ print_siginfo32(private_t *pri, const siginfo32_t *sip)
 	const char *code = NULL;
 
 	(void) printf("%s      siginfo: %s", pri->pname,
-		signame(pri, sip->si_signo));
+	    signame(pri, sip->si_signo));
 
 	if (sip->si_signo != 0 && SI_FROMUSER(sip) && sip->si_pid != 0) {
 		(void) printf(" pid=%d uid=%d", sip->si_pid, sip->si_uid);
@@ -2931,21 +2933,21 @@ print_siginfo32(private_t *pri, const siginfo32_t *sip)
 	case SIGBUS:
 	case SIGEMT:
 		(void) printf(" %s addr=0x%.8X",
-			code,
-			sip->si_addr);
+		    code,
+		    sip->si_addr);
 		break;
 	case SIGCLD:
 		(void) printf(" %s pid=%d status=0x%.4X",
-			code,
-			sip->si_pid,
-			sip->si_status);
+		    code,
+		    sip->si_pid,
+		    sip->si_status);
 		break;
 	case SIGPOLL:
 	case SIGXFSZ:
 		(void) printf(" %s fd=%d band=%d",
-			code,
-			sip->si_fd,
-			sip->si_band);
+		    code,
+		    sip->si_fd,
+		    sip->si_band);
 		break;
 	}
 
@@ -2967,7 +2969,7 @@ print_siginfo(private_t *pri, const siginfo_t *sip)
 	const char *code = NULL;
 
 	(void) printf("%s      siginfo: %s", pri->pname,
-		signame(pri, sip->si_signo));
+	    signame(pri, sip->si_signo));
 
 	if (sip->si_signo != 0 && SI_FROMUSER(sip) && sip->si_pid != 0) {
 		(void) printf(" pid=%d uid=%u",
@@ -3089,21 +3091,21 @@ print_siginfo(private_t *pri, const siginfo_t *sip)
 	case SIGBUS:
 	case SIGEMT:
 		(void) printf(" %s addr=0x%.8lX",
-			code,
-			(long)sip->si_addr);
+		    code,
+		    (long)sip->si_addr);
 		break;
 	case SIGCLD:
 		(void) printf(" %s pid=%d status=0x%.4X",
-			code,
-			(int)sip->si_pid,
-			sip->si_status);
+		    code,
+		    (int)sip->si_pid,
+		    sip->si_status);
 		break;
 	case SIGPOLL:
 	case SIGXFSZ:
 		(void) printf(" %s fd=%d band=%ld",
-			code,
-			sip->si_fd,
-			sip->si_band);
+		    code,
+		    sip->si_fd,
+		    sip->si_band);
 		break;
 	}
 
@@ -3198,9 +3200,9 @@ show_iovec32(private_t *pri, long offset, int niov, int showbuf, long count)
 
 		for (ip = &iovec[0]; niov-- && !interrupt; ip++) {
 			(void) printf("%s\tiov_base = 0x%.8X  iov_len = %d\n",
-				pri->pname,
-				ip->iov_base,
-				ip->iov_len);
+			    pri->pname,
+			    ip->iov_base,
+			    ip->iov_len);
 			if ((nb = count) > 0) {
 				if (nb > ip->iov_len)
 					nb = ip->iov_len;
@@ -3244,9 +3246,9 @@ show_iovec(private_t *pri, long offset, long niov, int showbuf, long count)
 
 		for (ip = &iovec[0]; niov-- && !interrupt; ip++) {
 			(void) printf("%s\tiov_base = 0x%.8lX  iov_len = %lu\n",
-				pri->pname,
-				(long)ip->iov_base,
-				ip->iov_len);
+			    pri->pname,
+			    (long)ip->iov_base,
+			    ip->iov_len);
 			if ((nb = count) > 0) {
 				if (nb > ip->iov_len)
 					nb = ip->iov_len;
@@ -3289,11 +3291,11 @@ show_dents32(private_t *pri, long offset, long count)
 		if ((unsigned)nb < dp->d_reclen) {
 			/* getdents() error? */
 			(void) printf(
-			"%s    ino=%-5u off=%-4d rlen=%-3d\n",
-				pri->pname,
-				dp->d_ino,
-				dp->d_off,
-				dp->d_reclen);
+			    "%s    ino=%-5u off=%-4d rlen=%-3d\n",
+			    pri->pname,
+			    dp->d_ino,
+			    dp->d_off,
+			    dp->d_reclen);
 			break;
 		}
 
@@ -3301,13 +3303,13 @@ show_dents32(private_t *pri, long offset, long count)
 		    nb >= (int)(dp->d_name - (char *)dp) &&
 		    (unsigned)nb >= dp->d_reclen) {
 			(void) printf(
-			"%s    ino=%-5u off=%-4d rlen=%-3d \"%.*s\"\n",
-				pri->pname,
-				dp->d_ino,
-				dp->d_off,
-				dp->d_reclen,
-				dp->d_reclen - (int)(dp->d_name - (char *)dp),
-				dp->d_name);
+			    "%s    ino=%-5u off=%-4d rlen=%-3d \"%.*s\"\n",
+			    pri->pname,
+			    dp->d_ino,
+			    dp->d_off,
+			    dp->d_reclen,
+			    dp->d_reclen - (int)(dp->d_name - (char *)dp),
+			    dp->d_name);
 			nb -= dp->d_reclen;
 			count -= dp->d_reclen;
 			offset += dp->d_reclen;
@@ -3347,11 +3349,11 @@ show_dents64(private_t *pri, long offset, long count)
 		if ((unsigned)nb < dp->d_reclen) {
 			/* getdents() error? */
 			(void) printf(
-			"%s    ino=%-5llu off=%-4lld rlen=%-3d\n",
-				pri->pname,
-				(long long)dp->d_ino,
-				(long long)dp->d_off,
-				dp->d_reclen);
+			    "%s    ino=%-5llu off=%-4lld rlen=%-3d\n",
+			    pri->pname,
+			    (long long)dp->d_ino,
+			    (long long)dp->d_off,
+			    dp->d_reclen);
 			break;
 		}
 
@@ -3359,13 +3361,13 @@ show_dents64(private_t *pri, long offset, long count)
 		    nb >= (int)(dp->d_name - (char *)dp) &&
 		    (unsigned)nb >= dp->d_reclen) {
 			(void) printf(
-			"%s    ino=%-5llu off=%-4lld rlen=%-3d \"%.*s\"\n",
-				pri->pname,
-				(long long)dp->d_ino,
-				(long long)dp->d_off,
-				dp->d_reclen,
-				dp->d_reclen - (int)(dp->d_name - (char *)dp),
-				dp->d_name);
+			    "%s    ino=%-5llu off=%-4lld rlen=%-3d \"%.*s\"\n",
+			    pri->pname,
+			    (long long)dp->d_ino,
+			    (long long)dp->d_off,
+			    dp->d_reclen,
+			    dp->d_reclen - (int)(dp->d_name - (char *)dp),
+			    dp->d_name);
 			nb -= dp->d_reclen;
 			count -= dp->d_reclen;
 			offset += dp->d_reclen;
@@ -3467,13 +3469,13 @@ show_nuname(private_t *pri, long offset)
 	if (offset != NULL &&
 	    Pread(Proc, &ubuf, sizeof (ubuf), offset) == sizeof (ubuf)) {
 		(void) printf(
-		"%s\tsys=%s nod=%s rel=%s ver=%s mch=%s\n",
-			pri->pname,
-			ubuf.sysname,
-			ubuf.nodename,
-			ubuf.release,
-			ubuf.version,
-			ubuf.machine);
+		    "%s\tsys=%s nod=%s rel=%s ver=%s mch=%s\n",
+		    pri->pname,
+		    ubuf.sysname,
+		    ubuf.nodename,
+		    ubuf.release,
+		    ubuf.version,
+		    ubuf.machine);
 	}
 }
 
@@ -3493,7 +3495,7 @@ show_sockaddr(private_t *pri,
 	 * also large enough to store a sockaddr_in or a sockaddr_in6.
 	 */
 	long buf[(sizeof (short) + PATH_MAX + sizeof (long) - 1)
-		/ sizeof (long)];
+	    / sizeof (long)];
 	struct sockaddr *sa = (struct sockaddr *)buf;
 	struct sockaddr_in *sin = (struct sockaddr_in *)buf;
 	struct sockaddr_un *soun = (struct sockaddr_un *)buf;
@@ -3517,7 +3519,7 @@ show_sockaddr(private_t *pri,
 		(void) printf("%s\tAF_INET6  %s = %s  port = %u\n",
 		    pri->pname, str,
 		    inet_ntop(AF_INET6, &sin6->sin6_addr, addrbuf,
-			sizeof (addrbuf)),
+		    sizeof (addrbuf)),
 		    ntohs(sin6->sin6_port));
 		(void) printf("%s\tscope id = %u  source id = 0x%x\n"
 		    "%s\tflow class = 0x%02x  flow label = 0x%05x\n",
@@ -3539,7 +3541,7 @@ show_sockaddr(private_t *pri,
 			/* Null terminate */
 			soun->sun_path[len] = NULL;
 			(void) printf("%s\tAF_UNIX  %s = %s\n", pri->pname,
-				str, soun->sun_path);
+			    str, soun->sun_path);
 		}
 		break;
 	}
@@ -3561,7 +3563,7 @@ show_msghdr(private_t *pri, long offset)
 
 	if (msg.msg_name != NULL && msg.msg_namelen != 0)
 		show_sockaddr(pri, "msg_name",
-			(long)msg.msg_name, 0, (long)msg.msg_namelen);
+		    (long)msg.msg_name, 0, (long)msg.msg_namelen);
 
 	/*
 	 * Print the iovec if the syscall was successful and the fd is
@@ -3599,7 +3601,7 @@ show_msghdr32(private_t *pri, long offset)
 
 	if (msg.msg_name != NULL && msg.msg_namelen != 0)
 		show_sockaddr(pri, "msg_name",
-			(long)msg.msg_name, 0, (long)msg.msg_namelen);
+		    (long)msg.msg_name, 0, (long)msg.msg_namelen);
 	/*
 	 * Print the iovec if the syscall was successful and the fd is
 	 * part of the set being traced.
@@ -4002,7 +4004,7 @@ show_sendfilevec(private_t *pri, int fd, sendfilevec_t *sndvec, int sfvcnt)
 			if (snd_ptr->sfv_fd == SFV_FD_SELF &&
 			    prismember(&writefd, fd)) {
 				showbuffer(pri, (long)snd_ptr->sfv_off,
-					    (long)snd_ptr->sfv_len);
+				    (long)snd_ptr->sfv_len);
 			}
 
 			cpy_rqst -= sizeof (snd[0]);
@@ -4057,7 +4059,7 @@ show_sendfilevec64(private_t *pri, int fd, sendfilevec64_t *sndvec, int sfvcnt)
 			if (snd_ptr->sfv_fd == SFV_FD_SELF &&
 			    prismember(&writefd, fd)) {
 				showbuffer(pri, (long)snd_ptr->sfv_off,
-					    (long)snd_ptr->sfv_len);
+				    (long)snd_ptr->sfv_len);
 			}
 
 			cpy_rqst -= sizeof (snd[0]);
@@ -4155,7 +4157,7 @@ show_ids(private_t *pri, long offset, int count)
 
 	while (count > 0 && !interrupt) {
 		ssize_t nb = (count * sizeof (id_t) < MYBUFSIZ)?
-			count * sizeof (id_t) : MYBUFSIZ;
+		    count * sizeof (id_t) : MYBUFSIZ;
 
 		if ((nb = Pread(Proc, &buf[0], (size_t)nb, offset)) < 0 ||
 		    nb < sizeof (id_t))
@@ -4754,15 +4756,15 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_getitimer:
 		if (!err && pri->sys_nargs > 1)
 			show_itimerval(pri, (long)pri->sys_args[1],
-				" value");
+			    " value");
 		break;
 	case SYS_setitimer:
 		if (pri->sys_nargs > 1)
 			show_itimerval(pri, (long)pri->sys_args[1],
-				" value");
+			    " value");
 		if (!err && pri->sys_nargs > 2)
 			show_itimerval(pri, (long)pri->sys_args[2],
-				"ovalue");
+			    "ovalue");
 		break;
 	case SYS_stime:
 		show_stime(pri);
@@ -4786,7 +4788,7 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_ioctl:
 		if (pri->sys_nargs >= 3) /* each case must decide for itself */
 			show_ioctl(pri, pri->sys_args[1],
-				(long)pri->sys_args[2]);
+			    (long)pri->sys_args[2]);
 		break;
 	case SYS_stat:
 	case SYS_fstat:
@@ -4816,7 +4818,7 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_lxstat:
 		if (!err && pri->sys_nargs >= 3)
 			show_xstat(pri, (int)pri->sys_args[0],
-				(long)pri->sys_args[2]);
+			    (long)pri->sys_args[2]);
 		break;
 	case SYS_statvfs:
 	case SYS_fstatvfs:
@@ -4927,18 +4929,18 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_sigaltstack:
 		if (pri->sys_nargs > 0)
 			show_sigaltstack(pri, (long)pri->sys_args[0],
-				"new");
+			    "new");
 		if (!err && pri->sys_nargs > 1)
 			show_sigaltstack(pri, (long)pri->sys_args[1],
-				"old");
+			    "old");
 		break;
 	case SYS_sigaction:
 		if (pri->sys_nargs > 1)
 			show_sigaction(pri, (long)pri->sys_args[1],
-				"new", NULL);
+			    "new", NULL);
 		if (!err && pri->sys_nargs > 2)
 			show_sigaction(pri, (long)pri->sys_args[2],
-				"old", r0);
+			    "old", r0);
 		break;
 	case SYS_signotify:
 		if (pri->sys_nargs > 1)
@@ -4969,7 +4971,7 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_mincore:
 		if (!err && pri->sys_nargs > 2)
 			show_bool(pri, (long)pri->sys_args[2],
-				(pri->sys_args[1] + pagesize - 1) / pagesize);
+			    (pri->sys_args[1] + pagesize - 1) / pagesize);
 		break;
 	case SYS_readv:
 	case SYS_writev:
@@ -4984,7 +4986,7 @@ expound(private_t *pri, long r0, int raw)
 			    prismember(&writefd, i)))
 				showbuf = TRUE;
 			show_iovec(pri, (long)pri->sys_args[1],
-				pri->sys_args[2], showbuf, nb);
+			    pri->sys_args[2], showbuf, nb);
 		}
 		break;
 	case SYS_getrlimit:
@@ -5019,7 +5021,7 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_adjtime:
 		if (!err && pri->sys_nargs > 1)
 			show_adjtime(pri, (long)pri->sys_args[0],
-				(long)pri->sys_args[1]);
+			    (long)pri->sys_args[1]);
 		break;
 	case SYS_lwp_info:
 		if (!err && pri->sys_nargs > 0)
@@ -5096,7 +5098,7 @@ expound(private_t *pri, long r0, int raw)
 		case PRIVSYS_GETPPRIV:
 			if (!err)
 				show_privset(pri, (long)pri->sys_args[3],
-					(size_t)pri->sys_args[4], "");
+				    (size_t)pri->sys_args[4], "");
 		}
 		break;
 	case SYS_ucredsys:
@@ -5112,23 +5114,23 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_connect:
 		if (pri->sys_nargs > 2)
 			show_sockaddr(pri, "name", (long)pri->sys_args[1],
-				0, (long)pri->sys_args[2]);
+			    0, (long)pri->sys_args[2]);
 		break;
 	case SYS_sendto:
 		if (pri->sys_nargs > 5)
 			show_sockaddr(pri, "to", (long)pri->sys_args[4], 0,
-				pri->sys_args[5]);
+			    pri->sys_args[5]);
 		break;
 	case SYS_accept:
 		if (!err && pri->sys_nargs > 2)
 			show_sockaddr(pri, "name", (long)pri->sys_args[1],
-				(long)pri->sys_args[2], 0);
+			    (long)pri->sys_args[2], 0);
 		break;
 	case SYS_getsockname:
 	case SYS_getpeername:
 		if (!err && pri->sys_nargs > 2)
 			show_sockaddr(pri, "name", (long)pri->sys_args[1],
-				(long)pri->sys_args[2], 0);
+			    (long)pri->sys_args[2], 0);
 		break;
 	case SYS_cladm:
 		if (!err && pri->sys_nargs > 2)
@@ -5138,7 +5140,7 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_recvfrom:
 		if (!err && pri->sys_nargs > 5)
 			show_sockaddr(pri, "from", (long)pri->sys_args[4],
-				(long)pri->sys_args[5], 0);
+			    (long)pri->sys_args[5], 0);
 		break;
 	case SYS_recvmsg:
 		if (err)
@@ -5165,12 +5167,12 @@ expound(private_t *pri, long r0, int raw)
 
 		if (pri->sys_args[0] == SENDFILEV) {
 			show_sendfilevec(pri, (int)pri->sys_args[1],
-				(sendfilevec_t *)pri->sys_args[2],
-				(int)pri->sys_args[3]);
+			    (sendfilevec_t *)pri->sys_args[2],
+			    (int)pri->sys_args[3]);
 		} else if (pri->sys_args[0] == SENDFILEV64) {
 			show_sendfilevec64(pri, (int)pri->sys_args[1],
-				(sendfilevec64_t *)pri->sys_args[2],
-				(int)pri->sys_args[3]);
+			    (sendfilevec64_t *)pri->sys_args[2],
+			    (int)pri->sys_args[3]);
 		}
 		break;
 	case SYS_memcntl:
@@ -5202,10 +5204,10 @@ expound(private_t *pri, long r0, int raw)
 			if (pri->sys_args[0] == _RUSAGESYS_GETRUSAGE) {
 #ifdef _LP64
 				if (!lp64)
-				    show_getrusage32(pri->sys_args[1]);
+					show_getrusage32(pri->sys_args[1]);
 				else
 #endif
-				    show_getrusage(pri->sys_args[1]);
+					show_getrusage(pri->sys_args[1]);
 			}
 		break;
 	case SYS_port:

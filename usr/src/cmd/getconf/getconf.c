@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,7 +226,7 @@ static struct sctab {
 
 	/* UNIX 03 Additions */
 
-	/* Not supporting the Advisory Information (ADV) at this time.  */
+	/* Advisory Information (ADV) */
 	_PC_ALLOC_SIZE_MIN,	"POSIX_ALLOC_SIZE_MIN",	PATHCONF,  NOFLAGS,
 	_PC_REC_INCR_XFER_SIZE,	"POSIX_REC_INCR_XFER_SIZE", PATHCONF,  NOFLAGS,
 	_PC_REC_MAX_XFER_SIZE,	"POSIX_REC_MAX_XFER_SIZE",  PATHCONF,  NOFLAGS,
@@ -755,9 +756,9 @@ usage()
 {
 
 	(void) fputs(gettext(
-		"usage:\tgetconf [-v specification] system_var\n"
-		"\tgetconf [-v specification] path_var pathname\n"
-		"\tgetconf -a\n"), stderr);
+	    "usage:\tgetconf [-v specification] system_var\n"
+	    "\tgetconf [-v specification] path_var pathname\n"
+	    "\tgetconf -a\n"), stderr);
 	return (2);
 }
 

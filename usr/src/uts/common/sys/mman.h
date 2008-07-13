@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -200,6 +201,10 @@ extern int shm_open(const char *, int, mode_t);
 extern int shm_unlink(const char *);
 #endif
 
+#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
+extern int posix_madvise(void *, size_t, int);
+#endif
+
 /* mmap failure value */
 #define	MAP_FAILED	((void *) -1)
 
@@ -211,6 +216,7 @@ extern int mincore();
 extern int memcntl();
 extern int msync();
 extern int madvise();
+extern int posix_madvise();
 extern int getpagesizes();
 extern int getpagesizes2();
 extern int mlock();
@@ -264,6 +270,16 @@ struct memcntl_mha32 {
 #define	MADV_ACCESS_LWP		7	/* next LWP to access heavily */
 #define	MADV_ACCESS_MANY	8	/* many processes to access heavily */
 #endif	/* (_POSIX_C_SOURCE <= 2) && !defined(_XPG4_2) ...  */
+
+#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
+/* advice to posix_madvise */
+/* these values must be kept in sync with the MADV_* values, above */
+#define	POSIX_MADV_NORMAL	0	/* MADV_NORMAL */
+#define	POSIX_MADV_RANDOM	1	/* MADV_RANDOM */
+#define	POSIX_MADV_SEQUENTIAL	2	/* MADV_SEQUENTIAL */
+#define	POSIX_MADV_WILLNEED	3	/* MADV_WILLNEED */
+#define	POSIX_MADV_DONTNEED	4	/* MADV_DONTNEED */
+#endif
 
 /* flags to msync */
 #define	MS_OLDSYNC	0x0		/* old value of MS_SYNC */

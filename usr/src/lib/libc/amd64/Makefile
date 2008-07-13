@@ -488,6 +488,10 @@ PORTGEN=			\
 	pfmt_print.o		\
 	plock.o			\
 	poll.o			\
+	posix_fadvise.o		\
+	posix_fallocate.o	\
+	posix_madvise.o		\
+	posix_memalign.o	\
 	priocntl.o		\
 	privlib.o		\
 	priv_str_xlate.o	\
@@ -722,7 +726,6 @@ AIOOBJS=			\
 
 RTOBJS=				\
 	clock_timer.o		\
-	fallocate.o		\
 	mqueue.o		\
 	pos4obj.o		\
 	sched.o			\

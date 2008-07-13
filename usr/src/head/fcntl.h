@@ -18,14 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #ifndef	_FCNTL_H
 #define	_FCNTL_H
@@ -76,9 +76,10 @@ extern "C" {
 #ifdef __PRAGMA_REDEFINE_EXTNAME
 #pragma redefine_extname	open	open64
 #pragma redefine_extname	creat	creat64
-#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
+#pragma redefine_extname	posix_fadvise posix_fadvise64
 #pragma redefine_extname	posix_fallocate posix_fallocate64
-#endif /* defined(__EXTENSIONS__) || defined(_XPG6) ||  ... */
+#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 #pragma redefine_extname	openat	openat64
@@ -87,9 +88,10 @@ extern "C" {
 #else
 #define	open			open64
 #define	creat			creat64
-#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
+#define	posix_fadvise		posix_fadvise64
 #define	posix_fallocate		posix_fallocate64
-#endif /* defined(__EXTENSIONS__) || defined(_XPG6) ||  ... */
+#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 #define	openat			openat64
@@ -102,9 +104,10 @@ extern "C" {
 #ifdef __PRAGMA_REDEFINE_EXTNAME
 #pragma	redefine_extname	open64	open
 #pragma	redefine_extname	creat64	creat
-#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
+#pragma redefine_extname	posix_fadvise64 posix_fadvise
 #pragma redefine_extname	posix_fallocate64 posix_fallocate
-#endif /* defined(__EXTENSIONS__) || defined(_XPG6) ||  ... */
+#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 #pragma	redefine_extname	openat64	openat
@@ -113,9 +116,10 @@ extern "C" {
 #else
 #define	open64				open
 #define	creat64				creat
-#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
+#define	posix_fadvise64			posix_fadvise
 #define	posix_fallocate64		posix_fallocate
-#endif /* defined(__EXTENSIONS__) || defined(_XPG6) ||  ... */
+#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 #define	openat64			openat
@@ -129,9 +133,10 @@ extern "C" {
 extern int fcntl(int, int, ...);
 extern int open(const char *, int, ...);
 extern int creat(const char *, mode_t);
-#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
+extern int posix_fadvise(int, off_t, off_t, int);
 extern int posix_fallocate(int, off_t, off_t);
-#endif /* defined(__EXTENSIONS__) || defined(_XPG6) || ... */
+#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 extern int openat(int, const char *, int, ...);
@@ -146,9 +151,10 @@ extern int directio(int, int);
 	    !defined(__PRAGMA_REDEFINE_EXTNAME))
 extern int open64(const char *, int, ...);
 extern int creat64(const char *, mode_t);
-#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
+extern int posix_fadvise64(int, off64_t, off64_t, int);
 extern int posix_fallocate64(int, off64_t, off64_t);
-#endif /* defined(__EXTENSIONS__) || defined(_XPG6) || ... */
+#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 extern int openat64(int, const char *, int, ...);
@@ -161,9 +167,10 @@ extern int attropen64(const char *, const char *, int, ...);
 extern int fcntl();
 extern int open();
 extern int creat();
-#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
+extern int posix_fadvise();
 extern int posix_fallocate();
-#endif /* defined(__EXTENSIONS__) || defined(_XPG6) || ... */
+#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 extern int openat();
@@ -179,9 +186,10 @@ extern int directio();
 	    !defined(__PRAGMA_REDEFINE_EXTNAME))
 extern int open64();
 extern int creat64();
-#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
+extern int posix_fadvise64();
 extern int posix_fallocate64();
-#endif /* defined(__EXTENSIONS__) || defined(_XPG6) || ... */
+#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 extern int openat64();

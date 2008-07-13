@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -350,6 +351,16 @@ typedef struct fshare {
 #define	AT_SYMLINK_NOFOLLOW		0x1000
 #define	AT_REMOVEDIR			0x1
 #define	_AT_TRIGGER			0x2
+#endif
+
+#if !defined(__XOPEN_OR_POSIX) || defined(_XPG6) || defined(__EXTENSIONS__)
+/* advice for posix_fadvise */
+#define	POSIX_FADV_NORMAL	0
+#define	POSIX_FADV_RANDOM	1
+#define	POSIX_FADV_SEQUENTIAL	2
+#define	POSIX_FADV_WILLNEED	3
+#define	POSIX_FADV_DONTNEED	4
+#define	POSIX_FADV_NOREUSE	5
 #endif
 
 #ifdef	__cplusplus

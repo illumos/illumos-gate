@@ -18,14 +18,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #ifndef _UNISTD_H
 #define	_UNISTD_H
@@ -149,6 +149,7 @@ extern "C" {
 #endif
 
 /* New in UNIX 03 */
+#define	_POSIX_ADVISORY_INFO			200112L
 #define	_POSIX_BARRIERS				200112L
 #define	_POSIX_CLOCK_SELECTION			200112L
 #define	_POSIX_IPV6				200112L

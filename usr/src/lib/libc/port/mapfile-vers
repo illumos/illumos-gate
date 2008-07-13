@@ -100,7 +100,10 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	nanosleep;
 	ntohl;
 	ntohs;
+	posix_fadvise;
 	posix_fallocate;
+	posix_madvise;
+	posix_memalign;
 	pthread_key_create_once_np;
 	sched_getparam;
 	sched_get_priority_max;

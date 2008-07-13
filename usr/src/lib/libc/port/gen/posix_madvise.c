@@ -27,46 +27,32 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
-#include <errno.h>
-#include <fcntl.h>
 #include <sys/types.h>
+#include <sys/mman.h>
+#include <errno.h>
 
-#include <stdio.h>
-
+/*
+ * SUSv3 - memory advisory information and alignment control
+ *
+ * The POSIX_MADV_* constants below are defined in <sys/mman.h>
+ * to have the same values as the corresponding MADV_* constants,
+ * also defined in <sys/mman.h>, so a direct call to madvise()
+ * can be made here without further ado.
+ */
 int
-posix_fallocate(int fd, off_t offset, off_t len)
+posix_madvise(void *addr, size_t len, int advice)
 {
-	struct flock lck;
-
-	lck.l_whence = 0;
-	lck.l_start = offset;
-	lck.l_len = len;
-	lck.l_type = F_WRLCK;
-
-	if (fcntl(fd, F_ALLOCSP, &lck) == -1) {
-		return (-1);
+	switch (advice) {
+	case POSIX_MADV_NORMAL:
+	case POSIX_MADV_SEQUENTIAL:
+	case POSIX_MADV_RANDOM:
+	case POSIX_MADV_WILLNEED:
+	case POSIX_MADV_DONTNEED:
+		break;
+	default:
+		return (EINVAL);
 	}
-
-	return (0);
+	if (madvise(addr, len, advice) == 0)
+		return (0);
+	return (errno);
 }
-
-#if !defined(_LP64)
-
-int
-posix_fallocate64(int fd, off64_t offset, off64_t len)
-{
-	struct flock64 lck;
-
-	lck.l_whence = 0;
-	lck.l_start = offset;
-	lck.l_len = len;
-	lck.l_type = F_WRLCK;
-
-	if (fcntl(fd, F_ALLOCSP64, &lck) == -1) {
-		return (-1);
-	}
-
-	return (0);
-}
-
-#endif

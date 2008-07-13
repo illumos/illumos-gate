@@ -469,6 +469,9 @@ sysconf(int name)
 		case _SC_SHELL:
 			return ((long)_POSIX_SHELL);
 
+		case _SC_ADVISORY_INFO:
+			return ((long)_POSIX_ADVISORY_INFO);
+
 		case _SC_HOST_NAME_MAX:
 			return ((long)_POSIX_HOST_NAME_MAX);
 
@@ -506,7 +509,6 @@ sysconf(int name)
 		case _SC_2_PBS_LOCATE:
 		case _SC_2_PBS_MESSAGE:
 		case _SC_2_PBS_TRACK:
-		case _SC_ADVISORY_INFO:
 		case _SC_CPUTIME:
 		case _SC_SPORADIC_SERVER:
 		case _SC_SS_REPL_MAX:

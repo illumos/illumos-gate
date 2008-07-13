@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +55,7 @@
 static long
 cpathconf(register vnode_t *vp, int cmd, struct cred *cr)
 {
+	struct statvfs64 sb;
 	int error;
 	ulong_t val;
 
@@ -68,7 +70,35 @@ cpathconf(register vnode_t *vp, int cmd, struct cred *cr)
 	case _PC_REC_MAX_XFER_SIZE:
 	case _PC_REC_MIN_XFER_SIZE:
 	case _PC_REC_XFER_ALIGN:
-		return ((long)set_errno(EINVAL));
+		if ((error = VFS_STATVFS(vp->v_vfsp, &sb)) != 0)
+			return ((long)set_errno(error));
+
+		/*
+		 * There is generally no harm in doing larger transfers, but
+		 * there's a point of diminishing returns.  With 1MB transfers,
+		 * even if they're random, you get very close to platter speed.
+		 * Se we return 1MB as the maximum transfer size.
+		 */
+		if (cmd == _PC_REC_MAX_XFER_SIZE)
+			return ((long)MAX(sb.f_bsize, 1UL << 20));
+
+		/*
+		 * By definition, f_frsize is the smallest filesystem block.
+		 * However, _PC_ALLOC_SIZE_MIN is intended to define the
+		 * threshold for direct I/O.  This implies two requirements:
+		 * the VM and I/O subsystems must be able to create mappings
+		 * for DMA, which requires at least page alignment; and the
+		 * filesystem must avoid read/modify/write, which generally
+		 * requires multiples of its 'preferred' blocksize, f_bsize.
+		 *
+		 * PAGESIZE alignment is sufficient for DMA and block copy.
+		 * Rounding up to the filesystem 'preferred' blocksize
+		 * works just as well.
+		 *
+		 * All together, this means that the remaining parameters
+		 * map into the same value.
+		 */
+		return ((long)MAX(sb.f_bsize, PAGESIZE));
 
 	case _PC_ASYNC_IO:
 		return (1l);

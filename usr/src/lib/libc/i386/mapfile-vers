@@ -40,6 +40,7 @@ SUNW_1.23 {
 	enable_extended_FILE_stdio;
 	lio_listio64;
 	mkstemps64;
+	posix_fadvise64;
 	posix_fallocate64;
 };
 

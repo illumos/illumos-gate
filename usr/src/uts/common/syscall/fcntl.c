@@ -18,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -424,13 +425,18 @@ fcntl(int fdes, int cmd, intptr_t arg)
 	case F_FREESP:
 	case F_ALLOCSP64:
 	case F_FREESP64:
-		if ((flag & FWRITE) == 0) {
-			error = EBADF;
+		/*
+		 * Test for not-a-regular-file (and returning EINVAL)
+		 * before testing for open-for-writing (and returning EBADF).
+		 * This is relied upon by posix_fallocate() in libc.
+		 */
+		if (vp->v_type != VREG) {
+			error = EINVAL;
 			break;
 		}
 
-		if (vp->v_type != VREG) {
-			error = EINVAL;
+		if ((flag & FWRITE) == 0) {
+			error = EBADF;
 			break;
 		}
 
@@ -533,7 +539,7 @@ fcntl(int fdes, int cmd, intptr_t arg)
 				break;
 			begin = start > vattr.va_size ? vattr.va_size : start;
 			length = vattr.va_size > start ? vattr.va_size - start :
-				start - vattr.va_size;
+			    start - vattr.va_size;
 			if (nbl_conflict(vp, NBL_WRITE, begin, length, 0,
 			    NULL)) {
 				error = EACCES;

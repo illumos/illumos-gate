@@ -18,14 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #ifndef _STDLIB_H
 #define	_STDLIB_H
@@ -206,6 +206,7 @@ extern void *valloc(size_t);
 #if defined(__EXTENSIONS__) || \
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX)) || \
 	defined(_XPG6)
+extern int posix_memalign(void **, size_t, size_t);
 extern int posix_openpt(int);
 extern int setenv(const char *, const char *, int);
 extern int unsetenv(const char *);
@@ -308,6 +309,7 @@ extern void *valloc();
 #endif /* defined(__EXTENSIONS__) || ... || defined(_XPG4_2) */
 
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || defined(_XPG6)
+extern int posix_memalign();
 extern int posix_openpt();
 extern int setenv();
 extern int unsetenv();
