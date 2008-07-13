@@ -55,7 +55,7 @@ d none usr/lib/brand/native 755 root sys
 f none usr/lib/brand/native/attach_update 755 root bin
 f none usr/lib/brand/native/config.xml 444 root bin
 f none usr/lib/brand/native/platform.xml 444 root bin
-f none usr/lib/brand/native/postclone 755 root bin
+f none usr/lib/brand/native/sw_support 755 root bin
 f none usr/lib/libbrand.so.1 755 root bin
 f none usr/lib/libzonecfg.so.1 755 root bin
 d none usr/lib/zones 755 root bin

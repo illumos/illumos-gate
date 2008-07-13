@@ -38,14 +38,16 @@
 	<login_cmd>/usr/bin/login -z %Z -f %u</login_cmd>
 	<user_cmd>/usr/bin/getent passwd %u</user_cmd>
 
-	<install>/usr/lib/lu/lucreatezone -z %z</install>
-	<installopts></installopts>
+	<install>/usr/lib/brand/native/sw_support install %z %R</install>
 	<boot>/usr/lib/brand/sn1/sn1_boot %R</boot>
-	<halt></halt>
 	<verify_cfg></verify_cfg>
 	<verify_adm></verify_adm>
-	<postclone></postclone>
-	<postinstall></postinstall>
+	<postclone>/usr/lib/brand/native/sw_support postclone %z %R</postclone>
+	<attach>/usr/lib/brand/native/sw_support attach %z %R</attach>
+	<detach>/usr/lib/brand/native/sw_support detach %z %R</detach>
+	<presnap>/usr/lib/brand/native/sw_support presnap %z %R</presnap>
+	<postsnap>/usr/lib/brand/native/sw_support postsnap %z %R</postsnap>
+	<validatesnap>/usr/lib/brand/native/sw_support validatesnap %z %R</validatesnap>
 
 	<privilege set="default" name="contract_event" />
 	<privilege set="default" name="contract_identity" />

@@ -34,13 +34,13 @@ include ../Makefile.cmd
 
 ROOTMANIFESTDIR=        $(ROOTSVCSYSTEM)
 
-OBJS= zoneadm.o sw_cmp.o zfs.o
+OBJS= zoneadm.o zfs.o
 SRCS = $(OBJS:.o=.c)
 POFILE=zoneadm_all.po
 POFILES= $(OBJS:%.o=%.po)
 
-LDLIBS += -lzonecfg -lsocket -lgen -lpool -lbsm -lzfs -luuid -lnvpair -lbrand \
-	-ldlpi -luutil
+LDLIBS += -lzonecfg -lsocket -lgen -lpool -lzfs -luuid -lnvpair -lbrand \
+	-ldlpi
 
 .KEEP_STATE:
 

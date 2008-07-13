@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,9 +47,12 @@
 #include <libbrand_impl.h>
 #include <libbrand.h>
 
+#define	DTD_ELEM_ATTACH		((const xmlChar *) "attach")
 #define	DTD_ELEM_BOOT		((const xmlChar *) "boot")
 #define	DTD_ELEM_BRAND		((const xmlChar *) "brand")
+#define	DTD_ELEM_CLONE		((const xmlChar *) "clone")
 #define	DTD_ELEM_COMMENT	((const xmlChar *) "comment")
+#define	DTD_ELEM_DETACH		((const xmlChar *) "detach")
 #define	DTD_ELEM_DEVICE		((const xmlChar *) "device")
 #define	DTD_ELEM_GLOBAL_MOUNT	((const xmlChar *) "global_mount")
 #define	DTD_ELEM_HALT		((const xmlChar *) "halt")
@@ -62,11 +65,15 @@
 #define	DTD_ELEM_POSTATTACH	((const xmlChar *) "postattach")
 #define	DTD_ELEM_POSTCLONE	((const xmlChar *) "postclone")
 #define	DTD_ELEM_POSTINSTALL	((const xmlChar *) "postinstall")
+#define	DTD_ELEM_POSTSNAP	((const xmlChar *) "postsnap")
 #define	DTD_ELEM_PREDETACH	((const xmlChar *) "predetach")
+#define	DTD_ELEM_PRESNAP	((const xmlChar *) "presnap")
 #define	DTD_ELEM_PREUNINSTALL	((const xmlChar *) "preuninstall")
 #define	DTD_ELEM_PRIVILEGE	((const xmlChar *) "privilege")
 #define	DTD_ELEM_SYMLINK	((const xmlChar *) "symlink")
+#define	DTD_ELEM_UNINSTALL	((const xmlChar *) "uninstall")
 #define	DTD_ELEM_USER_CMD	((const xmlChar *) "user_cmd")
+#define	DTD_ELEM_VALIDSNAP	((const xmlChar *) "validatesnap")
 #define	DTD_ELEM_VERIFY_CFG	((const xmlChar *) "verify_cfg")
 #define	DTD_ELEM_VERIFY_ADM	((const xmlChar *) "verify_adm")
 
@@ -306,13 +313,10 @@ brand_close(brand_handle_t bh)
 
 static int
 i_substitute_tokens(const char *sbuf, char *dbuf, int dbuf_size,
-    const char *zonename, const char *zoneroot, const char *username,
-    const char *curr_zone, int argc, char **argv)
+    const char *zonename, const char *zonepath, const char *username,
+    const char *curr_zone)
 {
-	int dst, src, i;
-
-	assert(argc >= 0);
-	assert((argc == 0) || (argv != NULL));
+	int dst, src;
 
 	/*
 	 * Walk through the characters, substituting values as needed.
@@ -330,9 +334,9 @@ i_substitute_tokens(const char *sbuf, char *dbuf, int dbuf_size,
 			dst += strlcpy(dbuf + dst, "%", dbuf_size - dst);
 			break;
 		case 'R':
-			if (zoneroot == NULL)
+			if (zonepath == NULL)
 				break;
-			dst += strlcpy(dbuf + dst, zoneroot, dbuf_size - dst);
+			dst += strlcpy(dbuf + dst, zonepath, dbuf_size - dst);
 			break;
 		case 'u':
 			if (username == NULL)
@@ -350,13 +354,6 @@ i_substitute_tokens(const char *sbuf, char *dbuf, int dbuf_size,
 			if (zonename == NULL)
 				break;
 			dst += strlcpy(dbuf + dst, zonename, dbuf_size - dst);
-			break;
-		case '*':
-			if (argv == NULL)
-				break;
-			for (i = 0; i < argc; i++)
-				dst += snprintf(dbuf + dst, dbuf_size - dst,
-				    " \"%s\"", argv[i]);
 			break;
 		}
 	}
@@ -376,15 +373,14 @@ i_substitute_tokens(const char *sbuf, char *dbuf, int dbuf_size,
  *	%u	Username
  *	%z	Name of target zone
  *	%Z	Name of current zone
- *	%R	Root of zone
- *	%*	Additional arguments (argc, argv)
+ *	%R	Zonepath of zone
  *
  * Returns 0 on success, -1 on failure.
  */
 static int
 brand_get_value(struct brand_handle *bhp, const char *zonename,
-    const char *zoneroot, const char *username, const char *curr_zone,
-    char *buf, size_t len, int argc, char **argv, const xmlChar *tagname,
+    const char *zonepath, const char *username, const char *curr_zone,
+    char *buf, size_t len, const xmlChar *tagname,
     boolean_t substitute, boolean_t optional)
 {
 	xmlNodePtr node;
@@ -433,8 +429,7 @@ brand_get_value(struct brand_handle *bhp, const char *zonename,
 		/* Substitute token values as needed. */
 		if (substitute) {
 			if (i_substitute_tokens((char *)content, buf, len,
-			    zonename, zoneroot, username, curr_zone,
-			    argc, argv) != 0)
+			    zonename, zonepath, username, curr_zone) != 0)
 				err = -1;
 		} else {
 			if (strlcpy(buf, (char *)content, len) >= len)
@@ -448,12 +443,21 @@ brand_get_value(struct brand_handle *bhp, const char *zonename,
 }
 
 int
-brand_get_boot(brand_handle_t bh, const char *zonename,
-    const char *zoneroot, char *buf, size_t len, int argc, char **argv)
+brand_get_attach(brand_handle_t bh, const char *zonename,
+    const char *zonepath, char *buf, size_t len)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
-	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
-	    buf, len, argc, argv, DTD_ELEM_BOOT, B_TRUE, B_TRUE));
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_ATTACH, B_TRUE, B_TRUE));
+}
+
+int
+brand_get_boot(brand_handle_t bh, const char *zonename,
+    const char *zonepath, char *buf, size_t len)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_BOOT, B_TRUE, B_TRUE));
 }
 
 int
@@ -469,12 +473,30 @@ brand_get_brandname(brand_handle_t bh, char *buf, size_t len)
 }
 
 int
-brand_get_halt(brand_handle_t bh, const char *zonename,
-    const char *zoneroot, char *buf, size_t len, int argc, char **argv)
+brand_get_clone(brand_handle_t bh, const char *zonename,
+    const char *zonepath, char *buf, size_t len)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
-	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
-	    buf, len, argc, argv, DTD_ELEM_HALT, B_TRUE, B_TRUE));
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_CLONE, B_TRUE, B_TRUE));
+}
+
+int
+brand_get_detach(brand_handle_t bh, const char *zonename,
+    const char *zonepath, char *buf, size_t len)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_DETACH, B_TRUE, B_TRUE));
+}
+
+int
+brand_get_halt(brand_handle_t bh, const char *zonename,
+    const char *zonepath, char *buf, size_t len)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_HALT, B_TRUE, B_TRUE));
 }
 
 int
@@ -482,7 +504,7 @@ brand_get_initname(brand_handle_t bh, char *buf, size_t len)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, NULL, NULL, NULL, NULL,
-	    buf, len, 0, NULL, DTD_ELEM_INITNAME, B_FALSE, B_FALSE));
+	    buf, len, DTD_ELEM_INITNAME, B_FALSE, B_FALSE));
 }
 
 int
@@ -492,7 +514,7 @@ brand_get_login_cmd(brand_handle_t bh, const char *username,
 	struct brand_handle *bhp = (struct brand_handle *)bh;
 	const char *curr_zone = get_curr_zone();
 	return (brand_get_value(bhp, NULL, NULL, username, curr_zone,
-	    buf, len, 0, NULL, DTD_ELEM_LOGIN_CMD, B_TRUE, B_FALSE));
+	    buf, len, DTD_ELEM_LOGIN_CMD, B_TRUE, B_FALSE));
 }
 
 int
@@ -502,16 +524,16 @@ brand_get_user_cmd(brand_handle_t bh, const char *username,
 	struct brand_handle *bhp = (struct brand_handle *)bh;
 
 	return (brand_get_value(bhp, NULL, NULL, username, NULL,
-	    buf, len, 0, NULL, DTD_ELEM_USER_CMD, B_TRUE, B_FALSE));
+	    buf, len, DTD_ELEM_USER_CMD, B_TRUE, B_FALSE));
 }
 
 int
 brand_get_install(brand_handle_t bh, const char *zonename,
-    const char *zoneroot, char *buf, size_t len, int argc, char **argv)
+    const char *zonepath, char *buf, size_t len)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
-	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
-	    buf, len, argc, argv, DTD_ELEM_INSTALL, B_TRUE, B_FALSE));
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_INSTALL, B_TRUE, B_FALSE));
 }
 
 int
@@ -519,7 +541,7 @@ brand_get_installopts(brand_handle_t bh, char *buf, size_t len)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, NULL, NULL, NULL, NULL,
-	    buf, len, 0, NULL, DTD_ELEM_INSTALLOPTS, B_FALSE, B_TRUE));
+	    buf, len, DTD_ELEM_INSTALLOPTS, B_FALSE, B_TRUE));
 }
 
 int
@@ -527,52 +549,88 @@ brand_get_modname(brand_handle_t bh, char *buf, size_t len)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, NULL, NULL, NULL, NULL,
-	    buf, len, 0, NULL, DTD_ELEM_MODNAME, B_FALSE, B_TRUE));
+	    buf, len, DTD_ELEM_MODNAME, B_FALSE, B_TRUE));
 }
 
 int
 brand_get_postattach(brand_handle_t bh, const char *zonename,
-    const char *zoneroot, char *buf, size_t len, int argc, char **argv)
+    const char *zonepath, char *buf, size_t len)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
-	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
-	    buf, len, argc, argv, DTD_ELEM_POSTATTACH, B_TRUE, B_TRUE));
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_POSTATTACH, B_TRUE, B_TRUE));
 }
 
 int
 brand_get_postclone(brand_handle_t bh, const char *zonename,
-    const char *zoneroot, char *buf, size_t len, int argc, char **argv)
+    const char *zonepath, char *buf, size_t len)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
-	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
-	    buf, len, argc, argv, DTD_ELEM_POSTCLONE, B_TRUE, B_TRUE));
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_POSTCLONE, B_TRUE, B_TRUE));
 }
 
 int
 brand_get_postinstall(brand_handle_t bh, const char *zonename,
-    const char *zoneroot, char *buf, size_t len, int argc, char **argv)
+    const char *zonepath, char *buf, size_t len)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
-	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
-	    buf, len, argc, argv, DTD_ELEM_POSTINSTALL, B_TRUE, B_TRUE));
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_POSTINSTALL, B_TRUE, B_TRUE));
+}
+
+int
+brand_get_postsnap(brand_handle_t bh, const char *zonename,
+    const char *zonepath, char *buf, size_t len)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_POSTSNAP, B_TRUE, B_TRUE));
 }
 
 int
 brand_get_predetach(brand_handle_t bh, const char *zonename,
-    const char *zoneroot, char *buf, size_t len, int argc, char **argv)
+    const char *zonepath, char *buf, size_t len)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
-	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
-	    buf, len, argc, argv, DTD_ELEM_PREDETACH, B_TRUE, B_TRUE));
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_PREDETACH, B_TRUE, B_TRUE));
+}
+
+int
+brand_get_presnap(brand_handle_t bh, const char *zonename,
+    const char *zonepath, char *buf, size_t len)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_PRESNAP, B_TRUE, B_TRUE));
 }
 
 int
 brand_get_preuninstall(brand_handle_t bh, const char *zonename,
-    const char *zoneroot, char *buf, size_t len, int argc, char **argv)
+    const char *zonepath, char *buf, size_t len)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
-	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
-	    buf, len, argc, argv, DTD_ELEM_PREUNINSTALL, B_TRUE, B_TRUE));
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_PREUNINSTALL, B_TRUE, B_TRUE));
+}
+
+int
+brand_get_uninstall(brand_handle_t bh, const char *zonename,
+    const char *zonepath, char *buf, size_t len)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_UNINSTALL, B_TRUE, B_TRUE));
+}
+
+int
+brand_get_validatesnap(brand_handle_t bh, const char *zonename,
+    const char *zonepath, char *buf, size_t len)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_VALIDSNAP, B_TRUE, B_TRUE));
 }
 
 int
@@ -580,16 +638,16 @@ brand_get_verify_cfg(brand_handle_t bh, char *buf, size_t len)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, NULL, NULL, NULL, NULL,
-	    buf, len, 0, NULL, DTD_ELEM_VERIFY_CFG, B_FALSE, B_TRUE));
+	    buf, len, DTD_ELEM_VERIFY_CFG, B_FALSE, B_TRUE));
 }
 
 int
 brand_get_verify_adm(brand_handle_t bh, const char *zonename,
-    const char *zoneroot, char *buf, size_t len, int argc, char **argv)
+    const char *zonepath, char *buf, size_t len)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
-	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
-	    buf, len, argc, argv, DTD_ELEM_VERIFY_ADM, B_TRUE, B_TRUE));
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_VERIFY_ADM, B_TRUE, B_TRUE));
 }
 
 int
@@ -683,7 +741,7 @@ brand_config_iter_privilege(brand_handle_t bh,
 }
 
 static int
-i_brand_platform_iter_mounts(struct brand_handle *bhp, const char *zoneroot,
+i_brand_platform_iter_mounts(struct brand_handle *bhp, const char *zonepath,
     int (*func)(void *, const char *, const char *, const char *,
     const char *), void *data, const xmlChar *mount_type)
 {
@@ -714,7 +772,7 @@ i_brand_platform_iter_mounts(struct brand_handle *bhp, const char *zoneroot,
 		/* Substitute token values as needed. */
 		if ((ret = i_substitute_tokens((char *)special,
 		    special_exp, sizeof (special_exp),
-		    NULL, zoneroot, NULL, NULL, 0, NULL)) != 0)
+		    NULL, zonepath, NULL, NULL)) != 0)
 			goto next;
 
 		/* opt might not be defined */
@@ -724,7 +782,7 @@ i_brand_platform_iter_mounts(struct brand_handle *bhp, const char *zoneroot,
 		} else {
 			if ((ret = i_substitute_tokens((char *)opt,
 			    opt_exp, sizeof (opt_exp),
-			    NULL, zoneroot, NULL, NULL, 0, NULL)) != 0)
+			    NULL, zonepath, NULL, NULL)) != 0)
 				goto next;
 		}
 
@@ -755,15 +813,15 @@ next:
  *
  * Perform the following substitutions as necessary:
  *
- *	%R	Root of zone
+ *	%R	Zonepath of zone
  */
 int
-brand_platform_iter_gmounts(brand_handle_t bh, const char *zoneroot,
+brand_platform_iter_gmounts(brand_handle_t bh, const char *zonepath,
     int (*func)(void *, const char *, const char *, const char *,
     const char *), void *data)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
-	return (i_brand_platform_iter_mounts(bhp, zoneroot, func, data,
+	return (i_brand_platform_iter_mounts(bhp, zonepath, func, data,
 	    DTD_ELEM_GLOBAL_MOUNT));
 }
 
@@ -884,7 +942,7 @@ brand_platform_iter_devices(brand_handle_t bh, const char *zonename,
 		/* Substitute token values as needed. */
 		if ((ret = i_substitute_tokens((char *)match,
 		    match_exp, sizeof (match_exp),
-		    zonename, NULL, NULL, NULL, 0, NULL)) != 0) {
+		    zonename, NULL, NULL, NULL)) != 0) {
 			err = B_TRUE;
 			goto next;
 		}

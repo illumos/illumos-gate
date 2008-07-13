@@ -303,6 +303,7 @@ COMMON_SUBDIRS = \
 	cmd/ztest \
 	lib/abi \
 	lib/auditd_plugins \
+	lib/brand/native \
 	lib/brand/sn1 \
 	lib/crypt_modules \
 	lib/extendedFILE \

@@ -675,7 +675,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 {
 	zoneid_t zoneid;
 	struct stat st;
-	char zroot[MAXPATHLEN], initpath[MAXPATHLEN], init_file[MAXPATHLEN];
+	char zpath[MAXPATHLEN], initpath[MAXPATHLEN], init_file[MAXPATHLEN];
 	char nbootargs[BOOTARGS_MAX];
 	char cmdbuf[MAXPATHLEN];
 	fs_callback_t cb;
@@ -716,14 +716,14 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 	/*
 	 * Get the brand's boot callback if it exists.
 	 */
-	if (zone_get_zonepath(zone_name, zroot, sizeof (zroot)) != Z_OK) {
-		zerror(zlogp, B_FALSE, "unable to determine zone root");
+	if (zone_get_zonepath(zone_name, zpath, sizeof (zpath)) != Z_OK) {
+		zerror(zlogp, B_FALSE, "unable to determine zone path");
 		brand_close(bh);
 		return (-1);
 	}
 	(void) strcpy(cmdbuf, EXEC_PREFIX);
-	if (brand_get_boot(bh, zone_name, zroot, cmdbuf + EXEC_LEN,
-	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL) != 0) {
+	if (brand_get_boot(bh, zone_name, zpath, cmdbuf + EXEC_LEN,
+	    sizeof (cmdbuf) - EXEC_LEN) != 0) {
 		zerror(zlogp, B_FALSE,
 		    "unable to determine branded zone's boot callback");
 		brand_close(bh);
@@ -750,12 +750,12 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 	assert(init_file[0] != '\0');
 
 	/* Try to anticipate possible problems: Make sure init is executable. */
-	if (zone_get_rootpath(zone_name, zroot, sizeof (zroot)) != Z_OK) {
+	if (zone_get_rootpath(zone_name, zpath, sizeof (zpath)) != Z_OK) {
 		zerror(zlogp, B_FALSE, "unable to determine zone root");
 		return (-1);
 	}
 
-	(void) snprintf(initpath, sizeof (initpath), "%s%s", zroot, init_file);
+	(void) snprintf(initpath, sizeof (initpath), "%s%s", zpath, init_file);
 
 	if (stat(initpath, &st) == -1) {
 		zerror(zlogp, B_TRUE, "could not stat %s", initpath);

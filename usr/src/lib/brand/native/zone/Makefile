@@ -26,15 +26,20 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
+PROG=		sw_support
 BRAND=		native
-PROGS=		postclone attach_update
+PROGS=		attach_update $(PROG)
 XMLDOCS=	config.xml platform.xml
 TEMPLATES=	SUNWdefault.xml SUNWblank.xml
+CLOBBERFILES=	$(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
 
 all:	$(PROGS)
 
 include $(SRC)/cmd/Makefile.cmd
 include ../../Makefile.brand
+
+CPPFLAGS +=	-I/usr/include/libxml2 -D_REENTRANT
+LDLIBS += -lzonecfg -luutil
 
 POFILES=	$(PROGS:%=%.po)
 POFILE=		native_zone.po
@@ -45,14 +50,12 @@ $(POFILE): $(POFILES)
 
 _msg: $(MSGDOMAINPOFILE)
 
-lint:
+lint: lint_PROG
 
 install: $(PROGS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
 
 clean:
 	-$(RM) $(PROGS)
 
-clobber: clean
-	-$(RM) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
-
 include $(SRC)/Makefile.msg.targ
+include $(SRC)/cmd/Makefile.targ

@@ -4531,7 +4531,7 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 	zoneid_t zoneid;
 	int res;
 	char pool_err[128];
-	char zroot[MAXPATHLEN];
+	char zpath[MAXPATHLEN];
 	char cmdbuf[MAXPATHLEN];
 	char brand[MAXNAMELEN];
 	brand_handle_t bh = NULL;
@@ -4568,9 +4568,9 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 		goto error;
 	}
 
-	/* Get the path to the root of this zone */
-	if (zone_get_zonepath(zone_name, zroot, sizeof (zroot)) != Z_OK) {
-		zerror(zlogp, B_FALSE, "unable to determine zone root");
+	/* Get the zonepath of this zone */
+	if (zone_get_zonepath(zone_name, zpath, sizeof (zpath)) != Z_OK) {
+		zerror(zlogp, B_FALSE, "unable to determine zone path");
 		goto error;
 	}
 
@@ -4585,8 +4585,8 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 	 * brand a chance to cleanup any custom configuration.
 	 */
 	(void) strcpy(cmdbuf, EXEC_PREFIX);
-	if (brand_get_halt(bh, zone_name, zroot, cmdbuf + EXEC_LEN,
-	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL) < 0) {
+	if (brand_get_halt(bh, zone_name, zpath, cmdbuf + EXEC_LEN,
+	    sizeof (cmdbuf) - EXEC_LEN) < 0) {
 		brand_close(bh);
 		zerror(zlogp, B_FALSE, "unable to determine branded zone's "
 		    "halt callback.");

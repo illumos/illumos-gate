@@ -135,11 +135,12 @@ struct cmd {
 #define	SHELP_LIST	"list [-cipv]"
 #define	SHELP_VERIFY	"verify"
 #define	SHELP_INSTALL	"install [-x nodataset] [brand-specific args]"
-#define	SHELP_UNINSTALL	"uninstall [-F]"
-#define	SHELP_CLONE	"clone [-m method] [-s <ZFS snapshot>] zonename"
+#define	SHELP_UNINSTALL	"uninstall [-F] [brand-specific args]"
+#define	SHELP_CLONE	"clone [-m method] [-s <ZFS snapshot>] "\
+	"[brand-specific args] zonename"
 #define	SHELP_MOVE	"move zonepath"
-#define	SHELP_DETACH	"detach [-n]"
-#define	SHELP_ATTACH	"attach [-F] [-n <path>] [-u]"
+#define	SHELP_DETACH	"detach [-n] [brand-specific args]"
+#define	SHELP_ATTACH	"attach [-F] [-n <path>] [brand-specific args]"
 #define	SHELP_MARK	"mark incomplete"
 
 #define	EXEC_PREFIX	"exec "
@@ -206,8 +207,6 @@ static char *target_uuid;
 
 /* used in do_subproc() and signal handler */
 static volatile boolean_t child_killed;
-/* used in attach_func() and signal handler */
-static volatile boolean_t attach_interupted;
 static int do_subproc_cnt = 0;
 
 /*
@@ -215,14 +214,6 @@ static int do_subproc_cnt = 0;
  * instance in its ancestry.
  */
 static boolean_t zoneadm_is_nested = B_FALSE;
-
-/* used to track nested zone-lock operations */
-static int zone_lock_cnt = 0;
-
-/* used to communicate lock status to children */
-#define	LOCK_ENV_VAR	"_ZONEADM_LOCK_HELD"
-static char zoneadm_lock_held[] = LOCK_ENV_VAR"=1";
-static char zoneadm_lock_not_held[] = LOCK_ENV_VAR"=0";
 
 char *
 cmd_to_str(int cmd_num)
@@ -278,10 +269,12 @@ long_help(int cmd_num)
 		    "creation of a new ZFS file system for the\n\tzone "
 		    "(assuming the zonepath is within a ZFS file system).\n\t"
 		    "All other arguments are passed to the brand installation "
-		    "function;\n\tsee brand(4) for more information."));
+		    "function;\n\tsee brands(5) for more information."));
 	case CMD_UNINSTALL:
 		return (gettext("Uninstall the configuration from the system.  "
-		    "The -F flag can be used\n\tto force the action."));
+		    "The -F flag can be used\n\tto force the action.  All "
+		    "other arguments are passed to the brand\n\tuninstall "
+		    "function; see brands(5) for more information."));
 	case CMD_CLONE:
 		return (gettext("Clone the installation of another zone.  "
 		    "The -m option can be used to\n\tspecify 'copy' which "
@@ -289,7 +282,9 @@ long_help(int cmd_num)
 		    "can be used to specify the name of a ZFS snapshot "
 		    "that was taken from\n\ta previous clone command.  The "
 		    "snapshot will be used as the source\n\tinstead of "
-		    "creating a new ZFS snapshot."));
+		    "creating a new ZFS snapshot.  All other arguments are "
+		    "passed\n\tto the brand clone function; see "
+		    "brands(5) for more information."));
 	case CMD_MOVE:
 		return (gettext("Move the zone to a new zonepath."));
 	case CMD_DETACH:
@@ -300,22 +295,25 @@ long_help(int cmd_num)
 		    "attached there.  The -n option can be used to specify\n\t"
 		    "'no-execute' mode.  When -n is used, the information "
 		    "needed to attach\n\tthe zone is sent to standard output "
-		    "but the zone is not actually\n\tdetached."));
+		    "but the zone is not actually\n\tdetached.  All other "
+		    "arguments are passed to the brand detach function;\n\tsee "
+		    "brands(5) for more information."));
 	case CMD_ATTACH:
 		return (gettext("Attach the zone to the system.  The zone "
 		    "state must be 'configured'\n\tprior to attach; upon "
 		    "successful completion, the zone state will be\n\t"
 		    "'installed'.  The system software on the current "
 		    "system must be\n\tcompatible with the software on the "
-		    "zone's original system or use\n\tthe -u option to update "
-		    "the zone to the current system software.\n\tSpecify -F "
+		    "zone's original system.\n\tSpecify -F "
 		    "to force the attach and skip software compatibility "
 		    "tests.\n\tThe -n option can be used to specify "
 		    "'no-execute' mode.  When -n is\n\tused, the information "
 		    "needed to attach the zone is read from the\n\tspecified "
 		    "path and the configuration is only validated.  The path "
-		    "can\n\tbe '-' to specify standard input.  The -F, -n and "
-		    "-u options are\n\tmutually exclusive."));
+		    "can\n\tbe '-' to specify standard input.  The -F and -n "
+		    "options are mutually\n\texclusive.  All other arguments "
+		    "are passed to the brand attach\n\tfunction; see "
+		    "brands(5) for more information."));
 	case CMD_MARK:
 		return (gettext("Set the state of the zone.  This can be used "
 		    "to force the zone\n\tstate to 'incomplete' "
@@ -1118,351 +1116,6 @@ validate_zonepath(char *path, int cmd_num)
 	return (err ? Z_ERR : Z_OK);
 }
 
-/*
- * The following two routines implement a simple locking mechanism to
- * ensure that only one instance of zoneadm at a time is able to manipulate
- * a given zone.  The lock is built on top of an fcntl(2) lock of
- * [<altroot>]/var/run/zones/<zonename>.zoneadm.lock.  If a zoneadm instance
- * can grab that lock, it is allowed to manipulate the zone.
- *
- * Since zoneadm may call external applications which in turn invoke
- * zoneadm again, we introduce the notion of "lock inheritance".  Any
- * instance of zoneadm that has another instance in its ancestry is assumed
- * to be acting on behalf of the original zoneadm, and is thus allowed to
- * manipulate its zone.
- *
- * This inheritance is implemented via the _ZONEADM_LOCK_HELD environment
- * variable.  When zoneadm is granted a lock on its zone, this environment
- * variable is set to 1.  When it releases the lock, the variable is set to
- * 0.  Since a child process inherits its parent's environment, checking
- * the state of this variable indicates whether or not any ancestor owns
- * the lock.
- */
-static void
-release_lock_file(int lockfd)
-{
-	/*
-	 * If we are cleaning up from a failed attempt to lock the zone for
-	 * the first time, we might have a zone_lock_cnt of 0.  In that
-	 * error case, we don't want to do anything but close the lock
-	 * file.
-	 */
-	assert(zone_lock_cnt >= 0);
-	if (zone_lock_cnt > 0) {
-		assert(getenv(LOCK_ENV_VAR) != NULL);
-		assert(atoi(getenv(LOCK_ENV_VAR)) == 1);
-		if (--zone_lock_cnt > 0) {
-			assert(lockfd == -1);
-			return;
-		}
-		if (putenv(zoneadm_lock_not_held) != 0) {
-			zperror(target_zone, B_TRUE);
-			exit(Z_ERR);
-		}
-	}
-	assert(lockfd >= 0);
-	(void) close(lockfd);
-}
-
-static int
-grab_lock_file(const char *zone_name, int *lockfd)
-{
-	char pathbuf[PATH_MAX];
-	struct flock flock;
-
-	/*
-	 * If we already have the lock, we can skip this expensive song
-	 * and dance.
-	 */
-	if (zone_lock_cnt > 0) {
-		zone_lock_cnt++;
-		*lockfd = -1;
-		return (Z_OK);
-	}
-	assert(getenv(LOCK_ENV_VAR) != NULL);
-	assert(atoi(getenv(LOCK_ENV_VAR)) == 0);
-
-	if (snprintf(pathbuf, sizeof (pathbuf), "%s%s", zonecfg_get_root(),
-	    ZONES_TMPDIR) >= sizeof (pathbuf)) {
-		zerror(gettext("alternate root path is too long"));
-		return (Z_ERR);
-	}
-	if (mkdir(pathbuf, S_IRWXU) < 0 && errno != EEXIST) {
-		zerror(gettext("could not mkdir %s: %s"), pathbuf,
-		    strerror(errno));
-		return (Z_ERR);
-	}
-	(void) chmod(pathbuf, S_IRWXU);
-
-	/*
-	 * One of these lock files is created for each zone (when needed).
-	 * The lock files are not cleaned up (except on system reboot),
-	 * but since there is only one per zone, there is no resource
-	 * starvation issue.
-	 */
-	if (snprintf(pathbuf, sizeof (pathbuf), "%s%s/%s.zoneadm.lock",
-	    zonecfg_get_root(), ZONES_TMPDIR, zone_name) >= sizeof (pathbuf)) {
-		zerror(gettext("alternate root path is too long"));
-		return (Z_ERR);
-	}
-	if ((*lockfd = open(pathbuf, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR)) < 0) {
-		zerror(gettext("could not open %s: %s"), pathbuf,
-		    strerror(errno));
-		return (Z_ERR);
-	}
-	/*
-	 * Lock the file to synchronize with other zoneadmds
-	 */
-	flock.l_type = F_WRLCK;
-	flock.l_whence = SEEK_SET;
-	flock.l_start = (off_t)0;
-	flock.l_len = (off_t)0;
-	if ((fcntl(*lockfd, F_SETLKW, &flock) < 0) ||
-	    (putenv(zoneadm_lock_held) != 0)) {
-		zerror(gettext("unable to lock %s: %s"), pathbuf,
-		    strerror(errno));
-		release_lock_file(*lockfd);
-		return (Z_ERR);
-	}
-	zone_lock_cnt = 1;
-	return (Z_OK);
-}
-
-static boolean_t
-get_doorname(const char *zone_name, char *buffer)
-{
-	return (snprintf(buffer, PATH_MAX, "%s" ZONE_DOOR_PATH,
-	    zonecfg_get_root(), zone_name) < PATH_MAX);
-}
-
-/*
- * system daemons are not audited.  For the global zone, this occurs
- * "naturally" since init is started with the default audit
- * characteristics.  Since zoneadmd is a system daemon and it starts
- * init for a zone, it is necessary to clear out the audit
- * characteristics inherited from whomever started zoneadmd.  This is
- * indicated by the audit id, which is set from the ruid parameter of
- * adt_set_user(), below.
- */
-
-static void
-prepare_audit_context()
-{
-	adt_session_data_t	*ah;
-	char			*failure = gettext("audit failure: %s");
-
-	if (adt_start_session(&ah, NULL, 0)) {
-		zerror(failure, strerror(errno));
-		return;
-	}
-	if (adt_set_user(ah, ADT_NO_AUDIT, ADT_NO_AUDIT,
-	    ADT_NO_AUDIT, ADT_NO_AUDIT, NULL, ADT_NEW)) {
-		zerror(failure, strerror(errno));
-		(void) adt_end_session(ah);
-		return;
-	}
-	if (adt_set_proc(ah))
-		zerror(failure, strerror(errno));
-
-	(void) adt_end_session(ah);
-}
-
-static int
-start_zoneadmd(const char *zone_name)
-{
-	char doorpath[PATH_MAX];
-	pid_t child_pid;
-	int error = Z_ERR;
-	int doorfd, lockfd;
-	struct door_info info;
-
-	if (!get_doorname(zone_name, doorpath))
-		return (Z_ERR);
-
-	if (grab_lock_file(zone_name, &lockfd) != Z_OK)
-		return (Z_ERR);
-
-	/*
-	 * Now that we have the lock, re-confirm that the daemon is
-	 * *not* up and working fine.  If it is still down, we have a green
-	 * light to start it.
-	 */
-	if ((doorfd = open(doorpath, O_RDONLY)) < 0) {
-		if (errno != ENOENT) {
-			zperror(doorpath, B_FALSE);
-			goto out;
-		}
-	} else {
-		if (door_info(doorfd, &info) == 0 &&
-		    ((info.di_attributes & DOOR_REVOKED) == 0)) {
-			error = Z_OK;
-			(void) close(doorfd);
-			goto out;
-		}
-		(void) close(doorfd);
-	}
-
-	if ((child_pid = fork()) == -1) {
-		zperror(gettext("could not fork"), B_FALSE);
-		goto out;
-	} else if (child_pid == 0) {
-		const char *argv[6], **ap;
-
-		/* child process */
-		prepare_audit_context();
-
-		ap = argv;
-		*ap++ = "zoneadmd";
-		*ap++ = "-z";
-		*ap++ = zone_name;
-		if (zonecfg_in_alt_root()) {
-			*ap++ = "-R";
-			*ap++ = zonecfg_get_root();
-		}
-		*ap = NULL;
-
-		(void) execv("/usr/lib/zones/zoneadmd", (char * const *)argv);
-		/*
-		 * TRANSLATION_NOTE
-		 * zoneadmd is a literal that should not be translated.
-		 */
-		zperror(gettext("could not exec zoneadmd"), B_FALSE);
-		_exit(Z_ERR);
-	} else {
-		/* parent process */
-		pid_t retval;
-		int pstatus = 0;
-
-		do {
-			retval = waitpid(child_pid, &pstatus, 0);
-		} while (retval != child_pid);
-		if (WIFSIGNALED(pstatus) || (WIFEXITED(pstatus) &&
-		    WEXITSTATUS(pstatus) != 0)) {
-			zerror(gettext("could not start %s"), "zoneadmd");
-			goto out;
-		}
-	}
-	error = Z_OK;
-out:
-	release_lock_file(lockfd);
-	return (error);
-}
-
-static int
-ping_zoneadmd(const char *zone_name)
-{
-	char doorpath[PATH_MAX];
-	int doorfd;
-	struct door_info info;
-
-	if (!get_doorname(zone_name, doorpath))
-		return (Z_ERR);
-
-	if ((doorfd = open(doorpath, O_RDONLY)) < 0) {
-		return (Z_ERR);
-	}
-	if (door_info(doorfd, &info) == 0 &&
-	    ((info.di_attributes & DOOR_REVOKED) == 0)) {
-		(void) close(doorfd);
-		return (Z_OK);
-	}
-	(void) close(doorfd);
-	return (Z_ERR);
-}
-
-static int
-call_zoneadmd(const char *zone_name, zone_cmd_arg_t *arg)
-{
-	char doorpath[PATH_MAX];
-	int doorfd, result;
-	door_arg_t darg;
-
-	zoneid_t zoneid;
-	uint64_t uniqid = 0;
-
-	zone_cmd_rval_t *rvalp;
-	size_t rlen;
-	char *cp, *errbuf;
-
-	rlen = getpagesize();
-	if ((rvalp = malloc(rlen)) == NULL) {
-		zerror(gettext("failed to allocate %lu bytes: %s"), rlen,
-		    strerror(errno));
-		return (-1);
-	}
-
-	if ((zoneid = getzoneidbyname(zone_name)) != ZONE_ID_UNDEFINED) {
-		(void) zone_getattr(zoneid, ZONE_ATTR_UNIQID, &uniqid,
-		    sizeof (uniqid));
-	}
-	arg->uniqid = uniqid;
-	(void) strlcpy(arg->locale, locale, sizeof (arg->locale));
-	if (!get_doorname(zone_name, doorpath)) {
-		zerror(gettext("alternate root path is too long"));
-		free(rvalp);
-		return (-1);
-	}
-
-	/*
-	 * Loop trying to start zoneadmd; if something goes seriously
-	 * wrong we break out and fail.
-	 */
-	for (;;) {
-		if (start_zoneadmd(zone_name) != Z_OK)
-			break;
-
-		if ((doorfd = open(doorpath, O_RDONLY)) < 0) {
-			zperror(gettext("failed to open zone door"), B_FALSE);
-			break;
-		}
-
-		darg.data_ptr = (char *)arg;
-		darg.data_size = sizeof (*arg);
-		darg.desc_ptr = NULL;
-		darg.desc_num = 0;
-		darg.rbuf = (char *)rvalp;
-		darg.rsize = rlen;
-		if (door_call(doorfd, &darg) != 0) {
-			(void) close(doorfd);
-			/*
-			 * We'll get EBADF if the door has been revoked.
-			 */
-			if (errno != EBADF) {
-				zperror(gettext("door_call failed"), B_FALSE);
-				break;
-			}
-			continue;	/* take another lap */
-		}
-		(void) close(doorfd);
-
-		if (darg.data_size == 0) {
-			/* Door server is going away; kick it again. */
-			continue;
-		}
-
-		errbuf = rvalp->errbuf;
-		while (*errbuf != '\0') {
-			/*
-			 * Remove any newlines since zerror()
-			 * will append one automatically.
-			 */
-			cp = strchr(errbuf, '\n');
-			if (cp != NULL)
-				*cp = '\0';
-			zerror("%s", errbuf);
-			if (cp == NULL)
-				break;
-			errbuf = cp + 1;
-		}
-		result = rvalp->rval == 0 ? 0 : -1;
-		free(rvalp);
-		return (result);
-	}
-
-	free(rvalp);
-	return (-1);
-}
-
 static int
 invoke_brand_handler(int cmd_num, char *argv[])
 {
@@ -1520,7 +1173,7 @@ ready_func(int argc, char *argv[])
 		return (Z_ERR);
 
 	zarg.cmd = Z_READY;
-	if (call_zoneadmd(target_zone, &zarg) != 0) {
+	if (zonecfg_call_zoneadmd(target_zone, &zarg, locale, B_TRUE) != 0) {
 		zerror(gettext("call to %s failed"), "zoneadmd");
 		return (Z_ERR);
 	}
@@ -1595,7 +1248,7 @@ boot_func(int argc, char *argv[])
 	if (verify_details(CMD_BOOT, argv) != Z_OK)
 		return (Z_ERR);
 	zarg.cmd = force ? Z_FORCEBOOT : Z_BOOT;
-	if (call_zoneadmd(target_zone, &zarg) != 0) {
+	if (zonecfg_call_zoneadmd(target_zone, &zarg, locale, B_TRUE) != 0) {
 		zerror(gettext("call to %s failed"), "zoneadmd");
 		return (Z_ERR);
 	}
@@ -1822,7 +1475,7 @@ do_subproc(char *cmdbuf)
 	return (pclose(file));
 }
 
-static int
+int
 do_subproc_interactive(char *cmdbuf)
 {
 	void (*saveint)(int);
@@ -1861,7 +1514,7 @@ do_subproc_interactive(char *cmdbuf)
 	return (pid == -1 ? -1 : status);
 }
 
-static int
+int
 subproc_status(const char *cmd, int status, boolean_t verbose_failure)
 {
 	if (WIFEXITED(status)) {
@@ -2132,7 +1785,8 @@ halt_func(int argc, char *argv[])
 		return (Z_ERR);
 
 	zarg.cmd = Z_HALT;
-	return ((call_zoneadmd(target_zone, &zarg) == 0) ? Z_OK : Z_ERR);
+	return ((zonecfg_call_zoneadmd(target_zone, &zarg, locale,
+	    B_TRUE) == 0) ?  Z_OK : Z_ERR);
 }
 
 static int
@@ -2186,7 +1840,24 @@ reboot_func(int argc, char *argv[])
 		return (Z_ERR);
 
 	zarg.cmd = Z_REBOOT;
-	return ((call_zoneadmd(target_zone, &zarg) == 0) ? Z_OK : Z_ERR);
+	return ((zonecfg_call_zoneadmd(target_zone, &zarg, locale, B_TRUE) == 0)
+	    ? Z_OK : Z_ERR);
+}
+
+static int
+get_hook(brand_handle_t bh, char *cmd, size_t len, int (*bp)(brand_handle_t,
+    const char *, const char *, char *, size_t), char *zonename, char *zonepath)
+{
+	if (strlcpy(cmd, EXEC_PREFIX, len) >= len)
+		return (Z_ERR);
+
+	if (bp(bh, zonename, zonepath, cmd + EXEC_LEN, len - EXEC_LEN) != 0)
+		return (Z_ERR);
+
+	if (strlen(cmd) <= EXEC_LEN)
+		cmd[0] = '\0';
+
+	return (Z_OK);
 }
 
 static int
@@ -2203,8 +1874,10 @@ verify_brand(zone_dochandle_t handle, int cmd_num, char *argv[])
 	 * "exec" the command so that the returned status is that of
 	 * the command and not the shell.
 	 */
-	if ((err = zonecfg_get_zonepath(handle, zonepath, sizeof (zonepath))) !=
-	    Z_OK) {
+	if (handle == NULL) {
+		(void) strlcpy(zonepath, "-", sizeof (zonepath));
+	} else if ((err = zonecfg_get_zonepath(handle, zonepath,
+	    sizeof (zonepath))) != Z_OK) {
 		errno = err;
 		zperror(cmd_to_str(cmd_num), B_TRUE);
 		return (Z_ERR);
@@ -2220,13 +1893,12 @@ verify_brand(zone_dochandle_t handle, int cmd_num, char *argv[])
 	 * operation for the specific brand. The zoneadm subcommand and
 	 * all its arguments are passed to the routine.
 	 */
-	(void) strcpy(cmdbuf, EXEC_PREFIX);
-	err = brand_get_verify_adm(bh, target_zone, zonepath,
-	    cmdbuf + EXEC_LEN, sizeof (cmdbuf) - EXEC_LEN, 0, NULL);
+	err = get_hook(bh, cmdbuf, sizeof (cmdbuf), brand_get_verify_adm,
+	    target_zone, zonepath);
 	brand_close(bh);
-	if (err != 0)
+	if (err != Z_OK)
 		return (Z_BRAND_ERROR);
-	if (strlen(cmdbuf) <= EXEC_LEN)
+	if (cmdbuf[0] == '\0')
 		return (Z_OK);
 
 	if (strlcat(cmdbuf, cmd_to_str(cmd_num),
@@ -3122,6 +2794,25 @@ verify_func(int argc, char *argv[])
 }
 
 static int
+addoptions(char *buf, char *argv[], size_t len)
+{
+	int i = 0;
+
+	if (buf[0] == '\0')
+		return (Z_OK);
+
+	while (argv[i] != NULL) {
+		if (strlcat(buf, " ", len) >= len ||
+		    strlcat(buf, argv[i++], len) >= len) {
+			zerror("Command line too long");
+			return (Z_ERR);
+		}
+	}
+
+	return (Z_OK);
+}
+
+static int
 addopt(char *buf, int opt, char *optarg, size_t bufsize)
 {
 	char optstring[4];
@@ -3133,11 +2824,14 @@ addopt(char *buf, int opt, char *optarg, size_t bufsize)
 
 	if ((strlcat(buf, optstring, bufsize) > bufsize))
 		return (Z_ERR);
+
 	if ((optarg != NULL) && (strlcat(buf, optarg, bufsize) > bufsize))
 		return (Z_ERR);
+
 	return (Z_OK);
 }
 
+/* ARGSUSED */
 static int
 install_func(int argc, char *argv[])
 {
@@ -3150,6 +2844,7 @@ install_func(int argc, char *argv[])
 	int status;
 	boolean_t nodataset = B_FALSE;
 	boolean_t do_postinstall = B_FALSE;
+	boolean_t brand_help = B_FALSE;
 	char opts[128];
 
 	if (target_zone == NULL) {
@@ -3175,148 +2870,134 @@ install_func(int argc, char *argv[])
 		return (Z_ERR);
 	}
 
-	(void) strcpy(cmdbuf, EXEC_PREFIX);
-	if (brand_get_install(bh, target_zone, zonepath, cmdbuf + EXEC_LEN,
-	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL) != 0) {
+	if (get_hook(bh, cmdbuf, sizeof (cmdbuf), brand_get_install,
+	    target_zone, zonepath) != Z_OK) {
 		zerror("invalid brand configuration: missing install resource");
 		brand_close(bh);
 		return (Z_ERR);
 	}
 
-	(void) strcpy(postcmdbuf, EXEC_PREFIX);
-	if (brand_get_postinstall(bh, target_zone, zonepath,
-	    postcmdbuf + EXEC_LEN, sizeof (postcmdbuf) - EXEC_LEN, 0, NULL)
-	    != 0) {
+	if (get_hook(bh, postcmdbuf, sizeof (postcmdbuf), brand_get_postinstall,
+	    target_zone, zonepath) != Z_OK) {
 		zerror("invalid brand configuration: missing postinstall "
 		    "resource");
 		brand_close(bh);
 		return (Z_ERR);
-	} else if (strlen(postcmdbuf) > EXEC_LEN) {
-		do_postinstall = B_TRUE;
 	}
+
+	if (postcmdbuf[0] != '\0')
+		do_postinstall = B_TRUE;
 
 	(void) strcpy(opts, "?x:");
-	if (!is_native_zone) {
-		/*
-		 * Fetch the list of recognized command-line options from
-		 * the brand configuration file.
-		 */
-		if (brand_get_installopts(bh, opts + strlen(opts),
-		    sizeof (opts) - strlen(opts)) != 0) {
-			zerror("invalid brand configuration: missing "
-			    "install options resource");
-			brand_close(bh);
-			return (Z_ERR);
-		}
+	/*
+	 * Fetch the list of recognized command-line options from
+	 * the brand configuration file.
+	 */
+	if (brand_get_installopts(bh, opts + strlen(opts),
+	    sizeof (opts) - strlen(opts)) != 0) {
+		zerror("invalid brand configuration: missing "
+		    "install options resource");
+		brand_close(bh);
+		return (Z_ERR);
 	}
+
 	brand_close(bh);
 
+	if (cmdbuf[0] == '\0') {
+		zerror("Missing brand install command");
+		return (Z_ERR);
+	}
+
+	/* Check the argv string for args we handle internally */
 	optind = 0;
+	opterr = 0;
 	while ((arg = getopt(argc, argv, opts)) != EOF) {
 		switch (arg) {
 		case '?':
-			sub_usage(SHELP_INSTALL, CMD_INSTALL);
-			return (optopt == '?' ? Z_OK : Z_USAGE);
+			if (optopt == '?') {
+				sub_usage(SHELP_INSTALL, CMD_INSTALL);
+				brand_help = B_TRUE;
+			}
+			/* Ignore unknown options - may be brand specific. */
+			break;
 		case 'x':
-			if (strcmp(optarg, "nodataset") != 0) {
-				sub_usage(SHELP_INSTALL, CMD_INSTALL);
-				return (Z_USAGE);
+			/* Handle this option internally, don't pass to brand */
+			if (strcmp(optarg, "nodataset") == 0) {
+				/* Handle this option internally */
+				nodataset = B_TRUE;
 			}
-			nodataset = B_TRUE;
-			break;
+			continue;
 		default:
-			if (is_native_zone) {
-				sub_usage(SHELP_INSTALL, CMD_INSTALL);
-				return (Z_USAGE);
-			}
-
-			/*
-			 * This option isn't for zoneadm, so append it to
-			 * the command line passed to the brand-specific
-			 * install and postinstall routines.
-			 */
-			if (addopt(cmdbuf, optopt, optarg,
-			    sizeof (cmdbuf)) != Z_OK) {
-				zerror("Install command line too long");
-				return (Z_ERR);
-			}
-			if (addopt(postcmdbuf, optopt, optarg,
-			    sizeof (postcmdbuf)) != Z_OK) {
-				zerror("Post-Install command line too long");
-				return (Z_ERR);
-			}
+			/* Ignore unknown options - may be brand specific. */
 			break;
 		}
-	}
 
-	if (!is_native_zone) {
-		for (; optind < argc; optind++) {
-			if (addopt(cmdbuf, 0, argv[optind],
-			    sizeof (cmdbuf)) != Z_OK) {
-				zerror("Install command line too long");
-				return (Z_ERR);
-			}
-			if (addopt(postcmdbuf, 0, argv[optind],
-			    sizeof (postcmdbuf)) != Z_OK) {
-				zerror("Post-Install command line too long");
-				return (Z_ERR);
-			}
+		/*
+		 * Append the option to the command line passed to the
+		 * brand-specific install and postinstall routines.
+		 */
+		if (addopt(cmdbuf, optopt, optarg, sizeof (cmdbuf)) != Z_OK) {
+			zerror("Install command line too long");
+			return (Z_ERR);
+		}
+		if (addopt(postcmdbuf, optopt, optarg, sizeof (postcmdbuf))
+		    != Z_OK) {
+			zerror("Post-Install command line too long");
+			return (Z_ERR);
 		}
 	}
 
-	if (sanity_check(target_zone, CMD_INSTALL, B_FALSE, B_TRUE, B_FALSE)
-	    != Z_OK)
-		return (Z_ERR);
-	if (verify_details(CMD_INSTALL, argv) != Z_OK)
-		return (Z_ERR);
+	for (; optind < argc; optind++) {
+		if (addopt(cmdbuf, 0, argv[optind], sizeof (cmdbuf)) != Z_OK) {
+			zerror("Install command line too long");
+			return (Z_ERR);
+		}
 
-	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
-		zerror(gettext("another %s may have an operation in progress."),
-		    "zoneadm");
-		return (Z_ERR);
-	}
-	err = zone_set_state(target_zone, ZONE_STATE_INCOMPLETE);
-	if (err != Z_OK) {
-		errno = err;
-		zperror2(target_zone, gettext("could not set state"));
-		goto done;
+		if (addopt(postcmdbuf, 0, argv[optind], sizeof (postcmdbuf))
+		    != Z_OK) {
+			zerror("Post-Install command line too long");
+			return (Z_ERR);
+		}
 	}
 
-	if (!nodataset)
-		create_zfs_zonepath(zonepath);
+	if (!brand_help) {
+		if (sanity_check(target_zone, CMD_INSTALL, B_FALSE, B_TRUE,
+		    B_FALSE) != Z_OK)
+			return (Z_ERR);
+		if (verify_details(CMD_INSTALL, argv) != Z_OK)
+			return (Z_ERR);
 
-	/*
-	 * According to the Application Packaging Developer's Guide, a
-	 * "checkinstall" script when included in a package is executed as
-	 * the user "install", if such a user exists, or by the user
-	 * "nobody".  In order to support this dubious behavior, the path
-	 * to the zone being constructed is opened up during the life of
-	 * the command laying down the zone's root file system.  Once this
-	 * has completed, regardless of whether it was successful, the
-	 * path to the zone is again restricted.
-	 */
-	if (chmod(zonepath, DEFAULT_DIR_MODE) != 0) {
-		zperror(zonepath, B_FALSE);
-		err = Z_ERR;
-		goto done;
+		if (zonecfg_grab_lock_file(target_zone, &lockfd) != Z_OK) {
+			zerror(gettext("another %s may have an operation in "
+			    "progress."), "zoneadm");
+			return (Z_ERR);
+		}
+		err = zone_set_state(target_zone, ZONE_STATE_INCOMPLETE);
+		if (err != Z_OK) {
+			errno = err;
+			zperror2(target_zone, gettext("could not set state"));
+			goto done;
+		}
+
+		if (!nodataset)
+			create_zfs_zonepath(zonepath);
 	}
 
-	if (is_native_zone)
-		status = do_subproc(cmdbuf);
-	else
-		status = do_subproc_interactive(cmdbuf);
-
-	if (chmod(zonepath, S_IRWXU) != 0) {
-		zperror(zonepath, B_FALSE);
-		err = Z_ERR;
-		goto done;
-	}
+	status = do_subproc_interactive(cmdbuf);
 	if ((subproc_err =
 	    subproc_status(gettext("brand-specific installation"), status,
 	    B_FALSE)) != ZONE_SUBPROC_OK) {
+		if (subproc_err == ZONE_SUBPROC_USAGE && !brand_help) {
+			sub_usage(SHELP_INSTALL, CMD_INSTALL);
+			zonecfg_release_lock_file(target_zone, lockfd);
+			return (Z_ERR);
+		}
 		err = Z_ERR;
 		goto done;
 	}
+
+	if (brand_help)
+		return (Z_OK);
 
 	if ((err = zone_set_state(target_zone, ZONE_STATE_INSTALLED)) != Z_OK) {
 		errno = err;
@@ -3338,13 +3019,12 @@ install_func(int argc, char *argv[])
 
 done:
 	/*
-	 * If the install script exited with ZONE_SUBPROC_USAGE or
-	 * ZONE_SUBPROC_NOTCOMPLETE, try to clean up the zone and leave the
-	 * zone in the CONFIGURED state so that another install can be
-	 * attempted without requiring an uninstall first.
+	 * If the install script exited with ZONE_SUBPROC_NOTCOMPLETE, try to
+	 * clean up the zone and leave the zone in the CONFIGURED state so that
+	 * another install can be attempted without requiring an uninstall
+	 * first.
 	 */
-	if ((subproc_err == ZONE_SUBPROC_USAGE) ||
-	    (subproc_err == ZONE_SUBPROC_NOTCOMPLETE)) {
+	if (subproc_err == ZONE_SUBPROC_NOTCOMPLETE) {
 		if ((err = cleanup_zonepath(zonepath, B_FALSE)) != Z_OK) {
 			errno = err;
 			zperror2(target_zone,
@@ -3356,7 +3036,8 @@ done:
 		}
 	}
 
-	release_lock_file(lockfd);
+	if (!brand_help)
+		zonecfg_release_lock_file(target_zone, lockfd);
 	return ((err == Z_OK) ? Z_OK : Z_ERR);
 }
 
@@ -3837,39 +3518,6 @@ copy_zone(char *src, char *dst)
 	return (Z_OK);
 }
 
-static int
-zone_postclone(char *zonepath)
-{
-	char cmdbuf[MAXPATHLEN];
-	int status;
-	brand_handle_t bh;
-	int err = Z_OK;
-
-	/*
-	 * Fetch the post-clone command, if any, from the brand
-	 * configuration.
-	 */
-	if ((bh = brand_open(target_brand)) == NULL) {
-		zerror(gettext("missing or invalid brand"));
-		return (Z_ERR);
-	}
-	(void) strcpy(cmdbuf, EXEC_PREFIX);
-	err = brand_get_postclone(bh, target_zone, zonepath, cmdbuf + EXEC_LEN,
-	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL);
-	brand_close(bh);
-
-	if (err == 0 && strlen(cmdbuf) > EXEC_LEN) {
-		status = do_subproc(cmdbuf);
-		if ((err = subproc_status("postclone", status, B_FALSE))
-		    != ZONE_SUBPROC_OK) {
-			zerror(gettext("post-clone configuration failed."));
-			err = Z_ERR;
-		}
-	}
-
-	return (err);
-}
-
 /* ARGSUSED */
 static int
 zfm_print(const char *p, void *r) {
@@ -3919,18 +3567,32 @@ clone_func(int argc, char *argv[])
 	zone_entry_t *zent;
 	char *method = NULL;
 	char *snapshot = NULL;
+	char cmdbuf[MAXPATHLEN];
+	char postcmdbuf[MAXPATHLEN];
+	char presnapbuf[MAXPATHLEN];
+	char postsnapbuf[MAXPATHLEN];
+	char validsnapbuf[MAXPATHLEN];
+	brand_handle_t bh = NULL;
+	int status;
+	boolean_t brand_help = B_FALSE;
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot clone zone in alternate root"));
 		return (Z_ERR);
 	}
 
+	/* Check the argv string for args we handle internally */
 	optind = 0;
-	if ((arg = getopt(argc, argv, "?m:s:")) != EOF) {
+	opterr = 0;
+	while ((arg = getopt(argc, argv, "?m:s:")) != EOF) {
 		switch (arg) {
 		case '?':
-			sub_usage(SHELP_CLONE, CMD_CLONE);
-			return (optopt == '?' ? Z_OK : Z_USAGE);
+			if (optopt == '?') {
+				sub_usage(SHELP_CLONE, CMD_CLONE);
+				brand_help = B_TRUE;
+			}
+			/* Ignore unknown options - may be brand specific. */
+			break;
 		case 'm':
 			method = optarg;
 			break;
@@ -3938,78 +3600,84 @@ clone_func(int argc, char *argv[])
 			snapshot = optarg;
 			break;
 		default:
-			sub_usage(SHELP_CLONE, CMD_CLONE);
-			return (Z_USAGE);
+			/* Ignore unknown options - may be brand specific. */
+			break;
 		}
 	}
-	if (argc != (optind + 1) ||
-	    (method != NULL && strcmp(method, "copy") != 0)) {
+
+	if (argc != (optind + 1)) {
 		sub_usage(SHELP_CLONE, CMD_CLONE);
 		return (Z_USAGE);
 	}
+
 	source_zone = argv[optind];
-	if (sanity_check(target_zone, CMD_CLONE, B_FALSE, B_TRUE, B_FALSE)
-	    != Z_OK)
-		return (Z_ERR);
-	if (verify_details(CMD_CLONE, argv) != Z_OK)
-		return (Z_ERR);
 
-	/*
-	 * We also need to do some extra validation on the source zone.
-	 */
-	if (strcmp(source_zone, GLOBAL_ZONENAME) == 0) {
-		zerror(gettext("%s operation is invalid for the global zone."),
-		    cmd_to_str(CMD_CLONE));
-		return (Z_ERR);
-	}
+	if (!brand_help) {
+		if (sanity_check(target_zone, CMD_CLONE, B_FALSE, B_TRUE,
+		    B_FALSE) != Z_OK)
+			return (Z_ERR);
+		if (verify_details(CMD_CLONE, argv) != Z_OK)
+			return (Z_ERR);
 
-	if (strncmp(source_zone, "SUNW", 4) == 0) {
-		zerror(gettext("%s operation is invalid for zones starting "
-		    "with SUNW."), cmd_to_str(CMD_CLONE));
-		return (Z_ERR);
-	}
-
-	zent = lookup_running_zone(source_zone);
-	if (zent != NULL) {
-		/* check whether the zone is ready or running */
-		if ((err = zone_get_state(zent->zname, &zent->zstate_num))
-		    != Z_OK) {
-			errno = err;
-			zperror2(zent->zname, gettext("could not get state"));
-			/* can't tell, so hedge */
-			zent->zstate_str = "ready/running";
-		} else {
-			zent->zstate_str = zone_state_str(zent->zstate_num);
+		/*
+		 * We also need to do some extra validation on the source zone.
+		 */
+		if (strcmp(source_zone, GLOBAL_ZONENAME) == 0) {
+			zerror(gettext("%s operation is invalid for the "
+			    "global zone."), cmd_to_str(CMD_CLONE));
+			return (Z_ERR);
 		}
-		zerror(gettext("%s operation is invalid for %s zones."),
-		    cmd_to_str(CMD_CLONE), zent->zstate_str);
-		return (Z_ERR);
-	}
 
-	if ((err = zone_get_state(source_zone, &state)) != Z_OK) {
-		errno = err;
-		zperror2(source_zone, gettext("could not get state"));
-		return (Z_ERR);
-	}
-	if (state != ZONE_STATE_INSTALLED) {
-		(void) fprintf(stderr,
-		    gettext("%s: zone %s is %s; %s is required.\n"),
-		    execname, source_zone, zone_state_str(state),
-		    zone_state_str(ZONE_STATE_INSTALLED));
-		return (Z_ERR);
-	}
+		if (strncmp(source_zone, "SUNW", 4) == 0) {
+			zerror(gettext("%s operation is invalid for zones "
+			    "starting with SUNW."), cmd_to_str(CMD_CLONE));
+			return (Z_ERR);
+		}
 
-	/*
-	 * The source zone checks out ok, continue with the clone.
-	 */
+		zent = lookup_running_zone(source_zone);
+		if (zent != NULL) {
+			/* check whether the zone is ready or running */
+			if ((err = zone_get_state(zent->zname,
+			    &zent->zstate_num)) != Z_OK) {
+				errno = err;
+				zperror2(zent->zname, gettext("could not get "
+				    "state"));
+				/* can't tell, so hedge */
+				zent->zstate_str = "ready/running";
+			} else {
+				zent->zstate_str =
+				    zone_state_str(zent->zstate_num);
+			}
+			zerror(gettext("%s operation is invalid for %s zones."),
+			    cmd_to_str(CMD_CLONE), zent->zstate_str);
+			return (Z_ERR);
+		}
 
-	if (validate_clone(source_zone, target_zone) != Z_OK)
-		return (Z_ERR);
+		if ((err = zone_get_state(source_zone, &state)) != Z_OK) {
+			errno = err;
+			zperror2(source_zone, gettext("could not get state"));
+			return (Z_ERR);
+		}
+		if (state != ZONE_STATE_INSTALLED) {
+			(void) fprintf(stderr,
+			    gettext("%s: zone %s is %s; %s is required.\n"),
+			    execname, source_zone, zone_state_str(state),
+			    zone_state_str(ZONE_STATE_INSTALLED));
+			return (Z_ERR);
+		}
 
-	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
-		zerror(gettext("another %s may have an operation in progress."),
-		    "zoneadm");
-		return (Z_ERR);
+		/*
+		 * The source zone checks out ok, continue with the clone.
+		 */
+
+		if (validate_clone(source_zone, target_zone) != Z_OK)
+			return (Z_ERR);
+
+		if (zonecfg_grab_lock_file(target_zone, &lockfd) != Z_OK) {
+			zerror(gettext("another %s may have an operation in "
+			    "progress."), "zoneadm");
+			return (Z_ERR);
+		}
 	}
 
 	if ((err = zone_get_zonepath(source_zone, source_zonepath,
@@ -4026,36 +3694,140 @@ clone_func(int argc, char *argv[])
 		goto done;
 	}
 
-	if ((err = zone_set_state(target_zone, ZONE_STATE_INCOMPLETE))
-	    != Z_OK) {
-		errno = err;
-		zperror2(target_zone, gettext("could not set state"));
+	/*
+	 * Fetch the clone and postclone hooks from the brand configuration.
+	 */
+	if ((bh = brand_open(target_brand)) == NULL) {
+		zerror(gettext("missing or invalid brand"));
+		err = Z_ERR;
 		goto done;
 	}
 
-	if (snapshot != NULL) {
-		err = clone_snapshot_zfs(snapshot, zonepath);
-	} else {
-		/*
-		 * We always copy the clone unless the source is ZFS and a
-		 * ZFS clone worked.  We fallback to copying if the ZFS clone
-		 * fails for some reason.
-		 */
+	if (get_hook(bh, cmdbuf, sizeof (cmdbuf), brand_get_clone, target_zone,
+	    zonepath) != Z_OK) {
+		zerror("invalid brand configuration: missing clone resource");
+		brand_close(bh);
 		err = Z_ERR;
-		if (method == NULL && is_zonepath_zfs(source_zonepath))
-			err = clone_zfs(source_zone, source_zonepath, zonepath);
+		goto done;
+	}
 
-		if (err != Z_OK)
-			err = clone_copy(source_zonepath, zonepath);
+	if (get_hook(bh, postcmdbuf, sizeof (postcmdbuf), brand_get_postclone,
+	    target_zone, zonepath) != Z_OK) {
+		zerror("invalid brand configuration: missing postclone "
+		    "resource");
+		brand_close(bh);
+		err = Z_ERR;
+		goto done;
+	}
+
+	if (get_hook(bh, presnapbuf, sizeof (presnapbuf), brand_get_presnap,
+	    source_zone, source_zonepath) != Z_OK) {
+		zerror("invalid brand configuration: missing presnap "
+		    "resource");
+		brand_close(bh);
+		err = Z_ERR;
+		goto done;
+	}
+
+	if (get_hook(bh, postsnapbuf, sizeof (postsnapbuf), brand_get_postsnap,
+	    source_zone, source_zonepath) != Z_OK) {
+		zerror("invalid brand configuration: missing postsnap "
+		    "resource");
+		brand_close(bh);
+		err = Z_ERR;
+		goto done;
+	}
+
+	if (get_hook(bh, validsnapbuf, sizeof (validsnapbuf),
+	    brand_get_validatesnap, target_zone, zonepath) != Z_OK) {
+		zerror("invalid brand configuration: missing validatesnap "
+		    "resource");
+		brand_close(bh);
+		err = Z_ERR;
+		goto done;
+	}
+	brand_close(bh);
+
+	/* Append all options to clone hook. */
+	if (addoptions(cmdbuf, argv, sizeof (cmdbuf)) != Z_OK) {
+		err = Z_ERR;
+		goto done;
+	}
+
+	/* Append all options to postclone hook. */
+	if (addoptions(postcmdbuf, argv, sizeof (postcmdbuf)) != Z_OK) {
+		err = Z_ERR;
+		goto done;
+	}
+
+	if (!brand_help) {
+		if ((err = zone_set_state(target_zone, ZONE_STATE_INCOMPLETE))
+		    != Z_OK) {
+			errno = err;
+			zperror2(target_zone, gettext("could not set state"));
+			goto done;
+		}
 	}
 
 	/*
-	 * Trusted Extensions requires that cloned zones use the same sysid
-	 * configuration, so it is not appropriate to perform any
-	 * post-clone reconfiguration.
+	 * The clone hook is optional.  If it exists, use the hook for
+	 * cloning, otherwise use the built-in clone support
 	 */
-	if ((err == Z_OK) && !is_system_labeled())
-		err = zone_postclone(zonepath);
+	if (cmdbuf[0] != '\0') {
+		/* Run the clone hook */
+		status = do_subproc_interactive(cmdbuf);
+		if ((status = subproc_status(gettext("brand-specific clone"),
+		    status, B_FALSE)) != ZONE_SUBPROC_OK) {
+			if (status == ZONE_SUBPROC_USAGE && !brand_help)
+				sub_usage(SHELP_CLONE, CMD_CLONE);
+			err = Z_ERR;
+			goto done;
+		}
+
+		if (brand_help)
+			return (Z_OK);
+
+	} else {
+		/* If just help, we're done since there is no brand help. */
+		if (brand_help)
+			return (Z_OK);
+
+		/* Run the built-in clone support. */
+
+		/* The only explicit built-in method is "copy". */
+		if (method != NULL && strcmp(method, "copy") != 0) {
+			sub_usage(SHELP_CLONE, CMD_CLONE);
+			err = Z_USAGE;
+			goto done;
+		}
+
+		if (snapshot != NULL) {
+			err = clone_snapshot_zfs(snapshot, zonepath,
+			    validsnapbuf);
+		} else {
+			/*
+			 * We always copy the clone unless the source is ZFS
+			 * and a ZFS clone worked.  We fallback to copying if
+			 * the ZFS clone fails for some reason.
+			 */
+			err = Z_ERR;
+			if (method == NULL && is_zonepath_zfs(source_zonepath))
+				err = clone_zfs(source_zonepath, zonepath,
+				    presnapbuf, postsnapbuf);
+
+			if (err != Z_OK)
+				err = clone_copy(source_zonepath, zonepath);
+		}
+	}
+
+	if (err == Z_OK && postcmdbuf[0] != '\0') {
+		status = do_subproc(postcmdbuf);
+		if ((err = subproc_status("postclone", status, B_FALSE))
+		    != ZONE_SUBPROC_OK) {
+			zerror(gettext("post-clone configuration failed."));
+			err = Z_ERR;
+		}
+	}
 
 done:
 	/*
@@ -4068,7 +3840,8 @@ done:
 			zperror2(target_zone, gettext("could not set state"));
 		}
 	}
-	release_lock_file(lockfd);
+	if (!brand_help)
+		zonecfg_release_lock_file(target_zone, lockfd);
 	return ((err == Z_OK) ? Z_OK : Z_ERR);
 }
 
@@ -4317,7 +4090,7 @@ move_func(int argc, char *argv[])
 		return (Z_ERR);
 	}
 
-	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
+	if (zonecfg_grab_lock_file(target_zone, &lockfd) != Z_OK) {
 		zerror(gettext("another %s may have an operation in progress."),
 		    "zoneadm");
 		zonecfg_fini_handle(handle);
@@ -4347,7 +4120,7 @@ move_func(int argc, char *argv[])
 			zperror(gettext("could not rmdir new zone path"),
 			    B_FALSE);
 			zonecfg_fini_handle(handle);
-			release_lock_file(lockfd);
+			zonecfg_release_lock_file(target_zone, lockfd);
 			return (Z_ERR);
 		}
 
@@ -4359,7 +4132,7 @@ move_func(int argc, char *argv[])
 			 */
 			zperror(gettext("could not move zone"), B_FALSE);
 			zonecfg_fini_handle(handle);
-			release_lock_file(lockfd);
+			zonecfg_release_lock_file(target_zone, lockfd);
 			return (Z_ERR);
 		}
 
@@ -4399,7 +4172,7 @@ move_func(int argc, char *argv[])
 
 done:
 	zonecfg_fini_handle(handle);
-	release_lock_file(lockfd);
+	zonecfg_release_lock_file(target_zone, lockfd);
 
 	/*
 	 * Clean up the file system based on how things went.  We either
@@ -4467,6 +4240,7 @@ done:
 	return ((err == Z_OK) ? Z_OK : Z_ERR);
 }
 
+/* ARGSUSED */
 static int
 detach_func(int argc, char *argv[])
 {
@@ -4474,29 +4248,41 @@ detach_func(int argc, char *argv[])
 	int err, arg;
 	char zonepath[MAXPATHLEN];
 	char cmdbuf[MAXPATHLEN];
+	char precmdbuf[MAXPATHLEN];
 	zone_dochandle_t handle;
 	boolean_t execute = B_TRUE;
+	boolean_t brand_help = B_FALSE;
 	brand_handle_t bh = NULL;
+	int status;
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot detach zone in alternate root"));
 		return (Z_ERR);
 	}
 
+	/* Check the argv string for args we handle internally */
 	optind = 0;
-	if ((arg = getopt(argc, argv, "?n")) != EOF) {
+	opterr = 0;
+	while ((arg = getopt(argc, argv, "?n")) != EOF) {
 		switch (arg) {
 		case '?':
-			sub_usage(SHELP_DETACH, CMD_DETACH);
-			return (optopt == '?' ? Z_OK : Z_USAGE);
+			if (optopt == '?') {
+				sub_usage(SHELP_DETACH, CMD_DETACH);
+				brand_help = B_TRUE;
+			}
+			/* Ignore unknown options - may be brand specific. */
+			break;
 		case 'n':
 			execute = B_FALSE;
 			break;
 		default:
-			sub_usage(SHELP_DETACH, CMD_DETACH);
-			return (Z_USAGE);
+			/* Ignore unknown options - may be brand specific. */
+			break;
 		}
 	}
+
+	if (brand_help)
+		execute = B_FALSE;
 
 	if (execute) {
 		if (sanity_check(target_zone, CMD_DETACH, B_FALSE, B_TRUE,
@@ -4528,14 +4314,6 @@ detach_func(int argc, char *argv[])
 		return (Z_ERR);
 	}
 
-	/* Don't detach the zone if anything is still mounted there */
-	if (execute && zonecfg_find_mounts(zonepath, NULL, NULL)) {
-		zerror(gettext("These file systems are mounted on "
-		    "subdirectories of %s.\n"), zonepath);
-		(void) zonecfg_find_mounts(zonepath, zfm_print, NULL);
-		return (Z_ERR);
-	}
-
 	if ((handle = zonecfg_init_handle()) == NULL) {
 		zperror(cmd_to_str(CMD_DETACH), B_TRUE);
 		return (Z_ERR);
@@ -4548,15 +4326,21 @@ detach_func(int argc, char *argv[])
 		return (Z_ERR);
 	}
 
-	/* Fetch the predetach hook from the brand configuration.  */
+	/* Fetch the detach and predetach hooks from the brand configuration. */
 	if ((bh = brand_open(target_brand)) == NULL) {
 		zerror(gettext("missing or invalid brand"));
 		return (Z_ERR);
 	}
 
-	(void) strcpy(cmdbuf, EXEC_PREFIX);
-	if (brand_get_predetach(bh, target_zone, zonepath, cmdbuf + EXEC_LEN,
-	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL) != 0) {
+	if (get_hook(bh, cmdbuf, sizeof (cmdbuf), brand_get_detach, target_zone,
+	    zonepath) != Z_OK) {
+		zerror("invalid brand configuration: missing detach resource");
+		brand_close(bh);
+		return (Z_ERR);
+	}
+
+	if (get_hook(bh, precmdbuf, sizeof (precmdbuf), brand_get_predetach,
+	    target_zone, zonepath) != Z_OK) {
 		zerror("invalid brand configuration: missing predetach "
 		    "resource");
 		brand_close(bh);
@@ -4564,43 +4348,88 @@ detach_func(int argc, char *argv[])
 	}
 	brand_close(bh);
 
-	/* If we have a brand predetach hook, run it. */
-	if (strlen(cmdbuf) > EXEC_LEN) {
-		int status;
+	/* Append all options to predetach hook. */
+	if (addoptions(precmdbuf, argv, sizeof (precmdbuf)) != Z_OK)
+		return (Z_ERR);
 
-		/* If this is a dry-run, pass that flag to the hook. */
-		if (!execute && addopt(cmdbuf, 0, "-n", sizeof (cmdbuf))
-		    != Z_OK) {
-			zerror("Predetach command line too long");
-			return (Z_ERR);
-		}
+	/* Append all options to detach hook. */
+	if (addoptions(cmdbuf, argv, sizeof (cmdbuf)) != Z_OK)
+		return (Z_ERR);
 
-		status = do_subproc(cmdbuf);
-		if (subproc_status(gettext("brand-specific predetach"),
-		    status, B_FALSE) != ZONE_SUBPROC_OK) {
-			return (Z_ERR);
-		}
-	}
-
-	if (execute && grab_lock_file(target_zone, &lockfd) != Z_OK) {
+	if (execute && zonecfg_grab_lock_file(target_zone, &lockfd) != Z_OK) {
 		zerror(gettext("another %s may have an operation in progress."),
 		    "zoneadm");
 		zonecfg_fini_handle(handle);
 		return (Z_ERR);
 	}
 
-	if ((err = zonecfg_get_detach_info(handle, B_TRUE)) != Z_OK) {
-		errno = err;
-		zperror(gettext("getting the detach information failed"),
-		    B_TRUE);
-		goto done;
+	/* If we have a brand predetach hook, run it. */
+	if (!brand_help && precmdbuf[0] != '\0') {
+		status = do_subproc(precmdbuf);
+		if (subproc_status(gettext("brand-specific predetach"),
+		    status, B_FALSE) != ZONE_SUBPROC_OK) {
+
+			if (execute)
+				zonecfg_release_lock_file(target_zone, lockfd);
+			return (Z_ERR);
+		}
 	}
 
-	if ((err = zonecfg_detach_save(handle, (execute ? 0 : ZONE_DRY_RUN)))
-	    != Z_OK) {
-		errno = err;
-		zperror(gettext("saving the detach manifest failed"), B_TRUE);
-		goto done;
+	if (cmdbuf[0] != '\0') {
+		/* Run the detach hook */
+		status = do_subproc_interactive(cmdbuf);
+		if ((status = subproc_status(gettext("brand-specific detach"),
+		    status, B_FALSE)) != ZONE_SUBPROC_OK) {
+			if (status == ZONE_SUBPROC_USAGE && !brand_help)
+				sub_usage(SHELP_DETACH, CMD_DETACH);
+
+			if (execute)
+				zonecfg_release_lock_file(target_zone, lockfd);
+
+			return (Z_ERR);
+		}
+
+	} else {
+		/* If just help, we're done since there is no brand help. */
+		if (brand_help)
+			return (Z_OK);
+
+		/*
+		 * Run the built-in detach support.  Just generate a simple
+		 * zone definition XML file and detach.
+		 */
+
+		/* Don't detach the zone if anything is still mounted there */
+		if (execute && zonecfg_find_mounts(zonepath, NULL, NULL)) {
+			(void) fprintf(stderr, gettext("These file systems are "
+			    "mounted on subdirectories of %s.\n"), zonepath);
+			(void) zonecfg_find_mounts(zonepath, zfm_print, NULL);
+			err = ZONE_SUBPROC_NOTCOMPLETE;
+			goto done;
+		}
+
+		if ((handle = zonecfg_init_handle()) == NULL) {
+			zperror(cmd_to_str(CMD_DETACH), B_TRUE);
+			err = ZONE_SUBPROC_NOTCOMPLETE;
+			goto done;
+		}
+
+		if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
+			errno = err;
+			zperror(cmd_to_str(CMD_DETACH), B_TRUE);
+			zonecfg_fini_handle(handle);
+			goto done;
+		}
+
+		if ((err = zonecfg_detach_save(handle,
+		    (execute ? 0 : ZONE_DRY_RUN))) != Z_OK) {
+			errno = err;
+			zperror(gettext("saving the detach manifest failed"),
+			    B_TRUE);
+			goto done;
+		}
+
+		zonecfg_fini_handle(handle);
 	}
 
 	/*
@@ -4616,124 +4445,73 @@ detach_func(int argc, char *argv[])
 done:
 	zonecfg_fini_handle(handle);
 	if (execute)
-		release_lock_file(lockfd);
+		zonecfg_release_lock_file(target_zone, lockfd);
 
 	return ((err == Z_OK) ? Z_OK : Z_ERR);
 }
 
 /*
- * During attach we go through and fix up the /dev entries for the zone
- * we are attaching.  In order to regenerate /dev with the correct devices,
- * the old /dev will be removed, the zone readied (which generates a new
- * /dev) then halted, then we use the info from the manifest to update
- * the modes, owners, etc. on the new /dev.
+ * Determine the brand when doing a dry-run attach.  The zone does not have to
+ * exist, so we have to read the incoming manifest to determine the zone's
+ * brand.
+ *
+ * Because the manifest has to be processed twice; once to determine the brand
+ * and once to do the brand-specific attach logic, we always read it into a tmp
+ * file.  This handles the manifest coming from stdin or a regular file.  The
+ * tmpname parameter returns the name of the temporary file that the manifest
+ * was read into.
  */
 static int
-dev_fix(zone_dochandle_t handle)
-{
-	int			res;
-	int			err;
-	int			status;
-	struct zone_devpermtab	devtab;
-	zone_cmd_arg_t		zarg;
-	char			devpath[MAXPATHLEN];
-				/* 6: "exec " and " " */
-	char			cmdbuf[sizeof (RMCOMMAND) + MAXPATHLEN + 6];
-
-	if ((res = zonecfg_get_zonepath(handle, devpath, sizeof (devpath)))
-	    != Z_OK)
-		return (res);
-
-	if (strlcat(devpath, "/dev", sizeof (devpath)) >= sizeof (devpath))
-		return (Z_TOO_BIG);
-
-	/*
-	 * "exec" the command so that the returned status is that of
-	 * RMCOMMAND and not the shell.
-	 */
-	(void) snprintf(cmdbuf, sizeof (cmdbuf), EXEC_PREFIX RMCOMMAND " %s",
-	    devpath);
-	status = do_subproc(cmdbuf);
-	if ((err = subproc_status(RMCOMMAND, status, B_TRUE)) !=
-	    ZONE_SUBPROC_OK) {
-		(void) fprintf(stderr,
-		    gettext("could not remove existing /dev\n"));
-		return (Z_ERR);
-	}
-
-	/* In order to ready the zone, it must be in the installed state */
-	if ((err = zone_set_state(target_zone, ZONE_STATE_INSTALLED)) != Z_OK) {
-		errno = err;
-		zperror(gettext("could not reset state"), B_TRUE);
-		return (Z_ERR);
-	}
-
-	/* We have to ready the zone to regen the dev tree */
-	zarg.cmd = Z_READY;
-	if (call_zoneadmd(target_zone, &zarg) != 0) {
-		zerror(gettext("call to %s failed"), "zoneadmd");
-		/* attempt to restore zone to configured state */
-		(void) zone_set_state(target_zone, ZONE_STATE_CONFIGURED);
-		return (Z_ERR);
-	}
-
-	zarg.cmd = Z_HALT;
-	if (call_zoneadmd(target_zone, &zarg) != 0) {
-		zerror(gettext("call to %s failed"), "zoneadmd");
-		/* attempt to restore zone to configured state */
-		(void) zone_set_state(target_zone, ZONE_STATE_CONFIGURED);
-		return (Z_ERR);
-	}
-
-	/* attempt to restore zone to configured state */
-	(void) zone_set_state(target_zone, ZONE_STATE_CONFIGURED);
-
-	if (zonecfg_setdevperment(handle) != Z_OK) {
-		(void) fprintf(stderr,
-		    gettext("unable to enumerate device entries\n"));
-		return (Z_ERR);
-	}
-
-	while (zonecfg_getdevperment(handle, &devtab) == Z_OK) {
-		int err;
-
-		if ((err = zonecfg_devperms_apply(handle,
-		    devtab.zone_devperm_name, devtab.zone_devperm_uid,
-		    devtab.zone_devperm_gid, devtab.zone_devperm_mode,
-		    devtab.zone_devperm_acl)) != Z_OK && err != Z_INVAL)
-			(void) fprintf(stderr, gettext("error updating device "
-			    "%s: %s\n"), devtab.zone_devperm_name,
-			    zonecfg_strerror(err));
-
-		free(devtab.zone_devperm_acl);
-	}
-
-	(void) zonecfg_enddevperment(handle);
-
-	return (Z_OK);
-}
-
-/*
- * Validate attaching a zone but don't actually do the work.  The zone
- * does not have to exist, so there is some complexity getting a new zone
- * configuration set up so that we can perform the validation.  This is
- * handled within zonecfg_attach_manifest() which returns two handles; one
- * for the the full configuration to validate (rem_handle) and the other
- * (local_handle) containing only the zone configuration derived from the
- * manifest.
- */
-static int
-dryrun_attach(char *manifest_path, char *argv[])
+dryrun_get_brand(char *manifest_path, char *tmpname, int size)
 {
 	int fd;
 	int err;
-	int res;
+	int res = Z_OK;
 	zone_dochandle_t local_handle;
 	zone_dochandle_t rem_handle = NULL;
+	int len;
+	int ofd;
+	char buf[512];
 
 	if (strcmp(manifest_path, "-") == 0) {
-		fd = 0;
-	} else if ((fd = open(manifest_path, O_RDONLY)) < 0) {
+		fd = STDIN_FILENO;
+	} else {
+		if ((fd = open(manifest_path, O_RDONLY)) < 0) {
+			if (getcwd(buf, sizeof (buf)) == NULL)
+				(void) strlcpy(buf, "/", sizeof (buf));
+			zerror(gettext("could not open manifest path %s%s: %s"),
+			    (*manifest_path == '/' ? "" : buf), manifest_path,
+			    strerror(errno));
+			return (Z_ERR);
+		}
+	}
+
+	(void) snprintf(tmpname, size, "/var/run/zone.%d", getpid());
+
+	if ((ofd = open(tmpname, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR)) < 0) {
+		zperror(gettext("could not save manifest"), B_FALSE);
+		(void) close(fd);
+		return (Z_ERR);
+	}
+
+	while ((len = read(fd, buf, sizeof (buf))) > 0) {
+		if (write(ofd, buf, len) == -1) {
+			zperror(gettext("could not save manifest"), B_FALSE);
+			(void) close(ofd);
+			(void) close(fd);
+			return (Z_ERR);
+		}
+	}
+
+	if (close(ofd) != 0) {
+		zperror(gettext("could not save manifest"), B_FALSE);
+		(void) close(fd);
+		return (Z_ERR);
+	}
+
+	(void) close(fd);
+
+	if ((fd = open(tmpname, O_RDONLY)) < 0) {
 		zperror(gettext("could not open manifest path"), B_FALSE);
 		return (Z_ERR);
 	}
@@ -4785,281 +4563,22 @@ dryrun_attach(char *manifest_path, char *argv[])
 		goto done;
 	}
 
-	/*
-	 * Retrieve remote handle brand type and determine whether it is
-	 * native or not.
-	 */
+	/* Retrieve remote handle brand type. */
 	if (zonecfg_get_brand(rem_handle, target_brand, sizeof (target_brand))
 	    != Z_OK) {
 		zerror(gettext("missing or invalid brand"));
 		exit(Z_ERR);
 	}
-	is_native_zone = (strcmp(target_brand, NATIVE_BRAND_NAME) == 0);
-	is_cluster_zone =
-	    (strcmp(target_brand, CLUSTER_BRAND_NAME) == 0);
-
-	res = verify_handle(CMD_ATTACH, local_handle, argv);
-
-	/* Get the detach information for the locally defined zone. */
-	if ((err = zonecfg_get_detach_info(local_handle, B_FALSE)) != Z_OK) {
-		errno = err;
-		zperror(gettext("getting the attach information failed"),
-		    B_TRUE);
-		res = Z_ERR;
-	} else {
-		/* sw_cmp prints error msgs as necessary */
-		if (sw_cmp(local_handle, rem_handle, SW_CMP_NONE) != Z_OK)
-			res = Z_ERR;
-	}
 
 done:
-	if (strcmp(manifest_path, "-") != 0)
-		(void) close(fd);
-
 	zonecfg_fini_handle(local_handle);
 	zonecfg_fini_handle(rem_handle);
+	(void) close(fd);
 
 	return ((res == Z_OK) ? Z_OK : Z_ERR);
 }
 
-/*
- * Attempt to generate the information we need to make the zone look like
- * it was properly detached by using the pkg information contained within
- * the zone itself.
- *
- * We will perform a dry-run detach within the zone to generate the xml file.
- * To do this we need to be able to get a handle on the zone so we can see
- * how it is configured.  In order to get a handle, we need a copy of the
- * zone configuration within the zone.  Since the zone's configuration is
- * not available within the zone itself, we need to temporarily copy it into
- * the zone.
- *
- * The sequence of actions we are doing is this:
- *	[set zone state to installed]
- *	[mount zone]
- *	zlogin {zone} </etc/zones/{zone}.xml 'cat >/etc/zones/{zone}.xml'
- *	zlogin {zone} 'zoneadm -z {zone} detach -n' >{zonepath}/SUNWdetached.xml
- *	zlogin {zone} 'rm -f /etc/zones/{zone}.xml'
- *	[unmount zone]
- *	[set zone state to configured]
- *
- * The successful result of this function is that we will have a
- * SUNWdetached.xml file in the zonepath and we can use that to attach the zone.
- */
-static boolean_t
-gen_detach_info(char *zonepath)
-{
-	int		status;
-	boolean_t	mounted = B_FALSE;
-	boolean_t	res = B_FALSE;
-	char		cmdbuf[2 * MAXPATHLEN];
-
-	/*
-	 * The zone has to be installed to mount and zlogin.  Temporarily set
-	 * the state to 'installed'.
-	 */
-	if (zone_set_state(target_zone, ZONE_STATE_INSTALLED) != Z_OK)
-		return (B_FALSE);
-
-	/* Mount the zone so we can zlogin. */
-	if (mount_func(0, NULL) != Z_OK)
-		goto cleanup;
-	mounted = B_TRUE;
-
-	/*
-	 * We need to copy the zones xml configuration file into the
-	 * zone so we can get a handle for the zone while running inside
-	 * the zone.
-	 */
-	if (snprintf(cmdbuf, sizeof (cmdbuf), "/usr/sbin/zlogin -S %s "
-	    "</etc/zones/%s.xml '/usr/bin/cat >/etc/zones/%s.xml'",
-	    target_zone, target_zone, target_zone) >= sizeof (cmdbuf))
-		goto cleanup;
-
-	status = do_subproc_interactive(cmdbuf);
-	if (subproc_status("copy", status, B_TRUE) != ZONE_SUBPROC_OK)
-		goto cleanup;
-
-	/* Now run the detach command within the mounted zone. */
-	if (snprintf(cmdbuf, sizeof (cmdbuf), "/usr/sbin/zlogin -S %s "
-	    "'/usr/sbin/zoneadm -z %s detach -n' >%s/SUNWdetached.xml",
-	    target_zone, target_zone, zonepath) >= sizeof (cmdbuf))
-		goto cleanup;
-
-	status = do_subproc_interactive(cmdbuf);
-	if (subproc_status("detach", status, B_TRUE) != ZONE_SUBPROC_OK)
-		goto cleanup;
-
-	res = B_TRUE;
-
-cleanup:
-	/* Cleanup from the previous actions. */
-	if (mounted) {
-		if (snprintf(cmdbuf, sizeof (cmdbuf),
-		    "/usr/sbin/zlogin -S %s '/usr/bin/rm -f /etc/zones/%s.xml'",
-		    target_zone, target_zone) >= sizeof (cmdbuf)) {
-			res = B_FALSE;
-		} else {
-			status = do_subproc_interactive(cmdbuf);
-			if (subproc_status("rm", status, B_TRUE)
-			    != ZONE_SUBPROC_OK)
-				res = B_FALSE;
-		}
-
-		if (unmount_func(0, NULL) != Z_OK)
-			res =  B_FALSE;
-	}
-
-	if (zone_set_state(target_zone, ZONE_STATE_CONFIGURED) != Z_OK)
-		res = B_FALSE;
-
-	return (res);
-}
-
-/*
- * The zone needs to be updated so set it up for the update and initiate the
- * update within the scratch zone.  First set the state to incomplete so we can
- * force-mount the zone for the update operation.  We pass the -U option to the
- * mount so that the scratch zone is mounted without the zone's /etc and /var
- * being lofs mounted back into the scratch zone root.  This is done by
- * overloading the bootbuf string in the zone_cmd_arg_t to pass -U as an option
- * to the mount cmd.
- */
-static int
-attach_update(zone_dochandle_t handle, char *zonepath)
-{
-	int err;
-	int update_res;
-	int status;
-	zone_cmd_arg_t zarg;
-	FILE *fp;
-	struct zone_fstab fstab;
-	char cmdbuf[(4 * MAXPATHLEN) + 20];
-
-	if ((err = zone_set_state(target_zone, ZONE_STATE_INCOMPLETE))
-	    != Z_OK) {
-		errno = err;
-		zperror(gettext("could not set state"), B_TRUE);
-		return (Z_ERR);
-	}
-
-	zarg.cmd = Z_FORCEMOUNT;
-	(void) strlcpy(zarg.bootbuf, "-U",  sizeof (zarg.bootbuf));
-	if (call_zoneadmd(target_zone, &zarg) != 0) {
-		zerror(gettext("could not mount zone"));
-
-		/* We reset the state since the zone wasn't modified yet. */
-		if ((err = zone_set_state(target_zone, ZONE_STATE_CONFIGURED))
-		    != Z_OK) {
-			errno = err;
-			zperror(gettext("could not reset state"), B_TRUE);
-		}
-		return (Z_ERR);
-	}
-
-	/*
-	 * Move data files generated by sw_up_to_date() into the scratch
-	 * zone's /tmp.
-	 */
-	(void) snprintf(cmdbuf, sizeof (cmdbuf), "exec /usr/bin/mv "
-	    "%s/pkg_add %s/pkg_rm %s/lu/tmp",
-	    zonepath, zonepath, zonepath);
-
-	status = do_subproc_interactive(cmdbuf);
-	if (subproc_status("mv", status, B_TRUE) != ZONE_SUBPROC_OK) {
-		zperror(gettext("could not mv data files"), B_FALSE);
-		goto fail;
-	}
-
-	/*
-	 * Save list of inherit-pkg-dirs into zone.  Since the file is in
-	 * /tmp we don't have to worry about deleting it.
-	 */
-	(void) snprintf(cmdbuf, sizeof (cmdbuf), "%s/lu/tmp/inherited",
-	    zonepath);
-	if ((fp = fopen(cmdbuf, "w")) == NULL) {
-		zperror(gettext("could not save inherit-pkg-dirs"), B_FALSE);
-		goto fail;
-	}
-	if (zonecfg_setipdent(handle) != Z_OK) {
-		zperror(gettext("could not enumerate inherit-pkg-dirs"),
-		    B_TRUE);
-		goto fail;
-	}
-	while (zonecfg_getipdent(handle, &fstab) == Z_OK) {
-		if (fprintf(fp, "%s\n", fstab.zone_fs_dir) < 0) {
-			zperror(gettext("could not save inherit-pkg-dirs"),
-			    B_FALSE);
-			(void) fclose(fp);
-			goto fail;
-		}
-	}
-	(void) zonecfg_endipdent(handle);
-	if (fclose(fp) != 0) {
-		zperror(gettext("could not save inherit-pkg-dirs"), B_FALSE);
-		goto fail;
-	}
-
-	/* run the updater inside the scratch zone */
-	(void) snprintf(cmdbuf, sizeof (cmdbuf),
-	    "exec /usr/sbin/zlogin -S %s "
-	    "/usr/lib/brand/native/attach_update %s", target_zone, target_zone);
-
-	update_res = Z_OK;
-	status = do_subproc_interactive(cmdbuf);
-	if (subproc_status("attach_update", status, B_TRUE)
-	    != ZONE_SUBPROC_OK) {
-		zerror(gettext("could not update zone"));
-		update_res = Z_ERR;
-	}
-
-	zarg.cmd = Z_UNMOUNT;
-	if (call_zoneadmd(target_zone, &zarg) != 0) {
-		zerror(gettext("could not unmount zone"));
-		return (Z_ERR);
-	}
-
-	/*
-	 * If the update script within the scratch zone failed for some reason
-	 * we will now leave the zone in the incomplete state since we no
-	 * longer know the state of the files within the zonepath.
-	 */
-	if (update_res == Z_ERR)
-		return (Z_ERR);
-
-	zonecfg_rm_detached(handle, B_FALSE);
-
-	if ((err = zone_set_state(target_zone, ZONE_STATE_INSTALLED)) != Z_OK) {
-		errno = err;
-		zperror(gettext("could not set state"), B_TRUE);
-		return (Z_ERR);
-	}
-
-	return (Z_OK);
-
-fail:
-	zarg.cmd = Z_UNMOUNT;
-	if (call_zoneadmd(target_zone, &zarg) != 0)
-		zerror(gettext("could not unmount zone"));
-
-	/* We reset the state since the zone wasn't modified yet. */
-	if ((err = zone_set_state(target_zone, ZONE_STATE_CONFIGURED))
-	    != Z_OK) {
-		errno = err;
-		zperror(gettext("could not reset state"), B_TRUE);
-	}
-
-	return (Z_ERR);
-}
-
 /* ARGSUSED */
-static void
-sigcleanup(int sig)
-{
-	attach_interupted = B_TRUE;
-}
-
-
 static int
 attach_func(int argc, char *argv[])
 {
@@ -5067,91 +4586,124 @@ attach_func(int argc, char *argv[])
 	int err, arg;
 	boolean_t force = B_FALSE;
 	zone_dochandle_t handle;
-	zone_dochandle_t athandle = NULL;
 	char zonepath[MAXPATHLEN];
-	char brand[MAXNAMELEN], atbrand[MAXNAMELEN];
 	char cmdbuf[MAXPATHLEN];
+	char postcmdbuf[MAXPATHLEN];
 	boolean_t execute = B_TRUE;
-	boolean_t retried = B_FALSE;
-	boolean_t update = B_FALSE;
+	boolean_t brand_help = B_FALSE;
 	char *manifest_path;
+	char tmpmanifest[80];
+	int manifest_pos;
 	brand_handle_t bh = NULL;
+	int status;
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot attach zone in alternate root"));
 		return (Z_ERR);
 	}
 
+	/* Check the argv string for args we handle internally */
 	optind = 0;
-	if ((arg = getopt(argc, argv, "?Fn:u")) != EOF) {
+	opterr = 0;
+	while ((arg = getopt(argc, argv, "?Fn:")) != EOF) {
 		switch (arg) {
 		case '?':
-			sub_usage(SHELP_ATTACH, CMD_ATTACH);
-			return (optopt == '?' ? Z_OK : Z_USAGE);
+			if (optopt == '?') {
+				sub_usage(SHELP_ATTACH, CMD_ATTACH);
+				brand_help = B_TRUE;
+			}
+			/* Ignore unknown options - may be brand specific. */
+			break;
 		case 'F':
 			force = B_TRUE;
 			break;
 		case 'n':
 			execute = B_FALSE;
 			manifest_path = optarg;
-			break;
-		case 'u':
-			update = B_TRUE;
+			manifest_pos = optind - 1;
 			break;
 		default:
-			sub_usage(SHELP_ATTACH, CMD_ATTACH);
-			return (Z_USAGE);
+			/* Ignore unknown options - may be brand specific. */
+			break;
 		}
 	}
 
-	/* dry-run and update flags are mutually exclusive */
-	if (!execute && update) {
-		zerror(gettext("-n and -u flags are mutually exclusive"));
+	if (brand_help) {
+		force = B_FALSE;
+		execute = B_TRUE;
+	}
+
+	/* dry-run and force flags are mutually exclusive */
+	if (!execute && force) {
+		zerror(gettext("-F and -n flags are mutually exclusive"));
 		return (Z_ERR);
 	}
 
 	/*
-	 * If the no-execute option was specified, we need to branch down
-	 * a completely different path since there is no zone required to be
+	 * If the no-execute option was specified, we don't do validation and
+	 * need to figure out the brand, since there is no zone required to be
 	 * configured for this option.
 	 */
-	if (!execute)
-		return (dryrun_attach(manifest_path, argv));
+	if (execute) {
+		if (!brand_help) {
+			if (sanity_check(target_zone, CMD_ATTACH, B_FALSE,
+			    B_TRUE, B_FALSE) != Z_OK)
+				return (Z_ERR);
+			if (verify_details(CMD_ATTACH, argv) != Z_OK)
+				return (Z_ERR);
+		}
 
-	if (sanity_check(target_zone, CMD_ATTACH, B_FALSE, B_TRUE, B_FALSE)
-	    != Z_OK)
-		return (Z_ERR);
-	if (verify_details(CMD_ATTACH, argv) != Z_OK)
-		return (Z_ERR);
+		if ((err = zone_get_zonepath(target_zone, zonepath,
+		    sizeof (zonepath))) != Z_OK) {
+			errno = err;
+			zperror2(target_zone,
+			    gettext("could not get zone path"));
+			return (Z_ERR);
+		}
 
-	if ((err = zone_get_zonepath(target_zone, zonepath, sizeof (zonepath)))
-	    != Z_OK) {
-		errno = err;
-		zperror2(target_zone, gettext("could not get zone path"));
-		return (Z_ERR);
+		if ((handle = zonecfg_init_handle()) == NULL) {
+			zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
+			return (Z_ERR);
+		}
+
+		if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
+			errno = err;
+			zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
+			zonecfg_fini_handle(handle);
+			return (Z_ERR);
+		}
+
+	} else {
+		if (dryrun_get_brand(manifest_path, tmpmanifest,
+		    sizeof (tmpmanifest)) != Z_OK)
+			return (Z_ERR);
+
+		argv[manifest_pos] = tmpmanifest;
+		target_zone = "-";
+		(void) strlcpy(zonepath, "-", sizeof (zonepath));
+
+		/* Run the brand's verify_adm hook. */
+		if (verify_brand(NULL, CMD_ATTACH, argv) != Z_OK)
+			return (Z_ERR);
 	}
 
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
-		return (Z_ERR);
-	}
-
-	if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
-		errno = err;
-		zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
-		zonecfg_fini_handle(handle);
-		return (Z_ERR);
-	}
-
-	/* Fetch the postattach hook from the brand configuration.  */
+	/*
+	 * Fetch the attach and postattach hooks from the brand configuration.
+	 */
 	if ((bh = brand_open(target_brand)) == NULL) {
 		zerror(gettext("missing or invalid brand"));
 		return (Z_ERR);
 	}
 
-	(void) strcpy(cmdbuf, EXEC_PREFIX);
-	if (brand_get_postattach(bh, target_zone, zonepath, cmdbuf + EXEC_LEN,
-	    sizeof (cmdbuf) - EXEC_LEN, 0, NULL) != 0) {
+	if (get_hook(bh, cmdbuf, sizeof (cmdbuf), brand_get_attach, target_zone,
+	    zonepath) != Z_OK) {
+		zerror("invalid brand configuration: missing attach resource");
+		brand_close(bh);
+		return (Z_ERR);
+	}
+
+	if (get_hook(bh, postcmdbuf, sizeof (postcmdbuf), brand_get_postattach,
+	    target_zone, zonepath) != Z_OK) {
 		zerror("invalid brand configuration: missing postattach "
 		    "resource");
 		brand_close(bh);
@@ -5159,133 +4711,55 @@ attach_func(int argc, char *argv[])
 	}
 	brand_close(bh);
 
-	/* If we have a brand postattach hook and the force flag, append it. */
-	if (strlen(cmdbuf) > EXEC_LEN && force) {
-		if (addopt(cmdbuf, 0, "-F", sizeof (cmdbuf)) != Z_OK) {
-			zerror("Postattach command line too long");
+	/* Append all options to attach hook. */
+	if (addoptions(cmdbuf, argv, sizeof (cmdbuf)) != Z_OK)
+		return (Z_ERR);
+
+	/* Append all options to postattach hook. */
+	if (addoptions(postcmdbuf, argv, sizeof (postcmdbuf)) != Z_OK)
+		return (Z_ERR);
+
+	if (execute && !brand_help) {
+		if (zonecfg_grab_lock_file(target_zone, &lockfd) != Z_OK) {
+			zerror(gettext("another %s may have an operation in "
+			    "progress."), "zoneadm");
+			zonecfg_fini_handle(handle);
 			return (Z_ERR);
 		}
 	}
 
-	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
-		zerror(gettext("another %s may have an operation in progress."),
-		    "zoneadm");
-		zonecfg_fini_handle(handle);
-		return (Z_ERR);
-	}
-
 	if (force)
-		goto forced;
-
-	if ((athandle = zonecfg_init_handle()) == NULL) {
-		zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
 		goto done;
-	}
 
-retry:
-	if ((err = zonecfg_get_attach_handle(zonepath, target_zone, B_TRUE,
-	    athandle)) != Z_OK) {
-		if (err == Z_NO_ZONE) {
-			/*
-			 * Zone was not detached.  Try to fall back to getting
-			 * the needed information from within the zone.
-			 * However, we can only try to generate the attach
-			 * information for native branded zones, so fail if the
-			 * zone is not native.
-			 */
-			if (!is_native_zone) {
-				zerror(gettext("Not a detached zone."));
-				goto done;
-			}
+	if (cmdbuf[0] != '\0') {
+		/* Run the attach hook */
+		status = do_subproc_interactive(cmdbuf);
+		if ((status = subproc_status(gettext("brand-specific attach"),
+		    status, B_FALSE)) != ZONE_SUBPROC_OK) {
+			if (status == ZONE_SUBPROC_USAGE && !brand_help)
+				sub_usage(SHELP_ATTACH, CMD_ATTACH);
 
-			if (!retried) {
-				zerror(gettext("The zone was not properly "
-				    "detached.\n\tAttempting to attach "
-				    "anyway."));
-				if (gen_detach_info(zonepath)) {
-					retried = B_TRUE;
-					goto retry;
-				}
-			}
-			zerror(gettext("Cannot generate the information "
-			    "needed to attach this zone."));
-		} else if (err == Z_INVALID_DOCUMENT) {
-			zerror(gettext("Cannot attach to an earlier release "
-			    "of the operating system"));
-		} else {
-			zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
+			if (execute && !brand_help)
+				zonecfg_release_lock_file(target_zone, lockfd);
+
+			return (Z_ERR);
 		}
-		goto done;
-	}
 
-	/* Get the detach information for the locally defined zone. */
-	if ((err = zonecfg_get_detach_info(handle, B_FALSE)) != Z_OK) {
-		errno = err;
-		zperror(gettext("getting the attach information failed"),
-		    B_TRUE);
-		goto done;
 	}
 
 	/*
-	 * Ensure that the detached and locally defined zones are both of
-	 * the same brand.
+	 * Else run the built-in attach support.
+	 * This is a no-op since there is nothing to validate.
 	 */
-	if ((zonecfg_get_brand(handle, brand, sizeof (brand)) != 0) ||
-	    (zonecfg_get_brand(athandle, atbrand, sizeof (atbrand)) != 0)) {
-		err = Z_ERR;
-		zerror(gettext("missing or invalid brand"));
-		goto done;
+
+	/* If dry-run or help, then we're done. */
+	if (!execute || brand_help) {
+		if (!execute)
+			(void) unlink(tmpmanifest);
+		return (Z_OK);
 	}
 
-	if (strcmp(atbrand, brand) != NULL) {
-		err = Z_ERR;
-		zerror(gettext("Trying to attach a '%s' zone to a '%s' "
-		    "configuration."), atbrand, brand);
-		goto done;
-	}
-
-	/*
-	 * If we're doing an update on attach, and the zone does need to be
-	 * updated, then run the update.
-	 */
-	if (update) {
-		char fname[MAXPATHLEN];
-
-		(void) sigset(SIGINT, sigcleanup);
-
-		if ((err = sw_up_to_date(handle, athandle, zonepath)) != Z_OK) {
-			if (err != Z_FATAL && !attach_interupted) {
-				err = Z_FATAL;
-				err = attach_update(handle, zonepath);
-			}
-			if (!attach_interupted || err == Z_OK)
-				goto done;
-		}
-
-		(void) sigset(SIGINT, SIG_DFL);
-
-		/* clean up data files left behind by sw_up_to_date() */
-		(void) snprintf(fname, sizeof (fname), "%s/pkg_add", zonepath);
-		(void) unlink(fname);
-		(void) snprintf(fname, sizeof (fname), "%s/pkg_rm", zonepath);
-		(void) unlink(fname);
-
-		if (attach_interupted) {
-			err = Z_FATAL;
-			goto done;
-		}
-
-	} else {
-		/* sw_cmp prints error msgs as necessary */
-		if ((err = sw_cmp(handle, athandle, SW_CMP_NONE)) != Z_OK)
-			goto done;
-
-		if ((err = dev_fix(athandle)) != Z_OK)
-			goto done;
-	}
-
-forced:
-
+done:
 	zonecfg_rm_detached(handle, force);
 
 	if ((err = zone_set_state(target_zone, ZONE_STATE_INSTALLED)) != Z_OK) {
@@ -5293,17 +4767,12 @@ forced:
 		zperror(gettext("could not reset state"), B_TRUE);
 	}
 
-done:
 	zonecfg_fini_handle(handle);
-	release_lock_file(lockfd);
-	if (athandle != NULL)
-		zonecfg_fini_handle(athandle);
+	zonecfg_release_lock_file(target_zone, lockfd);
 
 	/* If we have a brand postattach hook, run it. */
-	if (err == Z_OK && strlen(cmdbuf) > EXEC_LEN) {
-		int status;
-
-		status = do_subproc(cmdbuf);
+	if (err == Z_OK && !force && postcmdbuf[0] != '\0') {
+		status = do_subproc(postcmdbuf);
 		if (subproc_status(gettext("brand-specific postattach"),
 		    status, B_FALSE) != ZONE_SUBPROC_OK) {
 			if ((err = zone_set_state(target_zone,
@@ -5344,62 +4813,70 @@ ask_yesno(boolean_t default_answer, const char *question)
 	}
 }
 
+/* ARGSUSED */
 static int
 uninstall_func(int argc, char *argv[])
 {
 	char line[ZONENAME_MAX + 128];	/* Enough for "Are you sure ..." */
 	char rootpath[MAXPATHLEN], zonepath[MAXPATHLEN];
 	char cmdbuf[MAXPATHLEN];
+	char precmdbuf[MAXPATHLEN];
 	boolean_t force = B_FALSE;
 	int lockfd, answer;
 	int err, arg;
+	boolean_t brand_help = B_FALSE;
 	brand_handle_t bh = NULL;
+	int status;
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot uninstall zone in alternate root"));
 		return (Z_ERR);
 	}
 
+	/* Check the argv string for args we handle internally */
 	optind = 0;
+	opterr = 0;
 	while ((arg = getopt(argc, argv, "?F")) != EOF) {
 		switch (arg) {
 		case '?':
-			sub_usage(SHELP_UNINSTALL, CMD_UNINSTALL);
-			return (optopt == '?' ? Z_OK : Z_USAGE);
+			if (optopt == '?') {
+				sub_usage(SHELP_UNINSTALL, CMD_UNINSTALL);
+				brand_help = B_TRUE;
+			}
+			/* Ignore unknown options - may be brand specific. */
+			break;
 		case 'F':
 			force = B_TRUE;
 			break;
 		default:
-			sub_usage(SHELP_UNINSTALL, CMD_UNINSTALL);
-			return (Z_USAGE);
+			/* Ignore unknown options - may be brand specific. */
+			break;
 		}
 	}
-	if (argc > optind) {
-		sub_usage(SHELP_UNINSTALL, CMD_UNINSTALL);
-		return (Z_USAGE);
-	}
 
-	if (sanity_check(target_zone, CMD_UNINSTALL, B_FALSE, B_TRUE, B_FALSE)
-	    != Z_OK)
-		return (Z_ERR);
-
-	/*
-	 * Invoke brand-specific handler.
-	 */
-	if (invoke_brand_handler(CMD_UNINSTALL, argv) != Z_OK)
-		return (Z_ERR);
-
-	if (!force) {
-		(void) snprintf(line, sizeof (line),
-		    gettext("Are you sure you want to %s zone %s"),
-		    cmd_to_str(CMD_UNINSTALL), target_zone);
-		if ((answer = ask_yesno(B_FALSE, line)) == 0) {
-			return (Z_OK);
-		} else if (answer == -1) {
-			zerror(gettext("Input not from terminal and -F "
-			    "not specified: %s not done."),
-			    cmd_to_str(CMD_UNINSTALL));
+	if (!brand_help) {
+		if (sanity_check(target_zone, CMD_UNINSTALL, B_FALSE, B_TRUE,
+		    B_FALSE) != Z_OK)
 			return (Z_ERR);
+
+		/*
+		 * Invoke brand-specific handler.
+		 */
+		if (invoke_brand_handler(CMD_UNINSTALL, argv) != Z_OK)
+			return (Z_ERR);
+
+		if (!force) {
+			(void) snprintf(line, sizeof (line),
+			    gettext("Are you sure you want to %s zone %s"),
+			    cmd_to_str(CMD_UNINSTALL), target_zone);
+			if ((answer = ask_yesno(B_FALSE, line)) == 0) {
+				return (Z_OK);
+			} else if (answer == -1) {
+				zerror(gettext("Input not from terminal and -F "
+				    "not specified: %s not done."),
+				    cmd_to_str(CMD_UNINSTALL));
+				return (Z_ERR);
+			}
 		}
 	}
 
@@ -5409,50 +4886,26 @@ uninstall_func(int argc, char *argv[])
 		zperror2(target_zone, gettext("could not get zone path"));
 		return (Z_ERR);
 	}
-	if ((err = zone_get_rootpath(target_zone, rootpath,
-	    sizeof (rootpath))) != Z_OK) {
-		errno = err;
-		zperror2(target_zone, gettext("could not get root path"));
-		return (Z_ERR);
-	}
 
 	/*
-	 * If there seems to be a zoneadmd running for this zone, call it
-	 * to tell it that an uninstall is happening; if all goes well it
-	 * will then shut itself down.
+	 * Fetch the uninstall and preuninstall hooks from the brand
+	 * configuration.
 	 */
-	if (ping_zoneadmd(target_zone) == Z_OK) {
-		zone_cmd_arg_t zarg;
-		zarg.cmd = Z_NOTE_UNINSTALLING;
-		/* we don't care too much if this fails... just plow on */
-		(void) call_zoneadmd(target_zone, &zarg);
-	}
-
-	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
-		zerror(gettext("another %s may have an operation in progress."),
-		    "zoneadm");
-		return (Z_ERR);
-	}
-
-	/* Don't uninstall the zone if anything is mounted there */
-	err = zonecfg_find_mounts(rootpath, NULL, NULL);
-	if (err) {
-		zerror(gettext("These file systems are mounted on "
-		    "subdirectories of %s.\n"), rootpath);
-		(void) zonecfg_find_mounts(rootpath, zfm_print, NULL);
-		return (Z_ERR);
-	}
-
-	/* Fetch the uninstall hook from the brand configuration.  */
 	if ((bh = brand_open(target_brand)) == NULL) {
 		zerror(gettext("missing or invalid brand"));
 		return (Z_ERR);
 	}
 
-	(void) strcpy(cmdbuf, EXEC_PREFIX);
-	if (brand_get_preuninstall(bh, target_zone, zonepath,
-	    cmdbuf + EXEC_LEN, sizeof (cmdbuf) - EXEC_LEN, 0, NULL)
-	    != 0) {
+	if (get_hook(bh, cmdbuf, sizeof (cmdbuf), brand_get_uninstall,
+	    target_zone, zonepath) != Z_OK) {
+		zerror("invalid brand configuration: missing uninstall "
+		    "resource");
+		brand_close(bh);
+		return (Z_ERR);
+	}
+
+	if (get_hook(bh, precmdbuf, sizeof (precmdbuf), brand_get_preuninstall,
+	    target_zone, zonepath) != Z_OK) {
 		zerror("invalid brand configuration: missing preuninstall "
 		    "resource");
 		brand_close(bh);
@@ -5460,33 +4913,102 @@ uninstall_func(int argc, char *argv[])
 	}
 	brand_close(bh);
 
-	if (strlen(cmdbuf) > EXEC_LEN) {
-		int status;
+	/* Append all options to preuninstall hook. */
+	if (addoptions(precmdbuf, argv, sizeof (precmdbuf)) != Z_OK)
+		return (Z_ERR);
 
-		/* If we have the force flag, append it. */
-		if (force && addopt(cmdbuf, 0, "-F", sizeof (cmdbuf)) != Z_OK) {
-			zerror("Preuninstall command line too long");
+	/* Append all options to uninstall hook. */
+	if (addoptions(cmdbuf, argv, sizeof (cmdbuf)) != Z_OK)
+		return (Z_ERR);
+
+	if (!brand_help) {
+		if ((err = zone_get_rootpath(target_zone, rootpath,
+		    sizeof (rootpath))) != Z_OK) {
+			errno = err;
+			zperror2(target_zone, gettext("could not get root "
+			    "path"));
 			return (Z_ERR);
 		}
 
+		/*
+		 * If there seems to be a zoneadmd running for this zone, call
+		 * it to tell it that an uninstall is happening; if all goes
+		 * well it will then shut itself down.
+		 */
+		if (zonecfg_ping_zoneadmd(target_zone) == Z_OK) {
+			zone_cmd_arg_t zarg;
+			zarg.cmd = Z_NOTE_UNINSTALLING;
+			/* we don't care too much if this fails, just plow on */
+			(void) zonecfg_call_zoneadmd(target_zone, &zarg, locale,
+			    B_TRUE);
+		}
+
+		if (zonecfg_grab_lock_file(target_zone, &lockfd) != Z_OK) {
+			zerror(gettext("another %s may have an operation in "
+			    "progress."), "zoneadm");
+			return (Z_ERR);
+		}
+
+		/* Don't uninstall the zone if anything is mounted there */
+		err = zonecfg_find_mounts(rootpath, NULL, NULL);
+		if (err) {
+			zerror(gettext("These file systems are mounted on "
+			    "subdirectories of %s.\n"), rootpath);
+			(void) zonecfg_find_mounts(rootpath, zfm_print, NULL);
+			zonecfg_release_lock_file(target_zone, lockfd);
+			return (Z_ERR);
+		}
+	}
+
+	/* If we have a brand preuninstall hook, run it. */
+	if (!brand_help && precmdbuf[0] != '\0') {
 		status = do_subproc(cmdbuf);
 		if (subproc_status(gettext("brand-specific preuninstall"),
 		    status, B_FALSE) != ZONE_SUBPROC_OK) {
+			zonecfg_release_lock_file(target_zone, lockfd);
 			return (Z_ERR);
 		}
 	}
 
-	err = zone_set_state(target_zone, ZONE_STATE_INCOMPLETE);
-	if (err != Z_OK) {
-		errno = err;
-		zperror2(target_zone, gettext("could not set state"));
-		goto bad;
+	if (!brand_help) {
+		err = zone_set_state(target_zone, ZONE_STATE_INCOMPLETE);
+		if (err != Z_OK) {
+			errno = err;
+			zperror2(target_zone, gettext("could not set state"));
+			goto bad;
+		}
 	}
 
-	if ((err = cleanup_zonepath(zonepath, B_FALSE)) != Z_OK) {
-		errno = err;
-		zperror2(target_zone, gettext("cleaning up zonepath failed"));
-		goto bad;
+	/*
+	 * If there is a brand uninstall hook, use it, otherwise use the
+	 * built-in uninstall code.
+	 */
+	if (cmdbuf[0] != '\0') {
+		/* Run the uninstall hook */
+		status = do_subproc_interactive(cmdbuf);
+		if ((status = subproc_status(gettext("brand-specific "
+		    "uninstall"), status, B_FALSE)) != ZONE_SUBPROC_OK) {
+			if (status == ZONE_SUBPROC_USAGE && !brand_help)
+				sub_usage(SHELP_UNINSTALL, CMD_UNINSTALL);
+			if (!brand_help)
+				zonecfg_release_lock_file(target_zone, lockfd);
+			return (Z_ERR);
+		}
+
+		if (brand_help)
+			return (Z_OK);
+	} else {
+		/* If just help, we're done since there is no brand help. */
+		if (brand_help)
+			return (Z_OK);
+
+		/* Run the built-in uninstall support. */
+		if ((err = cleanup_zonepath(zonepath, B_FALSE)) != Z_OK) {
+			errno = err;
+			zperror2(target_zone, gettext("cleaning up zonepath "
+			    "failed"));
+			goto bad;
+		}
 	}
 
 	err = zone_set_state(target_zone, ZONE_STATE_CONFIGURED);
@@ -5495,7 +5017,7 @@ uninstall_func(int argc, char *argv[])
 		zperror2(target_zone, gettext("could not reset state"));
 	}
 bad:
-	release_lock_file(lockfd);
+	zonecfg_release_lock_file(target_zone, lockfd);
 	return (err);
 }
 
@@ -5532,7 +5054,7 @@ mount_func(int argc, char *argv[])
 
 	zarg.cmd = force ? Z_FORCEMOUNT : Z_MOUNT;
 	zarg.bootbuf[0] = '\0';
-	if (call_zoneadmd(target_zone, &zarg) != 0) {
+	if (zonecfg_call_zoneadmd(target_zone, &zarg, locale, B_TRUE) != 0) {
 		zerror(gettext("call to %s failed"), "zoneadmd");
 		return (Z_ERR);
 	}
@@ -5552,7 +5074,7 @@ unmount_func(int argc, char *argv[])
 		return (Z_ERR);
 
 	zarg.cmd = Z_UNMOUNT;
-	if (call_zoneadmd(target_zone, &zarg) != 0) {
+	if (zonecfg_call_zoneadmd(target_zone, &zarg, locale, B_TRUE) != 0) {
 		zerror(gettext("call to %s failed"), "zoneadmd");
 		return (Z_ERR);
 	}
@@ -5576,7 +5098,7 @@ mark_func(int argc, char *argv[])
 	if (invoke_brand_handler(CMD_MARK, argv) != Z_OK)
 		return (Z_ERR);
 
-	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
+	if (zonecfg_grab_lock_file(target_zone, &lockfd) != Z_OK) {
 		zerror(gettext("another %s may have an operation in progress."),
 		    "zoneadm");
 		return (Z_ERR);
@@ -5587,7 +5109,7 @@ mark_func(int argc, char *argv[])
 		errno = err;
 		zperror2(target_zone, gettext("could not set state"));
 	}
-	release_lock_file(lockfd);
+	zonecfg_release_lock_file(target_zone, lockfd);
 
 	return (err);
 }
@@ -6022,17 +5544,9 @@ main(int argc, char **argv)
 	 * a zoneadm instance in our ancestry.  If so, set zone_lock_cnt to
 	 * indicate it.  If not, make that explicit in our environment.
 	 */
-	zone_lock_env = getenv(LOCK_ENV_VAR);
-	if (zone_lock_env == NULL) {
-		if (putenv(zoneadm_lock_not_held) != 0) {
-			zperror(target_zone, B_TRUE);
-			exit(Z_ERR);
-		}
-	} else {
+	zonecfg_init_lock_file(target_zone, &zone_lock_env);
+	if (zone_lock_env != NULL)
 		zoneadm_is_nested = B_TRUE;
-		if (atoi(zone_lock_env) == 1)
-			zone_lock_cnt = 1;
-	}
 
 	/*
 	 * If we are going to be operating on a single zone, retrieve its

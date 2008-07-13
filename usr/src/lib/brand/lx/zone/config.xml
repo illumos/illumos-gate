@@ -38,7 +38,7 @@
 	<login_cmd>/bin/login -h zone:%Z -f %u</login_cmd>
 	<user_cmd>/usr/bin/getent passwd %u</user_cmd>
 
-	<install>/usr/lib/brand/lx/lx_install %z %R %*</install>
+	<install>/usr/lib/brand/lx/lx_install %z %R</install>
 	<installopts>d:hsvX</installopts>
 	<boot>/usr/lib/brand/lx/lx_support boot %R %z</boot>
 	<halt>/usr/lib/brand/lx/lx_support halt %R %z</halt>

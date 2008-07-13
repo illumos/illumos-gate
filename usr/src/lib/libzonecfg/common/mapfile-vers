@@ -40,6 +40,9 @@ SUNWprivate_1.1 {
 	zonecfg_add_fs_option;
 	zonecfg_add_ipd;
 	zonecfg_add_nwif;
+	zonecfg_add_patch;
+	zonecfg_add_patch_obs;
+	zonecfg_add_pkg;
 	zonecfg_add_pset;
 	zonecfg_add_rctl;
 	zonecfg_add_rctl_value;
@@ -49,6 +52,7 @@ SUNWprivate_1.1 {
 	zonecfg_attach_manifest;
 	zonecfg_bind_pool;
 	zonecfg_bind_tmp_pool;
+	zonecfg_call_zoneadmd;
 	zonecfg_check_handle;
 	zonecfg_close_scratch;
 	zonecfg_construct_rctlblk;
@@ -71,7 +75,7 @@ SUNWprivate_1.1 {
 	zonecfg_detached;
 	zonecfg_detach_save;
 	zonecfg_devperms_apply;
-	zonecfg_devwalk;
+	zonecfg_dev_manifest;
 	zonecfg_enable_rcapd;
 	zonecfg_endattrent;
 	zonecfg_enddevent;
@@ -96,7 +100,6 @@ SUNWprivate_1.1 {
 	zonecfg_get_autoboot;
 	zonecfg_get_bootargs;
 	zonecfg_get_brand;
-	zonecfg_get_detach_info;
 	zonecfg_get_dflt_sched_class;
 	zonecfg_getdevent;
 	zonecfg_getdevperment;
@@ -123,9 +126,11 @@ SUNWprivate_1.1 {
 	zonecfg_get_uuid;
 	zonecfg_get_xml_handle;
 	zonecfg_get_zonepath;
+	zonecfg_grab_lock_file;
 	zonecfg_ifname_exists;
 	zonecfg_in_alt_root;
 	zonecfg_init_handle;
+	zonecfg_init_lock_file;
 	zonecfg_is_rctl;
 	zonecfg_is_scratch;
 	zonecfg_lock_scratch;
@@ -154,6 +159,8 @@ SUNWprivate_1.1 {
 	zonecfg_notify_unbind;
 	zonecfg_num_resources;
 	zonecfg_open_scratch;
+	zonecfg_ping_zoneadmd;
+	zonecfg_release_lock_file;
 	zonecfg_remove_fs_option;
 	zonecfg_remove_rctl_value;
 	zonecfg_reverse_scratch;
@@ -179,6 +186,7 @@ SUNWprivate_1.1 {
 	zonecfg_setrctlent;
 	zonecfg_set_root;
 	zonecfg_set_sched;
+	zonecfg_set_swinv;
 	zonecfg_set_zonepath;
 	zonecfg_strerror;
 	zonecfg_str_to_bytes;

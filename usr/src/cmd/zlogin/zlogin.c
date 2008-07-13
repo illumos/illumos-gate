@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -500,6 +500,8 @@ sigwinch(int s)
 		(void) ioctl(masterfd, TIOCSWINSZ, &ws);
 }
 
+static volatile int close_on_sig = -1;
+
 static void
 /*ARGSUSED*/
 sigcld(int s)
@@ -513,10 +515,16 @@ sigcld(int s)
 	 */
 	if ((pid = waitpid(child_pid, &status, WNOHANG|WNOWAIT)) != -1) {
 		if (pid == child_pid &&
-		    (WIFEXITED(status) || WIFSIGNALED(status)))
+		    (WIFEXITED(status) || WIFSIGNALED(status))) {
 			dead = 1;
-		else
+			if (close_on_sig != -1) {
+				(void) write(close_on_sig, "a", 1);
+				(void) close(close_on_sig);
+				close_on_sig = -1;
+			}
+		} else {
 			(void) waitpid(pid, &status, WNOHANG);
+		}
 	}
 }
 
@@ -576,15 +584,29 @@ canonify(char c, char *cc)
  * to prevent deadlock between the two processes.
  *
  * This routine returns -1 when the 'quit' escape sequence has been issued,
- * and 0 otherwise.
+ * or an error is encountered, 1 if stdin is EOF, and 0 otherwise.
  */
 static int
-process_user_input(int outfd, int infd, char *buf, size_t nbytes)
+process_user_input(int outfd, int infd)
 {
 	static boolean_t beginning_of_line = B_TRUE;
 	static boolean_t local_echo = B_FALSE;
-
+	char ibuf[ZLOGIN_BUFSIZ];
+	int nbytes;
+	char *buf = ibuf;
 	char c = *buf;
+
+	nbytes = read(STDIN_FILENO, ibuf, ZLOGIN_RDBUFSIZ);
+	if (nbytes == -1 && (errno != EINTR || dead))
+		return (-1);
+
+	if (nbytes == -1)	/* The read was interrupted. */
+		return (0);
+
+	/* 0 read means EOF, close the pipe to the child */
+	if (nbytes == 0)
+		return (1);
+
 	for (c = *buf; nbytes > 0; c = *buf, --nbytes) {
 		buf++;
 		if (beginning_of_line && !nocmdchar) {
@@ -625,10 +647,10 @@ retry:
 			if (errno == EAGAIN) {
 				struct timespec rqtp;
 				int ln;
-				char ibuf[ZLOGIN_BUFSIZ];
+				char obuf[ZLOGIN_BUFSIZ];
 
-				if ((ln = read(infd, ibuf, ZLOGIN_BUFSIZ)) > 0)
-					(void) write(STDOUT_FILENO, ibuf, ln);
+				if ((ln = read(infd, obuf, ZLOGIN_BUFSIZ)) > 0)
+					(void) write(STDOUT_FILENO, obuf, ln);
 
 				/* sleep for 10 milliseconds */
 				rqtp.tv_sec = 0;
@@ -664,9 +686,9 @@ retry:
  * read from our stdin.  If the pipe already is pretty full, we bypass the read
  * for now.  We'll circle back here again after the poll() so that we can
  * try again.  When this function is called, we already know there is data
- * ready to read on STDIN_FILENO.  We return -1 if there is a problem, 0
- * if everything is ok (even though we might not have read/written any data
- * into the pipe on this iteration).
+ * ready to read on STDIN_FILENO.  We return -1 if there is a problem, 1 if
+ * stdin is EOF, and 0 if everything is ok (even though we might not have
+ * read/written any data into the pipe on this iteration).
  */
 static int
 process_raw_input(int stdin_fd, int appin_fd)
@@ -698,10 +720,13 @@ process_raw_input(int stdin_fd, int appin_fd)
 	if (cc == -1)	/* The read was interrupted. */
 		return (0);
 
+	/* 0 read means EOF, close the pipe to the child */
+	if (cc == 0)
+		return (1);
+
 	/*
 	 * stdin_fd is stdin of the target; so, the thing we'll write the user
-	 * data *to*.  Also, unlike on the output side, we propagate
-	 * zero-length messages to the other side.
+	 * data *to*.
 	 */
 	if (write(stdin_fd, ibuf, cc) == -1)
 		return (-1);
@@ -766,10 +791,10 @@ process_output(int in_fd, int out_fd)
  *
  */
 static void
-doio(int stdin_fd, int appin_fd, int stdout_fd, int stderr_fd,
+doio(int stdin_fd, int appin_fd, int stdout_fd, int stderr_fd, int sig_fd,
     boolean_t raw_mode)
 {
-	struct pollfd pollfds[3];
+	struct pollfd pollfds[4];
 	char ibuf[ZLOGIN_BUFSIZ];
 	int cc, ret;
 
@@ -785,15 +810,31 @@ doio(int stdin_fd, int appin_fd, int stdout_fd, int stderr_fd,
 	pollfds[2].fd = STDIN_FILENO;
 	pollfds[2].events = pollfds[0].events;
 
+	/* read from signalling pipe so we know when child dies */
+	pollfds[3].fd = sig_fd;
+	pollfds[3].events = pollfds[0].events;
+
 	for (;;) {
 		pollfds[0].revents = pollfds[1].revents =
-		    pollfds[2].revents = 0;
+		    pollfds[2].revents = pollfds[3].revents = 0;
 
 		if (dead)
 			break;
 
+		/*
+		 * There is a race condition here where we can receive the
+		 * child death signal, set the dead flag, but since we have
+		 * passed the test above, we would go into poll and hang.
+		 * To avoid this we use the sig_fd as an additional poll fd.
+		 * The signal handler writes into the other end of this pipe
+		 * when the child dies so that the poll will always see that
+		 * input and proceed.  We just loop around at that point and
+		 * then notice the dead flag.
+		 */
+
 		ret = poll(pollfds,
 		    sizeof (pollfds) / sizeof (struct pollfd), -1);
+
 		if (ret == -1 && errno != EINTR) {
 			perror("poll failed");
 			break;
@@ -838,27 +879,30 @@ doio(int stdin_fd, int appin_fd, int stdout_fd, int stderr_fd,
 				 * the thing we'll write the user data *to*.
 				 *
 				 * Also, unlike on the output side, we
-				 * propagate zero-length messages to the
-				 * other side.
+				 * close the pipe on a zero-length message.
 				 */
-				if (raw_mode == B_TRUE) {
-					if (process_raw_input(stdin_fd,
-					    appin_fd) == -1)
-						break;
-				} else {
-					cc = read(STDIN_FILENO, ibuf,
-					    ZLOGIN_RDBUFSIZ);
-					if (cc == -1 &&
-					    (errno != EINTR || dead))
-						break;
+				int res;
 
-					if (cc != -1 &&
-					    process_user_input(stdin_fd,
-					    stdout_fd, ibuf, cc) == -1)
+				if (raw_mode)
+					res = process_raw_input(stdin_fd,
+					    appin_fd);
+				else
+					res = process_user_input(stdin_fd,
+					    stdout_fd);
+
+				if (res < 0)
+					break;
+				if (res > 0) {
+					/* EOF (close) child's stdin_fd */
+					pollfds[2].fd = -1;
+					while ((res = close(stdin_fd)) != 0 &&
+					    errno == EINTR)
+						;
+					if (res != 0)
 						break;
 				}
-			} else if (raw_mode == B_TRUE &&
-			    pollfds[2].revents & POLLHUP) {
+
+			} else if (raw_mode && pollfds[2].revents & POLLHUP) {
 				/*
 				 * It's OK to get a POLLHUP on STDIN-- it
 				 * always happens if you do:
@@ -866,11 +910,17 @@ doio(int stdin_fd, int appin_fd, int stdout_fd, int stderr_fd,
 				 * echo foo | zlogin <zone> <command>
 				 *
 				 * We reset fd to -1 in this case to clear
-				 * the condition and write an EOF to the
-				 * other side in order to wrap things up.
+				 * the condition and close the pipe (EOF) to
+				 * the other side in order to wrap things up.
 				 */
+				int res;
+
 				pollfds[2].fd = -1;
-				(void) write(stdin_fd, ibuf, 0);
+				while ((res = close(stdin_fd)) != 0 &&
+				    errno == EINTR)
+					;
+				if (res != 0)
+					break;
 			} else {
 				pollerr = pollfds[2].revents;
 				break;
@@ -1454,7 +1504,7 @@ noninteractive_login(char *zonename, const char *user_cmd, zoneid_t zoneid,
     char **new_args, char **new_env)
 {
 	pid_t retval;
-	int stdin_pipe[2], stdout_pipe[2], stderr_pipe[2];
+	int stdin_pipe[2], stdout_pipe[2], stderr_pipe[2], dead_child_pipe[2];
 	int child_status;
 	int tmpl_fd;
 	sigset_t block_cld;
@@ -1489,6 +1539,12 @@ noninteractive_login(char *zonename, const char *user_cmd, zoneid_t zoneid,
 		return (1);
 	}
 
+	if (pipe(dead_child_pipe) != 0) {
+		zperror(gettext("could not create signalling pipe"));
+		return (1);
+	}
+	close_on_sig = dead_child_pipe[0];
+
 	/*
 	 * If any of the pipe FD's winds up being less than STDERR, then we
 	 * have a mess on our hands-- and we are lacking some of the I/O
@@ -1499,7 +1555,9 @@ noninteractive_login(char *zonename, const char *user_cmd, zoneid_t zoneid,
 	    stdout_pipe[0] <= STDERR_FILENO ||
 	    stdout_pipe[1] <= STDERR_FILENO ||
 	    stderr_pipe[0] <= STDERR_FILENO ||
-	    stderr_pipe[1] <= STDERR_FILENO) {
+	    stderr_pipe[1] <= STDERR_FILENO ||
+	    dead_child_pipe[0] <= STDERR_FILENO ||
+	    dead_child_pipe[1] <= STDERR_FILENO) {
 		zperror(gettext("process lacks valid STDIN, STDOUT, STDERR"));
 		return (1);
 	}
@@ -1579,6 +1637,11 @@ noninteractive_login(char *zonename, const char *user_cmd, zoneid_t zoneid,
 		_exit(1);
 	}
 	/* parent */
+
+	/* close pipe sides written by child */
+	(void) close(stdout_pipe[1]);
+	(void) close(stderr_pipe[1]);
+
 	(void) sigset(SIGINT, sig_forward);
 
 	postfork_dropprivs();
@@ -1588,7 +1651,7 @@ noninteractive_login(char *zonename, const char *user_cmd, zoneid_t zoneid,
 
 	(void) sigprocmask(SIG_UNBLOCK, &block_cld, NULL);
 	doio(stdin_pipe[0], stdin_pipe[1], stdout_pipe[0], stderr_pipe[0],
-	    B_TRUE);
+	    dead_child_pipe[1], B_TRUE);
 	do {
 		retval = waitpid(child_pid, &child_status, 0);
 		if (retval == -1) {
@@ -1762,7 +1825,6 @@ main(int argc, char **argv)
 	 * it first.
 	 */
 	if (console) {
-
 		/*
 		 * Ensure that zoneadmd for this zone is running.
 		 */
@@ -1790,7 +1852,7 @@ main(int argc, char **argv)
 		/*
 		 * Run the I/O loop until we get disconnected.
 		 */
-		doio(masterfd, -1, masterfd, -1, B_FALSE);
+		doio(masterfd, -1, masterfd, -1, -1, B_FALSE);
 		reset_tty();
 		(void) printf(gettext("\n[Connection to zone '%s' console "
 		    "closed]\n"), zonename);
@@ -2042,7 +2104,7 @@ main(int argc, char **argv)
 	postfork_dropprivs();
 
 	(void) sigprocmask(SIG_UNBLOCK, &block_cld, NULL);
-	doio(masterfd, -1, masterfd, -1, B_FALSE);
+	doio(masterfd, -1, masterfd, -1, -1, B_FALSE);
 
 	reset_tty();
 	(void) fprintf(stderr,

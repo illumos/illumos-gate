@@ -20,7 +20,7 @@
 
  CDDL HEADER END
 
- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,8 +54,8 @@
     The following replacements are performed:
 
       %z	Name of zone
-      %R	Root of zone
-      %*	Additional arguments, if any
+      %R	Zonepath of zone
+      Additional arguments, if any, are appended.
 
     The program should return 0 on success and non-0 on failure.  Any
     detailed error messages should be displayed to stderr.
@@ -73,8 +73,8 @@
     replacements are performed:
 
       %z	Name of zone
-      %R	Root of zone
-      %*	Additional arguments, if any
+      %R	Zonepath of zone
+      Additional arguments, if any, are appended.
 
     It has no attributes.
 -->
@@ -107,8 +107,8 @@
     The following replacements are performed:
 
       %z	Name of zone
-      %R	Root of zone
-      %*	Additional arguments, if any
+      %R	Zonepath of zone
+      Additional arguments, if any, are appended.
 
     It has no attributes.
 -->
@@ -139,8 +139,8 @@
     The following replacements are performed:
 
       %z	Name of zone
-      %R	Root of zone
-      %*	Additional arguments, if any
+      %R	Zonepath of zone
+      Additional arguments, if any, are appended.
 
     It has no attributes.
 -->
@@ -201,20 +201,45 @@
 <!ATTLIST user_cmd>
 
 <!--
-  postattach
+  attach
 
-    Path to a script that will perform any necessary post-processing on
-    a zone after it has been attached.  The additional argument could be '-F'
-    if this is a forced attach.
+    Path to a hook that will perform any necessary processing on
+    a zone to allow it to be attached.  The zone will be in the "configured"
+    state when this hook is run.  This hook is never called when the zone
+    is "force attached" (-F).
 
-    If this program exits with a non-zero exit status, the attach operation
+    If this hook exits with a non-zero exit status, the attach operation
     will fail.
 
     The following replacements are performed:
 
       %z	Name of zone
-      %R	Root of zone
-      %*	Additional arguments, if any
+      %R	Zonepath of zone
+      Additional arguments, if any, are appended.
+
+    If no hook is provided, the internal zoneadm attach code will be used.
+
+    It has no attributes.
+-->
+<!ELEMENT attach	(#PCDATA) >
+<!ATTLIST attach>
+
+<!--
+  postattach
+
+    Path to a hook that will perform any necessary post-processing on
+    a zone after it has been attached.  The zone will be in the "installed"
+    state when this hook is run.  This hook is never called when the zone
+    is "force attached" (-F).
+
+    If this hook exits with a non-zero exit status, the attach operation
+    will fail and the zone state will be reset to "configured".
+
+    The following replacements are performed:
+
+      %z	Name of zone
+      %R	Zonepath of zone
+      Additional arguments, if any, are appended.
 
     It has no attributes.
 -->
@@ -224,14 +249,19 @@
 <!--
   postclone
 
-    Path to a script that will perform any necessary post-processing on
-    a zone after it has been freshly copied.
+    Path to a hook that will perform any necessary post-processing on
+    a zone after it has been cloned.  The zone will be in the "incomplete"
+    state when this hook is run.
+
+    If this hook exits with a non-zero exit status, the clone operation
+    will fail and the zone will be left in the "incomplete" state,
+    otherwise the state will be changed to the "installed" state.
 
     The following replacements are performed:
 
       %z	Name of zone
-      %R	Root of zone
-      %*	Additional arguments, if any
+      %R	Zonepath of zone
+      Additional arguments, if any, are appended.
 
     It has no attributes.
 -->
@@ -249,8 +279,8 @@
     The following replacements are performed:
 
       %z	Name of zone
-      %R	Root of zone
-      %*	Additional arguments, if any
+      %R	Zonepath of zone
+      Additional arguments, if any, are appended.
 
     It has no attributes.
 -->
@@ -260,21 +290,26 @@
 <!--
   predetach
 
-    Path to a script that will perform any necessary pre-processing on
-    a zone before it is detached.  The additional argument could be '-n'
-    if this is a dry-run detach.
+    Path to a hook that will perform any necessary pre-processing on
+    a zone before it is detached.  The zone will be in the "installed"
+    state when this hook is run.
 
     It is possible that if the zone fails to detach after invoking this
-    program, future attempts to detach the zone will invoke this program again.
-    So this program should be designed to gracefully handle the case where
-    it is run multiple times on the same zone.  If this program exits with
+    hook, future attempts to detach the zone will invoke this hook again.
+    So this hook should be designed to gracefully handle the case where
+    it is run multiple times on the same zone.  If this hook exits with
     a non-zero exit status, the detach operation will fail.
+
+    This hook is most commonly used when there is pre-processing for detaching
+    a zone but the built-in detach support will be used for the actual
+    detach.  Otherwise, if a detach hook is provided, then it can be used
+    to do both preprocessing as well as the actual detach.
 
     The following replacements are performed:
 
       %z	Name of zone
-      %R	Root of zone
-      %*	Additional arguments, if any
+      %R	Zonepath of zone
+      Additional arguments, if any, are appended.
 
     It has no attributes.
 -->
@@ -282,28 +317,152 @@
 <!ATTLIST predetach>
 
 <!--
+  detach
+
+    Path to a hook that will perform any necessary processing on
+    a zone to allow it to be detached.  The zone will be in the "installed"
+    state when this hook is run.
+
+    It is possible that if the zone fails to detach while running this
+    hook, future attempts to detach the zone will invoke this hook again.
+    So this hook should be designed to gracefully handle the case where
+    it is run multiple times on the same zone.  If this hook exits with
+    a non-zero exit status, the detach operation will fail and the zone will
+    be left in the "installed" state, otherwise the state will be changed
+    to "configured".
+
+    The following replacements are performed:
+
+      %z	Name of zone
+      %R	Zonepath of zone
+      Additional arguments, if any, are appended.
+
+    If no hook is provided, the internal zoneadm detach code will be used.
+
+    It has no attributes.
+-->
+<!ELEMENT detach	(#PCDATA) >
+<!ATTLIST detach>
+
+<!--
+  clone
+    Path to a hook that will perform any necessary processing on a zone to
+    allow it to be installed via cloning.  Cloning is an alternative to
+    installing so this hook should result in the same effect for the zone.
+    The zone will be in the "incomplete" state when this hook is run.
+
+    If this hook exits with a non-zero exit status, the clone operation
+    will fail and the zone will be left in the "incomplete" state, otherwise
+    the state will be changed to "installed".
+
+    The following replacements are performed:
+
+      %z	Name of zone
+      %R	Zonepath of zone
+      1st arg   name of source zone
+      Additional arguments, if any, are appended.
+
+    If no hook is provided, the internal zoneadm cloning code will be used.
+-->
+<!ELEMENT clone	(#PCDATA) >
+<!ATTLIST clone>
+
+<!--
   preuninstall
 
     Path to a script that will perform any necessary pre-processing on
-    a zone before it is uninstalled.  The additional argument could be '-F'
-    if this is a forced uninstall.
+    a zone before it is uninstalled.  The zone will be in the "installed"
+    state when this hook is run.
 
     It is possible that if the zone fails to uninstall after invoking this
-    program, future attempts to uninstall the zone will invoke this program
-    again.  So this program should be designed to gracefully handle the case
-    where it is run multiple times on the same zone.  If this program exits
+    hook, future attempts to uninstall the zone will invoke this hook
+    again.  So this hook should be designed to gracefully handle the case
+    where it is run multiple times on the same zone.  If this hook exits
     with a non-zero exit status, the uninstall operation will fail.
 
     The following replacements are performed:
 
       %z	Name of zone
-      %R	Root of zone
-      %*	Additional arguments, if any
+      %R	Zonepath of zone
+      Additional arguments, if any, are appended.
 
     It has no attributes.
 -->
 <!ELEMENT preuninstall	(#PCDATA) >
 <!ATTLIST preuninstall>
+
+<!--
+  uninstall
+    Identifies the hook to invoke when uninstalling a zone.  The zone will
+    be in the "incomplete" state when this hook is run.
+
+    If this hook exits with a non-zero exit status, the uninstall operation
+    will fail and the zone will be left in the "incomplete" state, otherwise
+    the state will be changed to "configured".
+
+    The following replacements are performed:
+
+      %z	Name of zone
+      %R	Zonepath of zone
+      Additional arguments, if any, are appended.
+
+    If no hook is provided, the internal zoneadm uninstall code will be used.
+-->
+<!ELEMENT uninstall	(#PCDATA) >
+<!ATTLIST uninstall>
+
+<!--
+  presnap
+    Identifies the hook to invoke before snapshotting a zone using the
+    built-in ZFS clone support.
+
+    If this hook exits with a non-zero exit status, the snapshot operation
+    will fail and the zfs clone operation will fail.
+
+    The following replacements are performed:
+
+      %z	Name of zone
+      %R	Zonepath of zone
+-->
+<!ELEMENT presnap	(#PCDATA) >
+<!ATTLIST presnap>
+
+<!--
+  postsnap
+    Identifies the hook to invoke after snapshotting a zone using the
+    built-in ZFS clone support.
+
+    If this hook exits with a non-zero exit status, the zfs clone operation
+    will fail.
+
+    The following replacements are performed:
+
+      %z	Name of zone
+      %R	Zonepath of zone
+-->
+<!ELEMENT postsnap	(#PCDATA) >
+<!ATTLIST postsnap>
+
+<!--
+  validatesnap
+    Identifies the hook to invoke to validate a snapshot of a zone using the
+    built-in ZFS clone support.  This will validate a snapshot that was
+    explicitly specified to the clone command when the user wants to
+    re-use a snapshot from an earlier clone operation.
+
+    If this hook exits with a non-zero exit status, the snapshot validation
+    operation will fail, meaning the zfs snapshot cannot be used to install
+    the zone.
+
+    The following replacements are performed:
+
+      %z	Name of zone
+      %R	Zonepath of zone
+      1st arg   snapshot name
+      2nd arg   snapshot path
+-->
+<!ELEMENT validatesnap	(#PCDATA) >
+<!ATTLIST validatesnap>
 
 <!--
   privilege
@@ -348,6 +507,8 @@
 <!ELEMENT brand		(modname?, initname, login_cmd, user_cmd, install,
 			installopts?, boot?, halt?, verify_cfg?, verify_adm?,
 			postattach?, postclone?, postinstall?, predetach?,
-			preuninstall?, privilege+)>
+			attach?, detach?, clone?,
+			presnap?, postsnap?, validatesnap?,
+			preuninstall?, uninstall?, privilege+)>
 
 <!ATTLIST brand		name		CDATA #REQUIRED>

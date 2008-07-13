@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,31 +50,45 @@ extern int brand_is_native(brand_handle_t);
 
 extern boolean_t brand_allow_exclusive_ip(brand_handle_t);
 
+extern int brand_get_attach(brand_handle_t, const char *, const char *,
+    char *, size_t);
 extern int brand_get_boot(brand_handle_t, const char *, const char *,
-    char *, size_t, int, char **);
+    char *, size_t);
 extern int brand_get_brandname(brand_handle_t, char *, size_t);
+extern int brand_get_clone(brand_handle_t, const char *, const char *,
+    char *, size_t);
+extern int brand_get_detach(brand_handle_t, const char *, const char *,
+    char *, size_t);
 extern int brand_get_halt(brand_handle_t, const char *, const char *,
-    char *, size_t, int, char **);
+    char *, size_t);
 extern int brand_get_initname(brand_handle_t, char *, size_t);
 extern int brand_get_install(brand_handle_t, const char *, const char *,
-    char *, size_t, int, char **);
+    char *, size_t);
 extern int brand_get_installopts(brand_handle_t, char *, size_t);
 extern int brand_get_login_cmd(brand_handle_t, const char *, char *, size_t);
 extern int brand_get_modname(brand_handle_t, char *, size_t);
 extern int brand_get_postattach(brand_handle_t, const char *, const char *,
-    char *, size_t, int, char **);
+    char *, size_t);
 extern int brand_get_postclone(brand_handle_t, const char *, const char *,
-    char *, size_t, int, char **);
+    char *, size_t);
 extern int brand_get_postinstall(brand_handle_t, const char *, const char *,
-    char *, size_t, int, char **);
+    char *, size_t);
+extern int brand_get_postsnap(brand_handle_t, const char *, const char *,
+    char *, size_t);
 extern int brand_get_predetach(brand_handle_t, const char *, const char *,
-    char *, size_t, int, char **);
+    char *, size_t);
+extern int brand_get_presnap(brand_handle_t, const char *, const char *,
+    char *, size_t);
 extern int brand_get_preuninstall(brand_handle_t, const char *, const char *,
-    char *, size_t, int, char **);
+    char *, size_t);
+extern int brand_get_uninstall(brand_handle_t, const char *, const char *,
+    char *, size_t);
+extern int brand_get_validatesnap(brand_handle_t, const char *, const char *,
+    char *, size_t);
 extern int brand_get_user_cmd(brand_handle_t, const char *, char *, size_t);
 extern int brand_get_verify_cfg(brand_handle_t, char *, size_t);
 extern int brand_get_verify_adm(brand_handle_t, const char *, const char *,
-    char *, size_t, int, char **);
+    char *, size_t);
 
 extern int brand_config_iter_privilege(brand_handle_t,
     int (*func)(void *, priv_iter_t *), void *);

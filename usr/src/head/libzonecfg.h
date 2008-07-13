@@ -426,14 +426,15 @@ extern	int	zonecfg_get_attach_handle(const char *, const char *,
 extern	int	zonecfg_attach_manifest(int, zone_dochandle_t,
     zone_dochandle_t);
 extern	int	zonecfg_detach_save(zone_dochandle_t, uint_t);
-extern	int	zonecfg_get_detach_info(zone_dochandle_t, boolean_t);
 extern	boolean_t zonecfg_detached(const char *);
 extern	void	zonecfg_rm_detached(zone_dochandle_t, boolean_t forced);
-extern	int	zonecfg_devwalk(zone_dochandle_t handle,
-    int (*cb)(const char *, uid_t, gid_t, mode_t, const char *, void *),
-    void *data);
+extern	int	zonecfg_dev_manifest(zone_dochandle_t);
 extern	int	zonecfg_devperms_apply(zone_dochandle_t, const char *,
     uid_t, gid_t, mode_t, const char *);
+extern	void	zonecfg_set_swinv(zone_dochandle_t);
+extern	int	zonecfg_add_pkg(zone_dochandle_t, char *, char *);
+extern	int	zonecfg_add_patch(zone_dochandle_t, char *, void **);
+extern	int	zonecfg_add_patch_obs(char *, void *);
 
 /*
  * External zone verification support.
@@ -541,6 +542,16 @@ extern int zonecfg_add_scratch(FILE *, const char *, const char *,
     const char *);
 extern int zonecfg_delete_scratch(FILE *, const char *);
 extern boolean_t zonecfg_is_scratch(const char *);
+
+/*
+ * zoneadmd support functions.  Shared between zoneadm and brand hook code.
+ */
+extern void zonecfg_init_lock_file(const char *, char **);
+extern void zonecfg_release_lock_file(const char *, int);
+extern int zonecfg_grab_lock_file(const char *, int *);
+extern int zonecfg_ping_zoneadmd(const char *);
+extern int zonecfg_call_zoneadmd(const char *, zone_cmd_arg_t *, char *,
+    boolean_t);
 
 #ifdef __cplusplus
 }

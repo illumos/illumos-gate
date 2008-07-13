@@ -69,6 +69,9 @@ extern char *target_zone;
 
 extern int clone_copy(char *source_zonepath, char *zonepath);
 extern char *cmd_to_str(int cmd_num);
+extern int do_subproc_interactive(char *cmdbuf);
+extern int subproc_status(const char *cmd, int status,
+    boolean_t verbose_failure);
 extern void zerror(const char *fmt, ...);
 extern void zperror(const char *str, boolean_t zonecfg_error);
 extern void zperror2(const char *zone, const char *str);
@@ -76,8 +79,10 @@ extern void zperror2(const char *zone, const char *str);
 /*
  * zfs.c
  */
-extern int clone_snapshot_zfs(char *snap_name, char *zonepath);
-extern int clone_zfs(char *source_zone, char *source_zonepath, char *zonepath);
+extern int clone_snapshot_zfs(char *snap_name, char *zonepath,
+    char *validatesnap);
+extern int clone_zfs(char *source_zonepath, char *zonepath, char *presnapbuf,
+    char *postsnapbuf);
 extern void create_zfs_zonepath(char *zonepath);
 extern int destroy_zfs(char *zonepath);
 extern boolean_t is_zonepath_zfs(char *zonepath);
@@ -85,13 +90,5 @@ extern int move_zfs(char *zonepath, char *new_zonepath);
 extern int verify_datasets(zone_dochandle_t handle);
 extern int verify_fs_zfs(struct zone_fstab *fstab);
 extern int init_zfs(void);
-
-/*
- * sw_cmp.c
- */
-extern int sw_cmp(zone_dochandle_t l_handle, zone_dochandle_t s_handle,
-    uint_t flag);
-extern int sw_up_to_date(zone_dochandle_t l_handle, zone_dochandle_t s_handle,
-    char *zonepath);
 
 #endif	/* _ZONEADM_H */

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,8 +30,11 @@ SUNWprivate {
 	brand_allow_exclusive_ip;
 	brand_close;
 	brand_config_iter_privilege;
+	brand_get_attach;
 	brand_get_boot;
 	brand_get_brandname;
+	brand_get_clone;
+	brand_get_detach;
 	brand_get_halt;
 	brand_get_initname;
 	brand_get_install;
@@ -41,9 +44,13 @@ SUNWprivate {
 	brand_get_postattach;
 	brand_get_postclone;
 	brand_get_postinstall;
+	brand_get_postsnap;
 	brand_get_predetach;
+	brand_get_presnap;
 	brand_get_preuninstall;
+	brand_get_uninstall;
 	brand_get_user_cmd;
+	brand_get_validatesnap;
 	brand_get_verify_adm;
 	brand_get_verify_cfg;
 	brand_is_native;

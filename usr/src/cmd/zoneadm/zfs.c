@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,76 +155,43 @@ is_mountpnt(char *path)
 }
 
 /*
- * Perform any necessary housekeeping tasks we need to do before we take
- * a ZFS snapshot of the zone.  What this really entails is that we are
- * taking a sw inventory of the source zone, like we do when we detach,
- * so that there is the XML manifest in the snapshot.  We use that to
- * validate the snapshot if it is the source of a clone at some later time.
+ * Run the brand's pre-snapshot hook before we take a ZFS snapshot of the zone.
  */
 static int
-pre_snapshot(char *source_zone)
+pre_snapshot(char *presnapbuf)
 {
-	int err;
-	zone_dochandle_t handle;
+	int status;
 
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zperror(cmd_to_str(CMD_CLONE), B_TRUE);
+	/* No brand-specific handler */
+	if (presnapbuf[0] == '\0')
+		return (Z_OK);
+
+	/* Run the hook */
+	status = do_subproc_interactive(presnapbuf);
+	if ((status = subproc_status(gettext("brand-specific presnapshot"),
+	    status, B_FALSE)) != ZONE_SUBPROC_OK)
 		return (Z_ERR);
-	}
 
-	if ((err = zonecfg_get_handle(source_zone, handle)) != Z_OK) {
-		errno = err;
-		zperror(cmd_to_str(CMD_CLONE), B_TRUE);
-		zonecfg_fini_handle(handle);
-		return (Z_ERR);
-	}
-
-	if ((err = zonecfg_get_detach_info(handle, B_TRUE)) != Z_OK) {
-		errno = err;
-		zperror(gettext("getting the software version information "
-		    "failed"), B_TRUE);
-		zonecfg_fini_handle(handle);
-		return (Z_ERR);
-	}
-
-	if ((err = zonecfg_detach_save(handle, 0)) != Z_OK) {
-		errno = err;
-		zperror(gettext("saving the software version manifest failed"),
-		    B_TRUE);
-		zonecfg_fini_handle(handle);
-		return (Z_ERR);
-	}
-
-	zonecfg_fini_handle(handle);
 	return (Z_OK);
 }
 
 /*
- * Perform any necessary housekeeping tasks we need to do after we take
- * a ZFS snapshot of the zone.  What this really entails is removing the
- * sw inventory XML file from the zone.  It is still in the snapshot where
- * we want it, but we don't want it in the source zone itself.
+ * Run the brand's post-snapshot hook after we take a ZFS snapshot of the zone.
  */
 static int
-post_snapshot(char *source_zone)
+post_snapshot(char *postsnapbuf)
 {
-	int err;
-	zone_dochandle_t handle;
+	int status;
 
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zperror(cmd_to_str(CMD_CLONE), B_TRUE);
+	/* No brand-specific handler */
+	if (postsnapbuf[0] == '\0')
+		return (Z_OK);
+
+	/* Run the hook */
+	status = do_subproc_interactive(postsnapbuf);
+	if ((status = subproc_status(gettext("brand-specific postsnapshot"),
+	    status, B_FALSE)) != ZONE_SUBPROC_OK)
 		return (Z_ERR);
-	}
-
-	if ((err = zonecfg_get_handle(source_zone, handle)) != Z_OK) {
-		errno = err;
-		zperror(cmd_to_str(CMD_CLONE), B_TRUE);
-		zonecfg_fini_handle(handle);
-		return (Z_ERR);
-	}
-
-	zonecfg_rm_detached(handle, B_FALSE);
-	zonecfg_fini_handle(handle);
 
 	return (Z_OK);
 }
@@ -265,8 +232,8 @@ get_snap_max(zfs_handle_t *zhp, void *data)
  * Take a ZFS snapshot to be used for cloning the zone.
  */
 static int
-take_snapshot(char *source_zone, zfs_handle_t *zhp, char *snapshot_name,
-    int snap_size)
+take_snapshot(zfs_handle_t *zhp, char *snapshot_name, int snap_size,
+    char *presnapbuf, char *postsnapbuf)
 {
 	int			res;
 	char			template[ZFS_MAXNAMELEN];
@@ -294,10 +261,10 @@ take_snapshot(char *source_zone, zfs_handle_t *zhp, char *snapshot_name,
 	    zfs_get_name(zhp), cb.max) >= snap_size)
 		return (Z_ERR);
 
-	if (pre_snapshot(source_zone) != Z_OK)
+	if (pre_snapshot(presnapbuf) != Z_OK)
 		return (Z_ERR);
 	res = zfs_snapshot(g_zfs, snapshot_name, B_FALSE);
-	if (post_snapshot(source_zone) != Z_OK)
+	if (post_snapshot(postsnapbuf) != Z_OK)
 		return (Z_ERR);
 
 	if (res != 0)
@@ -307,66 +274,32 @@ take_snapshot(char *source_zone, zfs_handle_t *zhp, char *snapshot_name,
 
 /*
  * We are using an explicit snapshot from some earlier point in time so
- * we need to validate it.  This involves checking the sw inventory that
- * we took when we made the snapshot to verify that the current sw config
- * on the host is still valid to run a zone made from this snapshot.
+ * we need to validate it.  Run the brand specific hook.
  */
 static int
-validate_snapshot(char *snapshot_name, char *snap_path)
+validate_snapshot(char *snapshot_name, char *snap_path, char *validsnapbuf)
 {
-	int err;
-	zone_dochandle_t handle;
-	zone_dochandle_t athandle = NULL;
+	int status;
+	char cmdbuf[MAXPATHLEN];
 
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zperror(cmd_to_str(CMD_CLONE), B_TRUE);
+	/* No brand-specific handler */
+	if (validsnapbuf[0] == '\0')
+		return (Z_OK);
+
+	/* pass args - snapshot_name & snap_path */
+	if (snprintf(cmdbuf, sizeof (cmdbuf), "%s %s %s", validsnapbuf,
+	    snapshot_name, snap_path) >= sizeof (cmdbuf)) {
+		zerror("Command line too long");
 		return (Z_ERR);
 	}
 
-	if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
-		errno = err;
-		zperror(cmd_to_str(CMD_CLONE), B_TRUE);
-		zonecfg_fini_handle(handle);
+	/* Run the hook */
+	status = do_subproc_interactive(cmdbuf);
+	if ((status = subproc_status(gettext("brand-specific validatesnapshot"),
+	    status, B_FALSE)) != ZONE_SUBPROC_OK)
 		return (Z_ERR);
-	}
 
-	if ((athandle = zonecfg_init_handle()) == NULL) {
-		zperror(cmd_to_str(CMD_CLONE), B_TRUE);
-		goto done;
-	}
-
-	if ((err = zonecfg_get_attach_handle(snap_path, target_zone, B_TRUE,
-	    athandle)) != Z_OK) {
-		if (err == Z_NO_ZONE)
-			(void) fprintf(stderr, gettext("snapshot %s was not "
-			    "taken\n\tby a 'zoneadm clone' command.  It can "
-			    "not be used to clone zones.\n"), snapshot_name);
-		else
-			(void) fprintf(stderr, gettext("snapshot %s is "
-			    "out-dated\n\tIt can no longer be used to clone "
-			    "zones on this system.\n"), snapshot_name);
-		goto done;
-	}
-
-	/* Get the detach information for the locally defined zone. */
-	if ((err = zonecfg_get_detach_info(handle, B_FALSE)) != Z_OK) {
-		errno = err;
-		zperror(gettext("getting the attach information failed"),
-		    B_TRUE);
-		goto done;
-	}
-
-	if ((err = sw_cmp(handle, athandle, SW_CMP_SILENT)) != Z_OK)
-		(void) fprintf(stderr, gettext("snapshot %s is out-dated\n\t"
-		    "It can no longer be used to clone zones on this "
-		    "system.\n"), snapshot_name);
-
-done:
-	zonecfg_fini_handle(handle);
-	if (athandle != NULL)
-		zonecfg_fini_handle(athandle);
-
-	return (err);
+	return (Z_OK);
 }
 
 /*
@@ -569,7 +502,7 @@ snap2path(char *snap_name, char *path, int len)
  * possible, or by copying the data from the snapshot to the zonepath.
  */
 int
-clone_snapshot_zfs(char *snap_name, char *zonepath)
+clone_snapshot_zfs(char *snap_name, char *zonepath, char *validatesnap)
 {
 	int	err = Z_OK;
 	char	clone_name[MAXPATHLEN];
@@ -581,7 +514,7 @@ clone_snapshot_zfs(char *snap_name, char *zonepath)
 		return (Z_ERR);
 	}
 
-	if (validate_snapshot(snap_name, snap_path) != Z_OK)
+	if (validate_snapshot(snap_name, snap_path, validatesnap) != Z_OK)
 		return (Z_NO_ENTRY);
 
 	/*
@@ -635,7 +568,8 @@ clone_snapshot_zfs(char *snap_name, char *zonepath)
  * Attempt to clone a source_zone to a target zonepath by using a ZFS clone.
  */
 int
-clone_zfs(char *source_zone, char *source_zonepath, char *zonepath)
+clone_zfs(char *source_zonepath, char *zonepath, char *presnapbuf,
+    char *postsnapbuf)
 {
 	zfs_handle_t	*zhp;
 	char		clone_name[MAXPATHLEN];
@@ -678,8 +612,8 @@ clone_zfs(char *source_zone, char *source_zonepath, char *zonepath)
 		return (Z_ERR);
 	}
 
-	if (take_snapshot(source_zone, zhp, snap_name, sizeof (snap_name))
-	    != Z_OK) {
+	if (take_snapshot(zhp, snap_name, sizeof (snap_name), presnapbuf,
+	    postsnapbuf) != Z_OK) {
 		zfs_close(zhp);
 		return (Z_ERR);
 	}
