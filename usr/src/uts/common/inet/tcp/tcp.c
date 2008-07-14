@@ -19416,13 +19416,8 @@ tcp_send_find_ire(tcp_t *tcp, ipaddr_t *dst, ire_t **irep)
 		}
 
 		IRE_REFHOLD_NOTR(ire);
-		/*
-		 * Since we are inside the squeue, there cannot be another
-		 * thread in TCP trying to set the conn_ire_cache now.  The
-		 * check for IRE_MARK_CONDEMNED ensures that an interface
-		 * unplumb thread has not yet started cleaning up the conns.
-		 * Hence we don't need to grab the conn lock.
-		 */
+
+		mutex_enter(&connp->conn_lock);
 		if (CONN_CACHE_IRE(connp)) {
 			rw_enter(&ire->ire_bucket->irb_lock, RW_READER);
 			if (!(ire->ire_marks & IRE_MARK_CONDEMNED)) {
@@ -19432,6 +19427,7 @@ tcp_send_find_ire(tcp_t *tcp, ipaddr_t *dst, ire_t **irep)
 			}
 			rw_exit(&ire->ire_bucket->irb_lock);
 		}
+		mutex_exit(&connp->conn_lock);
 
 		/*
 		 * We can continue to use the ire but since it was
