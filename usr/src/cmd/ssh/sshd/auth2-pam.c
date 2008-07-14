@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +90,11 @@ do_pam_kbdint(Authctxt *authctxt)
 	char		*text = NULL;
 
 	debug2("Calling pam_authenticate()");
-	if ((retval = pam_authenticate(pamh, 0)) != PAM_SUCCESS)
+	retval = pam_authenticate(pamh,
+	    options.permit_empty_passwd ? 0 :
+	    PAM_DISALLOW_NULL_AUTHTOK);
+
+	if (retval != PAM_SUCCESS)
 		goto cleanup;
 
 	debug2("kbd-int: pam_authenticate() succeeded");
