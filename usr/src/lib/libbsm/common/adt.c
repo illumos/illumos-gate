@@ -51,12 +51,16 @@
 #include <unistd.h>
 #include <adt_xlate.h>
 #include <adt_ucred.h>
+#include <arpa/inet.h>
+#include <net/if.h>
+#include <libinetutil.h>
 
 static int adt_selected(struct adt_event_state *, au_event_t, int);
 static int adt_init(adt_internal_state_t *, int);
 static int adt_import(adt_internal_state_t *, const adt_export_data_t *);
 static m_label_t *adt_ucred_label(ucred_t *);
 static void adt_setto_unaudited(adt_internal_state_t *);
+static int adt_get_local_address(int, struct ifaddrlist *);
 
 #ifdef C2_DEBUG
 #define	DPRINTF(x) {printf x; }
@@ -89,16 +93,14 @@ static int auditstate = AUC_DISABLED;	/* default state */
 void
 adt_write_syslog(const char *message, int err)
 {
-	int	save_errno;
+	int	save_errno = errno;
 	int	mask_priority;
-
-	save_errno = errno;
-	errno = err;
 
 	DPRINTF(("syslog called: %s\n", message));
 
 	mask_priority = setlogmask(LOG_MASK(LOG_ALERT));
-	syslog(LOG_ALERT, "Solaris_audit %s: %m", message, err);
+	errno = err;
+	syslog(LOG_ALERT, "Solaris_audit %s: %m", message);
 	(void) setlogmask(mask_priority);
 	errno = save_errno;
 }
@@ -296,7 +298,7 @@ adt_cpy_tid(au_tid_addr_t *dest, const au_tid64_addr_t *src)
 {
 #ifdef _LP64
 	(void) memcpy(dest, src, sizeof (au_tid_addr_t));
-#else
+#else	/* _LP64 */
 	dest->at_type = src->at_type;
 
 	dest->at_port  = src->at_port.at_minor & MAXMIN32;
@@ -304,7 +306,7 @@ adt_cpy_tid(au_tid_addr_t *dest, const au_tid64_addr_t *src)
 	    NBITSMINOR32;
 
 	(void) memcpy(dest->at_addr, src->at_addr, 4 * sizeof (uint32_t));
-#endif
+#endif	/* _LP64 */
 }
 
 /*
@@ -656,34 +658,82 @@ adt_have_termid(au_tid_addr_t *dest)
 static int
 adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
 {
-	struct addrinfo	*ai;
-	void		*p;
+	struct addrinfo	*ai = NULL;
+	int	tries = 3;
+	char	msg[512];
+	int	eai_err;
 
-	if (getaddrinfo(hostname, NULL, NULL, &ai) != 0)
-		return (-1);
+	while ((tries-- > 0) &&
+	    ((eai_err = getaddrinfo(hostname, NULL, NULL, &ai)) != 0)) {
+		/*
+		 * getaddrinfo returns its own set of errors.
+		 * Log them here, so any subsequent syslogs will
+		 * have a context.  adt_get_hostIP callers can only
+		 * return errno, so subsequent syslogs may be lacking
+		 * that getaddrinfo failed.
+		 */
+		(void) snprintf(msg, sizeof (msg), "getaddrinfo(%s) "
+		    "failed[%s]", hostname, gai_strerror(eai_err));
+		adt_write_syslog(msg, 0);
 
-	switch (ai->ai_family) {
-		case AF_INET:
-			/* LINTED */
-			p = &((struct sockaddr_in *)ai->ai_addr)->sin_addr;
-			(void) memcpy(p_term->at_addr, p,
-			    sizeof (((struct sockaddr_in *)NULL)->sin_addr));
-			p_term->at_type = AU_IPv4;
+		if (eai_err != EAI_AGAIN) {
+
 			break;
-		case AF_INET6:
-			/* LINTED */
-			p = &((struct sockaddr_in6 *)ai->ai_addr)->sin6_addr,
-			    (void) memcpy(p_term->at_addr, p,
-			    sizeof (((struct sockaddr_in6 *)NULL)->sin6_addr));
-			p_term->at_type = AU_IPv6;
-			break;
-		default:
-			return (-1);
+		}
+		/* see if resolution becomes available */
+		(void) sleep(1);
 	}
+	if (ai != NULL) {
+		if (ai->ai_family == AF_INET) {
+			p_term->at_type = AU_IPv4;
+			(void) memcpy(p_term->at_addr,
+			    /* LINTED */
+			    &((struct sockaddr_in *)ai->ai_addr)->sin_addr,
+			    AU_IPv4);
+		} else {
+			p_term->at_type = AU_IPv6;
+			(void) memcpy(p_term->at_addr,
+			    /* LINTED */
+			    &((struct sockaddr_in6 *)ai->ai_addr)->sin6_addr,
+			    AU_IPv6);
+		}
+		freeaddrinfo(ai);
+		return (0);
+	} else {
+		struct ifaddrlist al;
+		int	family;
+		char	ntop[INET6_ADDRSTRLEN];
 
-	freeaddrinfo(ai);
+		/*
+		 * getaddrinfo has failed to map the hostname
+		 * to an IP address, try to get an IP address
+		 * from a local interface.
+		 */
+		family = AF_INET6;
+		if (adt_get_local_address(family, &al) != 0) {
+			family = AF_INET;
 
-	return (0);
+			if (adt_get_local_address(family, &al) != 0) {
+				adt_write_syslog("adt_get_local_address "
+				    "failed, no Audit IP address available",
+				    errno);
+				return (-1);
+			}
+		}
+		if (family == AF_INET) {
+			p_term->at_type = AU_IPv4;
+			(void) memcpy(p_term->at_addr, &al.addr.addr, AU_IPv4);
+		} else {
+			p_term->at_type = AU_IPv6;
+			(void) memcpy(p_term->at_addr, &al.addr.addr6, AU_IPv6);
+		}
+
+		(void) snprintf(msg, sizeof (msg), "mapping %s to %s",
+		    hostname, inet_ntop(family, &(al.addr), ntop,
+		    sizeof (ntop)));
+		adt_write_syslog(msg, 0);
+		return (0);
+	}
 }
 
 /*
@@ -702,7 +752,7 @@ adt_get_hostIP(const char *hostname, au_tid_addr_t *p_term)
 int
 adt_load_hostname(const char *hostname, adt_termid_t **termid)
 {
-	char		localhost[ADT_STRING_MAX + 1];
+	char		localhost[MAXHOSTNAMELEN + 1];
 	au_tid_addr_t	*p_term;
 
 	*termid = NULL;
@@ -720,7 +770,7 @@ adt_load_hostname(const char *hostname, adt_termid_t **termid)
 	p_term->at_port = 0;
 
 	if (hostname == NULL || *hostname == '\0') {
-		(void) sysinfo(SI_HOSTNAME, localhost, ADT_STRING_MAX);
+		(void) sysinfo(SI_HOSTNAME, localhost, MAXHOSTNAMELEN);
 		hostname = localhost;
 	}
 	if (adt_get_hostIP(hostname, p_term))
@@ -756,7 +806,7 @@ return_err:
 int
 adt_load_ttyname(const char *ttyname, adt_termid_t **termid)
 {
-	char		localhost[ADT_STRING_MAX + 1];
+	char		localhost[MAXHOSTNAMELEN + 1];
 	au_tid_addr_t	*p_term;
 	struct stat	stat_buf;
 
@@ -775,7 +825,7 @@ adt_load_ttyname(const char *ttyname, adt_termid_t **termid)
 
 	p_term->at_port = 0;
 
-	if (sysinfo(SI_HOSTNAME, localhost, ADT_STRING_MAX) < 0)
+	if (sysinfo(SI_HOSTNAME, localhost, MAXHOSTNAMELEN) < 0)
 		goto return_err_free; /* errno from sysinfo */
 
 	if (ttyname != NULL) {
@@ -2052,4 +2102,55 @@ adt_selected(struct adt_event_state *event, au_event_t actual_id, int status)
 		return (adt_is_selected(actual_id, &(sp->as_info.ai_mask),
 		    status));
 	}
+}
+
+/*
+ * Can't map the host name to an IP address in
+ * adt_get_hostIP.  Get something off an interface
+ * to act as the hosts IP address for auditing.
+ */
+
+int
+adt_get_local_address(int family, struct ifaddrlist *al)
+{
+	struct ifaddrlist	*ifal;
+	char	errbuf[ERRBUFSIZE] = "empty list";
+	char	msg[ERRBUFSIZE + 512];
+	int	ifal_count;
+	int	i;
+
+	if ((ifal_count = ifaddrlist(&ifal, family, errbuf)) <= 0) {
+		int serrno = errno;
+
+		(void) snprintf(msg, sizeof (msg), "adt_get_local_address "
+		    "couldn't get %d addrlist %s", family, errbuf);
+		adt_write_syslog(msg, serrno);
+		errno = serrno;
+		return (-1);
+	}
+
+	for (i = 0; i < ifal_count; i++) {
+		/*
+		 * loopback always defined,
+		 * even if there is no real address
+		 */
+		if ((ifal[i].flags & (IFF_UP | IFF_LOOPBACK)) == IFF_UP) {
+			break;
+		}
+	}
+	if (i >= ifal_count) {
+		free(ifal);
+		/*
+		 * Callers of adt_get_hostIP() can only return
+		 * errno to their callers and eventually the application.
+		 * Picked one that seemed least worse for saying no
+		 * usable address for Audit terminal ID.
+		 */
+		errno = ENETDOWN;
+		return (-1);
+	}
+
+	*al = ifal[i];
+	free(ifal);
+	return (0);
 }

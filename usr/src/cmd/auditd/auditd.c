@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +50,7 @@
 #define	MEM_TEST	0	/* set to one to generate core dump on exit */
 
 #include <assert.h>
+#include <bsm/adt.h>
 #include <bsm/audit.h>
 #include <bsm/audit_record.h>
 #include <bsm/libbsm.h>
@@ -64,6 +64,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 #include <errno.h>
 #include <sys/file.h>
 #include <sys/param.h>
@@ -683,8 +684,8 @@ loadauditlist()
 				if (*endptr == '\0')
 					p->plg_qmax = tmp;
 			}
-			DPRINT((dbfp, "%s queue max = %d\n",
-				p->plg_path, p->plg_qmax));
+			DPRINT((dbfp, "%s queue max = %d\n", p->plg_path,
+			    p->plg_qmax));
 
 			have_plugin++;
 		}
@@ -786,57 +787,44 @@ signal_thread()
 
 /*
  * do_sethost - do auditon(2) to set the audit host-id.
- *		Returns 0 if success, error code or -1 otherwise.
+ *		Returns 0 if success or -1 otherwise.
  */
 static int
 do_sethost(void)
 {
-	int		err;
-	char		host_name[MAXHOSTNAMELEN + 1];
+	au_tid_addr_t	*termid;
 	auditinfo_addr_t	audit_info;
-	struct addrinfo	hints;
-	struct addrinfo	*ai;
-	int		addr_type;
-	void		*p;
+	char	msg[512];
 
-	/* First, get our machine name and convert to IP address */
-	if ((err = gethostname(host_name, sizeof (host_name)))) {
-		return (err);
+	if (adt_load_hostname(NULL, (adt_termid_t **)&termid) < 0) {
+		(void) snprintf(msg, sizeof (msg), "unable to get local "
+		    "IP address: %s", strerror(errno));
+		goto fail;
 	}
-	(void) memset(&hints, 0, sizeof (hints));
-	hints.ai_family = PF_INET;
-	err = getaddrinfo(host_name, NULL, &hints, &ai);
-	if (err == 0) {
-		addr_type = AU_IPv4;
-		/* LINTED */
-		p = &((struct sockaddr_in *)ai->ai_addr)->sin_addr;
-	} else {
-		hints.ai_family = PF_INET6;
-		err = getaddrinfo(host_name, NULL, &hints, &ai);
-		if (err != 0) {
-			return (-1);
-		}
-		addr_type = AU_IPv6;
-		/* LINTED */
-		p = &((struct sockaddr_in6 *)ai->ai_addr)->sin6_addr;
-	}
-
 	/* Get current kernel audit info, and fill in the IP address */
-	if ((err = auditon(A_GETKAUDIT, (caddr_t)&audit_info,
-	    sizeof (audit_info))) < 0) {
-		return (err);
+	if (auditon(A_GETKAUDIT, (caddr_t)&audit_info,
+	    sizeof (audit_info)) < 0) {
+		(void) snprintf(msg, sizeof (msg), "unable to get kernel "
+		    "audit info: %s", strerror(errno));
+		goto fail;
 	}
-	audit_info.ai_termid.at_type = addr_type;
-	(void) memcpy(&audit_info.ai_termid.at_addr[0], p,
-	    addr_type);
 
-	freeaddrinfo(ai);
+	audit_info.ai_termid = *termid;
 
 	/* Update the kernel audit info with new IP address */
-	if ((err = auditon(A_SETKAUDIT, (caddr_t)&audit_info,
-	    sizeof (audit_info))) < 0) {
-		return (err);
+	if (auditon(A_SETKAUDIT, (caddr_t)&audit_info,
+	    sizeof (audit_info)) < 0) {
+		(void) snprintf(msg, sizeof (msg), "unable to set kernel "
+		    "audit info: %s", strerror(errno));
+		goto fail;
 	}
 
+	free(termid);
 	return (0);
+
+fail:
+	free(termid);
+	__audit_syslog("auditd", LOG_PID | LOG_CONS | LOG_NOWAIT, LOG_DAEMON,
+	    LOG_ALERT, msg);
+	return (-1);
 }
