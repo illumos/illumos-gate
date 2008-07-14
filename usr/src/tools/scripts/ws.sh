@@ -112,7 +112,7 @@ WHICH_SCM=$(dirname $(whence $0))/which_scm
 # current directory we're in
 #
 if [ $# -lt 1 ]; then
-	if $WHICH_SCM | read SCM_MODE tmpwsname && \
+	if env CODEMGR_WS="" $WHICH_SCM | read SCM_MODE tmpwsname && \
 	    [[ $SCM_MODE != unknown ]]; then
 		echo "Defaulting to $SCM_MODE repository $tmpwsname"
 	else
@@ -190,7 +190,7 @@ fi
 # This catches the case of a passed in workspace path
 # Check which type of SCM is in use by $wsname.
 #
-(cd $wsname && $WHICH_SCM) | read SCM_MODE tmpwsname
+(cd $wsname && env CODEMGR_WS="" $WHICH_SCM) | read SCM_MODE tmpwsname
 if [[ $? != 0 || "$SCM_MODE" == unknown ]]; then
 	echo "Error: Unable to detect a supported SCM repository in $wsname"
 	if $setenv; then
@@ -223,6 +223,8 @@ else
 		exit 1
 	fi
 fi
+
+MACH=`uname -p`
 
 if [ ! -f $protofile ]; then
 	if [ ! -w $CODEMGR_WS/$CM_DATA ]; then
@@ -286,7 +288,7 @@ PROTOFILE_EoF
 		cat << PROTOFILE_EoF >> $protofile
 parent=\`(cd \$CODEMGR_WS && hg path default 2>/dev/null)\`
 if [[ \$? -eq 0 && -n \$parent ]]; then
-   PROTO2=\$(check_proto \$parent/proto)
+   [[ -n \$(check_proto \$parent/proto) ]] && PROTO2=\$parent/proto
 fi
 PROTOFILE_EoF
 	fi
@@ -301,7 +303,6 @@ MAKEFLAGS=e; export MAKEFLAGS
 #
 #	Set up the environment variables
 #
-MACH=`uname -p`
 ROOT=/proto/root_${MACH}	# default
 
 ENVCPPFLAGS1=
@@ -329,7 +330,6 @@ if [[ -n "$PROTO1" ]]; then	# first proto area specifed
 
 		PROTO3=`check_proto $PROTO3`
 		if [[ -n "$PROTO3" ]]; then	# third proto area specifed
-			PROTO3=`check_proto $PROTO3`
 			ENVCPPFLAGS3=-I$PROTO3/usr/include
 			export ENVCPPFLAGS3
 			ENVLDLIBS3="-L$PROTO3/lib -L$PROTO3/usr/lib"
