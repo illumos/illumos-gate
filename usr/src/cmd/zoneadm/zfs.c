@@ -44,6 +44,7 @@
 #include <libzonecfg.h>
 #include <sys/mnttab.h>
 #include <libzfs.h>
+#include <sys/mntent.h>
 
 #include "zoneadm.h"
 
@@ -104,13 +105,53 @@ match_mountpoint(zfs_handle_t *zhp, void *data)
 		return (0);
 	}
 
-	cbp = (zfs_mount_data_t *)data;
+	/* First check if the dataset is mounted. */
+	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTED, mp, sizeof (mp), NULL, NULL,
+	    0, B_FALSE) != 0 || strcmp(mp, "no") == 0) {
+		zfs_close(zhp);
+		return (0);
+	}
+
+	/* Now check mount point. */
 	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mp, sizeof (mp), NULL, NULL,
-	    0, B_FALSE) == 0 && strcmp(mp, cbp->match_name) == 0) {
+	    0, B_FALSE) != 0) {
+		zfs_close(zhp);
+		return (0);
+	}
+
+	cbp = (zfs_mount_data_t *)data;
+
+	if (strcmp(mp, "legacy") == 0) {
+		/* If legacy, must look in mnttab for mountpoint. */
+		FILE		*fp;
+		struct mnttab	entry;
+		const char	*nm;
+
+		nm = zfs_get_name(zhp);
+		if ((fp = fopen(MNTTAB, "r")) == NULL) {
+			zfs_close(zhp);
+			return (0);
+		}
+
+		while (getmntent(fp, &entry) == 0) {
+			if (strcmp(nm, entry.mnt_special) == 0) {
+				if (strcmp(entry.mnt_mountp, cbp->match_name)
+				    == 0) {
+					(void) fclose(fp);
+					cbp->match_handle = zhp;
+					return (1);
+				}
+				break;
+			}
+		}
+		(void) fclose(fp);
+
+	} else if (strcmp(mp, cbp->match_name) == 0) {
 		cbp->match_handle = zhp;
 		return (1);
 	}
 
+	/* Iterate over any nested datasets. */
 	res = zfs_iter_filesystems(zhp, match_mountpoint, data);
 	zfs_close(zhp);
 	return (res);
@@ -140,7 +181,7 @@ is_mountpnt(char *path)
 	FILE		*fp;
 	struct mnttab	entry;
 
-	if ((fp = fopen("/etc/mnttab", "r")) == NULL)
+	if ((fp = fopen(MNTTAB, "r")) == NULL)
 		return (B_FALSE);
 
 	while (getmntent(fp, &entry) == 0) {
@@ -421,25 +462,52 @@ static int
 path2name(char *zonepath, char *zfs_name, int len)
 {
 	int		res;
-	char		*p;
+	char		*bnm, *dnm, *dname, *bname;
 	zfs_handle_t	*zhp;
-
-	if ((p = strrchr(zonepath, '/')) == NULL)
-		return (Z_ERR);
+	struct stat	stbuf;
 
 	/*
-	 * If the parent directory is not its own ZFS fs, then we can't
-	 * automatically create a new ZFS fs at the 'zonepath' mountpoint
-	 * so return an error.
+	 * We need two tmp strings to handle paths directly in / (e.g. /foo)
+	 * since dirname will overwrite the first char after "/" in this case.
 	 */
-	*p = '\0';
-	zhp = mount2zhandle(zonepath);
-	*p = '/';
-	if (zhp == NULL)
+	if ((bnm = strdup(zonepath)) == NULL)
 		return (Z_ERR);
 
-	res = snprintf(zfs_name, len, "%s/%s", zfs_get_name(zhp), p + 1);
+	if ((dnm = strdup(zonepath)) == NULL) {
+		free(bnm);
+		return (Z_ERR);
+	}
 
+	bname = basename(bnm);
+	dname = dirname(dnm);
+
+	/*
+	 * This is a quick test to save iterating over all of the zfs datasets
+	 * on the system (which can be a lot).  If the parent dir is not in a
+	 * ZFS fs, then we're done.
+	 */
+	if (stat(dname, &stbuf) != 0 || !S_ISDIR(stbuf.st_mode) ||
+	    strcmp(stbuf.st_fstype, MNTTYPE_ZFS) != 0) {
+		free(bnm);
+		free(dnm);
+		return (Z_ERR);
+	}
+
+	/* See if the parent directory is its own ZFS dataset. */
+	if ((zhp = mount2zhandle(dname)) == NULL) {
+		/*
+		 * The parent is not a ZFS dataset so we can't automatically
+		 * create a dataset on the given path.
+		 */
+		free(bnm);
+		free(dnm);
+		return (Z_ERR);
+	}
+
+	res = snprintf(zfs_name, len, "%s/%s", zfs_get_name(zhp), bname);
+
+	free(bnm);
+	free(dnm);
 	zfs_close(zhp);
 	if (res >= len)
 		return (Z_ERR);
