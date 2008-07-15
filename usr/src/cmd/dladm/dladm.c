@@ -227,7 +227,7 @@ typedef struct show_grp_state {
 	print_state_t	gs_print;
 } show_grp_state_t;
 
-typedef void cmdfunc_t(int, char **);
+typedef void cmdfunc_t(int, char **, const char *);
 
 static cmdfunc_t do_show_link, do_show_dev, do_show_wifi, do_show_phys;
 static cmdfunc_t do_create_aggr, do_delete_aggr, do_add_aggr, do_remove_aggr;
@@ -271,7 +271,7 @@ static boolean_t	link_is_ether(const char *, datalink_id_t *);
 static boolean_t str2int(const char *, int *);
 static void	die(const char *, ...);
 static void	die_optdup(int);
-static void	die_opterr(int, int);
+static void	die_opterr(int, int, const char *);
 static void	die_dlerr(dladm_status_t, const char *, ...);
 static void	warn(const char *, ...);
 static void	warn_dlerr(dladm_status_t, const char *, ...);
@@ -279,40 +279,74 @@ static void	warn_dlerr(dladm_status_t, const char *, ...);
 typedef struct	cmd {
 	char		*c_name;
 	cmdfunc_t	*c_fn;
+	const char	*c_usage;
 } cmd_t;
 
 static cmd_t	cmds[] = {
-	{ "show-link",		do_show_link		},
-	{ "show-dev",		do_show_dev		},
-	{ "create-aggr",	do_create_aggr		},
-	{ "delete-aggr",	do_delete_aggr		},
-	{ "add-aggr",		do_add_aggr		},
-	{ "remove-aggr",	do_remove_aggr		},
-	{ "modify-aggr",	do_modify_aggr		},
-	{ "show-aggr",		do_show_aggr		},
-	{ "up-aggr",		do_up_aggr		},
-	{ "scan-wifi",		do_scan_wifi		},
-	{ "connect-wifi",	do_connect_wifi		},
-	{ "disconnect-wifi",	do_disconnect_wifi	},
-	{ "show-wifi",		do_show_wifi		},
-	{ "show-linkprop",	do_show_linkprop	},
-	{ "set-linkprop",	do_set_linkprop		},
-	{ "reset-linkprop",	do_reset_linkprop	},
-	{ "show-ether",		do_show_ether		},
-	{ "create-secobj",	do_create_secobj	},
-	{ "delete-secobj",	do_delete_secobj	},
-	{ "show-secobj",	do_show_secobj		},
-	{ "init-linkprop",	do_init_linkprop	},
-	{ "init-secobj",	do_init_secobj		},
-	{ "create-vlan", 	do_create_vlan 		},
-	{ "delete-vlan", 	do_delete_vlan 		},
-	{ "show-vlan",		do_show_vlan		},
-	{ "up-vlan",		do_up_vlan		},
-	{ "rename-link",	do_rename_link 		},
-	{ "delete-phys",	do_delete_phys 		},
-	{ "show-phys",		do_show_phys		},
-	{ "init-phys",		do_init_phys		},
-	{ "show-linkmap",	do_show_linkmap		}
+	{ "show-link",		do_show_link,
+	    "\tshow-link\t[-pP] [-o <field>,..] [-s [-i <interval>]] [<link>]"},
+	{ "rename-link",	do_rename_link,
+	    "\trename-link\t[-R <root-dir>] <oldlink> <newlink>\n"	},
+	{ "show-dev",		do_show_dev,
+	    "\tshow-dev\t[-p] [-o <field>,..] [-s [-i <interval>]] [<dev>]\n" },
+	{ "create-aggr",	do_create_aggr,
+	    "\tcreate-aggr\t[-t] [-R <root-dir>] [-P <policy>] [-L <mode>]\n"
+	    "\t\t\t[-T <time>] [-u <address>] [-l <link>] ... <link>"	},
+	{ "delete-aggr",	do_delete_aggr,
+	    "\tdelete-aggr\t[-t] [-R <root-dir>] <link>"		},
+	{ "add-aggr",		do_add_aggr,
+	    "\tadd-aggr\t[-t] [-R <root-dir>] [-l <link>] ... <link>"	},
+	{ "remove-aggr",	do_remove_aggr,
+	    "\tremove-aggr\t[-t] [-R <root-dir>] [-l <link>] ... <link>"},
+	{ "modify-aggr",	do_modify_aggr,
+	    "\tmodify-aggr\t[-t] [-R <root-dir>] [-P <policy>] [-L <mode>]\n"
+	    "\t\t\t[-T <time>] [-u <address>] <link>"			},
+	{ "show-aggr",		do_show_aggr,
+	    "\tshow-aggr\t[-pPLx] [-o <field>,..] [-s [-i <interval>]] "
+	    "[<link>]\n"						},
+	{ "up-aggr",		do_up_aggr,		NULL		},
+	{ "scan-wifi",		do_scan_wifi,
+	    "\tscan-wifi\t[-p] [-o <field>,...] [<link>]"		},
+	{ "connect-wifi",	do_connect_wifi,
+	    "\tconnect-wifi\t[-e <essid>] [-i <bssid>] [-k <key>,...] "
+	    "[-s wep|wpa]\n"
+	    "\t\t\t[-a open|shared] [-b bss|ibss] [-c] [-m a|b|g]\n"
+	    "\t\t\t[-T <time>] [<link>]"				},
+	{ "disconnect-wifi",	do_disconnect_wifi,
+	    "\tdisconnect-wifi\t[-a] [<link>]"				},
+	{ "show-wifi",		do_show_wifi,
+	    "\tshow-wifi\t[-p] [-o <field>,...] [<link>]\n"		},
+	{ "show-linkprop",	do_show_linkprop,
+	    "\tshow-linkprop\t[-cP] [-o <field>,...] [-p <prop>,...] <name>"},
+	{ "set-linkprop",	do_set_linkprop,
+	    "\tset-linkprop\t[-t] [-R <root-dir>] -p <prop>=<value>[,...] "
+	    "<name>"							},
+	{ "reset-linkprop",	do_reset_linkprop,
+	    "\treset-linkprop\t[-t] [-R <root-dir>] [-p <prop>,...] <name>\n" },
+	{ "show-ether",		do_show_ether,
+	    "\tshow-ether\t[-px][-o <field>,...] <link>\n"		},
+	{ "create-secobj",	do_create_secobj,
+	    "\tcreate-secobj\t[-t] [-R <root-dir>] [-f <file>] -c <class> "
+	    "<secobj>"							},
+	{ "delete-secobj",	do_delete_secobj,
+	    "\tdelete-secobj\t[-t] [-R <root-dir>] <secobj>[,...]"	},
+	{ "show-secobj",	do_show_secobj,
+	    "\tshow-secobj\t[-pP] [-o <field>,...] [<secobj>,...]\n"	},
+	{ "init-linkprop",	do_init_linkprop,	NULL		},
+	{ "init-secobj",	do_init_secobj,		NULL		},
+	{ "create-vlan", 	do_create_vlan,
+	    "\tcreate-vlan\t[-ft] [-R <root-dir>] -l <link> -v <vid> [link]" },
+	{ "delete-vlan", 	do_delete_vlan,
+	    "\tdelete-vlan\t[-t] [-R <root-dir>] <link>"		},
+	{ "show-vlan",		do_show_vlan,
+	    "\tshow-vlan\t[-pP] [-o <field>,..] [<link>]\n"		},
+	{ "up-vlan",		do_up_vlan,		NULL		},
+	{ "delete-phys",	do_delete_phys,
+	    "\tdelete-phys\t<link>"					},
+	{ "show-phys",		do_show_phys,
+	    "\tshow-phys\t[-pP] [-o <field>,..] [<link>]"		},
+	{ "init-phys",		do_init_phys,		NULL		},
+	{ "show-linkmap",	do_show_linkmap,	NULL		}
 };
 
 static const struct option lopts[] = {
@@ -788,50 +822,15 @@ static sig_atomic_t signalled;
 static void
 usage(void)
 {
-	(void) fprintf(stderr, gettext("usage:	dladm <subcommand> <args> ...\n"
-	    "\tshow-link       [-pP] [-o <field>,..] [-s [-i <interval>]] "
-	    "[<link>]\n"
-	    "\trename-link     [-R <root-dir>] <oldlink> <newlink>\n"
-	    "\n"
-	    "\tdelete-phys     <link>\n"
-	    "\tshow-phys       [-pP] [-o <field>,..] [<link>]\n"
-	    "\tshow-dev        [-p] [-o <field>,..] [-s [-i <interval>]] "
-	    "[<dev>]\n"
-	    "\n"
-	    "\tcreate-aggr     [-t] [-R <root-dir>] [-P <policy>] [-L <mode>]\n"
-	    "\t		[-T <time>] [-u <address>] [-l <link>] ... <link>\n"
-	    "\tmodify-aggr     [-t] [-R <root-dir>] [-P <policy>] [-L <mode>]\n"
-	    "\t		[-T <time>] [-u <address>] <link>\n"
-	    "\tdelete-aggr     [-t] [-R <root-dir>] <link>\n"
-	    "\tadd-aggr        [-t] [-R <root-dir>] [-l <link>] ... <link>\n"
-	    "\tremove-aggr     [-t] [-R <root-dir>] [-l <link>] ... <link>"
-	    "\n\tshow-aggr       [-pPLx] [-o <field>,..] [-s [-i <interval>]] "
-	    "[<link>]\n"
-	    "\n"
-	    "\tcreate-vlan     [-ft] [-R <root-dir>] -l <link> -v <vid> [link]"
-	    "\n\tdelete-vlan     [-t]  [-R <root-dir>] <link>\n"
-	    "\tshow-vlan       [-pP] [-o <field>,..] [<link>]\n"
-	    "\n"
-	    "\tscan-wifi       [-p] [-o <field>,...] [<link>]\n"
-	    "\tconnect-wifi    [-e <essid>] [-i <bssid>] [-k <key>,...]"
-	    " [-s wep|wpa]\n"
-	    "\t                [-a open|shared] [-b bss|ibss] [-c] [-m a|b|g]\n"
-	    "\t                [-T <time>] [<link>]\n"
-	    "\tdisconnect-wifi [-a] [<link>]\n"
-	    "\tshow-wifi       [-p] [-o <field>,...] [<link>]\n"
-	    "\n"
-	    "\tset-linkprop    [-t] [-R <root-dir>]  -p <prop>=<value>[,...]"
-	    " <name>\n"
-	    "\treset-linkprop  [-t] [-R <root-dir>] [-p <prop>,...] <name>\n"
-	    "\tshow-linkprop   [-cP][-o <field>,...][-p <prop>,...] <name>\n"
-	    "\n"
-	    "\tcreate-secobj   [-t] [-R <root-dir>] [-f <file>] -c <class>"
-	    " <secobj>\n"
-	    "\tdelete-secobj   [-t] [-R <root-dir>] <secobj>[,...]\n"
-	    "\tshow-secobj     [-pP][-o <field>,...][<secobj>,...]\n"
-	    "\n"
-	    "\tshow-ether      [-px][-o <field>,...] <link>\n"));
-
+	int	i;
+	cmd_t	*cmdp;
+	(void) fprintf(stderr, gettext("usage:  dladm <subcommand> <args> ..."
+	    "\n"));
+	for (i = 0; i < sizeof (cmds) / sizeof (cmds[0]); i++) {
+		cmdp = &cmds[i];
+		if (cmdp->c_usage != NULL)
+			(void) fprintf(stderr, "%s\n", gettext(cmdp->c_usage));
+	}
 	exit(1);
 }
 
@@ -859,7 +858,7 @@ main(int argc, char *argv[])
 	for (i = 0; i < sizeof (cmds) / sizeof (cmds[0]); i++) {
 		cmdp = &cmds[i];
 		if (strcmp(argv[1], cmdp->c_name) == 0) {
-			cmdp->c_fn(argc - 1, &argv[1]);
+			cmdp->c_fn(argc - 1, &argv[1], cmdp->c_usage);
 			exit(0);
 		}
 	}
@@ -872,7 +871,7 @@ main(int argc, char *argv[])
 }
 
 static void
-do_create_aggr(int argc, char *argv[])
+do_create_aggr(int argc, char *argv[], const char *use)
 {
 	char			option;
 	int			key = 0;
@@ -960,7 +959,7 @@ do_create_aggr(int argc, char *argv[])
 			altroot = optarg;
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -1046,7 +1045,7 @@ i_dladm_aggr_get_linkid(const char *altroot, const char *arg,
 }
 
 static void
-do_delete_aggr(int argc, char *argv[])
+do_delete_aggr(int argc, char *argv[], const char *use)
 {
 	char			option;
 	char			*altroot = NULL;
@@ -1064,7 +1063,7 @@ do_delete_aggr(int argc, char *argv[])
 			altroot = optarg;
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -1087,7 +1086,7 @@ done:
 }
 
 static void
-do_add_aggr(int argc, char *argv[])
+do_add_aggr(int argc, char *argv[], const char *use)
 {
 	char			option;
 	uint_t			n, ndev, nlink;
@@ -1125,7 +1124,7 @@ do_add_aggr(int argc, char *argv[])
 			altroot = optarg;
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -1183,7 +1182,7 @@ done:
 }
 
 static void
-do_remove_aggr(int argc, char *argv[])
+do_remove_aggr(int argc, char *argv[], const char *use)
 {
 	char				option;
 	dladm_aggr_port_attr_db_t	port[MAXPORT];
@@ -1219,7 +1218,7 @@ do_remove_aggr(int argc, char *argv[])
 			altroot = optarg;
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -1259,7 +1258,7 @@ done:
 }
 
 static void
-do_modify_aggr(int argc, char *argv[])
+do_modify_aggr(int argc, char *argv[], const char *use)
 {
 	char			option;
 	uint32_t		policy = AGGR_POLICY_L4;
@@ -1322,7 +1321,7 @@ do_modify_aggr(int argc, char *argv[])
 			altroot = optarg;
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -1349,8 +1348,9 @@ done:
 		die_dlerr(status, "modify operation failed");
 }
 
+/*ARGSUSED*/
 static void
-do_up_aggr(int argc, char *argv[])
+do_up_aggr(int argc, char *argv[], const char *use)
 {
 	datalink_id_t	linkid = DATALINK_ALL_LINKID;
 	dladm_status_t	status;
@@ -1380,7 +1380,7 @@ done:
 }
 
 static void
-do_create_vlan(int argc, char *argv[])
+do_create_vlan(int argc, char *argv[], const char *use)
 {
 	char		*link = NULL;
 	char		drv[DLPI_LINKNAME_MAX];
@@ -1421,7 +1421,7 @@ do_create_vlan(int argc, char *argv[])
 			altroot = optarg;
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -1464,7 +1464,7 @@ do_create_vlan(int argc, char *argv[])
 }
 
 static void
-do_delete_vlan(int argc, char *argv[])
+do_delete_vlan(int argc, char *argv[], const char *use)
 {
 	char		option;
 	uint32_t	flags = (DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST);
@@ -1482,7 +1482,7 @@ do_delete_vlan(int argc, char *argv[])
 			altroot = optarg;
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -1504,8 +1504,9 @@ done:
 		die_dlerr(status, "delete operation failed");
 }
 
+/*ARGSUSED*/
 static void
-do_up_vlan(int argc, char *argv[])
+do_up_vlan(int argc, char *argv[], const char *use)
 {
 	datalink_id_t	linkid = DATALINK_ALL_LINKID;
 	dladm_status_t	status;
@@ -1535,7 +1536,7 @@ done:
 }
 
 static void
-do_rename_link(int argc, char *argv[])
+do_rename_link(int argc, char *argv[], const char *use)
 {
 	char		option;
 	char		*link1, *link2;
@@ -1549,7 +1550,7 @@ do_rename_link(int argc, char *argv[])
 			altroot = optarg;
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -1567,8 +1568,9 @@ do_rename_link(int argc, char *argv[])
 		die_dlerr(status, "rename operation failed");
 }
 
+/*ARGSUSED*/
 static void
-do_delete_phys(int argc, char *argv[])
+do_delete_phys(int argc, char *argv[], const char *use)
 {
 	datalink_id_t	linkid = DATALINK_ALL_LINKID;
 	dladm_status_t	status;
@@ -1614,7 +1616,7 @@ i_dladm_walk_linkmap(datalink_id_t linkid, void *arg)
 
 /*ARGSUSED*/
 static void
-do_show_linkmap(int argc, char *argv[])
+do_show_linkmap(int argc, char *argv[], const char *use)
 {
 	if (argc != 1)
 		die("invalid arguments");
@@ -1649,7 +1651,7 @@ purge_phys(datalink_id_t linkid, void *arg)
 
 /*ARGSUSED*/
 static void
-do_init_phys(int argc, char *argv[])
+do_init_phys(int argc, char *argv[], const char *use)
 {
 	di_node_t devtree;
 
@@ -2496,7 +2498,7 @@ show_dev_stats(const char *dev, void *arg)
 }
 
 static void
-do_show_link(int argc, char *argv[])
+do_show_link(int argc, char *argv[], const char *use)
 {
 	int		option;
 	boolean_t	s_arg = B_FALSE;
@@ -2551,7 +2553,7 @@ do_show_link(int argc, char *argv[])
 				die("invalid interval value '%s'", optarg);
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -2621,7 +2623,7 @@ do_show_link(int argc, char *argv[])
 }
 
 static void
-do_show_aggr(int argc, char *argv[])
+do_show_aggr(int argc, char *argv[], const char *use)
 {
 	boolean_t		L_arg = B_FALSE;
 	boolean_t		s_arg = B_FALSE;
@@ -2699,7 +2701,7 @@ do_show_aggr(int argc, char *argv[])
 				die("invalid interval value '%s'", optarg);
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -2795,7 +2797,7 @@ do_show_aggr(int argc, char *argv[])
 }
 
 static void
-do_show_dev(int argc, char *argv[])
+do_show_dev(int argc, char *argv[], const char *use)
 {
 	int		option;
 	char		*dev = NULL;
@@ -2845,7 +2847,7 @@ do_show_dev(int argc, char *argv[])
 				die("invalid interval value '%s'", optarg);
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -3065,7 +3067,7 @@ done:
 }
 
 static void
-do_show_phys(int argc, char *argv[])
+do_show_phys(int argc, char *argv[], const char *use)
 {
 	int		option;
 	uint32_t	flags = DLADM_OPT_ACTIVE;
@@ -3104,7 +3106,7 @@ do_show_phys(int argc, char *argv[])
 			fields_str = optarg;
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -3154,7 +3156,7 @@ do_show_phys(int argc, char *argv[])
 }
 
 static void
-do_show_vlan(int argc, char *argv[])
+do_show_vlan(int argc, char *argv[], const char *use)
 {
 	int		option;
 	uint32_t	flags = DLADM_OPT_ACTIVE;
@@ -3191,7 +3193,7 @@ do_show_vlan(int argc, char *argv[])
 			fields_str = optarg;
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -3838,7 +3840,7 @@ show_wifi(datalink_id_t linkid, void *arg)
 }
 
 static void
-do_display_wifi(int argc, char **argv, int cmd)
+do_display_wifi(int argc, char **argv, int cmd, const char *use)
 {
 	int			option;
 	char			*fields_str = NULL;
@@ -3871,8 +3873,7 @@ do_display_wifi(int argc, char **argv, int cmd)
 				fields_str = "all";
 			break;
 		default:
-			die_opterr(optopt, option);
-			break;
+			die_opterr(optopt, option, use);
 		}
 	}
 
@@ -3902,15 +3903,15 @@ do_display_wifi(int argc, char **argv, int cmd)
 }
 
 static void
-do_scan_wifi(int argc, char **argv)
+do_scan_wifi(int argc, char **argv, const char *use)
 {
-	do_display_wifi(argc, argv, WIFI_CMD_SCAN);
+	do_display_wifi(argc, argv, WIFI_CMD_SCAN, use);
 }
 
 static void
-do_show_wifi(int argc, char **argv)
+do_show_wifi(int argc, char **argv, const char *use)
 {
-	do_display_wifi(argc, argv, WIFI_CMD_SHOW);
+	do_display_wifi(argc, argv, WIFI_CMD_SHOW, use);
 }
 
 typedef struct wlan_count_attr {
@@ -3986,7 +3987,7 @@ fail:
 }
 
 static void
-do_connect_wifi(int argc, char **argv)
+do_connect_wifi(int argc, char **argv, const char *use)
 {
 	int			option;
 	dladm_wlan_attr_t	attr, *attrp;
@@ -4074,7 +4075,7 @@ do_connect_wifi(int argc, char **argv)
 			flags |= DLADM_WLAN_CONNECT_CREATEIBSS;
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -4155,7 +4156,7 @@ do_all_disconnect_wifi(datalink_id_t linkid, void *arg)
 }
 
 static void
-do_disconnect_wifi(int argc, char **argv)
+do_disconnect_wifi(int argc, char **argv, const char *use)
 {
 	int			option;
 	datalink_id_t		linkid = DATALINK_ALL_LINKID;
@@ -4171,7 +4172,7 @@ do_disconnect_wifi(int argc, char **argv)
 			all_links = B_TRUE;
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -4444,7 +4445,7 @@ show_linkprop(datalink_id_t linkid, const char *propname, void *arg)
 }
 
 static void
-do_show_linkprop(int argc, char **argv)
+do_show_linkprop(int argc, char **argv, const char *use)
 {
 	int			option;
 	prop_list_t		*proplist = NULL;
@@ -4488,7 +4489,7 @@ do_show_linkprop(int argc, char **argv)
 				fields_str = optarg;
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -4613,7 +4614,7 @@ set_linkprop_persist(datalink_id_t linkid, const char *prop_name,
 }
 
 static void
-set_linkprop(int argc, char **argv, boolean_t reset)
+set_linkprop(int argc, char **argv, boolean_t reset, const char *use)
 {
 	int		i, option;
 	char		errmsg[DLADM_STRSIZE];
@@ -4638,8 +4639,8 @@ set_linkprop(int argc, char **argv, boolean_t reset)
 			altroot = optarg;
 			break;
 		default:
-			die_opterr(optopt, option);
-			break;
+			die_opterr(optopt, option, use);
+
 		}
 	}
 
@@ -4777,15 +4778,15 @@ done:
 }
 
 static void
-do_set_linkprop(int argc, char **argv)
+do_set_linkprop(int argc, char **argv, const char *use)
 {
-	set_linkprop(argc, argv, B_FALSE);
+	set_linkprop(argc, argv, B_FALSE, use);
 }
 
 static void
-do_reset_linkprop(int argc, char **argv)
+do_reset_linkprop(int argc, char **argv, const char *use)
 {
-	set_linkprop(argc, argv, B_TRUE);
+	set_linkprop(argc, argv, B_TRUE, use);
 }
 
 static int
@@ -4994,7 +4995,7 @@ audit_secobj(char *auth, char *class, char *obj,
 #define	MAX_SECOBJS		32
 #define	MAX_SECOBJ_NAMELEN	32
 static void
-do_create_secobj(int argc, char **argv)
+do_create_secobj(int argc, char **argv, const char *use)
 {
 	int			option, rval;
 	FILE			*filep = NULL;
@@ -5041,7 +5042,7 @@ do_create_secobj(int argc, char **argv)
 			}
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -5098,7 +5099,7 @@ do_create_secobj(int argc, char **argv)
 }
 
 static void
-do_delete_secobj(int argc, char **argv)
+do_delete_secobj(int argc, char **argv, const char *use)
 {
 	int		i, option;
 	boolean_t	temp = B_FALSE;
@@ -5122,7 +5123,7 @@ do_delete_secobj(int argc, char **argv)
 			}
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -5217,7 +5218,7 @@ show_secobj(void *arg, const char *obj_name)
 }
 
 static void
-do_show_secobj(int argc, char **argv)
+do_show_secobj(int argc, char **argv, const char *use)
 {
 	int			option;
 	show_secobj_state_t	state;
@@ -5254,7 +5255,7 @@ do_show_secobj(int argc, char **argv)
 				fields_str = optarg;
 			break;
 		default:
-			die_opterr(optopt, option);
+			die_opterr(optopt, option, use);
 			break;
 		}
 	}
@@ -5298,8 +5299,9 @@ i_dladm_init_linkprop(datalink_id_t linkid, void *arg)
 	return (DLADM_WALK_CONTINUE);
 }
 
+/*ARGSUSED*/
 static void
-do_init_linkprop(int argc, char **argv)
+do_init_linkprop(int argc, char **argv, const char *use)
 {
 	int			option;
 	dladm_status_t		status;
@@ -5315,7 +5317,11 @@ do_init_linkprop(int argc, char **argv)
 			any_media = B_FALSE;
 			break;
 		default:
-			die_opterr(optopt, option);
+			/*
+			 * Because init-linkprop is not a public command,
+			 * print the usage instead.
+			 */
+			usage();
 			break;
 		}
 	}
@@ -5342,7 +5348,7 @@ do_init_linkprop(int argc, char **argv)
 
 /* ARGSUSED */
 static void
-do_show_ether(int argc, char **argv)
+do_show_ether(int argc, char **argv, const char *use)
 {
 	int 			option;
 	datalink_id_t		linkid;
@@ -5376,7 +5382,7 @@ do_show_ether(int argc, char **argv)
 					fields_str = optarg;
 				break;
 			default:
-				die_opterr(optopt, option);
+				die_opterr(optopt, option, use);
 				break;
 		}
 	}
@@ -5489,7 +5495,7 @@ show_etherprop(datalink_id_t linkid, void *arg)
 
 /* ARGSUSED */
 static void
-do_init_secobj(int argc, char **argv)
+do_init_secobj(int argc, char **argv, const char *use)
 {
 	dladm_status_t status;
 
@@ -5651,15 +5657,17 @@ die_optdup(int opt)
 }
 
 static void
-die_opterr(int opt, int opterr)
+die_opterr(int opt, int opterr, const char *usage)
 {
 	switch (opterr) {
 	case ':':
-		die("option '-%c' requires a value", opt);
+		die("option '-%c' requires a value\nusage: %s", opt,
+		    gettext(usage));
 		break;
 	case '?':
 	default:
-		die("unrecognized option '-%c'", opt);
+		die("unrecognized option '-%c'\nusage: %s", opt,
+		    gettext(usage));
 		break;
 	}
 }
