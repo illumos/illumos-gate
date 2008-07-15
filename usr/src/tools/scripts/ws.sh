@@ -106,6 +106,9 @@ else
 fi
 
 WHICH_SCM=$(dirname $(whence $0))/which_scm
+if [[ ! -x $WHICH_SCM ]]; then
+	WHICH_SCM=which_scm
+fi
 
 #
 # No workspace/repository path was given, so try and detect one from our
