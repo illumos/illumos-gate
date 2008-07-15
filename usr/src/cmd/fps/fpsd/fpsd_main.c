@@ -79,7 +79,6 @@ void terminate_process();
 
 static int  door_id = -1;
 static char *str_fps_fmri = NULL;
-static int  max_cpuids = 0;
 
 /* Local static functions */
 
@@ -409,13 +408,12 @@ fpsd_probe(mach_conf_t *m_stat)
 
 	processorid_t *cpuid_list;
 	kid_t ret;
+	int total_onln = sysconf(_SC_NPROCESSORS_ONLN);
 
 	/* probe the system and fill in mach_conf_t elements */
 
 	(void) sysinfo(SI_MACHINE, m_stat->m_machine,
 	    sizeof (m_stat->m_machine) - 1);
-
-	m_stat->m_num_fpus = (uint_t)sysconf(_SC_NPROCESSORS_CONF);
 
 	if (1 == m_stat->m_reprobe) {
 		/* Reprobe request */
@@ -423,7 +421,6 @@ fpsd_probe(mach_conf_t *m_stat)
 		fpsd.d_iteration = 0;
 		fpsd.d_interval = 0;
 		fpsd.d_fpuid_index = 0;
-		m_stat->m_num_fpus = 0;
 		m_stat->m_num_on_fpuids = 0;
 		m_stat->m_cpuids_size = 0;
 		m_stat->total_iter = 0;
@@ -441,10 +438,7 @@ fpsd_probe(mach_conf_t *m_stat)
 	 * cpu_info for each.
 	 */
 
-	m_stat->m_num_on_fpuids = (uint_t)sysconf(_SC_NPROCESSORS_ONLN);
-	fpsd_message(FPSD_NO_EXIT, FPS_DEBUG, NUM_ONLN_CPUS,
-	    m_stat->m_num_on_fpuids);
-	cpuid_list = (processorid_t *)malloc(m_stat->m_num_on_fpuids *
+	cpuid_list = (processorid_t *)malloc(m_stat->m_num_fpus *
 	    sizeof (processorid_t));
 	if (NULL == cpuid_list) {
 		fpsd_message(FPSD_NO_EXIT, FPS_INFO, LIBRARY_CALL_FAIL,
@@ -453,15 +447,18 @@ fpsd_probe(mach_conf_t *m_stat)
 	}
 
 	cpuid_index = 0;
-	for (i = 0; i < max_cpuids; i++) {
+	for (i = 0; i < m_stat->m_max_cpuid; i++) {
 		if (p_online(i, P_STATUS) == P_ONLINE) {
 			cpuid_list[cpuid_index++] = i;
 		}
-		if (cpuid_index == m_stat->m_num_on_fpuids) {
+		if (cpuid_index == total_onln) {
 			/* Break after all onln cpuids found */
 			break;
 		}
 	}
+	m_stat->m_num_on_fpuids = (uint_t)cpuid_index;
+	fpsd_message(FPSD_NO_EXIT, FPS_DEBUG, NUM_ONLN_CPUS,
+	    m_stat->m_num_on_fpuids);
 
 	/*
 	 * Get cpu-brand info all valid cpuids using kstat.
@@ -616,7 +613,7 @@ parse_and_set_cpu_id_list(char *strCPUs)
 			invalid = 1;
 		}
 		if (num_cpus == fpsd.d_conf->m_num_fpus) {
-			/* More than max configurable cpus */
+			/* More than max supported cpus */
 			fpsd_message(FPSD_NO_EXIT, FPS_ERROR,
 			    INVAL_PROP_VALUE, strCPUs);
 			invalid = 1;
@@ -808,23 +805,23 @@ static int fpsd_init() {
 
 	m_conf_p = fpsd.d_conf;
 	m_conf_p->m_machine[0] = '\0';
-	m_conf_p->m_num_fpus = 0;
 	m_conf_p->m_num_on_fpuids = 0;
 	m_conf_p->m_cpuids_size = 0;
 	m_conf_p->total_iter = 0;
 	m_conf_p->m_reprobe = 0;
 	m_conf_p->m_num_cpus_to_test = 0;
+	m_conf_p->m_num_fpus = (uint_t)sysconf(_SC_NPROCESSORS_MAX);
 
 	(void) mutex_init(&log_mutex, USYNC_THREAD, NULL);
 
-	max_cpuids = (int)sysconf(_SC_CPUID_MAX) + 1;
+	m_conf_p->m_max_cpuid = (int)sysconf(_SC_CPUID_MAX) + 1;
 
 	/*
 	 * Allocate enough memory to accomodate maximum number of CPUs
 	 * supported by this platform.
 	 */
 	m_conf_p->m_cpus = malloc(sizeof (fps_cpu_t) *
-			(int)sysconf(_SC_NPROCESSORS_MAX));
+			m_conf_p->m_num_fpus);
 	if (NULL == m_conf_p->m_cpus)
 		return (1);
 	else

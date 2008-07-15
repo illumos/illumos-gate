@@ -344,7 +344,7 @@ test_fpu_thr(/* ARGSUSED */ void *arg)
  */
 #define	MINSLEEP	8
 
-	num_cpus =  sysconf(_SC_NPROCESSORS_ONLN);
+	num_cpus = fpsd.d_conf->m_num_on_fpuids;
 
 	intvl =  poll_intvl = fpsd.d_interval;
 
@@ -586,6 +586,32 @@ test_fpu_thr(/* ARGSUSED */ void *arg)
 }
 
 /*
+ * get_num_onln_cpus(): returns the number of processors that are in
+ * "on-line" state only. This number will be less than the number
+ * returned by sysconf(_SC_NPROCESSORS_ONLN) if there are some
+ * processors in "no-intr" state.
+ */
+
+static int
+get_num_onln_cpus()
+{
+	int i;
+	int num_onln = 0;
+	int total_onln = sysconf(_SC_NPROCESSORS_ONLN);
+
+	for (i = 0; i < fpsd.d_conf->m_max_cpuid; i++) {
+		if (p_online(i, P_STATUS) == P_ONLINE) {
+			num_onln++;
+		}
+		if (num_onln == total_onln) {
+			/* Break after all onln cpuids found */
+			break;
+		}
+	}
+	return (num_onln);
+}
+
+/*
  * Identifies the fpu on which test will be scheduled next.
  */
 
@@ -603,7 +629,8 @@ identify_fpu_to_run_test(int *freq, int *iteration, int *fpu_index) {
 
 	*iteration = *freq = 0;
 	while (fpuid == -1) {
-		num_onln = (int)sysconf(_SC_NPROCESSORS_ONLN);
+		/* Check if the number of online processors has changed */
+		num_onln = get_num_onln_cpus();
 		if (num_onln != fpsd.d_conf->m_num_on_fpuids) {
 			fpsd_message(FPSD_NO_EXIT, FPS_DEBUG, REPROBE_MSG);
 			fpsd.d_conf->m_reprobe = 1;
