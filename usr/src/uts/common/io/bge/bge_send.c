@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -281,8 +281,13 @@ bge_pseudo_cksum(uint8_t *buf)
 	 * update the checksum field.
 	 */
 	buf += iphl + ((proto == IPPROTO_TCP) ?
-		TCP_CKSUM_OFFSET : UDP_CKSUM_OFFSET);
+	    TCP_CKSUM_OFFSET : UDP_CKSUM_OFFSET);
 
+	/*
+	 * A real possibility that pointer cast is a problem.
+	 * Should be fixed when we know the code better.
+	 * E_BAD_PTR_CAST_ALIGN is added to make it temporarily clean.
+	 */
 	*(uint16_t *)buf = htons((uint16_t)cksum);
 }
 
@@ -520,7 +525,7 @@ bge_send(bge_t *bgep, mblk_t *mp)
 	ASSERT(txbuf->copy_len >= sizeof (struct ether_header));
 	pbuf = DMA_VPTR(txbuf->buf);
 
-	ehp = (struct ether_vlan_header *)pbuf;
+	ehp = (void *)pbuf;
 	if (ehp->ether_tpid == htons(ETHERTYPE_VLAN)) {
 		/* Strip the vlan tag */
 		vlan_tci = ntohs(ehp->ether_tci);
@@ -574,7 +579,7 @@ bge_send_drain(caddr_t arg)
 	bge_t *bgep;
 	send_ring_t *srp;
 
-	bgep = (bge_t *)arg;
+	bgep = (void *)arg;
 	BGE_TRACE(("bge_send_drain($%p)", (void *)bgep));
 
 	srp = &bgep->send[ring];

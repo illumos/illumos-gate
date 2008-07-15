@@ -207,7 +207,7 @@ bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p)
 		struct ether_vlan_header *ehp;
 		mp->b_rptr = dp = mp->b_rptr + BGE_HEADROOM - VLAN_TAGSZ;
 		bcopy(DMA_VPTR(srbdp->pbuf), dp, 2 * ETHERADDRL);
-		ehp = (struct ether_vlan_header *)dp;
+		ehp = (void *)dp;
 		ehp->ether_tpid = ntohs(ETHERTYPE_VLAN);
 		ehp->ether_tci = ntohs(hw_rbd.vlan_tci);
 		bcopy(((uchar_t *)(DMA_VPTR(srbdp->pbuf))) + 2 * ETHERADDRL,

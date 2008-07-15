@@ -34,7 +34,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "Broadcom Gb Ethernet v0.63";
+static char bge_ident[] = "Broadcom Gb Ethernet v0.64";
 
 /*
  * Property names
@@ -101,18 +101,6 @@ static ddi_device_acc_attr_t bge_data_accattr = {
 	DDI_NEVERSWAP_ACC,
 	DDI_STRICTORDER_ACC
 };
-
-/*
- * Versions of the O/S up to Solaris 8 didn't support network booting
- * from any network interface except the first (NET0).  Patching this
- * flag to a non-zero value will tell the driver to work around this
- * limitation by creating an extra (internal) pathname node.  To do
- * this, just add a line like the following to the CLIENT'S etc/system
- * file ON THE ROOT FILESYSTEM SERVER before booting the client:
- *
- *	set bge:bge_net1_boot_support = 1;
- */
-static uint32_t bge_net1_boot_support = 1;
 
 static int		bge_m_start(void *);
 static void		bge_m_stop(void *);
@@ -282,8 +270,8 @@ bge_reinit_buff_ring(buff_ring_t *brp, uint32_t ring)
 	srbdp = brp->sw_rbds;
 	for (slot = 0; slot < nslots; ++hw_rbd_p, ++srbdp, ++slot) {
 		hw_rbd_p->host_buf_addr = srbdp->pbuf.cookie.dmac_laddress;
-		hw_rbd_p->index = slot;
-		hw_rbd_p->len = bufsize;
+		hw_rbd_p->index = (uint16_t)slot;
+		hw_rbd_p->len = (uint16_t)bufsize;
 		hw_rbd_p->opaque = srbdp->pbuf.token;
 		hw_rbd_p->flags |= ring_type_flag[ring];
 	}
@@ -1254,7 +1242,7 @@ bge_set_priv_prop(bge_t *bgep, const char *pr_name, uint_t pr_valsize,
 		if (result > 1 || result < 0) {
 			err = EINVAL;
 		} else {
-			bgep->param_adv_pause = result;
+			bgep->param_adv_pause = (uint32_t)result;
 			if (bge_reprogram(bgep) == IOC_INVAL)
 				err = EINVAL;
 		}
@@ -1265,7 +1253,7 @@ bge_set_priv_prop(bge_t *bgep, const char *pr_name, uint_t pr_valsize,
 		if (result > 1 || result < 0) {
 			err = EINVAL;
 		} else {
-			bgep->param_adv_asym_pause = result;
+			bgep->param_adv_asym_pause = (uint32_t)result;
 			if (bge_reprogram(bgep) == IOC_INVAL)
 				err = EINVAL;
 		}
@@ -1316,7 +1304,7 @@ bge_set_priv_prop(bge_t *bgep, const char *pr_name, uint_t pr_valsize,
 		if (ddi_strtol(pr_val, (char **)NULL, 0, &result) != 0)
 			return (EINVAL);
 
-		bgep->chipid.rx_ticks_norm = result;
+		bgep->chipid.rx_ticks_norm = (uint32_t)result;
 		return (0);
 	}
 
@@ -1324,7 +1312,7 @@ bge_set_priv_prop(bge_t *bgep, const char *pr_name, uint_t pr_valsize,
 		if (ddi_strtol(pr_val, (char **)NULL, 0, &result) != 0)
 			return (EINVAL);
 
-		bgep->chipid.rx_count_norm = result;
+		bgep->chipid.rx_count_norm = (uint32_t)result;
 		return (0);
 	}
 	return (ENOTSUP);
@@ -1665,28 +1653,28 @@ bge_loop_ioctl(bge_t *bgep, queue_t *wq, mblk_t *mp, struct iocblk *iocp)
 	case LB_GET_INFO_SIZE:
 		if (iocp->ioc_count != sizeof (lb_info_sz_t))
 			return (IOC_INVAL);
-		lbsp = (lb_info_sz_t *)mp->b_cont->b_rptr;
+		lbsp = (void *)mp->b_cont->b_rptr;
 		*lbsp = sizeof (loopmodes);
 		return (IOC_REPLY);
 
 	case LB_GET_INFO:
 		if (iocp->ioc_count != sizeof (loopmodes))
 			return (IOC_INVAL);
-		lbpp = (lb_property_t *)mp->b_cont->b_rptr;
+		lbpp = (void *)mp->b_cont->b_rptr;
 		bcopy(loopmodes, lbpp, sizeof (loopmodes));
 		return (IOC_REPLY);
 
 	case LB_GET_MODE:
 		if (iocp->ioc_count != sizeof (uint32_t))
 			return (IOC_INVAL);
-		lbmp = (uint32_t *)mp->b_cont->b_rptr;
+		lbmp = (void *)mp->b_cont->b_rptr;
 		*lbmp = bgep->param_loop_mode;
 		return (IOC_REPLY);
 
 	case LB_SET_MODE:
 		if (iocp->ioc_count != sizeof (uint32_t))
 			return (IOC_INVAL);
-		lbmp = (uint32_t *)mp->b_cont->b_rptr;
+		lbmp = (void *)mp->b_cont->b_rptr;
 		return (bge_set_loop_mode(bgep, *lbmp));
 	}
 }
@@ -1707,7 +1695,7 @@ bge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	/*
 	 * Validate the command before bothering with the mutex ...
 	 */
-	iocp = (struct iocblk *)mp->b_rptr;
+	iocp = (void *)mp->b_rptr;
 	iocp->ioc_error = 0;
 	need_privilege = B_TRUE;
 	cmd = iocp->ioc_cmd;
@@ -1980,7 +1968,6 @@ bge_slice_chunk(dma_area_t *slice, dma_area_t *chunk,
 	size_t totsize;
 
 	totsize = qty*size;
-	ASSERT(size >= 0);
 	ASSERT(totsize <= chunk->alength);
 
 	*slice = *chunk;
@@ -2046,7 +2033,7 @@ bge_init_buff_ring(bge_t *bgep, uint64_t ring)
 	 * this field indicates the size of each buffer in the ring.
 	 */
 	brp->hw_rcb.host_ring_addr = brp->desc.cookie.dmac_laddress;
-	brp->hw_rcb.max_len = bufsize;
+	brp->hw_rcb.max_len = (uint16_t)bufsize;
 	brp->hw_rcb.flags = nslots > 0 ? 0 : RCB_FLAG_RING_DISABLED;
 	brp->hw_rcb.nic_ring_addr = nic_ring_addrs[ring];
 
@@ -2125,7 +2112,7 @@ bge_init_recv_ring(bge_t *bgep, uint64_t ring)
 	 * Set up the copy of the h/w RCB
 	 */
 	rrp->hw_rcb.host_ring_addr = rrp->desc.cookie.dmac_laddress;
-	rrp->hw_rcb.max_len = nslots;
+	rrp->hw_rcb.max_len = (uint16_t)nslots;
 	rrp->hw_rcb.flags = nslots > 0 ? 0 : RCB_FLAG_RING_DISABLED;
 	rrp->hw_rcb.nic_ring_addr = 0;
 
@@ -2191,7 +2178,7 @@ bge_init_send_ring(bge_t *bgep, uint64_t ring)
 	 * Set up the copy of the h/w RCB
 	 */
 	srp->hw_rcb.host_ring_addr = srp->desc.cookie.dmac_laddress;
-	srp->hw_rcb.max_len = nslots;
+	srp->hw_rcb.max_len = (uint16_t)nslots;
 	srp->hw_rcb.flags = nslots > 0 ? 0 : RCB_FLAG_RING_DISABLED;
 	srp->hw_rcb.nic_ring_addr = NIC_MEM_SHADOW_SEND_RING(ring, nslots);
 
@@ -2562,7 +2549,6 @@ bge_alloc_bufs(bge_t *bgep)
 		bge_slice_chunk(&bgep->buff[BGE_MINI_BUFF_RING].buf[split],
 		    &area, BGE_MINI_SLOTS_USED/BGE_SPLIT,
 		    BGE_MINI_BUFF_SIZE);
-		ASSERT(area.alength >= 0);
 	}
 
 	for (split = 0; split < BGE_SPLIT; ++split) {
@@ -2574,7 +2560,6 @@ bge_alloc_bufs(bge_t *bgep)
 		for (; ring < BGE_SEND_RINGS_MAX; ++ring)
 			bge_slice_chunk(&bgep->send[ring].buf[0][split],
 			    &area, 0, bgep->chipid.snd_buff_size);
-		ASSERT(area.alength >= 0);
 	}
 
 	for (ring = 0; ring < rx_rings; ++ring)
