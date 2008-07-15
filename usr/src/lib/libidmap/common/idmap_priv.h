@@ -49,12 +49,6 @@ extern "C" {
 #define	IDMAP_FATAL_ERROR(rc)	(rc == IDMAP_ERR_MEMORY ||\
 				rc == IDMAP_ERR_DB)
 
-/* Direction in which mapping is valid */
-#define	IDMAP_DIRECTION_UNDEF	-1	/* not defined */
-#define	IDMAP_DIRECTION_BI	0	/* bi-directional */
-#define	IDMAP_DIRECTION_W2U	1	/* windows to unix only */
-#define	IDMAP_DIRECTION_U2W	2	/* unix to windows only */
-
 
 /* is_user values */
 

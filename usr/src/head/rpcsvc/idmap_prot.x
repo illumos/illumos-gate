@@ -146,6 +146,16 @@ const IDMAP_REQ_FLG_NO_NAMESERVICE	= 0x00000004;
 /* Request how a mapping was formed */
 const IDMAP_REQ_FLG_MAPPING_INFO	= 0x00000008;
 
+
+/*
+ * Mapping direction definitions
+ */
+const IDMAP_DIRECTION_UNDEF =	-1;	/* not defined */
+const IDMAP_DIRECTION_BI =	0;	/* bi-directional */
+const IDMAP_DIRECTION_W2U =	1;	/* windows to unix only */
+const IDMAP_DIRECTION_U2W =	2;	/* unix to windows only */
+
+
 /* Identity mappings (sid-posix) */
 struct idmap_mapping {
 	int32_t		flag;

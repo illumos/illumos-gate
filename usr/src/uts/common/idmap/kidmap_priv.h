@@ -41,11 +41,24 @@ extern "C" {
 #endif
 
 
-typedef struct idmap_avl_cache {
+
+typedef struct idmap_sid2pid_cache {
 	avl_tree_t		tree;
 	kmutex_t		mutex;
+	struct sid2pid		*prev;
 	time_t			purge_time;
-} idmap_avl_cache_t;
+	int			uid_num;
+	int			gid_num;
+	int			pid_num;
+} idmap_sid2pid_cache_t;
+
+
+typedef struct idmap_pid2sid_cache {
+	avl_tree_t		tree;
+	kmutex_t		mutex;
+	struct pid2sid		*prev;
+	time_t			purge_time;
+} idmap_pid2sid_cache_t;
 
 
 /*
@@ -55,11 +68,9 @@ typedef struct idmap_avl_cache {
  * both a UID and a GID.
  */
 typedef struct idmap_cache {
-	idmap_avl_cache_t	uidbysid;
-	idmap_avl_cache_t	gidbysid;
-	idmap_avl_cache_t	pidbysid;
-	idmap_avl_cache_t	sidbyuid;
-	idmap_avl_cache_t	sidbygid;
+	idmap_sid2pid_cache_t	sid2pid;
+	idmap_pid2sid_cache_t	uid2sid;
+	idmap_pid2sid_cache_t	gid2sid;
 } idmap_cache_t;
 
 
@@ -71,6 +82,7 @@ kidmap_cache_delete(idmap_cache_t *cache);
 
 void
 kidmap_cache_purge(idmap_cache_t *cache);
+
 
 int
 kidmap_cache_lookup_uidbysid(idmap_cache_t *cache, const char *sid_prefix,
@@ -94,25 +106,16 @@ kidmap_cache_lookup_sidbygid(idmap_cache_t *cache, const char **sid_prefix,
 
 
 void
-kidmap_cache_add_uidbysid(idmap_cache_t *cache, const char *sid_prefix,
-			uint32_t rid, uid_t uid);
+kidmap_cache_add_sid2uid(idmap_cache_t *cache, const char *sid_prefix,
+			uint32_t rid, uid_t uid, int direction);
 
 void
-kidmap_cache_add_gidbysid(idmap_cache_t *cache, const char *sid_prefix,
-			uint32_t rid, gid_t gid);
+kidmap_cache_add_sid2gid(idmap_cache_t *cache, const char *sid_prefix,
+			uint32_t rid, gid_t gid, int direction);
 
 void
-kidmap_cache_add_pidbysid(idmap_cache_t *cache, const char *sid_prefix,
-			uint32_t rid, uid_t pid, int is_user);
-
-void
-kidmap_cache_add_sidbyuid(idmap_cache_t *cache, const char *sid_prefix,
-			uint32_t rid, uid_t uid);
-
-void
-kidmap_cache_add_sidbygid(idmap_cache_t *cache, const char *sid_prefix,
-			uint32_t rid, gid_t gid);
-
+kidmap_cache_add_sid2pid(idmap_cache_t *cache, const char *sid_prefix,
+			uint32_t rid, uid_t pid, int is_user, int direction);
 void
 kidmap_cache_get_data(idmap_cache_t *cache, size_t *uidbysid, size_t *gidbysid,
 			size_t *pidbysid, size_t *sidbyuid, size_t *sidbygid);
