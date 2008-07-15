@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -344,5 +344,68 @@ cat >> $BASEDIR/var/svc/profile/upgrade <<\_NWAM_SYSID
 			-a /lib/svc/method/net-nwam
 	fi
 _NWAM_SYSID
+
+#
+# Migrate /etc/acctadm.conf settings to smf(5) repository.  Enable the instance
+# if the configuration differs from the default configuration.
+#
+cat >> $BASEDIR/var/svc/profile/upgrade <<\_ACCTADM
+if [ -f /etc/acctadm.conf ]; then
+	. /etc/acctadm.conf
+
+	fmri="svc:/system/extended-accounting:flow"
+	svccfg -s $fmri setprop config/file = \
+	    ${ACCTADM_FLOW_FILE:="none"}
+	svccfg -s $fmri setprop config/tracked = \
+	    ${ACCTADM_FLOW_TRACKED:="none"}
+	svccfg -s $fmri setprop config/untracked = \
+	    ${ACCTADM_FLOW_UNTRACKED:="extended"}
+	if [ ${ACCTADM_FLOW_ENABLE:="no"} = "yes" ]; then
+		svccfg -s $fmri setprop config/enabled = "true"
+	else
+		svccfg -s $fmri setprop config/enabled = "false"
+	fi
+	if [ $ACCTADM_FLOW_ENABLE = "yes" -o $ACCTADM_FLOW_FILE != "none" -o \
+	    $ACCTADM_FLOW_TRACKED != "none" ]; then
+		svcadm enable $fmri
+	fi
+
+	fmri="svc:/system/extended-accounting:process"
+	svccfg -s $fmri setprop config/file = \
+	    ${ACCTADM_PROC_FILE:="none"}
+	svccfg -s $fmri setprop config/tracked = \
+	    ${ACCTADM_PROC_TRACKED:="none"}
+	svccfg -s $fmri setprop config/untracked = \
+	    ${ACCTADM_PROC_UNTRACKED:="extended,host"}
+	if [ ${ACCTADM_PROC_ENABLE:="no"} = "yes" ]; then
+		svccfg -s $fmri setprop config/enabled = "true"
+	else
+		svccfg -s $fmri setprop config/enabled = "false"
+	fi
+	if [ $ACCTADM_PROC_ENABLE = "yes" -o $ACCTADM_PROC_FILE != "none" -o \
+	    $ACCTADM_PROC_TRACKED != "none" ]; then
+		svcadm enable $fmri
+	fi
+
+	fmri="svc:/system/extended-accounting:task"
+	svccfg -s $fmri setprop config/file = \
+	    ${ACCTADM_TASK_FILE:="none"}
+	svccfg -s $fmri setprop config/tracked = \
+	    ${ACCTADM_TASK_TRACKED:="none"}
+	svccfg -s $fmri setprop config/untracked = \
+	    ${ACCTADM_TASK_UNTRACKED:="extended"}
+	if [ ${ACCTADM_TASK_ENABLE:="no"} = "yes" ]; then
+		svccfg -s $fmri setprop config/enabled = "true"
+	else
+		svccfg -s $fmri setprop config/enabled = "false"
+	fi
+	if [ $ACCTADM_TASK_ENABLE = "yes" -o $ACCTADM_TASK_FILE != "none" -o \
+	    $ACCTADM_TASK_TRACKED != "none" ]; then
+		svcadm enable $fmri
+	fi
+
+	rm /etc/acctadm.conf
+fi
+_ACCTADM
 
 exit 0

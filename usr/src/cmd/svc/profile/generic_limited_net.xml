@@ -60,6 +60,11 @@
   <service name='system/dbus' version='1' type='service'>
     <instance name='default' enabled='true'/>
   </service>
+  <service name='system/extended-accounting' version='1' type='service'>
+    <instance name='flow'    enabled='false'/>
+    <instance name='process' enabled='false'/>
+    <instance name='task'    enabled='false'/>
+  </service>
   <service name='system/hal' version='1' type='service'>
     <instance name='default' enabled='true'/>
   </service>

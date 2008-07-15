@@ -82,7 +82,6 @@ export ARCHIVE=${ARCHIVEPATH}
 all_zones_files="
 	etc/.login
 	etc/acct/holidays
-	etc/acctadm.conf
 	etc/auto_*
 	etc/cron.d/at.deny
 	etc/cron.d/cron.deny
@@ -1076,6 +1075,76 @@ migrate_rcap_conf() {
 }
 
 #
+# Migrate an existing extended accounting configuration from /etc/acctadm.conf
+# to the smf(5) repository upon reboot.  Enable the instance if the 
+# configuration differs from the default configuration.
+#
+migrate_acctadm_conf()
+{
+	cat >> $rootprefix/var/svc/profile/upgrade <<\_EOF
+	if [ -f /etc/acctadm.conf ]; then 
+		. /etc/acctadm.conf
+
+		fmri="svc:/system/extended-accounting:flow"
+		svccfg -s $fmri setprop config/file = \
+		    ${ACCTADM_FLOW_FILE:="none"}
+		svccfg -s $fmri setprop config/tracked = \
+		    ${ACCTADM_FLOW_TRACKED:="none"}
+		svccfg -s $fmri setprop config/untracked = \
+		    ${ACCTADM_FLOW_UNTRACKED:="extended"}
+		if [ ${ACCTADM_FLOW_ENABLE:="no"} = "yes" ]; then
+			svccfg -s $fmri setprop config/enabled = "true"
+		else
+			svccfg -s $fmri setprop config/enabled = "false"
+		fi
+		if [ $ACCTADM_FLOW_ENABLE = "yes" -o \
+		    $ACCTADM_FLOW_FILE != "none" -o \
+		    $ACCTADM_FLOW_TRACKED != "none" ]; then
+			svcadm enable $fmri
+		fi
+
+		fmri="svc:/system/extended-accounting:process"
+		svccfg -s $fmri setprop config/file = \
+		    ${ACCTADM_PROC_FILE:="none"}
+		svccfg -s $fmri setprop config/tracked = \
+		    ${ACCTADM_PROC_TRACKED:="none"}
+		svccfg -s $fmri setprop config/untracked = \
+		    ${ACCTADM_PROC_UNTRACKED:="extended"}
+		if [ ${ACCTADM_PROC_ENABLE:="no"} = "yes" ]; then
+			svccfg -s $fmri setprop config/enabled = "true"
+		else
+			svccfg -s $fmri setprop config/enabled = "false"
+		fi
+		if [ $ACCTADM_PROC_ENABLE = "yes" -o \
+		    $ACCTADM_PROC_FILE != "none" -o \
+		    $ACCTADM_PROC_TRACKED != "none" ]; then
+			svcadm enable $fmri
+		fi
+
+		fmri="svc:/system/extended-accounting:task"
+		svccfg -s $fmri setprop config/file = \
+		    ${ACCTADM_TASK_FILE:="none"}
+		svccfg -s $fmri setprop config/tracked = \
+		    ${ACCTADM_TASK_TRACKED:="none"}
+		svccfg -s $fmri setprop config/untracked = \
+		    ${ACCTADM_TASK_UNTRACKED:="extended"}
+		if [ ${ACCTADM_TASK_ENABLE:="no"} = "yes" ]; then
+			svccfg -s $fmri setprop config/enabled = "true"
+		else
+			svccfg -s $fmri setprop config/enabled = "false"
+		fi
+		if [ $ACCTADM_TASK_ENABLE = "yes" -o \
+		    $ACCTADM_TASK_FILE != "none" -o \
+		    $ACCTADM_TASK_TRACKED != "none" ]; then
+			svcadm enable $fmri
+		fi
+
+		rm /etc/acctadm.conf
+	fi
+_EOF
+}
+
+#
 # smf(5) "Greenline" doesn't install the init.d or rc*.d scripts for
 # converted services.  Clean up previous scripts for such services.
 #
@@ -1083,6 +1152,7 @@ smf_obsolete_rc_files="
 	etc/init.d/ANNOUNCE
 	etc/init.d/MOUNTFSYS
 	etc/init.d/RMTMPFILES
+	etc/init.d/acctadm
 	etc/init.d/audit
 	etc/init.d/autofs
 	etc/init.d/coreadm
@@ -1825,6 +1895,8 @@ smf_apply_conf () {
 	if [ -f $rootprefix/etc/rcap.conf ]; then
 		migrate_rcap_conf
 	fi
+
+	migrate_acctadm_conf
 
 	if [ $zone = global ]; then
 		if [ -f $rootprefix/etc/dfs/dfstab ] &&

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,52 +36,43 @@
 extern "C" {
 #endif
 
-/*
- * Permissions and ownership for the configuration file:
- */
-#define	AC_OWNER	0		/* Uid 0 (root) */
-#define	AC_GROUP	1		/* Gid 1 (other) */
-#define	AC_PERM		(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)	/* Mode 0644 */
-
 #define	MAXRESLEN	256
 
 typedef struct acctconf {
-	FILE	*ac_conf_fp;		/* file pointer for config file */
-	int	ac_conf_fd;		/* file descriptor for config file */
-	int	ac_proc_state;
-	char	ac_proc_file[MAXPATHLEN];
-	char	ac_proc_tracked[MAXRESLEN];
-	char	ac_proc_untracked[MAXRESLEN];
-	char	ac_task_file[MAXPATHLEN];
-	char	ac_task_tracked[MAXRESLEN];
-	char	ac_task_untracked[MAXRESLEN];
-	int	ac_task_state;
-	char	ac_flow_file[MAXPATHLEN];
-	char	ac_flow_tracked[MAXRESLEN];
-	char	ac_flow_untracked[MAXRESLEN];
-	int	ac_flow_state;
+	int	state;
+	char	file[MAXPATHLEN];
+	char	tracked[MAXRESLEN];
+	char	untracked[MAXRESLEN];
 } acctconf_t;
 
 /*
  * Predefined strings
  */
-#define	AC_STR_YES	"yes"
-#define	AC_STR_NO	"no"
-#define	AC_STR_NONE	"none"
+#define	AC_STR_NONE		"none"
 
-extern void	aconf_init(acctconf_t *);
-extern int	aconf_create(acctconf_t *, const char *);
-extern int	aconf_open(acctconf_t *, const char *);
-extern int	aconf_close(acctconf_t *);
-extern int	aconf_setup(acctconf_t *);
-extern int	aconf_write(acctconf_t *);
-extern int	aconf_update(acctconf_t *);
-extern void	aconf_print(acctconf_t *, FILE *, int);
+/*
+ * Configuration property group name
+ */
+#define	AC_PGNAME		"config"
 
-extern int	aconf_str2enable(acctconf_t *, char *, int);
-extern int	aconf_str2file(acctconf_t *, char *, int);
-extern int	aconf_str2tracked(acctconf_t *, char *, int);
-extern int	aconf_str2untracked(acctconf_t *, char *, int);
+/*
+ * Configuration property names
+ */
+#define	AC_PROP_STATE		"enabled"
+#define	AC_PROP_FILE		"file"
+#define	AC_PROP_TRACKED		"tracked"
+#define	AC_PROP_UNTRACKED	"untracked"
+
+extern void	aconf_init(acctconf_t *, int);
+extern int	aconf_setup(const char *);
+extern int	aconf_scf_init(const char *);
+extern void	aconf_scf_fini(void);
+extern int	aconf_set_string(const char *, const char *);
+extern int	aconf_set_bool(const char *, boolean_t);
+extern int	aconf_save(void);
+extern void	aconf_print(FILE *, int);
+extern boolean_t aconf_have_smf_auths(void);
+extern const char *aconf_type2fmri(int);
 
 #ifdef	__cplusplus
 }

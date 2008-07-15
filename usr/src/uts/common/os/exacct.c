@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,31 +150,20 @@ exacct_sub_task_mstate(task_usage_t *tu, task_usage_t *delta)
 }
 
 /*
- * exacct_vn_write() is a vn_rdwr wrapper that protects us from corrupting the
- * accounting file in case of an I/O or filesystem error.  acctctl() prevents
- * the two accounting vnodes from being equal, and the appropriate ac_lock is
- * held across the call, so we're single threaded through this code for each
- * file.
+ * Wrapper for vn_rdwr() used by exacct_vn_write() and exacct_write_header()
+ * to write to the accounting file without corrupting it in case of an I/O or
+ * filesystem error.
  */
 static int
-exacct_vn_write(ac_info_t *info, void *buf, ssize_t bufsize)
+exacct_vn_write_impl(ac_info_t *info, void *buf, ssize_t bufsize)
 {
-	int error = 0;
+	int error;
 	ssize_t resid;
 	struct vattr va;
 
-	if (info == NULL)
-		return (0);
-
-	mutex_enter(&info->ac_lock);
-
-	/*
-	 * Don't do anything unless accounting file is set.
-	 */
-	if (info->ac_vnode == NULL) {
-		mutex_exit(&info->ac_lock);
-		return (0);
-	}
+	ASSERT(info != NULL);
+	ASSERT(info->ac_vnode != NULL);
+	ASSERT(MUTEX_HELD(&info->ac_lock));
 
 	/*
 	 * Save the size. If vn_rdwr fails, reset the size to avoid corrupting
@@ -193,6 +182,33 @@ exacct_vn_write(ac_info_t *info, void *buf, ssize_t bufsize)
 			error = ENOSPC;
 		}
 	}
+	return (error);
+}
+
+/*
+ * exacct_vn_write() safely writes to an accounting file.  acctctl() prevents
+ * the two accounting vnodes from being equal, and the appropriate ac_lock is
+ * held across the call, so we're single threaded through this code for each
+ * file.
+ */
+static int
+exacct_vn_write(ac_info_t *info, void *buf, ssize_t bufsize)
+{
+	int error;
+
+	if (info == NULL)
+		return (0);
+
+	mutex_enter(&info->ac_lock);
+
+	/*
+	 * Don't do anything unless accounting file is set.
+	 */
+	if (info->ac_vnode == NULL) {
+		mutex_exit(&info->ac_lock);
+		return (0);
+	}
+	error = exacct_vn_write_impl(info, buf, bufsize);
 	mutex_exit(&info->ac_lock);
 
 	return (error);
@@ -256,23 +272,22 @@ exacct_create_header(size_t *sizep)
  *
  * Overview
  *   exacct_write_header() writes the given header buffer to the indicated
- *   vnode, and frees the buffer.
+ *   vnode.
  *
  * Return values
  *   The result of the write operation is returned.
  *
  * Caller's context
- *   Caller must not hold the ac_lock of the appropriate accounting file
+ *   Caller must hold the ac_lock of the appropriate accounting file
  *   information block (ac_info_t).
  */
 int
 exacct_write_header(ac_info_t *info, void *hdr, size_t hdrsize)
 {
-	int error;
+	if (info != NULL && info->ac_vnode != NULL)
+		return (exacct_vn_write_impl(info, hdr, hdrsize));
 
-	error = exacct_vn_write(info, hdr, hdrsize);
-	kmem_free(hdr, hdrsize);
-	return (error);
+	return (0);
 }
 
 static void

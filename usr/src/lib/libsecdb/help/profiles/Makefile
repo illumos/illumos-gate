@@ -29,6 +29,7 @@
 include ../../../../Makefile.master
 
 HTMLENTS = \
+	RtAcctadm.html \
 	RtAll.html \
 	RtAuditCtrl.html \
 	RtAuditReview.html \
@@ -36,6 +37,9 @@ HTMLENTS = \
 	RtConsUser.html \
 	RtCronMngmnt.html \
 	RtCryptoMngmnt.html \
+	RtExAcctFlow.html \
+	RtExAcctProcess.html \
+	RtExAcctTask.html \
 	RtLogMngmnt.html \
 	RtDeviceMngmnt.html \
 	RtDeviceSecurity.html \

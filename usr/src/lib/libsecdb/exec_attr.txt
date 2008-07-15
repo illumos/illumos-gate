@@ -303,3 +303,4 @@ Zone Management:solaris:cmd:::/usr/sbin/txzonemgr:uid=0
 Zone Management:solaris:cmd:::/usr/sbin/zonecfg:uid=0
 Zone Management:solaris:cmd:::/usr/sbin/zoneadm:uid=0
 Zone Management:solaris:cmd:::/usr/sbin/zlogin:uid=0
+acctadm:solaris:cmd:::/usr/sbin/acctadm:euid=0;egid=0;privs=sys_acct,file_dac_write

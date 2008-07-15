@@ -67,6 +67,9 @@ HTMLENTS = \
 	BindStates.html \
 	SmfAutofsStates.html \
 	SmfCronStates.html \
+	SmfExAcctFlowStates.html \
+	SmfExAcctProcessStates.html \
+	SmfExAcctTaskStates.html \
 	SmfHeader.html \
 	SmfInetdStates.html \
 	SmfIPsecStates.html \
@@ -86,6 +89,9 @@ HTMLENTS = \
 	SmfSendmailStates.html \
 	SmfSshStates.html \
 	SmfSyslogStates.html \
+	SmfValueExAcctFlow.html \
+	SmfValueExAcctProcess.html \
+	SmfValueExAcctTask.html \
 	SmfValueHeader.html \
 	SmfValueInetd.html \
 	SmfValueIPsec.html \

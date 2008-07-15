@@ -152,6 +152,7 @@ ac_file_set(ac_info_t *info, void *ubuf, size_t bufsz)
 	vnode_t *vp;
 	void *hdr;
 	size_t hdrsize;
+	vattr_t va;
 
 	if (ubuf == NULL) {
 		mutex_enter(&info->ac_lock);
@@ -227,14 +228,23 @@ ac_file_set(ac_info_t *info, void *ubuf, size_t bufsz)
 	}
 
 	/*
+	 * Create an exacct header here because exacct_create_header() may
+	 * sleep so we should not be holding ac_lock. At this point we cannot
+	 * reliably know if we need the header or not, so we may end up not
+	 * using the header.
+	 */
+	hdr = exacct_create_header(&hdrsize);
+
+	/*
 	 * Now, grab info's ac_lock and try to set up everything.
 	 */
 	mutex_enter(&info->ac_lock);
 
 	if ((error = vn_open(namebuf, UIO_SYSSPACE,
-	    FCREAT | FWRITE | FTRUNC | FOFFMAX, 0600, &vp, CRCREAT, 0)) != 0) {
+	    FCREAT | FWRITE | FOFFMAX, 0600, &vp, CRCREAT, 0)) != 0) {
 		mutex_exit(&info->ac_lock);
 		kmem_free(namebuf, namelen);
+		kmem_free(hdr, hdrsize);
 		return (error);
 	}
 
@@ -242,6 +252,7 @@ ac_file_set(ac_info_t *info, void *ubuf, size_t bufsz)
 		VN_RELE(vp);
 		mutex_exit(&info->ac_lock);
 		kmem_free(namebuf, namelen);
+		kmem_free(hdr, hdrsize);
 		return (EACCES);
 	}
 
@@ -269,6 +280,7 @@ ac_file_set(ac_info_t *info, void *ubuf, size_t bufsz)
 			VN_RELE(vp);
 			mutex_exit(&info->ac_lock);
 			kmem_free(namebuf, namelen);
+			kmem_free(hdr, hdrsize);
 			return (error);
 		}
 		VN_RELE(vp);
@@ -278,18 +290,17 @@ ac_file_set(ac_info_t *info, void *ubuf, size_t bufsz)
 			info->ac_file = NULL;
 		}
 	}
-	/*
-	 * Finally, point ac_file to the filename string and release the lock.
-	 */
 	info->ac_file = namebuf;
-	mutex_exit(&info->ac_lock);
 
 	/*
-	 * Create and write an exacct header to the file.
+	 * Write the exacct header only if the file is empty.
 	 */
-	hdr = exacct_create_header(&hdrsize);
-	error = exacct_write_header(info, hdr, hdrsize);
+	error = VOP_GETATTR(info->ac_vnode, &va, AT_SIZE, CRED(), NULL);
+	if (error == 0 && va.va_size == 0)
+		error = exacct_write_header(info, hdr, hdrsize);
 
+	mutex_exit(&info->ac_lock);
+	kmem_free(hdr, hdrsize);
 	return (error);
 }
 

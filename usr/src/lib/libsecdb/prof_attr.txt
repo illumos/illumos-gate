@@ -43,6 +43,9 @@ Log Management:::Manage log files:help=RtLogMngmnt.html
 Basic Solaris User:::Automatically assigned rights:auths=solaris.profmgr.read,solaris.jobs.user,solaris.mail.mailq,solaris.device.mount.removable;profiles=All;help=RtDefault.html
 Device Security:::Manage devices and Volume Manager:auths=solaris.device.*;help=RtDeviceSecurity.html
 DHCP Management:::Manage the DHCP service:auths=solaris.dhcpmgr.*;help=RtDHCPMngmnt.html
+Extended Accounting Flow Management:::Manage the Flow Extended Accounting service:auths=solaris.smf.manage.extended-accounting.flow,solaris.smf.value.extended-accounting.flow;profiles=acctadm;help=RtExActtFlow.html
+Extended Accounting Process Management:::Manage the Process Extended Accounting service:auths=solaris.smf.manage.extended-accounting.process,solaris.smf.value.extended-accounting.process;profiles=acctadm;hep=RtExAcctProcess.html
+Extended Accounting Task Management:::Manage the Task Extended Accounting service:auths=solaris.smf.manage.extended-accounting.task,solaris.smf.value.extended-accounting.task;profiles=acctadm;help=RtExAcctTask.html
 File System Management:::Manage, mount, share file systems:profiles=SMB Management,VSCAN Management,SMBFS Management;auths=solaris.smf.manage.autofs,solaris.smf.manage.shares.*,solaris.smf.value.shares.*;help=RtFileSysMngmnt.html
 File System Security:::Manage file system security attributes:help=RtFileSysSecurity.html
 HAL Management:::Manage HAL SMF service:auths=solaris.smf.manage.hal;help=RtHALMngmnt.html
@@ -102,3 +105,4 @@ Suspend To Disk:::For authorized users to Suspend to Disk:auths=solaris.system.p
 Suspend To RAM:::For authorized users to Suspend to RAM:auths=solaris.system.power.suspend.ram;help=RtSysPowerMgmtSuspendToRAM.html
 Brightness:::For authorized users to Control LCD Brightness:auths=solaris.system.power.brightness;help=RtSysPowerMgmtBrightness.html
 CPU Power Management:::For authorized users to manage CPU Power:auths=solaris.system.power.cpu;help=RtCPUPowerManagement.html
+acctadm:::Do not assign to users. Commands required for Extended Accounting Management profiles:help=RtAcctadm.help

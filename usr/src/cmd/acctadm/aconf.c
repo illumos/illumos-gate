@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,552 +19,506 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/acctctl.h>
-
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
-#include <stdio.h>
-#include <fcntl.h>
 #include <errno.h>
 #include <limits.h>
+#include <libscf.h>
+#include <pwd.h>
+#include <auth_attr.h>
+#include <nss_dbdefs.h>
+#include <secdb.h>
+#include <priv.h>
+#include <zone.h>
 
 #include "aconf.h"
 #include "utils.h"
 #include "res.h"
 
-#define	BUFSZ	(PATH_MAX + 80)
+#define	FMRI_FLOW_ACCT	"svc:/system/extended-accounting:flow"
+#define	FMRI_PROC_ACCT	"svc:/system/extended-accounting:process"
+#define	FMRI_TASK_ACCT	"svc:/system/extended-accounting:task"
 
-typedef struct ac_token {
-	char *tok_name;
-	int tok_type;
-	int (*tok_parse)(acctconf_t *, char *, int);
-	int (*tok_print)(acctconf_t *, FILE *, int);
-} ac_token_t;
+#define	NELEM(x)	(sizeof (x)) / (sizeof (x[0]))
 
-static int print_enable(acctconf_t *, FILE *, int);
-static int print_file(acctconf_t *, FILE *, int);
-static int print_tracked(acctconf_t *, FILE *, int);
-static int print_untracked(acctconf_t *, FILE *, int);
+typedef struct props {
+	char *propname;
+	int proptype;
+	scf_transaction_entry_t *entry;
+	scf_value_t *value;
+	struct props *next;
+} props_t;
 
-static ac_token_t tokens[] = {
-	{ "ACCTADM_PROC_ENABLE",
-		AC_PROC, aconf_str2enable, print_enable },
-	{ "ACCTADM_PROC_FILE",
-		AC_PROC, aconf_str2file, print_file },
-	{ "ACCTADM_PROC_TRACKED",
-		AC_PROC, aconf_str2tracked, print_tracked },
-	{ "ACCTADM_PROC_UNTRACKED",
-		AC_PROC, aconf_str2untracked, print_untracked },
-	{ "ACCTADM_TASK_ENABLE",
-		AC_TASK, aconf_str2enable, print_enable },
-	{ "ACCTADM_TASK_FILE",
-		AC_TASK, aconf_str2file, print_file },
-	{ "ACCTADM_TASK_TRACKED",
-		AC_TASK, aconf_str2tracked, print_tracked },
-	{ "ACCTADM_TASK_UNTRACKED",
-		AC_TASK, aconf_str2untracked, print_untracked },
-	{ "ACCTADM_FLOW_ENABLE",
-		AC_FLOW, aconf_str2enable, print_enable },
-	{ "ACCTADM_FLOW_FILE",
-		AC_FLOW, aconf_str2file, print_file },
-	{ "ACCTADM_FLOW_TRACKED",
-		AC_FLOW, aconf_str2tracked, print_tracked },
-	{ "ACCTADM_FLOW_UNTRACKED",
-		AC_FLOW, aconf_str2untracked, print_untracked },
-	{ NULL,
-		AC_NONE, NULL, NULL }
-};
+static void	aconf_print_type(acctconf_t *, FILE *, int);
+static int	aconf_get_bool(const char *, const char *, uint8_t *);
+static int	aconf_get_string(const char *, const char *, char *, size_t);
+static props_t	*aconf_prop(const char *, int);
+static int	aconf_fmri2type(const char *);
+
+static scf_handle_t	*handle = NULL;
+static scf_instance_t	*inst = NULL;
+static props_t		*props = NULL;
 
 void
-aconf_init(acctconf_t *acp)
+aconf_init(acctconf_t *acp, int type)
 {
 	void *buf;
-	void *pathname;
-	char *tracked, *untracked;
-	int state;
-
-	if ((buf = malloc(AC_BUFSIZE)) == NULL ||
-	    (pathname = malloc(MAXPATHLEN)) == NULL)
-		die(gettext("not enough memory\n"));
-
-	/*
-	 * Initialize process accounting settings
-	 */
-	(void) memset(pathname, 0, MAXPATHLEN);
-	if (acctctl(AC_PROC | AC_STATE_GET, &state, sizeof (int)) == -1)
-		die(gettext("cannot get process accounting state\n"));
-	acp->ac_proc_state = state;
-	if (acctctl(AC_PROC | AC_FILE_GET, pathname, MAXPATHLEN) == -1) {
-		if (errno == ENOTACTIVE)
-			(void) strlcpy(acp->ac_proc_file,
-			    AC_STR_NONE, MAXPATHLEN);
-		else
-			die(gettext("cannot get process accounting file name"));
-	} else {
-		(void) strlcpy(acp->ac_proc_file, pathname, MAXPATHLEN);
-	}
-	(void) memset(buf, 0, AC_BUFSIZE);
-	if (acctctl(AC_PROC | AC_RES_GET, buf, AC_BUFSIZE) == -1)
-		die(gettext("cannot obtain the list of enabled resources\n"));
-	tracked = buf2str(buf, AC_BUFSIZE, AC_ON, AC_PROC);
-	untracked = buf2str(buf, AC_BUFSIZE, AC_OFF, AC_PROC);
-	(void) strlcpy(acp->ac_proc_tracked, tracked, MAXRESLEN);
-	(void) strlcpy(acp->ac_proc_untracked, untracked, MAXRESLEN);
-	free(tracked);
-	free(untracked);
-
-	/*
-	 * Initialize flow accounting settings
-	 */
-	(void) memset(pathname, 0, MAXPATHLEN);
-	if (acctctl(AC_FLOW | AC_STATE_GET, &state, sizeof (int)) == -1)
-		die(gettext("cannot get flow accounting state\n"));
-	acp->ac_flow_state = state;
-	if (acctctl(AC_FLOW | AC_FILE_GET, pathname, MAXPATHLEN) == -1) {
-		if (errno == ENOTACTIVE)
-			(void) strlcpy(acp->ac_flow_file,
-			    AC_STR_NONE, MAXPATHLEN);
-		else
-			die(gettext("cannot get flow accounting file name"));
-	} else {
-		(void) strlcpy(acp->ac_flow_file, pathname, MAXPATHLEN);
-	}
-	(void) memset(buf, 0, AC_BUFSIZE);
-	if (acctctl(AC_FLOW | AC_RES_GET, buf, AC_BUFSIZE) == -1)
-		die(gettext("cannot obtain the list of enabled resources\n"));
-	tracked = buf2str(buf, AC_BUFSIZE, AC_ON, AC_FLOW);
-	untracked = buf2str(buf, AC_BUFSIZE, AC_OFF, AC_FLOW);
-	(void) strlcpy(acp->ac_flow_tracked, tracked, MAXRESLEN);
-	(void) strlcpy(acp->ac_flow_untracked, untracked, MAXRESLEN);
-	free(tracked);
-	free(untracked);
-
-	/*
-	 * Initialize task accounting settings
-	 */
-	(void) memset(pathname, 0, MAXPATHLEN);
-	if (acctctl(AC_TASK | AC_STATE_GET, &state, sizeof (int)) == -1)
-		die(gettext("cannot get task accounting state\n"));
-	acp->ac_task_state = state;
-	if (acctctl(AC_TASK | AC_FILE_GET, pathname, MAXPATHLEN) == -1) {
-		if (errno == ENOTACTIVE)
-			(void) strlcpy(acp->ac_task_file,
-			    AC_STR_NONE, MAXPATHLEN);
-		else
-			die(gettext("cannot get task accounting file name"));
-	} else {
-		(void) strlcpy(acp->ac_task_file, pathname, MAXPATHLEN);
-	}
-	(void) memset(buf, 0, AC_BUFSIZE);
-	if (acctctl(AC_TASK | AC_RES_GET, buf, AC_BUFSIZE) == -1)
-		die(gettext("cannot obtain the list of enabled resources\n"));
-	tracked = buf2str(buf, AC_BUFSIZE, AC_ON, AC_TASK);
-	untracked = buf2str(buf, AC_BUFSIZE, AC_OFF, AC_TASK);
-	(void) strlcpy(acp->ac_task_tracked, tracked, MAXRESLEN);
-	(void) strlcpy(acp->ac_task_untracked, untracked, MAXRESLEN);
-	free(pathname);
-	free(buf);
-	free(tracked);
-	free(untracked);
-}
-
-int
-aconf_create(acctconf_t *acp, const char *fpath)
-{
-	if ((acp->ac_conf_fd = open(fpath, O_RDWR | O_CREAT, AC_PERM)) == -1) {
-		warn(gettext("failed to open %s"), fpath);
-		return (-1);
-	}
-	if ((acp->ac_conf_fp = fdopen(acp->ac_conf_fd, "r+")) == NULL) {
-		warn(gettext("failed to open stream for %s"), fpath);
-		return (-1);
-	}
-	return (0);
-}
-
-int
-aconf_open(acctconf_t *acp, const char *fpath)
-{
-	char buf[BUFSZ];
-	int line;
-	int ret = 0;
-
-	if ((acp->ac_conf_fd = open(fpath, O_RDONLY, AC_PERM)) == -1) {
-		warn(gettext("failed to open %s"), fpath);
-		return (-1);
-	}
-	if ((acp->ac_conf_fp = fdopen(acp->ac_conf_fd, "r")) == NULL) {
-		warn(gettext("failed to open stream for %s"), fpath);
-		return (-1);
-	}
-	for (line = 1; fgets(buf, BUFSZ, acp->ac_conf_fp) != NULL; line++) {
-		char name[BUFSZ], value[BUFSZ];
-		ac_token_t *tokp;
-		int len;
-
-		if (buf[0] == '#' || buf[0] == '\n')
-			continue;
-		/*
-		 * Look for "name=value", with optional whitespace on either
-		 * side, terminated by a newline, and consuming the whole line.
-		 */
-		/* LINTED - unbounded string specifier */
-		if (sscanf(buf, " %[^=]=%s \n%n", name, value, &len) == 2 &&
-		    name[0] != '\0' && value[0] != '\0' && len == strlen(buf)) {
-			/*
-			 * Locate a matching token in the tokens[] table,
-			 * and invoke its parsing function.
-			 */
-			for (tokp = tokens; tokp->tok_name != NULL; tokp++) {
-				if (strcmp(name, tokp->tok_name) == 0) {
-					if (tokp->tok_parse(acp, value,
-					    tokp->tok_type) == -1) {
-						warn(gettext("\"%s\", line %d: "
-						    "warning: invalid %s\n"),
-						    fpath, line, name);
-						ret = -1;
-					}
-					break;
-				}
-			}
-			/*
-			 * If we hit the end of the tokens[] table,
-			 * no matching token was found.
-			 */
-			if (tokp->tok_name == NULL) {
-				warn(gettext("\"%s\", line %d: warning: "
-				    "invalid token: %s\n"), fpath, line, name);
-				ret = -1;
-			}
-		} else {
-			warn(gettext("\"%s\", line %d: syntax error\n"),
-			    fpath, line);
-			ret = -1;
-		}
-	}
-	if (line == 1) {
-		warn(gettext("cannot read settings from %s\n"), fpath);
-		ret = -1;
-	}
-	return (ret);
-}
-
-int
-aconf_setup(acctconf_t *acp)
-{
-	void *buf;
+	char *tracked;
+	char *untracked;
 
 	if ((buf = malloc(AC_BUFSIZE)) == NULL)
 		die(gettext("not enough memory\n"));
 
-	/*
-	 * Setup process accounting
-	 */
+	if (acctctl(type | AC_STATE_GET, &acp->state,
+	    sizeof (acp->state)) == -1)
+		die(gettext("cannot get %s accounting state\n"),
+		    ac_type_name(type));
+
+	(void) memset(acp->file, 0, sizeof (acp->file));
+	if (acctctl(type | AC_FILE_GET, acp->file, sizeof (acp->file)) == -1) {
+		if (errno == ENOTACTIVE)
+			(void) strlcpy(acp->file, AC_STR_NONE,
+			    sizeof (acp->file));
+		else
+			die(gettext("cannot get %s accounting file name"),
+			    ac_type_name(type));
+	}
 	(void) memset(buf, 0, AC_BUFSIZE);
-	str2buf(buf, acp->ac_proc_untracked, AC_OFF, AC_PROC);
-	str2buf(buf, acp->ac_proc_tracked, AC_ON, AC_PROC);
-	if (acctctl(AC_PROC | AC_RES_SET, buf, AC_BUFSIZE) == -1) {
-		warn(gettext("cannot enable or disable resources\n"));
-		return (-1);
-	}
-	if (strcmp(acp->ac_proc_file, AC_STR_NONE) != 0) {
-		if (acctctl(AC_PROC | AC_FILE_SET,
-		    acp->ac_proc_file, strlen(acp->ac_proc_file) + 1) == -1) {
-			warn(gettext("cannot open accounting file"));
-			return (-1);
-		}
-	} else {
-		if (acctctl(AC_PROC | AC_FILE_SET, NULL, 0) == -1) {
-			warn(gettext("cannot close accounting file\n"));
-			return (-1);
-		}
-	}
-	if (acctctl(AC_PROC | AC_STATE_SET, &acp->ac_proc_state,
-	    sizeof (int)) == -1) {
-		warn(gettext("cannot enable/disable process accounting"));
-		return (-1);
-	}
+	if (acctctl(type | AC_RES_GET, buf, AC_BUFSIZE) == -1)
+		die(gettext("cannot obtain the list of enabled resources\n"));
 
-	/*
-	 * Setup flow accounting
-	 */
-	(void) memset(buf, 0, AC_BUFSIZE);
-	str2buf(buf, acp->ac_flow_untracked, AC_OFF, AC_FLOW);
-	str2buf(buf, acp->ac_flow_tracked, AC_ON, AC_FLOW);
-	if (acctctl(AC_FLOW | AC_RES_SET, buf, AC_BUFSIZE) == -1) {
-		warn(gettext("cannot enable or disable resources\n"));
-		return (-1);
-	}
-	if (strcmp(acp->ac_flow_file, AC_STR_NONE) != 0) {
-		if (acctctl(AC_FLOW | AC_FILE_SET,
-		    acp->ac_flow_file, strlen(acp->ac_flow_file) + 1) == -1) {
-			warn(gettext("cannot open accounting file"));
-			return (-1);
-		}
-	} else {
-		if (acctctl(AC_FLOW | AC_FILE_SET, NULL, 0) == -1) {
-			warn(gettext("cannot close accounting file\n"));
-			return (-1);
-		}
-	}
-	if (acctctl(AC_FLOW | AC_STATE_SET, &acp->ac_flow_state,
-	    sizeof (int)) == -1) {
-		warn(gettext("cannot enable/disable flow accounting"));
-		return (-1);
-	}
-
-
-	/*
-	 * Setup task accounting
-	 */
-	(void) memset(buf, 0, AC_BUFSIZE);
-	str2buf(buf, acp->ac_task_untracked, AC_OFF, AC_TASK);
-	str2buf(buf, acp->ac_task_tracked, AC_ON, AC_TASK);
-	if (acctctl(AC_TASK | AC_RES_SET, buf, AC_BUFSIZE) == -1) {
-		warn(gettext("cannot enable or disable resources\n"));
-		return (-1);
-	}
-	if (strcmp(acp->ac_task_file, AC_STR_NONE) != 0) {
-		if (acctctl(AC_TASK | AC_FILE_SET,
-		    acp->ac_task_file, strlen(acp->ac_task_file) + 1) == -1) {
-			warn(gettext("cannot set accounting file"));
-			return (-1);
-		}
-	} else {
-		if (acctctl(AC_TASK | AC_FILE_SET, NULL, 0) == -1) {
-			warn(gettext("cannot close accounting file\n"));
-			return (-1);
-		}
-	}
-	if (acctctl(AC_TASK | AC_STATE_SET, &acp->ac_task_state,
-	    sizeof (int)) == -1) {
-		warn(gettext("cannot enable/disable task accounting"));
-		return (-1);
-	}
-
+	tracked = buf2str(buf, AC_BUFSIZE, AC_ON, type);
+	untracked = buf2str(buf, AC_BUFSIZE, AC_OFF, type);
+	(void) strlcpy(acp->tracked, tracked, sizeof (acp->tracked));
+	(void) strlcpy(acp->untracked, untracked, sizeof (acp->untracked));
+	free(tracked);
+	free(untracked);
 	free(buf);
-	return (0);
 }
 
+/*
+ * SMF start method: configure extended accounting from properties stored in
+ * the repository.  Any errors encountered while retrieving properties from
+ * the repository, such as missing properties or properties of the wrong type,
+ * are fatal as they indicate severe damage to the service (all required
+ * properties are delivered in the service manifest and should thus always be
+ * present).  No attempts will be made to repair such damage;  the service will
+ * be forced into maintenance state by returning SMF_EXIT_ERR_CONFIG.  For all
+ * other errors we we try to configure as much as possible and return
+ * SMF_EXIT_ERR_FATAL.
+ */
 int
-aconf_close(acctconf_t *acp)
+aconf_setup(const char *fmri)
 {
-	if (acp->ac_conf_fp != NULL && fclose(acp->ac_conf_fp) != 0)
-		return (-1);
-	else
-		return (0);
-}
+	char file[MAXPATHLEN];
+	char tracked[MAXRESLEN];
+	char untracked[MAXRESLEN];
+	void *buf;
+	int type;
+	int state;
+	uint8_t b;
+	int ret = SMF_EXIT_OK;
 
-int
-aconf_write(acctconf_t *acp)
-{
-	ac_token_t *tokp;
+	if ((type = aconf_fmri2type(fmri)) == -1) {
+		warn(gettext("no accounting type for %s\n"), fmri);
+		return (SMF_EXIT_ERR_FATAL);
+	}
 
-	if (fseeko(acp->ac_conf_fp, (off_t)0, SEEK_SET) == -1) {
-		warn(gettext("failed to seek config file"));
-		return (-1);
+	/*
+	 * Flow accounting is not available in non-global zones and
+	 * the service instance should therefore never be 'enabled' in
+	 * non-global zones.  This is enforced by acctadm(1M), but there is
+	 * nothing that prevents someone from calling svcadm enable directly,
+	 * so we handle that case here by disabling the instance.
+	 */
+	if (type == AC_FLOW && getzoneid() != GLOBAL_ZONEID) {
+		(void) smf_disable_instance(fmri, 0);
+		warn(gettext("%s accounting cannot be configured in "
+		    "non-global zones\n"), ac_type_name(type));
+		return (SMF_EXIT_OK);
 	}
-	if (ftruncate(acp->ac_conf_fd, (off_t)0) == -1) {
-		warn(gettext("failed to truncate config file"));
-		return (-1);
+
+	if (aconf_scf_init(fmri) == -1) {
+		warn(gettext("cannot connect to repository\n"));
+		return (SMF_EXIT_ERR_FATAL);
 	}
-	(void) fputs("#\n# acctadm.conf\n#\n"
-	    "# Configuration parameters for extended accounting.\n"
-	    "# Do NOT edit this file by hand -- use acctadm(1m) instead.\n"
-	    "#\n", acp->ac_conf_fp);
-	for (tokp = tokens; tokp->tok_name != NULL; tokp++) {
-		if (fprintf(acp->ac_conf_fp, "%s=", tokp->tok_name) == -1 ||
-		    tokp->tok_print(acp, acp->ac_conf_fp,
-		    tokp->tok_type) == -1) {
-			warn(gettext("failed to write token"));
-			return (-1);
+	if (aconf_get_string(AC_PGNAME, AC_PROP_TRACKED, tracked,
+	    sizeof (tracked)) == -1) {
+		warn(gettext("cannot get %s property\n"), AC_PROP_TRACKED);
+		ret = SMF_EXIT_ERR_CONFIG;
+		goto out;
+	}
+	if (aconf_get_string(AC_PGNAME, AC_PROP_UNTRACKED, untracked,
+	    sizeof (untracked)) == -1) {
+		warn(gettext("cannot get %s property\n"), AC_PROP_UNTRACKED);
+		ret = SMF_EXIT_ERR_CONFIG;
+		goto out;
+	}
+	if (aconf_get_string(AC_PGNAME, AC_PROP_FILE, file,
+	    sizeof (file)) == -1) {
+		warn(gettext("cannot get %s property\n"), AC_PROP_FILE);
+		ret = SMF_EXIT_ERR_CONFIG;
+		goto out;
+	}
+	if (aconf_get_bool(AC_PGNAME, AC_PROP_STATE, &b) == -1) {
+		warn(gettext("cannot get %s property\n"), AC_PROP_STATE);
+		ret = SMF_EXIT_ERR_CONFIG;
+		goto out;
+	}
+	state = (b ? AC_ON : AC_OFF);
+
+	if ((buf = malloc(AC_BUFSIZE)) == NULL) {
+		warn(gettext("not enough memory\n"));
+		ret = SMF_EXIT_ERR_FATAL;
+		goto out;
+	}
+	(void) memset(buf, 0, AC_BUFSIZE);
+	str2buf(buf, untracked, AC_OFF, type);
+	str2buf(buf, tracked, AC_ON, type);
+
+	(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_SYS_ACCT, NULL);
+	if (acctctl(type | AC_RES_SET, buf, AC_BUFSIZE) == -1) {
+		warn(gettext("cannot enable/disable %s accounting resources"),
+		    ac_type_name(type));
+		ret = SMF_EXIT_ERR_FATAL;
+	}
+	free(buf);
+
+	if (strcmp(file, AC_STR_NONE) != 0) {
+		if (open_exacct_file(file, type) == -1)
+			ret = SMF_EXIT_ERR_FATAL;
+	} else {
+		if (acctctl(type | AC_FILE_SET, NULL, 0) == -1) {
+			warn(gettext("cannot close %s accounting file"),
+			    ac_type_name(type));
+			ret = SMF_EXIT_ERR_FATAL;
 		}
 	}
-	if (fflush(acp->ac_conf_fp) != 0)
-		warn(gettext("warning: failed to flush config file"));
-	if (fsync(acp->ac_conf_fd) == -1)
-		warn(gettext("warning: failed to sync config file to disk"));
-	if (fchmod(acp->ac_conf_fd, AC_PERM) == -1)
-		warn(gettext("warning: failed to reset mode on config file"));
-	if (fchown(acp->ac_conf_fd, AC_OWNER, AC_GROUP) == -1)
-		warn(gettext("warning: failed to reset owner on config file"));
+	if (acctctl(type | AC_STATE_SET, &state, sizeof (state)) == -1) {
+		warn(gettext("cannot %s %s accounting"),
+		    state == AC_ON ? gettext("enable") : gettext("disable"),
+		    ac_type_name(type));
+		ret = SMF_EXIT_ERR_FATAL;
+	}
+	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_SYS_ACCT, NULL);
+out:
+	aconf_scf_fini();
+	return (ret);
+}
+
+void
+aconf_print(FILE *fp, int types)
+{
+	acctconf_t ac;
+	int print_order[] = { AC_TASK, AC_PROC, AC_FLOW };
+	int i;
+
+	for (i = 0; i < NELEM(print_order); i++) {
+		if (types & print_order[i]) {
+			aconf_init(&ac, print_order[i]);
+			aconf_print_type(&ac, fp, print_order[i]);
+		}
+	}
+}
+
+static void
+aconf_print_type(acctconf_t *acp, FILE *fp, int type)
+{
+	switch (type) {
+	case AC_TASK:
+		(void) fprintf(fp,
+		    gettext("            Task accounting: %s\n"),
+		    acp->state == AC_ON ?
+		    gettext("active") : gettext("inactive"));
+		(void) fprintf(fp,
+		    gettext("       Task accounting file: %s\n"),
+		    acp->file);
+		(void) fprintf(fp,
+		    gettext("     Tracked task resources: %s\n"),
+		    acp->tracked);
+		(void) fprintf(fp,
+		    gettext("   Untracked task resources: %s\n"),
+		    acp->untracked);
+		break;
+	case AC_PROC:
+		(void) fprintf(fp,
+		    gettext("         Process accounting: %s\n"),
+		    acp->state == AC_ON ?
+		    gettext("active") : gettext("inactive"));
+		(void) fprintf(fp,
+		    gettext("    Process accounting file: %s\n"),
+		    acp->file);
+		(void) fprintf(fp,
+		    gettext("  Tracked process resources: %s\n"),
+		    acp->tracked);
+		(void) fprintf(fp,
+		    gettext("Untracked process resources: %s\n"),
+		    acp->untracked);
+		break;
+	case AC_FLOW:
+		(void) fprintf(fp,
+		    gettext("            Flow accounting: %s\n"),
+		    acp->state == AC_ON ?
+		    gettext("active") : gettext("inactive"));
+		(void) fprintf(fp,
+		    gettext("       Flow accounting file: %s\n"),
+		    acp->file);
+		(void) fprintf(fp,
+		    gettext("     Tracked flow resources: %s\n"),
+		    acp->tracked);
+		(void) fprintf(fp,
+		    gettext("   Untracked flow resources: %s\n"),
+		    acp->untracked);
+		break;
+	}
+}
+
+/*
+ * Modified properties are put on the 'props' linked list by aconf_set_string()
+ * and aconf_set_bool().  Walk the list of modified properties and write them
+ * to the repository.  The list is deleted on exit.
+ */
+int
+aconf_save(void)
+{
+	scf_propertygroup_t *pg;
+	scf_transaction_t *tx;
+	props_t *p;
+	props_t *q;
+	int tx_result;
+
+	if (props == NULL)
+		return (0);
+
+	if ((pg = scf_pg_create(handle)) == NULL ||
+	    scf_instance_get_pg(inst, AC_PGNAME, pg) == -1 ||
+	    (tx = scf_transaction_create(handle)) == NULL)
+		goto out;
+
+	do {
+		if (scf_pg_update(pg) == -1 ||
+		    scf_transaction_start(tx, pg) == -1)
+			goto out;
+
+		for (p = props; p != NULL; p = p->next) {
+			if (scf_transaction_property_change(tx, p->entry,
+			    p->propname, p->proptype) == -1)
+				goto out;
+			(void) scf_entry_add_value(p->entry, p->value);
+		}
+		tx_result = scf_transaction_commit(tx);
+		scf_transaction_reset(tx);
+	} while (tx_result == 0);
+
+out:
+	p = props;
+	while (p != NULL) {
+		scf_value_destroy(p->value);
+		scf_entry_destroy(p->entry);
+		free(p->propname);
+		q = p->next;
+		free(p);
+		p = q;
+	}
+	props = NULL;
+	scf_transaction_destroy(tx);
+	scf_pg_destroy(pg);
+	return ((tx_result == 1) ? 0 : -1);
+}
+
+boolean_t
+aconf_have_smf_auths(void)
+{
+	char auth[NSS_BUFLEN_AUTHATTR];
+	struct passwd *pw;
+
+	if ((pw = getpwuid(getuid())) == NULL)
+		return (B_FALSE);
+
+	if (aconf_get_string("general", "action_authorization", auth,
+	    sizeof (auth)) == -1 || chkauthattr(auth, pw->pw_name) == 0)
+		return (B_FALSE);
+
+	if (aconf_get_string("general", "value_authorization", auth,
+	    sizeof (auth)) == -1 || chkauthattr(auth, pw->pw_name) == 0)
+		return (B_FALSE);
+
+	if (aconf_get_string("config", "value_authorization", auth,
+	    sizeof (auth)) == -1 || chkauthattr(auth, pw->pw_name) == 0)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+const char *
+aconf_type2fmri(int type)
+{
+	switch (type) {
+	case AC_PROC:
+		return (FMRI_PROC_ACCT);
+	case AC_TASK:
+		return (FMRI_TASK_ACCT);
+	case AC_FLOW:
+		return (FMRI_FLOW_ACCT);
+	default:
+		die(gettext("invalid type %d\n"), type);
+	}
+	/* NOTREACHED */
+	return (NULL);
+}
+
+static int
+aconf_fmri2type(const char *fmri)
+{
+	if (strcmp(fmri, FMRI_PROC_ACCT) == 0)
+		return (AC_PROC);
+	else if (strcmp(fmri, FMRI_TASK_ACCT) == 0)
+		return (AC_TASK);
+	else if (strcmp(fmri, FMRI_FLOW_ACCT) == 0)
+		return (AC_FLOW);
+	else
+		return (-1);
+}
+
+int
+aconf_scf_init(const char *fmri)
+{
+	if ((handle = scf_handle_create(SCF_VERSION)) == NULL ||
+	    scf_handle_bind(handle) == -1 ||
+	    (inst = scf_instance_create(handle)) == NULL ||
+	    scf_handle_decode_fmri(handle, fmri, NULL, NULL, inst, NULL, NULL,
+	    SCF_DECODE_FMRI_EXACT) == -1) {
+		aconf_scf_fini();
+		return (-1);
+	}
 	return (0);
 }
 
 void
-aconf_print(acctconf_t *acp, FILE *fp, int type)
+aconf_scf_fini(void)
 {
-	if (type & AC_TASK) {
-		(void) fprintf(fp,
-		    gettext("            Task accounting: %s\n"),
-		    acp->ac_task_state ?
-		    gettext("active") : gettext("inactive"));
-		(void) fprintf(fp,
-		    gettext("       Task accounting file: %s\n"),
-		    acp->ac_task_file);
-		(void) fprintf(fp,
-		    gettext("     Tracked task resources: %s\n"),
-		    acp->ac_task_tracked);
-		(void) fprintf(fp,
-		    gettext("   Untracked task resources: %s\n"),
-		    acp->ac_task_untracked);
+	scf_instance_destroy(inst);
+	(void) scf_handle_unbind(handle);
+	scf_handle_destroy(handle);
+}
+
+static int
+aconf_get_string(const char *pgname, const char *propname, char *buf,
+    size_t len)
+{
+	scf_propertygroup_t *pg;
+	scf_property_t *prop;
+	scf_value_t *value;
+	int ret = 0;
+
+	if ((pg = scf_pg_create(handle)) == NULL)
+		return (-1);
+
+	if (scf_instance_get_pg_composed(inst, NULL, pgname, pg) == -1) {
+		scf_pg_destroy(pg);
+		return (-1);
 	}
-	if (type & AC_PROC) {
-		(void) fprintf(fp,
-		    gettext("         Process accounting: %s\n"),
-		    acp->ac_proc_state ?
-		    gettext("active") : gettext("inactive"));
-		(void) fprintf(fp,
-		    gettext("    Process accounting file: %s\n"),
-		    acp->ac_proc_file);
-		(void) fprintf(fp,
-		    gettext("  Tracked process resources: %s\n"),
-		    acp->ac_proc_tracked);
-		(void) fprintf(fp,
-		    gettext("Untracked process resources: %s\n"),
-		    acp->ac_proc_untracked);
+
+	if ((prop = scf_property_create(handle)) == NULL ||
+	    (value = scf_value_create(handle)) == NULL ||
+	    scf_pg_get_property(pg, propname, prop) == -1 ||
+	    scf_property_get_value(prop, value) == -1 ||
+	    scf_value_get_astring(value, buf, len) == -1)
+		ret = -1;
+
+	scf_value_destroy(value);
+	scf_property_destroy(prop);
+	scf_pg_destroy(pg);
+	return (ret);
+}
+
+static int
+aconf_get_bool(const char *pgname, const char *propname, uint8_t *rval)
+{
+	scf_propertygroup_t *pg;
+	scf_property_t *prop;
+	scf_value_t *value;
+	int ret = 0;
+
+	if ((pg = scf_pg_create(handle)) == NULL)
+		return (-1);
+
+	if (scf_instance_get_pg_composed(inst, NULL, pgname, pg) == -1) {
+		scf_pg_destroy(pg);
+		return (-1);
 	}
-	if (type & AC_FLOW) {
-		(void) fprintf(fp,
-		    gettext("            Flow accounting: %s\n"),
-		    acp->ac_flow_state ?
-		    gettext("active") : gettext("inactive"));
-		(void) fprintf(fp,
-		    gettext("       Flow accounting file: %s\n"),
-		    acp->ac_flow_file);
-		(void) fprintf(fp,
-		    gettext("     Tracked flow resources: %s\n"),
-		    acp->ac_flow_tracked);
-		(void) fprintf(fp,
-		    gettext("   Untracked flow resources: %s\n"),
-		    acp->ac_flow_untracked);
+
+	if ((prop = scf_property_create(handle)) == NULL ||
+	    (value = scf_value_create(handle)) == NULL ||
+	    scf_pg_get_property(pg, propname, prop) == -1 ||
+	    scf_property_get_value(prop, value) == -1 ||
+	    scf_value_get_boolean(value, rval) == -1)
+		ret = -1;
+
+	scf_value_destroy(value);
+	scf_property_destroy(prop);
+	scf_pg_destroy(pg);
+	return (ret);
+}
+
+int
+aconf_set_string(const char *propname, const char *value)
+{
+	props_t *p;
+
+	if ((p = aconf_prop(propname, SCF_TYPE_ASTRING)) == NULL)
+		return (-1);
+
+	if (scf_value_set_astring(p->value, value) == -1)
+		return (-1);
+	return (0);
+}
+
+int
+aconf_set_bool(const char *propname, boolean_t value)
+{
+	props_t *p;
+
+	if ((p = aconf_prop(propname, SCF_TYPE_BOOLEAN)) == NULL)
+		return (-1);
+
+	scf_value_set_boolean(p->value, value);
+	return (0);
+}
+
+static props_t *
+aconf_prop(const char *propname, int proptype)
+{
+	props_t *p;
+
+	if ((p = malloc(sizeof (props_t))) != NULL) {
+		if ((p->propname = strdup(propname)) == NULL) {
+			free(p);
+			return (NULL);
+		}
+		if ((p->entry = scf_entry_create(handle)) == NULL) {
+			free(p->propname);
+			free(p);
+			return (NULL);
+		}
+		if ((p->value = scf_value_create(handle)) == NULL) {
+			scf_entry_destroy(p->entry);
+			free(p->propname);
+			free(p);
+			return (NULL);
+		}
+		p->proptype = proptype;
+		p->next = props;
+		props = p;
 	}
-}
-
-int
-aconf_str2enable(acctconf_t *acp, char *buf, int type)
-{
-	int state;
-
-	if (strcasecmp(buf, AC_STR_YES) == 0)
-		state = AC_ON;
-	else if (strcasecmp(buf, AC_STR_NO) == 0)
-		state = AC_OFF;
-	else
-		return (-1);
-	if (type == AC_PROC)
-		acp->ac_proc_state = state;
-	else if (type == AC_TASK)
-		acp->ac_task_state = state;
-	else if (type == AC_FLOW)
-		acp->ac_flow_state = state;
-	else
-		return (-1);
-	return (0);
-}
-
-int
-aconf_str2file(acctconf_t *acp, char *buf, int type)
-{
-	if (strcmp(buf, AC_STR_NONE) != 0 && !valid_abspath(buf))
-		return (-1);
-	if (type == AC_PROC)
-		(void) strlcpy(acp->ac_proc_file, buf, MAXPATHLEN);
-	else if (type == AC_TASK)
-		(void) strlcpy(acp->ac_task_file, buf, MAXPATHLEN);
-	else if (type == AC_FLOW)
-		(void) strlcpy(acp->ac_flow_file, buf, MAXPATHLEN);
-	return (0);
-}
-
-int
-aconf_str2tracked(acctconf_t *acp, char *buf, int type)
-{
-	if (type == AC_PROC)
-		(void) strlcpy(acp->ac_proc_tracked, buf, MAXRESLEN);
-	else if (type == AC_TASK)
-		(void) strlcpy(acp->ac_task_tracked, buf, MAXRESLEN);
-	else if (type == AC_FLOW)
-		(void) strlcpy(acp->ac_flow_tracked, buf, MAXRESLEN);
-	else
-		return (-1);
-	return (0);
-}
-
-int
-aconf_str2untracked(acctconf_t *acp, char *buf, int type)
-{
-	if (type == AC_PROC)
-		(void) strlcpy(acp->ac_proc_untracked, buf, MAXRESLEN);
-	else if (type == AC_TASK)
-		(void) strlcpy(acp->ac_task_untracked, buf, MAXRESLEN);
-	else if (type == AC_FLOW)
-		(void) strlcpy(acp->ac_flow_untracked, buf, MAXRESLEN);
-	else
-		return (-1);
-	return (0);
-}
-
-static int
-print_enable(acctconf_t *acp, FILE *fp, int type)
-{
-	if (type == AC_PROC)
-		return (fprintf(fp, "%s\n", (acp->ac_proc_state == AC_OFF) ?
-		    AC_STR_NO : AC_STR_YES));
-	else if (type == AC_TASK)
-		return (fprintf(fp, "%s\n", (acp->ac_task_state == AC_OFF) ?
-		    AC_STR_NO : AC_STR_YES));
-	else if (type == AC_FLOW)
-		return (fprintf(fp, "%s\n", (acp->ac_flow_state == AC_OFF) ?
-		    AC_STR_NO : AC_STR_YES));
-	else
-		return (-1);
-}
-
-static int
-print_file(acctconf_t *acp, FILE *fp, int type)
-{
-	if (type == AC_PROC)
-		return (fprintf(fp, "%s\n", acp->ac_proc_file));
-	else if (type == AC_TASK)
-		return (fprintf(fp, "%s\n", acp->ac_task_file));
-	else if (type == AC_FLOW)
-		return (fprintf(fp, "%s\n", acp->ac_flow_file));
-	else
-		return (-1);
-}
-
-static int
-print_tracked(acctconf_t *acp, FILE *fp, int type)
-{
-	if (type == AC_PROC)
-		return (fprintf(fp, "%s\n", acp->ac_proc_tracked));
-	else if (type == AC_TASK)
-		return (fprintf(fp, "%s\n", acp->ac_task_tracked));
-	else if (type == AC_FLOW)
-		return (fprintf(fp, "%s\n", acp->ac_flow_tracked));
-	else
-		return (-1);
-}
-
-static int
-print_untracked(acctconf_t *acp, FILE *fp, int type)
-{
-	if (type == AC_PROC)
-		return (fprintf(fp, "%s\n", acp->ac_proc_untracked));
-	else if (type == AC_TASK)
-		return (fprintf(fp, "%s\n", acp->ac_task_untracked));
-	else if (type == AC_FLOW)
-		return (fprintf(fp, "%s\n", acp->ac_flow_untracked));
-	else
-		return (-1);
+	return (p);
 }

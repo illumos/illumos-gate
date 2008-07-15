@@ -180,7 +180,6 @@ s none etc/init=../sbin/init
 d none etc/init.d 755 root sys
 e initd etc/init.d/PRESERVE 744 root sys
 e initd etc/init.d/README 644 root sys
-e initd etc/init.d/acctadm 744 root sys
 e initd etc/init.d/cachefs.daemon 744 root sys
 e initd etc/init.d/deallocate 744 root sys
 f initd etc/init.d/ldap.client 744 root sys
@@ -538,6 +537,7 @@ f manifest var/svc/manifest/system/console-login.xml 0444 root sys
 f manifest var/svc/manifest/system/coreadm.xml 0444 root sys
 f manifest var/svc/manifest/system/cron.xml 0444 root sys
 f manifest var/svc/manifest/system/cryptosvc.xml 0444 root sys
+f manifest var/svc/manifest/system/extended-accounting.xml 0444 root sys
 f manifest var/svc/manifest/system/identity.xml 0444 root sys
 f manifest var/svc/manifest/system/idmap.xml 0444 root sys
 f manifest var/svc/manifest/system/keymap.xml 0444 root sys

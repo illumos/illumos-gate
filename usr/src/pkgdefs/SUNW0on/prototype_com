@@ -240,6 +240,9 @@ f none usr/lib/help/auths/locale/DhcpmgrWrite.html 444 root bin
 f none usr/lib/help/auths/locale/BindStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfAutofsStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfCronStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfExAcctFlowStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfExAcctProcessStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfExAcctTaskStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfHeader.html 444 root bin
 f none usr/lib/help/auths/locale/SmfInetdStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfManageHeader.html 444 root bin
@@ -261,6 +264,9 @@ f none usr/lib/help/auths/locale/SmfSMBStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSshStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSyslogStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfVscanStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfValueExAcctFlow.html 444 root bin
+f none usr/lib/help/auths/locale/SmfValueExAcctProcess.html 444 root bin
+f none usr/lib/help/auths/locale/SmfValueExAcctTask.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueHeader.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueInetd.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueIPsec.html 444 root bin
@@ -317,10 +323,14 @@ f none usr/lib/help/auths/locale/SysCpuPowerMgmt.html 444 root bin
 #
 d none usr/lib/help/profiles 755 root bin
 d none usr/lib/help/profiles/locale 755 root bin
+f none usr/lib/help/profiles/locale/RtAcctadm.html 444 root bin
 f none usr/lib/help/profiles/locale/RtAll.html 444 root bin
 f none usr/lib/help/profiles/locale/RtAuditCtrl.html 444 root bin
 f none usr/lib/help/profiles/locale/RtAuditReview.html 444 root bin
 f none usr/lib/help/profiles/locale/RtDeviceMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtExAcctFlow.html 444 root bin
+f none usr/lib/help/profiles/locale/RtExAcctProcess.html 444 root bin
+f none usr/lib/help/profiles/locale/RtExAcctTask.html 444 root bin
 f none usr/lib/help/profiles/locale/RtPrntAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/RtConsUser.html 444 root bin
 f none usr/lib/help/profiles/locale/RtContractObserver.html 444 root bin

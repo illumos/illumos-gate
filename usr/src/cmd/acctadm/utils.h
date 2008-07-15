@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,9 @@ extern "C" {
 extern void warn(const char *, ...);
 extern void die(char *, ...);
 extern char *setprogname(char *);
-extern int valid_abspath(char *);
+extern const char *ac_type_name(int);
+extern int open_exacct_file(const char *, int);
+extern boolean_t verify_exacct_file(const char *, int);
 
 #ifdef	__cplusplus
 }
