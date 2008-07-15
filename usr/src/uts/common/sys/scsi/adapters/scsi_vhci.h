@@ -610,8 +610,8 @@ struct scsi_failover_ops {
  */
 #define	SFO_NAME_SYM		"f_sym"
 #define	SFO_NAME_TPGS		"f_tpgs"
-#define	SCSI_FAILOVER_IS_SYM(sfo)	\
-	((sfo) ? (strcmp((sfo)->sfo_name, SFO_NAME_SYM) == 0) : 0)
+#define	SCSI_FAILOVER_IS_ASYM(svl)	\
+	((svl) ? ((svl)->svl_fo_support != SCSI_NO_FAILOVER) : 0)
 #define	SCSI_FAILOVER_IS_TPGS(sfo)	\
 	((sfo) ? (strcmp((sfo)->sfo_name, SFO_NAME_TPGS) == 0) : 0)
 

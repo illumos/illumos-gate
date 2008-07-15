@@ -2686,8 +2686,8 @@ vhci_mpapi_create_item(struct scsi_vhci *vhci, uint8_t obj_type, void* res)
 			(void) strlcat(lu->prop.deviceFileName, lu->prop.name,
 			    sizeof (lu->prop.deviceFileName));
 
-			if ((svl->svl_fops != NULL) &&
-			    !SCSI_FAILOVER_IS_SYM(svl->svl_fops)) {
+			if ((svl != NULL) &&
+			    SCSI_FAILOVER_IS_ASYM(svl)) {
 				lu->prop.asymmetric = 1;
 			}
 
@@ -3230,7 +3230,7 @@ vhci_mpapi_synthesize_tpg_data(struct scsi_vhci *vhci, scsi_vhci_lun_t *vlun,
 			tpg_data = tpg_list->item->idata;
 		}
 
-		if (!SCSI_FAILOVER_IS_SYM(vlun->svl_fops)) {
+		if ((vlun != NULL) && SCSI_FAILOVER_IS_ASYM(vlun)) {
 			tpg_data->prop.explicitFailover = 1;
 		}
 
