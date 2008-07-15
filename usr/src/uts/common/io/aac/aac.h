@@ -57,7 +57,7 @@ extern "C" {
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	2
-#define	AAC_DRIVER_BUGFIX_LEVEL		3
+#define	AAC_DRIVER_BUGFIX_LEVEL		4
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -260,7 +260,7 @@ struct aac_softstate {
 
 	/* PCI spaces */
 	ddi_acc_handle_t pci_mem_handle;
-	char *pci_mem_base_vaddr;
+	uint8_t *pci_mem_base_vaddr;
 	uint32_t pci_mem_base_paddr;
 
 	struct aac_interface aac_if;	/* adapter hardware interface */

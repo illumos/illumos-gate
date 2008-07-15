@@ -571,8 +571,9 @@ aac_send_raw_srb(struct aac_softstate *softs, dev_t dev, intptr_t arg, int mode)
 	for (usge = usgt; usge < &usgt[srb_sgcount]; usge++) {
 		struct buf *bp;
 
-		bp = ddi_umem_iosetup(cookie, usge->addr - addrlo,
-		    usge->bcount, direct, dev, 0, NULL, DDI_UMEM_SLEEP);
+		bp = ddi_umem_iosetup(cookie, (uintptr_t)usge->addr - \
+		    (uintptr_t)addrlo, usge->bcount, direct, dev, 0, NULL,
+		    DDI_UMEM_SLEEP);
 		if (bp == NULL) {
 			AACDB_PRINT(softs, CE_NOTE, "ddi_umem_iosetup failed");
 			rval = EFAULT;
