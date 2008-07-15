@@ -285,7 +285,7 @@ display_mechs:
 	for (i = 0; i < mech_count; i++) {
 		CK_MECHANISM_TYPE	mech = pmech_list[i];
 
-		if (mech > CKM_VENDOR_DEFINED) {
+		if (mech >= CKM_VENDOR_DEFINED) {
 			(void) printf("%#lx", mech);
 		} else {
 			(void) printf("%-29s", pkcs11_mech2str(mech));

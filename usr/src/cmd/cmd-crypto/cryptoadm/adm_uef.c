@@ -448,7 +448,7 @@ list_mechlist_for_lib(char *libname, mechlist_t *mlist,
 		for (j = 0; show_mechs && j < mech_count; j++) {
 			CK_MECHANISM_TYPE	mech = pmech_list[j];
 
-			if (mech > CKM_VENDOR_DEFINED) {
+			if (mech >= CKM_VENDOR_DEFINED) {
 				(void) printf("%#lx", mech);
 			} else {
 				mech_name = pkcs11_mech2str(mech);
@@ -1143,7 +1143,7 @@ display_policy(uentry_t *puent)
 					/* vendor defined mechanism */
 					(void) printf("%s", ptr->name);
 				} else {
-					if (mech_id > CKM_VENDOR_DEFINED) {
+					if (mech_id >= CKM_VENDOR_DEFINED) {
 						(void) printf("%#lx", mech_id);
 					} else {
 						mech_name = pkcs11_mech2str(

@@ -212,7 +212,7 @@ kernel_mech(CK_MECHANISM_TYPE type, crypto_mech_type_t *k_number)
 		}
 	}
 
-	if (type > CKM_VENDOR_DEFINED) {
+	if (type >= CKM_VENDOR_DEFINED) {
 		(void) snprintf(buf, sizeof (buf), "%#lx", type);
 		string = buf;
 	} else {
@@ -1234,7 +1234,7 @@ get_mechanism_info(kernel_slot_t *pslot, CK_MECHANISM_TYPE type,
 	int r;
 	char buf[11];   /* Num chars for representing ulong in ASCII */
 
-	if (type > CKM_VENDOR_DEFINED) {
+	if (type >= CKM_VENDOR_DEFINED) {
 		/* allocate/build a string containing the mechanism number */
 		(void) snprintf(buf, sizeof (buf), "%#lx", type);
 		string = buf;

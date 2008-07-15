@@ -301,7 +301,7 @@ static const pkcs11_mapping_t mapping[] = {
 	{ "CKM_DH_PKCS_PARAMETER_GEN", CKM_DH_PKCS_PARAMETER_GEN },
 	{ "CKM_X9_42_DH_PARAMETER_GEN", CKM_X9_42_DH_PARAMETER_GEN },
 	/*
-	 * Values above 0x8000000 (CKM_VENDOR_DEFINED) are represented
+	 * Values >= 0x8000000 (CKM_VENDOR_DEFINED) are represented
 	 * as strings with hexadecimal numbers (e.g., "0x8123456").
 	 */
 	{ NULL, 0 }
@@ -334,7 +334,7 @@ const char
 	pkcs11_mapping_t	target;
 	pkcs11_mapping_t	*result = NULL;
 
-	if (mech > CKM_VENDOR_DEFINED) {
+	if (mech >= CKM_VENDOR_DEFINED) {
 		return (NULL);
 	}
 
