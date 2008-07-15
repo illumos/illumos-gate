@@ -285,7 +285,7 @@ extern	void	ipsq_enq(ipsq_t *, queue_t *, mblk_t *, ipsq_func_t, int,
 extern	boolean_t ipsq_enter(ill_t *, boolean_t);
 extern	ipsq_t	*ipsq_try_enter(ipif_t *, ill_t *, queue_t *, mblk_t *,
     ipsq_func_t, int, boolean_t);
-extern	void	ipsq_exit(ipsq_t *, boolean_t, boolean_t);
+extern	void	ipsq_exit(ipsq_t *);
 extern mblk_t	*ipsq_pending_mp_get(ipsq_t *, conn_t **);
 extern boolean_t ipsq_pending_mp_add(conn_t *, ipif_t *, queue_t *,
     mblk_t *, int);

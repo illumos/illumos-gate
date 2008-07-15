@@ -1,4 +1,8 @@
 /*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
@@ -703,7 +707,7 @@ ip_mrouter_done(mblk_t *mp, ip_stack_t *ipst)
 				if (suc) {
 					(void) ip_delmulti(INADDR_ANY, ipif,
 					    B_TRUE, B_TRUE);
-					ipsq_exit(ipsq, B_TRUE, B_TRUE);
+					ipsq_exit(ipsq);
 				}
 				mutex_enter(&vifp->v_lock);
 			}
@@ -956,7 +960,7 @@ add_vif(struct vifctl *vifcp, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 			    "add_vif: source route tunnels not supported\n");
 			VIF_REFRELE_LOCKED(vifp);
 			ipif_refrele(ipif);
-			ipsq_exit(ipsq, B_TRUE, B_TRUE);
+			ipsq_exit(ipsq);
 			return (EOPNOTSUPP);
 		}
 		vifp->v_rmt_addr  = vifcp->vifc_rmt_addr;
@@ -978,7 +982,7 @@ add_vif(struct vifctl *vifcp, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 				mutex_exit(&ipst->ips_numvifs_mutex);
 				VIF_REFRELE_LOCKED(vifp);
 				ipif_refrele(ipif);
-				ipsq_exit(ipsq, B_TRUE, B_TRUE);
+				ipsq_exit(ipsq);
 				return (EADDRINUSE);
 			}
 		}
@@ -992,7 +996,7 @@ add_vif(struct vifctl *vifcp, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 				ipst->ips_reg_vif_num = ALL_VIFS;
 				mutex_exit(&ipst->ips_numvifs_mutex);
 			}
-			ipsq_exit(ipsq, B_TRUE, B_TRUE);
+			ipsq_exit(ipsq);
 			return (EOPNOTSUPP);
 		}
 		/* Enable promiscuous reception of all IP mcasts from the if */
@@ -1015,7 +1019,7 @@ add_vif(struct vifctl *vifcp, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 			}
 			VIF_REFRELE_LOCKED(vifp);
 			ipif_refrele(ipif);
-			ipsq_exit(ipsq, B_TRUE, B_TRUE);
+			ipsq_exit(ipsq);
 			return (error?error:EINVAL);
 		}
 	}
@@ -1060,7 +1064,7 @@ add_vif(struct vifctl *vifcp, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 
 	vifp->v_marks = VIF_MARK_GOOD;
 	mutex_exit(&vifp->v_lock);
-	ipsq_exit(ipsq, B_TRUE, B_TRUE);
+	ipsq_exit(ipsq);
 	return (0);
 }
 
@@ -1182,7 +1186,7 @@ del_vif(vifi_t *vifip, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 			 * someone beat us.
 			 */
 			mutex_exit(&vifp->v_lock);
-			ipsq_exit(ipsq, B_TRUE, B_TRUE);
+			ipsq_exit(ipsq);
 			return (EADDRNOTAVAIL);
 		}
 	}
@@ -1213,7 +1217,7 @@ del_vif(vifi_t *vifip, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 		mutex_exit(&(vifp)->v_lock);
 		(void) ip_delmulti(INADDR_ANY, ipif, B_TRUE, B_TRUE);
 		if (first_mp != NULL)
-			ipsq_exit(ipsq, B_TRUE, B_TRUE);
+			ipsq_exit(ipsq);
 		mutex_enter(&(vifp)->v_lock);
 	}
 

@@ -1487,7 +1487,7 @@ conn_ioctl_cleanup(conn_t *connp)
 			if (!ipsq_pending_mp_cleanup(ill, connp))
 				ipsq_xopq_mp_cleanup(ill, connp);
 			ipsq = ill->ill_phyint->phyint_ipsq;
-			ipsq_exit(ipsq, B_TRUE, B_TRUE);
+			ipsq_exit(ipsq);
 			return;
 		}
 	}
@@ -7814,7 +7814,7 @@ qwriter_ip(ill_t *ill, queue_t *q, mblk_t *mp, ipsq_func_t func, int type,
 	ill_refrele(ill);
 	if (ipsq != NULL) {
 		(*func)(ipsq, q, mp, NULL);
-		ipsq_exit(ipsq, B_TRUE, B_TRUE);
+		ipsq_exit(ipsq);
 	}
 }
 
@@ -7828,7 +7828,7 @@ qwriter_ip(ill_t *ill, queue_t *q, mblk_t *mp, ipsq_func_t func, int type,
  * Called by a thread that is currently exclusive on this ipsq.
  */
 void
-ipsq_exit(ipsq_t *ipsq, boolean_t start_igmp_timer, boolean_t start_mld_timer)
+ipsq_exit(ipsq_t *ipsq)
 {
 	queue_t	*q;
 	mblk_t	*mp;
@@ -7967,39 +7967,40 @@ again:
 		 */
 		ipsq_delete(ipsq);
 	}
+
 	/*
-	 * Now start any igmp or mld timers that could not be started
-	 * while inside the ipsq. The timers can't be started while inside
-	 * the ipsq, since igmp_start_timers may need to call untimeout()
-	 * which can't be done while holding a lock i.e. the ipsq. Otherwise
-	 * there could be a deadlock since the timeout handlers
-	 * mld_timeout_handler / igmp_timeout_handler also synchronously
-	 * wait in ipsq_enter() trying to get the ipsq.
+	 * Now that we're outside the IPSQ, start any IGMP/MLD timers.  We
+	 * can't start these inside the IPSQ since e.g. igmp_start_timers() ->
+	 * untimeout() (inside the IPSQ, waiting for an executing timeout to
+	 * finish) could deadlock with igmp_timeout_handler() -> ipsq_enter()
+	 * (executing the timeout, waiting to get inside the IPSQ).
 	 *
-	 * However there is one exception to the above. If this thread is
-	 * itself the igmp/mld timeout handler thread, then we don't want
-	 * to start any new timer until the current handler is done. The
-	 * handler thread passes in B_FALSE for start_igmp/mld_timers, while
-	 * all others pass B_TRUE.
+	 * However, there is one exception to the above: if this thread *is*
+	 * the IGMP/MLD timeout handler thread, then we must not start its
+	 * timer until the current handler is done.
 	 */
-	if (start_igmp_timer) {
-		mutex_enter(&ipst->ips_igmp_timer_lock);
+	mutex_enter(&ipst->ips_igmp_timer_lock);
+	if (curthread != ipst->ips_igmp_timer_thread) {
 		next = ipst->ips_igmp_deferred_next;
 		ipst->ips_igmp_deferred_next = INFINITY;
 		mutex_exit(&ipst->ips_igmp_timer_lock);
 
 		if (next != INFINITY)
 			igmp_start_timers(next, ipst);
+	} else {
+		mutex_exit(&ipst->ips_igmp_timer_lock);
 	}
 
-	if (start_mld_timer) {
-		mutex_enter(&ipst->ips_mld_timer_lock);
+	mutex_enter(&ipst->ips_mld_timer_lock);
+	if (curthread != ipst->ips_mld_timer_thread) {
 		next = ipst->ips_mld_deferred_next;
 		ipst->ips_mld_deferred_next = INFINITY;
 		mutex_exit(&ipst->ips_mld_timer_lock);
 
 		if (next != INFINITY)
 			mld_start_timers(next, ipst);
+	} else {
+		mutex_exit(&ipst->ips_mld_timer_lock);
 	}
 }
 
@@ -9940,7 +9941,7 @@ done:
 	if (CONN_Q(q))
 		CONN_OPER_PENDING_DONE(Q_TO_CONN(q));
 	if (entered_ipsq)
-		ipsq_exit(ipsq, B_TRUE, B_TRUE);
+		ipsq_exit(ipsq);
 }
 
 /*
@@ -10004,7 +10005,7 @@ ip_sioctl_plink_ipmod(ipsq_t *ipsq, queue_t *q, mblk_t *mp, int ioccmd,
 		if ((islink && ill->ill_ip_muxid != 0) ||
 		    (!islink && ill->ill_arp_muxid != 0)) {
 			if (entered_ipsq)
-				ipsq_exit(ipsq, B_TRUE, B_TRUE);
+				ipsq_exit(ipsq);
 			return (EINVAL);
 		}
 	}
@@ -10039,7 +10040,7 @@ ip_sioctl_plink_ipmod(ipsq_t *ipsq, queue_t *q, mblk_t *mp, int ioccmd,
 	}
 
 	if (entered_ipsq)
-		ipsq_exit(ipsq, B_TRUE, B_TRUE);
+		ipsq_exit(ipsq);
 
 	return (0);
 }
@@ -10797,7 +10798,7 @@ ip_sioctl_addif(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	}
 
 done:
-	ipsq_exit(ipsq, B_TRUE, B_TRUE);
+	ipsq_exit(ipsq);
 	return (err);
 }
 
@@ -14890,7 +14891,7 @@ ill_merge_groups(ill_t *from_ill, ill_t *to_ill, char *groupname, mblk_t *mp,
 	 * a set groupname or failover/failback.
 	 */
 	if (became_writer_on_new_sq)
-		ipsq_exit(new_ipsq, B_TRUE, B_TRUE);
+		ipsq_exit(new_ipsq);
 
 	/*
 	 * syncq has been changed and all the messages have been moved.
@@ -22410,7 +22411,7 @@ done:
 		mutex_exit(&usesrc_cli_ill->ill_lock);
 	}
 	if (ipsq != NULL)
-		ipsq_exit(ipsq, B_TRUE, B_TRUE);
+		ipsq_exit(ipsq);
 	/* The refrele on the lifr_name ipif is done by ip_process_ioctl */
 	ill_refrele(usesrc_ill);
 	return (err);
@@ -23079,7 +23080,7 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 		ASSERT(ipsq->ipsq_current_ipif == ipif);
 
 	error = ipif_set_values_tail(ill, ipif, mp, q);
-	ipsq_exit(ipsq, B_TRUE, B_TRUE);
+	ipsq_exit(ipsq);
 	if (error != 0 && error != EINPROGRESS) {
 		/*
 		 * restore previous values

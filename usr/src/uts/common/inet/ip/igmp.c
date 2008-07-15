@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -821,12 +821,8 @@ igmp_joingroup(ilm_t *ilm)
 		mutex_exit(&ill->ill_lock);
 
 		/*
-		 * To avoid deadlock, we don't call igmp_start_timers from
-		 * here. igmp_start_timers needs to call untimeout, and we
-		 * can't hold the ipsq across untimeout since
-		 * igmp_timeout_handler could be blocking trying to
-		 * acquire the ipsq. Instead we start the timer after we get
-		 * out of the ipsq in ipsq_exit.
+		 * To avoid deadlock, we defer igmp_start_timers() to
+		 * ipsq_exit().  See the comment in ipsq_exit() for details.
 		 */
 		mutex_enter(&ipst->ips_igmp_timer_lock);
 		ipst->ips_igmp_deferred_next = MIN(timer,
@@ -903,12 +899,8 @@ mld_joingroup(ilm_t *ilm)
 		mutex_exit(&ill->ill_lock);
 
 		/*
-		 * To avoid deadlock, we don't call mld_start_timers from
-		 * here. mld_start_timers needs to call untimeout, and we
-		 * can't hold the ipsq (i.e. the lock) across untimeout
-		 * since mld_timeout_handler could be blocking trying to
-		 * acquire the ipsq. Instead we start the timer after we get
-		 * out of the ipsq in ipsq_exit
+		 * To avoid deadlock, we defer mld_start_timers() to
+		 * ipsq_exit().  See the comment in ipsq_exit() for details.
 		 */
 		mutex_enter(&ipst->ips_mld_timer_lock);
 		ipst->ips_mld_deferred_next = MIN(timer,
@@ -1425,11 +1417,12 @@ igmp_timeout_handler(void *arg)
 	uint_t  next;
 	ill_walk_context_t ctx;
 	boolean_t success;
-	ip_stack_t *ipst = (ip_stack_t *)arg;
+	ip_stack_t *ipst = arg;
 
 	ASSERT(arg != NULL);
 	mutex_enter(&ipst->ips_igmp_timer_lock);
 	ASSERT(ipst->ips_igmp_timeout_id != 0);
+	ipst->ips_igmp_timer_thread = curthread;
 	ipst->ips_igmp_timer_scheduled_last = 0;
 	ipst->ips_igmp_time_to_next = 0;
 	mutex_exit(&ipst->ips_igmp_timer_lock);
@@ -1451,8 +1444,7 @@ igmp_timeout_handler(void *arg)
 			next = igmp_timeout_handler_per_ill(ill);
 			if (next < global_next)
 				global_next = next;
-			ipsq_exit(ill->ill_phyint->phyint_ipsq, B_FALSE,
-			    B_TRUE);
+			ipsq_exit(ill->ill_phyint->phyint_ipsq);
 		}
 		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 		ill_waiter_dcr(ill);
@@ -1462,6 +1454,7 @@ igmp_timeout_handler(void *arg)
 	mutex_enter(&ipst->ips_igmp_timer_lock);
 	ASSERT(ipst->ips_igmp_timeout_id != 0);
 	ipst->ips_igmp_timeout_id = 0;
+	ipst->ips_igmp_timer_thread = NULL;
 	mutex_exit(&ipst->ips_igmp_timer_lock);
 
 	if (global_next != INFINITY)
@@ -1667,11 +1660,12 @@ mld_timeout_handler(void *arg)
 	uint_t  next;
 	ill_walk_context_t ctx;
 	boolean_t success;
-	ip_stack_t *ipst = (ip_stack_t *)arg;
+	ip_stack_t *ipst = arg;
 
 	ASSERT(arg != NULL);
 	mutex_enter(&ipst->ips_mld_timer_lock);
 	ASSERT(ipst->ips_mld_timeout_id != 0);
+	ipst->ips_mld_timer_thread = curthread;
 	ipst->ips_mld_timer_scheduled_last = 0;
 	ipst->ips_mld_time_to_next = 0;
 	mutex_exit(&ipst->ips_mld_timer_lock);
@@ -1693,8 +1687,7 @@ mld_timeout_handler(void *arg)
 			next = mld_timeout_handler_per_ill(ill);
 			if (next < global_next)
 				global_next = next;
-			ipsq_exit(ill->ill_phyint->phyint_ipsq, B_TRUE,
-			    B_FALSE);
+			ipsq_exit(ill->ill_phyint->phyint_ipsq);
 		}
 		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 		ill_waiter_dcr(ill);
@@ -1704,6 +1697,7 @@ mld_timeout_handler(void *arg)
 	mutex_enter(&ipst->ips_mld_timer_lock);
 	ASSERT(ipst->ips_mld_timeout_id != 0);
 	ipst->ips_mld_timeout_id = 0;
+	ipst->ips_mld_timer_thread = NULL;
 	mutex_exit(&ipst->ips_mld_timer_lock);
 
 	if (global_next != INFINITY)
@@ -1806,7 +1800,7 @@ igmp_slowtimo(void *arg)
 	rw_exit(&ipst->ips_ill_g_lock);
 	mutex_enter(&ipst->ips_igmp_slowtimeout_lock);
 	ipst->ips_igmp_slowtimeout_id = timeout(igmp_slowtimo, (void *)ipst,
-		MSEC_TO_TICK(MCAST_SLOWTIMO_INTERVAL));
+	    MSEC_TO_TICK(MCAST_SLOWTIMO_INTERVAL));
 	mutex_exit(&ipst->ips_igmp_slowtimeout_lock);
 }
 
@@ -2314,7 +2308,7 @@ mld_input(queue_t *q, mblk_t *mp, ill_t *ill)
 		mutex_enter(&ill->ill_lock);
 		for (ilm = ill->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
 			if (!IN6_ARE_ADDR_EQUAL(&ilm->ilm_v6addr, v6group_ptr))
-			    continue;
+				continue;
 			BUMP_MIB(ill->ill_icmp6_mib,
 			    ipv6IfIcmpInGroupMembOurReports);
 

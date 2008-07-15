@@ -5487,7 +5487,7 @@ ip_modclose(ill_t *ill)
 	mi_close_free((IDP)ill);
 	q->q_ptr = WR(q)->q_ptr = NULL;
 
-	ipsq_exit(ipsq, B_TRUE, B_TRUE);
+	ipsq_exit(ipsq);
 
 	return (0);
 }
@@ -9693,7 +9693,7 @@ ip_modopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	}
 
 	/* ill_init initializes the ipsq marking this thread as writer */
-	ipsq_exit(ill->ill_phyint->phyint_ipsq, B_TRUE, B_TRUE);
+	ipsq_exit(ill->ill_phyint->phyint_ipsq);
 	/* Wait for the DL_INFO_ACK */
 	mutex_enter(&ill->ill_lock);
 	while (ill->ill_state_flags & ILL_LL_SUBNET_PENDING) {
@@ -27156,7 +27156,7 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 	ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), ipsq);
 
 	if (entered_ipsq)
-		ipsq_exit(ipsq, B_TRUE, B_TRUE);
+		ipsq_exit(ipsq);
 }
 
 /*

@@ -159,7 +159,7 @@ static int	ip_opt_delete_group_excl_v6(conn_t *connp,
 
 #define	IPSQ_EXIT(ipsq)	\
 	if (ipsq != NULL)	\
-		ipsq_exit(ipsq, B_TRUE, B_TRUE);
+		ipsq_exit(ipsq);
 
 #define	ILG_WALKER_HOLD(connp)	(connp)->conn_ilg_walker_cnt++
 
@@ -3869,7 +3869,7 @@ retry:
 			 * to a failover or unplumb. Retry on the same ilg.
 			 */
 			mutex_exit(&connp->conn_lock);
-			ipsq_exit(ipsq, B_TRUE, B_TRUE);
+			ipsq_exit(ipsq);
 			mutex_enter(&connp->conn_lock);
 			continue;
 		}
@@ -3886,7 +3886,7 @@ retry:
 			(void) ip_delmulti_v6(&v6group, ill, orig_ifindex,
 			    connp->conn_zoneid, B_FALSE, B_TRUE);
 
-		ipsq_exit(ipsq, B_TRUE, B_TRUE);
+		ipsq_exit(ipsq);
 		mutex_enter(&connp->conn_lock);
 		/* Go to the next ilg */
 		i--;
