@@ -91,7 +91,7 @@ static void (*SSL_load_error_strings_fn)() = NULL;
 static void (*ERR_free_strings_fn)() = NULL;
 static void (*CRYPTO_set_locking_callback_fn)() = NULL;
 static void (*CRYPTO_set_id_callback_fn)() = NULL;
-static void (*OPENSSL_free_fn)() = NULL;
+static void (*X509_NAME_free_fn)() = NULL;
 
 static void solaris_locking_callback(int, int, char *, int);
 static unsigned long solaris_thread_id(void);
@@ -156,9 +156,9 @@ libssl_load()
 		if (CRYPTO_set_id_callback_fn == NULL)
 			goto libssl_err;
 
-		OPENSSL_free_fn = (void(*)())dlsym(dldesc,
-		    "OPENSSL_free");
-		if (OPENSSL_free_fn == NULL)
+		X509_NAME_free_fn = (void(*)())dlsym(dldesc,
+		    "X509_NAME_free");
+		if (X509_NAME_free_fn == NULL)
 			goto libssl_err;
 
 		thread_setup();
@@ -226,21 +226,24 @@ print_asn1_name(FILE *file, const unsigned char *buf, long buflen)
 	libssl_load();
 
 	if (libssl_loaded) {
-		X509_NAME *x509 = NULL;
+		X509_NAME *x509name = NULL;
 		const unsigned char *p;
 
 		/* Make an effort to decode the ASN1 encoded name */
 		SSL_load_error_strings_fn();
 
-		/* temporary variable is mandatory per openssl docs */
+		/*
+		 * Temporary variable is mandatory per d2i_X509(3). Upcoming
+		 * call to d2i_X509_NAME_fn() will change the 'p' pointer.
+		 */
 		p = buf;
 
-		x509 = d2i_X509_NAME_fn(NULL, &p, buflen);
-		if (x509 != NULL) {
-			(void) X509_NAME_print_ex_fp_fn(file, x509, 0,
+		x509name = d2i_X509_NAME_fn(NULL, &p, buflen);
+		if (x509name != NULL) {
+			(void) X509_NAME_print_ex_fp_fn(file, x509name, 0,
 			    (ASN1_STRFLGS_RFC2253 | ASN1_STRFLGS_ESC_QUOTE |
 			    XN_FLAG_SEP_CPLUS_SPC | XN_FLAG_FN_SN));
-			OPENSSL_free_fn(p);
+			X509_NAME_free_fn(x509name);
 			(void) fprintf(file, "\n");
 		} else {
 			char errbuf[80];
