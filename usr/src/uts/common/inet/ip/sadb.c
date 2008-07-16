@@ -484,6 +484,11 @@ sadbp_init(const char *name, sadbp_t *sp, int type, int size, netstack_t *ns)
 		ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 		ip_drop_register(&ipss->ipsec_sadb_dropper, "IPsec SADB");
+		sp->s_addflags = AH_ADD_SETTABLE_FLAGS;
+		sp->s_updateflags = AH_UPDATE_SETTABLE_FLAGS;
+	} else {
+		sp->s_addflags = ESP_ADD_SETTABLE_FLAGS;
+		sp->s_updateflags = ESP_UPDATE_SETTABLE_FLAGS;
 	}
 }
 
@@ -4286,14 +4291,13 @@ sadb_update_sa(mblk_t *mp, keysock_in_t *ksi,
 		error = EINVAL;
 		goto bail;
 	}
-	if (assoc->sadb_sa_flags & ~(SADB_SAFLAGS_NOREPLAY |
-	    SADB_X_SAFLAGS_NATT_LOC | SADB_X_SAFLAGS_NATT_REM |
-	    SADB_X_SAFLAGS_OUTBOUND | SADB_X_SAFLAGS_INBOUND |
-	    SADB_X_SAFLAGS_PAIRED)) {
+
+	if (assoc->sadb_sa_flags & ~spp->s_updateflags) {
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_SAFLAGS;
 		error = EINVAL;
 		goto bail;
 	}
+
 	if (ksi->ks_in_extv[SADB_EXT_LIFETIME_CURRENT] != NULL) {
 		error = EOPNOTSUPP;
 		goto bail;

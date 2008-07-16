@@ -331,13 +331,37 @@ typedef struct ipsa_s {
 #define	IPSA_F_HW	0x200000		/* hwaccel capable SA */
 #define	IPSA_F_NATT_LOC	SADB_X_SAFLAGS_NATT_LOC
 #define	IPSA_F_NATT_REM	SADB_X_SAFLAGS_NATT_REM
-#define	IPSA_F_NATT	(SADB_X_SAFLAGS_NATT_LOC | SADB_X_SAFLAGS_NATT_REM)
 #define	IPSA_F_BEHIND_NAT SADB_X_SAFLAGS_NATTED
+#define	IPSA_F_NATT	(SADB_X_SAFLAGS_NATT_LOC | SADB_X_SAFLAGS_NATT_REM | \
+	SADB_X_SAFLAGS_NATTED)
 #define	IPSA_F_CINVALID	0x40000		/* SA shouldn't be cached */
 #define	IPSA_F_PAIRED	SADB_X_SAFLAGS_PAIRED	/* SA is one of a pair */
 #define	IPSA_F_OUTBOUND	SADB_X_SAFLAGS_OUTBOUND	/* SA direction bit */
 #define	IPSA_F_INBOUND	SADB_X_SAFLAGS_INBOUND	/* SA direction bit */
 #define	IPSA_F_TUNNEL	SADB_X_SAFLAGS_TUNNEL
+
+/*
+ * Sets of flags that are allowed to by set or modified by PF_KEY apps.
+ */
+#define	AH_UPDATE_SETTABLE_FLAGS \
+	(SADB_X_SAFLAGS_PAIRED | SADB_SAFLAGS_NOREPLAY | \
+	SADB_X_SAFLAGS_OUTBOUND | SADB_X_SAFLAGS_INBOUND | \
+	SADB_X_SAFLAGS_KM1 | SADB_X_SAFLAGS_KM2 | \
+	SADB_X_SAFLAGS_KM3 | SADB_X_SAFLAGS_KM4)
+
+/* AH can't set NAT flags (or even use NAT).  Add NAT flags to the ESP set. */
+#define	ESP_UPDATE_SETTABLE_FLAGS (AH_UPDATE_SETTABLE_FLAGS | IPSA_F_NATT)
+
+#define	AH_ADD_SETTABLE_FLAGS \
+	(AH_UPDATE_SETTABLE_FLAGS | SADB_X_SAFLAGS_AALG1 | \
+	SADB_X_SAFLAGS_AALG2 | SADB_X_SAFLAGS_TUNNEL | \
+	SADB_SAFLAGS_NOREPLAY)
+
+/* AH can't set NAT flags (or even use NAT).  Add NAT flags to the ESP set. */
+#define	ESP_ADD_SETTABLE_FLAGS (AH_ADD_SETTABLE_FLAGS | IPSA_F_NATT | \
+	SADB_X_SAFLAGS_EALG1 | SADB_X_SAFLAGS_EALG2)
+
+
 
 /* SA states are important for handling UPDATE PF_KEY messages. */
 #define	IPSA_STATE_LARVAL	SADB_SASTATE_LARVAL
@@ -467,6 +491,8 @@ typedef struct sadbp_s
 	void 		(*s_acqfn)(ipsacq_t *, mblk_t *, netstack_t *);
 	sadb_t		s_v4;
 	sadb_t		s_v6;
+	uint32_t	s_addflags;
+	uint32_t	s_updateflags;
 } sadbp_t;
 
 /*

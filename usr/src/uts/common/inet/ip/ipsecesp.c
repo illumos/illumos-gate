@@ -3317,8 +3317,12 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 		    ALL_ZEROES_PTR, dstaddr, dst->sin_family);
 		mutex_exit(&inbound->isaf_lock);
 
-		if (larval == NULL) {
+		if ((larval == NULL) ||
+		    (larval->ipsa_state != IPSA_STATE_LARVAL)) {
 			*diagnostic = SADB_X_DIAGNOSTIC_SA_NOTFOUND;
+			if (larval != NULL) {
+				IPSA_REFRELE(larval);
+			}
 			esp0dbg(("Larval update, but larval disappeared.\n"));
 			return (ESRCH);
 		} /* Else sadb_common_add unlinks it for me! */
@@ -3470,10 +3474,7 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 		return (EINVAL);
 	}
 
-	if (assoc->sadb_sa_flags & ~(SADB_SAFLAGS_NOREPLAY |
-	    SADB_X_SAFLAGS_NATT_LOC | SADB_X_SAFLAGS_NATT_REM |
-	    SADB_X_SAFLAGS_TUNNEL | SADB_X_SAFLAGS_OUTBOUND |
-	    SADB_X_SAFLAGS_INBOUND | SADB_X_SAFLAGS_PAIRED)) {
+	if (assoc->sadb_sa_flags & ~espstack->esp_sadb.s_addflags) {
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_SAFLAGS;
 		return (EINVAL);
 	}

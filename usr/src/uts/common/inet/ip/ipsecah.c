@@ -1014,6 +1014,9 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 		if ((larval == NULL) ||
 		    (larval->ipsa_state != IPSA_STATE_LARVAL)) {
 			*diagnostic = SADB_X_DIAGNOSTIC_SA_NOTFOUND;
+			if (larval != NULL) {
+				IPSA_REFRELE(larval);
+			}
 			ah0dbg(("Larval update, but larval disappeared.\n"));
 			return (ESRCH);
 		} /* Else sadb_common_add unlinks it for me! */
@@ -1145,10 +1148,7 @@ ah_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 		*diagnostic = SADB_X_DIAGNOSTIC_ENCR_NOTSUPP;
 		return (EINVAL);
 	}
-	if (assoc->sadb_sa_flags &
-	    ~(SADB_SAFLAGS_NOREPLAY | SADB_X_SAFLAGS_TUNNEL |
-	    SADB_X_SAFLAGS_OUTBOUND | SADB_X_SAFLAGS_INBOUND |
-	    SADB_X_SAFLAGS_PAIRED)) {
+	if (assoc->sadb_sa_flags & ~ahstack->ah_sadb.s_addflags) {
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_SAFLAGS;
 		return (EINVAL);
 	}
