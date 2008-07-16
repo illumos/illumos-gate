@@ -235,57 +235,6 @@ pk_import_pk12_nss(
 		    "key(s) in %s\n"), ncerts, nkeys, filename);
 
 	if (rv == KMF_OK) {
-		NEW_ATTRLIST(attrlist, (3 + (2 * ncerts)));
-
-		kmf_set_attr_at_index(attrlist, numattr,
-		    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
-		numattr++;
-
-		if (token_spec != NULL) {
-			kmf_set_attr_at_index(attrlist, numattr,
-			    KMF_TOKEN_LABEL_ATTR, token_spec,
-			    strlen(token_spec));
-			numattr++;
-		}
-
-		if (trustflags != NULL) {
-			kmf_set_attr_at_index(attrlist, numattr,
-			    KMF_TRUSTFLAG_ATTR, trustflags,
-			    strlen(trustflags));
-			numattr++;
-		}
-
-		for (i = 0; rv == KMF_OK && i < ncerts; i++) {
-			int num = numattr;
-
-			if (certs[i].kmf_private.label != NULL) {
-				kmf_set_attr_at_index(attrlist, num,
-				    KMF_CERT_LABEL_ATTR,
-				    certs[i].kmf_private.label,
-				    strlen(certs[i].kmf_private.label));
-				num++;
-			} else if (i == 0 && nickname != NULL) {
-				kmf_set_attr_at_index(attrlist, num,
-				    KMF_CERT_LABEL_ATTR, nickname,
-				    strlen(nickname));
-				num++;
-			}
-
-			kmf_set_attr_at_index(attrlist, num,
-			    KMF_CERT_DATA_ATTR,
-			    &certs[i].certificate, sizeof (KMF_DATA));
-			num++;
-			rv = kmf_store_cert(kmfhandle, num, attrlist);
-		}
-		free(attrlist);
-		attrlist = NULL;
-		if (rv != KMF_OK) {
-			display_error(kmfhandle, rv,
-			    gettext("Error storing certificate in NSS token"));
-		}
-	}
-
-	if (rv == KMF_OK) {
 		numattr = 0;
 		NEW_ATTRLIST(attrlist, (4 + (2 * nkeys)));
 
@@ -334,6 +283,58 @@ pk_import_pk12_nss(
 			rv = kmf_store_key(kmfhandle, num, attrlist);
 		}
 		free(attrlist);
+		attrlist = NULL;
+	}
+
+	if (rv == KMF_OK) {
+		NEW_ATTRLIST(attrlist, (3 + (2 * ncerts)));
+
+		kmf_set_attr_at_index(attrlist, numattr,
+		    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
+		numattr++;
+
+		if (token_spec != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_TOKEN_LABEL_ATTR, token_spec,
+			    strlen(token_spec));
+			numattr++;
+		}
+
+		if (trustflags != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr,
+			    KMF_TRUSTFLAG_ATTR, trustflags,
+			    strlen(trustflags));
+			numattr++;
+		}
+
+		for (i = 0; rv == KMF_OK && i < ncerts; i++) {
+			int num = numattr;
+
+			if (certs[i].kmf_private.label != NULL) {
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_CERT_LABEL_ATTR,
+				    certs[i].kmf_private.label,
+				    strlen(certs[i].kmf_private.label));
+				num++;
+			} else if (i == 0 && nickname != NULL) {
+				kmf_set_attr_at_index(attrlist, num,
+				    KMF_CERT_LABEL_ATTR, nickname,
+				    strlen(nickname));
+				num++;
+			}
+
+			kmf_set_attr_at_index(attrlist, num,
+			    KMF_CERT_DATA_ATTR,
+			    &certs[i].certificate, sizeof (KMF_DATA));
+			num++;
+			rv = kmf_store_cert(kmfhandle, num, attrlist);
+		}
+		free(attrlist);
+		attrlist = NULL;
+		if (rv != KMF_OK) {
+			display_error(kmfhandle, rv,
+			    gettext("Error storing certificate in NSS token"));
+		}
 	}
 
 end:

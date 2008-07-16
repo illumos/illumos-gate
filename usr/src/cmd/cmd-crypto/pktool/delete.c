@@ -182,10 +182,6 @@ pk_delete_keys(KMF_HANDLE_T kmfhandle, KMF_ATTRIBUTE *attlist, int numattr,
 		free(keys);
 	}
 
-	if (rv == KMF_ERR_KEY_NOT_FOUND) {
-		rv = KMF_OK;
-	}
-
 	*keysdeleted = numkeys;
 	return (rv);
 }
@@ -220,8 +216,6 @@ pk_delete_certs(KMF_HANDLE_T kmfhandle, KMF_ATTRIBUTE *attlist, int numattr)
 		 */
 		rv = kmf_delete_cert_from_keystore(kmfhandle, numattr, attlist);
 
-	} else if (rv == KMF_ERR_CERT_NOT_FOUND) {
-		rv = KMF_OK;
 	}
 
 	return (rv);
@@ -277,6 +271,9 @@ delete_nss_keys(KMF_HANDLE_T kmfhandle, char *dir, char *prefix,
 		keytype = "private";
 		rv = pk_delete_keys(kmfhandle, attrlist, num, keytype, &nk);
 		numkeys += nk;
+		if (rv == KMF_ERR_KEY_NOT_FOUND &&
+		    oclass != PK_PRIKEY_OBJ)
+			rv = KMF_OK;
 	}
 	if (rv == KMF_OK && (oclass & PK_SYMKEY_OBJ)) {
 		int num = numattr;
@@ -289,6 +286,9 @@ delete_nss_keys(KMF_HANDLE_T kmfhandle, char *dir, char *prefix,
 		keytype = "symmetric";
 		rv = pk_delete_keys(kmfhandle, attrlist, num, keytype, &nk);
 		numkeys += nk;
+		if (rv == KMF_ERR_KEY_NOT_FOUND &&
+		    oclass != PK_SYMKEY_OBJ)
+			rv = KMF_OK;
 	}
 	if (rv == KMF_OK && (oclass & PK_PUBKEY_OBJ)) {
 		int num = numattr;
@@ -301,13 +301,15 @@ delete_nss_keys(KMF_HANDLE_T kmfhandle, char *dir, char *prefix,
 		keytype = "public";
 		rv = pk_delete_keys(kmfhandle, attrlist, num, keytype, &nk);
 		numkeys += nk;
+		if (rv == KMF_ERR_KEY_NOT_FOUND &&
+		    oclass != PK_PUBKEY_OBJ)
+			rv = KMF_OK;
 	}
 	if (rv == KMF_OK && numkeys == 0)
 		rv = KMF_ERR_KEY_NOT_FOUND;
 
 	return (rv);
 }
-
 
 static KMF_RETURN
 delete_nss_certs(KMF_HANDLE_T kmfhandle,
@@ -475,6 +477,9 @@ delete_pk11_keys(KMF_HANDLE_T kmfhandle,
 
 		rv = pk_delete_keys(kmfhandle, attrlist, num, "private", &nk);
 		numkeys += nk;
+		if (rv == KMF_ERR_KEY_NOT_FOUND &&
+		    oclass != PK_PRIKEY_OBJ)
+			rv = KMF_OK;
 	}
 
 	if (rv == KMF_OK && (oclass & PK_SYMKEY_OBJ)) {
@@ -487,6 +492,9 @@ delete_pk11_keys(KMF_HANDLE_T kmfhandle,
 
 		rv = pk_delete_keys(kmfhandle, attrlist, num, "symmetric", &nk);
 		numkeys += nk;
+		if (rv == KMF_ERR_KEY_NOT_FOUND &&
+		    oclass != PK_SYMKEY_OBJ)
+			rv = KMF_OK;
 	}
 
 	if (rv == KMF_OK && (oclass & PK_PUBKEY_OBJ)) {
@@ -500,6 +508,9 @@ delete_pk11_keys(KMF_HANDLE_T kmfhandle,
 
 		rv = pk_delete_keys(kmfhandle, attrlist, num, "public", &nk);
 		numkeys += nk;
+		if (rv == KMF_ERR_KEY_NOT_FOUND &&
+		    oclass != PK_PUBKEY_OBJ)
+			rv = KMF_OK;
 	}
 	if (rv == KMF_OK && numkeys == 0)
 		rv = KMF_ERR_KEY_NOT_FOUND;
@@ -654,7 +665,7 @@ delete_file_keys(KMF_HANDLE_T kmfhandle, int oclass,
 		rv = pk_delete_keys(kmfhandle, attrlist, num, keytype, &nk);
 		numkeys += nk;
 	}
-	if (rv == KMF_OK && (oclass & PK_SYMKEY_OBJ)) {
+	if (oclass & PK_SYMKEY_OBJ) {
 		int num = numattr;
 
 		keyclass = KMF_SYMMETRIC;
@@ -665,6 +676,8 @@ delete_file_keys(KMF_HANDLE_T kmfhandle, int oclass,
 		keytype = "symmetric";
 		rv = pk_delete_keys(kmfhandle, attrlist, num, keytype, &nk);
 		numkeys += nk;
+		if (rv == KMF_ERR_KEY_NOT_FOUND && numkeys > 0)
+			rv = KMF_OK;
 	}
 	if (rv == KMF_OK && numkeys == 0)
 		rv = KMF_ERR_KEY_NOT_FOUND;
@@ -720,7 +733,7 @@ pk_delete(int argc, char *argv[])
 	KMF_BIGINT	serial = { NULL, 0 };
 	KMF_HANDLE_T	kmfhandle = NULL;
 	KMF_KEYSTORE_TYPE	kstype = 0;
-	KMF_RETURN	kmfrv;
+	KMF_RETURN	kmfrv, keyrv, certrv, crlrv;
 	int		rv = 0;
 	char			*find_criteria = NULL;
 	KMF_CERT_VALIDITY	find_criteria_flag = KMF_ALL_CERTS;
@@ -863,10 +876,11 @@ pk_delete(int argc, char *argv[])
 	if ((kmfrv = kmf_initialize(&kmfhandle, NULL, NULL)) != KMF_OK)
 		return (kmfrv);
 
+	keyrv = certrv = crlrv = KMF_OK;
 	switch (kstype) {
 		case KMF_KEYSTORE_PK11TOKEN:
 			if (oclass & PK_KEY_OBJ) {
-				kmfrv = delete_pk11_keys(kmfhandle,
+				keyrv = delete_pk11_keys(kmfhandle,
 				    token_spec, oclass,
 				    object_label, &tokencred);
 				/*
@@ -874,14 +888,12 @@ pk_delete(int argc, char *argv[])
 				 * to ignore the "key not found" case so that
 				 * we can continue to find other objects.
 				 */
-				if (kmfrv == KMF_ERR_KEY_NOT_FOUND &&
-				    (oclass != PK_KEY_OBJ))
-					kmfrv = KMF_OK;
-				if (kmfrv != KMF_OK)
+				if (keyrv != KMF_OK &&
+				    keyrv != KMF_ERR_KEY_NOT_FOUND)
 					break;
 			}
 			if (oclass & (PK_CERT_OBJ | PK_PUBLIC_OBJ)) {
-				kmfrv = delete_pk11_certs(kmfhandle,
+				certrv = delete_pk11_certs(kmfhandle,
 				    token_spec, object_label,
 				    &serial, issuer,
 				    subject, find_criteria_flag);
@@ -889,55 +901,56 @@ pk_delete(int argc, char *argv[])
 				 * If cert delete failed, but we are looking at
 				 * other objects, then it is OK.
 				 */
-				if (kmfrv == KMF_ERR_CERT_NOT_FOUND &&
-				    (oclass & (PK_CRL_OBJ | PK_KEY_OBJ)))
-					kmfrv = KMF_OK;
-				if (kmfrv != KMF_OK)
+				if (certrv != KMF_OK &&
+				    certrv != KMF_ERR_CERT_NOT_FOUND)
 					break;
 			}
 			if (oclass & PK_CRL_OBJ)
-				kmfrv = delete_file_crl(kmfhandle,
+				crlrv = delete_file_crl(kmfhandle,
 				    infile);
 			break;
 		case KMF_KEYSTORE_NSS:
+			keyrv = certrv = crlrv = KMF_OK;
 			if (oclass & PK_KEY_OBJ) {
-				kmfrv = delete_nss_keys(kmfhandle,
+				keyrv = delete_nss_keys(kmfhandle,
 				    dir, prefix, token_spec,
 				    oclass, (char  *)object_label,
 				    &tokencred);
-				if (kmfrv != KMF_OK)
+				if (keyrv != KMF_OK &&
+				    keyrv != KMF_ERR_KEY_NOT_FOUND)
 					break;
 			}
 			if (oclass & PK_CERT_OBJ) {
-				kmfrv = delete_nss_certs(kmfhandle,
+				certrv = delete_nss_certs(kmfhandle,
 				    dir, prefix, token_spec,
 				    (char  *)object_label,
 				    &serial, issuer, subject,
 				    find_criteria_flag);
-				if (kmfrv != KMF_OK)
+				if (certrv != KMF_OK &&
+				    certrv != KMF_ERR_CERT_NOT_FOUND)
 					break;
 			}
 			if (oclass & PK_CRL_OBJ)
-				kmfrv = delete_nss_crl(kmfhandle,
+				crlrv = delete_nss_crl(kmfhandle,
 				    dir, prefix, token_spec,
 				    (char  *)object_label, subject);
 			break;
 		case KMF_KEYSTORE_OPENSSL:
 			if (oclass & PK_KEY_OBJ) {
-				kmfrv = delete_file_keys(kmfhandle, oclass,
+				keyrv = delete_file_keys(kmfhandle, oclass,
 				    dir, infile);
-				if (kmfrv != KMF_OK)
+				if (keyrv != KMF_OK)
 					break;
 			}
 			if (oclass & (PK_CERT_OBJ)) {
-				kmfrv = delete_file_certs(kmfhandle,
+				certrv = delete_file_certs(kmfhandle,
 				    dir, infile, &serial, issuer,
 				    subject, find_criteria_flag);
-				if (kmfrv != KMF_OK)
+				if (certrv != KMF_OK)
 					break;
 			}
 			if (oclass & PK_CRL_OBJ)
-				kmfrv = delete_file_crl(kmfhandle,
+				crlrv = delete_file_crl(kmfhandle,
 				    infile);
 			break;
 		default:
@@ -945,6 +958,41 @@ pk_delete(int argc, char *argv[])
 			break;
 	}
 
+	/*
+	 * Logic here:
+	 *    If searching for more than just one class of object (key or cert)
+	 *    and only 1 of the classes was not found, it is not an error.
+	 *    If searching for just one class of object, that failure should
+	 *    be reported.
+	 *
+	 *    Any error other than "KMF_ERR_[key/cert]_NOT_FOUND" should
+	 *    be reported either way.
+	 */
+	if (keyrv != KMF_ERR_KEY_NOT_FOUND && keyrv != KMF_OK)
+		kmfrv = keyrv;
+	else if (certrv != KMF_OK && certrv != KMF_ERR_CERT_NOT_FOUND)
+		kmfrv = certrv;
+	else if (crlrv != KMF_OK && crlrv != KMF_ERR_CRL_NOT_FOUND)
+		kmfrv = crlrv;
+
+	/*
+	 * If nothing was found, return error.
+	 */
+	if ((keyrv == KMF_ERR_KEY_NOT_FOUND && (oclass & PK_KEY_OBJ)) &&
+	    (certrv == KMF_ERR_CERT_NOT_FOUND && (oclass & PK_CERT_OBJ)))
+		kmfrv = KMF_ERR_KEY_NOT_FOUND;
+
+	if (kmfrv != KMF_OK)
+		goto out;
+
+	if (keyrv != KMF_OK && (oclass == PK_KEY_OBJ))
+		kmfrv = keyrv;
+	else if (certrv != KMF_OK && (oclass == PK_CERT_OBJ))
+		kmfrv = certrv;
+	else if (crlrv != KMF_OK && (oclass == PK_CRL_OBJ))
+		kmfrv = crlrv;
+
+out:
 	if (kmfrv != KMF_OK) {
 		display_error(kmfhandle, kmfrv,
 		    gettext("Error deleting objects"));
