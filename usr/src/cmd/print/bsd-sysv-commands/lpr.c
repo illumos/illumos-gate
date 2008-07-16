@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -195,12 +195,6 @@ main(int ac, char *av[])
 		default:
 			usage(av[0]);
 		}
-
-	if ((remove != 0) && (copy == 0)) {
-		fprintf(stderr, gettext(
-			"-r and -s may not be used together\n"));
-		exit(1);
-	}
 
 	if ((printer == NULL) &&
 	    ((printer = getenv("PRINTER")) == NULL) &&
