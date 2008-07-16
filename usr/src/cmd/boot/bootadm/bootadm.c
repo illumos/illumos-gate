@@ -7817,11 +7817,12 @@ is_sparc(void)
 		}
 	} else {
 		if (sysinfo(SI_ARCHITECTURE, mbuf, sizeof (mbuf)) > 0 &&
-		    strcmp(mbuf, "sparc") == 0)
+		    strcmp(mbuf, "sparc") == 0) {
 			issparc = 1;
-		else
-			issparc = 0;
+		}
 	}
+	if (issparc == -1)
+		issparc = 0;
 
 	return (issparc);
 }
