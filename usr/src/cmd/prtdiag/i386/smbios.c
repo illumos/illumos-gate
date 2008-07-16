@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,7 +134,7 @@ do_memdevs(smbios_hdl_t *shp, const smbios_struct_t *sp, void *arg)
 		else
 			(void) strcpy(buf, "-");
 
-		(void) printf(gettext("%-7s %-6s %-3s %-19s %s\n"),
+		(void) printf(gettext("%-11s %-6s %-3s %-19s %s\n"),
 		    t ? t : gettext("Unknown"),
 		    md.smbmd_size ? gettext("in use") : gettext("empty"),
 		    buf, md.smbmd_dloc, md.smbmd_bloc);
@@ -242,11 +241,11 @@ do_prominfo(int opt_v, char *progname, int opt_l, int opt_p)
 	(void) printf(gettext(
 	    "\n==== Memory Device Sockets ================================\n"));
 
-	(void) printf(gettext("\n%-7s %-6s %-3s %-19s %s"),
+	(void) printf(gettext("\n%-11s %-6s %-3s %-19s %s"),
 	    "Type", "Status", "Set", "Device Locator", "Bank Locator");
 
 	(void) printf(gettext(
-	    "\n------- ------ --- ------------------- --------------------\n"));
+	    "\n----------- ------ --- ------------------- ----------------\n"));
 	(void) smbios_iter(shp, do_memdevs, NULL);
 
 	(void) printf(gettext(

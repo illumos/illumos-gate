@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -317,6 +317,10 @@ typedef struct smbios_chassis {
 #define	SMB_CHT_RACK		0x17	/* rack mount chassis */
 #define	SMB_CHT_SEALED		0x18	/* sealed case pc */
 #define	SMB_CHT_MULTI		0x19	/* multi-system chassis */
+#define	SMB_CHT_CPCI		0x1A	/* compact PCI */
+#define	SMB_CHT_ATCA		0x1B	/* advanced TCA */
+#define	SMB_CHT_BLADE		0x1C	/* blade */
+#define	SMB_CHT_BLADEENC	0x1D	/* blade enclosure */
 
 #define	SMB_CHST_OTHER		0x01	/* other */
 #define	SMB_CHST_UNKNOWN	0x02	/* unknown */
@@ -399,6 +403,13 @@ typedef struct smbios_processor {
 #define	SMB_PRU_478		0x0F	/* socket 478 */
 #define	SMB_PRU_754		0x10	/* socket 754 */
 #define	SMB_PRU_940		0x11	/* socket 940 */
+#define	SMB_PRU_939		0x12	/* socket 939 */
+#define	SMB_PRU_MPGA604		0x13	/* mPGA604 */
+#define	SMB_PRU_LGA771		0x14	/* LGA771 */
+#define	SMB_PRU_LGA775		0x15	/* LGA775 */
+#define	SMB_PRU_S1		0x16	/* socket S1 */
+#define	SMB_PRU_AM2		0x17	/* socket AM2 */
+#define	SMB_PRU_F		0x18	/* socket F */
 
 #define	SMB_PRF_OTHER		0x01	/* other */
 #define	SMB_PRF_UNKNOWN		0x02	/* unknown */
@@ -487,14 +498,35 @@ typedef struct smbios_processor {
 #define	SMB_PRF_AS400		0xB4	/* AS400 */
 #define	SMB_PRF_XEON_MP		0xB5	/* Intel Xeon MP */
 #define	SMB_PRF_ATHLON_XP	0xB6	/* AMD Athlon XP */
-#define	SMB_PRF_ATHLON_MP	0xB7	/* AMB Athlon MP */
+#define	SMB_PRF_ATHLON_MP	0xB7	/* AMD Athlon MP */
 #define	SMB_PRF_ITANIC2		0xB8	/* Itanium 2 */
 #define	SMB_PRF_PENTIUM_M	0xB9	/* Pentium M */
+#define	SMB_PRF_CELERON_D	0xBA	/* Celeron D */
+#define	SMB_PRF_PENTIUM_D	0xBB	/* Pentium D */
+#define	SMB_PRF_PENTIUM_EE	0xBC	/* Pentium Extreme Edition */
+#define	SMB_PRF_CORE		0xBD	/* Intel Core */
+#define	SMB_PRF_CORE2		0xBF	/* Intel Core 2 */
 #define	SMB_PRF_IBM390		0xC8	/* IBM 390 */
 #define	SMB_PRF_G4		0xC9	/* G4 */
 #define	SMB_PRF_G5		0xCA	/* G5 */
+#define	SMB_PRF_ESA390		0xCB	/* ESA390 */
+#define	SMB_PRF_ZARCH		0xCC	/* z/Architecture */
+#define	SMB_PRF_C7M		0xD2	/* VIA C7-M */
+#define	SMB_PRF_C7D		0xD3	/* VIA C7-D */
+#define	SMB_PRF_C7		0xD4	/* VIA C7 */
+#define	SMB_PRF_EDEN		0xD5	/* VIA Eden */
 #define	SMB_PRF_I860		0xFA	/* i860 */
 #define	SMB_PRF_I960		0xFB	/* i960 */
+#define	SMB_PRF_SH3		0x104	/* SH-3 */
+#define	SMB_PRF_SH4		0x105	/* SH-4 */
+#define	SMB_PRF_ARM		0x118	/* ARM */
+#define	SMB_PRF_SARM		0x119	/* StrongARM */
+#define	SMB_PRF_6X86		0x12C	/* 6x86 */
+#define	SMB_PRF_MEDIAGX		0x12D	/* MediaGX */
+#define	SMB_PRF_MII		0x12E	/* MII */
+#define	SMB_PRF_WINCHIP		0x140	/* WinChip */
+#define	SMB_PRF_DSP		0x15E	/* DSP */
+#define	SMB_PRF_VIDEO		0x1F4	/* Video Processor */
 
 /*
  * SMBIOS Cache Information.  See DSP0134 Section 3.3.8 for more information.
@@ -644,6 +676,8 @@ typedef struct smbios_port {
 #define	SMB_POT_AUDIO		0x1D		/* Audio port */
 #define	SMB_POT_MODEM		0x1E		/* Modem port */
 #define	SMB_POT_NETWORK		0x1F		/* Network port */
+#define	SMB_POT_SATA		0x20		/* SATA */
+#define	SMB_POT_SAS		0x21		/* SAS */
 #define	SMB_POT_8251		0xA0		/* 8251 compatible */
 #define	SMB_POT_8251F		0xA1		/* 8251 FIFO compatible */
 #define	SMB_POT_OTHER		0xFF		/* other */
@@ -688,6 +722,11 @@ typedef struct smbios_slot {
 #define	SMB_SLT_PC98_LB		0xA3	/* PC-98/Local Bus */
 #define	SMB_SLT_PC98_C		0xA4	/* PC-98/Card */
 #define	SMB_SLT_PCIE		0xA5	/* PCI Express */
+#define	SMB_SLT_PCIE1		0xA6	/* PCI Express x1 */
+#define	SMB_SLT_PCIE2		0xA7	/* PCI Express x2 */
+#define	SMB_SLT_PCIE4		0xA8	/* PCI Express x4 */
+#define	SMB_SLT_PCIE8		0xA9	/* PCI Express x8 */
+#define	SMB_SLT_PCIE16		0xAA	/* PCI Express x16 */
 
 #define	SMB_SLW_OTHER		0x01	/* other */
 #define	SMB_SLW_UNKNOWN		0x02	/* unknown */
@@ -746,6 +785,9 @@ typedef struct smbios_obdev {
 #define	SMB_OBT_ETHERNET	0x05	/* ethernet */
 #define	SMB_OBT_TOKEN		0x06	/* token ring */
 #define	SMB_OBT_SOUND		0x07	/* sound */
+#define	SMB_OBT_PATA		0x08	/* pata */
+#define	SMB_OBT_SATA		0x09	/* sata */
+#define	SMB_OBT_SAS		0x0A	/* sas */
 
 /*
  * SMBIOS BIOS Language Information.  See DSP0134 Section 3.3.14 for more
@@ -887,6 +929,7 @@ typedef struct smbios_memdevice {
 #define	SMB_MDFF_RIMM		0x0C	/* RIMM */
 #define	SMB_MDFF_SODIMM		0x0D	/* SODIMM */
 #define	SMB_MDFF_SRIMM		0x0E	/* SRIMM */
+#define	SMB_MDFF_FBDIMM		0x0F	/* FBDIMM */
 
 #define	SMB_MDT_OTHER		0x01	/* other */
 #define	SMB_MDT_UNKNOWN		0x02	/* unknown */
@@ -907,6 +950,7 @@ typedef struct smbios_memdevice {
 #define	SMB_MDT_RDRAM		0x11	/* RDRAM */
 #define	SMB_MDT_DDR		0x12	/* DDR */
 #define	SMB_MDT_DDR2		0x13	/* DDR2 */
+#define	SMB_MDT_DDR2FBDIMM	0x14	/* DDR2 FBDIMM */
 
 #define	SMB_MDF_OTHER		0x0002	/* other */
 #define	SMB_MDF_UNKNOWN		0x0004	/* unknown */
