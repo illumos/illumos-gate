@@ -239,12 +239,13 @@ conn_process(void *v)
 	util_title(c->c_mgmtq, Q_CONN_LOGIN, c->c_num,
 	    ctime_r(&tval, debug, sizeof (debug)));
 
-	(void) pthread_create(&c->c_thr_id_poller, NULL,
-	    conn_poller, (void *)c);
 	c->c_thr_id_process = pthread_self();
 
 	assert(c->c_state == S1_FREE);
 	conn_state(c, T3);
+
+	(void) pthread_create(&c->c_thr_id_poller, NULL,
+	    conn_poller, (void *)c);
 
 	do {
 		m = queue_message_get(c->c_dataq);
