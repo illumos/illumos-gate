@@ -688,10 +688,12 @@ check_for_valid_I_T(iscsi_conn_t *c)
 {
 	iscsi_sess_t	*s = c->c_sess;
 	if (s->s_type == SessionDiscovery)
-		return ((s->s_i_name == NULL) ? False : True);
+		return (s->s_i_name == NULL || strlen(s->s_i_name) == 0) ?
+		    False : True;
 	else
-		return (((s->s_t_name == NULL) ||
-		    (s->s_i_name == NULL)) ? False : True);
+		return (s->s_t_name == NULL || strlen(s->s_t_name) == 0) ||
+		    (s->s_i_name == NULL || strlen(s->s_i_name) == 0) ?
+		    False : True;
 }
 
 static iscsi_login_rsp_hdr_t *
@@ -826,7 +828,8 @@ login_set_auth(iscsi_sess_t *s)
 				    XML_ELEMENT_CHAPNAME,
 				    &szChapName) == True) {
 					/*CSTYLED*/
-					(void) strcpy((char *)sess_auth->username_in,
+					(void) strcpy(
+					    (char *)sess_auth->username_in,
 					    szChapName);
 					free(szChapName);
 				}
@@ -835,7 +838,8 @@ login_set_auth(iscsi_sess_t *s)
 				    XML_ELEMENT_CHAPSECRET,
 				    &szChapSecret) == True) {
 					/*CSTYLED*/
-					(void) strcpy((char *)sess_auth->password_in,
+					(void) strcpy(
+					    (char *)sess_auth->password_in,
 					    szChapSecret);
 					sess_auth->password_length_in =
 					    strlen(szChapSecret);
