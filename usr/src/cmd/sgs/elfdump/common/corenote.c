@@ -654,7 +654,7 @@ dump_siginfo(note_state_t *state, const char *title)
 	Word		w;
 	int		v_si_code, v_si_signo;
 
-	if (data_present(state, &layout->sizeof_struct))
+	if (!data_present(state, &layout->sizeof_struct))
 		return;
 
 	indent_enter(state, title, &layout->f_si_signo);
@@ -688,7 +688,6 @@ dump_siginfo(note_state_t *state, const char *title)
 		case SI_TIMER:
 		case SI_ASYNCIO:
 		case SI_MESGQ:
-		default:
 			indent_enter(state, MSG_ORIG(MSG_CNOTE_T_SI_VALUE),
 			    &layout->f_si_value_int);
 			PRINT_ZHEX(MSG_ORIG(MSG_CNOTE_T_SIVAL_INT),
