@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,7 +116,9 @@ event_walker(void *arg, uint_t picno, const char *event)
 static int
 event_valid(int picnum, char *event)
 {
+	char *end_event;
 	found = 0;
+
 
 	cpc_walk_events_pic(cpc, picnum, event, event_walker);
 
@@ -128,8 +130,10 @@ event_valid(int picnum, char *event)
 	 * a raw event code. An event code of '0' is not recognized, as it
 	 * already has a corresponding event name in existing backends and it
 	 * is the only reasonable way to know if strtol() succeeded.
+	 * Check the second argument of strtol() to ensure invalid events
+	 * beginning with number do not go through.
 	 */
-	if (strtol(event, NULL, 0) != 0)
+	if ((strtol(event, &end_event, 0) != 0) && (*end_event == '\0'))
 		/*
 		 * Success - this is a valid raw code in hex, decimal, or octal.
 		 */
@@ -531,8 +535,8 @@ cpc_strtoset(cpc_t *cpcin, const char *spec, int smt)
 			free(req_attrs);
 			(void) cpc_set_destroy(cpc, set);
 			strtoset_err(
-				gettext("cpc_set_add_request() failed: %s\n"),
-				    strerror(errno));
+			    gettext("cpc_set_add_request() failed: %s\n"),
+			    strerror(errno));
 			goto inval;
 		}
 
