@@ -2120,7 +2120,7 @@ vhci_bind_transport(struct scsi_address *ap, struct vhci_pkt *vpkt, int flags,
 	int			mps_flag = MDI_SELECT_ONLINE_PATH;
 	struct scsi_vhci_lun	*vlun;
 	time_t			tnow;
-	int			path_instance;
+	int			path_instance = 0;
 
 	vlun = ADDR2VLUN(ap);
 	ASSERT(vlun != 0);
@@ -2197,11 +2197,10 @@ vhci_bind_transport(struct scsi_address *ap, struct vhci_pkt *vpkt, int flags,
 	 *
 	 * NB: Condition pkt_path_instance reference on proper allocation.
 	 */
-	if (scsi_pkt_allocated_correctly(vpkt->vpkt_tgt_pkt) &&
-	    (vpkt->vpkt_tgt_pkt->pkt_flags & FLAG_PKT_PATH_INSTANCE))
+	if ((vpkt->vpkt_tgt_pkt->pkt_flags & FLAG_PKT_PATH_INSTANCE) &&
+	    scsi_pkt_allocated_correctly(vpkt->vpkt_tgt_pkt)) {
 		path_instance = vpkt->vpkt_tgt_pkt->pkt_path_instance;
-	else
-		path_instance = 0;
+	}
 
 	/*
 	 * If reservation is active bind the transport directly to the pip
