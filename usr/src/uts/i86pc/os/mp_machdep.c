@@ -938,7 +938,16 @@ mach_smpinit(void)
 	if (pops->psm_state)
 		psm_state = pops->psm_state;
 
-	/* check for multiple cpu's */
+	/*
+	 * Set these vectors here so they can be used by Suspend/Resume
+	 * on UP machines.
+	 */
+	if (pops->psm_disable_intr)
+		psm_disable_intr = pops->psm_disable_intr;
+	if (pops->psm_enable_intr)
+		psm_enable_intr  = pops->psm_enable_intr;
+
+	/* check for multiple CPUs */
 	if (cnt < 2)
 		return;
 
@@ -957,11 +966,6 @@ mach_smpinit(void)
 			disp_enq_thread = cpu_wakeup_mwait;
 #endif
 	}
-
-	if (pops->psm_disable_intr)
-		psm_disable_intr = pops->psm_disable_intr;
-	if (pops->psm_enable_intr)
-		psm_enable_intr  = pops->psm_enable_intr;
 
 	psm_get_ipivect = pops->psm_get_ipivect;
 

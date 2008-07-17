@@ -216,6 +216,16 @@ i_cpr_save_context(void *arg)
 		i_cpr_platform_free(papic_state);
 
 		/*
+		 * Enable interrupts on this cpu.
+		 * Do not bind interrupts to this CPU's local APIC until
+		 * the CPU is ready to recieve interrupts.
+		 */
+		ASSERT(CPU->cpu_id != i_cpr_bootcpuid());
+		mutex_enter(&cpu_lock);
+		cpu_enable_intr(CPU);
+		mutex_exit(&cpu_lock);
+
+		/*
 		 * Setting the bit in cpu_ready_set must be the last operation
 		 * in processor initialization; the boot CPU will continue to
 		 * boot once it sees this bit set for all active CPUs.
@@ -657,6 +667,14 @@ i_cpr_power_down(int sleeptype)
 		ASSERT(ret == 0);
 
 		i_cpr_platform_free(&(wc_other_cpus->wc_apic_state));
+
+		/*
+		 * Enable interrupts on boot cpu.
+		 */
+		ASSERT(CPU->cpu_id == i_cpr_bootcpuid());
+		mutex_enter(&cpu_lock);
+		cpu_enable_intr(CPU);
+		mutex_exit(&cpu_lock);
 
 		PT(PT_INTRRESTORE);
 		intr_restore(saved_intr);

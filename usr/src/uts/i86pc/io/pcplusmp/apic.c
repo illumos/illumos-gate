@@ -1169,8 +1169,13 @@ apic_post_cpu_start()
 	while (get_apic_cmd1() & AV_PENDING)
 		apic_ret();
 
+	/*
+	 * We may be booting, or resuming from suspend; aci_status will
+	 * be APIC_CPU_INTR_ENABLE if coming from suspend, so we add the
+	 * APIC_CPU_ONLINE flag here rather than setting aci_status completely.
+	 */
 	cpun = psm_get_cpu_id();
-	apic_cpus[cpun].aci_status = APIC_CPU_ONLINE;
+	apic_cpus[cpun].aci_status |= APIC_CPU_ONLINE;
 
 	apicadr[APIC_DIVIDE_REG] = apic_divide_reg_init;
 	return (PSM_SUCCESS);
@@ -1651,6 +1656,11 @@ apic_disable_intr(processorid_t cpun)
 		return (PSM_SUCCESS);
 }
 
+/*
+ * Bind interrupts to the CPU's local APIC.
+ * Interrupts should not be bound to a CPU's local APIC until the CPU
+ * is ready to receive interrupts.
+ */
 static void
 apic_enable_intr(processorid_t cpun)
 {

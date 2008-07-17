@@ -839,7 +839,12 @@ xen_psm_post_cpu_start()
 
 	cpun = psm_get_cpu_id();
 	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
-		apic_cpus[cpun].aci_status = APIC_CPU_ONLINE;
+		/*
+		 * Non-virtualized environments can call psm_post_cpu_start
+		 * from Suspend/Resume with the APIC_CPU_INTR_ENABLE bit set.
+		 * xen_psm_post_cpu_start() is only called from boot.
+		 */
+		apic_cpus[cpun].aci_status |= APIC_CPU_ONLINE;
 	}
 	return (PSM_SUCCESS);
 }
