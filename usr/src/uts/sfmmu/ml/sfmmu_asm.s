@@ -777,17 +777,8 @@ sfmmu_panic10:
 	 * cnum reachs max, bail, so wrap around can be performed later.
 	 */
 	set	INVALID_CONTEXT, %o1
-	/*
-	 * When the routine is called by shared ctx, we want to set
-	 * both private and shared ctx regs to INVALID. In order to
-	 * do so, we set the sfmmu priv/shared flag to 'private' regardless.
-	 * so that private ctx reg will be set to invalid.
-	 * Note that values written to private context register are
-	 * automatically written to shared context register as well.
-	 */
-	mov	%g0, %g1		! %g1 = sfmmu private/shared flag
 	mov	%g0, %g4		! %g4 = ret = 0
-	
+
 	membar  #LoadStore|#StoreStore
 	ba,pt	%icc, 8f
 	  clrb	[%o0 + SFMMU_CTX_LOCK]
@@ -826,6 +817,22 @@ sfmmu_panic10:
 	 * %o1 = cnum
 	 * %g1 = sfmmu private/shared flag (0:private,  1:shared)
 	 */
+	 
+	/*
+	 * When we come here and context is invalid, we want to set both 
+	 * private and shared ctx regs to INVALID. In order to
+	 * do so, we set the sfmmu priv/shared flag to 'private' regardless
+	 * so that private ctx reg will be set to invalid.
+	 * Note that on sun4v values written to private context register are
+	 * automatically written to corresponding shared context register as 
+	 * well. On sun4u SET_SECCTX() will invalidate shared context register
+	 * when it sets a private secondary context register.
+	 */
+	 
+	cmp	%o1, INVALID_CONTEXT
+	be,a,pn	%icc, 9f
+	  clr	%g1
+9:
 
 #ifdef	sun4u
 	ldub	[%o0 + SFMMU_CEXT], %o2
