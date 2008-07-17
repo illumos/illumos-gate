@@ -587,10 +587,8 @@ ipsecesp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	netstack_t		*ns;
 	ipsecesp_stack_t	*espstack;
 
-	if (secpolicy_ip_config(credp, B_FALSE) != 0) {
-		esp0dbg(("Non-privileged user trying to open ipsecesp.\n"));
+	if (secpolicy_ip_config(credp, B_FALSE) != 0)
 		return (EPERM);
-	}
 
 	if (q->q_ptr != NULL)
 		return (0);  /* Re-open of an already open instance. */
