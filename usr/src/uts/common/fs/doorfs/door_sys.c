@@ -36,6 +36,8 @@
 #include <sys/door_data.h>
 #include <sys/proc.h>
 #include <sys/thread.h>
+#include <sys/prsystm.h>
+#include <sys/procfs.h>
 #include <sys/class.h>
 #include <sys/cred.h>
 #include <sys/kmem.h>
@@ -562,6 +564,14 @@ door_call(int did, void *args)
 	 */
 	VN_HOLD(DTOV(dp));
 	releasef(did);
+
+	/*
+	 * This should be done in shuttle_resume(), just before going to
+	 * sleep, but we want to avoid overhead while holding door_knob.
+	 * prstop() is just a no-op if we don't really go to sleep.
+	 */
+	if (lwp && lwp->lwp_nostop == 0)
+		prstop(PR_REQUESTED, 0);
 
 	mutex_enter(&door_knob);
 	if (DOOR_INVALID(dp)) {
@@ -1372,11 +1382,13 @@ door_return(caddr_t data_ptr, size_t data_size,
 	st->d_ssize = ssize;		/* and its size */
 
 	/*
-	 * before we release our stack to the whims of our next caller,
-	 * copy in the syscall arguments if we're being traced by /proc.
+	 * This should be done in shuttle_resume(), just before going to
+	 * sleep, but we want to avoid overhead while holding door_knob.
+	 * prstop() is just a no-op if we don't really go to sleep.
 	 */
-	if (curthread->t_post_sys && PTOU(ttoproc(curthread))->u_systrap)
-		(void) save_syscall_args();
+	lwp = ttolwp(curthread);
+	if (lwp && lwp->lwp_nostop == 0)
+		prstop(PR_REQUESTED, 0);
 
 	/* Make sure the caller hasn't gone away */
 	mutex_enter(&door_knob);
@@ -1463,7 +1475,6 @@ out:
 	 * We've sprung to life. Determine if we are part of a door
 	 * invocation, or just interrupted
 	 */
-	lwp = ttolwp(curthread);
 	mutex_enter(&door_knob);
 	if ((dp = st->d_active) != NULL) {
 		/*
@@ -3090,6 +3101,14 @@ door_upcall(vnode_t *vp, door_arg_t *param, struct cred *cred,
 	dup->du_cred = (cred != NULL) ? cred : curthread->t_cred;
 	dup->du_max_data = max_data;
 	dup->du_max_descs = max_descs;
+
+	/*
+	 * This should be done in shuttle_resume(), just before going to
+	 * sleep, but we want to avoid overhead while holding door_knob.
+	 * prstop() is just a no-op if we don't really go to sleep.
+	 */
+	if (lwp && lwp->lwp_nostop == 0)
+		prstop(PR_REQUESTED, 0);
 
 	mutex_enter(&door_knob);
 	if (DOOR_INVALID(dp)) {
