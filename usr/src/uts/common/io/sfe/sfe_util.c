@@ -1,7 +1,7 @@
 /*
  * sfe_util.c: general ethernet mac driver framework version 2.6
  *
- * Copyright (c) 2002-2007 Masayuki Murayama.  All rights reserved.
+ * Copyright (c) 2002-2008 Masayuki Murayama.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -114,7 +114,7 @@ static int gem_debug = GEM_DEBUG_LEVEL;
 	((dp)->mtu + sizeof (struct ether_header) + VTAG_SIZE + ETHERFCSL)
 
 #define	WATCH_INTERVAL_FAST	drv_usectohz(100*1000)	/* 100mS */
-#define	BOOLEAN(x)	((x) ? 1 : 0)
+#define	BOOLEAN(x)	((x) != 0)
 
 /*
  * Macros to distinct chip generation.
@@ -211,46 +211,148 @@ gem_population(uint32_t x)
 	return (cnt);
 }
 
-
-/* ============================================================== */
-/*
- * vlan tag operations
- */
-/* ============================================================== */
-
-__INLINE__
+#ifdef GEM_DEBUG_LEVEL
+#ifdef GEM_DEBUG_VLAN
 static void
-gem_add_vtag(mblk_t *mp, int vtag)
+gem_dump_packet(struct gem_dev *dp, char *title, mblk_t *mp,
+    boolean_t check_cksum)
 {
-	uint32_t	*bp;
+	char	msg[180];
+	uint8_t	buf[18+20+20];
+	uint8_t	*p;
+	size_t	offset;
+	uint_t	ethertype;
+	uint_t	proto;
+	uint_t	ipproto = 0;
+	uint_t	iplen;
+	uint_t	iphlen;
+	uint_t	tcplen;
+	uint_t	udplen;
+	uint_t	cksum;
+	int	rest;
+	int	len;
+	char	*bp;
+	mblk_t	*tp;
+	extern uint_t	ip_cksum(mblk_t *, int, uint32_t);
 
-	/* we must have enough room to insert vtag before b_rptr */
-	ASSERT((long)mp->b_rptr - (long)mp->b_datap->db_base >= VTAG_SIZE);
+	msg[0] = 0;
+	bp = msg;
 
-	bp = (void *)mp->b_rptr;
-	mp->b_rptr = (uint8_t *)bp - VTAG_SIZE;
-
-	switch (3ull & (long)bp) {
-	case 3:
-		((uint8_t *)bp)[VTAG_OFF-3] = ((uint8_t *)bp)[VTAG_OFF+1];
-		/* FALLTHROUGH */
-	case 2:
-		((uint8_t *)bp)[VTAG_OFF-2] = ((uint8_t *)bp)[VTAG_OFF+2];
-		/* FALLTHROUGH */
-	case 1:
-		((uint8_t *)bp)[VTAG_OFF-1] = ((uint8_t *)bp)[VTAG_OFF+3];
-		break;
+	rest = sizeof (buf);
+	offset = 0;
+	for (tp = mp; tp; tp = tp->b_cont) {
+		len = tp->b_wptr - tp->b_rptr;
+		len = min(rest, len);
+		bcopy(tp->b_rptr, &buf[offset], len);
+		rest -= len;
+		offset += len;
+		if (rest == 0) {
+			break;
+		}
 	}
-	((uint8_t *)bp)[VTAG_OFF + 0] = (uint8_t)(VTAG_TPID >> 8);
-	((uint8_t *)bp)[VTAG_OFF + 1] = (uint8_t)VTAG_TPID;
-	((uint8_t *)bp)[VTAG_OFF + 2] = (uint8_t)(vtag >> 8);
-	((uint8_t *)bp)[VTAG_OFF + 3] = (uint8_t)vtag;
-	bp = (void *)(long)((~3ull) & (long)bp);
-	bp[0] = bp[1];
-	bp[1] = bp[2];
-	bp[2] = bp[3];
+
+	offset = 0;
+	p = &buf[offset];
+
+	/* ethernet address */
+	sprintf(bp,
+	    "ether: %02x:%02x:%02x:%02x:%02x:%02x"
+	    " -> %02x:%02x:%02x:%02x:%02x:%02x",
+	    p[6], p[7], p[8], p[9], p[10], p[11],
+	    p[0], p[1], p[2], p[3], p[4], p[5]);
+	bp = &msg[strlen(msg)];
+
+	/* vlag tag and etherrtype */
+	ethertype = GET_ETHERTYPE(p);
+	if (ethertype == VTAG_TPID) {
+		sprintf(bp, " vtag:0x%04x", GET_NET16(&p[14]));
+		bp = &msg[strlen(msg)];
+
+		offset += VTAG_SIZE;
+		p = &buf[offset];
+		ethertype = GET_ETHERTYPE(p);
+	}
+	sprintf(bp, " type:%04x", ethertype);
+	bp = &msg[strlen(msg)];
+
+	/* ethernet packet length */
+	sprintf(bp, " mblklen:%d", msgdsize(mp));
+	bp = &msg[strlen(msg)];
+	if (mp->b_cont) {
+		sprintf(bp, "(");
+		bp = &msg[strlen(msg)];
+		for (tp = mp; tp; tp = tp->b_cont) {
+			if (tp == mp) {
+				sprintf(bp, "%d", tp->b_wptr - tp->b_rptr);
+			} else {
+				sprintf(bp, "+%d", tp->b_wptr - tp->b_rptr);
+			}
+			bp = &msg[strlen(msg)];
+		}
+		sprintf(bp, ")");
+		bp = &msg[strlen(msg)];
+	}
+
+	if (ethertype != ETHERTYPE_IP) {
+		goto x;
+	}
+
+	/* ip address */
+	offset += sizeof (struct ether_header);
+	p = &buf[offset];
+	ipproto = p[9];
+	iplen = GET_NET16(&p[2]);
+	sprintf(bp, ", ip: %d.%d.%d.%d -> %d.%d.%d.%d proto:%d iplen:%d",
+	    p[12], p[13], p[14], p[15],
+	    p[16], p[17], p[18], p[19],
+	    ipproto, iplen);
+	bp = (void *)&msg[strlen(msg)];
+
+	iphlen = (p[0] & 0xf) * 4;
+
+	/* cksum for psuedo header */
+	cksum = *(uint16_t *)&p[12];
+	cksum += *(uint16_t *)&p[14];
+	cksum += *(uint16_t *)&p[16];
+	cksum += *(uint16_t *)&p[18];
+	cksum += BE_16(ipproto);
+
+	/* tcp or udp protocol header */
+	offset += iphlen;
+	p = &buf[offset];
+	if (ipproto == IPPROTO_TCP) {
+		tcplen = iplen - iphlen;
+		sprintf(bp, ", tcp: len:%d cksum:%x",
+		    tcplen, GET_NET16(&p[16]));
+		bp = (void *)&msg[strlen(msg)];
+
+		if (check_cksum) {
+			cksum += BE_16(tcplen);
+			cksum = (uint16_t)ip_cksum(mp, offset, cksum);
+			sprintf(bp, " (%s)",
+			    (cksum == 0 || cksum == 0xffff) ? "ok" : "ng");
+			bp = (void *)&msg[strlen(msg)];
+		}
+	} else if (ipproto == IPPROTO_UDP) {
+		udplen = GET_NET16(&p[4]);
+		sprintf(bp, ", udp: len:%d cksum:%x",
+		    udplen, GET_NET16(&p[6]));
+		bp = (void *)&msg[strlen(msg)];
+
+		if (GET_NET16(&p[6]) && check_cksum) {
+			cksum += *(uint16_t *)&p[4];
+			cksum = (uint16_t)ip_cksum(mp, offset, cksum);
+			sprintf(bp, " (%s)",
+			    (cksum == 0 || cksum == 0xffff) ? "ok" : "ng");
+			bp = (void *)&msg[strlen(msg)];
+		}
+	}
+x:
+	cmn_err(CE_CONT, "!%s: %s: %s", dp->name, title, msg);
 }
-#pragma inline(gem_add_vtag)
+#endif /* GEM_DEBUG_VLAN */
+#endif /* GEM_DEBUG_LEVEL */
+
 /* ============================================================== */
 /*
  * IO cache flush
@@ -334,7 +436,7 @@ gem_dump_txbuf(struct gem_dev *dp, int level, const char *title)
 	    "tx_softq: %d[%d] %d[%d] (+%d), "
 	    "tx_free: %d[%d] %d[%d] (+%d), "
 	    "tx_desc: %d[%d] %d[%d] (+%d), "
-	    "intr: %d[%d] (+%d)",
+	    "intr: %d[%d] (+%d), ",
 	    dp->name, title,
 	    dp->tx_active_head,
 	    SLOT(dp->tx_active_head, dp->gc.gc_tx_buf_size),
@@ -865,6 +967,7 @@ gem_txbuf_free_dma_resources(struct txbuf *tbp)
 		tbp->txb_mp = NULL;
 	}
 	tbp->txb_nfrags = 0;
+	tbp->txb_flag = 0;
 }
 #pragma inline(gem_txbuf_free_dma_resources)
 
@@ -957,9 +1060,13 @@ gem_reclaim_txbuf(struct gem_dev *dp)
 	int		tx_ring_size = dp->gc.gc_tx_ring_size;
 	uint_t (*tx_desc_stat)(struct gem_dev *dp,
 	    int slot, int ndesc) = dp->gc.gc_tx_desc_stat;
-#if GEM_DEBUG_LEVEL > 4
-	clock_t			now = ddi_get_lbolt();
-#endif
+	clock_t		now;
+
+	now = ddi_get_lbolt();
+	if (now == (clock_t)0) {
+		/* make non-zero timestamp */
+		now--;
+	}
 
 	mutex_enter(&dp->xmitlock);
 
@@ -1000,12 +1107,20 @@ gem_reclaim_txbuf(struct gem_dev *dp)
 		ASSERT(tbp->txb_desc == desc_head);
 
 		ndescs = tbp->txb_ndescs;
+		if (ndescs == 0) {
+			/* skip errored descriptors */
+			continue;
+		}
 		txstat = (*tx_desc_stat)(dp,
 		    SLOT(tbp->txb_desc, tx_ring_size), ndescs);
 
 		if (txstat == 0) {
 			/* not transmitted yet */
 			break;
+		}
+
+		if (!dp->tx_blocked && (tbp->txb_flag & GEM_TXFLAG_INTR)) {
+			dp->tx_blocked = now;
 		}
 
 		ASSERT(txstat & (GEM_TX_DONE | GEM_TX_ERR));
@@ -1030,7 +1145,7 @@ gem_reclaim_txbuf(struct gem_dev *dp)
 		dp->tx_desc_head = desc_head;
 
 		/* If we passed the next interrupt position, update it */
-		if (desc_head - dp->tx_desc_intr >= 0) {
+		if (desc_head - dp->tx_desc_intr > 0) {
 			dp->tx_desc_intr = desc_head;
 		}
 	}
@@ -1096,8 +1211,7 @@ gem_reclaim_txbuf(struct gem_dev *dp)
  */
 static void
 gem_tx_load_descs_oo(struct gem_dev *dp,
-	seqnum_t start_slot, seqnum_t end_slot, seqnum_t intr_slot,
-	uint64_t flags)
+	seqnum_t start_slot, seqnum_t end_slot, uint64_t flags)
 {
 	seqnum_t	sn;
 	struct txbuf	*tbp;
@@ -1111,9 +1225,6 @@ gem_tx_load_descs_oo(struct gem_dev *dp,
 	sn = start_slot;
 	tbp = GET_TXBUF(dp, sn);
 	do {
-		if (sn == intr_slot) {
-			flags |= GEM_TXFLAG_INTR;
-		}
 #if GEM_DEBUG_LEVEL > 1
 		if (dp->tx_cnt < 100) {
 			dp->tx_cnt++;
@@ -1135,9 +1246,8 @@ gem_tx_load_descs_oo(struct gem_dev *dp,
 	} while (sn != end_slot);
 }
 
-
 __INLINE__
-static void
+static size_t
 gem_setup_txbuf_copy(struct gem_dev *dp, mblk_t *mp, struct txbuf *tbp)
 {
 	size_t			min_pkt;
@@ -1160,27 +1270,6 @@ gem_setup_txbuf_copy(struct gem_dev *dp, mblk_t *mp, struct txbuf *tbp)
 		/* need to increase min packet size */
 		min_pkt += VTAG_SIZE;
 		ASSERT((flag & GEM_TXFLAG_VTAG) == 0);
-	} else if (flag & GEM_TXFLAG_VTAG) {
-		size_t		rest;
-		/* we use hardware capability to add vlan tag. */
-
-		/* copy until VTAG + VTAG_SIZE */
-		for (rest = VTAG_OFF + VTAG_SIZE; ; tp = tp->b_cont) {
-			ASSERT(tp != NULL);
-			len = min((long)tp->b_wptr - (long)tp->b_rptr, rest);
-			bcopy(tp->b_rptr, &bp[off], len);
-			off  += len;
-			rest -= len;
-			if (rest == 0) {
-				tp->b_rptr += len;
-				break;
-			}
-		}
-		/* we have just copied vlan tag, see it. */
-		ASSERT(GET_NET16(&bp[off - VTAG_SIZE]) == VTAG_TPID);
-
-		/* remove the vlan tag */
-		off -= VTAG_SIZE;
 	}
 
 	/* copy the rest */
@@ -1194,9 +1283,9 @@ gem_setup_txbuf_copy(struct gem_dev *dp, mblk_t *mp, struct txbuf *tbp)
 	if (off < min_pkt &&
 	    (min_pkt > ETHERMIN || !dp->gc.gc_tx_auto_pad)) {
 		/*
-		 * Extend explicitly the packet to minimum packet size.
+		 * Extend the packet to minimum packet size explicitly.
 		 * For software vlan packets, we shouldn't use tx autopad
-		 * function because nics may not be aware of vlan, that
+		 * function because nics may not be aware of vlan.
 		 * we must keep 46 octet of payload even if we use vlan.
 		 */
 		bzero(&bp[off], min_pkt - off);
@@ -1234,6 +1323,7 @@ gem_setup_txbuf_copy(struct gem_dev *dp, mblk_t *mp, struct txbuf *tbp)
 		tbp->txb_nfrags  = 3;
 	}
 #endif
+	return (off);
 }
 #pragma inline(gem_setup_txbuf_copy)
 
@@ -1280,7 +1370,53 @@ gem_tx_start_unit(struct gem_dev *dp)
 #ifdef GEM_DEBUG_LEVEL
 static int gem_send_cnt[10];
 #endif
+#define	PKT_MIN_SIZE	(sizeof (struct ether_header) + 10 + VTAG_SIZE)
+#define	EHLEN	(sizeof (struct ether_header))
+/*
+ * check ether packet type and ip protocol
+ */
+static uint64_t
+gem_txbuf_options(struct gem_dev *dp, mblk_t *mp, uint8_t *bp)
+{
+	mblk_t		*tp;
+	ssize_t		len;
+	uint_t		vtag;
+	int		off;
+	uint64_t	flag;
 
+	flag = 0ULL;
+
+	/*
+	 * prepare continuous header of the packet for protocol analysis
+	 */
+	if ((long)mp->b_wptr - (long)mp->b_rptr < PKT_MIN_SIZE) {
+		/* we use work buffer to copy mblk */
+		for (tp = mp, off = 0;
+		    tp && (off < PKT_MIN_SIZE);
+		    tp = tp->b_cont, off += len) {
+			len = (long)tp->b_wptr - (long)tp->b_rptr;
+			len = min(len, PKT_MIN_SIZE - off);
+			bcopy(tp->b_rptr, &bp[off], len);
+		}
+	} else {
+		/* we can use mblk without copy */
+		bp = mp->b_rptr;
+	}
+
+	/* process vlan tag for GLD v3 */
+	if (GET_NET16(&bp[VTAG_OFF]) == VTAG_TPID) {
+		if (dp->misc_flag & GEM_VLAN_HARD) {
+			vtag = GET_NET16(&bp[VTAG_OFF + 2]);
+			ASSERT(vtag);
+			flag |= vtag << GEM_TXFLAG_VTAG_SHIFT;
+		} else {
+			flag |= GEM_TXFLAG_SWVTAG;
+		}
+	}
+	return (flag);
+}
+#undef EHLEN
+#undef PKT_MIN_SIZE
 /*
  * gem_send_common is an exported function because hw depend routines may
  * use it for sending control frames like setup frames for 2114x chipset.
@@ -1292,14 +1428,13 @@ gem_send_common(struct gem_dev *dp, mblk_t *mp_head, uint32_t flags)
 	int			avail;
 	mblk_t			*tp;
 	mblk_t			*mp;
-	int			i = 0;
+	int			i;
 	struct txbuf		*tbp;
 	seqnum_t		head;
-	seqnum_t		intr;
 	uint64_t		load_flags;
 	uint64_t		len_total = 0;
-	uint64_t		packets = 0;
-	uint32_t		vtag;
+	uint32_t		bcast = 0;
+	uint32_t		mcast = 0;
 
 	ASSERT(mp_head != NULL);
 
@@ -1316,7 +1451,6 @@ gem_send_common(struct gem_dev *dp, mblk_t *mp_head, uint32_t flags)
 	 * Aquire resources
 	 */
 	mutex_enter(&dp->xmitlock);
-
 	if (dp->mac_suspended) {
 		mutex_exit(&dp->xmitlock);
 		mp = mp_head;
@@ -1330,6 +1464,7 @@ gem_send_common(struct gem_dev *dp, mblk_t *mp_head, uint32_t flags)
 
 	if (!dp->mac_active && (flags & GEM_SEND_CTRL) == 0) {
 		/* don't send data packets while mac isn't active */
+		/* XXX - should we discard packets? */
 		mutex_exit(&dp->xmitlock);
 		return (mp_head);
 	}
@@ -1343,16 +1478,13 @@ gem_send_common(struct gem_dev *dp, mblk_t *mp_head, uint32_t flags)
 	    dp->name, __func__,
 	    dp->tx_free_head, dp->tx_free_tail, avail, nmblk));
 
-	if ((dp->misc_flag & GEM_CTRL_PKT) &&
-	    (flags & GEM_SEND_CTRL) == 0 && avail > 0) {
-		/* reserve a txbuffer for sending control packets */
-		avail--;
-	}
+	avail = min(avail, dp->tx_max_packets);
 
 	if (nmblk > avail) {
 		if (avail == 0) {
 			/* no resources; short cut */
 			DPRINTF(2, (CE_CONT, "!%s: no resources", __func__));
+			dp->tx_max_packets = max(dp->tx_max_packets - 1, 1);
 			goto done;
 		}
 		nmblk = avail;
@@ -1361,26 +1493,19 @@ gem_send_common(struct gem_dev *dp, mblk_t *mp_head, uint32_t flags)
 	dp->tx_free_head = head + nmblk;
 	load_flags = ((dp->tx_busy++) == 0) ? GEM_TXFLAG_HEAD : 0;
 
-	/* calculate next interrupt position */
-	intr = head + avail;	/* free tail */
-
-	/*
-	 * update interrupt position if it is in the range of
-	 * allcated tx buffers and we are using out of order way.
-	 */
-	if ((head + nmblk) - intr >= 0 &&
-	    intr - dp->tx_desc_intr > 0) {
-		dp->tx_desc_intr = intr;
+	/* update last interrupt position if tx buffers exhaust.  */
+	if (nmblk == avail) {
+		tbp = GET_TXBUF(dp, head + avail - 1);
+		tbp->txb_flag = GEM_TXFLAG_INTR;
+		dp->tx_desc_intr = head + avail;
 	}
 	mutex_exit(&dp->xmitlock);
 
 	tbp = GET_TXBUF(dp, head);
 
-	i = nmblk;
-	do {
-		size_t		len;
+	for (i = nmblk; i > 0; i--, tbp = tbp->txb_next) {
 		uint8_t		*bp;
-#define	PKT_MIN_SIZE	(sizeof (struct ether_header) + 10 + VTAG_SIZE)
+		uint64_t	txflag;
 
 		/* remove one from the mblk list */
 		ASSERT(mp_head != NULL);
@@ -1388,57 +1513,27 @@ gem_send_common(struct gem_dev *dp, mblk_t *mp_head, uint32_t flags)
 		mp_head = mp_head->b_next;
 		mp->b_next = NULL;
 
-		/* save misc info */
-		tbp->txb_flag =
-		    (flags & GEM_SEND_CTRL) << GEM_TXFLAG_PRIVATE_SHIFT;
-
-		/*
-		 * prepare the header of the packet for further analysis
-		 */
-		if ((long)mp->b_wptr - (long)mp->b_rptr < PKT_MIN_SIZE) {
-			int 	off;
-
-			/* we use bounce buffer for the packet */
-			bp = (uint8_t *)tbp->txb_buf;
-			for (tp = mp, off = 0;
-			    tp && (off < PKT_MIN_SIZE);
-			    tp = tp->b_cont, off += len) {
-				len = min((long)tp->b_wptr - (long)tp->b_rptr,
-				    PKT_MIN_SIZE - off);
-				bcopy(tp->b_rptr, &bp[off], len);
-			}
-		} else {
-			bp = mp->b_rptr;
-		}
-#undef PKT_MIN_SIZE
-
+		/* statistics for non-unicast packets */
+		bp = mp->b_rptr;
 		if ((bp[0] & 1) && (flags & GEM_SEND_CTRL) == 0) {
-			/* statistics for non-unicast packets */
 			if (bcmp(bp, gem_etherbroadcastaddr.ether_addr_octet,
 			    ETHERADDRL) == 0) {
-				dp->stats.obcast++;
+				bcast++;
 			} else {
-				dp->stats.omcast++;
+				mcast++;
 			}
 		}
 
-		/* process vlan tag for GLD v3 */
-		if (GET_NET16(&bp[VTAG_OFF]) == VTAG_TPID) {
-			if (dp->misc_flag & GEM_VLAN_HARD) {
-				vtag = GET_NET16(&bp[VTAG_OFF + 2]);
-				ASSERT(vtag);
-				tbp->txb_flag |= vtag << GEM_TXFLAG_VTAG_SHIFT;
-			} else {
-				tbp->txb_flag |= GEM_TXFLAG_SWVTAG;
-			}
-		}
+		/* save misc info */
+		txflag = tbp->txb_flag;
+		txflag |= (flags & GEM_SEND_CTRL) << GEM_TXFLAG_PRIVATE_SHIFT;
+		txflag |= gem_txbuf_options(dp, mp, (uint8_t *)tbp->txb_buf);
+		tbp->txb_flag = txflag;
 
-		gem_setup_txbuf_copy(dp, mp, tbp);
-		tbp = tbp->txb_next;
-	} while (--i > 0);
+		len_total += gem_setup_txbuf_copy(dp, mp, tbp);
+	}
 
-	(void) gem_tx_load_descs_oo(dp,
-	    head, head + nmblk, intr - 1, load_flags);
+	(void) gem_tx_load_descs_oo(dp, head, head + nmblk, load_flags);
 
 	/* Append the tbp at the tail of the active tx buffer list */
 	mutex_enter(&dp->xmitlock);
@@ -1461,16 +1556,10 @@ gem_send_common(struct gem_dev *dp, mblk_t *mp_head, uint32_t flags)
 		}
 	}
 	dp->stats.obytes += len_total;
-	dp->stats.opackets += packets;
-
+	dp->stats.opackets += nmblk;
+	dp->stats.obcast += bcast;
+	dp->stats.omcast += mcast;
 done:
-	if (mp_head) {
-		/*
-		 * We mark the tx side as blocked. The state will be
-		 * kept until we'll unblock tx side explicitly.
-		 */
-		dp->tx_blocked = B_TRUE;
-	}
 	mutex_exit(&dp->xmitlock);
 
 	return (mp_head);
@@ -1486,9 +1575,12 @@ gem_restart_nic(struct gem_dev *dp, uint_t flags)
 {
 	ASSERT(mutex_owned(&dp->intrlock));
 
-	DPRINTF(1, (CE_CONT, "!%s: %s: called: tx_desc:%d %d %d",
-	    dp->name, __func__,
-	    dp->tx_active_head, dp->tx_active_tail, dp->tx_desc_intr));
+	DPRINTF(1, (CE_CONT, "!%s: %s: called", dp->name, __func__));
+#ifdef GEM_DEBUG_LEVEL
+#if GEM_DEBUG_LEVEL > 1
+	gem_dump_txbuf(dp, CE_CONT, "gem_restart_nic");
+#endif
+#endif
 
 	if (dp->mac_suspended) {
 		/* should we return GEM_FAILURE ? */
@@ -1533,7 +1625,7 @@ gem_restart_nic(struct gem_dev *dp, uint_t flags)
 	}
 
 	/*
-	 * XXX - a panic happended because of linkdown.
+	 * XXX - a panic happened because of linkdown.
 	 * We must check mii_state here, because the link can be down just
 	 * before the restart event happen. If the link is down now,
 	 * gem_mac_start() will be called from gem_mii_link_check() when
@@ -1574,15 +1666,22 @@ gem_tx_timeout(struct gem_dev *dp)
 		/* tx error happened, reset transmitter in the chip */
 		(void) gem_restart_nic(dp, 0);
 		tx_sched = B_TRUE;
-		dp->tx_blocked = B_FALSE;
+		dp->tx_blocked = (clock_t)0;
 
 		goto schedule_next;
 	}
 
 	mutex_enter(&dp->xmitlock);
-	/* check if the transmitter is stuck */
+	/* check if the transmitter thread is stuck */
 	if (dp->tx_active_head == dp->tx_active_tail) {
 		/* no tx buffer is loaded to the nic */
+		if (dp->tx_blocked &&
+		    now - dp->tx_blocked > dp->gc.gc_tx_timeout_interval) {
+			gem_dump_txbuf(dp, CE_WARN,
+			    "gem_tx_timeout: tx blocked");
+			tx_sched = B_TRUE;
+			dp->tx_blocked = (clock_t)0;
+		}
 		mutex_exit(&dp->xmitlock);
 		goto schedule_next;
 	}
@@ -1594,12 +1693,12 @@ gem_tx_timeout(struct gem_dev *dp)
 	}
 	mutex_exit(&dp->xmitlock);
 
-	gem_dump_txbuf(dp, CE_WARN, __func__);
+	gem_dump_txbuf(dp, CE_WARN, "gem_tx_timeout: tx timeout");
 
 	/* discard untransmitted packet and restart tx.  */
-	(void) gem_restart_nic(dp, 0);
+	(void) gem_restart_nic(dp, GEM_RESTART_NOWAIT);
 	tx_sched = B_TRUE;
-	dp->tx_blocked = B_FALSE;
+	dp->tx_blocked = (clock_t)0;
 
 schedule_next:
 	mutex_exit(&dp->intrlock);
@@ -1610,8 +1709,8 @@ schedule_next:
 	}
 
 	DPRINTF(4, (CE_CONT,
-	    "!%s: blocked:%d desc_head:%d desc_tail:%d desc_intr:%d",
-	    dp->name, dp->tx_blocked,
+	    "!%s: blocked:%d active_head:%d active_tail:%d desc_intr:%d",
+	    dp->name, BOOLEAN(dp->tx_blocked),
 	    dp->tx_active_head, dp->tx_active_tail, dp->tx_desc_intr));
 	dp->timeout_id =
 	    timeout((void (*)(void *))gem_tx_timeout,
@@ -1678,8 +1777,12 @@ gem_get_packet_default(struct gem_dev *dp, struct rxbuf *rbp, size_t len)
 		bp = mp->b_rptr;
 		mp->b_wptr = bp + len;
 
+		/*
+		 * flush the range of the entire buffer to invalidate
+		 * all of corresponding dirty entries in iocache.
+		 */
 		(void) ddi_dma_sync(rbp->rxb_dh, rx_header_len,
-		    len, DDI_DMA_SYNC_FORKERNEL);
+		    0, DDI_DMA_SYNC_FORKERNEL);
 
 		bcopy(rbp->rxb_buf + rx_header_len, bp, len);
 	}
@@ -1707,9 +1810,9 @@ gem_receive(struct gem_dev *dp)
 	seqnum_t	active_head;
 	uint64_t	(*rx_desc_stat)(struct gem_dev *dp,
 	    int slot, int ndesc);
-	uint16_t	vtag;
 	int		ethermin = ETHERMIN;
 	int		ethermax = dp->mtu + sizeof (struct ether_header);
+	int		rx_header_len = dp->gc.gc_rx_header_len;
 
 	ASSERT(mutex_owned(&dp->intrlock));
 
@@ -1731,6 +1834,12 @@ gem_receive(struct gem_dev *dp)
 			    cnt,
 			    DDI_DMA_SYNC_FORKERNEL);
 		}
+
+		if (rx_header_len > 0) {
+			(void) ddi_dma_sync(rbp->rxb_dh, 0,
+			    rx_header_len, DDI_DMA_SYNC_FORKERNEL);
+		}
+
 		if (((rxstat = (*rx_desc_stat)(dp,
 		    SLOT(active_head, rx_ring_size),
 		    rbp->rxb_nfrags))
@@ -1766,14 +1875,7 @@ gem_receive(struct gem_dev *dp)
 		 */
 		ethermin = ETHERMIN;
 		ethermax = dp->mtu + sizeof (struct ether_header);
-		vtag = (rxstat & GEM_RX_VTAG) >> GEM_RX_VTAG_SHIFT;
-		if (vtag) {
-			/* insert vlan vtag extracted by the hardware */
-			gem_add_vtag(mp, vtag);
-			len += VTAG_SIZE;
-			ethermax += VTAG_SIZE;
-		} else if (GET_NET16(mp->b_rptr + VTAG_OFF) == VTAG_TPID) {
-
+		if (GET_NET16(mp->b_rptr + VTAG_OFF) == VTAG_TPID) {
 			ethermax += VTAG_SIZE;
 		}
 
@@ -1794,6 +1896,11 @@ gem_receive(struct gem_dev *dp)
 
 		len_total += len;
 
+#ifdef GEM_DEBUG_VLAN
+		if (GET_ETHERTYPE(mp->b_rptr) == VTAG_TPID) {
+			gem_dump_packet(dp, (char *)__func__, mp, B_TRUE);
+		}
+#endif
 		/* append received packet to temporaly rx buffer list */
 		*rx_tailp = mp;
 		rx_tailp  = &mp->b_next;
@@ -1866,7 +1973,7 @@ next:
 boolean_t
 gem_tx_done(struct gem_dev *dp)
 {
-	boolean_t		tx_sched = B_FALSE;
+	boolean_t	tx_sched = B_FALSE;
 
 	if (gem_reclaim_txbuf(dp) != GEM_SUCCESS) {
 		(void) gem_restart_nic(dp, GEM_RESTART_KEEP_BUF);
@@ -1878,27 +1985,29 @@ gem_tx_done(struct gem_dev *dp)
 
 	mutex_enter(&dp->xmitlock);
 
-	/* XXX - for oo, we must not have any packets in soft queue */
-	ASSERT((!dp->gc.gc_tx_desc_write_oo) ||
-	    dp->tx_softq_head == dp->tx_softq_tail);
+	/* XXX - we must not have any packets in soft queue */
+	ASSERT(dp->tx_softq_head == dp->tx_softq_tail);
 	/*
-	 * if we won't have chance to get more free tx buffers, and blocked,
+	 * If we won't have chance to get more free tx buffers, and blocked,
 	 * it is worth to reschedule the downstream i.e. tx side.
 	 */
-	if (dp->tx_blocked && (dp->tx_desc_intr == dp->tx_desc_head)) {
+	ASSERT(dp->tx_desc_intr - dp->tx_desc_head >= 0);
+	if (dp->tx_blocked && dp->tx_desc_intr == dp->tx_desc_head) {
 		/*
 		 * As no further tx-done interrupts are scheduled, this
 		 * is the last chance to kick tx side, which may be
 		 * blocked now, otherwise the tx side never works again.
 		 */
 		tx_sched = B_TRUE;
-		dp->tx_blocked = B_FALSE;
+		dp->tx_blocked = (clock_t)0;
+		dp->tx_max_packets =
+		    min(dp->tx_max_packets + 2, dp->gc.gc_tx_buf_limit);
 	}
 
 	mutex_exit(&dp->xmitlock);
 
-	DPRINTF(3, (CE_CONT, "!%s: gem_tx_done: ret: blocked:%d",
-	    dp->name, dp->tx_blocked));
+	DPRINTF(3, (CE_CONT, "!%s: %s: ret: blocked:%d",
+	    dp->name, __func__, BOOLEAN(dp->tx_blocked)));
 x:
 	return (tx_sched);
 }
@@ -2146,6 +2255,19 @@ gem_mii_link_check(struct gem_dev *dp)
 
 	diff = now - dp->mii_last_check;
 	dp->mii_last_check = now;
+
+	/*
+	 * For NWAM, don't show linkdown state right
+	 * after the system boots
+	 */
+	if (dp->linkup_delay > 0) {
+		if (dp->linkup_delay > diff) {
+			dp->linkup_delay -= diff;
+		} else {
+			/* link up timeout */
+			dp->linkup_delay = -1;
+		}
+	}
 
 next_nowait:
 	switch (dp->mii_state) {
@@ -2546,9 +2668,6 @@ next_nowait:
 					(void) gem_mac_start(dp);
 				}
 				tx_sched = B_TRUE;
-				if (dp->tx_blocked) {
-					dp->tx_blocked = B_FALSE;
-				}
 			}
 			goto next;
 		}
@@ -2583,6 +2702,11 @@ next_nowait:
 			    dp->mac_active &&
 			    dp->gc.gc_mii_stop_mac_on_linkdown) {
 				(void) gem_mac_stop(dp, 0);
+
+				if (dp->tx_blocked) {
+					/* drain tx */
+					tx_sched = B_TRUE;
+				}
 			}
 
 			if (dp->anadv_autoneg) {
@@ -2673,14 +2797,8 @@ autonego:
 	val = gem_mii_read(dp, MII_CONTROL) &
 	    ~(MII_CONTROL_ISOLATE | MII_CONTROL_PWRDN | MII_CONTROL_RESET);
 
-	if (val & MII_CONTROL_ANE) {
-		/* restart auto nego */
-		gem_mii_write(dp, MII_CONTROL, val | MII_CONTROL_RSAN);
-	} else {
-		/* enable auto nego */
-		/* XXX - it doesn't work for mx98315 */
-		gem_mii_write(dp, MII_CONTROL, val | MII_CONTROL_ANE);
-	}
+	gem_mii_write(dp, MII_CONTROL,
+	    val | MII_CONTROL_RSAN | MII_CONTROL_ANE);
 
 	dp->mii_interval = dp->gc.gc_mii_an_watch_interval;
 
@@ -2688,19 +2806,24 @@ next:
 	if (dp->link_watcher_id == 0 && dp->mii_interval) {
 		/* we must schedule next mii_watcher */
 		dp->link_watcher_id =
-		    timeout((void (*)(void *))& gem_mii_link_watcher,
+		    timeout((void (*)(void *))&gem_mii_link_watcher,
 		    (void *)dp, dp->mii_interval);
 	}
 
-	if (old_mii_state == MII_STATE_UNKNOWN ||
-	    old_mii_state != dp->mii_state) {
+	if (old_mii_state != dp->mii_state) {
 		/* notify new mii link state */
 		if (dp->mii_state == MII_STATE_LINKUP) {
+			dp->linkup_delay = 0;
 			GEM_LINKUP(dp);
-		} else {
+		} else if (dp->linkup_delay <= 0) {
 			GEM_LINKDOWN(dp);
 		}
+	} else if (dp->linkup_delay < 0) {
+		/* first linkup timeout */
+		dp->linkup_delay = 0;
+		GEM_LINKDOWN(dp);
 	}
+
 	return (tx_sched);
 }
 
@@ -2845,6 +2968,7 @@ gem_mii_start(struct gem_dev *dp)
 	/* make a first call of check link */
 	dp->mii_state = MII_STATE_UNKNOWN;
 	dp->mii_last_check = ddi_get_lbolt();
+	dp->linkup_delay = dp->gc.gc_mii_linkdown_timeout;
 	(void) gem_mii_link_watcher(dp);
 }
 
@@ -2974,9 +3098,10 @@ gem_mac_init(struct gem_dev *dp)
 	gem_init_tx_ring(dp);
 
 	/* reset transmitter state */
-	dp->tx_blocked  = B_FALSE;
+	dp->tx_blocked = (clock_t)0;
 	dp->tx_busy = 0;
 	dp->tx_reclaim_busy = 0;
+	dp->tx_max_packets = dp->gc.gc_tx_buf_limit;
 
 	if ((*dp->gc.gc_init_chip)(dp) != GEM_SUCCESS) {
 		return (GEM_FAILURE);
@@ -3007,16 +3132,16 @@ gem_mac_start(struct gem_dev *dp)
 	dp->mac_active = B_TRUE;
 	mutex_exit(&dp->xmitlock);
 
+	/* setup rx buffers */
+	(*dp->gc.gc_rx_start)(dp,
+	    SLOT(dp->rx_active_head, dp->gc.gc_rx_ring_size),
+	    dp->rx_active_tail - dp->rx_active_head);
+
 	if ((*dp->gc.gc_start_chip)(dp) != GEM_SUCCESS) {
 		cmn_err(CE_WARN, "%s: %s: start_chip: failed",
 		    dp->name, __func__);
 		return (GEM_FAILURE);
 	}
-
-	/* kick rx */
-	dp->gc.gc_rx_start(dp,
-	    SLOT(dp->rx_active_head, dp->gc.gc_rx_ring_size),
-	    dp->rx_active_tail - dp->rx_active_head);
 
 	mutex_enter(&dp->xmitlock);
 
@@ -3025,7 +3150,6 @@ gem_mac_start(struct gem_dev *dp)
 	if (dp->tx_softq_tail - dp->tx_softq_head > 0) {
 		gem_tx_load_descs_oo(dp,
 		    dp->tx_softq_head, dp->tx_softq_tail,
-		    dp->tx_free_tail - 1,
 		    GEM_TXFLAG_HEAD);
 		/* issue preloaded tx buffers */
 		gem_tx_start_unit(dp);
@@ -3172,7 +3296,7 @@ gem_add_multicast(struct gem_dev *dp, const uint8_t *ep)
 		dp->rxmode &= ~RXMODE_MULTI_OVF;
 	}
 
-	/* tell the new multicast list to the hardwaire */
+	/* tell new multicast list to the hardware */
 	err = gem_mac_set_rx_filter(dp);
 
 	mutex_exit(&dp->intrlock);
@@ -3625,7 +3749,7 @@ gem_nd_load(struct gem_dev *dp, char *name, ndgetf_t gf, ndsetf_t sf, int item)
 
 	DPRINTF(2, (CE_CONT, "!%s: %s: name:%s, item:%d",
 	    dp->name, __func__, name, item));
-	(void *) nd_load(&dp->nd_data_p, name, gf, sf, (caddr_t)arg);
+	(void) nd_load(&dp->nd_data_p, name, gf, sf, (caddr_t)arg);
 }
 
 static void
@@ -4109,12 +4233,18 @@ gem_m_getstat(void *arg, uint_t stat, uint64_t *valp)
 
 	DPRINTF(1, (CE_CONT, "!%s: %s: called", dp->name, __func__));
 
-	mutex_enter(&dp->intrlock);
-	if (dp->mac_suspended) {
+	if (mutex_owned(&dp->intrlock)) {
+		if (dp->mac_suspended) {
+			return (EIO);
+		}
+	} else {
+		mutex_enter(&dp->intrlock);
+		if (dp->mac_suspended) {
+			mutex_exit(&dp->intrlock);
+			return (EIO);
+		}
 		mutex_exit(&dp->intrlock);
-		return (EIO);
 	}
-	mutex_exit(&dp->intrlock);
 
 	if ((*dp->gc.gc_get_stats)(dp) != GEM_SUCCESS) {
 		return (EIO);
@@ -4280,7 +4410,7 @@ gem_m_getstat(void *arg, uint_t stat, uint64_t *valp)
 		break;
 
 	case ETHER_STAT_CAP_AUTONEG:
-		val = dp->anadv_autoneg;
+		val = BOOLEAN(dp->mii_status & MII_STATUS_CANAUTONEG);
 		break;
 
 	case ETHER_STAT_ADV_CAP_1000FDX:
@@ -4469,7 +4599,7 @@ gem_set_coalease(void *arg, time_t ticks, uint_t count)
 	    dp->name, __func__, ticks, count));
 
 	mutex_enter(&dp->intrlock);
-	dp->poll_pkt_delay = count;
+	dp->poll_pkt_delay = min(count, dp->gc.gc_rx_ring_size/2);
 	mutex_exit(&dp->intrlock);
 }
 
@@ -4491,7 +4621,7 @@ gem_m_resources(void *arg)
 	mrf.mrf_type = MAC_RX_FIFO;
 	mrf.mrf_blank = gem_set_coalease;
 	mrf.mrf_arg = (void *)dp;
-	mrf.mrf_normal_blank_time = 128; /* in uS */
+	mrf.mrf_normal_blank_time = 1; /* in uS */
 	mrf.mrf_normal_pkt_count = dp->poll_pkt_delay;
 
 	dp->mac_rx_ring_ha = mac_resource_add(dp->mh, (mac_resource_t *)&mrf);
@@ -4533,7 +4663,10 @@ gem_gld3_init(struct gem_dev *dp, mac_register_t *macp)
 	macp->m_callbacks = &gem_m_callbacks;
 	macp->m_min_sdu = 0;
 	macp->m_max_sdu = dp->mtu;
-	macp->m_margin = VTAG_SIZE;
+
+	if (dp->misc_flag & GEM_VLAN) {
+		macp->m_margin = VTAG_SIZE;
+	}
 }
 
 /* ======================================================================== */
@@ -4544,8 +4677,7 @@ gem_gld3_init(struct gem_dev *dp, mac_register_t *macp)
 static void
 gem_read_conf(struct gem_dev *dp)
 {
-	char			propname[32];
-	int			val;
+	int	val;
 
 	DPRINTF(1, (CE_CONT, "!%s: %s: called", dp->name, __func__));
 
@@ -4565,9 +4697,15 @@ gem_read_conf(struct gem_dev *dp)
 	    DDI_PROP_DONTPASS, "full-duplex"))) {
 		dp->full_duplex = gem_prop_get_int(dp, "full-duplex", 1) != 0;
 		dp->anadv_autoneg = B_FALSE;
-		dp->anadv_1000hdx = B_FALSE;
-		dp->anadv_100hdx = B_FALSE;
-		dp->anadv_10hdx = B_FALSE;
+		if (dp->full_duplex) {
+			dp->anadv_1000hdx = B_FALSE;
+			dp->anadv_100hdx = B_FALSE;
+			dp->anadv_10hdx = B_FALSE;
+		} else {
+			dp->anadv_1000fdx = B_FALSE;
+			dp->anadv_100fdx = B_FALSE;
+			dp->anadv_10fdx = B_FALSE;
+		}
 	}
 
 	if ((val = gem_prop_get_int(dp, "speed", 0)) > 0) {
@@ -4599,7 +4737,7 @@ gem_read_conf(struct gem_dev *dp)
 		default:
 			cmn_err(CE_WARN,
 			    "!%s: property %s: illegal value:%d",
-			    dp->name, propname, val);
+			    dp->name, "speed", val);
 			dp->anadv_autoneg = B_TRUE;
 			break;
 		}
@@ -4609,7 +4747,7 @@ gem_read_conf(struct gem_dev *dp)
 	if (val > FLOW_CONTROL_RX_PAUSE || val < FLOW_CONTROL_NONE) {
 		cmn_err(CE_WARN,
 		    "!%s: property %s: illegal value:%d",
-		    dp->name, propname, val);
+		    dp->name, "flow-control", val);
 	} else {
 		val = min(val, dp->gc.gc_flow_control);
 	}
@@ -4625,8 +4763,6 @@ gem_read_conf(struct gem_dev *dp)
 	dp->rxthr = gem_prop_get_int(dp, "rxthr", dp->rxthr);
 	dp->txmaxdma = gem_prop_get_int(dp, "txmaxdma", dp->txmaxdma);
 	dp->rxmaxdma = gem_prop_get_int(dp, "rxmaxdma", dp->rxmaxdma);
-	dp->poll_pkt_delay =
-	    gem_prop_get_int(dp, "pkt_delay", dp->poll_pkt_delay);
 }
 
 
@@ -4677,7 +4813,7 @@ gem_do_attach(dev_info_t *dip, int port,
 	/* ddi_set_driver_private(dip, dp); */
 
 	/* link to private area */
-	dp->private   = lp;
+	dp->private = lp;
 	dp->priv_size = lmsize;
 	dp->mc_list = (struct mcast_addr *)&dp[1];
 
@@ -4705,25 +4841,16 @@ gem_do_attach(dev_info_t *dip, int port,
 	/*
 	 * configure gem parameter
 	 */
-	dp->base_addr   = base;
+	dp->base_addr = base;
 	dp->regs_handle = *regs_handlep;
 	dp->gc = *gc;
 	gc = &dp->gc;
-	if (gc->gc_tx_ring_size == 0) {
-		/* patch for simplify dma resource management */
-		gc->gc_tx_max_frags = 1;
-		gc->gc_tx_max_descs_per_pkt = 1;
-		gc->gc_tx_ring_size = gc->gc_tx_buf_size;
-		gc->gc_tx_ring_limit = gc->gc_tx_buf_limit;
-		gc->gc_tx_desc_write_oo = B_TRUE;
-	}
-	if (gc->gc_tx_desc_write_oo) {
-		/* doublec check for making tx descs in out of order way */
-		gc->gc_tx_desc_write_oo =
-		    gc->gc_tx_max_descs_per_pkt == 1 &&
-		    gc->gc_tx_buf_size == gc->gc_tx_ring_size &&
-		    gc->gc_tx_buf_limit == gc->gc_tx_ring_limit;
-	}
+	/* patch for simplify dma resource management */
+	gc->gc_tx_max_frags = 1;
+	gc->gc_tx_max_descs_per_pkt = 1;
+	gc->gc_tx_ring_size = gc->gc_tx_buf_size;
+	gc->gc_tx_ring_limit = gc->gc_tx_buf_limit;
+	gc->gc_tx_desc_write_oo = B_TRUE;
 
 	gc->gc_nports = nports;	/* fix nports */
 
@@ -4736,6 +4863,10 @@ gem_do_attach(dev_info_t *dip, int port,
 	ASSERT(gc->gc_dma_attr_rxbuf.dma_attr_align-1 == gc->gc_rx_buf_align);
 	gc->gc_rx_buf_align = max(gc->gc_rx_buf_align, IOC_LINESIZE - 1);
 	gc->gc_dma_attr_rxbuf.dma_attr_align = gc->gc_rx_buf_align + 1;
+
+	/* fix descriptor boundary for cache line size */
+	gc->gc_dma_attr_desc.dma_attr_align =
+	    max(gc->gc_dma_attr_desc.dma_attr_align, IOC_LINESIZE);
 
 	/* patch get_packet method */
 	if (gc->gc_get_packet == NULL) {
@@ -4771,8 +4902,7 @@ gem_do_attach(dev_info_t *dip, int port,
 	dp->speed	   = GEM_SPD_10;	/* default is 10Mbps */
 	dp->full_duplex    = B_FALSE;		/* default is half */
 	dp->flow_control   = FLOW_CONTROL_NONE;
-	dp->poll_pkt_delay = 6;
-	dp->poll_pkt_hiwat = INT32_MAX;
+	dp->poll_pkt_delay = 8;		/* typical coalease for rx packets */
 
 	/* performance tuning parameters */
 	dp->txthr    = ETHERMAX;	/* tx fifo threshold */
@@ -4843,6 +4973,7 @@ gem_do_attach(dev_info_t *dip, int port,
 	}
 
 	/* mask unsupported abilities */
+	dp->anadv_autoneg &= BOOLEAN(dp->mii_status & MII_STATUS_CANAUTONEG);
 	dp->anadv_1000fdx &=
 	    BOOLEAN(dp->mii_xstatus &
 	    (MII_XSTATUS_1000BASEX_FD | MII_XSTATUS_1000BASET_FD));
@@ -4909,9 +5040,10 @@ gem_do_attach(dev_info_t *dip, int port,
 
 	/* link this device to dev_info */
 	dp->next = (struct gem_dev *)ddi_get_driver_private(dip);
+	dp->port = port;
 	ddi_set_driver_private(dip, (caddr_t)dp);
 
-	/* reset_mii and start mii link watcher */
+	/* reset mii phy and start mii link watcher */
 	gem_mii_start(dp);
 
 	DPRINTF(2, (CE_CONT, "!gem_do_attach: return: success"));
@@ -4959,6 +5091,11 @@ gem_do_detach(dev_info_t *dip)
 	priv_size = dp->priv_size;
 
 	while (dp) {
+		/* unregister with gld v3 */
+		if (mac_unregister(dp->mh) != 0) {
+			return (DDI_FAILURE);
+		}
+
 		/* ensure any rx buffers are not used */
 		if (dp->rx_buf_allocated != dp->rx_buf_freecnt) {
 			/* resource is busy */
@@ -4986,9 +5123,6 @@ gem_do_detach(dev_info_t *dip)
 			}
 		}
 
-		/* unregister with gld v3 */
-		(void) mac_unregister(dp->mh);
-
 		/* release NDD resources */
 		gem_nd_cleanup(dp);
 		/* release buffers, descriptors and dma resources */
@@ -5010,7 +5144,6 @@ gem_do_detach(dev_info_t *dip)
 
 	/* release register mapping resources */
 	ddi_regs_map_free(&rh);
-	ddi_set_driver_private(dip, NULL);
 
 	DPRINTF(2, (CE_CONT, "!%s%d: gem_do_detach: return: success",
 	    ddi_driver_name(dip), ddi_get_instance(dip)));

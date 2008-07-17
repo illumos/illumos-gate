@@ -1,7 +1,7 @@
 /*
  *  sfe.c : DP83815/DP83816/SiS900 Fast Ethernet MAC driver for Solaris
  *
- * Copyright (c) 2002-2007 Masayuki Murayama.  All rights reserved.
+ * Copyright (c) 2002-2008 Masayuki Murayama.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -52,7 +52,7 @@
 #include "sfe_util.h"
 #include "sfereg.h"
 
-char	ident[] = "sis900/dp83815 driver v" VERSION;
+char	ident[] = "sis900/dp83815 driver v" "2.6.1t27os";
 
 /* Debugging support */
 #ifdef DEBUG_LEVEL
@@ -140,6 +140,7 @@ struct sfe_dev {
 	/* misc HW information */
 	struct chip_info	*chip;
 	uint32_t		our_intr_bits;
+	uint32_t		isr_pended;
 	uint32_t		cr;
 	uint_t			tx_drain_threshold;
 	uint_t			tx_fill_threshold;
@@ -531,10 +532,7 @@ sfe_reset_chip_sis900(struct gem_dev *dp)
 
 	/* inhibit interrupt */
 	OUTL(dp, IMR, 0);
-	if (lp->our_intr_bits == 0) {
-		/* we can clear interrupt source safely. */
-		(void) INL(dp, ISR);
-	}
+	lp->isr_pended |= INL(dp, ISR) & lp->our_intr_bits;
 
 	OUTL(dp, RFCR, 0);
 
@@ -559,7 +557,7 @@ sfe_reset_chip_sis900(struct gem_dev *dp)
 	/* Configuration register: enable PCI parity */
 	DPRINTF(2, (CE_CONT, CONS "%s: cfg:%b",
 	    dp->name, INL(dp, CFG), CFG_BITS_SIS900));
-	val = CFG_PESEL;
+	val = 0;
 	if (lp->revid >= SIS635A_900_REV ||
 	    lp->revid == SIS900B_900_REV) {
 		/* what is this ? */
@@ -576,6 +574,7 @@ static int
 sfe_reset_chip_dp83815(struct gem_dev *dp)
 {
 	int		i;
+	uint32_t	val;
 	struct sfe_dev	*lp = dp->private;
 
 	DPRINTF(4, (CE_CONT, CONS "%s: %s called", dp->name, __func__));
@@ -587,10 +586,7 @@ sfe_reset_chip_dp83815(struct gem_dev *dp)
 
 	/* inhibit interrupts */
 	OUTL(dp, IMR, 0);
-	if (lp->our_intr_bits == 0) {
-		/* we can clear interrupt source safely. */
-		(void) INL(dp, ISR);
-	}
+	lp->isr_pended |= INL(dp, ISR) & lp->our_intr_bits;
 
 	OUTL(dp, RFCR, 0);
 
@@ -612,7 +608,8 @@ sfe_reset_chip_dp83815(struct gem_dev *dp)
 	/* Configuration register: enable PCI parity */
 	DPRINTF(2, (CE_CONT, CONS "%s: cfg:%b",
 	    dp->name, INL(dp, CFG), CFG_BITS_DP83815));
-	OUTL(dp, CFG, CFG_PESEL | CFG_PAUSE_ADV);
+	val = INL(dp, CFG) & (CFG_ANEG_SEL | CFG_PHY_CFG);
+	OUTL(dp, CFG, val | CFG_PAUSE_ADV);
 	DPRINTF(2, (CE_CONT, CONS "%s: cfg:%b", dp->name,
 	    INL(dp, CFG), CFG_BITS_DP83815));
 
@@ -918,6 +915,7 @@ sfe_stop_chip(struct gem_dev *dp)
 	struct sfe_dev	*lp = dp->private;
 	uint32_t	done;
 	int		i;
+	uint32_t	val;
 
 	DPRINTF(4, (CE_CONT, CONS "%s: %s: called", dp->name, __func__));
 
@@ -942,7 +940,9 @@ sfe_stop_chip(struct gem_dev *dp)
 
 			return (GEM_FAILURE);
 		}
-		done |= INL(dp, ISR) & (ISR_RXRCMP | ISR_TXRCMP);
+		val = INL(dp, ISR);
+		done |= val & (ISR_RXRCMP | ISR_TXRCMP);
+		lp->isr_pended |= val & lp->our_intr_bits;
 		drv_usecwait(10);
 	}
 
@@ -995,7 +995,7 @@ sfe_set_media(struct gem_dev *dp)
 	if (dp->full_duplex) {
 		txcfg |= (TXCFG_CSI | TXCFG_HBI);
 	}
-	rxcfg =	RXCFG_AEP | RXCFG_ARP;
+	rxcfg = RXCFG_AEP | RXCFG_ARP;
 	if (dp->full_duplex) {
 		rxcfg |= RXCFG_ATX;
 	}
@@ -1056,7 +1056,7 @@ sfe_set_media(struct gem_dev *dp)
 
 	/* encode rxmxdma, maxmum burst length for rx */
 	val = sfe_encode_mxdma(rxmxdma);
-	txcfg |= val << RXCFG_MXDMA_SHIFT;
+	rxcfg |= val << RXCFG_MXDMA_SHIFT;
 	rxmxdma = sfe_mxdma_value[val];
 
 	/* receive starting threshold - it have only 5bit-wide field */
@@ -1140,7 +1140,8 @@ sfe_tx_desc_write(struct gem_dev *dp, int slot,
 	uint32_t		mark;
 	struct sfe_desc		*tdp;
 	ddi_dma_cookie_t	*dcp;
-#if DEBUG_LEVEL > 1
+	uint32_t		tmp0;
+#if DEBUG_LEVEL > 2
 	int			i;
 
 	cmn_err(CE_CONT,
@@ -1151,7 +1152,7 @@ sfe_tx_desc_write(struct gem_dev *dp, int slot,
 	for (i = 0; i < frags; i++) {
 		cmn_err(CE_CONT, CONS "%d: addr: 0x%x, len: 0x%x",
 		    i, dmacookie[i].dmac_address, dmacookie[i].dmac_size);
-}
+	}
 #endif
 	/*
 	 * write tx descriptor in reversed order.
@@ -1160,7 +1161,7 @@ sfe_tx_desc_write(struct gem_dev *dp, int slot,
 	flags |= GEM_TXFLAG_INTR;
 #endif
 	mark = (flags & GEM_TXFLAG_INTR)
-			? (CMDSTS_OWN | CMDSTS_INTR) : CMDSTS_OWN;
+	    ? (CMDSTS_OWN | CMDSTS_INTR) : CMDSTS_OWN;
 
 	ASSERT(frags == 1);
 	dcp = &dmacookie[0];
@@ -1169,8 +1170,10 @@ sfe_tx_desc_write(struct gem_dev *dp, int slot,
 	}
 
 	tdp = (void *)&dp->tx_ring[SFE_DESC_SIZE * slot];
-	tdp->d_bufptr = LE_32((uint32_t)dcp->dmac_address);
-	tdp->d_cmdsts = LE_32(mark | (uint32_t)dcp->dmac_size);
+	tmp0 = (uint32_t)dcp->dmac_address;
+	mark |= (uint32_t)dcp->dmac_size;
+	tdp->d_bufptr = LE_32(tmp0);
+	tdp->d_cmdsts = LE_32(mark);
 
 	return (frags);
 }
@@ -1178,12 +1181,13 @@ sfe_tx_desc_write(struct gem_dev *dp, int slot,
 static void
 sfe_tx_start(struct gem_dev *dp, int start_slot, int nslot)
 {
+	uint_t			tx_ring_size = dp->gc.gc_tx_ring_size;
 	struct sfe_desc		*tdp;
 	struct sfe_dev		*lp = dp->private;
 
 	if (nslot > 1) {
 		gem_tx_desc_dma_sync(dp,
-		    SLOT(start_slot + 1, TX_RING_SIZE),
+		    SLOT(start_slot + 1, tx_ring_size),
 		    nslot - 1, DDI_DMA_SYNC_FORDEV);
 	}
 
@@ -1205,6 +1209,8 @@ sfe_rx_desc_write(struct gem_dev *dp, int slot,
 	    ddi_dma_cookie_t *dmacookie, int frags)
 {
 	struct sfe_desc		*rdp;
+	uint32_t		tmp0;
+	uint32_t		tmp1;
 #if DEBUG_LEVEL > 2
 	int			i;
 
@@ -1221,25 +1227,34 @@ sfe_rx_desc_write(struct gem_dev *dp, int slot,
 	/* for the last slot of the packet */
 	rdp = (void *)&dp->rx_ring[SFE_DESC_SIZE * slot];
 
-	rdp->d_bufptr = LE_32((uint32_t)dmacookie->dmac_address);
-	rdp->d_cmdsts = LE_32(CMDSTS_INTR | (uint32_t)dmacookie->dmac_size);
+	tmp0 = (uint32_t)dmacookie->dmac_address;
+	tmp1 = CMDSTS_INTR | (uint32_t)dmacookie->dmac_size;
+	rdp->d_bufptr = LE_32(tmp0);
+	rdp->d_cmdsts = LE_32(tmp1);
 }
 
 static uint_t
 sfe_tx_desc_stat(struct gem_dev *dp, int slot, int ndesc)
 {
+	uint_t			tx_ring_size = dp->gc.gc_tx_ring_size;
 	struct sfe_desc		*tdp;
 	uint32_t		status;
 	int			cols;
+	struct sfe_dev		*lp = dp->private;
 #ifdef DEBUG_LEVEL
 	int			i;
 	clock_t			delay;
 #endif
 	/* check status of the last descriptor */
 	tdp = (void *)
-	    &dp->tx_ring[SFE_DESC_SIZE * SLOT(slot + ndesc - 1, TX_RING_SIZE)];
+	    &dp->tx_ring[SFE_DESC_SIZE * SLOT(slot + ndesc - 1, tx_ring_size)];
 
-	status = LE_32(tdp->d_cmdsts);
+	/*
+	 * Don't use LE_32() directly to refer tdp->d_cmdsts.
+	 * It is not atomic for big endian cpus.
+	 */
+	status = tdp->d_cmdsts;
+	status = LE_32(status);
 
 	DPRINTF(2, (CE_CONT, CONS "%s: time:%ld %s: slot:%d, status:0x%b",
 	    dp->name, ddi_get_lbolt(), __func__,
@@ -1249,6 +1264,11 @@ sfe_tx_desc_stat(struct gem_dev *dp, int slot, int ndesc)
 		/*
 		 * not yet transmitted
 		 */
+		/* workaround for tx hang */
+		if (lp->chip->chip_type == CHIPTYPE_DP83815 &&
+		    dp->mac_active) {
+			OUTL(dp, CR, lp->cr | CR_TXE);
+		}
 		return (0);
 	}
 
@@ -1273,7 +1293,7 @@ sfe_tx_desc_stat(struct gem_dev *dp, int slot, int ndesc)
 		uint32_t	s;
 		int		n;
 
-		n = SLOT(slot + i, TX_RING_SIZE);
+		n = SLOT(slot + i, tx_ring_size);
 		s = LE_32(
 		    ((struct sfe_desc *)((void *)
 		    &dp->tx_ring[SFE_DESC_SIZE * n]))->d_cmdsts);
@@ -1338,7 +1358,12 @@ sfe_rx_desc_stat(struct gem_dev *dp, int slot, int ndesc)
 
 	rdp = (void *)&dp->rx_ring[SFE_DESC_SIZE * slot];
 
-	status = LE_32(rdp->d_cmdsts);
+	/*
+	 * Don't use LE_32() directly to refer rdp->d_cmdsts.
+	 * It is not atomic for big endian cpus.
+	 */
+	status = rdp->d_cmdsts;
+	status = LE_32(status);
 
 	DPRINTF(2, (CE_CONT, CONS "%s: time:%ld %s: slot:%d, status:0x%b",
 	    dp->name, ddi_get_lbolt(), __func__,
@@ -1413,6 +1438,7 @@ sfe_rx_desc_stat(struct gem_dev *dp, int slot, int ndesc)
 static void
 sfe_tx_desc_init(struct gem_dev *dp, int slot)
 {
+	uint_t			tx_ring_size = dp->gc.gc_tx_ring_size;
 	struct sfe_desc		*tdp;
 	uint32_t		here;
 
@@ -1425,13 +1451,14 @@ sfe_tx_desc_init(struct gem_dev *dp, int slot)
 	here = ((uint32_t)dp->tx_ring_dma) + SFE_DESC_SIZE*slot;
 
 	tdp = (void *)
-	    &dp->tx_ring[SFE_DESC_SIZE * SLOT(slot - 1, TX_RING_SIZE)];
+	    &dp->tx_ring[SFE_DESC_SIZE * SLOT(slot - 1, tx_ring_size)];
 	tdp->d_link = LE_32(here);
 }
 
 static void
 sfe_rx_desc_init(struct gem_dev *dp, int slot)
 {
+	uint_t			rx_ring_size = dp->gc.gc_rx_ring_size;
 	struct sfe_desc		*rdp;
 	uint32_t		here;
 
@@ -1444,7 +1471,7 @@ sfe_rx_desc_init(struct gem_dev *dp, int slot)
 	here = ((uint32_t)dp->rx_ring_dma) + SFE_DESC_SIZE*slot;
 
 	rdp = (void *)
-	    &dp->rx_ring[SFE_DESC_SIZE * SLOT(slot - 1, RX_RING_SIZE)];
+	    &dp->rx_ring[SFE_DESC_SIZE * SLOT(slot - 1, rx_ring_size)];
 	rdp->d_link = LE_32(here);
 }
 
@@ -1472,7 +1499,9 @@ sfe_rx_desc_clean(struct gem_dev *dp, int slot)
 static uint_t
 sfe_interrupt(struct gem_dev *dp)
 {
+	uint_t		rx_ring_size = dp->gc.gc_rx_ring_size;
 	uint32_t	isr;
+	uint32_t	isr_bogus;
 	uint_t		flags = 0;
 	boolean_t	need_to_reset = B_FALSE;
 	struct sfe_dev	*lp = dp->private;
@@ -1480,7 +1509,10 @@ sfe_interrupt(struct gem_dev *dp)
 	/* read reason and clear interrupt */
 	isr = INL(dp, ISR);
 
-	if ((isr & lp->our_intr_bits) == 0) {
+	isr_bogus = lp->isr_pended;
+	lp->isr_pended = 0;
+
+	if (((isr | isr_bogus) & lp->our_intr_bits) == 0) {
 		/* we are not the interrupt source */
 		return (DDI_INTR_UNCLAIMED);
 	}
@@ -1523,7 +1555,7 @@ sfe_interrupt(struct gem_dev *dp)
 			 */
 			OUTL(dp, RXDP, dp->rx_ring_dma +
 			    SFE_DESC_SIZE *
-			    SLOT(dp->rx_active_head, RX_RING_SIZE));
+			    SLOT(dp->rx_active_head, rx_ring_size));
 
 			/* Restart the receive engine */
 			OUTL(dp, CR, lp->cr | CR_RXE);
@@ -1536,7 +1568,6 @@ sfe_interrupt(struct gem_dev *dp)
 		if (gem_tx_done(dp)) {
 			flags |= INTR_RESTART_TX;
 		}
-
 		/*
 		 * XXX - tx error statistics will be counted in
 		 * sfe_tx_desc_stat() and no need to restart tx on errors.
@@ -1606,11 +1637,11 @@ sfe_mii_config_dp83815(struct gem_dev *dp)
 	    INW(dp, 0x00f4),	/* DSPCFG */
 	    INW(dp, 0x00f8)));	/* SDCFG */
 
-	if (srr == SRR_REV_CVNG) {
+	if (srr == SRR_REV_DP83815CVNG) {
 		/*
 		 * NS datasheet says that DP83815CVNG needs following
 		 * registers to be patched for optimizing its performance.
-		 * A report said that CRC errors on RX were disappeared
+		 * A report said that CRC errors on RX disappeared
 		 * with the patch.
 		 */
 		OUTW(dp, 0x00cc, 0x0001);	/* PGSEL */
@@ -1618,6 +1649,7 @@ sfe_mii_config_dp83815(struct gem_dev *dp)
 		OUTW(dp, 0x00fc, 0x0000);	/* TSTDAT */
 		OUTW(dp, 0x00f4, 0x5040);	/* DSPCFG */
 		OUTW(dp, 0x00f8, 0x008c);	/* SDCFG */
+		OUTW(dp, 0x00cc, 0x0000);	/* PGSEL */
 
 		DPRINTF(0, (CE_CONT,
 		    CONS "%s: PHY patched %04x %04x %04x %04x %04x",
@@ -1627,21 +1659,92 @@ sfe_mii_config_dp83815(struct gem_dev *dp)
 		    INW(dp, 0x00fc),	/* TSTDAT */
 		    INW(dp, 0x00f4),	/* DSPCFG */
 		    INW(dp, 0x00f8)));	/* SDCFG */
+	} else if (((srr ^ SRR_REV_DP83815DVNG) & 0xff00) == 0 ||
+	    ((srr ^ SRR_REV_DP83816AVNG) & 0xff00) == 0) {
+		/*
+		 * Additional packets for later chipset
+		 */
+		OUTW(dp, 0x00cc, 0x0001);	/* PGSEL */
+		OUTW(dp, 0x00e4, 0x189c);	/* PMDCSR */
+		OUTW(dp, 0x00cc, 0x0000);	/* PGSEL */
+
+		DPRINTF(0, (CE_CONT,
+		    CONS "%s: PHY patched %04x %04x",
+		    dp->name,
+		    INW(dp, 0x00cc),	/* PGSEL */
+		    INW(dp, 0x00e4)));	/* PMDCSR */
 	}
 
 	return (gem_mii_config_default(dp));
 }
 
+static int
+sfe_mii_probe_dp83815(struct gem_dev *dp)
+{
+	uint32_t	val;
+
+	/* try external phy first */
+	DPRINTF(0, (CE_CONT, CONS "%s: %s: trying external phy",
+	    dp->name, __func__));
+	dp->mii_phy_addr = 0;
+	dp->gc.gc_mii_sync = &sfe_mii_sync_sis900;
+	dp->gc.gc_mii_read = &sfe_mii_read_sis900;
+	dp->gc.gc_mii_write = &sfe_mii_write_sis900;
+
+	val = INL(dp, CFG) & (CFG_ANEG_SEL | CFG_PHY_CFG);
+	OUTL(dp, CFG, val | CFG_EXT_PHY | CFG_PHY_DIS);
+
+	if (gem_mii_probe_default(dp) == GEM_SUCCESS) {
+		return (GEM_SUCCESS);
+	}
+
+	/* switch to internal phy */
+	DPRINTF(0, (CE_CONT, CONS "%s: %s: switching to internal phy",
+	    dp->name, __func__));
+	dp->mii_phy_addr = -1;
+	dp->gc.gc_mii_sync = &sfe_mii_sync_dp83815;
+	dp->gc.gc_mii_read = &sfe_mii_read_dp83815;
+	dp->gc.gc_mii_write = &sfe_mii_write_dp83815;
+
+	val = INL(dp, CFG) & (CFG_ANEG_SEL | CFG_PHY_CFG);
+	OUTL(dp, CFG, val | CFG_PAUSE_ADV | CFG_PHY_RST);
+	drv_usecwait(100);	/* keep to assert RST bit for a while */
+	OUTL(dp, CFG, val | CFG_PAUSE_ADV);
+
+	/* wait for PHY reset */
+	delay(drv_usectohz(10000));
+
+	return (gem_mii_probe_default(dp));
+}
+
+static int
+sfe_mii_init_dp83815(struct gem_dev *dp)
+{
+	uint32_t	val;
+
+	val = INL(dp, CFG) & (CFG_ANEG_SEL | CFG_PHY_CFG);
+
+	if (dp->mii_phy_addr == -1) {
+		/* select internal phy */
+		OUTL(dp, CFG, val | CFG_PAUSE_ADV);
+	} else {
+		/* select external phy */
+		OUTL(dp, CFG, val | CFG_EXT_PHY | CFG_PHY_DIS);
+	}
+
+	return (GEM_SUCCESS);
+}
 
 /*
  * MII routines for SiS900
  */
-#define	MDIO_DELAY(dp)	{(void) INL(dp, MEAR); }
+#define	MDIO_DELAY(dp)	{(void) INL(dp, MEAR); (void) INL(dp, MEAR); }
 static void
 sfe_mii_sync_sis900(struct gem_dev *dp)
 {
 	int	i;
 
+	/* send 32 ONE's to make MII line idle */
 	for (i = 0; i < 32; i++) {
 		OUTL(dp, MEAR, MEAR_MDDIR | MEAR_MDIO);
 		MDIO_DELAY(dp);
@@ -1695,36 +1798,43 @@ sfe_mii_read_sis900(struct gem_dev *dp, uint_t reg)
 	}
 
 	/* turn around cycle */
-	OUTL(dp, MEAR, data | MEAR_MDDIR);
+	OUTL(dp, MEAR, 0);
 	MDIO_DELAY(dp);
 
 	/* get response from PHY */
 	OUTL(dp, MEAR, MEAR_MDC);
 	MDIO_DELAY(dp);
-	OUTL(dp, MEAR, 0);
 
+	OUTL(dp, MEAR, 0);
 #if DEBUG_LEBEL > 0
+	(void) INL(dp, MEAR);	/* delay */
 	if (INL(dp, MEAR) & MEAR_MDIO) {
 		cmn_err(CE_WARN, "%s: PHY@%d not responded",
 		    dp->name, dp->mii_phy_addr);
 	}
+#else
+	MDIO_DELAY(dp);
 #endif
 	/* terminate response cycle */
 	OUTL(dp, MEAR, MEAR_MDC);
+	MDIO_DELAY(dp);
 
 	ret = 0;	/* to avoid lint errors */
 	for (i = 16; i > 0; i--) {
 		OUTL(dp, MEAR, 0);
+		(void) INL(dp, MEAR);	/* delay */
 		ret = (ret << 1) | ((INL(dp, MEAR) >> MEAR_MDIO_SHIFT) & 1);
 		OUTL(dp, MEAR, MEAR_MDC);
 		MDIO_DELAY(dp);
 	}
 
-	/* terminate data transmission from PHY */
-	OUTL(dp, MEAR, 0);
-	MDIO_DELAY(dp);
-	OUTL(dp, MEAR, MEAR_MDC);
-	MDIO_DELAY(dp);
+	/* send two idle(Z) bits to terminate the read cycle */
+	for (i = 0; i < 2; i++) {
+		OUTL(dp, MEAR, 0);
+		MDIO_DELAY(dp);
+		OUTL(dp, MEAR, MEAR_MDC);
+		MDIO_DELAY(dp);
+	}
 
 	return (ret);
 }
@@ -1746,17 +1856,13 @@ sfe_mii_write_sis900(struct gem_dev *dp, uint_t reg, uint16_t val)
 		MDIO_DELAY(dp);
 	}
 
-	/* send two 0s to terminate write cycle. */
+	/* send two idle(Z) bits to terminate the write cycle. */
 	for (i = 0; i < 2; i++) {
-		OUTL(dp, MEAR, MEAR_MDDIR);
+		OUTL(dp, MEAR, 0);
 		MDIO_DELAY(dp);
-		OUTL(dp, MEAR, MEAR_MDDIR | MEAR_MDC);
+		OUTL(dp, MEAR, MEAR_MDC);
 		MDIO_DELAY(dp);
 	}
-	OUTL(dp, MEAR, MEAR_MDDIR);
-	MDIO_DELAY(dp);
-	OUTL(dp, MEAR, MEAR_MDC);
-	MDIO_DELAY(dp);
 }
 #undef MDIO_DELAY
 
@@ -1962,8 +2068,8 @@ sfeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	did  = pci_config_get16(conf_handle, PCI_CONF_DEVID);
 	rev  = pci_config_get16(conf_handle, PCI_CONF_REVID);
 #ifdef DEBUG_LEVEL
-	iline =	pci_config_get32(conf_handle, PCI_CONF_ILINE),
-	    latim = pci_config_get8(conf_handle, PCI_CONF_LATENCY_TIMER);
+	iline = pci_config_get32(conf_handle, PCI_CONF_ILINE);
+	latim = pci_config_get8(conf_handle, PCI_CONF_LATENCY_TIMER);
 #endif
 #ifdef DEBUG_BUILT_IN_SIS900
 	rev  = SIS630E_900_REV;
@@ -2062,6 +2168,10 @@ chip_found:
 		/* time out parameters */
 		gcp->gc_tx_timeout = 3*ONESEC;
 		gcp->gc_tx_timeout_interval = ONESEC;
+		if (p->chip_type == CHIPTYPE_DP83815) {
+			/* workaround for tx hang */
+			gcp->gc_tx_timeout_interval = ONESEC/20; /* 50mS */
+		}
 
 		/* MII timeout parameters */
 		gcp->gc_mii_link_watch_interval = ONESEC;
@@ -2117,8 +2227,8 @@ chip_found:
 
 		/* mii operations */
 		if (p->chip_type == CHIPTYPE_DP83815) {
-			gcp->gc_mii_probe = &gem_mii_probe_default;
-			gcp->gc_mii_init = NULL;
+			gcp->gc_mii_probe = &sfe_mii_probe_dp83815;
+			gcp->gc_mii_init = &sfe_mii_init_dp83815;
 			gcp->gc_mii_config = &sfe_mii_config_dp83815;
 			gcp->gc_mii_sync = &sfe_mii_sync_dp83815;
 			gcp->gc_mii_read = &sfe_mii_read_dp83815;
@@ -2139,6 +2249,8 @@ chip_found:
 		lp = kmem_zalloc(sizeof (*lp), KM_SLEEP);
 		lp->chip = p;
 		lp->revid = rev;
+		lp->our_intr_bits = 0;
+		lp->isr_pended = 0;
 
 		cmn_err(CE_CONT, CONS "%s%d: chip:%s rev:0x%02x",
 		    drv_name, unit, p->chip_name, rev);

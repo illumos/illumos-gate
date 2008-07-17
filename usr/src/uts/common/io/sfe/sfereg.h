@@ -30,6 +30,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* sfe device driver */
 
 #ifndef	_SFEREG_H_
@@ -173,6 +174,7 @@ struct sfe_desc {
 #define	CFG_FDUP	0x20000000U	/* full duplex (83815) */
 #define	CFG_POL		0x10000000U	/* 10Mbps polarity indication (83815) */
 #define	CFG_ANEG_DN	0x08000000U	/* auto negotiation done (83815) */
+#define	CFG_PHY_CFG	0x00fc0000U	/* internal PHY configuration (83815) */
 #define	CFG_PINT_ACEN	0x00020000U	/* PHY interrupt auto clear (83815) */
 #define	CFG_PAUSE_ADV	0x00010000U	/* Advertise pause (83815) */
 #define	CFG_ANEG_SEL	0x0000e000U	/* Auto-nego default (83815) */
@@ -423,8 +425,9 @@ struct sfe_desc {
 
 /* dp83815 Silicon revision register */
 #define	SRR_REV			0x0000ffffU
-#define	SRR_REV_CVNG		0x0302U
-#define	SRR_REV_DVNG_UJG	0x0403U
+#define	SRR_REV_DP83815CVNG	0x0302U
+#define	SRR_REV_DP83815DVNG	0x0403U
+#define	SRR_REV_DP83816AVNG	0x0505U
 
 /* sis900 revisions */
 #define	SIS630A_900_REV		0x80

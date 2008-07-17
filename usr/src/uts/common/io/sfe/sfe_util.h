@@ -1,7 +1,7 @@
 /*
  *  sfe_util.h: header to support the gem layer used by Masa Murayama
  *
- * Copyright (c) 2002-2007 Masayuki Murayama.  All rights reserved.
+ * Copyright (c) 2002-2008 Masayuki Murayama.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -30,6 +30,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
  * DAMAGE.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* sfe device driver */
 
 #ifndef _SFE_UTIL_H_
@@ -54,7 +55,7 @@
 /* return code of gem_tx_done */
 #define	INTR_RESTART_TX	0x80000000
 
-typedef	int32_t			seqnum_t;
+typedef	int32_t		seqnum_t;
 
 /*
  * I/O instructions
@@ -114,13 +115,11 @@ struct gem_stats {
 	uint32_t	omcast;
 	uint32_t	rcv_internal_err;
 };
-
 #define	GEM_MAXTXSEGS		4
 #define	GEM_MAXRXSEGS		1
 
 #define	GEM_MAXTXFRAGS		8
 #define	GEM_MAXRXFRAGS		4
-
 /* TX buffer management */
 struct txbuf {
 	struct txbuf		*txb_next;
@@ -150,7 +149,7 @@ struct txbuf {
 
 /* RX buffer management */
 struct rxbuf {
-	/* Hardware independant section */
+	/* Hardware independent section */
 	struct rxbuf		*rxb_next;
 	struct gem_dev		*rxb_devp;
 
@@ -231,6 +230,7 @@ struct gem_dev {
 	seqnum_t		tx_softq_tail;
 	seqnum_t		tx_free_head;
 	seqnum_t		tx_free_tail;
+	int			tx_max_packets;
 
 	/* TX buffer resource management */
 	struct txbuf		*tx_buf;
@@ -239,7 +239,7 @@ struct gem_dev {
 	/* TX state management */
 	int			tx_busy;
 	int			tx_reclaim_busy;
-	boolean_t		tx_blocked;
+	clock_t			tx_blocked;
 
 	/* NIC state */
 	volatile boolean_t	mac_active;	/* tx and rx are running */
@@ -270,6 +270,7 @@ struct gem_dev {
 #define		GEM_SPD_10	0
 #define		GEM_SPD_100	1
 #define		GEM_SPD_1000	2
+#define		GEM_SPD_NUM	3
 	unsigned int		flow_control:2;
 #define		FLOW_CONTROL_NONE	0
 #define		FLOW_CONTROL_SYMMETRIC	1
@@ -303,6 +304,7 @@ struct gem_dev {
 #define		MII_AN_TIMEOUT		drv_usectohz(5000*1000)
 #define		MII_LINKDOWN_TIMEOUT	drv_usectohz(10000*1000)
 	clock_t			mii_interval;	/* in tick */
+	clock_t			linkup_delay;	/* in tick */
 
 	volatile timeout_id_t	link_watcher_id;
 
@@ -333,12 +335,11 @@ struct gem_dev {
 	int			priv_size;
 
 	/* polling mode */
-	int		poll_pkt_hiwat;	/* max pkt count */
-	int		poll_pkt_delay;	/* in number of packets */
+	int			poll_pkt_delay;	/* in number of packets */
 
 	/* descriptor area */
-	int	tx_desc_size;
-	int	rx_desc_size;
+	int			tx_desc_size;
+	int			rx_desc_size;
 
 	/* configuration */
 	struct gem_conf {
@@ -455,10 +456,14 @@ struct gem_dev {
 #define				GEM_TXFLAG_PRI_MASK		0x7ull
 #define			GEM_TXFLAG_VTAG		0xffff0000ull
 #define				GEM_TXFLAG_VTAG_SHIFT		16ull
-#define			GEM_TXFLAG_HCKSTART		0x000000ff00000000ull
+#define			GEM_TXFLAG_HCKSTART	0x000000ff00000000ull
 #define				GEM_TXFLAG_HCKSTART_SHIFT	32ull
-#define			GEM_TXFLAG_HCKSTUFF		0x0000ff0000000000ull
+#define			GEM_TXFLAG_HCKSTUFF	0x0000ff0000000000ull
 #define				GEM_TXFLAG_HCKSTUFF_SHIFT	40ull
+#define			GEM_TXFLAG_TCPHLEN	0x0000ff0000000000ull
+#define				GEM_TXFLAG_TCPHLEN_SHIFT	40ull
+#define			GEM_TXFLAG_MSS		0xffff000000000000ull
+#define				GEM_TXFLAG_MSS_SHIFT	48ull
 
 		void (*gc_tx_start) (struct gem_dev *dp, int slot, int frags);
 		void	(*gc_rx_desc_write)(struct gem_dev *dp, int slot,
@@ -523,6 +528,7 @@ struct gem_dev {
 	} gc;
 
 	uint32_t	misc_flag;
+#define		GEM_LSO			0x00000400
 #define		GEM_CTRL_PKT		0x00000200
 #define		GEM_SOFTINTR		0x00000100
 #define		GEM_POLL_RXONLY		0x00000080
@@ -548,7 +554,9 @@ struct gem_dev {
 	/* kstat stuff */
 	kstat_t	*ksp;
 
+	/* multiple port device support */
 	struct	gem_dev	*next;	/* pointer to next port on the same device */
+	int		port;
 
 	/* ndd stuff */
 	caddr_t	nd_data_p;
