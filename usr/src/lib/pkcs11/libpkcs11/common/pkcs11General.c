@@ -35,6 +35,7 @@
 #include "pkcs11Slot.h"
 #include "pkcs11Conf.h"
 #include "pkcs11Session.h"
+#include "metaGlobal.h"
 
 #pragma fini(pkcs11_fini)
 
@@ -226,7 +227,7 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 	/* Check if application has provided mutex-handling functions */
 	if (pInitArgs != NULL) {
 		CK_C_INITIALIZE_ARGS_PTR initargs =
-			(CK_C_INITIALIZE_ARGS_PTR) pInitArgs;
+		    (CK_C_INITIALIZE_ARGS_PTR) pInitArgs;
 
 		/* pReserved should not be set */
 		if (initargs->pReserved != NULL) {
@@ -239,13 +240,13 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 		 * all set.
 		 */
 		if (!(((initargs->CreateMutex   != NULL) &&
-			(initargs->LockMutex    != NULL) &&
-			(initargs->UnlockMutex  != NULL) &&
-			(initargs->DestroyMutex != NULL)) ||
-			((initargs->CreateMutex == NULL) &&
-			(initargs->LockMutex    == NULL) &&
-			(initargs->UnlockMutex  == NULL) &&
-			(initargs->DestroyMutex == NULL)))) {
+		    (initargs->LockMutex    != NULL) &&
+		    (initargs->UnlockMutex  != NULL) &&
+		    (initargs->DestroyMutex != NULL)) ||
+		    ((initargs->CreateMutex == NULL) &&
+		    (initargs->LockMutex    == NULL) &&
+		    (initargs->UnlockMutex  == NULL) &&
+		    (initargs->DestroyMutex == NULL)))) {
 			rv = CKR_ARGUMENTS_BAD;
 			goto errorexit;
 		}
@@ -372,6 +373,9 @@ finalize_common(CK_VOID_PTR pReserved)
 	pkcs11_cant_create_threads = B_FALSE;
 	pkcs11_pid = 0;
 
+	if (metaslot_enabled)
+		rv = meta_Finalize(pReserved);
+
 	/* Check if C_WaitForSlotEvent() is currently active */
 	(void) pthread_mutex_lock(&slottable->st_mutex);
 	if (slottable->st_wfse_active) {
@@ -388,9 +392,9 @@ finalize_common(CK_VOID_PTR pReserved)
 			if (slottable->st_blocking) {
 				slottable->st_list_signaled = B_TRUE;
 				(void) pthread_cond_signal(
-					&slottable->st_wait_cond);
+				    &slottable->st_wait_cond);
 				(void) pthread_mutex_unlock(
-					&slottable->st_mutex);
+				    &slottable->st_mutex);
 				(void) pthread_join(slottable->st_tid, NULL);
 			}
 		}
