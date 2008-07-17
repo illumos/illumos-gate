@@ -2294,74 +2294,74 @@ http_get() {
 	fi
 }
 
-# Echo a string name for the workspace SCM (teamware, hg, or svn).
-function wstype {
-	typeset rtype ltype
+# Echo the SCM types of $CODEMGR_WS and $BRINGOVER_WS
+function wstypes {
+	typeset parent_type child_type
 
-	env CODEMGR_WS=$BRINGOVER_WS $WHICH_SCM 2>/dev/null | read rtype junk
-	if [[ -z "$rtype" || "$rtype" == unknown ]]; then
+	env CODEMGR_WS=$BRINGOVER_WS $WHICH_SCM 2>/dev/null | read parent_type junk
+	if [[ -z "$parent_type" || "$parent_type" == unknown ]]; then
 		# Probe BRINGOVER_WS to determine its type
 		if [[ $BRINGOVER_WS == svn*://* ]]; then
-			rtype="subversion"
+			parent_type="subversion"
 		elif [[ $BRINGOVER_WS == file://* ]] &&
 		    egrep -s "This is a Subversion repository" \
 		    ${BRINGOVER_WS#file://}/README.txt 2> /dev/null; then
-			rtype="subversion"
+			parent_type="subversion"
 		elif [[ $BRINGOVER_WS == ssh://* ]]; then
-			rtype="mercurial"
+			parent_type="mercurial"
 		elif svn info $BRINGOVER_WS > /dev/null 2>&1; then
-			rtype="subversion"
+			parent_type="subversion"
 		elif [[ $BRINGOVER_WS == http://* ]] && \
 		    http_get "$BRINGOVER_WS/?cmd=heads" | \
 		    egrep -s "application/mercurial" 2> /dev/null; then
-			rtype="mercurial"
+			parent_type="mercurial"
 		else
-			rtype="none"
+			parent_type="none"
 		fi
 	fi
-
-	# Make sure that the repository is one we support.  If not, then
-	# call it "none."
-	case "$rtype" in
-	none|subversion|teamware|mercurial)
-		;;
-	*)	rtype=none
-		;;
-	esac
 
 	# Probe CODEMGR_WS to determine its type
 	if [[ -d $CODEMGR_WS ]]; then
-		$WHICH_SCM | read ltype junk || exit 1
-		# This occurs when we have an empty build directory and nightly
-		# itself creates the directory.  It's not an error, as long as
-		# we'll be doing a bringover.
-		if [[ "$ltype" == unknown ]]; then
-			ltype=$rtype
-		fi
+		$WHICH_SCM | read child_type junk || exit 1
 	fi
 
-	# If BRINGOVER_WS and CODEMGR_WS don't match, doing a bringover
-	# will be problematic!
-	if [[ -n $ltype && $rtype != $ltype ]]; then
-		echo "none"
-	else
-		echo $rtype
-	fi
+	# fold both unsupported and unrecognized results into "none"
+	case "$parent_type" in
+	none|subversion|teamware|mercurial)
+		;;
+	*)	parent_type=none
+		;;
+	esac
+	case "$child_type" in
+	none|subversion|teamware|mercurial)
+		;;
+	*)	child_type=none
+		;;
+	esac
+
+	echo $child_type $parent_type
 }
 
-SCM_TYPE=$(wstype)
-export SCM_TYPE
+wstypes | read SCM_TYPE PARENT_SCM_TYPE
+export SCM_TYPE PARENT_SCM_TYPE
 
 #
 #	Decide whether to bringover to the codemgr workspace
 #
 if [ "$n_FLAG" = "n" ]; then
+
+	if [[ $SCM_TYPE != none && $SCM_TYPE != $PARENT_SCM_TYPE ]]; then
+		echo "cannot bringover from $PARENT_SCM_TYPE to $SCM_TYPE, " \
+		    "quitting at `date`." | tee -a $mail_msg_file >> $LOGFILE
+		exit 1
+	fi
+
 	run_hook PRE_BRINGOVER
 
 	echo "\n==== bringover to $CODEMGR_WS at `date` ====\n" >> $LOGFILE
 	echo "\n==== BRINGOVER LOG ====\n" >> $mail_msg_file
 
-	eval "bringover_$SCM_TYPE" 2>&1 |
+	eval "bringover_${PARENT_SCM_TYPE}" 2>&1 |
 		tee -a $mail_msg_file >> $LOGFILE
 
 	if [ -f $TMPDIR/bringover_failed ]; then
@@ -2371,6 +2371,13 @@ if [ "$n_FLAG" = "n" ]; then
 			tee -a $mail_msg_file >> $LOGFILE
 		exit 1
 	fi
+
+	#
+	# It's possible that we used the bringover above to create
+	# $CODEMGR_WS.  If so, then SCM_TYPE was previously "none,"
+	# but should now be the same as $BRINGOVER_WS.
+	#
+	[[ $SCM_TYPE = none ]] && SCM_TYPE=$PARENT_SCM_TYPE
 
 	run_hook POST_BRINGOVER
 

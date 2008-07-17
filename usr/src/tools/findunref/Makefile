@@ -32,7 +32,7 @@ LINTFLAGS += -ux
 
 include ../Makefile.tools
 
-EXCEPTION_SRC=	$(SCM_TYPE) common open
+EXCEPTION_SRC=	$(SCM_TYPE:none=) common open
 $(CLOSED_BUILD)EXCEPTION_SRC += closed
 EXCEPTION_LISTS=	$(EXCEPTION_SRC:%=exception_list.%)
 

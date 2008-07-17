@@ -385,8 +385,6 @@ def cdm_branchchk(ui, repo, **opts):
     '''check if multiple heads (or branches) are present, or if
     branch changes are made'''
 
-    active = opts.get('active') or wslist[repo].active(opts['parent'])
-
     ui.write('Checking for multiple heads (or branches):\n')
 
     heads = set(repo.heads())
@@ -408,14 +406,14 @@ def cdm_branchchk(ui, repo, **opts):
 
     ui.write('\nChecking for branch changes:\n')
 
-    if active.localtip.branch() != 'default':
+    if repo.dirstate.branch() != 'default':
         ui.write("Warning: Workspace tip has named branch: '%s'\n"
                  "Only gatekeepers should push new branches.\n"
                  "Use the following commands to restore the branch name:\n"
                  "  hg branch [-f] default\n"
                  "  hg commit\n"
                  "You should also recommit before integration\n" %
-                 (active.localtip.branch()))
+                 (repo.dirstate.branch()))
         return 1
 
     branches = repo.branchtags().keys()
