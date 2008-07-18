@@ -73,15 +73,24 @@ static	int	ipf_nic_event_v4 __P((hook_event_token_t, hook_data_t,
     netstack_t *));
 static	int	ipf_nic_event_v6 __P((hook_event_token_t, hook_data_t,
     netstack_t *));
-static	int	ipf_hook_out __P((hook_event_token_t, hook_data_t,
+static	int	ipf_hook4_out __P((hook_event_token_t, hook_data_t,
     netstack_t *));
-static	int	ipf_hook_in __P((hook_event_token_t, hook_data_t,
+static	int	ipf_hook4_in __P((hook_event_token_t, hook_data_t,
     netstack_t *));
-static	int	ipf_hook_loop_out __P((hook_event_token_t, hook_data_t,
+static	int	ipf_hook4_loop_out __P((hook_event_token_t, hook_data_t,
     netstack_t *));
-static	int	ipf_hook_loop_in __P((hook_event_token_t, hook_data_t,
+static	int	ipf_hook4_loop_in __P((hook_event_token_t, hook_data_t,
     netstack_t *));
-static	int	ipf_hook __P((hook_data_t, int, int, netstack_t *));
+static	int	ipf_hook4 __P((hook_data_t, int, int, netstack_t *));
+static	int	ipf_hook6_out __P((hook_event_token_t, hook_data_t,
+    netstack_t *));
+static	int	ipf_hook6_in __P((hook_event_token_t, hook_data_t,
+    netstack_t *));
+static	int	ipf_hook6_loop_out __P((hook_event_token_t, hook_data_t,
+    netstack_t *));
+static	int	ipf_hook6_loop_in __P((hook_event_token_t, hook_data_t,
+    netstack_t *));
+static	int     ipf_hook6 __P((hook_data_t, int, int, netstack_t *));
 extern	int	ipf_geniter __P((ipftoken_t *, ipfgeniter_t *, ipf_stack_t *));
 extern	int	ipf_frruleiter __P((void *, int, void *, ipf_stack_t *));
 
@@ -146,12 +155,12 @@ ipf_stack_t *ifs;
 	if (ifs->ifs_ipf_ipv6 != NULL) {
 		if (ifs->ifs_hook6_physical_in) {
 			ifs->ifs_hook6_physical_in = (net_unregister_hook(ifs->ifs_ipf_ipv6,
-			    NH_PHYSICAL_IN, &ifs->ifs_ipfhook_in) != 0);
+			    NH_PHYSICAL_IN, &ifs->ifs_ipfhook6_in) != 0);
 		}
 		if (ifs->ifs_hook6_physical_out) {
 			ifs->ifs_hook6_physical_out =
 			    (net_unregister_hook(ifs->ifs_ipf_ipv6,
-			    NH_PHYSICAL_OUT, &ifs->ifs_ipfhook_out) != 0);
+			    NH_PHYSICAL_OUT, &ifs->ifs_ipfhook6_out) != 0);
 		}
 		if (ifs->ifs_hook6_nic_events) {
 			ifs->ifs_hook6_nic_events =
@@ -161,12 +170,12 @@ ipf_stack_t *ifs;
 		if (ifs->ifs_hook6_loopback_in) {
 			ifs->ifs_hook6_loopback_in =
 			    (net_unregister_hook(ifs->ifs_ipf_ipv6,
-			    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) != 0);
+			    NH_LOOPBACK_IN, &ifs->ifs_ipfhook6_loop_in) != 0);
 		}
 		if (ifs->ifs_hook6_loopback_out) {
 			ifs->ifs_hook6_loopback_out =
 			    (net_unregister_hook(ifs->ifs_ipf_ipv6,
-			    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) != 0);
+			    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook6_loop_out) != 0);
 		}
 
 		if (net_release(ifs->ifs_ipf_ipv6) != 0)
@@ -181,12 +190,12 @@ ipf_stack_t *ifs;
 		if (ifs->ifs_hook4_physical_in) {
 			ifs->ifs_hook4_physical_in =
 			    (net_unregister_hook(ifs->ifs_ipf_ipv4,
-			    NH_PHYSICAL_IN, &ifs->ifs_ipfhook_in) != 0);
+			    NH_PHYSICAL_IN, &ifs->ifs_ipfhook4_in) != 0);
 		}
 		if (ifs->ifs_hook4_physical_out) {
 			ifs->ifs_hook4_physical_out =
 			    (net_unregister_hook(ifs->ifs_ipf_ipv4,
-			    NH_PHYSICAL_OUT, &ifs->ifs_ipfhook_out) != 0);
+			    NH_PHYSICAL_OUT, &ifs->ifs_ipfhook4_out) != 0);
 		}
 		if (ifs->ifs_hook4_nic_events) {
 			ifs->ifs_hook4_nic_events =
@@ -196,12 +205,12 @@ ipf_stack_t *ifs;
 		if (ifs->ifs_hook4_loopback_in) {
 			ifs->ifs_hook4_loopback_in =
 			    (net_unregister_hook(ifs->ifs_ipf_ipv4,
-			    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) != 0);
+			    NH_LOOPBACK_IN, &ifs->ifs_ipfhook4_loop_in) != 0);
 		}
 		if (ifs->ifs_hook4_loopback_out) {
 			ifs->ifs_hook4_loopback_out =
 			    (net_unregister_hook(ifs->ifs_ipf_ipv4,
-			    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) != 0);
+			    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook4_loop_out) != 0);
 		}
 
 		if (net_release(ifs->ifs_ipf_ipv4) != 0)
@@ -267,7 +276,6 @@ netstack_t *ns;
 	ifs->ifs_fr_pass = (IPF_DEFAULT_PASS)|FR_NOMATCH;
 #endif
 
-	bzero((char *)ifs->ifs_frcache, sizeof(ifs->ifs_frcache));
 	MUTEX_INIT(&ifs->ifs_ipf_rw, "ipf rw mutex");
 	MUTEX_INIT(&ifs->ifs_ipf_timeoutlock, "ipf timeout lock mutex");
 	RWLOCK_INIT(&ifs->ifs_ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
@@ -279,11 +287,11 @@ netstack_t *ns;
 
 	HOOK_INIT(&ifs->ifs_ipfhook_nicevents, ipf_nic_event_v4,
 		  "ipfilter_hook_nicevents");
-	HOOK_INIT(&ifs->ifs_ipfhook_in, ipf_hook_in, "ipfilter_hook_in");
-	HOOK_INIT(&ifs->ifs_ipfhook_out, ipf_hook_out, "ipfilter_hook_out");
-	HOOK_INIT(&ifs->ifs_ipfhook_loop_in, ipf_hook_in,
+	HOOK_INIT(&ifs->ifs_ipfhook4_in, ipf_hook4_in, "ipfilter_hook_in");
+	HOOK_INIT(&ifs->ifs_ipfhook4_out, ipf_hook4_out, "ipfilter_hook_out");
+	HOOK_INIT(&ifs->ifs_ipfhook4_loop_in, ipf_hook4_in,
 	    "ipfilter_hook_loop_in");
-	HOOK_INIT(&ifs->ifs_ipfhook_loop_out, ipf_hook_out,
+	HOOK_INIT(&ifs->ifs_ipfhook4_loop_out, ipf_hook4_out,
 	    "ipfilter_hook_loop_out");
 
 	/*
@@ -307,25 +315,25 @@ netstack_t *ns;
 		goto hookup_failed;
 
 	ifs->ifs_hook4_physical_in = (net_register_hook(ifs->ifs_ipf_ipv4,
-	    NH_PHYSICAL_IN, &ifs->ifs_ipfhook_in) == 0);
+	    NH_PHYSICAL_IN, &ifs->ifs_ipfhook4_in) == 0);
 	if (!ifs->ifs_hook4_physical_in)
 		goto hookup_failed;
 
 	ifs->ifs_hook4_physical_out = (net_register_hook(ifs->ifs_ipf_ipv4,
-	    NH_PHYSICAL_OUT, &ifs->ifs_ipfhook_out) == 0);
+	    NH_PHYSICAL_OUT, &ifs->ifs_ipfhook4_out) == 0);
 	if (!ifs->ifs_hook4_physical_out)
 		goto hookup_failed;
 
 	if (ifs->ifs_ipf_loopback) {
 		ifs->ifs_hook4_loopback_in =
 		    (net_register_hook(ifs->ifs_ipf_ipv4,
-		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) == 0);
+		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook4_loop_in) == 0);
 		if (!ifs->ifs_hook4_loopback_in)
 			goto hookup_failed;
 
 		ifs->ifs_hook4_loopback_out =
 		    (net_register_hook(ifs->ifs_ipf_ipv4,
-		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) == 0);
+		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook4_loop_out) == 0);
 		if (!ifs->ifs_hook4_loopback_out)
 			goto hookup_failed;
 	}
@@ -336,6 +344,13 @@ netstack_t *ns;
 	if (ifs->ifs_ipf_ipv6 == NULL)
 		goto hookup_failed;
 
+	HOOK_INIT(&ifs->ifs_ipfhook6_in, ipf_hook6_in, "ipfilter_hook_in");
+	HOOK_INIT(&ifs->ifs_ipfhook6_out, ipf_hook6_out, "ipfilter_hook_out");
+	HOOK_INIT(&ifs->ifs_ipfhook6_loop_in, ipf_hook6_in,
+	    "ipfilter_hook_loop_in");
+	HOOK_INIT(&ifs->ifs_ipfhook6_loop_out, ipf_hook6_out,
+	    "ipfilter_hook_loop_out");
+
 	HOOK_INIT(&ifs->ifs_ipfhook_nicevents, ipf_nic_event_v6,
 		  "ipfilter_hook_nicevents");
 	ifs->ifs_hook6_nic_events = (net_register_hook(ifs->ifs_ipf_ipv6,
@@ -344,25 +359,25 @@ netstack_t *ns;
 		goto hookup_failed;
 
 	ifs->ifs_hook6_physical_in = (net_register_hook(ifs->ifs_ipf_ipv6,
-	    NH_PHYSICAL_IN, &ifs->ifs_ipfhook_in) == 0);
+	    NH_PHYSICAL_IN, &ifs->ifs_ipfhook6_in) == 0);
 	if (!ifs->ifs_hook6_physical_in)
 		goto hookup_failed;
 
 	ifs->ifs_hook6_physical_out = (net_register_hook(ifs->ifs_ipf_ipv6,
-	    NH_PHYSICAL_OUT, &ifs->ifs_ipfhook_out) == 0);
+	    NH_PHYSICAL_OUT, &ifs->ifs_ipfhook6_out) == 0);
 	if (!ifs->ifs_hook6_physical_out)
 		goto hookup_failed;
 
 	if (ifs->ifs_ipf_loopback) {
 		ifs->ifs_hook6_loopback_in =
 		    (net_register_hook(ifs->ifs_ipf_ipv6,
-		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) == 0);
+		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook6_loop_in) == 0);
 		if (!ifs->ifs_hook6_loopback_in)
 			goto hookup_failed;
 
 		ifs->ifs_hook6_loopback_out =
 		    (net_register_hook(ifs->ifs_ipf_ipv6,
-		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) == 0);
+		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook6_loop_out) == 0);
 		if (!ifs->ifs_hook6_loopback_out)
 			goto hookup_failed;
 	}
@@ -442,25 +457,25 @@ ipf_stack_t *ifs;
 
 		ifs->ifs_hook4_loopback_in =
 		    (net_register_hook(ifs->ifs_ipf_ipv4,
-		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) == 0);
+		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook4_loop_in) == 0);
 		if (!ifs->ifs_hook4_loopback_in)
 			return EINVAL;
 
 		ifs->ifs_hook4_loopback_out =
 		    (net_register_hook(ifs->ifs_ipf_ipv4,
-		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) == 0);
+		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook4_loop_out) == 0);
 		if (!ifs->ifs_hook4_loopback_out)
 			return EINVAL;
 
 		ifs->ifs_hook6_loopback_in =
 		    (net_register_hook(ifs->ifs_ipf_ipv6,
-		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) == 0);
+		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook6_loop_in) == 0);
 		if (!ifs->ifs_hook6_loopback_in)
 			return EINVAL;
 
 		ifs->ifs_hook6_loopback_out =
 		    (net_register_hook(ifs->ifs_ipf_ipv6,
-		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) == 0);
+		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook6_loop_out) == 0);
 		if (!ifs->ifs_hook6_loopback_out)
 			return EINVAL;
 
@@ -469,25 +484,25 @@ ipf_stack_t *ifs;
 
 		ifs->ifs_hook4_loopback_in =
 		    (net_unregister_hook(ifs->ifs_ipf_ipv4,
-		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) != 0);
+		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook4_loop_in) != 0);
 		if (ifs->ifs_hook4_loopback_in)
 			return EBUSY;
 
 		ifs->ifs_hook4_loopback_out =
 		    (net_unregister_hook(ifs->ifs_ipf_ipv4,
-		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) != 0);
+		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook4_loop_out) != 0);
 		if (ifs->ifs_hook4_loopback_out)
 			return EBUSY;
 
 		ifs->ifs_hook6_loopback_in =
 		    (net_unregister_hook(ifs->ifs_ipf_ipv6,
-		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook_loop_in) != 0);
+		    NH_LOOPBACK_IN, &ifs->ifs_ipfhook6_loop_in) != 0);
 		if (ifs->ifs_hook6_loopback_in)
 			return EBUSY;
 
 		ifs->ifs_hook6_loopback_out =
 		    (net_unregister_hook(ifs->ifs_ipf_ipv6,
-		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook_loop_out) != 0);
+		    NH_LOOPBACK_OUT, &ifs->ifs_ipfhook6_loop_out) != 0);
 		if (ifs->ifs_hook6_loopback_out)
 			return EBUSY;
 	}
@@ -633,9 +648,6 @@ int *rp;
 			error = EPERM;
 		else {
 			WRITE_ENTER(&ifs->ifs_ipf_mutex);
-			/* Clear one fourth of the table */
-			bzero((char *)&ifs->ifs_frcache,
-			    sizeof (ifs->ifs_frcache[0]) * 2);
 			error = COPYOUT((caddr_t)&ifs->ifs_fr_active,
 					(caddr_t)data,
 					sizeof(ifs->ifs_fr_active));
@@ -1829,9 +1841,14 @@ bad_fastroute:
 /* Calling ipf_hook.                                                        */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
-int ipf_hook_out(hook_event_token_t token, hook_data_t info, netstack_t *ns)
+int ipf_hook4_out(hook_event_token_t token, hook_data_t info, netstack_t *ns)
 {
-	return ipf_hook(info, 1, 0, ns);
+	return ipf_hook4(info, 1, 0, ns);
+}
+/*ARGSUSED*/
+int ipf_hook6_out(hook_event_token_t token, hook_data_t info, netstack_t *ns)
+{
+	return ipf_hook6(info, 1, 0, ns);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -1843,9 +1860,14 @@ int ipf_hook_out(hook_event_token_t token, hook_data_t info, netstack_t *ns)
 /* Calling ipf_hook.                                                        */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
-int ipf_hook_in(hook_event_token_t token, hook_data_t info, netstack_t *ns)
+int ipf_hook4_in(hook_event_token_t token, hook_data_t info, netstack_t *ns)
 {
-	return ipf_hook(info, 0, 0, ns);
+	return ipf_hook4(info, 0, 0, ns);
+}
+/*ARGSUSED*/
+int ipf_hook6_in(hook_event_token_t token, hook_data_t info, netstack_t *ns)
+{
+	return ipf_hook6(info, 0, 0, ns);
 }
 
 
@@ -1858,10 +1880,16 @@ int ipf_hook_in(hook_event_token_t token, hook_data_t info, netstack_t *ns)
 /* Calling ipf_hook.                                                        */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
-int ipf_hook_loop_out(hook_event_token_t token, hook_data_t info,
+int ipf_hook4_loop_out(hook_event_token_t token, hook_data_t info,
     netstack_t *ns)
 {
-	return ipf_hook(info, 1, 1, ns);
+	return ipf_hook4(info, 1, FI_NOCKSUM, ns);
+}
+/*ARGSUSED*/
+int ipf_hook6_loop_out(hook_event_token_t token, hook_data_t info,
+    netstack_t *ns)
+{
+	return ipf_hook6(info, 1, FI_NOCKSUM, ns);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -1873,10 +1901,16 @@ int ipf_hook_loop_out(hook_event_token_t token, hook_data_t info,
 /* Calling ipf_hook.                                                        */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
-int ipf_hook_loop_in(hook_event_token_t token, hook_data_t info,
+int ipf_hook4_loop_in(hook_event_token_t token, hook_data_t info,
     netstack_t *ns)
 {
-	return ipf_hook(info, 0, 1, ns);
+	return ipf_hook4(info, 0, FI_NOCKSUM, ns);
+}
+/*ARGSUSED*/
+int ipf_hook6_loop_in(hook_event_token_t token, hook_data_t info,
+    netstack_t *ns)
+{
+	return ipf_hook6(info, 0, FI_NOCKSUM, ns);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -1890,10 +1924,10 @@ int ipf_hook_loop_in(hook_event_token_t token, hook_data_t info,
 /* parameters out of the info structure and forms them up to be useful for  */
 /* calling ipfilter.                                                        */
 /* ------------------------------------------------------------------------ */
-int ipf_hook(hook_data_t info, int out, int loopback, netstack_t *ns)
+int ipf_hook4(hook_data_t info, int out, int loopback, netstack_t *ns)
 {
 	hook_pkt_event_t *fw;
-	int rval, v, hlen;
+	int rval, hlen;
 	qpktinfo_t qpi;
 	u_short swap;
 	phy_if_t phy; 
@@ -1905,30 +1939,20 @@ int ipf_hook(hook_data_t info, int out, int loopback, netstack_t *ns)
 	phy = (out == 0) ? fw->hpe_ifp : fw->hpe_ofp;
 
 	ip = fw->hpe_hdr;
-	v = ip->ip_v;
-	if (v == IPV4_VERSION) {
-		swap = ntohs(ip->ip_len);
-		ip->ip_len = swap;
-		swap = ntohs(ip->ip_off);
-		ip->ip_off = swap;
-
-		hlen = IPH_HDR_LENGTH(ip);
-	} else
-		hlen = sizeof (ip6_t);
-
-	bzero(&qpi, sizeof (qpktinfo_t));
+	swap = ntohs(ip->ip_len);
+	ip->ip_len = swap;
+	swap = ntohs(ip->ip_off);
+	ip->ip_off = swap;
+	hlen = IPH_HDR_LENGTH(ip);
 
 	qpi.qpi_m = fw->hpe_mb;
 	qpi.qpi_data = fw->hpe_hdr;
 	qpi.qpi_off = (char *)qpi.qpi_data - (char *)fw->hpe_mb->b_rptr;
 	qpi.qpi_ill = (void *)phy;
-	qpi.qpi_flags = 0;
-	if (fw->hpe_flags & HPE_MULTICAST)
-		qpi.qpi_flags |= FI_MBCAST|FI_MULTICAST;
-	else if (fw->hpe_flags & HPE_BROADCAST)
-		qpi.qpi_flags = FI_MBCAST|FI_BROADCAST;
-	if (loopback)
-		qpi.qpi_flags |= FI_NOCKSUM;
+	qpi.qpi_flags = fw->hpe_flags & (HPE_MULTICAST|HPE_BROADCAST);
+	if (qpi.qpi_flags)
+		qpi.qpi_flags |= FI_MBCAST;
+	qpi.qpi_flags |= loopback;
 
 	rval = fr_check(fw->hpe_hdr, hlen, qpi.qpi_ill, out,
 	    &qpi, fw->hpe_mp, ns->netstack_ipf);
@@ -1937,16 +1961,52 @@ int ipf_hook(hook_data_t info, int out, int loopback, netstack_t *ns)
 	if (rval == 0 && *(fw->hpe_mp) == NULL)
 		rval = 1;
 
-	/* Notify IP the packet mblk_t and IP header pointers. */	
+	/* Notify IP the packet mblk_t and IP header pointers. */
 	fw->hpe_mb = qpi.qpi_m;
 	fw->hpe_hdr = qpi.qpi_data;
-	if ((rval == 0) && (v == IPV4_VERSION)) {
+	if (rval == 0) {
 		ip = qpi.qpi_data;
 		swap = ntohs(ip->ip_len);
 		ip->ip_len = swap;
 		swap = ntohs(ip->ip_off);
 		ip->ip_off = swap;
 	}
+	return rval;
+
+}
+int ipf_hook6(hook_data_t info, int out, int loopback, netstack_t *ns)
+{
+	hook_pkt_event_t *fw;
+	int rval, hlen;
+	qpktinfo_t qpi;
+	phy_if_t phy; 
+
+	fw = (hook_pkt_event_t *)info;
+
+	ASSERT(fw != NULL);
+	phy = (out == 0) ? fw->hpe_ifp : fw->hpe_ofp;
+
+	hlen = sizeof (ip6_t);
+
+	qpi.qpi_m = fw->hpe_mb;
+	qpi.qpi_data = fw->hpe_hdr;
+	qpi.qpi_off = (char *)qpi.qpi_data - (char *)fw->hpe_mb->b_rptr;
+	qpi.qpi_ill = (void *)phy;
+	qpi.qpi_flags = fw->hpe_flags & (HPE_MULTICAST|HPE_BROADCAST);
+	if (qpi.qpi_flags)
+		qpi.qpi_flags |= FI_MBCAST;
+	qpi.qpi_flags |= loopback;
+
+	rval = fr_check(fw->hpe_hdr, hlen, qpi.qpi_ill, out,
+	    &qpi, fw->hpe_mp, ns->netstack_ipf);
+
+	/* For fastroute cases, fr_check returns 0 with mp set to NULL */
+	if (rval == 0 && *(fw->hpe_mp) == NULL)
+		rval = 1;
+
+	/* Notify IP the packet mblk_t and IP header pointers. */
+	fw->hpe_mb = qpi.qpi_m;
+	fw->hpe_hdr = qpi.qpi_data;
 	return rval;
 
 }

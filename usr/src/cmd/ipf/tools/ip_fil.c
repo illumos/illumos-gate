@@ -362,8 +362,6 @@ int mode;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			bzero((char *)ifs->ifs_frcache,
-			    sizeof(ifs->ifs_frcache[0]) * 2);
 			*(u_int *)data = ifs->ifs_fr_active;
 			ifs->ifs_fr_active = 1 - ifs->ifs_fr_active;
 		}

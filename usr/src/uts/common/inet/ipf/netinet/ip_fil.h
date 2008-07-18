@@ -240,13 +240,13 @@ typedef	struct	fr_ip	{
 /*
  * For use in fi_flx
  */
-#define	FI_TCPUDP	0x0001	/* TCP/UCP implied comparison*/
-#define	FI_OPTIONS	0x0002
+#define	FI_MULTICAST	0x0001
+#define	FI_BROADCAST	0x0002
 #define	FI_FRAG		0x0004
 #define	FI_SHORT	0x0008
 #define	FI_NATED	0x0010
-#define	FI_MULTICAST	0x0020
-#define	FI_BROADCAST	0x0040
+#define	FI_TCPUDP	0x0020	/* TCP/UCP implied comparison*/
+#define	FI_OPTIONS	0x0040
 #define	FI_MBCAST	0x0080
 #define	FI_STATE	0x0100
 #define	FI_BADNAT	0x0200

@@ -109,13 +109,11 @@ char *argv[];
 #endif
 	ipftuneable_alloc(ifs);
 	
-	bzero((char *)ifs->ifs_frcache, sizeof(ifs->ifs_frcache));
 	MUTEX_INIT(&ifs->ifs_ipf_rw, "ipf rw mutex");
 	MUTEX_INIT(&ifs->ifs_ipf_timeoutlock, "ipf timeout lock");
 	RWLOCK_INIT(&ifs->ifs_ipf_global, "ipf filter load/unload mutex");
 	RWLOCK_INIT(&ifs->ifs_ipf_mutex, "ipf filter rwlock");
 	RWLOCK_INIT(&ifs->ifs_ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
-	RWLOCK_INIT(&ifs->ifs_ipf_frcache, "ipf cache rwlock");
 
 	fr_loginit(ifs);
 	fr_authinit(ifs);

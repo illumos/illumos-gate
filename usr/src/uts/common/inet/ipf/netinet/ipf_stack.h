@@ -44,7 +44,6 @@ struct ipf_stack {
 	netstack_t		*ifs_netstack;
 
 	/* ipf module */
-	fr_info_t		ifs_frcache[2][8];
 
 	filterstats_t		ifs_frstats[2];
 	frentry_t		*ifs_ipfilter[2][2];
@@ -91,7 +90,6 @@ struct ipf_stack {
 	ipfmutex_t	ifs_ipf_timeoutlock;
 	ipfrwlock_t	ifs_ipf_mutex;
 	ipfrwlock_t	ifs_ipf_global;
-	ipfrwlock_t	ifs_ipf_frcache;
 	ipfrwlock_t	ifs_ip_poolrw;
 	ipfrwlock_t	ifs_ipf_frag;
 	ipfrwlock_t	ifs_ipf_state;
@@ -110,11 +108,15 @@ struct ipf_stack {
 	ipftuneable_t	*ifs_ipf_tunelist;
 
 	/* ip_fil_solaris.c */
-	hook_t		ifs_ipfhook_in;
-	hook_t		ifs_ipfhook_out;
-	hook_t		ifs_ipfhook_loop_in;
-	hook_t		ifs_ipfhook_loop_out;
-	hook_t		ifs_ipfhook_nicevents;
+	hook_t	ifs_ipfhook4_in;
+	hook_t	ifs_ipfhook4_out;
+	hook_t	ifs_ipfhook4_loop_in;
+	hook_t	ifs_ipfhook4_loop_out;
+	hook_t	ifs_ipfhook6_in;
+	hook_t	ifs_ipfhook6_out;
+	hook_t	ifs_ipfhook6_loop_in;
+	hook_t	ifs_ipfhook6_loop_out;
+	hook_t	ifs_ipfhook_nicevents;
 
 	/* flags to indicate whether hooks are registered. */
 	boolean_t	ifs_hook4_physical_in;

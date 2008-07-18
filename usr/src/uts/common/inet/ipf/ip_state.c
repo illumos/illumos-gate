@@ -688,6 +688,7 @@ ipf_stack_t *ifs;
 		fr->fr_ref = 0;
 		fr->fr_dsize = 0;
 		fr->fr_data = NULL;
+		fr->fr_type = FR_T_NONE;
 
 		fr_resolvedest(&fr->fr_tif, fr->fr_v, ifs);
 		fr_resolvedest(&fr->fr_dif, fr->fr_v, ifs);

@@ -384,7 +384,6 @@ ipf_stack_init(netstackid_t stackid, netstack_t *ns)
 	 */
 	RWLOCK_INIT(&ifs->ifs_ipf_global, "ipf filter load/unload mutex");
 	RWLOCK_INIT(&ifs->ifs_ipf_mutex, "ipf filter rwlock");
-	RWLOCK_INIT(&ifs->ifs_ipf_frcache, "ipf cache rwlock");
 #ifdef KERNEL
 	ipf_kstat_init(ifs, stackid);
 #endif
@@ -494,7 +493,6 @@ ipf_stack_fini(netstackid_t stackid, void *arg)
 
 	RWLOCK_EXIT(&ifs->ifs_ipf_global);
 	RW_DESTROY(&ifs->ifs_ipf_mutex);
-	RW_DESTROY(&ifs->ifs_ipf_frcache);
 	RW_DESTROY(&ifs->ifs_ipf_global);
 
 	KFREE(ifs);

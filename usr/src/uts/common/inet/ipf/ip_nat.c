@@ -3699,11 +3699,11 @@ int fr_checknatout(fin, passp)
 fr_info_t *fin;
 u_32_t *passp;
 {
+	ipnat_t *np = NULL, *npnext;
 	struct ifnet *ifp, *sifp;
 	icmphdr_t *icmp = NULL;
 	tcphdr_t *tcp = NULL;
 	int rval, natfailed;
-	ipnat_t *np = NULL;
 	u_int nflags = 0;
 	u_32_t ipa, iph;
 	int natadd = 1;
@@ -3769,15 +3769,13 @@ u_32_t *passp;
 		 * If there is no current entry in the nat table for this IP#,
 		 * create one for it (if there is a matching rule).
 		 */
-		RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 		msk = 0xffffffff;
 		nmsk = ifs->ifs_nat_masks;
-		WRITE_ENTER(&ifs->ifs_ipf_nat);
 maskloop:
 		iph = ipa & htonl(msk);
 		hv = NAT_HASH_FN(iph, 0, ifs->ifs_ipf_natrules_sz);
-		for (np = ifs->ifs_nat_rules[hv]; np; np = np->in_mnext)
-		{
+		for (np = ifs->ifs_nat_rules[hv]; np; np = npnext) {
+			npnext = np->in_mnext;
 			if ((np->in_ifps[1] && (np->in_ifps[1] != ifp)))
 				continue;
 			if (np->in_v != fin->fin_v)
@@ -3804,12 +3802,20 @@ maskloop:
 					continue;
 			}
 
-			if ((nat = nat_new(fin, np, NULL, nflags,
-					   NAT_OUTBOUND))) {
+			ATOMIC_INC32(np->in_use);
+			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
+			WRITE_ENTER(&ifs->ifs_ipf_nat);
+			nat = nat_new(fin, np, NULL, nflags, NAT_OUTBOUND);
+			if (nat != NULL) {
+				np->in_use--;
 				np->in_hits++;
+				MUTEX_DOWNGRADE(&ifs->ifs_ipf_nat);
 				break;
-			} else
-				natfailed = -1;
+			}
+			natfailed = -1;
+			npnext = np->in_mnext;
+			fr_ipnatderef(&np, ifs);
+			MUTEX_DOWNGRADE(&ifs->ifs_ipf_nat);
 		}
 		if ((np == NULL) && (nmsk != 0)) {
 			while (nmsk) {
@@ -3823,7 +3829,6 @@ maskloop:
 				goto maskloop;
 			}
 		}
-		MUTEX_DOWNGRADE(&ifs->ifs_ipf_nat);
 	}
 
 	if (nat != NULL) {
@@ -3986,7 +3991,7 @@ u_32_t nflags;
 			i = 1;
 	} else
 		i = 1;
-	ATOMIC_INCL(ifs->ifs_nat_stats.ns_mapped[1]);
+	ifs->ifs_nat_stats.ns_mapped[1]++;
 	fin->fin_flx |= FI_NATED;
 	return i;
 }
@@ -4012,13 +4017,13 @@ fr_info_t *fin;
 u_32_t *passp;
 {
 	u_int nflags, natadd;
+	ipnat_t *np, *npnext;
 	int rval, natfailed;
 	struct ifnet *ifp;
 	struct in_addr in;
 	icmphdr_t *icmp;
 	tcphdr_t *tcp;
 	u_short dport;
-	ipnat_t *np;
 	nat_t *nat;
 	u_32_t iph;
 	ipf_stack_t *ifs = fin->fin_ifs;
@@ -4079,10 +4084,8 @@ u_32_t *passp;
 	} else {
 		u_32_t hv, msk, rmsk;
 
-		RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 		rmsk = ifs->ifs_rdr_masks;
 		msk = 0xffffffff;
-		WRITE_ENTER(&ifs->ifs_ipf_nat);
 		/*
 		 * If there is no current entry in the nat table for this IP#,
 		 * create one for it (if there is a matching rule).
@@ -4090,7 +4093,8 @@ u_32_t *passp;
 maskloop:
 		iph = in.s_addr & htonl(msk);
 		hv = NAT_HASH_FN(iph, 0, ifs->ifs_ipf_rdrrules_sz);
-		for (np = ifs->ifs_rdr_rules[hv]; np; np = np->in_rnext) {
+		for (np = ifs->ifs_rdr_rules[hv]; np; np = npnext) {
+			npnext = np->in_rnext;
 			if (np->in_ifps[0] && (np->in_ifps[0] != ifp))
 				continue;
 			if (np->in_v != fin->fin_v)
@@ -4117,12 +4121,20 @@ maskloop:
 				}
 			}
 
+			ATOMIC_INC32(np->in_use);
+			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
+			WRITE_ENTER(&ifs->ifs_ipf_nat);
 			nat = nat_new(fin, np, NULL, nflags, NAT_INBOUND);
 			if (nat != NULL) {
+				np->in_use--;
 				np->in_hits++;
+				MUTEX_DOWNGRADE(&ifs->ifs_ipf_nat);
 				break;
-			} else
-				natfailed = -1;
+			}	
+			natfailed = -1;
+			npnext = np->in_rnext;
+			fr_ipnatderef(&np, ifs);
+			MUTEX_DOWNGRADE(&ifs->ifs_ipf_nat);
 		}
 
 		if ((np == NULL) && (rmsk != 0)) {
@@ -4137,7 +4149,6 @@ maskloop:
 				goto maskloop;
 			}
 		}
-		MUTEX_DOWNGRADE(&ifs->ifs_ipf_nat);
 	}
 	if (nat != NULL) {
 		rval = fr_natin(fin, nat, natadd, nflags);
@@ -4303,7 +4314,7 @@ u_32_t nflags;
 	}
 #endif
 
-	ATOMIC_INCL(ifs->ifs_nat_stats.ns_mapped[0]);
+	ifs->ifs_nat_stats.ns_mapped[0]++;
 	fin->fin_flx |= FI_NATED;
 	if (np != NULL && np->in_tag.ipt_num[0] != 0)
 		fin->fin_nattag = &np->in_tag;
@@ -4837,7 +4848,7 @@ ipf_stack_t *ifs;
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_ipnatderef                                               */
 /* Returns:     Nil                                                         */
-/* Parameters:  isp(I) - pointer to pointer to NAT rule                     */
+/* Parameters:  inp(I) - pointer to pointer to NAT rule                     */
 /* Write Locks: ipf_nat                                                     */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
@@ -4849,7 +4860,6 @@ ipf_stack_t *ifs;
 
 	in = *inp;
 	*inp = NULL;
-	in->in_space++;
 	in->in_use--;
 	if (in->in_use == 0 && (in->in_flags & IPN_DELETE)) {
 		if (in->in_apr)

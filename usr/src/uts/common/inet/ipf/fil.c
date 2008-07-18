@@ -189,6 +189,9 @@ int	fr_features = 0
 #endif
 	;
 
+#define	IPF_BUMP(x)	(x)++	
+
+static	INLINE int	fr_ipfcheck __P((fr_info_t *, frentry_t *, int));
 static	INLINE int	fr_ipfcheck __P((fr_info_t *, frentry_t *, int));
 static	int		fr_portcheck __P((frpcmp_t *, u_short *));
 static	int		frflushlist __P((int, minor_t, int *, frentry_t **,
@@ -1975,7 +1978,7 @@ u_32_t pass;
 		 * it, except for increasing the hit counter.
 		 */
 		if ((passt & FR_CALLNOW) != 0) {
-			ATOMIC_INC64(fr->fr_hits);
+			IPF_BUMP(fr->fr_hits);
 			if ((fr->fr_func != NULL) &&
 			    (fr->fr_func != (ipfunc_t)-1)) {
 				frentry_t *frs;
@@ -2004,9 +2007,9 @@ u_32_t pass;
 					passt &= ~FR_CMDMASK;
 					passt |= FR_BLOCK|FR_QUICK;
 				}
-				ATOMIC_INCL(ifs->ifs_frstats[fin->fin_out].fr_skip);
+				IPF_BUMP(ifs->ifs_frstats[fin->fin_out].fr_skip);
 			}
-			ATOMIC_INCL(ifs->ifs_frstats[fin->fin_out].fr_pkl);
+			IPF_BUMP(ifs->ifs_frstats[fin->fin_out].fr_pkl);
 			logged = 1;
 		}
 #endif /* IPFILTER_LOG */
@@ -2019,7 +2022,7 @@ u_32_t pass;
 		if (passt & (FR_RETICMP|FR_FAKEICMP))
 			fin->fin_icode = fr->fr_icode;
 		FR_DEBUG(("pass %#x\n", pass));
-		ATOMIC_INC64(fr->fr_hits);
+		IPF_BUMP(fr->fr_hits);
 		fin->fin_rule = rulen;
 		(void) strncpy(fin->fin_group, fr->fr_group, FR_GROUPLEN);
 		if (fr->fr_grp != NULL) {
@@ -2048,9 +2051,9 @@ u_32_t pass;
 				int out = fin->fin_out;
 
 				if (fr_addstate(fin, NULL, 0) != NULL) {
-					ATOMIC_INCL(ifs->ifs_frstats[out].fr_ads);
+					IPF_BUMP(ifs->ifs_frstats[out].fr_ads);
 				} else {
-					ATOMIC_INCL(ifs->ifs_frstats[out].fr_bads);
+					IPF_BUMP(ifs->ifs_frstats[out].fr_bads);
 					pass = passo;
 					continue;
 				}
@@ -2101,7 +2104,7 @@ u_32_t *passp;
 		fin->fin_fr = fr;
 		pass = fr_scanlist(fin, FR_NOMATCH);
 		if (FR_ISACCOUNT(pass)) {
-			ATOMIC_INCL(ifs->ifs_frstats[0].fr_acct);
+			IPF_BUMP(ifs->ifs_frstats[0].fr_acct);
 		}
 		fin->fin_fr = frsave;
 		bcopy(group, fin->fin_group, FR_GROUPLEN);
@@ -2129,7 +2132,6 @@ fr_info_t *fin;
 u_32_t *passp;
 {
 	frentry_t *fr;
-	fr_info_t *fc;
 	u_32_t pass;
 	int out;
 	ipf_stack_t *ifs = fin->fin_ifs;
@@ -2137,48 +2139,19 @@ u_32_t *passp;
 	out = fin->fin_out;
 	pass = *passp;
 
-	/*
-	 * If a packet is found in the auth table, then skip checking
-	 * the access lists for permission but we do need to consider
-	 * the result as if it were from the ACL's.
-	 */
-	fc = &ifs->ifs_frcache[out][CACHE_HASH(fin)];
-	READ_ENTER(&ifs->ifs_ipf_frcache);
-	if (!bcmp((char *)fin, (char *)fc, FI_CSIZE)) {
-		/*
-		 * copy cached data so we can unlock the mutexes earlier.
-		 */
-		bcopy((char *)fc, (char *)fin, FI_COPYSIZE);
-		RWLOCK_EXIT(&ifs->ifs_ipf_frcache);
-		ATOMIC_INCL(ifs->ifs_frstats[out].fr_chit);
-
-		if ((fr = fin->fin_fr) != NULL) {
-			ATOMIC_INC64(fr->fr_hits);
-			pass = fr->fr_flags;
-		}
-	} else {
-		RWLOCK_EXIT(&ifs->ifs_ipf_frcache);
-
 #ifdef	USE_INET6
-		if (fin->fin_v == 6)
-			fin->fin_fr = ifs->ifs_ipfilter6[out][ifs->ifs_fr_active];
-		else
+	if (fin->fin_v == 6)
+		fin->fin_fr = ifs->ifs_ipfilter6[out][ifs->ifs_fr_active];
+	else
 #endif
-			fin->fin_fr = ifs->ifs_ipfilter[out][ifs->ifs_fr_active];
-		if (fin->fin_fr != NULL)
-			pass = fr_scanlist(fin, ifs->ifs_fr_pass);
+		fin->fin_fr = ifs->ifs_ipfilter[out][ifs->ifs_fr_active];
+	if (fin->fin_fr != NULL)
+		pass = fr_scanlist(fin, ifs->ifs_fr_pass);
 
-		if (((pass & FR_KEEPSTATE) == 0) &&
-		    ((fin->fin_flx & FI_DONTCACHE) == 0)) {
-			WRITE_ENTER(&ifs->ifs_ipf_frcache);
-			bcopy((char *)fin, (char *)fc, FI_COPYSIZE);
-			RWLOCK_EXIT(&ifs->ifs_ipf_frcache);
-		}
-		if ((pass & FR_NOMATCH)) {
-			ATOMIC_INCL(ifs->ifs_frstats[out].fr_nom);
-		}
-		fr = fin->fin_fr;
+	if ((pass & FR_NOMATCH)) {
+		IPF_BUMP(ifs->ifs_frstats[out].fr_nom);
 	}
+	fr = fin->fin_fr;
 
 	/*
 	 * Apply packets per second rate-limiting to a rule as required.
@@ -2187,7 +2160,7 @@ u_32_t *passp;
 	    !ppsratecheck(&fr->fr_lastpkt, &fr->fr_curpps, fr->fr_pps)) {
 		pass &= ~(FR_CMDMASK|FR_DUP|FR_RETICMP|FR_RETRST);
 		pass |= FR_BLOCK;
-		ATOMIC_INCL(ifs->ifs_frstats[out].fr_ppshit);
+		IPF_BUMP(ifs->ifs_frstats[out].fr_ppshit);
 	}
 
 	/*
@@ -2229,12 +2202,12 @@ u_32_t *passp;
 	if ((pass & (FR_KEEPFRAG|FR_KEEPSTATE)) == FR_KEEPFRAG) {
 		if (fin->fin_flx & FI_FRAG) {
 			if (fr_newfrag(fin, pass) == -1) {
-				ATOMIC_INCL(ifs->ifs_frstats[out].fr_bnfr);
+				IPF_BUMP(ifs->ifs_frstats[out].fr_bnfr);
 			} else {
-				ATOMIC_INCL(ifs->ifs_frstats[out].fr_nfr);
+				IPF_BUMP(ifs->ifs_frstats[out].fr_nfr);
 			}
 		} else {
-			ATOMIC_INCL(ifs->ifs_frstats[out].fr_cfr);
+			IPF_BUMP(ifs->ifs_frstats[out].fr_cfr);
 		}
 	}
 
@@ -2243,9 +2216,9 @@ u_32_t *passp;
 	 */
 	if ((pass & FR_KEEPSTATE) && !(fin->fin_flx & FI_STATE)) {
 		if (fr_addstate(fin, NULL, 0) != NULL) {
-			ATOMIC_INCL(ifs->ifs_frstats[out].fr_ads);
+			IPF_BUMP(ifs->ifs_frstats[out].fr_ads);
 		} else {
-			ATOMIC_INCL(ifs->ifs_frstats[out].fr_bads);
+			IPF_BUMP(ifs->ifs_frstats[out].fr_bads);
 			if (FR_ISPASS(pass)) {
 				pass &= ~FR_CMDMASK;
 				pass |= FR_BLOCK;
@@ -2341,10 +2314,8 @@ ipf_stack_t *ifs;
 		return 2;
 # endif
 
-	READ_ENTER(&ifs->ifs_ipf_global);
 
 	if (ifs->ifs_fr_running <= 0) {
-		RWLOCK_EXIT(&ifs->ifs_ipf_global);
 		return 0;
 	}
 
@@ -2391,7 +2362,6 @@ ipf_stack_t *ifs;
 #  endif /* CSUM_DELAY_DATA */
 # endif /* MENTAT */
 #else
-	READ_ENTER(&ifs->ifs_ipf_global);
 
 	bzero((char *)fin, sizeof(*fin));
 	m = *mp;
@@ -2413,7 +2383,7 @@ ipf_stack_t *ifs;
 
 #ifdef	USE_INET6
 	if (v == 6) {
-		ATOMIC_INCL(ifs->ifs_frstats[out].fr_ipv6);
+		IPF_BUMP(ifs->ifs_frstats[out].fr_ipv6);
 		/*
 		 * Jumbo grams are quite likely too big for internal buffer
 		 * structures to handle comfortably, for now, so just drop
@@ -2454,12 +2424,12 @@ ipf_stack_t *ifs;
 		if (v == 4) {
 #ifdef _KERNEL
 			if (ifs->ifs_fr_chksrc && !fr_verifysrc(fin)) {
-				ATOMIC_INCL(ifs->ifs_frstats[0].fr_badsrc);
+				IPF_BUMP(ifs->ifs_frstats[0].fr_badsrc);
 				fin->fin_flx |= FI_BADSRC;
 			}
 #endif
 			if (fin->fin_ip->ip_ttl < ifs->ifs_fr_minttl) {
-				ATOMIC_INCL(ifs->ifs_frstats[0].fr_badttl);
+				IPF_BUMP(ifs->ifs_frstats[0].fr_badttl);
 				fin->fin_flx |= FI_LOWTTL;
 			}
 		}
@@ -2468,12 +2438,12 @@ ipf_stack_t *ifs;
 			ip6 = (ip6_t *)ip;
 #ifdef _KERNEL
 			if (ifs->ifs_fr_chksrc && !fr_verifysrc(fin)) {
-				ATOMIC_INCL(ifs->ifs_frstats[0].fr_badsrc);
+				IPF_BUMP(ifs->ifs_frstats[0].fr_badsrc);
 				fin->fin_flx |= FI_BADSRC;
 			}
 #endif
 			if (ip6->ip6_hlim < ifs->ifs_fr_minttl) {
-				ATOMIC_INCL(ifs->ifs_frstats[0].fr_badttl);
+				IPF_BUMP(ifs->ifs_frstats[0].fr_badttl);
 				fin->fin_flx |= FI_LOWTTL;
 			}
 		}
@@ -2481,7 +2451,7 @@ ipf_stack_t *ifs;
 	}
 
 	if (fin->fin_flx & FI_SHORT) {
-		ATOMIC_INCL(ifs->ifs_frstats[out].fr_short);
+		IPF_BUMP(ifs->ifs_frstats[out].fr_short);
 	}
 
 	READ_ENTER(&ifs->ifs_ipf_mutex);
@@ -2526,11 +2496,11 @@ ipf_stack_t *ifs;
 			goto finished;
 		} else if ((ifs->ifs_fr_update_ipid != 0) && (v == 4)) {
 			if (fr_updateipid(fin) == -1) {
-				ATOMIC_INCL(ifs->ifs_frstats[1].fr_ipud);
+				IPF_BUMP(ifs->ifs_frstats[1].fr_ipud);
 				pass &= ~FR_CMDMASK;
 				pass |= FR_BLOCK;
 			} else {
-				ATOMIC_INCL(ifs->ifs_frstats[0].fr_ipud);
+				IPF_BUMP(ifs->ifs_frstats[0].fr_ipud);
 			}
 		}
 	}
@@ -2575,11 +2545,11 @@ ipf_stack_t *ifs;
 				else
 					dst = 0;
 				(void) fr_send_icmp_err(ICMP_UNREACH, fin, dst);
-				ATOMIC_INCL(ifs->ifs_frstats[0].fr_ret);
+				IPF_BUMP(ifs->ifs_frstats[0].fr_ret);
 			} else if (((pass & FR_RETMASK) == FR_RETRST) &&
 				   !(fin->fin_flx & FI_SHORT)) {
 				if (fr_send_reset(fin) == 0) {
-					ATOMIC_INCL(ifs->ifs_frstats[1].fr_ret);
+					IPF_BUMP(ifs->ifs_frstats[1].fr_ret);
 				}
 			}
 		} else {
@@ -2632,13 +2602,13 @@ filtered:
 
 finished:
 	if (!FR_ISPASS(pass)) {
-		ATOMIC_INCL(ifs->ifs_frstats[out].fr_block);
+		IPF_BUMP(ifs->ifs_frstats[out].fr_block);
 		if (*mp != NULL) {
 			FREE_MB_T(*mp);
 			m = *mp = NULL;
 		}
 	} else {
-		ATOMIC_INCL(ifs->ifs_frstats[out].fr_pass);
+		IPF_BUMP(ifs->ifs_frstats[out].fr_pass);
 #if defined(_KERNEL) && defined(__sgi)
 		if ((fin->fin_hbuf != NULL) &&
 		    (mtod(fin->fin_m, struct ip *) != fin->fin_ip)) {
@@ -2648,7 +2618,6 @@ finished:
 	}
 
 	SPL_X(s);
-	RWLOCK_EXIT(&ifs->ifs_ipf_global);
 
 #ifdef _KERNEL
 # if OpenBSD >= 200311
@@ -2716,22 +2685,22 @@ u_32_t *passp;
 
 	if ((ifs->ifs_fr_flags & FF_LOGNOMATCH) && (pass & FR_NOMATCH)) {
 		pass |= FF_LOGNOMATCH;
-		ATOMIC_INCL(ifs->ifs_frstats[out].fr_npkl);
+		IPF_BUMP(ifs->ifs_frstats[out].fr_npkl);
 		goto logit;
 	} else if (((pass & FR_LOGMASK) == FR_LOGP) ||
 	    (FR_ISPASS(pass) && (ifs->ifs_fr_flags & FF_LOGPASS))) {
 		if ((pass & FR_LOGMASK) != FR_LOGP)
 			pass |= FF_LOGPASS;
-		ATOMIC_INCL(ifs->ifs_frstats[out].fr_ppkl);
+		IPF_BUMP(ifs->ifs_frstats[out].fr_ppkl);
 		goto logit;
 	} else if (((pass & FR_LOGMASK) == FR_LOGB) ||
 		   (FR_ISBLOCK(pass) && (ifs->ifs_fr_flags & FF_LOGBLOCK))) {
 		if ((pass & FR_LOGMASK) != FR_LOGB)
 			pass |= FF_LOGBLOCK;
-		ATOMIC_INCL(ifs->ifs_frstats[out].fr_bpkl);
+		IPF_BUMP(ifs->ifs_frstats[out].fr_bpkl);
 logit:
 		if (ipflog(fin, pass) == -1) {
-			ATOMIC_INCL(ifs->ifs_frstats[out].fr_skip);
+			IPF_BUMP(ifs->ifs_frstats[out].fr_skip);
 
 			/*
 			 * If the "or-block" option has been used then
@@ -3432,7 +3401,6 @@ ipf_stack_t *ifs;
 	int flushed = 0, set;
 
 	WRITE_ENTER(&ifs->ifs_ipf_mutex);
-	bzero((char *)&ifs->ifs_frcache, sizeof (ifs->ifs_frcache));
 
 	set = ifs->ifs_fr_active;
 	if ((flags & FR_INACTIVE) == FR_INACTIVE)
@@ -4371,7 +4339,6 @@ ipf_stack_t *ifs;
 		fp->fr_cksum += *p;
 
 	WRITE_ENTER(&ifs->ifs_ipf_mutex);
-	bzero((char *)&ifs->ifs_frcache, sizeof (ifs->ifs_frcache));
 
 	for (; (f = *ftail) != NULL; ftail = &f->fr_next) {
 		if ((fp->fr_cksum != f->fr_cksum) ||
@@ -4401,7 +4368,6 @@ ipf_stack_t *ifs;
 			 * copied out into user space.
 			 */
 			bcopy((char *)f, (char *)fp, sizeof(*f));
-			/* MUTEX_DOWNGRADE(&ipf_mutex); */
 
 			/*
 			 * When we copy this rule back out, set the data
@@ -5144,12 +5110,15 @@ ipf_stack_t *ifs;
 	/*
 	 * Is the operation here going to be a no-op ?
 	 */
-	MUTEX_ENTER(&oifq->ifq_lock);
-	if (oifq == nifq && *oifq->ifq_tail == tqe) {
-		MUTEX_EXIT(&oifq->ifq_lock);
-		return;
+	tqe->tqe_die = ifs->ifs_fr_ticks + nifq->ifq_ttl;
+	if (oifq == nifq) {
+		if (tqe->tqe_next == NULL)
+			return;
+		if (tqe->tqe_next->tqe_die == tqe->tqe_die)
+			return;
 	}
 
+	MUTEX_ENTER(&oifq->ifq_lock);
 	/*
 	 * Remove from the old queue
 	 */
@@ -5181,7 +5150,6 @@ ipf_stack_t *ifs;
 	/*
 	 * Add to the bottom of the new queue
 	 */
-	tqe->tqe_die = ifs->ifs_fr_ticks + nifq->ifq_ttl;
 	tqe->tqe_pnext = nifq->ifq_tail;
 	*nifq->ifq_tail = tqe;
 	nifq->ifq_tail = &tqe->tqe_next;
@@ -5859,7 +5827,7 @@ fr_info_t *fin;
 
 #if defined(_KERNEL)
 	if (fr_pullup(fin->fin_m, fin, fin->fin_plen) == NULL) {
-		ATOMIC_INCL(ifs->ifs_fr_badcoalesces[fin->fin_out]);
+		IPF_BUMP(ifs->ifs_fr_badcoalesces[fin->fin_out]);
 # ifdef MENTAT
 		FREE_MB_T(*fin->fin_mp);
 # endif
