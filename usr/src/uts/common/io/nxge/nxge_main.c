@@ -154,6 +154,25 @@ uint32_t	nxge_use_kmem_alloc = 0;
 
 rtrace_t npi_rtracebuf;
 
+/*
+ * The hardware sometimes fails to allow enough time for the link partner
+ * to send an acknowledgement for packets that the hardware sent to it. The
+ * hardware resends the packets earlier than it should be in those instances.
+ * This behavior caused some switches to acknowledge the wrong packets
+ * and it triggered the fatal error.
+ * This software workaround is to set the replay timer to a value
+ * suggested by the hardware team.
+ *
+ * PCI config space replay timer register:
+ *     The following replay timeout value is 0xc
+ *     for bit 14:18.
+ */
+#define	PCI_REPLAY_TIMEOUT_CFG_OFFSET	0xb8
+#define	PCI_REPLAY_TIMEOUT_SHIFT	14
+
+uint32_t	nxge_set_replay_timer = 1;
+uint32_t	nxge_replay_timeout = 0xc;
+
 #if	defined(sun4v)
 /*
  * Hypervisor N2/NIU services information.
@@ -281,6 +300,7 @@ static int nxge_get_priv_prop(nxge_t *, const char *, uint_t, uint_t,
 static int nxge_get_def_val(nxge_t *, mac_prop_id_t, uint_t, void *);
 
 static void nxge_niu_peu_reset(p_nxge_t nxgep);
+static void nxge_set_pci_replay_timeout(nxge_t *);
 
 mac_priv_prop_t nxge_priv_props[] = {
 	{"_adv_10gfdx_cap", MAC_PROP_PERM_RW},
@@ -592,6 +612,13 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "nxge_init_common_dev failed"));
 		goto nxge_attach_fail4;
+	}
+
+	/*
+	 * Software workaround: set the replay timer.
+	 */
+	if (nxgep->niu_type != N2_NIU) {
+		nxge_set_pci_replay_timeout(nxgep);
 	}
 
 #if defined(sun4v)
@@ -6820,4 +6847,53 @@ nxge_niu_peu_reset(p_nxge_t nxgep)
 
 	MUTEX_EXIT(&hw_p->nxge_cfg_lock);
 	NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL, "<== nxge_niu_peu_reset"));
+}
+
+static void
+nxge_set_pci_replay_timeout(p_nxge_t nxgep)
+{
+	p_dev_regs_t 	dev_regs;
+	uint32_t	value;
+
+	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_set_pci_replay_timeout"));
+
+	if (!nxge_set_replay_timer) {
+		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+		    "==> nxge_set_pci_replay_timeout: will not change "
+		    "the timeout"));
+		return;
+	}
+
+	dev_regs = nxgep->dev_regs;
+	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+	    "==> nxge_set_pci_replay_timeout: dev_regs 0x%p pcireg 0x%p",
+	    dev_regs, dev_regs->nxge_pciregh));
+
+	if (dev_regs == NULL || (dev_regs->nxge_pciregh == NULL)) {
+		NXGE_DEBUG_MSG((nxgep, CCI_CTL,
+		    "==> nxge_set_pci_replay_timeout: NULL dev_regs $%p or "
+		    "no PCI handle",
+		    dev_regs));
+		return;
+	}
+	value = (pci_config_get32(dev_regs->nxge_pciregh,
+	    PCI_REPLAY_TIMEOUT_CFG_OFFSET) |
+	    (nxge_replay_timeout << PCI_REPLAY_TIMEOUT_SHIFT));
+
+	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+	    "nxge_set_pci_replay_timeout: replay timeout value before set 0x%x "
+	    "(timeout value to set 0x%x at offset 0x%x) value 0x%x",
+	    pci_config_get32(dev_regs->nxge_pciregh,
+	    PCI_REPLAY_TIMEOUT_CFG_OFFSET), nxge_replay_timeout,
+	    PCI_REPLAY_TIMEOUT_CFG_OFFSET, value));
+
+	pci_config_put32(dev_regs->nxge_pciregh, PCI_REPLAY_TIMEOUT_CFG_OFFSET,
+	    value);
+
+	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+	    "nxge_set_pci_replay_timeout: replay timeout value after set 0x%x",
+	    pci_config_get32(dev_regs->nxge_pciregh,
+	    PCI_REPLAY_TIMEOUT_CFG_OFFSET)));
+
+	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_set_pci_replay_timeout"));
 }

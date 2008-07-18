@@ -2163,7 +2163,7 @@ nxge_m_tx_stat(
 	statsp = (p_nxge_stats_t)nxgep->statsp;
 
 	tx_set = &nxgep->tx_set;
-	for (i = 0, cursor = 0; i < NXGE_MAX_RDCS; i++) {
+	for (i = 0, cursor = 0; i < NXGE_MAX_TDCS; i++) {
 		if ((1 << i) & tx_set->owned.map) {
 			set[cursor++] = (uint8_t)i;
 		}
