@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,7 +107,7 @@ static struct dev_ops dp_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* type of module - a driver */
-	"Dev Poll driver %I%",
+	"/dev/poll driver",
 	&dp_ops,
 };
 
@@ -293,6 +293,7 @@ retry:
 				start = fd + 1;
 			}
 			pdp = pcache_lookup_fd(pcp, fd);
+repoll:
 			ASSERT(pdp != NULL);
 			ASSERT(pdp->pd_fd == fd);
 			if (pdp->pd_fp == NULL) {
@@ -394,6 +395,12 @@ retry:
 				if (pdp->pd_php == NULL) {
 					pollhead_insert(php, pdp);
 					pdp->pd_php = php;
+					/*
+					 * An event of interest may have
+					 * arrived between the VOP_POLL() and
+					 * the pollhead_insert(); check again.
+					 */
+					goto repoll;
 				}
 			}
 		} else {
@@ -626,12 +633,11 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			    &pfdp->revents, &php, NULL);
 			curthread->t_pollcache = NULL;
 			/*
-			 * We always set the bit when this fd is cached.
-			 * So we don't have to worry about missing a
-			 * pollwakeup between VOP_POLL and pollhead_insert.
-			 * This forces the first DP_POLL to poll this fd.
+			 * We always set the bit when this fd is cached;
+			 * this forces the first DP_POLL to poll this fd.
 			 * Real performance gain comes from subsequent
-			 * DP_POLL.
+			 * DP_POLL.  We also attempt a pollhead_insert();
+			 * if it's not possible, we'll do it in dpioctl().
 			 */
 			BT_SET(pcp->pc_bitmap, fd);
 			if (error != 0) {
@@ -815,7 +821,7 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			if (time_out == 0)	/* immediate timeout */
 				break;
 			rval = cv_waituntil_sig(&pcp->pc_cv, &pcp->pc_lock,
-				rqtp, timecheck);
+			    rqtp, timecheck);
 			/*
 			 * If we were awakened by a signal or timeout
 			 * then break the loop, else poll again.
