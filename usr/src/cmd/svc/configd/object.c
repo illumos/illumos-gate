@@ -194,7 +194,6 @@ tx_process_cmds(tx_commit_data_t *data)
 
 	backend_query_t *q;
 	int do_delete;
-	uint32_t nvalues;
 
 	/*
 	 * For persistent pgs, we use backend_fail_if_seen to abort the
@@ -283,7 +282,7 @@ tx_process_cmds(tx_commit_data_t *data)
 			    data->txc_pg_id, data->txc_gen, elem->tx_prop,
 			    type);
 		} else {
-			uint32_t *v;
+			uint32_t *v, i = 0;
 			const char *str;
 
 			val_id = backend_new_id(data->txc_tx, BACKEND_ID_VALUE);
@@ -299,16 +298,29 @@ tx_process_cmds(tx_commit_data_t *data)
 
 			v = elem->tx_values;
 
-			nvalues = elem->tx_nvalues;
-			while (r == REP_PROTOCOL_SUCCESS &&
-			    nvalues--) {
+			for (i = 0; i < elem->tx_nvalues; i++) {
 				str = (const char *)&v[1];
 
+				/*
+				 * Update values in backend,  imposing
+				 * ordering via the value_order column.
+				 * This ordering is then used in subseqent
+				 * value retrieval operations.  We can
+				 * safely assume that the repository schema
+				 * has been upgraded (and hence has the
+				 * value_order column in value_tbl),  since
+				 * it is upgraded as soon as the repository
+				 * is writable.
+				 */
 				r = backend_tx_run_update(data->txc_tx,
-				    "INSERT INTO value_tbl "
-				    " (value_id, value_type, value_value) "
-				    "VALUES (%d, '%c', '%q');\n",
-				    val_id, elem->tx_cmd->rptc_type, str);
+				    "INSERT INTO value_tbl (value_id, "
+				    "value_type, value_value, "
+				    "value_order) VALUES (%d, '%c', "
+				    "'%q', '%d');\n",
+				    val_id, elem->tx_cmd->rptc_type,
+				    str, i);
+				if (r != REP_PROTOCOL_SUCCESS)
+					break;
 
 				/*LINTED alignment*/
 				v = (uint32_t *)((caddr_t)str + TX_SIZE(*v));

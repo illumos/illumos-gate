@@ -3637,6 +3637,7 @@ entry_invalidate(scf_transaction_entry_t *cur, int and_destroy,
 			scf_value_reset_locked(v, and_destroy);
 	}
 	cur->entry_head = NULL;
+	cur->entry_tail = NULL;
 }
 
 static void
@@ -4173,8 +4174,15 @@ scf_entry_add_value(scf_transaction_entry_t *entry, scf_value_t *v)
 	}
 
 	v->value_tx = entry;
-	v->value_next = entry->entry_head;
-	entry->entry_head = v;
+	v->value_next = NULL;
+	if (entry->entry_head == NULL) {
+		entry->entry_head = v;
+		entry->entry_tail = v;
+	} else {
+		entry->entry_tail->value_next = v;
+		entry->entry_tail = v;
+	}
+
 	(void) pthread_mutex_unlock(&h->rh_lock);
 
 	return (SCF_SUCCESS);

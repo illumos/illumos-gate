@@ -135,7 +135,12 @@ int backend_panic_abort = 0;		/* abort when panicking */
 #define	BACKEND_READONLY_CHECK_INTERVAL	(2 * (hrtime_t)NANOSEC)
 
 /*
- * Any change to the below schema should bump the version number
+ * Any incompatible change to the below schema should bump the version number.
+ * The schema has been changed to support value ordering,  but this change
+ * is backwards-compatible - i.e. a previous svc.configd can use a
+ * repository database with the new schema perfectly well.  As a result,
+ * the schema version has not been updated,  allowing downgrade of systems
+ * without losing repository data.
  */
 #define	BACKEND_SCHEMA_VERSION		5
 
@@ -257,13 +262,15 @@ static struct backend_tbl_info tbls_common[] = { /* all backend types */
 
 	/*
 	 * value_tbl maps a value_id to a set of values.  For any given
-	 * value_id, value_type is constant.
+	 * value_id, value_type is constant.  The table definition here
+	 * is repeated in backend_check_upgrade(),  and must be kept in-sync.
 	 */
 	{
 		"value_tbl",
 		"value_id        INTEGER NOT NULL,"
 		"value_type      CHAR(1) NOT NULL,"
-		"value_value     VARCHAR NOT NULL"
+		"value_value     VARCHAR NOT NULL,"
+		"value_order     INTEGER DEFAULT 0"
 	},
 
 	/*
@@ -286,6 +293,10 @@ static struct backend_tbl_info tbls_common[] = { /* all backend types */
 	{ NULL, NULL }
 };
 
+/*
+ * The indexing of value_tbl is repeated in backend_check_upgrade() and
+ * must be kept in sync with the indexing specification here.
+ */
 static struct backend_idx_info idxs_common[] = { /* all backend types */
 	{ "pg_tbl",		"parent", "pg_parent_id" },
 	{ "pg_tbl",		"name",	"pg_parent_id, pg_name" },
@@ -367,6 +378,29 @@ backend_trace_sql(void *arg, const char *sql)
 
 static sqlite_backend_t be_info[BACKEND_TYPE_TOTAL];
 static sqlite_backend_t *bes[BACKEND_TYPE_TOTAL];
+
+/*
+ * For a native build,  repositories are created from scratch, so upgrade
+ * is not an issue.  This variable is implicitly protected by
+ * bes[BACKEND_TYPE_NORMAL]->be_lock.
+ */
+#ifdef NATIVE_BUILD
+static boolean_t be_normal_upgraded = B_TRUE;
+#else
+static boolean_t be_normal_upgraded = B_FALSE;
+#endif	/* NATIVE_BUILD */
+
+/*
+ * Has backend been upgraded? In nonpersistent case, answer is always
+ * yes.
+ */
+boolean_t
+backend_is_upgraded(backend_tx_t *bt)
+{
+	if (bt->bt_type == BACKEND_TYPE_NONPERSIST)
+		return (B_TRUE);
+	return (be_normal_upgraded);
+}
 
 #define	BACKEND_PANIC_TIMEOUT	(50 * MILLISEC)
 /*
@@ -953,6 +987,75 @@ out:
 	return (result);
 }
 
+/*
+ * Check if value_tbl has been upgraded in the main database,  and
+ * if not (if the value_order column is not present),  and do_upgrade is true,
+ * upgrade value_tbl in repository to contain the additional value_order
+ * column. The version of sqlite used means ALTER TABLE is not
+ * available, so we cannot simply use "ALTER TABLE value_tbl ADD COLUMN".
+ * Rather we need to create a temporary table with the additional column,
+ * import the value_tbl, drop the original value_tbl, recreate the value_tbl
+ * with the additional column, import the values from value_tbl_tmp,
+ * reindex and finally drop value_tbl_tmp.  During boot, we wish to check
+ * if the repository has been upgraded before it is writable,  so that
+ * property value retrieval can use the appropriate form of the SELECT
+ * statement that retrieves property values.  As a result, we need to check
+ * if the repository has been upgraded prior to the point when we can
+ * actually carry out the update.
+ */
+void
+backend_check_upgrade(sqlite_backend_t *be, boolean_t do_upgrade)
+{
+	char *errp;
+	int r;
+
+	if (be_normal_upgraded)
+		return;
+	/*
+	 * Test if upgrade is needed. If value_order column does not exist,
+	 * we need to upgrade the schema.
+	 */
+	r = sqlite_exec(be->be_db, "SELECT value_order FROM value_tbl LIMIT 1;",
+	    NULL, NULL, NULL);
+	if (r == SQLITE_ERROR && do_upgrade) {
+		/* No value_order column - needs upgrade */
+		configd_info("Upgrading SMF repository format...");
+		r = sqlite_exec(be->be_db,
+		    "BEGIN TRANSACTION; "
+		    "CREATE TABLE value_tbl_tmp ( "
+		    "value_id   INTEGER NOT NULL, "
+		    "value_type CHAR(1) NOT NULL, "
+		    "value_value VARCHAR NOT NULL, "
+		    "value_order INTEGER DEFAULT 0); "
+		    "INSERT INTO value_tbl_tmp "
+		    "(value_id, value_type, value_value) "
+		    "SELECT value_id, value_type, value_value FROM value_tbl; "
+		    "DROP TABLE value_tbl; "
+		    "CREATE TABLE value_tbl( "
+		    "value_id   INTEGER NOT NULL, "
+		    "value_type CHAR(1) NOT NULL, "
+		    "value_value VARCHAR NOT NULL, "
+		    "value_order INTEGER DEFAULT 0); "
+		    "INSERT INTO value_tbl SELECT * FROM value_tbl_tmp; "
+		    "CREATE INDEX value_tbl_id ON value_tbl (value_id); "
+		    "DROP TABLE value_tbl_tmp; "
+		    "COMMIT TRANSACTION; "
+		    "VACUUM; ",
+		    NULL, NULL, &errp);
+		if (r == SQLITE_OK) {
+			configd_info("SMF repository upgrade is complete.");
+		} else {
+			backend_panic("%s: repository upgrade failed: %s",
+			    be->be_path, errp);
+			/* NOTREACHED */
+		}
+	}
+	if (r == SQLITE_OK)
+		be_normal_upgraded = B_TRUE;
+	else
+		be_normal_upgraded = B_FALSE;
+}
+
 static int
 backend_check_readonly(sqlite_backend_t *be, int writing, hrtime_t t)
 {
@@ -990,11 +1093,14 @@ backend_check_readonly(sqlite_backend_t *be, int writing, hrtime_t t)
 
 	/*
 	 * We can write!  Swap the db handles, mark ourself writable,
-	 * and make a backup.
+	 * upgrade if necessary,  and make a backup.
 	 */
 	sqlite_close(be->be_db);
 	be->be_db = new;
 	be->be_readonly = 0;
+
+	if (be->be_type == BACKEND_TYPE_NORMAL)
+		backend_check_upgrade(be, B_TRUE);
 
 	if (backend_create_backup_locked(be, REPOSITORY_BOOT_BACKUP) !=
 	    REP_PROTOCOL_SUCCESS) {
@@ -1435,6 +1541,7 @@ backend_create(backend_type_t backend_id, const char *db_file,
 	assert(backend_id >= 0 && backend_id < BACKEND_TYPE_TOTAL);
 
 	be = &be_info[backend_id];
+
 	assert(be->be_db == NULL);
 
 	(void) pthread_mutex_init(&be->be_lock, NULL);
@@ -1466,7 +1573,6 @@ backend_create(backend_type_t backend_id, const char *db_file,
 	/*
 	 * check if we are inited and of the correct schema version
 	 *
-	 * Eventually, we'll support schema upgrade here.
 	 */
 	info.rs_out = &val;
 	info.rs_result = REP_PROTOCOL_FAIL_NOT_FOUND;
@@ -1598,6 +1704,17 @@ integrity_fail:
 	}
 
 	/*
+	 * Simply do check if backend has been upgraded.  We do not wish
+	 * to actually carry out upgrade here - the main repository may
+	 * not be writable at this point.  Actual upgrade is carried out
+	 * via backend_check_readonly().  This check is done so that
+	 * we determine repository state - upgraded or not - and then
+	 * the appropriate SELECT statement (value-ordered or not)
+	 * can be used when retrieving property values early in boot.
+	 */
+	if (backend_id == BACKEND_TYPE_NORMAL)
+		backend_check_upgrade(be, B_FALSE);
+	/*
 	 * check if we are writable
 	 */
 	r = backend_is_readonly(be->be_db, be->be_path);
@@ -1614,6 +1731,7 @@ integrity_fail:
 		*bep = be;
 		return (BACKEND_CREATE_READONLY);
 	}
+
 	*bep = be;
 	return (BACKEND_CREATE_SUCCESS);
 
@@ -2250,7 +2368,8 @@ backend_init(const char *db_file, const char *npdb_file, int have_np)
 		/*
 		 * If we started up with a writable filesystem, but the
 		 * non-persistent database needed initialization, we
-		 * are booting a non-global zone, so do a backup.
+		 * are booting a non-global zone, so do a backup, and carry
+		 * out upgrade if necessary.
 		 */
 		if (r == BACKEND_CREATE_NEED_INIT && writable_persist &&
 		    backend_lock(BACKEND_TYPE_NORMAL, 0, &be) ==
@@ -2262,6 +2381,7 @@ backend_init(const char *db_file, const char *npdb_file, int have_np)
 				    "\"%s\"\n", REPOSITORY_BOOT_BACKUP,
 				    be->be_path);
 			}
+			backend_check_upgrade(be, B_TRUE);
 			backend_unlock(be);
 		}
 	}

@@ -11156,7 +11156,7 @@ lscf_setprop(const char *pgname, const char *type, const char *value,
 			assert(values != NULL);
 
 			walk = uu_list_walk_start((uu_list_t *)values,
-			    UU_WALK_REVERSE);
+			    UU_DEFAULT);
 			if (walk == NULL)
 				uu_die(gettext("Could not walk list"));
 
@@ -11619,7 +11619,7 @@ add_string(uu_list_t *strlist, const char *str)
 	elem = safe_malloc(sizeof (*elem));
 	uu_list_node_init(elem, &elem->node, string_pool);
 	elem->str = safe_strdup(str);
-	if (uu_list_prepend(strlist, elem) != 0)
+	if (uu_list_append(strlist, elem) != 0)
 		uu_die(gettext("libuutil error: %s\n"),
 		    uu_strerror(uu_error()));
 }

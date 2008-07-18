@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -458,7 +458,7 @@ internal_property_new()
 
 	uu_list_node_init(p, &p->sc_node, property_pool);
 
-	p->sc_property_values = uu_list_create(value_pool, p, UU_LIST_SORTED);
+	p->sc_property_values = uu_list_create(value_pool, p, 0);
 	p->sc_property_name = "<unset>";
 
 	return (p);
@@ -669,10 +669,7 @@ internal_attach_property(pgroup_t *pgrp, property_t *prop)
 void
 internal_attach_value(property_t *prop, value_t *val)
 {
-	uu_list_index_t idx;
-
-	(void) uu_list_find(prop->sc_property_values, val, NULL, &idx);
-	uu_list_insert(prop->sc_property_values, val, idx);
+	(void) uu_list_append(prop->sc_property_values, val);
 }
 
 /*

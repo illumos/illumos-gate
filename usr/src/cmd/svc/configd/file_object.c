@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -743,9 +742,29 @@ fill_property_callback(void *data, int columns, char **vals, char **names)
 		rep_protocol_responseid_t r;
 		backend_query_t *q = backend_query_alloc();
 
-		backend_query_add(q,
-		    "SELECT value_value FROM value_tbl "
-		    "WHERE (value_id = '%q')", cur);
+		/*
+		 * Ensure that select operation is reflective
+		 * of repository schema.  If the repository has
+		 * been upgraded,  make use of value ordering
+		 * by retrieving values in order using the
+		 * value_order column.  Otherwise, simply
+		 * run the select with no order specified.
+		 * The order-insensitive select is necessary
+		 * as on first reboot post-upgrade,  the repository
+		 * contents need to be read before the repository
+		 * backend is writable (and upgrade is possible).
+		 */
+		if (backend_is_upgraded(tx)) {
+			backend_query_add(q,
+			    "SELECT value_value FROM value_tbl "
+			    "WHERE (value_id = '%q') ORDER BY value_order",
+			    cur);
+		} else {
+			backend_query_add(q,
+			    "SELECT value_value FROM value_tbl "
+			    "WHERE (value_id = '%q')",
+			    cur);
+		}
 
 		switch (r = backend_tx_run(tx, q, property_value_size_cb,
 		    &info)) {

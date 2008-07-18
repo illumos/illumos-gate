@@ -616,6 +616,7 @@ adt_session_data_t *get_audit_session(void);
 
 void configd_critical(const char *, ...);
 void configd_vcritical(const char *, va_list);
+void configd_info(const char *, ...);
 
 extern int is_main_repository;
 extern int max_repository_backups;
@@ -752,6 +753,7 @@ void rc_snaplevel_rele(rc_snaplevel_t *);
  * backend.c
  */
 int backend_init(const char *, const char *, int);
+boolean_t backend_is_upgraded(backend_tx_t *);
 void backend_fini(void);
 
 rep_protocol_responseid_t backend_create_backup(const char *);

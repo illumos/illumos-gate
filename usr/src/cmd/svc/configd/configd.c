@@ -380,13 +380,15 @@ create_connection(ucred_t *uc, repository_door_request_t *rp,
 }
 
 void
-configd_vcritical(const char *message, va_list args)
+configd_vlog(int severity, const char *prefix, const char *message,
+    va_list args)
 {
 	if (log_to_syslog)
-		vsyslog(LOG_CRIT, message, args);
+		vsyslog(severity, message, args);
 	else {
 		flockfile(stderr);
-		(void) fprintf(stderr, "svc.configd: Fatal error: ");
+		if (prefix != NULL)
+			(void) fprintf(stderr, "%s", prefix);
 		(void) vfprintf(stderr, message, args);
 		if (message[0] == 0 || message[strlen(message) - 1] != '\n')
 			(void) fprintf(stderr, "\n");
@@ -395,11 +397,26 @@ configd_vcritical(const char *message, va_list args)
 }
 
 void
+configd_vcritical(const char *message, va_list args)
+{
+	configd_vlog(LOG_CRIT, "svc.configd: Fatal error: ", message, args);
+}
+
+void
 configd_critical(const char *message, ...)
 {
 	va_list args;
 	va_start(args, message);
 	configd_vcritical(message, args);
+	va_end(args);
+}
+
+void
+configd_info(const char *message, ...)
+{
+	va_list args;
+	va_start(args, message);
+	configd_vlog(LOG_INFO, "svc.configd: ", message, args);
 	va_end(args);
 }
 
