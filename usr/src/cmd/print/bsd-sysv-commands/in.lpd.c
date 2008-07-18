@@ -69,7 +69,7 @@ remote_host_name(FILE *fp)
 	socklen_t peer_len = sizeof (peer);
 	int fd = fileno(fp);
 	int error_num;
-	char myname[MAXHOSTNAMELEN], tmp_buf[INET6_ADDRSTRLEN];
+	char tmp_buf[INET6_ADDRSTRLEN];
 	char *hostname;
 
 	/* who is our peer ? */
@@ -88,28 +88,9 @@ remote_host_name(FILE *fp)
 			&peer.sin6_addr, tmp_buf, sizeof (tmp_buf))));
 	}
 
-	/* is it "localhost" ? */
-	if (strcasecmp(hp->h_name, "localhost") == 0)
-		return (strdup("localhost"));
-
-	/* duplicate the name because gethostbyXXXX() is not reentrant */
 	hostname = strdup(hp->h_name);
-	(void) sysinfo(SI_HOSTNAME, myname, sizeof (myname));
-
-	/* is it from one of my addresses ? */
-	if ((hp = getipnodebyname(myname, AF_INET6, AI_ALL|AI_V4MAPPED,
-	    &error_num)) != NULL) {
-		struct in6_addr **tmp = (struct in6_addr **)hp->h_addr_list;
-		int i = 0;
-
-		while (tmp[i] != NULL) {
-			if (memcmp(tmp[i++], &peer.sin6_addr, hp->h_length)
-			    == 0) {
-				free(hostname);
-				return (strdup("localhost"));
-			}
-		}
-	}
+	if (is_localhost(hp->h_name) != 0)
+		return (strdup("localhost"));
 
 	/* It must be someone else */
 	return (hostname);
@@ -152,11 +133,8 @@ parse_cf(papi_service_t svc, char *cf, char **files)
 {
 	papi_attribute_t **list = NULL;
 	char	previous = NULL,
-		*entry,
-		*s,
-		text[BUFSIZ];
-	int	count = 0,
-		copies_set = 0,
+		*entry;
+	int	copies_set = 0,
 		copies = 0;
 
 	for (entry = strtok(cf, "\n"); entry != NULL;
@@ -288,12 +266,21 @@ parse_cf(papi_service_t svc, char *cf, char **files)
 		/* Sun Solaris Extensions */
 		case 'O':
 			++entry;
-			do {
-				if (*entry != '"')
-					text[count++] = *entry;
-			} while (*entry++);
-			papiAttributeListFromString(&list, PAPI_ATTR_APPEND,
-				text);
+			{
+				int rd, wr;
+
+				for (rd = wr = 0; entry[rd] != '\0'; rd++) {
+					if (entry[rd] == '"')
+						continue;
+					if (rd != wr)
+						entry[wr] = entry[rd];
+					wr++;
+				}
+				entry[wr] = '\0';
+
+				papiAttributeListFromString(&list,
+				    PAPI_ATTR_APPEND, entry);
+			}
 			break;
 		case '5':
 			++entry;
@@ -596,7 +583,6 @@ static int
 cyclical_service_check(char *svc_name)
 {
 	papi_attribute_t **list;
-	char buf[BUFSIZ];
 	uri_t *uri = NULL;
 	char *s = NULL;
 
@@ -627,9 +613,7 @@ cyclical_service_check(char *svc_name)
 	}
 
 	/* is it the local host? */
-	sysinfo(SI_HOSTNAME, buf, sizeof (buf));
-	if ((strcasecmp(uri->host, "localhost") != 0) &&
-	    (strcasecmp(uri->host, buf) != 0)) {
+	if (is_localhost(uri->host) != 0) {
 		uri_free(uri);
 		return (0);
 	}

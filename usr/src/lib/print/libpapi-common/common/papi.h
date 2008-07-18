@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -442,6 +442,8 @@ extern void split_and_copy_attributes(char **list,
 				papi_attribute_t ***out);
 
 extern papi_attribute_t **getprinterbyname(char *name, char *ns);
+
+extern int is_localhost(char *hostname);
 
 #ifdef __cplusplus
 }

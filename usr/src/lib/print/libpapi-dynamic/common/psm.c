@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -48,17 +48,12 @@ papi_status_t
 psm_open(service_t *svc, char *scheme)
 {
 	papi_status_t result = PAPI_OK;
-	char *path;
-	char buf[BUFSIZ];
+	char path[BUFSIZ];
 
-	if (scheme == NULL)
+	if ((scheme == NULL) || (strchr(scheme, '/') != NULL))
 		return (PAPI_BAD_ARGUMENT);
 
-	if (strchr(scheme, '/') == NULL) {
-		snprintf(buf, sizeof (buf), PSM_DIR "/psm-%s.so", scheme);
-		path = buf;
-	} else
-		path = scheme;
+	snprintf(path, sizeof (path), PSM_DIR "/psm-%s.so", scheme);
 
 	svc->so_handle = dlopen(path, RTLD_LAZY|RTLD_LOCAL|RTLD_GROUP);
 	if (svc->so_handle == NULL) {	/* failed, set the result/message */

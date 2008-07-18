@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,7 +46,7 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
 CPPFLAGS +=	-I../../libpapi-common/common
 CPPFLAGS +=	-DNSS_SOLARIS
-LDLIBS +=	-lsocket -lnsl -lc
+LDLIBS +=	-lc
 
 .KEEP_STATE:
 

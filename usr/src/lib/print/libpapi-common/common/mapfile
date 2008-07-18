@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -147,6 +147,8 @@ SUNWprivate_1.0 { # Misc. semi-private supporting calls
         copy_attributes;
         split_and_copy_attributes;
 	papiAttributeListPrint;
+
+	is_localhost;
 
     local:
         *;

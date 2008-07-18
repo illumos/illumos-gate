@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -399,9 +399,7 @@ cyclical_service_check(char *svc_name, int port)
 	}
 
 	/* does the host match up */
-	sysinfo(SI_HOSTNAME, buf, sizeof (buf));
-	if ((strcasecmp(uri->host, "localhost") != 0) &&
-	    (strcasecmp(uri->host, buf) != 0)) {
+	if (is_localhost(uri->host) != 0) {
 		uri_free(uri);
 		return (0);
 	}

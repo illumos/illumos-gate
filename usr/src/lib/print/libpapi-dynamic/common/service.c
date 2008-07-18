@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -34,6 +34,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <string.h>
 #include <alloca.h>
 #include <libintl.h>
@@ -57,7 +59,10 @@ default_service_uri(char *fallback)
 {
 	char *result = NULL;
 
-	if ((result = getenv("PAPI_SERVICE_URI")) == NULL) {
+	if (getuid() == geteuid())
+		result = getenv("PAPI_SERVICE_URI");
+
+	if (result == NULL) {
 		char *cups;
 
 		if ((cups = getenv("CUPS_SERVER")) != NULL) {

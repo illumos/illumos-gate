@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -141,6 +141,7 @@ SUNWprivate_1.0 {
 	list_concatenate  = FUNCTION FILTER libpapi-common.so ;
 	#    NS
 	getprinterbyname ;
+	is_localhost  = FUNCTION FILTER libpapi-common.so ;
 
 	#    extra Attribute Calls
 	copy_attributes  = FUNCTION FILTER libpapi-common.so ;
