@@ -2971,6 +2971,8 @@ bge_poll_firmware(bge_t *bgep)
 	for (i = 0; i < 1000; ++i) {
 		drv_usecwait(1000);
 		gen = bge_nic_get64(bgep, NIC_MEM_GENCOMM) >> 32;
+		if (DEVICE_5704_SERIES_CHIPSETS(bgep))
+			drv_usecwait(100000);
 		mac = bge_reg_get64(bgep, MAC_ADDRESS_REG(0));
 #ifdef BGE_IPMI_ASF
 		if (!bgep->asf_enabled) {
