@@ -40,17 +40,6 @@
 #include "i915_drm.h"
 #include "i915_drv.h"
 
-#define IS_I965G(dev)  (dev->pci_device == 0x2972 || \
-			dev->pci_device == 0x2982 || \
-			dev->pci_device == 0x2992 || \
-			dev->pci_device == 0x29A2 || \
-    			dev->pci_device == 0x2A02 || \
-    			dev->pci_device == 0x2A12)
-
-#define	IS_G33(dev)	(dev->pci_device == 0x29b2 || \
-			dev->pci_device == 0x29c2 || \
-			dev->pci_device == 0x29d2)
-
 
 
 /* Really want an OS-independent resettable timer.  Would like to have
@@ -151,6 +140,10 @@ static int i915_initialize(drm_device_t * dev,
 		return (EINVAL);
 	}
 
+	/*
+	 * mmio_map will be destoried after DMA clean up.  We should not
+	 * access mmio_map in suspend or resume process.
+	 */
 	dev_priv->mmio_map = drm_core_findmap(dev, init->mmio_offset);
 	if (!dev_priv->mmio_map) {
 		dev->dev_private = (void *)dev_priv;

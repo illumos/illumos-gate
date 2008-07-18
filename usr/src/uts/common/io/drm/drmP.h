@@ -674,6 +674,11 @@ struct drm_device {
 	u32 *drw_bitfield;
 	unsigned int drw_info_length;
 	drm_drawable_info_t **drw_info;
+
+	/*
+	 * Saving S3 context
+	 */
+	void		  *s3_private;
 };
 
 /* Memory management support (drm_memory.c) */

@@ -52,6 +52,8 @@ typedef struct agp_target_softstate {
 	/* The offset of the ACAPID register */
 	off_t			tsoft_acaptr;
 	kmutex_t		tsoft_lock;
+	int			tsoft_gms_off; /* GMS offset in config */
+	uint32_t		tsoft_gms;
 }agp_target_softstate_t;
 
 /*
@@ -79,6 +81,7 @@ is_64bit_aper(agp_target_softstate_t *softstate)
 {
 	return (softstate->tsoft_devid == AMD_BR_8151);
 }
+
 /*
  * Check if it is an intel bridge
  */
@@ -363,6 +366,21 @@ static gms_mode_t gms_modes[] = {
 	{INTEL_BR_GM45, I8XX_CONF_GC, I8XX_GC_MODE_MASK,
 		GMS_SIZE(gms_965GM), gms_965GM}
 };
+static int
+get_chip_gms(uint32_t devid)
+{
+	int num_modes;
+	int i;
+
+	num_modes = (sizeof (gms_modes) / sizeof (gms_mode_t));
+
+	for (i = 0; i < num_modes; i++) {
+		if (gms_modes[i].gm_devid == devid)
+			break;
+	}
+
+	return ((i == num_modes) ? -1 : i);
+}
 
 /* Returns the size (kbytes) of pre-allocated graphics memory */
 static size_t
@@ -370,32 +388,26 @@ i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 {
 	uint8_t memval;
 	size_t kbytes;
-	int i;
-	int num_modes;
+	int	gms_off;
 
 	kbytes = 0;
-	/* get GMS modes list entry */
-	num_modes = (sizeof (gms_modes) / sizeof (gms_mode_t));
-	for (i = 0; i < num_modes; i++) {
-		if (gms_modes[i].gm_devid == softstate->tsoft_devid)
-			break;
-	}
-	if (i ==  num_modes)
-		goto done;
+	gms_off = softstate->tsoft_gms_off;
+
 	/* fetch the GMS value from DRAM controller */
 	memval = pci_config_get8(softstate->tsoft_pcihdl,
-	    gms_modes[i].gm_regoff);
+	    gms_modes[gms_off].gm_regoff);
 	TARGETDB_PRINT2((CE_NOTE, "i8xx_biosmem_detect: memval = %x", memval));
-	memval = (memval & gms_modes[i].gm_mask) >> GMS_SHIFT;
+	memval = (memval & gms_modes[gms_off].gm_mask) >> GMS_SHIFT;
 	/* assuming zero byte for 0 or "reserved" GMS values */
-	if (memval == 0 || memval > gms_modes[i].gm_num) {
+	if (memval == 0 || memval > gms_modes[gms_off].gm_num) {
 		TARGETDB_PRINT2((CE_WARN, "i8xx_biosmem_detect: "
 		    "devid = %x, GMS = %x. assuming zero byte of "
-		    "pre-allocated memory", gms_modes[i].gm_devid, memval));
+		    "pre-allocated memory",
+		    gms_modes[gms_off].gm_devid, memval));
 		goto done;
 	}
 	memval--;	/* use (GMS_value - 1) as index */
-	kbytes = (gms_modes[i].gm_vec)[memval];
+	kbytes = (gms_modes[gms_off].gm_vec)[memval];
 
 done:
 	TARGETDB_PRINT2((CE_NOTE,
@@ -439,45 +451,105 @@ static int agptarget_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd,
 }
 
 static int
+intel_br_resume(agp_target_softstate_t *softstate)
+{
+	int gms_off;
+
+	gms_off = softstate->tsoft_gms_off;
+
+	/*
+	 * We recover the gmch graphics control register here
+	 */
+	pci_config_put16(softstate->tsoft_pcihdl,
+	    gms_modes[gms_off].gm_regoff, softstate->tsoft_gms);
+
+	return (DDI_SUCCESS);
+}
+static int
+intel_br_suspend(agp_target_softstate_t *softstate)
+{
+	int gms_off;
+
+	gms_off = softstate->tsoft_gms_off;
+	softstate->tsoft_gms = pci_config_get16(softstate->tsoft_pcihdl,
+	    gms_modes[gms_off].gm_regoff);
+
+	return (DDI_SUCCESS);
+}
+
+static int
 agp_target_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	agp_target_softstate_t *softstate;
 	int instance;
 	int status;
 
-	if (cmd != DDI_ATTACH)
-		return (DDI_FAILURE);
-
 	instance = ddi_get_instance(dip);
 
-	if (ddi_soft_state_zalloc(agptarget_glob_soft_handle, instance) !=
-	    DDI_SUCCESS)
+	switch (cmd) {
+	case DDI_ATTACH:
+		break;
+	case DDI_RESUME:
+		softstate =
+		    ddi_get_soft_state(agptarget_glob_soft_handle, instance);
+		return (intel_br_resume(softstate));
+	default:
+		TARGETDB_PRINT2((CE_WARN, "agp_target_attach:"
+		    "only attach and resume ops are supported"));
 		return (DDI_FAILURE);
+	}
+
+	if (ddi_soft_state_zalloc(agptarget_glob_soft_handle,
+	    instance) != DDI_SUCCESS) {
+		TARGETDB_PRINT2((CE_WARN, "agp_target_attach:"
+		    "soft state zalloc failed"));
+		return (DDI_FAILURE);
+	}
 
 	softstate = ddi_get_soft_state(agptarget_glob_soft_handle, instance);
 	mutex_init(&softstate->tsoft_lock, NULL, MUTEX_DRIVER, NULL);
 	softstate->tsoft_dip = dip;
 	status = pci_config_setup(dip, &softstate->tsoft_pcihdl);
 	if (status != DDI_SUCCESS) {
-		ddi_soft_state_free(agptarget_glob_soft_handle, instance);
+		TARGETDB_PRINT2((CE_WARN, "agp_target_attach:"
+		    "pci config setup failed"));
+		ddi_soft_state_free(agptarget_glob_soft_handle,
+		    instance);
 		return (DDI_FAILURE);
 	}
 
 	softstate->tsoft_devid = pci_config_get32(softstate->tsoft_pcihdl,
 	    PCI_CONF_VENID);
+	softstate->tsoft_gms_off = get_chip_gms(softstate->tsoft_devid);
+	if (softstate->tsoft_gms_off < 0) {
+		TARGETDB_PRINT2((CE_WARN, "agp_target_attach:"
+		    "read gms offset failed"));
+		pci_config_teardown(&softstate->tsoft_pcihdl);
+		ddi_soft_state_free(agptarget_glob_soft_handle,
+		    instance);
+		return (DDI_FAILURE);
+	}
 	softstate->tsoft_acaptr = agp_target_cap_find(softstate->tsoft_pcihdl);
 	if (softstate->tsoft_acaptr == 0) {
 		/* Make a correction for some Intel chipsets */
 		if (is_intel_br(softstate))
 			softstate->tsoft_acaptr = AGP_CAP_OFF_DEF;
-		else
+		else {
+			TARGETDB_PRINT2((CE_WARN, "agp_target_attach:"
+			    "Not a supposed corretion"));
+			pci_config_teardown(&softstate->tsoft_pcihdl);
+			ddi_soft_state_free(agptarget_glob_soft_handle,
+			    instance);
 			return (DDI_FAILURE);
+		}
 	}
 
 	status = ddi_create_minor_node(dip, AGPTARGET_NAME, S_IFCHR,
 	    INST2NODENUM(instance), DDI_NT_AGP_TARGET, 0);
 
 	if (status != DDI_SUCCESS) {
+		TARGETDB_PRINT2((CE_WARN, "agp_target_attach:"
+		    "Create minor node failed"));
 		pci_config_teardown(&softstate->tsoft_pcihdl);
 		ddi_soft_state_free(agptarget_glob_soft_handle, instance);
 		return (DDI_FAILURE);
@@ -493,12 +565,19 @@ agp_target_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	int instance;
 	agp_target_softstate_t *softstate;
 
-	if (cmd != DDI_DETACH)
-		return (DDI_FAILURE);
-
 	instance = ddi_get_instance(dip);
-
 	softstate = ddi_get_soft_state(agptarget_glob_soft_handle, instance);
+
+	if (cmd == DDI_SUSPEND) {
+		/* get GMS modes list entry */
+		return (intel_br_suspend(softstate));
+	}
+
+	if (cmd != DDI_DETACH) {
+		TARGETDB_PRINT2((CE_WARN, "agp_target_detach:"
+		    "only detach and suspend ops are supported"));
+		return (DDI_FAILURE);
+	}
 
 	ddi_remove_minor_node(dip, AGPTARGET_NAME);
 	pci_config_teardown(&softstate->tsoft_pcihdl);
@@ -785,7 +864,7 @@ static struct dev_ops agp_target_ops = {
 
 static  struct modldrv modldrv = {
 	&mod_driverops,
-	"AGP target driver v%I%",
+	"AGP target driver",
 	&agp_target_ops,
 };
 
