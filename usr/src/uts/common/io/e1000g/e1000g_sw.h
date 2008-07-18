@@ -806,6 +806,7 @@ typedef struct e1000g {
 	boolean_t e1000g_promisc;
 	boolean_t strip_crc;
 	boolean_t rx_buffer_setup;
+	boolean_t esb2_workaround;
 	link_state_t link_state;
 	uint32_t link_speed;
 	uint32_t link_duplex;

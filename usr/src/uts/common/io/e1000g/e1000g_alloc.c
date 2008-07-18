@@ -99,7 +99,7 @@ static ddi_dma_attr_t e1000g_tx_dma_attr = {
 	1,			/* minimum transfer */
 	0xffffffffU,		/* maximum transfer */
 	0xffffffffffffffffULL,	/* maximum segment length */
-	16,			/* maximum number of segments */
+	18,			/* maximum number of segments */
 	1,			/* granularity */
 	DDI_DMA_FLAGERR,	/* dma_attr_flags */
 };

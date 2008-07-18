@@ -590,3 +590,12 @@ Notes on packaging:
   This version has the following fixes:
    6335837 e1000g needs to support LSO
    6637659 e1000g has problem on transmit hardware checksum support
+
+5.2.11
+======
+  This version has the following fixes:
+   6698039 e1000g tx doesn't work on the specific chipset since snv_88
+   6597545 e1000g ESB2 serdes device pciex8086,1098 hangs in network testing
+   6693205 running sunvts7.0 on Generic s10u5build10 causes unix:cmi_mca_panic on thumper
+   6694279 e1000g driver: internal loopback mode support needed for nic ESB-2
+   6721574 max number of segments in e1000g_tx_dma_attr need to be updated when LSO is supported

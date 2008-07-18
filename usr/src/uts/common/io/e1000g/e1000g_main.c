@@ -20,7 +20,7 @@
 
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Use is subject to license terms of the CDDLv1.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,9 +46,9 @@
 #include "e1000g_sw.h"
 #include "e1000g_debug.h"
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.2.10";
+static char ident[] = "Intel PRO/1000 Ethernet 5.2.11";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.2.10";
+static char e1000g_version[] = "Driver Ver. 5.2.11";
 
 /*
  * Proto types for DDI entry points
@@ -134,6 +134,7 @@ static enum ioc_reply e1000g_pp_ioctl(struct e1000g *,
 #endif
 static enum ioc_reply e1000g_loopback_ioctl(struct e1000g *,
     struct iocblk *, mblk_t *);
+static boolean_t e1000g_check_loopback_support(struct e1000_hw *);
 static boolean_t e1000g_set_loopback_mode(struct e1000g *, uint32_t);
 static void e1000g_set_internal_loopback(struct e1000g *);
 static void e1000g_set_external_loopback_1000(struct e1000g *);
@@ -297,6 +298,16 @@ krwlock_t e1000g_rx_detach_lock;
  */
 krwlock_t e1000g_dma_type_lock;
 
+/*
+ * The 82546 chipset is a dual-port device, both the ports share one eeprom.
+ * Based on the information from Intel, the 82546 chipset has some hardware
+ * problem. When one port is being reset and the other port is trying to
+ * access the eeprom, it could cause system hang or panic. To workaround this
+ * hardware problem, we use a global mutex to prevent such operations from
+ * happening simultaneously on different instances. This workaround is applied
+ * to all the devices supported by this driver.
+ */
+kmutex_t e1000g_nvm_lock;
 
 /*
  * Loadable module configuration entry points for the driver
@@ -317,6 +328,7 @@ _init(void)
 	else {
 		rw_init(&e1000g_rx_detach_lock, NULL, RW_DRIVER, NULL);
 		rw_init(&e1000g_dma_type_lock, NULL, RW_DRIVER, NULL);
+		mutex_init(&e1000g_nvm_lock, NULL, MUTEX_DRIVER, NULL);
 	}
 
 	return (status);
@@ -360,6 +372,7 @@ _fini(void)
 
 		rw_destroy(&e1000g_rx_detach_lock);
 		rw_destroy(&e1000g_dma_type_lock);
+		mutex_destroy(&e1000g_nvm_lock);
 	}
 
 	return (status);
@@ -999,6 +1012,8 @@ e1000g_free_priv_devi_node(struct e1000g *Adapter, boolean_t free_flag)
 static void
 e1000g_unattach(dev_info_t *devinfo, struct e1000g *Adapter)
 {
+	int result;
+
 	if (Adapter->attach_progress & ATTACH_PROGRESS_ENABLE_INTR) {
 		(void) e1000g_disable_intrs(Adapter);
 	}
@@ -1021,7 +1036,12 @@ e1000g_unattach(dev_info_t *devinfo, struct e1000g *Adapter)
 
 	if (Adapter->attach_progress & ATTACH_PROGRESS_INIT) {
 		stop_link_timer(Adapter);
-		if (e1000_reset_hw(&Adapter->shared) != 0) {
+
+		mutex_enter(&e1000g_nvm_lock);
+		result = e1000_reset_hw(&Adapter->shared);
+		mutex_exit(&e1000g_nvm_lock);
+
+		if (result != E1000_SUCCESS) {
 			e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
 			ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_LOST);
 		}
@@ -1141,6 +1161,7 @@ e1000g_init(struct e1000g *Adapter)
 	uint32_t high_water;
 	struct e1000_hw *hw;
 	clock_t link_timeout;
+	int result;
 
 	hw = &Adapter->shared;
 
@@ -1150,46 +1171,55 @@ e1000g_init(struct e1000g *Adapter)
 	 * reset to put the hardware in a known state
 	 * before we try to do anything with the eeprom
 	 */
-	if (e1000_reset_hw(hw) != 0) {
+	mutex_enter(&e1000g_nvm_lock);
+	result = e1000_reset_hw(hw);
+	mutex_exit(&e1000g_nvm_lock);
+
+	if (result != E1000_SUCCESS) {
 		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
 		goto init_fail;
 	}
 
-	if (e1000_validate_nvm_checksum(hw) < 0) {
+	mutex_enter(&e1000g_nvm_lock);
+	result = e1000_validate_nvm_checksum(hw);
+	if (result < E1000_SUCCESS) {
 		/*
 		 * Some PCI-E parts fail the first check due to
 		 * the link being in sleep state.  Call it again,
 		 * if it fails a second time its a real issue.
 		 */
-		if (e1000_validate_nvm_checksum(hw) < 0) {
-			e1000g_log(Adapter, CE_WARN,
-			    "Invalid NVM checksum. Please contact "
-			    "the vendor to update the NVM.");
-			e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
-			goto init_fail;
-		}
+		result = e1000_validate_nvm_checksum(hw);
+	}
+	mutex_exit(&e1000g_nvm_lock);
+
+	if (result < E1000_SUCCESS) {
+		e1000g_log(Adapter, CE_WARN,
+		    "Invalid NVM checksum. Please contact "
+		    "the vendor to update the NVM.");
+		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
+		goto init_fail;
 	}
 
+	result = 0;
 #ifdef __sparc
 	/*
 	 * Firstly, we try to get the local ethernet address from OBP. If
-	 * fail, we get from EEPROM of NIC card.
+	 * failed, then we get it from the EEPROM of NIC card.
 	 */
-	if (!e1000g_find_mac_address(Adapter)) {
-		if (e1000_read_mac_addr(hw) < 0) {
-			e1000g_log(Adapter, CE_WARN, "Read mac addr failed");
-			e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
-			goto init_fail;
-		}
-	}
-#else
+	result = e1000g_find_mac_address(Adapter);
+#endif
 	/* Get the local ethernet address. */
-	if (e1000_read_mac_addr(hw) < 0) {
+	if (!result) {
+		mutex_enter(&e1000g_nvm_lock);
+		e1000_read_mac_addr(hw);
+		mutex_exit(&e1000g_nvm_lock);
+	}
+
+	if (result < E1000_SUCCESS) {
 		e1000g_log(Adapter, CE_WARN, "Read mac addr failed");
 		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
 		goto init_fail;
 	}
-#endif
 
 	/* check for valid mac address */
 	if (!is_valid_mac_addr(hw->mac.addr)) {
@@ -1216,7 +1246,7 @@ e1000g_init(struct e1000g *Adapter)
 		else
 			pba = E1000_PBA_48K;	/* 48K for Rx, 16K for Tx */
 	} else if (hw->mac.type >= e1000_82571 &&
-	    hw->mac.type <= e1000_82572) {
+	    hw->mac.type <= e1000_80003es2lan) {
 		/*
 		 * Total FIFO is 48K
 		 */
@@ -1270,7 +1300,11 @@ e1000g_init(struct e1000g *Adapter)
 	/*
 	 * Reset the adapter hardware the second time.
 	 */
-	if (e1000_reset_hw(hw) != 0) {
+	mutex_enter(&e1000g_nvm_lock);
+	result = e1000_reset_hw(hw);
+	mutex_exit(&e1000g_nvm_lock);
+
+	if (result != E1000_SUCCESS) {
 		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
 		goto init_fail;
 	}
@@ -1285,7 +1319,11 @@ e1000g_init(struct e1000g *Adapter)
 	/*
 	 * Configure/Initialize hardware
 	 */
-	if (e1000_init_hw(hw) < 0) {
+	mutex_enter(&e1000g_nvm_lock);
+	result = e1000_init_hw(hw);
+	mutex_exit(&e1000g_nvm_lock);
+
+	if (result < E1000_SUCCESS) {
 		e1000g_log(Adapter, CE_WARN, "Initialize hw failed");
 		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
 		goto init_fail;
@@ -1544,6 +1582,8 @@ e1000g_m_stop(void *arg)
 static void
 e1000g_stop(struct e1000g *Adapter, boolean_t global)
 {
+	int result;
+
 	/* Set stop flags */
 	rw_enter(&Adapter->chip_lock, RW_WRITER);
 
@@ -1564,7 +1604,12 @@ e1000g_stop(struct e1000g *Adapter, boolean_t global)
 	rw_enter(&Adapter->chip_lock, RW_WRITER);
 
 	e1000g_clear_all_interrupts(Adapter);
-	if (e1000_reset_hw(&Adapter->shared) != 0) {
+
+	mutex_enter(&e1000g_nvm_lock);
+	result = e1000_reset_hw(&Adapter->shared);
+	mutex_exit(&e1000g_nvm_lock);
+
+	if (result != E1000_SUCCESS) {
 		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_LOST);
 	}
@@ -1932,11 +1977,17 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t icr)
 
 			/*
 			 * Workaround for esb2. Data stuck in fifo on a link
-			 * down event. Reset the adapter to recover it.
+			 * down event. Stop receiver here and reset in watchdog.
 			 */
 			if ((Adapter->link_state == LINK_STATE_DOWN) &&
-			    (Adapter->shared.mac.type == e1000_80003es2lan))
-				(void) e1000g_reset(Adapter);
+			    (Adapter->shared.mac.type == e1000_80003es2lan)) {
+				uint32_t rctl = E1000_READ_REG(hw, E1000_RCTL);
+				E1000_WRITE_REG(hw, E1000_RCTL,
+				    rctl & ~E1000_RCTL_EN);
+				e1000g_log(Adapter, CE_WARN,
+				    "ESB2 receiver disabled");
+				Adapter->esb2_workaround = B_TRUE;
+			}
 
 			mac_link_update(Adapter->mh, Adapter->link_state);
 		}
@@ -3609,16 +3660,16 @@ e1000g_local_timer(void *ws)
 		link_changed = e1000g_link_check(Adapter);
 	rw_exit(&Adapter->chip_lock);
 
-	if (link_changed) {
-		/*
-		 * Workaround for esb2. Data stuck in fifo on a link
-		 * down event. Reset the adapter to recover it.
-		 */
-		if ((Adapter->link_state == LINK_STATE_DOWN) &&
-		    (hw->mac.type == e1000_80003es2lan))
-			(void) e1000g_reset(Adapter);
-
+	if (link_changed)
 		mac_link_update(Adapter->mh, Adapter->link_state);
+
+	/*
+	 * Workaround for esb2. Data stuck in fifo on a link
+	 * down event. Reset the adapter to recover it.
+	 */
+	if (Adapter->esb2_workaround) {
+		Adapter->esb2_workaround = B_FALSE;
+		(void) e1000g_reset(Adapter);
 	}
 
 	/*
@@ -3811,13 +3862,15 @@ e1000g_get_max_frame_size(struct e1000g *Adapter)
 
 	/* ich8 does not do jumbo frames */
 	if (mac->type == e1000_ich8lan) {
-		Adapter->max_frame_size = ETHERMAX;
+		Adapter->max_frame_size = ETHERMTU +
+		    sizeof (struct ether_vlan_header) + ETHERFCSL;
 	}
 
 	/* ich9 does not do jumbo frames on one phy type */
 	if ((mac->type == e1000_ich9lan) &&
 	    (phy->type == e1000_phy_ife)) {
-		Adapter->max_frame_size = ETHERMAX;
+		Adapter->max_frame_size = ETHERMTU +
+		    sizeof (struct ether_vlan_header) + ETHERFCSL;
 	}
 }
 
@@ -4345,6 +4398,12 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 	if (mp->b_cont == NULL)
 		return (IOC_INVAL);
 
+	if (!e1000g_check_loopback_support(hw)) {
+		e1000g_log(NULL, CE_WARN,
+		    "Loopback is not supported on e1000g%d", Adapter->instance);
+		return (IOC_INVAL);
+	}
+
 	switch (iocp->ioc_cmd) {
 	default:
 		return (IOC_INVAL);
@@ -4376,6 +4435,7 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 			switch (hw->mac.type) {
 			case e1000_82571:
 			case e1000_82572:
+			case e1000_80003es2lan:
 				value += sizeof (lb_external1000);
 				break;
 			}
@@ -4400,6 +4460,7 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 			switch (hw->mac.type) {
 			case e1000_82571:
 			case e1000_82572:
+			case e1000_80003es2lan:
 				value += sizeof (lb_external1000);
 				break;
 			}
@@ -4425,6 +4486,7 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 			switch (hw->mac.type) {
 			case e1000_82571:
 			case e1000_82572:
+			case e1000_80003es2lan:
 				lbpp[value++] = lb_external1000;
 				break;
 			}
@@ -4465,6 +4527,28 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 	}
 
 	return (IOC_REPLY);
+}
+
+static boolean_t
+e1000g_check_loopback_support(struct e1000_hw *hw)
+{
+	switch (hw->mac.type) {
+	case e1000_82540:
+	case e1000_82545:
+	case e1000_82545_rev_3:
+	case e1000_82546:
+	case e1000_82546_rev_3:
+	case e1000_82541:
+	case e1000_82541_rev_2:
+	case e1000_82547:
+	case e1000_82547_rev_2:
+	case e1000_82571:
+	case e1000_82572:
+	case e1000_82573:
+	case e1000_80003es2lan:
+		return (B_TRUE);
+	}
+	return (B_FALSE);
 }
 
 static boolean_t
@@ -4594,6 +4678,12 @@ e1000g_set_internal_loopback(struct e1000g *Adapter)
 		e1000_write_phy_reg(hw, 29, 0x001A);
 		e1000_write_phy_reg(hw, 30, 0x8FF0);
 		break;
+	case e1000_80003es2lan:
+		/* Force Link Up */
+		e1000_write_phy_reg(hw, GG82563_PHY_KMRN_MODE_CTRL, 0x1CC);
+		/* Sets PCS loopback at 1Gbs */
+		e1000_write_phy_reg(hw, GG82563_PHY_MAC_SPEC_CTRL, 0x1046);
+		break;
 	}
 
 	/* Set loopback */
@@ -4634,6 +4724,7 @@ e1000g_set_internal_loopback(struct e1000g *Adapter)
 			if ((status & E1000_STATUS_FD) == 0)
 				ctrl |= E1000_CTRL_ILOS | E1000_CTRL_SLU;
 		}
+		E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
 		break;
 
 	case e1000_82571:
@@ -4664,15 +4755,14 @@ e1000g_set_internal_loopback(struct e1000g *Adapter)
 			E1000_WRITE_REG(hw, E1000_SCTL, 0x0410);
 			msec_delay(10);
 		}
+		E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
 		break;
 
 	case e1000_82573:
 		ctrl |= E1000_CTRL_ILOS;
+		E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
 		break;
 	}
-
-	E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
-
 }
 
 static void
@@ -4684,82 +4774,96 @@ e1000g_set_external_loopback_1000(struct e1000g *Adapter)
 	uint32_t ctrl;
 	uint32_t status;
 	uint32_t txcw;
+	uint16_t phydata;
 
 	hw = &Adapter->shared;
 
 	/* Disable Smart Power Down */
 	phy_spd_state(hw, B_FALSE);
 
-	switch (hw->phy.media_type) {
-	case e1000_media_type_copper:
-		/* Force link up (Must be done before the PHY writes) */
-		ctrl = E1000_READ_REG(hw, E1000_CTRL);
-		ctrl |= E1000_CTRL_SLU;	/* Force Link Up */
-		E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
-
-		rctl = E1000_READ_REG(hw, E1000_RCTL);
-		rctl |= (E1000_RCTL_EN |
-		    E1000_RCTL_SBP |
-		    E1000_RCTL_UPE |
-		    E1000_RCTL_MPE |
-		    E1000_RCTL_LPE |
-		    E1000_RCTL_BAM);		/* 0x803E */
-		E1000_WRITE_REG(hw, E1000_RCTL, rctl);
-
-		ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
-		ctrl_ext |= (E1000_CTRL_EXT_SDP4_DATA |
-		    E1000_CTRL_EXT_SDP6_DATA |
-		    E1000_CTRL_EXT_SDP7_DATA |
-		    E1000_CTRL_EXT_SDP4_DIR |
-		    E1000_CTRL_EXT_SDP6_DIR |
-		    E1000_CTRL_EXT_SDP7_DIR);	/* 0x0DD0 */
-		E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
-
-		/*
-		 * This sequence tunes the PHY's SDP and no customer
-		 * settable values. For background, see comments above
-		 * e1000g_set_internal_loopback().
-		 */
-		e1000_write_phy_reg(hw, 0x0, 0x140);
-		msec_delay(10);
-		e1000_write_phy_reg(hw, 0x9, 0x1A00);
-		e1000_write_phy_reg(hw, 0x12, 0xC10);
-		e1000_write_phy_reg(hw, 0x12, 0x1C10);
-		e1000_write_phy_reg(hw, 0x1F37, 0x76);
-		e1000_write_phy_reg(hw, 0x1F33, 0x1);
-		e1000_write_phy_reg(hw, 0x1F33, 0x0);
-
-		e1000_write_phy_reg(hw, 0x1F35, 0x65);
-		e1000_write_phy_reg(hw, 0x1837, 0x3F7C);
-		e1000_write_phy_reg(hw, 0x1437, 0x3FDC);
-		e1000_write_phy_reg(hw, 0x1237, 0x3F7C);
-		e1000_write_phy_reg(hw, 0x1137, 0x3FDC);
-
-		msec_delay(50);
-		break;
-	case e1000_media_type_fiber:
-	case e1000_media_type_internal_serdes:
-		status = E1000_READ_REG(hw, E1000_STATUS);
-		if (((status & E1000_STATUS_LU) == 0) ||
-		    (hw->phy.media_type == e1000_media_type_internal_serdes)) {
+	switch (hw->mac.type) {
+	case e1000_82571:
+	case e1000_82572:
+		switch (hw->phy.media_type) {
+		case e1000_media_type_copper:
+			/* Force link up (Must be done before the PHY writes) */
 			ctrl = E1000_READ_REG(hw, E1000_CTRL);
-			ctrl |= E1000_CTRL_ILOS | E1000_CTRL_SLU;
+			ctrl |= E1000_CTRL_SLU;	/* Force Link Up */
 			E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
+
+			rctl = E1000_READ_REG(hw, E1000_RCTL);
+			rctl |= (E1000_RCTL_EN |
+			    E1000_RCTL_SBP |
+			    E1000_RCTL_UPE |
+			    E1000_RCTL_MPE |
+			    E1000_RCTL_LPE |
+			    E1000_RCTL_BAM);		/* 0x803E */
+			E1000_WRITE_REG(hw, E1000_RCTL, rctl);
+
+			ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
+			ctrl_ext |= (E1000_CTRL_EXT_SDP4_DATA |
+			    E1000_CTRL_EXT_SDP6_DATA |
+			    E1000_CTRL_EXT_SDP7_DATA |
+			    E1000_CTRL_EXT_SDP4_DIR |
+			    E1000_CTRL_EXT_SDP6_DIR |
+			    E1000_CTRL_EXT_SDP7_DIR);	/* 0x0DD0 */
+			E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
+
+			/*
+			 * This sequence tunes the PHY's SDP and no customer
+			 * settable values. For background, see comments above
+			 * e1000g_set_internal_loopback().
+			 */
+			e1000_write_phy_reg(hw, 0x0, 0x140);
+			msec_delay(10);
+			e1000_write_phy_reg(hw, 0x9, 0x1A00);
+			e1000_write_phy_reg(hw, 0x12, 0xC10);
+			e1000_write_phy_reg(hw, 0x12, 0x1C10);
+			e1000_write_phy_reg(hw, 0x1F37, 0x76);
+			e1000_write_phy_reg(hw, 0x1F33, 0x1);
+			e1000_write_phy_reg(hw, 0x1F33, 0x0);
+
+			e1000_write_phy_reg(hw, 0x1F35, 0x65);
+			e1000_write_phy_reg(hw, 0x1837, 0x3F7C);
+			e1000_write_phy_reg(hw, 0x1437, 0x3FDC);
+			e1000_write_phy_reg(hw, 0x1237, 0x3F7C);
+			e1000_write_phy_reg(hw, 0x1137, 0x3FDC);
+
+			msec_delay(50);
+			break;
+		case e1000_media_type_fiber:
+		case e1000_media_type_internal_serdes:
+			status = E1000_READ_REG(hw, E1000_STATUS);
+			if (((status & E1000_STATUS_LU) == 0) ||
+			    (hw->phy.media_type ==
+			    e1000_media_type_internal_serdes)) {
+				ctrl = E1000_READ_REG(hw, E1000_CTRL);
+				ctrl |= E1000_CTRL_ILOS | E1000_CTRL_SLU;
+				E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
+			}
+
+			/* Disable autoneg by setting bit 31 of TXCW to zero */
+			txcw = E1000_READ_REG(hw, E1000_TXCW);
+			txcw &= ~((uint32_t)1 << 31);
+			E1000_WRITE_REG(hw, E1000_TXCW, txcw);
+
+			/*
+			 * Write 0x410 to Serdes Control register
+			 * to enable Serdes analog loopback
+			 */
+			E1000_WRITE_REG(hw, E1000_SCTL, 0x0410);
+			msec_delay(10);
+			break;
+		default:
+			break;
 		}
-
-		/* Disable autoneg by setting bit 31 of TXCW to zero */
-		txcw = E1000_READ_REG(hw, E1000_TXCW);
-		txcw &= ~((uint32_t)1 << 31);
-		E1000_WRITE_REG(hw, E1000_TXCW, txcw);
-
-		/*
-		 * Write 0x410 to Serdes Control register
-		 * to enable Serdes analog loopback
-		 */
-		E1000_WRITE_REG(hw, E1000_SCTL, 0x0410);
-		msec_delay(10);
 		break;
-	default:
+	case e1000_80003es2lan:
+		e1000_read_phy_reg(hw, GG82563_REG(6, 16), &phydata);
+		e1000_write_phy_reg(hw, GG82563_REG(6, 16), phydata | (1 << 5));
+		Adapter->param_adv_autoneg = 1;
+		Adapter->param_adv_1000fdx = 1;
+		e1000g_reset_link(Adapter);
 		break;
 	}
 }

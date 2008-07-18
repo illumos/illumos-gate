@@ -801,7 +801,8 @@ e1000g_tx_setup(struct e1000g *Adapter)
 	 * Setup Hardware TX Registers
 	 */
 	/* Setup the Transmit Control Register (TCTL). */
-	reg_tctl = E1000_TCTL_PSP | E1000_TCTL_EN |
+	reg_tctl = E1000_READ_REG(hw, E1000_TCTL);
+	reg_tctl |= E1000_TCTL_PSP | E1000_TCTL_EN |
 	    (E1000_COLLISION_THRESHOLD << E1000_CT_SHIFT) |
 	    (E1000_COLLISION_DISTANCE << E1000_COLD_SHIFT) |
 	    E1000_TCTL_RTLC;
@@ -811,35 +812,6 @@ e1000g_tx_setup(struct e1000g *Adapter)
 		reg_tctl |= E1000_TCTL_MULR;
 
 	E1000_WRITE_REG(hw, E1000_TCTL, reg_tctl);
-
-	if ((hw->mac.type == e1000_82571) || (hw->mac.type == e1000_82572)) {
-		e1000_get_speed_and_duplex(hw, &speed, &duplex);
-
-		reg_tarc = E1000_READ_REG(hw, E1000_TARC(0));
-		reg_tarc |= (1 << 25);
-		if (speed == SPEED_1000)
-			reg_tarc |= (1 << 21);
-		E1000_WRITE_REG(hw, E1000_TARC(0), reg_tarc);
-
-		reg_tarc = E1000_READ_REG(hw, E1000_TARC(1));
-		reg_tarc |= (1 << 25);
-		if (reg_tctl & E1000_TCTL_MULR)
-			reg_tarc &= ~(1 << 28);
-		else
-			reg_tarc |= (1 << 28);
-		E1000_WRITE_REG(hw, E1000_TARC(1), reg_tarc);
-
-	} else if (hw->mac.type == e1000_80003es2lan) {
-		reg_tarc = E1000_READ_REG(hw, E1000_TARC(0));
-		reg_tarc |= 1;
-		if (hw->phy.media_type == e1000_media_type_internal_serdes)
-			reg_tarc |= (1 << 20);
-		E1000_WRITE_REG(hw, E1000_TARC(0), reg_tarc);
-
-		reg_tarc = E1000_READ_REG(hw, E1000_TARC(1));
-		reg_tarc |= 1;
-		E1000_WRITE_REG(hw, E1000_TARC(1), reg_tarc);
-	}
 
 	/* Setup HW Base and Length of Tx descriptor area */
 	size = (Adapter->tx_desc_num * sizeof (struct e1000_tx_desc));
@@ -865,6 +837,10 @@ e1000g_tx_setup(struct e1000g *Adapter)
 		    DEFAULT_82542_TIPG_IPGR1 << E1000_TIPG_IPGR1_SHIFT;
 		reg_tipg |=
 		    DEFAULT_82542_TIPG_IPGR2 << E1000_TIPG_IPGR2_SHIFT;
+	} else if (hw->mac.type == e1000_80003es2lan) {
+		reg_tipg = DEFAULT_82543_TIPG_IPGR1;
+		reg_tipg = DEFAULT_80003ES2LAN_TIPG_IPGR2 <<
+		    E1000_TIPG_IPGR2_SHIFT;
 	} else {
 		if (hw->phy.media_type == e1000_media_type_fiber)
 			reg_tipg = DEFAULT_82543_TIPG_IPGT_FIBER;

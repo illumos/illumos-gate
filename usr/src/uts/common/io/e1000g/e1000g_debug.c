@@ -158,6 +158,8 @@ e1000g_log(void *instance, int level, char *fmt, ...)
 
 
 #ifdef E1000G_DEBUG
+extern kmutex_t e1000g_nvm_lock;
+
 void
 eeprom_dump(void *instance)
 {
@@ -168,10 +170,12 @@ eeprom_dump(void *instance)
 	int ee_size[] =
 	    {128, 256, 512, 1024, 2048, 4096, 16 * 1024, 32 * 1024, 64 * 1024};
 
+	mutex_enter(&e1000g_nvm_lock);
+
 	if (ret = e1000_read_nvm(hw, 0x12, 1, &size_field)) {
 		e1000g_log(Adapter, CE_WARN,
 		    "e1000_read_nvm failed to read size: %d", ret);
-		return;
+		goto eeprom_dump_end;
 	}
 
 	sign = (size_field & 0xc000) >> 14;
@@ -201,7 +205,7 @@ eeprom_dump(void *instance)
 		if (ret = e1000_read_nvm(hw, offset, WPL, eeprom)) {
 			e1000g_log(Adapter, CE_WARN,
 			    "e1000_read_nvm failed: %d", ret);
-			return;
+			goto eeprom_dump_end;
 		}
 
 		e1000g_log(Adapter, CE_CONT,
@@ -211,6 +215,9 @@ eeprom_dump(void *instance)
 		    eeprom[4], eeprom[5], eeprom[6], eeprom[7]);
 		offset += WPL;
 	}
+
+eeprom_dump_end:
+	mutex_exit(&e1000g_nvm_lock);
 }
 
 /*
