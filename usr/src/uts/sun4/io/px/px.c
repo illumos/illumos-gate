@@ -375,7 +375,9 @@ err_bad_mmu:
 err_bad_cb:
 		px_ib_detach(px_p);
 err_bad_ib:
-		(void) px_lib_dev_fini(dip);
+		if (px_lib_dev_fini(dip) != DDI_SUCCESS) {
+			DBG(DBG_ATTACH, dip, "px_lib_dev_fini failed\n");
+		}
 err_bad_dev_init:
 		px_free_props(px_p);
 err_bad_px_prop:
@@ -474,7 +476,9 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		px_mmu_detach(px_p);
 		px_cb_detach(px_p);
 		px_ib_detach(px_p);
-		(void) px_lib_dev_fini(dip);
+		if (px_lib_dev_fini(dip) != DDI_SUCCESS) {
+			DBG(DBG_DETACH, dip, "px_lib_dev_fini failed\n");
+		}
 
 		/*
 		 * Free the px soft state structure and the rest of the

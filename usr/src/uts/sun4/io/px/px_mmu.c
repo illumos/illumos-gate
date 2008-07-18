@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,7 +89,7 @@ px_mmu_attach(px_t *px_p)
 	 * Setup base and bounds for DVMA and bypass mappings.
 	 */
 	mmu_p->mmu_dvma_cache_locks =
-		kmem_zalloc(px_dvma_page_cache_entries, KM_SLEEP);
+	    kmem_zalloc(px_dvma_page_cache_entries, KM_SLEEP);
 
 	mmu_p->dvma_base_pg = MMU_BTOP(mmu_p->mmu_dvma_base);
 	mmu_p->mmu_dvma_reserve = tsb_entries >> 1;
@@ -103,9 +103,9 @@ px_mmu_attach(px_t *px_p)
 	    ddi_driver_name(dip), ddi_get_instance(dip));
 
 	cache_size = MMU_PTOB(px_dvma_page_cache_entries *
-		px_dvma_page_cache_clustsz);
+	    px_dvma_page_cache_clustsz);
 	mmu_p->mmu_dvma_fast_end = mmu_p->mmu_dvma_base +
-		cache_size - 1;
+	    cache_size - 1;
 
 	mmu_p->mmu_dvma_map = vmem_create(map_name,
 	    (void *)(mmu_p->mmu_dvma_fast_end + 1),
@@ -209,7 +209,10 @@ px_mmu_map_pages(px_mmu_t *mmu_p, ddi_dma_impl_t *mp, px_dvma_addr_t dvma_pg,
 		DBG(DBG_MAP_WIN, dip, "px_mmu_map_pages: mapping "
 		    "REDZONE page failed\n");
 
-		(void) px_lib_iommu_demap(dip, PCI_TSBID(0, pg_index), npages);
+		if (px_lib_iommu_demap(dip, PCI_TSBID(0, pg_index), npages)
+		    != DDI_SUCCESS) {
+			DBG(DBG_MAP_WIN, dip, "px_lib_iommu_demap: failed\n");
+		}
 		return (DDI_FAILURE);
 	}
 
@@ -232,19 +235,25 @@ px_mmu_unmap_pages(px_mmu_t *mmu_p, ddi_dma_impl_t *mp, px_dvma_addr_t dvma_pg,
 	    (uint_t)mmu_p->dvma_base_pg, (uint_t)pg_index, dvma_pg,
 	    (uint_t)npages);
 
-	(void) px_lib_iommu_demap(mmu_p->mmu_px_p->px_dip,
-	    PCI_TSBID(0, pg_index), npages);
+	if (px_lib_iommu_demap(mmu_p->mmu_px_p->px_dip,
+	    PCI_TSBID(0, pg_index), npages) != DDI_SUCCESS) {
+		DBG(DBG_UNMAP_WIN, mmu_p->mmu_px_p->px_dip,
+		    "px_lib_iommu_demap: failed\n");
+	}
 
 	if (!PX_MAP_BUFZONE(mp))
 		return;
 
-	DBG(DBG_MAP_WIN, mmu_p->mmu_px_p->px_dip, "px_mmu_unmap_pages: "
+	DBG(DBG_UNMAP_WIN, mmu_p->mmu_px_p->px_dip, "px_mmu_unmap_pages: "
 	    "redzone pg=%x\n", pg_index + npages);
 
 	ASSERT(PX_HAS_REDZONE(mp));
 
-	(void) px_lib_iommu_demap(mmu_p->mmu_px_p->px_dip,
-	    PCI_TSBID(0, pg_index + npages), 1);
+	if (px_lib_iommu_demap(mmu_p->mmu_px_p->px_dip,
+	    PCI_TSBID(0, pg_index + npages), 1) != DDI_SUCCESS) {
+		DBG(DBG_UNMAP_WIN, mmu_p->mmu_px_p->px_dip,
+		    "px_lib_iommu_demap: failed\n");
+	}
 }
 
 /*

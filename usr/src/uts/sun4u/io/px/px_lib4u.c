@@ -704,7 +704,14 @@ px_lib_msiq_init(dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 
-	(void) hvio_msiq_init(DIP_TO_HANDLE(dip), pxu_p);
+	if ((ret = hvio_msiq_init(DIP_TO_HANDLE(dip),
+	    pxu_p)) != H_EOK) {
+		DBG(DBG_LIB_MSIQ, dip,
+		    "hvio_msiq_init failed, ret 0x%lx\n", ret);
+
+		(void) px_lib_msiq_fini(dip);
+		return (DDI_FAILURE);
+	}
 
 	return (DDI_SUCCESS);
 }

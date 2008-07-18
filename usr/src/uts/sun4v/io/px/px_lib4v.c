@@ -282,7 +282,13 @@ px_lib_intr_settarget(dev_info_t *dip, sysino_t sysino, cpuid_t cpuid)
 	DBG(DBG_LIB_INT, dip, "px_lib_intr_settarget: dip 0x%p sysino 0x%llx "
 	    "cpuid 0x%x\n", dip, sysino, cpuid);
 
-	if ((ret = hvio_intr_settarget(sysino, cpuid)) != H_EOK) {
+	ret = hvio_intr_settarget(sysino, cpuid);
+	if (ret == H_ECPUERROR) {
+		cmn_err(CE_PANIC,
+		    "px_lib_intr_settarget: hvio_intr_settarget failed, "
+		    "ret = 0x%lx, cpuid = 0x%x, sysino = 0x%lx\n", ret,
+		    cpuid, sysino);
+	} else if (ret != H_EOK) {
 		DBG(DBG_LIB_INT, dip,
 		    "hvio_intr_settarget failed, ret 0x%lx\n", ret);
 		return (DDI_FAILURE);

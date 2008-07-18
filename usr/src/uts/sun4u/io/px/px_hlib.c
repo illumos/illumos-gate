@@ -2690,6 +2690,7 @@ hvio_resume(devhandle_t dev_hdl, devino_t devino, pxu_t *pxu_p)
 	int		total_size;
 	sysino_t	sysino;
 	int		i;
+	uint64_t	ret;
 
 	/* Make sure that suspend actually did occur */
 	if (!pxu_p->pec_config_state) {
@@ -2735,9 +2736,19 @@ hvio_resume(devhandle_t dev_hdl, devino_t devino, pxu_t *pxu_p)
 	}
 
 	/* Enable PCI-E interrupt */
-	(void) hvio_intr_devino_to_sysino(dev_hdl, pxu_p, devino, &sysino);
+	if ((ret = hvio_intr_devino_to_sysino(dev_hdl, pxu_p, devino,
+	    &sysino)) != H_EOK) {
+		cmn_err(CE_WARN,
+		    "hvio_resume: hvio_intr_devino_to_sysino failed, "
+		    "ret 0x%lx", ret);
+	}
 
-	(void) hvio_intr_setstate(dev_hdl, sysino, INTR_IDLE_STATE);
+	if ((ret =  hvio_intr_setstate(dev_hdl, sysino, INTR_IDLE_STATE))
+	    != H_EOK) {
+		cmn_err(CE_WARN,
+		    "hvio_resume: hvio_intr_setstate failed, "
+		    "ret 0x%lx", ret);
+	}
 
 	total_size = PEC_SIZE + MMU_SIZE + IB_SIZE + IB_MAP_SIZE;
 	kmem_free(pxu_p->pec_config_state, total_size);
@@ -2796,6 +2807,7 @@ hvio_cb_resume(devhandle_t pci_dev_hdl, devhandle_t xbus_dev_hdl,
 	sysino_t sysino;
 	uint64_t *cb_regs;
 	int i, cb_size, cb_keys;
+	uint64_t ret;
 
 	switch (PX_CHIP_TYPE(pxu_p)) {
 	case PX_CHIP_OBERON:
@@ -2833,9 +2845,19 @@ hvio_cb_resume(devhandle_t pci_dev_hdl, devhandle_t xbus_dev_hdl,
 	}
 
 	/* Enable XBC interrupt */
-	(void) hvio_intr_devino_to_sysino(pci_dev_hdl, pxu_p, devino, &sysino);
+	if ((ret = hvio_intr_devino_to_sysino(pci_dev_hdl, pxu_p, devino,
+	    &sysino)) != H_EOK) {
+		cmn_err(CE_WARN,
+		    "hvio_cb_resume: hvio_intr_devino_to_sysino failed, "
+		    "ret 0x%lx", ret);
+	}
 
-	(void) hvio_intr_setstate(pci_dev_hdl, sysino, INTR_IDLE_STATE);
+	if ((ret = hvio_intr_setstate(pci_dev_hdl, sysino, INTR_IDLE_STATE))
+	    != H_EOK) {
+		cmn_err(CE_WARN,
+		    "hvio_cb_resume: hvio_intr_setstate failed, "
+		    "ret 0x%lx", ret);
+	}
 
 	kmem_free(pxu_p->xcb_config_state, cb_size);
 
@@ -2876,6 +2898,7 @@ msiq_resume(devhandle_t dev_hdl, pxu_t *pxu_p)
 	size_t	bufsz;
 	uint64_t *cur_p, state;
 	int i;
+	uint64_t ret;
 
 	bufsz = MSIQ_STATE_SIZE + MSIQ_MAPPING_SIZE + MSIQ_OTHER_SIZE;
 	cur_p = pxu_p->msiq_config_state;
@@ -2883,7 +2906,11 @@ msiq_resume(devhandle_t dev_hdl, pxu_t *pxu_p)
 	 * Initialize EQ base address register and
 	 * Interrupt Mondo Data 0 register.
 	 */
-	(void) hvio_msiq_init(dev_hdl, pxu_p);
+	if ((ret = hvio_msiq_init(dev_hdl, pxu_p)) != H_EOK) {
+		cmn_err(CE_WARN,
+		    "msiq_resume: hvio_msiq_init failed, "
+		    "ret 0x%lx", ret);
+	}
 
 	/* Restore EQ states */
 	for (i = 0; i < EVENT_QUEUE_STATE_ENTRIES; i++, cur_p++) {

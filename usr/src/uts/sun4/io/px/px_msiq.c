@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,7 +110,10 @@ px_msiq_detach(px_t *px_p)
 
 	DBG(DBG_MSIQ, px_p->px_dip, "px_msiq_detach\n");
 
-	(void) px_lib_msiq_fini(px_p->px_dip);
+	if (px_lib_msiq_fini(px_p->px_dip) != DDI_SUCCESS) {
+		DBG(DBG_MSIQ, px_p->px_dip,
+		    "px_lib_msiq_fini: failed\n");
+	}
 	kmem_free(msiq_state_p->msiq_buf_p, msiq_state_p->msiq_cnt *
 	    msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t));
 

@@ -984,7 +984,11 @@ px_ks_update(kstat_t *ksp, int rw)
 	sysino_t sysino;
 
 	ino = ino_p->ino_ino;
-	(void) px_lib_intr_devino_to_sysino(px_p->px_dip, ino, &sysino);
+	if (px_lib_intr_devino_to_sysino(px_p->px_dip, ino, &sysino) !=
+	    DDI_SUCCESS) {
+		cmn_err(CE_WARN, "px_ks_update: px_lib_intr_devino_to_sysino "
+		    "failed");
+	}
 
 	(void) snprintf(pxintr_ks_template.pxintr_ks_name.value.c, maxlen,
 	    "%s%d", ddi_driver_name(ih_p->ih_dip),
