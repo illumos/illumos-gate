@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,7 +140,7 @@ static struct fmodsw fsw = {
  */
 static struct modlstrmod modlstrmod = {
 	&mod_strmodops,
-	"USB keyboard streams %I%",
+	"USB keyboard streams 1.44",
 	&fsw
 };
 
@@ -382,11 +382,8 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 {
 	usbkbm_state_t	*usbkbmd;
 	struct iocblk	mctlmsg;
-	uint32_t	packet_size;
 	mblk_t		*mctl_ptr;
 	int		error, ret;
-
-	packet_size = 0;
 
 	if (q->q_ptr) {
 		USB_DPRINTF_L3(PRINT_MASK_OPEN, usbkbm_log_handle,
@@ -494,10 +491,30 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 
 	qprocson(q);
 
+	/*
+	 * The hid module already configured this keyboard for report mode,
+	 * but usbkbm only knows how to deal with boot-protocol mode,
+	 * so switch into boot-protocol mode now.
+	 */
 	if (ret = usbkbm_set_protocol(usbkbmd, SET_BOOT_PROTOCOL)) {
 
 		return (ret);
 	}
+
+	/*
+	 * USB keyboards are expected to send well-defined 8-byte data
+	 * packets in boot-protocol mode (the format of which is documented
+	 * in the HID specification).
+	 *
+	 * Note: We do not look at the interface's HID report descriptors to
+	 * derive the report size, because the HID report descriptor describes
+	 * the format of each report in report mode.  This format might be
+	 * different from the format used in boot-protocol mode.  The internal
+	 * USB keyboard in a recent version of the Apple MacBook Pro is one
+	 * example of a USB keyboard that uses different formats for
+	 * boot-protocol-mode reports and report-mode reports.
+	 */
+	usbkbmd->usbkbm_packet_size = USB_KBD_BOOT_PROTOCOL_PACKET_SIZE;
 
 	/* request hid report descriptor from HID */
 	mctlmsg.ioc_cmd = HID_GET_PARSER_HANDLE;
@@ -544,29 +561,12 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 
 			usbkbmd->usbkbm_layout = usbkbm_layout;
 		}
-
-		if (hidparser_get_packet_size(usbkbmd->usbkbm_report_descr,
-		    0, HIDPARSER_ITEM_INPUT, (uint32_t *)&packet_size) ==
-		    HIDPARSER_FAILURE) {
-
-			USB_DPRINTF_L3(PRINT_MASK_OPEN,
-			    usbkbm_log_handle, "get_packet_size failed"
-			    "setting default packet size(8)");
-
-			/* Setting to default packet size = 8 */
-			usbkbmd->usbkbm_packet_size =
-			    USB_KBD_DEFAULT_PACKET_SIZE;
-		} else {
-			usbkbmd->usbkbm_packet_size = packet_size/8;
-		}
 	} else {
 		USB_DPRINTF_L3(PRINT_MASK_OPEN, usbkbm_log_handle,
 		    "usbkbm: Invalid HID Descriptor Tree."
-		    "setting default layout(0) & packet_size(8)");
+		    "setting default layout(0)");
 
 		usbkbmd->usbkbm_layout = usbkbm_layout;
-		usbkbmd->usbkbm_packet_size =
-		    USB_KBD_DEFAULT_PACKET_SIZE;
 	}
 
 	/*
@@ -1689,7 +1689,7 @@ usbkbm_polled_exit(cons_polledio_arg_t arg)
 
 /*
  * usbkbm_unpack_usb_packet :
- *	USB key packets contain 8 bytes while in boot protocol mode.
+ *	USB key packets contain 8 bytes while in boot-protocol mode.
  *	The first byte contains bit packed modifier key information.
  *	Second byte is reserved. The last 6 bytes contain bytes of
  *	currently pressed keys. If a key was not recorded on the
