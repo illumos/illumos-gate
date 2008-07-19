@@ -60,8 +60,8 @@
 static void usage();
 static int show_profs(char *, int);
 static int list_profs(userattr_t *, int);
-static void print_profs_long(char *, void *, int);
-static void print_profs(char *, char **, int, int);
+static void print_profs_long(void *, int);
+static void print_profs(char **, int, int);
 static void format_attr(int *, int, char *);
 static void getProfiles(char *, char **, int *);
 static void getDefaultProfiles(char *, char **, int *);
@@ -72,8 +72,8 @@ int
 main(int argc, char *argv[])
 {
 	extern int	optind;
-	register int	c;
-	register int	status = EXIT_OK;
+	int		c;
+	int		status = EXIT_OK;
 	int		print_flag = PRINT_DEFAULT;
 
 	(void) setlocale(LC_ALL, "");
@@ -96,7 +96,9 @@ main(int argc, char *argv[])
 		status = show_profs(NULL, print_flag);
 	} else {
 		do {
-			status = show_profs((char *)*argv, print_flag);
+			(void) printf("\n%s :\n", *argv);
+			status = show_profs((char *)*argv,
+			    (print_flag | PRINT_NAME));
 			if (status == EXIT_FATAL) {
 				break;
 			}
@@ -111,12 +113,12 @@ main(int argc, char *argv[])
 static int
 show_profs(char *username, int print_flag)
 {
-	register int		status = EXIT_OK;
-	register struct passwd	*pw;
-	register userattr_t	*user;
-	char			*profArray[MAXPROFS];
-	int			profcnt = 0;
-	execattr_t		*exec;
+	int		status = EXIT_OK;
+	struct passwd	*pw;
+	userattr_t	*user;
+	char		*profArray[MAXPROFS];
+	int		profcnt = 0;
+	execattr_t	*exec;
 
 	if (username == NULL) {
 		if ((pw = getpwuid(getuid())) == NULL) {
@@ -143,12 +145,11 @@ show_profs(char *username, int print_flag)
 				if (print_flag & PRINT_LONG) {
 					exec = getexecuser(username, KV_COMMAND,
 					    NULL, GET_ALL);
-					print_profs_long(username,
-					    exec, print_flag);
+					print_profs_long(exec, print_flag);
 					free_execattr(exec);
 				} else {
-					print_profs(username, profArray,
-					    print_flag, profcnt);
+					print_profs(profArray, print_flag,
+					    profcnt);
 				}
 			}
 		}
@@ -166,7 +167,7 @@ show_profs(char *username, int print_flag)
 static int
 list_profs(userattr_t *user, int print_flag)
 {
-	register int	status = EXIT_OK;
+	int		status = EXIT_OK;
 	char		*proflist = (char *)NULL;
 	execattr_t	*exec = (execattr_t *)NULL;
 	char		*profArray[MAXPROFS];
@@ -190,11 +191,10 @@ list_profs(userattr_t *user, int print_flag)
 	}
 	if (status == EXIT_OK) {
 		if (print_flag & PRINT_LONG) {
-			print_profs_long(user->name, exec, print_flag);
+			print_profs_long(exec, print_flag);
 			free_execattr(exec);
 		} else {
-			print_profs(user->name, profArray,
-			    print_flag, profcnt);
+			print_profs(profArray, print_flag, profcnt);
 		}
 	}
 	free_userattr(user);
@@ -204,24 +204,22 @@ list_profs(userattr_t *user, int print_flag)
 
 
 static void
-print_profs_long(char *user, void *data, int print_flag)
+print_profs_long(void *data, int print_flag)
 {
 
-	register int		i;
-	register int		len;
-	int			outlen;
-	char			tmpstr[TMP_BUF_LEN];
-	register char		*empty = "";
-	register char		*lastname = empty;
-	register char		*key;
-	register char		*val;
-	register kv_t		*kv_pair;
-	register execattr_t	*exec;
+	int		i;
+	int		len;
+	int		outlen;
+	char		tmpstr[TMP_BUF_LEN];
+	char		*lastname = "";
+	char		*key;
+	char		*val;
+	kv_t		*kv_pair;
+	execattr_t	*exec;
 
-	if (print_flag & PRINT_NAME) {
-		(void) printf("%s : ", user);
+	if (!(print_flag & PRINT_NAME)) {
+		(void) printf("\n");
 	}
-	(void) printf("\n");
 	exec = (execattr_t *)data;
 	while (exec != (execattr_t *)NULL) {
 		if (strcmp(exec->name, lastname) != NULL) {
@@ -304,17 +302,18 @@ getProfiles(char *profiles, char **profArray, int *profcnt) {
 }
 
 static void
-print_profs(char *user, char **profnames, int print_flag, int profcnt)
+print_profs(char **profnames, int print_flag, int profcnt)
 {
 
 	int i;
+	char *indent = "";
 
 	if (print_flag & PRINT_NAME) {
-		(void) printf("%s : ", user);
+		indent = "          ";
 	}
 
 	for (i = 0; i < profcnt; i++) {
-		(void) printf("%s\n", profnames[i]);
+		(void) printf("%s%s\n", indent, profnames[i]);
 	}
 
 	free_proflist(profnames, profcnt);
