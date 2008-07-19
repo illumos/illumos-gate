@@ -322,6 +322,7 @@ struct acpi_drv_output_state {
 	int cur_level_index;
 	int state;
 	struct acpi_drv_output_state *next;
+	struct acpi_drv_output_state *tail;
 };
 static struct acpi_drv_output_state *outputs = NULL;
 static int noutput = 0;
@@ -1825,7 +1826,7 @@ acpi_drv_find_cb(ACPI_HANDLE ObjHandle, UINT32 NestingLevel, void *Context,
 		char str[256];
 		ACPI_HANDLE ohl = NULL;
 		struct acpi_drv_display_state *dp;
-		struct acpi_drv_output_state *op, *tail;
+		struct acpi_drv_output_state *op;
 
 		/*
 		 * Reduce the search by checking for support of _ADR
@@ -1866,11 +1867,13 @@ acpi_drv_find_cb(ACPI_HANDLE ObjHandle, UINT32 NestingLevel, void *Context,
 				    (sizeof (struct acpi_drv_output_state),
 				    KM_SLEEP);
 				if (outputs == NULL) {
-					outputs = tail = op;
+					outputs = op;
+					outputs->tail = op;
 				} else {
-					tail->next = op;
-					tail = op;
+					outputs->tail->next = op;
+					outputs->tail = op;
 				}
+
 				noutput++;
 				devp = (struct acpi_drv_dev *)op;
 				devp->op = op;

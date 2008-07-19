@@ -37,7 +37,6 @@
 #define		DEVINFO_PROBE_BATTERY_TIMEOUT	30000
 
 static HalDevice *devinfo_acpi_add(HalDevice *, di_node_t, char *, char *);
-static HalDevice *devinfo_battery_add(HalDevice *, di_node_t, char *, char *);
 static HalDevice *devinfo_power_button_add(HalDevice *parent, di_node_t node,
     char *devfs_path, char *device_type);
 static void devinfo_battery_rescan_probing_done(HalDevice *d, guint32 exit_type,
@@ -49,16 +48,7 @@ DevinfoDevHandler devinfo_acpi_handler = {
 	NULL,
 	NULL,
 	NULL,
-	NULL
-};
-
-DevinfoDevHandler devinfo_battery_handler = {
-	devinfo_battery_add,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	devinfo_battery_get_prober
+	devinfo_acpi_get_prober
 };
 
 DevinfoDevHandler devinfo_power_button_handler = {
@@ -72,31 +62,6 @@ DevinfoDevHandler devinfo_power_button_handler = {
 
 static HalDevice *
 devinfo_acpi_add(HalDevice *parent, di_node_t node, char *devfs_path,
-    char *device_type)
-{
-	HalDevice *d, *computer;
-
-	if (strcmp(devfs_path, "/acpi") != 0) {
-		return (NULL);
-	}
-
-	d = hal_device_new();
-
-	if ((computer = hal_device_store_find(hald_get_gdl(),
-	    "/org/freedesktop/Hal/devices/computer")) ||
-	    (computer = hal_device_store_find(hald_get_tdl(),
-	    "/org/freedesktop/Hal/devices/computer"))) {
-		hal_device_property_set_string(computer,
-		    "power_management.type", "acpi");
-	}
-	devinfo_set_default_properties(d, parent, node, devfs_path);
-	devinfo_add_enqueue(d, devfs_path, &devinfo_acpi_handler);
-
-	return (d);
-}
-
-static HalDevice *
-devinfo_battery_add(HalDevice *parent, di_node_t node, char *devfs_path,
     char *device_type)
 {
 	HalDevice *d, *computer;
@@ -121,9 +86,11 @@ devinfo_battery_add(HalDevice *parent, di_node_t node, char *devfs_path,
 	    "/org/freedesktop/Hal/devices/computer"))) {
 		hal_device_property_set_string(computer,
 		    "system.formfactor", "laptop");
+		hal_device_property_set_string(computer,
+		    "power_management.type", "acpi");
 	}
 	devinfo_set_default_properties(d, parent, node, devfs_path);
-	devinfo_add_enqueue(d, devfs_path, &devinfo_battery_handler);
+	devinfo_add_enqueue(d, devfs_path, &devinfo_acpi_handler);
 
 	major = di_driver_major(node);
 	if ((devlink_hdl = di_devlink_init(NULL, 0)) == NULL) {
@@ -141,7 +108,7 @@ devinfo_battery_add(HalDevice *parent, di_node_t node, char *devfs_path,
 
 		if (hal_device_store_match_key_value_string(hald_get_gdl(),
 		    "solaris.devfs_path", minor_path) == NULL) {
-			devinfo_battery_add_minor(d, node, minor_path, dev);
+			devinfo_acpi_add_minor(d, node, minor_path, dev);
 		}
 
 		di_devfs_path_free(minor_path);
@@ -152,14 +119,14 @@ devinfo_battery_add(HalDevice *parent, di_node_t node, char *devfs_path,
 }
 
 void
-devinfo_battery_add_minor(HalDevice *parent, di_node_t node, char *minor_path,
+devinfo_acpi_add_minor(HalDevice *parent, di_node_t node, char *minor_path,
     dev_t dev)
 {
 	HalDevice *d;
 
 	d = hal_device_new();
 	devinfo_set_default_properties(d, parent, node, minor_path);
-	devinfo_add_enqueue(d, minor_path, &devinfo_battery_handler);
+	devinfo_add_enqueue(d, minor_path, &devinfo_acpi_handler);
 }
 
 static HalDevice *
@@ -260,7 +227,7 @@ devinfo_battery_rescan_probing_done(HalDevice *d, guint32 exit_type,
 }
 
 const gchar *
-devinfo_battery_get_prober(HalDevice *d, int *timeout)
+devinfo_acpi_get_prober(HalDevice *d, int *timeout)
 {
 	*timeout = DEVINFO_PROBE_BATTERY_TIMEOUT;    /* 30 second timeout */
 	return ("hald-probe-acpi");

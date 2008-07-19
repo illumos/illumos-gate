@@ -17,7 +17,6 @@
 #include "devinfo.h"
 
 extern DevinfoDevHandler devinfo_acpi_handler;
-extern DevinfoDevHandler devinfo_battery_handler;
 extern DevinfoDevHandler devinfo_power_button_handler;
 
 #define	MINOR_SHIFT			8
@@ -33,11 +32,11 @@ enum batt_type {
 
 HalDevice *devinfo_battery_add_major(HalDevice *parent, di_node_t node,
     char *devfs_path, char *device_type, gboolean rescan, HalDevice *battery_d);
-void devinfo_battery_add_minor(HalDevice *parent, di_node_t node,
+void devinfo_acpi_add_minor(HalDevice *parent, di_node_t node,
     char *minor_path, dev_t dev);
 void devinfo_battery_remove_minor(char *parent_devfs_path, gchar *udi);
 void devinfo_battery_device_rescan(char *parent_devfs_path, gchar *udi);
-const gchar *devinfo_battery_get_prober(HalDevice *d, int *timeout);
+const gchar *devinfo_acpi_get_prober(HalDevice *d, int *timeout);
 void devinfo_power_button_rescan(void);
 void devinfo_brightness_hotkeys_rescan(char *subclass);
 
