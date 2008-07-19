@@ -92,6 +92,7 @@ main(int argc, char *argv[])
 			}
 			/* free memory allocated for default authorizations */
 			free_auths(defauths, &defauth_cnt);
+			(void) printf("\n");
 		}
 		break;
 	}
