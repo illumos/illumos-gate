@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -137,6 +137,9 @@ void
 meta_slotManager_finalize() {
 	CK_ULONG slot;
 
+	/* If no slots to free, return */
+	if (slots == NULL)
+		return;
 	/*
 	 * No need to lock pool, we assume all meta sessions are closed.
 	 *
@@ -181,6 +184,7 @@ meta_slotManager_finalize() {
 
 	free(slots);
 	slots = NULL;
+	num_slots = 0;
 }
 
 
