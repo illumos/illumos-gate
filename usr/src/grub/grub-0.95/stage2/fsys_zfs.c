@@ -536,7 +536,7 @@ zap_leaf_lookup(zap_leaf_phys_t *l, int blksft, uint64_t h,
 			uint8_t *ip;
 
 			if (le->le_int_size != 8 || le->le_value_length != 1)
-				return (ERR_FSYS_CORRUPT);
+			    return (ERR_FSYS_CORRUPT);
 
 			/* get the uint64_t property value */
 			la = &ZAP_LEAF_CHUNK(l, blksft,
@@ -1133,7 +1133,7 @@ check_pool_label(int label, char *stack, char *outdevid, char *outpath)
 		return (ERR_READ);
 
 	vdev = (vdev_phys_t *)stack;
-	stack += sizeof(vdev_phys_t);
+	stack += sizeof (vdev_phys_t);
 
 	if (nvlist_unpack(vdev->vp_nvlist, &nvlist))
 		return (ERR_FSYS_CORRUPT);
@@ -1189,7 +1189,7 @@ zfs_mount(void)
 
 	/* if it's our first time here, zero the best uberblock out */
 	if (best_drive == 0 && best_part == 0 && find_best_root)
-	    grub_memset(&current_uberblock, 0, sizeof(uberblock_t));
+	    grub_memset(&current_uberblock, 0, sizeof (uberblock_t));
 
 	stackbase = ZFS_SCRATCH;
 	stack = stackbase;
@@ -1227,7 +1227,8 @@ zfs_mount(void)
 
 			VERIFY_OS_TYPE(osp, DMU_OST_META);
 
-			if (check_pool_label(label, stack, tmp_devid, tmp_bootpath))
+			if (check_pool_label(label, stack, tmp_devid,
+			    tmp_bootpath))
 				return (0);
 
 			if (find_best_root &&
@@ -1238,7 +1239,7 @@ zfs_mount(void)
 			grub_memmove(MOS, &osp->os_meta_dnode, DNODE_SIZE);
 			grub_memmove(&current_uberblock,
 			    &ubbest->ubp_uberblock,
-			    sizeof(uberblock_t));
+			    sizeof (uberblock_t));
 			grub_memmove(current_bootpath, tmp_bootpath,
 			    MAXNAMELEN);
 			grub_memmove(current_devid, tmp_devid,
