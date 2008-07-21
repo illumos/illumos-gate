@@ -1211,7 +1211,7 @@ e1000g_init(struct e1000g *Adapter)
 	/* Get the local ethernet address. */
 	if (!result) {
 		mutex_enter(&e1000g_nvm_lock);
-		e1000_read_mac_addr(hw);
+		result = e1000_read_mac_addr(hw);
 		mutex_exit(&e1000g_nvm_lock);
 	}
 
@@ -1245,8 +1245,9 @@ e1000g_init(struct e1000g *Adapter)
 			pba = E1000_PBA_40K;	/* 40K for Rx, 24K for Tx */
 		else
 			pba = E1000_PBA_48K;	/* 48K for Rx, 16K for Tx */
-	} else if (hw->mac.type >= e1000_82571 &&
-	    hw->mac.type <= e1000_80003es2lan) {
+	} else if ((hw->mac.type == e1000_82571) ||
+	    (hw->mac.type == e1000_82572) ||
+	    (hw->mac.type == e1000_80003es2lan)) {
 		/*
 		 * Total FIFO is 48K
 		 */

@@ -839,7 +839,7 @@ e1000g_tx_setup(struct e1000g *Adapter)
 		    DEFAULT_82542_TIPG_IPGR2 << E1000_TIPG_IPGR2_SHIFT;
 	} else if (hw->mac.type == e1000_80003es2lan) {
 		reg_tipg = DEFAULT_82543_TIPG_IPGR1;
-		reg_tipg = DEFAULT_80003ES2LAN_TIPG_IPGR2 <<
+		reg_tipg |= DEFAULT_80003ES2LAN_TIPG_IPGR2 <<
 		    E1000_TIPG_IPGR2_SHIFT;
 	} else {
 		if (hw->phy.media_type == e1000_media_type_fiber)
