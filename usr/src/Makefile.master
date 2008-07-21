@@ -185,6 +185,7 @@ XARGS=		/usr/bin/xargs
 ELFEDIT=	/usr/bin/elfedit
 ELFSIGN=	/usr/bin/elfsign
 DTRACE=		/usr/sbin/dtrace
+UNIQ=		/usr/bin/uniq
 
 FILEMODE=	644
 DIRMODE=	755

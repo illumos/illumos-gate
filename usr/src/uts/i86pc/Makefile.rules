@@ -229,7 +229,8 @@ $(OBJS_DIR)/%.o:		$(SRC)/common/mc/mc-amd/%.c
 #
 
 $(OBJS_DIR)/dtracestubs.s:	$(UNIX_O) $(LIBS)
-	nm -u $(UNIX_O) $(LIBS) | grep __dtrace_probe_ | sort | uniq | nawk '{ \
+	$(NM) -u $(UNIX_O) $(LIBS) | $(GREP) __dtrace_probe_ | $(SORT) | \
+	    $(UNIQ) | $(NAWK) '{ \
 	    printf("\t.globl %s\n\t.type %s,@function\n%s:\n", \
 	    $$1, $$1, $$1); }' > $(OBJS_DIR)/dtracestubs.s
 

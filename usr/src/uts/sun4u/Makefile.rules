@@ -161,7 +161,8 @@ $(OBJS_DIR)/%.o:		$(SRC)/common/atomic/sparcv9/%.s
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/dtracestubs.s:	$(UNIX_O) $(LIBS)
-	nm -u $(UNIX_O) $(LIBS) | grep __dtrace_probe_ | sort | uniq | nawk '{ \
+	$(NM) -u $(UNIX_O) $(LIBS) | $(GREP) __dtrace_probe_ | $(SORT) | \
+	    $(UNIQ) | $(NAWK) '{ \
 	    printf("\t.global %s\n\t.type %s, #function\n%s:\n", \
 	    $$1, $$1, $$1); }' > $(OBJS_DIR)/dtracestubs.s
 
