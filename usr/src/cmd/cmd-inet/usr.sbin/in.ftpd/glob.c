@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,7 +123,7 @@ char **ftpglob(register char *v)
     }
     fixpath(v);
     if (v[0] == '\0')
-	v = "*";
+	v = ".";
     else if ((strlen(v) > 1) && (v[strlen(v) - 1] == '/'))
 	v[strlen(v) - 1] = '\0';
 
