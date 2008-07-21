@@ -128,7 +128,11 @@ char current_bootpath[MAXNAMELEN];
 char current_rootpool[MAXNAMELEN];
 char current_bootfs[MAXNAMELEN];
 uint64_t current_bootfs_obj;
+char current_devid[MAXNAMELEN];
 int is_zfs_mount;
+unsigned long best_drive;
+unsigned long best_part;
+int find_best_root;
 
 /* disk buffer parameters */
 int buf_drive = -1;
@@ -686,7 +690,7 @@ next_partition (unsigned long drive, unsigned long dest,
 	  pcs_start = *start;	/* save the start of pc slice */
 	}
 
-      /* Search next valid BSD partition.  */
+      /* Search next valid Solaris partition.  */
       for (i = sol_part_no + 1; i < SOL_LABEL_NPARTS; i++)
 	{
 	  if (SOL_PART_EXISTS (buf, i))

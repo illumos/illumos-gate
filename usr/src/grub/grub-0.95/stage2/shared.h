@@ -666,7 +666,11 @@ extern char current_rootpool[MAXNAMELEN];
 extern char current_bootfs[MAXNAMELEN];
 extern char current_bootpath[MAXNAMELEN];
 extern unsigned long long current_bootfs_obj;
+extern char current_devid[MAXNAMELEN];
 extern int is_zfs_mount;
+extern unsigned long best_drive;
+extern unsigned long best_part;
+extern int find_best_root;
 
 extern int fsys_type;
 

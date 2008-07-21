@@ -30,94 +30,26 @@
 #include <sys/bootconf.h>
 
 char *
-spa_get_bootfs()
+spa_get_bootprop(char *propname)
 {
 	int proplen;
-	char *zfs_bp;
+	char *value;
 
-	proplen = BOP_GETPROPLEN(bootops, "zfs-bootfs");
-	if (proplen == 0)
+	proplen = BOP_GETPROPLEN(bootops, propname);
+	if (proplen <= 0)
 		return (NULL);
 
-	zfs_bp = kmem_zalloc(proplen, KM_SLEEP);
-	if (BOP_GETPROP(bootops, "zfs-bootfs", zfs_bp) == -1) {
-		kmem_free(zfs_bp, proplen);
+	value = kmem_zalloc(proplen, KM_SLEEP);
+	if (BOP_GETPROP(bootops, propname, value) == -1) {
+		kmem_free(value, proplen);
 		return (NULL);
 	}
 
-	return (zfs_bp);
+	return (value);
 }
 
 void
-spa_free_bootfs(char *bootfs)
+spa_free_bootprop(char *propname)
 {
-	kmem_free(bootfs, strlen(bootfs) + 1);
-}
-
-/*
- * Given the boot device physpath, check if the device is in a valid state.
- * If so, return the configuration from the vdev label.
- */
-int
-spa_get_rootconf(char *devpath, char **bestdev, nvlist_t **bestconf)
-{
-	nvlist_t *conf = NULL;
-	char *dev = NULL;
-	uint64_t txg = 0;
-	nvlist_t *nvtop, **child;
-	char *type;
-	uint_t children, c;
-
-	spa_check_rootconf(devpath, &dev, &conf, &txg);
-	if (txg == 0 || conf == NULL)
-		return (EINVAL);
-
-	VERIFY(nvlist_lookup_nvlist(conf, ZPOOL_CONFIG_VDEV_TREE,
-	    &nvtop) == 0);
-	VERIFY(nvlist_lookup_string(nvtop, ZPOOL_CONFIG_TYPE, &type) == 0);
-
-	if (strcmp(type, VDEV_TYPE_DISK) == 0) {
-		if (spa_rootdev_validate(nvtop))
-			goto out;
-		else
-			return (EINVAL);
-	}
-
-	ASSERT(strcmp(type, VDEV_TYPE_MIRROR) == 0);
-
-	VERIFY(nvlist_lookup_nvlist_array(nvtop, ZPOOL_CONFIG_CHILDREN,
-	    &child, &children) == 0);
-
-	/*
-	 * Go thru vdevs in the mirror to see if the given device (devpath)
-	 * is in a healthy state. Also check if the given device has the most
-	 * recent txg. Only the device with the most recent txg has valid
-	 * information and can be booted.
-	 */
-	for (c = 0; c < children; c++) {
-		char *physpath;
-
-		if (nvlist_lookup_string(child[c], ZPOOL_CONFIG_PHYS_PATH,
-		    &physpath) != 0)
-			return (EINVAL);
-
-		if (strcmp(devpath, physpath) == 0) {
-			if (!spa_rootdev_validate(child[c]))
-				return (EINVAL);
-		} else {
-			/* get dev with the highest txg */
-			if (spa_rootdev_validate(child[c])) {
-				spa_check_rootconf(physpath, &dev,
-				    &conf, &txg);
-			}
-		}
-	}
-
-	/* Does the given device have the most recent txg? */
-	if (strcmp(devpath, dev) != 0)
-		return (EINVAL);
-out:
-	*bestdev = dev;
-	*bestconf = conf;
-	return (0);
+	kmem_free(propname, strlen(propname) + 1);
 }

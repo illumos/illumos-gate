@@ -866,6 +866,7 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 	znode_t *zp = NULL;
 	vnode_t *vp = NULL;
 	char *zfs_bootfs;
+	char *zfs_devid;
 
 	ASSERT(vfsp);
 
@@ -885,40 +886,42 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 		 */
 		clkset(-1);
 
-		if ((zfs_bootfs = spa_get_bootfs()) == NULL) {
-			cmn_err(CE_NOTE, "\nspa_get_bootfs: can not get "
-			    "bootfs name \n");
+		if ((zfs_bootfs = spa_get_bootprop("zfs-bootfs")) == NULL) {
+			cmn_err(CE_NOTE, "spa_get_bootfs: can not get "
+			    "bootfs name");
 			return (EINVAL);
 		}
-
-		if (error = spa_import_rootpool(rootfs.bo_name)) {
-			spa_free_bootfs(zfs_bootfs);
-			cmn_err(CE_NOTE, "\nspa_import_rootpool: error %d\n",
+		zfs_devid = spa_get_bootprop("diskdevid");
+		error = spa_import_rootpool(rootfs.bo_name, zfs_devid);
+		if (zfs_devid)
+			spa_free_bootprop(zfs_devid);
+		if (error) {
+			spa_free_bootprop(zfs_bootfs);
+			cmn_err(CE_NOTE, "spa_import_rootpool: error %d",
 			    error);
 			return (error);
 		}
-
 		if (error = zfs_parse_bootfs(zfs_bootfs, rootfs.bo_name)) {
-			spa_free_bootfs(zfs_bootfs);
-			cmn_err(CE_NOTE, "\nzfs_parse_bootfs: error %d\n",
+			spa_free_bootprop(zfs_bootfs);
+			cmn_err(CE_NOTE, "zfs_parse_bootfs: error %d",
 			    error);
 			return (error);
 		}
 
-		spa_free_bootfs(zfs_bootfs);
+		spa_free_bootprop(zfs_bootfs);
 
 		if (error = vfs_lock(vfsp))
 			return (error);
 
 		if (error = zfs_domount(vfsp, rootfs.bo_name)) {
-			cmn_err(CE_NOTE, "\nzfs_domount: error %d\n", error);
+			cmn_err(CE_NOTE, "zfs_domount: error %d", error);
 			goto out;
 		}
 
 		zfsvfs = (zfsvfs_t *)vfsp->vfs_data;
 		ASSERT(zfsvfs);
 		if (error = zfs_zget(zfsvfs, zfsvfs->z_root, &zp)) {
-			cmn_err(CE_NOTE, "\nzfs_zget: error %d\n", error);
+			cmn_err(CE_NOTE, "zfs_zget: error %d", error);
 			goto out;
 		}
 

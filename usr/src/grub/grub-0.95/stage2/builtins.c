@@ -122,6 +122,7 @@ init_config (void)
   current_bootfs[0] = '\0';
   current_bootpath[0] = '\0';
   current_bootfs_obj = 0;
+  current_devid[0] = '\0';
   is_zfs_mount = 0;
 }
 
@@ -1518,6 +1519,21 @@ static struct builtin builtin_fallback =
 };
 
 
+
+void
+set_root (char *root, unsigned long drive, unsigned long part)
+{
+  int bsd_part = (part >> 8) & 0xFF;
+  int pc_slice = part >> 16;
+
+  if (bsd_part == 0xFF) {
+    grub_sprintf (root, "(hd%d,%d)\n", drive - 0x80, pc_slice);
+  } else {
+    grub_sprintf (root, "(hd%d,%d,%c)\n",
+		 drive - 0x80, pc_slice, bsd_part + 'a');
+  }
+}
+
 static int
 find_common (char *arg, char *root, int for_root, int flags)
 {
@@ -1589,7 +1605,7 @@ harddisk:
       char buf[SECTOR_SIZE];
 
       if (for_root && tmp_argpart) {
-	grub_sprintf(device, "(hd%d%s", drive - 0x80, argpart); 
+	grub_sprintf(device, "(hd%d%s", drive - 0x80, argpart);
 	set_device(device);
         errnum = ERR_NONE;
 	part = current_partition;
@@ -1598,18 +1614,16 @@ harddisk:
 	   saved_partition = current_partition;
            errnum = ERR_NONE;
 	   if (grub_open (filename)) {
-	      int bsd_part = (part >> 8) & 0xFF;
-	      int pc_slice = part >> 16;
 	      grub_close ();
 	      got_file = 1;
-	      if (bsd_part == 0xFF)
-		grub_sprintf (root, "(hd%d,%d)\n", drive - 0x80, pc_slice);
-	      else
-		grub_sprintf (root, "(hd%d,%d,%c)\n",
-			     drive - 0x80, pc_slice, bsd_part + 'a');
-	      goto out;
+	      if (is_zfs_mount == 0) {
+	        set_root(root, current_drive, current_partition);
+	        goto out;
+	      } else {
+		best_drive = current_drive;
+		best_part = current_partition;
+	      }
            }
-
 	}
         errnum = ERR_NONE;
 	continue;
@@ -1630,30 +1644,22 @@ harddisk:
 		  saved_partition = current_partition;
 		  if (grub_open (filename))
 		    {
-		      int bsd_part = (part >> 8) & 0xFF;
-		      int pc_slice = part >> 16;
-		      
+		      char tmproot[32];
+
 		      grub_close ();
 		      got_file = 1;
-		      
-		      if (bsd_part == 0xFF) {
-			if (for_root)  {
-			   grub_sprintf (root, "(hd%d,%d)\n",
-				     drive - 0x80, pc_slice);
-			   goto out;
-			} else
-			   grub_printf (" (hd%d,%d)\n",
-				     drive - 0x80, pc_slice);
+		      set_root(tmproot, drive, part);
+		      if (for_root) {
+		 	grub_memcpy(root, tmproot, sizeof(tmproot));
+			if (is_zfs_mount == 0) {
+			      goto out;
+			} else {
+			      best_drive = current_drive;
+			      best_part = current_partition;
+			}
 		      } else {
-			if (for_root) {
-			   grub_sprintf (root, "(hd%d,%d,%c)\n",
-				     drive - 0x80, pc_slice, bsd_part + 'a');
-			   goto out;
-			} else
-			   grub_printf (" (hd%d,%d,%c)\n",
-				     drive - 0x80, pc_slice, bsd_part + 'a');
+			grub_printf("%s", tmproot);
 		      }
-
 		    }
 		}
 	    }
@@ -1668,8 +1674,13 @@ harddisk:
     }
 
 out:
-  saved_drive = tmp_drive;
-  saved_partition = tmp_partition;
+  if (is_zfs_mount && for_root) {
+        set_root(root, best_drive, best_part);
+	buf_drive = -1;
+  } else {
+	saved_drive = tmp_drive;
+	saved_partition = tmp_partition;
+  }
   if (tmp_argpart)
 	*tmp_argpart = ',';
 
@@ -2752,7 +2763,7 @@ expand_dollar_bootfs(char *in, char *out)
 		token[0] = '\0';	
 		grub_sprintf(tmpout, "%s", in);
 		token[0] = '$';
-		in = token + 11; /* move over $ZFS-BOOTFS */
+		in = token + 11; /* skip over $ZFS-BOOTFS */
 		tmpout = out + strlen(out);
 
 		/* Note: %u only fits 32 bit integer; */ 
@@ -2791,6 +2802,16 @@ expand_dollar_bootfs(char *in, char *out)
 		grub_sprintf(tmpout,
 		    postcomma ? "bootpath=\"%s\"," : ",bootpath=\"%s\"",
 		    current_bootpath);
+		tmpout = out + strlen(out);
+	}
+	if (strlen(current_devid)) {
+		if ((outlen += 13 + strlen(current_devid)) > MAX_CMDLINE) {
+			errnum = ERR_WONT_FIT;
+			return (1);
+		}
+		grub_sprintf(tmpout,
+		    postcomma ? "diskdevid=\"%s\"," : ",diskdevid=\"%s\"",
+		    current_devid);
 	}
 
 	strncat(out, in, MAX_CMDLINE);
@@ -4010,11 +4031,14 @@ findroot_func (char *arg, int flags)
 	return 1;
   }
 
+  find_best_root = 1;
+  best_drive = 0;
+  best_part = 0;
   ret = find_common(arg, root, 1, flags);
   if (ret != 0)
 	return (ret);
+  find_best_root = 0;
 
-  is_zfs_mount = 0;
   return real_root_func (root, 1);
 }
 

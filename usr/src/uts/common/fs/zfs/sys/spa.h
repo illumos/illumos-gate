@@ -326,10 +326,10 @@ extern int spa_get_stats(const char *pool, nvlist_t **config,
     char *altroot, size_t buflen);
 extern int spa_create(const char *pool, nvlist_t *config, nvlist_t *props,
     const char *history_str);
-extern void spa_check_rootconf(char *devpath, char **the_dev_p,
-    nvlist_t **the_conf_p, uint64_t *the_txg_p);
+extern int spa_check_rootconf(char *devpath, char *devid,
+    nvlist_t **bestconf, uint64_t *besttxg);
 extern boolean_t spa_rootdev_validate(nvlist_t *nv);
-extern int spa_import_rootpool(char *devpath);
+extern int spa_import_rootpool(char *devpath, char *devid);
 extern int spa_import(const char *pool, nvlist_t *config, nvlist_t *props);
 extern int spa_import_faulted(const char *, nvlist_t *, nvlist_t *);
 extern nvlist_t *spa_tryimport(nvlist_t *tryconfig);

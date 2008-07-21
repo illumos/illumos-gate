@@ -599,22 +599,34 @@ vdev_ops_t vdev_disk_ops = {
 };
 
 /*
- * Given the root disk device pathname, read the label from the device,
- * and construct a configuration nvlist.
+ * Given the root disk device devid or pathname, read the label from
+ * the device, and construct a configuration nvlist.
  */
 nvlist_t *
-vdev_disk_read_rootlabel(char *devpath)
+vdev_disk_read_rootlabel(char *devpath, char *devid)
 {
 	nvlist_t *config = NULL;
 	ldi_handle_t vd_lh;
 	vdev_label_t *label;
 	uint64_t s, size;
 	int l;
+	ddi_devid_t tmpdevid;
+	int error = -1;
+	char *minor_name;
 
 	/*
 	 * Read the device label and build the nvlist.
 	 */
-	if (ldi_open_by_name(devpath, FREAD, kcred, &vd_lh, zfs_li))
+	if (devid != NULL && ddi_devid_str_decode(devid, &tmpdevid,
+	    &minor_name) == 0) {
+		error = ldi_open_by_devid(tmpdevid, minor_name,
+		    spa_mode, kcred, &vd_lh, zfs_li);
+		ddi_devid_free(tmpdevid);
+		ddi_devid_str_free(minor_name);
+	}
+
+	if (error && ldi_open_by_name(devpath, FREAD, kcred, &vd_lh,
+	    zfs_li))
 		return (NULL);
 
 	if (ldi_get_size(vd_lh, &s)) {
