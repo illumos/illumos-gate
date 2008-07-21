@@ -983,7 +983,10 @@ kcage_init(pgcnt_t preferred_size)
 		do {
 			ASSERT(!PP_ISFREE(pp));
 			ASSERT(pp->p_szc == 0);
-			PP_SETNORELOC(pp);
+			if (PP_ISNORELOC(pp) == 0) {
+				PP_SETNORELOC(pp);
+				PLCNT_XFER_NORELOC(pp);
+			}
 		} while ((pp = pp->p_vpnext) != kvp.v_pages);
 
 	}

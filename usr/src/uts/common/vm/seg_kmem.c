@@ -376,8 +376,10 @@ boot_mapin(caddr_t addr, size_t size)
 		 * If the cage is on but doesn't yet contain this page,
 		 * mark it as non-relocatable.
 		 */
-		if (kcage_on && !PP_ISNORELOC(pp))
+		if (kcage_on && !PP_ISNORELOC(pp)) {
 			PP_SETNORELOC(pp);
+			PLCNT_XFER_NORELOC(pp);
+		}
 
 		(void) page_hashin(pp, &kvp, (u_offset_t)(uintptr_t)addr, NULL);
 		pp->p_lckcnt = 1;

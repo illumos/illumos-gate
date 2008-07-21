@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,6 +71,7 @@
 #include <vm/seg_kmem.h>
 #include <vm/seg_map.h>
 #include <vm/seg_vn.h>
+#include <vm/vm_dep.h>
 
 #include <sys/exec.h>
 #include <sys/acct.h>
@@ -230,7 +231,10 @@ less_pages(uint64_t base, uint64_t len)
 
 			if (kcage_on) {
 				ASSERT(pp->p_szc == 0);
-				PP_SETNORELOC(pp);
+				if (PP_ISNORELOC(pp) == 0) {
+					PP_SETNORELOC(pp);
+					PLCNT_XFER_NORELOC(pp);
+				}
 			}
 			(void) page_pp_lock(pp, 0, 1);
 		}
