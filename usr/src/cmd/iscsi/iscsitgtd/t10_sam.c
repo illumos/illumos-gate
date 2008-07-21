@@ -84,7 +84,6 @@ static void *lu_runner(void *v);
 static Boolean_t t10_lu_initialize(t10_lu_common_t *lu, char *basedir);
 static void *t10_aio_done(void *v);
 static Boolean_t lu_remove_cmds(msg_t *m, void *v);
-static void lu_remove_all_cmds(t10_lu_impl_t *);
 static void cmd_common_free(t10_cmd_t *cmd);
 static Boolean_t load_params(t10_lu_common_t *lu, char *basedir);
 static Boolean_t fallocate(int fd, off64_t len);
@@ -308,7 +307,12 @@ t10_handle_destroy(t10_targ_handle_t tp, Boolean_t wait)
 					 * been canceled by the transport.
 					 * The initiator response won't
 					 * arrive since the connection
-					 * is shutting down.
+					 * is shutting down.  If the
+					 * backing store is closed, then
+					 * all the aio requests are
+					 * canceled by libaio, we can
+					 * free the t10_cmd in S4 or
+					 * S7 state.
 					 *
 					 * Other commands will be freed as
 					 * they are processed by the
@@ -317,7 +321,11 @@ t10_handle_destroy(t10_targ_handle_t tp, Boolean_t wait)
 					if ((c2free->c_state ==
 					    T10_Cmd_S5_Wait) ||
 					    (c2free->c_state ==
-					    T10_Cmd_S6_Freeing_In)) {
+					    T10_Cmd_S6_Freeing_In) ||
+					    (c2free->c_state ==
+					    T10_Cmd_S4_AIO) ||
+					    (c2free->c_state ==
+					    T10_Cmd_S7_Freeing_AIO)) {
 						fast_free++;
 						(void) t10_cmd_state_machine(
 						    c2free, T10_Cmd_T8);
@@ -1783,6 +1791,7 @@ lu_runner(void *v)
 	void		*provo_err;
 	t10_shutdown_t	*s;
 	t10_aio_t	*a;
+	t10_targ_impl_t	*t;
 
 	util_title(mgmtq, Q_STE_NONIO, lu->l_internal_num, "Start LU");
 
@@ -1874,6 +1883,7 @@ lu_runner(void *v)
 
 			s = (t10_shutdown_t *)m->msg_data;
 			itl = s->t_lu;
+			t = itl->l_targ;
 			(void) pthread_mutex_lock(&lu_list_mutex);
 			(void) pthread_mutex_lock(&lu->l_common_mutex);
 			assert(avl_find(&lu->l_all_open, (void *)itl, NULL) !=
@@ -1886,6 +1896,12 @@ lu_runner(void *v)
 			queue_message_set(s->t_q, 0, msg_shutdown_rsp,
 			    (void *)(uintptr_t)itl->l_targ_lun);
 			if (avl_numnodes(&lu->l_all_open) == 0) {
+				/*
+				 * Acquire mutex and close backing
+				 * store, this is to sync up with
+				 * t10_handle_destroy.
+				 */
+				(void) pthread_mutex_lock(&t->s_mutex);
 				queue_prt(mgmtq, Q_STE_NONIO,
 				    "LU_%x  No remaining targets for LU(%d)\n",
 				    lu->l_internal_num, lu->l_fd);
@@ -1897,16 +1913,16 @@ lu_runner(void *v)
 					    "LU_%x  Failed to close fd, "
 					    "errno=%d\n", lu->l_internal_num,
 					    errno);
+				else
+					lu->l_fd = -1;
 				/*CSTYLED*/
 				(*sam_emul_table[lu->l_dtype].t_common_fini)(lu);
-
-				/* shoot all t10_cmd */
-				lu_remove_all_cmds(itl);
 
 				avl_remove(&lu_list, (void *)lu);
 				util_title(mgmtq, Q_STE_NONIO,
 				    lu->l_internal_num, "End LU");
 				queue_free(lu->l_from_transports, NULL);
+				(void) pthread_mutex_unlock(&t->s_mutex);
 				(void) pthread_mutex_unlock(
 				    &lu->l_common_mutex);
 				(void) pthread_mutex_unlock(&lu_list_mutex);
@@ -2145,31 +2161,6 @@ lu_buserr_handler(int sig, siginfo_t *sip, void *v)
 	pthread_exit((void *)0);
 }
 
-/*
- * Remove all t10_cmds, since this is call from shutdown, just shoot a T8
- * and remove the iscsi command.  This is call from lu_rinner process
- * msg_shutdown.
- */
-static void
-lu_remove_all_cmds(t10_lu_impl_t *lu)
-{
-	t10_cmd_t	*c;
-	t10_cmd_t	*cnxt;
-	iscsi_cmd_t	*cmd;
-	iscsi_conn_t	*conn;
-
-	c = avl_first(&lu->l_cmds);
-	while (c != NULL) {
-		cmd = T10_TRANS_ID(c);
-		conn = cmd->c_allegiance;
-		cnxt = AVL_NEXT(&lu->l_cmds, c);
-		(void) pthread_mutex_lock(&conn->c_mutex);
-		(void) t10_cmd_shoot_event(c, T10_Cmd_T8);
-		iscsi_cmd_free(conn, cmd);
-		(void) pthread_mutex_unlock(&conn->c_mutex);
-		c = cnxt;
-	}
-}
 
 /*
  * []----
@@ -2230,8 +2221,10 @@ load_params(t10_lu_common_t *lu, char *basedir)
 	 */
 	if (lu->l_mmap != MAP_FAILED)
 		(void) munmap(lu->l_mmap, lu->l_size);
-	if (lu->l_fd != -1)
+	if (lu->l_fd != -1) {
 		(void) close(lu->l_fd);
+		lu->l_fd = -1;
+	}
 
 	node = lu->l_root;
 
