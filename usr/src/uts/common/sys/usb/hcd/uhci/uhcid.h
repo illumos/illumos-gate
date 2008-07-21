@@ -83,6 +83,7 @@ extern "C" {
 #define	UHCI_ONE_SECOND		drv_usectohz(1000000)
 #define	UHCI_ONE_MS		drv_usectohz(1000)
 #define	UHCI_32_MS		drv_usectohz(32*1000)
+#define	UHCI_256_MS		drv_usectohz(256*1000)
 #define	UHCI_MAX_INSTS		4
 
 #define	POLLED_RAW_BUF_SIZE	8

@@ -714,7 +714,7 @@ uhci_handle_get_device_status(
 
 /*
  * uhci_handle_root_hub_status_change:
- *	This function is called every 32 seconds from the time out handler.
+ *	This function is called every 256 ms from the time out handler.
  *	It checks for the status change of the root hub and its ports.
  */
 void
@@ -876,7 +876,7 @@ uhci_root_hub_allocate_intr_pipe_resource(
 	if (uhcip->uhci_timeout_id == 0) {
 		uhcip->uhci_timeout_id = timeout(
 		    uhci_handle_root_hub_status_change,
-		    (void *)uhcip, UHCI_32_MS);
+		    (void *)uhcip, UHCI_256_MS);
 		uhcip->uhci_root_hub.rh_pipe_state =
 		    UHCI_PIPE_STATE_ACTIVE;
 	}
