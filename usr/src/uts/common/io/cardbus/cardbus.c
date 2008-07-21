@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -735,21 +735,58 @@ cardbus_unload_cardbus(dev_info_t *dip)
 	cardbus_revert_properties(dip);
 }
 
-boolean_t
-cardbus_can_suspend(dev_info_t *dip)
+static boolean_t
+is_32bit_pccard(dev_info_t *dip)
 {
-#ifdef HOTPLUG
-	cbus_t *cbp;
-	int	cb_instance;
+	int len;
+	char bus_type[16];
 
-	cb_instance = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS, "cbus-instance", -1);
-	ASSERT(cb_instance >= 0);
-	cbp = (cbus_t *)ddi_get_soft_state(cardbus_state, cb_instance);
-	if (cbp->ostate == AP_OSTATE_UNCONFIGURED)
-		return (B_TRUE);
-#endif
-	return (B_FALSE);
+	len = sizeof (bus_type);
+	if (ddi_prop_op(DDI_DEV_T_ANY, ddi_get_parent(dip),
+		PROP_LEN_AND_VAL_BUF,
+		DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS,
+		"device_type",
+		(caddr_t)&bus_type, &len) != DDI_SUCCESS)
+		return (B_FALSE);
+
+	if ((strcmp(bus_type, "pci") != 0) &&
+	    (strcmp(bus_type, "pciex") != 0) &&
+	    (strcmp(bus_type, "cardbus") != 0)) /* not of pci type */
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+void
+cardbus_save_children(dev_info_t *dip)
+{
+	for (; dip != NULL; dip = ddi_get_next_sibling(dip)) {
+		cardbus_save_children(ddi_get_child(dip));
+
+		if (strcmp("pcs", ddi_node_name(dip)) == 0)
+			continue;
+		if (!is_32bit_pccard(dip))
+			continue;
+		cardbus_err(dip, 1, "Saving device\n");
+		(void) pci_save_config_regs(dip);
+	}
+
+}
+
+void
+cardbus_restore_children(dev_info_t *dip)
+{
+	for (; dip != NULL; dip = ddi_get_next_sibling(dip)) {
+		cardbus_restore_children(ddi_get_child(dip));
+
+		if (strcmp("pcs", ddi_node_name(dip)) == 0)
+			continue;
+		if (!is_32bit_pccard(dip))
+			continue;
+		cardbus_err(dip, 1, "restoring device\n");
+		(void) pci_restore_config_regs(dip);
+	}
+
 }
 
 static int
@@ -893,6 +930,8 @@ cardbus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	switch (ctlop) {
 	case DDI_CTLOPS_UNINITCHILD:
 		cardbus_removechild((dev_info_t *)arg);
+		return (DDI_SUCCESS);
+	case DDI_CTLOPS_POWER:
 		return (DDI_SUCCESS);
 
 	default:

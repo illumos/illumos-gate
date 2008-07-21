@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -125,7 +125,8 @@ extern int cardbus_close(dev_t, int, int, cred_t *);
 extern int cardbus_ioctl(dev_t, int, intptr_t, int, cred_t *,
 	    int *);
 extern boolean_t cardbus_is_cb_minor(dev_t);
-extern boolean_t cardbus_can_suspend(dev_info_t *);
+void cardbus_save_children(dev_info_t *dip);
+void cardbus_restore_children(dev_info_t *dip);
 #endif
 
 #ifdef  __cplusplus

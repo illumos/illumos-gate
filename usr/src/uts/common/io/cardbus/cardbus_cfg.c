@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -3656,7 +3656,7 @@ cardbus_set_standard_props(dev_info_t *parent, dev_info_t *dip,
 		return (ret);
 	}
 	val = (pci_config_get16(config_handle,
-	    PCI_CONF_STAT) & PCI_STAT_DEVSELT);
+	    PCI_CONF_STAT) & PCI_STAT_DEVSELT) >> 9;
 	if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 	    "devsel-speed", val)) != DDI_SUCCESS) {
 		return (ret);

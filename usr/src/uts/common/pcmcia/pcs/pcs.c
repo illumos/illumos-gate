@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -141,10 +140,15 @@ pcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int ret = DDI_SUCCESS;
 	int inum;
 	struct pcs_inst *inst;
-#ifdef lint
-	dip = dip;
-	cmd = cmd;
-#endif
+
+	switch (cmd) {
+	case DDI_RESUME:
+		return (DDI_SUCCESS);
+	case DDI_ATTACH:
+		break;
+	default:
+		return (DDI_FAILURE);
+	}
 
 	inum = ddi_get_instance(dip);
 
@@ -163,9 +167,16 @@ pcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 int
 pcs_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	if (cmd == DDI_DETACH) {
+	switch (cmd) {
+	case DDI_DETACH:
 		ddi_soft_state_free(pcs_instances, ddi_get_instance(dip));
 		return (DDI_SUCCESS);
+
+	case DDI_SUSPEND:
+	case DDI_PM_SUSPEND:
+		return (DDI_SUCCESS);
+	default:
+		break;
 	}
 	return (DDI_FAILURE);
 }

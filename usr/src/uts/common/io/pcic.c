@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -185,7 +185,6 @@ static struct dev_ops pcic_devops = {
 
 void *pcic_soft_state_p = NULL;
 static int pcic_maxinst = -1;
-static timeout_id_t pcic_delayed_resume_toid;
 
 int pcic_do_insertion = 1;
 int pcic_do_removal = 1;
@@ -298,6 +297,8 @@ static void pcic_set_cdtimers(pcicdev_t *, int, uint32_t, int);
 static void pcic_ready_wait(pcicdev_t *, int);
 extern int pcmcia_get_intr(dev_info_t *, int);
 extern int pcmcia_return_intr(dev_info_t *, int);
+extern void pcmcia_cb_suspended(int);
+extern void pcmcia_cb_resumed(int);
 
 static int pcic_callback(dev_info_t *, int (*)(), int);
 static int pcic_inquire_adapter(dev_info_t *, inquire_adapter_t *);
@@ -330,7 +331,7 @@ static int pcic_set_vcc_level(pcicdev_t *, set_socket_t *);
 static uint_t pcic_softintr(caddr_t, caddr_t);
 
 static void pcic_debounce(pcic_socket_t *);
-static void pcic_delayed_resume(void *);
+static void pcic_do_resume(pcicdev_t *);
 static void *pcic_add_debqueue(pcic_socket_t *, int);
 static void pcic_rm_debqueue(void *);
 static void pcic_deb_thread();
@@ -573,7 +574,7 @@ pcic_probe(dev_info_t *dip)
  */
 static int pci_config_reg_num = PCIC_PCI_CONFIG_REG_NUM;
 static int pci_control_reg_num = PCIC_PCI_CONTROL_REG_NUM;
-static int pcic_do_pcmcia_sr = 0;
+static int pcic_do_pcmcia_sr = 1;
 static int pcic_use_cbpwrctl = PCF_CBPWRCTL;
 
 /*
@@ -651,31 +652,11 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			pcic->pc_flags &= ~PCF_SUSPENDED;
 			mutex_exit(&pcic->pc_lock);
 			(void) pcmcia_begin_resume(dip);
-			/*
-			 * this will do the CARD_INSERTION
-			 * due to needing time for threads to
-			 * run, it must be delayed for a short amount
-			 * of time.  pcmcia_wait_insert checks for all
-			 * children to be removed and then triggers insert.
-			 */
-			/*
-			 * The reason for having a single timeout here
-			 * rather than seperate timeout()s for each instance
-			 * is due to the limited number (2) of callout threads
-			 * available in Solaris 2.6. A single 1250A ends up
-			 * as two instances of the interface with one slot each.
-			 * The pcic_delayed_resume() function ends by calling
-			 * pcmcia_wait_insert() which at one point does a
-			 * delay(). delay() is implemented with a timeout()
-			 * call so you end up with both the callout()
-			 * threads waiting to be woken up by another callout().
-			 * This situation locks up the machine hence the
-			 * convolution here to only use one timeout.
-			 */
-			if (!pcic_delayed_resume_toid)
-				pcic_delayed_resume_toid =
-				    timeout(pcic_delayed_resume, (caddr_t)0,
-				    drv_usectohz(pcic_wait_insert_time));
+
+			pcic_do_resume(pcic);
+#ifdef CARDBUS
+			cardbus_restore_children(ddi_get_child(dip));
+#endif
 
 			/*
 			 * for complete implementation need END_RESUME (later)
@@ -1678,19 +1659,19 @@ pcic_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 */
 		mutex_enter(&pcic->pc_lock);
 #ifdef CARDBUS
-		if (pcic->pc_flags & PCF_CARDBUS)
-			for (i = 0; i < pcic->pc_numsockets; i++)
+		if (pcic->pc_flags & PCF_CARDBUS) {
+			for (i = 0; i < pcic->pc_numsockets; i++) {
 				if ((pcic->pc_sockets[i].pcs_flags &
 				    (PCS_CARD_PRESENT|PCS_CARD_ISCARDBUS)) ==
-				    (PCS_CARD_PRESENT|PCS_CARD_ISCARDBUS))
-					if (!cardbus_can_suspend(dip)) {
-						mutex_exit(&pcic->pc_lock);
-						cmn_err(CE_WARN,
-						    "Please unconfigure all "
-						    "CardBus devices before "
-						    "attempting to suspend\n");
-						return (DDI_FAILURE);
-					}
+				    (PCS_CARD_PRESENT|PCS_CARD_ISCARDBUS)) {
+
+					pcmcia_cb_suspended(
+						pcic->pc_sockets[i].pcs_socket);
+				}
+			}
+
+			cardbus_save_children(ddi_get_child(dip));
+		}
 #endif
 		/* turn everything off for all sockets and chips */
 		for (i = 0; i < pcic->pc_numsockets; i++) {
@@ -1727,7 +1708,6 @@ pcic_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		pcic->pc_flags |= PCF_SUSPENDED;
 		mutex_exit(&pcic->pc_lock);
-		pcic_delayed_resume_toid = 0;
 
 		/*
 		 * when true power management exists, save the adapter
@@ -6057,7 +6037,9 @@ pcic_load_cardbus(pcicdev_t *pcic, const pcic_socket_t *sockp)
 	s.VccLevel = vccLevel;
 	s.Vpp1Level = s.Vpp2Level = 0;
 
-	if (pcic_set_socket(dip, &s) != SUCCESS)
+	retval = pcic_set_socket(dip, &s);
+	pcmcia_cb_resumed(s.socket);
+	if (retval != SUCCESS)
 		goto failure;
 
 	retval = cardbus_load_cardbus(dip, sockp->pcs_socket, pcic->pc_base);
@@ -6317,42 +6299,52 @@ pcic_fault(enum pci_fault_ops op, void *arg)
 #endif
 
 static void
-pcic_delayed_resume(void *arg)
+pcic_do_resume(pcicdev_t *pcic)
 {
-	int	i, j, interrupt;
-	anp_t *pcic_nexus;
-	pcicdev_t *pcic;
+	int	i, interrupt;
+	uint8_t cfg;
 
-	_NOTE(ARGUNUSED(arg))
 
 #if defined(PCIC_DEBUG)
-	pcic_err(NULL, 6, "pcic_delayed_resume(): entered\n");
+	pcic_err(NULL, 6, "pcic_do_resume(): entered\n");
 #endif
-	for (j = 0; j <= pcic_maxinst; j++) {
 
-		pcic_nexus = ddi_get_soft_state(pcic_soft_state_p, j);
-		if (!pcic_nexus)
-			continue;
-		pcic = (pcicdev_t *)pcic_nexus->an_private;
-		if (!pcic)
-			continue;
-
-		pcic_mutex_enter(&pcic->pc_lock); /* protect the registers */
-		for (i = 0; i < pcic->pc_numsockets; i++) {
-			/* Enable interrupts  on PCI if needs be */
-			interrupt = pcic_getb(pcic, i, PCIC_INTERRUPT);
-			if (pcic->pc_flags & PCF_USE_SMI)
-				interrupt |= PCIC_INTR_ENABLE;
-			pcic_putb(pcic, i, PCIC_INTERRUPT,
-			    PCIC_RESET | interrupt);
-			pcic->pc_sockets[i].pcs_debounce_id =
-			    pcic_add_debqueue(&pcic->pc_sockets[i],
-			    drv_usectohz(pcic_debounce_time));
-		}
-		pcic_mutex_exit(&pcic->pc_lock); /* protect the registers */
-		if (pcic_do_pcmcia_sr)
-			(void) pcmcia_wait_insert(pcic->dip);
+	pcic_mutex_enter(&pcic->pc_lock); /* protect the registers */
+	for (i = 0; i < pcic->pc_numsockets; i++) {
+		/* Enable interrupts  on PCI if needs be */
+		interrupt = pcic_getb(pcic, i, PCIC_INTERRUPT);
+		if (pcic->pc_flags & PCF_USE_SMI)
+			interrupt |= PCIC_INTR_ENABLE;
+		pcic_putb(pcic, i, PCIC_INTERRUPT,
+		    PCIC_RESET | interrupt);
+		pcic->pc_sockets[i].pcs_debounce_id =
+		    pcic_add_debqueue(&pcic->pc_sockets[i],
+		    drv_usectohz(pcic_debounce_time));
 	}
+	pcic_mutex_exit(&pcic->pc_lock); /* protect the registers */
+	if (pcic_do_pcmcia_sr)
+		(void) pcmcia_wait_insert(pcic->dip);
+	/*
+	 * The CardBus controller may be in RESET state after the
+	 * system is resumed from sleeping. The RESET bit is in
+	 * the Bridge Control register. This is true for all(TI,
+	 * Toshiba ToPIC95/97, RICOH, and O2Micro) CardBus
+	 * controllers. Need to clear the RESET bit explicitly.
+	 */
+	cfg = ddi_get8(pcic->cfg_handle,
+		pcic->cfgaddr + PCIC_BRIDGE_CTL_REG);
+	if (cfg & (1<<6)) {
+		cfg &= ~(1<<6);
+		ddi_put8(pcic->cfg_handle,
+			pcic->cfgaddr + PCIC_BRIDGE_CTL_REG,
+			cfg);
+		cfg = ddi_get8(pcic->cfg_handle,
+			pcic->cfgaddr + PCIC_BRIDGE_CTL_REG);
+		if (cfg & (1<<6)) {
+		    pcic_err(pcic->dip, 1, "Failed to take pcic out of reset");
+		}
+	}
+
 }
 
 static void

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -746,6 +746,10 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		return (DDI_FAILURE);
 		/* These CTLOPS will need to be implemented for new form */
 		/* let CardServices know about this */
+	case DDI_CTLOPS_DETACH:
+		return (DDI_SUCCESS);
+	case DDI_CTLOPS_ATTACH:
+		return (DDI_SUCCESS);
 
 	default:
 		/* if we don't understand, pass up the tree */
@@ -1953,35 +1957,36 @@ SocketServices(int function, ...)
 			break;
 		}
 
-		for (func = 0; func < sockp->ls_functions; func++) {
-			/*
-			 * break the association of dip and socket
-			 * for all functions on that socket
-			 */
-			dip = sockp->ls_dip[func];
-			sockp->ls_dip[func] = NULL;
-			if (dip != NULL) {
-				struct pcmcia_parent_private *ppd;
-				ppd = (struct pcmcia_parent_private *)
-				    ddi_get_parent_data(dip);
-				ppd->ppd_active = 0;
-				(void) ndi_devi_offline(dip,
-				    NDI_DEVI_REMOVE);
+		if (!(sockp->ls_flags & PCS_SUSPENDED)) {
+			for (func = 0; func < sockp->ls_functions; func++) {
+				/*
+				 * break the association of dip and socket
+				 * for all functions on that socket
+				 */
+				dip = sockp->ls_dip[func];
+				sockp->ls_dip[func] = NULL;
+				if (dip != NULL) {
+					struct pcmcia_parent_private *ppd;
+					ppd = (struct pcmcia_parent_private *)
+					    ddi_get_parent_data(dip);
+					ppd->ppd_active = 0;
+					(void) ndi_devi_offline(dip,
+					    NDI_DEVI_REMOVE);
 
-				pcmcia_ppd_free(ppd);
-			}
+					pcmcia_ppd_free(ppd);
+				}
 #if defined(PCMCIA_DEBUG)
-			else {
-				if (pcmcia_debug)
-					cmn_err(CE_CONT,
-					    "CardRemoved: no "
-					    "dip present "
-					    "on socket %d!\n",
-					    (int)args[0]);
-			}
+				else {
+					if (pcmcia_debug)
+						cmn_err(CE_CONT,
+						    "CardRemoved: no "
+						    "dip present "
+						    "on socket %d!\n",
+						    (int)args[0]);
+				}
 #endif
-		}
-		if (sockp->ls_flags & PCS_SUSPENDED) {
+			}
+		} else {
 			mutex_enter(&pcmcia_global_lock);
 			sockp->ls_flags &= ~PCS_SUSPENDED;
 			cv_broadcast(&pcmcia_condvar);
@@ -4245,6 +4250,38 @@ pcmcia_begin_resume(dev_info_t *dip)
 	}
 }
 
+/*
+ * mark a cardbus card as "suspended" in the pcmcia module
+ */
+void
+pcmcia_cb_suspended(int socket)
+{
+	mutex_enter(&pcmcia_global_lock);
+	pcmcia_sockets[socket]->ls_flags |= PCS_SUSPENDED;
+	mutex_exit(&pcmcia_global_lock);
+
+}
+
+/*
+ * mark a cardbus card as "resumed" in the pcmcia module
+ */
+void
+pcmcia_cb_resumed(int socket)
+{
+	if (pcmcia_sockets[socket]->ls_flags & PCS_SUSPENDED) {
+		mutex_enter(&pcmcia_global_lock);
+		pcmcia_sockets[socket]->ls_flags &= ~PCS_SUSPENDED;
+		cv_broadcast(&pcmcia_condvar);
+		mutex_exit(&pcmcia_global_lock);
+#ifdef PCMCIA_DEBUG
+		if (pcmcia_debug) {
+			cmn_err(CE_NOTE, "pcmcia_cb_resume RESUMED");
+		}
+#endif
+	}
+
+}
+
 void
 pcmcia_wait_insert(dev_info_t *dip)
 {
@@ -4272,6 +4309,14 @@ pcmcia_wait_insert(dev_info_t *dip)
 				if (pcmcia_sockets[s] &&
 				    pcmcia_sockets[s]->ls_flags &
 				    PCS_SUSPENDED) {
+
+#ifdef PCMCIA_DEBUG
+					if (pcmcia_debug) {
+						cmn_err(CE_NOTE,
+						"pcmcia_wait_insert: "
+						"socket in SUSPENDED state");
+					}
+#endif
 					done = 0;
 					break;
 				}
@@ -4285,6 +4330,10 @@ pcmcia_wait_insert(dev_info_t *dip)
 			tries = 0;
 		}
 		mutex_exit(&pcmcia_global_lock);
+	}
+
+	if (tries == 0) {
+		cmn_err(CE_NOTE, "pcmcia_wait_insert timed out");
 	}
 
 	nexus = (anp_t *)ddi_get_driver_private(dip);
