@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <sys/stat.h>
 #include <sys/stream.h>
 #include <sys/strsun.h>
+#include <sys/stropts.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/sunldi.h>
@@ -203,7 +204,7 @@ sdp_gen_ioctl(queue_t *q, mblk_t *mp)
 			 */
 			rw_enter(&sdp_transport_lock, RW_READER);
 			if ((enable == 1) && (sdp_transport_handle == NULL) &&
-				(priv == B_TRUE)) {
+			    (priv == B_TRUE)) {
 				/* Initialize sdpib transport driver */
 				rw_exit(&sdp_transport_lock);
 				ret = sdp_open_sdpib_driver();
@@ -253,11 +254,19 @@ static void
 sdp_gen_wput(queue_t *q, mblk_t *mp)
 {
 	switch (mp->b_datap->db_type) {
-		case M_IOCTL:
-			sdp_gen_ioctl(q, mp);
-			break;
-		default:
-			return;
+	case M_IOCTL:
+		sdp_gen_ioctl(q, mp);
+		break;
+	case M_FLUSH:
+		*mp->b_rptr &= ~FLUSHW;
+		if (*mp->b_rptr & FLUSHR)
+			qreply(q, mp);
+		else
+			freemsg(mp);
+		break;
+	default:
+		freemsg(mp);
+		return;
 	}
 }
 
@@ -279,46 +288,8 @@ struct streamtab sdpinfo = {
 	&rinit, &winit, NULL, NULL
 };
 
-/* Stream operations */
-static struct streamtab sdp_streamtab = {
-	&rinit,	/* read queue */
-	&winit,	/* write queue */
-};
-
-/* Character/block operations */
-static struct cb_ops sdp_cb_ops = {
-	nodev,		/* open */
-	nodev,		/* close */
-	nodev,		/* strategy */
-	nodev,		/* print */
-	nodev,		/* dump */
-	nodev,		/* read */
-	nodev,		/* write */
-	nodev,	/* ioctl */
-	nodev,		/* devmap */
-	nodev,		/* mmap */
-	nodev,		/* segmap */
-	nochpoll,	/* chpoll */
-	ddi_prop_op,	/* prop_op (sun DDI-specific) */
-	&sdp_streamtab,	/* streams */
-	D_MP,
-	CB_REV
-};
-
-/* Driver operations */
-static struct dev_ops sdp_devops = {
-	DEVO_REV,	/* struct rev */
-	0,		/* refcnt */
-	nodev,		/* getinfo */
-	nulldev,	/* identify */
-	nulldev,	/* probe */
-	sdp_gen_attach,	/* attach */
-	sdp_gen_detach,	/* detach */
-	nodev,		/* reset */
-	&sdp_cb_ops,	/* cb_ops */
-	NULL,		/* bus_ops */
-	nodev		/* power */
-};
+DDI_DEFINE_STREAM_OPS(sdp_devops, nulldev, nulldev, sdp_gen_attach,
+    sdp_gen_detach, nodev, NULL, D_MP, &sdpinfo);
 
 /*
  * Module linkage information for the kernel.
