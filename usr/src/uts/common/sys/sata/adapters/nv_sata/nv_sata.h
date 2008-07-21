@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,6 +174,7 @@ typedef struct nv_slot {
 	caddr_t		nvslot_v_addr;	/* I/O buffer address */
 	size_t		nvslot_byte_count; /* # bytes left to read/write */
 	sata_pkt_t	*nvslot_spkt;
+	uint8_t		nvslot_rqsense_buff[SATA_ATAPI_RQSENSE_LEN];
 	clock_t		nvslot_stime;
 	int		(*nvslot_start)(nv_port_t *nvp, int queue);
 	void		(*nvslot_intr)(nv_port_t *nvp,
@@ -186,7 +187,8 @@ typedef struct nv_slot {
  * nvslot_flags
  */
 #define	NVSLOT_COMPLETE 0x01
-#define	NVSLOT_NCQ	0x02 /* NCQ is active */
+#define	NVSLOT_NCQ	0x02	/* NCQ is active */
+#define	NVSLOT_RQSENSE	0x04	/* processing request sense */
 
 /*
  * state values for nv_attach
@@ -228,6 +230,7 @@ typedef struct nv_slot {
 #define	NVDBG_COOKIES	0x1000
 #define	NVDBG_HOT	0x2000
 #define	NVDBG_PROBE	0x4000
+#define	NVDBG_ATAPI	0x8000
 
 #ifdef DEBUG
 #define	NVLOG(a) nv_log a

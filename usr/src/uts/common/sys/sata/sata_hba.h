@@ -709,6 +709,7 @@ void 	sata_hba_fini(struct modlinkage *);
 void 	sata_hba_event_notify(dev_info_t *, sata_device_t *, int);
 sata_pkt_t *sata_get_error_retrieval_pkt(dev_info_t *, sata_device_t *, int);
 void	sata_free_error_retrieval_pkt(sata_pkt_t *);
+void	sata_free_dma_resources(sata_pkt_t *);
 
 
 #ifdef	__cplusplus

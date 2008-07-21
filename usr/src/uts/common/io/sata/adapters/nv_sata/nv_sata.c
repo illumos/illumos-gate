@@ -110,6 +110,8 @@ static int nv_start_pio_in(nv_port_t *nvp, int slot);
 static int nv_start_pio_out(nv_port_t *nvp, int slot);
 static void nv_intr_pio_in(nv_port_t *nvp, nv_slot_t *spkt);
 static void nv_intr_pio_out(nv_port_t *nvp, nv_slot_t *spkt);
+static int nv_start_pkt_pio(nv_port_t *nvp, int slot);
+static void nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp);
 static int nv_start_dma(nv_port_t *nvp, int slot);
 static void nv_intr_dma(nv_port_t *nvp, struct nv_slot *spkt);
 static void nv_log(uint_t flag, nv_ctl_t *nvc, nv_port_t *nvp, char *fmt, ...);
@@ -151,6 +153,7 @@ static int nv_wait3(nv_port_t *nvp, uchar_t onbits1, uchar_t offbits1,
     uint_t timeout_usec, int type_wait);
 static int nv_wait(nv_port_t *nvp, uchar_t onbits, uchar_t offbits,
     uint_t timeout_usec, int type_wait);
+static int nv_start_rqsense_pio(nv_port_t *nvp, nv_slot_t *nv_slotp);
 
 
 /*
@@ -214,6 +217,21 @@ static struct dev_ops nv_dev_ops = {
 	NULL,			/* bus operations */
 	NULL			/* power */
 };
+
+
+/*
+ * Request Sense CDB for ATAPI
+ */
+static const uint8_t nv_rqsense_cdb[16] = {
+	SCMD_REQUEST_SENSE,
+	0,
+	0,
+	0,
+	SATA_ATAPI_MIN_RQSENSE_LEN,
+	0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0	/* pad out to max CDB length */
+};
+
 
 static sata_tran_hotplug_ops_t nv_hotplug_ops;
 
@@ -1004,12 +1022,14 @@ nv_sata_probe(dev_info_t *dip, sata_device_t *sd)
 	    TICK_TO_MSEC(nv_lbolt - nvp->nvp_probe_time)));
 
 	/*
-	 * nv_sata only deals with ATA disks so far.  If it is
-	 * not an ATA disk, then just return.
+	 * nv_sata only deals with ATA disks and ATAPI CD/DVDs so far.  If
+	 * it is not either of those, then just return.
 	 */
-	if (nvp->nvp_type != SATA_DTYPE_ATADISK) {
-		nv_cmn_err(CE_WARN, nvc, nvp, "Driver currently handles only"
-		    " disks.  Signature acquired was %X", nvp->nvp_signature);
+	if ((nvp->nvp_type != SATA_DTYPE_ATADISK) &&
+	    (nvp->nvp_type != SATA_DTYPE_ATAPICD)) {
+		NVLOG((NVDBG_PROBE, nvc, nvp, "Driver currently handles only"
+		    " disks/CDs/DVDs.  Signature acquired was %X",
+		    nvp->nvp_signature));
 		mutex_exit(&nvp->nvp_mutex);
 
 		return (SATA_SUCCESS);
@@ -1093,16 +1113,6 @@ nv_sata_start(dev_info_t *dip, sata_pkt_t *spkt)
 		mutex_exit(&nvp->nvp_mutex);
 
 		return (SATA_TRAN_PORT_ERROR);
-	}
-
-	if (spkt->satapkt_device.satadev_type == SATA_DTYPE_ATAPICD) {
-		ASSERT(nvp->nvp_type == SATA_DTYPE_ATAPICD);
-		nv_cmn_err(CE_WARN, nvc, nvp,
-		    "optical devices not supported");
-		spkt->satapkt_reason = SATA_PKT_CMD_UNSUPPORTED;
-		mutex_exit(&nvp->nvp_mutex);
-
-		return (SATA_TRAN_CMD_UNSUPPORTED);
 	}
 
 	if (spkt->satapkt_device.satadev_type == SATA_DTYPE_PMULT) {
@@ -1706,6 +1716,25 @@ nv_start_common(nv_port_t *nvp, sata_pkt_t *spkt)
 		NVLOG((NVDBG_DELIVER, nvc,  nvp, "DMA command"));
 		nv_slotp->nvslot_start = nv_start_dma;
 		nv_slotp->nvslot_intr = nv_intr_dma;
+	} else if (spkt->satapkt_cmd.satacmd_cmd_reg == SATAC_PACKET) {
+		NVLOG((NVDBG_DELIVER, nvc,  nvp, "packet command"));
+		nv_slotp->nvslot_start = nv_start_pkt_pio;
+		nv_slotp->nvslot_intr = nv_intr_pkt_pio;
+		if ((direction == SATA_DIR_READ) ||
+		    (direction == SATA_DIR_WRITE)) {
+			nv_slotp->nvslot_byte_count =
+			    spkt->satapkt_cmd.satacmd_bp->b_bcount;
+			nv_slotp->nvslot_v_addr =
+			    spkt->satapkt_cmd.satacmd_bp->b_un.b_addr;
+			/*
+			 * Freeing DMA resources allocated by the framework
+			 * now to avoid buffer overwrite (dma sync) problems
+			 * when the buffer is released at command completion.
+			 * Primarily an issue on systems with more than
+			 * 4GB of memory.
+			 */
+			sata_free_dma_resources(spkt);
+		}
 	} else if (direction == SATA_DIR_NODATA_XFER) {
 		NVLOG((NVDBG_DELIVER, nvc, nvp, "non-data command"));
 		nv_slotp->nvslot_start = nv_start_nodata;
@@ -1718,6 +1747,14 @@ nv_start_common(nv_port_t *nvp, sata_pkt_t *spkt)
 		    spkt->satapkt_cmd.satacmd_bp->b_bcount;
 		nv_slotp->nvslot_v_addr =
 		    spkt->satapkt_cmd.satacmd_bp->b_un.b_addr;
+		/*
+		 * Freeing DMA resources allocated by the framework now to
+		 * avoid buffer overwrite (dma sync) problems when the buffer
+		 * is released at command completion.  This is not an issue
+		 * for write because write does not update the buffer.
+		 * Primarily an issue on systems with more than 4GB of memory.
+		 */
+		sata_free_dma_resources(spkt);
 	} else if (direction == SATA_DIR_WRITE) {
 		NVLOG((NVDBG_DELIVER, nvc, nvp, "pio out command"));
 		nv_slotp->nvslot_start = nv_start_pio_out;
@@ -2071,12 +2108,12 @@ nv_init_ctl(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
 	}
 
 
-	stran.sata_tran_hba_rev = SATA_TRAN_HBA_REV;
+	stran.sata_tran_hba_rev = SATA_TRAN_HBA_REV_2;
 	stran.sata_tran_hba_dip = nvc->nvc_dip;
 	stran.sata_tran_hba_dma_attr = &buffer_dma_attr;
 	stran.sata_tran_hba_num_cports = NV_NUM_CPORTS;
 	stran.sata_tran_hba_features_support =
-	    SATA_CTLF_HOTPLUG | SATA_CTLF_ASN;
+	    SATA_CTLF_HOTPLUG | SATA_CTLF_ASN | SATA_CTLF_ATAPI;
 	stran.sata_tran_hba_qdepth = NV_QUEUE_SLOTS;
 	stran.sata_tran_probe_port = nv_sata_probe;
 	stran.sata_tran_start = nv_sata_start;
@@ -3851,6 +3888,114 @@ nv_start_pio_out(nv_port_t *nvp, int slot)
 
 
 /*
+ * start a ATAPI Packet command (PIO data in or out)
+ */
+static int
+nv_start_pkt_pio(nv_port_t *nvp, int slot)
+{
+	nv_slot_t *nv_slotp = &(nvp->nvp_slot[slot]);
+	sata_pkt_t *spkt = nv_slotp->nvslot_spkt;
+	ddi_acc_handle_t cmdhdl = nvp->nvp_cmd_hdl;
+	sata_cmd_t *satacmd = &spkt->satapkt_cmd;
+
+	NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+	    "nv_start_pkt_pio: start"));
+
+	/*
+	 * Write the PACKET command to the command register.  Normally
+	 * this would be done through nv_program_taskfile_regs().  It
+	 * is done here because some values need to be overridden.
+	 */
+
+	/* select the drive */
+	nv_put8(cmdhdl, nvp->nvp_drvhd, satacmd->satacmd_device_reg);
+
+	/* make certain the drive selected */
+	if (nv_wait(nvp, SATA_STATUS_DRDY, SATA_STATUS_BSY,
+	    NV_SEC2USEC(5), 0) == B_FALSE) {
+		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_start_pkt_pio: drive select failed"));
+		return (SATA_TRAN_PORT_ERROR);
+	}
+
+	/*
+	 * The command is always sent via PIO, despite whatever the SATA
+	 * framework sets in the command.  Overwrite the DMA bit to do this.
+	 * Also, overwrite the overlay bit to be safe (it shouldn't be set).
+	 */
+	nv_put8(cmdhdl, nvp->nvp_feature, 0);	/* deassert DMA and OVL */
+
+	/* set appropriately by the sata framework */
+	nv_put8(cmdhdl, nvp->nvp_hcyl, satacmd->satacmd_lba_high_lsb);
+	nv_put8(cmdhdl, nvp->nvp_lcyl, satacmd->satacmd_lba_mid_lsb);
+	nv_put8(cmdhdl, nvp->nvp_sect, satacmd->satacmd_lba_low_lsb);
+	nv_put8(cmdhdl, nvp->nvp_count, satacmd->satacmd_sec_count_lsb);
+
+	/* initiate the command by writing the command register last */
+	nv_put8(cmdhdl, nvp->nvp_cmd, spkt->satapkt_cmd.satacmd_cmd_reg);
+
+	/* Give the host controller time to do its thing */
+	NV_DELAY_NSEC(400);
+
+	/*
+	 * Wait for the device to indicate that it is ready for the command
+	 * ATAPI protocol state - HP0: Check_Status_A
+	 */
+
+	if (nv_wait3(nvp, SATA_STATUS_DRQ, SATA_STATUS_BSY, /* okay */
+	    SATA_STATUS_ERR, SATA_STATUS_BSY, /* cmd failed */
+	    SATA_STATUS_DF, SATA_STATUS_BSY, /* drive failed */
+	    4000000, 0) == B_FALSE) {
+		/*
+		 * Either an error or device fault occurred or the wait
+		 * timed out.  According to the ATAPI protocol, command
+		 * completion is also possible.  Other implementations of
+		 * this protocol don't handle this last case, so neither
+		 * does this code.
+		 */
+
+		if (nv_get8(cmdhdl, nvp->nvp_status) &
+		    (SATA_STATUS_ERR | SATA_STATUS_DF)) {
+			spkt->satapkt_reason = SATA_PKT_DEV_ERROR;
+
+			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			    "nv_start_pkt_pio: device error (HP0)"));
+		} else {
+			spkt->satapkt_reason = SATA_PKT_TIMEOUT;
+
+			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			    "nv_start_pkt_pio: timeout (HP0)"));
+		}
+
+		nv_copy_registers(nvp, &spkt->satapkt_device, spkt);
+		nv_complete_io(nvp, spkt, 0);
+		nv_reset(nvp);
+
+		return (SATA_TRAN_PORT_ERROR);
+	}
+
+	/*
+	 * Put the ATAPI command in the data register
+	 * ATAPI protocol state - HP1: Send_Packet
+	 */
+
+	ddi_rep_put16(cmdhdl, (ushort_t *)spkt->satapkt_cmd.satacmd_acdb,
+	    (ushort_t *)nvp->nvp_data,
+	    (spkt->satapkt_cmd.satacmd_acdb_len >> 1), DDI_DEV_NO_AUTOINCR);
+
+	/*
+	 * See you in nv_intr_pkt_pio.
+	 * ATAPI protocol state - HP3: INTRQ_wait
+	 */
+
+	NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+	    "nv_start_pkt_pio: exiting into HP3"));
+
+	return (SATA_TRAN_ACCEPTED);
+}
+
+
+/*
  * Interrupt processing for a non-data ATA command.
  */
 static void
@@ -4037,6 +4182,259 @@ nv_intr_pio_out(nv_port_t *nvp, nv_slot_t *nv_slotp)
 
 	nv_slotp->nvslot_v_addr += count;
 	nv_slotp->nvslot_byte_count -= count;
+}
+
+
+/*
+ * ATAPI PACKET command, PIO in/out interrupt
+ *
+ * Under normal circumstances, one of four different interrupt scenarios
+ * will result in this function being called:
+ *
+ * 1. Packet command data transfer
+ * 2. Packet command completion
+ * 3. Request sense data transfer
+ * 4. Request sense command completion
+ */
+static void
+nv_intr_pkt_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
+{
+	uchar_t	status;
+	sata_pkt_t *spkt = nv_slotp->nvslot_spkt;
+	sata_cmd_t *sata_cmdp = &spkt->satapkt_cmd;
+	int direction = sata_cmdp->satacmd_flags.sata_data_direction;
+	ddi_acc_handle_t ctlhdl = nvp->nvp_ctl_hdl;
+	ddi_acc_handle_t cmdhdl = nvp->nvp_cmd_hdl;
+	uint16_t ctlr_count;
+	int count;
+
+	/* ATAPI protocol state - HP2: Check_Status_B */
+
+	status = nv_get8(cmdhdl, nvp->nvp_status);
+	NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+	    "nv_intr_pkt_pio: status 0x%x", status));
+
+	if (status & SATA_STATUS_BSY) {
+		if ((nv_slotp->nvslot_flags & NVSLOT_RQSENSE) != 0) {
+			nv_slotp->nvslot_flags = NVSLOT_COMPLETE;
+			spkt->satapkt_reason = SATA_PKT_DEV_ERROR;
+		} else {
+			nv_slotp->nvslot_flags = NVSLOT_COMPLETE;
+			spkt->satapkt_reason = SATA_PKT_TIMEOUT;
+
+			nv_reset(nvp);
+		}
+
+		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_intr_pkt_pio: busy - status 0x%x", status));
+
+		return;
+	}
+
+	if ((status & SATA_STATUS_DF) != 0) {
+		/*
+		 * On device fault, just clean up and bail.  Request sense
+		 * will just default to its NO SENSE initialized value.
+		 */
+
+		if ((nv_slotp->nvslot_flags & NVSLOT_RQSENSE) == 0) {
+			nv_copy_registers(nvp, &spkt->satapkt_device, spkt);
+		}
+
+		nv_slotp->nvslot_flags = NVSLOT_COMPLETE;
+		spkt->satapkt_reason = SATA_PKT_DEV_ERROR;
+
+		sata_cmdp->satacmd_status_reg = nv_get8(ctlhdl,
+		    nvp->nvp_altstatus);
+		sata_cmdp->satacmd_error_reg = nv_get8(cmdhdl,
+		    nvp->nvp_error);
+
+		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_intr_pkt_pio: device fault"));
+
+		return;
+	}
+
+	if ((status & SATA_STATUS_ERR) != 0) {
+		/*
+		 * On command error, figure out whether we are processing a
+		 * request sense.  If so, clean up and bail.  Otherwise,
+		 * do a REQUEST SENSE.
+		 */
+
+		if ((nv_slotp->nvslot_flags & NVSLOT_RQSENSE) == 0) {
+			nv_slotp->nvslot_flags |= NVSLOT_RQSENSE;
+			if (nv_start_rqsense_pio(nvp, nv_slotp) ==
+			    NV_FAILURE) {
+				nv_copy_registers(nvp, &spkt->satapkt_device,
+				    spkt);
+				nv_slotp->nvslot_flags = NVSLOT_COMPLETE;
+				spkt->satapkt_reason = SATA_PKT_DEV_ERROR;
+			}
+
+			sata_cmdp->satacmd_status_reg = nv_get8(ctlhdl,
+			    nvp->nvp_altstatus);
+			sata_cmdp->satacmd_error_reg = nv_get8(cmdhdl,
+			    nvp->nvp_error);
+		} else {
+			nv_slotp->nvslot_flags = NVSLOT_COMPLETE;
+			spkt->satapkt_reason = SATA_PKT_DEV_ERROR;
+
+			nv_copy_registers(nvp, &spkt->satapkt_device, spkt);
+		}
+
+		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_intr_pkt_pio: error (status 0x%x)", status));
+
+		return;
+	}
+
+	if ((nv_slotp->nvslot_flags & NVSLOT_RQSENSE) != 0) {
+		/*
+		 * REQUEST SENSE command processing
+		 */
+
+		if ((status & (SATA_STATUS_DRQ)) != 0) {
+			/* ATAPI state - HP4: Transfer_Data */
+
+			/* read the byte count from the controller */
+			ctlr_count =
+			    (uint16_t)nv_get8(cmdhdl, nvp->nvp_hcyl) << 8;
+			ctlr_count |= nv_get8(cmdhdl, nvp->nvp_lcyl);
+
+			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			    "nv_intr_pkt_pio: ctlr byte count - %d",
+			    ctlr_count));
+
+			if (ctlr_count == 0) {
+				/* no data to transfer - some devices do this */
+
+				spkt->satapkt_reason = SATA_PKT_DEV_ERROR;
+				nv_slotp->nvslot_flags = NVSLOT_COMPLETE;
+
+				NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+				    "nv_intr_pkt_pio: done (no data)"));
+
+				return;
+			}
+
+			count = min(ctlr_count, SATA_ATAPI_RQSENSE_LEN);
+
+			/* transfer the data */
+			ddi_rep_get16(cmdhdl,
+			    (ushort_t *)nv_slotp->nvslot_rqsense_buff,
+			    (ushort_t *)nvp->nvp_data, (count >> 1),
+			    DDI_DEV_NO_AUTOINCR);
+
+			/* consume residual bytes */
+			ctlr_count -= count;
+
+			if (ctlr_count > 0) {
+				for (; ctlr_count > 0; ctlr_count -= 2)
+					(void) ddi_get16(cmdhdl,
+					    (ushort_t *)nvp->nvp_data);
+			}
+
+			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			    "nv_intr_pkt_pio: transition to HP2"));
+		} else {
+			/* still in ATAPI state - HP2 */
+
+			/*
+			 * In order to avoid clobbering the rqsense data
+			 * set by the SATA framework, the sense data read
+			 * from the device is put in a separate buffer and
+			 * copied into the packet after the request sense
+			 * command successfully completes.
+			 */
+			bcopy(nv_slotp->nvslot_rqsense_buff,
+			    spkt->satapkt_cmd.satacmd_rqsense,
+			    SATA_ATAPI_RQSENSE_LEN);
+
+			nv_slotp->nvslot_flags = NVSLOT_COMPLETE;
+			spkt->satapkt_reason = SATA_PKT_DEV_ERROR;
+
+			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			    "nv_intr_pkt_pio: request sense done"));
+		}
+
+		return;
+	}
+
+	/*
+	 * Normal command processing
+	 */
+
+	if ((status & (SATA_STATUS_DRQ)) != 0) {
+		/* ATAPI protocol state - HP4: Transfer_Data */
+
+		/* read the byte count from the controller */
+		ctlr_count = (uint16_t)nv_get8(cmdhdl, nvp->nvp_hcyl) << 8;
+		ctlr_count |= nv_get8(cmdhdl, nvp->nvp_lcyl);
+
+		if (ctlr_count == 0) {
+			/* no data to transfer - some devices do this */
+
+			spkt->satapkt_reason = SATA_PKT_COMPLETED;
+			nv_slotp->nvslot_flags = NVSLOT_COMPLETE;
+
+			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			    "nv_intr_pkt_pio: done (no data)"));
+
+			return;
+		}
+
+		count = min(ctlr_count, nv_slotp->nvslot_byte_count);
+
+		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_intr_pkt_pio: drive_bytes 0x%x", ctlr_count));
+
+		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_intr_pkt_pio: byte_count 0x%x",
+		    nv_slotp->nvslot_byte_count));
+
+		/* transfer the data */
+
+		if (direction == SATA_DIR_READ) {
+			ddi_rep_get16(cmdhdl,
+			    (ushort_t *)nv_slotp->nvslot_v_addr,
+			    (ushort_t *)nvp->nvp_data, (count >> 1),
+			    DDI_DEV_NO_AUTOINCR);
+
+			ctlr_count -= count;
+
+			if (ctlr_count > 0) {
+				/* consume remainding bytes */
+
+				for (; ctlr_count > 0;
+				    ctlr_count -= 2)
+					(void) ddi_get16(cmdhdl,
+					    (ushort_t *)nvp->nvp_data);
+
+				NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+				    "nv_intr_pkt_pio: bytes remained"));
+			}
+		} else {
+			ddi_rep_put16(cmdhdl,
+			    (ushort_t *)nv_slotp->nvslot_v_addr,
+			    (ushort_t *)nvp->nvp_data, (count >> 1),
+			    DDI_DEV_NO_AUTOINCR);
+		}
+
+		nv_slotp->nvslot_v_addr += count;
+		nv_slotp->nvslot_byte_count -= count;
+
+		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_intr_pkt_pio: transition to HP2"));
+	} else {
+		/* still in ATAPI state - HP2 */
+
+		spkt->satapkt_reason = SATA_PKT_COMPLETED;
+		nv_slotp->nvslot_flags = NVSLOT_COMPLETE;
+
+		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_intr_pkt_pio: done"));
+	}
 }
 
 
@@ -4389,7 +4787,8 @@ nv_timeout(void *arg)
 		nv_read_signature(nvp);
 
 		if (nvp->nvp_signature != 0) {
-			if (nvp->nvp_type == SATA_DTYPE_ATADISK) {
+			if ((nvp->nvp_type == SATA_DTYPE_ATADISK) ||
+			    (nvp->nvp_type == SATA_DTYPE_ATAPICD)) {
 				nvp->nvp_state |= NV_PORT_RESTORE;
 				nv_port_state_change(nvp,
 				    SATA_EVNT_DEVICE_RESET,
@@ -4846,4 +5245,102 @@ nv_report_add_remove(nv_port_t *nvp, int flags)
 		nv_port_state_change(nvp, SATA_EVNT_DEVICE_ATTACHED,
 		    SATA_ADDR_CPORT, 0);
 	}
+}
+
+
+/*
+ * Get request sense data and stuff it the command's sense buffer.
+ * Start a request sense command in order to get sense data to insert
+ * in the sata packet's rqsense buffer.  The command completion
+ * processing is in nv_intr_pkt_pio.
+ *
+ * The sata framework provides a function to allocate and set-up a
+ * request sense packet command. The reasons it is not being used here is:
+ * a) it cannot be called in an interrupt context and this function is
+ *    called in an interrupt context.
+ * b) it allocates DMA resources that are not used here because this is
+ *    implemented using PIO.
+ *
+ * If, in the future, this is changed to use DMA, the sata framework should
+ * be used to allocate and set-up the error retrieval (request sense)
+ * command.
+ */
+static int
+nv_start_rqsense_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
+{
+	sata_pkt_t *spkt = nv_slotp->nvslot_spkt;
+	sata_cmd_t *satacmd = &spkt->satapkt_cmd;
+	ddi_acc_handle_t cmdhdl = nvp->nvp_cmd_hdl;
+	int cdb_len = spkt->satapkt_cmd.satacmd_acdb_len;
+
+	NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+	    "nv_start_rqsense_pio: start"));
+
+	/* clear the local request sense buffer before starting the command */
+	bzero(nv_slotp->nvslot_rqsense_buff, SATA_ATAPI_RQSENSE_LEN);
+
+	/* Write the request sense PACKET command */
+
+	/* select the drive */
+	nv_put8(cmdhdl, nvp->nvp_drvhd, satacmd->satacmd_device_reg);
+
+	/* make certain the drive selected */
+	if (nv_wait(nvp, SATA_STATUS_DRDY, SATA_STATUS_BSY,
+	    NV_SEC2USEC(5), 0) == B_FALSE) {
+		NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+		    "nv_start_rqsense_pio: drive select failed"));
+		return (NV_FAILURE);
+	}
+
+	/* set up the command */
+	nv_put8(cmdhdl, nvp->nvp_feature, 0);	/* deassert DMA and OVL */
+	nv_put8(cmdhdl, nvp->nvp_hcyl, SATA_ATAPI_MAX_BYTES_PER_DRQ >> 8);
+	nv_put8(cmdhdl, nvp->nvp_lcyl, SATA_ATAPI_MAX_BYTES_PER_DRQ & 0xff);
+	nv_put8(cmdhdl, nvp->nvp_sect, 0);
+	nv_put8(cmdhdl, nvp->nvp_count, 0);	/* no tag */
+
+	/* initiate the command by writing the command register last */
+	nv_put8(cmdhdl, nvp->nvp_cmd, SATAC_PACKET);
+
+	/* Give the host ctlr time to do its thing, according to ATA/ATAPI */
+	NV_DELAY_NSEC(400);
+
+	/*
+	 * Wait for the device to indicate that it is ready for the command
+	 * ATAPI protocol state - HP0: Check_Status_A
+	 */
+
+	if (nv_wait3(nvp, SATA_STATUS_DRQ, SATA_STATUS_BSY, /* okay */
+	    SATA_STATUS_ERR, SATA_STATUS_BSY, /* cmd failed */
+	    SATA_STATUS_DF, SATA_STATUS_BSY, /* drive failed */
+	    4000000, 0) == B_FALSE) {
+		if (nv_get8(cmdhdl, nvp->nvp_status) &
+		    (SATA_STATUS_ERR | SATA_STATUS_DF)) {
+			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			    "nv_start_rqsense_pio: rqsense dev error (HP0)"));
+		} else {
+			NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+			    "nv_start_rqsense_pio: rqsense timeout (HP0)"));
+		}
+
+		nv_copy_registers(nvp, &spkt->satapkt_device, spkt);
+		nv_complete_io(nvp, spkt, 0);
+		nv_reset(nvp);
+
+		return (NV_FAILURE);
+	}
+
+	/*
+	 * Put the ATAPI command in the data register
+	 * ATAPI protocol state - HP1: Send_Packet
+	 */
+
+	ddi_rep_put16(cmdhdl, (ushort_t *)nv_rqsense_cdb,
+	    (ushort_t *)nvp->nvp_data,
+	    (cdb_len >> 1), DDI_DEV_NO_AUTOINCR);
+
+	NVLOG((NVDBG_ATAPI, nvp->nvp_ctlp, nvp,
+	    "nv_start_rqsense_pio: exiting into HP3"));
+
+	return (NV_SUCCESS);
 }
