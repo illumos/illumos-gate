@@ -536,7 +536,7 @@ zap_leaf_lookup(zap_leaf_phys_t *l, int blksft, uint64_t h,
 			uint8_t *ip;
 
 			if (le->le_int_size != 8 || le->le_value_length != 1)
-			    return (ERR_FSYS_CORRUPT);
+				return (ERR_FSYS_CORRUPT);
 
 			/* get the uint64_t property value */
 			la = &ZAP_LEAF_CHUNK(l, blksft,
@@ -590,7 +590,7 @@ fzap_lookup(dnode_phys_t *zap_dnode, zap_phys_t *zap,
 	l = (zap_leaf_phys_t *)stack;
 	stack += 1<<blksft;
 	if ((1<<blksft) < sizeof (zap_leaf_phys_t))
-	    return (ERR_FSYS_CORRUPT);
+		return (ERR_FSYS_CORRUPT);
 	if (errnum = dmu_read(zap_dnode, blkid, l, stack))
 		return (errnum);
 
@@ -1189,7 +1189,7 @@ zfs_mount(void)
 
 	/* if it's our first time here, zero the best uberblock out */
 	if (best_drive == 0 && best_part == 0 && find_best_root)
-	    grub_memset(&current_uberblock, 0, sizeof (uberblock_t));
+		grub_memset(&current_uberblock, 0, sizeof (uberblock_t));
 
 	stackbase = ZFS_SCRATCH;
 	stack = stackbase;
