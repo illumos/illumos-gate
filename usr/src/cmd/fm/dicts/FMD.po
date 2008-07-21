@@ -30,6 +30,9 @@
 #
 msgid "syslog-msgs-message-template"
 msgstr "SUNW-MSG-ID: %s, TYPE: %s, VER: 1, SEVERITY: %s\nEVENT-TIME: %s\nPLATFORM: %s, CSN: %s, HOSTNAME: %s\nSOURCE: %s, REV: %s\nEVENT-ID: %s\nDESC: %s\nAUTO-RESPONSE: %s\nIMPACT: %s\nREC-ACTION: %s\n"
+msgid "syslog-msgs-pointer"
+msgstr "\n...\nSee fmadm faulty -u <EVENT-ID> for full information.\n"
+
 #
 # Fault-related messages
 #

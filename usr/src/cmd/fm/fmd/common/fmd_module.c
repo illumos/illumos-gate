@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -465,6 +465,7 @@ fmd_module_destroy(fmd_module_t *mp)
 	fmd_strfree(mp->mod_path);
 	fmd_strfree(mp->mod_ckpt);
 	nvlist_free(mp->mod_fmri);
+	fmd_strfree(mp->mod_vers);
 
 	fmd_free(mp, sizeof (fmd_module_t));
 }

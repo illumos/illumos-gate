@@ -182,8 +182,8 @@ fmd_case_hash_apply(fmd_case_hash_t *chp,
 
 	for (i = 0; i < chp->ch_hashlen; i++) {
 		for (cp = chp->ch_hash[i]; cp != NULL; cp = cp->ci_next) {
-			fmd_case_hold((fmd_case_t *)cp);
-			*cpp++ = cp;
+			if (fmd_case_tryhold(cp) != NULL)
+				*cpp++ = cp;
 		}
 	}
 
@@ -462,16 +462,19 @@ fmd_case_check_for_dups(fmd_case_t *cp)
 		 * only look for any cases (apart from this one)
 		 * whose code and number of suspects match
 		 */
-		if (xcip == cip || strcmp(xcip->ci_code, cip->ci_code) != 0 ||
-		    xcip->ci_nsuspects != cip->ci_nsuspects)
+		if (xcip == cip || fmd_case_tryhold(xcip) == NULL)
 			continue;
+		if (strcmp(xcip->ci_code, cip->ci_code) != 0 ||
+		    xcip->ci_nsuspects != cip->ci_nsuspects) {
+			fmd_case_rele((fmd_case_t *)xcip);
+			continue;
+		}
 
 		/*
 		 * For each suspect in one list, check if there
 		 * is an identical suspect in the other list
 		 */
 		match = 1;
-		fmd_case_hold((fmd_case_t *)xcip);
 		for (xcis = xcip->ci_suspects; xcis != NULL;
 		    xcis = xcis->cis_next) {
 			match_susp = 0;

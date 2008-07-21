@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,6 +136,7 @@ typedef struct fmd_module {
 	fmd_list_t mod_transports;	/* list of transports owned by module */
 	fmd_list_t mod_topolist;	/* list of held topo handles */
 	fmd_topo_t *mod_topo_current;	/* current libtopo snapshot */
+	char *mod_vers;			/* a copy of module version string */
 } fmd_module_t;
 
 #define	FMD_MOD_INIT	0x001		/* mod_ops->mop_init() has completed */

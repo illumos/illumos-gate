@@ -495,6 +495,12 @@ fmd_hdl_register(fmd_hdl_t *hdl, int version, const fmd_hdl_info_t *mip)
 	mp->mod_info->fmdi_props = NULL;
 
 	/*
+	 * Store a copy of module version in mp for fmd_scheme_fmd_present()
+	 */
+	if (mp->mod_vers == NULL)
+		mp->mod_vers = fmd_strdup(mip->fmdi_vers, FMD_SLEEP);
+
+	/*
 	 * Allocate an FMRI representing this module.  We'll use this later
 	 * if the module decides to publish any events (e.g. list.suspects).
 	 */

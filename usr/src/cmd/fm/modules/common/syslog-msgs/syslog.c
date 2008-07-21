@@ -73,6 +73,7 @@
 static const char SYSLOG_DOMAIN[] = "FMD";
 static const char SYSLOG_TEMPLATE[] = "syslog-msgs-message-template";
 static const char SYSLOG_URL[] = "syslog-url";
+static const char SYSLOG_POINTER[] = "syslog-msgs-pointer";
 
 static struct stats {
 	fmd_stat_t bad_vers;
@@ -110,6 +111,7 @@ static const struct facility {
 
 static char *syslog_locdir;	/* l10n messages directory (if alternate) */
 static char *syslog_url;	/* current value of "url" property */
+static char *syslog_pointer;	/* info to point user to the full message */
 static int syslog_msgall;	/* set to message all faults */
 static log_ctl_t syslog_ctl;	/* log(7D) meta-data for each msg */
 static int syslog_logfd = -1;	/* log(7D) file descriptor */
@@ -151,10 +153,10 @@ syslog_emit(fmd_hdl_t *hdl, const char *msgformat, ...)
 	struct strbuf ctl, dat;
 	uint32_t msgid;
 
-	char *format, c;
+	char *format, *p, c;
 	char *buf = NULL;
 	size_t formatlen, logmsglen;
-	int len;
+	int len, plen;
 	va_list ap;
 
 	formatlen = strlen(msgformat) + 64; /* +64 for prefix and \0 */
@@ -185,12 +187,23 @@ syslog_emit(fmd_hdl_t *hdl, const char *msgformat, ...)
 
 	/*
 	 * The underlying log driver won't accept (ERANGE) messages
-	 * longer than LOG_MAXPS bytes so don't putmsg more than that.
+	 * longer than LOG_MAXPS bytes.  The long message will be truncated
+	 * and appended with a pointer to the full message.
 	 */
-	if (logmsglen > LOG_MAXPS)
-		dat.len = LOG_MAXPS;
-	else
+	if (logmsglen <= LOG_MAXPS) {
 		dat.len = logmsglen;
+	} else {
+		plen = strlen(syslog_pointer) + 1;
+		buf[LOG_MAXPS - plen] = '\0';
+		/*
+		 * If possible, the pointer is appended after a newline
+		 */
+		if ((p = strrchr(buf, '\n')) == NULL)
+			p = &buf[LOG_MAXPS - plen];
+
+		(void) strcpy(p, syslog_pointer);
+		dat.len = strlen(buf) + 1;
+	}
 
 	if (syslog_file && putmsg(syslog_logfd, &ctl, &dat, 0) != 0) {
 		fmd_hdl_debug(hdl, "putmsg failed: %s\n", strerror(errno));
@@ -367,6 +380,14 @@ syslog_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	 */
 	if ((template = dgettext(dict, SYSLOG_TEMPLATE)) == SYSLOG_TEMPLATE)
 		template = dgettext(SYSLOG_DOMAIN, SYSLOG_TEMPLATE);
+	/*
+	 * Do samely for the message pointer.  If the message is too long
+	 * to be handled by the underlying log drvier, the message will be
+	 * truncated and the pointer will be added to point user to the
+	 * full message.
+	 */
+	if ((syslog_pointer = dgettext(dict, SYSLOG_POINTER)) == SYSLOG_POINTER)
+		syslog_pointer = dgettext(SYSLOG_DOMAIN, SYSLOG_POINTER);
 
 	syslog_ctl.pri &= LOG_FACMASK;
 	if (strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)
