@@ -6289,6 +6289,7 @@ ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	const char *errtype;
 	zoneid_t zoneid;
 	ill_t *ill = q->q_ptr;
+	ipif_t *ipif;
 
 	first_mp = mp;
 	if (mp->b_datap->db_type == M_CTL) {
@@ -6456,6 +6457,25 @@ ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 					    B_FALSE, B_FALSE, zoneid, ipst);
 					return (-1);
 				case IP6OPT_TYPE_FORCEICMP:
+					/*
+					 * If we don't have a zone and the dst
+					 * addr is multicast, then pick a zone
+					 * based on the inbound interface.
+					 */
+					if (zoneid == ALL_ZONES &&
+					    IN6_IS_ADDR_MULTICAST(
+					    &ip6h->ip6_dst)) {
+						ipif = ipif_select_source_v6(
+						    ill, &ip6h->ip6_src,
+						    RESTRICT_TO_GROUP,
+						    IPV6_PREFER_SRC_DEFAULT,
+						    ALL_ZONES);
+						if (ipif != NULL) {
+							zoneid =
+							    ipif->ipif_zoneid;
+							ipif_refrele(ipif);
+						}
+					}
 					if (zoneid == ALL_ZONES) {
 						freemsg(first_mp);
 						return (-1);
