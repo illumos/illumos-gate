@@ -2585,10 +2585,26 @@ nxge_receive_packet(p_nxge_t nxgep,
 		}
 	}
 	if (nmp != NULL) {
-		if (first_entry)
+		if (first_entry) {
+			/*
+			 * Jumbo packets may be received with more than one
+			 * buffer, increment ipackets for the first entry only.
+			 */
+			rdc_stats->ipackets++;
+
+			/* Update ibytes for kstat. */
+			rdc_stats->ibytes += skip_len
+			    + l2_len < bsize ? l2_len : bsize;
+			/*
+			 * Update the number of bytes read so far for the
+			 * current frame.
+			 */
 			bytes_read  = nmp->b_wptr - nmp->b_rptr;
-		else
+		} else {
+			rdc_stats->ibytes += l2_len - bytes_read < bsize ?
+			    l2_len - bytes_read : bsize;
 			bytes_read += nmp->b_wptr - nmp->b_rptr;
+		}
 
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
 		    "==> nxge_receive_packet after dupb: "
@@ -2616,21 +2632,8 @@ nxge_receive_packet(p_nxge_t nxgep,
 	if (buffer_free == B_TRUE) {
 		rx_msg_p->free = B_TRUE;
 	}
-	/*
-	 * ERROR, FRAG and PKT_TYPE are only reported
-	 * in the first entry.
-	 * If a packet is not fragmented and no error bit is set, then
-	 * L4 checksum is OK.
-	 */
+
 	is_valid = (nmp != NULL);
-	if (first_entry) {
-		rdc_stats->ipackets++; /* count only 1st seg for jumbo */
-		rdc_stats->ibytes += skip_len + l2_len < bsize ?
-		    l2_len : bsize;
-	} else {
-		rdc_stats->ibytes += l2_len - bytes_read < bsize ?
-		    l2_len - bytes_read : bsize;
-	}
 
 	rcr_p->rcvd_pkt_bytes = bytes_read;
 
@@ -2653,10 +2656,15 @@ nxge_receive_packet(p_nxge_t nxgep,
 	}
 
 	/*
-	 * Update stats and hardware checksuming.
+	 * ERROR, FRAG and PKT_TYPE are only reported in the first entry.
+	 * If a packet is not fragmented and no error bit is set, then
+	 * L4 checksum is OK.
 	 */
+
 	if (is_valid && !multi) {
 		/*
+		 * Update hardware checksuming.
+		 *
 		 * If the checksum flag nxge_chksum_offload
 		 * is 1, TCP and UDP packets can be sent
 		 * up with good checksum. If the checksum flag

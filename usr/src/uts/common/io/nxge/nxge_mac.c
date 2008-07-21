@@ -5687,8 +5687,6 @@ nxge_check_tn1010_link_exit:
 	 */
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 
-	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_check_tn1010_link port<%d>",
-	    portn));
 	return (NXGE_OK);
 
 fail:

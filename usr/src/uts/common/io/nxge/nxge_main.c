@@ -6870,7 +6870,7 @@ nxge_set_pci_replay_timeout(p_nxge_t nxgep)
 	    dev_regs, dev_regs->nxge_pciregh));
 
 	if (dev_regs == NULL || (dev_regs->nxge_pciregh == NULL)) {
-		NXGE_DEBUG_MSG((nxgep, CCI_CTL,
+		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
 		    "==> nxge_set_pci_replay_timeout: NULL dev_regs $%p or "
 		    "no PCI handle",
 		    dev_regs));
