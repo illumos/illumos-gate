@@ -73,13 +73,14 @@
 #define	WIFI_CMD_ALL		(WIFI_CMD_SCAN | WIFI_CMD_SHOW)
 
 /*
- * data structures and routines for printing output.
+ * Data structures and routines for printing output.
  * All non-parseable output is assumed to be in a columnar format.
- * Parseable output will be printed as <pf_header>="<value>"
+ * Multiple fields in parsable output are separated by ':'; single
+ * field output is printed as-is.
  *
  * Each sub-command is associated with a global array of pointers,
  * print_field_t *fields[], where the print_field_t contains information
- * about the format in which the output is  to be printed.
+ * about the format in which the output is to be printed.
  *
  * Sub-commands may be implemented in one of two ways:
  * (i)  the implementation could get all field values into a character
@@ -2001,7 +2002,7 @@ print_xaggr_callback(print_field_t *pf, void *arg)
 			(void) dladm_aggr_portstate2str(
 			    portp->lp_state, buf);
 		} else {
-			return (STR_UNDEF_VAL);
+			return ("");
 		}
 		break;
 	case AGGR_X_ADDRESS:
@@ -2009,11 +2010,12 @@ print_xaggr_callback(print_field_t *pf, void *arg)
 		    (is_port ? portp->lp_mac : l->laggr_ginfop->lg_mac),
 		    buf);
 		break;
-
 	case AGGR_X_PORTSTATE:
-		(void) snprintf(buf, sizeof (buf), "%s",
-		    (is_port ? dladm_aggr_portstate2str(portp->lp_state, buf):
-		    (l->laggr_parseable ? "" : STR_UNDEF_VAL)));
+		if (is_port)
+			(void) dladm_aggr_portstate2str(
+			    portp->lp_state, buf);
+		else
+			return ("");
 		break;
 	}
 	return (buf);
@@ -2208,7 +2210,7 @@ print_aggr_stats_callback(print_field_t *pf, void *arg)
 	case AGGR_S_PORT:
 		if (is_port)
 			break;
-		return (STR_UNDEF_VAL);
+		return ("");
 		break;
 
 	case AGGR_S_IPKTS:
@@ -2257,7 +2259,7 @@ print_aggr_stats_callback(print_field_t *pf, void *arg)
 			    (double)diff_stats.opackets/
 			    (double)l->laggr_pktsumtot->ipackets * 100);
 		} else {
-			return (STR_UNDEF_VAL);
+			return ("");
 		}
 		break;
 	case AGGR_S_OPKTDIST:
@@ -2266,7 +2268,7 @@ print_aggr_stats_callback(print_field_t *pf, void *arg)
 			    (double)diff_stats.opackets/
 			    (double)l->laggr_pktsumtot->opackets * 100);
 		} else {
-			(void) sprintf(buf, STR_UNDEF_VAL);
+			return ("");
 		}
 		break;
 	}
@@ -2591,6 +2593,12 @@ do_show_link(int argc, char *argv[], const char *use)
 	state.ls_flags = flags;
 	state.ls_donefirst = B_FALSE;
 
+	if (p_arg && !o_arg)
+		die("-p requires -o");
+
+	if (p_arg && strcasecmp(fields_str, "all") == 0)
+		die("\"-o all\" is invalid with -p");
+
 	if (!o_arg || (o_arg && strcasecmp(fields_str, "all") == 0)) {
 		if (state.ls_flags & DLADM_OPT_ACTIVE)
 			fields_str = all_active_fields;
@@ -2602,10 +2610,8 @@ do_show_link(int argc, char *argv[], const char *use)
 	fields = parse_output_fields(fields_str, link_fields, DEV_LINK_FIELDS,
 	    CMD_TYPE_ANY, &nfields);
 
-	if (fields == NULL) {
+	if (fields == NULL)
 		die("invalid field(s) specified");
-		return;
-	}
 
 	state.ls_print.ps_fields = fields;
 	state.ls_print.ps_nfields = nfields;
@@ -2705,6 +2711,12 @@ do_show_aggr(int argc, char *argv[], const char *use)
 			break;
 		}
 	}
+
+	if (p_arg && !o_arg)
+		die("-p requires -o");
+
+	if (p_arg && strcasecmp(fields_str, "all") == 0)
+		die("\"-o all\" is invalid with -p");
 
 	if (i_arg && !s_arg)
 		die("the option -i can be used only with -s");
@@ -2851,6 +2863,12 @@ do_show_dev(int argc, char *argv[], const char *use)
 			break;
 		}
 	}
+
+	if (p_arg && !o_arg)
+		die("-p requires -o");
+
+	if (p_arg && strcasecmp(fields_str, "all") == 0)
+		die("\"-o all\" is invalid with -p");
 
 	if (i_arg && !s_arg)
 		die("the option -i can be used only with -s");
@@ -3111,6 +3129,12 @@ do_show_phys(int argc, char *argv[], const char *use)
 		}
 	}
 
+	if (p_arg && !o_arg)
+		die("-p requires -o");
+
+	if (p_arg && strcasecmp(fields_str, "all") == 0)
+		die("\"-o all\" is invalid with -p");
+
 	/* get link name (optional last argument) */
 	if (optind == (argc-1)) {
 		if ((status = dladm_name2info(argv[optind], &linkid, NULL,
@@ -3197,6 +3221,12 @@ do_show_vlan(int argc, char *argv[], const char *use)
 			break;
 		}
 	}
+
+	if (p_arg && !o_arg)
+		die("-p requires -o");
+
+	if (p_arg && strcasecmp(fields_str, "all") == 0)
+		die("\"-o all\" is invalid with -p");
 
 	/* get link name (optional last argument) */
 	if (optind == (argc-1)) {
@@ -3660,7 +3690,6 @@ typedef struct  wlan_scan_args_s {
 	void			*ws_attr;
 } wlan_scan_args_t;
 
-
 static void
 print_field(print_state_t *statep, print_field_t *pfp, const char *value,
     boolean_t parseable)
@@ -3669,8 +3698,25 @@ print_field(print_state_t *statep, print_field_t *pfp, const char *value,
 	uint_t	valwidth = strlen(value);
 	uint_t	compress;
 
+	/*
+	 * Parsable fields are separated by ':'. If such a field contains
+	 * a ':' or '\', this character is prefixed by a '\'.
+	 */
 	if (parseable) {
-		(void) printf("%s=\"%s\"", pfp->pf_header, value);
+		char	c;
+
+		if (statep->ps_nfields == 1) {
+			(void) printf("%s", value);
+			return;
+		}
+		while ((c = *value++) != '\0') {
+			if (c == ':' || c == '\\')
+				(void) putchar('\\');
+			(void) putchar(c);
+		}
+		if (!statep->ps_lastfield)
+			(void) putchar(':');
+		return;
 	} else {
 		if (value[0] == '\0')
 			value = STR_UNDEF_VAL;
@@ -3869,13 +3915,17 @@ do_display_wifi(int argc, char **argv, int cmd, const char *use)
 			break;
 		case 'p':
 			state.ws_parseable = B_TRUE;
-			if (fields_str == NULL)
-				fields_str = "all";
 			break;
 		default:
 			die_opterr(optopt, option, use);
 		}
 	}
+
+	if (state.ws_parseable && fields_str == NULL)
+		die("-p requires -o");
+
+	if (state.ws_parseable && strcasecmp(fields_str, "all") == 0)
+		die("\"-o all\" is invalid with -p");
 
 	if (optind == (argc - 1)) {
 		if ((status = dladm_name2info(argv[optind], &linkid, NULL,
@@ -4456,6 +4506,7 @@ do_show_linkprop(int argc, char **argv, const char *use)
 	char			*fields_str = NULL;
 	print_field_t		**fields;
 	uint_t			nfields;
+	boolean_t		o_arg = B_FALSE;
 	char			*all_fields =
 	    "link,property,value,default,possible";
 
@@ -4483,6 +4534,7 @@ do_show_linkprop(int argc, char **argv, const char *use)
 			flags = DLADM_OPT_PERSIST;
 			break;
 		case 'o':
+			o_arg = B_TRUE;
 			if (strcasecmp(optarg, "all") == 0)
 				fields_str = all_fields;
 			else
@@ -4493,6 +4545,12 @@ do_show_linkprop(int argc, char **argv, const char *use)
 			break;
 		}
 	}
+
+	if (state.ls_parseable && !o_arg)
+		die("-c requires -o");
+
+	if (state.ls_parseable && fields_str == all_fields)
+		die("\"-o all\" is invalid with -c");
 
 	if (optind == (argc - 1)) {
 		if ((status = dladm_name2info(argv[optind], &linkid, NULL,
@@ -5223,6 +5281,7 @@ do_show_secobj(int argc, char **argv, const char *use)
 	int			option;
 	show_secobj_state_t	state;
 	dladm_status_t		status;
+	boolean_t		o_arg = B_FALSE;
 	uint_t			i;
 	split_t			*sp;
 	uint_t			flags;
@@ -5249,6 +5308,7 @@ do_show_secobj(int argc, char **argv, const char *use)
 			state.ss_persist = B_TRUE;
 			break;
 		case 'o':
+			o_arg = B_TRUE;
 			if (strcasecmp(optarg, "all") == 0)
 				fields_str = all_fields;
 			else
@@ -5259,6 +5319,12 @@ do_show_secobj(int argc, char **argv, const char *use)
 			break;
 		}
 	}
+
+	if (state.ss_parseable && !o_arg)
+		die("option -c requires -o");
+
+	if (state.ss_parseable && fields_str == all_fields)
+		die("\"-o all\" is invalid with -p");
 
 	fields = parse_output_fields(fields_str, secobj_fields,
 	    DEV_SOBJ_FIELDS, CMD_TYPE_ANY, &nfields);
@@ -5354,6 +5420,7 @@ do_show_ether(int argc, char **argv, const char *use)
 	datalink_id_t		linkid;
 	print_ether_state_t 	state;
 	print_field_t 		**fields;
+	boolean_t		o_arg = B_FALSE;
 	char			*fields_str;
 	uint_t			nfields;
 	char *all_fields =
@@ -5376,6 +5443,7 @@ do_show_ether(int argc, char **argv, const char *use)
 				state.es_parseable = B_TRUE;
 				break;
 			case 'o':
+				o_arg = B_TRUE;
 				if (strcasecmp(optarg, "all") == 0)
 					fields_str = all_fields;
 				else
@@ -5386,6 +5454,12 @@ do_show_ether(int argc, char **argv, const char *use)
 				break;
 		}
 	}
+
+	if (state.es_parseable && !o_arg)
+		die("-p requires -o");
+
+	if (state.es_parseable && fields_str == all_fields)
+		die("\"-o all\" is invalid with -p");
 
 	if (optind == (argc - 1))
 		state.es_link = argv[optind];
@@ -5687,8 +5761,7 @@ show_ether_xprop(datalink_id_t linkid, void *arg)
 
 	(void) snprintf(ebuf.eth_ptype, sizeof (ebuf.eth_ptype),
 	    "%s", "capable");
-	(void) snprintf(ebuf.eth_state, sizeof (ebuf.eth_state),
-	    STR_UNDEF_VAL);
+	(void) snprintf(ebuf.eth_state, sizeof (ebuf.eth_state), "");
 
 	(void) dladm_get_single_mac_stat(linkid, "cap_autoneg",
 	    KSTAT_DATA_UINT32, &autoneg);
@@ -5731,8 +5804,7 @@ show_ether_xprop(datalink_id_t linkid, void *arg)
 	bzero(&ebuf, sizeof (ebuf));
 	(void) snprintf(ebuf.eth_ptype, sizeof (ebuf.eth_ptype),
 	    "%s", "adv");
-	(void) snprintf(ebuf.eth_state, sizeof (ebuf.eth_state),
-	    STR_UNDEF_VAL);
+	(void) snprintf(ebuf.eth_state, sizeof (ebuf.eth_state), "");
 
 	(void) dladm_get_single_mac_stat(linkid, "adv_cap_autoneg",
 	    KSTAT_DATA_UINT32, &autoneg);
@@ -5768,8 +5840,7 @@ show_ether_xprop(datalink_id_t linkid, void *arg)
 	bzero(&ebuf, sizeof (ebuf));
 	(void) snprintf(ebuf.eth_ptype, sizeof (ebuf.eth_ptype),
 	    "%s", "peeradv");
-	(void) snprintf(ebuf.eth_state, sizeof (ebuf.eth_state),
-	    STR_UNDEF_VAL);
+	(void) snprintf(ebuf.eth_state, sizeof (ebuf.eth_state), "");
 
 	(void) dladm_get_single_mac_stat(linkid, "lp_cap_autoneg",
 	    KSTAT_DATA_UINT32, &autoneg);
