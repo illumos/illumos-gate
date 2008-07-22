@@ -40,6 +40,12 @@
 #include <papi.h>
 #include <regex.h>
 
+#define	MAX_PAGES 32767
+/*
+ * Assuming the maximum number of pages in
+ * a document to be 32767
+ */
+
 static void papiAttributeFree(papi_attribute_t *attribute);
 
 static void
@@ -647,7 +653,7 @@ _process_value(char *string, char ***parts)
 		{ PAPI_COLLECTION, 1, "^\\{(.+)\\}$", 0 },
 		/* PAPI_DATETIME is unsupported, too much like an integer */
 		{ PAPI_INTEGER,	   1, "^([+-]{0,1}[[:digit:]]+)$", 0 },
-		{ PAPI_RANGE,	   3, "^([[:digit:]]+)-([[:digit:]]+)$", 0 },
+		{ PAPI_RANGE,	   3, "^([[:digit:]]*)-([[:digit:]]*)$", 0 },
 		{ PAPI_RESOLUTION, 4, "^([[:digit:]]+)x([[:digit:]]+)dp(i|c)$",
 			0 },
 		NULL
@@ -699,12 +705,31 @@ _add_attribute_value(papi_attribute_value_t ***list,
 		list_append(list, value);
 		break;
 	case PAPI_RANGE:
-		if (dtype == PAPI_INTEGER) 
-			value->range.lower = value->range.upper
-					 = atoi(parts[0]);
-		else if (dtype == PAPI_RANGE)  {
-			value->range.lower = atoi(parts[1]);
-			value->range.upper = atoi(parts[2]);
+		if (dtype == PAPI_INTEGER) {
+			if (atoi(parts[0]) < 0) {
+				/*
+				 * Handles -P -x case
+				 * which prints from page number 1
+				 * till page number x
+				 */
+				value->range.lower = 1;
+				value->range.upper = 0 - (atoi(parts[0]));
+			} else {
+				value->range.lower = value->range.upper
+				    = atoi(parts[0]);
+			}
+		} else if (dtype == PAPI_RANGE)  {
+			if (parts[2] == NULL) {
+				value->range.lower = atoi(parts[1]);
+				/*
+				 * Imposing an artificial limit on
+				 * the upper bound for page range.
+				 */
+				value->range.upper = MAX_PAGES;
+			} else if ((parts[1] != NULL) && (parts[2] != NULL)) {
+				value->range.lower = atoi(parts[1]);
+				value->range.upper = atoi(parts[2]);
+			}
 		}
 		list_append(list, value);
 		break;
