@@ -2283,10 +2283,12 @@ zfs_zaccess_common(znode_t *zp, uint32_t v4_mode, uint32_t *working_mode,
 	zfs_acl_free(aclp);
 
 	/* Put the found 'denies' back on the working mode */
-	*working_mode |= deny_mask;
-
-	if (*working_mode)
+	if (deny_mask) {
+		*working_mode |= deny_mask;
 		return (EACCES);
+	} else if (*working_mode) {
+		return (-1);
+	}
 
 	return (0);
 }
@@ -2526,10 +2528,10 @@ zfs_zaccess_delete(znode_t *dzp, znode_t *zp, cred_t *cr)
 		return (EPERM);
 
 	/*
+	 * First row
 	 * If the directory permissions allow the delete, we are done.
 	 */
-	if ((dzp_error = zfs_zaccess_common(dzp,
-	    ACE_DELETE_CHILD|ACE_EXECUTE|ACE_WRITE_DATA,
+	if ((dzp_error = zfs_zaccess_common(dzp, ACE_DELETE_CHILD,
 	    &dzp_working_mode, &dzpcheck_privs, B_FALSE, cr)) == 0)
 		return (0);
 
@@ -2540,54 +2542,49 @@ zfs_zaccess_delete(znode_t *dzp, znode_t *zp, cred_t *cr)
 	    &zpcheck_privs, B_FALSE, cr)) == 0)
 		return (0);
 
+	ASSERT(dzp_error && zp_error);
+
 	if (!dzpcheck_privs)
 		return (dzp_error);
-	else if (!zpcheck_privs)
+	if (!zpcheck_privs)
 		return (zp_error);
 
 	/*
-	 * First check the first row.
-	 * We only need to see if parent Allows delete_child
-	 */
-	if ((dzp_working_mode & ACE_DELETE_CHILD) == 0)
-		return (0);
-
-	/*
 	 * Second row
-	 * we already have the necessary information in
-	 * zp_working_mode, zp_error and dzp_error.
+	 *
+	 * If directory returns EACCES then delete_child was denied
+	 * due to deny delete_child.  In this case send the request through
+	 * secpolicy_vnode_remove().  We don't use zfs_delete_final_check()
+	 * since that *could* allow the delete based on write/execute permission
+	 * and we want delete permissions to override write/execute.
 	 */
-
-	if ((zp_working_mode & ACE_DELETE) == 0)
-		return (0);
-
-	/*
-	 * determine the needed permissions based off of the directories
-	 * working mode
-	 */
-
-	missing_perms = (dzp_working_mode & ACE_WRITE_DATA) ? VWRITE : 0;
-	missing_perms |= (dzp_working_mode & ACE_EXECUTE) ? VEXEC : 0;
 
 	if (dzp_error == EACCES)
-		return (zfs_delete_final_check(zp, dzp, missing_perms, cr));
+		return (secpolicy_vnode_remove(cr));
 
 	/*
 	 * Third Row
 	 * only need to see if we have write/execute on directory.
 	 */
 
-	if (missing_perms == 0)
+	if ((dzp_error = zfs_zaccess_common(dzp, ACE_EXECUTE|ACE_WRITE_DATA,
+	    &dzp_working_mode, &dzpcheck_privs, B_FALSE, cr)) == 0)
 		return (zfs_sticky_remove_access(dzp, zp, cr));
+
+	if (!dzpcheck_privs)
+		return (dzp_error);
 
 	/*
-	 * Fourth Row
+	 * Fourth row
 	 */
 
-	if (missing_perms && ((zp_working_mode & ACE_DELETE) == 0))
-		return (zfs_sticky_remove_access(dzp, zp, cr));
+	missing_perms = (dzp_working_mode & ACE_WRITE_DATA) ? VWRITE : 0;
+	missing_perms |= (dzp_working_mode & ACE_EXECUTE) ? VEXEC : 0;
+
+	ASSERT(missing_perms);
 
 	return (zfs_delete_final_check(zp, dzp, missing_perms, cr));
+
 }
 
 int
