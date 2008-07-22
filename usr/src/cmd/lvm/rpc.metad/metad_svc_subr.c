@@ -409,7 +409,7 @@ mdrpc_flush_internal_common(mdrpc_null_args *args, mdrpc_generic_res *res,
 	md_error_t	*ep = &res->status;
 	int		err, op_mode = W_OK;
 
-	memset(res, 0, sizeof (*res));
+	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -452,7 +452,6 @@ mdrpc_add_drv_sidenms_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -489,6 +488,7 @@ mdrpc_add_drv_sidenms_1_svc(
 	/* allocate memory */
 	v2_args.sd = Zalloc(sizeof (md_set_desc));
 	alloc_newdrvdesc(args->sd->sd_drvs, &v2_args.sd->sd_drvs);
+	(void) memset(res, 0, sizeof (*res));
 
 	/* build args */
 	v2_args.hostname = args->hostname;
@@ -527,6 +527,7 @@ mdrpc_add_drv_sidenms_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_add_drv_sidenms_common(
@@ -907,7 +908,6 @@ mdrpc_adddrvs_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -942,6 +942,7 @@ mdrpc_adddrvs_1_svc(
 
 	/* allocate memory */
 	alloc_newdrvdesc(args->drivedescs, &v2_args.drivedescs);
+	(void) memset(res, 0, sizeof (*res));
 
 	/* build args */
 	v2_args.cl_sk = args->cl_sk;
@@ -965,6 +966,7 @@ mdrpc_adddrvs_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_adddrvs_common(
@@ -989,6 +991,7 @@ mdrpc_imp_adddrvs_2_svc(
 	int			err;
 	int			op_mode = W_OK;
 
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		v2_args = &args->mdrpc_drives_2_args_u.rev1;
@@ -1001,7 +1004,6 @@ mdrpc_imp_adddrvs_2_svc(
 	}
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -1181,7 +1183,6 @@ mdrpc_addhosts_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -1207,6 +1208,7 @@ mdrpc_addhosts_1_svc(
 )
 {
 	/* Pass RPC version (METAD_VERSION) to common routine */
+	(void) memset(res, 0, sizeof (*res));
 	return (mdrpc_addhosts_common(args, res, rqstp, METAD_VERSION));
 }
 
@@ -1217,6 +1219,7 @@ mdrpc_addhosts_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		/* Pass RPC version (METAD_VERSION_DEVID) to common routine */
@@ -1448,7 +1451,6 @@ mdrpc_createset_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -1496,6 +1498,7 @@ mdrpc_createset_1_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	return (mdrpc_createset_common(args, res, rqstp));
 }
 
@@ -1506,6 +1509,7 @@ mdrpc_createset_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_createset_common(
@@ -1529,7 +1533,6 @@ mdrpc_mncreateset_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -1579,6 +1582,7 @@ mdrpc_mncreateset_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_mncreateset_common(
@@ -1709,7 +1713,6 @@ mdrpc_del_drv_sidenms_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -1733,6 +1736,7 @@ mdrpc_del_drv_sidenms_1_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	/* Pass RPC version (METAD_VERSION) to common routine */
 	return (mdrpc_del_drv_sidenms_common(args, res, rqstp, METAD_VERSION));
 }
@@ -1744,6 +1748,7 @@ mdrpc_del_drv_sidenms_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		/* Pass RPC version (METAD_VERSION_DEVID) to common routine */
@@ -2043,7 +2048,6 @@ mdrpc_deldrvs_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -2077,6 +2081,7 @@ mdrpc_deldrvs_1_svc(
 
 	/* allocate memory */
 	alloc_newdrvdesc(args->drivedescs, &v2_args.drivedescs);
+	(void) memset(res, 0, sizeof (*res));
 
 	/* build args */
 	v2_args.cl_sk = args->cl_sk;
@@ -2100,6 +2105,7 @@ mdrpc_deldrvs_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_deldrvs_common(
@@ -2202,7 +2208,6 @@ mdrpc_delhosts_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -2227,6 +2232,7 @@ mdrpc_delhosts_1_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	/* Pass RPC version (METAD_VERSION) to common routine */
 	return (mdrpc_delhosts_common(args, res, rqstp, METAD_VERSION));
 }
@@ -2238,6 +2244,7 @@ mdrpc_delhosts_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		/* Pass RPC version (METAD_VERSION_DEVID) to common routine */
@@ -2264,7 +2271,6 @@ mdrpc_delset_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -2288,6 +2294,7 @@ mdrpc_delset_1_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	return (mdrpc_delset_common(args, res, rqstp));
 }
 
@@ -2298,6 +2305,7 @@ mdrpc_delset_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_delset_common(
@@ -2346,7 +2354,6 @@ mdrpc_devinfo_common(
 	int			op_mode = R_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -2393,6 +2400,7 @@ mdrpc_devinfo_1_svc(
 	v2_args.drivenamep = Zalloc(sizeof (mddrivename_t));
 	v2_args.drivenamep->parts.parts_val =
 	    Zalloc(sizeof (mdname_t) * args->drivenamep->parts.parts_len);
+	(void) memset(res, 0, sizeof (*res));
 
 	/* convert v1 args to v2 (revision 1) args */
 	meta_conv_drvname_old2new(args->drivenamep, v2_args.drivenamep);
@@ -2420,6 +2428,7 @@ mdrpc_devinfo_2_svc(
 	struct svc_req		*rqstp			/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_devinfo_common(
@@ -2465,6 +2474,7 @@ mdrpc_devid_2_svc(
 	int			err;
 	int			op_mode = R_OK;
 
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		dnp = (&(args->mdrpc_devid_2_args_u.rev1))->drivenamep;
@@ -2474,7 +2484,6 @@ mdrpc_devid_2_svc(
 	}
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -2619,6 +2628,7 @@ mdrpc_devinfo_by_devid_name_2_svc(
 	mdname_t	*np;
 	mdsetname_t	*sp;
 
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		sp = (&(args->mdrpc_devid_name_2_args_u.rev1))->sp;
@@ -2631,7 +2641,6 @@ mdrpc_devinfo_by_devid_name_2_svc(
 	}
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -2728,7 +2737,6 @@ mdrpc_drvused_common(
 	int			op_mode = R_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -2778,6 +2786,7 @@ mdrpc_drvused_1_svc(
 	v2_args.drivenamep = Zalloc(sizeof (mddrivename_t));
 	v2_args.drivenamep->parts.parts_val =
 	    Zalloc(sizeof (mdname_t) * args->drivenamep->parts.parts_len);
+	(void) memset(res, 0, sizeof (*res));
 
 	/* build args */
 	v2_args.sp = args->sp;
@@ -2800,6 +2809,7 @@ mdrpc_drvused_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_drvused_common(
@@ -2824,7 +2834,6 @@ mdrpc_getset_common(
 	int			op_mode = R_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -2854,6 +2863,7 @@ mdrpc_getset_1_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	return (mdrpc_getset_common(args, res, rqstp));
 }
 
@@ -2864,6 +2874,7 @@ mdrpc_getset_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_getset_common(
@@ -2890,7 +2901,6 @@ mdrpc_mngetset_common(
 	md_mnset_record		*mnsr = NULL;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -2924,6 +2934,7 @@ mdrpc_mngetset_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_mngetset_common(
@@ -2994,7 +3005,6 @@ mdrpc_mnsetmaster_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -3018,6 +3028,7 @@ mdrpc_mnsetmaster_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_mnsetmaster_common(
@@ -3176,7 +3187,6 @@ mdrpc_joinset_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -3207,6 +3217,7 @@ mdrpc_joinset_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_joinset_common(
@@ -3247,7 +3258,6 @@ mdrpc_withdrawset_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -3271,6 +3281,7 @@ mdrpc_withdrawset_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_withdrawset_common(
@@ -3311,7 +3322,6 @@ mdrpc_gtimeout_common(
 	int			op_mode = R_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -3335,6 +3345,7 @@ mdrpc_gtimeout_1_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	return (mdrpc_gtimeout_common(args, res, rqstp));
 }
 
@@ -3345,6 +3356,7 @@ mdrpc_gtimeout_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_gtimeout_common(
@@ -3458,7 +3470,6 @@ mdrpc_ownset_common(
 	int			op_mode = R_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -3485,6 +3496,7 @@ mdrpc_ownset_1_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	return (mdrpc_ownset_common(args, res, rqstp));
 }
 
@@ -3495,6 +3507,7 @@ mdrpc_ownset_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_ownset_common(
@@ -3575,7 +3588,6 @@ mdrpc_setnameok_common(
 	int			op_mode = R_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -3599,6 +3611,7 @@ mdrpc_setnameok_1_svc(
 	struct svc_req		*rqstp	/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	return (mdrpc_setnameok_common(args, res, rqstp));
 }
 
@@ -3609,6 +3622,7 @@ mdrpc_setnameok_2_svc(
 	struct svc_req		*rqstp	/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_setnameok_common(
@@ -3634,7 +3648,6 @@ mdrpc_setnumbusy_common(
 	int			op_mode = R_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -3665,6 +3678,7 @@ mdrpc_setnumbusy_1_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	return (mdrpc_setnumbusy_common(args, res, rqstp));
 }
 
@@ -3675,6 +3689,7 @@ mdrpc_setnumbusy_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_setnumbusy_common(
@@ -3760,7 +3775,6 @@ mdrpc_stimeout_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -3784,6 +3798,7 @@ mdrpc_stimeout_1_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	/* Pass RPC version (METAD_VERSION) to common routine */
 	return (mdrpc_stimeout_common(args, res, rqstp, METAD_VERSION));
 }
@@ -3795,6 +3810,7 @@ mdrpc_stimeout_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		/* Pass RPC version (METAD_VERSION_DEVID) to common routine */
@@ -3930,7 +3946,6 @@ mdrpc_upd_dr_dbinfo_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -3964,6 +3979,7 @@ mdrpc_upd_dr_dbinfo_1_svc(
 
 	/* allocate memory */
 	alloc_newdrvdesc(args->drivedescs, &v2_args.drivedescs);
+	(void) memset(res, 0, sizeof (*res));
 
 	/* build args */
 	v2_args.cl_sk = args->cl_sk;
@@ -3987,6 +4003,7 @@ mdrpc_upd_dr_dbinfo_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_upd_dr_dbinfo_common(
@@ -4116,7 +4133,6 @@ mdrpc_upd_dr_flags_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -4150,6 +4166,7 @@ mdrpc_upd_dr_flags_1_svc(
 
 	/* allocate memory */
 	alloc_newdrvdesc(args->drivedescs, &v2_args.drivedescs);
+	(void) memset(res, 0, sizeof (*res));
 
 	/* build args */
 	v2_args.cl_sk = args->cl_sk;
@@ -4172,6 +4189,7 @@ mdrpc_upd_dr_flags_2_svc(
 	struct svc_req			*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_upd_dr_flags_common(
@@ -4213,7 +4231,6 @@ mdrpc_upd_sr_flags_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -4237,6 +4254,7 @@ mdrpc_upd_sr_flags_1_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	return (mdrpc_upd_sr_flags_common(args, res, rqstp));
 }
 
@@ -4247,6 +4265,7 @@ mdrpc_upd_sr_flags_2_svc(
 	struct svc_req			*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_upd_sr_flags_common(
@@ -4373,7 +4392,6 @@ mdrpc_upd_nr_flags_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -4406,6 +4424,7 @@ mdrpc_upd_nr_flags_2_svc(
 	struct svc_req			*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_upd_nr_flags_common(
@@ -4844,7 +4863,6 @@ mdrpc_updmeds_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -4868,6 +4886,7 @@ mdrpc_updmeds_1_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	/* Pass RPC version (METAD_VERSION) to common routine */
 	return (mdrpc_updmeds_common(args, res, rqstp, METAD_VERSION));
 }
@@ -4879,6 +4898,7 @@ mdrpc_updmeds_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		/* Pass RPC version (METAD_VERSION_DEVID) to common routine */
@@ -4908,10 +4928,10 @@ mdrpc_mdcommdctl_2_svc(
 	int			op_mode = R_OK;
 	int			suspend_ret;
 
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		/* setup, check permissions */
-		(void) memset(res, 0, sizeof (*res));
 		if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 			return (FALSE);
 		else if (err != 0)
@@ -4969,6 +4989,7 @@ mdrpc_mn_is_stale_2_svc(
 	int		err;
 	int		op_mode = R_OK;
 
+	(void) memset(res, 0, sizeof (*res));
 	(void) memset(&c, 0, sizeof (c));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
@@ -5092,10 +5113,10 @@ mdrpc_getdrivedesc_2_svc(
 	mdsetname_t		*my_sp;
 	mdrpc_sp_args		*args_r1;
 
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		/* setup, check permissions */
-		(void) memset(res, 0, sizeof (*res));
 		if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 			return (FALSE);
 		else if (err != 0)
@@ -5150,7 +5171,6 @@ mdrpc_upd_dr_reconfig_common(
 	int			change = 0;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -5257,6 +5277,7 @@ mdrpc_upd_dr_reconfig_2_svc(
 	struct svc_req			*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_upd_dr_reconfig_common(
@@ -5375,7 +5396,6 @@ mdrpc_reset_mirror_owner_common(
 	int			op_mode = W_OK;
 
 	/* setup, check permissions */
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -5408,6 +5428,7 @@ mdrpc_reset_mirror_owner_2_svc(
 	struct svc_req		*rqstp		/* RPC stuff */
 )
 {
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		return (mdrpc_reset_mirror_owner_common(
@@ -5435,10 +5456,10 @@ mdrpc_mn_susp_res_io_2_svc(
 	int				err;
 	int				op_mode = R_OK;
 
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		/* setup, check permissions */
-		(void) memset(res, 0, sizeof (*res));
 		if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 			return (FALSE);
 		else if (err != 0)
@@ -5478,15 +5499,15 @@ mdrpc_resnarf_set_2_svc(
 	int			err;
 	int			op_mode = R_OK;
 
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
-		case MD_METAD_ARGS_REV_1:
+	case MD_METAD_ARGS_REV_1:
 		setno_args = &args->mdrpc_setno_2_args_u.rev1;
 		break;
 	default:
 		return (FALSE);
 	}
 
-	(void) memset(res, 0, sizeof (*res));
 	if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 		return (FALSE);
 	else if (err != 0)
@@ -5516,10 +5537,10 @@ mdrpc_mn_mirror_resync_all_2_svc(
 	int			err;
 	int			op_mode = R_OK;
 
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		/* setup, check permissions */
-		(void) memset(res, 0, sizeof (*res));
 		if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 			return (FALSE);
 		else if (err != 0)
@@ -5556,10 +5577,10 @@ mdrpc_mn_sp_update_abr_2_svc(
 	int			err;
 	int			op_mode = R_OK;
 
+	(void) memset(res, 0, sizeof (*res));
 	switch (args->rev) {
 	case MD_METAD_ARGS_REV_1:
 		/* setup, check permissions */
-		(void) memset(res, 0, sizeof (*res));
 		if ((err = svc_init(rqstp, op_mode, ep)) < 0)
 			return (FALSE);
 		else if (err != 0)
