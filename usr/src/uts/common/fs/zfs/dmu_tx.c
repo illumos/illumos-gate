@@ -608,7 +608,7 @@ dmu_tx_hold_zap(dmu_tx_t *tx, uint64_t object, int add, char *name)
 	 * 3 new blocks written if adding: new split leaf, 2 grown ptrtbl blocks
 	 */
 	dmu_tx_count_write(txh, dn->dn_maxblkid * dn->dn_datablksz,
-	    (3 + add ? 3 : 0) << dn->dn_datablkshift);
+	    (3 + (add ? 3 : 0)) << dn->dn_datablkshift);
 
 	/*
 	 * If the modified blocks are scattered to the four winds,
