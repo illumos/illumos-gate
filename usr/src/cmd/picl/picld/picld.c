@@ -82,6 +82,9 @@
 #define	PICLD_MAJOR_REV			0x1
 #define	PICLD_MINOR_REV			0x0
 #define	DOS_SLEEPTIME_MS		1000
+#define	MAX_POOL_SIZE			_POSIX_THREAD_THREADS_MAX
+#define	MAX_CONCURRENT_WAITS	(_POSIX_THREAD_THREADS_MAX - 2)
+#define	MAX_USER_WAITS			4
 
 /*
  * Macros
@@ -98,6 +101,8 @@ extern	char	**environ;
 static	int		logflag = 1;
 static	int		doreinit = 0;
 static	int		door_id = -1;
+static	pthread_mutex_t door_mutex = PTHREAD_MUTEX_INITIALIZER;
+static	pthread_cond_t door_cv = PTHREAD_COND_INITIALIZER;
 static  int 		service_requests = 0;
 static	hrtime_t	orig_time;
 static	hrtime_t	sliding_interval_ms;
@@ -105,6 +110,14 @@ static	uint32_t	dos_req_limit;
 static	uint32_t	dos_ms;
 static	pthread_mutex_t	dos_mutex = PTHREAD_MUTEX_INITIALIZER;
 static	rwlock_t	init_lk;
+static	int pool_count = 0;
+static	pthread_mutex_t pool_mutex = PTHREAD_MUTEX_INITIALIZER;
+static	pthread_mutex_t	wait_req_mutex = PTHREAD_MUTEX_INITIALIZER;
+static	int wait_count = 0;
+static	struct {
+	uid_t uid;
+	int count;
+} user_count[MAX_CONCURRENT_WAITS];
 
 /*
  * This returns an error message to libpicl
@@ -168,6 +181,76 @@ picld_ping(picl_service_t *in)
 	(void) door_return((char *)&ret, sizeof (picl_retping_t), NULL, 0);
 }
 
+static int
+check_user(uid_t uid)
+{
+	int i;
+	uid_t tmp_uid;
+	int free_idx = -1;
+
+	if (uid == 0)
+		return (PICL_SUCCESS);
+	for (i = 0; i < MAX_CONCURRENT_WAITS; i++) {
+		if ((tmp_uid = user_count[i].uid) == uid) {
+			if (user_count[i].count == MAX_USER_WAITS)
+				return (PICL_FAILURE);
+			user_count[i].count++;
+			return (PICL_SUCCESS);
+		}
+		if ((free_idx == -1) && (tmp_uid == 0))
+			free_idx = i;
+	}
+	if (free_idx != -1) {
+		user_count[free_idx].uid = uid;
+		user_count[free_idx].count = 1;
+		return (PICL_SUCCESS);
+	}
+	return (PICL_FAILURE);
+}
+
+static void
+done_user(uid_t uid)
+{
+	int i;
+
+	if (uid == 0)
+		return;
+	for (i = 0; i < MAX_CONCURRENT_WAITS; i++) {
+		if (user_count[i].uid == uid) {
+			if (--user_count[i].count == 0)
+				user_count[i].uid = 0;
+			return;
+		}
+	}
+}
+
+static int
+enter_picld_wait(uid_t uid)
+{
+	int	rv;
+
+	if (pthread_mutex_lock(&wait_req_mutex) != 0)
+		return (PICL_FAILURE);
+	if ((wait_count < MAX_CONCURRENT_WAITS) &&
+	    (check_user(uid) == PICL_SUCCESS)) {
+		rv = PICL_SUCCESS;
+		wait_count++;
+	} else {
+		rv = PICL_FAILURE;
+	}
+	(void) pthread_mutex_unlock(&wait_req_mutex);
+	return (rv);
+}
+
+static void
+exit_picld_wait(uid_t uid)
+{
+	(void) pthread_mutex_lock(&wait_req_mutex);
+	done_user(uid);
+	wait_count--;
+	(void) pthread_mutex_unlock(&wait_req_mutex);
+}
+
 /*
  * picld_wait is called when a picl_wait request is received
  */
@@ -176,12 +259,23 @@ picld_wait(picl_service_t *in)
 {
 	picl_retwait_t	ret;
 	int		err;
+	ucred_t	*puc = NULL;
+	uid_t uid;
 
 	ret.cnum = in->req_wait.cnum;
-
-	err = xptree_refresh_notify(in->req_wait.secs);
-	ret.retcode = err;
-
+	if (door_ucred(&puc) != 0)
+		ret.retcode = PICL_FAILURE;
+	else {
+		uid = ucred_geteuid(puc);
+		if (enter_picld_wait(uid) == PICL_FAILURE)
+			ret.retcode = PICL_FAILURE;
+		else {
+			err = xptree_refresh_notify(in->req_wait.secs);
+			ret.retcode = err;
+			exit_picld_wait(uid);
+		}
+		ucred_free(puc);
+	}
 	(void) rw_unlock(&init_lk);
 	(void) door_return((char *)&ret, sizeof (picl_retwait_t), NULL, 0);
 }
@@ -703,7 +797,6 @@ check_denial_of_service(int cnum)
 		(void) poll(NULL, 0, dos_ms);
 }
 
-
 /* ARGSUSED */
 static void
 picld_door_handler(void *cookie, char *argp, size_t asize,
@@ -859,6 +952,64 @@ daemon_exists(void)
 }
 
 /*
+ * picld_create_server_thread - binds the running thread to the private
+ * door pool, and sets the required cancellation state.
+ */
+/* ARGSUSED */
+static void *
+picld_create_server_thread(void *arg)
+{
+	/*
+	 * wait for door descriptor to be initialized
+	 */
+	(void) pthread_mutex_lock(&door_mutex);
+	while (door_id == -1) {
+		(void) pthread_cond_wait(&door_cv, &door_mutex);
+	}
+	(void) pthread_mutex_unlock(&door_mutex);
+
+	/*
+	 * Bind this thread to the door's private thread pool
+	 */
+	if (door_bind(door_id) < 0) {
+		perror("door_bind");
+	}
+
+	/*
+	 * Disable thread cancellation mechanism
+	 */
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+	(void) door_return(NULL, 0, NULL, 0); /* wait for door invocation */
+	return (NULL);
+}
+
+/*
+ * picld_server_create_fn - creates threads for the private door pool
+ *
+ */
+/* ARGSUSED */
+static void
+picld_server_create_fn(door_info_t *dip)
+{
+	pthread_attr_t attr;
+
+	(void) pthread_mutex_lock(&pool_mutex);
+	if (pool_count < MAX_POOL_SIZE) {
+		(void) pthread_attr_init(&attr);
+		(void) pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+		(void) pthread_attr_setdetachstate(&attr,
+		    PTHREAD_CREATE_DETACHED);
+		if (pthread_create(NULL, &attr, picld_create_server_thread,
+		    NULL)) {
+			perror("pthread_create");
+		} else {
+			pool_count++;
+		}
+	}
+	(void) pthread_mutex_unlock(&pool_mutex);
+}
+
+/*
  * Create the picld door
  */
 static int
@@ -866,14 +1017,20 @@ setup_door(void)
 {
 	struct stat	stbuf;
 
+	(void) door_server_create(picld_server_create_fn);
+	(void) pthread_mutex_lock(&door_mutex);
 	/*
 	 * Create the door
 	 */
 	door_id = door_create(picld_door_handler, PICLD_DOOR_COOKIE,
-	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL);
+	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL | DOOR_PRIVATE);
 
 	if (door_id < 0) {
+		(void) pthread_mutex_unlock(&door_mutex);
 		return (-1);
+	} else {
+		(void) pthread_cond_signal(&door_cv);
+		(void) pthread_mutex_unlock(&door_mutex);
 	}
 
 	if (stat(PICLD_DOOR, &stbuf) < 0) {
@@ -895,7 +1052,6 @@ setup_door(void)
 		    (fattach(door_id, PICLD_DOOR) < 0))
 			return (-1);
 	}
-
 	return (0);
 }
 
