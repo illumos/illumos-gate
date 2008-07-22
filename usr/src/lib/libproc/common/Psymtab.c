@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -564,12 +564,13 @@ Pupdate_maps(struct ps_prochandle *P)
 void
 Pupdate_syms(struct ps_prochandle *P)
 {
-	file_info_t *fptr = list_next(&P->file_head);
+	file_info_t *fptr;
 	int i;
 
 	Pupdate_maps(P);
 
-	for (i = 0; i < P->num_files; i++, fptr = list_next(fptr)) {
+	for (i = 0, fptr = list_next(&P->file_head); i < P->num_files;
+	    i++, fptr = list_next(fptr)) {
 		Pbuild_file_symtab(P, fptr);
 		(void) Pbuild_file_ctf(P, fptr);
 	}
