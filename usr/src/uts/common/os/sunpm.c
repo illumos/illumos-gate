@@ -313,8 +313,12 @@ callb_id_t	pm_halt_cb_id;
 int		pm_comps_notlowest;	/* no. of comps not at lowest power */
 int		pm_powering_down;	/* cpr is source of DDI_SUSPEND calls */
 
-clock_t pm_min_scan = PM_MIN_SCAN;
 clock_t pm_id_ticks = 5;	/* ticks to wait before scan during idle-down */
+clock_t pm_default_min_scan = PM_DEFAULT_MIN_SCAN;
+clock_t pm_cpu_min_scan = PM_CPU_MIN_SCAN;
+
+#define	PM_MIN_SCAN(dip)	(PM_ISCPU(dip) ? pm_cpu_min_scan : \
+				    pm_default_min_scan)
 
 static int pm_busop_set_power(dev_info_t *,
     void *, pm_bus_power_op_t, void *, void *);
@@ -1000,7 +1004,7 @@ pm_rescan(void *arg)
 		}
 		scanp->ps_scan_id = timeout(pm_rescan, (void *)dip,
 		    (scanp->ps_idle_down ? pm_id_ticks :
-		    (pm_min_scan * hz)));
+		    (PM_MIN_SCAN(dip) * hz)));
 		PMD(PMD_SCAN, ("%s: %s@%s(%s#%d): scheduled next pm_rescan, "
 		    "scanid %lx\n", pmf, PM_DEVICE(dip),
 		    (ulong_t)scanp->ps_scan_id))
@@ -1185,18 +1189,20 @@ pm_scan_dev(dev_info_t *dip)
 	int		circ;
 	static int	cur_threshold(dev_info_t *, int);
 	static int	pm_next_lower_power(pm_component_t *, int);
+	clock_t		min_scan = pm_default_min_scan;
 
 	/*
 	 * skip attaching device
 	 */
 	if (DEVI_IS_ATTACHING(dip)) {
 		PMD(PMD_SCAN, ("%s: %s@%s(%s#%d) is attaching, timeleft(%lx)\n",
-		    pmf, PM_DEVICE(dip), pm_min_scan))
-		return (pm_min_scan);
+		    pmf, PM_DEVICE(dip), min_scan))
+		return (min_scan);
 	}
 
 	PM_LOCK_DIP(dip);
 	scanp = PM_GET_PM_SCAN(dip);
+	min_scan = PM_MIN_SCAN(dip);
 	ASSERT(scanp && PM_GET_PM_INFO(dip));
 
 	PMD(PMD_SCAN, ("%s: [BEGIN %s@%s(%s#%d)]\n", pmf, PM_DEVICE(dip)))
@@ -1258,10 +1264,10 @@ pm_scan_dev(dev_info_t *dip)
 		if ((timestamp[i] == 0) || (cp->pmc_busycount > 0)) {
 			/* were busy or newly became busy by another thread */
 			if (timeleft == 0)
-				timeleft = max(thresh, pm_min_scan);
+				timeleft = max(thresh, min_scan);
 			else
 				timeleft = min(
-				    timeleft, max(thresh, pm_min_scan));
+				    timeleft, max(thresh, min_scan));
 			continue;
 		}
 
@@ -1278,7 +1284,7 @@ pm_scan_dev(dev_info_t *dip)
 				PMD(PMD_SCAN, ("%s: %s@%s(%s#%d) comp %d, "
 				    "%d->%d Failed\n", pmf, PM_DEVICE(dip),
 				    i, curpwr, nxtpwr))
-				timeleft = pm_min_scan;
+				timeleft = min_scan;
 				continue;
 			} else {
 				PMD(PMD_SCAN, ("%s: %s@%s(%s#%d) comp %d, "

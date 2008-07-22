@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,15 +99,17 @@ typedef struct cpudrv_pm {
 #if defined(__x86)
 #define	CPUDRV_PM_IDLE_HWM		85	/* idle high water mark */
 #define	CPUDRV_PM_IDLE_LWM		70	/* idle low water mark */
+#define	CPUDRV_PM_IDLE_BLWM_CNT_MAX	1    /* # of iters idle can be < lwm */
+#define	CPUDRV_PM_IDLE_BHWM_CNT_MAX	1    /* # of iters idle can be < hwm */
 #else
 #define	CPUDRV_PM_IDLE_HWM		98	/* idle high water mark */
 #define	CPUDRV_PM_IDLE_LWM		8	/* idle low water mark */
+#define	CPUDRV_PM_IDLE_BLWM_CNT_MAX	2    /* # of iters idle can be < lwm */
+#define	CPUDRV_PM_IDLE_BHWM_CNT_MAX	2    /* # of iters idle can be < hwm */
 #endif
 #define	CPUDRV_PM_USER_HWM		20	/* user high water mark */
 #define	CPUDRV_PM_IDLE_BUF_ZONE		4    /* buffer zone when going down */
 
-#define	CPUDRV_PM_IDLE_BLWM_CNT_MAX	2    /* # of iters idle can be < lwm */
-#define	CPUDRV_PM_IDLE_BHWM_CNT_MAX	2    /* # of iters idle can be < hwm */
 
 /*
  * Maximums for creating 'pm-components' property
@@ -140,7 +142,11 @@ typedef struct cpudrv_pm {
  * might really be using the CPU fully, we monitor less frequently
  * (CPUDRV_PM_QUANT_CNT_NORMAL).
  */
+#if defined(__x86)
+#define	CPUDRV_PM_QUANT_CNT_NORMAL	(hz * 1)	/* 1 sec */
+#else
 #define	CPUDRV_PM_QUANT_CNT_NORMAL	(hz * 5)	/* 5 sec */
+#endif
 #define	CPUDRV_PM_QUANT_CNT_OTHR	(hz * 1)	/* 1 sec */
 
 /*

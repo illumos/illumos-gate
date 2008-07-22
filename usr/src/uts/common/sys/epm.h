@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,7 +116,8 @@ typedef struct pm_scan {
 #define	PM_SCAN_STOP		0x400
 #define	PM_SCAN_DISPATCHED	0x800
 
-#define	PM_MIN_SCAN	((clock_t)15)	/* Minimum scan interval in seconds */
+#define	PM_DEFAULT_MIN_SCAN	((clock_t)15) /* Minimum scan interval in sec */
+#define	PM_CPU_MIN_SCAN		((clock_t)1) /* Minimum interval for CPUs */
 
 /*
  * Power management component definitions, used for tracking idleness of
