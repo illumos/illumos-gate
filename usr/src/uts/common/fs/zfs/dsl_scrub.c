@@ -41,12 +41,7 @@
 #include <sys/zfs_znode.h>
 #include <sys/spa_impl.h>
 #include <sys/vdev_impl.h>
-
-/* XXX */
-#ifndef _KERNEL
-#include <ucontext.h>
-#include <stdio.h>
-#endif
+#include <sys/zil_impl.h>
 
 typedef int (scrub_cb_t)(dsl_pool_t *, const blkptr_t *, const zbookmark_t *);
 
@@ -54,7 +49,7 @@ static scrub_cb_t dsl_pool_scrub_clean_cb;
 static dsl_syncfunc_t dsl_pool_scrub_cancel_sync;
 
 int zfs_scrub_min_time = 1; /* scrub for at least 1 sec each txg */
-int zfs_scrub_max_time = 2; /* scrub for at most 2 sec each txg */
+int zfs_resilver_min_time = 3; /* resilver for at least 3 sec each txg */
 boolean_t zfs_no_scrub_io = B_FALSE; /* set to disable scrub i/o */
 
 extern int zfs_txg_timeout;
@@ -122,6 +117,7 @@ dsl_pool_scrub_setup_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	    ot ? ot : DMU_OT_SCRUB_QUEUE, DMU_OT_NONE, 0, tx);
 	bzero(&dp->dp_scrub_bookmark, sizeof (zbookmark_t));
 	dp->dp_scrub_restart = B_FALSE;
+	dp->dp_spa->spa_scrub_errors = 0;
 
 	VERIFY(0 == zap_add(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_POOL_SCRUB_FUNC, sizeof (uint32_t), 1,
@@ -179,6 +175,7 @@ dsl_pool_scrub_cancel_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	}
 	mutex_exit(&dp->dp_spa->spa_scrub_lock);
 	dp->dp_spa->spa_scrub_started = B_FALSE;
+	dp->dp_spa->spa_scrub_active = B_FALSE;
 
 	dp->dp_scrub_func = SCRUB_FUNC_NONE;
 	VERIFY(0 == dmu_object_free(dp->dp_meta_objset,
@@ -296,6 +293,7 @@ static boolean_t
 scrub_pause(dsl_pool_t *dp, const zbookmark_t *zb)
 {
 	int elapsed_ticks;
+	int mintime;
 
 	if (dp->dp_scrub_pausing)
 		return (B_TRUE); /* we're already pausing */
@@ -307,9 +305,11 @@ scrub_pause(dsl_pool_t *dp, const zbookmark_t *zb)
 	if (zb->zb_object == 0 || zb->zb_level != 0)
 		return (B_FALSE);
 
+	mintime = dp->dp_scrub_isresilver ? zfs_resilver_min_time :
+	    zfs_scrub_min_time;
 	elapsed_ticks = lbolt64 - dp->dp_scrub_start_time;
 	if (elapsed_ticks > hz * zfs_txg_timeout ||
-	    (elapsed_ticks > hz * zfs_scrub_min_time && txg_sync_waiting(dp))) {
+	    (elapsed_ticks > hz * mintime && txg_sync_waiting(dp))) {
 		dprintf("pausing at %llx/%llx/%llx/%llx\n",
 		    (longlong_t)zb->zb_objset, (longlong_t)zb->zb_object,
 		    (longlong_t)zb->zb_level, (longlong_t)zb->zb_blkid);
@@ -330,8 +330,10 @@ traverse_zil_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t claim_txg)
 		return;
 
 	if (claim_txg != 0 || bp->blk_birth < spa_first_txg(dp->dp_spa)) {
-		zbookmark_t zb = { 0 };
-		/* XXX figure out zb.objset */
+		zbookmark_t zb;
+		zb.zb_objset = dmu_objset_id(zilog->zl_os);
+		zb.zb_object = 0;
+		zb.zb_level = -1;
 		zb.zb_blkid = bp->blk_cksum.zc_word[ZIL_ZC_SEQ];
 		VERIFY(0 ==
 		    scrub_funcs[dp->dp_scrub_func](dp, bp, &zb));
@@ -352,9 +354,10 @@ traverse_zil_record(zilog_t *zilog, lr_t *lrc, void *arg, uint64_t claim_txg)
 			return;
 
 		if (claim_txg != 0 && bp->blk_birth >= claim_txg) {
-			zbookmark_t zb = { 0 };
-			/* XXX figure out zb.objset */
+			zbookmark_t zb;
+			zb.zb_objset = dmu_objset_id(zilog->zl_os);
 			zb.zb_object = lr->lr_foid;
+			zb.zb_level = 0;
 			zb.zb_blkid = lr->lr_offset / BP_GET_LSIZE(bp);
 			VERIFY(0 ==
 			    scrub_funcs[dp->dp_scrub_func](dp, bp, &zb));
@@ -375,6 +378,13 @@ traverse_zil(dsl_pool_t *dp, zil_header_t *zh)
 	if (claim_txg == 0 && (spa_mode & FWRITE))
 		return;
 
+	/*
+	 * XXX We are passing the wrong objset; the bookmark will be
+	 * wrong, so traverse_zil_record (for dmu_sync()-ed blocks) will
+	 * not report the specific fs if there is an i/o error.  (Note,
+	 * we ignore i/o errors on the zil itself due to the zil's
+	 * design, so there is no negative impact there.)
+	 */
 	zilog = zil_alloc(dp->dp_meta_objset, zh);
 
 	(void) zil_parse(zilog, traverse_zil_block, traverse_zil_record, dp,
@@ -724,6 +734,7 @@ dsl_pool_scrub_sync(dsl_pool_t *dp, dmu_tx_t *tx)
 	dp->dp_scrub_pausing = B_FALSE;
 	dp->dp_scrub_start_time = lbolt64;
 	dp->dp_scrub_isresilver = (dp->dp_scrub_min_txg != 0);
+	dp->dp_spa->spa_scrub_active = B_TRUE;
 
 	if (dp->dp_scrub_bookmark.zb_objset == 0) {
 		/* First do the MOS & ORIGIN */
@@ -845,6 +856,10 @@ dsl_pool_scrub_clean_cb(dsl_pool_t *dp,
 		zio_priority = ZIO_PRIORITY_RESILVER;
 		needs_io = B_FALSE;
 	}
+
+	/* If it's an intent log block, failure is expected. */
+	if (zb->zb_level == -1 && BP_GET_TYPE(bp) != DMU_OT_OBJSET)
+		zio_flags |= ZIO_FLAG_SPECULATIVE;
 
 	for (d = 0; d < BP_GET_NDVAS(bp); d++) {
 		vdev_t *vd = vdev_lookup_top(spa,
