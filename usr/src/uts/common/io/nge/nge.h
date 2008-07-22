@@ -719,6 +719,7 @@ typedef struct nge {
 	enum nge_mac_state	nge_mac_state;	/* definitions above	*/
 	enum nge_chip_state	nge_chip_state; /* definitions above	*/
 	boolean_t		promisc;
+	boolean_t		record_promisc;
 	boolean_t		suspended;
 
 	int			resched_needed;

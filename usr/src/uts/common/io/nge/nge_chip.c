@@ -670,13 +670,14 @@ nge_chip_stop(nge_t *ngep, boolean_t fault)
 	mode.mode_bits.desc_type = ngep->desc_mode;
 	nge_reg_put32(ngep, NGE_MODE_CNTL, mode.mode_val);
 
-	for (tries = 0; tries < 5000; tries++) {
+	for (tries = 0; tries < 10000; tries++) {
 		drv_usecwait(10);
 		mode.mode_val = nge_reg_get32(ngep, NGE_MODE_CNTL);
 		if (mode.mode_bits.dma_status == NGE_SET)
 			break;
 	}
-	if (tries == 5000) {
+	if (tries == 10000) {
+		ngep->nge_chip_state = NGE_CHIP_FAULT;
 		return (DDI_FAILURE);
 	}
 
@@ -721,6 +722,7 @@ nge_chip_stop(nge_t *ngep, boolean_t fault)
 		tx_sta.sta_val = nge_reg_get32(ngep, NGE_TX_STA);
 	}
 	if (tries == 1000) {
+		ngep->nge_chip_state = NGE_CHIP_FAULT;
 		return (DDI_FAILURE);
 	}
 	nge_reg_put32(ngep, NGE_TX_STA,  tx_sta.sta_val);
@@ -737,6 +739,7 @@ nge_chip_stop(nge_t *ngep, boolean_t fault)
 		rx_sta.sta_val = nge_reg_get32(ngep, NGE_RX_STA);
 	}
 	if (tries == 1000) {
+		ngep->nge_chip_state = NGE_CHIP_FAULT;
 		return (DDI_FAILURE);
 	}
 	nge_reg_put32(ngep, NGE_RX_STA, rx_sta.sta_val);
@@ -1606,7 +1609,7 @@ nge_factotum_stall_check(nge_t *ngep)
 	} else {
 		ngep->stall_cknum++;
 	}
-	if (ngep->stall_cknum < 8) {
+	if (ngep->stall_cknum < 16) {
 		return (B_FALSE);
 	} else {
 		ngep->stall_cknum = 0;

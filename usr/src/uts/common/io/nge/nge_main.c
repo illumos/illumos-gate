@@ -1240,6 +1240,7 @@ nge_m_promisc(void *arg, boolean_t on)
 		return (0);
 	}
 	ngep->promisc = on;
+	ngep->record_promisc = ngep->promisc;
 	nge_chip_sync(ngep);
 	NGE_DEBUG(("nge_m_promisc($%p) done", arg));
 	mutex_exit(ngep->genlock);
@@ -2140,6 +2141,8 @@ nge_restart(nge_t *ngep)
 {
 	int err = 0;
 	err = nge_reset(ngep);
+	/* write back the promisc setting */
+	ngep->promisc = ngep->record_promisc;
 	nge_chip_sync(ngep);
 	if (!err)
 		err = nge_chip_start(ngep);
