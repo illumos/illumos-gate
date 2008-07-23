@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,7 +87,7 @@ typedef struct keytable_ent {
 	int		kte_bound;	/* bound to gart table */
 	void		*kte_memhdl;	/* agp_kmem or agp_pmem handle */
 	pfn_t		*kte_pfnarray;	/* page frame numbers allocated */
-	uint32_t	kte_refcnt;	/* reference count */
+	int	kte_refcnt;	/* reference count */
 } keytable_ent_t;
 
 typedef struct key_list {

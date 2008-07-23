@@ -65,8 +65,8 @@ static void *agpgart_glob_soft_handle;
 		(v32).agpi32_version = (v).agpi_version;	\
 		(v32).agpi32_devid = (v).agpi_devid;	\
 		(v32).agpi32_mode = (v).agpi_mode;	\
-		(v32).agpi32_aperbase = (v).agpi_aperbase;	\
-		(v32).agpi32_apersize = (v).agpi_apersize;	\
+		(v32).agpi32_aperbase = (uint32_t)(v).agpi_aperbase;	\
+		(v32).agpi32_apersize = (uint32_t)(v).agpi_apersize;	\
 		(v32).agpi32_pgtotal = (v).agpi_pgtotal;	\
 		(v32).agpi32_pgsystem = (v).agpi_pgsystem;	\
 		(v32).agpi32_pgused = (v).agpi_pgused;	\
@@ -717,7 +717,7 @@ lyr_get_info(agp_kern_info_t *info, agp_registered_dev_t *agp_regdev)
 			return (-1);
 		info->agpki_mdevid = value1.igd_devid;
 		info->agpki_aperbase = value1.igd_aperbase;
-		info->agpki_apersize = value1.igd_apersize;
+		info->agpki_apersize = (uint32_t)value1.igd_apersize;
 
 		hdl = agp_regdev->agprd_targethdl;
 		err = ldi_ioctl(hdl, I8XX_GET_PREALLOC_SIZE,
@@ -736,7 +736,7 @@ lyr_get_info(agp_kern_info_t *info, agp_registered_dev_t *agp_regdev)
 			return (-1);
 		info->agpki_mdevid = value1.igd_devid;
 		info->agpki_aperbase = value1.igd_aperbase;
-		info->agpki_apersize = value1.igd_apersize;
+		info->agpki_apersize = (uint32_t)value1.igd_apersize;
 
 		hdl = agp_regdev->agprd_targethdl;
 		err = ldi_ioctl(hdl, I8XX_GET_PREALLOC_SIZE,
@@ -787,7 +787,7 @@ lyr_get_info(agp_kern_info_t *info, agp_registered_dev_t *agp_regdev)
 		info->agpki_tver = value2.iagp_ver;
 		info->agpki_tstatus = value2.iagp_mode;
 		info->agpki_aperbase = value2.iagp_aperbase;
-		info->agpki_apersize = value2.iagp_apersize;
+		info->agpki_apersize = (uint32_t)value2.iagp_apersize;
 		break;
 	default:
 		AGPDB_PRINT2((CE_WARN,
@@ -1991,7 +1991,7 @@ agp_alloc_kmem(agpgart_softstate_t *softstate, size_t length, int type)
 	if (type == AGP_PHYSICAL)
 		agpgart_dma_attr.dma_attr_sgllen = 1;
 	else
-		agpgart_dma_attr.dma_attr_sgllen = keyentry.kte_pages;
+		agpgart_dma_attr.dma_attr_sgllen = (int)keyentry.kte_pages;
 
 	/* 4k size pages */
 	keyentry.kte_memhdl = kmem_zalloc(sizeof (agp_kmem_handle_t), KM_SLEEP);
