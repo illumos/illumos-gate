@@ -218,6 +218,20 @@ static int ncpus = 0;
 			(uintptr_t)malloc_addr; \
 	}
 
+/*
+ * Add big to the oversize hash table at the head of the relevant bucket.
+ */
+static void
+insert_hash(oversize_t *big)
+{
+	caddr_t ret = big->addr;
+	int bucket = HASH_OVERSIZE(ret);
+
+	assert(MUTEX_HELD(&oversize_lock));
+	big->hash_next = ovsz_hashtab[bucket];
+	ovsz_hashtab[bucket] = big;
+}
+
 void *
 malloc(size_t bytes)
 {
@@ -489,7 +503,7 @@ memalign(size_t alignment, size_t size)
 		uchar_t	oversize_bits = 0;
 		size_t	head_sz, data_sz, tail_sz;
 		uintptr_t ret_addr, taddr, shift, tshift;
-		oversize_t *orig, *tail;
+		oversize_t *orig, *tail, *big;
 		size_t tsize;
 
 		/* needs to be aligned */
@@ -560,9 +574,12 @@ memalign(size_t alignment, size_t size)
 				 */
 				orig = (oversize_t *)((uintptr_t)alloc_buf -
 						OVSZ_HEADER_SIZE);
-				(void) oversize_header_alloc(ret_addr -
+				big = oversize_header_alloc(ret_addr -
 						OVSZ_HEADER_SIZE,
 						(orig->size - shift));
+				(void) mutex_lock(&oversize_lock);
+				insert_hash(big);
+				(void) mutex_unlock(&oversize_lock);
 				orig->size = shift - OVSZ_HEADER_SIZE;
 
 				/* free up the head fragment */
@@ -630,9 +647,12 @@ memalign(size_t alignment, size_t size)
 					 * to make both data and tail oversize
 					 * we just keep them as one piece.
 					 */
-					(void) oversize_header_alloc(ret_addr -
+					big = oversize_header_alloc(ret_addr -
 						OVSZ_HEADER_SIZE,
 						orig->size - shift);
+					(void) mutex_lock(&oversize_lock);
+					insert_hash(big);
+					(void) mutex_unlock(&oversize_lock);
 					orig->size = shift -
 						OVSZ_HEADER_SIZE;
 					free_oversize(orig);
@@ -667,8 +687,11 @@ memalign(size_t alignment, size_t size)
 					(shift + data_sz + OVSZ_HEADER_SIZE);
 
 				/* create oversize header for data seg */
-				(void) oversize_header_alloc(ret_addr -
+				big = oversize_header_alloc(ret_addr -
 					OVSZ_HEADER_SIZE, data_sz);
+				(void) mutex_lock(&oversize_lock);
+				insert_hash(big);
+				(void) mutex_unlock(&oversize_lock);
 
 				/* create oversize header for tail fragment */
 				tail = oversize_header_alloc(taddr, tail_sz);
@@ -1152,7 +1175,6 @@ oversize(size_t size)
 {
 	caddr_t ret;
 	oversize_t *big;
-	int bucket;
 
 	/* make sure we will not overflow */
 	if (size > MAX_MTMALLOC) {
@@ -1192,10 +1214,7 @@ oversize(size_t size)
 	}
 	ret = big->addr;
 
-	/* Add big to the hash table at the head of the relevant bucket. */
-	bucket = HASH_OVERSIZE(ret);
-	big->hash_next = ovsz_hashtab[bucket];
-	ovsz_hashtab[bucket] = big;
+	insert_hash(big);
 
 	if (debugopt & MTINITBUFFER)
 		copy_pattern(INITPATTERN, ret, size);
