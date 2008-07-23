@@ -335,6 +335,8 @@ pci_save_config_regs(dev_info_t *dip)
 	off_t offset = 0;
 	uint8_t cap_ptr, cap_id;
 	int pcie = 0;
+	uint16_t status;
+
 	PMD(PMD_SX, ("pci_save_config_regs %s:%d\n", ddi_driver_name(dip),
 	    ddi_get_instance(dip)))
 
@@ -343,6 +345,14 @@ pci_save_config_regs(dev_info_t *dip)
 		    ddi_driver_name(dip), ddi_get_instance(dip));
 
 		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Determine if it implements capabilities
+	 */
+	status = pci_config_get16(confhdl, PCI_CONF_STAT);
+	if (!(status & 0x10)) {
+		goto no_cap;
 	}
 	/*
 	 * Determine if it is a pci express device. If it is, save entire
@@ -363,7 +373,7 @@ pci_save_config_regs(dev_info_t *dip)
 		cap_ptr = pci_config_get8(confhdl,
 		    cap_ptr + PCI_CAP_NEXT_PTR);
 	}
-
+no_cap:
 	if (pcie) {
 		/* PCI express device. Can have data in all 4k space */
 		regbuf = (uint32_t *)kmem_zalloc((size_t)PCIE_CONF_HDR_SIZE,
@@ -501,11 +511,20 @@ cap_walk_and_save(ddi_acc_handle_t confhdl, uint32_t *regbuf,
     pci_cap_save_desc_t *cap_descp, uint32_t *ncapsp, int xspace)
 {
 	pci_cap_entry_t *pci_cap_entp;
-	uint16_t cap_id, offset;
+	uint16_t cap_id, offset, status;
 	uint32_t words_saved = 0, nwords = 0;
 	uint16_t cap_ptr = PCI_CAP_NEXT_PTR_NULL;
 
 	*ncapsp = 0;
+
+	/*
+	 * Determine if it implements capabilities
+	 */
+	status = pci_config_get16(confhdl, PCI_CONF_STAT);
+	if (!(status & 0x10)) {
+		return (words_saved);
+	}
+
 	if (!xspace)
 		cap_ptr = pci_config_get8(confhdl, PCI_BCNF_CAP_PTR);
 	/*
