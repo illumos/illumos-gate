@@ -108,7 +108,7 @@ typedef struct fmd {
 	const char *d_machine;		/* machine class name (uname -m) */
 	const char *d_isaname;		/* processor ISA name (uname -p) */
 
-	void *d_dr_hdl;			/* DR event handle (see fmd_dr.c) */
+	void *d_sysev_hdl;		/* legacy sysevent handle */
 	nv_alloc_t d_nva;		/* libnvpair allocator handle */
 	nvlist_t *d_auth;		/* FMRI authority nvlist */
 	pthread_mutex_t d_topo_lock;	/* lock for topo hdl */

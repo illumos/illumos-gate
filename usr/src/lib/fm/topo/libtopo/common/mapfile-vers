@@ -127,6 +127,7 @@ SUNWprivate {
 	topo_prop_get_uint64_array;
 	topo_prop_get_string_array;
 	topo_prop_get_fmri_array;
+	topo_prop_getpgrp;
 	topo_prop_getprop;
 	topo_prop_getprops;
 	topo_prop_inherit;

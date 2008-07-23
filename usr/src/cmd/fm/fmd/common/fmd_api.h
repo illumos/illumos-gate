@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -228,6 +228,9 @@ extern int fmd_nvl_fmri_unusable(fmd_hdl_t *, nvlist_t *);
 extern int fmd_nvl_fmri_faulty(fmd_hdl_t *, nvlist_t *);
 extern int fmd_nvl_fmri_contains(fmd_hdl_t *, nvlist_t *, nvlist_t *);
 extern nvlist_t *fmd_nvl_fmri_translate(fmd_hdl_t *, nvlist_t *, nvlist_t *);
+
+extern nvlist_t *fmd_nvl_alloc(fmd_hdl_t *, int);
+extern nvlist_t *fmd_nvl_dup(fmd_hdl_t *, nvlist_t *, int);
 
 extern int fmd_event_local(fmd_hdl_t *, fmd_event_t *);
 extern uint64_t fmd_event_ena_create(fmd_hdl_t *);

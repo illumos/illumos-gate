@@ -137,6 +137,8 @@ typedef struct fmd_module {
 	fmd_list_t mod_topolist;	/* list of held topo handles */
 	fmd_topo_t *mod_topo_current;	/* current libtopo snapshot */
 	char *mod_vers;			/* a copy of module version string */
+	nv_alloc_t mod_nva_sleep;	/* module nvalloc routines (sleep) */
+	nv_alloc_t mod_nva_nosleep;	/* module nvalloc routines (nosleep) */
 } fmd_module_t;
 
 #define	FMD_MOD_INIT	0x001		/* mod_ops->mop_init() has completed */
@@ -219,6 +221,9 @@ extern int fmd_modstat_snapshot(fmd_module_t *, struct fmd_ustat_snap *);
 
 extern struct topo_hdl *fmd_module_topo_hold(fmd_module_t *);
 extern int fmd_module_topo_rele(fmd_module_t *, struct topo_hdl *);
+
+extern nv_alloc_ops_t fmd_module_nva_ops_sleep;
+extern nv_alloc_ops_t fmd_module_nva_ops_nosleep;
 
 #ifdef	__cplusplus
 }

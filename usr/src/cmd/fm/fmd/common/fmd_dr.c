@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,20 +71,25 @@
 #include <fmd_topo.h>
 #include <fmd.h>
 
-static void
+void
 fmd_dr_event(sysevent_t *sep)
 {
 	uint64_t gen;
 	fmd_event_t *e;
 	const char *class = sysevent_get_class_name(sep);
+	const char *subclass = sysevent_get_subclass_name(sep);
 	hrtime_t evtime;
 	fmd_topo_t *ftp, *prev;
 	boolean_t update_topo = B_FALSE;
 
-	/*
-	 * The dr generation is only changed in response to DR events.
-	 */
 	if (strcmp(class, EC_DR) == 0) {
+		if (strcmp(subclass, ESC_DR_AP_STATE_CHANGE) != 0 &&
+		    strcmp(subclass, ESC_DR_TARGET_STATE_CHANGE) != 0)
+			return;
+
+		/*
+		 * The DR generation is only changed in response to DR events.
+		 */
 		update_topo = B_TRUE;
 
 		(void) pthread_mutex_lock(&fmd.d_stats_lock);
@@ -93,6 +98,24 @@ fmd_dr_event(sysevent_t *sep)
 
 		TRACE((FMD_DBG_XPRT, "dr event %p, gen=%llu",
 		    (void *)sep, gen));
+	} else if (strcmp(class, EC_DEVFS) == 0) {
+		/*
+		 * A devfs configuration event can change the topology,
+		 * as disk nodes only exist when the device is configured.
+		 */
+		update_topo = B_TRUE;
+	} else if (strcmp(class, EC_ZFS) == 0) {
+		/*
+		 * These events can change the resource cache.
+		 */
+		if (strcmp(subclass, ESC_ZFS_VDEV_CLEAR) != 0 &&
+		    strcmp(subclass, ESC_ZFS_VDEV_REMOVE) != 0 &&
+		    strcmp(subclass, ESC_ZFS_POOL_DESTROY) != 0)
+			return;
+	} else if (strcmp(class, EC_DEV_ADD) == 0 ||
+	    strcmp(class, EC_DEV_REMOVE) == 0) {
+		if (strcmp(subclass, ESC_DISK) != 0)
+			return;
 	}
 
 	/*
@@ -127,47 +150,4 @@ fmd_dr_event(sysevent_t *sep)
 	ftp = fmd_topo_hold();
 	e = fmd_event_create(FMD_EVT_TOPO, ftp->ft_time, NULL, ftp);
 	fmd_modhash_dispatch(fmd.d_mod_hash, e);
-}
-
-void
-fmd_dr_init(void)
-{
-	const char *dr_subclasses[] = {
-	    ESC_DR_AP_STATE_CHANGE
-	};
-	const char *zfs_subclasses[] = {
-	    ESC_ZFS_VDEV_CLEAR,
-	    ESC_ZFS_VDEV_REMOVE,
-	    ESC_ZFS_POOL_DESTROY
-	};
-	const char *dev_subclasses[] = {
-	    EC_SUB_ALL
-	};
-
-	if (geteuid() != 0)
-		return; /* legacy sysevent mechanism is still root-only */
-
-	if ((fmd.d_dr_hdl = sysevent_bind_handle(fmd_dr_event)) == NULL)
-		fmd_error(EFMD_EXIT, "failed to bind handle for DR sysevent");
-
-	if (sysevent_subscribe_event(fmd.d_dr_hdl, EC_DR,
-	    dr_subclasses, sizeof (dr_subclasses) / sizeof (char *)) == -1)
-		fmd_error(EFMD_EXIT, "failed to subscribe to DR sysevents");
-
-	if (sysevent_subscribe_event(fmd.d_dr_hdl, EC_DEVFS,
-	    dev_subclasses, sizeof (dev_subclasses) / sizeof (char *)) == -1)
-		fmd_error(EFMD_EXIT, "failed to subscribe to devfs sysevents");
-
-	if (sysevent_subscribe_event(fmd.d_dr_hdl, EC_ZFS,
-	    zfs_subclasses, sizeof (zfs_subclasses) / sizeof (char *)) == -1)
-		fmd_error(EFMD_EXIT, "failed to subscribe to ZFS sysevents");
-}
-
-void
-fmd_dr_fini(void)
-{
-	if (fmd.d_dr_hdl != NULL) {
-		sysevent_unsubscribe_event(fmd.d_dr_hdl, EC_DR);
-		sysevent_unbind_handle(fmd.d_dr_hdl);
-	}
 }

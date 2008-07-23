@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -74,8 +74,10 @@
 	fmd_hdl_verror = FUNCTION extern;
 	fmd_hdl_zalloc = FUNCTION extern;
 
+	fmd_nvl_alloc = FUNCTION extern;
 	fmd_nvl_class_match = FUNCTION extern;
 	fmd_nvl_create_fault = FUNCTION extern;
+	fmd_nvl_dup = FUNCTION extern;
 	fmd_nvl_fmri_expand = FUNCTION extern;
 	fmd_nvl_fmri_present = FUNCTION extern;
 	fmd_nvl_fmri_unusable = FUNCTION extern;

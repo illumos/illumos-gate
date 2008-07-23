@@ -510,7 +510,6 @@ fmd_destroy(fmd_t *dp)
 	(void) fmd_conf_getprop(fmd.d_conf, "core", &core);
 
 	fmd_rpc_fini();
-	fmd_dr_fini();
 
 	if (dp->d_xprt_ids != NULL)
 		fmd_xprt_suspend_all();
@@ -922,11 +921,6 @@ fmd_run(fmd_t *dp, int pfd)
 
 	(void) fmd_conf_getprop(dp->d_conf, "agent.path", &pap);
 	fmd_modhash_loadall(dp->d_mod_hash, pap, &fmd_proc_ops, NULL);
-
-	/*
-	 * Subscribe to sysevents after all modules have been loaded.
-	 */
-	fmd_dr_init();
 
 	/*
 	 * With all modules loaded, replay fault events from the ASRU cache for

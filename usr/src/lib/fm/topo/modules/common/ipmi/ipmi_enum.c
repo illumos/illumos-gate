@@ -140,7 +140,7 @@ ipmi_present(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
 			topo_mod_dprintf(mod,
 			    "ipmi_entity_present() failed: %s",
 			    ipmi_errmsg(ihp));
-			present = B_TRUE;
+			return (-1);
 		}
 	}
 

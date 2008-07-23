@@ -226,6 +226,16 @@ fmd_module_create(const char *path, const fmd_modops_t *ops)
 		return (NULL);
 	}
 
+	if (nv_alloc_init(&mp->mod_nva_sleep,
+	    &fmd_module_nva_ops_sleep, mp) != 0 ||
+	    nv_alloc_init(&mp->mod_nva_nosleep,
+	    &fmd_module_nva_ops_nosleep, mp) != 0) {
+		fmd_error(EFMD_MOD_INIT, "failed to initialize nvlist "
+		    "allocation routines");
+		fmd_module_destroy(mp);
+		return (NULL);
+	}
+
 	(void) fmd_conf_getprop(fmd.d_conf, "client.evqlim", &limit);
 
 	mp->mod_queue = fmd_eventq_create(mp,
@@ -428,6 +438,11 @@ fmd_module_destroy(fmd_module_t *mp)
 
 	if (mp->mod_topo_current != NULL)
 		fmd_topo_rele(mp->mod_topo_current);
+
+	if (mp->mod_nva_sleep.nva_ops != NULL)
+		nv_alloc_fini(&mp->mod_nva_sleep);
+	if (mp->mod_nva_nosleep.nva_ops != NULL)
+		nv_alloc_fini(&mp->mod_nva_nosleep);
 
 	/*
 	 * Once the module is no longer processing events and no longer visible

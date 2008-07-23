@@ -98,6 +98,11 @@ typedef enum ses_element_status_code {
 #define	SES_PROP_DESCRIPTION		"ses-description"	/* S */
 #define	SES_PROP_HOT_SWAP		"ses-hot-swappable"
 
+#define	SES_PROP_CRIT_OVER		"ses-critical-over"
+#define	SES_PROP_CRIT_UNDER		"ses-critical-under"
+#define	SES_PROP_WARN_OVER		"ses-warning-over"
+#define	SES_PROP_WARN_UNDER		"ses-warning-under"
+
 #define	SES_FC_PROP_NODE_NAME		"ses-fc-node-name"	/* U64 */
 #define	SES_FC_PROP_LOOP_POS		"ses-fc-loop-position"	/* U64 */
 #define	SES_FC_PROP_REQ_HARDADDR	"ses-fc-requested-hard-address"
@@ -221,8 +226,6 @@ typedef enum ses2_display_mode_status {
 /*
  * Current Sensor properties
  */
-#define	SES_CS_PROP_CRIT_OVER		"ses-overcurrent-critical"
-#define	SES_CS_PROP_WARN_OVER		"ses-overcurrent-warning"
 #define	SES_CS_PROP_CURRENT_MA		"ses-current"		/* I64 */
 
 /*
@@ -310,10 +313,6 @@ typedef enum ses_sasconn_type {
  * Temperature Sensor properties
  */
 #define	SES_TEMP_PROP_TEMP		"ses-temperature"	/* I64 */
-#define	SES_TEMP_PROP_UNDERTEMP_WARN	"ses-undertemperature-warning"
-#define	SES_TEMP_PROP_UNDERTEMP_FAIL	"ses-undertemperature-failure"
-#define	SES_TEMP_PROP_OVERTEMP_WARN	"ses-overtemperature-warning"
-#define	SES_TEMP_PROP_OVERTEMP_FAIL	"ses-overtemperature-failure"
 
 /*
  * Uninterruptible Power Supply properties
@@ -333,10 +332,6 @@ typedef enum ses_sasconn_type {
 /*
  * Voltage Sensor properties
  */
-#define	SES_VS_PROP_CRIT_UNDER		"ses-undervoltage-critical"
-#define	SES_VS_PROP_CRIT_OVER		"ses-overvoltage-critical"
-#define	SES_VS_PROP_WARN_UNDER		"ses-undervoltage-warning"
-#define	SES_VS_PROP_WARN_OVER		"ses-overvoltage-warning"
 #define	SES_VS_PROP_VOLTAGE_MV		"ses-voltage"		/* I64 */
 
 /*

@@ -732,10 +732,9 @@ fmd_hdl_topo_rele(fmd_hdl_t *hdl, topo_hdl_t *thp)
 	fmd_module_unlock(mp);
 }
 
-void *
-fmd_hdl_alloc(fmd_hdl_t *hdl, size_t size, int flags)
+static void *
+fmd_hdl_alloc_locked(fmd_module_t *mp, size_t size, int flags)
 {
-	fmd_module_t *mp = fmd_api_module_lock(hdl);
 	void *data;
 
 	if (mp->mod_stats->ms_memlimit.fmds_value.ui64 -
@@ -748,6 +747,17 @@ fmd_hdl_alloc(fmd_hdl_t *hdl, size_t size, int flags)
 
 	if ((data = fmd_alloc(size, flags)) != NULL)
 		mp->mod_stats->ms_memtotal.fmds_value.ui64 += size;
+
+	return (data);
+}
+
+void *
+fmd_hdl_alloc(fmd_hdl_t *hdl, size_t size, int flags)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	void *data;
+
+	data = fmd_hdl_alloc_locked(mp, size, flags);
 
 	fmd_module_unlock(mp);
 	return (data);
@@ -764,13 +774,19 @@ fmd_hdl_zalloc(fmd_hdl_t *hdl, size_t size, int flags)
 	return (data);
 }
 
+static void
+fmd_hdl_free_locked(fmd_module_t *mp, void *data, size_t size)
+{
+	fmd_free(data, size);
+	mp->mod_stats->ms_memtotal.fmds_value.ui64 -= size;
+}
+
 void
 fmd_hdl_free(fmd_hdl_t *hdl, void *data, size_t size)
 {
 	fmd_module_t *mp = fmd_api_module_lock(hdl);
 
-	fmd_free(data, size);
-	mp->mod_stats->ms_memtotal.fmds_value.ui64 -= size;
+	fmd_hdl_free_locked(mp, data, size);
 
 	fmd_module_unlock(mp);
 }
@@ -1864,6 +1880,102 @@ fmd_nvl_fmri_translate(fmd_hdl_t *hdl, nvlist_t *fmri, nvlist_t *auth)
 	xfmri = fmd_fmri_translate(fmri, auth);
 	fmd_module_unlock(mp);
 	return (xfmri);
+}
+
+static int
+fmd_nvl_op_init(nv_alloc_t *ops, va_list ap)
+{
+	fmd_module_t *mp = va_arg(ap, fmd_module_t *);
+
+	ops->nva_arg = mp;
+
+	return (0);
+}
+
+static void *
+fmd_nvl_op_alloc_sleep(nv_alloc_t *ops, size_t size)
+{
+	fmd_module_t *mp = ops->nva_arg;
+
+	return (fmd_hdl_alloc_locked(mp, size, FMD_SLEEP));
+}
+
+static void *
+fmd_nvl_op_alloc_nosleep(nv_alloc_t *ops, size_t size)
+{
+	fmd_module_t *mp = ops->nva_arg;
+
+	return (fmd_hdl_alloc_locked(mp, size, FMD_NOSLEEP));
+}
+
+static void
+fmd_nvl_op_free(nv_alloc_t *ops, void *data, size_t size)
+{
+	fmd_module_t *mp = ops->nva_arg;
+
+	fmd_hdl_free_locked(mp, data, size);
+}
+
+nv_alloc_ops_t fmd_module_nva_ops_sleep = {
+	fmd_nvl_op_init,
+	NULL,
+	fmd_nvl_op_alloc_sleep,
+	fmd_nvl_op_free,
+	NULL
+};
+
+nv_alloc_ops_t fmd_module_nva_ops_nosleep = {
+	fmd_nvl_op_init,
+	NULL,
+	fmd_nvl_op_alloc_nosleep,
+	fmd_nvl_op_free,
+	NULL
+};
+
+nvlist_t *
+fmd_nvl_alloc(fmd_hdl_t *hdl, int flags)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	nv_alloc_t *nva;
+	nvlist_t *nvl;
+	int ret;
+
+	if (flags == FMD_SLEEP)
+		nva = &mp->mod_nva_sleep;
+	else
+		nva = &mp->mod_nva_nosleep;
+
+	ret = nvlist_xalloc(&nvl, NV_UNIQUE_NAME, nva);
+
+	fmd_module_unlock(mp);
+
+	if (ret != 0)
+		return (NULL);
+	else
+		return (nvl);
+}
+
+nvlist_t *
+fmd_nvl_dup(fmd_hdl_t *hdl, nvlist_t *src, int flags)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	nv_alloc_t *nva;
+	nvlist_t *nvl;
+	int ret;
+
+	if (flags == FMD_SLEEP)
+		nva = &mp->mod_nva_sleep;
+	else
+		nva = &mp->mod_nva_nosleep;
+
+	ret = nvlist_xdup(src, &nvl, nva);
+
+	fmd_module_unlock(mp);
+
+	if (ret != 0)
+		return (NULL);
+	else
+		return (nvl);
 }
 
 int

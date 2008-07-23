@@ -1329,12 +1329,6 @@ topo_xml_range_process(topo_mod_t *mp, xmlNodePtr rn, tf_rdata_t *rd)
 			ct = topo_child_next(rd->rd_pn, ct);
 			ccnt++;
 		}
-		if (ccnt == 0) {
-			topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "no nodes "
-			    "processed for range %s\n", rd->rd_name);
-			topo_node_range_destroy(rd->rd_pn, rd->rd_name);
-			return (-1);
-		}
 	}
 
 	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "topo_xml_range_process: end "

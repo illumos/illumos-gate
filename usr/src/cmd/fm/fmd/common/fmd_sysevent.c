@@ -52,7 +52,9 @@
 #include <fmd_log.h>
 #include <fmd_subr.h>
 #include <fmd_dispq.h>
+#include <fmd_dr.h>
 #include <fmd_module.h>
+#include <fmd_protocol.h>
 #include <fmd_scheme.h>
 #include <fmd_error.h>
 
@@ -87,6 +89,50 @@ static pthread_mutex_t sysev_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int sysev_replay_wait = 1;
 static int sysev_exiting;
 
+/*
+ * Entry point for legacy sysevents.  This function is responsible for two
+ * things: passing off interesting events to the DR handler, and converting
+ * sysevents into resource events that modules can then subscribe to.
+ */
+static void
+sysev_legacy(sysevent_t *sep)
+{
+	const char *class = sysevent_get_class_name(sep);
+	const char *subclass = sysevent_get_subclass_name(sep);
+	char *fullclass;
+	size_t len;
+	nvlist_t *attr, *nvl;
+	fmd_event_t *e;
+	hrtime_t hrt;
+
+	/* notify the DR subsystem of the event */
+	fmd_dr_event(sep);
+
+	/* get the matching sysevent name */
+	len = snprintf(NULL, 0, "%s%s.%s", SYSEVENT_RSRC_CLASS,
+	    class, subclass);
+	fullclass = alloca(len + 1);
+	(void) snprintf(fullclass, len + 1, "%s%s.%s",
+	    SYSEVENT_RSRC_CLASS, class, subclass);
+
+	/* construct the event payload */
+	(void) nvlist_xalloc(&nvl, NV_UNIQUE_NAME, &fmd.d_nva);
+	(void) nvlist_add_string(nvl, FM_CLASS, fullclass);
+	(void) nvlist_add_uint8(nvl, FM_VERSION, FM_RSRC_VERSION);
+	if (sysevent_get_attr_list(sep, &attr) == 0)
+		(void) nvlist_merge(nvl, attr, 0);
+
+	/*
+	 * Dispatch the event.  Ideally, we'd like to use the same transport
+	 * interface as sysev_recv(), but because the legacy sysevent mechanism
+	 * puts in a thread outside fmd's control, using the module APIs is
+	 * impossible.
+	 */
+	sysevent_get_time(sep, &hrt);
+	(void) nvlist_lookup_string(nvl, FM_CLASS, &fullclass);
+	e = fmd_event_create(FMD_EVT_PROTOCOL, hrt, nvl, fullclass);
+	fmd_dispq_dispatch(fmd.d_disp, e, fullclass);
+}
 
 /*
  * Receive an event from the SysEvent channel and post it to our transport.
@@ -383,12 +429,15 @@ static const fmd_hdl_info_t sysev_info = {
 
 /*
  * Bind to the sysevent channel we use for listening for error events and then
- * subscribe to appropriate events received over this channel.
+ * subscribe to appropriate events received over this channel.  Setup the
+ * legacy sysevent handler for creating sysevent resources and forwarding DR
+ * events.
  */
 void
 sysev_init(fmd_hdl_t *hdl)
 {
 	uint_t flags;
+	const char *subclasses[] = { EC_SUB_ALL };
 
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &sysev_info) != 0)
 		return; /* invalid property settings */
@@ -447,6 +496,22 @@ sysev_init(fmd_hdl_t *hdl)
 	 */
 	fmd_hdl_debug(hdl, "transport '%s' open\n", sysev_channel);
 	(void) fmd_timer_install(hdl, NULL, NULL, 0);
+
+	/*
+	 * Open the legacy sysevent handle and subscribe to all events.  These
+	 * are automatically converted to "resource.sysevent.*" events so that
+	 * modules can manage these events without additional infrastructure.
+	 */
+	if (geteuid() != 0)
+		return;
+
+	if ((fmd.d_sysev_hdl =
+	    sysevent_bind_handle(sysev_legacy)) == NULL)
+		fmd_hdl_abort(hdl, "failed to bind to legacy sysevent channel");
+
+	if (sysevent_subscribe_event(fmd.d_sysev_hdl, EC_ALL,
+	    subclasses, 1) != 0)
+		fmd_hdl_abort(hdl, "failed to subscribe to legacy sysevents");
 }
 
 /*
@@ -465,6 +530,9 @@ sysev_fini(fmd_hdl_t *hdl)
 		sysevent_evc_unsubscribe(sysev_evc, sysev_sid);
 		sysevent_evc_unbind(sysev_evc);
 	}
+
+	if (fmd.d_sysev_hdl != NULL)
+		sysevent_unbind_handle(fmd.d_sysev_hdl);
 
 	if (sysev_xprt != NULL) {
 		/*

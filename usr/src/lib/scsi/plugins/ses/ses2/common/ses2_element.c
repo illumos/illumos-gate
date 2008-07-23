@@ -140,13 +140,13 @@ elem_parse_temp(const ses2_elem_status_impl_t *esip, nvlist_t *nvl)
 	SES_NV_ADD(boolean_value, nverr, nvl, SES_PROP_FAIL, tip->stsi_fail);
 	SES_NV_ADD(int64, nverr, nvl, SES_TEMP_PROP_TEMP,
 	    SES2_ES_TEMP_ST_TEMPERATURE(tip));
-	SES_NV_ADD(boolean_value, nverr, nvl, SES_TEMP_PROP_UNDERTEMP_WARN,
+	SES_NV_ADD(boolean_value, nverr, nvl, SES_PROP_WARN_UNDER,
 	    tip->stsi_ut_warn);
-	SES_NV_ADD(boolean_value, nverr, nvl, SES_TEMP_PROP_UNDERTEMP_FAIL,
+	SES_NV_ADD(boolean_value, nverr, nvl, SES_PROP_CRIT_UNDER,
 	    tip->stsi_ut_fail);
-	SES_NV_ADD(boolean_value, nverr, nvl, SES_TEMP_PROP_OVERTEMP_WARN,
+	SES_NV_ADD(boolean_value, nverr, nvl, SES_PROP_WARN_OVER,
 	    tip->stsi_ot_warn);
-	SES_NV_ADD(boolean_value, nverr, nvl, SES_TEMP_PROP_OVERTEMP_FAIL,
+	SES_NV_ADD(boolean_value, nverr, nvl, SES_PROP_CRIT_OVER,
 	    tip->stsi_ot_fail);
 
 	return (0);
@@ -356,13 +356,13 @@ elem_parse_voltage(const ses2_elem_status_impl_t *esip, nvlist_t *nvl)
 	ses2_voltage_status_impl_t *vip = (ses2_voltage_status_impl_t *)esip;
 	int nverr;
 
-	SES_NV_ADD(boolean_value, nverr, nvl, SES_VS_PROP_CRIT_UNDER,
+	SES_NV_ADD(boolean_value, nverr, nvl, SES_PROP_CRIT_UNDER,
 	    vip->svsi_crit_under);
-	SES_NV_ADD(boolean_value, nverr, nvl, SES_VS_PROP_CRIT_OVER,
+	SES_NV_ADD(boolean_value, nverr, nvl, SES_PROP_CRIT_OVER,
 	    vip->svsi_crit_over);
-	SES_NV_ADD(boolean_value, nverr, nvl, SES_VS_PROP_WARN_UNDER,
+	SES_NV_ADD(boolean_value, nverr, nvl, SES_PROP_WARN_UNDER,
 	    vip->svsi_warn_under);
-	SES_NV_ADD(boolean_value, nverr, nvl, SES_VS_PROP_WARN_OVER,
+	SES_NV_ADD(boolean_value, nverr, nvl, SES_PROP_WARN_OVER,
 	    vip->svsi_warn_over);
 	SES_NV_ADD(boolean_value, nverr, nvl, SES_PROP_FAIL, vip->svsi_fail);
 	SES_NV_ADD(boolean_value, nverr, nvl, SES_PROP_IDENT, vip->svsi_ident);
@@ -378,9 +378,9 @@ elem_parse_current(const ses2_elem_status_impl_t *esip, nvlist_t *nvl)
 	ses2_current_status_impl_t *cip = (ses2_current_status_impl_t *)esip;
 	int nverr;
 
-	SES_NV_ADD(boolean_value, nverr, nvl, SES_CS_PROP_CRIT_OVER,
+	SES_NV_ADD(boolean_value, nverr, nvl, SES_PROP_CRIT_OVER,
 	    cip->scsi_crit_over);
-	SES_NV_ADD(boolean_value, nverr, nvl, SES_CS_PROP_WARN_OVER,
+	SES_NV_ADD(boolean_value, nverr, nvl, SES_PROP_WARN_OVER,
 	    cip->scsi_warn_over);
 	SES_NV_ADD(boolean_value, nverr, nvl, SES_PROP_FAIL, cip->scsi_fail);
 	SES_NV_ADD(boolean_value, nverr, nvl, SES_PROP_IDENT, cip->scsi_ident);
