@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1801,6 +1801,7 @@ print_raw_address(void *input, boolean_t isv4)
 		} else {
 			domain[0] = 0;
 		}
+		cp = NULL;
 		hp = getipnodebyaddr(addr_ptr, addr_len, af, &error_num);
 		if (hp) {
 			if ((cp = strchr(hp->h_name, '.')) != 0 &&
