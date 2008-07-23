@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,6 +152,8 @@ get_first_interface()
 	}
 
 	ifnum.lifn_family = AF_UNSPEC;
+	ifnum.lifn_flags = 0;
+	ifnum.lifn_count = 0;
 
 	if (ioctl(fd, SIOCGLIFNUM, &ifnum) < 0) {
 		(void) fprintf(stderr, "%s: SIOCGLIFNUM: %s\n", program,
@@ -161,6 +163,7 @@ get_first_interface()
 	}
 
 	ifconf.lifc_family = AF_UNSPEC;
+	ifconf.lifc_flags = 0;
 	ifconf.lifc_len = ifnum.lifn_count * sizeof (struct lifreq);
 	ifconf.lifc_buf = alloca(ifconf.lifc_len);
 
