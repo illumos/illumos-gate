@@ -2553,6 +2553,7 @@ return_partial_alloc(page_t *plist)
 	while (plist != NULL) {
 		pp = plist;
 		page_sub(&plist, pp);
+		page_io_unlock(pp);
 		page_destroy_io(pp);
 	}
 }

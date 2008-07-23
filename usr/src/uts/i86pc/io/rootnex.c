@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2729,11 +2729,18 @@ rootnex_setup_copybuf(ddi_dma_impl_t *hp, struct ddi_dma_req *dmareq,
 	}
 
 	/*
-	 * Allocated the actual copy buffer. This needs to fit within the DMA
-	 * engines limits, so we can't use kmem_alloc...
+	 * Allocate the actual copy buffer. This needs to fit within the DMA
+	 * engine limits, so we can't use kmem_alloc... We don't need
+	 * contiguous memory (sgllen) since we will be forcing windows on
+	 * sgllen anyway.
 	 */
 	lattr = *attr;
 	lattr.dma_attr_align = MMU_PAGESIZE;
+	/*
+	 * this should be < 0 to indicate no limit, but due to a bug in
+	 * the rootnex, we'll set it to the maximum positive int.
+	 */
+	lattr.dma_attr_sgllen = 0x7fffffff;
 	e = i_ddi_mem_alloc(dma->dp_dip, &lattr, dma->dp_copybuf_size, cansleep,
 	    0, NULL, &dma->dp_cbaddr, &dma->dp_cbsize, NULL);
 	if (e != DDI_SUCCESS) {
