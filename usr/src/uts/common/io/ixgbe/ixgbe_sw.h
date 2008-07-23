@@ -62,6 +62,7 @@ extern "C" {
 #include <sys/netlb.h>
 #include <sys/random.h>
 #include <inet/common.h>
+#include <inet/tcp.h>
 #include <inet/ip.h>
 #include <inet/mi.h>
 #include <inet/nd.h>
@@ -88,7 +89,7 @@ extern "C" {
 #define	IXGBE_INTR_MSI			2
 #define	IXGBE_INTR_LEGACY		3
 
-#define	MAX_COOKIE			16
+#define	MAX_COOKIE			18
 #define	MIN_NUM_TX_DESC			2
 
 /*
@@ -152,6 +153,13 @@ extern "C" {
 #define	DEFAULT_FCRTL			0x10000
 #define	DEFAULT_FCPAUSE			0xFFFF
 
+#define	DEFAULT_TX_HCKSUM_ENABLE	B_TRUE
+#define	DEFAULT_RX_HCKSUM_ENABLE	B_TRUE
+#define	DEFAULT_LSO_ENABLE		B_TRUE
+#define	DEFAULT_TX_HEAD_WB_ENABLE	B_TRUE
+
+#define	IXGBE_LSO_MAXLEN	65535
+
 #define	TX_DRAIN_TIME			200
 #define	RX_DRAIN_TIME			200
 
@@ -171,7 +179,6 @@ extern "C" {
 #define	IXGBE_PCS1GANA_FDC	0x20
 #define	IXGBE_PCS1GANLP_LPFD	0x20
 #define	IXGBE_PCS1GANLP_LPHD	0x40
-
 
 /*
  * Defined for IP header alignment.
@@ -404,12 +411,15 @@ typedef enum {
 	RCB_SENDUP
 } rcb_state_t;
 
-typedef struct hcksum_context {
+typedef struct ixgbe_tx_context {
 	uint32_t		hcksum_flags;
 	uint32_t		ip_hdr_len;
 	uint32_t		mac_hdr_len;
 	uint32_t		l4_proto;
-} hcksum_context_t;
+	uint32_t		mss;
+	uint32_t		l4_hdr_len;
+	boolean_t		lso_flag;
+} ixgbe_tx_context_t;
 
 /*
  * Hold address/length of each DMA segment
@@ -495,9 +505,10 @@ typedef struct ixgbe_tx_ring {
 	uint32_t		(*tx_recycle)(struct ixgbe_tx_ring *);
 
 	/*
-	 * TCP/UDP checksum offload
+	 * s/w context structure for TCP/UDP checksum offload
+	 * and LSO.
 	 */
-	hcksum_context_t	hcksum_context;
+	ixgbe_tx_context_t	tx_context;
 
 	/*
 	 * Tx ring settings and status

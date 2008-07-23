@@ -30,7 +30,7 @@
 
 #include "ixgbe_sw.h"
 
-static char ident[] = "Intel 10Gb Ethernet 1.0.0";
+static char ident[] = "Intel 10Gb Ethernet 1.0.1";
 
 /*
  * Local function protoypes
@@ -294,7 +294,7 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/*
 	 * Initialize for fma support
 	 */
-	ixgbe->fm_capabilities = ixgbe_get_prop(ixgbe, "PROP_FM_CAPABLE",
+	ixgbe->fm_capabilities = ixgbe_get_prop(ixgbe, PROP_FM_CAPABLE,
 	    0, 0x0f, DDI_FM_EREPORT_CAPABLE | DDI_FM_ACCCHK_CAPABLE |
 	    DDI_FM_DMACHK_CAPABLE | DDI_FM_ERRCB_CAPABLE);
 	ixgbe_fm_init(ixgbe);
@@ -1847,22 +1847,31 @@ ixgbe_setup_tx_ring(ixgbe_tx_ring_t *tx_ring)
 	/*
 	 * Initialize hardware checksum offload settings
 	 */
-	tx_ring->hcksum_context.hcksum_flags = 0;
-	tx_ring->hcksum_context.ip_hdr_len = 0;
-	tx_ring->hcksum_context.mac_hdr_len = 0;
-	tx_ring->hcksum_context.l4_proto = 0;
+	tx_ring->tx_context.hcksum_flags = 0;
+	tx_ring->tx_context.ip_hdr_len = 0;
+	tx_ring->tx_context.mac_hdr_len = 0;
+	tx_ring->tx_context.l4_proto = 0;
 }
 
 static void
 ixgbe_setup_tx(ixgbe_t *ixgbe)
 {
+	struct ixgbe_hw *hw = &ixgbe->hw;
 	ixgbe_tx_ring_t *tx_ring;
+	uint32_t reg_val;
 	int i;
 
 	for (i = 0; i < ixgbe->num_tx_rings; i++) {
 		tx_ring = &ixgbe->tx_rings[i];
 		ixgbe_setup_tx_ring(tx_ring);
 	}
+
+	/*
+	 * Enable CRC appending and TX padding (for short tx frames)
+	 */
+	reg_val = IXGBE_READ_REG(hw, IXGBE_HLREG0);
+	reg_val |= IXGBE_HLREG0_TXCRCEN | IXGBE_HLREG0_TXPADEN;
+	IXGBE_WRITE_REG(hw, IXGBE_HLREG0, reg_val);
 }
 
 /*
@@ -1872,20 +1881,18 @@ static void
 ixgbe_setup_rss(ixgbe_t *ixgbe)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
-	uint32_t i, j, mrqc, rxcsum;
+	uint32_t i, mrqc, rxcsum;
 	uint32_t random;
 	uint32_t reta;
 
 	/*
 	 * Fill out redirection table
 	 */
-	j = 0;
 	reta = 0;
 	for (i = 0; i < 128; i++) {
-		reta = (reta << 8) | (j * 0x11);
-		if (j == 3)
+		reta = (reta << 8) | (i % ixgbe->num_rx_rings);
+		if ((i & 3) == 3)
 			IXGBE_WRITE_REG(hw, IXGBE_RETA(i >> 2), reta);
-		j = ((j + 1) % 4);
 	}
 
 	/*
@@ -1898,7 +1905,7 @@ ixgbe_setup_rss(ixgbe_t *ixgbe)
 	}
 
 	/*
-	 * enable RSS & perform hash on these packet types
+	 * Enable RSS & perform hash on these packet types
 	 */
 	mrqc = IXGBE_MRQC_RSSEN |
 	    IXGBE_MRQC_RSS_FIELD_IPV4 |
@@ -1914,7 +1921,6 @@ ixgbe_setup_rss(ixgbe_t *ixgbe)
 
 	/*
 	 * Disable Packet Checksum to enable RSS for multiple receive queues.
-	 *
 	 * It is an adapter hardware limitation that Packet Checksum is
 	 * mutually exclusive with RSS.
 	 */
@@ -2180,13 +2186,22 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	ixgbe_log(ixgbe, "interrupt force: %d\n", ixgbe->intr_force);
 
 	ixgbe->tx_hcksum_enable = ixgbe_get_prop(ixgbe, PROP_TX_HCKSUM_ENABLE,
-	    0, 1, 1);
+	    0, 1, DEFAULT_TX_HCKSUM_ENABLE);
 	ixgbe->rx_hcksum_enable = ixgbe_get_prop(ixgbe, PROP_RX_HCKSUM_ENABLE,
-	    0, 1, 1);
+	    0, 1, DEFAULT_RX_HCKSUM_ENABLE);
 	ixgbe->lso_enable = ixgbe_get_prop(ixgbe, PROP_LSO_ENABLE,
-	    0, 1, 0);
+	    0, 1, DEFAULT_LSO_ENABLE);
 	ixgbe->tx_head_wb_enable = ixgbe_get_prop(ixgbe, PROP_TX_HEAD_WB_ENABLE,
-	    0, 1, 1);
+	    0, 1, DEFAULT_TX_HEAD_WB_ENABLE);
+
+	/*
+	 * ixgbe LSO needs the tx h/w checksum support.
+	 * LSO will be disabled if tx h/w checksum is not
+	 * enabled.
+	 */
+	if (ixgbe->tx_hcksum_enable == B_FALSE) {
+		ixgbe->lso_enable = B_FALSE;
+	}
 
 	ixgbe->tx_copy_thresh = ixgbe_get_prop(ixgbe, PROP_TX_COPY_THRESHOLD,
 	    MIN_TX_COPY_THRESHOLD, MAX_TX_COPY_THRESHOLD,

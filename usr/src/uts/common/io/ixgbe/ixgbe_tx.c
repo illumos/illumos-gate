@@ -32,25 +32,25 @@
 
 static boolean_t ixgbe_tx(ixgbe_tx_ring_t *, mblk_t *);
 static int ixgbe_tx_copy(ixgbe_tx_ring_t *, tx_control_block_t *, mblk_t *,
-    uint32_t, boolean_t, boolean_t);
+    uint32_t, boolean_t);
 static int ixgbe_tx_bind(ixgbe_tx_ring_t *, tx_control_block_t *, mblk_t *,
     uint32_t);
 static int ixgbe_tx_fill_ring(ixgbe_tx_ring_t *, link_list_t *,
-    hcksum_context_t *);
+    ixgbe_tx_context_t *, size_t);
 static void ixgbe_save_desc(tx_control_block_t *, uint64_t, size_t);
 static tx_control_block_t *ixgbe_get_free_list(ixgbe_tx_ring_t *);
 
-static void ixgbe_get_hcksum_context(mblk_t *, hcksum_context_t *);
-static boolean_t ixgbe_check_hcksum_context(ixgbe_tx_ring_t *,
-    hcksum_context_t *);
-static void ixgbe_fill_hcksum_context(struct ixgbe_adv_tx_context_desc *,
-    hcksum_context_t *);
+static int ixgbe_get_context(mblk_t *, ixgbe_tx_context_t *);
+static boolean_t ixgbe_check_context(ixgbe_tx_ring_t *,
+    ixgbe_tx_context_t *);
+static void ixgbe_fill_context(struct ixgbe_adv_tx_context_desc *,
+    ixgbe_tx_context_t *);
 
 #ifndef IXGBE_DEBUG
 #pragma inline(ixgbe_save_desc)
-#pragma inline(ixgbe_get_hcksum_context)
-#pragma inline(ixgbe_check_hcksum_context)
-#pragma inline(ixgbe_fill_hcksum_context)
+#pragma inline(ixgbe_get_context)
+#pragma inline(ixgbe_check_context)
+#pragma inline(ixgbe_fill_context)
 #endif
 
 /*
@@ -148,7 +148,7 @@ ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
 	boolean_t copy_done, eop;
 	mblk_t *current_mp, *next_mp, *nmp;
 	tx_control_block_t *tcb;
-	hcksum_context_t hcksum_context, *hcksum;
+	ixgbe_tx_context_t tx_context, *ctx;
 	link_list_t pending_list;
 
 	/* Get the mblk size */
@@ -157,15 +157,33 @@ ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
 		mbsize += MBLK_LEN(nmp);
 	}
 
-	/*
-	 * If the mblk size exceeds the max frame size,
-	 * discard this mblk, and return B_TRUE
-	 */
-	if (mbsize > (ixgbe->max_frame_size - ETHERFCSL)) {
-		freemsg(mp);
-		IXGBE_DEBUGLOG_0(ixgbe, "ixgbe_tx: packet oversize");
-		return (B_TRUE);
+	if (ixgbe->tx_hcksum_enable) {
+		/*
+		 * Retrieve checksum context information from the mblk
+		 * that will be used to decide whether/how to fill the
+		 * context descriptor.
+		 */
+		ctx = &tx_context;
+		if (ixgbe_get_context(mp, ctx) < 0) {
+			freemsg(mp);
+			return (B_TRUE);
+		}
+
+		/*
+		 * If the mblk size exceeds the max size ixgbe could
+		 * process, then discard this mblk, and return B_TRUE
+		 */
+		if ((ctx->lso_flag && ((mbsize - ctx->mac_hdr_len)
+		    > IXGBE_LSO_MAXLEN)) || (!ctx->lso_flag &&
+		    (mbsize > (ixgbe->max_frame_size - ETHERFCSL)))) {
+			freemsg(mp);
+			IXGBE_DEBUGLOG_0(ixgbe, "ixgbe_tx: packet oversize");
+			return (B_TRUE);
+		}
+	} else {
+		ctx = NULL;
 	}
+
 
 	/*
 	 * Check and recycle tx descriptors.
@@ -305,7 +323,7 @@ ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
 			}
 
 			desc_num = ixgbe_tx_copy(tx_ring, tcb, current_mp,
-			    current_len, copy_done, eop);
+			    current_len, copy_done);
 		} else {
 			/*
 			 * Check whether to use bcopy or DMA binding to process
@@ -336,17 +354,6 @@ ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
 	ASSERT(tcb->mp == NULL);
 	tcb->mp = mp;
 
-	if (ixgbe->tx_hcksum_enable) {
-		/*
-		 * Retrieve checksum context information from the mblk that will
-		 * be used to decide whether/how to fill the context descriptor.
-		 */
-		hcksum = &hcksum_context;
-		ixgbe_get_hcksum_context(mp, hcksum);
-	} else {
-		hcksum = NULL;
-	}
-
 	/*
 	 * Before fill the tx descriptor ring with the data, we need to
 	 * ensure there are adequate free descriptors for transmit
@@ -372,7 +379,8 @@ ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
 		goto tx_failure;
 	}
 
-	desc_num = ixgbe_tx_fill_ring(tx_ring, &pending_list, hcksum);
+	desc_num = ixgbe_tx_fill_ring(tx_ring, &pending_list, ctx,
+	    mbsize);
 
 	ASSERT((desc_num == desc_total) || (desc_num == (desc_total + 1)));
 
@@ -412,7 +420,7 @@ tx_failure:
  */
 static int
 ixgbe_tx_copy(ixgbe_tx_ring_t *tx_ring, tx_control_block_t *tcb, mblk_t *mp,
-    uint32_t len, boolean_t copy_done, boolean_t eop)
+    uint32_t len, boolean_t copy_done)
 {
 	dma_buffer_t *tx_buf;
 	uint32_t desc_num;
@@ -447,17 +455,6 @@ ixgbe_tx_copy(ixgbe_tx_ring_t *tx_ring, tx_control_block_t *tcb, mblk_t *mp,
 	 * DMA buffer and saving the descriptor data.
 	 */
 	if (copy_done) {
-		/*
-		 * For the packet smaller than 64 bytes, we need to
-		 * pad it to 60 bytes. The NIC hardware will add 4
-		 * bytes of CRC.
-		 */
-		if (eop && (tx_buf->len < ETHERMIN)) {
-			bzero(tx_buf->address + tx_buf->len,
-			    ETHERMIN - tx_buf->len);
-			tx_buf->len = ETHERMIN;
-		}
-
 		/*
 		 * Sync the DMA buffer of the packet data
 		 */
@@ -531,12 +528,12 @@ ixgbe_tx_bind(ixgbe_tx_ring_t *tx_ring, tx_control_block_t *tcb, mblk_t *mp,
 }
 
 /*
- * ixgbe_get_hcksum_context
+ * ixgbe_get_context
  *
- * Get the hcksum context information from the mblk
+ * Get the context information from the mblk
  */
-static void
-ixgbe_get_hcksum_context(mblk_t *mp, hcksum_context_t *hcksum)
+static int
+ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 {
 	uint32_t start;
 	uint32_t flags;
@@ -547,15 +544,33 @@ ixgbe_get_hcksum_context(mblk_t *mp, hcksum_context_t *hcksum)
 	ushort_t etype;
 	uint32_t mac_hdr_len;
 	uint32_t l4_proto;
+	uint32_t l4_hdr_len;
 
 	ASSERT(mp != NULL);
 
 	hcksum_retrieve(mp, NULL, NULL, &start, NULL, NULL, NULL, &flags);
-
-	hcksum->hcksum_flags = flags;
+	bzero(ctx, sizeof (ixgbe_tx_context_t));
+	ctx->hcksum_flags = flags;
 
 	if (flags == 0)
-		return;
+		return (0);
+
+	ctx->mss = DB_LSOMSS(mp);
+	ctx->lso_flag = (ctx->hcksum_flags & HW_LSO) &&
+	    (ctx->mss != 0);
+
+	/*
+	 * LSO relies on tx h/w checksum, so here will drop the package
+	 * if h/w checksum flag is not declared.
+	 */
+	if (ctx->lso_flag) {
+		if (!((ctx->hcksum_flags & HCK_PARTIALCKSUM) &&
+		    (ctx->hcksum_flags & HCK_IPV4_HDRCKSUM))) {
+			IXGBE_DEBUGLOG_0(NULL, "ixgbe_tx: h/w "
+			    "checksum flags are not specified when doing LSO");
+			return (-1);
+		}
+	}
 
 	etype = 0;
 	mac_hdr_len = 0;
@@ -598,13 +613,12 @@ ixgbe_get_hcksum_context(mblk_t *mp, hcksum_context_t *hcksum)
 	}
 
 	/*
-	 * Here we don't assume the IP(V6) header is fully included in
-	 * one mblk fragment, so we go thourgh the fragments to parse
-	 * the protocol type.
+	 * Here we assume the IP(V6) header is fully included in
+	 * one mblk fragment.
 	 */
 	switch (etype) {
 	case ETHERTYPE_IP:
-		offset = offsetof(ipha_t, ipha_protocol) + mac_hdr_len;
+		offset = mac_hdr_len;
 		while (size <= offset) {
 			mp = mp->b_cont;
 			ASSERT(mp != NULL);
@@ -613,7 +627,22 @@ ixgbe_get_hcksum_context(mblk_t *mp, hcksum_context_t *hcksum)
 		}
 		pos = mp->b_rptr + offset + len - size;
 
-		l4_proto = *(uint8_t *)pos;
+		if (ctx->lso_flag) {
+			*((uint16_t *)(uintptr_t)(pos + offsetof(ipha_t,
+			    ipha_length))) = 0;
+			*((uint16_t *)(uintptr_t)(pos + offsetof(ipha_t,
+			    ipha_hdr_checksum))) = 0;
+
+			/*
+			 * To perform ixgbe LSO, here also need to fill
+			 * the tcp checksum field of the packet with the
+			 * following pseudo-header checksum:
+			 * (ip_source_addr, ip_destination_addr, l4_proto)
+			 * Currently the tcp/ip stack has done it.
+			 */
+		}
+
+		l4_proto = *(uint8_t *)(pos + offsetof(ipha_t, ipha_protocol));
 		break;
 	case ETHERTYPE_IPV6:
 		offset = offsetof(ip6_t, ip6_nxt) + mac_hdr_len;
@@ -630,25 +659,46 @@ ixgbe_get_hcksum_context(mblk_t *mp, hcksum_context_t *hcksum)
 	default:
 		/* Unrecoverable error */
 		IXGBE_DEBUGLOG_0(NULL, "Ether type error with tx hcksum");
-		return;
+		return (-2);
 	}
 
-	hcksum->mac_hdr_len = mac_hdr_len;
-	hcksum->ip_hdr_len = start;
-	hcksum->l4_proto = l4_proto;
+	if (ctx->lso_flag) {
+		offset = mac_hdr_len + start;
+		while (size <= offset) {
+			mp = mp->b_cont;
+			ASSERT(mp != NULL);
+			len = MBLK_LEN(mp);
+			size += len;
+		}
+		pos = mp->b_rptr + offset + len - size;
+
+		l4_hdr_len = TCP_HDR_LENGTH((tcph_t *)pos);
+	} else {
+		/*
+		 * l4 header length is only required for LSO
+		 */
+		l4_hdr_len = 0;
+	}
+
+	ctx->mac_hdr_len = mac_hdr_len;
+	ctx->ip_hdr_len = start;
+	ctx->l4_proto = l4_proto;
+	ctx->l4_hdr_len = l4_hdr_len;
+
+	return (0);
 }
 
 /*
- * ixgbe_check_hcksum_context
+ * ixgbe_check_context
  *
  * Check if a new context descriptor is needed
  */
 static boolean_t
-ixgbe_check_hcksum_context(ixgbe_tx_ring_t *tx_ring, hcksum_context_t *hcksum)
+ixgbe_check_context(ixgbe_tx_ring_t *tx_ring, ixgbe_tx_context_t *ctx)
 {
-	hcksum_context_t *last;
+	ixgbe_tx_context_t *last;
 
-	if (hcksum == NULL)
+	if (ctx == NULL)
 		return (B_FALSE);
 
 	/*
@@ -659,16 +709,20 @@ ixgbe_check_hcksum_context(ixgbe_tx_ring_t *tx_ring, hcksum_context_t *hcksum)
 	 *	l4_proto
 	 *	mac_hdr_len
 	 *	ip_hdr_len
+	 *	mss (only checked for LSO)
+	 *	l4_hr_len (only checked for LSO)
 	 * Either one of the above data is changed, a new context descriptor
 	 * will be needed.
 	 */
-	last = &tx_ring->hcksum_context;
+	last = &tx_ring->tx_context;
 
-	if (hcksum->hcksum_flags != 0) {
-		if ((hcksum->hcksum_flags != last->hcksum_flags) ||
-		    (hcksum->l4_proto != last->l4_proto) ||
-		    (hcksum->mac_hdr_len != last->mac_hdr_len) ||
-		    (hcksum->ip_hdr_len != last->ip_hdr_len)) {
+	if (ctx->hcksum_flags != 0) {
+		if ((ctx->hcksum_flags != last->hcksum_flags) ||
+		    (ctx->l4_proto != last->l4_proto) ||
+		    (ctx->mac_hdr_len != last->mac_hdr_len) ||
+		    (ctx->ip_hdr_len != last->ip_hdr_len) ||
+		    (ctx->lso_flag && ((ctx->mss != last->mss) ||
+		    (ctx->l4_hdr_len != last->l4_hdr_len)))) {
 
 			return (B_TRUE);
 		}
@@ -678,30 +732,30 @@ ixgbe_check_hcksum_context(ixgbe_tx_ring_t *tx_ring, hcksum_context_t *hcksum)
 }
 
 /*
- * ixgbe_fill_hcksum_context
+ * ixgbe_fill_context
  *
  * Fill the context descriptor with hardware checksum informations
  */
 static void
-ixgbe_fill_hcksum_context(struct ixgbe_adv_tx_context_desc *ctx_tbd,
-    hcksum_context_t *hcksum)
+ixgbe_fill_context(struct ixgbe_adv_tx_context_desc *ctx_tbd,
+    ixgbe_tx_context_t *ctx)
 {
 	/*
 	 * Fill the context descriptor with the checksum
 	 * context information we've got
 	 */
-	ctx_tbd->vlan_macip_lens = hcksum->ip_hdr_len;
-	ctx_tbd->vlan_macip_lens |= hcksum->mac_hdr_len <<
+	ctx_tbd->vlan_macip_lens = ctx->ip_hdr_len;
+	ctx_tbd->vlan_macip_lens |= ctx->mac_hdr_len <<
 	    IXGBE_ADVTXD_MACLEN_SHIFT;
 
 	ctx_tbd->type_tucmd_mlhl =
 	    IXGBE_ADVTXD_DCMD_DEXT | IXGBE_ADVTXD_DTYP_CTXT;
 
-	if (hcksum->hcksum_flags & HCK_IPV4_HDRCKSUM)
+	if (ctx->hcksum_flags & HCK_IPV4_HDRCKSUM)
 		ctx_tbd->type_tucmd_mlhl |= IXGBE_ADVTXD_TUCMD_IPV4;
 
-	if (hcksum->hcksum_flags & HCK_PARTIALCKSUM) {
-		switch (hcksum->l4_proto) {
+	if (ctx->hcksum_flags & HCK_PARTIALCKSUM) {
+		switch (ctx->l4_proto) {
 		case IPPROTO_TCP:
 			ctx_tbd->type_tucmd_mlhl |= IXGBE_ADVTXD_TUCMD_L4T_TCP;
 			break;
@@ -721,7 +775,13 @@ ixgbe_fill_hcksum_context(struct ixgbe_adv_tx_context_desc *ctx_tbd,
 	}
 
 	ctx_tbd->seqnum_seed = 0;
-	ctx_tbd->mss_l4len_idx = 0;
+	if (ctx->lso_flag) {
+		ctx_tbd->mss_l4len_idx =
+		    (ctx->l4_hdr_len << IXGBE_ADVTXD_L4LEN_SHIFT) |
+		    (ctx->mss << IXGBE_ADVTXD_MSS_SHIFT);
+	} else {
+		ctx_tbd->mss_l4len_idx = 0;
+	}
 }
 
 /*
@@ -731,7 +791,7 @@ ixgbe_fill_hcksum_context(struct ixgbe_adv_tx_context_desc *ctx_tbd,
  */
 static int
 ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
-    hcksum_context_t *hcksum)
+    ixgbe_tx_context_t *ctx, size_t mbsize)
 {
 	struct ixgbe_hw *hw = &tx_ring->ixgbe->hw;
 	boolean_t load_context;
@@ -759,13 +819,14 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 	index = tx_ring->tbd_tail;
 	tcb_index = tx_ring->tbd_tail;
 
-	if (hcksum != NULL) {
-		hcksum_flags = hcksum->hcksum_flags;
+	if (ctx != NULL) {
+		hcksum_flags = ctx->hcksum_flags;
 
 		/*
 		 * Check if a new context descriptor is needed for this packet
 		 */
-		load_context = ixgbe_check_hcksum_context(tx_ring, hcksum);
+		load_context = ixgbe_check_context(tx_ring, ctx);
+
 		if (load_context) {
 			first_tcb = (tx_control_block_t *)
 			    LIST_GET_HEAD(pending_list);
@@ -775,8 +836,9 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 			 * Fill the context descriptor with the
 			 * hardware checksum offload informations.
 			 */
-			ixgbe_fill_hcksum_context(
-			    (struct ixgbe_adv_tx_context_desc *)tbd, hcksum);
+			ixgbe_fill_context(
+			    (struct ixgbe_adv_tx_context_desc *)tbd,
+			    ctx);
 
 			index = NEXT_INDEX(index, 1, tx_ring->ring_size);
 			desc_num++;
@@ -785,7 +847,7 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 			 * Store the checksum context data if
 			 * a new context descriptor is added
 			 */
-			tx_ring->hcksum_context = *hcksum;
+			tx_ring->tx_context = *ctx;
 		}
 	}
 
@@ -847,14 +909,21 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 	ASSERT(first_tbd != NULL);
 	first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_IFCS;
 
+	if (ctx != NULL && ctx->lso_flag) {
+		first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_TSE;
+		first_tbd->read.olinfo_status |=
+		    (mbsize - ctx->mac_hdr_len - ctx->ip_hdr_len
+		    - ctx->l4_hdr_len) << IXGBE_ADVTXD_PAYLEN_SHIFT;
+	}
+
 	/* Set hardware checksum bits */
 	if (hcksum_flags != 0) {
 		if (hcksum_flags & HCK_IPV4_HDRCKSUM)
 			first_tbd->read.olinfo_status |=
-			    IXGBE_TXD_POPTS_IXSM << 8;
+			    IXGBE_ADVTXD_POPTS_IXSM;
 		if (hcksum_flags & HCK_PARTIALCKSUM)
 			first_tbd->read.olinfo_status |=
-			    IXGBE_TXD_POPTS_TXSM << 8;
+			    IXGBE_ADVTXD_POPTS_TXSM;
 	}
 
 	/*
