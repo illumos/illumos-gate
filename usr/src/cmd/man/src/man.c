@@ -214,6 +214,7 @@ static struct pathmap {
 	{"/sbin",		"/usr/share/man,1m",			0, 0},
 	{"/usr/sbin",		"/usr/share/man,1m",			0, 0},
 	{"/usr/ucb",		"/usr/share/man,1b",			0, 0},
+	{"/usr/bin/X11",	"/usr/X11/share/man",			0, 0},
 	/*
 	 * Restrict to section 1 so that whatis /usr/{,xpg4,xpg6}/bin/ls
 	 * does not confuse users with section 1 and 1b
@@ -1459,7 +1460,8 @@ split(char *s1, char sep)
  * Free a vector allocated by split();
  */
 static void
-freev(char **v) {
+freev(char **v)
+{
 	int i;
 	for (i = 0; v[i] != NULL; i++) {
 		free(v[i]);
@@ -1628,7 +1630,7 @@ manual(struct man_node *manp, char *name)
  * ex. localedir = ja, ldir = /usr/share/man/ja
  */
 			if (debug)
-			    (void) printf(gettext(
+				(void) printf(gettext(
 					"localedir = %s, ldir = %s\n"),
 					localedir, ldir);
 			ndirs = getdirs(ldir, NULL, 0);
@@ -2994,7 +2996,8 @@ init_bintoman(void)
  * If a duplicate is not found, add it to the dupnode list and return 0
  */
 static int
-dupcheck(struct man_node *mnp, struct dupnode **dnp) {
+dupcheck(struct man_node *mnp, struct dupnode **dnp)
+{
 	struct dupnode	*curdnp;
 	struct secnode	*cursnp;
 	struct stat 	sb;
@@ -3006,6 +3009,13 @@ dupcheck(struct man_node *mnp, struct dupnode **dnp) {
 	 * If the path doesn't exist, treat it as a duplicate
 	 */
 	if (stat(mnp->path, &sb) != 0) {
+		return (1);
+	}
+
+	/*
+	 * If no sections were found in the man dir, treat it as duplicate
+	 */
+	if (mnp->secv == NULL) {
 		return (1);
 	}
 
@@ -3153,7 +3163,8 @@ path_to_manpath(char *bindir)
 			free(mand);
 			return (NULL);
 		}
-		for (; *p != '\0'; p++);
+		for (; *p != '\0'; p++)
+			;
 	} else {
 		*p = '\0';
 	}
@@ -3163,7 +3174,7 @@ path_to_manpath(char *bindir)
 		return (NULL);
 	}
 
-	if (stat(mand, &sb) == 0) {
+	if ((stat(mand, &sb) == 0) && S_ISDIR(sb.st_mode)) {
 		return (mand);
 	}
 
@@ -3175,12 +3186,15 @@ path_to_manpath(char *bindir)
 		free(mand);
 		return (NULL);
 	}
-	if (stat(mand, &sb) != 0) {
-		free(mand);
-		return (NULL);
+	if ((stat(mand, &sb) == 0) && S_ISDIR(sb.st_mode)) {
+		return (mand);
 	}
 
-	return (mand);
+	/*
+	 * No man or share/man directory found
+	 */
+	free(mand);
+	return (NULL);
 }
 
 /*
