@@ -128,7 +128,7 @@ CODEMGR_WS="$1"
 export CODEMGR_WS
 
 if [[ -n "$hg_ws" ]]; then
-	if [[ -d "$hg_ws" && ! -d "$hg_ws/.hg" ]]; then
+	if [[ ! -d "$hg_ws" || ! -d "$hg_ws/.hg" ]]; then
 		fail "$hg_ws is not a Mercurial workspace."
 	fi
 	[[ "$hg_ws" = /* ]] || hg_ws="$(pwd)/$hg_ws"
