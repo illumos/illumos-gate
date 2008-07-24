@@ -23,7 +23,7 @@
  *
  * JNI wrapper for adt interface within libbsm
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -310,13 +310,15 @@ Java_com_sun_audit_AuditSession_sessionAttr(JNIEnv *env, jobject cls,
 
 	hostname = (*env)->GetStringUTFChars(env, jhostname, NULL);
 
-	if (adt_load_hostname(hostname, &termid))
+	if (adt_load_hostname(hostname, &termid)) {
 		local_throw(env, "java/lang/Error", errno_to_i18n(errno));
-	else if (adt_set_user(state, euid, egid, ruid, rgid,
-	    termid, context))
+	} else if (adt_set_user(state, euid, egid, ruid, rgid, termid,
+	    context)) {
+		free(termid);
 		local_throw(env, "java/lang/Error", errno_to_i18n(errno));
-
+	}
 	(*env)->ReleaseStringUTFChars(env, jhostname, hostname);
+	free(termid);
 }
 
 /* ARGSUSED */
