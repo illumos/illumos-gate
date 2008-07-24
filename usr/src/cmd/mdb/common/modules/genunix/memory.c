@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -275,8 +275,8 @@ int
 memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	ulong_t pagesize;
-	pgcnt_t total_pages;
-	ulong_t physmem, freemem;
+	pgcnt_t total_pages, physmem;
+	ulong_t freemem;
 	memstat_t stats;
 	memstat_t unused_stats;
 	GElf_Sym sym;
@@ -360,52 +360,62 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	stats.ms_vnode -= unused_stats.ms_kmem;
 	stats.ms_total -= unused_stats.ms_kmem;
 
-#define	MS_PCT_TOTAL(x)	(((5 * total_pages) + ((x) * 1000ull))) / \
-		((physmem) * 10)
+#define	MS_PCT_TOTAL(x)	((ulong_t)((((5 * total_pages) + ((x) * 1000ull))) / \
+		((physmem) * 10)))
 
 	mdb_printf("Page Summary                Pages                MB"
 	    "  %%Tot\n");
 	mdb_printf("------------     ----------------  ----------------"
 	    "  ----\n");
-	mdb_printf("Kernel           %16llu  %16llu  %3llu%%\n",
+	mdb_printf("Kernel           %16llu  %16llu  %3lu%%\n",
 	    stats.ms_kmem,
 	    (uint64_t)stats.ms_kmem * pagesize / (1024 * 1024),
 	    MS_PCT_TOTAL(stats.ms_kmem));
-	mdb_printf("Anon             %16llu  %16llu  %3llu%%\n",
+	mdb_printf("Anon             %16llu  %16llu  %3lu%%\n",
 	    stats.ms_anon,
 	    (uint64_t)stats.ms_anon * pagesize / (1024 * 1024),
 	    MS_PCT_TOTAL(stats.ms_anon));
-	mdb_printf("Exec and libs    %16llu  %16llu  %3llu%%\n",
+	mdb_printf("Exec and libs    %16llu  %16llu  %3lu%%\n",
 	    stats.ms_exec,
 	    (uint64_t)stats.ms_exec * pagesize / (1024 * 1024),
 	    MS_PCT_TOTAL(stats.ms_exec));
-	mdb_printf("Page cache       %16llu  %16llu  %3llu%%\n",
+	mdb_printf("Page cache       %16llu  %16llu  %3lu%%\n",
 	    stats.ms_vnode,
 	    (uint64_t)stats.ms_vnode * pagesize / (1024 * 1024),
 	    MS_PCT_TOTAL(stats.ms_vnode));
-	mdb_printf("Free (cachelist) %16llu  %16llu  %3llu%%\n",
+	mdb_printf("Free (cachelist) %16llu  %16llu  %3lu%%\n",
 	    stats.ms_cachelist,
 	    (uint64_t)stats.ms_cachelist * pagesize / (1024 * 1024),
 	    MS_PCT_TOTAL(stats.ms_cachelist));
 
-	freemem = physmem - stats.ms_total;
+	/*
+	 * occasionally, we double count pages above.  To avoid printing
+	 * absurdly large values for freemem, we clamp it at zero.
+	 */
+	if (physmem > stats.ms_total)
+		freemem = physmem - stats.ms_total;
+	else
+		freemem = 0;
 
 #if defined(__i386) || defined(__amd64)
 	/* Are we running under Xen?  If so, get balloon memory usage. */
 	if ((bln_size = mdb_readvar(&bln_stats, "bln_stats")) != -1) {
-		freemem -= bln_stats.bln_hv_pages;
+		if (freemem > bln_stats.bln_hv_pages)
+			freemem -= bln_stats.bln_hv_pages;
+		else
+			freemem = 0;
 	}
 #endif
 
-	mdb_printf("Free (freelist)  %16llu  %16llu  %3llu%%\n", freemem,
+	mdb_printf("Free (freelist)  %16lu  %16llu  %3lu%%\n", freemem,
 	    (uint64_t)freemem * pagesize / (1024 * 1024),
 	    MS_PCT_TOTAL(freemem));
 
 #if defined(__i386) || defined(__amd64)
 	if (bln_size != -1) {
-		mdb_printf("Balloon          %16ld  %16ld  %3ld%%\n",
+		mdb_printf("Balloon          %16lu  %16llu  %3lu%%\n",
 		    bln_stats.bln_hv_pages,
-		    bln_stats.bln_hv_pages * (long)pagesize / (1024 * 1024),
+		    (uint64_t)bln_stats.bln_hv_pages * pagesize / (1024 * 1024),
 		    MS_PCT_TOTAL(bln_stats.bln_hv_pages));
 	}
 #endif

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -347,7 +346,7 @@ fmt_swapint(mdb_tgt_t *t, mdb_tgt_as_t as, mdb_tgt_addr_t addr, size_t cnt)
 static mdb_tgt_addr_t
 fmt_time32(mdb_tgt_t *t, mdb_tgt_as_t as, mdb_tgt_addr_t addr, size_t cnt)
 {
-	uint32_t x;
+	int32_t x;
 
 	while (cnt-- != 0) {
 		if (mdb_tgt_aread(t, as, &x, sizeof (x), addr) == sizeof (x)) {
@@ -365,11 +364,15 @@ fmt_time32(mdb_tgt_t *t, mdb_tgt_as_t as, mdb_tgt_addr_t addr, size_t cnt)
 static mdb_tgt_addr_t
 fmt_time64(mdb_tgt_t *t, mdb_tgt_as_t as, mdb_tgt_addr_t addr, size_t cnt)
 {
-	uint64_t x;
+	int64_t x;
 
 	while (cnt-- != 0) {
 		if (mdb_tgt_aread(t, as, &x, sizeof (x), addr) == sizeof (x)) {
-			mdb_iob_printf(mdb.m_out, "%-24Y", (time_t)x);
+			if ((time_t)x == x)
+				mdb_iob_printf(mdb.m_out, "%-24Y", (time_t)x);
+			else
+				mdb_iob_printf(mdb.m_out, "%-24llR", x);
+
 			mdb_nv_set_value(mdb.m_rvalue, x);
 			addr += sizeof (x);
 		} else {

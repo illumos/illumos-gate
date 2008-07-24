@@ -90,13 +90,13 @@
 #define	CBUFSIZ 26
 
 static char *
-ct_numb(char *cp, int n)
+ct_numb(char *cp, int n, char pad)
 {
 	cp++;
 	if (n >= 10)
 		*cp++ = (n / 10) % 10 + '0';
 	else
-		*cp++ = ' ';		/* Pad with blanks */
+		*cp++ = pad;
 	*cp++ = n % 10 + '0';
 	return (cp);
 }
@@ -110,10 +110,11 @@ __posix_asctime_r(const struct tm *t, char *cbuf)
 {
 	char *cp;
 	const char *ncp;
-	const int *tp;
-	const char *Date = "Day Mon 00 00:00:00 1900\n";
+	const char *Date = "Day Mon 00 00:00:00 YYYY\n";
 	const char *Day  = "SunMonTueWedThuFriSat";
 	const char *Month = "JanFebMarAprMayJunJulAugSepOctNovDec";
+
+	int year = t->tm_year + 1900;
 
 	cp = cbuf;
 	for (ncp = Date; *cp++ = *ncp++; /* */)
@@ -124,28 +125,23 @@ __posix_asctime_r(const struct tm *t, char *cbuf)
 	*cp++ = *ncp++;
 	*cp++ = *ncp++;
 	cp++;
-	tp = &t->tm_mon;
-	ncp = Month + ((*tp) * 3);
+	ncp = Month + (3 * t->tm_mon);
 	*cp++ = *ncp++;
 	*cp++ = *ncp++;
 	*cp++ = *ncp++;
-	cp = ct_numb(cp, *--tp);
-	cp = ct_numb(cp, *--tp + 100);
-	cp = ct_numb(cp, *--tp + 100);
-	--tp;
-	cp = ct_numb(cp, *tp + 100);
-	if (t->tm_year < 100) {
-		/* Common case: "19" already in buffer */
-		cp += 2;
-	} else if (t->tm_year < 8100) {
-		cp = ct_numb(cp, (1900 + t->tm_year) / 100);
-		cp--;
-	} else {
-		/* Only 4-digit years are supported */
+	cp = ct_numb(cp, t->tm_mday, ' ');
+	cp = ct_numb(cp, t->tm_hour, '0');
+	cp = ct_numb(cp, t->tm_min, '0');
+	cp = ct_numb(cp, t->tm_sec, '0');
+
+	if (year < 0 || year >= 10000) {
+		/* Only positive, 4-digit years are supported */
 		errno = EOVERFLOW;
 		return (NULL);
 	}
-	(void) ct_numb(cp, t->tm_year + 100);
+	cp = ct_numb(cp, year / 100, '0');
+	cp--;
+	(void) ct_numb(cp, year, '0');
 	return (cbuf);
 }
 
