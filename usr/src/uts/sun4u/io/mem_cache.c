@@ -931,6 +931,12 @@ mem_cache_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		mutex_exit(&softc->mutex);
 		return (EFAULT);
 	}
+
+	if ((cache_info.cpu_id < 0) || (cache_info.cpu_id >= NCPU)) {
+		mutex_exit(&softc->mutex);
+		return (EINVAL);
+	}
+
 	is_panther = IS_PANTHER(cpunodes[cache_info.cpu_id].implementation);
 	if (!is_panther) {
 		mutex_exit(&softc->mutex);
