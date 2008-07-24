@@ -45,11 +45,7 @@
  * for some Broadcom chips due to known MSI hardware issues. Currently MSI
  * is enabled only for 5714C A2 and 5715C A2 broadcom chips.
  */
-#if defined(__sparc)
 boolean_t bge_enable_msi = B_TRUE;
-#else
-boolean_t bge_enable_msi = B_FALSE;
-#endif
 
 /*
  * PCI-X/PCI-E relaxed ordering tunable for OS/Nexus driver
