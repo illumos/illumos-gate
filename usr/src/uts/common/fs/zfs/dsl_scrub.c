@@ -254,11 +254,10 @@ static boolean_t
 bookmark_is_before(dnode_phys_t *dnp, const zbookmark_t *zb1,
     const zbookmark_t *zb2)
 {
-	uint64_t nextL0;
+	uint64_t zb1nextL0, zb2thisobj;
 
 	ASSERT(zb1->zb_objset == zb2->zb_objset);
 	ASSERT(zb1->zb_object != -1ULL);
-	ASSERT(zb2->zb_object != 0);
 	ASSERT(zb2->zb_level == 0);
 
 	/*
@@ -272,21 +271,25 @@ bookmark_is_before(dnode_phys_t *dnp, const zbookmark_t *zb1,
 	if (dnp == NULL)
 		return (B_FALSE);
 
-	nextL0 = (zb1->zb_blkid + 1) <<
+	zb1nextL0 = (zb1->zb_blkid + 1) <<
 	    ((zb1->zb_level) * (dnp->dn_indblkshift - SPA_BLKPTRSHIFT));
 
+	zb2thisobj = zb2->zb_object ? zb2->zb_object :
+	    zb2->zb_blkid << (DNODE_BLOCK_SHIFT - DNODE_SHIFT);
+
 	if (zb1->zb_object == 0) {
-		uint64_t nextobj = nextL0 *
+		uint64_t nextobj = zb1nextL0 *
 		    (dnp->dn_datablkszsec << SPA_MINBLOCKSHIFT) >> DNODE_SHIFT;
-		return (nextobj <= zb2->zb_object);
+		return (nextobj <= zb2thisobj);
 	}
 
-	if (zb1->zb_object < zb2->zb_object)
+	if (zb1->zb_object < zb2thisobj)
 		return (B_TRUE);
-	if (zb1->zb_object > zb2->zb_object)
+	if (zb1->zb_object > zb2thisobj)
 		return (B_FALSE);
-
-	return (nextL0 <= zb2->zb_blkid);
+	if (zb2->zb_object == 0)
+		return (B_FALSE);
+	return (zb1nextL0 <= zb2->zb_blkid);
 }
 
 static boolean_t
@@ -301,8 +304,8 @@ scrub_pause(dsl_pool_t *dp, const zbookmark_t *zb)
 	if (!bookmark_is_zero(&dp->dp_scrub_bookmark))
 		return (B_FALSE); /* we're resuming */
 
-	/* we don't yet know how to resume from anything but leaf blocks */
-	if (zb->zb_object == 0 || zb->zb_level != 0)
+	/* We only know how to resume from level-0 blocks. */
+	if (zb->zb_level != 0)
 		return (B_FALSE);
 
 	mintime = dp->dp_scrub_isresilver ? zfs_resilver_min_time :
@@ -402,9 +405,6 @@ scrub_visitbp(dsl_pool_t *dp, dnode_phys_t *dnp,
 
 	if (bp->blk_birth == 0)
 		return;
-
-	dprintf_bp(bp, "scrub_visitbp bm %lld/%lld/%lld/%lld: ",
-	    zb->zb_objset, zb->zb_object, zb->zb_level, zb->zb_blkid);
 
 	if (bp->blk_birth <= dp->dp_scrub_min_txg)
 		return;
@@ -827,7 +827,8 @@ dsl_pool_scrub_clean_done(zio_t *zio)
 	spa->spa_scrub_inflight--;
 	cv_broadcast(&spa->spa_scrub_io_cv);
 
-	if (zio->io_error)
+	if (zio->io_error &&
+	    (zio->io_error == EIO || !(zio->io_flags & ZIO_FLAG_SPECULATIVE)))
 		spa->spa_scrub_errors++;
 	mutex_exit(&spa->spa_scrub_lock);
 }
@@ -842,8 +843,6 @@ dsl_pool_scrub_clean_cb(dsl_pool_t *dp,
 	boolean_t needs_io;
 	int zio_flags = ZIO_FLAG_SCRUB_THREAD | ZIO_FLAG_CANFAIL;
 	int zio_priority;
-
-	dprintf_bp(bp, "visiting %s", "");
 
 	if (dp->dp_scrub_isresilver == 0) {
 		/* It's a scrub */
