@@ -198,7 +198,7 @@ extern int zpool_iter(libzfs_handle_t *, zpool_iter_f, void *);
  * Functions to create and destroy pools
  */
 extern int zpool_create(libzfs_handle_t *, const char *, nvlist_t *,
-    nvlist_t *);
+    nvlist_t *, nvlist_t *);
 extern int zpool_destroy(zpool_handle_t *);
 extern int zpool_add(zpool_handle_t *, nvlist_t *);
 
@@ -341,6 +341,9 @@ extern const char *zfs_prop_default_string(zfs_prop_t);
 extern uint64_t zfs_prop_default_numeric(zfs_prop_t);
 extern const char *zfs_prop_column_name(zfs_prop_t);
 extern boolean_t zfs_prop_align_right(zfs_prop_t);
+
+extern nvlist_t *zfs_valid_proplist(libzfs_handle_t *, zfs_type_t,
+    nvlist_t *, uint64_t, zfs_handle_t *, const char *);
 
 extern const char *zfs_prop_to_name(zfs_prop_t);
 extern int zfs_prop_set(zfs_handle_t *, const char *, const char *);

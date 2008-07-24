@@ -800,7 +800,7 @@ ztest_spa_create_destroy(ztest_args_t *za)
 	 * Attempt to create using a bad file.
 	 */
 	nvroot = make_vdev_root(0, 0, 0, 0, 1);
-	error = spa_create("ztest_bad_file", nvroot, NULL, NULL);
+	error = spa_create("ztest_bad_file", nvroot, NULL, NULL, NULL);
 	nvlist_free(nvroot);
 	if (error != ENOENT)
 		fatal(0, "spa_create(bad_file) = %d", error);
@@ -809,7 +809,7 @@ ztest_spa_create_destroy(ztest_args_t *za)
 	 * Attempt to create using a bad mirror.
 	 */
 	nvroot = make_vdev_root(0, 0, 0, 2, 1);
-	error = spa_create("ztest_bad_mirror", nvroot, NULL, NULL);
+	error = spa_create("ztest_bad_mirror", nvroot, NULL, NULL, NULL);
 	nvlist_free(nvroot);
 	if (error != ENOENT)
 		fatal(0, "spa_create(bad_mirror) = %d", error);
@@ -820,7 +820,7 @@ ztest_spa_create_destroy(ztest_args_t *za)
 	 */
 	(void) rw_rdlock(&ztest_shared->zs_name_lock);
 	nvroot = make_vdev_root(0, 0, 0, 0, 1);
-	error = spa_create(za->za_pool, nvroot, NULL, NULL);
+	error = spa_create(za->za_pool, nvroot, NULL, NULL, NULL);
 	nvlist_free(nvroot);
 	if (error != EEXIST)
 		fatal(0, "spa_create(whatever) = %d", error);
@@ -3362,7 +3362,7 @@ ztest_init(char *pool)
 	(void) spa_destroy(pool);
 	ztest_shared->zs_vdev_primaries = 0;
 	nvroot = make_vdev_root(zopt_vdev_size, 0, zopt_raidz, zopt_mirrors, 1);
-	error = spa_create(pool, nvroot, NULL, NULL);
+	error = spa_create(pool, nvroot, NULL, NULL, NULL);
 	nvlist_free(nvroot);
 
 	if (error)

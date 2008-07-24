@@ -224,7 +224,7 @@ dsl_pool_close(dsl_pool_t *dp)
 }
 
 dsl_pool_t *
-dsl_pool_create(spa_t *spa, uint64_t txg)
+dsl_pool_create(spa_t *spa, nvlist_t *zplprops, uint64_t txg)
 {
 	int err;
 	dsl_pool_t *dp = dsl_pool_open_impl(spa, txg);
@@ -263,7 +263,7 @@ dsl_pool_create(spa_t *spa, uint64_t txg)
 	osip = dmu_objset_create_impl(dp->dp_spa, ds,
 	    dsl_dataset_get_blkptr(ds), DMU_OST_ZFS, tx);
 #ifdef _KERNEL
-	zfs_create_fs(&osip->os, kcred, NULL, tx);
+	zfs_create_fs(&osip->os, kcred, zplprops, tx);
 #endif
 	dsl_dataset_rele(ds, FTAG);
 

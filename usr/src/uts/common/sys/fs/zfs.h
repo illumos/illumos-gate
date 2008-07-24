@@ -147,6 +147,13 @@ typedef enum {
 typedef int (*zprop_func)(int, void *);
 
 /*
+ * Properties to be set on the root file system of a new pool
+ * are stuffed into their own nvlist, which is then included in
+ * the properties nvlist with the pool properties.
+ */
+#define	ZPOOL_ROOTFS_PROPS	"root-props-nvl"
+
+/*
  * Dataset property functions shared between libzfs and kernel.
  */
 const char *zfs_prop_default_string(zfs_prop_t);

@@ -98,7 +98,7 @@ typedef struct dsl_pool {
 
 int dsl_pool_open(spa_t *spa, uint64_t txg, dsl_pool_t **dpp);
 void dsl_pool_close(dsl_pool_t *dp);
-dsl_pool_t *dsl_pool_create(spa_t *spa, uint64_t txg);
+dsl_pool_t *dsl_pool_create(spa_t *spa, nvlist_t *zplprops, uint64_t txg);
 void dsl_pool_sync(dsl_pool_t *dp, uint64_t txg);
 void dsl_pool_zil_clean(dsl_pool_t *dp);
 int dsl_pool_sync_context(dsl_pool_t *dp);

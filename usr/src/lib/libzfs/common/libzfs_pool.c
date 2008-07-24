@@ -38,6 +38,7 @@
 #include <stdlib.h>
 #include <strings.h>
 #include <unistd.h>
+#include <zone.h>
 #include <sys/efi_partition.h>
 #include <sys/vtoc.h>
 #include <sys/zfs_ioctl.h>
@@ -311,7 +312,7 @@ pool_uses_efi(nvlist_t *config)
  * specified as strings.
  */
 static nvlist_t *
-zpool_validate_properties(libzfs_handle_t *hdl, const char *poolname,
+zpool_valid_proplist(libzfs_handle_t *hdl, const char *poolname,
     nvlist_t *props, uint64_t version, boolean_t create_or_import, char *errbuf)
 {
 	nvpair_t *elem;
@@ -515,7 +516,7 @@ zpool_set_prop(zpool_handle_t *zhp, const char *propname, const char *propval)
 	}
 
 	version = zpool_get_prop_int(zhp, ZPOOL_PROP_VERSION, NULL);
-	if ((realprops = zpool_validate_properties(zhp->zpool_hdl,
+	if ((realprops = zpool_valid_proplist(zhp->zpool_hdl,
 	    zhp->zpool_name, nvl, version, B_FALSE, errbuf)) == NULL) {
 		nvlist_free(nvl);
 		return (-1);
@@ -798,11 +799,14 @@ zpool_get_state(zpool_handle_t *zhp)
  */
 int
 zpool_create(libzfs_handle_t *hdl, const char *pool, nvlist_t *nvroot,
-    nvlist_t *props)
+    nvlist_t *props, nvlist_t *fsprops)
 {
 	zfs_cmd_t zc = { 0 };
+	nvlist_t *zc_fsprops = NULL;
+	nvlist_t *zc_props = NULL;
 	char msg[1024];
 	char *altroot;
+	int ret = -1;
 
 	(void) snprintf(msg, sizeof (msg), dgettext(TEXT_DOMAIN,
 	    "cannot create '%s'"), pool);
@@ -813,21 +817,45 @@ zpool_create(libzfs_handle_t *hdl, const char *pool, nvlist_t *nvroot,
 	if (zcmd_write_conf_nvlist(hdl, &zc, nvroot) != 0)
 		return (-1);
 
-	if (props && (props = zpool_validate_properties(hdl, pool, props,
-	    SPA_VERSION_1, B_TRUE, msg)) == NULL)
-		return (-1);
-
-	if (props && zcmd_write_src_nvlist(hdl, &zc, props) != 0) {
-		nvlist_free(props);
-		return (-1);
+	if (props) {
+		if ((zc_props = zpool_valid_proplist(hdl, pool, props,
+		    SPA_VERSION_1, B_TRUE, msg)) == NULL) {
+			goto create_failed;
+		}
 	}
+
+	if (fsprops) {
+		uint64_t zoned;
+		char *zonestr;
+
+		zoned = ((nvlist_lookup_string(fsprops,
+		    zfs_prop_to_name(ZFS_PROP_ZONED), &zonestr) == 0) &&
+		    strcmp(zonestr, "on") == 0);
+
+		if ((zc_fsprops = zfs_valid_proplist(hdl,
+		    ZFS_TYPE_FILESYSTEM, fsprops, zoned, NULL, msg)) == NULL) {
+			goto create_failed;
+		}
+		if (!zc_props &&
+		    (nvlist_alloc(&zc_props, NV_UNIQUE_NAME, 0) != 0)) {
+			goto create_failed;
+		}
+		if (nvlist_add_nvlist(zc_props,
+		    ZPOOL_ROOTFS_PROPS, zc_fsprops) != 0) {
+			goto create_failed;
+		}
+	}
+
+	if (zc_props && zcmd_write_src_nvlist(hdl, &zc, zc_props) != 0)
+		goto create_failed;
 
 	(void) strlcpy(zc.zc_name, pool, sizeof (zc.zc_name));
 
-	if (zfs_ioctl(hdl, ZFS_IOC_POOL_CREATE, &zc) != 0) {
+	if ((ret = zfs_ioctl(hdl, ZFS_IOC_POOL_CREATE, &zc)) != 0) {
 
 		zcmd_free_nvlists(&zc);
-		nvlist_free(props);
+		nvlist_free(zc_props);
+		nvlist_free(zc_fsprops);
 
 		switch (errno) {
 		case EBUSY:
@@ -889,9 +917,11 @@ zpool_create(libzfs_handle_t *hdl, const char *pool, nvlist_t *nvroot,
 		zfs_close(zhp);
 	}
 
+create_failed:
 	zcmd_free_nvlists(&zc);
-	nvlist_free(props);
-	return (0);
+	nvlist_free(zc_props);
+	nvlist_free(zc_fsprops);
+	return (ret);
 }
 
 /*
@@ -1141,7 +1171,7 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 		verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION,
 		    &version) == 0);
 
-		if ((props = zpool_validate_properties(hdl, origname,
+		if ((props = zpool_valid_proplist(hdl, origname,
 		    props, version, B_TRUE, errbuf)) == NULL) {
 			return (-1);
 		} else if (zcmd_write_src_nvlist(hdl, &zc, props) != 0) {

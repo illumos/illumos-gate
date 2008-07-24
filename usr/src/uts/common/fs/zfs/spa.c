@@ -1829,7 +1829,7 @@ spa_l2cache_drop(spa_t *spa)
  */
 int
 spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
-    const char *history_str)
+    const char *history_str, nvlist_t *zplprops)
 {
 	spa_t *spa;
 	char *altroot = NULL;
@@ -1938,7 +1938,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 		spa->spa_l2cache.sav_sync = B_TRUE;
 	}
 
-	spa->spa_dsl_pool = dp = dsl_pool_create(spa, txg);
+	spa->spa_dsl_pool = dp = dsl_pool_create(spa, zplprops, txg);
 	spa->spa_meta_objset = dp->dp_meta_objset;
 
 	tx = dmu_tx_create_assigned(dp, txg);

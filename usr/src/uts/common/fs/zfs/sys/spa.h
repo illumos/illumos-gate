@@ -325,7 +325,7 @@ extern int spa_open(const char *pool, spa_t **, void *tag);
 extern int spa_get_stats(const char *pool, nvlist_t **config,
     char *altroot, size_t buflen);
 extern int spa_create(const char *pool, nvlist_t *config, nvlist_t *props,
-    const char *history_str);
+    const char *history_str, nvlist_t *zplprops);
 extern int spa_check_rootconf(char *devpath, char *devid,
     nvlist_t **bestconf, uint64_t *besttxg);
 extern boolean_t spa_rootdev_validate(nvlist_t *nv);

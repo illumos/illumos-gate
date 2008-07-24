@@ -1623,7 +1623,7 @@ int
 zfs_get_zplprop(objset_t *os, zfs_prop_t prop, uint64_t *value)
 {
 	const char *pname;
-	int error;
+	int error = ENOENT;
 
 	/*
 	 * Look up the file system's value for the property.  For the
@@ -1634,7 +1634,8 @@ zfs_get_zplprop(objset_t *os, zfs_prop_t prop, uint64_t *value)
 	else
 		pname = zfs_prop_to_name(prop);
 
-	error = zap_lookup(os, MASTER_NODE_OBJ, pname, 8, 1, value);
+	if (os != NULL)
+		error = zap_lookup(os, MASTER_NODE_OBJ, pname, 8, 1, value);
 
 	if (error == ENOENT) {
 		/* No value set, use the default value */

@@ -187,6 +187,7 @@ get_usage(zpool_help_t idx) {
 		return (gettext("\tclear <pool> [device]\n"));
 	case HELP_CREATE:
 		return (gettext("\tcreate [-fn] [-o property=value] ... \n"
+		    "\t    [-O file-system-property=value] ... \n"
 		    "\t    [-m mountpoint] [-R root] <pool> <vdev> ...\n"));
 	case HELP_DESTROY:
 		return (gettext("\tdestroy [-f] <pool>\n"));
@@ -351,11 +352,14 @@ print_vdev_tree(zpool_handle_t *zhp, const char *name, nvlist_t *nv, int indent,
  * Add a property pair (name, string-value) into a property nvlist.
  */
 static int
-add_prop_list(const char *propname, char *propval, nvlist_t **props)
+add_prop_list(const char *propname, char *propval, nvlist_t **props,
+    boolean_t poolprop)
 {
-	char *strval;
+	zpool_prop_t prop = ZPROP_INVAL;
+	zfs_prop_t fprop;
 	nvlist_t *proplist;
-	zpool_prop_t prop;
+	const char *normnm;
+	char *strval;
 
 	if (*props == NULL &&
 	    nvlist_alloc(props, NV_UNIQUE_NAME, 0) != 0) {
@@ -366,22 +370,30 @@ add_prop_list(const char *propname, char *propval, nvlist_t **props)
 
 	proplist = *props;
 
-	if ((prop = zpool_name_to_prop(propname)) == ZPROP_INVAL) {
-		(void) fprintf(stderr, gettext("property '%s' is "
-		    "not a valid pool property\n"), propname);
-		return (2);
+	if (poolprop) {
+		if ((prop = zpool_name_to_prop(propname)) == ZPROP_INVAL) {
+			(void) fprintf(stderr, gettext("property '%s' is "
+			    "not a valid pool property\n"), propname);
+			return (2);
+		}
+		normnm = zpool_prop_to_name(prop);
+	} else {
+		if ((fprop = zfs_name_to_prop(propname)) == ZPROP_INVAL) {
+			(void) fprintf(stderr, gettext("property '%s' is "
+			    "not a valid file system property\n"), propname);
+			return (2);
+		}
+		normnm = zfs_prop_to_name(fprop);
 	}
 
-	/* Use normalized property name for nvlist operations */
-	if (nvlist_lookup_string(proplist, zpool_prop_to_name(prop),
-	    &strval) == 0 && prop != ZPOOL_PROP_CACHEFILE) {
+	if (nvlist_lookup_string(proplist, normnm, &strval) == 0 &&
+	    prop != ZPOOL_PROP_CACHEFILE) {
 		(void) fprintf(stderr, gettext("property '%s' "
 		    "specified multiple times\n"), propname);
 		return (2);
 	}
 
-	if (nvlist_add_string(proplist, zpool_prop_to_name(prop),
-	    propval) != 0) {
+	if (nvlist_add_string(proplist, normnm, propval) != 0) {
 		(void) fprintf(stderr, gettext("internal "
 		    "error: out of memory\n"));
 		return (1);
@@ -537,8 +549,9 @@ zpool_do_remove(int argc, char **argv)
 }
 
 /*
- * zpool create [-fn] [-o property=value] ... [-R root] [-m mountpoint]
- *		<pool> <dev> ...
+ * zpool create [-fn] [-o property=value] ...
+ *		[-O file-system-property=value] ...
+ *		[-R root] [-m mountpoint] <pool> <dev> ...
  *
  *	-f	Force creation, even if devices appear in use
  *	-n	Do not create the pool, but display the resulting layout if it
@@ -547,6 +560,7 @@ zpool_do_remove(int argc, char **argv)
  *      -m	Set default mountpoint for the root dataset.  By default it's
  *      	'/<pool>'
  *	-o	Set property=value.
+ *	-O	Set fsproperty=value in the pool's root file system
  *
  * Creates the named pool according to the given vdev specification.  The
  * bulk of the vdev processing is done in get_vdev_spec() in zpool_vdev.c.  Once
@@ -564,11 +578,12 @@ zpool_do_create(int argc, char **argv)
 	int ret = 1;
 	char *altroot = NULL;
 	char *mountpoint = NULL;
+	nvlist_t *fsprops = NULL;
 	nvlist_t *props = NULL;
 	char *propval;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":fnR:m:o:")) != -1) {
+	while ((c = getopt(argc, argv, ":fnR:m:o:O:")) != -1) {
 		switch (c) {
 		case 'f':
 			force = B_TRUE;
@@ -579,14 +594,14 @@ zpool_do_create(int argc, char **argv)
 		case 'R':
 			altroot = optarg;
 			if (add_prop_list(zpool_prop_to_name(
-			    ZPOOL_PROP_ALTROOT), optarg, &props))
+			    ZPOOL_PROP_ALTROOT), optarg, &props, B_TRUE))
 				goto errout;
 			if (nvlist_lookup_string(props,
 			    zpool_prop_to_name(ZPOOL_PROP_CACHEFILE),
 			    &propval) == 0)
 				break;
 			if (add_prop_list(zpool_prop_to_name(
-			    ZPOOL_PROP_CACHEFILE), "none", &props))
+			    ZPOOL_PROP_CACHEFILE), "none", &props, B_TRUE))
 				goto errout;
 			break;
 		case 'm':
@@ -601,7 +616,19 @@ zpool_do_create(int argc, char **argv)
 			*propval = '\0';
 			propval++;
 
-			if (add_prop_list(optarg, propval, &props))
+			if (add_prop_list(optarg, propval, &props, B_TRUE))
+				goto errout;
+			break;
+		case 'O':
+			if ((propval = strchr(optarg, '=')) == NULL) {
+				(void) fprintf(stderr, gettext("missing "
+				    "'=' for -O option\n"));
+				goto errout;
+			}
+			*propval = '\0';
+			propval++;
+
+			if (add_prop_list(optarg, propval, &fsprops, B_FALSE))
 				goto errout;
 			break;
 		case ':':
@@ -646,7 +673,7 @@ zpool_do_create(int argc, char **argv)
 	nvroot = make_root_vdev(NULL, force, !force, B_FALSE, argc - 1,
 	    argv + 1);
 	if (nvroot == NULL)
-		return (1);
+		goto errout;
 
 	/* make_root_vdev() allows 0 toplevel children if there are spares */
 	if (!zfs_allocatable_devs(nvroot)) {
@@ -738,7 +765,8 @@ zpool_do_create(int argc, char **argv)
 		/*
 		 * Hand off to libzfs.
 		 */
-		if (zpool_create(g_zfs, poolname, nvroot, props) == 0) {
+		if (zpool_create(g_zfs, poolname,
+		    nvroot, props, fsprops) == 0) {
 			zfs_handle_t *pool = zfs_open(g_zfs, poolname,
 			    ZFS_TYPE_FILESYSTEM);
 			if (pool != NULL) {
@@ -759,9 +787,11 @@ zpool_do_create(int argc, char **argv)
 
 errout:
 	nvlist_free(nvroot);
+	nvlist_free(fsprops);
 	nvlist_free(props);
 	return (ret);
 badusage:
+	nvlist_free(fsprops);
 	nvlist_free(props);
 	usage(B_FALSE);
 	return (2);
@@ -1381,7 +1411,8 @@ zpool_do_import(int argc, char **argv)
 			if ((propval = strchr(optarg, '=')) != NULL) {
 				*propval = '\0';
 				propval++;
-				if (add_prop_list(optarg, propval, &props))
+				if (add_prop_list(optarg, propval,
+				    &props, B_TRUE))
 					goto error;
 			} else {
 				mntopts = optarg;
@@ -1389,14 +1420,14 @@ zpool_do_import(int argc, char **argv)
 			break;
 		case 'R':
 			if (add_prop_list(zpool_prop_to_name(
-			    ZPOOL_PROP_ALTROOT), optarg, &props))
+			    ZPOOL_PROP_ALTROOT), optarg, &props, B_TRUE))
 				goto error;
 			if (nvlist_lookup_string(props,
 			    zpool_prop_to_name(ZPOOL_PROP_CACHEFILE),
 			    &propval) == 0)
 				break;
 			if (add_prop_list(zpool_prop_to_name(
-			    ZPOOL_PROP_CACHEFILE), "none", &props))
+			    ZPOOL_PROP_CACHEFILE), "none", &props, B_TRUE))
 				goto error;
 			break;
 		case ':':
