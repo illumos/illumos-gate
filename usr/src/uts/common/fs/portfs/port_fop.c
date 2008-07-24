@@ -174,6 +174,8 @@
 #include <sys/fem.h>
 #include <sys/vfs_opreg.h>
 #include <sys/atomic.h>
+#include <sys/mount.h>
+#include <sys/mntent.h>
 
 /*
  * For special case support of mnttab (/etc/mnttab).
@@ -1961,6 +1963,27 @@ port_fop(vnode_t *vp, int op, int retval)
 	}
 }
 
+static int port_forceunmount(vfs_t *vfsp)
+{
+	char *fsname = vfssw[vfsp->vfs_fstype].vsw_name;
+
+	if (fsname == NULL) {
+		return (0);
+	}
+
+	if (strcmp(fsname, MNTTYPE_NFS) == 0) {
+		return (1);
+	}
+
+	if (strcmp(fsname, MNTTYPE_NFS3) == 0) {
+		return (1);
+	}
+
+	if (strcmp(fsname, MNTTYPE_NFS4) == 0) {
+		return (1);
+	}
+	return (0);
+}
 /*
  * ----- the unmount filesystem op(fsem) hook.
  */
@@ -1972,6 +1995,9 @@ port_fop_unmount(fsemarg_t *vf, int flag, cred_t *cr)
 	portfop_vfs_t	*pvfsp, **ppvfsp;
 	portfop_vp_t	*pvp;
 	int error;
+	int fmfs;
+
+	fmfs = port_forceunmount(vfsp);
 
 	mtx = &(portvfs_hash[PORTFOP_PVFSHASH(vfsp)].pvfshash_mutex);
 	ppvfsp = &(portvfs_hash[PORTFOP_PVFSHASH(vfsp)].pvfshash_pvfsp);
@@ -1983,6 +2009,16 @@ port_fop_unmount(fsemarg_t *vf, int flag, cred_t *cr)
 	 */
 	for (pvfsp = *ppvfsp; pvfsp->pvfs != vfsp; pvfsp = pvfsp->pvfs_next)
 	;
+
+	/*
+	 * For some of the filesystems, allow unmounts to proceed only if
+	 * there are no files being watched or it is a forced unmount.
+	 */
+	if (fmfs && !(flag & MS_FORCE) &&
+	    !list_is_empty(&pvfsp->pvfs_pvplist)) {
+		mutex_exit(mtx);
+		return (EBUSY);
+	}
 
 	/*
 	 * Indicate that the unmount is in process. Don't remove it yet.
