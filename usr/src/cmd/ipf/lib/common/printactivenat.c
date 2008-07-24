@@ -1,12 +1,7 @@
 /*
- * Copyright (C) 1993-2001 by Darren Reed.
+ * Copyright (C) 2002-2004 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
- *
- * Added redirect stuff and a variety of bug fixes. (mcn@EnGarde.com)
- *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,17 +24,23 @@ int opts, alive;
 	if (nat->nat_flags & SI_CLONE)
 		printf(" CLONE");
 
-	printf(" %-15s", inet_ntoa(nat->nat_inip));
+	printactiveaddress(nat->nat_v, " %-15s", &nat->nat_inip6,
+			   nat->nat_ifnames[0]);
 
 	if ((nat->nat_flags & IPN_TCPUDP) != 0)
 		printf(" %-5hu", ntohs(nat->nat_inport));
 
-	printf(" <- -> %-15s",inet_ntoa(nat->nat_outip));
+	printf(" <- -> ");
+	printactiveaddress(nat->nat_v, "%-15s", &nat->nat_outip6,
+			   nat->nat_ifnames[0]);
 
 	if ((nat->nat_flags & IPN_TCPUDP) != 0)
 		printf(" %-5hu", ntohs(nat->nat_outport));
 
-	printf(" [%s", inet_ntoa(nat->nat_oip));
+	printf(" [");
+	printactiveaddress(nat->nat_v, "%s", &nat->nat_oip6,
+			   nat->nat_ifnames[0]);
+
 	if ((nat->nat_flags & IPN_TCPUDP) != 0)
 		printf(" %hu", ntohs(nat->nat_oport));
 	printf("]");

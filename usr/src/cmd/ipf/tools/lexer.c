@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 2004 by Darren Reed.
+ * Copyright (C) 2002-2008 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -398,7 +398,7 @@ nextchar:
 	 * 0000:0000:0000:0000:0000:0000:0000:0000
 	 */
 #ifdef	USE_INET6
-	if (yyexpectaddr == 1 && isbuilding == 0 && (ishex(c) || c == ':')) {
+	if (isbuilding == 0 && (ishex(c) || c == ':')) {
 		char ipv6buf[45 + 1], *s, oc;
 		int start;
 

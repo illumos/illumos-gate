@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -36,8 +36,8 @@ IPMON_OBJS=	ipmon.o ipmon_y.o ipmon_l.o
 IPNAT_OBJS=	ipnat.o ipnat_y.o ipnat_l.o
 IPPOOL_OBJS=	ippool.o ippool_y.o ippool_l.o
 IPFTEST_OBJS=	ipftest.o  \
-		ip_fil.o ip_state.o \
-		ip_frag.o ip_nat.o fil.o \
+		ip_fil.o ip_state.o ip_compat.o \
+		ip_frag.o ip_nat.o ip_nat6.o fil.o \
 		ip_htable.o ip_lookup.o \
 		ip_proxy.o ip_auth.o ip_log.o \
 		ipf_y.o ipf_l.o \

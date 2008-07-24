@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -479,7 +479,8 @@ ipf_stack_t *ifs;
 			f->fr_ifa = (void *)-1;
 #endif
 	RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
-	fr_natifpsync(IPFSYNC_OLDIFP, ifp, NULL, ifs);
+	fr_natifpsync(IPFSYNC_OLDIFP, 4, ifp, NULL, ifs);
+	fr_natifpsync(IPFSYNC_OLDIFP, 6, ifp, NULL, ifs);
 }
 
 

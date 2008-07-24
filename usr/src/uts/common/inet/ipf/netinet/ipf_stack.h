@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,6 +212,8 @@ struct ipf_stack {
 	uint_t			ifs_fr_nat_maxbucket_reset;
 	uint32_t		ifs_nat_masks;
 	uint32_t		ifs_rdr_masks;
+	uint32_t		ifs_nat6_masks[4];
+	uint32_t		ifs_rdr6_masks[4];
 	ipnat_t			**ifs_nat_rules;
 	ipnat_t			**ifs_rdr_rules;
 	hostmap_t		**ifs_maptable;

@@ -222,7 +222,6 @@ static	void		*fr_ifsync __P((int, int, char *, char *,
 					void *, void *, ipf_stack_t *));
 static	ipftuneable_t	*fr_findtunebyname __P((const char *, ipf_stack_t *));
 static	ipftuneable_t	*fr_findtunebycookie __P((void *, void **, ipf_stack_t *));
-static	void		ipf_unlinktoken __P((ipftoken_t *, ipf_stack_t *));
 
 
 /*
@@ -696,10 +695,15 @@ fr_info_t *fin;
 
 		fin->fin_data[0] = *(u_short *)icmp6;
 
+		if ((icmp6->icmp6_type & ICMP6_INFOMSG_MASK) != 0)
+			fin->fin_flx |= FI_ICMPQUERY;
+
 		switch (icmp6->icmp6_type)
 		{
 		case ICMP6_ECHO_REPLY :
 		case ICMP6_ECHO_REQUEST :
+			if (fin->fin_dlen >= 6)
+				fin->fin_data[1] = icmp6->icmp6_id;
 			minicmpsz = ICMP6ERR_MINPKTLEN - sizeof(ip6_t);
 			break;
 		case ICMP6_DST_UNREACH :
@@ -2465,9 +2469,24 @@ ipf_stack_t *ifs;
 	 */
 	fr = fr_checkauth(fin, &pass);
 	if (!out) {
-		if (fr_checknatin(fin, &pass) == -1) {
-			RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
-			goto finished;
+		switch (fin->fin_v)
+		{
+		case 4 :
+			if (fr_checknatin(fin, &pass) == -1) {
+				RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
+				goto finished;
+			}
+			break;
+#ifdef	USE_INET6
+		case 6 :
+			if (fr_checknat6in(fin, &pass) == -1) {
+				RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
+				goto finished;
+			}
+			break;
+#endif
+		default :
+			break;
 		}
 	}
 	if (!out)
@@ -2491,10 +2510,27 @@ ipf_stack_t *ifs;
 	if (out && FR_ISPASS(pass)) {
 		(void) fr_acctpkt(fin, NULL);
 
-		if (fr_checknatout(fin, &pass) == -1) {
-			RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
-			goto finished;
-		} else if ((ifs->ifs_fr_update_ipid != 0) && (v == 4)) {
+		switch (fin->fin_v)
+		{
+		case 4 :
+			if (fr_checknatout(fin, &pass) == -1) {
+				RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
+				goto finished;
+			}
+			break;
+#ifdef	USE_INET6
+		case 6 :
+			if (fr_checknat6out(fin, &pass) == -1) {
+				RWLOCK_EXIT(&ifs->ifs_ipf_mutex);
+				goto finished;
+			}
+			break;
+#endif
+		default :
+			break;
+		}
+
+		if ((ifs->ifs_fr_update_ipid != 0) && (v == 4)) {
 			if (fr_updateipid(fin) == -1) {
 				IPF_BUMP(ifs->ifs_frstats[1].fr_ipud);
 				pass &= ~FR_CMDMASK;
@@ -5405,15 +5441,14 @@ int type;
 	} else if (obj.ipfo_size != fr_objbytes[type][1])
 		return EINVAL;
 #else
-	if (obj.ipfo_rev != IPFILTER_VERSION)
-		/* XXX compatibility hook here */
-		;
-	if ((fr_objbytes[type][0] & 1) != 0) {
-		if (obj.ipfo_size < fr_objbytes[type][1])
-			/* XXX compatibility hook here */
-			return EINVAL;
-	} else if (obj.ipfo_size != fr_objbytes[type][1])
-		/* XXX compatibility hook here */
+	if (obj.ipfo_rev != IPFILTER_VERSION) {
+		error = fr_incomptrans(&obj, ptr);
+		return error;
+	}
+
+	if ((fr_objbytes[type][0] & 1) != 0 &&
+	    obj.ipfo_size < fr_objbytes[type][1] ||
+	    obj.ipfo_size != fr_objbytes[type][1])
 		return EINVAL;
 #endif
 
@@ -5465,8 +5500,8 @@ int type, sz;
 		return EINVAL;
 #else
 	if (obj.ipfo_rev != IPFILTER_VERSION)
-		/* XXX compatibility hook here */
-		;
+		/*XXX compatibility hook here */
+		/*EMPTY*/;
 	if (obj.ipfo_size != sz)
 		/* XXX compatibility hook here */
 		return EINVAL;
@@ -5515,7 +5550,7 @@ int type, sz;
 #else
 	if (obj.ipfo_rev != IPFILTER_VERSION)
 		/* XXX compatibility hook here */
-		;
+		/*EMPTY*/;
 	if (obj.ipfo_size != sz)
 		/* XXX compatibility hook here */
 		return EINVAL;
@@ -5560,15 +5595,14 @@ int type;
 	} else if (obj.ipfo_size != fr_objbytes[type][1])
 		return EINVAL;
 #else
-	if (obj.ipfo_rev != IPFILTER_VERSION)
-		/* XXX compatibility hook here */
-		;
-	if ((fr_objbytes[type][0] & 1) != 0) {
-		if (obj.ipfo_size < fr_objbytes[type][1])
-			/* XXX compatibility hook here */
-			return EINVAL;
-	} else if (obj.ipfo_size != fr_objbytes[type][1])
-		/* XXX compatibility hook here */
+	if (obj.ipfo_rev != IPFILTER_VERSION) {
+		error = fr_outcomptrans(&obj, ptr);
+		return error;
+	}
+
+	if ((fr_objbytes[type][0] & 1) != 0 &&
+	    obj.ipfo_size < fr_objbytes[type][1] ||
+	    obj.ipfo_size != fr_objbytes[type][1])
 		return EINVAL;
 #endif
 

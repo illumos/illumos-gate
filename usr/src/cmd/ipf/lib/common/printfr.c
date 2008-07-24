@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2001 by Darren Reed.
+ * Copyright (C) 2000-2005 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
@@ -12,86 +12,6 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ipf.h"
-
-static void printaddr(int, int, char *, u_32_t *, u_32_t *);
-
-static void printaddr(v, type, ifname, addr, mask)
-int v, type;
-char *ifname;
-u_32_t *addr, *mask;
-{
-	char *suffix;
-
-	switch (type)
-	{
-	case FRI_BROADCAST :
-		suffix = "/bcast";
-		break;
-
-	case FRI_DYNAMIC :
-		printf("%s", ifname);
-		printmask(v, mask);
-		suffix = NULL;
-		break;
-
-	case FRI_NETWORK :
-		suffix = "/net";
-		break;
-
-	case FRI_NETMASKED :
-		suffix = "/netmasked";
-		break;
-
-	case FRI_PEERADDR :
-		suffix = "/peer";
-		break;
-
-	case FRI_LOOKUP :
-		suffix = NULL;
-		printlookup((i6addr_t *)addr, (i6addr_t *)mask);
-		break;
-
-	case FRI_NORMAL :
-		printhostmask(v, addr, mask);
-		suffix = NULL;
-		break;
-	default :
-		printf("<%d>", type);
-		printmask(v, mask);
-		suffix = NULL;
-		break;
-	}
-
-	if (suffix != NULL) {
-		printf("%s/%s", ifname, suffix);
-	}
-}
-
-
-void printlookup(addr, mask)
-i6addr_t *addr, *mask;
-{
-	switch (addr->iplookuptype)
-	{
-	case IPLT_POOL :
-		printf("pool/");
-		break;
-	case IPLT_HASH :
-		printf("hash/");
-		break;
-	default :
-		printf("lookup(%x)=", addr->iplookuptype);
-		break;
-	}
-
-	printf("%u", addr->iplookupnum);
-	if (opts & OPT_UNDEF) {
-		if (mask->iplookupptr == NULL) {
-			printf("(!)");
-		}
-	}
-}
-
 
 /*
  * print the filter structure in a useful way

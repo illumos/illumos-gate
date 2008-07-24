@@ -1,10 +1,10 @@
 %{
 /*
- * Copyright (C) 2003 by Darren Reed.
+ * Copyright (C) 2001-2008 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,13 +66,15 @@ static	addfunc_t	nataddfunc = NULL;
 
 static	void	newnatrule __P((void));
 static	void	setnatproto __P((int));
-static  u_32_t  lookuphost __P((char *));
 
 %}
 %union	{
 	char	*str;
 	u_32_t	num;
-	struct	in_addr	ipa;
+	struct	{
+		i6addr_t	a;
+		int		v;
+	} ipa;
 	frentry_t	fr;
 	frtuc_t	*frt;
 	u_short	port;
@@ -82,8 +84,9 @@ static  u_32_t  lookuphost __P((char *));
 		int	pc;
 	} pc;
 	struct	{
-		struct	in_addr	a;
-		struct	in_addr	m;
+		i6addr_t	a;
+		i6addr_t	m;
+		int	v;
 	} ipp;
 	union	i6addr	ip6;
 };
@@ -102,8 +105,9 @@ static  u_32_t  lookuphost __P((char *));
 %token	IPNY_TLATE
 %type	<port> portspec
 %type	<num> hexnumber compare range proto
-%type	<ipa> hostname ipv4
-%type	<ipp> addr nummask rhaddr
+%type	<num> saddr daddr sobject dobject mapfrom rdrfrom dip
+%type	<ipa> hostname ipv4 ipaddr
+%type	<ipp> addr rhaddr
 %type	<pc> portstuff
 %%
 file:	line
@@ -113,6 +117,8 @@ file:	line
 	;
 
 line:	xx rule		{ while ((nat = nattop) != NULL) {
+				if (nat->in_v == 0)
+					nat->in_v = 4;
 				nattop = nat->in_next;
 				(*nataddfunc)(natfd, natioctlfunc, nat);
 				free(nat);
@@ -145,11 +151,12 @@ eol:	| ';'
 	;
 
 map:	mapit ifnames addr IPNY_TLATE rhaddr proxy mapoptions
-				{ nat->in_v = 4;
-				  nat->in_inip = $3.a.s_addr;
-				  nat->in_inmsk = $3.m.s_addr;
-				  nat->in_outip = $5.a.s_addr;
-				  nat->in_outmsk = $5.m.s_addr;
+				{ if ($3.v != 0 && $3.v != $5.v && $5.v != 0)
+					yyerror("1.address family mismatch");
+				  bcopy(&$3.a, &nat->in_in[0], sizeof($3.a));
+				  bcopy(&$3.m, &nat->in_in[1], sizeof($3.a));
+				  bcopy(&$5.a, &nat->in_out[0], sizeof($5.a));
+				  bcopy(&$5.m, &nat->in_out[1], sizeof($5.a));
 				  if (nat->in_ifnames[1][0] == '\0')
 					strncpy(nat->in_ifnames[1],
 						nat->in_ifnames[0],
@@ -161,11 +168,12 @@ map:	mapit ifnames addr IPNY_TLATE rhaddr proxy mapoptions
 					nat_setgroupmap(nat);
 				}
 	| mapit ifnames addr IPNY_TLATE rhaddr mapport mapoptions
-				{ nat->in_v = 4;
-				  nat->in_inip = $3.a.s_addr;
-				  nat->in_inmsk = $3.m.s_addr;
-				  nat->in_outip = $5.a.s_addr;
-				  nat->in_outmsk = $5.m.s_addr;
+				{ if ($3.v != 0 && $3.v != $5.v && $5.v != 0)
+					yyerror("2.address family mismatch");
+				  bcopy(&$3.a, &nat->in_in[0], sizeof($3.a));
+				  bcopy(&$3.m, &nat->in_in[1], sizeof($3.a));
+				  bcopy(&$5.a, &nat->in_out[0], sizeof($5.a));
+				  bcopy(&$5.m, &nat->in_out[1], sizeof($5.a));
 				  if (nat->in_ifnames[1][0] == '\0')
 					strncpy(nat->in_ifnames[1],
 						nat->in_ifnames[0],
@@ -177,9 +185,10 @@ map:	mapit ifnames addr IPNY_TLATE rhaddr proxy mapoptions
 					nat_setgroupmap(nat);
 				}
 	| mapit ifnames mapfrom IPNY_TLATE rhaddr proxy mapoptions
-				{ nat->in_v = 4;
-				  nat->in_outip = $5.a.s_addr;
-				  nat->in_outmsk = $5.m.s_addr;
+				{ if ($3 != 0 && $3 != $5.v && $5.v != 0)
+					yyerror("3.address family mismatch");
+				  bcopy(&$5.a, &nat->in_out[0], sizeof($5.a));
+				  bcopy(&$5.m, &nat->in_out[1], sizeof($5.a));
 				  if (nat->in_ifnames[1][0] == '\0')
 					strncpy(nat->in_ifnames[1],
 						nat->in_ifnames[0],
@@ -191,9 +200,10 @@ map:	mapit ifnames addr IPNY_TLATE rhaddr proxy mapoptions
 					nat_setgroupmap(nat);
 				}
 	| mapit ifnames mapfrom IPNY_TLATE rhaddr mapport mapoptions
-				{ nat->in_v = 4;
-				  nat->in_outip = $5.a.s_addr;
-				  nat->in_outmsk = $5.m.s_addr;
+				{ if ($3 != 0 && $3 != $5.v && $5.v != 0)
+					yyerror("4.address family mismatch");
+				  bcopy(&$5.a, &nat->in_out[0], sizeof($5.a));
+				  bcopy(&$5.m, &nat->in_out[1], sizeof($5.a));
 				  if (nat->in_ifnames[1][0] == '\0')
 					strncpy(nat->in_ifnames[1],
 						nat->in_ifnames[0],
@@ -208,11 +218,12 @@ map:	mapit ifnames addr IPNY_TLATE rhaddr proxy mapoptions
 
 mapblock:
 	mapblockit ifnames addr IPNY_TLATE addr ports mapoptions
-				{ nat->in_v = 4;
-				  nat->in_inip = $3.a.s_addr;
-				  nat->in_inmsk = $3.m.s_addr;
-				  nat->in_outip = $5.a.s_addr;
-				  nat->in_outmsk = $5.m.s_addr;
+				{ if ($3.v != 0 && $3.v != $5.v && $5.v != 0)
+					yyerror("5.address family mismatch");
+				  bcopy(&$3.a, &nat->in_in[0], sizeof($3.a));
+				  bcopy(&$3.m, &nat->in_in[1], sizeof($3.a));
+				  bcopy(&$5.a, &nat->in_out[0], sizeof($5.a));
+				  bcopy(&$5.m, &nat->in_out[1], sizeof($5.a));
 				  if (nat->in_ifnames[1][0] == '\0')
 					strncpy(nat->in_ifnames[1],
 						nat->in_ifnames[0],
@@ -226,9 +237,10 @@ mapblock:
 	;
 
 redir:	rdrit ifnames addr dport IPNY_TLATE dip nport setproto rdroptions
-				{ nat->in_v = 4;
-				  nat->in_outip = $3.a.s_addr;
-				  nat->in_outmsk = $3.m.s_addr;
+				{ if ($6 != 0 && $3.v != 0 && $6 != $3.v)
+					yyerror("6.address family mismatch");
+				  bcopy(&$3.a, &nat->in_out[0], sizeof($3.a));
+				  bcopy(&$3.m, &nat->in_out[1], sizeof($3.a));
 				  if (nat->in_ifnames[1][0] == '\0')
 					strncpy(nat->in_ifnames[1],
 						nat->in_ifnames[0],
@@ -241,7 +253,8 @@ redir:	rdrit ifnames addr dport IPNY_TLATE dip nport setproto rdroptions
 						setnatproto(IPPROTO_TCP);
 				}
 	| rdrit ifnames rdrfrom IPNY_TLATE dip nport setproto rdroptions
-				{ nat->in_v = 4;
+				{ if ($5 != 0 && $3 != 0 && $5 != $3)
+					yyerror("7.address family mismatch");
 				  if ((nat->in_p == 0) &&
 				      ((nat->in_flags & IPN_TCPUDP) == 0) &&
 				      (nat->in_pmin != 0 ||
@@ -254,9 +267,10 @@ redir:	rdrit ifnames addr dport IPNY_TLATE dip nport setproto rdroptions
 						sizeof(nat->in_ifnames[0]));
 				}
 	| rdrit ifnames addr IPNY_TLATE dip setproto rdroptions
-				{ nat->in_v = 4;
-				  nat->in_outip = $3.a.s_addr;
-				  nat->in_outmsk = $3.m.s_addr;
+				{ if ($5 != 0 && $3.v != 0 && $5 != $3.v)
+					yyerror("8.address family mismatch");
+				  bcopy(&$3.a, &nat->in_out[0], sizeof($3.a));
+				  bcopy(&$3.m, &nat->in_out[1], sizeof($3.a));
 				  if (nat->in_ifnames[1][0] == '\0')
 					strncpy(nat->in_ifnames[1],
 						nat->in_ifnames[0],
@@ -307,23 +321,77 @@ setproto:
 					}
 	;
 
-rhaddr:	addr				{ $$.a = $1.a; $$.m = $1.m; }
-	| IPNY_RANGE ipv4 '-' ipv4
-					{ $$.a = $2; $$.m = $4;
-					  nat->in_flags |= IPN_IPRANGE; }
+rhaddr:	addr				{ $$.a = $1.a;
+					  $$.m = $1.m;
+					  $$.v = $1.v;
+					  if ($$.v == 0)
+						$$.v = nat->in_v;
+					  yyexpectaddr = 0; }
+	| IPNY_RANGE hostname '-' hostname
+					{ if ($2.v != 0 && $4.v != 0 && $4.v != $2.v)
+						yyerror("9.address family "
+							"mismatch");
+					  $$.v = $2.v;
+					  $$.a = $2.a;
+					  $$.m = $4.a;
+					  nat->in_flags |= IPN_IPRANGE;
+					  yyexpectaddr = 0; }
 	;
 
 dip:
-	hostname			{ nat->in_inip = $1.s_addr;
-					  nat->in_inmsk = 0xffffffff; }
-	| hostname '/' YY_NUMBER        { nat->in_inip = $1.s_addr;
-					  if (nat->in_inip != 0 ||
-					      ($3 != 0 && $3 != 32))
+	hostname			{ bcopy(&$1.a, &nat->in_in[0],
+						sizeof($1.a));
+					  if ($1.v == 0)
+						$1.v = nat->in_v;
+					  if ($1.v == 4) {
+						nat->in_inmsk = 0xffffffff;
+					  } else {
+						nat->in_in[1].i6[0] = 0xffffffff;
+						nat->in_in[1].i6[1] = 0xffffffff;
+						nat->in_in[1].i6[2] = 0xffffffff;
+						nat->in_in[1].i6[3] = 0xffffffff;
+					  }
+					  $$ = $1.v;
+					}
+	| hostname '/' YY_NUMBER        { if ($1.v == 0)
+						$1.v = nat->in_v;
+					  if ($1.v == 4 &&
+					      ($1.a.in4.s_addr != 0 ||
+					      ($3 != 0 && $3 != 32)))
 						yyerror("Invalid mask for dip");
-					  ntomask(4, $3, &nat->in_inmsk); }
-	| hostname ',' hostname		{ nat->in_flags |= IPN_SPLIT;
-					  nat->in_inip = $1.s_addr;
-					  nat->in_inmsk = $3.s_addr; }
+					  else if ($1.v == 6 &&
+					      ($1.a.in4.s_addr != 0 ||
+					      ($3 != 0 && $3 != 128)))
+						yyerror("Invalid mask for dip");
+					  else if ($1.v == 0 ) {
+						if ($1.a.in4.s_addr == 0 &&
+						    ($3 == 32 || $3 == 0))
+							$1.v = 4;
+						else if ($3 == 128)
+							$1.v = 6;
+					  }
+					  bcopy(&$1.a, &nat->in_in[0],
+						sizeof($1.a));
+					  ntomask($1.v, $3,
+						(u_32_t *)&nat->in_in[1]);
+					  nat->in_in[0].i6[0] &= nat->in_in[1].i6[0];
+					  nat->in_in[0].i6[0] &= nat->in_in[1].i6[1];
+					  nat->in_in[0].i6[0] &= nat->in_in[1].i6[2];
+					  nat->in_in[0].i6[0] &= nat->in_in[1].i6[3];
+					  nat->in_v = $1.v;
+					  $$ = $1.v;
+					}
+	| hostname ',' { yyexpectaddr = 1; } hostname
+					{ if ($1.v != $4.v)
+						yyerror("10.address family "
+							"mismatch");
+					  $$ = $1.v;
+					  nat->in_flags |= IPN_SPLIT;
+					  bcopy(&$1.a, &nat->in_in[0],
+						sizeof($1.a));
+					  bcopy(&$4.a, &nat->in_in[1],
+						sizeof($4.a));
+					  yyexpectaddr = 0; }
 	;
 
 portspec:
@@ -368,23 +436,42 @@ mapblockit:
 	;
 
 mapfrom:
-	from sobject IPNY_TO dobject
+	from sobject IPNY_TO dobject	{ if ($2 != 0 && $4 != 0 && $2 != $4)
+						yyerror("11.address family "
+							"mismatch");
+					  $$ = $2;
+					}
 	| from sobject '!' IPNY_TO dobject
-					{ nat->in_flags |= IPN_NOTDST; }
+					{ if ($2 != 0 && $5 != 0 && $2 != $5)
+						yyerror("12.address family "
+							"mismatch");
+					  nat->in_flags |= IPN_NOTDST;
+					  $$ = $2;
+					}
 	;
 
 rdrfrom:
-	from sobject IPNY_TO dobject
+	from sobject IPNY_TO dobject	{ if ($2 != 0 && $4 != 0 && $2 != $4)
+						yyerror("13.address family "
+							"mismatch");
+					  $$ = $2;
+					}
 	| '!' from sobject IPNY_TO dobject
-					{ nat->in_flags |= IPN_NOTSRC; }
+					{ if ($3 != 0 && $5 != 0 && $3 != $5)
+						yyerror("14.address family "
+							"mismatch");
+					  nat->in_flags |= IPN_NOTSRC;
+					  $$ = $3;
+					}
 	;
 
-from:	IPNY_FROM			{ nat->in_flags |= IPN_FILTER; }
+from:	IPNY_FROM			{ nat->in_flags |= IPN_FILTER;
+					  yyexpectaddr = 1; }
 	;
 
 ifnames:
-	ifname
-	| ifname ',' otherifname
+	ifname				{ yyexpectaddr = 1; }
+	| ifname ',' otherifname	{ yyexpectaddr = 1; }
 	;
 
 ifname:	YY_STR			{ strncpy(nat->in_ifnames[0], $1,
@@ -428,24 +515,31 @@ mapport:
 	;
 
 sobject:
-	saddr
+	saddr				{ $$ = $1; }
 	| saddr IPNY_PORT portstuff	{ nat->in_sport = $3.p1;
 					  nat->in_stop = $3.p2;
-					  nat->in_scmp = $3.pc; }
+					  nat->in_scmp = $3.pc;
+					  $$ = $1;
+					}
 	;
 
 saddr:	addr				{ if (nat->in_redir == NAT_REDIRECT) {
-						nat->in_srcip = $1.a.s_addr;
-						nat->in_srcmsk = $1.m.s_addr;
+						bcopy(&$1.a, &nat->in_src[0],
+							sizeof($1.a));
+						bcopy(&$1.m, &nat->in_src[1],
+							sizeof($1.a));
 					  } else {
-						nat->in_inip = $1.a.s_addr;
-						nat->in_inmsk = $1.m.s_addr;
+						bcopy(&$1.a, &nat->in_in[0],
+							sizeof($1.a));
+						bcopy(&$1.m, &nat->in_in[1],
+							sizeof($1.a));
 					  }
+					  $$ = $1.v;
 					}
 	;
 
 dobject:
-	daddr
+	daddr				{ $$ = $1; }
 	| daddr IPNY_PORT portstuff	{ nat->in_dport = $3.p1;
 					  nat->in_dtop = $3.p2;
 					  nat->in_dcmp = $3.pc;
@@ -455,33 +549,93 @@ dobject:
 	;
 
 daddr:	addr				{ if (nat->in_redir == NAT_REDIRECT) {
-						nat->in_outip = $1.a.s_addr;
-						nat->in_outmsk = $1.m.s_addr;
+						bcopy(&$1.a, &nat->in_out[0],
+							sizeof($1.a));
+						bcopy(&$1.m, &nat->in_out[1],
+							sizeof($1.a));
 					  } else {
-						nat->in_srcip = $1.a.s_addr;
-						nat->in_srcmsk = $1.m.s_addr;
+						bcopy(&$1.a, &nat->in_src[0],
+							sizeof($1.a));
+						bcopy(&$1.m, &nat->in_src[1],
+							sizeof($1.a));
 					  }
+					  $$ = $1.v;
 					}
 	;
 
-addr:	IPNY_ANY			{ $$.a.s_addr = 0; $$.m.s_addr = 0; }
-	| nummask			{ $$.a = $1.a; $$.m = $1.m;
-					  $$.a.s_addr &= $$.m.s_addr; }
-	| hostname '/' ipv4		{ $$.a = $1; $$.m = $3;
-					  $$.a.s_addr &= $$.m.s_addr; }
-	| hostname '/' hexnumber	{ $$.a = $1; $$.m.s_addr = $3;
-					  $$.a.s_addr &= $$.m.s_addr; }
-	| hostname IPNY_MASK ipv4	{ $$.a = $1; $$.m = $3;
-					  $$.a.s_addr &= $$.m.s_addr; }
-	| hostname IPNY_MASK hexnumber	{ $$.a = $1; $$.m.s_addr = $3;
-					  $$.a.s_addr &= $$.m.s_addr; }
-	;
-
-nummask:
-	hostname			{ $$.a = $1;
-					  $$.m.s_addr = 0xffffffff; }
-	| hostname '/' YY_NUMBER	{ $$.a = $1;
-					  ntomask(4, $3, &$$.m.s_addr); }
+addr:	IPNY_ANY			{ yyexpectaddr = 0;
+					  bzero(&$$.a, sizeof($$.a));
+					  bzero(&$$.m, sizeof($$.a));
+					  $$.v = nat->in_v;
+					}
+	| hostname			{ $$.a = $1.a;
+					  $$.v = $1.v;
+					  if ($$.v == 4) {
+						$$.m.in4.s_addr = 0xffffffff;
+					  } else {
+						$$.m.i6[0] = 0xffffffff;
+						$$.m.i6[1] = 0xffffffff;
+						$$.m.i6[2] = 0xffffffff;
+						$$.m.i6[3] = 0xffffffff;
+					  }
+					  yyexpectaddr = 0;
+					}
+	| hostname '/' YY_NUMBER	{ $$.a = $1.a;
+					  if ($1.v == 0) {
+						if ($1.a.in4.s_addr != 0)
+							yyerror("invalid addr");
+						if ($3 == 0 || $3 == 32)
+							$1.v = 4;
+						else if ($3 == 128)
+							$1.v = 6;
+						else
+							yyerror("invalid mask");
+						nat->in_v = $1.v;
+					  }
+					  ntomask($1.v, $3, (u_32_t *)&$$.m);
+					  $$.a.i6[0] &= $$.m.i6[0];
+					  $$.a.i6[1] &= $$.m.i6[1];
+					  $$.a.i6[2] &= $$.m.i6[2];
+					  $$.a.i6[3] &= $$.m.i6[3];
+					  $$.v = $1.v;
+					  yyexpectaddr = 0;
+					}
+	| hostname '/' ipaddr		{ if ($1.v != $3.v) {
+						yyerror("1.address family "
+							"mismatch");
+					  }
+					  $$.a = $1.a;
+					  $$.m = $3.a;
+					  $$.a.i6[0] &= $$.m.i6[0];
+					  $$.a.i6[1] &= $$.m.i6[1];
+					  $$.a.i6[2] &= $$.m.i6[2];
+					  $$.a.i6[3] &= $$.m.i6[3];
+					  $$.v = $1.v;
+					  yyexpectaddr = 0;
+					}
+	| hostname '/' hexnumber	{ $$.a = $1.a;
+					  $$.m.in4.s_addr = htonl($3);
+					  $$.a.in4.s_addr &= $$.m.in4.s_addr;
+					  $$.v = 4;
+					}
+	| hostname IPNY_MASK ipaddr	{ if ($1.v != $3.v) {
+						yyerror("2.address family "
+							"mismatch");
+					  }
+					  $$.a = $1.a;
+					  $$.m = $3.a;
+					  $$.a.i6[0] &= $$.m.i6[0];
+					  $$.a.i6[1] &= $$.m.i6[1];
+					  $$.a.i6[2] &= $$.m.i6[2];
+					  $$.a.i6[3] &= $$.m.i6[3];
+					  $$.v = $1.v;
+					  yyexpectaddr = 0;
+					}
+	| hostname IPNY_MASK hexnumber	{ $$.a = $1.a;
+					  $$.m.in4.s_addr = htonl($3);
+					  $$.a.in4.s_addr &= $$.m.in4.s_addr;
+					  $$.v = 4;
+					}
 	;
 
 portstuff:
@@ -562,13 +716,40 @@ hexnumber:
 	;
 
 hostname:
-	YY_STR				{ $$.s_addr = lookuphost($1);
-					  free($1);
-					  if ($$.s_addr == 0)
+	YY_STR				{ i6addr_t addr;
+					  if (gethost($1, &addr, 0) == 0) {
+						$$.a = addr;
+						$$.v = 4;
+					  } else
+					  if (gethost($1, &addr, 1) == 0) {
+						$$.a = addr;
+						$$.v = 6;
+					  } else {
 						yyerror("Unknown hostname");
+					  }
+					  if ($$.v != 0)
+						nat->in_v = $$.v;
+					  free($1);
 					}
-	| YY_NUMBER			{ $$.s_addr = htonl($1); }
-	| ipv4				{ $$.s_addr = $1.s_addr; }
+	| YY_NUMBER			{ bzero(&$$.a, sizeof($$.a));
+					  $$.a.in4.s_addr = htonl($1);
+					  if ($$.a.in4.s_addr != 0)
+						$$.v = 4;
+					  else
+						$$.v = nat->in_v;
+					  if ($$.v != 0)
+						nat->in_v = $$.v;
+					}
+	| ipv4				{ $$ = $1; 
+					  nat->in_v = 4;
+					}
+	| YY_IPV6			{ $$.a = $1;
+					  $$.v = 6;
+					  nat->in_v = 6;
+					}
+	| YY_NUMBER YY_IPV6		{ $$.a = $2;
+					  $$.v = 6;
+					}
 	;
 
 compare:
@@ -585,13 +766,20 @@ range:
 	| YY_RANGE_IN			{ $$ = FR_INRANGE; }
 	;
 
+ipaddr:	ipv4				{ $$ = $1; }
+	| YY_IPV6			{ $$.a = $1;
+					  $$.v = 6;
+					}
+	;
+
 ipv4:	YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER
 		{ if ($1 > 255 || $3 > 255 || $5 > 255 || $7 > 255) {
 			yyerror("Invalid octet string for IP address");
 			return 0;
 		  }
-		  $$.s_addr = ($1 << 24) | ($3 << 16) | ($5 << 8) | $7;
-		  $$.s_addr = htonl($$.s_addr);
+		  $$.a.in4.s_addr = ($1 << 24) | ($3 << 16) | ($5 << 8) | $7;
+		  $$.a.in4.s_addr = htonl($$.a.in4.s_addr);
+		  $$.v = 4;
 		}
 	;
 
@@ -844,13 +1032,3 @@ void *ptr;
 	}
 }
 
-static u_32_t lookuphost(name)
-char *name;
-{
-	i6addr_t addr;
-
-	if (gethost(name, &addr, 0) == -1) {
-		return 0;
-	}
-	return addr.in4_addr;
-}

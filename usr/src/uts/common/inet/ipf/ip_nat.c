@@ -145,8 +145,6 @@ static	int	nat_clearlist __P((ipf_stack_t *));
 static	void	nat_addnat __P((struct ipnat *, ipf_stack_t *));
 static	void	nat_addrdr __P((struct ipnat *, ipf_stack_t *));
 static	void	nat_delete __P((struct nat *, int, ipf_stack_t *));
-static	void	nat_delrdr __P((struct ipnat *));
-static	void	nat_delnat __P((struct ipnat *));
 static	int	fr_natgetent __P((caddr_t, ipf_stack_t *));
 static	int	fr_natgetsz __P((caddr_t, ipf_stack_t *));
 static	int	fr_natputent __P((caddr_t, int, ipf_stack_t *));
@@ -158,17 +156,14 @@ static	hostmap_t *nat_hostmap __P((ipnat_t *, struct in_addr,
 				    struct in_addr, struct in_addr, u_32_t, 
 				    ipf_stack_t *));
 static	INLINE	int nat_icmpquerytype4 __P((int));
-static	int	nat_siocaddnat __P((ipnat_t *, ipnat_t **, int,
-				    ipf_stack_t *));
-static	void	nat_siocdelnat __P((ipnat_t *, ipnat_t **, int,
-				    ipf_stack_t *));
+static	int	nat_ruleaddrinit __P((ipnat_t *));
+static	int	nat_siocaddnat __P((ipnat_t *, ipnat_t **, int, ipf_stack_t *));
+static	void	nat_siocdelnat __P((ipnat_t *, ipnat_t **, int, ipf_stack_t *));
 static	INLINE	int nat_icmperrortype4 __P((int));
 static	INLINE	int nat_finalise __P((fr_info_t *, nat_t *, natinfo_t *,
 				      tcphdr_t *, nat_t **, int));
 static	INLINE	int nat_resolverule __P((ipnat_t *, ipf_stack_t *));
-static	nat_t	*fr_natclone __P((fr_info_t *, nat_t *));
 static	void	nat_mssclamp __P((tcphdr_t *, u_32_t, u_short *));
-static	INLINE	int nat_wildok __P((nat_t *, int, int, int, int));
 static	int	nat_getnext __P((ipftoken_t *, ipfgeniter_t *, ipf_stack_t *));
 static	int	nat_iterator __P((ipftoken_t *, ipfgeniter_t *, ipf_stack_t *));
 static	int	nat_extraflush __P((int, ipf_stack_t *));
@@ -394,7 +389,7 @@ ipf_stack_t *ifs;
 /*                                                                          */
 /* Removes a redirect rule from the hash table of redirect rules.           */
 /* ------------------------------------------------------------------------ */
-static void nat_delrdr(n)
+void nat_delrdr(n)
 ipnat_t *n;
 {
 	if (n->in_rnext)
@@ -410,7 +405,7 @@ ipnat_t *n;
 /*                                                                          */
 /* Removes a NAT map rule from the hash table of NAT map rules.             */
 /* ------------------------------------------------------------------------ */
-static void nat_delnat(n)
+void nat_delnat(n)
 ipnat_t *n;
 {
 	if (n->in_mnext != NULL)
@@ -479,6 +474,7 @@ ipf_stack_t *ifs;
 		hm->hm_mapip = map;
 		hm->hm_ref = 1;
 		hm->hm_port = port;
+		hm->hm_v = 4;
 	}
 	return hm;
 }
@@ -795,8 +791,27 @@ ipf_stack_t *ifs;
 			READ_ENTER(&ifs->ifs_ipf_nat);
 		}
 		error = fr_inobj(data, &nl, IPFOBJ_NATLOOKUP);
+		if (nl.nl_v != 6)
+			nl.nl_v = 4;
 		if (error == 0) {
-			if (nat_lookupredir(&nl, ifs) != NULL) {
+			void *ptr;
+
+			switch (nl.nl_v)
+			{
+			case 4:
+				ptr = nat_lookupredir(&nl, ifs);
+				break;
+#ifdef	USE_INET6
+			case 6:
+				ptr = nat6_lookupredir(&nl, ifs);
+				break;
+#endif
+			default:
+				ptr = NULL;
+				break;
+			}
+
+			if (ptr != NULL) {
 				error = fr_outobj(data, &nl, IPFOBJ_NATLOOKUP);
 			} else {
 				error = ESRCH;
@@ -943,6 +958,17 @@ ipf_stack_t *ifs;
 	} else
 		n->in_space = 1;
 
+#ifdef	USE_INET6
+	if (n->in_v == 6 && (n->in_flags & (IPN_IPRANGE|IPN_SPLIT)) == 0 &&
+	    !IP6_ISONES(&n->in_out[1]) && !IP6_ISZERO(&n->in_out[1]))
+		IP6_ADD(&n->in_out[0], 1, &n->in_next6)
+	else if (n->in_v == 6 &&
+	    (n->in_flags & IPN_SPLIT) && (n->in_redir & NAT_REDIRECT))
+		n->in_next6 = n->in_in[0];
+	else if (n->in_v == 6)
+		n->in_next6 = n->in_out[0];
+	else
+#endif
 	if ((n->in_outmsk != 0xffffffff) && (n->in_outmsk != 0) &&
 	    ((n->in_flags & (IPN_IPRANGE|IPN_SPLIT)) == 0))
 		n->in_nip = ntohl(n->in_outip) + 1;
@@ -951,6 +977,7 @@ ipf_stack_t *ifs;
 		n->in_nip = ntohl(n->in_inip);
 	else
 		n->in_nip = ntohl(n->in_outip);
+
 	if (n->in_redir & NAT_MAP) {
 		n->in_pnext = ntohs(n->in_pmin);
 		/*
@@ -1006,11 +1033,35 @@ ipf_stack_t *ifs;
 
 	if (n->in_redir & NAT_REDIRECT) {
 		n->in_flags &= ~IPN_NOTDST;
-		nat_addrdr(n, ifs);
+		switch (n->in_v)
+		{
+		case 4 :
+			nat_addrdr(n, ifs);
+			break;
+#ifdef	USE_INET6
+		case 6 :
+			nat6_addrdr(n, ifs);
+			break;
+#endif
+		default :
+			break;
+		}
 	}
 	if (n->in_redir & (NAT_MAP|NAT_MAPBLK)) {
 		n->in_flags &= ~IPN_NOTSRC;
-		nat_addnat(n, ifs);
+		switch (n->in_v)
+		{
+		case 4 :
+			nat_addnat(n, ifs);
+			break;
+#ifdef	USE_INET6
+		case 6 :
+			nat6_addnat(n, ifs);
+			break;
+#endif
+		default :
+			break;
+		}
 	}
 	n = NULL;
 	ifs->ifs_nat_stats.ns_rules++;
@@ -1038,14 +1089,14 @@ ipnat_t *n;
 ipf_stack_t *ifs;
 {
 	n->in_ifnames[0][LIFNAMSIZ - 1] = '\0';
-	n->in_ifps[0] = fr_resolvenic(n->in_ifnames[0], 4, ifs);
+	n->in_ifps[0] = fr_resolvenic(n->in_ifnames[0], n->in_v, ifs);
 
 	n->in_ifnames[1][LIFNAMSIZ - 1] = '\0';
 	if (n->in_ifnames[1][0] == '\0') {
 		(void) strncpy(n->in_ifnames[1], n->in_ifnames[0], LIFNAMSIZ);
 		n->in_ifps[1] = n->in_ifps[0];
 	} else {
-		n->in_ifps[1] = fr_resolvenic(n->in_ifnames[1], 4, ifs);
+		n->in_ifps[1] = fr_resolvenic(n->in_ifnames[1], n->in_v, ifs);
 	}
 
 	if (n->in_plabel[0] != '\0') {
@@ -1074,6 +1125,8 @@ ipnat_t *n, **np;
 int getlock;
 ipf_stack_t *ifs;
 {
+	int i;
+
 	if (getlock) {
 		WRITE_ENTER(&ifs->ifs_ipf_nat);
 	}
@@ -1084,6 +1137,10 @@ ipf_stack_t *ifs;
 	if (ifs->ifs_nat_list == NULL) {
 		ifs->ifs_nat_masks = 0;
 		ifs->ifs_rdr_masks = 0;
+		for (i = 0; i < 4; i++) {
+			ifs->ifs_nat6_masks[i] = 0;
+			ifs->ifs_rdr6_masks[i] = 0;
+		}
 	}
 
 	if (n->in_tqehead[0] != NULL) {
@@ -1329,7 +1386,7 @@ finished:
 /* header adjustment. It is by design see (IP_CKSUM_RECV() macro in ip.c).  */
 /*									    */
 /* ------------------------------------------------------------------------ */
-static void nat_calc_chksum_diffs(nat)
+void nat_calc_chksum_diffs(nat)
 nat_t *nat;
 {
 	u_32_t	sum_orig = 0;
@@ -1337,6 +1394,9 @@ nat_t *nat;
 	u_32_t	sumd;
 	u_32_t	ipsum_orig = 0;
 	u_32_t	ipsum_changed = 0;
+
+	if (nat->nat_v != 4 && nat->nat_v != 6)
+		return;
 
 	/*
 	 * the switch calculates operands for CALC_SUMD(),
@@ -1349,16 +1409,26 @@ nat_t *nat;
 		 * we are dealing with RDR rule (DST address gets
 		 * modified on packet from client)
 		 */
-		sum_changed = LONG_SUM(ntohl(nat->nat_inip.s_addr));
-		sum_orig = LONG_SUM(ntohl(nat->nat_outip.s_addr));
+		if (nat->nat_v == 4) {
+			sum_changed = LONG_SUM(ntohl(nat->nat_inip.s_addr));
+			sum_orig = LONG_SUM(ntohl(nat->nat_outip.s_addr));
+		} else {
+			sum_changed = LONG_SUM6(&nat->nat_inip6);
+			sum_orig = LONG_SUM6(&nat->nat_outip6);
+		}
 		break;
 	case NAT_OUTBOUND:
 		/* 
 		 * we are dealing with MAP rule (SRC address gets
 		 * modified on packet from client)
 		 */
-		sum_changed = LONG_SUM(ntohl(nat->nat_outip.s_addr));
-		sum_orig = LONG_SUM(ntohl(nat->nat_inip.s_addr));
+		if (nat->nat_v == 4) {
+			sum_changed = LONG_SUM(ntohl(nat->nat_outip.s_addr));
+			sum_orig = LONG_SUM(ntohl(nat->nat_inip.s_addr));
+		} else {
+			sum_changed = LONG_SUM6(&nat->nat_outip6);
+			sum_orig = LONG_SUM6(&nat->nat_inip6);
+		}
 		break;
 	default: ;
 		break;
@@ -1386,24 +1456,34 @@ nat_t *nat;
 		switch (nat->nat_dir) 
 		{
 		case NAT_INBOUND:
-			sum_changed = LONG_SUM(
-					ntohl(nat->nat_inip.s_addr) +
-					ntohs(nat->nat_inport)
-				    );
-			sum_orig = LONG_SUM(
-					ntohl(nat->nat_outip.s_addr) +
-					ntohs(nat->nat_outport)
-				    );
+			if (nat->nat_v == 4) {
+				sum_changed = LONG_SUM(
+				    ntohl(nat->nat_inip.s_addr) +
+				    ntohs(nat->nat_inport));
+				sum_orig = LONG_SUM(
+				    ntohl(nat->nat_outip.s_addr) +
+				    ntohs(nat->nat_outport));
+			} else {
+				sum_changed = LONG_SUM6(&nat->nat_inip6) +
+				    ntohs(nat->nat_inport);
+				sum_orig = LONG_SUM6(&nat->nat_outip6) +
+				    ntohs(nat->nat_outport);
+			}
 			break;
 		case NAT_OUTBOUND:
-			sum_changed = LONG_SUM(
-					ntohl(nat->nat_outip.s_addr) +
-					ntohs(nat->nat_outport)
-				);
-			sum_orig = LONG_SUM(
-					ntohl(nat->nat_inip.s_addr) +
-					ntohs(nat->nat_inport)
-				);
+			if (nat->nat_v == 4) {
+				sum_changed = LONG_SUM(
+				    ntohl(nat->nat_outip.s_addr) +
+				    ntohs(nat->nat_outport));
+				sum_orig = LONG_SUM(
+				    ntohl(nat->nat_inip.s_addr) +
+				    ntohs(nat->nat_inport));
+			} else {
+				sum_changed = LONG_SUM6(&nat->nat_outip6) +
+				    ntohs(nat->nat_outport);
+				sum_orig = LONG_SUM6(&nat->nat_inip6) +
+				    ntohs(nat->nat_inport);
+			}
 			break;
 		default: ;
 			break;
@@ -1427,27 +1507,28 @@ nat_t *nat;
 	 * we may reuse the already computed nat_sumd[0] for IP header chksum
 	 * adjustment in case the L4 (TCP/UDP header) is not changed by NAT.
 	 */
-	if (NAT_HAS_L4_CHANGED(nat)) {
-		/*
-		 * bad luck, NAT changes also the L4 header, use IP addresses
-		 * to compute chksum adjustment for IP header. 
-		 */
-		CALC_SUMD(ipsum_orig, ipsum_changed, sumd);
-		nat->nat_ipsumd = (sumd & 0xffff) + (sumd >> 16);
-	}
-	else {
-		/* 
-		 * the NAT does not change L4 hdr -> reuse chksum adjustment
-		 * for IP hdr.
-		 */
-		nat->nat_ipsumd = nat->nat_sumd[0];
+	if (nat->nat_v == 4) {
+		if (NAT_HAS_L4_CHANGED(nat)) {
+			/*
+			 * bad luck, NAT changes also the L4 header, use IP
+			 * addresses to compute chksum adjustment for IP header.
+			 */
+			CALC_SUMD(ipsum_orig, ipsum_changed, sumd);
+			nat->nat_ipsumd = (sumd & 0xffff) + (sumd >> 16);
+		} else {
+			/*
+			 * the NAT does not change L4 hdr -> reuse chksum
+			 * adjustment for IP hdr.
+			 */
+			nat->nat_ipsumd = nat->nat_sumd[0];
 
-		/*
-		 * if L4 header does not use chkusm - zero out deltas
-		 */
-		if (!(nat->nat_flags & IPN_TCPUDPICMP)) {
-			nat->nat_sumd[0] = 0;
-			nat->nat_sumd[1] = 0;
+			/*
+			 * if L4 header does not use chksum - zero out deltas
+			 */
+			if (!(nat->nat_flags & IPN_TCPUDP)) {
+				nat->nat_sumd[0] = 0;
+				nat->nat_sumd[1] = 0;
+			}
 		}
 	}
 
@@ -1564,6 +1645,8 @@ ipf_stack_t *ifs;
 	/*
 	 * Check that the NAT entry doesn't already exist in the kernel.
 	 */
+	if (nat->nat_v != 6)
+		nat->nat_v = 4;
 	bzero((char *)&fin, sizeof(fin));
 	fin.fin_p = nat->nat_p;
 	fin.fin_ifs = ifs;
@@ -1574,8 +1657,25 @@ ipf_stack_t *ifs;
 		if (getlock) {
 			READ_ENTER(&ifs->ifs_ipf_nat);
 		}
-		n = nat_inlookup(&fin, nat->nat_flags, fin.fin_p,
-			nat->nat_oip, nat->nat_outip);
+
+		switch (nat->nat_v)
+		{
+		case 4:
+			fin.fin_v = nat->nat_v;
+			n = nat_inlookup(&fin, nat->nat_flags, fin.fin_p,
+			    nat->nat_oip, nat->nat_outip);
+			break;
+#ifdef USE_INET6
+		case 6:
+			n = nat6_inlookup(&fin, nat->nat_flags, fin.fin_p,
+			    &nat->nat_oip6.in6, &nat->nat_outip6.in6);
+			break;
+#endif
+		default:
+			n = NULL;
+			break;
+		}
+
 		if (getlock) {
 			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 		}
@@ -1590,8 +1690,24 @@ ipf_stack_t *ifs;
 		if (getlock) {
 			READ_ENTER(&ifs->ifs_ipf_nat);
 		}
-		n = nat_outlookup(&fin, nat->nat_flags, fin.fin_p,
-			nat->nat_inip, nat->nat_oip);
+
+		switch (nat->nat_v)
+		{
+		case 4:
+			n = nat_outlookup(&fin, nat->nat_flags, fin.fin_p,
+			    nat->nat_inip, nat->nat_oip);
+			break;
+#ifdef USE_INET6
+		case 6:
+			n = nat6_outlookup(&fin, nat->nat_flags, fin.fin_p,
+			    &nat->nat_inip6.in6, &nat->nat_oip6.in6);
+			break;
+#endif
+		default:
+			n = NULL;
+			break;
+		}
+
 		if (getlock) {
 			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 		}
@@ -1696,7 +1812,23 @@ ipf_stack_t *ifs;
 	if (getlock) {
 		WRITE_ENTER(&ifs->ifs_ipf_nat);
 	}
-	error = nat_insert(nat, nat->nat_rev, ifs);
+
+	nat_calc_chksum_diffs(nat);
+
+	switch (nat->nat_v)
+	{
+	case 4 :
+		error = nat_insert(nat, nat->nat_rev, ifs);
+		break;
+#ifdef USE_INET6
+	case 6 :
+		error = nat6_insert(nat, nat->nat_rev, ifs);
+		break;
+#endif
+	default :
+		break;
+	}
+
 	if ((error == 0) && (aps != NULL)) {
 		aps->aps_next = ifs->ifs_ap_sess_list;
 		ifs->ifs_ap_sess_list = aps;
@@ -1926,6 +2058,10 @@ ipf_stack_t *ifs;
 	}
 	ifs->ifs_nat_masks = 0;
 	ifs->ifs_rdr_masks = 0;
+	for (i = 0; i < 4; i++) {
+		ifs->ifs_nat6_masks[i] = 0;
+		ifs->ifs_rdr6_masks[i] = 0;
+	}
 	return i;
 }
 
@@ -2561,6 +2697,7 @@ int direction;
 	nat->nat_ifps[1] = np->in_ifps[1];
 	nat->nat_ptr = np;
 	nat->nat_p = fin->fin_p;
+	nat->nat_v = fin->fin_v;
 	nat->nat_mssclamp = np->in_mssclamp;
 	fr = fin->fin_fr;
 	nat->nat_fr = fr;
@@ -3152,6 +3289,9 @@ struct in_addr src , mapdst;
 	hv = NAT_HASH_FN(src.s_addr, hv + sport, ifs->ifs_ipf_nattable_sz);
 	nat = ifs->ifs_nat_table[1][hv];
 	for (; nat; nat = nat->nat_hnext[1]) {
+		if (nat->nat_v != 4)
+			continue;
+
 		if (nat->nat_ifps[0] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[0]))
 				continue;
@@ -3223,6 +3363,9 @@ find_in_wild_ports:
 
 	nat = ifs->ifs_nat_table[1][hv];
 	for (; nat; nat = nat->nat_hnext[1]) {
+		if (nat->nat_v != 4)
+			continue;
+
 		if (nat->nat_ifps[0] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[0]))
 				continue;
@@ -3397,6 +3540,9 @@ struct in_addr src , dst;
 	hv = NAT_HASH_FN(dst.s_addr, hv + dport, ifs->ifs_ipf_nattable_sz);
 	nat = ifs->ifs_nat_table[0][hv];
 	for (; nat; nat = nat->nat_hnext[0]) {
+		if (nat->nat_v != 4)
+			continue;
+
 		if (nat->nat_ifps[1] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[1]))
 				continue;
@@ -3458,6 +3604,9 @@ find_out_wild_ports:
 
 	nat = ifs->ifs_nat_table[0][hv];
 	for (; nat; nat = nat->nat_hnext[0]) {
+		if (nat->nat_v != 4)
+			continue;
+
 		if (nat->nat_ifps[1] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[1]))
 				continue;
@@ -3878,12 +4027,16 @@ u_32_t nflags;
 	int i;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
+	if (fin->fin_v == 6) {
+#ifdef	USE_INET6
+		return fr_nat6out(fin, nat, natadd, nflags);
+#else
+		return NULL;
+#endif
+	}
+
 #if SOLARIS && defined(_KERNEL)
-	net_data_t net_data_p;
-	if (fin->fin_v == 4)
-		net_data_p = ifs->ifs_ipf_ipv4;
-	else
-		net_data_p = ifs->ifs_ipf_ipv6;
+	net_data_t net_data_p = ifs->ifs_ipf_ipv4;
 #endif
 
 	tcp = NULL;
@@ -4198,12 +4351,16 @@ u_32_t nflags;
 	int i;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
+	if (fin->fin_v == 6) {
+#ifdef	USE_INET6
+		return fr_nat6in(fin, nat, natadd, nflags);
+#else
+		return NULL;
+#endif
+	}
+
 #if SOLARIS && defined(_KERNEL)
-	net_data_t net_data_p;
-	if (fin->fin_v == 4)
-		net_data_p = ifs->ifs_ipf_ipv4;
-	else
-		net_data_p = ifs->ifs_ipf_ipv6;
+	net_data_t net_data_p = ifs->ifs_ipf_ipv4;
 #endif
 
 	tcp = NULL;
@@ -4342,6 +4499,7 @@ nat_t *nat;
 u_int nflags;
 {
 	icmphdr_t *icmp;
+	struct icmp6_hdr *icmp6;
 	u_short *csump;
 	tcphdr_t *tcp;
 	udphdr_t *udp;
@@ -4382,6 +4540,15 @@ u_int nflags;
 		if ((nflags & IPN_ICMPQUERY) != 0) {
 			if (icmp->icmp_cksum != 0)
 				csump = &icmp->icmp_cksum;
+		}
+		break;
+
+	case IPPROTO_ICMPV6 :
+		icmp6 = fin->fin_dp;
+
+		if ((nflags & IPN_ICMPQUERY) != 0) {
+			if (icmp6->icmp6_cksum != 0)
+				csump = &icmp6->icmp6_cksum;
 		}
 		break;
 	}
@@ -4542,9 +4709,10 @@ ipf_stack_t *ifs;
 /* matches the one passed in) and change it, recalculating the checksum sum */
 /* difference too.                                                          */
 /* ------------------------------------------------------------------------ */
-void fr_nataddrsync(ifp, addr, ifs)
+void fr_nataddrsync(v, ifp, addr, ifs)
+int v;
 void *ifp;
-struct in_addr *addr;
+void *addr;
 ipf_stack_t *ifs;
 {
 	u_32_t sum1, sum2, sumd;
@@ -4574,32 +4742,59 @@ ipf_stack_t *ifs;
 			if (((ifp != NULL) && ifp != (nat->nat_ifps[0])) ||
 			    ((nat->nat_flags & IPN_TCP) != 0))
 				continue;
-			if (((np = nat->nat_ptr) == NULL) ||
-			    (np->in_nip || (np->in_outmsk != 0xffffffff)))
+			if ((np = nat->nat_ptr) == NULL)
+				continue;
+			if (v == 4 && np->in_v == 4) {
+				if (np->in_nip || np->in_outmsk != 0xffffffff)
+					continue;
+				/*
+				 * Change the map-to address to be the same as
+				 * the new one.
+				 */
+				sum1 = nat->nat_outip.s_addr;
+				nat->nat_outip = *(struct in_addr *)addr;
+				sum2 = nat->nat_outip.s_addr;
+			} else if (v == 6 && np->in_v == 6) {
+				if (!IP6_ISZERO(&np->in_next6.in6) ||
+				    !IP6_ISONES(&np->in_out[1].in6))
+					continue;
+				/*
+				 * Change the map-to address to be the same as
+				 * the new one.
+				 */
+				nat->nat_outip6.in6 = *(struct in6_addr *)addr;
+			} else
 				continue;
 
-			/*
-			 * Change the map-to address to be the same as the
-			 * new one.
-			 */
-			sum1 = nat->nat_outip.s_addr;
-			nat->nat_outip = *addr;
-			sum2 = nat->nat_outip.s_addr;
-
 		} else if (((ifp == NULL) || (ifp == nat->nat_ifps[0])) &&
-		    !(nat->nat_flags & IPN_TCP) && (np = nat->nat_ptr) &&
-		    (np->in_outmsk == 0xffffffff) && !np->in_nip) {
-			struct in_addr in;
-
-			/*
-			 * Change the map-to address to be the same as the
-			 * new one.
-			 */
-			sum1 = nat->nat_outip.s_addr;
-			if (fr_ifpaddr(4, FRI_NORMAL, nat->nat_ifps[0],
-				       &in, NULL, ifs) != -1)
-				nat->nat_outip = in;
-			sum2 = nat->nat_outip.s_addr;
+		    !(nat->nat_flags & IPN_TCP) && (np = nat->nat_ptr)) {
+			if (np->in_v == 4 && (v == 4 || v == 0)) {
+				struct in_addr in;
+				if (np->in_outmsk != 0xffffffff || np->in_nip)
+					continue;
+				/*
+				 * Change the map-to address to be the same as
+				 * the new one.
+				 */
+				sum1 = nat->nat_outip.s_addr;
+				if (fr_ifpaddr(4, FRI_NORMAL, nat->nat_ifps[0],
+					       &in, NULL, ifs) != -1)
+					nat->nat_outip = in;
+				sum2 = nat->nat_outip.s_addr;
+			} else if (np->in_v == 6 && (v == 6 || v == 0)) {
+				struct in6_addr in6;
+				if (!IP6_ISZERO(&np->in_next6.in6) ||
+				    !IP6_ISONES(&np->in_out[1].in6))
+					continue;
+				/*
+				 * Change the map-to address to be the same as
+				 * the new one.
+				 */
+				if (fr_ifpaddr(6, FRI_NORMAL, nat->nat_ifps[0],
+					       (void *)&in6, NULL, ifs) != -1)
+					nat->nat_outip6.in6 = in6;
+			} else
+				continue;
 		} else {
 			continue;
 		}
@@ -4638,8 +4833,8 @@ ipf_stack_t *ifs;
 /* "name" and for "action == IPFSYNC_OLDIFP", ifp is a pointer for which    */
 /* there is no longer any interface associated with it.                     */
 /* ------------------------------------------------------------------------ */
-void fr_natifpsync(action, ifp, name, ifs)
-int action;
+void fr_natifpsync(action, v, ifp, name, ifs)
+int action, v;
 void *ifp;
 char *name;
 ipf_stack_t *ifs;
@@ -4649,6 +4844,7 @@ ipf_stack_t *ifs;
 #endif
 	nat_t *nat;
 	ipnat_t *n;
+	int nv;
 
 	if (ifs->ifs_fr_running <= 0)
 		return;
@@ -4665,34 +4861,42 @@ ipf_stack_t *ifs;
 	{
 	case IPFSYNC_RESYNC :
 		for (nat = ifs->ifs_nat_instances; nat; nat = nat->nat_next) {
+			nv = (v == 0) ? nat->nat_v : v;
+			if (nat->nat_v != nv)
+				continue;
 			if ((ifp == nat->nat_ifps[0]) ||
 			    (nat->nat_ifps[0] == (void *)-1)) {
 				nat->nat_ifps[0] =
-				    fr_resolvenic(nat->nat_ifnames[0], 4, ifs);
+				    fr_resolvenic(nat->nat_ifnames[0], nv, ifs);
 			}
 
 			if ((ifp == nat->nat_ifps[1]) ||
 			    (nat->nat_ifps[1] == (void *)-1)) {
 				nat->nat_ifps[1] =
-				    fr_resolvenic(nat->nat_ifnames[1], 4, ifs);
+				    fr_resolvenic(nat->nat_ifnames[1], nv, ifs);
 			}
 		}
 
 		for (n = ifs->ifs_nat_list; (n != NULL); n = n->in_next) {
+			nv = (v == 0) ? (int)n->in_v : v;
+			if ((int)n->in_v != nv)
+				continue;
 			if (n->in_ifps[0] == ifp ||
 			    n->in_ifps[0] == (void *)-1) {
 				n->in_ifps[0] =
-				    fr_resolvenic(n->in_ifnames[0], 4, ifs);
+				    fr_resolvenic(n->in_ifnames[0], nv, ifs);
 			}
 			if (n->in_ifps[1] == ifp ||
 			    n->in_ifps[1] == (void *)-1) {
 				n->in_ifps[1] =
-				    fr_resolvenic(n->in_ifnames[1], 4, ifs);
+				    fr_resolvenic(n->in_ifnames[1], nv, ifs);
 			}
 		}
 		break;
 	case IPFSYNC_NEWIFP :
 		for (nat = ifs->ifs_nat_instances; nat; nat = nat->nat_next) {
+			if (nat->nat_v != v)
+				continue;
 			if (!strncmp(name, nat->nat_ifnames[0],
 				     sizeof(nat->nat_ifnames[0])))
 				nat->nat_ifps[0] = ifp;
@@ -4701,6 +4905,8 @@ ipf_stack_t *ifs;
 				nat->nat_ifps[1] = ifp;
 		}
 		for (n = ifs->ifs_nat_list; (n != NULL); n = n->in_next) {
+			if ((int)n->in_v != v)
+				continue;
 			if (!strncmp(name, n->in_ifnames[0],
 				     sizeof(n->in_ifnames[0])))
 				n->in_ifps[0] = ifp;
@@ -4711,12 +4917,16 @@ ipf_stack_t *ifs;
 		break;
 	case IPFSYNC_OLDIFP :
 		for (nat = ifs->ifs_nat_instances; nat; nat = nat->nat_next) {
+			if (nat->nat_v != v)
+				continue;
 			if (ifp == nat->nat_ifps[0])
 				nat->nat_ifps[0] = (void *)-1;
 			if (ifp == nat->nat_ifps[1])
 				nat->nat_ifps[1] = (void *)-1;
 		}
 		for (n = ifs->ifs_nat_list; (n != NULL); n = n->in_next) {
+			if ((int)n->in_v != v)
+				continue;
 			if (n->in_ifps[0] == ifp)
 				n->in_ifps[0] = (void *)-1;
 			if (n->in_ifps[1] == ifp)
@@ -4794,25 +5004,26 @@ ipf_stack_t *ifs;
 	size_t sizes[1];
 	int types[1];
 
-	natl.nl_inip = nat->nat_inip;
-	natl.nl_outip = nat->nat_outip;
-	natl.nl_origip = nat->nat_oip;
-	natl.nl_bytes[0] = nat->nat_bytes[0];
-	natl.nl_bytes[1] = nat->nat_bytes[1];
-	natl.nl_pkts[0] = nat->nat_pkts[0];
-	natl.nl_pkts[1] = nat->nat_pkts[1];
-	natl.nl_origport = nat->nat_oport;
-	natl.nl_inport = nat->nat_inport;
-	natl.nl_outport = nat->nat_outport;
-	natl.nl_p = nat->nat_p;
-	natl.nl_type = type;
-	natl.nl_rule = -1;
+	natl.nlg_inip = nat->nat_inip6;
+	natl.nlg_outip = nat->nat_outip6;
+	natl.nlg_origip = nat->nat_oip6;
+	natl.nlg_bytes[0] = nat->nat_bytes[0];
+	natl.nlg_bytes[1] = nat->nat_bytes[1];
+	natl.nlg_pkts[0] = nat->nat_pkts[0];
+	natl.nlg_pkts[1] = nat->nat_pkts[1];
+	natl.nlg_origport = nat->nat_oport;
+	natl.nlg_inport = nat->nat_inport;
+	natl.nlg_outport = nat->nat_outport;
+	natl.nlg_p = nat->nat_p;
+	natl.nlg_type = type;
+	natl.nlg_rule = -1;
+	natl.nlg_v = nat->nat_v;
 # ifndef LARGE_NAT
 	if (nat->nat_ptr != NULL) {
 		for (rulen = 0, np = ifs->ifs_nat_list; np;
 		     np = np->in_next, rulen++)
 			if (np == nat->nat_ptr) {
-				natl.nl_rule = rulen;
+				natl.nlg_rule = rulen;
 				break;
 			}
 	}
@@ -4925,7 +5136,7 @@ ipf_stack_t *ifs;
 /*                                                                          */
 /* Create a "duplcate" state table entry from the master.                   */
 /* ------------------------------------------------------------------------ */
-static nat_t *fr_natclone(fin, nat)
+nat_t *fr_natclone(fin, nat)
 fr_info_t *fin;
 nat_t *nat;
 {
@@ -5004,7 +5215,7 @@ nat_t *nat;
 /* Use NAT entry and packet direction to determine which combination of     */
 /* wildcard flags should be used.                                           */
 /* ------------------------------------------------------------------------ */
-static INLINE int nat_wildok(nat, sport, dport, flags, dir)
+int nat_wildok(nat, sport, dport, flags, dir)
 nat_t *nat;
 int sport;
 int dport;

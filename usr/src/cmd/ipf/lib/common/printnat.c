@@ -1,11 +1,11 @@
 /*
- * Copyright (C) 1993-2001 by Darren Reed.
+ * Copyright (C) 2002-2005 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * Added redirect stuff and a variety of bug fixes. (mcn@EnGarde.com)
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,7 +27,9 @@ ipnat_t *np;
 int opts;
 {
 	struct	protoent	*pr;
-	int	bits;
+	int	bits, af;
+	char	ipbuf[INET6_ADDRSTRLEN];
+	void	*ptr;
 
 	pr = getprotobynumber(np->in_p);
 
@@ -63,11 +65,11 @@ int opts;
 			printf("! ");
 		printf("from ");
 		if (np->in_redir == NAT_REDIRECT) {
-			printhostmask(4, (u_32_t *)&np->in_srcip,
-				      (u_32_t *)&np->in_srcmsk);
+			printhostmask(np->in_v, (u_32_t *)&np->in_src[0],
+				      (u_32_t *)&np->in_src[1]);
 		} else {
-			printhostmask(4, (u_32_t *)&np->in_inip,
-				      (u_32_t *)&np->in_inmsk);
+			printhostmask(np->in_v, (u_32_t *)&np->in_in[0],
+				      (u_32_t *)&np->in_in[1]);
 		}
 		if (np->in_scmp)
 			printportcmp(np->in_p, &np->in_tuc.ftu_src);
@@ -76,37 +78,46 @@ int opts;
 			printf(" !");
 		printf(" to ");
 		if (np->in_redir == NAT_REDIRECT) {
-			printhostmask(4, (u_32_t *)&np->in_outip,
-				      (u_32_t *)&np->in_outmsk);
+			printhostmask(np->in_v, (u_32_t *)&np->in_out[0],
+				      (u_32_t *)&np->in_out[1]);
 		} else {
-			printhostmask(4, (u_32_t *)&np->in_srcip,
-				      (u_32_t *)&np->in_srcmsk);
+			printhostmask(np->in_v, (u_32_t *)&np->in_src[0],
+				      (u_32_t *)&np->in_src[1]);
 		}
 		if (np->in_dcmp)
 			printportcmp(np->in_p, &np->in_tuc.ftu_dst);
 	}
 
+	if (np->in_v == 4)
+		af = AF_INET;
+	else if (np->in_v == 6)
+		af = AF_INET6;
+	else
+		af = 0;
+
 	if (np->in_redir == NAT_REDIRECT) {
 		if (!(np->in_flags & IPN_FILTER)) {
-			printf("%s", inet_ntoa(np->in_out[0].in4));
-			bits = count4bits(np->in_outmsk);
-			if (bits != -1)
-				printf("/%d", bits);
-			else
-				printf("/%s", inet_ntoa(np->in_out[1].in4));
+			ptr = (void *)(u_32_t *)&np->in_out[0];
+			printf("%s", inet_ntop(af, ptr, ipbuf, sizeof (ipbuf)));
+			printmask(np->in_v, (u_32_t *)&np->in_out[1]);
 			if (np->in_flags & IPN_TCPUDP) {
 				printf(" port %d", ntohs(np->in_pmin));
 				if (np->in_pmax != np->in_pmin)
 					printf("-%d", ntohs(np->in_pmax));
 			}
 		}
-		printf(" -> %s", inet_ntoa(np->in_in[0].in4));
-		if (np->in_flags & IPN_SPLIT)
-			printf(",%s", inet_ntoa(np->in_in[1].in4));
-		if (np->in_inip == 0) {
-			bits = count4bits(np->in_inmsk);
-			printf("/%d", bits);
+		printf(" -> ");
+		ptr = (void *)(u_32_t *)&np->in_in[0];
+		printf("%s", inet_ntop(af, ptr, ipbuf, sizeof (ipbuf)));
+		if (np->in_flags & IPN_SPLIT) {
+			printf(",");
+			ptr = (void *)(u_32_t *)&np->in_in[1];
+			printf("%s", inet_ntop(af, ptr, ipbuf, sizeof (ipbuf)));
 		}
+		if (((np->in_v == 4) && (np->in_inip == 0)) ||
+		    ((np->in_v == 6) && IP6_ISZERO(&np->in_in[0])))
+			printmask(np->in_v, (u_32_t *)&np->in_in[1]);
+
 		if (np->in_flags & IPN_TCPUDP) {
 			if ((np->in_flags & IPN_FIXEDDPORT) != 0)
 				printf(" port = %d", ntohs(np->in_pnext));
@@ -127,7 +138,7 @@ int opts;
 		if (np->in_mssclamp != 0)
 			printf(" mssclamp %d", np->in_mssclamp);
 		if (*np->in_plabel != '\0')
-			printf(" proxy %.*s", (int)sizeof(np->in_plabel),
+			printf(" proxy %.*s", (int)sizeof (np->in_plabel),
 				np->in_plabel);
 		if (np->in_tag.ipt_tag[0] != '\0')
 			printf(" tag %-.*s", IPFTAG_LEN, np->in_tag.ipt_tag);
@@ -136,24 +147,22 @@ int opts;
 			printf("\tpmax %u\n", np->in_pmax);
 	} else {
 		if (!(np->in_flags & IPN_FILTER)) {
-			printf("%s/", inet_ntoa(np->in_in[0].in4));
-			bits = count4bits(np->in_inmsk);
-			if (bits != -1)
-				printf("%d", bits);
-			else
-				printf("%s", inet_ntoa(np->in_in[1].in4));
+			ptr = (void *)(u_32_t *)&np->in_in[0];
+			printf("%s", inet_ntop(af, ptr, ipbuf, sizeof (ipbuf)));
+			printmask(np->in_v, (u_32_t *)&np->in_in[1]);
 		}
 		printf(" -> ");
 		if (np->in_flags & IPN_IPRANGE) {
-			printf("range %s-", inet_ntoa(np->in_out[0].in4));
-			printf("%s", inet_ntoa(np->in_out[1].in4));
+			printf("range ");
+			ptr = (void *)(u_32_t *)&np->in_out[0];
+			printf("%s", inet_ntop(af, ptr, ipbuf, sizeof (ipbuf)));
+			printf("-");
+			ptr = (void *)(u_32_t *)&np->in_out[1];
+			printf("%s", inet_ntop(af, ptr, ipbuf, sizeof (ipbuf)));
 		} else {
-			printf("%s/", inet_ntoa(np->in_out[0].in4));
-			bits = count4bits(np->in_outmsk);
-			if (bits != -1)
-				printf("%d", bits);
-			else
-				printf("%s", inet_ntoa(np->in_out[1].in4));
+			ptr = (void *)(u_32_t *)&np->in_out[0];
+			printf("%s", inet_ntop(af, ptr, ipbuf, sizeof (ipbuf)));
+			printmask(np->in_v, (u_32_t *)&np->in_out[1]);
 		}
 		if (*np->in_plabel != '\0') {
 			printf(" proxy port ");
@@ -168,7 +177,7 @@ int opts;
 				else
 					fputs("???", stdout);
 			}
-			printf(" %.*s/", (int)sizeof(np->in_plabel),
+			printf(" %.*s/", (int)sizeof (np->in_plabel),
 				np->in_plabel);
 			printproto(pr, np->in_p, NULL);
 		} else if (np->in_redir == NAT_MAPBLK) {

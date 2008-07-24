@@ -6,7 +6,7 @@
  * @(#)ipf.h	1.12 6/5/96
  * $Id: ipf.h,v 2.71.2.7 2005/06/12 07:18:31 darrenr Exp $
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -250,6 +250,7 @@ extern int ports __P((char ***, char *, u_short *, int *, u_short *, int));
 extern int pri_findname __P((char *));
 extern char *pri_toname __P((int));
 extern void print_toif __P((char *, struct frdest *));
+extern void printaddr __P((int, int, char *, u_32_t *, u_32_t *));
 extern void printaps __P((ap_session_t *, int));
 extern void printbuf __P((char *, int, int));
 extern void printfr __P((struct frentry *, ioctlfunc_t));
@@ -298,6 +299,7 @@ extern char *hostname __P((int, void *));
 extern struct ipstate *printstate __P((struct ipstate *, int, u_long));
 extern void printsbuf __P((char *));
 extern void printnat __P((struct ipnat *, int));
+extern void printactiveaddress __P((int, char *, i6addr_t *, char *));
 extern void printactivenat __P((struct nat *, int, int));
 extern void printhostmap __P((struct hostmap *, u_int));
 extern void printpacket __P((struct ip *));

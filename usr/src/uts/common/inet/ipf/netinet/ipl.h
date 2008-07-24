@@ -6,7 +6,7 @@
  * @(#)ipl.h	1.21 6/5/96
  * $Id: ipl.h,v 2.52.2.10 2005/08/13 05:42:49 darrenr Exp $
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -18,6 +18,6 @@
 
 #define	IPL_VERSION	"IP Filter: v4.1.9"
 
-#define	IPFILTER_VERSION	4010900
+#define	IPFILTER_VERSION	4010901
 
 #endif

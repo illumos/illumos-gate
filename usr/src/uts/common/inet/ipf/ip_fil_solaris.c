@@ -733,8 +733,8 @@ int *rp;
 			WRITE_ENTER(&ifs->ifs_ipf_global);
 
 			frsync(IPFSYNC_RESYNC, 0, NULL, NULL, ifs);
-			fr_natifpsync(IPFSYNC_RESYNC, NULL, NULL, ifs);
-			fr_nataddrsync(NULL, NULL, ifs);
+			fr_natifpsync(IPFSYNC_RESYNC, 0, NULL, NULL, ifs);
+			fr_nataddrsync(0, NULL, NULL, ifs);
 			fr_statesync(IPFSYNC_RESYNC, 0, NULL, NULL, ifs);
 			error = 0;
 		}
@@ -1010,8 +1010,8 @@ fr_info_t *fin;
 	if (fin->fin_v == 6) {
 		ip6 = (ip6_t *)m->b_rptr;
 		ip6->ip6_flow = ((ip6_t *)fin->fin_ip)->ip6_flow;
-		ip6->ip6_src = fin->fin_dst6;
-		ip6->ip6_dst = fin->fin_src6;
+		ip6->ip6_src = fin->fin_dst6.in6;
+		ip6->ip6_dst = fin->fin_src6.in6;
 		ip6->ip6_plen = htons(sizeof(*tcp));
 		ip6->ip6_nxt = IPPROTO_TCP;
 		tcp2->th_sum = fr_cksum(m, (ip_t *)ip6, IPPROTO_TCP, tcp2);
@@ -1224,7 +1224,7 @@ int dst;
 				return -1;
 			}
 		} else
-			dst6 = fin->fin_dst6;
+			dst6 = fin->fin_dst6.in6;
 
 		csz = sz;
 		sz -= sizeof(ip6_t);
@@ -1233,7 +1233,7 @@ int dst;
 		ip6->ip6_plen = htons((u_short)sz);
 		ip6->ip6_nxt = IPPROTO_ICMPV6;
 		ip6->ip6_src = dst6;
-		ip6->ip6_dst = fin->fin_src6;
+		ip6->ip6_dst = fin->fin_src6.in6;
 		sz -= offsetof(struct icmp, icmp_ip);
 		bcopy((char *)mb->b_rptr, (char *)&icmp->icmp_ip, sz);
 		icmp->icmp_cksum = csz - sizeof(ip6_t);
@@ -2034,8 +2034,8 @@ int ipf_nic_event_v4(hook_event_token_t event, hook_data_t info,
 	{
 	case NE_PLUMB :
 		frsync(IPFSYNC_NEWIFP, 4, (void *)hn->hne_nic, hn->hne_data,
-		    ifs);
-		fr_natifpsync(IPFSYNC_NEWIFP, (void *)hn->hne_nic,
+		       ifs);
+		fr_natifpsync(IPFSYNC_NEWIFP, 4, (void *)hn->hne_nic,
 			      hn->hne_data, ifs);
 		fr_statesync(IPFSYNC_NEWIFP, 4, (void *)hn->hne_nic,
 			     hn->hne_data, ifs);
@@ -2043,7 +2043,8 @@ int ipf_nic_event_v4(hook_event_token_t event, hook_data_t info,
 
 	case NE_UNPLUMB :
 		frsync(IPFSYNC_OLDIFP, 4, (void *)hn->hne_nic, NULL, ifs);
-		fr_natifpsync(IPFSYNC_OLDIFP, (void *)hn->hne_nic, NULL, ifs);
+		fr_natifpsync(IPFSYNC_OLDIFP, 4, (void *)hn->hne_nic, NULL,
+			      ifs);
 		fr_statesync(IPFSYNC_OLDIFP, 4, (void *)hn->hne_nic, NULL, ifs);
 		break;
 
@@ -2059,7 +2060,7 @@ int ipf_nic_event_v4(hook_event_token_t event, hook_data_t info,
 			frsync(IPFSYNC_RESYNC, 4, (void *)hn->hne_nic, NULL,
 			    ifs);
 			sin = hn->hne_data;
-			fr_nataddrsync((void *)hn->hne_nic, &sin->sin_addr,
+			fr_nataddrsync(4, (void *)hn->hne_nic, &sin->sin_addr,
 			    ifs);
 		}
 		break;
@@ -2084,6 +2085,7 @@ int ipf_nic_event_v4(hook_event_token_t event, hook_data_t info,
 int ipf_nic_event_v6(hook_event_token_t event, hook_data_t info,
     netstack_t *ns)
 {
+	struct sockaddr_in6 *sin6;
 	hook_nic_event_t *hn;
 	ipf_stack_t *ifs = ns->netstack_ipf;
 
@@ -2092,17 +2094,27 @@ int ipf_nic_event_v6(hook_event_token_t event, hook_data_t info,
 	switch (hn->hne_event)
 	{
 	case NE_PLUMB :
-		frsync(IPFSYNC_NEWIFP, 6, (void *)hn->hne_nic, hn->hne_data, ifs);
+		frsync(IPFSYNC_NEWIFP, 6, (void *)hn->hne_nic,
+		       hn->hne_data, ifs);
+		fr_natifpsync(IPFSYNC_NEWIFP, 6, (void *)hn->hne_nic,
+			      hn->hne_data, ifs);
 		fr_statesync(IPFSYNC_NEWIFP, 6, (void *)hn->hne_nic,
 			     hn->hne_data, ifs);
 		break;
 
 	case NE_UNPLUMB :
 		frsync(IPFSYNC_OLDIFP, 6, (void *)hn->hne_nic, NULL, ifs);
+		fr_natifpsync(IPFSYNC_OLDIFP, 6, (void *)hn->hne_nic, NULL,
+			      ifs);
 		fr_statesync(IPFSYNC_OLDIFP, 6, (void *)hn->hne_nic, NULL, ifs);
 		break;
 
 	case NE_ADDRESS_CHANGE :
+		if (hn->hne_lif == 1) {
+			sin6 = hn->hne_data;
+			fr_nataddrsync(6, (void *)hn->hne_nic, &sin6->sin6_addr,
+				       ifs);
+		}
 		break;
 	default :
 		break;

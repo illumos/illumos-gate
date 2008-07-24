@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -49,7 +49,7 @@ OBJECTS=	addicmp.o addipopt.o bcopywrap.o \
 		printhashnode.o printip.o printpool.o \
 		printpoolnode.o printfr.o printfraginfo.o \
 		printhostmap.o printifname.o printhostmask.o \
-		printlog.o printmask.o printnat.o printpacket.o \
+		printlog.o printlookup.o printmask.o printnat.o printpacket.o \
 		printpacket6.o printportcmp.o printproto.o \
 		printsbuf.o printstate.o printtunable.o ratoi.o \
 		remove_pool.o remove_poolnode.o remove_hash.o \
@@ -57,7 +57,7 @@ OBJECTS=	addicmp.o addipopt.o bcopywrap.o \
 		tcpflags.o var.o verbose.o \
 		v6ionames.o v6optvalue.o printpool_live.o \
 		printpooldata.o printhash_live.o printhashdata.o \
-		printactivenat.o
+		printactiveaddr.o printactivenat.o printaddr.o
 
 include $(SRC)/lib/Makefile.lib
 include ../../Makefile.ipf

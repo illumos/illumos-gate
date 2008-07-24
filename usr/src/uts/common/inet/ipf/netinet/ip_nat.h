@@ -6,7 +6,7 @@
  * @(#)ip_nat.h	1.5 2/4/96
  * $Id: ip_nat.h,v 2.90.2.11 2005/06/18 02:41:32 darrenr Exp $
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,7 +30,7 @@
 #define	SIOCGNATL	_IOWR(r, 63, struct ipfobj)
 #endif
 
-#undef	LARGE_NAT	/* define	this if you're setting up a system to NAT
+#undef	LARGE_NAT	/* define this if you're setting up a system to NAT
 			 * LARGE numbers of networks/hosts - i.e. in the
 			 * hundreds or thousands.  In such a case, you should
 			 * also change the RDR_SIZE and NAT_SIZE below to more
@@ -114,7 +114,7 @@ typedef	struct	nat	{
 	void		*nat_sync;
 	ipftqent_t	nat_tqe;
 	u_32_t		nat_flags;
-	u_32_t		nat_sumd[2];	/* ip checksum delta for data segment*/
+	u_32_t		nat_sumd[2];	/* ip checksum delta for data segment */
 	u_32_t		nat_ipsumd;	/* ip checksum delta for ip header */
 	u_32_t		nat_mssclamp;	/* if != zero clamp MSS to this */
 	i6addr_t	nat_inip6;
@@ -136,6 +136,7 @@ typedef	struct	nat	{
 	int		nat_hv[2];
 	char		nat_ifnames[2][LIFNAMSIZ];
 	int		nat_rev;		/* 0 = forward, 1 = reverse */
+	int		nat_v;
 	int		nat_redir;		/* copy of in_redir */
 } nat_t;
 
@@ -280,17 +281,25 @@ typedef	struct	ipnat	{
 #define	MAPBLK_MINPORT	1024	/* don't use reserved ports for src port */
 #define	USABLE_PORTS	(65536 - MAPBLK_MINPORT)
 
-#define	IPN_CMPSIZ	(sizeof(ipnat_t) - offsetof(ipnat_t, in_flags))
+#define	IPN_CMPSIZ	(sizeof (ipnat_t) - offsetof(ipnat_t, in_flags))
 
 typedef	struct	natlookup {
-	struct	in_addr	nl_inip;
-	struct	in_addr	nl_outip;
-	struct	in_addr	nl_realip;
-	int	nl_flags;
-	u_short	nl_inport;
-	u_short	nl_outport;
-	u_short	nl_realport;
+	i6addr_t	nl_inipaddr;
+	i6addr_t	nl_outipaddr;
+	i6addr_t	nl_realipaddr;
+	int		nl_v;
+	int		nl_flags;
+	u_short		nl_inport;
+	u_short		nl_outport;
+	u_short		nl_realport;
 } natlookup_t;
+
+#define	nl_inip		nl_inipaddr.in4
+#define	nl_outip	nl_outipaddr.in4
+#define	nl_realip	nl_realipaddr.in4
+#define	nl_inip6	nl_inipaddr.in6
+#define	nl_outip6	nl_outipaddr.in6
+#define	nl_realip6	nl_realipaddr.in6
 
 
 typedef struct  nat_save    {
@@ -341,12 +350,20 @@ typedef	struct	hostmap	{
 	struct	hostmap	*hm_hnext;
 	struct	hostmap	**hm_phnext;
 	struct	ipnat	*hm_ipnat;
-	struct	in_addr	hm_srcip;
-	struct	in_addr	hm_dstip;
-	struct	in_addr	hm_mapip;
+	i6addr_t	hm_src;
+	i6addr_t	hm_dst;
+	i6addr_t	hm_map;
 	u_32_t		hm_port;
 	int		hm_ref;
+	int		hm_v;
 } hostmap_t;
+
+#define	hm_srcip	hm_src.in4
+#define	hm_dstip	hm_dst.in4
+#define	hm_mapip	hm_map.in4
+#define	hm_srcip6	hm_src.in6
+#define	hm_dstip6	hm_dst.in6
+#define	hm_mapip6	hm_map.in6
 
 
 /*
@@ -354,8 +371,6 @@ typedef	struct	hostmap	{
  */
 typedef struct	natinfo	{
 	ipnat_t		*nai_np;
-	u_32_t		nai_sum1;
-	u_32_t		nai_sum2;
 	u_32_t		nai_nflags;
 	u_32_t		nai_flags;
 	struct	in_addr	nai_ip;
@@ -395,17 +410,18 @@ typedef	struct	natstat	{
 } natstat_t;
 
 typedef	struct	natlog {
-	struct	in_addr	nl_origip;
-	struct	in_addr	nl_outip;
-	struct	in_addr	nl_inip;
-	u_short	nl_origport;
-	u_short	nl_outport;
-	u_short	nl_inport;
-	u_short	nl_type;
-	int	nl_rule;
-	U_QUAD_T	nl_pkts[2];
-	U_QUAD_T	nl_bytes[2];
-	u_char	nl_p;
+	i6addr_t	nlg_origip;
+	i6addr_t	nlg_outip;
+	i6addr_t	nlg_inip;
+	u_short		nlg_origport;
+	u_short		nlg_outport;
+	u_short		nlg_inport;
+	u_short		nlg_type;
+	int		nlg_rule;
+	U_QUAD_T	nlg_pkts[2];
+	U_QUAD_T	nlg_bytes[2];
+	u_char		nlg_p;
+	int		nlg_v;
 } natlog_t;
 
 
@@ -417,9 +433,22 @@ typedef	struct	natlog {
 #define	NL_FLUSH	0xfffe
 #define	NL_EXPIRE	0xffff
 
-#define	NAT_HASH_FN(k,l,m)	(((k) + ((k) >> 12) + l) % (m))
+#define	NAT_HASH_FN(k, l, m)	(((k) + ((k) >> 12) + l) % (m))
+#define	NAT_HASH_FN6(k, l, m)	((((u_32_t *)(k))[3] \
+				+ (((u_32_t *)(k))[3] >> 12) \
+				+ (((u_32_t *)(k))[2]) \
+				+ (((u_32_t *)(k))[2] >> 12) \
+				+ (((u_32_t *)(k))[1]) \
+				+ (((u_32_t *)(k))[1] >> 12) \
+				+ (((u_32_t *)(k))[0]) \
+				+ (((u_32_t *)(k))[0] >> 12) \
+				+ l) % (m))
 
 #define	LONG_SUM(in)	(((in) & 0xffff) + ((in) >> 16))
+#define	LONG_SUM6(in)	(LONG_SUM(ntohl(((u_32_t *)(in))[0])) + \
+			 LONG_SUM(ntohl(((u_32_t *)(in))[1])) + \
+			 LONG_SUM(ntohl(((u_32_t *)(in))[2])) + \
+			 LONG_SUM(ntohl(((u_32_t *)(in))[3])))
 
 #define	CALC_SUMD(s1, s2, sd) { \
 			    (s1) = ((s1) & 0xffff) + ((s1) >> 16); \
@@ -436,8 +465,8 @@ typedef	struct	natlog {
 #define	NAT_LOCKHELD		0x40000000
 
 extern	void	fr_natsync __P((void *, ipf_stack_t *));
-extern	void	fr_nataddrsync __P((void *, struct in_addr *, ipf_stack_t *));
-extern	void	fr_natifpsync __P((int, void *, char *, ipf_stack_t *));
+extern	void	fr_nataddrsync __P((int, void *, void *, ipf_stack_t *));
+extern	void	fr_natifpsync __P((int, int, void *, char *, ipf_stack_t *));
 
 #if defined(__OpenBSD__)
 extern	void	nat_ifdetach __P((void *, ipf_stack_t *));
@@ -473,5 +502,29 @@ extern	u_short	*nat_proto __P((fr_info_t *, nat_t *, u_int));
 extern	void	nat_update __P((fr_info_t *, nat_t *, ipnat_t *));
 extern	void	fr_setnatqueue __P((nat_t *, int, ipf_stack_t *));
 extern  void    fr_hostmapdel __P((hostmap_t **));
+
+extern	nat_t	*fr_natclone __P((fr_info_t *, nat_t *));
+extern	void	nat_delrdr __P((struct ipnat *));
+extern	void	nat_delnat __P((struct ipnat *));
+extern	int	nat_wildok __P((nat_t *, int, int, int, int));
+extern	void	nat_calc_chksum_diffs __P((nat_t *));
+
+#ifdef	USE_INET6
+extern	void	nat6_addnat __P((ipnat_t *, ipf_stack_t *));
+extern	void	nat6_addrdr __P((ipnat_t *, ipf_stack_t *));
+extern	nat_t	*nat6_new __P((fr_info_t *, ipnat_t *, nat_t **, u_int, int));
+extern	nat_t	*nat6_outlookup __P((fr_info_t *, u_int, u_int,
+				struct in6_addr *, struct in6_addr *));
+extern	nat_t	*nat6_inlookup __P((fr_info_t *, u_int, u_int,
+				struct in6_addr *, struct in6_addr *));
+extern	nat_t	*nat6_lookupredir __P((natlookup_t *, ipf_stack_t *));
+extern	nat_t	*nat6_icmperrorlookup __P((fr_info_t *, int));
+extern	nat_t	*nat6_icmperror __P((fr_info_t *, u_int *, int));
+extern	int	nat6_insert __P((nat_t *, int, ipf_stack_t *));
+extern	int	fr_checknat6out __P((fr_info_t *, u_32_t *));
+extern	int	fr_nat6out __P((fr_info_t *, nat_t *, int, u_32_t));
+extern	int	fr_checknat6in __P((fr_info_t *, u_32_t *));
+extern	int	fr_nat6in __P((fr_info_t *, nat_t *, int, u_32_t));
+#endif
 
 #endif /* __IP_NAT_H__ */

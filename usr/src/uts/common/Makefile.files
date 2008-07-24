@@ -1469,7 +1469,7 @@ PHX_OBJS += phx.o
 
 IPF_OBJS += ip_fil_solaris.o fil.o solaris.o ip_state.o ip_frag.o ip_nat.o \
 	    ip_proxy.o ip_auth.o ip_pool.o ip_htable.o ip_lookup.o \
-	    ip_log.o misc.o
+	    ip_log.o misc.o ip_compat.o ip_nat6.o
 
 IBD_OBJS +=	ibd.o
 

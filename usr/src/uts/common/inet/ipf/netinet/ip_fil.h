@@ -131,7 +131,7 @@ typedef	union	i6addr	{
 	void	*vptr[2];
 	lookupfunc_t	lptr[2];
 } i6addr_t;
-#define in6_addr8	in6.s6_addr
+#define	in6_addr8	in6.s6_addr
 #else
 typedef	union	i6addr	{
 	u_32_t	i6[4];
@@ -141,7 +141,7 @@ typedef	union	i6addr	{
 } i6addr_t;
 #endif
 
-#define in4_addr	in4.s_addr
+#define	in4_addr	in4.s_addr
 #define	iplookupnum	i6[0]
 #define	iplookuptype	i6[1]
 /*
@@ -163,26 +163,34 @@ typedef	union	i6addr	{
 			 (I61(a) == I61(b)) && (I60(a) == I60(b)))
 #define	IP6_NEQ(a,b)	((I63(a) != I63(b)) || (I62(a) != I62(b)) || \
 			 (I61(a) != I61(b)) || (I60(a) != I60(b)))
-#define IP6_ISZERO(a)   ((I60(a) | I61(a) | I62(a) | I63(a)) == 0)
+#define	IP6_ISZERO(a)   ((I60(a) | I61(a) | I62(a) | I63(a)) == 0)
 #define IP6_NOTZERO(a)  ((I60(a) | I61(a) | I62(a) | I63(a)) != 0)
-#define	IP6_GT(a,b)	(HI60(a) > HI60(b) || (HI60(a) == HI60(b) && \
-			  (HI61(a) > HI61(b) || (HI61(a) == HI61(b) && \
-			    (HI62(a) > HI62(b) || (HI62(a) == HI62(b) && \
-			      HI63(a) > HI63(b)))))))
-#define	IP6_LT(a,b)	(HI60(a) < HI60(b) || (HI60(a) == HI60(b) && \
-			  (HI61(a) < HI61(b) || (HI61(a) == HI61(b) && \
-			    (HI62(a) < HI62(b) || (HI62(a) == HI62(b) && \
-			      HI63(a) < HI63(b)))))))
+#define	IP6_ISONES(a)	((I63(a) == 0xffffffff) && (I62(a) == 0xffffffff) && \
+			 (I61(a) == 0xffffffff) && (I60(a) == 0xffffffff))
+#define	IP6_GT(a,b)	(ntohl(HI60(a)) > ntohl(HI60(b)) || \
+			 (HI60(a) == HI60(b) && \
+			  (ntohl(HI61(a)) > ntohl(HI61(b)) || \
+			   (HI61(a) == HI61(b) && \
+			    (ntohl(HI62(a)) > ntohl(HI62(b)) || \
+			     (HI62(a) == HI62(b) && \
+			      ntohl(HI63(a)) > ntohl(HI63(b))))))))
+#define	IP6_LT(a,b)	(ntohl(HI60(a)) < ntohl(HI60(b)) || \
+			 (HI60(a) == HI60(b) && \
+			  (ntohl(HI61(a)) < ntohl(HI61(b)) || \
+			   (HI61(a) == HI61(b) && \
+			    (ntohl(HI62(a)) < ntohl(HI62(b)) || \
+			     (HI62(a) == HI62(b) && \
+			      ntohl(HI63(a)) < ntohl(HI63(b))))))))
 #define	NLADD(n,x)	htonl(ntohl(n) + (x))
 #define	IP6_INC(a)	\
 		{ i6addr_t *_i6 = (i6addr_t *)(a); \
-		  _i6->i6[0] = NLADD(_i6->i6[0], 1); \
-		  if (_i6->i6[0] == 0) { \
-			_i6->i6[0] = NLADD(_i6->i6[1], 1); \
-			if (_i6->i6[1] == 0) { \
-				_i6->i6[0] = NLADD(_i6->i6[2], 1); \
-				if (_i6->i6[2] == 0) { \
-					_i6->i6[0] = NLADD(_i6->i6[3], 1); \
+		  _i6->i6[3] = NLADD(_i6->i6[3], 1); \
+		  if (_i6->i6[3] == 0) { \
+			_i6->i6[2] = NLADD(_i6->i6[2], 1); \
+			if (_i6->i6[2] == 0) { \
+				_i6->i6[1] = NLADD(_i6->i6[1], 1); \
+				if (_i6->i6[1] == 0) { \
+					_i6->i6[0] = NLADD(_i6->i6[0], 1); \
 				} \
 			} \
 		  } \
@@ -190,25 +198,35 @@ typedef	union	i6addr	{
 #define	IP6_ADD(a,x,d)	\
 		{ i6addr_t *_s = (i6addr_t *)(a); \
 		  i6addr_t *_d = (i6addr_t *)(d); \
-		  _d->i6[0] = NLADD(_s->i6[0], x); \
-		  if (ntohl(_d->i6[0]) < ntohl(_s->i6[0])) { \
-			_d->i6[1] = NLADD(_d->i6[1], 1); \
-			if (ntohl(_d->i6[1]) < ntohl(_s->i6[1])) { \
-				_d->i6[2] = NLADD(_d->i6[2], 1); \
-				if (ntohl(_d->i6[2]) < ntohl(_s->i6[2])) { \
-					_d->i6[3] = NLADD(_d->i6[3], 1); \
+		  _d->i6[3] = NLADD(_s->i6[3], x); \
+		  if (ntohl(_d->i6[3]) < ntohl(_s->i6[3])) { \
+			_d->i6[2] = NLADD(_d->i6[2], 1); \
+			if (ntohl(_d->i6[2]) < ntohl(_s->i6[2])) { \
+				_d->i6[1] = NLADD(_d->i6[1], 1); \
+				if (ntohl(_d->i6[1]) < ntohl(_s->i6[1])) { \
+					_d->i6[0] = NLADD(_d->i6[0], 1); \
 				} \
 			} \
 		  } \
 		}
 #define	IP6_AND(a,b,d)	{ i6addr_t *_s1 = (i6addr_t *)(a); \
-			  i6addr_t *_s2 = (i6addr_t *)(d); \
+			  i6addr_t *_s2 = (i6addr_t *)(b); \
 			  i6addr_t *_d = (i6addr_t *)(d); \
 			  _d->i6[0] = _s1->i6[0] & _s2->i6[0]; \
 			  _d->i6[1] = _s1->i6[1] & _s2->i6[1]; \
 			  _d->i6[2] = _s1->i6[2] & _s2->i6[2]; \
 			  _d->i6[3] = _s1->i6[3] & _s2->i6[3]; \
 			}
+#define	IP6_MASKEQ(a,m,b) \
+			(((I60(a) & I60(m)) == I60(b)) && \
+			 ((I61(a) & I61(m)) == I61(b)) && \
+			 ((I62(a) & I62(m)) == I62(b)) && \
+			 ((I63(a) & I63(m)) == I63(b)))
+#define	IP6_MASKNEQ(a,m,b) \
+			(((I60(a) & I60(m)) != I60(b)) || \
+			 ((I61(a) & I61(m)) != I61(b)) || \
+			 ((I62(a) & I62(m)) != I62(b)) || \
+			 ((I63(a) & I63(m)) != I63(b)))
 #define	IP6_MERGE(a,b,c) \
 			{ i6addr_t *_d, *_s1, *_s2; \
 			  _d = (i6addr_t *)(a); \
@@ -217,7 +235,7 @@ typedef	union	i6addr	{
 			  _d->i6[0] |= _s1->i6[0] & ~_s2->i6[0]; \
 			  _d->i6[1] |= _s1->i6[1] & ~_s2->i6[1]; \
 			  _d->i6[2] |= _s1->i6[2] & ~_s2->i6[2]; \
-			  _d->i6[2] |= _s1->i6[3] & ~_s2->i6[3]; \
+			  _d->i6[3] |= _s1->i6[3] & ~_s2->i6[3]; \
 			}
 
 
@@ -261,6 +279,7 @@ typedef	struct	fr_ip	{
 #define	FI_WITH		0xeffe	/* Not FI_TCPUDP */
 #define	FI_V6EXTHDR	0x10000
 #define	FI_COALESCE	0x20000
+#define	FI_ICMPQUERY	0x40000
 #define	FI_NOCKSUM	0x20000000	/* don't do a L4 checksum validation */
 #define	FI_DONTCACHE	0x40000000	/* don't cache the result */
 #define	FI_IGNORE	0x80000000
@@ -323,7 +342,12 @@ typedef	struct	fr_info	{
 	void	*fin_nat;
 	void	*fin_state;
 	void	*fin_nattag;
-	ip_t	*fin_ip;
+	union {
+		ip_t	*fip_ip;
+#ifdef	USE_INET6
+		ip6_t	*fip_ip6;
+#endif
+	} fin_ipu;
 	mb_t	**fin_mp;		/* pointer to pointer to mbuf */
 	mb_t	*fin_m;			/* pointer to mbuf */
 #ifdef	MENTAT
@@ -336,6 +360,8 @@ typedef	struct	fr_info	{
 #endif
 } fr_info_t;
 
+#define	fin_ip		fin_ipu.fip_ip
+#define	fin_ip6		fin_ipu.fip_ip6
 #define	fin_v		fin_fi.fi_v
 #define	fin_p		fin_fi.fi_p
 #define	fin_flx		fin_fi.fi_flx
@@ -343,15 +369,20 @@ typedef	struct	fr_info	{
 #define	fin_secmsk	fin_fi.fi_secmsk
 #define	fin_auth	fin_fi.fi_auth
 #define	fin_src		fin_fi.fi_src.in4
-#define	fin_src6	fin_fi.fi_src.in6
 #define	fin_saddr	fin_fi.fi_saddr
 #define	fin_dst		fin_fi.fi_dst.in4
-#define	fin_dst6	fin_fi.fi_dst.in6
 #define	fin_daddr	fin_fi.fi_daddr
 #define	fin_data	fin_dat.fid_16
 #define	fin_sport	fin_dat.fid_16[0]
 #define	fin_dport	fin_dat.fid_16[1]
 #define	fin_ports	fin_dat.fid_32
+
+#ifdef	USE_INET6
+# define	fin_src6	fin_fi.fi_src
+# define	fin_dst6	fin_fi.fi_dst
+# define	fin_dstip6	fin_fi.fi_dst.in6
+# define	fin_srcip6	fin_fi.fi_src.in6
+#endif
 
 #define	IPF_IN	0
 #define	IPF_OUT	1
@@ -1397,7 +1428,8 @@ extern	int	copyoutptr __P((void *, void *, size_t));
 extern	int	fr_fastroute __P((mb_t *, mb_t **, fr_info_t *, frdest_t *));
 extern	int	fr_inobj __P((void *, void *, int));
 extern	int	fr_inobjsz __P((void *, void *, int, int));
-extern	int	fr_ioctlswitch __P((int, void *, ioctlcmd_t, int, int, void *, ipf_stack_t *));
+extern	int	fr_ioctlswitch __P((int, void *, ioctlcmd_t, int, int, void *,
+				    ipf_stack_t *));
 extern	int	fr_ipftune __P((ioctlcmd_t, void *, ipf_stack_t *));
 extern	int	fr_outobj __P((void *, void *, int));
 extern	int	fr_outobjsz __P((void *, void *, int, int));
@@ -1414,8 +1446,10 @@ extern	ipftq_t	*fr_addtimeoutqueue __P((ipftq_t **, u_int, ipf_stack_t *));
 extern	void	fr_deletequeueentry __P((ipftqent_t *));
 extern	int	fr_deletetimeoutqueue __P((ipftq_t *));
 extern	void	fr_freetimeoutqueue __P((ipftq_t *, ipf_stack_t *));
-extern	void	fr_movequeue __P((ipftqent_t *, ipftq_t *, ipftq_t *, ipf_stack_t *));
-extern	void	fr_queueappend __P((ipftqent_t *, ipftq_t *, void *, ipf_stack_t *));
+extern	void	fr_movequeue __P((ipftqent_t *, ipftq_t *, ipftq_t *,
+				  ipf_stack_t *));
+extern	void	fr_queueappend __P((ipftqent_t *, ipftq_t *, void *,
+				    ipf_stack_t *));
 extern	void	fr_queueback __P((ipftqent_t *, ipf_stack_t *));
 extern	void	fr_queuefront __P((ipftqent_t *));
 extern	void	fr_checkv4sum __P((fr_info_t *));
@@ -1430,6 +1464,10 @@ extern	int	fr_ifpfillv6addr __P((int, struct sockaddr_in6 *,
 				      struct sockaddr_in6 *, struct in_addr *,
 				      struct in_addr *));
 #endif
+
+#define	IPFILTER_COMPAT
+extern	int	fr_incomptrans __P((ipfobj_t *, void *));
+extern	int	fr_outcomptrans __P((ipfobj_t *, void *));
 
 extern	int		fr_addipftune __P((ipftuneable_t *, ipf_stack_t *));
 extern	int		fr_delipftune __P((ipftuneable_t *, ipf_stack_t *));
@@ -1470,7 +1508,7 @@ extern	void		fr_lock __P((caddr_t, int *));
 extern  int		fr_makefrip __P((int, ip_t *, fr_info_t *));
 extern	int		fr_matchtag __P((ipftag_t *, ipftag_t *));
 extern	int		fr_matchicmpqueryreply __P((int, icmpinfo_t *,
-					    struct icmp *, int));
+						    struct icmp *, int));
 extern	u_32_t		fr_newisn __P((fr_info_t *));
 extern	u_short		fr_nextipid __P((fr_info_t *));
 extern	int		fr_rulen __P((int, frentry_t *, ipf_stack_t *));
@@ -1479,12 +1517,14 @@ extern	frentry_t 	*fr_srcgrpmap __P((fr_info_t *, u_32_t *));
 extern	int		fr_tcpudpchk __P((fr_info_t *, frtuc_t *));
 extern	int		fr_verifysrc __P((fr_info_t *fin));
 extern	int		fr_zerostats __P((char *, ipf_stack_t *));
-extern  ipftoken_t      *ipf_findtoken __P((int, int, void *, ipf_stack_t *));
-extern  int             ipf_getnextrule __P((ipftoken_t *, void *, ipf_stack_t *));
+extern	ipftoken_t	*ipf_findtoken __P((int, int, void *, ipf_stack_t *));
+extern	int		ipf_getnextrule __P((ipftoken_t *, void *,
+					     ipf_stack_t *));
 extern  void            ipf_expiretokens __P((ipf_stack_t *));
-extern  void            ipf_freetoken __P((ipftoken_t *, ipf_stack_t *));
-extern  int             ipf_deltoken __P((int,int, void *, ipf_stack_t *));
-extern  int             ipf_genericiter __P((void *, int, void *, ipf_stack_t *));
+extern	void		ipf_freetoken __P((ipftoken_t *, ipf_stack_t *));
+extern	int		ipf_deltoken __P((int,int, void *, ipf_stack_t *));
+extern	int		ipf_genericiter __P((void *, int, void *,
+					     ipf_stack_t *));
 
 extern	char	ipfilter_version[];
 #ifdef	USE_INET6

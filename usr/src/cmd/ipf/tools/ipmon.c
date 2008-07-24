@@ -1,9 +1,9 @@
 /*
- * Copyright (C) 1993-2001, 2003 by Darren Reed.
+ * Copyright (C) 2001-2008 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -737,49 +737,52 @@ int	blen;
 	}
 	(void) strftime(t, len, "%T", tm);
 	t += strlen(t);
-	(void) sprintf(t, ".%-.6ld @%hd ", ipl->ipl_usec, nl->nl_rule + 1);
+	(void) sprintf(t, ".%-.6ld @%hd ", ipl->ipl_usec, nl->nlg_rule + 1);
 	t += strlen(t);
 
-	if (nl->nl_type == NL_NEWMAP)
+	if (nl->nlg_type == NL_NEWMAP)
 		strcpy(t, "NAT:MAP ");
-	else if (nl->nl_type == NL_NEWRDR)
+	else if (nl->nlg_type == NL_NEWRDR)
 		strcpy(t, "NAT:RDR ");
-	else if (nl->nl_type == NL_FLUSH)
+	else if (nl->nlg_type == NL_FLUSH)
 		strcpy(t, "NAT:FLUSH ");
-	else if (nl->nl_type == NL_EXPIRE)
+	else if (nl->nlg_type == NL_EXPIRE)
 		strcpy(t, "NAT:EXPIRE ");
-	else if (nl->nl_type == NL_NEWBIMAP)
+	else if (nl->nlg_type == NL_NEWBIMAP)
 		strcpy(t, "NAT:BIMAP ");
-	else if (nl->nl_type == NL_NEWBLOCK)
+	else if (nl->nlg_type == NL_NEWBLOCK)
 		strcpy(t, "NAT:MAPBLOCK ");
-	else if (nl->nl_type == NL_CLONE)
+	else if (nl->nlg_type == NL_CLONE)
 		strcpy(t, "NAT:CLONE ");
 	else
-		sprintf(t, "Type: %d ", nl->nl_type);
+		sprintf(t, "Type: %d ", nl->nlg_type);
 	t += strlen(t);
 
-	proto = getproto(nl->nl_p);
+	proto = getproto(nl->nlg_p);
 
-	(void) sprintf(t, "%s,%s <- -> ", HOSTNAME_V4(res, nl->nl_inip),
-		portname(res, proto, (u_int)nl->nl_inport));
+	(void) sprintf(t, "%s,%s <- -> ", hostname(res, nl->nlg_v,
+		(u_32_t *)&nl->nlg_inip),
+		portname(res, proto, (u_int)nl->nlg_inport));
 	t += strlen(t);
-	(void) sprintf(t, "%s,%s ", HOSTNAME_V4(res, nl->nl_outip),
-		portname(res, proto, (u_int)nl->nl_outport));
+	(void) sprintf(t, "%s,%s ", hostname(res, nl->nlg_v,
+		(u_32_t *)&nl->nlg_outip),
+		portname(res, proto, (u_int)nl->nlg_outport));
 	t += strlen(t);
-	(void) sprintf(t, "[%s,%s]", HOSTNAME_V4(res, nl->nl_origip),
-		portname(res, proto, (u_int)nl->nl_origport));
+	(void) sprintf(t, "[%s,%s]", hostname(res, nl->nlg_v,
+		(u_32_t *)&nl->nlg_origip),
+		portname(res, proto, (u_int)nl->nlg_origport));
 	t += strlen(t);
-	if (nl->nl_type == NL_EXPIRE) {
+	if (nl->nlg_type == NL_EXPIRE) {
 #ifdef	USE_QUAD_T
 		(void) sprintf(t, " Pkts %qd/%qd Bytes %qd/%qd",
-				(long long)nl->nl_pkts[0],
-				(long long)nl->nl_pkts[1],
-				(long long)nl->nl_bytes[0],
-				(long long)nl->nl_bytes[1]);
+				(long long)nl->nlg_pkts[0],
+				(long long)nl->nlg_pkts[1],
+				(long long)nl->nlg_bytes[0],
+				(long long)nl->nlg_bytes[1]);
 #else
 		(void) sprintf(t, " Pkts %ld/%ld Bytes %ld/%ld",
-				nl->nl_pkts[0], nl->nl_pkts[1],
-				nl->nl_bytes[0], nl->nl_bytes[1]);
+				nl->nlg_pkts[0], nl->nlg_pkts[1],
+				nl->nlg_bytes[0], nl->nlg_bytes[1]);
 #endif
 		t += strlen(t);
 	}
