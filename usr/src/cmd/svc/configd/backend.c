@@ -2368,8 +2368,7 @@ backend_init(const char *db_file, const char *npdb_file, int have_np)
 		/*
 		 * If we started up with a writable filesystem, but the
 		 * non-persistent database needed initialization, we
-		 * are booting a non-global zone, so do a backup, and carry
-		 * out upgrade if necessary.
+		 * are booting a non-global zone, so do a backup.
 		 */
 		if (r == BACKEND_CREATE_NEED_INIT && writable_persist &&
 		    backend_lock(BACKEND_TYPE_NORMAL, 0, &be) ==
@@ -2381,10 +2380,26 @@ backend_init(const char *db_file, const char *npdb_file, int have_np)
 				    "\"%s\"\n", REPOSITORY_BOOT_BACKUP,
 				    be->be_path);
 			}
-			backend_check_upgrade(be, B_TRUE);
 			backend_unlock(be);
 		}
 	}
+
+	/*
+	 * If the persistent backend is writable at this point, upgrade it.
+	 * This can occur in a few cases, most notably on UFS roots if
+	 * we are operating on the backend from another root, as is the case
+	 * during alternate-root BFU.
+	 *
+	 * Otherwise, upgrade will occur via backend_check_readonly() when
+	 * the repository is re-opened read-write.
+	 */
+	if (writable_persist) {
+		r = backend_lock(BACKEND_TYPE_NORMAL, 1, &be);
+		assert(r == REP_PROTOCOL_SUCCESS);
+		backend_check_upgrade(be, B_TRUE);
+		backend_unlock(be);
+	}
+
 	return (CONFIGD_EXIT_OKAY);
 }
 
