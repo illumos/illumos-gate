@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # common/crypto/aes/Makefile
@@ -37,8 +36,7 @@ FRC:
 
 # EXPORT DELETE START
 EXPORT_SRC:
-	$(RM) Makefile+ aes_impl.c+ aes_impl.h+ aes_cbc_crypt.c+ \
-		aes_cbc_crypt.h+ sun4u/aes_crypt_asm.s+
+	$(RM) Makefile+ aes_impl.c+ aes_impl.h+ sun4u/aes_crypt_asm.s+
 	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
 		< aes_impl.c > aes_impl.c+
 	$(MV) aes_impl.c+ aes_impl.c
@@ -46,19 +44,12 @@ EXPORT_SRC:
 		< aes_impl.h > aes_impl.h+
 	$(MV) aes_impl.h+ aes_impl.h
 	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< aes_cbc_crypt.c > aes_cbc_crypt.c+
-	$(MV) aes_cbc_crypt.c+ aes_cbc_crypt.c
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< aes_cbc_crypt.h > aes_cbc_crypt.h+
-	$(MV) aes_cbc_crypt.h+ aes_cbc_crypt.h
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
 		< sun4u/aes_crypt_asm.s > sun4u/aes_crypt_asm.s+
 	$(MV) sun4u/aes_crypt_asm.s+ sun4u/aes_crypt_asm.s
 	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
 		< Makefile > Makefile+
 	$(RM) Makefile
 	$(MV) Makefile+ Makefile 
-	$(CHMOD) 444 Makefile aes_impl.c aes_impl.h aes_cbc_crypt.c \
-		aes_cbc_crypt.h sun4u/aes_crypt_asm.s
+	$(CHMOD) 444 Makefile aes_impl.c aes_impl.h sun4u/aes_crypt_asm.s
 
 # EXPORT DELETE END

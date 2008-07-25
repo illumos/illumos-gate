@@ -35,7 +35,7 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
-COM_DIR = $(COMMONBASE)/crypto/des
+COM_DIR = $(COMMONBASE)/crypto
 
 #
 #	Define the module and object file sets.
@@ -64,6 +64,11 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
+#
+# Linkage dependencies
+#
+LDFLAGS		+= -dy -Nmisc/kcf
+
 CPPFLAGS	+= -I$(COM_DIR)
 
 #
@@ -73,7 +78,6 @@ CPPFLAGS	+= -I$(COM_DIR)
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 #

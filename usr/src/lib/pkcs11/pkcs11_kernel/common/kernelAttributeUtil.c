@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <security/cryptoki.h>
+#include <sys/crypto/common.h>
 #include <aes_impl.h>
 #include <blowfish_impl.h>
 #include <arcfour.h>
@@ -415,7 +416,7 @@ kernel_copy_extra_attr(CK_ATTRIBUTE_INFO_PTR old_attrp,
 	attrp->attr.ulValueLen = old_attrp->attr.ulValueLen;
 
 	if ((old_attrp->attr.pValue != NULL) &&
-		(old_attrp->attr.ulValueLen > 0)) {
+	    (old_attrp->attr.ulValueLen > 0)) {
 		attrp->attr.pValue = malloc(old_attrp->attr.ulValueLen);
 		if (attrp->attr.pValue == NULL) {
 			free(attrp);

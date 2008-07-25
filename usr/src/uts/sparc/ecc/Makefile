@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -63,7 +63,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy
+LDFLAGS += -dy -Nmisc/kcf
 
 #
 # lint pass one enforcement
@@ -71,7 +71,6 @@ LDFLAGS += -dy
 CFLAGS		+= $(CCVERBOSE) -I$(COM1_DIR) -I$(COM2_DIR) -I$(COM3_DIR)
 CFLAGS		+= -DMP_API_COMPATIBLE -DNSS_ECC_MORE_THAN_SUITE_B
 LINTFLAGS	+= -I$(COM1_DIR) -I$(COM2_DIR) -I$(COM3_DIR)
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
 #
 #	Default build targets.

@@ -31,12 +31,10 @@
 #include <strings.h>
 #include <sys/types.h>
 #include <security/cryptoki.h>
-#include <blowfish_cbc_crypt.h>
-#include <blowfish_impl.h>
 #include "softSession.h"
 #include "softObject.h"
 #include "softCrypt.h"
-
+#include <blowfish_impl.h>
 
 CK_RV
 soft_blowfish_crypt_init_common(soft_session_t *session_p,
@@ -492,18 +490,18 @@ void *
 blowfish_cbc_ctx_init(void *key_sched, size_t size, uint8_t *ivec)
 {
 
-	blowfish_ctx_t *blowfish_ctx;
+	cbc_ctx_t *cbc_ctx;
 
-	if ((blowfish_ctx = calloc(1, sizeof (blowfish_ctx_t))) == NULL)
+	if ((cbc_ctx = calloc(1, sizeof (cbc_ctx_t))) == NULL)
 		return (NULL);
 
-	blowfish_ctx->bc_keysched = key_sched;
+	cbc_ctx->cc_keysched = key_sched;
 
-	(void) memcpy(&blowfish_ctx->bc_iv, ivec, sizeof (blowfish_ctx->bc_iv));
+	(void) memcpy(&cbc_ctx->cc_iv[0], ivec, BLOWFISH_BLOCK_LEN);
 
-	blowfish_ctx->bc_lastp = (uint8_t *)&(blowfish_ctx->bc_iv);
-	blowfish_ctx->bc_keysched_len = size;
-	blowfish_ctx->bc_flags |= BLOWFISH_CBC_MODE;
+	cbc_ctx->cc_lastp = (uint8_t *)&(cbc_ctx->cc_iv);
+	cbc_ctx->cc_keysched_len = size;
+	cbc_ctx->cc_flags |= CBC_MODE;
 
-	return ((void *)blowfish_ctx);
+	return (cbc_ctx);
 }

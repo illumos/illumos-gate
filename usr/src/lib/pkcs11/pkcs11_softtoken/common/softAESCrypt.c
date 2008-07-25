@@ -31,11 +31,10 @@
 #include <strings.h>
 #include <sys/types.h>
 #include <security/cryptoki.h>
-#include <aes_cbc_crypt.h>
-#include <aes_impl.h>
 #include "softSession.h"
 #include "softObject.h"
 #include "softCrypt.h"
+#include <aes_impl.h>
 
 /*
  * Allocate context for the active encryption or decryption operation, and
@@ -170,6 +169,9 @@ soft_aes_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 	CK_ULONG out_len;
 	CK_ULONG total_len;
 	CK_ULONG remain;
+
+	if (mechanism == CKM_AES_CTR)
+		goto do_encryption;
 
 	/*
 	 * AES only takes input length that is a multiple of blocksize
@@ -307,6 +309,7 @@ soft_aes_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 		out_buf = pEncrypted;
 	}
 
+do_encryption:
 	/*
 	 * Begin Encryption now.
 	 */
@@ -323,7 +326,7 @@ soft_aes_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 			tmp_inbuf = &in_buf[i];
 			tmp_outbuf = &out_buf[i];
 			/* Crunch one block of data for AES. */
-			aes_encrypt_block(soft_aes_ctx->key_sched,
+			(void) aes_encrypt_block(soft_aes_ctx->key_sched,
 			    tmp_inbuf, tmp_outbuf);
 		}
 
@@ -407,6 +410,34 @@ encrypt_failed:
 		rv = CKR_FUNCTION_FAILED;
 		goto cleanup;
 	}
+	case CKM_AES_CTR:
+	{
+		crypto_data_t out;
+
+		out.cd_format = CRYPTO_DATA_RAW;
+		out.cd_offset = 0;
+		out.cd_length = *pulEncryptedLen;
+		out.cd_raw.iov_base = (char *)pEncrypted;
+		out.cd_raw.iov_len = *pulEncryptedLen;
+
+		rc = aes_encrypt_contiguous_blocks(soft_aes_ctx->aes_cbc,
+		    (char *)pData, ulDataLen, &out);
+
+		if (rc != 0) {
+			*pulEncryptedLen = 0;
+			rv = CKR_FUNCTION_FAILED;
+			goto cleanup;
+		}
+		/*
+		 * Since AES counter mode is a stream cipher, we call
+		 * aes_counter_final() to pick up any remaining bytes.
+		 * It is an internal function that does not destroy
+		 * the context like *normal* final routines.
+		 */
+		if (((aes_ctx_t *)soft_aes_ctx->aes_cbc)->ac_remainder_len > 0)
+			rc = ctr_mode_final(soft_aes_ctx->aes_cbc, &out,
+			    aes_encrypt_block);
+	}
 	} /* end switch */
 
 	if (update)
@@ -476,6 +507,9 @@ soft_aes_decrypt_common(soft_session_t *session_p, CK_BYTE_PTR pEncrypted,
 	CK_ULONG out_len;
 	CK_ULONG total_len;
 	CK_ULONG remain;
+
+	if (mechanism == CKM_AES_CTR)
+		goto do_decryption;
 
 	/*
 	 * AES only takes input length that is a multiple of 16 bytes
@@ -615,6 +649,7 @@ soft_aes_decrypt_common(soft_session_t *session_p, CK_BYTE_PTR pEncrypted,
 		out_buf = pData;
 	}
 
+do_decryption:
 	/*
 	 * Begin Decryption.
 	 */
@@ -631,7 +666,7 @@ soft_aes_decrypt_common(soft_session_t *session_p, CK_BYTE_PTR pEncrypted,
 			tmp_inbuf = &in_buf[i];
 			tmp_outbuf = &out_buf[i];
 			/* Crunch one block of data for AES. */
-			aes_decrypt_block(soft_aes_ctx->key_sched,
+			(void) aes_decrypt_block(soft_aes_ctx->key_sched,
 			    tmp_inbuf, tmp_outbuf);
 		}
 
@@ -725,6 +760,39 @@ decrypt_failed:
 		rv = CKR_FUNCTION_FAILED;
 		goto cleanup;
 	}
+	case CKM_AES_CTR:
+	{
+		crypto_data_t out;
+
+		out.cd_format = CRYPTO_DATA_RAW;
+		out.cd_offset = 0;
+		out.cd_length = *pulDataLen;
+		out.cd_raw.iov_base = (char *)pData;
+		out.cd_raw.iov_len = *pulDataLen;
+
+		rc = aes_decrypt_contiguous_blocks(soft_aes_ctx->aes_cbc,
+		    (char *)pEncrypted, ulEncryptedLen, &out);
+
+		if (rc != 0) {
+			*pulDataLen = 0;
+			rv = CKR_FUNCTION_FAILED;
+			goto cleanup;
+		}
+
+		/*
+		 * Since AES counter mode is a stream cipher, we call
+		 * aes_counter_final() to pick up any remaining bytes.
+		 * It is an internal function that does not destroy
+		 * the context like *normal* final routines.
+		 */
+		if (((aes_ctx_t *)soft_aes_ctx->aes_cbc)->ac_remainder_len
+		    > 0) {
+			rc = ctr_mode_final(soft_aes_ctx->aes_cbc, &out,
+			    aes_encrypt_block);
+			if (rc == CRYPTO_DATA_LEN_RANGE)
+				rc = CRYPTO_ENCRYPTED_DATA_LEN_RANGE;
+		}
+	}
 	} /* end switch */
 
 	if (update)
@@ -760,19 +828,46 @@ void *
 aes_cbc_ctx_init(void *key_sched, size_t size, uint8_t *ivec)
 {
 
-	aes_ctx_t *aes_ctx;
+	cbc_ctx_t *cbc_ctx;
 
-	if ((aes_ctx = calloc(1, sizeof (aes_ctx_t))) == NULL)
+	if ((cbc_ctx = calloc(1, sizeof (cbc_ctx_t))) == NULL)
 		return (NULL);
 
-	aes_ctx->ac_keysched = key_sched;
+	cbc_ctx->cc_keysched = key_sched;
+	cbc_ctx->cc_keysched_len = size;
 
-	(void) memcpy(&aes_ctx->ac_iv[0], ivec, AES_BLOCK_LEN);
+	(void) memcpy(&cbc_ctx->cc_iv[0], ivec, AES_BLOCK_LEN);
 
-	aes_ctx->ac_lastp = (uint8_t *)aes_ctx->ac_iv;
-	aes_ctx->ac_keysched_len = size;
-	aes_ctx->ac_flags |= AES_CBC_MODE;
+	cbc_ctx->cc_lastp = (uint8_t *)cbc_ctx->cc_iv;
+	cbc_ctx->cc_flags |= CBC_MODE;
 
-	return ((void *)aes_ctx);
+	return (cbc_ctx);
+}
 
+/*
+ * Allocate and initialize a context for AES CTR mode of operation.
+ */
+void *
+aes_ctr_ctx_init(void *key_sched, size_t size, uint8_t *param)
+{
+
+	ctr_ctx_t *ctr_ctx;
+	CK_AES_CTR_PARAMS *pp;
+
+	/* LINTED: pointer alignment */
+	pp = (CK_AES_CTR_PARAMS *)param;
+
+	if ((ctr_ctx = calloc(1, sizeof (ctr_ctx_t))) == NULL)
+		return (NULL);
+
+	ctr_ctx->ctr_keysched = key_sched;
+	ctr_ctx->ctr_keysched_len = size;
+
+	if (ctr_init_ctx(ctr_ctx, pp->ulCounterBits, pp->cb, aes_copy_block)
+	    != CRYPTO_SUCCESS) {
+		free(ctr_ctx);
+		return (NULL);
+	}
+
+	return (ctr_ctx);
 }

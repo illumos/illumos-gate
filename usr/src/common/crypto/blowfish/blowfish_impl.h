@@ -36,6 +36,26 @@
 extern "C" {
 #endif
 
+#define	BLOWFISH_COPY_BLOCK(src, dst) \
+	(dst)[0] = (src)[0]; \
+	(dst)[1] = (src)[1]; \
+	(dst)[2] = (src)[2]; \
+	(dst)[3] = (src)[3]; \
+	(dst)[4] = (src)[4]; \
+	(dst)[5] = (src)[5]; \
+	(dst)[6] = (src)[6]; \
+	(dst)[7] = (src)[7]
+
+#define	BLOWFISH_XOR_BLOCK(src, dst) \
+	(dst)[0] ^= (src)[0]; \
+	(dst)[1] ^= (src)[1]; \
+	(dst)[2] ^= (src)[2]; \
+	(dst)[3] ^= (src)[3]; \
+	(dst)[4] ^= (src)[4]; \
+	(dst)[5] ^= (src)[5]; \
+	(dst)[6] ^= (src)[6]; \
+	(dst)[7] ^= (src)[7]
+
 #define	BLOWFISH_MINBITS	32
 #define	BLOWFISH_MINBYTES	(BLOWFISH_MINBITS >> 3)
 #define	BLOWFISH_MAXBITS	448
@@ -46,11 +66,16 @@ extern "C" {
 #define	BLOWFISH_KEY_INCREMENT	8
 #define	BLOWFISH_DEFAULT	128
 
-extern void blowfish_encrypt_block(void *, uint8_t *, uint8_t *);
-extern void blowfish_decrypt_block(void *, uint8_t *, uint8_t *);
+extern int blowfish_encrypt_contiguous_blocks(void *, char *, size_t,
+    crypto_data_t *);
+extern int blowfish_decrypt_contiguous_blocks(void *, char *, size_t,
+    crypto_data_t *);
+extern int blowfish_encrypt_block(const void *, const uint8_t *, uint8_t *);
+extern int blowfish_decrypt_block(const void *, const uint8_t *, uint8_t *);
 extern void blowfish_init_keysched(uint8_t *, uint_t, void *);
 extern void *blowfish_alloc_keysched(size_t *, int);
-
+extern void blowfish_copy_block(uint8_t *, uint8_t *);
+extern void blowfish_xor_block(uint8_t *, uint8_t *);
 #ifdef	__cplusplus
 }
 #endif

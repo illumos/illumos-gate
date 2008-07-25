@@ -35,7 +35,7 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
-COM_DIR = $(COMMONBASE)/crypto/des
+COM_DIR = $(COMMONBASE)/crypto
 
 #
 #	Define the module and object file sets.
@@ -72,6 +72,11 @@ $(MODSTUBS_O)	:= AS_CPPFLAGS += -DDES_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
 
 #
+# Linkage dependencies
+#
+LDFLAGS += -dy -Nmisc/kcf
+
+#
 # lint pass one enforcement
 #
 CFLAGS		+= $(CCVERBOSE) -I$(COM_DIR)
@@ -83,7 +88,6 @@ LINTFLAGS	+= -I$(COM_DIR)
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 
 #

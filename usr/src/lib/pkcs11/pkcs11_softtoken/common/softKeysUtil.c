@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <strings.h>
 #include <sys/types.h>
 #include <security/cryptoki.h>
+#include <sys/crypto/common.h>
 #include <aes_impl.h>
 #include <blowfish_impl.h>
 #include <des_impl.h>
@@ -1418,6 +1419,7 @@ soft_wrapkey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	case CKM_DES_CBC:
 	case CKM_DES3_CBC:
 	case CKM_AES_CBC:
+	case CKM_AES_CTR:
 	case CKM_BLOWFISH_CBC:
 		/*
 		 * Unpadded secret key mechs and private key mechs are only

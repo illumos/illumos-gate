@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,8 @@
 #include <sys/ddi.h>
 #include <sys/sysmacros.h>
 #include <sys/strsun.h>
-#include <sys/note.h>
+#include <sys/crypto/spi.h>
+#include <modes/modes.h>
 #include <sys/crypto/common.h>
 #include "des_impl.h"
 #ifndef	_KERNEL
@@ -429,22 +430,22 @@ des_ip(uint64_t *l, uint64_t *r, uint64_t pt)
 	b = b | (b >> 7);
 
 	b = (ip_table[0][(b >> 48) & 255ULL]) |
-		(ip_table[1][(b >> 32) & 255ULL]) |
-		(ip_table[0][(b >> 16) & 255ULL] << 6) |
-		(ip_table[1][b & 255ULL] << 6);
+	    (ip_table[1][(b >> 32) & 255ULL]) |
+	    (ip_table[0][(b >> 16) & 255ULL] << 6) |
+	    (ip_table[1][b & 255ULL] << 6);
 
 	a = (ip_table[0][(a >> 56) & 255]) |
-		(ip_table[1][(a >> 40) & 255]) |
-		(ip_table[0][(a >> 24) & 255] << 6) |
-		(ip_table[1][(a >> 8) & 255] << 6);
+	    (ip_table[1][(a >> 40) & 255]) |
+	    (ip_table[0][(a >> 24) & 255] << 6) |
+	    (ip_table[1][(a >> 8) & 255] << 6);
 
 	*l = ((b & top_1) << 8) |
-		(b & mid_4) |
-		((b & low_3) >> 5);
+	    (b & mid_4) |
+	    ((b & low_3) >> 5);
 
 	*r = ((a & top_1) << 8) |
-		(a & mid_4) |
-		((a & low_3) >> 5);
+	    (a & mid_4) |
+	    ((a & low_3) >> 5);
 }
 
 
@@ -454,14 +455,14 @@ des_fp(uint64_t l, uint64_t r)
 	uint32_t upper, lower;
 
 	lower = fp_table[((l >> 55) & 240) | ((r >> 59) & 15)] |
-		(fp_table[((l >> 35) & 240) | ((r>>39) & 15)] >> 2) |
-		(fp_table[((l >> 23) & 240) | ((r >> 27) & 15)] >> 4) |
-		(fp_table[((l >> 6) & 240) | ((r >> 10) & 15)] >> 6);
+	    (fp_table[((l >> 35) & 240) | ((r>>39) & 15)] >> 2) |
+	    (fp_table[((l >> 23) & 240) | ((r >> 27) & 15)] >> 4) |
+	    (fp_table[((l >> 6) & 240) | ((r >> 10) & 15)] >> 6);
 
 	upper = fp_table[((l >> 41) & 240) | ((r >> 45) & 15)] |
-		(fp_table[((l >> 29) & 240) | ((r >> 33) & 15)] >> 2) |
-		(fp_table[((l >> 12) & 240) | ((r >> 16) & 15)] >> 4) |
-		(fp_table[(l & 240) | (r >> 4) & 15] >> 6);
+	    (fp_table[((l >> 29) & 240) | ((r >> 33) & 15)] >> 2) |
+	    (fp_table[((l >> 12) & 240) | ((r >> 16) & 15)] >> 4) |
+	    (fp_table[(l & 240) | (r >> 4) & 15] >> 6);
 
 	return ((((uint64_t)upper) << 32) | (uint64_t)lower);
 
@@ -478,13 +479,13 @@ des_crypt_impl(uint64_t *ks, uint64_t block, int one_or_three)
 		for (i = j * 16; i < (j + 1) * 16; i++) {
 			t = r ^ ks[i];
 			t = sbox_table[0][t >> 58] |
-				sbox_table[1][(t >> 44) & 63] |
-				sbox_table[2][(t >> 38) & 63] |
-				sbox_table[3][(t >> 32) & 63] |
-				sbox_table[4][(t >> 26) & 63] |
-				sbox_table[5][(t >> 15) & 63] |
-				sbox_table[6][(t >> 9) & 63] |
-				sbox_table[7][(t >> 3) & 63];
+			    sbox_table[1][(t >> 44) & 63] |
+			    sbox_table[2][(t >> 38) & 63] |
+			    sbox_table[3][(t >> 32) & 63] |
+			    sbox_table[4][(t >> 26) & 63] |
+			    sbox_table[5][(t >> 15) & 63] |
+			    sbox_table[6][(t >> 9) & 63] |
+			    sbox_table[7][(t >> 3) & 63];
 			t = t^l;
 			l = r;
 			r = t;
@@ -499,8 +500,8 @@ des_crypt_impl(uint64_t *ks, uint64_t block, int one_or_three)
 
 /* EXPORT DELETE END */
 
-void
-des3_crunch_block(void *cookie, uint8_t block[DES_BLOCK_LEN],
+int
+des3_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
     uint8_t out_block[DES_BLOCK_LEN], boolean_t decrypt)
 {
 /* EXPORT DELETE START */
@@ -552,10 +553,11 @@ des3_crunch_block(void *cookie, uint8_t block[DES_BLOCK_LEN],
 	}
 #endif
 /* EXPORT DELETE END */
+	return (CRYPTO_SUCCESS);
 }
 
-void
-des_crunch_block(void *cookie, uint8_t block[DES_BLOCK_LEN],
+int
+des_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
     uint8_t out_block[DES_BLOCK_LEN], boolean_t decrypt)
 {
 /* EXPORT DELETE START */
@@ -608,6 +610,7 @@ des_crunch_block(void *cookie, uint8_t block[DES_BLOCK_LEN],
 	}
 #endif
 /* EXPORT DELETE END */
+	return (CRYPTO_SUCCESS);
 }
 
 static boolean_t
@@ -961,4 +964,129 @@ fix_des_parity(uint64_t *keyp)
 	*keyp ^= (k & 0x0101010101010101ULL);
 	*keyp ^= 0x0101010101010101ULL;
 /* EXPORT DELETE END */
+}
+
+void
+des_copy_block(uint8_t *in, uint8_t *out)
+{
+	if (IS_P2ALIGNED(in, sizeof (uint32_t)) &&
+	    IS_P2ALIGNED(out, sizeof (uint32_t))) {
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&out[0] = *(uint32_t *)&in[0];
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&out[4] = *(uint32_t *)&in[4];
+	} else {
+		DES_COPY_BLOCK(in, out);
+	}
+}
+
+/* XOR block of data into dest */
+void
+des_xor_block(uint8_t *data, uint8_t *dst)
+{
+	if (IS_P2ALIGNED(dst, sizeof (uint32_t)) &&
+	    IS_P2ALIGNED(data, sizeof (uint32_t))) {
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&dst[0] ^=
+		/* LINTED: pointer alignment */
+		    *(uint32_t *)&data[0];
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&dst[4] ^=
+		/* LINTED: pointer alignment */
+		    *(uint32_t *)&data[4];
+	} else {
+		DES_XOR_BLOCK(data, dst);
+	}
+}
+
+int
+des_encrypt_block(const void *keysched, const uint8_t *in, uint8_t *out)
+{
+	return (des_crunch_block(keysched, in, out, B_FALSE));
+}
+
+int
+des3_encrypt_block(const void *keysched, const uint8_t *in, uint8_t *out)
+{
+	return (des3_crunch_block(keysched, in, out, B_FALSE));
+}
+
+int
+des_decrypt_block(const void *keysched, const uint8_t *in, uint8_t *out)
+{
+	return (des_crunch_block(keysched, in, out, B_TRUE));
+}
+
+int
+des3_decrypt_block(const void *keysched, const uint8_t *in, uint8_t *out)
+{
+	return (des3_crunch_block(keysched, in, out, B_TRUE));
+}
+
+/*
+ * Encrypt multiple blocks of data according to mode.
+ */
+int
+des_encrypt_contiguous_blocks(void *ctx, char *data, size_t length,
+    crypto_data_t *out)
+{
+	des_ctx_t *des_ctx = ctx;
+	int rv;
+
+	if (des_ctx->dc_flags & DES3_STRENGTH) {
+		if (des_ctx->dc_flags & CBC_MODE) {
+			rv = cbc_encrypt_contiguous_blocks(ctx, data,
+			    length, out, DES_BLOCK_LEN, des3_encrypt_block,
+			    des_copy_block, des_xor_block);
+		} else {
+			rv = ecb_cipher_contiguous_blocks(ctx, data, length,
+			    out, DES_BLOCK_LEN, des3_encrypt_block);
+		}
+	} else {
+		if (des_ctx->dc_flags & CBC_MODE) {
+			rv = cbc_encrypt_contiguous_blocks(ctx, data,
+			    length, out, DES_BLOCK_LEN, des_encrypt_block,
+			    des_copy_block, des_xor_block);
+		} else {
+			rv = ecb_cipher_contiguous_blocks(ctx, data, length,
+			    out, DES_BLOCK_LEN, des_encrypt_block);
+		}
+	}
+	return (rv);
+}
+
+/*
+ * Decrypt multiple blocks of data according to mode.
+ */
+int
+des_decrypt_contiguous_blocks(void *ctx, char *data, size_t length,
+    crypto_data_t *out)
+{
+	des_ctx_t *des_ctx = ctx;
+	int rv;
+
+	if (des_ctx->dc_flags & DES3_STRENGTH) {
+		if (des_ctx->dc_flags & CBC_MODE) {
+			rv = cbc_decrypt_contiguous_blocks(ctx, data,
+			    length, out, DES_BLOCK_LEN, des3_decrypt_block,
+			    des_copy_block, des_xor_block);
+		} else {
+			rv = ecb_cipher_contiguous_blocks(ctx, data, length,
+			    out, DES_BLOCK_LEN, des3_decrypt_block);
+			if (rv == CRYPTO_DATA_LEN_RANGE)
+				rv = CRYPTO_ENCRYPTED_DATA_LEN_RANGE;
+		}
+	} else {
+		if (des_ctx->dc_flags & CBC_MODE) {
+			rv = cbc_decrypt_contiguous_blocks(ctx, data,
+			    length, out, DES_BLOCK_LEN, des_decrypt_block,
+			    des_copy_block, des_xor_block);
+		} else {
+			rv = ecb_cipher_contiguous_blocks(ctx, data, length,
+			    out, DES_BLOCK_LEN, des_decrypt_block);
+			if (rv == CRYPTO_DATA_LEN_RANGE)
+				rv = CRYPTO_ENCRYPTED_DATA_LEN_RANGE;
+		}
+	}
+	return (rv);
 }

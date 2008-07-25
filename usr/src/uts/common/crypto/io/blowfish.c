@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,8 +39,8 @@
 #include <sys/sysmacros.h>
 #include <sys/strsun.h>
 #include <sys/note.h>
-#include <blowfish_impl.h>
-#include <blowfish_cbc_crypt.h>
+#include <modes/modes.h>
+#include <blowfish/blowfish_impl.h>
 
 extern struct mod_ops mod_cryptoops;
 
@@ -325,18 +325,22 @@ blowfish_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	    mechanism->cm_param_len != BLOWFISH_BLOCK_LEN)
 		return (CRYPTO_MECHANISM_PARAM_INVALID);
 
-	/*
-	 * Allocate a blowfish context.
-	 */
 	kmflag = crypto_kmflag(req);
-	blowfish_ctx = kmem_zalloc(sizeof (blowfish_ctx_t), kmflag);
+	switch (mechanism->cm_type) {
+	case BLOWFISH_ECB_MECH_INFO_TYPE:
+		blowfish_ctx = ecb_alloc_ctx(kmflag);
+		break;
+	case BLOWFISH_CBC_MECH_INFO_TYPE:
+		blowfish_ctx = cbc_alloc_ctx(kmflag);
+		break;
+	}
 	if (blowfish_ctx == NULL)
 		return (CRYPTO_HOST_MEMORY);
 
 	rv = blowfish_common_init_ctx(blowfish_ctx, template, mechanism,
 	    key, kmflag);
 	if (rv != CRYPTO_SUCCESS) {
-		kmem_free(blowfish_ctx, sizeof (blowfish_ctx_t));
+		crypto_free_mode_ctx(blowfish_ctx);
 		return (rv);
 	}
 
@@ -347,169 +351,17 @@ blowfish_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	return (CRYPTO_SUCCESS);
 }
 
-/*
- * Helper blowfish encrypt update function for iov input data.
- */
-static int
-blowfish_cipher_update_iov(blowfish_ctx_t *blowfish_ctx, crypto_data_t *input,
-    crypto_data_t *output, int (*cipher)(blowfish_ctx_t *, caddr_t, size_t,
-    crypto_data_t *))
+static void
+blowfish_copy_block64(uint8_t *in, uint64_t *out)
 {
-	if (input->cd_miscdata != NULL) {
-		if (IS_P2ALIGNED(input->cd_miscdata, sizeof (uint64_t))) {
-			/* LINTED: pointer alignment */
-			blowfish_ctx->bc_iv = *(uint64_t *)input->cd_miscdata;
-		} else {
-			uint8_t *miscdata8 = (uint8_t *)&input->cd_miscdata[0];
-			uint8_t *iv8 = (uint8_t *)&blowfish_ctx->bc_iv;
+	if (IS_P2ALIGNED(in, sizeof (uint64_t))) {
+		/* LINTED: pointer alignment */
+		out[0] = *(uint64_t *)&in[0];
+	} else {
+		uint8_t *iv8 = (uint8_t *)&out[0];
 
-			BLOWFISH_COPY_BLOCK(miscdata8, iv8);
-		}
+		BLOWFISH_COPY_BLOCK(in, iv8);
 	}
-
-	if (input->cd_raw.iov_len < input->cd_length)
-		return (CRYPTO_ARGUMENTS_BAD);
-
-	return (cipher)(blowfish_ctx, input->cd_raw.iov_base + input->cd_offset,
-	    input->cd_length, (input == output) ? NULL : output);
-}
-
-/*
- * Helper blowfish encrypt update function for uio input data.
- */
-static int
-blowfish_cipher_update_uio(blowfish_ctx_t *blowfish_ctx, crypto_data_t *input,
-    crypto_data_t *output, int (*cipher)(blowfish_ctx_t *, caddr_t, size_t,
-    crypto_data_t *))
-{
-	uio_t *uiop = input->cd_uio;
-	off_t offset = input->cd_offset;
-	size_t length = input->cd_length;
-	uint_t vec_idx;
-	size_t cur_len;
-
-	if (input->cd_miscdata != NULL) {
-		if (IS_P2ALIGNED(input->cd_miscdata, sizeof (uint64_t))) {
-			/*LINTED: pointer alignment */
-			blowfish_ctx->bc_iv = *(uint64_t *)input->cd_miscdata;
-		} else {
-			uint8_t *miscdata8 = (uint8_t *)&input->cd_miscdata[0];
-			uint8_t *iv8 = (uint8_t *)&blowfish_ctx->bc_iv;
-
-			BLOWFISH_COPY_BLOCK(miscdata8, iv8);
-		}
-	}
-
-	if (input->cd_uio->uio_segflg != UIO_SYSSPACE) {
-		return (CRYPTO_ARGUMENTS_BAD);
-	}
-
-	/*
-	 * Jump to the first iovec containing data to be
-	 * processed.
-	 */
-	for (vec_idx = 0; vec_idx < uiop->uio_iovcnt &&
-	    offset >= uiop->uio_iov[vec_idx].iov_len;
-	    offset -= uiop->uio_iov[vec_idx++].iov_len)
-		;
-	if (vec_idx == uiop->uio_iovcnt) {
-		/*
-		 * The caller specified an offset that is larger than the
-		 * total size of the buffers it provided.
-		 */
-		return (CRYPTO_DATA_LEN_RANGE);
-	}
-
-	/*
-	 * Now process the iovecs.
-	 */
-	while (vec_idx < uiop->uio_iovcnt && length > 0) {
-		cur_len = MIN(uiop->uio_iov[vec_idx].iov_len -
-		    offset, length);
-
-		(cipher)(blowfish_ctx, uiop->uio_iov[vec_idx].iov_base +
-		    offset, cur_len, (input == output) ? NULL : output);
-
-		length -= cur_len;
-		vec_idx++;
-		offset = 0;
-	}
-
-	if (vec_idx == uiop->uio_iovcnt && length > 0) {
-		/*
-		 * The end of the specified iovec's was reached but
-		 * the length requested could not be processed, i.e.
-		 * The caller requested to digest more data than it provided.
-		 */
-
-		return (CRYPTO_DATA_LEN_RANGE);
-	}
-
-	return (CRYPTO_SUCCESS);
-}
-
-/*
- * Helper blowfish encrypt update function for mblk input data.
- */
-static int
-blowfish_cipher_update_mp(blowfish_ctx_t *blowfish_ctx, crypto_data_t *input,
-    crypto_data_t *output, int (*cipher)(blowfish_ctx_t *, caddr_t, size_t,
-    crypto_data_t *))
-{
-	off_t offset = input->cd_offset;
-	size_t length = input->cd_length;
-	mblk_t *mp;
-	size_t cur_len;
-
-	if (input->cd_miscdata != NULL) {
-		if (IS_P2ALIGNED(input->cd_miscdata, sizeof (uint64_t))) {
-			/*LINTED: pointer alignment */
-			blowfish_ctx->bc_iv = *(uint64_t *)input->cd_miscdata;
-		} else {
-			uint8_t *miscdata8 = (uint8_t *)&input->cd_miscdata[0];
-			uint8_t *iv8 = (uint8_t *)&blowfish_ctx->bc_iv;
-
-			BLOWFISH_COPY_BLOCK(miscdata8, iv8);
-		}
-	}
-
-	/*
-	 * Jump to the first mblk_t containing data to be processed.
-	 */
-	for (mp = input->cd_mp; mp != NULL && offset >= MBLKL(mp);
-	    offset -= MBLKL(mp), mp = mp->b_cont)
-		;
-	if (mp == NULL) {
-		/*
-		 * The caller specified an offset that is larger than the
-		 * total size of the buffers it provided.
-		 */
-		return (CRYPTO_DATA_LEN_RANGE);
-	}
-
-	/*
-	 * Now do the processing on the mblk chain.
-	 */
-	while (mp != NULL && length > 0) {
-		cur_len = MIN(MBLKL(mp) - offset, length);
-		(cipher)(blowfish_ctx, (char *)(mp->b_rptr + offset), cur_len,
-		    (input == output) ? NULL : output);
-
-		length -= cur_len;
-		offset = 0;
-		mp = mp->b_cont;
-	}
-
-	if (mp == NULL && length > 0) {
-		/*
-		 * The end of the mblk was reached but the length requested
-		 * could not be processed, i.e. The caller requested
-		 * to digest more data than it provided.
-		 */
-		return (CRYPTO_DATA_LEN_RANGE);
-	}
-
-	return (CRYPTO_SUCCESS);
 }
 
 /* ARGSUSED */
@@ -637,16 +489,19 @@ blowfish_encrypt_update(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	 */
 	switch (plaintext->cd_format) {
 	case CRYPTO_DATA_RAW:
-		ret = blowfish_cipher_update_iov(ctx->cc_provider_private,
-		    plaintext, ciphertext, blowfish_encrypt_contiguous_blocks);
+		ret = crypto_update_iov(ctx->cc_provider_private,
+		    plaintext, ciphertext, blowfish_encrypt_contiguous_blocks,
+		    blowfish_copy_block64);
 		break;
 	case CRYPTO_DATA_UIO:
-		ret = blowfish_cipher_update_uio(ctx->cc_provider_private,
-		    plaintext, ciphertext, blowfish_encrypt_contiguous_blocks);
+		ret = crypto_update_uio(ctx->cc_provider_private,
+		    plaintext, ciphertext, blowfish_encrypt_contiguous_blocks,
+		    blowfish_copy_block64);
 		break;
 	case CRYPTO_DATA_MBLK:
-		ret = blowfish_cipher_update_mp(ctx->cc_provider_private,
-		    plaintext, ciphertext, blowfish_encrypt_contiguous_blocks);
+		ret = crypto_update_mp(ctx->cc_provider_private,
+		    plaintext, ciphertext, blowfish_encrypt_contiguous_blocks,
+		    blowfish_copy_block64);
 		break;
 	default:
 		ret = CRYPTO_ARGUMENTS_BAD;
@@ -697,16 +552,19 @@ blowfish_decrypt_update(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 	 */
 	switch (ciphertext->cd_format) {
 	case CRYPTO_DATA_RAW:
-		ret = blowfish_cipher_update_iov(ctx->cc_provider_private,
-		    ciphertext, plaintext, blowfish_decrypt_contiguous_blocks);
+		ret = crypto_update_iov(ctx->cc_provider_private,
+		    ciphertext, plaintext, blowfish_decrypt_contiguous_blocks,
+		    blowfish_copy_block64);
 		break;
 	case CRYPTO_DATA_UIO:
-		ret = blowfish_cipher_update_uio(ctx->cc_provider_private,
-		    ciphertext, plaintext, blowfish_decrypt_contiguous_blocks);
+		ret = crypto_update_uio(ctx->cc_provider_private,
+		    ciphertext, plaintext, blowfish_decrypt_contiguous_blocks,
+		    blowfish_copy_block64);
 		break;
 	case CRYPTO_DATA_MBLK:
-		ret = blowfish_cipher_update_mp(ctx->cc_provider_private,
-		    ciphertext, plaintext, blowfish_decrypt_contiguous_blocks);
+		ret = crypto_update_mp(ctx->cc_provider_private,
+		    ciphertext, plaintext, blowfish_decrypt_contiguous_blocks,
+		    blowfish_copy_block64);
 		break;
 	default:
 		ret = CRYPTO_ARGUMENTS_BAD;
@@ -832,22 +690,25 @@ blowfish_encrypt_atomic(crypto_provider_handle_t provider,
 	 */
 	switch (plaintext->cd_format) {
 	case CRYPTO_DATA_RAW:
-		ret = blowfish_cipher_update_iov(&blowfish_ctx,
-		    plaintext, ciphertext, blowfish_encrypt_contiguous_blocks);
+		ret = crypto_update_iov(&blowfish_ctx,
+		    plaintext, ciphertext, blowfish_encrypt_contiguous_blocks,
+		    blowfish_copy_block64);
 		break;
 	case CRYPTO_DATA_UIO:
-		ret = blowfish_cipher_update_uio(&blowfish_ctx,
-		    plaintext, ciphertext, blowfish_encrypt_contiguous_blocks);
+		ret = crypto_update_uio(&blowfish_ctx,
+		    plaintext, ciphertext, blowfish_encrypt_contiguous_blocks,
+		    blowfish_copy_block64);
 		break;
 	case CRYPTO_DATA_MBLK:
-		ret = blowfish_cipher_update_mp(&blowfish_ctx,
-		    plaintext, ciphertext, blowfish_encrypt_contiguous_blocks);
+		ret = crypto_update_mp((void *)&blowfish_ctx,
+		    plaintext, ciphertext, blowfish_encrypt_contiguous_blocks,
+		    blowfish_copy_block64);
 		break;
 	default:
 		ret = CRYPTO_ARGUMENTS_BAD;
 	}
 
-	if (blowfish_ctx.bc_flags & BLOWFISH_PROVIDER_OWNS_KEY_SCHEDULE) {
+	if (blowfish_ctx.bc_flags & PROVIDER_OWNS_KEY_SCHEDULE) {
 		bzero(blowfish_ctx.bc_keysched, blowfish_ctx.bc_keysched_len);
 		kmem_free(blowfish_ctx.bc_keysched,
 		    blowfish_ctx.bc_keysched_len);
@@ -916,22 +777,25 @@ blowfish_decrypt_atomic(crypto_provider_handle_t provider,
 	 */
 	switch (ciphertext->cd_format) {
 	case CRYPTO_DATA_RAW:
-		ret = blowfish_cipher_update_iov(&blowfish_ctx,
-		    ciphertext, plaintext, blowfish_decrypt_contiguous_blocks);
+		ret = crypto_update_iov(&blowfish_ctx,
+		    ciphertext, plaintext, blowfish_decrypt_contiguous_blocks,
+		    blowfish_copy_block64);
 		break;
 	case CRYPTO_DATA_UIO:
-		ret = blowfish_cipher_update_uio(&blowfish_ctx,
-		    ciphertext, plaintext, blowfish_decrypt_contiguous_blocks);
+		ret = crypto_update_uio(&blowfish_ctx,
+		    ciphertext, plaintext, blowfish_decrypt_contiguous_blocks,
+		    blowfish_copy_block64);
 		break;
 	case CRYPTO_DATA_MBLK:
-		ret = blowfish_cipher_update_mp(&blowfish_ctx,
-		    ciphertext, plaintext, blowfish_decrypt_contiguous_blocks);
+		ret = crypto_update_mp(&blowfish_ctx,
+		    ciphertext, plaintext, blowfish_decrypt_contiguous_blocks,
+		    blowfish_copy_block64);
 		break;
 	default:
 		ret = CRYPTO_ARGUMENTS_BAD;
 	}
 
-	if (blowfish_ctx.bc_flags & BLOWFISH_PROVIDER_OWNS_KEY_SCHEDULE) {
+	if (blowfish_ctx.bc_flags & PROVIDER_OWNS_KEY_SCHEDULE) {
 		bzero(blowfish_ctx.bc_keysched, blowfish_ctx.bc_keysched_len);
 		kmem_free(blowfish_ctx.bc_keysched,
 		    blowfish_ctx.bc_keysched_len);
@@ -999,15 +863,14 @@ blowfish_free_context(crypto_ctx_t *ctx)
 	blowfish_ctx_t *blowfish_ctx = ctx->cc_provider_private;
 
 	if (blowfish_ctx != NULL) {
-		if (blowfish_ctx->bc_flags &
-		    BLOWFISH_PROVIDER_OWNS_KEY_SCHEDULE) {
+		if (blowfish_ctx->bc_flags & PROVIDER_OWNS_KEY_SCHEDULE) {
 			ASSERT(blowfish_ctx->bc_keysched_len != 0);
 			bzero(blowfish_ctx->bc_keysched,
 			    blowfish_ctx->bc_keysched_len);
 			kmem_free(blowfish_ctx->bc_keysched,
 			    blowfish_ctx->bc_keysched_len);
 		}
-		kmem_free(blowfish_ctx, sizeof (blowfish_ctx_t));
+		crypto_free_mode_ctx(blowfish_ctx);
 		ctx->cc_provider_private = NULL;
 	}
 
@@ -1037,40 +900,29 @@ blowfish_common_init_ctx(blowfish_ctx_t *blowfish_ctx,
 		if ((rv = init_keysched(key, keysched)) != CRYPTO_SUCCESS)
 			kmem_free(keysched, size);
 
-		blowfish_ctx->bc_flags = BLOWFISH_PROVIDER_OWNS_KEY_SCHEDULE;
+		blowfish_ctx->bc_flags |= PROVIDER_OWNS_KEY_SCHEDULE;
 		blowfish_ctx->bc_keysched_len = size;
 	} else {
 		keysched = template;
 	}
-
-	if (mechanism->cm_type == BLOWFISH_CBC_MECH_INFO_TYPE) {
-		/*
-		 * Copy IV into BLOWFISH context.
-		 *
-		 * If cm_param == NULL then the IV comes from the
-		 * cd_miscdata field in the crypto_data structure.
-		 */
-		if (mechanism->cm_param != NULL) {
-			ASSERT(mechanism->cm_param_len == BLOWFISH_BLOCK_LEN);
-			if (IS_P2ALIGNED(mechanism->cm_param,
-			    sizeof (uint64_t))) {
-				/* LINTED: pointer alignment */
-				blowfish_ctx->bc_iv =
-				    *(uint64_t *)mechanism->cm_param;
-			} else {
-				uint8_t *iv8;
-				uint8_t *p8;
-				iv8 = (uint8_t *)&blowfish_ctx->bc_iv;
-				p8 = (uint8_t *)&mechanism->cm_param[0];
-
-				BLOWFISH_COPY_BLOCK(p8, iv8);
-			}
-		}
-
-		blowfish_ctx->bc_lastp = (uint8_t *)&blowfish_ctx->bc_iv;
-		blowfish_ctx->bc_flags |= BLOWFISH_CBC_MODE;
-	}
 	blowfish_ctx->bc_keysched = keysched;
+
+	switch (mechanism->cm_type) {
+	case BLOWFISH_CBC_MECH_INFO_TYPE:
+		rv = cbc_init_ctx((cbc_ctx_t *)blowfish_ctx,
+		    mechanism->cm_param, mechanism->cm_param_len,
+		    BLOWFISH_BLOCK_LEN, blowfish_copy_block64);
+		break;
+	case BLOWFISH_ECB_MECH_INFO_TYPE:
+		blowfish_ctx->bc_flags |= ECB_MODE;
+	}
+
+	if (rv != CRYPTO_SUCCESS) {
+		if (blowfish_ctx->bc_flags & PROVIDER_OWNS_KEY_SCHEDULE) {
+			bzero(keysched, size);
+			kmem_free(keysched, size);
+		}
+	}
 
 /* EXPORT DELETE END */
 

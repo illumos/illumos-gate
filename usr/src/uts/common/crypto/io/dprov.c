@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,7 +93,8 @@
 #include <sys/crypto/sched_impl.h>
 
 #include <sys/sha2.h>
-#include <aes/aes_cbc_crypt.h>
+#include <modes/modes.h>
+#include <aes/aes_impl.h>
 #include <des/des_impl.h>
 #include <ecc/ecc_impl.h>
 #include <blowfish/blowfish_impl.h>
@@ -4676,6 +4677,21 @@ dprov_free_mechanism(crypto_provider_handle_t provider,
 		    roundup(ecc_params->ulPublicDataLen, sizeof (caddr_t)));
 		return (CRYPTO_SUCCESS);
 	}
+	case AES_CCM_MECH_INFO_TYPE: {
+		CK_AES_CCM_PARAMS *params;
+		size_t total_param_len;
+
+		if ((mech->cm_param != NULL) && (mech->cm_param_len != 0)) {
+			/* LINTED: pointer alignment */
+			params = (CK_AES_CCM_PARAMS *)mech->cm_param;
+			total_param_len = mech->cm_param_len +
+			    params->ulNonceSize + params->ulAuthDataSize;
+			kmem_free(params, total_param_len);
+			mech->cm_param = NULL;
+			mech->cm_param_len = 0;
+		}
+	}
+
 	default:
 		len = mech->cm_param_len;
 	}

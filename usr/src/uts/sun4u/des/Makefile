@@ -35,7 +35,7 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
-COM_DIR = $(COMMONBASE)/crypto/des
+COM_DIR = $(COMMONBASE)/crypto
 
 #
 #	Define the module and object file sets.
@@ -63,6 +63,11 @@ ELFSIGN_MOD	= $(ELFSIGN_CRYPTO)
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
+
+#
+# Linkage dependencies
+#
+LDFLAGS += -dy -Nmisc/kcf
 
 #
 # lint pass one enforcement

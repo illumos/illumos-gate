@@ -31,13 +31,12 @@
 #include <strings.h>
 #include <sys/types.h>
 #include <security/cryptoki.h>
-#include <des_cbc_crypt.h>
+#include <modes/modes.h>
 #include <des_impl.h>
 #include "softSession.h"
 #include "softObject.h"
 #include "softCrypt.h"
 #include "softOps.h"
-
 
 /*
  * Allocate context for the active encryption or decryption operation, and
@@ -348,10 +347,12 @@ soft_des_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 			tmp_outbuf = &out_buf[i];
 			/* Crunch one block of data for DES. */
 			if (soft_des_ctx->key_type == CKK_DES)
-				des_crunch_block(soft_des_ctx->key_sched,
+				(void) des_crunch_block(
+				    soft_des_ctx->key_sched,
 				    tmp_inbuf, tmp_outbuf, B_FALSE);
 			else
-				des3_crunch_block(soft_des_ctx->key_sched,
+				(void) des3_crunch_block(
+				    soft_des_ctx->key_sched,
 				    tmp_inbuf, tmp_outbuf, B_FALSE);
 		}
 
@@ -665,10 +666,12 @@ soft_des_decrypt_common(soft_session_t *session_p, CK_BYTE_PTR pEncrypted,
 			tmp_outbuf = &out_buf[i];
 			/* Crunch one block of data for DES. */
 			if (soft_des_ctx->key_type == CKK_DES)
-				des_crunch_block(soft_des_ctx->key_sched,
+				(void) des_crunch_block(
+				    soft_des_ctx->key_sched,
 				    tmp_inbuf, tmp_outbuf, B_TRUE);
 			else
-				des3_crunch_block(soft_des_ctx->key_sched,
+				(void) des3_crunch_block(
+				    soft_des_ctx->key_sched,
 				    tmp_inbuf, tmp_outbuf, B_TRUE);
 		}
 
@@ -798,23 +801,23 @@ void *
 des_cbc_ctx_init(void *key_sched, size_t size, uint8_t *ivec, CK_KEY_TYPE type)
 {
 
-	des_ctx_t *des_ctx;
+	cbc_ctx_t *cbc_ctx;
 
-	if ((des_ctx = calloc(1, sizeof (des_ctx_t))) == NULL)
+	if ((cbc_ctx = calloc(1, sizeof (cbc_ctx_t))) == NULL)
 		return (NULL);
 
-	des_ctx->dc_keysched = key_sched;
+	cbc_ctx->cc_keysched = key_sched;
 
-	(void) memcpy(&des_ctx->dc_iv, ivec, DES_BLOCK_LEN);
+	(void) memcpy(&cbc_ctx->cc_iv[0], ivec, DES_BLOCK_LEN);
 
-	des_ctx->dc_lastp = (uint8_t *)&des_ctx->dc_iv;
-	des_ctx->dc_keysched_len = size;
+	cbc_ctx->cc_lastp = (uint8_t *)&cbc_ctx->cc_iv[0];
+	cbc_ctx->cc_keysched_len = size;
 	if (type == CKK_DES)
-		des_ctx->dc_flags |= DES_CBC_MODE;
+		cbc_ctx->cc_flags |= CBC_MODE;
 	else
-		des_ctx->dc_flags |= DES_CBC_MODE | DES3_STRENGTH;
+		cbc_ctx->cc_flags |= CBC_MODE | DES3_STRENGTH;
 
-	return ((void *)des_ctx);
+	return (cbc_ctx);
 
 }
 

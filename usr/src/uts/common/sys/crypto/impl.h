@@ -1322,6 +1322,27 @@ extern int kcf_rnd_get_bytes(uint8_t *, size_t, boolean_t, boolean_t);
 extern int random_add_pseudo_entropy(uint8_t *, size_t, uint_t);
 extern void kcf_rnd_chpoll(int, short *, struct pollhead **);
 extern void kcf_rnd_schedule_timeout(boolean_t);
+extern int crypto_uio_data(crypto_data_t *, uchar_t *, int, cmd_type_t,
+    void *, void (*update)());
+extern int crypto_mblk_data(crypto_data_t *, uchar_t *, int, cmd_type_t,
+    void *, void (*update)());
+extern int crypto_put_output_data(uchar_t *, crypto_data_t *, int);
+extern int crypto_get_input_data(crypto_data_t *, uchar_t **, uchar_t *);
+extern int crypto_copy_key_to_ctx(crypto_key_t *, crypto_key_t **, size_t *,
+    int kmflag);
+extern int crypto_digest_data(crypto_data_t *, void *, uchar_t *,
+    void (*update)(), void (*final)(), uchar_t);
+extern int crypto_update_iov(void *, crypto_data_t *, crypto_data_t *,
+    int (*cipher)(void *, caddr_t, size_t, crypto_data_t *),
+    void (*copy_block)(uint8_t *, uint64_t *));
+extern int crypto_update_uio(void *, crypto_data_t *, crypto_data_t *,
+    int (*cipher)(void *, caddr_t, size_t, crypto_data_t *),
+    void (*copy_block)(uint8_t *, uint64_t *));
+extern int crypto_update_mp(void *, crypto_data_t *, crypto_data_t *,
+    int (*cipher)(void *, caddr_t, size_t, crypto_data_t *),
+    void (*copy_block)(uint8_t *, uint64_t *));
+extern int crypto_get_key_attr(crypto_key_t *, crypto_attr_type_t, uchar_t **,
+    ssize_t *);
 
 /* Access to the provider's table */
 extern void kcf_prov_tab_init(void);

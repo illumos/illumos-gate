@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,9 +31,7 @@
 #include <strings.h>
 #include <sys/types.h>
 #include <security/cryptoki.h>
-#include <des_cbc_crypt.h>
-#include <aes_cbc_crypt.h>
-#include <blowfish_cbc_crypt.h>
+#include <modes/modes.h>
 #include <arcfour.h>
 #include "softSession.h"
 #include "softObject.h"
@@ -252,6 +250,45 @@ cbc_common:
 
 		return (rv);
 	}
+	case CKM_AES_CTR:
+	{
+		soft_aes_ctx_t *soft_aes_ctx;
+
+		if (key_p->key_type != CKK_AES) {
+			return (CKR_KEY_TYPE_INCONSISTENT);
+		}
+
+		if (pMechanism->pParameter == NULL ||
+		    pMechanism->ulParameterLen != sizeof (CK_AES_CTR_PARAMS)) {
+			return (CKR_MECHANISM_PARAM_INVALID);
+		}
+
+		rv = soft_aes_crypt_init_common(session_p, pMechanism,
+		    key_p, B_TRUE);
+
+		if (rv != CKR_OK)
+			return (rv);
+
+		(void) pthread_mutex_lock(&session_p->session_mutex);
+
+		soft_aes_ctx = (soft_aes_ctx_t *)session_p->encrypt.context;
+		soft_aes_ctx->aes_cbc = aes_ctr_ctx_init(
+		    soft_aes_ctx->key_sched, soft_aes_ctx->keysched_len,
+		    pMechanism->pParameter);
+
+		if (soft_aes_ctx->aes_cbc == NULL) {
+			bzero(soft_aes_ctx->key_sched,
+			    soft_aes_ctx->keysched_len);
+			free(soft_aes_ctx->key_sched);
+			free(session_p->encrypt.context);
+			session_p->encrypt.context = NULL;
+			rv = CKR_HOST_MEMORY;
+		}
+
+		(void) pthread_mutex_unlock(&session_p->session_mutex);
+
+		return (rv);
+	}
 	case CKM_RC4:
 
 		if (key_p->key_type != CKK_RC4) {
@@ -299,8 +336,8 @@ cbc_common:
 		/* Allocate a context for Blowfish cipher-block chaining */
 		soft_blowfish_ctx->blowfish_cbc =
 		    (void *)blowfish_cbc_ctx_init(soft_blowfish_ctx->key_sched,
-			soft_blowfish_ctx->keysched_len,
-			soft_blowfish_ctx->ivec);
+		    soft_blowfish_ctx->keysched_len,
+		    soft_blowfish_ctx->ivec);
 
 		if (soft_blowfish_ctx->blowfish_cbc == NULL) {
 			bzero(soft_blowfish_ctx->key_sched,
@@ -369,6 +406,7 @@ soft_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 
 	case CKM_AES_ECB:
 	case CKM_AES_CBC:
+	case CKM_AES_CTR:
 
 		if (ulDataLen == 0) {
 			*pulEncryptedLen = 0;
@@ -477,6 +515,7 @@ soft_encrypt_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
 	case CKM_AES_ECB:
 	case CKM_AES_CBC:
 	case CKM_AES_CBC_PAD:
+	case CKM_AES_CTR:
 	case CKM_BLOWFISH_CBC:
 	case CKM_RC4:
 
@@ -691,7 +730,6 @@ soft_encrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastEncryptedPart,
 	case CKM_AES_CBC:
 	case CKM_AES_ECB:
 	{
-
 		soft_aes_ctx_t *soft_aes_ctx;
 
 		soft_aes_ctx = (soft_aes_ctx_t *)session_p->encrypt.context;
@@ -715,7 +753,42 @@ soft_encrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastEncryptedPart,
 
 		break;
 	}
+	case CKM_AES_CTR:
+	{
+		crypto_data_t out;
+		soft_aes_ctx_t *soft_aes_ctx;
+		ctr_ctx_t *ctr_ctx;
+		size_t len;
 
+		soft_aes_ctx = (soft_aes_ctx_t *)session_p->encrypt.context;
+		ctr_ctx = soft_aes_ctx->aes_cbc;
+		len = ctr_ctx->ctr_remainder_len;
+
+		if (pLastEncryptedPart == NULL) {
+			*pulLastEncryptedPartLen = len;
+			goto clean1;
+		}
+		if (len > 0) {
+			out.cd_format = CRYPTO_DATA_RAW;
+			out.cd_offset = 0;
+			out.cd_length = len;
+			out.cd_raw.iov_base = (char *)pLastEncryptedPart;
+			out.cd_raw.iov_len = len;
+
+			rv = ctr_mode_final(ctr_ctx, &out, aes_encrypt_block);
+		}
+		if (rv == CRYPTO_BUFFER_TOO_SMALL) {
+			*pulLastEncryptedPartLen = len;
+			goto clean1;
+		}
+
+		/* Cleanup memory space. */
+		free(ctr_ctx);
+		bzero(soft_aes_ctx->key_sched, soft_aes_ctx->keysched_len);
+		free(soft_aes_ctx->key_sched);
+
+		break;
+	}
 	case CKM_BLOWFISH_CBC:
 	{
 		soft_blowfish_ctx_t *soft_blowfish_ctx;

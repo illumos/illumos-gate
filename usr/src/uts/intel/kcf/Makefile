@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,6 +34,7 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
+COM_DIR = $(COMMONBASE)/crypto
 
 #
 #	Define the module and object file sets.
@@ -64,10 +65,14 @@ LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+LINTTAGS	+= -I$(COM_DIR)
 
 #
 # Linkage dependencies
 #
+
+CFLAGS += $(CCVERBOSE) -I$(COM_DIR)
 
 #
 #	Default build targets.

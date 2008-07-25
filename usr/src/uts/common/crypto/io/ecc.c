@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <sys/modctl.h>
 #include <sys/ddi.h>
 #include <sys/crypto/spi.h>
+#include <sys/crypto/impl.h>
 #include <sys/sysmacros.h>
 #include <sys/strsun.h>
 #include <sys/sha1.h>
@@ -300,28 +301,6 @@ ecc_provider_status(crypto_provider_handle_t provider, uint_t *status)
 }
 
 /*
- * Utility routine to look up a attribute of type, 'type',
- * in the key.
- */
-static int
-get_key_attr(crypto_key_t *key, crypto_attr_type_t type,
-    uchar_t **value, ssize_t *value_len)
-{
-	int i;
-
-	ASSERT(key->ck_format == CRYPTO_KEY_ATTR_LIST);
-	for (i = 0; i < key->ck_count; i++) {
-		if (key->ck_attrs[i].oa_type == type) {
-			*value = (uchar_t *)key->ck_attrs[i].oa_value;
-			*value_len = key->ck_attrs[i].oa_value_len;
-			return (CRYPTO_SUCCESS);
-		}
-	}
-
-	return (CRYPTO_FAILED);
-}
-
-/*
  * Return the index of an attribute of specified type found in
  * the specified array of attributes. If the attribute cannot
  * found, return -1.
@@ -400,8 +379,8 @@ check_mech_and_key(ecc_mech_type_t mech_type, crypto_key_t *key, ulong_t class)
 
 	switch (class) {
 	case CKO_PUBLIC_KEY:
-		if ((rv = get_key_attr(key, CKA_EC_POINT, &foo, &point_len))
-		    != CRYPTO_SUCCESS) {
+		if ((rv = crypto_get_key_attr(key, CKA_EC_POINT, &foo,
+		    &point_len)) != CRYPTO_SUCCESS) {
 			return (CRYPTO_TEMPLATE_INCOMPLETE);
 		}
 		if (point_len < CRYPTO_BITS2BYTES(EC_MIN_KEY_LEN) * 2 + 1 ||
@@ -410,8 +389,8 @@ check_mech_and_key(ecc_mech_type_t mech_type, crypto_key_t *key, ulong_t class)
 		break;
 
 	case CKO_PRIVATE_KEY:
-		if ((rv = get_key_attr(key, CKA_VALUE, &foo, &value_len))
-		    != CRYPTO_SUCCESS) {
+		if ((rv = crypto_get_key_attr(key, CKA_VALUE, &foo,
+		    &value_len)) != CRYPTO_SUCCESS) {
 			return (CRYPTO_TEMPLATE_INCOMPLETE);
 		}
 		if (value_len < CRYPTO_BITS2BYTES(EC_MIN_KEY_LEN) ||
@@ -483,290 +462,6 @@ ecc_knzero_random_generator(uint8_t *ran_out, size_t ran_len)
 	return (CRYPTO_SUCCESS);
 }
 
-typedef enum cmd_type {
-	COPY_FROM_DATA,
-	COPY_TO_DATA,
-	COMPARE_TO_DATA,
-	SHA1_DIGEST_DATA
-} cmd_type_t;
-
-/*
- * Utility routine to apply the command, 'cmd', to the
- * data in the uio structure.
- */
-static int
-process_uio_data(crypto_data_t *data, uchar_t *buf, int len,
-    cmd_type_t cmd, void *digest_ctx)
-{
-	uio_t *uiop = data->cd_uio;
-	off_t offset = data->cd_offset;
-	size_t length = len;
-	uint_t vec_idx;
-	size_t cur_len;
-	uchar_t *datap;
-
-	ASSERT(data->cd_format == CRYPTO_DATA_UIO);
-	if (uiop->uio_segflg != UIO_SYSSPACE) {
-		return (CRYPTO_ARGUMENTS_BAD);
-	}
-
-	/*
-	 * Jump to the first iovec containing data to be
-	 * processed.
-	 */
-	for (vec_idx = 0; vec_idx < uiop->uio_iovcnt &&
-	    offset >= uiop->uio_iov[vec_idx].iov_len;
-	    offset -= uiop->uio_iov[vec_idx++].iov_len)
-		;
-
-	if (vec_idx == uiop->uio_iovcnt) {
-		/*
-		 * The caller specified an offset that is larger than
-		 * the total size of the buffers it provided.
-		 */
-		return (CRYPTO_DATA_LEN_RANGE);
-	}
-
-	while (vec_idx < uiop->uio_iovcnt && length > 0) {
-		cur_len = MIN(uiop->uio_iov[vec_idx].iov_len -
-		    offset, length);
-
-		datap = (uchar_t *)(uiop->uio_iov[vec_idx].iov_base +
-		    offset);
-		switch (cmd) {
-		case COPY_FROM_DATA:
-			bcopy(datap, buf, cur_len);
-			buf += cur_len;
-			break;
-		case COPY_TO_DATA:
-			bcopy(buf, datap, cur_len);
-			buf += cur_len;
-			break;
-		case COMPARE_TO_DATA:
-			if (bcmp(datap, buf, cur_len))
-				return (CRYPTO_SIGNATURE_INVALID);
-			buf += cur_len;
-			break;
-		case SHA1_DIGEST_DATA:
-			SHA1Update(digest_ctx, datap, cur_len);
-			break;
-		}
-
-		length -= cur_len;
-		vec_idx++;
-		offset = 0;
-	}
-
-	if (vec_idx == uiop->uio_iovcnt && length > 0) {
-		/*
-		 * The end of the specified iovec's was reached but
-		 * the length requested could not be processed.
-		 */
-		switch (cmd) {
-		case COPY_TO_DATA:
-			data->cd_length = len;
-			return (CRYPTO_BUFFER_TOO_SMALL);
-		default:
-			return (CRYPTO_DATA_LEN_RANGE);
-		}
-	}
-
-	return (CRYPTO_SUCCESS);
-}
-
-/*
- * Utility routine to apply the command, 'cmd', to the
- * data in the mblk structure.
- */
-static int
-process_mblk_data(crypto_data_t *data, uchar_t *buf, int len,
-    cmd_type_t cmd, void *digest_ctx)
-{
-	off_t offset = data->cd_offset;
-	size_t length = len;
-	mblk_t *mp;
-	size_t cur_len;
-	uchar_t *datap;
-
-	ASSERT(data->cd_format == CRYPTO_DATA_MBLK);
-	/*
-	 * Jump to the first mblk_t containing data to be processed.
-	 */
-	for (mp = data->cd_mp; mp != NULL && offset >= MBLKL(mp);
-	    offset -= MBLKL(mp), mp = mp->b_cont)
-		;
-	if (mp == NULL) {
-		/*
-		 * The caller specified an offset that is larger
-		 * than the total size of the buffers it provided.
-		 */
-		return (CRYPTO_DATA_LEN_RANGE);
-	}
-
-	/*
-	 * Now do the processing on the mblk chain.
-	 */
-	while (mp != NULL && length > 0) {
-		cur_len = MIN(MBLKL(mp) - offset, length);
-
-		datap = (uchar_t *)(mp->b_rptr + offset);
-		switch (cmd) {
-		case COPY_FROM_DATA:
-			bcopy(datap, buf, cur_len);
-			buf += cur_len;
-			break;
-		case COPY_TO_DATA:
-			bcopy(buf, datap, cur_len);
-			buf += cur_len;
-			break;
-		case COMPARE_TO_DATA:
-			if (bcmp(datap, buf, cur_len))
-				return (CRYPTO_SIGNATURE_INVALID);
-			buf += cur_len;
-			break;
-		case SHA1_DIGEST_DATA:
-			SHA1Update(digest_ctx, datap, cur_len);
-			break;
-		}
-
-		length -= cur_len;
-		offset = 0;
-		mp = mp->b_cont;
-	}
-
-	if (mp == NULL && length > 0) {
-		/*
-		 * The end of the mblk was reached but the length
-		 * requested could not be processed.
-		 */
-		switch (cmd) {
-		case COPY_TO_DATA:
-			data->cd_length = len;
-			return (CRYPTO_BUFFER_TOO_SMALL);
-		default:
-			return (CRYPTO_DATA_LEN_RANGE);
-		}
-	}
-
-	return (CRYPTO_SUCCESS);
-}
-
-/*
- * Utility routine to copy a buffer to a crypto_data structure.
- */
-static int
-put_output_data(uchar_t *buf, crypto_data_t *output, int len)
-{
-	switch (output->cd_format) {
-	case CRYPTO_DATA_RAW:
-		if (output->cd_raw.iov_len < len) {
-			output->cd_length = len;
-			return (CRYPTO_BUFFER_TOO_SMALL);
-		}
-		bcopy(buf, (uchar_t *)(output->cd_raw.iov_base +
-		    output->cd_offset), len);
-		break;
-
-	case CRYPTO_DATA_UIO:
-		return (process_uio_data(output, buf, len, COPY_TO_DATA, NULL));
-
-	case CRYPTO_DATA_MBLK:
-		return (process_mblk_data(output, buf, len,
-		    COPY_TO_DATA, NULL));
-
-	default:
-		return (CRYPTO_ARGUMENTS_BAD);
-	}
-
-	return (CRYPTO_SUCCESS);
-}
-
-/*
- * Utility routine to get data from a crypto_data structure.
- *
- * '*dptr' contains a pointer to a buffer on return. 'buf'
- * is allocated by the caller and is ignored for CRYPTO_DATA_RAW case.
- */
-static int
-get_input_data(crypto_data_t *input, uchar_t **dptr, uchar_t *buf)
-{
-	int rv;
-
-	switch (input->cd_format) {
-	case CRYPTO_DATA_RAW:
-		if (input->cd_raw.iov_len < input->cd_length)
-			return (CRYPTO_ARGUMENTS_BAD);
-		*dptr = (uchar_t *)(input->cd_raw.iov_base +
-		    input->cd_offset);
-		break;
-
-	case CRYPTO_DATA_UIO:
-		if ((rv = process_uio_data(input, buf, input->cd_length,
-		    COPY_FROM_DATA, NULL)) != CRYPTO_SUCCESS)
-			return (rv);
-		*dptr = buf;
-		break;
-
-	case CRYPTO_DATA_MBLK:
-		if ((rv = process_mblk_data(input, buf, input->cd_length,
-		    COPY_FROM_DATA, NULL)) != CRYPTO_SUCCESS)
-			return (rv);
-		*dptr = buf;
-		break;
-
-	default:
-		return (CRYPTO_ARGUMENTS_BAD);
-	}
-
-	return (CRYPTO_SUCCESS);
-}
-
-static int
-copy_key_to_ctx(crypto_key_t *in_key, ecc_ctx_t *ctx, int kmflag)
-{
-	int i, count;
-	size_t len;
-	caddr_t attr_val;
-	crypto_object_attribute_t *k_attrs = NULL;
-
-	ASSERT(in_key->ck_format == CRYPTO_KEY_ATTR_LIST);
-
-	count = in_key->ck_count;
-	/* figure out how much memory to allocate for everything */
-	len = sizeof (crypto_key_t) +
-	    count * sizeof (crypto_object_attribute_t);
-	for (i = 0; i < count; i++) {
-		len += roundup(in_key->ck_attrs[i].oa_value_len,
-		    sizeof (caddr_t));
-	}
-
-	/* one big allocation for everything */
-	ctx->key = kmem_alloc(len, kmflag);
-	if (ctx->key == NULL)
-		return (CRYPTO_HOST_MEMORY);
-	/* LINTED: pointer alignment */
-	k_attrs = (crypto_object_attribute_t *)((caddr_t)(ctx->key) +
-	    sizeof (crypto_key_t));
-
-	attr_val = (caddr_t)k_attrs +
-	    count * sizeof (crypto_object_attribute_t);
-	for (i = 0; i < count; i++) {
-		k_attrs[i].oa_type = in_key->ck_attrs[i].oa_type;
-		bcopy(in_key->ck_attrs[i].oa_value, attr_val,
-		    in_key->ck_attrs[i].oa_value_len);
-		k_attrs[i].oa_value = attr_val;
-		k_attrs[i].oa_value_len = in_key->ck_attrs[i].oa_value_len;
-		attr_val += roundup(k_attrs[i].oa_value_len, sizeof (caddr_t));
-	}
-
-	ctx->keychunk_size = len;	/* save the size to be freed */
-	ctx->key->ck_format = CRYPTO_KEY_ATTR_LIST;
-	ctx->key->ck_count = count;
-	ctx->key->ck_attrs = k_attrs;
-
-	return (CRYPTO_SUCCESS);
-}
-
 static void
 ecc_free_context(crypto_ctx_t *ctx)
 {
@@ -803,7 +498,7 @@ ecc_sign_verify_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	ECParams  *ecparams;
 	SECKEYECParams params_item;
 
-	if (get_key_attr(key, CKA_EC_PARAMS, (void *) &params,
+	if (crypto_get_key_attr(key, CKA_EC_PARAMS, (void *) &params,
 	    &params_len)) {
 		return (CRYPTO_ARGUMENTS_BAD);
 	}
@@ -839,7 +534,8 @@ ecc_sign_verify_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 		return (CRYPTO_HOST_MEMORY);
 	}
 
-	if ((rv = copy_key_to_ctx(key, ctxp, kmflag)) != CRYPTO_SUCCESS) {
+	if ((rv = crypto_copy_key_to_ctx(key, &ctxp->key, &ctxp->keychunk_size,
+	    kmflag)) != CRYPTO_SUCCESS) {
 		switch (mech_type) {
 		case ECDSA_SHA1_MECH_INFO_TYPE:
 			kmem_free(dctxp, sizeof (digest_ecc_ctx_t));
@@ -915,70 +611,6 @@ ecc_verify_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	(data).cd_raw.iov_len = len;			\
 	(data).cd_length = cd_len;
 
-#define	DO_UPDATE	0x01
-#define	DO_FINAL	0x02
-#define	DO_SHA1		0x08
-#define	DO_SIGN		0x10
-#define	DO_VERIFY	0x20
-
-static int
-digest_data(crypto_data_t *data, void *dctx, uchar_t *digest,
-    uchar_t flag)
-{
-	int rv, dlen;
-	uchar_t *dptr;
-
-	ASSERT(flag & DO_SHA1);
-	if (data == NULL) {
-		ASSERT((flag & DO_UPDATE) == 0);
-		goto dofinal;
-	}
-
-	dlen = data->cd_length;
-
-	if (flag & DO_UPDATE) {
-
-		switch (data->cd_format) {
-		case CRYPTO_DATA_RAW:
-			dptr = (uchar_t *)(data->cd_raw.iov_base +
-			    data->cd_offset);
-
-			if (flag & DO_SHA1)
-				SHA1Update(dctx, dptr, dlen);
-
-		break;
-
-		case CRYPTO_DATA_UIO:
-			if (flag & DO_SHA1)
-				rv = process_uio_data(data, NULL, dlen,
-				    SHA1_DIGEST_DATA, dctx);
-
-			if (rv != CRYPTO_SUCCESS)
-				return (rv);
-
-			break;
-
-		case CRYPTO_DATA_MBLK:
-			if (flag & DO_SHA1)
-				rv = process_mblk_data(data, NULL, dlen,
-				    SHA1_DIGEST_DATA, dctx);
-
-			if (rv != CRYPTO_SUCCESS)
-				return (rv);
-
-			break;
-		}
-	}
-
-dofinal:
-	if (flag & DO_FINAL) {
-		if (flag & DO_SHA1)
-			SHA1Final(digest, dctx);
-	}
-
-	return (CRYPTO_SUCCESS);
-}
-
 static int
 ecc_digest_svrfy_common(digest_ecc_ctx_t *ctxp, crypto_data_t *data,
     crypto_data_t *signature, uchar_t flag, crypto_req_handle_t req)
@@ -988,8 +620,8 @@ ecc_digest_svrfy_common(digest_ecc_ctx_t *ctxp, crypto_data_t *data,
 	crypto_data_t der_cd;
 	ecc_mech_type_t mech_type;
 
-	ASSERT(flag & DO_SIGN || flag & DO_VERIFY);
-	ASSERT(data != NULL || (flag & DO_FINAL));
+	ASSERT(flag & CRYPTO_DO_SIGN || flag & CRYPTO_DO_VERIFY);
+	ASSERT(data != NULL || (flag & CRYPTO_DO_FINAL));
 
 	mech_type = ctxp->mech_type;
 	if (mech_type != ECDSA_SHA1_MECH_INFO_TYPE)
@@ -998,8 +630,9 @@ ecc_digest_svrfy_common(digest_ecc_ctx_t *ctxp, crypto_data_t *data,
 	/* Don't digest if only returning length of signature. */
 	if (signature->cd_length > 0) {
 		if (mech_type == ECDSA_SHA1_MECH_INFO_TYPE) {
-			rv = digest_data(data, &(ctxp->sha1_ctx),
-			    digest, flag | DO_SHA1);
+			rv = crypto_digest_data(data, &(ctxp->sha1_ctx),
+			    digest, (void (*)())SHA1Update,
+			    (void (*)())SHA1Final, flag | CRYPTO_DO_SHA1);
 			if (rv != CRYPTO_SUCCESS)
 				return (rv);
 		}
@@ -1008,7 +641,7 @@ ecc_digest_svrfy_common(digest_ecc_ctx_t *ctxp, crypto_data_t *data,
 	INIT_RAW_CRYPTO_DATA(der_cd, digest, SHA1_DIGEST_SIZE,
 	    SHA1_DIGEST_SIZE);
 
-	if (flag & DO_SIGN) {
+	if (flag & CRYPTO_DO_SIGN) {
 		rv = ecc_sign_common((ecc_ctx_t *)ctxp, &der_cd, signature,
 		    req);
 	} else
@@ -1040,7 +673,7 @@ ecc_sign_common(ecc_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 	crypto_key_t *key = ctx->key;
 	int kmflag;
 
-	if ((rv = get_key_attr(key, CKA_EC_PARAMS, &param,
+	if ((rv = crypto_get_key_attr(key, CKA_EC_PARAMS, &param,
 	    &param_len)) != CRYPTO_SUCCESS) {
 		return (rv);
 	}
@@ -1048,7 +681,7 @@ ecc_sign_common(ecc_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 	if (data->cd_length > sizeof (tmp_data))
 		return (CRYPTO_DATA_LEN_RANGE);
 
-	if ((rv = get_input_data(data, &digest_item.data, tmp_data))
+	if ((rv = crypto_get_input_data(data, &digest_item.data, tmp_data))
 	    != CRYPTO_SUCCESS) {
 		return (rv);
 	}
@@ -1057,7 +690,7 @@ ecc_sign_common(ecc_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 	/* structure assignment */
 	ECkey.ecParams = ctx->ecparams;
 
-	if ((rv = get_key_attr(key, CKA_VALUE, &private,
+	if ((rv = crypto_get_key_attr(key, CKA_VALUE, &private,
 	    &private_len)) != CRYPTO_SUCCESS) {
 		return (rv);
 	}
@@ -1078,7 +711,7 @@ ecc_sign_common(ecc_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 
 	if (rv == CRYPTO_SUCCESS) {
 		/* copy out the signature */
-		if ((rv = put_output_data(signed_data,
+		if ((rv = crypto_put_output_data(signed_data,
 		    signature, signature_item.len)) != CRYPTO_SUCCESS)
 			return (rv);
 
@@ -1102,7 +735,8 @@ ecc_sign(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 	switch (ctxp->mech_type) {
 	case ECDSA_SHA1_MECH_INFO_TYPE:
 		rv = ecc_digest_svrfy_common((digest_ecc_ctx_t *)ctxp, data,
-		    signature, DO_SIGN | DO_UPDATE | DO_FINAL, req);
+		    signature, CRYPTO_DO_SIGN | CRYPTO_DO_UPDATE |
+		    CRYPTO_DO_FINAL, req);
 		break;
 	default:
 		rv = ecc_sign_common(ctxp, data, signature, req);
@@ -1133,8 +767,9 @@ ecc_sign_update(crypto_ctx_t *ctx, crypto_data_t *data, crypto_req_handle_t req)
 	}
 
 	if (mech_type == ECDSA_SHA1_MECH_INFO_TYPE)
-		rv = digest_data(data, &(ctxp->sha1_ctx),
-		    NULL, DO_SHA1 | DO_UPDATE);
+		rv = crypto_digest_data(data, &(ctxp->sha1_ctx), NULL,
+		    (void (*)())SHA1Update, (void (*)())SHA1Final,
+		    CRYPTO_DO_SHA1 | CRYPTO_DO_UPDATE);
 
 	if (rv != CRYPTO_SUCCESS)
 		ecc_free_context(ctx);
@@ -1153,8 +788,8 @@ ecc_sign_final(crypto_ctx_t *ctx, crypto_data_t *signature,
 	ASSERT(ctx->cc_provider_private != NULL);
 	ctxp = ctx->cc_provider_private;
 
-	rv = ecc_digest_svrfy_common(ctxp, NULL, signature, DO_SIGN | DO_FINAL,
-	    req);
+	rv = ecc_digest_svrfy_common(ctxp, NULL, signature, CRYPTO_DO_SIGN |
+	    CRYPTO_DO_FINAL, req);
 	if (rv != CRYPTO_BUFFER_TOO_SMALL)
 		ecc_free_context(ctx);
 
@@ -1180,7 +815,7 @@ ecc_sign_atomic(crypto_provider_handle_t provider,
 	    CKO_PRIVATE_KEY)) != CRYPTO_SUCCESS)
 		return (rv);
 
-	if (get_key_attr(key, CKA_EC_PARAMS, (void *) &params,
+	if (crypto_get_key_attr(key, CKA_EC_PARAMS, (void *) &params,
 	    &params_len)) {
 		return (CRYPTO_ARGUMENTS_BAD);
 	}
@@ -1216,7 +851,7 @@ ecc_sign_atomic(crypto_provider_handle_t provider,
 		SHA1Init(&(dctx.sha1_ctx));
 
 		rv = ecc_digest_svrfy_common(&dctx, data, signature,
-		    DO_SIGN | DO_UPDATE | DO_FINAL, req);
+		    CRYPTO_DO_SIGN | CRYPTO_DO_UPDATE | CRYPTO_DO_FINAL, req);
 	}
 	free_ecparams(ecparams, B_TRUE);
 
@@ -1240,7 +875,7 @@ ecc_verify_common(ecc_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 	crypto_key_t *key = ctx->key;
 	int kmflag;
 
-	if ((rv = get_key_attr(key, CKA_EC_PARAMS, &param,
+	if ((rv = crypto_get_key_attr(key, CKA_EC_PARAMS, &param,
 	    &param_len)) != CRYPTO_SUCCESS) {
 		return (rv);
 	}
@@ -1249,7 +884,7 @@ ecc_verify_common(ecc_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 		return (CRYPTO_SIGNATURE_LEN_RANGE);
 	}
 
-	if ((rv = get_input_data(signature, &signature_item.data,
+	if ((rv = crypto_get_input_data(signature, &signature_item.data,
 	    signed_data)) != CRYPTO_SUCCESS) {
 		return (rv);
 	}
@@ -1258,7 +893,7 @@ ecc_verify_common(ecc_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 	if (data->cd_length > sizeof (tmp_data))
 		return (CRYPTO_DATA_LEN_RANGE);
 
-	if ((rv = get_input_data(data, &digest_item.data, tmp_data))
+	if ((rv = crypto_get_input_data(data, &digest_item.data, tmp_data))
 	    != CRYPTO_SUCCESS) {
 		return (rv);
 	}
@@ -1267,7 +902,7 @@ ecc_verify_common(ecc_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 	/* structure assignment */
 	ECkey.ecParams = ctx->ecparams;
 
-	if ((rv = get_key_attr(key, CKA_EC_POINT, &public,
+	if ((rv = crypto_get_key_attr(key, CKA_EC_POINT, &public,
 	    &public_len)) != CRYPTO_SUCCESS) {
 		return (rv);
 	}
@@ -1299,7 +934,8 @@ ecc_verify(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *signature,
 	switch (ctxp->mech_type) {
 	case ECDSA_SHA1_MECH_INFO_TYPE:
 		rv = ecc_digest_svrfy_common((digest_ecc_ctx_t *)ctxp, data,
-		    signature, DO_VERIFY | DO_UPDATE | DO_FINAL, req);
+		    signature, CRYPTO_DO_VERIFY | CRYPTO_DO_UPDATE |
+		    CRYPTO_DO_FINAL, req);
 		break;
 	default:
 		rv = ecc_verify_common(ctxp, data, signature, req);
@@ -1323,8 +959,9 @@ ecc_verify_update(crypto_ctx_t *ctx, crypto_data_t *data,
 
 	switch (ctxp->mech_type) {
 	case ECDSA_SHA1_MECH_INFO_TYPE:
-		rv = digest_data(data, &(ctxp->sha1_ctx),
-		    NULL, DO_SHA1 | DO_UPDATE);
+		rv = crypto_digest_data(data, &(ctxp->sha1_ctx), NULL,
+		    (void (*)())SHA1Update, (void (*)())SHA1Final,
+		    CRYPTO_DO_SHA1 | CRYPTO_DO_UPDATE);
 		break;
 	default:
 		rv = CRYPTO_MECHANISM_INVALID;
@@ -1348,7 +985,7 @@ ecc_verify_final(crypto_ctx_t *ctx, crypto_data_t *signature,
 	ctxp = ctx->cc_provider_private;
 
 	rv = ecc_digest_svrfy_common(ctxp, NULL, signature,
-	    DO_VERIFY | DO_FINAL, req);
+	    CRYPTO_DO_VERIFY | CRYPTO_DO_FINAL, req);
 
 	ecc_free_context(ctx);
 
@@ -1375,7 +1012,7 @@ ecc_verify_atomic(crypto_provider_handle_t provider,
 	    CKO_PUBLIC_KEY)) != CRYPTO_SUCCESS)
 		return (rv);
 
-	if (get_key_attr(key, CKA_EC_PARAMS, (void *) &params,
+	if (crypto_get_key_attr(key, CKA_EC_PARAMS, (void *) &params,
 	    &params_len)) {
 		return (CRYPTO_ARGUMENTS_BAD);
 	}
@@ -1411,7 +1048,7 @@ ecc_verify_atomic(crypto_provider_handle_t provider,
 		SHA1Init(&(dctx.sha1_ctx));
 
 		rv = ecc_digest_svrfy_common(&dctx, data, signature,
-		    DO_VERIFY | DO_UPDATE | DO_FINAL, req);
+		    CRYPTO_DO_VERIFY | CRYPTO_DO_UPDATE | CRYPTO_DO_FINAL, req);
 	}
 	free_ecparams(ecparams, B_TRUE);
 	return (rv);

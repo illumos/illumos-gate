@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +34,7 @@ extern "C" {
 
 #include <sys/types.h>
 #include <security/pkcs11t.h>
+#include <modes/modes.h>
 #include <aes_impl.h>
 #include <blowfish_impl.h>
 #include <des_impl.h>
@@ -108,6 +108,7 @@ CK_RV soft_arcfour_crypt(crypto_active_op_t *, CK_BYTE_PTR, CK_ULONG,
 	CK_BYTE_PTR, CK_ULONG_PTR);
 
 void *aes_cbc_ctx_init(void *, size_t, uint8_t *);
+void *aes_ctr_ctx_init(void *, size_t, uint8_t *);
 
 CK_RV soft_aes_crypt_init_common(soft_session_t *, CK_MECHANISM_PTR,
 	soft_object_t *, boolean_t);

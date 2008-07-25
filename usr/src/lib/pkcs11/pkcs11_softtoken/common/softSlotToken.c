@@ -28,6 +28,7 @@
 #include <strings.h>
 #include <cryptoutil.h>
 #include <security/cryptoki.h>
+#include <sys/crypto/common.h>
 #include <arcfour.h>
 #include "softGlobal.h"
 #include "softSession.h"
@@ -54,6 +55,7 @@ static CK_MECHANISM_TYPE soft_mechanisms[] = {
 	CKM_DES3_KEY_GEN,
 	CKM_AES_CBC,
 	CKM_AES_CBC_PAD,
+	CKM_AES_CTR,
 	CKM_AES_ECB,
 	CKM_AES_KEY_GEN,
 	CKM_BLOWFISH_CBC,
@@ -153,6 +155,9 @@ static CK_MECHANISM_INFO soft_mechanism_info[] = {
 	{AES_MINBYTES, AES_MAXBYTES,
 		CKF_ENCRYPT|CKF_DECRYPT|
 		CKF_WRAP|CKF_UNWRAP},		/* CKM_AES_CBC_PAD */
+	{AES_MINBYTES, AES_MAXBYTES,
+		CKF_ENCRYPT|CKF_DECRYPT|
+		CKF_WRAP|CKF_UNWRAP},		/* CKM_AES_CTR */
 	{AES_MINBYTES, AES_MAXBYTES,
 		CKF_ENCRYPT|CKF_DECRYPT|
 		CKF_WRAP|CKF_UNWRAP},		/* CKM_AES_ECB */

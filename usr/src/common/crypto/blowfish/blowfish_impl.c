@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +36,8 @@
 #include <sys/strsun.h>
 #include <sys/note.h>
 #include <sys/byteorder.h>
+#include <sys/crypto/spi.h>
+#include <modes/modes.h>
 #include <sys/crypto/common.h>
 #include "blowfish_impl.h"
 
@@ -370,8 +371,10 @@ typedef struct keysched_s {
  * Encrypt a block of data.  Because of addition operations, convert blocks
  * to their big-endian representation, even on Intel boxen.
  */
-void
-blowfish_encrypt_block(void *cookie, uint8_t *block, uint8_t *out_block)
+/* ARGSUSED */
+int
+blowfish_encrypt_block(const void *cookie, const uint8_t *block,
+    uint8_t *out_block)
 {
 /* EXPORT DELETE START */
 	keysched_t *ksch = (keysched_t *)cookie;
@@ -448,6 +451,7 @@ blowfish_encrypt_block(void *cookie, uint8_t *block, uint8_t *out_block)
 	}
 #endif
 /* EXPORT DELETE END */
+	return (CRYPTO_SUCCESS);
 }
 
 /*
@@ -456,8 +460,10 @@ blowfish_encrypt_block(void *cookie, uint8_t *block, uint8_t *out_block)
  * It should look like the blowfish_encrypt_block() operation
  * except for the order in which the S/P boxes are accessed.
  */
-void
-blowfish_decrypt_block(void *cookie, uint8_t *block, uint8_t *out_block)
+/* ARGSUSED */
+int
+blowfish_decrypt_block(const void *cookie, const uint8_t *block,
+    uint8_t *out_block)
 {
 /* EXPORT DELETE START */
 	keysched_t *ksch = (keysched_t *)cookie;
@@ -534,6 +540,7 @@ blowfish_decrypt_block(void *cookie, uint8_t *block, uint8_t *out_block)
 	}
 #endif
 /* EXPORT DELETE END */
+	return (CRYPTO_SUCCESS);
 }
 
 static void
@@ -647,7 +654,7 @@ blowfish_init_keysched(uint8_t *key, uint_t bits, void *keysched)
 	 */
 	initp = P;
 	for (i = 0; i < 9; i++) {
-		blowfish_encrypt_block(newbie, (uint8_t *)tmpblock,
+		(void) blowfish_encrypt_block(newbie, (uint8_t *)tmpblock,
 		    (uint8_t *)tmpblock);
 		*initp++ = ntohl(tmpblock[0]);
 		*initp++ = ntohl(tmpblock[1]);
@@ -655,7 +662,7 @@ blowfish_init_keysched(uint8_t *key, uint_t bits, void *keysched)
 
 	initp = S;
 	for (i = 0; i < 512; i++) {
-		blowfish_encrypt_block(newbie, (uint8_t *)tmpblock,
+		(void) blowfish_encrypt_block(newbie, (uint8_t *)tmpblock,
 		    (uint8_t *)tmpblock);
 		*initp++ = ntohl(tmpblock[0]);
 		*initp++ = ntohl(tmpblock[1]);
@@ -685,4 +692,77 @@ blowfish_alloc_keysched(size_t *size, int kmflag)
 /* EXPORT DELETE END */
 
 	return (NULL);
+}
+
+void
+blowfish_copy_block(uint8_t *in, uint8_t *out)
+{
+	if (IS_P2ALIGNED(in, sizeof (uint32_t)) &&
+	    IS_P2ALIGNED(out, sizeof (uint32_t))) {
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&out[0] = *(uint32_t *)&in[0];
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&out[4] = *(uint32_t *)&in[4];
+	} else {
+		BLOWFISH_COPY_BLOCK(in, out);
+	}
+}
+
+/* XOR block of data into dest */
+void
+blowfish_xor_block(uint8_t *data, uint8_t *dst)
+{
+	if (IS_P2ALIGNED(dst, sizeof (uint32_t)) &&
+	    IS_P2ALIGNED(data, sizeof (uint32_t))) {
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&dst[0] ^= *(uint32_t *)&data[0];
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&dst[4] ^= *(uint32_t *)&data[4];
+	} else {
+		BLOWFISH_XOR_BLOCK(data, dst);
+	}
+}
+
+/*
+ * Encrypt multiple blocks of data according to mode.
+ */
+int
+blowfish_encrypt_contiguous_blocks(void *ctx, char *data, size_t length,
+    crypto_data_t *out)
+{
+	blowfish_ctx_t *blowfish_ctx = ctx;
+	int rv;
+
+	if (blowfish_ctx->bc_flags & CBC_MODE) {
+		rv = cbc_encrypt_contiguous_blocks(ctx, data, length, out,
+		    BLOWFISH_BLOCK_LEN, blowfish_encrypt_block,
+		    blowfish_copy_block, blowfish_xor_block);
+	} else {
+		rv = ecb_cipher_contiguous_blocks(ctx, data, length, out,
+		    BLOWFISH_BLOCK_LEN, blowfish_encrypt_block);
+	}
+	return (rv);
+}
+
+/*
+ * Decrypt multiple blocks of data according to mode.
+ */
+int
+blowfish_decrypt_contiguous_blocks(void *ctx, char *data, size_t length,
+    crypto_data_t *out)
+{
+	blowfish_ctx_t *blowfish_ctx = ctx;
+	int rv;
+
+	if (blowfish_ctx->bc_flags & CBC_MODE) {
+		rv = cbc_decrypt_contiguous_blocks(ctx, data, length, out,
+		    BLOWFISH_BLOCK_LEN, blowfish_decrypt_block,
+		    blowfish_copy_block, blowfish_xor_block);
+	} else {
+		rv = ecb_cipher_contiguous_blocks(ctx, data, length, out,
+		    BLOWFISH_BLOCK_LEN, blowfish_decrypt_block);
+		if (rv == CRYPTO_DATA_LEN_RANGE)
+			rv = CRYPTO_ENCRYPTED_DATA_LEN_RANGE;
+	}
+	return (rv);
 }

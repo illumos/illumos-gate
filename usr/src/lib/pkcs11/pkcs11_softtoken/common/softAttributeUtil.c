@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <security/cryptoki.h>
+#include <sys/crypto/common.h>
 #include <arcfour.h>
 #include <aes_impl.h>
 #include <blowfish_impl.h>

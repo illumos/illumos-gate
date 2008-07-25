@@ -62,7 +62,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Linkage dependencies
 #
-LDFLAGS += -dy -Ncrypto/md5 -Ncrypto/sha2 -Nmisc/bignum
+LDFLAGS += -dy -Ncrypto/md5 -Ncrypto/sha2 -Nmisc/bignum -Nmisc/kcf
 
 #
 # lint pass one enforcement
@@ -80,7 +80,6 @@ LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 #

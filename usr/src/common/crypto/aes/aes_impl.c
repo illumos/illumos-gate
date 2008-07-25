@@ -31,6 +31,8 @@
 #include <sys/sysmacros.h>
 #include <sys/strsun.h>
 #include <netinet/in.h>
+#include <sys/crypto/spi.h>
+#include <modes/modes.h>
 #include "aes_impl.h"
 #ifndef	_KERNEL
 #include <strings.h>
@@ -1499,7 +1501,6 @@ aes_init_keysched(const uint8_t *cipherKey, uint_t keyBits, void *keysched)
 /* EXPORT DELETE END */
 }
 
-
 /*
  * Encrypt one block using AES.
  * Align if needed and (for x86 32-bit only) byte-swap.
@@ -1509,7 +1510,7 @@ aes_init_keysched(const uint8_t *cipherKey, uint_t keyBits, void *keysched)
  * pt	Input block (plain text)
  * ct	Output block (crypto text).  Can overlap with pt
  */
-void
+int
 aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct)
 {
 /* EXPORT DELETE START */
@@ -1567,8 +1568,8 @@ aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct)
 		ct[15] = (uint8_t)buffer[3];
 #endif
 /* EXPORT DELETE END */
+	return (CRYPTO_SUCCESS);
 }
-
 
 /*
  * Decrypt one block using AES.
@@ -1579,7 +1580,7 @@ aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct)
  * ct	Input block (crypto text)
  * pt	Output block (plain text). Can overlap with pt
  */
-void
+int
 aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt)
 {
 /* EXPORT DELETE START */
@@ -1641,6 +1642,7 @@ aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt)
 #endif
 
 /* EXPORT DELETE END */
+	return (CRYPTO_SUCCESS);
 }
 
 
@@ -1673,4 +1675,106 @@ aes_alloc_keysched(size_t *size, int kmflag)
 	}
 /* EXPORT DELETE END */
 	return (NULL);
+}
+
+void
+aes_copy_block(uint8_t *in, uint8_t *out)
+{
+	if (IS_P2ALIGNED(in, sizeof (uint32_t)) &&
+	    IS_P2ALIGNED(out, sizeof (uint32_t))) {
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&out[0] = *(uint32_t *)&in[0];
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&out[4] = *(uint32_t *)&in[4];
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&out[8] = *(uint32_t *)&in[8];
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&out[12] = *(uint32_t *)&in[12];
+	} else {
+		AES_COPY_BLOCK(in, out);
+	}
+}
+
+/* XOR block of data into dest */
+void
+aes_xor_block(uint8_t *data, uint8_t *dst)
+{
+	if (IS_P2ALIGNED(dst, sizeof (uint32_t)) &&
+	    IS_P2ALIGNED(data, sizeof (uint32_t))) {
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&dst[0] ^= *(uint32_t *)&data[0];
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&dst[4] ^= *(uint32_t *)&data[4];
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&dst[8] ^= *(uint32_t *)&data[8];
+		/* LINTED: pointer alignment */
+		*(uint32_t *)&dst[12] ^= *(uint32_t *)&data[12];
+	} else {
+		AES_XOR_BLOCK(data, dst);
+	}
+}
+
+/*
+ * Encrypt multiple blocks of data according to mode.
+ */
+/* ARGSUSED */
+int
+aes_encrypt_contiguous_blocks(void *ctx, char *data, size_t length,
+    crypto_data_t *out)
+{
+	aes_ctx_t *aes_ctx = ctx;
+	int rv;
+
+	if (aes_ctx->ac_flags & CTR_MODE) {
+		rv = ctr_mode_contiguous_blocks(ctx, data, length, out,
+		    AES_BLOCK_LEN, aes_encrypt_block, aes_xor_block);
+#ifdef _KERNEL
+	} else if (aes_ctx->ac_flags & CCM_MODE) {
+		rv = ccm_mode_encrypt_contiguous_blocks(ctx, data, length,
+		    out, AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
+		    aes_xor_block);
+#endif
+	} else if (aes_ctx->ac_flags & CBC_MODE) {
+		rv = cbc_encrypt_contiguous_blocks(ctx,
+		    data, length, out, AES_BLOCK_LEN, aes_encrypt_block,
+		    aes_copy_block, aes_xor_block);
+	} else {
+		rv = ecb_cipher_contiguous_blocks(ctx, data, length, out,
+		    AES_BLOCK_LEN, aes_encrypt_block);
+	}
+	return (rv);
+}
+
+/*
+ * Decrypt multiple blocks of data according to mode.
+ */
+int
+aes_decrypt_contiguous_blocks(void *ctx, char *data, size_t length,
+    crypto_data_t *out)
+{
+	aes_ctx_t *aes_ctx = ctx;
+	int rv;
+
+	if (aes_ctx->ac_flags & CTR_MODE) {
+		rv = ctr_mode_contiguous_blocks(ctx, data, length, out,
+		    AES_BLOCK_LEN, aes_encrypt_block, aes_xor_block);
+		if (rv == CRYPTO_DATA_LEN_RANGE)
+			rv = CRYPTO_ENCRYPTED_DATA_LEN_RANGE;
+#ifdef _KERNEL
+	} else if (aes_ctx->ac_flags & CCM_MODE) {
+		rv = ccm_mode_decrypt_contiguous_blocks(ctx, data, length,
+		    out, AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
+		    aes_xor_block);
+#endif
+	} else if (aes_ctx->ac_flags & CBC_MODE) {
+		rv = cbc_decrypt_contiguous_blocks(ctx, data, length, out,
+		    AES_BLOCK_LEN, aes_decrypt_block, aes_copy_block,
+		    aes_xor_block);
+	} else {
+		rv = ecb_cipher_contiguous_blocks(ctx, data, length, out,
+		    AES_BLOCK_LEN, aes_decrypt_block);
+		if (rv == CRYPTO_DATA_LEN_RANGE)
+			rv = CRYPTO_ENCRYPTED_DATA_LEN_RANGE;
+	}
+	return (rv);
 }

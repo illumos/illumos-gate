@@ -423,6 +423,25 @@ typedef struct crypto_provider_ext_info {
 
 typedef uint_t		crypto_session_id_t;
 
+typedef enum cmd_type {
+	COPY_FROM_DATA,
+	COPY_TO_DATA,
+	COMPARE_TO_DATA,
+	MD5_DIGEST_DATA,
+	SHA1_DIGEST_DATA,
+	SHA2_DIGEST_DATA
+} cmd_type_t;
+
+#define	CRYPTO_DO_UPDATE	0x01
+#define	CRYPTO_DO_FINAL		0x02
+#define	CRYPTO_DO_MD5		0x04
+#define	CRYPTO_DO_SHA1		0x08
+#define	CRYPTO_DO_SIGN		0x10
+#define	CRYPTO_DO_VERIFY	0x20
+#define	CRYPTO_DO_SHA2		0x40
+
+#define	PROVIDER_OWNS_KEY_SCHEDULE	0x00000001
+
 /*
  * Common cryptographic status and error codes.
  */

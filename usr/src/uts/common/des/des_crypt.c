@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,8 +47,8 @@
 #include <sys/sysmacros.h>
 #include <sys/strsun.h>
 #include <sys/note.h>
-#include <des_impl.h>
-#include <des_cbc_crypt.h>
+#include <modes/modes.h>
+#include <des/des_impl.h>
 
 /* EXPORT DELETE START */
 #include <sys/types.h>
@@ -462,7 +462,7 @@ des_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 /* EXPORT DELETE START */
 
 	des_strength_t strength;
-	des_ctx_t *des_ctx;
+	des_ctx_t *des_ctx = NULL;
 	int rv;
 	int kmflag;
 
@@ -473,9 +473,12 @@ des_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 		return (CRYPTO_KEY_TYPE_INCONSISTENT);
 	}
 
+	kmflag = crypto_kmflag(req);
 	/* Check mechanism type and parameter length */
 	switch (mechanism->cm_type) {
 	case DES_ECB_MECH_INFO_TYPE:
+		des_ctx = ecb_alloc_ctx(kmflag);
+		/* FALLTHRU */
 	case DES_CBC_MECH_INFO_TYPE:
 		if (mechanism->cm_param != NULL &&
 		    mechanism->cm_param_len != DES_BLOCK_LEN)
@@ -483,8 +486,12 @@ des_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 		if (key->ck_length != DES_MINBITS)
 			return (CRYPTO_KEY_SIZE_RANGE);
 		strength = DES;
+		if (des_ctx == NULL)
+			des_ctx = cbc_alloc_ctx(kmflag);
 		break;
 	case DES3_ECB_MECH_INFO_TYPE:
+		des_ctx = ecb_alloc_ctx(kmflag);
+		/* FALLTHRU */
 	case DES3_CBC_MECH_INFO_TYPE:
 		if (mechanism->cm_param != NULL &&
 		    mechanism->cm_param_len != DES_BLOCK_LEN)
@@ -492,21 +499,16 @@ des_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 		if (key->ck_length != DES3_MINBITS)
 			return (CRYPTO_KEY_SIZE_RANGE);
 		strength = DES3;
+		if (des_ctx == NULL)
+			des_ctx = cbc_alloc_ctx(kmflag);
 		break;
 	default:
 		return (CRYPTO_MECHANISM_INVALID);
 	}
 
-	/*
-	 * Allocate a context.  Same context is used for DES and DES3.
-	 */
-	kmflag = crypto_kmflag(req);
-	if ((des_ctx = kmem_zalloc(sizeof (des_ctx_t), kmflag)) == NULL)
-		return (CRYPTO_HOST_MEMORY);
-
 	if ((rv = des_common_init_ctx(des_ctx, template, mechanism, key,
 	    strength, kmflag)) != CRYPTO_SUCCESS) {
-		kmem_free(des_ctx, sizeof (des_ctx_t));
+		crypto_free_mode_ctx(des_ctx);
 		return (rv);
 	}
 
@@ -517,229 +519,37 @@ des_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	return (CRYPTO_SUCCESS);
 }
 
-/*
- * Helper DES encrypt update function for iov input data.
- */
-static int
-des_cipher_update_iov(des_ctx_t *des_ctx, crypto_data_t *input,
-    crypto_data_t *output, int (*cipher)(des_ctx_t *, caddr_t, size_t,
-    crypto_data_t *))
+static void
+des_copy_block64(uint8_t *in, uint64_t *out)
 {
-	if (input->cd_miscdata != NULL) {
-		if (IS_P2ALIGNED(input->cd_miscdata, sizeof (uint64_t))) {
-			/* LINTED: pointer alignment */
-			des_ctx->dc_iv = *(uint64_t *)input->cd_miscdata;
-		} else {
-			uint64_t tmp64;
-			uint8_t *tmp = (uint8_t *)input->cd_miscdata;
+	if (IS_P2ALIGNED(in, sizeof (uint64_t))) {
+		/* LINTED: pointer alignment */
+		out[0] = *(uint64_t *)&in[0];
+	} else {
+		uint64_t tmp64;
 
 #ifdef _BIG_ENDIAN
-			tmp64 = (((uint64_t)tmp[0] << 56) |
-			    ((uint64_t)tmp[1] << 48) |
-			    ((uint64_t)tmp[2] << 40) |
-			    ((uint64_t)tmp[3] << 32) |
-			    ((uint64_t)tmp[4] << 24) |
-			    ((uint64_t)tmp[5] << 16) |
-			    ((uint64_t)tmp[6] << 8) |
-			    (uint64_t)tmp[7]);
+		tmp64 = (((uint64_t)in[0] << 56) |
+		    ((uint64_t)in[1] << 48) |
+		    ((uint64_t)in[2] << 40) |
+		    ((uint64_t)in[3] << 32) |
+		    ((uint64_t)in[4] << 24) |
+		    ((uint64_t)in[5] << 16) |
+		    ((uint64_t)in[6] << 8) |
+		    (uint64_t)in[7]);
 #else
-			tmp64 = (((uint64_t)tmp[7] << 56) |
-			    ((uint64_t)tmp[6] << 48) |
-			    ((uint64_t)tmp[5] << 40) |
-			    ((uint64_t)tmp[4] << 32) |
-			    ((uint64_t)tmp[3] << 24) |
-			    ((uint64_t)tmp[2] << 16) |
-			    ((uint64_t)tmp[1] << 8) |
-			    (uint64_t)tmp[0]);
+		tmp64 = (((uint64_t)in[7] << 56) |
+		    ((uint64_t)in[6] << 48) |
+		    ((uint64_t)in[5] << 40) |
+		    ((uint64_t)in[4] << 32) |
+		    ((uint64_t)in[3] << 24) |
+		    ((uint64_t)in[2] << 16) |
+		    ((uint64_t)in[1] << 8) |
+		    (uint64_t)in[0]);
 #endif /* _BIG_ENDIAN */
 
-			des_ctx->dc_iv = tmp64;
-		}
+		out[0] = tmp64;
 	}
-
-	if (input->cd_raw.iov_len < input->cd_length)
-		return (CRYPTO_ARGUMENTS_BAD);
-
-	return ((cipher)(des_ctx, input->cd_raw.iov_base + input->cd_offset,
-	    input->cd_length, (input == output) ? NULL : output));
-}
-
-/*
- * Helper DES encrypt update function for uio input data.
- */
-static int
-des_cipher_update_uio(des_ctx_t *des_ctx, crypto_data_t *input,
-    crypto_data_t *output, int (*cipher)(des_ctx_t *, caddr_t, size_t,
-    crypto_data_t *))
-{
-	uio_t *uiop = input->cd_uio;
-	off_t offset = input->cd_offset;
-	size_t length = input->cd_length;
-	uint_t vec_idx;
-	size_t cur_len;
-
-	if (input->cd_miscdata != NULL) {
-		if (IS_P2ALIGNED(input->cd_miscdata, sizeof (uint64_t))) {
-			/* LINTED: pointer alignment */
-			des_ctx->dc_iv = *(uint64_t *)input->cd_miscdata;
-		} else {
-			uint64_t tmp64;
-			uint8_t *tmp = (uint8_t *)input->cd_miscdata;
-
-#ifdef _BIG_ENDIAN
-			tmp64 = (((uint64_t)tmp[0] << 56) |
-			    ((uint64_t)tmp[1] << 48) |
-			    ((uint64_t)tmp[2] << 40) |
-			    ((uint64_t)tmp[3] << 32) |
-			    ((uint64_t)tmp[4] << 24) |
-			    ((uint64_t)tmp[5] << 16) |
-			    ((uint64_t)tmp[6] << 8) |
-			    (uint64_t)tmp[7]);
-#else
-			tmp64 = (((uint64_t)tmp[7] << 56) |
-			    ((uint64_t)tmp[6] << 48) |
-			    ((uint64_t)tmp[5] << 40) |
-			    ((uint64_t)tmp[4] << 32) |
-			    ((uint64_t)tmp[3] << 24) |
-			    ((uint64_t)tmp[2] << 16) |
-			    ((uint64_t)tmp[1] << 8) |
-			    (uint64_t)tmp[0]);
-#endif /* _BIG_ENDIAN */
-
-			des_ctx->dc_iv = tmp64;
-		}
-	}
-
-	if (input->cd_uio->uio_segflg != UIO_SYSSPACE) {
-		return (CRYPTO_ARGUMENTS_BAD);
-	}
-
-	/*
-	 * Jump to the first iovec containing data to be
-	 * processed.
-	 */
-	for (vec_idx = 0; vec_idx < uiop->uio_iovcnt &&
-	    offset >= uiop->uio_iov[vec_idx].iov_len;
-	    offset -= uiop->uio_iov[vec_idx++].iov_len)
-		;
-	if (vec_idx == uiop->uio_iovcnt) {
-		/*
-		 * The caller specified an offset that is larger than the
-		 * total size of the buffers it provided.
-		 */
-		return (CRYPTO_DATA_LEN_RANGE);
-	}
-
-	/*
-	 * Now process the iovecs.
-	 */
-	while (vec_idx < uiop->uio_iovcnt && length > 0) {
-		cur_len = MIN(uiop->uio_iov[vec_idx].iov_len -
-		    offset, length);
-
-		(cipher)(des_ctx, uiop->uio_iov[vec_idx].iov_base + offset,
-		    cur_len, (input == output) ? NULL : output);
-
-		length -= cur_len;
-		vec_idx++;
-		offset = 0;
-	}
-
-	if (vec_idx == uiop->uio_iovcnt && length > 0) {
-		/*
-		 * The end of the specified iovec's was reached but
-		 * the length requested could not be processed, i.e.
-		 * The caller requested to digest more data than it provided.
-		 */
-
-		return (CRYPTO_DATA_LEN_RANGE);
-	}
-
-	return (CRYPTO_SUCCESS);
-}
-
-/*
- * Helper DES encrypt update function for mblk input data.
- */
-static int
-des_cipher_update_mp(des_ctx_t *des_ctx, crypto_data_t *input,
-    crypto_data_t *output, int (*cipher)(des_ctx_t *, caddr_t, size_t,
-    crypto_data_t *))
-{
-	off_t offset = input->cd_offset;
-	size_t length = input->cd_length;
-	mblk_t *mp;
-	size_t cur_len;
-
-	if (input->cd_miscdata != NULL) {
-		if (IS_P2ALIGNED(input->cd_miscdata, sizeof (uint64_t))) {
-			/* LINTED: pointer alignment */
-			des_ctx->dc_iv = *(uint64_t *)input->cd_miscdata;
-		} else {
-			uint64_t tmp64;
-			uint8_t *tmp = (uint8_t *)input->cd_miscdata;
-
-#ifdef _BIG_ENDIAN
-			tmp64 = (((uint64_t)tmp[0] << 56) |
-			    ((uint64_t)tmp[1] << 48) |
-			    ((uint64_t)tmp[2] << 40) |
-			    ((uint64_t)tmp[3] << 32) |
-			    ((uint64_t)tmp[4] << 24) |
-			    ((uint64_t)tmp[5] << 16) |
-			    ((uint64_t)tmp[6] << 8) |
-			    (uint64_t)tmp[7]);
-#else
-			tmp64 = (((uint64_t)tmp[7] << 56) |
-			    ((uint64_t)tmp[6] << 48) |
-			    ((uint64_t)tmp[5] << 40) |
-			    ((uint64_t)tmp[4] << 32) |
-			    ((uint64_t)tmp[3] << 24) |
-			    ((uint64_t)tmp[2] << 16) |
-			    ((uint64_t)tmp[1] << 8) |
-			    (uint64_t)tmp[0]);
-#endif /* _BIG_ENDIAN */
-
-			des_ctx->dc_iv = tmp64;
-		}
-	}
-
-	/*
-	 * Jump to the first mblk_t containing data to be processed.
-	 */
-	for (mp = input->cd_mp; mp != NULL && offset >= MBLKL(mp);
-	    offset -= MBLKL(mp), mp = mp->b_cont)
-		;
-	if (mp == NULL) {
-		/*
-		 * The caller specified an offset that is larger than the
-		 * total size of the buffers it provided.
-		 */
-		return (CRYPTO_DATA_LEN_RANGE);
-	}
-
-	/*
-	 * Now do the processing on the mblk chain.
-	 */
-	while (mp != NULL && length > 0) {
-		cur_len = MIN(MBLKL(mp) - offset, length);
-		(cipher)(des_ctx, (char *)(mp->b_rptr + offset), cur_len,
-		    (input == output) ? NULL : output);
-
-		length -= cur_len;
-		offset = 0;
-		mp = mp->b_cont;
-	}
-
-	if (mp == NULL && length > 0) {
-		/*
-		 * The end of the mblk was reached but the length requested
-		 * could not be processed, i.e. The caller requested
-		 * to digest more data than it provided.
-		 */
-		return (CRYPTO_DATA_LEN_RANGE);
-	}
-
-	return (CRYPTO_SUCCESS);
 }
 
 /* ARGSUSED */
@@ -866,16 +676,19 @@ des_encrypt_update(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	 */
 	switch (plaintext->cd_format) {
 	case CRYPTO_DATA_RAW:
-		ret = des_cipher_update_iov(ctx->cc_provider_private,
-		    plaintext, ciphertext, des_encrypt_contiguous_blocks);
+		ret = crypto_update_iov(ctx->cc_provider_private,
+		    plaintext, ciphertext, des_encrypt_contiguous_blocks,
+		    des_copy_block64);
 		break;
 	case CRYPTO_DATA_UIO:
-		ret = des_cipher_update_uio(ctx->cc_provider_private,
-		    plaintext, ciphertext, des_encrypt_contiguous_blocks);
+		ret = crypto_update_uio(ctx->cc_provider_private,
+		    plaintext, ciphertext, des_encrypt_contiguous_blocks,
+		    des_copy_block64);
 		break;
 	case CRYPTO_DATA_MBLK:
-		ret = des_cipher_update_mp(ctx->cc_provider_private,
-		    plaintext, ciphertext, des_encrypt_contiguous_blocks);
+		ret = crypto_update_mp(ctx->cc_provider_private,
+		    plaintext, ciphertext, des_encrypt_contiguous_blocks,
+		    des_copy_block64);
 		break;
 	default:
 		ret = CRYPTO_ARGUMENTS_BAD;
@@ -929,16 +742,19 @@ des_decrypt_update(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 	 */
 	switch (ciphertext->cd_format) {
 	case CRYPTO_DATA_RAW:
-		ret = des_cipher_update_iov(ctx->cc_provider_private,
-		    ciphertext, plaintext, des_decrypt_contiguous_blocks);
+		ret = crypto_update_iov(ctx->cc_provider_private,
+		    ciphertext, plaintext, des_decrypt_contiguous_blocks,
+		    des_copy_block64);
 		break;
 	case CRYPTO_DATA_UIO:
-		ret = des_cipher_update_uio(ctx->cc_provider_private,
-		    ciphertext, plaintext, des_decrypt_contiguous_blocks);
+		ret = crypto_update_uio(ctx->cc_provider_private,
+		    ciphertext, plaintext, des_decrypt_contiguous_blocks,
+		    des_copy_block64);
 		break;
 	case CRYPTO_DATA_MBLK:
-		ret = des_cipher_update_mp(ctx->cc_provider_private,
-		    ciphertext, plaintext, des_decrypt_contiguous_blocks);
+		ret = crypto_update_mp(ctx->cc_provider_private,
+		    ciphertext, plaintext, des_decrypt_contiguous_blocks,
+		    des_copy_block64);
 		break;
 	default:
 		ret = CRYPTO_ARGUMENTS_BAD;
@@ -1087,22 +903,22 @@ des_encrypt_atomic(crypto_provider_handle_t provider,
 	 */
 	switch (plaintext->cd_format) {
 	case CRYPTO_DATA_RAW:
-		ret = des_cipher_update_iov(&des_ctx, plaintext, ciphertext,
-		    des_encrypt_contiguous_blocks);
+		ret = crypto_update_iov(&des_ctx, plaintext, ciphertext,
+		    des_encrypt_contiguous_blocks, des_copy_block64);
 		break;
 	case CRYPTO_DATA_UIO:
-		ret = des_cipher_update_uio(&des_ctx, plaintext, ciphertext,
-		    des_encrypt_contiguous_blocks);
+		ret = crypto_update_uio(&des_ctx, plaintext, ciphertext,
+		    des_encrypt_contiguous_blocks, des_copy_block64);
 		break;
 	case CRYPTO_DATA_MBLK:
-		ret = des_cipher_update_mp(&des_ctx, plaintext, ciphertext,
-		    des_encrypt_contiguous_blocks);
+		ret = crypto_update_mp(&des_ctx, plaintext, ciphertext,
+		    des_encrypt_contiguous_blocks, des_copy_block64);
 		break;
 	default:
 		ret = CRYPTO_ARGUMENTS_BAD;
 	}
 
-	if (des_ctx.dc_flags & DES_PROVIDER_OWNS_KEY_SCHEDULE) {
+	if (des_ctx.dc_flags & PROVIDER_OWNS_KEY_SCHEDULE) {
 		bzero(des_ctx.dc_keysched, des_ctx.dc_keysched_len);
 		kmem_free(des_ctx.dc_keysched, des_ctx.dc_keysched_len);
 	}
@@ -1194,22 +1010,22 @@ des_decrypt_atomic(crypto_provider_handle_t provider,
 	 */
 	switch (ciphertext->cd_format) {
 	case CRYPTO_DATA_RAW:
-		ret = des_cipher_update_iov(&des_ctx, ciphertext, plaintext,
-		    des_decrypt_contiguous_blocks);
+		ret = crypto_update_iov(&des_ctx, ciphertext, plaintext,
+		    des_decrypt_contiguous_blocks, des_copy_block64);
 		break;
 	case CRYPTO_DATA_UIO:
-		ret = des_cipher_update_uio(&des_ctx, ciphertext, plaintext,
-		    des_decrypt_contiguous_blocks);
+		ret = crypto_update_uio(&des_ctx, ciphertext, plaintext,
+		    des_decrypt_contiguous_blocks, des_copy_block64);
 		break;
 	case CRYPTO_DATA_MBLK:
-		ret = des_cipher_update_mp(&des_ctx, ciphertext, plaintext,
-		    des_decrypt_contiguous_blocks);
+		ret = crypto_update_mp(&des_ctx, ciphertext, plaintext,
+		    des_decrypt_contiguous_blocks, des_copy_block64);
 		break;
 	default:
 		ret = CRYPTO_ARGUMENTS_BAD;
 	}
 
-	if (des_ctx.dc_flags & DES_PROVIDER_OWNS_KEY_SCHEDULE) {
+	if (des_ctx.dc_flags & PROVIDER_OWNS_KEY_SCHEDULE) {
 		bzero(des_ctx.dc_keysched, des_ctx.dc_keysched_len);
 		kmem_free(des_ctx.dc_keysched, des_ctx.dc_keysched_len);
 	}
@@ -1297,13 +1113,13 @@ des_free_context(crypto_ctx_t *ctx)
 	des_ctx_t *des_ctx = ctx->cc_provider_private;
 
 	if (des_ctx != NULL) {
-		if (des_ctx->dc_flags & DES_PROVIDER_OWNS_KEY_SCHEDULE) {
+		if (des_ctx->dc_flags & PROVIDER_OWNS_KEY_SCHEDULE) {
 			ASSERT(des_ctx->dc_keysched_len != 0);
 			bzero(des_ctx->dc_keysched, des_ctx->dc_keysched_len);
 			kmem_free(des_ctx->dc_keysched,
 			    des_ctx->dc_keysched_len);
 		}
-		kmem_free(des_ctx, sizeof (des_ctx_t));
+		crypto_free_mode_ctx(des_ctx);
 		ctx->cc_provider_private = NULL;
 	}
 
@@ -1387,63 +1203,34 @@ des_common_init_ctx(des_ctx_t *des_ctx, crypto_spi_ctx_template_t *template,
 		    strength)) != CRYPTO_SUCCESS)
 			kmem_free(keysched, size);
 
-		des_ctx->dc_flags = DES_PROVIDER_OWNS_KEY_SCHEDULE;
+		des_ctx->dc_flags |= PROVIDER_OWNS_KEY_SCHEDULE;
 		des_ctx->dc_keysched_len = size;
 	} else {
 		keysched = template;
 	}
+	des_ctx->dc_keysched = keysched;
 
 	if (strength == DES3) {
 		des_ctx->dc_flags |= DES3_STRENGTH;
 	}
 
-	if (mechanism->cm_type == DES_CBC_MECH_INFO_TYPE ||
-	    mechanism->cm_type == DES3_CBC_MECH_INFO_TYPE) {
-		/*
-		 * Copy IV into DES context.
-		 *
-		 * If cm_param == NULL then the IV comes from the
-		 * cd_miscdata field in the crypto_data structure.
-		 */
-		if (mechanism->cm_param != NULL) {
-			ASSERT(mechanism->cm_param_len == DES_BLOCK_LEN);
-			if (IS_P2ALIGNED(mechanism->cm_param,
-			    sizeof (uint64_t))) {
-				/* LINTED: pointer alignment */
-				des_ctx->dc_iv =
-				    *(uint64_t *)mechanism->cm_param;
-			} else {
-				uint64_t tmp64;
-				uint8_t *tmp = (uint8_t *)mechanism->cm_param;
-
-#ifdef _BIG_ENDIAN
-				tmp64 = (((uint64_t)tmp[0] << 56) |
-				    ((uint64_t)tmp[1] << 48) |
-				    ((uint64_t)tmp[2] << 40) |
-				    ((uint64_t)tmp[3] << 32) |
-				    ((uint64_t)tmp[4] << 24) |
-				    ((uint64_t)tmp[5] << 16) |
-				    ((uint64_t)tmp[6] << 8) |
-				    (uint64_t)tmp[7]);
-#else
-				tmp64 = (((uint64_t)tmp[7] << 56) |
-				    ((uint64_t)tmp[6] << 48) |
-				    ((uint64_t)tmp[5] << 40) |
-				    ((uint64_t)tmp[4] << 32) |
-				    ((uint64_t)tmp[3] << 24) |
-				    ((uint64_t)tmp[2] << 16) |
-				    ((uint64_t)tmp[1] << 8) |
-				    (uint64_t)tmp[0]);
-#endif /* _BIG_ENDIAN */
-
-				des_ctx->dc_iv = tmp64;
-			}
-		}
-
-		des_ctx->dc_lastp = (uint8_t *)&des_ctx->dc_iv;
-		des_ctx->dc_flags |= DES_CBC_MODE;
+	switch (mechanism->cm_type) {
+	case DES_CBC_MECH_INFO_TYPE:
+	case DES3_CBC_MECH_INFO_TYPE:
+		rv = cbc_init_ctx((cbc_ctx_t *)des_ctx, mechanism->cm_param,
+		    mechanism->cm_param_len, DES_BLOCK_LEN, des_copy_block64);
+		break;
+	case DES_ECB_MECH_INFO_TYPE:
+	case DES3_ECB_MECH_INFO_TYPE:
+		des_ctx->dc_flags |= ECB_MODE;
 	}
-	des_ctx->dc_keysched = keysched;
+
+	if (rv != CRYPTO_SUCCESS) {
+		if (des_ctx->dc_flags & PROVIDER_OWNS_KEY_SCHEDULE) {
+			bzero(keysched, size);
+			kmem_free(keysched, size);
+		}
+	}
 
 /* EXPORT DELETE END */
 

@@ -1254,8 +1254,9 @@ BIGNUM_OBJS += $(COMMON_BIGNUM_OBJS) $(BIGNUM_PSR_OBJS)
 KCF_OBJS +=	kcf.o kcf_callprov.o kcf_cbufcall.o kcf_cipher.o kcf_crypto.o \
 		kcf_cryptoadm.o kcf_ctxops.o kcf_digest.o kcf_dual.o \
 		kcf_keys.o kcf_mac.o kcf_mech_tabs.o kcf_miscapi.o \
-		kcf_object.o kcf_policy.o kcf_prov_tabs.o kcf_sched.o \
-		kcf_session.o kcf_sign.o kcf_spi.o kcf_verify.o kcf_random.o
+		kcf_object.o kcf_policy.o kcf_prov_lib.o kcf_prov_tabs.o \
+		kcf_sched.o kcf_session.o kcf_sign.o kcf_spi.o kcf_verify.o \
+		kcf_random.o modes.o ecb.o cbc.o ctr.o ccm.o
 
 CRYPTOADM_OBJS += cryptoadm.o
 
@@ -1266,11 +1267,11 @@ DPROV_OBJS +=	dprov.o
 DCA_OBJS +=	dca.o dca_3des.o dca_debug.o dca_dsa.o dca_kstat.o dca_rng.o \
 		dca_rsa.o
 
-AESPROV_OBJS +=	aes.o aes_cbc_crypt.o aes_impl.o
+AESPROV_OBJS +=	aes.o aes_impl.o
 
 ARCFOURPROV_OBJS += arcfour.o arcfour_crypt.o
 
-BLOWFISHPROV_OBJS += blowfish.o blowfish_impl.o blowfish_cbc_crypt.o
+BLOWFISHPROV_OBJS += blowfish.o blowfish_impl.o
 
 ECCPROV_OBJS += ecc.o ec.o ec2_163.o ec2_mont.o ecdecode.o ecl_mult.o \
 		ecp_384.o ecp_jac.o ec2_193.o ecl.o ecp_192.o ecp_521.o \
@@ -1404,7 +1405,7 @@ KGSS_KRB5_OBJS += krb5mech.o \
 	$(CRYPTO_OLD) \
 	$(CRYPTO_RAW) $(K5_KRB) $(K5_OS)
 
-DES_OBJS +=	des_crypt.o des_cbc_crypt.o des_impl.o des_ks.o des_soft.o
+DES_OBJS +=	des_crypt.o des_impl.o des_ks.o des_soft.o
 
 DLBOOT_OBJS +=	bootparam_xdr.o nfs_dlinet.o scan.o
 

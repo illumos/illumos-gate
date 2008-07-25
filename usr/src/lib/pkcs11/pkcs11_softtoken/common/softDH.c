@@ -30,6 +30,7 @@
 #include <strings.h>
 #include <sys/types.h>
 #include <security/cryptoki.h>
+#include <sys/crypto/common.h>
 #include <bignum.h>
 #include <des_impl.h>
 #include "softGlobal.h"

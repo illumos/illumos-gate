@@ -37,6 +37,7 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <sys/crypto/common.h>
 
 /* Similar to sysmacros.h IS_P2ALIGNED, but checks two pointers: */
 #define	IS_P2ALIGNED2(v, w, a) \
@@ -115,11 +116,17 @@ struct aes_key {
 	aes_ks_t	decr_ks;
 };
 
-extern void aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct);
-extern void aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt);
+extern int aes_encrypt_contiguous_blocks(void *, char *, size_t,
+    crypto_data_t *);
+extern int aes_decrypt_contiguous_blocks(void *, char *, size_t,
+    crypto_data_t *);
+extern int aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct);
+extern int aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt);
 extern void aes_init_keysched(const uint8_t *cipherKey, uint_t keyBits,
 	void *keysched);
 extern void *aes_alloc_keysched(size_t *size, int kmflag);
+extern void aes_copy_block(uint8_t *, uint8_t *);
+extern void aes_xor_block(uint8_t *, uint8_t *);
 
 #ifdef	__cplusplus
 }

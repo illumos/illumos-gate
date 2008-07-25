@@ -33,7 +33,7 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
-COM_DIR	= $(COMMONBASE)/crypto/aes
+COM_DIR = $(COMMONBASE)/crypto/aes
 
 #
 #	Define the module and object file sets.
@@ -64,9 +64,10 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #	Linkage dependencies
 #
-LDFLAGS += -dy
+LDFLAGS += -dy -Nmisc/kcf
 
-CPPFLAGS	+= -I$(COM_DIR) -DCRYPTO_PROVIDER_NAME=\"$(MODULE)\"
+CPPFLAGS	+= -I$(COM_DIR) -I$(COM_DIR)/..
+CPPFLAGS	+= -DCRYPTO_PROVIDER_NAME=\"$(MODULE)\"
 
 #
 # For now, disable these lint checks; maintainers should endeavor
@@ -75,7 +76,6 @@ CPPFLAGS	+= -I$(COM_DIR) -DCRYPTO_PROVIDER_NAME=\"$(MODULE)\"
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
 #
 #	Default build targets.
