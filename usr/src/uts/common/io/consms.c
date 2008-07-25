@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +66,7 @@ static void
 consms_lqs_ack_complete(consms_lq_t *, mblk_t *);
 static void consms_add_lq(consms_lq_t *);
 static void consms_check_caps(void);
-static mblk_t *consms_new_firm_event(int, int);
+static mblk_t *consms_new_firm_event(ushort_t, int);
 
 static void consms_mux_max_wheel_report(mblk_t *);
 static void consms_mux_cache_states(mblk_t *);
@@ -274,7 +274,7 @@ consms_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(devi, "mouse", S_IFCHR,
-		0, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    0, DDI_PSEUDO, NULL) == DDI_FAILURE) {
 		ddi_remove_minor_node(devi, NULL);
 		return (-1);
 	}
@@ -964,7 +964,7 @@ consms_check_caps(void)
  * Allocate a dynamical notification event.
  */
 static mblk_t *
-consms_new_firm_event(int id, int value)
+consms_new_firm_event(ushort_t id, int value)
 {
 	Firm_event *fep;
 	mblk_t	*tmp;

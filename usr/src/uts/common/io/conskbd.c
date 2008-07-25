@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -289,7 +289,7 @@ static void conskbd_ioc_plink(queue_t *, mblk_t *);
 static void conskbd_ioc_punlink(queue_t *, mblk_t *);
 static void conskbd_legacy_kbd_ioctl(queue_t *, mblk_t *);
 static void conskbd_virtual_kbd_ioctl(queue_t *, mblk_t *);
-static mblk_t *conskbd_alloc_firm_event(int, int);
+static mblk_t *conskbd_alloc_firm_event(ushort_t, int);
 
 static conskbd_pending_msg_t *conskbd_mux_find_msg(mblk_t *);
 static void conskbd_mux_enqueue_msg(conskbd_pending_msg_t *);
@@ -1671,7 +1671,7 @@ err_exit:
  * Allocate a firm event
  */
 static mblk_t *
-conskbd_alloc_firm_event(int id, int value)
+conskbd_alloc_firm_event(ushort_t id, int value)
 {
 	mblk_t	*mb;
 	Firm_event *fe;
