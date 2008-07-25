@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,6 +91,10 @@ static struct scsi_watch {
 	uchar_t			sw_state;	/* for suspend-resume */
 	uchar_t			sw_flags;	/* to start at head of list */
 						/* for watch thread */
+	struct scsi_watch_request *swr_current; /* the command waiting to be */
+						/* processed by the watch */
+						/* thread which is being */
+						/* blocked */
 } sw;
 
 #if !defined(lint)
@@ -125,7 +128,14 @@ struct scsi_watch_request {
 	caddr_t			swr_callback_arg;
 	kcondvar_t		swr_terminate_cv; /* cv to wait on to cleanup */
 						/* request synchronously */
+	int			swr_ref;	/*  refer count to the swr */
+	uchar_t			suspend_destroy; /* flag for free later */
 };
+
+/*
+ * values for swr flags
+ */
+#define	SUSPEND_DESTROY		1
 
 #if !defined(lint)
 _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_watch_request))
@@ -156,6 +166,7 @@ scsi_watch_init()
 	cv_init(&sw.sw_cv, NULL, CV_DRIVER, NULL);
 	sw.sw_state = SW_RUNNING;
 	sw.sw_flags = 0;
+	sw.swr_current = NULL;
 }
 
 /*
@@ -194,30 +205,34 @@ scsi_watch_request_submit(
 	uchar_t					dtype;
 
 	SW_DEBUG((dev_info_t *)NULL, sw_label, SCSI_DEBUG,
-		"scsi_watch_request_submit: Entering ...\n");
+	    "scsi_watch_request_submit: Entering ...\n");
 
 	mutex_enter(&sw.sw_mutex);
 	if (sw.sw_thread == 0) {
 		register kthread_t	*t;
 
 		t = thread_create((caddr_t)NULL, 0, scsi_watch_thread,
-			NULL, 0, &p0, TS_RUN, v.v_maxsyspri - 2);
+		    NULL, 0, &p0, TS_RUN, v.v_maxsyspri - 2);
 		sw.sw_thread = t;
 	}
 
 	for (p = sw.sw_head; p != NULL; p = p->swr_next) {
 		if ((p->swr_callback_arg == cb_arg) &&
-			(p->swr_callback == callback))
+		    (p->swr_callback == callback))
 			break;
 	}
 
 	/* update time interval for an existing request */
 	if (p) {
-		p->swr_timeout = p->swr_interval = drv_usectohz(interval);
-		p->swr_what = SWR_WATCH;
-		cv_signal(&sw.sw_cv);
-		mutex_exit(&sw.sw_mutex);
-		return ((opaque_t)p);
+		if (p->swr_what != SWR_STOP) {
+			p->swr_timeout = p->swr_interval
+			    = drv_usectohz(interval);
+			p->swr_what = SWR_WATCH;
+			p->swr_ref++;
+			cv_signal(&sw.sw_cv);
+			mutex_exit(&sw.sw_mutex);
+			return ((opaque_t)p);
+		}
 	}
 	mutex_exit(&sw.sw_mutex);
 
@@ -232,10 +247,10 @@ scsi_watch_request_submit(
 	 * if the ARQ failed.
 	 */
 	bp = scsi_alloc_consistent_buf(ROUTE, NULL,
-		sense_length, B_READ, SLEEP_FUNC, NULL);
+	    sense_length, B_READ, SLEEP_FUNC, NULL);
 
 	rqpkt = scsi_init_pkt(ROUTE, (struct scsi_pkt *)NULL,
-		bp, CDB_GROUP0, 1, 0, PKT_CONSISTENT, SLEEP_FUNC, NULL);
+	    bp, CDB_GROUP0, 1, 0, PKT_CONSISTENT, SLEEP_FUNC, NULL);
 
 	(void) scsi_setup_cdb((union scsi_cdb *)rqpkt->pkt_cdbp,
 	    SCMD_REQUEST_SENSE, 0, SENSE_LENGTH, 0);
@@ -255,20 +270,20 @@ scsi_watch_request_submit(
 
 	dtype = devp->sd_inq->inq_dtype & DTYPE_MASK;
 	if (((dtype == 0) || (dtype == 0xE)) &&
-		(devp->sd_inq->inq_ansi > 2)) {
+	    (devp->sd_inq->inq_ansi > 2)) {
 		pkt = scsi_init_pkt(ROUTE, (struct scsi_pkt *)NULL, NULL,
-			CDB_GROUP1, sizeof (struct scsi_arq_status),
-			0, 0, SLEEP_FUNC, NULL);
+		    CDB_GROUP1, sizeof (struct scsi_arq_status),
+		    0, 0, SLEEP_FUNC, NULL);
 
 		(void) scsi_setup_cdb((union scsi_cdb *)pkt->pkt_cdbp,
-			SCMD_WRITE_G1, 0, 0, 0);
+		    SCMD_WRITE_G1, 0, 0, 0);
 	} else {
 		pkt = scsi_init_pkt(ROUTE, (struct scsi_pkt *)NULL, NULL,
-			CDB_GROUP0, sizeof (struct scsi_arq_status),
-			0, 0, SLEEP_FUNC, NULL);
+		    CDB_GROUP0, sizeof (struct scsi_arq_status),
+		    0, 0, SLEEP_FUNC, NULL);
 
 		(void) scsi_setup_cdb((union scsi_cdb *)pkt->pkt_cdbp,
-			SCMD_TEST_UNIT_READY, 0, 0, 0);
+		    SCMD_TEST_UNIT_READY, 0, 0, 0);
 		FILL_SCSI1_LUN(devp, pkt);
 	}
 
@@ -290,6 +305,7 @@ scsi_watch_request_submit(
 	swr->swr_callback_arg = cb_arg;
 	swr->swr_what = SWR_WATCH;
 	swr->swr_sense_length = (uchar_t)sense_length;
+	swr->swr_ref = 1;
 	cv_init(&swr->swr_terminate_cv, NULL, CV_DRIVER, NULL);
 
 	/*
@@ -428,7 +444,9 @@ scsi_watch_request_destroy(struct scsi_watch_request *swr)
 	ASSERT(swr->swr_busy == 0);
 
 	SW_DEBUG((dev_info_t *)NULL, sw_label, SCSI_DEBUG,
-		"scsi_watch_request_destroy: Entering ...\n");
+	    "scsi_watch_request_destroy: Entering ...\n");
+	if (swr->swr_ref != 0)
+		return;
 
 	/*
 	 * remove swr from linked list and destroy pkts
@@ -441,6 +459,10 @@ scsi_watch_request_destroy(struct scsi_watch_request *swr)
 	}
 	if (sw.sw_head == swr) {
 		sw.sw_head = swr->swr_next;
+	}
+	if (sw.swr_current == swr) {
+		swr->suspend_destroy = SUSPEND_DESTROY;
+		sw.swr_current = NULL;
 	}
 
 	scsi_destroy_pkt(swr->swr_rqpkt);
@@ -459,8 +481,11 @@ int
 scsi_watch_request_terminate(opaque_t token, int flags)
 {
 	struct scsi_watch_request *swr =
-		(struct scsi_watch_request *)token;
+	    (struct scsi_watch_request *)token;
 	struct scsi_watch_request *sswr;
+
+	int count = 0;
+	int free_flag = 0;
 
 	/*
 	 * We try to clean up this request if we can. We also inform
@@ -468,8 +493,8 @@ scsi_watch_request_terminate(opaque_t token, int flags)
 	 * to start reading from head of list again.
 	 */
 	SW_DEBUG((dev_info_t *)NULL, sw_label, SCSI_DEBUG,
-		"scsi_watch_request_terminate: Entering(0x%p) ...\n",
-		(void *)swr);
+	    "scsi_watch_request_terminate: Entering(0x%p) ...\n",
+	    (void *)swr);
 	mutex_enter(&sw.sw_mutex);
 
 	/*
@@ -478,19 +503,38 @@ scsi_watch_request_terminate(opaque_t token, int flags)
 	sswr = sw.sw_head;
 	while (sswr) {
 		if (sswr == swr) {
+			swr->swr_ref--;
+			count = swr->swr_ref;
+
 			if (swr->swr_busy) {
 				if (flags == SCSI_WATCH_TERMINATE_NOWAIT) {
 					mutex_exit(&sw.sw_mutex);
 					return (SCSI_WATCH_TERMINATE_FAIL);
-				} else {
-					swr->swr_what = SWR_STOP;
-					cv_wait(&swr->swr_terminate_cv,
-						&sw.sw_mutex);
-					goto done;
 				}
+				if (count != 0 && flags !=
+				    SCSI_WATCH_TERMINATE_ALL_WAIT) {
+					mutex_exit(&sw.sw_mutex);
+					return (SCSI_WATCH_TERMINATE_SUCCESS);
+				}
+				if (SCSI_WATCH_TERMINATE_ALL_WAIT == flags) {
+					swr->swr_ref = 0;
+					count = 0;
+				}
+				swr->swr_what = SWR_STOP;
+				cv_wait(&swr->swr_terminate_cv, &sw.sw_mutex);
+				free_flag = 1;
+				goto done;
 			} else {
+				if (SCSI_WATCH_TERMINATE_NOWAIT == flags ||
+				    SCSI_WATCH_TERMINATE_ALL_WAIT == flags) {
+					swr->swr_ref = 0;
+					count = 0;
+				}
 				scsi_watch_request_destroy(swr);
-				sw.sw_flags |= SW_START_HEAD;
+				if (0 == count) {
+					sw.sw_flags |= SW_START_HEAD;
+					free_flag = 1;
+				}
 				goto done;
 			}
 		}
@@ -498,13 +542,16 @@ scsi_watch_request_terminate(opaque_t token, int flags)
 	}
 done:
 	mutex_exit(&sw.sw_mutex);
-	if (sswr) {
-		cv_destroy(&swr->swr_terminate_cv);
-		kmem_free((caddr_t)swr, sizeof (struct scsi_watch_request));
-		return (SCSI_WATCH_TERMINATE_SUCCESS);
-	} else {
+	if (!sswr) {
 		return (SCSI_WATCH_TERMINATE_FAIL);
 	}
+	if (1 == free_flag &&
+	    sswr->suspend_destroy != SUSPEND_DESTROY) {
+		cv_destroy(&swr->swr_terminate_cv);
+		kmem_free((caddr_t)swr, sizeof (struct scsi_watch_request));
+	}
+
+	return (SCSI_WATCH_TERMINATE_SUCCESS);
 }
 
 
@@ -572,14 +619,14 @@ scsi_watch_thread()
 	clock_t				exit_delay = 60 * onesec;
 
 	SW_DEBUG((dev_info_t *)NULL, sw_label, SCSI_DEBUG,
-		"scsi_watch_thread: Entering ...\n");
+	    "scsi_watch_thread: Entering ...\n");
 
 #if !defined(lint)
 	_NOTE(NO_COMPETING_THREADS_NOW);
 #endif
 	mutex_init(&cpr_mutex, NULL, MUTEX_DRIVER, NULL);
 	CALLB_CPR_INIT(&cpr_info,
-		&cpr_mutex, callb_generic_cpr, "scsi_watch");
+	    &cpr_mutex, callb_generic_cpr, "scsi_watch");
 	sw_cpr_flag = 0;
 #if !defined(lint)
 	/*LINTED*/
@@ -609,14 +656,17 @@ head:
 			 */
 			if (sw.sw_state != SW_RUNNING) {
 				SW_DEBUG(0, sw_label, SCSI_DEBUG,
-					"scsi_watch_thread suspended\n");
+				    "scsi_watch_thread suspended\n");
 				mutex_enter(&cpr_mutex);
 				if (!sw_cmd_count) {
 					CALLB_CPR_SAFE_BEGIN(&cpr_info);
 					sw_cpr_flag = 1;
 				}
 				mutex_exit(&cpr_mutex);
+				sw.swr_current = swr;
 				cv_wait(&sw.sw_cv, &sw.sw_mutex);
+
+
 				/*
 				 * Need to let the PM framework know that it
 				 * is no longer safe to stop the thread for
@@ -626,13 +676,20 @@ head:
 				mutex_enter(&cpr_mutex);
 				if (sw_cpr_flag == 1) {
 					CALLB_CPR_SAFE_END(
-						&cpr_info, &cpr_mutex);
+					    &cpr_info, &cpr_mutex);
 					sw_cpr_flag = 0;
 				}
 				mutex_exit(&cpr_mutex);
 				mutex_enter(&sw.sw_mutex);
+				if (SUSPEND_DESTROY == swr->suspend_destroy) {
+					cv_destroy(&swr->swr_terminate_cv);
+					kmem_free((caddr_t)swr,
+					    sizeof (struct scsi_watch_request));
+					goto head;
+				} else {
+					sw.swr_current = NULL;
+				}
 			}
-
 			if (next_delay == 0) {
 				next_delay = swr->swr_timeout;
 			} else {
@@ -643,11 +700,11 @@ head:
 			next = swr->swr_next;
 
 			SW_DEBUG((dev_info_t *)NULL, sw_label, SCSI_DEBUG,
-				"scsi_watch_thread: "
-				"swr(0x%p),what=%x,timeout=%lx,"
-				"interval=%lx,delay=%lx\n",
-				(void *)swr, swr->swr_what, swr->swr_timeout,
-				swr->swr_interval, last_delay);
+			    "scsi_watch_thread: "
+			    "swr(0x%p),what=%x,timeout=%lx,"
+			    "interval=%lx,delay=%lx\n",
+			    (void *)swr, swr->swr_what, swr->swr_timeout,
+			    swr->swr_interval, last_delay);
 
 			switch (swr->swr_what) {
 			case SWR_SUSPENDED:
@@ -677,20 +734,20 @@ head:
 					sw_cmd_count++;
 					mutex_exit(&cpr_mutex);
 					SW_DEBUG((dev_info_t *)NULL,
-						sw_label, SCSI_DEBUG,
-						"scsi_watch_thread: "
-						"Starting TUR\n");
+					    sw_label, SCSI_DEBUG,
+					    "scsi_watch_thread: "
+					    "Starting TUR\n");
 					if (scsi_transport(swr->swr_pkt) !=
-						TRAN_ACCEPT) {
+					    TRAN_ACCEPT) {
 
 						/*
 						 * try again later
 						 */
 						swr->swr_busy = 0;
 						SW_DEBUG((dev_info_t *)NULL,
-							sw_label, SCSI_DEBUG,
-							"scsi_watch_thread: "
-							"Transport Failed\n");
+						    sw_label, SCSI_DEBUG,
+						    "scsi_watch_thread: "
+						    "Transport Failed\n");
 						mutex_enter(&cpr_mutex);
 						sw_cmd_count--;
 						mutex_exit(&cpr_mutex);
@@ -762,7 +819,7 @@ head:
 #endif
 	mutex_destroy(&cpr_mutex);
 	SW_DEBUG((dev_info_t *)NULL, sw_label, SCSI_DEBUG,
-		"scsi_watch_thread: Exiting ...\n");
+	    "scsi_watch_thread: Exiting ...\n");
 }
 
 /*
@@ -776,20 +833,20 @@ scsi_watch_request_intr(struct scsi_pkt *pkt)
 {
 	struct scsi_watch_result	result;
 	struct scsi_watch_request	*swr =
-		(struct scsi_watch_request *)pkt->pkt_private;
+	    (struct scsi_watch_request *)pkt->pkt_private;
 	struct scsi_status		*rqstatusp;
 	struct scsi_extended_sense	*rqsensep = NULL;
 	int				amt = 0;
 
 	SW_DEBUG((dev_info_t *)NULL, sw_label, SCSI_DEBUG,
-		"scsi_watch_intr: Entering ...\n");
+	    "scsi_watch_intr: Entering ...\n");
 
 	/*
 	 * first check if it is the TUR or RQS pkt
 	 */
 	if (pkt == swr->swr_pkt) {
 		if (SCBP_C(pkt) != STATUS_GOOD &&
-			SCBP_C(pkt) != STATUS_RESERVATION_CONFLICT) {
+		    SCBP_C(pkt) != STATUS_RESERVATION_CONFLICT) {
 			if (SCBP(pkt)->sts_chk &&
 			    ((pkt->pkt_state & STATE_ARQ_DONE) == 0)) {
 
@@ -797,21 +854,21 @@ scsi_watch_request_intr(struct scsi_pkt *pkt)
 				 * submit the request sense pkt
 				 */
 				SW_DEBUG((dev_info_t *)NULL,
-					sw_label, SCSI_DEBUG,
-					"scsi_watch_intr: "
-					"Submitting a Request Sense "
-					"Packet\n");
+				    sw_label, SCSI_DEBUG,
+				    "scsi_watch_intr: "
+				    "Submitting a Request Sense "
+				    "Packet\n");
 				if (scsi_transport(swr->swr_rqpkt) !=
-					TRAN_ACCEPT) {
+				    TRAN_ACCEPT) {
 
 					/*
 					 * just give up and try again later
 					 */
 					SW_DEBUG((dev_info_t *)NULL,
-						sw_label, SCSI_DEBUG,
-						"scsi_watch_intr: "
-						"Request Sense "
-						"Transport Failed\n");
+					    sw_label, SCSI_DEBUG,
+					    "scsi_watch_intr: "
+					    "Request Sense "
+					    "Transport Failed\n");
 					goto done;
 				}
 
@@ -831,11 +888,11 @@ scsi_watch_request_intr(struct scsi_pkt *pkt)
 				rqstatusp = &arqstat->sts_rqpkt_status;
 				rqsensep = &arqstat->sts_sensedata;
 				amt = swr->swr_sense_length -
-					arqstat->sts_rqpkt_resid;
+				    arqstat->sts_rqpkt_resid;
 				SW_DEBUG((dev_info_t *)NULL,
-					sw_label, SCSI_DEBUG,
-					"scsi_watch_intr: "
-					"Auto Request Sense, amt=%x\n", amt);
+				    sw_label, SCSI_DEBUG,
+				    "scsi_watch_intr: "
+				    "Auto Request Sense, amt=%x\n", amt);
 			}
 		}
 
@@ -846,18 +903,18 @@ scsi_watch_request_intr(struct scsi_pkt *pkt)
 		 */
 		rqstatusp = (struct scsi_status *)pkt->pkt_scbp;
 		rqsensep = (struct scsi_extended_sense *)
-			swr->swr_rqbp->b_un.b_addr;
+		    swr->swr_rqbp->b_un.b_addr;
 		amt = swr->swr_sense_length - pkt->pkt_resid;
 		SW_DEBUG((dev_info_t *)NULL, sw_label, SCSI_DEBUG,
-		"scsi_watch_intr: "
-		"Request Sense Completed, amt=%x\n", amt);
+		    "scsi_watch_intr: "
+		    "Request Sense Completed, amt=%x\n", amt);
 	} else {
 
 		/*
 		 * should not reach here!!!
 		 */
 		scsi_log((dev_info_t *)NULL, sw_label, CE_PANIC,
-			"scsi_watch_intr: Bad Packet(0x%p)", (void *)pkt);
+		    "scsi_watch_intr: Bad Packet(0x%p)", (void *)pkt);
 	}
 
 	if (rqsensep) {
@@ -871,16 +928,16 @@ scsi_watch_request_intr(struct scsi_pkt *pkt)
 			 * try again later
 			 */
 			SW_DEBUG((dev_info_t *)NULL, sw_label, SCSI_DEBUG,
-				"scsi_watch_intr: "
-				"Auto Request Sense Failed - "
-				"Busy or Check Condition\n");
+			    "scsi_watch_intr: "
+			    "Auto Request Sense Failed - "
+			    "Busy or Check Condition\n");
 			goto done;
 		}
 
 		SW_DEBUG((dev_info_t *)NULL, sw_label, SCSI_DEBUG,
-			"scsi_watch_intr: "
-			"es_key=%x, adq=%x, amt=%x\n",
-			rqsensep->es_key, rqsensep->es_add_code, amt);
+		    "scsi_watch_intr: "
+		    "es_key=%x, adq=%x, amt=%x\n",
+		    rqsensep->es_key, rqsensep->es_add_code, amt);
 	}
 
 	/*

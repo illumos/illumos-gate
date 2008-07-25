@@ -3598,7 +3598,7 @@ vhci_efo_done(void *arg)
 
 	/* Wait for clean termination of scsi_watch */
 	(void) scsi_watch_request_terminate(svp->svp_sw_token,
-	    SCSI_WATCH_TERMINATE_WAIT);
+	    SCSI_WATCH_TERMINATE_ALL_WAIT);
 	svp->svp_sw_token = NULL;
 
 	/* release path and freeup resources to indicate failover completion */

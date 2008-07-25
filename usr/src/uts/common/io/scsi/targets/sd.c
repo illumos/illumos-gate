@@ -6210,7 +6210,7 @@ sdpower(dev_info_t *devi, int component, int level)
 				un->un_swr_token = NULL;
 				mutex_exit(SD_MUTEX(un));
 				(void) scsi_watch_request_terminate(temp_token,
-				    SCSI_WATCH_TERMINATE_WAIT);
+				    SCSI_WATCH_TERMINATE_ALL_WAIT);
 			} else {
 				mutex_exit(SD_MUTEX(un));
 			}
@@ -21230,13 +21230,12 @@ sd_check_media(dev_t dev, enum dkio_state state)
 	}
 done:
 	un->un_f_watcht_stopped = FALSE;
-	if (un->un_swr_token) {
 		/*
 		 * Use of this local token and the mutex ensures that we avoid
 		 * some race conditions associated with terminating the
 		 * scsi watch.
 		 */
-		token = un->un_swr_token;
+	if (token) {
 		un->un_swr_token = (opaque_t)NULL;
 		mutex_exit(SD_MUTEX(un));
 		(void) scsi_watch_request_terminate(token,
@@ -22127,7 +22126,7 @@ sd_check_mhd(dev_t dev, int interval)
 			un->un_mhd_token = NULL;
 			mutex_exit(SD_MUTEX(un));
 			(void) scsi_watch_request_terminate(token,
-			    SCSI_WATCH_TERMINATE_WAIT);
+			    SCSI_WATCH_TERMINATE_ALL_WAIT);
 			mutex_enter(SD_MUTEX(un));
 		} else {
 			mutex_exit(SD_MUTEX(un));
