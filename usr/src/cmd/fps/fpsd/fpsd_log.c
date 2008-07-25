@@ -97,7 +97,7 @@ fpsd_timestamp(char *buf, size_t buflen)
 }
 
 static void
-fpsd_log_msg(int prio, char *fmt, va_list vap)
+fpsd_log_msg(int prio, const char *fmt, va_list vap)
 {
 	char msgbuf[FPSD_MAX_MSG_HDR_LEN];
 	char timebuf[FPSD_MAX_TIME_LEN] = "";
@@ -114,7 +114,7 @@ fpsd_log_msg(int prio, char *fmt, va_list vap)
 	/* In debug mode, messages will be sent to the controlling terminal */
 
 	if (fpsd.d_fg || !fpsd.d_daemon) {
-		(void) fprintf(stderr, msgbuf);
+		(void) fprintf(stderr, "%s", msgbuf);
 		(void) vfprintf(stderr, fmt, vap);
 		return;
 	}
@@ -140,7 +140,6 @@ fpsd_log_msg(int prio, char *fmt, va_list vap)
 
 }
 
-/* Need to remove parameter return_code from the params list */
 void
 fpsd_message(int return_code, int msg_type, char *fmt,  ...)
 {

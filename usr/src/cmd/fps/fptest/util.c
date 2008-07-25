@@ -45,7 +45,7 @@ msg_get_hostname(void) {
 	static char hname[MAXHOSTNAMELEN+1];
 
 	if (hname[0] == 0)
-		sysinfo(SI_HOSTNAME, hname, MAXHOSTNAMELEN);
+		(void) sysinfo(SI_HOSTNAME, hname, MAXHOSTNAMELEN);
 
 	return (hname);
 }
@@ -61,20 +61,24 @@ fps_msg(int msg_enable, const char *fmt, ...)
 
 	va_start(ap, fmt);
 
-	if (!msg_enable)
+	if (!msg_enable) {
+		va_end(ap);
 		return;
+	}
 
-	if (NULL == fmt)
+	if (NULL == fmt) {
+		va_end(ap);
 		return;
+	}
 
-	time(&ts);
-	localtime_r(&ts, &tms);
+	(void) time(&ts);
+	(void) localtime_r(&ts, &tms);
 
 	msg_buf[0] = 0;
-	strftime(msg_buf, sizeof (msg_buf), "%x %X ", &tms);
+	(void) strftime(msg_buf, sizeof (msg_buf), "%x %X ", &tms);
 
 	msg_ptr = &msg_buf[strlen(msg_buf)];
-	snprintf(msg_ptr, sizeof (msg_buf) - strlen(msg_buf) - 1,
+	(void) snprintf(msg_ptr, sizeof (msg_buf) - strlen(msg_buf) - 1,
 	    "%s %s(%s).%s: ",
 	    msg_get_hostname(),
 	    FPS_TEST_NAME, FPS_VER_TEST,
@@ -82,9 +86,10 @@ fps_msg(int msg_enable, const char *fmt, ...)
 
 	msg_ptr = &msg_buf[strlen(msg_buf)];
 
-	vsnprintf(msg_ptr, sizeof (msg_buf) - strlen(msg_buf) - 1, fmt, ap);
+	(void) vsnprintf(msg_ptr,
+	    sizeof (msg_buf) - strlen(msg_buf) - 1, fmt, ap);
 	if (msg_buf[strlen(msg_buf)-1] != '\n')
-		strcat(msg_buf, "\n");
+		(void) strcat(msg_buf, "\n");
 
 
 	(void) fputs(msg_buf, stdout);

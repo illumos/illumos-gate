@@ -26,22 +26,73 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+setgsr(unsigned long arg1)
+{
+
+	return (0);
+}
+
+#else
+
 .inline setgsr
 	rd	%gsr,%o1
 	wr	%o0,%gsr
 	mov	%o1,%o0
 .end
 
+#endif
+
+#ifdef __lint
+
+/*ARGSUSED*/
+float
+fpackfix(double arg1)
+{
+	return (0);
+}
+
+#else
+
 .inline	fpackfix
 	fpackfix	%f0,%f0
 .end
 
+#endif
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+fcmpne16(double arg1, double arg2)
+{
+	return (0);
+}
+
+#else
 
 .inline	fcmpne16
 	fcmpne16	%f0,%f2,%o0
 .end
 
+#endif
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+fcmpgt16(double arg1, double arg2)
+{
+	return (0);
+}
+
+#else
 
 .inline	fcmpgt16
 	fcmpgt16	%f0,%f2,%o0
 .end
+
+#endif

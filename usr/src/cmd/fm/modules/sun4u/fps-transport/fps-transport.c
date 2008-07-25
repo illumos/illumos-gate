@@ -153,14 +153,14 @@ _fmd_init(fmd_hdl_t *hdl)
 	h_fmd = hdl;
 
 	if (sysevent_evc_bind(CHANNEL, &h_event, BIND_FLAGS) != 0) {
-		snprintf(fail_msg, sizeof (fail_msg),
+		(void) snprintf(fail_msg, sizeof (fail_msg),
 		    "Failed to bind to channel %s", CHANNEL);
 		fmd_hdl_abort(hdl, fail_msg);
 	}
 
 	if (sysevent_evc_subscribe(h_event, SUBSCRIBE_ID, SUBSCRIBE_FLAGS,
 	    event_transfer, h_xprt, 0) != 0) {
-		snprintf(fail_msg, sizeof (fail_msg),
+		(void) snprintf(fail_msg, sizeof (fail_msg),
 		    "Failed to subsrcibe to channel %s", CHANNEL);
 		fmd_hdl_abort(hdl, fail_msg);
 	}

@@ -36,4 +36,4 @@ i depend
 d none usr 755 root sys
 d none usr/lib 755 root bin
 d none usr/lib/fps 755 root bin
-f none usr/lib/fps/fpsd 755 root bin
+f none usr/lib/fps/fpsd 555 root bin

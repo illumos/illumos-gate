@@ -42,9 +42,9 @@ d none usr/lib/fps/sun4u/UltraSPARC-IIIi 755 root bin
 d none usr/lib/fps/sun4u/UltraSPARC-III+ 755 root bin
 d none usr/lib/fps/sun4u/UltraSPARC-IV 755 root bin
 d none usr/lib/fps/sun4u/UltraSPARC-IV+ 755 root bin
-f none usr/lib/fps/fpsd 755 root bin
-f none usr/lib/fps/sun4u/UltraSPARC-III/fptest 755 root bin
-s none usr/lib/fps/sun4u/UltraSPARC-IIIi/fptest=../UltraSPARC-III/fptest 755 root bin
-s none usr/lib/fps/sun4u/UltraSPARC-III+/fptest=../UltraSPARC-III/fptest 755 root bin
-s none usr/lib/fps/sun4u/UltraSPARC-IV/fptest=../UltraSPARC-III/fptest 755 root bin
-s none usr/lib/fps/sun4u/UltraSPARC-IV+/fptest=../UltraSPARC-III/fptest 755 root bin
+f none usr/lib/fps/fpsd 555 root bin
+f none usr/lib/fps/sun4u/UltraSPARC-III/fptest 555 root bin
+s none usr/lib/fps/sun4u/UltraSPARC-IIIi/fptest=../UltraSPARC-III/fptest 555 root bin
+s none usr/lib/fps/sun4u/UltraSPARC-III+/fptest=../UltraSPARC-III/fptest 555 root bin
+s none usr/lib/fps/sun4u/UltraSPARC-IV/fptest=../UltraSPARC-III/fptest 555 root bin
+s none usr/lib/fps/sun4u/UltraSPARC-IV+/fptest=../UltraSPARC-III/fptest 555 root bin

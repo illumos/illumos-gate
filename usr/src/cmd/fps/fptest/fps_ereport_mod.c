@@ -83,8 +83,8 @@ fps_nvlist_create()
 	(void) nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0);
 
 	while (nvl == NULL && nr_malloc < 10) {
-		select(1, NULL, NULL, NULL, &timeout);
-		nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0);
+		(void) select(1, NULL, NULL, NULL, &timeout);
+		(void) nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0);
 		nr_malloc++;
 	}
 
@@ -198,7 +198,7 @@ fps_post_ereport(nvlist_t *ereport)
 
 	(void) sleep(1);
 
-	fflush(NULL);
+	(void) fflush(NULL);
 	sysevent_evc_unbind(scp);
 
 	return (0);
@@ -246,24 +246,23 @@ fps_get_cpu_brand(uint32_t cpu_id)
 		return (NULL);
 	}
 
-	/* LINTED */
 	if ((ksp = kstat_lookup(kc, "cpu_info", (int)cpu_id, NULL)) == NULL) {
-		kstat_close(kc);
+		(void) kstat_close(kc);
 		return (NULL);
 	}
 
 	if ((kstat_read(kc, ksp, NULL)) == -1) {
-		kstat_close(kc);
+		(void) kstat_close(kc);
 		return (NULL);
 	}
 
 	if ((knp = kstat_data_lookup(ksp, "brand")) == NULL) {
-		kstat_close(kc);
+		(void) kstat_close(kc);
 		return (NULL);
 	}
 
 	brand = fps_convert_cpu_brand(KSTAT_NAMED_STR_PTR(knp));
-	kstat_close(kc);
+	(void) kstat_close(kc);
 
 	if (brand == NULL)
 		return (NULL);
@@ -493,7 +492,7 @@ setup_fps_test_struct(int mask, struct fps_test_ereport *rep, ...)
 			return;
 		}
 
-		strlcpy(rep->info, data, MAX_INFO_SIZE-1);
+		(void) strlcpy(rep->info, data, MAX_INFO_SIZE-1);
 	}
 
 	va_end(argptr);

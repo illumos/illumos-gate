@@ -42,12 +42,14 @@ extern "C" {
 #define	GESL	dgetrs_64
 #define	AXPY	daxpy
 #define	SCAL	dscal
-#define	IAMAX	diamax
 #define	EPSLON	depslon
 #define	MXPY	dmxpy
 #define	REAL	double
 #define	LP_ZERO	0.0e0
 #define	LP_ONE	1.0e0
+#define	MAT_SIZE	d_mat_size
+#define	LinpValsA	d_linpvalsa
+#define	LAPACK_ECACHE_SIZE	d_lapack_ecache_size
 
 #else
 
@@ -59,12 +61,14 @@ extern "C" {
 #define	GESL	sgetrs_64
 #define	AXPY	saxpy
 #define	SCAL	sscal
-#define	IAMAX	siamax
 #define	EPSLON	sepslon
 #define	MXPY	smxpy
 #define	REAL	float
 #define	LP_ZERO	0.0
 #define	LP_ONE	1.0
+#define	MAT_SIZE	s_mat_size
+#define	LinpValsA	s_linpvalsa
+#define	LAPACK_ECACHE_SIZE	s_lapack_ecache_size
 
 #endif
 

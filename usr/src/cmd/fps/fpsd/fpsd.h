@@ -148,8 +148,6 @@ extern int  sys_pm_state;	/* fpsd_esutil.c */
 /* Util Functions */
 
 extern  uint64_t  get_free_swap(void);	/* fpsd_util.c */
-extern  uint64_t  get_total_swap(void);	/* fpsd_util.c */
-extern  uint64_t	get_physmem(void);	/* fpsd_util.c */
 extern  void	fps_wait_secs(int secs);	/* fpsd_util.c */
 
 extern  void  *test_fpu_thr(void *arg);	/* in fpsd_sched.c */

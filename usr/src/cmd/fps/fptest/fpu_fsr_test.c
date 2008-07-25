@@ -474,7 +474,7 @@ test_ieee754_exc_fields(int trapStatus, struct fps_test_ereport *report)
 				rval = FPU_FOROFFLINE;
 				observed = 1;
 				expected = 0;
-				snprintf(err_data, sizeof (err_data),
+				(void) snprintf(err_data, sizeof (err_data),
 				    "test: %d", i);
 				setup_fps_test_struct(IS_EREPORT_INFO,
 				    report, 6305, &observed, &expected,
@@ -485,7 +485,7 @@ test_ieee754_exc_fields(int trapStatus, struct fps_test_ereport *report)
 			rval = FPU_FOROFFLINE;
 			observed = (uint64_t)(result_fsr & exc_bits);
 			expected = (uint64_t)exc_bits;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "test: %d, trapStatus: %d", i, trapStatus);
 			setup_fps_test_struct(IS_EREPORT_INFO, report,
 			    6308, &observed, &expected, 1, 1, err_data);
@@ -550,7 +550,7 @@ test_fccn(struct fps_test_ereport *report)
 				rval = FPU_FOROFFLINE;
 				expected = (uint64_t)des_fcc;
 				observed = (uint64_t)res_fcc;
-				snprintf(err_data, sizeof (err_data),
+				(void) snprintf(err_data, sizeof (err_data),
 				    "FSR.fcc: %d, FCC ID: %s"
 				    "\nExpected: %lld"
 				    "\nObserved: %lld",
@@ -688,7 +688,7 @@ test_rounding(struct fps_test_ereport *report)
 			if (result != des_res) {
 				expected = (uint64_t)des_res;
 				observed = (uint64_t)result;
-				snprintf(err_data, sizeof (err_data),
+				(void) snprintf(err_data, sizeof (err_data),
 				    "FSR.RD: %d, %s, TestID: %s"
 				    "\nExpected: %lld\nObserved: %lld",
 				    rd, rndModes[rd], r_data[i].test_id,

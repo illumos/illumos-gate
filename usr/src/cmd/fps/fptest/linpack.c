@@ -49,8 +49,10 @@ static REAL EPSLON(REAL x);
 static void MXPY(int n1, REAL y[], int n2, int ldm, REAL x[], REAL m[]);
 
 extern int errno;
-static int LAPACK_ECACHE_SIZE = 8 * 1024 * 1024;
 static int MAT_SIZE;
+#ifndef __lint
+static int LAPACK_ECACHE_SIZE = 8 * 1024 * 1024;
+#endif
 
 /*
  * LINPACK(int Stress, int unit, struct fps_test_ereport *report,
@@ -94,7 +96,9 @@ LINPACK(int Stress, int unit, struct fps_test_ereport *report,
 	 * computed results will depend on the size of the E$ (
 	 * sos10/libsunperf ) IIIi computed results != IV+/IV/III+/III ...
 	 */
+#ifndef __lint
 	___pl_dss_set_chip_cache_(&LAPACK_ECACHE_SIZE);
+#endif
 
 	c_index = Stress;
 
@@ -154,7 +158,7 @@ LINPACK(int Stress, int unit, struct fps_test_ereport *report,
 
 		return (0);
 	} else {
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "\nExpected: %.16e, %.16e, %.16e, %.16e, %.16e"
 		    "\nObserved: %.16e, %.16e, %.16e, %.16e, %.16e",
 		    RESIDN, RESID, EPS, X11, XN1, residn, resid, eps, x11, xn1);
@@ -215,8 +219,10 @@ LINSUB(REAL *residn, REAL *resid,
 	REAL normx;
 	REAL *x;
 	struct timeval timeout;
-	long info;
 	long *ipvt;
+#ifndef __lint
+	long info;
+#endif
 
 	timeout.tv_sec = 0;
 	timeout.tv_usec = 10000; /* microseconds, 10ms */
@@ -257,8 +263,10 @@ mallocAgain:
 	n = MAT_SIZE;
 
 	(void) MATGEN(a, lda, n, b, &norma);
+#ifndef __lint
 	GEFA(n, n, a, lda, ipvt, &info);
 	GESL('N', n, 1, a, lda, ipvt, b, n, &info);
+#endif
 	free(ipvt);
 
 	for (i = 0; i < n; i++) {
@@ -401,37 +409,6 @@ MATGEN(REAL a[], int lda, int n, REAL b[], REAL *norma)
 	}
 
 	return (0);
-}
-
-/*
- * IAMAX(int n, REAL dx[])finds the index of element
- * having maximum absolute value.
- */
-int
-IAMAX(int n, REAL dx[])
-{
-	double abs;
-	double dmax;
-	int i;
-	int itemp;
-
-	if (n < 1)
-		return (-1);
-	if (n == 1)
-		return (0);
-
-	itemp = 0;
-	dmax = fabs((double)dx[0]);
-
-	for (i = 1; i < n; i++) {
-		abs = fabs((double)dx[i]);
-		if (abs > dmax) {
-			itemp = i;
-			dmax = abs;
-		}
-	}
-
-	return (itemp);
 }
 
 /*

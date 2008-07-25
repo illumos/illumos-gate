@@ -29,26 +29,165 @@
 #include <sys/asm_linkage.h>
 #include "cheetah_sdc.h"
 
-! TARGET_REG and TEMP_REG are macros defined in cheetah_sdc.h
-! They are set based on some compile time values
-! for eg. 
-!	as -xarch=v8 -P -D_ASM -DLOCALS -DL0 cheetah_sdc.s -o ch_sdc_l0.o
-! ch_sdc_l0.o will contain code to test %l0 register
-! The functions are named after the register it is testing (l1(), l2() etc)
+/*
+ * TARGET_REG and TEMP_REG are macros defined in cheetah_sdc.h
+ * They are set based on some compile time values
+ * for eg. 
+ * as -xarch=v8 -P -D_ASM -DLOCALS -DL0 cheetah_sdc.s -o ch_sdc_l0.o
+ * ch_sdc_l0.o will contain code to test %l0 register
+ * The functions are named after the register it is testing (l1(), l2() etc)
+ *
+ * Algorithm
+ * Use TARGET_REGISTER
+ * Do some random stuff on TEMP_REGISTER
+ * Do some operations on TARGET_REGISTER
+ * Test 
+ *
+ * TARGET_REG(unsigned long, unsigned long*, unsigned long*)
+ * Registers :
+ * i0 = contains the pattern
+ * i1 = location for the observed value
+ * i2 = location for the expected value
+ */
 
-! Algorithm
-!	Use TARGET_REGISTER
-!	Do some random stuff on TEMP_REGISTER
-!	Do some operations on TARGET_REGISTER
-!	Test 
+#ifdef __lint
 
-! TARGET_REG(unsigned long, unsigned long*, unsigned long*)
-! Registers :
-! 	i0 = contains the pattern
-! 	i1 = location for the observed value
-! 	i2 = location for the expected value
+/*ARGSUSED*/
+int
+g1(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
 
-	.align	64
+/*ARGSUSED*/
+int
+g2(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+g3(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+g4(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+l0(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+l1(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+l2(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+l3(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+l4(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+l5(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+l6(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+l7(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+o0(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+o1(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+o2(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+o3(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+o4(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+o5(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+int
+o7(unsigned long arg1, unsigned long *arg2, unsigned long *arg3)
+{
+	return (0);
+}
+
+#else /* LINT */
+
+	.align 64
 ENTRY(TARGET_REG)
 
 	save	%sp, -SA(MINFRAME), %sp
@@ -129,3 +268,4 @@ Done :
 	restore
 SET_SIZE(TARGET_REG)
 
+#endif /* LINT */

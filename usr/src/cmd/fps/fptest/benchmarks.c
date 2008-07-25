@@ -46,24 +46,32 @@ int fpu_fmulx(int rloop, struct fps_test_ereport *report);
 
 #ifdef V9B
 
+/* Lint doesn't recognize .il files where these are defined */
+#ifdef __lint
+
+unsigned long fcmpgt16(double in1, double in2);
+unsigned long fcmpne16(double in1, double in2);
+unsigned long setgsr(unsigned long);
+
+#else
+
 extern float fpackfix(double num);
 extern unsigned long fcmpgt16(double in1, double in2);
 extern unsigned long fcmpne16(double in1, double in2);
+extern unsigned long setgsr(unsigned long);
 
-float fpackfix(double);
-int align_data(int loop, int unit,
+#endif
+
+int align_data(int loop,
     struct fps_test_ereport *report);
-int vis_test(int unit, struct fps_test_ereport *report);
-static int align_error_create(char *err, int start, int offest,
-    int loop, int count);
+int vis_test(struct fps_test_ereport *report);
+static int align_error_create(char *err, uint32_t start, uint32_t offest,
+    int loop, uint32_t count);
 static int do_aligndata(uchar_t *from, uint32_t *offset, size_t sz,
     uchar_t *f0, uchar_t *f2, uint32_t bmask);
-static int visgt16(int, struct fps_test_ereport *report);
-static int visne16(int, struct fps_test_ereport *report);
-static int vispackfix(int, struct fps_test_ereport *report);
-unsigned long fcmpgt16(double, double);
-unsigned long fcmpne16(double, double);
-unsigned long setgsr(unsigned long);
+static int visgt16(struct fps_test_ereport *report);
+static int visne16(struct fps_test_ereport *report);
+static int vispackfix(struct fps_test_ereport *report);
 
 #endif
 
@@ -98,7 +106,6 @@ fpu_fdivd(int rloop, struct fps_test_ereport *report)
 	while (loop < rloop) {
 		loop++;
 
-		/* LINTED */
 		*(uint32_t *)& f22 = mrand48();
 		*(uint32_t *)& f22 &= 0x80069fff;
 		*(uint32_t *)& f22 |= 0x7fd69f00;
@@ -107,7 +114,6 @@ fpu_fdivd(int rloop, struct fps_test_ereport *report)
 		(void) f22;
 #endif
 
-		/* LINTED */
 		*((uint32_t *)& f22 + 1) = mrand48();
 		*((uint32_t *)& f22 + 1) |= 0x00000001;
 
@@ -121,7 +127,7 @@ fpu_fdivd(int rloop, struct fps_test_ereport *report)
 		fdivd(&f22, &f2, &f12);
 
 		if (f12 != expect_ans) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16e,\nObserved: %.16e",
 			    expect_ans, f12);
 			expect = *(uint64_t *)&expect_ans;
@@ -196,7 +202,7 @@ fpu_fmuld(int rloop, struct fps_test_ereport *report)
 		fmuld(&x, &y, &z, &z1);
 
 		if (*(uint64_t *)&z != *(uint64_t *)&z1) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16e,\nObserved: %.16e",
 			    *(uint64_t *)&z, *(uint64_t *)&z1);
 			expect = *(uint64_t *)&z;
@@ -295,7 +301,7 @@ fpu_fmulx(int rloop, struct fps_test_ereport *report)
 		if (*rd1 != *rd2) {
 			expect = (uint64_t)*rd1;
 			observe = (uint64_t)*rd2;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %lld\nObserved: %lld", *rd1, *rd2);
 			setup_fps_test_struct(IS_EREPORT_INFO, report,
 			    6356, &observe, &expect, 1, 1, err_data);
@@ -347,8 +353,40 @@ static uint32_t bmask[] = {0x01234567, 0x12345678,
 			0x55555555, 0xaaaaaaaa,
 			0x00000000, 0xffffffff};
 
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+setgsr(unsigned long arg1)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+float
+fpackfix(double arg1)
+{
+	return (0.0);
+}
+
+/*ARGSUSED*/
+unsigned long
+fcmpne16(double arg1, double arg2)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+unsigned long
+fcmpgt16(double arg1, double arg2)
+{
+	return (0);
+}
+
+#endif /* LINT */
+
 /*
- * align_data(int loop, int unit, struct fps_test_ereport *report)
+ * align_data(int loop, struct fps_test_ereport *report)
  * returns whether a miscompare was found after running alignment tests
  * loop amount of times. If an error is found, relevant data is stored
  * in report. This test exercises the alignaddr and aligndata
@@ -359,7 +397,7 @@ static uint32_t bmask[] = {0x01234567, 0x12345678,
  * greater than 256 bytes.
  */
 int
-align_data(int loop, int unit, struct fps_test_ereport *report)
+align_data(int loop, struct fps_test_ereport *report)
 {
 	char err[MAX_INFO_SIZE];
 	int test_ret;
@@ -385,7 +423,6 @@ align_data(int loop, int unit, struct fps_test_ereport *report)
 	/* Make sure memsize is 64 bytes aligned  with minimum of 64 bytes */
 	memsize = MEMSIZE;
 	memsize = memsize / 64 * 64;
-	src = NULL;
 
 	if (memsize < 64)
 		memsize = 64;
@@ -393,7 +430,7 @@ align_data(int loop, int unit, struct fps_test_ereport *report)
 	src = (uchar_t *)memalign(64, memsize + 64);
 
 	while (src == NULL && nr_malloc < 10) {
-		select(1, NULL, NULL, NULL, &timeout);
+		(void) select(1, NULL, NULL, NULL, &timeout);
 		nr_malloc++;
 		src = (uchar_t *)memalign(64, memsize + 64);
 	}
@@ -409,7 +446,6 @@ align_data(int loop, int unit, struct fps_test_ereport *report)
 
 	for (cnt = 0; cnt < loop; cnt++) {
 		for (start = 1; start < 64; start += 1) {
-			test_ret = 0;
 			offset = 0;
 
 			test_ret = do_aligndata(src + start, &offset,
@@ -430,7 +466,7 @@ align_data(int loop, int unit, struct fps_test_ereport *report)
 						break;
 				}
 
-				align_error_create(err, start,
+				(void) align_error_create(err, start,
 				    offset + start + i, loop, cnt);
 				expect[0] =
 				    (uint64_t)(*(uint8_t *)
@@ -459,7 +495,7 @@ align_data(int loop, int unit, struct fps_test_ereport *report)
 				for (i = 0; i < 64; i++) {
 					if (f0[i] != *(pf2 + i)) {
 
-						align_error_create(err,
+						(void) align_error_create(err,
 						    start,
 						    offset + start + i,
 						    loop, cnt);
@@ -493,7 +529,8 @@ align_data(int loop, int unit, struct fps_test_ereport *report)
  * error message for align_data.
  */
 static int
-align_error_create(char *err, int start, int offset, int loop, int count)
+align_error_create(char *err, uint32_t start,
+	uint32_t offset, int loop, uint32_t count)
 {
 	if (err == NULL)
 		return (-1);
@@ -508,10 +545,13 @@ align_error_create(char *err, int start, int offset, int loop, int count)
  * uchar_t *f0, uchar_t *f2, uint32_t bmask) performs
  * the assembly lvl routines for align_data.
  */
+/*ARGSUSED*/
 static int
 do_aligndata(uchar_t *from, uint32_t *offset, size_t sz,
 	uchar_t *f0, uchar_t *f2, uint32_t bmask)
 {
+	int ret = 1;
+
 	asm("bmask	%i5,%g0,%g0");
 	/* produce GSR.offset and align %l0 to 8 bytes boundary */
 	asm("alignaddr	%i0, %g0, %l0");
@@ -602,6 +642,7 @@ do_aligndata(uchar_t *from, uint32_t *offset, size_t sz,
 
 	/* no miscompare error */
 	asm("mov	0,%i0");
+	ret = 0;
 	/* no error, move back to last 64 bytes boundary */
 	asm("sub	%l1,56,%l1");
 
@@ -612,26 +653,25 @@ do_aligndata(uchar_t *from, uint32_t *offset, size_t sz,
 	asm("st 	%l1,[%i1]");
 	asm("membar	#Sync");
 
+	return (ret);
 }
 
 /*
- * vis_test(int unit, struct fps_test_ereport *report)
+ * vis_test(struct fps_test_ereport *report)
  * checks if various RISC operations are performed
  * succesfully. If an error is found, relevant data
  * is stored in report.
  */
 int
-vis_test(int unit, struct fps_test_ereport *report)
+vis_test(struct fps_test_ereport *report)
 {
 	int v1;
 	int v2;
 	int v3;
 
-	v1 = v2 = v3 = 0;
-
-	v1 = visgt16(unit, report);
-	v2 = visne16(unit, report);
-	v3 = vispackfix(unit, report);
+	v1 = visgt16(report);
+	v2 = visne16(report);
+	v3 = vispackfix(report);
 
 	if ((0 != v1) || (0 != v2) || (0 != v3))
 		return (-1);
@@ -640,13 +680,13 @@ vis_test(int unit, struct fps_test_ereport *report)
 }
 
 /*
- * visgt16(int unit, struct fps_test_ereport *report)
+ * visgt16(struct fps_test_ereport *report)
  * does a greater-than compare instruction and returns if
  * successful or not. If an error, relevant data is
  * stored in report.
  */
 static int
-visgt16(int unit, struct fps_test_ereport *report)
+visgt16(struct fps_test_ereport *report)
 {
 	uint64_t expected;
 	uint64_t observed;
@@ -667,13 +707,13 @@ visgt16(int unit, struct fps_test_ereport *report)
 }
 
 /*
- * visne16(int unit, struct fps_test_ereport *report)
+ * visne16(struct fps_test_ereport *report)
  * does a not-equal compare instruction and returns if
  * successful or not. If an error, relevant data is
  * stored in report.
  */
 static int
-visne16(int unit, struct fps_test_ereport *report)
+visne16(struct fps_test_ereport *report)
 {
 	uint64_t expected;
 	uint64_t observed;
@@ -694,22 +734,20 @@ visne16(int unit, struct fps_test_ereport *report)
 }
 
 /*
- * vispackfix(int unit, struct fps_test_ereport *report)
+ * vispackfix(struct fps_test_ereport *report)
  * does four 16-bit pack conversions to a lower precsion
  * format and returns if successful or not. If an error,
  * relevant data is stored in report.
  */
 static int
-vispackfix(int unit, struct fps_test_ereport *report)
+vispackfix(struct fps_test_ereport *report)
 {
 	float b;
-	int failed = 0;
 	uint64_t expected;
 	uint64_t observed;
 	unsigned int c;
 	unsigned long a = 0x8008000008008008;
 	unsigned long gsr = 0;
-	unsigned long old_gsr;
 
 	(void) setgsr(gsr);
 

@@ -79,7 +79,18 @@
  *  Operand 'fcc' indicates which fcc field of FSR to use.
  */
 
-	.data
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+fcmps_fcc(unsigned int arg1, unsigned int arg2, unsigned int arg3)
+{
+	return (0);
+}
+
+#else 
+        
+.data
 
 fcmps_opr1 : .word 0
 .type fcmps_opr1,#object
@@ -132,7 +143,7 @@ fini :
   restore
 SET_SIZE(fcmps_fcc)
 
-
+#endif
 
 /*
  *  uint64_t res_fsr = fcmpd_fcc(uint64_t val1, uint64_t val2, 
@@ -148,8 +159,19 @@ SET_SIZE(fcmps_fcc)
  *  This is not done in SPARC V9 as the registers are 64-bit.
  */
 
-	.data
-	.align 8
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+fcmpd_fcc(uint64_t arg1, uint64_t arg2, unsigned int arg3)
+{
+	return (0);
+}
+
+#else
+
+.data
+.align 8
 
 fcmpd_opr1 : .word 0,0
 .type fcmpd_opr1,#object
@@ -203,3 +225,5 @@ egress :
   ret
   restore
 SET_SIZE(fcmpd_fcc)
+
+#endif

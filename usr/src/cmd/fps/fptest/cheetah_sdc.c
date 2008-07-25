@@ -112,7 +112,7 @@ cheetah_sdc_test(int limit, struct fps_test_ereport *report)
 			rval = reg_func[regs].test_func(pattern, &tmp1, &tmp2);
 
 			if (rval != 0) {
-				snprintf(err_data, sizeof (err_data),
+				(void) snprintf(err_data, sizeof (err_data),
 				    "Test:%d, reg:%s", iter,
 				    reg_func[regs].reg);
 				expect = (uint64_t)0;

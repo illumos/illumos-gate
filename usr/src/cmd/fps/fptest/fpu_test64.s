@@ -26,37 +26,51 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-! Usage of %ncc
-!
-! When the branch instructions were modified from Bicc to BPcc format,
-! the pseudo-op %ncc was used. This will be converted by the assembler
-! to %icc or %xcc depending on whether the compilation is being done
-! for 32-bit or 64-bit platforms.
+/*
+ * Usage of %ncc
+ * 
+ * When the branch instructions were modified from Bicc to BPcc format,
+ * the pseudo-op %ncc was used. This will be converted by the assembler
+ * to %icc or %xcc depending on whether the compilation is being done
+ * for 32-bit or 64-bit platforms.
+ */
 
 
 #include<sys/asm_linkage.h>
 
+/*
+ * ------------------------------------------------------------------------
+ *  Name:        datap_add()	
+ * Function:	This routine test the data path of the adder for single 
+ * 		precision.
+ * Calling:	i0 = value
+ * Returns:	
+ * Convention:	
+ * --------------------------------------------------------------------------
+ *
+ *		f0 = value
+ *		f1 = 0
+ *	add =   f2 = value
+ */
 
-!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-! Name:	        datap_add()	
-! Function:	This routine test the data path of the adder for single 
-!		precision.
-! Calling:	i0 = value
-! Returns:	
-! Convention:	
-!--------------------------------------------------------------------------
-!
-!		f0 = value
-!		f1 = 0
-!	add =   f2 = value
-!
-	.section	".data"
-	.align	4
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+datap_add(unsigned long arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  4
 
 .Ldadd:
-	.skip	4
+        .skip   4
 .Ldadd1:
-	.skip   4
+        .skip   4
 
 ENTRY_NP(datap_add)
 	save    %sp, -SA(MINFRAME), %sp	! save the stack frame
@@ -80,27 +94,41 @@ datap_ok:
 	restore
 SET_SIZE(datap_add)
 
+#endif
 
-!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-! Name:		
-! Function:	
-! Calling:	
-! Returns:	
-! Convention:	
-!--------------------------------------------------------------------------
-! 
-! This routine test the data path of multiplier for single precision
-!              f0 = value
-!              f1 = 1 
-!      mult =  f2 = f0 * f1
-!
-        .section        ".data"
-        .align  4      
+/*
+ * ------------------------------------------------------------------------
+ * Name:		
+ * Function:	
+ * Calling:	
+ * Returns:	
+ * Convention:	
+ * --------------------------------------------------------------------------
+ * 
+ * This routine test the data path of multiplier for single precision
+ *             f0 = value
+ *             f1 = 1 
+ *     mult =  f2 = f0 * f1
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+datap_mult(unsigned long arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  4
 
 .Ldtmlt:
-	.skip	4
+        .skip   4
 .Ldtmlt1:
-	.skip	4
+        .skip   4
 
 ENTRY_NP(datap_mult)
 	save    %sp, -SA(MINFRAME), %sp
@@ -130,39 +158,54 @@ datap_mult_done :
 	restore
 SET_SIZE(datap_mult)
 
+#endif
 
-!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-! Name:		
-! Function:	
-! Calling:	
-! Returns:	
-! Convention:	
-!--------------------------------------------------------------------------
-!
-!	This routine tests the data path of the weitek multiplier for 
-!	double precision. Single-precision load and store are being
-!       used as the input double-precision value is taken as two SP
-!       arguments
-!
-!               f0 = msw value
-!		f1 = lsw value
-!		f2 = 0
-!		f3 = 0
-!	add =   f4 = f0 + f2
-!
-        .section        ".data"
-        .align  8       
+/*
+ * ------------------------------------------------------------------------
+ * Name:		
+ * Function:	
+ * Calling:	
+ * Returns:	
+ * Convention:	
+ * --------------------------------------------------------------------------
+ *
+ *	This routine tests the data path of the weitek multiplier for 
+ *	double precision. Single-precision load and store are being
+ *      used as the input double-precision value is taken as two SP
+ *      arguments
+ *
+ *              f0 = msw value
+ *		f1 = lsw value
+ *
+ *		f2 = 0
+ *		f3 = 0
+ *	add =   f4 = f0 + f2
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+datap_add_dp(unsigned long arg1, unsigned long arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 
 .Ldtadddp:
-	.skip	8
+        .skip   8
 .Ldtadddp1:
-	.skip	8
+        .skip   8
 .Ldtadddp2:
-	.skip	8
+        .skip   8
 .Lamsw:
-	.skip	8
+        .skip   8
 .Lalsw:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(datap_add_dp)
 	save    %sp, -SA(MINFRAME), %sp  
@@ -195,38 +238,53 @@ datap_add_dp_ok :
 	
 SET_SIZE(datap_add_dp)
 
-!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-! Name:		
-! Function:	
-! Calling:	
-! Returns:	
-! Convention:	
-!--------------------------------------------------------------------------
-!
-!  This routine tests the data path of the weitek multiplier for 
-!  double precision. Single-precision load and store are being
-!  used as the input double-precision value is taken as two SP
-!  arguments.
-!
-!              f0 = msw value 
-!              f1 = lsw value 
-!              f2 = 0
-!              f3 = 0
-!	mult = f4 = f0 * f2
-!
-        .section        ".data"
-        .align  8       
+#endif
+
+/*
+ * ------------------------------------------------------------------------
+ * Name:		
+ * Function:	
+ * Calling:	
+ * Returns:	
+ * Convention:	
+ *
+ * This routine tests the data path of the weitek multiplier for 
+ * double precision. Single-precision load and store are being
+ * used as the input double-precision value is taken as two SP
+ * arguments.
+ *
+ *             f0 = msw value 
+ *             f1 = lsw value 
+ *             f2 = 0
+ *             f3 = 0
+ *	mult = f4 = f0 * f2
+ * ------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+datap_mult_dp(unsigned long arg1, unsigned long arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 
 .Ldtmdp:
-	.skip	8
+        .skip   8
 .Ldtmdp1:
-	.skip	8
+        .skip   8
 .Ldtmdp2:
-	.skip	8
+        .skip   8
 .Lmmsw:
-	.skip	8
+        .skip   8
 .Lmlsw:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(datap_mult_dp)
 	save    %sp, -SA(MINFRAME), %sp  
@@ -261,20 +319,34 @@ datap_mult_dp_ok :
 	
 SET_SIZE(datap_mult_dp)
 
-!
-! for add routine all the f registers from 0 - 19 will be filled with numbers
-! and the result should be 10.
-!
+#endif
 
-        .section        ".data"
-        .align  4       
+/*
+ * -------------------------------------------------------------------------
+ * for add routine all the f registers from 0 - 19 will be filled with numbers
+ * and the result should be 10.
+ * -------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+unsigned long
+timing_add_sp()
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  4
 
 .Ltmasp:
-	.skip	4
+        .skip   4
 .Ltmasp1:
-	.skip	4
+        .skip   4
 .Ltmasp2:
-	.skip	4
+        .skip   4
 
 ENTRY_NP(timing_add_sp)
 	save    %sp, -SA(MINFRAME), %sp		! save the registers, stacck
@@ -386,19 +458,35 @@ done_t_add_sp:
         restore
 SET_SIZE(timing_add_sp)
 
-!
-!	for mult routine all the f registers from 0 - 19 will be filled 
-!	with numbers and the result should be the number.
-!
-        .section        ".data"
-        .align  4       
+#endif
+
+/*
+ * ----------------------------------------------------------------------
+ *	for mult routine all the f registers from 0 - 19 will be filled 
+ *	with numbers and the result should be the number.
+ * ----------------------------------------------------------------------
+ */
+
+
+#ifdef __lint
+
+unsigned long
+timing_mult_sp()
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  4
 
 .Ltmmsp:
-	.skip	4
+        .skip   4
 .Ltmmsp1:
-	.skip	4
+        .skip   4
 .Ltmmsp2:
-	.skip	4
+        .skip   4
 
 ENTRY_NP(timing_mult_sp)
 	save    %sp, -SA(MINFRAME), %sp           ! save the registers, stacck
@@ -508,18 +596,33 @@ done_t_mult_sp:
         restore
 SET_SIZE(timing_mult_sp)
 
-!
-!	same thing for double precision
-!
-        .section        ".data"
-        .align  8       
+#endif
+
+/*
+ * ----------------------------------------------------------------
+ *	same thing for double precision
+ * ----------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+uint64_t
+timing_add_dp()
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 
 .Ltmadp:
-	.skip	8
+        .skip   8
 .Ltmadp1:
-	.skip	8
+        .skip   8
 .Ltmadp2:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(timing_add_dp)
 	save    %sp, -SA(MINFRAME), %sp           ! save the registers, stacck
@@ -581,18 +684,33 @@ done_t_add_dp:
 	restore
 SET_SIZE(timing_add_dp)
 
+#endif
 				
-!	Now for mult
-!
-        .section        ".data"
-        .align  8       
+/*
+ * -------------------------------------------------------------------
+ *	Now for mult
+ * -------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+uint64_t
+timing_mult_dp()
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 
 .Ltmmdp:
-	.skip	8
+        .skip   8
 .Ltmmdp1:
-	.skip	8
+        .skip   8
 .Ltmmdp2:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(timing_mult_dp)
 	save    %sp, -SA(MINFRAME), %sp           ! save the registers, stacck
@@ -656,28 +774,41 @@ done_t_mult_dp:
 	restore
 SET_SIZE(timing_mult_dp)
 
-	
-!--------------------------------------------------------------------------
-! The following routines are for testing the IEEE754 exception fields
-! of the FSR (cexc, aexc)
-!	The input is : i0 = amsw
-!		       i1 = bmsw or alsw (for double precision)
-!	  	       i2 = bmsw (for dp)
-!		       i3 = blsw (for dp)
-!
-!	The output is  i0 = value of FSR register
-!
+#endif
 
-        .section        ".data"
-        .align  8       
+/*
+ * --------------------------------------------------------------------------
+ * The following routines are for testing the IEEE754 exception fields
+ * of the FSR (cexc, aexc)
+ *	The input is : i0 = amsw
+ *		       i1 = bmsw or alsw (for double precision)
+ *	  	       i2 = bmsw (for dp)
+ *		       i3 = blsw (for dp)
+ *
+ *	The output is  i0 = value of FSR register
+ * -------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+wadd_sp(unsigned long arg1, unsigned long arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 
 .Lwadds:
-	.word 	0
+        .word   0
 .Lwadds1:
-	.word 	0
+        .word   0
 .Lwadds2:
-	.xword	0    ! For the FSR contents
-
+        .xword  0    ! For the FSR contents
 
 ENTRY_NP(wadd_sp)
 	save    %sp, -SA(MINFRAME), %sp
@@ -698,19 +829,35 @@ ENTRY_NP(wadd_sp)
 	restore
 SET_SIZE(wadd_sp)
 
+#endif
 
-!
-!	same thing for add double precision
-!
-        .section        ".data"
-        .align  8       
+/*
+ * -------------------------------------------------------------
+ *	same thing for add double precision
+ * -------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+wadd_dp(unsigned long arg1, unsigned long arg2,
+	    unsigned long arg3, unsigned long arg4)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 
 .Ladddp:
-	.word	0
+        .word   0
 .Ladddp1:
-	.word	0
+        .word   0
 .Ladddp2:
-	.xword	0    ! For the FSR contents
+        .xword  0    ! For the FSR contents
 
 ENTRY_NP(wadd_dp)
 	save    %sp, -SA(MINFRAME), %sp
@@ -736,20 +883,33 @@ ENTRY_NP(wadd_dp)
 	
 SET_SIZE(wadd_dp)
 
+#endif
 
-!
-!
-!	for divide single precision
-!
-        .section        ".data"
-        .align  8       
+/*
+ * --------------------------------------------------------------
+ *	for divide single precision
+ * --------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t wdiv_sp(unsigned long arg1, unsigned long arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 
 .Ldvsp:
-	.word	0
+        .word   0
 .Ldvsp1:
-	.word	0
+        .word   0
 .Ldvsp2:
-	.xword	0    ! For the FSR contents
+        .xword  0    ! For the FSR contents
 
 ENTRY_NP(wdiv_sp)
 	save    %sp, -SA(MINFRAME), %sp
@@ -771,20 +931,35 @@ ENTRY_NP(wdiv_sp)
 	
 SET_SIZE(wdiv_sp)
 
+#endif
 
-!
-!
-!	for divide double precision
-!
-        .section        ".data"
-        .align  8       
+/*
+ * ----------------------------------------------------------------
+ *	for divide double precision
+ * ----------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+wdiv_dp(unsigned long arg1, unsigned long arg2,
+	    unsigned long arg3, unsigned long arg4)
+{
+	return (0);
+}
+
+#else
+
+ .section        ".data"
+ .align  8
 
 .Ldvdp:
-	.word	0
+        .word   0
 .Ldvdp1:
-	.word	0
+        .word   0
 .Ldvdp2:
-	.xword	0    ! For the FSR contents
+        .xword  0    ! For the FSR contents
 
 ENTRY_NP(wdiv_dp)
 	save    %sp, -SA(MINFRAME), %sp  
@@ -810,20 +985,34 @@ ENTRY_NP(wdiv_dp)
 	
 SET_SIZE(wdiv_dp)
 
+#endif
 
-!
-!
-!       for multiply single precision   
-!
-        .section        ".data"
-        .align  8       
+/*
+ * ------------------------------------------------------------------------
+ *      for multiply single precision   
+ * ------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+wmult_sp(unsigned long arg1, unsigned long arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 
 .Lmltsp:
-	.word	0
+        .word   0
 .Lmltsp1:
-	.word	0
+        .word   0
 .Lmltsp2:
-	.xword	0    ! For the FSR contents
+        .xword  0    ! For the FSR contents
 
 ENTRY_NP(wmult_sp)
 	save    %sp, -SA(MINFRAME), %sp 
@@ -845,20 +1034,35 @@ ENTRY_NP(wmult_sp)
 	
 SET_SIZE(wmult_sp)
 
+#endif
 
-! 
-! 
-!       for multiply double precision 
-! 
-        .section        ".data"
-        .align  8       
+/*
+ * ---------------------------------------------------------------------
+ *      for multiply double precision 
+ * ---------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+wmult_dp(unsigned long arg1, unsigned long arg2,
+	    unsigned long arg3, unsigned long arg4)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 
 .Lmltdp:
-	.word	0
+        .word   0
 .Lmltdp1:
-	.word	0
+        .word   0
 .Lmltdp2:
-	.xword	0    ! For the FSR contents
+        .xword  0    ! For the FSR contents
 
 ENTRY_NP(wmult_dp)
         save    %sp, -SA(MINFRAME), %sp   
@@ -884,19 +1088,33 @@ ENTRY_NP(wmult_dp)
 	
 SET_SIZE(wmult_dp)
 
+#endif
 
-! 
-! 
-!       for square-root single precision 
-! 
-        .section        ".data"
-        .align  4
+/* 
+ * -----------------------------------------------------------------
+ *      for square-root single precision 
+ * -----------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+wsqrt_sp(unsigned long arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  4
 .Lsqsp_opr:
-		.word	0
+                .word   0
 
         .align  8
 .Lsqsp_fsr:
-		.xword	0	! For the FSR contents
+                .xword  0       ! For the FSR contents
 
 ENTRY_NP(wsqrt_sp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack
@@ -915,17 +1133,31 @@ ENTRY_NP(wsqrt_sp)
 	
 SET_SIZE(wsqrt_sp)
 
+#endif
 
-! 
-! 
-!       for square-root double precision 
-! 
-        .section        ".data"
-        .align  8
+/* 
+ * ---------------------------------------------------------------------
+ *       for square-root double precision 
+ * ---------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+wsqrt_dp(uint64_t arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 .Lsqdp_opr:
-		.xword	0
+                .xword  0
 .Lsqdp_fsr:
-		.xword	0	! For the FSR contents
+                .xword  0       ! For the FSR contents
 
 ENTRY_NP(wsqrt_dp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack 
@@ -944,18 +1176,32 @@ ENTRY_NP(wsqrt_dp)
 	
 SET_SIZE(wsqrt_dp)
 
+#endif
 
-!
-!	
-!	Chaining test.
-!	 
-        .section        ".data"
-        .align  8       
+/*
+ * ---------------------------------------------------------------------
+ *	Chaining test.
+ * ---------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+chain_sp(int arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 
 .Lchsp:
-	.word	0
+        .word   0
 .Lchsp1:
-	.word	0
+        .word   0
 
 ENTRY_NP(chain_sp)
 	save    %sp, -SA(MINFRAME), %sp
@@ -978,16 +1224,26 @@ ENTRY_NP(chain_sp)
         restore
 SET_SIZE(chain_sp)
 
+#endif
 
-!
-!
-        .section        ".data"
-        .align  8       
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+chain_dp(int arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 
 .Lchdp:
-	.word	0
+        .word   0
 .Lchdp1:
-	.word	0
+        .word   0
 
 ENTRY_NP(chain_dp)
 	save    %sp, -SA(MINFRAME), %sp
@@ -1010,20 +1266,34 @@ ENTRY_NP(chain_dp)
         restore
 SET_SIZE(chain_dp)
 
+#endif
 
-!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-! Name:		Initialize all SP Registers
-! Function:	Loads the callers value into all SP floating point registers.
-! Calling:	in0 = Value
-! Returns:	All float register = Value
-! Convention:	init_regs(val);
-! Method:	Copys the user value into each fp reg in sequence.
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8       
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Initialize all SP Registers
+ * Function:	Loads the callers value into all SP floating point registers.
+ * Calling:	in0 = Value
+ * Returns:	All float register = Value
+ * Convention:	init_regs(val);
+ * Method:	Copys the user value into each fp reg in sequence.
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+void
+init_regs(uint32_t arg1)
+{
+}
+
+#else
+
+.section        ".data"
+.align  8
 
 .Lclrg:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(init_regs)
 	save    %sp, -SA(MINFRAME), %sp	! save the registers, stack
@@ -1065,21 +1335,33 @@ ENTRY_NP(init_regs)
         restore
 SET_SIZE(init_regs)
 
+#endif
 
+/*
+ * Name:	Initialize all double precision Registers
+ * Function:	Loads the callers value into all floating point registers.
+ * Calling:	in0 = Value
+ * Returns:	All float register = Value
+ * Convention:	init_regs_dp(val);
+ * Method:	Copys the user value into each fp reg in sequence.
+ * --------------------------------------------------------------------------
+ */
 
-!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-! Name:		Initialize all double precision Registers
-! Function:	Loads the callers value into all floating point registers.
-! Calling:	in0 = Value
-! Returns:	All float register = Value
-! Convention:	init_regs_dp(val);
-! Method:	Copys the user value into each fp reg in sequence.
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8       
+#ifdef __lint
+
+/*ARGSUSED*/
+void
+init_regs_dp(uint64_t arg1)
+{
+}
+
+#else
+
+.section        ".data"
+.align  8
 
 .Lclrg_dp:
-	.skip	16
+        .skip   16
 
 ENTRY_NP(init_regs_dp)
 	save    %sp, -SA(MINFRAME), %sp	
@@ -1122,23 +1404,35 @@ ENTRY_NP(init_regs_dp)
         restore
 SET_SIZE(init_regs_dp)
 
+#endif
 
+/*
+ * Name:		
+ * Function:	
+ * Calling:	
+ * Returns:	
+ * Convention:	
+ * --------------------------------------------------------------------------
+ */
 
-!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-! Name:		
-! Function:	
-! Calling:	
-! Returns:	
-! Convention:	
-!--------------------------------------------------------------------------
+#ifdef __lint
 
-        .section        ".data"
-        .align  4
+/*ARGSUSED*/
+uint32_t
+register_test(int arg1, uint32_t arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  4
 
 .Lrgtst1:
-	.skip	4
+        .skip   4
 .Lrgtst2:
-	.skip	4
+        .skip   4
 
 ENTRY_NP(register_test)
 	save    %sp, -SA(MINFRAME), %sp
@@ -1211,21 +1505,35 @@ reg_done:
 	restore
 SET_SIZE(register_test)
 
+#endif
 
-!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-! Name:		
-! Function:	
-! Calling:	
-! Returns:	
-! Convention:	
-!--------------------------------------------------------------------------
-    	.section        ".data"
-	.align  8       
+/*
+ * Name:		
+ * Function:	
+ * Calling:	
+ * Returns:	
+ * Convention:	
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+register_test_dp(int arg1, uint64_t arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 
 .Lrgtst1_dp:
-	.skip	8
+        .skip   8
 .Lrgtst2_dp:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(register_test_dp)
 	save    %sp, -SA(MINFRAME), %sp
@@ -1301,23 +1609,37 @@ reg_done_dp:
 	restore
 SET_SIZE(register_test_dp)
 
+#endif
 
+/*
+ * ------------------------------------------------------------------------
+ * Name:	Move Registers
+ * Function:	Move a value thru the float registers
+ * Calling:	in0 = value
+ * Returns:	in0 = result 
+ * Convention:	if (result != move_regs(value)) 
+ *                  error(result-value);
+ * --------------------------------------------------------------------------
+ */
 
-!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-! Name:		Move Registers
-! Function:	Move a value thru the float registers
-! Calling:	in0 = value
-! Returns:	in0 = result 
-! Convention:	if (result != move_regs(value)) 
-!                   error(result-value);
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  4
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+move_regs(unsigned long arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  4
 
 .Lmvrg:
-	.skip	4
+        .skip   4
 .Lmvrg1:
-	.skip 	4
+        .skip   4
 
 ENTRY_NP(move_regs)
 	save    %sp, -SA(MINFRAME), %sp	! save the registers, stack
@@ -1362,107 +1684,58 @@ ENTRY_NP(move_regs)
         restore
 SET_SIZE(move_regs)
 
+#endif
 
+/*
+ * ------------------------------------------------------------------------
+ * Name:		
+ * Function:	
+ * Calling:	
+ * Returns:	
+ * Convention:	
+ * --------------------------------------------------------------------------
+ *
+ *	The following routine checks the branching is done accordingly
+ *	to the ficc bits.
+ * 	input	%i0 = 0 = branch unordered
+ *		      1 = branch greater
+ *		      2 = branch unordered or greater
+ *		      3 = branch less
+ *		      4 = branch unordered or less
+ *		      5 = branch less or greater
+ *		      6 = branch not equal
+ *		      7 = branch equal
+ *		      8 = branch unordered or equal
+ *		    . 9 = branch greater or equal
+ * 		     10 = branch branch unordered or greater or equal
+ *		     11 = branch less or equal
+ *		     12 = branch unordered or or less or equal
+ *		     13 = branch ordered
+ *		     14 = branch always
+ *		     15 = branch never
+ *
+ *	ouput : %i0 = 0 = good
+ *		    = 1 = error
+ */
 
-!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-! Name:		Move Registers Double Precision
-! Function:	Move a value thru the float registers
-! Calling:	in0 = value
-! Returns:	in0 = result 
-! Convention:	if (result != move_regs_dp(value)) 
-!                   error(result-value);
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8       
+#ifdef __lint
 
-.Lmvrg_dp:
-	.skip	8
-.Lmvrg1_dp:
-	.skip 	8
+/*ARGSUSED*/
+unsigned long
+branches(unsigned long arg1, unsigned long arg2, unsigned long arg3)
+{
+	return (0);
+}
 
-ENTRY_NP(move_regs_dp)
-    	save    %sp, -SA(MINFRAME), %sp	! save the registers, stack
-    	setx    .Lmvrg1_dp,%l6,%l0	! get the address to temp2
-    	setx    .Lmvrg_dp,%l6,%l1	! .. and temp
-    	stx     %i0, [%l0]	! get the callers value
-    	ldd     [%l0], %f0	! .. into a float register
-    	fmovd   %f0, %f2	! copy from 1 register to the next
-	fmovd   %f2, %f4	! .. to the next
-	fmovd   %f4, %f6	! .. to the next
-	fmovd   %f6, %f8	! .. to the next
-	fmovd   %f8, %f10	! .. to the next
-	fmovd   %f10, %f12	! .. to the next
-	fmovd   %f12, %f14	! .. to the next
-	fmovd   %f14, %f16	! .. to the next
-	fmovd   %f16, %f18	! .. to the next
-	fmovd   %f18, %f20	! .. to the next
-	fmovd   %f20, %f22	! .. to the next
-	fmovd   %f22, %f24	! .. to the next
-	fmovd   %f24, %f26	! .. to the next
-	fmovd   %f26, %f28	! .. to the next
-	fmovd   %f28, %f30	! .. to the next
-	fmovd   %f30, %f32	! .. to the next
-	fmovd   %f32, %f34	! .. to the next
-	fmovd   %f34, %f36	! .. to the next
-	fmovd   %f36, %f38	! .. to the next
-	fmovd   %f38, %f40	! .. to the next
-	fmovd   %f40, %f42	! .. to the next
-	fmovd   %f42, %f44	! .. to the next
-	fmovd   %f44, %f46	! .. to the next
-	fmovd   %f46, %f48	! .. to the next
-	fmovd   %f48, %f50	! .. to the next
-	fmovd   %f50, %f52	! .. to the next
-	fmovd   %f52, %f54	! .. to the next
-	fmovd   %f54, %f56	! .. to the next
-	fmovd   %f56, %f58	! .. to the next
-	fmovd   %f58, %f60	! .. to the next
-	fmovd   %f60, %f62	! .. to the next
-	std		%f62, [%l1]	! .... save the result
-	ldx		[%l1], %i0	! .. and return it to the caller
-	ret
-    restore
-SET_SIZE(move_regs_dp)
+#else
 
-
-
-!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-! Name:		
-! Function:	
-! Calling:	
-! Returns:	
-! Convention:	
-!--------------------------------------------------------------------------
-!
-! 	The following routine checks the branching is done accordingly
-!	to the ficc bits.
-!	input	%i0 = 0 = branch unordered
-!		      1 = branch greater
-!		      2 = branch unordered or greater
-!		      3 = branch less
-!		      4 = branch unordered or less
-!		      5 = branch less or greater
-!		      6 = branch not equal
-!		      7 = branch equal
-!		      8 = branch unordered or equal
-!		    . 9 = branch greater or equal
-!		     10 = branch branch unordered or greater or equal
-!		     11 = branch less or equal
-!		     12 = branch unordered or or less or equal
-!		     13 = branch ordered
-!		     14 = branch always
-!		     15 = branch never
-!
-!	ouput : %i0 = 0 = good
-!		    = 1 = error
-!
-
-        .section        ".data"
-        .align  8       
+.section        ".data"
+.align  8
 
 .Lbr:
-	.skip	8
+        .skip   8
 .Lbr1:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(branches)
 	save    %sp, -SA(MINFRAME), %sp           ! save the registers, stacck
@@ -1588,14 +1861,28 @@ br_error:
         restore	
 SET_SIZE(branches)
 
+#endif
 
-!void read_fpreg(pf, n)
-!       FPU_REGS_TYPE   *pf;    /* Old freg value. */
-!       unsigned        n;      /* Want to read register n. */
-!
-!{
-!       *pf = %f[n];
-!}
+/*
+ * void read_fpreg(pf, n)
+ *      FPU_REGS_TYPE   *pf;    Old freg value.
+ *      unsigned        n;      Want to read register n.
+ *
+ * {
+ *      *pf = %f[n];
+ * }
+ */
+
+
+#ifdef __lint
+
+/*ARGSUSED*/
+void
+read_fpreg(unsigned int *arg1, int arg2)
+{
+}
+
+#else
 
 ENTRY_NP(read_fpreg)
 	save    %sp, -SA(MINFRAME), %sp
@@ -1641,6 +1928,18 @@ stable:
 	STOREFP(31)
 SET_SIZE(read_fpreg)
 
+#endif
+
+#ifdef __lint
+
+/*ARGSUSED*/
+void
+read_fpreg_dp(unsigned long *arg1, int arg2)
+{
+	return;
+}
+
+#else
 
 ENTRY_NP(read_fpreg_dp)
 	save    %sp, -SA(MINFRAME), %sp
@@ -1689,15 +1988,22 @@ stable_dp:
 
 SET_SIZE(read_fpreg_dp)
 
-!
-!void
-!write_fpreg(pf, n)
-!       FPU_REGS_TYPE   *pf;    /* New freg value. */
-!       unsigned        n;      /* Want to read register n. */
-!
-!{
-!       %f[n] = *pf;
-!}
+#endif
+
+/*
+ * void
+ * write_fpreg(pf, n)
+ *      FPU_REGS_TYPE   *pf;    New freg value.
+ *      unsigned        n;      Want to read register n.
+ *
+ * {
+ *      %f[n] = *pf;
+ * }
+ */
+
+#ifdef __lint
+
+#else
           
 ENTRY_NP(write_fpreg)
         sll     %o1, 3, %o1             ! Table entries are 8 bytes each.
@@ -1742,3 +2048,5 @@ ltable:
 	LOADFP(30)
 	LOADFP(31)
 SET_SIZE(write_fpreg)
+
+#endif

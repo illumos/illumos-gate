@@ -43,8 +43,6 @@
 extern int FPU_cpu;
 static int check_conv();
 uint_t trap_flag = 0x0;
-unsigned int result_lsw;
-unsigned int result_msw;
 unsigned long fsr_at_trap;
 
 extern unsigned long long_float_d(unsigned long);
@@ -664,7 +662,7 @@ chain_sp_test(struct fps_test_ereport *report)
 		if ((result = chain_sp(i)) != (unsigned long) i) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)i;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %d\nObserved: %d", i, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6225, &observed, &expected, 1, 1,
@@ -703,7 +701,7 @@ chain_dp_test(struct fps_test_ereport *report)
 		if ((result = chain_dp(i)) != (unsigned long) i) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)i;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %d\nObserved: %d", i, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6226, &observed, &expected, 1, 1,
@@ -742,7 +740,7 @@ integer_to_float_sp(struct fps_test_ereport *report)
 		if (result != val[i].floatsingle) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[i].floatsingle;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %d"
 			    "\nObserved: %d", i, val[i].floatsingle,
 			    result);
@@ -783,7 +781,7 @@ integer_to_float_dp(struct fps_test_ereport *report)
 		if (result != val[i].floatdouble) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[i].floatdouble;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %lld"
 			    "\nObserved: %lld", i, val[i].floatdouble,
 			    result);
@@ -824,7 +822,7 @@ long_to_float_sp(struct fps_test_ereport *report)
 		if (result != val[i].floatsingle) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[i].floatsingle;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %d"
 			    "\nObserved: %d", i, val[i].floatdouble,
 			    result);
@@ -865,7 +863,7 @@ long_to_float_dp(struct fps_test_ereport *report)
 		if (res1 != val[i].floatdouble) {
 			observed = (uint64_t)res1;
 			expected = (uint64_t)val[i].floatdouble;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %lld"
 			    "\nObserved: %lld", i, val[i].floatdouble,
 			    res1);
@@ -907,7 +905,7 @@ float_to_integer_sp(struct fps_test_ereport *report)
 		if (result != i) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)i;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %d"
 			    "\nObserved: %d", i, i,
 			    result);
@@ -931,12 +929,12 @@ float_to_integer_sp(struct fps_test_ereport *report)
 	/* Set trap flag to solicited */
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_int_s(0x50000000);
+	(void) float_int_s(0x50000000);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstoi max value exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    0x50000000, fsr_at_trap);
@@ -950,7 +948,7 @@ float_to_integer_sp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstoi max value exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    0x50000000, fsr_at_trap);
@@ -965,12 +963,12 @@ float_to_integer_sp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NV);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_int_s(nan_sp);
+	(void) float_int_s(nan_sp);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstoi NaN exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    nan_sp, fsr_at_trap);
@@ -984,7 +982,7 @@ float_to_integer_sp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstoi NaN exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    nan_sp, fsr_at_trap);
@@ -999,12 +997,12 @@ float_to_integer_sp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NV);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_int_s(PLUS_INF_SP);
+	(void) float_int_s(PLUS_INF_SP);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstoi +infinity exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    PLUS_INF_SP, fsr_at_trap);
@@ -1018,7 +1016,7 @@ float_to_integer_sp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstoi +infinity exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    PLUS_INF_SP, fsr_at_trap);
@@ -1033,12 +1031,12 @@ float_to_integer_sp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NV);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_int_s(MINUS_INF_SP);
+	(void) float_int_s(MINUS_INF_SP);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstoi -infinity exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    MINUS_INF_SP, fsr_at_trap);
@@ -1052,7 +1050,7 @@ float_to_integer_sp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstoi -infinity exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    MINUS_INF_SP, fsr_at_trap);
@@ -1066,12 +1064,12 @@ float_to_integer_sp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NX);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_int_s(pi_sp);
+	(void) float_int_s(pi_sp);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstoi inexact exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    pi_sp, fsr_at_trap);
@@ -1084,7 +1082,7 @@ float_to_integer_sp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NX) != FSR_CEXC_NX) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NX;
 		expected = (uint64_t)FSR_CEXC_NX;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstoi inexact exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    pi_sp, fsr_at_trap);
@@ -1123,7 +1121,7 @@ float_to_integer_dp(struct fps_test_ereport *report)
 		if (res1 != i) {
 			observed = (uint64_t)res1;
 			expected = (uint64_t)i;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %d"
 			    "\nObserved: %d", i, i,
 			    res1);
@@ -1145,12 +1143,12 @@ float_to_integer_dp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NV);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_int_d(0x4200000000000000);
+	(void) float_int_d(0x4200000000000000);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtoi max value exception not raised, "
 		    "fp val=%llx, fsr=%lx",
 		    0x4200000000000000, fsr_at_trap);
@@ -1164,7 +1162,7 @@ float_to_integer_dp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtoi max value exception not raised, "
 		    "fp val=%llx, fsr=%lx",
 		    0x4200000000000000, fsr_at_trap);
@@ -1179,12 +1177,12 @@ float_to_integer_dp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NV);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_int_d(nan_dp);
+	(void) float_int_d(nan_dp);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtoi NaN exception not raised, "
 		    "fp val=%llx, fsr=%lx",
 		    nan_dp, fsr_at_trap);
@@ -1198,7 +1196,7 @@ float_to_integer_dp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtoi NaN exception not raised, "
 		    "fp val=%llx, fsr=%lx",
 		    nan_dp, fsr_at_trap);
@@ -1213,12 +1211,12 @@ float_to_integer_dp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NV);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_int_d(PLUS_INF_DP);
+	(void) float_int_d(PLUS_INF_DP);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtoi +infinity exception not raised, "
 		    "fp val=%llx, fsr=%lx",
 		    PLUS_INF_DP, fsr_at_trap);
@@ -1232,7 +1230,7 @@ float_to_integer_dp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtoi +infinity exception not raised, "
 		    "fp val=%llx, fsr=%lx",
 		    PLUS_INF_DP, fsr_at_trap);
@@ -1247,12 +1245,12 @@ float_to_integer_dp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NV);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_int_d(MINUS_INF_DP);
+	(void) float_int_d(MINUS_INF_DP);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtoi -infinity exception not raised, "
 		    "fp val=%llx, fsr=%lx",
 		    MINUS_INF_DP, fsr_at_trap);
@@ -1266,7 +1264,7 @@ float_to_integer_dp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtoi -infinity exception not raised, "
 		    "fp val=%llx, fsr=%lx",
 		    MINUS_INF_DP, fsr_at_trap);
@@ -1281,11 +1279,11 @@ float_to_integer_dp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NX);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_int_d(pi_dp);
+	(void) float_int_d(pi_dp);
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtoi inexact exception not raised, "
 		    "fp val=%llx, fsr=%lx",
 		    pi_dp, fsr_at_trap);
@@ -1299,7 +1297,7 @@ float_to_integer_dp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NX) != FSR_CEXC_NX) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NX;
 		expected = (uint64_t)FSR_CEXC_NX;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtoi inexact exception not raised, "
 		    "fp val=%llx, fsr=%lx",
 		    pi_dp, fsr_at_trap);
@@ -1341,7 +1339,7 @@ float_to_long_sp(struct fps_test_ereport *report)
 		if (result != i) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)i;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %d"
 			    "\nObserved: %d", i, i,
 			    result);
@@ -1364,12 +1362,12 @@ float_to_long_sp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NV);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_long_s(0x60000000);
+	(void) float_long_s(0x60000000);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstox max value exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    0x60000000, fsr_at_trap);
@@ -1383,7 +1381,7 @@ float_to_long_sp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstox max value exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    0x50000000, fsr_at_trap);
@@ -1398,12 +1396,12 @@ float_to_long_sp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NV);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_long_s(nan_sp);
+	(void) float_long_s(nan_sp);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstox NaN exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    nan_sp, fsr_at_trap);
@@ -1417,7 +1415,7 @@ float_to_long_sp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstox NaN exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    nan_sp, fsr_at_trap);
@@ -1432,12 +1430,12 @@ float_to_long_sp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NV);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_long_s(PLUS_INF_SP);
+	(void) float_long_s(PLUS_INF_SP);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstox +infinity exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    PLUS_INF_SP, fsr_at_trap);
@@ -1451,7 +1449,7 @@ float_to_long_sp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstox +infinity exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    PLUS_INF_SP, fsr_at_trap);
@@ -1466,12 +1464,12 @@ float_to_long_sp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NV);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_long_s(MINUS_INF_SP);
+	(void) float_long_s(MINUS_INF_SP);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstox -infinity exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    MINUS_INF_SP, fsr_at_trap);
@@ -1485,7 +1483,7 @@ float_to_long_sp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstox -infinity exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    MINUS_INF_SP, fsr_at_trap);
@@ -1501,12 +1499,12 @@ float_to_long_sp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NX);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_int_s(pi_sp);
+	(void) float_int_s(pi_sp);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstox inexact exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    pi_sp, fsr_at_trap);
@@ -1520,7 +1518,7 @@ float_to_long_sp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NX) != FSR_CEXC_NX) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NX;
 		expected = (uint64_t)FSR_CEXC_NX;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fstox inexact exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    pi_sp, fsr_at_trap);
@@ -1561,7 +1559,7 @@ float_to_long_dp(struct fps_test_ereport *report)
 		if (res1 != i) {
 			observed = (uint64_t)res1;
 			expected = (uint64_t)i;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %d"
 			    "\nObserved: %d", i, i,
 			    res1);
@@ -1584,12 +1582,12 @@ float_to_long_dp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NV);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_long_d(0x4400000000000000);
+	(void) float_long_d(0x4400000000000000);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtox max value exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    0x4400000000000000, fsr_at_trap);
@@ -1603,7 +1601,7 @@ float_to_long_dp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtox max value exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    0x4200000000000000, fsr_at_trap);
@@ -1618,12 +1616,12 @@ float_to_long_dp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NV);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_long_d(nan_dp);
+	(void) float_long_d(nan_dp);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtox NaN exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    nan_dp, fsr_at_trap);
@@ -1637,7 +1635,7 @@ float_to_long_dp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtox NaN exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    nan_dp, fsr_at_trap);
@@ -1652,12 +1650,12 @@ float_to_long_dp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NV);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_long_d(PLUS_INF_DP);
+	(void) float_long_d(PLUS_INF_DP);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtox +infinity exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    PLUS_INF_DP, fsr_at_trap);
@@ -1671,7 +1669,7 @@ float_to_long_dp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtox +infinity exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    PLUS_INF_DP, fsr_at_trap);
@@ -1686,12 +1684,12 @@ float_to_long_dp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NV);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_long_d(MINUS_INF_DP);
+	(void) float_long_d(MINUS_INF_DP);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtox -infinity exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    MINUS_INF_DP, fsr_at_trap);
@@ -1705,7 +1703,7 @@ float_to_long_dp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 		expected = (uint64_t)FSR_CEXC_NV;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtox -infinity exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    MINUS_INF_DP, fsr_at_trap);
@@ -1721,12 +1719,12 @@ float_to_long_dp(struct fps_test_ereport *report)
 	set_fsr(prev_fsr | FSR_ENABLE_TEM_NX);
 	trap_flag = trap_flag | TRAP_SOLICITED;
 
-	float_long_d(pi_dp);
+	(void) float_long_d(pi_dp);
 
 	if (trap_flag) {
 		observed = (uint64_t)trap_flag;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtox inexact exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    pi_dp, fsr_at_trap);
@@ -1740,7 +1738,7 @@ float_to_long_dp(struct fps_test_ereport *report)
 	if ((fsr_at_trap & FSR_CEXC_NX) != FSR_CEXC_NX) {
 		observed = (uint64_t)fsr_at_trap & FSR_CEXC_NX;
 		expected = (uint64_t)FSR_CEXC_NX;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "fdtox inexact exception not raised, "
 		    "fp val=%lx, fsr=%lx",
 		    pi_dp, fsr_at_trap);
@@ -1783,7 +1781,7 @@ single_doub(struct fps_test_ereport *report)
 		if (result != val[i].floatdouble) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[i].floatdouble;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %lld"
 			    "\nObserved: %lld", i,
 			    val[i].floatdouble, result);
@@ -1826,7 +1824,7 @@ double_sing(struct fps_test_ereport *report)
 		if (result != val[i].floatsingle) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[i].floatsingle;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %d"
 			    "\nObserved: %d", i,
 			    val[i].floatsingle, result);
@@ -1865,7 +1863,7 @@ fmovs_ins(struct fps_test_ereport *report)
 	if ((result = move_regs(0x3F800000)) != 0x3F800000) {
 		observed = (uint64_t)result;
 		expected = (uint64_t)0x3F800000;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "Wrote to f0, read from f31");
 		setup_fps_test_struct(IS_EREPORT_INFO,
 		    report, 6233, &observed, &expected, 1,
@@ -1903,7 +1901,7 @@ get_negative_value_pn_sp(struct fps_test_ereport *report)
 		if (result != neg_val_sp[i]) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)neg_val_sp[i];
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %d"
 			    "\nObserved: %d", i, neg_val_sp[i],
 			    result);
@@ -1941,7 +1939,7 @@ get_negative_value_pn_dp(struct fps_test_ereport *report)
 		if (result != neg_val_dp[i]) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)neg_val_dp[i];
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %lld"
 			    "\nObserved: %lld", i, neg_val_dp[i],
 			    result);
@@ -1982,7 +1980,7 @@ get_negative_value_np_sp(struct fps_test_ereport *report)
 		if (result != val[i].floatsingle) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[i].floatsingle;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %d"
 			    "\nObserved: %d", i, val[i].floatsingle,
 			    result);
@@ -2021,7 +2019,7 @@ get_negative_value_np_dp(struct fps_test_ereport *report)
 		if (result != val[i].floatdouble) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[i].floatdouble;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %lld"
 			    "\nObserved: %lld", i, val[i].floatdouble,
 			    result);
@@ -2060,7 +2058,7 @@ fabs_ins_sp(struct fps_test_ereport *report)
 		if (result != val[i].floatsingle) {
 			observed = *(uint64_t *)&result;
 			expected = *(uint64_t *)&(val[i].floatsingle);
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %d"
 			    "\nObserved: %d", i, val[i].floatsingle,
 			    result);
@@ -2099,7 +2097,7 @@ fabs_ins_dp(struct fps_test_ereport *report)
 		if (result != val[i].floatdouble) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[i].floatdouble;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d]\nExpected: %lld"
 			    "\nObserved: %lld", i, val[i].floatdouble,
 			    result);
@@ -2141,7 +2139,7 @@ addition_test_sp(struct fps_test_ereport *report)
 
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[i + 1].floatsingle;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d], reg f4=f0+f2"
 			    "\nExpected: %d\nObserved: %d",
 			    i, val[i + 1].floatsingle, result);
@@ -2184,7 +2182,7 @@ addition_test_dp(struct fps_test_ereport *report)
 		if (result != (val[i + 1].floatdouble)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[i + 1].floatdouble;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d], reg f4=f0+f2"
 			    "\nExpected: %lld\nObserved: %lld",
 			    i, val[i + 1].floatdouble, result);
@@ -2226,7 +2224,7 @@ subtraction_test_sp(struct fps_test_ereport *report)
 		if (result != val[1].floatsingle) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[1].floatsingle;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d], reg f4=f0-f2"
 			    "\nExpected: %d\nObserved: %d",
 			    i, val[1].floatsingle, result);
@@ -2269,7 +2267,7 @@ subtraction_test_dp(struct fps_test_ereport *report)
 		if (result != val[1].floatdouble) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[1].floatdouble;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d], reg f4=f0-f2"
 			    "\nExpected: %lld\nObserved: %lld",
 			    i, val[1].floatdouble, result);
@@ -2311,7 +2309,7 @@ squareroot_test_sp(struct fps_test_ereport *report)
 		if (result != workvalue) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)workvalue;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %d\nObserved: %d", workvalue,
 			    result);
 			setup_fps_test_struct(NO_EREPORT_INFO,
@@ -2378,7 +2376,7 @@ squareroot_test_dp(struct fps_test_ereport *report)
 		if (result != workvalue) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)workvalue;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %lld\nObserved: %lld", workvalue,
 			    result);
 			setup_fps_test_struct(NO_EREPORT_INFO,
@@ -2444,7 +2442,7 @@ division_test_sp(struct fps_test_ereport *report)
 		if (result != val[i].floatsingle) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[i].floatsingle;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d], reg f4=f0/f2"
 			    "\nExpected: %d\nObserved: %d",
 			    i, val[i].floatsingle, result);
@@ -2485,7 +2483,7 @@ division_test_dp(struct fps_test_ereport *report)
 		if (result != val[i].floatdouble) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[i].floatdouble;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d], reg f4=f0/f2"
 			    "\nExpected: %lld\nObserved: %lld",
 			    i, val[i].floatdouble, result);
@@ -2526,7 +2524,7 @@ multiplication_test_sp(struct fps_test_ereport *report)
 		if (result != val[i].floatsingle) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[i].floatsingle;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d], reg f4=f0*f2"
 			    "\nExpected: %d\nObserved: %d",
 			    i, val[i].floatsingle, result);
@@ -2566,7 +2564,7 @@ multiplication_test_dp(struct fps_test_ereport *report)
 		if (result != val[i].floatdouble) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)val[i].floatdouble;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Val Entry[%d], reg f4=f0*f2"
 			    "\nExpected: %lld\nObserved: %lld",
 			    i, val[i].floatdouble, result);
@@ -2610,7 +2608,7 @@ compare_sp(struct fps_test_ereport *report)
 		if ((result & 0xc00) != 0) {
 			observed = (uint64_t)result & 0xc00;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "f0= %d, f2= %d", i, i);
 			setup_fps_test_struct(IS_EREPORT_INFO, report,
 			    6247, &observed, &expected, 1, 1, err_data);
@@ -2625,7 +2623,7 @@ compare_sp(struct fps_test_ereport *report)
 		if ((result & 0xc00) != 0x400) {
 			observed = (uint64_t)result & 0xc00;
 			expected = (uint64_t)0x400;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "f0= %d, f2= %d", i, i+1);
 			setup_fps_test_struct(IS_EREPORT_INFO, report,
 			    6248, &observed, &expected, 1, 1, err_data);
@@ -2641,7 +2639,7 @@ compare_sp(struct fps_test_ereport *report)
 		if ((result & 0xc00) != 0x800) {
 			observed = (uint64_t)result & 0xc00;
 			expected = (uint64_t)0x800;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "f0= %d, f2= %d", i+1, i);
 			setup_fps_test_struct(IS_EREPORT_INFO, report,
 			    6249, &observed, &expected, 1, 1, err_data);
@@ -2657,7 +2655,7 @@ compare_sp(struct fps_test_ereport *report)
 		if ((result & 0xc00) != 0xc00) {
 			observed = (uint64_t)result & 0xc00;
 			expected = (uint64_t)0xc00;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "f0= %d, f2= NaN", i);
 			setup_fps_test_struct(IS_EREPORT_INFO, report,
 			    6250, &observed, &expected, 1, 1, err_data);
@@ -2673,7 +2671,7 @@ compare_sp(struct fps_test_ereport *report)
 	if (result & 0xc00) {
 		observed = (uint64_t)result & 0xc00;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "f0= %d, f2= %d", +0, -0);
 		setup_fps_test_struct(IS_EREPORT_INFO, report,
 		    8251, &observed, &expected, 1, 1, err_data);
@@ -2711,7 +2709,7 @@ compare_dp(struct fps_test_ereport *report)
 		if ((result & 0xc00) != 0) {
 			observed = (uint64_t)result & 0xc00;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "f0= %d, f2= %d", i, i);
 			setup_fps_test_struct(IS_EREPORT_INFO, report,
 			    6251, &observed, &expected, 1, 1, err_data);
@@ -2725,7 +2723,7 @@ compare_dp(struct fps_test_ereport *report)
 		if ((result & 0xc00) != 0x400) {
 			observed = (uint64_t)result & 0xc00;
 			expected = (uint64_t)0x400;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "f0= %d, f2= %d", i, i+1);
 			setup_fps_test_struct(IS_EREPORT_INFO, report,
 			    6252, &observed, &expected, 1, 1, err_data);
@@ -2739,7 +2737,7 @@ compare_dp(struct fps_test_ereport *report)
 		if ((result & 0xc00) != 0x800) {
 			observed = (uint64_t)result & 0xc00;
 			expected = (uint64_t)0x800;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "f0= %d, f2= %d", i+1, i);
 			setup_fps_test_struct(IS_EREPORT_INFO, report,
 			    6253, &observed, &expected, 1, 1, err_data);
@@ -2753,7 +2751,7 @@ compare_dp(struct fps_test_ereport *report)
 		if ((result & 0xc00) != 0xc00) {
 			observed = (uint64_t)result & 0xc00;
 			expected = (uint64_t)0xc00;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "f0= %d, f2=NaN", i);
 			setup_fps_test_struct(IS_EREPORT_INFO, report,
 			    6254, &observed, &expected, 1, 1, err_data);
@@ -2768,7 +2766,7 @@ compare_dp(struct fps_test_ereport *report)
 	if (result & 0xc00) {
 		observed = (uint64_t)result & 0xc00;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "f0= %d, f2= %d", +0, -0);
 		setup_fps_test_struct(IS_EREPORT_INFO, report,
 		    8252, &observed, &expected, 1, 1, err_data);
@@ -2815,7 +2813,7 @@ branching(struct fps_test_ereport *report)
 		    val[i].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d ", i+1, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6256, &observed, &expected, 1, 1,
@@ -2837,7 +2835,7 @@ branching(struct fps_test_ereport *report)
 		    val[i].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d ", i+1, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6258, &observed, &expected, 1, 1,
@@ -2850,7 +2848,7 @@ branching(struct fps_test_ereport *report)
 		    val[i + 1].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d and f2= %d ", i, i+1);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6259, &observed, &expected, 1, 1,
@@ -2872,7 +2870,7 @@ branching(struct fps_test_ereport *report)
 		    val[i + 1].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d ", i, i+1);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6261, &observed, &expected, 1, 1,
@@ -2885,7 +2883,7 @@ branching(struct fps_test_ereport *report)
 		    val[i + 1].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d ", i, i+1);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6262, &observed, &expected, 1, 1,
@@ -2898,7 +2896,7 @@ branching(struct fps_test_ereport *report)
 		    val[i].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d ", i+1, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6263, &observed, &expected, 1, 1,
@@ -2911,7 +2909,7 @@ branching(struct fps_test_ereport *report)
 		    val[i + 1].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d ", i, i+1);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6264, &observed, &expected, 1, 1,
@@ -2924,7 +2922,7 @@ branching(struct fps_test_ereport *report)
 		    val[i].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d ", i, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6265, &observed, &expected, 1, 1,
@@ -2946,7 +2944,7 @@ branching(struct fps_test_ereport *report)
 		    val[i].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d ", i, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6267, &observed, &expected, 1, 1,
@@ -2958,7 +2956,7 @@ branching(struct fps_test_ereport *report)
 		    val[i].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d ", i, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6268, &observed, &expected, 1, 1,
@@ -2970,7 +2968,7 @@ branching(struct fps_test_ereport *report)
 		    val[i].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d ", i+1, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6269, &observed, &expected, 1, 1,
@@ -2992,7 +2990,7 @@ branching(struct fps_test_ereport *report)
 		    val[i].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6271, &observed, &expected, 1, 1,
@@ -3005,7 +3003,7 @@ branching(struct fps_test_ereport *report)
 		    val[i].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i+1, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6272, &observed, &expected, 1, 1,
@@ -3018,7 +3016,7 @@ branching(struct fps_test_ereport *report)
 		    val[i + 1].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i, i+1);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6273, &observed, &expected, 1, 1,
@@ -3031,7 +3029,7 @@ branching(struct fps_test_ereport *report)
 		    val[i].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6274, &observed, &expected, 1, 1,
@@ -3053,7 +3051,7 @@ branching(struct fps_test_ereport *report)
 		    val[i + 1].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i, i+1);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6276, &observed, &expected, 1, 1,
@@ -3066,7 +3064,7 @@ branching(struct fps_test_ereport *report)
 		    val[i].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6277, &observed, &expected, 1, 1,
@@ -3079,7 +3077,7 @@ branching(struct fps_test_ereport *report)
 		    val[i + 1].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i, i+1);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6278, &observed, &expected, 1, 1,
@@ -3092,7 +3090,7 @@ branching(struct fps_test_ereport *report)
 		    val[i + 1].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i, i+1);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6279, &observed, &expected, 1, 1,
@@ -3105,7 +3103,7 @@ branching(struct fps_test_ereport *report)
 		    val[i + 1].floatsingle)) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d ", i, i+1);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6280, &observed, &expected, 1, 1,
@@ -3156,7 +3154,7 @@ no_branching(struct fps_test_ereport *report)
 		    val[i].floatsingle))) {
 			observed = (uint64_t)0;
 			expected = (uint64_t)1;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6282, &observed, &expected, 1, 1,
@@ -3169,7 +3167,7 @@ no_branching(struct fps_test_ereport *report)
 		    val[i].floatsingle))) {
 			observed = (uint64_t)0;
 			expected = (uint64_t)1;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6283, &observed, &expected, 1, 1,
@@ -3182,7 +3180,7 @@ no_branching(struct fps_test_ereport *report)
 		    val[i].floatsingle))) {
 			observed = (uint64_t)0;
 			expected = (uint64_t)1;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6284, &observed, &expected, 1, 1,
@@ -3195,7 +3193,7 @@ no_branching(struct fps_test_ereport *report)
 		    val[i].floatsingle))) {
 			observed = (uint64_t)0;
 			expected = (uint64_t)1;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6285, &observed, &expected, 1, 1,
@@ -3208,7 +3206,7 @@ no_branching(struct fps_test_ereport *report)
 		    val[i].floatsingle))) {
 			observed = (uint64_t)0;
 			expected = (uint64_t)1;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6286, &observed, &expected, 1, 1,
@@ -3221,7 +3219,7 @@ no_branching(struct fps_test_ereport *report)
 		    val[i].floatsingle))) {
 			observed = (uint64_t)0;
 			expected = (uint64_t)1;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6287, &observed, &expected, 1, 1,
@@ -3234,7 +3232,7 @@ no_branching(struct fps_test_ereport *report)
 		    val[i].floatsingle))) {
 			observed = (uint64_t)0;
 			expected = (uint64_t)1;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i+1, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6288, &observed, &expected, 1, 1,
@@ -3247,7 +3245,7 @@ no_branching(struct fps_test_ereport *report)
 		    val[i].floatsingle))) {
 			observed = (uint64_t)0;
 			expected = (uint64_t)1;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i+1, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6289, &observed, &expected, 1, 1,
@@ -3260,7 +3258,7 @@ no_branching(struct fps_test_ereport *report)
 		    val[i + 1].floatsingle))) {
 			observed = (uint64_t)0;
 			expected = (uint64_t)1;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i, i+1);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6290, &observed, &expected, 1, 1,
@@ -3273,7 +3271,7 @@ no_branching(struct fps_test_ereport *report)
 		    val[i + 1].floatsingle))) {
 			observed = (uint64_t)0;
 			expected = (uint64_t)1;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i, i+1);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6291, &observed, &expected, 1, 1,
@@ -3286,7 +3284,7 @@ no_branching(struct fps_test_ereport *report)
 		    val[i].floatsingle))) {
 			observed = (uint64_t)0;
 			expected = (uint64_t)1;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i+1, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6292, &observed, &expected, 1, 1,
@@ -3299,7 +3297,7 @@ no_branching(struct fps_test_ereport *report)
 		    val[i].floatsingle))) {
 			observed = (uint64_t)0;
 			expected = (uint64_t)1;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "reg f0= %d, f2= %d", i+1, i);
 			setup_fps_test_struct(IS_EREPORT_INFO,
 			    report, 6293, &observed, &expected, 1, 1,
@@ -3354,7 +3352,7 @@ compare_sp_except(struct fps_test_ereport *report)
 		if (trap_flag) {
 			observed = (uint64_t)trap_flag;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "fcmpxs exception did not occur, fsr=%lo",
 			    fsr_at_trap);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -3366,7 +3364,7 @@ compare_sp_except(struct fps_test_ereport *report)
 		if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 			observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 			expected = (uint64_t)FSR_CEXC_NV;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "fcmpxs exception did not occur, fsr=%lo",
 			    fsr_at_trap);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -3410,7 +3408,7 @@ compare_dp_except(struct fps_test_ereport *report)
 		if (trap_flag) {
 			observed = (uint64_t)trap_flag;
 			expected = (uint64_t)0;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "fcmpxd exception did not occur, fsr=%lo",
 			    fsr_at_trap);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -3422,7 +3420,7 @@ compare_dp_except(struct fps_test_ereport *report)
 		if ((fsr_at_trap & FSR_CEXC_NV) != FSR_CEXC_NV) {
 			observed = (uint64_t)fsr_at_trap & FSR_CEXC_NV;
 			expected = (uint64_t)FSR_CEXC_NV;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "fcmpxd exception did not occur, fsr=%lo",
 			    fsr_at_trap);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -3476,7 +3474,7 @@ registers_four(struct fps_test_ereport *report)
 		if (result != ALLZEROES_SP) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)ALLZEROES_SP;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Reg: %d\nExpected: %d\nObserved: %d",
 			    i, ALLZEROES_SP, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -3494,7 +3492,7 @@ registers_four(struct fps_test_ereport *report)
 		if (result != ALLONES_SP) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)ALLONES_SP;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Reg: %d\nExpected: %d\nObserved: %d",
 			    i, ALLONES_SP, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -3540,7 +3538,7 @@ registers_four_dp(struct fps_test_ereport *report)
 		if (result != ALLZEROES_DP) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)ALLZEROES_DP;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Reg: %d\nExpected: %lld\nObserved: %lld",
 			    i, ALLZEROES_DP, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -3558,7 +3556,7 @@ registers_four_dp(struct fps_test_ereport *report)
 		if (result != ALLONES_DP) {
 			observed = (uint64_t)result;
 			expected = (uint64_t)ALLONES_DP;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "Reg: %d\nExpected: %lld\nObserved: %lld",
 			    i, ALLONES_DP, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -3595,7 +3593,7 @@ registers_two(struct fps_test_ereport *report)
 			if ((result = register_test(j, value)) != value) {
 				observed = (uint64_t)result;
 				expected = (uint64_t)value;
-				snprintf(err_data, sizeof (err_data),
+				(void) snprintf(err_data, sizeof (err_data),
 				    "Reg: %d\nExpected: %d\nObserved: %d",
 				    j, value, result);
 				setup_fps_test_struct(IS_EREPORT_INFO,
@@ -3635,7 +3633,7 @@ registers_two_dp(struct fps_test_ereport *report)
 			if (result != value) {
 				observed = (*(uint64_t *)&result);
 				expected = (*(uint64_t *)&value);
-				snprintf(err_data, sizeof (err_data),
+				(void) snprintf(err_data, sizeof (err_data),
 				    "Reg: %d\nExpected: %lld\nObserved: %lld",
 				    j, value, result);
 				setup_fps_test_struct(IS_EREPORT_INFO,
@@ -3672,7 +3670,7 @@ registers_one(struct fps_test_ereport *report)
 			if (result != pat[j]) {
 				observed = (uint64_t)result;
 				expected = (uint64_t)pat[j];
-				snprintf(err_data, sizeof (err_data),
+				(void) snprintf(err_data, sizeof (err_data),
 				    "Reg: %d\nExpected: %d\nObserved: %d",
 				    i, pat[j], result);
 				setup_fps_test_struct(IS_EREPORT_INFO,
@@ -3710,7 +3708,7 @@ registers_one_dp(struct fps_test_ereport *report)
 			if (result != pat_dp[j]) {
 				observed = (uint64_t)result;
 				expected = (uint64_t)pat[j];
-				snprintf(err_data, sizeof (err_data),
+				(void) snprintf(err_data, sizeof (err_data),
 				    "Reg: %d\nExpected: %lld"
 				    "\nObserved: %lld",
 				    i, pat[j], result);
@@ -3819,28 +3817,28 @@ sigill_handler(int sig, siginfo_t *sip, ucontext_t *ucp)
 int
 winitfp()
 {
-	sigemptyset(&newfpe.sa_mask);
+	(void) sigemptyset(&newfpe.sa_mask);
 	newfpe.sa_flags = SA_SIGINFO;
 	newfpe.sa_handler = sigfpe_handler;
 	if (sigaction(SIGFPE, &newfpe, &oldfpe)) {
 		_exit(FPU_SYSCALL_FAIL);
 	}
 
-	sigemptyset(&newill.sa_mask);
+	(void) sigemptyset(&newill.sa_mask);
 	newill.sa_flags = SA_SIGINFO;
 	newill.sa_handler = sigill_handler;
 	if (sigaction(SIGILL, &newill, &oldill)) {
 		_exit(FPU_SYSCALL_FAIL);
 	}
 
-	sigemptyset(&newbus.sa_mask);
+	(void) sigemptyset(&newbus.sa_mask);
 	newbus.sa_flags = SA_SIGINFO;
 	newbus.sa_handler = sigbus_handler;
 	if (sigaction(SIGBUS, &newbus, &oldbus)) {
 		_exit(FPU_SYSCALL_FAIL);
 	}
 
-	sigemptyset(&newsegv.sa_mask);
+	(void) sigemptyset(&newsegv.sa_mask);
 	newsegv.sa_flags = SA_SIGINFO;
 	newsegv.sa_handler = sigsegv_handler;
 	if (sigaction(SIGSEGV, &newsegv, &oldsegv)) {
@@ -4332,7 +4330,7 @@ check_conv(struct fps_test_ereport *report)
 	if (strncmp(l_buf, pREP_RX, strlen(pREP_RX)) != 0) {
 		observed = (uint64_t)1;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "\nObserved: %s\nExpected: %s", l_buf, pREP_RX);
 		setup_fps_test_struct(IS_EREPORT_INFO,	report,
 		    6326, &observed, &expected, 1, 1, err_data);
@@ -4342,11 +4340,11 @@ check_conv(struct fps_test_ereport *report)
 
 	gcon = 4.5;
 	(void) memset(l_buf, 0, LLL);
-	gconvert(gcon, 15, 0, l_buf);
+	(void) gconvert(gcon, 15, 0, l_buf);
 	if (strncmp(l_buf, pREP_GCON, strlen(pREP_GCON)) != 0) {
 		observed = (uint64_t)1;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "\nObserved: %s\nExpected: %s", l_buf, pREP_GCON);
 		setup_fps_test_struct(IS_EREPORT_INFO, report,
 		    6327, &observed, &expected, 1, 1, err_data);
@@ -4356,11 +4354,11 @@ check_conv(struct fps_test_ereport *report)
 
 	qgcon = 4.5;
 	(void) memset(l_buf, 0, LLL);
-	qgconvert(&qgcon, 15, 0, l_buf);
+	(void) qgconvert(&qgcon, 15, 0, l_buf);
 	if (strncmp(l_buf, pREP_GCON, strlen(pREP_GCON)) != 0) {
 		observed = (uint64_t)1;
 		expected = (uint64_t)0;
-		snprintf(err_data, sizeof (err_data),
+		(void) snprintf(err_data, sizeof (err_data),
 		    "\nObserved: %s\nExpected: %s", l_buf, pREP_GCON);
 		setup_fps_test_struct(IS_EREPORT_INFO, report,
 		    6328, &observed, &expected, 1, 1, err_data);

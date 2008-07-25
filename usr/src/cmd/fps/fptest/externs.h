@@ -115,7 +115,7 @@ extern void write_fpreg(unsigned int *, int);
 extern void fps_msg(int msg_enable, const char *fmt, ...);
 
 /* benchmarks */
-extern int align_data(int loop, int unit,
+extern int align_data(int loop,
 			    struct fps_test_ereport *report);
 extern int fpu_fdivd(int rloop,
 			    struct fps_test_ereport *report);
@@ -123,7 +123,7 @@ extern int fpu_fmuld(int rloop,
 			    struct fps_test_ereport *report);
 extern int fpu_fmulx(int rloop,
 			    struct fps_test_ereport *report);
-extern int vis_test(int unit, struct fps_test_ereport *report);
+extern int vis_test(struct fps_test_ereport *report);
 
 /* cbbcopy */
 extern int cbbcopy(struct fps_test_ereport *report);

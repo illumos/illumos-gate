@@ -107,7 +107,7 @@ fpsd_read_config()
 	ret = reprobe_and_reread_config();
 	if (NO_CPUS_2_TEST == ret) {
 		while (NO_CPUS_2_TEST == ret) {
-			sleep(600);
+			(void) sleep(600);
 			ret = reprobe_and_reread_config();
 		}
 	}
@@ -486,7 +486,7 @@ fpsd_probe(mach_conf_t *m_stat)
 			fpsd_message(FPSD_NO_EXIT, FPS_INFO,
 			    LIBRARY_CALL_FAIL, "kstat_lookup",
 			    strerror(errno));
-			kstat_close(kstat_ctl);
+			(void) kstat_close(kstat_ctl);
 			free(cpuid_list);
 			return (-1);
 		}
@@ -531,7 +531,7 @@ fpsd_probe(mach_conf_t *m_stat)
 		} else {
 			fpsd_message(FPSD_NO_EXIT, FPS_INFO,
 			    FREQ_PROBE_FAIL, cpuid_list[i]);
-			kstat_close(kstat_ctl);
+			(void) kstat_close(kstat_ctl);
 			free(cpuid_list);
 			return (-1);
 		}
@@ -550,7 +550,7 @@ fpsd_probe(mach_conf_t *m_stat)
 	fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
 	    NUM_CPUS_2_TST, m_stat->m_cpuids_size);
 	free(cpuid_list);
-	kstat_close(kstat_ctl);
+	(void) kstat_close(kstat_ctl);
 	if (m_stat->m_num_cpus_to_test <= 0) {
 		fpsd_message(FPSD_NO_EXIT, FPS_ERROR,
 		    FPSD_NO_CPUS_TO_TEST);
@@ -667,7 +667,7 @@ parse_and_set_cpu_id_list(char *strCPUs)
 
 #define	CLEAN_UP_SCF_STUFF	{	\
 	if (scf_handle_p) {	\
-		scf_handle_unbind(scf_handle_p);	\
+		(void) scf_handle_unbind(scf_handle_p);	\
 		scf_handle_destroy(scf_handle_p);	\
 	}	\
 	if (inst)	\
@@ -1067,7 +1067,7 @@ main(int argc, char **argv)
 		if (NULL != str_fps_fmri) {
 			const char *smf_state = smf_get_state(str_fps_fmri);
 			if (NULL != smf_state) {
-				smf_disable_instance(str_fps_fmri,
+				(void) smf_disable_instance(str_fps_fmri,
 				    SMF_TEMPORARY);
 				(void) fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
 				    FPSD_STATE, smf_state);

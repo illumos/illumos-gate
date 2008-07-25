@@ -152,7 +152,7 @@ main(int argc, char *argv[])
 		procb = processor_bind(P_PID, P_MYID, fpu_cpu, NULL);
 
 		if (procb) {
-			pset_bind(PS_NONE, P_PID, P_MYID, NULL);
+			(void) pset_bind(PS_NONE, P_PID, P_MYID, NULL);
 			return (FPU_BIND_FAIL);
 		}
 	}
@@ -191,7 +191,7 @@ main(int argc, char *argv[])
 		 * check bind and
 		 * check if on supported plaform
 		 */
-		processor_bind(P_PID, P_MYID, PBIND_QUERY, &proc_used);
+		(void) processor_bind(P_PID, P_MYID, PBIND_QUERY, &proc_used);
 
 		if (proc_used != (processorid_t)fpu_cpu ||
 		    proc_used == PBIND_NONE) {
@@ -246,9 +246,9 @@ exe_time(hrtime_t time_start)
 	    (dif_mili - ((second * 1000) + (((hour * 3600) +
 	    (minute * 60)) * 1000)));
 
-	printf("Execution time: %ldH.%ldM.%ldS.%ldMsec\n", hour, minute,
+	(void) printf("Execution time: %ldH.%ldM.%ldS.%ldMsec\n", hour, minute,
 	    second, mili);
-	fflush(NULL);
+	(void) fflush(NULL);
 }
 
 /*
@@ -333,11 +333,11 @@ start_testing(int unit, struct fps_test_ereport *report)
 		if (limit_group == 3)
 			lim = 1000;
 
-		if (align_data(lim, unit, report) != 0) {
+		if (align_data(lim, report) != 0) {
 			return (FPU_FOROFFLINE);
 		}
 
-		if (vis_test(unit, report) != 0) {
+		if (vis_test(report) != 0) {
 			return (FPU_FOROFFLINE);
 		}
 
@@ -455,17 +455,21 @@ do_lapack(int unit, struct fps_test_ereport *report)
 				if (slinpack_test(lapa_loop_stress, unit,
 				    report, fps_verbose_msg))
 					return (-4);
+#ifndef __lint
 				if (dlinpack_test(lapa_loop_stress, unit,
 				    report, fps_verbose_msg))
 					return (-4);
+#endif
 			}
 		break;
 		}
 
 		if (slinpack_test(lapa_stress, unit, report, fps_verbose_msg))
 			return (-4);
+#ifndef __lint
 		if (dlinpack_test(lapa_stress, unit, report, fps_verbose_msg))
 			return (-4);
+#endif
 	}
 
 	return (0);
@@ -500,7 +504,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != expect_ans) {
 		if (ans < (2.2221000 - SPMARGIN) ||
 		    ans > (2.2221000 + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -518,7 +522,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != expect_ans) {
 		if (ans < (0.2469000 - SPMARGIN) ||
 		    ans > (0.2469000 + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -536,7 +540,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != expect_ans) {
 		if (ans < (1.2191923 - SPMARGIN) ||
 		    ans > (1.2191923 + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -554,7 +558,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != expect_ans) {
 		if (ans < (1.2500000 - SPMARGIN) ||
 		    ans > (1.2500000 + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -572,7 +576,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != expect_ans) {
 		if (ans < (1.4814000 - SPMARGIN) ||
 		    ans > (1.4814000 + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -590,7 +594,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != expect_ans) {
 		if (ans < (-(0.9876000) - SPMARGIN) ||
 		    ans > (-(0.9876000) + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -608,7 +612,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != expect_ans) {
 		if (ans < (2.4536924 - SPMARGIN) ||
 		    ans > (2.4536924 + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -626,7 +630,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != expect_ans) {
 		if (ans < (0.0153078 - SPMARGIN) ||
 		    ans > (0.0153078 + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -644,7 +648,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != expect_ans) {
 		if (ans < (2.4844999 - SPMARGIN) ||
 		    ans > (2.4844999 + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -662,7 +666,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != -(0.0155000)) {
 		if (ans < (-(0.0155000) - SPMARGIN) ||
 		    ans > (-(0.0155000) + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -680,7 +684,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != expect_ans) {
 		if (ans < (2.7431827 - SPMARGIN) ||
 		    ans > (2.7431827 + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -698,7 +702,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != expect_ans) {
 		if (ans < (0.3047981 - SPMARGIN) ||
 		    ans > (0.3047981 + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -716,7 +720,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != expect_ans) {
 		if (ans < (0.5555556 - SPMARGIN) ||
 		    ans > (0.5555556 + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -734,7 +738,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != expect_ans) {
 		if (ans < (4.9999995 - SPMARGIN) ||
 		    ans > (4.9999995 + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -752,7 +756,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != expect_ans) {
 		if (ans < (1.5431250 - SPMARGIN) ||
 		    ans > (1.5431250 + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -770,7 +774,7 @@ spmath(struct fps_test_ereport *report)
 	if (ans != expect_ans) {
 		if (ans < (1.0125557 - SPMARGIN) ||
 		    ans > (1.0125557 + SPMARGIN)) {
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.8f\nObserved: %.8f",
 			    expect_ans, ans);
 			expected = (uint64_t)(*(uint32_t *)&expect_ans);
@@ -817,7 +821,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -835,7 +839,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -853,7 +857,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -871,7 +875,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -889,7 +893,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -907,7 +911,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -925,7 +929,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -943,7 +947,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -961,7 +965,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -979,7 +983,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -997,7 +1001,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1015,7 +1019,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1034,7 +1038,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1052,7 +1056,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1070,7 +1074,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1088,7 +1092,7 @@ dpmath(struct fps_test_ereport *report)
 		    ans > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&ans;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, ans);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1109,7 +1113,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1126,7 +1130,7 @@ dpmath(struct fps_test_ereport *report)
 		if (result < (expect_ans - DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1139,7 +1143,7 @@ dpmath(struct fps_test_ereport *report)
 		else if (result > (-(0.000000000000000) + DPMARGIN)) {
 			expected = (uint64_t)-(0.000000000000000);
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    -0.000000000000000, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1158,7 +1162,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1176,7 +1180,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1194,7 +1198,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1212,7 +1216,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1230,7 +1234,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1248,7 +1252,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1267,7 +1271,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans2 + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1286,7 +1290,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1304,7 +1308,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1322,7 +1326,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1340,7 +1344,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1358,7 +1362,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1376,7 +1380,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1394,7 +1398,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1412,7 +1416,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1430,7 +1434,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1449,7 +1453,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1467,7 +1471,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1485,7 +1489,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1503,7 +1507,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1521,7 +1525,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1539,7 +1543,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1557,7 +1561,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1575,7 +1579,7 @@ dpmath(struct fps_test_ereport *report)
 		    result > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&result;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, result);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1594,7 +1598,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1612,7 +1616,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1630,7 +1634,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1648,7 +1652,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1666,7 +1670,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1684,7 +1688,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1702,7 +1706,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1720,7 +1724,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1738,7 +1742,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1756,7 +1760,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1774,7 +1778,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1793,7 +1797,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 		expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1811,7 +1815,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1829,7 +1833,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1847,7 +1851,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1865,7 +1869,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1883,7 +1887,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1901,7 +1905,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1924,7 +1928,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1942,7 +1946,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1960,7 +1964,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),\
+			(void) snprintf(err_data, sizeof (err_data),\
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1978,7 +1982,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -1996,7 +2000,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2014,7 +2018,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2032,7 +2036,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2050,7 +2054,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2068,7 +2072,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2086,7 +2090,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2104,7 +2108,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2122,7 +2126,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2140,7 +2144,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2158,7 +2162,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2176,7 +2180,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2194,7 +2198,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2212,7 +2216,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2230,7 +2234,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2248,7 +2252,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2266,7 +2270,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2284,7 +2288,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2302,7 +2306,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2320,7 +2324,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2338,7 +2342,7 @@ dpmath(struct fps_test_ereport *report)
 		    x > (expect_ans + DPMARGIN)) {
 			expected = *(uint64_t *)&expect_ans;
 			observed = *(uint64_t *)&x;
-			snprintf(err_data, sizeof (err_data),
+			(void) snprintf(err_data, sizeof (err_data),
 			    "\nExpected: %.16f\nObserved: %.16f",
 			    expect_ans, x);
 			setup_fps_test_struct(IS_EREPORT_INFO,
@@ -2369,10 +2373,10 @@ process_fpu_args(int argc, char *argv[])
 		case 'P': /* -p N or -p all or no -p */
 		case 'p':
 
-			memset(l_buf, 0, sizeof (l_buf));
+			(void) memset(l_buf, 0, sizeof (l_buf));
 			test_group = -1;
 			if (NULL != optarg) {
-			strncpy(l_buf, optarg, 3);	/* -p all */
+			(void) strncpy(l_buf, optarg, 3);	/* -p all */
 			if (!strncasecmp(l_buf, "all", 3)) {
 				test_group = 12345;
 				break;
@@ -2388,9 +2392,11 @@ process_fpu_args(int argc, char *argv[])
 			break;
 		case 'f': /* 1000,1500,2000 freq */
 		case 'F':
-			memset(l_buf, 0, sizeof (l_buf));
+			(void) memset(l_buf, 0, sizeof (l_buf));
 			if (NULL != optarg) {
-				strncpy(l_buf, optarg, 5);	/* -f 1000 */
+				/* -f 1000 */
+				(void) strncpy(l_buf, optarg, 5);
+
 				proc_fr = atoi(optarg);
 
 				switch (proc_fr) {
@@ -2457,11 +2463,11 @@ process_fpu_args(int argc, char *argv[])
 			break;
 		case 'S':
 		case 's':
-			memset(l_buf, 0, sizeof (l_buf));
+			(void) memset(l_buf, 0, sizeof (l_buf));
 			stress_level = 1;
 
 			if (NULL != optarg) {
-				strncpy(l_buf, optarg, 2);
+				(void) strncpy(l_buf, optarg, 2);
 
 				if (('X' != l_buf[0]) && (0 != l_buf[1]))
 					l_buf[0] = 'E';
@@ -2548,26 +2554,26 @@ check_proc(int cpu_id)
 		return (1);
 
 	if ((ksp = kstat_lookup(kc, "cpu_info", (int)cpu_id, NULL)) == NULL) {
-		kstat_close(kc);
+		(void) kstat_close(kc);
 
 		return (1);
 	}
 
 	if ((kstat_read(kc, ksp, NULL)) == -1) {
-		kstat_close(kc);
+		(void) kstat_close(kc);
 
 		return (1);
 	}
 
 	if ((knp = kstat_data_lookup(ksp, "brand")) == NULL) {
-		kstat_close(kc);
+		(void) kstat_close(kc);
 
 		return (1);
 	}
 
-	if ((snprintf(brand, MAX_CPU_BRAND, "%s",
-	    KSTAT_NAMED_STR_PTR(knp))) < 0) {
-		kstat_close(kc);
+	if (snprintf(brand, MAX_CPU_BRAND, "%s",
+	    KSTAT_NAMED_STR_PTR(knp)) < 0) {
+		(void) kstat_close(kc);
 
 		return (1);
 	}
@@ -2579,12 +2585,12 @@ check_proc(int cpu_id)
 	    strcmp(brand, USIIIP_KSTAT) != 0 &&
 	    strcmp(brand, USIV_KSTAT) != 0 &&
 	    strcmp(brand, USIVP_KSTAT) != 0) {
-			kstat_close(kc);
+			(void) kstat_close(kc);
 
 			return (2);
 	}
 
-	kstat_close(kc);
+	(void) kstat_close(kc);
 
 	return (0);
 }

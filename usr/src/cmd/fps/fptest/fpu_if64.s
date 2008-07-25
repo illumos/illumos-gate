@@ -28,23 +28,36 @@
 
 #include<sys/asm_linkage.h>
 
+/*
+ * -----------------------------------------------------------------------
+ *	File: fpu-if64.s
+ * -----------------------------------------------------------------------
+ */
 
-!=============================================================================
-! 	File: fpu-if64.s
-!=============================================================================
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Get the Floating point Status Register
+ * Function:	return a copy of the FSR to caller
+ * Calling:	none
+ * Returns:	i0 = fsr contents
+ * Convention:	fsr_value = get_fsr() ** 
+ * --------------------------------------------------------------------------
+ */
 
+#ifdef __lint
 
-!--------------------------------------------------------------------------
-! Name:		Get the Floating point Status Register
-! Function:	return a copy of the FSR to caller
-! Calling:	none
-! Returns:	i0 = fsr contents
-! Convention:	fsr_value = get_fsr() ** 
-!--------------------------------------------------------------------------
-	.section	".data"
-	.align		8
+unsigned long
+get_fsr()
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align          8
 .Lgfsr:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(get_fsr)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers & stack frame
@@ -55,20 +68,35 @@ ENTRY_NP(get_fsr)
 	restore			! .. restore the frame window
 SET_SIZE(get_fsr)
 
-!--------------------------------------------------------------------------
-! Name:		Set Floating point Status Register
-! Function:	Set the FSR
-! Calling:	i0 = value to write to fsr
-! Returns:	none
-! Convention:	set_fsr(get_fsr() ** || <userVal>) ** 
-!               Please note that the user is expected to OR the new value
-!               with the current FSR content and pass the result to 
-!               set_fsr().
-!--------------------------------------------------------------------------
-	.section	".data"
-	.align		8
+#endif
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Set Floating point Status Register
+ * Function:	Set the FSR
+ * Calling:	i0 = value to write to fsr
+ * Returns:	none
+ * Convention:	set_fsr(get_fsr() ** || <userVal>) ** 
+ *              Please note that the user is expected to OR the new value
+ *              with the current FSR content and pass the result to 
+ *              set_fsr().
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+void
+set_fsr(unsigned long arg1)
+{
+}
+
+#else
+
+.section        ".data"
+.align          8
 .Lsfsr:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(set_fsr)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers & stack frame
@@ -79,14 +107,28 @@ ENTRY_NP(set_fsr)
 	restore			! .. restore the frame window
 SET_SIZE(set_fsr)
 
+#endif
 
-!--------------------------------------------------------------------------
-! Name:		Get the Graphics Status Register
-! Function:	return a copy of the GSR to caller
-! Calling:	none
-! Returns:	i0 = gsr contents
-! Convention:	gsr_value = get_gsr() ** 
-!--------------------------------------------------------------------------
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Get the Graphics Status Register
+ * Function:	return a copy of the GSR to caller
+ * Calling:	none
+ * Returns:	i0 = gsr contents
+ * Convention:	gsr_value = get_gsr() ** 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+uint64_t
+get_gsr()
+{
+	return (0);
+}
+
+#else
+
 ENTRY_NP(get_gsr)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers & stack frame
 	rd      %gsr, %i0
@@ -94,16 +136,31 @@ ENTRY_NP(get_gsr)
 	restore			! .. restore the frame window
 SET_SIZE(get_gsr)
 
-!--------------------------------------------------------------------------
-! Name:		Set Graphics Status Register
-! Function:	Set the GSR
-! Calling:	i0 = value to write to gsr
-! Returns:	none
-! Convention:	set_gsr(get_gsr() || <userVal>)
-!               Please note that the user is expected to OR the new value
-!               with the current GSR content and pass the result to 
-!               set_gsr().
-!--------------------------------------------------------------------------
+#endif
+
+/*
+ * -------------------------------------------------------------------------
+ * Name:	Set Graphics Status Register
+ * Function:	Set the GSR
+ * Calling:	i0 = value to write to gsr
+ * Returns:	none
+ * Convention:	set_gsr(get_gsr() || <userVal>)
+ *              Please note that the user is expected to OR the new value
+ *              with the current GSR content and pass the result to 
+ *              set_gsr().
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+void
+set_gsr(uint64_t arg1)
+{
+}
+
+#else
+
 ENTRY_NP(set_gsr)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers & stack frame
 	wr      %i0, %g0, %gsr
@@ -111,26 +168,42 @@ ENTRY_NP(set_gsr)
 	restore			! .. restore the frame window
 SET_SIZE(set_gsr)
 
+#endif
 
+/*
+ * -----------------------------------------------------------------------
+ *			Data Conversion Functions			 *
+ * -----------------------------------------------------------------------
+ */
 
-!**************************************************************************
-!*			Data Conversion Functions			 *
-!**************************************************************************
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Integer to Float (Single)
+ * Function:	Convert an integer value to a single precision floating point 
+ * 		value
+ * Calling:	in0 = value to convert
+ * Returns:	in0 = converted value
+ * Convention:	Real = int_float_s(Int) ** 
+ * --------------------------------------------------------------------------
+ */
 
-!--------------------------------------------------------------------------
-! Name:		Integer to Float (Single)
-! Function:	Convert an integer value to a single precision floating point 
-!		value
-! Calling:	in0 = value to convert
-! Returns:	in0 = converted value
-! Convention:	Real = int_float_s(Int) ** 
-!--------------------------------------------------------------------------
-	.section	".data"
-	.align		4
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+int_float_s(int arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align          4
 .Lfls:
-	.word   0
+        .word   0
 .Lfls1:
-	.word   0
+        .word   0
 
 ENTRY_NP(int_float_s)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack
@@ -145,23 +218,39 @@ ENTRY_NP(int_float_s)
 	restore			! .. restore the frame window
 SET_SIZE(int_float_s)
 
-!--------------------------------------------------------------------------
-! Name:		Integer to Float (double)
-! Function:	Convert an integer value to a double precision floating point 
-!		value
-! Calling:	in0 = value to convert
-! Returns:	in0 = converted value
-! Convention:	Real = int_float_d(Int) ** 
-!--------------------------------------------------------------------------
-	.section	".data"
-	.align	4
-.Lfld:
-	.word   0
+#endif
 
-	.align	8
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Integer to Float (double)
+ * Function:	Convert an integer value to a double precision floating point 
+ * 		value
+ * Calling:	in0 = value to convert
+ * Returns:	in0 = converted value
+ * Convention:	Real = int_float_d(Int) ** 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+int_float_d(int arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  4
+.Lfld:
+        .word   0
+
+        .align  8
 
 .Lfld1:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(int_float_d)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack
@@ -176,20 +265,35 @@ ENTRY_NP(int_float_d)
 	restore			! .. restore the frame window
 SET_SIZE(int_float_d)
 
+#endif
 
-!--------------------------------------------------------------------------
-! Name:		float to integer (single)
-! Function:	Convert a real value to an integer
-! Calling:	in0 = Value
-! Returns:	in0 = Value
-! Convention:	Int = float_int_s(real) ** 
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  4
+/*
+ * --------------------------------------------------------------------------
+ * Name:	float to integer (single)
+ * Function:	Convert a real value to an integer
+ * Calling:	in0 = Value
+ * Returns:	in0 = Value
+ * Convention:	Int = float_int_s(real) ** 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+float_int_s(unsigned long arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  4
 .Lflnts:
-	.word   0
+        .word   0
 .Lflnts1:
-	.word   0
+        .word   0
 
 ENTRY_NP(float_int_s)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack
@@ -204,19 +308,35 @@ ENTRY_NP(float_int_s)
 	restore			! .. restore the frame window
 SET_SIZE(float_int_s)
 
-!--------------------------------------------------------------------------
-! Name:		Float to Integer conversion (double)
-! Function:	Convert a real value to an integer
-! Calling:	in0 = value
-! Returns:	in0 = value
-! Convention:	Int = float_int_d(real) ** 
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8
+#endif
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Float to Integer conversion (double)
+ * Function:	Convert a real value to an integer
+ * Calling:	in0 = value
+ * Returns:	in0 = value
+ * Convention:	Int = float_int_d(real) ** 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+float_int_d(uint64_t arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 .Lflntd:
-	.skip	8
+        .skip   8
 .Lflntd1:
-	.skip	4
+        .skip   4
 
 ENTRY_NP(float_int_d)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack 
@@ -231,19 +351,35 @@ ENTRY_NP(float_int_d)
 	restore 		! .. restore the frame window
 SET_SIZE(float_int_d)
 
-!--------------------------------------------------------------------------
-! Name:		Convert Single to double precision
-! Function:	<as the name says>
-! Calling:	in0 = value
-! Returns:	in0 = result
-! Convention:	result = convert_sp_dp(value) ** 
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8
+#endif
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Convert Single to double precision
+ * Function:	<as the name says>
+ * Calling:	in0 = value
+ * Returns:	in0 = result
+ * Convention:	result = convert_sp_dp(value) ** 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+convert_sp_dp(unsigned long arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 .Lspdp:
-	.skip 	8
+        .skip   8
 .Lspdp1:
-	.skip 	4
+        .skip   4
 
 ENTRY_NP(convert_sp_dp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack
@@ -258,22 +394,38 @@ ENTRY_NP(convert_sp_dp)
 	restore			! .. restore the frame window
 SET_SIZE(convert_sp_dp)
 
-!--------------------------------------------------------------------------
-! Name:		Convert Double to Single precision
-! Function:	..
-! Calling:	in0 = double precision value
-! Returns:	in0 = result
-! Convention:	result = convert_dp_sp(value) ** 
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  4
+#endif
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Convert Double to Single precision
+ * Function:	..
+ * Calling:	in0 = double precision value
+ * Returns:	in0 = result
+ * Convention:	result = convert_dp_sp(value) ** 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+convert_dp_sp(uint64_t arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  4
 .Ldpsp:
-	.skip	4
+        .skip   4
 
         .align  8
 
 .Ldpsp1:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(convert_dp_sp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack
@@ -288,20 +440,35 @@ ENTRY_NP(convert_dp_sp)
 	restore			! .. restore the frame window
 SET_SIZE(convert_dp_sp)
 
+#endif
 
-!--------------------------------------------------------------------------
-! Name:		Negate a value (Single-precision)
-! Function:	Compliments the Sign bit
-! Calling:	in0 = number to cross her
-! Returns:	in0 = result
-! Convention:	result = negate_value_sp(value) ** 
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Negate a value (Single-precision)
+ * Function:	Compliments the Sign bit
+ * Calling:	in0 = number to cross her
+ * Returns:	in0 = result
+ * Convention:	result = negate_value_sp(value) ** 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+negate_value_sp(unsigned long arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 .Lneg:
-	.skip	8
+        .skip   8
 .Lneg1:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(negate_value_sp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack
@@ -316,20 +483,35 @@ ENTRY_NP(negate_value_sp)
 	restore 		! .. restore the frame window
 SET_SIZE(negate_value_sp)
 
+#endif
 
-!--------------------------------------------------------------------------
-! Name:		Negate a value (Double-precision)
-! Function:	Compliments the Sign bit
-! Calling:	in0 = number to cross her
-! Returns:	in0 = result
-! Convention:	result = negate_value_dp(value) ** 
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Negate a value (Double-precision)
+ * Function:	Compliments the Sign bit
+ * Calling:	in0 = number to cross her
+ * Returns:	in0 = result
+ * Convention:	result = negate_value_dp(value) ** 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+negate_value_dp(uint64_t arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 .Lneg2:
-	.skip	8
+        .skip   8
 .Lneg3:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(negate_value_dp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack
@@ -344,19 +526,35 @@ ENTRY_NP(negate_value_dp)
 	restore 		! .. restore the frame window
 SET_SIZE(negate_value_dp)
 
-!--------------------------------------------------------------------------
-! Name:		Absolute Value (Single-precision)
-! Function:	Convert a SP value to its absolute value (clears sign bit)
-! Calling:	in0 = value
-! Returns:	in0 = result
-! Convention:	result = absolute_value_sp(value) ** 
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8
+#endif
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Absolute Value (Single-precision)
+ * Function:	Convert a SP value to its absolute value (clears sign bit)
+ * Calling:	in0 = value
+ * Returns:	in0 = result
+ * Convention:	result = absolute_value_sp(value) ** 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+absolute_value_sp(unsigned long arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 .Labs:
-	.skip	8
+        .skip   8
 .Labs1:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(absolute_value_sp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack 
@@ -371,20 +569,35 @@ ENTRY_NP(absolute_value_sp)
 	restore			! .. restore the frame window
 SET_SIZE(absolute_value_sp)
 
+#endif
 
-!--------------------------------------------------------------------------
-! Name:		Absolute Value (Double-precision)
-! Function:	Convert a DP value to its absolute value (clears sign bit)
-! Calling:	in0 = value
-! Returns:	in0 = result
-! Convention:	result = absolute_value_dp(value) ** 
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Absolute Value (Double-precision)
+ * Function:	Convert a DP value to its absolute value (clears sign bit)
+ * Calling:	in0 = value
+ * Returns:	in0 = result
+ * Convention:	result = absolute_value_dp(value) ** 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+absolute_value_dp(uint64_t arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 .Labs2:
-	.skip	8
+        .skip   8
 .Labs3:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(absolute_value_dp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack 
@@ -399,23 +612,41 @@ ENTRY_NP(absolute_value_dp)
 	restore			! .. restore the frame window
 SET_SIZE(absolute_value_dp)
 
-!**************************************************************************
-!*				Arithmetic Functions			 *
-!**************************************************************************
+#endif
 
-!--------------------------------------------------------------------------
-! Name:		Single-precision square-root
-! Function:	Calculate the square-root of a Single precision value
-! Calling:	in0 = value
-! Returns:	in0 = result
-! Convention:	result = sqrt_sp(value) ** 
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  4
+/*
+ * -----------------------------------------------------------------------
+ *				Arithmetic Functions			 *
+ * -----------------------------------------------------------------------
+ */
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Single-precision square-root
+ * Function:	Calculate the square-root of a Single precision value
+ * Calling:	in0 = value
+ * Returns:	in0 = result
+ * Convention:	result = sqrt_sp(value) ** 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+sqrt_sp(unsigned long arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  4
 .Lsqsp:
-	.skip	4
+        .skip   4
 .Lsqsp1:
-	.skip	4
+        .skip   4
 
 ENTRY_NP(sqrt_sp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack
@@ -430,19 +661,35 @@ ENTRY_NP(sqrt_sp)
 	restore			! .. restore the frame window
 SET_SIZE(sqrt_sp)
 
-!--------------------------------------------------------------------------
-! Name:		Double-precision square-root
-! Function:	Calculate the square-root of a double precision value
-! Calling:	in0 = value
-! Returns:	in0 = result
-! Convention:	result = sqrt_dp(value) ** 
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8
+#endif
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Double-precision square-root
+ * Function:	Calculate the square-root of a double precision value
+ * Calling:	in0 = value
+ * Returns:	in0 = result
+ * Convention:	result = sqrt_dp(value) ** 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+sqrt_dp(uint64_t arg1)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 .Lsqdp:
-	.skip	8
+        .skip   8
 .Lsqdp1:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(sqrt_dp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack 
@@ -457,23 +704,37 @@ ENTRY_NP(sqrt_dp)
 	restore			! .. restore the frame window
 SET_SIZE(sqrt_dp)
 
+#endif
 
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Add single precision
+ * Function:	Add two values
+ * Calling:	in0 = value1,  in1 = value2
+ * Returns:	in0 = result
+ * Convention:	result = add_sp(value1,value2); 
+ * --------------------------------------------------------------------------
+ */
 
-!--------------------------------------------------------------------------
-! Name:		Add single precision
-! Function:	Add two values
-! Calling:	in0 = value1,  in1 = value2
-! Returns:	in0 = result
-! Convention:	result = add_sp(value1,value2); 
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  4
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+add_sp(unsigned long arg1, unsigned long arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  4
 .Laddsp:
-	.skip	4
+        .skip   4
 .Laddsp1:
-	.skip	4
+        .skip   4
 .Laddsp2:
-	.skip	4
+        .skip   4
 
 ENTRY_NP(add_sp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack  
@@ -491,21 +752,37 @@ ENTRY_NP(add_sp)
 	restore			! .. restore the frame window
 SET_SIZE(add_sp)
 
-!--------------------------------------------------------------------------
-! Name:		Add double precision 
-! Function:	Add two 64 bit values
-! Calling:	in0 = value1, in1 = value2
-! Returns:	in0.1 = result
-! Convention:	result = add_dp(value1,value2); 
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8
+#endif
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Add double precision 
+ * Function:	Add two 64 bit values
+ * Calling:	in0 = value1, in1 = value2
+ * Returns:	in0.1 = result
+ * Convention:	result = add_dp(value1,value2); 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+add_dp(uint64_t arg1, uint64_t arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 .Ladddp:
-	.skip	8
+        .skip   8
 .Ladddp1:
-	.skip	8
+        .skip   8
 .Ladddp2:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(add_dp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack   
@@ -523,21 +800,37 @@ ENTRY_NP(add_dp)
 	restore 		! .. restore the frame window
 SET_SIZE(add_dp)
 
-!--------------------------------------------------------------------------
-! Name:		Subtract Single Precision
-! Function:	Subtract two single precision values from each other
-! Calling:	in0 = Value1, in1 = value2
-! Returns:	in0 = result
-! Convention:	result = sub_sp(value1, value2);
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  4
+#endif
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:		Subtract Single Precision
+ * Function:	Subtract two single precision values from each other
+ * Calling:	in0 = Value1, in1 = value2
+ * Returns:	in0 = result
+ * Convention:	result = sub_sp(value1, value2);
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+sub_sp(unsigned long arg1, unsigned long arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  4
 .Lsbsp:
-	.skip	4
+        .skip   4
 .Lsbsp1:
-	.skip	4
+        .skip   4
 .Lsbsp2:
-	.skip	4
+        .skip   4
 
 ENTRY_NP(sub_sp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack   
@@ -555,21 +848,37 @@ ENTRY_NP(sub_sp)
 	restore 		! .. restore the frame window
 SET_SIZE(sub_sp)
 
-!--------------------------------------------------------------------------
-! Name:		Subtract Double Precision
-! Function:	Subtract two double precision values
-! Calling:	in0 = Value1, in1 = Value2
-! Returns:	in0 = Result
-! Convention:	Result = sub_dp(Value1,Value2);
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8
+#endif
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Subtract Double Precision
+ * Function:	Subtract two double precision values
+ * Calling:	in0 = Value1, in1 = Value2
+ * Returns:	in0 = Result
+ * Convention:	Result = sub_dp(Value1,Value2);
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+sub_dp(uint64_t arg1, uint64_t arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 .Lsbdp:
-	.skip	8
+        .skip   8
 .Lsbdp1:
-	.skip	8
+        .skip   8
 .Lsbdp2:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(sub_dp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack    
@@ -587,21 +896,37 @@ ENTRY_NP(sub_dp)
 	restore			! .. restore the frame window
 SET_SIZE(sub_dp)
 
-!--------------------------------------------------------------------------
-! Name:		Multiply Single Precision
-! Function:	Multiply two single precision values
-! Calling:	in0 = Value1, in1 = value2
-! Returns:	in0 = Result
-! Convention:	Result = mult_sp(Value1,Value2);
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  4
+#endif
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Multiply Single Precision
+ * Function:	Multiply two single precision values
+ * Calling:	in0 = Value1, in1 = value2
+ * Returns:	in0 = Result
+ * Convention:	Result = mult_sp(Value1,Value2);
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned
+long mult_sp(unsigned long arg1, unsigned long arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  4
 .Lmlsp:
-	.skip	4
+        .skip   4
 .Lmlsp1:
-	.skip	4
+        .skip   4
 .Lmlsp2:
-	.skip	4
+        .skip   4
 
 ENTRY_NP(mult_sp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack
@@ -619,21 +944,37 @@ ENTRY_NP(mult_sp)
 	restore			! .. restore the frame window
 SET_SIZE(mult_sp)
 
-!--------------------------------------------------------------------------
-! Name:		Multiply Double Precision
-! Function:	Multiply two values and return the result
-! Calling:	i0 = value1, i1 = value2
-! Returns:	i0 = result
-! Convention:	result = mul_dp(value1, value2); 
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8
+#endif
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:		Multiply Double Precision
+ * Function:	Multiply two values and return the result
+ * Calling:	i0 = value1, i1 = value2
+ * Returns:	i0 = result
+ * Convention:	result = mul_dp(value1, value2); 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+mult_dp(uint64_t arg1, uint64_t arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 .Lmldp:
-	.skip	8
+        .skip   8
 .Lmldp1:
-	.skip	8
+        .skip   8
 .Lmldp2:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(mult_dp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack   
@@ -651,21 +992,37 @@ ENTRY_NP(mult_dp)
 	restore			! .. restore the frame window
 SET_SIZE(mult_dp)
 
-!--------------------------------------------------------------------------
-! Name:		Divide Single Precision
-! Function:	Divide two value and return the result
-! Calling:	i0 = value1, i1 = value2
-! Returns:	i0 = result
-! Convention:	result = div_sp(value1, value2); 
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  4
+#endif
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:		Divide Single Precision
+ * Function:	Divide two value and return the result
+ * Calling:	i0 = value1, i1 = value2
+ * Returns:	i0 = result
+ * Convention:	result = div_sp(value1, value2); 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+div_sp(unsigned long arg1, unsigned long arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  4
 .Ldvsp:
-	.word   0
+        .word   0
 .Ldvsp1:
-	.word   0
+        .word   0
 .Ldvsp2:
-	.word   0
+        .word   0
 
 ENTRY_NP(div_sp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack   
@@ -685,21 +1042,37 @@ ENTRY_NP(div_sp)
 	restore			! .. restore the frame window
 SET_SIZE(div_sp)
 
-!--------------------------------------------------------------------------
-! Name:		Divide Double Precision
-! Function:	Divide two value and return the result
-! Calling:	i0 = value1, i1 = value2
-! Returns:	i0 = result
-! Convention:	result = div_dp(value1, value2); 
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8
+#endif
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Divide Double Precision
+ * Function:	Divide two value and return the result
+ * Calling:	i0 = value1, i1 = value2
+ * Returns:	i0 = result
+ * Convention:	result = div_dp(value1, value2); 
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+div_dp(uint64_t arg1, uint64_t arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 .Ldvdp:
-	.skip	8
+        .skip   8
 .Ldvdp1:
-	.skip	8
+        .skip   8
 .Ldvdp2:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(div_dp)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack   
@@ -717,26 +1090,44 @@ ENTRY_NP(div_dp)
 	restore			! .. restore the frame window
 SET_SIZE(div_dp)
 
-!**************************************************************************
-!*			Data Comparison Functions			 *
-!**************************************************************************
+#endif
 
-!--------------------------------------------------------------------------
-! Name:		Compare Single and Exception if Unordered
-! Function:	Compare two values and return the FSR flags
-! Warning:	
-! Calling:	i0 = value1, i2 = value2
-! Returns:	i0 = flags
-! Convention:	flagsresult  = cmp_s_ex(value1, value2);
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8
+/*
+ * -----------------------------------------------------------------------
+ *			Data Comparison Functions			 
+ * -----------------------------------------------------------------------
+ */
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:		Compare Single and Exception if Unordered
+ * Function:	Compare two values and return the FSR flags
+ * Warning:	
+ * Calling:	i0 = value1, i2 = value2
+ * Returns:	i0 = flags
+ * Convention:	flagsresult  = cmp_s_ex(value1, value2);
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+cmp_s_ex(unsigned long arg1, unsigned long arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 .Lcpsx:
-	.skip	8
+        .skip   8
 .Lcpsx1:
-	.skip	4
+        .skip   4
 .Lcpsx2:
-	.skip	4
+        .skip   4
 
 ENTRY_NP(cmp_s_ex)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack
@@ -755,22 +1146,38 @@ ENTRY_NP(cmp_s_ex)
 	restore			! .. restore the frame window
 SET_SIZE(cmp_s_ex)
 
-!--------------------------------------------------------------------------
-! Name:		Compare Double and Exception if Unordered
-! Function:	Compare two values and return the FSR flags
-! Warning:
-! Calling:	i0 = value1, i2 = value2
-! Returns:	i0 = flags
-! Convention:	flagsresult  = cmp_d_ex(value1, value2);
-!--------------------------------------------------------------------------
-        .section        ".data"
-        .align  8
+#endif
+
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Compare Double and Exception if Unordered
+ * Function:	Compare two values and return the FSR flags
+ * Warning:
+ * Calling:	i0 = value1, i2 = value2
+ * Returns:	i0 = flags
+ * Convention:	flagsresult  = cmp_d_ex(value1, value2);
+ * --------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+cmp_d_ex(unsigned long arg1, unsigned long arg2)
+{
+	return (0);
+}
+
+#else
+
+.section        ".data"
+.align  8
 .Lcpdx:
-	.skip	8
+        .skip   8
 .Lcpdx1:
-	.skip	8
+        .skip   8
 .Lcpdx2:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(cmp_d_ex)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack   
@@ -789,24 +1196,38 @@ ENTRY_NP(cmp_d_ex)
 	restore			! .. restore the frame window
 SET_SIZE(cmp_d_ex)
 
-!--------------------------------------------------------------------------
-! Name:		Float to long conversion (single)
-! Function:	Convert a real single-precision value to a long
-! Calling:	in0 = value
-! Returns:	in0 = value
-! Convention:	long = float_long_s(real) ** 
-!--------------------------------------------------------------------------
+#endif
 
-        .data
-        .align  4
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Float to long conversion (single)
+ * Function:	Convert a real single-precision value to a long
+ * Calling:	in0 = value
+ * Returns:	in0 = value
+ * Convention:	long = float_long_s(real) ** 
+ * --------------------------------------------------------------------------
+ */
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+float_long_s(unsigned long arg1)
+{
+	return (0);
+}
+
+#else
+
+.data
+.align  4
 
 .Lfllngs:
-    .skip   4
+	.skip   4
 
-        .align  8
+.align  8
 
 .Lfllngs1:
-    .skip   8
+	.skip   8
 
 ENTRY_NP(float_long_s)
     save    %sp, -SA(MINFRAME), %sp
@@ -823,15 +1244,28 @@ ENTRY_NP(float_long_s)
     restore
 SET_SIZE(float_long_s)
 
+#endif
 
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Float to long conversion (double)
+ * Function:	Convert a real value to a long
+ * Calling:	in0 = value
+ * Returns:	in0 = value
+ * Convention:	long = float_long_d(real) ** 
+ * --------------------------------------------------------------------------
+ */
 
-!--------------------------------------------------------------------------
-! Name:		Float to long conversion (double)
-! Function:	Convert a real value to a long
-! Calling:	in0 = value
-! Returns:	in0 = value
-! Convention:	long = float_long_d(real) ** 
-!--------------------------------------------------------------------------
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+float_long_d(uint64_t arg1)
+{
+	return (0);
+}
+
+#else
 
         .data
         .align  8
@@ -856,24 +1290,37 @@ ENTRY_NP(float_long_d)
     restore
 SET_SIZE(float_long_d)
 
+#endif
 
+/*
+ * --------------------------------------------------------------------------
+ * Name:	Long to Float (Single)
+ * Function:	Convert an integer value to a single precision floating point 
+ *		value
+ * Calling:	in0 = value to convert
+ * Returns:	in0 = converted value
+ * Convention:	Real = long_float_s(Int) ** 
+ * --------------------------------------------------------------------------
+ */
 
-!--------------------------------------------------------------------------
-! Name:		Long to Float (Single)
-! Function:	Convert an integer value to a single precision floating point 
-!		value
-! Calling:	in0 = value to convert
-! Returns:	in0 = converted value
-! Convention:	Real = long_float_s(Int) ** 
-!--------------------------------------------------------------------------
+#ifdef __lint
+
+/*ARGSUSED*/
+unsigned long
+long_float_s(uint64_t arg1)
+{
+	return (0);
+}
+
+#else
 
         .data
-	.align	8
+        .align  8
 
 .Llngfls:
-	.skip	8
+        .skip   8
 .Llngfls1:
-	.skip	4
+        .skip   4
 
 ENTRY_NP(long_float_s)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack
@@ -888,22 +1335,35 @@ ENTRY_NP(long_float_s)
 	restore			! .. restore the frame window
 SET_SIZE(long_float_s)
 
-!--------------------------------------------------------------------------
-! Name:		Long to Float (double)
-! Function:	Convert an integer value to a double precision floating point 
-!		value
-! Calling:	in0 = value to convert
-! Returns:	in0 = converted value
-! Convention:	Real = long_float_d(Int) ** 
-!--------------------------------------------------------------------------
+#endif
 
+/*
+ * --------------------------------------------------------------------------
+ * Name:		Long to Float (double)
+ * Function:	Convert an integer value to a double precision floating point 
+ * 		value
+ * Calling:	in0 = value to convert
+ * Returns:	in0 = converted value
+ * Convention:	Real = long_float_d(Int) ** 
+ * ---------------------------------------------------------------------------
+ */
+
+#ifdef __lint
+
+/*ARGSUSED*/
+uint64_t
+long_float_d(uint64_t arg1)
+{
+	return (0);
+}
+
+#else
         .data
-	.align	8
-
+        .align  8
 .Llngfld:
-	.skip	8
+        .skip   8
 .Llngfld1:
-	.skip	8
+        .skip   8
 
 ENTRY_NP(long_float_d)
 	save	%sp, -SA(MINFRAME), %sp	! save the registers, stack
@@ -917,3 +1377,5 @@ ENTRY_NP(long_float_d)
 	ret			! Delayed return (get user ret addr)
 	restore			! .. restore the frame window
 SET_SIZE(long_float_d)
+
+#endif

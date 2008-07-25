@@ -36,7 +36,16 @@
 #define	NOP_4K		NOP_1K;NOP_1K;NOP_1K;NOP_1K
 #define	NOP_16K		NOP_4K;NOP_4K;NOP_4K;NOP_4K
 
-! flushes the icache using a series of nops
+/* flushes the icache using a series of nops */
+
+#ifdef __lint
+
+void
+iflush(void)
+{
+}
+
+#else
 
 ENTRY(iflush)
 	NOP_4K
@@ -44,3 +53,5 @@ ENTRY(iflush)
 	retl
 	nop
 SET_SIZE(iflush)
+
+#endif

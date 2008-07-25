@@ -62,7 +62,7 @@
 void fps_door_handler(void *cookie, char *argp, size_t asize,
 	door_desc_t  *dp, uint_t  n_desc);
 
-/* Used by get_free_swap() and get_total_swap() */
+/* Used by get_free_swap() */
 static uint64_t
 ctok(int clicks)
 {
@@ -71,14 +71,6 @@ ctok(int clicks)
 	if (factor == -1) factor = ((int)sysconf(_SC_PAGESIZE)) >> 10;
 	return (clicks*factor);
 }
-
-/* get physical memory size in the unit of KB */
-uint64_t
-get_physmem(void)
-{
-	return (ctok(sysconf(_SC_PHYS_PAGES)));
-}
-
 
 /* return the available free swap space in unit of MB */
 uint64_t
@@ -96,20 +88,6 @@ get_free_swap(void)
 
 	return (freemem/1024);
 }
-
-/* Return the available free swap in unit of MB */
-uint64_t
-get_total_swap(void)
-{
-
-	struct anoninfo ai;
-	unsigned   total_swap;
-	if (swapctl(SC_AINFO, &ai) != -1)
-	total_swap = (int)ctok(ai.ani_max);
-
-	return (total_swap/1024);
-}
-
 
 /*
  *  Wait for n secs. Don't use sleep due to signal behaviours.
