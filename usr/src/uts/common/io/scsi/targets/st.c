@@ -14818,13 +14818,8 @@ st_interpret_read_pos(struct scsi_tape const *un, tapepos_t *dest,
 				dest->pmode = logical;
 			}
 			dest->fileno = (int32_t)value;
-		} else {
-			/*
-			 * If the drive doesn't know its position,
-			 * we don't either.
-			 */
-			dest->pmode = invalid;
 		}
+
 		if (dest->pmode != invalid && long_pos_info->end_of_part) {
 			dest->eof = ST_EOT;
 		}
