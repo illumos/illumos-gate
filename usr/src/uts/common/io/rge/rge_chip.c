@@ -563,6 +563,13 @@ rge_phy_update(rge_t *rgep)
 	 * changes can be attributed to our reprogramming the PHY
 	 */
 	rge_phy_init(rgep);
+	if (rgep->chipid.mac_ver == MAC_VER_8168B_B ||
+	    rgep->chipid.mac_ver == MAC_VER_8168B_C) {
+		/* power up PHY for RTL8168B chipset */
+		rge_mii_put16(rgep, PHY_1F_REG, 0x0000);
+		rge_mii_put16(rgep, PHY_0E_REG, 0x0000);
+		rge_mii_put16(rgep, PHY_1F_REG, 0x0000);
+	}
 	rge_mii_put16(rgep, MII_AN_ADVERT, anar);
 	rge_mii_put16(rgep, MII_1000BASE_T_CONTROL, gigctrl);
 	rge_mii_put16(rgep, MII_CONTROL, control);
