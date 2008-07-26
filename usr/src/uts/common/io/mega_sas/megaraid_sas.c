@@ -327,7 +327,7 @@ megasas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	switch (cmd) {
 		case DDI_ATTACH:
-			con_log(CL_ANN, (CE_NOTE, "megasas: DDI_ATTACH"));
+			con_log(CL_DLEVEL1, (CE_NOTE, "megasas: DDI_ATTACH"));
 			/* allocate the soft state for the instance */
 			if (ddi_soft_state_zalloc(megasas_state, instance_no)
 			    != DDI_SUCCESS) {
@@ -401,7 +401,7 @@ megasas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #ifdef lint
 			irq = irq;
 #endif
-			con_log(CL_ANN, (CE_CONT, "megasas[%d]: "
+			con_log(CL_DLEVEL1, (CE_CONT, "megasas[%d]: "
 			    "0x%x:0x%x 0x%x:0x%x, irq:%d drv-ver:%s\n",
 			    instance_no, vendor_id, device_id, subsysvid,
 			    subsysid, pci_config_get8(instance->pci_handle,
@@ -427,7 +427,7 @@ megasas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			/* initialize function pointers */
 			if ((device_id == PCI_DEVICE_ID_LSI_1078) ||
 			    (device_id == PCI_DEVICE_ID_LSI_1078DE)) {
-				con_log(CL_ANN, (CE_CONT, "megasas[%d]: "
+				con_log(CL_DLEVEL1, (CE_CONT, "megasas[%d]: "
 				    "1078R/DE detected\n", instance_no));
 				instance->func_ptr->read_fw_status_reg =
 				    read_fw_status_reg_ppc;
@@ -442,7 +442,7 @@ megasas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				    disable_intr_ppc;
 				instance->func_ptr->intr_ack = intr_ack_ppc;
 			} else {
-				con_log(CL_ANN, (CE_CONT, "megasas[%d]: "
+				con_log(CL_DLEVEL1, (CE_CONT, "megasas[%d]: "
 				    "1064/8R detected\n", instance_no));
 				instance->func_ptr->read_fw_status_reg =
 				    read_fw_status_reg_xscale;
@@ -662,7 +662,7 @@ megasas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				goto fail_initiate_aen;
 			}
 
-			con_log(CL_ANN, (CE_NOTE,
+			con_log(CL_DLEVEL1, (CE_NOTE,
 			    "AEN started for instance %d.", instance_no));
 
 			/* Finally! We are on the air.  */
@@ -1026,22 +1026,11 @@ megasas_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 			break;
 		default:
-			if (scsi_hba_ioctl) {
-				rval = scsi_hba_ioctl(dev, cmd, arg,
-				    mode, credp, rvalp);
+			rval = scsi_hba_ioctl(dev, cmd, arg,
+			    mode, credp, rvalp);
 
-				con_log(CL_ANN, (CE_NOTE, "megasas_ioctl: "
-				    "scsi_hba_ioctl called, ret = %x.", rval));
-			} else {
-				rval = ENOTTY;
-
-				con_log(CL_ANN, (CE_WARN,
-				    "megasas_ioctl: scsi_hba_ioctl is NULL."));
-			}
-
-			rval = EINVAL;
-			con_log(CL_ANN, (CE_WARN,
-			    "megasas_ioctl: ERROR invalid cmd = 0x%x", cmd));
+			con_log(CL_DLEVEL1, (CE_NOTE, "megasas_ioctl: "
+			    "scsi_hba_ioctl called, ret = %x.", rval));
 	}
 
 	return (rval);
@@ -1308,6 +1297,7 @@ megasas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 	    __func__, __LINE__, pkt->pkt_cdbp[0]));
 
 	pkt->pkt_reason	= CMD_CMPLT;
+	*pkt->pkt_scbp = STATUS_GOOD; /* clear arq scsi_status */
 
 	cmd = build_cmd(instance, ap, pkt, &cmd_done);
 
@@ -1320,7 +1310,10 @@ megasas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 		if (((pkt->pkt_flags & FLAG_NOINTR) == 0) && pkt->pkt_comp) {
 			(*pkt->pkt_comp)(pkt);
 		}
-
+		pkt->pkt_reason = CMD_CMPLT;
+		pkt->pkt_scbp[0] = STATUS_GOOD;
+		pkt->pkt_state |= STATE_GOT_BUS | STATE_GOT_TARGET
+		    | STATE_SENT_CMD;
 		return (TRAN_ACCEPT);
 	}
 
@@ -1367,8 +1360,8 @@ megasas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 
 		case MFI_STAT_SCSI_DONE_WITH_ERROR:
 
-			pkt->pkt_reason	= CMD_INCOMPLETE;
-			pkt->pkt_statistics = STAT_DISCON;
+			pkt->pkt_reason	= CMD_CMPLT;
+			pkt->pkt_statistics = 0;
 
 			((struct scsi_status *)pkt->pkt_scbp)->sts_chk = 1;
 			break;
@@ -1830,7 +1823,7 @@ megasas_isr(caddr_t arg)
 
 	mutex_exit(&instance->completed_pool_mtx);
 
-	*instance->consumer = producer;
+	*instance->consumer = consumer;
 	(void) ddi_dma_sync(instance->mfi_internal_dma_obj.dma_handle,
 	    0, 0, DDI_DMA_SYNC_FORDEV);
 
@@ -1982,8 +1975,8 @@ create_mfi_frame_pool(struct megasas_instance *instance)
 	sge_sz	= sizeof (struct megasas_sge64);
 
 	/* calculated the number of 64byte frames required for SGL */
-	sgl_sz		= sge_sz * instance->max_num_sge;
-	tot_frame_size	= sgl_sz + MEGAMFI_FRAME_SIZE + NUM_SENSE_KEYS;
+	sgl_sz = sge_sz * instance->max_num_sge;
+	tot_frame_size = sgl_sz + MEGAMFI_FRAME_SIZE + SENSE_LENGTH;
 
 	con_log(CL_DLEVEL3, (CE_NOTE, "create_mfi_frame_pool: "
 	    "sgl_sz %x tot_frame_size %x", sgl_sz, tot_frame_size));
@@ -2016,10 +2009,10 @@ create_mfi_frame_pool(struct megasas_instance *instance)
 
 		cmd->sense = (uint8_t *)(((unsigned long)
 		    cmd->frame_dma_obj.buffer) +
-		    tot_frame_size - NUM_SENSE_KEYS);
+		    tot_frame_size - SENSE_LENGTH);
 		cmd->sense_phys_addr =
 		    cmd->frame_dma_obj.dma_cookie[0].dmac_address +
-		    tot_frame_size - NUM_SENSE_KEYS;
+		    tot_frame_size - SENSE_LENGTH;
 
 		if (!cmd->frame || !cmd->sense) {
 			con_log(CL_ANN, (CE_NOTE,
@@ -2341,7 +2334,7 @@ init_mfi(struct megasas_instance *instance)
 
 	if (reglength > 8192) {
 		reglength = 8192;
-		con_log(CL_ANN, (CE_NOTE,
+		con_log(CL_DLEVEL1, (CE_NOTE,
 		    "mega: register length to map is 0x%lx bytes", reglength));
 	}
 
@@ -2821,7 +2814,7 @@ flush_cache(struct megasas_instance *instance)
 		cmn_err(CE_WARN,
 		    "flush_cache: failed to issue MFI_DCMD_CTRL_CACHE_FLUSH\n");
 	}
-	con_log(CL_ANN, (CE_NOTE, "done"));
+	con_log(CL_DLEVEL1, (CE_NOTE, "done"));
 	return_mfi_pkt(instance, cmd);
 }
 
@@ -2929,6 +2922,7 @@ megasas_softintr(caddr_t arg)
 	mlist_t			process_list;
 	struct megasas_header	*hdr;
 	struct megasas_instance	*instance;
+	struct scsi_arq_status  *arqstat;
 
 	con_log(CL_ANN1, (CE_CONT, "megasas_softintr called"));
 
@@ -2994,7 +2988,9 @@ megasas_softintr(caddr_t arg)
 
 			pkt->pkt_reason		= CMD_CMPLT;
 			pkt->pkt_statistics	= 0;
-			pkt->pkt_state = STATE_XFERRED_DATA | STATE_GOT_STATUS;
+			pkt->pkt_state = STATE_GOT_BUS
+			    | STATE_GOT_TARGET | STATE_SENT_CMD
+			    | STATE_XFERRED_DATA | STATE_GOT_STATUS;
 
 			con_log(CL_ANN1, (CE_CONT,
 			    "CDB[0] = %x completed for %s: size %lx context %x",
@@ -3033,32 +3029,88 @@ megasas_softintr(caddr_t arg)
 				pkt->pkt_scbp[0] = STATUS_GOOD;
 				break;
 			case MFI_STAT_LD_CC_IN_PROGRESS:
-			case MFI_STAT_LD_INIT_IN_PROGRESS:
 			case MFI_STAT_LD_RECON_IN_PROGRESS:
 			    /* SJ - these are not correct way */
 				pkt->pkt_scbp[0] = STATUS_GOOD;
 				break;
+			case MFI_STAT_LD_INIT_IN_PROGRESS:
+				con_log(CL_ANN,
+				    (CE_WARN, "Initialization in Progress"));
+				pkt->pkt_reason	= CMD_TRAN_ERR;
+
+				break;
 			case MFI_STAT_SCSI_DONE_WITH_ERROR:
 				con_log(CL_ANN1, (CE_CONT, "scsi_done error"));
-				if (pkt->pkt_cdbp[0] != SCMD_TEST_UNIT_READY) {
-					pkt->pkt_reason	= CMD_INCOMPLETE;
-					pkt->pkt_statistics = STAT_DISCON;
-					((struct scsi_status *)
-					    pkt->pkt_scbp)->sts_chk = 1;
+
+				pkt->pkt_reason	= CMD_CMPLT;
+				((struct scsi_status *)
+				    pkt->pkt_scbp)->sts_chk = 1;
+
+				if (pkt->pkt_cdbp[0] == SCMD_TEST_UNIT_READY) {
+
+					con_log(CL_ANN,
+					    (CE_WARN, "TEST_UNIT_READY fail"));
+
 				} else {
-					pkt->pkt_reason = CMD_DEV_GONE;
-					pkt->pkt_statistics = STAT_DISCON;
+					pkt->pkt_state |= STATE_ARQ_DONE;
+					arqstat = (void *)(pkt->pkt_scbp);
+					arqstat->sts_rqpkt_reason = CMD_CMPLT;
+					arqstat->sts_rqpkt_resid = 0;
+					arqstat->sts_rqpkt_state |=
+					    STATE_GOT_BUS | STATE_GOT_TARGET
+					    | STATE_SENT_CMD
+					    | STATE_XFERRED_DATA;
+					*(uint8_t *)&arqstat->sts_rqpkt_status =
+					    STATUS_GOOD;
+
+					bcopy(cmd->sense,
+					    &(arqstat->sts_sensedata),
+					    pkt->pkt_scblen -
+					    offsetof(struct scsi_arq_status,
+					    sts_sensedata));
 				}
 				break;
+			case MFI_STAT_LD_OFFLINE:
 			case MFI_STAT_DEVICE_NOT_FOUND:
 				con_log(CL_ANN1, (CE_CONT,
 				    "device not found error"));
 				pkt->pkt_reason	= CMD_DEV_GONE;
 				pkt->pkt_statistics  = STAT_DISCON;
 				break;
-			default:
+			case MFI_STAT_LD_LBA_OUT_OF_RANGE:
+				pkt->pkt_state |= STATE_ARQ_DONE;
+				pkt->pkt_reason	= CMD_CMPLT;
 				((struct scsi_status *)
-				    pkt->pkt_scbp)->sts_busy = 1;
+				    pkt->pkt_scbp)->sts_chk = 1;
+
+				arqstat = (void *)(pkt->pkt_scbp);
+				arqstat->sts_rqpkt_reason = CMD_CMPLT;
+				arqstat->sts_rqpkt_resid = 0;
+				arqstat->sts_rqpkt_state |= STATE_GOT_BUS
+				    | STATE_GOT_TARGET | STATE_SENT_CMD
+				    | STATE_XFERRED_DATA;
+				*(uint8_t *)&arqstat->sts_rqpkt_status =
+				    STATUS_GOOD;
+
+				arqstat->sts_sensedata.es_valid = 1;
+				arqstat->sts_sensedata.es_key =
+				    KEY_ILLEGAL_REQUEST;
+				arqstat->sts_sensedata.es_class =
+				    CLASS_EXTENDED_SENSE;
+
+				/*
+				 * LOGICAL BLOCK ADDRESS OUT OF RANGE:
+				 * ASC: 0x21h; ASCQ: 0x00h;
+				 */
+				arqstat->sts_sensedata.es_add_code = 0x21;
+				arqstat->sts_sensedata.es_qual_code = 0x00;
+
+				break;
+
+			default:
+				con_log(CL_ANN, (CE_CONT, "Unknown status!"));
+				pkt->pkt_reason	= CMD_TRAN_ERR;
+
 				break;
 			}
 
@@ -3429,6 +3481,7 @@ build_cmd(struct megasas_instance *instance, struct scsi_address *ap,
 	/* find out if this is logical or physical drive command.  */
 	acmd->islogical = MEGADRV_IS_LOGICAL(ap);
 	acmd->device_id = MAP_DEVICE_ID(instance, ap);
+	*cmd_done = 0;
 
 	/* get the command packet */
 	if (!(cmd = get_mfi_pkt(instance))) {
@@ -3462,18 +3515,16 @@ build_cmd(struct megasas_instance *instance, struct scsi_address *ap,
 	/* flags |= MFI_FRAME_SGL64; */
 
 	switch (pkt->pkt_cdbp[0]) {
-	    /* Mode sense */
-	case 0x15 : /* mode select(6) */
-	case 0x55 : /* mode select(10) */
-	case 0x1a : /* mode sense(6) */
-	case 0x5a : /* mode sense(10) */
-	case 0x5e : /* ??? */
-	case 0x4d : /* log sense */
-	case 0x35 : /* Synchronize Cache */
-		return_mfi_pkt(instance, cmd);
-		*cmd_done = 1;
 
-		return (NULL);
+	/*
+	 * case SCMD_SYNCHRONIZE_CACHE:
+	 * 	flush_cache(instance);
+	 *	return_mfi_pkt(instance, cmd);
+	 *	*cmd_done = 1;
+	 *
+	 *	return (NULL);
+	 */
+
 	case SCMD_READ:
 	case SCMD_WRITE:
 	case SCMD_READ_G1:
@@ -3494,6 +3545,13 @@ build_cmd(struct megasas_instance *instance, struct scsi_address *ap,
 			ldio->reserved_0 = 0;
 			ldio->pad_0 = 0;
 			ldio->flags = flags;
+
+			/* Initialize sense Information */
+			bzero(cmd->sense, SENSE_LENGTH);
+			ldio->sense_len = SENSE_LENGTH;
+			ldio->sense_buf_phys_addr_hi = 0;
+			ldio->sense_buf_phys_addr_lo = cmd->sense_phys_addr;
+
 			ldio->start_lba_hi = 0;
 			ldio->access_byte = (acmd->cmd_cdblen != 6) ?
 			    pkt->pkt_cdbp[1] : 0;
@@ -3572,11 +3630,11 @@ build_cmd(struct megasas_instance *instance, struct scsi_address *ap,
 		pthru->data_xfer_len	= acmd->cmd_dmacount;
 		pthru->sge_count	= acmd->cmd_cookiecnt;
 		mfi_sgl			= (struct megasas_sge32 *)&pthru->sgl;
-		/* pthru->sense_len	= NUM_SENSE_KEYS; */
-		pthru->sense_len	= 0;
+
+		bzero(cmd->sense, SENSE_LENGTH);
+		pthru->sense_len	= SENSE_LENGTH;
 		pthru->sense_buf_phys_addr_hi = 0;
-		/* pthru->sense_buf_phys_addr_lo = cmd->sense_phys_addr; */
-		pthru->sense_buf_phys_addr_lo = 0;
+		pthru->sense_buf_phys_addr_lo = cmd->sense_phys_addr;
 
 		context = pthru->context;
 

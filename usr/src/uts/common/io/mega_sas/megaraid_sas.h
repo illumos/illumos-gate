@@ -55,7 +55,7 @@ extern "C" {
 /*
  * MegaRAID SAS Driver meta data
  */
-#define	MEGASAS_VERSION				"LSIv1.23"
+#define	MEGASAS_VERSION				"LSIv1.26"
 #define	MEGASAS_RELDATE				"Mar 31, 2008"
 
 #define	MEGASAS_TRUE				1
@@ -244,6 +244,7 @@ enum MFI_STAT {
 	MFI_STAT_SHUTDOWN_FAILED		= 0x30,
 	MFI_STAT_TIME_NOT_SET			= 0x31,
 	MFI_STAT_WRONG_STATE			= 0x32,
+	MFI_STAT_LD_OFFLINE			= 0x33,
 	MFI_STAT_INVALID_STATUS			= 0xFF
 };
 
