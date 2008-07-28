@@ -175,7 +175,7 @@ rcm_mod_init(void)
 const char *
 rcm_mod_info(void)
 {
-	return ("Network namespace module %I%");
+	return ("Network namespace module 1.13");
 }
 
 /*

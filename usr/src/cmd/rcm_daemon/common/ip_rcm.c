@@ -315,7 +315,7 @@ rcm_mod_info(void)
 {
 	rcm_log_message(RCM_TRACE1, "IP: mod_info\n");
 
-	return ("IP Multipathing module version %I%");
+	return ("IP Multipathing module version 1.23");
 }
 
 /*

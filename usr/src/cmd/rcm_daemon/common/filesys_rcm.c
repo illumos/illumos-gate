@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,7 +160,7 @@ rcm_mod_init()
 const char *
 rcm_mod_info()
 {
-	return ("File system module %I%");
+	return ("File system module 1.9");
 }
 
 /*

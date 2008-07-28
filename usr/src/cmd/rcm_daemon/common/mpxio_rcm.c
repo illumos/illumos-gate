@@ -151,7 +151,7 @@ rcm_mod_info()
 {
 	rcm_log_message(RCM_TRACE1, "MPXIO: rcm_mod_info()\n");
 
-	return (gettext("RCM MPxIO module %I%"));
+	return (gettext("RCM MPxIO module 1.6"));
 }
 
 /*

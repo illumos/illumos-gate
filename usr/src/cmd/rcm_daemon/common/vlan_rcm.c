@@ -184,7 +184,7 @@ rcm_mod_info(void)
 {
 	rcm_log_message(RCM_TRACE1, "VLAN: mod_info\n");
 
-	return ("VLAN module version %I%");
+	return ("VLAN module version 1.2");
 }
 
 /*

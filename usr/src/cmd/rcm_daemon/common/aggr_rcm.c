@@ -193,7 +193,7 @@ rcm_mod_info(void)
 {
 	rcm_log_message(RCM_TRACE1, "AGGR: mod_info\n");
 
-	return ("AGGR module version %I%");
+	return ("AGGR module version 1.1");
 }
 
 /*

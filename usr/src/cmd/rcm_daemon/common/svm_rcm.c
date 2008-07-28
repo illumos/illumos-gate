@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -283,7 +283,7 @@ rcm_mod_init()
 const char *
 rcm_mod_info()
 {
-	return (gettext("Solaris Volume Manager module %I%"));
+	return (gettext("Solaris Volume Manager module 1.9"));
 }
 
 /*
