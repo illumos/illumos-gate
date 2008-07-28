@@ -106,7 +106,6 @@ event_transfer(sysevent_t *ev, void *arg)
 		    " has an invalid payload.", seq);
 		sysev_stats.bad_attr.fmds_value.ui64++;
 
-		return (0);
 	}
 
 	return (0);
@@ -140,8 +139,6 @@ _fmd_fini(fmd_hdl_t *handle)
 void
 _fmd_init(fmd_hdl_t *hdl)
 {
-	char fail_msg[FAIL_MSG_MAX];
-
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0) {
 		return;
 	}
@@ -153,15 +150,14 @@ _fmd_init(fmd_hdl_t *hdl)
 	h_fmd = hdl;
 
 	if (sysevent_evc_bind(CHANNEL, &h_event, BIND_FLAGS) != 0) {
-		(void) snprintf(fail_msg, sizeof (fail_msg),
-		    "Failed to bind to channel %s", CHANNEL);
-		fmd_hdl_abort(hdl, fail_msg);
+		fmd_hdl_error(hdl, "Failed to bind to channel %s", CHANNEL);
+		fmd_hdl_unregister(hdl);
 	}
 
 	if (sysevent_evc_subscribe(h_event, SUBSCRIBE_ID, SUBSCRIBE_FLAGS,
-	    event_transfer, h_xprt, 0) != 0) {
-		(void) snprintf(fail_msg, sizeof (fail_msg),
-		    "Failed to subsrcibe to channel %s", CHANNEL);
-		fmd_hdl_abort(hdl, fail_msg);
+	    event_transfer, NULL, 0) != 0) {
+		fmd_hdl_error(hdl, "Failed to subsrcibe to channel %s",
+		    CHANNEL);
+		fmd_hdl_unregister(hdl);
 	}
 }

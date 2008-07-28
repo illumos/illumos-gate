@@ -281,7 +281,6 @@ fps_generate_ereport_struct(struct fps_test_ereport *report)
 	char class_name[FM_MAX_CLASS];
 	char *cpu_brand;
 	char *string_data;
-	int detector_available;
 	int expect_size;
 	int is_valid_cpu;
 	int mask;
@@ -311,15 +310,13 @@ fps_generate_ereport_struct(struct fps_test_ereport *report)
 	observe_size = report->observed_size;
 	observe = report->observed;
 	string_data = report->info;
-	detector_available = 1;
 
 	/* allocate nvlists */
 	if ((ereport = fps_nvlist_create()) == NULL)
 		_exit(FPU_EREPORT_FAIL);
 
 	if ((detector = fps_nvlist_create()) == NULL) {
-		detector_available = 0;
-		ret = FPU_EREPORT_INCOM;
+		_exit(FPU_EREPORT_FAIL);
 	}
 
 	/* setup class */
@@ -336,8 +333,7 @@ fps_generate_ereport_struct(struct fps_test_ereport *report)
 
 	/* setup detector */
 	if (fps_fmri_svc_set(detector, getenv("SMF_FMRI")) != 0) {
-		detector_available = 0;
-		ret = FPU_EREPORT_INCOM;
+		_exit(FPU_EREPORT_FAIL);
 	}
 
 	/* setup fps-version */
@@ -360,21 +356,19 @@ fps_generate_ereport_struct(struct fps_test_ereport *report)
 
 	if (ena != 0) {
 		if (nvlist_add_uint64(ereport, NAME_FPS_ENA, ena) != 0)
-			ret = FPU_EREPORT_INCOM;
+			_exit(FPU_EREPORT_FAIL);
 	} else
-		ret = FPU_EREPORT_INCOM;
+		_exit(FPU_EREPORT_FAIL);
 
-	if (detector_available) {
-		if (nvlist_add_nvlist(ereport, NAME_FPS_DETECTOR,
-		    (nvlist_t *)detector) != 0)
-			ret = FPU_EREPORT_INCOM;
-	}
+	if (nvlist_add_nvlist(ereport, NAME_FPS_DETECTOR,
+	    (nvlist_t *)detector) != 0)
+		_exit(FPU_EREPORT_FAIL);
 
 	if (nvlist_add_uint8(ereport, NAME_FPS_VERSION, fps_ver) != 0)
 		_exit(FPU_EREPORT_FAIL);
 
 	if (nvlist_add_uint32(ereport, NAME_FPS_TEST_ID, test) != 0)
-		_exit(FPU_EREPORT_FAIL);
+		ret = FPU_EREPORT_INCOM;
 
 	if (nvlist_add_uint64_array(ereport, NAME_FPS_EXPECTED_VALUE,
 	    expect, expect_size) != 0)
@@ -398,7 +392,7 @@ fps_generate_ereport_struct(struct fps_test_ereport *report)
 
 	/* publish */
 	if (fps_post_ereport(ereport)) {
-		_exit(FPU_EREPORT_FAIL);
+		ret = FPU_EREPORT_FAIL;
 	}
 
 	/* free nvlists */
