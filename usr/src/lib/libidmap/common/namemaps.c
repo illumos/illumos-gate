@@ -30,6 +30,7 @@
 #include <sasl/sasl.h>
 #include <libintl.h>
 #include <strings.h>
+#include <strings.h>
 
 #include "idmap_impl.h"
 #include "ns_sldap.h"
@@ -38,7 +39,7 @@
 /* From adutils.c: */
 
 /* A single DS */
-typedef struct ad_nameh {
+struct idmap_nm_handle {
 	LDAP			*ad;		/* LDAP connection */
 	/* LDAP DS info */
 	char			*ad_host;
@@ -54,7 +55,9 @@ typedef struct ad_nameh {
 	char			*default_domain;
 	bool_t			is_nldap;
 	bool_t			is_ad;
-} ad_nameh_t;
+	int			direction;
+	ns_cred_t		nsc;
+};
 
 static
 idmap_stat
@@ -127,8 +130,19 @@ strings2cred(ns_cred_t *nsc, char *user, char *passwd, char *auth)
 	if ((rc = string2auth(auth, &nsc->auth)) != IDMAP_SUCCESS)
 		return (rc);
 
-	nsc->cred.unix_cred.userID = user;
-	nsc->cred.unix_cred.passwd = passwd;
+	if (user != NULL) {
+		nsc->cred.unix_cred.userID = strdup(user);
+		if (nsc->cred.unix_cred.userID == NULL)
+			return (IDMAP_ERR_MEMORY);
+	}
+
+	if (passwd != NULL) {
+		nsc->cred.unix_cred.passwd = strdup(passwd);
+		if (nsc->cred.unix_cred.passwd == NULL) {
+			free(nsc->cred.unix_cred.userID);
+			return (IDMAP_ERR_MEMORY);
+		}
+	}
 
 	return (IDMAP_SUCCESS);
 }
@@ -157,7 +171,7 @@ idmap_saslcallback(LDAP *ld, unsigned flags, void *defaults, void *prompts)
 
 static
 idmap_stat
-idmap_open_ad_conn(ad_nameh_t *adh)
+idmap_open_ad_conn(idmap_nm_handle_t *adh)
 {
 	int zero = 0;
 	int timeoutms = 30 * 1000;
@@ -168,7 +182,7 @@ idmap_open_ad_conn(ad_nameh_t *adh)
 	adh->ad = ldap_init(adh->ad_host, adh->ad_port);
 	if (adh->ad == NULL) {
 		idmapdlog(LOG_INFO, "ldap_init() to server "
-		    "%s port %d failed. (%s)", adh->ad_host,
+		    "%s port %d failed. (%s)", CHECK_NULL(adh->ad_host),
 		    adh->ad_port, strerror(errno));
 		rc = IDMAP_ERR_INTERNAL;
 		goto out;
@@ -188,8 +202,8 @@ idmap_open_ad_conn(ad_nameh_t *adh)
 		(void) ldap_unbind(adh->ad);
 		adh->ad = NULL;
 		idmapdlog(LOG_INFO, "ldap_sasl_interactive_bind_s() to server "
-		    "%s port %d failed. (%s)", adh->ad_host, adh->ad_port,
-		    ldap_err2string(ldap_rc));
+		    "%s port %d failed. (%s)", CHECK_NULL(adh->ad_host),
+		    adh->ad_port, ldap_err2string(ldap_rc));
 		rc = IDMAP_ERR_INTERNAL;
 	}
 
@@ -197,133 +211,25 @@ out:
 	return (rc);
 }
 
-
 static
 idmap_stat
-idmap_init_namemaps(ad_nameh_t **adh, idmap_handle_t **handle, char *windomain)
+idmap_init_nldap(idmap_nm_handle_t *p)
 {
-	idmap_stat rc;
-	ad_nameh_t *p;
-
-
-	*handle = NULL;
-
-	/*
-	 * Autodiscovery functions blabble LOG_DEBUG messages to stderr, so
-	 * we have to set a higher threshold:
-	 */
-	p = (ad_nameh_t *)calloc(1, sizeof (ad_nameh_t));
-	if (p == NULL)
-		return (IDMAP_ERR_MEMORY);
-
-	rc = idmap_init(handle);
-	if (rc != IDMAP_SUCCESS) {
-		idmapdlog(LOG_ERR,
-		    gettext("Connection to idmapd not established (%s)"),
-		    idmap_stat2string(NULL, rc));
-		goto cleanup;
-	}
-
-	rc = idmap_get_prop_str(*handle, PROP_DEFAULT_DOMAIN,
-	    &p->default_domain);
-	if (rc != IDMAP_SUCCESS) {
-		idmapdlog(LOG_ERR,
-		    gettext("Error obtaining default domain from idmapd (%s)"),
-		    idmap_stat2string(NULL, rc));
-		goto cleanup;
-	}
-
-
-	rc = idmap_get_prop_str(*handle, PROP_AD_UNIXUSER_ATTR,
-	    &p->ad_unixuser_attr);
-	if (rc != IDMAP_SUCCESS) {
-		idmapdlog(LOG_ERR,
-		    gettext("Error obtaining AD unixuser attribute (%s)"),
-		    idmap_stat2string(NULL, rc));
-		goto cleanup;
-	}
-
-	rc = idmap_get_prop_str(*handle, PROP_AD_UNIXGROUP_ATTR,
-	    &p->ad_unixgroup_attr);
-	if (rc != IDMAP_SUCCESS) {
-		idmapdlog(LOG_ERR,
-		    gettext("Error obtaining AD unixgroup attribute (%s)"),
-		    idmap_stat2string(NULL, rc));
-		goto cleanup;
-	}
-
-
-	rc = idmap_get_prop_str(*handle, PROP_NLDAP_WINNAME_ATTR,
-	    &p->nldap_winname_attr);
-	if (rc != IDMAP_SUCCESS) {
-		idmapdlog(LOG_ERR,
-		    gettext("Error obtaining AD unixgroup attribute (%s)"),
-		    idmap_stat2string(NULL, rc));
-		goto cleanup;
-	}
-
-	p->is_nldap = p->nldap_winname_attr == NULL ? FALSE : TRUE;
-	p->is_ad = p->ad_unixuser_attr == NULL || p->ad_unixgroup_attr == NULL
-	    ? FALSE : TRUE;
-
-
-	if (windomain != NULL) {
-		p->windomain = strdup(windomain);
-	} else if (p->default_domain != NULL) {
-		p->windomain = strdup(p->default_domain);
-	} else {
-		idmapdlog(LOG_ERR,
-		    gettext("Windows domain not given and idmapd daemon"
-		    " didn't provide a default one"));
-		rc = IDMAP_ERR_ARG;
-		goto cleanup;
-	}
-
-	if (p->windomain == NULL) {
-		rc = IDMAP_ERR_MEMORY;
-		goto cleanup;
-	}
-
-
-
-
-
-cleanup:
-
-	if (rc == IDMAP_SUCCESS) {
-		*adh = p;
-		return (IDMAP_SUCCESS);
-	}
-
-	/* There was an error: */
-	if (*handle != NULL) {
-		(void) idmap_fini(*handle);
-		*handle = NULL;
-	}
-
-	if (p != NULL) {
-		if (p->ad_unixuser_attr != NULL)
-			free(p->ad_unixuser_attr);
-		if (p->ad_unixgroup_attr != NULL)
-			free(p->ad_unixgroup_attr);
-		if (p->nldap_winname_attr != NULL)
-			free(p->nldap_winname_attr);
-		if (p->default_domain != NULL)
-			free(p->default_domain);
-		free(p);
-	}
-	*adh = NULL;
-	return (rc);
+/*
+ * For now, there is nothing to initialize in nldap. This is just to
+ * make it future-proof, especially standalone libsldap-proof
+ */
+	p->is_nldap = TRUE;
+	return (0);
 }
 
 static
 idmap_stat
-idmap_init_ad(ad_nameh_t *p)
+idmap_init_ad(idmap_nm_handle_t *p)
 {
 	idmap_stat	rc = IDMAP_SUCCESS;
 	idmap_ad_disc_ds_t	*dc = NULL;
 	ad_disc_t	ad_ctx;
-	char		*domain = NULL;
 
 	ad_ctx = ad_disc_init();
 	if (ad_ctx == NULL) {
@@ -335,11 +241,11 @@ idmap_init_ad(ad_nameh_t *p)
 
 
 	/* Based on the supplied or default domain, find the proper AD: */
-	if (ad_disc_set_DomainName(ad_ctx, domain)) {
+	if (ad_disc_set_DomainName(ad_ctx, p->windomain)) {
 		rc = IDMAP_ERR_INTERNAL;
 		idmapdlog(LOG_ERR,
 		    gettext("Setting a domain name \"%s\" for autodiscovery"
-		    " failed, most likely not enough memory"), domain);
+		    " failed, most likely not enough memory"), p->windomain);
 		goto cleanup;
 	}
 
@@ -348,7 +254,7 @@ idmap_init_ad(ad_nameh_t *p)
 		rc = IDMAP_ERR_ARG;
 		idmapdlog(LOG_ERR,
 		    gettext("A domain controller for the "
-		    "domain \"%s\" not found."), domain);
+		    "domain \"%s\" not found."), p->windomain);
 		goto cleanup;
 	}
 
@@ -374,6 +280,7 @@ idmap_init_ad(ad_nameh_t *p)
 	if (rc != IDMAP_SUCCESS)
 		goto cleanup;
 
+	p->is_ad = TRUE;
 
 cleanup:
 	ad_disc_fini(ad_ctx);
@@ -381,43 +288,154 @@ cleanup:
 	return (rc);
 }
 
-static
-idmap_stat
-/* LINTED E_FUNC_ARG_UNUSED */
-idmap_init_nldap(ad_nameh_t *p)
-{
-/*
- * For now, there is nothing to initialize in nldap. This is just to
- * make it future-proof, especially standalone libsldap-proof
- */
-	return (0);
-}
-
-
-static
 void
-idmap_fini_namemaps(ad_nameh_t *p, idmap_handle_t *ih)
+idmap_fini_namemaps(idmap_nm_handle_t *p)
 {
-	if (ih != NULL) {
-		(void) idmap_fini(ih);
-	}
-
 	if (p == NULL)
 		return;
 
-	free(p->ad_unixgroup_attr);
-	free(p->ad_unixuser_attr);
-	free(p->nldap_winname_attr);
-	free(p->windomain);
-	free(p->default_domain);
-	free(p->saslmech);
-	free(p->ad_host);
+	if (p->ad_unixgroup_attr != NULL)
+		free(p->ad_unixgroup_attr);
+
+	if (p->ad_unixuser_attr != NULL)
+		free(p->ad_unixuser_attr);
+
+	if (p->nldap_winname_attr)
+		free(p->nldap_winname_attr);
+
+	if (p->windomain != NULL)
+		free(p->windomain);
+
+	if (p->default_domain != NULL)
+		free(p->default_domain);
+
+	if (p->saslmech != NULL)
+		free(p->saslmech);
+
+	if (p->ad_host != NULL)
+		free(p->ad_host);
+
+	if (p->nsc.cred.unix_cred.userID != NULL) {
+		free(p->nsc.cred.unix_cred.userID);
+	}
+
+	if (p->nsc.cred.unix_cred.passwd != NULL) {
+		/* No archeology: */
+		(void) memset(p->nsc.cred.unix_cred.passwd, 0,
+		    strlen(p->nsc.cred.unix_cred.passwd));
+		free(p->nsc.cred.unix_cred.passwd);
+	}
+
 	if (p->ad)
 		(void) ldap_unbind(p->ad);
 	free(p);
 
 }
 
+
+
+idmap_stat
+idmap_init_namemaps(idmap_handle_t *handle, idmap_nm_handle_t **adh,
+    char *user, char *passwd, char *auth, char *windomain,
+    int direction)
+{
+	idmap_stat rc;
+	idmap_nm_handle_t *p;
+
+	p = (idmap_nm_handle_t *)calloc(1, sizeof (idmap_nm_handle_t));
+	if (p == NULL)
+		return (IDMAP_ERR_MEMORY);
+
+	rc = idmap_get_prop_str(handle, PROP_DEFAULT_DOMAIN,
+	    &p->default_domain);
+	if (rc != IDMAP_SUCCESS) {
+		idmapdlog(LOG_ERR,
+		    gettext("Error obtaining default domain from idmapd (%s)"),
+		    idmap_stat2string(NULL, rc));
+		goto cleanup;
+	}
+
+	rc = idmap_get_prop_str(handle, PROP_AD_UNIXUSER_ATTR,
+	    &p->ad_unixuser_attr);
+	if (rc != IDMAP_SUCCESS) {
+		idmapdlog(LOG_ERR,
+		    gettext("Error obtaining AD unixuser attribute (%s)"),
+		    idmap_stat2string(NULL, rc));
+		goto cleanup;
+	}
+
+	rc = idmap_get_prop_str(handle, PROP_AD_UNIXGROUP_ATTR,
+	    &p->ad_unixgroup_attr);
+	if (rc != IDMAP_SUCCESS) {
+		idmapdlog(LOG_ERR,
+		    gettext("Error obtaining AD unixgroup attribute (%s)"),
+		    idmap_stat2string(NULL, rc));
+		goto cleanup;
+	}
+
+
+	rc = idmap_get_prop_str(handle, PROP_NLDAP_WINNAME_ATTR,
+	    &p->nldap_winname_attr);
+	if (rc != IDMAP_SUCCESS) {
+		idmapdlog(LOG_ERR,
+		    gettext("Error obtaining AD unixgroup attribute (%s)"),
+		    idmap_stat2string(NULL, rc));
+		goto cleanup;
+	}
+
+	if (windomain != NULL) {
+		p->windomain = strdup(windomain);
+		if (p->windomain == NULL) {
+			rc = IDMAP_ERR_MEMORY;
+			goto cleanup;
+		}
+	} else if (!EMPTY_STRING(p->default_domain)) {
+		p->windomain = strdup(p->default_domain);
+		if (p->windomain == NULL) {
+			rc = IDMAP_ERR_MEMORY;
+			goto cleanup;
+		}
+	} else if (direction == IDMAP_DIRECTION_W2U) {
+		idmapdlog(LOG_ERR,
+		    gettext("Windows domain not given and idmapd daemon"
+		    " didn't provide a default one"));
+		rc = IDMAP_ERR_ARG;
+		goto cleanup;
+	}
+
+	p->direction = direction;
+
+	if ((p->ad_unixuser_attr != NULL || p->ad_unixgroup_attr != NULL) &&
+	    direction != IDMAP_DIRECTION_U2W) {
+		rc = idmap_init_ad(p);
+		if (rc != IDMAP_SUCCESS) {
+			goto cleanup;
+		}
+	}
+
+	if (p->nldap_winname_attr != NULL && direction != IDMAP_DIRECTION_W2U) {
+		rc = idmap_init_nldap(p);
+		if (rc != IDMAP_SUCCESS) {
+			goto cleanup;
+		}
+
+		rc = strings2cred(&p->nsc, user, passwd, auth);
+		if (rc != IDMAP_SUCCESS) {
+			goto cleanup;
+		}
+	}
+
+cleanup:
+
+	if (rc == IDMAP_SUCCESS) {
+		*adh = p;
+		return (IDMAP_SUCCESS);
+	}
+
+	/* There was an error: */
+	idmap_fini_namemaps(*adh);
+	return (rc);
+}
 
 static
 char *
@@ -457,7 +475,8 @@ dns2dn(const char *dns, const char *prefix)
 
 static
 idmap_stat
-extract_attribute(ad_nameh_t *p, LDAPMessage *entry, char *name, char **value)
+extract_attribute(idmap_nm_handle_t *p, LDAPMessage *entry, char *name,
+    char **value)
 {
 	char	**values = NULL;
 	idmap_stat rc = IDMAP_SUCCESS;
@@ -529,7 +548,7 @@ errout:
 
 static
 idmap_stat
-unixname2dn(ad_nameh_t *p, char *unixname, int is_user, char **dn,
+unixname2dn(idmap_nm_handle_t *p, char *unixname, int is_user, char **dn,
     char **winname, char **windomain)
 {
 	idmap_stat rc = IDMAP_SUCCESS;
@@ -603,7 +622,7 @@ unixname2dn(ad_nameh_t *p, char *unixname, int is_user, char **dn,
 
 static
 idmap_stat
-winname2dn(ad_nameh_t *p, char *winname,
+winname2dn(idmap_nm_handle_t *p, char *winname,
     int *is_wuser, char **dn, char **unixuser, char **unixgroup)
 {
 	idmap_stat rc = IDMAP_SUCCESS;
@@ -716,7 +735,7 @@ winname2dn(ad_nameh_t *p, char *winname,
 /* set the given attribute to the given value. If value is NULL, unset it */
 static
 idmap_stat
-idmap_ad_set(ad_nameh_t *p, char *dn, char *attr, char *value)
+idmap_ad_set(idmap_nm_handle_t *p, char *dn, char *attr, char *value)
 {
 	idmap_stat rc = IDMAP_SUCCESS;
 	int ldap_rc;
@@ -755,7 +774,7 @@ idmap_ad_set(ad_nameh_t *p, char *dn, char *attr, char *value)
 static
 idmap_stat
 /* LINTED E_FUNC_ARG_UNUSED */
-idmap_nldap_set(ad_nameh_t *p, ns_cred_t *nsc, char *dn, char *attr,
+idmap_nldap_set(idmap_nm_handle_t *p, ns_cred_t *nsc, char *dn, char *attr,
     char *value, bool_t is_new, int is_user)
 {
 	int ldaprc;
@@ -819,31 +838,19 @@ idmap_nldap_set(ad_nameh_t *p, ns_cred_t *nsc, char *dn, char *attr,
 }
 
 idmap_stat
-idmap_set_namemap(char *user, char *passwd, char *auth, char *windomain,
-    char *winname, char *unixname, int is_user, int is_wuser, int direction)
+idmap_set_namemap(idmap_nm_handle_t *p, char *winname, char *unixname,
+    int is_user, int is_wuser, int direction)
 {
 	idmap_stat	rc = IDMAP_SUCCESS;
-	ad_nameh_t	*p;
 	char		*dn = NULL;
-	idmap_handle_t	*ih;
 	char		*oldwinname = NULL;
 	char		*oldwindomain = NULL;
-	ns_cred_t	nsc;
 
-	rc = strings2cred(&nsc, user, passwd, auth);
-	if (rc != IDMAP_SUCCESS) {
-		goto cleanup;
-	}
-
-	rc = idmap_init_namemaps(&p, &ih, windomain);
-	if (rc != IDMAP_SUCCESS) {
-		goto cleanup;
-	}
-
-
-	if (p->is_ad && (direction == IDMAP_DIRECTION_W2U || !p->is_nldap)) {
-		rc = idmap_init_ad(p);
-		if (rc != IDMAP_SUCCESS) {
+	if (direction == IDMAP_DIRECTION_W2U) {
+		if (!p->is_ad) {
+			rc = IDMAP_ERR_ARG;
+			idmapdlog(LOG_ERR,
+			    gettext("AD namemaps aren't set up."));
 			goto cleanup;
 		}
 
@@ -860,13 +867,16 @@ idmap_set_namemap(char *user, char *passwd, char *auth, char *windomain,
 	}
 
 
-	if (p->is_nldap && (direction == IDMAP_DIRECTION_U2W || !p->is_ad)) {
+	if (direction == IDMAP_DIRECTION_U2W) {
 		char *fullname;
 
-		rc = idmap_init_nldap(p);
-		if (rc != IDMAP_SUCCESS) {
+		if (!p->is_nldap) {
+			rc = IDMAP_ERR_ARG;
+			idmapdlog(LOG_ERR,
+			    gettext("Native ldap namemaps aren't set up."));
 			goto cleanup;
 		}
+
 
 		rc = unixname2dn(p, unixname, is_user, &dn,
 		    &oldwinname, &oldwindomain);
@@ -890,7 +900,7 @@ idmap_set_namemap(char *user, char *passwd, char *auth, char *windomain,
 			    strlen(winname) + strlen(p->windomain) + 2,
 			    "%s\\%s", p->windomain, winname);
 		}
-		rc = idmap_nldap_set(p, &nsc, dn, p->nldap_winname_attr,
+		rc = idmap_nldap_set(p, &p->nsc, dn, p->nldap_winname_attr,
 		    fullname, oldwinname == NULL ? TRUE : FALSE, is_user);
 
 		free(fullname);
@@ -903,46 +913,34 @@ idmap_set_namemap(char *user, char *passwd, char *auth, char *windomain,
 	}
 
 cleanup:
-	idmap_fini_namemaps(p, ih);
-	free(dn);
-	free(oldwindomain);
-	free(oldwinname);
+	if (dn != NULL)
+		free(dn);
+
+	if (oldwindomain != NULL)
+		free(oldwindomain);
+
+	if (oldwinname != NULL)
+		free(oldwinname);
+
 	return (rc);
 
 }
 
+
 idmap_stat
-idmap_unset_namemap(char *user, char *passwd, char *auth, char *windomain,
-    char *winname, char *unixname, int is_user, int is_wuser, int direction)
+idmap_unset_namemap(idmap_nm_handle_t *p, char *winname, char *unixname,
+    int is_user, int is_wuser, int direction)
 {
 	idmap_stat	rc = IDMAP_SUCCESS;
-	ad_nameh_t	*p;
 	char		*dn = NULL;
-	idmap_handle_t	*ih;
 	char		*oldwinname = NULL;
 	char		*oldwindomain = NULL;
-	ns_cred_t	nsc;
-
-	rc = strings2cred(&nsc, user, passwd, auth);
-	if (rc != IDMAP_SUCCESS) {
-		goto cleanup;
-	}
-
-	rc = idmap_init_namemaps(&p, &ih, windomain);
-	if (rc != IDMAP_SUCCESS) {
-		goto cleanup;
-	}
 
 	if (direction == IDMAP_DIRECTION_W2U) {
 		if (!p->is_ad) {
 			rc = IDMAP_ERR_ARG;
 			idmapdlog(LOG_ERR,
 			    gettext("AD namemaps aren't set up."));
-			goto cleanup;
-		}
-
-		rc = idmap_init_ad(p);
-		if (rc != IDMAP_SUCCESS) {
 			goto cleanup;
 		}
 
@@ -964,65 +962,66 @@ idmap_unset_namemap(char *user, char *passwd, char *auth, char *windomain,
 			goto cleanup;
 		}
 
-		rc = idmap_init_nldap(p);
-		if (rc != IDMAP_SUCCESS) {
-			goto cleanup;
-		}
-
 		rc = unixname2dn(p, unixname, is_user, &dn, NULL, NULL);
 		if (rc != IDMAP_SUCCESS)
 			goto cleanup;
 
-		rc = idmap_nldap_set(p, &nsc, dn, p->nldap_winname_attr, NULL,
-		    TRUE, is_user);
+		rc = idmap_nldap_set(p, &p->nsc, dn, p->nldap_winname_attr,
+		    NULL, TRUE, is_user);
 		if (rc != IDMAP_SUCCESS)
 			goto cleanup;
 
 	}
 
 cleanup:
-	free(oldwindomain);
-	free(oldwinname);
-	free(dn);
-	idmap_fini_namemaps(p, ih);
+	if (oldwindomain != NULL)
+		free(oldwindomain);
+	if (oldwinname != NULL)
+		free(oldwinname);
+	if (dn != NULL)
+		free(dn);
 	return (rc);
 }
 
 idmap_stat
-idmap_get_namemap(int *is_source_ad, char **windomain, char **winname,
-    int *is_wuser, char **unixuser, char **unixgroup) {
+idmap_get_namemap(idmap_nm_handle_t *p, int *is_source_ad, char **winname,
+    char **windomain, int *is_wuser, char **unixuser, char **unixgroup)
+{
 	idmap_stat	rc = IDMAP_SUCCESS;
-	ad_nameh_t	*p;
-	idmap_handle_t	*ih;
 	char		*dn = NULL;
 
 	*is_source_ad = IDMAP_UNKNOWN;
-	rc = idmap_init_namemaps(&p, &ih, *windomain);
-	if (rc != IDMAP_SUCCESS) {
-		goto cleanup;
-	}
-
-	if (p->is_ad && (!p->is_nldap || *winname != NULL)) {
+	if (*winname != NULL) {
 		*is_source_ad = IDMAP_YES;
 
-		if (*winname == NULL) {
+		if (p->is_ad == NULL) {
 			rc = IDMAP_ERR_ARG;
 			idmapdlog(LOG_ERR,
-			    gettext("No winname given and native ldap namemaps"
-				" aren't set up."));
+			    gettext("AD namemaps are not active."));
 			goto cleanup;
-	/* TODO: call idmap_get_u2w_mapping(ih, NULL, ...) instead */
+			/* In future maybe resolve winname and try nldap? */
 		}
 
 		rc = winname2dn(p, *winname, is_wuser, &dn, unixuser,
 		    unixgroup);
-	} else if (p->is_nldap && (!p->is_ad ||
-			*unixuser != NULL ||
-			*unixgroup != NULL)) {
+		if (rc != IDMAP_SUCCESS) {
+			idmapdlog(LOG_ERR,
+			    gettext("Winname %s@%s not found in AD."),
+			    *winname, p->windomain);
+		}
+	} else if (*unixuser != NULL ||	*unixgroup != NULL) {
 		char *unixname;
 		int is_user;
 
 		*is_source_ad = IDMAP_NO;
+
+		if (p->is_nldap == NULL) {
+			rc = IDMAP_ERR_ARG;
+			idmapdlog(LOG_ERR,
+			    gettext("Native ldap namemaps aren't active."));
+			goto cleanup;
+			/* In future maybe resolve unixname and try AD? */
+		}
 
 		if (*unixuser != NULL) {
 			is_user = IDMAP_YES;
@@ -1030,25 +1029,22 @@ idmap_get_namemap(int *is_source_ad, char **windomain, char **winname,
 		} else if (*unixgroup != NULL) {
 			is_user = IDMAP_NO;
 			unixname = *unixgroup;
-		} else {
-			rc = IDMAP_ERR_ARG;
-			idmapdlog(LOG_ERR,
-			    gettext("Native ldap namemaps aren't set up."));
-			goto cleanup;
-	/* TODO: call idmap_get_u2w_mapping(ih, NULL, ...) instead */
 		}
-
 
 		rc = unixname2dn(p, unixname, is_user, NULL, winname,
 		    windomain);
-		if (rc != IDMAP_SUCCESS)
+		if (rc != IDMAP_SUCCESS) {
+			idmapdlog(LOG_ERR,
+			    gettext("%s %s not found in native ldap."),
+			    is_user == IDMAP_YES ? "UNIX user" : "UNIX group",
+			    unixname);
 			goto cleanup;
+		}
 	} else {
 		rc = IDMAP_ERR_ARG;
 		goto cleanup;
 	}
 
 cleanup:
-	idmap_fini_namemaps(p, ih);
 	return (rc);
 }

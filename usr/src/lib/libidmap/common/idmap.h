@@ -73,21 +73,6 @@ extern void idmap_free(void *);
 
 
 /*
- * Directory based name map API
- */
-
-/* Set namemap */
-extern idmap_stat idmap_set_namemap(char *, char *, char *,
-    char *, char *, char *, int, int, int);
-
-/* Unset namemap */
-extern idmap_stat idmap_unset_namemap(char *, char *, char *,
-	char *, char *, char *, int, int, int);
-
-extern idmap_stat idmap_get_namemap(int *, char **, char **, int *, char **,
-    char **);
-
-/*
  * API to batch SID to UID/GID mapping requests
  */
 /* Create handle */

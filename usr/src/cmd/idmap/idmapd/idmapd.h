@@ -193,8 +193,6 @@ typedef struct msg_table {
 #define	IDMAP_DBNAME	IDMAP_DBDIR "/idmap.db"
 #define	IDMAP_CACHENAME	IDMAP_CACHEDIR "/idmap.db"
 
-#define	EMPTY_STRING(str)	(str == NULL || *str == 0)
-
 #define	IS_BATCH_SID(batch, i) \
 	(batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_SID ||	\
 	batch.idmap_mapping_batch_val[i].id1.idtype == IDMAP_USID ||	\

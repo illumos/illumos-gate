@@ -222,7 +222,7 @@ line2array(const char *line)
 	int len;
 
 	for (cur = line; len = get_param(&param, cur); cur += len) {
-		if (my_argc > my_argv_size) {
+		if (my_argc >= my_argv_size) {
 			my_argv_size *= 2;
 			my_argv = (char **)realloc(my_argv,
 			    my_argv_size * sizeof (char *));

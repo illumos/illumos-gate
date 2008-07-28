@@ -91,6 +91,8 @@ SUNWprivate {
 	idmap_set_namemap;
 	idmap_unset_namemap;
 	idmap_get_namemap;
+	idmap_init_namemaps;
+	idmap_fini_namemaps;
 	ad_disc_fini;
 	ad_disc_init;
 	ad_disc_get_DomainName;

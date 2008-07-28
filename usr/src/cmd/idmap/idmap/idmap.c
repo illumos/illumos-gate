@@ -215,6 +215,18 @@ static struct pos_sds *positions;
 static idmap_handle_t *handle = NULL;
 static idmap_udt_handle_t *udt = NULL;
 
+typedef struct {
+	char *user;
+	char *passwd;
+	char *auth;
+	char *windomain;
+	int direction;
+	idmap_nm_handle_t *handle;
+} namemaps_t;
+
+static namemaps_t namemaps = {NULL, NULL, NULL, NULL, 0, NULL};
+
+
 /* Do we need to commit the udt batch at the end? */
 static int udt_used;
 
@@ -340,7 +352,7 @@ init_positions()
 	    (init_size - 1) * sizeof (cmd_pos_t *));
 
 	if (positions == NULL) {
-		print_error(NULL, gettext("Not enough memory.\n"));
+		print_error(NULL, "%s.\n", strerror(ENOMEM));
 		return (-1);
 	}
 
@@ -399,7 +411,7 @@ positions_add(cmd_pos_t *pos)
 	return (0);
 
 nomemory:
-	print_error(NULL, gettext("Not enough memory.\n"));
+	print_error(NULL, "%s.\n", strerror(ENOMEM));
 	return (-1);
 }
 
@@ -460,13 +472,14 @@ init_batch()
 		print_error(NULL,
 		    gettext("Connection not established (%s)\n"),
 		    idmap_stat2string(NULL, stat));
+		handle = NULL;
 		return (-1);
 	}
 
 	return (0);
 }
 
-/* Initialization common to all commands */
+/* Initialization of the libidmap API (idmap help doesn't run that) */
 static int
 init_command()
 {
@@ -476,14 +489,17 @@ init_command()
 	return (init_batch());
 }
 
-/* Finalization common to all commands */
+/* Finalization of the libidmap API */
 static void
 fini_command()
 {
 	if (batch_mode)
 		return;
-	(void) idmap_fini(handle);
-	handle = NULL;
+
+	if (handle != NULL) {
+		(void) idmap_fini(handle);
+		handle = NULL;
+	}
 }
 
 /* Initialization of the commands which perform write operations  */
@@ -569,10 +585,132 @@ out:
 	idmap_udt_destroy(udt);
 	udt = NULL;
 	udt_used = 0;
-	fini_command();
 	fini_positions();
 	return (rc);
 }
+
+
+/*
+ * Compare two possibly NULL strings
+ */
+static int
+strcasecmp_null(char *a, char *b)
+{
+	if (a == NULL && b == NULL)
+		return (0);
+	if (a == NULL)
+		return (-1);
+	if (b == NULL)
+		return (1);
+	return (strcasecmp(a, b));
+}
+
+/*
+ * Compare two possibly NULL strings
+ */
+static int
+strcmp_null(char *a, char *b)
+{
+	if (a == NULL && b == NULL)
+		return (0);
+	if (a == NULL)
+		return (-1);
+	if (b == NULL)
+		return (1);
+	return (strcmp(a, b));
+}
+
+static void
+free_null(char **ptr)
+{
+	if (*ptr != NULL) {
+		free(*ptr);
+		*ptr = NULL;
+	}
+}
+
+static
+void
+namemaps_free()
+{
+	free_null(&namemaps.user);
+
+	if (namemaps.passwd != NULL)
+		(void) memset(namemaps.passwd, 0, strlen(namemaps.passwd));
+
+	free_null(&namemaps.passwd);
+	free_null(&namemaps.auth);
+	free_null(&namemaps.windomain);
+
+	namemaps.direction = IDMAP_DIRECTION_UNDEF;
+	if (namemaps.handle != NULL) {
+		idmap_fini_namemaps(namemaps.handle);
+		namemaps.handle = NULL;
+	}
+}
+
+/* Initialization of the commands which perform write operations  */
+static
+int
+init_nm_command(char *user, char *passwd, char *auth, char *windomain,
+    int direction, cmd_pos_t *pos)
+{
+	idmap_stat stat;
+
+	if (!batch_mode)
+		if (init_batch() < 0)
+			return (-1);
+
+	if (namemaps.handle != NULL && (
+	    strcmp_null(user, namemaps.user) != 0 ||
+	    strcmp_null(passwd, namemaps.passwd) != 0 ||
+	    strcasecmp_null(auth, namemaps.auth) != 0 ||
+	    strcasecmp_null(windomain, namemaps.windomain) != 0 ||
+	    direction != namemaps.direction)) {
+		namemaps_free();
+	}
+
+	if (namemaps.handle == NULL) {
+		idmap_log_stderr(LOG_INFO);
+		stat = idmap_init_namemaps(handle, &namemaps.handle, user,
+		    passwd, auth, windomain, direction);
+		if (stat != IDMAP_SUCCESS) {
+			print_error(pos,
+			    gettext("Error: could not perform directory-based "
+			    "name mapping operation (%s)"),
+			    idmap_stat2string(handle, stat));
+			namemaps_free();
+			return (-1);
+		}
+
+		if (user != NULL && (namemaps.user = strdup(user)) == NULL ||
+		    passwd != NULL && (namemaps.passwd =
+		    strdup(passwd)) == NULL ||
+		    auth != NULL && (namemaps.auth = strdup(auth)) == NULL ||
+		    windomain != NULL && (namemaps.windomain =
+		    strdup(windomain)) == NULL) {
+			print_error(pos, "%s.\n", strerror(ENOMEM));
+			namemaps_free();
+			return (-1);
+		}
+		namemaps.direction = direction;
+
+	}
+
+	return (0);
+}
+
+
+/* Cleanup after the xxx-namemaps commands  */
+static void
+fini_nm_command()
+{
+	if (batch_mode)
+		return;
+
+	namemaps_free();
+}
+
 
 /* Convert numeric expression of the direction to it's string form */
 static char *
@@ -655,7 +793,7 @@ shell_app(char **res, char *string, int quote)
 	if (INHIBITED(string)) {
 		out = strdup("\"\"");
 		if (out == NULL) {
-			print_error(NULL, gettext("Not enough memory.\n"));
+			print_error(NULL, "%s.\n", strerror(ENOMEM));
 			return (-1);
 		}
 		*res = out;
@@ -676,7 +814,7 @@ shell_app(char **res, char *string, int quote)
 	if (noss == 0) {
 		out = strdup(string);
 		if (out == NULL) {
-			print_error(NULL, gettext("Not enough memory.\n"));
+			print_error(NULL, "%s.\n", strerror(ENOMEM));
 			return (-1);
 		}
 		*res = out;
@@ -691,7 +829,7 @@ shell_app(char **res, char *string, int quote)
 
 	out = (char *)malloc(len);
 	if (out == NULL) {
-		print_error(NULL, gettext("Not enough memory.\n"));
+		print_error(NULL, "%s.\n", strerror(ENOMEM));
 		return (-1);
 	}
 
@@ -806,7 +944,7 @@ nm2winqn(name_mapping_t *nm, char **winqn)
 	out = (char *)malloc(length + 1);
 	if (out == NULL) {
 		print_error(NULL,
-		    gettext("Not enough memory.\n"));
+		    "%s.\n", strerror(ENOMEM));
 		return (-1);
 	}
 
@@ -874,7 +1012,7 @@ nm2unixname(name_mapping_t *nm, char **unixname)
 	out = (char *)malloc(length + 1);
 	if (out == NULL) {
 		print_error(NULL,
-		    gettext("Not enough memory.\n"));
+		    "%s.\n", strerror(ENOMEM));
 		free(it);
 		return (-1);
 	}
@@ -893,7 +1031,7 @@ name_mapping_init()
 {
 	name_mapping_t *nm = (name_mapping_t *)malloc(sizeof (name_mapping_t));
 	if (nm == NULL) {
-		print_error(NULL, gettext("Not enough memory.\n"));
+		print_error(NULL, "%s.\n", strerror(ENOMEM));
 		return (NULL);
 	}
 	nm->winname = nm->windomain = nm->unixname = nm->sidprefix = NULL;
@@ -933,7 +1071,7 @@ name_mapping_cpy(name_mapping_t *to, name_mapping_t *from)
 	if (from->winname != NULL) {
 		to->winname = strdup(from->winname);
 		if (to->winname == NULL) {
-			print_error(NULL, gettext("Not enough memory.\n"));
+			print_error(NULL, "%s.\n", strerror(ENOMEM));
 			return (-1);
 		}
 	}
@@ -941,7 +1079,7 @@ name_mapping_cpy(name_mapping_t *to, name_mapping_t *from)
 	if (from->windomain != NULL) {
 		to->windomain = strdup(from->windomain);
 		if (to->windomain == NULL)  {
-			print_error(NULL, gettext("Not enough memory.\n"));
+			print_error(NULL, "%s.\n", strerror(ENOMEM));
 			return (-1);
 		}
 	}
@@ -949,7 +1087,7 @@ name_mapping_cpy(name_mapping_t *to, name_mapping_t *from)
 	if (from->unixname != NULL) {
 		to->unixname = strdup(from->unixname);
 		if (to->unixname == NULL)  {
-			print_error(NULL, gettext("Not enough memory.\n"));
+			print_error(NULL, "%s.\n", strerror(ENOMEM));
 			return (-1);
 		}
 	}
@@ -957,7 +1095,7 @@ name_mapping_cpy(name_mapping_t *to, name_mapping_t *from)
 	if (from->sidprefix != NULL) {
 		to->sidprefix = strdup(from->sidprefix);
 		if (to->sidprefix == NULL)  {
-			print_error(NULL, gettext("Not enough memory.\n"));
+			print_error(NULL, "%s.\n", strerror(ENOMEM));
 			return (-1);
 		}
 	}
@@ -1016,7 +1154,7 @@ print_mapping_init(format_t f, FILE *fi)
 
 	out = (print_handle_t *)malloc(sizeof (print_handle_t));
 	if (out == NULL) {
-		print_error(NULL, gettext("Not enough memory.\n"));
+		print_error(NULL, "%s.\n", strerror(ENOMEM));
 		return (NULL);
 	}
 
@@ -1081,21 +1219,6 @@ usermap_cfg_string(char *in)
 
 	(void) snprintf(out, len + 3, "\"%s\"", in);
 	return (out);
-}
-
-/*
- * Compare two possibly NULL strings
- */
-static int
-strcmp_null(char *a, char *b)
-{
-	if (a == NULL && b == NULL)
-		return (0);
-	if (a == NULL)
-		return (-1);
-	if (b == NULL)
-		return (1);
-	return (strcmp(a, b));
 }
 
 /*
@@ -1176,7 +1299,7 @@ print_mapping(print_handle_t *pnm, name_mapping_t *nm)
 			pnm->last->unixname = strdup(unixname);
 			if (pnm->last->unixname == NULL) {
 				print_error(NULL,
-				    gettext("Not enough memory.\n"));
+				    "%s.\n", strerror(ENOMEM));
 			}
 
 			(void) fprintf(f, "%s=%s", unixname, winname);
@@ -1196,7 +1319,7 @@ print_mapping(print_handle_t *pnm, name_mapping_t *nm)
 		if ((winname = usermap_cfg_string(nm->winname)) == NULL ||
 		    (unixname = usermap_cfg_string(nm->unixname)) == NULL ||
 		    (windomain = usermap_cfg_string(nm->windomain)) == NULL) {
-			print_error(NULL, gettext("Not enough memory.\n"));
+			print_error(NULL, "%s.\n", strerror(ENOMEM));
 			free(winname);
 			free(unixname);
 			free(windomain);
@@ -1703,7 +1826,7 @@ sid_convert(char *from, char **prefix, idmap_rid_t *rid, cmd_pos_t *pos)
 	*prefix = strndup(from, prefix_end - from - 1);
 	if (*prefix == NULL) {
 		print_error(pos,
-		    gettext("Not enough memory.\n"));
+		    "%s.\n", strerror(ENOMEM));
 		return (0);
 	}
 
@@ -3019,7 +3142,7 @@ flags2cred(flag_t *f, char **user, char **passwd,  cmd_pos_t *pos)
 
 	*user = strdup(f[D_FLAG]);
 	if (*user == NULL) {
-		print_error(pos, gettext("Not enough memory.\n"));
+		print_error(pos, "%s.\n", strerror(ENOMEM));
 		return (-1);
 	}
 
@@ -3061,7 +3184,7 @@ flags2cred(flag_t *f, char **user, char **passwd,  cmd_pos_t *pos)
 
 		*passwd = strdup(line);
 		if (*passwd == NULL) {
-			print_error(pos, gettext("Not enough memory.\n"));
+			print_error(pos, "%s.\n", strerror(ENOMEM));
 			goto fail;
 		}
 	} else if (!batch_mode) {
@@ -3078,7 +3201,7 @@ flags2cred(flag_t *f, char **user, char **passwd,  cmd_pos_t *pos)
 		(void) memset(it, 0, strlen(it));
 
 		if (*passwd == NULL) {
-			print_error(pos, gettext("Not enough memory.\n"));
+			print_error(pos, "%s.\n", strerror(ENOMEM));
 			goto fail;
 		}
 	} else {
@@ -3130,10 +3253,12 @@ do_set_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	nm->direction = is_first_win ? IDMAP_DIRECTION_W2U
 	    : IDMAP_DIRECTION_U2W;
 
-	idmap_log_stderr(LOG_INFO);
+	if (init_nm_command(user, passwd, f[a_FLAG], nm->windomain,
+	    nm->direction, pos) < 0)
+		return (-1);
 
-	stat = idmap_set_namemap(user, passwd, f[a_FLAG],
-	    nm->windomain, nm->winname, nm->unixname,
+
+	stat = idmap_set_namemap(namemaps.handle, nm->winname, nm->unixname,
 	    nm->is_user, nm->is_wuser, nm->direction);
 
 	if (stat != IDMAP_SUCCESS) {
@@ -3149,6 +3274,7 @@ do_set_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 
 	free(user);
 
+	fini_nm_command();
 	name_mapping_fini(nm);
 	return (stat != IDMAP_SUCCESS ? -1 : 0);
 }
@@ -3211,10 +3337,11 @@ do_unset_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 		}
 	}
 
-	idmap_log_stderr(LOG_INFO);
+	if (init_nm_command(user, passwd, f[a_FLAG], nm->windomain,
+	    nm->direction, pos) < 0)
+		return (-1);
 
-	stat = idmap_unset_namemap(user, passwd, f[a_FLAG],
-	    nm->windomain, nm->winname, nm->unixname,
+	stat = idmap_unset_namemap(namemaps.handle, nm->winname, nm->unixname,
 	    nm->is_user, nm->is_wuser, nm->direction);
 
 	if (stat != IDMAP_SUCCESS) {
@@ -3231,6 +3358,7 @@ cleanup:
 
 	free(user);
 
+	fini_nm_command();
 	name_mapping_fini(nm);
 	return (stat == IDMAP_SUCCESS ? 0 : -1);
 }
@@ -3271,21 +3399,23 @@ do_get_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	if (nm->is_user == IDMAP_YES) {
 		unixuser = strdup(nm->unixname);
 		if (unixuser == NULL) {
-			print_error(pos, gettext("Not enough memory.\n"));
+			print_error(pos, "%s.\n", strerror(ENOMEM));
 			goto cleanup;
 		}
 	} else if (nm->is_user == IDMAP_NO) {
 		unixgroup = strdup(nm->unixname);
 		if (unixgroup == NULL) {
-			print_error(pos, gettext("Not enough memory.\n"));
+			print_error(pos, "%s.\n", strerror(ENOMEM));
 			goto cleanup;
 		}
 	}
 
-	idmap_log_stderr(LOG_INFO);
+	if (init_nm_command(NULL, NULL, NULL, nm->windomain,
+	    nm->direction, pos) < 0)
+		return (-1);
 
-	stat = idmap_get_namemap(&is_source_ad, &nm->windomain, &nm->winname,
-	    &nm->is_wuser, &unixuser, &unixgroup);
+	stat = idmap_get_namemap(namemaps.handle, &is_source_ad, &nm->winname,
+	    &nm->windomain, &nm->is_wuser, &unixuser, &unixgroup);
 
 	if (stat != IDMAP_SUCCESS) {
 		print_error(pos,
@@ -3335,6 +3465,7 @@ do_get_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos)
 	}
 
 cleanup:
+	fini_nm_command();
 	name_mapping_fini(nm);
 	if (winname != NULL)
 		free(winname);
@@ -3383,7 +3514,10 @@ main(int argc, char *argv[])
 		batch_mode = 0;
 		if (fini_udt_command(rc == 0 ? 1 : 0, NULL))
 			rc = -1;
+		fini_nm_command();
 	}
+
+	fini_command();
 
 	(void) engine_fini();
 	return (rc == 0 ? 0 : 1);

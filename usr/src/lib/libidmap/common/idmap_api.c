@@ -111,8 +111,6 @@ static idmap_stat	idmap_strdupnull(char **, const char *);
 		return (IDMAP_ERR_ARG);\
 	}
 
-#define	EMPTY_STRING(str)	(str == NULL || *str == '\0')
-
 /*
  * Free memory allocated by libidmap API
  *
