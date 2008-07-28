@@ -246,7 +246,7 @@ ignore_section_processing(Ofl_desc *ofl)
 			 */
 			sdp = ifl->ifl_oldndx[num];
 			if ((sdp->sd_file != ifl) ||
-			    (sdp->sd_flags & FLG_SY_ISDISC) ||
+			    (sdp->sd_flags & (FLG_SY_ISDISC|FLG_SY_INVALID)) ||
 			    (sdp->sd_flags1 & FLG_SY1_ELIM))
 				continue;
 

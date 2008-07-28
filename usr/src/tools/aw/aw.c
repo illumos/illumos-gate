@@ -164,17 +164,17 @@ copyuntil_path(FILE *in, FILE *out, int termchar,
 #define	PROTO_INC "/proto/root_i386/usr/include/"
 #define	SYS_INC "/usr/include/"
 
-	static const proto_inc_len = sizeof (PROTO_INC) - 1;
-	static const sys_inc_len = sizeof (SYS_INC) - 1;
+	static const size_t proto_inc_len = sizeof (PROTO_INC) - 1;
+	static const size_t sys_inc_len = sizeof (SYS_INC) - 1;
 
 	/*
 	 * Dynamically sized buffer for reading paths. Retained
 	 * and reused between calls.
 	 */
-	static char *buf = NULL;
-	static char bufsize = 0;
+	static char	*buf = NULL;
+	static size_t	bufsize = 0;
 
-	int	bufcnt = 0;
+	size_t	bufcnt = 0;
 	char	*bufptr;
 	int	c;
 
@@ -185,7 +185,7 @@ copyuntil_path(FILE *in, FILE *out, int termchar,
 		 * fix that here.
 		 */
 		if (bufcnt >= bufsize) {
-			bufsize = (bufsize == 0) ? MAXPATHLEN : (bufsize *= 2);
+			bufsize = (bufsize == 0) ? MAXPATHLEN : (bufsize * 2);
 			buf = realloc(buf, bufsize + 1); /* + room for NULL */
 			if (buf == NULL) {
 				perror("realloc");

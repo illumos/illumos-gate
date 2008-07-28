@@ -1368,3 +1368,4 @@ Bugid   Risk Synopsis
 	false positive by wsdiff]
 6724311 dldump() mishandles R_AMD64_JUMP_SLOT relocations
 6724774 elfdump -n doesn't print siginfo structure
+6728555 Fix for amd64 aw (6617475) breaks pure gcc builds
