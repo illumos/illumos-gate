@@ -236,6 +236,7 @@ uint32_t	ipw2200_debug = 0;
  *	| IPW2200_DBG_GLD
  *	| IPW2200_DBG_WIFI
  *	| IPW2200_DBG_SOFTINT
+ *	| IPW2200_DBG_SUSPEND
  */
 
 /*
@@ -271,24 +272,90 @@ ipw2200_dbg(dev_info_t *dip, int level, const char *fmt, ...)
 }
 
 /*
+ * Set up pci
+ */
+int
+ipw2200_setup_pci(dev_info_t *dip, struct ipw2200_softc *sc)
+{
+	ddi_acc_handle_t	cfgh;
+	caddr_t			regs;
+	int			err;
+
+	/*
+	 * Map config spaces register to read the vendor id, device id, sub
+	 * vendor id, and sub device id.
+	 */
+	err = ddi_regs_map_setup(dip, IPW2200_PCI_CFG_RNUM, &regs,
+	    0, 0, &ipw2200_csr_accattr, &cfgh);
+	if (err != DDI_SUCCESS) {
+		IPW2200_WARN((dip, CE_WARN,
+		    "ipw2200_attach(): unable to map spaces regs\n"));
+		return (DDI_FAILURE);
+	}
+
+	ddi_put8(cfgh, (uint8_t *)(regs + 0x41), 0);
+	sc->sc_vendor = ddi_get16(cfgh,
+	    (uint16_t *)((uintptr_t)regs + PCI_CONF_VENID));
+	sc->sc_device = ddi_get16(cfgh,
+	    (uint16_t *)((uintptr_t)regs + PCI_CONF_DEVID));
+	sc->sc_subven = ddi_get16(cfgh,
+	    (uint16_t *)((uintptr_t)regs + PCI_CONF_SUBVENID));
+	sc->sc_subdev = ddi_get16(cfgh,
+	    (uint16_t *)((uintptr_t)regs + PCI_CONF_SUBSYSID));
+	IPW2200_DBG(IPW2200_DBG_WIFI, (sc->sc_dip, CE_CONT,
+	    "ipw2200_setup_pci(): vendor = 0x%04x, devic = 0x%04x,"
+	    "subversion = 0x%04x, subdev = 0x%04x",
+	    sc->sc_vendor, sc->sc_device, sc->sc_subven, sc->sc_subdev));
+
+	ddi_regs_map_free(&cfgh);
+
+	return (DDI_SUCCESS);
+
+}
+
+/*
  * Device operations
  */
 int
 ipw2200_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	struct ipw2200_softc	*sc;
-	ddi_acc_handle_t	cfgh;
-	caddr_t			regs;
 	struct ieee80211com	*ic;
 	int			instance, err, i;
 	char			strbuf[32];
 	wifi_data_t		wd = { 0 };
 	mac_register_t		*macp;
-	uint16_t		vendor, device, subven, subdev;
 
-	if (cmd != DDI_ATTACH) {
-		err = DDI_FAILURE;
-		goto fail1;
+	switch (cmd) {
+	case DDI_ATTACH:
+		break;
+	case DDI_RESUME:
+		sc = ddi_get_soft_state(ipw2200_ssp, ddi_get_instance(dip));
+		ASSERT(sc != NULL);
+
+		/*
+		 * set up pci
+		 */
+		err = ipw2200_setup_pci(dip, sc);
+		if (err != DDI_SUCCESS) {
+			IPW2200_DBG(IPW2200_DBG_SUSPEND, (sc->sc_dip, CE_CONT,
+			    "ipw2200_attach(): resume failure\n"));
+			return (DDI_FAILURE);
+		}
+
+		/*
+		 * resume hardware.
+		 * If it was on runnning status, reset to INIT state
+		 */
+		sc->sc_flags &= ~IPW2200_FLAG_SUSPEND;
+		if (sc->sc_flags & IPW2200_FLAG_RUNNING)
+			(void) ipw2200_init(sc);
+
+		IPW2200_DBG(IPW2200_DBG_SUSPEND, (sc->sc_dip, CE_CONT,
+		    "ipw2200_attach(): resume successful\n"));
+		return (DDI_SUCCESS);
+	default:
+		return (DDI_FAILURE);
 	}
 
 	instance = ddi_get_instance(dip);
@@ -301,27 +368,13 @@ ipw2200_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	sc = ddi_get_soft_state(ipw2200_ssp, instance);
 	sc->sc_dip = dip;
 
-	/*
-	 * Map config spaces register to read the vendor id, device id, sub
-	 * vendor id, and sub device id.
-	 */
-	err = ddi_regs_map_setup(dip, IPW2200_PCI_CFG_RNUM, &regs,
-	    0, 0, &ipw2200_csr_accattr, &cfgh);
+	/* set up pci, put reg+0x41 0 */
+	err = ipw2200_setup_pci(dip, sc);
 	if (err != DDI_SUCCESS) {
 		IPW2200_WARN((dip, CE_WARN,
-		    "ipw2200_attach(): unable to map spaces regs\n"));
+		    "ipw2200_attach(): unable to setup pci\n"));
 		goto fail2;
 	}
-	ddi_put8(cfgh, (uint8_t *)(regs + 0x41), 0);
-	vendor = ddi_get16(cfgh, (uint16_t *)(regs + PCI_CONF_VENID));
-	device = ddi_get16(cfgh, (uint16_t *)(regs + PCI_CONF_DEVID));
-	subven = ddi_get16(cfgh, (uint16_t *)(regs + PCI_CONF_SUBVENID));
-	subdev = ddi_get16(cfgh, (uint16_t *)(regs + PCI_CONF_SUBSYSID));
-	IPW2200_DBG(IPW2200_DBG_WIFI, (sc->sc_dip, CE_CONT,
-	    "ipw2200_attach(): vendor = 0x%04x, devic = 0x%04x,"
-	    "subversion = 0x%04x, subdev = 0x%04x",
-	    vendor, device, subven, subdev));
-	ddi_regs_map_free(&cfgh);
 
 	/*
 	 * Map operating registers
@@ -424,7 +477,7 @@ ipw2200_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * set supported .11a rates and channel - (2915ABG only)
 	 */
-	if (device >= 0x4223) {
+	if (sc->sc_device >= 0x4223) {
 		/* .11a rates */
 		ic->ic_sup_rates[IEEE80211_MODE_11A] = ipw2200_rateset_11a;
 		/* .11a channels */
@@ -590,13 +643,27 @@ fail1:
 int
 ipw2200_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	struct ipw2200_softc	*sc =
-	    ddi_get_soft_state(ipw2200_ssp, ddi_get_instance(dip));
+	struct ipw2200_softc	*sc;
 	int			err;
+
+	sc = ddi_get_soft_state(ipw2200_ssp, ddi_get_instance(dip));
 	ASSERT(sc != NULL);
 
-	if (cmd != DDI_DETACH)
+	switch (cmd) {
+	case DDI_DETACH:
+		break;
+	case DDI_SUSPEND:
+		if (sc->sc_flags & IPW2200_FLAG_RUNNING) {
+			ipw2200_stop(sc);
+		}
+		sc->sc_flags |= IPW2200_FLAG_SUSPEND;
+
+		IPW2200_DBG(IPW2200_DBG_SUSPEND, (sc->sc_dip, CE_CONT,
+		    "ipw2200_detach(): suspend\n"));
+		return (DDI_SUCCESS);
+	default:
 		return (DDI_FAILURE);
+	}
 
 	ipw2200_stop(sc);
 
@@ -1754,16 +1821,28 @@ ipw2200_newstate(struct ieee80211com *ic, enum ieee80211_state state, int arg)
 static int
 ipw2200_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
-	ieee80211com_t	*ic = (ieee80211com_t *)arg;
+	ieee80211com_t		*ic = (ieee80211com_t *)arg;
+	struct ipw2200_softc	*sc = (struct ipw2200_softc *)ic;
 
 	IPW2200_DBG(IPW2200_DBG_GLD, (((struct ipw2200_softc *)arg)->sc_dip,
 	    CE_CONT,
 	    "ipw2200_m_stat(): enter\n"));
-
 	/*
 	 * Some of below statistic data are from hardware, some from net80211
 	 */
 	switch (stat) {
+	case MAC_STAT_NOXMTBUF:
+		*val = ic->ic_stats.is_tx_nobuf;
+		break;
+	case MAC_STAT_IERRORS:
+		*val = sc->sc_stats.sc_rx_len_err;
+		break;
+	case MAC_STAT_OERRORS:
+		*val = sc->sc_stats.sc_tx_discard +
+		    sc->sc_stats.sc_tx_alloc_fail +
+		    sc->sc_stats.sc_tx_encap_fail +
+		    sc->sc_stats.sc_tx_crypto_fail;
+		break;
 	case MAC_STAT_RBYTES:
 		*val = ic->ic_stats.is_rx_bytes;
 		break;
@@ -1799,9 +1878,6 @@ ipw2200_m_stat(void *arg, uint_t stat, uint64_t *val)
 	 * Need be supported later
 	 */
 	case MAC_STAT_IFSPEED:
-	case MAC_STAT_NOXMTBUF:
-	case MAC_STAT_IERRORS:
-	case MAC_STAT_OERRORS:
 	default:
 		return (ENOTSUP);
 	}
@@ -1817,7 +1893,7 @@ ipw2200_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	    CE_CONT,
 	    "ipw2200_m_multicst(): enter\n"));
 
-	return (DDI_SUCCESS);
+	return (0);
 }
 
 /*
@@ -1837,6 +1913,14 @@ ipw2200_thread(struct ipw2200_softc *sc)
 	mutex_enter(&sc->sc_mflock);
 
 	while (sc->sc_mfthread_switch) {
+		/*
+		 * when radio is off or SUSPEND status, nothing to do
+		 */
+		if ((ipw2200_radio_status(sc) == 0) ||
+		    sc->sc_flags & IPW2200_FLAG_SUSPEND) {
+			goto wait_loop;
+		}
+
 		/*
 		 * notify the link state
 		 */
@@ -1900,6 +1984,7 @@ ipw2200_thread(struct ipw2200_softc *sc)
 		} else
 			stat_cnt++; /* until 1s */
 
+wait_loop:
 		mutex_exit(&sc->sc_mflock);
 		delay(drv_usectohz(delay_aux_thread));
 		mutex_enter(&sc->sc_mflock);
@@ -1935,7 +2020,7 @@ ipw2200_m_start(void *arg)
 	 */
 	(void) crypto_mech2id(SUN_CKM_RC4);
 
-	return (DDI_SUCCESS);
+	return (0);
 }
 
 static void
@@ -1986,9 +2071,9 @@ ipw2200_m_unicst(void *arg, const uint8_t *macaddr)
 			}
 		}
 	}
-	return (DDI_SUCCESS);
+	return (0);
 fail:
-	return (err);
+	return (EIO);
 }
 
 static int
@@ -2001,7 +2086,7 @@ ipw2200_m_promisc(void *arg, boolean_t on)
 	    "ipw2200_m_promisc(): enter. "
 	    "GLD setting promiscuous mode - %d\n", on));
 
-	return (DDI_SUCCESS);
+	return (0);
 }
 
 static mblk_t *
@@ -2012,6 +2097,17 @@ ipw2200_m_tx(void *arg, mblk_t *mp)
 	mblk_t			*next;
 
 	/*
+	 * when driver in on suspend state, freemsgchain directly
+	 */
+	if (sc->sc_flags & IPW2200_FLAG_SUSPEND) {
+		IPW2200_DBG(IPW2200_DBG_SUSPEND, (sc->sc_dip, CE_CONT,
+		    "ipw2200_m_tx(): suspend status, discard msg\n"));
+		sc->sc_stats.sc_tx_discard++; /* discard data */
+		freemsgchain(mp);
+		return (NULL);
+	}
+
+	/*
 	 * No data frames go out unless we're associated; this
 	 * should not happen as the 802.11 layer does not enable
 	 * the xmit queue until we enter the RUN state.
@@ -2020,6 +2116,7 @@ ipw2200_m_tx(void *arg, mblk_t *mp)
 		IPW2200_DBG(IPW2200_DBG_GLD, (sc->sc_dip, CE_CONT,
 		    "ipw2200_m_tx(): discard msg, ic_state = %u\n",
 		    ic->ic_state));
+		sc->sc_stats.sc_tx_discard++; /* discard data */
 		freemsgchain(mp);
 		return (NULL);
 	}
@@ -2071,6 +2168,14 @@ ipw2200_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	}
 
 	mutex_enter(&sc->sc_tx_lock);
+	if (sc->sc_flags & IPW2200_FLAG_SUSPEND) {
+		/*
+		 * when sending data, system runs into suspend status,
+		 * return fail directly
+		 */
+		err = ENXIO;
+		goto fail0;
+	}
 
 	/*
 	 * need 1 empty descriptor
@@ -2099,6 +2204,8 @@ ipw2200_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 		IPW2200_DBG(IPW2200_DBG_WIFI, (sc->sc_dip, CE_CONT,
 		    "ipw2200_send(): msg allocation failed\n"));
 		freemsg(mp);
+		sc->sc_stats.sc_tx_alloc_fail++; /* alloc fail */
+		ic->ic_stats.is_tx_failed++;  /* trans failed */
 		err = DDI_FAILURE;
 		goto fail1;
 	}
@@ -2115,7 +2222,8 @@ ipw2200_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	wh = (struct ieee80211_frame *)m->b_rptr;
 	in = ieee80211_find_txnode(ic, wh->i_addr1);
 	if (in == NULL) { /* can not find the tx node, drop the package */
-		ic->ic_stats.is_tx_failed++;
+		sc->sc_stats.sc_tx_encap_fail++; /* tx encap fail */
+		ic->ic_stats.is_tx_failed++; /* trans failed */
 		freemsg(mp);
 		err = DDI_FAILURE;
 		goto fail2;
@@ -2131,6 +2239,8 @@ ipw2200_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 			IPW2200_DBG(IPW2200_DBG_WIFI, (sc->sc_dip, CE_CONT,
 			    "ipw2200_send(): "
 			    "Encrypting 802.11 frame failed\n"));
+			sc->sc_stats.sc_tx_crypto_fail++; /* tx encap fail */
+			ic->ic_stats.is_tx_failed++; /* trans failed */
 			freemsg(mp);
 			err = DDI_FAILURE;
 			goto fail2;
@@ -2254,15 +2364,16 @@ static int
 ipw2200_ioctl(struct ipw2200_softc *sc, queue_t *q, mblk_t *m)
 {
 	struct iocblk	*iocp;
-	uint32_t	len, ret, cmd;
+	uint32_t	len, ret, cmd, mblen;
 	mblk_t		*m0;
 	boolean_t	need_privilege;
 	boolean_t	need_net80211;
 
-	if (MBLKL(m) < sizeof (struct iocblk)) {
+	mblen = MBLKL(m);
+	if (mblen < sizeof (struct iocblk)) {
 		IPW2200_DBG(IPW2200_DBG_IOCTL, (sc->sc_dip, CE_CONT,
 		    "ipw2200_ioctl(): ioctl buffer too short, %u\n",
-		    MBLKL(m)));
+		    mblen));
 		miocnak(q, m, 0, EINVAL);
 		/*
 		 * Buf not enough, do not need net80211 either
@@ -2273,7 +2384,7 @@ ipw2200_ioctl(struct ipw2200_softc *sc, queue_t *q, mblk_t *m)
 	/*
 	 * Validate the command
 	 */
-	iocp = (struct iocblk *)m->b_rptr;
+	iocp = (struct iocblk *)(uintptr_t)m->b_rptr;
 	iocp->ioc_error = 0;
 	cmd = iocp->ioc_cmd;
 	need_privilege = B_TRUE;
@@ -2357,8 +2468,8 @@ ipw2200_getset(struct ipw2200_softc *sc, mblk_t *m, uint32_t cmd,
 	uint32_t	id;
 	int		ret;
 
-	infp = (wldp_t *)m->b_rptr;
-	outfp = (wldp_t *)m->b_rptr;
+	infp  = (wldp_t *)(uintptr_t)m->b_rptr;
+	outfp = (wldp_t *)(uintptr_t)m->b_rptr;
 	outfp->wldp_result = WL_NOTSUPPORTED;
 
 	id = infp->wldp_id;
@@ -2500,6 +2611,7 @@ ipw2200_rcv_frame(struct ipw2200_softc *sc, struct ipw2200_frame *frame)
 		IPW2200_DBG(IPW2200_DBG_RX, (sc->sc_dip, CE_CONT,
 		    "ipw2200_rcv_frame(): bad frame length=%u\n",
 		    LE_16(frame->len)));
+		sc->sc_stats.sc_rx_len_err++; /* length doesn't work */
 		return;
 	}
 	IPW2200_DBG(IPW2200_DBG_RX, (sc->sc_dip, CE_CONT,
@@ -2637,7 +2749,7 @@ ipw2200_rcv_notif(struct ipw2200_softc *sc, struct ipw2200_notif *notif)
 static uint_t
 ipw2200_intr(caddr_t arg)
 {
-	struct ipw2200_softc	*sc = (struct ipw2200_softc *)arg;
+	struct ipw2200_softc	*sc = (struct ipw2200_softc *)(uintptr_t)arg;
 	struct ieee80211com	*ic = &sc->sc_ic;
 	uint32_t		ireg, ridx, len, i;
 	uint8_t			*p, *rxbuf;
@@ -2645,12 +2757,14 @@ ipw2200_intr(caddr_t arg)
 	struct ipw2200_hdr	*hdr;
 	uint32_t		widx;
 
-	ireg = ipw2200_csr_get32(sc, IPW2200_CSR_INTR);
-
-	if (ireg == 0xffffffff)
+	/* when it is on suspend, unclaim all interrupt directly */
+	if (sc->sc_flags & IPW2200_FLAG_SUSPEND)
 		return (DDI_INTR_UNCLAIMED);
 
-	if (!(ireg & IPW2200_INTR_MASK_ALL))
+	/* unclaim interrupt when it is not for iwi */
+	ireg = ipw2200_csr_get32(sc, IPW2200_CSR_INTR);
+	if (ireg == 0xffffffff ||
+	    !(ireg & IPW2200_INTR_MASK_ALL))
 		return (DDI_INTR_UNCLAIMED);
 
 	/*
@@ -2678,154 +2792,155 @@ ipw2200_intr(caddr_t arg)
 		sc->sc_flags |= IPW2200_FLAG_HW_ERR_RECOVER;
 		mutex_exit(&sc->sc_mflock);
 
-	} else {
-		/*
-		 * FW intr
-		 */
-		if (ireg & IPW2200_INTR_FW_INITED) {
-			mutex_enter(&sc->sc_ilock);
-			sc->sc_fw_ok = 1;
-			cv_signal(&sc->sc_fw_cond);
-			mutex_exit(&sc->sc_ilock);
-		}
-
-		/*
-		 * Radio OFF
-		 */
-		if (ireg & IPW2200_INTR_RADIO_OFF) {
-			IPW2200_REPORT((sc->sc_dip, CE_CONT,
-			    "ipw2200_intr(): radio is OFF\n"));
-
-			/*
-			 * Stop hardware, will notify LINK is down.
-			 * Need a better scan solution to ensure
-			 * table has right value.
-			 */
-			ipw2200_stop(sc);
-		}
-
-		/*
-		 * CMD intr
-		 */
-		if (ireg & IPW2200_INTR_CMD_TRANSFER) {
-			mutex_enter(&sc->sc_cmd_lock);
-			ridx = ipw2200_csr_get32(sc,
-			    IPW2200_CSR_CMD_READ_INDEX);
-			i = RING_FORWARD(sc->sc_cmd_cur,
-			    sc->sc_cmd_free, IPW2200_CMD_RING_SIZE);
-			len = RING_FLEN(i, ridx, IPW2200_CMD_RING_SIZE);
-
-			IPW2200_DBG(IPW2200_DBG_INT, (sc->sc_dip, CE_CONT,
-			    "ipw2200_intr(): cmd-ring,i=%u,ridx=%u,len=%u\n",
-			    i, ridx, len));
-
-			if (len > 0) {
-				sc->sc_cmd_free += len;
-				cv_signal(&sc->sc_cmd_cond);
-			}
-			for (; i != ridx;
-			    i = RING_FORWARD(i, 1, IPW2200_CMD_RING_SIZE))
-				sc->sc_done[i] = 1;
-			mutex_exit(&sc->sc_cmd_lock);
-
-			mutex_enter(&sc->sc_ilock);
-			cv_signal(&sc->sc_cmd_status_cond);
-			mutex_exit(&sc->sc_ilock);
-		}
-
-		/*
-		 * RX intr
-		 */
-		if (ireg & IPW2200_INTR_RX_TRANSFER) {
-			ridx = ipw2200_csr_get32(sc,
-			    IPW2200_CSR_RX_READ_INDEX);
-			widx = ipw2200_csr_get32(sc,
-			    IPW2200_CSR_RX_WRITE_INDEX);
-
-			IPW2200_DBG(IPW2200_DBG_INT, (sc->sc_dip, CE_CONT,
-			    "ipw2200_intr(): rx-ring,widx=%u,ridx=%u\n",
-			    ridx, widx));
-
-			for (; sc->sc_rx_cur != ridx;
-			    sc->sc_rx_cur = RING_FORWARD(sc->sc_rx_cur, 1,
-			    IPW2200_RX_RING_SIZE)) {
-				i	= sc->sc_rx_cur;
-				rxbuf	= sc->sc_rxbufs[i];
-				dr	= &sc->sc_dma_rxbufs[i];
-
-				/*
-				 * DMA sync
-				 */
-				(void) ddi_dma_sync(dr->dr_hnd, 0,
-				    IPW2200_RXBUF_SIZE, DDI_DMA_SYNC_FORKERNEL);
-				/*
-				 * Get rx header(hdr) and rx data(p) from rxbuf
-				 */
-				p	= rxbuf;
-				hdr	= (struct ipw2200_hdr *)p;
-				p	+= sizeof (struct ipw2200_hdr);
-
-				IPW2200_DBG(IPW2200_DBG_INT,
-				    (sc->sc_dip, CE_CONT,
-				    "ipw2200_intr(): Rx hdr type %u\n",
-				    hdr->type));
-
-				switch (hdr->type) {
-				case IPW2200_HDR_TYPE_FRAME:
-					ipw2200_rcv_frame(sc,
-					    (struct ipw2200_frame *)p);
-					break;
-
-				case IPW2200_HDR_TYPE_NOTIF:
-					ipw2200_rcv_notif(sc,
-					    (struct ipw2200_notif *)p);
-					break;
-				default:
-					IPW2200_DBG(IPW2200_DBG_INT,
-					    (sc->sc_dip, CE_CONT,
-					    "ipw2200_intr(): "
-					    "unknown Rx hdr type %u\n",
-					    hdr->type));
-					break;
-				}
-			}
-			/*
-			 * write sc_rx_cur backward 1 step into RX_WRITE_INDEX
-			 */
-			ipw2200_csr_put32(sc, IPW2200_CSR_RX_WRITE_INDEX,
-			    RING_BACKWARD(sc->sc_rx_cur, 1,
-			    IPW2200_RX_RING_SIZE));
-		}
-
-		/*
-		 * TX intr
-		 */
-		if (ireg & IPW2200_INTR_TX1_TRANSFER) {
-			mutex_enter(&sc->sc_tx_lock);
-			ridx = ipw2200_csr_get32(sc,
-			    IPW2200_CSR_TX1_READ_INDEX);
-			len  = RING_FLEN(RING_FORWARD(sc->sc_tx_cur,
-			    sc->sc_tx_free, IPW2200_TX_RING_SIZE),
-			    ridx, IPW2200_TX_RING_SIZE);
-			sc->sc_tx_free += len;
-			IPW2200_DBG(IPW2200_DBG_RING, (sc->sc_dip, CE_CONT,
-			    "ipw2200_intr(): tx-ring,ridx=%u,len=%u\n",
-			    ridx, len));
-			mutex_exit(&sc->sc_tx_lock);
-
-			mutex_enter(&sc->sc_resched_lock);
-			if ((sc->sc_tx_free > IPW2200_TX_RING_MIN) &&
-			    (sc->sc_flags & IPW2200_FLAG_TX_SCHED)) {
-				IPW2200_DBG(IPW2200_DBG_RING, (sc->sc_dip,
-				    CE_CONT,
-				    "ipw2200_intr(): Need Reschedule!"));
-				sc->sc_flags &= ~IPW2200_FLAG_TX_SCHED;
-				mac_tx_update(ic->ic_mach);
-			}
-			mutex_exit(&sc->sc_resched_lock);
-		}
+		goto enable_interrupt;
 	}
 
+	/*
+	 * FW intr
+	 */
+	if (ireg & IPW2200_INTR_FW_INITED) {
+		mutex_enter(&sc->sc_ilock);
+		sc->sc_fw_ok = 1;
+		cv_signal(&sc->sc_fw_cond);
+		mutex_exit(&sc->sc_ilock);
+	}
+
+	/*
+	 * Radio OFF
+	 */
+	if (ireg & IPW2200_INTR_RADIO_OFF) {
+		IPW2200_REPORT((sc->sc_dip, CE_CONT,
+		    "ipw2200_intr(): radio is OFF\n"));
+
+		/*
+		 * Stop hardware, will notify LINK is down.
+		 * Need a better scan solution to ensure
+		 * table has right value.
+		 */
+		ipw2200_stop(sc);
+	}
+
+	/*
+	 * CMD intr
+	 */
+	if (ireg & IPW2200_INTR_CMD_TRANSFER) {
+		mutex_enter(&sc->sc_cmd_lock);
+		ridx = ipw2200_csr_get32(sc,
+		    IPW2200_CSR_CMD_READ_INDEX);
+		i = RING_FORWARD(sc->sc_cmd_cur,
+		    sc->sc_cmd_free, IPW2200_CMD_RING_SIZE);
+		len = RING_FLEN(i, ridx, IPW2200_CMD_RING_SIZE);
+
+		IPW2200_DBG(IPW2200_DBG_INT, (sc->sc_dip, CE_CONT,
+		    "ipw2200_intr(): cmd-ring,i=%u,ridx=%u,len=%u\n",
+		    i, ridx, len));
+
+		if (len > 0) {
+			sc->sc_cmd_free += len;
+			cv_signal(&sc->sc_cmd_cond);
+		}
+		for (; i != ridx;
+		    i = RING_FORWARD(i, 1, IPW2200_CMD_RING_SIZE))
+			sc->sc_done[i] = 1;
+		mutex_exit(&sc->sc_cmd_lock);
+
+		mutex_enter(&sc->sc_ilock);
+		cv_signal(&sc->sc_cmd_status_cond);
+		mutex_exit(&sc->sc_ilock);
+	}
+
+	/*
+	 * RX intr
+	 */
+	if (ireg & IPW2200_INTR_RX_TRANSFER) {
+		ridx = ipw2200_csr_get32(sc,
+		    IPW2200_CSR_RX_READ_INDEX);
+		widx = ipw2200_csr_get32(sc,
+		    IPW2200_CSR_RX_WRITE_INDEX);
+
+		IPW2200_DBG(IPW2200_DBG_INT, (sc->sc_dip, CE_CONT,
+		    "ipw2200_intr(): rx-ring,widx=%u,ridx=%u\n",
+		    ridx, widx));
+
+		for (; sc->sc_rx_cur != ridx;
+		    sc->sc_rx_cur = RING_FORWARD(sc->sc_rx_cur, 1,
+		    IPW2200_RX_RING_SIZE)) {
+			i	= sc->sc_rx_cur;
+			rxbuf	= sc->sc_rxbufs[i];
+			dr	= &sc->sc_dma_rxbufs[i];
+
+			/*
+			 * DMA sync
+			 */
+			(void) ddi_dma_sync(dr->dr_hnd, 0,
+			    IPW2200_RXBUF_SIZE, DDI_DMA_SYNC_FORKERNEL);
+			/*
+			 * Get rx header(hdr) and rx data(p) from rxbuf
+			 */
+			p	= rxbuf;
+			hdr	= (struct ipw2200_hdr *)p;
+			p	+= sizeof (struct ipw2200_hdr);
+
+			IPW2200_DBG(IPW2200_DBG_INT, (sc->sc_dip, CE_CONT,
+			    "ipw2200_intr(): Rx hdr type %u\n",
+			    hdr->type));
+
+			switch (hdr->type) {
+			case IPW2200_HDR_TYPE_FRAME:
+				ipw2200_rcv_frame(sc,
+				    (struct ipw2200_frame *)p);
+				break;
+
+			case IPW2200_HDR_TYPE_NOTIF:
+				ipw2200_rcv_notif(sc,
+				    (struct ipw2200_notif *)p);
+				break;
+
+			default:
+				IPW2200_DBG(IPW2200_DBG_INT, (sc->sc_dip,
+				    CE_CONT,
+				    "ipw2200_intr(): unknown Rx hdr type %u\n",
+				    hdr->type));
+				break;
+			}
+		}
+		/*
+		 * write sc_rx_cur backward 1 step into RX_WRITE_INDEX
+		 */
+		ipw2200_csr_put32(sc, IPW2200_CSR_RX_WRITE_INDEX,
+		    RING_BACKWARD(sc->sc_rx_cur, 1,
+		    IPW2200_RX_RING_SIZE));
+	}
+
+	/*
+	 * TX intr
+	 */
+	if (ireg & IPW2200_INTR_TX1_TRANSFER) {
+		mutex_enter(&sc->sc_tx_lock);
+		ridx = ipw2200_csr_get32(sc,
+		    IPW2200_CSR_TX1_READ_INDEX);
+		len  = RING_FLEN(RING_FORWARD(sc->sc_tx_cur,
+		    sc->sc_tx_free, IPW2200_TX_RING_SIZE),
+		    ridx, IPW2200_TX_RING_SIZE);
+		sc->sc_tx_free += len;
+		IPW2200_DBG(IPW2200_DBG_RING, (sc->sc_dip, CE_CONT,
+		    "ipw2200_intr(): tx-ring,ridx=%u,len=%u\n",
+		    ridx, len));
+		mutex_exit(&sc->sc_tx_lock);
+
+		mutex_enter(&sc->sc_resched_lock);
+		if ((sc->sc_tx_free > IPW2200_TX_RING_MIN) &&
+		    (sc->sc_flags & IPW2200_FLAG_TX_SCHED)) {
+			IPW2200_DBG(IPW2200_DBG_RING, (sc->sc_dip,
+			    CE_CONT,
+			    "ipw2200_intr(): Need Reschedule!"));
+			sc->sc_flags &= ~IPW2200_FLAG_TX_SCHED;
+			mac_tx_update(ic->ic_mach);
+		}
+		mutex_exit(&sc->sc_resched_lock);
+	}
+
+enable_interrupt:
 	/*
 	 * enable all interrupts
 	 */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,21 +67,24 @@ ipw2200_csr_get8(struct ipw2200_softc *sc, uint32_t off)
 uint16_t
 ipw2200_csr_get16(struct ipw2200_softc *sc, uint32_t off)
 {
-	return (ddi_get16(sc->sc_ioh, (uint16_t *)(sc->sc_regs + off)));
+	return (ddi_get16(sc->sc_ioh,
+	    (uint16_t *)((uintptr_t)sc->sc_regs + off)));
 }
 
 uint32_t
 ipw2200_csr_get32(struct ipw2200_softc *sc, uint32_t off)
 {
-	return (ddi_get32(sc->sc_ioh, (uint32_t *)(sc->sc_regs + off)));
+	return (ddi_get32(sc->sc_ioh,
+	    (uint32_t *)((uintptr_t)sc->sc_regs + off)));
 }
 
 void
 ipw2200_csr_getbuf32(struct ipw2200_softc *sc, uint32_t off,
 	uint32_t *buf, size_t cnt)
 {
-	ddi_rep_get32(sc->sc_ioh, buf, (uint32_t *)(sc->sc_regs + off),
-		cnt, DDI_DEV_AUTOINCR);
+	ddi_rep_get32(sc->sc_ioh, buf,
+	    (uint32_t *)((uintptr_t)sc->sc_regs + off),
+	    cnt, DDI_DEV_AUTOINCR);
 }
 
 void
@@ -95,14 +98,16 @@ void
 ipw2200_csr_put16(struct ipw2200_softc *sc, uint32_t off,
 	uint16_t val)
 {
-	ddi_put16(sc->sc_ioh, (uint16_t *)(sc->sc_regs + off), val);
+	ddi_put16(sc->sc_ioh,
+	    (uint16_t *)((uintptr_t)sc->sc_regs + off), val);
 }
 
 void
 ipw2200_csr_put32(struct ipw2200_softc *sc, uint32_t off,
 	uint32_t val)
 {
-	ddi_put32(sc->sc_ioh, (uint32_t *)(sc->sc_regs + off), val);
+	ddi_put32(sc->sc_ioh,
+	    (uint32_t *)((uintptr_t)sc->sc_regs + off), val);
 }
 
 uint8_t
@@ -175,11 +180,11 @@ ipw2200_rom_get16(struct ipw2200_softc *sc, uint8_t addr)
 	/* start bit */
 	ipw2200_rom_control(sc, IPW2200_EEPROM_S | IPW2200_EEPROM_D);
 	ipw2200_rom_control(sc, IPW2200_EEPROM_S | IPW2200_EEPROM_D |
-		IPW2200_EEPROM_C);
+	    IPW2200_EEPROM_C);
 	/* read opcode */
 	ipw2200_rom_control(sc, IPW2200_EEPROM_S | IPW2200_EEPROM_D);
 	ipw2200_rom_control(sc, IPW2200_EEPROM_S | IPW2200_EEPROM_D |
-		IPW2200_EEPROM_C);
+	    IPW2200_EEPROM_C);
 	ipw2200_rom_control(sc, IPW2200_EEPROM_S);
 	ipw2200_rom_control(sc, IPW2200_EEPROM_S | IPW2200_EEPROM_C);
 	/*
@@ -187,10 +192,10 @@ ipw2200_rom_get16(struct ipw2200_softc *sc, uint8_t addr)
 	 */
 	for (n = 7; n >= 0; n--) {
 		ipw2200_rom_control(sc, IPW2200_EEPROM_S |
-			(((addr >> n) & 1) << IPW2200_EEPROM_SHIFT_D));
+		    (((addr >> n) & 1) << IPW2200_EEPROM_SHIFT_D));
 		ipw2200_rom_control(sc, IPW2200_EEPROM_S |
-			(((addr >> n) & 1) << IPW2200_EEPROM_SHIFT_D) |
-			IPW2200_EEPROM_C);
+		    (((addr >> n) & 1) << IPW2200_EEPROM_SHIFT_D) |
+		    IPW2200_EEPROM_C);
 	}
 
 	ipw2200_rom_control(sc, IPW2200_EEPROM_S);
@@ -257,7 +262,7 @@ ipw2200_cache_firmware(struct ipw2200_softc *sc)
 	/* boot code */
 	sc->sc_fw.boot_base = ipw2200_boot_bin + sizeof (struct header);
 	sc->sc_fw.boot_size =
-		sizeof (ipw2200_boot_bin) - sizeof (struct header);
+	    sizeof (ipw2200_boot_bin) - sizeof (struct header);
 	/* ucode */
 	sc->sc_fw.uc_base = ipw2200_ucode_bin + sizeof (struct header);
 	sc->sc_fw.uc_size = sizeof (ipw2200_ucode_bin) - sizeof (struct header);
@@ -328,7 +333,7 @@ ipw2200_load_uc(struct ipw2200_softc *sc, uint8_t *buf, size_t size)
 	ipw2200_imem_put8(sc, 0x200000, 0x40);
 	drv_usecwait(1000);
 
-	for (w = (uint16_t *)buf; size > 0; w++, size -= 2)
+	for (w = (uint16_t *)(uintptr_t)buf; size > 0; w++, size -= 2)
 		ipw2200_imem_put16(sc, 0x200010, LE_16(*w));
 
 	ipw2200_imem_put8(sc, 0x200000, 0x00);
@@ -389,8 +394,8 @@ ipw2200_load_fw(struct ipw2200_softc *sc, uint8_t *buf, size_t size)
 	ipw2200_csr_put32(sc, IPW2200_CSR_AUTOINC_ADDR, 0x27000);
 
 	while (p < end) {
-		dst = LE_32(*((uint32_t *)p)); p += 4;
-		len = LE_32(*((uint32_t *)p)); p += 4;
+		dst = LE_32(*((uint32_t *)(uintptr_t)p)); p += 4;
+		len = LE_32(*((uint32_t *)(uintptr_t)p)); p += 4;
 		v = p;
 		p += len;
 		IPW2200_DBG(IPW2200_DBG_FW, (sc->sc_dip, CE_CONT,
@@ -484,8 +489,8 @@ ipw2200_load_fw(struct ipw2200_softc *sc, uint8_t *buf, size_t size)
 	 */
 	ipw2200_csr_put32(sc, IPW2200_CSR_RST, 0);
 	ipw2200_csr_put32(sc, IPW2200_CSR_CTL,
-		ipw2200_csr_get32(sc, IPW2200_CSR_CTL) |
-		IPW2200_CTL_ALLOW_STANDBY);
+	    ipw2200_csr_get32(sc, IPW2200_CSR_CTL) |
+	    IPW2200_CTL_ALLOW_STANDBY);
 
 	/*
 	 * wait for interrupt to notify fw initialization is done

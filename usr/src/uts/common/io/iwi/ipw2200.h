@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +49,7 @@ extern "C" {
 
 #define	IPW2200_DRV_NAME  "iwi"
 #define	IPW2200_DRV_DESC  "Intel Wireless 2200/2915"
-#define	IPW2200_DRV_REV   "V1.01"
+#define	IPW2200_DRV_REV   "V1.02"
 
 /*
  * Debug functionalities
@@ -71,6 +71,7 @@ extern "C" {
 #define	IPW2200_DBG_SCAN	(0x00004000)  /* scan results */
 #define	IPW2200_DBG_SOFTINT	(0x00008000)  /* soft interrupt */
 #define	IPW2200_DBG_FATAL	(0x00010000)  /* interrupt report error */
+#define	IPW2200_DBG_SUSPEND	(0x00020000)  /* suspend resume */
 
 extern uint32_t ipw2200_debug;
 extern void	ipw2200_dbg(dev_info_t *dip, int level, const char *fmt, ...);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,18 @@ struct ipw2200_firmware {
 };
 
 /*
+ * besides the statistic counted by net80211, driver can also record
+ * statistic data while process
+ */
+struct ipw2200_stats {
+	uint32_t		sc_rx_len_err;
+	uint32_t		sc_tx_discard;
+	uint32_t		sc_tx_alloc_fail;
+	uint32_t		sc_tx_encap_fail;
+	uint32_t		sc_tx_crypto_fail;
+};
+
+/*
  * per-instance soft-state structure
  */
 struct ipw2200_softc {
@@ -115,6 +127,7 @@ struct ipw2200_softc {
 #define	IPW2200_FLAG_SCANNING		(1 << 5)
 #define	IPW2200_FLAG_HW_ERR_RECOVER	(1 << 6)
 #define	IPW2200_FLAG_ASSOCIATED		(1 << 7)
+#define	IPW2200_FLAG_SUSPEND		(1 << 8)
 #define	IPW2200_FLAG_HAS_RADIO_SWITCH	(1 << 16)
 	/* firmware download */
 	int			sc_fw_ok;
@@ -160,6 +173,12 @@ struct ipw2200_softc {
 
 	/* reschedule lock */
 	kmutex_t		sc_resched_lock;
+
+	/* pci information */
+	uint16_t		sc_vendor, sc_device, sc_subven, sc_subdev;
+
+	/* statistic counting by driver */
+	struct ipw2200_stats	sc_stats;
 
 	/* mfthread related, mfthread is used to handle asynchronous task */
 	kthread_t		*sc_mf_thread;

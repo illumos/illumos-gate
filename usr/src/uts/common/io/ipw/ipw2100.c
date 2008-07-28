@@ -405,7 +405,7 @@ ipw2100_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	wd.wd_secalloc = WIFI_SEC_NONE;
 	wd.wd_opmode = ic->ic_opmode;
-	IEEE80211_ADDR_COPY(wd.wd_bssid, ic->ic_macaddr);
+	IEEE80211_ADDR_COPY(wd.wd_bssid, ic->ic_bss->in_bssid);
 
 	macp = mac_alloc(MAC_VERSION);
 	if (err != 0) {
@@ -1645,7 +1645,7 @@ ipw2100_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	    CE_CONT,
 	    "ipw2100_m_multicst(): enter\n"));
 
-	return (DDI_SUCCESS);
+	return (0);
 }
 
 /*
@@ -1732,13 +1732,12 @@ ipw2100_m_start(void *arg)
 	(void) ipw2100_init(sc);
 
 	sc->sc_flags |= IPW2100_FLAG_RUNNING;
-
 	/*
 	 * fix KCF bug. - workaround, need to fix it in net80211
 	 */
 	(void) crypto_mech2id(SUN_CKM_RC4);
 
-	return (DDI_SUCCESS);
+	return (0);
 }
 
 static void
@@ -1784,9 +1783,9 @@ ipw2100_m_unicst(void *arg, const uint8_t *macaddr)
 		}
 	}
 
-	return (DDI_SUCCESS);
+	return (0);
 fail:
-	return (err);
+	return (EIO);
 }
 
 static int
@@ -1821,9 +1820,9 @@ ipw2100_m_promisc(void *arg, boolean_t on)
 		}
 	}
 
-	return (DDI_SUCCESS);
+	return (0);
 fail:
-	return (err);
+	return (EIO);
 }
 
 static mblk_t *
@@ -2165,7 +2164,7 @@ ipw2100_ioctl(struct ipw2100_softc *sc, queue_t *q, mblk_t *m)
 	/*
 	 * Validate the command
 	 */
-	iocp = (struct iocblk *)m->b_rptr;
+	iocp = (struct iocblk *)(uintptr_t)m->b_rptr;
 	iocp->ioc_error = 0;
 	cmd = iocp->ioc_cmd;
 	need_privilege = B_TRUE;
@@ -2193,7 +2192,7 @@ ipw2100_ioctl(struct ipw2100_softc *sc, queue_t *q, mblk_t *m)
 		else
 			ret = drv_priv(iocp->ioc_cr);
 		if (ret != 0) {
-			miocnak(q, m, 0, ret);
+			miocnak(q, m, 0, ret); /* ret is errno */
 			return (IEEE80211_IOCTL_NOT_REQUIRED);
 		}
 	}
@@ -2240,8 +2239,8 @@ ipw2100_getset(struct ipw2100_softc *sc, mblk_t *m, uint32_t cmd,
 	uint32_t	id;
 	int		ret; /* IEEE80211_IOCTL - handled by net80211 */
 
-	infp = (wldp_t *)m->b_rptr;
-	outfp = (wldp_t *)m->b_rptr;
+	infp  = (wldp_t *)(uintptr_t)m->b_rptr;
+	outfp = (wldp_t *)(uintptr_t)m->b_rptr;
 	outfp->wldp_result = WL_NOTSUPPORTED;
 
 	id = infp->wldp_id;
@@ -2437,7 +2436,7 @@ ipw2100_rcvpkt(struct ipw2100_softc *sc, struct ipw2100_status *status,
 static uint_t
 ipw2100_intr(caddr_t arg)
 {
-	struct ipw2100_softc	*sc = (struct ipw2100_softc *)arg;
+	struct ipw2100_softc	*sc = (struct ipw2100_softc *)(uintptr_t)arg;
 	uint32_t		ireg, ridx, len, i;
 	struct ieee80211com	*ic = &sc->sc_ic;
 	struct ipw2100_status	*status;
@@ -2479,168 +2478,160 @@ ipw2100_intr(caddr_t arg)
 		sc->sc_flags |= IPW2100_FLAG_HW_ERR_RECOVER;
 		mutex_exit(&sc->sc_mflock);
 
-	} else {
-
-		/*
-		 * FW intr
-		 */
-		if (ireg & IPW2100_INTR_FW_INIT_DONE) {
-			mutex_enter(&sc->sc_ilock);
-			sc->sc_flags |= IPW2100_FLAG_FW_INITED;
-			cv_signal(&sc->sc_fw_cond);
-			mutex_exit(&sc->sc_ilock);
-		}
-
-		/*
-		 * RX intr
-		 */
-		if (ireg & IPW2100_INTR_RX_TRANSFER) {
-			ridx = ipw2100_csr_get32(sc,
-			    IPW2100_CSR_RX_READ_INDEX);
-
-			for (; sc->sc_rx_cur != ridx;
-			    sc->sc_rx_cur = RING_FORWARD(
-			    sc->sc_rx_cur, 1, IPW2100_NUM_RXBD)) {
-
-				i	= sc->sc_rx_cur;
-				status	= &sc->sc_status[i];
-				rxbuf	= &sc->sc_rxbufs[i]->rxb_dat[0];
-				dr	= &sc->sc_dma_rxbufs[i];
-
-				/*
-				 * sync
-				 */
-				(void) ddi_dma_sync(sc->sc_dma_status.dr_hnd,
-				    i * sizeof (struct ipw2100_status),
-				    sizeof (struct ipw2100_status),
-				    DDI_DMA_SYNC_FORKERNEL);
-				(void) ddi_dma_sync(sc->sc_dma_rxbd.dr_hnd,
-				    i * sizeof (struct ipw2100_bd),
-				    sizeof (struct ipw2100_bd),
-				    DDI_DMA_SYNC_FORKERNEL);
-				(void) ddi_dma_sync(dr->dr_hnd, 0,
-				    sizeof (struct ipw2100_rxb),
-				    DDI_DMA_SYNC_FORKERNEL);
-				IPW2100_DBG(IPW2100_DBG_INT,
-				    (sc->sc_dip, CE_CONT,
-				    "ipw2100_intr(): "
-				    "status code=0x%04x, len=0x%08x, "
-				    "flags=0x%02x, rssi=%02x\n",
-				    LE_16(status->code), LE_32(status->len),
-				    status->flags, status->rssi));
-#if DEBUG
-				rxbd	= &sc->sc_rxbd[i];
-				IPW2100_DBG(IPW2100_DBG_INT,
-				    (sc->sc_dip, CE_CONT,
-				    "ipw2100_intr(): "
-				    "rxbd,phyaddr=0x%08x, len=0x%08x, "
-				    "flags=0x%02x,nfrag=%02x\n",
-				    LE_32(rxbd->phyaddr), LE_32(rxbd->len),
-				    rxbd->flags, rxbd->nfrag));
-#endif
-				switch (LE_16(status->code) & 0x0f) {
-				/*
-				 * command complete response
-				 */
-				case IPW2100_STATUS_CODE_COMMAND:
-					mutex_enter(&sc->sc_ilock);
-					sc->sc_done = 1;
-					cv_signal(&sc->sc_cmd_cond);
-					mutex_exit(&sc->sc_ilock);
-					break;
-				/*
-				 * change state
-				 */
-				case IPW2100_STATUS_CODE_NEWSTATE:
-					state = LE_32(*((uint32_t *)rxbuf));
-					IPW2100_DBG(IPW2100_DBG_INT,
-					    (sc->sc_dip, CE_CONT,
-					    "ipw2100_intr(): "
-					    "newstate,state=0x%x\n", state));
-
-					switch (state) {
-					case IPW2100_STATE_ASSOCIATED:
-						ieee80211_new_state(ic,
-						    IEEE80211_S_RUN, -1);
-						break;
-					case IPW2100_STATE_ASSOCIATION_LOST:
-					case IPW2100_STATE_DISABLED:
-						ieee80211_new_state(ic,
-						    IEEE80211_S_INIT, -1);
-						break;
-					/*
-					 * When radio is OFF, need a better
-					 * scan approach to ensure scan
-					 * result correct.
-					 */
-					case IPW2100_STATE_RADIO_DISABLED:
-						IPW2100_REPORT((sc->sc_dip,
-						    CE_WARN,
-						    "ipw2100_intr(): "
-						    "RADIO is OFF\n"));
-						ipw2100_stop(sc);
-						break;
-					case IPW2100_STATE_SCAN_COMPLETE:
-						ieee80211_cancel_scan(ic);
-						break;
-					case IPW2100_STATE_SCANNING:
-						if (ic->ic_state !=
-						    IEEE80211_S_RUN)
-							ieee80211_new_state(ic,
-							    IEEE80211_S_SCAN,
-							    -1);
-						ic->ic_flags |=
-						    IEEE80211_F_SCAN;
-
-						break;
-					default:
-						break;
-					}
-					break;
-				case IPW2100_STATUS_CODE_DATA_802_11:
-				case IPW2100_STATUS_CODE_DATA_802_3:
-					ipw2100_rcvpkt(sc, status, rxbuf);
-					break;
-				case IPW2100_STATUS_CODE_NOTIFICATION:
-					break;
-				default:
-					IPW2100_WARN((sc->sc_dip, CE_WARN,
-					    "ipw2100_intr(): "
-					    "unknown status code 0x%04x\n",
-					    LE_16(status->code)));
-					break;
-				}
-			}
-			/*
-			 * write sc_rx_cur backward 1 step to RX_WRITE_INDEX
-			 */
-			ipw2100_csr_put32(sc, IPW2100_CSR_RX_WRITE_INDEX,
-			    RING_BACKWARD(sc->sc_rx_cur, 1, IPW2100_NUM_RXBD));
-		}
-
-		/*
-		 * TX intr
-		 */
-		if (ireg & IPW2100_INTR_TX_TRANSFER) {
-			mutex_enter(&sc->sc_tx_lock);
-			ridx = ipw2100_csr_get32(sc, IPW2100_CSR_TX_READ_INDEX);
-			len = RING_FLEN(RING_FORWARD(sc->sc_tx_cur,
-			    sc->sc_tx_free, IPW2100_NUM_TXBD),
-			    ridx, IPW2100_NUM_TXBD);
-			sc->sc_tx_free += len;
-			IPW2100_DBG(IPW2100_DBG_INT, (sc->sc_dip, CE_CONT,
-			    "ipw2100_intr(): len=%d\n", len));
-			mutex_exit(&sc->sc_tx_lock);
-
-			mutex_enter(&sc->sc_resched_lock);
-			if (len > 1 && (sc->sc_flags & IPW2100_FLAG_TX_SCHED)) {
-				sc->sc_flags &= ~IPW2100_FLAG_TX_SCHED;
-				mac_tx_update(ic->ic_mach);
-			}
-			mutex_exit(&sc->sc_resched_lock);
-		}
+		goto enable_interrupt;
 	}
 
+	/*
+	 * FW intr
+	 */
+	if (ireg & IPW2100_INTR_FW_INIT_DONE) {
+		mutex_enter(&sc->sc_ilock);
+		sc->sc_flags |= IPW2100_FLAG_FW_INITED;
+		cv_signal(&sc->sc_fw_cond);
+		mutex_exit(&sc->sc_ilock);
+	}
+
+	/*
+	 * RX intr
+	 */
+	if (ireg & IPW2100_INTR_RX_TRANSFER) {
+		ridx = ipw2100_csr_get32(sc,
+		    IPW2100_CSR_RX_READ_INDEX);
+
+		for (; sc->sc_rx_cur != ridx;
+		    sc->sc_rx_cur = RING_FORWARD(
+		    sc->sc_rx_cur, 1, IPW2100_NUM_RXBD)) {
+
+			i	= sc->sc_rx_cur;
+			status	= &sc->sc_status[i];
+			rxbuf	= &sc->sc_rxbufs[i]->rxb_dat[0];
+			dr	= &sc->sc_dma_rxbufs[i];
+
+			/*
+			 * sync
+			 */
+			(void) ddi_dma_sync(sc->sc_dma_status.dr_hnd,
+			    i * sizeof (struct ipw2100_status),
+			    sizeof (struct ipw2100_status),
+			    DDI_DMA_SYNC_FORKERNEL);
+			(void) ddi_dma_sync(sc->sc_dma_rxbd.dr_hnd,
+			    i * sizeof (struct ipw2100_bd),
+			    sizeof (struct ipw2100_bd),
+			    DDI_DMA_SYNC_FORKERNEL);
+			(void) ddi_dma_sync(dr->dr_hnd, 0,
+			    sizeof (struct ipw2100_rxb),
+			    DDI_DMA_SYNC_FORKERNEL);
+			IPW2100_DBG(IPW2100_DBG_INT, (sc->sc_dip, CE_CONT,
+			    "ipw2100_intr(): status code=0x%04x, len=0x%08x, "
+			    "flags=0x%02x, rssi=%02x\n",
+			    LE_16(status->code), LE_32(status->len),
+			    status->flags, status->rssi));
+#if DEBUG
+			rxbd	= &sc->sc_rxbd[i];
+			IPW2100_DBG(IPW2100_DBG_INT, (sc->sc_dip, CE_CONT,
+			    "ipw2100_intr(): rxbd,phyaddr=0x%08x, len=0x%08x, "
+			    "flags=0x%02x,nfrag=%02x\n",
+			    LE_32(rxbd->phyaddr), LE_32(rxbd->len),
+			    rxbd->flags, rxbd->nfrag));
+#endif
+			switch (LE_16(status->code) & 0x0f) {
+			/*
+			 * command complete response
+			 */
+			case IPW2100_STATUS_CODE_COMMAND:
+				mutex_enter(&sc->sc_ilock);
+				sc->sc_done = 1;
+				cv_signal(&sc->sc_cmd_cond);
+				mutex_exit(&sc->sc_ilock);
+				break;
+			/*
+			 * change state
+			 */
+			case IPW2100_STATUS_CODE_NEWSTATE:
+				state = LE_32(* ((uint32_t *)(uintptr_t)rxbuf));
+				IPW2100_DBG(IPW2100_DBG_INT,
+				    (sc->sc_dip, CE_CONT,
+				    "ipw2100_intr(): newstate,state=0x%x\n",
+				    state));
+
+				switch (state) {
+				case IPW2100_STATE_ASSOCIATED:
+					ieee80211_new_state(ic,
+					    IEEE80211_S_RUN, -1);
+					break;
+				case IPW2100_STATE_ASSOCIATION_LOST:
+					case IPW2100_STATE_DISABLED:
+					ieee80211_new_state(ic,
+					    IEEE80211_S_INIT, -1);
+					break;
+				/*
+				 * When radio is OFF, need a better
+				 * scan approach to ensure scan
+				 * result correct.
+				 */
+				case IPW2100_STATE_RADIO_DISABLED:
+					IPW2100_REPORT((sc->sc_dip, CE_WARN,
+					    "ipw2100_intr(): RADIO is OFF\n"));
+					ipw2100_stop(sc);
+					break;
+				case IPW2100_STATE_SCAN_COMPLETE:
+					ieee80211_cancel_scan(ic);
+					break;
+				case IPW2100_STATE_SCANNING:
+					if (ic->ic_state != IEEE80211_S_RUN)
+						ieee80211_new_state(ic,
+						    IEEE80211_S_SCAN, -1);
+					ic->ic_flags |= IEEE80211_F_SCAN;
+
+					break;
+				default:
+					break;
+				}
+				break;
+			case IPW2100_STATUS_CODE_DATA_802_11:
+			case IPW2100_STATUS_CODE_DATA_802_3:
+				ipw2100_rcvpkt(sc, status, rxbuf);
+				break;
+			case IPW2100_STATUS_CODE_NOTIFICATION:
+				break;
+			default:
+				IPW2100_WARN((sc->sc_dip, CE_WARN,
+				    "ipw2100_intr(): "
+				    "unknown status code 0x%04x\n",
+				    LE_16(status->code)));
+				break;
+			}
+		}
+		/*
+		 * write sc_rx_cur backward 1 step to RX_WRITE_INDEX
+		 */
+		ipw2100_csr_put32(sc, IPW2100_CSR_RX_WRITE_INDEX,
+		    RING_BACKWARD(sc->sc_rx_cur, 1, IPW2100_NUM_RXBD));
+	}
+
+	/*
+	 * TX intr
+	 */
+	if (ireg & IPW2100_INTR_TX_TRANSFER) {
+		mutex_enter(&sc->sc_tx_lock);
+		ridx = ipw2100_csr_get32(sc, IPW2100_CSR_TX_READ_INDEX);
+		len = RING_FLEN(RING_FORWARD(sc->sc_tx_cur,
+		    sc->sc_tx_free, IPW2100_NUM_TXBD),
+		    ridx, IPW2100_NUM_TXBD);
+		sc->sc_tx_free += len;
+		IPW2100_DBG(IPW2100_DBG_INT, (sc->sc_dip, CE_CONT,
+		    "ipw2100_intr(): len=%d\n", len));
+		mutex_exit(&sc->sc_tx_lock);
+
+		mutex_enter(&sc->sc_resched_lock);
+		if (len > 1 && (sc->sc_flags & IPW2100_FLAG_TX_SCHED)) {
+			sc->sc_flags &= ~IPW2100_FLAG_TX_SCHED;
+			mac_tx_update(ic->ic_mach);
+		}
+		mutex_exit(&sc->sc_resched_lock);
+	}
+
+enable_interrupt:
 	/*
 	 * enable all interrupts
 	 */

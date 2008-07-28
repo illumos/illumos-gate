@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,21 +67,24 @@ ipw2100_csr_get8(struct ipw2100_softc *sc, uint32_t off)
 uint16_t
 ipw2100_csr_get16(struct ipw2100_softc *sc, uint32_t off)
 {
-	return (ddi_get16(sc->sc_ioh, (uint16_t *)(sc->sc_regs + off)));
+	return (ddi_get16(sc->sc_ioh,
+	    (uint16_t *)((uintptr_t)sc->sc_regs + off)));
 }
 
 uint32_t
 ipw2100_csr_get32(struct ipw2100_softc *sc, uint32_t off)
 {
-	return (ddi_get32(sc->sc_ioh, (uint32_t *)(sc->sc_regs + off)));
+	return (ddi_get32(sc->sc_ioh,
+	    (uint32_t *)((uintptr_t)sc->sc_regs + off)));
 }
 
 void
 ipw2100_csr_rep_get16(struct ipw2100_softc *sc,
 	uint32_t off, uint16_t *buf, size_t cnt)
 {
-	ddi_rep_get16(sc->sc_ioh, buf, (uint16_t *)(sc->sc_regs + off),
-		cnt, DDI_DEV_NO_AUTOINCR);
+	ddi_rep_get16(sc->sc_ioh, buf,
+	    (uint16_t *)((uintptr_t)sc->sc_regs + off),
+	    cnt, DDI_DEV_NO_AUTOINCR);
 }
 
 void
@@ -93,13 +96,15 @@ ipw2100_csr_put8(struct ipw2100_softc *sc, uint32_t off, uint8_t val)
 void
 ipw2100_csr_put16(struct ipw2100_softc *sc, uint32_t off, uint16_t val)
 {
-	ddi_put16(sc->sc_ioh, (uint16_t *)(sc->sc_regs + off), val);
+	ddi_put16(sc->sc_ioh,
+	    (uint16_t *)((uintptr_t)sc->sc_regs + off), val);
 }
 
 void
 ipw2100_csr_put32(struct ipw2100_softc *sc, uint32_t off, uint32_t val)
 {
-	ddi_put32(sc->sc_ioh, (uint32_t *)(sc->sc_regs + off), val);
+	ddi_put32(sc->sc_ioh,
+	    (uint32_t *)((uintptr_t)sc->sc_regs + off), val);
 }
 
 void
@@ -107,7 +112,7 @@ ipw2100_csr_rep_put8(struct ipw2100_softc *sc,
 	uint32_t off, uint8_t *buf, size_t cnt)
 {
 	ddi_rep_put8(sc->sc_ioh, buf, (uint8_t *)(sc->sc_regs + off),
-		cnt, DDI_DEV_NO_AUTOINCR);
+	    cnt, DDI_DEV_NO_AUTOINCR);
 }
 
 uint8_t
@@ -178,7 +183,7 @@ ipw2100_imem_getbuf(struct ipw2100_softc *sc,
 	for (; cnt > 0; addr++, buf++, cnt--) {
 		ipw2100_csr_put32(sc, IPW2100_CSR_INDIRECT_ADDR, addr & ~3);
 		*buf = ipw2100_csr_get8(sc,
-			IPW2100_CSR_INDIRECT_DATA +(addr & 3));
+		    IPW2100_CSR_INDIRECT_DATA +(addr & 3));
 	}
 }
 
@@ -189,7 +194,7 @@ ipw2100_imem_putbuf(struct ipw2100_softc *sc,
 	for (; cnt > 0; addr++, buf++, cnt--) {
 		ipw2100_csr_put32(sc, IPW2100_CSR_INDIRECT_ADDR, addr & ~3);
 		ipw2100_csr_put8(sc,
-			IPW2100_CSR_INDIRECT_DATA +(addr & 3), *buf);
+		    IPW2100_CSR_INDIRECT_DATA +(addr & 3), *buf);
 	}
 }
 
@@ -448,8 +453,8 @@ ipw2100_load_fw(struct ipw2100_softc *sc)
 			    "ipw2100_load_fw(): invalid firmware image\n"));
 			return (DDI_FAILURE);
 		}
-		dst = LE_32(*((uint32_t *)p)); p += sizeof (dst);
-		len = LE_16(*((uint16_t *)p)); p += sizeof (len);
+		dst = LE_32(*((uint32_t *)(uintptr_t)p)); p += sizeof (dst);
+		len = LE_16(*((uint16_t *)(uintptr_t)p)); p += sizeof (len);
 		if ((p + len) > e) {
 			IPW2100_WARN((sc->sc_dip, CE_CONT,
 			    "ipw2100_load_fw(): invalid firmware image\n"));
@@ -486,7 +491,6 @@ ipw2100_load_fw(struct ipw2100_softc *sc)
 		if (cv_timedwait(&sc->sc_fw_cond, &sc->sc_ilock, clk) < 0)
 			break;
 	}
-
 	mutex_exit(&sc->sc_ilock);
 
 	ipw2100_csr_put32(sc, IPW2100_CSR_IO,
@@ -494,7 +498,6 @@ ipw2100_load_fw(struct ipw2100_softc *sc)
 	    IPW2100_IO_GPIO1_MASK | IPW2100_IO_GPIO3_MASK);
 
 	if (!(sc->sc_flags & IPW2100_FLAG_FW_INITED)) {
-
 		IPW2100_DBG(IPW2100_DBG_FW, (sc->sc_dip, CE_CONT,
 		    "ipw2100_load_fw(): exit, init failed\n"));
 		return (DDI_FAILURE);
