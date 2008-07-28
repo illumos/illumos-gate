@@ -57,7 +57,6 @@
 #include "esclex.h"
 
 /* imported from eft.c... */
-extern char *Autoclose;
 extern hrtime_t Hesitate;
 extern char *Serd_Override;
 extern nv_alloc_t Eft_nv_hdl;
@@ -975,9 +974,33 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 	char *serdname;
 	struct node *nid;
 	struct serd_entry *newentp;
+	int i, serdn = -1, serdincrement = 1;
+	char *serdsuffix = NULL, *serdt = NULL;
+	struct evalue *ep;
 
 	ASSERT(sp->t == N_UPSET);
 	ASSERT(ffep != NULL);
+
+	if ((ep = (struct evalue *)lut_lookup(sp->serdprops,
+	    (void *)"n", (lut_cmp)strcmp)) != NULL) {
+		ASSERT(ep->t == UINT64);
+		serdn = (int)ep->v;
+	}
+	if ((ep = (struct evalue *)lut_lookup(sp->serdprops,
+	    (void *)"t", (lut_cmp)strcmp)) != NULL) {
+		ASSERT(ep->t == STRING);
+		serdt = (char *)(uintptr_t)ep->v;
+	}
+	if ((ep = (struct evalue *)lut_lookup(sp->serdprops,
+	    (void *)"suffix", (lut_cmp)strcmp)) != NULL) {
+		ASSERT(ep->t == STRING);
+		serdsuffix = (char *)(uintptr_t)ep->v;
+	}
+	if ((ep = (struct evalue *)lut_lookup(sp->serdprops,
+	    (void *)"increment", (lut_cmp)strcmp)) != NULL) {
+		ASSERT(ep->t == UINT64);
+		serdincrement = (int)ep->v;
+	}
 
 	/*
 	 * obtain instanced SERD engine from the upset sp.  from this
@@ -986,10 +1009,18 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 	serdinst = eventprop_lookup(sp, L_engine);
 
 	if (serdinst == NULL)
-		return (0);
+		return (-1);
 
 	serdname = ipath2str(serdinst->u.stmt.np->u.event.ename->u.name.s,
 	    ipath(serdinst->u.stmt.np->u.event.epname));
+
+	if (serdsuffix != NULL) {
+		int len = strlen(serdname) + strlen(serdsuffix) + 1;
+		char *ptr = MALLOC(len);
+		(void) snprintf(ptr, len, "%s%s", serdname, serdsuffix);
+		FREE(serdname);
+		serdname = ptr;
+	}
 
 	/* handle serd engine "id" property, if there is one */
 	if ((nid =
@@ -1023,6 +1054,14 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 		FREE(serdname);
 		serdname = nserdname;
 	}
+
+	/*
+	 * if the engine is empty, and we have an override for n/t then
+	 * destroy and recreate it.
+	 */
+	if ((serdn != -1 || serdt != NULL) && fmd_serd_exists(hdl, serdname) &&
+	    fmd_serd_empty(hdl, serdname))
+		fmd_serd_destroy(hdl, serdname);
 
 	if (!fmd_serd_exists(hdl, serdname)) {
 		struct node *nN, *nT;
@@ -1110,6 +1149,17 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 			FREE(serd_name);
 		}
 
+		if (serdn != -1 && got_n_override == 0) {
+			nval = serdn;
+			out(O_ALTFP, "serd override %s_n %d", name, serdn);
+			got_n_override = 1;
+		}
+		if (serdt != NULL && got_t_override == 0) {
+			ptr = STRDUP(serdt);
+			out(O_ALTFP, "serd override %s_t %s", name, serdt);
+			got_t_override = 1;
+		}
+
 		if (!got_n_override) {
 			nN = lut_lookup(serdinst->u.stmt.lutp, (void *)L_N,
 			    NULL);
@@ -1131,8 +1181,7 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 			ullp = (unsigned long long *)lut_lookup(Timesuffixlut,
 			    (void *)suffix, NULL);
 			ptr[len] = '\0';
-			tval = (unsigned long long)strtoul(ptr, NULL, 0) *
-			    (ullp ? *ullp : 1ll);
+			tval = strtoull(ptr, NULL, 0) * (ullp ? *ullp : 1ll);
 			FREE(ptr);
 		}
 		fmd_serd_create(hdl, serdname, nval, tval);
@@ -1154,25 +1203,31 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 
 	/*
 	 * increment SERD engine.  if engine fires, reset serd
-	 * engine and return trip_strcode
+	 * engine and return trip_strcode if required.
 	 */
-	if (fmd_serd_record(hdl, serdname, ffep)) {
-		struct node *tripinst = lut_lookup(serdinst->u.stmt.lutp,
-		    (void *)L_trip, NULL);
+	for (i = 0; i < serdincrement; i++) {
+		if (fmd_serd_record(hdl, serdname, ffep)) {
+			fmd_case_add_serd(hdl, fmcase, serdname);
+			fmd_serd_reset(hdl, serdname);
 
-		ASSERT(tripinst != NULL);
-
-		*enamep = tripinst->u.event.ename->u.name.s;
-		*ippp = ipath(tripinst->u.event.epname);
-
-		fmd_case_add_serd(hdl, fmcase, serdname);
-		fmd_serd_reset(hdl, serdname);
-		out(O_ALTFP|O_NONL, "[engine fired: %s, sending: ", serdname);
-		ipath_print(O_ALTFP|O_NONL, *enamep, *ippp);
-		out(O_ALTFP, "]");
-
-		FREE(serdname);
-		return (1);
+			if (ippp) {
+				struct node *tripinst =
+				    lut_lookup(serdinst->u.stmt.lutp,
+				    (void *)L_trip, NULL);
+				ASSERT(tripinst != NULL);
+				*enamep = tripinst->u.event.ename->u.name.s;
+				*ippp = ipath(tripinst->u.event.epname);
+				out(O_ALTFP|O_NONL,
+				    "[engine fired: %s, sending: ", serdname);
+				ipath_print(O_ALTFP|O_NONL, *enamep, *ippp);
+				out(O_ALTFP, "]");
+			} else {
+				out(O_ALTFP, "[engine fired: %s, no trip]",
+				    serdname);
+			}
+			FREE(serdname);
+			return (1);
+		}
 	}
 
 	FREE(serdname);
@@ -1223,7 +1278,7 @@ upsets_eval(struct fme *fmep, fmd_event_t *ffep)
 	for (sp = fmep->suspects; sp; sp = sp->suspects)
 		if (sp->t == N_UPSET &&
 		    serd_eval(fmep, fmep->hdl, ffep, fmep->fmcase, sp,
-		    &tripped[ntrip].ename, &tripped[ntrip].ipp))
+		    &tripped[ntrip].ename, &tripped[ntrip].ipp) == 1)
 			ntrip++;
 
 	for (i = 0; i < ntrip; i++) {
@@ -1273,6 +1328,7 @@ upsets_eval(struct fme *fmep, fmd_event_t *ffep)
 		    fmd_case_uuid(nfmep->hdl, nfmep->fmcase));
 		if (ffep) {
 			fmd_case_setprincipal(nfmep->hdl, nfmep->fmcase, ffep);
+			fmd_case_add_ereport(nfmep->hdl, nfmep->fmcase, ffep);
 			nfmep->e0r = ffep;
 		}
 
@@ -1292,9 +1348,9 @@ upsets_eval(struct fme *fmep, fmd_event_t *ffep)
 				serialize_observation(nfmep, eventstring, ipp);
 				nep->nvp = evnv_dupnvl(ep->nvp);
 			}
-			if (ffep)
+			if (ep->ffep && ep->ffep != ffep)
 				fmd_case_add_ereport(nfmep->hdl, nfmep->fmcase,
-				    ffep);
+				    ep->ffep);
 			stats_counter_bump(nfmep->Rcount);
 		}
 
@@ -1361,9 +1417,6 @@ retry_lone_ereport:
 		 * and evaluate
 		 */
 		serialize_observation(nfmep, tripped[i].ename, tripped[i].ipp);
-		if (ffep)
-			fmd_case_add_ereport(nfmep->hdl, nfmep->fmcase, ffep);
-		stats_counter_bump(nfmep->Rcount);
 		fme_eval(nfmep, ffep);
 	}
 
@@ -1576,8 +1629,10 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 			if (ep->count == 1)
 				serialize_observation(fmep, eventstring, ipp);
 
-			if (ffep)
+			if (ffep) {
 				fmd_case_add_ereport(hdl, fmep->fmcase, ffep);
+				ep->ffep = ffep;
+			}
 
 			stats_counter_bump(fmep->Rcount);
 
@@ -1698,6 +1753,7 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		fmd_case_add_ereport(hdl, fmep->fmcase, ffep);
 		fmd_case_setprincipal(hdl, fmep->fmcase, ffep);
 		fmep->e0r = ffep;
+		ep->ffep = ffep;
 	}
 
 	/* give the diagnosis algorithm a shot at the new FME state */
@@ -2004,6 +2060,8 @@ struct rsl {
 	nvlist_t *rsrc;
 };
 
+static void publish_suspects(struct fme *fmep, struct rsl *srl);
+
 /*
  *  rslfree -- free internal members of struct rsl not expected to be
  *	freed elsewhere.
@@ -2039,13 +2097,13 @@ rslcmp(const void *a, const void *b)
 	if (rv != 0)
 		return (rv);
 
-	if (r1->asru == NULL && r2->asru == NULL)
+	if (r1->rsrc == NULL && r2->rsrc == NULL)
 		return (0);
-	if (r1->asru == NULL)
+	if (r1->rsrc == NULL)
 		return (-1);
-	if (r2->asru == NULL)
+	if (r2->rsrc == NULL)
 		return (1);
-	return (evnv_cmpnvl(r1->asru, r2->asru, 0));
+	return (evnv_cmpnvl(r1->rsrc, r2->rsrc, 0));
 }
 
 /*
@@ -2122,7 +2180,7 @@ get_resources(struct event *sp, struct rsl *rsrcs, struct config *croot)
 	pathstr = ipath2str(NULL, sp->ipp);
 
 	/*
-	 * Allow for platform translations of the FMRIs
+	 *  Allow for platform translations of the FMRIs
 	 */
 	platform_units_translate(is_defect(sp->t), croot, &asru, &fru, &rsrc,
 	    pathstr);
@@ -2141,51 +2199,41 @@ get_resources(struct event *sp, struct rsl *rsrcs, struct config *croot)
  *    defects resolve to the same ASRU (driver) we only want to publish
  *    that as a single suspect.
  */
-static void
-trim_suspects(struct fme *fmep, boolean_t no_upsets, struct rsl **begin,
-    struct rsl **end)
+static int
+trim_suspects(struct fme *fmep, struct rsl *begin, struct rsl *begin2,
+    fmd_event_t *ffep, int *mess_zero_nonfaultp)
 {
 	struct event *ep;
-	struct rsl *rp;
-	int rpcnt;
+	struct rsl *rp = begin;
+	struct rsl *rp2 = begin2;
+	int mess_zero_count = 0;
+	int serd_rval;
+	uint_t messval;
 
-	/*
-	 * First save the suspects in the psuspects, then copy back
-	 * only the ones we wish to retain.  This resets nsuspects to
-	 * zero.
-	 */
-	rpcnt = fmep->nsuspects;
-	save_suspects(fmep);
-
-	/*
-	 * allocate an array of resource pointers for the suspects.
-	 * We may end up using less than the full allocation, but this
-	 * is a very short-lived array.  publish_suspects() will free
-	 * this array when it's done using it.
-	 */
-	rp = *begin = MALLOC(rpcnt * sizeof (struct rsl));
-	bzero(rp, rpcnt * sizeof (struct rsl));
-
-	/* first pass, remove any unwanted upsets and populate our array */
+	/* remove any unwanted upsets and populate our array */
 	for (ep = fmep->psuspects; ep; ep = ep->psuspects) {
-		if (no_upsets && is_upset(ep->t))
+		if (is_upset(ep->t))
 			continue;
-		get_resources(ep, rp, fmep->config);
-		rp++;
-		fmep->nsuspects++;
-		if (!is_fault(ep->t))
-			fmep->nonfault++;
+		serd_rval = serd_eval(fmep, fmep->hdl, ffep, fmep->fmcase, ep,
+		    NULL, NULL);
+		if (serd_rval == 0)
+			continue;
+		if (node2uint(eventprop_lookup(ep, L_message),
+		    &messval) == 0 && messval == 0) {
+			get_resources(ep, rp2, fmep->config);
+			rp2++;
+			mess_zero_count++;
+			if (!is_fault(ep->t))
+				(*mess_zero_nonfaultp)++;
+		} else {
+			get_resources(ep, rp, fmep->config);
+			rp++;
+			fmep->nsuspects++;
+			if (!is_fault(ep->t))
+				fmep->nonfault++;
+		}
 	}
-
-	/* if all we had was unwanted upsets, we're done */
-	if (fmep->nsuspects == 0)
-		return;
-
-	*end = rp - 1;
-
-	/* sort the array */
-	qsort(*begin, fmep->nsuspects, sizeof (struct rsl), rslcmp);
-	rsluniq(*begin, *end, &fmep->nsuspects, &fmep->nonfault);
+	return (mess_zero_count);
 }
 
 /*
@@ -2194,22 +2242,41 @@ trim_suspects(struct fme *fmep, boolean_t no_upsets, struct rsl **begin,
 static void
 addpayloadprop(const char *lhs, struct evalue *rhs, nvlist_t *fault)
 {
+	nvlist_t *rsrc, *hcs;
+
 	ASSERT(fault != NULL);
 	ASSERT(lhs != NULL);
 	ASSERT(rhs != NULL);
 
+	if (nvlist_lookup_nvlist(fault, FM_FAULT_RESOURCE, &rsrc) != 0)
+		out(O_DIE, "cannot add payloadprop \"%s\" to fault", lhs);
+
+	if (nvlist_lookup_nvlist(rsrc, FM_FMRI_HC_SPECIFIC, &hcs) != 0) {
+		out(O_ALTFP|O_VERB2, "addpayloadprop: create hc_specific");
+		if (nvlist_xalloc(&hcs, NV_UNIQUE_NAME, &Eft_nv_hdl) != 0)
+			out(O_DIE,
+			    "cannot add payloadprop \"%s\" to fault", lhs);
+		if (nvlist_add_nvlist(rsrc, FM_FMRI_HC_SPECIFIC, hcs) != 0)
+			out(O_DIE,
+			    "cannot add payloadprop \"%s\" to fault", lhs);
+		nvlist_free(hcs);
+		if (nvlist_lookup_nvlist(rsrc, FM_FMRI_HC_SPECIFIC, &hcs) != 0)
+			out(O_DIE,
+			    "cannot add payloadprop \"%s\" to fault", lhs);
+	} else
+		out(O_ALTFP|O_VERB2, "addpayloadprop: reuse hc_specific");
+
 	if (rhs->t == UINT64) {
 		out(O_ALTFP|O_VERB2, "addpayloadprop: %s=%llu", lhs, rhs->v);
 
-		if (nvlist_add_uint64(fault, lhs, rhs->v) != 0)
+		if (nvlist_add_uint64(hcs, lhs, rhs->v) != 0)
 			out(O_DIE,
 			    "cannot add payloadprop \"%s\" to fault", lhs);
 	} else {
 		out(O_ALTFP|O_VERB2, "addpayloadprop: %s=\"%s\"",
 		    lhs, (char *)(uintptr_t)rhs->v);
 
-		if (nvlist_add_string(fault, lhs, (char *)(uintptr_t)rhs->v) !=
-		    0)
+		if (nvlist_add_string(hcs, lhs, (char *)(uintptr_t)rhs->v) != 0)
 			out(O_DIE,
 			    "cannot add payloadprop \"%s\" to fault", lhs);
 	}
@@ -2664,47 +2731,26 @@ serd_fini(void)
 }
 
 static void
-publish_suspects(struct fme *fmep)
+publish_suspects(struct fme *fmep, struct rsl *srl)
 {
-	struct rsl *srl = NULL;
-	struct rsl *erl;
 	struct rsl *rp;
 	nvlist_t *fault;
 	uint8_t cert;
 	uint_t *frs;
 	uint_t fravg, frsum, fr;
 	uint_t messval;
+	uint_t retireval;
+	uint_t responseval;
 	struct node *snp;
 	int frcnt, fridx;
-	boolean_t no_upsets = B_FALSE;
 	boolean_t allfaulty = B_TRUE;
-
-	stats_counter_bump(fmep->diags);
-
-	/*
-	 * If we're auto-closing upsets, we don't want to include them
-	 * in any produced suspect lists or certainty accounting.
-	 */
-	if (Autoclose != NULL)
-		if (strcmp(Autoclose, "true") == 0 ||
-		    strcmp(Autoclose, "all") == 0 ||
-		    strcmp(Autoclose, "upsets") == 0)
-			no_upsets = B_TRUE;
-
-	trim_suspects(fmep, no_upsets, &srl, &erl);
+	struct rsl *erl = srl + fmep->nsuspects - 1;
 
 	/*
-	 * If the resulting suspect list has no members, we're
-	 * done.  Returning here will simply close the case.
+	 * sort the array
 	 */
-	if (fmep->nsuspects == 0) {
-		out(O_ALTFP,
-		    "[FME%d, case %s (all suspects are upsets)]",
-		    fmep->id, fmd_case_uuid(fmep->hdl, fmep->fmcase));
-		FREE(srl);
-		restore_suspects(fmep);
-		return;
-	}
+	qsort(srl, fmep->nsuspects, sizeof (struct rsl), rslcmp);
+	rsluniq(srl, erl, &fmep->nsuspects, &fmep->nonfault);
 
 	/*
 	 * If the suspect list is all faults, then for a given fault,
@@ -2798,15 +2844,47 @@ publish_suspects(struct fme *fmep)
 				out(O_DIE, "cannot add no-message to fault");
 			}
 		}
+
+		/* if "retire" property exists, add it to the fault */
+		if (node2uint(eventprop_lookup(rp->suspect, L_retire),
+		    &retireval) == 0) {
+
+			out(O_ALTFP,
+			    "[FME%d, %s adds retire=%d to suspect list]",
+			    fmep->id,
+			    rp->suspect->enode->u.event.ename->u.name.s,
+			    retireval);
+			if (nvlist_add_boolean_value(fault,
+			    FM_SUSPECT_RETIRE,
+			    (retireval) ? B_TRUE : B_FALSE) != 0) {
+				out(O_DIE, "cannot add no-retire to fault");
+			}
+		}
+
+		/* if "response" property exists, add it to the fault */
+		if (node2uint(eventprop_lookup(rp->suspect, L_response),
+		    &responseval) == 0) {
+
+			out(O_ALTFP,
+			    "[FME%d, %s adds response=%d to suspect list]",
+			    fmep->id,
+			    rp->suspect->enode->u.event.ename->u.name.s,
+			    responseval);
+			if (nvlist_add_boolean_value(fault,
+			    FM_SUSPECT_RESPONSE,
+			    (responseval) ? B_TRUE : B_FALSE) != 0) {
+				out(O_DIE, "cannot add no-response to fault");
+			}
+		}
+
 		/* add any payload properties */
 		lut_walk(rp->suspect->payloadprops,
 		    (lut_cb)addpayloadprop, (void *)fault);
-		fmd_case_add_suspect(fmep->hdl, fmep->fmcase, fault);
 		rslfree(rp);
 
 		/*
 		 * If "action" property exists, evaluate it;  this must be done
-		 * before the dupclose check below since some actions may
+		 * before the allfaulty check below since some actions may
 		 * modify the asru to be used in fmd_nvl_fmri_faulty.  This
 		 * needs to be restructured if any new actions are introduced
 		 * that have effects that we do not want to be visible if
@@ -2825,13 +2903,15 @@ publish_suspects(struct fme *fmep)
 			    NULL, 0, &evalue);
 		}
 
+		fmd_case_add_suspect(fmep->hdl, fmep->fmcase, fault);
+
 		/*
 		 * check if the asru is already marked as "faulty".
 		 */
 		if (allfaulty) {
 			nvlist_t *asru;
 
-			out(O_ALTFP|O_VERB, "FMD%d dup check ", fmep->id);
+			out(O_ALTFP|O_VERB, "FME%d dup check ", fmep->id);
 			itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, rp->suspect);
 			out(O_ALTFP|O_VERB|O_NONL, " ");
 			if (nvlist_lookup_nvlist(fault,
@@ -2848,9 +2928,6 @@ publish_suspects(struct fme *fmep)
 
 	}
 
-	/*
-	 * We are going to publish so take any pre-publication actions.
-	 */
 	if (!allfaulty) {
 		/*
 		 * don't update the count stat if all asrus are already
@@ -2876,16 +2953,6 @@ publish_suspects(struct fme *fmep)
 		}
 		istat_save();	/* write out any istat changes */
 	}
-
-	out(O_ALTFP, "[solving FME%d, case %s]", fmep->id,
-	    fmd_case_uuid(fmep->hdl, fmep->fmcase));
-	fmd_case_solve(fmep->hdl, fmep->fmcase);
-
-	/*
-	 * revert to the original suspect list
-	 */
-	FREE(srl);
-	restore_suspects(fmep);
 }
 
 static void
@@ -3140,6 +3207,11 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 {
 	struct event *ep;
 	unsigned long long my_delay = TIMEVAL_EVENTUALLY;
+	struct rsl *srl = NULL;
+	struct rsl *srl2 = NULL;
+	int mess_zero_count;
+	int mess_zero_nonfault = 0;
+	int rpcnt;
 
 	save_suspects(fmep);
 
@@ -3169,7 +3241,89 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 		if (fmep->posted_suspects)
 			return;
 
-		publish_suspects(fmep);
+		stats_counter_bump(fmep->diags);
+		rpcnt = fmep->nsuspects;
+		save_suspects(fmep);
+
+		/*
+		 * create two lists, one for "message=1" faults and one for
+		 * "message=0" faults. If we have a mixture we will generate
+		 * two separate suspect lists.
+		 */
+		srl = MALLOC(rpcnt * sizeof (struct rsl));
+		bzero(srl, rpcnt * sizeof (struct rsl));
+		srl2 = MALLOC(rpcnt * sizeof (struct rsl));
+		bzero(srl2, rpcnt * sizeof (struct rsl));
+		mess_zero_count = trim_suspects(fmep, srl, srl2, ffep,
+		    &mess_zero_nonfault);
+
+		/*
+		 * If the resulting suspect list has no members, we're
+		 * done so simply close the case. Otherwise sort and publish.
+		 */
+		if (fmep->nsuspects == 0 && mess_zero_count == 0) {
+			out(O_ALTFP,
+			    "[FME%d, case %s (all suspects are upsets)]",
+			    fmep->id, fmd_case_uuid(fmep->hdl, fmep->fmcase));
+			fmd_case_close(fmep->hdl, fmep->fmcase);
+		} else if (fmep->nsuspects != 0 && mess_zero_count == 0) {
+			publish_suspects(fmep, srl);
+			out(O_ALTFP, "[solving FME%d, case %s]", fmep->id,
+			    fmd_case_uuid(fmep->hdl, fmep->fmcase));
+			fmd_case_solve(fmep->hdl, fmep->fmcase);
+		} else if (fmep->nsuspects == 0 && mess_zero_count != 0) {
+			fmep->nsuspects = mess_zero_count;
+			fmep->nonfault = mess_zero_nonfault;
+			publish_suspects(fmep, srl2);
+			out(O_ALTFP, "[solving FME%d, case %s]", fmep->id,
+			    fmd_case_uuid(fmep->hdl, fmep->fmcase));
+			fmd_case_solve(fmep->hdl, fmep->fmcase);
+		} else {
+			struct event *obsp;
+			struct fme *nfmep;
+
+			publish_suspects(fmep, srl);
+			out(O_ALTFP, "[solving FME%d, case %s]", fmep->id,
+			    fmd_case_uuid(fmep->hdl, fmep->fmcase));
+			fmd_case_solve(fmep->hdl, fmep->fmcase);
+
+			/*
+			 * Got both message=0 and message=1 so create a
+			 * duplicate case. Also need a temporary duplicate fme
+			 * structure for use by publish_suspects().
+			 */
+			nfmep = alloc_fme();
+			nfmep->id =  Nextid++;
+			nfmep->hdl = fmep->hdl;
+			nfmep->nsuspects = mess_zero_count;
+			nfmep->nonfault = mess_zero_nonfault;
+			nfmep->fmcase = fmd_case_open(fmep->hdl, NULL);
+			out(O_ALTFP|O_STAMP,
+			    "[creating parallel FME%d, case %s]", nfmep->id,
+			    fmd_case_uuid(nfmep->hdl, nfmep->fmcase));
+			Open_fme_count++;
+			if (ffep) {
+				fmd_case_setprincipal(nfmep->hdl,
+				    nfmep->fmcase, ffep);
+				fmd_case_add_ereport(nfmep->hdl,
+				    nfmep->fmcase, ffep);
+			}
+			for (obsp = fmep->observations; obsp;
+			    obsp = obsp->observations)
+				if (obsp->ffep && obsp->ffep != ffep)
+					fmd_case_add_ereport(nfmep->hdl,
+					    nfmep->fmcase, obsp->ffep);
+
+			publish_suspects(nfmep, srl2);
+			out(O_ALTFP, "[solving FME%d, case %s]", nfmep->id,
+			    fmd_case_uuid(nfmep->hdl, nfmep->fmcase));
+			fmd_case_solve(nfmep->hdl, nfmep->fmcase);
+			FREE(nfmep);
+		}
+		FREE(srl);
+		FREE(srl2);
+		restore_suspects(fmep);
+
 		fmep->posted_suspects = 1;
 		fmd_buf_write(fmep->hdl, fmep->fmcase,
 		    WOBUF_POSTD,
@@ -3201,29 +3355,6 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 		break;
 	}
 
-	if (fmep->posted_suspects == 1 && Autoclose != NULL) {
-		int doclose = 0;
-
-		if (strcmp(Autoclose, "true") == 0 ||
-		    strcmp(Autoclose, "all") == 0)
-			doclose = 1;
-
-		if (strcmp(Autoclose, "upsets") == 0) {
-			doclose = 1;
-			for (ep = fmep->suspects; ep; ep = ep->suspects) {
-				if (ep->t != N_UPSET) {
-					doclose = 0;
-					break;
-				}
-			}
-		}
-
-		if (doclose) {
-			out(O_ALTFP, "[closing FME%d, case %s (autoclose)]",
-			    fmep->id, fmd_case_uuid(fmep->hdl, fmep->fmcase));
-			fmd_case_close(fmep->hdl, fmep->fmcase);
-		}
-	}
 	itree_free(fmep->eventtree);
 	fmep->eventtree = NULL;
 	structconfig_free(fmep->config);
@@ -3673,23 +3804,21 @@ requirements_test(struct fme *fmep, struct event *ep,
 			    ap = itree_next_arrow(bp, ap)) {
 				ep2 = ap->arrowp->head->myevent;
 				platform_set_payloadnvp(ep2->nvp);
-				if (checkconstraints(fmep, ap->arrowp) == 0) {
+				(void) checkconstraints(fmep, ap->arrowp);
+				if (ap->arrowp->forever_true) {
 					/*
-					 * if any arrow is invalidated by the
+					 * if all arrows are invalidated by the
 					 * constraints, then we should elide the
 					 * whole bubble to be consistant with
 					 * the tree creation time behaviour
 					 */
-					bp->mark |= BUBBLE_ELIDED;
+					bp->mark |= BUBBLE_OK;
 					platform_set_payloadnvp(NULL);
 					break;
 				}
 				platform_set_payloadnvp(NULL);
 			}
 		}
-		if (bp->mark & BUBBLE_ELIDED)
-			continue;
-		bp->mark |= BUBBLE_OK;
 		for (ap = itree_next_arrow(bp, NULL); ap;
 		    ap = itree_next_arrow(bp, ap)) {
 			ep2 = ap->arrowp->head->myevent;
@@ -3721,6 +3850,10 @@ requirements_test(struct fme *fmep, struct event *ep,
 				}
 			else
 				deferred_events++;
+		}
+		if (!(bp->mark & BUBBLE_OK) && waiting_events == 0) {
+			bp->mark |= BUBBLE_ELIDED;
+			continue;
 		}
 		indent();
 		out(O_ALTFP|O_VERB, " Credible: %d Waiting %d",

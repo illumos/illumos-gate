@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,7 +100,7 @@ prop fault.io.hbus@hostbridge (0)->
 
 fru cpu;
 
-event fault.io.datapath@cpu,
+event fault.io.datapath@cpu, retire=0,
     FITrate=CPU_FIT, FRU=cpu;
 
 event error.io.cpu.ecc.thresh@cpu;

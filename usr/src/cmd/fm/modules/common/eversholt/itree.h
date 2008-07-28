@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * itree.h -- public definitions for itree module
@@ -37,6 +37,7 @@ extern "C" {
 
 /* the "fault" field in the event struct requires the definition of nvlist_t */
 #include <sys/fm/protocol.h>
+#include <fm/fmd_api.h>
 
 /* Numerical representation of propagation N value (A), short for All */
 #define	N_IS_ALL	-1
@@ -77,11 +78,13 @@ struct event {
 	struct event *suspects;
 	struct event *psuspects;
 	struct event *observations;	/* for lists like suspect list */
+	fmd_event_t *ffep;
 	nvlist_t *nvp;			/* payload nvp for ereports */
 	struct node *enode;		/* event node in parse tree */
 	const struct ipath *ipp;	/* instanced version of event */
 	struct lut *props;		/* instanced version of nvpairs */
 	struct lut *payloadprops;	/* nvpairs for problem payload */
+	struct lut *serdprops;		/* nvpairs for dynamic serd args */
 	int count;			/* for reports, number seen */
 	enum nametype t:3;		/* defined in tree.h */
 	int is_suspect:1;		/* true if on suspect list */

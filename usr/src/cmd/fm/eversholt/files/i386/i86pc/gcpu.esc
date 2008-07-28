@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,10 +37,6 @@
  */
 
 #pragma dictionary "GMCA"
-
-fru motherboard/chip;
-
-asru motherboard/chip/cpu;
 
 /*
  * Ereports for Simple error codes.
@@ -59,47 +55,19 @@ SMPL_EVENT(internal_unclassified);
 
 /*
  * Propogations for all but "external" and "unknown" simple errors.
- * If the error is uncorrected we produce a fault immediately, otherwise
- * we diagnose it to an upset and decalre a fault when the SERD engine
- * trips.
+ * If the error is uncorrected we produce a fault immediately by incrementing
+ * by N+1, otherwise we declare a fault when the SERD engine trips.
  */
 
-/* Simple fault event */
+#define	SMPL_N	3
+
+engine serd.cpu.generic-x86.simple@chip/cpu, N=SMPL_N, T=72h;
 event fault.cpu.generic-x86.internal@chip/cpu,
-    ASRU=motherboard/chip/cpu, FRU=motherboard/chip,
-    FITrate=1000;
-
-/* Produced when the correctable engine trips */
-event ereport.cpu.generic-x86.simple_trip@chip/cpu { within(1s) };
-
-/* Upset to diagnose corrected events to */
-event upset.cpu.generic-x86.simple@chip/cpu
     engine=serd.cpu.generic-x86.simple@chip/cpu;
 
-/* SERD engine for corrected simple errors */
-engine serd.cpu.generic-x86.simple@chip/cpu,
-	N=3, T=72h, method=persistent,
-	trip=ereport.cpu.generic-x86.simple_trip@chip/cpu;
-
-#define	STATUS_UC \
-	(payloadprop("error_uncorrected") + 0 == 1)
-
-/* Diagnose corrected events to upsets */
-prop upset.cpu.generic-x86.simple@chip/cpu
-    { !STATUS_UC } (1)->
-    ereport.cpu.generic-x86.microcode_rom_parity@chip/cpu,
-    ereport.cpu.generic-x86.internal_timer@chip/cpu,
-    ereport.cpu.generic-x86.unclassified@chip/cpu,
-    ereport.cpu.generic-x86.internal_unclassified@chip/cpu,
-    ereport.cpu.generic-x86.frc@chip/cpu;
-
-/* When the correctable engine trips, diagnose a fault */
-prop fault.cpu.generic-x86.internal@chip/cpu (0)->
-	ereport.cpu.generic-x86.simple_trip@chip/cpu;
-
-/* Diagnose uncorrected events to faults */
 prop fault.cpu.generic-x86.internal@chip/cpu
-    { STATUS_UC } (0)->
+    { payloadprop("error_uncorrected") == 1 ?
+	setserdincrement(SMPL_N + 1) : 1 } (1)->
     ereport.cpu.generic-x86.microcode_rom_parity@chip/cpu,
     ereport.cpu.generic-x86.internal_timer@chip/cpu,
     ereport.cpu.generic-x86.unclassified@chip/cpu,
@@ -163,7 +131,7 @@ CMPND_EVENT(bus_interconnect_memory);
 CMPND_EVENT(bus_interconnect_io);
 
 /*
- * Compound error propogations for all but bus_interconnect*.
+ * Compound error propogations
  *
  * We resist the temptation propogate, for example, a single dcache fault
  * to all ereports mentioning dcache (l0dcache, l1dcache, l2dcache, dcache).
@@ -172,41 +140,30 @@ CMPND_EVENT(bus_interconnect_io);
  *
  * Corrected errors are SERDed and produce a fault when the engine fires;
  * the same fault is diagnosed immediately for a corresponding uncorrected
- * error.
+ * error by incrementing the serd engine by n + 1.
  */
 
 #define	CMPND_FLT_PROP_1(erptleaf, fltleaf, n, t) \
-	/* Declare the fault that we can diagnose here */		\
+	engine serd.cpu.generic-x86.fltleaf@chip/cpu, N=n, T=t;		\
 	event fault.cpu.generic-x86.fltleaf@chip/cpu,			\
-	    FITrate=1000,						\
-	    FRU=motherboard/chip,					\
-	    ASRU=motherboard/chip/cpu;					\
-									\
-	/* Produced when the correctable engine trips */		\
-	event ereport.cpu.generic-x86.fltleaf/**/_error@chip/cpu	\
-	    { within(1s) };						\
-									\
-	/* Upset to diagnose corrected events to */			\
-	event upset.cpu.generic-x86.fltleaf@chip/cpu,			\
 	    engine=serd.cpu.generic-x86.fltleaf@chip/cpu;		\
 									\
-	/* SERD engine for corrected events */				\
-	engine serd.cpu.generic-x86.fltleaf@chip/cpu,			\
-	    N=n, T=t, method=persistent,				\
-	    trip=ereport.cpu.generic-x86.fltleaf/**/_error@chip/cpu;	\
-									\
-	/* Diagnose corrected events to the corresponding upset	*/	\
-	prop upset.cpu.generic-x86.fltleaf@chip/cpu (1)->		\
-	    ereport.cpu.generic-x86.erptleaf@chip/cpu;			\
-									\
-	/* When the engine trips, diagnose a fault */			\
-	prop fault.cpu.generic-x86.fltleaf@chip/cpu (0)->		\
-	    ereport.cpu.generic-x86.fltleaf/**/_error@chip/cpu;		\
-									\
-	/* Produce immediate faults for uncorrected errors */		\
-	prop fault.cpu.generic-x86.fltleaf@chip/cpu (0)->		\
+        prop fault.cpu.generic-x86.fltleaf@chip/cpu (0)->		\
+            ereport.cpu.generic-x86.erptleaf@chip/cpu;                  \
+	prop fault.cpu.generic-x86.fltleaf@chip/cpu			\
+	    { setserdincrement(n + 1) } (0)->				\
 	    ereport.cpu.generic-x86.erptleaf/**/_uc@chip/cpu
 
+#define	CMPND_FLT_PROP_2(erptleaf, fltleaf, n, t) \
+	engine serd.cpu.generic-x86.fltleaf@chip/cpu, N=n, T=t;		\
+	event fault.cpu.generic-x86.fltleaf@chip/cpu, retire=0,		\
+	    response=0, engine=serd.cpu.generic-x86.fltleaf@chip/cpu;	\
+									\
+        prop fault.cpu.generic-x86.fltleaf@chip/cpu (0)->		\
+            ereport.cpu.generic-x86.erptleaf@chip/cpu;                  \
+	prop fault.cpu.generic-x86.fltleaf@chip/cpu			\
+	    { setserdincrement(n + 1) } (0)->				\
+	    ereport.cpu.generic-x86.erptleaf/**/_uc@chip/cpu
 
 CMPND_FLT_PROP_1(l0cache, l0cache, 3, 72h);
 CMPND_FLT_PROP_1(l1cache, l1cache, 3, 72h);
@@ -237,43 +194,6 @@ CMPND_FLT_PROP_1(l0icache, l0icache, 3, 72h);
 CMPND_FLT_PROP_1(l1icache, l1icache, 3, 72h);
 CMPND_FLT_PROP_1(l2icache, l2icache, 3, 72h);
 CMPND_FLT_PROP_1(icache, icache, 12, 72h);
-
-/*
- * Compound error propogations for bus_interconnect* - as above but
- * with no FRU.
- */
-
-#define	CMPND_FLT_PROP_2(erptleaf, fltleaf, n, t) \
-	/* Declare the fault that we can diagnose here */		\
-	event fault.cpu.generic-x86.fltleaf@chip/cpu,			\
-	    FITrate=1000,						\
-	    ASRU=motherboard/chip/cpu;					\
-									\
-	/* Produced when the correctable engine trips */		\
-	event ereport.cpu.generic-x86.fltleaf/**/_error@chip/cpu	\
-	    { within(1s) };						\
-									\
-	/* Upset to diagnose corrected events to */			\
-	event upset.cpu.generic-x86.fltleaf@chip/cpu,			\
-	    engine=serd.cpu.generic-x86.fltleaf@chip/cpu;		\
-									\
-	/* SERD engine for corrected events */				\
-	engine serd.cpu.generic-x86.fltleaf@chip/cpu,			\
-	    N=n, T=t, method=persistent,				\
-	    trip=ereport.cpu.generic-x86.fltleaf/**/_error@chip/cpu;	\
-									\
-	/* Diagnose corrected events to the corresponding upset	*/	\
-	prop upset.cpu.generic-x86.fltleaf@chip/cpu (1)->		\
-	    ereport.cpu.generic-x86.erptleaf@chip/cpu;			\
-									\
-	/* When the engine trips, diagnose a fault */			\
-	prop fault.cpu.generic-x86.fltleaf@chip/cpu (0)->		\
-	    ereport.cpu.generic-x86.fltleaf/**/_error@chip/cpu;		\
-									\
-	/* Produce immediate faults for uncorrected errors */		\
-	prop fault.cpu.generic-x86.fltleaf@chip/cpu (0)->		\
-	    ereport.cpu.generic-x86.erptleaf/**/_uc@chip/cpu
-
 
 CMPND_FLT_PROP_2(bus_interconnect, bus_interconnect, 10, 72h);
 CMPND_FLT_PROP_2(bus_interconnect_memory, bus_interconnect_memory, 10, 72h);

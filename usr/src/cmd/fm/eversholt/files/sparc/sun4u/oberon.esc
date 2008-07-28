@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /* 
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved. 
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved. 
  * Use is subject to license terms. 
  */ 
 
@@ -113,7 +113,7 @@ prop fault.io.oberon@hostbridge/pciexrc (0)->
  */
 
 #define SW_FIT			5000	/* No real fit rate, SW */
-event fault.io.fire.hb.sw-config@hostbridge/pciexrc,
+event fault.io.fire.hb.sw-config@hostbridge/pciexrc, retire=0, response=0,
     FITrate=SW_FIT;
  
 prop fault.io.fire.hb.sw-config@hostbridge/pciexrc (0)-> 

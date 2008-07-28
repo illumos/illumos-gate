@@ -114,6 +114,11 @@ static const struct {
 	 */
 	{ "is_connected", PATHFUNC },
 	{ "is_under", PATHFUNC },
+	{ "is_on", PATHFUNC },
+	{ "is_present", PATHFUNC },
+	{ "is_type", PATHFUNC },
+	{ "confprop", PATHFUNC },
+	{ "confprop_defined", PATHFUNC },
 };
 
 /*

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,6 +28,12 @@
 
 include ../../Makefile.com
 include $(SRC)/Makefile.master.64
+
+LDLIBS += \
+	-L$(ROOTLIB)/fm/$(MACH64) -ltopo
+LDFLAGS += -R/usr/lib/fm/$(MACH64)
+
+
 include ../../Makefile.targ
 
 install: all $(ROOTPROG64)

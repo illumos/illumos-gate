@@ -32,25 +32,13 @@
  * Eversholt rules for the AMD Opteron CPU/Memory
  */
 
-fru motherboard;
-fru chip;
-fru dimm; 
-
-asru chip/cpu;
-asru dimm;
-asru dimm/rank; 
-asru dram-channel;
-asru chip/memory-controller/chip-select;
-
 #define	MAX(x, y) ((x) >= (y) ? (x) : (y))
 #define	MIN(x, y) ((x) <= (y) ? (x) : (y))
 
 /*
  * SET_ADDR and SET_OFFSET are used to set a payload value in the fault that
  * we diagnose for page faults, to record the physical address of the faulting
- * page.  The "asru-" prefix is hooked in the "rewrite-ASRU" confcalls made on
- * diagnosis of associated faults when the libtopo mem scheme rewrites the
- * asru in "mem" scheme.
+ * page.
  */
 #define	SET_ADDR (setpayloadprop("asru-physaddr", payloadprop("IA32_MCi_ADDR")))
 
@@ -104,7 +92,8 @@ asru chip/memory-controller/chip-select;
 	(payloadprop("syndrome-type") == "C" &&				\
 	!CKSINGLE(payloadprop("syndrome")))
 
-/* 
+/*								#PAGE#
+ *								#DIMM_SCU#
  * A single bit fault in a memory rank can cause:
  * 
  *  - mem_ce : reported by nb
@@ -118,7 +107,7 @@ asru chip/memory-controller/chip-select;
  * trips we diagnose a fault.memory.page so that the response agent can
  * retire the page that caused the trip.  If the total number of pages
  * faulted in this way on a single rank exceeds a threshold we will
- * diagnose a fault.memory.dimm_sb against the containing.
+ * diagnose a fault.memory.dimm_sb against the containing dimm.
  *
  * Multibit ChipKill-correctable errors are treated identically to
  * single-bit errors, but via separate serd engines to allow distinct
@@ -138,21 +127,10 @@ event ereport.cpu.amd.bu.s_ecc1@chip/cpu{within(5s)};
 event ereport.cpu.amd.nb.mem_ce@chip/cpu{within(5s)};
 
 /*
- * If the address is not valid then no resource member will be included
- * in a nb.mem_ce or nb.mem_ue ereport.  These cases should be rare.
- * We will also discard all inf_sys_ecc1 events detected at the ic since they
- * have no syndrome and therefore no resource information.
- * We will discard such ereports.  An alternative may be to SERD them 
- * on a per MC basis and trip if we see too many such events.
- */
-
-event upset.memory.discard1@chip/cpu;
-
-/*								#PAGE#
- * Single-bit correctable errors are diagnosed as upsets and feed into per-rank
+ * Single-bit correctable errors feed into per-rank
  * SERD engines which diagnose fault.memory.page_sb if they trip.
  *
- * Multi-bit correctable (via ChipKill) errors are diagnosed as upsets and feed
+ * Multi-bit correctable (via ChipKill) errors feed
  * into additional per-rank SERD engines which diagnose fault.memory.page_ck
  * if they trip.
  *
@@ -161,11 +139,31 @@ event upset.memory.discard1@chip/cpu;
  * whether to declare a dimm faulty after repeated page faults.
  */
 
-#define PAGE_FIT		1
 #define PAGE_SB_COUNT		2
 #define PAGE_SB_TIME		72h
 #define	PAGE_CK_COUNT		2
 #define	PAGE_CK_TIME		72h
+
+engine stat.sbpgflt@chip/memory-controller/dimm/rank;
+engine stat.ckpgflt@chip/memory-controller/dimm/rank;
+engine serd.memory.page_sb@chip/memory-controller/dimm/rank,
+    N=PAGE_SB_COUNT, T=PAGE_SB_TIME;
+engine serd.memory.page_ck@chip/memory-controller/dimm/rank,
+    N=PAGE_CK_COUNT, T=PAGE_CK_TIME;
+engine serd.memory.dimm_sb@chip/memory-controller/dimm/rank,
+    N=PAGE_SB_COUNT, T=PAGE_SB_TIME;
+engine serd.memory.dimm_ck@chip/memory-controller/dimm/rank,
+    N=PAGE_CK_COUNT, T=PAGE_CK_TIME;
+event fault.memory.page_sb@chip/memory-controller/dimm/rank, message=0,
+    count=stat.sbpgflt@chip/memory-controller/dimm/rank, response=0,
+    engine=serd.memory.page_sb@chip/memory-controller/dimm/rank;
+event fault.memory.page_ck@chip/memory-controller/dimm/rank, message=0,
+    count=stat.ckpgflt@chip/memory-controller/dimm/rank, response=0,
+    engine=serd.memory.page_ck@chip/memory-controller/dimm/rank;
+event fault.memory.dimm_sb@chip/memory-controller/dimm/rank,
+    engine=serd.memory.dimm_sb@chip/memory-controller/dimm/rank;
+event fault.memory.dimm_ck@chip/memory-controller/dimm/rank,
+    engine=serd.memory.dimm_ck@chip/memory-controller/dimm/rank;
 
 /*
  * The fraction of pages on a single rank that must be diagnosed as faulty
@@ -211,7 +209,7 @@ event upset.memory.discard1@chip/cpu;
  * never more than 512.
  */
 #define	RANK_THRESH MIN(512, MAX(128, \
-	_BPS_PGCNT(confprop(asru(chip/memory-controller/dimm/rank), "size"))))
+	_BPS_PGCNT(confprop(chip/memory-controller/dimm/rank, "size"))))
 
 /*
  * The maximum number of single-correctable-unit page faults we will diagnose
@@ -220,98 +218,10 @@ event upset.memory.discard1@chip/cpu;
  */
 #define	RANK_PGFLT_MAX (2 * RANK_THRESH)
 
-engine stat.sbpgflt@chip/memory-controller/dimm/rank;
-engine stat.ckpgflt@chip/memory-controller/dimm/rank;
-
-event fault.memory.page_sb@chip/memory-controller/dimm/rank,
-    FITrate=PAGE_FIT, FRU=dimm, ASRU=dimm/rank, message=0,
-    count=stat.sbpgflt@chip/memory-controller/dimm/rank,
-    action=confcall("rewrite-ASRU"); /* rewrite ASRU to identify page in rank */
-
 #define	SB_PGFLTS (count(stat.sbpgflt@chip/memory-controller/dimm/rank))
-
-event fault.memory.page_ck@chip/memory-controller/dimm/rank,
-    FITrate=PAGE_FIT, FRU=dimm, ASRU=dimm/rank, message=0,
-    count=stat.ckpgflt@chip/memory-controller/dimm/rank,
-    action=confcall("rewrite-ASRU"); /* rewrite ASRU to identify page in rank */
-
 #define	CK_PGFLTS (count(stat.ckpgflt@chip/memory-controller/dimm/rank))
 
-#define	RANK_PGFLT_LIMIT_REACHED \
-    (SB_PGFLTS + CK_PGFLTS > RANK_PGFLT_MAX)
-
-event ereport.memory.page_sb_trip@chip/memory-controller/dimm/rank{within(5s)};
-engine serd.memory.page_sb@chip/memory-controller/dimm/rank,
-    N=PAGE_SB_COUNT, T=PAGE_SB_TIME, method=persistent,
-    trip=ereport.memory.page_sb_trip@chip/memory-controller/dimm/rank;
-event upset.memory.page_sb@chip/memory-controller/dimm/rank,
-    engine=serd.memory.page_sb@chip/memory-controller/dimm/rank;
-
-event ereport.memory.page_ck_trip@chip/memory-controller/dimm/rank{within(5s)};
-engine serd.memory.page_ck@chip/memory-controller/dimm/rank,
-    N=PAGE_CK_COUNT, T=PAGE_CK_TIME, method=persistent,
-    trip=ereport.memory.page_ck_trip@chip/memory-controller/dimm/rank;
-event upset.memory.page_ck@chip/memory-controller/dimm/rank,
-    engine=serd.memory.page_ck@chip/memory-controller/dimm/rank;
-
-event upset.memory.overpgfltlimit@chip/memory-controller/dimm/rank;
-
-/*
- * If we have not reached the per-rank limit on faulted pages then
- * continue to explain ereport observations as upsets which can lead
- * lead to page fault diagnoses if the serd engine trips.
- */
-prop upset.memory.page_sb@chip/memory-controller/dimm/rank
-    { CONTAINS_RANK && SINGLE_BIT_CE && !RANK_PGFLT_LIMIT_REACHED } (0)->
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
-    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
-    ereport.cpu.amd.nb.mem_ce@chip/cpu;
-
-prop upset.memory.page_ck@chip/memory-controller/dimm/rank
-    { CONTAINS_RANK && MULTI_BIT_CE && !RANK_PGFLT_LIMIT_REACHED } (0)->
-    /* no dc.inf_sys_ecc1 or bu.s_ecc1 in ChipKill mode */
-    ereport.cpu.amd.nb.mem_ce@chip/cpu;
-
-/*
- * If we have reached the per-rank limit on faulted pages then diagnose
- * further observations on the rank to a engine-less upset (i.e., discard
- * them).
- */
-prop upset.memory.overpgfltlimit@chip/memory-controller/dimm/rank
-    { CONTAINS_RANK && RANK_PGFLT_LIMIT_REACHED } (1)->
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
-    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
-    ereport.cpu.amd.nb.mem_ce@chip/cpu;
-  
-prop fault.memory.page_sb@chip/memory-controller/dimm/rank (1)->
-    ereport.memory.page_sb_trip@chip/memory-controller/dimm/rank;
-
-prop fault.memory.page_ck@chip/memory-controller/dimm/rank (1)->
-    ereport.memory.page_ck_trip@chip/memory-controller/dimm/rank;
-
-prop fault.memory.page_sb@chip/memory-controller/dimm/rank
-    { CONTAINS_RANK && SET_ADDR && SET_OFFSET } (0)->
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
-    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
-    ereport.cpu.amd.nb.mem_ce@chip/cpu;
-
-prop fault.memory.page_ck@chip/memory-controller/dimm/rank
-    { CONTAINS_RANK && SET_ADDR && SET_OFFSET } (0)->
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
-    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
-    ereport.cpu.amd.nb.mem_ce@chip/cpu;
-
-/*
- * Discard memory ereports that do not indicate a resource.
- */
-prop upset.memory.discard1@chip/cpu
-    { !RESOURCE_EXISTS } (1)->
-    ereport.cpu.amd.ic.inf_sys_ecc1@chip/cpu,
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
-    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
-    ereport.cpu.amd.nb.mem_ce@chip/cpu;
-
-/*								#DIMM_SCU#
+/* 
  * "Single-correctable-unit" DIMM faults are diagnosed when the total number of
  * page faults (diagnosed from repeated single-bit or multibit-chipkills)
  * from any one rank on that DIMM reaches a threshold.  A "correctable unit"
@@ -330,81 +240,49 @@ prop upset.memory.discard1@chip/cpu
  *
  * Implementation: we maintain parallel SERD engines to the page_sb and
  * page_ck engines, which trip in unison.  On trip it generates a distinct
- * ereport which we diagnose to a fault if the threshold has been
- * reached, or to a throwaway upset if not.
- *
+ * ereport which we diagnose to a fault if the threshold has been reached.
  */
-
-#define DIMM_SB_FIT		2000 
-#define DIMM_CK_FIT		4000 
-
-event fault.memory.dimm_sb@chip/memory-controller/dimm/rank,
-    FITrate=DIMM_SB_FIT, FRU=dimm, ASRU=dimm,
-    action=confcall("rewrite-ASRU"); /* rewrite non-leaf ASRU in mem scheme */
-
-event fault.memory.dimm_ck@chip/memory-controller/dimm/rank,
-    FITrate=DIMM_CK_FIT, FRU=dimm, ASRU=dimm,
-    action=confcall("rewrite-ASRU"); /* rewrite non-leaf ASRU in mem scheme */
-
-event ereport.memory.dimm_sb_trip@chip/memory-controller/dimm/rank
-	{ within(5s) };
-engine serd.memory.dimm_sb@chip/memory-controller/dimm/rank,
-    N=PAGE_SB_COUNT, T=PAGE_SB_TIME, method=persistent,
-    trip=ereport.memory.dimm_sb_trip@chip/memory-controller/dimm/rank;
-event upset.memory.dimm_sb@chip/memory-controller/dimm/rank,
-    engine=serd.memory.dimm_sb@chip/memory-controller/dimm/rank;
-
-event ereport.memory.dimm_ck_trip@chip/memory-controller/dimm/rank
-	{ within(5s) };
-engine serd.memory.dimm_ck@chip/memory-controller/dimm/rank,
-    N=PAGE_CK_COUNT, T=PAGE_CK_TIME, method=persistent,
-    trip=ereport.memory.dimm_ck_trip@chip/memory-controller/dimm/rank;
-event upset.memory.dimm_ck@chip/memory-controller/dimm/rank,
-    engine=serd.memory.dimm_ck@chip/memory-controller/dimm/rank;
-
-event upset.memory.discard2@chip/memory-controller/dimm/rank;
-
-prop upset.memory.dimm_sb@chip/memory-controller/dimm/rank
-    { CONTAINS_RANK && SINGLE_BIT_CE } (0)->
+prop fault.memory.page_sb@chip/memory-controller/dimm/rank
+    { CONTAINS_RANK && SINGLE_BIT_CE &&
+      SB_PGFLTS + CK_PGFLTS < RANK_PGFLT_MAX && SET_ADDR && SET_OFFSET } (1)->
     ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
     ereport.cpu.amd.bu.s_ecc1@chip/cpu,
     ereport.cpu.amd.nb.mem_ce@chip/cpu;
 
-prop upset.memory.dimm_ck@chip/memory-controller/dimm/rank
-    { CONTAINS_RANK && MULTI_BIT_CE } (0)->
+prop fault.memory.page_ck@chip/memory-controller/dimm/rank
+    { CONTAINS_RANK && !SINGLE_BIT_CE &&
+      SB_PGFLTS + CK_PGFLTS < RANK_PGFLT_MAX && SET_ADDR && SET_OFFSET } (1)->
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
+    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
+    ereport.cpu.amd.nb.mem_ce@chip/cpu;
+
+prop fault.memory.dimm_sb@chip/memory-controller/dimm/rank
+    { CONTAINS_RANK && SB_PGFLTS + CK_PGFLTS > RANK_THRESH &&
+      SB_PGFLTS > RANK_THRESH / 2 } (1)->
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
+    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
+    ereport.cpu.amd.nb.mem_ce@chip/cpu;
+
+prop fault.memory.dimm_ck@chip/memory-controller/dimm/rank
+    { CONTAINS_RANK && SB_PGFLTS + CK_PGFLTS > RANK_THRESH &&
+      CK_PGFLTS > RANK_THRESH / 2 } (1)->
     ereport.cpu.amd.nb.mem_ce@chip/cpu;
 
 /*
- * The following two propogations diagnose a fault.memory.dimm_sb when
- * either the dimm_sb or dimm_ck engine trips (for a new page fault)
- * and the total number of page faults (sb and ck) exceeds the threshold
- * value with the majority being from sb page faults.
+ * If the address is not valid then no resource member will be included
+ * in a nb.mem_ce or nb.mem_ue ereport.  These cases should be rare.
+ * We will also discard all inf_sys_ecc1 events detected at the ic since they
+ * have no syndrome and therefore no resource information.
+ * We will discard such ereports.  An alternative may be to SERD them 
+ * on a per MC basis and trip if we see too many such events.
  */
-prop fault.memory.dimm_sb@chip/memory-controller/dimm/rank (0)->
-    ereport.memory.dimm_sb_trip@chip/memory-controller/dimm/rank
-    { SB_PGFLTS + CK_PGFLTS > RANK_THRESH && SB_PGFLTS > RANK_THRESH / 2 };
-
-prop fault.memory.dimm_sb@chip/memory-controller/dimm/rank (0)->
-    ereport.memory.dimm_ck_trip@chip/memory-controller/dimm/rank
-    { SB_PGFLTS + CK_PGFLTS > RANK_THRESH && SB_PGFLTS > RANK_THRESH / 2 };
-
-/*
- * The following two propogation diagnose a fault.memory.dimm_ck when
- * either the dimm_sb or dimm_ck engine trip (for a new page fault)
- * and the total number of page faults (sb and ck) exceeds the threshold
- * value with the majority  being from ck page faults.
- */
-prop fault.memory.dimm_ck@chip/memory-controller/dimm/rank (0)->
-    ereport.memory.dimm_sb_trip@chip/memory-controller/dimm/rank
-    { SB_PGFLTS + CK_PGFLTS > RANK_THRESH && CK_PGFLTS > RANK_THRESH / 2 };
-
-prop fault.memory.dimm_ck@chip/memory-controller/dimm/rank (0)->
-    ereport.memory.dimm_ck_trip@chip/memory-controller/dimm/rank
-    { SB_PGFLTS + CK_PGFLTS > RANK_THRESH && CK_PGFLTS > RANK_THRESH / 2 };
-
-prop upset.memory.discard2@chip/memory-controller/dimm/rank (1)->
-    ereport.memory.dimm_sb_trip@chip/memory-controller/dimm/rank,
-    ereport.memory.dimm_ck_trip@chip/memory-controller/dimm/rank;
+event upset.memory.discard1@chip/cpu;
+prop upset.memory.discard1@chip/cpu
+    { !RESOURCE_EXISTS } (1)->
+    ereport.cpu.amd.ic.inf_sys_ecc1@chip/cpu,
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
+    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
+    ereport.cpu.amd.nb.mem_ce@chip/cpu;
 
 /* 								#DIMM_UE#
  *								#PAGE_UE#
@@ -414,72 +292,35 @@ prop upset.memory.discard2@chip/memory-controller/dimm/rank (1)->
  *  - inf_sys_eccm : reported by ic or dc; the ic does not report a syndrome
  *  - s_eccm	   : reported by bu
  *
- * Note we use a SERD engine here simply as a way of ensuring that we get
- * both dimm and page faults reported.
- *
  * Since on production systems we force HT Sync Flood on uncorrectable
  * memory errors (if not already set as such by the BIOS, as it should be)
  * we won't actually receive these ereports since the system will be reset.
  */ 
-
-#define DIMM_UE_FIT		6000 
 
 event ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu{within(5s)};
 event ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu{within(5s)};
 event ereport.cpu.amd.bu.s_eccm@chip/cpu{within(5s)};
 event ereport.cpu.amd.nb.mem_ue@chip/cpu{within(5s)};
 
-event fault.memory.dimm_ue@chip/memory-controller/dimm/rank,
-    FITrate=DIMM_UE_FIT, FRU=dimm, ASRU=dimm,
-    action=confcall("rewrite-ASRU"); /* rewrite non-leaf ASRU in mem scheme */
+event fault.memory.dimm_ue@chip/memory-controller/dimm/rank;
+event fault.memory.page_ue@chip/memory-controller/dimm/rank, message=0,
+    response=0;
 
-event fault.memory.page_ue@chip/memory-controller/dimm/rank,
-    FITrate=PAGE_FIT, FRU=dimm, ASRU=dimm/rank, message=0,
-    action=confcall("rewrite-ASRU"); /* rewrite ASRU to identify page in rank */
-
-event ereport.memory.dimm_ue_trip@chip/memory-controller/dimm/rank{within(5s)};
-engine serd.memory.dimm_ue@chip/memory-controller/dimm/rank,
-    N=0, T=1h, method=persistent,
-    trip=ereport.memory.dimm_ue_trip@chip/memory-controller/dimm/rank;
-event upset.memory.dimm_ue@chip/memory-controller/dimm/rank,
-    engine=serd.memory.dimm_ue@chip/memory-controller/dimm/rank;
-
-event ereport.memory.page_ue_trip@chip/memory-controller/dimm/rank{within(5s)};
-engine serd.memory.page_ue@chip/memory-controller/dimm/rank,
-    N=0, T=1h, method=persistent,
-    trip=ereport.memory.page_ue_trip@chip/memory-controller/dimm/rank;
-event upset.memory.page_ue@chip/memory-controller/dimm/rank,
-    engine=serd.memory.page_ue@chip/memory-controller/dimm/rank;
-
-event upset.memory.discard3@chip/cpu;
-
-prop upset.memory.page_ue@chip/memory-controller/dimm/rank
-    { CONTAINS_RANK } (0)->
+prop fault.memory.dimm_ue@chip/memory-controller/dimm/rank
+    { CONTAINS_RANK } (1)->
     ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu,
     ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu,
     ereport.cpu.amd.bu.s_eccm@chip/cpu,
     ereport.cpu.amd.nb.mem_ue@chip/cpu;
-
-prop upset.memory.dimm_ue@chip/memory-controller/dimm/rank
-    { CONTAINS_RANK } (0)->
-    ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu,
-    ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu,
-    ereport.cpu.amd.bu.s_eccm@chip/cpu,
-    ereport.cpu.amd.nb.mem_ue@chip/cpu;
-
-prop fault.memory.page_ue@chip/memory-controller/dimm/rank (1)->
-    ereport.memory.page_ue_trip@chip/memory-controller/dimm/rank;
 
 prop fault.memory.page_ue@chip/memory-controller/dimm/rank
-    { CONTAINS_RANK && SET_ADDR && SET_OFFSET } (0)-> 
+    { CONTAINS_RANK && SET_ADDR && SET_OFFSET } (1)->
     ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu,
     ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu,
     ereport.cpu.amd.bu.s_eccm@chip/cpu,
     ereport.cpu.amd.nb.mem_ue@chip/cpu;
 
-prop fault.memory.dimm_ue@chip/memory-controller/dimm/rank (1)-> 
-    ereport.memory.dimm_ue_trip@chip/memory-controller/dimm/rank;
-
+event upset.memory.discard3@chip/cpu;
 prop upset.memory.discard3@chip/cpu
     { !RESOURCE_EXISTS } (1)->
     ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu,
@@ -499,11 +340,7 @@ prop upset.memory.discard3@chip/cpu
  */
 
 event ereport.cpu.amd.mc.cs_testfail@chip/memory-controller{within(5s)};
-
-event fault.memory.dimm_testfail@chip/memory-controller/dimm/rank,
-    FITrate=1000, ASRU=dimm, FRU=dimm,
-    action=confcall("rewrite-ASRU"); /* rewrite non-leaf ASRU in mem scheme */
-
+event fault.memory.dimm_testfail@chip/memory-controller/dimm/rank;
 event error.memory.cs_testfail@chip/memory-controller/chip-select;
 
 #define	CONTAINS_CS (payloadprop_contains("resource", \
@@ -514,9 +351,9 @@ prop error.memory.cs_testfail@chip/memory-controller/chip-select (1)->
     { CONTAINS_CS };
 
 #define CSMATCH(s) \
-	(confprop_defined(asru(chip/memory-controller/chip-select), s) && \
-	confprop(asru(chip/memory-controller/chip-select), s) == \
-	confprop(asru(chip/memory-controller/dimm/rank), "csname"))
+	(confprop_defined(chip/memory-controller/chip-select, s) && \
+	confprop(chip/memory-controller/chip-select, s) == \
+	confprop(chip/memory-controller/dimm/rank, "csname"))
 
 prop fault.memory.dimm_testfail@chip/memory-controller/dimm/rank (1)->
     error.memory.cs_testfail@chip/memory-controller/chip-select
@@ -531,32 +368,11 @@ prop fault.memory.dimm_testfail@chip/memory-controller/dimm/rank (1)->
  */
 
 event ereport.cpu.amd.nb.dramaddr_par@chip/cpu{within(5s)};
-
-event fault.cpu.amd.dramchannel@chip/memory-controller/dram-channel,
-    FITrate=1000, ASRU=dram-channel;
-
-#define GET_CHANNEL ($chan = (payloadprop("IA32_MCi_STATUS") >> 32 & 0x200) ? \
-    1 : 0)
+event fault.cpu.amd.dramchannel@chip/memory-controller/dram-channel, response=0;
 
 prop fault.cpu.amd.dramchannel@chip/memory-controller/dram-channel[y] (0)->
-    ereport.cpu.amd.nb.dramaddr_par@chip/cpu { GET_CHANNEL && $chan == y };
-
-/*
- * l2 cache data errors.
- */
-
-#define L2CACHEDATA_FIT		1000 
-#define L2CACHEDATA_SB_COUNT	3
-#define L2CACHEDATA_SB_TIME	12h
-
-event fault.cpu.amd.l2cachedata@chip/cpu, FITrate=L2CACHEDATA_FIT,
-	FRU=chip, ASRU=chip/cpu;
-event error.cpu.amd.l2cachedata_sb@chip/cpu;
-event error.cpu.amd.l2cachedata_mb@chip/cpu;
-
-prop fault.cpu.amd.l2cachedata@chip/cpu (1)->
-    error.cpu.amd.l2cachedata_sb@chip/cpu,
-    error.cpu.amd.l2cachedata_mb@chip/cpu;
+    ereport.cpu.amd.nb.dramaddr_par@chip/cpu {
+    ((payloadprop("IA32_MCi_STATUS") >> 32 & 0x200) ? 1 : 0) == y };
 
 /* 								#L2D_SINGLE#
  * A single bit data array fault in an l2 cache can cause:
@@ -564,30 +380,17 @@ prop fault.cpu.amd.l2cachedata@chip/cpu (1)->
  *  - inf_l2_ecc1 : reported by ic on this cpu
  *  - inf_l2_ecc1 : reported by dc on this cpu
  *  - l2d_ecc1 : reported by bu on copyback or on snoop from another cpu 
- *
- * Single-bit errors are diagnosed to cache upsets.  SERD engines are used
- * to count upsets resulting from CEs.
  */ 
+
+#define L2CACHEDATA_SB_COUNT	3
+#define L2CACHEDATA_SB_TIME	12h
 
 event ereport.cpu.amd.ic.inf_l2_ecc1@chip/cpu{within(5s)};
 event ereport.cpu.amd.dc.inf_l2_ecc1@chip/cpu{within(5s)};
 event ereport.cpu.amd.bu.l2d_ecc1@chip/cpu{within(5s)};
-event ereport.cpu.amd.l2d_sb_trip@chip/cpu{within(5s)};
-
 engine serd.cpu.amd.l2d_sb@chip/cpu,
-    N=L2CACHEDATA_SB_COUNT, T=L2CACHEDATA_SB_TIME, method=persistent, 
-    trip=ereport.cpu.amd.l2d_sb_trip@chip/cpu;
-
-event upset.cpu.amd.l2d_sb@chip/cpu,
-	engine=serd.cpu.amd.l2d_sb@chip/cpu;
-
-prop upset.cpu.amd.l2d_sb@chip/cpu (1)->
-    ereport.cpu.amd.ic.inf_l2_ecc1@chip/cpu,
-    ereport.cpu.amd.dc.inf_l2_ecc1@chip/cpu,
-    ereport.cpu.amd.bu.l2d_ecc1@chip/cpu;
-
-prop error.cpu.amd.l2cachedata_sb@chip/cpu (1)-> 
-    ereport.cpu.amd.l2d_sb_trip@chip/cpu;
+    N=L2CACHEDATA_SB_COUNT, T=L2CACHEDATA_SB_TIME;
+event fault.cpu.amd.l2cachedata@chip/cpu, engine=serd.cpu.amd.l2d_sb@chip/cpu;
 
 prop fault.cpu.amd.l2cachedata@chip/cpu (0)->
     ereport.cpu.amd.ic.inf_l2_ecc1@chip/cpu,
@@ -606,61 +409,27 @@ event ereport.cpu.amd.ic.inf_l2_eccm@chip/cpu{within(5s)};
 event ereport.cpu.amd.dc.inf_l2_eccm@chip/cpu{within(5s)};
 event ereport.cpu.amd.bu.l2d_eccm@chip/cpu{within(5s)};
 
-prop error.cpu.amd.l2cachedata_mb@chip/cpu (1)->
+prop fault.cpu.amd.l2cachedata@chip/cpu
+    { setserdincrement(L2CACHEDATA_SB_COUNT + 1) } (0)->
     ereport.cpu.amd.ic.inf_l2_eccm@chip/cpu,
     ereport.cpu.amd.dc.inf_l2_eccm@chip/cpu,
     ereport.cpu.amd.bu.l2d_eccm@chip/cpu;
-
-prop fault.cpu.amd.l2cachedata@chip/cpu (0)->
-    ereport.cpu.amd.ic.inf_l2_eccm@chip/cpu,
-    ereport.cpu.amd.dc.inf_l2_eccm@chip/cpu,
-    ereport.cpu.amd.bu.l2d_eccm@chip/cpu;
-
-/*
- * l2 cache main tag errors
- */
-
-#define L2CACHETAG_FIT		1000 
-#define L2CACHETAG_SB_COUNT	3
-#define L2CACHETAG_SB_TIME	12h
-
-event fault.cpu.amd.l2cachetag@chip/cpu, FITrate=L2CACHETAG_FIT,
-	FRU=chip, ASRU=chip/cpu;
-event error.cpu.amd.l2cachetag_sb@chip/cpu;
-event error.cpu.amd.l2cachetag_mb@chip/cpu;
- 
-prop fault.cpu.amd.l2cachetag@chip/cpu (1)->
-    error.cpu.amd.l2cachetag_sb@chip/cpu,
-    error.cpu.amd.l2cachetag_mb@chip/cpu;
 
 /* 								#L2T_SINGLE#
  * A single bit tag array fault in an l2 cache can cause:
  * 
  *  - l2t_ecc1 : reported by bu on this cpu when detected during snoop
  *  - l2t_par : reported by bu on this cpu when detected other than during snoop
- *
- * Note that the bu.l2t_par ereport could be due to a single bit or multi bit
- * event. If the l2t_sb_trip has already triggered it will be treated as another
- * ce, otherwise it will be treated as a ue event.
  */ 
+
+#define L2CACHETAG_SB_COUNT	3
+#define L2CACHETAG_SB_TIME	12h
 
 event ereport.cpu.amd.bu.l2t_ecc1@chip/cpu{within(5s)};
 event ereport.cpu.amd.bu.l2t_par@chip/cpu{within(5s)};
-event ereport.cpu.amd.l2t_sb_trip@chip/cpu{within(5s)};
-
 engine serd.cpu.amd.l2t_sb@chip/cpu,
-    N=L2CACHETAG_SB_COUNT, T=L2CACHETAG_SB_TIME, method=persistent, 
-    trip=ereport.cpu.amd.l2t_sb_trip@chip/cpu;
-
-event upset.cpu.amd.l2t_sb@chip/cpu,
-	engine=serd.cpu.amd.l2t_sb@chip/cpu;
-
-prop upset.cpu.amd.l2t_sb@chip/cpu (1)->
-    ereport.cpu.amd.bu.l2t_ecc1@chip/cpu,
-    ereport.cpu.amd.bu.l2t_par@chip/cpu;
-
-prop error.cpu.amd.l2cachetag_sb@chip/cpu (1)-> 
-    ereport.cpu.amd.l2t_sb_trip@chip/cpu;
+    N=L2CACHETAG_SB_COUNT, T=L2CACHETAG_SB_TIME;
+event fault.cpu.amd.l2cachetag@chip/cpu, engine=serd.cpu.amd.l2t_sb@chip/cpu;
 
 prop fault.cpu.amd.l2cachetag@chip/cpu (0)->
     ereport.cpu.amd.bu.l2t_ecc1@chip/cpu,
@@ -675,11 +444,8 @@ prop fault.cpu.amd.l2cachetag@chip/cpu (0)->
 
 event ereport.cpu.amd.bu.l2t_eccm@chip/cpu{within(5s)};
 
-prop error.cpu.amd.l2cachetag_mb@chip/cpu (1)->
-    ereport.cpu.amd.bu.l2t_eccm@chip/cpu,
-    ereport.cpu.amd.bu.l2t_par@chip/cpu;
-
-prop fault.cpu.amd.l2cachetag@chip/cpu (0)->
+prop fault.cpu.amd.l2cachetag@chip/cpu
+    { setserdincrement(L2CACHETAG_SB_COUNT + 1) } (0)->
     ereport.cpu.amd.bu.l2t_eccm@chip/cpu,
     ereport.cpu.amd.bu.l2t_par@chip/cpu;
 
@@ -689,28 +455,14 @@ prop fault.cpu.amd.l2cachetag@chip/cpu (0)->
  *  - data_par : reported by ic on this cpu
  */ 
 
-#define ICACHEDATA_FIT		1000 
 #define ICACHEDATA_SB_COUNT	2
 #define ICACHEDATA_SB_TIME	168h
 
 event ereport.cpu.amd.ic.data_par@chip/cpu{within(5s)};
-event ereport.cpu.amd.ic_dp_trip@chip/cpu{within(5s)};
-
-event fault.cpu.amd.icachedata@chip/cpu, FITrate=ICACHEDATA_FIT,
-	FRU=chip, ASRU=chip/cpu;
- 
 engine serd.cpu.amd.icachedata@chip/cpu,
-    N=ICACHEDATA_SB_COUNT, T=ICACHEDATA_SB_TIME, method=persistent, 
-    trip=ereport.cpu.amd.ic_dp_trip@chip/cpu;
-
-event upset.cpu.amd.icachedata@chip/cpu,
-	engine=serd.cpu.amd.icachedata@chip/cpu;
-
-prop upset.cpu.amd.icachedata@chip/cpu (1)->
-    ereport.cpu.amd.ic.data_par@chip/cpu;
-
-prop fault.cpu.amd.icachedata@chip/cpu (1)-> 
-    ereport.cpu.amd.ic_dp_trip@chip/cpu;
+    N=ICACHEDATA_SB_COUNT, T=ICACHEDATA_SB_TIME;
+event fault.cpu.amd.icachedata@chip/cpu,
+    engine=serd.cpu.amd.icachedata@chip/cpu;
 
 prop fault.cpu.amd.icachedata@chip/cpu (0)->
     ereport.cpu.amd.ic.data_par@chip/cpu;
@@ -721,28 +473,13 @@ prop fault.cpu.amd.icachedata@chip/cpu (0)->
  *  - tag_par : reported by ic on this cpu
  */ 
 
-#define ICACHETAG_FIT		1000 
 #define ICACHETAG_SB_COUNT	2
 #define ICACHETAG_SB_TIME	168h
 
 event ereport.cpu.amd.ic.tag_par@chip/cpu{within(5s)};
-event ereport.cpu.amd.ic_tp_trip@chip/cpu{within(5s)};
-
-event fault.cpu.amd.icachetag@chip/cpu, FITrate=ICACHETAG_FIT,
-	FRU=chip, ASRU=chip/cpu;
- 
 engine serd.cpu.amd.icachetag@chip/cpu,
-    N=ICACHETAG_SB_COUNT, T=ICACHETAG_SB_TIME, method=persistent, 
-    trip=ereport.cpu.amd.ic_tp_trip@chip/cpu;
-
-event upset.cpu.amd.icachetag@chip/cpu,
-	engine=serd.cpu.amd.icachetag@chip/cpu;
-
-prop upset.cpu.amd.icachetag@chip/cpu (1)->
-    ereport.cpu.amd.ic.tag_par@chip/cpu;
-
-prop fault.cpu.amd.icachetag@chip/cpu (1)-> 
-    ereport.cpu.amd.ic_tp_trip@chip/cpu;
+    N=ICACHETAG_SB_COUNT, T=ICACHETAG_SB_TIME;
+event fault.cpu.amd.icachetag@chip/cpu, engine=serd.cpu.amd.icachetag@chip/cpu;
 
 prop fault.cpu.amd.icachetag@chip/cpu (0)->
     ereport.cpu.amd.ic.tag_par@chip/cpu;
@@ -753,12 +490,8 @@ prop fault.cpu.amd.icachetag@chip/cpu (0)->
  *  - stag_par : reported by ic on this cpu
  */ 
 
-#define ICACHESTAG_FIT		1000 
-
 event ereport.cpu.amd.ic.stag_par@chip/cpu{within(5s)};
-
-event fault.cpu.amd.icachestag@chip/cpu, FITrate=ICACHESTAG_FIT,
-	FRU=chip, ASRU=chip/cpu;
+event fault.cpu.amd.icachestag@chip/cpu;
  
 prop fault.cpu.amd.icachestag@chip/cpu (1)->
     ereport.cpu.amd.ic.stag_par@chip/cpu;
@@ -769,28 +502,13 @@ prop fault.cpu.amd.icachestag@chip/cpu (1)->
  *  - l1tlb_par : reported by ic on this cpu
  */ 
 
-#define ICACHEL1TLB_FIT		1000 
 #define ICACHEL1TLB_SB_COUNT	2
 #define ICACHEL1TLB_SB_TIME	168h
 
 event ereport.cpu.amd.ic.l1tlb_par@chip/cpu{within(5s)};
-event ereport.cpu.amd.ic_l1tlb_trip@chip/cpu{within(5s)};
-
-event fault.cpu.amd.l1itlb@chip/cpu, FITrate=ICACHEL1TLB_FIT,
-	FRU=chip, ASRU=chip/cpu;
- 
 engine serd.cpu.amd.l1itlb@chip/cpu,
-    N=ICACHEL1TLB_SB_COUNT, T=ICACHEL1TLB_SB_TIME, method=persistent, 
-    trip=ereport.cpu.amd.ic_l1tlb_trip@chip/cpu;
-
-event upset.cpu.amd.l1itlb@chip/cpu,
-	engine=serd.cpu.amd.l1itlb@chip/cpu;
-
-prop upset.cpu.amd.l1itlb@chip/cpu (1)->
-    ereport.cpu.amd.ic.l1tlb_par@chip/cpu;
-
-prop fault.cpu.amd.l1itlb@chip/cpu (1)-> 
-    ereport.cpu.amd.ic_l1tlb_trip@chip/cpu;
+    N=ICACHEL1TLB_SB_COUNT, T=ICACHEL1TLB_SB_TIME;
+event fault.cpu.amd.l1itlb@chip/cpu, engine=serd.cpu.amd.l1itlb@chip/cpu;
 
 prop fault.cpu.amd.l1itlb@chip/cpu (0)->
     ereport.cpu.amd.ic.l1tlb_par@chip/cpu;
@@ -801,48 +519,16 @@ prop fault.cpu.amd.l1itlb@chip/cpu (0)->
  *  - l2tlb_par : reported by ic on this cpu
  */ 
 
-#define ICACHEL2TLB_FIT		1000 
 #define ICACHEL2TLB_SB_COUNT	2
 #define ICACHEL2TLB_SB_TIME	168h
 
 event ereport.cpu.amd.ic.l2tlb_par@chip/cpu{within(5s)};
-event ereport.cpu.amd.ic_l2tlb_trip@chip/cpu{within(5s)};
-
-event fault.cpu.amd.l2itlb@chip/cpu, FITrate=ICACHEL2TLB_FIT,
-	FRU=chip, ASRU=chip/cpu;
- 
 engine serd.cpu.amd.l2itlb@chip/cpu,
-    N=ICACHEL2TLB_SB_COUNT, T=ICACHEL2TLB_SB_TIME, method=persistent, 
-    trip=ereport.cpu.amd.ic_l2tlb_trip@chip/cpu;
-
-event upset.cpu.amd.l2itlb@chip/cpu,
-	engine=serd.cpu.amd.l2itlb@chip/cpu;
-
-prop upset.cpu.amd.l2itlb@chip/cpu (1)->
-    ereport.cpu.amd.ic.l2tlb_par@chip/cpu;
-
-prop fault.cpu.amd.l2itlb@chip/cpu (1)-> 
-    ereport.cpu.amd.ic_l2tlb_trip@chip/cpu;
+    N=ICACHEL2TLB_SB_COUNT, T=ICACHEL2TLB_SB_TIME;
+event fault.cpu.amd.l2itlb@chip/cpu, engine=serd.cpu.amd.l2itlb@chip/cpu;
 
 prop fault.cpu.amd.l2itlb@chip/cpu (0)->
     ereport.cpu.amd.ic.l2tlb_par@chip/cpu;
-
-/*
- * dcache data errors
- */
-
-#define DCACHEDATA_FIT		1000 
-#define DCACHEDATA_SB_COUNT	2
-#define DCACHEDATA_SB_TIME	168h
-
-event fault.cpu.amd.dcachedata@chip/cpu, FITrate=DCACHEDATA_FIT,
-	FRU=chip, ASRU=chip/cpu;
-event error.cpu.amd.dcachedata_sb@chip/cpu;
-event error.cpu.amd.dcachedata_mb@chip/cpu;
- 
-prop fault.cpu.amd.dcachedata@chip/cpu (1)->
-    error.cpu.amd.dcachedata_sb@chip/cpu,
-    error.cpu.amd.dcachedata_mb@chip/cpu;
 
 /* 								#DCD_SINGLE#
  * A single bit data array fault in an D cache can cause:
@@ -850,39 +536,21 @@ prop fault.cpu.amd.dcachedata@chip/cpu (1)->
  *  - data_ecc1 : reported by dc on this cpu by scrubber
  *  - data_ecc1_uc : reported by dc on this cpu other than by scrubber
  *
- * Make data_ecc1_uc fault immediately as it may have caused a panic
+ * Make data_ecc1_uc fault immediately as it may have caused a panic, so
+ * it is handled by the multi-bit case in the following section.
  */ 
+
+#define DCACHEDATA_SB_COUNT	2
+#define DCACHEDATA_SB_TIME	168h
 
 event ereport.cpu.amd.dc.data_ecc1@chip/cpu{within(5s)};
 event ereport.cpu.amd.dc.data_ecc1_uc@chip/cpu{within(5s)};
-event ereport.cpu.amd.dc_sb_trip@chip/cpu{within(5s)};
-
 engine serd.cpu.amd.dc_sb@chip/cpu,
-    N=DCACHEDATA_SB_COUNT, T=DCACHEDATA_SB_TIME, method=persistent, 
-    trip=ereport.cpu.amd.dc_sb_trip@chip/cpu;
-
-engine serd.cpu.amd.dc_sb_uc@chip/cpu,
-    N=0, T=1hr, method=persistent, 
-    trip=ereport.cpu.amd.dc_sb_trip@chip/cpu;
-
-event upset.cpu.amd.dc_sb@chip/cpu,
-	engine=serd.cpu.amd.dc_sb@chip/cpu;
-
-event upset.cpu.amd.dc_sb_uc@chip/cpu,
-	engine=serd.cpu.amd.dc_sb_uc@chip/cpu;
-
-prop upset.cpu.amd.dc_sb@chip/cpu (1)->
-    ereport.cpu.amd.dc.data_ecc1@chip/cpu;
-
-prop upset.cpu.amd.dc_sb_uc@chip/cpu (1)->
-    ereport.cpu.amd.dc.data_ecc1_uc@chip/cpu;
-
-prop error.cpu.amd.dcachedata_sb@chip/cpu (1)-> 
-    ereport.cpu.amd.dc_sb_trip@chip/cpu;
+    N=DCACHEDATA_SB_COUNT, T=DCACHEDATA_SB_TIME;
+event fault.cpu.amd.dcachedata@chip/cpu, engine=serd.cpu.amd.dc_sb@chip/cpu;
 
 prop fault.cpu.amd.dcachedata@chip/cpu (0)->
-    ereport.cpu.amd.dc.data_ecc1@chip/cpu,
-    ereport.cpu.amd.dc.data_ecc1_uc@chip/cpu;
+    ereport.cpu.amd.dc.data_ecc1@chip/cpu;
 
 /* 								#DCD_MULTI#
  * A multi-bit data array fault in an D cache can cause:
@@ -892,11 +560,10 @@ prop fault.cpu.amd.dcachedata@chip/cpu (0)->
 
 event ereport.cpu.amd.dc.data_eccm@chip/cpu{within(5s)};
 
-prop error.cpu.amd.dcachedata_mb@chip/cpu (1)->
-    ereport.cpu.amd.dc.data_eccm@chip/cpu;
-
-prop fault.cpu.amd.dcachedata@chip/cpu (0)->
-    ereport.cpu.amd.dc.data_eccm@chip/cpu;
+prop fault.cpu.amd.dcachedata@chip/cpu
+    { setserdincrement(L2CACHETAG_SB_COUNT + 1) } (0)->
+    ereport.cpu.amd.dc.data_eccm@chip/cpu,
+    ereport.cpu.amd.dc.data_ecc1_uc@chip/cpu;
 
 /* 								#DCT_PAR#
  * A tag array parity fault in an D cache can cause:
@@ -904,12 +571,8 @@ prop fault.cpu.amd.dcachedata@chip/cpu (0)->
  *  - tag_par : reported by dc on this cpu
  */ 
 
-#define DCACHETAG_FIT		1000 
-
 event ereport.cpu.amd.dc.tag_par@chip/cpu{within(5s)};
-
-event fault.cpu.amd.dcachetag@chip/cpu, FITrate=DCACHETAG_FIT,
-	FRU=chip, ASRU=chip/cpu;
+event fault.cpu.amd.dcachetag@chip/cpu;
  
 prop fault.cpu.amd.dcachetag@chip/cpu (1)->
     ereport.cpu.amd.dc.tag_par@chip/cpu;
@@ -920,12 +583,8 @@ prop fault.cpu.amd.dcachetag@chip/cpu (1)->
  *  - stag_par : reported by dc on this cpu
  */ 
 
-#define DCACHESTAG_FIT		1000 
-
 event ereport.cpu.amd.dc.stag_par@chip/cpu{within(5s)};
-
-event fault.cpu.amd.dcachestag@chip/cpu, FITrate=DCACHESTAG_FIT,
-	FRU=chip, ASRU=chip/cpu;
+event fault.cpu.amd.dcachestag@chip/cpu;
  
 prop fault.cpu.amd.dcachestag@chip/cpu (1)->
     ereport.cpu.amd.dc.stag_par@chip/cpu;
@@ -936,12 +595,8 @@ prop fault.cpu.amd.dcachestag@chip/cpu (1)->
  *  - l1tlb_par : reported by dc on this cpu
  */ 
 
-#define L1DTLB_FIT		1000 
-
 event ereport.cpu.amd.dc.l1tlb_par@chip/cpu{within(5s)};
-
-event fault.cpu.amd.l1dtlb@chip/cpu, FITrate=L1DTLB_FIT,
-	FRU=chip, ASRU=chip/cpu;
+event fault.cpu.amd.l1dtlb@chip/cpu;
  
 prop fault.cpu.amd.l1dtlb@chip/cpu (1)->
     ereport.cpu.amd.dc.l1tlb_par@chip/cpu;
@@ -952,12 +607,8 @@ prop fault.cpu.amd.l1dtlb@chip/cpu (1)->
  *  - l2tlb_par : reported by dc on this cpu
  */ 
 
-#define L2DTLB_FIT		1000 
-
 event ereport.cpu.amd.dc.l2tlb_par@chip/cpu{within(5s)};
-
-event fault.cpu.amd.l2dtlb@chip/cpu, FITrate=L2DTLB_FIT,
-	FRU=chip, ASRU=chip/cpu;
+event fault.cpu.amd.l2dtlb@chip/cpu;
  
 prop fault.cpu.amd.l2dtlb@chip/cpu (1)->
     ereport.cpu.amd.dc.l2tlb_par@chip/cpu;

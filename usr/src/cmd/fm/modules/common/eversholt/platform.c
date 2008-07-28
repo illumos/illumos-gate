@@ -733,117 +733,30 @@ cfgstrprop_lookup(struct config *croot, char *path, char *pname)
 	return (fmristr);
 }
 
-static nvlist_t *
-rewrite_resource(char *pname, struct config *croot, char *path)
-{
-	const char *fmristr;
-	nvlist_t *fmri;
-	int err;
-
-	if ((fmristr = cfgstrprop_lookup(croot, path, pname)) == NULL)
-		return (NULL);
-
-	if (topo_fmri_str2nvl(Eft_topo_hdl, fmristr, &fmri, &err) < 0) {
-		out(O_ALTFP, "Can not convert config info: %s",
-		    topo_strerror(err));
-		return (NULL);
-	}
-
-	return (fmri);
-}
-
-static void
-defect_units(nvlist_t **ap, struct config *croot, char *path)
-{
-	const char *modstr;
-	nvlist_t *na;
-	int err;
-
-	/*
-	 * Defects aren't required to have ASRUs defined with
-	 * them in the eversholt fault tree, so usually we'll be
-	 * creating original FMRIs here.  If the ASRU
-	 * is defined when we get here, we won't replace it.
-	 */
-	if (*ap != NULL)
-		return;
-
-	/*
-	 * Find the driver for this resource and use that to get
-	 * a mod fmri for ASRU.  There are no FRUs for defects.
-	 */
-	if ((modstr = cfgstrprop_lookup(croot, path, TOPO_IO_MODULE)) == NULL)
-		return;
-
-	if (topo_fmri_str2nvl(Eft_topo_hdl, modstr, &na, &err) < 0) {
-		out(O_ALTFP, "topo_fmri_str2nvl() of %s failed", modstr);
-		return;
-	}
-
-	*ap = na;
-}
-
 /*
- * platform_units_translate
- *	This routines offers a chance for platform-specific rewrites of
- *	the hc scheme FRU and ASRUs associated with a suspect fault.
+ * Get resource FMRI from libtopo
  */
 /*ARGSUSED*/
 void
 platform_units_translate(int isdefect, struct config *croot,
     nvlist_t **dfltasru, nvlist_t **dfltfru, nvlist_t **dfltrsrc, char *path)
 {
-	nvlist_t *asru, *rsrc, *fru;
+	const char *fmristr;
+	nvlist_t *rsrc;
+	int err;
 
-	out(O_ALTFP, "platform_units_translate(%d, ....)", isdefect);
-
-	/*
-	 * Get our FMRIs from libtopo
-	 */
-	if ((rsrc = rewrite_resource(TOPO_PROP_RESOURCE, croot, path))
-	    == NULL) {
+	fmristr = cfgstrprop_lookup(croot, path, TOPO_PROP_RESOURCE);
+	if (fmristr == NULL) {
 		out(O_ALTFP, "Cannot rewrite resource for %s.", path);
-	} else {
-		nvlist_free(*dfltrsrc);
-		*dfltrsrc = rsrc;
-	}
-
-	/*
-	 * If it is a defect we want to re-write the FRU as the pkg
-	 * scheme fmri of the package containing the buggy driver, and
-	 * the ASRU as the mod scheme fmri of the driver's kernel
-	 * module.
-	 */
-	if (isdefect) {
-		defect_units(dfltasru, croot, path);
 		return;
 	}
-
-	/*
-	 * Find the TOPO_PROP_ASRU and TOPO_PROP_FRU properties
-	 * for this resource if *dfltasru and *dfltfru are set
-	 */
-	if (*dfltasru != NULL) {
-		if ((asru = rewrite_resource(TOPO_PROP_ASRU, croot, path))
-		    == NULL) {
-			out(O_ALTFP, "Cannot rewrite %s for %s.",
-			    TOPO_PROP_ASRU, path);
-		} else {
-			nvlist_free(*dfltasru);
-			*dfltasru = asru;
-		}
+	if (topo_fmri_str2nvl(Eft_topo_hdl, fmristr, &rsrc, &err) < 0) {
+		out(O_ALTFP, "Can not convert config info: %s",
+		    topo_strerror(err));
+		out(O_ALTFP, "Cannot rewrite resource for %s.", path);
+		return;
 	}
-
-	if (*dfltfru != NULL) {
-		if ((fru = rewrite_resource(TOPO_PROP_FRU, croot, path))
-		    == NULL) {
-			out(O_ALTFP, "Cannot rewrite %s for %s.",
-			    TOPO_PROP_FRU, path);
-		} else {
-			nvlist_free(*dfltfru);
-			*dfltfru = fru;
-		}
-	}
+	*dfltrsrc = rsrc;
 }
 
 /*
@@ -1421,106 +1334,7 @@ int
 platform_confcall(struct node *np, struct lut **globals, struct config *croot,
 	struct arrow *arrowp, struct evalue *valuep)
 {
-	nvlist_t *rsrc, *hcs;
-	nvpair_t *nvp;
-
-	ASSERT(np != NULL);
-
-	/* assume we're returning true */
-	valuep->t = UINT64;
-	valuep->v = 1;
-
-	/*
-	 * We've detected a well-formed confcall() to rewrite
-	 * an ASRU in a fault.  We get here via lines like this
-	 * in the eversholt rules:
-	 *
-	 *	event fault.memory.page@dimm, FITrate=PAGE_FIT,
-	 *		ASRU=dimm, message=0,
-	 *		count=stat.page_fault@dimm,
-	 *		action=confcall("rewrite-ASRU");
-	 *
-	 * So first rewrite the resource in the fault.  Any payload data
-	 * following the FM_FMRI_HC_SPECIFIC member is used to expand the
-	 * resource nvlist.  Next, use libtopo to compute the ASRU from
-	 * from the new resource.
-	 */
-	if (np->t == T_QUOTE && np->u.quote.s == stable("rewrite-ASRU")) {
-		int err;
-		nvlist_t *asru;
-
-		out(O_ALTFP|O_VERB, "platform_confcall: rewrite-ASRU");
-
-		if (nvlist_lookup_nvlist(Action_nvl, FM_FAULT_RESOURCE, &rsrc)
-		    != 0) {
-			outfl(O_ALTFP|O_VERB, np->file, np->line, "no resource "
-			    "in fault event");
-			return (0);
-		}
-
-		if (topo_hdl_nvalloc(Eft_topo_hdl, &hcs, NV_UNIQUE_NAME) != 0) {
-			outfl(O_ALTFP|O_VERB, np->file, np->line,
-			    "unable to allocate nvlist for resource rewrite");
-			return (0);
-		}
-
-		/*
-		 * Loop until we run across asru-specific payload.  All
-		 * payload members prefixed "asru-" will be added to the
-		 * hc-specific nvlist and removed from the original.
-		 */
-		nvp = nvlist_next_nvpair(Action_nvl, NULL);
-		while (nvp != NULL) {
-			if (strncmp(nvpair_name(nvp), "asru-", 5) == 0) {
-				if (nvlist_add_nvpair(hcs, nvp) != 0) {
-					nvlist_free(hcs);
-					outfl(O_ALTFP|O_VERB, np->file,
-					    np->line, "unable to rewrite "
-					    "resource - nvlist_add_nvpair for "
-					    "'%s' failed", nvpair_name(nvp));
-					return (0);
-				}
-
-				(void) nvlist_remove(Action_nvl,
-				    nvpair_name(nvp), nvpair_type(nvp));
-				nvp = nvlist_next_nvpair(Action_nvl, NULL);
-			} else {
-				nvp = nvlist_next_nvpair(Action_nvl, nvp);
-			}
-		}
-
-		if (nvlist_add_nvlist(rsrc, FM_FMRI_HC_SPECIFIC, hcs) != 0) {
-			nvlist_free(hcs);
-			outfl(O_ALTFP|O_VERB, np->file, np->line, "unable to "
-			    "rewrite resource with HC specific data");
-			return (0);
-		}
-		nvlist_free(hcs);
-
-		if (topo_fmri_asru(Eft_topo_hdl, rsrc, &asru, &err) != 0) {
-			outfl(O_ALTFP|O_VERB, np->file, np->line, "unable to "
-			    "rewrite asru: %s", topo_strerror(err));
-			return (0);
-		}
-
-		if (nvlist_remove(Action_nvl, FM_FAULT_ASRU, DATA_TYPE_NVLIST)
-		    != 0) {
-			nvlist_free(asru);
-			outfl(O_ALTFP|O_VERB, np->file, np->line,
-			    "failed to remove old asru during rewrite");
-			return (0);
-		}
-		if (nvlist_add_nvlist(Action_nvl, FM_FAULT_ASRU, asru) != 0) {
-			nvlist_free(asru);
-			outfl(O_ALTFP|O_VERB, np->file, np->line,
-			    "unable to add re-written asru");
-			return (0);
-		}
-		nvlist_free(asru);
-	} else {
-		outfl(O_ALTFP|O_VERB, np->file, np->line, "unknown confcall");
-	}
-
+	outfl(O_ALTFP|O_VERB, np->file, np->line, "unknown confcall");
 	return (0);
 }
 

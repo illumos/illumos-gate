@@ -81,6 +81,8 @@ extern "C" {
 #define	FM_SUSPECT_FAULT_SZ		"fault-list-sz"
 #define	FM_SUSPECT_FAULT_STATUS		"fault-status"
 #define	FM_SUSPECT_MESSAGE		"message"
+#define	FM_SUSPECT_RETIRE		"retire"
+#define	FM_SUSPECT_RESPONSE		"response"
 
 #define	FM_SUSPECT_VERS0		0
 #define	FM_SUSPECT_VERSION		FM_SUSPECT_VERS0

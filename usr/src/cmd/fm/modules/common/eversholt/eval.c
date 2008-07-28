@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * eval.c -- constraint evaluation module
@@ -499,6 +499,9 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		ASSERTinfo(np->u.expr.left->t == T_QUOTE,
 		    ptree_nodetype2str(np->u.expr.left->t));
 
+		if (arrowp->head->myevent->count == 0)
+			return (0);
+
 		outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line,
 		    "setpayloadprop: %s: %s=",
 		    arrowp->tail->myevent->enode->u.event.ename->u.name.s,
@@ -547,6 +550,86 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		    (void *)payloadvalp, NULL);
 
 		/* function is always true */
+		valuep->t = UINT64;
+		valuep->v = 1;
+		return (1);
+	} else if (funcname == L_setserdn || funcname == L_setserdt ||
+	    funcname == L_setserdsuffix || funcname == L_setserdincrement) {
+		struct evalue *serdvalp;
+		int alloced = 0;
+		char *str;
+		struct event *flt = arrowp->tail->myevent;
+
+		if (arrowp->head->myevent->count == 0)
+			return (0);
+
+		if (funcname == L_setserdn)
+			str = "n";
+		else if (funcname == L_setserdt)
+			str = "t";
+		else if (funcname == L_setserdsuffix)
+			str = "suffix";
+		else if (funcname == L_setserdincrement)
+			str = "increment";
+
+		/*
+		 * allocate a struct evalue to hold the serd property's
+		 * value, unless we've been here already, in which case we
+		 * might calculate a different value, but we'll store it
+		 * in the already-allocated struct evalue.
+		 */
+		if ((serdvalp = (struct evalue *)lut_lookup(flt->serdprops,
+		    (void *)str, NULL)) == NULL) {
+			serdvalp = MALLOC(sizeof (*serdvalp));
+			alloced = 1;
+		}
+
+		if (!eval_expr(np, ex, events, globals, croot, arrowp, try,
+		    serdvalp)) {
+			outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line,
+			    "setserd%s: %s: ", str,
+			    flt->enode->u.event.ename->u.name.s);
+			ptree_name_iter(O_ALTFP|O_VERB2|O_NONL, np);
+			out(O_ALTFP|O_VERB2, " (cannot eval)");
+			if (alloced)
+				FREE(serdvalp);
+			return (0);
+		} else if (serdvalp->t == UNDEFINED) {
+			outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line,
+			    "setserd%s: %s: ", str,
+			    flt->enode->u.event.ename->u.name.s);
+			ptree_name_iter(O_ALTFP|O_VERB2|O_NONL, np);
+			out(O_ALTFP|O_VERB2, " (undefined)");
+		} else {
+			outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line,
+			    "setserd%s: %s: ", str,
+			    flt->enode->u.event.ename->u.name.s);
+			ptree_name_iter(O_ALTFP|O_VERB2|O_NONL, np);
+			if ((funcname == L_setserdincrement ||
+			    funcname == L_setserdn) && serdvalp->t == STRING) {
+				serdvalp->t = UINT64;
+				serdvalp->v = strtoull((char *)
+				    (uintptr_t)serdvalp->v, NULL, 0);
+			}
+			if (funcname == L_setserdt && serdvalp->t == UINT64) {
+				int len = snprintf(NULL, 0, "%lldns",
+				    serdvalp->v);
+				char *buf = MALLOC(len + 1);
+
+				(void) snprintf(buf, len + 1, "%lldns",
+				    serdvalp->v);
+				serdvalp->t = STRING;
+				serdvalp->v = (uintptr_t)stable(buf);
+				FREE(buf);
+			}
+			if (serdvalp->t == UINT64)
+				out(O_ALTFP|O_VERB2, " (%llu)", serdvalp->v);
+			else
+				out(O_ALTFP|O_VERB2, " (\"%s\")",
+				    (char *)(uintptr_t)serdvalp->v);
+			flt->serdprops = lut_add(flt->serdprops, (void *)str,
+			    (void *)serdvalp, NULL);
+		}
 		valuep->t = UINT64;
 		valuep->v = 1;
 		return (1);
@@ -942,6 +1025,11 @@ eval_dup(struct node *np, struct lut *ex, struct node *events[])
 
 	case T_NUM:
 		newnp = newnode(T_NUM, np->file, np->line);
+		newnp->u.ull = np->u.ull;
+		return (newnp);
+
+	case T_TIMEVAL:
+		newnp = newnode(T_TIMEVAL, np->file, np->line);
 		newnp->u.ull = np->u.ull;
 		return (newnp);
 
@@ -1686,6 +1774,7 @@ eval_expr(struct node *np, struct lut *ex, struct node *events[],
 		    globals, croot, arrowp, try, valuep));
 
 	case T_NUM:
+	case T_TIMEVAL:
 		valuep->t = UINT64;
 		valuep->v = np->u.ull;
 		return (1);

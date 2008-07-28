@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@
 #include <gelf.h>
 
 #include <topo_method.h>
+#include <topo_subr.h>
 #include <pkg.h>
 
 #define	BUFLEN	(2 * PATH_MAX)
@@ -54,10 +55,14 @@ static int pkg_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
 static void pkg_release(topo_mod_t *, tnode_t *);
 static int pkg_fmri_create_meth(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
+static int pkg_fmri_nvl2str(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
 
 static const topo_method_t pkg_methods[] = {
 	{ TOPO_METH_FMRI, TOPO_METH_FMRI_DESC, TOPO_METH_FMRI_VERSION,
 	    TOPO_STABILITY_INTERNAL, pkg_fmri_create_meth },
+	{ TOPO_METH_NVL2STR, TOPO_METH_NVL2STR_DESC, TOPO_METH_NVL2STR_VERSION,
+	    TOPO_STABILITY_INTERNAL, pkg_fmri_nvl2str },
 	{ NULL }
 };
 
@@ -236,5 +241,109 @@ pkg_fmri_create_meth(topo_mod_t *mp, tnode_t *node, topo_version_t version,
 
 	if ((*out = pkg_fmri_create(mp, path)) == NULL)
 		return (-1);
+	return (0);
+}
+
+static ssize_t
+fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
+{
+	nvlist_t *anvl = NULL;
+	uint8_t version;
+	ssize_t size = 0;
+	char *pkgname = NULL;
+	char *achas = NULL;
+	char *adom = NULL;
+	char *aprod = NULL;
+	char *asrvr = NULL;
+	char *ahost = NULL;
+	int err;
+
+	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
+	    version > FM_PKG_SCHEME_VERSION)
+		return (-1);
+
+	/* Get authority, if present */
+	err = nvlist_lookup_nvlist(nvl, FM_FMRI_AUTHORITY, &anvl);
+	if (err != 0 && err != ENOENT)
+		return (-1);
+
+	/*
+	 *  For brevity, we only include the pkgname and any authority
+	 *  info present in the FMRI in our output string.  The FMRI
+	 *  also has data on the package directory and version.
+	 */
+	err = nvlist_lookup_string(nvl, FM_FMRI_PKG_INST, &pkgname);
+	if (err != 0 || pkgname == NULL)
+		return (-1);
+
+	if (anvl != NULL) {
+		(void) nvlist_lookup_string(anvl,
+		    FM_FMRI_AUTH_PRODUCT, &aprod);
+		(void) nvlist_lookup_string(anvl,
+		    FM_FMRI_AUTH_CHASSIS, &achas);
+		(void) nvlist_lookup_string(anvl,
+		    FM_FMRI_AUTH_DOMAIN, &adom);
+		(void) nvlist_lookup_string(anvl,
+		    FM_FMRI_AUTH_SERVER, &asrvr);
+		(void) nvlist_lookup_string(anvl,
+		    FM_FMRI_AUTH_HOST, &ahost);
+	}
+
+	/* pkg:// */
+	topo_fmristr_build(&size, buf, buflen, FM_FMRI_SCHEME_PKG, NULL, "://");
+
+	/* authority, if any */
+	if (aprod != NULL)
+		topo_fmristr_build(&size, buf, buflen, aprod,
+		    FM_FMRI_AUTH_PRODUCT "=", NULL);
+	if (achas != NULL)
+		topo_fmristr_build(&size, buf, buflen, achas,
+		    FM_FMRI_AUTH_CHASSIS "=", NULL);
+	if (adom != NULL)
+		topo_fmristr_build(&size, buf, buflen, adom,
+		    FM_FMRI_AUTH_DOMAIN "=", NULL);
+	if (asrvr != NULL)
+		topo_fmristr_build(&size, buf, buflen, asrvr,
+		    FM_FMRI_AUTH_SERVER "=", NULL);
+	if (ahost != NULL)
+		topo_fmristr_build(&size, buf, buflen, ahost,
+		    FM_FMRI_AUTH_HOST "=", NULL);
+
+	/* pkg-name part */
+	topo_fmristr_build(&size, buf, buflen, pkgname, "/", NULL);
+
+	return (size);
+}
+
+/*ARGSUSED*/
+static int
+pkg_fmri_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *nvl, nvlist_t **out)
+{
+	ssize_t len;
+	char *name = NULL;
+	nvlist_t *fmristr;
+
+	if (version > TOPO_METH_NVL2STR_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	if ((len = fmri_nvl2str(nvl, NULL, 0)) == 0 ||
+	    (name = topo_mod_alloc(mod, len + 1)) == NULL ||
+	    fmri_nvl2str(nvl, name, len + 1) == 0) {
+		if (name != NULL)
+			topo_mod_free(mod, name, len + 1);
+		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
+	}
+
+	if (topo_mod_nvalloc(mod, &fmristr, NV_UNIQUE_NAME) != 0)
+		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
+	if (nvlist_add_string(fmristr, "fmri-string", name) != 0) {
+		topo_mod_free(mod, name, len + 1);
+		nvlist_free(fmristr);
+		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
+	}
+	topo_mod_free(mod, name, len + 1);
+	*out = fmristr;
+
 	return (0);
 }

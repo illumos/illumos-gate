@@ -285,10 +285,6 @@ config_cook(struct cfgdata *cdata)
 	Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
 	ptr = stable("resource");
 	Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
-	ptr = stable("ASRU");
-	Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
-	ptr = stable("FRU");
-	Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
 
 	out(O_ALTFP|O_VERB3, "Raw config data follows:");
 	out(O_ALTFP|O_VERB3|O_NONL,

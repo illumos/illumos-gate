@@ -1096,6 +1096,10 @@ tree_decl(enum nodetype t, struct node *np, struct node *nvpairs,
 		case N_FAULT:
 			ret = dodecl(T_FAULT, file, line, np, nvpairs,
 			    &Faults, Faultcount, 0);
+
+			/* increment serd statement reference */
+			decl = tree_event2np_lut_lookup(Faults, np);
+			update_serd_refstmt(NULL, decl, NULL);
 			break;
 
 		case N_UPSET:
@@ -1110,6 +1114,10 @@ tree_decl(enum nodetype t, struct node *np, struct node *nvpairs,
 		case N_DEFECT:
 			ret = dodecl(T_DEFECT, file, line, np, nvpairs,
 			    &Defects, Defectcount, 0);
+
+			/* increment serd statement reference */
+			decl = tree_event2np_lut_lookup(Defects, np);
+			update_serd_refstmt(NULL, decl, NULL);
 			break;
 
 		case N_ERROR:
@@ -1318,6 +1326,8 @@ tree_report()
 	 * an upset "engine" property.
 	 */
 	lut_walk(Faults, (lut_cb)check_refcount, (void *)T_FAULT);
+	lut_walk(Faults, (lut_cb)check_upset_engine, (void *)T_FAULT);
+	lut_walk(Defects, (lut_cb)check_upset_engine, (void *)T_DEFECT);
 	lut_walk(Upsets, (lut_cb)check_upset_engine, (void *)T_UPSET);
 	lut_walk(Upsets, (lut_cb)check_refcount, (void *)T_UPSET);
 	lut_walk(Errors, (lut_cb)check_refcount, (void *)T_ERROR);

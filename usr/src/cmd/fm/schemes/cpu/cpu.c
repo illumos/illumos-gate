@@ -44,81 +44,23 @@ ssize_t
 fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 {
 	int err;
-	uint8_t version, type;
-	uint32_t cpuid, index, way;
-	uint64_t serint;
-	char *serstr = NULL;
+	ssize_t len;
+	topo_hdl_t *thp;
+	char *str;
 
-	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0)
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
 		return (fmd_fmri_set_errno(EINVAL));
-
-	if (version == CPU_SCHEME_VERSION0) {
-		if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid) != 0 ||
-		    nvlist_lookup_uint64(nvl, FM_FMRI_CPU_SERIAL_ID, &serint)
-		    != 0)
-			return (fmd_fmri_set_errno(EINVAL));
-
-		return (snprintf(buf, buflen, "cpu:///%s=%u/%s=%llX",
-		    FM_FMRI_CPU_ID, cpuid, FM_FMRI_CPU_SERIAL_ID,
-		    (u_longlong_t)serint));
-
-	} else if (version == CPU_SCHEME_VERSION1) {
-		if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid) != 0)
-			return (fmd_fmri_set_errno(EINVAL));
-
-		/*
-		 * Serial number is an optional element
-		 */
-		if ((err = nvlist_lookup_string(nvl, FM_FMRI_CPU_SERIAL_ID,
-		    &serstr)) != 0)
-
-			if (err != ENOENT)
-				return (fmd_fmri_set_errno(EINVAL));
-
-		/*
-		 * Cache index, way and type are optional elements
-		 * But if we have one of them, we must have them all.
-		 */
-		err = nvlist_lookup_uint32(nvl, FM_FMRI_CPU_CACHE_INDEX,
-		    &index);
-		err |= nvlist_lookup_uint32(nvl, FM_FMRI_CPU_CACHE_WAY, &way);
-		err |= nvlist_lookup_uint8(nvl, FM_FMRI_CPU_CACHE_TYPE, &type);
-
-		/* Insure there were no errors accessing the nvl */
-		if (err != 0 && err != ENOENT)
-			return (fmd_fmri_set_errno(EINVAL));
-
-		if (serstr == NULL) {
-			/* If we have a serial string and no cache info */
-			if (err == ENOENT)
-				return (snprintf(buf, buflen, "cpu:///%s=%u",
-				    FM_FMRI_CPU_ID, cpuid));
-			else {
-				return (snprintf(buf, buflen,
-				    "cpu:///%s=%u/%s=%u/%s=%u/%s=%d",
-				    FM_FMRI_CPU_ID, cpuid,
-				    FM_FMRI_CPU_CACHE_INDEX, index,
-				    FM_FMRI_CPU_CACHE_WAY, way,
-				    FM_FMRI_CPU_CACHE_TYPE, type));
-			}
-		} else {
-			if (err == ENOENT) {
-				return (snprintf(buf, buflen,
-				    "cpu:///%s=%u/%s=%s",
-				    FM_FMRI_CPU_ID, cpuid,
-				    FM_FMRI_CPU_SERIAL_ID, serstr));
-			} else {
-				return (snprintf(buf, buflen,
-				    "cpu:///%s=%u/%s=%s/%s=%u/%s=%u/%s=%d",
-				    FM_FMRI_CPU_ID, cpuid,
-				    FM_FMRI_CPU_SERIAL_ID, serstr,
-				    FM_FMRI_CPU_CACHE_INDEX, index,
-				    FM_FMRI_CPU_CACHE_WAY, way,
-				    FM_FMRI_CPU_CACHE_TYPE, type));
-			}
-		}
-	} else
+	if (topo_fmri_nvl2str(thp, nvl, &str, &err) != 0) {
+		fmd_fmri_topo_rele(thp);
 		return (fmd_fmri_set_errno(EINVAL));
+	}
+	if (buf != NULL)
+		len = snprintf(buf, buflen, "%s", str);
+	else
+		len = strlen(str);
+	topo_hdl_strfree(thp, str);
+	fmd_fmri_topo_rele(thp);
+	return (len);
 }
 
 /*

@@ -244,6 +244,7 @@ struct node {
 			struct node *knp;	/* K value */
 			struct node *prop;	/* arrow is part of this prop */
 			int needed;
+			struct node *parent;
 		} arrow;
 
 		struct {

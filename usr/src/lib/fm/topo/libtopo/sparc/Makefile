@@ -30,4 +30,6 @@ include ../Makefile.com
 CPPFLAGS += -I $(ROOT)/usr/platform/sun4v/include
 LDLIBS += -L$(ROOTLIBDIR)
 
+LDLIBS += -lzfs
+
 install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)

@@ -257,6 +257,13 @@ nvl2subr(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t **asrup)
 	char *scheme;
 	uint8_t version;
 	char *fltclass = "(unknown)";
+	boolean_t retire;
+
+	if (nvlist_lookup_boolean_value(nvl, FM_SUSPECT_RETIRE, &retire) == 0 &&
+	    retire == 0) {
+		fmd_hdl_debug(hdl, "cma_recv: retire suppressed");
+		return (NULL);
+	}
 
 	if (nvlist_lookup_nvlist(nvl, FM_FAULT_ASRU, &asru) != 0 ||
 	    nvlist_lookup_string(asru, FM_FMRI_SCHEME, &scheme) != 0 ||

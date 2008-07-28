@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -45,3 +45,8 @@ fault.io.pciex.bus-linkerr fault.io.pciex.bus-noresp fault.io.pciex.device-inter
 fault.io.pciex.bus-linkerr fault.io.pciex.bus-noresp fault.io.pciex.device-interr fault.io.pciex.device-invreq fault.io.pciex.device-noresp=14
 fault.io.pciex.bus-noresp fault.io.pciex.device-interr fault.io.pciex.device-invreq fault.io.pciex.device-noresp=15
 fault.io.pciex.bus-noresp fault.io.pciex.device-interr=16
+fault.io.pciex.device-interr-corr=17
+fault.io.pciex.bus-linkerr-corr fault.io.pciex.device-interr-corr=18
+fault.io.pci.bus-linkerr-unaf fault.io.pciex.device-interr-unaf=19
+fault.io.pciex.device-interr-unaf=20
+fault.io.pciex.device-interr-deg=21

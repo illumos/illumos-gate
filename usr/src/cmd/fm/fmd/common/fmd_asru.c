@@ -412,6 +412,10 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	fmd_case_t *cp;
 	int64_t *diag_time;
 	uint_t nelem;
+	topo_hdl_t *thp;
+	char *class;
+	nvlist_t *rsrc;
+	int err;
 
 	/*
 	 * Extract the most recent values of 'faulty' from the event log.
@@ -448,6 +452,23 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	else
 		fmd_case_settime(cp, lp->log_stat.st_ctime, 0);
 	(void) nvlist_xdup(flt, &flt_copy, &fmd.d_nva);
+
+	/*
+	 * For faults with a resource, re-evaluate the asru from the resource.
+	 */
+	thp = fmd_fmri_topo_hold(TOPO_VERSION);
+	if (nvlist_lookup_string(flt_copy, FM_CLASS, &class) == 0 &&
+	    strncmp(class, "fault", 5) == 0 &&
+	    nvlist_lookup_nvlist(flt_copy, FM_FAULT_RESOURCE, &rsrc) == 0 &&
+	    rsrc != NULL && topo_fmri_asru(thp, rsrc, &asru, &err) == 0) {
+		(void) nvlist_remove(flt_copy, FM_FAULT_ASRU, DATA_TYPE_NVLIST);
+		(void) nvlist_add_nvlist(flt_copy, FM_FAULT_ASRU, asru);
+		nvlist_free(asru);
+	}
+	fmd_fmri_topo_rele(thp);
+
+	(void) nvlist_xdup(flt_copy, &flt, &fmd.d_nva);
+
 	fmd_case_recreate_suspect(cp, flt_copy);
 
 	/*
@@ -474,6 +495,8 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 
 	} else
 		u = FMD_B_TRUE;	/* not present; set unusable */
+
+	nvlist_free(flt);
 
 	ap->asru_flags |= FMD_ASRU_RECREATED;
 	if (ps)

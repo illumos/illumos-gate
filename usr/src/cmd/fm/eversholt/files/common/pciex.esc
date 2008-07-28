@@ -62,12 +62,8 @@
  */
 #define CORRLINK_COUNT 6
 #define CORRLINK_TIME 2h
-#define NONFATAL_COUNT 6
-#define NONFATAL_TIME 2h
-#define NONFATAL_DPE_U_COUNT 3
-#define NONFATAL_DPE_U_TIME 168h
-#define NONFATAL_DPE_D_COUNT 3
-#define NONFATAL_DPE_D_TIME 168h
+#define NONFATAL_DPE_COUNT 3
+#define NONFATAL_DPE_TIME 168h
 
 /*
  * if the source-id payload is valid, then check it matches
@@ -80,7 +76,7 @@
 #define SOURCE_ID_MATCHES_OWN_BDF \
 	(payloadprop_defined("source-valid") && \
 	payloadprop("source-valid") == 1 && \
-	payloadprop("source-id") == (confprop(asru(pciexrc), TOPO_PCI_BDF) + 0))
+	payloadprop("source-id") == (confprop(pciexrc, TOPO_PCI_BDF) + 0))
 
 /*
  * Other useful macros. These use the EXCAP property (PCI Express Capabilities
@@ -89,110 +85,62 @@
  * a PCI Express-PCI bridge - note that 60400 and 60401 are defined as PCI-PCI
  * bridges, everything else is consider a PCI leaf device.
  */
-#define BDF_IS_UNDER_RC \
-	is_under(pciexrc<>, pciexbus[b]/pciexdev[d]/pciexfn[f])
-
-#define PCIBDF_IS_UNDER_RC \
-	is_under(pciexrc<>, pcibus[b]/pcidev[d]/pcifn[f])
-
-#define PCIBDF_IS_UNDER_DEV \
-	is_under(pciexbus/pciexdev/pciexfn, pcibus[b]/pcidev[d]/pcifn[f])
-
-#define IS_SWD \
-	(confprop(asru(pciexbus/pciexdev/pciexfn), TOPO_PCI_EXCAP) == \
-	"pciexswd")
-
-#define IS_SWU \
-	(confprop(asru(pciexbus/pciexdev/pciexfn), TOPO_PCI_EXCAP) == \
-	"pciexswu")
-
-#define IS_LEAF \
-	(confprop(asru(pciexbus/pciexdev/pciexfn), TOPO_PCI_EXCAP) == \
-	"pciexdev")
-
-#define	IS_PCI_LEAF \
-	(confprop_defined(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) && \
-	confprop(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) != "60400" && \
-	confprop(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) != "60401")
-
-#define	BDF_IS_PCI_LEAF \
-	(confprop_defined(asru(pcibus[b]/pcidev[d]/pcifn[f]), \
-	TOPO_PCI_CLASS) && \
-	confprop(asru(pcibus[b]/pcidev[d]/pcifn[f]), TOPO_PCI_CLASS) != \
-	"60400" && \
-	confprop(asru(pcibus[b]/pcidev[d]/pcifn[f]), TOPO_PCI_CLASS) != "60401")
-
-#define IS_BDG \
-	(confprop(asru(pciexbus/pciexdev/pciexfn), TOPO_PCI_EXCAP) == \
-	"pcibus")
-
-#define BDF_IS_LEAF \
-	(confprop(asru(pciexbus[b]/pciexdev[d]/pciexfn[f]), \
-	TOPO_PCI_EXCAP) == "pciexdev")
+#define	PCIEXFN		pciexbus/pciexdev/pciexfn
+#define	PCIEXFNHZ	pciexbus<>/pciexdev<>/pciexfn<>
+#define	PCIEXFN1	pciexbus[b]/pciexdev[d]/pciexfn[f]
+#define	PCIFN		pcibus/pcidev/pcifn
+#define	PCIFNHZ		pcibus<>/pcidev<>/pcifn<>
+#define	PCIFN1		pcibus[b]/pcidev[d]/pcifn[f]
+#define IS_LF(f) 	(confprop(f, TOPO_PCI_EXCAP) == "pciexdev")
+#define IS_BG(f) 	(confprop(f, TOPO_PCI_EXCAP) == "pcibus")
+#define IS_SD(f)	(confprop(f, TOPO_PCI_EXCAP) == "pciexswd")
+#define IS_SU(f)	(confprop(f, TOPO_PCI_EXCAP) == "pciexswu")
+#define	IS_PCI_LF(f)	(confprop_defined(f, TOPO_PCI_CLASS) && \
+			confprop(f, TOPO_PCI_CLASS) != "60400" && \
+			confprop(f, TOPO_PCI_CLASS) != "60401")
 
 /*
  * define faults
  */
-asru pciexrc;
-fru pciexrc;
-asru pciexbus/pciexdev/pciexfn;
-fru pciexbus/pciexdev;
-fru pciexbus;
-asru pciexbus;
+event fault.io.pciex.device-interr@PCIEXFN, FITrate=PCIEX_DEV_FIT;
 
-event fault.io.pciex.device-interr@pciexbus/pciexdev/pciexfn,
-	FITrate=PCIEX_DEV_FIT, FRU=pciexbus/pciexdev,
-	ASRU=pciexbus/pciexdev/pciexfn;
+event fault.io.pciex.device-interr-deg@PCIEXFN, FITrate=PCIEX_DEV_FIT, retire=0;
 
-event fault.io.pciex.device-interr@pciexrc,
-	FITrate=PCIEX_RC_FIT, FRU=pciexrc, ASRU=pciexrc;
+engine serd.io.pciex.flt-nf@PCIEXFN, N=NONFATAL_DPE_COUNT, T=NONFATAL_DPE_TIME;
+event fault.io.pciex.device-interr-unaf@PCIEXFN, FITrate=PCIEX_DEV_FIT,
+	engine=serd.io.pciex.flt-nf@PCIEXFN;
 
-event fault.io.pciex.device-invreq@pciexbus/pciexdev/pciexfn,
-	FITrate=PCIEX_DEV_INV_FIT, FRU=pciexbus/pciexdev,
-	ASRU=pciexbus/pciexdev/pciexfn;
+engine serd.io.pciex.corrlink@PCIEXFN, N=CORRLINK_COUNT, T=CORRLINK_TIME;
+event fault.io.pciex.device-interr-corr@PCIEXFN, FITrate=PCIEX_DEV_FIT,
+	engine=serd.io.pciex.corrlink@PCIEXFN;
 
-event fault.io.pciex.device-invreq@pciexrc,
-	FITrate=PCIEX_RC_FIT, FRU=pciexrc, ASRU=pciexrc;
+event fault.io.pciex.device-interr@pciexrc, FITrate=PCIEX_RC_FIT;
 
-event fault.io.pciex.device-noresp@pciexbus/pciexdev/pciexfn,
-	FITrate=PCIEX_DEV_NR_FIT, FRU=pciexbus/pciexdev,
-	ASRU=pciexbus/pciexdev/pciexfn;
+event fault.io.pciex.device-interr-deg@pciexrc, FITrate=PCIEX_RC_FIT, retire=0;
 
-event fault.io.pciex.device-noresp@pciexrc,
-	FITrate=PCIEX_RC_NR_FIT, FRU=pciexrc, ASRU=pciexrc;
+engine serd.io.pciex.flt-nf@pciexrc, N=NONFATAL_DPE_COUNT, T=NONFATAL_DPE_TIME;
+event fault.io.pciex.device-interr-unaf@pciexrc, FITrate=PCIEX_RC_FIT,
+	engine=serd.io.pciex.flt-nf@pciexrc;
 
-event fault.io.pciex.bus-noresp@pciexbus/pciexdev/pciexfn,
-        FITrate=PCIEX_BUS_NR_FIT, FRU=pciexbus, ASRU=pciexbus/pciexdev/pciexfn;
+engine serd.io.pciex.corrlink@pciexrc, N=CORRLINK_COUNT, T=CORRLINK_TIME;
+event fault.io.pciex.device-interr-corr@pciexrc, FITrate=PCIEX_RC_FIT,
+	engine=serd.io.pciex.corrlink@pciexrc;
 
-event fault.io.pciex.bus-linkerr@pciexbus/pciexdev/pciexfn,
-        FITrate=PCIEX_BUS_FIT, FRU=pciexbus, ASRU=pciexbus/pciexdev/pciexfn;
+event fault.io.pciex.device-invreq@PCIEXFN, FITrate=PCIEX_DEV_INV_FIT;
 
-/*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * serd engine for correctable link errors
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- */
-event error.io.pciex.corrlink@pciexbus;
-event error.io.pciex.corrlink@pciexrc/pciexbus;
-event error.io.pciex.corrlink@pciexbus/pciexdev/pciexfn/pciexbus;
-event error.io.pciex.corrlink_trip@pciexbus;
-event ereport.io.pciex.corrlink_trip@pciexbus{within(5s)};
+event fault.io.pciex.device-invreq@pciexrc, FITrate=PCIEX_RC_FIT;
 
-engine serd.io.pciex.corrlink@pciexbus,
-    N=CORRLINK_COUNT, T=CORRLINK_TIME, method=persistent,
-    trip=ereport.io.pciex.corrlink_trip@pciexbus;
+event fault.io.pciex.device-noresp@PCIEXFN, FITrate=PCIEX_DEV_NR_FIT;
 
-event upset.io.pciex.corrlink@pciexbus,
-    engine=serd.io.pciex.corrlink@pciexbus;
+event fault.io.pciex.device-noresp@pciexrc, FITrate=PCIEX_RC_NR_FIT;
 
-prop upset.io.pciex.corrlink@pciexbus (1)->
-    error.io.pciex.corrlink@pciexbus;
+event fault.io.pciex.bus-noresp@PCIEXFN, FITrate=PCIEX_BUS_NR_FIT;
 
-prop error.io.pciex.corrlink_trip@pciexbus (1)->
-    ereport.io.pciex.corrlink_trip@pciexbus;
+event fault.io.pciex.bus-linkerr@PCIEXFN, FITrate=PCIEX_BUS_FIT;
 
-prop error.io.pciex.corrlink_trip@pciexbus (0)->
-   error.io.pciex.corrlink@pciexbus;
+engine serd.io.pciex.corrlink-bus@PCIEXFN, N=CORRLINK_COUNT, T=CORRLINK_TIME;
+event fault.io.pciex.bus-linkerr-corr@PCIEXFN, FITrate=PCIEX_BUS_FIT,
+	engine=serd.io.pciex.corrlink-bus@PCIEXFN;
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -200,151 +148,112 @@ prop error.io.pciex.corrlink_trip@pciexbus (0)->
  * no service impact - otherwise fail immediately
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  */
-event ereport.io.device.inval_state@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.device.no_response@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.device.stall@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.device.badint_limit@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.device.intern_corr@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.device.intern_uncorr@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.service.lost@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.service.degraded@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.service.unaffected@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.service.restored@pciexbus/pciexdev/pciexfn{within(30s)};
-event ereport.io.device.nf-device@pciexbus/pciexdev/pciexfn{within(5s)};
+event ereport.io.device.inval_state@PCIEXFN{within(5s)};
+event ereport.io.device.no_response@PCIEXFN{within(5s)};
+event ereport.io.device.stall@PCIEXFN{within(5s)};
+event ereport.io.device.badint_limit@PCIEXFN{within(5s)};
+event ereport.io.device.intern_corr@PCIEXFN{within(5s)};
+event ereport.io.device.intern_uncorr@PCIEXFN{within(5s)};
+event ereport.io.service.lost@PCIEXFN{within(5s)};
+event ereport.io.service.degraded@PCIEXFN{within(5s)};
+event ereport.io.service.unaffected@PCIEXFN{within(5s)};
+event ereport.io.service.restored@PCIEXFN{within(30s)};
+event ereport.io.service.lost@PCIFN{within(5s)};
+event ereport.io.service.degraded@PCIFN{within(5s)};
+event ereport.io.service.unaffected@PCIFN{within(5s)};
 
-event error.io.service.restored@pciexbus/pciexdev/pciexfn;
-event error.io.device.nf-device@pciexbus/pciexdev/pciexfn;
-event error.io.device.f-device@pciexbus/pciexdev/pciexfn;
+event error.io.pciex.noimpact-d@PCIEXFN;
+event error.io.pciex.noimpact-d@PCIEXFN/PCIEXFN;
+event error.io.pciex.noimpact-d@PCIEXFN/PCIFN;
+event error.io.pciex.noimpact-d@PCIFN/PCIFN;
+event error.io.pciex.noimpact-d@PCIFN;
+event error.io.pciex.degraded-d@PCIEXFN;
+event error.io.pciex.degraded-d@PCIEXFN/PCIEXFN;
+event error.io.pciex.degraded-d@PCIEXFN/PCIFN;
+event error.io.pciex.degraded-d@PCIFN/PCIFN;
+event error.io.pciex.degraded-d@PCIFN;
+event error.io.pciex.lost-d@PCIEXFN;
+event error.io.pciex.lost-d@PCIEXFN/PCIEXFN;
+event error.io.pciex.lost-d@PCIEXFN/PCIFN;
+event error.io.pciex.lost-d@PCIFN/PCIFN;
+event error.io.pciex.lost-d@PCIFN;
+event error.io.service.restored@PCIEXFN;
+event error.io.service.restored@PCIFN;
+event error.io.device.nf-device@PCIEXFN;
+event error.io.device.deg-device@PCIEXFN;
+event error.io.device.f-device@PCIEXFN;
 
-prop error.io.device.f-device@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.device.inval_state@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.no_response@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.stall@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.badint_limit@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.intern_corr@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.intern_uncorr@pciexbus/pciexdev/pciexfn;
+prop error.io.device.f-device@PCIEXFN (1)->
+    ereport.io.device.inval_state@PCIEXFN,
+    ereport.io.device.no_response@PCIEXFN,
+    ereport.io.device.stall@PCIEXFN,
+    ereport.io.device.badint_limit@PCIEXFN,
+    ereport.io.device.intern_corr@PCIEXFN,
+    ereport.io.device.intern_uncorr@PCIEXFN;
 
-prop error.io.device.f-device@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.service.lost@pciexbus/pciexdev/pciexfn,
-    ereport.io.service.degraded@pciexbus/pciexdev/pciexfn;
+prop error.io.device.f-device@PCIEXFN (1)->
+    error.io.pciex.lost-d@PCIEXFN;
 
-engine serd.io.device.nonfatal@pciexbus/pciexdev/pciexfn,
-    N=NONFATAL_COUNT, T=NONFATAL_TIME, method=persistent,
-    trip=ereport.io.device.nf-device@pciexbus/pciexdev/pciexfn;
+prop error.io.device.deg-device@PCIEXFN (1)->
+    ereport.io.device.inval_state@PCIEXFN,
+    ereport.io.device.no_response@PCIEXFN,
+    ereport.io.device.stall@PCIEXFN,
+    ereport.io.device.badint_limit@PCIEXFN,
+    ereport.io.device.intern_corr@PCIEXFN,
+    ereport.io.device.intern_uncorr@PCIEXFN;
 
-event upset.io.device.nonfatal@pciexbus/pciexdev/pciexfn,
-    engine=serd.io.device.nonfatal@pciexbus/pciexdev/pciexfn;
+prop error.io.device.deg-device@PCIEXFN (1)->
+    error.io.pciex.degraded-d@PCIEXFN;
 
-prop error.io.device.nf-device@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.device.nf-device@pciexbus/pciexdev/pciexfn;
+prop error.io.device.nf-device@PCIEXFN (1)->
+    ereport.io.device.inval_state@PCIEXFN,
+    ereport.io.device.no_response@PCIEXFN,
+    ereport.io.device.stall@PCIEXFN,
+    ereport.io.device.badint_limit@PCIEXFN,
+    ereport.io.device.intern_corr@PCIEXFN,
+    ereport.io.device.intern_uncorr@PCIEXFN;
 
-prop error.io.device.nf-device@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.device.inval_state@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.no_response@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.stall@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.badint_limit@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.intern_corr@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.intern_uncorr@pciexbus/pciexdev/pciexfn,
-    ereport.io.service.unaffected@pciexbus/pciexdev/pciexfn,
-    error.io.service.restored@pciexbus/pciexdev/pciexfn;
-
-prop upset.io.device.nonfatal@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.device.inval_state@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.no_response@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.stall@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.badint_limit@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.intern_corr@pciexbus/pciexdev/pciexfn,
-    ereport.io.device.intern_uncorr@pciexbus/pciexdev/pciexfn;
-
-prop upset.io.device.nonfatal@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.service.unaffected@pciexbus/pciexdev/pciexfn,
-    error.io.service.restored@pciexbus/pciexdev/pciexfn;
+prop error.io.device.nf-device@PCIEXFN (1)->
+    error.io.pciex.noimpact-d@PCIEXFN;
 
 /*
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * Handling of pci express nonfatal errors (ptlp/ecrc). Use serd engine if
- * no service impact - otherwise fail immediately
- * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * handling of service impact ereports.
  */
-event ereport.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn{within(5s)};
+prop error.io.pciex.lost-d@PCIEXFN (0)->
+    ereport.io.service.lost@PCIEXFN,
+    error.io.pciex.lost-d@PCIEXFN/PCIEXFNHZ,
+    error.io.pciex.lost-d@PCIEXFN/PCIFNHZ;
 
-event error.io.pciex.flt-f-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-f-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-f-ecrcreq-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-f-ecrccomp-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-f-poisreq-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-f-poiscomp-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-f-ecrcreq-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-f-ecrccomp-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-f-poisreq-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-f-poiscomp-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-nf-ecrcreq-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-nf-ecrccomp-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-nf-poisreq-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-nf-poiscomp-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-nf-ecrcreq-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-nf-ecrccomp-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-nf-poisreq-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-nf-poiscomp-d@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.lost-d@PCIFN (0)->
+    ereport.io.service.lost@PCIFN,
+    error.io.pciex.lost-d@PCIFN/PCIFNHZ;
 
-prop error.io.pciex.flt-f-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.flt-f-ecrcreq-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-f-ecrccomp-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-f-poisreq-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-f-poiscomp-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.degraded-d@PCIEXFN (1)->
+    ereport.io.service.degraded@PCIEXFN,
+    error.io.pciex.degraded-d@PCIEXFN/PCIEXFNHZ,
+    error.io.pciex.degraded-d@PCIEXFN/PCIFNHZ;
 
-prop error.io.pciex.flt-f-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.flt-f-ecrcreq-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-f-ecrccomp-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-f-poisreq-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-f-poiscomp-d@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.degraded-d@PCIFN (1)->
+    ereport.io.service.degraded@PCIFN,
+    error.io.pciex.degraded-d@PCIFN/PCIFNHZ;
 
-engine serd.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn,
-    N=NONFATAL_DPE_U_COUNT, T=NONFATAL_DPE_U_TIME, method=persistent,
-    trip=ereport.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.noimpact-d@PCIEXFN (1)->
+    ereport.io.service.unaffected@PCIEXFN,
+    error.io.service.restored@PCIEXFN,
+    error.io.pciex.noimpact-d@PCIEXFN/PCIEXFNHZ,
+    error.io.pciex.noimpact-d@PCIEXFN/PCIFNHZ;
 
-event upset.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn,
-    engine=serd.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.noimpact-d@PCIFN (1)->
+    ereport.io.service.unaffected@PCIFN,
+    error.io.service.restored@PCIFN,
+    error.io.pciex.noimpact-d@PCIFN/PCIFNHZ;
 
-prop error.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn;
+prop error.io.service.restored@PCIEXFN (1)->
+    ereport.io.service.lost@PCIEXFN,
+    ereport.io.service.degraded@PCIEXFN;
 
-prop error.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.flt-nf-ecrcreq-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-nf-ecrccomp-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-nf-poisreq-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-nf-poiscomp-u@pciexbus/pciexdev/pciexfn;
-
-prop upset.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.flt-nf-ecrcreq-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-nf-ecrccomp-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-nf-poisreq-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-nf-poiscomp-u@pciexbus/pciexdev/pciexfn;
-
-engine serd.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn,
-    N=NONFATAL_DPE_D_COUNT, T=NONFATAL_DPE_D_TIME, method=persistent,
-    trip=ereport.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn;
-
-event upset.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn,
-    engine=serd.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.flt-nf-ecrcreq-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-nf-ecrccomp-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-nf-poisreq-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-nf-poiscomp-d@pciexbus/pciexdev/pciexfn;
-
-prop upset.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.flt-nf-ecrcreq-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-nf-ecrccomp-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-nf-poisreq-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-nf-poiscomp-d@pciexbus/pciexdev/pciexfn;
+prop error.io.service.restored@PCIEXFN (1)->
+    ereport.io.service.restored@PCIEXFN;
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -362,78 +271,105 @@ prop upset.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn (1)->
  * - corrlink:		correctable link or physical level error
  * - fatlink:		fatal link or physical level error
  */
-event error.io.pciex.nr-d@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-ca-d@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.mtlp-d@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.badreq-d@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-nf-d@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-f-d@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.corrlink_trip@pciexrc/pciexbus;
-event error.io.pciex.fatlink@pciexrc/pciexbus/pciexdev/pciexfn;
+event error.io.pciex.nr-d@pciexrc/PCIEXFN;
+event error.io.pciex.ca-d@pciexrc/PCIEXFN;
+event error.io.pciex.mtlp-d@pciexrc/PCIEXFN;
+event error.io.pciex.corrlink@pciexrc/pciexbus;
+event error.io.pciex.fatlink@pciexrc/PCIEXFN;
+event error.io.pciex.badreq-d@pciexrc/PCIEXFN;
+event error.io.pciex.nf-poisecrc-d@pciexrc/PCIEXFN;
+event error.io.pciex.f-poisecrc-d@pciexrc/PCIEXFN;
+event error.io.pciex.deg-poisecrc-d@pciexrc/PCIEXFN;
 
 prop fault.io.pciex.device-noresp@pciexrc (1)->
-    error.io.pciex.nr-d@pciexrc/pciexbus<>/pciexdev<>/pciexfn<>;
+    error.io.pciex.nr-d@pciexrc/PCIEXFNHZ;
 
 prop fault.io.pciex.device-invreq@pciexrc (1)->
-    error.io.pciex.badreq-d@pciexrc/pciexbus<>/pciexdev<>/pciexfn<>;
+    error.io.pciex.badreq-d@pciexrc/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-corr@pciexrc (1)->
+    error.io.pciex.corrlink@pciexrc/pciexbus<>;
+
+prop fault.io.pciex.device-interr-unaf@pciexrc (1)->
+    error.io.pciex.nf-poisecrc-d@pciexrc/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-deg@pciexrc (1)->
+    error.io.pciex.deg-poisecrc-d@pciexrc/PCIEXFNHZ;
 
 prop fault.io.pciex.device-interr@pciexrc (1)->
-    error.io.pciex.flt-nf-d@pciexrc/pciexbus<>/pciexdev<>/pciexfn<>,
-    error.io.pciex.flt-f-d@pciexrc/pciexbus<>/pciexdev<>/pciexfn<>,
-    error.io.pciex.flt-ca-d@pciexrc/pciexbus<>/pciexdev<>/pciexfn<>,
-    error.io.pciex.mtlp-d@pciexrc/pciexbus<>/pciexdev<>/pciexfn<>,
-    error.io.pciex.corrlink_trip@pciexrc/pciexbus<>,
-    error.io.pciex.fatlink@pciexrc/pciexbus<>/pciexdev<>/pciexfn<>;
+    error.io.pciex.f-poisecrc-d@pciexrc/PCIEXFNHZ,
+    error.io.pciex.ca-d@pciexrc/PCIEXFNHZ,
+    error.io.pciex.mtlp-d@pciexrc/PCIEXFNHZ,
+    error.io.pciex.fatlink@pciexrc/PCIEXFNHZ;
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  * A faulty PCI Express leaf device or upstream switch port may cause:
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * - nr-u:		the device not to respond to a valid downstream request
- * - ca-u:		the device to completer abort a valid downstream request
- * - badreq-u:		a bad upstream request - not CRC error (may cause
+ * - flt-nr-u:		the device not to respond to a valid downstream request
+ * - flt-ca-u:		the device to completer abort a valid downstream request
+ * - flt-badreq-u:	a bad upstream request - not CRC error (may cause
  *			completer to respond with ur or ca) - leaf only
- * - mtlp-u:		a malformed tlp transmitted upstream - leaf only
- * - ecrcreq-u:		request with end-to-end CRC error transmitted upstream
- * - ecrccomp-u:	compl with end-to-end CRC error transmitted upstream
- * - poisreq-u:		poisoned request transmitted upstream
- * - poiscomp-u:	poisoned completion transmitted upstream
+ * - flt-mtlp-u:	a malformed tlp transmitted upstream - leaf only
+ * - flt-ecrcreq-u:	request with end-to-end CRC error transmitted upstream
+ * - flt-ecrccomp-u:	compl with end-to-end CRC error transmitted upstream
+ * - flt-poisreq-u:	poisoned request transmitted upstream
+ * - flt-poiscomp-u:	poisoned completion transmitted upstream
  * - device:		internal error reported by leaf device
  * - corrlink:		correctable link or physical level error
  * - fatlink:		fatal link or physical level error
  */
 
-event error.io.pciex.flt-nr-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-ca-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.mtlp-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-badreq-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn;
+event error.io.pciex.flt-nr-u@PCIEXFN;
+event error.io.pciex.flt-ca-u@PCIEXFN;
+event error.io.pciex.flt-mtlp-u@PCIEXFN;
+event error.io.pciex.fatlink@PCIEXFN;
+event error.io.pciex.flt-badreq-u@PCIEXFN;
+event error.io.pciex.flt-nf-poisecrc-u@PCIEXFN;
+event error.io.pciex.flt-f-poisecrc-u@PCIEXFN;
+event error.io.pciex.flt-deg-poisecrc-u@PCIEXFN;
+event error.io.pciex.corrlink@pciexbus;
 
-prop fault.io.pciex.device-noresp@pciexbus/pciexdev/pciexfn { IS_LEAF } (1)->
-    error.io.pciex.flt-nr-u@pciexbus/pciexdev/pciexfn;
+prop fault.io.pciex.device-noresp@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+    error.io.pciex.flt-nr-u@PCIEXFN;
 
-prop fault.io.pciex.device-noresp@pciexbus/pciexdev/pciexfn { IS_SWU } (1)->
-    error.io.pciex.flt-nr-u@pciexbus/pciexdev/pciexfn;
+prop fault.io.pciex.device-noresp@PCIEXFN { IS_SU(PCIEXFN) } (1)->
+    error.io.pciex.flt-nr-u@PCIEXFN;
 
-prop fault.io.pciex.device-invreq@pciexbus/pciexdev/pciexfn { IS_LEAF } (1)->
-    error.io.pciex.flt-badreq-u@pciexbus/pciexdev/pciexfn;
+prop fault.io.pciex.device-invreq@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+    error.io.pciex.flt-badreq-u@PCIEXFN;
 
-prop fault.io.pciex.device-interr@pciexbus/pciexdev/pciexfn { IS_SWU } (1)->
-    error.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-f-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-ca-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.corrlink_trip@pciexbus,
-    error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn;
+prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_SU(PCIEXFN) } (1)->
+    error.io.pciex.corrlink@pciexbus;
 
-prop fault.io.pciex.device-interr@pciexbus/pciexdev/pciexfn { IS_LEAF } (1)->
-    error.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-f-u@pciexbus/pciexdev/pciexfn,
-    error.io.device.nf-device@pciexbus/pciexdev/pciexfn,
-    error.io.device.f-device@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-ca-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.mtlp-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.corrlink_trip@pciexbus,
-    error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn;
+prop fault.io.pciex.device-interr-unaf@PCIEXFN { IS_SU(PCIEXFN) } (1)->
+    error.io.pciex.flt-nf-poisecrc-u@PCIEXFN;
+
+prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+    error.io.pciex.corrlink@pciexbus,
+    error.io.device.nf-device@PCIEXFN;
+
+prop fault.io.pciex.device-interr-unaf@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+    error.io.pciex.flt-nf-poisecrc-u@PCIEXFN;
+
+prop fault.io.pciex.device-interr-deg@PCIEXFN { IS_SU(PCIEXFN) } (1)->
+    error.io.pciex.flt-deg-poisecrc-u@PCIEXFN;
+
+prop fault.io.pciex.device-interr@PCIEXFN { IS_SU(PCIEXFN) } (1)->
+    error.io.pciex.flt-f-poisecrc-u@PCIEXFN,
+    error.io.pciex.flt-ca-u@PCIEXFN,
+    error.io.pciex.fatlink@PCIEXFN;
+
+prop fault.io.pciex.device-interr-deg@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+    error.io.pciex.flt-deg-poisecrc-u@PCIEXFN,
+    error.io.device.deg-device@PCIEXFN;
+
+prop fault.io.pciex.device-interr@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+    error.io.pciex.flt-f-poisecrc-u@PCIEXFN,
+    error.io.device.f-device@PCIEXFN,
+    error.io.pciex.flt-ca-u@PCIEXFN,
+    error.io.pciex.flt-mtlp-u@PCIEXFN,
+    error.io.pciex.fatlink@PCIEXFN;
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -449,57 +385,64 @@ prop fault.io.pciex.device-interr@pciexbus/pciexdev/pciexfn { IS_LEAF } (1)->
  * - fatlink:		fatal link or physical level error
  */
 
-event error.io.pciex.nr-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-ca-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-f-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.corrlink_trip@pciexbus/pciexdev/pciexfn/pciexbus;
-event error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
+event error.io.pciex.nr-d@PCIEXFN/PCIEXFN;
+event error.io.pciex.ca-d@PCIEXFN/PCIEXFN;
+event error.io.pciex.corrlink@PCIEXFN/pciexbus;
+event error.io.pciex.fatlink@PCIEXFN/PCIEXFN;
+event error.io.pciex.nf-poisecrc-d@PCIEXFN/PCIEXFN;
+event error.io.pciex.f-poisecrc-d@PCIEXFN/PCIEXFN;
+event error.io.pciex.deg-poisecrc-d@PCIEXFN/PCIEXFN;
 
-prop fault.io.pciex.device-noresp@pciexbus/pciexdev/pciexfn { IS_SWD } (1)->
-    error.io.pciex.nr-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
+prop fault.io.pciex.device-noresp@PCIEXFN { IS_SD(PCIEXFN) } (1)->
+    error.io.pciex.nr-d@PCIEXFN/PCIEXFNHZ;
 
-prop fault.io.pciex.device-interr@pciexbus/pciexdev/pciexfn { IS_SWD } (1)->
-    error.io.pciex.flt-ca-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>,
-    error.io.pciex.flt-nf-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>,
-    error.io.pciex.flt-f-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>,
-    error.io.pciex.corrlink_trip@pciexbus/pciexdev/pciexfn/pciexbus<>,
-    error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
+prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_SD(PCIEXFN) } (1)->
+    error.io.pciex.corrlink@PCIEXFN/pciexbus<>;
+
+prop fault.io.pciex.device-interr-unaf@PCIEXFN { IS_SD(PCIEXFN) } (1)->
+    error.io.pciex.nf-poisecrc-d@PCIEXFN/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr-deg@PCIEXFN { IS_SD(PCIEXFN) } (1)->
+    error.io.pciex.deg-poisecrc-d@PCIEXFN/PCIEXFNHZ;
+
+prop fault.io.pciex.device-interr@PCIEXFN { IS_SD(PCIEXFN) } (1)->
+    error.io.pciex.ca-d@PCIEXFN/PCIEXFNHZ,
+    error.io.pciex.f-poisecrc-d@PCIEXFN/PCIEXFNHZ,
+    error.io.pciex.fatlink@PCIEXFN/PCIEXFNHZ;
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  * A faulty PCIEX bus may cause:
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * - nr-u:		a device to not respond because the link is down
+ * - flt-nr-u:		a device to not respond because the link is down
  * - nr-d:		a device to not respond because the link is down
  * - corrlink:		correctable link or physical level error
  * - fatlink:		fatal link or physical level error
  */
 
-event error.io.pciex.nr-d@pciexbus/pciexdev/pciexfn;
+event error.io.pciex.nr-d@PCIEXFN;
 
-prop fault.io.pciex.bus-noresp@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.flt-nr-u@pciexbus/pciexdev/pciexfn
-	{ IS_SWU || IS_LEAF || IS_BDG },
-    error.io.pciex.nr-d@pciexbus/pciexdev/pciexfn
-	{ IS_SWU || IS_LEAF || IS_BDG };
+prop fault.io.pciex.bus-noresp@PCIEXFN { !IS_SD(PCIEXFN) } (0)->
+    error.io.pciex.flt-nr-u@PCIEXFN,
+    error.io.pciex.nr-d@PCIEXFN;
 
-prop fault.io.pciex.bus-linkerr@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.corrlink_trip@pciexbus,
-    error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn
-	{ IS_SWU || IS_LEAF || IS_BDG };
+prop fault.io.pciex.bus-linkerr-corr@PCIEXFN (0)->
+    error.io.pciex.corrlink@pciexbus;
+
+prop fault.io.pciex.bus-linkerr@PCIEXFN { !IS_SD(PCIEXFN) } (0)->
+    error.io.pciex.fatlink@PCIEXFN;
 
 /*
  * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  * A faulty pciex-pci bridge may cause
  * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  * The following errors to propagate onto the PCI Express fabric
- * - nr-u:		the device not to respond to a valid downstream request
- * - ca-u:		the device to completer abort a valid downstream request
- * - ecrcreq-u:		request with end-to-end CRC error transmitted upstream
- * - ecrccomp-u:	compl with end-to-end CRC error transmitted upstream
- * - poisreq-u:		poisoned request transmitted upstream
- * - poiscomp-u:	poisoned completion transmitted upstream
+ * - flt-nr-u:		the device not to respond to a valid downstream request
+ * - flt-ca-u:		the device to completer abort a valid downstream request
+ * - flt-ecrcreq-u:	request with end-to-end CRC error transmitted upstream
+ * - flt-ecrccomp-u:	compl with end-to-end CRC error transmitted upstream
+ * - flt-poisreq-u:	poisoned request transmitted upstream
+ * - flt-poiscomp-u:	poisoned completion transmitted upstream
  * - corrlink:		correctable link or physical level error upstream
  * - fatlink:		fatal link or physical level error upstream
  * - sec-interr:	internal error on pci express to pci bridge
@@ -518,191 +461,207 @@ prop fault.io.pciex.bus-linkerr@pciexbus/pciexdev/pciexfn (0)->
  * - scpe-d:	split completion to get corrupted during downstream transmission
  */
 
-event error.io.pci.ape-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.f-dpe-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.nf-dpe-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.retry-to-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.nr-pw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.nr-drw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.ta-pw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.ta-drw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pcix.scpe-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pciex.sec-interr@pciexbus/pciexdev/pciexfn;
-event ereport.io.pci.sec-sta@pciexbus/pciexdev/pciexfn{within(5s)};
+event error.io.pci.ape-d@PCIEXFN/PCIFN;
+event error.io.pci.f-dpe-d@PCIEXFN/PCIFN;
+event error.io.pci.deg-dpe-d@PCIEXFN/PCIFN;
+event error.io.pci.nf-dpe-d@PCIEXFN/PCIFN;
+event error.io.pci.retry-to-d@PCIEXFN/PCIFN;
+event error.io.pci.nr-pw-d@PCIEXFN/PCIFN;
+event error.io.pci.nr-drw-d@PCIEXFN/PCIFN;
+event error.io.pci.ta-pw-d@PCIEXFN/PCIFN;
+event error.io.pci.ta-drw-d@PCIEXFN/PCIFN;
+event error.io.pcix.scpe-d@PCIEXFN/PCIFN;
+event error.io.pciex.sec-interr@PCIEXFN;
+event ereport.io.pci.sec-sta@PCIEXFN{within(5s)};
 
-prop fault.io.pciex.device-noresp@pciexbus/pciexdev/pciexfn { IS_BDG } (1)->
-    error.io.pciex.flt-nr-u@pciexbus/pciexdev/pciexfn,
-    error.io.pci.retry-to-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>,
-    error.io.pci.nr-pw-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>,
-    error.io.pci.nr-drw-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
+prop fault.io.pciex.device-noresp@PCIEXFN { IS_BG(PCIEXFN) } (1)->
+    error.io.pciex.flt-nr-u@PCIEXFN,
+    error.io.pci.retry-to-d@PCIEXFN/PCIFNHZ,
+    error.io.pci.nr-pw-d@PCIEXFN/PCIFNHZ,
+    error.io.pci.nr-drw-d@PCIEXFN/PCIFNHZ;
 
-prop fault.io.pciex.device-interr@pciexbus/pciexdev/pciexfn { IS_BDG } (1)->
-    error.io.pciex.flt-nf-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-f-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-ca-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.mtlp-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.sec-interr@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.corrlink_trip@pciexbus,
-    error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn,
-    error.io.pci.ta-pw-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>,
-    error.io.pci.ta-drw-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>,
-    error.io.pci.ape-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>,
-    error.io.pcix.scpe-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>,
-    error.io.pci.f-dpe-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>,
-    error.io.pci.nf-dpe-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
+prop fault.io.pciex.device-interr-corr@PCIEXFN { IS_BG(PCIEXFN) } (1)->
+    error.io.pciex.corrlink@pciexbus;
 
-prop fault.io.pciex.device-interr@pciexbus/pciexdev/pciexfn { IS_BDG } (0)->
-    ereport.io.pci.sec-sta@pciexbus/pciexdev/pciexfn;
+prop fault.io.pciex.device-interr-unaf@PCIEXFN { IS_BG(PCIEXFN) } (1)->
+    error.io.pciex.flt-nf-poisecrc-u@PCIEXFN,
+    error.io.pci.nf-dpe-d@PCIEXFN/PCIFNHZ;
+
+prop fault.io.pciex.device-interr-deg@PCIEXFN { IS_BG(PCIEXFN) } (1)->
+    error.io.pciex.flt-deg-poisecrc-u@PCIEXFN,
+    error.io.pci.deg-dpe-d@PCIEXFN/PCIFNHZ;
+
+prop fault.io.pciex.device-interr@PCIEXFN { IS_BG(PCIEXFN) } (1)->
+    error.io.pciex.flt-f-poisecrc-u@PCIEXFN,
+    error.io.pciex.flt-ca-u@PCIEXFN,
+    error.io.pciex.flt-mtlp-u@PCIEXFN,
+    error.io.pciex.sec-interr@PCIEXFN,
+    error.io.pciex.fatlink@PCIEXFN,
+    error.io.pci.ta-pw-d@PCIEXFN/PCIFNHZ,
+    error.io.pci.ta-drw-d@PCIEXFN/PCIFNHZ,
+    error.io.pci.ape-d@PCIEXFN/PCIFNHZ,
+    error.io.pcix.scpe-d@PCIEXFN/PCIFNHZ,
+    error.io.pci.f-dpe-d@PCIEXFN/PCIFNHZ;
+
+prop fault.io.pciex.device-interr-unaf@PCIEXFN { IS_BG(PCIEXFN) } (0)->
+    ereport.io.pci.sec-sta@PCIEXFN;
+
+prop fault.io.pciex.device-interr@PCIEXFN { IS_BG(PCIEXFN) } (0)->
+    ereport.io.pci.sec-sta@PCIEXFN;
+
+/*
+ * the following rules for ptlp and ecrc faults are split into fatal and
+ * nonfatal, depending on the service impact reported by the leaf driver
+ */
+event error.io.pciex.nf-poisecrc-d@PCIEXFN;
+event error.io.pciex.deg-poisecrc-d@PCIEXFN;
+event error.io.pciex.f-poisecrc-d@PCIEXFN;
+event error.io.pciex.ecrcreq-d@PCIEXFN;
+event error.io.pciex.ecrccomp-d@PCIEXFN;
+event error.io.pciex.poisreq-d@PCIEXFN;
+event error.io.pciex.poiscomp-d@PCIEXFN;
+event error.io.pciex.flt-poisreq-u@PCIEXFN;
+event error.io.pciex.flt-poiscomp-u@PCIEXFN;
+event error.io.pciex.flt-ecrcreq-u@PCIEXFN;
+event error.io.pciex.flt-ecrccomp-u@PCIEXFN;
+
+prop error.io.pciex.nf-poisecrc-d@PCIEXFN (1)->
+    error.io.pciex.ecrcreq-d@PCIEXFN,
+    error.io.pciex.ecrccomp-d@PCIEXFN,
+    error.io.pciex.poisreq-d@PCIEXFN,
+    error.io.pciex.poiscomp-d@PCIEXFN;
+
+prop error.io.pciex.nf-poisecrc-d@PCIEXFN (1)->
+    error.io.pciex.noimpact-d@PCIEXFN;
+
+prop error.io.pciex.f-poisecrc-d@PCIEXFN (1)->
+    error.io.pciex.ecrcreq-d@PCIEXFN,
+    error.io.pciex.ecrccomp-d@PCIEXFN,
+    error.io.pciex.poisreq-d@PCIEXFN,
+    error.io.pciex.poiscomp-d@PCIEXFN;
+
+prop error.io.pciex.f-poisecrc-d@PCIEXFN (1)->
+    error.io.pciex.lost-d@PCIEXFN;
+
+prop error.io.pciex.deg-poisecrc-d@PCIEXFN (1)->
+    error.io.pciex.ecrcreq-d@PCIEXFN,
+    error.io.pciex.ecrccomp-d@PCIEXFN,
+    error.io.pciex.poisreq-d@PCIEXFN,
+    error.io.pciex.poiscomp-d@PCIEXFN;
+
+prop error.io.pciex.deg-poisecrc-d@PCIEXFN (1)->
+    error.io.pciex.degraded-d@PCIEXFN;
+
+prop error.io.pciex.flt-nf-poisecrc-u@PCIEXFN (1)->
+    error.io.pciex.flt-ecrcreq-u@PCIEXFN,
+    error.io.pciex.flt-ecrccomp-u@PCIEXFN,
+    error.io.pciex.flt-poisreq-u@PCIEXFN,
+    error.io.pciex.flt-poiscomp-u@PCIEXFN;
+
+prop error.io.pciex.flt-nf-poisecrc-u@PCIEXFN (1)->
+    error.io.pciex.noimpact-d@PCIEXFN;
+
+prop error.io.pciex.flt-deg-poisecrc-u@PCIEXFN (1)->
+    error.io.pciex.flt-ecrcreq-u@PCIEXFN,
+    error.io.pciex.flt-ecrccomp-u@PCIEXFN,
+    error.io.pciex.flt-poisreq-u@PCIEXFN,
+    error.io.pciex.flt-poiscomp-u@PCIEXFN;
+
+prop error.io.pciex.flt-deg-poisecrc-u@PCIEXFN (1)->
+    error.io.pciex.degraded-d@PCIEXFN;
+
+prop error.io.pciex.flt-f-poisecrc-u@PCIEXFN (1)->
+    error.io.pciex.flt-ecrcreq-u@PCIEXFN,
+    error.io.pciex.flt-ecrccomp-u@PCIEXFN,
+    error.io.pciex.flt-poisreq-u@PCIEXFN,
+    error.io.pciex.flt-poiscomp-u@PCIEXFN;
+
+prop error.io.pciex.flt-f-poisecrc-u@PCIEXFN (1)->
+    error.io.pciex.lost-d@PCIEXFN;
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  * declarations
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  */
-event error.io.pciex.fatal@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-ur-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.ur-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.ur-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.ur-u@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nr-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nr-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nr-u@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.ca-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.ca-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.ca-u@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.mtlp-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.sw-mtlp-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.mtlp-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.flt-ca-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.ca-d@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.ca-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.ca-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.poisreq-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.poisreq-d@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.poisreq-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.sw-poisreq-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.poiscomp-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.ecrcreq-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.sw-ecrcreq-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.ecrccomp-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.badreq-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.badreq-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.badreq-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.badreq-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.badreq-u@pciexbus/pciexdev;
-event error.io.pciex.badreq-u@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.ecrcreq-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.ecrcreq-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-f-ecrcreq-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-nf-ecrcreq-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-f-ecrcreq-u@pcibus/pcidev/pcifn;
-event error.io.pciex.source-nf-ecrcreq-u@pcibus/pcidev/pcifn;
-event error.io.pciex.ecrccomp-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.ecrccomp-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-f-ecrccomp-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-nf-ecrccomp-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-f-ecrccomp-u@pcibus/pcidev/pcifn;
-event error.io.pciex.source-nf-ecrccomp-u@pcibus/pcidev/pcifn;
-event error.io.pciex.poiscomp-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.poiscomp-u@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.poiscomp-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-f-poiscomp-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-nf-poiscomp-u@pciexbus/pciexdev/pciexfn;
-event error.io.pci.source-f-dpdata-r-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.source-nf-dpdata-r-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.source-f-dpdata-r-u@pcibus/pcidev/pcifn;
-event error.io.pci.source-nf-dpdata-r-u@pcibus/pcidev/pcifn;
-event error.io.pciex.poisreq-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.poisreq-u@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.poisreq-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-f-poisreq-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-nf-poisreq-u@pciexbus/pciexdev/pciexfn;
-event error.io.pci.source-f-dpdata-w-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.source-nf-dpdata-w-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.source-f-dpdata-w-u@pcibus/pcidev/pcifn;
-event error.io.pci.source-nf-dpdata-w-u@pcibus/pcidev/pcifn;
-event error.io.pciex.source-f-poisreq-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-nf-poisreq-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-mtlp-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-mtlp-u@pcibus/pcidev/pcifn;
-event error.io.pci.badreq-pw-u@pcibus/pcidev/pcifn;
-event error.io.pci.badreq-drw-u@pcibus/pcidev/pcifn;
-event error.io.pci.badreq-pw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.badreq-drw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.target-ma-d@pciexbus/pciexdev/pciexfn;
-event error.io.pci.target-rta-d@pciexbus/pciexdev/pciexfn;
-event error.io.pci.target-mdpe-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.f-poisreq-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.f-poisreq-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.f-lf-poisreq-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nf-poisreq-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nf-poisreq-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.anf-poisreq-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.anf-poisreq-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.f-poiscomp-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.f-poiscomp-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.f-lf-poiscomp-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nf-poiscomp-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nf-poiscomp-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.anf-poiscomp-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.anf-poiscomp-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.f-ecrcreq-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.f-ecrcreq-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.f-ecrcreq-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pciex.f-ecrcreq-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pciex.f-ecrcreq-d@pcibus/pcidev/pcifn;
-event error.io.pciex.nf-ecrcreq-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nf-ecrcreq-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nf-ecrcreq-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pciex.nf-ecrcreq-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pciex.nf-ecrcreq-d@pcibus/pcidev/pcifn;
-event error.io.pciex.f-ecrccomp-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.f-ecrccomp-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.f-ecrccomp-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pciex.f-ecrccomp-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pciex.f-ecrccomp-d@pcibus/pcidev/pcifn;
-event error.io.pciex.f-lf-ecrccomp-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nf-ecrccomp-d@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nf-ecrccomp-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nf-ecrccomp-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pciex.nf-ecrccomp-d@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pciex.nf-ecrccomp-d@pcibus/pcidev/pcifn;
-event error.io.pciex.f-lf-poisreq-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.fatal-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nonfatal-u@pciexbus/pciexdev/pciexfn;
-event error.io.pciex.fatal-u@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nonfatal-u@pciexrc/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.fatal-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.nonfatal-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.service.restored@pcibus/pcidev/pcifn;
+event error.io.pciex.fatal@PCIEXFN;
+event error.io.pciex.nonfatal@PCIEXFN;
+event error.io.pciex.flt-ur-u@PCIEXFN;
+event error.io.pciex.mtlp-d@PCIEXFN;
+event error.io.pciex.sw-mtlp-d@PCIEXFN;
+event error.io.pciex.mtlp-d@PCIEXFN/PCIEXFN;
+event error.io.pciex.ca-d@PCIEXFN;
+event error.io.pciex.ca-fwd-d@PCIEXFN;
+event error.io.pciex.ca-fwd-d@PCIEXFN/PCIEXFN;
+event error.io.pciex.poisreq-fwd-d@PCIEXFN;
+event error.io.pciex.poisreq-fwd-d@pciexrc/PCIEXFN;
+event error.io.pciex.poisreq-fwd-d@PCIEXFN/PCIEXFN;
+event error.io.pciex.poiscomp-fwd-d@PCIEXFN;
+event error.io.pciex.poiscomp-fwd-d@PCIEXFN/PCIEXFN;
+event error.io.pciex.ecrcreq-fwd-d@PCIEXFN/PCIEXFN;
+event error.io.pciex.ecrccomp-fwd-d@PCIEXFN/PCIEXFN;
+event error.io.pciex.ecrcreq-fwd-d@PCIEXFN;
+event error.io.pciex.ecrccomp-fwd-d@PCIEXFN;
+event error.io.pciex.source-ecrcreq-u@PCIEXFN;
+event error.io.pciex.source-ecrccomp-u@PCIEXFN;
+event error.io.pciex.source-poiscomp-u@PCIEXFN;
+event error.io.pciex.source-poisreq-u@PCIEXFN;
+event error.io.pciex.badreq-d@PCIEXFN;
+event error.io.pciex.badreq-d@PCIEXFN/PCIEXFN;
+event error.io.pci.badreq-pw-d@PCIEXFN/PCIFN;
+event error.io.pci.badreq-drw-d@PCIEXFN/PCIFN;
+event error.io.pci.target-ma-d@PCIEXFN;
+event error.io.pci.target-rta-d@PCIEXFN;
+event error.io.pci.dpdata-pw-d@PCIEXFN/PCIFN;
+event error.io.pci.dpdata-dw-d@PCIEXFN/PCIFN;
+event error.io.pci.dpdata-dr-d@PCIEXFN/PCIFN;
+event error.io.pciex.ca-u@PCIEXFN;
+event error.io.pciex.ca-u@PCIEXFN/PCIEXFN;
+event error.io.pciex.ca-u@pciexrc/PCIEXFN;
+event error.io.pciex.ur-u@PCIEXFN;
+event error.io.pciex.ur-u@PCIEXFN/PCIEXFN;
+event error.io.pciex.ur-u@pciexrc/PCIEXFN;
+event error.io.pciex.nr-u@PCIEXFN;
+event error.io.pciex.nr-u@PCIEXFN/PCIEXFN;
+event error.io.pciex.nr-u@pciexrc/PCIEXFN;
+event error.io.pciex.mtlp-u@PCIEXFN;
+event error.io.pciex.mtlp-u@PCIEXFN/PCIEXFN;
+event error.io.pciex.mtlp-u@pciexrc/PCIEXFN;
+event error.io.pciex.badreq-u@PCIEXFN;
+event error.io.pciex.badreq-u@PCIEXFN/PCIEXFN;
+event error.io.pciex.badreq-u@pciexrc/PCIEXFN;
+event error.io.pciex.poisreq-u@PCIEXFN;
+event error.io.pciex.poisreq-u@PCIEXFN/PCIEXFN;
+event error.io.pciex.poisreq-u@pciexrc/PCIEXFN;
+event error.io.pciex.poiscomp-u@PCIEXFN;
+event error.io.pciex.poiscomp-u@PCIEXFN/PCIEXFN;
+event error.io.pciex.poiscomp-u@pciexrc/PCIEXFN;
+event error.io.pciex.ecrcreq-u@PCIEXFN;
+event error.io.pciex.ecrcreq-u@PCIEXFN/PCIEXFN;
+event error.io.pciex.ecrccomp-u@PCIEXFN;
+event error.io.pciex.ecrccomp-u@PCIEXFN/PCIEXFN;
 
-event ereport.io.pci.ma@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pci.mdpe@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pci.dpe@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pci.rta@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pci.sta@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.service.lost@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.service.degraded@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.service.unaffected@pcibus/pcidev/pcifn{within(5s)};
-event ereport.io.pciex.dl.dllp@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.dl.btlp@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.dl.bdllp@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.dl.rto@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.dl.rnr@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.pl.re@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.pl.te@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.tl.fcp@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.tl.rof@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.tl.mtlp@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.tl.ur@pciexfn{within(5s)};
-event ereport.io.pciex.tl.ca@pciexfn{within(5s)};
-event ereport.io.pciex.tl.ur@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.tl.ca@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.tl.ecrc@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.tl.uc@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.tl.cto@pciexbus/pciexdev/pciexfn{within(5s)};
+event ereport.io.pci.ma@PCIEXFN{within(5s)};
+event ereport.io.pci.mdpe@PCIEXFN{within(5s)};
+event ereport.io.pci.dpe@PCIEXFN{within(5s)};
+event ereport.io.pci.rta@PCIEXFN{within(5s)};
+event ereport.io.pci.sta@PCIEXFN{within(5s)};
+event ereport.io.pciex.dl.dllp@PCIEXFN{within(5s)};
+event ereport.io.pciex.dl.btlp@PCIEXFN{within(5s)};
+event ereport.io.pciex.dl.bdllp@PCIEXFN{within(5s)};
+event ereport.io.pciex.dl.rto@PCIEXFN{within(5s)};
+event ereport.io.pciex.dl.rnr@PCIEXFN{within(5s)};
+event ereport.io.pciex.pl.re@PCIEXFN{within(5s)};
+event ereport.io.pciex.pl.te@PCIEXFN{within(5s)};
+event ereport.io.pciex.tl.fcp@PCIEXFN{within(5s)};
+event ereport.io.pciex.tl.rof@PCIEXFN{within(5s)};
+event ereport.io.pciex.tl.mtlp@PCIEXFN{within(5s)};
+event ereport.io.pciex.tl.ur@PCIEXFN{within(5s)};
+event ereport.io.pciex.tl.ca@PCIEXFN{within(5s)};
+event ereport.io.pciex.tl.ptlp@PCIEXFN{within(5s)};
+event ereport.io.pciex.tl.ecrc@PCIEXFN{within(5s)};
+event ereport.io.pciex.tl.uc@PCIEXFN{within(5s)};
+event ereport.io.pciex.tl.cto@PCIEXFN{within(5s)};
 event ereport.io.pciex.dl.dllp@pciexrc{within(5s)};
 event ereport.io.pciex.dl.btlp@pciexrc{within(5s)};
 event ereport.io.pciex.dl.bdllp@pciexrc{within(5s)};
@@ -723,15 +682,18 @@ event ereport.io.pci.sec-mdpe@pciexrc{within(5s)};
 event ereport.io.pci.sec-dpe@pciexrc{within(5s)};
 event ereport.io.pci.sec-rta@pciexrc{within(5s)};
 event ereport.io.pci.sec-sta@pciexrc{within(5s)};
-event ereport.io.pci.sec-mdpe@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pci.sec-dpe@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pci.sec-rserr@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pci.sserr@pciexbus/pciexdev/pciexfn{within(5s)};
+event ereport.io.pci.sec-mdpe@PCIEXFN{within(5s)};
+event ereport.io.pci.sec-dpe@PCIEXFN{within(5s)};
+event ereport.io.pci.sec-rserr@PCIEXFN{within(5s)};
+event ereport.io.pci.sserr@PCIEXFN{within(5s)};
 event ereport.io.pci.sec-rserr@pciexrc{within(5s)};
 event ereport.io.pciex.rc.fe-msg@pciexrc{within(5s)};
 event ereport.io.pciex.rc.nfe-msg@pciexrc{within(5s)};
-event ereport.io.pciex.bdg.sec-interr@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.bdg.sec-ude@pciexbus/pciexdev/pciexfn{within(5s)};
+event ereport.io.pciex.rc.mue-msg@pciexrc{within(5s)};
+event ereport.io.pciex.bdg.sec-interr@PCIEXFN{within(5s)};
+event ereport.io.pciex.bdg.sec-ude@PCIEXFN{within(5s)};
+event ereport.io.pci.target-mdpe@PCIEXFN{within(5s)};
+event ereport.io.pci.target-mdpe@PCIFN{within(5s)};
 
 /*
  * handling of fatal and nonfatal error messages propagated up to root complex
@@ -739,38 +701,34 @@ event ereport.io.pciex.bdg.sec-ude@pciexbus/pciexdev/pciexfn{within(5s)};
  * Use these for errors reported by root-complex on behalf of another device.
  * Can use source-id payload to identify where the message came from.
  */
-prop error.io.pciex.fatal@pciexbus[b]/pciexdev[d]/pciexfn[f] (1)->
-    ereport.io.pciex.rc.fe-msg@pciexrc<> {
-	SOURCE_ID_MATCHES_BDF && BDF_IS_UNDER_RC };
+prop error.io.pciex.fatal@PCIEXFN1 (1)->
+    ereport.io.pciex.rc.mue-msg@pciexrc { is_under(pciexrc, PCIEXFN1) },
+    ereport.io.pciex.rc.fe-msg@pciexrc { is_under(pciexrc, PCIEXFN1) &&
+	SOURCE_ID_MATCHES_BDF };
 
-prop error.io.pciex.fatal@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.fatal-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.fatal@PCIEXFN (0)->
+    ereport.io.pci.sserr@PCIEXFN1;
 
-prop error.io.pciex.fatal-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.sserr@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.fatal@PCIEXFN { is_under(PCIEXFN1, PCIEXFN) } (0)->
+    ereport.io.pci.sserr@PCIEXFN1,
+    ereport.io.pci.sec-rserr@PCIEXFN1;
 
-prop error.io.pciex.fatal-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.fatal-u@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.sec-rserr@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.fatal-u@pciexrc/pciexbus/pciexdev/pciexfn (0)->
+prop error.io.pciex.fatal@PCIEXFN { is_under(pciexrc, PCIEXFN) } (0)->
     ereport.io.pci.sec-rserr@pciexrc;
 
-prop error.io.pciex.nonfatal@pciexbus[b]/pciexdev[d]/pciexfn[f] (1)->
-    ereport.io.pciex.rc.nfe-msg@pciexrc<> {
-	SOURCE_ID_MATCHES_BDF && BDF_IS_UNDER_RC };
+prop error.io.pciex.nonfatal@PCIEXFN1 (1)->
+    ereport.io.pciex.rc.mue-msg@pciexrc { is_under(pciexrc, PCIEXFN1) },
+    ereport.io.pciex.rc.nfe-msg@pciexrc { is_under(pciexrc, PCIEXFN1) &&
+	SOURCE_ID_MATCHES_BDF };
 
-prop error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nonfatal-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.nonfatal@PCIEXFN (0)->
+    ereport.io.pci.sserr@PCIEXFN;
 
-prop error.io.pciex.nonfatal-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.sserr@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.nonfatal@PCIEXFN { is_under(PCIEXFN1, PCIEXFN) } (0)->
+    ereport.io.pci.sserr@PCIEXFN1,
+    ereport.io.pci.sec-rserr@PCIEXFN1;
 
-prop error.io.pciex.nonfatal-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.nonfatal-u@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.sec-rserr@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.nonfatal-u@pciexrc/pciexbus/pciexdev/pciexfn (0)->
+prop error.io.pciex.nonfatal@PCIEXFN { is_under(pciexrc, PCIEXFN) } (0)->
     ereport.io.pci.sec-rserr@pciexrc;
 
 /*
@@ -779,24 +737,19 @@ prop error.io.pciex.nonfatal-u@pciexrc/pciexbus/pciexdev/pciexfn (0)->
  * can use may propagations here as these ereports are only seen for these
  * faults.
  */
-prop error.io.pciex.corrlink@pciexbus (0)->
-    ereport.io.pciex.dl.btlp@pciexbus/pciexdev/pciexfn
-	{ IS_SWU || IS_LEAF || IS_BDG },
-    ereport.io.pciex.dl.bdllp@pciexbus/pciexdev/pciexfn
-	{ IS_SWU || IS_LEAF || IS_BDG },
-    ereport.io.pciex.dl.rto@pciexbus/pciexdev/pciexfn
-	{ IS_SWU || IS_LEAF || IS_BDG },
-    ereport.io.pciex.dl.rnr@pciexbus/pciexdev/pciexfn
-	{ IS_SWU || IS_LEAF || IS_BDG },
-    ereport.io.pciex.pl.re@pciexbus/pciexdev/pciexfn
-	{ IS_SWU || IS_LEAF || IS_BDG };
+prop error.io.pciex.corrlink@pciexbus { !IS_SD(PCIEXFN) } (0)->
+    ereport.io.pciex.dl.btlp@PCIEXFN,
+    ereport.io.pciex.dl.bdllp@PCIEXFN,
+    ereport.io.pciex.dl.rto@PCIEXFN,
+    ereport.io.pciex.dl.rnr@PCIEXFN,
+    ereport.io.pciex.pl.re@PCIEXFN;
 
-prop error.io.pciex.corrlink@pciexbus/pciexdev/pciexfn/pciexbus (0)->
-    ereport.io.pciex.dl.btlp@pciexbus/pciexdev/pciexfn { IS_SWD },
-    ereport.io.pciex.dl.bdllp@pciexbus/pciexdev/pciexfn { IS_SWD },
-    ereport.io.pciex.dl.rto@pciexbus/pciexdev/pciexfn { IS_SWD },
-    ereport.io.pciex.dl.rnr@pciexbus/pciexdev/pciexfn { IS_SWD },
-    ereport.io.pciex.pl.re@pciexbus/pciexdev/pciexfn { IS_SWD };
+prop error.io.pciex.corrlink@PCIEXFN/pciexbus { IS_SD(PCIEXFN) } (0)->
+    ereport.io.pciex.dl.btlp@PCIEXFN,
+    ereport.io.pciex.dl.bdllp@PCIEXFN,
+    ereport.io.pciex.dl.rto@PCIEXFN,
+    ereport.io.pciex.dl.rnr@PCIEXFN,
+    ereport.io.pciex.pl.re@PCIEXFN;
 
 prop error.io.pciex.corrlink@pciexrc/pciexbus (0)->
     ereport.io.pciex.dl.btlp@pciexrc,
@@ -805,29 +758,24 @@ prop error.io.pciex.corrlink@pciexrc/pciexbus (0)->
     ereport.io.pciex.dl.rnr@pciexrc,
     ereport.io.pciex.pl.re@pciexrc;
 
-prop error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.fatal@pciexbus/pciexdev/pciexfn
-	{ IS_SWU || IS_LEAF || IS_BDG };
+prop error.io.pciex.fatlink@PCIEXFN { !IS_SD(PCIEXFN) } (0)->
+    error.io.pciex.fatal@PCIEXFN;
 
-prop error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pciex.dl.dllp@pciexbus/pciexdev/pciexfn
-	{ IS_SWU || IS_LEAF || IS_BDG },
-    ereport.io.pciex.tl.fcp@pciexbus/pciexdev/pciexfn
-	{ IS_SWU || IS_LEAF || IS_BDG },
-    ereport.io.pciex.tl.rof@pciexbus/pciexdev/pciexfn
-	{ IS_SWU || IS_LEAF || IS_BDG };
+prop error.io.pciex.fatlink@PCIEXFN { !IS_SD(PCIEXFN) } (0)->
+    ereport.io.pciex.dl.dllp@PCIEXFN,
+    ereport.io.pciex.tl.fcp@PCIEXFN,
+    ereport.io.pciex.tl.rof@PCIEXFN;
 
-prop error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn
-(0)->
-    error.io.pciex.fatal@pciexbus/pciexdev/pciexfn { IS_SWD };
+prop error.io.pciex.fatlink@PCIEXFN/PCIEXFN { IS_SD(PCIEXFN) } (0)->
+    error.io.pciex.fatal@PCIEXFN;
 
-prop error.io.pciex.fatlink@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pciex.dl.dllp@pciexbus/pciexdev/pciexfn { IS_SWD },
-    ereport.io.pciex.pl.te@pciexbus/pciexdev/pciexfn { IS_SWD },
-    ereport.io.pciex.tl.fcp@pciexbus/pciexdev/pciexfn { IS_SWD },
-    ereport.io.pciex.tl.rof@pciexbus/pciexdev/pciexfn { IS_SWD };
+prop error.io.pciex.fatlink@PCIEXFN/PCIEXFN { IS_SD(PCIEXFN) } (0)->
+    ereport.io.pciex.dl.dllp@PCIEXFN,
+    ereport.io.pciex.pl.te@PCIEXFN,
+    ereport.io.pciex.tl.fcp@PCIEXFN,
+    ereport.io.pciex.tl.rof@PCIEXFN;
 
-prop error.io.pciex.fatlink@pciexrc/pciexbus/pciexdev/pciexfn (0)->
+prop error.io.pciex.fatlink@pciexrc/PCIEXFN (0)->
     ereport.io.pciex.dl.dllp@pciexrc,
     ereport.io.pciex.pl.te@pciexrc,
     ereport.io.pciex.tl.fcp@pciexrc,
@@ -836,9 +784,9 @@ prop error.io.pciex.fatlink@pciexrc/pciexbus/pciexdev/pciexfn (0)->
 /*
  * bridge internal error
  */
-prop error.io.pciex.sec-interr@pciexbus/pciexdev/pciexfn (2) ->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn { IS_BDG },
-    ereport.io.pciex.bdg.sec-interr@pciexbus/pciexdev/pciexfn { IS_BDG };
+prop error.io.pciex.sec-interr@PCIEXFN { IS_BG(PCIEXFN) } (2) ->
+    error.io.pciex.nonfatal@PCIEXFN,
+    ereport.io.pciex.bdg.sec-interr@PCIEXFN;
 
 /*
  * downstream poisoned request
@@ -847,109 +795,63 @@ prop error.io.pciex.sec-interr@pciexbus/pciexdev/pciexfn (2) ->
  *   on route must raise a ptlp ereport while any switch ports forwarding
  *   the poisoned request must raise sec-mdpe ereports. The originator of the
  *   poisoning (be it root complex or downstream port of a switch) also raises
- *   sec-mdpe. A hardened leaf driver will also raise ptlp. A target-mdpe
- *   cascades down to the leaf (which may be a pci device beyond the bridge).
+ *   sec-mdpe. A hardened leaf driver will also raise ptlp. A target-mdpe may
+ *   be seen at the leaf (which may be a pci device beyond the bridge).
  *
  * Additionally, the leaf/bridge may treat the request as a ur, which the
  * root complex will see and report an ma. Use flt-ur-u to represent this.
- * Note that sw-poisreq-d is to handle the case where the switch is actually
- * the target of the packet (config request etc).
  *
  * The fault can always be recognized and the source identified using the ptlp
  * and sec-mdpe ereports.
  */
-prop error.io.pciex.flt-f-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.f-poisreq-d@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.poisreq-d@PCIEXFN (1)->
+    error.io.pciex.poisreq-fwd-d@PCIEXFN;
 
-prop error.io.pciex.f-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.sw-poisreq-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.f-poisreq-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>; 
+prop error.io.pciex.poisreq-fwd-d@PCIEXFN { IS_SD(PCIEXFN) ||
+    IS_SU(PCIEXFN) } (1)->
+    error.io.pciex.flt-ur-u@PCIEXFN,
+    error.io.pciex.poisreq-fwd-d@PCIEXFN/PCIEXFNHZ; 
 
-prop error.io.pciex.f-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.poisreq-d@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.f-poisreq-d@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.f-lf-poisreq-d@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.f-lf-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pci.dpe@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.f-lf-poisreq-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn,
-    ereport.io.service.lost@pciexbus/pciexdev/pciexfn,
-    ereport.io.service.degraded@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.f-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
-
-prop error.io.pciex.flt-nf-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nf-poisreq-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.anf-poisreq-d@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.nf-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nf-poisreq-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>; 
-
-prop error.io.pciex.nf-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.poisreq-d@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.nf-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pci.dpe@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.nf-poisreq-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.nf-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.service.unaffected@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    error.io.service.restored@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.service.restored@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.service.lost@pciexbus/pciexdev/pciexfn,
-    ereport.io.service.degraded@pciexbus/pciexdev/pciexfn;
-
-prop error.io.service.restored@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.service.restored@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.nf-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
-
-prop error.io.pciex.anf-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.anf-poisreq-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>; 
-
-prop error.io.pciex.anf-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.poisreq-d@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.anf-poisreq-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.dpe@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.poisreq-d@pciexrc/pciexbus/pciexdev/pciexfn (1)->
+prop error.io.pciex.poisreq-fwd-d@pciexrc/PCIEXFN (1)->
     ereport.io.pci.sec-mdpe@pciexrc;
 
-prop error.io.pciex.poisreq-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pci.sec-mdpe@pciexbus/pciexdev/pciexfn { IS_SWD };
+prop error.io.pciex.poisreq-fwd-d@PCIEXFN/PCIEXFN { IS_SU(PCIEXFN) } (0)->
+    ereport.io.pci.sec-mdpe@PCIEXFN;
 
-prop error.io.pciex.poisreq-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.sec-mdpe@pciexbus/pciexdev/pciexfn { IS_SWU };
+prop error.io.pciex.poisreq-fwd-d@PCIEXFN { IS_SU(PCIEXFN) } (2)->
+    ereport.io.pci.dpe@PCIEXFN,
+    ereport.io.pciex.tl.ptlp@PCIEXFN;
 
-prop error.io.pciex.poisreq-d@pciexbus/pciexdev/pciexfn (2)->
-    ereport.io.pci.dpe@pciexbus/pciexdev/pciexfn { IS_SWU || IS_BDG },
-    ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn { IS_SWU || IS_BDG };
+prop error.io.pciex.poisreq-fwd-d@PCIEXFN { IS_SU(PCIEXFN) } (0)->
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.poisreq-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.dpe@pciexbus/pciexdev/pciexfn { IS_SWD },
-    ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn { IS_SWD };
+prop error.io.pciex.poisreq-fwd-d@PCIEXFN/PCIEXFN { IS_SD(PCIEXFN) } (1)->
+    ereport.io.pci.sec-mdpe@PCIEXFN;
 
-prop error.io.pciex.poisreq-d@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.flt-ur-u@pciexbus/pciexdev/pciexfn { IS_LEAF };
+prop error.io.pciex.poisreq-fwd-d@PCIEXFN { IS_SD(PCIEXFN) } (0)->
+    ereport.io.pci.dpe@PCIEXFN,
+    ereport.io.pciex.tl.ptlp@PCIEXFN,
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.target-mdpe-d@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
+prop error.io.pciex.poisreq-fwd-d@PCIEXFN { IS_BG(PCIEXFN) } (3)->
+    ereport.io.pci.dpe@PCIEXFN,
+    ereport.io.pciex.tl.ptlp@PCIEXFN,
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.sw-poisreq-d@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.flt-ur-u@pciexbus/pciexdev/pciexfn { IS_SWU };
+prop error.io.pciex.poisreq-fwd-d@PCIEXFN { IS_BG(PCIEXFN) } (1)->
+    error.io.pci.dpdata-pw-d@PCIEXFN/PCIFNHZ,
+    error.io.pci.dpdata-dw-d@PCIEXFN/PCIFNHZ;
 
-prop error.io.pciex.sw-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.target-mdpe-d@pciexbus/pciexdev/pciexfn { IS_SWU };
+prop error.io.pciex.poisreq-fwd-d@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+    error.io.pciex.nonfatal@PCIEXFN;
+
+prop error.io.pciex.poisreq-fwd-d@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+    ereport.io.pci.dpe@PCIEXFN,
+    ereport.io.pciex.tl.ptlp@PCIEXFN,
+    error.io.pciex.flt-ur-u@PCIEXFN;
+
+prop error.io.pciex.poisreq-fwd-d@PCIEXFN (0)->
+    ereport.io.pci.target-mdpe@PCIEXFN;
 
 /*
  * downstream poisoned completion
@@ -961,83 +863,46 @@ prop error.io.pciex.sw-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
  *   the root complex identifying the leaf device, we won't actually be informed
  *   that the error was an ptlp.
  */
-prop error.io.pciex.flt-f-poiscomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.f-poiscomp-d@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.poiscomp-d@PCIEXFN (1)->
+    error.io.pciex.poiscomp-fwd-d@PCIEXFN;
 
-prop error.io.pciex.f-poiscomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.f-poiscomp-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>; 
+prop error.io.pciex.poiscomp-fwd-d@PCIEXFN (1)->
+    error.io.pciex.poiscomp-fwd-d@PCIEXFN/PCIEXFNHZ; 
 
-prop error.io.pciex.f-poiscomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.poiscomp-d@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.poiscomp-fwd-d@PCIEXFN { IS_SU(PCIEXFN) } (2)->
+    ereport.io.pci.dpe@PCIEXFN,
+    ereport.io.pciex.tl.ptlp@PCIEXFN;
 
-prop error.io.pciex.f-poiscomp-d@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.f-lf-poiscomp-d@pciexbus/pciexdev/pciexfn { IS_LEAF };
+prop error.io.pciex.poiscomp-fwd-d@PCIEXFN { IS_SU(PCIEXFN) } (1)->
+    ereport.io.pci.mdpe@PCIEXFN,
+    ereport.io.pci.sec-mdpe@PCIEXFN;
 
-prop error.io.pciex.f-lf-poiscomp-d@pciexbus/pciexdev/pciexfn (2)->
-    ereport.io.pci.mdpe@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.dpe@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.poiscomp-fwd-d@PCIEXFN { IS_SU(PCIEXFN) } (0)->
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.f-lf-poiscomp-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn,
-    ereport.io.service.lost@pciexbus/pciexdev/pciexfn,
-    ereport.io.service.degraded@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.poiscomp-fwd-d@PCIEXFN { IS_SD(PCIEXFN) } (0)->
+    ereport.io.pci.mdpe@PCIEXFN,
+    ereport.io.pci.sec-mdpe@PCIEXFN,
+    ereport.io.pci.dpe@PCIEXFN,
+    ereport.io.pciex.tl.ptlp@PCIEXFN,
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.f-poiscomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
+prop error.io.pciex.poiscomp-fwd-d@PCIEXFN { IS_BG(PCIEXFN) } (4)->
+    ereport.io.pci.mdpe@PCIEXFN,
+    ereport.io.pci.dpe@PCIEXFN,
+    ereport.io.pciex.tl.ptlp@PCIEXFN,
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.flt-nf-poiscomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nf-poiscomp-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.anf-poiscomp-d@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.poiscomp-fwd-d@PCIEXFN { IS_BG(PCIEXFN) } (1)->
+    error.io.pci.dpdata-dr-d@PCIEXFN/PCIFNHZ;
 
-prop error.io.pciex.nf-poiscomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nf-poiscomp-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>; 
+prop error.io.pciex.poiscomp-fwd-d@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.nf-poiscomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.poiscomp-d@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.nf-poiscomp-d@pciexbus/pciexdev/pciexfn (2)->
-    ereport.io.pci.mdpe@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    ereport.io.pci.dpe@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.nf-poiscomp-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.nf-poiscomp-d@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.service.unaffected@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    error.io.service.restored@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.nf-poiscomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
-
-prop error.io.pciex.anf-poiscomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.anf-poiscomp-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>; 
-
-prop error.io.pciex.anf-poiscomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.poiscomp-d@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.anf-poiscomp-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.mdpe@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    ereport.io.pci.dpe@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.poiscomp-d@pciexbus/pciexdev/pciexfn (3)->
-    ereport.io.pci.mdpe@pciexbus/pciexdev/pciexfn { IS_BDG },
-    ereport.io.pci.dpe@pciexbus/pciexdev/pciexfn { IS_BDG },
-    ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn { IS_BDG };
-
-prop error.io.pciex.poiscomp-d@pciexbus/pciexdev/pciexfn (2)->
-    ereport.io.pci.dpe@pciexbus/pciexdev/pciexfn { IS_SWU },
-    ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn { IS_SWU };
-
-prop error.io.pciex.poiscomp-d@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pci.mdpe@pciexbus/pciexdev/pciexfn { IS_SWU },
-    ereport.io.pci.sec-mdpe@pciexbus/pciexdev/pciexfn { IS_SWU };
-
-prop error.io.pciex.poiscomp-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.mdpe@pciexbus/pciexdev/pciexfn { IS_SWD },
-    ereport.io.pci.sec-mdpe@pciexbus/pciexdev/pciexfn { IS_SWD },
-    ereport.io.pci.dpe@pciexbus/pciexdev/pciexfn { IS_SWD },
-    ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn { IS_SWD };
+prop error.io.pciex.poiscomp-fwd-d@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+    ereport.io.pci.mdpe@PCIEXFN,
+    ereport.io.pci.dpe@PCIEXFN,
+    ereport.io.pciex.tl.ptlp@PCIEXFN;
 
 /*
  * downstream request with ecrc error.
@@ -1050,7 +915,7 @@ prop error.io.pciex.poiscomp-d@pciexbus/pciexdev/pciexfn (0)->
  *   was an ecrc.
  *
  * Additionally, as the leaf/bridge will just throw away the packet, we should
- * eventually get a cto at the root complex - so use an flt-nr-u at the pciex
+ * eventually get a cto at the root complex - so use an nr-u at the pciex
  * leaf or bridge to get the appropriate behaviour. For the case where the leaf
  * driver wasn't hardened we may be able to identify the leaf device (and
  * therefore any intermediate switches which might have caused the problem)
@@ -1058,75 +923,31 @@ prop error.io.pciex.poiscomp-d@pciexbus/pciexdev/pciexfn (0)->
  * reported from the root complex identifying the leaf device. The combination
  * of a nonfatal error reported from the root complex and a cto from the root
  * complex is sufficient to positively identify this case.
- *
- * Note that sw-ecrcreq-d is to handle the case where the switch is actually
- * the target of the packet (config request etc).
  */
-prop error.io.pciex.flt-f-ecrcreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.f-ecrcreq-d@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.ecrcreq-d@PCIEXFN (1)->
+    error.io.pciex.ecrcreq-fwd-d@PCIEXFN;
 
-prop error.io.pciex.f-ecrcreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.sw-ecrcreq-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.f-ecrcreq-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>; 
+prop error.io.pciex.ecrcreq-fwd-d@PCIEXFN { IS_SU(PCIEXFN) ||
+    IS_SD(PCIEXFN) } (1)->
+    error.io.pciex.flt-nr-u@PCIEXFN,
+    error.io.pciex.ecrcreq-fwd-d@PCIEXFN/PCIEXFNHZ;
 
-prop error.io.pciex.f-ecrcreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.f-ecrcreq-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>; 
+prop error.io.pciex.ecrcreq-fwd-d@PCIEXFN { IS_SU(PCIEXFN) ||
+    IS_SD(PCIEXFN) } (0)->
+    ereport.io.pciex.tl.ecrc@PCIEXFN,
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.f-ecrcreq-d@pcibus/pcidev/pcifn (1)->
-    error.io.pciex.f-ecrcreq-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>; 
+prop error.io.pciex.ecrcreq-fwd-d@PCIEXFN { IS_BG(PCIEXFN) } (3)->
+    error.io.pciex.nonfatal@PCIEXFN,
+    ereport.io.pciex.tl.ecrc@PCIEXFN,
+    error.io.pciex.flt-nr-u@PCIEXFN;
 
-prop error.io.pciex.f-ecrcreq-d@pcibus/pcidev/pcifn (0)->
-    ereport.io.service.lost@pcibus/pcidev/pcifn { IS_PCI_LEAF },
-    ereport.io.service.degraded@pcibus/pcidev/pcifn { IS_PCI_LEAF };
+prop error.io.pciex.ecrcreq-fwd-d@PCIEXFN { IS_LF(PCIEXFN) } (2)->
+    error.io.pciex.nonfatal@PCIEXFN,
+    error.io.pciex.flt-nr-u@PCIEXFN;
 
-prop error.io.pciex.f-ecrcreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.ecrcreq-d@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.f-ecrcreq-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pciex.tl.ecrc@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    ereport.io.service.lost@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    ereport.io.service.degraded@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.flt-nf-ecrcreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nf-ecrcreq-d@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.nf-ecrcreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nf-ecrcreq-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>; 
-
-prop error.io.pciex.nf-ecrcreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nf-ecrcreq-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>; 
-
-prop error.io.pciex.nf-ecrcreq-d@pcibus/pcidev/pcifn (1)->
-    error.io.pciex.nf-ecrcreq-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>; 
-
-prop error.io.pciex.nf-ecrcreq-d@pcibus/pcidev/pcifn (1)->
-    ereport.io.service.unaffected@pcibus/pcidev/pcifn { IS_PCI_LEAF },
-    error.io.service.restored@pcibus/pcidev/pcifn { IS_PCI_LEAF };
-
-prop error.io.pciex.nf-ecrcreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.ecrcreq-d@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.nf-ecrcreq-d@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pciex.tl.ecrc@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.nf-ecrcreq-d@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.service.unaffected@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    error.io.service.restored@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.ecrcreq-d@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.flt-nr-u@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
-
-prop error.io.pciex.ecrcreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
-
-prop error.io.pciex.ecrcreq-d@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pciex.tl.ecrc@pciexbus/pciexdev/pciexfn { IS_BDG };
-
-prop error.io.pciex.ecrcreq-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pciex.tl.ecrc@pciexbus/pciexdev/pciexfn { IS_SWU || IS_SWD };
-
-prop error.io.pciex.sw-ecrcreq-d@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.flt-nr-u@pciexbus/pciexdev/pciexfn { IS_SWU };
+prop error.io.pciex.ecrcreq-fwd-d@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+    ereport.io.pciex.tl.ecrc@PCIEXFN;
 
 /*
  * downstream completion with ecrc error.
@@ -1143,86 +964,37 @@ prop error.io.pciex.sw-ecrcreq-d@pciexbus/pciexdev/pciexfn (0)->
  * not hardened) but if we get both ecrc and cto we need to distinguish from
  * cto only which would be an nr-d.
  */
-prop error.io.pciex.flt-f-ecrccomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.f-ecrccomp-d@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.ecrccomp-d@PCIEXFN (1)->
+    error.io.pciex.ecrccomp-fwd-d@PCIEXFN;
 
-prop error.io.pciex.f-ecrccomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.f-ecrccomp-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>; 
+prop error.io.pciex.ecrccomp-fwd-d@PCIEXFN (1)->
+    error.io.pciex.ecrccomp-fwd-d@PCIEXFN/PCIEXFNHZ;
 
-prop error.io.pciex.f-ecrccomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.f-ecrccomp-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>; 
+prop error.io.pciex.ecrccomp-fwd-d@PCIEXFN { IS_SU(PCIEXFN) ||
+    IS_SD(PCIEXFN) } (0)->
+    error.io.pciex.nonfatal@PCIEXFN,
+    ereport.io.pciex.tl.ecrc@PCIEXFN;
 
-prop error.io.pciex.f-ecrccomp-d@pcibus/pcidev/pcifn (1)->
-    error.io.pciex.f-ecrccomp-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>; 
+prop error.io.pciex.ecrccomp-fwd-d@PCIEXFN { IS_BG(PCIEXFN) } (3)->
+    error.io.pciex.nonfatal@PCIEXFN,
+    ereport.io.pciex.tl.ecrc@PCIEXFN,
+    error.io.pciex.nr-d@PCIEXFN;
 
-prop error.io.pciex.f-ecrccomp-d@pcibus/pcidev/pcifn (0)->
-    ereport.io.service.lost@pcibus/pcidev/pcifn { IS_PCI_LEAF },
-    ereport.io.service.degraded@pcibus/pcidev/pcifn { IS_PCI_LEAF };
+prop error.io.pciex.ecrccomp-fwd-d@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.f-ecrccomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.ecrccomp-d@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.f-ecrccomp-d@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.f-lf-ecrccomp-d@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    ereport.io.service.lost@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    ereport.io.service.degraded@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.f-lf-ecrccomp-d@pciexbus/pciexdev/pciexfn (2)->
-    ereport.io.pciex.tl.ecrc@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.tl.cto@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.f-lf-ecrccomp-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.ma@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.flt-nf-ecrccomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nf-ecrccomp-d@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.nf-ecrccomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nf-ecrccomp-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>; 
-
-prop error.io.pciex.nf-ecrccomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nf-ecrccomp-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>; 
-
-prop error.io.pciex.nf-ecrccomp-d@pcibus/pcidev/pcifn (1)->
-    error.io.pciex.nf-ecrccomp-d@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>; 
-
-prop error.io.pciex.nf-ecrccomp-d@pcibus/pcidev/pcifn (1)->
-    ereport.io.service.unaffected@pcibus/pcidev/pcifn { IS_PCI_LEAF },
-    error.io.service.restored@pcibus/pcidev/pcifn { IS_PCI_LEAF };
-
-prop error.io.pciex.nf-ecrccomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.ecrccomp-d@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.nf-ecrccomp-d@pciexbus/pciexdev/pciexfn (2)->
-    ereport.io.pciex.tl.ecrc@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    ereport.io.pciex.tl.cto@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.nf-ecrccomp-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.ma@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.nf-ecrccomp-d@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.service.unaffected@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    error.io.service.restored@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.ecrccomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
-
-prop error.io.pciex.ecrccomp-d@pciexbus/pciexdev/pciexfn (2)->
-    ereport.io.pciex.tl.ecrc@pciexbus/pciexdev/pciexfn { IS_BDG },
-    error.io.pciex.nr-d@pciexbus/pciexdev/pciexfn { IS_BDG };
-
-prop error.io.pciex.ecrccomp-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pciex.tl.ecrc@pciexbus/pciexdev/pciexfn { IS_SWU || IS_SWD };
+prop error.io.pciex.ecrccomp-fwd-d@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+    ereport.io.pciex.tl.ecrc@PCIEXFN,
+    error.io.pciex.nr-d@PCIEXFN;
 
 /*
  * upstream poisoned request
  *
- * - flt-poisreq-u is just on the pciex node which generated the fault (if the
- *   fault was generated by a pciex node and not a child pci node).
- * - source-poisreq-u cascades down to at least one leaf device (pciex or pci),
- *   whose bdf (if pciex) must match the source-id in the payload of the
+ * - flt-poisreq-u is on the pciex node which generated the fault
+ * - source-poisreq-u refers to at least one leaf or bridge device
+ *   whose bdf (if leaf) must match the source-id in the payload of the
  *   ereport generated from the root complex.
- * - poisreq-u cascades up to the root complex and any switch ports on
+ * - poisreq-u propagates up to the root complex and any switch ports on
  *   route will raise a ptlp ereport, while any upstream devices generating
  *   or forwarding the poisoned packed will raise an mdpe ereport. The root
  *   complex should also report a ptlp.
@@ -1239,113 +1011,72 @@ prop error.io.pciex.ecrccomp-d@pciexbus/pciexdev/pciexfn (0)->
  * at the intervening switches will narrow the fault down to a single suspect.
  */
 
-prop error.io.pciex.flt-f-poisreq-u@pciexbus/pciexdev/pciexfn (2)->
-    error.io.pciex.source-f-poisreq-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.poisreq-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.flt-poisreq-u@PCIEXFN1 { (IS_LF(PCIEXFN) ||
+    IS_BG(PCIEXFN)) && is_under(PCIEXFN1, PCIEXFN) } (0)->
+    error.io.pciex.source-poisreq-u@PCIEXFN;
 
-prop error.io.pciex.source-f-poisreq-u@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.f-lf-poisreq-u@pciexbus/pciexdev/pciexfn { IS_LEAF };
+prop error.io.pciex.source-poisreq-u@PCIEXFN1 { IS_LF(PCIEXFN1) &&
+    SOURCE_ID_MATCHES_BDF && is_under(pciexrc, PCIEXFN1) } (0)->
+    ereport.io.pciex.tl.ptlp@pciexrc,
+    ereport.io.pciex.tl.ur@pciexrc;
 
-prop error.io.pciex.f-lf-poisreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.service.lost@pciexbus/pciexdev/pciexfn,
-    ereport.io.service.degraded@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.source-poisreq-u@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+    ereport.io.pci.ma@PCIEXFN;
 
-prop error.io.pciex.f-lf-poisreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.ma@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.source-poisreq-u@PCIEXFN { IS_BG(PCIEXFN) &&
+    is_under(pciexrc, PCIEXFN) } (0)->
+    ereport.io.pciex.tl.ptlp@pciexrc,
+    ereport.io.pciex.tl.ur@pciexrc;
 
-prop error.io.pciex.source-f-poisreq-u@pciexbus[b]/pciexdev[d]/pciexfn[f] (0)->
-    ereport.io.pciex.tl.ptlp@pciexrc<> {
-	BDF_IS_LEAF && SOURCE_ID_MATCHES_BDF && BDF_IS_UNDER_RC },
-    ereport.io.pciex.tl.ur@pciexrc<> {
-	BDF_IS_LEAF && SOURCE_ID_MATCHES_BDF && BDF_IS_UNDER_RC };
+prop error.io.pciex.source-poisreq-u@PCIEXFN { IS_BG(PCIEXFN) } (0)->
+    ereport.io.pci.ma@PCIEXFN,
+    ereport.io.pci.sec-sta@PCIEXFN,
+    error.io.pci.ta-drw-d@PCIEXFN/PCIFN;
 
-prop error.io.pciex.source-f-poisreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.ma@pciexbus/pciexdev/pciexfn { IS_BDG };
+prop error.io.pciex.flt-poisreq-u@PCIEXFN (1)->
+    error.io.pciex.poisreq-u@PCIEXFN;
 
-prop error.io.pciex.source-f-poisreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.sec-sta@pciexbus/pciexdev/pciexfn,
-    error.io.pci.ta-drw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
+/*
+ * the remaining propagations are also used for poisoned requests propagating
+ * up due to a fault behind a pcie-pci bridge
+ */
+prop error.io.pciex.poisreq-u@PCIEXFN/PCIEXFN (1)->
+    error.io.pciex.poisreq-u@PCIEXFN;
 
-prop error.io.pci.source-f-dpdata-w-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.tl.ptlp@pciexrc<> { PCIBDF_IS_UNDER_RC },
-    ereport.io.pciex.tl.ur@pciexrc<> { PCIBDF_IS_UNDER_RC };
+prop error.io.pciex.poisreq-u@PCIEXFN { IS_BG(PCIEXFN) } (1)->
+    ereport.io.pci.mdpe@PCIEXFN;
 
-prop error.io.pci.source-f-dpdata-w-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.bdg.sec-ude@pciexbus/pciexdev/pciexfn { IS_BDG &&
-        BDF_IS_PCI_LEAF && SOURCE_ID_MATCHES_BDF && PCIBDF_IS_UNDER_DEV };
+prop error.io.pciex.poisreq-u@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+    ereport.io.pci.mdpe@PCIEXFN;
 
-prop error.io.pciex.flt-nf-poisreq-u@pciexbus/pciexdev/pciexfn (2)->
-    error.io.pciex.source-nf-poisreq-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.poisreq-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.poisreq-u@PCIEXFN { IS_SD(PCIEXFN) } (2)->
+    ereport.io.pci.sec-dpe@PCIEXFN,
+    ereport.io.pciex.tl.ptlp@PCIEXFN;
 
-prop error.io.pciex.source-nf-poisreq-u@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.service.unaffected@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    error.io.service.restored@pciexbus/pciexdev/pciexfn { IS_LEAF };
+prop error.io.pciex.poisreq-u@PCIEXFN { IS_SD(PCIEXFN) } (0)->
+    ereport.io.pci.mdpe@PCIEXFN,
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.source-nf-poisreq-u@pciexbus[b]/pciexdev[d]/pciexfn[f] (0)->
-    ereport.io.pciex.tl.ptlp@pciexrc<> {
-	BDF_IS_LEAF && SOURCE_ID_MATCHES_BDF && BDF_IS_UNDER_RC },
-    ereport.io.pciex.tl.ur@pciexrc<> {
-	BDF_IS_LEAF && SOURCE_ID_MATCHES_BDF && BDF_IS_UNDER_RC };
+prop error.io.pciex.poisreq-u@PCIEXFN { IS_SU(PCIEXFN) } (1)->
+    ereport.io.pci.mdpe@PCIEXFN;
 
-prop error.io.pciex.source-nf-poisreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.ma@pciexbus/pciexdev/pciexfn { IS_LEAF };
+prop error.io.pciex.poisreq-u@PCIEXFN { IS_SU(PCIEXFN) } (0)->
+    ereport.io.pci.sec-dpe@PCIEXFN,
+    ereport.io.pciex.tl.ptlp@PCIEXFN,
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.source-nf-poisreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.ma@pciexbus/pciexdev/pciexfn { IS_BDG };
-
-prop error.io.pciex.source-nf-poisreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.sec-sta@pciexbus/pciexdev/pciexfn,
-    error.io.pci.ta-drw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-
-prop error.io.pci.source-nf-dpdata-w-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.tl.ptlp@pciexrc<> { PCIBDF_IS_UNDER_RC },
-    ereport.io.pciex.tl.ur@pciexrc<> { PCIBDF_IS_UNDER_RC };
-
-prop error.io.pci.source-nf-dpdata-w-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.bdg.sec-ude@pciexbus/pciexdev/pciexfn { IS_BDG &&
-        BDF_IS_PCI_LEAF && SOURCE_ID_MATCHES_BDF && PCIBDF_IS_UNDER_DEV };
-
-prop error.io.pciex.poisreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.ma@pciexbus/pciexdev/pciexfn { IS_BDG };
-
-prop error.io.pciex.poisreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.sec-sta@pciexbus/pciexdev/pciexfn,
-    error.io.pci.ta-drw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-
-prop error.io.pciex.poisreq-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.poisreq-u@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.poisreq-u@pciexbus/pciexdev/pciexfn (2)->
-    ereport.io.pci.sec-dpe@pciexbus/pciexdev/pciexfn { IS_SWD },
-    ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn { IS_SWD };
-
-prop error.io.pciex.poisreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.sec-dpe@pciexbus/pciexdev/pciexfn { IS_SWU },
-    ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn { IS_SWU };
-
-prop error.io.pciex.poisreq-u@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pci.mdpe@pciexbus/pciexdev/pciexfn { IS_BDG || IS_SWU };
-
-prop error.io.pciex.poisreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.mdpe@pciexbus/pciexdev/pciexfn { IS_SWD };
-
-prop error.io.pciex.poisreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.mdpe@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.poisreq-u@pciexrc/pciexbus/pciexdev/pciexfn (1)->
+prop error.io.pciex.poisreq-u@pciexrc/PCIEXFN (1)->
     ereport.io.pci.sec-dpe@pciexrc;
 
 /*
  * upstream poisoned completion
  *
- * - flt-poiscomp-u is just on the pciex node which generated the fault (if the
- *   fault was generated by a pciex node and not a child pci node). There will
+ * - flt-poiscomp-u is on the pciex node which generated the fault. There will
  *   be a target-mdpe downstream from here.
- * - source-poiscomp-u cascades down to at least one leaf device (pciex or pci),
- *   whose bdf (if pciex) must match the source-id in the payload of the
+ * - source-poiscomp-u refers to at least one leaf or bridge device
+ *   whose bdf (if leaf) must match the source-id in the payload of the
  *   ereport generated from the root complex.
- * - poiscomp-u cascades up to the root complex and any switches on
+ * - poiscomp-u propagates up to the root complex and any switches on
  *   route will raise ptlp and sec-mdpe ereports. The root complex will also
  *   raise a sec-mdpe and ptlp.
  *
@@ -1355,78 +1086,69 @@ prop error.io.pciex.poisreq-u@pciexrc/pciexbus/pciexdev/pciexfn (1)->
  * originator of the completion. The ptlp/sec-mdpe ereports at the intervening
  * switches will narrow the fault down to a single suspect.
  */
-prop error.io.pciex.flt-f-poiscomp-u@pciexbus/pciexdev/pciexfn (3)->
-    error.io.pciex.source-f-poiscomp-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.poiscomp-u@pciexbus/pciexdev/pciexfn,
-    error.io.pci.target-mdpe-d@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.flt-poiscomp-u@PCIEXFN { IS_LF(PCIEXFN1) &&
+    is_under(PCIEXFN, PCIEXFN1) } (0)->
+    ereport.io.pci.target-mdpe@PCIEXFN1;
 
-prop error.io.pciex.source-f-poiscomp-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.service.lost@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    ereport.io.service.degraded@pciexbus/pciexdev/pciexfn { IS_LEAF };
+prop error.io.pciex.flt-poiscomp-u@PCIEXFN { IS_PCI_LF(PCIFN) &&
+    is_under(PCIEXFN, PCIFN) } (0)->
+    ereport.io.pci.target-mdpe@PCIFN;
 
-prop error.io.pciex.source-f-poiscomp-u@pciexbus[b]/pciexdev[d]/pciexfn[f] (0)->
-    ereport.io.pciex.tl.ptlp@pciexrc<> {
-	SOURCE_ID_MATCHES_BDF && BDF_IS_UNDER_RC };
+prop error.io.pciex.flt-poiscomp-u@PCIEXFN1 { (IS_LF(PCIEXFN) ||
+    IS_BG(PCIEXFN)) && is_under(PCIEXFN1, PCIEXFN) } (0)->
+    error.io.pciex.source-poiscomp-u@PCIEXFN;
 
-prop error.io.pci.source-f-dpdata-r-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.tl.ptlp@pciexrc<> { PCIBDF_IS_UNDER_RC };
+prop error.io.pciex.source-poiscomp-u@PCIEXFN1 { IS_LF(PCIEXFN1) &&
+    SOURCE_ID_MATCHES_BDF && is_under(pciexrc, PCIEXFN1) } (0)->
+    ereport.io.pciex.tl.ptlp@pciexrc;
 
-prop error.io.pci.source-f-dpdata-r-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.bdg.sec-ude@pciexbus/pciexdev/pciexfn { IS_BDG &&
-        BDF_IS_PCI_LEAF && SOURCE_ID_MATCHES_BDF && PCIBDF_IS_UNDER_DEV };
+prop error.io.pciex.source-poiscomp-u@PCIEXFN1 { IS_BG(PCIEXFN1) &&
+    is_under(pciexrc, PCIEXFN1) } (0)->
+    ereport.io.pciex.tl.ptlp@pciexrc;
 
-prop error.io.pciex.flt-nf-poiscomp-u@pciexbus/pciexdev/pciexfn (3)->
-    error.io.pciex.source-nf-poiscomp-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.poiscomp-u@pciexbus/pciexdev/pciexfn,
-    error.io.pci.target-mdpe-d@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.flt-poiscomp-u@PCIEXFN (1)->
+    error.io.pciex.poiscomp-u@PCIEXFN;
 
-prop error.io.pciex.source-nf-poiscomp-u@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.service.unaffected@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    error.io.service.restored@pciexbus/pciexdev/pciexfn { IS_LEAF };
+/*
+ * the remaining propagations are also used for poisoned completions propagating
+ * up due to a fault behind a pcie-pci bridge
+ */
+prop error.io.pciex.poiscomp-u@PCIEXFN/PCIEXFN (1)->
+    error.io.pciex.poiscomp-u@PCIEXFN;
 
-prop error.io.pciex.source-nf-poiscomp-u@pciexbus[b]/pciexdev[d]/pciexfn[f] (0)->
-    ereport.io.pciex.tl.ptlp@pciexrc<> {
-	SOURCE_ID_MATCHES_BDF && BDF_IS_UNDER_RC };
+prop error.io.pciex.poiscomp-u@PCIEXFN { IS_SD(PCIEXFN) } (2)->
+    ereport.io.pci.sec-dpe@PCIEXFN,
+    ereport.io.pciex.tl.ptlp@PCIEXFN;
 
-prop error.io.pci.source-nf-dpdata-r-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.tl.ptlp@pciexrc<> { PCIBDF_IS_UNDER_RC };
+prop error.io.pciex.poiscomp-u@PCIEXFN { IS_SD(PCIEXFN) } (1)->
+    ereport.io.pci.sec-mdpe@PCIEXFN,
+    ereport.io.pci.mdpe@PCIEXFN;
 
-prop error.io.pci.source-nf-dpdata-r-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.bdg.sec-ude@pciexbus/pciexdev/pciexfn { IS_BDG &&
-        BDF_IS_PCI_LEAF && SOURCE_ID_MATCHES_BDF && PCIBDF_IS_UNDER_DEV };
+prop error.io.pciex.poiscomp-u@PCIEXFN { IS_SD(PCIEXFN) } (0)->
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.poiscomp-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.poiscomp-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.poiscomp-u@PCIEXFN { IS_SU(PCIEXFN) } (0)->
+    ereport.io.pci.mdpe@PCIEXFN,
+    ereport.io.pci.sec-mdpe@PCIEXFN,
+    ereport.io.pci.sec-dpe@PCIEXFN,
+    ereport.io.pciex.tl.ptlp@PCIEXFN,
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.poiscomp-u@pciexbus/pciexdev/pciexfn (2)->
-    ereport.io.pci.sec-dpe@pciexbus/pciexdev/pciexfn { IS_SWD },
-    ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn { IS_SWD };
-
-prop error.io.pciex.poiscomp-u@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pci.sec-mdpe@pciexbus/pciexdev/pciexfn { IS_SWD },
-    ereport.io.pci.mdpe@pciexbus/pciexdev/pciexfn { IS_SWD };
-
-prop error.io.pciex.poiscomp-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.mdpe@pciexbus/pciexdev/pciexfn { IS_SWU },
-    ereport.io.pci.sec-mdpe@pciexbus/pciexdev/pciexfn { IS_SWU },
-    ereport.io.pci.sec-dpe@pciexbus/pciexdev/pciexfn { IS_SWU },
-    ereport.io.pciex.tl.ptlp@pciexbus/pciexdev/pciexfn { IS_SWU };
-
-prop error.io.pciex.poiscomp-u@pciexrc/pciexbus/pciexdev/pciexfn (1)->
+prop error.io.pciex.poiscomp-u@pciexrc/PCIEXFN (1)->
     ereport.io.pci.sec-dpe@pciexrc;
 
-prop error.io.pciex.poiscomp-u@pciexrc/pciexbus/pciexdev/pciexfn (0)->
+prop error.io.pciex.poiscomp-u@pciexrc/PCIEXFN (0)->
     ereport.io.pci.sec-mdpe@pciexrc;
 
 /*
  * upstream request with ecrc error.
  *
- * - flt-ecrcreq-u is just on the pciex node which generated the fault.
+ * - flt-ecrcreq-u is on the pciex node which generated the fault.
  * - source-ecrcreq-u cascades down to at least one leaf device (pciex or pci),
  *   whose bdf (if pciex) must match the source-id in the payload of the
  *   ereport generated from the root complex.
- * - ecrcreq-u cascades up to the root complex which must report it with an ecrc
- *   ereport and any switches on route can optionally raise an ecrc ereport.
+ * - ecrcreq-u propagates up to the root complex which must report it with an
+ *   ecrc ereport and any switches on route can optionally raise an ecrc ereport
  *
  * Additionally, as the root complex will just throw away the packet, we may
  * eventually get a cto - so use an nr-d at the pciex leaf or bridge to get
@@ -1437,65 +1159,40 @@ prop error.io.pciex.poiscomp-u@pciexrc/pciexbus/pciexdev/pciexfn (0)->
  * can be done from the cto ereport (for a hardened leaf driver) or for a
  * non-hardened leaf using the source-id payload of the ecrc.
  */
-prop error.io.pciex.flt-f-ecrcreq-u@pciexbus/pciexdev/pciexfn (2)->
-    error.io.pciex.source-f-ecrcreq-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.ecrcreq-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.flt-ecrcreq-u@PCIEXFN1 { (IS_LF(PCIEXFN) ||
+    IS_BG(PCIEXFN)) && is_under(PCIEXFN1, PCIEXFN) } (0)->
+    error.io.pciex.source-ecrcreq-u@PCIEXFN;
 
-prop error.io.pciex.source-f-ecrcreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.service.lost@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    ereport.io.service.degraded@pciexbus/pciexdev/pciexfn { IS_LEAF };
+prop error.io.pciex.source-ecrcreq-u@PCIEXFN (0)->
+    error.io.pciex.nr-d@PCIEXFN;
 
-prop error.io.pciex.source-f-ecrcreq-u@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.nr-d@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
+prop error.io.pciex.source-ecrcreq-u@PCIEXFN1 { IS_LF(PCIEXFN1) &&
+    SOURCE_ID_MATCHES_BDF && is_under(pciexrc, PCIEXFN1) } (0)->
+    ereport.io.pciex.tl.ecrc@pciexrc;
 
-prop error.io.pciex.source-f-ecrcreq-u@pciexbus[b]/pciexdev[d]/pciexfn[f] (1)->
-    ereport.io.pciex.tl.ecrc@pciexrc<> {
-	BDF_IS_LEAF && SOURCE_ID_MATCHES_BDF && BDF_IS_UNDER_RC };
+prop error.io.pciex.source-ecrcreq-u@PCIEXFN { IS_BG(PCIEXFN) &&
+    is_under(pciexrc, PCIEXFN) } (0)->
+    ereport.io.pciex.tl.ecrc@pciexrc;
 
-prop error.io.pciex.source-f-ecrcreq-u@pcibus/pcidev/pcifn (0)->
-    ereport.io.service.lost@pcibus/pcidev/pcifn { IS_PCI_LEAF },
-    ereport.io.service.degraded@pcibus/pcidev/pcifn { IS_PCI_LEAF };
+prop error.io.pciex.flt-ecrcreq-u@PCIEXFN (1)->
+     error.io.pciex.ecrcreq-u@PCIEXFN;
 
-prop error.io.pciex.source-f-ecrcreq-u@pcibus[b]/pcidev[d]/pcifn[f] (1)->
-    ereport.io.pciex.tl.ecrc@pciexrc<> { PCIBDF_IS_UNDER_RC };
+prop error.io.pciex.ecrcreq-u@PCIEXFN/PCIEXFN (1)->
+     error.io.pciex.ecrcreq-u@PCIEXFN;
 
-prop error.io.pciex.flt-nf-ecrcreq-u@pciexbus/pciexdev/pciexfn (2)->
-    error.io.pciex.source-nf-ecrcreq-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.ecrcreq-u@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.source-nf-ecrcreq-u@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.nr-d@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
-
-prop error.io.pciex.source-nf-ecrcreq-u@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.service.unaffected@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    error.io.service.restored@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.source-nf-ecrcreq-u@pciexbus[b]/pciexdev[d]/pciexfn[f] (1)->
-    ereport.io.pciex.tl.ecrc@pciexrc<> {
-	BDF_IS_LEAF && SOURCE_ID_MATCHES_BDF && BDF_IS_UNDER_RC };
-
-prop error.io.pciex.source-nf-ecrcreq-u@pcibus/pcidev/pcifn (1)->
-    ereport.io.service.unaffected@pcibus/pcidev/pcifn { IS_PCI_LEAF },
-    error.io.service.restored@pcibus/pcidev/pcifn { IS_PCI_LEAF };
-
-prop error.io.pciex.source-nf-ecrcreq-u@pcibus[b]/pcidev[d]/pcifn[f] (1)->
-    ereport.io.pciex.tl.ecrc@pciexrc<> { PCIBDF_IS_UNDER_RC };
-
-prop error.io.pciex.ecrcreq-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.ecrcreq-u@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.ecrcreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pciex.tl.ecrc@pciexbus/pciexdev/pciexfn { IS_SWD || IS_SWU };
+prop error.io.pciex.ecrcreq-u@PCIEXFN { IS_SD(PCIEXFN)||IS_SU(PCIEXFN) } (0)->
+    ereport.io.pciex.tl.ecrc@PCIEXFN,
+    error.io.pciex.nonfatal@PCIEXFN;
 
 /*
  * upstream completion with ecrc error.
  *
- * - flt-ecrccomp-u is just on the pciex node which generated the fault.
+ * - flt-ecrccomp-u is on the pciex node which generated the fault.
  * - source-ecrccomp-u cascades down to at least one leaf device (pciex or pci),
  *   whose bdf (if pciex) must match the source-id in the payload of the
  *   ereport generated from the root complex.
- * - ecrccomp-u cascades up to the root complex, which should report it with an
- *   ecrc ereport and any switches on route can optionally raise an ecrc
+ * - ecrccomp-u propagates up to the root complex, which should report it with
+ *   an ecrc ereport and any switches on route can optionally raise an ecrc
  *   ereport.
  *
  * Additionally, as the root complex will just throw away the packet, we'll
@@ -1507,55 +1204,30 @@ prop error.io.pciex.ecrcreq-u@pciexbus/pciexdev/pciexfn (0)->
  * using either the source-id payload of the ecrc or the target-ma ereport if
  * available.
  */
-prop error.io.pciex.flt-f-ecrccomp-u@pciexbus/pciexdev/pciexfn (2)->
-    error.io.pciex.source-f-ecrccomp-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.ecrccomp-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.flt-ecrccomp-u@PCIEXFN1 { (IS_LF(PCIEXFN) ||
+    IS_BG(PCIEXFN)) && is_under(PCIEXFN1, PCIEXFN) } (0)->
+    error.io.pciex.source-ecrccomp-u@PCIEXFN;
 
-prop error.io.pciex.source-f-ecrccomp-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.service.lost@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    ereport.io.service.degraded@pciexbus/pciexdev/pciexfn { IS_LEAF };
+prop error.io.pciex.source-ecrccomp-u@PCIEXFN (0)->
+    error.io.pciex.flt-nr-u@PCIEXFN;
 
-prop error.io.pciex.source-f-ecrccomp-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.flt-nr-u@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
+prop error.io.pciex.source-ecrccomp-u@PCIEXFN1 { IS_LF(PCIEXFN1) &&
+    SOURCE_ID_MATCHES_BDF && is_under(pciexrc, PCIEXFN1) } (0)->
+    ereport.io.pciex.tl.ecrc@pciexrc;
 
-prop error.io.pciex.source-f-ecrccomp-u@pciexbus[b]/pciexdev[d]/pciexfn[f] (1)->
-    ereport.io.pciex.tl.ecrc@pciexrc<> {
-	SOURCE_ID_MATCHES_BDF && BDF_IS_UNDER_RC };
+prop error.io.pciex.source-ecrccomp-u@PCIEXFN { IS_BG(PCIEXFN) &&
+    is_under(pciexrc, PCIEXFN) } (0)->
+    ereport.io.pciex.tl.ecrc@pciexrc;
 
-prop error.io.pciex.source-f-ecrccomp-u@pcibus/pcidev/pcifn (0)->
-    ereport.io.service.lost@pcibus/pcidev/pcifn { IS_PCI_LEAF },
-    ereport.io.service.degraded@pcibus/pcidev/pcifn { IS_PCI_LEAF };
+prop error.io.pciex.flt-ecrccomp-u@PCIEXFN (1)->
+    error.io.pciex.ecrccomp-u@PCIEXFN;
 
-prop error.io.pciex.source-f-ecrccomp-u@pcibus[b]/pcidev[d]/pcifn[f] (1)->
-    ereport.io.pciex.tl.ecrc@pciexrc<> { PCIBDF_IS_UNDER_RC };
+prop error.io.pciex.ecrccomp-u@PCIEXFN/PCIEXFN (1)->
+    error.io.pciex.ecrccomp-u@PCIEXFN;
 
-prop error.io.pciex.flt-nf-ecrccomp-u@pciexbus/pciexdev/pciexfn (2)->
-    error.io.pciex.source-nf-ecrccomp-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.ecrccomp-u@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.source-nf-ecrccomp-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.flt-nr-u@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
-
-prop error.io.pciex.source-nf-ecrccomp-u@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.service.unaffected@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    error.io.service.restored@pciexbus/pciexdev/pciexfn { IS_LEAF };
-
-prop error.io.pciex.source-nf-ecrccomp-u@pciexbus[b]/pciexdev[d]/pciexfn[f] (1)->
-    ereport.io.pciex.tl.ecrc@pciexrc<> {
-	SOURCE_ID_MATCHES_BDF && BDF_IS_UNDER_RC };
-
-prop error.io.pciex.source-nf-ecrccomp-u@pcibus/pcidev/pcifn (1)->
-    ereport.io.service.unaffected@pcibus/pcidev/pcifn { IS_PCI_LEAF },
-    error.io.service.restored@pcibus/pcidev/pcifn { IS_PCI_LEAF };
-
-prop error.io.pciex.source-nf-ecrccomp-u@pcibus[b]/pcidev[d]/pcifn[f] (1)->
-    ereport.io.pciex.tl.ecrc@pciexrc<> { PCIBDF_IS_UNDER_RC };
-
-prop error.io.pciex.ecrccomp-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.ecrccomp-u@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.ecrccomp-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pciex.tl.ecrc@pciexbus/pciexdev/pciexfn { IS_SWD || IS_SWU };
+prop error.io.pciex.ecrccomp-u@PCIEXFN { IS_SD(PCIEXFN)||IS_SU(PCIEXFN) } (0)->
+    ereport.io.pciex.tl.ecrc@PCIEXFN,
+    error.io.pciex.nonfatal@PCIEXFN;
 
 /*
  * no response to downstream requester
@@ -1568,41 +1240,47 @@ prop error.io.pciex.ecrccomp-u@pciexbus/pciexdev/pciexfn (0)->
  *   identifying the leaf device, we won't actually be informed that the error
  *   was a cto.
  */
-prop error.io.pciex.nr-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nr-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>; 
+prop error.io.pciex.nr-d@PCIEXFN (1)->
+    error.io.pciex.nr-d@PCIEXFN/PCIEXFNHZ; 
 
-prop error.io.pciex.nr-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
+prop error.io.pciex.nr-d@PCIEXFN { IS_BG(PCIEXFN) } (2)->
+    error.io.pciex.nonfatal@PCIEXFN,
+    ereport.io.pciex.tl.cto@PCIEXFN;
 
-prop error.io.pciex.nr-d@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pciex.tl.cto@pciexbus/pciexdev/pciexfn { IS_BDG };
+prop error.io.pciex.nr-d@PCIEXFN { IS_BG(PCIEXFN) } (0)->
+    ereport.io.pci.ma@PCIEXFN,
+    ereport.io.pci.sec-sta@PCIEXFN,
+    error.io.pci.nr-drw-d@PCIEXFN/PCIFN,
+    error.io.pci.ta-drw-d@PCIEXFN/PCIFN;
 
-prop error.io.pciex.nr-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pciex.tl.cto@pciexbus/pciexdev/pciexfn { IS_LEAF };
+prop error.io.pciex.nr-d@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.nr-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.ma@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
+prop error.io.pciex.nr-d@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+    ereport.io.pci.ma@PCIEXFN,
+    ereport.io.pciex.tl.cto@PCIEXFN;
 
 /*
  * no response to upstream requester
  *
- * - flt-nr-u is just on the pciex node which generated the fault.
- * - nr-u will effectively cascade upstream to the root complex which will
+ * - flt-nr-u will effectively cascade upstream to the root complex which will
  *   report it as a cto.
  *
  * We have to use target-ma to informs us which device failed to respond.
  */
-prop error.io.pciex.flt-nr-u@pciexbus/pciexdev/pciexfn (2)->
-    error.io.pciex.nr-u@pciexbus/pciexdev/pciexfn,
-    error.io.pci.target-ma-d@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.flt-nr-u@PCIEXFN (1)->
+    error.io.pci.target-ma-d@PCIEXFN;
 
-prop error.io.pciex.nr-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.nr-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.flt-nr-u@PCIEXFN (1)->
+    error.io.pciex.nr-u@PCIEXFN;
 
-prop error.io.pciex.nr-u@pciexrc/pciexbus/pciexdev/pciexfn (1)->
+prop error.io.pciex.nr-u@PCIEXFN/PCIEXFN (1)->
+    error.io.pciex.nr-u@PCIEXFN;
+
+prop error.io.pciex.nr-u@pciexrc/PCIEXFN (1)->
     ereport.io.pciex.tl.cto@pciexrc;
 
-prop error.io.pciex.nr-u@pciexrc/pciexbus/pciexdev/pciexfn (0)->
+prop error.io.pciex.nr-u@pciexrc/PCIEXFN (0)->
     ereport.io.pci.sec-ma@pciexrc;
 
 /*
@@ -1615,43 +1293,44 @@ prop error.io.pciex.nr-u@pciexrc/pciexbus/pciexdev/pciexfn (0)->
  * Note that sw-mtlp-d is to handle the case where the switch is actually
  * the target of the packet (config request etc).
  */
-prop error.io.pciex.mtlp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.sw-mtlp-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.mtlp-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
+prop error.io.pciex.mtlp-d@PCIEXFN { IS_SD(PCIEXFN) || IS_SU(PCIEXFN) } (1)->
+    error.io.pciex.sw-mtlp-d@PCIEXFN,
+    error.io.pciex.mtlp-d@PCIEXFN/PCIEXFNHZ;
 
-prop error.io.pciex.mtlp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.fatal@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
+prop error.io.pciex.sw-mtlp-d@PCIEXFN { IS_SU(PCIEXFN) } (2)->
+    error.io.pciex.fatal@PCIEXFN,
+    ereport.io.pciex.tl.mtlp@PCIEXFN;
 
-prop error.io.pciex.mtlp-d@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pciex.tl.mtlp@pciexbus/pciexdev/pciexfn { IS_BDG };
+prop error.io.pciex.mtlp-d@PCIEXFN { IS_BG(PCIEXFN) } (2)->
+    error.io.pciex.fatal@PCIEXFN,
+    ereport.io.pciex.tl.mtlp@PCIEXFN;
 
-prop error.io.pciex.mtlp-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pciex.tl.mtlp@pciexbus/pciexdev/pciexfn { IS_LEAF };
+prop error.io.pciex.mtlp-d@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+    error.io.pciex.fatal@PCIEXFN;
 
-prop error.io.pciex.sw-mtlp-d@pciexbus/pciexdev/pciexfn (2)->
-    error.io.pciex.fatal@pciexbus/pciexdev/pciexfn { IS_SWU },
-    ereport.io.pciex.tl.mtlp@pciexbus/pciexdev/pciexfn { IS_SWU };
+prop error.io.pciex.mtlp-d@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+    ereport.io.pciex.tl.mtlp@PCIEXFN;
 
 /*
  * upstream malformed tlp
  *
  * This will cascade upstream to the receiver which will report it as an mtlp.
  */
-prop error.io.pciex.mtlp-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.source-mtlp-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.flt-mtlp-u@PCIEXFN (1)->
+    error.io.pciex.mtlp-u@PCIEXFN;
 
-prop error.io.pciex.source-mtlp-u@pciexbus[b]/pciexdev[d]/pciexfn[f] (1)->
-    ereport.io.pciex.tl.mtlp@pciexrc<> { BDF_IS_LEAF && BDF_IS_UNDER_RC };
+prop error.io.pciex.mtlp-u@PCIEXFN/PCIEXFN (1)->
+    error.io.pciex.mtlp-u@PCIEXFN;
 
-prop error.io.pciex.source-mtlp-u@pcibus[b]/pcidev[d]/pcifn[f] (1)->
-    ereport.io.pciex.tl.mtlp@pciexrc<> { PCIBDF_IS_UNDER_RC };
+prop error.io.pciex.mtlp-u@pciexrc/PCIEXFN (1)->
+    ereport.io.pciex.tl.mtlp@pciexrc;
 
 /*
  * downstream completer aborts
  *
  * This could be the fault of the root complex or a switch reporting an internal
  * error, or of the leaf device sending an invalid request (the latter is
- * handled by the badreq-u case below).
+ * handled by the flt-badreq-u case below).
  *
  * This is reported by the completer or by an intervening downstream switch
  * port. The completer abort response propagates down to the initiator which
@@ -1661,75 +1340,35 @@ prop error.io.pciex.source-mtlp-u@pcibus[b]/pcidev[d]/pcifn[f] (1)->
  * or downstream switch port. The originator of the request can be recognized
  * by the rta for a hardened driver or by using the source-id payload of the
  * ca ereport for a non-hardened driver.
- *
- * Note that there is no ur-d (we assume that a ur reported by the root complex
- * is always due to a badreq-u - see below).
  */
-prop error.io.pciex.flt-ca-d@pciexrc/pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.ca-d@pciexrc/pciexbus/pciexdev/pciexfn,
+prop error.io.pciex.ca-d@pciexrc/PCIEXFN (0)->
     ereport.io.pciex.tl.ca@pciexrc;
 
-prop error.io.pciex.ca-d@pciexrc/pciexbus/pciexdev/pciexfn (1)->
+prop error.io.pciex.ca-d@pciexrc/PCIEXFN (1)->
     ereport.io.pci.sec-sta@pciexrc;
 
-prop error.io.pciex.flt-ca-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.sec-sta@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.ca-d@PCIEXFN/PCIEXFN (0)->
+    ereport.io.pci.sec-sta@PCIEXFN;
 
-prop error.io.pciex.flt-ca-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn (2)->
-    ereport.io.pciex.tl.ca@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.ca-d@PCIEXFN/PCIEXFN (2)->
+    ereport.io.pciex.tl.ca@PCIEXFN,
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pciex.flt-ca-d@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.ca-d@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.ca-d@PCIEXFN (0)->
+    error.io.pciex.ca-fwd-d@PCIEXFN;
 
-prop error.io.pciex.ca-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.ca-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>; 
+prop error.io.pciex.ca-fwd-d@PCIEXFN (1)->
+    error.io.pciex.ca-fwd-d@PCIEXFN/PCIEXFNHZ; 
 
-prop error.io.pciex.ca-d@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pci.rta@pciexbus/pciexdev/pciexfn { IS_BDG };
+prop error.io.pciex.ca-fwd-d@PCIEXFN { IS_BG(PCIEXFN) } (1)->
+    ereport.io.pci.rta@PCIEXFN;
 
-prop error.io.pciex.ca-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.rta@pciexbus/pciexdev/pciexfn { IS_LEAF };
+prop error.io.pciex.ca-fwd-d@PCIEXFN { IS_BG(PCIEXFN) } (0)->
+    ereport.io.pci.sec-sta@PCIEXFN,
+    error.io.pci.ta-drw-d@PCIEXFN/PCIFN;
 
-/*
- * upstream unexpected requests
- *
- * This could be the fault of a device behind a PCI Express/PCI(X) bridge not
- * responding, or of the root complex sending an invalid request (the latter
- * case is handled by badreq-d below).
- *
- * This is reported as a ur by the completer, which for non-posted reqs sets the
- * appropriate error bit in the completion message to the initiator which will
- * set the legacy pci bit sec-ma.
- *
- * The fault can always be recognized from the sec-ma bit at the root complex.
- *
- * If the fault was with the root complex, then we don't care which leaf is
- * involved.
- * 
- * If the fault originated from a pci device behind a PCI Express/PCI(X) bridge
- * we can identify the leaf device from the target-ma ereport if available or
- * from the source-id payload of the sec-rma ereport from the bridge.
- */
-prop error.io.pciex.flt-ur-u@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn
-	{ IS_SWU || IS_LEAF || IS_BDG };
-
-prop error.io.pciex.flt-ur-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pciex.tl.ur@pciexbus/pciexdev/pciexfn { IS_LEAF || IS_BDG };
-
-prop error.io.pciex.flt-ur-u@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pciex.tl.ur@pciexbus/pciexdev/pciexfn { IS_SWU };
-
-prop error.io.pciex.flt-ur-u@pciexbus/pciexdev/pciexfn (2)->
-    error.io.pci.target-ma-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.ur-u@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.ur-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.ur-u@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.ur-u@pciexrc/pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.sec-ma@pciexrc;
+prop error.io.pciex.ca-fwd-d@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+    ereport.io.pci.rta@PCIEXFN;
 
 /*
  * upstream completer aborts
@@ -1739,7 +1378,7 @@ prop error.io.pciex.ur-u@pciexrc/pciexbus/pciexdev/pciexfn (0)->
  * request (the latter case is handled by badreq-d below).
  *
  * This is reported as a ca by the completer. The completer (for non-posted
- * requested) sends the appropriate error bits in the completion message to
+ * requests) sends the appropriate error bits in the completion message to
  * the initiator which will set the legacy pci bit sec-rta.
  *
  * The fault can always be recognized from the sec-rta bit at the root complex.
@@ -1750,39 +1389,25 @@ prop error.io.pciex.ur-u@pciexrc/pciexbus/pciexdev/pciexfn (0)->
  * If the fault was with a PCI Express leaf with a non-hardened driver, then we
  * can still identify the leaf device from the source-id payload of the nonfatal
  * message ereport from the root complex or from the target-rta ereport.
- *
- * If the fault originated from a PCI(X) device behind a PCI Express/PCI(X)
- * bridge, and it's driver is hardened, we can identify the device from the PCI
- * sta ereport or from the source-id payload of the sec-rta ereport from the
- * bridge.
- *
- * If the fault originated from a PCI(X) device behind a PCI Express/PCI(X)
- * bridge, and its driver is not hardened we can only identify the leaf device
- * from the target-rta ereport if available or from the source-id payload of
- * the sec-rta ereport from the bridge.
  */
-prop error.io.pciex.flt-ca-u@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn
-	{ IS_SWU || IS_LEAF || IS_BDG };
+prop error.io.pciex.flt-ca-u@PCIEXFN { !IS_LF(PCIEXFN) } (1)->
+    ereport.io.pciex.tl.ca@PCIEXFN;
 
-prop error.io.pciex.flt-ca-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.sta@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    ereport.io.pciex.tl.ca@pciexbus/pciexdev/pciexfn { IS_LEAF };
+prop error.io.pciex.flt-ca-u@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+    ereport.io.pciex.tl.ca@PCIEXFN;
 
-prop error.io.pciex.flt-ca-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.sta@pciexbus/pciexdev/pciexfn { IS_SWU || IS_BDG };
+prop error.io.pciex.flt-ca-u@PCIEXFN (0)->
+    error.io.pciex.nonfatal@PCIEXFN,
+    ereport.io.pci.sta@PCIEXFN;
 
-prop error.io.pciex.flt-ca-u@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pciex.tl.ca@pciexbus/pciexdev/pciexfn { IS_SWU || IS_BDG };
+prop error.io.pciex.flt-ca-u@PCIEXFN (2)->
+    error.io.pci.target-rta-d@PCIEXFN,
+    error.io.pciex.ca-u@PCIEXFN;
 
-prop error.io.pciex.flt-ca-u@pciexbus/pciexdev/pciexfn (2)->
-    error.io.pci.target-rta-d@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.ca-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.ca-u@PCIEXFN/PCIEXFN (1)->
+    error.io.pciex.ca-u@PCIEXFN;
 
-prop error.io.pciex.ca-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.ca-u@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.ca-u@pciexrc/pciexbus/pciexdev/pciexfn (0)->
+prop error.io.pciex.ca-u@pciexrc/PCIEXFN (0)->
     ereport.io.pci.sec-rta@pciexrc;
 
 /*
@@ -1796,79 +1421,41 @@ prop error.io.pciex.ca-u@pciexrc/pciexbus/pciexdev/pciexfn (0)->
  * then sends the appropriate error bits in the completion message to the
  * initiator which will set the legacy pci bits ma or rta.
  *
- * For badreq-u, the ca/ur ereports contain a source-id payload that identifies
- * the initiator.
- * - flt-badreq-u represents the initiator that caused the fault. This may
- *   be a child pci device in which case flt-badreq-u is generated in pci.esc
- * - badreq-u propagates up to the root complex.
+ * For flt-badreq-u, the ca/ur ereports contain a source-id payload that
+ * identifies the initiator.
  *
  * The fault can always be recognized by the ca/ur ereport from the root
  * complex or downstream switch port. The originator of the request can be
  * recognized by the rta/ma for a hardened driver or by using the source-id
  * payload of the ca/ur ereport for a non-hardened driver.
- *
- * Note that handling of badreq-u where source and detector are both pciexfn
- * has to be handled specially to avoid path name matching.
  */
-prop error.io.pciex.flt-badreq-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.badreq-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.flt-badreq-u@PCIEXFN (0)->
+    ereport.io.pci.ma@PCIEXFN,
+    ereport.io.pci.rta@PCIEXFN;
 
-prop error.io.pciex.badreq-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.badreq-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pciex.flt-badreq-u@PCIEXFN1 {
+    SOURCE_ID_MATCHES_BDF && is_under(pciexrc, PCIEXFN1) } (0)->
+    ereport.io.pciex.tl.ur@pciexrc,
+    ereport.io.pciex.tl.ca@pciexrc;
 
-prop error.io.pciex.badreq-u@pciexrc/pciexbus/pciexdev/pciexfn (0)->
+prop error.io.pciex.flt-badreq-u@PCIEXFN (1)->
+    error.io.pciex.badreq-u@PCIEXFN;
+
+prop error.io.pciex.badreq-u@PCIEXFN/PCIEXFN (1)->
+    error.io.pciex.badreq-u@PCIEXFN;
+
+prop error.io.pciex.badreq-u@pciexrc/PCIEXFN (0)->
     ereport.io.pci.sec-sta@pciexrc;
 
-prop error.io.pciex.flt-badreq-u@pciexbus[b]/pciexdev[d]/pciexfn[f] (0)->
-    ereport.io.pciex.tl.ur@pciexrc<> {
-        BDF_IS_LEAF && SOURCE_ID_MATCHES_BDF && BDF_IS_UNDER_RC},
-    ereport.io.pciex.tl.ca@pciexrc<> {
-        BDF_IS_LEAF && SOURCE_ID_MATCHES_BDF && BDF_IS_UNDER_RC};
+prop error.io.pciex.flt-badreq-u@PCIEXFN1 { IS_SD(PCIEXFN) &&
+    SOURCE_ID_MATCHES_BDF && is_under(PCIEXFN, PCIEXFN1) } (0)->
+    ereport.io.pciex.tl.ur@PCIEXFN,
+    ereport.io.pciex.tl.ca@PCIEXFN;
 
-prop error.io.pci.badreq-pw-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.tl.ur@pciexrc<> { PCIBDF_IS_UNDER_RC },
-    ereport.io.pciex.tl.ca@pciexrc<> { PCIBDF_IS_UNDER_RC };
-
-prop error.io.pci.badreq-drw-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.tl.ur@pciexrc<> { PCIBDF_IS_UNDER_RC },
-    ereport.io.pciex.tl.ca@pciexrc<> { PCIBDF_IS_UNDER_RC };
-
-prop error.io.pciex.badreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.sec-sta@pciexbus/pciexdev/pciexfn { IS_SWD };
-
-prop error.io.pciex.badreq-u@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.badreq-u@pciexbus/pciexdev { IS_LEAF };
-
-prop error.io.pciex.badreq-u@pciexbus/pciexdev/pciexfn (0)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.badreq-u@pciexbus[b]/pciexdev[d] (0)->
-    ereport.io.pciex.tl.ur@pciexfn {
-	(confprop(asru(pciexfn), TOPO_PCI_EXCAP) == "pciexswd") &&
-	(!payloadprop_defined("source-valid") ||
-	payloadprop("source-valid") == 0 ||
-	(payloadprop("source-id") & 0xfff8) == ((b << 8) | (d << 3))) },
-    ereport.io.pciex.tl.ca@pciexfn {
-	(confprop(asru(pciexfn), TOPO_PCI_EXCAP) == "pciexswd") &&
-	(!payloadprop_defined("source-valid") ||
-	payloadprop("source-valid") == 0 ||
-	(payloadprop("source-id") & 0xfff8) == ((b << 8) | (d << 3))) };
-
-prop error.io.pci.badreq-pw-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.tl.ur@pciexbus/pciexdev/pciexfn { IS_SWD &&
-	PCIBDF_IS_UNDER_DEV },
-    ereport.io.pciex.tl.ca@pciexbus/pciexdev/pciexfn { IS_SWD &&
-	PCIBDF_IS_UNDER_DEV };
-
-prop error.io.pci.badreq-drw-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.tl.ur@pciexbus/pciexdev/pciexfn { IS_SWD &&
-	PCIBDF_IS_UNDER_DEV },
-    ereport.io.pciex.tl.ca@pciexbus/pciexdev/pciexfn { IS_SWD &&
-	PCIBDF_IS_UNDER_DEV };
-
-prop error.io.pciex.flt-badreq-u@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.ma@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    ereport.io.pci.rta@pciexbus/pciexdev/pciexfn { IS_LEAF };
+prop error.io.pciex.flt-badreq-u@PCIEXFN1 { IS_SD(PCIEXFN) &&
+    is_under(PCIEXFN, PCIEXFN1) } (0)->
+    ereport.io.pci.sec-sta@PCIEXFN,
+    error.io.pciex.nonfatal@PCIEXFN;
 
 /*
  * downstream bad request
@@ -1884,20 +1471,39 @@ prop error.io.pciex.flt-badreq-u@pciexbus/pciexdev/pciexfn (0)->
  * legacy pci bits ma or rta (oddly there is no equivalent in pcie error
  * reporting).
  */
-prop error.io.pciex.badreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.flt-ur-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-ca-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.badreq-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
+prop error.io.pciex.badreq-d@PCIEXFN { IS_SU(PCIEXFN) || IS_SD(PCIEXFN) } (1)->
+    error.io.pciex.flt-ur-u@PCIEXFN,
+    error.io.pciex.flt-ca-u@PCIEXFN,
+    error.io.pciex.badreq-d@PCIEXFN/PCIEXFNHZ;
 
-prop error.io.pciex.badreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.flt-ur-u@pciexbus/pciexdev/pciexfn { IS_LEAF },
-    error.io.pciex.flt-ca-u@pciexbus/pciexdev/pciexfn { IS_LEAF };
+prop error.io.pciex.badreq-d@PCIEXFN { IS_BG(PCIEXFN) } (1)->
+    error.io.pciex.flt-ur-u@PCIEXFN,
+    error.io.pciex.flt-ca-u@PCIEXFN,
+    error.io.pci.badreq-pw-d@PCIEXFN/PCIFNHZ,
+    error.io.pci.badreq-drw-d@PCIEXFN/PCIFNHZ;
 
-prop error.io.pciex.badreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.flt-ur-u@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.flt-ca-u@pciexbus/pciexdev/pciexfn,
-    error.io.pci.badreq-pw-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>,
-    error.io.pci.badreq-drw-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
+prop error.io.pciex.badreq-d@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+    error.io.pciex.flt-ur-u@PCIEXFN,
+    error.io.pciex.flt-ca-u@PCIEXFN;
+
+prop error.io.pciex.flt-ur-u@PCIEXFN { !IS_LF(PCIEXFN) } (1)->
+    ereport.io.pciex.tl.ur@PCIEXFN;
+
+prop error.io.pciex.flt-ur-u@PCIEXFN { IS_LF(PCIEXFN) } (0)->
+    ereport.io.pciex.tl.ur@PCIEXFN;
+
+prop error.io.pciex.flt-ur-u@PCIEXFN (2)->
+    error.io.pci.target-ma-d@PCIEXFN,
+    error.io.pciex.ur-u@PCIEXFN;
+
+prop error.io.pciex.flt-ur-u@PCIEXFN (0)->
+    error.io.pciex.nonfatal@PCIEXFN;
+
+prop error.io.pciex.ur-u@PCIEXFN/PCIEXFN (1)->
+    error.io.pciex.ur-u@PCIEXFN;
+
+prop error.io.pciex.ur-u@pciexrc/PCIEXFN (0)->
+    ereport.io.pci.sec-ma@pciexrc;
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -1912,13 +1518,12 @@ prop error.io.pciex.badreq-d@pciexbus/pciexdev/pciexfn (1)->
 
 event error.io.pciex.discard_rc@pciexrc;
 
-event ereport.io.pciex.tl.uc@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.noadverr@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.correctable@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.a-nonfatal@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.fatal@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pci.nr@pciexbus/pciexdev/pciexfn{within(5s)};
+event ereport.io.pciex.noadverr@PCIEXFN{within(5s)};
+event ereport.io.pciex.correctable@PCIEXFN{within(5s)};
+event ereport.io.pciex.nonfatal@PCIEXFN{within(5s)};
+event ereport.io.pciex.a-nonfatal@PCIEXFN{within(5s)};
+event ereport.io.pciex.fatal@PCIEXFN{within(5s)};
+event ereport.io.pci.nr@PCIEXFN{within(5s)};
 event ereport.io.pci.nr@pciexrc{within(5s)};
 event ereport.io.pci.ma@pciexrc{within(5s)};
 event ereport.io.pci.rta@pciexrc{within(5s)};
@@ -1931,30 +1536,29 @@ event ereport.io.pciex.noadverr@pciexrc{within(5s)};
 event ereport.io.pciex.a-nonfatal@pciexrc{within(5s)};
 event ereport.io.pciex.rc.ce-msg@pciexrc{within(5s)};
 event ereport.io.pciex.rc.mce-msg@pciexrc{within(5s)};
-event ereport.io.pciex.rc.mue-msg@pciexrc{within(5s)};
 
-event upset.io.pciex.discard_uc@pciexbus/pciexdev/pciexfn;
-event upset.io.pciex.discard@pciexbus/pciexdev/pciexfn;
+event upset.io.pciex.discard_uc@PCIEXFN;
+event upset.io.pciex.discard@PCIEXFN;
 event upset.io.pciex.discard@pciexrc;
 
-prop upset.io.pciex.discard_uc@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pciex.tl.uc@pciexbus/pciexdev/pciexfn { IS_BDG };
+prop upset.io.pciex.discard_uc@PCIEXFN { IS_BG(PCIEXFN) } (1)->
+    ereport.io.pciex.tl.uc@PCIEXFN;
 
-prop upset.io.pciex.discard_uc@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pciex.tl.uc@pciexbus/pciexdev/pciexfn { IS_LEAF };
+prop upset.io.pciex.discard_uc@PCIEXFN { IS_LF(PCIEXFN) } (1)->
+    ereport.io.pciex.tl.uc@PCIEXFN;
 
-prop upset.io.pciex.discard@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pci.nr@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.noadverr@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.correctable@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.a-nonfatal@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.fatal@pciexbus/pciexdev/pciexfn;
+prop upset.io.pciex.discard@PCIEXFN (1)->
+    ereport.io.pci.nr@PCIEXFN,
+    ereport.io.pciex.noadverr@PCIEXFN,
+    ereport.io.pciex.correctable@PCIEXFN,
+    ereport.io.pciex.nonfatal@PCIEXFN,
+    ereport.io.pciex.a-nonfatal@PCIEXFN,
+    ereport.io.pciex.fatal@PCIEXFN;
 
-prop error.io.pciex.discard_rc@pciexrc (1)->
+prop error.io.pciex.discard_rc@pciexrc (0)->
+    ereport.io.pciex.rc.mue-msg@pciexrc,
     ereport.io.pciex.rc.fe-msg@pciexrc { SOURCE_ID_MATCHES_OWN_BDF },
-    ereport.io.pciex.rc.nfe-msg@pciexrc { SOURCE_ID_MATCHES_OWN_BDF },
-    ereport.io.pciex.rc.ce-msg@pciexrc { SOURCE_ID_MATCHES_OWN_BDF };
+    ereport.io.pciex.rc.nfe-msg@pciexrc { SOURCE_ID_MATCHES_OWN_BDF };
 
 prop upset.io.pciex.discard@pciexrc (1)->
     error.io.pciex.discard_rc@pciexrc,
@@ -1963,7 +1567,6 @@ prop upset.io.pciex.discard@pciexrc (1)->
     ereport.io.pciex.a-nonfatal@pciexrc,
     ereport.io.pciex.rc.ce-msg@pciexrc,
     ereport.io.pciex.rc.mce-msg@pciexrc,
-    ereport.io.pciex.rc.mue-msg@pciexrc,
     ereport.io.pciex.tl.uc@pciexrc,
     ereport.io.pci.ma@pciexrc,
     ereport.io.pci.rta@pciexrc,
@@ -1974,203 +1577,168 @@ prop upset.io.pciex.discard@pciexrc (1)->
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * rules for PCI Express to PCI bridge propagations
+ * rules for propagations from child PCI bus
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  */
 
-event error.io.pci.retry-to-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.badreq-pw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.badreq-drw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.ma-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.ta-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.ape-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.source-ape-u@pcibus/pcidev/pcifn;
-event error.io.pci.source-f-perr-u@pcibus/pcidev/pcifn;
-event error.io.pci.source-nf-perr-u@pcibus/pcidev/pcifn;
-event error.io.pci.target-ma-d@pcibus/pcidev/pcifn;
-event error.io.pci.target-rta-d@pcibus/pcidev/pcifn;
-event error.io.pci.f-dpdata-pw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.nf-dpdata-pw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.f-dpdata-dw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.nf-dpdata-dw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.f-dpdata-dr-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.nf-dpdata-dr-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.dpdata-pw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.dpdata-dw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.dpdata-dr-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.perr-pw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.perr-dw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.perr-dr-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.serr-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pcix.scpe-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pcix.source-scpe-u@pcibus/pcidev/pcifn;
-event error.io.pcix.spl-comp-ma-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pcix.spl-comp-ta-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pcix.spl-comp-ma-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pcix.spl-comp-ta-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pcix.uscmd@pciexbus/pciexdev/pciexfn;
+event error.io.pci.retry-to-u@PCIEXFN/PCIFN;
+event error.io.pci.ma-u@PCIEXFN/PCIFN;
+event error.io.pci.ta-u@PCIEXFN/PCIFN;
+event error.io.pci.ape-u@PCIEXFN/PCIFN;
+event error.io.pci.source-ape-u@PCIFN;
+event error.io.pci.target-ma-d@PCIFN;
+event error.io.pci.target-rta-d@PCIFN;
+event error.io.pci.badreq-pw-u@PCIEXFN/PCIFN;
+event error.io.pci.badreq-drw-u@PCIEXFN/PCIFN;
+event error.io.pci.source-perr-u@PCIFN;
+event error.io.pci.source-dpdata-u@PCIFN;
+event error.io.pci.dpdata-pw-u@PCIEXFN/PCIFN;
+event error.io.pci.dpdata-dw-u@PCIEXFN/PCIFN;
+event error.io.pci.dpdata-dr-u@PCIEXFN/PCIFN;
+event error.io.pci.perr-pw-u@PCIEXFN/PCIFN;
+event error.io.pci.perr-dw-u@PCIEXFN/PCIFN;
+event error.io.pci.perr-dr-u@PCIEXFN/PCIFN;
+event error.io.pci.serr-u@PCIEXFN/PCIFN;
+event error.io.pcix.scpe-u@PCIEXFN/PCIFN;
+event error.io.pcix.source-scpe-u@PCIFN;
+event error.io.pcix.spl-comp-ma-u@PCIEXFN/PCIFN;
+event error.io.pcix.spl-comp-ta-u@PCIEXFN/PCIFN;
+event error.io.pcix.spl-comp-ma-d@PCIEXFN/PCIFN;
+event error.io.pcix.spl-comp-ta-d@PCIEXFN/PCIFN;
+event error.io.pcix.uscmd@PCIEXFN;
 
-event ereport.io.pcix.sec-spl-dis@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.bdg.uscmd@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.bdg.sec-perr@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.bdg.sec-uadr@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.bdg.sec-uat@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.bdg.sec-serr@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.bdg.sec-tex@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.bdg.sec-rma@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.bdg.sec-rta@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.bdg.sec-ma-sc@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pciex.bdg.sec-ta-sc@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pci.dto@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pci.sec-rta@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pci.sec-ma@pciexbus/pciexdev/pciexfn{within(5s)};
-
-/*
- * propagations from pci express onto pci/pci-x
- */
-
-/*
- * poisoned tlps propagate as parity/ecc errors.
- */
-prop error.io.pciex.f-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.f-dpdata-pw-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>,
-    error.io.pci.f-dpdata-dw-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
-
-prop error.io.pciex.nf-poisreq-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.nf-dpdata-pw-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>,
-    error.io.pci.nf-dpdata-dw-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
-
-prop error.io.pciex.f-poiscomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.f-dpdata-dr-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
-
-prop error.io.pciex.nf-poiscomp-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.nf-dpdata-dr-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
-
-/*
- * ca-d only propagates on to pci bus if non-posted access
- */
-prop error.io.pciex.ca-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.sec-sta@pciexbus/pciexdev/pciexfn,
-    error.io.pci.ta-drw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-
-/*
- * nr-d only propagates on to pci bus if non-posted access
- */
-prop error.io.pciex.nr-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.sec-sta@pciexbus/pciexdev/pciexfn,
-    error.io.pci.nr-drw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn,
-    error.io.pci.ta-drw-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-
-/*
- * propagations from pci/pci-x onto pci express
- */
+event ereport.io.pcix.sec-spl-dis@PCIEXFN{within(5s)};
+event ereport.io.pciex.bdg.uscmd@PCIEXFN{within(5s)};
+event ereport.io.pciex.bdg.sec-perr@PCIEXFN{within(5s)};
+event ereport.io.pciex.bdg.sec-uadr@PCIEXFN{within(5s)};
+event ereport.io.pciex.bdg.sec-uat@PCIEXFN{within(5s)};
+event ereport.io.pciex.bdg.sec-serr@PCIEXFN{within(5s)};
+event ereport.io.pciex.bdg.sec-tex@PCIEXFN{within(5s)};
+event ereport.io.pciex.bdg.sec-rma@PCIEXFN{within(5s)};
+event ereport.io.pciex.bdg.sec-rta@PCIEXFN{within(5s)};
+event ereport.io.pciex.bdg.sec-ma-sc@PCIEXFN{within(5s)};
+event ereport.io.pciex.bdg.sec-ta-sc@PCIEXFN{within(5s)};
+event ereport.io.pci.dto@PCIEXFN{within(5s)};
+event ereport.io.pci.sec-rta@PCIEXFN{within(5s)};
+event ereport.io.pci.sec-ma@PCIEXFN{within(5s)};
 
 /*
  * ma-u will only propagate on to pciex bus for non-posted accesses. It
  * is then represented as an unsupported request.
  */
-prop error.io.pci.ma-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pciex.tl.ur@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.ur-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.ma-u@PCIEXFN/PCIFN (0)->
+    ereport.io.pciex.tl.ur@PCIEXFN;
 
-prop error.io.pci.ma-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (2)->
-    ereport.io.pci.sec-ma@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.ma-u@PCIEXFN/PCIFN { is_under(pciexrc, PCIEXFN/PCIFN) } (0)->
+    ereport.io.pci.sec-ma@pciexrc;
 
-prop error.io.pci.target-ma-d@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.bdg.sec-rma@pciexbus/pciexdev/pciexfn { IS_BDG &&
-	BDF_IS_PCI_LEAF && SOURCE_ID_MATCHES_BDF && PCIBDF_IS_UNDER_DEV };
+prop error.io.pci.ma-u@PCIEXFN/PCIFN (2)->
+    ereport.io.pci.sec-ma@PCIEXFN,
+    error.io.pciex.nonfatal@PCIEXFN;
+
+prop error.io.pci.target-ma-d@PCIFN1 { IS_BG(PCIEXFN) && IS_PCI_LF(PCIFN1) &&
+    SOURCE_ID_MATCHES_BDF && is_under(PCIEXFN, PCIFN1) } (0)->
+    ereport.io.pciex.bdg.sec-rma@PCIEXFN;
 
 /*
  * ta-u will only propagate on to pciex bus for non-posted accesses. It is
  * then represented as a completer abort.
  */
-prop error.io.pci.ta-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.sta@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.tl.ca@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.ca-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.ta-u@PCIEXFN/PCIFN (0)->
+    ereport.io.pci.sta@PCIEXFN,
+    ereport.io.pciex.tl.ca@PCIEXFN;
 
-prop error.io.pci.ta-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (2)->
-    ereport.io.pci.sec-rta@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.ta-u@PCIEXFN/PCIFN { is_under(pciexrc, PCIEXFN/PCIFN) } (0)->
+    ereport.io.pci.sec-rta@pciexrc;
 
-prop error.io.pci.target-rta-d@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.bdg.sec-rta@pciexbus/pciexdev/pciexfn { IS_BDG &&
-	BDF_IS_PCI_LEAF && SOURCE_ID_MATCHES_BDF && PCIBDF_IS_UNDER_DEV };
+prop error.io.pci.ta-u@PCIEXFN/PCIFN (2)->
+    ereport.io.pci.sec-rta@PCIEXFN,
+    error.io.pciex.nonfatal@PCIEXFN;
+
+prop error.io.pci.target-rta-d@PCIFN1 { IS_BG(PCIEXFN) && IS_PCI_LF(PCIFN1) &&
+    SOURCE_ID_MATCHES_BDF && is_under(PCIEXFN, PCIFN1) } (0)->
+    ereport.io.pciex.bdg.sec-rta@PCIEXFN;
 
 /*
  * PERR# on a delayed write is represented as an unsupported request
  */
-prop error.io.pci.perr-dw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.sec-mdpe@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.perr-dw-u@PCIEXFN/PCIFN (1)->
+    ereport.io.pci.sec-mdpe@PCIEXFN;
 
-prop error.io.pci.perr-dw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (0)->
-    error.io.pciex.flt-ur-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.perr-dw-u@PCIEXFN/PCIFN (0)->
+    error.io.pciex.flt-ur-u@PCIEXFN;
 
-prop error.io.pci.perr-pw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.sec-mdpe@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.perr-pw-u@PCIEXFN/PCIFN (1)->
+    ereport.io.pci.sec-mdpe@PCIEXFN;
 
-prop error.io.pci.perr-pw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (0)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.perr-pw-u@PCIEXFN/PCIFN (0)->
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pci.source-f-perr-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.bdg.sec-perr@pciexbus/pciexdev/pciexfn { IS_BDG &&
-	BDF_IS_PCI_LEAF && SOURCE_ID_MATCHES_BDF && PCIBDF_IS_UNDER_DEV };
+prop error.io.pci.perr-dr-u@PCIEXFN/PCIFN (1)->
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pci.source-nf-perr-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.bdg.sec-perr@pciexbus/pciexdev/pciexfn { IS_BDG &&
-	BDF_IS_PCI_LEAF && SOURCE_ID_MATCHES_BDF && PCIBDF_IS_UNDER_DEV };
-
-prop error.io.pci.perr-dr-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (1)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.source-perr-u@PCIFN1 { IS_BG(PCIEXFN) && IS_PCI_LF(PCIFN1) &&
+    SOURCE_ID_MATCHES_BDF && is_under(PCIEXFN, PCIFN1) } (0)->
+    ereport.io.pciex.bdg.sec-perr@PCIEXFN;
 
 /*
  * If the bridge receives data with bad ecc/parity from pci/pci-x, it will
  * propagate onto pci express as a poisoned tlp
  */
-prop error.io.pci.dpdata-dr-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (2)->
-    ereport.io.pci.sec-dpe@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.poiscomp-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.dpdata-dr-u@PCIEXFN/PCIFN (2)->
+    ereport.io.pci.sec-dpe@PCIEXFN,
+    error.io.pciex.poiscomp-u@PCIEXFN;
 
-prop error.io.pci.dpdata-dr-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (0)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.dpdata-dr-u@PCIEXFN/PCIFN (0)->
+    error.io.pciex.nonfatal@PCIEXFN;
 
-prop error.io.pci.dpdata-dr-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.sec-mdpe@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.mdpe@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.dpdata-dr-u@PCIEXFN/PCIFN (1)->
+    ereport.io.pci.sec-mdpe@PCIEXFN,
+    ereport.io.pci.mdpe@PCIEXFN;
 
-prop error.io.pci.dpdata-dw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (1)->
-    ereport.io.pci.sec-dpe@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.dpdata-dw-u@PCIEXFN/PCIFN (1)->
+    ereport.io.pci.sec-dpe@PCIEXFN;
 
-prop error.io.pci.dpdata-dw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (0)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.poisreq-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.dpdata-dw-u@PCIEXFN/PCIFN (0)->
+    error.io.pciex.nonfatal@PCIEXFN,
+    error.io.pciex.poisreq-u@PCIEXFN,
+    ereport.io.pci.ma@PCIEXFN,
+    ereport.io.pci.sec-sta@PCIEXFN,
+    error.io.pci.ta-drw-d@PCIEXFN/PCIFN;
 
-prop error.io.pci.dpdata-pw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (2)->
-    ereport.io.pci.sec-dpe@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.poisreq-u@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.dpdata-pw-u@PCIEXFN/PCIFN (2)->
+    ereport.io.pci.sec-dpe@PCIEXFN,
+    error.io.pciex.poisreq-u@PCIEXFN;
 
-prop error.io.pci.dpdata-pw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (0)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.dpdata-pw-u@PCIEXFN/PCIFN (0)->
+    error.io.pciex.nonfatal@PCIEXFN,
+    ereport.io.pci.ma@PCIEXFN;
+
+prop error.io.pci.source-dpdata-u@PCIFN { is_under(pciexrc, PCIFN) } (0)->
+    ereport.io.pciex.tl.ptlp@pciexrc,
+    ereport.io.pciex.tl.ur@pciexrc;
+
+prop error.io.pci.source-dpdata-u@PCIFN1 { IS_BG(PCIEXFN) && IS_PCI_LF(PCIFN1)
+    && SOURCE_ID_MATCHES_BDF && is_under(PCIEXFN, PCIFN1) } (0)->
+    ereport.io.pciex.bdg.sec-ude@PCIEXFN;
 
 /*
  * If the bridge sees an address or attribute parity error it is considered
  * a fatal error.
  */
-prop error.io.pci.ape-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (2)->
-    ereport.io.pci.sec-dpe@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.fatal@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.ape-u@PCIEXFN/PCIFN (2)->
+    ereport.io.pci.sec-dpe@PCIEXFN,
+    error.io.pciex.fatal@PCIEXFN;
 
-prop error.io.pci.source-ape-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.bdg.sec-uat@pciexbus/pciexdev/pciexfn { IS_BDG &&
-	BDF_IS_PCI_LEAF && SOURCE_ID_MATCHES_BDF && PCIBDF_IS_UNDER_DEV },
-    ereport.io.pciex.bdg.sec-uadr@pciexbus/pciexdev/pciexfn { IS_BDG &&
-	BDF_IS_PCI_LEAF && SOURCE_ID_MATCHES_BDF && PCIBDF_IS_UNDER_DEV };
+prop error.io.pci.source-ape-u@PCIFN1 { IS_BG(PCIEXFN) && IS_PCI_LF(PCIFN1) &&
+    SOURCE_ID_MATCHES_BDF && is_under(PCIEXFN, PCIFN1) } (0)->
+    ereport.io.pciex.bdg.sec-uat@PCIEXFN,
+    ereport.io.pciex.bdg.sec-uadr@PCIEXFN;
 
-prop error.io.pci.ape-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.sec-rserr@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.bdg.sec-serr@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.sec-sta@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.ape-u@PCIEXFN/PCIFN (0)->
+    ereport.io.pci.sec-rserr@PCIEXFN,
+    ereport.io.pciex.bdg.sec-serr@PCIEXFN,
+    ereport.io.pci.sec-sta@PCIEXFN;
 
 /*
  * If the bridge sees a split completion error (pci-x only) it could
@@ -2184,231 +1752,151 @@ prop error.io.pci.ape-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (0)->
  *   just drop the request (which the child device sees as a split
  *   completion ma)
  */
-prop error.io.pcix.scpe-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.sec-dpe@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.sec-rserr@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.bdg.sec-serr@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.sec-sta@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.fatal@pciexbus/pciexdev/pciexfn;
+prop error.io.pcix.scpe-u@PCIEXFN/PCIFN (0)->
+    ereport.io.pci.sec-dpe@PCIEXFN,
+    ereport.io.pci.sec-rserr@PCIEXFN,
+    ereport.io.pciex.bdg.sec-serr@PCIEXFN,
+    ereport.io.pci.sec-sta@PCIEXFN,
+    error.io.pciex.fatal@PCIEXFN;
 
-prop error.io.pcix.source-scpe-u@pcibus[b]/pcidev[d]/pcifn[f] (0)->
-    ereport.io.pciex.bdg.sec-uat@pciexbus/pciexdev/pciexfn { IS_BDG &&
-	BDF_IS_PCI_LEAF && SOURCE_ID_MATCHES_BDF && PCIBDF_IS_UNDER_DEV },
-    ereport.io.pciex.bdg.sec-uadr@pciexbus/pciexdev/pciexfn { IS_BDG &&
-	BDF_IS_PCI_LEAF && SOURCE_ID_MATCHES_BDF && PCIBDF_IS_UNDER_DEV };
+prop error.io.pcix.source-scpe-u@PCIFN1 { IS_BG(PCIEXFN) && IS_PCI_LF(PCIFN1) &&
+    SOURCE_ID_MATCHES_BDF && is_under(PCIEXFN, PCIFN1) } (0)->
+    ereport.io.pciex.bdg.sec-uat@PCIEXFN,
+    ereport.io.pciex.bdg.sec-uadr@PCIEXFN;
 
-prop error.io.pcix.scpe-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (1)->
-    error.io.pcix.uscmd@pciexbus/pciexdev/pciexfn,
-    error.io.pcix.spl-comp-ma-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn,
-    error.io.pcix.spl-comp-ta-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
+prop error.io.pcix.scpe-u@PCIEXFN/PCIFN (1)->
+    error.io.pcix.uscmd@PCIEXFN,
+    error.io.pcix.spl-comp-ma-d@PCIEXFN/PCIFN,
+    error.io.pcix.spl-comp-ta-d@PCIEXFN/PCIFN;
 
-prop error.io.pcix.uscmd@pciexbus/pciexdev/pciexfn (5)->
-    error.io.pciex.fatal@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.sta@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.tl.ca@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.ca-u@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.bdg.uscmd@pciexbus/pciexdev/pciexfn;
+prop error.io.pcix.uscmd@PCIEXFN (4)->
+    error.io.pciex.fatal@PCIEXFN,
+    ereport.io.pci.sta@PCIEXFN,
+    ereport.io.pciex.tl.ca@PCIEXFN,
+    ereport.io.pciex.bdg.uscmd@PCIEXFN;
+
+prop error.io.pcix.uscmd@PCIEXFN { is_under(pciexrc, PCIEXFN) } (0)->
+    ereport.io.pci.sec-rta@pciexrc;
 
 /*
  * Similarly a child device may have responded with a master abort or
  * target abort to one of our split competions. The hardware just logs these.
  */
-prop error.io.pcix.spl-comp-ma-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (3)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn,
-    ereport.io.pcix.sec-spl-dis@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.bdg.sec-ma-sc@pciexbus/pciexdev/pciexfn;
+prop error.io.pcix.spl-comp-ma-u@PCIEXFN/PCIFN (3)->
+    error.io.pciex.nonfatal@PCIEXFN,
+    ereport.io.pcix.sec-spl-dis@PCIEXFN,
+    ereport.io.pciex.bdg.sec-ma-sc@PCIEXFN;
 
-prop error.io.pcix.spl-comp-ma-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.sec-ma@pciexbus/pciexdev/pciexfn;
+prop error.io.pcix.spl-comp-ma-u@PCIEXFN/PCIFN (0)->
+    ereport.io.pci.sec-ma@PCIEXFN;
 
-prop error.io.pcix.spl-comp-ta-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (4)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn,
-    ereport.io.pcix.sec-spl-dis@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.bdg.sec-ta-sc@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.sec-rta@pciexbus/pciexdev/pciexfn;
+prop error.io.pcix.spl-comp-ta-u@PCIEXFN/PCIFN (4)->
+    error.io.pciex.nonfatal@PCIEXFN,
+    ereport.io.pcix.sec-spl-dis@PCIEXFN,
+    ereport.io.pciex.bdg.sec-ta-sc@PCIEXFN,
+    ereport.io.pci.sec-rta@PCIEXFN;
 
 /*
  * SERR# is considered fatal
  */
-prop error.io.pci.serr-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (3)->
-    error.io.pciex.fatal@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.sec-rserr@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.bdg.sec-serr@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.serr-u@PCIEXFN/PCIFN (3)->
+    error.io.pciex.fatal@PCIEXFN,
+    ereport.io.pci.sec-rserr@PCIEXFN,
+    ereport.io.pciex.bdg.sec-serr@PCIEXFN;
 
 /*
  * Retry time-out is nonfatal. The initial requester has stopped retrying so
  * there's nothing else the hardware can do but flag the error.
  */
-prop error.io.pci.retry-to-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (2)->
-    error.io.pciex.nonfatal@pciexbus/pciexdev/pciexfn,
-    ereport.io.pciex.bdg.sec-tex@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.retry-to-u@PCIEXFN/PCIFN (2)->
+    error.io.pciex.nonfatal@PCIEXFN,
+    ereport.io.pciex.bdg.sec-tex@PCIEXFN;
 
-prop error.io.pci.retry-to-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (0)->
-    ereport.io.pci.sta@pciexbus/pciexdev/pciexfn,
-    error.io.pciex.ca-u@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.dto@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.retry-to-u@PCIEXFN/PCIFN (0)->
+    ereport.io.pci.sta@PCIEXFN,
+    ereport.io.pci.dto@PCIEXFN;
+
+prop error.io.pci.retry-to-u@PCIEXFN/PCIFN {
+    is_under(pciexrc, PCIEXFN/PCIFN) } (0)->
+    ereport.io.pci.sec-rta@pciexrc;
 
 /*
  * A bad dma request (eg with invalid address) propagates onto pci express
  * as a bad dma request. The end result may be a master abort or target abort
  * (depending on whether the child is pci-x or pci).
  */
-prop error.io.pci.badreq-pw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (0)->
-    error.io.pciex.badreq-u@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.ma@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.rta@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.sec-sta@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.badreq-pw-u@PCIEXFN/PCIFN (0)->
+    ereport.io.pci.ma@PCIEXFN,
+    ereport.io.pci.rta@PCIEXFN,
+    ereport.io.pci.sec-sta@PCIEXFN;
 
-prop error.io.pci.badreq-drw-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn (0)->
-    error.io.pciex.badreq-u@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.ma@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.rta@pciexbus/pciexdev/pciexfn,
-    ereport.io.pci.sec-sta@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.badreq-pw-u@PCIEXFN/PCIFN {
+    is_under(pciexrc, PCIEXFN/PCIFN) } (0)->
+    ereport.io.pciex.tl.ur@pciexrc,
+    ereport.io.pciex.tl.ca@pciexrc,
+    ereport.io.pci.sec-sta@pciexrc;
+
+prop error.io.pci.badreq-pw-u@PCIEXFN/PCIFN { IS_SD(PCIEXFN1) &&
+    is_under(PCIEXFN1, PCIEXFN/PCIFN) } (0)->
+    ereport.io.pciex.tl.ur@PCIEXFN1,
+    ereport.io.pciex.tl.ca@PCIEXFN1,
+    ereport.io.pci.sec-sta@PCIEXFN1,
+    error.io.pciex.nonfatal@PCIEXFN1;
+
+prop error.io.pci.badreq-drw-u@PCIEXFN/PCIFN (0)->
+    ereport.io.pci.ma@PCIEXFN,
+    ereport.io.pci.rta@PCIEXFN,
+    ereport.io.pci.sec-sta@PCIEXFN;
+
+prop error.io.pci.badreq-drw-u@PCIEXFN/PCIFN {
+    is_under(pciexrc, PCIEXFN/PCIFN) } (0)->
+    ereport.io.pciex.tl.ur@pciexrc,
+    ereport.io.pciex.tl.ca@pciexrc,
+    ereport.io.pci.sec-sta@pciexrc;
+
+prop error.io.pci.badreq-drw-u@PCIEXFN/PCIFN { IS_SD(PCIEXFN1) &&
+    is_under(PCIEXFN1, PCIEXFN/PCIFN) } (0)->
+    ereport.io.pciex.tl.ur@PCIEXFN1,
+    ereport.io.pciex.tl.ca@PCIEXFN1,
+    ereport.io.pci.sec-sta@PCIEXFN1,
+    error.io.pciex.nonfatal@PCIEXFN1;
 
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- * source- and target- propagations
+ * target- propagations
  * 
- * The source- propagations cascade down to a leaf device, which can then have
- * its bdf matched against the source-id of various ereports. This is necessary
- * because for a number of cases the source-id represents the original requester
- * of the packet which may be different from the detector of the error (which
- * could be a bridge or switch).
- *
  * A Root Complex driver may generate "target-" ereports when knowledge of the
  * physical address associated with a fault allows the target device to be
  * determined. This is not a requirement of the Diagnosis Engine, but can be
  * valuable when available.
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  */
-event error.io.pci.target-ma-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pci.target-rta-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pci.target-mdpe-d@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pci.target-ma-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.target-rta-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.target-mdpe-d@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pciex.source-f-poiscomp-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-nf-poiscomp-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pci.source-f-dpdata-r-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.source-nf-dpdata-r-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.source-f-dpdata-w-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pci.source-nf-dpdata-w-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pciex.source-f-ecrcreq-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-nf-ecrcreq-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-f-ecrcreq-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pciex.source-nf-ecrcreq-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pciex.source-f-ecrcreq-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pciex.source-nf-ecrcreq-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pciex.source-f-ecrccomp-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-nf-ecrccomp-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-f-ecrccomp-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pciex.source-nf-ecrccomp-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pciex.source-f-ecrccomp-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pciex.source-nf-ecrccomp-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
-event error.io.pciex.source-mtlp-u@pciexbus/pciexdev/pciexfn/pciexbus/pciexdev/pciexfn;
-event error.io.pciex.source-mtlp-u@pciexbus/pciexdev/pciexfn/pcibus/pcidev/pcifn;
-event error.io.pciex.source-mtlp-u@pcibus/pcidev/pcifn/pcibus/pcidev/pcifn;
+event error.io.pci.target-ma-d@PCIEXFN/PCIEXFN;
+event error.io.pci.target-rta-d@PCIEXFN/PCIEXFN;
+event error.io.pci.target-ma-d@PCIEXFN/PCIFN;
+event error.io.pci.target-rta-d@PCIEXFN/PCIFN;
 
-event ereport.io.pci.target-mdpe@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pci.target-rta@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pci.target-ma@pciexbus/pciexdev/pciexfn{within(5s)};
+event ereport.io.pci.target-rta@PCIEXFN{within(5s)};
+event ereport.io.pci.target-ma@PCIEXFN{within(5s)};
 
-prop error.io.pci.target-ma-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.target-ma-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
+prop error.io.pci.target-ma-d@PCIEXFN (1)->
+    error.io.pci.target-ma-d@PCIEXFN/PCIEXFNHZ;
 
-prop error.io.pci.target-ma-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.target-ma-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
+prop error.io.pci.target-ma-d@PCIEXFN (1)->
+    error.io.pci.target-ma-d@PCIEXFN/PCIFNHZ;
 
-prop error.io.pci.target-ma-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.target-ma@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.target-ma-d@PCIEXFN (0)->
+    ereport.io.pci.target-ma@PCIEXFN;
 
-prop error.io.pci.target-rta-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.target-rta-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
+prop error.io.pci.target-rta-d@PCIEXFN (1)->
+    error.io.pci.target-rta-d@PCIEXFN/PCIEXFNHZ;
 
-prop error.io.pci.target-rta-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.target-rta-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
+prop error.io.pci.target-rta-d@PCIEXFN (1)->
+    error.io.pci.target-rta-d@PCIEXFN/PCIFNHZ;
 
-prop error.io.pci.target-rta-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.target-rta@pciexbus/pciexdev/pciexfn;
+prop error.io.pci.target-rta-d@PCIEXFN (0)->
+    ereport.io.pci.target-rta@PCIEXFN;
 
-prop error.io.pci.target-mdpe-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.target-mdpe-d@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
-
-prop error.io.pci.target-mdpe-d@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.target-mdpe-d@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
-
-prop error.io.pci.target-mdpe-d@pciexbus/pciexdev/pciexfn (0)->
-    ereport.io.pci.target-mdpe@pciexbus/pciexdev/pciexfn;
-
-prop error.io.pciex.source-f-poisreq-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.source-f-poisreq-u@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
-    
-prop error.io.pciex.source-nf-poisreq-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.source-nf-poisreq-u@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
-    
-prop error.io.pciex.source-f-poisreq-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.source-f-dpdata-w-u@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
-    
-prop error.io.pciex.source-nf-poisreq-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.source-nf-dpdata-w-u@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
-    
-prop error.io.pciex.source-f-poiscomp-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.source-f-poiscomp-u@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
-    
-prop error.io.pciex.source-nf-poiscomp-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.source-nf-poiscomp-u@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
-    
-prop error.io.pciex.source-f-poiscomp-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.source-f-dpdata-r-u@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
-    
-prop error.io.pciex.source-nf-poiscomp-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pci.source-nf-dpdata-r-u@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
-    
-prop error.io.pciex.source-f-ecrcreq-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.source-f-ecrcreq-u@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
-    
-prop error.io.pciex.source-f-ecrcreq-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.source-f-ecrcreq-u@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
-    
-prop error.io.pciex.source-nf-ecrcreq-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.source-nf-ecrcreq-u@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
-    
-prop error.io.pciex.source-nf-ecrcreq-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.source-nf-ecrcreq-u@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
-    
-prop error.io.pciex.source-f-ecrcreq-u@pcibus/pcidev/pcifn (1)->
-    error.io.pciex.source-f-ecrcreq-u@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
-    
-prop error.io.pciex.source-nf-ecrcreq-u@pcibus/pcidev/pcifn (1)->
-    error.io.pciex.source-nf-ecrcreq-u@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
-    
-prop error.io.pciex.source-f-ecrccomp-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.source-f-ecrccomp-u@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
-    
-prop error.io.pciex.source-f-ecrccomp-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.source-f-ecrccomp-u@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
-    
-prop error.io.pciex.source-nf-ecrccomp-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.source-nf-ecrccomp-u@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
-    
-prop error.io.pciex.source-nf-ecrccomp-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.source-nf-ecrccomp-u@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
-    
-prop error.io.pciex.source-f-ecrccomp-u@pcibus/pcidev/pcifn (1)->
-    error.io.pciex.source-f-ecrccomp-u@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
-    
-prop error.io.pciex.source-nf-ecrccomp-u@pcibus/pcidev/pcifn (1)->
-    error.io.pciex.source-nf-ecrccomp-u@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
-    
-prop error.io.pciex.source-mtlp-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.source-mtlp-u@pciexbus/pciexdev/pciexfn/pciexbus<>/pciexdev<>/pciexfn<>;
-    
-prop error.io.pciex.source-mtlp-u@pciexbus/pciexdev/pciexfn (1)->
-    error.io.pciex.source-mtlp-u@pciexbus/pciexdev/pciexfn/pcibus<>/pcidev<>/pcifn<>;
-    
-prop error.io.pciex.source-mtlp-u@pcibus/pcidev/pcifn (1)->
-    error.io.pciex.source-mtlp-u@pcibus/pcidev/pcifn/pcibus<>/pcidev<>/pcifn<>;
-    
 /*
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  * stub unused pciex-pci bridge ereports
@@ -2419,31 +1907,31 @@ prop error.io.pciex.source-mtlp-u@pcibus/pcidev/pcifn (1)->
  * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
  */
 
-event ereport.io.pciex.bdg.usc@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pcix.sec-unex-spl@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pcix.sec-spl-or@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pcix.sec-spl-dly@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pcix.sec-ecc.ce-addr@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pcix.sec-ecc.ce-attr@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pcix.sec-ecc.ce-data@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pcix.sec-ecc.ue-addr@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pcix.sec-ecc.ue-attr@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pcix.sec-ecc.ue-data@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pcix.sec-s-ce@pciexbus/pciexdev/pciexfn{within(5s)};
-event ereport.io.pcix.sec-s-ue@pciexbus/pciexdev/pciexfn{within(5s)};
+event ereport.io.pciex.bdg.usc@PCIEXFN{within(5s)};
+event ereport.io.pcix.sec-unex-spl@PCIEXFN{within(5s)};
+event ereport.io.pcix.sec-spl-or@PCIEXFN{within(5s)};
+event ereport.io.pcix.sec-spl-dly@PCIEXFN{within(5s)};
+event ereport.io.pcix.sec-ecc.ce-addr@PCIEXFN{within(5s)};
+event ereport.io.pcix.sec-ecc.ce-attr@PCIEXFN{within(5s)};
+event ereport.io.pcix.sec-ecc.ce-data@PCIEXFN{within(5s)};
+event ereport.io.pcix.sec-ecc.ue-addr@PCIEXFN{within(5s)};
+event ereport.io.pcix.sec-ecc.ue-attr@PCIEXFN{within(5s)};
+event ereport.io.pcix.sec-ecc.ue-data@PCIEXFN{within(5s)};
+event ereport.io.pcix.sec-s-ce@PCIEXFN{within(5s)};
+event ereport.io.pcix.sec-s-ue@PCIEXFN{within(5s)};
 
-event upset.io.pciex.discard-bdg@pciexbus/pciexdev/pciexfn;
+event upset.io.pciex.discard-bdg@PCIEXFN;
 
-prop upset.io.pciex.discard-bdg@pciexbus/pciexdev/pciexfn (1)->
-    ereport.io.pciex.bdg.usc@pciexbus/pciexdev/pciexfn,
-    ereport.io.pcix.sec-unex-spl@pciexbus/pciexdev/pciexfn,
-    ereport.io.pcix.sec-spl-or@pciexbus/pciexdev/pciexfn,
-    ereport.io.pcix.sec-spl-dly@pciexbus/pciexdev/pciexfn,
-    ereport.io.pcix.sec-ecc.ce-addr@pciexbus/pciexdev/pciexfn,
-    ereport.io.pcix.sec-ecc.ce-attr@pciexbus/pciexdev/pciexfn,
-    ereport.io.pcix.sec-ecc.ce-data@pciexbus/pciexdev/pciexfn,
-    ereport.io.pcix.sec-ecc.ue-addr@pciexbus/pciexdev/pciexfn,
-    ereport.io.pcix.sec-ecc.ue-attr@pciexbus/pciexdev/pciexfn,
-    ereport.io.pcix.sec-ecc.ue-data@pciexbus/pciexdev/pciexfn,
-    ereport.io.pcix.sec-s-ce@pciexbus/pciexdev/pciexfn,
-    ereport.io.pcix.sec-s-ue@pciexbus/pciexdev/pciexfn;
+prop upset.io.pciex.discard-bdg@PCIEXFN (1)->
+    ereport.io.pciex.bdg.usc@PCIEXFN,
+    ereport.io.pcix.sec-unex-spl@PCIEXFN,
+    ereport.io.pcix.sec-spl-or@PCIEXFN,
+    ereport.io.pcix.sec-spl-dly@PCIEXFN,
+    ereport.io.pcix.sec-ecc.ce-addr@PCIEXFN,
+    ereport.io.pcix.sec-ecc.ce-attr@PCIEXFN,
+    ereport.io.pcix.sec-ecc.ce-data@PCIEXFN,
+    ereport.io.pcix.sec-ecc.ue-addr@PCIEXFN,
+    ereport.io.pcix.sec-ecc.ue-attr@PCIEXFN,
+    ereport.io.pcix.sec-ecc.ue-data@PCIEXFN,
+    ereport.io.pcix.sec-s-ce@PCIEXFN,
+    ereport.io.pcix.sec-s-ue@PCIEXFN;

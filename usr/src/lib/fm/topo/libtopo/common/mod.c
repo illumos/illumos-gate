@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -266,11 +266,12 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	ssize_t size = 0;
 	int32_t modid;
 	char *achas = NULL;
+	char *adom = NULL;
 	char *aprod = NULL;
 	char *asrvr = NULL;
+	char *ahost = NULL;
 	char *modname = NULL;
 	char numbuf[MAXINTSTR];
-	int more_auth = 0;
 	int err;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
@@ -304,13 +305,11 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 		(void) nvlist_lookup_string(anvl,
 		    FM_FMRI_AUTH_CHASSIS, &achas);
 		(void) nvlist_lookup_string(anvl,
+		    FM_FMRI_AUTH_DOMAIN, &adom);
+		(void) nvlist_lookup_string(anvl,
 		    FM_FMRI_AUTH_SERVER, &asrvr);
-		if (aprod != NULL)
-			more_auth++;
-		if (achas != NULL)
-			more_auth++;
-		if (asrvr != NULL)
-			more_auth++;
+		(void) nvlist_lookup_string(anvl,
+		    FM_FMRI_AUTH_HOST, &ahost);
 	}
 
 	/* mod:// */
@@ -323,9 +322,15 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	if (achas != NULL)
 		topo_fmristr_build(&size, buf, buflen, achas,
 		    ":" FM_FMRI_AUTH_CHASSIS "=", NULL);
+	if (adom != NULL)
+		topo_fmristr_build(&size, buf, buflen, adom,
+		    ":" FM_FMRI_AUTH_DOMAIN "=", NULL);
 	if (asrvr != NULL)
 		topo_fmristr_build(&size, buf, buflen, asrvr,
 		    ":" FM_FMRI_AUTH_SERVER "=", NULL);
+	if (ahost != NULL)
+		topo_fmristr_build(&size, buf, buflen, ahost,
+		    ":" FM_FMRI_AUTH_HOST "=", NULL);
 
 	/* module parts */
 	topo_fmristr_build(&size, buf, buflen, modname,

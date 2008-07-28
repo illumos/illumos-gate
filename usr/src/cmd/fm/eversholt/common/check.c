@@ -69,22 +69,26 @@ static struct {
 	int (*checker)(enum nodetype t, const char *s, struct node *np);
 	int outflags;
 } Allowednames[] = {
-	{ T_FAULT, "FITrate", 1, check_num_func, O_ERR },
+	{ T_FAULT, "FITrate", 0, check_num_func, O_ERR },
 	{ T_FAULT, "FRU", 0, check_fru_asru, O_ERR },
 	{ T_FAULT, "ASRU", 0, check_fru_asru, O_ERR },
 	{ T_FAULT, "message", 0, check_num_func, O_ERR },
+	{ T_FAULT, "retire", 0, check_num_func, O_ERR },
+	{ T_FAULT, "response", 0, check_num_func, O_ERR },
 	{ T_FAULT, "action", 0, check_action, O_ERR },
 	{ T_FAULT, "count", 0, check_count, O_ERR },
+	{ T_FAULT, "engine", 0, check_engine, O_ERR },
 	{ T_UPSET, "engine", 0, check_engine, O_ERR },
 	{ T_DEFECT, "FRU", 0, check_fru_asru, O_ERR },
 	{ T_DEFECT, "ASRU", 0, check_fru_asru, O_ERR },
+	{ T_DEFECT, "engine", 0, check_engine, O_ERR },
 	{ T_EREPORT, "poller", 0, check_id, O_ERR },
 	{ T_EREPORT, "delivery", 0, check_timeval, O_ERR },
 	{ T_EREPORT, "discard_if_config_unknown", 0, check_num, O_ERR },
 	{ T_SERD, "N", 1, check_num, O_ERR },
 	{ T_SERD, "T", 1, check_timeval, O_ERR },
-	{ T_SERD, "method", 1, check_serd_method, O_ERR },
-	{ T_SERD, "trip", 1, check_reportlist, O_ERR },
+	{ T_SERD, "method", 0, check_serd_method, O_ERR },
+	{ T_SERD, "trip", 0, check_reportlist, O_ERR },
 	{ T_SERD, "FRU", 0, check_fru_asru, O_ERR },
 	{ T_SERD, "id", 0, check_serd_id, O_ERR },
 	{ T_ERROR, "ASRU", 0, check_fru_asru, O_ERR },
@@ -1092,33 +1096,39 @@ check_func(struct node *np)
 			    np->u.func.s);
 		}
 	} else if (np->u.func.s == L_is_on) {
-		if (arglist->t == T_FUNC &&
+		if (arglist->t == T_NAME ||
+		    (arglist->t == T_FUNC &&
 		    (arglist->u.func.s == L_fru ||
-		    arglist->u.func.s == L_asru)) {
-			check_func(arglist);
+		    arglist->u.func.s == L_asru))) {
+			if (arglist->t == T_FUNC)
+				check_func(arglist);
 		} else {
 			outfl(O_ERR, arglist->file, arglist->line,
-			    "argument to is_on() must be a call to "
+			    "argument to is_on() must be a path or a call to "
 			    "fru() or asru()");
 		}
 	} else if (np->u.func.s == L_is_present) {
-		if (arglist->t == T_FUNC &&
+		if (arglist->t == T_NAME ||
+		    (arglist->t == T_FUNC &&
 		    (arglist->u.func.s == L_fru ||
-		    arglist->u.func.s == L_asru)) {
-			check_func(arglist);
+		    arglist->u.func.s == L_asru))) {
+			if (arglist->t == T_FUNC)
+				check_func(arglist);
 		} else {
 			outfl(O_ERR, arglist->file, arglist->line,
-			    "argument to is_present() must be a call to "
-			    "fru() or asru()");
+			    "argument to is_present() must be a path or a call "
+			    "to fru() or asru()");
 		}
 	} else if (np->u.func.s == L_is_type) {
-		if (arglist->t == T_FUNC &&
+		if (arglist->t == T_NAME ||
+		    (arglist->t == T_FUNC &&
 		    (arglist->u.func.s == L_fru ||
-		    arglist->u.func.s == L_asru)) {
-			check_func(arglist);
+		    arglist->u.func.s == L_asru))) {
+			if (arglist->t == T_FUNC)
+				check_func(arglist);
 		} else {
 			outfl(O_ERR, arglist->file, arglist->line,
-			    "argument to is_type() must be a call to "
+			    "argument to is_type() must be a path or a call to "
 			    "fru() or asru()");
 		}
 	} else if (np->u.func.s == L_confcall) {
@@ -1131,14 +1141,16 @@ check_func(struct node *np)
 	} else if (np->u.func.s == L_confprop ||
 	    np->u.func.s == L_confprop_defined) {
 		if (arglist->t == T_LIST &&
+		    (arglist->u.expr.left->t == T_NAME ||
 		    (arglist->u.expr.left->t == T_FUNC &&
 		    (arglist->u.expr.left->u.func.s == L_fru ||
-		    arglist->u.expr.left->u.func.s == L_asru)) &&
+		    arglist->u.expr.left->u.func.s == L_asru))) &&
 		    arglist->u.expr.right->t == T_QUOTE) {
-			check_func(arglist->u.expr.left);
+			if (arglist->u.expr.left->t == T_FUNC)
+				check_func(arglist->u.expr.left);
 		} else {
 			outfl(O_ERR, arglist->file, arglist->line,
-			    "%s(): first argument must be a call to "
+			    "%s(): first argument must be a path or a call to "
 			    "fru() or asru(); "
 			    "second argument must be a string", np->u.func.s);
 		}
@@ -1179,6 +1191,11 @@ check_func(struct node *np)
 			    "first arg must be a string, "
 			    "second arg a value");
 		}
+	} else if (np->u.func.s == L_setserdn || np->u.func.s == L_setserdt ||
+	    np->u.func.s == L_setserdsuffix || np->u.func.s ==
+	    L_setserdincrement) {
+		if (arglist->t == T_FUNC)
+			check_func(arglist);
 	} else if (np->u.func.s == L_envprop) {
 		if (arglist->t != T_QUOTE)
 			outfl(O_ERR, arglist->file, arglist->line,

@@ -18,44 +18,29 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+#ifndef	_LEGACY_HC_H
+#define	_LEGACY_HC_H
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <fm/fmd_fmri.h>
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
-ssize_t
-fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
-{
-	uint8_t version;
-	ssize_t size;
-	char *c;
+#define	LEGACY_HC_VERSION	1
+#define	LEGACY_HC		"legacy-hc"
 
-	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
-	    version > FM_LEGACY_SCHEME_VERSION ||
-	    nvlist_lookup_string(nvl, FM_FMRI_LEGACY_HC, &c) != 0)
-		return (fmd_fmri_set_errno(EINVAL));
+extern int legacy_hc_init(topo_mod_t *, topo_version_t);
+extern void legacy_hc_fini(topo_mod_t *);
 
-	c = fmd_fmri_strescape(c);
-	size = snprintf(buf, buflen, "legacy-hc:///component=%s", c);
-	fmd_fmri_strfree(c);
-
-	return (size);
+#ifdef	__cplusplus
 }
+#endif
 
-/*ARGSUSED*/
-int
-fmd_fmri_present(nvlist_t *nvl)
-{
-	return (1);
-}
-
-/*ARGSUSED*/
-int
-fmd_fmri_unusable(nvlist_t *nvl)
-{
-	return (0);
-}
+#endif	/* _LEGACY_HC_H */

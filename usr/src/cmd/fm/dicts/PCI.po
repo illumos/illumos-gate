@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -146,13 +146,13 @@ msgstr "Fault"
 msgid "PCI-8000-7J.severity"
 msgstr "Critical"
 msgid "PCI-8000-7J.description"
-msgstr "A problem was detected for a PCI device.\n  Refer to %s for more information."
+msgstr "An unrecoverable problem was detected for a PCI device.\n  Refer to %s for more information."
 msgid "PCI-8000-7J.response"
 msgstr "One or more device instances may be disabled\n"
 msgid "PCI-8000-7J.impact"
 msgstr "Possible loss of services provided by the device instances associated with this fault\n"
 msgid "PCI-8000-7J.action"
-msgstr "Schedule a repair procedure to replace the affected device.  Use fmdump -v -u <EVENT_ID> to identify the device or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"
 #
 # code: PCI-8000-8S
 # keys: fault.io.pci.bus-linkerr fault.io.pci.device-interr
@@ -162,13 +162,13 @@ msgstr "Fault"
 msgid "PCI-8000-8S.severity"
 msgstr "Critical"
 msgid "PCI-8000-8S.description"
-msgstr "A problem has been detected on the specified bus or on the specified transmitting device.\n  Refer to %s for more information."
+msgstr "An unrecoverable problem has been detected on the specified bus or on the specified transmitting device.\n  Refer to %s for more information."
 msgid "PCI-8000-8S.response"
 msgstr "One or more device instances may be disabled\n"
 msgid "PCI-8000-8S.impact"
 msgstr "Possible loss of services provided by the device instances associated with this fault\n"
 msgid "PCI-8000-8S.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmdump -v -u <EVENT_ID> to identify the device and bus or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device and bus or contact Sun for support.\n"
 #
 # code: PCI-8000-95
 # keys: fault.io.pci.device-invreq fault.io.pci.device-noresp
@@ -176,7 +176,7 @@ msgstr "If a plug-in card is involved check for badly-seated cards or bent pins.
 msgid "PCI-8000-95.type"
 msgstr "Fault"
 msgid "PCI-8000-95.severity"
-msgstr "Critical"
+msgstr "Major"
 msgid "PCI-8000-95.description"
 msgstr "Either the transmitting device sent an invalid request or the receiving device failed to respond.\n  Refer to %s for more information."
 msgid "PCI-8000-95.response"
@@ -184,7 +184,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCI-8000-95.impact"
 msgstr "Possible loss of services provided by the device instances associated with this fault\n"
 msgid "PCI-8000-95.action"
-msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCI-8000-AP
 # keys: fault.io.pci.device-interr fault.io.pci.device-invreq
@@ -192,7 +192,7 @@ msgstr "Ensure that the latest drivers and patches are installed. If a plug-in c
 msgid "PCI-8000-AP.type"
 msgstr "Fault"
 msgid "PCI-8000-AP.severity"
-msgstr "Critical"
+msgstr "Major"
 msgid "PCI-8000-AP.description"
 msgstr "Either the transmitting device sent an invalid request or the receiving device is reporting an internal fault.\n  Refer to %s for more information."
 msgid "PCI-8000-AP.response"
@@ -200,7 +200,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCI-8000-AP.impact"
 msgstr "Possible loss of services provided by the device instances associated with this fault\n"
 msgid "PCI-8000-AP.action"
-msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCI-8000-CA
 # keys: fault.io.pci.device-noresp
@@ -208,7 +208,7 @@ msgstr "Ensure that the latest drivers and patches are installed.  Otherwise sch
 msgid "PCI-8000-CA.type"
 msgstr "Fault"
 msgid "PCI-8000-CA.severity"
-msgstr "Critical"
+msgstr "Major"
 msgid "PCI-8000-CA.description"
 msgstr "A device is failing to respond\n  Refer to %s for more information."
 msgid "PCI-8000-CA.response"
@@ -216,4 +216,68 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCI-8000-CA.impact"
 msgstr "Possible loss of services provided by the device instances associated with this fault\n"
 msgid "PCI-8000-CA.action"
-msgstr "Schedule a repair procedure to replace the affected device.\n\nUse fmdump -v -u <EVENT_ID> to identify the device or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"
+#
+# code: PCI-8000-DH
+# keys: fault.io.pci.bus-linkerr-unaf fault.io.pci.device-interr-unaf
+#
+msgid "PCI-8000-DH.type"
+msgstr "Fault"
+msgid "PCI-8000-DH.severity"
+msgstr "Major"
+msgid "PCI-8000-DH.description"
+msgstr "Too many recovered bus faults have been detected, which indicates a problem with the specified bus or with the specified transmitting device. This may degrade into an unrecoverable fault.\n  Refer to %s for more information."
+msgid "PCI-8000-DH.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "PCI-8000-DH.impact"
+msgstr "Possible loss of services provided by the device instances associated with this fault\n"
+msgid "PCI-8000-DH.action"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device and bus or contact Sun for support.\n"
+#
+# code: PCI-8000-ED
+# keys: fault.io.pci.device-interr-corr
+#
+msgid "PCI-8000-ED.type"
+msgstr "Fault"
+msgid "PCI-8000-ED.severity"
+msgstr "Major"
+msgid "PCI-8000-ED.description"
+msgstr "Too many recovered internal faults have been detected within the specified PCI device. This may degrade into a non-recoverable fault.\n  Refer to %s for more information."
+msgid "PCI-8000-ED.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "PCI-8000-ED.impact"
+msgstr "Possible loss of services provided by the device instances associated with this fault\n"
+msgid "PCI-8000-ED.action"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"
+#
+# code: PCI-8000-FY
+# keys: fault.io.pci.bus-linkerr-deg fault.io.pci.device-interr-deg
+#
+msgid "PCI-8000-FY.type"
+msgstr "Fault"
+msgid "PCI-8000-FY.severity"
+msgstr "Major"
+msgid "PCI-8000-FY.description"
+msgstr "An unrecoverable problem has been detected on the specified bus or on the specified transmitting device, which has resulted in that device running in a degraded state.\n  Refer to %s for more information."
+msgid "PCI-8000-FY.response"
+msgstr "None\n"
+msgid "PCI-8000-FY.impact"
+msgstr "Degraded services provided by the device instances associated with this fault\n"
+msgid "PCI-8000-FY.action"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device and bus or contact Sun for support.\n"
+#
+# code: PCI-8000-G3
+# keys: fault.io.pci.device-interr-deg
+#
+msgid "PCI-8000-G3.type"
+msgstr "Fault"
+msgid "PCI-8000-G3.severity"
+msgstr "Major"
+msgid "PCI-8000-G3.description"
+msgstr "An unrecoverable problem was detected for a PCI device, which has resulted in that device running in a degraded state.\n  Refer to %s for more information."
+msgid "PCI-8000-G3.response"
+msgstr "None\n"
+msgid "PCI-8000-G3.impact"
+msgstr "Degraded services provided by the device instances associated with this fault\n"
+msgid "PCI-8000-G3.action"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"

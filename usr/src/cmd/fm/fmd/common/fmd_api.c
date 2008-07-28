@@ -28,6 +28,7 @@
 
 #include <sys/types.h>
 #include <sys/fm/protocol.h>
+#include <fm/topo_hc.h>
 
 #include <unistd.h>
 #include <signal.h>
@@ -1201,6 +1202,10 @@ fmd_case_add_suspect(fmd_hdl_t *hdl, fmd_case_t *cp, nvlist_t *nvl)
 	fmd_module_t *mp = fmd_api_module_lock(hdl);
 	fmd_case_impl_t *cip = fmd_api_case_impl(mp, cp);
 	char *class;
+	topo_hdl_t *thp;
+	int err;
+	nvlist_t *rsrc = NULL, *asru = NULL, *fru = NULL;
+	char *loc = NULL, *serial = NULL;
 
 	if (cip->ci_state >= FMD_CASE_SOLVED) {
 		fmd_api_error(mp, EFMD_CASE_STATE, "cannot add suspect to "
@@ -1212,6 +1217,77 @@ fmd_case_add_suspect(fmd_hdl_t *hdl, fmd_case_t *cp, nvlist_t *nvl)
 		fmd_api_error(mp, EFMD_CASE_EVENT, "cannot add suspect to "
 		    "%s: suspect event is missing a class\n", cip->ci_uuid);
 	}
+
+	thp = fmd_module_topo_hold(mp);
+	(void) nvlist_lookup_nvlist(nvl, FM_FAULT_RESOURCE, &rsrc);
+	(void) nvlist_lookup_nvlist(nvl, FM_FAULT_ASRU, &asru);
+	(void) nvlist_lookup_nvlist(nvl, FM_FAULT_FRU, &fru);
+	if (rsrc != NULL) {
+		if (strncmp(class, "defect", 6) == 0) {
+			if (asru == NULL && topo_fmri_getprop(thp, rsrc,
+			    TOPO_PGROUP_IO, TOPO_IO_MODULE, rsrc,
+			    &asru, &err) == 0) {
+				(void) nvlist_add_nvlist(nvl, FM_FAULT_ASRU,
+				    asru);
+				nvlist_free(asru);
+				(void) nvlist_lookup_nvlist(nvl, FM_FAULT_ASRU,
+				    &asru);
+			}
+		} else {
+			if (topo_fmri_asru(thp, rsrc, &asru, &err) == 0) {
+				(void) nvlist_remove(nvl, FM_FAULT_ASRU,
+				    DATA_TYPE_NVLIST);
+				(void) nvlist_add_nvlist(nvl, FM_FAULT_ASRU,
+				    asru);
+				nvlist_free(asru);
+				(void) nvlist_lookup_nvlist(nvl, FM_FAULT_ASRU,
+				    &asru);
+			}
+			if (topo_fmri_fru(thp, rsrc, &fru, &err) == 0) {
+				(void) nvlist_remove(nvl, FM_FAULT_FRU,
+				    DATA_TYPE_NVLIST);
+				(void) nvlist_add_nvlist(nvl, FM_FAULT_FRU,
+				    fru);
+				nvlist_free(fru);
+				(void) nvlist_lookup_nvlist(nvl, FM_FAULT_FRU,
+				    &fru);
+			}
+		}
+	}
+
+	/*
+	 * Try to find the location label for this resource
+	 */
+	if (fru != NULL)
+		(void) topo_fmri_label(thp, fru, &loc, &err);
+	else if (rsrc != NULL)
+		(void) topo_fmri_label(thp, rsrc, &loc, &err);
+	if (loc != NULL) {
+		(void) nvlist_remove(nvl, FM_FAULT_LOCATION, DATA_TYPE_STRING);
+		(void) nvlist_add_string(nvl, FM_FAULT_LOCATION, loc);
+		topo_hdl_strfree(thp, loc);
+	}
+
+	/*
+	 * In some cases, serial information for the resource will not be
+	 * available at enumeration but may instead be available by invoking
+	 * a dynamic property method on the FRU.  In order to ensure the serial
+	 * number is persisted properly in the ASRU cache, we'll fetch the
+	 * property, if it exists, and add it to the resource and fru fmris.
+	 */
+	if (fru != NULL) {
+		(void) topo_fmri_serial(thp, fru, &serial, &err);
+		if (serial != NULL) {
+			if (rsrc != NULL)
+				(void) nvlist_add_string(rsrc, "serial",
+				    serial);
+			(void) nvlist_add_string(fru, "serial", serial);
+			topo_hdl_strfree(thp, serial);
+		}
+	}
+
+	err = fmd_module_topo_rele(mp, thp);
+	ASSERT(err == 0);
 
 	fmd_case_insert_suspect(cp, nvl);
 	fmd_module_unlock(mp);
@@ -1704,44 +1780,13 @@ fmd_nvl_create_fault(fmd_hdl_t *hdl, const char *class,
     uint8_t certainty, nvlist_t *asru, nvlist_t *fru, nvlist_t *rsrc)
 {
 	fmd_module_t *mp;
-	topo_hdl_t *thp;
 	nvlist_t *nvl;
-	char *loc = NULL, *serial = NULL;
-	int err;
 
 	mp = fmd_api_module_lock(hdl);
 	if (class == NULL || class[0] == '\0')
 		fmd_api_error(mp, EFMD_NVL_INVAL, "invalid fault class\n");
 
-	thp = fmd_module_topo_hold(mp);
-
-	/*
-	 * Try to find the location label for this resource
-	 */
-	(void) topo_fmri_label(thp, fru, &loc, &err);
-
-	/*
-	 * In some cases, serial information for the resource will not be
-	 * available at enumeration but may instead be available by invoking
-	 * a dynamic property method on the FRU.  In order to ensure the serial
-	 * number is persisted properly in the ASRU cache, we'll fetch the
-	 * property, if it exists, and add it to the resource and fru fmris.
-	 */
-	if (fru != NULL) {
-		(void) topo_fmri_serial(thp, fru, &serial, &err);
-		if (serial != NULL) {
-			(void) nvlist_add_string(rsrc, "serial", serial);
-			(void) nvlist_add_string(fru, "serial", serial);
-			topo_hdl_strfree(thp, serial);
-		}
-	}
-	nvl = fmd_protocol_fault(class, certainty, asru, fru, rsrc, loc);
-
-	if (loc != NULL)
-		topo_hdl_strfree(thp, loc);
-
-	err = fmd_module_topo_rele(mp, thp);
-	ASSERT(err == 0);
+	nvl = fmd_protocol_fault(class, certainty, asru, fru, rsrc, NULL);
 
 	fmd_module_unlock(mp);
 

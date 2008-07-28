@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,6 +135,7 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	int		rval;
 	int		error;
 	char		*snglfault = FM_FAULT_CLASS"."FM_ERROR_IO".";
+	boolean_t	rtr;
 
 
 	/*
@@ -172,6 +173,12 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	devpath[0] = '\0';
 	rval = 0;
 	for (f = 0; f < nfaults; f++) {
+		if (nvlist_lookup_boolean_value(faults[f], FM_SUSPECT_RETIRE,
+		    &rtr) == 0 && !rtr) {
+			fmd_hdl_debug(hdl, "rio_recv: retire suppressed");
+			continue;
+		}
+
 		if (nvlist_lookup_nvlist(faults[f], FM_FAULT_ASRU,
 		    &asru) != 0) {
 			fmd_hdl_debug(hdl, "rio_recv: no asru in fault");

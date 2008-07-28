@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -40,7 +40,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-0A.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-0A.action"
-msgstr "Schedule a repair procedure to replace the affected device.  Use fmdump -v -u <EVENT_ID> to identify the device or contact Sun for support.\n"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"
 #
 # code: PCIEX-8000-1P
 # keys: fault.io.pciex.device-interr fault.io.pciex.device-invreq
@@ -48,7 +48,7 @@ msgstr "Schedule a repair procedure to replace the affected device.  Use fmdump 
 msgid "PCIEX-8000-1P.type"
 msgstr "Fault"
 msgid "PCIEX-8000-1P.severity"
-msgstr "Critical"
+msgstr "Major"
 msgid "PCIEX-8000-1P.description"
 msgstr "Either the transmitting device sent an invalid request or the receiving device is reporting an internal fault.\n  Refer to %s for more information."
 msgid "PCIEX-8000-1P.response"
@@ -56,7 +56,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-1P.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-1P.action"
-msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCIEX-8000-25
 # keys: fault.io.pciex.bus-noresp fault.io.pciex.device-noresp
@@ -72,7 +72,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-25.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-25.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCIEX-8000-3S
 # keys: fault.io.pciex.bus-linkerr fault.io.pciex.device-interr
@@ -88,7 +88,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-3S.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-3S.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCIEX-8000-43
 # keys: fault.io.pci.bus-linkerr fault.io.pciex.device-interr
@@ -104,7 +104,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-43.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-43.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmdump -v -u <EVENT_ID> to identify the device and bus or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device and bus or contact Sun for support.\n"
 #
 # code: PCIEX-8000-5Y
 # keys: fault.io.pci.device-invreq
@@ -112,7 +112,7 @@ msgstr "If a plug-in card is involved check for badly-seated cards or bent pins.
 msgid "PCIEX-8000-5Y.type"
 msgstr "Fault"
 msgid "PCIEX-8000-5Y.severity"
-msgstr "Critical"
+msgstr "Major"
 msgid "PCIEX-8000-5Y.description"
 msgstr "The transmitting device sent an invalid request.\n  Refer to %s for more information."
 msgid "PCIEX-8000-5Y.response"
@@ -120,7 +120,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-5Y.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-5Y.action"
-msgstr "Ensure that the latest drivers and patches are installed. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCIEX-8000-6D
 # keys: fault.io.pci.device-invreq fault.io.pciex.device-interr
@@ -128,7 +128,7 @@ msgstr "Ensure that the latest drivers and patches are installed. Otherwise sche
 msgid "PCIEX-8000-6D.type"
 msgstr "Fault"
 msgid "PCIEX-8000-6D.severity"
-msgstr "Critical"
+msgstr "Major"
 msgid "PCIEX-8000-6D.description"
 msgstr "Either the transmitting device sent an invalid request or the receiving device is reporting an internal fault.\n  Refer to %s for more information."
 msgid "PCIEX-8000-6D.response"
@@ -136,7 +136,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-6D.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-6D.action"
-msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCIEX-8000-7H
 # keys: fault.io.pci.device-interr fault.io.pciex.device-invreq
@@ -144,7 +144,7 @@ msgstr "Ensure that the latest drivers and patches are installed.  Otherwise sch
 msgid "PCIEX-8000-7H.type"
 msgstr "Fault"
 msgid "PCIEX-8000-7H.severity"
-msgstr "Critical"
+msgstr "Major"
 msgid "PCIEX-8000-7H.description"
 msgstr "Either the transmitting device sent an invalid request or the receiving device is reporting an internal fault.\n  Refer to %s for more information."
 msgid "PCIEX-8000-7H.response"
@@ -152,7 +152,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-7H.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-7H.action"
-msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCIEX-8000-8R
 # keys: fault.io.pciex.device-invreq
@@ -160,7 +160,7 @@ msgstr "Ensure that the latest drivers and patches are installed.  Otherwise sch
 msgid "PCIEX-8000-8R.type"
 msgstr "Fault"
 msgid "PCIEX-8000-8R.severity"
-msgstr "Critical"
+msgstr "Major"
 msgid "PCIEX-8000-8R.description"
 msgstr "The transmitting device sent an invalid request.\n  Refer to %s for more information."
 msgid "PCIEX-8000-8R.response"
@@ -168,7 +168,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-8R.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-8R.action"
-msgstr "Ensure that the latest drivers and patches are installed. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCIEX-8000-94
 # keys: fault.io.pci.device-noresp fault.io.pciex.device-invreq
@@ -176,7 +176,7 @@ msgstr "Ensure that the latest drivers and patches are installed. Otherwise sche
 msgid "PCIEX-8000-94.type"
 msgstr "Fault"
 msgid "PCIEX-8000-94.severity"
-msgstr "Critical"
+msgstr "Major"
 msgid "PCIEX-8000-94.description"
 msgstr "Either the transmitting device sent an invalid request or the receiving device failed to respond.\n  Refer to %s for more information."
 msgid "PCIEX-8000-94.response"
@@ -184,7 +184,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-94.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-94.action"
-msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCIEX-8000-AQ
 # keys: fault.io.pci.device-invreq fault.io.pciex.device-noresp
@@ -192,7 +192,7 @@ msgstr "Ensure that the latest drivers and patches are installed. If a plug-in c
 msgid "PCIEX-8000-AQ.type"
 msgstr "Fault"
 msgid "PCIEX-8000-AQ.severity"
-msgstr "Critical"
+msgstr "Major"
 msgid "PCIEX-8000-AQ.description"
 msgstr "Either the transmitting device sent an invalid request or the receiving device failed to respond.\n  Refer to %s for more information."
 msgid "PCIEX-8000-AQ.response"
@@ -200,7 +200,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-AQ.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-AQ.action"
-msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins.  Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCIEX-8000-CC
 # keys: fault.io.pci.bus-linkerr fault.io.pci.device-interr fault.io.pciex.device-interr
@@ -216,7 +216,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-CC.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-CC.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCIEX-8000-DJ
 # keys: fault.io.pciex.bus-noresp fault.io.pciex.device-interr fault.io.pciex.device-noresp
@@ -224,7 +224,7 @@ msgstr "If a plug-in card is involved check for badly-seated cards or bent pins.
 msgid "PCIEX-8000-DJ.type"
 msgstr "Fault"
 msgid "PCIEX-8000-DJ.severity"
-msgstr "Critical"
+msgstr "Major"
 msgid "PCIEX-8000-DJ.description"
 msgstr "A problem has been detected on one of the specified devices or on one of the specified connecting buses.\n  Refer to %s for more information."
 msgid "PCIEX-8000-DJ.response"
@@ -232,7 +232,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-DJ.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-DJ.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCIEX-8000-EE
 # keys: fault.io.pciex.bus-linkerr fault.io.pciex.bus-noresp fault.io.pciex.device-interr fault.io.pciex.device-noresp
@@ -248,7 +248,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-EE.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-EE.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCIEX-8000-FX
 # keys: fault.io.pciex.bus-linkerr fault.io.pciex.bus-noresp fault.io.pciex.device-interr fault.io.pciex.device-invreq fault.io.pciex.device-noresp
@@ -264,7 +264,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-FX.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-FX.action"
-msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed. If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCIEX-8000-G2
 # keys: fault.io.pciex.bus-noresp fault.io.pciex.device-interr fault.io.pciex.device-invreq fault.io.pciex.device-noresp
@@ -272,7 +272,7 @@ msgstr "Ensure that the latest drivers and patches are installed. If a plug-in c
 msgid "PCIEX-8000-G2.type"
 msgstr "Fault"
 msgid "PCIEX-8000-G2.severity"
-msgstr "Critical"
+msgstr "Major"
 msgid "PCIEX-8000-G2.description"
 msgstr "A problem has been detected on one of the specified devices or on one of the specified connecting buses.\n  Refer to %s for more information."
 msgid "PCIEX-8000-G2.response"
@@ -280,7 +280,7 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-G2.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-G2.action"
-msgstr "Ensure that the latest drivers and patches are installed. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "Ensure that the latest drivers and patches are installed. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
 #
 # code: PCIEX-8000-HS
 # keys: fault.io.pciex.bus-noresp fault.io.pciex.device-interr
@@ -288,7 +288,7 @@ msgstr "Ensure that the latest drivers and patches are installed. Otherwise sche
 msgid "PCIEX-8000-HS.type"
 msgstr "Fault"
 msgid "PCIEX-8000-HS.severity"
-msgstr "Critical"
+msgstr "Major"
 msgid "PCIEX-8000-HS.description"
 msgstr "A problem has been detected on one of the specified devices or on one of the specified connecting buses.\n  Refer to %s for more information."
 msgid "PCIEX-8000-HS.response"
@@ -296,4 +296,84 @@ msgstr "One or more device instances may be disabled\n"
 msgid "PCIEX-8000-HS.impact"
 msgstr "Loss of services provided by the device instances associated with this fault\n"
 msgid "PCIEX-8000-HS.action"
-msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmdump -v -u <EVENT_ID> to identify the devices or contact Sun for support.\n"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device(s).  Use fmadm faulty to identify the devices or contact Sun for support.\n"
+#
+# code: PCIEX-8000-J5
+# keys: fault.io.pciex.device-interr-corr
+#
+msgid "PCIEX-8000-J5.type"
+msgstr "Fault"
+msgid "PCIEX-8000-J5.severity"
+msgstr "Major"
+msgid "PCIEX-8000-J5.description"
+msgstr "Too many recovered internal errors have been detected within the specified PCIEX device. This may degrade into a non-recoverable fault.\n  Refer to %s for more information."
+msgid "PCIEX-8000-J5.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "PCIEX-8000-J5.impact"
+msgstr "Loss of services provided by the device instances associated with this fault\n"
+msgid "PCIEX-8000-J5.action"
+msgstr "Schedule a repair procedure to replace the affected device. Use fmadm faulty to identify the device or contact Sun for support.\n"
+#
+# code: PCIEX-8000-KP
+# keys: fault.io.pciex.bus-linkerr-corr fault.io.pciex.device-interr-corr
+#
+msgid "PCIEX-8000-KP.type"
+msgstr "Fault"
+msgid "PCIEX-8000-KP.severity"
+msgstr "Major"
+msgid "PCIEX-8000-KP.description"
+msgstr "Too many recovered bus errors have been detected, which indicates a problem with the specified bus or with the specified transmitting device. This may degrade into an unrecoverable fault.\n  Refer to %s for more information."
+msgid "PCIEX-8000-KP.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "PCIEX-8000-KP.impact"
+msgstr "Loss of services provided by the device instances associated with this fault\n"
+msgid "PCIEX-8000-KP.action"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"
+#
+# code: PCIEX-8000-LA
+# keys: fault.io.pci.bus-linkerr-unaf fault.io.pciex.device-interr-unaf
+#
+msgid "PCIEX-8000-LA.type"
+msgstr "Fault"
+msgid "PCIEX-8000-LA.severity"
+msgstr "Major"
+msgid "PCIEX-8000-LA.description"
+msgstr "Too many recovered bus errors have been detected, which indicates a problem with the specified bus or with the specified transmitting device. This may degrade into an unrecoverable fault.\n  Refer to %s for more information."
+msgid "PCIEX-8000-LA.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "PCIEX-8000-LA.impact"
+msgstr "Loss of services provided by the device instances associated with this fault\n"
+msgid "PCIEX-8000-LA.action"
+msgstr "If a plug-in card is involved check for badly-seated cards or bent pins. Otherwise schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device and bus or contact Sun for support.\n"
+#
+# code: PCIEX-8000-MH
+# keys: fault.io.pciex.device-interr-unaf
+#
+msgid "PCIEX-8000-MH.type"
+msgstr "Fault"
+msgid "PCIEX-8000-MH.severity"
+msgstr "Major"
+msgid "PCIEX-8000-MH.description"
+msgstr "Too many recovered errors have been detected, which indicates a problem with the specified PCIEX device. This may degrade into an unrecoverable fault.\n  Refer to %s for more information."
+msgid "PCIEX-8000-MH.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "PCIEX-8000-MH.impact"
+msgstr "Loss of services provided by the device instances associated with this fault\n"
+msgid "PCIEX-8000-MH.action"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"
+#
+# code: PCIEX-8000-ND
+# keys: fault.io.pciex.device-interr-deg
+#
+msgid "PCIEX-8000-ND.type"
+msgstr "Fault"
+msgid "PCIEX-8000-ND.severity"
+msgstr "Major"
+msgid "PCIEX-8000-ND.description"
+msgstr "An unrecoverable problem was detected for a PCIEX device, which has resulted in that device running in a degraded state.\n  Refer to %s for more information."
+msgid "PCIEX-8000-ND.response"
+msgstr "None\n"
+msgid "PCIEX-8000-ND.impact"
+msgstr "Degraded services provided by the device instances associated with this fault\n"
+msgid "PCIEX-8000-ND.action"
+msgstr "Schedule a repair procedure to replace the affected device.  Use fmadm faulty to identify the device or contact Sun for support.\n"

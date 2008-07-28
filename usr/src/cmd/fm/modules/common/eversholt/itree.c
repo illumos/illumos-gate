@@ -119,6 +119,7 @@ static void itree_free_constraints(struct arrow *ap);
  */
 static struct {
 	int generation;		/* generation number of arrow set */
+	int matched;		/* number of matches */
 	struct node *arrownp;	/* top-level parse tree for arrow */
 	int n;			/* n value associated with arrow */
 	int k;			/* k value associated with arrow */
@@ -461,6 +462,13 @@ payloadprops_destructor(void *left, void *right, void *arg)
 	FREE(right);
 }
 
+/*ARGSUSED*/
+static void
+serdprops_destructor(void *left, void *right, void *arg)
+{
+	FREE(right);
+}
+
 /*
  * event_cmp -- used via lut_lookup/lut_add on instance tree lut
  */
@@ -573,6 +581,9 @@ hmatch_event(struct info *infop, struct node *eventnp, struct node *epname,
 	}
 
 	ASSERTeq(epname->t, T_NAME, ptree_nodetype2str);
+
+	if (epname->u.name.cp == NULL)
+		return;
 
 	/*
 	 * we only get here when eventnp already has a completely
@@ -1040,6 +1051,7 @@ vmatch(struct info *infop, struct node *np, struct node *lnp, struct node *anp)
 	struct wildcardinfo *wcp;
 
 	if (np == NULL) {
+		G.matched = 1;
 		if (lnp)
 			vmatch(infop, lnp, NULL, anp);
 		else if (anp)
@@ -1119,6 +1131,7 @@ vmatch(struct info *infop, struct node *np, struct node *lnp, struct node *anp)
 			np->u.event.epname = oldepname;
 			return;
 		}
+		G.matched = 0;
 		if (epmatches) {
 			/*
 			 * just first part of names match - do wildcarding
@@ -1139,6 +1152,13 @@ vmatch(struct info *infop, struct node *np, struct node *lnp, struct node *anp)
 			    anp, wcp);
 			wcp->oldepname = oldepname;
 			wcp->nptop = oldnptop;
+			if (G.matched == 0) {
+				/*
+				 * This list entry is NULL. Move on to next item
+				 * in the list.
+				 */
+				vmatch(infop, NULL, lnp, anp);
+			}
 			return;
 		}
 		/*
@@ -1156,6 +1176,13 @@ vmatch(struct info *infop, struct node *np, struct node *lnp, struct node *anp)
 
 		wcproot = wcp->next;
 		FREE(wcp);
+		if (G.matched == 0) {
+			/*
+			 * This list entry is NULL. Move on to next item in the
+			 * list.
+			 */
+			vmatch(infop, NULL, lnp, anp);
+		}
 		break;
 	}
 	case T_LIST:
@@ -1165,7 +1192,7 @@ vmatch(struct info *infop, struct node *np, struct node *lnp, struct node *anp)
 
 	case T_ARROW:
 		ASSERT(lnp == NULL && anp == NULL);
-		vmatch(infop, np->u.arrow.rhs, NULL, np->u.arrow.lhs);
+		vmatch(infop, np->u.arrow.rhs, NULL, np->u.arrow.parent);
 		break;
 
 	default:
@@ -1173,6 +1200,16 @@ vmatch(struct info *infop, struct node *np, struct node *lnp, struct node *anp)
 		    "vmatch: unexpected type: %s",
 		    ptree_nodetype2str(np->t));
 	}
+}
+
+static void
+find_first_arrow(struct info *infop, struct node *anp)
+{
+	if (anp->u.arrow.lhs->t == T_ARROW) {
+		anp->u.arrow.lhs->u.arrow.parent = anp;
+		find_first_arrow(infop, anp->u.arrow.lhs);
+	} else
+		vmatch(infop, anp->u.arrow.lhs, NULL, anp);
 }
 
 static void
@@ -1231,7 +1268,8 @@ itree_create(struct config *croot)
 		Ninfo.ex = NULL;
 
 		generate_arrownp(anp);
-		vmatch(&Ninfo, anp, NULL, NULL);
+		anp->u.arrow.parent = NULL;
+		find_first_arrow(&Ninfo, anp);
 
 		if (Ninfo.ex) {
 			lut_free(Ninfo.ex, iterinfo_destructor, NULL);
@@ -1522,6 +1560,10 @@ itree_destructor(void *left, void *right, void *arg)
 	if (ep->payloadprops)
 		lut_free(ep->payloadprops, payloadprops_destructor, NULL);
 
+	/* Free the serd properties */
+	if (ep->serdprops)
+		lut_free(ep->serdprops, serdprops_destructor, NULL);
+
 	/* Free my bubbles */
 	for (bub = ep->bubbles; bub != NULL; ) {
 		nextbub = bub->next;
@@ -1560,6 +1602,9 @@ itree_pruner(void *left, void *right, void *arg)
 	/* Free the payload properties */
 	lut_free(ep->payloadprops, payloadprops_destructor, NULL);
 
+	/* Free the serd properties */
+	lut_free(ep->serdprops, serdprops_destructor, NULL);
+
 	/* Free my bubbles */
 	for (bub = ep->bubbles; bub != NULL; ) {
 		nextbub = bub->next;
@@ -1572,6 +1617,7 @@ itree_pruner(void *left, void *right, void *arg)
 		nvlist_free(ep->nvp);
 	ep->props = NULL;
 	ep->payloadprops = NULL;
+	ep->serdprops = NULL;
 	ep->bubbles = NULL;
 	ep->nvp = NULL;
 }

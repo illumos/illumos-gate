@@ -120,6 +120,7 @@ iexpr_hash(struct node *np)
 		return ((uintptr_t)np->u.quote.s);
 
 	case T_NUM:
+	case T_TIMEVAL:
 		return ((int)np->u.ull);
 
 	default:
@@ -208,6 +209,7 @@ iexpr_cmp(struct node *np1, struct node *np2)
 		return (np2->u.quote.s - np1->u.quote.s);
 
 	case T_NUM:
+	case T_TIMEVAL:
 		if (np2->u.ull > np1->u.ull)
 			return (1);
 		else if (np1->u.ull > np2->u.ull)

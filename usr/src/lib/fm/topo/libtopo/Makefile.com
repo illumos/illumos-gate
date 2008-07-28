@@ -32,6 +32,9 @@ BUILTINSRCS = \
 	cpu.c \
 	dev.c \
 	hc.c \
+	zfs.c \
+	fmd.c \
+	legacy_hc.c \
 	mem.c \
 	mod.c \
 	pkg.c

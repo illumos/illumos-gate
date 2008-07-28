@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -40,3 +40,7 @@ fault.io.pci.bus-linkerr fault.io.pci.device-interr=8
 fault.io.pci.device-invreq fault.io.pci.device-noresp=9
 fault.io.pci.device-interr fault.io.pci.device-invreq=10
 fault.io.pci.device-noresp=11
+fault.io.pci.bus-linkerr-unaf fault.io.pci.device-interr-unaf=12
+fault.io.pci.device-interr-corr=13
+fault.io.pci.bus-linkerr-deg fault.io.pci.device-interr-deg=14
+fault.io.pci.device-interr-deg=15

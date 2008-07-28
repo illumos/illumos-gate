@@ -205,19 +205,19 @@ prop fault.io.fire.asic@hostbridge/pciexrc (0)->
  * -------------
  * Errors caused by bad SW or HV
  ***************/
-event fault.io.fire.sw-epkt@hostbridge/pciexrc,
+event fault.io.fire.sw-epkt@hostbridge/pciexrc, retire=0, response=0,
     FITrate=SW_FIT;
-event fault.io.fire.fw-epkt@hostbridge/pciexrc,
+event fault.io.fire.fw-epkt@hostbridge/pciexrc, retire=0, response=0,
     FITrate=HV_FIT;
-event fault.io.fire.sw-fw-mismatch@hostbridge/pciexrc,
+event fault.io.fire.sw-fw-mismatch@hostbridge/pciexrc, retire=0, response=0,
     FITrate=SW_HV_MISMATCH_FIT;
-event fault.io.fire.hb.sw-config@hostbridge/pciexrc,
+event fault.io.fire.hb.sw-config@hostbridge/pciexrc, retire=0, response=0,
     FITrate=SW_FIT;
-event fault.io.fire.dmc.sw-algorithm@hostbridge/pciexrc,
+event fault.io.fire.dmc.sw-algorithm@hostbridge/pciexrc, retire=0, response=0,
     FITrate=SW_FIT;
-event fault.io.fire.dmc.sw-state@hostbridge/pciexrc,
+event fault.io.fire.dmc.sw-state@hostbridge/pciexrc, retire=0, response=0,
     FITrate=SW_FIT;
-event fault.io.fire.pec.sw-algorithm@hostbridge/pciexrc,
+event fault.io.fire.pec.sw-algorithm@hostbridge/pciexrc, retire=0, response=0,
     FITrate=SW_FIT;
 
 event error.io.fire.jbc.driver@hostbridge/pciexrc;

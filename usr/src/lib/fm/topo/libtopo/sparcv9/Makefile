@@ -31,4 +31,6 @@ include ../../../../Makefile.lib.64
 CPPFLAGS += -I $(ROOT)/usr/platform/sun4v/include
 LDLIBS += -L$(ROOTLIBDIR64)
 
+LDLIBS += -lzfs
+
 install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)
