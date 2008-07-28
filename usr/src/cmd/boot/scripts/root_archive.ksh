@@ -536,6 +536,18 @@ packmedia()
 		cp $MINIROOT/boot/grub/install_menu \
 		    $MEDIA/boot/grub/menu.lst
 	fi
+
+	#
+	# jumpstart utilities in usr/sbin/install.d
+	#
+	if [ -d "$MINIROOT/usr/sbin/install.d" ] ; then
+		(
+		cd ${MINIROOT}
+		find usr/sbin/install.d/chkprobe \
+		    -print | cpio -ocmPuB 2> /dev/null | bzip2 > \
+		    ${MEDIA}/${RELEASE}/Tools/Boot/usr_sbin_install_d.cpio.bz2
+		)
+	fi
 }
 
 unarchive_X()
