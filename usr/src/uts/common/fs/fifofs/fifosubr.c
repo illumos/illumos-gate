@@ -366,6 +366,16 @@ fifoinit(int fstype, char *name)
 	fifovfsp->vfs_dev = fifodev;
 	fifovfsp->vfs_bcount = 0;
 
+	/*
+	 * It is necessary to initialize vfs_count here to 1.
+	 * This prevents the fifovfsp from getting freed when
+	 * a thread does a VFS_HOLD followed by a VFS_RELE
+	 * on the fifovfsp
+	 *
+	 * The fifovfsp should never be freed.
+	 */
+	fifovfsp->vfs_count = 1;
+
 	mutex_init(&ftable_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&fino_lock, NULL, MUTEX_DEFAULT, NULL);
 
