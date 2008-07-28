@@ -28,6 +28,7 @@
 PROG=	ldap_cachemgr
 
 MANIFEST=	client.xml
+SVCMETHOD=	ldap-client
 
 include ../Makefile.cmd
 
@@ -74,6 +75,7 @@ OWNER=	root
 clean := TARGET= clean
 clobber := TARGET= clobber
 
+$(ROOTSVCMETHOD) := FILEMODE = 0555
 
 all: $(PROG)
 
@@ -95,7 +97,7 @@ lint:
 cstyle:
 	${CSTYLE} ${SRCS}
 
-install: all $(ROOTLDAPLIB) $(ROOTLDAPPROG) $(ROOTMANIFEST)
+install: all $(ROOTLDAPLIB) $(ROOTLDAPPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 check:	$(CHKMANIFEST)
 

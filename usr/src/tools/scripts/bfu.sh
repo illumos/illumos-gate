@@ -2119,6 +2119,12 @@ EOFA
 	smf_import_service network/dlmgmt.xml \
 	    svc:/network/datalink-management:default
 
+	#
+	# Import the ldap/client service. This is to get the service
+	# (with correct dependencies) in the repository before reboot.
+	#
+	smf_import_service network/ldap/client.xml
+
 	# Enable new NFS status and nlockmgr services if client is enabled
 	cat >> $rootprefix/var/svc/profile/upgrade <<-EOF
 	    cl="svc:/network/nfs/client:default"

@@ -357,6 +357,7 @@ f none lib/svc/method/identity-node 0555 root bin
 f none lib/svc/method/identity-domain 0555 root bin
 f none lib/svc/method/inetd-upgrade 0555 root bin
 f none lib/svc/method/keymap 0555 root bin
+f none lib/svc/method/ldap-client 0555 root bin
 f none lib/svc/method/manifest-import 0555 root bin
 f none lib/svc/method/mpxio-upgrade 0555 root bin
 f none lib/svc/method/net-init 0555 root bin
