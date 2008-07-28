@@ -145,6 +145,7 @@ f none usr/platform/sun4v/lib/fm/topo/plugins/platform-cpu.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/platform-mem.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/motherboard.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/niu.so 555 root bin
+f none usr/platform/sun4v/lib/fm/topo/plugins/sun4vpi.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/xaui.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/zambezi.so 555 root bin
 d none usr/platform/SUNW,SPARC-Enterprise 755 root sys

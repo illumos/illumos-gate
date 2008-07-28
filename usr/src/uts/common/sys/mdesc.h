@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,6 +114,33 @@ typedef struct {
 
 
 /*
+ * Walk callback function return codes
+ */
+#define	MDE_WALK_ERROR	-1	/* Terminate walk with error */
+#define	MDE_WALK_NEXT	0	/* Continue to next node */
+#define	MDE_WALK_DONE	1	/* Terminate walk with success */
+
+/*
+ * The function prototype for a walker callback function.
+ * The machine description session, parent node, current node,
+ * and private data are given to the callback.
+ *
+ * The parent node is given to the callback to provide context
+ * on how the walker arrived at this location.  While the node
+ * may have many parents, it will be visited only once, this
+ * provides context on how the walker arrived at the node.
+ *
+ * Input		Description
+ * -------------------	----------------------------------------
+ * md_t *		Pointer to md session
+ * mde_cookie_t		Index of parent node to provide context
+ * mde_cookie_t		The current node in the walk
+ * void *		Private data for the walking function
+ */
+typedef int md_walk_fn_t(md_t *, mde_cookie_t, mde_cookie_t, void *);
+
+
+/*
  * External Interface
  */
 
@@ -139,6 +166,13 @@ extern int		md_scan_dag(md_t *,
 				mde_str_cookie_t,
 				mde_cookie_t *);
 
+extern int		md_walk_dag(md_t *,
+				mde_cookie_t,
+				mde_str_cookie_t,
+				mde_str_cookie_t,
+				md_walk_fn_t,
+				void *);
+
 extern int		md_get_prop_val(md_t *,
 				mde_cookie_t,
 				char *,
@@ -154,6 +188,13 @@ extern int		md_get_prop_data(md_t *,
 				char *,
 				uint8_t **,
 				int *);
+
+extern int		md_get_prop_arcs(md_t *,
+				mde_cookie_t,
+				char *,
+				mde_cookie_t *,
+				size_t);
+
 
 extern md_diff_cookie_t	md_diff_init(md_t *,
 				mde_cookie_t,

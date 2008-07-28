@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,11 +32,13 @@ LIBSRCS =	\
 	mdesc_fini.c \
 	mdesc_findname.c \
 	mdesc_findnodeprop.c \
+	mdesc_getproparcs.c \
 	mdesc_getpropstr.c \
 	mdesc_getpropval.c \
 	mdesc_init_intern.c \
 	mdesc_nodecount.c \
-	mdesc_scandag.c
+	mdesc_scandag.c \
+	mdesc_walkdag.c
 
 OBJECTS = $(LIBSRCS:%.c=%.o)
 

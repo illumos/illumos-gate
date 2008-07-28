@@ -34,6 +34,7 @@ SUBDIRS = chip \
 	niu \
 	platform-cpu \
 	platform-mem \
+	sun4vpi \
 	xaui \
 	zambezi
 

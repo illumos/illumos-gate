@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -25,18 +26,21 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUNWprivate {
-    global:
-	md_find_name;
-	md_find_node_prop;
-	md_fini;
-	md_get_prop_arcs;
-	md_get_prop_str;
-	md_get_prop_val;
-	md_init_intern;
-	md_node_count;
-	md_scan_dag;
-	md_walk_dag;
-    local:
-	*;
-};
+MODULE	= sun4vpi
+ARCH	= sun4v
+CLASS	= arch
+TOPODIR	= ../../../libtopo/common
+
+MODULESRCS =	pi_defer.c pi_ldom.c pi_walker.c pi_subr.c \
+		pi_cpu.c pi_generic.c pi_pciexrc.c pi_niu.c pi_top.c \
+		sun4vpi.c
+
+include ../../Makefile.plugin
+
+LDLIBS += -ldevinfo -lmdesc -lldom -luutil
+
+CPPFLAGS += -I. -I$(ROOT)/usr/platform/sun4v/include -I$(TOPODIR)
+
+%.o: ../../../../../common/mdesc/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)

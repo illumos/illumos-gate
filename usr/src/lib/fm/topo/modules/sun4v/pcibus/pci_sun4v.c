@@ -29,6 +29,10 @@
 #include <fm/topo_mod.h>
 #include <sys/fm/protocol.h>
 #include <string.h>
+#include <alloca.h>
+#include <libdevinfo.h>
+#include <did_props.h>
+
 /*
  * Including the following file gives us definitions of the three
  * global arrays used to adjust labels, Slot_Rewrites, Physlot_Names,
@@ -36,15 +40,62 @@
  * routines for pci.
  */
 #include "pci_sun4v.h"
-
 #include "pci_sun4.h"
+
+#define	PI_PROP_CHASSIS_LOCATION_NAME		"chassis-location-name"
+
+typedef struct _pci_fru {
+	tnode_t	*node;
+	char	*location;
+	int	locsiz;
+} _pci_fru_t;
+
+
+static int platform_pci_fru_location(topo_mod_t *, tnode_t *, uchar_t *, int);
+static int platform_pci_fru_cb(topo_mod_t *, tnode_t *, void *);
+
 
 int
 platform_pci_label(topo_mod_t *mod, tnode_t *node, nvlist_t *in,
     nvlist_t **out)
 {
-	return (pci_label_cmn(mod, node, in, out));
+	int	result;
+	int	err;
+	int	locsiz = 0;
+	uchar_t	*loc = NULL;
+	char	*nac = NULL;
+
+	topo_mod_dprintf(mod, "entering platform_pci_label\n");
+
+	*out = NULL;
+	result = di_bytes_get(mod, topo_node_getspecific(node),
+	    PI_PROP_CHASSIS_LOCATION_NAME, &locsiz, &loc);
+	if (result == -1 || locsiz < 0) {
+		topo_mod_dprintf(mod, "platform_pci_label: %s not found (%s)\n",
+		    PI_PROP_CHASSIS_LOCATION_NAME, strerror(errno));
+
+		/* Invoke the generic label generator for this node */
+		return (pci_label_cmn(mod, node, in, out));
+	}
+
+	/*
+	 * We have crossed a FRU boundary.  Use the value in the
+	 * chassis-location-name property as the node label.
+	 */
+	nac = alloca(locsiz+1);
+	(void) memset(nac, 0, locsiz+1);
+	(void) memcpy(nac, loc, locsiz);
+	result = topo_node_label_set(node, nac, &err);
+	if (result < 0) {
+		if (err != ETOPO_PROP_NOENT) {
+			return (topo_mod_seterrno(mod, err));
+		}
+	}
+
+	return (0);
 }
+
+
 int
 platform_pci_fru(topo_mod_t *mod, tnode_t *node, nvlist_t *in,
     nvlist_t **out)
@@ -56,6 +107,8 @@ platform_pci_fru(topo_mod_t *mod, tnode_t *node, nvlist_t *in,
 	char *nm, *plat, *pp, **cp;
 	const char *label;
 	int found_t1plat = 0;
+	uchar_t *loc;
+	int locsiz;
 
 	topo_mod_dprintf(mod, "entering platform_pci_fru\n");
 
@@ -119,7 +172,94 @@ platform_pci_fru(topo_mod_t *mod, tnode_t *node, nvlist_t *in,
 			*out = rnvl;
 		}
 		return (0);
+	} else if (di_bytes_get(mod, topo_node_getspecific(node),
+	    PI_PROP_CHASSIS_LOCATION_NAME, &locsiz, &loc) == 0 && locsiz > 0) {
+		/*
+		 * We have crossed a FRU boundary and need to find the parent
+		 * node with this location and set our FMRI to that value.
+		 */
+		return (platform_pci_fru_location(mod, node, loc, locsiz));
 	} else {
 		return (pci_fru_compute(mod, node, in, out));
 	}
+}
+
+
+static int
+platform_pci_fru_location(topo_mod_t *mod, tnode_t *node, uchar_t *loc,
+    int locsiz)
+{
+	int		err;
+	tnode_t		*parent;
+	tnode_t		*top;
+	topo_walk_t	*wp;
+	_pci_fru_t	walkdata;
+
+	topo_mod_dprintf(mod, "entering platform_pci_fru_location\n");
+
+	/* Find the root node */
+	top = node;
+	while ((parent = topo_node_parent(top)) != NULL) {
+		top = parent;
+	}
+	walkdata.node = node;
+	walkdata.locsiz = locsiz;
+	walkdata.location = alloca(locsiz+1);
+	(void) memset(walkdata.location, 0, locsiz+1);
+	(void) memcpy(walkdata.location, loc, locsiz);
+
+	/* Create a walker starting at the root node */
+	wp = topo_mod_walk_init(mod, top, platform_pci_fru_cb, &walkdata, &err);
+	if (wp == NULL) {
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	/*
+	 * Walk the tree breadth first to hopefully avoid visiting too many
+	 * nodes while searching for the node with the appropriate FMRI.
+	 */
+	(void) topo_walk_step(wp, TOPO_WALK_SIBLING);
+	topo_walk_fini(wp);
+
+	return (0);
+}
+
+
+static int
+platform_pci_fru_cb(topo_mod_t *mod, tnode_t *node, void *private)
+{
+	int		err;
+	_pci_fru_t	*walkdata = (_pci_fru_t *)private;
+	nvlist_t	*fmri;
+	char		*location;
+	int 		result, rc;
+
+	if (node == walkdata->node) {
+		/* This is the starting node.  Do not check the location */
+		return (TOPO_WALK_NEXT);
+	}
+
+	if (topo_node_label(node, &location, &err) != 0) {
+		/* This node has no location property.  Continue the walk */
+		return (TOPO_WALK_NEXT);
+	}
+
+	result = TOPO_WALK_NEXT;
+	if (strncmp(location, walkdata->location, walkdata->locsiz) == 0) {
+		/*
+		 * We have a match.  Set the node's FRU FMRI to this nodes
+		 * FRU FMRI
+		 */
+		rc = topo_node_fru(node, &fmri, NULL, &err);
+		if (rc == 0) {
+			rc = topo_node_fru_set(walkdata->node, fmri, 0, &err);
+			nvlist_free(fmri);
+		}
+		if (rc != 0) {
+			result = TOPO_WALK_TERMINATE;
+			topo_mod_seterrno(mod, err);
+		}
+	}
+	topo_mod_strfree(mod, location);
+	return (result);
 }
