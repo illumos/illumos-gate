@@ -212,10 +212,12 @@ extern int vhci_debug;
 
 struct	scsi_vhci_swarg;
 
+#define	VHCI_NUM_RESV_KEYS	8
+
 typedef struct vhci_prin_readkeys {
 	uint32_t		generation;
 	uint32_t		length;
-	mhioc_resv_key_t	keylist[MHIOC_RESV_KEY_SIZE];
+	mhioc_resv_key_t	keylist[VHCI_NUM_RESV_KEYS];
 } vhci_prin_readkeys_t;
 
 #define	VHCI_PROUT_SIZE	\

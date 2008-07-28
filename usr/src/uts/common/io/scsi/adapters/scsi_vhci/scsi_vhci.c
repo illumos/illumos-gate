@@ -197,7 +197,7 @@ static int vhci_bind_transport(struct scsi_address *, struct vhci_pkt *,
 static void vhci_intr(struct scsi_pkt *);
 static int vhci_do_prout(scsi_vhci_priv_t *);
 static void vhci_run_cmd(void *);
-static int vhci_do_prin(struct vhci_pkt *);
+static int vhci_do_prin(struct vhci_pkt **);
 static struct scsi_pkt *vhci_create_retry_pkt(struct vhci_pkt *);
 static struct vhci_pkt *vhci_sync_retry_pkt(struct vhci_pkt *);
 static struct scsi_vhci_lun *vhci_lun_lookup(dev_info_t *);
@@ -2702,114 +2702,133 @@ done:
  * additional length field equal to the data bytes of the reservation
  * keys to be returned.
  */
+
+#define	VHCI_PRIN_HEADER_SZ (sizeof (prin->length) + sizeof (prin->generation))
+
 static int
-vhci_do_prin(struct vhci_pkt *vpkt)
+vhci_do_prin(struct vhci_pkt **intr_vpkt)
 {
-	scsi_vhci_priv_t *svp = (scsi_vhci_priv_t *)
-	    mdi_pi_get_vhci_private(vpkt->vpkt_path);
+	scsi_vhci_priv_t *svp;
+	struct vhci_pkt *vpkt = *intr_vpkt;
 	vhci_prin_readkeys_t *prin;
-	scsi_vhci_lun_t *vlun = svp->svp_svl;
-	struct scsi_vhci *vhci =
-	    ADDR2VHCI(&(vpkt->vpkt_tgt_pkt->pkt_address));
+	scsi_vhci_lun_t *vlun;
+	struct scsi_vhci *vhci = ADDR2VHCI(&vpkt->vpkt_tgt_pkt->pkt_address);
 
 	struct buf		*new_bp = NULL;
 	struct scsi_pkt		*new_pkt = NULL;
 	struct vhci_pkt		*new_vpkt = NULL;
-	int			hdr_len = 0;
+	uint32_t		needed_length;
 	int			rval = VHCI_CMD_CMPLT;
 	uint32_t		prin_length = 0;
 	uint32_t		svl_prin_length = 0;
 
-	prin = (vhci_prin_readkeys_t *)
-	    bp_mapin_common(vpkt->vpkt_tgt_init_bp, VM_NOSLEEP);
+	ASSERT(vpkt->vpkt_path);
+	svp = mdi_pi_get_vhci_private(vpkt->vpkt_path);
+	ASSERT(svp);
+	vlun = svp->svp_svl;
+	ASSERT(vlun);
 
-	if (prin != NULL) {
-		prin_length = BE_32(prin->length);
+	/*
+	 * If the caller only asked for an amount of data that would not
+	 * be enough to include any key data it is likely that they will
+	 * send the next command with a buffer size based on the information
+	 * from this header. Doing recovery on this would be a duplication
+	 * of efforts.
+	 */
+	if (vpkt->vpkt_tgt_init_bp->b_bcount <= VHCI_PRIN_HEADER_SZ) {
+		rval = VHCI_CMD_CMPLT;
+		goto exit;
+	}
+
+	if (vpkt->vpkt_org_vpkt == NULL) {
+		/*
+		 * Can fail as sleep is not allowed.
+		 */
+		prin = (vhci_prin_readkeys_t *)
+		    bp_mapin_common(vpkt->vpkt_tgt_init_bp, VM_NOSLEEP);
+	} else {
+		/*
+		 * The retry buf doesn't need to be mapped in.
+		 */
+		prin = (vhci_prin_readkeys_t *)
+		    vpkt->vpkt_tgt_init_bp->b_un.b_daddr;
 	}
 
 	if (prin == NULL) {
 		VHCI_DEBUG(5, (CE_WARN, NULL,
 		    "vhci_do_prin: bp_mapin_common failed."));
 		rval = VHCI_CMD_ERROR;
-	} else {
-		/*
-		 * According to SPC-3r22, sec 4.3.4.6: "If the amount of
-		 * information to be transferred exceeds the maximum value
-		 * that the ALLOCATION LENGTH field is capable of specifying,
-		 * the device server shall...terminate the command with CHECK
-		 * CONDITION status".  The ALLOCATION LENGTH field of the
-		 * PERSISTENT RESERVE IN command is 2 bytes. We should never
-		 * get here with an ADDITIONAL LENGTH greater than 0xFFFF
-		 * so if we do, then it is an error!
-		 */
-
-		hdr_len = sizeof (prin->length) + sizeof (prin->generation);
-
-		if ((prin_length + hdr_len) > 0xFFFF) {
-			VHCI_DEBUG(5, (CE_NOTE, NULL,
-			    "vhci_do_prin: Device returned invalid "
-			    "length 0x%x\n", prin_length));
-			rval = VHCI_CMD_ERROR;
-		}
+		goto fail;
 	}
+
+	prin_length = BE_32(prin->length);
+
+	/*
+	 * According to SPC-3r22, sec 4.3.4.6: "If the amount of
+	 * information to be transferred exceeds the maximum value
+	 * that the ALLOCATION LENGTH field is capable of specifying,
+	 * the device server shall...terminate the command with CHECK
+	 * CONDITION status".  The ALLOCATION LENGTH field of the
+	 * PERSISTENT RESERVE IN command is 2 bytes. We should never
+	 * get here with an ADDITIONAL LENGTH greater than 0xFFFF
+	 * so if we do, then it is an error!
+	 */
+
+
+	if ((prin_length + VHCI_PRIN_HEADER_SZ) > 0xFFFF) {
+		VHCI_DEBUG(5, (CE_NOTE, NULL,
+		    "vhci_do_prin: Device returned invalid "
+		    "length 0x%x\n", prin_length));
+		rval = VHCI_CMD_ERROR;
+		goto fail;
+	}
+	needed_length = prin_length + VHCI_PRIN_HEADER_SZ;
 
 	/*
 	 * If prin->length is greater than the byte count allocated in the
 	 * original buffer, then resend the request with enough buffer
 	 * allocated to get all of the available registered keys.
 	 */
-	if (rval != VHCI_CMD_ERROR) {
-		if ((vpkt->vpkt_tgt_init_bp->b_bcount - hdr_len) <
-		    prin_length) {
-			if (vpkt->vpkt_org_vpkt == NULL) {
-				new_pkt = vhci_create_retry_pkt(vpkt);
-				if (new_pkt != NULL) {
-					new_vpkt = TGTPKT2VHCIPKT(new_pkt);
+	if ((vpkt->vpkt_tgt_init_bp->b_bcount < needed_length) &&
+	    (vpkt->vpkt_org_vpkt == NULL)) {
 
-					/*
-					 * This is the buf with buffer pointer
-					 * where the prin readkeys will be
-					 * returned from the device
-					 */
-					new_bp = scsi_alloc_consistent_buf(
-					    &svp->svp_psd->sd_address,
-					    NULL, (prin_length + hdr_len),
-					    (vpkt->vpkt_tgt_init_bp->
-					    b_flags & (B_READ | B_WRITE)),
-					    NULL_FUNC, NULL);
-					if (new_bp != NULL) {
-						if (new_bp->b_un.b_addr !=
-						    NULL) {
-
-							new_bp->b_bcount =
-							    prin_length +
-							    hdr_len;
-
-							new_pkt->pkt_cdbp[7] =
-							    (uchar_t)(new_bp->
-							    b_bcount >> 8);
-							new_pkt->pkt_cdbp[8] =
-							    (uchar_t)new_bp->
-							    b_bcount;
-
-							rval = VHCI_CMD_RETRY;
-						} else {
-							rval = VHCI_CMD_ERROR;
-						}
-					} else {
-						rval = VHCI_CMD_ERROR;
-					}
-				} else {
-					rval = VHCI_CMD_ERROR;
-				}
-			} else {
-				rval = VHCI_CMD_ERROR;
-			}
+		new_pkt = vhci_create_retry_pkt(vpkt);
+		if (new_pkt == NULL) {
+			rval = VHCI_CMD_ERROR;
+			goto fail;
 		}
+		new_vpkt = TGTPKT2VHCIPKT(new_pkt);
+
+		/*
+		 * This is the buf with buffer pointer
+		 * where the prin readkeys will be
+		 * returned from the device
+		 */
+		new_bp = scsi_alloc_consistent_buf(&svp->svp_psd->sd_address,
+		    NULL, needed_length, B_READ, NULL_FUNC, NULL);
+		if ((new_bp == NULL) || (new_bp->b_un.b_addr == NULL)) {
+			if (new_bp) {
+				scsi_free_consistent_buf(new_bp);
+			}
+			vhci_scsi_destroy_pkt(&new_pkt->pkt_address, new_pkt);
+			rval = VHCI_CMD_ERROR;
+			goto fail;
+		}
+		new_bp->b_bcount = needed_length;
+		new_pkt->pkt_cdbp[7] = (uchar_t)(needed_length >> 8);
+		new_pkt->pkt_cdbp[8] = (uchar_t)needed_length;
+
+		rval = VHCI_CMD_RETRY;
+
+		new_vpkt->vpkt_tgt_init_bp = new_bp;
 	}
 
 	if (rval == VHCI_CMD_RETRY) {
-		new_vpkt->vpkt_tgt_init_bp = new_bp;
+
+		/*
+		 * There were more keys then the original request asked for.
+		 */
+		mdi_pathinfo_t *path_holder = vpkt->vpkt_path;
 
 		/*
 		 * Release the old path because it does not matter which path
@@ -2826,35 +2845,48 @@ vhci_do_prin(struct vhci_pkt *vpkt)
 		 */
 		if (taskq_dispatch(vhci->vhci_taskq, vhci_dispatch_scsi_start,
 		    (void *) new_vpkt, KM_NOSLEEP) == NULL) {
+			if (path_holder) {
+				vpkt->vpkt_path = path_holder;
+				mdi_hold_path(path_holder);
+			}
+			scsi_free_consistent_buf(new_bp);
+			vhci_scsi_destroy_pkt(&new_pkt->pkt_address, new_pkt);
 			rval = VHCI_CMD_ERROR;
-		} else {
-			/*
-			 * If we return VHCI_CMD_RETRY, that means the caller
-			 * is going to bail and wait for the reissued command
-			 * to complete.  In that case, we need to decrement
-			 * the path command count right now.  In any other
-			 * case, it'll be decremented by the caller.
-			 */
-			VHCI_DECR_PATH_CMDCOUNT(svp);
+			goto fail;
 		}
+
+		/*
+		 * If we return VHCI_CMD_RETRY, that means the caller
+		 * is going to bail and wait for the reissued command
+		 * to complete.  In that case, we need to decrement
+		 * the path command count right now.  In any other
+		 * case, it'll be decremented by the caller.
+		 */
+		VHCI_DECR_PATH_CMDCOUNT(svp);
+		goto exit;
+
 	}
 
-	if ((rval != VHCI_CMD_ERROR) && (rval != VHCI_CMD_RETRY)) {
-		int new, old;
-		int data_len = 0;
+	if (rval == VHCI_CMD_CMPLT) {
+		/*
+		 * The original request got all of the keys or the recovery
+		 * packet returns.
+		 */
+		int new;
+		int old;
+		int num_keys = prin_length / MHIOC_RESV_KEY_SIZE;
 
-		data_len = prin_length / MHIOC_RESV_KEY_SIZE;
 		VHCI_DEBUG(4, (CE_NOTE, NULL, "vhci_do_prin: %d keys read\n",
-		    data_len));
+		    num_keys));
 
 #ifdef DEBUG
 		VHCI_DEBUG(5, (CE_NOTE, NULL, "vhci_do_prin: from storage\n"));
 		if (vhci_debug == 5)
-			vhci_print_prin_keys(prin, data_len);
+			vhci_print_prin_keys(prin, num_keys);
 		VHCI_DEBUG(5, (CE_NOTE, NULL,
 		    "vhci_do_prin: MPxIO old keys:\n"));
 		if (vhci_debug == 5)
-			vhci_print_prin_keys(&vlun->svl_prin, data_len);
+			vhci_print_prin_keys(&vlun->svl_prin, num_keys);
 #endif
 
 		/*
@@ -2866,14 +2898,23 @@ vhci_do_prin(struct vhci_pkt *vpkt)
 
 		new = 0;
 
-		if (data_len > 0) {
+		/*
+		 * If we got at least 1 key copy it.
+		 */
+		if (num_keys > 0) {
 			vlun->svl_prin.keylist[0] = prin->keylist[0];
 			new++;
 		}
 
-		for (old = 1; old < data_len; old++) {
+		/*
+		 * find next unique key.
+		 */
+		for (old = 1; old < num_keys; old++) {
 			int j;
 			int match = 0;
+
+			if (new >= VHCI_NUM_RESV_KEYS)
+				break;
 			for (j = 0; j < new; j++) {
 				if (bcmp(&prin->keylist[old],
 				    &vlun->svl_prin.keylist[j],
@@ -2889,9 +2930,12 @@ vhci_do_prin(struct vhci_pkt *vpkt)
 			}
 		}
 
+		/* Stored Big Endian */
 		vlun->svl_prin.generation = prin->generation;
-		svl_prin_length = new * MHIOC_RESV_KEY_SIZE;
+		svl_prin_length = new * sizeof (mhioc_resv_key_t);
+		/* Stored Big Endian */
 		vlun->svl_prin.length = BE_32(svl_prin_length);
+		svl_prin_length += VHCI_PRIN_HEADER_SZ;
 
 		/*
 		 * If we arrived at this point after issuing a retry, make sure
@@ -2904,6 +2948,7 @@ vhci_do_prin(struct vhci_pkt *vpkt)
 			scsi_free_consistent_buf(new_bp);
 
 			vpkt = vhci_sync_retry_pkt(vpkt);
+			*intr_vpkt = vpkt;
 
 			/*
 			 * Make sure the original buffer is mapped into kernel
@@ -2918,13 +2963,12 @@ vhci_do_prin(struct vhci_pkt *vpkt)
 		 * Now copy the desired number of prin keys into the original
 		 * target buffer.
 		 */
-		if (svl_prin_length <=
-		    (vpkt->vpkt_tgt_init_bp->b_bcount - hdr_len)) {
+		if (svl_prin_length <= vpkt->vpkt_tgt_init_bp->b_bcount) {
 			/*
 			 * It is safe to return all of the available unique
 			 * keys
 			 */
-			bcopy(&vlun->svl_prin, prin, svl_prin_length + hdr_len);
+			bcopy(&vlun->svl_prin, prin, svl_prin_length);
 		} else {
 			/*
 			 * Not all of the available keys were requested by the
@@ -2944,7 +2988,7 @@ vhci_do_prin(struct vhci_pkt *vpkt)
 			vhci_print_prin_keys(&vlun->svl_prin, new);
 #endif
 	}
-
+fail:
 	if (rval == VHCI_CMD_ERROR) {
 		/*
 		 * If we arrived at this point after issuing a
@@ -2976,7 +3020,7 @@ vhci_do_prin(struct vhci_pkt *vpkt)
 
 		rval = VHCI_CMD_CMPLT;
 	}
-
+exit:
 	/*
 	 * Make sure that the semaphore is only released once.
 	 */
@@ -3202,7 +3246,7 @@ vhci_intr(struct scsi_pkt *pkt)
 		 * Command completed successfully, release the dma binding and
 		 * destroy the transport side of the packet.
 		 */
-		if ((pkt->pkt_cdbp[0] ==  SCMD_PROUT) &&
+		if ((pkt->pkt_cdbp[0] == SCMD_PROUT) &&
 		    (((pkt->pkt_cdbp[1] & 0x1f) == VHCI_PROUT_REGISTER) ||
 		    ((pkt->pkt_cdbp[1] & 0x1f) == VHCI_PROUT_R_AND_IGNORE))) {
 			if (SCBP_C(pkt) == STATUS_GOOD) {
@@ -3251,7 +3295,7 @@ vhci_intr(struct scsi_pkt *pkt)
 				 * vpkt will contain the address of the
 				 * original vpkt
 				 */
-				if (vhci_do_prin(vpkt) == VHCI_CMD_RETRY) {
+				if (vhci_do_prin(&vpkt) == VHCI_CMD_RETRY) {
 					/*
 					 * The command has been resent to get
 					 * all the keys from the device.  Don't
