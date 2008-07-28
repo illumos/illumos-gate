@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -874,14 +874,20 @@ reencode_attrs:
 				if (ae & FATTR4_NAMED_ATTR_MASK) {
 					uint_t isit;
 					pc_val = FALSE;
+					int sattr_error;
 
 					if (!(vp->v_vfsp->vfs_flag &
-						VFS_XATTR)) {
+					    VFS_XATTR)) {
 						isit = FALSE;
 					} else {
-						(void) VOP_PATHCONF(vp,
-							_PC_XATTR_EXISTS,
-							&pc_val, cs->cr, NULL);
+						sattr_error = VOP_PATHCONF(vp,
+						    _PC_SATTR_EXISTS,
+						    &pc_val, cs->cr, NULL);
+						if (sattr_error || pc_val == 0)
+							(void) VOP_PATHCONF(vp,
+							    _PC_XATTR_EXISTS,
+							    &pc_val,
+							    cs->cr, NULL);
 					}
 					isit = (pc_val ? TRUE : FALSE);
 					IXDR_PUT_U_INT32(ptr, isit);

@@ -599,8 +599,12 @@ rfs4_fattr4_named_attr(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	case NFS4ATTR_VERIT:
 		ASSERT(sarg->cs->vp != NULL);
 		if (sarg->cs->vp->v_vfsp->vfs_flag & VFS_XATTR) {
-			error = VOP_PATHCONF(sarg->cs->vp, _PC_XATTR_EXISTS,
+			error = VOP_PATHCONF(sarg->cs->vp, _PC_SATTR_EXISTS,
 			    &val, sarg->cs->cr, NULL);
+			if (error || val == 0)
+				error = VOP_PATHCONF(sarg->cs->vp,
+				    _PC_XATTR_EXISTS, &val,
+				    sarg->cs->cr, NULL);
 			if (error)
 				break;
 		} else
