@@ -1,5 +1,5 @@
 /*
- * Copyright 1996, 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -13,4 +13,4 @@
 #define	PATCH   ""
 
 const char *Version = "ntpdate "
-    PROTOCOL_VER "-" VERSION "+" VENDOR PATCH " %E% %U% (%I%)";
+    PROTOCOL_VER "-" VERSION "+" VENDOR PATCH " 03/06/05 23:16:45 (1.4)";
