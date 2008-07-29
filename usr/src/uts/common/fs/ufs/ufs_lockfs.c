@@ -1311,6 +1311,8 @@ ufs_lockfs_begin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
 {
 	int 		error;
 	int		rec_vop;
+	ushort_t	op_cnt_incremented = 0;
+	ulong_t		*ctr;
 	struct ulockfs *ulp;
 	ulockfs_info_t	*ulockfs_info;
 	ulockfs_info_t	*ulockfs_info_free;
@@ -1350,25 +1352,78 @@ ufs_lockfs_begin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
 
 	/*
 	 * First time VOP call
+	 *
+	 * Increment the ctr irrespective of the lockfs state. If the lockfs
+	 * state is not ULOCKFS_ULOCK, we can decrement it later. However,
+	 * before incrementing we need to check if there is a pending quiesce
+	 * request because if we have a continuous stream of ufs_lockfs_begin
+	 * requests pounding on a few cpu's then the ufs_quiesce thread might
+	 * never see the value of zero for ctr - a livelock kind of scenario.
 	 */
-	mutex_enter(&ulp->ul_lock);
-	if (ULOCKFS_IS_JUSTULOCK(ulp)) {
-		if (mask & ULOCKFS_FWLOCK) {
-			atomic_add_long(&ulp->ul_falloc_cnt, 1);
-			ULOCKFS_SET_FALLOC(ulp);
-		} else {
-			atomic_add_long(&ulp->ul_vnops_cnt, 1);
-		}
-	} else {
-		if (error = ufs_check_lockfs(ufsvfsp, ulp, mask)) {
-			mutex_exit(&ulp->ul_lock);
+	ctr = (mask & ULOCKFS_FWLOCK) ?
+	    &ulp->ul_falloc_cnt : &ulp->ul_vnops_cnt;
+	if (!ULOCKFS_IS_SLOCK(ulp)) {
+		atomic_add_long(ctr, 1);
+		op_cnt_incremented++;
+	}
+
+	/*
+	 * If the lockfs state (indicated by ul_fs_lock) is not just
+	 * ULOCKFS_ULOCK, then we will be routed through ufs_check_lockfs
+	 * where there is a check with an appropriate mask to selectively allow
+	 * operations permitted for that kind of lockfs state.
+	 *
+	 * Even these selective operations should not be allowed to go through
+	 * if a lockfs request is in progress because that could result in inode
+	 * modifications during a quiesce and could hence result in inode
+	 * reconciliation failures. ULOCKFS_SLOCK alone would not be sufficient,
+	 * so make use of ufs_quiesce_pend to disallow vnode operations when a
+	 * quiesce is in progress.
+	 */
+	if (!ULOCKFS_IS_JUSTULOCK(ulp) || ufs_quiesce_pend) {
+		if (op_cnt_incremented)
+			if (!atomic_add_long_nv(ctr, -1))
+				cv_broadcast(&ulp->ul_cv);
+		mutex_enter(&ulp->ul_lock);
+		error = ufs_check_lockfs(ufsvfsp, ulp, mask);
+		mutex_exit(&ulp->ul_lock);
+		if (error) {
 			if (ulockfs_info_free == NULL)
 				kmem_free(ulockfs_info_temp,
 				    sizeof (ulockfs_info_t));
 			return (error);
 		}
+	} else {
+		/*
+		 * This is the common case of file system in a unlocked state.
+		 *
+		 * If a file system is unlocked, we would expect the ctr to have
+		 * been incremented by now. But this will not be true when a
+		 * quiesce is winding up - SLOCK was set when we checked before
+		 * incrementing the ctr, but by the time we checked for
+		 * ULOCKFS_IS_JUSTULOCK, the quiesce thread was gone. It is okay
+		 * to take ul_lock and go through the slow path in this uncommon
+		 * case.
+		 */
+		if (op_cnt_incremented == 0) {
+			mutex_enter(&ulp->ul_lock);
+			error = ufs_check_lockfs(ufsvfsp, ulp, mask);
+			if (error) {
+				mutex_exit(&ulp->ul_lock);
+				if (ulockfs_info_free == NULL)
+					kmem_free(ulockfs_info_temp,
+					    sizeof (ulockfs_info_t));
+				return (error);
+			}
+			if (mask & ULOCKFS_FWLOCK)
+				ULOCKFS_SET_FALLOC(ulp);
+			mutex_exit(&ulp->ul_lock);
+		} else if (mask & ULOCKFS_FWLOCK) {
+			mutex_enter(&ulp->ul_lock);
+			ULOCKFS_SET_FALLOC(ulp);
+			mutex_exit(&ulp->ul_lock);
+		}
 	}
-	mutex_exit(&ulp->ul_lock);
 
 	if (ulockfs_info_free != NULL) {
 		ulockfs_info_free->ulp = ulp;
@@ -1438,25 +1493,20 @@ ufs_lockfs_end(struct ulockfs *ulp)
 	if (ufs_lockfs_top_vop_return(head))
 		curthread->t_flag &= ~T_DONTBLOCK;
 
-	mutex_enter(&ulp->ul_lock);
-
 	/* fallocate thread */
 	if (ULOCKFS_IS_FALLOC(ulp) && info->flags & ULOCK_INFO_FALLOCATE) {
-		if (!atomic_add_long_nv(&ulp->ul_falloc_cnt, -1))
+		/* Clear the thread's fallocate state */
+		info->flags &= ~ULOCK_INFO_FALLOCATE;
+		if (!atomic_add_long_nv(&ulp->ul_falloc_cnt, -1)) {
+			mutex_enter(&ulp->ul_lock);
 			ULOCKFS_CLR_FALLOC(ulp);
+			cv_broadcast(&ulp->ul_cv);
+			mutex_exit(&ulp->ul_lock);
+		}
 	} else  { /* normal thread */
 		if (!atomic_add_long_nv(&ulp->ul_vnops_cnt, -1))
 			cv_broadcast(&ulp->ul_cv);
 	}
-
-	/* Clear the thread's fallocate state */
-	if (info->flags & ULOCK_INFO_FALLOCATE)
-		info->flags &= ~ULOCK_INFO_FALLOCATE;
-
-	if (ulp->ul_vnops_cnt == 0 && ulp->ul_falloc_cnt)
-		cv_broadcast(&ulp->ul_cv);
-
-	mutex_exit(&ulp->ul_lock);
 }
 
 /*
@@ -1468,6 +1518,8 @@ ufs_lockfs_trybegin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
 {
 	int 		error = 0;
 	int		rec_vop;
+	ushort_t	op_cnt_incremented = 0;
+	ulong_t		*ctr;
 	struct ulockfs *ulp;
 	ulockfs_info_t	*ulockfs_info;
 	ulockfs_info_t	*ulockfs_info_free;
@@ -1507,20 +1559,22 @@ ufs_lockfs_trybegin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
 
 	/*
 	 * First time VOP call
+	 *
+	 * Increment the ctr irrespective of the lockfs state. If the lockfs
+	 * state is not ULOCKFS_ULOCK, we can decrement it later. However,
+	 * before incrementing we need to check if there is a pending quiesce
+	 * request because if we have a continuous stream of ufs_lockfs_begin
+	 * requests pounding on a few cpu's then the ufs_quiesce thread might
+	 * never see the value of zero for ctr - a livelock kind of scenario.
 	 */
-	mutex_enter(&ulp->ul_lock);
-	if (ULOCKFS_IS_JUSTULOCK(ulp)) {
-		/*
-		 * This is the common case of file system in a
-		 * unlocked state.
-		 */
-		if (mask & ULOCKFS_FWLOCK) {
-			atomic_add_long(&ulp->ul_falloc_cnt, 1);
-			ULOCKFS_SET_FALLOC(ulp);
-		} else {
-			atomic_add_long(&ulp->ul_vnops_cnt, 1);
-		}
-	} else {
+	ctr = (mask & ULOCKFS_FWLOCK) ?
+	    &ulp->ul_falloc_cnt : &ulp->ul_vnops_cnt;
+	if (!ULOCKFS_IS_SLOCK(ulp)) {
+		atomic_add_long(ctr, 1);
+		op_cnt_incremented++;
+	}
+
+	if (!ULOCKFS_IS_JUSTULOCK(ulp) || ufs_quiesce_pend) {
 		/*
 		 * Non-blocking version of ufs_check_lockfs() code.
 		 *
@@ -1529,6 +1583,10 @@ ufs_lockfs_trybegin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
 		 * the appropriate counter and proceed (For eg., In case the
 		 * file system is delete locked, a mmap can still go through).
 		 */
+		if (op_cnt_incremented)
+			if (!atomic_add_long_nv(ctr, -1))
+				cv_broadcast(&ulp->ul_cv);
+		mutex_enter(&ulp->ul_lock);
 		if (ULOCKFS_IS_HLOCK(ulp) ||
 		    (ULOCKFS_IS_ELOCK(ulp) && ufsvfsp->vfs_dontblock))
 			error = EIO;
@@ -1541,16 +1599,48 @@ ufs_lockfs_trybegin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
 				kmem_free(ulockfs_info_temp,
 				    sizeof (ulockfs_info_t));
 			return (error);
-		} else {
-			if (mask & ULOCKFS_FWLOCK) {
-				atomic_add_long(&ulp->ul_falloc_cnt, 1);
-				ULOCKFS_SET_FALLOC(ulp);
-			} else {
-				atomic_add_long(&ulp->ul_vnops_cnt, 1);
+		}
+		atomic_add_long(ctr, 1);
+		if (mask & ULOCKFS_FWLOCK)
+			ULOCKFS_SET_FALLOC(ulp);
+		mutex_exit(&ulp->ul_lock);
+	} else {
+		/*
+		 * This is the common case of file system in a unlocked state.
+		 *
+		 * If a file system is unlocked, we would expect the ctr to have
+		 * been incremented by now. But this will not be true when a
+		 * quiesce is winding up - SLOCK was set when we checked before
+		 * incrementing the ctr, but by the time we checked for
+		 * ULOCKFS_IS_JUSTULOCK, the quiesce thread was gone. Take
+		 * ul_lock and go through the non-blocking version of
+		 * ufs_check_lockfs() code.
+		 */
+		if (op_cnt_incremented == 0) {
+			mutex_enter(&ulp->ul_lock);
+			if (ULOCKFS_IS_HLOCK(ulp) ||
+			    (ULOCKFS_IS_ELOCK(ulp) && ufsvfsp->vfs_dontblock))
+				error = EIO;
+			else if (ulp->ul_fs_lock & mask)
+				error = EAGAIN;
+
+			if (error) {
+				mutex_exit(&ulp->ul_lock);
+				if (ulockfs_info_free == NULL)
+					kmem_free(ulockfs_info_temp,
+					    sizeof (ulockfs_info_t));
+				return (error);
 			}
+			atomic_add_long(ctr, 1);
+			if (mask & ULOCKFS_FWLOCK)
+				ULOCKFS_SET_FALLOC(ulp);
+			mutex_exit(&ulp->ul_lock);
+		} else if (mask & ULOCKFS_FWLOCK) {
+			mutex_enter(&ulp->ul_lock);
+			ULOCKFS_SET_FALLOC(ulp);
+			mutex_exit(&ulp->ul_lock);
 		}
 	}
-	mutex_exit(&ulp->ul_lock);
 
 	if (ulockfs_info_free != NULL) {
 		ulockfs_info_free->ulp = ulp;
@@ -1623,13 +1713,11 @@ ufs_lockfs_begin_getpage(
 	/*
 	 * First time VOP call
 	 */
-	mutex_enter(&ulp->ul_lock);
-	if (ULOCKFS_IS_JUSTULOCK(ulp))
-		/*
-		 * fs is not locked, simply inc the active-ops counter
-		 */
-		atomic_add_long(&ulp->ul_vnops_cnt, 1);
-	else {
+	atomic_add_long(&ulp->ul_vnops_cnt, 1);
+	if (!ULOCKFS_IS_JUSTULOCK(ulp) || ufs_quiesce_pend) {
+		if (!atomic_add_long_nv(&ulp->ul_vnops_cnt, -1))
+			cv_broadcast(&ulp->ul_cv);
+		mutex_enter(&ulp->ul_lock);
 		if (seg->s_ops == &segvn_ops &&
 		    ((struct segvn_data *)seg->s_data)->type != MAP_SHARED) {
 			mask = (ulong_t)ULOCKFS_GETREAD_MASK;
@@ -1648,15 +1736,15 @@ ufs_lockfs_begin_getpage(
 		/*
 		 * will sleep if this fs is locked against this VOP
 		 */
-		if (error = ufs_check_lockfs(ufsvfsp, ulp, mask)) {
-			mutex_exit(&ulp->ul_lock);
+		error = ufs_check_lockfs(ufsvfsp, ulp, mask);
+		mutex_exit(&ulp->ul_lock);
+		if (error) {
 			if (ulockfs_info_free == NULL)
 				kmem_free(ulockfs_info_temp,
 				    sizeof (ulockfs_info_t));
 			return (error);
 		}
 	}
-	mutex_exit(&ulp->ul_lock);
 
 	if (ulockfs_info_free != NULL) {
 		ulockfs_info_free->ulp = ulp;
