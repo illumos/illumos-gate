@@ -80,13 +80,13 @@
 #include <openssl/pem.h>
 #ifndef OPENSSL_NO_RSA
 #include <openssl/rsa.h>
-#endif
+#endif /* OPENSSL_NO_RSA */
 #ifndef OPENSSL_NO_DSA
 #include <openssl/dsa.h>
-#endif
+#endif /* OPENSSL_NO_DSA */
 #ifndef OPENSSL_NO_DH
 #include <openssl/dh.h>
-#endif
+#endif /* OPENSSL_NO_DH */
 #include <openssl/rand.h>
 #include <openssl/objects.h>
 #include <openssl/x509.h>
@@ -102,8 +102,8 @@
 /*
  * structure for tracking handles of asymmetric key objects
  *
- * Note: can be split into multiple active lists per
- *       assym cipher (RSA, DSA, DH)
+ * this can be split into multiple active lists per asymmetric cipher (RSA, DSA,
+ * DH) if needed in the future.
  */
 typedef struct PK11_active_st
 	{
@@ -220,7 +220,6 @@ static PK11_active *pk11_active_find(CK_OBJECT_HANDLE h)
  */
 int pk11_active_add(CK_OBJECT_HANDLE h)
 	{
-	int found = 0;
 	PK11_active *entry = NULL;
 
 	if (h == CK_INVALID_HANDLE)
@@ -377,7 +376,8 @@ static DH_METHOD pk11_dh =
 	pk11_DH_init,		/* init */
 	pk11_DH_finish,		/* finish */
 	0,			/* flags */
-	NULL			/* app_data */
+	NULL,			/* app_data */
+	NULL			/* generate_params */
 	};
 
 DH_METHOD *PK11_DH(void)
@@ -664,9 +664,8 @@ static int pk11_RSA_public_encrypt_low(int flen,
 	CK_MECHANISM *p_mech = &mech_rsa;
 	CK_OBJECT_HANDLE h_pub_key = CK_INVALID_HANDLE;
 	PK11_SESSION *sp;
-	char tmp_buf[20];
 	
-	if ((sp = pk11_get_session()) == NULL)
+	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
 		return -1;
 
 	(void) check_new_rsa_key_pub(sp, rsa);
@@ -684,11 +683,9 @@ static int pk11_RSA_public_encrypt_low(int flen,
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_RSA_PUB_ENC_LOW, 
-				PK11_R_ENCRYPTINIT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
-			pk11_return_session(sp);
+			PK11err_add_data(PK11_F_RSA_PUB_ENC_LOW, 
+			    PK11_R_ENCRYPTINIT, rv);
+			pk11_return_session(sp, OP_PUBKEY);
 			return -1;
 			}
 	
@@ -697,16 +694,15 @@ static int pk11_RSA_public_encrypt_low(int flen,
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_RSA_PUB_ENC_LOW, PK11_R_ENCRYPT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
-			pk11_return_session(sp);
+			PK11err_add_data(PK11_F_RSA_PUB_ENC_LOW, PK11_R_ENCRYPT,
+			  rv);
+			pk11_return_session(sp, OP_PUBKEY);
 			return -1;
 			}
 		retval = bytes_encrypted;
 		}
 	
-	pk11_return_session(sp);
+	pk11_return_session(sp, OP_PUBKEY);
 	return retval;
 	}
 
@@ -725,9 +721,8 @@ static int pk11_RSA_private_encrypt_low(int flen,
 	CK_MECHANISM *p_mech = &mech_rsa;
 	CK_OBJECT_HANDLE h_priv_key= CK_INVALID_HANDLE;
 	PK11_SESSION *sp;
-	char tmp_buf[20];
 	
-	if ((sp = pk11_get_session()) == NULL)
+	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
 		return -1;
 	
 	(void) check_new_rsa_key_priv(sp, rsa);
@@ -745,10 +740,9 @@ static int pk11_RSA_private_encrypt_low(int flen,
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_RSA_PRIV_ENC_LOW, PK11_R_SIGNINIT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
-			pk11_return_session(sp);
+			PK11err_add_data(PK11_F_RSA_PRIV_ENC_LOW,
+			    PK11_R_SIGNINIT, rv);
+			pk11_return_session(sp, OP_PUBKEY);
 			return -1;
 			}
 	
@@ -757,17 +751,16 @@ static int pk11_RSA_private_encrypt_low(int flen,
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_RSA_PRIV_ENC_LOW, PK11_R_SIGN);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
-			pk11_return_session(sp);
+			PK11err_add_data(PK11_F_RSA_PRIV_ENC_LOW, PK11_R_SIGN,
+			    rv);
+			pk11_return_session(sp, OP_PUBKEY);
 			return -1;
 			}
 
 		retval = ul_sig_len;
 		}
 	
-	pk11_return_session(sp);
+	pk11_return_session(sp, OP_PUBKEY);
 	return retval;
 	}
 
@@ -786,9 +779,8 @@ static int pk11_RSA_private_decrypt_low(int flen,
 	CK_MECHANISM *p_mech = &mech_rsa;
 	CK_OBJECT_HANDLE h_priv_key;
 	PK11_SESSION *sp;
-	char tmp_buf[20];
 	
-	if ((sp = pk11_get_session()) == NULL)
+	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
 		return -1;
 	
 	(void) check_new_rsa_key_priv(sp, rsa);
@@ -806,11 +798,9 @@ static int pk11_RSA_private_decrypt_low(int flen,
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_RSA_PRIV_DEC_LOW, 
-				PK11_R_DECRYPTINIT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
-			pk11_return_session(sp);
+			PK11err_add_data(PK11_F_RSA_PRIV_DEC_LOW, 
+				PK11_R_DECRYPTINIT, rv);
+			pk11_return_session(sp, OP_PUBKEY);
 			return -1;
 			}
 	
@@ -819,16 +809,15 @@ static int pk11_RSA_private_decrypt_low(int flen,
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_RSA_PRIV_DEC_LOW, PK11_R_DECRYPT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
-			pk11_return_session(sp);
+			PK11err_add_data(PK11_F_RSA_PRIV_DEC_LOW,
+			    PK11_R_DECRYPT, rv);
+			pk11_return_session(sp, OP_PUBKEY);
 			return -1;
 			}
 		retval = bytes_decrypted;
 		}
 
-	pk11_return_session(sp);
+	pk11_return_session(sp, OP_PUBKEY);
 	return retval;
 	}
 
@@ -847,9 +836,8 @@ static int pk11_RSA_public_decrypt_low(int flen,
 	CK_MECHANISM *p_mech = &mech_rsa;
 	CK_OBJECT_HANDLE h_pub_key = CK_INVALID_HANDLE;
 	PK11_SESSION *sp;
-	char tmp_buf[20];
 	
-	if ((sp = pk11_get_session()) == NULL)
+	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
 		return -1;
 	
 	(void) check_new_rsa_key_pub(sp, rsa);
@@ -867,11 +855,9 @@ static int pk11_RSA_public_decrypt_low(int flen,
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_RSA_PUB_DEC_LOW, 
-				PK11_R_VERIFYRECOVERINIT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
-			pk11_return_session(sp);
+			PK11err_add_data(PK11_F_RSA_PUB_DEC_LOW, 
+				PK11_R_VERIFYRECOVERINIT, rv);
+			pk11_return_session(sp, OP_PUBKEY);
 			return -1;
 			}
 	
@@ -880,17 +866,15 @@ static int pk11_RSA_public_decrypt_low(int flen,
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_RSA_PUB_DEC_LOW, 
-				PK11_R_VERIFYRECOVER);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
-			pk11_return_session(sp);
+			PK11err_add_data(PK11_F_RSA_PUB_DEC_LOW, 
+			    PK11_R_VERIFYRECOVER, rv);
+			pk11_return_session(sp, OP_PUBKEY);
 			return -1;
 			}
 		retval = bytes_decrypted;
 		}
 
-	pk11_return_session(sp);
+	pk11_return_session(sp, OP_PUBKEY);
 	return retval;
 	}
 
@@ -938,7 +922,6 @@ static int pk11_RSA_sign(int type, const unsigned char *m, unsigned int m_len,
 	CK_OBJECT_HANDLE h_priv_key;
 	PK11_SESSION *sp = NULL;
 	int ret = 0;
-	char tmp_buf[20];
 	unsigned long ulsiglen;
 
 	/* Encode the digest */
@@ -1000,7 +983,7 @@ static int pk11_RSA_sign(int type, const unsigned char *m, unsigned int m_len,
 		i2d_X509_SIG(&sig,&p);
 		}
 	
-	if ((sp = pk11_get_session()) == NULL)
+	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
 		goto err;
 
 	(void) check_new_rsa_key_priv(sp, rsa);
@@ -1017,9 +1000,7 @@ static int pk11_RSA_sign(int type, const unsigned char *m, unsigned int m_len,
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_RSA_SIGN, PK11_R_SIGNINIT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_RSA_SIGN, PK11_R_SIGNINIT, rv);
 			goto err;
 			}
 
@@ -1030,9 +1011,7 @@ static int pk11_RSA_sign(int type, const unsigned char *m, unsigned int m_len,
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_RSA_SIGN, PK11_R_SIGN);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_RSA_SIGN, PK11_R_SIGN, rv);
 			goto err;
 			}
 		ret = 1;
@@ -1045,7 +1024,7 @@ err:
 		OPENSSL_free(s);
 		}
 	
-	pk11_return_session(sp);
+	pk11_return_session(sp, OP_PUBKEY);
 	return ret;
 	}
 
@@ -1065,7 +1044,6 @@ static int pk11_RSA_verify(int type, const unsigned char *m,
 	CK_OBJECT_HANDLE h_pub_key;
 	PK11_SESSION *sp = NULL;
 	int ret = 0;
-	char tmp_buf[20];
 
 	/* Encode the digest	*/
 	/* Special case: SSL signature, just check the length */
@@ -1124,7 +1102,7 @@ static int pk11_RSA_verify(int type, const unsigned char *m,
 		i2d_X509_SIG(&sig,&p);
 		}
 	
-	if ((sp = pk11_get_session()) == NULL)
+	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
 		goto err;
 	
 	(void) check_new_rsa_key_pub(sp, rsa);
@@ -1142,9 +1120,8 @@ static int pk11_RSA_verify(int type, const unsigned char *m,
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_RSA_VERIFY, PK11_R_VERIFYINIT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_RSA_VERIFY, PK11_R_VERIFYINIT,
+			    rv);
 			goto err;
 			}
 		rv = pFuncList->C_Verify(sp->session, s, i, sigbuf, 
@@ -1152,9 +1129,7 @@ static int pk11_RSA_verify(int type, const unsigned char *m,
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_RSA_VERIFY, PK11_R_VERIFY);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_RSA_VERIFY, PK11_R_VERIFY, rv);
 			goto err;
 			}
 		ret = 1;
@@ -1167,7 +1142,7 @@ err:
 		OPENSSL_free(s);
 		}
 
-	pk11_return_session(sp);
+	pk11_return_session(sp, OP_PUBKEY);
 	return ret;
 	}
 
@@ -1181,7 +1156,7 @@ EVP_PKEY *pk11_load_privkey(ENGINE* e, const char* privkey_file,
 	RSA *rsa;
 	PK11_SESSION *sp;
 
-	if ((sp = pk11_get_session()) == NULL)
+	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
 		return NULL;
 
 	if ((pubkey=fopen(privkey_file,"r")) != NULL)
@@ -1212,7 +1187,7 @@ EVP_PKEY *pk11_load_privkey(ENGINE* e, const char* privkey_file,
 			}
 		}
 
-	pk11_return_session(sp);
+	pk11_return_session(sp, OP_PUBKEY);
 	return(pkey);
 	}
 
@@ -1226,7 +1201,7 @@ EVP_PKEY *pk11_load_pubkey(ENGINE* e, const char* pubkey_file,
 	RSA *rsa;
 	PK11_SESSION *sp;
 
-	if ((sp = pk11_get_session()) == NULL)
+	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
 		return NULL;
 
 	if ((pubkey=fopen(pubkey_file,"r")) != NULL)
@@ -1258,7 +1233,7 @@ EVP_PKEY *pk11_load_pubkey(ENGINE* e, const char* pubkey_file,
 			}
 		}
 
-	pk11_return_session(sp);
+	pk11_return_session(sp, OP_PUBKEY);
 	return(pkey);
 	}
 
@@ -1274,7 +1249,6 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 	CK_OBJECT_CLASS o_key = CKO_PUBLIC_KEY;
 	CK_KEY_TYPE k_type = CKK_RSA;
 	CK_ULONG ul_key_attr_count = 7;
-	char tmp_buf[20];
 
 	CK_ATTRIBUTE  a_key_template[] =
 		{
@@ -1326,9 +1300,8 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_GET_PUB_RSA_KEY, PK11_R_FINDOBJECTSINIT);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_GET_PUB_RSA_KEY, PK11_R_FINDOBJECTSINIT,
+		    rv);
 		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
@@ -1337,9 +1310,7 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_GET_PUB_RSA_KEY, PK11_R_FINDOBJECTS);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_GET_PUB_RSA_KEY, PK11_R_FINDOBJECTS, rv);
 		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
@@ -1348,9 +1319,8 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_GET_PUB_RSA_KEY, PK11_R_FINDOBJECTSFINAL);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_GET_PUB_RSA_KEY,
+		    PK11_R_FINDOBJECTSFINAL, rv);
 		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
@@ -1361,10 +1331,8 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 			a_key_template, ul_key_attr_count, &h_key);
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_GET_PUB_RSA_KEY, 
-				PK11_R_CREATEOBJECT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_GET_PUB_RSA_KEY, 
+			    PK11_R_CREATEOBJECT, rv);
 			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 			goto err;
 			}
@@ -1414,7 +1382,6 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa,
 	CK_OBJECT_CLASS o_key = CKO_PRIVATE_KEY;
 	CK_KEY_TYPE k_type = CKK_RSA;
 	CK_ULONG ul_key_attr_count = 14;
-	char tmp_buf[20];
 
 	/* Both CKA_TOKEN and CKA_SENSITIVE have to be FALSE for session keys
 	 */
@@ -1473,9 +1440,8 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa,
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_GET_PRIV_RSA_KEY, PK11_R_FINDOBJECTSINIT);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_GET_PRIV_RSA_KEY,
+		    PK11_R_FINDOBJECTSINIT, rv);
 		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
@@ -1484,9 +1450,7 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa,
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_GET_PRIV_RSA_KEY, PK11_R_FINDOBJECTS);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_GET_PRIV_RSA_KEY, PK11_R_FINDOBJECTS, rv);
 		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
@@ -1495,9 +1459,8 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa,
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_GET_PRIV_RSA_KEY, PK11_R_FINDOBJECTSFINAL);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_GET_PRIV_RSA_KEY,
+		    PK11_R_FINDOBJECTSFINAL, rv);
 		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
@@ -1508,10 +1471,8 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa,
 			a_key_template, ul_key_attr_count, &h_key);
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_GET_PRIV_RSA_KEY, 
-				PK11_R_CREATEOBJECT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_GET_PRIV_RSA_KEY, 
+				PK11_R_CREATEOBJECT, rv);
 			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 			goto err;
 			}
@@ -1638,7 +1599,6 @@ pk11_dsa_do_sign(const unsigned char *dgst, int dlen, DSA *dsa)
 	unsigned int siglen2 = DSA_SIGNATURE_LEN / 2;
 
 	PK11_SESSION *sp = NULL;
-	char tmp_buf[20];
 
 	if ((dsa->p == NULL) || (dsa->q == NULL) || (dsa->g == NULL)) 
 		{
@@ -1653,7 +1613,7 @@ pk11_dsa_do_sign(const unsigned char *dgst, int dlen, DSA *dsa)
 		goto ret;
 		}
 
-	if ((sp = pk11_get_session()) == NULL)
+	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
 		goto ret;
 
 	(void) check_new_dsa_key_priv(sp, dsa);
@@ -1670,9 +1630,7 @@ pk11_dsa_do_sign(const unsigned char *dgst, int dlen, DSA *dsa)
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_DSA_SIGN, PK11_R_SIGNINIT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_DSA_SIGN, PK11_R_SIGNINIT, rv);
 			goto ret;
 			}
 
@@ -1683,9 +1641,7 @@ pk11_dsa_do_sign(const unsigned char *dgst, int dlen, DSA *dsa)
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_DSA_SIGN, PK11_R_SIGN);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_DSA_SIGN, PK11_R_SIGN, rv);
 			goto ret;
 			}
 		}
@@ -1724,7 +1680,7 @@ ret:
 			BN_free(s);
 		}
 
-	pk11_return_session(sp);
+	pk11_return_session(sp, OP_PUBKEY);
 	return (dsa_sig);
 	}
 
@@ -1744,7 +1700,6 @@ pk11_dsa_do_verify(const unsigned char *dgst, int dlen, DSA_SIG *sig,
 	unsigned long siglen2 = DSA_SIGNATURE_LEN/2;
 
 	PK11_SESSION *sp = NULL;
-	char tmp_buf[20];
 
 	if (BN_is_zero(sig->r) || sig->r->neg || BN_ucmp(sig->r, dsa->q) >= 0)
 		{
@@ -1769,7 +1724,7 @@ pk11_dsa_do_verify(const unsigned char *dgst, int dlen, DSA_SIG *sig,
 		goto ret;
 		}
 
-	if ((sp = pk11_get_session()) == NULL)
+	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
 		goto ret;
 	
 	(void) check_new_dsa_key_pub(sp, dsa);
@@ -1787,9 +1742,8 @@ pk11_dsa_do_verify(const unsigned char *dgst, int dlen, DSA_SIG *sig,
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_DSA_VERIFY, PK11_R_VERIFYINIT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_DSA_VERIFY, PK11_R_VERIFYINIT,
+			    rv);
 			goto ret;
 			}
 
@@ -1799,19 +1753,16 @@ pk11_dsa_do_verify(const unsigned char *dgst, int dlen, DSA_SIG *sig,
 		 * to act accordingly and shift if necessary.
 		 */
 		memset(sigbuf, 0, siglen);
-		BN_bn2bin(sig->r, sigbuf +
-		    siglen2 - BN_num_bytes(sig->r));
-		BN_bn2bin(sig->s, &sigbuf[siglen2] +
-		    siglen2 - BN_num_bytes(sig->s));
+		BN_bn2bin(sig->r, sigbuf + siglen2 - BN_num_bytes(sig->r));
+		BN_bn2bin(sig->s, &sigbuf[siglen2] + siglen2 -
+		    BN_num_bytes(sig->s));
 		
 		rv = pFuncList->C_Verify(sp->session, 
 			(unsigned char *) dgst, dlen, sigbuf, (CK_ULONG)siglen);
 
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_DSA_VERIFY, PK11_R_VERIFY);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_DSA_VERIFY, PK11_R_VERIFY, rv);
 			goto ret;
 			}
 		}
@@ -1819,7 +1770,7 @@ pk11_dsa_do_verify(const unsigned char *dgst, int dlen, DSA_SIG *sig,
 	retval = 1;
 ret:
 
-	pk11_return_session(sp);
+	pk11_return_session(sp, OP_PUBKEY);
 	return retval;
 	}
 
@@ -1836,7 +1787,6 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
 	CK_KEY_TYPE k_type = CKK_DSA;
 	CK_ULONG ul_key_attr_count = 8;
 	int i;
-	char tmp_buf[20];
 
 	CK_ATTRIBUTE  a_key_template[] =
 		{
@@ -1879,9 +1829,8 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_GET_PUB_DSA_KEY, PK11_R_FINDOBJECTSINIT);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_GET_PUB_DSA_KEY, PK11_R_FINDOBJECTSINIT,
+		    rv);
 		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
@@ -1890,9 +1839,7 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_GET_PUB_DSA_KEY, PK11_R_FINDOBJECTS);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_GET_PUB_DSA_KEY, PK11_R_FINDOBJECTS, rv);
 		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
@@ -1901,9 +1848,8 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_GET_PUB_DSA_KEY, PK11_R_FINDOBJECTSFINAL);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_GET_PUB_DSA_KEY,
+		    PK11_R_FINDOBJECTSFINAL, rv);
 		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
@@ -1914,10 +1860,8 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
 			a_key_template, ul_key_attr_count, &h_key);
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_GET_PUB_DSA_KEY, 
-				PK11_R_CREATEOBJECT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_GET_PUB_DSA_KEY, 
+			    PK11_R_CREATEOBJECT, rv);
 			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 			goto err;
 			}
@@ -1958,7 +1902,6 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa,
 	CK_OBJECT_HANDLE h_key = CK_INVALID_HANDLE;
 	CK_OBJECT_CLASS o_key = CKO_PRIVATE_KEY;
 	int i;
-	char tmp_buf[20];
 	CK_ULONG found;
 	CK_KEY_TYPE k_type = CKK_DSA;
 	CK_ULONG ul_key_attr_count = 9;
@@ -2008,9 +1951,8 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa,
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_GET_PRIV_DSA_KEY, PK11_R_FINDOBJECTSINIT);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_GET_PRIV_DSA_KEY,
+		    PK11_R_FINDOBJECTSINIT, rv);
 		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
@@ -2019,9 +1961,7 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa,
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_GET_PRIV_DSA_KEY, PK11_R_FINDOBJECTS);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_GET_PRIV_DSA_KEY, PK11_R_FINDOBJECTS, rv);
 		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
@@ -2030,9 +1970,8 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa,
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_GET_PRIV_DSA_KEY, PK11_R_FINDOBJECTSFINAL);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_GET_PRIV_DSA_KEY,
+		    PK11_R_FINDOBJECTSFINAL, rv);
 		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
@@ -2043,10 +1982,8 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa,
 			a_key_template, ul_key_attr_count, &h_key);
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_GET_PRIV_DSA_KEY, 
-				PK11_R_CREATEOBJECT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_GET_PRIV_DSA_KEY, 
+			    PK11_R_CREATEOBJECT, rv);
 			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 			goto err;
 			}
@@ -2167,7 +2104,6 @@ static int pk11_DH_generate_key(DH *dh)
 	CK_RV rv, rv1;
 	int reuse_mem_len = 0, ret = 0;
 	PK11_SESSION *sp = NULL;
-	char tmp_buf[20];
 	CK_BYTE_PTR reuse_mem;
 
 	CK_MECHANISM mechanism = {CKM_DH_PKCS_KEY_PAIR_GEN, NULL_PTR, 0};
@@ -2246,7 +2182,7 @@ static int pk11_DH_generate_key(DH *dh)
 	 *	 a session handle. The objects created in this function are
 	 *	 destroyed before return and thus not cached.
 	 */
-	if ((sp = pk11_get_session()) == NULL)
+	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
 		goto err;
 	
 	rv = pFuncList->C_GenerateKeyPair(sp->session,
@@ -2259,9 +2195,7 @@ static int pk11_DH_generate_key(DH *dh)
 			   &h_priv_key);
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_DH_GEN_KEY, PK11_R_GEN_KEY);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_DH_GEN_KEY, PK11_R_GEN_KEY, rv);
 		goto err;
 		}
 
@@ -2286,9 +2220,7 @@ static int pk11_DH_generate_key(DH *dh)
 	if (rv != CKR_OK || rv1 != CKR_OK)
 		{
 		rv = (rv != CKR_OK) ? rv : rv1;
-		PK11err(PK11_F_DH_GEN_KEY, PK11_R_GETATTRIBUTVALUE);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_DH_GEN_KEY, PK11_R_GETATTRIBUTVALUE, rv);
 		goto err;
 		}
 
@@ -2308,9 +2240,7 @@ static int pk11_DH_generate_key(DH *dh)
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_DH_GEN_KEY, PK11_R_GETATTRIBUTVALUE);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_DH_GEN_KEY, PK11_R_GETATTRIBUTVALUE, rv);
 		goto err;
 		}
 
@@ -2336,9 +2266,7 @@ static int pk11_DH_generate_key(DH *dh)
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_DH_GEN_KEY, PK11_R_GETATTRIBUTVALUE);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_DH_GEN_KEY, PK11_R_GETATTRIBUTVALUE, rv);
 		goto err;
 		}
 
@@ -2364,9 +2292,8 @@ err:
 		rv = pFuncList->C_DestroyObject(sp->session, h_pub_key);
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_DH_GEN_KEY, PK11_R_DESTROYOBJECT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_DH_GEN_KEY,
+			    PK11_R_DESTROYOBJECT, rv);
 			}
 		}
 
@@ -2375,9 +2302,8 @@ err:
 		rv = pFuncList->C_DestroyObject(sp->session, h_priv_key);
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_DH_GEN_KEY, PK11_R_DESTROYOBJECT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_DH_GEN_KEY,
+			    PK11_R_DESTROYOBJECT, rv);
 			}
 		}
 
@@ -2390,7 +2316,7 @@ err:
 			}
 		}
 
-	pk11_return_session(sp);
+	pk11_return_session(sp, OP_PUBKEY);
 	return ret;
 	}
 
@@ -2419,7 +2345,6 @@ static int pk11_DH_compute_key(unsigned char *key,const BIGNUM *pub_key,DH *dh)
 	CK_RV rv;
 	int ret = -1;
 	PK11_SESSION *sp = NULL;
-	char tmp_buf[20];
 
 	if (dh->priv_key == NULL)
 		goto err;
@@ -2427,7 +2352,7 @@ static int pk11_DH_compute_key(unsigned char *key,const BIGNUM *pub_key,DH *dh)
 	priv_key_template[0].pValue = &key_class;
 	priv_key_template[1].pValue = &key_type;
 
-	if ((sp = pk11_get_session()) == NULL)
+	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
 		goto err;
 
 	mechanism.ulParameterLen = BN_num_bytes(pub_key);
@@ -2461,9 +2386,7 @@ static int pk11_DH_compute_key(unsigned char *key,const BIGNUM *pub_key,DH *dh)
 			   &h_derived_key);
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_DH_COMP_KEY, PK11_R_DERIVEKEY);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_DH_COMP_KEY, PK11_R_DERIVEKEY, rv);
 		goto err;
 		}
 
@@ -2472,9 +2395,7 @@ static int pk11_DH_compute_key(unsigned char *key,const BIGNUM *pub_key,DH *dh)
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_DH_COMP_KEY, PK11_R_GETATTRIBUTVALUE);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_DH_COMP_KEY, PK11_R_GETATTRIBUTVALUE, rv);
 		goto err;
 		}
 
@@ -2496,9 +2417,7 @@ static int pk11_DH_compute_key(unsigned char *key,const BIGNUM *pub_key,DH *dh)
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_DH_COMP_KEY, PK11_R_GETATTRIBUTVALUE);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_DH_COMP_KEY, PK11_R_GETATTRIBUTVALUE, rv);
 		goto err;
 		}
 
@@ -2532,9 +2451,8 @@ err:
 		rv = pFuncList->C_DestroyObject(sp->session, h_derived_key);
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_DH_COMP_KEY, PK11_R_DESTROYOBJECT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_DH_COMP_KEY,
+			    PK11_R_DESTROYOBJECT, rv);
 			}
 		}
 	if (priv_key_result[0].pValue)
@@ -2549,7 +2467,7 @@ err:
 		mechanism.pParameter = NULL;
 		}
 
-	pk11_return_session(sp);
+	pk11_return_session(sp, OP_PUBKEY);
 	return ret;
 	}
 
@@ -2563,7 +2481,6 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 	CK_KEY_TYPE key_type = CKK_DH;
 	CK_ULONG found;
 	int i;
-	char tmp_buf[20];
 
 	CK_ULONG ul_key_attr_count = 7;
 	CK_ATTRIBUTE key_template[] =
@@ -2625,9 +2542,7 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_GET_DH_KEY, PK11_R_FINDOBJECTSINIT);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_GET_DH_KEY, PK11_R_FINDOBJECTSINIT, rv);
 		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
@@ -2636,9 +2551,7 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_GET_DH_KEY, PK11_R_FINDOBJECTS);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_GET_DH_KEY, PK11_R_FINDOBJECTS, rv);
 		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
@@ -2647,9 +2560,7 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 
 	if (rv != CKR_OK)
 		{
-		PK11err(PK11_F_GET_DH_KEY, PK11_R_FINDOBJECTSFINAL);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+		PK11err_add_data(PK11_F_GET_DH_KEY, PK11_R_FINDOBJECTSFINAL, rv);
 		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
@@ -2660,9 +2571,8 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 			key_template, ul_key_attr_count, &h_key);
 		if (rv != CKR_OK)
 			{
-			PK11err(PK11_F_GET_DH_KEY, PK11_R_CREATEOBJECT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
+			PK11err_add_data(PK11_F_GET_DH_KEY, PK11_R_CREATEOBJECT,
+			    rv);
 			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 			goto err;
 			}
@@ -2743,5 +2653,6 @@ static int init_template_value(BIGNUM *bn, CK_VOID_PTR *p_value,
 
 	return 1;
 	}
-#endif
-#endif
+
+#endif	/* OPENSSL_NO_HW_PK11 */
+#endif	/* OPENSSL_NO_HW */

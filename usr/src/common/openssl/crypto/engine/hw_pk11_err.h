@@ -70,6 +70,7 @@
 
 static void ERR_load_pk11_strings(void);
 static void ERR_pk11_error(int function, int reason, char *file, int line);
+static void PK11err_add_data(int function, int reason, CK_RV rv);
 #define PK11err(f,r) ERR_pk11_error((f),(r),__FILE__,__LINE__)
 
 /* Error codes for the PK11 functions. */
@@ -130,6 +131,9 @@ static void ERR_pk11_error(int function, int reason, char *file, int line);
 #define	PK11_F_CIPHER_CLEANUP			151
 #define	PK11_F_ACTIVE_ADD			152
 #define	PK11_F_ACTIVE_DELETE			153
+#define	PK11_F_CHECK_HW_MECHANISMS		154
+#define	PK11_F_INIT_SYMMETRIC			155
+#define	PK11_F_ADD_AES_CTR_NIDS			156
 
 /* Reason codes. */
 #define PK11_R_ALREADY_LOADED 			100
@@ -194,16 +198,22 @@ static void ERR_pk11_error(int function, int reason, char *file, int line);
 #define PK11_R_GET_OPERATION_STATE		160
 #define PK11_R_SET_OPERATION_STATE		161
 #define	PK11_R_INVALID_HANDLE			162
+#define	PK11_R_KEY_OR_IV_LEN_PROBLEM		163
+#define	PK11_R_INVALID_OPERATION_TYPE		164
+#define	PK11_R_ADD_NID_FAILED			165
+
+/* max byte length of a symetric key we support */
+#define PK11_KEY_LEN_MAX			32
 
 /*
- * CRYPTO_LOCK_PK11_ENGINE lock is primarily used for the protection
- * of free_session list and active_list but generally serves as global
- * per-process lock for the whole engine.
- * We reuse CRYPTO_LOCK_RSA lock (which is defined in OpenSSL for RSA
- * method) as the global engine lock. This is not optimal w.r.t.
- * performance but is safe.
+ * CRYPTO_LOCK_PK11_ENGINE lock is primarily used for the protection of the
+ * free_session list and active_list but generally serves as a global per-process
+ * lock for the whole engine.
+ *
+ * We reuse CRYPTO_LOCK_EC lock (which is defined in OpenSSL for EC method) as
+ * the global engine lock. This is not optimal w.r.t. performance but it's safe.
  */
-#define	CRYPTO_LOCK_PK11_ENGINE	CRYPTO_LOCK_RSA
+#define CRYPTO_LOCK_PK11_ENGINE	CRYPTO_LOCK_EC
 
 /* This structure encapsulates all reusable information for a PKCS#11
  * session. A list of this object is created on behalf of the
@@ -230,24 +240,45 @@ typedef struct PK11_SESSION_st
 	BIGNUM			*rsa_e_num;	/* Public RSA exponent */
 	RSA			*rsa_priv;	/* Address of RSA private key */
 	BIGNUM			*rsa_d_num;	/* Private RSA exponent */
-#endif
+#endif /* OPENSSL_NO_RSA */
 #ifndef OPENSSL_NO_DSA
 	DSA			*dsa_pub;	/* Address of DSA public key */
 	BIGNUM			*dsa_pub_num;	/* Public DSA key */
 	DSA			*dsa_priv;	/* Address of DSA private key */
 	BIGNUM			*dsa_priv_num;	/* Private DSA key */
-#endif
+#endif /* OPENSSL_NO_DSA */
 #ifndef OPENSSL_NO_DH
 	DH			*dh;		/* Address of DH keypair */
 	BIGNUM			*dh_priv_num;	/* Private DH key */
-#endif
-        unsigned char           key[24];/* Save the private key here */
-        int                     key_len;/* Saved private key length */
-        int                     encrypt;/* 1/0 for encrypt/decrypt */
+#endif /* OPENSSL_NO_DH */
+        unsigned char           key[PK11_KEY_LEN_MAX]; /* Save the symmetric
+							  key here */
+        int                     key_len;	/* Saved private key length */
+        int                     encrypt;	/* 1/0 for encrypt/decrypt */
         } PK11_SESSION;
 
-extern PK11_SESSION *pk11_get_session();
-extern void pk11_return_session(PK11_SESSION *sp);
+/*
+ * We have 3 different groups of operation types, with OP_CIPHER and OP_DIGEST
+ * operations combined into a single type. For every group a different slot can
+ * be chosen. That means that we must have 3 different lists of cached PKCS#11
+ * sessions since sessions from different groups are initialized in different
+ * slots.
+ *
+ * This division into groups stems from the fact that it's common that hardware
+ * providers may support operations from one group only. For example, hardware
+ * providers on UltraSPARC T2, n2rng(7d), ncp(7d), and n2cp(7d), each support
+ * only a single group of operations.
+ */
+typedef enum PK11_OPTYPE_ENUM
+	{
+	OP_RAND,
+	OP_PUBKEY,
+	OP_CIPHER,
+	OP_DIGEST
+    	} PK11_OPTYPE;	    
+
+extern PK11_SESSION *pk11_get_session(PK11_OPTYPE optype);
+extern void pk11_return_session(PK11_SESSION *sp, PK11_OPTYPE optype);
 
 #ifndef OPENSSL_NO_RSA
 extern int pk11_destroy_rsa_key_objects(PK11_SESSION *session);
@@ -258,18 +289,18 @@ extern EVP_PKEY *pk11_load_privkey(ENGINE*, const char* pubkey_file,
 extern EVP_PKEY *pk11_load_pubkey(ENGINE*, const char* pubkey_file,
         UI_METHOD *ui_method, void *callback_data);
 extern RSA_METHOD *PK11_RSA(void);
-#endif
+#endif /* OPENSSL_NO_RSA */
 #ifndef OPENSSL_NO_DSA
 extern int pk11_destroy_dsa_key_objects(PK11_SESSION *session);
 extern int pk11_destroy_dsa_object_pub(PK11_SESSION *sp, CK_BBOOL uselock);
 extern int pk11_destroy_dsa_object_priv(PK11_SESSION *sp, CK_BBOOL uselock);
 extern DSA_METHOD *PK11_DSA(void);
-#endif
+#endif /* OPENSSL_NO_DSA */
 #ifndef OPENSSL_NO_DH
 extern int pk11_destroy_dh_key_objects(PK11_SESSION *session);
 extern int pk11_destroy_dh_object(PK11_SESSION *sp, CK_BBOOL uselock);
 extern DH_METHOD *PK11_DH(void);
-#endif
+#endif /* OPENSSL_NO_DH */
 
 extern CK_FUNCTION_LIST_PTR pFuncList;
 
