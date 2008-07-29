@@ -918,7 +918,7 @@ zpool_do_export(int argc, char **argv)
 			continue;
 		}
 
-		if (zpool_export(zhp) != 0)
+		if (zpool_export(zhp, force) != 0)
 			ret = 1;
 
 		zpool_close(zhp);

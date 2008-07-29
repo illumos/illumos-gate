@@ -421,7 +421,7 @@ vdev_inuse(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason,
 	 */
 	if (state != POOL_STATE_SPARE && state != POOL_STATE_L2CACHE &&
 	    !spa_guid_exists(pool_guid, device_guid) &&
-	    !spa_spare_exists(device_guid, NULL) &&
+	    !spa_spare_exists(device_guid, NULL, NULL) &&
 	    !spa_l2cache_exists(device_guid, NULL))
 		return (B_FALSE);
 
@@ -441,7 +441,7 @@ vdev_inuse(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason,
 	 * spa_has_spare() here because it may be on our pending list of spares
 	 * to add.  We also check if it is an l2cache device.
 	 */
-	if (spa_spare_exists(device_guid, &spare_pool) ||
+	if (spa_spare_exists(device_guid, &spare_pool, NULL) ||
 	    spa_has_spare(spa, device_guid)) {
 		if (spare_guid)
 			*spare_guid = device_guid;
@@ -691,7 +691,7 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 	 */
 	if (error == 0 && !vd->vdev_isspare &&
 	    (reason == VDEV_LABEL_SPARE ||
-	    spa_spare_exists(vd->vdev_guid, NULL)))
+	    spa_spare_exists(vd->vdev_guid, NULL, NULL)))
 		spa_spare_add(vd);
 
 	if (error == 0 && !vd->vdev_isl2cache &&

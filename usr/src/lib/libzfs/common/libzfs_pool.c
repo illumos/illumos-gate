@@ -1081,19 +1081,36 @@ zpool_add(zpool_handle_t *zhp, nvlist_t *nvroot)
  * mounted datasets in the pool.
  */
 int
-zpool_export(zpool_handle_t *zhp)
+zpool_export(zpool_handle_t *zhp, boolean_t force)
 {
 	zfs_cmd_t zc = { 0 };
+	char msg[1024];
 
 	if (zpool_remove_zvol_links(zhp) != 0)
 		return (-1);
 
-	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
+	(void) snprintf(msg, sizeof (msg), dgettext(TEXT_DOMAIN,
+	    "cannot export '%s'"), zhp->zpool_name);
 
-	if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_POOL_EXPORT, &zc) != 0)
-		return (zpool_standard_error_fmt(zhp->zpool_hdl, errno,
-		    dgettext(TEXT_DOMAIN, "cannot export '%s'"),
-		    zhp->zpool_name));
+	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
+	zc.zc_cookie = force;
+
+	if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_POOL_EXPORT, &zc) != 0) {
+		switch (errno) {
+		case EXDEV:
+			zfs_error_aux(zhp->zpool_hdl, dgettext(TEXT_DOMAIN,
+			    "use '-f' to override the following errors:\n"
+			    "'%s' has an active shared spare which could be"
+			    " used by other pools once '%s' is exported."),
+			    zhp->zpool_name, zhp->zpool_name);
+			return (zfs_error(zhp->zpool_hdl, EZFS_ACTIVE_SPARE,
+			    msg));
+		default:
+			return (zpool_standard_error_fmt(zhp->zpool_hdl, errno,
+			    msg));
+		}
+	}
+
 	return (0);
 }
 

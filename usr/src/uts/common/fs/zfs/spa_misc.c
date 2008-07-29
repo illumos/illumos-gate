@@ -555,19 +555,25 @@ spa_aux_remove(vdev_t *vd, avl_tree_t *avl)
 }
 
 boolean_t
-spa_aux_exists(uint64_t guid, uint64_t *pool, avl_tree_t *avl)
+spa_aux_exists(uint64_t guid, uint64_t *pool, int *refcnt, avl_tree_t *avl)
 {
 	spa_aux_t search, *found;
-	avl_index_t where;
 
 	search.aux_guid = guid;
-	found = avl_find(avl, &search, &where);
+	found = avl_find(avl, &search, NULL);
 
 	if (pool) {
 		if (found)
 			*pool = found->aux_pool;
 		else
 			*pool = 0ULL;
+	}
+
+	if (refcnt) {
+		if (found)
+			*refcnt = found->aux_count;
+		else
+			*refcnt = 0;
 	}
 
 	return (found != NULL);
@@ -636,12 +642,12 @@ spa_spare_remove(vdev_t *vd)
 }
 
 boolean_t
-spa_spare_exists(uint64_t guid, uint64_t *pool)
+spa_spare_exists(uint64_t guid, uint64_t *pool, int *refcnt)
 {
 	boolean_t found;
 
 	mutex_enter(&spa_spare_lock);
-	found = spa_aux_exists(guid, pool, &spa_spare_avl);
+	found = spa_aux_exists(guid, pool, refcnt, &spa_spare_avl);
 	mutex_exit(&spa_spare_lock);
 
 	return (found);
@@ -694,7 +700,7 @@ spa_l2cache_exists(uint64_t guid, uint64_t *pool)
 	boolean_t found;
 
 	mutex_enter(&spa_l2cache_lock);
-	found = spa_aux_exists(guid, pool, &spa_l2cache_avl);
+	found = spa_aux_exists(guid, pool, NULL, &spa_l2cache_avl);
 	mutex_exit(&spa_l2cache_lock);
 
 	return (found);

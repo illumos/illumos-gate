@@ -68,6 +68,7 @@
 int zio_taskq_threads = 8;
 
 static void spa_sync_props(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx);
+static boolean_t spa_has_active_shared_spare(spa_t *spa);
 
 /*
  * ==========================================================================
@@ -1543,7 +1544,8 @@ spa_add_spares(spa_t *spa, nvlist_t *config)
 		for (i = 0; i < nspares; i++) {
 			VERIFY(nvlist_lookup_uint64(spares[i],
 			    ZPOOL_CONFIG_GUID, &guid) == 0);
-			if (spa_spare_exists(guid, &pool) && pool != 0ULL) {
+			if (spa_spare_exists(guid, &pool, NULL) &&
+			    pool != 0ULL) {
 				VERIFY(nvlist_lookup_uint64_array(
 				    spares[i], ZPOOL_CONFIG_STATS,
 				    (uint64_t **)&vs, &vsc) == 0);
@@ -2498,7 +2500,8 @@ spa_tryimport(nvlist_t *tryconfig)
  * configuration from the cache afterwards.
  */
 static int
-spa_export_common(char *pool, int new_state, nvlist_t **oldconfig)
+spa_export_common(char *pool, int new_state, nvlist_t **oldconfig,
+    boolean_t force)
 {
 	spa_t *spa;
 
@@ -2549,6 +2552,19 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig)
 		}
 
 		/*
+		 * A pool cannot be exported if it has an active shared spare.
+		 * This is to prevent other pools stealing the active spare
+		 * from an exported pool. At user's own will, such pool can
+		 * be forcedly exported.
+		 */
+		if (!force && new_state == POOL_STATE_EXPORTED &&
+		    spa_has_active_shared_spare(spa)) {
+			spa_async_resume(spa);
+			mutex_exit(&spa_namespace_lock);
+			return (EXDEV);
+		}
+
+		/*
 		 * We want this to be reflected on every label,
 		 * so mark them all dirty.  spa_unload() will do the
 		 * final sync that pushes these changes out.
@@ -2587,16 +2603,16 @@ spa_export_common(char *pool, int new_state, nvlist_t **oldconfig)
 int
 spa_destroy(char *pool)
 {
-	return (spa_export_common(pool, POOL_STATE_DESTROYED, NULL));
+	return (spa_export_common(pool, POOL_STATE_DESTROYED, NULL, B_FALSE));
 }
 
 /*
  * Export a storage pool.
  */
 int
-spa_export(char *pool, nvlist_t **oldconfig)
+spa_export(char *pool, nvlist_t **oldconfig, boolean_t force)
 {
-	return (spa_export_common(pool, POOL_STATE_EXPORTED, oldconfig));
+	return (spa_export_common(pool, POOL_STATE_EXPORTED, oldconfig, force));
 }
 
 /*
@@ -2606,7 +2622,8 @@ spa_export(char *pool, nvlist_t **oldconfig)
 int
 spa_reset(char *pool)
 {
-	return (spa_export_common(pool, POOL_STATE_UNINITIALIZED, NULL));
+	return (spa_export_common(pool, POOL_STATE_UNINITIALIZED, NULL,
+	    B_FALSE));
 }
 
 /*
@@ -4130,6 +4147,27 @@ spa_has_spare(spa_t *spa, uint64_t guid)
 	for (i = 0; i < sav->sav_npending; i++) {
 		if (nvlist_lookup_uint64(sav->sav_pending[i], ZPOOL_CONFIG_GUID,
 		    &spareguid) == 0 && spareguid == guid)
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+/*
+ * Check if a pool has an active shared spare device.
+ * Note: reference count of an active spare is 2, as a spare and as a replace
+ */
+static boolean_t
+spa_has_active_shared_spare(spa_t *spa)
+{
+	int i, refcnt;
+	uint64_t pool;
+	spa_aux_vdev_t *sav = &spa->spa_spares;
+
+	for (i = 0; i < sav->sav_count; i++) {
+		if (spa_spare_exists(sav->sav_vdevs[i]->vdev_guid, &pool,
+		    &refcnt) && pool != 0ULL && pool == spa_guid(spa) &&
+		    refcnt > 2)
 			return (B_TRUE);
 	}
 

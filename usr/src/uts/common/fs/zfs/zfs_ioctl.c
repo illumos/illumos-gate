@@ -856,8 +856,10 @@ static int
 zfs_ioc_pool_export(zfs_cmd_t *zc)
 {
 	int error;
+	boolean_t force = (boolean_t)zc->zc_cookie;
+
 	zfs_log_history(zc);
-	error = spa_export(zc->zc_name, NULL);
+	error = spa_export(zc->zc_name, NULL, force);
 	return (error);
 }
 
