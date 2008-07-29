@@ -422,7 +422,14 @@ plat_cpu_poweroff(struct cpu *cp)
 int
 plat_max_boards(void)
 {
-	return (OPL_MAX_BOARDS);
+	/*
+	 * If the model cannot be determined, default to the max value.
+	 * Otherwise, Ikkaku model only supports 1 system board.
+	 */
+	if ((opl_cur_model != NULL) && (opl_cur_model->model_type == IKKAKU))
+		return (OPL_MAX_BOARDS_IKKAKU);
+	else
+		return (OPL_MAX_BOARDS);
 }
 
 int
