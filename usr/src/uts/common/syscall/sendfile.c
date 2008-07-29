@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -500,7 +500,7 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 #ifdef _SYSCALL32_IMPL
 	model_t model = get_udatamodel();
 	u_offset_t maxoff = (model == DATAMODEL_ILP32) ?
-		MAXOFF32_T : MAXOFFSET_T;
+	    MAXOFF32_T : MAXOFFSET_T;
 #else
 	const u_offset_t maxoff = MAXOFF32_T;
 #endif
@@ -531,8 +531,10 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 
 	auio.uio_extflg = UIO_COPY_DEFAULT;
 	for (i = 0; i < copy_cnt; i++) {
-		if (ISSIG(curthread, JUSTLOOKING))
+		if (ISSIG(curthread, JUSTLOOKING)) {
+			freemsg(head);
 			return (EINTR);
+		}
 
 		/*
 		 * Do similar checks as "write" as we are writing
@@ -545,25 +547,19 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 			continue;
 		}
 
-		/* Make sure sfv_len is not negative */
-#ifdef _SYSCALL32_IMPL
-		if (model == DATAMODEL_ILP32) {
-			if ((ssize32_t)sfv_len < 0)
-				return (EINVAL);
-		} else
-#endif
-		if (sfv_len < 0)
-			return (EINVAL);
-
 		/* Check for overflow */
 #ifdef _SYSCALL32_IMPL
 		if (model == DATAMODEL_ILP32) {
-			if (((ssize32_t)(*count + sfv_len)) < 0)
+			if (((ssize32_t)(*count + sfv_len)) < 0) {
+				freemsg(head);
 				return (EINVAL);
+			}
 		} else
 #endif
-		if ((*count + sfv_len) < 0)
+		if ((*count + sfv_len) < 0) {
+			freemsg(head);
 			return (EINVAL);
+		}
 
 		sfv_off = (u_offset_t)(ulong_t)sfv->sfv_off;
 
@@ -671,7 +667,7 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					dmp = allocb(buf_left + extra, BPRI_HI);
 					if (dmp == NULL) {
 						VOP_RWUNLOCK(readvp, readflg,
-									NULL);
+						    NULL);
 						releasef(sfv->sfv_fd);
 						freemsg(head);
 						return (ENOMEM);
@@ -768,7 +764,7 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 #ifdef _SYSCALL32_IMPL
 	model_t model = get_udatamodel();
 	u_offset_t maxoff = (model == DATAMODEL_ILP32) ?
-		MAXOFF32_T : MAXOFFSET_T;
+	    MAXOFF32_T : MAXOFFSET_T;
 #else
 	const u_offset_t maxoff = MAXOFF32_T;
 #endif
@@ -806,16 +802,6 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 			sfv++;
 			continue;
 		}
-
-		/* Make sure sfv_len is not negative */
-#ifdef _SYSCALL32_IMPL
-		if (model == DATAMODEL_ILP32) {
-			if ((ssize32_t)sfv_len < 0)
-				return (EINVAL);
-		} else
-#endif
-		if (sfv_len < 0)
-			return (EINVAL);
 
 		if (vp->v_type == VREG) {
 			if (*fileoff >= curproc->p_fsz_ctl) {
@@ -997,8 +983,8 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					maxpsz = maxphys;
 				maxpsz = roundup(maxpsz, MAXBSIZE);
 				error = snf_segmap(fp, readvp, sfv_off,
-					    (u_offset_t)sfv_len, maxpsz,
-					    (ssize_t *)&cnt, nowait);
+				    (u_offset_t)sfv_len, maxpsz,
+				    (ssize_t *)&cnt, nowait);
 				releasef(sfv->sfv_fd);
 				*count += cnt;
 				if (error)
@@ -1087,7 +1073,7 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					if (error != 0) {
 						freeb(dmp);
 						VOP_RWUNLOCK(readvp, readflg,
-									NULL);
+						    NULL);
 						releasef(sfv->sfv_fd);
 						return (error);
 					}
@@ -1125,7 +1111,7 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					if (error != 0) {
 						kmem_free(buf, size);
 						VOP_RWUNLOCK(readvp, readflg,
-									NULL);
+						    NULL);
 						releasef(sfv->sfv_fd);
 						return (error);
 					}
@@ -1147,7 +1133,8 @@ ssize_t
 sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
     size_t *xferred)
 {
-	int error;
+	int error = 0;
+	int first_vector_error = 0;
 	file_t *fp;
 	struct vnode *vp;
 	struct sonode *so;
@@ -1260,11 +1247,36 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 			for (i = 0; i < copy_cnt; i++) {
 				sfv[i].sfv_fd = sfv32[i].sfv_fd;
 				sfv[i].sfv_off =
-					(off_t)(uint32_t)sfv32[i].sfv_off;
+				    (off_t)(uint32_t)sfv32[i].sfv_off;
 				sfv[i].sfv_len = (size_t)sfv32[i].sfv_len;
 				total_size += sfv[i].sfv_len;
 				sfv[i].sfv_flag = sfv32[i].sfv_flag;
+				/*
+				 * Individual elements of the vector must not
+				 * wrap or overflow, as later math is signed.
+				 * Equally total_size needs to be checked after
+				 * each vector is added in, to be sure that
+				 * rogue values haven't overflowed the counter.
+				 */
+				if (((ssize32_t)sfv[i].sfv_len < 0) ||
+				    ((ssize32_t)total_size < 0)) {
+					/*
+					 * Truncate the vector to send data
+					 * described by elements before the
+					 * error.
+					 */
+					copy_cnt = i;
+					first_vector_error = EINVAL;
+					/* total_size can't be trusted */
+					if ((ssize32_t)total_size < 0)
+						error = EINVAL;
+					break;
+				}
 			}
+			/* Nothing to do, process errors */
+			if (copy_cnt == 0)
+				break;
+
 		} else {
 #endif
 			if (copyin(copy_vec, sfv,
@@ -1275,7 +1287,31 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 
 			for (i = 0; i < copy_cnt; i++) {
 				total_size += sfv[i].sfv_len;
+				/*
+				 * Individual elements of the vector must not
+				 * wrap or overflow, as later math is signed.
+				 * Equally total_size needs to be checked after
+				 * each vector is added in, to be sure that
+				 * rogue values haven't overflowed the counter.
+				 */
+				if (((ssize_t)sfv[i].sfv_len < 0) ||
+				    (total_size < 0)) {
+					/*
+					 * Truncate the vector to send data
+					 * described by elements before the
+					 * error.
+					 */
+					copy_cnt = i;
+					first_vector_error = EINVAL;
+					/* total_size can't be trusted */
+					if (total_size < 0)
+						error = EINVAL;
+					break;
+				}
 			}
+			/* Nothing to do, process errors */
+			if (copy_cnt == 0)
+				break;
 #ifdef _SYSCALL32_IMPL
 		}
 #endif
@@ -1313,7 +1349,8 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 				if (so->so_nl7c_flags != 0)
 					error = nl7c_sendfilev(so, &fileoff,
 					    sfv, copy_cnt, &count);
-				else if (total_size <= (4 * maxblk))
+				else if ((total_size <= (4 * maxblk)) &&
+				    error == 0)
 					error = sendvec_small_chunk(fp,
 					    &fileoff, sfv, copy_cnt,
 					    total_size, maxblk, &count);
@@ -1337,11 +1374,12 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 #endif
 		copy_vec += copy_cnt;
 		sfvcnt -= copy_cnt;
-	} while (sfvcnt > 0);
+
+	/* Process all vector members up to first error */
+	} while ((sfvcnt > 0) && first_vector_error == 0 && error == 0);
 
 	if (vp->v_type == VREG)
 		fp->f_offset += count;
-
 
 	VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, NULL);
 
@@ -1353,6 +1391,8 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 		releasef(fildes);
 		if (error != 0)
 			return (set_errno(error));
+		if (first_vector_error != 0)
+			return (set_errno(first_vector_error));
 		return (count32);
 	}
 #endif
@@ -1361,6 +1401,8 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 	releasef(fildes);
 	if (error != 0)
 		return (set_errno(error));
+	if (first_vector_error != 0)
+		return (set_errno(first_vector_error));
 	return (count);
 err:
 	ASSERT(error != 0);
