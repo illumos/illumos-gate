@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1824,7 +1824,7 @@ main(int argc, char **argv)
 			sf.sf_flags = MDDB_NM_GET;
 			/* Use magic to help protect ioctl against attack. */
 			sf.sf_magic = MDDB_SETFLAGS_MAGIC;
-			if (metaioctl(MD_MN_SET_SETFLAGS, &sf,
+			if (metaioctl(MD_MN_GET_SETFLAGS, &sf,
 			    &sf.sf_mde, NULL)) {
 				mdstealerror(ep, &sf.sf_mde);
 				mde_perror(ep, gettext("Could not get "

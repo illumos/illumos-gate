@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,8 @@
 
 #define	MAX_N_ARGS 64
 #define	MAX_ARG_LEN 1024
+#define	MAX_SLEEPS 99
+#define	SLEEP_MOD 5
 
 /* we reserve 1024 bytes for stdout and the same for stderr */
 #define	MAX_OUT	1024
@@ -209,7 +211,7 @@ mdmn_do_cmd(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 			if (FD_ISSET(pout[0], &rset)) {
 				if (MAX_OUT - out_read - 1 > 0) {
 					i = read(pout[0], out,
-						MAX_OUT - out_read);
+					    MAX_OUT - out_read);
 					out_read += i;
 					out += i;
 				} else {
@@ -225,7 +227,7 @@ mdmn_do_cmd(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 			if (FD_ISSET(perr[0], &rset)) {
 				if (MAX_ERR - err_read - 1 > 0) {
 					i = read(perr[0], err,
-						MAX_ERR - err_read);
+					    MAX_ERR - err_read);
 					err_read += i;
 					err += i;
 				} else {
@@ -653,7 +655,7 @@ mdmn_do_allocate_hotspare(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 	d = (md_mn_msg_allochsp_t *)((void *)(msg->msg_event_data));
 
 	(void) memset(&allochsp_ioc, 0,
-	sizeof (md_alloc_hotsp_params_t));
+	    sizeof (md_alloc_hotsp_params_t));
 	MD_SETDRIVERNAME(&allochsp_ioc, MD_MIRROR,
 	    MD_MIN2SET(d->msg_allochsp_mnum));
 	allochsp_ioc.mnum = d->msg_allochsp_mnum;
@@ -673,10 +675,16 @@ mdmn_do_allocate_hotspare(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 void
 mdmn_do_resync(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 {
-	md_mn_msg_resync_t	*d;
-	md_mn_rs_params_t	respar;
-	int			ret;
-	int			smi;
+	md_mn_msg_resync_t		*d;
+	md_mn_rs_params_t		respar;
+	mddb_setflags_config_t	sf;
+	md_error_t				ep = mdnullerror;
+	mdsetname_t				*sp;
+	int	ret;
+	int	smi;
+	int start_flag = 1;
+	int sleep_count = 0;
+	unsigned int sleep_time = 2;
 
 	resp->mmr_out_size = 0;
 	resp->mmr_err_size = 0;
@@ -703,8 +711,68 @@ mdmn_do_resync(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 		respar.rs_sm_flags[smi] = d->msg_sm_flags[smi];
 	}
 
-	ret = metaioctl(MD_MN_RESYNC, &respar, &respar.mde, NULL);
+	/*
+	 * Prior to running the resync thread first check that the start_step
+	 * flag (MD_SET_MN_START_RC) added by metaclust's MC_START step has been
+	 * removed from the set record flags. Ordinarily, this would be removed
+	 * at MC_STEP4 in metaclust - need to ensure this has happened on all
+	 * nodes.
+	 */
+	(void) memset(&sf, 0, sizeof (sf));
+	sf.sf_setno = MD_MIN2SET(d->msg_resync_mnum);
+	sf.sf_flags = MDDB_NM_GET;
+	/* Use magic to help protect ioctl against attack. */
+	sf.sf_magic = MDDB_SETFLAGS_MAGIC;
+	if ((sp = metasetnosetname(sf.sf_setno, &ep)) == NULL) {
+		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+		    "MDMN_DO_RESYNC: Invalid setno = %d\n"),
+		    sf.sf_setno);
+		(void) mdstealerror(&(resp->mmr_ep), &ep);
+		resp->mmr_exitval = -1;
+		return;
+	}
 
+	/* start_flag always true initially */
+	while (start_flag) {
+		if (metaioctl(MD_MN_GET_SETFLAGS, &sf, &sf.sf_mde, NULL) != 0) {
+			syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+			    "MDMN_DO_RESYNC: Could not get start_step "
+			    "flag for set %s - returning\n"),
+			    sp->setname);
+			(void) mdstealerror(&(resp->mmr_ep), &sf.sf_mde);
+			resp->mmr_exitval = -1;
+			return;
+		}
+
+		/* metaioctl returns successfully - is start flag cleared? */
+		if (sf.sf_setflags & MD_SET_MN_START_RC) {
+			start_flag = 1;
+			(void) sleep(sleep_time);
+			sleep_count++;
+			if ((sleep_count == 1) ||
+			    (sleep_count % SLEEP_MOD) == 0) {
+				syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+				    "MDMN_DO_RESYNC: Waiting for start_step "
+				    "flag for set %s to be cleared\n"),
+				    sp->setname);
+			}
+			if (sleep_count == MAX_SLEEPS) {
+				syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+				    "MDMN_DO_RESYNC: Could not clear "
+				    "start_step flag for set %s "
+				    "- returning\n"), sp->setname);
+				resp->mmr_exitval = -1;
+				return;
+			}
+		} else {
+			start_flag = 0;
+		}
+	}
+
+	ret = metaioctl(MD_MN_RESYNC, &respar, &respar.mde, NULL);
+	if (ret) {
+		(void) mdstealerror(&(resp->mmr_ep), &respar.mde);
+	}
 	resp->mmr_exitval = ret;
 }
 
@@ -1010,14 +1078,14 @@ mdmn_smgen_mddb_attach(md_mn_msg_t *msg, md_mn_msg_t *msglist[])
 	MSGID_COPY(&(msg->msg_msgid), &(nmsg->msg_msgid));
 
 	/* Don't log submessages and panic on inconsistent results */
-	nmsg->msg_flags		= MD_MSGF_NO_LOG |
-				    MD_MSGF_PANIC_WHEN_INCONSISTENT;
+	nmsg->msg_flags = MD_MSGF_NO_LOG |
+	    MD_MSGF_PANIC_WHEN_INCONSISTENT;
 	nmsg->msg_setno		= msg->msg_setno;
 	nmsg->msg_type		= MD_MN_MSG_SM_MDDB_ATTACH;
 	nmsg->msg_event_size	= sizeof (md_mn_msg_meta_db_attach_t);
 	nmsg->msg_event_data	= Zalloc(sizeof (md_mn_msg_meta_db_attach_t));
 	attach_d = (md_mn_msg_meta_db_attach_t *)
-			(void *)nmsg->msg_event_data;
+	    (void *)nmsg->msg_event_data;
 	attach_d->msg_l_dev = d->msg_l_dev;
 	attach_d->msg_cnt = d->msg_cnt;
 	attach_d->msg_dbsize = d->msg_dbsize;
@@ -1072,14 +1140,14 @@ mdmn_smgen_mddb_detach(md_mn_msg_t *msg, md_mn_msg_t *msglist[])
 	MSGID_COPY(&(msg->msg_msgid), &(nmsg->msg_msgid));
 
 	/* Don't log submessages and panic on inconsistent results */
-	nmsg->msg_flags		= MD_MSGF_NO_LOG |
-				    MD_MSGF_PANIC_WHEN_INCONSISTENT;
+	nmsg->msg_flags = MD_MSGF_NO_LOG |
+	    MD_MSGF_PANIC_WHEN_INCONSISTENT;
 	nmsg->msg_setno		= msg->msg_setno;
 	nmsg->msg_type		= MD_MN_MSG_SM_MDDB_DETACH;
 	nmsg->msg_event_size	= sizeof (md_mn_msg_meta_db_detach_t);
 	nmsg->msg_event_data	= Zalloc(sizeof (md_mn_msg_meta_db_detach_t));
 	detach_d = (md_mn_msg_meta_db_detach_t *)
-			(void *)nmsg->msg_event_data;
+	    (void *)nmsg->msg_event_data;
 	detach_d->msg_splitname = d->msg_splitname;
 	msglist[1] = nmsg;
 
@@ -1130,7 +1198,7 @@ mdmn_do_sm_mddb_attach(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 	c.c_setno = msg->msg_setno;
 	c.c_locator.l_dev = meta_cmpldev(d->msg_l_dev);
 	(void) strncpy(c.c_locator.l_driver, d->msg_dname,
-		sizeof (c.c_locator.l_driver));
+	    sizeof (c.c_locator.l_driver));
 	c.c_devname = d->msg_splitname;
 	c.c_locator.l_mnum = meta_getminor(d->msg_l_dev);
 	c.c_multi_node = 1;
@@ -1315,7 +1383,7 @@ mdmn_do_meta_db_newside(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 	c.c_locator.l_dev = meta_cmpldev(d->msg_l_dev);
 	c.c_locator.l_blkno = d->msg_blkno;
 	(void) strncpy(c.c_locator.l_driver, d->msg_dname,
-		sizeof (c.c_locator.l_driver));
+	    sizeof (c.c_locator.l_driver));
 	c.c_devname = d->msg_splitname;
 	c.c_locator.l_mnum = d->msg_mnum;
 	c.c_multi_node = 1;
@@ -1446,7 +1514,7 @@ mdmn_do_meta_md_addside(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 		 * Let's see if it is hsp or not
 		 */
 		nm.devname = (uintptr_t)meta_getnmentbykey(msg->msg_setno,
-			d->msg_otherside, nm.key, &drvnm, NULL, NULL, &ep);
+		    d->msg_otherside, nm.key, &drvnm, NULL, NULL, &ep);
 		if (nm.devname == NULL || drvnm == NULL) {
 			if (nm.devname)
 				Free((void *)(uintptr_t)nm.devname);
@@ -2020,13 +2088,13 @@ mdmn_do_addmdname(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 	 * If device node does not exist then init it
 	 */
 	if (!is_existing_meta_hsp(sp, d->addmdname_name)) {
-	    if ((key = meta_init_make_device(&sp, d->addmdname_name,
-		&mde)) <= 0) {
-		    syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
-			"MD_MN_MSG_ADDMDNAME: Invalid name %s\n"),
-			d->addmdname_name);
-		    resp->mmr_exitval = 1;
-		    return;
+		if ((key = meta_init_make_device(&sp, d->addmdname_name,
+		    &mde)) <= 0) {
+			syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+			    "MD_MN_MSG_ADDMDNAME: Invalid name %s\n"),
+			    d->addmdname_name);
+			resp->mmr_exitval = 1;
+			return;
 		}
 
 		init = 1;
@@ -2037,17 +2105,17 @@ mdmn_do_addmdname(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 	 */
 	if (metaname(&sp, d->addmdname_name, META_DEVICE, &mde) == NULL) {
 
-	    if (init) {
-		if (meta_getnmentbykey(sp->setno, MD_SIDEWILD,
-		    key, NULL, &mnum, NULL, &mde) != NULL) {
-			(void) metaioctl(MD_IOCREM_DEV, &mnum,
-				&mde, NULL);
-		}
+		if (init) {
+			if (meta_getnmentbykey(sp->setno, MD_SIDEWILD,
+			    key, NULL, &mnum, NULL, &mde) != NULL) {
+				(void) metaioctl(
+				    MD_IOCREM_DEV, &mnum, &mde, NULL);
+			}
 		(void) del_self_name(sp, key, &mde);
-	    }
+		}
 
-	    resp->mmr_exitval = 1;
-	    return;
+		resp->mmr_exitval = 1;
+		return;
 	}
 
 	resp->mmr_exitval = 0;
