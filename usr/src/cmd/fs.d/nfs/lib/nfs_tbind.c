@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,7 +151,7 @@ nfslib_transport_open(struct netconfig *nconf)
 		    (nofile_increase(0) == 0)) {
 			/* Try again with a higher NOFILE limit. */
 			fd = t_open(nconf->nc_device, O_RDWR,
-					(struct t_info *)NULL);
+			    (struct t_info *)NULL);
 		}
 		if (fd == -1) {
 			syslog(LOG_ERR, "t_open %s failed:  t_errno %d, %m",
@@ -201,6 +201,14 @@ nfslib_transport_open(struct netconfig *nconf)
 		return (-1);
 	}
 
+	/*
+	 * Enable options of returning the ip's for udp.
+	 */
+	if (strcmp(nconf->nc_netid, "udp6") == 0)
+		__rpc_tli_set_options(fd, IPPROTO_IPV6, IPV6_RECVPKTINFO, 1);
+	else if (strcmp(nconf->nc_netid, "udp") == 0)
+		__rpc_tli_set_options(fd, IPPROTO_IP, IP_RECVDSTADDR, 1);
+
 	return (fd);
 }
 
@@ -225,7 +233,7 @@ nofile_increase(int limit)
 
 	if (setrlimit(RLIMIT_NOFILE, &rl) == -1) {
 		syslog(LOG_ERR, "setrlimit of NOFILE to %d failed: %m",
-			rl.rlim_cur);
+		    rl.rlim_cur);
 		return (-1);
 	}
 
@@ -248,7 +256,7 @@ nfslib_bindit(struct netconfig *nconf, struct netbuf **addr,
 
 	if ((fd = nfslib_transport_open(nconf)) == -1) {
 		syslog(LOG_ERR, "cannot establish transport service over %s",
-			nconf->nc_device);
+		    nconf->nc_device);
 		return (-1);
 	}
 
@@ -266,7 +274,7 @@ nfslib_bindit(struct netconfig *nconf, struct netbuf **addr,
 
 		syslog(LOG_ERR,
 		"Cannot get address for transport %s host %s service %s",
-			nconf->nc_netid, hs->h_host, hs->h_serv);
+		    nconf->nc_netid, hs->h_host, hs->h_serv);
 		(void) t_close(fd);
 		return (-1);
 	}
@@ -389,10 +397,10 @@ nfslib_bindit(struct netconfig *nconf, struct netbuf **addr,
 		resp.opt.maxlen = sizeof (reqbuf);
 
 		if (t_optmgmt(fd, &req, &resp) < 0 ||
-				resp.flags != T_SUCCESS) {
+		    resp.flags != T_SUCCESS) {
 			syslog(LOG_ERR,
 	"couldn't set NODELAY option for proto %s: t_errno = %d, %m",
-				nconf->nc_proto, t_errno);
+			    nconf->nc_proto, t_errno);
 		}
 	}
 
@@ -459,11 +467,11 @@ nfslib_log_tli_error(char *tli_name, int fd, struct netconfig *nconf)
 	error = errno;
 	if (t_errno == TSYSERR) {
 		syslog(LOG_ERR, "%s(file descriptor %d/transport %s) %m",
-			tli_name, fd, nconf->nc_proto);
+		    tli_name, fd, nconf->nc_proto);
 	} else {
 		syslog(LOG_ERR,
-			"%s(file descriptor %d/transport %s) TLI error %d",
-			tli_name, fd, nconf->nc_proto, t_errno);
+		    "%s(file descriptor %d/transport %s) TLI error %d",
+		    tli_name, fd, nconf->nc_proto, t_errno);
 	}
 	errno = error;
 }
@@ -486,15 +494,15 @@ do_one(char *provider, NETSELDECL(proto), struct protob *protobp0,
 
 	if (provider)
 		sock = bind_to_provider(provider, protobp0->serv, &retaddr,
-					&retnconf);
+		    &retnconf);
 	else
 		sock = bind_to_proto(proto, protobp0->serv, &retaddr,
-					&retnconf);
+		    &retnconf);
 
 	if (sock == -1) {
 		(void) syslog(LOG_ERR,
 	"Cannot establish %s service over %s: transport setup problem.",
-			protobp0->serv, provider ? provider : proto);
+		    protobp0->serv, provider ? provider : proto);
 		return;
 	}
 
@@ -510,11 +518,11 @@ do_one(char *provider, NETSELDECL(proto), struct protob *protobp0,
 	l = strlen(NC_UDP);
 	for (protobp = protobp0; protobp; protobp = protobp->next) {
 		for (vers = protobp->versmin; vers <= protobp->versmax;
-			vers++) {
+		    vers++) {
 			if ((protobp->program == NFS_PROGRAM ||
-				protobp->program == NFS_ACL_PROGRAM) &&
-				vers == NFS_V4 &&
-				strncasecmp(retnconf->nc_proto, NC_UDP, l) == 0)
+			    protobp->program == NFS_ACL_PROGRAM) &&
+			    vers == NFS_V4 &&
+			    strncasecmp(retnconf->nc_proto, NC_UDP, l) == 0)
 				continue;
 
 			if (use_pmap) {
@@ -555,15 +563,15 @@ do_one(char *provider, NETSELDECL(proto), struct protob *protobp0,
 
 		if (svc == NULL && Mysvc4 != NULL)
 			err = (*Mysvc4)(sock, &addrmask, retnconf,
-					NFS4_SETPORT|NFS4_KRPC_START, retaddr);
+			    NFS4_SETPORT|NFS4_KRPC_START, retaddr);
 		else
 			err = (*svc)(sock, addrmask, retnconf);
 
 		if (err < 0) {
 			(void) syslog(LOG_ERR,
-				"Cannot establish %s service over <file desc."
-				" %d, protocol %s> : %m. Exiting",
-				protobp0->serv, sock, retnconf->nc_proto);
+			    "Cannot establish %s service over <file desc."
+			    " %d, protocol %s> : %m. Exiting",
+			    protobp0->serv, sock, retnconf->nc_proto);
 			exit(1);
 		}
 	}
@@ -598,7 +606,7 @@ do_all(struct protob *protobp,
 		    (protobp->program != NFS4_CALLBACK ||
 		    strncasecmp(nconf->nc_proto, NC_UDP, l) != 0))
 			do_one(nconf->nc_device, nconf->nc_proto,
-				protobp, svc, use_pmap);
+			    protobp, svc, use_pmap);
 	}
 	(void) endnetconfig(nc);
 	return (0);
@@ -633,7 +641,7 @@ poll_for_action(void)
 			 */
 			switch (errno) {
 			case EINTR:
-			    continue;
+				continue;
 
 			case EAGAIN:
 			case ENOMEM:
@@ -642,7 +650,7 @@ poll_for_action(void)
 
 			default:
 				(void) syslog(LOG_ERR,
-						"poll failed: %m. Exiting");
+				    "poll failed: %m. Exiting");
 				exit(1);
 			}
 		default:
@@ -664,10 +672,10 @@ poll_for_action(void)
 				if (conn_polled[i].nc.nc_semantics ==
 				    NC_TPI_CLTS) {
 					errno = do_poll_clts_action(
-							poll_array[i].fd, i);
+					    poll_array[i].fd, i);
 				} else {
 					errno = do_poll_cots_action(
-							poll_array[i].fd, i);
+					    poll_array[i].fd, i);
 				}
 
 				if (errno == 0)
@@ -680,8 +688,8 @@ poll_for_action(void)
 				if (errno != EAGAIN && errno != ENOMEM) {
 					(void) syslog(LOG_ERR,
 		"Error (%m) reading descriptor %d/transport %s. Closing it.",
-						poll_array[i].fd,
-						conn_polled[i].nc.nc_proto);
+					    poll_array[i].fd,
+					    conn_polled[i].nc.nc_proto);
 					(void) t_close(poll_array[i].fd);
 					remove_from_poll_list(poll_array[i].fd);
 
@@ -692,7 +700,7 @@ poll_for_action(void)
 	}
 
 	(void) syslog(LOG_ERR,
-		"All transports have been closed with errors. Exiting.");
+	    "All transports have been closed with errors. Exiting.");
 }
 
 /*
@@ -736,9 +744,9 @@ add_to_poll_list(int fd, struct netconfig *nconf)
 		 */
 		if (tpa) {
 			(void) memcpy((void *)poll_array, (void *)tpa,
-				num_fds * sizeof (struct pollfd));
+			    num_fds * sizeof (struct pollfd));
 			(void) memcpy((void *)conn_polled, (void *)tnp,
-				num_fds * sizeof (struct conn_entry));
+			    num_fds * sizeof (struct conn_entry));
 			free((void *)tpa);
 			free((void *)tnp);
 		}
@@ -765,7 +773,7 @@ add_to_poll_list(int fd, struct netconfig *nconf)
 	if (fcntl(fd, F_SETFL, O_NONBLOCK) == -1) {
 		(void) syslog(LOG_ERR,
 	"fcntl(file desc. %d/transport %s, F_SETFL, O_NONBLOCK): %m. Exiting",
-			num_fds, nconf->nc_proto);
+		    num_fds, nconf->nc_proto);
 		exit(1);
 	}
 
@@ -786,15 +794,15 @@ remove_from_poll_list(int fd)
 			--num_fds;
 			num_to_copy = num_fds - i;
 			(void) memcpy((void *)&poll_array[i],
-				(void *)&poll_array[i+1],
-				num_to_copy * sizeof (struct pollfd));
+			    (void *)&poll_array[i+1],
+			    num_to_copy * sizeof (struct pollfd));
 			(void) memset((void *)&poll_array[num_fds], 0,
-				sizeof (struct pollfd));
+			    sizeof (struct pollfd));
 			(void) memcpy((void *)&conn_polled[i],
-				(void *)&conn_polled[i+1],
-				num_to_copy * sizeof (struct conn_entry));
+			    (void *)&conn_polled[i+1],
+			    num_to_copy * sizeof (struct conn_entry));
 			(void) memset((void *)&conn_polled[num_fds], 0,
-				sizeof (struct conn_entry));
+			    sizeof (struct conn_entry));
 			return;
 		}
 	}
@@ -871,12 +879,12 @@ do_poll_clts_action(int fd, int conn_index)
 				error = errno;
 				(void) syslog(LOG_ERR,
 	"t_alloc(file descriptor %d/transport %s, T_UNITDATA) failed: %m",
-					fd, nconf->nc_proto);
+				    fd, nconf->nc_proto);
 				return (error);
 			}
 			(void) syslog(LOG_ERR,
 "t_alloc(file descriptor %d/transport %s, T_UNITDATA) failed TLI error %d",
-					fd, nconf->nc_proto, t_errno);
+			    fd, nconf->nc_proto, t_errno);
 			goto flush_it;
 		}
 	}
@@ -902,7 +910,7 @@ try_again:
 	if (ret == 0 || t_errno == TBUFOVFLW) {
 		(void) syslog(LOG_WARNING,
 "t_rcvudata(file descriptor %d/transport %s) got unexpected data, %d bytes",
-			fd, nconf->nc_proto, unitdata->udata.len);
+		    fd, nconf->nc_proto, unitdata->udata.len);
 
 		/*
 		 * Even though we don't expect any data, in case we do,
@@ -927,15 +935,15 @@ try_again:
 		 */
 		error = errno;
 		(void) syslog(LOG_ERR,
-			"t_rcvudata(file descriptor %d/transport %s) %m",
-			fd, nconf->nc_proto);
+		    "t_rcvudata(file descriptor %d/transport %s) %m",
+		    fd, nconf->nc_proto);
 		return (error);
 	case TLOOK:
 		break;
 	default:
 		(void) syslog(LOG_ERR,
 		"t_rcvudata(file descriptor %d/transport %s) TLI error %d",
-			fd, nconf->nc_proto, t_errno);
+		    fd, nconf->nc_proto, t_errno);
 		goto flush_it;
 	}
 
@@ -956,20 +964,20 @@ try_again:
 			 */
 			error = errno;
 			(void) syslog(LOG_ERR,
-				"t_look(file descriptor %d/transport %s) %m",
-				fd, nconf->nc_proto);
+			    "t_look(file descriptor %d/transport %s) %m",
+			    fd, nconf->nc_proto);
 			return (error);
 		}
 		(void) syslog(LOG_ERR,
-			"t_look(file descriptor %d/transport %s) TLI error %d",
-			fd, nconf->nc_proto, t_errno);
+		    "t_look(file descriptor %d/transport %s) TLI error %d",
+		    fd, nconf->nc_proto, t_errno);
 		goto flush_it;
 	case T_UDERR:
 		break;
 	default:
 		(void) syslog(LOG_WARNING,
 	"t_look(file descriptor %d/transport %s) returned %d not T_UDERR (%d)",
-			fd, nconf->nc_proto, ret, T_UDERR);
+		    fd, nconf->nc_proto, ret, T_UDERR);
 	}
 
 	if (uderr == NULL) {
@@ -986,12 +994,12 @@ try_again:
 				error = errno;
 				(void) syslog(LOG_ERR,
 	"t_alloc(file descriptor %d/transport %s, T_UDERROR) failed: %m",
-					fd, nconf->nc_proto);
+				    fd, nconf->nc_proto);
 				return (error);
 			}
 			(void) syslog(LOG_ERR,
 "t_alloc(file descriptor %d/transport %s, T_UDERROR) failed TLI error: %d",
-				fd, nconf->nc_proto, t_errno);
+			    fd, nconf->nc_proto, t_errno);
 			goto flush_it;
 		}
 	}
@@ -1013,7 +1021,7 @@ try_again:
 		 */
 		(void) syslog((errno == ECONNREFUSED) ? LOG_DEBUG : LOG_WARNING,
 "NFS response over <file descriptor %d/transport %s> generated error: %m",
-			fd, nconf->nc_proto);
+		    fd, nconf->nc_proto);
 
 		/*
 		 * Try to map the client's address back to a
@@ -1024,8 +1032,8 @@ try_again:
 		    host->h_hostservs) {
 		(void) syslog((errno == ECONNREFUSED) ? LOG_DEBUG : LOG_WARNING,
 "Bad NFS response was sent to client with host name: %s; service port: %s",
-				host->h_hostservs->h_host,
-				host->h_hostservs->h_serv);
+		    host->h_hostservs->h_host,
+		    host->h_hostservs->h_serv);
 		} else {
 			int i, j;
 			char *buf;
@@ -1043,7 +1051,7 @@ try_again:
 			buf[j] = '\0';
 		(void) syslog((errno == ECONNREFUSED) ? LOG_DEBUG : LOG_WARNING,
 	"Bad NFS response was sent to client with transport address: 0x%s",
-				buf);
+		    buf);
 			free((void *)buf);
 		}
 
@@ -1065,13 +1073,13 @@ try_again:
 		 */
 		error = errno;
 		(void) syslog(LOG_ERR,
-			"t_rcvuderr(file descriptor %d/transport %s) %m",
-			fd, nconf->nc_proto);
+		    "t_rcvuderr(file descriptor %d/transport %s) %m",
+		    fd, nconf->nc_proto);
 		return (error);
 	default:
 		(void) syslog(LOG_ERR,
 		"t_rcvuderr(file descriptor %d/transport %s) TLI error %d",
-			fd, nconf->nc_proto, t_errno);
+		    fd, nconf->nc_proto, t_errno);
 		goto flush_it;
 	}
 
@@ -1084,7 +1092,7 @@ flush_it:
 	 */
 	(void) syslog(LOG_ERR,
 	"Flushing one input message from <file descriptor %d/transport %s>",
-		fd, nconf->nc_proto);
+	    fd, nconf->nc_proto);
 
 	/*
 	 * Read and discard the message. Do this this until there is
@@ -1122,10 +1130,10 @@ conn_close_oldest(void)
 	}
 #ifdef DEBUG
 	printf("too many connections (%d), releasing oldest (%d)\n",
-		num_conns, poll_array[i1].fd);
+	    num_conns, poll_array[i1].fd);
 #else
 	syslog(LOG_WARNING, "too many connections (%d), releasing oldest (%d)",
-		num_conns, poll_array[i1].fd);
+	    num_conns, poll_array[i1].fd);
 #endif
 	fd = poll_array[i1].fd;
 	if (conn_polled[i1].nc.nc_semantics == NC_TPI_COTS) {
@@ -1178,7 +1186,7 @@ conn_get(int fd, struct netconfig *nconf, struct conn_ind **connp)
 	if (conn->conn_call->udata.len > 0) {
 		syslog(LOG_WARNING,
 	"rejecting inbound connection(%s) with %d bytes of connect data",
-			nconf->nc_proto, conn->conn_call->udata.len);
+		    nconf->nc_proto, conn->conn_call->udata.len);
 
 		conn->conn_call->udata.len = 0;
 		(void) t_snddis(fd, conn->conn_call);
@@ -1286,7 +1294,7 @@ cots_listen_event(int fd, int conn_index)
 			(void) t_snddis(fd, call);
 			(void) t_free((char *)call, T_CALL);
 			syslog(LOG_ERR, "Cannot establish transport over %s",
-				nconf->nc_device);
+			    nconf->nc_device);
 			continue;
 		}
 
@@ -1325,15 +1333,15 @@ cots_listen_event(int fd, int conn_index)
 #ifdef DEBUG
 					printf(
 	"cots_listen_event(%s): T_DISCONNECT during accept processing\n",
-						nconf->nc_proto);
+					    nconf->nc_proto);
 #endif
 					(void) discon_get(fd, nconf,
-								&conn_head);
+					    &conn_head);
 					continue;
 				default:
 					syslog(LOG_ERR,
 			"unexpected event 0x%x during accept processing (%s)",
-						event, nconf->nc_proto);
+					    event, nconf->nc_proto);
 					call->udata.len = 0;
 					(void) t_snddis(fd, call);
 					(void) t_free((char *)call, T_CALL);
@@ -1346,14 +1354,14 @@ cots_listen_event(int fd, int conn_index)
 		if (set_addrmask(new_fd, nconf, &addrmask) < 0) {
 			(void) syslog(LOG_ERR,
 			    "Cannot set address mask for %s",
-				nconf->nc_netid);
+			    nconf->nc_netid);
 			return;
 		}
 
 		/* Tell KRPC about the new stream. */
 		if (Mysvc4 != NULL)
 			ret = (*Mysvc4)(new_fd, &addrmask, nconf,
-				NFS4_KRPC_START, &call->addr);
+			    NFS4_KRPC_START, &call->addr);
 		else
 			ret = (*Mysvc)(new_fd, addrmask, nconf);
 
@@ -1458,7 +1466,7 @@ printf("do_poll_cots_action(%s,%d): ", nconf->nc_proto, fd);
 printf("initiating orderly release of idle connection\n");
 #endif
 				if (nconf->nc_semantics == NC_TPI_COTS ||
-					connent->closing != 0) {
+				    connent->closing != 0) {
 					(void) t_snddis(fd, (struct t_call *)0);
 					goto fdclose;
 				}
@@ -1525,11 +1533,11 @@ printf("do_poll_cots_action(%s,%d): T_DISCONNECT event\n", nconf->nc_proto, fd);
 		case T_ERROR:
 		default:
 			if (event == T_ERROR || t_errno == TSYSERR) {
-			    if ((errorstr = strerror(errno)) == NULL) {
-				(void) sprintf(buf, "Unknown error num %d",
-									errno);
-				errorstr = (const char *) buf;
-			    }
+				if ((errorstr = strerror(errno)) == NULL) {
+					(void) sprintf(buf,
+					    "Unknown error num %d", errno);
+					errorstr = (const char *) buf;
+				}
 			} else if (event == -1)
 				errorstr = t_strerror(t_errno);
 			else
@@ -1587,7 +1595,7 @@ bind_to_provider(char *provider, char *serv, struct netbuf **addr,
 		    strcmp(nconf->nc_device, provider) == 0) {
 			*retnconf = nconf;
 			return (nfslib_bindit(nconf, addr, &hs,
-					listen_backlog));
+			    listen_backlog));
 		}
 	}
 	(void) endnetconfig(nc);
@@ -1616,7 +1624,7 @@ bind_to_proto(NETSELDECL(proto), char *serv, struct netbuf **addr,
 		if (OK_TPI_TYPE(nconf) && NETSELEQ(nconf->nc_proto, proto)) {
 			*retnconf = nconf;
 			return (nfslib_bindit(nconf, addr, &hs,
-					listen_backlog));
+			    listen_backlog));
 		}
 	}
 	(void) endnetconfig(nc);

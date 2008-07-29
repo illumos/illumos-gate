@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- *  Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
 
@@ -64,6 +63,7 @@
 #include <rpc/clnt.h>
 #include <rpc/rpc_msg.h>
 #include <rpc/svc.h>
+#include <inet/ip.h>
 
 /*
  * Routines exported through ops vector.
@@ -163,6 +163,7 @@ svc_clts_kcreate(file_t *fp, uint_t sendsz, struct T_info_ack *tinfo,
 	ASSERT(rpcstat != NULL);
 
 	xprt = kmem_zalloc(sizeof (*xprt), KM_SLEEP);
+	xprt->xp_lcladdr.buf = kmem_zalloc(sizeof (sin6_t), KM_SLEEP);
 	xprt->xp_p2 = (caddr_t)rpcstat->rpc_clts_server;
 	xprt->xp_ops = &svc_clts_op;
 	xprt->xp_msg_size = tinfo->TSDU_size;
@@ -191,6 +192,7 @@ svc_clts_kdestroy(SVCMASTERXPRT *xprt)
 	mutex_destroy(&xprt->xp_req_lock);
 	mutex_destroy(&xprt->xp_thread_lock);
 
+	kmem_free(xprt->xp_lcladdr.buf, sizeof (sin6_t));
 	kmem_free(xprt, sizeof (SVCMASTERXPRT));
 }
 
@@ -272,9 +274,9 @@ svc_clts_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 	hdrsz = (int)(mp->b_wptr - mp->b_rptr);
 	if (hdrsz < TUNITDATAINDSZ ||
 	    hdrsz < (pptr->unitdata_ind.OPT_offset +
-		    pptr->unitdata_ind.OPT_length) ||
+	    pptr->unitdata_ind.OPT_length) ||
 	    hdrsz < (pptr->unitdata_ind.SRC_offset +
-		    pptr->unitdata_ind.SRC_length)) {
+	    pptr->unitdata_ind.SRC_length)) {
 		goto bad;
 	}
 
@@ -291,6 +293,32 @@ svc_clts_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 	clone_xprt->xp_rtaddr.buf = (char *)mp->b_rptr +
 	    pptr->unitdata_ind.SRC_offset;
 	clone_xprt->xp_rtaddr.len = pptr->unitdata_ind.SRC_length;
+
+	/*
+	 * Copy the local transport address in the service_transport
+	 * handle at the address in the request. We will have only
+	 * the local IP address in options.
+	 */
+	if (pptr->unitdata_ind.OPT_length && pptr->unitdata_ind.OPT_offset) {
+		char *dstopt = (char *)mp->b_rptr +
+		    pptr->unitdata_ind.OPT_offset;
+		struct T_opthdr *toh = (struct T_opthdr *)dstopt;
+
+		if (toh->level == IPPROTO_IPV6 && toh->status == 0 &&
+		    toh->name == IPV6_PKTINFO) {
+			struct in6_pktinfo *pkti;
+
+			dstopt += sizeof (struct T_opthdr);
+			pkti = (struct in6_pktinfo *)dstopt;
+			((sin6_t *)(clone_xprt->xp_lcladdr.buf))->sin6_addr
+			    = pkti->ipi6_addr;
+		} else if (toh->level == IPPROTO_IP && toh->status == 0 &&
+		    toh->name == IP_RECVDSTADDR) {
+			dstopt += sizeof (struct T_opthdr);
+			((sin_t *)(clone_xprt->xp_lcladdr.buf))->sin_addr
+			    = *(struct in_addr *)dstopt;
+		}
+	}
 
 	/*
 	 * Save the first mblk which contains the T_unidata_ind in
@@ -379,7 +407,7 @@ svc_clts_ksend(SVCXPRT *clone_xprt, struct rpc_msg *msg)
 	 */
 	has_args = FALSE;
 	if (msg->rm_reply.rp_stat == MSG_ACCEPTED &&
-		msg->rm_reply.rp_acpt.ar_stat == SUCCESS) {
+	    msg->rm_reply.rp_acpt.ar_stat == SUCCESS) {
 		if ((xdr_results = msg->acpted_rply.ar_results.proc) != NULL) {
 			has_args = TRUE;
 			xdr_location = msg->acpted_rply.ar_results.where;
@@ -420,8 +448,8 @@ svc_clts_ksend(SVCXPRT *clone_xprt, struct rpc_msg *msg)
 		TRACE_0(TR_FAC_KRPC, TR_XDR_REPLYMSG_START,
 		    "xdr_replymsg_start:");
 		if (!(xdr_replymsg(xdrs, msg) &&
-			(!has_args || SVCAUTH_WRAP(&clone_xprt->xp_auth, xdrs,
-				xdr_results, xdr_location)))) {
+		    (!has_args || SVCAUTH_WRAP(&clone_xprt->xp_auth, xdrs,
+		    xdr_results, xdr_location)))) {
 			TRACE_1(TR_FAC_KRPC, TR_XDR_REPLYMSG_END,
 			    "xdr_replymsg_end:(%S)", "bad");
 			RPCLOG0(1, "xdr_replymsg/SVCAUTH_WRAP failed\n");
@@ -431,8 +459,8 @@ svc_clts_ksend(SVCXPRT *clone_xprt, struct rpc_msg *msg)
 		    "xdr_replymsg_end:(%S)", "good");
 
 	} else if (!(xdr_replymsg_body(xdrs, msg) &&
-		    (!has_args || SVCAUTH_WRAP(&clone_xprt->xp_auth, xdrs,
-				xdr_results, xdr_location)))) {
+	    (!has_args || SVCAUTH_WRAP(&clone_xprt->xp_auth, xdrs,
+	    xdr_results, xdr_location)))) {
 		RPCLOG0(1, "xdr_replymsg_body/SVCAUTH_WRAP failed\n");
 		goto out;
 	}
@@ -444,7 +472,7 @@ svc_clts_ksend(SVCXPRT *clone_xprt, struct rpc_msg *msg)
 #ifdef	DEBUG
 		cmn_err(CE_NOTE,
 "KRPC: server response message of %d bytes; transport limits are [0, %d]",
-			msgsz, clone_xprt->xp_msg_size);
+		    msgsz, clone_xprt->xp_msg_size);
 #endif
 		goto out;
 	}
@@ -493,7 +521,7 @@ svc_clts_kgetargs(SVCXPRT *clone_xprt, xdrproc_t xdr_args,
 
 	/* LINTED pointer alignment */
 	return (SVCAUTH_UNWRAP(&clone_xprt->xp_auth, &clone_xprt->xp_xdrin,
-				xdr_args, args_ptr));
+	    xdr_args, args_ptr));
 
 }
 

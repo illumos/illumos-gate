@@ -43,14 +43,30 @@ typedef struct nfsv4cbinfo {
 #pragma D binding "1.5" translator
 translator conninfo_t < struct svc_req *P > {
 	ci_protocol = P->rq_xprt->xp_master->xp_netid == "tcp" ? "ipv4" :
+	    P->rq_xprt->xp_master->xp_netid == "udp" ? "ipv4" :
 	    P->rq_xprt->xp_master->xp_netid == "tcp6" ? "ipv6" :
+	    P->rq_xprt->xp_master->xp_netid == "udp6" ? "ipv6" :
 	    "<unknown>";
 
-	ci_local = inet_ntoa6(&((conn_t *)P->rq_xprt->xp_xpc.
-	    xpc_wq->q_next->q_ptr)->connua_v6addr.connua_laddr);
+	ci_local = (P->rq_xprt->xp_master->xp_netid == "tcp" ||
+	    P->rq_xprt->xp_master->xp_netid == "udp") ?
+	    inet_ntoa(&((struct sockaddr_in *)
+	    P->rq_xprt->xp_xpc.xpc_lcladdr.buf)->sin_addr.S_un.S_addr) :
+	    (P->rq_xprt->xp_master->xp_netid == "tcp6" ||
+	    P->rq_xprt->xp_master->xp_netid == "udp6") ?
+	    inet_ntoa6(&((struct sockaddr_in6 *)
+	    P->rq_xprt->xp_xpc.xpc_lcladdr.buf)->sin6_addr) :
+	    "unknown";
 
-	ci_remote = inet_ntoa6(&((conn_t *)P->rq_xprt->xp_xpc.
-	    xpc_wq->q_next->q_ptr)->connua_v6addr.connua_faddr);
+	ci_remote = (P->rq_xprt->xp_master->xp_netid == "tcp" ||
+	    P->rq_xprt->xp_master->xp_netid == "udp") ?
+	    inet_ntoa(&((struct sockaddr_in *)
+	    P->rq_xprt->xp_xpc.xpc_rtaddr.buf)->sin_addr.S_un.S_addr) :
+	    (P->rq_xprt->xp_master->xp_netid == "tcp6" ||
+	    P->rq_xprt->xp_master->xp_netid == "udp6") ?
+	    inet_ntoa6(&((struct sockaddr_in6 *)
+	    P->rq_xprt->xp_xpc.xpc_rtaddr.buf)->sin6_addr) :
+	    "unknown";
 };
 
 #pragma D binding "1.5" translator

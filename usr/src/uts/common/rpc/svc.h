@@ -391,6 +391,7 @@ typedef struct __svcxprt_common {
 	int32_t		xpc_type;	/* transport type		*/
 	int		xpc_msg_size;	/* TSDU or TIDU size		*/
 	struct netbuf	xpc_rtaddr;	/* remote transport address	*/
+	struct netbuf	xpc_lcladdr;	/* local transport address	*/
 	SVC_CALLOUT_TABLE *xpc_sct;
 } __SVCXPRT_COMMON;
 
@@ -401,6 +402,7 @@ typedef struct __svcxprt_common {
 #define	xp_type		xp_xpc.xpc_type
 #define	xp_msg_size	xp_xpc.xpc_msg_size
 #define	xp_rtaddr	xp_xpc.xpc_rtaddr
+#define	xp_lcladdr	xp_xpc.xpc_lcladdr
 #define	xp_sct		xp_xpc.xpc_sct
 
 struct __svcmasterxprt {

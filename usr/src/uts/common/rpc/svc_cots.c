@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- *  Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
 
@@ -65,6 +64,7 @@
 #include <rpc/auth.h>
 #include <rpc/rpc_msg.h>
 #include <rpc/svc.h>
+#include <inet/ip.h>
 
 #define	COTS_MAX_ALLOCSIZE	2048
 #define	MSG_OFFSET		128	/* offset of call into the mblk */
@@ -186,11 +186,11 @@ svc_cots_kcreate(file_t *fp, uint_t max_msgsize, struct T_info_ack *tinfo,
     SVCMASTERXPRT **nxprt)
 {
 	struct cots_master_data *cmd;
-	int err;
-	int retval;
+	int err, retval;
 	SVCMASTERXPRT *xprt;
-	int addr_size;
 	struct rpcstat *rpcstat;
+	struct T_addr_ack *ack_p;
+	struct strioctl getaddr;
 
 	if (nxprt == NULL)
 		return (EINVAL);
@@ -198,25 +198,19 @@ svc_cots_kcreate(file_t *fp, uint_t max_msgsize, struct T_info_ack *tinfo,
 	rpcstat = zone_getspecific(rpcstat_zone_key, curproc->p_zone);
 	ASSERT(rpcstat != NULL);
 
-	addr_size = tinfo->ADDR_size;
-	if (addr_size == T_UNKNOWNADDRSIZE) {
-	    addr_size = T_MINADDRSIZE;
-	}
-
-allocate_space:
-
 	xprt = kmem_zalloc(sizeof (SVCMASTERXPRT), KM_SLEEP);
-	cmd = kmem_zalloc(sizeof (*cmd) + addr_size, KM_SLEEP);
 
-	/* cd_src_addr is set to the end of cots_data_t struct */
-	cmd->cmd_src_addr = (char *)&cmd[1];
+	cmd = kmem_zalloc(sizeof (*cmd) + sizeof (*ack_p)
+	    + (2 * sizeof (sin6_t)), KM_SLEEP);
+
+	ack_p = (struct T_addr_ack *)&cmd[1];
 
 	if ((tinfo->TIDU_size > COTS_MAX_ALLOCSIZE) ||
 	    (tinfo->TIDU_size <= 0))
 		xprt->xp_msg_size = COTS_MAX_ALLOCSIZE;
 	else {
 		xprt->xp_msg_size = tinfo->TIDU_size -
-			(tinfo->TIDU_size % BYTES_PER_XDR_UNIT);
+		    (tinfo->TIDU_size % BYTES_PER_XDR_UNIT);
 	}
 
 	xprt->xp_ops = &svc_cots_op;
@@ -224,29 +218,29 @@ allocate_space:
 	cmd->cmd_xprt_started = 0;
 	cmd->cmd_stats = rpcstat->rpc_cots_server;
 
-	xprt->xp_rtaddr.maxlen = addr_size;
-	xprt->xp_rtaddr.len = 0;
-	xprt->xp_rtaddr.buf = cmd->cmd_src_addr;
+	getaddr.ic_cmd = TI_GETINFO;
+	getaddr.ic_timout = -1;
+	getaddr.ic_len = sizeof (*ack_p) + (2 * sizeof (sin6_t));
+	getaddr.ic_dp = (char *)ack_p;
+	ack_p->PRIM_type = T_ADDR_REQ;
 
-	/*
-	 * Get the address of the client for duplicate request
-	 * cache processing. Note that the TI_GETPEERNAME ioctl should
-	 * be replaced with a T_ADDR_REQ/T_ADDR_ACK handshake when
-	 * TCP supports these standard TPI primitives.
-	 */
-	retval = 0;
-	err = strioctl(fp->f_vnode, TI_GETPEERNAME,
-	    (intptr_t)&xprt->xp_rtaddr, 0, K_TO_K, CRED(), &retval);
+	err = strioctl(fp->f_vnode, I_STR, (intptr_t)&getaddr,
+	    0, K_TO_K, CRED(), &retval);
 	if (err) {
+		kmem_free(cmd, sizeof (*cmd) + sizeof (*ack_p) +
+		    (2 * sizeof (sin6_t)));
 		kmem_free(xprt, sizeof (SVCMASTERXPRT));
-		kmem_free(cmd, sizeof (*cmd) + addr_size);
-		if ((err == ENAMETOOLONG) &&
-			(tinfo->ADDR_size == T_UNKNOWNADDRSIZE)) {
-			addr_size *= 2;
-			goto allocate_space;
-		}
 		return (err);
 	}
+
+	xprt->xp_rtaddr.maxlen = ack_p->REMADDR_length;
+	xprt->xp_rtaddr.len = ack_p->REMADDR_length;
+	cmd->cmd_src_addr = xprt->xp_rtaddr.buf =
+	    (char *)ack_p + ack_p->REMADDR_offset;
+
+	xprt->xp_lcladdr.maxlen = ack_p->LOCADDR_length;
+	xprt->xp_lcladdr.len = ack_p->LOCADDR_length;
+	xprt->xp_lcladdr.buf = (char *)ack_p + ack_p->LOCADDR_offset;
 
 	/*
 	 * If the current sanity check size in rpcmod is smaller
@@ -264,6 +258,7 @@ allocate_space:
 	}
 
 	*nxprt = xprt;
+
 	return (0);
 }
 
@@ -286,7 +281,9 @@ svc_cots_kdestroy(SVCMASTERXPRT *xprt)
 	mutex_destroy(&xprt->xp_req_lock);
 	mutex_destroy(&xprt->xp_thread_lock);
 
-	kmem_free(cmd, sizeof (*cmd) + xprt->xp_rtaddr.maxlen);
+	kmem_free(cmd, sizeof (*cmd) + sizeof (struct T_addr_ack) +
+	    (2 * sizeof (sin6_t)));
+
 	kmem_free(xprt, sizeof (SVCMASTERXPRT));
 }
 
@@ -307,7 +304,7 @@ svc_cots_kstart(SVCMASTERXPRT *xprt)
 		 */
 		mutex_enter(&xprt->xp_req_lock);
 		if (cmd->cmd_xprt_started == 0 &&
-			xprt->xp_wq != NULL) {
+		    xprt->xp_wq != NULL) {
 			(*mir_start)(xprt->xp_wq);
 			cmd->cmd_xprt_started = 1;
 		}
@@ -510,7 +507,7 @@ svc_cots_ksend(SVCXPRT *clone_xprt, struct rpc_msg *msg)
 			    "xdr_replymsg_end:(%S)", "bad");
 			freemsg(mp);
 			RPCLOG0(1, "svc_cots_ksend: xdr_replymsg/SVCAUTH_WRAP "
-				"failed\n");
+			    "failed\n");
 			goto out;
 		}
 		TRACE_1(TR_FAC_KRPC, TR_XDR_REPLYMSG_END,
