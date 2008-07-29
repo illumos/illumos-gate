@@ -595,7 +595,8 @@ segvn_create(struct seg *seg, void *argsp)
 	 */
 	if (!(a->flags & MAP_NORESERVE) && ((a->vp == NULL && a->amp == NULL) ||
 	    (a->type == MAP_PRIVATE && (a->prot & PROT_WRITE)))) {
-		if (anon_resv(seg->s_size) == 0)
+		if (anon_resv_zone(seg->s_size,
+		    seg->s_as->a_proc->p_zone) == 0)
 			return (EAGAIN);
 		swresv = seg->s_size;
 		TRACE_3(TR_FAC_VM, TR_ANON_PROC, "anon proc:%p %lu %u",
@@ -626,7 +627,8 @@ segvn_create(struct seg *seg, void *argsp)
 		    a->maxprot, a->type, cred, NULL);
 		if (error) {
 			if (swresv != 0) {
-				anon_unresv(swresv);
+				anon_unresv_zone(swresv,
+				    seg->s_as->a_proc->p_zone);
 				TRACE_3(TR_FAC_VM, TR_ANON_PROC,
 				    "anon proc:%p %lu %u", seg, swresv, 0);
 			}
@@ -1469,6 +1471,7 @@ segvn_dup(struct seg *seg, struct seg *newseg)
 	struct anon_map *amp;
 
 	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(newseg->s_as->a_proc->p_parent == curproc);
 
 	/*
 	 * If segment has anon reserved, reserve more for the new seg.
@@ -2005,7 +2008,8 @@ retry:
 				 * case it's MAP_SHARED
 				 */
 				if (svd->type == MAP_SHARED) {
-					anon_unresv(len);
+					anon_unresv_zone(len,
+					    seg->s_as->a_proc->p_zone);
 					amp->swresv -= len;
 				}
 			}
@@ -2025,7 +2029,8 @@ retry:
 
 				svd->swresv = ptob(anon_pages(amp->ahp,
 				    svd->anon_index, npages));
-				anon_unresv(oswresv - svd->swresv);
+				anon_unresv_zone(oswresv - svd->swresv,
+				    seg->s_as->a_proc->p_zone);
 			} else {
 				size_t unlen;
 
@@ -2040,7 +2045,8 @@ retry:
 					ASSERT(svd->swresv == seg->s_size);
 					unlen = len;
 				}
-				anon_unresv(unlen);
+				anon_unresv_zone(unlen,
+				    seg->s_as->a_proc->p_zone);
 			}
 			TRACE_3(TR_FAC_VM, TR_ANON_PROC, "anon proc:%p %lu %u",
 			    seg, len, 0);
@@ -2108,7 +2114,8 @@ retry:
 				 * case it's MAP_SHARED
 				 */
 				if (svd->type == MAP_SHARED) {
-					anon_unresv(len);
+					anon_unresv_zone(len,
+					    seg->s_as->a_proc->p_zone);
 					amp->swresv -= len;
 				}
 			}
@@ -2123,7 +2130,8 @@ retry:
 				oswresv = svd->swresv;
 				svd->swresv = ptob(anon_pages(amp->ahp,
 				    svd->anon_index, npages));
-				anon_unresv(oswresv - svd->swresv);
+				anon_unresv_zone(oswresv - svd->swresv,
+				    seg->s_as->a_proc->p_zone);
 			} else {
 				size_t unlen;
 
@@ -2138,7 +2146,8 @@ retry:
 					ASSERT(svd->swresv == seg->s_size);
 					unlen = len;
 				}
-				anon_unresv(unlen);
+				anon_unresv_zone(unlen,
+				    seg->s_as->a_proc->p_zone);
 			}
 			TRACE_3(TR_FAC_VM, TR_ANON_PROC,
 			    "anon proc:%p %lu %u", seg, len, 0);
@@ -2253,7 +2262,8 @@ retry:
 			 * case it's MAP_SHARED
 			 */
 			if (svd->type == MAP_SHARED) {
-				anon_unresv(len);
+				anon_unresv_zone(len,
+				    seg->s_as->a_proc->p_zone);
 				amp->swresv -= len;
 			}
 		}
@@ -2292,7 +2302,8 @@ retry:
 			nsvd->swresv = ptob(anon_pages(nsvd->amp->ahp,
 			    nsvd->anon_index, btop(nseg->s_size)));
 			ASSERT(oswresv >= (svd->swresv + nsvd->swresv));
-			anon_unresv(oswresv - (svd->swresv + nsvd->swresv));
+			anon_unresv_zone(oswresv - (svd->swresv + nsvd->swresv),
+			    seg->s_as->a_proc->p_zone);
 		} else {
 			size_t unlen;
 
@@ -2313,7 +2324,8 @@ retry:
 				nsvd->swresv = nseg->s_size;
 				unlen = len;
 			}
-			anon_unresv(unlen);
+			anon_unresv_zone(unlen,
+			    seg->s_as->a_proc->p_zone);
 		}
 		TRACE_3(TR_FAC_VM, TR_ANON_PROC, "anon proc:%p %lu %u",
 		    seg, len, 0);
@@ -2397,7 +2409,8 @@ segvn_free(struct seg *seg)
 					anon_free(amp->ahp, 0, amp->size);
 				}
 				if ((len = amp->swresv) != 0) {
-					anon_unresv(len);
+					anon_unresv_zone(len,
+					    seg->s_as->a_proc->p_zone);
 					TRACE_3(TR_FAC_VM, TR_ANON_PROC,
 					    "anon proc:%p %lu %u", seg, len, 0);
 				}
@@ -2428,7 +2441,8 @@ segvn_free(struct seg *seg)
 	 * Release swap reservation.
 	 */
 	if ((len = svd->swresv) != 0) {
-		anon_unresv(svd->swresv);
+		anon_unresv_zone(svd->swresv,
+		    seg->s_as->a_proc->p_zone);
 		TRACE_3(TR_FAC_VM, TR_ANON_PROC, "anon proc:%p %lu %u",
 		    seg, len, 0);
 		svd->swresv = 0;

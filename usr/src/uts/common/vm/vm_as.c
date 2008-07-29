@@ -789,6 +789,8 @@ as_dup(struct as *as, struct as **outas)
 	as_clearwatch(as);
 	newas = as_alloc();
 	newas->a_userlimit = as->a_userlimit;
+	newas->a_proc = as->a_proc->p_child;
+
 	AS_LOCK_ENTER(newas, &newas->a_lock, RW_WRITER);
 
 	/* This will prevent new XHATs from attaching */

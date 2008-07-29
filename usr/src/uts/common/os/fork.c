@@ -308,7 +308,6 @@ cfork(int isvfork, int isfork1, int flags)
 			error = (error == ENOMEM) ? ENOMEM : EAGAIN;
 			goto forkerr;
 		}
-		cp->p_as->a_proc = cp;
 
 		/* Duplicate parent's shared memory */
 		if (p->p_segacct)
