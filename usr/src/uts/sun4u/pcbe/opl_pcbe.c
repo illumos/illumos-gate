@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -231,6 +231,7 @@ static const struct nametable SPARC64_VI_names_u0[] = {
 	{0x18,	"thread_switch_all"},
 	{0x18,	"only_this_thread_active"},
 	SPARC64_VI_EVENTS_comm_2,
+	{0x1b,	"rsf_pmmi"},
 	{0x1d,	"act_thread_suspend"},
 	{0x1e,	"cse_window_empty"},
 	{0x1f,	"inh_cmit_gpr_2write"},
