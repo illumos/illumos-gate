@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,6 +86,7 @@ extern void sfmmu_patch_utsb(void);
 extern caddr_t	textva, datava;
 extern tte_t	ktext_tte, kdata_tte;	/* ttes for kernel text and data */
 extern int	enable_bigktsb;
+extern int	kmem64_smchunks;
 
 uint64_t memsegspa = (uintptr_t)MSEG_NULLPTR_PA; /* memsegs physical linkage */
 uint64_t memseg_phash[N_MEM_SLOTS];	/* use physical memseg addresses */
@@ -129,7 +130,8 @@ va_to_pfn(void *vaddr)
 		return (hat_getpfnum(kas.a_hat, (caddr_t)vaddr));
 
 #if !defined(C_OBP)
-	if ((caddr_t)vaddr >= kmem64_base && (caddr_t)vaddr < kmem64_end) {
+	if (!kmem64_smchunks &&
+	    (caddr_t)vaddr >= kmem64_base && (caddr_t)vaddr < kmem64_end) {
 		if (kmem64_pabase == (uint64_t)-1)
 			prom_panic("va_to_pfn: kmem64_pabase not init");
 		physaddr = kmem64_pabase + ((caddr_t)vaddr - kmem64_base);
@@ -332,7 +334,8 @@ sfmmu_map_prom_mappings(struct translation *trans_root, size_t ntrans_root)
 			/*
 			 * skip kmem64 area
 			 */
-			if (vaddr >= kmem64_base &&
+			if (!kmem64_smchunks &&
+			    vaddr >= kmem64_base &&
 			    vaddr < kmem64_aligned_end) {
 #if !defined(C_OBP)
 				prom_panic("sfmmu_map_prom_mappings:"
@@ -398,7 +401,7 @@ sfmmu_map_prom_mappings(struct translation *trans_root, size_t ntrans_root)
 	/*
 	 * We claimed kmem64 from prom, so now we need to load tte.
 	 */
-	if (kmem64_base != NULL) {
+	if (!kmem64_smchunks && kmem64_base != NULL) {
 		pgcnt_t pages;
 		size_t psize;
 		int pszc;

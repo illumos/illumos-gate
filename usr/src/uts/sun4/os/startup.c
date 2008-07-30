@@ -285,6 +285,11 @@ int thermal_powerdown_delay = 1200;
 int page_relocate_ready = 0;
 
 /*
+ * Indicate if kmem64 allocation was done in small chunks
+ */
+int kmem64_smchunks = 0;
+
+/*
  * Enable some debugging messages concerning memory usage...
  */
 #ifdef  DEBUGGING_MEM
@@ -739,11 +744,16 @@ calc_pagehash_sz(pgcnt_t npages)
 	return (page_hashsz * sizeof (struct page *));
 }
 
-void
+int testkmem64_smchunks = 0;
+
+int
 alloc_kmem64(caddr_t base, caddr_t end)
 {
 	int i;
 	caddr_t aligned_end = NULL;
+
+	if (testkmem64_smchunks)
+		return (1);
 
 	/*
 	 * Make one large memory alloc after figuring out the 64-bit size. This
@@ -788,10 +798,16 @@ alloc_kmem64(caddr_t base, caddr_t end)
 		}
 #endif	/* !C_OBP */
 		if (i == TTE8K) {
+#ifdef sun4v
+			/* return failure to try small allocations */
+			return (1);
+#else
 			prom_panic("kmem64 allocation failure");
+#endif
 		}
 	}
 	ASSERT(aligned_end != NULL);
+	return (0);
 }
 
 static prom_memlist_t *boot_physinstalled, *boot_physavail, *boot_virtavail;
@@ -1133,7 +1149,71 @@ startup_memlist(void)
 	kmem64_sz = roundup(kmem64_sz, PAGESIZE);
 	kmem64_base = (caddr_t)syslimit;
 	kmem64_end = kmem64_base + kmem64_sz;
-	alloc_kmem64(kmem64_base, kmem64_end);
+	if (alloc_kmem64(kmem64_base, kmem64_end)) {
+		/*
+		 * Attempt for kmem64 to allocate one big
+		 * contiguous chunk of memory failed.
+		 * We get here because we are sun4v.
+		 * We will proceed by breaking up
+		 * the allocation into two attempts.
+		 * First, we allocate kpm_pp_sz, hmehash_sz,
+		 * pagehash_sz, pagelist_sz, tt_sz & psetable_sz as
+		 * one contiguous chunk. This is a much smaller
+		 * chunk and we should get it, if not we panic.
+		 * Note that hmehash and tt need to be physically
+		 * (in the real address sense) contiguous.
+		 * Next, we use bop_alloc_chunk() to
+		 * to allocate the page_t structures.
+		 * This will allow the page_t to be allocated
+		 * in multiple smaller chunks.
+		 * In doing so, the assumption that page_t is
+		 * physically contiguous no longer hold, this is ok
+		 * for sun4v but not for sun4u.
+		 */
+		size_t  tmp_size;
+		caddr_t tmp_base;
+
+		pp_sz  = roundup(pp_sz, PAGESIZE);
+
+		/*
+		 * Allocate kpm_pp_sz, hmehash_sz,
+		 * pagehash_sz, pagelist_sz, tt_sz & psetable_sz
+		 */
+		tmp_base = kmem64_base + pp_sz;
+		tmp_size = roundup(kpm_pp_sz + hmehash_sz + pagehash_sz +
+		    pagelist_sz + tt_sz + psetable_sz, PAGESIZE);
+		if (prom_alloc(tmp_base, tmp_size, PAGESIZE) == 0)
+			prom_panic("kmem64 prom_alloc contig failed");
+		PRM_DEBUG(tmp_base);
+		PRM_DEBUG(tmp_size);
+
+		/*
+		 * Allocate the page_ts
+		 */
+		if (bop_alloc_chunk(kmem64_base, pp_sz, PAGESIZE) == 0)
+			prom_panic("kmem64 bop_alloc_chunk page_t failed");
+		PRM_DEBUG(kmem64_base);
+		PRM_DEBUG(pp_sz);
+
+		kmem64_aligned_end = kmem64_base + pp_sz + tmp_size;
+		ASSERT(kmem64_aligned_end >= kmem64_end);
+
+		kmem64_smchunks = 1;
+	} else {
+
+		/*
+		 * We need to adjust pp_sz for the normal
+		 * case where kmem64 can allocate one large chunk
+		 */
+		if (kpm_smallpages == 0) {
+			npages -= kmem64_sz / (PAGESIZE + sizeof (struct page));
+		} else {
+			npages -= kmem64_sz / (PAGESIZE + sizeof (struct page) +
+			    sizeof (kpm_spage_t));
+		}
+		pp_sz = npages * sizeof (struct page);
+	}
+
 	if (kmem64_aligned_end > (hole_start ? hole_start : kpm_vbase))
 		cmn_err(CE_PANIC, "not enough kmem64 space");
 	PRM_DEBUG(kmem64_base);
@@ -1145,15 +1225,7 @@ startup_memlist(void)
 	 */
 	alloc_base = kmem64_base;
 
-	if (kpm_smallpages == 0) {
-		npages -= kmem64_sz / (PAGESIZE + sizeof (struct page));
-	} else {
-		npages -= kmem64_sz / (PAGESIZE + sizeof (struct page) +
-		    sizeof (kpm_spage_t));
-	}
-
 	pp_base = (page_t *)alloc_base;
-	pp_sz = npages * sizeof (struct page);
 	alloc_base += pp_sz;
 	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, ecache_alignsize);
 	PRM_DEBUG(pp_base);
@@ -1199,8 +1271,18 @@ startup_memlist(void)
 	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, ecache_alignsize);
 	PRM_DEBUG(alloc_base);
 
-	/* adjust kmem64_end to what we really allocated */
-	kmem64_end = (caddr_t)roundup((uintptr_t)alloc_base, PAGESIZE);
+	/*
+	 * Note that if we use small chunk allocations for
+	 * kmem64, we need to ensure kmem64_end is the same as
+	 * kmem64_aligned_end to prevent subsequent logic from
+	 * trying to reuse the overmapping.
+	 * Otherwise we adjust kmem64_end to what we really allocated.
+	 */
+	if (kmem64_smchunks) {
+		kmem64_end = kmem64_aligned_end;
+	} else {
+		kmem64_end = (caddr_t)roundup((uintptr_t)alloc_base, PAGESIZE);
+	}
 	kmem64_sz = kmem64_end - kmem64_base;
 
 	if (&ecache_init_scrub_flush_area) {
@@ -1332,7 +1414,10 @@ startup_memlist(void)
 	memlist_new(va_to_pa(s_text), MMU_PAGESIZE4M, &memlist);
 	memlist_add(va_to_pa(s_data), MMU_PAGESIZE4M - ndata_remain_sz,
 	    &memlist, &nopp_list);
-	memlist_add(kmem64_pabase, kmem64_sz, &memlist, &nopp_list);
+
+	/* Don't add to nopp_list if kmem64 was allocated in smchunks */
+	if (!kmem64_smchunks)
+		memlist_add(kmem64_pabase, kmem64_sz, &memlist, &nopp_list);
 
 	if ((caddr_t)memlist > (memspace + memlist_sz))
 		prom_panic("memlist overflow");

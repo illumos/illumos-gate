@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -280,6 +280,79 @@ bop_alloc(caddr_t virthint, size_t size, int align)
 		return (bop_temp_alloc(size, align));
 	return (prom_alloc(virthint, size, align));
 }
+
+
+/*
+ * Similar to bop_alloc functionality except that
+ * it will try to breakup into PAGESIZE chunk allocations
+ * if the original single chunk request failed.
+ * This routine does not guarantee physical contig
+ * allocation.
+ */
+caddr_t
+bop_alloc_chunk(caddr_t virthint, size_t size, int align)
+{
+	caddr_t ret;
+	size_t chunksz;
+
+	if (virthint == NULL)
+		return (bop_temp_alloc(size, align));
+
+	if ((ret = prom_alloc(virthint, size, align)))
+		return (ret);
+
+	/*
+	 * Normal request to prom_alloc has failed.
+	 * We will attempt to satisfy the request by allocating
+	 * smaller chunks resulting in allocation that
+	 * will be virtually contiguous but potentially
+	 * not physically contiguous. There are additional
+	 * requirements before we want to do this:
+	 * 1. virthirt must be PAGESIZE aligned.
+	 * 2. align must not be greater than PAGESIZE
+	 * 3. size request must be at least PAGESIZE
+	 * Otherwise, we will revert back to the original
+	 * bop_alloc behavior i.e. return failure.
+	 */
+	if (P2PHASE_TYPED(virthint, PAGESIZE, size_t) != 0 ||
+	    align > PAGESIZE || size < PAGESIZE)
+		return (ret);
+
+	/*
+	 * Now we will break up the allocation
+	 * request in smaller chunks that are
+	 * always PAGESIZE aligned.
+	 */
+	ret = virthint;
+	chunksz = P2ALIGN((size >> 1), PAGESIZE);
+	chunksz = MAX(chunksz, PAGESIZE);
+
+	while (size) {
+		do {
+			/*LINTED E_FUNC_SET_NOT_USED*/
+			caddr_t res;
+			if ((res = prom_alloc(virthint, chunksz,
+			    PAGESIZE))) {
+				ASSERT(virthint == res);
+				break;
+			}
+
+			chunksz >>= 1;
+			chunksz = P2ALIGN(chunksz, PAGESIZE);
+		} while (chunksz >= PAGESIZE);
+
+		if (chunksz < PAGESIZE)
+			/* Can't really happen.. */
+			prom_panic("bop_alloc_chunk failed");
+
+		virthint += chunksz;
+		size -= chunksz;
+		if (size < chunksz)
+			chunksz = size;
+	}
+	return (ret);
+}
+
 
 /*
  * Implementation of the "alloc_virt" boot service

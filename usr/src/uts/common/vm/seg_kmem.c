@@ -405,8 +405,13 @@ boot_alloc(void *inaddr, size_t size, uint_t align)
 		    "BOP_GONE");
 
 	size = ptob(btopr(size));
+#ifdef __sparc
+	if (bop_alloc_chunk(addr, size, align) != (caddr_t)addr)
+		panic("boot_alloc: bop_alloc_chunk failed");
+#else
 	if (BOP_ALLOC(bootops, addr, size, align) != addr)
 		panic("boot_alloc: BOP_ALLOC failed");
+#endif
 	boot_mapin((caddr_t)addr, size);
 	return (addr);
 }

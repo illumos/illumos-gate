@@ -98,6 +98,7 @@ extern int bop_close(int fd);
 extern caddr_t bop_alloc(caddr_t virthint, size_t size, int align);
 extern caddr_t bop_alloc_virt(caddr_t virt, size_t size);
 extern caddr_t bop_temp_alloc(size_t size, int align);
+extern caddr_t bop_alloc_chunk(caddr_t virthint, size_t size, int align);
 extern void bop_free(caddr_t virt, size_t size);
 extern int bop_getproplen(const char *name);
 extern int bop_getprop(const char *name, void *value);
