@@ -163,6 +163,7 @@ ndi_prop_remove(dev_t dev, dev_info_t *dip, char *name)
 void
 ndi_prop_remove_all(dev_info_t *dip)
 {
+	i_ddi_prop_dyn_parent_set(dip, NULL);
 	ddi_prop_remove_all_common(dip, (int)DDI_PROP_HW_DEF);
 }
 
@@ -202,7 +203,7 @@ ndi_post_event(dev_info_t *dip, dev_info_t *rdip,
 	 * post the event to the responsible ancestor
 	 */
 	return ((*(DEVI(ddip)->devi_ops->devo_bus_ops->bus_post_event))
-		(ddip, rdip, cookie, impl_data));
+	    (ddip, rdip, cookie, impl_data));
 }
 
 /*
@@ -225,7 +226,7 @@ ndi_busop_remove_eventcall(dev_info_t *ddip, ddi_callback_id_t id)
 	 * request responsible nexus to remove the eventcall
 	 */
 	return ((*(DEVI(ddip)->devi_ops->devo_bus_ops->bus_remove_eventcall))
-		(ddip, id));
+	    (ddip, id));
 }
 
 /*
@@ -256,7 +257,7 @@ ndi_busop_add_eventcall(dev_info_t *dip, dev_info_t *rdip,
 	 * request responsible ancestor to add the eventcall
 	 */
 	return ((*(DEVI(ddip)->devi_ops->devo_bus_ops->bus_add_eventcall))
-		(ddip, rdip, cookie, callback, arg, cb_id));
+	    (ddip, rdip, cookie, callback, arg, cb_id));
 }
 
 /*
@@ -294,11 +295,11 @@ ndi_busop_get_eventcookie(dev_info_t *dip, dev_info_t *rdip, char *name,
 #endif /* DEBUG */
 
 		return (ndi_busop_get_eventcookie(pdip, rdip, name,
-			    event_cookiep));
+		    event_cookiep));
 	}
 
 	return ((*(DEVI(pdip)->devi_ops->devo_bus_ops->bus_get_eventcookie))
-		(pdip, rdip, name, event_cookiep));
+	    (pdip, rdip, name, event_cookiep));
 }
 
 /*
@@ -466,7 +467,7 @@ ndi_devctl_device_online(dev_info_t *dip, struct devctl_iocdata *dcp,
 
 	name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 	(void) snprintf(name, MAXNAMELEN, "%s@%s",
-		ndi_dc_getname(dcp), ndi_dc_getaddr(dcp));
+	    ndi_dc_getname(dcp), ndi_dc_getaddr(dcp));
 
 	if ((rval = ndi_devi_config_one(dip, name, &rdip,
 	    flags | NDI_DEVI_ONLINE | NDI_CONFIG)) == NDI_SUCCESS) {
@@ -486,8 +487,8 @@ ndi_devctl_device_online(dev_info_t *dip, struct devctl_iocdata *dcp,
 	}
 
 	NDI_DEBUG(flags, (CE_CONT, "%s%d: online: %s: %s\n",
-		ddi_driver_name(dip), ddi_get_instance(dip), name,
-		((rval == NDI_SUCCESS) ? "ok" : "failed")));
+	    ddi_driver_name(dip), ddi_get_instance(dip), name,
+	    ((rval == NDI_SUCCESS) ? "ok" : "failed")));
 
 	kmem_free(name, MAXNAMELEN);
 
@@ -510,7 +511,7 @@ ndi_devctl_device_offline(dev_info_t *dip, struct devctl_iocdata *dcp,
 
 	name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 	(void) snprintf(name, MAXNAMELEN, "%s@%s",
-		ndi_dc_getname(dcp), ndi_dc_getaddr(dcp));
+	    ndi_dc_getname(dcp), ndi_dc_getaddr(dcp));
 
 	(void) devfs_clean(dip, name, DV_CLEAN_FORCE);
 	rval = ndi_devi_unconfig_one(dip, name, NULL,
@@ -523,8 +524,8 @@ ndi_devctl_device_offline(dev_info_t *dip, struct devctl_iocdata *dcp,
 	}
 
 	NDI_DEBUG(flags, (CE_CONT, "%s%d: offline: %s: %s\n",
-		ddi_driver_name(dip), ddi_get_instance(dip), name,
-		(rval == NDI_SUCCESS) ? "ok" : "failed"));
+	    ddi_driver_name(dip), ddi_get_instance(dip), name,
+	    (rval == NDI_SUCCESS) ? "ok" : "failed"));
 
 	kmem_free(name, MAXNAMELEN);
 
@@ -547,7 +548,7 @@ ndi_devctl_device_remove(dev_info_t *dip, struct devctl_iocdata *dcp,
 
 	name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 	(void) snprintf(name, MAXNAMELEN, "%s@%s",
-		ndi_dc_getname(dcp), ndi_dc_getaddr(dcp));
+	    ndi_dc_getname(dcp), ndi_dc_getaddr(dcp));
 
 	(void) devfs_clean(dip, name, DV_CLEAN_FORCE);
 
@@ -560,8 +561,8 @@ ndi_devctl_device_remove(dev_info_t *dip, struct devctl_iocdata *dcp,
 	}
 
 	NDI_DEBUG(flags, (CE_CONT, "%s%d: remove: %s: %s\n",
-		ddi_driver_name(dip), ddi_get_instance(dip), name,
-		(rval == NDI_SUCCESS) ? "ok" : "failed"));
+	    ddi_driver_name(dip), ddi_get_instance(dip), name,
+	    (rval == NDI_SUCCESS) ? "ok" : "failed"));
 
 	kmem_free(name, MAXNAMELEN);
 
@@ -765,8 +766,8 @@ ndi_dc_return_ap_state(devctl_ap_state_t *ap, struct devctl_iocdata *dcp)
 
 	if (get_udatamodel() == DATAMODEL_NATIVE) {
 		if (copyout(ap, dcp->cpyout_buf,
-			sizeof (devctl_ap_state_t)) != 0)
-		    return (NDI_FAULT);
+		    sizeof (devctl_ap_state_t)) != 0)
+			return (NDI_FAULT);
 	}
 #ifdef _SYSCALL32_IMPL
 	else {
@@ -779,8 +780,8 @@ ndi_dc_return_ap_state(devctl_ap_state_t *ap, struct devctl_iocdata *dcp)
 		ap_state32.ap_in_transition = ap->ap_in_transition;
 		ap_state32.ap_last_change = (time32_t)ap->ap_last_change;
 		if (copyout(&ap_state32, dcp->cpyout_buf,
-			sizeof (devctl_ap_state32_t)) != 0)
-		    return (NDI_FAULT);
+		    sizeof (devctl_ap_state32_t)) != 0)
+			return (NDI_FAULT);
 	}
 #endif
 
@@ -1209,7 +1210,7 @@ ndi_event_alloc_hdl(dev_info_t *dip, ddi_iblock_cookie_t cookie,
 	struct ndi_event_hdl *ndi_event_hdl;
 
 	ndi_event_hdl = kmem_zalloc(sizeof (struct ndi_event_hdl),
-		((flag & NDI_NOSLEEP) ? KM_NOSLEEP : KM_SLEEP));
+	    ((flag & NDI_NOSLEEP) ? KM_NOSLEEP : KM_SLEEP));
 
 	if (!ndi_event_hdl) {
 		return (NDI_FAILURE);
@@ -1487,12 +1488,12 @@ ndi_event_unbind_set(ndi_event_hdl_t   handle, ndi_event_set_t	*ndi_events,
 			if (strncmp(NDI_EVENT_NAME(cookie_list),
 			    ndi_event_defs[i].ndi_event_name, len) == 0) {
 
-			    ASSERT(cookie_list->callback_list == NULL);
-			    if (cookie_list->callback_list) {
-				    rval = NDI_FAILURE;
-				    goto done;
-			    }
-			    break;
+				ASSERT(cookie_list->callback_list == NULL);
+				if (cookie_list->callback_list) {
+					rval = NDI_FAILURE;
+					goto done;
+				}
+				break;
 			} else {
 				cookie_list = cookie_list->next_cookie;
 			}
@@ -1633,8 +1634,7 @@ ndi_event_retrieve_cookie(ndi_event_hdl_t handle,
 	 */
 	if ((flag & NDI_EVENT_NOPASS) == 0) {
 		return (ndi_busop_get_eventcookie(
-			ndi_event_hdl->ndi_evthdl_dip, rdip,
-			eventname, cookiep));
+		    ndi_event_hdl->ndi_evthdl_dip, rdip, eventname, cookiep));
 	} else {
 		return (NDI_FAILURE);
 	}
@@ -2113,25 +2113,19 @@ ndi_event_dump_hdl(struct ndi_event_hdl *hdl, char *location)
 	list = hdl->ndi_evthdl_cookie_list;
 
 	cmn_err(CE_CONT, "%s: event handle (%p): dip = %p (%s%d)\n",
-		location, (void *)hdl,
-		(void *)hdl->ndi_evthdl_dip,
-		ddi_node_name(hdl->ndi_evthdl_dip),
-		ddi_get_instance(hdl->ndi_evthdl_dip));
+	    location, (void *)hdl, (void *)hdl->ndi_evthdl_dip,
+	    ddi_node_name(hdl->ndi_evthdl_dip),
+	    ddi_get_instance(hdl->ndi_evthdl_dip));
 	cmn_err(CE_CONT, "\thigh=%d other=%d n=%d\n",
-		hdl->ndi_evthdl_high_plevels,
-		hdl->ndi_evthdl_other_plevels,
-		hdl->ndi_evthdl_n_events);
-
+	    hdl->ndi_evthdl_high_plevels, hdl->ndi_evthdl_other_plevels,
+	    hdl->ndi_evthdl_n_events);
 
 	cmn_err(CE_CONT, "\tevent cookies:\n");
 	while (list) {
-		cmn_err(CE_CONT,
-			"\t\ttag=%d name=%s p=%d a=%x dd=%p\n",
-			NDI_EVENT_TAG(list),
-			NDI_EVENT_NAME(list),
-			NDI_EVENT_PLEVEL(list),
-			NDI_EVENT_ATTRIBUTES(list),
-			(void *)NDI_EVENT_DDIP(list));
+		cmn_err(CE_CONT, "\t\ttag=%d name=%s p=%d a=%x dd=%p\n",
+		    NDI_EVENT_TAG(list), NDI_EVENT_NAME(list),
+		    NDI_EVENT_PLEVEL(list), NDI_EVENT_ATTRIBUTES(list),
+		    (void *)NDI_EVENT_DDIP(list));
 		cmn_err(CE_CONT, "\t\tcallbacks:\n");
 		for (next = list->callback_list; next != NULL;
 		    next = next->ndi_evtcb_next) {
@@ -2355,15 +2349,13 @@ i_ddi_fault_logger(dev_info_t *rdip, struct ddi_fault_event_data *fedp)
 	}
 
 	cmn_err(level, "!%s%d: %s %s device; service %s%s"+(bad|changed),
-		ddi_driver_name(fedp->f_dip),
-		ddi_get_instance(fedp->f_dip),
-		bad ? "invalid report of fault" : action,
-		location, still ? "still " : "", servstate);
+	    ddi_driver_name(fedp->f_dip), ddi_get_instance(fedp->f_dip),
+	    bad ? "invalid report of fault" : action,
+	    location, still ? "still " : "", servstate);
 
 	cmn_err(level, "!%s%d: %s"+(bad|changed),
-		ddi_driver_name(fedp->f_dip),
-		ddi_get_instance(fedp->f_dip),
-		fedp->f_message);
+	    ddi_driver_name(fedp->f_dip), ddi_get_instance(fedp->f_dip),
+	    fedp->f_message);
 }
 
 /*
@@ -2425,7 +2417,7 @@ i_ddi_rootnex_get_eventcookie(dev_info_t *dip, dev_info_t *rdip,
 	if (rootnex_event_hdl == NULL)
 		return (NDI_FAILURE);
 	return (ndi_event_retrieve_cookie(rootnex_event_hdl, rdip, eventname,
-		cookiep, NDI_EVENT_NOPASS));
+	    cookiep, NDI_EVENT_NOPASS));
 }
 
 /*ARGSUSED*/
@@ -2438,7 +2430,7 @@ i_ddi_rootnex_add_eventcall(dev_info_t *dip, dev_info_t *rdip,
 	if (rootnex_event_hdl == NULL)
 		return (NDI_FAILURE);
 	return (ndi_event_add_callback(rootnex_event_hdl, rdip,
-		eventid, handler, arg, NDI_SLEEP, cb_id));
+	    eventid, handler, arg, NDI_SLEEP, cb_id));
 }
 
 /*ARGSUSED*/
@@ -2467,7 +2459,7 @@ i_ddi_rootnex_post_event(dev_info_t *dip, dev_info_t *rdip,
 		(*plat_fault_logger)(rdip, impl_data);
 	}
 	return (ndi_event_run_callbacks(rootnex_event_hdl, rdip,
-		eventid, impl_data));
+	    eventid, impl_data));
 }
 
 /*

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -419,8 +419,7 @@ dcdprobe(dev_info_t *devi)
 		dcd_max_instance = instance;
 	mutex_exit(&dcd_attach_mutex);
 
-	DAD_DEBUG2(devp->dcd_dev, dcd_label, DCD_DEBUG,
-		    "dcdprobe:\n");
+	DAD_DEBUG2(devp->dcd_dev, dcd_label, DCD_DEBUG, "dcdprobe:\n");
 
 	if (ddi_get_soft_state(dcd_state, instance) != NULL)
 		return (DDI_PROBE_PARTIAL);
@@ -586,14 +585,14 @@ dcdattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	cmlb_alloc_handle(&un->un_dklbhandle);
 
 	if (cmlb_attach(devi,
-		&dcd_lb_ops,
-		0,
-		0,
-		0,
-		DDI_NT_BLOCK_CHAN,
-		CMLB_FAKE_GEOM_LABEL_IOCTLS_VTOC8,
-		un->un_dklbhandle,
-		0) != 0) {
+	    &dcd_lb_ops,
+	    0,
+	    0,
+	    0,
+	    DDI_NT_BLOCK_CHAN,
+	    CMLB_FAKE_GEOM_LABEL_IOCTLS_VTOC8,
+	    un->un_dklbhandle,
+	    0) != 0) {
 		cmlb_free_handle(&un->un_dklbhandle);
 		dcd_free_softstate(un, devi);
 		return (DDI_FAILURE);
@@ -705,7 +704,7 @@ dcddetach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		 */
 		wait_cmds_complete = ddi_get_lbolt();
 		wait_cmds_complete +=
-			DCD_WAIT_CMDS_COMPLETE * drv_usectohz(1000000);
+		    DCD_WAIT_CMDS_COMPLETE * drv_usectohz(1000000);
 
 		while (un->un_ncmds) {
 			if (cv_timedwait(&un->un_disk_busy_cv,
@@ -820,8 +819,8 @@ dcdpower(dev_info_t *devi, int component, int level)
 	instance = ddi_get_instance(devi);
 
 	if (!(un = ddi_get_soft_state(dcd_state, instance)) ||
-		(DCD_DEVICE_STANDBY > level) || (level > DCD_DEVICE_ACTIVE) ||
-		component != 0) {
+	    (DCD_DEVICE_STANDBY > level) || (level > DCD_DEVICE_ACTIVE) ||
+	    component != 0) {
 		return (DDI_FAILURE);
 	}
 
@@ -1189,8 +1188,8 @@ dcd_validate_geometry(struct dcd_disk *un)
 
 	if (un->un_state == DCD_STATE_PM_SUSPENDED) {
 		mutex_exit(DCD_MUTEX);
-		if (pm_raise_power(DCD_DEVINFO, 0, DCD_DEVICE_ACTIVE)
-			!= DDI_SUCCESS) {
+		if (pm_raise_power(DCD_DEVINFO, 0, DCD_DEVICE_ACTIVE) !=
+		    DDI_SUCCESS) {
 			mutex_enter(DCD_MUTEX);
 			return (DCD_BAD_LABEL);
 		}
@@ -1638,40 +1637,15 @@ static int
 dcd_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
     char *name, caddr_t valuep, int *lengthp)
 {
-	int		instance = ddi_get_instance(dip);
 	struct dcd_disk	*un;
-	uint64_t	nblocks64;
-	diskaddr_t lblocks;
 
-	/*
-	 * Our dynamic properties are all device specific and size oriented.
-	 * Requests issued under conditions where size is valid are passed
-	 * to ddi_prop_op_nblocks with the size information, otherwise the
-	 * request is passed to ddi_prop_op. Size depends on valid geometry.
-	 */
-	un = ddi_get_soft_state(dcd_state, instance);
-	if ((dev == DDI_DEV_T_ANY) || (un == NULL)) {
+	if ((un = ddi_get_soft_state(dcd_state, ddi_get_instance(dip))) == NULL)
 		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
 		    name, valuep, lengthp));
-	} else {
-		if (cmlb_partinfo(
-		    un->un_dklbhandle,
-		    DCDPART(dev),
-		    &lblocks,
-		    NULL,
-		    NULL,
-		    NULL,
-		    0)) {
-			return (ddi_prop_op(dev, dip, prop_op, mod_flags,
-			    name, valuep, lengthp));
-		}
 
-		/* get nblocks value */
-		nblocks64 = (ulong_t)lblocks;
-
-		return (ddi_prop_op_nblocks(dev, dip, prop_op, mod_flags,
-		    name, valuep, lengthp, nblocks64));
-	}
+	return (cmlb_prop_op(un->un_dklbhandle,
+	    dev, dip, prop_op, mod_flags, name, valuep, lengthp,
+	    DCDPART(dev), NULL));
 }
 
 /*
@@ -1858,7 +1832,7 @@ error:
 		mutex_exit(DCD_MUTEX);
 		(void) pm_idle_component(DCD_DEVINFO, 0);
 		if (pm_raise_power(DCD_DEVINFO, 0,
-			DCD_DEVICE_ACTIVE) !=  DDI_SUCCESS) {
+		    DCD_DEVICE_ACTIVE) !=  DDI_SUCCESS) {
 			SET_BP_ERROR(bp, EIO);
 			goto error;
 		}
@@ -2744,7 +2718,7 @@ dcd_handle_incomplete(struct dcd_disk *un, struct buf *bp)
 		 */
 		DCD_DO_ERRSTATS(un, dcd_transerrs);
 		if ((pkt->pkt_reason != CMD_RESET) &&
-			(pkt->pkt_reason != CMD_ABORTED)) {
+		    (pkt->pkt_reason != CMD_ABORTED)) {
 			(void) dcd_reset_disk(un, pkt);
 		}
 		break;
@@ -2779,7 +2753,7 @@ dcd_handle_incomplete(struct dcd_disk *un, struct buf *bp)
 		 */
 		if (un->un_state != DCD_STATE_OFFLINE) {
 			dcd_log(DCD_DEVINFO, dcd_label, CE_WARN,
-			(const char *) notresp);
+			    (const char *) notresp);
 			New_state(un, DCD_STATE_OFFLINE);
 		}
 	} else if (pkt->pkt_reason == CMD_FATAL) {
@@ -2876,11 +2850,13 @@ dcd_check_error(struct dcd_disk *un, struct buf *bp)
 		} else if ((error &  ERR_UNC) == ERR_UNC) {
 			dcd_log(DCD_DEVINFO, dcd_label, CE_WARN,
 			    "Uncorrectable data Error: Block %x\n",
-		((struct dcd_cmd *)pkt->pkt_cdbp)->sector_num.lba_num);
+			    ((struct dcd_cmd *)pkt->pkt_cdbp)->
+			    sector_num.lba_num);
 		} else if ((error & ERR_BBK) == ERR_BBK) {
 			dcd_log(DCD_DEVINFO, dcd_label, CE_WARN,
 			    "Bad block detected: Block %x\n",
-			((struct dcd_cmd *)pkt->pkt_cdbp)->sector_num.lba_num);
+			    ((struct dcd_cmd *)pkt->pkt_cdbp)->
+			    sector_num.lba_num);
 		} else if ((error & ERR_ABORT) == ERR_ABORT) {
 			/* Aborted Command */
 			dcd_log(DCD_DEVINFO, dcd_label, CE_WARN,
@@ -3824,7 +3800,7 @@ dcdrestart(void *arg)
 				 * }
 				 */
 				un->un_reissued_timeid =
-				timeout(dcdrestart, (caddr_t)un,
+				    timeout(dcdrestart, (caddr_t)un,
 				    DCD_BSY_TIMEOUT/500);
 				mutex_exit(DCD_MUTEX);
 				return;
@@ -3898,7 +3874,7 @@ dcd_handle_tran_busy(struct buf *bp, struct diskhd *dp, struct dcd_disk *un)
 	}
 	if (!un->un_reissued_timeid) {
 		un->un_reissued_timeid =
-			timeout(dcdrestart, (caddr_t)un, DCD_BSY_TIMEOUT/500);
+		    timeout(dcdrestart, (caddr_t)un, DCD_BSY_TIMEOUT/500);
 	}
 }
 
@@ -4710,7 +4686,7 @@ dcd_lb_getinfo(dev_info_t *devi, int cmd,  void *arg, void *tg_cookie)
 		if (un->un_diskcapacity <= 0) {
 			mutex_exit(DCD_MUTEX);
 			dcd_log(DCD_DEVINFO, dcd_label, CE_WARN,
-				"invalid disk capacity\n");
+			    "invalid disk capacity\n");
 			return (EIO);
 		}
 		if (cmd == TG_GETCAPACITY)

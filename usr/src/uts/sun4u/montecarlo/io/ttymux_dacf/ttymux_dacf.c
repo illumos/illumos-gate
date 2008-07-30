@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -240,6 +240,7 @@ usable_consoles(sm_mux_state_t *sp, uint_t *iconsoles, uint_t *oconsoles)
 static boolean_t
 compatible_console(dev_t dev)
 {
+	int			circ;
 	boolean_t		compatible;
 	char *const		*nodetype;
 	struct ddi_minor_data	*dmdp;
@@ -261,6 +262,7 @@ compatible_console(dev_t dev)
 	compatible = B_FALSE;
 	len = sizeof (devtype);
 
+	ndi_devi_enter(dip, &circ);
 	for (dmdp = DEVI(dip)->devi_minor; dmdp != NULL; dmdp = dmdp->next) {
 		struct ddi_minor_data   *mdp = dmdp;
 
@@ -279,9 +281,9 @@ compatible_console(dev_t dev)
 				compatible = B_TRUE;
 			} else {
 				for (nodetype =
-					(char *const *)&supported_types[0];
-					*nodetype != (char *const)NULL;
-					nodetype++) {
+				    (char *const *)&supported_types[0];
+				    *nodetype != (char *const)NULL;
+				    nodetype++) {
 					if (strcmp(*nodetype,
 					    mdp->ddm_node_type) == 0) {
 						compatible = B_TRUE;
@@ -292,6 +294,7 @@ compatible_console(dev_t dev)
 			break;
 		}
 	}
+	ndi_devi_exit(dip, circ);
 	ddi_release_devi(dip);
 
 	/*
@@ -300,7 +303,7 @@ compatible_console(dev_t dev)
 	 */
 
 	ttymux_dprintf(DPRINT_L0, "%d:%d is %s\n", getmajor(dev),
-		getminor(dev), (compatible) ? "compatible" : "incompatible");
+	    getminor(dev), (compatible) ? "compatible" : "incompatible");
 
 	return (compatible);
 }
@@ -636,7 +639,7 @@ link_aconsole(vnode_t *mux_avp, sm_console_t *cn)
 	}
 
 	if ((rv = strioctl(mux_avp, I_PLINK, (intptr_t)lfd,
-		FREAD+FWRITE+FNOCTTY, K_TO_K, CRED(), &(cn->sm_muxid))) != 0) {
+	    FREAD+FWRITE+FNOCTTY, K_TO_K, CRED(), &(cn->sm_muxid))) != 0) {
 
 		ttymux_dprintf(DPRINT_L3,
 		    "Failed to link device: error %d", rv);
@@ -718,7 +721,7 @@ enable_all_consoles(sm_mux_state_t *ms, vnode_t *muxvp)
 			continue;
 		}
 		ttymux_dprintf(DPRINT_L0, "Enabling %d:%d\n",
-			getmajor(cn->sm_dev), getminor(cn->sm_dev));
+		    getmajor(cn->sm_dev), getminor(cn->sm_dev));
 
 		/*
 		 * Refuse requests to use devices as consoles which have an

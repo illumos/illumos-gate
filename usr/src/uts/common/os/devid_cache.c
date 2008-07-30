@@ -680,6 +680,7 @@ e_devid_minor_to_devlist(
 	int		*devtcntp,
 	dev_t		*devtsp)
 {
+	int			circ;
 	struct ddi_minor_data	*dmdp;
 	int			minor_all = 0;
 	int			ndevts = *devtcntp;
@@ -692,9 +693,8 @@ e_devid_minor_to_devlist(
 	    (minor_name == DEVID_MINOR_NAME_ALL_BLK))
 		minor_all = 1;
 
-	mutex_enter(&(DEVI(dip)->devi_lock));
-
 	/* Find matching minor names */
+	ndi_devi_enter(dip, &circ);
 	for (dmdp = DEVI(dip)->devi_minor; dmdp; dmdp = dmdp->next) {
 
 		/* Skip non-minors, and non matching minor names */
@@ -714,8 +714,7 @@ e_devid_minor_to_devlist(
 			devtsp[ndevts] = dmdp->ddm_dev;
 		ndevts++;
 	}
-
-	mutex_exit(&(DEVI(dip)->devi_lock));
+	ndi_devi_exit(dip, circ);
 
 	*devtcntp = ndevts;
 }

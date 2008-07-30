@@ -946,7 +946,7 @@ init_node(dev_info_t *dip)
 
 		/*
 		 * Release our initial hold. If ddi_initchild() was
-		 * successfull then it will return with the active hold.
+		 * successful then it will return with the active hold.
 		 */
 		ndi_rele_devi(pdip);
 		goto out;
@@ -1784,8 +1784,8 @@ ndi_rele_driver(dev_info_t *dip)
 }
 
 /*
- * Single thread entry into devinfo node for modifying its children.
- * To verify in ASSERTS use DEVI_BUSY_OWNED macro.
+ * Single thread entry into devinfo node for modifying its children (devinfo,
+ * pathinfo, and minor). To verify in ASSERTS use DEVI_BUSY_OWNED macro.
  */
 void
 ndi_devi_enter(dev_info_t *dip, int *circular)
@@ -2588,6 +2588,7 @@ ndi_merge_wildcard_node(dev_info_t *dip)
 	 * and copy properties.
 	 */
 	mutex_enter(&DEVI(dip)->devi_lock);
+	ASSERT(DEVI_BUSY_OWNED(pdip));
 	for (hwdip = ddi_get_child(pdip); hwdip;
 	    hwdip = ddi_get_next_sibling(hwdip)) {
 		/*
@@ -3654,15 +3655,16 @@ int
 resolve_pathname(char *pathname,
 	dev_info_t **dipp, dev_t *devtp, int *spectypep)
 {
-	int error;
-	dev_info_t *parent, *child;
-	struct pathname pn;
-	char *component, *config_name;
-	char *minorname = NULL;
-	char *prev_minor = NULL;
-	dev_t devt = NODEV;
-	int spectype;
-	struct ddi_minor_data *dmn;
+	int			error;
+	dev_info_t		*parent, *child;
+	struct pathname		pn;
+	char			*component, *config_name;
+	char			*minorname = NULL;
+	char			*prev_minor = NULL;
+	dev_t			devt = NODEV;
+	int			spectype;
+	struct ddi_minor_data	*dmn;
+	int			circ;
 
 	if (*pathname != '/')
 		return (EINVAL);
@@ -3740,8 +3742,11 @@ resolve_pathname(char *pathname,
 
 	if (devtp || spectypep) {
 		if (minorname == NULL) {
-			/* search for a default entry */
-			mutex_enter(&(DEVI(parent)->devi_lock));
+			/*
+			 * Search for a default entry with an active
+			 * ndi_devi_enter to protect the devi_minor list.
+			 */
+			ndi_devi_enter(parent, &circ);
 			for (dmn = DEVI(parent)->devi_minor; dmn;
 			    dmn = dmn->next) {
 				if (dmn->type == DDM_DEFAULT) {
@@ -3768,7 +3773,7 @@ resolve_pathname(char *pathname,
 					spectype = S_IFCHR;
 				}
 			}
-			mutex_exit(&(DEVI(parent)->devi_lock));
+			ndi_devi_exit(parent, circ);
 		}
 		if (devtp)
 			*devtp = devt;
@@ -3842,6 +3847,7 @@ i_ddi_prompath_to_devfspath(char *prompath, char *devfspath)
 	char		*minor_name = NULL;
 	int		spectype;
 	int		error;
+	int		circ;
 
 	error = resolve_pathname(prompath, &dip, &devt, &spectype);
 	if (error)
@@ -3853,7 +3859,7 @@ i_ddi_prompath_to_devfspath(char *prompath, char *devfspath)
 	 */
 	(void) ddi_pathname(dip, devfspath);
 
-	mutex_enter(&(DEVI(dip)->devi_lock));
+	ndi_devi_enter(dip, &circ);
 	minor_name = i_ddi_devtspectype_to_minorname(dip, devt, spectype);
 	if (minor_name) {
 		(void) strcat(devfspath, ":");
@@ -3866,7 +3872,7 @@ i_ddi_prompath_to_devfspath(char *prompath, char *devfspath)
 		(void) snprintf(devfspath, MAXPATHLEN, "%s:%s",
 		    CLONE_PATH, ddi_driver_name(dip));
 	}
-	mutex_exit(&(DEVI(dip)->devi_lock));
+	ndi_devi_exit(dip, circ);
 
 	/* release hold from resolve_pathname() */
 	ndi_rele_devi(dip);
@@ -6641,14 +6647,16 @@ i_ddi_devs_attached(major_t major)
 int
 i_ddi_minor_node_count(dev_info_t *ddip, const char *node_type)
 {
-	struct ddi_minor_data *dp;
-	int count = 0;
+	int			circ;
+	struct ddi_minor_data	*dp;
+	int			count = 0;
 
-	mutex_enter(&(DEVI(ddip)->devi_lock));
-	for (dp = DEVI(ddip)->devi_minor; dp != NULL; dp = dp->next)
+	ndi_devi_enter(ddip, &circ);
+	for (dp = DEVI(ddip)->devi_minor; dp != NULL; dp = dp->next) {
 		if (strcmp(dp->ddm_node_type, node_type) == 0)
 			count++;
-	mutex_exit(&(DEVI(ddip)->devi_lock));
+	}
+	ndi_devi_exit(ddip, circ);
 	return (count);
 }
 

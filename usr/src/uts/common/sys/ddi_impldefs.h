@@ -219,6 +219,10 @@ struct dev_info  {
 
 	/* owned by bus framework */
 	devi_bus_priv_t	devi_bus;		/* bus private data */
+
+	/* Declarations of the pure dynamic properties to snapshot */
+	struct i_ddi_prop_dyn	*devi_prop_dyn_driver;	/* prop_op */
+	struct i_ddi_prop_dyn	*devi_prop_dyn_parent;	/* bus_prop_op */
 };
 
 #define	DEVI(dev_info_type)	((struct dev_info *)(dev_info_type))
@@ -258,7 +262,7 @@ struct dev_info  {
  * Device state information is stored in bits [0-7], bus state in bits
  * [8-15].
  *
- * NOTE: all devi_state updates shoule be protected by devi_lock.
+ * NOTE: all devi_state updates should be protected by devi_lock.
  */
 #define	DEVI_DEVICE_OFFLINE	0x00000001
 #define	DEVI_DEVICE_DOWN	0x00000002
@@ -277,7 +281,6 @@ struct dev_info  {
 #define	DEVI_S_INVOKING_DACF	0x00100000 /* busy invoking a dacf task */
 
 #define	DEVI_S_UNBOUND		0x00200000
-#define	DEVI_S_MD_UPDATE	0x00400000
 #define	DEVI_S_REPORT		0x08000000 /* report status change */
 
 #define	DEVI_S_EVADD		0x10000000 /* state of devfs event */
@@ -525,13 +528,10 @@ struct dev_info  {
 	DEVI(dip)->devi_state &= ~DEVI_S_NEED_RESET;			\
 	}
 
-void	i_devi_enter(dev_info_t *, uint_t s_mask, uint_t w_mask, int has_lock);
-void	i_devi_exit(dev_info_t *, uint_t c_mask, int has_lock);
-
 /*
  * devi_flags bits
  *
- * NOTE: all devi_state updates shoule be protected by devi_lock.
+ * NOTE: all devi_state updates should be protected by devi_lock.
  */
 #define	DEVI_BUSY		0x00000001 /* busy configuring children */
 #define	DEVI_MADE_CHILDREN	0x00000002 /* children made from specs */
@@ -878,6 +878,55 @@ struct ddi_callback {
 	size_t			c_size;
 };
 
+/*
+ * Pure dynamic property declaration. A pure dynamic property is a property
+ * for which a driver's prop_op(9E) implementation will return a value on
+ * demand, but the property name does not exist on a property list (global,
+ * driver, system, or hardware) - the person asking for the value must know
+ * the name and type information.
+ *
+ * For a pure dynamic property to show up in a di_init() devinfo shapshot, the
+ * devinfo driver must know name and type. The i_ddi_prop_dyn_t mechanism
+ * allows a driver to define an array of the name/type information of its
+ * dynamic properties. When a driver declares its dynamic properties in a
+ * i_ddi_prop_dyn_t array, and registers that array using
+ * i_ddi_prop_dyn_driver_set() the devinfo driver has sufficient information
+ * to represent the properties in a snapshot - calling the driver's
+ * prop_op(9E) to obtain values.
+ *
+ * The last element of a i_ddi_prop_dyn_t is detected via a NULL dp_name value.
+ *
+ * A pure dynamic property name associated with a minor_node/dev_t should be
+ * defined with a dp_spec_type of S_IFCHR or S_IFBLK, as appropriate.  The
+ * driver's prop_op(9E) entry point will be called for all
+ * ddi_create_minor_node(9F) nodes of the specified spec_type. For a driver
+ * where not all minor_node/dev_t combinations support the same named
+ * properties, it is the responsibility of the prop_op(9E) implementation to
+ * sort out what combinations are appropriate.
+ *
+ * A pure dynamic property of a devinfo node should be defined with a
+ * dp_spec_type of 0.
+ *
+ * NB: Public DDI property interfaces no longer support pure dynamic
+ * properties, but they are still still used.  A prime example is the cmlb
+ * implementation of size(9P) properties. Using pure dynamic properties
+ * reduces the space required to maintain per-partition information. Since
+ * there are no public interfaces to create pure dynamic properties,
+ * the i_ddi_prop_dyn_t mechanism should remain private.
+ */
+typedef struct i_ddi_prop_dyn {
+	char	*dp_name;		/* name of dynamic property */
+	int	dp_type;		/* DDI_PROP_TYPE_ of property */
+	int	dp_spec_type;		/* 0, S_IFCHR, S_IFBLK */
+} i_ddi_prop_dyn_t;
+void			i_ddi_prop_dyn_driver_set(dev_info_t *,
+			    i_ddi_prop_dyn_t *);
+i_ddi_prop_dyn_t	*i_ddi_prop_dyn_driver_get(dev_info_t *);
+void			i_ddi_prop_dyn_parent_set(dev_info_t *,
+			    i_ddi_prop_dyn_t *);
+i_ddi_prop_dyn_t	*i_ddi_prop_dyn_parent_get(dev_info_t *);
+void			i_ddi_prop_dyn_cache_invalidate(dev_info_t *,
+			    i_ddi_prop_dyn_t *);
 
 /*
  * Device id - Internal definition.

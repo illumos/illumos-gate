@@ -301,19 +301,9 @@ static int
 xdf_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 	char *name, caddr_t valuep, int *lengthp)
 {
-	int instance = ddi_get_instance(dip);
-	xdf_t *vdp;
-	diskaddr_t p_blkcnt;
+	xdf_t	*vdp;
 
-	/*
-	 * xdf dynamic properties are device specific and size oriented.
-	 * Requests issued under conditions where size is valid are passed
-	 * to ddi_prop_op_nblocks with the size information, otherwise the
-	 * request is passed to ddi_prop_op.
-	 */
-	vdp = ddi_get_soft_state(vbd_ss, instance);
-
-	if ((dev == DDI_DEV_T_ANY) || (vdp == NULL))
+	if ((vdp = ddi_get_soft_state(vbd_ss, ddi_get_instance(dip))) == NULL)
 		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
 		    name, valuep, lengthp));
 
@@ -321,18 +311,14 @@ xdf_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 	mutex_enter(&vdp->xdf_dev_lk);
 	if (xdf_connect(vdp, B_TRUE) != XD_READY) {
 		mutex_exit(&vdp->xdf_dev_lk);
-		goto out;
+		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
+		    name, valuep, lengthp));
 	}
 	mutex_exit(&vdp->xdf_dev_lk);
 
-	if (cmlb_partinfo(vdp->xdf_vd_lbl, XDF_PART(getminor(dev)), &p_blkcnt,
-	    NULL, NULL, NULL, NULL) == 0)
-		return (ddi_prop_op_nblocks(dev, dip, prop_op, mod_flags,
-		    name, valuep, lengthp, (uint64_t)p_blkcnt));
-
-out:
-	return (ddi_prop_op(dev, dip, prop_op, mod_flags, name, valuep,
-	    lengthp));
+	return (cmlb_prop_op(vdp->xdf_vd_lbl,
+	    dev, dip, prop_op, mod_flags, name, valuep, lengthp,
+	    XDF_PART(getminor(dev)), NULL));
 }
 
 static int

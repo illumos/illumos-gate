@@ -1565,7 +1565,7 @@ pcm_search_devinfo(dev_info_t *self, struct pcm_device_info *info, int socket)
 	char bf[256];
 	struct pcmcia_parent_private *ppd;
 	dev_info_t *dip;
-	int circular;
+	int circ;
 
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug)
@@ -1575,7 +1575,7 @@ pcm_search_devinfo(dev_info_t *self, struct pcm_device_info *info, int socket)
 		    info->pd_vers1_name, info->pd_flags);
 #endif
 
-	ndi_devi_enter(self, &circular);
+	ndi_devi_enter(self, &circ);
 	/* do searches in compatible property order */
 	for (dip = (dev_info_t *)DEVI(self)->devi_child;
 	    dip != NULL;
@@ -1644,7 +1644,7 @@ pcm_search_devinfo(dev_info_t *self, struct pcm_device_info *info, int socket)
 				break;
 		}
 	}
-	ndi_devi_exit(self, circular);
+	ndi_devi_exit(self, circ);
 	return (dip);
 }
 
@@ -3996,6 +3996,7 @@ pcmcia_create_device(ss_make_device_node_t *init)
 int
 pcmcia_get_minors(dev_info_t *dip, struct pcm_make_dev **minors)
 {
+	int circ;
 	int count = 0;
 	struct ddi_minor_data *dp;
 	struct pcm_make_dev *md;
@@ -4005,7 +4006,7 @@ pcmcia_get_minors(dev_info_t *dip, struct pcm_make_dev **minors)
 
 	socket = ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    PCM_DEV_SOCKET, -1);
-	mutex_enter(&(DEVI(dip)->devi_lock));
+	ndi_devi_enter(dip, &circ);
 	if (DEVI(dip)->devi_minor != (struct ddi_minor_data *)NULL) {
 		for (dp = DEVI(dip)->devi_minor;
 			dp != (struct ddi_minor_data *)NULL;
@@ -4060,7 +4061,7 @@ pcmcia_get_minors(dev_info_t *dip, struct pcm_make_dev **minors)
 			count = 0;
 		}
 	}
-	mutex_exit(&(DEVI(dip)->devi_lock));
+	ndi_devi_exit(dip, circ);
 	return (count);
 }
 
@@ -4070,6 +4071,7 @@ static char *ddmtypes[] = { "minor", "alias", "default", "internal" };
 static void
 pcmcia_dump_minors(dev_info_t *dip)
 {
+	int circ;
 	int count = 0;
 	struct ddi_minor_data *dp;
 	int unit, major;
@@ -4093,7 +4095,7 @@ pcmcia_dump_minors(dev_info_t *dip)
 			cmn_err(CE_CONT, "\tsibs: %s %s %s\n",
 				ddi_binding_name(np), cf2, cur);
 
-			mutex_enter(&(DEVI(np)->devi_lock));
+			ndi_devi_enter(np, &circ);
 			if (DEVI(np)->devi_minor !=
 			    (struct ddi_minor_data *)NULL) {
 				for (dp = DEVI(np)->devi_minor;
@@ -4117,7 +4119,7 @@ pcmcia_dump_minors(dev_info_t *dip)
 						ddi_binding_name(np));
 				}
 			}
-			mutex_exit(&(DEVI(np)->devi_lock));
+			ndi_devi_exit(np, circ);
 		}
 	}
 }
@@ -4639,9 +4641,9 @@ pcmcia_free_resources(dev_info_t *self)
 	struct regspec *assigned;
 	int len;
 	dev_info_t *dip;
-	int circular;
+	int circ;
 
-	ndi_devi_enter(self, &circular);
+	ndi_devi_enter(self, &circ);
 	/* do searches in compatible property order */
 	for (dip = (dev_info_t *)DEVI(self)->devi_child;
 	    dip != NULL;
@@ -4660,7 +4662,7 @@ pcmcia_free_resources(dev_info_t *self)
 			kmem_free(assigned, len);
 		}
 	}
-	ndi_devi_exit(self, circular);
+	ndi_devi_exit(self, circ);
 }
 
 /*

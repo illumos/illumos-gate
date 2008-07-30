@@ -268,7 +268,8 @@ dv_mkino(dev_info_t *devi, vtype_t typ, dev_t dev)
 static int
 dv_compare_nodes(const struct dv_node *dv1, const struct dv_node *dv2)
 {
-	int rv;
+	int	rv;
+
 	if ((rv = strcmp(dv1->dv_name, dv2->dv_name)) == 0)
 		return (0);
 	return ((rv < 0) ? -1 : 1);
@@ -282,8 +283,8 @@ dv_compare_nodes(const struct dv_node *dv1, const struct dv_node *dv2)
 struct dv_node *
 dv_mkroot(struct vfs *vfsp, dev_t devfsdev)
 {
-	struct dv_node *dv;
-	struct vnode *vp;
+	struct dv_node	*dv;
+	struct vnode	*vp;
 
 	ASSERT(ddi_root_node() != NULL);
 	ASSERT(dv_node_cache != NULL);
@@ -332,9 +333,9 @@ dv_mkroot(struct vfs *vfsp, dev_t devfsdev)
 struct dv_node *
 dv_mkdir(struct dv_node *ddv, dev_info_t *devi, char *nm)
 {
-	struct dv_node *dv;
-	struct vnode *vp;
-	size_t nmlen;
+	struct dv_node	*dv;
+	struct vnode	*vp;
+	size_t		nmlen;
 
 	ASSERT((devi));
 	dcmn_err4(("dv_mkdir: %s\n", nm));
@@ -384,9 +385,9 @@ static struct dv_node *
 dv_mknod(struct dv_node *ddv, dev_info_t *devi, char *nm,
 	struct ddi_minor_data *dmd)
 {
-	struct dv_node *dv;
-	struct vnode *vp;
-	size_t nmlen;
+	struct dv_node	*dv;
+	struct vnode	*vp;
+	size_t		nmlen;
 
 	dcmn_err4(("dv_mknod: %s\n", nm));
 
@@ -405,9 +406,12 @@ dv_mknod(struct dv_node *ddv, dev_info_t *devi, char *nm,
 	vn_setops(vp, vn_getops(DVTOV(ddv)));
 	vn_exists(vp);
 
-	ASSERT(MUTEX_HELD(&DEVI(devi)->devi_lock));
+	/* increment dev_ref with devi_lock held */
+	ASSERT(DEVI_BUSY_OWNED(devi));
+	mutex_enter(&DEVI(devi)->devi_lock);
 	dv->dv_devi = devi;
 	DEVI(devi)->devi_ref++;
+	mutex_exit(&DEVI(devi)->devi_lock);
 
 	dv->dv_ino = dv_mkino(devi, vp->v_type, vp->v_rdev);
 	dv->dv_nlink = 0;		/* updated on insert */
@@ -518,7 +522,7 @@ dv_findbyname(struct dv_node *ddv, char *nm)
 void
 dv_insert(struct dv_node *ddv, struct dv_node *dv)
 {
-	avl_index_t where;
+	avl_index_t	where;
 
 	ASSERT(RW_WRITE_HELD(&ddv->dv_contents));
 	ASSERT(DVTOV(ddv)->v_type == VDIR);
@@ -577,7 +581,7 @@ dv_unlink(struct dv_node *ddv, struct dv_node *dv)
 void
 dv_vattr_merge(struct dv_node *dv, struct vattr *vap)
 {
-	struct vnode *vp = DVTOV(dv);
+	struct vnode	*vp = DVTOV(dv);
 
 	vap->va_nodeid = dv->dv_ino;
 	vap->va_nlink = dv->dv_nlink;
@@ -608,8 +612,8 @@ dv_vattr_merge(struct dv_node *dv, struct vattr *vap)
 void
 devfs_get_defattr(struct vnode *vp, struct vattr *vap, int *no_fs_perm)
 {
-	mperm_t	mp;
-	struct dv_node *dv;
+	mperm_t		mp;
+	struct dv_node	*dv;
 
 	/* If vp isn't a dv_node, return something sensible */
 	if (!vn_matchops(vp, dv_vnodeops)) {
@@ -837,12 +841,12 @@ lookup:
 static int
 dv_find_leafnode(dev_info_t *devi, char *minor_nm, struct ddi_minor_data *r_mi)
 {
-	struct ddi_minor_data *dmd;
+	struct ddi_minor_data	*dmd;
 
 	ASSERT(i_ddi_devi_attached(devi));
-	ASSERT(MUTEX_HELD(&DEVI(devi)->devi_lock));
 
 	dcmn_err3(("dv_find_leafnode: %s\n", minor_nm));
+	ASSERT(DEVI_BUSY_OWNED(devi));
 	for (dmd = DEVI(devi)->devi_minor; dmd; dmd = dmd->next) {
 
 		/*
@@ -880,10 +884,10 @@ dv_find_leafnode(dev_info_t *devi, char *minor_nm, struct ddi_minor_data *r_mi)
 static struct dv_node *
 dv_clone_mknod(struct dv_node *ddv, char *drvname)
 {
-	major_t	major;
-	struct dv_node *dvp;
-	char *devnm;
-	struct ddi_minor_data *dmd;
+	major_t			major;
+	struct dv_node		*dvp;
+	char			*devnm;
+	struct ddi_minor_data	*dmd;
 
 	/*
 	 * Make sure drvname is a STREAMS driver. We load the driver,
@@ -926,12 +930,13 @@ dv_find(struct dv_node *ddv, char *nm, struct vnode **vpp, struct pathname *pnp,
 {
 	extern int isminiroot;	/* see modctl.c */
 
-	int rv = 0, was_busy = 0, nmlen, write_held = 0;
-	struct vnode *vp;
-	struct dv_node *dv, *dup;
-	dev_info_t *pdevi, *devi = NULL;
-	char *mnm;
-	struct ddi_minor_data *dmd;
+	int			circ;
+	int			rv = 0, was_busy = 0, nmlen, write_held = 0;
+	struct vnode		*vp;
+	struct dv_node		*dv, *dup;
+	dev_info_t		*pdevi, *devi = NULL;
+	char			*mnm;
+	struct ddi_minor_data	*dmd;
 
 	dcmn_err3(("dv_find %s\n", nm));
 
@@ -1119,24 +1124,29 @@ founddv:
 		dv = dv_mkdir(ddv, devi, nm);
 	} else {
 		/*
-		 * For clone minors, load the driver indicated by minor name.
+		 * Allocate dmd first to avoid KM_SLEEP with active
+		 * ndi_devi_enter.
 		 */
-		mutex_enter(&DEVI(devi)->devi_lock);
+		dmd = kmem_zalloc(sizeof (*dmd), KM_SLEEP);
+		ndi_devi_enter(devi, &circ);
 		if (devi == clone_dip) {
+			/*
+			 * For clone minors, load the driver indicated by
+			 * minor name.
+			 */
 			dv = dv_clone_mknod(ddv, mnm + 1);
 		} else {
 			/*
 			 * Find minor node and make a dv_node
 			 */
-			dmd = kmem_zalloc(sizeof (*dmd), KM_SLEEP);
 			if (dv_find_leafnode(devi, mnm + 1, dmd) == 0) {
 				dv = dv_mknod(ddv, devi, nm, dmd);
 				if (dmd->ddm_node_priv)
 					dpfree(dmd->ddm_node_priv);
 			}
-			kmem_free(dmd, sizeof (*dmd));
 		}
-		mutex_exit(&DEVI(devi)->devi_lock);
+		ndi_devi_exit(devi, circ);
+		kmem_free(dmd, sizeof (*dmd));
 	}
 	/*
 	 * Release hold from ndi_devi_config_one()
@@ -1213,11 +1223,11 @@ notfound:
 void
 dv_filldir(struct dv_node *ddv)
 {
-	struct dv_node *dv;
-	dev_info_t *devi, *pdevi;
-	struct ddi_minor_data *dmd;
-	char devnm[MAXNAMELEN];
-	int circ;
+	struct dv_node		*dv;
+	dev_info_t		*devi, *pdevi;
+	struct ddi_minor_data	*dmd;
+	char			devnm[MAXNAMELEN];
+	int			circ, ccirc;
 
 	ASSERT(DVTOV(ddv)->v_type == VDIR);
 	ASSERT(RW_WRITE_HELD(&ddv->dv_contents));
@@ -1240,7 +1250,7 @@ dv_filldir(struct dv_node *ddv)
 
 		dcmn_err3(("dv_filldir: node %s\n", ddi_node_name(devi)));
 
-		mutex_enter(&DEVI(devi)->devi_lock);
+		ndi_devi_enter(devi, &ccirc);
 		for (dmd = DEVI(devi)->devi_minor; dmd; dmd = dmd->next) {
 			char *addr;
 
@@ -1272,7 +1282,7 @@ dv_filldir(struct dv_node *ddv)
 			dv_insert(ddv, dv);
 			VN_RELE(DVTOV(dv));
 		}
-		mutex_exit(&DEVI(devi)->devi_lock);
+		ndi_devi_exit(devi, ccirc);
 
 		(void) ddi_deviname(devi, devnm);
 		if ((dv = dv_findbyname(ddv, devnm + 1)) == NULL) {
@@ -1300,10 +1310,10 @@ dv_filldir(struct dv_node *ddv)
 int
 dv_cleandir(struct dv_node *ddv, char *devnm, uint_t flags)
 {
-	struct dv_node *dv;
-	struct dv_node *next;
-	struct vnode *vp;
-	int busy = 0;
+	struct dv_node	*dv;
+	struct dv_node	*next;
+	struct vnode	*vp;
+	int		busy = 0;
 
 	/*
 	 * We should always be holding the tsd_clean_key here: dv_cleandir()
@@ -1428,15 +1438,15 @@ set_busy:	busy++;
 static int
 dv_reset_perm_dir(struct dv_node *ddv, uint_t flags)
 {
-	struct dv_node *dv;
-	struct vnode *vp;
-	int retval = 0;
-	struct vattr *attrp;
-	mperm_t mp;
-	char *nm;
-	uid_t old_uid;
-	gid_t old_gid;
-	mode_t old_mode;
+	struct dv_node	*dv;
+	struct vnode	*vp;
+	int		retval = 0;
+	struct vattr	*attrp;
+	mperm_t		mp;
+	char		*nm;
+	uid_t		old_uid;
+	gid_t		old_gid;
+	mode_t		old_mode;
 
 	rw_enter(&ddv->dv_contents, RW_WRITER);
 	for (dv = DV_FIRST_ENTRY(ddv); dv; dv = DV_NEXT_ENTRY(ddv, dv)) {
@@ -1524,8 +1534,8 @@ dv_reset_perm_dir(struct dv_node *ddv, uint_t flags)
 int
 devfs_reset_perm(uint_t flags)
 {
-	struct dv_node *dvp;
-	int rval;
+	struct dv_node	*dvp;
+	int		rval;
 
 	if ((dvp = devfs_dip_to_dvnode(ddi_root_node())) == NULL)
 		return (0);
@@ -1555,17 +1565,17 @@ devfs_reset_perm(uint_t flags)
 static int
 devfs_remdrv_rmdir(vnode_t *dirvp, const char *dir, vnode_t *rvp)
 {
-	int error;
-	vnode_t *vp;
-	int eof;
-	struct iovec iov;
-	struct uio uio;
-	struct dirent64 *dp;
-	dirent64_t *dbuf;
-	size_t dlen;
-	size_t dbuflen;
-	int ndirents = 64;
-	char *nm;
+	int		error;
+	vnode_t		*vp;
+	int		eof;
+	struct iovec	iov;
+	struct uio	uio;
+	struct dirent64	*dp;
+	dirent64_t	*dbuf;
+	size_t		dlen;
+	size_t		dbuflen;
+	int		ndirents = 64;
+	char		*nm;
 
 	VN_HOLD(dirvp);
 
@@ -1651,21 +1661,21 @@ exit:
 int
 devfs_remdrv_cleanup(const char *dir, const char *nodename)
 {
-	int error;
-	vnode_t *vp;
-	vnode_t *dirvp;
-	int eof;
-	struct iovec iov;
-	struct uio uio;
-	struct dirent64 *dp;
-	dirent64_t *dbuf;
-	size_t dlen;
-	size_t dbuflen;
-	int ndirents = 64;
-	int nodenamelen = strlen(nodename);
-	char *nm;
-	struct pathname pn;
-	vnode_t *rvp;		/* root node of the underlying attribute fs */
+	int		error;
+	vnode_t		*vp;
+	vnode_t		*dirvp;
+	int		eof;
+	struct iovec	iov;
+	struct uio	uio;
+	struct dirent64	*dp;
+	dirent64_t	*dbuf;
+	size_t		dlen;
+	size_t		dbuflen;
+	int		ndirents = 64;
+	int		nodenamelen = strlen(nodename);
+	char		*nm;
+	struct pathname	pn;
+	vnode_t		*rvp;	/* root node of the underlying attribute fs */
 
 	dcmn_err5(("devfs_remdrv_cleanup: %s %s\n", dir, nodename));
 

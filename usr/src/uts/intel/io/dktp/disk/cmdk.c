@@ -684,8 +684,6 @@ cmdk_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
     char *name, caddr_t valuep, int *lengthp)
 {
 	struct	cmdk	*dkp;
-	diskaddr_t	p_lblksrt;
-	diskaddr_t	p_lblkcnt;
 
 #ifdef CMDK_DEBUG
 	if (cmdk_debug & DENT)
@@ -693,31 +691,13 @@ cmdk_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 #endif
 
 	dkp = ddi_get_soft_state(cmdk_state, ddi_get_instance(dip));
+	if (dkp == NULL)
+		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
+		    name, valuep, lengthp));
 
-	/*
-	 * Our dynamic properties are all device specific and size oriented.
-	 * Requests issued under conditions where size is valid are passed
-	 * to ddi_prop_op_nblocks with the size information, otherwise the
-	 * request is passed to ddi_prop_op. Size depends on valid label.
-	 */
-	if ((dev != DDI_DEV_T_ANY) && (dkp != NULL)) {
-		if (!cmlb_partinfo(
-		    dkp->dk_cmlbhandle,
-		    CMDKPART(dev),
-		    &p_lblkcnt,
-		    &p_lblksrt,
-		    NULL,
-		    NULL,
-		    0))
-			return (ddi_prop_op_nblocks(dev, dip,
-			    prop_op, mod_flags,
-			    name, valuep, lengthp,
-			    (uint64_t)p_lblkcnt));
-	}
-
-	return (ddi_prop_op(dev, dip,
-	    prop_op, mod_flags,
-	    name, valuep, lengthp));
+	return (cmlb_prop_op(dkp->dk_cmlbhandle,
+	    dev, dip, prop_op, mod_flags, name, valuep, lengthp,
+	    CMDKPART(dev), NULL));
 }
 
 /*

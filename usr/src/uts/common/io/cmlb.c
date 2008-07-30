@@ -41,6 +41,7 @@
 #include <sys/efi_partition.h>
 #include <sys/cmlb.h>
 #include <sys/cmlb_impl.h>
+#include <sys/ddi_impldefs.h>
 
 /*
  * Driver minor node structure and data table
@@ -139,6 +140,18 @@ static struct driver_minor_data dk_minor_data_efi[] = {
 	{0}
 };
 
+/*
+ * Declare the dynamic properties implemented in prop_op(9E) implementation
+ * that we want to have show up in a di_init(3DEVINFO) device tree snapshot
+ * of drivers that call cmlb_attach().
+ */
+static i_ddi_prop_dyn_t cmlb_prop_dyn[] = {
+	{"Nblocks",		DDI_PROP_TYPE_INT64,	S_IFBLK},
+	{"Size",		DDI_PROP_TYPE_INT64,	S_IFCHR},
+	{"device-nblocks",	DDI_PROP_TYPE_INT64},
+	{"device-blksize",	DDI_PROP_TYPE_INT},
+	{NULL}
+};
 
 /*
  * External kernel interfaces
@@ -595,6 +608,9 @@ cmlb_attach(dev_info_t *devi, cmlb_tg_ops_t *tgopsp, int device_type,
 		return (ENXIO);
 	}
 
+	/* Define the dynamic properties for devinfo spapshots. */
+	i_ddi_prop_dyn_driver_set(CMLB_DEVINFO(cl), cmlb_prop_dyn);
+
 	cl->cl_state = CMLB_ATTACHED;
 
 	mutex_exit(CMLB_MUTEX(cl));
@@ -624,6 +640,7 @@ cmlb_detach(cmlb_handle_t cmlbhandle, void *tg_cookie)
 	cl->cl_def_labeltype = CMLB_LABEL_UNDEF;
 	cl->cl_f_geometry_is_valid = FALSE;
 	ddi_remove_minor_node(CMLB_DEVINFO(cl), NULL);
+	i_ddi_prop_dyn_driver_set(CMLB_DEVINFO(cl), NULL);
 	cl->cl_state = CMLB_INITED;
 	mutex_exit(CMLB_MUTEX(cl));
 }
@@ -1161,6 +1178,25 @@ cmlb_ioctl(cmlb_handle_t cmlbhandle, dev_t dev, int cmd, intptr_t arg,
 	default:
 		err = ENOTTY;
 
+	}
+
+	/*
+	 * An ioctl that succeeds and changed ('set') size(9P) information
+	 * needs to invalidate the cached devinfo snapshot to avoid having
+	 * old information being returned in a snapshots.
+	 *
+	 * NB: When available, call ddi_change_minor_node() to clear
+	 * SSIZEVALID in specfs vnodes via spec_size_invalidate().
+	 */
+	if (err == 0) {
+		switch (cmd) {
+		case DKIOCSGEOM:
+		case DKIOCSAPART:
+		case DKIOCSVTOC:
+		case DKIOCSETEFI:
+			i_ddi_prop_dyn_cache_invalidate(CMLB_DEVINFO(cl),
+			    i_ddi_prop_dyn_driver_get(CMLB_DEVINFO(cl)));
+		}
 	}
 	return (err);
 }
@@ -2737,7 +2773,7 @@ cmlb_build_default_label(struct cmlb_lun *cl, void *tg_cookie)
 		/*
 		 * Refer to comments related to off-by-1 at the
 		 * header of this file.
-		 * Before caculating geometry, capacity should be
+		 * Before calculating geometry, capacity should be
 		 * decreased by 1.
 		 */
 
@@ -4735,3 +4771,106 @@ cmlb_dkio_partinfo(struct cmlb_lun *cl, dev_t dev, caddr_t  arg, int flag)
 	return (err);
 }
 #endif
+
+int
+cmlb_prop_op(cmlb_handle_t cmlbhandle,
+    dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
+    char *name, caddr_t valuep, int *lengthp, int part, void *tg_cookie)
+{
+	struct cmlb_lun	*cl;
+	diskaddr_t	capacity;
+	uint32_t	lbasize;
+	enum		dp { DP_NBLOCKS, DP_BLKSIZE } dp;
+	int		callers_length;
+	caddr_t		buffer;
+	uint64_t	nblocks64;
+	uint_t		dblk;
+
+	/* Always fallback to ddi_prop_op... */
+	cl = (struct cmlb_lun *)cmlbhandle;
+	if (cl == NULL) {
+fallback:	return (ddi_prop_op(dev, dip, prop_op, mod_flags,
+		    name, valuep, lengthp));
+	}
+
+	/* Pick up capacity and blocksize information. */
+	capacity = cl->cl_blockcount;
+	if (capacity == 0)
+		goto fallback;
+	lbasize = cl->cl_tgt_blocksize;
+	if (lbasize == 0)
+		lbasize = DEV_BSIZE;	/* 0 -> DEV_BSIZE units */
+
+	/* Check for dynamic property of whole device. */
+	if (dev == DDI_DEV_T_ANY) {
+		/* Fallback to ddi_prop_op if we don't understand.  */
+		if (strcmp(name, "device-nblocks") == 0)
+			dp = DP_NBLOCKS;
+		else if (strcmp(name, "device-blksize") == 0)
+			dp = DP_BLKSIZE;
+		else
+			goto fallback;
+
+		/* get callers length, establish length of our dynamic prop */
+		callers_length = *lengthp;
+		if (dp == DP_NBLOCKS)
+			*lengthp = sizeof (uint64_t);
+		else if (dp == DP_BLKSIZE)
+			*lengthp = sizeof (uint32_t);
+
+		/* service request for the length of the property */
+		if (prop_op == PROP_LEN)
+			return (DDI_PROP_SUCCESS);
+
+		switch (prop_op) {
+		case PROP_LEN_AND_VAL_ALLOC:
+			if ((buffer = kmem_alloc(*lengthp,
+			    (mod_flags & DDI_PROP_CANSLEEP) ?
+			    KM_SLEEP : KM_NOSLEEP)) == NULL)
+				return (DDI_PROP_NO_MEMORY);
+			*(caddr_t *)valuep = buffer;	/* set callers buf */
+			break;
+
+		case PROP_LEN_AND_VAL_BUF:
+			/* the length of the prop and the request must match */
+			if (callers_length != *lengthp)
+				return (DDI_PROP_INVAL_ARG);
+			buffer = valuep;		/* get callers buf */
+			break;
+
+		default:
+			return (DDI_PROP_INVAL_ARG);
+		}
+
+		/* transfer the value into the buffer */
+		if (dp == DP_NBLOCKS)
+			*((uint64_t *)buffer) = capacity;
+		else if (dp == DP_BLKSIZE)
+			*((uint32_t *)buffer) = lbasize;
+
+		return (DDI_PROP_SUCCESS);
+	}
+
+	/*
+	 * Support dynamic size oriented properties of partition. Requests
+	 * issued under conditions where size is valid are passed to
+	 * ddi_prop_op_nblocks with the size information, otherwise the
+	 * request is passed to ddi_prop_op. Size depends on valid geometry.
+	 */
+	if (!cmlb_is_valid(cmlbhandle))
+		goto fallback;
+
+	/* Get partition nblocks value. */
+	(void) cmlb_partinfo(cmlbhandle, part,
+	    (diskaddr_t *)&nblocks64, NULL, NULL, NULL, tg_cookie);
+
+	/*
+	 * Assume partition information is in DEV_BSIZE units, compute
+	 * divisor for size(9P) property representation.
+	 */
+	dblk = lbasize / DEV_BSIZE;
+
+	/* Now let ddi_prop_op_nblocks_blksize() handle the request. */
+	return (ddi_prop_op_nblocks_blksize(dev, dip, prop_op, mod_flags,
+	    name, valuep, lengthp, nblocks64 / dblk, lbasize));
+}

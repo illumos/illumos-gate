@@ -474,7 +474,7 @@ scsi_hba_attach_setup(
 	if (ddi_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN, 0, prop_name,
 	    NULL, &len) == DDI_PROP_NOT_FOUND) {
 		value = scsi_reset_delay;
-		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
+		if (ddi_prop_update_int(DDI_DEV_T_NONE, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
 			    ddi_driver_name(dip), ddi_get_instance(dip));
@@ -486,7 +486,7 @@ scsi_hba_attach_setup(
 	if (ddi_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN, 0, prop_name,
 	    NULL, &len) == DDI_PROP_NOT_FOUND) {
 		value = scsi_tag_age_limit;
-		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
+		if (ddi_prop_update_int(DDI_DEV_T_NONE, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
 			    ddi_driver_name(dip), ddi_get_instance(dip));
@@ -498,7 +498,7 @@ scsi_hba_attach_setup(
 	if (ddi_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN, 0, prop_name,
 	    NULL, &len) == DDI_PROP_NOT_FOUND) {
 		value = scsi_watchdog_tick;
-		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
+		if (ddi_prop_update_int(DDI_DEV_T_NONE, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
 			    ddi_driver_name(dip), ddi_get_instance(dip));
@@ -510,7 +510,7 @@ scsi_hba_attach_setup(
 	if (ddi_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN, 0, prop_name,
 	    NULL, &len) == DDI_PROP_NOT_FOUND) {
 		value = scsi_options;
-		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
+		if (ddi_prop_update_int(DDI_DEV_T_NONE, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
 			    ddi_driver_name(dip), ddi_get_instance(dip));
@@ -522,7 +522,7 @@ scsi_hba_attach_setup(
 	if (ddi_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN, 0, prop_name,
 	    NULL, &len) == DDI_PROP_NOT_FOUND) {
 		value = scsi_selection_timeout;
-		if (ddi_prop_update_int(DDI_MAJOR_T_UNKNOWN, dip,
+		if (ddi_prop_update_int(DDI_DEV_T_NONE, dip,
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
 			    ddi_driver_name(dip), ddi_get_instance(dip));
@@ -537,7 +537,7 @@ scsi_hba_attach_setup(
 		    NULL, &len) == DDI_PROP_NOT_FOUND) {
 			value = hba_tran->tran_interconnect_type;
 			prop_value = interconnect[value];
-			if (ddi_prop_update_string(DDI_MAJOR_T_UNKNOWN, dip,
+			if (ddi_prop_update_string(DDI_DEV_T_NONE, dip,
 			    prop_name, (char *)prop_value)
 			    != DDI_PROP_SUCCESS) {
 				cmn_err(CE_CONT, errmsg, prop_name,

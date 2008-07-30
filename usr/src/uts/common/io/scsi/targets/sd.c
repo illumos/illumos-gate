@@ -2174,7 +2174,7 @@ _init(void)
 
 	/*
 	 * Creating taskq before mod_install ensures that all callers (threads)
-	 * that enter the module after a successfull mod_install encounter
+	 * that enter the module after a successful mod_install encounter
 	 * a valid taskq.
 	 */
 	sd_taskq_create();
@@ -2601,36 +2601,15 @@ static int
 sd_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 	char *name, caddr_t valuep, int *lengthp)
 {
-	int		instance = ddi_get_instance(dip);
 	struct sd_lun	*un;
-	uint64_t	nblocks64;
-	uint_t		dblk;
 
-	/*
-	 * Our dynamic properties are all device specific and size oriented.
-	 * Requests issued under conditions where size is valid are passed
-	 * to ddi_prop_op_nblocks with the size information, otherwise the
-	 * request is passed to ddi_prop_op. Size depends on valid geometry.
-	 */
-	un = ddi_get_soft_state(sd_state, instance);
-	if ((dev == DDI_DEV_T_ANY) || (un == NULL)) {
+	if ((un = ddi_get_soft_state(sd_state, ddi_get_instance(dip))) == NULL)
 		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
 		    name, valuep, lengthp));
-	} else if (!SD_IS_VALID_LABEL(un)) {
-		return (ddi_prop_op(dev, dip, prop_op, mod_flags, name,
-		    valuep, lengthp));
-	}
 
-	/* get nblocks value */
-	ASSERT(!mutex_owned(SD_MUTEX(un)));
-
-	(void) cmlb_partinfo(un->un_cmlbhandle, SDPART(dev),
-	    (diskaddr_t *)&nblocks64, NULL, NULL, NULL, (void *)SD_PATH_DIRECT);
-
-	/* report size in target size blocks */
-	dblk = un->un_tgt_blocksize / un->un_sys_blocksize;
-	return (ddi_prop_op_nblocks_blksize(dev, dip, prop_op, mod_flags,
-	    name, valuep, lengthp, nblocks64 / dblk, un->un_tgt_blocksize));
+	return (cmlb_prop_op(un->un_cmlbhandle,
+	    dev, dip, prop_op, mod_flags, name, valuep, lengthp,
+	    SDPART(dev), (void *)SD_PATH_DIRECT));
 }
 
 /*
@@ -4592,8 +4571,6 @@ sd_get_virtual_geometry(struct sd_lun *un, cmlb_geom_t *lgeom_p,
 static void
 sd_update_block_info(struct sd_lun *un, uint32_t lbasize, uint64_t capacity)
 {
-	uint_t		dblk;
-
 	if (lbasize != 0) {
 		un->un_tgt_blocksize = lbasize;
 		un->un_f_tgt_blocksize_is_valid	= TRUE;
@@ -4602,32 +4579,6 @@ sd_update_block_info(struct sd_lun *un, uint32_t lbasize, uint64_t capacity)
 	if (capacity != 0) {
 		un->un_blockcount		= capacity;
 		un->un_f_blockcount_is_valid	= TRUE;
-	}
-
-	/*
-	 * Update device capacity properties.
-	 *
-	 *   'device-nblocks'	number of blocks in target's units
-	 *   'device-blksize'	data bearing size of target's block
-	 *
-	 * NOTE: math is complicated by the fact that un_tgt_blocksize may
-	 * not be a power of two for checksumming disks with 520/528 byte
-	 * sectors.
-	 */
-	if (un->un_f_tgt_blocksize_is_valid &&
-	    un->un_f_blockcount_is_valid &&
-	    un->un_sys_blocksize) {
-		dblk = un->un_tgt_blocksize / un->un_sys_blocksize;
-		(void) ddi_prop_update_int64(DDI_DEV_T_NONE, SD_DEVINFO(un),
-		    "device-nblocks", un->un_blockcount / dblk);
-		/*
-		 * To save memory, only define "device-blksize" when its
-		 * value is differnet than the default DEV_BSIZE value.
-		 */
-		if ((un->un_sys_blocksize * dblk) != DEV_BSIZE)
-			(void) ddi_prop_update_int(DDI_DEV_T_NONE,
-			    SD_DEVINFO(un), "device-blksize",
-			    un->un_sys_blocksize * dblk);
 	}
 }
 
@@ -4706,11 +4657,11 @@ sd_register_devid(struct sd_lun *un, dev_info_t *devi, int reservation_flag)
 	}
 
 	/*
-	 * We check the availibility of the World Wide Name (0x83) and Unit
+	 * We check the availability of the World Wide Name (0x83) and Unit
 	 * Serial Number (0x80) pages in sd_check_vpd_page_support(), and using
 	 * un_vpd_page_mask from them, we decide which way to get the WWN.  If
-	 * 0x83 is availible, that is the best choice.  Our next choice is
-	 * 0x80.  If neither are availible, we munge the devid from the device
+	 * 0x83 is available, that is the best choice.  Our next choice is
+	 * 0x80.  If neither are available, we munge the devid from the device
 	 * vid/pid/serial # for Sun qualified disks, or use the ddi framework
 	 * to fabricate a devid for non-Sun qualified disks.
 	 */
@@ -5044,7 +4995,7 @@ sd_write_deviceid(struct sd_lun *un)
  *
  * Description: This routine sends an inquiry command with the EVPD bit set and
  *		a page code of 0x00 to the device. It is used to determine which
- *		vital product pages are availible to find the devid. We are
+ *		vital product pages are available to find the devid. We are
  *		looking for pages 0x83 or 0x80.  If we return a negative 1, the
  *		device does not support that command.
  *
@@ -5276,7 +5227,7 @@ sd_setup_pm(struct sd_lun *un, dev_info_t *devi)
 
 		/*
 		 * If the Log sense for Page( Start/stop cycle counter page)
-		 * succeeds, then power managment is supported and we can
+		 * succeeds, then power management is supported and we can
 		 * enable auto-pm.
 		 */
 		if (rval == 0)  {
@@ -6041,7 +5992,7 @@ sdpower(dev_info_t *devi, int component, int level)
 			 * To effect this behavior, call pm_busy_component to
 			 * indicate to the framework this device is busy.
 			 * By not adjusting un_pm_count the rest of PM in
-			 * the driver will function normally, and independant
+			 * the driver will function normally, and independent
 			 * of this but because the framework is told the device
 			 * is busy it won't attempt powering down until it gets
 			 * a matching idle. The timeout handler sends this.
@@ -6546,7 +6497,7 @@ sd_unit_attach(dev_info_t *devi)
 	 * Note: This driver is currently compiled as two binaries, a parallel
 	 * scsi version (sd) and a fibre channel version (ssd). All functional
 	 * differences are determined at compile time. In the future a single
-	 * binary will be provided and the inteconnect type will be used to
+	 * binary will be provided and the interconnect type will be used to
 	 * differentiate between fibre and parallel scsi behaviors. At that time
 	 * it will be necessary for all fibre channel HBAs to support this
 	 * property.
@@ -6808,7 +6759,7 @@ sd_unit_attach(dev_info_t *devi)
 	 * configuration file (.conf) for this unit and update the soft state
 	 * for the device as needed for the indicated properties.
 	 * Note: the property configuration needs to occur here as some of the
-	 * following routines may have dependancies on soft state flags set
+	 * following routines may have dependencies on soft state flags set
 	 * as part of the driver property configuration.
 	 */
 	sd_read_unit_properties(un);
@@ -7263,7 +7214,7 @@ sd_unit_attach(dev_info_t *devi)
 	 * "retry-on-reservation-conflict") (1189689)
 	 *
 	 * Note: The use of a global here can have unintended consequences. A
-	 * per instance variable is preferrable to match the capabilities of
+	 * per instance variable is preferable to match the capabilities of
 	 * different underlying hba's (4402600)
 	 */
 	sd_retry_on_reservation_conflict = ddi_getprop(DDI_DEV_T_ANY, devi,
@@ -7337,7 +7288,7 @@ sd_unit_attach(dev_info_t *devi)
 
 #if (defined(__fibre))
 	/*
-	 * Register callbacks for fibre only.  You can't do this soley
+	 * Register callbacks for fibre only.  You can't do this solely
 	 * on the basis of the devid_type because this is hba specific.
 	 * We need to query our hba capabilities to find out whether to
 	 * register or not.
@@ -26058,12 +26009,6 @@ sr_ejected(struct sd_lun *un)
 		stp = (struct sd_errstats *)un->un_errstats->ks_data;
 		stp->sd_capacity.value.ui64 = 0;
 	}
-
-	/* remove "capacity-of-device" properties */
-	(void) ddi_prop_remove(DDI_DEV_T_NONE, SD_DEVINFO(un),
-	    "device-nblocks");
-	(void) ddi_prop_remove(DDI_DEV_T_NONE, SD_DEVINFO(un),
-	    "device-blksize");
 }
 
 
@@ -28227,7 +28172,7 @@ sd_tg_getinfo(dev_info_t *devi, int cmd, void *arg, void *tg_cookie)
 	case TG_GETPHYGEOM:
 	case TG_GETVIRTGEOM:
 	case TG_GETCAPACITY:
-	case  TG_GETBLOCKSIZE:
+	case TG_GETBLOCKSIZE:
 		mutex_enter(SD_MUTEX(un));
 
 		if ((un->un_f_blockcount_is_valid == TRUE) &&

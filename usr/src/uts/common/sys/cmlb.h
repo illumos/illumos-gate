@@ -184,7 +184,7 @@ typedef struct cmlb_tg_ops {
 	 *			In case of TG_GETCAP, this return code
 	 *			indicates no media in the drive.
 	 *
-	 *	EIO		An error occured during obtaining info
+	 *	EIO		An error occurred during obtaining info
 	 *			from device/media.
 	 *
 	 *	ENOTSUP		In case of TG_GETCAP, target does not
@@ -481,6 +481,28 @@ cmlb_efi_label_capacity(cmlb_handle_t cmlbhandle, diskaddr_t *capacity,
 int
 cmlb_ioctl(cmlb_handle_t cmlbhandle, dev_t dev, int cmd,
     intptr_t arg, int flag, cred_t *cred_p, int *rval_p, void *tg_cookie);
+
+/*
+ * cmlb_prop_op:
+ *	provide common label prop_op(9E) implementation that understands the
+ *	size(9p) properties.
+ *
+ * Arguments:
+ *	cmlbhandle	cmlb handle associated with device.
+ *	dev		See prop_op(9E)
+ *	dip		"
+ *	prop_op		"
+ *	mod_flags	"
+ *	name		"
+ *	valuep		"
+ *	lengthp		"
+ *	part		partition number
+ *	tg_cookie 	cookie from target driver to be passed back to target
+ */
+int
+cmlb_prop_op(cmlb_handle_t cmlbhandle,
+    dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
+    char *name, caddr_t valuep, int *lengthp, int part, void *tg_cookie);
 
 /*
  * cmlb_get_devid_block:

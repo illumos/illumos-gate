@@ -1894,6 +1894,21 @@ ddi_prop_op_size_blksize(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 	caddr_t	buffer;
 	int	blkshift;
 
+	/*
+	 * This is a kludge to support capture of size(9P) pure dynamic
+	 * properties in snapshots for non-cmlb code (without exposing
+	 * i_ddi_prop_dyn changes). When everyone uses cmlb, this code
+	 * should be removed.
+	 */
+	if (i_ddi_prop_dyn_driver_get(dip) == NULL) {
+		static i_ddi_prop_dyn_t prop_dyn_size[] = {
+		    {"Size",		DDI_PROP_TYPE_INT64,	S_IFCHR},
+		    {"Nblocks",		DDI_PROP_TYPE_INT64,	S_IFBLK},
+		    {NULL}
+		};
+		i_ddi_prop_dyn_driver_set(dip, prop_dyn_size);
+	}
+
 	/* convert block size to shift value */
 	ASSERT(BIT_ONLYONESET(blksize));
 	blkshift = highbit(blksize) - 1;
@@ -1924,10 +1939,6 @@ ddi_prop_op_size_blksize(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 	if (prop_op == PROP_LEN)
 		return (DDI_PROP_SUCCESS);
 
-	/* the length of the property and the request must match */
-	if (callers_length != *lengthp)
-		return (DDI_PROP_INVAL_ARG);
-
 	switch (prop_op) {
 	case PROP_LEN_AND_VAL_ALLOC:
 		if ((buffer = kmem_alloc(*lengthp,
@@ -1939,6 +1950,10 @@ ddi_prop_op_size_blksize(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 		break;
 
 	case PROP_LEN_AND_VAL_BUF:
+		/* the length of the property and the request must match */
+		if (callers_length != *lengthp)
+			return (DDI_PROP_INVAL_ARG);
+
 		buffer = valuep;		/* get callers buf ptr */
 		break;
 
@@ -3842,8 +3857,8 @@ ddi_prop_create(dev_t dev, dev_info_t *dip, int flag,
 #endif /* DDI_PROP_DEBUG */
 	}
 	flag &= ~DDI_PROP_SYSTEM_DEF;
-	return (ddi_prop_update_common(dev, dip,
-	    (flag | DDI_PROP_STACK_CREATE | DDI_PROP_TYPE_ANY), name,
+	flag |= DDI_PROP_STACK_CREATE | DDI_PROP_TYPE_ANY;
+	return (ddi_prop_update_common(dev, dip, flag, name,
 	    value, length, ddi_prop_fm_encode_bytes));
 }
 
@@ -3853,9 +3868,8 @@ e_ddi_prop_create(dev_t dev, dev_info_t *dip, int flag,
 {
 	if (!(flag & DDI_PROP_CANSLEEP))
 		flag |= DDI_PROP_DONTSLEEP;
-	return (ddi_prop_update_common(dev, dip,
-	    (flag | DDI_PROP_SYSTEM_DEF | DDI_PROP_STACK_CREATE |
-	    DDI_PROP_TYPE_ANY),
+	flag |= DDI_PROP_SYSTEM_DEF | DDI_PROP_STACK_CREATE | DDI_PROP_TYPE_ANY;
+	return (ddi_prop_update_common(dev, dip, flag,
 	    name, value, length, ddi_prop_fm_encode_bytes));
 }
 
@@ -4501,6 +4515,7 @@ ddi_prop_remove_all_common(dev_info_t *dip, int flag)
 void
 ddi_prop_remove_all(dev_info_t *dip)
 {
+	i_ddi_prop_dyn_driver_set(dip, NULL);
 	ddi_prop_remove_all_common(dip, 0);
 }
 
@@ -4531,9 +4546,9 @@ ddi_prop_undefine(dev_t dev, dev_info_t *dip, int flag, char *name)
 {
 	if (!(flag & DDI_PROP_CANSLEEP))
 		flag |= DDI_PROP_DONTSLEEP;
-	return (ddi_prop_update_common(dev, dip,
-	    (flag | DDI_PROP_STACK_CREATE | DDI_PROP_UNDEF_IT |
-	    DDI_PROP_TYPE_ANY), name, NULL, 0, ddi_prop_fm_encode_bytes));
+	flag |= DDI_PROP_STACK_CREATE | DDI_PROP_UNDEF_IT | DDI_PROP_TYPE_ANY;
+	return (ddi_prop_update_common(dev, dip, flag,
+	    name, NULL, 0, ddi_prop_fm_encode_bytes));
 }
 
 int
@@ -4541,11 +4556,55 @@ e_ddi_prop_undefine(dev_t dev, dev_info_t *dip, int flag, char *name)
 {
 	if (!(flag & DDI_PROP_CANSLEEP))
 		flag |= DDI_PROP_DONTSLEEP;
-	return (ddi_prop_update_common(dev, dip,
-	    (flag | DDI_PROP_SYSTEM_DEF | DDI_PROP_STACK_CREATE |
-	    DDI_PROP_UNDEF_IT | DDI_PROP_TYPE_ANY),
+	flag |= DDI_PROP_SYSTEM_DEF | DDI_PROP_STACK_CREATE |
+	    DDI_PROP_UNDEF_IT | DDI_PROP_TYPE_ANY;
+	return (ddi_prop_update_common(dev, dip, flag,
 	    name, NULL, 0, ddi_prop_fm_encode_bytes));
 }
+
+/*
+ * Support for gathering dynamic properties in devinfo snapshot.
+ */
+void
+i_ddi_prop_dyn_driver_set(dev_info_t *dip, i_ddi_prop_dyn_t *dp)
+{
+	DEVI(dip)->devi_prop_dyn_driver = dp;
+}
+
+i_ddi_prop_dyn_t *
+i_ddi_prop_dyn_driver_get(dev_info_t *dip)
+{
+	return (DEVI(dip)->devi_prop_dyn_driver);
+}
+
+void
+i_ddi_prop_dyn_parent_set(dev_info_t *dip, i_ddi_prop_dyn_t *dp)
+{
+	DEVI(dip)->devi_prop_dyn_parent = dp;
+}
+
+i_ddi_prop_dyn_t *
+i_ddi_prop_dyn_parent_get(dev_info_t *dip)
+{
+	return (DEVI(dip)->devi_prop_dyn_parent);
+}
+
+void
+i_ddi_prop_dyn_cache_invalidate(dev_info_t *dip, i_ddi_prop_dyn_t *dp)
+{
+	/* for now we invalidate the entire cached snapshot */
+	if (dip && dp)
+		i_ddi_di_cache_invalidate(KM_SLEEP);
+}
+
+/* ARGSUSED */
+void
+ddi_prop_cache_invalidate(dev_t dev, dev_info_t *dip, char *name, int flags)
+{
+	/* for now we invalidate the entire cached snapshot */
+	i_ddi_di_cache_invalidate(KM_SLEEP);
+}
+
 
 /*
  * Code to search hardware layer (PROM), if it exists, on behalf of child.
@@ -5639,11 +5698,10 @@ swab(void *src, void *dst, size_t nbytes)
 static void
 ddi_append_minor_node(dev_info_t *ddip, struct ddi_minor_data *dmdp)
 {
-	struct ddi_minor_data *dp;
+	int			circ;
+	struct ddi_minor_data	*dp;
 
-	mutex_enter(&(DEVI(ddip)->devi_lock));
-	i_devi_enter(ddip, DEVI_S_MD_UPDATE, DEVI_S_MD_UPDATE, 1);
-
+	ndi_devi_enter(ddip, &circ);
 	if ((dp = DEVI(ddip)->devi_minor) == (struct ddi_minor_data *)NULL) {
 		DEVI(ddip)->devi_minor = dmdp;
 	} else {
@@ -5651,9 +5709,7 @@ ddi_append_minor_node(dev_info_t *ddip, struct ddi_minor_data *dmdp)
 			dp = dp->next;
 		dp->next = dmdp;
 	}
-
-	i_devi_exit(ddip, DEVI_S_MD_UPDATE, 1);
-	mutex_exit(&(DEVI(ddip)->devi_lock));
+	ndi_devi_exit(ddip, circ);
 }
 
 /*
@@ -6094,12 +6150,11 @@ ddi_create_internal_pathname(dev_info_t *dip, char *name, int spec_type,
 void
 ddi_remove_minor_node(dev_info_t *dip, char *name)
 {
-	struct ddi_minor_data *dmdp, *dmdp1;
-	struct ddi_minor_data **dmdp_prev;
+	int			circ;
+	struct ddi_minor_data	*dmdp, *dmdp1;
+	struct ddi_minor_data	**dmdp_prev;
 
-	mutex_enter(&(DEVI(dip)->devi_lock));
-	i_devi_enter(dip, DEVI_S_MD_UPDATE, DEVI_S_MD_UPDATE, 1);
-
+	ndi_devi_enter(dip, &circ);
 	dmdp_prev = &DEVI(dip)->devi_minor;
 	dmdp = DEVI(dip)->devi_minor;
 	while (dmdp != NULL) {
@@ -6134,9 +6189,7 @@ ddi_remove_minor_node(dev_info_t *dip, char *name)
 		}
 		dmdp = dmdp1;
 	}
-
-	i_devi_exit(dip, DEVI_S_MD_UPDATE, 1);
-	mutex_exit(&(DEVI(dip)->devi_lock));
+	ndi_devi_exit(dip, circ);
 }
 
 
@@ -6650,6 +6703,7 @@ ddi_pathname(dev_info_t *dip, char *path)
 int
 ddi_dev_pathname(dev_t devt, int spec_type, char *path)
 {
+	int		circ;
 	major_t		major = getmajor(devt);
 	int		instance;
 	dev_info_t	*dip;
@@ -6682,14 +6736,14 @@ ddi_dev_pathname(dev_t devt, int spec_type, char *path)
 			goto fail;
 
 		/* Add minorname to path. */
-		mutex_enter(&(DEVI(dip)->devi_lock));
+		ndi_devi_enter(dip, &circ);
 		minorname = i_ddi_devtspectype_to_minorname(dip,
 		    devt, spec_type);
 		if (minorname) {
 			(void) strcat(path, ":");
 			(void) strcat(path, minorname);
 		}
-		mutex_exit(&(DEVI(dip)->devi_lock));
+		ndi_devi_exit(dip, circ);
 		ddi_release_devi(dip);
 		if (minorname == NULL)
 			goto fail;
@@ -7359,8 +7413,8 @@ i_ddi_devtspectype_to_minorname(dev_info_t *dip, dev_t dev, int spec_type)
 	 */
 	ASSERT((ddi_driver_major(dip) == getmajor(dev)) ||
 	    (strcmp(ddi_major_to_name(getmajor(dev)), "did") == 0));
-	ASSERT(MUTEX_HELD(&(DEVI(dip)->devi_lock)));
 
+	ASSERT(DEVI_BUSY_OWNED(dip));
 	for (dmdp = DEVI(dip)->devi_minor; dmdp; dmdp = dmdp->next) {
 		if (((dmdp->type == DDM_MINOR) ||
 		    (dmdp->type == DDM_INTERNAL_PATH) ||
@@ -7383,6 +7437,7 @@ int
 i_ddi_minorname_to_devtspectype(dev_info_t *dip, char *minor_name,
 	dev_t *devtp, int *spectypep)
 {
+	int			circ;
 	struct ddi_minor_data	*dmdp;
 
 	/* deal with clone minor nodes */
@@ -7415,9 +7470,7 @@ i_ddi_minorname_to_devtspectype(dev_info_t *dip, char *minor_name,
 		return (DDI_SUCCESS);
 	}
 
-	ASSERT(!MUTEX_HELD(&(DEVI(dip)->devi_lock)));
-	mutex_enter(&(DEVI(dip)->devi_lock));
-
+	ndi_devi_enter(dip, &circ);
 	for (dmdp = DEVI(dip)->devi_minor; dmdp; dmdp = dmdp->next) {
 		if (((dmdp->type != DDM_MINOR) &&
 		    (dmdp->type != DDM_INTERNAL_PATH) &&
@@ -7431,11 +7484,11 @@ i_ddi_minorname_to_devtspectype(dev_info_t *dip, char *minor_name,
 		if (spectypep)
 			*spectypep = dmdp->ddm_spec_type;
 
-		mutex_exit(&(DEVI(dip)->devi_lock));
+		ndi_devi_exit(dip, circ);
 		return (DDI_SUCCESS);
 	}
+	ndi_devi_exit(dip, circ);
 
-	mutex_exit(&(DEVI(dip)->devi_lock));
 	return (DDI_FAILURE);
 }
 
@@ -7792,54 +7845,38 @@ ddi_lyr_get_devid(dev_t dev, ddi_devid_t *ret_devid)
 int
 ddi_lyr_get_minor_name(dev_t dev, int spec_type, char **minor_name)
 {
+	char		*buf;
+	int		circ;
 	dev_info_t	*dip;
 	char		*nm;
-	size_t		alloc_sz, sz;
+	int		rval;
 
-	if ((dip = e_ddi_hold_devi_by_dev(dev, 0)) == NULL)
-		return (DDI_FAILURE);
-
-	mutex_enter(&(DEVI(dip)->devi_lock));
-
-	if ((nm = i_ddi_devtspectype_to_minorname(dip,
-	    dev, spec_type)) == NULL) {
-		mutex_exit(&(DEVI(dip)->devi_lock));
-		ddi_release_devi(dip);	/* e_ddi_hold_devi_by_dev() */
-		return (DDI_FAILURE);
-	}
-
-	/* make a copy */
-	alloc_sz = strlen(nm) + 1;
-retry:
-	/* drop lock to allocate memory */
-	mutex_exit(&(DEVI(dip)->devi_lock));
-	*minor_name = kmem_alloc(alloc_sz, KM_SLEEP);
-	mutex_enter(&(DEVI(dip)->devi_lock));
-
-	/* re-check things, since we dropped the lock */
-	if ((nm = i_ddi_devtspectype_to_minorname(dip,
-	    dev, spec_type)) == NULL) {
-		mutex_exit(&(DEVI(dip)->devi_lock));
-		kmem_free(*minor_name, alloc_sz);
+	if ((dip = e_ddi_hold_devi_by_dev(dev, 0)) == NULL) {
 		*minor_name = NULL;
-		ddi_release_devi(dip);	/* e_ddi_hold_devi_by_dev() */
 		return (DDI_FAILURE);
 	}
 
-	/* verify size is the same */
-	sz = strlen(nm) + 1;
-	if (alloc_sz != sz) {
-		kmem_free(*minor_name, alloc_sz);
-		alloc_sz = sz;
-		goto retry;
+	/* Find the minor name and copy into max size buf */
+	buf = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+	ndi_devi_enter(dip, &circ);
+	nm = i_ddi_devtspectype_to_minorname(dip, dev, spec_type);
+	if (nm)
+		(void) strcpy(buf, nm);
+	ndi_devi_exit(dip, circ);
+	ddi_release_devi(dip);	/* e_ddi_hold_devi_by_dev() */
+
+	if (nm) {
+		/* duplicate into min size buf for return result */
+		*minor_name = i_ddi_strdup(buf, KM_SLEEP);
+		rval = DDI_SUCCESS;
+	} else {
+		*minor_name = NULL;
+		rval = DDI_FAILURE;
 	}
 
-	/* sz == alloc_sz - make a copy */
-	(void) strcpy(*minor_name, nm);
-
-	mutex_exit(&(DEVI(dip)->devi_lock));
-	ddi_release_devi(dip);	/* e_ddi_hold_devi_by_dev() */
-	return (DDI_SUCCESS);
+	/* free max size buf and return */
+	kmem_free(buf, MAXNAMELEN);
+	return (rval);
 }
 
 int
@@ -7945,48 +7982,6 @@ ddi_get_eventcookie(dev_info_t *dip, char *name,
 {
 	return (ndi_busop_get_eventcookie(dip, dip,
 	    name, event_cookiep));
-}
-
-/*
- * single thread access to dev_info node and set state
- */
-void
-i_devi_enter(dev_info_t *dip, uint_t s_mask, uint_t w_mask, int has_lock)
-{
-	if (!has_lock)
-		mutex_enter(&(DEVI(dip)->devi_lock));
-
-	ASSERT(mutex_owned(&(DEVI(dip)->devi_lock)));
-
-	/*
-	 * wait until state(s) have been changed
-	 */
-	while ((DEVI(dip)->devi_state & w_mask) != 0) {
-		cv_wait(&(DEVI(dip)->devi_cv), &(DEVI(dip)->devi_lock));
-	}
-	DEVI(dip)->devi_state |= s_mask;
-
-	if (!has_lock)
-		mutex_exit(&(DEVI(dip)->devi_lock));
-}
-
-void
-i_devi_exit(dev_info_t *dip, uint_t c_mask, int has_lock)
-{
-	if (!has_lock)
-		mutex_enter(&(DEVI(dip)->devi_lock));
-
-	ASSERT(mutex_owned(&(DEVI(dip)->devi_lock)));
-
-	/*
-	 * clear the state(s) and wakeup any threads waiting
-	 * for state change
-	 */
-	DEVI(dip)->devi_state &= ~c_mask;
-	cv_broadcast(&(DEVI(dip)->devi_cv));
-
-	if (!has_lock)
-		mutex_exit(&(DEVI(dip)->devi_lock));
 }
 
 /*

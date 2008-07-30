@@ -924,6 +924,15 @@ ddi_prop_undefine(dev_t dev, dev_info_t *dip, int flag, char *name);
 
 
 /*
+ * ddi_prop_cache_invalidate
+ *			Invalidate a property in the current cached
+ *			devinfo snapshot - next cached snapshot will
+ *			return the latest property value available.
+ */
+void
+ddi_prop_cache_invalidate(dev_t dev, dev_info_t *dip, char *name, int flags);
+
+/*
  * The default ddi_bus_prop_op wrapper...
  */
 

@@ -1110,7 +1110,6 @@ devinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    { "S_OFFLINING",	DEVI_S_OFFLINING,	DEVI_S_OFFLINING },
 	    { "S_INVOKING_DACF", DEVI_S_INVOKING_DACF,	DEVI_S_INVOKING_DACF },
 	    { "S_UNBOUND",	DEVI_S_UNBOUND,		DEVI_S_UNBOUND },
-	    { "S_MD_UPDATE",	DEVI_S_MD_UPDATE,	DEVI_S_MD_UPDATE },
 	    { "S_REPORT",	DEVI_S_REPORT,		DEVI_S_REPORT },
 	    { "S_EVADD",	DEVI_S_EVADD,		DEVI_S_EVADD },
 	    { "S_EVREMOVE",	DEVI_S_EVREMOVE,	DEVI_S_EVREMOVE },

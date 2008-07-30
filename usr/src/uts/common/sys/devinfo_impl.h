@@ -118,15 +118,7 @@ extern "C" {
 #define	DI_DEVNM(addr)		((struct di_devnm *)((void *)(addr)))
 #define	DI_LINK(addr)		((struct di_link *)((void *)(addr)))
 #define	DI_LNODE(addr)		((struct di_lnode *)((void *)(addr)))
-
-/*
- * For compatibility only
- */
-#define	DINO(addr)		DI_NODE(addr)
-#define	DIMI(addr)		DI_MINOR(addr)
-#define	DIPROP(addr)		DI_PROP(addr)
-#define	DIPATH(addr)		DI_PATH(addr)
-#define	DIPATHPROP(addr)	DI_PATHPROP(addr)
+#define	DI_PRIV_FORMAT(addr)	((struct di_priv_format *)((void *)(addr)))
 
 /*
  * multipath component definitions:  Follows the registered component of
@@ -360,9 +352,9 @@ struct di_prop {
 	di_off_t	prop_data;	/* property data */
 	major_t		dev_major;	/* dev_t can be 64 bit */
 	minor_t		dev_minor;
-	int	prop_flags;	/* mark prop value types & more */
-	int	prop_len;	/* prop length in bytes (boolean if 0) */
-	int	prop_list;	/* which list (DI_PROP_SYS_LIST), etc */
+	int		prop_flags;	/* mark prop value types & more */
+	int		prop_len;	/* prop len in bytes (boolean if 0) */
+	int		prop_list;	/* which list (DI_PROP_SYS_LIST), etc */
 };
 
 /*
