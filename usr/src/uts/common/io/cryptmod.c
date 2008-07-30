@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * STREAMS Crypto Module
@@ -176,7 +176,7 @@ static struct fmodsw fsw = {
  */
 static struct modlstrmod modlstrmod = {
 	&mod_strmodops,
-	"STREAMS encryption module %I%",
+	"STREAMS encryption module",
 	&fsw
 };
 
@@ -1996,6 +1996,8 @@ arcfour_hmac_md5_encrypt(queue_t *q, struct tmodinfo *tmi, mblk_t *mp,
 	crypto_mechanism_t mech;
 	int usage;
 
+	bzero(&indata, sizeof (indata));
+
 	/* The usage constant is 1026 for all "old" rcmd mode operations */
 	if (tmi->enc_data.option_mask & CRYPTOPT_RCMD_MODE_V1)
 		usage = RCMDV1_USAGE;
@@ -3040,7 +3042,7 @@ encrypt_block(queue_t *q, struct tmodinfo *tmi, mblk_t *mp, size_t plainlen)
 		 * Make sure the rptr is positioned correctly so that
 		 * routines later do not have to shift this data around
 		 */
-		if ((cbp->b_rptr + P2ROUNDUP(plainlen + extra, 8) >
+		if ((cbp->b_rptr + P2ROUNDUP(cipherlen + extra, 8) >
 			DB_LIM(cbp)) ||
 			(cbp->b_rptr - headspace < DB_BASE(cbp))) {
 			ovbcopy(cbp->b_rptr, DB_BASE(cbp) + headspace,
