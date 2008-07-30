@@ -889,22 +889,21 @@ ire_send(queue_t *q, mblk_t *pkt, ire_t *ire)
 		ire_refrele(ire);
 	} else {
 		/* Locally originated packets */
-		boolean_t is_inaddr_any;
+		boolean_t delete_ire = B_FALSE;
 		ipha_t *ipha = (ipha_t *)pkt->b_rptr;
 
 		/*
-		 * We need to do an ire_delete below for which
-		 * we need to make sure that the IRE will be
-		 * around even after calling ip_wput_ire -
-		 * which does ire_refrele. Otherwise somebody
-		 * could potentially delete this ire and hence
-		 * free this ire and we will be calling ire_delete
-		 * on a freed ire below.
+		 * If this IRE shouldn't be kept in the table (because its
+		 * source address is unspecified), hold a reference to it so
+		 * we can delete it even after e.g. ip_wput_ire() has dropped
+		 * its reference.
 		 */
-		is_inaddr_any = (ire->ire_src_addr == INADDR_ANY);
-		if (is_inaddr_any) {
+		if (!(ire->ire_marks & IRE_MARK_NOADD) &&
+		    ire->ire_src_addr == INADDR_ANY) {
+			delete_ire = B_TRUE;
 			IRE_REFHOLD(ire);
 		}
+
 		/*
 		 * If we were resolving a router we can not use the
 		 * routers IRE for sending the packet (since it would
@@ -971,26 +970,12 @@ ire_send(queue_t *q, mblk_t *pkt, ire_t *ire)
 		 * We prevent returning/using this IRE by the upper layers
 		 * by making checks to NULL source address in other places
 		 * like e.g ip_ire_append, ip_ire_req and ip_bind_connected.
-		 * Though, this does not completely prevent other threads
+		 * Though this does not completely prevent other threads
 		 * from using this ire, this should not cause any problems.
-		 *
-		 * NOTE : We use is_inaddr_any instead of using ire_src_addr
-		 * because for the normal case i.e !is_inaddr_any, ire_refrele
-		 * above could have potentially freed the ire.
 		 */
-		if (is_inaddr_any) {
-			/*
-			 * If this IRE has been deleted by another thread, then
-			 * ire_bucket won't be NULL, but ire_ptpn will be NULL.
-			 * Thus, ire_delete will do nothing.  This check
-			 * guards against calling ire_delete when the IRE was
-			 * never inserted in the table, which is handled by
-			 * ire_delete as dropping another reference.
-			 */
-			if (ire->ire_bucket != NULL) {
-				ip1dbg(("ire_send: delete IRE\n"));
-				ire_delete(ire);
-			}
+		if (delete_ire) {
+			ip1dbg(("ire_send: delete IRE\n"));
+			ire_delete(ire);
 			ire_refrele(ire);	/* Held above */
 		}
 	}
@@ -1998,14 +1983,15 @@ ire_walk_ipvers(pfv_t func, void *arg, uchar_t vers, zoneid_t zoneid,
 }
 
 /*
- * Arrange to call the specified
- * function for every IRE that matches the ill.
+ * Arrange to call the specified function for every IRE that matches the ill.
  */
 void
 ire_walk_ill(uint_t match_flags, uint_t ire_type, pfv_t func, void *arg,
     ill_t *ill)
 {
-	ire_walk_ill_ipvers(match_flags, ire_type, func, arg, 0, ill);
+	uchar_t vers = (ill->ill_isv6 ? IPV6_VERSION : IPV4_VERSION);
+
+	ire_walk_ill_ipvers(match_flags, ire_type, func, arg, vers, ill);
 }
 
 void
@@ -2025,7 +2011,7 @@ ire_walk_ill_v6(uint_t match_flags, uint_t ire_type, pfv_t func, void *arg,
 }
 
 /*
- * Walk a particular ill and version. version == 0 means both v4 and v6.
+ * Walk a particular ill and version.
  */
 static void
 ire_walk_ill_ipvers(uint_t match_flags, uint_t ire_type, pfv_t func,
@@ -2033,13 +2019,12 @@ ire_walk_ill_ipvers(uint_t match_flags, uint_t ire_type, pfv_t func,
 {
 	ip_stack_t	*ipst = ill->ill_ipst;
 
-	if (vers != IPV6_VERSION) {
+	if (vers == IPV4_VERSION) {
 		ire_walk_ill_tables(match_flags, ire_type, func, arg,
 		    IP_MASK_TABLE_SIZE, 0,
 		    NULL, ipst->ips_ip_cache_table_size,
 		    ipst->ips_ip_cache_table, ill, ALL_ZONES, ipst);
-	}
-	if (vers != IPV4_VERSION) {
+	} else if (vers == IPV6_VERSION) {
 		ire_walk_ill_tables(match_flags, ire_type, func, arg,
 		    IP6_MASK_TABLE_SIZE, ipst->ips_ip6_ftable_hash_size,
 		    ipst->ips_ip_forwarding_table_v6,

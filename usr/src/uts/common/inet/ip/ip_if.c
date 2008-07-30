@@ -141,7 +141,7 @@ static int	ip_sioctl_dstaddr_tail(ipif_t *ipif, sin_t *sin, queue_t *q,
 static int	ip_sioctl_slifzone_tail(ipif_t *ipif, zoneid_t zoneid,
     queue_t *q, mblk_t *mp, boolean_t need_up);
 static int	ip_sioctl_flags_tail(ipif_t *ipif, uint64_t flags, queue_t *q,
-    mblk_t *mp, boolean_t need_up);
+    mblk_t *mp);
 static int	ip_sioctl_netmask_tail(ipif_t *ipif, sin_t *sin, queue_t *q,
     mblk_t *mp);
 static int	ip_sioctl_subnet_tail(ipif_t *ipif, in6_addr_t, in6_addr_t,
@@ -419,7 +419,6 @@ static arc_t	ip_aroff_template = {
 	sizeof (arc_t),		/* Name offset */
 	sizeof (arc_t)		/* Name length (set by ill_arp_alloc) */
 };
-
 
 static arma_t	ip_arma_multi_template = {
 	AR_MAPPING_ADD,
@@ -912,7 +911,6 @@ ill_delete_tail(ill_t *ill)
 	if (ill->ill_ndd_name != NULL)
 		nd_unload(&ipst->ips_ip_g_nd, ill->ill_ndd_name);
 	rw_exit(&ipst->ips_ip_g_nd_lock);
-
 
 	if (ill->ill_frag_ptr != NULL) {
 		uint_t count;
@@ -1552,7 +1550,6 @@ conn_cleanup_ill(conn_t *connp, caddr_t arg)
 		}
 	}
 	mutex_exit(&connp->conn_lock);
-
 }
 
 /* ARGSUSED */
@@ -2094,7 +2091,6 @@ ill_enable_promisc_notify(ill_t *ill)
 
 	return (B_TRUE);
 }
-
 
 /*
  * Allocate an IPsec capability request which will be filled by our
@@ -3491,7 +3487,6 @@ ill_capability_lso_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 	}
 }
 
-
 static void
 ill_capability_lso_reset(ill_t *ill, mblk_t **sc_mp)
 {
@@ -4225,7 +4220,6 @@ ill_find_by_name(char *name, boolean_t isv6, queue_t *q, mblk_t *mp,
 		}
 	}
 
-
 	if (ifp == (ill_if_t *)&IP_VX_ILL_G_LIST(list, ipst)) {
 		/*
 		 * Even the interface type does not exist.
@@ -4578,10 +4572,8 @@ ill_glist_insert(ill_t *ill, char *name, boolean_t isv6)
 				vmem_free(ill_interface->illif_ppa_arena,
 				    (void *)(uintptr_t)(ill->ill_ppa+1), 1);
 			}
-			if (avl_numnodes(&ill_interface->illif_avl_by_ppa) ==
-			    0) {
+			if (avl_numnodes(&ill_interface->illif_avl_by_ppa) == 0)
 				ill_delete_interface_type(ill->ill_ifptr);
-			}
 
 			return (EINVAL);
 		}
@@ -4709,7 +4701,6 @@ ill_init(queue_t *q, ill_t *ill)
 
 	ill->ill_state_flags |= ILL_LL_SUBNET_PENDING;
 
-
 	/* Frag queue limit stuff */
 	ill->ill_frag_count = 0;
 	ill->ill_ipf_gen = 0;
@@ -4820,7 +4811,6 @@ loopback_kstat_update(kstat_t *ksp, int rw)
 	netstack_rele(ns);
 	return (0);
 }
-
 
 /*
  * Has ifindex been plumbed already.
@@ -5260,7 +5250,6 @@ ill_get_next_ifindex(uint_t index, boolean_t isv6, ip_stack_t *ipst)
 	return (ifindex);
 }
 
-
 /*
  * Return the ifindex for the named interface.
  * If there is no next ifindex for the interface, return 0.
@@ -5286,7 +5275,6 @@ ill_get_ifindex_by_name(char *name, ip_stack_t *ipst)
 
 	return (ifindex);
 }
-
 
 /*
  * Obtain a reference to the ill. The ill_refcnt is a dynamic refcnt
@@ -8770,7 +8758,6 @@ ip_sioctl_get_lifsrcof(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q,
 		return (err);
 	}
 
-
 	/* Allocate a buffer to hold requested information */
 	numlifs = ip_get_lifsrcofnum(ipif->ipif_ill);
 	lifs_bufsize = numlifs * sizeof (struct lifreq);
@@ -9248,7 +9235,6 @@ next_dst:
 	}
 	miocack(q, mp, iocp->ioc_count, 0);
 }
-
 
 /*
  * Check if this is an address assigned to this machine.
@@ -11111,7 +11097,6 @@ ip_sioctl_addr(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		IN6_IPADDR_TO_V4MAPPED(addr, &v6addr);
 	}
 
-
 	/*
 	 * Even if there is no change we redo things just to rerun
 	 * ipif_set_default.
@@ -11671,7 +11656,6 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	uint64_t turn_on;
 	uint64_t turn_off;
 	int	err;
-	boolean_t need_up = B_FALSE;
 	phyint_t *phyi;
 	ill_t *ill;
 	uint64_t intf_flags;
@@ -11703,7 +11687,7 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	intf_flags = ipif->ipif_flags | ill->ill_flags | phyi->phyint_flags;
 
 	/*
-	 * Has the flags been set correctly till now ?
+	 * Have the flags been set correctly until now?
 	 */
 	ASSERT((phyi->phyint_flags & ~(IFF_PHYINT_FLAGS)) == 0);
 	ASSERT((ill->ill_flags & ~(IFF_PHYINTINST_FLAGS)) == 0);
@@ -11997,7 +11981,6 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 
 		if (((ipif->ipif_flags | turn_on) & IPIF_UP) &&
 		    !(turn_off & IPIF_UP)) {
-			need_up = B_TRUE;
 			if (ipif->ipif_flags & IPIF_UP)
 				ill->ill_logical_down = 1;
 			turn_on &= ~IPIF_UP;
@@ -12008,12 +11991,11 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 			return (err);
 		ipif_down_tail(ipif);
 	}
-	return (ip_sioctl_flags_tail(ipif, flags, q, mp, need_up));
+	return (ip_sioctl_flags_tail(ipif, flags, q, mp));
 }
 
 static int
-ip_sioctl_flags_tail(ipif_t *ipif, uint64_t flags, queue_t *q, mblk_t *mp,
-    boolean_t need_up)
+ip_sioctl_flags_tail(ipif_t *ipif, uint64_t flags, queue_t *q, mblk_t *mp)
 {
 	ill_t	*ill;
 	phyint_t *phyi;
@@ -12076,7 +12058,7 @@ ip_sioctl_flags_tail(ipif_t *ipif, uint64_t flags, queue_t *q, mblk_t *mp,
 	else
 		ipif->ipif_v6src_addr = ipif->ipif_v6lcl_addr;
 
-	if (need_up) {
+	if ((flags & IFF_UP) && !(ipif->ipif_flags & IPIF_UP)) {
 		/*
 		 * XXX ipif_up really does not know whether a phyint flags
 		 * was modified or not. So, it sends up information on
@@ -12112,37 +12094,28 @@ ip_sioctl_flags_tail(ipif_t *ipif, uint64_t flags, queue_t *q, mblk_t *mp,
 }
 
 /*
- * Restart entry point to restart the flags restart operation after the
- * refcounts have dropped to zero.
+ * Restart the flags operation now that the refcounts have dropped to zero.
  */
 /* ARGSUSED */
 int
 ip_sioctl_flags_restart(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
     ip_ioctl_cmd_t *ipip, void *if_req)
 {
-	int	err;
-	struct ifreq *ifr = (struct ifreq *)if_req;
-	struct lifreq *lifr = (struct lifreq *)if_req;
+	uint64_t flags;
+	struct ifreq *ifr = if_req;
+	struct lifreq *lifr = if_req;
 
 	ip1dbg(("ip_sioctl_flags_restart(%s:%u %p)\n",
 	    ipif->ipif_ill->ill_name, ipif->ipif_id, (void *)ipif));
 
 	ipif_down_tail(ipif);
 	if (ipip->ipi_cmd_type == IF_CMD) {
-		/*
-		 * Since ip_sioctl_flags expects an int and ifr_flags
-		 * is a short we need to cast ifr_flags into an int
-		 * to avoid having sign extension cause bits to get
-		 * set that should not be.
-		 */
-		err = ip_sioctl_flags_tail(ipif,
-		    (uint64_t)(ifr->ifr_flags & 0x0000ffff),
-		    q, mp, B_TRUE);
+		/* cast to uint16_t prevents unwanted sign extension */
+		flags = (uint16_t)ifr->ifr_flags;
 	} else {
-		err = ip_sioctl_flags_tail(ipif, lifr->lifr_flags,
-		    q, mp, B_TRUE);
+		flags = lifr->lifr_flags;
 	}
-	return (err);
+	return (ip_sioctl_flags_tail(ipif, flags, q, mp));
 }
 
 /*
@@ -12528,13 +12501,11 @@ ip_sioctl_metric(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	return (0);
 }
 
-
 /* ARGSUSED */
 int
 ip_sioctl_get_metric(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
     ip_ioctl_cmd_t *ipip, void *if_req)
 {
-
 	/* Get interface metric. */
 	ip1dbg(("ip_sioctl_get_metric(%s:%u %p)\n",
 	    ipif->ipif_ill->ill_name, ipif->ipif_id, (void *)ipif));
@@ -13013,15 +12984,9 @@ ip_sioctl_lnkinfo(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 				ire->ire_max_frag = ipif->ipif_mtu;
 				ire_refrele(ire);
 			}
-			if (ill->ill_isv6) {
-				ire_walk_ill_v6(MATCH_IRE_ILL, 0,
-				    ipif_mtu_change, (char *)nipif,
-				    ill);
-			} else {
-				ire_walk_ill_v4(MATCH_IRE_ILL, 0,
-				    ipif_mtu_change, (char *)nipif,
-				    ill);
-			}
+
+			ire_walk_ill(MATCH_IRE_ILL, 0, ipif_mtu_change,
+			    nipif, ill);
 		}
 	}
 
@@ -14348,7 +14313,6 @@ ill_up_ipifs(ill_t *ill, queue_t *q, mblk_t *mp)
 	ill_t *ill_v6;
 	ill_t *from_ill;
 	int err = 0;
-
 
 	ASSERT(IAM_WRITER_ILL(ill));
 
@@ -15803,13 +15767,8 @@ ill_handoff_responsibility(ill_t *ill, ill_group_t *illgrp)
 	 * deleted and IRE_CACHES that are not pointing at this ill will
 	 * be left alone.
 	 */
-	if (ill->ill_isv6) {
-		ire_walk_ill_v6(MATCH_IRE_ILL | MATCH_IRE_TYPE,
-		    IRE_CACHE, illgrp_cache_delete, (char *)ill, ill);
-	} else {
-		ire_walk_ill_v4(MATCH_IRE_ILL | MATCH_IRE_TYPE,
-		    IRE_CACHE, illgrp_cache_delete, (char *)ill, ill);
-	}
+	ire_walk_ill(MATCH_IRE_ILL | MATCH_IRE_TYPE, IRE_CACHE,
+	    illgrp_cache_delete, ill, ill);
 
 	/*
 	 * Some conn may have cached one of the IREs deleted above. By removing
@@ -16197,7 +16156,6 @@ phyint_lookup_group_ifindex(uint_t group_ifindex, ip_stack_t *ipst)
 	}
 	return (NULL);
 }
-
 
 /*
  * MT notes on creation and deletion of IPMP groups
@@ -16739,7 +16697,6 @@ ilm_send_multicast_reqs(ill_t *from_ill, ill_t *to_ill)
 			    "resolver\n"));
 			continue;		/* Must be IRE_IF_NORESOLVER */
 		}
-
 
 		if (to_ill->ill_phyint->phyint_flags & PHYI_MULTI_BCAST) {
 			ip1dbg(("ilm_send_multicast_reqs: "
@@ -17767,7 +17724,6 @@ ill_move(ill_t *from_ill, ill_t *to_ill, queue_t *q, mblk_t *mp)
 		}
 	}
 
-
 	ill_down_ipifs(from_ill, mp, ifindex, B_TRUE);
 
 	GRAB_ILL_LOCKS(from_ill, to_ill);
@@ -17848,7 +17804,6 @@ ip_extract_move_args(queue_t *q, mblk_t *mp, ill_t **ill_from_v4,
 		ipst = CONNQ_TO_IPST(q);
 	else
 		ipst = ILLQ_TO_IPST(q);
-
 
 	if ((mp1 = mp->b_cont) == NULL)
 		return (EPROTO);
@@ -18926,7 +18881,6 @@ ipif_down_delete_ire(ire_t *ire, char *ipif_arg)
 			return;
 		}
 	}
-
 
 	if (ire->ire_ipif != ipif) {
 		/*
@@ -21213,7 +21167,6 @@ if_unitsel_restart(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	return (ipif_set_values_tail(ipif->ipif_ill, ipif, mp, q));
 }
 
-
 /*
  * Can operate on either a module or a driver queue.
  * Returns an error if not a module queue.
@@ -22144,7 +22097,6 @@ ip_sioctl_get_lifusesrc(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 
 	return (0);
 }
-
 
 /* Find the previous ILL in this usesrc group */
 static ill_t *
@@ -23201,7 +23153,6 @@ ipif_lookup_onlink_addr(ipaddr_t addr, zoneid_t zoneid, ip_stack_t *ipst)
 	return (best_ipif);
 }
 
-
 /*
  * Save enough information so that we can recreate the IRE if
  * the interface goes down and then up.
@@ -23233,7 +23184,6 @@ ipif_save_ire(ipif_t *ipif, ire_t *ire)
 	}
 }
 
-
 static void
 ipif_remove_ire(ipif_t *ipif, ire_t *ire)
 {
@@ -23264,7 +23214,6 @@ ipif_remove_ire(ipif_t *ipif, ire_t *ire)
 	}
 	mutex_exit(&ipif->ipif_saved_ire_lock);
 }
-
 
 /*
  * IP multirouting broadcast routes handling
@@ -23569,7 +23518,6 @@ done:
 		ill_refrele(ill);
 	return (B_FALSE);
 }
-
 
 /*
  * Add a new ill to the list of IPsec capable ills.

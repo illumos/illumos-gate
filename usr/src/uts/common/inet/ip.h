@@ -213,7 +213,6 @@ typedef struct ipoptp_s
 #define	IPOPTP_ERROR	0x00000001
 #endif	/* _KERNEL */
 
-
 /* Controls forwarding of IP packets, set via ndd */
 #define	IP_FORWARD_NEVER	0
 #define	IP_FORWARD_ALWAYS	1
@@ -387,7 +386,7 @@ typedef struct ipf_s {
 #define	ipf_dst	V4_PART_OF_V6(ipf_v6dst)
 
 typedef enum {
-	IB_PKT =  0x01,
+	IB_PKT = 0x01,
 	OB_PKT = 0x02
 } ip_pkt_t;
 
@@ -404,6 +403,7 @@ typedef enum {
 			atomic_add_32(&(ire)->ire_ipif->ipif_fo_pkt_count, 1);\
 	} \
 	}
+
 #define	UPDATE_OB_PKT_COUNT(ire)\
 	{ \
 	(ire)->ire_ob_pkt_count++;\
@@ -411,7 +411,6 @@ typedef enum {
 		atomic_add_32(&(ire)->ire_ipif->ipif_ob_pkt_count, 1); \
 	} \
 	}
-
 
 #define	IP_RPUT_LOCAL(q, mp, ipha, ire, recv_ill) \
 { \
@@ -555,7 +554,7 @@ typedef struct ipha_s {
 #define	IPH_FRAG_HDR	0x8000	/* IPv6 don't fragment bit */
 
 /* ECN code points for IPv4 TOS byte and IPv6 traffic class octet. */
-#define	IPH_ECN_NECT	0x0	/* Not ECN-Capabable Transport */
+#define	IPH_ECN_NECT	0x0	/* Not ECN-Capable Transport */
 #define	IPH_ECN_ECT1	0x1	/* ECN-Capable Transport, ECT(1) */
 #define	IPH_ECN_ECT0	0x2	/* ECN-Capable Transport, ECT(0) */
 #define	IPH_ECN_CE	0x3	/* ECN-Congestion Experienced (CE) */
@@ -801,7 +800,7 @@ typedef struct mrec_s {
  *
  * 2) With IP multipathing, we want to keep receiving even after the
  *    interface has failed. We do this by moving multicast memberships
- *    to a new_ill within the group. This is acheived by sending
+ *    to a new_ill within the group. This is achieved by sending
  *    DL_DISABMULTI_REQS on ilg_ill/ilm_ill and sending DL_ENABMULTIREQS
  *    on the new_ill and changing ilg_ill/ilm_ill to new_ill. But, we
  *    need to be able to delete memberships which will still come down
@@ -840,9 +839,8 @@ typedef struct ilg_s {
 	slist_t		*ilg_filter;
 } ilg_t;
 
-
 /*
- * Multicast address list entry for lower ill.
+ * Multicast address list entry for ill.
  * ilm_ipif is used by IPv4 as multicast groups are joined using ipif.
  * ilm_ill is used by IPv6 as multicast groups are joined using ill.
  * ilm_ill is NULL for IPv4 and ilm_ipif is NULL for IPv6.
@@ -903,7 +901,7 @@ typedef struct ilm_s {
 /*
  * Soft reference to an IPsec SA.
  *
- * On relative terms, conn's can be persistant (living as long as the
+ * On relative terms, conn's can be persistent (living as long as the
  * processes which create them), while SA's are ephemeral (dying when
  * they hit their time-based or byte-based lifetimes).
  *
@@ -1065,10 +1063,8 @@ typedef struct conn_s conn_t;
  */
 
 /*
- * This is used to match an inbound/outbound datagram with
- * policy.
+ * This is used to match an inbound/outbound datagram with policy.
  */
-
 typedef	struct ipsec_selector {
 	in6_addr_t	ips_local_addr_v6;
 	in6_addr_t	ips_remote_addr_v6;
@@ -1234,9 +1230,7 @@ typedef struct ifrt_s {
 
 #ifdef IP_DEBUG
 /*
- * Tracing refholds and refreleases for debugging. Existing tracing mechanisms
- * do not allow the granularity need to trace refrences to ipif/ill/ire's. This
- * mechanism should be revisited once dtrace is available.
+ * Trace refholds and refreles for debugging.
  */
 #define	TR_STACK_DEPTH	14
 typedef struct tr_buf_s {
@@ -1430,7 +1424,7 @@ typedef struct ipif_s {
 #define	ILL_UNTRACE_REF(ill)
 #endif
 
-/* IPv4 compatability macros */
+/* IPv4 compatibility macros */
 #define	ipif_lcl_addr		V4_PART_OF_V6(ipif_v6lcl_addr)
 #define	ipif_src_addr		V4_PART_OF_V6(ipif_v6src_addr)
 #define	ipif_subnet		V4_PART_OF_V6(ipif_v6subnet)
@@ -1528,7 +1522,7 @@ enum { IPIF_DOWN = 1, ILL_DOWN, IPIF_FREE, ILL_FREE, ILL_MOVE_OK };
 /*
  * phyint represents state that is common to both IPv4 and IPv6 interfaces.
  * There is a separate ill_t representing IPv4 and IPv6 which has a
- * backpointer to the phyint structure for acessing common state.
+ * backpointer to the phyint structure for accessing common state.
  *
  * NOTE : It just stores the group name as there is only one name for
  *	  IPv4 and IPv6 i.e it is a underlying link property. Actually
@@ -1770,7 +1764,7 @@ typedef struct ill_lso_capab_s ill_lso_capab_t;
 #define	ILL_CONDEMNED		0x02	/* No more new ref's to the ILL */
 #define	ILL_CHANGING		0x04	/* ILL not globally visible */
 #define	ILL_DL_UNBIND_IN_PROGRESS	0x08	/* UNBIND_REQ is sent */
-#define	ILL_SOFT_RING_ASSIGN	0x10	/* Makeing soft ring assigment */
+#define	ILL_SOFT_RING_ASSIGN	0x10	/* Making soft ring assignment */
 
 /* Is this an ILL whose source address is used by other ILL's ? */
 #define	IS_USESRC_ILL(ill)			\
@@ -1828,7 +1822,7 @@ typedef struct ill_s {
 	ipfb_t	*ill_frag_hash_tbl;	/* Fragment hash list head. */
 	ipif_t	*ill_pending_ipif;	/* IPIF waiting for DL operation. */
 
-	ilm_t	*ill_ilm;		/* Multicast mebership for lower ill */
+	ilm_t	*ill_ilm;		/* Multicast membership for ill */
 	uint_t	ill_global_timer;	/* for IGMPv3/MLDv2 general queries */
 	int	ill_mcast_type;		/* type of router which is querier */
 					/* on this interface */
@@ -2549,7 +2543,7 @@ typedef struct ire_s {
 	ip_stack_t	*ire_ipst;	/* Does not have a netstack_hold */
 } ire_t;
 
-/* IPv4 compatiblity macros */
+/* IPv4 compatibility macros */
 #define	ire_src_addr		ire_u.ire4_u.ire4_src_addr
 #define	ire_mask		ire_u.ire4_u.ire4_mask
 #define	ire_addr		ire_u.ire4_u.ire4_addr
@@ -2791,12 +2785,10 @@ typedef struct ip_pktinfo {
 #define	ILL_UNMARK_CHANGING(ill)                                \
 	(ill)->ill_state_flags &= ~ILL_CHANGING;
 
-/* Macros used to assert that this thread is a writer  */
+/* Macros used to assert that this thread is a writer */
 #define	IAM_WRITER_IPSQ(ipsq)	((ipsq)->ipsq_writer == curthread)
-#define	IAM_WRITER_ILL(ill)					\
-	((ill)->ill_phyint->phyint_ipsq->ipsq_writer == curthread)
-#define	IAM_WRITER_IPIF(ipif)					\
-	((ipif)->ipif_ill->ill_phyint->phyint_ipsq->ipsq_writer == curthread)
+#define	IAM_WRITER_ILL(ill)	IAM_WRITER_IPSQ((ill)->ill_phyint->phyint_ipsq)
+#define	IAM_WRITER_IPIF(ipif)	IAM_WRITER_ILL((ipif)->ipif_ill)
 
 /*
  * Grab ill locks in the proper order. The order is highest addressed
@@ -3144,8 +3136,7 @@ extern void	icmp_unreachable(queue_t *, mblk_t *, uint8_t, zoneid_t,
 extern mblk_t	*ip_add_info(mblk_t *, ill_t *, uint_t, zoneid_t, ip_stack_t *);
 extern mblk_t	*ip_bind_v4(queue_t *, mblk_t *, conn_t *);
 extern int	ip_bind_connected(conn_t *, mblk_t *, ipaddr_t *, uint16_t,
-    ipaddr_t, uint16_t, boolean_t, boolean_t, boolean_t,
-    boolean_t);
+    ipaddr_t, uint16_t, boolean_t, boolean_t, boolean_t, boolean_t);
 extern boolean_t ip_bind_ipsec_policy_set(conn_t *, mblk_t *);
 extern int	ip_bind_laddr(conn_t *, mblk_t *, ipaddr_t, uint16_t,
     boolean_t, boolean_t, boolean_t);
