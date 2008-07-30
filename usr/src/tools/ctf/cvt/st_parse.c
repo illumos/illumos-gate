@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -482,7 +482,8 @@ whitesp(char *cp)
 {
 	char c;
 
-	for (c = *cp++; isspace(c); c = *cp++);
+	for (c = *cp++; isspace(c); c = *cp++)
+		;
 	--cp;
 	return (cp);
 }
@@ -497,8 +498,8 @@ name(char *cp, char **w)
 	c = *cp++;
 	if (c == ':')
 		*w = NULL;
-	else if (isalpha(c) || strchr("_.$", c)) {
-		for (c = *cp++; isalnum(c) || strchr(" _.$", c); c = *cp++)
+	else if (isalpha(c) || strchr("_.$#", c)) {
+		for (c = *cp++; isalnum(c) || strchr(" _.$#", c); c = *cp++)
 			;
 		if (c != ':')
 			reset();
