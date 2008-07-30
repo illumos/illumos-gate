@@ -336,10 +336,10 @@ vs_svc_vlog(char *filepath, vs_result_t *result)
 
 	/* syslog */
 	if (result->vsr_nviolations == 0) {
-		syslog(LOG_WARNING, "quarantine %s\n", filepath);
+		syslog(LOG_NOTICE, "quarantine %s\n", filepath);
 	} else {
 		for (i = 0; i < result->vsr_nviolations; i++) {
-			syslog(LOG_WARNING, "quarantine %s %d - %s\n",
+			syslog(LOG_NOTICE, "quarantine %s %d - %s\n",
 			    filepath,
 			    result->vsr_vrec[i].vr_id,
 			    result->vsr_vrec[i].vr_desc);

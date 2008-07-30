@@ -232,7 +232,7 @@ vs_eng_config(vs_props_all_t *config)
 	}
 
 	if ((vs_eng_total_maxcon <= 0) || (vs_eng_count == 0))
-		syslog(LOG_WARNING, "Scan Engine - no engines configured");
+		syslog(LOG_NOTICE, "Scan Engine - no engines configured");
 
 	(void) pthread_mutex_unlock(&vs_eng_mutex);
 }
@@ -405,7 +405,7 @@ vs_eng_get(vs_eng_ctx_t *eng_ctx, boolean_t retry)
 		vs_eng_wait_count++;
 		if (pthread_cond_reltimedwait_np(&vs_eng_cv, &vs_eng_mutex,
 		    &tswait) < 0) {
-			syslog(LOG_WARNING, "Scan Engine "
+			syslog(LOG_NOTICE, "Scan Engine "
 			    "- timeout waiting for available engine");
 			vs_eng_wait_count--;
 			(void) pthread_mutex_unlock(&vs_eng_mutex);
@@ -458,7 +458,7 @@ vs_eng_get(vs_eng_ctx_t *eng_ctx, boolean_t retry)
 	}
 
 	if (sockfd == -1) {
-		syslog(LOG_WARNING, "Scan Engine - connection error (%s:%d) %s",
+		syslog(LOG_NOTICE, "Scan Engine - connection error (%s:%d) %s",
 		    eng_ctx->vse_host, eng_ctx->vse_port,
 		    errno ? strerror(errno) : "");
 		vs_eng_set_error(eng_ctx, 1);
