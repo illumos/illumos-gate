@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -956,10 +956,10 @@ pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 			 */
 			if ((prg.bus_no == 0) &&
 			    (prg.dev_no >= 0x18) &&
-			    (prg.dev_no < (0x18 + ncpus))) {
-				if (cpuid_getvendor(CPU) == X86_VENDOR_AMD)
-					rval = pcitool_cfg_access(dip, &prg,
-					    write_flag);
+			    (prg.dev_no < (0x18 + ncpus)) &&
+			    (cpuid_getvendor(CPU) == X86_VENDOR_AMD)) {
+				rval = pcitool_cfg_access(dip, &prg,
+				    write_flag);
 			} else if (max_cfg_size == PCIE_CONF_HDR_SIZE)
 				rval = pcitool_pciex_cfg_access(dip, &prg,
 				    write_flag);
