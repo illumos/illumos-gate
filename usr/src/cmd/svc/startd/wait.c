@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,8 +77,11 @@ static pthread_mutex_t wait_info_lock;
  * void wait_remove(wait_info_t *, int)
  *   Remove the given wait_info structure from our list, performing various
  *   cleanup operations along the way.  If the direct flag is false (meaning
- *   that we are being called with from restarter instance list context), then
- *   notify the restarter that the associated instance has exited.
+ *   that we are being called with from restarter instance list context) and
+ *   the instance should not be ignored, then notify the restarter that the
+ *   associated instance has exited. If the wi_ignore flag is true then it
+ *   means that the stop was initiated from within svc.startd, rather than
+ *   from outside it.
  *
  *   Since we may no longer be the startd that started this process, we only are
  *   concerned with a waitpid(3C) failure if the wi_parent field is non-zero.
@@ -116,7 +118,7 @@ wait_remove(wait_info_t *wi, int direct)
 	 */
 	utmpx_mark_dead(wi->wi_pid, status, B_FALSE);
 
-	if (!direct) {
+	if (!direct && !wi->wi_ignore) {
 		/*
 		 * Bind wait_hndl lazily.
 		 */
@@ -140,6 +142,33 @@ wait_remove(wait_info_t *wi, int direct)
 
 	uu_list_node_fini(wi, &wi->wi_link, wait_info_pool);
 	startd_free(wi, sizeof (wait_info_t));
+}
+
+/*
+ * void wait_ignore_by_fmri(const char *)
+ *   wait_ignore_by_fmri is called when svc.startd is going to stop the
+ *   instance. Since we need to wait on the process and close the utmpx record,
+ *   we're going to set the wi_ignore flag, so that when the process exits we
+ *   clean up, but don't tell the restarter to stop it.
+ */
+void
+wait_ignore_by_fmri(const char *fmri)
+{
+	wait_info_t *wi;
+
+	MUTEX_LOCK(&wait_info_lock);
+
+	for (wi = uu_list_first(wait_info_list); wi != NULL;
+	    wi = uu_list_next(wait_info_list, wi)) {
+		if (strcmp(wi->wi_fmri, fmri) == 0)
+			break;
+	}
+
+	if (wi != NULL) {
+		wi->wi_ignore = 1;
+	}
+
+	MUTEX_UNLOCK(&wait_info_lock);
 }
 
 /*
@@ -175,6 +204,7 @@ wait_register(pid_t pid, const char *inst_fmri, int am_parent, int direct)
 	wi->wi_pid = pid;
 	wi->wi_fmri = inst_fmri;
 	wi->wi_parent = am_parent;
+	wi->wi_ignore = 0;
 
 	MUTEX_LOCK(&wait_info_lock);
 	(void) uu_list_insert_before(wait_info_list, NULL, wi);
@@ -249,7 +279,7 @@ wait_thread(void *args)
 				    "couldn't get psinfo data for %s (%s); "
 				    "assuming failed\n", wi->wi_fmri,
 				    strerror(errno));
-				    goto err_remove;
+				goto err_remove;
 			}
 
 			if (psi.pr_nlwp != 0 ||
@@ -261,7 +291,7 @@ wait_thread(void *args)
 				 * zombie.  Reassociate.
 				 */
 				if (port_associate(port_fd, PORT_SOURCE_FD, fd,
-					0, wi))
+				    0, wi))
 					log_error(LOG_WARNING,
 					    "port_association of %d / %s "
 					    "failed\n", fd, wi->wi_fmri);

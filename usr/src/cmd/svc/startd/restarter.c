@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1101,6 +1101,15 @@ stop_instance(scf_handle_t *local_handle, restarter_inst_t *inst,
 		}
 
 		return (0);
+	} else if (instance_is_wait_style(inst) && re == RERR_RESTART) {
+		/*
+		 * Stopping a wait service through means other than the pid
+		 * exiting should keep wait_thread() from restarting the
+		 * service, by removing it from the wait list.
+		 * We cannot remove it right now otherwise the process will
+		 * end up <defunct> so mark it to be ignored.
+		 */
+		wait_ignore_by_fmri(inst->ri_i.i_fmri);
 	}
 
 	switch (err = restarter_instance_update_states(local_handle, inst,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -476,6 +476,7 @@ typedef struct wait_info {
 	id_t			wi_pid;		/* process ID */
 	const char		*wi_fmri;	/* instance FMRI */
 	int			wi_parent;	/* startd is parent */
+	int			wi_ignore;	/* ignore events */
 } wait_info_t;
 
 #define	STARTD_LOG_FILE		0x1
@@ -750,6 +751,7 @@ void wait_prefork(void);
 void wait_postfork(pid_t);
 int wait_register(pid_t, const char *, int, int);
 void *wait_thread(void *);
+void wait_ignore_by_fmri(const char *);
 
 /* proc.c */
 ctid_t proc_get_ctid();
