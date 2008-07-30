@@ -21,7 +21,7 @@
 .\" Use is subject to license terms.
 .\"
 .\" ident	"%Z%%M%	%I%	%E% SMI"
-.TH wx2hg 1 "6 Jul 2008"
+.TH wx2hg 1 "29 Jul 2008"
 .SH NAME
 .I wx2hg
 \- Convert a wx-managed workspace to Mercurial.
@@ -127,12 +127,25 @@ Use
 .I hg_rev
 as the Mercurial changeset that corresponds to the point
 in time at which your teamware workspace was synchronized with its parent.
-You may specify
+If you don't have any nested repositories, you may specify
 .I hg_rev
-as a changeset id or a Mercurial tag.
+as a changeset id or a Mercurial tag.  If you have nested repositories,
+like usr/closed in ON, then you should specify a Mercurial tag common to
+both (or all) repositories.  This tag may be local (ie a local tag that you
+create yourself using \fIhg tag -l\fR) or version controlled (ie a tag
+that the gatekeepers created, such as \fIonnv_96\fR).
+If you use
+.I hg_rev
+without specifying \fIhg_ws\fR, then the tags must resolve correctly
+in the Mercurial twin(s) of your Teamware parent.
+If you use
+.I hg_rev
+in conjunction with \fIhg_ws\fR, then the tags must resolve correctly
+in your existing Mercurial repositories.
 .IP "\fB\-t\fR \fIhg_ws\fR" 10
 Use an existing Mercurial workspace as the target, rather than
-creating one.  
+creating one.  If you use an existing workspace, you must also create any
+nested repositories (like usr/closed) before running wx2hg.
 .IP
 If omitted, 
 .I tw_ws
@@ -219,5 +232,7 @@ conflict.
 .LP
 If a Teamware workspace is split into multiple Mercurial twin
 workspaces (as is the case with the ON closed source tree), then
-Teamware filemv commands that alter the inner workspace are not
-supported.
+Teamware filemv commands that result in moving across repository
+boundaries will result in file removal from the source repository and
+file addition to the destination repository.  So a webrev will not
+show changes to such files, merely entire old and new contents.

@@ -41,30 +41,16 @@ can_retry=no
 tail=/usr/xpg4/bin/tail
 
 function has_hg_twin {
-    	[[ -f "$1"/Codemgr_wsdata/hg_twin ]]
+	[[ -n "$primary_twin" ]]
 }
 
-function clone_twin {
-    	twinfile="$1"/Codemgr_wsdata/hg_twin
-    	twin=$(head -1 "$twinfile")
-	ws="$2"
-	rev="$3"
-
-	echo "Teamware parent $1 has an hg twin"
-
-	clonedirs=$($tail -n +2 "$twinfile")
-	echo "Cloning $twin"
-	echo "to $ws"
-	set -x
-	hg clone -r $rev "$twin" "$ws"
-	set +x
-	for dir in $clonedirs; do
-		echo "Cloning from $twin/$dir"
-		echo "to $ws/$dir"
-	    	hg clone -r $rev "$twin"/$dir "$ws"/$dir
-	done
+function warn {
+	print -u2 wx2hg: warning: "$@"
 }
 
+function note {
+	print -u2 wx2hg: note: "$@"
+}
 
 function fail {
 	print -u2 wx2hg: "$@"
@@ -76,12 +62,38 @@ function fail {
 	exit 1
 }
 
-function warn {
-	print -u2 wx2hg: warning: "$@"
-}
+function clone_twins {
+	ws="$1"
+	rev="$2"
 
-function note {
-	print -u2 wx2hg: note: "$@"
+	echo "Cloning $primary_twin"
+	echo "to $ws"
+	set -x
+	hg clone -r $rev "$primary_twin" "$ws"
+	set +x
+
+	rev_warning=n
+	for dir in $nested_twins; do
+		(cd "$primary_twin"/$dir ; \
+		    hg log -l 1 -r $hg_rev > /dev/null 2>1)
+		if  (( $? != 0 )); then
+			warn "Unable to clone $primary_twin/$dir"
+			rev_warning=y
+			continue
+		fi
+		echo "Cloning from $primary_twin/$dir"
+		echo "to $ws/$dir"
+		mkdir -p $ws/$dir
+		set -x
+		hg init $ws/$dir
+	    	( cd $ws/$dir; hg pull -u "$primary_twin"/$dir )
+		set +x
+	done
+
+	[[ $rev_warning = "n" ]] || fail \
+"revision $hgrev was not present in all workspaces.\n" \
+"When using -r with nested repositories, you should specify a tag\n" \
+"name that is valid in each workspace."
 }
 
 #
@@ -142,6 +154,20 @@ codemgr_parent=$(workspace parent)
     fail "$CODEMGR_WS is not a Teamware workspace or does not have a parent."
 [[ -d "$codemgr_parent" ]] || fail "parent ($codemgr_parent) doesn't exist."
 
+primary_twin=""
+nested_twins=""
+twinfile="$codemgr_parent"/Codemgr_wsdata/hg_twin
+if [[ -f $twinfile ]]; then
+	primary_twin=$(head -1 $twinfile)
+	nested_twins=$($tail -n +2 $twinfile | sort -r)
+fi
+
+if has_hg_twin; then
+	echo "Teamware parent $codemgr_parent has twin $primary_twin"
+	[[ -n "$nested_twins" ]] &&
+	    echo "and nested twins $nested_twins"
+fi
+
 #
 # Do this check before time-consuming operations like creating
 # the target repo.
@@ -182,12 +208,36 @@ if [[ -z "$hg_ws" ]]; then
 fi
 
 if [[ -d "$hg_ws" ]]; then
-	echo "Updating preexisting Mercurial workspace $hg_ws to $hg_rev\n"
-	(cd "$hg_ws"; hg update -C $hg_rev) ||
+    	echo "Updating preexisting Mercurial workspace $hg_ws to $hg_rev\n"
+    	(cd "$hg_ws"; hg update -C $hg_rev) ||
 	    fail "hg update $hg_rev failed for $hg_ws"
+	if [[ -n "$nested_twins" ]]; then
+		update_warning=n
+		for dir in $nested_twins; do
+			if [[ ! -d "$hg_ws/$dir" ]]; then
+				warn "$hw_ws/$dir does not exist"
+				update_warning=y
+			fi
+			echo "Updating preexisting nested workspace " \
+			    "$hg_ws/$dir to $hg_rev\n"
+			(cd "$hg_ws"/$dir ; hg update -C $hg_rev)
+			if (( $? != 0 )); then
+				warn "hg update $hg_rev failed for $hg_ws/$dir"
+				update_warning=y
+				continue
+			fi
+		done
+
+		[[ $update_warning = "n" ]] ||
+		    fail "When using an existing Mercurial workspace with\n" \
+			"nested repositories, all nested repositories must\n" \
+			"already exist in the existing workspace.  If also\n" \
+			"specifying -r, then the specified hg_rev must be\n" \
+			"valid in all nested repositories."
+	fi
 else
-    	if has_hg_twin "$codemgr_parent"; then
-    	    	clone_twin "$codemgr_parent" "$hg_ws" $hg_rev
+    	if has_hg_twin; then
+    	    	clone_twins "$hg_ws" $hg_rev
 	else
 		fail "$codemgr_parent is not recognized as a gate;" \
 		    "please provide a Mercurial workspace (-t hg_ws)" \
@@ -199,6 +249,21 @@ can_retry=yes
 
 # Make sure hg_ws is an absolute path
 [[ "$hg_ws" = /* ]] || hg_ws="$(pwd)/$hg_ws"
+
+
+# usage: which_repo filename
+function which_repo {
+	typeset f=$1
+
+	for r in $nested_twins; do
+		if [ ${f##$r/} != $f ]; then
+			echo ${f##$r/} $r
+			return
+		fi
+	done
+
+	echo $f "."
+}
 
 #
 # Do renames first, because they'll be listed with the new name by "wx
@@ -214,15 +279,36 @@ wx renamed > "$renamelist"
 
 # usage: do_rename oldname newname
 function do_rename {
-	typeset old=$1
-	typeset new=$2
+	typeset old_file old_repo new_file new_repo
 
-	print "rename $old -> $new"
+	which_repo $1 | read old_file old_repo
+	which_repo $2 | read new_file new_repo
+
+	typeset old=$old_repo/$old_file
+	typeset new=$new_repo/$new_file
+
 	[[ -f "$old" ]] || fail "can't rename: $old doesn't exist."
 	[[ ! -f "$new" ]] || fail "can't rename: $new already exists."
-	set -x
-	hg mv $old $new || fail "rename failed."
-	set +x
+
+	dir=$(dirname "$new")
+	base=$(basename "$new")
+	[[ -d "$dir" ]] || mkdir -p "$dir" || fail "mkdir failed"
+
+	if [ $old_repo = $new_repo ]; then
+		print "rename $old -> $new"
+		set -x
+		( cd $old_repo; hg mv $old_file $new_file ) || \
+		    fail "rename failed."
+		set +x
+	else
+		print "moving $old_file from repository $old_repo"
+		print "to $new_file in repository $new_repo"
+		cp $old $new
+		set -x
+		( cd $old_repo; hg rm $old_file ) || fail "hg rm failed"
+		( cd $new_repo; hg add $new_file ) || fail "hg add failed"
+		set +x
+	fi
 }
 
 if [[ -s "$renamelist" ]]; then
@@ -312,7 +398,13 @@ for f in $active_files; do
 	fi
 done
 
-note "remember to commit your changes in $hg_ws"
+note "remember to commit your changes:"
+echo "in primary repository ${hg_ws}:"
+( cd $hg_ws ; hg status -mard )
+for n in $nested_twins; do
+	echo "in nested repository ${n}:"
+	( cd $hg_ws/$n ; hg status -mard )
+done
 
 if [[ "$hg_rev" != "tip" ]]; then
     	note "before you integrate your changes, $hg_ws must be merged to tip"
