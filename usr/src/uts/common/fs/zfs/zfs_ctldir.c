@@ -779,7 +779,12 @@ zfsctl_snapdir_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, pathname_t *pnp,
 	if (err) {
 		mutex_exit(&sdp->sd_lock);
 		ZFS_EXIT(zfsvfs);
-		return (err);
+		/*
+		 * handle "ls *" or "?" in a graceful manner,
+		 * forcing EILSEQ to ENOENT.
+		 * Since shell ultimately passes "*" or "?" as name to lookup
+		 */
+		return (err == EILSEQ ? ENOENT : err);
 	}
 	if (dmu_objset_open(snapname, DMU_OST_ZFS,
 	    DS_MODE_USER | DS_MODE_READONLY, &snap) != 0) {
