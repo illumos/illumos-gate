@@ -4281,8 +4281,6 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 
 
 	/* Initialize for valid message and mapped dring */
-	PR1("descriptor size = %u, dring length = %u",
-	    vd->descriptor_size, vd->dring_len);
 	vd->initialized |= VD_DRING;
 	vd->dring_ident = 1;	/* "There Can Be Only One" */
 	vd->dring = dring_minfo.vaddr;
@@ -4290,6 +4288,8 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	vd->dring_len = reg_msg->num_descriptors;
 	vd->dring_mtype = dring_minfo.mtype;
 	reg_msg->dring_ident = vd->dring_ident;
+	PR1("descriptor size = %u, dring length = %u",
+	    vd->descriptor_size, vd->dring_len);
 
 	/*
 	 * Allocate and initialize a "shadow" array of data structures for
@@ -4300,7 +4300,6 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	for (int i = 0; i < vd->dring_len; i++) {
 		vd->dring_task[i].vd		= vd;
 		vd->dring_task[i].index		= i;
-		vd->dring_task[i].request	= &VD_DRING_ELEM(i)->payload;
 
 		status = ldc_mem_alloc_handle(vd->ldc_handle,
 		    &(vd->dring_task[i].mhdl));
@@ -4309,6 +4308,13 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 			return (ENXIO);
 		}
 
+		/*
+		 * The descriptor payload varies in length. Calculate its
+		 * size by subtracting the header size from the total
+		 * descriptor size.
+		 */
+		vd->dring_task[i].request = kmem_zalloc((vd->descriptor_size -
+		    sizeof (vio_dring_entry_hdr_t)), KM_SLEEP);
 		vd->dring_task[i].msg = kmem_alloc(vd->max_msglen, KM_SLEEP);
 	}
 
@@ -4467,6 +4473,8 @@ vd_process_element(vd_t *vd, vd_task_type_t type, uint32_t idx,
 	ready = (elem->hdr.dstate == VIO_DESC_READY);
 	if (ready) {
 		elem->hdr.dstate = VIO_DESC_ACCEPTED;
+		bcopy(&elem->payload, vd->dring_task[idx].request,
+		    (vd->descriptor_size - sizeof (vio_dring_entry_hdr_t)));
 	} else {
 		PR0("descriptor %u not ready", idx);
 		VD_DUMP_DRING_ELEM(elem);
@@ -6301,6 +6309,10 @@ vd_free_dring_task(vd_t *vdp)
 		/* Free all dring_task memory handles */
 		for (int i = 0; i < vdp->dring_len; i++) {
 			(void) ldc_mem_free_handle(vdp->dring_task[i].mhdl);
+			kmem_free(vdp->dring_task[i].request,
+			    (vdp->descriptor_size -
+			    sizeof (vio_dring_entry_hdr_t)));
+			vdp->dring_task[i].request = NULL;
 			kmem_free(vdp->dring_task[i].msg, vdp->max_msglen);
 			vdp->dring_task[i].msg = NULL;
 		}

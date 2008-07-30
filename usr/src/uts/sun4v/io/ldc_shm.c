@@ -556,8 +556,6 @@ i_ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 		/* store entry for this page */
 		memseg->pages[i].index = index;
 		memseg->pages[i].raddr = raddr;
-		memseg->pages[i].offset = poffset;
-		memseg->pages[i].size = psize;
 		memseg->pages[i].mte = &(mtbl->table[index]);
 
 		/* create the cookie */
@@ -724,7 +722,7 @@ ldc_mem_unbind_handle(ldc_mem_handle_t mhandle)
 		/* check for mapped pages, revocation cookie != 0 */
 		if (memseg->pages[i].mte->cookie) {
 
-			pg_size_code = page_szc(memseg->pages[i].size);
+			pg_size_code = page_szc(MMU_PAGESIZE);
 			pg_shift = page_get_shift(pg_size_code);
 			cookie_addr = IDX2COOKIE(memseg->pages[i].index,
 			    pg_size_code, pg_shift);
@@ -1430,7 +1428,6 @@ i_ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie,
 		/* Save all page and cookie information */
 		for (i = 0, tmpaddr = memseg->vaddr; i < npages; i++) {
 			memseg->pages[i].raddr = va_to_pa(tmpaddr);
-			memseg->pages[i].size = pg_size;
 			tmpaddr += pg_size;
 		}
 
@@ -2035,7 +2032,7 @@ i_ldc_mem_inject_dring_clear(ldc_chan_t *ldcp)
 			/* clear the entry from the table */
 			memseg->pages[i].mte->entry.ll = 0;
 
-			pg_size_code = page_szc(memseg->pages[i].size);
+			pg_size_code = page_szc(MMU_PAGESIZE);
 			pg_shift = page_get_shift(pg_size_code);
 			cookie_addr = IDX2COOKIE(memseg->pages[i].index,
 			    pg_size_code, pg_shift);

@@ -341,8 +341,6 @@ typedef struct ldc_mtbl {
  */
 typedef struct ldc_page {
 	uintptr_t		raddr;		/* Exported page RA */
-	uint64_t		offset;		/* Exported page offset */
-	size_t			size;		/* Exported page size */
 	uint64_t		index;		/* Index in map table */
 	ldc_mte_slot_t		*mte;		/* Map table entry */
 } ldc_page_t;
