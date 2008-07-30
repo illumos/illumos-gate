@@ -1998,12 +1998,10 @@ print_xaggr_callback(print_field_t *pf, void *arg)
 		break;
 
 	case AGGR_X_STATE:
-		if (is_port) {
-			(void) dladm_aggr_portstate2str(
-			    portp->lp_state, buf);
-		} else {
-			return ("");
-		}
+		if (is_port)
+			(void) get_linkstate(dpa.dp_dev,  B_FALSE, buf);
+		else
+			(void) get_linkstate(l->laggr_link, B_TRUE, buf);
 		break;
 	case AGGR_X_ADDRESS:
 		(void) dladm_aggr_macaddr2str(
