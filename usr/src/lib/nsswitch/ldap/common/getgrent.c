@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -311,7 +311,13 @@ getbymember(ldap_backend_ptr be, void *a)
 	if (gcnt == argp->numgids)
 		return ((nss_status_t)NSS_NOTFOUND);
 
-	return ((nss_status_t)NSS_SUCCESS);
+	/*
+	 * Return NSS_SUCCESS only if array is full.
+	 * Explained in <nss_dbdefs.h>.
+	 */
+	return ((nss_status_t)((argp->numgids == argp->maxgids)
+	    ? NSS_SUCCESS
+	    : NSS_NOTFOUND));
 }
 
 static ldap_backend_op_t gr_ops[] = {
