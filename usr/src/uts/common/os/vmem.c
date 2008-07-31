@@ -503,10 +503,10 @@ vmem_hash_delete(vmem_t *vmp, uintptr_t addr, size_t size)
 
 	if (vsp == NULL)
 		panic("vmem_hash_delete(%p, %lx, %lu): bad free",
-		    vmp, addr, size);
+		    (void *)vmp, addr, size);
 	if (VS_SIZE(vsp) != size)
 		panic("vmem_hash_delete(%p, %lx, %lu): wrong size (expect %lu)",
-		    vmp, addr, size, VS_SIZE(vsp));
+		    (void *)vmp, addr, size, VS_SIZE(vsp));
 
 	vmp->vm_kstat.vk_free.value.ui64++;
 	vmp->vm_kstat.vk_mem_inuse.value.ui64 -= size;
@@ -558,7 +558,7 @@ vmem_span_create(vmem_t *vmp, void *vaddr, size_t size, uint8_t import)
 
 	if ((start | end) & (vmp->vm_quantum - 1))
 		panic("vmem_span_create(%p, %p, %lu): misaligned",
-		    vmp, vaddr, size);
+		    (void *)vmp, vaddr, size);
 
 	span = vmem_seg_create(vmp, vmp->vm_seg0.vs_aprev, start, end);
 	span->vs_type = VMEM_SPAN;
@@ -1330,7 +1330,8 @@ void *
 vmem_add(vmem_t *vmp, void *vaddr, size_t size, int vmflag)
 {
 	if (vaddr == NULL || size == 0)
-		panic("vmem_add(%p, %p, %lu): bad arguments", vmp, vaddr, size);
+		panic("vmem_add(%p, %p, %lu): bad arguments",
+		    (void *)vmp, vaddr, size);
 
 	ASSERT(!vmem_contains(vmp, vaddr, size));
 

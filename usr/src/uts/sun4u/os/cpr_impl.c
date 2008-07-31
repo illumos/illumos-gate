@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1024,8 +1024,8 @@ i_cpr_compress_and_save(int chunks, pfn_t spfn, pgcnt_t pages)
 	if (descp >= i_cpr_storage_desc_end) {
 		CPR_DEBUG(CPR_DEBUG1, "ran out of descriptors, base 0x%p, "
 		    "chunks %d, end 0x%p, descp 0x%p\n",
-		    i_cpr_storage_desc_base, chunks,
-		    i_cpr_storage_desc_end, descp);
+		    (void *)i_cpr_storage_desc_base, chunks,
+		    (void *)i_cpr_storage_desc_end, (void *)descp);
 		return (-1);
 	}
 	ASSERT(descp->csd_dirty_spfn == (uint_t)-1);
@@ -1196,7 +1196,7 @@ i_cpr_storage_desc_alloc(csd_t **basepp, pgcnt_t *pgsp, csd_t **endpp,
 	end = *endpp = descp + (len / (sizeof (**basepp)));
 	CPR_DEBUG(CPR_DEBUG7, "npages 0x%lx, len 0x%lx, items 0x%lx\n\t*basepp "
 	    "%p, *endpp %p\n", npages, len, (len / (sizeof (**basepp))),
-	    *basepp, *endpp);
+	    (void *)*basepp, (void *)*endpp);
 	i_cpr_storage_desc_init(descp, npages, end);
 	return (0);
 }
@@ -1317,7 +1317,7 @@ cpr_dump_sensitive(vnode_t *vp, csd_t *descp)
 	/* Write cpr page descriptor */
 	error = cpr_write(vp, (caddr_t)&cpd, sizeof (cpd));
 	if (error) {
-		CPR_DEBUG(CPR_DEBUG7, "descp: %p\n", descp);
+		CPR_DEBUG(CPR_DEBUG7, "descp: %p\n", (void *)descp);
 #ifdef DEBUG
 		debug_enter("cpr_dump_sensitive: cpr_write() page "
 		    "descriptor failed!\n");
@@ -1331,9 +1331,9 @@ cpr_dump_sensitive(vnode_t *vp, csd_t *descp)
 	error = cpr_write(vp, (caddr_t)datap, cpd.cpd_length);
 	if (error) {
 		CPR_DEBUG(CPR_DEBUG7, "error: %x\n", error);
-		CPR_DEBUG(CPR_DEBUG7, "descp: %p\n", descp);
-		CPR_DEBUG(CPR_DEBUG7, "cpr_write(%p, %p , %lx)\n", vp, datap,
-		    cpd.cpd_length);
+		CPR_DEBUG(CPR_DEBUG7, "descp: %p\n", (void *)descp);
+		CPR_DEBUG(CPR_DEBUG7, "cpr_write(%p, %p , %lx)\n",
+		    (void *)vp, (void *)datap, cpd.cpd_length);
 #ifdef DEBUG
 		debug_enter("cpr_dump_sensitive: cpr_write() data failed!\n");
 #endif

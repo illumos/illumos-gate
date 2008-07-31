@@ -337,7 +337,7 @@ fill_address(pnode_t curnode, char *namep)
 			*wkp->wk_vaddrp = (caddr_t)(uintptr_t)vaddr;
 #ifdef VPRINTF
 			VPRINTF("fill_address: %s mapped to %p\n", namep,
-			    *wkp->wk_vaddrp);
+			    (void *)*wkp->wk_vaddrp);
 #endif /* VPRINTF */
 		}
 		if (wkp->wk_func != NULL)

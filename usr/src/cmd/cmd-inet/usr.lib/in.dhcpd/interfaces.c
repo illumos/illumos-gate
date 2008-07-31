@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -207,8 +207,8 @@ refresh_pktlist(dsvc_clnt_t *pcd, PKT_LIST *plp)
 	else {
 		if (debug) {
 			dhcpmsg(LOG_DEBUG,
-			    "%04d: Refreshed (0x%x) to (0x%x)\n",
-			    thr_self(), plp, retplp);
+			    "%04d: Refreshed (0x%p) to (0x%p)\n",
+			    thr_self(), (void *)plp, (void *)retplp);
 		}
 		free_plp(plp);
 	}
@@ -819,7 +819,7 @@ monitor_interface(void *argp)
 					(void) mutex_unlock(&freep->thr_mtx);
 					pcd->clnt_thread = freep;
 				} else if (max_threads != -1 &&
-						pnd->nthreads >= max_threads) {
+				    pnd->nthreads >= max_threads) {
 					/*
 					 * Add client once to deferred work
 					 * list, to keep track of future work.

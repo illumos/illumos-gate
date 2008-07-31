@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -381,7 +381,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, 	/* Type of module.  This one is a driver */
-	"SBus (sysio) nexus driver %I%",	/* Name of module. */
+	"SBus (sysio) nexus driver",	/* Name of module. */
 	&sbus_ops,		/* driver ops */
 };
 
@@ -536,7 +536,7 @@ sbus_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	DPRINTF(SBUS_ATTACH_DEBUG, ("sbus: devi=0x%p, softsp=0x%p\n",
-	    devi, softsp));
+	    (void *)devi, (void *)softsp));
 
 #ifdef	notdef
 	/*
@@ -734,8 +734,8 @@ sbus_init(struct sbus_soft_state *softsp, caddr_t address)
 #undef	REG_ADDR
 
 	DPRINTF(SBUS_REGISTERS_DEBUG, ("SYSIO Control reg: 0x%p\n"
-	    "SBUS Control reg: 0x%p", softsp->sysio_ctrl_reg,
-	    softsp->sbus_ctrl_reg));
+	    "SBUS Control reg: 0x%p", (void *)softsp->sysio_ctrl_reg,
+	    (void *)softsp->sbus_ctrl_reg));
 
 #ifdef _STARFIRE
 	/* Setup interrupt target translation for starfire */
@@ -875,7 +875,7 @@ sbus_resume_init(struct sbus_soft_state *softsp, int resume)
 
 			DPRINTF(SBUS_REGISTERS_DEBUG, ("Sbus slot 0x%x slot "
 			    "configuration reg: 0x%p", (i > 3) ? i + 9 : i,
-			    config));
+			    (void *)config));
 		}
 	} else {
 		/* Program the slot configuration registers */
@@ -1743,7 +1743,7 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	intr_handler->inum = hdlp->ih_inum;
 
 	DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr: xlated interrupt 0x%x "
-	    "intr_handler 0x%p\n", hdlp->ih_vector, intr_handler));
+	    "intr_handler 0x%p\n", hdlp->ih_vector, (void *)intr_handler));
 
 	/*
 	 * Grab this lock here. So it will protect the poll list.
@@ -1763,7 +1763,7 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 #endif
 
 		DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr:sbus_arg exists "
-		    "0x%p\n", sbus_arg));
+		    "0x%p\n", (void *)sbus_arg));
 		/*
 		 * Two bits per ino in the diagnostic register
 		 * indicate the status of its interrupt.
@@ -1785,7 +1785,7 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 		sbus_arg->clear_reg = (softsp->clr_intr_reg +
 		    ino_table[ino]->clear_reg);
 		DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr:Ino 0x%x Interrupt "
-		    "clear reg: 0x%p\n", ino, sbus_arg->clear_reg));
+		    "clear reg: 0x%p\n", ino, (void *)sbus_arg->clear_reg));
 		sbus_arg->softsp = softsp;
 		sbus_arg->handler_list = intr_handler;
 
@@ -1845,7 +1845,7 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 		sbus_arg->pil = hdlp->ih_pri;
 
 		DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr:Alloc sbus_arg "
-		    "0x%p\n", sbus_arg));
+		    "0x%p\n", (void *)sbus_arg));
 	}
 
 	softsp->intr_hndlr_cnt[slot]++;
@@ -1862,7 +1862,7 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	tmp_mondo_vec |= INTERRUPT_VALID;
 
 	DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr: Ino 0x%x mapping reg: 0x%p "
-	    "Intr cntr %d\n", ino, mondo_vec_reg,
+	    "Intr cntr %d\n", ino, (void *)mondo_vec_reg,
 	    softsp->intr_hndlr_cnt[slot]));
 
 	/* Force the interrupt state machine to idle. */
@@ -1976,8 +1976,9 @@ sbus_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	softsp->intr_hndlr_cnt[slot]--;
 
 	DPRINTF(SBUS_INTERRUPT_DEBUG, ("Rem intr: Softsp 0x%p, Mondo 0x%x, "
-	    "ino 0x%x, sbus_arg 0x%p intr cntr %d\n", softsp,
-	    hdlp->ih_vector, ino, sbus_arg, softsp->intr_hndlr_cnt[slot]));
+	    "ino 0x%x, sbus_arg 0x%p intr cntr %d\n", (void *)softsp,
+	    hdlp->ih_vector, ino, (void *)sbus_arg,
+	    softsp->intr_hndlr_cnt[slot]));
 
 	ASSERT(sbus_arg != NULL);
 	ASSERT(sbus_arg->handler_list != NULL);
@@ -2010,7 +2011,7 @@ sbus_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	/* Free up the memory used for the sbus interrupt handler */
 	if (sbus_arg->handler_list == NULL) {
 		DPRINTF(SBUS_INTERRUPT_DEBUG, ("Rem intr: Freeing sbus arg "
-		    "0x%p\n", sbus_arg));
+		    "0x%p\n", (void *)sbus_arg));
 		kmem_free(sbus_arg, sizeof (struct sbus_wrapper_arg));
 		softsp->intr_list[ino] = NULL;
 	}

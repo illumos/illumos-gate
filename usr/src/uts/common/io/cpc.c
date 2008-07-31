@@ -608,7 +608,7 @@ kcpc_copyin_set(kcpc_set_t **inset, void *ubuf, size_t len)
 		case DATA_TYPE_NVLIST_ARRAY:
 			if (strcmp(nvpair_name(nvp), "reqs") != 0 ||
 			    nvpair_value_nvlist_array(nvp, &reqlist,
-				&nreqs) != 0) {
+			    &nreqs) != 0) {
 				nvlist_free(nvl);
 				return (EINVAL);
 			}
@@ -702,7 +702,7 @@ kcpc_copyin_set(kcpc_set_t **inset, void *ubuf, size_t len)
 					if (nvlist_remove(attrs, "picnum",
 					    DATA_TYPE_UINT64) != 0)
 						panic("nvlist %p faulty",
-						    attrs);
+						    (void *)attrs);
 					set->ks_req[i].kr_picnum = uint64;
 				}
 
@@ -900,7 +900,7 @@ static struct dev_ops dev_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"cpc sampling driver v%I%",
+	"cpc sampling driver",
 	&dev_ops
 };
 

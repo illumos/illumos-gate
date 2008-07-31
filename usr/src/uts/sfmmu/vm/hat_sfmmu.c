@@ -2955,7 +2955,7 @@ sfmmu_tteload_addentry(sfmmu_t *sfmmup, struct hme_blk *hmeblkp, tte_t *ttep,
 	 * space be >= USERLIMIT.
 	 */
 	if (!TTE_IS_PRIVILEGED(ttep) && vaddr >= (caddr_t)USERLIMIT)
-		panic("user addr %p in kernel space", vaddr);
+		panic("user addr %p in kernel space", (void *)vaddr);
 #if defined(TTE_IS_GLOBAL)
 	if (TTE_IS_GLOBAL(ttep))
 		panic("sfmmu_tteload: creating global tte");
@@ -3990,7 +3990,7 @@ hat_unlock_region(struct hat *sfmmup, caddr_t addr, size_t len,
 		}
 		if (ttesz < HBLK_MIN_TTESZ) {
 			panic("hat_unlock_region: addr not found "
-			    "addr %p hat %p", va, sfmmup);
+			    "addr %p hat %p", (void *)va, (void *)sfmmup);
 		}
 	}
 	sfmmu_hblks_list_purge(&list);
@@ -4356,7 +4356,7 @@ rehash:
 	}
 
 	if (!PAGE_LOCKED(pp) && !panicstr)
-		panic("hat_add_callback: page 0x%p not locked", pp);
+		panic("hat_add_callback: page 0x%p not locked", (void *)pp);
 
 	if (osfhmep->hme_page != pp || pp->p_vnode != vp ||
 	    pp->p_offset != off) {
@@ -6010,7 +6010,8 @@ again:
 				if (pp != NULL) {
 					panic("sfmmu_hblk_unload: pp = 0x%p "
 					    "tte became invalid under mlist"
-					    " lock = 0x%p", pp, pml);
+					    " lock = 0x%p", (void *)pp,
+					    (void *)pml);
 				}
 				continue;
 			}
@@ -6988,7 +6989,7 @@ sfmmu_pahment_leaked(struct pa_hment *pahmep)
 		    HAT_CB_ERR_LEAKED, pahmep->pvt) == 0)
 			return;		/* non-fatal */
 	}
-	panic("pa_hment leaked: 0x%p", pahmep);
+	panic("pa_hment leaked: 0x%p", (void *)pahmep);
 }
 
 /*
@@ -7817,9 +7818,11 @@ again:
 	 * page_create_va()) for VA->PA translations to be valid.
 	 */
 	if (!PP_ISNORELOC(pp))
-		panic("Illegal VA->PA translation, pp 0x%p not permanent", pp);
+		panic("Illegal VA->PA translation, pp 0x%p not permanent",
+		    (void *)pp);
 	else
-		panic("Illegal VA->PA translation, pp 0x%p not locked", pp);
+		panic("Illegal VA->PA translation, pp 0x%p not locked",
+		    (void *)pp);
 }
 #endif	/* DEBUG */
 
@@ -14524,13 +14527,14 @@ check_scd_sfmmu_list(sfmmu_t **headp, sfmmu_t *sfmmup, int onlist)
 				return;
 			} else {
 				panic("shctx: sfmmu 0x%p found on scd"
-				    "list 0x%p", sfmmup, *headp);
+				    "list 0x%p", (void *)sfmmup,
+				    (void *)*headp);
 			}
 		}
 	}
 	if (onlist) {
 		panic("shctx: sfmmu 0x%p not found on scd list 0x%p",
-		    sfmmup, *headp);
+		    (void *)sfmmup, (void *)*headp);
 	} else {
 		return;
 	}

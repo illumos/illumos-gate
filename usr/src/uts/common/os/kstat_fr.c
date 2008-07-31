@@ -600,7 +600,8 @@ kstat_named_setstr(kstat_named_t *knp, const char *src)
 {
 	if (knp->data_type != KSTAT_DATA_STRING)
 		panic("kstat_named_setstr('%p', '%p'): "
-		    "named kstat is not of type KSTAT_DATA_STRING", knp, src);
+		    "named kstat is not of type KSTAT_DATA_STRING",
+		    (void *)knp, (void *)src);
 
 	KSTAT_NAMED_STR_PTR(knp) = (char *)src;
 	if (src != NULL)

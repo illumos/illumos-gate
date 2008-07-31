@@ -401,7 +401,7 @@ int (*pcic_ci_funcs[])(pcicdev_t *) = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module. This one is a driver */
-	"PCIC PCMCIA adapter driver %I%",	/* Name of the module. */
+	"PCIC PCMCIA adapter driver",	/* Name of the module. */
 	&pcic_devops,		/* driver ops */
 };
 
@@ -6731,10 +6731,10 @@ pcic_err(dev_info_t *dip, int level, const char *fmt, ...)
 			if (dip) {
 				if (instance >= 0)
 					prom_printf("%s(%d),0x%p: %s", name,
-					    instance, dip, buf);
+					    instance, (void *)dip, buf);
 				else
 					prom_printf("%s,0x%p: %s",
-					    name, dip, buf);
+					    name, (void *)dip, buf);
 			} else
 				prom_printf(buf);
 		} else {

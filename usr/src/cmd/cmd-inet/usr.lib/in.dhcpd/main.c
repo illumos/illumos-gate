@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -467,7 +467,7 @@ duplicate IP address detection!\n\n"));
 	    THR_DAEMON | THR_BOUND | THR_DETACHED, &sigthread)) != 0) {
 		(void) fprintf(stderr,
 		    gettext("Cannot start signal handling thread, error: %d\n"),
-			err);
+		    err);
 		return (err);
 	}
 #ifdef	DEBUG
@@ -568,7 +568,7 @@ duplicate IP address detection!\n\n"));
 	if (verbose) {
 		if (i != 0)
 			dhcpmsg(LOG_ERR, "Error setting concurrency %d: %s\n",
-				max_threads, strerror(i));
+			    max_threads, strerror(i));
 		dhcpmsg(LOG_INFO, "Daemon Version: %s\n", DAEMON_VERS);
 		dhcpmsg(LOG_INFO, "Maximum relay hops: %d\n", max_hops);
 		if (log_local > -1) {
@@ -579,32 +579,32 @@ duplicate IP address detection!\n\n"));
 		if (server_mode) {
 			dhcpmsg(LOG_INFO, "Run mode is: DHCP Server Mode.\n");
 			dhcpmsg(LOG_INFO, "Datastore resource: %s\n",
-				datastore.d_resource ?
-				datastore.d_resource : "");
+			    datastore.d_resource ?
+			    datastore.d_resource : "");
 			dhcpmsg(LOG_INFO, "Location: %s\n",
-				datastore.d_location ?
-				datastore.d_location : "");
-			dhcpmsg(LOG_INFO, "DHCP offer TTL: %d\n", off_secs);
+			    datastore.d_location ?
+			    datastore.d_location : "");
+			dhcpmsg(LOG_INFO, "DHCP offer TTL: %ld\n", off_secs);
 			if (bootp_compat)
 				dhcpmsg(LOG_INFO,
 				    "BOOTP compatibility enabled.\n");
 			if (rescan_interval != 0) {
 				dhcpmsg(LOG_INFO,
-				    "Dhcptab rescan interval: %d minutes.\n",
+				    "Dhcptab rescan interval: %ld minutes.\n",
 				    rescan_interval / rescan_scale);
 			}
-			dhcpmsg(LOG_INFO, "ICMP validation timeout: %d "
+			dhcpmsg(LOG_INFO, "ICMP validation timeout: %ld "
 			    "milliseconds, Attempts: %d.\n", icmp_timeout,
 			    icmp_tries);
 			if (nsutimeout_secs != DHCP_NO_NSU) {
 				dhcpmsg(LOG_INFO, "Name service update "
-				    "enabled, timeout: %d seconds\n",
+				    "enabled, timeout: %ld seconds\n",
 				    nsutimeout_secs);
 			}
 			for (oip = owner_ip; oip->s_addr != INADDR_ANY; oip++)
 				dhcpmsg(LOG_INFO, "Owner IP address: %s\n",
-					inet_ntop(AF_INET, oip, ntoab,
-					    sizeof (ntoab)));
+				    inet_ntop(AF_INET, oip, ntoab,
+				    sizeof (ntoab)));
 			dhcpmsg(LOG_INFO, "Maximum concurrent clients: %d\n",
 			    max_clients);
 			dhcpmsg(LOG_INFO, "Maximum threads: %d\n", max_threads);
@@ -619,7 +619,7 @@ duplicate IP address detection!\n\n"));
 
 		if (initntab() != 0) {
 			dhcpmsg(LOG_ERR, "Cannot allocate per network hash "
-				"table.\n");
+			    "table.\n");
 			local_closelog();
 			(void) mutex_destroy(&ttg_mtx);
 			(void) cond_destroy(&ttg_cv);
@@ -1320,8 +1320,8 @@ monitor_client(void *arg)
 				/* BOOTP packet */
 				if (!bootp_compat) {
 					dhcpmsg(LOG_INFO, "BOOTP request "
-						"received on interface: %s "
-						"ignored.\n", ifp->nm);
+					    "received on interface: %s "
+					    "ignored.\n", ifp->nm);
 				} else {
 					bootp(pcd, plp);
 				}

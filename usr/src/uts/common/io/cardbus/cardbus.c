@@ -162,7 +162,7 @@ int cardbus_debug = 0;
 extern struct mod_ops mod_miscops;
 static struct modlmisc modlmisc = {
 	&mod_miscops,
-	"Cardbus Configurator support %I%",
+	"Cardbus Configurator support",
 };
 
 static struct modlinkage modlinkage = {
@@ -286,7 +286,7 @@ cardbus_claim_pci_busnum(dev_info_t *dip, void *arg)
 	if (ddi_getlongprop_buf(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
 	    "bus-range", (caddr_t)&pci_bus_range, &len) == DDI_SUCCESS) {
 		cardbus_err(dip, 1, "cardbus_claim_pci_busnum: %u -> %u \n",
-			pci_bus_range.lo, pci_bus_range.hi);
+		    pci_bus_range.lo, pci_bus_range.hi);
 		if ((pci_bus_range.lo >= ctrl->range->lo) &&
 		    (pci_bus_range.hi <= ctrl->range->hi)) {
 			cardbus_err(dip, 1,
@@ -357,7 +357,7 @@ static void cardbus_fix_hostbridge_busrange(dev_info_t *dip)
 
 		bus_range.lo = 0;
 		(void) ddi_getlongprop_buf(DDI_DEV_T_NONE, dip,
-		DDI_PROP_DONTPASS, "bus-range", (caddr_t)&bus_range, &len);
+		    DDI_PROP_DONTPASS, "bus-range", (caddr_t)&bus_range, &len);
 		bus_range.hi = 255;
 
 		(void) ndi_ra_free(dip,
@@ -377,7 +377,7 @@ static void cardbus_fix_hostbridge_busrange(dev_info_t *dip)
 			    "cardbus_walk_node_child fails\n");
 
 		(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
-			    "bus-range", (int *)&bus_range, 2);
+		    "bus-range", (int *)&bus_range, 2);
 
 	} else {
 		cardbus_err(dip, 1, "cardbus_fix_hostbridge_busrange "
@@ -425,7 +425,7 @@ cardbus_attach(dev_info_t *dip, cb_nexus_cb_t *nex_ops)
 		cmn_err(CE_WARN,
 		    "%s%d: cardbus instance already initialized!\n",
 		    ddi_driver_name(dip), ddi_get_instance(dip));
-		    mutex_exit(&cardbus_list_mutex);
+			mutex_exit(&cardbus_list_mutex);
 		return (DDI_FAILURE);
 	}
 
@@ -520,7 +520,7 @@ cardbus_detach(dev_info_t *dip)
 	mutex_enter(&cardbus_list_mutex);
 	/* get the instance number for the cardbus soft state data */
 	cb_instance = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "cbus-instance", -1);
+	    DDI_PROP_DONTPASS, "cbus-instance", -1);
 	if (cb_instance < 0) {
 		mutex_exit(&cardbus_list_mutex);
 		return (DDI_FAILURE); /* no instance is setup for this bus */
@@ -589,7 +589,7 @@ cardbus_load_cardbus(dev_info_t *dip, uint_t socket, uint32_t pc_base)
 #endif
 
 	cb_instance = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "cbus-instance", -1);
+	    DDI_PROP_DONTPASS, "cbus-instance", -1);
 	ASSERT(cb_instance >= 0);
 	cbp = (cbus_t *)ddi_get_soft_state(cardbus_state, cb_instance);
 
@@ -977,7 +977,7 @@ cardbus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 	case DDI_CTLOPS_INITCHILD:
 		return (cardbus_initchild(rdip, dip, (dev_info_t *)arg,
-					result));
+		    result));
 
 	case DDI_CTLOPS_REPORTDEV:
 		if (rdip == (dev_info_t *)0)
@@ -1052,7 +1052,7 @@ cardbus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 				*ptr++ = '\n';
 				ASSERT(((caddr_t)ptr - (caddr_t)buf) <
-					sizeof (buf));
+				    sizeof (buf));
 				*ptr = '\0';
 
 				cardbus_err(dip, 1, buf);
@@ -1170,7 +1170,7 @@ cardbus_init_child_regs(dev_info_t *child)
 		n = pci_config_get8(config_handle, PCI_CONF_CACHE_LINESZ);
 		if (n != 0)
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, child,
-				"cache-line-size", n);
+			    "cache-line-size", n);
 	}
 
 	/*
@@ -1182,10 +1182,10 @@ cardbus_init_child_regs(dev_info_t *child)
 		if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_ONE) {
 			latency_timer = cardbus_latency_timer;
 			pci_config_put8(config_handle, PCI_BCNF_LATENCY_TIMER,
-					latency_timer);
+			    latency_timer);
 		} else {
 			min_gnt = pci_config_get8(config_handle,
-						PCI_CONF_MIN_G);
+			    PCI_CONF_MIN_G);
 
 			/*
 			 * Cardbus os only 33Mhz
@@ -1195,11 +1195,11 @@ cardbus_init_child_regs(dev_info_t *child)
 			}
 		}
 		pci_config_put8(config_handle, PCI_CONF_LATENCY_TIMER,
-				latency_timer);
+		    latency_timer);
 		n = pci_config_get8(config_handle, PCI_CONF_LATENCY_TIMER);
 		if (n != 0)
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, child,
-				"latency-timer", n);
+			"latency-timer", n);
 	}
 
 	pci_config_teardown(&config_handle);
@@ -1266,13 +1266,13 @@ cardbus_initchild(dev_info_t *rdip, dev_info_t *dip, dev_info_t *child,
 
 #ifdef sparc
 		ppd = (struct cardbus_parent_private_data *)
-		kmem_zalloc(sizeof (struct cardbus_parent_private_data),
+		    kmem_zalloc(sizeof (struct cardbus_parent_private_data),
 		    KM_SLEEP);
 
 #elif defined(__x86) || defined(__amd64)
 		ppd = (struct cardbus_parent_private_data *)
 		    kmem_zalloc(sizeof (struct cardbus_parent_private_data)
-			+ sizeof (struct intrspec), KM_SLEEP);
+		    + sizeof (struct intrspec), KM_SLEEP);
 
 		ppd->ppd.par_intr = (struct intrspec *)(ppd + 1);
 		(ppd->ppd.par_intr)->intrspec_pri = 0;
@@ -2388,21 +2388,22 @@ cardbus_err(dev_info_t *dip, int level, const char *fmt, ...)
 			if (dip) {
 				if (instance >= 0)
 					prom_printf("%s(%d),0x%p: %s%s",
-					    name, instance, dip, buf, nl);
+					    name, instance, (void *)dip,
+					    buf, nl);
 				else
 					prom_printf("%s,0x%p: %s%s", name,
-					    dip, buf, nl);
+					    (void *)dip, buf, nl);
 			} else
 				prom_printf("%s%s", buf, nl);
 		} else {
 			if (dip) {
 				if (instance >= 0)
 					cmn_err(CE_CONT, "%s(%d),0x%p: %s%s",
-					    name, instance, (void *) dip,
+					    name, instance, (void *)dip,
 					    buf, nl);
 				else
 					cmn_err(CE_CONT, "%s,0x%p: %s%s",
-					    name, (void *) dip, buf, nl);
+					    name, (void *)dip, buf, nl);
 			} else
 				cmn_err(CE_CONT, "%s%s", buf, nl);
 		}

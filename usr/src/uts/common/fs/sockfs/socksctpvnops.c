@@ -187,7 +187,8 @@ socksctpv_close(struct vnode *vp, int flag, int count, offset_t offset,
 	ASSERT(so->so_count > 0);
 	so->so_count--;			/* one fewer open reference */
 
-	dprint(2, ("socksctpv_close: %p so_count %d\n", so, so->so_count));
+	dprint(2, ("socksctpv_close: %p so_count %d\n", (void *)so,
+	    so->so_count));
 
 	if (so->so_count == 0) {
 		/*
@@ -593,7 +594,7 @@ socksctpv_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 		struct file *nfp;
 		struct vnode *nvp = NULL, *accessvp;
 
-		dprint(2, ("sctppeeloff %p\n", ss));
+		dprint(2, ("sctppeeloff %p\n", (void *)ss));
 
 		if (so->so_type != SOCK_SEQPACKET) {
 			return (EOPNOTSUPP);

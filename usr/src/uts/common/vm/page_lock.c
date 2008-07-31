@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -634,7 +634,7 @@ page_unlock_nocapture(page_t *pp)
 		if (CV_HAS_WAITERS(&pp->p_cv))
 			cv_broadcast(&pp->p_cv);
 	} else if ((old & ~SE_EWANTED) == SE_DELETED) {
-		panic("page_unlock_nocapture: page %p is deleted", pp);
+		panic("page_unlock_nocapture: page %p is deleted", (void *)pp);
 	} else if (old < 0) {
 		THREAD_KPRI_RELEASE();
 		pp->p_selock &= SE_EWANTED;
@@ -643,7 +643,8 @@ page_unlock_nocapture(page_t *pp)
 	} else if ((old & ~SE_EWANTED) > SE_READER) {
 		pp->p_selock = old - SE_READER;
 	} else {
-		panic("page_unlock_nocapture: page %p is not locked", pp);
+		panic("page_unlock_nocapture: page %p is not locked",
+		    (void *)pp);
 	}
 
 	mutex_exit(pse);
@@ -667,7 +668,7 @@ page_unlock(page_t *pp)
 		if (CV_HAS_WAITERS(&pp->p_cv))
 			cv_broadcast(&pp->p_cv);
 	} else if ((old & ~SE_EWANTED) == SE_DELETED) {
-		panic("page_unlock: page %p is deleted", pp);
+		panic("page_unlock: page %p is deleted", (void *)pp);
 	} else if (old < 0) {
 		THREAD_KPRI_RELEASE();
 		pp->p_selock &= SE_EWANTED;
@@ -676,7 +677,7 @@ page_unlock(page_t *pp)
 	} else if ((old & ~SE_EWANTED) > SE_READER) {
 		pp->p_selock = old - SE_READER;
 	} else {
-		panic("page_unlock: page %p is not locked", pp);
+		panic("page_unlock: page %p is not locked", (void *)pp);
 	}
 
 	if (pp->p_selock == 0) {

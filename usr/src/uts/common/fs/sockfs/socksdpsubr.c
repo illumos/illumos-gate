@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,7 +64,7 @@ sosdp_waitconnected(struct sonode *so, int fmode)
 	while ((so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING)) ==
 	    SS_ISCONNECTING && so->so_error == 0) {
 
-		dprint(3, ("waiting for SS_ISCONNECTED on %p\n", so));
+		dprint(3, ("waiting for SS_ISCONNECTED on %p\n", (void *)so));
 		if (fmode & (FNDELAY|FNONBLOCK))
 			return (EINPROGRESS);
 
@@ -77,7 +77,7 @@ sosdp_waitconnected(struct sonode *so, int fmode)
 			error = EINTR;
 			break;
 		}
-		dprint(3, ("awoken on %p\n", so));
+		dprint(3, ("awoken on %p\n", (void *)so));
 	}
 
 	if (so->so_error != 0) {

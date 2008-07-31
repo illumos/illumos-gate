@@ -65,7 +65,8 @@ strsock_kssl_input(vnode_t *vp, mblk_t *mp,
 	kssl_cmd_t kssl_cmd;
 	mblk_t *out;
 
-	dprintso(so, 1, ("strsock_kssl_input(%p, %p)\n", vp, mp));
+	dprintso(so, 1, ("strsock_kssl_input(%p, %p)\n",
+	    (void *)vp, (void *)mp));
 
 	kssl_cmd = kssl_handle_mblk(kssl_ctx, &mp, &out);
 
@@ -103,7 +104,8 @@ strsock_kssl_output(vnode_t *vp, mblk_t *mp,
 	kssl_ctx_t kssl_ctx = so->so_kssl_ctx;
 	mblk_t *recmp;
 
-	dprintso(so, 1, ("strsock_kssl_output(%p, %p)\n", vp, mp));
+	dprintso(so, 1, ("strsock_kssl_output(%p, %p)\n",
+	    (void *)vp, (void *)mp));
 
 	if ((recmp = kssl_build_record(kssl_ctx, mp)) == NULL) {
 		/* The caller will free the bogus message */

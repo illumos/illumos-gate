@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,7 +212,7 @@ static vmem_t	*rootnex_regspec_arena;
 
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module.  This one is a nexus driver */
-	"sun4 root nexus %I%",
+	"sun4 root nexus",
 	&rootnex_ops,	/* Driver ops */
 };
 
@@ -384,7 +384,7 @@ rootnex_map_regspec(ddi_map_req_t *mp, caddr_t *vaddrp, uint_t mapping_attr)
 		}
 	}
 
-	DPRINTF(ROOTNEX_MAP_DEBUG, ("at virtual 0x%p\n", *vaddrp));
+	DPRINTF(ROOTNEX_MAP_DEBUG, ("at virtual 0x%p\n", (void *)*vaddrp));
 	return (0);
 }
 
@@ -647,7 +647,7 @@ rootnex_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 	DPRINTF(ROOTNEX_INTR_DEBUG, ("rootnex_intr_ops: rdip=%s%d "
 	    "intr_op 0x%x hdlp 0x%p\n", ddi_driver_name(rdip),
-	    ddi_get_instance(rdip), intr_op, hdlp));
+	    ddi_get_instance(rdip), intr_op, (void *)hdlp));
 
 	switch (intr_op) {
 	case DDI_INTROP_GETCAP:
@@ -721,7 +721,7 @@ rootnex_map_fault(dev_info_t *dip, dev_info_t *rdip,
 	extern struct seg_ops segdev_ops;
 
 	DPRINTF(ROOTNEX_MAP_DEBUG, ("rootnex_map_fault: address <%p> "
-	    "pfn <%lx>", addr, pfn));
+	    "pfn <%lx>", (void *)addr, pfn));
 	DPRINTF(ROOTNEX_MAP_DEBUG, (" Seg <%s>\n",
 	    seg->s_ops == &segdev_ops ? "segdev" :
 	    seg == &kvseg ? "segkmem" : "NONE!"));

@@ -1084,6 +1084,7 @@ cachefs_charge_page(struct cnode *cp, u_offset_t offset)
 	int inc;
 
 	ASSERT(MUTEX_HELD(&cp->c_statelock));
+	/*LINTED*/
 	ASSERT(PAGESIZE <= MAXBSIZE);
 
 	error = 0;
@@ -7511,6 +7512,7 @@ cachefs_getapage(struct vnode *vp, u_offset_t off, size_t len, uint_t *protp,
 	u_offset_t popoff;
 	size_t popsize = 0;
 
+	/*LINTED*/
 	ASSERT(((DEF_POP_SIZE / PAGESIZE) + 1) <= 17);
 
 	if (fscp->fs_info.fi_popsize > DEF_POP_SIZE)

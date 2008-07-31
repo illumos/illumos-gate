@@ -588,7 +588,7 @@ zfs_znode_dmu_init(zfsvfs_t *zfsvfs, znode_t *zp, dmu_buf_t *db)
 	 * concurrent zgets on this object.
 	 */
 	if (nzp != NULL)
-		panic("existing znode %p for dbuf %p", nzp, db);
+		panic("existing znode %p for dbuf %p", (void *)nzp, (void *)db);
 
 	/*
 	 * Slap on VROOT if we are the root znode

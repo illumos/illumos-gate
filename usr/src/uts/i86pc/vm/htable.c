@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1368,7 +1368,8 @@ try_again:
 			if (l == level && shared && ht->ht_shares &&
 			    ht->ht_shares != shared) {
 				panic("htable shared from wrong place "
-				    "found htable=%p shared=%p", ht, shared);
+				    "found htable=%p shared=%p",
+				    (void *)ht, (void *)shared);
 			}
 			++ht->ht_busy;
 			HTABLE_EXIT(h);

@@ -374,7 +374,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 	void			*nl7c = NULL;
 
 	dprintso(so, 1, ("sotpi_bindlisten(%p, %p, %d, %d, 0x%x) %s\n",
-	    so, name, namelen, backlog, flags,
+	    (void *)so, (void *)name, namelen, backlog, flags,
 	    pr_state(so->so_state, so->so_mode)));
 
 	tcp_udp_xport = so->so_type == SOCK_STREAM || so->so_type == SOCK_DGRAM;
@@ -413,8 +413,8 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			dprintso(so, 1, ("sobind rebind UNIX: addrlen %d, "
 			    "addr 0x%p, vp %p\n",
 			    addrlen,
-			    ((struct so_ux_addr *)addr)->soua_vp,
-			    so->so_ux_bound_vp));
+			    (void *)((struct so_ux_addr *)addr)->soua_vp,
+			    (void *)so->so_ux_bound_vp));
 		} else {
 			addr = so->so_laddr_sa;
 			addrlen = (t_uscalar_t)so->so_laddr_len;
@@ -1033,7 +1033,7 @@ skip_transport:
 				eprintso(so,
 				    ("addrlen %d, addr 0x%x, vp %p\n",
 				    addrlen, *((int *)addr),
-				    so->so_ux_bound_vp));
+				    (void *)so->so_ux_bound_vp));
 				goto done;
 			}
 			so->so_state |= SS_LADDR_VALID;
@@ -1159,7 +1159,7 @@ sotpi_unbind(struct sonode *so, int flags)
 	mblk_t			*mp;
 
 	dprintso(so, 1, ("sotpi_unbind(%p, 0x%x) %s\n",
-	    so, flags, pr_state(so->so_state, so->so_mode)));
+	    (void *)so, flags, pr_state(so->so_state, so->so_mode)));
 
 	ASSERT(MUTEX_HELD(&so->so_lock));
 	ASSERT(so->so_flag & SOLOCKED);
@@ -1247,7 +1247,7 @@ sotpi_listen(struct sonode *so, int backlog)
 	int		error = 0;
 
 	dprintso(so, 1, ("sotpi_listen(%p, %d) %s\n",
-	    so, backlog, pr_state(so->so_state, so->so_mode)));
+	    (void *)so, backlog, pr_state(so->so_state, so->so_mode)));
 
 	if (so->so_serv_type == T_CLTS)
 		return (EOPNOTSUPP);
@@ -1352,7 +1352,7 @@ sodisconnect(struct sonode *so, t_scalar_t seqno, int flags)
 	mblk_t			*mp;
 
 	dprintso(so, 1, ("sodisconnect(%p, %d, 0x%x) %s\n",
-	    so, seqno, flags, pr_state(so->so_state, so->so_mode)));
+	    (void *)so, seqno, flags, pr_state(so->so_state, so->so_mode)));
 
 	if (!(flags & _SODISCONNECT_LOCK_HELD)) {
 		mutex_enter(&so->so_lock);
@@ -1433,7 +1433,8 @@ sotpi_accept(struct sonode *so, int fflag, struct sonode **nsop)
 	size_t			sinlen;
 
 	dprintso(so, 1, ("sotpi_accept(%p, 0x%x, %p) %s\n",
-	    so, fflag, nsop, pr_state(so->so_state, so->so_mode)));
+	    (void *)so, fflag, (void *)nsop,
+	    pr_state(so->so_state, so->so_mode)));
 
 	/*
 	 * Defer single-threading the accepting socket until
@@ -1951,7 +1952,7 @@ sotpi_connect(struct sonode *so,
 	boolean_t		need_unlock;
 
 	dprintso(so, 1, ("sotpi_connect(%p, %p, %d, 0x%x, 0x%x) %s\n",
-	    so, name, namelen, fflag, flags,
+	    (void *)so, (void *)name, namelen, fflag, flags,
 	    pr_state(so->so_state, so->so_mode)));
 
 	/*
@@ -2379,7 +2380,7 @@ sotpi_shutdown(struct sonode *so, int how)
 	int			error = 0;
 
 	dprintso(so, 1, ("sotpi_shutdown(%p, %d) %s\n",
-	    so, how, pr_state(so->so_state, so->so_mode)));
+	    (void *)so, how, pr_state(so->so_state, so->so_mode)));
 
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);	/* Set SOLOCKED */
@@ -2578,7 +2579,7 @@ so_unix_close(struct sonode *so)
 		return;
 
 	dprintso(so, 1, ("so_unix_close(%p) %s\n",
-	    so, pr_state(so->so_state, so->so_mode)));
+	    (void *)so, pr_state(so->so_state, so->so_mode)));
 
 	toh.level = SOL_SOCKET;
 	toh.name = SO_UNIX_CLOSE;
@@ -2711,7 +2712,8 @@ sorecvoob(struct sonode *so, struct nmsghdr *msg, struct uio *uiop, int flags)
 	mblk_t		*mp, *nmp;
 	int		error;
 
-	dprintso(so, 1, ("sorecvoob(%p, %p, 0x%x)\n", so, msg, flags));
+	dprintso(so, 1, ("sorecvoob(%p, %p, 0x%x)\n",
+	    (void *)so, (void *)msg, flags));
 
 	/*
 	 * There is never any oob data with addresses or control since
@@ -2766,7 +2768,7 @@ sorecvoob(struct sonode *so, struct nmsghdr *msg, struct uio *uiop, int flags)
 	}
 	dprintso(so, 1,
 	    ("after recvoob(%p): counts %d/%d state %s\n",
-	    so, so->so_oobsigcnt,
+	    (void *)so, so->so_oobsigcnt,
 	    so->so_oobcnt, pr_state(so->so_state, so->so_mode)));
 	ASSERT(so_verify_oobstate(so));
 	mutex_exit(&so->so_lock);
@@ -2926,7 +2928,7 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	msg->msg_flags = 0;
 
 	dprintso(so, 1, ("sotpi_recvmsg(%p, %p, 0x%x) state %s err %d\n",
-	    so, msg, flags,
+	    (void *)so, (void *)msg, flags,
 	    pr_state(so->so_state, so->so_mode), so->so_error));
 
 	/*
@@ -4046,7 +4048,7 @@ sosend_svc(struct sonode *so,
 
 	dprintso(so, 1,
 	    ("sosend_svc: %p, resid %ld bytes, prim %d, sflag 0x%x\n",
-	    so, uiop->uio_resid, prim, sflag));
+	    (void *)so, uiop->uio_resid, prim, sflag));
 
 	/*
 	 * Has to be bound and connected. However, since no locks are
@@ -4140,7 +4142,7 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	int		flags;
 
 	dprintso(so, 1, ("sotpi_sendmsg(%p, %p, 0x%x) state %s, error %d\n",
-	    so, msg, msg->msg_flags,
+	    (void *)so, (void *)msg, msg->msg_flags,
 	    pr_state(so->so_state, so->so_mode), so->so_error));
 
 	mutex_enter(&so->so_lock);
@@ -4636,7 +4638,7 @@ sotpi_getpeername(struct sonode *so)
 	k_sigset_t	smask;
 
 	dprintso(so, 1, ("sotpi_getpeername(%p) %s\n",
-	    so, pr_state(so->so_state, so->so_mode)));
+	    (void *)so, pr_state(so->so_state, so->so_mode)));
 
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);	/* Set SOLOCKED */
@@ -4746,7 +4748,7 @@ sotpi_getsockname(struct sonode *so)
 	k_sigset_t	smask;
 
 	dprintso(so, 1, ("sotpi_getsockname(%p) %s\n",
-	    so, pr_state(so->so_state, so->so_mode)));
+	    (void *)so, pr_state(so->so_state, so->so_mode)));
 
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);	/* Set SOLOCKED */
@@ -4868,7 +4870,7 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 	uint32_t		value;
 
 	dprintso(so, 1, ("sotpi_getsockopt(%p, 0x%x, 0x%x, %p, %p) %s\n",
-	    so, level, option_name, optval, optlenp,
+	    (void *)so, level, option_name, optval, (void *)optlenp,
 	    pr_state(so->so_state, so->so_mode)));
 
 	mutex_enter(&so->so_lock);
@@ -5163,7 +5165,7 @@ sotpi_setsockopt(struct sonode *so, int level, int option_name,
 	boolean_t		handled = B_FALSE;
 
 	dprintso(so, 1, ("sotpi_setsockopt(%p, 0x%x, 0x%x, %p, %d) %s\n",
-	    so, level, option_name, optval, optlen,
+	    (void *)so, level, option_name, optval, optlen,
 	    pr_state(so->so_state, so->so_mode)));
 
 

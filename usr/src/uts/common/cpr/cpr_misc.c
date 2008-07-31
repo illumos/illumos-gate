@@ -916,7 +916,7 @@ cpr_mp_offline(void)
 	} while ((cp = cp->cpu_next) != cpu_list);
 	if (brought_up_boot && (cpr_debug & (CPR_DEBUG1 | CPR_DEBUG6)))
 		prom_printf("changed cpu %p to state %d\n",
-		    bootcpu, CPU_CPR_ONLINE);
+		    (void *)bootcpu, CPU_CPR_ONLINE);
 	mutex_exit(&cpu_lock);
 
 	return (rc);

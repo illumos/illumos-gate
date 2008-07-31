@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -269,7 +269,8 @@ nfslog_setup(struct exportinfo *exi)
 	 * increment the reference count because the node is
 	 * entered into the global list.
 	 */
-	LOGGING_DPRINT((10, "exportfs: adding nlbp=%p to list\n", nlbp));
+	LOGGING_DPRINT((10, "exportfs: adding nlbp=%p to list\n",
+	    (void *)nlbp));
 
 	nlbp->lb_next = nfslog_buffer_list;
 	nfslog_buffer_list = nlbp;
@@ -358,7 +359,7 @@ log_buffer_rele(struct log_buffer *lbp)
 		 * list.
 		 */
 		LOGGING_DPRINT((10,
-		    "log_buffer_rele lbp=%p disconnecting\n", lbp));
+		    "log_buffer_rele lbp=%p disconnecting\n", (void *)lbp));
 		/*
 		 * Hold additional reference before dropping the lb_lock
 		 */
@@ -407,7 +408,7 @@ log_buffer_rele(struct log_buffer *lbp)
 	/*
 	 * ref count zero; finish clean up.
 	 */
-	LOGGING_DPRINT((10, "log_buffer_rele lbp=%p freeing\n", lbp));
+	LOGGING_DPRINT((10, "log_buffer_rele lbp=%p freeing\n", (void *)lbp));
 
 	log_file_rele(lbp->lb_logfile);
 	len = strlen(lbp->lb_path) + 1;
@@ -447,7 +448,7 @@ log_file_create(caddr_t origname, struct log_file **lfpp)
 		goto out;
 	}
 	LOGGING_DPRINT((3, "log_file_create: %s vp=%p v_count=%d\n",
-	    name, vp, vp->v_count));
+	    name, (void *)vp, vp->v_count));
 
 	logfile = (struct log_file *)kmem_zalloc(sizeof (*logfile), KM_SLEEP);
 	logfile->lf_path = name;
@@ -544,7 +545,7 @@ log_file_rele(struct log_file *lfp)
 	if (--lfp->lf_refcnt > 0) {
 		LOGGING_DPRINT((10,
 		    "log_file_rele lfp=%p decremented refcnt to %d\n",
-		    lfp, lfp->lf_refcnt));
+		    (void *)lfp, lfp->lf_refcnt));
 		mutex_exit(&lfp->lf_lock);
 		return;
 	}
@@ -553,7 +554,8 @@ log_file_rele(struct log_file *lfp)
 		/*NOTREACHED*/
 	}
 
-	LOGGING_DPRINT((10, "log_file_rele lfp=%p freeing node\n", lfp));
+	LOGGING_DPRINT((10, "log_file_rele lfp=%p freeing node\n",
+	    (void *)lfp));
 
 	lfp->lf_flags &= ~(L_PRINTED | L_ERROR);
 
@@ -569,7 +571,7 @@ log_file_rele(struct log_file *lfp)
 	} else {
 		LOGGING_DPRINT((3,
 		    "log_file_rele: %s has been closed vp=%p v_count=%d\n",
-		    lfp->lf_path, lfp->lf_vp, lfp->lf_vp->v_count));
+		    lfp->lf_path, (void *)lfp->lf_vp, lfp->lf_vp->v_count));
 #endif
 	}
 	VN_RELE(lfp->lf_vp);
@@ -634,7 +636,7 @@ nfslog_record_alloc(
 
 	LOGGING_DPRINT((3,
 	    "nfslog_record_alloc(log_buffer=%p mem=%p size=%lu)\n",
-	    exi->exi_logbuffer, lrp->log_record, lrp->size));
+	    (void *)exi->exi_logbuffer, (void *)lrp->log_record, lrp->size));
 	return (lrp->log_record);
 }
 

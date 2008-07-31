@@ -1072,10 +1072,10 @@ check_dma(ddi_dma_attr_t *dma_attr, page_t *pp, int cnt)
 	while (cnt-- > 0) {
 		if (pa_to_ma(pfn_to_pa(pp->p_pagenum)) <
 		    dma_attr->dma_attr_addr_lo)
-			panic("PFN (pp=%p) below dma_attr_addr_lo", pp);
+			panic("PFN (pp=%p) below dma_attr_addr_lo", (void *)pp);
 		if (pa_to_ma(pfn_to_pa(pp->p_pagenum)) >=
 		    dma_attr->dma_attr_addr_hi)
-			panic("PFN (pp=%p) above dma_attr_addr_hi", pp);
+			panic("PFN (pp=%p) above dma_attr_addr_hi", (void *)pp);
 		pp = pp->p_next;
 	}
 }
@@ -3739,7 +3739,7 @@ page_get_physical(uintptr_t seed)
 #ifdef	DEBUG
 	pp = page_exists(&kvp, offset);
 	if (pp != NULL)
-		panic("page already exists %p", pp);
+		panic("page already exists %p", (void *)pp);
 #endif
 
 	pp = page_create_va(&kvp, offset, MMU_PAGESIZE, PG_EXCL,

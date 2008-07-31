@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1828,7 +1828,7 @@ rctl_local_insert_all_cb(rctl_hndl_t hndl, struct proc *p, rctl_entity_p_t *e,
 			alloc_values->rcv_next = tmp_val;
 
 			if (rctl_val_list_insert(&rctl->rc_values,
-				alloc_values) == 0) {
+			    alloc_values) == 0) {
 				/* inserted move alloc_values on */
 				alloc_values = tmp_val;
 				modified = 1;
@@ -1938,7 +1938,7 @@ rctl_local_replace_all_cb(rctl_hndl_t hndl, struct proc *p, rctl_entity_p_t *e,
 			alloc_values->rcv_next = tmp_val;
 
 			if (rctl_val_list_insert(&rctl->rc_values,
-				alloc_values) == 0) {
+			    alloc_values) == 0) {
 				/* inserted, so move alloc_values on */
 				alloc_values = tmp_val;
 			}
@@ -2402,7 +2402,7 @@ rctl_register(
 	if (mod_hash_insert(rctl_dict, (mod_hash_key_t)(uintptr_t)rctl->rc_id,
 	    (mod_hash_val_t)rctl))
 		panic("unable to insert rctl %s/%u (%p)", name,
-		    (uint_t)rctl->rc_id, rctl);
+		    (uint_t)rctl->rc_id, (void *)rctl);
 
 	/*
 	 * 3a. Insert rctl_dict_entry_t * in appropriate entity list.
@@ -2696,7 +2696,7 @@ rctl_action_acquire:
 
 	if (e == NULL) {
 		rctl_entity_obtain_entity_p(lrctl->rc_dict_entry->rcd_entity,
-		p, &e_tmp);
+		    p, &e_tmp);
 		e = &e_tmp;
 	}
 
@@ -2795,7 +2795,7 @@ rctl_test_acquire:
 	 */
 	if (e == NULL) {
 		rctl_entity_obtain_entity_p(lrctl->rc_dict_entry->rcd_entity,
-		p, &e_tmp);
+		    p, &e_tmp);
 		e = &e_tmp;
 	}
 
@@ -3053,8 +3053,8 @@ rctl_kstat_create_common(char *ks_name, int ks_instance, char *ks_class,
 	(void) snprintf(name, KSTAT_STRLEN, "%s_%d", ks_name, ks_instance);
 
 	if ((ksp = kstat_create_zone("caps", ks_zoneid,
-		name, ks_class, ks_type,
-		ks_ndata, ks_flags, ks_zoneid)) != NULL) {
+	    name, ks_class, ks_type,
+	    ks_ndata, ks_flags, ks_zoneid)) != NULL) {
 		if (ks_zoneid != GLOBAL_ZONEID)
 			kstat_zone_add(ksp, GLOBAL_ZONEID);
 	}

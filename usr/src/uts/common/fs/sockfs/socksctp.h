@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -149,14 +148,16 @@ extern int sosctp_uiomove(mblk_t *hdr_mp, ssize_t count, ssize_t blk_size,
 	ASSERT(MUTEX_HELD(&(ssa)->ssa_sonode->ss_so.so_lock));	\
 	ASSERT((ssa)->ssa_refcnt > 0);				\
 	++(ssa)->ssa_refcnt;					\
-	dprint(3, ("ssa_refhold on %p %d (%s,%d)\n", (ssa),	\
-		(ssa)->ssa_refcnt, __FILE__, __LINE__));	\
+	dprint(3, ("ssa_refhold on %p %d (%s,%d)\n", 		\
+		(void *)(ssa), (ssa)->ssa_refcnt,		\
+		__FILE__, __LINE__));				\
 }
 
 
 #define	SSA_REFRELE(ss, ssa)					\
 {								\
-	dprint(3, ("ssa_refrele on %p %d (%s, %d)\n", (ssa),	\
+	dprint(3, ("ssa_refrele on %p %d (%s, %d)\n",		\
+		(void *)(ssa),					\
 		(ssa)->ssa_refcnt-1, __FILE__, __LINE__));	\
 	ASSERT((ssa)->ssa_refcnt > 0);				\
 	if (--(ssa)->ssa_refcnt == 0) {				\

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -402,7 +402,7 @@ extern struct mod_ops mod_miscops;
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,
-	"System Board DR v%I%"
+	"System Board DR"
 };
 
 static struct modlinkage modlinkage = {
@@ -1620,7 +1620,7 @@ sbd_copyin_ioarg(sbd_handle_t *hp, int mode, int cmd, sbd_cmd_t *cmdp,
 		cmdp->cmd_cm.c_opts = (caddr_t)(uintptr_t)scmd32.cmd_cm.c_opts;
 
 		if (cmd == SBD_CMD_PASSTHRU) {
-			PR_BYP("passthru copyin: iap=%p, sz=%ld", iap,
+			PR_BYP("passthru copyin: iap=%p, sz=%ld", (void *)iap,
 				sizeof (sbd_cmd32_t));
 			PR_BYP("passthru copyin: c_opts=%x, c_len=%d",
 				scmd32.cmd_cm.c_opts,

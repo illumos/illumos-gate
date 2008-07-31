@@ -401,7 +401,7 @@ ghd_intr(ccc_t *cccp, void *intr_status)
 	mutex_enter(hba_mutexp);
 
 	GDBG_INTR(("ghd_intr(): cccp=0x%p status=0x%p\n",
-	    cccp, intr_status));
+	    (void *)cccp, intr_status));
 
 	for (;;) {
 		more = FALSE;
@@ -423,7 +423,7 @@ ghd_intr(ccc_t *cccp, void *intr_status)
 			continue;
 		}
 		GDBG_INTR(("ghd_intr(): done cccp=0x%p status=0x%p rc %d\n",
-		    cccp, intr_status, rc));
+		    (void *)cccp, intr_status, rc));
 		/*
 		 * Release the mutexes in the opposite order that they
 		 * were acquired to prevent requests queued by
@@ -746,7 +746,7 @@ ghd_transport(ccc_t	*cccp,
 
 		GDBG_START(("ghd_transport: polled"
 		    " cccp 0x%p gdevp 0x%p gtgtp 0x%p gcmdp 0x%p\n",
-		    cccp, gdevp, gtgtp, gcmdp));
+		    (void *)cccp, (void *)gdevp, (void *)gtgtp, (void *)gcmdp));
 
 		/*
 		 * Lock the doneq so no other thread flushes the Q.
@@ -757,7 +757,7 @@ ghd_transport(ccc_t	*cccp,
 	else {
 		GDBG_START(("ghd_transport: non-polled"
 		    " cccp 0x%p gdevp 0x%p gtgtp 0x%p gcmdp 0x%p\n",
-		    cccp, gdevp, gtgtp, gcmdp));
+		    (void *)cccp, (void *)gdevp, (void *)gtgtp, (void *)gcmdp));
 	}
 #endif
 	/*
@@ -788,11 +788,13 @@ ghd_transport(ccc_t	*cccp,
 		 */
 		if (!mutex_tryenter(&cccp->ccc_hba_mutex)) {
 			/* The HBA mutex isn't available */
-			GDBG_START(("ghd_transport: !mutex cccp 0x%p\n", cccp));
+			GDBG_START(("ghd_transport: !mutex cccp 0x%p\n",
+			    (void *)cccp));
 			mutex_exit(&cccp->ccc_waitq_mutex);
 			return (TRAN_ACCEPT);
 		}
-		GDBG_START(("ghd_transport: got mutex cccp 0x%p\n", cccp));
+		GDBG_START(("ghd_transport: got mutex cccp 0x%p\n",
+		    (void *)cccp));
 
 		/*
 		 * start as many requests as possible from the head
@@ -824,7 +826,7 @@ ghd_transport(ccc_t	*cccp,
 	/* call HBA's completion function but don't do callback to target */
 	(*cccp->ccc_hba_complete)(cccp->ccc_hba_handle, gcmdp, FALSE);
 
-	GDBG_START(("ghd_transport: polled done cccp 0x%p\n", cccp));
+	GDBG_START(("ghd_transport: polled done cccp 0x%p\n", (void *)cccp));
 	return (TRAN_ACCEPT);
 }
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -738,7 +738,7 @@ DDI_DEFINE_STREAM_OPS(tl_devops, nulldev, nulldev, tl_attach, tl_detach,
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module -- pseudo driver here */
-	"TPI Local Transport (tl) %I%",
+	"TPI Local Transport (tl)",
 	&tl_devops,		/* driver ops */
 };
 
@@ -4430,8 +4430,8 @@ tl_data(mblk_t *mp, tl_endpt_t *tep)
 			}
 			return;
 		} else if (prim->type == T_OPTDATA_REQ &&
-		    (msz < sizeof (struct T_optdata_req) ||
-		    !IS_SOCKET(tep))) {
+			(msz < sizeof (struct T_optdata_req) ||
+			    !IS_SOCKET(tep))) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
 			    SL_TRACE|SL_ERROR,
 			    "tl_data:T_OPTDATA_REQ:invalid message"));
@@ -5895,7 +5895,7 @@ tl_merror(queue_t *wq, mblk_t *mp, int error)
 
 	(void) (STRLOG(TL_ID, tep->te_minor, 1,
 	    SL_TRACE|SL_ERROR,
-	    "tl_merror: tep=%p, err=%d", tep, error));
+	    "tl_merror: tep=%p, err=%d", (void *)tep, error));
 
 	/*
 	 * flush all messages on queue. we are shutting

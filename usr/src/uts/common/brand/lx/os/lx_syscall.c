@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -447,7 +447,7 @@ lx_emulate_syscall(int num, uintptr_t arg1, uintptr_t arg2,
 		break;
 	}
 	default:
-		panic("Invalid syscall entry: #%d at 0x%p\n", num, jsp);
+		panic("Invalid syscall entry: #%d at 0x%p\n", num, (void *)jsp);
 	}
 	lx_print("----------> return  (0x%llx)\n", (long long)rval);
 	return (rval);

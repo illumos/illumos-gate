@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -529,7 +529,7 @@ get_intr_parent(dev_info_t *pdip, dev_info_t *dip, ddi_intr_handle_impl_t *hdlp)
 	if (debug)
 		prom_printf("reg cell size 0x%x, intr cell size 0x%x, "
 		    "match_request 0x%p, imap 0x%p\n", addr_cells, intr_cells,
-		    match_req, imap);
+		    (void *)match_req, (void *)imap);
 #endif
 
 	/*
@@ -554,7 +554,7 @@ get_intr_parent(dev_info_t *pdip, dev_info_t *dip, ddi_intr_handle_impl_t *hdlp)
 		ASSERT(intr_parent_dip != 0);
 #ifdef DEBUG
 		if (debug)
-			prom_printf("scan 0x%p\n", scan);
+			prom_printf("scan 0x%p\n", (void *)scan);
 #endif
 		/*
 		 * The tmp_dip describes the new domain, get it's interrupt
@@ -602,13 +602,15 @@ get_intr_parent(dev_info_t *pdip, dev_info_t *dip, ddi_intr_handle_impl_t *hdlp)
 
 #ifdef DEBUG
 			if (debug)
-				prom_printf("dip 0x%p\n", intr_parent_dip);
+				prom_printf("dip 0x%p\n",
+				    (void *)intr_parent_dip);
 #endif
 			break;
 		} else {
 #ifdef DEBUG
 			if (debug)
-				prom_printf("dip 0x%p\n", intr_parent_dip);
+				prom_printf("dip 0x%p\n",
+				    (void *)intr_parent_dip);
 #endif
 			ndi_rele_devi(intr_parent_dip);
 			intr_parent_dip = NULL;

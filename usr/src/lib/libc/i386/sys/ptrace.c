@@ -467,7 +467,7 @@ Dupfd(int fd, int dfd)
 static void
 MakeProcName(char *procname, pid_t pid)
 {
-	(void) sprintf(procname, "/proc/%d", pid);
+	(void) sprintf(procname, "/proc/%ld", pid);
 }
 
 /*

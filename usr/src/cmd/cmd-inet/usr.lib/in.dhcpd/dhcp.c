@@ -165,7 +165,7 @@ dhcp(dsvc_clnt_t *pcd, PKT_LIST *plp)
 	default:
 		dhcpmsg(LOG_INFO,
 		    "Unexpected DHCP message type: %d from client: %s.\n",
-		    plp->opts[CD_DHCP_TYPE]->value, pcd->cidbuf);
+		    pcd->state, pcd->cidbuf);
 		break;
 	}
 }

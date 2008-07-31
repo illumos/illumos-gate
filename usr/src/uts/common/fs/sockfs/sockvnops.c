@@ -317,7 +317,7 @@ socktpi_close(
 	so = VTOSO(vp);
 
 	dprintso(so, 1, ("socktpi_close(%p, %x, %d) %s\n",
-	    vp, flag, count, pr_state(so->so_state, so->so_mode)));
+	    (void *)vp, flag, count, pr_state(so->so_state, so->so_mode)));
 
 	cleanlocks(vp, ttoproc(curthread)->p_pid, 0);
 	cleanshares(vp, ttoproc(curthread)->p_pid);
@@ -419,7 +419,7 @@ socktpi_read(
 	struct nmsghdr lmsg;
 
 	dprintso(so, 1, ("socktpi_read(%p) %s\n",
-	    so, pr_state(so->so_state, so->so_mode)));
+	    (void *)so, pr_state(so->so_state, so->so_mode)));
 
 	ASSERT(vp->v_type == VSOCK);
 	so_update_attrs(so, SOACC);
@@ -451,7 +451,7 @@ socktpi_write(
 	int error;
 
 	dprintso(so, 1, ("socktpi_write(%p) %s\n",
-	    so, pr_state(so->so_state, so->so_mode)));
+	    (void *)so, pr_state(so->so_state, so->so_mode)));
 
 	ASSERT(vp->v_type == VSOCK);
 
@@ -1235,7 +1235,7 @@ socktpi_poll(
 	int so_state = so->so_state;	/* snapshot */
 
 	dprintso(so, 0, ("socktpi_poll(%p): state %s err %d\n",
-	    vp, pr_state(so_state, so->so_mode), so->so_error));
+	    (void *)vp, pr_state(so_state, so->so_mode), so->so_error));
 
 	ASSERT(vp->v_type == VSOCK);
 	ASSERT(vp->v_stream != NULL);
@@ -1364,7 +1364,7 @@ sock_getmsg(
 	so = VTOSO(vp);
 
 	dprintso(so, 1, ("sock_getmsg(%p) %s\n",
-	    so, pr_state(so->so_state, so->so_mode)));
+	    (void *)so, pr_state(so->so_state, so->so_mode)));
 
 	if (so->so_version == SOV_STREAM) {
 		/* The imaginary "sockmod" has been popped - act as a stream */
@@ -1409,7 +1409,7 @@ sock_putmsg(
 	so = VTOSO(vp);
 
 	dprintso(so, 1, ("sock_putmsg(%p) %s\n",
-	    so, pr_state(so->so_state, so->so_mode)));
+	    (void *)so, pr_state(so->so_state, so->so_mode)));
 
 	if (so->so_version == SOV_STREAM) {
 		/* The imaginary "sockmod" has been popped - act as a stream */

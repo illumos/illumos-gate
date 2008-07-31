@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,7 +128,7 @@ _init()
 
 	ghd_timer_init(&tmr_conf, 0);
 	return ((err = mod_install(&modlinkage)) != 0)
-		ghd_timer_fini(&tmr_conf);
+	    ghd_timer_fini(&tmr_conf);
 	return (err);
 }
 
@@ -419,7 +419,7 @@ ghd_timer_newstate(ccc_t *cccp, gcmd_t *gcmdp, gtgt_t *gtgtp,
 		} else {
 			scsi_log(cccp->ccc_hba_dip, cccp->ccc_label, CE_WARN,
 			    "timeout: %s, target=%d lun=%d", msgp,
-				gtgtp->gt_target, gtgtp->gt_lun);
+			    gtgtp->gt_target, gtgtp->gt_lun);
 		}
 
 		/*
@@ -604,7 +604,7 @@ ghd_timer_poll(ccc_t *cccp, gtimer_poll_t calltype)
 	while (gcmdp = ghd_timeout_get(cccp)) {
 
 		GDBG_INTR(("?ghd_timer_poll: cccp=0x%p gcmdp=0x%p\n",
-		    cccp, gcmdp));
+		    (void *)cccp, (void *)gcmdp));
 
 		switch (gcmdp->cmd_state) {
 		case GCMD_STATE_IDLE:
@@ -709,7 +709,7 @@ ghd_timeout_enable(tmr_t *tmrp)
 	if (tmrp->t_refs++ == 0)  {
 		/* establish the timeout callback */
 		tmrp->t_timeout_id = timeout(ghd_timeout, (void *)tmrp,
-			tmrp->t_ticks);
+		    tmrp->t_ticks);
 	}
 	mutex_exit(&tglobal_mutex);
 }

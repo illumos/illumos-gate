@@ -105,7 +105,7 @@ so_socket(int domain, int type, int protocol, char *devpath, int version)
 	int sdomain = domain;
 
 	dprint(1, ("so_socket(%d,%d,%d,%p,%d)\n",
-	    domain, type, protocol, devpath, version));
+	    domain, type, protocol, (void *)devpath, version));
 
 	if (domain == AF_NCA) {
 		/*
@@ -405,7 +405,7 @@ so_socketpair(int sv[2])
 	struct sockaddr_ux *name;
 	size_t namelen;
 
-	dprint(1, ("so_socketpair(%p)\n", sv));
+	dprint(1, ("so_socketpair(%p)\n", (void *)sv));
 
 	error = useracc(sv, sizeof (svs), B_WRITE);
 	if (error && do_useracc)
@@ -581,7 +581,7 @@ bind(int sock, struct sockaddr *name, socklen_t namelen, int version)
 	int error;
 
 	dprint(1, ("bind(%d, %p, %d)\n",
-	    sock, name, namelen));
+	    sock, (void *)name, namelen));
 
 	if ((so = getsonode(sock, &error, NULL)) == NULL)
 		return (set_errno(error));
@@ -659,7 +659,7 @@ accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 	int nfd;
 
 	dprint(1, ("accept(%d, %p, %p)\n",
-	    sock, name, namelenp));
+	    sock, (void *)name, (void *)namelenp));
 
 	if ((so = getsonode(sock, &error, &fp)) == NULL)
 		return (set_errno(error));
@@ -776,7 +776,7 @@ connect(int sock, struct sockaddr *name, socklen_t namelen, int version)
 	int error;
 
 	dprint(1, ("connect(%d, %p, %d)\n",
-	    sock, name, namelen));
+	    sock, (void *)name, namelen));
 
 	if ((so = getsonode(sock, &error, &fp)) == NULL)
 		return (set_errno(error));
@@ -984,7 +984,7 @@ recvfrom(int sock, void *buffer, size_t len, int flags,
 	struct iovec aiov[1];
 
 	dprint(1, ("recvfrom(%d, %p, %ld, %d, %p, %p)\n",
-	    sock, buffer, len, flags, name, namelenp));
+	    sock, buffer, len, flags, (void *)name, (void *)namelenp));
 
 	if ((ssize_t)len < 0) {
 		return (set_errno(EINVAL));
@@ -1032,7 +1032,7 @@ recvmsg(int sock, struct nmsghdr *msg, int flags)
 	model_t	model;
 
 	dprint(1, ("recvmsg(%d, %p, %d)\n",
-	    sock, msg, flags));
+	    sock, (void *)msg, flags));
 
 	model = get_udatamodel();
 	STRUCT_INIT(u_lmsg, model);
@@ -1272,7 +1272,7 @@ sendmsg(int sock, struct nmsghdr *msg, int flags)
 	int i;
 	model_t	model;
 
-	dprint(1, ("sendmsg(%d, %p, %d)\n", sock, msg, flags));
+	dprint(1, ("sendmsg(%d, %p, %d)\n", sock, (void *)msg, flags));
 
 	model = get_udatamodel();
 	STRUCT_INIT(u_lmsg, model);
@@ -1380,7 +1380,7 @@ sendto(int sock, void *buffer, size_t len, int flags,
 	struct iovec aiov[1];
 
 	dprint(1, ("sendto(%d, %p, %ld, %d, %p, %d)\n",
-	    sock, buffer, len, flags, name, namelen));
+	    sock, buffer, len, flags, (void *)name, namelen));
 
 	if ((ssize_t)len < 0) {
 		return (set_errno(EINVAL));
@@ -1423,7 +1423,7 @@ getpeername(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 	socklen_t addrlen, size;
 
 	dprint(1, ("getpeername(%d, %p, %p)\n",
-	    sock, name, namelenp));
+	    sock, (void *)name, (void *)namelenp));
 
 	if ((so = getsonode(sock, &error, NULL)) == NULL)
 		goto bad;
@@ -1493,7 +1493,7 @@ getsockname(int sock, struct sockaddr *name,
 	socklen_t addrlen, size;
 
 	dprint(1, ("getsockname(%d, %p, %p)\n",
-	    sock, name, namelenp));
+	    sock, (void *)name, (void *)namelenp));
 
 	if ((so = getsonode(sock, &error, NULL)) == NULL)
 		goto bad;
@@ -1558,7 +1558,7 @@ getsockopt(int sock,
 	int error;
 
 	dprint(1, ("getsockopt(%d, %d, %d, %p, %p)\n",
-	    sock, level, option_name, option_value, option_lenp));
+	    sock, level, option_name, option_value, (void *)option_lenp));
 
 	if ((so = getsonode(sock, &error, NULL)) == NULL)
 		return (set_errno(error));
@@ -1659,7 +1659,7 @@ sockconfig(int domain, int type, int protocol, char *devpath)
 	int error = 0;
 
 	dprint(1, ("sockconfig(%d, %d, %d, %p)\n",
-	    domain, type, protocol, devpath));
+	    domain, type, protocol, (void *)devpath));
 
 	if (secpolicy_net_config(CRED(), B_FALSE) != 0)
 		return (set_errno(EPERM));

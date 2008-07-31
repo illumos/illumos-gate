@@ -399,7 +399,7 @@ kcage_range_init(struct memlist *ml, kcage_dir_t d, pgcnt_t preferred_size)
 		    btop(ml->size), d);
 		if (ret)
 			panic("kcage_range_add_internal failed: "
-			    "ml=%p, ret=0x%x\n", ml, ret);
+			    "ml=%p, ret=0x%x\n", (void *)ml, ret);
 
 		ml = (d == KCAGE_DOWN ? ml->prev : ml->next);
 	}

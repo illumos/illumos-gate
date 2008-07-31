@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -340,10 +340,12 @@ kern_postprom(void)
 		return; /* do not modify lock further if we have panicked */
 
 	if (prom_cpu != cp)
-		panic("kern_postprom: not owner, cp=%p owner=%p", cp, prom_cpu);
+		panic("kern_postprom: not owner, cp=%p owner=%p",
+		    (void *)cp, (void *)prom_cpu);
 
 	if (prom_holdcnt == 0)
-		panic("kern_postprom: prom_holdcnt == 0, owner=%p", prom_cpu);
+		panic("kern_postprom: prom_holdcnt == 0, owner=%p",
+		    (void *)prom_cpu);
 
 	if (atomic_add_32_nv(&prom_holdcnt, -1) != 0)
 		return; /* prom lock is held recursively by this CPU */

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -183,18 +183,19 @@ hsvc_dump(void)
 	mutex_enter(&hsvc_lock);
 
 	prom_printf("hsvc_dump: hsvc_groups: %p  hsvc_avail: %p\n",
-	    hsvc_groups, hsvc_avail);
+	    (void *)hsvc_groups, (void *)hsvc_avail);
 
 	for (hsvcp = hsvc_groups; hsvcp != NULL; hsvcp = hsvcp->next) {
 		prom_printf(" hsvcp: %p (0x%lx 0x%lx 0x%lx) ref: %ld clients: "
-		    "%p\n", hsvcp, hsvcp->group, hsvcp->major, hsvcp->minor,
-		    hsvcp->refcnt, hsvcp->clients);
+		    "%p\n", (void *)hsvcp, hsvcp->group, hsvcp->major,
+		    hsvcp->minor, hsvcp->refcnt, (void *)hsvcp->clients);
 
 		for (p = hsvcp->clients; p != NULL;
 		    p = (hsvc_info_t *)p->hsvc_private) {
 			prom_printf("  client %p (0x%lx 0x%lx 0x%lx '%s') "
-			    "private: %p\n", p, p->hsvc_group, p->hsvc_major,
-			    p->hsvc_minor, p->hsvc_modname, p->hsvc_private);
+			    "private: %p\n", (void *)p, p->hsvc_group,
+			    p->hsvc_major, p->hsvc_minor, p->hsvc_modname,
+			    p->hsvc_private);
 		}
 	}
 
@@ -222,7 +223,7 @@ hsvc_alloc(void)
 		hsvcp = kmem_zalloc(sizeof (hsvc_t), KM_SLEEP);
 		HSVC_DEBUG(DBG_HSVC_ALLOC,
 		    ("hsvc_alloc: hsvc_avail: %p  kmem_zalloc hsvcp: %p\n",
-		    hsvc_avail, hsvcp));
+		    (void *)hsvc_avail, (void *)hsvcp));
 	} else
 		hsvcp = NULL;
 	return (hsvcp);
@@ -241,7 +242,7 @@ hsvc_free(hsvc_t *hsvcp)
 	} else {
 		HSVC_DEBUG(DBG_HSVC_ALLOC,
 		    ("hsvc_free: hsvc_avail: %p  kmem_free hsvcp: %p\n",
-		    hsvc_avail, hsvcp));
+		    (void *)hsvc_avail, (void *)hsvcp));
 		(void) kmem_free(hsvcp, sizeof (hsvc_t));
 	}
 }
@@ -307,7 +308,7 @@ hsvc_register(hsvc_info_t *hsvcinfop, uint64_t *supported_minor)
 	int status = 0;
 
 	HSVC_DEBUG(DBG_HSVC_REGISTER,
-	    ("hsvc_register %p (0x%lx 0x%lx 0x%lx ID %s)\n", hsvcinfop,
+	    ("hsvc_register %p (0x%lx 0x%lx 0x%lx ID %s)\n", (void *)hsvcinfop,
 	    api_group, major, minor, hsvcinfop->hsvc_modname));
 
 	if (hsvcinfop->hsvc_rev != HSVC_REV_1)
@@ -470,8 +471,8 @@ hsvc_register(hsvc_info_t *hsvcinfop, uint64_t *supported_minor)
 	mutex_exit(&hsvc_lock);
 
 	HSVC_DEBUG(DBG_HSVC_REGISTER,
-	    ("hsvc_register(%p) status; %d sup_minor: 0x%lx\n", hsvcinfop,
-	    status, *supported_minor));
+	    ("hsvc_register(%p) status; %d sup_minor: 0x%lx\n",
+	    (void *)hsvcinfop, status, *supported_minor));
 
 	return (status);
 }
@@ -495,7 +496,7 @@ hsvc_unregister(hsvc_info_t *hsvcinfop)
 
 	HSVC_DEBUG(DBG_HSVC_UNREGISTER,
 	    ("hsvc_unregister %p (0x%lx 0x%lx 0x%lx ID %s)\n",
-	    hsvcinfop, api_group, major, hsvcinfop->hsvc_minor,
+	    (void *)hsvcinfop, api_group, major, hsvcinfop->hsvc_minor,
 	    hsvcinfop->hsvc_modname));
 
 	/*
@@ -555,7 +556,7 @@ hsvc_unregister(hsvc_info_t *hsvcinfop)
 	mutex_exit(&hsvc_lock);
 
 	HSVC_DEBUG(DBG_HSVC_UNREGISTER,
-		("hsvc_unregister %p status: %d\n", hsvcinfop, status));
+	    ("hsvc_unregister %p status: %d\n", (void *)hsvcinfop, status));
 
 	return (status);
 }

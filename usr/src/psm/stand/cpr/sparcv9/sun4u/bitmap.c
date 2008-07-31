@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -231,10 +230,10 @@ map_free_phys(caddr_t vaddr, size_t size, char *name)
 	str = "map_free_phys";
 	virt = prom_claim_virt(size, vaddr);
 	CB_VPRINTF(("\n%s: claim vaddr 0x%p, size 0x%lx, ret 0x%p\n",
-	    str, vaddr, size, virt));
+	    str, (void *)vaddr, size, (void *)virt));
 	if (virt != vaddr) {
 		prom_printf("\n%s: cant reserve (0x%p - 0x%p) for \"%s\"\n",
-		    str, vaddr, vaddr + size, name);
+		    str, (void *)vaddr, (void *)(vaddr + size), name);
 		return (virt);
 	}
 
@@ -248,7 +247,7 @@ map_free_phys(caddr_t vaddr, size_t size, char *name)
 		err = prom_map_phys(-1, MMU_PAGESIZE, virt, phys);
 		if (err || verbose) {
 			prom_printf("    map virt 0x%p, phys 0x%llx, "
-			    "ppn 0x%x, ret %d\n", virt, phys, ppn, err);
+			    "ppn 0x%x, ret %d\n", (void *)virt, phys, ppn, err);
 		}
 		if (err)
 			return ((caddr_t)ERR);
@@ -516,7 +515,7 @@ move_page(caddr_t vaddr, pfn_t oldppn)
 	oldphys = PN_TO_ADDR(oldppn);
 	CB_VPRINTF(("    remap vaddr 0x%p, old 0x%lx/0x%llx,"
 	    "	new 0x%lx/0x%llx\n",
-	    vaddr, oldppn, oldphys, newppn, newphys));
+	    (void *)vaddr, oldppn, oldphys, newppn, newphys));
 	phys_xcopy(oldphys, newphys, MMU_PAGESIZE);
 	err = prom_remap(MMU_PAGESIZE, vaddr, newphys);
 	if (err)

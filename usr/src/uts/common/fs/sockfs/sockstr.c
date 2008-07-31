@@ -174,7 +174,7 @@ so_sock2stream(struct sonode *so)
 		mutex_enter(&so->so_lock);
 		if (error != 0) {
 			dprintso(so, 0, ("so_sock2stream(%p): "
-			    "_SIOCSOCKFALLBACK failed\n", so));
+			    "_SIOCSOCKFALLBACK failed\n", (void *)so));
 			goto exit;
 		}
 		so->so_state &= ~SS_DIRECT;
@@ -283,7 +283,7 @@ so_sock2stream(struct sonode *so)
 		}
 		dprintso(so, 0,
 		    ("so_sock2stream(%p): moving T_CONN_IND\n",
-		    so));
+		    (void *)so));
 
 		/* Drop lock across put() */
 		mutex_exit(&so->so_lock);
@@ -403,7 +403,7 @@ so_strinit(struct sonode *so, struct sonode *tso)
 	mblk_t *mp;
 	int error;
 
-	dprintso(so, 1, ("so_strinit(%p)\n", so));
+	dprintso(so, 1, ("so_strinit(%p)\n", (void *)so));
 
 	/* Preallocate an unbind_req message */
 	mp = soallocproto(sizeof (struct T_unbind_req), _ALLOC_SLEEP);
@@ -652,7 +652,7 @@ do_tinfo(struct sonode *so)
 		return (0);
 	}
 
-	dprintso(so, 1, ("do_tinfo(%p)\n", so));
+	dprintso(so, 1, ("do_tinfo(%p)\n", (void *)so));
 
 	/* Send T_INFO_REQ */
 	tir.PRIM_type = T_INFO_REQ;
@@ -713,7 +713,7 @@ do_tcapability(struct sonode *so, t_uscalar_t cap_bits1)
 			return (0);
 	}
 
-	dprintso(so, 1, ("do_tcapability(%p)\n", so));
+	dprintso(so, 1, ("do_tcapability(%p)\n", (void *)so));
 
 	/* Send T_CAPABILITY_REQ */
 	tcr.PRIM_type = T_CAPABILITY_REQ;
@@ -975,7 +975,7 @@ sowaitprim(struct sonode *so, t_scalar_t request_prim, t_scalar_t ack_prim,
 	int error;
 
 	dprintso(so, 1, ("sowaitprim(%p, %d, %d, %d, %p, %lu)\n",
-	    so, request_prim, ack_prim, min_size, mpp, wait));
+	    (void *)so, request_prim, ack_prim, min_size, (void *)mpp, wait));
 
 	ASSERT(MUTEX_HELD(&so->so_lock));
 
@@ -983,7 +983,7 @@ sowaitprim(struct sonode *so, t_scalar_t request_prim, t_scalar_t ack_prim,
 	if (error)
 		return (error);
 
-	dprintso(so, 1, ("got msg %p\n", mp));
+	dprintso(so, 1, ("got msg %p\n", (void *)mp));
 	if (DB_TYPE(mp) != M_PCPROTO ||
 	    MBLKL(mp) < sizeof (tpr->type)) {
 		freemsg(mp);
@@ -1292,7 +1292,8 @@ sowaitconnected(struct sonode *so, int fmode, int nosig)
 	while ((so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING)) ==
 	    SS_ISCONNECTING && so->so_error == 0) {
 
-		dprintso(so, 1, ("waiting for SS_ISCONNECTED on %p\n", so));
+		dprintso(so, 1, ("waiting for SS_ISCONNECTED on %p\n",
+		    (void *)so));
 		if (fmode & (FNDELAY|FNONBLOCK))
 			return (EINPROGRESS);
 
@@ -1306,7 +1307,7 @@ sowaitconnected(struct sonode *so, int fmode, int nosig)
 			 */
 			return (EINTR);
 		}
-		dprintso(so, 1, ("awoken on %p\n", so));
+		dprintso(so, 1, ("awoken on %p\n", (void *)so));
 	}
 
 	if (so->so_error != 0) {
@@ -1690,7 +1691,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 
 	so = VTOSO(vp);
 
-	dprintso(so, 1, ("strsock_proto(%p, %p)\n", vp, mp));
+	dprintso(so, 1, ("strsock_proto(%p, %p)\n", (void *)vp, (void *)mp));
 
 	/* Set default return values */
 	*firstmsgsigs = *wakeups = *allmsgsigs = *pollwakeups = 0;
@@ -2046,7 +2047,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		 */
 		dprintso(so, 1,
 		    ("T_EXDATA_IND(%p): counts %d/%d state %s\n",
-		    vp, so->so_oobsigcnt, so->so_oobcnt,
+		    (void *)vp, so->so_oobsigcnt, so->so_oobcnt,
 		    pr_state(so->so_state, so->so_mode)));
 
 		if (msgdsize(mp->b_cont) == 0) {
@@ -2142,14 +2143,14 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			dprintso(so, 1,
 			    ("after outofline T_EXDATA_IND(%p): "
 			    "counts %d/%d  poll 0x%x sig 0x%x state %s\n",
-			    vp, so->so_oobsigcnt,
+			    (void *)vp, so->so_oobsigcnt,
 			    so->so_oobcnt, *pollwakeups, *allmsgsigs,
 			    pr_state(so->so_state, so->so_mode)));
 		} else {
 			dprintso(so, 1,
 			    ("after inline T_EXDATA_IND(%p): "
 			    "counts %d/%d  poll 0x%x sig 0x%x state %s\n",
-			    vp, so->so_oobsigcnt,
+			    (void *)vp, so->so_oobsigcnt,
 			    so->so_oobcnt, *pollwakeups, *allmsgsigs,
 			    pr_state(so->so_state, so->so_mode)));
 		}
@@ -2705,7 +2706,7 @@ strsock_misc(vnode_t *vp, mblk_t *mp,
 	so = VTOSO(vp);
 
 	dprintso(so, 1, ("strsock_misc(%p, %p, 0x%x)\n",
-	    vp, mp, DB_TYPE(mp)));
+	    (void *)vp, (void *)mp, DB_TYPE(mp)));
 
 	/* Set default return values */
 	*wakeups = *allmsgsigs = *firstmsgsigs = *pollwakeups = 0;
@@ -2725,14 +2726,14 @@ strsock_misc(vnode_t *vp, mblk_t *mp,
 			mutex_enter(&so->so_lock);
 			dprintso(so, 1,
 			    ("SIGURG(%p): counts %d/%d state %s\n",
-			    vp, so->so_oobsigcnt,
+			    (void *)vp, so->so_oobsigcnt,
 			    so->so_oobcnt,
 			    pr_state(so->so_state, so->so_mode)));
 			so_oob_sig(so, 1, allmsgsigs, pollwakeups);
 			dprintso(so, 1,
 			    ("after SIGURG(%p): counts %d/%d "
 			    " poll 0x%x sig 0x%x state %s\n",
-			    vp, so->so_oobsigcnt,
+			    (void *)vp, so->so_oobsigcnt,
 			    so->so_oobcnt, *pollwakeups, *allmsgsigs,
 			    pr_state(so->so_state, so->so_mode)));
 			mutex_exit(&so->so_lock);

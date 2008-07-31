@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -413,7 +412,7 @@ pmubus_get8(ddi_acc_impl_t *hdlp, uint8_t *addr)
 	value = pci_config_get8(softsp->pmubus_reghdl, offset) & mask;
 
 	DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_get8: addr=%p offset=%lx value=%x "
-	    "mask=%x\n", addr, offset, value, mask));
+	    "mask=%x\n", (void *)addr, offset, value, mask));
 
 	return (value);
 }
@@ -456,7 +455,7 @@ pmubus_get32(ddi_acc_impl_t *hdlp, uint32_t *addr)
 	value = pci_config_get32(softsp->pmubus_reghdl, offset) & mask;
 
 	DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_get32: addr=%p offset=%lx value=%x "
-	    "mask=%x\n", addr, offset, value, mask));
+	    "mask=%x\n", (void *)addr, offset, value, mask));
 
 	return (value);
 }
@@ -486,7 +485,7 @@ pmubus_put8(ddi_acc_impl_t *hdlp, uint8_t *addr, uint8_t value)
 		 * Process "bit lane" register
 		 */
 		DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_put8: addr=%p offset=%lx "
-		    "value=%x mask=%lx\n", addr, offset, value,
+		    "value=%x mask=%lx\n", (void *)addr, offset, value,
 		    pmubus_mapreqp->mapreq_mask));
 
 		if (addr != 0 ||
@@ -508,7 +507,7 @@ pmubus_put8(ddi_acc_impl_t *hdlp, uint8_t *addr, uint8_t value)
 		 * Process shared register
 		 */
 		DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_put8: addr=%p offset=%lx "
-		    "value=%x\n", addr, offset, value));
+		    "value=%x\n", (void *)addr, offset, value));
 		pci_config_put8(softsp->pmubus_reghdl, offset, value);
 	}
 
@@ -540,7 +539,7 @@ pmubus_put32(ddi_acc_impl_t *hdlp, uint32_t *addr, uint32_t value)
 		 * Process "bit lane" register
 		 */
 		DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_put32: addr=%p offset=%lx "
-		    "value=%x mask=%lx\n", addr, offset, value,
+		    "value=%x mask=%lx\n", (void *)addr, offset, value,
 		    pmubus_mapreqp->mapreq_mask));
 
 		if (addr != 0 ||
@@ -562,7 +561,7 @@ pmubus_put32(ddi_acc_impl_t *hdlp, uint32_t *addr, uint32_t value)
 		 * Process shared register
 		 */
 		DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_put32: addr=%p offset=%lx "
-		    "value=%x\n", addr, offset, value));
+		    "value=%x\n", (void *)addr, offset, value));
 		pci_config_put32(softsp->pmubus_reghdl, offset, value);
 	}
 
@@ -685,7 +684,7 @@ pmubus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		rnumber = mp->map_obj.rnumber;
 		DPRINTF(PMUBUS_MAP_DEBUG, ("rdip=%s%d: rnumber=%x "
 		    "handlep=%p\n", ddi_get_name(rdip), ddi_get_instance(rdip),
-		    rnumber, mp->map_handlep));
+		    rnumber, (void *)mp->map_handlep));
 
 		if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
 		    "reg", (caddr_t)&pmubus_regs, &pmubus_regs_size) !=
@@ -731,7 +730,7 @@ pmubus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 			ret = DDI_ME_INVAL;
 		DPRINTF(PMUBUS_MAP_DEBUG, ("rdip=%s%d: pmubus_map: "
 		    "%s is an invalid map type.\nmap request handlep=0x%p\n",
-		    ddi_get_name(rdip), ddi_get_instance(rdip), s, mp));
+		    ddi_get_name(rdip), ddi_get_instance(rdip), s, (void *)mp));
 
 		ret = DDI_ME_RNUMBER_RANGE;
 		goto done;

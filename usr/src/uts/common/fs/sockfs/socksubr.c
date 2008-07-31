@@ -240,7 +240,7 @@ soconfig(int domain, int type, int protocol,
 		}
 
 		dprint(0, ("soconfig: %s => vp %p, dev 0x%lx\n",
-		    devpath, vp, vp->v_rdev));
+		    devpath, (void *)vp, vp->v_rdev));
 
 		sp = kmem_alloc(sizeof (*sp), KM_SLEEP);
 		sp->sp_domain = domain;
@@ -333,17 +333,17 @@ solookup(int domain, int type, int protocol, char *devpath, int *errorp)
 		error = sogetvp(devpath, &vp, UIO_USERSPACE);
 		if (error) {
 			dprint(0, ("solookup: vp %p failed with %d\n",
-			    devpath, error));
+			    (void *)devpath, error));
 			*errorp = EPROTONOSUPPORT;
 			return (NULL);
 		}
 		dprint(0, ("solookup: %p => vp %p, dev 0x%lx\n",
-		    devpath, vp, vp->v_rdev));
+		    (void *)devpath, (void *)vp, vp->v_rdev));
 
 		return (vp);
 	}
 	dprint(0, ("solookup(%d,%d,%d) vp %p devpath %s\n",
-	    domain, type, protocol, sp->sp_vnode, sp->sp_devpath));
+	    domain, type, protocol, (void *)sp->sp_vnode, sp->sp_devpath));
 
 	vp = sp->sp_vnode;
 	VN_HOLD(vp);
@@ -922,7 +922,7 @@ so_ux_lookup(struct sonode *so, struct sockaddr_un *soun, int checkaccess,
 	struct sonode	*so2;
 	int		error;
 
-	dprintso(so, 1, ("so_ux_lookup(%p) name <%s>\n", so, soun->sun_path));
+	dprintso(so, 1, ("so_ux_lookup(%p) name <%s>\n", (void *)so, soun->sun_path));
 
 	error = lookupname(soun->sun_path, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
 	if (error) {
@@ -1011,7 +1011,8 @@ so_addr_verify(struct sonode *so, const struct sockaddr *name,
 {
 	int		family;
 
-	dprintso(so, 1, ("so_addr_verify(%p, %p, %d)\n", so, name, namelen));
+	dprintso(so, 1, ("so_addr_verify(%p, %p, %d)\n",
+	    (void *)so, (void *)name, namelen));
 
 	ASSERT(name != NULL);
 
@@ -1102,7 +1103,7 @@ so_ux_addr_xlate(struct sonode *so, struct sockaddr *name,
 	socklen_t		addrlen;
 
 	dprintso(so, 1, ("so_ux_addr_xlate(%p, %p, %d, %d)\n",
-	    so, name, namelen, checkaccess));
+	    (void *)so, (void *)name, namelen, checkaccess));
 
 	ASSERT(name != NULL);
 	ASSERT(so->so_family == AF_UNIX);
@@ -1129,7 +1130,8 @@ so_ux_addr_xlate(struct sonode *so, struct sockaddr *name,
 	so->so_ux_faddr.soua_magic = SOU_MAGIC_EXPLICIT;
 	addr = &so->so_ux_faddr;
 	addrlen = (socklen_t)sizeof (so->so_ux_faddr);
-	dprintso(so, 1, ("ux_xlate UNIX: addrlen %d, vp %p\n", addrlen, vp));
+	dprintso(so, 1, ("ux_xlate UNIX: addrlen %d, vp %p\n",
+	    addrlen, (void *)vp));
 	VN_RELE(vp);
 	*addrp = addr;
 	*addrlenp = (socklen_t)addrlen;
@@ -1156,7 +1158,7 @@ fdbuf_free(struct fdbuf *fdbuf)
 		 * assigning fdbuf->fd_fds[i] to fp.
 		 */
 		bcopy((char *)&fdbuf->fd_fds[i], (char *)&fp, sizeof (fp));
-		dprint(1, ("fdbuf_free: [%d] = %p\n", i, fp));
+		dprint(1, ("fdbuf_free: [%d] = %p\n", i, (void *)fp));
 		(void) closef(fp);
 	}
 	if (fdbuf->fd_ebuf != NULL)
@@ -1230,7 +1232,7 @@ fdbuf_extract(struct fdbuf *fdbuf, void *rights, int rightslen)
 		if (audit_active)
 			audit_fdrecv(fd, fp);
 		dprint(1, ("fdbuf_extract: [%d] = %d, %p refcnt %d\n",
-		    i, fd, fp, fp->f_count));
+		    i, fd, (void *)fp, fp->f_count));
 	}
 	return (0);
 
@@ -1283,7 +1285,7 @@ fdbuf_create(void *rights, int rightslen, struct fdbuf **fdbufp)
 			return (EBADF);
 		}
 		dprint(1, ("fdbuf_create: [%d] = %d, %p refcnt %d\n",
-		    i, fds[i], fp, fp->f_count));
+		    i, fds[i], (void *)fp, fp->f_count));
 		mutex_enter(&fp->f_tlock);
 		fp->f_count++;
 		mutex_exit(&fp->f_tlock);
@@ -1352,7 +1354,7 @@ fdbuf_verify(mblk_t *mp, struct fdbuf *fdbuf, int fdbuflen)
 		    frp->free_arg != NULL &&
 		    bcmp(frp->free_arg, fdbuf, fdbuflen) == 0) {
 			dprint(1, ("fdbuf_verify: fdbuf %p len %d\n",
-			    fdbuf, fdbuflen));
+			    (void *)fdbuf, fdbuflen));
 			return (1);
 		} else {
 			zcmn_err(getzoneid(), CE_WARN,
@@ -1756,7 +1758,7 @@ so_opt2cmsg(mblk_t *mp, void *opt, t_uscalar_t optlen, int oldflg,
 		cmsg = CMSG_NEXT(cmsg);
 	}
 	dprint(1, ("so_opt2cmsg: buf %p len %d; cend %p; final cmsg %p\n",
-	    control, controllen, cend, cmsg));
+	    control, controllen, (void *)cend, (void *)cmsg));
 	ASSERT(cmsg <= cend);
 	return (0);
 }
@@ -1963,61 +1965,61 @@ pr_state(uint_t state, uint_t mode)
 
 	buf[0] = 0;
 	if (state & SS_ISCONNECTED)
-		strcat(buf, "ISCONNECTED ");
+		(void) strcat(buf, "ISCONNECTED ");
 	if (state & SS_ISCONNECTING)
-		strcat(buf, "ISCONNECTING ");
+		(void) strcat(buf, "ISCONNECTING ");
 	if (state & SS_ISDISCONNECTING)
-		strcat(buf, "ISDISCONNECTING ");
+		(void) strcat(buf, "ISDISCONNECTING ");
 	if (state & SS_CANTSENDMORE)
-		strcat(buf, "CANTSENDMORE ");
+		(void) strcat(buf, "CANTSENDMORE ");
 
 	if (state & SS_CANTRCVMORE)
-		strcat(buf, "CANTRCVMORE ");
+		(void) strcat(buf, "CANTRCVMORE ");
 	if (state & SS_ISBOUND)
-		strcat(buf, "ISBOUND ");
+		(void) strcat(buf, "ISBOUND ");
 	if (state & SS_NDELAY)
-		strcat(buf, "NDELAY ");
+		(void) strcat(buf, "NDELAY ");
 	if (state & SS_NONBLOCK)
-		strcat(buf, "NONBLOCK ");
+		(void) strcat(buf, "NONBLOCK ");
 
 	if (state & SS_ASYNC)
-		strcat(buf, "ASYNC ");
+		(void) strcat(buf, "ASYNC ");
 	if (state & SS_ACCEPTCONN)
-		strcat(buf, "ACCEPTCONN ");
+		(void) strcat(buf, "ACCEPTCONN ");
 	if (state & SS_HASCONNIND)
-		strcat(buf, "HASCONNIND ");
+		(void) strcat(buf, "HASCONNIND ");
 	if (state & SS_SAVEDEOR)
-		strcat(buf, "SAVEDEOR ");
+		(void) strcat(buf, "SAVEDEOR ");
 
 	if (state & SS_RCVATMARK)
-		strcat(buf, "RCVATMARK ");
+		(void) strcat(buf, "RCVATMARK ");
 	if (state & SS_OOBPEND)
-		strcat(buf, "OOBPEND ");
+		(void) strcat(buf, "OOBPEND ");
 	if (state & SS_HAVEOOBDATA)
-		strcat(buf, "HAVEOOBDATA ");
+		(void) strcat(buf, "HAVEOOBDATA ");
 	if (state & SS_HADOOBDATA)
-		strcat(buf, "HADOOBDATA ");
+		(void) strcat(buf, "HADOOBDATA ");
 
 	if (state & SS_FADDR_NOXLATE)
-		strcat(buf, "FADDR_NOXLATE ");
+		(void) strcat(buf, "FADDR_NOXLATE ");
 
 	if (mode & SM_PRIV)
-		strcat(buf, "PRIV ");
+		(void) strcat(buf, "PRIV ");
 	if (mode & SM_ATOMIC)
-		strcat(buf, "ATOMIC ");
+		(void) strcat(buf, "ATOMIC ");
 	if (mode & SM_ADDR)
-		strcat(buf, "ADDR ");
+		(void) strcat(buf, "ADDR ");
 	if (mode & SM_CONNREQUIRED)
-		strcat(buf, "CONNREQUIRED ");
+		(void) strcat(buf, "CONNREQUIRED ");
 
 	if (mode & SM_FDPASSING)
-		strcat(buf, "FDPASSING ");
+		(void) strcat(buf, "FDPASSING ");
 	if (mode & SM_EXDATA)
-		strcat(buf, "EXDATA ");
+		(void) strcat(buf, "EXDATA ");
 	if (mode & SM_OPTDATA)
-		strcat(buf, "OPTDATA ");
+		(void) strcat(buf, "OPTDATA ");
 	if (mode & SM_BYTESTREAM)
-		strcat(buf, "BYTESTREAM ");
+		(void) strcat(buf, "BYTESTREAM ");
 	return (buf);
 }
 
@@ -2027,7 +2029,7 @@ pr_addr(int family, struct sockaddr *addr, t_uscalar_t addrlen)
 	static char buf[1024];
 
 	if (addr == NULL || addrlen == 0) {
-		sprintf(buf, "(len %d) %p", addrlen, addr);
+		(void) sprintf(buf, "(len %d) %p", addrlen, (void *)addr);
 		return (buf);
 	}
 	switch (family) {
@@ -2045,7 +2047,7 @@ pr_addr(int family, struct sockaddr *addr, t_uscalar_t addrlen)
 		uint16_t *piece = (uint16_t *)&sin6.sin6_addr;
 
 		bcopy((char *)addr, (char *)&sin6, sizeof (sin6));
-		sprintf(buf, "(len %d) %x:%x:%x:%x:%x:%x:%x:%x/%d",
+		(void) sprintf(buf, "(len %d) %x:%x:%x:%x:%x:%x:%x:%x/%d",
 		    addrlen,
 		    ntohs(piece[0]), ntohs(piece[1]),
 		    ntohs(piece[2]), ntohs(piece[3]),
@@ -2098,7 +2100,7 @@ so_verify_oobstate(struct sonode *so)
 		break;
 	default:
 		printf("Bad oob state 1 (%p): counts %d/%d state %s\n",
-		    so, so->so_oobsigcnt,
+		    (void *)so, so->so_oobsigcnt,
 		    so->so_oobcnt, pr_state(so->so_state, so->so_mode));
 		return (0);
 	}
@@ -2106,7 +2108,7 @@ so_verify_oobstate(struct sonode *so)
 	/* SS_RCVATMARK should only be set when SS_OOBPEND is set */
 	if ((so->so_state & (SS_RCVATMARK|SS_OOBPEND)) == SS_RCVATMARK) {
 		printf("Bad oob state 2 (%p): counts %d/%d state %s\n",
-		    so, so->so_oobsigcnt,
+		    (void *)so, so->so_oobsigcnt,
 		    so->so_oobcnt, pr_state(so->so_state, so->so_mode));
 		return (0);
 	}
@@ -2117,7 +2119,7 @@ so_verify_oobstate(struct sonode *so)
 	if (!EQUIV((so->so_oobsigcnt != 0) || (so->so_state & SS_RCVATMARK),
 	    so->so_state & SS_OOBPEND)) {
 		printf("Bad oob state 3 (%p): counts %d/%d state %s\n",
-		    so, so->so_oobsigcnt,
+		    (void *)so, so->so_oobsigcnt,
 		    so->so_oobcnt, pr_state(so->so_state, so->so_mode));
 		return (0);
 	}
@@ -2128,13 +2130,13 @@ so_verify_oobstate(struct sonode *so)
 	if (!(so->so_options & SO_OOBINLINE) &&
 	    !EQUIV(so->so_oobmsg != NULL, so->so_state & SS_HAVEOOBDATA)) {
 		printf("Bad oob state 4 (%p): counts %d/%d state %s\n",
-		    so, so->so_oobsigcnt,
+		    (void *)so, so->so_oobsigcnt,
 		    so->so_oobcnt, pr_state(so->so_state, so->so_mode));
 		return (0);
 	}
 	if (so->so_oobsigcnt < so->so_oobcnt) {
 		printf("Bad oob state 5 (%p): counts %d/%d state %s\n",
-		    so, so->so_oobsigcnt,
+		    (void *)so, so->so_oobsigcnt,
 		    so->so_oobcnt, pr_state(so->so_state, so->so_mode));
 		return (0);
 	}

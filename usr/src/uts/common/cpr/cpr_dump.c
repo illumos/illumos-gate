@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -927,7 +927,7 @@ cpr_compress_and_write(vnode_t *vp, uint_t va, pfn_t pfn, pgcnt_t npg)
 	i_cpr_mapin(CPR->c_mapping_area, npg, pfn);
 
 	CPR_DEBUG(CPR_DEBUG3, "mapped-in %ld pages, vaddr 0x%p, pfn 0x%lx\n",
-	    npg, CPR->c_mapping_area, pfn);
+	    npg, (void *)CPR->c_mapping_area, pfn);
 
 	/*
 	 * Fill cpr page descriptor.
@@ -953,7 +953,7 @@ cpr_compress_and_write(vnode_t *vp, uint_t va, pfn_t pfn, pgcnt_t npg)
 
 	if (error) {
 		CPR_DEBUG(CPR_DEBUG1,
-		    "cpr_compress_and_write: vp 0x%p va 0x%x ", vp, va);
+		    "cpr_compress_and_write: vp 0x%p va 0x%x ", (void *)vp, va);
 		CPR_DEBUG(CPR_DEBUG1, "pfn 0x%lx blk %d err %d\n",
 		    pfn, cpr_file_bn, error);
 	} else {
@@ -1005,7 +1005,7 @@ cpr_write(vnode_t *vp, caddr_t buffer, size_t size)
 
 		CPR_DEBUG(CPR_DEBUG3,
 		    "cpr_write: frmp=%p wptr=%p cnt=%lx...",
-		    fromp, cpr_wptr, bytes);
+		    (void *)fromp, (void *)cpr_wptr, bytes);
 		/*
 		 * cross check, this should not happen!
 		 */
@@ -1142,7 +1142,7 @@ cpr_show_range(caddr_t vaddr, size_t size,
 	else
 		action = "none";
 	prom_printf("range (0x%p, 0x%p), %s bitmap, %s %ld\n",
-	    vaddr, vaddr + size, bname, action, count);
+	    (void *)vaddr, (void *)(vaddr + size), bname, action, count);
 }
 
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -181,7 +181,7 @@ sosctp_assoc_create(struct sctp_sonode *ss, int kmflag)
 		ssa->ssa_txqueued = 0;
 		ssa->ssa_rxqueued = 0;
 	}
-	dprint(2, ("sosctp_assoc_create %p %p\n", ss, ssa));
+	dprint(2, ("sosctp_assoc_create %p %p\n", (void *)ss, (void *)ssa));
 	return (ssa);
 }
 
@@ -190,7 +190,8 @@ sosctp_assoc_free(struct sctp_sonode *ss, struct sctp_soassoc *ssa)
 {
 	struct sonode *so = &ss->ss_so;
 
-	dprint(2, ("sosctp_assoc_free %p %p (%d)\n", ss, ssa, ssa->ssa_id));
+	dprint(2, ("sosctp_assoc_free %p %p (%d)\n", (void *)ss, (void *)ssa,
+	    ssa->ssa_id));
 	ASSERT(MUTEX_HELD(&so->so_lock));
 	if (ssa->ssa_conn != NULL) {
 		mutex_exit(&so->so_lock);
@@ -319,7 +320,7 @@ sosctp_waitconnected(struct sonode *so, int fmode)
 	while ((so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING)) ==
 	    SS_ISCONNECTING && so->so_error == 0) {
 
-		dprint(3, ("waiting for SS_ISCONNECTED on %p\n", so));
+		dprint(3, ("waiting for SS_ISCONNECTED on %p\n", (void *)so));
 		if (fmode & (FNDELAY|FNONBLOCK))
 			return (EINPROGRESS);
 
@@ -331,7 +332,7 @@ sosctp_waitconnected(struct sonode *so, int fmode)
 			 */
 			return (EINTR);
 		}
-		dprint(3, ("awoken on %p\n", so));
+		dprint(3, ("awoken on %p\n", (void *)so));
 	}
 
 	if (so->so_error != 0) {
@@ -368,7 +369,7 @@ sosctp_assoc_waitconnected(struct sctp_soassoc *ssa, int fmode)
 	while ((ssa->ssa_state & (SS_ISCONNECTED|SS_ISCONNECTING)) ==
 	    SS_ISCONNECTING && ssa->ssa_error == 0) {
 
-		dprint(3, ("waiting for SS_ISCONNECTED on %p\n", so));
+		dprint(3, ("waiting for SS_ISCONNECTED on %p\n", (void *)so));
 		if (fmode & (FNDELAY|FNONBLOCK))
 			return (EINPROGRESS);
 
@@ -380,7 +381,7 @@ sosctp_assoc_waitconnected(struct sctp_soassoc *ssa, int fmode)
 			 */
 			return (EINTR);
 		}
-		dprint(3, ("awoken on %p\n", so));
+		dprint(3, ("awoken on %p\n", (void *)so));
 	}
 	if (ssa->ssa_error != 0) {
 		error = ssa->ssa_error;
@@ -568,7 +569,7 @@ sosctp_assoc_move(struct sctp_sonode *ss, struct sctp_sonode *nss,
 	nss->ss_so.so_state |= (ss->ss_so.so_state & (SS_NDELAY|SS_NONBLOCK));
 	nss->ss_so.so_state |=
 	    (ssa->ssa_state & (SS_ISCONNECTED|SS_ISCONNECTING|
-		SS_ISDISCONNECTING|SS_CANTSENDMORE|SS_CANTRCVMORE|SS_ISBOUND));
+	    SS_ISDISCONNECTING|SS_CANTSENDMORE|SS_CANTRCVMORE|SS_ISBOUND));
 	nss->ss_so.so_error = ssa->ssa_error;
 	nss->ss_txqueued = ssa->ssa_txqueued;
 	nss->ss_wroff = ssa->ssa_wroff;

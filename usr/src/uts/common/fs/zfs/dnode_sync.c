@@ -178,7 +178,7 @@ free_verify(dmu_buf_impl_t *db, uint64_t start, uint64_t end, dmu_tx_t *tx)
 				if (buf[j] != 0) {
 					panic("freed data not zero: "
 					    "child=%p i=%d off=%d num=%d\n",
-					    child, i, off, num);
+					    (void *)child, i, off, num);
 				}
 			}
 		}
@@ -195,7 +195,7 @@ free_verify(dmu_buf_impl_t *db, uint64_t start, uint64_t end, dmu_tx_t *tx)
 				if (buf[j] != 0) {
 					panic("freed data not zero: "
 					    "child=%p i=%d off=%d num=%d\n",
-					    child, i, off, num);
+					    (void *)child, i, off, num);
 				}
 			}
 		}

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,8 +91,8 @@ ghd_target_init(dev_info_t	*hba_dip,
 	while (gdevp != NULL) {
 		if (gdevp->gd_target == target && gdevp->gd_lun == lun) {
 			GDBG_WAITQ(("ghd_target_init(%d,%d) found gdevp 0x%p"
-				" gtgtp 0x%p max %lu\n",
-					target, lun, gdevp, gtgtp, maxactive));
+			    " gtgtp 0x%p max %lu\n", target, lun,
+			    (void *)gdevp, (void *)gtgtp, maxactive));
 
 			goto foundit;
 		}
@@ -117,7 +117,8 @@ ghd_target_init(dev_info_t	*hba_dip,
 	GDEV_QATTACH(gdevp, cccp, maxactive);
 
 	GDBG_WAITQ(("ghd_target_init(%d,%d) new gdevp 0x%p gtgtp 0x%p"
-		    " max %lu\n", target, lun, gdevp, gtgtp, maxactive));
+	    " max %lu\n", target, lun, (void *)gdevp, (void *)gtgtp,
+	    maxactive));
 
 foundit:
 
@@ -144,7 +145,7 @@ ghd_target_free(dev_info_t	*hba_dip,
 	gdev_t	*gdevp = gtgtp->gt_gdevp;
 
 	GDBG_WAITQ(("ghd_target_free(%d,%d) gdevp-0x%p gtgtp 0x%p\n",
-		gtgtp->gt_target, gtgtp->gt_lun, gdevp, gtgtp));
+	    gtgtp->gt_target, gtgtp->gt_lun, (void *)gdevp, (void *)gtgtp));
 
 	/*
 	 * grab both mutexes so the queue structures
@@ -163,7 +164,8 @@ ghd_target_free(dev_info_t	*hba_dip,
 	kmem_free((caddr_t)gtgtp, gtgtp->gt_size);
 
 	if (gdevp->gd_ninstances == 1) {
-		GDBG_WAITQ(("ghd_target_free: N=1 gdevp 0x%p\n", gdevp));
+		GDBG_WAITQ(("ghd_target_free: N=1 gdevp 0x%p\n",
+		    (void *)gdevp));
 		/*
 		 * If there's now just one instance left attached to this
 		 * device then reset the queue's max active value
@@ -174,7 +176,8 @@ ghd_target_free(dev_info_t	*hba_dip,
 
 	} else if (gdevp->gd_ninstances == 0) {
 		/* else no instances left */
-		GDBG_WAITQ(("ghd_target_free: N=0 gdevp 0x%p\n", gdevp));
+		GDBG_WAITQ(("ghd_target_free: N=0 gdevp 0x%p\n",
+		    (void *)gdevp));
 
 		/* detach this per-dev-structure from the HBA's dev list */
 		GDEV_QDETACH(gdevp, cccp);
@@ -184,7 +187,8 @@ ghd_target_free(dev_info_t	*hba_dip,
 #if defined(GHD_DEBUG) || defined(__lint)
 	else {
 		/* leave maxactive set to 1 */
-		GDBG_WAITQ(("ghd_target_free: N>1 gdevp 0x%p\n", gdevp));
+		GDBG_WAITQ(("ghd_target_free: N>1 gdevp 0x%p\n",
+		    (void *)gdevp));
 	}
 #endif
 
@@ -199,7 +203,7 @@ ghd_waitq_shuffle_up(ccc_t *cccp, gdev_t *gdevp)
 	ASSERT(mutex_owned(&cccp->ccc_waitq_mutex));
 
 	GDBG_WAITQ(("ghd_waitq_shuffle_up: cccp 0x%p gdevp 0x%p N %ld "
-	    "max %ld\n", cccp, gdevp, GDEV_NACTIVE(gdevp),
+	    "max %ld\n", (void *)cccp, (void *)gdevp, GDEV_NACTIVE(gdevp),
 	    GDEV_MAXACTIVE(gdevp)));
 	for (;;) {
 		/*
@@ -208,7 +212,7 @@ ghd_waitq_shuffle_up(ccc_t *cccp, gdev_t *gdevp)
 		 */
 		if (GDEV_NACTIVE(gdevp) >= GDEV_MAXACTIVE(gdevp)) {
 			GDBG_WAITQ(("ghd_waitq_shuffle_up: N>MAX gdevp 0x%p\n",
-				gdevp));
+			    (void *)gdevp));
 			return;
 		}
 
@@ -219,7 +223,7 @@ ghd_waitq_shuffle_up(ccc_t *cccp, gdev_t *gdevp)
 		 */
 		if (gdevp->gd_ninstances > 1 && GDEV_NACTIVE(gdevp) > 0) {
 			GDBG_WAITQ(("ghd_waitq_shuffle_up: multi gdevp 0x%p\n",
-				gdevp));
+			    (void *)gdevp));
 			return;
 		}
 
@@ -230,14 +234,14 @@ ghd_waitq_shuffle_up(ccc_t *cccp, gdev_t *gdevp)
 		if ((gcmdp = L2_remove_head(&GDEV_QHEAD(gdevp))) == NULL) {
 			/* the device is empty so we're done */
 			GDBG_WAITQ(("ghd_waitq_shuffle_up: MT gdevp 0x%p\n",
-				gdevp));
+			    (void *)gdevp));
 			return;
 		}
 		L2_add(&GHBA_QHEAD(cccp), &gcmdp->cmd_q, gcmdp);
 		GDEV_NACTIVE(gdevp)++;
 		gcmdp->cmd_waitq_level++;
 		GDBG_WAITQ(("ghd_waitq_shuffle_up: gdevp 0x%p gcmdp 0x%p\n",
-			gdevp, gcmdp));
+		    (void *)gdevp, (void *)gcmdp));
 	}
 }
 
@@ -303,7 +307,7 @@ ghd_waitq_delete(ccc_t *cccp, gcmd_t *gcmdp)
 	}
 
 	GDBG_WAITQ(("ghd_waitq_delete: gcmdp 0x%p qp 0x%p level %ld\n",
-		gcmdp, qp, gcmdp->cmd_waitq_level));
+	    (void *)gcmdp, (void *)qp, gcmdp->cmd_waitq_level));
 
 
 	/*
@@ -329,15 +333,16 @@ ghd_waitq_process_and_mutex_hold(ccc_t *cccp)
 		if (L2_EMPTY(&GHBA_QHEAD(cccp))) {
 			/* return if the list is empty */
 			GDBG_WAITQ(("ghd_waitq_proc: MT cccp 0x%p qp 0x%p\n",
-				cccp, &cccp->ccc_waitq));
+			    (void *)cccp, (void *)&cccp->ccc_waitq));
 			break;
 		}
 		if (GHBA_NACTIVE(cccp) >= GHBA_MAXACTIVE(cccp)) {
 			/* return if the HBA is too active */
 			GDBG_WAITQ(("ghd_waitq_proc: N>M cccp 0x%p qp 0x%p"
-				" N %ld max %ld\n", cccp, &cccp->ccc_waitq,
-					GHBA_NACTIVE(cccp),
-					GHBA_MAXACTIVE(cccp)));
+			    " N %ld max %ld\n", (void *)cccp,
+			    (void *)&cccp->ccc_waitq,
+			    GHBA_NACTIVE(cccp),
+			    GHBA_MAXACTIVE(cccp)));
 			break;
 		}
 
@@ -395,14 +400,14 @@ ghd_waitq_process_and_mutex_hold(ccc_t *cccp)
 			gcmdp->cmd_waitq_level--;
 			L2_add_head(&GHBA_QHEAD(cccp), &gcmdp->cmd_q, gcmdp);
 			GDBG_WAITQ(("ghd_waitq_proc: busy cccp 0x%p gcmdp 0x%p"
-				" handle 0x%p\n", cccp, gcmdp,
-					cccp->ccc_hba_handle));
+			    " handle 0x%p\n", (void *)cccp, (void *)gcmdp,
+			    cccp->ccc_hba_handle));
 			break;
 		}
 		rc = TRUE;
 		mutex_enter(&cccp->ccc_waitq_mutex);
 		GDBG_WAITQ(("ghd_waitq_proc: ++ cccp 0x%p gcmdp 0x%p N %ld\n",
-			cccp, gcmdp, GHBA_NACTIVE(cccp)));
+		    (void *)cccp, (void *)gcmdp, GHBA_NACTIVE(cccp)));
 	}
 	ASSERT(mutex_owned(&cccp->ccc_hba_mutex));
 	ASSERT(mutex_owned(&cccp->ccc_waitq_mutex));
@@ -415,7 +420,8 @@ ghd_waitq_process_and_mutex_exit(ccc_t *cccp)
 	ASSERT(mutex_owned(&cccp->ccc_hba_mutex));
 	ASSERT(mutex_owned(&cccp->ccc_waitq_mutex));
 
-	GDBG_WAITQ(("ghd_waitq_process_and_mutex_exit: cccp 0x%p\n", cccp));
+	GDBG_WAITQ(("ghd_waitq_process_and_mutex_exit: cccp 0x%p\n",
+	    (void *)cccp));
 
 	(void) ghd_waitq_process_and_mutex_hold(cccp);
 

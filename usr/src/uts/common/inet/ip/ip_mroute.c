@@ -23,7 +23,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.
+ * Copyright 2008 Sun Microsystems, Inc.
  * All rights reserved.  Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -2738,7 +2738,7 @@ reset_mrt_ill(ill_t *ill)
 						    mrouter->conn_rq,
 						    1, SL_TRACE,
 						    "reset_mrt_ill: "
-						    "ill 0x%p", ill);
+						    "ill 0x%p", (void *)ill);
 						}
 						rt->mfc_rte = rte->rte_next;
 						freemsg(rte->mp);
@@ -3079,7 +3079,7 @@ tbf_send_packet(struct vif *vifp, mblk_t *mp)
 				(void) mi_strlog(mrouter->conn_rq, 1,
 				    SL_TRACE,
 				    "tbf_send_pkt: mp_loop 0x%p, ire 0x%p "
-				    "vif %ld\n", mp_loop, ire,
+				    "vif %ld\n", (void *)mp_loop, (void *)ire,
 				    (ptrdiff_t)(vifp - ipst->ips_vifs));
 			}
 			if (ire != NULL)

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,7 +166,8 @@ hat_kpm_vaddr2page(caddr_t vaddr)
 int
 hat_kpm_fault(struct hat *hat, caddr_t vaddr)
 {
-	panic("pagefault in seg_kpm.  hat: 0x%p  vaddr: 0x%p", hat, vaddr);
+	panic("pagefault in seg_kpm.  hat: 0x%p  vaddr: 0x%p",
+	    (void *)hat, (void *)vaddr);
 
 	return (0);
 }

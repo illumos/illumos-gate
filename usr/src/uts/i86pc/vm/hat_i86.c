@@ -1452,7 +1452,8 @@ hati_load_common(
 	 */
 	ASSERT(ht->ht_busy > 0);
 	if (ht->ht_vaddr > va || va > HTABLE_LAST_PAGE(ht))
-		panic("hati_load_common: bad htable %p, va %p", ht, (void *)va);
+		panic("hati_load_common: bad htable %p, va %p",
+		    (void *)ht, (void *)va);
 	ASSERT(ht->ht_level == level);
 
 	/*
@@ -1866,7 +1867,7 @@ hat_unlock(hat_t *hat, caddr_t addr, size_t len)
 
 		if (ht->ht_lock_cnt < 1)
 			panic("hat_unlock(): lock_cnt < 1, "
-			    "htable=%p, vaddr=%p\n", ht, (caddr_t)vaddr);
+			    "htable=%p, vaddr=%p\n", (void *)ht, (void *)vaddr);
 		HTABLE_LOCK_DEC(ht);
 
 		vaddr += LEVEL_SIZE(ht->ht_level);
@@ -3856,7 +3857,7 @@ hat_mempte_setup(caddr_t addr)
 	}
 	if (PTE_ISVALID(oldpte))
 		panic("hat_mempte_setup(): address already mapped"
-		    "ht=%p, entry=%d, pte=" FMT_PTE, ht, entry, oldpte);
+		    "ht=%p, entry=%d, pte=" FMT_PTE, (void *)ht, entry, oldpte);
 
 	/*
 	 * increment ht_valid_cnt so that the pagetable can't disappear
@@ -4276,7 +4277,8 @@ hat_kpm_vaddr2page(caddr_t vaddr)
 int
 hat_kpm_fault(hat_t *hat, caddr_t vaddr)
 {
-	panic("pagefault in seg_kpm.  hat: 0x%p  vaddr: 0x%p", hat, vaddr);
+	panic("pagefault in seg_kpm.  hat: 0x%p  vaddr: 0x%p",
+	    (void *)hat, (void *)vaddr);
 
 	return (0);
 }

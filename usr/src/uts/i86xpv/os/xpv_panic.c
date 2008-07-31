@@ -478,11 +478,11 @@ xpv_die(struct regs *rp)
 		getcregs(&creg);
 		ti.trap_addr = (caddr_t)creg.cr_cr2;
 		panic("Fatal pagefault at 0x%lx.  fault addr=0x%p  rp=0x%p",
-		    rp->r_pc, ti.trap_addr, rp);
+		    rp->r_pc, (void *)ti.trap_addr, (void *)rp);
 	} else {
 		ti.trap_addr = (caddr_t)rp->r_pc;
 		panic("Fatal trap %ld at 0x%lx.  rp=0x%p", rp->r_trapno,
-		    rp->r_pc, rp);
+		    rp->r_pc, (void *)rp);
 	}
 }
 

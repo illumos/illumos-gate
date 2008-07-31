@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,7 @@
 void
 ghd_dmafree_attr(gcmd_t *gcmdp)
 {
-	GDBG_DMA(("ghd_dma_attr_free: gcmdp 0x%p\n", gcmdp));
+	GDBG_DMA(("ghd_dma_attr_free: gcmdp 0x%p\n", (void *)gcmdp));
 
 	if (gcmdp->cmd_dma_handle != NULL) {
 		if (ddi_dma_unbind_handle(gcmdp->cmd_dma_handle) !=
@@ -39,7 +39,8 @@ ghd_dmafree_attr(gcmd_t *gcmdp)
 			cmn_err(CE_WARN, "ghd dma free attr: "
 			    "unbind handle failed");
 		ddi_dma_free_handle(&gcmdp->cmd_dma_handle);
-		GDBG_DMA(("ghd_dma_attr_free: ddi_dma_free 0x%p\n", gcmdp));
+		GDBG_DMA(("ghd_dma_attr_free: ddi_dma_free 0x%p\n",
+		    (void *)gcmdp));
 		gcmdp->cmd_dma_handle = NULL;
 		gcmdp->cmd_ccount = 0;
 		gcmdp->cmd_totxfer = 0;
@@ -59,7 +60,7 @@ ghd_dma_buf_bind_attr(ccc_t		*cccp,
 	int	 status;
 
 	GDBG_DMA(("ghd_dma_attr_get: start: gcmdp 0x%p sg_attrp 0x%p\n",
-		gcmdp, sg_attrp));
+	    (void *)gcmdp, (void *)sg_attrp));
 
 
 	/*
@@ -69,7 +70,7 @@ ghd_dma_buf_bind_attr(ccc_t		*cccp,
 	ASSERT(gcmdp->cmd_dma_handle == NULL);
 
 	status = ddi_dma_alloc_handle(cccp->ccc_hba_dip, sg_attrp, callback,
-		arg, &gcmdp->cmd_dma_handle);
+	    arg, &gcmdp->cmd_dma_handle);
 
 	if (status != DDI_SUCCESS) {
 		bp->b_error = 0;
@@ -77,12 +78,11 @@ ghd_dma_buf_bind_attr(ccc_t		*cccp,
 	}
 
 	status = ddi_dma_buf_bind_handle(gcmdp->cmd_dma_handle, bp, dma_flags,
-		    callback, arg, &gcmdp->cmd_first_cookie,
-		    &gcmdp->cmd_ccount);
+	    callback, arg, &gcmdp->cmd_first_cookie, &gcmdp->cmd_ccount);
 
 	GDBG_DMA(("ghd_dma_attr_get: setup: gcmdp 0x%p status %d h 0x%p "
-		"c 0x%d\n", gcmdp, status, gcmdp->cmd_dma_handle,
-			gcmdp->cmd_ccount));
+	    "c 0x%d\n", (void *)gcmdp, status, (void *)gcmdp->cmd_dma_handle,
+	    gcmdp->cmd_ccount));
 
 	switch (status) {
 	case DDI_DMA_MAPPED:
@@ -93,7 +93,7 @@ ghd_dma_buf_bind_attr(ccc_t		*cccp,
 	case DDI_DMA_PARTIAL_MAP:
 		/* enable first call to ddi_dma_getwin */
 		if (ddi_dma_numwin(gcmdp->cmd_dma_handle, &gcmdp->cmd_wcount) !=
-								DDI_SUCCESS) {
+		    DDI_SUCCESS) {
 			bp->b_error = 0;
 			ddi_dma_free_handle(&gcmdp->cmd_dma_handle);
 			gcmdp->cmd_dma_handle = NULL;
@@ -141,7 +141,7 @@ ghd_dmaget_next_attr(ccc_t *cccp, gcmd_t *gcmdp, long max_transfer_cnt,
 	int	single_seg;
 
 	GDBG_DMA(("ghd_dma_attr_get: start: gcmdp 0x%p h 0x%p c 0x%x\n",
-			gcmdp, gcmdp->cmd_dma_handle, gcmdp->cmd_ccount));
+	    (void *)gcmdp, (void *)gcmdp->cmd_dma_handle, gcmdp->cmd_ccount));
 
 	/*
 	 * Disable single-segment Scatter/Gather option
@@ -224,8 +224,8 @@ ghd_dmaget_attr(ccc_t		*cccp,
 		 * start the next window, and get its first cookie
 		 */
 		status = ddi_dma_getwin(gcmdp->cmd_dma_handle,
-				gcmdp->cmd_windex, &offset, &length,
-				&cookie, &gcmdp->cmd_ccount);
+		    gcmdp->cmd_windex, &offset, &length,
+		    &cookie, &gcmdp->cmd_ccount);
 		if (status != DDI_SUCCESS)
 			return (FALSE);
 

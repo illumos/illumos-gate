@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -202,10 +202,10 @@ cpr_check_user_threads()
 			}
 
 			CPR_DEBUG(CPR_DEBUG2, "cant stop t=%p state=%x pfg=%x "
-			    "sched=%x\n", tp, tp->t_state, tp->t_proc_flag,
-			    tp->t_schedflag);
+			    "sched=%x\n", (void *)tp, tp->t_state,
+			    tp->t_proc_flag, tp->t_schedflag);
 			CPR_DEBUG(CPR_DEBUG2, "proc %p state=%x pid=%d\n",
-			    ttoproc(tp), ttoproc(tp)->p_stat,
+			    (void *)ttoproc(tp), ttoproc(tp)->p_stat,
 			    ttoproc(tp)->p_pidp->pid_id);
 			return (1);
 		}

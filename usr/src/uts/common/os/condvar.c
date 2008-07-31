@@ -70,7 +70,8 @@ cv_unsleep(kthread_t *t)
 	ASSERT(THREAD_LOCK_HELD(t));
 
 	if (cvp == NULL)
-		panic("cv_unsleep: thread %p not on sleepq %p", t, sqh);
+		panic("cv_unsleep: thread %p not on sleepq %p",
+		    (void *)t, (void *)sqh);
 	DTRACE_SCHED1(wakeup, kthread_t *, t);
 	sleepq_unsleep(t);
 	if (cvp->cv_waiters != CV_MAX_WAITERS)
@@ -92,7 +93,7 @@ cv_change_pri(kthread_t *t, pri_t pri, pri_t *t_prip)
 	ASSERT(&SQHASH(cvp)->sq_queue == sqp);
 
 	if (cvp == NULL)
-		panic("cv_change_pri: %p not on sleep queue", t);
+		panic("cv_change_pri: %p not on sleep queue", (void *)t);
 	sleepq_dequeue(t);
 	*t_prip = pri;
 	sleepq_insert(sqp, t);

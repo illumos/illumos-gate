@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,8 +73,8 @@ ghd_tran_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pktp)
 
 	if (gcmdp->cmd_dma_handle) {
 		status = ddi_dma_sync(gcmdp->cmd_dma_handle, 0, 0,
-			(gcmdp->cmd_dma_flags & DDI_DMA_READ) ?
-			DDI_DMA_SYNC_FORCPU : DDI_DMA_SYNC_FORDEV);
+		    (gcmdp->cmd_dma_flags & DDI_DMA_READ) ?
+		    DDI_DMA_SYNC_FORCPU : DDI_DMA_SYNC_FORDEV);
 		if (status != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "ghd_tran_sync_pkt() fail\n");
 		}
@@ -153,7 +153,7 @@ ghd_pktfree(ccc_t		*cccp,
 	struct scsi_pkt		*pktp)
 {
 	GDBG_PKT(("ghd_pktfree: cccp 0x%p ap 0x%p pktp 0x%p\n",
-	    cccp, ap, pktp));
+	    (void *)cccp, (void *)ap, (void *)pktp));
 
 	/* free any extra resources allocated by the HBA */
 	(*cccp->ccc_ccbfree)(PKTP2GCMDP(pktp));
@@ -201,7 +201,7 @@ ghd_tran_init_pkt_attr(ccc_t	*cccp,
 	gcmdp = PKTP2GCMDP(pktp);
 
 	GDBG_PKT(("ghd_tran_init_pkt_attr: gcmdp 0x%p dma_handle 0x%p\n",
-	    gcmdp, gcmdp->cmd_dma_handle));
+	    (void *)gcmdp, (void *)gcmdp->cmd_dma_handle));
 
 	/*
 	 * free stale DMA window if necessary.
@@ -218,7 +218,7 @@ ghd_tran_init_pkt_attr(ccc_t	*cccp,
 	 */
 
 	GDBG_PKT(("ghd_tran_init_pkt: gcmdp 0x%p bp 0x%p limp 0x%p\n",
-	    gcmdp, bp, sg_attrp));
+	    (void *)gcmdp, (void *)bp, (void *)sg_attrp));
 
 	if (bp && bp->b_bcount && sg_attrp) {
 		int	dma_flags;
@@ -237,7 +237,7 @@ ghd_tran_init_pkt_attr(ccc_t	*cccp,
 
 		if (gcmdp->cmd_dma_handle == NULL) {
 			if (!ghd_dma_buf_bind_attr(cccp, gcmdp, bp, dma_flags,
-				callback, arg, sg_attrp)) {
+			    callback, arg, sg_attrp)) {
 				if (new_pkt)
 					ghd_pktfree(cccp, ap, pktp);
 				return (NULL);
@@ -246,8 +246,8 @@ ghd_tran_init_pkt_attr(ccc_t	*cccp,
 
 		/* map the buffer and/or create the scatter/gather list */
 		if (!ghd_dmaget_attr(cccp, gcmdp,
-			bp->b_bcount - gcmdp->cmd_totxfer,
-			sg_attrp->dma_attr_sgllen, &xfercount)) {
+		    bp->b_bcount - gcmdp->cmd_totxfer,
+		    sg_attrp->dma_attr_sgllen, &xfercount)) {
 			if (new_pkt)
 				ghd_pktfree(cccp, ap, pktp);
 			return (NULL);
