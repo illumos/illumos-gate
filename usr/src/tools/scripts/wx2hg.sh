@@ -74,24 +74,21 @@ function clone_twins {
 
 	rev_warning=n
 	for dir in $nested_twins; do
-		(cd "$primary_twin"/$dir ; \
-		    hg log -l 1 -r $hg_rev > /dev/null 2>1)
-		if  (( $? != 0 )); then
-			warn "Unable to clone $primary_twin/$dir"
-			rev_warning=y
-			continue
-		fi
 		echo "Cloning from $primary_twin/$dir"
 		echo "to $ws/$dir"
 		mkdir -p $ws/$dir
 		set -x
 		hg init $ws/$dir
-	    	( cd $ws/$dir; hg pull -u "$primary_twin"/$dir )
+	    	( cd $ws/$dir; hg pull -u -r $rev "$primary_twin"/$dir )
+		if (( $? != 0 )); then
+			warn "Unable to clone $primary_twin/$dir"
+			rev_warning=y
+		fi
 		set +x
 	done
 
 	[[ $rev_warning = "n" ]] || fail \
-"revision $hgrev was not present in all workspaces.\n" \
+"revision $rev was not present in all workspaces.\n" \
 "When using -r with nested repositories, you should specify a tag\n" \
 "name that is valid in each workspace."
 }
