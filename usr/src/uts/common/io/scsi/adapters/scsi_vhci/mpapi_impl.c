@@ -4049,27 +4049,40 @@ vhci_mpapi_update_tpg_acc_state_for_lu(struct scsi_vhci *vhci,
 		path_list = lu_data->path_list->head;
 		while (path_list != NULL) {
 			path_data = path_list->item->idata;
-			if ((path_data->valid == 1) &&
-			    (strncmp(path_data->pclass, tpg_data->pclass,
-			    strlen(tpg_data->pclass)) == 0)) {
-				VHCI_DEBUG(4, (CE_NOTE, NULL, "vhci_mpapi_"
-				    "update_tpg_acc_state_for_lu: Operating on "
-				    "LUN(%s), PATH(%p), TPG(%x: %s)\n",
-				    lu_data->prop.name, path_data->resp,
-				    tpg_data->prop.tpgId, tpg_data->pclass));
-				if (MDI_PI_IS_ONLINE(path_data->resp)) {
-					tpg_data->prop.accessState =
-					    MP_DRVR_ACCESS_STATE_ACTIVE;
-					break;
-				} else if (MDI_PI_IS_STANDBY(path_data->resp)) {
+			if (strncmp(path_data->pclass, tpg_data->pclass,
+			    strlen(tpg_data->pclass)) == 0) {
+				if (path_data->valid == 1) {
+					VHCI_DEBUG(4, (CE_NOTE, NULL,
+					    "vhci_mpapi_update_tpg_acc_state_"
+					    "for_ lu: Operating on LUN(%s), "
+					    " PATH(%p), TPG(%x: %s)\n",
+					    lu_data->prop.name, path_data->resp,
+					    tpg_data->prop.tpgId,
+					    tpg_data->pclass));
+					if (MDI_PI_IS_ONLINE(path_data->resp)) {
+						tpg_data->prop.accessState =
+						    MP_DRVR_ACCESS_STATE_ACTIVE;
+						break;
+					} else if (MDI_PI_IS_STANDBY(
+					    path_data->resp)) {
 					tpg_data->prop.accessState =
 					    MP_DRVR_ACCESS_STATE_STANDBY;
-					break;
+						break;
+					} else {
+					tpg_data->prop.accessState =
+					    MP_DRVR_ACCESS_STATE_UNAVAILABLE;
+					}
 				} else {
+					/*
+					 * if path is not valid any more,
+					 * mark the associated tpg as
+					 * unavailable.
+					 */
 					tpg_data->prop.accessState =
 					    MP_DRVR_ACCESS_STATE_UNAVAILABLE;
 				}
 			}
+
 			path_list = path_list->next;
 		}
 		tpg_list = tpg_list->next;

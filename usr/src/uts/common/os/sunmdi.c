@@ -2827,8 +2827,6 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
 	static char	path[MAXPATHLEN];
 	char		*path_persistent;
 	int		path_instance;
-	int		se_flag;
-	int		kmem_flag;
 	mod_hash_val_t	hv;
 
 	ASSERT(MDI_VHCI_CLIENT_LOCKED(ph->ph_vhci));
@@ -2911,12 +2909,6 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
 
 	ndi_devi_exit(ph->ph_dip, ph_circular);
 	ndi_devi_exit(ct->ct_dip, ct_circular);
-
-	/* determine interrupt context */
-	se_flag = (servicing_interrupt()) ? SE_NOSLEEP : SE_SLEEP;
-	kmem_flag = (se_flag == SE_SLEEP) ? KM_SLEEP : KM_NOSLEEP;
-
-	i_ddi_di_cache_invalidate(kmem_flag);
 
 	return (pip);
 }
@@ -3150,8 +3142,6 @@ i_mdi_pi_free(mdi_phci_t *ph, mdi_pathinfo_t *pip, mdi_client_t *ct)
 {
 	int	ct_circular;
 	int	ph_circular;
-	int	se_flag;
-	int	kmem_flag;
 
 	ASSERT(MDI_CLIENT_LOCKED(ct));
 
@@ -3169,12 +3159,6 @@ i_mdi_pi_free(mdi_phci_t *ph, mdi_pathinfo_t *pip, mdi_client_t *ct)
 
 	ndi_devi_exit(ph->ph_dip, ph_circular);
 	ndi_devi_exit(ct->ct_dip, ct_circular);
-
-	/* determine interrupt context */
-	se_flag = (servicing_interrupt()) ? SE_NOSLEEP : SE_SLEEP;
-	kmem_flag = (se_flag == SE_SLEEP) ? KM_SLEEP : KM_NOSLEEP;
-
-	i_ddi_di_cache_invalidate(kmem_flag);
 
 	mutex_destroy(&MDI_PI(pip)->pi_mutex);
 	cv_destroy(&MDI_PI(pip)->pi_state_cv);
@@ -3615,6 +3599,8 @@ mdi_pi_online(mdi_pathinfo_t *pip, int flags)
 	mdi_client_t	*ct = MDI_PI(pip)->pi_client;
 	int		client_held = 0;
 	int		rv;
+	int		se_flag;
+	int		kmem_flag;
 
 	ASSERT(ct != NULL);
 	rv = i_mdi_pi_state_change(pip, MDI_PATHINFO_STATE_ONLINE, flags);
@@ -3641,6 +3627,13 @@ mdi_pi_online(mdi_pathinfo_t *pip, int flags)
 		i_mdi_pm_hold_client(ct, 1);
 		MDI_CLIENT_UNLOCK(ct);
 	}
+
+	/* determine interrupt context */
+	se_flag = (servicing_interrupt()) ? SE_NOSLEEP : SE_SLEEP;
+	kmem_flag = (se_flag == SE_SLEEP) ? KM_SLEEP : KM_NOSLEEP;
+
+	/* A new path is online.  Invalidate DINFOCACHE snap shot. */
+	i_ddi_di_cache_invalidate(kmem_flag);
 
 	return (rv);
 }
@@ -3684,6 +3677,8 @@ mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 {
 	int	ret, client_held = 0;
 	mdi_client_t	*ct;
+	int		se_flag;
+	int		kmem_flag;
 
 	ret = i_mdi_pi_state_change(pip, MDI_PATHINFO_STATE_OFFLINE, flags);
 
@@ -3702,6 +3697,13 @@ mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 			i_mdi_pm_rele_client(ct, 1);
 			MDI_CLIENT_UNLOCK(ct);
 		}
+
+		/* determine interrupt context */
+		se_flag = (servicing_interrupt()) ? SE_NOSLEEP : SE_SLEEP;
+		kmem_flag = (se_flag == SE_SLEEP) ? KM_SLEEP : KM_NOSLEEP;
+
+		/* pathinfo is offlined. update DINFOCACHE. */
+		i_ddi_di_cache_invalidate(kmem_flag);
 	}
 
 	return (ret);
