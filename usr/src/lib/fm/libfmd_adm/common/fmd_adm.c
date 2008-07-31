@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,6 @@ fmd_adm_open(const char *host, uint32_t prog, int version)
 {
 	fmd_adm_t *ap;
 	CLIENT *c;
-	int err;
 	rpcvers_t v;
 
 	if (version != FMD_ADM_VERSION) {
@@ -60,33 +59,25 @@ fmd_adm_open(const char *host, uint32_t prog, int version)
 	if (prog == FMD_ADM_PROGRAM)
 		prog = FMD_ADM;
 
-	/*
-	 * If we are connecting to the local host, attempt a door connection
-	 * first.  If that fails or we need another host, fall through to
-	 * using the standard clnt_create that iterates over all transports.
-	 */
-	if (strcmp(host, HOST_SELF) == 0)
-		c = clnt_door_create(prog, FMD_ADM_VERSION_1, _fmd_adm_bufsize);
-	else
-		c = NULL;
+	if ((ap = malloc(sizeof (fmd_adm_t))) == NULL)
+		return (NULL);
 
-	if (c == NULL) {
+	if (strcmp(host, HOST_SELF) == 0) {
+		c = clnt_door_create(prog, FMD_ADM_VERSION_1, _fmd_adm_bufsize);
+		ap->adm_maxretries = 1;
+	} else {
 		c = clnt_create_vers(host, prog, &v,
 		    FMD_ADM_VERSION_1, FMD_ADM_VERSION_1, NULL);
+		ap->adm_maxretries = 0;
 	}
 
 	if (c == NULL) {
 		errno = EPROTO;
+		free(ap);
 		return (NULL);
 	}
 
-	if ((ap = malloc(sizeof (fmd_adm_t))) == NULL) {
-		err = errno;
-		clnt_destroy(c);
-		errno = err;
-		return (NULL);
-	}
-
+	ap->adm_prog = prog;
 	ap->adm_clnt = c;
 	ap->adm_version = version;
 	ap->adm_svcerr = 0;
@@ -205,21 +196,58 @@ fmd_adm_stats_cmp(const void *lp, const void *rp)
 	    ((fmd_stat_t *)rp)->fmds_name));
 }
 
+/*
+ * If the server (fmd) is restarted, this will cause all future door calls to
+ * fail.  Unfortunately, once the server comes back up, we have no way of
+ * reestablishing the connection.  To get around this, if the error indicates
+ * that the RPC call failed, we reopen the client handle and try again.  For
+ * simplicity we only deal with the door case, as it's unclear whether the
+ * remote case suffers from the same pathology.
+ */
+boolean_t
+fmd_adm_retry(fmd_adm_t *ap, enum clnt_stat cs, uint_t *retries)
+{
+	CLIENT *c;
+	struct rpc_err err;
+
+	if (cs == RPC_SUCCESS || *retries == ap->adm_maxretries)
+		return (B_FALSE);
+
+	clnt_geterr(ap->adm_clnt, &err);
+	if (err.re_status != RPC_CANTSEND)
+		return (B_FALSE);
+
+	if ((c = clnt_door_create(ap->adm_prog, FMD_ADM_VERSION_1,
+	    _fmd_adm_bufsize)) == NULL)
+		return (B_FALSE);
+
+	(*retries)++;
+
+	clnt_destroy(ap->adm_clnt);
+	ap->adm_clnt = c;
+
+	return (B_TRUE);
+}
+
 int
 fmd_adm_stats_read(fmd_adm_t *ap, const char *name, fmd_adm_stats_t *sp)
 {
 	struct fmd_rpc_modstat rms;
 	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	if (sp == NULL)
 		return (fmd_adm_set_errno(ap, EINVAL));
 
 	bzero(&rms, sizeof (rms)); /* tell xdr to allocate memory for us */
 
-	if (name != NULL)
-		cs = fmd_adm_modcstat_1((char *)name, &rms, ap->adm_clnt);
-	else
-		cs = fmd_adm_modgstat_1(&rms, ap->adm_clnt);
+	do {
+		if (name != NULL)
+			cs = fmd_adm_modcstat_1((char *)name, &rms,
+			    ap->adm_clnt);
+		else
+			cs = fmd_adm_modgstat_1(&rms, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
 
 	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
@@ -271,10 +299,16 @@ fmd_adm_module_iter(fmd_adm_t *ap, fmd_adm_module_f *func, void *arg)
 	struct fmd_rpc_modinfo *rmi, **rms, **rmp;
 	struct fmd_rpc_modlist rml;
 	fmd_adm_modinfo_t ami;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	bzero(&rml, sizeof (rml)); /* tell xdr to allocate memory for us */
 
-	if (fmd_adm_modinfo_1(&rml, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_modinfo_1(&rml, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	if (rml.rml_err != 0 || rml.rml_len == 0) {
@@ -317,11 +351,17 @@ fmd_adm_module_load(fmd_adm_t *ap, const char *path)
 {
 	char *str = (char *)path;
 	int err;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	if (path == NULL || path[0] != '/')
 		return (fmd_adm_set_errno(ap, EINVAL));
 
-	if (fmd_adm_modload_1(str, &err, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_modload_1(str, &err, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	return (fmd_adm_set_svcerr(ap, err));
@@ -332,11 +372,17 @@ fmd_adm_module_unload(fmd_adm_t *ap, const char *name)
 {
 	char *str = (char *)name;
 	int err;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	if (name == NULL || strchr(name, '/') != NULL)
 		return (fmd_adm_set_errno(ap, EINVAL));
 
-	if (fmd_adm_modunload_1(str, &err, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_modunload_1(str, &err, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	return (fmd_adm_set_svcerr(ap, err));
@@ -347,11 +393,17 @@ fmd_adm_module_reset(fmd_adm_t *ap, const char *name)
 {
 	char *str = (char *)name;
 	int err;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	if (name == NULL || strchr(name, '/') != NULL)
 		return (fmd_adm_set_errno(ap, EINVAL));
 
-	if (fmd_adm_modreset_1(str, &err, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_modreset_1(str, &err, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	return (fmd_adm_set_svcerr(ap, err));
@@ -362,11 +414,17 @@ fmd_adm_module_gc(fmd_adm_t *ap, const char *name)
 {
 	char *str = (char *)name;
 	int err;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	if (name == NULL || strchr(name, '/') != NULL)
 		return (fmd_adm_set_errno(ap, EINVAL));
 
-	if (fmd_adm_modgc_1(str, &err, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_modgc_1(str, &err, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	return (fmd_adm_set_svcerr(ap, err));
@@ -376,13 +434,19 @@ int
 fmd_adm_module_stats(fmd_adm_t *ap, const char *name, fmd_adm_stats_t *sp)
 {
 	struct fmd_rpc_modstat rms;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	if (name == NULL || sp == NULL)
 		return (fmd_adm_set_errno(ap, EINVAL));
 
 	bzero(&rms, sizeof (rms)); /* tell xdr to allocate memory for us */
 
-	if (fmd_adm_moddstat_1((char *)name, &rms, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_moddstat_1((char *)name, &rms, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	if (rms.rms_err != 0) {
@@ -400,13 +464,19 @@ int
 fmd_adm_rsrc_count(fmd_adm_t *ap, int all, uint32_t *rcp)
 {
 	struct fmd_rpc_rsrclist rrl;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	if (rcp == NULL)
 		return (fmd_adm_set_errno(ap, EINVAL));
 
 	bzero(&rrl, sizeof (rrl)); /* tell xdr to allocate memory for us */
 
-	if (fmd_adm_rsrclist_1(all, &rrl, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_rsrclist_1(all, &rrl, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	if (rrl.rrl_err != 0) {
@@ -433,10 +503,16 @@ fmd_adm_rsrc_iter(fmd_adm_t *ap, int all, fmd_adm_rsrc_f *func, void *arg)
 	fmd_adm_rsrcinfo_t ari;
 	char **fmris, *p;
 	int i, rv;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	bzero(&rrl, sizeof (rrl)); /* tell xdr to allocate memory for us */
 
-	if (fmd_adm_rsrclist_1(all, &rrl, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_rsrclist_1(all, &rrl, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	if (rrl.rrl_err != 0) {
@@ -471,8 +547,12 @@ fmd_adm_rsrc_iter(fmd_adm_t *ap, int all, fmd_adm_rsrc_f *func, void *arg)
 	for (i = 0; i < rrl.rrl_cnt; i++) {
 		bzero(&rri, sizeof (rri));
 
-		if (fmd_adm_rsrcinfo_1(fmris[i], &rri,
-		    ap->adm_clnt) != RPC_SUCCESS) {
+		retries = 0;
+		do {
+			cs = fmd_adm_rsrcinfo_1(fmris[i], &rri, ap->adm_clnt);
+		} while (fmd_adm_retry(ap, cs, &retries));
+
+		if (cs != RPC_SUCCESS) {
 			free(fmris);
 			xdr_free(xdr_fmd_rpc_rsrclist, (char *)&rrl);
 			return (fmd_adm_set_errno(ap, EPROTO));
@@ -519,11 +599,17 @@ fmd_adm_rsrc_flush(fmd_adm_t *ap, const char *fmri)
 {
 	char *str = (char *)fmri;
 	int err;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	if (fmri == NULL)
 		return (fmd_adm_set_errno(ap, EINVAL));
 
-	if (fmd_adm_rsrcflush_1(str, &err, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_rsrcflush_1(str, &err, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	return (fmd_adm_set_svcerr(ap, err));
@@ -534,11 +620,17 @@ fmd_adm_rsrc_repair(fmd_adm_t *ap, const char *fmri)
 {
 	char *str = (char *)fmri;
 	int err;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	if (fmri == NULL)
 		return (fmd_adm_set_errno(ap, EINVAL));
 
-	if (fmd_adm_rsrcrepair_1(str, &err, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_rsrcrepair_1(str, &err, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	return (fmd_adm_set_svcerr(ap, err));
@@ -549,11 +641,17 @@ fmd_adm_case_repair(fmd_adm_t *ap, const char *uuid)
 {
 	char *str = (char *)uuid;
 	int err;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	if (uuid == NULL)
 		return (fmd_adm_set_errno(ap, EINVAL));
 
-	if (fmd_adm_caserepair_1(str, &err, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_caserepair_1(str, &err, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	return (fmd_adm_set_svcerr(ap, err));
@@ -629,10 +727,16 @@ fmd_adm_case_iter(fmd_adm_t *ap, const char *url_token, fmd_adm_case_f *func,
 	fmd_adm_caseinfo_t aci;
 	char **uuids, *p;
 	int i, rv;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	bzero(&rcl, sizeof (rcl)); /* tell xdr to allocate memory for us */
 
-	if (fmd_adm_caselist_1(&rcl, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_caselist_1(&rcl, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	if (rcl.rcl_err != 0) {
@@ -655,8 +759,12 @@ fmd_adm_case_iter(fmd_adm_t *ap, const char *url_token, fmd_adm_case_f *func,
 	for (i = 0; i < rcl.rcl_cnt; i++) {
 		bzero(&rci, sizeof (rci));
 
-		if (fmd_adm_caseinfo_1(uuids[i], &rci, ap->adm_clnt)
-		    != RPC_SUCCESS) {
+		retries = 0;
+		do {
+			cs = fmd_adm_caseinfo_1(uuids[i], &rci, ap->adm_clnt);
+		} while (fmd_adm_retry(ap, cs, &retries));
+
+		if (cs != RPC_SUCCESS) {
 			free(uuids);
 			xdr_free(xdr_fmd_rpc_caselist, (char *)&rcl);
 			return (fmd_adm_set_errno(ap, EPROTO));
@@ -729,10 +837,16 @@ fmd_adm_serd_iter(fmd_adm_t *ap, const char *name,
 	struct fmd_rpc_serdinfo *rsi, **ris, **rip;
 	struct fmd_rpc_serdlist rsl;
 	fmd_adm_serdinfo_t asi;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	bzero(&rsl, sizeof (rsl)); /* tell xdr to allocate memory for us */
 
-	if (fmd_adm_serdinfo_1((char *)name, &rsl, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_serdinfo_1((char *)name, &rsl, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	if (rsl.rsl_err != 0 || rsl.rsl_len == 0) {
@@ -777,11 +891,17 @@ fmd_adm_serd_reset(fmd_adm_t *ap, const char *mod, const char *name)
 {
 	char *s1 = (char *)mod, *s2 = (char *)name;
 	int err;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	if (mod == NULL || name == NULL || strchr(mod, '/') != NULL)
 		return (fmd_adm_set_errno(ap, EINVAL));
 
-	if (fmd_adm_serdreset_1(s1, s2, &err, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_serdreset_1(s1, s2, &err, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	return (fmd_adm_set_svcerr(ap, err));
@@ -792,10 +912,16 @@ fmd_adm_xprt_iter(fmd_adm_t *ap, fmd_adm_xprt_f *func, void *arg)
 {
 	struct fmd_rpc_xprtlist rxl;
 	uint_t i;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	bzero(&rxl, sizeof (rxl)); /* tell xdr to allocate memory for us */
 
-	if (fmd_adm_xprtlist_1(&rxl, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_xprtlist_1(&rxl, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	if (rxl.rxl_err != 0) {
@@ -814,13 +940,19 @@ int
 fmd_adm_xprt_stats(fmd_adm_t *ap, id_t id, fmd_adm_stats_t *sp)
 {
 	struct fmd_rpc_modstat rms;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	if (sp == NULL)
 		return (fmd_adm_set_errno(ap, EINVAL));
 
 	bzero(&rms, sizeof (rms)); /* tell xdr to allocate memory for us */
 
-	if (fmd_adm_xprtstat_1(id, &rms, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_xprtstat_1(id, &rms, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	if (rms.rms_err != 0) {
@@ -838,11 +970,17 @@ int
 fmd_adm_log_rotate(fmd_adm_t *ap, const char *log)
 {
 	int err;
+	enum clnt_stat cs;
+	uint_t retries = 0;
 
 	if (log == NULL)
 		return (fmd_adm_set_errno(ap, EINVAL));
 
-	if (fmd_adm_logrotate_1((char *)log, &err, ap->adm_clnt) != RPC_SUCCESS)
+	do {
+		cs = fmd_adm_logrotate_1((char *)log, &err, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	return (fmd_adm_set_svcerr(ap, err));
