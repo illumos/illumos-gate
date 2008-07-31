@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,8 @@ typedef struct msg_raid_action {
 #define	MPI_RAID_ACTION_DELETE_PHYSDISK			0x0E
 #define	MPI_RAID_ACTION_FAIL_PHYSDISK			0x0F
 #define	MPI_RAID_ACTION_REPLACE_PHYSDISK		0x10
+#define	MPI_RAID_ACTION_ACTIVATE_VOLUME			0x11
+#define	MPI_RAID_ACTION_INACTIVATE_VOLUME		0x12
 
 #define	MPI_RAID_ACTION_ADATA_DO_NOT_SYNC		0x00000001
 

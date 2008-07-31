@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,6 +74,7 @@ typedef	struct {
 
 typedef	diskseg_attr_t		raidcfg_diskseg_t;
 typedef	task_attr_t		raidcfg_task_t;
+typedef	property_attr_t		raidcfg_prop_t;
 
 /*
  * raidcfg common library APIs

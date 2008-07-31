@@ -82,12 +82,22 @@ extern "C" {
 #define	CACHE_RD_ON		1
 
 /*
+ * Array activation action
+ */
+#define	ARRAY_ACT_ACTIVATE	0
+
+/*
  * Array status
  */
 #define	ARRAY_STATE_OPTIMAL	0
 #define	ARRAY_STATE_DEGRADED	1
 #define	ARRAY_STATE_FAILED	2
 #define	ARRAY_STATE_MISSING	3
+
+/*
+ * Array activation state
+ */
+#define	ARRAY_STATE_INACTIVATE	0x8000
 
 /*
  * Disk state
@@ -128,6 +138,7 @@ extern "C" {
  */
 #define	SET_CACHE_WR_PLY	0
 #define	SET_CACHE_RD_PLY	1
+#define	SET_ACTIVATION_PLY	2
 
 /*
  * Sub-commands for act method of object
@@ -206,6 +217,7 @@ typedef enum {
 	OBJ_TYPE_ARRAY_PART,
 	OBJ_TYPE_DISK_SEG,
 	OBJ_TYPE_TASK,
+	OBJ_TYPE_PROP,
 	OBJ_TYPE_ALL
 } raid_obj_type_id_t;
 
@@ -230,6 +242,13 @@ typedef enum {
 	TASK_STATE_RUNNING,
 	TASK_STATE_SUSPENDED
 } raidtask_state_t;
+
+/*
+ * Properties
+ */
+typedef	enum {
+	PROP_GUID
+} property_type_t;
 
 /*
  * Attributes of all RAID objects
@@ -306,6 +325,13 @@ typedef struct {
 	uint32_t	task_state;
 	uint32_t	progress;
 } task_attr_t;
+
+typedef struct {
+	uint32_t	prop_id;
+	uint32_t	prop_size;
+	property_type_t	prop_type;
+	char		prop[1];
+} property_attr_t;
 
 typedef struct {
 	uint32_t	array_id;

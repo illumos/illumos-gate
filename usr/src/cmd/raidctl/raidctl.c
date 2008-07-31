@@ -1361,19 +1361,25 @@ do_set_array_attr(uint32_t f_flag, char *p_argp, char **argv, uint32_t optind)
 		param = strtok(p_argp, op);
 		if (strcmp(param, "wp") == 0) {
 			type = SET_CACHE_WR_PLY;
+			param = strtok(NULL, op);
+			if (strcmp(param, "on") == 0) {
+				value = CACHE_WR_ON;
+			} else if (strcmp(param, "off") == 0) {
+				value = CACHE_WR_OFF;
+			} else {
+				return (INVALID_ARG);
+			}
+		} else if (strcmp(param, "state") == 0) {
+			type = SET_ACTIVATION_PLY;
+			param = strtok(NULL, op);
+			if (strcmp(param, "activate") == 0) {
+				value = ARRAY_ACT_ACTIVATE;
+			} else {
+				return (INVALID_ARG);
+			}
 		} else {
 			return (INVALID_ARG);
 		}
-
-		param = strtok(NULL, op);
-		if (strcmp(param, "on") == 0) {
-			value = CACHE_WR_ON;
-		} else if (strcmp(param, "off") == 0) {
-			value = CACHE_WR_OFF;
-		} else {
-			return (INVALID_ARG);
-		}
-
 	} else {
 		return (INVALID_ARG);
 	}
@@ -1836,7 +1842,7 @@ print_array_table(raid_obj_handle_t ctl_handle, raid_obj_handle_t array_handle)
 	raid_obj_handle_t arraypart_handle;
 	raid_obj_handle_t task_handle;
 
-	char array[8];
+	char array[16];
 	char arraypart[8];
 	int ret;
 	int i;
@@ -1869,7 +1875,10 @@ print_array_table(raid_obj_handle_t ctl_handle, raid_obj_handle_t array_handle)
 	(void) snprintf(array, sizeof (array), "c%ut%llud%llu",
 	    ctl_attr.controller_id, array_attr.tag.idl.target_id,
 	    array_attr.tag.idl.lun);
-	(void) fprintf(stdout, "%s\t\t\t", array);
+	(void) fprintf(stdout, "%s\t\t", array);
+	if (strlen(array) < 8)
+		(void) fprintf(stdout, "\t");
+
 
 	/* check if array is in sync state */
 	task_handle = raidcfg_list_head(array_handle, OBJ_TYPE_TASK);
@@ -1990,6 +1999,8 @@ print_disk_table(raid_obj_handle_t ctl_handle, raid_obj_handle_t disk_handle)
 {
 	raidcfg_controller_t ctl_attr;
 	raidcfg_disk_t disk_attr;
+	raidcfg_prop_t *prop_attr, *prop_attr2;
+	raid_obj_handle_t prop_handle;
 	char disk[8];
 	int ret;
 
@@ -2020,8 +2031,47 @@ print_disk_table(raid_obj_handle_t ctl_handle, raid_obj_handle_t disk_handle)
 	(void) fprintf(stdout, "%s\t", disk);
 
 	(void) print_disk_attr(ctl_handle, disk_handle, &disk_attr);
-	(void) fprintf(stdout, "\n");
 
+	prop_attr = calloc(1, sizeof (raidcfg_prop_t));
+	if (prop_attr == NULL) {
+		(void) fprintf(stderr, "%s\n", raidcfg_errstr(ERR_NOMEM));
+		return (FAILURE);
+	}
+
+	prop_handle = raidcfg_list_head(disk_handle, OBJ_TYPE_PROP);
+	if (prop_handle == 0) {
+		free(prop_attr);
+		return (SUCCESS);
+	}
+
+	do {
+		prop_attr->prop_size = 0;
+		if ((ret = raidcfg_get_attr(prop_handle, prop_attr)) < 0) {
+			free(prop_attr);
+			(void) fprintf(stderr, "%s\n", raidcfg_errstr(ret));
+			return (FAILURE);
+		}
+		if (prop_attr->prop_type == PROP_GUID)
+			break;
+	} while (prop_handle != 0);
+
+	prop_attr2 = realloc(prop_attr,
+	    sizeof (raidcfg_prop_t) + prop_attr->prop_size);
+	free(prop_attr);
+	if (prop_attr2 == NULL) {
+		(void) fprintf(stderr, "%s\n", raidcfg_errstr(ERR_NOMEM));
+		return (FAILURE);
+	}
+
+	if ((ret = raidcfg_get_attr(prop_handle, prop_attr2)) < 0) {
+		free(prop_attr2);
+		(void) fprintf(stderr, "%s\n", raidcfg_errstr(ret));
+		return (FAILURE);
+	}
+
+	(void) fprintf(stdout, "GUID:%s\n", prop_attr2->prop);
+
+	free(prop_attr2);
 	return (SUCCESS);
 }
 
@@ -2082,25 +2132,29 @@ print_array_attr(raidcfg_array_t *attrp)
 		(void) printf(gettext("N/A\t"));
 	}
 
-	switch (attrp->state) {
-	case ARRAY_STATE_OPTIMAL:
-		(void) printf("%-8s", gettext("OPTIMAL"));
-		break;
-	case ARRAY_STATE_DEGRADED:
-		(void) printf("%-8s", gettext("DEGRADED"));
-		break;
-	case ARRAY_STATE_FAILED:
-		(void) printf("%-8s", gettext("FAILED"));
-		break;
-	case ARRAY_STATE_SYNC:
-		(void) printf("%-8s", gettext("SYNC"));
-		break;
-	case ARRAY_STATE_MISSING:
-		(void) printf("%-8s", gettext("MISSING"));
-		break;
-	default:
-		(void) printf("%-8s", gettext("N/A"));
-		break;
+	if (attrp->state & ARRAY_STATE_INACTIVATE)
+		(void) printf("%-8s", gettext("INACTIVE"));
+	else {
+		switch (attrp->state) {
+		case ARRAY_STATE_OPTIMAL:
+			(void) printf("%-8s", gettext("OPTIMAL"));
+			break;
+		case ARRAY_STATE_DEGRADED:
+			(void) printf("%-8s", gettext("DEGRADED"));
+			break;
+		case ARRAY_STATE_FAILED:
+			(void) printf("%-8s", gettext("FAILED"));
+			break;
+		case ARRAY_STATE_SYNC:
+			(void) printf("%-8s", gettext("SYNC"));
+			break;
+		case ARRAY_STATE_MISSING:
+			(void) printf("%-8s", gettext("MISSING"));
+			break;
+		default:
+			(void) printf("%-8s", gettext("N/A"));
+			break;
+		}
 	}
 	(void) printf(" ");
 

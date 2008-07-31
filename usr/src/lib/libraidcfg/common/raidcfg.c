@@ -142,6 +142,7 @@ typedef	struct {
 	uint32_t	disk_id;
 	uint64_t	seq_id;
 	uint32_t	task_id;
+	uint32_t	prop_id;
 	uint32_t	fd;		/* Only for controller */
 	raid_lib_t	*raid_lib;	/* Only for controller */
 } handle_attr_t;
@@ -191,6 +192,8 @@ static raid_obj_id_t obj_locate_arraypart(raid_obj_tab_t *, uint32_t,
 static raid_obj_id_t obj_locate_diskseg(raid_obj_tab_t *, uint32_t,
 	uint32_t, uint32_t);
 static raid_obj_id_t obj_locate_task(raid_obj_tab_t *, uint32_t, uint32_t);
+static raid_obj_id_t obj_locate_prop(raid_obj_tab_t *, uint32_t, uint32_t,
+	uint32_t);
 static raid_obj_id_t obj_get_controller(raid_obj_tab_t *, raid_obj_id_t);
 
 static int obj_sys_compnum(raid_obj_tab_t *, raid_obj_id_t,
@@ -220,6 +223,7 @@ static int obj_hsp_get_attr(raid_obj_tab_t *, raid_obj_id_t);
 static int obj_arraypart_get_attr(raid_obj_tab_t *, raid_obj_id_t);
 static int obj_diskseg_get_attr(raid_obj_tab_t *, raid_obj_id_t);
 static int obj_task_get_attr(raid_obj_tab_t *, raid_obj_id_t);
+static int obj_prop_get_attr(raid_obj_tab_t *, raid_obj_id_t);
 static int obj_array_create(raid_obj_tab_t *, raid_obj_id_t, int,
 	raid_obj_id_t *, char **);
 static int obj_array_delete(raid_obj_tab_t *, raid_obj_id_t, char **);
@@ -309,7 +313,9 @@ static raid_obj_op_t raid_obj_op_sys[OBJ_TYPE_ALL] = {
 		NULL, NULL},			/* array part object methods */
 	{NULL, NULL, obj_diskseg_get_attr, NULL, NULL, NULL, NULL, NULL, NULL},
 	{NULL, NULL, obj_task_get_attr, NULL, NULL, NULL, NULL,
-		NULL, NULL}			/* disk seg object methods */
+		NULL, NULL},			/* disk seg object methods */
+	{NULL, NULL, obj_prop_get_attr, NULL, NULL, NULL, NULL,
+		NULL, NULL}			/* property object methods */
 };
 
 /*
@@ -749,6 +755,28 @@ raidcfg_get_attr(int handle, void *attr)
 		break;
 	case	OBJ_TYPE_TASK:
 		size = sizeof (task_attr_t);
+		break;
+	case	OBJ_TYPE_PROP:
+		{
+			property_attr_t *src = data, *dst = attr;
+
+			dst->prop_id = src->prop_id;
+			dst->prop_type = src->prop_type;
+			if (dst->prop_size == 0) {
+				dst->prop_size = src->prop_size;
+				(void) mutex_unlock(&raidcfg_mp);
+				return (SUCCESS);
+			}
+
+			if (dst->prop_size < src->prop_size)
+				size = dst->prop_size;
+			else
+				size = src->prop_size;
+
+			(void) memcpy(dst->prop, src->prop, size);
+			(void) mutex_unlock(&raidcfg_mp);
+			return (SUCCESS);
+		}
 		break;
 	default:
 		(void) mutex_unlock(&raidcfg_mp);
@@ -1467,6 +1495,11 @@ raid_handle_to_obj(raid_obj_tab_t *raid_tab, raid_obj_handle_t handle)
 		obj_id = obj_locate_task(raid_tab,
 		    handle_attr->controller_id, handle_attr->task_id);
 		break;
+	case	OBJ_TYPE_PROP:
+		obj_id = obj_locate_prop(raid_tab,
+		    handle_attr->controller_id, handle_attr->disk_id,
+		    handle_attr->prop_id);
+		break;
 	default:
 		return (ERR_DEVICE_INVALID);
 	}
@@ -1493,6 +1526,7 @@ raid_obj_to_handle(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 	arraypart_attr_t *arraypart_attr;
 	diskseg_attr_t *diskseg_attr;
 	task_attr_t *task_attr;
+	property_attr_t *prop_attr;
 
 	if (obj_id == OBJ_SYSTEM)
 		return (OBJ_SYSTEM);
@@ -1581,6 +1615,18 @@ raid_obj_to_handle(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 	case OBJ_TYPE_TASK:
 		task_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 		raid_handle_sys.handles[handle].task_id = task_attr->task_id;
+		obj_id = obj_get_controller(raid_tab, obj_id);
+		controller_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
+		raid_handle_sys.handles[handle].controller_id =
+		    controller_attr->controller_id;
+		break;
+	case OBJ_TYPE_PROP:
+		prop_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
+		raid_handle_sys.handles[handle].prop_id =
+		    prop_attr->prop_id;
+		obj_id = raid_obj_get_container(raid_tab, obj_id);
+		disk_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
+		raid_handle_sys.handles[handle].disk_id = disk_attr->disk_id;
 		obj_id = obj_get_controller(raid_tab, obj_id);
 		controller_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 		raid_handle_sys.handles[handle].controller_id =
@@ -2129,7 +2175,34 @@ obj_locate_task(raid_obj_tab_t *raid_tab, uint32_t controller_id,
 	} while ((obj_id = obj_get_sibling(raid_tab, obj_id)) > OBJ_NONE);
 
 	return (obj_id);
+}
 
+static raid_obj_id_t
+obj_locate_prop(raid_obj_tab_t *raid_tab, uint32_t controller_id,
+	uint32_t disk_id, uint32_t prop_id)
+{
+	raid_obj_id_t obj_id;
+	property_attr_t *prop_attr;
+
+	obj_id = obj_locate_disk(raid_tab, controller_id, disk_id);
+	if (obj_id < OBJ_NONE)
+		return (obj_id);
+
+	obj_id = obj_get_comp(raid_tab, obj_id, OBJ_TYPE_PROP);
+	if (obj_id <= OBJ_NONE)
+		return (obj_id);
+
+	do {
+		(void) obj_get_attr(raid_tab, obj_id, (void **)(&prop_attr));
+		if (prop_attr->prop_id == prop_id)
+			break;
+
+		obj_id = obj_get_sibling(raid_tab, obj_id);
+		if (obj_id < OBJ_NONE)
+			return (obj_id);
+	} while (obj_id > OBJ_NONE);
+
+	return (obj_id);
 }
 
 static raid_obj_id_t
@@ -2697,6 +2770,10 @@ obj_array_set_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		    *value != CACHE_RD_ON)
 			return (ERR_OP_ILLEGAL);
 		break;
+	case SET_ACTIVATION_PLY:
+		if (*value != ARRAY_ACT_ACTIVATE)
+			return (ERR_OP_ILLEGAL);
+		break;
 	default:
 		return (ERR_OP_ILLEGAL);
 	}
@@ -2741,7 +2818,8 @@ obj_disk_compnum(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 
 	if (comp_type != OBJ_TYPE_DISK_SEG &&
 	    comp_type != OBJ_TYPE_HSP &&
-	    comp_type != OBJ_TYPE_TASK)
+	    comp_type != OBJ_TYPE_TASK &&
+	    comp_type != OBJ_TYPE_PROP)
 		return (0);
 	ret = obj_get_attr(raid_tab, obj_id, (void **)(&attr));
 	if ((ret != SUCCESS) || (attr == NULL)) {
@@ -2787,7 +2865,8 @@ obj_disk_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 
 	if (comp_type != OBJ_TYPE_DISK_SEG &&
 	    comp_type != OBJ_TYPE_HSP &&
-	    comp_type != OBJ_TYPE_TASK)
+	    comp_type != OBJ_TYPE_TASK &&
+	    comp_type != OBJ_TYPE_PROP)
 		return (0);
 
 	if (comp_num <= 0 || comp_list == NULL)
@@ -2835,6 +2914,7 @@ obj_disk_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		diskseg_attr_t *diskseg_attr;
 		hsp_attr_t *hsp_attr;
 		task_attr_t *task_attr;
+		property_attr_t *prop_attr;
 		void *attr_buf;
 
 		attr_buf = raid_obj_get_data_ptr(raid_tab, *(comp_list + i));
@@ -2855,6 +2935,10 @@ obj_disk_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		case OBJ_TYPE_TASK:
 			task_attr = attr_buf;
 			task_attr->task_id = *(ids + i);
+			break;
+		case OBJ_TYPE_PROP:
+			prop_attr = attr_buf;
+			prop_attr->prop_id = *(ids + i);
 			break;
 		default:
 			free(ids);
@@ -3073,6 +3157,74 @@ obj_task_get_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 
 	ret = raid_lib->get_attr(ctl_attrp->controller_id,
 	    attr->task_id, OBJ_ATTR_NONE, OBJ_TYPE_TASK, attr);
+
+	return (ret);
+}
+
+static int
+obj_prop_get_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
+{
+	property_attr_t *attr, *attr_new;
+	disk_attr_t *disk_attr;
+	controller_attr_t *ctl_attrp;
+	raid_lib_t *raid_lib;
+	int ret = SUCCESS, fd;
+	raid_obj_id_t controller_obj_id, disk_obj_id;
+
+	if (raid_obj_get_type(raid_tab, obj_id) != OBJ_TYPE_PROP)
+		return (ERR_DEVICE_TYPE);
+
+	if (raid_obj_get_status(raid_tab, obj_id) & OBJ_STATUS_OPENED)
+		return (SUCCESS);
+
+	attr = raid_obj_get_data_ptr(raid_tab, obj_id);
+	if (attr == NULL)
+		return (ERR_DEVICE_INVALID);
+
+	disk_obj_id = raid_obj_get_container(raid_tab, obj_id);
+	if (disk_obj_id < OBJ_NONE)
+		return (ERR_DEVICE_INVALID);
+
+	disk_attr = raid_obj_get_data_ptr(raid_tab, disk_obj_id);
+	if (disk_attr == NULL)
+		return (ERR_DEVICE_INVALID);
+
+	controller_obj_id = obj_get_controller(raid_tab, obj_id);
+	if (controller_obj_id < OBJ_NONE)
+		return (ERR_DEVICE_INVALID);
+
+	ctl_attrp = raid_obj_get_data_ptr(raid_tab, controller_obj_id);
+	if (ctl_attrp == NULL) {
+		return (ERR_DEVICE_INVALID);
+	}
+
+	raid_lib = raid_obj_get_lib(raid_tab, controller_obj_id);
+	fd = raid_obj_get_fd(raid_tab, controller_obj_id);
+	if ((raid_lib == NULL) || (fd == 0))
+		return (ERR_DRIVER_CLOSED);
+
+	/* Get the property size at first */
+	attr->prop_size = 0;
+	ret = raid_lib->get_attr(ctl_attrp->controller_id,
+	    disk_attr->disk_id, OBJ_ATTR_NONE, OBJ_TYPE_PROP, attr);
+
+	if (ret < SUCCESS)
+		return (ret);
+
+	/* Allocate memory for property and fill the buffer */
+	attr_new = realloc(attr, sizeof (property_attr_t) + attr->prop_size);
+	if (attr_new == NULL)
+		return (ERR_NOMEM);
+
+	(void) raid_obj_set_data_ptr(raid_tab, obj_id, attr_new);
+
+	ret = raid_lib->get_attr(ctl_attrp->controller_id,
+	    disk_attr->disk_id, OBJ_ATTR_NONE, OBJ_TYPE_PROP, attr_new);
+
+	if (ret < SUCCESS)
+		return (ret);
+
+	(void) raid_obj_set_status(raid_tab, obj_id, OBJ_STATUS_OPENED);
 
 	return (ret);
 }
@@ -3801,6 +3953,9 @@ raid_obj_attr_new(raid_obj_type_id_t obj_type)
 		break;
 	case	OBJ_TYPE_TASK:
 		obj_attr = calloc(1, sizeof (task_attr_t));
+		break;
+	case	OBJ_TYPE_PROP:
+		obj_attr = calloc(1, sizeof (property_attr_t));
 		break;
 	default:
 		break;
