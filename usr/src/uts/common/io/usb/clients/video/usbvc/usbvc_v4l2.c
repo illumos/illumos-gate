@@ -48,7 +48,8 @@ static int usbvc_v4l2_dequeue_buffer(usbvc_state_t *,
 static int usbvc_v4l2_query_ctrl(usbvc_state_t *, struct v4l2_queryctrl *);
 static int usbvc_v4l2_get_ctrl(usbvc_state_t *, struct v4l2_control *);
 static int usbvc_v4l2_set_ctrl(usbvc_state_t *, struct v4l2_control *);
-
+static int usbvc_v4l2_set_parm(usbvc_state_t *, struct v4l2_streamparm *);
+static int usbvc_v4l2_get_parm(usbvc_state_t *, struct v4l2_streamparm *);
 /* Video controls that supported by usbvc driver */
 static usbvc_v4l2_ctrl_map_t usbvc_v4l2_ctrls[] = {
 	{
@@ -112,7 +113,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 	{
 		struct v4l2_capability caps;
 
-		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "V4L2 ioctl: VIDIOC_QUERYCAP");
 		bzero(&caps, sizeof (caps));
 		(void) strncpy((char *)&caps.driver, "usbvc",
@@ -139,7 +140,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 		usbvc_format_group_t	*fmtgrp;
 		usbvc_stream_if_t	*strm_if;
 
-		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "V4L2 ioctl: VIDIOC_ENUM_FMT");
 		USBVC_COPYIN(fmtdesc);
 		mutex_enter(&usbvcp->usbvc_mutex);
@@ -153,7 +154,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 		}
 		fmtgrp = &strm_if->format_group[fmtdesc.index];
 		fmtdesc.pixelformat = fmtgrp->v4l2_pixelformat;
-		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L3(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "V4L2 ioctl: VIDIOC_ENUM_FMT, idx=%d, grpcnt=%d",
 		    fmtdesc.index, strm_if->fmtgrp_cnt);
 
@@ -195,7 +196,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 		struct v4l2_format	fmt;
 		usbvc_stream_if_t	*strm_if;
 
-		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "V4L2 ioctl: VIDIOC_S_FMT");
 		mutex_enter(&usbvcp->usbvc_mutex);
 		strm_if = usbvcp->usbvc_curr_strm;
@@ -224,7 +225,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 	{
 		struct v4l2_format	fmt;
 
-		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "V4L2 ioctl: VIDIOC_G_FMT");
 		USBVC_COPYIN(fmt);
 
@@ -243,7 +244,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 		uint_t				bufsize;
 		usbvc_stream_if_t		*strm_if;
 
-		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "V4L2 ioctl: VIDIOC_REQBUFS");
 		USBVC_COPYIN(reqbuf);
 		if (reqbuf.type != V4L2_BUF_TYPE_VIDEO_CAPTURE ||
@@ -349,7 +350,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 		usbvc_buf_grp_t		*usbvc_bufg;
 
 		USBVC_COPYIN(buf);
-		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "V4L2 ioctl: VIDIOC_QUERYBUF: idx=%d", buf.index);
 		mutex_enter(&usbvcp->usbvc_mutex);
 		usbvc_bufg = &usbvcp->usbvc_curr_strm->buf_map;
@@ -438,7 +439,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 		int			type; /* v4l2_buf_type */
 		usbvc_stream_if_t	*strm_if;
 
-		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "V4L2 ioctl: VIDIOC_STREAMON");
 		USBVC_COPYIN(type);
 		mutex_enter(&usbvcp->usbvc_mutex);
@@ -498,7 +499,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 		int			type;	/* v4l2_buf_type */
 		usbvc_stream_if_t	*strm_if;
 
-		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "V4L2 ioctl: VIDIOC_STREAMOFF");
 		USBVC_COPYIN(type);
 		mutex_enter(&usbvcp->usbvc_mutex);
@@ -538,7 +539,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 	{
 		struct v4l2_input input;
 
-		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "V4L2 ioctl: ENUMINPUT");
 		USBVC_COPYIN(input);
 
@@ -559,7 +560,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 	{
 		int input_idx = 0;	/* Support only one input now */
 
-		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "V4L2 ioctl: G_INPUT");
 		USBVC_COPYOUT(input_idx);
 
@@ -571,7 +572,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 		int input_idx;
 
 		USBVC_COPYIN(input_idx);
-		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "V4L2 ioctl: S_INPUT");
 		if (input_idx != 0) {	/* Support only one input now */
 			rv = EINVAL;
@@ -585,7 +586,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 	{
 		struct v4l2_queryctrl queryctrl;
 
-		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "V4L2 ioctl: QUERYCTRL");
 		USBVC_COPYIN(queryctrl);
 
@@ -603,7 +604,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 	{
 		struct v4l2_control ctrl;
 
-		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "V4L2 ioctl: G_CTRL");
 		USBVC_COPYIN(ctrl);
 		if (usbvc_v4l2_get_ctrl(usbvcp, &ctrl) != USB_SUCCESS) {
@@ -620,7 +621,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 	{
 		struct v4l2_control ctrl;
 
-		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 		    "V4L2 ioctl: S_CTRL");
 		USBVC_COPYIN(ctrl);
 		if (usbvc_v4l2_set_ctrl(usbvcp, &ctrl) != USB_SUCCESS) {
@@ -630,6 +631,68 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 		}
 
 		USBVC_COPYOUT(ctrl);
+
+		break;
+	}
+	case VIDIOC_S_PARM:
+	{
+		struct v4l2_streamparm	parm;
+		usbvc_stream_if_t	*strm_if;
+
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		    "V4L2 ioctl: VIDIOC_S_PARM");
+		mutex_enter(&usbvcp->usbvc_mutex);
+		strm_if = usbvcp->usbvc_curr_strm;
+
+		/* If data I/O is in progress */
+		if (strm_if->start_polling == 1) {
+			rv = EBUSY;
+			mutex_exit(&usbvcp->usbvc_mutex);
+
+			break;
+		}
+		mutex_exit(&usbvcp->usbvc_mutex);
+
+		USBVC_COPYIN(parm);
+
+		/* Support capture only, so far. */
+		if (parm.type != V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+			rv = EINVAL;
+
+			break;
+		}
+
+		if (usbvc_v4l2_set_parm(usbvcp, &parm) != USB_SUCCESS) {
+			rv = EINVAL;
+			USB_DPRINTF_L2(PRINT_MASK_IOCTL,
+			    usbvcp->usbvc_log_handle,
+			    "V4L2 ioctl VIDIOC_S_PARM fail");
+		}
+		USBVC_COPYOUT(parm);
+
+		break;
+	}
+	case VIDIOC_G_PARM:
+	{
+		struct v4l2_streamparm	parm;
+
+		USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		    "V4L2 ioctl: VIDIOC_G_PARM");
+		USBVC_COPYIN(parm);
+
+		/* Support capture only, so far. */
+		if (parm.type != V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+			rv = EINVAL;
+
+			break;
+		}
+
+		if ((rv = usbvc_v4l2_get_parm(usbvcp, &parm)) != USB_SUCCESS) {
+
+			break;
+		}
+
+		USBVC_COPYOUT(parm);
 
 		break;
 	}
@@ -649,7 +712,7 @@ usbvc_v4l2_ioctl(usbvc_state_t *usbvcp, int cmd, intptr_t arg, int mode)
 		rv = ENOTTY;
 	}
 
-	USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+	USB_DPRINTF_L3(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
 	    "usbvc_v4l2_ioctl: exit, rv=%d", rv);
 
 	return (rv);
@@ -1447,5 +1510,253 @@ usbvc_v4l2_set_ctrl(usbvc_state_t *usbvcp, struct v4l2_control *v4l2_ctrl)
 		freemsg(data);
 	}
 
+	return (USB_SUCCESS);
+}
+
+/* For the given interval, find the closest frame interval to it. */
+static uint32_t
+usbvc_find_interval(usbvc_frames_t *frame, uint32_t interval)
+{
+	uint32_t step, i, closest, index, approx1, approx2;
+
+
+	/*
+	 * for continuous case, there is a min and a max, and also a step
+	 * value. The available intervals are those between min and max
+	 * values.
+	 */
+	if (!frame->descr->bFrameIntervalType) {
+		step = frame->dwFrameIntervalStep;
+
+		if (step == 0) {
+		/* a malfunction device */
+
+			return (0);
+		} else if (interval <= frame->dwMinFrameInterval) {
+		/* return the most possible interval we can handle */
+
+			return (frame->dwMinFrameInterval);
+		} else if (interval >= frame->dwMaxFrameInterval) {
+		/* return the most possible interval we can handle */
+
+			return (frame->dwMaxFrameInterval);
+		}
+
+		approx1 = (interval / step) * step;
+		approx2 = approx1 + step;
+		closest = ((interval - approx1) < (approx2 - interval)) ?
+		    approx1 : approx2;
+
+		return (closest);
+	}
+
+	/*
+	 * for discrete case, search all the available intervals, find the
+	 * closest one.
+	 */
+	closest = 0;
+	approx2 = (uint32_t)-1;
+	for (index = 0; index < frame->descr->bFrameIntervalType; index++) {
+		LE_TO_UINT32(frame->dwFrameInterval, index * 4, i);
+		approx1 = (i > interval) ? (i - interval) : (interval - i);
+
+		if (approx1 == 0) {
+		/* find the matched one, return it immediately */
+			return (i);
+		}
+
+		if (approx1 < approx2) {
+			approx2 = approx1;
+			closest = i;
+		}
+	}
+
+	return (closest);
+}
+
+/* Implement ioctl VIDIOC_S_PARM. Support capture only, so far. */
+static int
+usbvc_v4l2_set_parm(usbvc_state_t *usbvcp, struct v4l2_streamparm *parm)
+{
+	usbvc_stream_if_t	*strm_if;
+	usbvc_format_group_t	*cur_fmt;
+	usbvc_frames_t			*cur_frame;
+	uint32_t n, d, c, i;
+	usbvc_vs_probe_commit_t	ctrl;
+
+	mutex_enter(&usbvcp->usbvc_mutex);
+	strm_if = usbvcp->usbvc_curr_strm;
+
+	if (!strm_if->cur_format_group ||
+	    !strm_if->cur_format_group->cur_frame) {
+		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		    "usbvc_v4l2_set_parm: current format or"
+		    " frame is not set. cur_fmt=%p",
+		    (void *)strm_if->cur_format_group);
+
+		mutex_exit(&usbvcp->usbvc_mutex);
+
+		return (USB_FAILURE);
+	}
+
+	cur_fmt = strm_if->cur_format_group;
+	cur_frame = cur_fmt->cur_frame;
+
+	mutex_exit(&usbvcp->usbvc_mutex);
+	if (parm->parm.capture.readbuffers > USBVC_MAX_READ_BUF_NUM) {
+		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		    "usbvc_v4l2_set_parm: ask too many read buffers,"
+		    " readbuffers=%d",
+		    parm->parm.capture.readbuffers);
+
+		return (USB_FAILURE);
+	}
+
+	n = parm->parm.capture.timeperframe.numerator;
+	d = parm->parm.capture.timeperframe.denominator;
+
+	/* check the values passed in, in case of zero devide */
+	if (d == 0) {
+		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		    "usbvc_v4l2_set_parm: invalid denominator=%d", d);
+
+		return (USB_FAILURE);
+	}
+
+	/*
+	 * UVC frame intervals are in 100ns units, need convert from
+	 * 1s unit to 100ns unit
+	 */
+	c = USBVC_FRAME_INTERVAL_DENOMINATOR;
+
+	/* check the values passed in, in case of overflow */
+	if (n / d >= ((uint32_t)-1) / c) {
+		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		    "usbvc_v4l2_set_parm: overflow, numerator=%d,"
+		    " denominator=%d", n, d);
+
+		return (USB_FAILURE);
+	}
+
+	USB_DPRINTF_L3(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+	    "usbvc_v4l2_set_parm: numerator=%d, denominator=%d", n, d);
+
+	/* compute the interval in 100ns unit */
+	if (n <= ((uint32_t)-1) / c) {
+		i = (n * c) / d;
+	} else {
+		do {
+			n >>= 1;
+			d >>= 1;
+		/* decrease both n and d, in case overflow */
+		} while (n && d && n > ((uint32_t)-1) / c);
+
+		if (!d) {
+			USB_DPRINTF_L2(PRINT_MASK_IOCTL,
+			    usbvcp->usbvc_log_handle,
+			    "usbvc_v4l2_set_parm: can't compute interval,"
+			    " denominator=%d", d);
+
+			return (USB_FAILURE);
+		}
+		i = (n * c) / d;
+	}
+
+	USB_DPRINTF_L3(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+	    "usbvc_v4l2_set_parm: want interval=%d, n=%d, d=%d, c=%d",
+	    i, n, d, c);
+
+	/*
+	 * Begin negotiate frame intervals.
+	 */
+	bcopy(&strm_if->ctrl_pc, &ctrl, sizeof (usbvc_vs_probe_commit_t));
+	i = usbvc_find_interval(cur_frame, i);
+
+	if (i == 0) {
+		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		    "usbvc_v4l2_set_parm: can not find an proper interval."
+		    " i=%d, n=%d, d=%d", i, n, d);
+
+		return (USB_FAILURE);
+	}
+
+	USB_DPRINTF_L3(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+	    "usbvc_v4l2_set_parm: get interval=%d", i);
+
+	UINT32_TO_LE(i, 0, ctrl.dwFrameInterval);
+
+	/* Probe, just a test before the real try */
+	if (usbvc_vs_set_probe_commit(usbvcp, strm_if, &ctrl, VS_PROBE_CONTROL)
+	    != USB_SUCCESS) {
+		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		    "usbvc_v4l2_set_parm: set probe failed");
+
+		return (USB_FAILURE);
+	}
+
+	/* Commit the frame interval. */
+	if (usbvc_vs_set_probe_commit(usbvcp, strm_if, &ctrl, VS_COMMIT_CONTROL)
+	    != USB_SUCCESS) {
+		USB_DPRINTF_L2(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
+		    "usbvc_v4l2_set_parm: set commit failed");
+
+		return (USB_FAILURE);
+	}
+
+	bcopy(&ctrl, &strm_if->ctrl_pc, sizeof (usbvc_vs_probe_commit_t));
+
+	LE_TO_UINT32(ctrl.dwFrameInterval, 0, i);
+	parm->parm.capture.timeperframe.numerator = i;
+	parm->parm.capture.timeperframe.denominator = c;
+
+	mutex_enter(&usbvcp->usbvc_mutex);
+	/*
+	 * According to ioctl VIDIOC_S_PARM, zero value of readbuffers will not
+	 * be set. And the current value is expected to return to application.
+	 */
+	if (parm->parm.capture.readbuffers != 0) {
+		strm_if->buf_read_num = parm->parm.capture.readbuffers;
+	} else {
+		parm->parm.capture.readbuffers = strm_if->buf_read_num;
+	}
+	mutex_exit(&usbvcp->usbvc_mutex);
+
+	return (USB_SUCCESS);
+}
+
+/* Implement ioctl VIDIOC_G_PARM. */
+static int
+usbvc_v4l2_get_parm(usbvc_state_t *usbvcp, struct v4l2_streamparm *parm)
+{
+	usbvc_stream_if_t	*strm_if;
+	uint32_t n, d;
+
+	bzero(parm, sizeof (*parm));
+
+	mutex_enter(&usbvcp->usbvc_mutex);
+	strm_if = usbvcp->usbvc_curr_strm;
+
+	/* return the actual number of buffers allocated for read() I/O */
+	parm->parm.capture.readbuffers = strm_if->buf_read.buf_cnt;
+
+	/* in 100ns units */
+	LE_TO_UINT32(strm_if->ctrl_pc.dwFrameInterval, 0, n);
+	mutex_exit(&usbvcp->usbvc_mutex);
+
+	/*
+	 * According to UVC payload specs, the dwFrameInterval in frame
+	 * descriptors is in 100ns unit.
+	 */
+	d = USBVC_FRAME_INTERVAL_DENOMINATOR;
+	parm->parm.capture.timeperframe.numerator = n;
+	parm->parm.capture.timeperframe.denominator = d;
+
+	/* Support capture only, so far. */
+	parm->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	parm->parm.capture.capability = V4L2_CAP_TIMEPERFRAME;
+	parm->parm.capture.capturemode = 0; /* no high quality imaging mode */
+	parm->parm.capture.extendedmode = 0; /* no driver specific parameters */
+
+	/* Always success for current support of this command */
 	return (USB_SUCCESS);
 }

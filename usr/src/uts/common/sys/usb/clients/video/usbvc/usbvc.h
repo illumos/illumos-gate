@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -358,7 +358,7 @@ typedef struct usbvc_frames {
 	uint32_t dwMinFrameInterval;	/* for continuous frame intervals */
 	uint32_t dwMaxFrameInterval;	/* for continuous frame intervals */
 	uint32_t dwFrameIntervalStep;	/* for continuous frame intervals */
-	uint32_t *dwFrameInterval;	/* for discrete frame intervals */
+	uint8_t *dwFrameInterval;	/* for discrete frame intervals */
 } usbvc_frames_t;
 
 /* The first several fixed length fields of still image frame descriptor */

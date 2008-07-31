@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,7 +75,7 @@ typedef struct usbvc_buf
 /* Group data buf related lists and other elements */
 typedef struct usbvc_buf_grp
 {
-	list_t		uv_buf_free;
+    list_t		uv_buf_free;
 	list_t		uv_buf_done;
 	usbvc_buf_t	*buf_filling;
 	uint_t		buf_cnt;
@@ -125,6 +125,7 @@ typedef struct usbvc_stream_if {
 	uchar_t		start_polling;	/* indicate if isoc polling started */
 	uchar_t		fid;		/* the MJPEG FID bit */
 	usbvc_buf_grp_t	buf_read;	/* buf used for read I/O */
+	uint8_t			buf_read_num; /* desired buf num for read I/O */
 	usbvc_buf_grp_t	buf_map;	/* buf used for mmap I/O */
 	list_node_t	stream_if_node;
 } usbvc_stream_if_t;
@@ -168,28 +169,32 @@ typedef struct usbvc_vic {
 
 #define	USBVC_MAX_PKTS 40
 
-#define	USBVC_READ_BUF_NUM 3
+#define	USBVC_DEFAULT_READ_BUF_NUM 3
+#define	USBVC_MAX_READ_BUF_NUM 40
 #define	USBVC_MAX_MAP_BUF_NUM 40
+
+/* According to UVC specs, the frame interval is in 100ns unit */
+#define	USBVC_FRAME_INTERVAL_DENOMINATOR	10000000
 
 /* Only D3...D0 are writable, Table 4-6, UVC Spec */
 #define	USBVC_POWER_MODE_MASK	0xf0;
 
 enum usbvc_buf_status {
 	USBVC_BUF_INIT		= 0,  /* Allocated, to be queued */
-	USBVC_BUF_MAPPED	= 1,  /* For map I/O only. Memory is mapped. */
-	USBVC_BUF_EMPTY		= 2, /* not initialized, to be filled */
+	    USBVC_BUF_MAPPED	= 1,  /* For map I/O only. Memory is mapped. */
+	    USBVC_BUF_EMPTY		= 2, /* not initialized, to be filled */
 
 	/*
 	 * buf is filled with a full frame without any errors,
 	 * it will be moved to full list.
 	 */
-	USBVC_BUF_DONE		= 4,
+	    USBVC_BUF_DONE		= 4,
 
 	/*
 	 * buf is filled to full but no EOF bit is found at the end
 	 * of video data
 	 */
-	USBVC_BUF_ERR		= 8
+	    USBVC_BUF_ERR		= 8
 };
 
 /*
@@ -252,8 +257,8 @@ struct usbvc_state {
  */
 #define	USBVC_COPYOUT(arg_name) \
 if (ddi_copyout(&arg_name, (caddr_t)arg, sizeof (arg_name), mode)) { \
-	rv = EFAULT; \
-	break;	\
+    rv = EFAULT; \
+    break;	\
 }
 
 /*
@@ -351,6 +356,7 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", usb_isoc_req))
 _NOTE(SCHEME_PROTECTS_DATA("unshared data", v4l2_queryctrl))
 _NOTE(SCHEME_PROTECTS_DATA("unshared data", v4l2_format))
 _NOTE(SCHEME_PROTECTS_DATA("unshared data", v4l2_control))
+_NOTE(SCHEME_PROTECTS_DATA("unshared data", v4l2_streamparm))
 
 int	usbvc_open_isoc_pipe(usbvc_state_t *, usbvc_stream_if_t *);
 int	usbvc_start_isoc_polling(usbvc_state_t *, usbvc_stream_if_t *, uchar_t);
