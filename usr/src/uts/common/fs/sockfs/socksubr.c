@@ -922,7 +922,8 @@ so_ux_lookup(struct sonode *so, struct sockaddr_un *soun, int checkaccess,
 	struct sonode	*so2;
 	int		error;
 
-	dprintso(so, 1, ("so_ux_lookup(%p) name <%s>\n", (void *)so, soun->sun_path));
+	dprintso(so, 1, ("so_ux_lookup(%p) name <%s>\n", (void *)so,
+	    soun->sun_path));
 
 	error = lookupname(soun->sun_path, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
 	if (error) {
