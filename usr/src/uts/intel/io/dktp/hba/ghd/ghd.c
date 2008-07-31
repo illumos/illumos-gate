@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,8 +161,17 @@ ghd_doneq_pollmode_exit(ccc_t *cccp)
 	mutex_exit(doneq_mutexp);
 
 	/* trigger software interrupt for the completion callbacks */
-	if (!L2_EMPTY(&cccp->ccc_doneq))
-		ddi_trigger_softintr(cccp->ccc_doneq_softid);
+	if (!L2_EMPTY(&cccp->ccc_doneq)) {
+		/*
+		 * If we are panicking we should just call the completion
+		 * function directly as we can not use soft interrupts
+		 * or timeouts during panic.
+		 */
+		if (!ddi_in_panic())
+			ddi_trigger_softintr(cccp->ccc_doneq_softid);
+		else
+			(void) ghd_doneq_process((caddr_t)cccp);
+	}
 }
 
 
@@ -392,7 +401,7 @@ ghd_intr(ccc_t *cccp, void *intr_status)
 	mutex_enter(hba_mutexp);
 
 	GDBG_INTR(("ghd_intr(): cccp=0x%p status=0x%p\n",
-		cccp, intr_status));
+	    cccp, intr_status));
 
 	for (;;) {
 		more = FALSE;
@@ -414,7 +423,7 @@ ghd_intr(ccc_t *cccp, void *intr_status)
 			continue;
 		}
 		GDBG_INTR(("ghd_intr(): done cccp=0x%p status=0x%p rc %d\n",
-			cccp, intr_status, rc));
+		    cccp, intr_status, rc));
 		/*
 		 * Release the mutexes in the opposite order that they
 		 * were acquired to prevent requests queued by
@@ -635,7 +644,7 @@ ghd_tran_abort_lun(ccc_t *cccp,	gtgt_t *gtgtp, void *intr_status)
 
 	/* wait for the device to go idle */
 	rc = ghd_poll(cccp, GHD_POLL_DEVICE, ghd_tran_abort_lun_timeout,
-		NULL, gtgtp, intr_status);
+	    NULL, gtgtp, intr_status);
 
 	ghd_doneq_pollmode_exit(cccp);
 
@@ -669,7 +678,7 @@ ghd_tran_reset_target(ccc_t *cccp, gtgt_t *gtgtp, void *intr_status)
 
 	/* wait for the device to reset */
 	rc = ghd_poll(cccp, GHD_POLL_DEVICE, ghd_tran_reset_target_timeout,
-		NULL, gtgtp, intr_status);
+	    NULL, gtgtp, intr_status);
 
 	ghd_doneq_pollmode_exit(cccp);
 
@@ -703,7 +712,7 @@ ghd_tran_reset_bus(ccc_t *cccp, gtgt_t *gtgtp, void *intr_status)
 	 * Wait for all active requests on this HBA to complete
 	 */
 	rc = ghd_poll(cccp, GHD_POLL_ALL, ghd_tran_reset_bus_timeout,
-		NULL, NULL, intr_status);
+	    NULL, NULL, intr_status);
 
 
 	ghd_doneq_pollmode_exit(cccp);
@@ -736,8 +745,8 @@ ghd_transport(ccc_t	*cccp,
 		mutex_enter(&cccp->ccc_hba_mutex);
 
 		GDBG_START(("ghd_transport: polled"
-			" cccp 0x%p gdevp 0x%p gtgtp 0x%p gcmdp 0x%p\n",
-				cccp, gdevp, gtgtp, gcmdp));
+		    " cccp 0x%p gdevp 0x%p gtgtp 0x%p gcmdp 0x%p\n",
+		    cccp, gdevp, gtgtp, gcmdp));
 
 		/*
 		 * Lock the doneq so no other thread flushes the Q.
@@ -747,8 +756,8 @@ ghd_transport(ccc_t	*cccp,
 #if defined(GHD_DEBUG) || defined(__lint)
 	else {
 		GDBG_START(("ghd_transport: non-polled"
-			" cccp 0x%p gdevp 0x%p gtgtp 0x%p gcmdp 0x%p\n",
-				cccp, gdevp, gtgtp, gcmdp));
+		    " cccp 0x%p gdevp 0x%p gtgtp 0x%p gcmdp 0x%p\n",
+		    cccp, gdevp, gtgtp, gcmdp));
 	}
 #endif
 	/*
@@ -851,7 +860,7 @@ int ghd_reset_notify(ccc_t 	*cccp,
 
 		mutex_enter(&cccp->ccc_reset_notify_mutex);
 		for (rnp = (ghd_reset_notify_list_t *)
-			L2_next(&cccp->ccc_reset_notify_list);
+		    L2_next(&cccp->ccc_reset_notify_list);
 		    rnp != NULL;
 		    rnp = (ghd_reset_notify_list_t *)L2_next(&rnp->l2_link)) {
 			if (rnp->gtgtp == gtgtp &&

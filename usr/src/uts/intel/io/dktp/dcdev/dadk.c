@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -247,7 +247,7 @@ extern struct mod_ops mod_miscops;
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,	/* Type of module */
-	"Direct Attached Disk %I%"
+	"Direct Attached Disk"
 };
 
 static struct modlinkage modlinkage = {
@@ -1340,6 +1340,14 @@ dadk_pktcb(struct cmpkt *pktp)
 
 	if (action == JUST_RETURN)
 		return;
+
+	/*
+	 * If we are panicking don't retry the command
+	 * just fail it so we can go down completing all
+	 * of the buffers.
+	 */
+	if (ddi_in_panic() && action == QUE_COMMAND)
+		action = COMMAND_DONE_ERROR;
 
 	if (action != COMMAND_DONE) {
 		if ((dadk_ioretry(pktp, action)) == JUST_RETURN)
