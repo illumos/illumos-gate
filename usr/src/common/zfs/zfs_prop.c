@@ -151,6 +151,13 @@ zfs_prop_init(void)
 		{ NULL }
 	};
 
+	static zprop_index_t cache_table[] = {
+		{ "none",	ZFS_CACHE_NONE },
+		{ "metadata",	ZFS_CACHE_METADATA },
+		{ "all",	ZFS_CACHE_ALL },
+		{ NULL }
+	};
+
 	/* inherit index properties */
 	register_index(ZFS_PROP_CHECKSUM, "checksum", ZIO_CHECKSUM_DEFAULT,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
@@ -173,6 +180,14 @@ zfs_prop_init(void)
 	register_index(ZFS_PROP_COPIES, "copies", 1,
 	    PROP_INHERIT, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "1 | 2 | 3", "COPIES", copies_table);
+	register_index(ZFS_PROP_PRIMARYCACHE, "primarycache",
+	    ZFS_CACHE_ALL, PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
+	    "all | none | metadata", "PRIMARYCACHE", cache_table);
+	register_index(ZFS_PROP_SECONDARYCACHE, "secondarycache",
+	    ZFS_CACHE_ALL, PROP_INHERIT,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
+	    "all | none | metadata", "SECONDARYCACHE", cache_table);
 
 	/* inherit index (boolean) properties */
 	register_index(ZFS_PROP_ATIME, "atime", 1, PROP_INHERIT,

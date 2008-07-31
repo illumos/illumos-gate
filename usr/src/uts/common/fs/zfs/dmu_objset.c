@@ -133,6 +133,34 @@ copies_changed_cb(void *arg, uint64_t newval)
 	osi->os_copies = newval;
 }
 
+static void
+primary_cache_changed_cb(void *arg, uint64_t newval)
+{
+	objset_impl_t *osi = arg;
+
+	/*
+	 * Inheritance and range checking should have been done by now.
+	 */
+	ASSERT(newval == ZFS_CACHE_ALL || newval == ZFS_CACHE_NONE ||
+	    newval == ZFS_CACHE_METADATA);
+
+	osi->os_primary_cache = newval;
+}
+
+static void
+secondary_cache_changed_cb(void *arg, uint64_t newval)
+{
+	objset_impl_t *osi = arg;
+
+	/*
+	 * Inheritance and range checking should have been done by now.
+	 */
+	ASSERT(newval == ZFS_CACHE_ALL || newval == ZFS_CACHE_NONE ||
+	    newval == ZFS_CACHE_METADATA);
+
+	osi->os_secondary_cache = newval;
+}
+
 void
 dmu_objset_byteswap(void *buf, size_t size)
 {
@@ -165,6 +193,8 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 		zb.zb_object = 0;
 		zb.zb_level = -1;
 		zb.zb_blkid = 0;
+		if (DMU_OS_IS_L2CACHEABLE(osi))
+			aflags |= ARC_L2CACHE;
 
 		dprintf_bp(osi->os_rootbp, "reading %s", "");
 		/*
@@ -190,18 +220,26 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 	/*
 	 * Note: the changed_cb will be called once before the register
 	 * func returns, thus changing the checksum/compression from the
-	 * default (fletcher2/off).  Snapshots don't need to know, and
-	 * registering would complicate clone promotion.
+	 * default (fletcher2/off).  Snapshots don't need to know about
+	 * checksum/compression/copies.
 	 */
-	if (ds && ds->ds_phys->ds_num_children == 0) {
-		err = dsl_prop_register(ds, "checksum",
-		    checksum_changed_cb, osi);
+	if (ds) {
+		err = dsl_prop_register(ds, "primarycache",
+		    primary_cache_changed_cb, osi);
 		if (err == 0)
-			err = dsl_prop_register(ds, "compression",
-			    compression_changed_cb, osi);
-		if (err == 0)
-			err = dsl_prop_register(ds, "copies",
-			    copies_changed_cb, osi);
+			err = dsl_prop_register(ds, "secondarycache",
+			    secondary_cache_changed_cb, osi);
+		if (!dsl_dataset_is_snapshot(ds)) {
+			if (err == 0)
+				err = dsl_prop_register(ds, "checksum",
+				    checksum_changed_cb, osi);
+			if (err == 0)
+				err = dsl_prop_register(ds, "compression",
+				    compression_changed_cb, osi);
+			if (err == 0)
+				err = dsl_prop_register(ds, "copies",
+				    copies_changed_cb, osi);
+		}
 		if (err) {
 			VERIFY(arc_buf_remove_ref(osi->os_phys_buf,
 			    &osi->os_phys_buf) == 1);
@@ -213,6 +251,8 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 		osi->os_checksum = ZIO_CHECKSUM_FLETCHER_4;
 		osi->os_compress = ZIO_COMPRESS_LZJB;
 		osi->os_copies = spa_max_replication(spa);
+		osi->os_primary_cache = ZFS_CACHE_ALL;
+		osi->os_secondary_cache = ZFS_CACHE_ALL;
 	}
 
 	osi->os_zil_header = osi->os_phys->os_zil_header;
@@ -393,13 +433,19 @@ dmu_objset_evict(dsl_dataset_t *ds, void *arg)
 		ASSERT(list_head(&osi->os_free_dnodes[i]) == NULL);
 	}
 
-	if (ds && ds->ds_phys && ds->ds_phys->ds_num_children == 0) {
-		VERIFY(0 == dsl_prop_unregister(ds, "checksum",
-		    checksum_changed_cb, osi));
-		VERIFY(0 == dsl_prop_unregister(ds, "compression",
-		    compression_changed_cb, osi));
-		VERIFY(0 == dsl_prop_unregister(ds, "copies",
-		    copies_changed_cb, osi));
+	if (ds) {
+		if (!dsl_dataset_is_snapshot(ds)) {
+			VERIFY(0 == dsl_prop_unregister(ds, "checksum",
+			    checksum_changed_cb, osi));
+			VERIFY(0 == dsl_prop_unregister(ds, "compression",
+			    compression_changed_cb, osi));
+			VERIFY(0 == dsl_prop_unregister(ds, "copies",
+			    copies_changed_cb, osi));
+		}
+		VERIFY(0 == dsl_prop_unregister(ds, "primarycache",
+		    primary_cache_changed_cb, osi));
+		VERIFY(0 == dsl_prop_unregister(ds, "secondarycache",
+		    secondary_cache_changed_cb, osi));
 	}
 
 	/*
@@ -867,9 +913,9 @@ dmu_objset_sync(objset_impl_t *os, zio_t *pio, dmu_tx_t *tx)
 	wp.wp_oscompress = os->os_compress;
 	arc_release(os->os_phys_buf, &os->os_phys_buf);
 	zio = arc_write(pio, os->os_spa, &wp,
-	    tx->tx_txg, os->os_rootbp, os->os_phys_buf, ready, NULL, os,
-	    ZIO_PRIORITY_ASYNC_WRITE, ZIO_FLAG_MUSTSUCCEED | ZIO_FLAG_METADATA,
-	    &zb);
+	    DMU_OS_IS_L2CACHEABLE(os), tx->tx_txg, os->os_rootbp,
+	    os->os_phys_buf, ready, NULL, os, ZIO_PRIORITY_ASYNC_WRITE,
+	    ZIO_FLAG_MUSTSUCCEED | ZIO_FLAG_METADATA, &zb);
 
 	/*
 	 * Sync meta-dnode - the parent IO for the sync is the root block

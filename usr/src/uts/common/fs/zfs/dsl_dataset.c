@@ -836,6 +836,10 @@ dsl_snapshot_destroy_one(char *name, void *arg)
 	*cp = '\0';
 	if (err == 0) {
 		dsl_dataset_make_exclusive(ds, da->dstg);
+		if (ds->ds_user_ptr) {
+			ds->ds_user_evict_func(ds, ds->ds_user_ptr);
+			ds->ds_user_ptr = NULL;
+		}
 		dsl_sync_task_create(da->dstg, dsl_dataset_destroy_check,
 		    dsl_dataset_destroy_sync, ds, da->dstg, 0);
 	} else if (err == ENOENT) {
@@ -905,6 +909,11 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag)
 	if (dsl_dataset_is_snapshot(ds)) {
 		/* Destroying a snapshot is simpler */
 		dsl_dataset_make_exclusive(ds, tag);
+
+		if (ds->ds_user_ptr) {
+			ds->ds_user_evict_func(ds, ds->ds_user_ptr);
+			ds->ds_user_ptr = NULL;
+		}
 		err = dsl_sync_task_do(ds->ds_dir->dd_pool,
 		    dsl_dataset_destroy_check, dsl_dataset_destroy_sync,
 		    ds, tag, 0);
@@ -2376,6 +2385,11 @@ dsl_dataset_promote_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	do {
 		dsl_dataset_t *ds = snap->ds;
 
+		/* unregister props as dsl_dir is changing */
+		if (ds->ds_user_ptr) {
+			ds->ds_user_evict_func(ds, ds->ds_user_ptr);
+			ds->ds_user_ptr = NULL;
+		}
 		/* move snap name entry */
 		dsl_dataset_name(ds, name);
 		VERIFY(0 == dsl_dataset_snap_remove(pa->old_head,
@@ -2383,7 +2397,6 @@ dsl_dataset_promote_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		VERIFY(0 == zap_add(dp->dp_meta_objset,
 		    hds->ds_phys->ds_snapnames_zapobj, ds->ds_snapname,
 		    8, 1, &ds->ds_object, tx));
-
 		/* change containing dsl_dir */
 		dmu_buf_will_dirty(ds->ds_dbuf, tx);
 		ASSERT3U(ds->ds_phys->ds_dir_obj, ==, odd->dd_object);

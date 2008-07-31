@@ -969,8 +969,8 @@ dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
 	wp.wp_dncompress = db->db_dnode->dn_compress;
 	wp.wp_oscompress = os->os_compress;
 	zio = arc_write(pio, os->os_spa, &wp,
-	    txg, bp, dr->dt.dl.dr_data, NULL, dmu_sync_done, in,
-	    ZIO_PRIORITY_SYNC_WRITE, zio_flags, &zb);
+	    DBUF_IS_L2CACHEABLE(db), txg, bp, dr->dt.dl.dr_data, NULL,
+	    dmu_sync_done, in, ZIO_PRIORITY_SYNC_WRITE, zio_flags, &zb);
 
 	if (pio) {
 		zio_nowait(zio);

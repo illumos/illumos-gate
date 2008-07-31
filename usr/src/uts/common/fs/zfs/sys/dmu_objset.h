@@ -69,6 +69,8 @@ typedef struct objset_impl {
 	uint8_t os_checksum;	/* can change, under dsl_dir's locks */
 	uint8_t os_compress;	/* can change, under dsl_dir's locks */
 	uint8_t os_copies;	/* can change, under dsl_dir's locks */
+	uint8_t os_primary_cache;	/* can change, under dsl_dir's locks */
+	uint8_t os_secondary_cache;	/* can change, under dsl_dir's locks */
 
 	/* no lock needed: */
 	struct dmu_tx *os_synctx; /* XXX sketchy */
@@ -92,6 +94,10 @@ typedef struct objset_impl {
 } objset_impl_t;
 
 #define	DMU_META_DNODE_OBJECT	0
+
+#define	DMU_OS_IS_L2CACHEABLE(os)				\
+	((os)->os_secondary_cache == ZFS_CACHE_ALL ||		\
+	(os)->os_secondary_cache == ZFS_CACHE_METADATA)
 
 /* called from zpl */
 int dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,

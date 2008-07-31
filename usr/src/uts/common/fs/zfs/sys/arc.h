@@ -67,6 +67,7 @@ typedef enum arc_buf_contents {
 #define	ARC_NOWAIT	(1 << 2)	/* perform I/O asynchronously */
 #define	ARC_PREFETCH	(1 << 3)	/* I/O is a prefetch */
 #define	ARC_CACHED	(1 << 4)	/* I/O was already in cache */
+#define	ARC_L2CACHE	(1 << 5)	/* cache in L2ARC */
 
 void arc_space_consume(uint64_t space);
 void arc_space_return(uint64_t space);
@@ -95,15 +96,15 @@ typedef struct writeprops {
 } writeprops_t;
 
 int arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_buf_t *pbuf,
-    arc_done_func_t *done, void *private, int priority, int flags,
+    arc_done_func_t *done, void *private, int priority, int zio_flags,
     uint32_t *arc_flags, const zbookmark_t *zb);
 int arc_read_nolock(zio_t *pio, spa_t *spa, blkptr_t *bp,
     arc_done_func_t *done, void *private, int priority, int flags,
     uint32_t *arc_flags, const zbookmark_t *zb);
 zio_t *arc_write(zio_t *pio, spa_t *spa, const writeprops_t *wp,
-    uint64_t txg, blkptr_t *bp, arc_buf_t *buf,
+    boolean_t l2arc, uint64_t txg, blkptr_t *bp, arc_buf_t *buf,
     arc_done_func_t *ready, arc_done_func_t *done, void *private, int priority,
-    int flags, const zbookmark_t *zb);
+    int zio_flags, const zbookmark_t *zb);
 int arc_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
     zio_done_func_t *done, void *private, uint32_t arc_flags);
 int arc_tryread(spa_t *spa, blkptr_t *bp, void *data);

@@ -497,6 +497,9 @@ dbuf_read_impl(dmu_buf_impl_t *db, zio_t *zio, uint32_t *flags)
 	db->db_state = DB_READ;
 	mutex_exit(&db->db_mtx);
 
+	if (DBUF_IS_L2CACHEABLE(db))
+		aflags |= ARC_L2CACHE;
+
 	zb.zb_objset = db->db_objset->os_dsl_dataset ?
 	    db->db_objset->os_dsl_dataset->ds_object : 0;
 	zb.zb_object = db->db.db_object;
@@ -536,7 +539,8 @@ dbuf_read(dmu_buf_impl_t *db, zio_t *zio, uint32_t flags)
 		rw_enter(&db->db_dnode->dn_struct_rwlock, RW_READER);
 
 	prefetch = db->db_level == 0 && db->db_blkid != DB_BONUS_BLKID &&
-	    (flags & DB_RF_NOPREFETCH) == 0 && db->db_dnode != NULL;
+	    (flags & DB_RF_NOPREFETCH) == 0 && db->db_dnode != NULL &&
+	    DBUF_IS_CACHEABLE(db);
 
 	mutex_enter(&db->db_mtx);
 	if (db->db_state == DB_CACHED) {
@@ -1746,7 +1750,10 @@ dbuf_rele(dmu_buf_impl_t *db, void *tag)
 			dbuf_evict(db);
 		} else {
 			VERIFY(arc_buf_remove_ref(db->db_buf, db) == 0);
-			mutex_exit(&db->db_mtx);
+			if (!DBUF_IS_CACHEABLE(db))
+				dbuf_clear(db);
+			else
+				mutex_exit(&db->db_mtx);
 		}
 	} else {
 		mutex_exit(&db->db_mtx);
@@ -2126,7 +2133,8 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, dmu_tx_t *tx)
 		    os->os_dsl_dataset, db->db_blkptr, zio, tx);
 
 	dr->dr_zio = arc_write(zio, os->os_spa, &wp,
-	    txg, db->db_blkptr, data, dbuf_write_ready, dbuf_write_done, db,
+	    DBUF_IS_L2CACHEABLE(db), txg, db->db_blkptr,
+	    data, dbuf_write_ready, dbuf_write_done, db,
 	    ZIO_PRIORITY_ASYNC_WRITE, zio_flags, &zb);
 }
 

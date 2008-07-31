@@ -475,11 +475,10 @@ static void arc_evict_ghost(arc_state_t *state, spa_t *spa, int64_t bytes);
 #define	ARC_BUF_AVAILABLE	(1 << 13)	/* block not in active use */
 #define	ARC_INDIRECT		(1 << 14)	/* this is an indirect block */
 #define	ARC_FREE_IN_PROGRESS	(1 << 15)	/* hdr about to be freed */
-#define	ARC_DONT_L2CACHE	(1 << 16)	/* originated by prefetch */
-#define	ARC_L2_WRITING		(1 << 17)	/* L2ARC write in progress */
-#define	ARC_L2_EVICTED		(1 << 18)	/* evicted during I/O */
-#define	ARC_L2_WRITE_HEAD	(1 << 19)	/* head of write list */
-#define	ARC_STORED		(1 << 20)	/* has been store()d to */
+#define	ARC_L2_WRITING		(1 << 16)	/* L2ARC write in progress */
+#define	ARC_L2_EVICTED		(1 << 17)	/* evicted during I/O */
+#define	ARC_L2_WRITE_HEAD	(1 << 18)	/* head of write list */
+#define	ARC_STORED		(1 << 19)	/* has been store()d to */
 
 #define	HDR_IN_HASH_TABLE(hdr)	((hdr)->b_flags & ARC_IN_HASH_TABLE)
 #define	HDR_IO_IN_PROGRESS(hdr)	((hdr)->b_flags & ARC_IO_IN_PROGRESS)
@@ -487,7 +486,7 @@ static void arc_evict_ghost(arc_state_t *state, spa_t *spa, int64_t bytes);
 #define	HDR_FREED_IN_READ(hdr)	((hdr)->b_flags & ARC_FREED_IN_READ)
 #define	HDR_BUF_AVAILABLE(hdr)	((hdr)->b_flags & ARC_BUF_AVAILABLE)
 #define	HDR_FREE_IN_PROGRESS(hdr)	((hdr)->b_flags & ARC_FREE_IN_PROGRESS)
-#define	HDR_DONT_L2CACHE(hdr)	((hdr)->b_flags & ARC_DONT_L2CACHE)
+#define	HDR_L2CACHE(hdr)	((hdr)->b_flags & ARC_L2CACHE)
 #define	HDR_L2_READING(hdr)	((hdr)->b_flags & ARC_IO_IN_PROGRESS &&	\
 				    (hdr)->b_l2hdr != NULL)
 #define	HDR_L2_WRITING(hdr)	((hdr)->b_flags & ARC_L2_WRITING)
@@ -2300,7 +2299,7 @@ arc_read_done(zio_t *zio)
 
 	hdr->b_flags &= ~ARC_L2_EVICTED;
 	if (l2arc_noprefetch && (hdr->b_flags & ARC_PREFETCH))
-		hdr->b_flags |= ARC_DONT_L2CACHE;
+		hdr->b_flags &= ~ARC_L2CACHE;
 
 	/* byteswap if necessary */
 	callback_list = hdr->b_acb;
@@ -2414,7 +2413,7 @@ arc_read_done(zio_t *zio)
  */
 int
 arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_buf_t *pbuf,
-    arc_done_func_t *done, void *private, int priority, int flags,
+    arc_done_func_t *done, void *private, int priority, int zio_flags,
     uint32_t *arc_flags, const zbookmark_t *zb)
 {
 	int err;
@@ -2424,7 +2423,7 @@ arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_buf_t *pbuf,
 	rw_enter(&pbuf->b_hdr->b_datalock, RW_READER);
 
 	err = arc_read_nolock(pio, spa, bp, done, private, priority,
-	    flags, arc_flags, zb);
+	    zio_flags, arc_flags, zb);
 
 	rw_exit(&pbuf->b_hdr->b_datalock);
 	return (err);
@@ -2432,7 +2431,7 @@ arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_buf_t *pbuf,
 
 int
 arc_read_nolock(zio_t *pio, spa_t *spa, blkptr_t *bp,
-    arc_done_func_t *done, void *private, int priority, int flags,
+    arc_done_func_t *done, void *private, int priority, int zio_flags,
     uint32_t *arc_flags, const zbookmark_t *zb)
 {
 	arc_buf_hdr_t *hdr;
@@ -2464,7 +2463,7 @@ top:
 				acb->acb_private = private;
 				if (pio != NULL)
 					acb->acb_zio_dummy = zio_null(pio,
-					    spa, NULL, NULL, flags);
+					    spa, NULL, NULL, zio_flags);
 
 				ASSERT(acb->acb_done != NULL);
 				acb->acb_next = hdr->b_acb;
@@ -2501,6 +2500,8 @@ top:
 		}
 		DTRACE_PROBE1(arc__hit, arc_buf_hdr_t *, hdr);
 		arc_access(hdr, hash_lock);
+		if (*arc_flags & ARC_L2CACHE)
+			hdr->b_flags |= ARC_L2CACHE;
 		mutex_exit(hash_lock);
 		ARCSTAT_BUMP(arcstat_hits);
 		ARCSTAT_CONDSTAT(!(hdr->b_flags & ARC_PREFETCH),
@@ -2540,6 +2541,8 @@ top:
 				    private);
 				hdr->b_flags |= ARC_PREFETCH;
 			}
+			if (*arc_flags & ARC_L2CACHE)
+				hdr->b_flags |= ARC_L2CACHE;
 			if (BP_GET_LEVEL(bp) > 0)
 				hdr->b_flags |= ARC_INDIRECT;
 		} else {
@@ -2554,6 +2557,8 @@ top:
 				hdr->b_flags |= ARC_PREFETCH;
 			else
 				add_reference(hdr, hash_lock, private);
+			if (*arc_flags & ARC_L2CACHE)
+				hdr->b_flags |= ARC_L2CACHE;
 			buf = kmem_cache_alloc(buf_cache, KM_PUSHPAGE);
 			buf->b_hdr = hdr;
 			buf->b_data = NULL;
@@ -2601,7 +2606,7 @@ top:
 		    demand, prefetch, hdr->b_type != ARC_BUFC_METADATA,
 		    data, metadata, misses);
 
-		if (l2arc_ndev != 0) {
+		if (l2arc_ndev != 0 && HDR_L2CACHE(hdr)) {
 			/*
 			 * Lock out device removal.
 			 */
@@ -2631,14 +2636,14 @@ top:
 				cb->l2rcb_spa = spa;
 				cb->l2rcb_bp = *bp;
 				cb->l2rcb_zb = *zb;
-				cb->l2rcb_flags = flags;
+				cb->l2rcb_flags = zio_flags;
 
 				/*
 				 * l2arc read.
 				 */
 				rzio = zio_read_phys(pio, vd, addr, size,
 				    buf->b_data, ZIO_CHECKSUM_OFF,
-				    l2arc_read_done, cb, priority, flags |
+				    l2arc_read_done, cb, priority, zio_flags |
 				    ZIO_FLAG_DONT_CACHE | ZIO_FLAG_CANFAIL,
 				    B_FALSE);
 				DTRACE_PROBE2(l2arc__read, vdev_t *, vd,
@@ -2667,7 +2672,7 @@ l2skip:
 		}
 
 		rzio = zio_read(pio, spa, bp, buf->b_data, size,
-		    arc_read_done, buf, priority, flags, zb);
+		    arc_read_done, buf, priority, zio_flags, zb);
 
 		if (*arc_flags & ARC_WAIT)
 			return (zio_wait(rzio));
@@ -3109,9 +3114,9 @@ write_policy(spa_t *spa, const writeprops_t *wp,
 
 zio_t *
 arc_write(zio_t *pio, spa_t *spa, const writeprops_t *wp,
-    uint64_t txg, blkptr_t *bp, arc_buf_t *buf,
+    boolean_t l2arc, uint64_t txg, blkptr_t *bp, arc_buf_t *buf,
     arc_done_func_t *ready, arc_done_func_t *done, void *private, int priority,
-    int flags, const zbookmark_t *zb)
+    int zio_flags, const zbookmark_t *zb)
 {
 	arc_buf_hdr_t *hdr = buf->b_hdr;
 	arc_write_callback_t *callback;
@@ -3121,6 +3126,8 @@ arc_write(zio_t *pio, spa_t *spa, const writeprops_t *wp,
 	ASSERT(!HDR_IO_ERROR(hdr));
 	ASSERT((hdr->b_flags & ARC_IO_IN_PROGRESS) == 0);
 	ASSERT(hdr->b_acb == 0);
+	if (l2arc)
+		hdr->b_flags |= ARC_L2CACHE;
 	callback = kmem_zalloc(sizeof (arc_write_callback_t), KM_SLEEP);
 	callback->awcb_ready = ready;
 	callback->awcb_done = done;
@@ -3130,7 +3137,7 @@ arc_write(zio_t *pio, spa_t *spa, const writeprops_t *wp,
 	write_policy(spa, wp, &cksum, &comp, &copies);
 	zio = zio_write(pio, spa, cksum, comp, copies, txg, bp,
 	    buf->b_data, hdr->b_size, arc_write_ready, arc_write_done,
-	    callback, priority, flags, zb);
+	    callback, priority, zio_flags, zb);
 
 	return (zio);
 }
@@ -4101,7 +4108,7 @@ l2arc_write_buffers(spa_t *spa, l2arc_dev_t *dev, uint64_t target_sz)
 				continue;
 			}
 
-			if (HDR_IO_IN_PROGRESS(ab) || HDR_DONT_L2CACHE(ab)) {
+			if (HDR_IO_IN_PROGRESS(ab) || !HDR_L2CACHE(ab)) {
 				mutex_exit(hash_lock);
 				continue;
 			}

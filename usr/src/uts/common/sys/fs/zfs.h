@@ -101,6 +101,8 @@ typedef enum {
 	ZFS_PROP_REFQUOTA,
 	ZFS_PROP_REFRESERVATION,
 	ZFS_PROP_GUID,
+	ZFS_PROP_PRIMARYCACHE,
+	ZFS_PROP_SECONDARYCACHE,
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 
@@ -220,6 +222,13 @@ typedef enum zfs_share_op {
 	ZFS_SHARE_SMB = 2,
 	ZFS_UNSHARE_SMB = 3
 } zfs_share_op_t;
+
+typedef enum zfs_cache_type {
+	ZFS_CACHE_NONE = 0,
+	ZFS_CACHE_METADATA = 1,
+	ZFS_CACHE_ALL = 2
+} zfs_cache_type_t;
+
 
 /*
  * On-disk version number.

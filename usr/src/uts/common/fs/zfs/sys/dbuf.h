@@ -279,10 +279,21 @@ void dbuf_new_size(dmu_buf_impl_t *db, int size, dmu_tx_t *tx);
 void dbuf_init(void);
 void dbuf_fini(void);
 
-#define	DBUF_GET_BUFC_TYPE(db)					\
-	((((db)->db_level > 0) ||				\
-	    (dmu_ot[(db)->db_dnode->dn_type].ot_metadata)) ?	\
-	    ARC_BUFC_METADATA : ARC_BUFC_DATA);
+#define	DBUF_IS_METADATA(db)	\
+	((db)->db_level > 0 || dmu_ot[(db)->db_dnode->dn_type].ot_metadata)
+
+#define	DBUF_GET_BUFC_TYPE(db)	\
+	(DBUF_IS_METADATA(db) ? ARC_BUFC_METADATA : ARC_BUFC_DATA)
+
+#define	DBUF_IS_CACHEABLE(db)						\
+	((db)->db_objset->os_primary_cache == ZFS_CACHE_ALL ||		\
+	(DBUF_IS_METADATA(db) &&					\
+	((db)->db_objset->os_primary_cache == ZFS_CACHE_METADATA)))
+
+#define	DBUF_IS_L2CACHEABLE(db)						\
+	((db)->db_objset->os_secondary_cache == ZFS_CACHE_ALL ||	\
+	(DBUF_IS_METADATA(db) &&					\
+	((db)->db_objset->os_secondary_cache == ZFS_CACHE_METADATA)))
 
 #ifdef ZFS_DEBUG
 
