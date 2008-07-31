@@ -173,6 +173,16 @@ rtrace_t npi_rtracebuf;
 uint32_t	nxge_set_replay_timer = 1;
 uint32_t	nxge_replay_timeout = 0xc;
 
+/*
+ * The transmit serialization sometimes causes
+ * longer sleep before calling the driver transmit
+ * function as it sleeps longer than it should.
+ * The performace group suggests that a time wait tunable
+ * can be used to set the maximum wait time when needed
+ * and the default is set to 1 tick.
+ */
+uint32_t	nxge_tx_serial_maxsleep = 1;
+
 #if	defined(sun4v)
 /*
  * Hypervisor N2/NIU services information.

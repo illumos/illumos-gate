@@ -35,6 +35,8 @@ extern proc_t p0;
 extern int servicing_interrupt(void);
 extern void bzero(void *, size_t);
 
+extern uint32_t nxge_tx_serial_maxsleep;
+
 #ifdef _KERNEL
 static void nxge_onetrack(void *p);
 #else
@@ -297,8 +299,10 @@ nxge_onetrack(void *s)
 				 */
 				while (p->serialop(mp, p->cookie)) {
 					hrtime_t tns = p->avg * p->length;
-					long wait = lbolt +
-					    drv_usectohz(tns / NXGE_TX_AVG_RES);
+					long wait = lbolt + min(
+					    drv_usectohz(tns / NXGE_TX_AVG_RES),
+					    nxge_tx_serial_maxsleep);
+
 					(void) cv_timedwait(&p->timecv,
 					    &p->serial, wait);
 					if (p->s_state &
