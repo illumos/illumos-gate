@@ -106,6 +106,9 @@ extern "C" {
 #define	MS_SUPERTOP_VID		0x14cd	/* Super Top USB 2.0 IDE enclosure */
 #define	MS_SUPERTOP_DEVICE_6600	0x6600
 
+#define	MS_AIGO_VID		0xed1	/* VendorID of Aigo */
+#define	MS_AIGO_DEVICE_6981	0x6981	/* Aigo Miniking Device NEHFSP14 */
+
 /*
  * The AMI virtual floppy device is not a real USB storage device, but
  * emulated by the SP firmware shipped together with important Sun x86

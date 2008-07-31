@@ -354,6 +354,10 @@ static struct blacklist {
 
 	/* Super Top USB 2.0 IDE Device */
 	{MS_SUPERTOP_VID, MS_SUPERTOP_DEVICE_6600, 0,
+	    SCSA2USB_ATTRS_USE_CSW_RESIDUE},
+
+	/* Aigo Miniking Device NEHFSP14 */
+	{MS_AIGO_VID, MS_AIGO_DEVICE_6981, 0,
 	    SCSA2USB_ATTRS_USE_CSW_RESIDUE}
 };
 
@@ -2367,7 +2371,7 @@ scsa2usb_scsi_bus_unconfig(dev_info_t *dip, uint_t flag, ddi_bus_config_op_t op,
 	    (save_flag & NDI_DEVI_REMOVE)) {
 		mutex_enter(&scsa2usbp->scsa2usb_mutex);
 		if (scsa2usbp->scsa2usb_warning_given != B_TRUE) {
-			USB_DPRINTF_L0(DPRINT_MASK_SCSA,
+			USB_DPRINTF_L2(DPRINT_MASK_SCSA,
 			    scsa2usbp->scsa2usb_log_handle,
 			    "Disconnected device was busy, "
 			    "please reconnect.");
