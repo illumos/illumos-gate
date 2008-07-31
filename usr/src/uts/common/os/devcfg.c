@@ -5709,7 +5709,7 @@ devi_unconfig_one(dev_info_t *pdip, char *devnm, int flags)
 
 	ndi_devi_exit(pdip, circ);
 	if (vdip)
-		ndi_devi_exit(pdip, v_circ);
+		ndi_devi_exit(vdip, v_circ);
 
 	return (rv);
 }
@@ -5804,7 +5804,7 @@ ndi_devi_unconfig_one(
 out:
 	ndi_devi_exit(pdip, circ);
 	if (vdip)
-		ndi_devi_exit(pdip, v_circ);
+		ndi_devi_exit(vdip, v_circ);
 
 	pm_post_unconfig(pdip, pm_cookie, devnm);
 
@@ -7819,6 +7819,7 @@ int
 e_ddi_unretire_device(char *path)
 {
 	int		circ;
+	int		circ2;
 	char		*path2;
 	dev_info_t	*pdip;
 	dev_info_t	*dip;
@@ -7868,9 +7869,9 @@ e_ddi_unretire_device(char *path)
 
 	(void) unmark_and_unfence(dip, path2);
 	if (!is_leaf_node(dip)) {
-		ndi_devi_enter(dip, &circ);
+		ndi_devi_enter(dip, &circ2);
 		ddi_walk_devs(ddi_get_child(dip), unmark_and_unfence, path2);
-		ndi_devi_exit(dip, circ);
+		ndi_devi_exit(dip, circ2);
 	}
 
 	kmem_free(path2, MAXPATHLEN);

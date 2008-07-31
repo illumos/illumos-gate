@@ -1321,6 +1321,7 @@ in_dq_drv(in_drv_t *mp)
 			prev->ind_next_drv = ptr->ind_next_drv;
 			return;
 		}
+		prev = ptr;
 	}
 	panic("in_dq_drv: in_drv not found on node driver list");
 }
