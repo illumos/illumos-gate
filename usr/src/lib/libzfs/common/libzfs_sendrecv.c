@@ -166,6 +166,7 @@ typedef struct send_data {
 	uint64_t parent_fromsnap_guid;
 	nvlist_t *parent_snaps;
 	nvlist_t *fss;
+	nvlist_t *snapprops;
 	const char *fromsnap;
 	const char *tosnap;
 
@@ -182,6 +183,7 @@ typedef struct send_data {
 	 *
 	 *	 "props" -> { name -> value (only if set here) }
 	 *	 "snaps" -> { name (lastname) -> number (guid) }
+	 *	 "snapprops" -> { name (lastname) -> { name -> value } }
 	 *
 	 *	 "origin" -> number (guid) (if clone)
 	 *	 "sent" -> boolean (not on-disk)
@@ -192,12 +194,15 @@ typedef struct send_data {
 	 */
 } send_data_t;
 
+static void send_iterate_prop(zfs_handle_t *zhp, nvlist_t *nv);
+
 static int
 send_iterate_snap(zfs_handle_t *zhp, void *arg)
 {
 	send_data_t *sd = arg;
 	uint64_t guid = zhp->zfs_dmustats.dds_guid;
 	char *snapname;
+	nvlist_t *nv;
 
 	snapname = strrchr(zhp->zfs_name, '@')+1;
 
@@ -211,6 +216,11 @@ send_iterate_snap(zfs_handle_t *zhp, void *arg)
 	    strcmp(snapname, sd->tosnap) == 0)) {
 		sd->parent_fromsnap_guid = guid;
 	}
+
+	VERIFY(0 == nvlist_alloc(&nv, NV_UNIQUE_NAME, 0));
+	send_iterate_prop(zhp, nv);
+	VERIFY(0 == nvlist_add_nvlist(sd->snapprops, snapname, nv));
+	nvlist_free(nv);
 
 	zfs_close(zhp);
 	return (0);
@@ -235,6 +245,8 @@ send_iterate_prop(zfs_handle_t *zhp, nvlist_t *nv)
 			uint64_t value;
 			verify(nvlist_lookup_uint64(propnv,
 			    ZPROP_VALUE, &value) == 0);
+			if (zhp->zfs_type == ZFS_TYPE_SNAPSHOT)
+				continue;
 		} else {
 			char *source;
 			if (nvlist_lookup_string(propnv,
@@ -292,9 +304,12 @@ send_iterate_fs(zfs_handle_t *zhp, void *arg)
 	/* iterate over snaps, and set sd->parent_fromsnap_guid */
 	sd->parent_fromsnap_guid = 0;
 	VERIFY(0 == nvlist_alloc(&sd->parent_snaps, NV_UNIQUE_NAME, 0));
+	VERIFY(0 == nvlist_alloc(&sd->snapprops, NV_UNIQUE_NAME, 0));
 	(void) zfs_iter_snapshots(zhp, send_iterate_snap, sd);
 	VERIFY(0 == nvlist_add_nvlist(nvfs, "snaps", sd->parent_snaps));
+	VERIFY(0 == nvlist_add_nvlist(nvfs, "snapprops", sd->snapprops));
 	nvlist_free(sd->parent_snaps);
+	nvlist_free(sd->snapprops);
 
 	/* add this fs to nvlist */
 	(void) snprintf(guidstring, sizeof (guidstring),
@@ -1180,7 +1195,7 @@ again:
 		    snapelem; snapelem = nextsnapelem) {
 			uint64_t thisguid;
 			char *stream_snapname;
-			nvlist_t *found;
+			nvlist_t *found, *props;
 
 			nextsnapelem = nvlist_next_nvpair(snaps, snapelem);
 
@@ -1208,6 +1223,22 @@ again:
 			}
 
 			stream_nvfs = found;
+
+			if (0 == nvlist_lookup_nvlist(stream_nvfs, "snapprops",
+			    &props) && 0 == nvlist_lookup_nvlist(props,
+			    stream_snapname, &props)) {
+				zfs_cmd_t zc = { 0 };
+
+				zc.zc_cookie = B_TRUE; /* clear current props */
+				snprintf(zc.zc_name, sizeof (zc.zc_name),
+				    "%s@%s", fsname, nvpair_name(snapelem));
+				if (zcmd_write_src_nvlist(hdl, &zc,
+				    props) == 0) {
+					(void) zfs_ioctl(hdl,
+					    ZFS_IOC_SET_PROP, &zc);
+					zcmd_free_nvlists(&zc);
+				}
+			}
 
 			/* check for different snapname */
 			if (strcmp(nvpair_name(snapelem),
@@ -1530,6 +1561,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	boolean_t stream_wantsnewfs;
 	uint64_t parent_snapguid = 0;
 	prop_changelist_t *clp = NULL;
+	nvlist_t *snapprops_nvlist = NULL;
 
 	begin_time = time(NULL);
 
@@ -1537,7 +1569,9 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	    "cannot receive"));
 
 	if (stream_avl != NULL) {
-		nvlist_t *fs = fsavl_find(stream_avl, drrb->drr_toguid, NULL);
+		char *snapname;
+		nvlist_t *fs = fsavl_find(stream_avl, drrb->drr_toguid,
+		    &snapname);
 		nvlist_t *props;
 		int ret;
 
@@ -1554,6 +1588,11 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		ret = zcmd_write_src_nvlist(hdl, &zc, props);
 		if (err)
 			nvlist_free(props);
+
+		if (0 == nvlist_lookup_nvlist(fs, "snapprops", &props)) {
+			VERIFY(0 == nvlist_lookup_nvlist(props,
+			    snapname, &snapprops_nvlist));
+		}
 
 		if (ret != 0)
 			return (-1);
@@ -1787,6 +1826,18 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 
 	err = ioctl_err = zfs_ioctl(hdl, ZFS_IOC_RECV, &zc);
 	ioctl_errno = errno;
+	zcmd_free_nvlists(&zc);
+
+	if (err == 0 && snapprops_nvlist) {
+		zfs_cmd_t zc2 = { 0 };
+
+		strcpy(zc2.zc_name, zc.zc_value);
+		if (zcmd_write_src_nvlist(hdl, &zc2, snapprops_nvlist) == 0) {
+			(void) zfs_ioctl(hdl, ZFS_IOC_SET_PROP, &zc2);
+			zcmd_free_nvlists(&zc2);
+		}
+	}
+
 	if (err && (ioctl_errno == ENOENT || ioctl_errno == ENODEV)) {
 		/*
 		 * It may be that this snapshot already exists,
@@ -1822,7 +1873,6 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		*cp = '@';
 	}
 
-	zcmd_free_nvlists(&zc);
 
 	if (ioctl_err != 0) {
 		switch (ioctl_errno) {

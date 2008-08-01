@@ -578,13 +578,6 @@ zfs_valid_proplist(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 	int chosen_normal = -1;
 	int chosen_utf = -1;
 
-	if (type == ZFS_TYPE_SNAPSHOT) {
-		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "snapshot properties cannot be modified"));
-		(void) zfs_error(hdl, EZFS_PROPTYPE, errbuf);
-		return (NULL);
-	}
-
 	if (nvlist_alloc(&ret, NV_UNIQUE_NAME, 0) != 0) {
 		(void) no_memory(hdl);
 		return (NULL);
@@ -630,6 +623,13 @@ zfs_valid_proplist(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 				goto error;
 			}
 			continue;
+		}
+
+		if (type == ZFS_TYPE_SNAPSHOT) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "this property can not be modified for snapshots"));
+			(void) zfs_error(hdl, EZFS_PROPTYPE, errbuf);
+			goto error;
 		}
 
 		if (!zfs_prop_valid_for_type(prop, type)) {
@@ -3450,10 +3450,11 @@ zfs_create_link_cb(zfs_handle_t *zhp, void *arg)
  * Takes a snapshot of the given dataset.
  */
 int
-zfs_snapshot(libzfs_handle_t *hdl, const char *path, boolean_t recursive)
+zfs_snapshot(libzfs_handle_t *hdl, const char *path, boolean_t recursive,
+    nvlist_t *props)
 {
 	const char *delim;
-	char *parent;
+	char parent[ZFS_MAXNAMELEN];
 	zfs_handle_t *zhp;
 	zfs_cmd_t zc = { 0 };
 	int ret;
@@ -3466,16 +3467,27 @@ zfs_snapshot(libzfs_handle_t *hdl, const char *path, boolean_t recursive)
 	if (!zfs_validate_name(hdl, path, ZFS_TYPE_SNAPSHOT, B_TRUE))
 		return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 
+	if (props) {
+		if ((props = zfs_valid_proplist(hdl, ZFS_TYPE_SNAPSHOT,
+		    props, B_FALSE, NULL, errbuf)) == NULL)
+			return (-1);
+
+		if (zcmd_write_src_nvlist(hdl, &zc, props) != 0) {
+			nvlist_free(props);
+			return (-1);
+		}
+
+		nvlist_free(props);
+	}
+
 	/* make sure the parent exists and is of the appropriate type */
 	delim = strchr(path, '@');
-	if ((parent = zfs_alloc(hdl, delim - path + 1)) == NULL)
-		return (-1);
 	(void) strncpy(parent, path, delim - path);
 	parent[delim - path] = '\0';
 
 	if ((zhp = zfs_open(hdl, parent, ZFS_TYPE_FILESYSTEM |
 	    ZFS_TYPE_VOLUME)) == NULL) {
-		free(parent);
+		zcmd_free_nvlists(&zc);
 		return (-1);
 	}
 
@@ -3487,6 +3499,8 @@ zfs_snapshot(libzfs_handle_t *hdl, const char *path, boolean_t recursive)
 		zc.zc_objset_type = DMU_OST_ZFS;
 	zc.zc_cookie = recursive;
 	ret = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_SNAPSHOT, &zc);
+
+	zcmd_free_nvlists(&zc);
 
 	/*
 	 * if it was recursive, the one that actually failed will be in
@@ -3510,7 +3524,6 @@ zfs_snapshot(libzfs_handle_t *hdl, const char *path, boolean_t recursive)
 			    dgettext(TEXT_DOMAIN,
 			    "Volume successfully snapshotted, but device links "
 			    "were not created"));
-			free(parent);
 			zfs_close(zhp);
 			return (-1);
 		}
@@ -3519,7 +3532,6 @@ zfs_snapshot(libzfs_handle_t *hdl, const char *path, boolean_t recursive)
 	if (ret != 0)
 		(void) zfs_standard_error(hdl, errno, errbuf);
 
-	free(parent);
 	zfs_close(zhp);
 
 	return (ret);

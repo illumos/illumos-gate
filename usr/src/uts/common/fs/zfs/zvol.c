@@ -843,7 +843,11 @@ zvol_update_volsize(zvol_state_t *zv, major_t maj, uint64_t volsize)
 		error = dmu_free_long_range(zv->zv_objset,
 		    ZVOL_OBJ, volsize, DMU_OBJECT_END);
 
-	if (error == 0) {
+	/*
+	 * If we are using a faked-up state (zv_minor == 0) then don't
+	 * try to update the in-core zvol state.
+	 */
+	if (error == 0 && zv->zv_minor) {
 		zv->zv_volsize = volsize;
 		zvol_size_changed(zv, maj);
 	}
@@ -857,25 +861,31 @@ zvol_set_volsize(const char *name, major_t maj, uint64_t volsize)
 	int error;
 	dmu_object_info_t doi;
 	uint64_t old_volsize = 0ULL;
+	zvol_state_t state = { 0 };
 
 	mutex_enter(&zvol_state_lock);
 
 	if ((zv = zvol_minor_lookup(name)) == NULL) {
-		mutex_exit(&zvol_state_lock);
-		return (ENXIO);
+		/*
+		 * If we are doing a "zfs clone -o volsize=", then the
+		 * minor node won't exist yet.
+		 */
+		error = dmu_objset_open(name, DMU_OST_ZVOL, DS_MODE_OWNER,
+		    &state.zv_objset);
+		if (error != 0)
+			goto out;
+		zv = &state;
 	}
 	old_volsize = zv->zv_volsize;
 
 	if ((error = dmu_object_info(zv->zv_objset, ZVOL_OBJ, &doi)) != 0 ||
 	    (error = zvol_check_volsize(volsize,
-	    doi.doi_data_block_size)) != 0) {
-		mutex_exit(&zvol_state_lock);
-		return (error);
-	}
+	    doi.doi_data_block_size)) != 0)
+		goto out;
 
 	if (zv->zv_flags & ZVOL_RDONLY || (zv->zv_mode & DS_MODE_READONLY)) {
-		mutex_exit(&zvol_state_lock);
-		return (EROFS);
+		error = EROFS;
+		goto out;
 	}
 
 	error = zvol_update_volsize(zv, maj, volsize);
@@ -892,6 +902,10 @@ zvol_set_volsize(const char *name, major_t maj, uint64_t volsize)
 			error = zvol_dumpify(zv);
 		}
 	}
+
+out:
+	if (state.zv_objset)
+		dmu_objset_close(state.zv_objset);
 
 	mutex_exit(&zvol_state_lock);
 

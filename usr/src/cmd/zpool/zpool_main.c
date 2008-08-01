@@ -3462,6 +3462,7 @@ zpool_do_upgrade(int argc, char **argv)
 		    "properties\n"));
 		(void) printf(gettext(" 10  Cache devices\n"));
 		(void) printf(gettext(" 11  Improved scrub performance\n"));
+		(void) printf(gettext(" 12  Snapshot properties\n"));
 		(void) printf(gettext("For more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"

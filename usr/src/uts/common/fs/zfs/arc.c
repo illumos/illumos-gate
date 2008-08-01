@@ -2417,6 +2417,7 @@ arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_buf_t *pbuf,
     uint32_t *arc_flags, const zbookmark_t *zb)
 {
 	int err;
+	arc_buf_hdr_t *hdr = pbuf->b_hdr;
 
 	ASSERT(!refcount_is_zero(&pbuf->b_hdr->b_refcnt));
 	ASSERT3U((char *)bp - (char *)pbuf->b_data, <, pbuf->b_hdr->b_size);
@@ -2425,6 +2426,7 @@ arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_buf_t *pbuf,
 	err = arc_read_nolock(pio, spa, bp, done, private, priority,
 	    zio_flags, arc_flags, zb);
 
+	ASSERT3P(hdr, ==, pbuf->b_hdr);
 	rw_exit(&pbuf->b_hdr->b_datalock);
 	return (err);
 }

@@ -802,6 +802,8 @@ dump_dsl_dataset(objset_t *os, uint64_t object, void *data, size_t size)
 	    (u_longlong_t)ds->ds_flags);
 	(void) printf("\t\tnext_clones_obj = %llu\n",
 	    (u_longlong_t)ds->ds_next_clones_obj);
+	(void) printf("\t\tprops_obj = %llu\n",
+	    (u_longlong_t)ds->ds_props_obj);
 	(void) printf("\t\tbp = %s\n", blkbuf);
 }
 

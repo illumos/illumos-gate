@@ -477,8 +477,9 @@ zfs_register_callbacks(vfs_t *vfsp)
 
 		dmu_objset_name(os, osname);
 		if (error = dsl_prop_get_integer(osname, "nbmand", &nbmand,
-		    NULL))
-		return (error);
+		    NULL)) {
+			return (error);
+		}
 	}
 
 	/*

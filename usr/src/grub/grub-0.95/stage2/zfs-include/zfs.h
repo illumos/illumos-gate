@@ -29,18 +29,7 @@
 /*
  * On-disk version number.
  */
-#define	SPA_VERSION_1			1ULL
-#define	SPA_VERSION_2			2ULL
-#define	SPA_VERSION_3			3ULL
-#define	SPA_VERSION_4			4ULL
-#define	SPA_VERSION_5			5ULL
-#define	SPA_VERSION_6			6ULL
-#define	SPA_VERSION_7			7ULL
-#define	SPA_VERSION_8			8ULL
-#define	SPA_VERSION_9			9ULL
-#define	SPA_VERSION_10			10ULL
-#define	SPA_VERSION_11			11ULL
-#define	SPA_VERSION			SPA_VERSION_11
+#define	SPA_VERSION			12ULL
 
 /*
  * The following are configuration names used in the nvlist describing a pool's

@@ -397,11 +397,11 @@ dsl_dataset_get_ref(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 			if (need_lock)
 				rw_enter(&dp->dp_config_rwlock, RW_READER);
 
-			err = dsl_prop_get_ds_locked(ds->ds_dir,
+			err = dsl_prop_get_ds(ds,
 			    "refreservation", sizeof (uint64_t), 1,
 			    &ds->ds_reserved, NULL);
 			if (err == 0) {
-				err = dsl_prop_get_ds_locked(ds->ds_dir,
+				err = dsl_prop_get_ds(ds,
 				    "refquota", sizeof (uint64_t), 1,
 				    &ds->ds_quota, NULL);
 			}
@@ -1673,6 +1673,10 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 		    ds->ds_phys->ds_next_clones_obj, &count) && count == 0);
 		VERIFY(0 == dmu_object_free(mos,
 		    ds->ds_phys->ds_next_clones_obj, tx));
+	}
+	if (ds->ds_phys->ds_props_obj != 0) {
+		VERIFY(0 == zap_destroy(mos,
+		    ds->ds_phys->ds_props_obj, tx));
 	}
 	dsl_dir_close(ds->ds_dir, ds);
 	ds->ds_dir = NULL;

@@ -93,8 +93,9 @@ typedef struct dsl_dataset_phys {
 	uint64_t ds_guid;
 	uint64_t ds_flags;		/* DS_FLAG_* */
 	blkptr_t ds_bp;
-	uint64_t ds_next_clones_obj;	/* DMU_OT_DSL_NEXT_CLONES */
-	uint64_t ds_pad[7]; /* pad out to 320 bytes for good measure */
+	uint64_t ds_next_clones_obj;	/* DMU_OT_DSL_CLONES */
+	uint64_t ds_props_obj;		/* DMU_OT_DSL_PROPS for snaps */
+	uint64_t ds_pad[6]; /* pad out to 320 bytes for good measure */
 } dsl_dataset_phys_t;
 
 typedef struct dsl_dataset {

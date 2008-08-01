@@ -304,7 +304,7 @@ take_snapshot(zfs_handle_t *zhp, char *snapshot_name, int snap_size,
 
 	if (pre_snapshot(presnapbuf) != Z_OK)
 		return (Z_ERR);
-	res = zfs_snapshot(g_zfs, snapshot_name, B_FALSE);
+	res = zfs_snapshot(g_zfs, snapshot_name, B_FALSE, NULL);
 	if (post_snapshot(postsnapbuf) != Z_OK)
 		return (Z_ERR);
 

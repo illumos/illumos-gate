@@ -269,8 +269,7 @@ uberblock_verify(uberblock_phys_t *ub, int offset)
 		return (-1);
 
 	if (uber->ub_magic == UBERBLOCK_MAGIC &&
-	    uber->ub_version >= SPA_VERSION_1 &&
-	    uber->ub_version <= SPA_VERSION)
+	    uber->ub_version > 0 && uber->ub_version <= SPA_VERSION)
 		return (0);
 
 	return (-1);

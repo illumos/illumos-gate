@@ -92,6 +92,7 @@ typedef struct zfs_ioc_vec {
 	boolean_t		zvec_his_log;
 } zfs_ioc_vec_t;
 
+static void clear_props(char *dataset, nvlist_t *props);
 static int zfs_fill_zplprops_root(uint64_t, nvlist_t *, nvlist_t *,
     boolean_t *);
 int zfs_set_prop_nvlist(const char *, nvlist_t *);
@@ -1465,8 +1466,6 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 				return (ENOTSUP);
 			break;
 		}
-		if ((error = zfs_secpolicy_setprop(name, prop, CRED())) != 0)
-			return (error);
 	}
 
 	elem = NULL;
@@ -1579,6 +1578,7 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
  * zc_name		name of filesystem
  * zc_value		name of property to inherit
  * zc_nvlist_src{_size}	nvlist of properties to apply
+ * zc_cookie		clear existing local props?
  *
  * outputs:		none
  */
@@ -1591,6 +1591,21 @@ zfs_ioc_set_prop(zfs_cmd_t *zc)
 	if ((error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
 	    &nvl)) != 0)
 		return (error);
+
+	if (zc->zc_cookie) {
+		nvlist_t *origprops;
+		objset_t *os;
+
+		if (dmu_objset_open(zc->zc_name, DMU_OST_ANY,
+		    DS_MODE_USER | DS_MODE_READONLY, &os) == 0) {
+			if (dsl_prop_get_all(os, &origprops, TRUE) == 0) {
+				clear_props(zc->zc_name, origprops);
+				nvlist_free(origprops);
+			}
+			dmu_objset_close(os);
+		}
+
+	}
 
 	error = zfs_set_prop_nvlist(zc->zc_name, nvl);
 
@@ -2129,6 +2144,27 @@ zfs_ioc_create(zfs_cmd_t *zc)
 	return (error);
 }
 
+struct snap_prop_arg {
+	nvlist_t *nvprops;
+	const char *snapname;
+};
+
+static int
+set_snap_props(char *name, void *arg)
+{
+	struct snap_prop_arg *snpa = arg;
+	int len = strlen(name) + strlen(snpa->snapname) + 2;
+	char *buf = kmem_alloc(len, KM_SLEEP);
+	int err;
+
+	(void) snprintf(buf, len, "%s@%s", name, snpa->snapname);
+	err = zfs_set_prop_nvlist(buf, snpa->nvprops);
+	if (err)
+		(void) dmu_objset_destroy(buf);
+	kmem_free(buf, len);
+	return (err);
+}
+
 /*
  * inputs:
  * zc_name	name of filesystem
@@ -2140,10 +2176,40 @@ zfs_ioc_create(zfs_cmd_t *zc)
 static int
 zfs_ioc_snapshot(zfs_cmd_t *zc)
 {
+	nvlist_t *nvprops = NULL;
+	int error;
+	boolean_t recursive = zc->zc_cookie;
+
 	if (snapshot_namecheck(zc->zc_value, NULL, NULL) != 0)
 		return (EINVAL);
-	return (dmu_objset_snapshot(zc->zc_name,
-	    zc->zc_value, zc->zc_cookie));
+
+	if (zc->zc_nvlist_src != NULL &&
+	    (error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
+	    &nvprops)) != 0)
+		return (error);
+
+	error = dmu_objset_snapshot(zc->zc_name, zc->zc_value, recursive);
+
+	/*
+	 * It would be nice to do this atomically.
+	 */
+	if (error == 0) {
+		struct snap_prop_arg snpa;
+		snpa.nvprops = nvprops;
+		snpa.snapname = zc->zc_value;
+		if (recursive) {
+			error = dmu_objset_find(zc->zc_name,
+			    set_snap_props, &snpa, DS_FIND_CHILDREN);
+			if (error) {
+				(void) dmu_snapshots_destroy(zc->zc_name,
+				    zc->zc_value);
+			}
+		} else {
+			error = set_snap_props(zc->zc_name, &snpa);
+		}
+	}
+	nvlist_free(nvprops);
+	return (error);
 }
 
 int
