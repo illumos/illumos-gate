@@ -78,6 +78,31 @@
 
 static char *program;
 
+static int s4, s6;	/* inet and inet6 sockets */
+
+static boolean_t
+open_sockets(void)
+{
+	if ((s4 = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+		(void) fprintf(stderr, "%s: inet socket: %s\n", program,
+		    strerror(errno));
+		return (B_FALSE);
+	}
+	if ((s6 = socket(AF_INET6, SOCK_DGRAM, 0)) == -1) {
+		(void) fprintf(stderr, "%s: inet6 socket: %s\n", program,
+		    strerror(errno));
+		return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+static void
+close_sockets(void)
+{
+	(void) close(s4);
+	(void) close(s6);
+}
+
 static char *
 get_root_fstype()
 {
@@ -137,28 +162,21 @@ boot_properties_present()
 }
 
 static char *
-get_first_interface()
+get_first_interface(boolean_t *dhcpflag)
 {
-	int fd;
 	struct lifnum ifnum;
 	struct lifconf ifconf;
 	struct lifreq *ifr;
-	static char interface[IFNAMSIZ];
-
-	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		(void) fprintf(stderr, "%s: socket: %s\n", program,
-		    strerror(errno));
-		return (NULL);
-	}
+	static char interface[LIFNAMSIZ];
+	boolean_t isv4, found_one = B_FALSE;
 
 	ifnum.lifn_family = AF_UNSPEC;
 	ifnum.lifn_flags = 0;
 	ifnum.lifn_count = 0;
 
-	if (ioctl(fd, SIOCGLIFNUM, &ifnum) < 0) {
+	if (ioctl(s4, SIOCGLIFNUM, &ifnum) < 0) {
 		(void) fprintf(stderr, "%s: SIOCGLIFNUM: %s\n", program,
 		    strerror(errno));
-		(void) close(fd);
 		return (NULL);
 	}
 
@@ -167,83 +185,69 @@ get_first_interface()
 	ifconf.lifc_len = ifnum.lifn_count * sizeof (struct lifreq);
 	ifconf.lifc_buf = alloca(ifconf.lifc_len);
 
-	if (ioctl(fd, SIOCGLIFCONF, &ifconf) < 0) {
+	if (ioctl(s4, SIOCGLIFCONF, &ifconf) < 0) {
 		(void) fprintf(stderr, "%s: SIOCGLIFCONF: %s\n", program,
 		    strerror(errno));
-		(void) close(fd);
 		return (NULL);
 	}
 
 	for (ifr = ifconf.lifc_req; ifr < &ifconf.lifc_req[ifconf.lifc_len /
 	    sizeof (ifconf.lifc_req[0])]; ifr++) {
+		struct lifreq flifr;
+		struct sockaddr_in *sin;
 
 		if (strchr(ifr->lifr_name, ':') != NULL)
 			continue;	/* skip logical interfaces */
 
-		if (ioctl(fd, SIOCGLIFFLAGS, ifr) < 0) {
-			(void) fprintf(stderr, "%s: SIOCGIFFLAGS: %s\n",
+		isv4 = ifr->lifr_addr.ss_family == AF_INET;
+
+		(void) strncpy(flifr.lifr_name, ifr->lifr_name, LIFNAMSIZ);
+
+		if (ioctl(isv4 ? s4 : s6, SIOCGLIFFLAGS, &flifr) < 0) {
+			(void) fprintf(stderr, "%s: SIOCGLIFFLAGS: %s\n",
 			    program, strerror(errno));
 			continue;
 		}
 
-		if (ifr->lifr_flags & (IFF_VIRTUAL|IFF_POINTOPOINT))
+		if (!(flifr.lifr_flags & IFF_UP) ||
+		    (flifr.lifr_flags & (IFF_VIRTUAL|IFF_POINTOPOINT)))
 			continue;
 
-		if (ifr->lifr_flags & IFF_UP) {
-			/*
-			 * For the "nfs rarp" and "nfs bootprops"
-			 * cases, we assume that the first non-virtual
-			 * IFF_UP interface is the one used.
-			 *
-			 * Since the order of the interfaces retrieved
-			 * via SIOCGLIFCONF is not deterministic, this
-			 * is largely silliness, but (a) "it's always
-			 * been this way", (b) machines booted this
-			 * way typically only have one interface, and
-			 * (c) no one consumes the interface name in
-			 * the RARP case anyway.
-			 */
-			(void) strncpy(interface, ifr->lifr_name, IFNAMSIZ);
-			(void) close(fd);
-			return (interface);
+		/*
+		 * For the "nfs rarp" and "nfs bootprops"
+		 * cases, we assume that the first non-virtual
+		 * IFF_UP interface with a non-zero address is
+		 * the one used.
+		 *
+		 * For the non-zero address check, we only check
+		 * v4 interfaces, as it's not possible to set the
+		 * the first logical interface (the only ones we
+		 * look at here) to ::0; that interface must have
+		 * a link-local address.
+		 *
+		 * If we don't find an IFF_UP interface with a
+		 * non-zero address, we'll return the last IFF_UP
+		 * interface seen.
+		 *
+		 * Since the order of the interfaces retrieved
+		 * via SIOCGLIFCONF is not deterministic, this
+		 * is largely silliness, but (a) "it's always
+		 * been this way", and (b) no one consumes the
+		 * interface name in the RARP case anyway.
+		 */
+
+		found_one = B_TRUE;
+		(void) strncpy(interface, ifr->lifr_name, LIFNAMSIZ);
+		*dhcpflag = (flifr.lifr_flags & IFF_DHCPRUNNING) != 0;
+		sin = (struct sockaddr_in *)&ifr->lifr_addr;
+		if (isv4 && (sin->sin_addr.s_addr == INADDR_ANY)) {
+			/* keep looking for a non-zero address */
+			continue;
 		}
+		return (interface);
 	}
 
-	(void) close(fd);
-
-	return (NULL);
-}
-
-/*
- * Is DHCP running on the specified interface?
- */
-static boolean_t
-check_dhcp_running(char *interface)
-{
-	int fd;
-	struct ifreq ifr;
-
-	if (interface == NULL)
-		return (B_FALSE);
-
-	(void) strncpy(ifr.ifr_name, interface, IFNAMSIZ);
-
-	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		(void) fprintf(stderr, "%s: socket: %s\n", program,
-		    strerror(errno));
-		return (B_FALSE);
-	}
-
-	if (ioctl(fd, SIOCGIFFLAGS, &ifr) < 0) {
-		(void) fprintf(stderr, "%s: SIOCGIFFLAGS: %s\n",
-		    program, strerror(errno));
-		return (B_FALSE);
-	}
-
-	if (ifr.ifr_flags & IFF_DHCPRUNNING)
-		return (B_TRUE);
-
-	return (B_FALSE);
+	return (found_one ? interface : NULL);
 }
 
 /* ARGSUSED */
@@ -252,11 +256,18 @@ main(int argc, char *argv[])
 {
 	char *root, *interface, *strategy, dummy;
 	long len;
+	boolean_t dhcp_running = B_FALSE;
 
 	root = interface = strategy = NULL;
 	program = argv[0];
 
 	root = get_root_fstype();
+
+	if (!open_sockets()) {
+		(void) fprintf(stderr,
+		    "%s: cannot get interface information\n", program);
+		return (2);
+	}
 
 	/*
 	 * If diskless, perhaps boot properties were used to configure
@@ -265,14 +276,16 @@ main(int argc, char *argv[])
 	if ((strcmp(root, "nfs") == 0) && boot_properties_present()) {
 		strategy = "bootprops";
 
-		interface = get_first_interface();
+		interface = get_first_interface(&dhcp_running);
 		if (interface == NULL) {
 			(void) fprintf(stderr,
 			    "%s: cannot identify root interface.\n", program);
+			close_sockets();
 			return (2);
 		}
 
 		(void) printf("%s %s %s\n", root, interface, strategy);
+		close_sockets();
 		return (0);
 	}
 
@@ -286,6 +299,7 @@ main(int argc, char *argv[])
 		interface = alloca(len);
 		(void) sysinfo(SI_DHCP_CACHE, interface, len);
 		(void) printf("%s %s %s\n", root, interface, strategy);
+		close_sockets();
 		return (0);
 	}
 
@@ -310,15 +324,16 @@ main(int argc, char *argv[])
 	 *	   It's too bad there isn't an IFF_RARPRUNNING flag.
 	 */
 
-	interface = get_first_interface();
+	interface = get_first_interface(&dhcp_running);
 
-	if (check_dhcp_running(interface))
+	if (dhcp_running)
 		strategy = "dhcp";
 
 	if (strcmp(root, "nfs") == 0 || strcmp(root, "cachefs") == 0) {
 		if (interface == NULL) {
 			(void) fprintf(stderr,
 			    "%s: cannot identify root interface.\n", program);
+			close_sockets();
 			return (2);
 		}
 		if (strategy == NULL)
@@ -329,5 +344,6 @@ main(int argc, char *argv[])
 	}
 
 	(void) printf("%s %s %s\n", root, interface, strategy);
+	close_sockets();
 	return (0);
 }
