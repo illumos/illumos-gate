@@ -95,9 +95,22 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 		ixgbe_ks->gprc.value.ul += IXGBE_READ_REG(hw, IXGBE_QPRC(i));
 		ixgbe_ks->gptc.value.ul += IXGBE_READ_REG(hw, IXGBE_QPTC(i));
 		ixgbe_ks->tor.value.ui64 += IXGBE_READ_REG(hw, IXGBE_QBRC(i));
-		ixgbe_ks->got.value.ui64 += IXGBE_READ_REG(hw, IXGBE_QBTC(i));
+		ixgbe_ks->tot.value.ui64 += IXGBE_READ_REG(hw, IXGBE_QBTC(i));
 	}
+
+	/*
+	 * This is a Workaround:
+	 * Currently h/w GORCH, GOTCH, TORH registers are not
+	 * correctly implemented. We found that the values in
+	 * these registers are same as those in corresponding
+	 * *L registers (i.e. GORCL, GOTCL, and TORL). Here the
+	 * gor and got stat data will not be retrieved through
+	 * GORC{H/L} and GOTC{H/L} registers but be obtained by
+	 * simply assigning tor/tot stat data, so the gor/got
+	 * stat data will not be accurate.
+	 */
 	ixgbe_ks->gor.value.ui64 = ixgbe_ks->tor.value.ui64;
+	ixgbe_ks->got.value.ui64 = ixgbe_ks->tot.value.ui64;
 
 	ixgbe_ks->prc64.value.ul += IXGBE_READ_REG(hw, IXGBE_PRC64);
 	ixgbe_ks->prc127.value.ul += IXGBE_READ_REG(hw, IXGBE_PRC127);

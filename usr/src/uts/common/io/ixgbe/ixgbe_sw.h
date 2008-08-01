@@ -750,6 +750,7 @@ typedef struct ixgbe_stat {
 	kstat_named_t roc;	/* Receive Oversize Count */
 	kstat_named_t rjc;	/* Receive Jabber Count */
 	kstat_named_t tor;	/* Total Octets Recvd Count */
+	kstat_named_t tot;	/* Total Octets Xmitted Count */
 	kstat_named_t tpr;	/* Total Packets Received */
 	kstat_named_t tpt;	/* Total Packets Xmitted */
 	kstat_named_t mptc;	/* Multicast Packets Xmited Count */

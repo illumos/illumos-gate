@@ -109,6 +109,13 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = ixgbe_ks->tor.value.ui64;
 		break;
 
+	case MAC_STAT_OBYTES:
+		for (i = 0; i < 16; i++)
+			ixgbe_ks->tot.value.ui64 +=
+			    IXGBE_READ_REG(hw, IXGBE_QBTC(i));
+		*val = ixgbe_ks->tot.value.ui64;
+		break;
+
 	case MAC_STAT_IPACKETS:
 		ixgbe_ks->tpr.value.ui64 +=
 		    IXGBE_READ_REG(hw, IXGBE_TPR);

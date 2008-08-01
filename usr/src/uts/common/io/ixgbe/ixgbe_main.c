@@ -30,7 +30,7 @@
 
 #include "ixgbe_sw.h"
 
-static char ident[] = "Intel 10Gb Ethernet 1.0.1";
+static char ident[] = "Intel 10Gb Ethernet 1.0.2";
 
 /*
  * Local function protoypes
@@ -1845,12 +1845,9 @@ ixgbe_setup_tx_ring(ixgbe_tx_ring_t *tx_ring)
 	}
 
 	/*
-	 * Initialize hardware checksum offload settings
+	 * Initialize the s/w context structure
 	 */
-	tx_ring->tx_context.hcksum_flags = 0;
-	tx_ring->tx_context.ip_hdr_len = 0;
-	tx_ring->tx_context.mac_hdr_len = 0;
-	tx_ring->tx_context.l4_proto = 0;
+	bzero(&tx_ring->tx_context, sizeof (ixgbe_tx_context_t));
 }
 
 static void
