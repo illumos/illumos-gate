@@ -1010,7 +1010,7 @@ staffer() {
 #
 check_closed_tree() {
 	if [ -z "$CLOSED_IS_PRESENT" ]; then
-		if [ -d $SRC/../closed ]; then
+		if [ -d $CODEMGR_WS/usr/closed ]; then
 			CLOSED_IS_PRESENT="yes"
 		else
 			CLOSED_IS_PRESENT="no"
@@ -1491,7 +1491,7 @@ export PATH
 
 # roots of source trees, both relative to $SRC and absolute.
 relsrcdirs="."
-if [[ -d $SRC/../closed && "$CLOSED_IS_PRESENT" != no ]]; then
+if [[ -d $CODEMGR_WS/usr/closed && "$CLOSED_IS_PRESENT" != no ]]; then
 	relsrcdirs="$relsrcdirs ../closed"
 fi
 abssrcdirs=""
@@ -2139,81 +2139,146 @@ type bringover_mercurial > /dev/null 2>&1 || bringover_mercurial() {
 	typeset -x PATH=$PATH
 
 	# If the repository doesn't exist yet, then we want to populate it.
-	# We only initially populate the closed repository if the open
-	# repository doesn't also exist (e.g.: don't bringover closed if
-	# only usr/src exists)
 	if [[ ! -d $CODEMGR_WS/.hg ]]; then
 		staffer hg init $CODEMGR_WS
-		# If the user set CLOSED_BRINGOVER_WS, then we'll want to
-		# initialise the closed repository
-		if [[ -n $CLOSED_BRINGOVER_WS ]]; then
-			staffer mkdir -p $CODEMGR_WS/usr
-			staffer hg init $CODEMGR_WS/usr/closed
-			CLOSED_IS_PRESENT="yes"
-		fi
+	fi
+
+	#
+	# If the user set CLOSED_BRINGOVER_WS and didn't set CLOSED_IS_PRESENT
+	# to "no," then we'll want to initialise the closed repository
+	#
+	# We use $orig_closed_is_present instead of $CLOSED_IS_PRESENT,
+	# because for newly-created source trees, the latter will be "no"
+	# until after the bringover completes.
+	#
+	if [[ "$orig_closed_is_present" != "no" && \
+	    -n "$CLOSED_BRINGOVER_WS" && \
+	    ! -d $CODEMGR_WS/usr/closed/.hg ]]; then
+		staffer mkdir -p $CODEMGR_WS/usr/closed
+		staffer hg init $CODEMGR_WS/usr/closed
+		export CLOSED_IS_PRESENT=yes
 	fi
 
 	typeset -x HGMERGE="/bin/false"
 
-	# Do the bringover, along with an update.  If a merge is necessary,
-	# this will not fail properly:
-	#     http://www.selenic.com/mercurial/bts/issue186
-	# so we grep through the output for signs of a merge.
 	#
-	# Note that pulling even non-conflicting changes on top of local
-	# changes (committed or not) requires a merge.
-	staffer hg --cwd $CODEMGR_WS pull -u $BRINGOVER_WS 2>&1 | \
-	    tee $TMPDIR/pull_open.out
-	hgstatus=$?
-	if [ $hgstatus -ne 0 ]; then
+	# If the user has changes, regardless of whether those changes are
+	# committed, and regardless of whether those changes conflict, then
+	# we'll attempt to merge them either implicitly (uncommitted) or
+	# explicitly (committed).
+	#
+	# These are the messages we'll use to help clarify mercurial output
+	# in those cases.
+	#
+	typeset mergefailmsg="\
+***\n\
+*** nightly was unable to automatically merge your changes.  You should\n\
+*** redo the full merge manually, following the steps outlined by mercurial\n\
+*** above, then restart nightly.\n\
+***\n"
+	typeset mergepassmsg="\
+***\n\
+*** nightly successfully merged your changes.  This means that your working\n\
+*** directory has been updated, but those changes are not yet committed.\n\
+*** After nightly completes, you should validate the results of the merge,\n\
+*** then use hg commit manually.\n\
+***\n"
+
+	#
+	# For each repository in turn:
+	#
+	# 1. Do the pull.  If this fails, dump the output and bail out.
+	#
+	# 2. If the pull resulted in an extra head, do an explicit merge.
+	#    If this fails, dump the output and bail out.
+	#
+	# Because we can't rely on Mercurial to exit with a failure code
+	# when a merge fails (Mercurial issue #186), we must grep the
+	# output of pull/merge to check for attempted and/or failed merges.
+	#
+	# 3. If a merge failed, set the message and fail the bringover.
+	#
+	# 4. Otherwise, if a merge succeeded, set the message
+	#
+	# 5. Dump the output, and any message from step 3 or 4.
+	#
+
+	staffer hg --cwd $CODEMGR_WS pull -u $BRINGOVER_WS \
+	    > $TMPDIR/pull_open.out 2>&1
+	if (( $? != 0 )); then
+		printf "%s: pull failed as follows:\n\n" "$CODEMGR_WS"
+		cat $TMPDIR/pull_open.out
+		if grep "^merging.*failed" $TMPDIR/pull_open.out > /dev/null 2>&1; then
+			printf "$mergefailmsg"
+		fi
 		touch $TMPDIR/bringover_failed
 		return
 	fi
 
-	# We never want to clone usr/closed by default.  If the usr/closed
-	# repository exists already and CLOSED_BRINGOVER_WS is set, then
-	# we update (pull -u).
-	if [[ -d $SRC/../closed && -n $CLOSED_BRINGOVER_WS ]]; then
-		staffer hg --cwd $SRC/../closed pull -u \
-			$CLOSED_BRINGOVER_WS 2>&1 | 
-			tee -a $TMPDIR/pull_closed.out
-		hgstatus=$?
-		if [ $hgstatus -ne 0 ]; then
+	if grep "not updating" $TMPDIR/pull_open.out > /dev/null 2>&1; then
+		staffer hg --cwd $CODEMGR_WS merge \
+		    >> $TMPDIR/pull_open.out 2>&1
+		if (( $? != 0 )); then
+			printf "%s: merge failed as follows:\n\n" \
+			    "$CODEMGR_WS"
+			cat $TMPDIR/pull_open.out
+			if grep "^merging.*failed" $TMPDIR/pull_open.out \
+			    > /dev/null 2>&1; then
+				printf "$mergefailmsg"
+			fi
 			touch $TMPDIR/bringover_failed
 			return
 		fi
 	fi
 
-	# If there were uncommitted changes, the pull -u would have
-	# attempted a merge.  In the likely event that it failed, fail the
-	# bringover.
-	if grep "^merging.*failed" $TMPDIR/pull_open.out > /dev/null 2>&1 || \
-		grep "^merging.*failed" $TMPDIR/pull_closed.out >/dev/null 2>&1;
-       	then
-		touch $TMPDIR/bringover_failed
-		return
+	printf "updated %s with the following results:\n" "$CODEMGR_WS"
+	cat $TMPDIR/pull_open.out
+	if grep "^merging" $TMPDIR/pull_open.out >/dev/null 2>&1; then
+		printf "$mergepassmsg"
 	fi
+	printf "\n"
 
-	# If heads were added, then a merge is required.  We attempt the
-	# merge, in case the branches touch different files (something that
-	# teamware wouldn't balk at).  If the merge fails, fail the
-	# bringover, leaving the conflicts unresolved.
 	#
-	# Note that even if the merge succeeds, the result of the merge
-	# will need to be committed, and not doing so will block any
-	# further pulls.
-	if grep "not updating" $TMPDIR/pull_open.out > /dev/null 2>&1; then
-		hg --cwd $CODEMGR_WS merge 2>&1 | tee $TMPDIR/merge.out
-		if grep "^merging.*failed" $TMPDIR/merge.out >/dev/null 2>&1;
-		then
+	# We only want to update usr/closed if it exists, and we haven't been
+	# told not to via $CLOSED_IS_PRESENT, and we actually know where to
+	# pull from ($CLOSED_BRINGOVER_WS).
+	#
+	if [[ $CLOSED_IS_PRESENT = yes && \
+	    -d $CODEMGR_WS/usr/closed/.hg && \
+	    -n $CLOSED_BRINGOVER_WS ]]; then
+
+		staffer hg --cwd $CODEMGR_WS/usr/closed pull -u \
+			$CLOSED_BRINGOVER_WS > $TMPDIR/pull_closed.out 2>&1
+		if (( $? != 0 )); then
+			printf "closed pull failed as follows:\n\n"
+			cat $TMPDIR/pull_closed.out
+			if grep "^merging.*failed" $TMPDIR/pull_closed.out \
+			    > /dev/null 2>&1; then
+				printf "$mergefailmsg"
+			fi
 			touch $TMPDIR/bringover_failed
+			return
 		fi
-	fi
-	if grep "not updating" $TMPDIR/pull_closed.out > /dev/null 2>&1; then
-		hg --cwd $SRC/../closed merge 2>&1 | tee $TMPDIR/merge.out
-		if grep "^merging.*failed" $TMPDIR/merge.out >/dev/null 2>&1;
-		then
-			touch $TMPDIR/bringover_failed
+
+		if grep "not updating" $TMPDIR/pull_closed.out > /dev/null 2>&1; then
+			staffer hg --cwd $CODEMGR_WS/usr/closed merge \
+			    >> $TMPDIR/pull_closed.out 2>&1
+			if (( $? != 0 )); then
+				printf "closed merge failed as follows:\n\n"
+				cat $TMPDIR/pull_closed.out
+				if grep "^merging.*failed" $TMPDIR/pull_closed.out > /dev/null 2>&1; then
+					printf "$mergefailmsg"
+				fi
+				touch $TMPDIR/bringover_failed
+				return
+			fi
+		fi
+
+		printf "updated %s with the following results:\n" \
+		    "$CODEMGR_WS/usr/closed"
+		cat $TMPDIR/pull_closed.out
+		if grep "^merging" $TMPDIR/pull_closed.out > /dev/null 2>&1; then
+			printf "$mergepassmsg"
 		fi
 	fi
 }
