@@ -367,7 +367,8 @@ ndi_dc_allochdl(void *iocarg, struct devctl_iocdata **rdcp)
 	 * copyin and unpack a user defined nvlist if one was passed
 	 */
 	if (dcp->nvl_user != NULL) {
-		if (dcp->nvl_usersz == 0) {
+		if ((dcp->nvl_usersz == 0) ||
+		    (dcp->nvl_usersz > DEVCTL_MAX_NVL_USERSZ)) {
 			if (dcp->c_nodename != NULL)
 				kmem_free(dcp->c_nodename, MAXNAMELEN);
 			if (dcp->c_unitaddr != NULL)
