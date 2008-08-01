@@ -1020,7 +1020,7 @@ core_pcbe_free(void *config)
 
 static struct modlpcbe core_modlpcbe = {
 	&mod_pcbeops,
-	"Core Performance Counters v%I%",
+	"Core Performance Counters",
 	&core_pcbe_ops
 };
 

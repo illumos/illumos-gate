@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -912,7 +912,7 @@ trunc3931(uint64_t value)
 
 static struct modlpcbe modlpcbe = {
 	&mod_pcbeops,
-	"Pentium Performance Counters v%I%",
+	"Pentium Performance Counters",
 	&ptm_pcbe_ops
 };
 

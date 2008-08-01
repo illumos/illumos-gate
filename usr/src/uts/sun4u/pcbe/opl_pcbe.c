@@ -759,7 +759,7 @@ opl_pcbe_free(void *config)
 
 static struct modlpcbe modlpcbe = {
 	&mod_pcbeops,
-	"SPARC64 VI&VII Perf Cntrs v%I%",
+	"SPARC64 VI&VII Perf Cntrs",
 	&opl_pcbe_ops
 };
 

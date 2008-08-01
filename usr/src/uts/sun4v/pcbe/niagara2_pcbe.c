@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -644,9 +644,9 @@ ni2_pcbe_free(void *config)
 static struct modlpcbe modlpcbe = {
 	&mod_pcbeops,
 #if defined(NIAGARA2_IMPL)
-	"UltraSPARC T2 Performance Counters v%I%",
+	"UltraSPARC T2 Performance Counters",
 #elif defined(VFALLS_IMPL)
-	"UltraSPARC T2+ Performance Counters v%I%",
+	"UltraSPARC T2+ Performance Counters",
 #endif
 	&ni2_pcbe_ops
 };
