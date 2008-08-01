@@ -1982,8 +1982,6 @@ sata_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 	 */
 	if ((rval = sata_dma_buf_setup(spx, flags, callback, arg,
 	    &cur_dma_attr)) != DDI_SUCCESS) {
-		spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp = NULL;
-		sata_pkt_free(spx);
 		/*
 		 * If a DMA allocation request fails with
 		 * DDI_DMA_NOMAPPING, indicate the error by calling
@@ -1991,6 +1989,8 @@ sata_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 		 * If a DMA allocation request fails with
 		 * DDI_DMA_TOOBIG, indicate the error by calling
 		 * bioerror(9F) with bp and an error code of EINVAL.
+		 * For DDI_DMA_NORESOURCES, we may have some of them allocated.
+		 * Request may be repeated later - there is no real error.
 		 */
 		switch (rval) {
 		case DDI_DMA_NORESOURCES:
@@ -2005,8 +2005,24 @@ sata_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 			bioerror(bp, EINVAL);
 			break;
 		}
-		if (new_pkt == TRUE)
-			scsi_hba_pkt_free(ap, pkt);
+		if (new_pkt == TRUE) {
+			/*
+			 * Since this is a new packet, we can clean-up
+			 * everything
+			 */
+			sata_scsi_destroy_pkt(ap, pkt);
+		} else {
+			/*
+			 * This is a re-used packet. It will be target driver's
+			 * responsibility to eventually destroy it (which
+			 * will free allocated resources).
+			 * Here, we just "complete" the request, leaving
+			 * allocated resources intact, so the request may
+			 * be retried.
+			 */
+			spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp = NULL;
+			sata_pkt_free(spx);
+		}
 		return (NULL);
 	}
 	/* Set number of bytes that are not yet accounted for */
@@ -5218,7 +5234,6 @@ sata_hba_start(sata_pkt_txlate_t *spx, int *rval)
 	    spx->txlt_sata_pkt);
 
 	mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
-	sdinfo = sata_get_device_info(sata_hba_inst, sata_device);
 	/*
 	 * If sata pkt was accepted and executed in asynchronous mode, i.e.
 	 * with the sata callback, the sata_pkt could be already destroyed
@@ -5228,8 +5243,7 @@ sata_hba_start(sata_pkt_txlate_t *spx, int *rval)
 	 * should be no references to it. In other cases, sata_pkt still
 	 * exists.
 	 */
-	switch (stat) {
-	case SATA_TRAN_ACCEPTED:
+	if (stat == SATA_TRAN_ACCEPTED) {
 		/*
 		 * pkt accepted for execution.
 		 * If it was executed synchronously, it is already completed
@@ -5237,7 +5251,10 @@ sata_hba_start(sata_pkt_txlate_t *spx, int *rval)
 		 */
 		*rval = TRAN_ACCEPT;
 		return (0);
+	}
 
+	sdinfo = sata_get_device_info(sata_hba_inst, sata_device);
+	switch (stat) {
 	case SATA_TRAN_QUEUE_FULL:
 		/*
 		 * Controller detected queue full condition.
