@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,3 +54,9 @@ rcsid
 sccsid
 secopt
 tcpopts
+lastx
+_drand48_a
+_drand48_c
+_drand48_x
+init48done
+seed_lock

@@ -220,6 +220,8 @@ int opts;
 			printf(" mssclamp %d", np->in_mssclamp);
 		if (np->in_tag.ipt_tag[0] != '\0')
 			printf(" tag %s", np->in_tag.ipt_tag);
+		if (np->in_flags & IPN_SEQUENTIAL)
+			printf(" sequential");
 		printf("\n");
 		if (opts & OPT_DEBUG) {
 			struct in_addr nip;

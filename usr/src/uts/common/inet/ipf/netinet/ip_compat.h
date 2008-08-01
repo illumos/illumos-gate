@@ -322,6 +322,7 @@ typedef mblk_t mb_t;
 typedef	struct uio	uio_t;
 # endif
 typedef	int		ioctlcmd_t;
+typedef	uint8_t		u_int8_t;
 
 # define OS_RECOGNISED 1
 
@@ -558,6 +559,8 @@ typedef struct {
 # endif
 
 # ifdef _KERNEL
+#  define	NEED_LOCAL_RAND	1
+#  define	ipf_random		arc4random
 #  define	ATOMIC_INC(x)		{ MUTEX_ENTER(&ipf_rw); \
 					  (x)++; MUTEX_EXIT(&ipf_rw); }
 #  define	ATOMIC_DEC(x)		{ MUTEX_ENTER(&ipf_rw); \
@@ -653,6 +656,8 @@ typedef struct mbuf mb_t;
 # include <sys/sysmacros.h>
 
 # ifdef _KERNEL
+#  define	NEED_LOCAL_RAND		1
+#  define	ipf_random		arc4random
 #  define	KMUTEX_T		simple_lock_data_t
 #  define	KRWLOCK_T		lock_data_t
 #  include <net/net_globals.h>

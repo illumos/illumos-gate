@@ -1525,6 +1525,9 @@ extern	void		ipf_freetoken __P((ipftoken_t *, ipf_stack_t *));
 extern	int		ipf_deltoken __P((int,int, void *, ipf_stack_t *));
 extern	int		ipf_genericiter __P((void *, int, void *,
 					     ipf_stack_t *));
+#ifndef ipf_random
+extern	u_32_t		ipf_random __P((void));
+#endif
 
 extern	char	ipfilter_version[];
 #ifdef	USE_INET6

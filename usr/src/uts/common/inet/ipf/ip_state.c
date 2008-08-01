@@ -157,6 +157,9 @@ int fr_stgetent __P((caddr_t, ipf_stack_t *));
 int fr_stateinit(ifs)
 ipf_stack_t *ifs;
 {
+#if defined(NEED_LOCAL_RAND) || !defined(_KERNEL)
+	struct timeval tv;
+#endif
 	int i;
 
 	KMALLOCS(ifs->ifs_ips_table, ipstate_t **, 
@@ -170,16 +173,20 @@ ipf_stack_t *ifs;
 		 ifs->ifs_fr_statesize * sizeof(*ifs->ifs_ips_seed));
 	if (ifs->ifs_ips_seed == NULL)
 		return -2;
+#if defined(NEED_LOCAL_RAND) || !defined(_KERNEL)
+	tv.tv_sec = 0;
+	GETKTIME(&tv);
+#endif
 	for (i = 0; i < ifs->ifs_fr_statesize; i++) {
 		/*
 		 * XXX - ips_seed[X] should be a random number of sorts.
 		 */
-#if  (__FreeBSD_version >= 400000)
-		ifs->ifs_ips_seed[i] = arc4random();
+#if !defined(NEED_LOCAL_RAND) && defined(_KERNEL)
+		ifs->ifs_ips_seed[i] = ipf_random();
 #else
 		ifs->ifs_ips_seed[i] = ((u_long)ifs->ifs_ips_seed + i) *
 		    ifs->ifs_fr_statesize;
-		ifs->ifs_ips_seed[i] ^= 0xa5a55a5a;
+		ifs->ifs_ips_seed[i] += tv.tv_sec;
 		ifs->ifs_ips_seed[i] *= (u_long)ifs->ifs_ips_seed;
 		ifs->ifs_ips_seed[i] ^= 0x5a5aa5a5;
 		ifs->ifs_ips_seed[i] *= ifs->ifs_fr_statemax;
