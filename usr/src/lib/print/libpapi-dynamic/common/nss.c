@@ -100,8 +100,15 @@ solaris_lpsched_shortcircuit_hack(papi_attribute_t ***list)
 
 	papiAttributeListGetString(*list, NULL,
 				"printer-uri-supported", &printer);
-	if (uri_from_string(printer, &uri) < 0)
+	/* if there is no printer-uri-supported, there is nothing to do */
+	if (printer == NULL)
 		return;
+
+	if (uri_from_string(printer, &uri) < 0) {
+		papiAttributeListFree(*list);
+		*list = NULL;
+		return;
+	}
 
 	/* already an lpsched URI ? */
 	if (strcasecmp(uri->scheme, "lpsched") == 0)

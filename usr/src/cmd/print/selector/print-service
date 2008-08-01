@@ -64,6 +64,8 @@ my $SVC_CUPS_SCHEDULER = 'cups/scheduler';
 my $SVC_CUPS_LPD = 'cups/in-lpd';
 
 sub fatal {
+	($ENV{"DESKTOP_LAUNCHED"}) &&
+		exec("/bin/zenity", "--error", "--text=@_");
 	print STDERR @_;
 	exit(1);
 }

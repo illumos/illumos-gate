@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -163,6 +163,14 @@ uri_from_string(char *string, uri_t **uri)
 		}
 	} else {	/* scheme:scheme_part */
 		u->scheme_part = strdup(&ptr[1]);
+	}
+
+	if ((u->host_part == NULL) && (u->path_part == NULL) &&
+	    (u->scheme_part == NULL)) {
+		errno = EINVAL;
+		uri_free(u);
+		*uri = NULL;
+		return (-1);
 	}
 
 	return (0);

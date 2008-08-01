@@ -400,8 +400,8 @@ strsplit(char *string, const char *seperators)
 }
 
 papi_status_t
-jobSubmitSTDIN(papi_service_t svc, char *printer, papi_attribute_t **list,
-		papi_job_t *job)
+jobSubmitSTDIN(papi_service_t svc, char *printer, char *prefetch, int len,
+		papi_attribute_t **list, papi_job_t *job)
 {
 	papi_status_t status;
 	papi_stream_t stream = NULL;
@@ -409,6 +409,10 @@ jobSubmitSTDIN(papi_service_t svc, char *printer, papi_attribute_t **list,
 	char buf[BUFSIZ];
 
 	status = papiJobStreamOpen(svc, printer, list, NULL, &stream);
+
+	if (len > 0)
+		status = papiJobStreamWrite(svc, stream, prefetch, len);
+
 	while ((status == PAPI_OK) && ((rc = read(0, buf, sizeof (buf))) > 0))
 		status = papiJobStreamWrite(svc, stream, buf, rc);
 
@@ -426,25 +430,35 @@ jobSubmitSTDIN(papi_service_t svc, char *printer, papi_attribute_t **list,
 #define	PS_MAGIC	"%!"
 #define	PC_PS_MAGIC	"^D%!"
 int
-is_postscript(const char *file)
+is_postscript_stream(int fd, char *buf, int *len)
 {
-	char buf[3];
-	int fd;
-
-	if ((fd = open(file, O_RDONLY)) < 0)
-		return (-1);
-
-	if (read(fd, buf, sizeof (buf)) < 0) {
+	if ((*len = read(fd, buf, *len)) < 0) {
 		close(fd);
 		return (-1);
 	}
-	close(fd);
 
 	if ((strncmp(buf, PS_MAGIC, sizeof (PS_MAGIC) - 1) == 0) ||
 	    (strncmp(buf, PC_PS_MAGIC, sizeof (PC_PS_MAGIC) - 1) == 0))
 		return (1);
 	else
 		return (0);
+}
+
+int
+is_postscript(const char *file)
+{
+	int rc = -1;
+	int fd;
+
+	if ((fd = open(file, O_RDONLY)) >= 0) {
+		char buf[3];
+		int len = sizeof (buf);
+
+		rc = is_postscript_stream(fd, buf, &len);
+		close(fd);
+	}
+
+	return (rc);
 }
 
 static char **

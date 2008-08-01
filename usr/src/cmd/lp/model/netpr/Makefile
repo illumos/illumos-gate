@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 1995-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/lp/model/netpr
@@ -34,9 +33,6 @@ include		../../Makefile.lp
 
 PURIFYOPTS      = -logfile=/tmp/errs.%p
 PURIFY          = purify $(PURIFYOPTS)
-
-LIBNPRT =	-L$(ROOT)/usr/lib -lprint $(LIBINTL)
-
 
 CPPFLAGS =	-I. -I$(LPINC) 	\
 		$(CPPFLAGS.master)
@@ -67,8 +63,7 @@ LPLIBS =			\
 		$(LIBOAM)	\
 		$(LIBLP)	\
 		$(LIBSEC)	\
-		$(LIBSYS)	\
-		$(LIBNPRT)
+		$(LIBSYS)
 
 SYSLIBS=	-lnsl -lsocket
 
@@ -116,7 +111,7 @@ strip:
 cstyle:
 		cstyle $(SRCS)
 
-LINTFLAGS	+= -L ../../../../lib/print -lprint -lnsl -lsocket
+LINTFLAGS	+= -lnsl -lsocket
 lint:
 		$(LINT.c) $(SRCS) $(LDLIBS)
 

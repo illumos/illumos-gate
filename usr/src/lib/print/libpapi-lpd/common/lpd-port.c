@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -232,6 +232,7 @@ next_job_id()
 			    (ftruncate(fd, 0) == 0))
 				write(fd, buf, strlen(buf));
 		}
+		close(fd);
 	}
 	syslog(LOG_DEBUG, "next_job_id() is %d", result);
 

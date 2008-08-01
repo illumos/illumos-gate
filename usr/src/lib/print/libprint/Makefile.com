@@ -28,7 +28,7 @@
 LIBRARY =		libprint.a
 VERS =			.2
 OBJECTS = \
-	job.o list.o misc.o network.o ns.o ns_bsd_addr.o ns_cmn_kvp.o \
+	list.o ns.o ns_bsd_addr.o ns_cmn_kvp.o \
 	ns_cmn_printer.o nss_convert.o nss_ldap.o nss_printer.o nss_write.o
 
 include ../../../Makefile.lib

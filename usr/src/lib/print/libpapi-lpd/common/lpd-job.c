@@ -94,10 +94,12 @@ add_lpd_control_line(char **metadata, char code, char *value)
 		*metadata = (char *)calloc(1, size);
 	} else {
 		void *tmp;
-		tmp = realloc(*metadata, size);
-		if (tmp)
+		tmp = calloc(1, size);
+		if (tmp) {
+			strlcpy(tmp, *metadata, size);
+			free(*metadata);
 			*metadata = (char *)tmp;
-		else
+		} else
 			return (PAPI_TEMPORARY_ERROR);
 	}
 

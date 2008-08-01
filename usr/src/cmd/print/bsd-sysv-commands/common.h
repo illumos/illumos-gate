@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -52,12 +52,14 @@ extern int berkeley_queue_report(papi_service_t svc, FILE *fp, char *dest,
 		int fmt, int ac, char *av[]);
 
 extern papi_status_t jobSubmitSTDIN(papi_service_t svc, char *printer,
+				char *prefetch, int len,
 				papi_attribute_t **list, papi_job_t *job);
 
 extern char **interest_list(papi_service_t svc);
 extern char *localhostname();
 extern char *lp_type_to_mime_type(char *lp_type);
 extern int is_postscript(const char *file);
+extern int is_postscript_stream(int fd, char *buf, int *len);
 
 extern int cli_auth_callback(papi_service_t svc, void *app_data);
 

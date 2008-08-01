@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,74 +53,13 @@
 #include <syslog.h>
 #include <unistd.h>
 
-typedef struct _jobfile jobfile_t;
-typedef struct _job job_t;
-
-struct _jobfile {
-	char	*jf_spl_path;	/* df file */
-	char	*jf_src_path;	/* source file */
-	char	*jf_name;		/* title/name */
-	char	*jf_data;	/* ptr to mmapped file */
-	long	jf_size;		/* size of data */
-	char	jf_mmapped;	/* is this mmapped or malloced */
-};
-
-struct _job {
-	int	job_id;
-	char	*job_printer;
-	char	*job_server;
-	char	*job_user;
-	char	*job_host;
-	char	*job_spool_dir;
-	jobfile_t *job_cf;
-	char 	job_df_next;
-	jobfile_t **job_df_list;
-};
-
-int	job_store(job_t *job);
-void	job_free(job_t *job);
-void	job_destroy(job_t *job);
-job_t	*job_create(char *printer, char *server, char *spool);
-job_t	*job_retrieve(char *xfer_file, char *spool);
-job_t	**job_list_append(job_t **list, char *printer, char *spool);
-#ifndef SUNOS_4
-int	vjob_match_attribute(char *attribute, __va_list ap);
-int	vjob_cancel(job_t *job, __va_list ap);
-#endif
-
-
 void **list_append(void **, void *);
 void **list_append_unique(void **, void *, int (*)(void *, void*));
 void **list_concatenate(void **, void **);
 void * list_locate(void **, int (*)(void *, void *), void *);
 int list_iterate(void **, int (*)(void *, __va_list), ...);
 
-char * get_user_name(void);
-int	check_client_spool(char *printer);
-int	get_lock(char *name, int write_pid);
-uid_t	get_user_id(void);
-char	*strcdup(char *, char);
-char	*strndup(char *, int);
-char	**strsplit(char *, char *);
-int	file_size(char *);
-int	copy_file(char *src, char *dst);
-int	map_in_file(const char *name, char **buf);
-int	write_buffer(char *name, char *buf, int len);
-void	start_daemon(int do_fork);
-int	kill_process(char *file);
 void	*dynamic_function(const char *, const char *);
-
-int	net_open(char *host, int timeout);
-int	net_close(int nd);
-int	net_read(int nd, char *buf, int len);
-int	net_write(int nd, char *buf, int len);
-int	net_printf(int nd, char *fmt, ...);
-char	*net_gets(char *buf, int size, int nd);
-int	net_send_message(int nd, char *fmt, ...);
-int	net_response(int nd);
-int	net_send_file(int nd, char *name, char *data, int data_len,
-				int type);
-
 
 struct ns_bsd_addr {
 	char	*server;	/* server name */

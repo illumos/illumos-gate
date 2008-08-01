@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,36 +72,6 @@ SUNWprivate_2.1 {
 		list_locate;
 		list_iterate;
 
-		job_free;			# job support
-		job_destroy;
-		job_retrieve;
-		job_list_append;
-		vjob_match_attribute;
-		vjob_cancel;
-
-		net_open;			# net support
-		net_close;
-		net_read;
-		net_write;
-		net_printf;
-		net_gets;
-		net_send_message;
-		net_response;
-		net_send_file;
-
-		check_client_spool;		# misc support
-		get_lock;
-		get_user_id;
-		get_user_name;
-		strcdup;
-		strndup;
-		strsplit;
-		file_size;
-		copy_file;
-		map_in_file;
-		write_buffer;
-		start_daemon;
-		
 		files_put_printer;		# required for ns_put_printer()
 		nis_put_printer;
 		nisplus_put_printer;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,20 @@
 
 #include <ns.h>
 #include <list.h>
-#include <misc.h>
+
+static char **
+strsplit(char *string, char *seperators)
+{
+	char **list = NULL;
+	char *where = NULL;
+	char *element;
+
+	for (element = strtok_r(string, seperators, &where); element != NULL;
+	    element = strtok_r(NULL, seperators, &where))
+		list = (char **)list_append((void **)list, element);
+
+	return (list);
+}
 
 /*
  *	Manipulate bsd_addr structures

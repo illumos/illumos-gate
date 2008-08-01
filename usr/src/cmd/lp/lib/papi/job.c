@@ -118,14 +118,15 @@ papiJobGetId(papi_job_t job)
 static REQUEST *
 create_request(papi_service_t svc, char *printer, papi_attribute_t **attributes)
 {
-	static REQUEST r;
+	REQUEST *r;
 
-	memset(&r, 0, sizeof (r));
-	r.priority = -1;
-	r.destination = printer_name_from_uri_id(printer, -1);
-	job_attributes_to_lpsched_request(svc, &r, attributes);
+	if ((r = calloc(1, sizeof (*r))) != NULL) {
+		r->priority = -1;
+		r->destination = printer_name_from_uri_id(printer, -1);
+		job_attributes_to_lpsched_request(svc, r, attributes);
+	}
 
-	return (&r);
+	return (r);
 }
 
 static papi_status_t
@@ -756,6 +757,7 @@ papiJobStreamClose(papi_service_t handle,
 			"job-uri", tmp);
 		free(s->meta_data_file);
 	}
+	freerequest(s->request);
 	free(s);
 
 	return (PAPI_OK);

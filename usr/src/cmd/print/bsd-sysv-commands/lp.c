@@ -70,6 +70,8 @@ main(int ac, char *av[])
 	papi_attribute_t **list = NULL;
 	papi_encryption_t encryption = PAPI_ENCRYPT_NEVER;
 	papi_job_t job = NULL;
+	char prefetch[3];
+	int prefetch_len = sizeof (prefetch);
 	char *printer = NULL;
 	char b = PAPI_TRUE;
 	int copy = 0;
@@ -230,6 +232,10 @@ main(int ac, char *av[])
 			if (is_postscript(av[optind]) == 1)
 				document_format = "application/postscript";
 #endif
+		} else {
+			if (is_postscript_stream(0, prefetch, &prefetch_len)
+						== 1)
+				document_format = "application/postscript";
 		}
 
 		papiAttributeListAddInteger(&list, PAPI_ATTR_EXCL, "copies", 1);
@@ -257,7 +263,8 @@ main(int ac, char *av[])
 	if (modify != -1)
 		status = papiJobModify(svc, printer, modify, list, &job);
 	else if (optind == ac)	/* no file list, use stdin */
-		status = jobSubmitSTDIN(svc, printer, list, &job);
+		status = jobSubmitSTDIN(svc, printer, prefetch, prefetch_len,
+					list, &job);
 	else if (validate == 1)	/* validate the request can be processed */
 		status = papiJobValidate(svc, printer, list,
 					NULL, &av[optind], &job);
