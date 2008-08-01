@@ -834,66 +834,6 @@ cmd_cache_valid_way_check(fmd_hdl_t *hdl, uint64_t ec_tag, uint64_t afar,
 	return (ret_val);
 }
 
-
-ssize_t
-cmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
-{
-	int err = 0;
-	uint8_t type;
-	uint32_t cpuid, index, way;
-	char *serstr = NULL;
-
-	err = nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid);
-	err |= nvlist_lookup_string(nvl, FM_FMRI_CPU_SERIAL_ID, &serstr);
-	err |= nvlist_lookup_uint32(nvl, FM_FMRI_CPU_CACHE_INDEX, &index);
-	err |= nvlist_lookup_uint32(nvl, FM_FMRI_CPU_CACHE_WAY, &way);
-	err |= nvlist_lookup_uint8(nvl, FM_FMRI_CPU_CACHE_TYPE, &type);
-
-	if (err)
-		return (-1);
-
-	return (snprintf(buf, buflen,
-	    "cpu:///%s=%u/%s=%s/%s=%u/%s=%u/%s=%u/%s=%d",
-	    FM_FMRI_CPU_ID, cpuid,
-	    FM_FMRI_CPU_SERIAL_ID, serstr,
-	    FM_FMRI_CPU_CACHE_INDEX, index,
-	    FM_FMRI_CPU_CACHE_WAY, way,
-	    FM_FMRI_CPU_CACHE_TYPE, type));
-}
-
-
-int
-cmd_Lx_repair_rsrc(fmd_hdl_t *hdl, nvlist_t *nvl)
-{
-	fmd_adm_t *ap;
-	char *buf = NULL;
-	ssize_t buflen;
-	int err;
-
-	if ((ap = fmd_adm_open(NULL, FMD_ADM_PROGRAM,
-	    FMD_ADM_VERSION)) == NULL) {
-		fmd_hdl_debug(hdl, "Could not contact fmadm to unretire\n");
-		return (-1);
-	}
-	if ((buflen = cmd_fmri_nvl2str(nvl, NULL, 0)) == -1 ||
-	    (buf = fmd_hdl_zalloc(hdl, buflen + 1, FMD_NOSLEEP)) == NULL ||
-	    cmd_fmri_nvl2str(nvl, buf, buflen + 1) == -1) {
-		fmd_hdl_debug(hdl, "Failed to reload asru for repair");
-		if (buf != NULL)
-			fmd_hdl_free(hdl, buf, buflen + 1);
-			err = -1;
-			goto out;
-	}
-
-	err = fmd_adm_rsrc_repair(ap, buf);
-	if (err)
-		err = -1;
-out:
-	fmd_adm_close(ap);
-	return (err);
-}
-
-
 /* Find the lowest way SERD engine not faulted for the given index */
 
 uint32_t
@@ -946,10 +886,10 @@ cmd_Lx_lookup_lowest_suspicous_way(cmd_Lxcache_t **other_cache, cmd_cpu_t *cpu,
     int32_t index, cmd_ptrsubtype_t pstype)
 {
 	cmd_Lxcache_t *cache = NULL;
-	uint32_t way, way1;
+	int32_t way, way1 = -1;
 
 	*other_cache = NULL;
-	for (way = 0; way < LX_NWAYS - 1; way++) {
+	for (way = 0; way < LX_NWAYS; way++) {
 		cache = cmd_Lxcache_lookup_by_index_way(cpu, pstype,
 		    index, way);
 			if (cache != NULL &&
@@ -964,11 +904,13 @@ cmd_Lx_lookup_lowest_suspicous_way(cmd_Lxcache_t **other_cache, cmd_cpu_t *cpu,
 	} else  {
 		pstype = CMD_PTR_CPU_L3TAG;
 	}
-	for (way = 0; way < LX_NWAYS - 1; way++) {
+	for (way = 0; way < LX_NWAYS; way++) {
 		cache = cmd_Lxcache_lookup_by_index_way(cpu, pstype,
 		    index, way);
 			if (cache != NULL &&
 			    (cache->Lxcache_reason == CMD_LXSUSPICOUS)) {
+				if (way1 == -1)
+					return (way);
 				/* Return the smaller of the two */
 				if (way < way1) {
 					*other_cache = cache;
@@ -978,7 +920,8 @@ cmd_Lx_lookup_lowest_suspicous_way(cmd_Lxcache_t **other_cache, cmd_cpu_t *cpu,
 				}
 		}
 	}
-	return ((uint32_t)-1);
+	/* if there are no suspicious tag ways, we fall through */
+	return (way1);
 }
 /* Count the number of ways convicted for a given index */
 
@@ -1300,22 +1243,13 @@ cmd_cache_ce_panther(fmd_hdl_t *hdl, fmd_event_t *ep, cmd_xr_t *xr)
 
 				cmd_Lxcache_destroy(hdl, xr->xr_cpu,
 				    other_cache);
-
-				/* Repair the cache line */
-				if (nvlist_add_uint32(repair_nvl,
-				    FM_FMRI_CPU_CACHE_WAY, unretire_way) == 0)
-					if (cmd_Lx_repair_rsrc(hdl,
-					    repair_nvl)) {
-						fmd_hdl_debug(hdl, "failed"
-						    " to repair index %d"
-						    " way %d\n",
-						    xr->xr_error_index,
-						    unretire_way);
-					}
-				else
-					fmd_hdl_debug(hdl, "failed to add"
-					    "way to nvl to repair resource",
-					    "with way %d\n", unretire_way);
+				/*
+				 * Unretire the cacheline from DE.
+				 */
+				if (cmd_Lxcache_unretire(hdl, cpu,
+				    other_cache,
+				    cache_ed->ed_fltnm) == B_FALSE)
+					return (CMD_EVD_BAD);
 			}
 			/* Indicate our reason for retiring */
 			cache->Lxcache_reason = CMD_LXSUSPICOUS;

@@ -296,6 +296,8 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl, boolean_t repair)
 	uint_t nvc = 0;
 	uint_t keepopen;
 	int err = 0;
+	nvlist_t *asru;
+	uint32_t index;
 
 	err |= nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid);
 	err |= nvlist_lookup_nvlist_array(nvl, FM_SUSPECT_FAULT_LIST,
@@ -309,7 +311,6 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl, boolean_t repair)
 	while (nvc-- != 0 && (repair || !fmd_case_uuclosed(hdl, uuid))) {
 		nvlist_t *nvl = *nva++;
 		const cma_subscriber_t *subr;
-		nvlist_t *asru;
 
 		if ((subr = nvl2subr(hdl, nvl, &asru)) == NULL)
 			continue;
@@ -327,9 +328,14 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl, boolean_t repair)
 				keepopen--;
 		}
 	}
-
-	if (!keepopen && !repair)
-		fmd_case_uuclose(hdl, uuid);
+	/*
+	 * Do not close the case if we are handling cache faults.
+	 */
+	if (nvlist_lookup_uint32(asru, FM_FMRI_CPU_CACHE_INDEX, &index) != 0) {
+		if (!keepopen && !repair) {
+			fmd_case_uuclose(hdl, uuid);
+		}
+	}
 }
 
 static void

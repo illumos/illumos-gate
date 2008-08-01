@@ -48,6 +48,10 @@ extern "C" {
 #define	CMD_ANON_WAY	-1
 #define	MAX_WAYS	8
 #define	CMD_LxCACHE_F_FAULTING	1
+#define	CMD_LxCACHE_F_RETIRED	0x2
+#define	CMD_LxCACHE_F_UNRETIRED 0x4
+#define	CMD_LxCACHE_F_RERETIRED 0x8
+
 #define	LxCACHE_MKVERSION(version)	((version) << 4 | 1)
 
 #define	CMD_LxCACHE_VERSION_1	LxCACHE_MKVERSION(1)	/* 17 */
@@ -55,6 +59,7 @@ extern "C" {
 
 #define	CMD_LxCACHE_VERSIONED(Lxcache)	((Lxcache)->Lxcache_version & 1)
 
+#define	MAX_FMRI_LEN    128
 typedef struct cmd_Lxcache_pers {
 	cmd_header_t Lxcachep_header;	/* Nodetype must be CMD_NT_LxCACHE */
 	/*
@@ -63,6 +68,7 @@ typedef struct cmd_Lxcache_pers {
 	char Lxcachep_cpu_hdr_bufname[CMD_BUFNMLEN];
 	uint_t Lxcachep_version;
 	cmd_fmri_t Lxcachep_asru;	/* ASRU for this LxCACHE */
+	char    Lxcachep_retired_fmri[MAX_FMRI_LEN];
 	cmd_ptrsubtype_t Lxcachep_type;	/* L2 or L3 */
 	uint32_t Lxcachep_index;	/* cache index Lxcache represents */
 	uint32_t Lxcachep_way;		/* cache way this Lxcache represents */
@@ -93,6 +99,7 @@ typedef struct cmd_Lxcache {
 #define	Lxcache_index		Lxcache_pers.Lxcachep_index
 #define	Lxcache_way		Lxcache_pers.Lxcachep_way
 #define	Lxcache_bit		Lxcache_pers.Lxcachep_bit
+#define	Lxcache_retired_fmri	Lxcache_pers.Lxcachep_retired_fmri
 #define	Lxcache_reason		Lxcache_pers.Lxreason
 #define	Lxcache_list		Lxcache_header.hdr_list
 
@@ -143,6 +150,9 @@ extern void cmd_fault_the_cpu(fmd_hdl_t *, cmd_cpu_t *, cmd_ptrsubtype_t,
 	    const char *);
 extern uint32_t cmd_Lx_index_count_type1_ways(cmd_cpu_t *);
 extern uint32_t cmd_Lx_index_count_type2_ways(cmd_cpu_t *);
+extern char *cmd_type_to_str(cmd_ptrsubtype_t);
+extern boolean_t cmd_Lxcache_unretire(fmd_hdl_t *, cmd_cpu_t *,
+	cmd_Lxcache_t *, const char *);
 extern int test_mode;
 #ifdef __cplusplus
 }

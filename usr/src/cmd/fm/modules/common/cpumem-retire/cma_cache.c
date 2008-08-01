@@ -46,6 +46,7 @@ cma_cache_way_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 	int ret, fd;
 
 	fmd_hdl_debug(hdl, "cpu cache *line* fault processing\n");
+	fmd_hdl_debug(hdl, "asru %lx\n", asru);
 
 	/*
 	 * This added expansion is needed to cover the situation where a
@@ -111,9 +112,9 @@ cma_cache_way_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 
 	if (repair) {
 		fmd_hdl_debug(hdl,
-		    "cpu %d: UnRetiring index 0x%06x, way 0x%02x\n bit 0x%04x"
+		    "cpu %d: UnRetire for index 0x%06x, way 0x%02x\n bit 0x%04x"
 		    " type 0x%02x", cpuid, index, way, bit, type);
-		ret = ioctl(fd, MEM_CACHE_UNRETIRE, &cache_info);
+		return (CMA_RA_SUCCESS);
 	} else {
 		fmd_hdl_debug(hdl,
 		    "cpu %d: Retiring index 0x%06x, way 0x%02x\n bit 0x%04x"

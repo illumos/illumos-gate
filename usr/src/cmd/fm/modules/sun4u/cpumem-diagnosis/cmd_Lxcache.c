@@ -42,6 +42,8 @@
 #include <sys/fm/protocol.h>
 #include <sys/cheetahregs.h>
 #include <sys/mem_cache.h>
+#include <fmd_adm.h>
+
 
 #define	PN_ECSTATE_NA	5
 /*
@@ -59,6 +61,27 @@ Lxcache_write(fmd_hdl_t *hdl, cmd_Lxcache_t *Lxcache)
 	    sizeof (cmd_Lxcache_pers_t));
 }
 
+char *
+cmd_type_to_str(cmd_ptrsubtype_t pstype)
+{
+	switch (pstype) {
+		case CMD_PTR_CPU_L2DATA:
+			return ("l2data");
+			break;
+		case CMD_PTR_CPU_L3DATA:
+			return ("l3data");
+			break;
+		case CMD_PTR_CPU_L2TAG:
+			return ("l2tag");
+			break;
+		case CMD_PTR_CPU_L3TAG:
+			return ("l3tag");
+			break;
+		default:
+			return ("unknown");
+			break;
+	}
+}
 void
 cmd_Lxcache_free(fmd_hdl_t *hdl, cmd_cpu_t *cpu, cmd_Lxcache_t *Lxcache,
     int destroy)
@@ -209,7 +232,60 @@ cmd_Lxcache_lookup(cmd_cpu_t *cpu, cmd_ptrsubtype_t pstype, uint32_t index,
 	return (Lxcache_lookup_by_type_index_way_bit(cpu, pstype, index, way,
 	    bit));
 }
+ssize_t
+cmd_fmri_nvl2str(fmd_hdl_t *hdl, nvlist_t *nvl, char *buf, size_t buflen)
+{
+	uint8_t type;
+	uint32_t cpuid, index, way;
+	char *serstr = NULL;
+	char    missing_list[128];
 
+	missing_list[0] = 0;
+	if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid) != 0)
+		(void) strcat(missing_list, FM_FMRI_CPU_ID);
+	if (nvlist_lookup_string(nvl, FM_FMRI_CPU_SERIAL_ID, &serstr) != 0)
+		(void) strcat(missing_list, FM_FMRI_CPU_SERIAL_ID);
+	if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_CACHE_INDEX, &index) != 0)
+		(void) strcat(missing_list, FM_FMRI_CPU_CACHE_INDEX);
+	if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_CACHE_WAY, &way) != 0)
+		(void) strcat(missing_list, FM_FMRI_CPU_CACHE_WAY);
+	if (nvlist_lookup_uint8(nvl, FM_FMRI_CPU_CACHE_TYPE, &type) != 0)
+		(void) strcat(missing_list, FM_FMRI_CPU_CACHE_TYPE);
+
+	if (strlen(missing_list) != 0) {
+		fmd_hdl_debug(hdl,
+		    "\ncmd_fmri_nvl2str: missing %s in fmri\n",
+		    missing_list);
+		return (-1);
+	}
+
+	return (snprintf(buf, buflen,
+	    "cpu:///%s=%u/%s=%s/%s=%u/%s=%u/%s=%d",
+	    FM_FMRI_CPU_ID, cpuid,
+	    FM_FMRI_CPU_SERIAL_ID, serstr,
+	    FM_FMRI_CPU_CACHE_INDEX, index,
+	    FM_FMRI_CPU_CACHE_WAY, way,
+	    FM_FMRI_CPU_CACHE_TYPE, type));
+}
+
+static int
+cmd_repair_fmri(fmd_hdl_t *hdl, char *buf)
+{
+	fmd_adm_t *ap;
+	int err;
+
+	if ((ap = fmd_adm_open(NULL, FMD_ADM_PROGRAM,
+	    FMD_ADM_VERSION)) == NULL) {
+		fmd_hdl_debug(hdl, "Could not contact fmadm to unretire\n");
+		return (-1);
+	}
+
+	err = fmd_adm_rsrc_repair(ap, buf);
+	if (err)
+		err = -1;
+	fmd_adm_close(ap);
+	return (err);
+}
 
 static cmd_Lxcache_t *
 Lxcache_wrapv1(fmd_hdl_t *hdl, cmd_Lxcache_pers_t *pers, size_t psz)
@@ -465,6 +541,20 @@ cmd_Lxcache_fault(fmd_hdl_t *hdl, cmd_cpu_t *cpu, cmd_Lxcache_t *Lxcache,
 	fmd_case_add_suspect(hdl, Lxcache->Lxcache_case.cc_cp, flt);
 	fmd_case_solve(hdl, Lxcache->Lxcache_case.cc_cp);
 
+	if (Lxcache->Lxcache_retired_fmri[0] == 0) {
+		if (cmd_fmri_nvl2str(hdl, Lxcache->Lxcache_asru.fmri_nvl,
+		    Lxcache->Lxcache_retired_fmri,
+		    sizeof (Lxcache->Lxcache_retired_fmri)) == -1)
+				fmd_hdl_debug(hdl,
+				    "\n%s:cpu_id %d: Failed to save the"
+				    " retired fmri string\n",
+				    fltnm, cpu->cpu_cpuid);
+		else
+			fmd_hdl_debug(hdl,
+			    "\n%s:cpu_id %d:Saved the retired fmri string %s\n",
+			    fltnm, cpu->cpu_cpuid,
+			    Lxcache->Lxcache_retired_fmri);
+	}
 	/* Retrieve the number of retired ways for each category */
 
 	cpu_retired_1 = cmd_Lx_index_count_type1_ways(cpu);
@@ -665,4 +755,204 @@ is_index_way_retired(cmd_cpu_t *cpu, cmd_ptrsubtype_t pstype, uint32_t index,
 	if ((tag_data[way] & CH_ECSTATE_MASK) == PN_ECSTATE_NA)
 		return (1);
 	return (0);
+}
+int
+cmd_cache_way_retire(fmd_hdl_t *hdl, cmd_cpu_t *cpu, cmd_Lxcache_t *Lxcache)
+{
+	char		*fltnm;
+	cache_info_t    cache_info;
+	int ret, fd;
+
+	fltnm = cmd_type_to_str(Lxcache->Lxcache_type);
+	fd = open(mem_cache_device, O_RDWR);
+	if (fd == -1) {
+		fmd_hdl_debug(hdl,
+		    "fltnm:cpu_id %d open of %s failed\n",
+		    fltnm, cpu->cpu_cpuid, mem_cache_device);
+		return (B_FALSE);
+	}
+	cache_info.cpu_id = cpu->cpu_cpuid;
+	cache_info.way = Lxcache->Lxcache_way;
+	cache_info.bit = Lxcache->Lxcache_bit;
+	cache_info.index = Lxcache->Lxcache_index;
+
+	switch (Lxcache->Lxcache_type) {
+		case CMD_PTR_CPU_L2TAG:
+			cache_info.cache = L2_CACHE_TAG;
+			break;
+		case CMD_PTR_CPU_L2DATA:
+			cache_info.cache = L2_CACHE_DATA;
+			break;
+		case CMD_PTR_CPU_L3TAG:
+			cache_info.cache = L3_CACHE_TAG;
+			break;
+		case CMD_PTR_CPU_L3DATA:
+			cache_info.cache = L3_CACHE_DATA;
+			break;
+	}
+
+	fmd_hdl_debug(hdl,
+	    "\n%s:cpu %d: Retiring index %d, way %d bit %d\n",
+	    fltnm, cpu->cpu_cpuid, cache_info.index, cache_info.way,
+	    (int16_t)cache_info.bit);
+	ret = ioctl(fd, MEM_CACHE_RETIRE, &cache_info);
+	(void) close(fd);
+	if (ret == -1) {
+		fmd_hdl_debug(hdl,
+		    "fltnm:cpu_id %d MEM_CACHE_RETIRE ioctl failed\n",
+		    fltnm, cpu->cpu_cpuid);
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+boolean_t
+cmd_cache_way_unretire(fmd_hdl_t *hdl, cmd_cpu_t *cpu, cmd_Lxcache_t *Lxcache)
+{
+	char		*fltnm;
+	cache_info_t    cache_info;
+	int ret, fd;
+
+	fltnm = cmd_type_to_str(Lxcache->Lxcache_type);
+	fd = open(mem_cache_device, O_RDWR);
+	if (fd == -1) {
+		fmd_hdl_debug(hdl,
+		    "fltnm:cpu_id %d open of %s failed\n",
+		    fltnm, cpu->cpu_cpuid, mem_cache_device);
+		return (B_FALSE);
+	}
+	cache_info.cpu_id = cpu->cpu_cpuid;
+	cache_info.way = Lxcache->Lxcache_way;
+	cache_info.bit = Lxcache->Lxcache_bit;
+	cache_info.index = Lxcache->Lxcache_index;
+
+	switch (Lxcache->Lxcache_type) {
+		case CMD_PTR_CPU_L2TAG:
+			cache_info.cache = L2_CACHE_TAG;
+			break;
+		case CMD_PTR_CPU_L2DATA:
+			cache_info.cache = L2_CACHE_DATA;
+			break;
+		case CMD_PTR_CPU_L3TAG:
+			cache_info.cache = L3_CACHE_TAG;
+			break;
+		case CMD_PTR_CPU_L3DATA:
+			cache_info.cache = L3_CACHE_DATA;
+			break;
+	}
+
+	fmd_hdl_debug(hdl,
+	    "\n%s:cpu %d: Unretiring index %d, way %d bit %d\n",
+	    fltnm, cpu->cpu_cpuid, cache_info.index, cache_info.way,
+	    (int16_t)cache_info.bit);
+	ret = ioctl(fd, MEM_CACHE_UNRETIRE, &cache_info);
+	(void) close(fd);
+	if (ret == -1) {
+		fmd_hdl_debug(hdl,
+		    "fltnm:cpu_id %d MEM_CACHE_UNRETIRE ioctl failed\n",
+		    fltnm, cpu->cpu_cpuid);
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+static cmd_Lxcache_t *
+cmd_Lxcache_lookup_by_type_index_way_flags(cmd_cpu_t *cpu,
+    cmd_ptrsubtype_t type, uint32_t index, int8_t way, int32_t flags)
+{
+	cmd_Lxcache_t *cmd_Lxcache;
+
+	for (cmd_Lxcache = cmd_list_next(&cpu->cpu_Lxcaches);
+	    cmd_Lxcache != NULL;
+	    cmd_Lxcache = cmd_list_next(cmd_Lxcache)) {
+		if ((cmd_Lxcache->Lxcache_index == index) &&
+		    (cmd_Lxcache->Lxcache_way == way) &&
+		    (cmd_Lxcache->Lxcache_type == type) &&
+		    (cmd_Lxcache->Lxcache_flags & flags))
+			return (cmd_Lxcache);
+	}
+	return (NULL);
+}
+boolean_t
+cmd_Lxcache_unretire(fmd_hdl_t *hdl, cmd_cpu_t *cpu, cmd_Lxcache_t *cmd_Lxcache,
+    const char *fltnm)
+{
+	cmd_ptrsubtype_t data_type;
+	cmd_Lxcache_t *retired_Lxcache;
+
+	/*
+	 * If we are unretiring a cacheline retired due to suspected TAG
+	 * fault, then we must first check if we are using a cacheline
+	 * that was retired earlier for DATA fault.
+	 * If so we will not unretire the cacheline.
+	 * We will change the flags to reflect the current condition.
+	 * We will return success, though.
+	 */
+	if ((cmd_Lxcache->Lxcache_type == CMD_PTR_CPU_L2TAG) ||
+	    (cmd_Lxcache->Lxcache_type == CMD_PTR_CPU_L3TAG)) {
+		if (cmd_Lxcache->Lxcache_type == CMD_PTR_CPU_L2TAG)
+			data_type = CMD_PTR_CPU_L2DATA;
+		if (cmd_Lxcache->Lxcache_type == CMD_PTR_CPU_L3TAG)
+			data_type = CMD_PTR_CPU_L3DATA;
+		fmd_hdl_debug(hdl,
+		    "\n%s:cpuid %d checking if there is a %s"
+		    " cacheline re-retired at this index %d and way %d\n",
+		    fltnm, cpu->cpu_cpuid, cmd_type_to_str(data_type),
+		    cmd_Lxcache->Lxcache_index, cmd_Lxcache->Lxcache_way);
+		retired_Lxcache = cmd_Lxcache_lookup_by_type_index_way_flags(
+		    cpu, data_type, cmd_Lxcache->Lxcache_index,
+		    cmd_Lxcache->Lxcache_way, CMD_LxCACHE_F_RERETIRED);
+		if (retired_Lxcache) {
+			retired_Lxcache->Lxcache_flags = CMD_LxCACHE_F_RETIRED;
+			cmd_Lxcache->Lxcache_flags = CMD_LxCACHE_F_UNRETIRED;
+			return (B_TRUE);
+		}
+	}
+	if (cmd_cache_way_unretire(hdl, cpu, cmd_Lxcache) == B_FALSE)
+		return (B_FALSE);
+	cmd_Lxcache->Lxcache_flags = CMD_LxCACHE_F_UNRETIRED;
+	/*
+	 * We have unretired the cacheline. We need to inform the fmd
+	 * that we have repaired the faulty fmri that we retired earlier.
+	 * The cpumem agent will not unretire cacheline in response to
+	 * the list.repair events it receives.
+	 */
+	if (cmd_Lxcache->Lxcache_retired_fmri[0] != 0) {
+		fmd_hdl_debug(hdl,
+		    "\n%s:cpuid %d Repairing the retired fmri %s",
+		    fltnm, cpu->cpu_cpuid,
+		    cmd_Lxcache->Lxcache_retired_fmri);
+			if (cmd_repair_fmri(hdl,
+			    cmd_Lxcache->Lxcache_retired_fmri) != 0) {
+				fmd_hdl_debug(hdl,
+				    "\n%s:cpuid %d Failed to repair"
+				    " retired fmri.",
+				    fltnm, cpu->cpu_cpuid);
+			/*
+			 * We need to retire the cacheline that we just
+			 * unretired.
+			 */
+			if (cmd_cache_way_retire(hdl, cpu, cmd_Lxcache)
+			    == B_FALSE) {
+				/*
+				 * A hopeless situation.
+				 * cannot maintain consistency of cacheline
+				 * sate between fmd and DE.
+				 * Aborting the DE.
+				 */
+				fmd_hdl_abort(hdl,
+				    "\n%s:cpuid %d We are unable to repair"
+				    " the fmri we just unretired and are"
+				    " unable to restore the DE and fmd to"
+				    " a sane state.\n",
+				    fltnm, cpu->cpu_cpuid);
+			}
+			return (B_FALSE);
+		} else {
+			cmd_Lxcache->Lxcache_retired_fmri[0] = 0;
+		}
+	}
+	return (B_TRUE);
 }
