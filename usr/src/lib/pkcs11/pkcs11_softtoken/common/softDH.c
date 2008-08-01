@@ -140,7 +140,7 @@ soft_dh_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 	 * The input to the first phase shall be the Diffie-Hellman
 	 * parameters, which include prime, base, and private-value length.
 	 */
-	rv = soft_get_public_attr(pubkey, CKA_PRIME, prime, &prime_len);
+	rv = soft_get_public_value(pubkey, CKA_PRIME, prime, &prime_len);
 
 	if (rv != CKR_OK) {
 		return (rv);
@@ -161,7 +161,7 @@ soft_dh_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 	/* Convert the prime octet string to big integer format. */
 	bytestring2bignum(&bnprime, prime, prime_len);
 
-	rv = soft_get_public_attr(pubkey, CKA_BASE, base, &base_len);
+	rv = soft_get_public_value(pubkey, CKA_BASE, base, &base_len);
 
 	if (rv != CKR_OK) {
 		goto ret1;
@@ -315,13 +315,13 @@ soft_dh_key_derive(soft_object_t *basekey, soft_object_t *secretkey,
 	BIGNUM		bnprivate;
 	BIGNUM		bnsecret;
 
-	rv = soft_get_private_attr(basekey, CKA_VALUE, privatevalue,
+	rv = soft_get_private_value(basekey, CKA_VALUE, privatevalue,
 	    &privatevaluelen);
 	if (rv != CKR_OK) {
 		return (rv);
 	}
 
-	rv = soft_get_private_attr(basekey, CKA_PRIME, privateprime,
+	rv = soft_get_private_value(basekey, CKA_PRIME, privateprime,
 	    &privateprimelen);
 	if (rv != CKR_OK) {
 		goto ret0;

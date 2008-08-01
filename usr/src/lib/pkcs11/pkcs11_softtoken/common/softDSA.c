@@ -199,7 +199,7 @@ dsa_sign(soft_object_t *key, CK_BYTE_PTR in, CK_ULONG inlen, CK_BYTE_PTR out)
 	BIG_ERR_CODE err;
 	CK_RV rv;
 
-	rv = soft_get_private_attr(key, CKA_SUBPRIME, q, &qlen);
+	rv = soft_get_private_value(key, CKA_SUBPRIME, q, &qlen);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
@@ -209,12 +209,12 @@ dsa_sign(soft_object_t *key, CK_BYTE_PTR in, CK_ULONG inlen, CK_BYTE_PTR out)
 		goto clean1;
 	}
 
-	rv = soft_get_private_attr(key, CKA_PRIME, p, &plen);
+	rv = soft_get_private_value(key, CKA_PRIME, p, &plen);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
 
-	rv = soft_get_private_attr(key, CKA_BASE, g, &glen);
+	rv = soft_get_private_value(key, CKA_BASE, g, &glen);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
@@ -224,7 +224,7 @@ dsa_sign(soft_object_t *key, CK_BYTE_PTR in, CK_ULONG inlen, CK_BYTE_PTR out)
 		goto clean1;
 	}
 
-	rv = soft_get_private_attr(key, CKA_VALUE, x, &xlen);
+	rv = soft_get_private_value(key, CKA_VALUE, x, &xlen);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
@@ -337,7 +337,7 @@ dsa_verify(soft_object_t *key, CK_BYTE_PTR data, CK_BYTE_PTR sig)
 	BIGNUM msg, tmp1, tmp2, tmp3;
 	CK_RV rv;
 
-	rv = soft_get_public_attr(key, CKA_SUBPRIME, q, &qlen);
+	rv = soft_get_public_value(key, CKA_SUBPRIME, q, &qlen);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
@@ -347,12 +347,12 @@ dsa_verify(soft_object_t *key, CK_BYTE_PTR data, CK_BYTE_PTR sig)
 		goto clean1;
 	}
 
-	rv = soft_get_public_attr(key, CKA_PRIME, p, &plen);
+	rv = soft_get_public_value(key, CKA_PRIME, p, &plen);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
 
-	rv = soft_get_public_attr(key, CKA_BASE, g, &glen);
+	rv = soft_get_public_value(key, CKA_BASE, g, &glen);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
@@ -362,7 +362,7 @@ dsa_verify(soft_object_t *key, CK_BYTE_PTR data, CK_BYTE_PTR sig)
 		goto clean1;
 	}
 
-	rv = soft_get_public_attr(key, CKA_VALUE, y, &ylen);
+	rv = soft_get_public_value(key, CKA_VALUE, y, &ylen);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
@@ -744,7 +744,7 @@ soft_dsa_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 	}
 
 	/* lookup prime, subprime and base */
-	rv = soft_get_public_attr(pubkey, CKA_PRIME, prime, &prime_len);
+	rv = soft_get_public_value(pubkey, CKA_PRIME, prime, &prime_len);
 	if (rv != CKR_OK) {
 		rv = CKR_TEMPLATE_INCOMPLETE;
 		goto cleanexit;
@@ -756,7 +756,7 @@ soft_dsa_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 		goto cleanexit;
 	}
 
-	rv = soft_get_public_attr(pubkey, CKA_SUBPRIME, subprime,
+	rv = soft_get_public_value(pubkey, CKA_SUBPRIME, subprime,
 	    &subprime_len);
 	if (rv != CKR_OK) {
 		rv = CKR_TEMPLATE_INCOMPLETE;
@@ -768,7 +768,7 @@ soft_dsa_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 		goto cleanexit;
 	}
 
-	rv = soft_get_public_attr(pubkey, CKA_BASE, base, &base_len);
+	rv = soft_get_public_value(pubkey, CKA_BASE, base, &base_len);
 	if (rv != CKR_OK) {
 		rv = CKR_TEMPLATE_INCOMPLETE;
 		goto cleanexit;

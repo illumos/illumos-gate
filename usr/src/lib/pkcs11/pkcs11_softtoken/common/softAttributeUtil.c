@@ -5095,7 +5095,7 @@ soft_set_attribute(soft_object_t *object_p, CK_ATTRIBUTE_PTR template,
 }
 
 CK_RV
-soft_get_public_attr(soft_object_t *key, CK_ATTRIBUTE_TYPE type,
+soft_get_public_value(soft_object_t *key, CK_ATTRIBUTE_TYPE type,
     uchar_t *value, uint32_t *value_len)
 {
 	uint32_t len = 0;
@@ -5309,7 +5309,7 @@ soft_get_public_attr(soft_object_t *key, CK_ATTRIBUTE_TYPE type,
 
 
 CK_RV
-soft_get_private_attr(soft_object_t *key, CK_ATTRIBUTE_TYPE type,
+soft_get_private_value(soft_object_t *key, CK_ATTRIBUTE_TYPE type,
     uchar_t *value, uint32_t *value_len)
 {
 
@@ -5607,7 +5607,7 @@ soft_get_private_attr(soft_object_t *key, CK_ATTRIBUTE_TYPE type,
 
 	case CKA_VALUE:
 
-		if (key->key_type == CKK_DSA)
+		if (key->key_type == CKK_DSA) {
 #ifdef	__sparcv9
 			len =
 			    /* LINTED */
@@ -5619,7 +5619,7 @@ soft_get_private_attr(soft_object_t *key, CK_ATTRIBUTE_TYPE type,
 			    ((biginteger_t *)OBJ_PRI_DSA_VALUE(key))->
 			    big_value_len;
 #endif	/* __sparcv9 */
-		else
+		} else if (key->key_type == CKK_DH) {
 #ifdef	__sparcv9
 			len =
 			    /* LINTED */
@@ -5631,6 +5631,19 @@ soft_get_private_attr(soft_object_t *key, CK_ATTRIBUTE_TYPE type,
 			    ((biginteger_t *)OBJ_PRI_DH_VALUE(key))->
 			    big_value_len;
 #endif	/* __sparcv9 */
+		} else {
+#ifdef	__sparcv9
+			len =
+			    /* LINTED */
+			    (uint32_t)
+			    ((biginteger_t *)OBJ_PRI_EC_VALUE(key))->
+			    big_value_len;
+#else	/* !__sparcv9 */
+			len =
+			    ((biginteger_t *)OBJ_PRI_EC_VALUE(key))->
+			    big_value_len;
+#endif	/* __sparcv9 */
+		}
 
 		/* This attribute MUST BE set */
 		if (len == 0 || len > *value_len) {
@@ -5638,14 +5651,19 @@ soft_get_private_attr(soft_object_t *key, CK_ATTRIBUTE_TYPE type,
 		}
 		*value_len = len;
 
-		if (key->key_type == CKK_DSA)
+		if (key->key_type == CKK_DSA) {
 			(void) memcpy(value,
 			    ((biginteger_t *)OBJ_PRI_DSA_VALUE(key))->big_value,
 			    *value_len);
-		else
+		} else if (key->key_type == CKK_DH) {
 			(void) memcpy(value,
 			    ((biginteger_t *)OBJ_PRI_DH_VALUE(key))->big_value,
 			    *value_len);
+		} else {
+			(void) memcpy(value,
+			    ((biginteger_t *)OBJ_PRI_EC_VALUE(key))->big_value,
+			    *value_len);
+		}
 
 		break;
 	}

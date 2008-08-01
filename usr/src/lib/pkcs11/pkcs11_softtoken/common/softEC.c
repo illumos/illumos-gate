@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -472,10 +472,10 @@ soft_ecc_sign(soft_session_t *session_p, CK_BYTE_PTR pData,
 	soft_ecc_ctx_t *ecc_ctx = session_p->sign.context;
 	soft_object_t *key = ecc_ctx->key;
 	uchar_t value[EC_MAX_VALUE_LEN];
-	CK_ATTRIBUTE template;
 	ECPrivateKey ECkey;
 	SECItem signature_item;
 	SECItem digest_item;
+	uint_t value_len;
 
 	if ((key->class != CKO_PRIVATE_KEY) || (key->key_type != CKK_EC)) {
 		rv = CKR_KEY_TYPE_INCONSISTENT;
@@ -490,16 +490,14 @@ soft_ecc_sign(soft_session_t *session_p, CK_BYTE_PTR pData,
 	/* structure assignment */
 	ECkey.ecParams = ecc_ctx->ecparams;
 
-	template.type = CKA_VALUE;
-	template.pValue = value;
-	template.ulValueLen = sizeof (value);
-	rv = soft_get_private_key_attribute(key, &template);
+	value_len = EC_MAX_VALUE_LEN;
+	rv = soft_get_private_value(key, CKA_VALUE, value, &value_len);
 	if (rv != CKR_OK) {
 		goto clean_exit;
 	}
 
 	ECkey.privateValue.data = value;
-	ECkey.privateValue.len = template.ulValueLen;
+	ECkey.privateValue.len = value_len;
 
 	signature_item.data = pSigned;
 	signature_item.len = *pulSignedLen;

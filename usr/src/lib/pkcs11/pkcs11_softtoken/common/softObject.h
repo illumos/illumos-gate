@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -828,10 +828,10 @@ CK_RV soft_set_attribute(soft_object_t *object_p, CK_ATTRIBUTE_PTR template,
 CK_RV soft_set_common_storage_attribute(soft_object_t *object_p,
 	CK_ATTRIBUTE_PTR template, boolean_t copy);
 
-CK_RV soft_get_public_attr(soft_object_t *, CK_ATTRIBUTE_TYPE, uchar_t *,
+CK_RV soft_get_public_value(soft_object_t *, CK_ATTRIBUTE_TYPE, uchar_t *,
 	uint32_t *);
 
-CK_RV soft_get_private_attr(soft_object_t *, CK_ATTRIBUTE_TYPE, uchar_t *,
+CK_RV soft_get_private_value(soft_object_t *, CK_ATTRIBUTE_TYPE, uchar_t *,
 	uint32_t *);
 
 CK_RV get_ulong_attr_from_object(CK_ULONG value, CK_ATTRIBUTE_PTR template);

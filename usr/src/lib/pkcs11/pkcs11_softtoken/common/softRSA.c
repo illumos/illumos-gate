@@ -58,20 +58,20 @@ soft_rsa_encrypt(soft_object_t *key, CK_BYTE_PTR in, uint32_t in_len,
 	RSAkey *rsakey;
 
 	if (realpublic) {
-		rv = soft_get_public_attr(key, CKA_PUBLIC_EXPONENT, expo,
+		rv = soft_get_public_value(key, CKA_PUBLIC_EXPONENT, expo,
 		    &expo_len);
 		if (rv != CKR_OK) {
 			goto clean1;
 		}
 	} else {
-		rv = soft_get_private_attr(key, CKA_PRIVATE_EXPONENT, expo,
+		rv = soft_get_private_value(key, CKA_PRIVATE_EXPONENT, expo,
 		    &expo_len);
 		if (rv != CKR_OK) {
 			goto clean1;
 		}
 	}
 
-	rv = soft_get_public_attr(key, CKA_MODULUS, modulus, &modulus_len);
+	rv = soft_get_public_value(key, CKA_MODULUS, modulus, &modulus_len);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
@@ -160,12 +160,12 @@ soft_rsa_decrypt(soft_object_t *key, CK_BYTE_PTR in, uint32_t in_len,
 	BIGNUM msg;
 	RSAkey *rsakey;
 
-	rv = soft_get_private_attr(key, CKA_MODULUS, modulus, &modulus_len);
+	rv = soft_get_private_value(key, CKA_MODULUS, modulus, &modulus_len);
 	if (rv != CKR_OK) {
 		goto clean1;
 	}
 
-	rv = soft_get_private_attr(key, CKA_PRIME_1, prime1, &prime1_len);
+	rv = soft_get_private_value(key, CKA_PRIME_1, prime1, &prime1_len);
 
 	if ((prime1_len == 0) && (rv == CKR_OK)) {
 		rv = soft_rsa_encrypt(key, in, in_len, out, 0);
@@ -175,7 +175,7 @@ soft_rsa_decrypt(soft_object_t *key, CK_BYTE_PTR in, uint32_t in_len,
 			goto clean1;
 	}
 
-	rv = soft_get_private_attr(key, CKA_PRIME_2, prime2, &prime2_len);
+	rv = soft_get_private_value(key, CKA_PRIME_2, prime2, &prime2_len);
 
 	if ((prime2_len == 0) && (rv == CKR_OK)) {
 		rv = soft_rsa_encrypt(key, in, in_len, out, 0);
@@ -185,7 +185,7 @@ soft_rsa_decrypt(soft_object_t *key, CK_BYTE_PTR in, uint32_t in_len,
 			goto clean1;
 	}
 
-	rv = soft_get_private_attr(key, CKA_EXPONENT_1, expo1, &expo1_len);
+	rv = soft_get_private_value(key, CKA_EXPONENT_1, expo1, &expo1_len);
 
 	if ((expo1_len == 0) && (rv == CKR_OK)) {
 		rv = soft_rsa_encrypt(key, in, in_len, out, 0);
@@ -195,7 +195,7 @@ soft_rsa_decrypt(soft_object_t *key, CK_BYTE_PTR in, uint32_t in_len,
 			goto clean1;
 	}
 
-	rv = soft_get_private_attr(key, CKA_EXPONENT_2, expo2, &expo2_len);
+	rv = soft_get_private_value(key, CKA_EXPONENT_2, expo2, &expo2_len);
 
 	if ((expo2_len == 0) && (rv == CKR_OK)) {
 		rv = soft_rsa_encrypt(key, in, in_len, out, 0);
@@ -205,7 +205,7 @@ soft_rsa_decrypt(soft_object_t *key, CK_BYTE_PTR in, uint32_t in_len,
 			goto clean1;
 	}
 
-	rv = soft_get_private_attr(key, CKA_COEFFICIENT, coef, &coef_len);
+	rv = soft_get_private_value(key, CKA_COEFFICIENT, coef, &coef_len);
 
 	if ((coef_len == 0) && (rv == CKR_OK)) {
 		rv = soft_rsa_encrypt(key, in, in_len, out, 0);
@@ -351,7 +351,7 @@ soft_rsa_encrypt_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 	CK_BYTE	cipher_data[MAX_RSA_KEYLENGTH_IN_BYTES];
 	CK_RV rv = CKR_OK;
 
-	rv = soft_get_public_attr(key, CKA_MODULUS, modulus, &modulus_len);
+	rv = soft_get_public_value(key, CKA_MODULUS, modulus, &modulus_len);
 	if (rv != CKR_OK) {
 		goto clean_exit;
 	}
@@ -440,7 +440,7 @@ soft_rsa_decrypt_common(soft_session_t *session_p, CK_BYTE_PTR pEncrypted,
 	CK_BYTE	plain_data[MAX_RSA_KEYLENGTH_IN_BYTES];
 	CK_RV rv = CKR_OK;
 
-	rv = soft_get_private_attr(key, CKA_MODULUS, modulus, &modulus_len);
+	rv = soft_get_private_value(key, CKA_MODULUS, modulus, &modulus_len);
 	if (rv != CKR_OK) {
 		goto clean_exit;
 	}
@@ -634,7 +634,7 @@ soft_rsa_sign_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 	CK_BYTE	plain_data[MAX_RSA_KEYLENGTH_IN_BYTES];
 	CK_BYTE	signed_data[MAX_RSA_KEYLENGTH_IN_BYTES];
 
-	rv = soft_get_private_attr(key, CKA_MODULUS, modulus, &modulus_len);
+	rv = soft_get_private_value(key, CKA_MODULUS, modulus, &modulus_len);
 	if (rv != CKR_OK) {
 		goto clean_exit;
 	}
@@ -750,7 +750,7 @@ soft_rsa_verify_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 	uint32_t modulus_len = sizeof (modulus);
 	CK_BYTE	plain_data[MAX_RSA_KEYLENGTH_IN_BYTES];
 
-	rv = soft_get_public_attr(key, CKA_MODULUS, modulus, &modulus_len);
+	rv = soft_get_public_value(key, CKA_MODULUS, modulus, &modulus_len);
 	if (rv != CKR_OK) {
 		goto clean_exit;
 	}
@@ -1171,7 +1171,7 @@ soft_rsa_genkey_pair(soft_object_t *pubkey, soft_object_t *prikey)
 		goto clean0;
 	}
 
-	rv = soft_get_public_attr(pubkey, CKA_PUBLIC_EXPONENT, pub_expo,
+	rv = soft_get_public_value(pubkey, CKA_PUBLIC_EXPONENT, pub_expo,
 	    &pub_expo_len);
 	if (rv != CKR_OK) {
 		goto clean0;
@@ -1287,7 +1287,7 @@ soft_rsa_digest_sign_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 	CK_ULONG der_len;
 	CK_BYTE_PTR der_prefix;
 
-	rv = soft_get_private_attr(key, CKA_MODULUS, modulus, &modulus_len);
+	rv = soft_get_private_value(key, CKA_MODULUS, modulus, &modulus_len);
 	if (rv != CKR_OK) {
 		(void) pthread_mutex_lock(&session_p->session_mutex);
 		free(session_p->digest.context);
@@ -1485,7 +1485,7 @@ soft_rsa_verify_recover(soft_session_t *session_p, CK_BYTE_PTR pSignature,
 	uint32_t modulus_len = sizeof (modulus);
 	CK_BYTE	plain_data[MAX_RSA_KEYLENGTH_IN_BYTES];
 
-	rv = soft_get_public_attr(key, CKA_MODULUS, modulus, &modulus_len);
+	rv = soft_get_public_value(key, CKA_MODULUS, modulus, &modulus_len);
 	if (rv != CKR_OK) {
 		goto clean_exit;
 	}
