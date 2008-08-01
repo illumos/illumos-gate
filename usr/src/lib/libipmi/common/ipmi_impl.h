@@ -120,6 +120,7 @@ extern ipmi_name_trans_t ipmi_sensor_type_table[];
 extern ipmi_name_trans_t ipmi_reading_type_table[];
 extern ipmi_name_trans_t ipmi_errno_table[];
 extern ipmi_name_trans_t ipmi_threshold_state_table[];
+extern ipmi_name_trans_t ipmi_units_type_table[];
 extern ipmi_sensor_trans_t ipmi_reading_state_table[];
 extern ipmi_sensor_trans_t ipmi_specific_state_table[];
 

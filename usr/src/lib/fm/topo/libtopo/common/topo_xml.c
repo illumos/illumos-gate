@@ -23,7 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libxml/parser.h>
@@ -50,6 +49,9 @@ static tf_rdata_t *topo_xml_walk(topo_mod_t *, tf_info_t *, xmlNodePtr,
     tnode_t *);
 static tf_edata_t *enum_attributes_process(topo_mod_t *, xmlNodePtr);
 static int enum_run(topo_mod_t *, tf_rdata_t *);
+static int fac_enum_run(topo_mod_t *, tnode_t *, const char *);
+static int fac_process(topo_mod_t *, xmlNodePtr, tf_rdata_t *, tnode_t *);
+static int fac_enum_process(topo_mod_t *, xmlNodePtr, tnode_t *);
 static int decorate_nodes(topo_mod_t *, tf_rdata_t *, xmlNodePtr, tnode_t *,
     tf_pad_t **);
 
@@ -103,7 +105,8 @@ xmlattr_to_int(topo_mod_t *mp,
 	xmlChar *str;
 	xmlChar *estr;
 
-	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "attribute to int\n");
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "xmlattr_to_int(propname=%s)\n",
+	    propname);
 	if ((str = xmlGetProp(n, (xmlChar *)propname)) == NULL)
 		return (topo_mod_seterrno(mp, ETOPO_PRSR_NOATTR));
 	*value = strtoull((char *)str, (char **)&estr, 10);
@@ -122,7 +125,8 @@ xmlattr_to_fmri(topo_mod_t *mp,
 {
 	xmlChar *str;
 
-	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "attribute to int\n");
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "xmlattr_to_fmri(propname=%s)\n",
+	    propname);
 	if ((str = xmlGetProp(xn, (xmlChar *)propname)) == NULL)
 		return (topo_mod_seterrno(mp, ETOPO_PRSR_NOATTR));
 	if (topo_mod_str2nvl(mp, (const char *)str, rnvl) < 0) {
@@ -176,7 +180,8 @@ const char *name)
 	nvlist_t *fmri;
 	xmlChar *str;
 
-	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "xlate_common\n");
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "xlate_common (name=%s)\n",
+	    name);
 	switch (ptype) {
 	case TOPO_TYPE_INT32:
 		if (xmlattr_to_int(mp, xn, Value, &ui) < 0)
@@ -329,8 +334,8 @@ prop_create(topo_mod_t *mp,
 	char *str;
 	int err, e;
 
-	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "prop_create(gnm = %s, "
-	    "pnm = %s)\n", gnm, pnm);
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "prop_create(pgrp = %s, "
+	    "prop = %s)\n", gnm, pnm);
 	switch (ptype) {
 	case TOPO_TYPE_INT32:
 		e = nvlist_lookup_int32(pfmri, INV_PVAL, &i32);
@@ -404,7 +409,8 @@ props_create(topo_mod_t *mp,
 	int pn;
 	int e;
 
-	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "props_create(gnm = %s)\n", gnm);
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "props_create(pgrp = %s)\n",
+	    gnm);
 	for (pn = 0; pn < nprops; pn++) {
 		e = nvlist_lookup_string(props[pn], INV_PNAME, &pnm);
 		if (e != 0) {
@@ -449,7 +455,8 @@ pgroups_create(topo_mod_t *mp, tf_pad_t *pad, tnode_t *ptn)
 	int pg;
 	int e;
 
-	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "pgroups_create\n");
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "pgroups_create: %s=%d\n",
+	    topo_node_name(ptn), topo_node_instance(ptn));
 	for (pg = 0; pg < pad->tpad_pgcnt; pg++) {
 		e = nvlist_lookup_string(pad->tpad_pgs[pg],
 		    INV_PGRP_NAME, &gnm);
@@ -601,14 +608,15 @@ pmeth_record(topo_mod_t *mp, const char *pg_name, xmlNodePtr xn, tnode_t *tn,
 	xmlNodePtr cn;
 	xmlChar *meth_name = NULL, *prop_name = NULL;
 	xmlChar *arg_name = NULL;
-	uint64_t meth_ver;
+	uint64_t meth_ver, is_mutable = 0;
 	topo_type_t prop_type;
 	struct propmeth_data meth;
-	int ret = 0;
+	int ret = 0, err;
 	topo_type_t ptype;
 	tnode_t *tmp;
 
-	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "pmeth_record\n");
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "pmeth_record: %s=%d "
+	    "(pgrp=%s)\n", topo_node_name(tn), topo_node_instance(tn), pg_name);
 
 	/*
 	 * Get propmethod attribute values
@@ -624,6 +632,12 @@ pmeth_record(topo_mod_t *mp, const char *pg_name, xmlNodePtr xn, tnode_t *tn,
 		ret = topo_mod_seterrno(mp, ETOPO_PRSR_NOATTR);
 		goto pmr_done;
 	}
+	/*
+	 * The "mutable" attribute is optional.  If not specified we default to
+	 * false (0)
+	 */
+	(void) xmlattr_to_int(mp, xn, Mutable, &is_mutable);
+
 	if ((prop_name = xmlGetProp(xn, (xmlChar *)Propname)) == NULL) {
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
 		    "propmethod element lacks propname attribute\n");
@@ -702,17 +716,35 @@ pmeth_record(topo_mod_t *mp, const char *pg_name, xmlNodePtr xn, tnode_t *tn,
 	 */
 	if (strcmp(ppgrp_name, Range) == 0) {
 		for (tmp = tn; tmp != NULL; tmp = topo_child_next(NULL, tmp)) {
-			if (strcmp(rname, topo_node_name(tmp)) == 0)
+			if (strcmp(rname, topo_node_name(tmp)) == 0) {
 				if (register_method(mp, tmp, &meth) != 0) {
 					ret = topo_mod_seterrno(mp,
 					    ETOPO_PRSR_REGMETH);
 					goto pmr_done;
 				}
+				if (is_mutable) {
+					if (topo_prop_setmutable(tmp,
+					    meth.pg_name, meth.prop_name, &err)
+					    != 0) {
+						ret = topo_mod_seterrno(mp,
+						    ETOPO_PRSR_REGMETH);
+						goto pmr_done;
+					}
+				}
+			}
 		}
 	} else {
 		if (register_method(mp, tn, &meth) != 0) {
 			ret = topo_mod_seterrno(mp, ETOPO_PRSR_REGMETH);
 			goto pmr_done;
+		}
+		if (is_mutable) {
+			if (topo_prop_setmutable(tn, meth.pg_name,
+			    meth.prop_name, &err) != 0) {
+				ret = topo_mod_seterrno(mp,
+				    ETOPO_PRSR_REGMETH);
+				goto pmr_done;
+			}
 		}
 	}
 
@@ -878,8 +910,9 @@ static int
 pad_process(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
     tf_pad_t **rpad)
 {
-	xmlNodePtr cn, gcn, psn, ecn;
+	xmlNodePtr cn, gcn, psn, ecn, target;
 	xmlNodePtr def_set = NULL;
+	tnode_t *ct;
 	tf_pad_t *new = *rpad;
 	tf_rdata_t tmp_rd;
 	int pgcnt = 0;
@@ -1008,23 +1041,48 @@ pad_process(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
 				return (-1);
 			}
 
-			if (joined_set) {
-				/*
-				 * If the property groups are contained within a
-				 * set then they will be one level lower in
-				 * the XML tree.
-				 */
-				if (pgroups_record(mp, psn, ptn, rd->rd_name,
-				    new, (const char *)pxn->name) < 0) {
-					tf_pad_free(mp, new);
-					return (-1);
+			/*
+			 * If the property groups are contained within a set
+			 * then they will be one level lower in the XML tree.
+			 */
+			if (joined_set)
+				target = psn;
+			else
+				target = pxn;
+
+			/*
+			 * If there is no "node" element under the "range"
+			 * element, then we need to attach the facility node to
+			 * each node in this range.
+			 *
+			 * Otherwise we only attach it to the current node
+			 */
+			if (!rd->contains_node_ele) {
+				for (ct = topo_child_first(rd->rd_pn);
+				    ct != NULL;
+				    ct = topo_child_next(rd->rd_pn, ct)) {
+
+					if (strcmp(topo_node_name(ct),
+					    rd->rd_name) != 0)
+						continue;
+
+					if (fac_enum_process(mp, target,
+					    ct) < 0)
+						return (-1);
+
+					if (fac_process(mp, target, rd, ct) < 0)
+						return (-1);
 				}
-			} else {
-				if (pgroups_record(mp, pxn, ptn, rd->rd_name,
-				    new, (const char *)pxn->name) < 0) {
-					tf_pad_free(mp, new);
+			} else
+				if (fac_enum_process(mp, target, ptn) < 0)
 					return (-1);
-				}
+				if (fac_process(mp, target, rd, ptn) < 0)
+					return (-1);
+
+			if (pgroups_record(mp, target, ptn, rd->rd_name,
+			    new, (const char *)pxn->name) < 0) {
+				tf_pad_free(mp, new);
+				return (-1);
 			}
 		}
 		*rpad = new;
@@ -1043,6 +1101,154 @@ pad_process(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
 
 
 static int
+fac_enum_process(topo_mod_t *mp, xmlNodePtr pn, tnode_t *ptn)
+{
+	xmlNodePtr cn;
+	xmlChar *fprov = NULL;
+	int rv = 0;
+
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
+	    "fac_enum_process() called for %s=%d\n", topo_node_name(ptn),
+	    topo_node_instance(ptn));
+
+	for (cn = pn->xmlChildrenNode; cn != NULL; cn = cn->next) {
+
+		if (xmlStrcmp(cn->name, (xmlChar *)"fac-enum") != 0)
+			continue;
+
+		if ((fprov = xmlGetProp(cn, (xmlChar *)Provider)) == NULL)
+			goto fenumdone;
+
+		if (xmlStrcmp(fprov, (xmlChar *)"fac_prov_ipmi") != 0) {
+			topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
+			    "Invalid provider specified: %s\n", fprov);
+			goto fenumdone;
+		}
+
+		/*
+		 * Invoke enum entry point in fac provider which will cause the
+		 * facility enumeration node method to be registered.
+		 */
+		if (fac_enum_run(mp, ptn, (const char *)fprov) != 0) {
+			topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
+			    "fac_enum_process: enum entry point failed!\n");
+			goto fenumdone;
+		}
+		xmlFree(fprov);
+	}
+	return (0);
+fenumdone:
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "fac-enum processing failed\n");
+
+	if (fprov != NULL)
+		xmlFree(fprov);
+
+	return (rv);
+}
+
+
+static int
+fac_process(topo_mod_t *mp, xmlNodePtr pn, tf_rdata_t *rd, tnode_t *ptn)
+{
+	xmlNodePtr cn;
+	xmlChar *fname = NULL, *ftype = NULL, *provider = NULL;
+	tnode_t *ntn = NULL;
+	tf_idata_t *newi;
+	int err;
+	topo_pgroup_info_t pgi;
+
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
+	    "fac_process() called\n");
+
+	for (cn = pn->xmlChildrenNode; cn != NULL; cn = cn->next) {
+
+		if (xmlStrcmp(cn->name, (xmlChar *)Facility) != 0)
+			continue;
+
+		topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
+		    "facility processing\n");
+
+		if ((fname = xmlGetProp(cn, (xmlChar *)Name)) == NULL)
+			goto facdone;
+
+		if ((ftype = xmlGetProp(cn, (xmlChar *)Type)) == NULL)
+			goto facdone;
+
+		if ((provider = xmlGetProp(cn, (xmlChar *)Provider)) == NULL)
+			goto facdone;
+
+		if (xmlStrcmp(ftype, (xmlChar *)Sensor) != 0 &&
+		    xmlStrcmp(ftype, (xmlChar *)Indicator) != 0)
+			goto facdone;
+
+		if (xmlStrcmp(provider, (xmlChar *)"fac_prov_ipmi") != 0) {
+			topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "fac_process: "
+			    "Invalid provider attr value: %s\n", provider);
+			goto facdone;
+		}
+
+		if ((ntn = topo_node_facbind(mp, ptn, (char *)fname,
+		    (char *)ftype)) == NULL)
+			goto facdone;
+
+		pgi.tpi_name = TOPO_PGROUP_FACILITY;
+		pgi.tpi_namestab = TOPO_STABILITY_PRIVATE;
+		pgi.tpi_datastab = TOPO_STABILITY_PRIVATE;
+		pgi.tpi_version = 1;
+		if (topo_pgroup_create(ntn, &pgi, &err) != 0) {
+			if (err != ETOPO_PROP_DEFD) {
+				topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
+				    "pgroups create failure: %s\n",
+				    topo_strerror(err));
+				return (-1);
+			}
+		}
+		/*
+		 * Invoke enum entry point in fac_prov_ipmi module, which will
+		 * cause the provider methods to be registered on this node
+		 */
+		if (fac_enum_run(mp, ntn, (const char *)provider) != 0) {
+			topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR, "fac_process: "
+			    "enum entry point failed for provider %s!\n",
+			    provider);
+			goto facdone;
+		}
+
+		if ((newi = tf_idata_new(mp, 0, ntn)) == NULL)
+			goto facdone;
+
+		if (tf_idata_insert(&rd->rd_instances, newi) < 0)
+			goto facdone;
+
+		if (pad_process(mp, rd, cn, ntn, &newi->ti_pad) < 0)
+			goto facdone;
+
+		topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "done with "
+		    "facility %s=%s.\n", ftype, fname);
+
+		xmlFree(ftype);
+		xmlFree(fname);
+		xmlFree(provider);
+	}
+
+	return (0);
+
+facdone:
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR, "facility processing failed\n");
+
+	if (ftype != NULL)
+		xmlFree(ftype);
+	if (fname != NULL)
+		xmlFree(fname);
+	if (provider != NULL)
+		xmlFree(provider);
+	if (ntn != NULL)
+		topo_node_unbind(ntn);
+
+	return (0);
+}
+
+static int
 node_process(topo_mod_t *mp, xmlNodePtr nn, tf_rdata_t *rd)
 {
 	xmlChar *str;
@@ -1056,6 +1262,7 @@ node_process(topo_mod_t *mp, xmlNodePtr nn, tf_rdata_t *rd)
 	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
 	    "node_process %s\n", rd->rd_name);
 
+	rd->contains_node_ele = 1;
 	if (xmlattr_to_int(mp, nn, Instance, &ui) < 0)
 		goto nodedone;
 	inst = (topo_instance_t)ui;
@@ -1097,6 +1304,8 @@ node_process(topo_mod_t *mp, xmlNodePtr nn, tf_rdata_t *rd)
 		goto nodedone;
 	}
 	if (pad_process(mp, rd, nn, ntn, &newi->ti_pad) < 0)
+		goto nodedone;
+	if (fac_process(mp, nn, rd, ntn) < 0)
 		goto nodedone;
 	rv = 0;
 nodedone:
@@ -1191,6 +1400,44 @@ enum_run(topo_mod_t *mp, tf_rdata_t *rd)
 	return (e);
 }
 
+static int
+fac_enum_run(topo_mod_t *mp, tnode_t *node, const char *name)
+{
+	topo_hdl_t *thp = mp->tm_hdl;
+	topo_mod_t *fmod;
+	int e = -1;
+
+	topo_dprintf(thp, TOPO_DBG_XML, "fac_enum_run\n");
+	/*
+	 * Check if the enumerator module is already loaded.
+	 * Module loading is single-threaded at this point so there's
+	 * no need to worry about the module going away or bumping the
+	 * ref count.
+	 */
+	if ((fmod = topo_mod_lookup(thp, name, 0)) == NULL) {
+		if ((fmod = topo_mod_load(mp, name, TOPO_VERSION)) == NULL) {
+			topo_dprintf(thp, TOPO_DBG_ERR,
+			    "fac_enum_run: mod_load of %s failed: %s.\n",
+			    name, topo_strerror(topo_mod_errno(mp)));
+			(void) topo_hdl_seterrno(thp, topo_mod_errno(mp));
+			return (e);
+		}
+	}
+	/*
+	 * We're live, so let's enumerate.
+	 */
+	topo_dprintf(thp, TOPO_DBG_XML, "fac enumerate request. (%s)\n", name);
+	e = topo_mod_enumerate(fmod, node, name, name, 0, 0, NULL);
+	topo_dprintf(thp, TOPO_DBG_XML, "back from enumeration. %d\n", e);
+	if (e != 0) {
+		topo_dprintf(thp, TOPO_DBG_ERR,
+		    "Facility provider enumeration failed (%s)\n",
+		    topo_strerror(topo_mod_errno(mp)));
+		(void) topo_hdl_seterrno(thp, EMOD_PARTIAL_ENUM);
+		return (topo_mod_seterrno(mp, EMOD_PARTIAL_ENUM));
+	}
+	return (e);
+}
 
 int
 decorate_nodes(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
@@ -1231,9 +1478,10 @@ topo_xml_range_process(topo_mod_t *mp, xmlNodePtr rn, tf_rdata_t *rd)
 	    "process %s range beneath %s\n", rd->rd_name,
 	    topo_node_name(rd->rd_pn));
 
+	rd->contains_node_ele = 0;
 	e = topo_node_range_create(mp,
 	    rd->rd_pn, rd->rd_name, rd->rd_min, rd->rd_max);
-	if (e != 0 && topo_mod_errno(mp) != ETOPO_NODE_DUP) {
+	if (e != 0 && topo_mod_errno(mp) != EMOD_NODE_DUP) {
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
 		    "Range create failed due to %s.\n",
 		    topo_strerror(topo_mod_errno(mp)));
@@ -1326,6 +1574,10 @@ topo_xml_range_process(topo_mod_t *mp, xmlNodePtr rn, tf_rdata_t *rd)
 			if (pad_process(mp, rd, rn, ct, &rd->rd_pad)
 			    < 0)
 				return (-1);
+
+			if (fac_process(mp, rn, rd, ct) < 0)
+				return (-1);
+
 			ct = topo_child_next(rd->rd_pn, ct);
 			ccnt++;
 		}

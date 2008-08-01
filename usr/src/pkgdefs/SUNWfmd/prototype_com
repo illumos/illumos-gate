@@ -136,6 +136,7 @@ d none usr/lib/fm/topo/maps 755 root bin
 f none usr/lib/fm/topo/maps/xfp-hc-topology.xml 444 root bin
 d none usr/lib/fm/topo/plugins 755 root bin
 f none usr/lib/fm/topo/plugins/disk.so 555 root bin
+f none usr/lib/fm/topo/plugins/fac_prov_ipmi.so 555 root bin
 f none usr/lib/fm/topo/plugins/ipmi.so 555 root bin
 f none usr/lib/fm/topo/plugins/ses.so 555 root bin
 f none usr/lib/fm/topo/plugins/xfp.so 555 root bin

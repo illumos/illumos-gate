@@ -153,6 +153,7 @@ extern "C" {
 #define	FM_FMRI_AUTHORITY		"authority"
 #define	FM_FMRI_SCHEME			"scheme"
 #define	FM_FMRI_SVC_AUTHORITY		"svc-authority"
+#define	FM_FMRI_FACILITY		"facility"
 
 /* FMRI authority-type member names */
 #define	FM_FMRI_AUTH_CHASSIS		"chassis-id"
@@ -205,6 +206,10 @@ extern "C" {
 #define	FM_FMRI_HC_LIST_SZ		"hc-list-sz"
 #define	FM_FMRI_HC_LIST			"hc-list"
 #define	FM_FMRI_HC_SPECIFIC		"hc-specific"
+
+/* facility member names */
+#define	FM_FMRI_FACILITY_NAME		"facility-name"
+#define	FM_FMRI_FACILITY_TYPE		"facility-type"
 
 /* hc-list version and member names */
 #define	FM_FMRI_HC_NAME			"hc-name"

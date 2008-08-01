@@ -96,7 +96,8 @@ extern nvlist_t *topo_mod_modfmri(topo_mod_t *, int, const char *);
 extern nvlist_t *topo_mod_pkgfmri(topo_mod_t *, int, const char *);
 extern int topo_mod_nvl2str(topo_mod_t *, nvlist_t *, char **);
 extern int topo_mod_str2nvl(topo_mod_t *, const char *,  nvlist_t **);
-
+extern int topo_prop_setmutable(tnode_t *node, const char *pgname,
+    const char *pname, int *err);
 /*
  * Snapshot walker support
  */
@@ -127,8 +128,8 @@ extern nvlist_t *topo_mod_auth(topo_mod_t *, tnode_t *);
 #define	TOPO_METH_LABEL_DESC		"label constructor"
 #define	TOPO_METH_LABEL_VERSION0	0
 #define	TOPO_METH_LABEL_VERSION		TOPO_METH_LABEL_VERSION0
-#define	TOPO_METH_LABEL_ARG_NVL	"label-specific"
-#define	TOPO_METH_LABEL_RET_STR	"label-string"
+#define	TOPO_METH_LABEL_ARG_NVL		"label-specific"
+#define	TOPO_METH_LABEL_RET_STR		"label-string"
 
 #define	TOPO_METH_PRESENT		"topo_present"
 #define	TOPO_METH_PRESENT_DESC		"presence indicator"
@@ -167,6 +168,11 @@ extern nvlist_t *topo_mod_auth(topo_mod_t *, tnode_t *);
 #define	TOPO_METH_DISK_STATUS_VERSION	0
 #define	TOPO_METH_DISK_STATUS_DESC	"Disk status"
 
+#define	TOPO_PROP_METH_DESC		"Dynamic Property method"
+
+#define	TOPO_METH_IPMI_ENTITY		"ipmi_entity"
+#define	TOPO_METH_FAC_ENUM_DESC		"Facility Enumerator"
+
 extern void *topo_mod_alloc(topo_mod_t *, size_t);
 extern void *topo_mod_zalloc(topo_mod_t *, size_t);
 extern void topo_mod_free(topo_mod_t *, void *, size_t);
@@ -189,6 +195,8 @@ extern int topo_node_range_create(topo_mod_t *, tnode_t *, const char *,
 extern void topo_node_range_destroy(tnode_t *, const char *);
 extern tnode_t *topo_node_bind(topo_mod_t *, tnode_t *, const char *,
     topo_instance_t, nvlist_t *);
+extern tnode_t *topo_node_facbind(topo_mod_t *, tnode_t *, const char *,
+    const char *);
 extern void topo_node_unbind(tnode_t *);
 extern void topo_node_setspecific(tnode_t *, void *);
 extern void *topo_node_getspecific(tnode_t *);
@@ -199,33 +207,6 @@ extern int topo_node_label_set(tnode_t *node, char *, int *);
 #define	TOPO_ASRU_COMPUTE	0x0001	/* Compute ASRU dynamically */
 #define	TOPO_FRU_COMPUTE	0x0002	/* Compute FRU dynamically */
 
-/*
- * Topo property set functions
- */
-extern int topo_prop_set_int32(tnode_t *, const char *, const char *, int,
-    int32_t, int *);
-extern int topo_prop_set_uint32(tnode_t *, const char *, const char *, int,
-    uint32_t, int *);
-extern int topo_prop_set_int64(tnode_t *, const char *, const char *,
-    int, int64_t, int *);
-extern int topo_prop_set_uint64(tnode_t *, const char *, const char *,
-    int, uint64_t, int *);
-extern int topo_prop_set_string(tnode_t *, const char *, const char *,
-    int, const char *, int *);
-extern int topo_prop_set_fmri(tnode_t *, const char *, const char *,
-    int, const nvlist_t *, int *);
-extern int topo_prop_set_int32_array(tnode_t *, const char *, const char *, int,
-    int32_t *, uint_t, int *);
-extern int topo_prop_set_uint32_array(tnode_t *, const char *, const char *,
-    int, uint32_t *, uint_t, int *);
-extern int topo_prop_set_int64_array(tnode_t *, const char *, const char *,
-    int, int64_t *, uint_t, int *);
-extern int topo_prop_set_uint64_array(tnode_t *, const char *, const char *,
-    int, uint64_t *, uint_t, int *);
-extern int topo_prop_set_string_array(tnode_t *, const char *, const char *,
-    int, const char **, uint_t, int *);
-extern int topo_prop_set_fmri_array(tnode_t *, const char *, const char *,
-    int, const nvlist_t **, uint_t, int *);
 extern int topo_prop_inherit(tnode_t *, const char *, const char *, int *);
 extern int topo_pgroup_create(tnode_t *, const topo_pgroup_info_t *, int *);
 
@@ -252,6 +233,10 @@ typedef enum topo_mod_errno {
     EMOD_FMRI_NVL,		/* nvlist allocation failure for FMRI */
     EMOD_FMRI_VERSION,		/* invalid FMRI scheme version */
     EMOD_FMRI_MALFORM,		/* malformed FMRI */
+    EMOD_NODE_BOUND,		/* node already bound */
+    EMOD_NODE_DUP,		/* duplicate node */
+    EMOD_NODE_NOENT,		/* node not found */
+    EMOD_NODE_RANGE,		/* invalid node range */
     EMOD_VER_ABI,		/* registered with invalid ABI version */
     EMOD_VER_OLD,		/* attempt to load obsolete module */
     EMOD_VER_NEW,		/* attempt to load a newer module */

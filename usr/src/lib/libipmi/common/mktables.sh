@@ -107,3 +107,17 @@ cat $libipmi_h | sed -n "s/$pattern/$replace/p" || exit 1
 
 echo "\t{ 0, NULL }
 };"
+
+#
+# Units
+#
+echo "\nipmi_name_trans_t ipmi_units_type_table[] = {"
+
+pattern="#define	IPMI_UNITS_\([A-Z0-9_]*\).*\$"
+replace="	{ IPMI_UNITS_\1, \"\1\" },"
+
+cat $libipmi_h | sed -n "s/$pattern/$replace/p" || exit 1
+
+echo "\t{ 0, NULL }
+};"
+

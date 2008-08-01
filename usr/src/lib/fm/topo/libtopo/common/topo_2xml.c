@@ -38,7 +38,8 @@
 #include <topo_tree.h>
 
 #define	INT32BUFSZ	sizeof (UINT32_MAX) + 1
-#define	INT64BUFSZ	sizeof (UINT64_MAX) + 1
+/* 2 bytes for "0x" + 16 bytes for the hex value + 1 for sign + null */
+#define	INT64BUFSZ	20
 #define	XML_VERSION	"1.0"
 
 static int txml_print_range(topo_hdl_t *, FILE *, tnode_t *, int);
@@ -103,77 +104,88 @@ end_element(FILE *fp, const char *ename)
 }
 
 static void
-txml_print_prop(topo_hdl_t *thp, FILE *fp, topo_propval_t *pv)
+txml_print_prop(topo_hdl_t *thp, FILE *fp, tnode_t *node, const char *pgname,
+    topo_propval_t *pv)
 {
 	int err;
 	char *fmri = NULL;
-	char vbuf[INT64BUFSZ], tbuf[10], *pval, *aval;
-	nvpair_t *nvp;
-
-	nvp = nvlist_next_nvpair(pv->tp_val, NULL);
-	while (nvp && (strcmp(TOPO_PROP_VAL_VAL, nvpair_name(nvp)) != 0))
-			nvp = nvlist_next_nvpair(pv->tp_val, nvp);
-
-	if (nvp == NULL)
-		return;
+	char vbuf[INT64BUFSZ], tbuf[32], *pval = NULL, *aval;
 
 	switch (pv->tp_type) {
 		case TOPO_TYPE_INT32: {
 			int32_t val;
-			(void) nvpair_value_int32(nvp, &val);
-			(void) snprintf(vbuf, INT64BUFSZ, "%d", val);
-			(void) snprintf(tbuf, 10, "%s", Int32);
-			pval = vbuf;
+			if (topo_prop_get_int32(node, pgname, pv->tp_name, &val,
+			    &err) == 0) {
+				(void) snprintf(vbuf, INT64BUFSZ, "%d", val);
+				(void) snprintf(tbuf, 10, "%s", Int32);
+				pval = vbuf;
+			} else
+				return;
 			break;
 		}
 		case TOPO_TYPE_UINT32: {
 			uint32_t val;
-			(void) nvpair_value_uint32(nvp, &val);
-			(void) snprintf(vbuf, INT64BUFSZ, "0x%x", val);
-			(void) snprintf(tbuf, 10, "%s", UInt32);
-			pval = vbuf;
+			if (topo_prop_get_uint32(node, pgname, pv->tp_name,
+			    &val, &err) == 0) {
+				(void) snprintf(vbuf, INT64BUFSZ, "0x%x", val);
+				(void) snprintf(tbuf, 10, "%s", UInt32);
+				pval = vbuf;
+			} else
+				return;
 			break;
 		}
 		case TOPO_TYPE_INT64: {
 			int64_t val;
-			(void) nvpair_value_int64(nvp, &val);
-			(void) snprintf(vbuf, INT64BUFSZ, "%lld",
-			    (longlong_t)val);
-			(void) snprintf(tbuf, 10, "%s", Int64);
-			pval = vbuf;
+			if (topo_prop_get_int64(node, pgname, pv->tp_name, &val,
+			    &err) == 0) {
+				(void) snprintf(vbuf, INT64BUFSZ, "0x%llx",
+				    (longlong_t)val);
+				(void) snprintf(tbuf, 10, "%s", Int64);
+				pval = vbuf;
+			} else
+				return;
 			break;
 		}
 		case TOPO_TYPE_UINT64: {
 			uint64_t val;
-			(void) nvpair_value_uint64(nvp, &val);
-			(void) snprintf(vbuf, INT64BUFSZ, "0x%llx",
-			    (u_longlong_t)val);
-			(void) snprintf(tbuf, 10, "%s", UInt64);
-			pval = vbuf;
+			if (topo_prop_get_uint64(node, pgname, pv->tp_name,
+			    &val, &err) == 0) {
+				(void) snprintf(vbuf, INT64BUFSZ, "0x%llx",
+				    (u_longlong_t)val);
+				(void) snprintf(tbuf, 10, "%s", UInt64);
+				pval = vbuf;
+			} else
+				return;
 			break;
 		}
 		case TOPO_TYPE_STRING: {
-			(void) nvpair_value_string(nvp, &pval);
-			(void) snprintf(tbuf, 10, "%s", String);
+			if (topo_prop_get_string(node, pgname, pv->tp_name,
+			    &pval, &err) != 0)
+				return;
+			(void) snprintf(tbuf, 10, "%s", "string");
 			break;
 		}
 		case TOPO_TYPE_FMRI: {
 			nvlist_t *val;
 
-			(void) nvpair_value_nvlist(nvp, &val);
-			if (topo_fmri_nvl2str(thp, val, &fmri, &err) == 0)
-				pval = fmri;
-			else
+			if (topo_prop_get_fmri(node, pgname, pv->tp_name, &val,
+			    &err) == 0) {
+				if (topo_fmri_nvl2str(thp, val, &fmri, &err)
+				    == 0)
+					pval = fmri;
+				else
+					return;
+			} else
 				return;
-
 			(void) snprintf(tbuf, 10, "%s", FMRI);
 			break;
 		}
 		case TOPO_TYPE_UINT32_ARRAY: {
 			uint32_t *val;
 			uint_t nelem, i;
-
-			(void) nvpair_value_uint32_array(nvp, &val, &nelem);
+			if (topo_prop_get_uint32_array(node, pgname,
+			    pv->tp_name, &val, &nelem, &err) != 0)
+				return;
 
 			if (nelem > 0) {
 				aval = calloc((nelem*9-1), sizeof (uchar_t));
@@ -195,11 +207,10 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, topo_propval_t *pv)
 
 	if (fmri != NULL)
 		topo_hdl_strfree(thp, fmri);
-
 }
 
 static void
-txml_print_pgroup(topo_hdl_t *thp, FILE *fp, topo_pgroup_t *pg)
+txml_print_pgroup(topo_hdl_t *thp, FILE *fp, tnode_t *node, topo_pgroup_t *pg)
 {
 	topo_ipgroup_info_t *pip = pg->tpg_info;
 	topo_proplist_t *plp;
@@ -213,7 +224,7 @@ txml_print_pgroup(topo_hdl_t *thp, FILE *fp, topo_pgroup_t *pg)
 	    namestab, Datastab, datastab, Version, version, NULL);
 	for (plp = topo_list_next(&pg->tpg_pvals); plp != NULL;
 	    plp = topo_list_next(plp)) {
-		txml_print_prop(thp, fp, plp->tp_pval);
+		txml_print_prop(thp, fp, node, pip->tpi_name, plp->tp_pval);
 	}
 	end_element(fp, Propgrp);
 }
@@ -238,7 +249,7 @@ txml_print_node(topo_hdl_t *thp, FILE *fp, tnode_t *node)
 	begin_element(fp, Node, Instance, inst, Static, True, NULL);
 	for (pg = topo_list_next(&node->tn_pgroups); pg != NULL;
 	    pg = topo_list_next(pg)) {
-		txml_print_pgroup(thp, fp, pg);
+		txml_print_pgroup(thp, fp, node, pg);
 	}
 	txml_print_dependents(thp, fp, node);
 	end_element(fp, Node);

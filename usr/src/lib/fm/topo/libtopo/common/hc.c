@@ -44,6 +44,7 @@
 #include <sys/utsname.h>
 
 #include <topo_method.h>
+#include <topo_module.h>
 #include <topo_subr.h>
 #include <topo_prop.h>
 #include <topo_tree.h>
@@ -69,6 +70,8 @@ static int hc_fmri_prop_get(topo_mod_t *, tnode_t *, topo_version_t,
 static int hc_fmri_prop_set(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 static int hc_fmri_pgrp_get(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+static int hc_fmri_facility(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 
 static nvlist_t *hc_fmri_create(topo_mod_t *, nvlist_t *, int, const char *,
@@ -98,6 +101,9 @@ const topo_method_t hc_methods[] = {
 	{ TOPO_METH_PGRP_GET, TOPO_METH_PGRP_GET_DESC,
 	    TOPO_METH_PGRP_GET_VERSION, TOPO_STABILITY_INTERNAL,
 	    hc_fmri_pgrp_get },
+	{ TOPO_METH_FACILITY, TOPO_METH_FACILITY_DESC,
+	    TOPO_METH_FACILITY_VERSION, TOPO_STABILITY_INTERNAL,
+	    hc_fmri_facility },
 	{ NULL }
 };
 
@@ -325,8 +331,10 @@ fmri_compare(topo_mod_t *mod, nvlist_t *nv1, nvlist_t *nv2)
 {
 	uint8_t v1, v2;
 	nvlist_t **hcp1, **hcp2;
+	nvlist_t *f1 = NULL, *f2 = NULL;
 	int err, i;
 	uint_t nhcp1, nhcp2;
+	char *f1str, *f2str;
 
 	if (nvlist_lookup_uint8(nv1, FM_VERSION, &v1) != 0 ||
 	    nvlist_lookup_uint8(nv2, FM_VERSION, &v2) != 0 ||
@@ -360,7 +368,28 @@ fmri_compare(topo_mod_t *mod, nvlist_t *nv1, nvlist_t *nv2)
 		return (0);
 	}
 
-	return (1);
+	/*
+	 * Finally, check if the FMRI's represent a facility node.  If so, then
+	 * verify that the facilty type ("sensor"|"indicator") and facility
+	 * name match.
+	 */
+	(void) nvlist_lookup_nvlist(nv1, FM_FMRI_FACILITY, &f1);
+	(void) nvlist_lookup_nvlist(nv2, FM_FMRI_FACILITY, &f2);
+
+	if (f1 == NULL && f2 == NULL)
+		return (1);
+	else if (f1 == NULL || f2 == NULL)
+		return (0);
+
+	if (nvlist_lookup_string(f1, FM_FMRI_FACILITY_NAME, &f1str) == 0 &&
+	    nvlist_lookup_string(f2, FM_FMRI_FACILITY_NAME, &f2str) == 0 &&
+	    strcmp(f1str, f2str) == 0 &&
+	    nvlist_lookup_string(f1, FM_FMRI_FACILITY_TYPE, &f1str) == 0 &&
+	    nvlist_lookup_string(f2, FM_FMRI_FACILITY_TYPE, &f2str) == 0 &&
+	    strcmp(f1str, f2str) == 0) {
+		return (1);
+	}
+	return (0);
 }
 
 /*ARGSUSED*/
@@ -400,6 +429,7 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 {
 	nvlist_t **hcprs = NULL;
 	nvlist_t *anvl = NULL;
+	nvlist_t *fnvl;
 	uint8_t version;
 	ssize_t size = 0;
 	uint_t hcnprs;
@@ -412,6 +442,7 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	char *part = NULL;
 	char *root = NULL;
 	char *rev = NULL;
+	char *fname = NULL, *ftype = NULL;
 	int more_auth = 0;
 	int err, i;
 
@@ -506,6 +537,22 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 			return (0);
 		topo_fmristr_build(&size, buf, buflen, nm, NULL, "=");
 		topo_fmristr_build(&size, buf, buflen, id, NULL, NULL);
+	}
+
+	/*
+	 * If the nvlist represents a facility node, then we append the
+	 * facility type and name to the end of the string representation using
+	 * the format below:
+	 *
+	 * ?<ftype>=<fname>
+	 */
+	if (nvlist_lookup_nvlist(nvl, FM_FMRI_FACILITY, &fnvl) == 0) {
+		if (nvlist_lookup_string(fnvl, FM_FMRI_FACILITY_NAME,
+		    &fname) != 0 || nvlist_lookup_string(fnvl,
+		    FM_FMRI_FACILITY_TYPE, &ftype) != 0)
+			return (0);
+		topo_fmristr_build(&size, buf, buflen, "?", NULL, NULL);
+		topo_fmristr_build(&size, buf, buflen, "=", ftype, fname);
 	}
 
 	return (size);
@@ -707,17 +754,17 @@ make_hc_pairs(topo_mod_t *mod, char *fmri, int *num)
 	return (pa);
 }
 
-void
+int
 make_hc_auth(topo_mod_t *mod, char *fmri, char **serial, char **part,
 char **rev, nvlist_t **auth)
 {
 	char *starti, *startn, *endi, *copy;
-	char *aname, *aid, *fs;
+	char *aname = NULL, *aid = NULL, *fs;
 	nvlist_t *na = NULL;
 	size_t len;
 
 	if ((copy = topo_mod_strdup(mod, fmri + 5)) == NULL)
-		return;
+		return (-1);
 
 	len = strlen(copy);
 
@@ -729,7 +776,7 @@ char **rev, nvlist_t **auth)
 
 	if (startn == NULL || fs == NULL) {
 		topo_mod_strfree(mod, copy);
-		return;
+		return (0);
 	}
 
 	/*
@@ -737,21 +784,21 @@ char **rev, nvlist_t **auth)
 	 * first slash
 	 */
 	if (startn > fs)
-		return;
+		goto hcabail;
 
 	do {
 		if (++startn >= copy + len)
 			break;
 
 		if ((starti = strchr(startn, '=')) == NULL)
-			break;
+			goto hcabail;
 
 		*starti = '\0';
 		if (++starti > copy + len)
-			break;
+			goto hcabail;
 
 		if ((aname = topo_mod_strdup(mod, startn)) == NULL)
-			break;
+			goto hcabail;
 
 		startn = endi = strchr(starti, ':');
 		if (endi == NULL)
@@ -759,10 +806,8 @@ char **rev, nvlist_t **auth)
 				break;
 
 		*endi = '\0';
-		if ((aid = topo_mod_strdup(mod, starti)) == NULL) {
-			topo_mod_strfree(mod, aname);
-			break;
-		}
+		if ((aid = topo_mod_strdup(mod, starti)) == NULL)
+			goto hcabail;
 
 		/*
 		 * Return possible serial, part and revision
@@ -786,12 +831,74 @@ char **rev, nvlist_t **auth)
 		}
 		topo_mod_strfree(mod, aname);
 		topo_mod_strfree(mod, aid);
+		aname = aid = NULL;
 
 	} while (startn != NULL);
 
 	*auth = na;
 
 	topo_mod_free(mod, copy, len + 1);
+	return (0);
+
+hcabail:
+	topo_mod_free(mod, copy, len + 1);
+	topo_mod_strfree(mod, aname);
+	topo_mod_strfree(mod, aid);
+	nvlist_free(na);
+	return (-1);
+}
+
+
+/*
+ * This function creates an nvlist to represent the facility portion of an
+ * hc-scheme node, given a string representation of the fmri.  This is called by
+ * hc_fmri_str2nvl.  If the string does not contain a facility component
+ * (e.g. ?<ftype>=<fname>) then it bails early and returns 0.
+ *
+ * On failure it returns -1 and sets the topo mod errno
+ */
+int
+make_facility(topo_mod_t *mod, char *str, nvlist_t **nvl)
+{
+	char *fac, *copy, *fname, *ftype;
+	nvlist_t *nf = NULL;
+	size_t len;
+
+	if ((fac = strchr(str, '?')) == NULL)
+		return (0);
+
+	++fac;
+	if ((copy = topo_mod_strdup(mod, fac)) == NULL)
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+
+	fac = copy;
+	len = strlen(fac);
+
+	if ((fname = strchr(fac, '=')) == NULL) {
+		topo_mod_free(mod, copy, len + 1);
+		return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
+	}
+
+	fname[0] = '\0';
+	++fname;
+	ftype = fac;
+
+	if (topo_mod_nvalloc(mod, &nf, NV_UNIQUE_NAME) != 0) {
+		topo_mod_free(mod, copy, len + 1);
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+	}
+
+	if (nvlist_add_string(nf, FM_FMRI_FACILITY_NAME, fname) != 0 ||
+	    nvlist_add_string(nf, FM_FMRI_FACILITY_TYPE, ftype) != 0) {
+		topo_mod_free(mod, copy, len + 1);
+		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
+	}
+
+	topo_mod_free(mod, copy, len + 1);
+
+	*nvl = nf;
+
+	return (0);
 }
 
 /*ARGSUSED*/
@@ -802,6 +909,7 @@ hc_fmri_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	nvlist_t **pa = NULL;
 	nvlist_t *nf = NULL;
 	nvlist_t *auth = NULL;
+	nvlist_t *fac = NULL;
 	char *str;
 	char *serial = NULL, *part = NULL, *rev = NULL;
 	int npairs;
@@ -820,7 +928,9 @@ hc_fmri_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	if ((pa = make_hc_pairs(mod, str, &npairs)) == NULL)
 		return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
 
-	make_hc_auth(mod, str, &serial, &part, &rev, &auth);
+	if (make_hc_auth(mod, str, &serial, &part, &rev, &auth) < 0)
+		goto hcfmbail;
+
 	if ((nf = hc_base_fmri_create(mod, auth, part, rev, serial)) == NULL)
 		goto hcfmbail;
 	if ((e = nvlist_add_uint32(nf, FM_FMRI_HC_LIST_SZ, npairs)) == 0)
@@ -829,16 +939,25 @@ hc_fmri_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		topo_mod_dprintf(mod, "construction of new hc nvl failed");
 		goto hcfmbail;
 	}
+
+	/*
+	 * Clean-up
+	 */
 	for (i = 0; i < npairs; i++)
 		nvlist_free(pa[i]);
 	topo_mod_free(mod, pa, npairs * sizeof (nvlist_t *));
-	if (serial != NULL)
-		topo_mod_strfree(mod, serial);
-	if (part != NULL)
-		topo_mod_strfree(mod, part);
-	if (rev != NULL)
-		topo_mod_strfree(mod, rev);
+	topo_mod_strfree(mod, serial);
+	topo_mod_strfree(mod, part);
+	topo_mod_strfree(mod, rev);
 	nvlist_free(auth);
+
+	if (make_facility(mod, str, &fac) == -1)
+		goto hcfmbail;
+
+	if (fac != NULL) {
+		if (nvlist_add_nvlist(nf, FM_FMRI_FACILITY, fac) != 0)
+			goto hcfmbail;
+	}
 
 	*out = nf;
 
@@ -850,13 +969,12 @@ hcfmbail:
 	for (i = 0; i < npairs; i++)
 		nvlist_free(pa[i]);
 	topo_mod_free(mod, pa, npairs * sizeof (nvlist_t *));
-	if (serial != NULL)
-		topo_mod_strfree(mod, serial);
-	if (part != NULL)
-		topo_mod_strfree(mod, part);
-	if (rev != NULL)
-		topo_mod_strfree(mod, rev);
+
+	topo_mod_strfree(mod, serial);
+	topo_mod_strfree(mod, part);
+	topo_mod_strfree(mod, rev);
 	nvlist_free(auth);
+	nvlist_free(nf);
 	return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
 }
 
@@ -1053,6 +1171,7 @@ struct hc_walk {
 	topo_walk_t *hcw_wp;
 	nvlist_t **hcw_list;
 	nvlist_t *hcw_fmri;
+	nvlist_t *hcw_fac;
 	uint_t hcw_index;
 	uint_t hcw_end;
 };
@@ -1151,7 +1270,7 @@ hc_walk_sibling(topo_mod_t *mod, tnode_t *node, struct hc_walk *hwp,
 
 /*
  * Generic walker for the hc-scheme topo tree.  This function uses the
- * hierachical nature of the hc-scheme to step through efficiently through
+ * hierachical nature of the hc-scheme to efficiently step through
  * the topo hc tree.  Node lookups are done by topo_walk_byid() and
  * topo_walk_bysibling()  at each component level to avoid unnecessary
  * traversal of the tree.  hc_walker() never returns TOPO_WALK_NEXT, so
@@ -1164,13 +1283,27 @@ hc_walker(topo_mod_t *mod, tnode_t *node, void *pdata)
 	int i, err;
 	struct hc_walk *hwp = (struct hc_walk *)pdata;
 	char *name, *id;
+	char *fname, *ftype;
 	topo_instance_t inst;
 	boolean_t match;
 
 	i = hwp->hcw_index;
 	if (i > hwp->hcw_end) {
-		(void) topo_mod_seterrno(mod, ETOPO_PROP_NOENT);
-		return (TOPO_WALK_TERMINATE);
+		if (hwp->hcw_fac != NULL) {
+			if ((err = hwp->hcw_cb(mod, node, hwp->hcw_priv))
+			    != 0) {
+				(void) topo_mod_seterrno(mod, err);
+				topo_mod_dprintf(mod, "hc_walker: callback "
+				    "failed: %s\n ", topo_mod_errmsg(mod));
+				return (TOPO_WALK_ERR);
+			}
+			topo_mod_dprintf(mod, "hc_walker: callback "
+			    "complete: terminate walk\n");
+			return (TOPO_WALK_TERMINATE);
+		} else {
+			topo_mod_dprintf(mod, "hc_walker: node not found\n");
+			return (TOPO_WALK_TERMINATE);
+		}
 	}
 
 	err = nvlist_lookup_string(hwp->hcw_list[i], FM_FMRI_HC_NAME, &name);
@@ -1198,29 +1331,46 @@ hc_walker(topo_mod_t *mod, tnode_t *node, void *pdata)
 	topo_mod_dprintf(mod, "hc_walker: walking node:%s=%d for hc:"
 	    "%s=%d at %d, end at %d \n", topo_node_name(node),
 	    topo_node_instance(node), name, inst, i, hwp->hcw_end);
+
 	if (i == hwp->hcw_end) {
+
 		/*
-		 * We are at the end of the hc-list.  Verify that
-		 * the last node contains the name/instance we are looking for.
+		 * We are at the end of the hc-list.  Now, check for
+		 * a facility leaf and walk one more time.
 		 */
-		if (match) {
-			if ((err = hwp->hcw_cb(mod, node, hwp->hcw_priv))
-			    != 0) {
-				(void) topo_mod_seterrno(mod, err);
-				topo_mod_dprintf(mod, "hc_walker: callback "
-				    "failed: %s\n ", topo_mod_errmsg(mod));
+		if (hwp->hcw_fac != NULL) {
+			err = nvlist_lookup_string(hwp->hcw_fac,
+			    FM_FMRI_FACILITY_NAME, &fname);
+			err |= nvlist_lookup_string(hwp->hcw_fac,
+			    FM_FMRI_FACILITY_TYPE, &ftype);
+			if (err != 0) {
+				(void) topo_mod_seterrno(mod, EMOD_NVL_INVAL);
 				return (TOPO_WALK_ERR);
 			}
+			hwp->hcw_index++;
+			topo_mod_dprintf(mod, "hc_walker: walk to facility "
+			    "node:%s=%s\n", fname, ftype);
+			return (topo_walk_byid(hwp->hcw_wp, fname, 0));
+		}
+
+		/*
+		 * Otherwise, this is the node we're looking for.
+		 */
+		if ((err = hwp->hcw_cb(mod, node, hwp->hcw_priv)) != 0) {
+			(void) topo_mod_seterrno(mod, err);
+			topo_mod_dprintf(mod, "hc_walker: callback "
+			    "failed: %s\n ", topo_mod_errmsg(mod));
+			return (TOPO_WALK_ERR);
+		} else {
 			topo_mod_dprintf(mod, "hc_walker: callback "
 			    "complete: terminate walk\n");
-			return (TOPO_WALK_TERMINATE);
-		} else {
-			topo_mod_dprintf(mod, "hc_walker: %s=%d\n "
-			    "not found\n", name, inst);
 			return (TOPO_WALK_TERMINATE);
 		}
 	}
 
+	/*
+	 * Move on to the next component in the hc-list
+	 */
 	hwp->hcw_index = ++i;
 	err = nvlist_lookup_string(hwp->hcw_list[i], FM_FMRI_HC_NAME, &name);
 	err |= nvlist_lookup_string(hwp->hcw_list[i], FM_FMRI_HC_ID, &id);
@@ -1230,8 +1380,6 @@ hc_walker(topo_mod_t *mod, tnode_t *node, void *pdata)
 	}
 	inst = atoi(id);
 
-	topo_mod_dprintf(mod, "hc_walker: walk byid of %s=%d \n", name,
-	    inst);
 	return (topo_walk_byid(hwp->hcw_wp, name, inst));
 
 }
@@ -1240,7 +1388,7 @@ static struct hc_walk *
 hc_walk_init(topo_mod_t *mod, tnode_t *node, nvlist_t *rsrc,
     topo_mod_walk_cb_t cb, void *pdata)
 {
-	int err;
+	int err, ret;
 	uint_t sz;
 	struct hc_walk *hwp;
 	topo_walk_t *wp;
@@ -1252,9 +1400,23 @@ hc_walk_init(topo_mod_t *mod, tnode_t *node, nvlist_t *rsrc,
 
 	if (nvlist_lookup_nvlist_array(rsrc, FM_FMRI_HC_LIST, &hwp->hcw_list,
 	    &sz) != 0) {
+		topo_mod_dprintf(mod, "hc_walk_init: failed to lookup %s "
+		    "nvlist\n", FM_FMRI_HC_LIST);
 		topo_mod_free(mod, hwp, sizeof (struct hc_walk));
 		(void) topo_mod_seterrno(mod, EMOD_METHOD_INVAL);
 		return (NULL);
+	}
+	if ((ret = nvlist_lookup_nvlist(rsrc, FM_FMRI_FACILITY, &hwp->hcw_fac))
+	    != 0) {
+		if (ret != ENOENT) {
+			topo_mod_dprintf(mod, "hc_walk_init: unexpected error "
+			    "looking up %s nvlist", FM_FMRI_FACILITY);
+			topo_mod_free(mod, hwp, sizeof (struct hc_walk));
+			(void) topo_mod_seterrno(mod, EMOD_METHOD_INVAL);
+			return (NULL);
+		} else {
+			hwp->hcw_fac = NULL;
+		}
 	}
 
 	hwp->hcw_fmri = rsrc;
@@ -1264,6 +1426,8 @@ hc_walk_init(topo_mod_t *mod, tnode_t *node, nvlist_t *rsrc,
 	hwp->hcw_cb = cb;
 	if ((wp = topo_mod_walk_init(mod, node, hc_walker, (void *)hwp, &err))
 	    == NULL) {
+		topo_mod_dprintf(mod, "hc_walk_init: topo_mod_walk_init failed "
+		    "(%s)\n", topo_strerror(err));
 		topo_mod_free(mod, hwp, sizeof (struct hc_walk));
 		(void) topo_mod_seterrno(mod, err);
 		return (NULL);
@@ -1612,6 +1776,125 @@ hc_fmri_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		*out = hap->ha_nvl;
 
 	topo_mod_free(mod, hap, sizeof (struct hc_args));
+
+	return (err);
+}
+
+struct fac_lookup {
+	const char *fl_fac_type;
+	uint32_t fl_fac_subtype;
+#ifdef _LP64
+	uint64_t fl_callback;
+	uint64_t fl_callback_args;
+#else
+	uint32_t fl_callback;
+	uint32_t fl_callback_args;
+#endif
+	nvlist_t *fl_rsrc;
+	nvlist_t *fl_fac_rsrc;
+};
+
+static int
+hc_fac_get(topo_mod_t *mod, tnode_t *node, void *pdata)
+{
+	struct fac_lookup *flp = (struct fac_lookup *)pdata;
+	topo_walk_cb_t cb = (topo_walk_cb_t)flp->fl_callback;
+	topo_faclist_t faclist, *tmp;
+	int err, ret = 0;
+
+	/*
+	 * Lookup the specified facility node.  Return with an error if we can't
+	 * find it.
+	 */
+	if (topo_node_facility(mod->tm_hdl, node, flp->fl_fac_type,
+	    flp->fl_fac_subtype, &faclist, &err) != 0) {
+		topo_mod_dprintf(mod, "hc_fac_get: topo_node_facility "
+		    "failed\n");
+		return (TOPO_WALK_ERR);
+	}
+
+	/*
+	 * Invoke user's callback for each facility node in the topo list,
+	 * passing in a pointer to the facility node
+	 */
+	for (tmp = topo_list_next(&faclist.tf_list); tmp != NULL;
+	    tmp = topo_list_next(tmp)) {
+
+		if ((err = cb(mod->tm_hdl, tmp->tf_node,
+		    (void *)flp->fl_callback_args)) != 0) {
+			(void) topo_mod_seterrno(mod, err);
+			topo_mod_dprintf(mod, "hc_fac_get: callback failed: "
+			    "%s\n ", topo_mod_errmsg(mod));
+			ret = TOPO_WALK_ERR;
+			break;
+		}
+	}
+
+	while ((tmp = topo_list_next(&faclist.tf_list)) != NULL) {
+		topo_list_delete(&faclist.tf_list, tmp);
+		topo_mod_free(mod, tmp, sizeof (topo_faclist_t));
+	}
+	return (ret);
+}
+
+static int
+hc_fmri_facility(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	int err = 0;
+	struct hc_walk *hwp;
+	struct fac_lookup *flp;
+
+	if (version > TOPO_METH_FACILITY_VERSION)
+		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
+
+	if ((flp = topo_mod_alloc(mod, sizeof (struct fac_lookup))) == NULL)
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+
+	/*
+	 * lookup arguments: hw resource, facility type, facility subtype,
+	 *  callback and callback args
+	 */
+	err = nvlist_lookup_nvlist(in, TOPO_PROP_RESOURCE, &flp->fl_rsrc);
+	err |= nvlist_lookup_string(in, FM_FMRI_FACILITY_TYPE,
+	    (char **)&flp->fl_fac_type);
+	err |= nvlist_lookup_uint32(in, "type", &flp->fl_fac_subtype);
+#ifdef _LP64
+	err |= nvlist_lookup_uint64(in, "callback", &flp->fl_callback);
+	err |= nvlist_lookup_uint64(in, "callback-args",
+	    &flp->fl_callback_args);
+#else
+	err |= nvlist_lookup_uint32(in, "callback", &flp->fl_callback);
+	err |= nvlist_lookup_uint32(in, "callback-args",
+	    &flp->fl_callback_args);
+#endif
+	if (err != 0) {
+		topo_mod_dprintf(mod, "hc_fmri_facility: failed to construct "
+		    "walker arg nvlist\n");
+		topo_mod_free(mod, flp, sizeof (struct fac_lookup));
+		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
+	}
+
+	flp->fl_fac_rsrc = NULL;
+	if ((hwp = hc_walk_init(mod, node, flp->fl_rsrc, hc_fac_get,
+	    (void *)flp)) != NULL) {
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
+		    TOPO_WALK_ERR)
+			err = -1;
+		else
+			err = 0;
+		topo_walk_fini(hwp->hcw_wp);
+		topo_mod_free(mod, hwp, sizeof (struct hc_walk));
+	} else {
+		topo_mod_dprintf(mod, "hc_fmri_facility: failed to initialize "
+		    "hc walker\n");
+		err = -1;
+	}
+
+	if (flp->fl_fac_rsrc != NULL)
+		*out = flp->fl_fac_rsrc;
+
+	topo_mod_free(mod, flp, sizeof (struct fac_lookup));
 
 	return (err);
 }

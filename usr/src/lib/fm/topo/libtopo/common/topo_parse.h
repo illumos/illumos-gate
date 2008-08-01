@@ -95,6 +95,15 @@ typedef struct tf_rdata {
 	tf_edata_t *rd_einfo;	/* enumerator information, if any */
 	struct tf_idata *rd_instances; /* hard instances */
 	tf_pad_t *rd_pad;	/* properties and dependents */
+	/*
+	 * true, if this range xml element contains any child xml
+	 * node elements.
+	 * We use this to determine whether or not we should apply
+	 * property map changes to all of the nodes in a given range
+	 * or just a specific node.
+	 *
+	 */
+	int contains_node_ele;
 } tf_rdata_t;
 
 /*
@@ -135,19 +144,25 @@ typedef struct tf_info {
 #define	Argval "argval"
 #define	Children "children"
 #define	Dependents "dependents"
+#define	Facility	"facility"
 #define	FMRI "fmri"
 #define	Grouping "grouping"
 #define	Immutable "immutable"
+#define	Indicator	"indicator"
 #define	Instance "instance"
 #define	Int32 "int32"
 #define	Int64 "int64"
+#define	Ipmi	"ipmi"
+#define	Mutable "mutable"
 #define	Name "name"
 #define	Propname "propname"
 #define	Proptype "proptype"
+#define	Provider "provider"
 #define	Range "range"
 #define	Scheme "scheme"
 #define	Set "set"
 #define	Setlist "setlist"
+#define	Sensor	"sensor"
 #define	Siblings "siblings"
 #define	Static "static"
 #define	String "string"

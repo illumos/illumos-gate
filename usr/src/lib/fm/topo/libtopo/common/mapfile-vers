@@ -34,6 +34,7 @@ SUNWprivate {
 	topo_fmri_contains;
 	topo_fmri_create;
 	topo_fmri_expand;
+	topo_fmri_facility;
 	topo_fmri_fru;
 	topo_fmri_getpgrp;
 	topo_fmri_getprop;
@@ -55,10 +56,13 @@ SUNWprivate {
 	topo_hdl_strdup;
 	topo_hdl_strfree;
 	topo_hdl_zalloc;
+	topo_led_state_name;
+	topo_led_type_name;
 	topo_list_append;
 	topo_list_delete;
 	topo_method_invoke;
 	topo_method_register;
+	topo_method_supported;
 	topo_method_unregister;
 	topo_method_unregister_all;
 	topo_mod_alloc;
@@ -98,6 +102,9 @@ SUNWprivate {
 	topo_node_asru;
 	topo_node_asru_set;
 	topo_node_bind;
+	topo_node_facility;
+	topo_node_facbind;
+	topo_node_flags;
 	topo_node_fru;
 	topo_node_fru_set;
 	topo_node_getspecific;
@@ -121,6 +128,7 @@ SUNWprivate {
 	topo_prop_get_string;
 	topo_prop_get_uint32;
 	topo_prop_get_uint64;
+	topo_prop_get_double;
 	topo_prop_get_int32_array;
 	topo_prop_get_uint32_array;
 	topo_prop_get_int64_array;
@@ -139,6 +147,7 @@ SUNWprivate {
 	topo_prop_set_string;
 	topo_prop_set_uint32;
 	topo_prop_set_uint64;
+	topo_prop_set_double;
 	topo_prop_set_int32_array;
 	topo_prop_set_uint32_array;
 	topo_prop_set_int64_array;
@@ -146,7 +155,11 @@ SUNWprivate {
 	topo_prop_set_string_array;
 	topo_prop_set_fmri_array;
 	topo_prop_setprop;
+	topo_prop_setmutable;
 	topo_name2stability;
+	topo_sensor_state_name;
+	topo_sensor_type_name;
+	topo_sensor_units_name;
 	topo_stability2name;
 	topo_snap_hold;
 	topo_snap_release;

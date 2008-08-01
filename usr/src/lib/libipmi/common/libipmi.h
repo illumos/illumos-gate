@@ -1426,7 +1426,8 @@ typedef struct ipmi_sensor_reading {
 #define	IPMI_SENSOR_THRESHOLD_UPPER_NONRECOV		0x0020
 
 extern ipmi_sensor_reading_t *ipmi_get_sensor_reading(ipmi_handle_t *, uint8_t);
-
+extern int ipmi_sdr_conv_reading(ipmi_sdr_full_sensor_t *, uint8_t,
+    double *);
 /*
  * Set Sensor Reading.  See section 35.14.
  */
@@ -1517,6 +1518,7 @@ extern int ipmi_fru_parse_product(ipmi_handle_t *, char *,
  */
 void ipmi_entity_name(uint8_t, char *, size_t);
 void ipmi_sensor_type_name(uint8_t, char *, size_t);
+void ipmi_sensor_units_name(uint8_t, char *, size_t);
 void ipmi_sensor_reading_name(uint8_t, uint8_t, char *, size_t);
 
 /*

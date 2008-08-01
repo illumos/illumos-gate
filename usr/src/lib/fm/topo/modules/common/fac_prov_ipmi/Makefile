@@ -18,22 +18,17 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS =		\
-	disk		\
-	fac_prov_ipmi	\
-	ipmi		\
-	ses		\
-	xfp
+MODULE = fac_prov_ipmi
+CLASS = common
 
-ses:	disk
+MODULESRCS = fac_prov_ipmi.c
 
-.PARALLEL: $(SUBDIRS)
+include ../../Makefile.plugin
 
-include ../../../Makefile.subdirs
+LDLIBS += -lipmi

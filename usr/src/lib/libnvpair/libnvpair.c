@@ -138,6 +138,12 @@ nvlist_print_with_indent(FILE *fp, nvlist_t *nvl, int depth)
 			(void) fprintf(fp, " 0x%llx", (u_longlong_t)val);
 			break;
 		}
+		case DATA_TYPE_DOUBLE: {
+			double val;
+			(void) nvpair_value_double(nvp, &val);
+			(void) fprintf(fp, " 0x%llf", val);
+			break;
+		}
 		case DATA_TYPE_STRING: {
 			char *val;
 			(void) nvpair_value_string(nvp, &val);
@@ -583,6 +589,7 @@ nvpair_value_match_regex(nvpair_t *nvp, int ai,
 	case DATA_TYPE_NVLIST:
 	case DATA_TYPE_NVLIST_ARRAY:
 	case DATA_TYPE_BOOLEAN:
+	case DATA_TYPE_DOUBLE:
 	case DATA_TYPE_UNKNOWN:
 	default:
 		/*

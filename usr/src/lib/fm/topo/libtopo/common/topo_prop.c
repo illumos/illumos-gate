@@ -234,6 +234,10 @@ prop_getval(tnode_t *node, const char *pgname, const char *pname, void *val,
 			ret = nvlist_lookup_uint64(pv->tp_val,
 			    TOPO_PROP_VAL_VAL, (uint64_t *)val);
 			break;
+		case TOPO_TYPE_DOUBLE:
+			ret = nvlist_lookup_double(pv->tp_val,
+			    TOPO_PROP_VAL_VAL, (double *)val);
+			break;
 		case TOPO_TYPE_STRING: {
 			char *str;
 
@@ -419,6 +423,14 @@ topo_prop_get_uint64(tnode_t *node, const char *pgname, const char *pname,
 }
 
 int
+topo_prop_get_double(tnode_t *node, const char *pgname, const char *pname,
+    double *val, int *err)
+{
+	return (prop_getval(node, pgname, pname, (void *)val, TOPO_TYPE_DOUBLE,
+	    NULL, err));
+}
+
+int
 topo_prop_get_string(tnode_t *node, const char *pgname, const char *pname,
     char **val, int *err)
 {
@@ -557,7 +569,6 @@ topo_prop_set(tnode_t *node, const char *pgname, const char *pname,
 	int ret;
 	topo_hdl_t *thp = node->tn_hdl;
 	nvlist_t *nvl;
-	topo_propval_t *pv;
 
 	if (topo_hdl_nvalloc(thp, &nvl, NV_UNIQUE_NAME) < 0) {
 		*err = ETOPO_PROP_NVL;
@@ -582,6 +593,10 @@ topo_prop_set(tnode_t *node, const char *pgname, const char *pname,
 		case TOPO_TYPE_UINT64:
 			ret |= nvlist_add_uint64(nvl, TOPO_PROP_VAL_VAL,
 			    *(uint64_t *)val);
+			break;
+		case TOPO_TYPE_DOUBLE:
+			ret |= nvlist_add_double(nvl, TOPO_PROP_VAL_VAL,
+			    *(double *)val);
 			break;
 		case TOPO_TYPE_STRING:
 			ret |= nvlist_add_string(nvl, TOPO_PROP_VAL_VAL,
@@ -631,16 +646,11 @@ topo_prop_set(tnode_t *node, const char *pgname, const char *pname,
 		}
 	}
 
-	topo_node_lock(node);
-	if ((pv = prop_create(node, pgname, pname, type, flag, err)) == NULL) {
+	if (topo_prop_setprop(node, pgname, nvl, flag, nvl, err) != 0) {
 		nvlist_free(nvl);
-		return (-1); /* unlocked and err set */
+		return (-1); /* err set */
 	}
-
-	pv->tp_val = nvl;
-
-	topo_node_unlock(node);
-
+	nvlist_free(nvl);
 	return (ret);
 }
 
@@ -673,6 +683,14 @@ topo_prop_set_uint64(tnode_t *node, const char *pgname, const char *pname,
     int flag, uint64_t val, int *err)
 {
 	return (topo_prop_set(node, pgname, pname, TOPO_TYPE_UINT64, flag,
+	    &val, 1, err));
+}
+
+int
+topo_prop_set_double(tnode_t *node, const char *pgname, const char *pname,
+    int flag, double val, int *err)
+{
+	return (topo_prop_set(node, pgname, pname, TOPO_TYPE_DOUBLE, flag,
 	    &val, 1, err));
 }
 
@@ -877,10 +895,18 @@ prop_method_register(tnode_t *node, const char *pgname, const char *pname,
 	 * to allow the method to be registered.  This is to handle the case
 	 * where we specify an prop method in an xml map to override the value
 	 * that was set by the enumerator.
+	 *
+	 * By default, propmethod-backed properties are IMMUTABLE.  This is done
+	 * to simplify the programming model for modules that implement property
+	 * methods as most propmethods tend to only support get operations.
+	 * Enumerator modules can override this by calling topo_prop_setflags().
+	 * Propmethods that are registered via XML can be set as mutable via
+	 * the optional "mutable" attribute, which will result in the xml parser
+	 * calling topo_prop_setflags() after registering the propmethod.
 	 */
 	if ((pv = propval_get(pgroup_get(node, pgname), pname)) == NULL)
 		if ((pv = prop_create(node, pgname, pname, ptype,
-		    TOPO_PROP_MUTABLE, err)) == NULL) {
+		    TOPO_PROP_IMMUTABLE, err)) == NULL) {
 			/* node unlocked */
 			return (register_methoderror(node, pm, err, 0, *err));
 		}
@@ -980,6 +1006,35 @@ topo_prop_method_unregister(tnode_t *node, const char *pgname,
 	}
 
 	topo_node_unlock(node);
+}
+
+int
+topo_prop_setmutable(tnode_t *node, const char *pgname, const char *pname,
+    int *err)
+{
+	topo_propval_t *pv = NULL;
+
+	topo_node_lock(node);
+	if ((pv = propval_get(pgroup_get(node, pgname), pname)) == NULL) {
+		topo_node_unlock(node);
+		*err = ETOPO_PROP_NOENT;
+		return (-1);
+	}
+
+	/*
+	 * If the property is being inherited then we don't want to allow a
+	 * change from IMMUTABLE to MUTABLE.
+	 */
+	if (pv->tp_refs > 1) {
+		topo_node_unlock(node);
+		*err = ETOPO_PROP_DEFD;
+		return (-1);
+	}
+	pv->tp_flag = TOPO_PROP_MUTABLE;
+
+	topo_node_unlock(node);
+
+	return (0);
 }
 
 static int

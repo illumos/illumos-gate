@@ -125,7 +125,7 @@
 -->
 
 <!ELEMENT set
-	 ( range*, propgroup* ) >
+	 ( range*, fac-enum?, propgroup*, facility* ) >
 
 <!ATTLIST set
 	type	( product ) #REQUIRED
@@ -177,6 +177,7 @@
       		version		Version of the method API
       		propname	Name of the property to create
 		proptype	Type of the property to create
+		mutable         optional: default is false (0)
 -->
 
 <!ELEMENT propmethod
@@ -186,7 +187,8 @@
 	name		CDATA #REQUIRED
 	version		CDATA #REQUIRED
 	propname	CDATA #REQUIRED
-	proptype	CDATA #REQUIRED>
+	proptype	CDATA #REQUIRED
+	mutable		(0|1) "0" >
 
 <!--
   enum-method
@@ -221,7 +223,7 @@
 -->
 
 <!ELEMENT node
-	( propgroup*, dependents*, set*, enum-method* ) >
+	( fac-enum?, facility*, propgroup*, set*, enum-method*, dependents? ) >
 
 <!ATTLIST node
 	instance	CDATA #REQUIRED >
@@ -259,12 +261,54 @@
 -->
 
 <!ELEMENT range
-	( enum-method?, propmap?, node*, propgroup*, set*, dependents* ) >
+	( enum-method?, propmap?, fac-enum?, facility*, node*, propgroup*, set*,
+	    dependents* ) >
 
 <!ATTLIST range
 	name		CDATA #REQUIRED
 	min		CDATA #REQUIRED
 	max		CDATA #REQUIRED >
+
+<!--
+  facility
+
+    This element identifies a single facility node instance
+
+    Its attributes are
+
+	name	The name of the facility node
+
+	type	The type of facility node: either "sensor" or "indicator"
+
+	provider	The name of the facility provider module that
+	                implements the methods for this node or range
+-->
+
+<!ELEMENT facility
+	( propgroup* ) >
+
+<!ATTLIST facility
+	name		CDATA #REQUIRED
+	type		(sensor | indicator) #REQUIRED
+	provider	CDATA #REQUIRED >
+
+<!--
+  fac-enum
+
+    This element identifies a facility provider module that
+    implements a facility enumeration method for the enclosing
+    node or range.
+
+    Its attributes are
+
+	provider	The name of the facility provider module that
+	                implements the facility enumerator method for
+			the parent node or range
+-->
+
+<!ELEMENT fac-enum EMPTY >
+
+<!ATTLIST fac-enum provider CDATA #REQUIRED >
 
 <!--
   topology

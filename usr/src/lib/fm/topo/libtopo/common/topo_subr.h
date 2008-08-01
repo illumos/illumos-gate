@@ -65,6 +65,55 @@ typedef struct topo_debug_mode {
 #define	TOPO_STABSTR_STANDARD	"Standard"	/* industry standard */
 #define	TOPO_STABSTR_UNKNOWN	"Unknown"	/* stability unknown */
 
+typedef struct topo_name_trans {
+	uint32_t	int_value;
+	const char	*int_name;
+} topo_name_trans_t;
+
+extern topo_name_trans_t topo_sensor_type_table[];
+extern topo_name_trans_t topo_units_type_table[];
+extern topo_name_trans_t topo_led_type_table[];
+extern topo_name_trans_t topo_led_states_table[];
+extern topo_name_trans_t topo_sensor_states_physical_table[];
+extern topo_name_trans_t topo_sensor_states_platform_table[];
+extern topo_name_trans_t topo_sensor_states_processor_table[];
+extern topo_name_trans_t topo_sensor_states_power_supply_table[];
+extern topo_name_trans_t topo_sensor_states_power_unit_table[];
+extern topo_name_trans_t topo_sensor_states_memory_table[];
+extern topo_name_trans_t topo_sensor_states_bay_table[];
+extern topo_name_trans_t topo_sensor_states_firmware_table[];
+extern topo_name_trans_t topo_sensor_states_event_log_table[];
+extern topo_name_trans_t topo_sensor_states_watchdog1_table[];
+extern topo_name_trans_t topo_sensor_states_system_table[];
+extern topo_name_trans_t topo_sensor_states_critical_table[];
+extern topo_name_trans_t topo_sensor_states_button_table[];
+extern topo_name_trans_t topo_sensor_states_cable_table[];
+extern topo_name_trans_t topo_sensor_states_boot_state_table[];
+extern topo_name_trans_t topo_sensor_states_boot_error_table[];
+extern topo_name_trans_t topo_sensor_states_boot_os_table[];
+extern topo_name_trans_t topo_sensor_states_os_table[];
+extern topo_name_trans_t topo_sensor_states_slot_table[];
+extern topo_name_trans_t topo_sensor_states_acpi_table[];
+extern topo_name_trans_t topo_sensor_states_watchdog2_table[];
+extern topo_name_trans_t topo_sensor_states_alert_table[];
+extern topo_name_trans_t topo_sensor_states_presence_table[];
+extern topo_name_trans_t topo_sensor_states_lan_table[];
+extern topo_name_trans_t topo_sensor_states_health_table[];
+extern topo_name_trans_t topo_sensor_states_battery_table[];
+extern topo_name_trans_t topo_sensor_states_audit_table[];
+extern topo_name_trans_t topo_sensor_states_version_table[];
+extern topo_name_trans_t topo_sensor_states_fru_state_table[];
+extern topo_name_trans_t topo_sensor_states_thresh_table[];
+extern topo_name_trans_t topo_sensor_states_generic_usage_table[];
+extern topo_name_trans_t topo_sensor_states_generic_state_table[];
+extern topo_name_trans_t topo_sensor_states_generic_predfail_table[];
+extern topo_name_trans_t topo_sensor_states_generic_limit_table[];
+extern topo_name_trans_t topo_sensor_states_generic_perf_table[];
+extern topo_name_trans_t topo_sensor_states_generic_presence_table[];
+extern topo_name_trans_t topo_sensor_states_severity_table[];
+extern topo_name_trans_t topo_sensor_states_generic_avail_table[];
+extern topo_name_trans_t topo_sensor_states_generic_status_table[];
+extern topo_name_trans_t topo_sensor_states_generic_acpi_pwr_table[];
 
 extern int topo_rw_read_held(pthread_rwlock_t *);
 extern int topo_rw_write_held(pthread_rwlock_t *);

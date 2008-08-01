@@ -402,6 +402,9 @@ i_validate_type_nelem(data_type_t type, uint_t nelem)
 	case DATA_TYPE_STRING:
 	case DATA_TYPE_HRTIME:
 	case DATA_TYPE_NVLIST:
+#if !defined(_KERNEL)
+	case DATA_TYPE_DOUBLE:
+#endif
 		if (nelem != 1)
 			return (EINVAL);
 		break;
@@ -740,6 +743,11 @@ i_get_value_size(data_type_t type, const void *data, uint_t nelem)
 	case DATA_TYPE_UINT64:
 		value_sz = sizeof (uint64_t);
 		break;
+#if !defined(_KERNEL)
+	case DATA_TYPE_DOUBLE:
+		value_sz = sizeof (double);
+		break;
+#endif
 	case DATA_TYPE_STRING:
 		if (data == NULL)
 			value_sz = 0;
@@ -1024,6 +1032,14 @@ nvlist_add_uint64(nvlist_t *nvl, const char *name, uint64_t val)
 	return (nvlist_add_common(nvl, name, DATA_TYPE_UINT64, 1, &val));
 }
 
+#if !defined(_KERNEL)
+int
+nvlist_add_double(nvlist_t *nvl, const char *name, double val)
+{
+	return (nvlist_add_common(nvl, name, DATA_TYPE_DOUBLE, 1, &val));
+}
+#endif
+
 int
 nvlist_add_string(nvlist_t *nvl, const char *name, const char *val)
 {
@@ -1206,6 +1222,9 @@ nvpair_value_common(nvpair_t *nvp, data_type_t type, uint_t *nelem, void *data)
 	case DATA_TYPE_INT64:
 	case DATA_TYPE_UINT64:
 	case DATA_TYPE_HRTIME:
+#if !defined(_KERNEL)
+	case DATA_TYPE_DOUBLE:
+#endif
 		if (data == NULL)
 			return (EINVAL);
 		bcopy(NVP_VALUE(nvp), data,
@@ -1342,6 +1361,14 @@ nvlist_lookup_uint64(nvlist_t *nvl, const char *name, uint64_t *val)
 	return (nvlist_lookup_common(nvl, name, DATA_TYPE_UINT64, NULL, val));
 }
 
+#if !defined(_KERNEL)
+int
+nvlist_lookup_double(nvlist_t *nvl, const char *name, double *val)
+{
+	return (nvlist_lookup_common(nvl, name, DATA_TYPE_DOUBLE, NULL, val));
+}
+#endif
+
 int
 nvlist_lookup_string(nvlist_t *nvl, const char *name, char **val)
 {
@@ -1476,6 +1503,9 @@ nvlist_lookup_pairs(nvlist_t *nvl, int flag, ...)
 		case DATA_TYPE_HRTIME:
 		case DATA_TYPE_STRING:
 		case DATA_TYPE_NVLIST:
+#if !defined(_KERNEL)
+		case DATA_TYPE_DOUBLE:
+#endif
 			val = va_arg(ap, void *);
 			ret = nvlist_lookup_common(nvl, name, type, NULL, val);
 			break;
@@ -1786,6 +1816,14 @@ nvpair_value_uint64(nvpair_t *nvp, uint64_t *val)
 {
 	return (nvpair_value_common(nvp, DATA_TYPE_UINT64, NULL, val));
 }
+
+#if !defined(_KERNEL)
+int
+nvpair_value_double(nvpair_t *nvp, double *val)
+{
+	return (nvpair_value_common(nvp, DATA_TYPE_DOUBLE, NULL, val));
+}
+#endif
 
 int
 nvpair_value_string(nvpair_t *nvp, char **val)
@@ -2924,7 +2962,11 @@ nvs_xdr_nvp_op(nvstream_t *nvs, nvpair_t *nvp)
 		 */
 		ret = xdr_longlong_t(xdr, (void *)buf);
 		break;
-
+#if !defined(_KERNEL)
+	case DATA_TYPE_DOUBLE:
+		ret = xdr_double(xdr, (void *)buf);
+		break;
+#endif
 	case DATA_TYPE_STRING:
 		ret = xdr_string(xdr, &buf, buflen - 1);
 		break;
@@ -3030,6 +3072,9 @@ nvs_xdr_nvp_size(nvstream_t *nvs, nvpair_t *nvp, size_t *size)
 	case DATA_TYPE_INT64:
 	case DATA_TYPE_UINT64:
 	case DATA_TYPE_HRTIME:
+#if !defined(_KERNEL)
+	case DATA_TYPE_DOUBLE:
+#endif
 		nvp_sz += 8;
 		break;
 

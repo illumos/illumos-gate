@@ -59,6 +59,7 @@ LIBSRCS = \
 	topo_snap.c \
 	topo_string.c \
 	topo_subr.c \
+	topo_tables.c \
 	topo_tree.c \
 	topo_xml.c
 
@@ -72,7 +73,7 @@ LIBS = $(DYNLIB) $(LINTLIB)
 
 SRCDIR =	../common
 
-CLEANFILES += ../common/topo_error.c
+CLEANFILES += $(SRCDIR)/topo_error.c $(SRCDIR)/topo_tables.c
 
 CPPFLAGS += -I../common -I/usr/include/libxml2 -I.
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
@@ -112,6 +113,9 @@ pics/%.o: ../$(MACH)/%.c
 	sh ../common/mkerror.sh fmrierrors < ../common/libtopo.h >> $@
 	sh ../common/mkerror.sh hdlerrors < ../common/libtopo.h >> $@
 	sh ../common/mkerror.sh moderrors < ../common/topo_mod.h >> $@
+
+$(SRCDIR)/topo_tables.c: $(SRCDIR)/mktables.sh $(SRCDIR)/libtopo.h
+	sh $(SRCDIR)/mktables.sh $(SRCDIR)/libtopo.h > $@
 
 include ../../../../Makefile.targ
 include ../../../Makefile.targ

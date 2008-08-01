@@ -52,7 +52,7 @@ SRCDIR=		../common
 
 CLEANFILES +=	$(SRCDIR)/ipmi_tables.c	
 INCS +=		-I$(SRCDIR)
-LDLIBS +=	-lc
+LDLIBS +=	-lc -lm
 CPPFLAGS +=	$(INCS)
 
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)

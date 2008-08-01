@@ -25,6 +25,13 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
+SUNW_1.4 {
+    global:
+	nvlist_add_double;
+	nvlist_lookup_double;
+	nvpair_value_double;
+} SUNW_1.3;
+
 SUNW_1.3 {
     global:
 	nvlist_exists;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,29 @@ topo_method_lookup(tnode_t *node, const char *name)
 	}
 
 	return (NULL);
+}
+
+/*
+ * Simple API to determine if the specified node supports a given topo method
+ * (specified by the method name and version).  Returns true if supported, false
+ * otherwise.
+ */
+boolean_t
+topo_method_supported(tnode_t *node, const char *name, topo_version_t vers)
+{
+	topo_imethod_t *mp;
+
+	topo_node_lock(node);
+	for (mp = topo_list_next(&node->tn_methods); mp != NULL;
+	    mp = topo_list_next(mp)) {
+		if ((strcmp(name, mp->tim_name) == 0) &&
+		    (vers == mp->tim_version)) {
+			topo_node_unlock(node);
+			return (B_TRUE);
+		}
+	}
+	topo_node_unlock(node);
+	return (B_FALSE);
 }
 
 static void

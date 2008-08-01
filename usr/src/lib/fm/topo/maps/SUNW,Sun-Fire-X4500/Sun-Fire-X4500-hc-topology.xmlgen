@@ -201,6 +201,103 @@ print OFILE "  <!--xml-gen internal storage-->\n";
 printf OFILE "  <range name='bay' min='0' max='%d'>\n",
 		$sys_supported->{"num_bays"}-1;
 
+#
+# Statically define locate indicator
+#
+print OFILE "     <facility name='locate' type='indicator' ".
+    "provider='fac_prov_ipmi' >\n";
+print OFILE "           <propgroup name='facility' version='1' ".
+    "name-stability='Private' data-stability='Private' >\n";
+print OFILE "                <propval name='type' type='uint32' value='1' />\n";
+print OFILE "                <propmethod name='ipmi_entity' version='0' ".
+    "propname='entity_ref' proptype='string' >\n";
+print OFILE "                    <argval name='format' type='string' ".
+    "value='hdd%d.ok2rm.led' />\n";
+print OFILE "                    <argval name='offset' type='uint32' ".
+    "value='0' />\n";
+print OFILE "                    <argval name='nparams' type='uint32' ".
+    "value='1' />\n";
+print OFILE "                </propmethod>\n";
+print OFILE "                <propmethod name='thumper_locate_mode' ".
+    "version='0'\n";
+print OFILE "                   propname='mode' proptype='uint32' ".
+    "mutable='1' >\n";
+print OFILE "                </propmethod>\n";
+print OFILE "            </propgroup>\n";
+print OFILE "     </facility>\n";
+
+#
+# Statically define ok2rm indicator
+#
+print OFILE "     <facility name='ok2rm' type='indicator' ".
+    "provider='fac_prov_ipmi' >\n";
+print OFILE "           <propgroup name='facility' version='1' ".
+    "name-stability='Private' data-stability='Private' >\n";
+print OFILE "                <propval name='type' type='uint32' value='2' />\n";
+print OFILE "                <propmethod name='ipmi_entity' version='0' ".
+    "propname='entity_ref' proptype='string' >\n";
+print OFILE "                    <argval name='format' type='string' ".
+    "value='hdd%d.state' />\n";
+print OFILE "                    <argval name='offset' type='uint32' ".
+    "value='0' />\n";
+print OFILE "                    <argval name='nparams' type='uint32' ".
+    "value='1' />\n";
+print OFILE "                </propmethod>\n";
+print OFILE "                <propmethod name='thumper_indicator_mode' ".
+    "version='0'\n";
+print OFILE "                   propname='mode' proptype='uint32' ".
+    "mutable='1' >\n";
+print OFILE "                </propmethod>\n";
+print OFILE "            </propgroup>\n";
+print OFILE "     </facility>\n";
+
+#
+# Statically define service indicator
+#
+print OFILE "     <facility name='service' type='indicator' ".
+    "provider='fac_prov_ipmi' >\n";
+print OFILE "           <propgroup name='facility' version='1' ".
+    "name-stability='Private' data-stability='Private' >\n";
+print OFILE "                <propval name='type' type='uint32' value='0' />\n";
+print OFILE "                <propmethod name='ipmi_entity' version='0' ".
+    "propname='entity_ref' proptype='string' >\n";
+print OFILE "                    <argval name='format' type='string' ".
+    "value='hdd%d.state' />\n";
+print OFILE "                    <argval name='offset' type='uint32' ".
+    "value='0' />\n";
+print OFILE "                    <argval name='nparams' type='uint32' ".
+    "value='1' />\n";
+print OFILE "                </propmethod>\n";
+print OFILE "                <propmethod name='thumper_indicator_mode' ".
+    "version='0' propname='mode' proptype='uint32' mutable='1' >\n";
+print OFILE "                </propmethod>\n";
+print OFILE "            </propgroup>\n";
+print OFILE "     </facility>\n";
+
+
+#
+# Statically define present indicator
+#
+print OFILE "     <facility name='present' type='indicator' ".
+    "provider='fac_prov_ipmi' >\n";
+print OFILE "           <propgroup name='facility' version='1' ".
+    "name-stability='Private' data-stability='Private' >\n";
+print OFILE "                <propval name='type' type='uint32' value='3' />\n";
+print OFILE "                <propmethod name='ipmi_entity' version='0' ".
+    "propname='entity_ref' proptype='string' >\n";
+print OFILE "                    <argval name='format' type='string' ".
+    "value='hdd%d.state' />\n";
+print OFILE "                    <argval name='offset' type='uint32' ".
+    "value='0' />\n";
+print OFILE "                    <argval name='nparams' type='uint32' ".
+    "value='1' />\n";
+print OFILE "                </propmethod>\n";
+print OFILE "                <propmethod name='thumper_indicator_mode' ".
+    "version='0' propname='mode' proptype='uint32' mutable='1' >\n";
+print OFILE "                </propmethod>\n";
+print OFILE "            </propgroup>\n";
+print OFILE "     </facility>\n";
+
 calc_nodes(0);
 
 printf OFILE "    <dependents grouping='children'>\n";

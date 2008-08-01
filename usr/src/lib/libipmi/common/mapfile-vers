@@ -46,6 +46,7 @@ SUNWprivate_1.1 {
 	ipmi_get_sensor_reading;
 	ipmi_open;
 	ipmi_sdr_changed;
+	ipmi_sdr_conv_reading;
 	ipmi_sdr_get;
 	ipmi_sdr_iter;
 	ipmi_sdr_lookup;
@@ -62,6 +63,7 @@ SUNWprivate_1.1 {
 	ipmi_sel_set_utc_offset;
 	ipmi_sensor_reading_name;
 	ipmi_sensor_type_name;
+	ipmi_sensor_units_name;
 	ipmi_send;
 	ipmi_set_sensor_reading;
 	ipmi_sunoem_led_get;

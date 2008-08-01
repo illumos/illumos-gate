@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,13 +64,6 @@ typedef enum topo_errno {
     ETOPO_RTLD_NOMEM,	/* memory limit exceeded when opening shared library */
     ETOPO_BLTIN_NAME,	/* built-in plug-in name not found in definition list */
     ETOPO_BLTIN_INIT,	/* built-in plug-in does not define init function */
-    ETOPO_NODE_INVAL,	/* node opertation invalid argument */
-    ETOPO_NODE_LINKED,	/* node already linked */
-    ETOPO_NODE_BOUND,	/* node already bound */
-    ETOPO_NODE_DUP,	/* duplicate node */
-    ETOPO_NODE_RANGE,	/* invalid instance range */
-    ETOPO_NODE_NOENT,	/* node not found */
-    ETOPO_NODE_FMRI,	/* no fmri specified */
     ETOPO_VER_OLD,	/* plugin compiled using an obsolete topo ABI */
     ETOPO_VER_NEW,	/* plugin is compiled using a newer topo ABI */
     ETOPO_ENUM_PARTIAL,	/* partial enumeration completed for client */
@@ -93,6 +86,7 @@ typedef enum topo_errno {
     ETOPO_PRSR_REGMETH,	/* failed to register property method */
     ETOPO_WALK_EMPTY,	/* empty topology */
     ETOPO_WALK_NOTFOUND, /* scheme based topology not found */
+    ETOPO_FAC_NOENT,	/* no facility node of specified type found */
     ETOPO_END		/* end of custom errno list (to ease auto-merge) */
 } topo_errno_t;
 

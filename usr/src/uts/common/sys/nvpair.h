@@ -67,7 +67,12 @@ typedef enum {
 	DATA_TYPE_UINT8,
 	DATA_TYPE_BOOLEAN_ARRAY,
 	DATA_TYPE_INT8_ARRAY,
+#if !defined(_KERNEL)
+	DATA_TYPE_UINT8_ARRAY,
+	DATA_TYPE_DOUBLE
+#else
 	DATA_TYPE_UINT8_ARRAY
+#endif
 } data_type_t;
 
 typedef struct nvpair {
@@ -188,6 +193,9 @@ int nvlist_add_uint64_array(nvlist_t *, const char *, uint64_t *, uint_t);
 int nvlist_add_string_array(nvlist_t *, const char *, char *const *, uint_t);
 int nvlist_add_nvlist_array(nvlist_t *, const char *, nvlist_t **, uint_t);
 int nvlist_add_hrtime(nvlist_t *, const char *, hrtime_t);
+#if !defined(_KERNEL)
+int nvlist_add_double(nvlist_t *, const char *, double);
+#endif
 
 int nvlist_remove(nvlist_t *, const char *, data_type_t);
 int nvlist_remove_all(nvlist_t *, const char *);
@@ -221,6 +229,9 @@ int nvlist_lookup_nvlist_array(nvlist_t *, const char *,
     nvlist_t ***, uint_t *);
 int nvlist_lookup_hrtime(nvlist_t *, const char *, hrtime_t *);
 int nvlist_lookup_pairs(nvlist_t *, int, ...);
+#if !defined(_KERNEL)
+int nvlist_lookup_double(nvlist_t *, const char *, double *);
+#endif
 
 int nvlist_lookup_nvpair(nvlist_t *, const char *, nvpair_t **);
 int nvlist_lookup_nvpair_embedded_index(nvlist_t *, const char *, nvpair_t **,
@@ -257,6 +268,9 @@ int nvpair_value_uint64_array(nvpair_t *, uint64_t **, uint_t *);
 int nvpair_value_string_array(nvpair_t *, char ***, uint_t *);
 int nvpair_value_nvlist_array(nvpair_t *, nvlist_t ***, uint_t *);
 int nvpair_value_hrtime(nvpair_t *, hrtime_t *);
+#if !defined(_KERNEL)
+int nvpair_value_double(nvpair_t *, double *);
+#endif
 
 #ifdef	__cplusplus
 }

@@ -690,3 +690,49 @@ topo_fmri_strcmp(topo_hdl_t *thp, const char *a, const char *b)
 
 	return (strcmp(ea, eb) == 0);
 }
+
+int
+topo_fmri_facility(topo_hdl_t *thp, nvlist_t *rsrc, const char *fac_type,
+    uint32_t fac_subtype, topo_walk_cb_t cb, void *cb_args, int *err)
+{
+	int rv;
+	nvlist_t *in = NULL, *out;
+	tnode_t *rnode;
+	char *scheme;
+
+	if (nvlist_lookup_string(rsrc, FM_FMRI_SCHEME, &scheme) != 0)
+		return (set_error(thp, ETOPO_FMRI_MALFORM, err,
+		    TOPO_METH_PROP_GET, in));
+
+	if ((rnode = topo_hdl_root(thp, scheme)) == NULL)
+		return (set_error(thp, ETOPO_METHOD_NOTSUP, err,
+		    TOPO_METH_PROP_GET, in));
+
+	if (topo_hdl_nvalloc(thp, &in, NV_UNIQUE_NAME) != 0)
+		return (set_error(thp, ETOPO_FMRI_NVL, err,
+		    TOPO_METH_PROP_GET, in));
+
+	rv = nvlist_add_nvlist(in, TOPO_PROP_RESOURCE, rsrc);
+	rv |= nvlist_add_string(in, FM_FMRI_FACILITY_TYPE, fac_type);
+	rv |= nvlist_add_uint32(in, "type", fac_subtype);
+#ifdef _LP64
+	rv |= nvlist_add_uint64(in, "callback", (uint64_t)cb);
+	rv |= nvlist_add_uint64(in, "callback-args", (uint64_t)cb_args);
+#else
+	rv |= nvlist_add_uint32(in, "callback", (uint32_t)cb);
+	rv |= nvlist_add_uint32(in, "callback-args", (uint32_t)cb_args);
+#endif
+	if (rv != 0)
+		return (set_error(thp, ETOPO_FMRI_NVL, err,
+		    TOPO_METH_PROP_GET, in));
+
+	rv = topo_method_invoke(rnode, TOPO_METH_FACILITY,
+	    TOPO_METH_FACILITY_VERSION, in, &out, err);
+
+	nvlist_free(in);
+
+	if (rv != 0)
+		return (-1); /* *err is set for us */
+
+	return (0);
+}

@@ -50,11 +50,12 @@ static const char *g_fmri = NULL;
 
 static const char *opt_R = "/";
 static const char *opt_s = FM_FMRI_SCHEME_HC;
-static const char optstr[] = "bCdeP:pR:s:StVx";
+static const char optstr[] = "bCdeEP:pR:s:StVx";
 
 static int opt_b = 0;
 static int opt_d = 0;
 static int opt_e = 0;
+static int opt_E = 0;
 static int opt_p = 0;
 static int opt_S = 0;
 static int opt_t = 0;
@@ -76,7 +77,7 @@ static int
 usage(FILE *fp)
 {
 	(void) fprintf(fp,
-	    "Usage: %s [-bCedpSVx] [-P group.property[=type:value]] "
+	    "Usage: %s [-bCeEdpSVx] [-P group.property[=type:value]] "
 	    "[-R root] [-s scheme] [fmri]\n", g_pname);
 
 	(void) fprintf(fp,
@@ -84,6 +85,7 @@ usage(FILE *fp)
 	    "\t-C  dump core after completing execution\n"
 	    "\t-d  set debug mode for libtopo modules\n"
 	    "\t-e  display FMRIs as paths using esc/eft notation\n"
+	    "\t-E  enumerate sensor nodes\n"
 	    "\t-P  get/set specified properties\n"
 	    "\t-p  display of FMRI protocol properties\n"
 	    "\t-R  set root directory for libtopo plug-ins and other files\n"
@@ -196,6 +198,7 @@ print_everstyle(tnode_t *node)
 		(void) fprintf(stderr, "%s: failed to find %s for %s=%d\n",
 		    g_pname, FM_FMRI_HC_LIST, topo_node_name(node),
 		    topo_node_instance(node));
+		nvlist_free(fmri);
 		return;
 	}
 
@@ -210,6 +213,7 @@ print_everstyle(tnode_t *node)
 			(void) fprintf(stderr, "%s: failed to get "
 			    "name-instance for %s=%d\n", g_pname,
 			    topo_node_name(node), topo_node_instance(node));
+			nvlist_free(fmri);
 			return;
 		}
 
@@ -226,16 +230,17 @@ print_everstyle(tnode_t *node)
 		(void) snprintf(numbuf, sizeof (numbuf), "%u", ul);
 		(void) strlcat(buf, numbuf, sizeof (buf));
 	}
+	nvlist_free(fmri);
 
 	(void) printf("%s\n", buf);
 }
 
 static void
-print_prop_nameval(topo_hdl_t *thp, nvlist_t *nvl)
+print_prop_nameval(topo_hdl_t *thp, tnode_t *node, nvlist_t *nvl)
 {
 	int err;
 	topo_type_t type;
-	char *tstr, *propn, buf[48];
+	char *tstr, *propn, buf[48], *factype;
 	nvpair_t *pv_nvp;
 	int i;
 	uint_t nelem;
@@ -271,6 +276,7 @@ print_prop_nameval(topo_hdl_t *thp, nvlist_t *nvl)
 		case TOPO_TYPE_UINT32: tstr = "uint32"; break;
 		case TOPO_TYPE_INT64: tstr = "int64"; break;
 		case TOPO_TYPE_UINT64: tstr = "uint64"; break;
+		case TOPO_TYPE_DOUBLE: tstr = "double"; break;
 		case TOPO_TYPE_STRING: tstr = "string"; break;
 		case TOPO_TYPE_FMRI: tstr = "fmri"; break;
 		case TOPO_TYPE_INT32_ARRAY: tstr = "int32[]"; break;
@@ -302,9 +308,65 @@ print_prop_nameval(topo_hdl_t *thp, nvlist_t *nvl)
 			break;
 		}
 		case DATA_TYPE_UINT32: {
-			uint32_t val;
+			uint32_t val, type;
+			char val_str[49];
+			nvlist_t *fac, *rsrc = NULL;
+
 			(void) nvpair_value_uint32(pv_nvp, &val);
+			if (node == NULL || topo_node_flags(node) !=
+			    TOPO_NODE_FACILITY)
+				goto uint32_def;
+
+			if (topo_node_resource(node, &rsrc, &err) != 0)
+				goto uint32_def;
+
+			if (nvlist_lookup_nvlist(rsrc, "facility", &fac) != 0)
+				goto uint32_def;
+
+			if (nvlist_lookup_string(fac, FM_FMRI_FACILITY_TYPE,
+			    &factype) != 0)
+				goto uint32_def;
+
+			nvlist_free(rsrc);
+			rsrc = NULL;
+
+			/*
+			 * Special case code to do friendlier printing of
+			 * facility node properties
+			 */
+			if ((strcmp(propn, TOPO_FACILITY_TYPE) == 0) &&
+			    (strcmp(factype, TOPO_FAC_TYPE_SENSOR) == 0)) {
+				topo_sensor_type_name(val, val_str, 48);
+				(void) printf(" 0x%x (%s)", val, val_str);
+				break;
+			} else if ((strcmp(propn, TOPO_FACILITY_TYPE) == 0) &&
+			    (strcmp(factype, TOPO_FAC_TYPE_INDICATOR) == 0)) {
+				topo_led_type_name(val, val_str, 48);
+				(void) printf(" 0x%x (%s)", val, val_str);
+				break;
+			} else if (strcmp(propn, TOPO_SENSOR_UNITS) == 0) {
+				topo_sensor_units_name(val, val_str, 48);
+				(void) printf(" 0x%x (%s)", val, val_str);
+				break;
+			} else if (strcmp(propn, TOPO_LED_MODE) == 0) {
+				topo_led_state_name(val, val_str, 48);
+				(void) printf(" 0x%x (%s)", val, val_str);
+				break;
+			} else if ((strcmp(propn, TOPO_SENSOR_STATE) == 0) &&
+			    (strcmp(factype, TOPO_FAC_TYPE_SENSOR) == 0)) {
+				if (topo_prop_get_uint32(node,
+				    TOPO_PGROUP_FACILITY, TOPO_FACILITY_TYPE,
+				    &type, &err) != 0) {
+					goto uint32_def;
+				}
+				topo_sensor_state_name(type, val, val_str, 48);
+				(void) printf(" 0x%x (%s)", val, val_str);
+				break;
+			}
+uint32_def:
 			(void) printf(" 0x%x", val);
+			if (rsrc != NULL)
+				nvlist_free(rsrc);
 			break;
 		}
 		case DATA_TYPE_INT64: {
@@ -317,6 +379,12 @@ print_prop_nameval(topo_hdl_t *thp, nvlist_t *nvl)
 			uint64_t val;
 			(void) nvpair_value_uint64(pv_nvp, &val);
 			(void) printf(" 0x%llx", (u_longlong_t)val);
+			break;
+		}
+		case DATA_TYPE_DOUBLE: {
+			double val;
+			(void) nvpair_value_double(pv_nvp, &val);
+			(void) printf(" %lf", (double)val);
 			break;
 		}
 		case DATA_TYPE_STRING: {
@@ -358,6 +426,16 @@ print_prop_nameval(topo_hdl_t *thp, nvlist_t *nvl)
 			(void) printf(" [ ");
 			for (i = 0; i < nelem; i++)
 				(void) printf("%u ", val[i]);
+			(void) printf("]");
+			break;
+		}
+		case DATA_TYPE_INT64_ARRAY: {
+			int64_t *val;
+
+			(void) nvpair_value_int64_array(pv_nvp, &val, &nelem);
+			(void) printf(" [ ");
+			for (i = 0; i < nelem; i++)
+				(void) printf("%lld ", val[i]);
 			(void) printf("]");
 			break;
 		}
@@ -483,7 +561,7 @@ print_all_props(topo_hdl_t *thp, tnode_t *node, nvlist_t *p_nv,
 			    == 0 && nvpair_type(pg_nvp) == DATA_TYPE_NVLIST) {
 				(void) nvpair_value_nvlist(pg_nvp, &pv_nv);
 				if ((match || all) && pg_done) {
-					print_prop_nameval(thp, pv_nv);
+					print_prop_nameval(thp, node, pv_nv);
 				}
 
 			}
@@ -649,7 +727,7 @@ set_prop(topo_hdl_t *thp, tnode_t *node, nvlist_t *fmri, struct prop_args *pp)
 	}
 
 	print_pgroup(thp, node, pp->group, NULL, NULL, 0);
-	print_prop_nameval(thp, nvl);
+	print_prop_nameval(thp, node, nvl);
 	nvlist_free(nvl);
 
 	nvlist_free(f);
@@ -706,7 +784,7 @@ print_props(topo_hdl_t *thp, tnode_t *node)
 			} else {
 				print_pgroup(thp, node, pp->group, NULL,
 				    NULL, 0);
-				print_prop_nameval(thp, nvl);
+				print_prop_nameval(thp, node, nvl);
 				nvlist_free(nvl);
 			}
 		} else {
@@ -721,7 +799,7 @@ walk_node(topo_hdl_t *thp, tnode_t *node, void *arg)
 {
 	int err;
 	nvlist_t *nvl;
-	nvlist_t *rsrc;
+	nvlist_t *rsrc, *out;
 	char *s;
 
 	if (opt_e && strcmp(opt_s, FM_FMRI_SCHEME_HC) == 0) {
@@ -752,6 +830,24 @@ walk_node(topo_hdl_t *thp, tnode_t *node, void *arg)
 	topo_hdl_strfree(thp, s);
 	nvlist_free(rsrc);
 
+	/*
+	 * If the "-E" option was specified, we want to also enumerate any
+	 * available facility nodes.  To do that we check if the node supports
+	 * a facility enumerator method.  If it exists, then we invoke it to
+	 * enumerate the sensors for this node.
+	 */
+	if (opt_E) {
+		if (topo_method_supported(node, TOPO_METH_FAC_ENUM, 0))
+			if (topo_method_invoke(node, TOPO_METH_FAC_ENUM, 0,
+			    NULL, &out, &err) != 0) {
+				(void) fprintf(stderr,
+				    "topo_method_invoke failed (%s) on node "
+				    "%s=%d\n", topo_strerror(err),
+				    topo_node_name(node),
+				    topo_node_instance(node));
+			}
+	}
+
 	if (opt_V || opt_all) {
 		if ((nvl = topo_prop_getprops(node, &err)) == NULL) {
 			(void) fprintf(stderr, "%s: failed to get "
@@ -762,9 +858,8 @@ walk_node(topo_hdl_t *thp, tnode_t *node, void *arg)
 			print_all_props(thp, node, nvl, ALL);
 			nvlist_free(nvl);
 		}
-	} else if (pcnt > 0) {
+	} else if (pcnt > 0)
 		print_props(thp, node);
-	}
 
 	printf("\n");
 
@@ -911,7 +1006,7 @@ print_fmri_pgroup(topo_hdl_t *thp, const char *pgn, nvlist_t *nvl)
 		if (strcmp(TOPO_PROP_VAL, nvpair_name(pnvp))
 		    == 0 && nvpair_type(pnvp) == DATA_TYPE_NVLIST) {
 			(void) nvpair_value_nvlist(pnvp, &pnvl);
-				print_prop_nameval(thp, pnvl);
+				print_prop_nameval(thp, NULL, pnvl);
 
 		}
 
@@ -951,7 +1046,8 @@ print_fmri_props(topo_hdl_t *thp, nvlist_t *nvl)
 					    pp->group, topo_strerror(err));
 					continue;
 				} else {
-					print_fmri_pgroup(thp, pp->group, pnvl);
+					print_fmri_pgroup(thp, pp->group,
+					    pnvl);
 					nvlist_free(pnvl);
 					continue;
 				}
@@ -965,7 +1061,7 @@ print_fmri_props(topo_hdl_t *thp, nvlist_t *nvl)
 				continue;
 			} else {
 				print_fmri_pgroup(thp, pp->group, pnvl);
-				print_prop_nameval(thp, pnvl);
+				print_prop_nameval(thp, NULL, pnvl);
 				nvlist_free(nvl);
 			}
 		} else {
@@ -1099,6 +1195,9 @@ main(int argc, char *argv[])
 				break;
 			case 'e':
 				opt_e++;
+				break;
+			case 'E':
+				opt_E++;
 				break;
 			case 'P':
 				pcnt++;

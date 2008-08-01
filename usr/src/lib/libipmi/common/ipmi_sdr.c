@@ -30,8 +30,56 @@
 #include <stddef.h>
 #include <string.h>
 #include <strings.h>
+#include <math.h>
 
 #include "ipmi_impl.h"
+
+/*
+ * This macros are used by ipmi_sdr_conv_reading.  They were taken verbatim from
+ * the source for ipmitool (v1.88)
+ */
+#define	tos32(val, bits)	((val & ((1<<((bits)-1)))) ? (-((val) & \
+				(1<<((bits)-1))) | (val)) : (val))
+
+#define	__TO_TOL(mtol)	(uint16_t)(BSWAP_16(mtol) & 0x3f)
+
+#define	__TO_M(mtol)	(int16_t)(tos32((((BSWAP_16(mtol) & 0xff00) >> 8) | \
+				((BSWAP_16(mtol) & 0xc0) << 2)), 10))
+
+#define	__TO_B(bacc)	(int32_t)(tos32((((BSWAP_32(bacc) & \
+				0xff000000) >> 24) | \
+				((BSWAP_32(bacc) & 0xc00000) >> 14)), 10))
+
+#define	__TO_ACC(bacc)	(uint32_t)(((BSWAP_32(bacc) & 0x3f0000) >> 16) | \
+				((BSWAP_32(bacc) & 0xf000) >> 6))
+
+#define	__TO_ACC_EXP(bacc)	(uint32_t)((BSWAP_32(bacc) & 0xc00) >> 10)
+#define	__TO_R_EXP(bacc)	(int32_t)(tos32(((BSWAP_32(bacc) & 0xf0) >> 4),\
+				4))
+#define	__TO_B_EXP(bacc)	(int32_t)(tos32((BSWAP_32(bacc) & 0xf), 4))
+
+#define	SDR_SENSOR_L_LINEAR	0x00
+#define	SDR_SENSOR_L_LN		0x01
+#define	SDR_SENSOR_L_LOG10	0x02
+#define	SDR_SENSOR_L_LOG2	0x03
+#define	SDR_SENSOR_L_E		0x04
+#define	SDR_SENSOR_L_EXP10	0x05
+#define	SDR_SENSOR_L_EXP2	0x06
+#define	SDR_SENSOR_L_1_X	0x07
+#define	SDR_SENSOR_L_SQR	0x08
+#define	SDR_SENSOR_L_CUBE	0x09
+#define	SDR_SENSOR_L_SQRT	0x0a
+#define	SDR_SENSOR_L_CUBERT	0x0b
+#define	SDR_SENSOR_L_NONLINEAR	0x70
+
+/*
+ * Analog sensor reading data formats
+ *
+ * See Section 43.1
+ */
+#define	IPMI_DATA_FMT_UNSIGNED	0
+#define	IPMI_DATA_FMT_ONESCOMP	1
+#define	IPMI_DATA_FMT_TWOSCOMP	2
 
 typedef struct ipmi_sdr_cache_ent {
 	char				*isc_name;
@@ -529,4 +577,80 @@ ipmi_sdr_lookup_full_sensor(ipmi_handle_t *ihp, const char *idstr)
 {
 	return (ipmi_sdr_lookup_common(ihp, idstr,
 	    IPMI_SDR_TYPE_FULL_SENSOR));
+}
+
+/*
+ * Mostly taken from ipmitool source v1.88
+ *
+ * This function converts the raw sensor reading returned by
+ * ipmi_get_sensor_reading to a unit-based value of type double.
+ */
+int
+ipmi_sdr_conv_reading(ipmi_sdr_full_sensor_t *sensor, uint8_t val,
+    double *result)
+{
+	int m, b, k1, k2;
+
+	m = __TO_M(sensor->is_fs_mtol);
+	b = __TO_B(sensor->is_fs_bacc);
+	k1 = __TO_B_EXP(sensor->is_fs_bacc);
+	k2 = __TO_R_EXP(sensor->is_fs_bacc);
+
+	switch (sensor->is_fs_analog_fmt) {
+	case IPMI_DATA_FMT_UNSIGNED:
+		*result = (double)(((m * val) +
+		    (b * pow(10, k1))) * pow(10, k2));
+		break;
+	case IPMI_DATA_FMT_ONESCOMP:
+		if (val & 0x80)
+			val++;
+		/* FALLTHRU */
+	case IPMI_DATA_FMT_TWOSCOMP:
+		*result = (double)(((m * (int8_t)val) +
+		    (b * pow(10, k1))) * pow(10, k2));
+		break;
+	default:
+		/* This sensor does not return a numeric reading */
+		return (-1);
+	}
+
+	switch (sensor->is_fs_sensor_linear_type) {
+	case SDR_SENSOR_L_LN:
+		*result = log(*result);
+		break;
+	case SDR_SENSOR_L_LOG10:
+		*result = log10(*result);
+		break;
+	case SDR_SENSOR_L_LOG2:
+		*result = (double)(log(*result) / log(2.0));
+		break;
+	case SDR_SENSOR_L_E:
+		*result = exp(*result);
+		break;
+	case SDR_SENSOR_L_EXP10:
+		*result = pow(10.0, *result);
+		break;
+	case SDR_SENSOR_L_EXP2:
+		*result = pow(2.0, *result);
+		break;
+	case SDR_SENSOR_L_1_X:
+		*result = pow(*result, -1.0);	/* 1/x w/o exception */
+		break;
+	case SDR_SENSOR_L_SQR:
+		*result = pow(*result, 2.0);
+		break;
+	case SDR_SENSOR_L_CUBE:
+		*result = pow(*result, 3.0);
+		break;
+	case SDR_SENSOR_L_SQRT:
+		*result = sqrt(*result);
+		break;
+	case SDR_SENSOR_L_CUBERT:
+		*result = cbrt(*result);
+		break;
+	case SDR_SENSOR_L_LINEAR:
+	default:
+		break;
+	}
+	return (0);
 }

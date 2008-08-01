@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -350,4 +350,205 @@ topo_cleanup_auth_str(topo_hdl_t *thp, char *begin)
 
 	pp = topo_hdl_strdup(thp, buf);
 	return (pp);
+}
+
+void
+topo_sensor_type_name(uint32_t type, char *buf, size_t len)
+{
+	topo_name_trans_t *ntp;
+
+	for (ntp = &topo_sensor_type_table[0]; ntp->int_name != NULL; ntp++) {
+		if (ntp->int_value == type) {
+			(void) strlcpy(buf, ntp->int_name, len);
+			return;
+		}
+	}
+
+	(void) snprintf(buf, len, "0x%02x", type);
+}
+
+void
+topo_sensor_units_name(uint8_t type, char *buf, size_t len)
+{
+	topo_name_trans_t *ntp;
+
+	for (ntp = &topo_units_type_table[0]; ntp->int_name != NULL; ntp++) {
+		if (ntp->int_value == type) {
+			(void) strlcpy(buf, ntp->int_name, len);
+			return;
+		}
+	}
+
+	(void) snprintf(buf, len, "0x%02x", type);
+}
+
+void
+topo_led_type_name(uint8_t type, char *buf, size_t len)
+{
+	topo_name_trans_t *ntp;
+
+	for (ntp = &topo_led_type_table[0]; ntp->int_name != NULL; ntp++) {
+		if (ntp->int_value == type) {
+			(void) strlcpy(buf, ntp->int_name, len);
+			return;
+		}
+	}
+
+	(void) snprintf(buf, len, "0x%02x", type);
+}
+
+void
+topo_led_state_name(uint8_t type, char *buf, size_t len)
+{
+	topo_name_trans_t *ntp;
+
+	for (ntp = &topo_led_states_table[0]; ntp->int_name != NULL; ntp++) {
+		if (ntp->int_value == type) {
+			(void) strlcpy(buf, ntp->int_name, len);
+			return;
+		}
+	}
+
+	(void) snprintf(buf, len, "0x%02x", type);
+}
+
+void
+topo_sensor_state_name(uint32_t sensor_type, uint8_t state, char *buf,
+size_t len)
+{
+	topo_name_trans_t *ntp;
+
+	switch (sensor_type) {
+		case TOPO_SENSOR_TYPE_PHYSICAL:
+			ntp = &topo_sensor_states_physical_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_PLATFORM:
+			ntp = &topo_sensor_states_platform_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_PROCESSOR:
+			ntp = &topo_sensor_states_processor_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_POWER_SUPPLY:
+			ntp = &topo_sensor_states_power_supply_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_POWER_UNIT:
+			ntp = &topo_sensor_states_power_unit_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_MEMORY:
+			ntp = &topo_sensor_states_memory_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_BAY:
+			ntp = &topo_sensor_states_bay_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_FIRMWARE:
+			ntp = &topo_sensor_states_firmware_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_EVENT_LOG:
+			ntp = &topo_sensor_states_event_log_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_WATCHDOG1:
+			ntp = &topo_sensor_states_watchdog1_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_SYSTEM:
+			ntp = &topo_sensor_states_system_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_CRITICAL:
+			ntp = &topo_sensor_states_critical_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_BUTTON:
+			ntp = &topo_sensor_states_button_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_CABLE:
+			ntp = &topo_sensor_states_cable_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_BOOT_STATE:
+			ntp = &topo_sensor_states_boot_state_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_BOOT_ERROR:
+			ntp = &topo_sensor_states_boot_error_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_BOOT_OS:
+			ntp = &topo_sensor_states_boot_os_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_OS_SHUTDOWN:
+			ntp = &topo_sensor_states_os_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_SLOT:
+			ntp = &topo_sensor_states_slot_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_ACPI:
+			ntp = &topo_sensor_states_acpi_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_WATCHDOG2:
+			ntp = &topo_sensor_states_watchdog2_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_ALERT:
+			ntp = &topo_sensor_states_alert_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_PRESENCE:
+			ntp = &topo_sensor_states_presence_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_LAN:
+			ntp = &topo_sensor_states_lan_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_HEALTH:
+			ntp = &topo_sensor_states_health_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_BATTERY:
+			ntp = &topo_sensor_states_battery_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_AUDIT:
+			ntp = &topo_sensor_states_audit_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_VERSION:
+			ntp = &topo_sensor_states_version_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_FRU_STATE:
+			ntp = &topo_sensor_states_fru_state_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_THRESHOLD_STATE:
+			ntp = &topo_sensor_states_thresh_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_GENERIC_USAGE:
+			ntp = &topo_sensor_states_generic_usage_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_GENERIC_STATE:
+			ntp = &topo_sensor_states_generic_state_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_GENERIC_PREDFAIL:
+			ntp = &topo_sensor_states_generic_predfail_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_GENERIC_LIMIT:
+			ntp = &topo_sensor_states_generic_limit_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_GENERIC_PERFORMANCE:
+			ntp = &topo_sensor_states_generic_perf_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_SEVERITY:
+			ntp = &topo_sensor_states_severity_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_GENERIC_PRESENCE:
+			ntp = &topo_sensor_states_generic_presence_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_GENERIC_AVAILABILITY:
+			ntp = &topo_sensor_states_generic_avail_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_GENERIC_STATUS:
+			ntp = &topo_sensor_states_generic_status_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_GENERIC_ACPI:
+			ntp = &topo_sensor_states_generic_acpi_pwr_table[0];
+			break;
+		default:
+			(void) snprintf(buf, len, "0x%02x", state);
+			return;
+	}
+	for (; ntp->int_name != NULL; ntp++) {
+		if (ntp->int_value == state) {
+			(void) strlcpy(buf, ntp->int_name, len);
+			return;
+		}
+	}
+
+	(void) snprintf(buf, len, "0x%02x", state);
 }

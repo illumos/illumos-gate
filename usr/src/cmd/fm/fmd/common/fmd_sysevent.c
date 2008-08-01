@@ -119,8 +119,10 @@ sysev_legacy(sysevent_t *sep)
 	(void) nvlist_xalloc(&nvl, NV_UNIQUE_NAME, &fmd.d_nva);
 	(void) nvlist_add_string(nvl, FM_CLASS, fullclass);
 	(void) nvlist_add_uint8(nvl, FM_VERSION, FM_RSRC_VERSION);
-	if (sysevent_get_attr_list(sep, &attr) == 0)
+	if (sysevent_get_attr_list(sep, &attr) == 0) {
 		(void) nvlist_merge(nvl, attr, 0);
+		nvlist_free(attr);
+	}
 
 	/*
 	 * Dispatch the event.  Ideally, we'd like to use the same transport

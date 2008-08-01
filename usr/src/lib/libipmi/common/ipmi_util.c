@@ -169,6 +169,21 @@ ipmi_sensor_type_name(uint8_t type, char *buf, size_t len)
 }
 
 void
+ipmi_sensor_units_name(uint8_t type, char *buf, size_t len)
+{
+	ipmi_name_trans_t *ntp;
+
+	for (ntp = &ipmi_units_type_table[0]; ntp->int_name != NULL; ntp++) {
+		if (ntp->int_value == type) {
+			(void) strlcpy(buf, ntp->int_name, len);
+			return;
+		}
+	}
+
+	(void) snprintf(buf, len, "0x%02x", type);
+}
+
+void
 ipmi_sensor_reading_name(uint8_t sensor_type, uint8_t reading_type,
     char *buf, size_t len)
 {
