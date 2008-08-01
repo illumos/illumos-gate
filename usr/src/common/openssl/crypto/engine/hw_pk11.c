@@ -2877,11 +2877,11 @@ pk11_choose_slots(int *any_slot_found)
 
 		/*
 		 * If the current slot supports more ciphers/digests than 
-		 * the previous best one we change the current best to this one.
+		 * the previous best one we change the current best to this one,
 		 * otherwise leave it where it is.
 		 */
-		if ((current_slot_n_cipher > slot_n_cipher) ||
-		    (current_slot_n_digest > slot_n_digest))
+		if ((current_slot_n_cipher + current_slot_n_digest) >
+		    (slot_n_cipher + slot_n_digest))
 			{
 #ifdef	DEBUG_SLOT_SELECTION
 			fprintf(stderr,
@@ -2889,23 +2889,13 @@ pk11_choose_slots(int *any_slot_found)
 				PK11_DBG, current_slot);
 #endif	/* DEBUG_SLOT_SELECTION */
 			best_slot_sofar = SLOTID = current_slot;
-			slot_n_cipher = current_slot_n_cipher;
-			slot_n_digest = current_slot_n_digest;
-
+			cipher_count = slot_n_cipher = current_slot_n_cipher;
+			digest_count = slot_n_digest = current_slot_n_digest;
+			memcpy(cipher_nids, local_cipher_nids,
+			    sizeof(local_cipher_nids));
+			memcpy(digest_nids, local_digest_nids, 
+			    sizeof(local_digest_nids));
 			}
-		}
-
-	if (slot_n_cipher > 0)
-		{
-		cipher_count = slot_n_cipher;
-		memcpy(cipher_nids, local_cipher_nids, 
-			sizeof(local_cipher_nids));
-		}
-	if (slot_n_digest > 0)
-		{
-		digest_count = slot_n_digest;
-		memcpy(digest_nids, local_digest_nids, 
-			sizeof(local_digest_nids));
 		}
 
 #ifdef	DEBUG_SLOT_SELECTION
