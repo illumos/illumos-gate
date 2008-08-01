@@ -530,9 +530,10 @@ d_ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    ulwp.ul_rt,
 	    ulwp.ul_rtqueued);
 
-	HD("adapt'spin queue_spin critical   sigdefer   vfork");
-	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %d\n",
-	    OFFSET(ul_adaptive_spin),
+	HD("misaligned adapt'spin queue_spin critical   sigdefer   vfork");
+	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %-10d %d\n",
+	    OFFSET(ul_misaligned),
+	    ulwp.ul_misaligned,
 	    ulwp.ul_adaptive_spin,
 	    ulwp.ul_queue_spin,
 	    ulwp.ul_critical,

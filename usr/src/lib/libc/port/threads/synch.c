@@ -190,6 +190,18 @@ mutex_init(mutex_t *mp, int type, void *arg)
 		mp->mutex_ceiling = ceil;
 	}
 
+	/*
+	 * This should be at the beginning of the function,
+	 * but for the sake of old broken applications that
+	 * do not have proper alignment for their mutexes
+	 * (and don't check the return code from mutex_init),
+	 * we put it here, after initializing the mutex regardless.
+	 */
+	if (error == 0 &&
+	    ((uintptr_t)mp & (_LONG_LONG_ALIGNMENT - 1)) &&
+	    curthread->ul_misaligned == 0)
+		error = EINVAL;
+
 	return (error);
 }
 
@@ -321,8 +333,25 @@ clear_lockbyte64(volatile uint64_t *lockword64)
 
 /*
  * Similar to set_lock_byte(), which only tries to set the lock byte.
- * Here, we attempt to set the lock byte AND the mutex_ownerpid,
- * keeping the remaining bytes constant.
+ * Here, we attempt to set the lock byte AND the mutex_ownerpid, keeping
+ * the remaining bytes constant.  This atomic operation is required for the
+ * correctness of process-shared robust locks, otherwise there would be
+ * a window or vulnerability in which the lock byte had been set but the
+ * mutex_ownerpid had not yet been set.  If the process were to die in
+ * this window of vulnerability (due to some other thread calling exit()
+ * or the process receiving a fatal signal), the mutex would be left locked
+ * but without a process-ID to determine which process was holding the lock.
+ * The kernel would then be unable to mark the robust mutex as LOCK_OWNERDEAD
+ * when the process died.  For all other cases of process-shared locks, this
+ * operation is just a convenience, for the sake of common code.
+ *
+ * This operation requires process-shared robust locks to be properly
+ * aligned on an 8-byte boundary, at least on sparc machines, lest the
+ * operation incur an alignment fault.  This is automatic when locks
+ * are declared properly using the mutex_t or pthread_mutex_t data types
+ * and the application does not allocate dynamic memory on less than an
+ * 8-byte boundary.  See the 'horrible hack' comments below for cases
+ * dealing with such broken applications.
  */
 static int
 set_lock_byte64(volatile uint64_t *lockword64, pid_t ownerpid)
@@ -1418,6 +1447,13 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 	int max_count;
 	uint8_t max_spinners;
 
+#if defined(__sparc) && !defined(_LP64)
+	/* horrible hack, necessary only on 32-bit sparc */
+	int fix_alignment_problem =
+	    (((uintptr_t)mp & (_LONG_LONG_ALIGNMENT - 1)) &&
+	    self->ul_misaligned && !(mp->mutex_type & LOCK_ROBUST));
+#endif
+
 	ASSERT(mp->mutex_type & USYNC_PROCESS);
 
 	if (shared_mutex_held(mp))
@@ -1435,6 +1471,18 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 	 * incurring the overhead of the spin loop.
 	 */
 	enter_critical(self);
+#if defined(__sparc) && !defined(_LP64)
+	/* horrible hack, necessary only on 32-bit sparc */
+	if (fix_alignment_problem) {
+		if (set_lock_byte(&mp->mutex_lockw) == 0) {
+			mp->mutex_ownerpid = udp->pid;
+			mp->mutex_owner = (uintptr_t)self;
+			exit_critical(self);
+			error = 0;
+			goto done;
+		}
+	} else
+#endif
 	if (set_lock_byte64(lockp, udp->pid) == 0) {
 		mp->mutex_owner = (uintptr_t)self;
 		/* mp->mutex_ownerpid was set by set_lock_byte64() */
@@ -1465,6 +1513,18 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 	}
 	DTRACE_PROBE1(plockstat, mutex__spin, mp);
 	for (count = 1; ; count++) {
+#if defined(__sparc) && !defined(_LP64)
+		/* horrible hack, necessary only on 32-bit sparc */
+		if (fix_alignment_problem) {
+			if ((*lockp & LOCKMASK64) == 0 &&
+			    set_lock_byte(&mp->mutex_lockw) == 0) {
+				mp->mutex_ownerpid = udp->pid;
+				mp->mutex_owner = (uintptr_t)self;
+				error = 0;
+				break;
+			}
+		} else
+#endif
 		if ((*lockp & LOCKMASK64) == 0 &&
 		    set_lock_byte64(lockp, udp->pid) == 0) {
 			mp->mutex_owner = (uintptr_t)self;
@@ -1493,6 +1553,16 @@ mutex_trylock_process(mutex_t *mp, int tryhard)
 		 * necessary for correctness, to avoid ending up with an
 		 * unheld mutex with waiters but no one to wake them up.
 		 */
+#if defined(__sparc) && !defined(_LP64)
+		/* horrible hack, necessary only on 32-bit sparc */
+		if (fix_alignment_problem) {
+			if (set_lock_byte(&mp->mutex_lockw) == 0) {
+				mp->mutex_ownerpid = udp->pid;
+				mp->mutex_owner = (uintptr_t)self;
+				error = 0;
+			}
+		} else
+#endif
 		if (set_lock_byte64(lockp, udp->pid) == 0) {
 			mp->mutex_owner = (uintptr_t)self;
 			/* mp->mutex_ownerpid was set by set_lock_byte64() */
@@ -1667,15 +1737,31 @@ mutex_unlock_queue(mutex_t *mp, int release_all)
 static void
 mutex_unlock_process(mutex_t *mp, int release_all)
 {
+	ulwp_t *self = curthread;
 	uint64_t old_lockword64;
 
 	DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
 	mp->mutex_owner = 0;
+#if defined(__sparc) && !defined(_LP64)
+	/* horrible hack, necessary only on 32-bit sparc */
+	if (((uintptr_t)mp & (_LONG_LONG_ALIGNMENT - 1)) &&
+	    self->ul_misaligned && !(mp->mutex_type & LOCK_ROBUST)) {
+		uint32_t old_lockword;
+		mp->mutex_ownerpid = 0;
+		old_lockword = clear_lockbyte(&mp->mutex_lockword);
+		if ((old_lockword & WAITERMASK) &&
+		    (release_all || (old_lockword & SPINNERMASK) == 0)) {
+			no_preempt(self);	/* ensure a prompt wakeup */
+			(void) ___lwp_mutex_wakeup(mp, release_all);
+			preempt(self);
+		}
+		return;
+	}
+#endif
 	/* mp->mutex_ownerpid is cleared by clear_lockbyte64() */
 	old_lockword64 = clear_lockbyte64(&mp->mutex_lockword64);
 	if ((old_lockword64 & WAITERMASK64) &&
 	    (release_all || (old_lockword64 & SPINNERMASK64) == 0)) {
-		ulwp_t *self = curthread;
 		no_preempt(self);	/* ensure a prompt wakeup */
 		(void) ___lwp_mutex_wakeup(mp, release_all);
 		preempt(self);
@@ -2062,6 +2148,19 @@ fast_process_lock(mutex_t *mp, timespec_t *tsp, int mtype, int try)
 	 */
 	ASSERT((mtype & ~(USYNC_PROCESS|LOCK_RECURSIVE|LOCK_ERRORCHECK)) == 0);
 	enter_critical(self);
+#if defined(__sparc) && !defined(_LP64)
+	/* horrible hack, necessary only on 32-bit sparc */
+	if (((uintptr_t)mp & (_LONG_LONG_ALIGNMENT - 1)) &&
+	    self->ul_misaligned) {
+		if (set_lock_byte(&mp->mutex_lockw) == 0) {
+			mp->mutex_ownerpid = udp->pid;
+			mp->mutex_owner = (uintptr_t)self;
+			exit_critical(self);
+			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
+			return (0);
+		}
+	} else
+#endif
 	if (set_lock_byte64(&mp->mutex_lockword64, udp->pid) == 0) {
 		mp->mutex_owner = (uintptr_t)self;
 		/* mp->mutex_ownerpid was set by set_lock_byte64() */
@@ -2093,6 +2192,10 @@ mutex_lock_impl(mutex_t *mp, timespec_t *tsp)
 	ulwp_t *self = curthread;
 	int mtype = mp->mutex_type;
 	uberflags_t *gflags;
+
+	if (((uintptr_t)mp & (_LONG_LONG_ALIGNMENT - 1)) &&
+	    self->ul_error_detection && self->ul_misaligned == 0)
+		lock_error(mp, "mutex_lock", NULL, "mutex is misaligned");
 
 	/*
 	 * Optimize the case of USYNC_THREAD, including
@@ -2697,6 +2800,18 @@ pthread_spin_init(pthread_spinlock_t *lock, int pshared)
 		mp->mutex_type = USYNC_THREAD;
 	mp->mutex_flag = LOCK_INITED;
 	mp->mutex_magic = MUTEX_MAGIC;
+
+	/*
+	 * This should be at the beginning of the function,
+	 * but for the sake of old broken applications that
+	 * do not have proper alignment for their mutexes
+	 * (and don't check the return code from pthread_spin_init),
+	 * we put it here, after initializing the mutex regardless.
+	 */
+	if (((uintptr_t)mp & (_LONG_LONG_ALIGNMENT - 1)) &&
+	    curthread->ul_misaligned == 0)
+		return (EINVAL);
+
 	return (0);
 }
 
@@ -2932,6 +3047,18 @@ cond_init(cond_t *cvp, int type, void *arg)
 	(void) memset(cvp, 0, sizeof (*cvp));
 	cvp->cond_type = (uint16_t)type;
 	cvp->cond_magic = COND_MAGIC;
+
+	/*
+	 * This should be at the beginning of the function,
+	 * but for the sake of old broken applications that
+	 * do not have proper alignment for their condvars
+	 * (and don't check the return code from cond_init),
+	 * we put it here, after initializing the condvar regardless.
+	 */
+	if (((uintptr_t)cvp & (_LONG_LONG_ALIGNMENT - 1)) &&
+	    curthread->ul_misaligned == 0)
+		return (EINVAL);
+
 	return (0);
 }
 
@@ -3063,12 +3190,24 @@ cond_sleep_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 	return (error);
 }
 
+static void
+cond_wait_check_alignment(cond_t *cvp, mutex_t *mp)
+{
+	if ((uintptr_t)mp & (_LONG_LONG_ALIGNMENT - 1))
+		lock_error(mp, "cond_wait", cvp, "mutex is misaligned");
+	if ((uintptr_t)cvp & (_LONG_LONG_ALIGNMENT - 1))
+		lock_error(mp, "cond_wait", cvp, "condvar is misaligned");
+}
+
 int
 cond_wait_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 {
 	ulwp_t *self = curthread;
 	int error;
 	int merror;
+
+	if (self->ul_error_detection && self->ul_misaligned == 0)
+		cond_wait_check_alignment(cvp, mp);
 
 	/*
 	 * The old thread library was programmed to defer signals
@@ -3151,6 +3290,9 @@ cond_wait_kernel(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 	ulwp_t *self = curthread;
 	int error;
 	int merror;
+
+	if (self->ul_error_detection && self->ul_misaligned == 0)
+		cond_wait_check_alignment(cvp, mp);
 
 	/*
 	 * See the large comment in cond_wait_queue(), above.

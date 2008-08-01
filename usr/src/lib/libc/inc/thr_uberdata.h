@@ -578,6 +578,8 @@ typedef struct ulwp {
 	char		ul_async_safe;		/* thread_async_safe */
 	char		ul_rt;			/* found on an RT queue */
 	char		ul_rtqueued;		/* was RT when queued */
+	char		ul_misaligned;		/* thread_locks_misaligned */
+	char		ul_pad[3];
 	int		ul_adaptive_spin;	/* thread_adaptive_spin */
 	int		ul_queue_spin;		/* thread_queue_spin */
 	volatile int	ul_critical;	/* non-zero == in a critical region */
@@ -980,6 +982,8 @@ typedef struct ulwp32 {
 	char		ul_async_safe;		/* thread_async_safe */
 	char		ul_rt;			/* found on an RT queue */
 	char		ul_rtqueued;		/* was RT when queued */
+	char		ul_misaligned;		/* thread_locks_misaligned */
+	char		ul_pad[3];
 	int		ul_adaptive_spin;	/* thread_adaptive_spin */
 	int		ul_queue_spin;		/* thread_queue_spin */
 	int		ul_critical;	/* non-zero == in a critical region */

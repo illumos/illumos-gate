@@ -86,7 +86,7 @@ pthread_barrierattr_getpshared(const pthread_barrierattr_t *attr, int *pshared)
 
 int
 pthread_barrier_init(pthread_barrier_t *barrier,
-	const pthread_barrierattr_t *attr, uint_t count)
+    const pthread_barrierattr_t *attr, uint_t count)
 {
 	mutex_t *mp = (mutex_t *)&barrier->__pthread_barrier_lock;
 	cond_t *cvp = (cond_t *)&barrier->__pthread_barrier_cond;
@@ -110,6 +110,18 @@ pthread_barrier_init(pthread_barrier_t *barrier,
 	barrier->__pthread_barrier_reserved = 0;
 	(void) mutex_init(mp, type, NULL);
 	(void) cond_init(cvp, type, NULL);
+
+	/*
+	 * This should be at the beginning of the function,
+	 * but for the sake of old broken applications that
+	 * do not have proper alignment for their barriers
+	 * (and don't check the return code from pthread_barrier_init),
+	 * we put it here, after initializing the barrier regardless.
+	 */
+	if (((uintptr_t)barrier & (_LONG_LONG_ALIGNMENT - 1)) &&
+	    curthread->ul_misaligned == 0)
+		return (EINVAL);
+
 	return (0);
 }
 

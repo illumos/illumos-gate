@@ -204,21 +204,35 @@ rw_write_held(rwlock_t *rwlp)
 int
 rwlock_init(rwlock_t *rwlp, int type, void *arg)
 {
+	ulwp_t *self = curthread;
+
 	if (type != USYNC_THREAD && type != USYNC_PROCESS)
 		return (EINVAL);
 	/*
 	 * Once reinitialized, we can no longer be holding a read or write lock.
 	 * We can do nothing about other threads that are holding read locks.
 	 */
-	sigoff(curthread);
+	sigoff(self);
 	rwl_entry(rwlp)->rd_count = 0;
-	sigon(curthread);
+	sigon(self);
 	(void) memset(rwlp, 0, sizeof (*rwlp));
 	rwlp->rwlock_type = (uint16_t)type;
 	rwlp->rwlock_magic = RWL_MAGIC;
 	rwlp->mutex.mutex_type = (uint8_t)type;
 	rwlp->mutex.mutex_flag = LOCK_INITED;
 	rwlp->mutex.mutex_magic = MUTEX_MAGIC;
+
+	/*
+	 * This should be at the beginning of the function,
+	 * but for the sake of old broken applications that
+	 * do not have proper alignment for their rwlocks
+	 * (and don't check the return code from rwlock_init),
+	 * we put it here, after initializing the rwlock regardless.
+	 */
+	if (((uintptr_t)rwlp & (_LONG_LONG_ALIGNMENT - 1)) &&
+	    self->ul_misaligned == 0)
+		return (EINVAL);
+
 	return (0);
 }
 

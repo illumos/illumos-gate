@@ -159,8 +159,8 @@ int	thread_cond_wait_defer = 0;
 int	thread_error_detection = 0;
 int	thread_async_safe = 0;
 int	thread_stack_cache = 10;
-
 int	thread_door_noreserve = 0;
+int	thread_locks_misaligned = 0;
 
 static	ulwp_t	*ulwp_alloc(void);
 static	void	ulwp_free(ulwp_t *);
@@ -614,6 +614,7 @@ _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 	ulwp->ul_adaptive_spin = self->ul_adaptive_spin;
 	ulwp->ul_queue_spin = self->ul_queue_spin;
 	ulwp->ul_door_noreserve = self->ul_door_noreserve;
+	ulwp->ul_misaligned = self->ul_misaligned;
 
 	/* new thread inherits creating thread's scheduling parameters */
 	ulwp->ul_policy = self->ul_policy;
@@ -1169,6 +1170,8 @@ etest(const char *ev)
 		thread_async_safe = value;
 	if ((value = envvar(ev, "DOOR_NORESERVE", 1)) >= 0)
 		thread_door_noreserve = value;
+	if ((value = envvar(ev, "LOCKS_MISALIGNED", 1)) >= 0)
+		thread_locks_misaligned = value;
 }
 
 /*
@@ -1426,6 +1429,7 @@ libc_init(void)
 	self->ul_error_detection = (char)thread_error_detection;
 	self->ul_async_safe = (char)thread_async_safe;
 	self->ul_door_noreserve = (char)thread_door_noreserve;
+	self->ul_misaligned = (char)thread_locks_misaligned;
 	self->ul_max_spinners = (uint8_t)thread_max_spinners;
 	self->ul_adaptive_spin = thread_adaptive_spin;
 	self->ul_queue_spin = thread_queue_spin;

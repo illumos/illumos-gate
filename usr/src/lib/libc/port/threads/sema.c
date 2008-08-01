@@ -55,6 +55,18 @@ sema_init(sema_t *sp, unsigned int count, int type, void *arg)
 	sp->count = count;
 	sp->type = (uint16_t)type;
 	sp->magic = SEMA_MAGIC;
+
+	/*
+	 * This should be at the beginning of the function,
+	 * but for the sake of old broken applications that
+	 * do not have proper alignment for their semaphores
+	 * (and don't check the return code from sema_init),
+	 * we put it here, after initializing the semaphore regardless.
+	 */
+	if (((uintptr_t)sp & (_LONG_LONG_ALIGNMENT - 1)) &&
+	    curthread->ul_misaligned == 0)
+		return (EINVAL);
+
 	return (0);
 }
 
