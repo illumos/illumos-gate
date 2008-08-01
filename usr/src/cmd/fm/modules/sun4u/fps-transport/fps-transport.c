@@ -139,6 +139,8 @@ _fmd_fini(fmd_hdl_t *handle)
 void
 _fmd_init(fmd_hdl_t *hdl)
 {
+	int ret = 0;
+
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0) {
 		return;
 	}
@@ -154,10 +156,15 @@ _fmd_init(fmd_hdl_t *hdl)
 		fmd_hdl_unregister(hdl);
 	}
 
-	if (sysevent_evc_subscribe(h_event, SUBSCRIBE_ID, SUBSCRIBE_FLAGS,
-	    event_transfer, NULL, 0) != 0) {
-		fmd_hdl_error(hdl, "Failed to subsrcibe to channel %s",
-		    CHANNEL);
-		fmd_hdl_unregister(hdl);
+	ret = sysevent_evc_subscribe(h_event, SUBSCRIBE_ID,
+	    SUBSCRIBE_FLAGS, event_transfer, NULL, 0);
+	if (ret != 0) {
+		if (ret == EEXIST) {
+			fmd_hdl_unregister(hdl);
+		} else {
+			fmd_hdl_error(hdl,
+			    "Failed to subsrcibe to channel %s", CHANNEL);
+			fmd_hdl_unregister(hdl);
+		}
 	}
 }
