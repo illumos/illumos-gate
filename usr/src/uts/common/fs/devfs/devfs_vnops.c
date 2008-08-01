@@ -225,7 +225,7 @@ devfs_setattr_dir(
 	struct cred *cr)
 {
 	struct vattr	*map;
-	long int	mask;
+	uint_t		mask;
 	int		error = 0;
 	struct vattr	vattr;
 
@@ -348,7 +348,7 @@ devfs_setattr(
 	struct dv_node	*ddv;
 	struct vnode	*dvp;
 	struct vattr	*map;
-	long int	mask;
+	uint_t		mask;
 	int		error = 0;
 	struct vattr	*free_vattr = NULL;
 	struct vattr	*vattrp = NULL;
@@ -546,8 +546,18 @@ devfs_setattr(
 				    DV_SHADOW_CREATE | DV_SHADOW_WRITE_HELD);
 			}
 			if (dv->dv_attrvp) {
-				error = VOP_SETATTR(dv->dv_attrvp,
-				    vap, flags, cr, NULL);
+				/* If map still valid do TIME for free. */
+				if (dv->dv_attr == map) {
+					mask = map->va_mask;
+					map->va_mask =
+					    vap->va_mask | AT_ATIME | AT_MTIME;
+					error = VOP_SETATTR(dv->dv_attrvp, map,
+					    flags, cr, NULL);
+					map->va_mask = mask;
+				} else {
+					error = VOP_SETATTR(dv->dv_attrvp,
+					    vap, flags, cr, NULL);
+				}
 				dsysdebug(error, ("vop_setattr %s %d\n",
 				    dv->dv_name, error));
 			}
