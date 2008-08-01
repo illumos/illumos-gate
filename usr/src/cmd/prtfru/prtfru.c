@@ -51,6 +51,7 @@
 #define	TIMESTRINGLEN 128
 #define	TEMPERATURE_OFFSET 73
 #define	MIN_VERSION 17
+#define	GMT "%a, %b %d %Y %H:%M:%S GMT"
 
 static void	(*print_node)(fru_node_t fru_type, const char *path,
 				const char *name, end_node_fp_t *end_node,
@@ -440,11 +441,11 @@ print_field(const uint8_t *field, const fru_regdef_t *def)
 				errmsg = "No Value Recorded";
 				break;
 			}
-			if ((tm = localtime(&timefield)) == NULL) {
+			if ((tm = gmtime(&timefield)) == NULL) {
 				errmsg = "cannot convert time value";
 				break;
 			}
-			if (strftime(timestring, sizeof (timestring), "%C", tm)
+			if (strftime(timestring, sizeof (timestring), GMT, tm)
 			    == 0) {
 				errmsg = "formatted time would overflow buffer";
 				break;
@@ -616,11 +617,11 @@ print_element(const uint8_t *data, const fru_regdef_t *def,
 			(void) sprintf(timestring,
 			    "00000000 (No Value Recorded)\"");
 		} else {
-			if ((tm = localtime(&timefield)) == NULL)
+			if ((tm = gmtime(&timefield)) == NULL)
 				(void) sprintf(timestring,
 				    "cannot convert time value");
 			if (strftime(timestring,
-			    sizeof (timestring), "%C", tm) == 0)
+			    sizeof (timestring), GMT, tm) == 0)
 				(void) sprintf(timestring,
 				    "formatted time would overflow buffer");
 		}
@@ -708,11 +709,11 @@ print_element(const uint8_t *data, const fru_regdef_t *def,
 			(void) sprintf(timestring,
 			    "00000000 (No Value Recorded)");
 		} else {
-			if ((tm = localtime(&timefield)) == NULL)
+			if ((tm = gmtime(&timefield)) == NULL)
 				(void) sprintf(timestring,
 				    "cannot convert time value");
 			if (strftime(timestring,
-			    sizeof (timestring), "%C", tm) == 0)
+			    sizeof (timestring), GMT, tm) == 0)
 				(void) sprintf(timestring,
 				    "formatted time would overflow buffer");
 		}
