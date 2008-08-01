@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,7 @@
 #include <sys/crypto/api.h>
 #include <sys/crc32.h>
 #include <sys/random.h>
+#include <sys/strsun.h>
 #include "net80211_impl.h"
 
 static void *tkip_attach(struct ieee80211com *, struct ieee80211_key *);
@@ -267,13 +268,13 @@ tkip_enmic(struct ieee80211_key *k, mblk_t *mp, int force)
 		mic = mp->b_wptr;
 		mp->b_wptr += tkip.ic_miclen;
 
-		if ((int)((mp->b_wptr - mp->b_rptr)
-		    - (hdrlen + tkip.ic_header + tkip.ic_miclen)) < 0)
+		if ((int)(MBLKL(mp) -
+		    (hdrlen + tkip.ic_header + tkip.ic_miclen)) < 0)
 			return (0);	/* dead packet */
 
 		michael_mic(ctx, k->wk_txmic, mp, (hdrlen + tkip.ic_header),
-		    (mp->b_wptr - mp->b_rptr)
-		    - (hdrlen + tkip.ic_header + tkip.ic_miclen), mic);
+		    MBLKL(mp) -
+		    (hdrlen + tkip.ic_header + tkip.ic_miclen), mic);
 	}
 	return (1);
 }
@@ -294,7 +295,7 @@ tkip_demic(struct ieee80211_key *k, mblk_t *mp, int force)
 
 		michael_mic(ctx, k->wk_rxmic,
 		    mp, hdrlen,
-		    (mp->b_wptr - mp->b_rptr) - (hdrlen + tkip.ic_miclen),
+		    MBLKL(mp) - (hdrlen + tkip.ic_miclen),
 		    mic);
 		bcopy(mp->b_wptr - tkip.ic_miclen, mic0, tkip.ic_miclen);
 		if (bcmp(mic, mic0, tkip.ic_miclen)) {
@@ -721,8 +722,8 @@ tkip_encrypt(struct tkip_ctx *ctx, struct ieee80211_key *key,
 
 	(void) wep_encrypt(ctx->tx_rc4key,
 	    mp, hdrlen + tkip.ic_header,
-	    (mp->b_wptr - mp->b_rptr)
-	    - (hdrlen + tkip.ic_header + tkip.ic_trailer),
+	    MBLKL(mp) -
+	    (hdrlen + tkip.ic_header + tkip.ic_trailer),
 	    icv);
 
 	key->wk_keytsc++;
@@ -754,8 +755,8 @@ tkip_decrypt(struct tkip_ctx *ctx, struct ieee80211_key *key,
 	/* m is unstripped; deduct headers + ICV to get payload */
 	if (!wep_decrypt(ctx->rx_rc4key,
 	    mp, hdrlen + tkip.ic_header,
-	    (mp->b_wptr - mp->b_rptr)
-	    - (hdrlen + tkip.ic_header + tkip.ic_trailer))) {
+	    MBLKL(mp) -
+	    (hdrlen + tkip.ic_header + tkip.ic_trailer))) {
 		if (iv32 != (uint32_t)(key->wk_keyrsc >> 16)) {
 			/*
 			 * Previously cached Phase1 result was already lost, so

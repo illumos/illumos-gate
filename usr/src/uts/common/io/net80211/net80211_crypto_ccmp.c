@@ -45,6 +45,7 @@
 #include <sys/crypto/api.h>
 #include <sys/crc32.h>
 #include <sys/random.h>
+#include <sys/strsun.h>
 #include "net80211_impl.h"
 
 struct ccmp_ctx {
@@ -425,7 +426,7 @@ ccmp_encrypt(struct ieee80211_key *key, mblk_t *mp, int hdrlen)
 	uint8_t buf[IEEE80211_MAX_LEN];
 
 	wh = (struct ieee80211_frame *)mp->b_rptr;
-	data_len = (mp->b_wptr - mp->b_rptr) - (hdrlen + ccmp.ic_header);
+	data_len = MBLKL(mp) - (hdrlen + ccmp.ic_header);
 	pos = mp->b_rptr + hdrlen + ccmp.ic_header;
 
 	ccmp_init(wh, key->wk_keytsc, data_len, b0, aad);
@@ -458,7 +459,7 @@ ccmp_decrypt(struct ieee80211_key *key, uint64_t pn, mblk_t *mp, int hdrlen)
 	uint8_t buf[IEEE80211_MAX_LEN];
 
 	wh = (struct ieee80211_frame *)mp->b_rptr;
-	data_len = (mp->b_wptr - mp->b_rptr) - (hdrlen + ccmp.ic_header);
+	data_len = MBLKL(mp) - (hdrlen + ccmp.ic_header);
 	pos = mp->b_rptr + hdrlen + ccmp.ic_header;
 
 	ccmp_init(wh, pn, data_len, b0, aad);

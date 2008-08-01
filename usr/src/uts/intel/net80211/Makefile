@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -66,7 +66,6 @@ LDFLAGS		+= -dy -Nmisc/mac -Nmac/mac_wifi -Ndrv/ip
 # STREAMS API limitations force us to turn off these lint checks.
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
 #
 #	Default build targets.

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,7 +40,7 @@ LDLIBS    += 	-ldladm -ldlpi
 all install := LDLIBS += -lcrypto
 
 CPPFLAGS  += 	-I/usr/sfw/include
-LINTFLAGS += 	-u -erroff=E_BAD_PTR_CAST_ALIGN
+LINTFLAGS += 	-u
 
 .KEEP_STATE:
 

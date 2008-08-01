@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -322,10 +322,11 @@ struct rt2560_rx_desc {
  * control and status registers access macros
  */
 #define	RAL_READ(sc, reg)						\
-	ddi_get32((sc)->sc_ioh, (uint32_t *)((sc)->sc_rbase + (reg)))
+	ddi_get32((sc)->sc_ioh, (uint32_t *)((uintptr_t)(sc)->sc_rbase + (reg)))
 
 #define	RAL_WRITE(sc, reg, val)						\
-	ddi_put32((sc)->sc_ioh, (uint32_t *)((sc)->sc_rbase + (reg)), (val))
+	ddi_put32((sc)->sc_ioh,						\
+	    (uint32_t *)((uintptr_t)(sc)->sc_rbase + (reg)), (val))
 
 
 /*

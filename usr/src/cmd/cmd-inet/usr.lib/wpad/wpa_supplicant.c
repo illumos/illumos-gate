@@ -580,6 +580,7 @@ event_handler(void *cookie, char *argp, size_t asize,
 {
 	wpa_event_type event;
 
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	event = ((wl_events_t *)argp)->event;
 	wpa_event_handler(cookie, event);
 

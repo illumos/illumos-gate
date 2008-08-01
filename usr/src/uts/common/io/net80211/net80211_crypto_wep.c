@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@
 #include <sys/crypto/api.h>
 #include <sys/crc32.h>
 #include <sys/random.h>
+#include <sys/strsun.h>
 #include "net80211_impl.h"
 
 static  void *wep_attach(struct ieee80211com *, struct ieee80211_key *);
@@ -243,25 +244,25 @@ wep_encrypt(struct ieee80211_key *key, mblk_t *mp, int hdrlen)
 
 	(void) memcpy(rc4key, mp->b_rptr + hdrlen, IEEE80211_WEP_IVLEN);
 	(void) memcpy(rc4key + IEEE80211_WEP_IVLEN, key->wk_key,
-		key->wk_keylen);
+	    key->wk_keylen);
 
 	ctx = NULL;
 	rv = rc4_init(&ctx, (const uint8_t *)rc4key,
-		IEEE80211_WEP_IVLEN + key->wk_keylen);
+	    IEEE80211_WEP_IVLEN + key->wk_keylen);
 
 	if (rv != CRYPTO_SUCCESS)
 		return (0);
 
 	/* calculate CRC over unencrypted data */
 	CRC32(crc, mp->b_rptr + hdrlen + wep.ic_header,
-	    mp->b_wptr - mp->b_rptr - (hdrlen + wep.ic_header),
+	    MBLKL(mp) - (hdrlen + wep.ic_header),
 	    -1U, crc_table);
 
 	/* encrypt data */
 	(void) rc4_crypt(ctx,
-		mp->b_rptr + hdrlen + wep.ic_header,
-		mp->b_rptr + hdrlen + wep.ic_header,
-		mp->b_wptr - mp->b_rptr - (hdrlen + wep.ic_header));
+	    mp->b_rptr + hdrlen + wep.ic_header,
+	    mp->b_rptr + hdrlen + wep.ic_header,
+	    MBLKL(mp) - (hdrlen + wep.ic_header));
 
 	/* tack on ICV */
 	*(uint32_t *)crcbuf = LE_32(~crc);
@@ -290,25 +291,25 @@ wep_decrypt(struct ieee80211_key *key, mblk_t *mp, int hdrlen)
 
 	(void) memcpy(rc4key, mp->b_rptr + hdrlen, IEEE80211_WEP_IVLEN);
 	(void) memcpy(rc4key + IEEE80211_WEP_IVLEN, key->wk_key,
-		key->wk_keylen);
+	    key->wk_keylen);
 
 	ctx = NULL;
 	rv = rc4_init(&ctx, (const uint8_t *)rc4key,
-		IEEE80211_WEP_IVLEN + key->wk_keylen);
+	    IEEE80211_WEP_IVLEN + key->wk_keylen);
 
 	if (rv != CRYPTO_SUCCESS)
 		return (0);
 
 	/* decrypt data */
 	(void) rc4_crypt(ctx,
-		mp->b_rptr + hdrlen + wep.ic_header,
-		mp->b_rptr + hdrlen + wep.ic_header,
-		mp->b_wptr - mp->b_rptr -
-		(hdrlen + wep.ic_header + wep.ic_trailer));
+	    mp->b_rptr + hdrlen + wep.ic_header,
+	    mp->b_rptr + hdrlen + wep.ic_header,
+	    MBLKL(mp) -
+	    (hdrlen + wep.ic_header + wep.ic_trailer));
 
 	/* calculate CRC over unencrypted data */
 	CRC32(crc, mp->b_rptr + hdrlen + wep.ic_header,
-	    mp->b_wptr - mp->b_rptr -
+	    MBLKL(mp) -
 	    (hdrlen + wep.ic_header + wep.ic_trailer),
 	    -1U, crc_table);
 

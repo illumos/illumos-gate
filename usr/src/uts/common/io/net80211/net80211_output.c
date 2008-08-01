@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -711,7 +711,7 @@ ieee80211_beacon_alloc(ieee80211com_t *ic, ieee80211_node_t *in,
 		frm = ieee80211_add_erp(frm, ic);
 	}
 	efrm = ieee80211_add_xrates(frm, rs);
-	bo->bo_trailer_len = efrm - bo->bo_trailer;
+	bo->bo_trailer_len = _PTRDIFF(efrm, bo->bo_trailer);
 	m->b_wptr = efrm;
 
 	wh = (struct ieee80211_frame *)m->b_rptr;

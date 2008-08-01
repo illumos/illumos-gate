@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1011,7 +1011,7 @@ pcan_send(pcan_maci_t *pcan_p, mblk_t *mblk_p)
 #ifdef DEBUG
 	if (pcan_debug & PCAN_DBG_SEND) {
 		cmn_err(CE_NOTE, "pcan send: packet from plugin");
-		for (i = 0; i < mblk_p->b_wptr - mblk_p->b_rptr; i++)
+		for (i = 0; i < MBLKL(mblk_p); i++)
 			cmn_err(CE_NOTE, "%x: %x\n", i,
 			    *((unsigned char *)mblk_p->b_rptr + i));
 	}
@@ -1127,7 +1127,7 @@ pcian_send(pcan_maci_t *pcan_p, mblk_t *mblk_p)
 #ifdef DEBUG
 	if (pcan_debug & PCAN_DBG_SEND) {
 		cmn_err(CE_NOTE, "pcan(pci) send: packet from plugin");
-		for (i = 0; i < mblk_p->b_wptr - mblk_p->b_rptr; i++)
+		for (i = 0; i < MBLKL(mblk_p); i++)
 			cmn_err(CE_NOTE, "%x: %x\n", i,
 			    *((unsigned char *)mblk_p->b_rptr + i));
 	}

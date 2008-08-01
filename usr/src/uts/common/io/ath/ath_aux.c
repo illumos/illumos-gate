@@ -230,7 +230,7 @@ ath_setcurmode(ath_t *asc, enum ieee80211_phymode mode)
 	ASSERT(rt != NULL);
 
 	for (i = 0; i < rt->rateCount; i++)
-		asc->asc_rixmap[rt->info[i].dot11Rate & IEEE80211_RATE_VAL] = i;
+		asc->asc_rixmap[rt->info[i].dot11Rate & IEEE80211_RATE_VAL] = (uint8_t)i;
 
 	asc->asc_currates = rt;
 	asc->asc_curmode = mode;

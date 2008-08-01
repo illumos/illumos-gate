@@ -1252,10 +1252,10 @@ iwk_alloc_tx_ring(iwk_sc_t *sc, iwk_tx_ring_t *ring,
 
 		data->desc = desc_h + i;
 		data->paddr_desc = paddr_desc_h +
-		    ((caddr_t)data->desc - (caddr_t)desc_h);
+		    _PTRDIFF(data->desc, desc_h);
 		data->cmd = cmd_h +  i; /* (i % slots); */
 		data->paddr_cmd = paddr_cmd_h +
-		    ((caddr_t)data->cmd - (caddr_t)cmd_h);
+		    _PTRDIFF(data->cmd, cmd_h);
 		    /* ((i % slots) * sizeof (iwk_cmd_t)); */
 	}
 	dma_p = &ring->data[0].dma_data;
@@ -3085,7 +3085,7 @@ iwk_scan(iwk_sc_t *sc)
 	}
 
 	/* setup length of probe request */
-	hdr->tx_cmd.len = LE_16(frm - (uint8_t *)wh);
+	hdr->tx_cmd.len = LE_16(_PTRDIFF(frm, wh));
 	hdr->len = hdr->nchan * sizeof (iwk_scan_chan_t) +
 	    hdr->tx_cmd.len + sizeof (iwk_scan_hdr_t);
 
@@ -3105,7 +3105,7 @@ iwk_scan(iwk_sc_t *sc)
 		frm += sizeof (iwk_scan_chan_t);
 	}
 
-	pktlen = frm - (uint8_t *)cmd;
+	pktlen = _PTRDIFF(frm, cmd);
 
 	(void) memset(desc, 0, sizeof (*desc));
 	desc->val0 = LE_32(1 << 24);

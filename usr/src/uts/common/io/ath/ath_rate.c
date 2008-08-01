@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -167,7 +167,7 @@ ath_rate_ctl_start(ath_t *asc, struct ieee80211_node *in)
 			 */
 			/* NB: the rate set is assumed sorted */
 			for (; srate >= 0 && IEEE80211_RATE(srate) > 72;
-			    srate--);
+			    srate--) {}
 		}
 	} else {
 		/*
@@ -178,7 +178,7 @@ ath_rate_ctl_start(ath_t *asc, struct ieee80211_node *in)
 		/* NB: the rate set is assumed sorted */
 		srate = in->in_rates.ir_nrates - 1;
 		for (; srate >= 0 && IEEE80211_RATE(srate) != ic->ic_fixed_rate;
-		    srate--);
+		    srate--) {}
 	}
 	ATH_DEBUG((ATH_DBG_RATE, "ath: ath_rate_ctl_start(): "
 	    "srate=%d rate=%d\n", srate, IEEE80211_RATE(srate)));
@@ -297,7 +297,8 @@ ath_rate_ctl(ieee80211com_t *isc, struct ieee80211_node *in)
 void
 ath_rate_setup(ath_t *asc, uint32_t mode)
 {
-	int32_t i, maxrates;
+	int32_t i;
+	uint8_t maxrates;
 	struct ieee80211_rateset *rs;
 	struct ath_hal *ah = asc->asc_ah;
 	ieee80211com_t *ic = (ieee80211com_t *)asc;

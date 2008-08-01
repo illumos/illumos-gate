@@ -221,7 +221,7 @@ wpa_driver_wifi_set_key(datalink_id_t linkid, wpa_alg alg,
 	wpa_printf(MSG_DEBUG, "wpa_driver_wifi_set_key: alg=%s key_idx=%d"
 	    " set_tx=%d seq_len=%d seq=%d key_len=%d",
 	    alg_name, key_idx, set_tx,
-	    seq_len, *(uint64_t *)seq, key_len);
+	    seq_len, *(uint64_t *)(uintptr_t)seq, key_len);
 
 	if (seq_len > sizeof (uint64_t)) {
 		wpa_printf(MSG_DEBUG, "wpa_driver_wifi_set_key:"
@@ -231,7 +231,7 @@ wpa_driver_wifi_set_key(datalink_id_t linkid, wpa_alg alg,
 	(void) memcpy(bss.wb_bytes, addr, DLADM_WLAN_BSSID_LEN);
 
 	status = dladm_wlan_wpa_set_key(linkid, cipher, &bss, set_tx,
-	    *(uint64_t *)seq, key_idx, key, key_len);
+	    *(uint64_t *)(uintptr_t)seq, key_idx, key, key_len);
 
 	return (WPA_STATUS(status));
 }

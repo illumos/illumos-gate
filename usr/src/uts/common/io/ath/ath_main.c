@@ -797,6 +797,7 @@ ath_tx_start(ath_t *asc, struct ieee80211_node *in, struct ath_buf *bf,
 		uint16_t dur;
 		dur = ath_hal_computetxtime(ah, rt, IEEE80211_ACK_SIZE,
 		    rix, shortPreamble);
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		*(uint16_t *)wh->i_dur = LE_16(dur);
 	}
 
@@ -855,6 +856,7 @@ ath_tx_start(ath_t *asc, struct ieee80211_node *in, struct ath_buf *bf,
 	    ctsduration);		/* rts/cts duration */
 	bf->bf_flags = flags;
 
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	ATH_DEBUG((ATH_DBG_SEND, "ath: ath_xmit(): to %s totlen=%d "
 	    "an->an_tx_rate1sp=%d tx_rate2sp=%d tx_rate3sp=%d "
 	    "qnum=%d rix=%d sht=%d dur = %d\n",
@@ -981,6 +983,7 @@ ath_xmit(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 			tsf = ATH_HAL_GETTSF64(ah);
 			/* adjust 100us delay to xmit */
 			tsf += 100;
+			/* LINTED E_BAD_PTR_CAST_ALIGN */
 			tstamp = (uint32_t *)&wh[1];
 			tstamp[0] = LE_32(tsf & 0xffffffff);
 			tstamp[1] = LE_32(tsf >> 32);
@@ -1439,6 +1442,7 @@ ath_watchdog(void *arg)
 static uint_t
 ath_intr(caddr_t arg)
 {
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	ath_t *asc = (ath_t *)arg;
 	struct ath_hal *ah = asc->asc_ah;
 	HAL_INT status;
@@ -1509,6 +1513,7 @@ reset:
 static uint_t
 ath_softint_handler(caddr_t data)
 {
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	ath_t *asc = (ath_t *)data;
 
 	/*

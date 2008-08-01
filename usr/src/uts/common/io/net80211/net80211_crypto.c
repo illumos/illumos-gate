@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <sys/note.h>
 #include <sys/crypto/common.h>
 #include <sys/crypto/api.h>
+#include <sys/strsun.h>
 #include "net80211_impl.h"
 
 extern const struct ieee80211_cipher wep;
@@ -413,10 +414,10 @@ ieee80211_crypto_decap(ieee80211com_t *ic, mblk_t *mp, int hdrlen)
 	uint8_t keyid;
 
 	/* NB: this minimum size data frame could be bigger */
-	if ((mp->b_wptr - mp->b_rptr) < IEEE80211_WEP_MINLEN) {
+	if (MBLKL(mp) < IEEE80211_WEP_MINLEN) {
 		ieee80211_dbg(IEEE80211_MSG_CRYPTO, "ieee80211_crypto_decap:"
 		    " WEP data frame too short, len %u\n",
-		    mp->b_wptr - mp->b_rptr);
+		    MBLKL(mp));
 		return (NULL);
 	}
 	/*
