@@ -148,6 +148,9 @@ extern "C" {
 #define	ALIAS_SHARES		"cpu-shares"
 #define	ALIAS_CPUCAP		"cpu-cap"
 
+/* Default name for zone detached manifest */
+#define	ZONE_DETACHED	"SUNWdetached.xml"
+
 /*
  * Bit flag definitions for passing into libzonecfg functions.
  */
@@ -422,7 +425,7 @@ extern	int	zonecfg_enable_rcapd(char *, int);
  * attach/detach support.
  */
 extern	int	zonecfg_get_attach_handle(const char *, const char *,
-    boolean_t, zone_dochandle_t);
+    const char *, boolean_t, zone_dochandle_t);
 extern	int	zonecfg_attach_manifest(int, zone_dochandle_t,
     zone_dochandle_t);
 extern	int	zonecfg_detach_save(zone_dochandle_t, uint_t);

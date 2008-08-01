@@ -138,7 +138,6 @@
 
 #define	DTD_ENTITY_BOOL_LEN	6	/* "false" */
 
-#define	DETACHED	"SUNWdetached.xml"
 #define	ATTACH_FORCED	"SUNWattached.xml"
 
 #define	TMP_POOL_NAME	"SUNWtmp_%s"
@@ -604,8 +603,8 @@ zonecfg_get_handle(const char *zonename, zone_dochandle_t handle)
 }
 
 int
-zonecfg_get_attach_handle(const char *path, const char *zonename,
-    boolean_t preserve_sw, zone_dochandle_t handle)
+zonecfg_get_attach_handle(const char *path, const char *fname,
+    const char *zonename, boolean_t preserve_sw, zone_dochandle_t handle)
 {
 	char		migpath[MAXPATHLEN];
 	int		err;
@@ -618,7 +617,7 @@ zonecfg_get_attach_handle(const char *path, const char *zonename,
 	if (stat(migpath, &buf) == -1 || !S_ISDIR(buf.st_mode))
 		return (Z_NO_ZONE);
 
-	if (snprintf(migpath, sizeof (migpath), "%s/%s", path, DETACHED) >=
+	if (snprintf(migpath, sizeof (migpath), "%s/%s", path, fname) >=
 	    sizeof (migpath))
 		return (Z_NOMEM);
 
@@ -1314,8 +1313,8 @@ zonecfg_detach_save(zone_dochandle_t handle, uint_t flags)
 		    != Z_OK)
 			return (err);
 
-		if (snprintf(migpath, sizeof (migpath), "%s/%s", path, DETACHED)
-		    >= sizeof (migpath))
+		if (snprintf(migpath, sizeof (migpath), "%s/%s", path,
+		    ZONE_DETACHED) >= sizeof (migpath))
 			return (Z_NOMEM);
 	}
 
@@ -1355,7 +1354,7 @@ zonecfg_detached(const char *path)
 	char		migpath[MAXPATHLEN];
 	struct stat	buf;
 
-	if (snprintf(migpath, sizeof (migpath), "%s/%s", path, DETACHED) >=
+	if (snprintf(migpath, sizeof (migpath), "%s/%s", path, ZONE_DETACHED) >=
 	    sizeof (migpath))
 		return (B_FALSE);
 
@@ -1382,7 +1381,8 @@ zonecfg_rm_detached(zone_dochandle_t handle, boolean_t forced)
 	if (zone_get_zonepath(zname, path, sizeof (path)) != Z_OK)
 		return;
 
-	(void) snprintf(detached, sizeof (detached), "%s/%s", path, DETACHED);
+	(void) snprintf(detached, sizeof (detached), "%s/%s", path,
+	    ZONE_DETACHED);
 	(void) snprintf(attached, sizeof (attached), "%s/%s", path,
 	    ATTACH_FORCED);
 

@@ -76,8 +76,7 @@
 #define	SW_CMP_SRC	0x01
 #define	SW_CMP_SILENT	0x02
 
-#define	DETACHED	"SUNWdetached.xml"
-#define	ATTACH_FORCED	"SUNWattached.xml"
+#define	TMP_MANIFEST	"SUNWupdate.xml"
 #define	PKG_PATH	"/var/sadm/pkg"
 #define	CONTENTS_FILE	"/var/sadm/install/contents"
 #define	SUNW_PKG_ALL_ZONES	"SUNW_PKG_ALLZONES=true\n"
@@ -95,6 +94,17 @@
 /* 0755 is the default directory mode. */
 #define	DEFAULT_DIR_MODE (S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)
 
+/* These are the file status indicators for the contents file */
+#define	INST_RDY	'+'	/* entry is ready to installf -f */
+#define	RM_RDY		'-'	/* entry is ready for removef -f */
+#define	NOT_FND		'!'	/* entry (or part of entry) was not found */
+#define	SERVED_FILE	'%'	/* using the file server's RO partition */
+#define	STAT_NEXT	'@'	/* this is awaiting eptstat */
+#define	DUP_ENTRY	'#'	/* there's a duplicate of this */
+#define	CONFIRM_CONT	'*'	/* need to confirm contents */
+#define	CONFIRM_ATTR	'~'	/* need to confirm attributes */
+#define	ENTRY_OK	'\0'	/* entry is a confirmed file */
+
 enum zn_ipd_fs {ZONE_IPD, ZONE_FS};
 
 struct zone_pkginfo {
@@ -102,6 +112,7 @@ struct zone_pkginfo {
 	boolean_t	zpi_this_zone;
 	int		zpi_patch_cnt;
 	char		*zpi_version;
+	char		*zpi_patchlist;
 	char		**zpi_patchinfo;
 };
 
@@ -122,6 +133,13 @@ typedef struct {
 	zone_dochandle_t handle;
 	int		res;
 } patch_parms_t;
+
+typedef struct {
+	uu_avl_node_t	link;
+	char		*patch_num;
+	boolean_t	can_backout;
+	boolean_t	installed;
+} bo_patch_node_t;
 
 static char *locale;
 static char *zonename;
@@ -278,9 +296,10 @@ add_pkg_list(char *lastp, char ***plist, int *pcnt, char **pkg_warn)
 
 		/* skip over any special pkg bookkeeping char */
 		if (!isalpha(*p)) {
-			p++;
-			if ((res = add_pkg_to_str(pkg_warn, p)) != Z_OK)
+			if ((*p == NOT_FND || *p == DUP_ENTRY) &&
+			    (res = add_pkg_to_str(pkg_warn, p + 1)) != Z_OK)
 				break;
+			p++;
 		}
 
 		/* Check if the pkg is already in the list */
@@ -580,8 +599,8 @@ get_ipd_pkgs(zone_dochandle_t handle, char ***pkg_list, int *cnt)
 
 			if (pkg_warn != NULL) {
 				(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
-				    "WARNING: package operation in progress "
-				    "on the following packages:\n   %s\n"),
+				    "WARNING: package metadata problems "
+				    "with the following packages:\n   %s\n"),
 				    pkg_warn);
 				free(pkg_warn);
 			}
@@ -1049,6 +1068,7 @@ static void
 free_pkginfo(struct zone_pkginfo *infop)
 {
 	free(infop->zpi_version);
+	free(infop->zpi_patchlist);
 	if (infop->zpi_patch_cnt > 0) {
 		int i;
 
@@ -1072,6 +1092,7 @@ get_pkginfo(char *pkginfo, struct zone_pkginfo *infop)
 	infop->zpi_all_zones = B_FALSE;
 	infop->zpi_this_zone = B_FALSE;
 	infop->zpi_version = NULL;
+	infop->zpi_patchlist = NULL;
 	infop->zpi_patch_cnt = 0;
 	infop->zpi_patchinfo = NULL;
 
@@ -1090,13 +1111,27 @@ get_pkginfo(char *pkginfo, struct zone_pkginfo *infop)
 
 			/* remove trailing newline */
 			len = strlen(infop->zpi_version);
-			*(infop->zpi_version + len - 1) = 0;
+			infop->zpi_version[len - 1] = '\0';
 
 		} else if (strcmp(buf, SUNW_PKG_ALL_ZONES) == 0) {
 			infop->zpi_all_zones = B_TRUE;
 
 		} else if (strcmp(buf, SUNW_PKG_THIS_ZONE) == 0) {
 			infop->zpi_this_zone = B_TRUE;
+
+		} else if (strncmp(buf, PATCHLIST, sizeof (PATCHLIST) - 1)
+		    == 0) {
+			int len;
+
+			if ((infop->zpi_patchlist =
+			    strdup(buf + sizeof (PATCHLIST) - 1)) == NULL) {
+				err = ENOMEM;
+				break;
+			}
+
+			/* remove trailing newline */
+			len = strlen(infop->zpi_patchlist);
+			infop->zpi_patchlist[len - 1] = '\0';
 
 		} else if (strncmp(buf, PATCHINFO, sizeof (PATCHINFO) - 1)
 		    == 0) {
@@ -1434,6 +1469,13 @@ zfm_print(const char *p, void *r) {
 	return (0);
 }
 
+static void
+detach_usage()
+{
+	(void) fprintf(stderr, gettext("usage:\t%s brand options: none\n"),
+	    MY_BRAND_NAME);
+}
+
 static int
 detach_func(int argc, char *argv[])
 {
@@ -1451,8 +1493,7 @@ detach_func(int argc, char *argv[])
 				    "invalid option: %c\n"), MY_BRAND_NAME,
 				    optopt);
 			}
-			(void) fprintf(stderr, gettext("usage:\t%s brand "
-			    "options: none\n"), MY_BRAND_NAME);
+			detach_usage();
 			return (optopt == '?' ? Z_OK : ZONE_SUBPROC_USAGE);
 		case 'n':
 			execute = B_FALSE;
@@ -1462,6 +1503,11 @@ detach_func(int argc, char *argv[])
 			    "option: %c\n"), MY_BRAND_NAME, arg);
 			return (ZONE_SUBPROC_USAGE);
 		}
+	}
+
+	if (argc > optind) {
+		detach_usage();
+		return (ZONE_SUBPROC_USAGE);
 	}
 
 	/* Don't detach the zone if anything is still mounted there */
@@ -1632,35 +1678,22 @@ unmount_func()
 }
 
 /*
- * Attempt to generate the information we need to make the zone look like
- * it was properly detached by using the pkg information contained within
- * the zone itself.
- *
- * We will perform a dry-run detach within the zone to generate the xml file.
- * To do this we need to be able to get a handle on the zone so we can see
- * how it is configured.  In order to get a handle, we need a copy of the
- * zone configuration within the zone.  Since the zone's configuration is
- * not available within the zone itself, we need to temporarily copy it into
- * the zone.
+ * Setup a configured zone so we can mount it and zlogin to perform various
+ * tasks.  Also put a copy of the zone configuration into the zone so we can
+ * get a handle on it.
  *
  * The sequence of actions we are doing is this:
  *	[set zone state to installed]
  *	[mount zone]
  *	zlogin {zone} </etc/zones/{zone}.xml 'cat >/etc/zones/{zone}.xml'
- *	zlogin {zone} 'zoneadm -z {zone} detach -n' >{zonepath}/SUNWdetached.xml
- *	zlogin {zone} 'rm -f /etc/zones/{zone}.xml'
- *	[unmount zone]
- *	[set zone state to configured]
  *
- * The successful result of this function is that we will have a
- * SUNWdetached.xml file in the zonepath and we can use that to attach the zone.
+ * The unmount_configured_zone() function should be used to clean up from
+ * this function.
  */
 static boolean_t
-gen_detach_info()
+mount_configured_zone(boolean_t *mounted)
 {
 	int		status;
-	boolean_t	mounted = B_FALSE;
-	boolean_t	res = B_FALSE;
 	char		cmdbuf[2 * MAXPATHLEN];
 
 	/*
@@ -1672,8 +1705,8 @@ gen_detach_info()
 
 	/* Mount the zone so we can zlogin. */
 	if (mount_func(B_FALSE) != Z_OK)
-		goto cleanup;
-	mounted = B_TRUE;
+		return (B_FALSE);
+	*mounted = B_TRUE;
 
 	/*
 	 * We need to copy the zones xml configuration file into the
@@ -1683,27 +1716,34 @@ gen_detach_info()
 	if (snprintf(cmdbuf, sizeof (cmdbuf), "/usr/sbin/zlogin -S %s "
 	    "</etc/zones/%s.xml '/usr/bin/cat >/etc/zones/%s.xml'",
 	    zonename, zonename, zonename) >= sizeof (cmdbuf))
-		goto cleanup;
+		return (B_FALSE);
 
 	status = do_subproc(cmdbuf);
 	if (subproc_status("copy", status, B_TRUE) != ZONE_SUBPROC_OK)
-		goto cleanup;
+		return (B_FALSE);
 
-	/* Now run the detach command within the mounted zone. */
-	if (snprintf(cmdbuf, sizeof (cmdbuf), "/usr/sbin/zlogin -S %s "
-	    "'/usr/sbin/zoneadm -z %s detach -n' >%s/SUNWdetached.xml",
-	    zonename, zonename, zonepath) >= sizeof (cmdbuf))
-		goto cleanup;
+	return (B_TRUE);
+}
 
-	status = do_subproc(cmdbuf);
-	if (subproc_status("detach", status, B_TRUE) != ZONE_SUBPROC_OK)
-		goto cleanup;
+/*
+ * Cleanup a configured zone mounted using mount_configured_zone().
+ * tasks.
+ *
+ * The sequence of actions we are doing is this:
+ *	zlogin {zone} 'rm -f /etc/zones/{zone}.xml'
+ *	[unmount zone]
+ *	[set zone state to configured]
+ */
+static boolean_t
+unmount_configured_zone(boolean_t mounted)
+{
+	boolean_t	res = B_TRUE;
 
-	res = B_TRUE;
-
-cleanup:
 	/* Cleanup from the previous actions. */
 	if (mounted) {
+		int status;
+		char cmdbuf[2 * MAXPATHLEN];
+
 		if (snprintf(cmdbuf, sizeof (cmdbuf),
 		    "/usr/sbin/zlogin -S %s '/usr/bin/rm -f /etc/zones/%s.xml'",
 		    zonename, zonename) >= sizeof (cmdbuf)) {
@@ -1721,6 +1761,44 @@ cleanup:
 
 	if (zone_set_state(zonename, ZONE_STATE_CONFIGURED) != Z_OK)
 		res = B_FALSE;
+
+	return (res);
+}
+
+/*
+ * Attempt to generate the information we need to make the zone look like
+ * it was properly detached by using the pkg information contained within
+ * the zone itself.
+ * We will perform a dry-run detach within the zone to generate the xml file.
+ * The successful result of this function is that we will have the "manifest"
+ * xml file in the zonepath and we can use that to attach the zone.
+ */
+static boolean_t
+gen_detach_info(char *manifest)
+{
+	int		status;
+	boolean_t	mounted = B_FALSE;
+	boolean_t	res = B_FALSE;
+	char		cmdbuf[2 * MAXPATHLEN];
+
+	if (!mount_configured_zone(&mounted))
+		goto cleanup;
+
+	/* Now run the detach command within the mounted zone. */
+	if (snprintf(cmdbuf, sizeof (cmdbuf), "/usr/sbin/zlogin -S %s "
+	    "'/usr/sbin/zoneadm -z %s detach -n' >%s/%s",
+	    zonename, zonename, zonepath, manifest) >= sizeof (cmdbuf))
+		goto cleanup;
+
+	status = do_subproc(cmdbuf);
+	if (subproc_status("detach", status, B_TRUE) != ZONE_SUBPROC_OK)
+		goto cleanup;
+
+	res = B_TRUE;
+
+cleanup:
+	if (!unmount_configured_zone(mounted))
+		res =  B_FALSE;
 
 	return (res);
 }
@@ -1825,6 +1903,21 @@ attach_update(zone_dochandle_t handle)
 		update_res = Z_ERR;
 	}
 
+	if (update_res == Z_OK) {
+		/* Install the new /etc/release file. */
+		(void) snprintf(cmdbuf, sizeof (cmdbuf),
+		    "exec /usr/sbin/zlogin -S %s "
+		    "'/usr/bin/cat >/a/etc/release' </etc/release", zonename);
+
+		status = do_subproc(cmdbuf);
+		if (subproc_status("/etc/release", status, B_TRUE)
+		    != ZONE_SUBPROC_OK) {
+			(void) fprintf(stderr, gettext("could not update "
+			    "zone\n"));
+			update_res = Z_ERR;
+		}
+	}
+
 	zarg.cmd = Z_UNMOUNT;
 	if (zonecfg_call_zoneadmd(zonename, &zarg, locale, B_FALSE) != 0) {
 		(void) fprintf(stderr, gettext("could not unmount zone\n"));
@@ -1840,13 +1933,6 @@ attach_update(zone_dochandle_t handle)
 		return (Z_ERR);
 
 	zonecfg_rm_detached(handle, B_FALSE);
-
-	if ((err = zone_set_state(zonename, ZONE_STATE_INSTALLED)) != Z_OK) {
-		errno = err;
-		(void) fprintf(stderr, gettext("could not set state: %s\n"),
-		    zonecfg_strerror(err));
-		return (Z_ERR);
-	}
 
 	return (Z_OK);
 
@@ -2465,6 +2551,7 @@ sw_up_to_date(zone_dochandle_t l_handle, zone_dochandle_t s_handle)
 	zone_pkg_entry_t *src_pkg;
 	zone_pkg_entry_t *dst_pkg;
 	char		fname[MAXPATHLEN];
+	boolean_t	failed = B_FALSE;
 
 	(void) snprintf(fname, sizeof (fname), "%s/pkg_add", zonepath);
 	if ((fp_add = fopen(fname, "w")) == NULL) {
@@ -2553,7 +2640,8 @@ sw_up_to_date(zone_dochandle_t l_handle, zone_dochandle_t s_handle)
 			zerror(gettext("ERROR: attempt to downgrade package "
 			    "%s %s to version %s"), src_pkg->zpe_name,
 			    src_pkg->zpe_vers, dst_pkg->zpe_vers);
-			goto fatal;
+			failed = B_TRUE;
+			continue;
 		}
 
 		/*
@@ -2580,8 +2668,24 @@ sw_up_to_date(zone_dochandle_t l_handle, zone_dochandle_t s_handle)
 			 */
 			zerror(gettext("ERROR: attempt to downgrade package "
 			    "%s, the source had patches but this system does "
-			    "not\n"), src_pkg->zpe_name);
-			goto fatal;
+			    "not.  Patches:"), src_pkg->zpe_name);
+			failed = B_TRUE;
+
+			patch_walk = uu_avl_walk_start(src_pkg->zpe_patches_avl,
+			    UU_WALK_ROBUST);
+			if (patch_walk == NULL) {
+				zerror(gettext("Out of memory"));
+				goto fatal;
+			}
+
+			while ((src_patch = uu_avl_walk_next(patch_walk))
+			    != NULL) {
+				(void) fprintf(stderr, "\t%s-%s\n",
+				    src_patch->zpe_name, src_patch->zpe_vers);
+			}
+
+			uu_avl_walk_end(patch_walk);
+			continue;
 		}
 
 		patch_walk = uu_avl_walk_start(src_pkg->zpe_patches_avl,
@@ -2617,7 +2721,8 @@ sw_up_to_date(zone_dochandle_t l_handle, zone_dochandle_t s_handle)
 				    src_pkg->zpe_name, src_patch->zpe_name,
 				    src_patch->zpe_vers);
 
-				goto fatal;
+				failed = B_TRUE;
+				continue;
 			}
 
 			/* Check if the src patch is newer than the dst patch */
@@ -2642,7 +2747,9 @@ sw_up_to_date(zone_dochandle_t l_handle, zone_dochandle_t s_handle)
 				    src_pkg->zpe_name, src_patch->zpe_name,
 				    src_patch->zpe_vers, dst_patch->zpe_name,
 				    dst_patch->zpe_vers);
-				goto fatal;
+
+				failed = B_TRUE;
+				continue;
 			}
 
 			/*
@@ -2655,6 +2762,9 @@ sw_up_to_date(zone_dochandle_t l_handle, zone_dochandle_t s_handle)
 	}
 
 	uu_avl_walk_end(walk);
+
+	if (failed)
+		goto fatal;
 
 	/*
 	 * Second Pass
@@ -2950,21 +3060,362 @@ dev_fix(char *zonename, zone_dochandle_t handle)
 	return (Z_OK);
 }
 
+/*
+ * Check the pkg to see if the patch backout data exists for the specified
+ * patch in the "bo" parameter.  Mark the patch if we cannot back it out.
+ * Only return false if we hit a fatal error.
+ */
+static boolean_t
+collect_patch_backout(char *pkg_path, bo_patch_node_t *bo)
+{
+	struct stat buf;
+	char backout_path[MAXPATHLEN];
+	char backout_data[MAXPATHLEN];
+
+	if (snprintf(backout_path, sizeof (backout_path), "%s/save/%s",
+	    pkg_path, bo->patch_num) >= sizeof (backout_path)) {
+		zerror(gettext("Package path is too long"));
+		return (B_FALSE);
+	}
+
+	if (snprintf(backout_data, sizeof (backout_data), "%s/undo.Z",
+	    backout_path) >= sizeof (backout_data)) {
+		zerror(gettext("Package path is too long"));
+		return (B_FALSE);
+	}
+
+	if (stat(backout_data, &buf) == 0)
+		return (B_TRUE);
+
+	if (snprintf(backout_data, sizeof (backout_data), "%s/undo",
+	    backout_path) >= sizeof (backout_data)) {
+		zerror(gettext("Package path is too long"));
+		return (B_FALSE);
+	}
+
+	if (stat(backout_data, &buf) == 0)
+		return (B_TRUE);
+
+	if (snprintf(backout_data, sizeof (backout_data), "%s/obsolete.Z",
+	    backout_path) >= sizeof (backout_data)) {
+		zerror(gettext("Package path is too long"));
+		return (B_FALSE);
+	}
+
+	if (stat(backout_data, &buf) == 0)
+		return (B_TRUE);
+
+	if (snprintf(backout_data, sizeof (backout_data), "%s/obsolete",
+	    backout_path) >= sizeof (backout_data)) {
+		zerror(gettext("Package path is too long"));
+		return (B_FALSE);
+	}
+
+	if (stat(backout_data, &buf) == 0)
+		return (B_TRUE);
+
+	/* There is no backout data for the patch. */
+	bo->can_backout = B_FALSE;
+	return (B_TRUE);
+}
+
+/*
+ * Parse pkg patch_list and check if any of the backout patches are in the pkg.
+ * For each backout, collect the data about backing it out.  Only return false
+ * if we hit a fatal error.
+ */
+static boolean_t
+collect_pkg_backout(char *pkg_path, char *patch_list, uu_avl_t *backout_list,
+    uu_avl_pool_t *backout_pool)
+{
+	char *tmp;
+	char *patch;
+	char *lastp;
+
+	if (patch_list == NULL)
+		return (B_TRUE);
+
+	for (tmp = patch_list; (patch = strtok_r(tmp, " ", &lastp)) != NULL;
+	    tmp = NULL) {
+		uu_list_index_t where;
+		bo_patch_node_t *found;
+		bo_patch_node_t backout;
+
+		backout.patch_num = patch;
+		uu_avl_node_init(&backout, &backout.link, backout_pool);
+
+		if ((found = uu_avl_find(backout_list, &backout, NULL, &where))
+		    != NULL) {
+			found->installed = B_TRUE;
+			if (!collect_patch_backout(pkg_path, found))
+				return (B_FALSE);
+		}
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * Walk all of the pkgs installed to determine if one of the patches to backout
+ * is installed on that pkg.  To figure out what patches are installed we have
+ * to look at each pkg, since patch data is stored in individual pkginfo files.
+ *
+ * Once that is done, the patches to backout will each be flagged so we
+ * can verify that the backout list is valid.
+ *
+ * We're doing this from the global zone, but this is just a sanity check and
+ * nothing is being modified.  The actual backout happens in the scratch zone.
+ */
+static boolean_t
+backout_ok(uu_avl_t *backout_list, uu_avl_pool_t *backout_pool)
+{
+	boolean_t res = B_TRUE;
+	struct dirent *dp;
+	DIR *dirp;
+	uu_avl_walk_t *walk;
+	bo_patch_node_t *backout;
+	boolean_t do_header = B_TRUE;
+	char pkg_dir[MAXPATHLEN];
+
+	if (backout_list == NULL)
+		return (B_TRUE);
+
+	if (snprintf(pkg_dir, sizeof (pkg_dir), "%s/root/%s", zonepath,
+	    PKG_PATH) >= sizeof (pkg_dir))
+		return (B_FALSE);
+
+	if ((dirp = opendir(pkg_dir)) == NULL)
+		return (B_FALSE);
+
+	while ((dp = readdir(dirp)) != NULL) {
+		char pkgpath[MAXPATHLEN];
+		char pkginfo[MAXPATHLEN];
+		struct stat buf;
+		struct zone_pkginfo info;
+
+		if (strcmp(dp->d_name, ".") == 0 ||
+		    strcmp(dp->d_name, "..") == 0)
+			continue;
+
+		if (snprintf(pkgpath, sizeof (pkgpath), "%s/%s", pkg_dir,
+		    dp->d_name) >= sizeof (pkgpath))
+			continue;
+
+		if (snprintf(pkginfo, sizeof (pkginfo), "%s/pkginfo", pkgpath)
+		    >= sizeof (pkginfo))
+			continue;
+
+		if (stat(pkginfo, &buf) == -1 || !S_ISREG(buf.st_mode))
+			continue;
+
+		if (get_pkginfo(pkginfo, &info) != 0) {
+			res = B_FALSE;
+			break;
+		}
+
+		res = collect_pkg_backout(pkgpath, info.zpi_patchlist,
+		    backout_list, backout_pool);
+
+		free_pkginfo(&info);
+
+		if (!res)
+			break;
+	}
+
+	(void) closedir(dirp);
+
+	/* If we had a fatal error in the loop above, we're done. */
+	if (!res)
+		return (B_FALSE);
+
+	/*
+	 * Walk the list of patches to see if any are not installed or cannot
+	 * be backed out.
+	 */
+	if ((walk = uu_avl_walk_start(backout_list, UU_WALK_ROBUST)) == NULL) {
+		zerror(gettext("Out of memory"));
+		return (B_FALSE);
+	}
+
+	while ((backout = uu_avl_walk_next(walk)) != NULL) {
+		if (!backout->installed || !backout->can_backout) {
+			if (do_header) {
+				(void) fprintf(stderr, gettext("The following "
+				    "patches cannot be removed:\n"));
+				do_header = B_FALSE;
+			}
+			if (!backout->installed)
+				(void) fprintf(stderr,
+				    gettext("\t%s is not installed\n"),
+				    backout->patch_num);
+			else
+				(void) fprintf(stderr, gettext("\t%s was "
+				    "installed without creating its backout "
+				    "data\n"), backout->patch_num);
+			res = B_FALSE;
+		}
+	}
+
+	uu_avl_walk_end(walk);
+
+	return (res);
+}
+
+/*
+ * Run patchrm in the scratch zone to backout the specified patches.
+ * Return B_TRUE if the backout suceeded, otherwise, return B_FALSE.
+ */
+static boolean_t
+backout_patches(uu_avl_t *backout_list)
+{
+	boolean_t res = B_FALSE;
+	uu_avl_walk_t *walk;
+	bo_patch_node_t *backout;
+	boolean_t mounted = B_FALSE;
+	int status;
+	int len;
+	char *patchrm = "/usr/sbin/zlogin -S %s "
+	    "'/usr/bin/date >>/a/var/sadm/system/logs/backout_log; "
+	    "/usr/sbin/patchrm -R /a ";
+	char *patchlog = " 2>&1 | "
+	    "tee -a /a/var/sadm/system/logs/backout_log'\n";
+	char *cmdbuf = NULL;
+	char *tmp;
+
+	if (backout_list == NULL)
+		return (B_TRUE);
+
+	if (!mount_configured_zone(&mounted))
+		goto cleanup;
+
+	len = strlen(patchrm) + strlen(zonename) + strlen(patchlog) + 1;
+	if ((cmdbuf = (char *)malloc(len)) == NULL) {
+		zerror(gettext("Out of memory"));
+		goto cleanup;
+	}
+
+	/* Walk the list of patches to build the backout command. */
+	if ((walk = uu_avl_walk_start(backout_list, UU_WALK_ROBUST)) == NULL) {
+		zerror(gettext("Out of memory"));
+		goto cleanup;
+	}
+
+	(void) printf(gettext("Backing out patches: "));
+
+	/* LINTED E_SEC_PRINTF_VAR_FMT */
+	(void) snprintf(cmdbuf, len, patchrm, zonename);
+	while ((backout = uu_avl_walk_next(walk)) != NULL) {
+		(void) printf("%s ", backout->patch_num);
+
+		len += strlen(backout->patch_num) + 1;
+		if ((tmp = (char *)realloc(cmdbuf, len)) == NULL) {
+			uu_avl_walk_end(walk);
+			zerror(gettext("Out of memory"));
+			goto cleanup;
+		}
+		cmdbuf = tmp;
+		(void) strlcat(cmdbuf, backout->patch_num, len);
+		(void) strlcat(cmdbuf, " ", len);
+	}
+
+	(void) printf("\n");
+
+	uu_avl_walk_end(walk);
+	(void) strlcat(cmdbuf, patchlog, len);
+
+	/* Now run the patchrm command within the mounted zone. */
+	status = do_subproc(cmdbuf);
+	if (subproc_status("patchrm", status, B_TRUE) != ZONE_SUBPROC_OK) {
+		zerror(gettext("Backing out the patches failed.\n"
+		    "See the /var/sadm/system/logs/backout_log file in the "
+		    "zone for details.\n"));
+		goto cleanup;
+	}
+
+	res = B_TRUE;
+
+cleanup:
+	if (cmdbuf != NULL)
+		free(cmdbuf);
+	if (!unmount_configured_zone(mounted))
+		res =  B_FALSE;
+
+	return (res);
+}
+
+/* ARGSUSED */
+static int
+backout_patch_node_compare(const void *l_arg, const void *r_arg, void *private)
+{
+	bo_patch_node_t *l = (bo_patch_node_t *)l_arg;
+	bo_patch_node_t *r = (bo_patch_node_t *)r_arg;
+
+	return (strcmp(l->patch_num, r->patch_num));
+}
+
+static boolean_t
+init_backout_data(uu_avl_pool_t **backout_pool, uu_avl_t **backout_list)
+{
+	if ((*backout_pool = uu_avl_pool_create("backout_pool",
+	    sizeof (bo_patch_node_t), offsetof(bo_patch_node_t, link),
+	    backout_patch_node_compare, UU_DEFAULT)) == NULL)
+		return (B_FALSE);
+
+	if ((*backout_list = uu_avl_create(*backout_pool, NULL, UU_DEFAULT))
+	    == NULL)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+static void
+cleanup_backout_data(uu_avl_pool_t *backout_pool, uu_avl_t *backout_list)
+{
+	if (backout_list != NULL) {
+		bo_patch_node_t *p;
+		void *cookie = NULL;
+
+		while ((p = uu_avl_teardown(backout_list, &cookie)) != NULL)
+			free(p);
+
+		uu_avl_destroy(backout_list);
+	}
+
+	if (backout_pool != NULL)
+		uu_avl_pool_destroy(backout_pool);
+}
+
+static void
+attach_usage()
+{
+	(void) fprintf(stderr, gettext("usage:\t%s brand options: "
+	    "[-b patchid]* [-u]\n"), MY_BRAND_NAME);
+	(void) fprintf(stderr, gettext("\tSpecify one or more -b patchid "
+	    "options to backout the patch from the\n\tzone.\n"));
+	(void) fprintf(stderr, gettext("\tSpecify -u to update the zone to "
+	    "the current system software.\n"));
+}
+
 static int
 attach_func(int argc, char *argv[])
 {
 	int err, arg;
-	zone_dochandle_t handle;
+	int res = ZONE_SUBPROC_NOTCOMPLETE;
+	zone_dochandle_t handle = NULL;
 	zone_dochandle_t athandle = NULL;
 	char brand[MAXNAMELEN], atbrand[MAXNAMELEN];
 	boolean_t execute = B_TRUE;
-	boolean_t retried = B_FALSE;
 	boolean_t update = B_FALSE;
 	char *manifest_path;
+	char tmp_path[MAXPATHLEN];
+	uu_avl_pool_t *backout_pool = NULL;
+	uu_avl_t *backout_list = NULL;
+	bo_patch_node_t *backout;
+	uu_avl_index_t where;
 
 	opterr = 0;
 	optind = 0;
-	if ((arg = getopt(argc, argv, "?Fn:u")) != EOF) {
+	while ((arg = getopt(argc, argv, "?b:Fn:u")) != EOF) {
 		switch (arg) {
 		case '?':
 			if (optopt != '?') {
@@ -2972,12 +3423,31 @@ attach_func(int argc, char *argv[])
 				    "invalid option: %c\n"), MY_BRAND_NAME,
 				    optopt);
 			}
-			(void) fprintf(stderr, gettext("usage:\t%s brand "
-			    "options: [-u]\n"), MY_BRAND_NAME);
-			(void) fprintf(stderr, gettext("\tSpecify "
-			    "-u to update the zone to the current "
-			    "system software.\n"));
-			return (optopt == '?' ? Z_OK : ZONE_SUBPROC_USAGE);
+			attach_usage();
+			res = (optopt == '?' ? ZONE_SUBPROC_OK :
+			    ZONE_SUBPROC_USAGE);
+			goto done;
+		case 'b':
+			if (backout_pool == NULL &&
+			    !init_backout_data(&backout_pool, &backout_list))
+				goto done;
+			if ((backout = (bo_patch_node_t *)malloc(
+			    sizeof (bo_patch_node_t))) == NULL)
+				goto done;
+
+			backout->patch_num = optarg;
+			backout->can_backout = B_TRUE;
+			backout->installed = B_FALSE;
+			uu_avl_node_init(backout, &backout->link, backout_pool);
+
+			if (uu_avl_find(backout_list, backout, NULL, &where)
+			    == NULL) {
+				(void) uu_avl_insert(backout_list, backout,
+				    where);
+			} else {
+				free(backout);
+			}
+			break;
 		case 'n':
 			execute = B_FALSE;
 			manifest_path = optarg;
@@ -2988,70 +3458,58 @@ attach_func(int argc, char *argv[])
 		default:
 			(void) fprintf(stderr, gettext("%s brand: invalid "
 			    "option: %c\n"), MY_BRAND_NAME, optopt);
-			return (ZONE_SUBPROC_USAGE);
+			res = ZONE_SUBPROC_USAGE;
+			goto done;
 		}
+	}
+
+	if (argc > optind) {
+		attach_usage();
+		res = ZONE_SUBPROC_USAGE;
+		goto done;
 	}
 
 	/* dry-run and update flags are mutually exclusive */
 	if (!execute && update) {
 		(void) fprintf(stderr, gettext("-n and -u flags are mutually "
 		    "exclusive\n"));
-		return (ZONE_SUBPROC_USAGE);
+		res = ZONE_SUBPROC_USAGE;
+		goto done;
 	}
+
+	/*
+	 * If there are any patches to backout, check if each patch was
+	 * installed with its backout data.
+	 */
+	if (!backout_ok(backout_list, backout_pool))
+		goto done;
 
 	/*
 	 * If the no-execute option was specified, we need to branch down
 	 * a completely different path since there is no zone required to be
 	 * configured for this option.
 	 */
-	if (!execute)
-		return (dryrun_attach(manifest_path));
+	if (!execute) {
+		res = dryrun_attach(manifest_path);
+		goto done;
+	}
 
 	if ((handle = zonecfg_init_handle()) == NULL) {
 		(void) fprintf(stderr, gettext("brand attach program error: "
 		    "%s\n"), strerror(errno));
-		return (ZONE_SUBPROC_NOTCOMPLETE);
+		goto done;
 	}
 
 	if ((err = zonecfg_get_handle(zonename, handle)) != Z_OK) {
 		(void) fprintf(stderr, gettext("brand attach program error: "
 		    "%s\n"), zonecfg_strerror(err));
 		zonecfg_fini_handle(handle);
-		return (ZONE_SUBPROC_NOTCOMPLETE);
+		goto done;
 	}
 
 	if ((athandle = zonecfg_init_handle()) == NULL) {
 		(void) fprintf(stderr, gettext("brand attach program error: "
 		    "%s\n"), strerror(errno));
-		goto done;
-	}
-
-retry:
-	if ((err = zonecfg_get_attach_handle(zonepath, zonename, B_TRUE,
-	    athandle)) != Z_OK) {
-		if (err == Z_NO_ZONE) {
-			/*
-			 * Zone was not detached.  Try to fall back to getting
-			 * the needed information from within the zone.
-			 */
-			if (!retried) {
-				(void) fprintf(stderr, gettext("The zone was "
-				    "not properly detached.\n\tAttempting to "
-				    "attach anyway.\n"));
-				if (gen_detach_info()) {
-					retried = B_TRUE;
-					goto retry;
-				}
-			}
-			(void) fprintf(stderr, gettext("Cannot generate the "
-			    "information needed to attach this zone.\n"));
-		} else if (err == Z_INVALID_DOCUMENT) {
-			(void) fprintf(stderr, gettext("Cannot attach to an "
-			    "earlier release of the operating system\n"));
-		} else {
-			(void) fprintf(stderr, gettext("brand attach program "
-			    "error: %s\n"), zonecfg_strerror(err));
-		}
 		goto done;
 	}
 
@@ -3063,22 +3521,74 @@ retry:
 	}
 
 	/*
-	 * Ensure that the detached and locally defined zones are both of
+	 * If the zone was previously detached, then we can read its manifest
+	 * to check that the detached and locally defined zones are both of
 	 * the same brand.
 	 */
-	if ((zonecfg_get_brand(handle, brand, sizeof (brand)) != 0) ||
-	    (zonecfg_get_brand(athandle, atbrand, sizeof (atbrand)) != 0)) {
-		err = Z_ERR;
-		(void) fprintf(stderr, gettext("missing or invalid brand\n"));
+	if (zonecfg_get_attach_handle(zonepath, ZONE_DETACHED, zonename,
+	    B_TRUE, athandle) == Z_OK) {
+
+		if ((zonecfg_get_brand(handle, brand, sizeof (brand)) != 0) ||
+		    (zonecfg_get_brand(athandle, atbrand, sizeof (atbrand))
+		    != 0)) {
+			(void) fprintf(stderr, gettext("missing or invalid "
+			    "brand\n"));
+			goto done;
+		}
+
+		if (strcmp(atbrand, brand) != 0) {
+			(void) fprintf(stderr, gettext("Trying to attach a "
+			    "'%s' zone to a '%s' configuration.\n"), atbrand,
+			    brand);
+			goto done;
+		}
+
+		zonecfg_fini_handle(athandle);
+		if ((athandle = zonecfg_init_handle()) == NULL) {
+			(void) fprintf(stderr, gettext("brand attach program "
+			    "error: %s\n"), strerror(errno));
+			goto done;
+		}
+	}
+
+	/* Now backout the specified patches. */
+	if (!backout_patches(backout_list)) {
+		res = ZONE_SUBPROC_FATAL;
 		goto done;
 	}
 
-	if (strcmp(atbrand, brand) != 0) {
-		err = Z_ERR;
-		(void) fprintf(stderr, gettext("Trying to attach a '%s' zone "
-		    "to a '%s' configuration.\n"), atbrand, brand);
+	/*
+	 * Now that any patches have been backed out, regenerate the zone
+	 * detach data.
+	 *
+	 * Even if no patches were backed out, we want to regenerate the
+	 * detach data using the latest software on this target system so
+	 * that we take advantage of any bug fixes on this release.
+	 */
+	if (snprintf(tmp_path, sizeof (tmp_path), "%s/%s", zonepath,
+	    TMP_MANIFEST) >= sizeof (tmp_path) ||
+	    !gen_detach_info(TMP_MANIFEST)) {
+		(void) fprintf(stderr, gettext("Cannot generate the "
+		    "information needed to attach this zone.\n"));
 		goto done;
 	}
+
+	if ((err = zonecfg_get_attach_handle(zonepath, TMP_MANIFEST, zonename,
+	    B_TRUE, athandle)) != Z_OK) {
+		(void) fprintf(stderr, gettext("brand attach program "
+		    "error: %s\n"), zonecfg_strerror(err));
+		(void) unlink(tmp_path);
+		goto done;
+	}
+
+	(void) unlink(tmp_path);
+
+	/*
+	 * We set the result to be fatal here.  If we make it through the sw
+	 * check and possible update cleanly, then we set the result to OK.
+	 * Otherwise, we goto done and the result remains fatal.
+	 */
+	res = ZONE_SUBPROC_FATAL;
 
 	/*
 	 * If we're doing an update on attach, and the zone does need to be
@@ -3090,47 +3600,57 @@ retry:
 		(void) sigset(SIGINT, sigcleanup);
 
 		if ((err = sw_up_to_date(handle, athandle)) != Z_OK) {
-			if (err != Z_FATAL && !attach_interupted) {
-				err = Z_FATAL;
+			if (err != Z_FATAL && !attach_interupted)
 				err = attach_update(handle);
-			}
-			if (!attach_interupted || err == Z_OK)
-				goto done;
 		}
 
 		(void) sigset(SIGINT, SIG_DFL);
 
-		/* clean up data files left behind by sw_up_to_date() */
+		/*
+		 * Clean up data files left behind by sw_up_to_date().
+		 * Don't worry if the files don't exist; they might have been
+		 * cleaned up by the attach_update() function.
+		 */
 		(void) snprintf(fname, sizeof (fname), "%s/pkg_add", zonepath);
 		(void) unlink(fname);
 		(void) snprintf(fname, sizeof (fname), "%s/pkg_rm", zonepath);
 		(void) unlink(fname);
 
-		if (attach_interupted) {
-			err = Z_FATAL;
+		if (attach_interupted || err != Z_OK)
 			goto done;
-		}
 
 	} else {
 		/* sw_cmp prints error msgs as necessary */
-		if ((err = sw_cmp(handle, athandle, SW_CMP_NONE)) != Z_OK)
+		if (sw_cmp(handle, athandle, SW_CMP_NONE) != Z_OK)
 			goto done;
 
-		if ((err = dev_fix(zonename, athandle)) != Z_OK)
+		if (dev_fix(zonename, athandle) != Z_OK)
 			goto done;
 	}
 
 	if ((err = zone_set_state(zonename, ZONE_STATE_INSTALLED)) != Z_OK) {
 		(void) fprintf(stderr, gettext("could not reset state: %s\n"),
 		    zonecfg_strerror(err));
+		goto done;
 	}
 
+	res = ZONE_SUBPROC_OK;
+
 done:
-	zonecfg_fini_handle(handle);
+	if (handle != NULL)
+		zonecfg_fini_handle(handle);
 	if (athandle != NULL)
 		zonecfg_fini_handle(athandle);
+	cleanup_backout_data(backout_pool, backout_list);
 
-	return ((err == Z_OK) ? Z_OK : ZONE_SUBPROC_FATAL);
+	return (res);
+}
+
+static void
+install_usage()
+{
+	(void) fprintf(stderr, gettext("usage:\t%s brand options: none\n"),
+	    MY_BRAND_NAME);
 }
 
 static int
@@ -3150,8 +3670,7 @@ install_func(int argc, char *argv[])
 				    "invalid option: %c\n"), MY_BRAND_NAME,
 				    optopt);
 			}
-			(void) fprintf(stderr, gettext("usage:\t%s brand "
-			    "options: none\n"), MY_BRAND_NAME);
+			install_usage();
 			return (optopt == '?' ? Z_OK : ZONE_SUBPROC_USAGE);
 		case 'x':
 			if (strcmp(optarg, "nodataset") != 0) {
@@ -3167,6 +3686,11 @@ install_func(int argc, char *argv[])
 			    "option: %c\n"), MY_BRAND_NAME, optopt);
 			return (ZONE_SUBPROC_USAGE);
 		}
+	}
+
+	if (argc > optind) {
+		install_usage();
+		return (ZONE_SUBPROC_USAGE);
 	}
 
 	if (snprintf(cmdbuf, sizeof (cmdbuf), "/usr/lib/lu/lucreatezone -z %s",
@@ -3383,8 +3907,8 @@ validatesnap_func(int argc, char *argv[])
 		goto done;
 	}
 
-	if ((err = zonecfg_get_attach_handle(snap_path, zonename, B_TRUE,
-	    athandle)) != Z_OK) {
+	if ((err = zonecfg_get_attach_handle(snap_path, ZONE_DETACHED, zonename,
+	    B_TRUE, athandle)) != Z_OK) {
 		if (err == Z_NO_ZONE)
 			(void) fprintf(stderr, gettext("snapshot %s was not "
 			    "taken\n\tby a 'zoneadm clone' command.  It can "

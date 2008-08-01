@@ -1549,8 +1549,8 @@ create_func(cmd_t *cmd)
 	}
 
 	if (attach)
-		err = zonecfg_get_attach_handle(attach_path, zone, B_FALSE,
-		    tmphandle);
+		err = zonecfg_get_attach_handle(attach_path, ZONE_DETACHED,
+		    zone, B_FALSE, tmphandle);
 	else
 		err = zonecfg_get_template_handle(zone_template, zone,
 		    tmphandle);
