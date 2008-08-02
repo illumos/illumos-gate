@@ -65,6 +65,13 @@ extern "C" {
  */
 #define	LIBSES_EN_PROP_CSN		"libses-chassis-serial"
 
+/*
+ * This boolean property identifies a chassis as internal, where the connected
+ * elements are part of a single system chassis and not an external enclosure.
+ * This is used on platforms with a disk backplane that exports a SES target.
+ */
+#define	LIBSES_EN_PROP_INTERNAL		"libses-internal"
+
 #ifdef	__cplusplus
 }
 #endif

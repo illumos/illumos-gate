@@ -1040,50 +1040,49 @@ pad_process(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
 				tf_pad_free(mp, new);
 				return (-1);
 			}
+		}
+		/*
+		 * If the property groups are contained within a set
+		 * then they will be one level lower in the XML tree.
+		 */
+		if (joined_set)
+			target = psn;
+		else
+			target = pxn;
 
-			/*
-			 * If the property groups are contained within a set
-			 * then they will be one level lower in the XML tree.
-			 */
-			if (joined_set)
-				target = psn;
-			else
-				target = pxn;
+		/*
+		 * If there is no "node" element under the "range"
+		 * element, then we need to attach the facility node to
+		 * each node in this range.
+		 *
+		 * Otherwise we only attach it to the current node
+		 */
+		if (xmlStrcmp(target->name, (xmlChar *)Range) == 0 ||
+		    xmlStrcmp(target->name, (xmlChar *)Set) == 0) {
+			for (ct = topo_child_first(rd->rd_pn);
+			    ct != NULL;
+			    ct = topo_child_next(rd->rd_pn, ct)) {
 
-			/*
-			 * If there is no "node" element under the "range"
-			 * element, then we need to attach the facility node to
-			 * each node in this range.
-			 *
-			 * Otherwise we only attach it to the current node
-			 */
-			if (!rd->contains_node_ele) {
-				for (ct = topo_child_first(rd->rd_pn);
-				    ct != NULL;
-				    ct = topo_child_next(rd->rd_pn, ct)) {
+				if (strcmp(topo_node_name(ct),
+				    rd->rd_name) != 0)
+					continue;
 
-					if (strcmp(topo_node_name(ct),
-					    rd->rd_name) != 0)
-						continue;
-
-					if (fac_enum_process(mp, target,
-					    ct) < 0)
+				if (fac_enum_process(mp, target, ct) < 0)
 						return (-1);
 
-					if (fac_process(mp, target, rd, ct) < 0)
-						return (-1);
-				}
-			} else
-				if (fac_enum_process(mp, target, ptn) < 0)
+				if (fac_process(mp, target, rd, ct) < 0)
 					return (-1);
-				if (fac_process(mp, target, rd, ptn) < 0)
-					return (-1);
-
-			if (pgroups_record(mp, target, ptn, rd->rd_name,
-			    new, (const char *)pxn->name) < 0) {
-				tf_pad_free(mp, new);
-				return (-1);
 			}
+		} else {
+			if (fac_enum_process(mp, target, ptn) < 0)
+				return (-1);
+			if (fac_process(mp, target, rd, ptn) < 0)
+				return (-1);
+		}
+		if (pgcnt > 0 && pgroups_record(mp, target, ptn, rd->rd_name,
+		    new, (const char *)pxn->name) < 0) {
+			tf_pad_free(mp, new);
+			return (-1);
 		}
 		*rpad = new;
 	}
@@ -1262,7 +1261,6 @@ node_process(topo_mod_t *mp, xmlNodePtr nn, tf_rdata_t *rd)
 	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
 	    "node_process %s\n", rd->rd_name);
 
-	rd->contains_node_ele = 1;
 	if (xmlattr_to_int(mp, nn, Instance, &ui) < 0)
 		goto nodedone;
 	inst = (topo_instance_t)ui;
@@ -1478,7 +1476,6 @@ topo_xml_range_process(topo_mod_t *mp, xmlNodePtr rn, tf_rdata_t *rd)
 	    "process %s range beneath %s\n", rd->rd_name,
 	    topo_node_name(rd->rd_pn));
 
-	rd->contains_node_ele = 0;
 	e = topo_node_range_create(mp,
 	    rd->rd_pn, rd->rd_name, rd->rd_min, rd->rd_max);
 	if (e != 0 && topo_mod_errno(mp) != EMOD_NODE_DUP) {

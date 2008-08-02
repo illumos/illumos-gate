@@ -47,13 +47,13 @@ ROOTTOPOMAPS = $(TOPOFILE:%=$(ROOTTOPOROOT)/%)
 
 install:= FILEMODE =	0444
 
-# The .xmlgen perl file merges the platform specific xml code with the
-# base $TOPOBASE xml file and generates a new xml file. This is 
-# done to avoid having to deal with things like 48 platform specific
-# internal storage bays by hand.
+# The .xmlgen perl file automatically generates a new xml file.  This is done
+# to avoid having to deal with things like 48 platform specific internal
+# storage bays by hand.
 .xmlgen.xml:
 	$(RM) $@ 
-	$(PERL) $< -p $(PLATFORM) -i $(TOPOBASE) -o $@
+	$(CAT) ../common/xmlgen-header.xml > $@
+	$(PERL) $< >> $@
 	
 %.xml: ../common/%.xml
 	$(RM) $@

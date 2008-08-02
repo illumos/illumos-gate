@@ -28,7 +28,7 @@ MODULE = ses
 CLASS = common
 SHAREDMODULE = disk
 
-MODULESRCS = ses.c
+MODULESRCS = ses.c ses_facility.c
 SHAREDSRCS = disk_common.c
 
 include ../../Makefile.plugin

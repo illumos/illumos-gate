@@ -32,7 +32,7 @@
 ARCH = i86pc
 CLASS = arch
 DTDFILE = topology.dtd.1
-TOPOFILE = Sun-Fire-X4540-hc-topology.xml
+TOPOFILE = Sun-Fire-X4540-disk-hc-topology.xml
 SRCDIR = ../SUNW,Sun-Fire-X4540
 
 PLATFORM = Sun-Fire-X4540

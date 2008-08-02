@@ -95,15 +95,6 @@ typedef struct tf_rdata {
 	tf_edata_t *rd_einfo;	/* enumerator information, if any */
 	struct tf_idata *rd_instances; /* hard instances */
 	tf_pad_t *rd_pad;	/* properties and dependents */
-	/*
-	 * true, if this range xml element contains any child xml
-	 * node elements.
-	 * We use this to determine whether or not we should apply
-	 * property map changes to all of the nodes in a given range
-	 * or just a specific node.
-	 *
-	 */
-	int contains_node_ele;
 } tf_rdata_t;
 
 /*

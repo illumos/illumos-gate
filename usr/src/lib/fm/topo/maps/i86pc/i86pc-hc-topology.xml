@@ -220,6 +220,21 @@
        <range name='fanmodule' min='0' max='100'>
           <propmap name='fan' />
        </range>
+       <set type='product' setlist='Sun-Fire-X4200-M2'>
+	  <range name='bay' min='0' max='3'>
+             <propmap name='Sun-Fire-X4200-M2-disk' />
+          </range>
+       </set>
+       <set type='product' setlist='Sun-Fire-X4200-Server'>
+	  <range name='bay' min='0' max='3'>
+             <propmap name='Sun-Fire-X4200-Server-disk' />
+	  </range>
+       </set>
+       <set type='product' setlist='default'>
+	  <range name='bay' min='0' max='1024'>
+             <enum-method name='ses' version='1' />
+	  </range>
+       </set>
     </set>
 
     <set type='product' setlist='Sun-Fire-X4500|Sun-Fire-X4540'>
@@ -229,6 +244,16 @@
        <range name='fanmodule' min='0' max='100'>
           <propmap name='fan' />
        </range>
+       <set type='product' setlist='Sun-Fire-X4500'>
+	  <range name='bay' min='0' max='47'>
+              <propmap name='Sun-Fire-X4500-disk' />
+	  </range>
+       </set>
+       <set type='product' setlist='Sun-Fire-X4540'>
+	  <range name='bay' min='0' max='47'>
+             <propmap name='Sun-Fire-X4540-disk' />
+	  </range>
+       </set>
     </set>
       
    <set type='product' setlist='Sun-Fire-X4600-M2'>
@@ -247,6 +272,9 @@
        </range>
        <range name='fan' min='0' max='100'>
 	  <enum-method name='ipmi' version='1' />
+       </range>
+       <range name='bay' min='0' max='1024'>
+          <enum-method name='ses' version='1' />
        </range>
     </set>
 

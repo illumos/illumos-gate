@@ -7502,6 +7502,12 @@ mondo_loop() {
 	rm -f $root/kernel/drv/sparcv9/softmac
 	rm -f $root/kernel/drv/amd64/softmac
 
+	#
+	# Remove libtopo platform XML files that have been replaced by propmap
+	# files.
+	#
+	rm -f $root/usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-*-topology.xml
+
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then

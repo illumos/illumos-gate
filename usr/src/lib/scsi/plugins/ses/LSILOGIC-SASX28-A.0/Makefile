@@ -23,19 +23,10 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 
-# NOTE: The name of the xml file we are building is 'platform'
-# specific, but its build is structured as 'arch' specific since
-# 'uname -i' on all x86 platforms returns i86pc.
+HDRS = 
+HDRDIR = common
+PLUGINTYPE = vendor
 
-ARCH = i86pc
-CLASS = arch
-DTDFILE = topology.dtd.1
-TOPOFILE = Sun-Fire-X4200-Server-disk-hc-topology.xml
-SRCDIR = ../SUNW,Sun-Fire-X4200-Server
-
-PLATFORM = Sun-Fire-X4200
-TOPOBASE = ../i86pc/i86pc-hc-topology.xml
-
-include ../Makefile.map
+include ../Makefile.plugin

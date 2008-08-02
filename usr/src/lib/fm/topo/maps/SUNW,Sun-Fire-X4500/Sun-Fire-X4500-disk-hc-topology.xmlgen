@@ -1,0 +1,192 @@
+#!/usr/local/bin/perl
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+$num_bays = 48;
+$bay_label = "HD_ID_";
+
+sub calc_sfx_prop
+{
+	my $name = shift;
+	my $bay = shift;
+	my $sid = shift;
+	my @names = (
+	    "+PRSNT",			"-PRSNT",
+	    "+OK2RM",			"-OK2RM",
+	    "+FAULT",			"-FAULT");
+	my @masks = (
+	    "amask=0x0001",		"dmask=0x0001",
+	    "amask=0x0008",		"dmask=0x0008",
+	    "amask=0x0002",		"dmask=0x0002");
+	my @states = (
+	    "absent>present",		"present>configured",
+	    "configured>unconfigured",	"unconfigured>configured",
+	    "unconfigured>absent",	"configured>absent",
+	    "present>absent",		"absent>configured");
+	my @actions = (
+	    "+PRSNT&amp;+OK2RM",	"+PRSNT&amp;-OK2RM",
+	    "+OK2RM",			"-OK2RM",
+	    "-OK2RM&amp;-PRSNT",	"-OK2RM&amp;-PRSNT",
+	    "-OK2RM&amp;-PRSNT",	"-OK2RM&amp;+PRSNT");
+
+	printf "\n";
+	printf "      <propgroup name='%s-properties' version='1' " .
+		"name-stability='Private' data-stability='Private' >\n", $name;
+	printf "        <propval name='fru-update-action' type='string' " .
+		"value='ipmi:fru gid=3 hdd=%d' />\n", $bay;
+
+	for ($i = 0; $i < 6; $i++) {
+		printf "        <propval name='indicator-name-%d' " .
+			"type='string' value='%s' />\n", $i, $names[$i];
+		printf "        <propval name='indicator-action-%d' " .
+			"type='string' value='ipmi:state sid=%d %s' />\n",
+			$i, $sid, $masks[$i];
+	}
+
+	for ($i = 0; $i < 8; $i++) {
+		printf "        <propval name='indicator-rule-states-%d' " .
+			"type='string' value='%s' />\n", $i, $states[$i];
+		printf "        <propval name='indicator-rule-actions-%d' " .
+			"type='string' value='%s' />\n", $i, $actions[$i];
+	}
+	printf "      </propgroup>\n\n";
+}
+
+print <<EOF;
+<topology name='disk' scheme='hc'>
+  <range name='bay' min='0' max='47'>
+    <facility name='locate' type='indicator' provider='fac_prov_ipmi' >
+      <propgroup name='facility' version='1' name-stability='Private'
+	data-stability='Private' >
+	<propval name='type' type='uint32' value='1' />
+	<propmethod name='ipmi_entity' version='0' propname='entity_ref'
+	  proptype='string' >
+	  <argval name='format' type='string' value='hdd\%d.ok2rm.led' />
+	  <argval name='offset' type='uint32' value='0' />
+	  <argval name='nparams' type='uint32' value='1' />
+	</propmethod>
+	<propmethod name='thumper_locate_mode' version='0'
+	  propname='mode' proptype='uint32' mutable='1'>
+	</propmethod>
+      </propgroup>
+    </facility>
+    <facility name='ok2rm' type='indicator' provider='fac_prov_ipmi' >
+      <propgroup name='facility' version='1' name-stability='Private'
+	data-stability='Private' >
+	<propval name='type' type='uint32' value='2' />
+	<propmethod name='ipmi_entity' version='0' propname='entity_ref'
+	  proptype='string' >
+	  <argval name='format' type='string' value='hdd\%d.state' />
+	  <argval name='offset' type='uint32' value='0' />
+	  <argval name='nparams' type='uint32' value='1' />
+	</propmethod>
+	<propmethod name='thumper_indicator_mode' version='0'
+	  propname='mode' proptype='uint32' mutable='1'>
+	</propmethod>
+      </propgroup>
+    </facility>
+    <facility name='service' type='indicator' provider='fac_prov_ipmi' >
+      <propgroup name='facility' version='1' name-stability='Private'
+	data-stability='Private' >
+	<propval name='type' type='uint32' value='0' />
+	<propmethod name='ipmi_entity' version='0' propname='entity_ref'
+	  proptype='string' >
+	  <argval name='format' type='string' value='hdd\%d.state' />
+	  <argval name='offset' type='uint32' value='0' />
+	  <argval name='nparams' type='uint32' value='1' />
+	</propmethod>
+	<propmethod name='thumper_indicator_mode' version='0' propname='mode'
+	  proptype='uint32' mutable='1'>
+	</propmethod>
+      </propgroup>
+    </facility>
+    <facility name='present' type='indicator' provider='fac_prov_ipmi' >
+      <propgroup name='facility' version='1' name-stability='Private'
+	data-stability='Private' >
+        <propval name='type' type='uint32' value='3' />
+	<propmethod name='ipmi_entity' version='0' propname='entity_ref'
+	  proptype='string' >
+	  <argval name='format' type='string' value='hdd\%d.state' />
+	  <argval name='offset' type='uint32' value='0' />
+	  <argval name='nparams' type='uint32' value='1' />
+	</propmethod>
+        <propmethod name='thumper_indicator_mode' version='0' propname='mode'
+	  proptype='uint32' mutable='1'>
+        </propmethod>
+      </propgroup>
+    </facility>
+EOF
+
+my @pci0=(1, 2, 0);
+my @pci1=(4, 3, 8, 7, 2, 1);
+
+for ($bay = 0; $bay < $num_bays; $bay++) {
+	$sid = 90 + $bay;
+	$target = (($bay/12) + (($bay & 1) << 2));
+	$index = (($bay >> 2) % 3);
+	$p0 = $pci0[$index];
+	$index = (($bay >> 1) % 6);
+	$p1 = $pci1[$index];
+
+	$hpath = sprintf("/pci\@%x,0/pci1022,7458\@%x/pci11ab,11ab\@1",
+	    $p0, $p1);
+	$tpath = sprintf("/disk\@%x,0", $target);
+	$apoint = sprintf(":%d", $target);
+
+	print <<EOF;
+    <node instance='$bay'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+	<propval name='label' type='string' value='$bay_label$bay' />
+      </propgroup>
+      <propgroup name='io' version='1' name-stability='Private'
+        data-stability='Private'>
+	<propval name='ap-path' type='string' value='/devices$hpath$apoint' />
+      </propgroup>
+EOF
+
+	calc_sfx_prop("sfx4500", $bay, $sid);
+
+	print <<EOF;
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+	<propval name='occupant-path' type='string' 
+	  value='$hpath$tpath' />
+      </propgroup>
+    </node>
+EOF
+}
+
+print <<EOF;
+    <dependents grouping='children'>
+      <range name='disk' min='0' max='0'>
+	<enum-method name='disk' version='1' />
+      </range>
+    </dependents>
+  </range>
+</topology>
+EOF

@@ -26,36 +26,26 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <assert.h>
 #include <dirent.h>
 #include <devid.h>
-#include <fm/topo_mod.h>
-#include <fm/topo_list.h>
-#include <fm/topo_method.h>
 #include <fm/libdiskstatus.h>
 #include <inttypes.h>
-#include <scsi/libses.h>
 #include <pthread.h>
 #include <strings.h>
 #include <unistd.h>
 #include <sys/dkio.h>
 #include <sys/fm/protocol.h>
 #include <sys/scsi/scsi_types.h>
+
 #include "disk.h"
+#include "ses.h"
 
 #define	SES_VERSION	1
 
-#define	TOPO_PGROUP_SES		"ses"
-#define	TOPO_PROP_NODE_ID	"node-id"
-#define	TOPO_PROP_TARGET_PATH	"target-path"
-
 #define	SES_SNAP_FREQ		1000	/* in milliseconds */
 
-#ifndef	NDEBUG
-#define	verify(x)	assert(x)
-#else
-#define	verify(x)	((void)(x))
-#endif
+#define	SES_STATUS_UNAVAIL(s)	\
+	((s) == SES_ESC_UNSUPPORTED || (s) >= SES_ESC_UNKNOWN)
 
 /*
  * Because multiple SES targets can be part of a single chassis, we construct
@@ -92,6 +82,7 @@ typedef struct ses_enum_chassis {
 	ses_enum_target_t	*sec_target;
 	topo_instance_t		sec_instance;
 	boolean_t		sec_hasdev;
+	boolean_t		sec_internal;
 } ses_enum_chassis_t;
 
 typedef struct ses_enum_data {
@@ -113,12 +104,22 @@ static int ses_contains(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
 static const topo_method_t ses_component_methods[] = {
 	{ TOPO_METH_PRESENT, TOPO_METH_PRESENT_DESC,
 	    TOPO_METH_PRESENT_VERSION0, TOPO_STABILITY_INTERNAL, ses_present },
+	{ TOPO_METH_FAC_ENUM, TOPO_METH_FAC_ENUM_DESC, 0,
+	    TOPO_STABILITY_INTERNAL, ses_node_enum_facility },
+	{ NULL }
+};
+
+static const topo_method_t ses_bay_methods[] = {
+	{ TOPO_METH_FAC_ENUM, TOPO_METH_FAC_ENUM_DESC, 0,
+	    TOPO_STABILITY_INTERNAL, ses_node_enum_facility },
 	{ NULL }
 };
 
 static const topo_method_t ses_enclosure_methods[] = {
 	{ TOPO_METH_CONTAINS, TOPO_METH_CONTAINS_DESC,
 	    TOPO_METH_CONTAINS_VERSION, TOPO_STABILITY_INTERNAL, ses_contains },
+	{ TOPO_METH_FAC_ENUM, TOPO_METH_FAC_ENUM_DESC, 0,
+	    TOPO_STABILITY_INTERNAL, ses_enc_enum_facility },
 	{ NULL }
 };
 
@@ -158,6 +159,7 @@ ses_data_free(ses_enum_data_t *sdp)
 	}
 
 	disk_list_free(mod, &sdp->sed_disks);
+	topo_mod_free(mod, sdp, sizeof (ses_enum_data_t));
 }
 
 /*
@@ -263,31 +265,28 @@ ses_contains(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
 }
 
 /*
- * Determine if the element is present.  This is somewhat complicated because
- * we need to take a new snapshot in order to determine presence, but we don't
+ * Return a current instance of the node.  This is somewhat complicated because
+ * we need to take a new snapshot in order to get the new data, but we don't
  * want to be constantly taking SES snapshots if the consumer is going to do a
  * series of queries.  So we adopt the strategy of assuming that the SES state
- * is not going to be rapidly changing, and limit our snapshot frequency to some
- * defined bounds.
+ * is not going to be rapidly changing, and limit our snapshot frequency to
+ * some defined bounds.
  */
-/*ARGSUSED*/
-static int
-ses_present(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
+ses_node_t *
+ses_node_get(topo_mod_t *mod, tnode_t *tn)
 {
-	nvlist_t *nvl;
 	struct timeval tv;
 	ses_enum_target_t *tp = topo_node_getspecific(tn);
 	uint64_t prev, now;
 	ses_snap_t *snap;
 	int err;
-	uint64_t nodeid, status;
+	uint64_t nodeid;
 	ses_node_t *np;
-	nvlist_t *props;
-	boolean_t present;
 
-	if (tp == NULL)
-		return (topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP));
+	if (tp == NULL) {
+		(void) topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP);
+		return (NULL);
+	}
 
 	/*
 	 * Determine if we need to take a new snapshot.
@@ -312,12 +311,12 @@ ses_present(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
 			 * But we need to consult the new topology in order to
 			 * determine presence at this moment in time.  We can't
 			 * go back and change the topo snapshot in situ, so
-			 * we'll just pretend like the device is present in
-			 * this scenario.
+			 * we'll just have to fail the call in this unlikely
+			 * scenario.
 			 */
 			ses_snap_rele(snap);
-			present = B_TRUE;
-			goto out;
+			(void) topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP);
+			return (NULL);
 		} else {
 			ses_snap_rele(tp->set_snap);
 			tp->set_snap = snap;
@@ -330,13 +329,32 @@ ses_present(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
 	verify(topo_prop_get_uint64(tn, TOPO_PGROUP_SES,
 	    TOPO_PROP_NODE_ID, &nodeid, &err) == 0);
 	verify((np = ses_node_lookup(snap, nodeid)) != NULL);
+
+	return (np);
+}
+
+/*
+ * Determine if the element is present.
+ */
+/*ARGSUSED*/
+static int
+ses_present(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	boolean_t present;
+	ses_node_t *np;
+	nvlist_t *props, *nvl;
+	uint64_t status;
+
+	if ((np = ses_node_get(mod, tn)) == NULL)
+		return (-1);
+
 	verify((props = ses_node_props(np)) != NULL);
 	verify(nvlist_lookup_uint64(props,
 	    SES_PROP_STATUS_CODE, &status) == 0);
 
 	present = (status != SES_ESC_NOT_INSTALLED);
 
-out:
 	if (topo_mod_nvalloc(mod, &nvl, NV_UNIQUE_NAME) != 0)
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 
@@ -383,7 +401,7 @@ ses_set_standard_props(topo_mod_t *mod, tnode_t *tn, nvlist_t *auth,
 		    FM_FMRI_AUTH_SERVER, TOPO_PROP_IMMUTABLE, "",
 		    &err) != 0) {
 			topo_mod_dprintf(mod, "failed to add authority "
-			    "properties: %s", topo_strerror(err));
+			    "properties: %s\n", topo_strerror(err));
 			return (topo_mod_seterrno(mod, err));
 		}
 	}
@@ -520,7 +538,7 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
     tnode_t *pnode, const char *nodename, const char *labelname)
 {
 	ses_node_t *np = snp->sen_node;
-	ses_node_t *agg;
+	ses_node_t *parent;
 	uint64_t instance = snp->sen_instance;
 	topo_mod_t *mod = sdp->sed_mod;
 	nvlist_t *props, *aprops;
@@ -528,8 +546,9 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 	tnode_t *tn;
 	char label[128];
 	int err;
-	char *part = NULL, *serial = NULL;
-	char *classdesc;
+	char *part = NULL, *serial = NULL, *revision = NULL;
+	char *desc;
+	boolean_t report;
 
 	props = ses_node_props(np);
 
@@ -545,8 +564,31 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 	if ((auth = topo_mod_auth(mod, pnode)) == NULL)
 		goto error;
 
+	/*
+	 * We want to report revision information for the controller nodes, but
+	 * we do not get per-element revision information.  However, we do have
+	 * revision information for the entire enclosure, and we can use the
+	 * 'reported-via' property to know that this controller corresponds to
+	 * the given revision information.  This means we cannot get revision
+	 * information for targets we are not explicitly connected to, but
+	 * there is little we can do about the situation.
+	 */
+	if (strcmp(nodename, CONTROLLER) == 0 &&
+	    nvlist_lookup_boolean_value(props, SES_PROP_REPORT, &report) == 0 &&
+	    report) {
+		for (parent = ses_node_parent(np); parent != NULL;
+		    parent = ses_node_parent(parent)) {
+			if (ses_node_type(parent) == SES_NODE_ENCLOSURE) {
+				(void) nvlist_lookup_string(
+				    ses_node_props(parent),
+				    SES_EN_PROP_REV, &revision);
+				break;
+			}
+		}
+	}
+
 	if ((fmri = topo_mod_hcfmri(mod, pnode, FM_HC_SCHEME_VERSION,
-	    nodename, (topo_instance_t)instance, NULL, auth, part, NULL,
+	    nodename, (topo_instance_t)instance, NULL, auth, part, revision,
 	    serial)) == NULL) {
 		topo_mod_dprintf(mod, "topo_mod_hcfmri() failed: %s",
 		    topo_mod_errmsg(mod));
@@ -561,17 +603,25 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 	}
 
 	/*
-	 * If the aggregate gives us class description, then use that instead
-	 * of the default label name.
+	 * For the node label, we look for the following in order:
+	 *
+	 * 	<ses-description>
+	 * 	<ses-class-description> <instance>
+	 * 	<default-type-label> <instance>
 	 */
-	agg = ses_node_parent(np);
-	aprops = ses_node_props(agg);
-	if (nvlist_lookup_string(aprops, SES_PROP_CLASS_DESCRIPTION,
-	    &classdesc) == 0 && classdesc[0] != '\0')
-		labelname = classdesc;
+	if (nvlist_lookup_string(props, SES_PROP_DESCRIPTION, &desc) != 0 ||
+	    desc[0] == '\0') {
+		parent = ses_node_parent(np);
+		aprops = ses_node_props(parent);
+		if (nvlist_lookup_string(aprops, SES_PROP_CLASS_DESCRIPTION,
+		    &desc) == 0 && desc[0] != '\0')
+			labelname = desc;
+		(void) snprintf(label, sizeof (label), "%s %llu", desc,
+		    instance);
+		desc = label;
+	}
 
-	(void) snprintf(label, sizeof (label), "%s %llu", labelname, instance);
-	if (topo_node_label_set(tn, label, &err) != 0)
+	if (topo_node_label_set(tn, desc, &err) != 0)
 		goto error;
 
 	if (ses_set_standard_props(mod, tn, NULL, ses_node_id(np),
@@ -581,11 +631,18 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 	if (strcmp(nodename, "bay") == 0) {
 		if (ses_create_disk(sdp, tn, props) != 0)
 			goto error;
+
+		if (topo_method_register(mod, tn, ses_bay_methods) != 0) {
+			topo_mod_dprintf(mod,
+			    "topo_method_register() failed: %s",
+			    topo_mod_errmsg(mod));
+			goto error;
+		}
 	} else {
 		/*
-		 * Only fan/psu nodes have a 'present' method.  Bay nodes are
-		 * always present, and disk nodes are present by virtue of being
-		 * enumerated.
+		 * Only fan, psu, and controller nodes have a 'present' method.
+		 * Bay nodes are always present, and disk nodes are present by
+		 * virtue of being enumerated.
 		 */
 		if (topo_method_register(mod, tn, ses_component_methods) != 0) {
 			topo_mod_dprintf(mod,
@@ -594,9 +651,10 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 			goto error;
 		}
 
-		snp->sen_target->set_refcount++;
-		topo_node_setspecific(tn, snp->sen_target);
 	}
+
+	snp->sen_target->set_refcount++;
+	topo_node_setspecific(tn, snp->sen_target);
 
 	nvlist_free(auth);
 	nvlist_free(fmri);
@@ -613,7 +671,8 @@ error:
  */
 static int
 ses_create_children(ses_enum_data_t *sdp, tnode_t *pnode, uint64_t type,
-    const char *nodename, const char *defaultlabel, ses_enum_chassis_t *cp)
+    const char *nodename, const char *defaultlabel, ses_enum_chassis_t *cp,
+    boolean_t dorange)
 {
 	topo_mod_t *mod = sdp->sed_mod;
 	boolean_t found;
@@ -646,7 +705,7 @@ ses_create_children(ses_enum_data_t *sdp, tnode_t *pnode, uint64_t type,
 	topo_mod_dprintf(mod, "%s: creating %llu %s nodes",
 	    cp->sec_csn, max, nodename);
 
-	if (topo_node_range_create(mod, pnode,
+	if (dorange && topo_node_range_create(mod, pnode,
 	    nodename, 0, max) != 0) {
 		topo_mod_dprintf(mod,
 		    "topo_node_create_range() failed: %s",
@@ -683,6 +742,12 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 	nvlist_t *fmri = NULL, *auth = NULL;
 	int ret = -1;
 	ses_enum_node_t *snp;
+
+	/*
+	 * Ignore any internal enclosures.
+	 */
+	if (cp->sec_internal)
+		return (0);
 
 	/*
 	 * Check to see if there are any devices presennt in the chassis.  If
@@ -782,16 +847,19 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 	 * Create the nodes for power supplies, fans, and devices.
 	 */
 	if (ses_create_children(sdp, tn, SES_ET_POWER_SUPPLY,
-	    PSU, "PSU", cp) != 0 ||
+	    PSU, "PSU", cp, B_TRUE) != 0 ||
 	    ses_create_children(sdp, tn, SES_ET_COOLING,
-	    FAN, "FAN", cp) != 0 ||
+	    FAN, "FAN", cp, B_TRUE) != 0 ||
 	    ses_create_children(sdp, tn, SES_ET_ESC_ELECTRONICS,
-	    CONTROLLER, "CONTROLLER", cp) != 0 ||
+	    CONTROLLER, "CONTROLLER", cp, B_TRUE) != 0 ||
 	    ses_create_children(sdp, tn, SES_ET_DEVICE,
-	    BAY, "BAY", cp) != 0 ||
+	    BAY, "BAY", cp, B_TRUE) != 0 ||
 	    ses_create_children(sdp, tn, SES_ET_ARRAY_DEVICE,
-	    BAY, "BAY", cp) != 0)
+	    BAY, "BAY", cp, B_TRUE) != 0)
 		goto error;
+
+	snp->sen_target->set_refcount++;
+	topo_node_setspecific(tn, snp->sen_target);
 
 	ret = 0;
 error:
@@ -806,6 +874,39 @@ error:
 }
 
 /*
+ * Create a bay node explicitly enumerated via XML.
+ */
+static int
+ses_create_bays(ses_enum_data_t *sdp, tnode_t *pnode)
+{
+	topo_mod_t *mod = sdp->sed_mod;
+	ses_enum_chassis_t *cp;
+
+	/*
+	 * Iterate over chassis looking for an internal enclosure.  This
+	 * property is set via a vendor-specific plugin, and there should only
+	 * ever be a single internal chassis in a system.
+	 */
+	for (cp = topo_list_next(&sdp->sed_chassis); cp != NULL;
+	    cp = topo_list_next(cp)) {
+		if (cp->sec_internal)
+			break;
+	}
+
+	if (cp == NULL) {
+		topo_mod_dprintf(mod, "failed to find internal chassis\n");
+		return (-1);
+	}
+
+	if (ses_create_children(sdp, pnode, SES_ET_DEVICE,
+	    BAY, "BAY", cp, B_FALSE) != 0 ||
+	    ses_create_children(sdp, pnode, SES_ET_ARRAY_DEVICE,
+	    BAY, "BAY", cp, B_FALSE) != 0)
+		return (-1);
+
+	return (0);
+}
+/*
  * Gather nodes from the current SES target into our chassis list, merging the
  * results if necessary.
  */
@@ -819,6 +920,8 @@ ses_enum_gather(ses_node_t *np, void *data)
 	ses_enum_node_t *snp;
 	char *csn;
 	uint64_t instance, type;
+	uint64_t prevstatus, status;
+	boolean_t report, internal;
 
 	if (ses_node_type(np) == SES_NODE_ENCLOSURE) {
 		/*
@@ -853,6 +956,10 @@ ses_enum_gather(ses_node_t *np, void *data)
 			if ((cp = topo_mod_zalloc(mod,
 			    sizeof (ses_enum_chassis_t))) == NULL)
 				goto error;
+
+			if (nvlist_lookup_boolean_value(props,
+			    LIBSES_EN_PROP_INTERNAL, &internal) == 0)
+				cp->sec_internal = internal;
 
 			cp->sec_csn = csn;
 			cp->sec_enclosure = np;
@@ -902,7 +1009,42 @@ ses_enum_gather(ses_node_t *np, void *data)
 		    snp = topo_list_next(snp)) {
 			if (snp->sen_type == type &&
 			    snp->sen_instance == instance)
-				return (SES_WALK_ACTION_CONTINUE);
+				break;
+		}
+
+		/*
+		 * We prefer the new element under the following circumstances:
+		 *
+		 * - The currently known element's status is unknown or not
+		 *   available, but the new element has a known status.  This
+		 *   occurs if a given element is only available through a
+		 *   particular target.
+		 *
+		 * - This is an ESC_ELECTRONICS element, and the 'reported-via'
+		 *   property is set.  This allows us to get reliable firmware
+		 *   revision information from the enclosure node.
+		 */
+		if (snp != NULL) {
+			if (nvlist_lookup_uint64(
+			    ses_node_props(snp->sen_node),
+			    SES_PROP_STATUS_CODE, &prevstatus) != 0)
+				prevstatus = SES_ESC_UNSUPPORTED;
+			if (nvlist_lookup_uint64(
+			    props, SES_PROP_STATUS_CODE, &status) != 0)
+				status = SES_ESC_UNSUPPORTED;
+			if (nvlist_lookup_boolean_value(
+			    props, SES_PROP_REPORT, &report) != 0)
+				report = B_FALSE;
+
+			if ((SES_STATUS_UNAVAIL(prevstatus) &&
+			    !SES_STATUS_UNAVAIL(status)) ||
+			    (type == SES_ET_ESC_ELECTRONICS &&
+			    report)) {
+				snp->sen_node = np;
+				snp->sen_target = sdp->sed_target;
+			}
+
+			return (SES_WALK_ACTION_CONTINUE);
 		}
 
 		if ((snp = topo_mod_zalloc(mod,
@@ -1026,44 +1168,74 @@ ses_enum(topo_mod_t *mod, tnode_t *rnode, const char *name,
     topo_instance_t min, topo_instance_t max, void *arg, void *notused)
 {
 	ses_enum_chassis_t *cp;
-	ses_enum_data_t data;
+	ses_enum_data_t *data;
 
 	/*
 	 * Check to make sure we're being invoked sensibly, and that we're not
 	 * being invoked as part of a post-processing step.
 	 */
-	if (strcmp(name, SES_ENCLOSURE) != 0 ||
-	    strcmp(topo_node_name(rnode), FM_FMRI_SCHEME_HC) != 0)
+	if (strcmp(name, SES_ENCLOSURE) != 0 && strcmp(name, BAY) != 0)
 		return (0);
 
-	(void) memset(&data, 0, sizeof (data));
-	data.sed_mod = mod;
-
-	if (disk_list_gather(mod, &data.sed_disks) != 0)
-		return (-1);
-
 	/*
-	 * We search both the ses(7D) and sgen(7D) locations, so we are
-	 * independent of any particular driver class bindings.
+	 * If this is the first time we've called our enumeration method, then
+	 * gather information about any available enclosures.
 	 */
-	if (ses_process_dir("/dev/es", &data) != 0 ||
-	    ses_process_dir("/dev/scsi/ses", &data) != 0)
-		goto error;
+	if ((data = topo_mod_getspecific(mod)) == NULL) {
+		if ((data = topo_mod_zalloc(mod, sizeof (ses_enum_data_t))) ==
+		    NULL)
+			return (-1);
 
-	/*
-	 * Iterate over known chassis and create the necessary nodes.
-	 */
-	for (cp = topo_list_next(&data.sed_chassis); cp != NULL;
-	    cp = topo_list_next(cp)) {
-		if (ses_create_chassis(&data, rnode, cp) != 0)
+		data->sed_mod = mod;
+		topo_mod_setspecific(mod, data);
+
+		if (disk_list_gather(mod, &data->sed_disks) != 0)
+			goto error;
+
+		/*
+		 * We search both the ses(7D) and sgen(7D) locations, so we are
+		 * independent of any particular driver class bindings.
+		 */
+		if (ses_process_dir("/dev/es", data) != 0 ||
+		    ses_process_dir("/dev/scsi/ses", data) != 0)
 			goto error;
 	}
 
-	ses_data_free(&data);
+	if (strcmp(name, SES_ENCLOSURE) == 0) {
+		/*
+		 * This is a request to enumerate external enclosures.  Go
+		 * through all the targets and create chassis nodes where
+		 * necessary.
+		 */
+		for (cp = topo_list_next(&data->sed_chassis); cp != NULL;
+		    cp = topo_list_next(cp)) {
+			if (ses_create_chassis(data, rnode, cp) != 0)
+				goto error;
+		}
+	} else {
+		/*
+		 * This is a request to enumerate a specific bay underneath the
+		 * root chassis (for internal disks).
+		 */
+		if (ses_create_bays(data, rnode) != 0)
+			goto error;
+	}
+
+	/*
+	 * This is a bit of a kludge.  In order to allow internal disks to be
+	 * enumerated and share snapshot-specific information with the external
+	 * enclosure enumeration, we rely on the fact that we will be invoked
+	 * for the 'ses-enclosure' node last.
+	 */
+	if (strcmp(name, SES_ENCLOSURE) == 0) {
+		ses_data_free(data);
+		topo_mod_setspecific(mod, NULL);
+	}
 	return (0);
 
 error:
-	ses_data_free(&data);
+	ses_data_free(data);
+	topo_mod_setspecific(mod, NULL);
 	return (-1);
 }
 
