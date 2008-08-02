@@ -2116,51 +2116,102 @@ zonecfg_ifname_exists(sa_family_t af, char *ifname)
 	return (B_TRUE);
 }
 
+/*
+ * Determines if the physical interface and IP address specified by 'tabptr'
+ * are in the zone document to which 'handle' refers.  'tabptr' must have an
+ * interface or an address or both.  If it contains both, then Z_OK is
+ * returned iff there is exactly one match.  If it contains an interface
+ * or an address, but not both, then Z_OK is returned iff there is exactly
+ * one entry with that interface or address.  If there are multiple entries
+ * matching the query, then Z_INSUFFICIENT_SPEC is returned.  If there
+ * are no matches, then Z_NO_RESOURCE_ID is returned.
+ *
+ * Errors might also be returned if the entry that exactly matches the
+ * query lacks critical network resource information.
+ *
+ * If there is a single exact match, then the matching entry's physical
+ * interface, IP address, and router information is stored in 'tabptr'.
+ */
 int
 zonecfg_lookup_nwif(zone_dochandle_t handle, struct zone_nwiftab *tabptr)
 {
-	xmlNodePtr cur, firstmatch;
+	xmlNodePtr cur;
+	xmlNodePtr firstmatch;
+	boolean_t physfound;
 	int err;
-	char address[INET6_ADDRSTRLEN], physical[LIFNAMSIZ];
+	char address[INET6_ADDRSTRLEN];
+	char physical[LIFNAMSIZ];
+	size_t addrspec;		/* nonzero if tabptr has IP addr */
+	size_t physspec;		/* nonzero if tabptr has interface */
 
 	if (tabptr == NULL)
 		return (Z_INVAL);
 
+	/*
+	 * zone_nwif_address and zone_nwif_physical are arrays, so no NULL
+	 * checks are necessary.
+	 */
+	addrspec = strlen(tabptr->zone_nwif_address);
+	physspec = strlen(tabptr->zone_nwif_physical);
+	assert(addrspec > 0 || physspec > 0);
+
 	if ((err = operation_prep(handle)) != Z_OK)
 		return (err);
 
-	cur = handle->zone_dh_cur;
 	firstmatch = NULL;
+	cur = handle->zone_dh_cur;
 	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		/* Skip non-net elements */
 		if (xmlStrcmp(cur->name, DTD_ELEM_NET))
 			continue;
-		if (strlen(tabptr->zone_nwif_physical) > 0) {
+
+		/*
+		 * If an interface is specified, then first check if the current
+		 * element's interface matches the query's interface.
+		 */
+		if (physspec > 0) {
+			physfound = B_FALSE;
 			if ((fetchprop(cur, DTD_ATTR_PHYSICAL, physical,
 			    sizeof (physical)) == Z_OK) &&
 			    (strcmp(tabptr->zone_nwif_physical,
 			    physical) == 0)) {
-				if (firstmatch == NULL)
-					firstmatch = cur;
-				else
-					return (Z_INSUFFICIENT_SPEC);
-			}
-		}
-		if (strlen(tabptr->zone_nwif_address) > 0) {
-			if ((fetchprop(cur, DTD_ATTR_ADDRESS, address,
-			    sizeof (address)) == Z_OK)) {
-				if (zonecfg_same_net_address(
-				    tabptr->zone_nwif_address, address)) {
+				if (addrspec == 0) {
 					if (firstmatch == NULL)
 						firstmatch = cur;
-					else if (firstmatch != cur)
+					else
 						return (Z_INSUFFICIENT_SPEC);
 				} else {
 					/*
-					 * If another property matched but this
-					 * one doesn't then reset firstmatch.
+					 * We're also matching based on IP
+					 * address, so we can't say that the
+					 * current element matches the query
+					 * yet.  Indicate that the interfaces
+					 * match.
 					 */
-					if (firstmatch == cur)
-						firstmatch = NULL;
+					physfound = B_TRUE;
+				}
+			}
+		}
+		if (addrspec > 0) {
+			if ((fetchprop(cur, DTD_ATTR_ADDRESS, address,
+			    sizeof (address)) == Z_OK) &&
+			    (zonecfg_same_net_address(
+			    tabptr->zone_nwif_address, address))) {
+				if (physspec == 0) {
+					/* We're only matching IP addresses. */
+					if (firstmatch == NULL)
+						firstmatch = cur;
+					else
+						return (Z_INSUFFICIENT_SPEC);
+				} else if (physfound) {
+					/*
+					 * Both the interfaces and the addresses
+					 * match.
+					 */
+					if (firstmatch == NULL)
+						firstmatch = cur;
+					else
+						return (Z_INSUFFICIENT_SPEC);
 				}
 			}
 		}
