@@ -885,6 +885,16 @@ ufs__fiolfs(
 	if (!vp || !vp->v_vfsp || !vp->v_vfsp->vfs_data)
 		return (EIO);
 
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED) /* has been unmounted */
+		return (EIO);
+
+	/* take the lock and check again */
+	vfs_lock_wait(vp->v_vfsp);
+	if (vp->v_vfsp->vfs_flag & VFS_UNMOUNTED) {
+		vfs_unlock(vp->v_vfsp);
+		return (EIO);
+	}
+
 	vfsp = vp->v_vfsp;
 	ufsvfsp = (struct ufsvfs *)vfsp->vfs_data;
 	ulp = &ufsvfsp->vfs_ulockfs;
@@ -899,11 +909,6 @@ ufs__fiolfs(
 	ufs_thread_suspend(&ufsvfsp->vfs_reclaim);
 	ufs_thread_suspend(&ufsvfsp->vfs_delete);
 
-	/*
-	 * Acquire vfs_reflock around ul_lock to avoid deadlock with
-	 * umount/remount/sync.
-	 */
-	vfs_lock_wait(vfsp);
 	mutex_enter(&ulp->ul_lock);
 	atomic_add_long(&ufs_quiesce_pend, 1);
 

@@ -1557,10 +1557,9 @@ ufs_ioctl(
 	/*
 	 * forcibly unmounted
 	 */
-	if (ufsvfsp == NULL) {
+	if (ufsvfsp == NULL || vp->v_vfsp == NULL ||
+	    vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
 		return (EIO);
-	}
-
 	fs = ufsvfsp->vfs_fs;
 
 	if (cmd == Q_QUOTACTL) {

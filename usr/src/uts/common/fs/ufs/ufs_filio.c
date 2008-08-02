@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -424,9 +424,9 @@ ufs_fioffs(
 	 * suspend the delete thread
 	 *	this must be done outside the lockfs locking protocol
 	 */
+	vfs_lock_wait(vp->v_vfsp);
 	ufs_thread_suspend(&ufsvfsp->vfs_delete);
 
-	vfs_lock_wait(vp->v_vfsp);
 	/* hold the mutex to prevent race with a lockfs request */
 	mutex_enter(&ulp->ul_lock);
 	atomic_add_long(&ufs_quiesce_pend, 1);
