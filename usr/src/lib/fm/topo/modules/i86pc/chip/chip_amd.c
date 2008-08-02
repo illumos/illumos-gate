@@ -81,6 +81,9 @@ static const topo_method_t rank_methods[] = {
 	{ TOPO_METH_PRESENT, TOPO_METH_PRESENT_DESC,
 	    TOPO_METH_PRESENT_VERSION, TOPO_STABILITY_INTERNAL,
 	    rank_fmri_present },
+	{ TOPO_METH_REPLACED, TOPO_METH_REPLACED_DESC,
+	    TOPO_METH_REPLACED_VERSION, TOPO_STABILITY_INTERNAL,
+	    rank_fmri_replaced },
 	{ NULL }
 };
 

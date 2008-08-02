@@ -82,6 +82,7 @@ extern "C" {
 #define	DI_DRIVER_DETACHED	0x8000
 #define	DI_DEVICE_OFFLINE	0x1
 #define	DI_DEVICE_DOWN		0x2
+#define	DI_DEVICE_DEGRADED	0x4
 #define	DI_BUS_QUIESCED		0x100
 #define	DI_BUS_DOWN		0x200
 

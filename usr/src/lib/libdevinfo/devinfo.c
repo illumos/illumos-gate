@@ -978,6 +978,8 @@ di_state(di_node_t node)
 		result |= DI_DEVICE_OFFLINE;
 	if (DI_NODE(node)->state & DEVI_DEVICE_DOWN)
 		result |= DI_DEVICE_OFFLINE;
+	if (DI_NODE(node)->state & DEVI_DEVICE_DEGRADED)
+		result |= DI_DEVICE_DEGRADED;
 	if (DI_NODE(node)->state & DEVI_BUS_QUIESCED)
 		result |= DI_BUS_QUIESCED;
 	if (DI_NODE(node)->state & DEVI_BUS_DOWN)

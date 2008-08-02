@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,17 +84,36 @@ fmd_fmri_present(nvlist_t *nvl)
 	err = nvlist_lookup_nvlist_array(nvl, FM_FMRI_HC_LIST, &hcprs, &hcnprs);
 	err |= nvlist_lookup_string(hcprs[0], FM_FMRI_HC_NAME, &nm);
 	if (err != 0)
-		return (0);
+		return (fmd_fmri_set_errno(EINVAL));
 
 	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
 		return (fmd_fmri_set_errno(EINVAL));
 	present = topo_fmri_present(thp, nvl, &err);
 	fmd_fmri_topo_rele(thp);
 
+	return (present);
+}
+
+int
+fmd_fmri_replaced(nvlist_t *nvl)
+{
+	int err, replaced;
+	topo_hdl_t *thp;
+	nvlist_t **hcprs;
+	char *nm;
+	uint_t hcnprs;
+
+	err = nvlist_lookup_nvlist_array(nvl, FM_FMRI_HC_LIST, &hcprs, &hcnprs);
+	err |= nvlist_lookup_string(hcprs[0], FM_FMRI_HC_NAME, &nm);
 	if (err != 0)
-		return (present);
-	else
-		return (1);
+		return (fmd_fmri_set_errno(EINVAL));
+
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
+		return (fmd_fmri_set_errno(EINVAL));
+	replaced = topo_fmri_replaced(thp, nvl, &err);
+	fmd_fmri_topo_rele(thp);
+
+	return (replaced);
 }
 
 /*

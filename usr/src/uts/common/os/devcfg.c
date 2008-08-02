@@ -7643,9 +7643,6 @@ e_ddi_retire_finalize(dev_info_t *dip, void *arg)
 		    (void *)dip));
 		if (finalize)
 			e_ddi_offline_finalize(dip, DDI_FAILURE);
-		mutex_enter(&DEVI(dip)->devi_lock);
-		DEVI_SET_DEVICE_DEGRADED(dip);
-		mutex_exit(&DEVI(dip)->devi_lock);
 	}
 
 	/*

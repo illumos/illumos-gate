@@ -122,17 +122,16 @@ free_exception_list(fmd_hdl_t *hdl)
 static void
 rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 {
-	nvlist_t	**faults;
+	nvlist_t	**faults = NULL;
 	nvlist_t	*asru;
-	uint_t		nfaults;
+	uint_t		nfaults = 0;
 	int		f;
-	char		devpath[PATH_MAX];
 	char		*path;
 	char		*uuid;
 	char		*scheme;
 	di_retire_t	drt = {0};
 	int		retire;
-	int		rval;
+	int		rval = 0;
 	int		error;
 	char		*snglfault = FM_FAULT_CLASS"."FM_ERROR_IO".";
 	boolean_t	rtr;
@@ -154,24 +153,23 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		retire = 1;
 	} else if (strcmp(class, FM_LIST_REPAIRED_CLASS) == 0) {
 		retire = 0;
+	} else if (strcmp(class, FM_LIST_UPDATED_CLASS) == 0) {
+		retire = 0;
 	} else if (strncmp(class, snglfault, strlen(snglfault)) == 0) {
-		fmd_hdl_debug(hdl, "rio_recv: single fault: %s\n", class);
-		return;
+		retire = 1;
+		faults = &nvl;
+		nfaults = 1;
 	} else {
 		fmd_hdl_debug(hdl, "rio_recv: not list.* class: %s\n", class);
 		return;
 	}
 
-	faults = NULL;
-	nfaults = 0;
-	if (nvlist_lookup_nvlist_array(nvl, FM_SUSPECT_FAULT_LIST,
-	    &faults, &nfaults) != 0) {
+	if (nfaults == 0 && nvlist_lookup_nvlist_array(nvl,
+	    FM_SUSPECT_FAULT_LIST, &faults, &nfaults) != 0) {
 		fmd_hdl_debug(hdl, "rio_recv: no fault list");
 		return;
 	}
 
-	devpath[0] = '\0';
-	rval = 0;
 	for (f = 0; f < nfaults; f++) {
 		if (nvlist_lookup_boolean_value(faults[f], FM_SUSPECT_RETIRE,
 		    &rtr) == 0 && !rtr) {
@@ -193,7 +191,7 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 			continue;
 		}
 
-		if (retire && fault_exception(hdl, faults[f]))
+		if (fault_exception(hdl, faults[f]))
 			continue;
 
 		if (nvlist_lookup_string(asru, FM_FMRI_DEV_PATH,
@@ -202,38 +200,28 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 			continue;
 		}
 
-		/*
-		 * If retire, we retire only if a single ASRU is pinpointed.
-		 * We don't do automatic retires if a fault event pinpoints
-		 * more than one ASRU.
-		 */
 		if (retire) {
-			if (devpath[0] != '\0' && strcmp(path, devpath) != 0) {
-				fmd_hdl_debug(hdl,
-				    "rio_recv: Skipping: multiple ASRU");
-				return;
-			} else if (devpath[0] == '\0') {
-				(void) strlcpy(devpath, path, sizeof (devpath));
+			if (fmd_nvl_fmri_has_fault(hdl, asru,
+			    FMD_HAS_FAULT_ASRU, NULL) == 1) {
+				error = di_retire_device(path, &drt, 0);
+				if (error != 0) {
+					fmd_hdl_debug(hdl, "rio_recv:"
+					    " di_retire_device failed:"
+					    " error: %d %s", error, path);
+					rval = -1;
+				}
 			}
 		} else {
-			error = di_unretire_device(path, &drt);
-			if (error != 0) {
-				fmd_hdl_debug(hdl, "rio_recv: "
-				    "di_unretire_device failed: error: %d %s",
-				    error, path);
-				rval = -1;
+			if (fmd_nvl_fmri_has_fault(hdl, asru,
+			    FMD_HAS_FAULT_ASRU, NULL) == 0) {
+				error = di_unretire_device(path, &drt);
+				if (error != 0) {
+					fmd_hdl_debug(hdl, "rio_recv:"
+					    " di_unretire_device failed:"
+					    " error: %d %s", error, path);
+					rval = -1;
+				}
 			}
-		}
-	}
-
-	if (retire) {
-		if (devpath[0] == '\0')
-			return;
-		error = di_retire_device(devpath, &drt, 0);
-		if (error != 0) {
-			fmd_hdl_debug(hdl, "rio_recv: di_retire_device "
-			    "failed: error: %d %s", error, devpath);
-			rval = -1;
 		}
 	}
 
@@ -242,12 +230,20 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	 * state. To move the case to the closed state however, we (the
 	 * retire agent) need to call fmd_case_uuclose()
 	 */
-	if (retire && rval == 0) {
+	if (strcmp(class, FM_LIST_SUSPECT_CLASS) == 0 && rval == 0) {
 		if (nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid) == 0 &&
 		    !fmd_case_uuclosed(hdl, uuid)) {
 			fmd_case_uuclose(hdl, uuid);
 		}
 	}
+
+	/*
+	 * Similarly to move the case to the resolved state, we (the
+	 * retire agent) need to call fmd_case_uuresolved()
+	 */
+	if (strcmp(class, FM_LIST_REPAIRED_CLASS) == 0 && rval == 0 &&
+	    nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid) == 0)
+		fmd_case_uuresolved(hdl, uuid);
 }
 
 static const fmd_hdl_ops_t fmd_ops = {

@@ -78,6 +78,44 @@ fmd_scheme_fmd_present(nvlist_t *nvl)
 }
 
 static int
+fmd_scheme_fmd_replaced(nvlist_t *nvl)
+{
+	char *name, *version;
+	fmd_module_t *mp;
+	int rv = 0;
+
+	if (nvlist_lookup_string(nvl, FM_FMRI_FMD_NAME, &name) != 0 ||
+	    nvlist_lookup_string(nvl, FM_FMRI_FMD_VERSION, &version) != 0)
+		return (fmd_fmri_set_errno(EINVAL));
+
+	if ((mp = fmd_modhash_lookup(fmd.d_mod_hash, name)) != NULL) {
+		rv = mp->mod_vers != NULL &&
+		    strcmp(mp->mod_vers, version) == 0;
+		fmd_module_rele(mp);
+	}
+
+	return (rv ? FMD_OBJ_STATE_STILL_PRESENT : FMD_OBJ_STATE_NOT_PRESENT);
+}
+
+static int
+fmd_scheme_fmd_service_state(nvlist_t *nvl)
+{
+	char *name;
+	fmd_module_t *mp;
+	int rv = 1;
+
+	if (nvlist_lookup_string(nvl, FM_FMRI_FMD_NAME, &name) != 0)
+		return (fmd_fmri_set_errno(EINVAL));
+
+	if ((mp = fmd_modhash_lookup(fmd.d_mod_hash, name)) != NULL) {
+		rv = mp->mod_error != 0;
+		fmd_module_rele(mp);
+	}
+
+	return (rv ? FMD_SERVICE_STATE_UNUSABLE : FMD_SERVICE_STATE_OK);
+}
+
+static int
 fmd_scheme_fmd_unusable(nvlist_t *nvl)
 {
 	char *name;
@@ -125,6 +163,8 @@ static const fmd_scheme_ops_t _fmd_scheme_default_ops = {
 	(ssize_t (*)())fmd_scheme_notsup,	/* sop_nvl2str */
 	(int (*)())fmd_scheme_nop,		/* sop_expand */
 	(int (*)())fmd_scheme_notsup,		/* sop_present */
+	(int (*)())fmd_scheme_notsup,		/* sop_replaced */
+	(int (*)())fmd_scheme_notsup,		/* sop_service_state */
 	(int (*)())fmd_scheme_notsup,		/* sop_unusable */
 	(int (*)())fmd_scheme_notsup,		/* sop_contains */
 	fmd_scheme_notranslate			/* sop_translate */
@@ -136,6 +176,8 @@ static const fmd_scheme_ops_t _fmd_scheme_builtin_ops = {
 	fmd_scheme_fmd_nvl2str,			/* sop_nvl2str */
 	(int (*)())fmd_scheme_nop,		/* sop_expand */
 	fmd_scheme_fmd_present,			/* sop_present */
+	fmd_scheme_fmd_replaced,		/* sop_replaced */
+	fmd_scheme_fmd_service_state,		/* sop_service_state */
 	fmd_scheme_fmd_unusable,		/* sop_unusable */
 	(int (*)())fmd_scheme_notsup,		/* sop_contains */
 	fmd_scheme_notranslate			/* sop_translate */
@@ -151,6 +193,9 @@ static const fmd_scheme_opd_t _fmd_scheme_ops[] = {
 	{ "fmd_fmri_nvl2str", offsetof(fmd_scheme_ops_t, sop_nvl2str) },
 	{ "fmd_fmri_expand", offsetof(fmd_scheme_ops_t, sop_expand) },
 	{ "fmd_fmri_present", offsetof(fmd_scheme_ops_t, sop_present) },
+	{ "fmd_fmri_replaced", offsetof(fmd_scheme_ops_t, sop_replaced) },
+	{ "fmd_fmri_service_state", offsetof(fmd_scheme_ops_t,
+	    sop_service_state) },
 	{ "fmd_fmri_unusable", offsetof(fmd_scheme_ops_t, sop_unusable) },
 	{ "fmd_fmri_contains", offsetof(fmd_scheme_ops_t, sop_contains) },
 	{ "fmd_fmri_translate", offsetof(fmd_scheme_ops_t, sop_translate) },

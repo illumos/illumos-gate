@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,8 +104,11 @@ typedef int fmd_adm_case_f(const fmd_adm_caseinfo_t *, void *);
 extern int fmd_adm_rsrc_count(fmd_adm_t *, int, uint32_t *);
 extern int fmd_adm_rsrc_iter(fmd_adm_t *, int, fmd_adm_rsrc_f *, void *);
 extern int fmd_adm_rsrc_flush(fmd_adm_t *, const char *);
-extern int fmd_adm_rsrc_repair(fmd_adm_t *, const char *);
+extern int fmd_adm_rsrc_repaired(fmd_adm_t *, const char *);
+extern int fmd_adm_rsrc_replaced(fmd_adm_t *, const char *);
+extern int fmd_adm_rsrc_acquit(fmd_adm_t *, const char *, const char *);
 extern int fmd_adm_case_repair(fmd_adm_t *, const char *);
+extern int fmd_adm_case_acquit(fmd_adm_t *, const char *);
 extern int fmd_adm_case_iter(fmd_adm_t *, const char *, fmd_adm_case_f *,
     void *);
 

@@ -209,6 +209,8 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	boolean_t is_repair;
 	char *scheme;
 	nvlist_t *vdev;
+	char *uuid;
+	int repair_done = 0;
 
 	/*
 	 * If this is a resource notifying us of device removal, then simply
@@ -231,7 +233,7 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		return;
 	}
 
-	if (strcmp(class, "list.repaired") == 0)
+	if (strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)
 		is_repair = B_TRUE;
 	else
 		is_repair = B_FALSE;
@@ -288,6 +290,7 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		 * continue.
 		 */
 		if (is_repair) {
+			repair_done = 1;
 			(void) zpool_vdev_clear(zhp, vdev_guid);
 			zpool_close(zhp);
 			continue;
@@ -307,6 +310,10 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		replace_with_spare(zhp, vdev);
 		zpool_close(zhp);
 	}
+
+	if (strcmp(class, FM_LIST_REPAIRED_CLASS) == 0 && repair_done &&
+	    nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid) == 0)
+		fmd_case_uuresolved(hdl, uuid);
 }
 
 static const fmd_hdl_ops_t fmd_ops = {

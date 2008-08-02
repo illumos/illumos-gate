@@ -36,6 +36,7 @@
 #include <limits.h>
 #include <fm/topo_mod.h>
 #include <fm/topo_hc.h>
+#include <fm/fmd_fmri.h>
 #include <sys/param.h>
 #include <sys/systeminfo.h>
 #include <sys/fm/protocol.h>
@@ -60,6 +61,8 @@ static int hc_fmri_str2nvl(topo_mod_t *, tnode_t *, topo_version_t,
 static int hc_compare(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
 static int hc_fmri_present(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
+    nvlist_t **);
+static int hc_fmri_replaced(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
 static int hc_fmri_unusable(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
@@ -87,6 +90,9 @@ const topo_method_t hc_methods[] = {
 	    TOPO_STABILITY_INTERNAL, hc_compare },
 	{ TOPO_METH_PRESENT, TOPO_METH_PRESENT_DESC, TOPO_METH_PRESENT_VERSION,
 	    TOPO_STABILITY_INTERNAL, hc_fmri_present },
+	{ TOPO_METH_REPLACED, TOPO_METH_REPLACED_DESC,
+	    TOPO_METH_REPLACED_VERSION, TOPO_STABILITY_INTERNAL,
+	    hc_fmri_replaced },
 	{ TOPO_METH_UNUSABLE, TOPO_METH_UNUSABLE_DESC,
 	    TOPO_METH_UNUSABLE_VERSION, TOPO_STABILITY_INTERNAL,
 	    hc_fmri_unusable },
@@ -1695,6 +1701,84 @@ hc_fmri_present(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	hap->ha_fmri = in;
 	hap->ha_nvl = NULL;
 	if ((hwp = hc_walk_init(mod, node, hap->ha_fmri, hc_is_present,
+	    (void *)hap)) != NULL) {
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
+		    TOPO_WALK_ERR)
+			err = -1;
+		else
+			err = 0;
+		topo_walk_fini(hwp->hcw_wp);
+		topo_mod_free(mod, hwp, sizeof (struct hc_walk));
+	} else {
+		err = -1;
+	}
+
+	if (hap->ha_nvl != NULL)
+		*out = hap->ha_nvl;
+
+	topo_mod_free(mod, hap, sizeof (struct hc_args));
+
+	return (err);
+}
+
+static int
+hc_is_replaced(topo_mod_t *mod, tnode_t *node, void *pdata)
+{
+	int err;
+	struct hc_args *hap = (struct hc_args *)pdata;
+	uint32_t present = 0;
+
+	/*
+	 * check with the enumerator that created this FMRI
+	 * (topo node)
+	 */
+	if (topo_method_invoke(node, TOPO_METH_REPLACED,
+	    TOPO_METH_REPLACED_VERSION, hap->ha_fmri, &hap->ha_nvl,
+	    &err) < 0) {
+		/*
+		 * enumerator didn't provide "replaced" method - so
+		 * try "present" method
+		 */
+		if (topo_method_invoke(node, TOPO_METH_PRESENT,
+		    TOPO_METH_PRESENT_VERSION, hap->ha_fmri, &hap->ha_nvl,
+		    &err) < 0) {
+			/* no present method either - assume present */
+			present = 1;
+		} else {
+			(void) nvlist_lookup_uint32(hap->ha_nvl,
+			    TOPO_METH_PRESENT_RET, &present);
+			(void) nvlist_remove(hap->ha_nvl,
+			    TOPO_METH_PRESENT_RET, DATA_TYPE_UINT32);
+		}
+		if (topo_mod_nvalloc(mod, &hap->ha_nvl,
+		    NV_UNIQUE_NAME) == 0)
+			if (nvlist_add_uint32(hap->ha_nvl,
+			    TOPO_METH_REPLACED_RET,
+			    FMD_OBJ_STATE_UNKNOWN) == 0)
+				return (0);
+		return (ETOPO_PROP_NVL);
+	}
+
+	return (0);
+}
+
+static int
+hc_fmri_replaced(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	int err;
+	struct hc_walk *hwp;
+	struct hc_args *hap;
+
+	if (version > TOPO_METH_REPLACED_VERSION)
+		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
+
+	if ((hap = topo_mod_alloc(mod, sizeof (struct hc_args))) == NULL)
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+
+	hap->ha_fmri = in;
+	hap->ha_nvl = NULL;
+	if ((hwp = hc_walk_init(mod, node, hap->ha_fmri, hc_is_replaced,
 	    (void *)hap)) != NULL) {
 		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
 		    TOPO_WALK_ERR)

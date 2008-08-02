@@ -97,7 +97,7 @@
  *
  * Fault class	: fault.memory.dimm_sb
  * Affects	: mem:///motherboard=0/chip=0/memory-controller=0/dimm=0/rank=0
- *		    degraded but still in service
+ *		    faulted but still in service
  * FRU		: "CPU 0 DIMM 0" (hc://.../memory-controller=0/dimm=0)
  *		    faulty
  *
@@ -1062,7 +1062,8 @@ extract_record_info(nvlist_t *nvl, name_list_t **class_p,
 		name = get_nvl2str_topo(lfru);
 		if (name != NULL) {
 			nlp = alloc_name_list(name, lpct);
-			nlp->status = status & ~FM_SUSPECT_UNUSABLE;
+			nlp->status = status & ~(FM_SUSPECT_UNUSABLE |
+			    FM_SUSPECT_DEGRADED);
 			free(name);
 			if (nvlist_lookup_string(nvl, FM_FAULT_LOCATION,
 			    &label) == 0)
@@ -1075,7 +1076,9 @@ extract_record_info(nvlist_t *nvl, name_list_t **class_p,
 		name = get_nvl2str_topo(lasru);
 		if (name != NULL) {
 			nlp = alloc_name_list(name, lpct);
-			nlp->status = status & ~FM_SUSPECT_NOT_PRESENT;
+			nlp->status = status & ~(FM_SUSPECT_NOT_PRESENT |
+			    FM_SUSPECT_REPAIRED | FM_SUSPECT_REPLACED |
+			    FM_SUSPECT_ACQUITTED);
 			free(name);
 			(void) merge_name_list(asru_p, nlp, 1);
 		}
@@ -1315,11 +1318,20 @@ print_asru_status(int status, char *label)
 	case 0:
 		msg = dgettext("FMD", "ok and in service");
 		break;
+	case FM_SUSPECT_DEGRADED:
+		msg = dgettext("FMD", "service degraded, "
+		    "but associated components no longer faulty");
+		break;
+	case FM_SUSPECT_FAULTY | FM_SUSPECT_DEGRADED:
+		msg = dgettext("FMD", "faulted but still "
+		    "providing degraded service");
+		break;
 	case FM_SUSPECT_FAULTY:
-		msg = dgettext("FMD", "degraded but still in service");
+		msg = dgettext("FMD", "faulted but still in service");
 		break;
 	case FM_SUSPECT_UNUSABLE:
-		msg = dgettext("FMD", "unknown, not present or disabled");
+		msg = dgettext("FMD", "out of service, "
+		    "but associated components no longer faulty");
 		break;
 	case FM_SUSPECT_FAULTY | FM_SUSPECT_UNUSABLE:
 		msg = dgettext("FMD", "faulted and taken out of service");
@@ -1341,8 +1353,14 @@ print_fru_status(int status, char *label)
 		msg = dgettext("FMD", "not present");
 	else if (status & FM_SUSPECT_FAULTY)
 		msg = dgettext("FMD", "faulty");
+	else if (status & FM_SUSPECT_REPLACED)
+		msg = dgettext("FMD", "replaced");
+	else if (status & FM_SUSPECT_REPAIRED)
+		msg = dgettext("FMD", "repair attempted");
+	else if (status & FM_SUSPECT_ACQUITTED)
+		msg = dgettext("FMD", "acquitted");
 	else
-		msg = dgettext("FMD", "repaired");
+		msg = dgettext("FMD", "removed");
 	(void) printf("%s     %s\n", label, msg);
 }
 
@@ -1727,8 +1745,15 @@ print_fru(int summary, int opt_a, int opt_i, int page_feed)
 				(void) printf(dgettext("FMD", "not present\n"));
 			else if (status & FM_SUSPECT_FAULTY)
 				(void) printf(dgettext("FMD", "faulty\n"));
+			else if (status & FM_SUSPECT_REPLACED)
+				(void) printf(dgettext("FMD", "replaced\n"));
+			else if (status & FM_SUSPECT_REPAIRED)
+				(void) printf(dgettext("FMD",
+				    "repair attempted\n"));
+			else if (status & FM_SUSPECT_ACQUITTED)
+				(void) printf(dgettext("FMD", "acquitted\n"));
 			else
-				(void) printf(dgettext("FMD", "repaired\n"));
+				(void) printf(dgettext("FMD", "removed\n"));
 
 			slp = tp->status_rec_list;
 			end = slp;
@@ -1810,6 +1835,12 @@ print_asru(int opt_a)
 			switch (status) {
 			case 0:
 				msg = dgettext("FMD", "ok");
+				break;
+			case FM_SUSPECT_DEGRADED:
+				msg = dgettext("FMD", "degraded");
+				break;
+			case FM_SUSPECT_FAULTY | FM_SUSPECT_DEGRADED:
+				msg = dgettext("FMD", "degraded");
 				break;
 			case FM_SUSPECT_FAULTY:
 				msg = dgettext("FMD", "degraded");
@@ -2017,16 +2048,93 @@ cmd_repair(fmd_adm_t *adm, int argc, char *argv[])
 		return (FMADM_EXIT_USAGE);
 
 	/*
-	 * argument could be a uuid, and fmri (asru, fru or resource)
+	 * argument could be a uuid, an fmri (asru, fru or resource)
 	 * or a label. Try uuid first, If that fails try the others.
 	 */
 	err = fmd_adm_case_repair(adm, argv[optind]);
 	if (err != 0)
-		err = fmd_adm_rsrc_repair(adm, argv[optind]);
+		err = fmd_adm_rsrc_repaired(adm, argv[optind]);
 
 	if (err != 0)
 		die("failed to record repair to %s", argv[optind]);
 
 	note("recorded repair to %s\n", argv[optind]);
+	return (FMADM_EXIT_SUCCESS);
+}
+
+int
+cmd_repaired(fmd_adm_t *adm, int argc, char *argv[])
+{
+	int err;
+
+	if (getopt(argc, argv, "") != EOF)
+		return (FMADM_EXIT_USAGE);
+
+	if (argc - optind != 1)
+		return (FMADM_EXIT_USAGE);
+
+	/*
+	 * argument could be an fmri (asru, fru or resource) or a label.
+	 */
+	err = fmd_adm_rsrc_repaired(adm, argv[optind]);
+	if (err != 0)
+		die("failed to record repair to %s", argv[optind]);
+
+	note("recorded repair to of %s\n", argv[optind]);
+	return (FMADM_EXIT_SUCCESS);
+}
+
+int
+cmd_replaced(fmd_adm_t *adm, int argc, char *argv[])
+{
+	int err;
+
+	if (getopt(argc, argv, "") != EOF)
+		return (FMADM_EXIT_USAGE);
+
+	if (argc - optind != 1)
+		return (FMADM_EXIT_USAGE);
+
+	/*
+	 * argument could be an fmri (asru, fru or resource) or a label.
+	 */
+	err = fmd_adm_rsrc_replaced(adm, argv[optind]);
+	if (err != 0)
+		die("failed to record replacement of %s", argv[optind]);
+
+	note("recorded replacement of %s\n", argv[optind]);
+	return (FMADM_EXIT_SUCCESS);
+}
+
+int
+cmd_acquit(fmd_adm_t *adm, int argc, char *argv[])
+{
+	int err;
+
+	if (getopt(argc, argv, "") != EOF)
+		return (FMADM_EXIT_USAGE);
+
+	if (argc - optind != 1 && argc - optind != 2)
+		return (FMADM_EXIT_USAGE);
+
+	/*
+	 * argument could be a uuid, an fmri (asru, fru or resource)
+	 * or a label. Or it could be a uuid and an fmri or label.
+	 */
+	if (argc - optind == 2) {
+		err = fmd_adm_rsrc_acquit(adm, argv[optind], argv[optind + 1]);
+		if (err != 0)
+			err = fmd_adm_rsrc_acquit(adm, argv[optind + 1],
+			    argv[optind]);
+	} else {
+		err = fmd_adm_case_acquit(adm, argv[optind]);
+		if (err != 0)
+			err = fmd_adm_rsrc_acquit(adm, argv[optind], "");
+	}
+
+	if (err != 0)
+		die("failed to record acquital of %s", argv[optind]);
+
+	note("recorded acquital of %s\n", argv[optind]);
 	return (FMADM_EXIT_SUCCESS);
 }

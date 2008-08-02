@@ -280,7 +280,7 @@ cmd_repair_fmri(fmd_hdl_t *hdl, char *buf)
 		return (-1);
 	}
 
-	err = fmd_adm_rsrc_repair(ap, buf);
+	err = fmd_adm_rsrc_repaired(ap, buf);
 	if (err)
 		err = -1;
 	fmd_adm_close(ap);

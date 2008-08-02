@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@ typedef struct sunFmProblem_data {
 	ulong_t		d_nsuspects;
 	nvlist_t	**d_suspects;
 	nvlist_t	*d_aci_event;
+	uint8_t		*d_statuses;
 } sunFmProblem_data_t;
 
 typedef struct sunFmProblem_update_ctx {
@@ -59,6 +60,7 @@ typedef struct sunFmProblem_update_ctx {
 } sunFmProblem_update_ctx_t;
 
 typedef nvlist_t sunFmFaultEvent_data_t;
+typedef uint8_t sunFmFaultStatus_data_t;
 
 int sunFmProblemTable_init(void);
 int sunFmFaultEventTable_init(void);

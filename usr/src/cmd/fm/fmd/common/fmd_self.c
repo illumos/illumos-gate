@@ -141,8 +141,10 @@ self_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	 */
 	if (strcmp(class, FM_LIST_SUSPECT_CLASS) == 0 ||
 	    strcmp(class, FM_LIST_ISOLATED_CLASS) == 0 ||
+	    strcmp(class, FM_LIST_UPDATED_CLASS) == 0 ||
+	    strcmp(class, FM_LIST_RESOLVED_CLASS) == 0 ||
 	    strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)
-		return; /* if no agents are present just drop list.suspect */
+		return; /* if no agents are present just drop list.* */
 
 	if (strncmp(class, FMD_ERR_CLASS, FMD_ERR_CLASS_LEN) == 0)
 		return; /* if fmd itself produced the error just drop it */

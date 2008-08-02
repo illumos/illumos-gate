@@ -49,6 +49,7 @@
 	fmd_case_uuclosed = FUNCTION extern;
 	fmd_case_uuid = FUNCTION extern;
 	fmd_case_uulookup = FUNCTION extern;
+	fmd_case_uuresolved = FUNCTION extern;
 
 	fmd_event_local = FUNCTION extern;
 	fmd_event_ena_create = FUNCTION extern;
@@ -80,8 +81,10 @@
 	fmd_nvl_dup = FUNCTION extern;
 	fmd_nvl_fmri_expand = FUNCTION extern;
 	fmd_nvl_fmri_present = FUNCTION extern;
+	fmd_nvl_fmri_replaced = FUNCTION extern;
 	fmd_nvl_fmri_unusable = FUNCTION extern;
-	fmd_nvl_fmri_faulty = FUNCTION extern;
+	fmd_nvl_fmri_service_state = FUNCTION extern;
+	fmd_nvl_fmri_has_fault = FUNCTION extern;
 	fmd_nvl_fmri_contains = FUNCTION extern;
 	fmd_nvl_fmri_translate = FUNCTION extern;
 

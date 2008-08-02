@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,10 +83,22 @@ fmd_fmri_present(nvlist_t *nvl)
 	present = topo_fmri_present(thp, nvl, &err);
 	fmd_fmri_topo_rele(thp);
 
-	if (err != 0)
-		return (0);
-	else
-		return (present);
+	return (present);
+}
+
+int
+fmd_fmri_replaced(nvlist_t *nvl)
+{
+	int err, rval;
+	topo_hdl_t *thp;
+
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
+		return (fmd_fmri_set_errno(EINVAL));
+	err = 0;
+	rval = topo_fmri_replaced(thp, nvl, &err);
+	fmd_fmri_topo_rele(thp);
+
+	return (rval);
 }
 
 int
@@ -110,4 +122,27 @@ fmd_fmri_unusable(nvlist_t *nvl)
 		return (0);
 	else
 		return (unusable);
+}
+
+int
+fmd_fmri_service_state(nvlist_t *nvl)
+{
+	uint8_t version;
+	int err, service_state;
+	topo_hdl_t *thp;
+
+	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
+	    version > FM_DEV_SCHEME_VERSION)
+		return (fmd_fmri_set_errno(EINVAL));
+
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
+		return (fmd_fmri_set_errno(EINVAL));
+	err = 0;
+	service_state = topo_fmri_service_state(thp, nvl, &err);
+	fmd_fmri_topo_rele(thp);
+
+	if (err != 0)
+		return (FMD_SERVICE_STATE_UNKNOWN);
+	else
+		return (service_state);
 }

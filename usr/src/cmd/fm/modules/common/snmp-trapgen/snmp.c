@@ -399,6 +399,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	fmd_prop_free_string(hdl, rootdir);
 	fmd_hdl_subscribe(hdl, FM_LIST_SUSPECT_CLASS);
 	fmd_hdl_subscribe(hdl, FM_LIST_REPAIRED_CLASS);
+	fmd_hdl_subscribe(hdl, FM_LIST_RESOLVED_CLASS);
 }
 
 void

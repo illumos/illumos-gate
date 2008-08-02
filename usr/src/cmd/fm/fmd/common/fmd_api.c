@@ -1137,6 +1137,20 @@ fmd_case_uuclosed(fmd_hdl_t *hdl, const char *uuid)
 	return (rv);
 }
 
+void
+fmd_case_uuresolved(fmd_hdl_t *hdl, const char *uuid)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	fmd_case_t *cp = fmd_case_hash_lookup(fmd.d_cases, uuid);
+
+	if (cp != NULL) {
+		fmd_case_transition(cp, FMD_CASE_RESOLVED, 0);
+		fmd_case_rele(cp);
+	}
+
+	fmd_module_unlock(mp);
+}
+
 static int
 fmd_case_instate(fmd_hdl_t *hdl, fmd_case_t *cp, uint_t state)
 {
@@ -1846,6 +1860,23 @@ fmd_nvl_fmri_present(fmd_hdl_t *hdl, nvlist_t *nvl)
 }
 
 int
+fmd_nvl_fmri_replaced(fmd_hdl_t *hdl, nvlist_t *nvl)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	int rv;
+
+	if (nvl == NULL) {
+		fmd_api_error(mp, EFMD_NVL_INVAL,
+		    "invalid nvlist %p\n", (void *)nvl);
+	}
+
+	rv = fmd_fmri_replaced(nvl);
+	fmd_module_unlock(mp);
+
+	return (rv);
+}
+
+int
 fmd_nvl_fmri_unusable(fmd_hdl_t *hdl, nvlist_t *nvl)
 {
 	fmd_module_t *mp = fmd_api_module_lock(hdl);
@@ -1868,23 +1899,91 @@ fmd_nvl_fmri_unusable(fmd_hdl_t *hdl, nvlist_t *nvl)
 }
 
 int
-fmd_nvl_fmri_faulty(fmd_hdl_t *hdl, nvlist_t *nvl)
+fmd_nvl_fmri_service_state(fmd_hdl_t *hdl, nvlist_t *nvl)
 {
 	fmd_module_t *mp = fmd_api_module_lock(hdl);
-	fmd_asru_hash_t *ahp = fmd.d_asrus;
-	fmd_asru_t *ap;
-	int rv = 0;
+	int rv;
 
 	if (nvl == NULL) {
 		fmd_api_error(mp, EFMD_NVL_INVAL,
 		    "invalid nvlist %p\n", (void *)nvl);
 	}
 
-	if ((ap = fmd_asru_hash_lookup_nvl(ahp, nvl)) != NULL) {
-		rv = (ap->asru_flags & FMD_ASRU_FAULTY) != 0;
-		fmd_asru_hash_release(ahp, ap);
+	rv = fmd_fmri_service_state(nvl);
+	if (rv < 0)
+		rv = fmd_fmri_unusable(nvl) ? FMD_SERVICE_STATE_UNUSABLE :
+		    FMD_SERVICE_STATE_OK;
+	fmd_module_unlock(mp);
+
+	if (rv < 0) {
+		fmd_api_error(mp, EFMD_FMRI_OP, "invalid fmri for "
+		    "fmd_nvl_fmri_service_state\n");
 	}
 
+	return (rv);
+}
+
+typedef struct {
+	const char	*class;
+	int	*rvp;
+} fmd_has_fault_arg_t;
+
+static void
+fmd_rsrc_has_fault(fmd_asru_link_t *alp, void *arg)
+{
+	fmd_has_fault_arg_t *fhfp = (fmd_has_fault_arg_t *)arg;
+	char *class;
+
+	if (fhfp->class == NULL) {
+		if (alp->al_flags & FMD_ASRU_FAULTY)
+			*fhfp->rvp = 1;
+	} else {
+		if ((alp->al_flags & FMD_ASRU_FAULTY) &&
+		    alp->al_event != NULL && nvlist_lookup_string(alp->al_event,
+		    FM_CLASS, &class) == 0 && fmd_strmatch(class, fhfp->class))
+			*fhfp->rvp = 1;
+	}
+}
+
+int
+fmd_nvl_fmri_has_fault(fmd_hdl_t *hdl, nvlist_t *nvl, int type, char *class)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	fmd_asru_hash_t *ahp = fmd.d_asrus;
+	int rv = 0;
+	char *name;
+	int namelen;
+	fmd_has_fault_arg_t fhf;
+
+	if (nvl == NULL) {
+		fmd_api_error(mp, EFMD_NVL_INVAL,
+		    "invalid nvlist %p\n", (void *)nvl);
+	}
+	if ((namelen = fmd_fmri_nvl2str(nvl, NULL, 0)) == -1)
+		fmd_api_error(mp, EFMD_NVL_INVAL,
+		    "invalid nvlist: %p\n", (void *)nvl);
+	name = fmd_alloc(namelen + 1, FMD_SLEEP);
+	if (fmd_fmri_nvl2str(nvl, name, namelen + 1) == -1) {
+		if (name != NULL)
+			fmd_free(name, namelen + 1);
+		fmd_api_error(mp, EFMD_NVL_INVAL,
+		    "invalid nvlist: %p\n", (void *)nvl);
+	}
+
+	fhf.class = class;
+	fhf.rvp = &rv;
+	if (type == FMD_HAS_FAULT_RESOURCE)
+		fmd_asru_hash_apply_by_rsrc(ahp, name, fmd_rsrc_has_fault,
+		    &fhf);
+	else if (type == FMD_HAS_FAULT_ASRU)
+		fmd_asru_hash_apply_by_asru(ahp, name, fmd_rsrc_has_fault,
+		    &fhf);
+	else if (type == FMD_HAS_FAULT_FRU)
+		fmd_asru_hash_apply_by_fru(ahp, name, fmd_rsrc_has_fault,
+		    &fhf);
+
+	if (name != NULL)
+		fmd_free(name, namelen + 1);
 	fmd_module_unlock(mp);
 	return (rv);
 }

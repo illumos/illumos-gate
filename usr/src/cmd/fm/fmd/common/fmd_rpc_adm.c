@@ -468,11 +468,11 @@ fmd_adm_rsrcinfo_1_svc(char *fmri,
 bool_t
 fmd_adm_rsrcflush_1_svc(char *name, int *rvp, struct svc_req *req)
 {
-	return (fmd_adm_rsrcrepair_1_svc(name, rvp, req));
+	return (fmd_adm_rsrcrepaired_1_svc(name, rvp, req));
 }
 
 bool_t
-fmd_adm_rsrcrepair_1_svc(char *name, int *rvp, struct svc_req *req)
+fmd_adm_rsrcrepaired_1_svc(char *name, int *rvp, struct svc_req *req)
 {
 	int err = FMD_ADM_ERR_RSRCNOTF;
 
@@ -480,13 +480,73 @@ fmd_adm_rsrcrepair_1_svc(char *name, int *rvp, struct svc_req *req)
 		err = FMD_ADM_ERR_PERM;
 	else {
 		fmd_asru_hash_apply_by_asru(fmd.d_asrus, name,
-		    fmd_asru_repair, &err);
+		    fmd_asru_repaired, &err);
 		fmd_asru_hash_apply_by_label(fmd.d_asrus, name,
-		    fmd_asru_repair, &err);
+		    fmd_asru_repaired, &err);
 		fmd_asru_hash_apply_by_fru(fmd.d_asrus, name,
-		    fmd_asru_repair, &err);
+		    fmd_asru_repaired, &err);
 		fmd_asru_hash_apply_by_rsrc(fmd.d_asrus, name,
-		    fmd_asru_repair, &err);
+		    fmd_asru_repaired, &err);
+	}
+	*rvp = err;
+	return (TRUE);
+}
+
+bool_t
+fmd_adm_rsrcreplaced_1_svc(char *name, int *rvp, struct svc_req *req)
+{
+	int err = FMD_ADM_ERR_RSRCNOTF;
+
+	if (fmd_rpc_deny(req))
+		err = FMD_ADM_ERR_PERM;
+	else {
+		fmd_asru_hash_apply_by_asru(fmd.d_asrus, name,
+		    fmd_asru_replaced, &err);
+		fmd_asru_hash_apply_by_label(fmd.d_asrus, name,
+		    fmd_asru_replaced, &err);
+		fmd_asru_hash_apply_by_fru(fmd.d_asrus, name,
+		    fmd_asru_replaced, &err);
+		fmd_asru_hash_apply_by_rsrc(fmd.d_asrus, name,
+		    fmd_asru_replaced, &err);
+	}
+	*rvp = err;
+	return (TRUE);
+}
+
+typedef struct {
+	int *errp;
+	char *uuid;
+} fmd_adm_ra_t;
+
+void
+fmd_asru_ra_cb(fmd_asru_link_t *alp, void *arg)
+{
+	fmd_adm_ra_t *farap = (fmd_adm_ra_t *)arg;
+
+	if (strcmp(farap->uuid, "") == 0 ||
+	    strcmp(farap->uuid, alp->al_case_uuid) == 0)
+		fmd_asru_acquit(alp, farap->errp);
+}
+
+bool_t
+fmd_adm_rsrcacquit_1_svc(char *name, char *uuid, int *rvp, struct svc_req *req)
+{
+	int err = FMD_ADM_ERR_RSRCNOTF;
+	fmd_adm_ra_t fara;
+
+	if (fmd_rpc_deny(req))
+		err = FMD_ADM_ERR_PERM;
+	else {
+		fara.errp = &err;
+		fara.uuid = uuid;
+		fmd_asru_hash_apply_by_asru(fmd.d_asrus, name,
+		    fmd_asru_ra_cb, &fara);
+		fmd_asru_hash_apply_by_label(fmd.d_asrus, name,
+		    fmd_asru_ra_cb, &fara);
+		fmd_asru_hash_apply_by_fru(fmd.d_asrus, name,
+		    fmd_asru_ra_cb, &fara);
+		fmd_asru_hash_apply_by_rsrc(fmd.d_asrus, name,
+		    fmd_asru_ra_cb, &fara);
 	}
 	*rvp = err;
 	return (TRUE);
@@ -658,6 +718,28 @@ fmd_adm_caserepair_1_svc(char *uuid, int *rvp, struct svc_req *req)
 	else if ((cp = fmd_case_hash_lookup(fmd.d_cases, uuid)) == NULL)
 		err = FMD_ADM_ERR_CASESRCH;
 	else if (fmd_case_repair(cp) != 0) {
+		err = errno == EFMD_CASE_OWNER ?
+		    FMD_ADM_ERR_CASEXPRT : FMD_ADM_ERR_CASEOPEN;
+	}
+
+	if (cp != NULL)
+		fmd_case_rele(cp);
+
+	*rvp = err;
+	return (TRUE);
+}
+
+bool_t
+fmd_adm_caseacquit_1_svc(char *uuid, int *rvp, struct svc_req *req)
+{
+	fmd_case_t *cp = NULL;
+	int err = 0;
+
+	if (fmd_rpc_deny(req))
+		err = FMD_ADM_ERR_PERM;
+	else if ((cp = fmd_case_hash_lookup(fmd.d_cases, uuid)) == NULL)
+		err = FMD_ADM_ERR_CASESRCH;
+	else if (fmd_case_acquit(cp) != 0) {
 		err = errno == EFMD_CASE_OWNER ?
 		    FMD_ADM_ERR_CASEXPRT : FMD_ADM_ERR_CASEOPEN;
 	}

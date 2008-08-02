@@ -29,6 +29,7 @@
 #include <strings.h>
 #include <umem.h>
 #include <fm/topo_mod.h>
+#include <fm/fmd_fmri.h>
 #include <sys/fm/protocol.h>
 #include <sys/mem.h>
 
@@ -37,7 +38,7 @@
 /*
  * This enumerator creates mem-schemed nodes for each dimm found in the
  * sun4v Physical Resource Inventory (PRI).
- * Each node exports four methods: present(), expand(), unusable(),
+ * Each node exports five methods: present(), expand(), unusable(), replaced(),
  * and contains().
  *
  */
@@ -52,6 +53,8 @@ static int mem_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
     topo_instance_t, void *, void *);
 static void mem_release(topo_mod_t *, tnode_t *);
 static int mem_present(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
+    nvlist_t **);
+static int mem_replaced(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
 static int mem_expand(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
@@ -69,6 +72,8 @@ static const topo_modinfo_t mem_info =
 static const topo_method_t mem_methods[] = {
 	{ TOPO_METH_PRESENT, TOPO_METH_PRESENT_DESC,
 	    TOPO_METH_PRESENT_VERSION, TOPO_STABILITY_INTERNAL, mem_present },
+	{ TOPO_METH_REPLACED, TOPO_METH_REPLACED_DESC,
+	    TOPO_METH_REPLACED_VERSION, TOPO_STABILITY_INTERNAL, mem_replaced },
 	{ TOPO_METH_EXPAND, TOPO_METH_EXPAND_DESC,
 	    TOPO_METH_EXPAND_VERSION, TOPO_STABILITY_INTERNAL, mem_expand },
 	{ TOPO_METH_UNUSABLE, TOPO_METH_UNUSABLE_DESC,
@@ -159,6 +164,45 @@ mem_present(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) != 0)
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	if (nvlist_add_uint32(*out, TOPO_METH_PRESENT_RET, present) != 0) {
+		nvlist_free(*out);
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+mem_replaced(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
+    nvlist_t *in, nvlist_t **out)
+{
+	uint8_t version;
+	char **nvlserids;
+	size_t n, nserids;
+	uint32_t rval = FMD_OBJ_STATE_NOT_PRESENT;
+	md_mem_info_t *mem = (md_mem_info_t *)topo_mod_getspecific(mod);
+
+	/* sun4v platforms all support dimm serial numbers */
+
+	if (nvlist_lookup_uint8(in, FM_VERSION, &version) != 0 ||
+	    version > FM_MEM_SCHEME_VERSION ||
+	    nvlist_lookup_string_array(in, FM_FMRI_MEM_SERIAL_ID,
+	    &nvlserids, &nserids) != 0) {
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+
+	/* Find the dimm entry */
+	for (n = 0; n < nserids; n++) {
+		if (mem_get_dimm_by_sn(nvlserids[n], mem) != NULL) {
+			rval = FMD_OBJ_STATE_STILL_PRESENT;
+			break;
+		}
+	}
+
+	/* return the replaced status */
+	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) != 0)
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	if (nvlist_add_uint32(*out, TOPO_METH_REPLACED_RET, rval) != 0) {
 		nvlist_free(*out);
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}

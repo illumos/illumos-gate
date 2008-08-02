@@ -164,7 +164,7 @@ fmd_asru_hash_lookup(fmd_asru_hash_t *ahp, const char *name)
 }
 
 static int
-fmd_asru_is_present(nvlist_t *event)
+fmd_asru_replacement_state(nvlist_t *event)
 {
 	int ps = -1;
 	nvlist_t *asru, *fru, *rsrc;
@@ -181,16 +181,36 @@ fmd_asru_is_present(nvlist_t *event)
 	 * as still present.
 	 */
 	if (fmd_asru_fake_not_present)
-		ps = 0;
-	if (ps == -1 && nvlist_lookup_nvlist(event, FM_FAULT_ASRU, &asru) == 0)
-		ps = fmd_fmri_present(asru);
-	if (ps == -1 && nvlist_lookup_nvlist(event, FM_FAULT_RESOURCE,
-	    &rsrc) == 0)
-		ps = fmd_fmri_present(rsrc);
-	if (ps == -1 && nvlist_lookup_nvlist(event, FM_FAULT_FRU, &fru) == 0)
-		ps = fmd_fmri_present(fru);
+		return (fmd_asru_fake_not_present);
+	if (nvlist_lookup_nvlist(event, FM_FAULT_ASRU, &asru) == 0)
+		ps = fmd_fmri_replaced(asru);
+	if (ps == -1) {
+		if (nvlist_lookup_nvlist(event, FM_FAULT_RESOURCE, &rsrc) == 0)
+			ps = fmd_fmri_replaced(rsrc);
+	} else if (ps == FMD_OBJ_STATE_UNKNOWN) {
+		/* see if we can improve on UNKNOWN */
+		if (nvlist_lookup_nvlist(event, FM_FAULT_RESOURCE,
+		    &rsrc) == 0) {
+			int ps2 = fmd_fmri_replaced(rsrc);
+			if (ps2 == FMD_OBJ_STATE_STILL_PRESENT ||
+			    ps2 == FMD_OBJ_STATE_REPLACED)
+				ps = ps2;
+		}
+	}
+	if (ps == -1) {
+		if (nvlist_lookup_nvlist(event, FM_FAULT_FRU, &fru) == 0)
+			ps = fmd_fmri_replaced(fru);
+	} else if (ps == FMD_OBJ_STATE_UNKNOWN) {
+		/* see if we can improve on UNKNOWN */
+		if (nvlist_lookup_nvlist(event, FM_FAULT_FRU, &fru) == 0) {
+			int ps2 = fmd_fmri_replaced(fru);
+			if (ps2 == FMD_OBJ_STATE_STILL_PRESENT ||
+			    ps2 == FMD_OBJ_STATE_REPLACED)
+				ps = ps2;
+		}
+	}
 	if (ps == -1)
-		ps = 1;
+		ps = FMD_OBJ_STATE_UNKNOWN;
 	return (ps);
 }
 
@@ -404,7 +424,10 @@ static void
 fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 {
 	nvlist_t *nvl = FMD_EVENT_NVL(ep);
-	boolean_t f, u, ps, us;
+	boolean_t faulty = FMD_B_FALSE, unusable = FMD_B_FALSE;
+	int ps;
+	boolean_t repaired = FMD_B_FALSE, replaced = FMD_B_FALSE;
+	boolean_t acquitted = FMD_B_FALSE;
 	nvlist_t *flt, *flt_copy, *asru;
 	char *case_uuid = NULL, *case_code = NULL;
 	fmd_asru_t *ap;
@@ -420,7 +443,8 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	/*
 	 * Extract the most recent values of 'faulty' from the event log.
 	 */
-	if (nvlist_lookup_boolean_value(nvl, FM_RSRC_ASRU_FAULTY, &f) != 0) {
+	if (nvlist_lookup_boolean_value(nvl, FM_RSRC_ASRU_FAULTY,
+	    &faulty) != 0) {
 		fmd_error(EFMD_ASRU_EVENT, "failed to reload asru %s: "
 		    "invalid event log record\n", lp->log_name);
 		ahp->ah_error = EFMD_ASRU_EVENT;
@@ -434,16 +458,25 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	}
 	(void) nvlist_lookup_string(nvl, FM_RSRC_ASRU_UUID, &case_uuid);
 	(void) nvlist_lookup_string(nvl, FM_RSRC_ASRU_CODE, &case_code);
+	(void) nvlist_lookup_boolean_value(nvl, FM_RSRC_ASRU_UNUSABLE,
+	    &unusable);
+	(void) nvlist_lookup_boolean_value(nvl, FM_RSRC_ASRU_REPAIRED,
+	    &repaired);
+	(void) nvlist_lookup_boolean_value(nvl, FM_RSRC_ASRU_REPLACED,
+	    &replaced);
+	(void) nvlist_lookup_boolean_value(nvl, FM_RSRC_ASRU_ACQUITTED,
+	    &acquitted);
 
 	/*
-	 * Attempt to recreate the case in the CLOSED state.
+	 * Attempt to recreate the case in either the CLOSED or REPAIRED state
+	 * (depending on whether the faulty bit is still set).
 	 * If the case is already present, fmd_case_recreate() will return it.
 	 * If not, we'll create a new orphaned case. Either way,  we use the
 	 * ASRU event to insert a suspect into the partially-restored case.
 	 */
 	fmd_module_lock(fmd.d_rmod);
-	cp = fmd_case_recreate(fmd.d_rmod, NULL, FMD_CASE_CLOSED, case_uuid,
-	    case_code);
+	cp = fmd_case_recreate(fmd.d_rmod, NULL, faulty ? FMD_CASE_CLOSED :
+	    FMD_CASE_REPAIRED, case_uuid, case_code);
 	fmd_case_hold(cp);
 	fmd_module_unlock(fmd.d_rmod);
 	if (nvlist_lookup_int64_array(nvl, FM_SUSPECT_DIAG_TIME, &diag_time,
@@ -478,37 +511,31 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	ap = alp->al_asru;
 
 	/*
-	 * Check to see if the resource is still present in the system.  If
-	 * so, then update the value of the unusable bit based on the current
-	 * system configuration.  If not, then consider unusable.
+	 * Check to see if the resource is still present in the system.
 	 */
-	ps = fmd_asru_is_present(flt);
-	if (ps) {
-		if (nvlist_lookup_nvlist(flt, FM_FAULT_ASRU, &asru) != 0)
-			u = FMD_B_FALSE;
-		else if ((us = fmd_fmri_unusable(asru)) == -1) {
-			fmd_error(EFMD_ASRU_FMRI, "failed to update "
-			    "status of asru %s", lp->log_name);
-			u = FMD_B_FALSE;
-		} else
-			u = us != 0;
-
-	} else
-		u = FMD_B_TRUE;	/* not present; set unusable */
+	ps = fmd_asru_replacement_state(flt);
+	if (ps == FMD_OBJ_STATE_STILL_PRESENT || ps == FMD_OBJ_STATE_UNKNOWN)
+		ap->asru_flags |= FMD_ASRU_PRESENT;
+	else if (ps == FMD_OBJ_STATE_REPLACED)
+		replaced = FMD_B_TRUE;
 
 	nvlist_free(flt);
 
 	ap->asru_flags |= FMD_ASRU_RECREATED;
-	if (ps)
-		ap->asru_flags |= FMD_ASRU_PRESENT;
-	if (f) {
+	if (faulty) {
 		alp->al_flags |= FMD_ASRU_FAULTY;
 		ap->asru_flags |= FMD_ASRU_FAULTY;
 	}
-	if (u) {
+	if (unusable) {
 		alp->al_flags |= FMD_ASRU_UNUSABLE;
 		ap->asru_flags |= FMD_ASRU_UNUSABLE;
 	}
+	if (replaced)
+		alp->al_reason = FMD_ASRU_REPLACED;
+	else if (repaired)
+		alp->al_reason = FMD_ASRU_REPAIRED;
+	else if (acquitted)
+		alp->al_reason = FMD_ASRU_ACQUITTED;
 
 	TRACE((FMD_DBG_ASRU, "asru %s recreated as %p (%s)", alp->al_uuid,
 	    (void *)ap, _fmd_asru_snames[ap->asru_flags & FMD_ASRU_STATE]));
@@ -629,29 +656,34 @@ fmd_asru_hash_replay(fmd_asru_hash_t *ahp)
  * Check if the resource is still present. If not, and if the rsrc.age time
  * has expired, then do an implicit repair on the resource.
  */
+/*ARGSUSED*/
 static void
-fmd_asru_repair_if_aged(fmd_asru_link_t *alp, void *er)
+fmd_asru_repair_if_aged(fmd_asru_link_t *alp, void *arg)
 {
 	struct timeval tv;
 	fmd_log_t *lp;
 	hrtime_t hrt;
+	int ps;
+	int err;
 
-	if (fmd_asru_is_present(alp->al_event))
-		return;
-	fmd_time_gettimeofday(&tv);
-	lp = fmd_log_open(alp->al_asru->asru_root, alp->al_uuid, FMD_LOG_ASRU);
-	hrt = (hrtime_t)(tv.tv_sec - lp->log_stat.st_mtime);
-	fmd_log_rele(lp);
-	if (hrt * NANOSEC >= fmd.d_asrus->ah_lifetime)
-		fmd_asru_repair(alp, er);
+	ps = fmd_asru_replacement_state(alp->al_event);
+	if (ps == FMD_OBJ_STATE_REPLACED) {
+		fmd_asru_replaced(alp, &err);
+	} else if (ps == FMD_OBJ_STATE_NOT_PRESENT) {
+		fmd_time_gettimeofday(&tv);
+		lp = fmd_log_open(alp->al_asru->asru_root, alp->al_uuid,
+		    FMD_LOG_ASRU);
+		hrt = (hrtime_t)(tv.tv_sec - lp->log_stat.st_mtime);
+		fmd_log_rele(lp);
+		if (hrt * NANOSEC >= fmd.d_asrus->ah_lifetime)
+			fmd_asru_removed(alp);
+	}
 }
 
 void
 fmd_asru_clear_aged_rsrcs()
 {
-	int err;
-
-	fmd_asru_al_hash_apply(fmd.d_asrus, fmd_asru_repair_if_aged, &err);
+	fmd_asru_al_hash_apply(fmd.d_asrus, fmd_asru_repair_if_aged, NULL);
 }
 
 fmd_asru_hash_t *
@@ -881,25 +913,6 @@ fmd_asru_hash_lookup_name(fmd_asru_hash_t *ahp, const char *name)
 }
 
 /*
- * Lookup an asru in the hash and place a hold on it.
- */
-fmd_asru_t *
-fmd_asru_hash_lookup_nvl(fmd_asru_hash_t *ahp, nvlist_t *fmri)
-{
-	fmd_asru_t *ap;
-	char *name = NULL;
-	ssize_t namelen;
-
-	if (fmd_asru_get_namestr(fmri, &name, &namelen) != 0)
-		return (NULL);
-	(void) pthread_rwlock_rdlock(&ahp->ah_lock);
-	ap = fmd_asru_hash_lookup(ahp, name);
-	(void) pthread_rwlock_unlock(&ahp->ah_lock);
-	fmd_free(name, namelen + 1);
-	return (ap);
-}
-
-/*
  * Create a resource cache entry using the fault event "nvl" for one of the
  * suspects from the case "cp".
  *
@@ -1109,12 +1122,13 @@ static void
 fmd_asru_repair_containee(fmd_asru_link_t *alp, void *er)
 {
 	if (er && alp->al_asru_fmri && fmd_fmri_contains(er,
-	    alp->al_asru_fmri) > 0 && fmd_asru_clrflags(alp, FMD_ASRU_FAULTY))
+	    alp->al_asru_fmri) > 0 && fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
+	    FMD_ASRU_REPAIRED))
 		fmd_case_update(alp->al_case);
 }
 
 void
-fmd_asru_repair(fmd_asru_link_t *alp, void *er)
+fmd_asru_repaired(fmd_asru_link_t *alp, void *er)
 {
 	int flags;
 	int rval;
@@ -1122,7 +1136,7 @@ fmd_asru_repair(fmd_asru_link_t *alp, void *er)
 	/*
 	 * repair this asru cache entry
 	 */
-	rval = fmd_asru_clrflags(alp, FMD_ASRU_FAULTY);
+	rval = fmd_asru_clrflags(alp, FMD_ASRU_FAULTY, FMD_ASRU_REPAIRED);
 
 	/*
 	 * now check if all entries associated with this asru are repaired and
@@ -1149,12 +1163,134 @@ fmd_asru_repair(fmd_asru_link_t *alp, void *er)
 }
 
 static void
+fmd_asru_acquit_containee(fmd_asru_link_t *alp, void *er)
+{
+	if (er && alp->al_asru_fmri && fmd_fmri_contains(er,
+	    alp->al_asru_fmri) > 0 && fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
+	    FMD_ASRU_ACQUITTED))
+		fmd_case_update(alp->al_case);
+}
+
+void
+fmd_asru_acquit(fmd_asru_link_t *alp, void *er)
+{
+	int flags;
+	int rval;
+
+	/*
+	 * acquit this asru cache entry
+	 */
+	rval = fmd_asru_clrflags(alp, FMD_ASRU_FAULTY, FMD_ASRU_ACQUITTED);
+
+	/*
+	 * now check if all entries associated with this asru are acquitted and
+	 * if so acquit containees
+	 */
+	(void) pthread_mutex_lock(&alp->al_asru->asru_lock);
+	flags = alp->al_asru->asru_flags;
+	(void) pthread_mutex_unlock(&alp->al_asru->asru_lock);
+	if (!(flags & FMD_ASRU_FAULTY))
+		fmd_asru_al_hash_apply(fmd.d_asrus, fmd_asru_acquit_containee,
+		    alp->al_asru_fmri);
+
+	/*
+	 * if called from fmd_adm_acquit() and we really did clear the bit then
+	 * we need to do a case update to see if the associated case can be
+	 * repaired. No need to do this if called from fmd_case_acquit() (ie
+	 * when er is NULL) as the case will be explicitly repaired anyway.
+	 */
+	if (er) {
+		*(int *)er = 0;
+		if (rval)
+			fmd_case_update(alp->al_case);
+	}
+}
+
+static void
+fmd_asru_replaced_containee(fmd_asru_link_t *alp, void *er)
+{
+	if (er && alp->al_asru_fmri && fmd_fmri_contains(er,
+	    alp->al_asru_fmri) > 0 && fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
+	    FMD_ASRU_REPLACED))
+		fmd_case_update(alp->al_case);
+}
+
+void
+fmd_asru_replaced(fmd_asru_link_t *alp, void *er)
+{
+	int flags;
+	int rval;
+	int ps;
+
+	ps = fmd_asru_replacement_state(alp->al_event);
+	if (ps == FMD_OBJ_STATE_STILL_PRESENT)
+		return;
+
+	/*
+	 * mark this cache entry as replaced
+	 */
+	rval = fmd_asru_clrflags(alp, FMD_ASRU_FAULTY, FMD_ASRU_REPLACED);
+
+	/*
+	 * now check if all entries associated with this asru are replaced and
+	 * if so replace containees
+	 */
+	(void) pthread_mutex_lock(&alp->al_asru->asru_lock);
+	flags = alp->al_asru->asru_flags;
+	(void) pthread_mutex_unlock(&alp->al_asru->asru_lock);
+	if (!(flags & FMD_ASRU_FAULTY))
+		fmd_asru_al_hash_apply(fmd.d_asrus, fmd_asru_replaced_containee,
+		    alp->al_asru_fmri);
+
+	*(int *)er = 0;
+	if (rval)
+		fmd_case_update(alp->al_case);
+}
+
+static void
+fmd_asru_removed_containee(fmd_asru_link_t *alp, void *er)
+{
+	if (er && alp->al_asru_fmri && fmd_fmri_contains(er,
+	    alp->al_asru_fmri) > 0 && fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
+	    0))
+		fmd_case_update(alp->al_case);
+}
+
+void
+fmd_asru_removed(fmd_asru_link_t *alp)
+{
+	int flags;
+	int rval;
+
+	/*
+	 * mark this cache entry as replacded
+	 */
+	rval = fmd_asru_clrflags(alp, FMD_ASRU_FAULTY, 0);
+
+	/*
+	 * now check if all entries associated with this asru are removed and
+	 * if so replace containees
+	 */
+	(void) pthread_mutex_lock(&alp->al_asru->asru_lock);
+	flags = alp->al_asru->asru_flags;
+	(void) pthread_mutex_unlock(&alp->al_asru->asru_lock);
+	if (!(flags & FMD_ASRU_FAULTY))
+		fmd_asru_al_hash_apply(fmd.d_asrus, fmd_asru_removed_containee,
+		    alp->al_asru_fmri);
+	if (rval)
+		fmd_case_update(alp->al_case);
+}
+
+static void
 fmd_asru_logevent(fmd_asru_link_t *alp)
 {
 	fmd_asru_t *ap = alp->al_asru;
-	boolean_t f = (ap->asru_flags & FMD_ASRU_FAULTY) != 0;
-	boolean_t u = (ap->asru_flags & FMD_ASRU_UNUSABLE) != 0;
-	boolean_t m = (ap->asru_flags & FMD_ASRU_INVISIBLE) == 0;
+	boolean_t faulty = (alp->al_flags & FMD_ASRU_FAULTY) != 0;
+	boolean_t unusable = (alp->al_flags & FMD_ASRU_UNUSABLE) != 0;
+	boolean_t message = (ap->asru_flags & FMD_ASRU_INVISIBLE) == 0;
+	boolean_t repaired = (alp->al_reason == FMD_ASRU_REPAIRED);
+	boolean_t replaced = (alp->al_reason == FMD_ASRU_REPLACED);
+	boolean_t acquitted = (alp->al_reason == FMD_ASRU_ACQUITTED);
 
 	fmd_case_impl_t *cip;
 	fmd_event_t *e;
@@ -1172,9 +1308,9 @@ fmd_asru_logevent(fmd_asru_link_t *alp)
 	if (lp == NULL)
 		return; /* can't log events if we can't open the log */
 
-	nvl = fmd_protocol_rsrc_asru(_fmd_asru_events[f | (u << 1)],
-	    alp->al_asru_fmri, cip->ci_uuid, cip->ci_code, f, u, m,
-	    alp->al_event, &cip->ci_tv);
+	nvl = fmd_protocol_rsrc_asru(_fmd_asru_events[faulty | (unusable << 1)],
+	    alp->al_asru_fmri, cip->ci_uuid, cip->ci_code, faulty, unusable,
+	    message, alp->al_event, &cip->ci_tv, repaired, replaced, acquitted);
 
 	(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
 	e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, class);
@@ -1224,7 +1360,7 @@ fmd_asru_setflags(fmd_asru_link_t *alp, uint_t sflag)
 }
 
 int
-fmd_asru_clrflags(fmd_asru_link_t *alp, uint_t sflag)
+fmd_asru_clrflags(fmd_asru_link_t *alp, uint_t sflag, uint8_t reason)
 {
 	fmd_asru_t *ap = alp->al_asru;
 	fmd_asru_link_t *nalp;
@@ -1240,9 +1376,16 @@ fmd_asru_clrflags(fmd_asru_link_t *alp, uint_t sflag)
 	nstate = alp->al_flags & FMD_ASRU_STATE;
 
 	if (nstate == ostate) {
+		if (reason > alp->al_reason) {
+			alp->al_reason = reason;
+			fmd_asru_logevent(alp);
+			(void) pthread_cond_broadcast(&ap->asru_cv);
+		}
 		(void) pthread_mutex_unlock(&ap->asru_lock);
 		return (0);
 	}
+	if (reason > alp->al_reason)
+		alp->al_reason = reason;
 
 	if (sflag == FMD_ASRU_UNUSABLE)
 		ap->asru_flags &= ~sflag;
@@ -1277,15 +1420,36 @@ fmd_asru_al_getstate(fmd_asru_link_t *alp)
 {
 	int us, st;
 	nvlist_t *asru;
+	int ps;
 
-	if (fmd_asru_is_present(alp->al_event) == 0)
+	ps = fmd_asru_replacement_state(alp->al_event);
+	if (ps == FMD_OBJ_STATE_NOT_PRESENT)
 		return ((alp->al_flags & FMD_ASRU_FAULTY) | FMD_ASRU_UNUSABLE);
+	if (ps == FMD_OBJ_STATE_REPLACED) {
+		if (alp->al_reason < FMD_ASRU_REPLACED)
+			alp->al_reason = FMD_ASRU_REPLACED;
+		return ((alp->al_flags & FMD_ASRU_FAULTY) | FMD_ASRU_UNUSABLE);
+	}
 
-	if (nvlist_lookup_nvlist(alp->al_event, FM_FAULT_ASRU, &asru) == 0)
-		us = fmd_fmri_unusable(asru);
-	else
-		us = (alp->al_flags & FMD_ASRU_UNUSABLE);
 	st = (alp->al_flags & FMD_ASRU_STATE) | FMD_ASRU_PRESENT;
+	if (nvlist_lookup_nvlist(alp->al_event, FM_FAULT_ASRU, &asru) == 0) {
+		us = fmd_fmri_service_state(asru);
+		if (us == -1 || us == FMD_SERVICE_STATE_UNKNOWN) {
+			/* not supported by scheme - try fmd_fmri_unusable */
+			us = fmd_fmri_unusable(asru);
+		} else if (us == FMD_SERVICE_STATE_UNUSABLE) {
+			st |= FMD_ASRU_UNUSABLE;
+			return (st);
+		} else if (us == FMD_SERVICE_STATE_OK) {
+			st &= ~FMD_ASRU_UNUSABLE;
+			return (st);
+		} else if (us == FMD_SERVICE_STATE_DEGRADED) {
+			st &= ~FMD_ASRU_UNUSABLE;
+			st |= FMD_ASRU_DEGRADED;
+			return (st);
+		}
+	} else
+		us = (alp->al_flags & FMD_ASRU_UNUSABLE);
 	if (us > 0)
 		st |= FMD_ASRU_UNUSABLE;
 	else if (us == 0)
@@ -1307,7 +1471,8 @@ fmd_asru_getstate(fmd_asru_t *ap)
 	int us, st;
 
 	if (!(ap->asru_flags & FMD_ASRU_INTERNAL) &&
-	    (fmd_asru_fake_not_present || fmd_fmri_present(ap->asru_fmri) <= 0))
+	    (fmd_asru_fake_not_present >= FMD_OBJ_STATE_REPLACED ||
+	    fmd_fmri_present(ap->asru_fmri) <= 0))
 		return (0); /* do not report non-fmd non-present resources */
 
 	us = fmd_fmri_unusable(ap->asru_fmri);

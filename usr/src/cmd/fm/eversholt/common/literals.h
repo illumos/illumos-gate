@@ -169,6 +169,7 @@ L_DECL(is_connected);
 L_DECL(is_under);
 L_DECL(is_on);
 L_DECL(is_present);
+L_DECL(has_fault);
 L_DECL(is_type);
 L_DECL(count);
 

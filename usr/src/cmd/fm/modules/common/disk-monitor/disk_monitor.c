@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -174,7 +174,7 @@ dm_fault_execute_actions(fmd_hdl_t *hdl, diskmon_t *diskp, nvlist_t *nvl)
 }
 
 static void
-diskmon_agent_repair(fmd_hdl_t *hdl, nvlist_t *nvl)
+diskmon_agent_repair(fmd_hdl_t *hdl, nvlist_t *nvl, int repair)
 {
 	char		*uuid = NULL;
 	nvlist_t	**nva;
@@ -208,6 +208,9 @@ diskmon_agent_repair(fmd_hdl_t *hdl, nvlist_t *nvl)
 
 		dm_state_change(diskp, HPS_REPAIRED);
 	}
+
+	if (repair)
+		fmd_case_uuresolved(hdl, uuid);
 
 }
 
@@ -267,12 +270,17 @@ diskmon_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	 * Act on the fault suspect list or repaired list (embedded agent
 	 * action).
 	 */
-	if (fmd_nvl_class_match(hdl, nvl, "list.repaired")) {
+	if (fmd_nvl_class_match(hdl, nvl, FM_LIST_REPAIRED_CLASS)) {
 
-		diskmon_agent_repair(hdl, nvl);
+		diskmon_agent_repair(hdl, nvl, 1);
 		return;
 
-	} else if (fmd_nvl_class_match(hdl, nvl, "list.suspect")) {
+	} else if (fmd_nvl_class_match(hdl, nvl, FM_LIST_UPDATED_CLASS)) {
+
+		diskmon_agent_repair(hdl, nvl, 0);
+		return;
+
+	} else if (fmd_nvl_class_match(hdl, nvl, FM_LIST_SUSPECT_CLASS)) {
 
 		diskmon_agent_suspect(hdl, nvl);
 		return;

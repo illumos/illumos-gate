@@ -44,6 +44,15 @@ flt_short(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 		(void) snprintf(str, sizeof (str), "%s %s", code, "Repaired");
 		code = str;
 	}
+	if (class != NULL && strcmp(class, FM_LIST_RESOLVED_CLASS) == 0) {
+		(void) snprintf(str, sizeof (str), "%s %s", code, "Resolved");
+		code = str;
+	}
+
+	if (class != NULL && strcmp(class, FM_LIST_UPDATED_CLASS) == 0) {
+		(void) snprintf(str, sizeof (str), "%s %s", code, "Updated");
+		code = str;
+	}
 
 	fmdump_printf(fp, "%-20s %-32s %s\n",
 	    fmdump_date(buf, sizeof (buf), rp), uuid, code);
@@ -56,6 +65,7 @@ flt_verb1(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 {
 	uint_t i, size = 0;
 	nvlist_t **nva;
+	uint8_t *ba;
 
 	(void) flt_short(lp, rp, fp);
 	(void) nvlist_lookup_uint32(rp->rec_nvl, FM_SUSPECT_FAULT_SZ, &size);
@@ -63,6 +73,8 @@ flt_verb1(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 	if (size != 0) {
 		(void) nvlist_lookup_nvlist_array(rp->rec_nvl,
 		    FM_SUSPECT_FAULT_LIST, &nva, &size);
+		(void) nvlist_lookup_uint8_array(rp->rec_nvl,
+		    FM_SUSPECT_FAULT_STATUS, &ba, &size);
 	}
 
 	for (i = 0; i < size; i++) {
@@ -91,15 +103,24 @@ flt_verb1(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 		}
 
 
-		fmdump_printf(fp, "  %3u%%  %s\n\n",
+		fmdump_printf(fp, "  %3u%%  %s",
 		    pct, class ? class : "-");
 
-		/*
-		 * Originally we didn't require FM_FAULT_RESOURCE, so if it
-		 * isn't defined in the event, display the ASRU FMRI instead.
-		 */
+		if (ba[i] & FM_SUSPECT_FAULTY)
+			fmdump_printf(fp, "\n\n");
+		else if (ba[i] & FM_SUSPECT_NOT_PRESENT)
+			fmdump_printf(fp, "\tRemoved\n\n");
+		else if (ba[i] & FM_SUSPECT_REPLACED)
+			fmdump_printf(fp, "\tReplaced\n\n");
+		else if (ba[i] & FM_SUSPECT_REPAIRED)
+			fmdump_printf(fp, "\tRepair Attempted\n\n");
+		else if (ba[i] & FM_SUSPECT_ACQUITTED)
+			fmdump_printf(fp, "\tAcquitted\n\n");
+		else
+			fmdump_printf(fp, "\n\n");
+
 		fmdump_printf(fp, "        Problem in: %s\n",
-		    rname ? rname : aname ? aname : "-");
+		    rname ? rname : "-");
 
 		fmdump_printf(fp, "           Affects: %s\n",
 		    aname ? aname : "-");

@@ -616,7 +616,7 @@ fmd_adm_rsrc_flush(fmd_adm_t *ap, const char *fmri)
 }
 
 int
-fmd_adm_rsrc_repair(fmd_adm_t *ap, const char *fmri)
+fmd_adm_rsrc_repaired(fmd_adm_t *ap, const char *fmri)
 {
 	char *str = (char *)fmri;
 	int err;
@@ -627,7 +627,50 @@ fmd_adm_rsrc_repair(fmd_adm_t *ap, const char *fmri)
 		return (fmd_adm_set_errno(ap, EINVAL));
 
 	do {
-		cs = fmd_adm_rsrcrepair_1(str, &err, ap->adm_clnt);
+		cs = fmd_adm_rsrcrepaired_1(str, &err, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
+		return (fmd_adm_set_errno(ap, EPROTO));
+
+	return (fmd_adm_set_svcerr(ap, err));
+}
+
+int
+fmd_adm_rsrc_replaced(fmd_adm_t *ap, const char *fmri)
+{
+	char *str = (char *)fmri;
+	int err;
+	enum clnt_stat cs;
+	uint_t retries = 0;
+
+	if (fmri == NULL)
+		return (fmd_adm_set_errno(ap, EINVAL));
+
+	do {
+		cs = fmd_adm_rsrcreplaced_1(str, &err, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
+		return (fmd_adm_set_errno(ap, EPROTO));
+
+	return (fmd_adm_set_svcerr(ap, err));
+}
+
+int
+fmd_adm_rsrc_acquit(fmd_adm_t *ap, const char *fmri, const char *uuid)
+{
+	char *str = (char *)fmri;
+	char *str2 = (char *)uuid;
+	int err;
+	enum clnt_stat cs;
+	uint_t retries = 0;
+
+	if (fmri == NULL)
+		return (fmd_adm_set_errno(ap, EINVAL));
+
+	do {
+		cs = fmd_adm_rsrcacquit_1(str, str2, &err, ap->adm_clnt);
 	} while (fmd_adm_retry(ap, cs, &retries));
 
 	if (cs != RPC_SUCCESS)
@@ -649,6 +692,27 @@ fmd_adm_case_repair(fmd_adm_t *ap, const char *uuid)
 
 	do {
 		cs = fmd_adm_caserepair_1(str, &err, ap->adm_clnt);
+	} while (fmd_adm_retry(ap, cs, &retries));
+
+	if (cs != RPC_SUCCESS)
+		return (fmd_adm_set_errno(ap, EPROTO));
+
+	return (fmd_adm_set_svcerr(ap, err));
+}
+
+int
+fmd_adm_case_acquit(fmd_adm_t *ap, const char *uuid)
+{
+	char *str = (char *)uuid;
+	int err;
+	enum clnt_stat cs;
+	uint_t retries = 0;
+
+	if (uuid == NULL)
+		return (fmd_adm_set_errno(ap, EINVAL));
+
+	do {
+		cs = fmd_adm_caseacquit_1(str, &err, ap->adm_clnt);
 	} while (fmd_adm_retry(ap, cs, &retries));
 
 	if (cs != RPC_SUCCESS)

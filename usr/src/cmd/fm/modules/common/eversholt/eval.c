@@ -56,6 +56,8 @@ static int check_expr_args(struct evalue *lp, struct evalue *rp,
 static struct node *eval_fru(struct node *np);
 static struct node *eval_asru(struct node *np);
 
+extern fmd_hdl_t *Hdl;	/* handle from eft.c */
+
 /*
  * begins_with -- return true if rhs path begins with everything in lhs path
  */
@@ -408,6 +410,27 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		valuep->v = 0;
 		if (cp != NULL)
 			valuep->v = 1;
+		return (1);
+	} else if (funcname == L_has_fault) {
+		nvlist_t *asru = NULL, *fru = NULL, *rsrc = NULL;
+
+		nodep = eval_getname(funcnp, ex, events, np->u.expr.left,
+		    globals, croot, arrowp, try, &duped);
+		path = ipath2str(NULL, ipath(nodep));
+		platform_units_translate(0, croot, &asru, &fru, &rsrc, path);
+		FREE((void *)path);
+		if (duped)
+			tree_free(nodep);
+
+		if (rsrc == NULL)
+			valuep->v = 0;
+		else
+			valuep->v = fmd_nvl_fmri_has_fault(Hdl, rsrc,
+			    FMD_HAS_FAULT_RESOURCE,
+			    strcmp(np->u.expr.right->u.quote.s, "") == 0 ?
+			    NULL : (char *)np->u.expr.right->u.quote.s);
+		valuep->t = UINT64;
+		valuep->v = 0;
 		return (1);
 	} else if (funcname == L_count) {
 		struct stats *statp;

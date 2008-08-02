@@ -33,6 +33,7 @@
 #include <sys/types.h>
 #include <stdarg.h>
 #include <strings.h>
+#include <fm/fmd_fmri.h>
 #include <sys/fm/protocol.h>
 
 #include "chip.h"
@@ -448,6 +449,72 @@ done:
 	}
 
 	if (nvlist_add_uint32(*out, TOPO_METH_PRESENT_RET, is_present) != 0) {
+		nvlist_free(*out);
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+
+	return (0);
+}
+
+/*
+ * If we're getting called then the question of whether this dimm is plugged
+ * in has already been answered.  What we don't know for sure is whether it's
+ * the same dimm or a different one plugged in the same slot.  To check, we
+ * try and compare the serial numbers on the dimm in the current topology with
+ * the serial num from the unum fmri that got passed into this function as the
+ * argument.
+ *
+ * In the event we encounter problems comparing serials or if a comparison isn't
+ * possible, we err on the side of caution and set is_present to TRUE.
+ */
+/* ARGSUSED */
+int
+rank_fmri_replaced(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	tnode_t *dimmnode;
+	int err, rval = FMD_OBJ_STATE_UNKNOWN;
+	nvlist_t *unum;
+	char *curr_serial, *old_serial = NULL;
+
+	/*
+	 * If a serial number for the dimm was available at the time of the
+	 * fault, it will have been added as a string to the unum nvlist
+	 */
+	unum = in;
+	if (nvlist_lookup_string(unum, FM_FMRI_HC_SERIAL_ID, &old_serial) != 0)
+		goto done;
+
+	/*
+	 * If the current serial number is available for the DIMM that this rank
+	 * belongs to, it will be accessible as a property on the parent (dimm)
+	 * node.
+	 */
+	dimmnode = topo_node_parent(node);
+	if (topo_prop_get_string(dimmnode, TOPO_PGROUP_PROTOCOL,
+	    FM_FMRI_HC_SERIAL_ID, &curr_serial, &err) != 0) {
+		if (err != ETOPO_PROP_NOENT) {
+			whinge(mod, &err, "rank_fmri_present: Unexpected error "
+			    "retrieving serial from node");
+			return (topo_mod_seterrno(mod,  EMOD_NVL_INVAL));
+		} else
+			goto done;
+	}
+
+	if (strcmp(old_serial, curr_serial) != 0)
+		rval = FMD_OBJ_STATE_REPLACED;
+	else
+		rval = FMD_OBJ_STATE_STILL_PRESENT;
+
+	topo_mod_strfree(mod, curr_serial);
+done:
+	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) < 0) {
+		whinge(mod, &err,
+		    "rank_fmri_present: failed to allocate nvlist!");
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+	}
+
+	if (nvlist_add_uint32(*out, TOPO_METH_REPLACED_RET, rval) != 0) {
 		nvlist_free(*out);
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}

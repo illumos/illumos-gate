@@ -89,6 +89,7 @@ typedef struct fmd_asru_link {
 	nvlist_t *al_event;		/* event associated with last change */
 	uint_t al_refs;			/* reference count */
 	uint_t al_flags;		/* flags (see below) */
+	uint8_t al_reason;		/* repair reason (see below) */
 } fmd_asru_link_t;
 
 #define	FMD_ASRU_FAULTY		0x01	/* asru has been diagnosed as faulty */
@@ -98,6 +99,15 @@ typedef struct fmd_asru_link {
 #define	FMD_ASRU_INVISIBLE	0x10	/* asru is not visibly administered */
 #define	FMD_ASRU_RECREATED	0x20	/* asru recreated by cache replay */
 #define	FMD_ASRU_PRESENT	0x40	/* asru present at last R$ update */
+#define	FMD_ASRU_DEGRADED	0x80	/* asru service is degraded */
+
+/*
+ * Note the following are defined in order of increasing precedence and
+ * this should not be changed
+ */
+#define	FMD_ASRU_ACQUITTED	1	/* asru acquitted */
+#define	FMD_ASRU_REPAIRED	2	/* asru repaired */
+#define	FMD_ASRU_REPLACED	3	/* asru replaced */
 
 #define	FMD_ASRU_STATE	(FMD_ASRU_FAULTY | FMD_ASRU_UNUSABLE)
 
@@ -146,16 +156,18 @@ extern void fmd_asru_hash_apply_by_case(fmd_asru_hash_t *, fmd_case_t *,
     void (*)(fmd_asru_link_t *, void *), void *);
 
 extern fmd_asru_t *fmd_asru_hash_lookup_name(fmd_asru_hash_t *, const char *);
-extern fmd_asru_t *fmd_asru_hash_lookup_nvl(fmd_asru_hash_t *, nvlist_t *);
 extern fmd_asru_link_t *fmd_asru_hash_create_entry(fmd_asru_hash_t *,
     fmd_case_t *, nvlist_t *);
 extern void fmd_asru_hash_release(fmd_asru_hash_t *, fmd_asru_t *);
 extern void fmd_asru_hash_delete_case(fmd_asru_hash_t *, fmd_case_t *);
 
 extern void fmd_asru_clear_aged_rsrcs();
-extern void fmd_asru_repair(fmd_asru_link_t *, void *);
+extern void fmd_asru_repaired(fmd_asru_link_t *, void *);
+extern void fmd_asru_acquit(fmd_asru_link_t *, void *);
+extern void fmd_asru_replaced(fmd_asru_link_t *, void *);
+extern void fmd_asru_removed(fmd_asru_link_t *);
 extern int fmd_asru_setflags(fmd_asru_link_t *, uint_t);
-extern int fmd_asru_clrflags(fmd_asru_link_t *, uint_t);
+extern int fmd_asru_clrflags(fmd_asru_link_t *, uint_t, uint8_t);
 extern int fmd_asru_al_getstate(fmd_asru_link_t *);
 extern int fmd_asru_getstate(fmd_asru_t *);
 

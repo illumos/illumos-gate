@@ -1119,6 +1119,21 @@ check_func(struct node *np)
 			    "argument to is_present() must be a path or a call "
 			    "to fru() or asru()");
 		}
+	} else if (np->u.func.s == L_has_fault) {
+		if (arglist->t == T_LIST &&
+		    (arglist->u.expr.left->t == T_NAME ||
+		    (arglist->u.expr.left->t == T_FUNC &&
+		    (arglist->u.expr.left->u.func.s == L_fru ||
+		    arglist->u.expr.left->u.func.s == L_asru))) &&
+		    arglist->u.expr.right->t == T_QUOTE) {
+			if (arglist->u.expr.left->t == T_FUNC)
+				check_func(arglist->u.expr.left);
+		} else {
+			outfl(O_ERR, arglist->file, arglist->line,
+			    "%s() must have path or call to "
+			    "fru() and/or asru() as first argument; "
+			    "second argument must be a string", np->u.func.s);
+		}
 	} else if (np->u.func.s == L_is_type) {
 		if (arglist->t == T_NAME ||
 		    (arglist->t == T_FUNC &&

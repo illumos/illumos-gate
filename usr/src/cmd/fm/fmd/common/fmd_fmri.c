@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -317,6 +317,40 @@ fmd_fmri_present(nvlist_t *nvl)
 
 	(void) pthread_mutex_lock(&sp->sch_opslock);
 	rv = sp->sch_ops.sop_present(nvl);
+	(void) pthread_mutex_unlock(&sp->sch_opslock);
+
+	fmd_scheme_hash_release(fmd.d_schemes, sp);
+	return (rv);
+}
+
+int
+fmd_fmri_replaced(nvlist_t *nvl)
+{
+	fmd_scheme_t *sp;
+	int rv;
+
+	if ((sp = nvl2scheme(nvl)) == NULL)
+		return (-1); /* errno is set for us */
+
+	(void) pthread_mutex_lock(&sp->sch_opslock);
+	rv = sp->sch_ops.sop_replaced(nvl);
+	(void) pthread_mutex_unlock(&sp->sch_opslock);
+
+	fmd_scheme_hash_release(fmd.d_schemes, sp);
+	return (rv);
+}
+
+int
+fmd_fmri_service_state(nvlist_t *nvl)
+{
+	fmd_scheme_t *sp;
+	int rv;
+
+	if ((sp = nvl2scheme(nvl)) == NULL)
+		return (-1); /* errno is set for us */
+
+	(void) pthread_mutex_lock(&sp->sch_opslock);
+	rv = sp->sch_ops.sop_service_state(nvl);
 	(void) pthread_mutex_unlock(&sp->sch_opslock);
 
 	fmd_scheme_hash_release(fmd.d_schemes, sp);

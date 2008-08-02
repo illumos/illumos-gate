@@ -84,7 +84,8 @@ typedef struct fmd_case_impl {
 #define	FMD_CASE_SOLVED		1	/* case is solved (suspects added) */
 #define	FMD_CASE_CLOSE_WAIT	2	/* case is executing fmdo_close() */
 #define	FMD_CASE_CLOSED		3	/* case is closed (reconfig done) */
-#define	FMD_CASE_REPAIRED	4	/* case is repaired (can be freed) */
+#define	FMD_CASE_REPAIRED	4	/* case is repaired */
+#define	FMD_CASE_RESOLVED	5	/* case is resolved (can be freed) */
 
 #define	FMD_CF_DIRTY		0x01	/* case is in need of checkpoint */
 #define	FMD_CF_SOLVED		0x02	/* case has been solved */
@@ -138,8 +139,10 @@ extern void fmd_case_discard(fmd_case_t *);
 extern void fmd_case_settime(fmd_case_t *, time_t, suseconds_t);
 
 extern int fmd_case_repair(fmd_case_t *);
+extern int fmd_case_acquit(fmd_case_t *);
 extern int fmd_case_contains(fmd_case_t *, fmd_event_t *);
 extern int fmd_case_orphaned(fmd_case_t *);
+extern void fmd_case_repair_replay(void);
 
 #ifdef	__cplusplus
 }

@@ -29,6 +29,7 @@
 #include <strings.h>
 #include <umem.h>
 #include <fm/topo_mod.h>
+#include <fm/fmd_fmri.h>
 #include <sys/fm/ldom.h>
 #include <sys/fm/protocol.h>
 
@@ -37,7 +38,7 @@
 /*
  * This enumerator creates cpu-schemed nodes for each strand found in the
  * sun4v Physical Rource Inventory (PRI).
- * Each node export three methods present(), expand() and unusable().
+ * Each node export four methods present(), expand() replaced() and unusable().
  *
  */
 
@@ -51,6 +52,8 @@ static int cpu_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
     topo_instance_t, void *, void *);
 static void cpu_release(topo_mod_t *, tnode_t *);
 static int cpu_present(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
+    nvlist_t **);
+static int cpu_replaced(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
 static int cpu_expand(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
@@ -66,6 +69,8 @@ static const topo_modinfo_t cpu_info =
 static const topo_method_t cpu_methods[] = {
 	{ TOPO_METH_PRESENT, TOPO_METH_PRESENT_DESC,
 	    TOPO_METH_PRESENT_VERSION, TOPO_STABILITY_INTERNAL, cpu_present },
+	{ TOPO_METH_REPLACED, TOPO_METH_REPLACED_DESC,
+	    TOPO_METH_REPLACED_VERSION, TOPO_STABILITY_INTERNAL, cpu_replaced },
 	{ TOPO_METH_EXPAND, TOPO_METH_EXPAND_DESC,
 	    TOPO_METH_EXPAND_VERSION, TOPO_STABILITY_INTERNAL, cpu_expand },
 	{ TOPO_METH_UNUSABLE, TOPO_METH_UNUSABLE_DESC,
@@ -173,6 +178,54 @@ cpu_present(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) != 0)
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	if (nvlist_add_uint32(*out, TOPO_METH_PRESENT_RET, present) != 0) {
+		nvlist_free(*out);
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+cpu_replaced(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
+    nvlist_t *in, nvlist_t **out)
+{
+	uint8_t version;
+	uint32_t cpuid;
+	uint64_t nvlserid;
+	uint32_t rval = FMD_OBJ_STATE_NOT_PRESENT;
+	md_cpumap_t *mcmp;
+	md_info_t *chip = (md_info_t *)topo_mod_getspecific(mod);
+
+	/*
+	 * Get the physical cpuid
+	 */
+	if (nvlist_lookup_uint8(in, FM_VERSION, &version) != 0 ||
+	    version > FM_CPU_SCHEME_VERSION ||
+	    nvlist_lookup_uint32(in, FM_FMRI_CPU_ID, &cpuid) != 0) {
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+
+	/*
+	 * Find the cpuid entry
+	 * If the input nvl contains a serial number, the cpu is identified
+	 * by a tuple <cpuid, cpuserial>
+	 * Otherwise, the cpu is identified by the <cpuid>.
+	 */
+	if ((mcmp = cpu_find_cpumap(chip, cpuid)) != NULL) {
+		if (nvlist_lookup_uint64(in, FM_FMRI_CPU_SERIAL_ID, &nvlserid)
+		    == 0)
+			rval = (nvlserid == mcmp->cpumap_serialno) ?
+			    FMD_OBJ_STATE_STILL_PRESENT :
+			    FMD_OBJ_STATE_REPLACED;
+		else
+			rval = FMD_OBJ_STATE_UNKNOWN;
+	}
+
+	/* return the replaced status */
+	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) != 0)
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	if (nvlist_add_uint32(*out, TOPO_METH_REPLACED_RET, rval) != 0) {
 		nvlist_free(*out);
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}

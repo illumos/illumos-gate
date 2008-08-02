@@ -138,6 +138,8 @@ extern int mem_asru_compute(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 extern int rank_fmri_present(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
+extern int rank_fmri_replaced(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
 extern int mem_asru_create(topo_mod_t *, nvlist_t *, nvlist_t **);
 
 /*

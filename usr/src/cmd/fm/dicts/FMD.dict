@@ -31,3 +31,5 @@ defect.sunos.fmd.nodiagcode=1
 defect.sunos.fmd.module=2
 defect.sunos.fmd.config=3
 list.repaired=4
+list.updated=5
+list.resolved=6

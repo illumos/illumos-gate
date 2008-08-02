@@ -30,6 +30,7 @@
 #include <string.h>
 #include <limits.h>
 #include <fm/topo_mod.h>
+#include <fm/fmd_fmri.h>
 #include <sys/fm/protocol.h>
 #include <topo_alloc.h>
 #include <topo_error.h>
@@ -50,8 +51,10 @@
  *
  *	- expand
  *	- present
+ *	- replaced
  *	- contains
  *	- unusable
+ *	- service_state
  *	- nvl2str
  *
  * In addition, the following operations are supported per-FMRI:
@@ -199,6 +202,34 @@ topo_fmri_present(topo_hdl_t *thp, nvlist_t *fmri, int *err)
 }
 
 int
+topo_fmri_replaced(topo_hdl_t *thp, nvlist_t *fmri, int *err)
+{
+	uint32_t replaced = FMD_OBJ_STATE_NOT_PRESENT;
+	char *scheme;
+	nvlist_t *out = NULL;
+	tnode_t *rnode;
+
+	if (nvlist_lookup_string(fmri, FM_FMRI_SCHEME, &scheme) != 0)
+		return (set_error(thp, ETOPO_FMRI_MALFORM, err,
+		    TOPO_METH_REPLACED, out));
+
+	if ((rnode = topo_hdl_root(thp, scheme)) == NULL)
+		return (set_error(thp, ETOPO_METHOD_NOTSUP, err,
+		    TOPO_METH_REPLACED, out));
+
+	if (topo_method_invoke(rnode, TOPO_METH_REPLACED,
+	    TOPO_METH_REPLACED_VERSION, fmri, &out, err) < 0) {
+		(void) set_error(thp, *err, err, TOPO_METH_REPLACED, out);
+		return (FMD_OBJ_STATE_UNKNOWN);
+	}
+
+	(void) nvlist_lookup_uint32(out, TOPO_METH_REPLACED_RET, &replaced);
+	nvlist_free(out);
+
+	return (replaced);
+}
+
+int
 topo_fmri_contains(topo_hdl_t *thp, nvlist_t *fmri, nvlist_t *subfmri, int *err)
 {
 	uint32_t contains;
@@ -264,6 +295,34 @@ topo_fmri_unusable(topo_hdl_t *thp, nvlist_t *fmri, int *err)
 	nvlist_free(out);
 
 	return (unusable);
+}
+
+int
+topo_fmri_service_state(topo_hdl_t *thp, nvlist_t *fmri, int *err)
+{
+	char *scheme;
+	uint32_t service_state = FMD_SERVICE_STATE_UNKNOWN;
+	nvlist_t *out = NULL;
+	tnode_t *rnode;
+
+	if (nvlist_lookup_string(fmri, FM_FMRI_SCHEME, &scheme) != 0)
+		return (set_error(thp, ETOPO_FMRI_MALFORM, err,
+		    TOPO_METH_SERVICE_STATE, out));
+
+	if ((rnode = topo_hdl_root(thp, scheme)) == NULL)
+		return (set_error(thp, ETOPO_METHOD_NOTSUP, err,
+		    TOPO_METH_SERVICE_STATE, out));
+
+	if (topo_method_invoke(rnode, TOPO_METH_SERVICE_STATE,
+	    TOPO_METH_SERVICE_STATE_VERSION, fmri, &out, err) < 0)
+		return (set_error(thp, *err, err, TOPO_METH_SERVICE_STATE,
+		    out));
+
+	(void) nvlist_lookup_uint32(out, TOPO_METH_SERVICE_STATE_RET,
+	    &service_state);
+	nvlist_free(out);
+
+	return (service_state);
 }
 
 int

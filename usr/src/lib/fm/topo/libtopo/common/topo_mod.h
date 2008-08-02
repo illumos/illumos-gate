@@ -137,11 +137,23 @@ extern nvlist_t *topo_mod_auth(topo_mod_t *, tnode_t *);
 #define	TOPO_METH_PRESENT_VERSION	TOPO_METH_PRESENT_VERSION0
 #define	TOPO_METH_PRESENT_RET		"present-ret"
 
+#define	TOPO_METH_REPLACED		"topo_replaced"
+#define	TOPO_METH_REPLACED_DESC		"replaced indicator"
+#define	TOPO_METH_REPLACED_VERSION0	0
+#define	TOPO_METH_REPLACED_VERSION	TOPO_METH_REPLACED_VERSION0
+#define	TOPO_METH_REPLACED_RET		"replaced-ret"
+
 #define	TOPO_METH_UNUSABLE		"topo_unusable"
 #define	TOPO_METH_UNUSABLE_DESC		"unusable indicator"
 #define	TOPO_METH_UNUSABLE_VERSION0	0
 #define	TOPO_METH_UNUSABLE_VERSION	TOPO_METH_UNUSABLE_VERSION0
 #define	TOPO_METH_UNUSABLE_RET		"unusable-ret"
+
+#define	TOPO_METH_SERVICE_STATE		"topo_service_state"
+#define	TOPO_METH_SERVICE_STATE_DESC	"service_state indicator"
+#define	TOPO_METH_SERVICE_STATE_VERSION0	0
+#define	TOPO_METH_SERVICE_STATE_VERSION	TOPO_METH_SERVICE_STATE_VERSION0
+#define	TOPO_METH_SERVICE_STATE_RET	"service_state-ret"
 
 #define	TOPO_METH_EXPAND		"topo_expand"
 #define	TOPO_METH_EXPAND_DESC		"expand FMRI"

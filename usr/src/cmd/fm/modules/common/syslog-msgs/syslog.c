@@ -390,7 +390,8 @@ syslog_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		syslog_pointer = dgettext(SYSLOG_DOMAIN, SYSLOG_POINTER);
 
 	syslog_ctl.pri &= LOG_FACMASK;
-	if (strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)
+	if (strcmp(class, FM_LIST_RESOLVED_CLASS) == 0 ||
+	    strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)
 		syslog_ctl.pri |= LOG_NOTICE;
 	else
 		syslog_ctl.pri |= LOG_ERR;
@@ -549,6 +550,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	fmd_prop_free_string(hdl, rootdir);
 	fmd_hdl_subscribe(hdl, FM_LIST_SUSPECT_CLASS);
 	fmd_hdl_subscribe(hdl, FM_LIST_REPAIRED_CLASS);
+	fmd_hdl_subscribe(hdl, FM_LIST_RESOLVED_CLASS);
 }
 
 void

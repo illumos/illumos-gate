@@ -90,9 +90,11 @@ extern void topo_walk_fini(topo_walk_t *);
  * FMRI helper routines
  */
 extern int topo_fmri_present(topo_hdl_t *, nvlist_t *, int *);
+extern int topo_fmri_replaced(topo_hdl_t *, nvlist_t *, int *);
 extern int topo_fmri_contains(topo_hdl_t *, nvlist_t *, nvlist_t *, int *);
 extern int topo_fmri_expand(topo_hdl_t *, nvlist_t *, int *);
 extern int topo_fmri_unusable(topo_hdl_t *, nvlist_t *, int *);
+extern int topo_fmri_service_state(topo_hdl_t *, nvlist_t *, int *);
 extern int topo_fmri_nvl2str(topo_hdl_t *, nvlist_t *, char **, int *);
 extern int topo_fmri_str2nvl(topo_hdl_t *, const char *, nvlist_t **, int *);
 extern int topo_fmri_asru(topo_hdl_t *, nvlist_t *, nvlist_t **, int *);

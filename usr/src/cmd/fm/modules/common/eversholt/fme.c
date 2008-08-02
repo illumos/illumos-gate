@@ -2885,7 +2885,7 @@ publish_suspects(struct fme *fmep, struct rsl *srl)
 		/*
 		 * If "action" property exists, evaluate it;  this must be done
 		 * before the allfaulty check below since some actions may
-		 * modify the asru to be used in fmd_nvl_fmri_faulty.  This
+		 * modify the asru to be used in fmd_nvl_fmri_has_fault.  This
 		 * needs to be restructured if any new actions are introduced
 		 * that have effects that we do not want to be visible if
 		 * we decide not to publish in the dupclose check below.
@@ -2918,7 +2918,8 @@ publish_suspects(struct fme *fmep, struct rsl *srl)
 			    FM_FAULT_ASRU, &asru) != 0) {
 				out(O_ALTFP|O_VERB, "NULL asru");
 				allfaulty = B_FALSE;
-			} else if (fmd_nvl_fmri_faulty(fmep->hdl, asru)) {
+			} else if (fmd_nvl_fmri_has_fault(fmep->hdl, asru,
+			    FMD_HAS_FAULT_ASRU, NULL)) {
 				out(O_ALTFP|O_VERB, "faulty");
 			} else {
 				out(O_ALTFP|O_VERB, "not faulty");

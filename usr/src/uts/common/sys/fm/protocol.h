@@ -56,6 +56,8 @@ extern "C" {
 #define	FM_LIST_SUSPECT_CLASS		FM_LIST_EVENT ".suspect"
 #define	FM_LIST_ISOLATED_CLASS		FM_LIST_EVENT ".isolated"
 #define	FM_LIST_REPAIRED_CLASS		FM_LIST_EVENT ".repaired"
+#define	FM_LIST_UPDATED_CLASS		FM_LIST_EVENT ".updated"
+#define	FM_LIST_RESOLVED_CLASS		FM_LIST_EVENT ".resolved"
 
 /* ereport class subcategory values */
 #define	FM_ERROR_CPU			"cpu"
@@ -72,7 +74,10 @@ extern "C" {
 /* list.* event payload member names */
 #define	FM_LIST_EVENT_SIZE		"list-sz"
 
-/* list.suspect, isolated, and repaired versions and payload member names */
+/*
+ * list.suspect, isolated, updated, repaired and resolved
+ * versions/payload member names.
+ */
 #define	FM_SUSPECT_UUID			"uuid"
 #define	FM_SUSPECT_DIAG_CODE		"code"
 #define	FM_SUSPECT_DIAG_TIME		"diag-time"
@@ -90,6 +95,10 @@ extern "C" {
 #define	FM_SUSPECT_FAULTY		0x1
 #define	FM_SUSPECT_UNUSABLE		0x2
 #define	FM_SUSPECT_NOT_PRESENT		0x4
+#define	FM_SUSPECT_DEGRADED		0x8
+#define	FM_SUSPECT_REPAIRED		0x10
+#define	FM_SUSPECT_REPLACED		0x20
+#define	FM_SUSPECT_ACQUITTED		0x40
 
 /* fault event versions and payload member names */
 #define	FM_FAULT_VERS0			0
@@ -111,6 +120,9 @@ extern "C" {
 #define	FM_RSRC_ASRU_UUID		"uuid"
 #define	FM_RSRC_ASRU_CODE		"code"
 #define	FM_RSRC_ASRU_FAULTY		"faulty"
+#define	FM_RSRC_ASRU_REPAIRED		"repaired"
+#define	FM_RSRC_ASRU_REPLACED		"replaced"
+#define	FM_RSRC_ASRU_ACQUITTED		"acquitted"
 #define	FM_RSRC_ASRU_UNUSABLE		"unusable"
 #define	FM_RSRC_ASRU_EVENT		"event"
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,7 +108,13 @@ static const struct cmd {
 { cmd_flush, "flush", "<fmri> ...", "flush cached state for resource" },
 { cmd_gc, "gc", "<module>", NULL },
 { cmd_load, "load", "<path>", "load specified fault manager module" },
-{ cmd_repair, "repair", "<fmri>|<uuid>", "record repair to resource(s)" },
+{ cmd_repair, "repair", "<fmri>|label|<uuid>", NULL },
+{ cmd_repaired, "repaired", "<fmri>|label>",
+	"notify fault manager that resource has been repaired" },
+{ cmd_acquit, "acquit", "<fmri> [<uuid>] | label [<uuid>] | <uuid>",
+	"acquit resource or acquit case" },
+{ cmd_replaced, "replaced", "<fmri>|label",
+	"notify fault manager that resource has been replaced" },
 { cmd_reset, "reset", "[-s serd] <module>", "reset module or sub-component" },
 { cmd_rotate, "rotate", "<logname>", "rotate log file" },
 { cmd_unload, "unload", "<module>", "unload specified fault manager module" },

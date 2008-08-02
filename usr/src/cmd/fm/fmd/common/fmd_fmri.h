@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,9 +91,24 @@ extern void fmd_fmri_fini(void);
 extern ssize_t fmd_fmri_nvl2str(nvlist_t *, char *, size_t);
 extern int fmd_fmri_expand(nvlist_t *);
 extern int fmd_fmri_present(nvlist_t *);
+extern int fmd_fmri_replaced(nvlist_t *);
+extern int fmd_fmri_service_state(nvlist_t *);
 extern int fmd_fmri_unusable(nvlist_t *);
 extern int fmd_fmri_contains(nvlist_t *, nvlist_t *);
 extern nvlist_t *fmd_fmri_translate(nvlist_t *, nvlist_t *);
+
+#define	FMD_OBJ_STATE_UNKNOWN		1
+#define	FMD_OBJ_STATE_STILL_PRESENT	2
+#define	FMD_OBJ_STATE_REPLACED		3
+#define	FMD_OBJ_STATE_NOT_PRESENT	4
+
+#define	FMD_SERVICE_STATE_UNKNOWN			0
+#define	FMD_SERVICE_STATE_OK				1
+#define	FMD_SERVICE_STATE_DEGRADED			2
+#define	FMD_SERVICE_STATE_UNUSABLE			3
+#define	FMD_SERVICE_STATE_DEGRADED_PENDING_RESET	4
+#define	FMD_SERVICE_STATE_UNUSABLE_PENDING_RESET	5
+#define	FMD_SERVICE_STATE_UNUSABLE_UNTIL_REPLACED	6
 
 #ifdef	__cplusplus
 }

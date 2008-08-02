@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,7 +135,7 @@ program FMD_ADM {
 		struct fmd_rpc_rsrclist FMD_ADM_RSRCLIST(bool) = 9;
 		struct fmd_rpc_rsrcinfo FMD_ADM_RSRCINFO(string) = 10;
 		int FMD_ADM_RSRCFLUSH(string) = 11;
-		int FMD_ADM_RSRCREPAIR(string) = 12;
+		int FMD_ADM_RSRCREPAIRED(string) = 12;
 		struct fmd_rpc_serdlist FMD_ADM_SERDINFO(string) = 13;
 		int FMD_ADM_SERDRESET(string, string) = 14;
 		int FMD_ADM_LOGROTATE(string) = 15;
@@ -144,6 +144,9 @@ program FMD_ADM {
 		struct fmd_rpc_modstat FMD_ADM_XPRTSTAT(int32_t) = 18;
 		struct fmd_rpc_caselist FMD_ADM_CASELIST(void) = 19;
 		struct fmd_rpc_caseinfo FMD_ADM_CASEINFO(string) = 20;
+		int FMD_ADM_RSRCREPLACED(string) = 21;
+		int FMD_ADM_RSRCACQUIT(string, string) = 22;
+		int FMD_ADM_CASEACQUIT(string) = 23;
 	} = 1;
 } = 100169;
 

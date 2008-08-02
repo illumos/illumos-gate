@@ -204,6 +204,8 @@ fmd_fmri_present(nvlist_t *nvl)
 	size_t nserids;
 #else
 	nvlist_t *unum_nvl;
+	nvlist_t *nvlcp = NULL;
+	uint64_t val;
 #endif /* sparc */
 
 	if (mem_fmri_get_unum(nvl, &unum) < 0)
@@ -274,6 +276,121 @@ fmd_fmri_present(nvlist_t *nvl)
 		rc = fmd_fmri_set_errno(EINVAL);
 	fmd_fmri_topo_rele(thp);
 
+	/*
+	 * Need to check if this is a valid page too. if "isretired" returns
+	 * EINVAL, assume page invalid and return not_present.
+	 */
+	if (rc == 1 && nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &val) ==
+	    0 && nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &val) == 0 &&
+	    mem_unum_rewrite(nvl, &nvlcp) == 0 && nvlcp != NULL) {
+		int rval = mem_page_cmd(MEM_PAGE_FMRI_ISRETIRED, nvlcp);
+		if (rval == -1 && errno == EINVAL)
+			rc = 0;
+		nvlist_free(nvlcp);
+	}
+#endif	/* sparc */
+	return (rc);
+}
+
+int
+fmd_fmri_replaced(nvlist_t *nvl)
+{
+	char *unum = NULL;
+	int rc, err = 0;
+	struct topo_hdl *thp;
+#ifdef sparc
+	char **nvlserids, **serids;
+	uint_t nnvlserids;
+	size_t nserids;
+#else
+	nvlist_t *unum_nvl;
+	nvlist_t *nvlcp = NULL;
+	uint64_t val;
+#endif /* sparc */
+
+	if (mem_fmri_get_unum(nvl, &unum) < 0)
+		return (-1); /* errno is set for us */
+
+#ifdef sparc
+	/*
+	 * If the mem-scheme topology exports this method replaced(), invoke it.
+	 */
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
+		return (fmd_fmri_set_errno(EINVAL));
+	rc = topo_fmri_replaced(thp, nvl, &err);
+	fmd_fmri_topo_rele(thp);
+	if (err != ETOPO_METHOD_NOTSUP)
+		return (rc);
+
+	if (nvlist_lookup_string_array(nvl, FM_FMRI_MEM_SERIAL_ID, &nvlserids,
+	    &nnvlserids) != 0) {
+		/*
+		 * Some mem scheme FMRIs don't have serial ids because
+		 * either the platform does not support them, or because
+		 * the FMRI was created before support for serial ids was
+		 * introduced.  If this is the case, assume it is there.
+		 */
+		if (mem.mem_dm == NULL)
+			return (FMD_OBJ_STATE_UNKNOWN);
+		else
+			return (fmd_fmri_set_errno(EINVAL));
+	}
+
+	if (mem_get_serids_by_unum(unum, &serids, &nserids) < 0) {
+		if (errno == ENOTSUP)
+			return (FMD_OBJ_STATE_UNKNOWN);
+		if (errno != ENOENT) {
+			/*
+			 * Errors are only signalled to the caller if they're
+			 * the caller's fault.  This isn't - it's a failure on
+			 * our part to burst or read the serial numbers.  We'll
+			 * whine about it, and tell the caller the named
+			 * module(s) isn't/aren't there.
+			 */
+			fmd_fmri_warn("failed to retrieve serial number for "
+			    "unum %s", unum);
+		}
+		return (FMD_OBJ_STATE_NOT_PRESENT);
+	}
+
+	rc = serids_eq(serids, nserids, nvlserids, nnvlserids) ?
+	    FMD_OBJ_STATE_STILL_PRESENT : FMD_OBJ_STATE_REPLACED;
+
+	mem_strarray_free(serids, nserids);
+#else
+	/*
+	 * On X86 we will invoke the topo is_replaced method passing in the
+	 * unum, which is in hc scheme.  The libtopo hc-scheme is_replaced
+	 * method will invoke the node-specific is_replaced method, which is
+	 * implemented by the chip enumerator for rank nodes.  The rank node's
+	 * is_replaced method will compare the serial number in the unum with
+	 * the current serial to determine if the same DIMM is replaced.
+	 */
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL) {
+		fmd_fmri_warn("failed to get handle to topology");
+		return (-1);
+	}
+	if (topo_fmri_str2nvl(thp, unum, &unum_nvl, &err) == 0) {
+		rc = topo_fmri_replaced(thp, unum_nvl, &err);
+		nvlist_free(unum_nvl);
+	} else
+		rc = fmd_fmri_set_errno(EINVAL);
+	fmd_fmri_topo_rele(thp);
+
+	/*
+	 * Need to check if this is a valid page too. if "isretired" returns
+	 * EINVAL, assume page invalid and return not_present.
+	 */
+	if ((rc == FMD_OBJ_STATE_STILL_PRESENT ||
+	    rc == FMD_OBJ_STATE_UNKNOWN) &&
+	    nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &val) == 0 &&
+	    nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &val) == 0 &&
+	    mem_unum_rewrite(nvl, &nvlcp) == 0 && nvlcp != NULL) {
+		int rval = mem_page_cmd(MEM_PAGE_FMRI_ISRETIRED, nvlcp);
+		if (rval == -1 && errno == EINVAL)
+			rc = FMD_OBJ_STATE_NOT_PRESENT;
+		nvlist_free(nvlcp);
+	}
 #endif	/* sparc */
 	return (rc);
 }

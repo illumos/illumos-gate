@@ -178,6 +178,7 @@ extern const char *fmd_case_uuid(fmd_hdl_t *, fmd_case_t *);
 extern fmd_case_t *fmd_case_uulookup(fmd_hdl_t *, const char *);
 extern void fmd_case_uuclose(fmd_hdl_t *, const char *);
 extern int fmd_case_uuclosed(fmd_hdl_t *, const char *);
+extern void fmd_case_uuresolved(fmd_hdl_t *, const char *);
 
 extern int fmd_case_solved(fmd_hdl_t *, fmd_case_t *);
 extern int fmd_case_closed(fmd_hdl_t *, fmd_case_t *);
@@ -225,7 +226,14 @@ extern int fmd_nvl_class_match(fmd_hdl_t *, nvlist_t *, const char *);
 extern int fmd_nvl_fmri_expand(fmd_hdl_t *, nvlist_t *);
 extern int fmd_nvl_fmri_present(fmd_hdl_t *, nvlist_t *);
 extern int fmd_nvl_fmri_unusable(fmd_hdl_t *, nvlist_t *);
-extern int fmd_nvl_fmri_faulty(fmd_hdl_t *, nvlist_t *);
+extern int fmd_nvl_fmri_replaced(fmd_hdl_t *, nvlist_t *);
+extern int fmd_nvl_fmri_service_state(fmd_hdl_t *, nvlist_t *);
+extern int fmd_nvl_fmri_has_fault(fmd_hdl_t *, nvlist_t *, int, char *);
+
+#define	FMD_HAS_FAULT_FRU	0
+#define	FMD_HAS_FAULT_ASRU	1
+#define	FMD_HAS_FAULT_RESOURCE	2
+
 extern int fmd_nvl_fmri_contains(fmd_hdl_t *, nvlist_t *, nvlist_t *);
 extern nvlist_t *fmd_nvl_fmri_translate(fmd_hdl_t *, nvlist_t *, nvlist_t *);
 
