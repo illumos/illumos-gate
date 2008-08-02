@@ -75,7 +75,7 @@ static	ip_t	eid_ip;
 static	int	num_reg = 0;
 static	pthread_t	scn_tid = 0;
 static	pthread_t	isns_tid = 0;
-static	Boolean_t	isns_shutdown = False;
+static	Boolean_t	isns_shutdown = True;
 static	Boolean_t	connection_thr_bail_out = False;
 static int ISNS_SLEEP_SECS = 20;
 Boolean_t	isns_server_connection_thr_running = False;
@@ -445,10 +445,13 @@ isns_server_connection_thr(void *arg)
 			syslog(LOG_INFO,
 			    "isns server is disabled, dergister target");
 			isns_fini();
-			return (NULL);
+			break;
 		}
 
 	}
+	queue_message_set(mgmtq, 0, msg_pthread_join,
+	    (void *)(uintptr_t)pthread_self());
+
 	return (NULL);
 }
 
@@ -727,6 +730,8 @@ isns_init(target_queue_t *q)
 		return (-1);
 	}
 
+	isns_shutdown = False;
+
 	(void) isns_populate_and_update_server_info(False);
 	if (pthread_create(&scn_tid, NULL,
 	    esi_scn_thr, (void *)&isns_args) !=
@@ -777,6 +782,7 @@ isns_update()
 		 * log off all targets and fini isns service
 		 */
 		if (is_isns_enabled == False) {
+			isns_shutdown = True;
 			/* pthread_join for the isns thread */
 			pthread_join(isns_tid, NULL);
 			pthread_join(scn_tid, NULL);
