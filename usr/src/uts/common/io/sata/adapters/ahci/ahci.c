@@ -2595,7 +2595,7 @@ ahci_selftest(dev_info_t *dip, sata_device_t *device)
 static int
 ahci_alloc_ports_state(ahci_ctl_t *ahci_ctlp)
 {
-	int port, cport;
+	int port, cport = 0;
 
 	AHCIDBG0(AHCIDBG_INIT|AHCIDBG_ENTRY, ahci_ctlp,
 	    "ahci_alloc_ports_state enter");
@@ -2603,8 +2603,7 @@ ahci_alloc_ports_state(ahci_ctl_t *ahci_ctlp)
 	mutex_enter(&ahci_ctlp->ahcictl_mutex);
 
 	/* Allocate structures only for the implemented ports */
-	for (port = 0, cport = 0; port < ahci_ctlp->ahcictl_num_ports;
-	    port++, cport++) {
+	for (port = 0; port < ahci_ctlp->ahcictl_num_ports; port++) {
 		if (!AHCI_PORT_IMPLEMENTED(ahci_ctlp, port)) {
 			AHCIDBG1(AHCIDBG_INIT, ahci_ctlp,
 			    "hba port %d not implemented", port);
@@ -2612,7 +2611,8 @@ ahci_alloc_ports_state(ahci_ctl_t *ahci_ctlp)
 		}
 
 		ahci_ctlp->ahcictl_cport_to_port[cport] = (uint8_t)port;
-		ahci_ctlp->ahcictl_port_to_cport[port] = (uint8_t)cport;
+		ahci_ctlp->ahcictl_port_to_cport[port] =
+		    (uint8_t)cport++;
 
 		if (ahci_alloc_port_state(ahci_ctlp, port) != AHCI_SUCCESS) {
 			goto err_out;
