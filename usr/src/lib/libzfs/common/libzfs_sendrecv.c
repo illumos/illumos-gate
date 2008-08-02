@@ -1230,7 +1230,7 @@ again:
 				zfs_cmd_t zc = { 0 };
 
 				zc.zc_cookie = B_TRUE; /* clear current props */
-				snprintf(zc.zc_name, sizeof (zc.zc_name),
+				(void) snprintf(zc.zc_name, sizeof (zc.zc_name),
 				    "%s@%s", fsname, nvpair_name(snapelem));
 				if (zcmd_write_src_nvlist(hdl, &zc,
 				    props) == 0) {
@@ -1831,7 +1831,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	if (err == 0 && snapprops_nvlist) {
 		zfs_cmd_t zc2 = { 0 };
 
-		strcpy(zc2.zc_name, zc.zc_value);
+		(void) strcpy(zc2.zc_name, zc.zc_value);
 		if (zcmd_write_src_nvlist(hdl, &zc2, snapprops_nvlist) == 0) {
 			(void) zfs_ioctl(hdl, ZFS_IOC_SET_PROP, &zc2);
 			zcmd_free_nvlists(&zc2);

@@ -1286,7 +1286,6 @@ static int
 inherit_recurse_cb(zfs_handle_t *zhp, void *data)
 {
 	char *propname = data;
-	int ret;
 	zfs_prop_t prop = zfs_name_to_prop(propname);
 
 	/*
