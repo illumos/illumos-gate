@@ -58,7 +58,9 @@ $(PROG): $(OBJS)
 $(POFILE): $(POFILES)
 	$(RM) $@; cat $(POFILES) > $@
 
-install: all $(ROOTUSRSBINPROG)
+install: all $(ROOTSBINPROG)
+	$(RM) $(ROOTUSRSBINPROG)
+	-$(SYMLINK) ../../sbin/$(PROG) $(ROOTUSRSBINPROG)
 
 clean:
 	$(RM) -f $(OBJS) $(PROG)

@@ -84,6 +84,8 @@ f none lib/llib-lgen 644 root bin
 f none lib/llib-lgen.ln 644 root bin
 f none lib/llib-lintl 644 root bin
 f none lib/llib-lintl.ln 644 root bin
+f none lib/llib-lkmf.ln 644 root bin
+f none lib/llib-lkmfberder.ln 644 root bin
 f none lib/llib-lkstat 644 root bin
 f none lib/llib-lkstat.ln 644 root bin
 f none lib/llib-lmd 644 root bin

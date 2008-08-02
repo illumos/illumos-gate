@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,9 +50,9 @@
 #
 d none usr/sfw/lib/sparcv9 755 root bin
 s none usr/sfw/lib/64=sparcv9
-f none usr/sfw/lib/sparcv9/libcrypto.so.0.9.8 755 root bin
-s none usr/sfw/lib/sparcv9/libcrypto.so=./libcrypto.so.0.9.8
-f none usr/sfw/lib/sparcv9/libssl.so.0.9.8 755 root bin
-s none usr/sfw/lib/sparcv9/libssl.so=./libssl.so.0.9.8
-f none usr/sfw/lib/sparcv9/llib-lssl.ln 644 root bin
-f none usr/sfw/lib/sparcv9/llib-lcrypto.ln 644 root bin
+s none usr/sfw/lib/sparcv9/libcrypto.so=../../../../lib/sparcv9/libcrypto.so.0.9.8
+s none usr/sfw/lib/sparcv9/libcrypto.so.0.9.8=../../../../lib/sparcv9/libcrypto.so.0.9.8
+s none usr/sfw/lib/sparcv9/libssl.so=../../../../lib/sparcv9/libssl.so.0.9.8
+s none usr/sfw/lib/sparcv9/libssl.so.0.9.8=../../../../lib/sparcv9/libssl.so.0.9.8
+s none usr/sfw/lib/sparcv9/llib-lcrypto.ln=../../../../lib/sparcv9/llib-lcrypto.ln
+s none usr/sfw/lib/sparcv9/llib-lssl.ln=../../../../lib/sparcv9/llib-lssl.ln

@@ -207,13 +207,13 @@ typedef struct _kmf_handle {
 
 #ifndef KMF_PLUGIN_PATH
 #if defined(__sparcv9)
-#define	KMF_PLUGIN_PATH "/usr/lib/security/sparcv9/"
+#define	KMF_PLUGIN_PATH "/lib/crypto/sparcv9/"
 #elif defined(__sparc)
-#define	KMF_PLUGIN_PATH "/usr/lib/security/"
+#define	KMF_PLUGIN_PATH "/lib/crypto/"
 #elif defined(__i386)
-#define	KMF_PLUGIN_PATH "/usr/lib/security/"
+#define	KMF_PLUGIN_PATH "/lib/crypto/"
 #elif defined(__amd64)
-#define	KMF_PLUGIN_PATH "/usr/lib/security/amd64/"
+#define	KMF_PLUGIN_PATH "/lib/crypto/amd64/"
 #endif
 #endif /* !KMF_PLUGIN_PATH */
 

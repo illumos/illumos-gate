@@ -41,11 +41,11 @@ i depend
 d none usr 755 root sys
 d none usr/sfw 755 root bin
 d none usr/sfw/lib 755 root bin
-f none usr/sfw/lib/libcrypto.so.0.9.8 755 root bin
-s none usr/sfw/lib/libcrypto.so=./libcrypto.so.0.9.8
-f none usr/sfw/lib/libssl.so.0.9.8 755 root bin
-s none usr/sfw/lib/libssl.so=./libssl.so.0.9.8
-f none usr/sfw/lib/llib-lssl 644 root bin
-f none usr/sfw/lib/llib-lssl.ln 644 root bin
-f none usr/sfw/lib/llib-lcrypto 644 root bin
-f none usr/sfw/lib/llib-lcrypto.ln 644 root bin
+s none usr/sfw/lib/libcrypto.so=../../../lib/libcrypto.so.0.9.8
+s none usr/sfw/lib/libcrypto.so.0.9.8=../../../lib/libcrypto.so.0.9.8
+s none usr/sfw/lib/libssl.so=../../../lib/libssl.so.0.9.8
+s none usr/sfw/lib/libssl.so.0.9.8=../../../lib/libssl.so.0.9.8
+s none usr/sfw/lib/llib-lcrypto=../../../lib/llib-lcrypto 644 root bin
+s none usr/sfw/lib/llib-lcrypto.ln=../../../lib/llib-lcrypto.ln 644 root bin
+s none usr/sfw/lib/llib-lssl=../../../lib/llib-lssl 644 root bin
+s none usr/sfw/lib/llib-lssl.ln=../../../lib/llib-lssl.ln 644 root bin

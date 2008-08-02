@@ -50,6 +50,7 @@ CRYPTOUTILLIB=	 -lcryptoutil
 CRYPTOUTILLIB64= -lcryptoutil
 
 include $(SRC)/lib/Makefile.lib
+include $(SRC)/lib/Makefile.rootfs
 
 SRCDIR=	../common
 INCDIR=	../../include

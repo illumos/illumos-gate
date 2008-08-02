@@ -48,11 +48,11 @@ usr/include/passwdutil.h		sparc
 #
 # Private/Internal libraries of the Cryptographic Framework.
 #
-usr/lib/llib-lelfsign.ln		sparc
-usr/lib/llib-lelfsign			sparc
-usr/lib/llib-lcryptoutil.ln		sparc
-usr/lib/llib-lcryptoutil		sparc
-usr/lib/sparcv9/llib-lcryptoutil.ln	sparc
+lib/llib-lelfsign.ln			sparc
+lib/llib-lelfsign			sparc
+lib/llib-lcryptoutil.ln			sparc
+lib/llib-lcryptoutil			sparc
+lib/sparcv9/llib-lcryptoutil.ln		sparc
 usr/include/cryptoutil.h		sparc
 usr/include/libelfsign.h		sparc
 #

@@ -91,8 +91,8 @@ f none usr/lib/libcommputil.so.1 755 root bin
 s none usr/lib/libcontract.so=../../lib/libcontract.so.1
 s none usr/lib/libcontract.so.1=../../lib/libcontract.so.1
 f none usr/lib/libcrle.so.1 755 root bin
-s none usr/lib/libcryptoutil.so=./libcryptoutil.so.1
-f none usr/lib/libcryptoutil.so.1 755 root bin
+s none usr/lib/libcryptoutil.so=../../lib/libcryptoutil.so.1
+s none usr/lib/libcryptoutil.so.1=../../lib/libcryptoutil.so.1
 f none usr/lib/libcrypt.so.1 755 root bin
 s none usr/lib/libcrypt.so=./libcrypt.so.1
 s none usr/lib/libcrypt_i.so=./libcrypt.so
@@ -125,8 +125,6 @@ s none usr/lib/libefi.so=../../lib/libefi.so.1
 s none usr/lib/libefi.so.1=../../lib/libefi.so.1
 s none usr/lib/libelf.so=../../lib/libelf.so.1
 s none usr/lib/libelf.so.1=../../lib/libelf.so.1
-s none usr/lib/libelfsign.so=./libelfsign.so.1
-f none usr/lib/libelfsign.so.1 755 root bin
 f none usr/lib/libexacct.so.1 755 root bin
 s none usr/lib/libexacct.so=./libexacct.so.1
 f none usr/lib/libform.so.1 755 root bin
@@ -154,10 +152,10 @@ f none usr/lib/libipp.so.1 755 root bin
 f none usr/lib/libipsecutil.so.1 755 root bin
 s none usr/lib/libkstat.so=../../lib/libkstat.so.1
 s none usr/lib/libkstat.so.1=../../lib/libkstat.so.1
-f none usr/lib/libkmf.so.1 755 root bin
-s none usr/lib/libkmf.so=./libkmf.so.1
-f none usr/lib/libkmfberder.so.1 755 root bin
-s none usr/lib/libkmfberder.so=./libkmfberder.so.1
+s none usr/lib/libkmf.so=../../lib/libkmf.so.1
+s none usr/lib/libkmf.so.1=../../lib/libkmf.so.1
+s none usr/lib/libkmfberder.so=../../lib/libkmfberder.so.1
+s none usr/lib/libkmfberder.so.1=../../lib/libkmfberder.so.1
 s none usr/lib/libkvm.so=./libkvm.so.1
 f none usr/lib/libkvm.so.1 755 root bin
 s none usr/lib/libl.so=./libl.so.1
@@ -317,9 +315,9 @@ f none usr/lib/security/crypt_sha512.so.1 755 root bin
 s none usr/lib/security/crypt_sha512.so=./crypt_sha512.so.1
 f none usr/lib/security/crypt_sunmd5.so.1 755 root bin
 s none usr/lib/security/crypt_sunmd5.so=./crypt_sunmd5.so.1
-f none usr/lib/security/kmf_nss.so.1 755 root bin
-f none usr/lib/security/kmf_openssl.so.1 755 root bin
-f none usr/lib/security/kmf_pkcs11.so.1 755 root bin
+s none usr/lib/security/kmf_nss.so.1=../../../lib/security/kmf_nss.so.1
+s none usr/lib/security/kmf_openssl.so.1=../../../lib/security/kmf_openssl.so.1
+s none usr/lib/security/kmf_pkcs11.so.1=../../../lib/security/kmf_pkcs11.so.1
 f none usr/lib/security/pam_ldap.so.1 755 root bin
 s none usr/lib/security/pam_ldap.so=./pam_ldap.so.1
 f none usr/lib/security/pam_allow.so.1 755 root bin

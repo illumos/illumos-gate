@@ -60,6 +60,13 @@ s none lib/libc_db.so=libc_db.so.1
 f none lib/libcmdutils.so.1 755 root bin
 f none lib/libcontract.so.1 755 root bin
 s none lib/libcontract.so=libcontract.so.1
+d none lib/crypto 755 root bin
+s none lib/crypto/32=.
+f none lib/crypto/kmf_nss.so.1 755 root bin
+f none lib/crypto/kmf_openssl.so.1 755 root bin
+f none lib/crypto/kmf_pkcs11.so.1 755 root bin
+s none lib/libcryptoutil.so=./libcryptoutil.so.1
+f none lib/libcryptoutil.so.1 755 root bin
 f none lib/libctf.so.1 755 root bin
 s none lib/libctf.so=libctf.so.1
 f none lib/libcurses.so.1 755 root bin
@@ -83,12 +90,18 @@ s none lib/libefi.so=libefi.so.1
 f none lib/libefi.so.1 755 root bin
 s none lib/libelf.so=libelf.so.1
 f none lib/libelf.so.1 755 root bin
+s none lib/libelfsign.so=libelfsign.so.1
+f none lib/libelfsign.so.1 755 root bin
 s none lib/libgen.so=libgen.so.1
 f none lib/libgen.so.1 755 root bin
 f none lib/libinetcfg.so.1 755 root bin
 f none lib/libinetutil.so.1 755 root bin
 s none lib/libintl.so=libintl.so.1
 f none lib/libintl.so.1 755 root bin
+s none lib/libkmf.so=libkmf.so.1
+f none lib/libkmf.so.1 755 root bin
+s none lib/libkmfberder.so=libkmfberder.so.1
+f none lib/libkmfberder.so.1 755 root bin
 s none lib/libkstat.so=libkstat.so.1
 f none lib/libkstat.so.1 755 root bin
 f none lib/libld.so.4 755 root bin

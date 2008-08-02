@@ -111,9 +111,9 @@ f none usr/lib/security/amd64/crypt_sha512.so.1 755 root bin
 s none usr/lib/security/amd64/crypt_sha512.so=./crypt_sha512.so.1
 f none usr/lib/security/amd64/crypt_sunmd5.so.1 755 root bin
 s none usr/lib/security/amd64/crypt_sunmd5.so=./crypt_sunmd5.so.1
-f none usr/lib/security/amd64/kmf_nss.so.1 755 root bin
-f none usr/lib/security/amd64/kmf_openssl.so.1 755 root bin
-f none usr/lib/security/amd64/kmf_pkcs11.so.1 755 root bin
+s none usr/lib/security/amd64/kmf_nss.so.1=../../../../lib/security/amd64/kmf_nss.so.1
+s none usr/lib/security/amd64/kmf_openssl.so.1=../../../../lib/security/amd64/kmf_openssl.so.1
+s none usr/lib/security/amd64/kmf_pkcs11.so.1=../../../../lib/security/amd64/kmf_pkcs11.so.1
 f none usr/lib/security/amd64/pam_ldap.so.1 755 root bin
 s none usr/lib/security/amd64/pam_ldap.so=./pam_ldap.so.1
 f none usr/lib/security/amd64/pam_allow.so.1 755 root bin
@@ -170,8 +170,8 @@ s none usr/lib/amd64/libcommputil.so=libcommputil.so.1
 s none usr/lib/amd64/libcontract.so.1=../../../lib/amd64/libcontract.so.1
 s none usr/lib/amd64/libcontract.so=../../../lib/amd64/libcontract.so.1
 f none usr/lib/amd64/libcrle.so.1 755 root bin
-f none usr/lib/amd64/libcryptoutil.so.1 755 root bin
-s none usr/lib/amd64/libcryptoutil.so=libcryptoutil.so.1
+s none usr/lib/amd64/libcryptoutil.so=../../../lib/amd64/libcryptoutil.so.1
+s none usr/lib/amd64/libcryptoutil.so.1=../../../lib/amd64/libcryptoutil.so.1
 f none usr/lib/amd64/libcrypt.so.1 755 root bin
 s none usr/lib/amd64/libcrypt.so=./libcrypt.so.1
 s none usr/lib/amd64/libcrypt_i.so=./libcrypt.so
@@ -193,10 +193,10 @@ f none usr/lib/amd64/libipmi.so.1 755 root bin
 s none usr/lib/amd64/libipmi.so=./libipmi.so.1
 f none usr/lib/amd64/libipp.so.1 755 root bin
 s none usr/lib/amd64/libipp.so=libipp.so.1
-f none usr/lib/amd64/libkmf.so.1 755 root bin
-s none usr/lib/amd64/libkmf.so=libkmf.so.1
-f none usr/lib/amd64/libkmfberder.so.1 755 root bin
-s none usr/lib/amd64/libkmfberder.so=libkmfberder.so.1
+s none usr/lib/amd64/libkmf.so=../../../lib/amd64/libkmf.so.1
+s none usr/lib/amd64/libkmf.so.1=../../../lib/amd64/libkmf.so.1
+s none usr/lib/amd64/libkmfberder.so=../../../lib/amd64/libkmfberder.so.1
+s none usr/lib/amd64/libkmfberder.so.1=../../../lib/amd64/libkmfberder.so.1
 f none usr/lib/amd64/libldap.so.4 755 root bin
 f none usr/lib/amd64/libldap.so.5 755 root bin
 s none usr/lib/amd64/libldap.so=libldap.so.5

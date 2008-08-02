@@ -40,8 +40,8 @@
 SYMLINKS=	$(SYM.ROOT.SYS) $(SYM.ROOT.BIN) $(SYM.OTHERS)
 
 TARGETDIRS=	$(ROOT.SYS) $(ROOT.BIN) $(ROOT.SYS2) \
-		$(UUCP.UUCP) $(OTHERS) $(SYM.USRCCSLIB) $(SYM.USRLIB) \
-		$(ROOT.SFW)
+		$(UUCP.UUCP) $(OTHERS) $(ROOT.SFW) \
+		$(SYM.USRCCSLIB) $(SYM.USRLIB)
 
 $(BUILD64)	TARGETDIRS += $(ROOT.SYS64.2) $(ROOT.BIN64) \
 		$(SYM.USRCCSLIB64) $(SYM.USRLIB64) $(ROOT.SFW64)
@@ -193,9 +193,9 @@ ROOT.SYS= \
 
 # EXPORT DELETE START
 XROOT.BIN= \
-	/etc/sfw/openssl \
-	/etc/sfw/openssl/certs \
-	/etc/sfw/openssl/private \
+	/etc/openssl \
+	/etc/openssl/certs \
+	/etc/openssl/private \
 	/usr/lib/inet/wanboot
 # EXPORT DELETE END
 
@@ -215,6 +215,7 @@ ROOT.BIN= \
 	/etc/sma \
 	/etc/sma/snmp \
 	/lib \
+	/lib/crypto \
 	/lib/inet \
 	/lib/secure \
 	/lib/svc \
@@ -346,6 +347,7 @@ amd64_ROOT.BIN64= \
 ROOT.BIN64= \
 	$($(MACH64)_ROOT.BIN64) \
 	/lib/$(MACH64) \
+	/lib/crypto/$(MACH64) \
 	/lib/secure/$(MACH64) \
 	/usr/bin/$(MACH64) \
 	/usr/ccs/bin/$(MACH64)  \
@@ -415,8 +417,7 @@ UUCP.UUCP= \
 ROOT.SFW= \
 	/usr/sfw/bin \
 	/usr/sfw/include \
-	/usr/sfw/lib \
-	/usr/sfw/share
+	/usr/sfw/lib
 
 ROOT.SFW64= \
 	/usr/sfw/lib/$(MACH64)
@@ -468,6 +469,7 @@ SYM.ROOT.SYS= \
 SYM.ROOT.BIN= \
 	/bin \
 	/lib/32 \
+	/lib/crypto/32 \
 	/lib/secure/32 \
 	/etc/lib/ld.so.1 \
 	/etc/lib/libdl.so.1 \
@@ -497,6 +499,7 @@ sparc_SYM.ROOT.BIN64=
 SYM.ROOT.BIN64= \
 	$($(MACH)_SYM.ROOT.BIN64) \
 	/lib/64 \
+	/lib/crypto/64 \
 	/lib/secure/64 \
 	/usr/lib/64 \
 	/usr/lib/elfedit/64 \
@@ -514,6 +517,7 @@ SYM.ROOT.SFW64= \
 
 SYM.OTHERS=  \
 	/etc/log  \
+	/etc/sfw/openssl \
 	/usr/mail  \
 	/usr/tmp
 
@@ -596,7 +600,7 @@ $(ROOT)/root:=		DIRMODE= 700
 
 $(ROOT)/var/krb5/rcache/root:=	DIRMODE= 700
 
-$(ROOT)/etc/sfw/openssl/private:=	DIRMODE= 700
+$(ROOT)/etc/openssl/private:=	DIRMODE= 700
 
 #
 # These permissions must match the ones set
@@ -621,6 +625,7 @@ $(ROOT)/system/object:=		DIRMODE= 555
 $(ROOT)/usr/lib/cron:=			LINKDEST=../../etc/cron.d
 $(ROOT)/bin:=				LINKDEST=usr/bin
 $(ROOT)/lib/32:=			LINKDEST=.
+$(ROOT)/lib/crypto/32:=			LINKDEST=.
 $(ROOT)/lib/secure/32:=			LINKDEST=.
 $(ROOT)/dev/stdin:=			LINKDEST=fd/0
 $(ROOT)/dev/stdout:=			LINKDEST=fd/1
@@ -633,6 +638,7 @@ $(ROOT)/etc/lib/ld.so.1:=		LINKDEST=../../lib/ld.so.1
 $(ROOT)/etc/lib/libdl.so.1:=		LINKDEST=../../lib/libdl.so.1
 $(ROOT)/etc/lib/nss_files.so.1:=	LINKDEST=../../lib/nss_files.so.1
 $(ROOT)/etc/log:=			LINKDEST=../var/adm/log
+$(ROOT)/etc/sfw/openssl:=		LINKDEST=../openssl
 $(ROOT)/usr/mail:=			LINKDEST=../var/mail
 $(ROOT)/usr/news:=			LINKDEST=../var/news
 $(ROOT)/usr/preserve:=			LINKDEST=../var/preserve
@@ -652,6 +658,7 @@ $(ROOT)/usr/ucblib/32:=			LINKDEST=.
 
 
 $(BUILD64) $(ROOT)/lib/64:=		LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/lib/crypto/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/lib/secure/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/64:=		LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/elfedit/64:=	LINKDEST=$(MACH64)
@@ -872,6 +879,8 @@ $(ROOT)/usr/lib/libcmdutils.so.1:=	REALPATH=../../lib/libcmdutils.so.1
 $(ROOT)/usr/lib/libcmdutils.so:=	REALPATH=../../lib/libcmdutils.so.1
 $(ROOT)/usr/lib/libcontract.so.1:=	REALPATH=../../lib/libcontract.so.1
 $(ROOT)/usr/lib/libcontract.so:=	REALPATH=../../lib/libcontract.so.1
+$(ROOT)/usr/lib/libcryptoutil.so.1:=	REALPATH=../../lib/libcryptoutil.so.1
+$(ROOT)/usr/lib/libcryptoutil.so:=	REALPATH=../../lib/libcryptoutil.so.1
 $(ROOT)/usr/lib/libctf.so.1:=		REALPATH=../../lib/libctf.so.1
 $(ROOT)/usr/lib/libctf.so:=		REALPATH=../../lib/libctf.so.1
 $(ROOT)/usr/lib/libcurses.so.1:=	REALPATH=../../lib/libcurses.so.1
@@ -906,6 +915,10 @@ $(ROOT)/usr/lib/libintl.so.1:=		REALPATH=../../lib/libintl.so.1
 $(ROOT)/usr/lib/libintl.so:=		REALPATH=../../lib/libintl.so.1
 $(ROOT)/usr/lib/libiscsitgt.so.1:=	REALPATH=../../lib/libiscsitgt.so.1
 $(ROOT)/usr/lib/libiscsitgt.so:=	REALPATH=../../lib/libiscsitgt.so.1
+$(ROOT)/usr/lib/libkmf.so.1:=		REALPATH=../../lib/libkmf.so.1
+$(ROOT)/usr/lib/libkmf.so:=		REALPATH=../../lib/libkmf.so.1
+$(ROOT)/usr/lib/libkmfberder.so.1:=	REALPATH=../../lib/libkmfberder.so.1
+$(ROOT)/usr/lib/libkmfberder.so:=	REALPATH=../../lib/libkmfberder.so.1
 $(ROOT)/usr/lib/libkstat.so.1:=		REALPATH=../../lib/libkstat.so.1
 $(ROOT)/usr/lib/libkstat.so:=		REALPATH=../../lib/libkstat.so.1
 $(ROOT)/usr/lib/liblddbg.so.4:=		REALPATH=../../lib/liblddbg.so.4
@@ -1024,6 +1037,8 @@ $(ROOT)/usr/lib/llib-linetutil.ln:=	REALPATH=../../lib/llib-linetutil.ln
 $(ROOT)/usr/lib/llib-linetutil:=	REALPATH=../../lib/llib-linetutil
 $(ROOT)/usr/lib/llib-lintl.ln:=		REALPATH=../../lib/llib-lintl.ln
 $(ROOT)/usr/lib/llib-lintl:=		REALPATH=../../lib/llib-lintl
+$(ROOT)/usr/lib/llib-lkmf.ln:=		REALPATH=../../lib/llib-lkmf.ln
+$(ROOT)/usr/lib/llib-lkmfberder.ln:=	REALPATH=../../lib/llib-lkmfberder.ln
 $(ROOT)/usr/lib/llib-lkstat.ln:=	REALPATH=../../lib/llib-lkstat.ln
 $(ROOT)/usr/lib/llib-lkstat:=		REALPATH=../../lib/llib-lkstat
 $(ROOT)/usr/lib/llib-lmd5.ln:=		REALPATH=../../lib/llib-lmd5.ln
@@ -1086,6 +1101,22 @@ $(ROOT)/usr/lib/nss_files.so.1:=	REALPATH=../../lib/nss_files.so.1
 $(ROOT)/usr/lib/nss_nis.so.1:=		REALPATH=../../lib/nss_nis.so.1
 $(ROOT)/usr/lib/nss_nisplus.so.1:=	REALPATH=../../lib/nss_nisplus.so.1
 $(ROOT)/usr/lib/nss_user.so.1:=		REALPATH=../../lib/nss_user.so.1
+$(ROOT)/usr/lib/security/kmf_nss.so.1:= \
+	REALPATH=../../../lib/crypto/kmf_nss.so.1
+$(ROOT)/usr/lib/security/kmf_openssl.so.1:= \
+	REALPATH=../../../lib/crypto/kmf_openssl.so.1
+$(ROOT)/usr/lib/security/kmf_pkcs11.so.1:= \
+	REALPATH=../../../lib/crypto/kmf_pkcs11.so.1
+$(ROOT)/usr/sfw/lib/libcrypto.so.0.9.8:= \
+	REALPATH=../../../lib/libcrypto.so.0.9.8
+$(ROOT)/usr/sfw/lib/libcrypto.so:= \
+	REALPATH=../../../lib/libcrypto.so.0.9.8
+$(ROOT)/usr/sfw/lib/libssl.so.0.9.8:=	REALPATH=../../../lib/libssl.so.0.9.8
+$(ROOT)/usr/sfw/lib/libssl.so:=		REALPATH=../../../lib/libssl.so.0.9.8
+$(ROOT)/usr/sfw/lib/llib-lcrypto.ln:=	REALPATH=../../../lib/llib-lcrypto.ln
+$(ROOT)/usr/sfw/lib/llib-lcrypto:=	REALPATH=../../../lib/llib-lcrypto
+$(ROOT)/usr/sfw/lib/llib-lssl.ln:=	REALPATH=../../../lib/llib-lssl.ln
+$(ROOT)/usr/sfw/lib/llib-lssl:=		REALPATH=../../../lib/llib-lssl
 
 $(ROOT)/lib/$(MACH64)/libposix4.so.1:= \
 	REALPATH=librt.so.1
@@ -1131,6 +1162,10 @@ $(ROOT)/usr/lib/$(MACH64)/libcontract.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libcontract.so.1
 $(ROOT)/usr/lib/$(MACH64)/libcontract.so:= \
 	REALPATH=../../../lib/$(MACH64)/libcontract.so.1
+$(ROOT)/usr/lib/$(MACH64)/libcryptoutil.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libcryptoutil.so.1
+$(ROOT)/usr/lib/$(MACH64)/libcryptoutil.so:= \
+	REALPATH=../../../lib/$(MACH64)/libcryptoutil.so.1
 $(ROOT)/usr/lib/$(MACH64)/libctf.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libctf.so.1
 $(ROOT)/usr/lib/$(MACH64)/libctf.so:= \
@@ -1187,6 +1222,14 @@ $(ROOT)/usr/lib/$(MACH64)/libiscsitgt.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libiscsitgt.so.1
 $(ROOT)/usr/lib/$(MACH64)/libiscsitgt.so:= \
 	REALPATH=../../../lib/$(MACH64)/libiscsitgt.so.1
+$(ROOT)/usr/lib/$(MACH64)/libkmf.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libkmf.so.1
+$(ROOT)/usr/lib/$(MACH64)/libkmf.so:= \
+	REALPATH=../../../lib/$(MACH64)/libkmf.so.1
+$(ROOT)/usr/lib/$(MACH64)/libkmfberder.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libkmfberder.so.1
+$(ROOT)/usr/lib/$(MACH64)/libkmfberder.so:= \
+	REALPATH=../../../lib/$(MACH64)/libkmfberder.so.1
 $(ROOT)/usr/lib/$(MACH64)/libkstat.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libkstat.so.1
 $(ROOT)/usr/lib/$(MACH64)/libkstat.so:= \
@@ -1367,6 +1410,10 @@ $(ROOT)/usr/lib/$(MACH64)/llib-linetutil.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-linetutil.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lintl.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lintl.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lkmf.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lkmf.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lkmfberder.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lkmfberder.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lkstat.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lkstat.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lmd5.ln:= \
@@ -1437,6 +1484,24 @@ $(ROOT)/usr/lib/$(MACH64)/nss_nisplus.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/nss_nisplus.so.1
 $(ROOT)/usr/lib/$(MACH64)/nss_user.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/nss_user.so.1
+$(ROOT)/usr/lib/security/$(MACH64)/kmf_nss.so.1:= \
+	REALPATH=../../../../lib/crypto/$(MACH64)/kmf_nss.so.1
+$(ROOT)/usr/lib/security/$(MACH64)/kmf_openssl.so.1:= \
+	REALPATH=../../../../lib/crypto/$(MACH64)/kmf_openssl.so.1
+$(ROOT)/usr/lib/security/$(MACH64)/kmf_pkcs11.so.1:= \
+	REALPATH=../../../../lib/crypto/$(MACH64)/kmf_pkcs11.so.1
+$(ROOT)/usr/sfw/lib/$(MACH64)/libcrypto.so.0.9.8:= \
+	REALPATH=../../../../lib/$(MACH64)/libcrypto.so.0.9.8
+$(ROOT)/usr/sfw/lib/$(MACH64)/libcrypto.so:= \
+	REALPATH=../../../../lib/$(MACH64)/libcrypto.so.0.9.8
+$(ROOT)/usr/sfw/lib/$(MACH64)/libssl.so.0.9.8:= \
+	REALPATH=../../../../lib/$(MACH64)/libssl.so.0.9.8
+$(ROOT)/usr/sfw/lib/$(MACH64)/libssl.so:= \
+	REALPATH=../../../../lib/$(MACH64)/libssl.so.0.9.8
+$(ROOT)/usr/sfw/lib/$(MACH64)/llib-lcrypto.ln:= \
+	REALPATH=../../../../lib/$(MACH64)/llib-lcrypto.ln
+$(ROOT)/usr/sfw/lib/$(MACH64)/llib-lssl.ln:= \
+	REALPATH=../../../../lib/$(MACH64)/llib-lssl.ln
 
 SYM.USRLIB= \
 	/lib/libposix4.so \
@@ -1462,6 +1527,8 @@ SYM.USRLIB= \
 	/usr/lib/libcmdutils.so.1 \
 	/usr/lib/libcontract.so \
 	/usr/lib/libcontract.so.1 \
+	/usr/lib/libcryptoutil.so \
+	/usr/lib/libcryptoutil.so.1 \
 	/usr/lib/libctf.so \
 	/usr/lib/libctf.so.1 \
 	/usr/lib/libcurses.so \
@@ -1496,6 +1563,10 @@ SYM.USRLIB= \
 	/usr/lib/libintl.so.1 \
 	/usr/lib/libiscsitgt.so \
 	/usr/lib/libiscsitgt.so.1 \
+	/usr/lib/libkmf.so \
+	/usr/lib/libkmf.so.1 \
+	/usr/lib/libkmfberder.so \
+	/usr/lib/libkmfberder.so.1 \
 	/usr/lib/libkstat.so \
 	/usr/lib/libkstat.so.1 \
 	/usr/lib/liblddbg.so.4 \
@@ -1614,6 +1685,8 @@ SYM.USRLIB= \
 	/usr/lib/llib-linetutil.ln \
 	/usr/lib/llib-lintl \
 	/usr/lib/llib-lintl.ln \
+	/usr/lib/llib-lkmf.ln \
+	/usr/lib/llib-lkmfberder.ln \
 	/usr/lib/llib-lkstat \
 	/usr/lib/llib-lkstat.ln \
 	/usr/lib/llib-lmd5 \
@@ -1675,7 +1748,18 @@ SYM.USRLIB= \
 	/usr/lib/nss_files.so.1 \
 	/usr/lib/nss_nis.so.1 \
 	/usr/lib/nss_nisplus.so.1 \
-	/usr/lib/nss_user.so.1
+	/usr/lib/nss_user.so.1 \
+	/usr/lib/security/kmf_nss.so.1 \
+	/usr/lib/security/kmf_openssl.so.1 \
+	/usr/lib/security/kmf_pkcs11.so.1 \
+	/usr/sfw/lib/libcrypto.so \
+	/usr/sfw/lib/libcrypto.so.0.9.8 \
+	/usr/sfw/lib/libssl.so \
+	/usr/sfw/lib/libssl.so.0.9.8 \
+	/usr/sfw/lib/llib-lcrypto.ln \
+	/usr/sfw/lib/llib-lcrypto \
+	/usr/sfw/lib/llib-lssl \
+	/usr/sfw/lib/llib-lssl.ln
 
 sparcv9_SYM.USRLIB64= 
 
@@ -1705,6 +1789,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libcmdutils.so.1 \
 	/usr/lib/$(MACH64)/libcontract.so \
 	/usr/lib/$(MACH64)/libcontract.so.1 \
+	/usr/lib/$(MACH64)/libcryptoutil.so \
+	/usr/lib/$(MACH64)/libcryptoutil.so.1 \
 	/usr/lib/$(MACH64)/libctf.so \
 	/usr/lib/$(MACH64)/libctf.so.1 \
 	/usr/lib/$(MACH64)/libcurses.so \
@@ -1733,6 +1819,10 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libintl.so.1 \
 	/usr/lib/$(MACH64)/libiscsitgt.so \
 	/usr/lib/$(MACH64)/libiscsitgt.so.1 \
+	/usr/lib/$(MACH64)/libkmf.so \
+	/usr/lib/$(MACH64)/libkmf.so.1 \
+	/usr/lib/$(MACH64)/libkmfberder.so \
+	/usr/lib/$(MACH64)/libkmfberder.so.1 \
 	/usr/lib/$(MACH64)/libkstat.so \
 	/usr/lib/$(MACH64)/libkstat.so.1 \
 	/usr/lib/$(MACH64)/liblddbg.so.4 \
@@ -1823,6 +1913,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/llib-lgen.ln \
 	/usr/lib/$(MACH64)/llib-linetutil.ln \
 	/usr/lib/$(MACH64)/llib-lintl.ln \
+	/usr/lib/$(MACH64)/llib-lkmf.ln \
+	/usr/lib/$(MACH64)/llib-lkmfberder.ln \
 	/usr/lib/$(MACH64)/llib-lkstat.ln \
 	/usr/lib/$(MACH64)/llib-lmd5.ln \
 	/usr/lib/$(MACH64)/llib-lnsl.ln \
@@ -1857,7 +1949,16 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/nss_files.so.1 \
 	/usr/lib/$(MACH64)/nss_nis.so.1 \
 	/usr/lib/$(MACH64)/nss_nisplus.so.1 \
-	/usr/lib/$(MACH64)/nss_user.so.1
+	/usr/lib/$(MACH64)/nss_user.so.1 \
+	/usr/lib/security/$(MACH64)/kmf_nss.so.1 \
+	/usr/lib/security/$(MACH64)/kmf_openssl.so.1 \
+	/usr/lib/security/$(MACH64)/kmf_pkcs11.so.1 \
+	/usr/sfw/lib/$(MACH64)/libcrypto.so \
+	/usr/sfw/lib/$(MACH64)/libcrypto.so.0.9.8 \
+	/usr/sfw/lib/$(MACH64)/llib-lcrypto.ln \
+	/usr/sfw/lib/$(MACH64)/libssl.so \
+	/usr/sfw/lib/$(MACH64)/libssl.so.0.9.8 \
+	/usr/sfw/lib/$(MACH64)/llib-lssl.ln
 
 $(SYM.USRLIB:%=$(ROOT)%):= \
     INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@; \

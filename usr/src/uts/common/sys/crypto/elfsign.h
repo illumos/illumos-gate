@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,7 +133,7 @@ struct filesignatures {
 
 #ifndef	_KERNEL
 
-#define	_PATH_KCFD_DOOR	"/var/run/kcfd_door"
+#define	_PATH_KCFD_DOOR	"/etc/svc/volatile/kcfd_door"
 
 #endif	/* _KERNEL */
 

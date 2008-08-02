@@ -42,6 +42,7 @@ OBJECTS= \
 	util.o
 
 include $(SRC)/lib/Makefile.lib
+include $(SRC)/lib/Makefile.rootfs
 
 SRCDIR=	../common
 

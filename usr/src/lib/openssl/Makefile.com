@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,14 +29,12 @@ VERS= .0.9.8
 
 include $(SRC)/lib/Makefile.lib
 include $(SRC)/lib/openssl/Makefile.openssl
+include $(SRC)/lib/Makefile.rootfs
 
 CPPFLAGS =	$(OPENSSL_BUILD_CPPFLAGS) $(CPPFLAGS.master)
 
 COPTFLAG =   -xO5
 sparcv9_COPTFLAG =	-xO5
-
-ROOTLIBDIR =     $(ROOTSFWLIB)
-ROOTLIBDIR64 =   $(ROOTSFWLIB64)
 
 #
 # Ensure `all' is the default target.
@@ -59,9 +57,9 @@ LIBPCDIR64 =/usr/lib/$(MACH64)/pkgconfig
 LIBPCSRC = openssl.pc
 
 $(LIBPCSRC): ../../$(LIBPCSRC).tmpl
-	$(SED)	-e "s@__VERSION__@$(VERS:.%=%)@" \
-		-e "s@__PREFIX__@$(SFW_ROOT)@" \
-		-e "s@__LIBDIR__@$(SFWLIBDIR)@" \
+	$(SED)	-e s@__VERSION__@$(VERS:.%=%)@ \
+		-e s@__PREFIX__@$(SFW_ROOT)@ \
+		-e s@__LIBDIR__@$(OPENSSL_LIBDIR)@ \
 		 < ../../$(LIBPCSRC).tmpl > $(LIBPCSRC)
 
 ROOTLIBPCDIR = $(ROOT)/$(LIBPCDIR)
