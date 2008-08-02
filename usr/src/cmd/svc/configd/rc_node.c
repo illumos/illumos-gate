@@ -27,38 +27,45 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * rc_node.c - object management primitives
+ * rc_node.c - In-memory SCF object management
  *
- * This layer manages entities, their data structure, its locking, iterators,
- * transactions, and change notification requests.  Entities (scopes,
- * services, instances, snapshots, snaplevels, property groups, "composed"
- * property groups (see composition below), and properties) are represented by
- * rc_node_t's and are kept in the cache_hash hash table.  (Property values
- * are kept in the rn_values member of the respective property -- not as
- * separate objects.)  Iterators are represented by rc_node_iter_t's.
- * Transactions are represented by rc_node_tx_t's and are only allocated as
- * part of repcache_tx_t's in the client layer (client.c).  Change
- * notification requests are represented by rc_notify_t structures and are
- * described below.
+ * This layer manages the in-memory cache (the Repository Cache) of SCF
+ * data.  Read requests are usually satisfied from here, but may require
+ * load calls to the "object" layer.  Modify requests always write-through
+ * to the object layer.
+ *
+ * SCF data comprises scopes, services, instances, snapshots, snaplevels,
+ * property groups, properties, and property values.  All but the last are
+ * known here as "entities" and are represented by rc_node_t data
+ * structures.  (Property values are kept in the rn_values member of the
+ * respective property, not as separate objects.)  All entities besides
+ * the "localhost" scope have some entity as a parent, and therefore form
+ * a tree.
  *
  * The entity tree is rooted at rc_scope, which rc_node_init() initializes to
  * the "localhost" scope.  The tree is filled in from the database on-demand
- * by rc_node_fill_children(), usually from rc_iter_create() since iterators
- * are the only way to find the children of an entity.
+ * by rc_node_fill_children().
  *
- * Each rc_node_t is protected by its rn_lock member.  Operations which can
- * take too long, however, should serialize on an RC_NODE_WAITING_FLAGS bit in
- * rn_flags with the rc_node_{hold,rele}_flag() functions.  And since pointers
- * to rc_node_t's are allowed, rn_refs is a reference count maintained by
- * rc_node_{hold,rele}().  See configd.h for locking order information.
+ * rc_node_t's are also placed in the cache_hash[] hash table, for rapid
+ * lookup.
  *
- * When a node (property group or snapshot) is updated, a new node takes the
- * place of the old node in the global hash, and the old node is hung off of
- * the rn_former list of the new node.  At the same time, all of its children
- * have their rn_parent_ref pointer set, and any holds they have are reflected
- * in the old node's rn_other_refs count.  This is automatically kept up
- * to date, until the final reference to the subgraph is dropped, at which
- * point the node is unrefed and destroyed, along with all of its children.
+ * Multiple threads may service client requests, so access to each
+ * rc_node_t is synchronized by its rn_lock member.  Some fields are
+ * protected by bits in the rn_flags field instead, to support operations
+ * which need to drop rn_lock, for example to respect locking order.  Such
+ * flags should be manipulated with the rc_node_{hold,rele}_flag()
+ * functions.
+ *
+ * We track references to nodes to tell when they can be free()d.  rn_refs
+ * should be incremented with rc_node_hold() on the creation of client
+ * references (rc_node_ptr_t's and rc_iter_t's).  rn_erefs ("ephemeral
+ * references") should be incremented when a pointer is read into a local
+ * variable of a thread, with rc_node_hold_ephemeral_locked().  This
+ * hasn't been fully implemented, however, so rc_node_rele() tolerates
+ * rn_erefs being 0.  Some code which predates rn_erefs counts ephemeral
+ * references in rn_refs.  Other references are tracked by the
+ * rn_other_refs field and the RC_NODE_DEAD, RC_NODE_IN_PARENT,
+ * RC_NODE_OLD, and RC_NODE_ON_FORMER flags.
  *
  * Locking rules: To dereference an rc_node_t * (usually to lock it), you must
  * have a hold (rc_node_hold()) on it or otherwise be sure that it hasn't been
@@ -67,6 +74,15 @@
  * RC_NODE_DEAD before you can use it.  This is usually done with the
  * rc_node_{wait,hold}_flag() functions (often via the rc_node_check_*()
  * functions & RC_NODE_*() macros), which fail if the object has died.
+ *
+ * When a transactional node (property group or snapshot) is updated,
+ * a new node takes the place of the old node in the global hash and the
+ * old node is hung off of the rn_former list of the new node.  At the
+ * same time, all of its children have their rn_parent_ref pointer set,
+ * and any holds they have are reflected in the old node's rn_other_refs
+ * count.  This is automatically kept up to date until the final reference
+ * to the subgraph is dropped, at which point the node is unrefed and
+ * destroyed, along with all of its children.
  *
  * Because name service lookups may take a long time and, more importantly
  * may trigger additional accesses to the repository, perm_granted() must be
@@ -81,9 +97,6 @@
  * An ITER_START for an ENTITY_VALUE makes sure the node has its values
  * filled, and sets up the iterator.  An ITER_READ_VALUE just copies out
  * the proper values and updates the offset information.
- *
- * When a property group gets changed by a transaction, it sticks around as
- * a child of its replacement property group, but is removed from the parent.
  *
  * To allow aliases, snapshots are implemented with a level of indirection.
  * A snapshot rc_node_t has a snapid which refers to an rc_snapshot_t in
@@ -547,8 +560,6 @@ static audit_special_prop_item_t special_props_list[] = {
 	sizeof (audit_special_prop_item_t))
 #endif	/* NATIVE_BUILD */
 
-static void rc_node_unrefed(rc_node_t *np);
-
 /*
  * We support an arbitrary number of clients interested in events for certain
  * types of changes.  Each client is represented by an rc_notify_info_t, and
@@ -587,6 +598,10 @@ static uu_list_t	*rc_notify_list;
 static cache_bucket_t cache_hash[HASH_SIZE];
 
 #define	CACHE_BUCKET(h)		(&cache_hash[(h) & HASH_MASK])
+
+
+static void rc_node_no_client_refs(rc_node_t *np);
+
 
 static uint32_t
 rc_node_hash(rc_node_lookup_t *lp)
@@ -653,6 +668,21 @@ rc_node_match(rc_node_t *np, rc_node_lookup_t *l)
 }
 
 /*
+ * Register an ephemeral reference to np.  This should be done while both
+ * the persistent reference from which the np pointer was read is locked
+ * and np itself is locked.  This guarantees that another thread which
+ * thinks it has the last reference will yield without destroying the
+ * node.
+ */
+static void
+rc_node_hold_ephemeral_locked(rc_node_t *np)
+{
+	assert(MUTEX_HELD(&np->rn_lock));
+
+	++np->rn_erefs;
+}
+
+/*
  * the "other" references on a node are maintained in an atomically
  * updated refcount, rn_other_refs.  This can be bumped from arbitrary
  * context, and tracks references to a possibly out-of-date node's children.
@@ -683,10 +713,15 @@ rc_node_rele_other(rc_node_t *np)
 		(void) pthread_mutex_lock(&np->rn_lock);
 		assert(np->rn_other_refs_held > 0);
 		if (atomic_add_32_nv(&np->rn_other_refs_held, -1) == 0 &&
-		    np->rn_refs == 0 && (np->rn_flags & RC_NODE_OLD))
-			rc_node_unrefed(np);
-		else
+		    np->rn_refs == 0 && (np->rn_flags & RC_NODE_OLD)) {
+			/*
+			 * This was the last client reference.  Destroy
+			 * any other references and free() the node.
+			 */
+			rc_node_no_client_refs(np);
+		} else {
 			(void) pthread_mutex_unlock(&np->rn_lock);
+		}
 	}
 }
 
@@ -734,10 +769,23 @@ rc_node_rele_locked(rc_node_t *np)
 			unref = 1;
 	}
 
-	if (unref)
-		rc_node_unrefed(np);
-	else
+	if (unref) {
+		/*
+		 * This was the last client reference.  Destroy any other
+		 * references and free() the node.
+		 */
+		rc_node_no_client_refs(np);
+	} else {
+		/*
+		 * rn_erefs can be 0 if we acquired the reference in
+		 * a path which hasn't been updated to increment rn_erefs.
+		 * When all paths which end here are updated, we should
+		 * assert rn_erefs > 0 and always decrement it.
+		 */
+		if (np->rn_erefs > 0)
+			--np->rn_erefs;
 		(void) pthread_mutex_unlock(&np->rn_lock);
+	}
 
 	if (par_ref != NULL)
 		rc_node_rele_other(par_ref);
@@ -1948,7 +1996,7 @@ rc_node_setup(rc_node_t *cp, rc_node_lookup_t *nip, const char *name,
 	}
 
 	/*
-	 * No one is there -- create a new node.
+	 * No one is there -- setup & install the new node.
 	 */
 	np = cp;
 	rc_node_hold(np);
@@ -2761,8 +2809,19 @@ rc_node_assign(rc_node_ptr_t *out, rc_node_t *val)
 	if (val != NULL)
 		rc_node_hold(val);
 	out->rnp_node = val;
-	if (cur != NULL)
-		rc_node_rele(cur);
+	if (cur != NULL) {
+		NODE_LOCK(cur);
+
+		/*
+		 * Register the ephemeral reference created by reading
+		 * out->rnp_node into cur.  Note that the persistent
+		 * reference we're destroying is locked by the client
+		 * layer.
+		 */
+		rc_node_hold_ephemeral_locked(cur);
+
+		rc_node_rele_locked(cur);
+	}
 	out->rnp_authorized = RC_AUTH_UNKNOWN;
 	rc_node_ptr_free_mem(out);
 	out->rnp_deleted = 0;
@@ -4201,7 +4260,8 @@ cleanup:
 }
 
 /*
- * N.B.:  this function drops np->rn_lock on the way out.
+ * Hold RC_NODE_DYING_FLAGS on np's descendents.  If andformer is true, do
+ * the same down the rn_former chain.
  */
 static void
 rc_node_delete_hold(rc_node_t *np, int andformer)
@@ -4312,7 +4372,9 @@ rc_node_finish_delete(rc_node_t *cp)
 }
 
 /*
- * N.B.:  this function drops np->rn_lock and a reference on the way out.
+ * For each child, call rc_node_finish_delete() and recurse.  If andformer
+ * is set, also recurse down rn_former.  Finally release np, which might
+ * free it.
  */
 static void
 rc_node_delete_children(rc_node_t *np, int andformer)
@@ -4342,6 +4404,16 @@ again:
 	if (andformer && (cp = np->rn_former) != NULL) {
 		np->rn_former = NULL;		/* unlink */
 		(void) pthread_mutex_lock(&cp->rn_lock);
+
+		/*
+		 * Register the ephemeral reference created by reading
+		 * np->rn_former into cp.  Note that the persistent
+		 * reference (np->rn_former) is locked because we haven't
+		 * dropped np's lock since we dropped its RC_NODE_IN_TX
+		 * (via RC_NODE_DYING_FLAGS).
+		 */
+		rc_node_hold_ephemeral_locked(cp);
+
 		(void) pthread_mutex_unlock(&np->rn_lock);
 		cp->rn_flags &= ~RC_NODE_ON_FORMER;
 
@@ -4357,11 +4429,17 @@ again:
 	rc_node_rele_locked(np);
 }
 
+/*
+ * The last client or child reference to np, which must be either
+ * RC_NODE_OLD or RC_NODE_DEAD, has been destroyed.  We'll destroy any
+ * remaining references (e.g., rn_former) and call rc_node_destroy() to
+ * free np.
+ */
 static void
-rc_node_unrefed(rc_node_t *np)
+rc_node_no_client_refs(rc_node_t *np)
 {
 	int unrefed;
-	rc_node_t *pp, *cur;
+	rc_node_t *current, *cur;
 
 	assert(MUTEX_HELD(&np->rn_lock));
 	assert(np->rn_refs == 0);
@@ -4369,30 +4447,61 @@ rc_node_unrefed(rc_node_t *np)
 	assert(np->rn_other_refs_held == 0);
 
 	if (np->rn_flags & RC_NODE_DEAD) {
+		/*
+		 * The node is DEAD, so the deletion code should have
+		 * destroyed all rn_children or rn_former references.
+		 * Since the last client or child reference has been
+		 * destroyed, we're free to destroy np.  Unless another
+		 * thread has an ephemeral reference, in which case we'll
+		 * pass the buck.
+		 */
+		if (np->rn_erefs > 1) {
+			--np->rn_erefs;
+			NODE_UNLOCK(np);
+			return;
+		}
+
 		(void) pthread_mutex_unlock(&np->rn_lock);
 		rc_node_destroy(np);
 		return;
 	}
 
+	/* We only collect DEAD and OLD nodes, thank you. */
 	assert(np->rn_flags & RC_NODE_OLD);
+
+	/*
+	 * RC_NODE_UNREFED keeps multiple threads from processing OLD
+	 * nodes.  But it's vulnerable to unfriendly scheduling, so full
+	 * use of rn_erefs should supersede it someday.
+	 */
 	if (np->rn_flags & RC_NODE_UNREFED) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
 		return;
 	}
 	np->rn_flags |= RC_NODE_UNREFED;
 
-	(void) pthread_mutex_unlock(&np->rn_lock);
+	/*
+	 * Now we'll remove the node from the rn_former chain and take its
+	 * DYING_FLAGS.
+	 */
 
 	/*
-	 * find the current in-hash object, and grab it's RC_NODE_IN_TX
-	 * flag.  That protects the entire rn_former chain.
+	 * Since this node is OLD, it should be on an rn_former chain.  To
+	 * remove it, we must find the current in-hash object and grab its
+	 * RC_NODE_IN_TX flag to protect the entire rn_former chain.
 	 */
+
+	(void) pthread_mutex_unlock(&np->rn_lock);
+
 	for (;;) {
-		pp = cache_lookup(&np->rn_id);
-		if (pp == NULL) {
+		current = cache_lookup(&np->rn_id);
+
+		if (current == NULL) {
 			(void) pthread_mutex_lock(&np->rn_lock);
+
 			if (np->rn_flags & RC_NODE_DEAD)
 				goto died;
+
 			/*
 			 * We are trying to unreference this node, but the
 			 * owner of the former list does not exist.  It must
@@ -4404,75 +4513,122 @@ rc_node_unrefed(rc_node_t *np)
 			(void) pthread_mutex_unlock(&np->rn_lock);
 			return;
 		}
-		if (pp == np) {
+
+		if (current == np) {
 			/*
 			 * no longer unreferenced
 			 */
 			(void) pthread_mutex_lock(&np->rn_lock);
 			np->rn_flags &= ~RC_NODE_UNREFED;
+			/* held in cache_lookup() */
 			rc_node_rele_locked(np);
 			return;
 		}
-		(void) pthread_mutex_lock(&pp->rn_lock);
-		if ((pp->rn_flags & RC_NODE_OLD) ||
-		    !rc_node_hold_flag(pp, RC_NODE_IN_TX)) {
-			rc_node_rele_locked(pp);
+
+		(void) pthread_mutex_lock(&current->rn_lock);
+		if (current->rn_flags & RC_NODE_OLD) {
+			/*
+			 * current has been replaced since we looked it
+			 * up.  Try again.
+			 */
+			/* held in cache_lookup() */
+			rc_node_rele_locked(current);
 			continue;
 		}
-		if (!(pp->rn_flags & RC_NODE_OLD)) {
-			(void) pthread_mutex_unlock(&pp->rn_lock);
+
+		if (!rc_node_hold_flag(current, RC_NODE_IN_TX)) {
+			/*
+			 * current has been deleted since we looked it up.  Try
+			 * again.
+			 */
+			/* held in cache_lookup() */
+			rc_node_rele_locked(current);
+			continue;
+		}
+
+		/*
+		 * rc_node_hold_flag() might have dropped current's lock, so
+		 * check OLD again.
+		 */
+		if (!(current->rn_flags & RC_NODE_OLD)) {
+			/* Not old.  Stop looping. */
+			(void) pthread_mutex_unlock(&current->rn_lock);
 			break;
 		}
-		rc_node_rele_flag(pp, RC_NODE_IN_TX);
-		rc_node_rele_locked(pp);
+
+		rc_node_rele_flag(current, RC_NODE_IN_TX);
+		rc_node_rele_locked(current);
 	}
 
+	/* To take np's RC_NODE_DYING_FLAGS, we need its lock. */
 	(void) pthread_mutex_lock(&np->rn_lock);
+
+	/*
+	 * While we didn't have the lock, a thread may have added
+	 * a reference or changed the flags.
+	 */
 	if (!(np->rn_flags & (RC_NODE_OLD | RC_NODE_DEAD)) ||
 	    np->rn_refs != 0 || np->rn_other_refs != 0 ||
 	    np->rn_other_refs_held != 0) {
 		np->rn_flags &= ~RC_NODE_UNREFED;
-		(void) pthread_mutex_lock(&pp->rn_lock);
 
-		rc_node_rele_flag(pp, RC_NODE_IN_TX);
-		rc_node_rele_locked(pp);
+		(void) pthread_mutex_lock(&current->rn_lock);
+		rc_node_rele_flag(current, RC_NODE_IN_TX);
+		/* held by cache_lookup() */
+		rc_node_rele_locked(current);
 		return;
 	}
 
 	if (!rc_node_hold_flag(np, RC_NODE_DYING_FLAGS)) {
+		/*
+		 * Someone deleted the node while we were waiting for
+		 * DYING_FLAGS.  Undo the modifications to current.
+		 */
 		(void) pthread_mutex_unlock(&np->rn_lock);
 
-		rc_node_rele_flag(pp, RC_NODE_IN_TX);
-		rc_node_rele_locked(pp);
+		rc_node_rele_flag(current, RC_NODE_IN_TX);
+		/* held by cache_lookup() */
+		rc_node_rele_locked(current);
 
 		(void) pthread_mutex_lock(&np->rn_lock);
 		goto died;
 	}
 
-	rc_node_delete_hold(np, 0);
+	/* Take RC_NODE_DYING_FLAGS on np's descendents. */
+	rc_node_delete_hold(np, 0);		/* drops np->rn_lock */
 
+	/* Mark np DEAD.  This requires the lock. */
 	(void) pthread_mutex_lock(&np->rn_lock);
+
+	/* Recheck for new references. */
 	if (!(np->rn_flags & RC_NODE_OLD) ||
 	    np->rn_refs != 0 || np->rn_other_refs != 0 ||
 	    np->rn_other_refs_held != 0) {
 		np->rn_flags &= ~RC_NODE_UNREFED;
-		rc_node_delete_rele(np, 0);
+		rc_node_delete_rele(np, 0);	/* drops np's lock */
 
-		(void) pthread_mutex_lock(&pp->rn_lock);
-		rc_node_rele_flag(pp, RC_NODE_IN_TX);
-		rc_node_rele_locked(pp);
+		(void) pthread_mutex_lock(&current->rn_lock);
+		rc_node_rele_flag(current, RC_NODE_IN_TX);
+		/* held by cache_lookup() */
+		rc_node_rele_locked(current);
 		return;
 	}
 
 	np->rn_flags |= RC_NODE_DEAD;
-	rc_node_hold_locked(np);
-	rc_node_delete_children(np, 0);
 
 	/*
-	 * It's gone -- remove it from the former chain and destroy it.
+	 * Delete the children.  This calls rc_node_rele_locked() on np at
+	 * the end, so add a reference to keep the count from going
+	 * negative.  It will recurse with RC_NODE_DEAD set, so we'll call
+	 * rc_node_destroy() above, but RC_NODE_UNREFED is also set, so it
+	 * shouldn't actually free() np.
 	 */
-	(void) pthread_mutex_lock(&pp->rn_lock);
-	for (cur = pp; cur != NULL && cur->rn_former != np;
+	rc_node_hold_locked(np);
+	rc_node_delete_children(np, 0);		/* unlocks np */
+
+	/* Remove np from current's rn_former chain. */
+	(void) pthread_mutex_lock(&current->rn_lock);
+	for (cur = current; cur != NULL && cur->rn_former != np;
 	    cur = cur->rn_former)
 		;
 	assert(cur != NULL && cur != np);
@@ -4480,21 +4636,46 @@ rc_node_unrefed(rc_node_t *np)
 	cur->rn_former = np->rn_former;
 	np->rn_former = NULL;
 
-	rc_node_rele_flag(pp, RC_NODE_IN_TX);
-	rc_node_rele_locked(pp);
+	rc_node_rele_flag(current, RC_NODE_IN_TX);
+	/* held by cache_lookup() */
+	rc_node_rele_locked(current);
 
+	/* Clear ON_FORMER and UNREFED, and destroy. */
 	(void) pthread_mutex_lock(&np->rn_lock);
 	assert(np->rn_flags & RC_NODE_ON_FORMER);
 	np->rn_flags &= ~(RC_NODE_UNREFED | RC_NODE_ON_FORMER);
+
+	if (np->rn_erefs > 1) {
+		/* Still referenced.  Stay execution. */
+		--np->rn_erefs;
+		NODE_UNLOCK(np);
+		return;
+	}
+
 	(void) pthread_mutex_unlock(&np->rn_lock);
 	rc_node_destroy(np);
 	return;
 
 died:
+	/*
+	 * Another thread marked np DEAD.  If there still aren't any
+	 * persistent references, destroy the node.
+	 */
 	np->rn_flags &= ~RC_NODE_UNREFED;
+
 	unrefed = (np->rn_refs == 0 && np->rn_other_refs == 0 &&
 	    np->rn_other_refs_held == 0);
+
+	if (np->rn_erefs > 0)
+		--np->rn_erefs;
+
+	if (unrefed && np->rn_erefs > 0) {
+		NODE_UNLOCK(np);
+		return;
+	}
+
 	(void) pthread_mutex_unlock(&np->rn_lock);
+
 	if (unrefed)
 		rc_node_destroy(np);
 }
@@ -4818,19 +4999,28 @@ again:
 	cache_release(bp);
 
 	np->rn_flags |= RC_NODE_DEAD;
-	if (pp != NULL) {
-		(void) pthread_mutex_unlock(&np->rn_lock);
 
+	if (pp != NULL) {
+		/*
+		 * Remove from pp's rn_children.  This requires pp's lock,
+		 * so we must drop np's lock to respect lock order.
+		 */
+		(void) pthread_mutex_unlock(&np->rn_lock);
 		(void) pthread_mutex_lock(&pp->rn_lock);
 		(void) pthread_mutex_lock(&np->rn_lock);
+
 		uu_list_remove(pp->rn_children, np);
+
 		rc_node_rele_flag(pp, RC_NODE_CHILDREN_CHANGING);
+
 		(void) pthread_mutex_unlock(&pp->rn_lock);
+
 		np->rn_flags &= ~RC_NODE_IN_PARENT;
 	}
+
 	/*
-	 * finally, propagate death to our children, handle notifications,
-	 * and release our hold.
+	 * finally, propagate death to our children (including marking
+	 * them DEAD), handle notifications, and release our hold.
 	 */
 	rc_node_hold_locked(np);	/* hold for delete */
 	rc_node_delete_children(np, 1);	/* drops DYING_FLAGS, lock, ref */

@@ -516,8 +516,11 @@ entity_remove(repcache_client_t *cp, uint32_t id)
 
 	(void) pthread_mutex_lock(&cp->rc_lock);
 	entity = uu_avl_find(cp->rc_entities, &id, NULL, NULL);
-	if (entity != NULL)
+	if (entity != NULL) {
+		add_log_ptr(get_log(), RC_PTR_TYPE_ENTITY, id, entity);
+
 		uu_avl_remove(cp->rc_entities, entity);
+	}
 	(void) pthread_mutex_unlock(&cp->rc_lock);
 
 	if (entity != NULL)

@@ -411,6 +411,11 @@ list_walk_init(uu_list_walk_t *wp, uu_list_t *lp, uint32_t flags)
 		wp->ulw_next_result = lp->ul_null_node.uln_prev;
 
 	if (lp->ul_debug || robust) {
+		/*
+		 * Add this walker to the list's list of walkers so
+		 * uu_list_remove() can advance us if somebody tries to
+		 * remove ulw_next_result.
+		 */
 		wp->ulw_next = next = &lp->ul_null_walk;
 		wp->ulw_prev = prev = next->ulw_prev;
 		next->ulw_prev = wp;

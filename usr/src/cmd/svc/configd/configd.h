@@ -236,7 +236,8 @@ struct rc_node {
 	pthread_mutex_t	rn_lock;
 	pthread_cond_t	rn_cv;
 	uint32_t	rn_flags;
-	uint32_t	rn_refs;		/* reference count */
+	uint32_t	rn_refs;		/* client reference count */
+	uint32_t	rn_erefs;		/* ephemeral ref count */
 	uint32_t	rn_other_refs;		/* atomic refcount */
 	uint32_t	rn_other_refs_held;	/* for 1->0 transitions */
 
@@ -295,12 +296,33 @@ struct rc_node {
 #define	RC_NODE_DYING			0x00004000 /* node is being deleted */
 #define	RC_NODE_DEAD			0x00008000 /* node has been deleted */
 
+/*
+ * RC_NODE_DEAD means that the node no longer represents data in the
+ * backend, and we should return _DELETED errors to clients who try to use
+ * it.  Very much like a zombie process.
+ *
+ * RC_NODE_OLD also means that the node no longer represents data in the
+ * backend, but it's ok for clients to access it because we've loaded all of
+ * the children.  (This only happens for transactional objects such as
+ * property groups and snapshots, where we guarantee a stable view once
+ * a reference is obtained.)  When all client references are destroyed,
+ * however, the node should be destroyed.
+ *
+ * Though RC_NODE_DEAD is set by the rc_node_delete() code, it is also set
+ * by rc_node_no_client_refs() for RC_NODE_OLD nodes not long before
+ * they're destroyed.
+ */
+
 #define	RC_NODE_DYING_FLAGS						\
 	(RC_NODE_CHILDREN_CHANGING | RC_NODE_IN_TX | RC_NODE_DYING |	\
 	    RC_NODE_CREATING_CHILD)
 
 #define	RC_NODE_WAITING_FLAGS						\
 	(RC_NODE_DYING_FLAGS | RC_NODE_USING_PARENT)
+
+
+#define	NODE_LOCK(n)	(void) pthread_mutex_lock(&(n)->rn_lock)
+#define	NODE_UNLOCK(n)	(void) pthread_mutex_unlock(&(n)->rn_lock)
 
 
 typedef enum rc_auth_state {
