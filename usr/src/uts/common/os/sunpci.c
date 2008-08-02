@@ -322,7 +322,6 @@ static pci_cap_entry_t pci_cap_table[] = {
 int
 pci_save_config_regs(dev_info_t *dip)
 {
-	peekpoke_ctlops_t cautacc_ctlops_arg;
 	ddi_acc_handle_t confhdl;
 	pci_config_header_state_t *chsp;
 	pci_cap_save_desc_t *pci_cap_descp;
@@ -331,7 +330,12 @@ pci_save_config_regs(dev_info_t *dip)
 	uint32_t *regbuf, *p;
 	uint8_t *maskbuf;
 	size_t maskbufsz, regbufsz, capbufsz;
+#ifdef __sparc
 	ddi_acc_hdl_t *hp;
+#else
+	ddi_device_acc_attr_t attr;
+	caddr_t cfgaddr;
+#endif
 	off_t offset = 0;
 	uint8_t cap_ptr, cap_id;
 	int pcie = 0;
@@ -340,12 +344,27 @@ pci_save_config_regs(dev_info_t *dip)
 	PMD(PMD_SX, ("pci_save_config_regs %s:%d\n", ddi_driver_name(dip),
 	    ddi_get_instance(dip)))
 
+#ifdef __sparc
 	if (pci_config_setup(dip, &confhdl) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d can't get config handle",
 		    ddi_driver_name(dip), ddi_get_instance(dip));
 
 		return (DDI_FAILURE);
 	}
+#else
+	/* Set up cautious config access handle */
+	attr.devacc_attr_version = DDI_DEVICE_ATTR_V1;
+	attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
+	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+	attr.devacc_attr_access = DDI_CAUTIOUS_ACC;
+	if (ddi_regs_map_setup(dip, 0, &cfgaddr, 0, 0, &attr, &confhdl)
+	    != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s%d can't setup cautious config handle",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
+
+		return (DDI_FAILURE);
+	}
+#endif
 
 	/*
 	 * Determine if it implements capabilities
@@ -386,18 +405,22 @@ no_cap:
 		maskbufsz = (size_t)((PCIE_CONF_HDR_SIZE/ sizeof (uint32_t)) >>
 		    INDEX_SHIFT);
 		maskbuf = (uint8_t *)kmem_zalloc(maskbufsz, KM_SLEEP);
+#ifdef __sparc
 		hp = impl_acc_hdl_get(confhdl);
-		cautacc_ctlops_arg.size = sizeof (uint32_t);
-		cautacc_ctlops_arg.handle = confhdl;
-		cautacc_ctlops_arg.repcount = 1;
-		cautacc_ctlops_arg.flags = 0;
+#endif
 		for (i = 0; i < (PCIE_CONF_HDR_SIZE / sizeof (uint32_t)); i++) {
-			cautacc_ctlops_arg.dev_addr = (uintptr_t)(hp->ah_addr +
-			    offset);
-			cautacc_ctlops_arg.host_addr = (uintptr_t)p;
-			ret = ddi_ctlops(dip, dip, DDI_CTLOPS_PEEK,
-			    &cautacc_ctlops_arg, NULL);
+#ifdef __sparc
+			ret = ddi_peek32(dip, (int32_t *)(hp->ah_addr + offset),
+			    (int32_t *)p);
 			if (ret == DDI_SUCCESS) {
+#else
+			/*
+			 * ddi_peek doesn't work on x86, so we use cautious pci
+			 * config access instead.
+			 */
+			*p = pci_config_get32(confhdl, offset);
+			if (*p != -1) {
+#endif
 				/* it is readable register. set the bit */
 				maskbuf[i >> INDEX_SHIFT] |=
 				    (uint8_t)(1 << (i & BITMASK));
