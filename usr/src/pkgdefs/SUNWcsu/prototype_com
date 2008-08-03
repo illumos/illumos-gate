@@ -1241,6 +1241,7 @@ f none usr/share/lib/zoneinfo/America/Regina 644 root bin
 f none usr/share/lib/zoneinfo/America/Resolute 644 root bin
 f none usr/share/lib/zoneinfo/America/Rio_Branco 644 root bin
 l none usr/share/lib/zoneinfo/America/Rosario=../../../../../usr/share/lib/zoneinfo/America/Argentina/Cordoba
+f none usr/share/lib/zoneinfo/America/Santarem 644 root bin
 f none usr/share/lib/zoneinfo/America/Santiago 644 root bin
 f none usr/share/lib/zoneinfo/America/Santo_Domingo 644 root bin
 f none usr/share/lib/zoneinfo/America/Sao_Paulo 644 root bin
