@@ -803,6 +803,7 @@ login_set_auth(iscsi_sess_t *s)
 	char *possible = NULL;
 	iscsi_auth_t *sess_auth = &(s->sess_auth);
 	int comp = 0;
+	int username_len = 0;
 
 	bzero(sess_auth->username_in, sizeof (sess_auth->username_in));
 	bzero(sess_auth->password_in, sizeof (sess_auth->password_in));
@@ -831,6 +832,7 @@ login_set_auth(iscsi_sess_t *s)
 					(void) strcpy(
 					    (char *)sess_auth->username_in,
 					    szChapName);
+					username_len = strlen(szChapName);
 					free(szChapName);
 				}
 
@@ -865,7 +867,7 @@ login_set_auth(iscsi_sess_t *s)
 	 * If iSNS enabled set LOGIN_AUTH
 	 */
 	if (isns_enabled() == True) {
-		if (sess_auth->password_length_in == 0)
+		if (username_len == 0)
 			return (LOGIN_NO_AUTH);
 		return (LOGIN_AUTH);
 	}
@@ -877,8 +879,8 @@ login_set_auth(iscsi_sess_t *s)
 	 * If acc_list exists for the target, and
 	 * If the initiator not in the list, drop it.
 	 * If the initiator in the list, and
-	 * If no CHAP secret for the initiator, transit.
-	 * If a CHAP secret exists for the initiator, it must be authed.
+	 * If no CHAP name for the initiator, transit.
+	 * If a CHAP name exists for the initiator, it must be authed.
 	 */
 
 	while ((xnTarget = tgt_node_next_child(targets_config, XML_ELEMENT_TARG,
@@ -900,7 +902,7 @@ login_set_auth(iscsi_sess_t *s)
 				/*
 				 * No acl_list found, return auth or no auth
 				 */
-				if (sess_auth->password_length_in == 0)
+				if (username_len == 0)
 					return (LOGIN_NO_AUTH);
 				return (LOGIN_AUTH);
 			}
@@ -925,7 +927,7 @@ login_set_auth(iscsi_sess_t *s)
 					 * authentication needed
 					 */
 					free(possible);
-					if (sess_auth->password_length_in == 0)
+					if (username_len == 0)
 						return (LOGIN_NO_AUTH);
 					else
 						return (LOGIN_AUTH);
