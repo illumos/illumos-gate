@@ -228,7 +228,7 @@ create_target(tgt_node_t *x)
 			goto error;
 		}
 		if ((node_name = create_node_name(name, alias)) == NULL) {
-			xml_rtn_msg(&msg, ERR_CREATE_NAME_TO_LONG);
+			xml_rtn_msg(&msg, ERR_CREATE_NAME_TOO_LONG);
 			goto error;
 		}
 		if (create_target_dir(node_name, name) == False) {
@@ -330,7 +330,7 @@ create_initiator(tgt_node_t *x)
 		goto error;
 	}
 	if (strlen(iscsi_name) >= ISCSI_MAX_NAME_LEN) {
-		xml_rtn_msg(&msg, ERR_NAME_TO_LONG);
+		xml_rtn_msg(&msg, ERR_NAME_TOO_LONG);
 		goto error;
 	}
 
@@ -475,7 +475,7 @@ create_zfs(tgt_node_t *x, ucred_t *cred)
 			tgt_node_add(n, c);
 			free(name);
 		} else {
-			xml_rtn_msg(&msg, ERR_CREATE_NAME_TO_LONG);
+			xml_rtn_msg(&msg, ERR_CREATE_NAME_TOO_LONG);
 			goto error;
 		}
 
@@ -907,7 +907,7 @@ create_lun_common(char *targ_name, char *local_name, int lun, uint64_t size,
 	if (write(fd, buf, sizeof (buf)) != sizeof (buf)) {
 		(void) unlink(path);
 		if (errno == EFBIG)
-			*code = ERR_FILE_TO_BIG;
+			*code = ERR_FILE_TOO_BIG;
 		else
 			*code = ERR_FAILED_TO_CREATE_LU;
 		goto error;
@@ -953,7 +953,7 @@ create_lun_common(char *targ_name, char *local_name, int lun, uint64_t size,
 		} else if ((fs.f_frsize * fs.f_bfree) < size) {
 			queue_prt(mgmtq, Q_STE_ERRS,
 			    "GEN  Not enough space for LU");
-			*code = ERR_FILE_TO_BIG;
+			*code = ERR_FILE_TOO_BIG;
 			goto error;
 		}
 

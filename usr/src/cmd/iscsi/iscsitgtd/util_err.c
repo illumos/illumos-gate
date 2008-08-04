@@ -59,7 +59,7 @@ errcode_to_str(err_code_t err_code)
 	case ERR_SYNTAX_MISSING_TYPE:
 		return ((char *)gettext("Syntax error: Missing type"));
 	case ERR_SYNTAX_EMPTY_ACL:
-		return ((char *)gettext("Syntax error: empty acl"));
+		return ((char *)gettext("Syntax error: empty ACL"));
 	case ERR_SYNTAX_EMPTY_ALIAS:
 		return ((char *)gettext("Syntax error: empty alias"));
 	case ERR_SYNTAX_EMPTY_CHAPNAME:
@@ -67,13 +67,13 @@ errcode_to_str(err_code_t err_code)
 	case ERR_SYNTAX_EMPTY_CHAPSECRET:
 		return ((char *)gettext("Empty 'chap-secret' element"));
 	case ERR_SYNTAX_EMPTY_IPADDR:
-		return ((char *)gettext("Syntax error: empty ip address"));
+		return ((char *)gettext("Syntax error: empty IP address"));
 	case ERR_SYNTAX_EMPTY_MAXRECV:
 		return ((char *)gettext("Syntax error: empty maxrecv"));
 	case ERR_SYNTAX_EMPTY_TPGT:
 		return ((char *)gettext("Syntax error: empty TPGT"));
 	case ERR_SYNTAX_INVALID_NAME:
-		return ((char *)gettext("Syntax error: name must only use "
+		return ((char *)gettext("Syntax error: name may contain only "
 		    "a..z, A..Z, 0-9, dot(.), dash(-), colon(:) characters"));
 	case ERR_INVALID_COMMAND:
 		return ((char *)gettext("Invalid command"));
@@ -100,7 +100,7 @@ errcode_to_str(err_code_t err_code)
 	case ERR_TPGT_EXISTS:
 		return ((char *)gettext("TPGT already exists"));
 	case ERR_ACL_NOT_FOUND:
-		return ((char *)gettext("Acl list not found"));
+		return ((char *)gettext("ACL list not found"));
 	case ERR_INIT_NOT_FOUND:
 		return ((char *)gettext("Initiator not found"));
 	case ERR_TARG_NOT_FOUND:
@@ -111,34 +111,34 @@ errcode_to_str(err_code_t err_code)
 		return ((char *)gettext("TPGT not found"));
 	case ERR_ACCESS_RAW_DEVICE_FAILED:
 		return ((char *)gettext("Failed to "
-		    "access direct access device"));
+		    "access a direct access device"));
 	case ERR_CREATE_METADATA_FAILED:
 		return ((char *)gettext("Failed to "
 		    "create meta data for tape device"));
 	case ERR_CREATE_SYMLINK_FAILED:
 		return ((char *)gettext("Failed to "
-		    "create symbol link to backing store"));
-	case ERR_CREATE_NAME_TO_LONG:
+		    "create a symbolic link to the backing store"));
+	case ERR_CREATE_NAME_TOO_LONG:
 		return ((char *)gettext("Name must be less than 166 "
 		    "characters"));
-	case ERR_NAME_TO_LONG:
-		return ((char *)gettext("Name to long, must be less that 223 "
+	case ERR_NAME_TOO_LONG:
+		return ((char *)gettext("Name too long, must be less than 223 "
 		    "characters"));
 	case ERR_DISK_BACKING_SIZE_OR_FILE:
-		return ((char *)gettext("Size must be zero if backing store "
+		return ((char *)gettext("Size must be 0 if backing store "
 		    "exists"));
 	case ERR_DISK_BACKING_MUST_BE_REGULAR_FILE:
 		return ((char *)gettext("For type "
 		    "'disk' backing must be a regular file"));
 	case ERR_DISK_BACKING_NOT_VALID_RAW:
-		return ((char *)gettext("Backing store is not valid raw "
+		return ((char *)gettext("Backing store is not a valid raw "
 		    "device"));
 	case ERR_STAT_BACKING_FAILED:
 		return ((char *)gettext("Failed to "
 		    "stat(2) backing for 'disk'"));
 	case ERR_RAW_PART_NOT_CAP:
-		return ((char *)gettext("Partition size doesn't match capacity"
-		    " of device, use p0 or ctd name"));
+		return ((char *)gettext("Partition size does not match capacity"
+		    " of device. Use p0 or ctd name"));
 	case ERR_CREATE_TARGET_DIR_FAILED:
 		return ((char *)gettext("Failed to "
 		    "create target directory"));
@@ -165,7 +165,7 @@ errcode_to_str(err_code_t err_code)
 	case ERR_NO_MATCH:
 		return ((char *)gettext("No match"));
 	case ERR_NO_MEM:
-		return ((char *)gettext("Internal error: no memory"));
+		return ((char *)gettext("Internal error: Out of memory"));
 	case ERR_LUN_ZERO_NOT_LAST:
 		return ((char *)gettext("LUN 0 must be the last one deleted"));
 	case ERR_LUN_ZERO_NOT_FIRST:
@@ -174,15 +174,15 @@ errcode_to_str(err_code_t err_code)
 	case ERR_SIZE_MOD_BLOCK:
 		return ((char *)gettext("Size must be multiple of 512"));
 	case ERR_CANT_SHRINK_LU:
-		return ((char *)gettext("Shinking of LU is not supported"));
+		return ((char *)gettext("Shrinking of LU is not supported"));
 	case ERR_RESIZE_WRONG_TYPE:
 		return ((char *)gettext("Backing store must be regular file"));
 	case ERR_RESIZE_WRONG_DTYPE:
-		return ((char *)gettext("Can't resize 'raw' targets"));
+		return ((char *)gettext("Cannot resize 'raw' targets"));
 	case ERR_LUN_NOT_GROWN:
-		return ((char *)gettext("Failed to grown LU"));
-	case ERR_FILE_TO_BIG:
-		return ((char *)gettext("Requested size is to large for "
+		return ((char *)gettext("Failed to grow LU"));
+	case ERR_FILE_TOO_BIG:
+		return ((char *)gettext("Requested size is too large for "
 		    "system"));
 	case ERR_FAILED_TO_CREATE_LU:
 		return ((char *)gettext("Failed to create backing store"));
