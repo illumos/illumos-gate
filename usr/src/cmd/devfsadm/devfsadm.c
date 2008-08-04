@@ -281,6 +281,7 @@ main(int argc, char *argv[])
 	if (getuid() != 0) {
 		err_print(MUST_BE_ROOT);
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 
 	/*
@@ -379,6 +380,7 @@ main(int argc, char *argv[])
 		 */
 		if (fork() != 0) {
 			devfsadm_exit(0);
+			/*NOTREACHED*/
 		}
 
 		/* set directory to / so it coredumps there */
@@ -397,6 +399,7 @@ main(int argc, char *argv[])
 				err_print(CANT_CREATE_THREAD, "daemon",
 				    strerror(errno));
 				devfsadm_exit(1);
+				/*NOTREACHED*/
 			}
 
 			/* start the minor_fini_thread */
@@ -408,6 +411,7 @@ main(int argc, char *argv[])
 				err_print(CANT_CREATE_THREAD, "minor_fini",
 				    strerror(errno));
 				devfsadm_exit(1);
+				/*NOTREACHED*/
 			}
 
 
@@ -423,12 +427,13 @@ main(int argc, char *argv[])
 				login_dev_enable = TRUE;
 			}
 			daemon_update();
+			devfsadm_exit(0);
+			/*NOTREACHED*/
 		} else {
 			err_print(DAEMON_RUNNING, pid);
 			devfsadm_exit(1);
+			/*NOTREACHED*/
 		}
-		exit_daemon_lock();
-
 	} else {
 		/* not a daemon, so just build /dev and /devices */
 
@@ -511,6 +516,7 @@ set_lock_root(void)
 	} else if (!S_ISDIR(sb.st_mode)) {
 		err_print(NOT_DIR, etc_dev_dir);
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 }
 
@@ -571,6 +577,7 @@ parse_args(int argc, char *argv[])
 				if (zone_pathcheck(root_dir) !=
 				    DEVFSADM_SUCCESS)
 					devfsadm_exit(1);
+					/*NOTREACHED*/
 				break;
 			case 's':
 				/*
@@ -616,6 +623,7 @@ parse_args(int argc, char *argv[])
 					err_print(ALIAS_TOO_LONG,
 					    MAXMODCONFNAME, ap->a_name);
 					devfsadm_exit(1);
+					/*NOTREACHED*/
 				}
 				ap->a_len = len;
 				if (a_tail == NULL) {
@@ -664,12 +672,14 @@ parse_args(int argc, char *argv[])
 				if (zone_pathcheck(root_dir) !=
 				    DEVFSADM_SUCCESS)
 				devfsadm_exit(devfsadm_copy());
+				/*NOTREACHED*/
 				break;
 			case 'r':
 				devices_dir = s_strdup(optarg);
 				if (zone_pathcheck(devices_dir) !=
 				    DEVFSADM_SUCCESS)
 					devfsadm_exit(1);
+					/*NOTREACHED*/
 				break;
 			case 's':
 				/*
@@ -700,6 +710,7 @@ parse_args(int argc, char *argv[])
 		    mc.drvname[0] == NULL)) {
 			err_print(MAJOR_AND_B_FLAG);
 			devfsadm_exit(1);
+			/*NOTREACHED*/
 		}
 		if (add_bind == TRUE) {
 			mc.num_aliases = num_aliases;
@@ -709,6 +720,7 @@ parse_args(int argc, char *argv[])
 				err_print(MODCTL_ADDMAJBIND);
 			}
 			devfsadm_exit(retval);
+			/*NOTREACHED*/
 		}
 
 	} else if ((strcmp(prog, DEVFSADM) == 0) ||
@@ -803,6 +815,7 @@ parse_args(int argc, char *argv[])
 				 */
 				root_dir = s_strdup(optarg);
 				devfsadm_exit(devfsadm_copy());
+				/*NOTREACHED*/
 				break;
 			case 'r':
 				set_root_devices_dev_dir(optarg);
@@ -870,6 +883,7 @@ parse_args(int argc, char *argv[])
 		if (zonename == NULL) {
 			if (zone_pathcheck(root_dir) != DEVFSADM_SUCCESS)
 				devfsadm_exit(1);
+				/*NOTREACHED*/
 		}
 
 		if (init_drvconf || init_perm || init_sysavail) {
@@ -886,12 +900,13 @@ parse_args(int argc, char *argv[])
 			if (init_sysavail)
 				modctl_sysavail();
 			devfsadm_exit(0);
-			/* NOTREACHED */
+			/*NOTREACHED*/
 		}
 
 		if (load_devname_nsmaps == TRUE) {
 			devname_setup_nsmaps();
 			devfsadm_exit(0);
+			/*NOTREACHED*/
 		}
 	}
 
@@ -919,6 +934,7 @@ parse_args(int argc, char *argv[])
 				if (zone_pathcheck(root_dir) !=
 				    DEVFSADM_SUCCESS)
 					devfsadm_exit(1);
+					/*NOTREACHED*/
 				break;
 			case 's':
 				/* suppress.  don't create/remove links/nodes */
@@ -960,6 +976,7 @@ usage(void)
 	}
 
 	devfsadm_exit(1);
+	/*NOTREACHED*/
 }
 
 static void
@@ -1149,6 +1166,7 @@ process_devinfo_tree()
 
 	if (dci.dci_error) {
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 
 	/* handle post-cleanup operations desired by the modules. */
@@ -1164,6 +1182,7 @@ print_cache_signal(int signo)
 	if (signal(SIGUSR1, print_cache_signal) == SIG_ERR) {
 		err_print("signal SIGUSR1 failed: %s\n", strerror(errno));
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 }
 
@@ -1202,10 +1221,12 @@ daemon_update(void)
 	if (signal(SIGUSR1, print_cache_signal) == SIG_ERR) {
 		err_print("signal SIGUSR1 failed: %s\n", strerror(errno));
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 	if (signal(SIGTERM, catch_exit) == SIG_ERR) {
 		err_print("signal SIGTERM failed: %s\n", strerror(errno));
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 
 	if (snprintf(door_file, sizeof (door_file),
@@ -1214,18 +1235,21 @@ daemon_update(void)
 		err_print("update_daemon failed to open sysevent service "
 		    "door\n");
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 	if ((sysevent_hp = sysevent_open_channel_alt(
 	    door_file)) == NULL) {
 		err_print(CANT_CREATE_DOOR,
 		    door_file, strerror(errno));
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 	if (sysevent_bind_subscriber(sysevent_hp, event_handler) != 0) {
 		err_print(CANT_CREATE_DOOR,
 		    door_file, strerror(errno));
 		(void) sysevent_close_channel(sysevent_hp);
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 	subclass_list = EC_SUB_ALL;
 	if (sysevent_register_event(sysevent_hp, EC_ALL, &subclass_list, 1)
@@ -1235,18 +1259,21 @@ daemon_update(void)
 		(void) sysevent_unbind_subscriber(sysevent_hp);
 		(void) sysevent_close_channel(sysevent_hp);
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 	if (snprintf(door_file, sizeof (door_file), "%s/%s",
 	    etc_dev_dir, DEVFSADM_SYNCH_DOOR) >= sizeof (door_file)) {
 		err_print(CANT_CREATE_DOOR, DEVFSADM_SYNCH_DOOR,
 		    strerror(ENAMETOOLONG));
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 
 	(void) s_unlink(door_file);
 	if ((fd = open(door_file, O_RDWR | O_CREAT, SYNCH_DOOR_PERMS)) == -1) {
 		err_print(CANT_CREATE_DOOR, door_file, strerror(errno));
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 	(void) close(fd);
 
@@ -1255,12 +1282,14 @@ daemon_update(void)
 		err_print(CANT_CREATE_DOOR, door_file, strerror(errno));
 		(void) s_unlink(door_file);
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 
 	if (fattach(fd, door_file) == -1) {
 		err_print(CANT_CREATE_DOOR, door_file, strerror(errno));
 		(void) s_unlink(door_file);
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 
 	/*
@@ -1271,12 +1300,14 @@ daemon_update(void)
 		err_print(CANT_CREATE_DOOR, DEVNAME_LOOKUP_DOOR,
 		    strerror(ENAMETOOLONG));
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 
 	(void) s_unlink(door_file);
 	if ((fd = open(door_file, O_RDWR | O_CREAT, S_IRUSR|S_IWUSR)) == -1) {
 		err_print(CANT_CREATE_DOOR, door_file, strerror(errno));
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 	(void) close(fd);
 
@@ -1285,6 +1316,7 @@ daemon_update(void)
 		err_print(CANT_CREATE_DOOR, door_file, strerror(errno));
 		(void) s_unlink(door_file);
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 
 	(void) fdetach(door_file);
@@ -1296,6 +1328,7 @@ retry:
 		err_print(CANT_CREATE_DOOR, door_file, strerror(errno));
 		(void) s_unlink(door_file);
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 	lookup_door_fd = fd;
 
@@ -1422,6 +1455,7 @@ lock_dev(void)
 			err_print(NO_MODULES, module_dirs);
 			err_print(ABORTING);
 			devfsadm_exit(1);
+			/*NOTREACHED*/
 		}
 	} else {
 		err_print(NO_MODULES, module_dirs);
@@ -1473,7 +1507,7 @@ unlock_dev(int flag)
 		process_syseventq();
 	}
 
-	exit_dev_lock();
+	exit_dev_lock(0);
 
 	(void) mutex_lock(&minor_fini_mutex);
 	if (flag == SYNC_STATE) {
@@ -2468,6 +2502,7 @@ devfsadm_mklink(char *link, di_node_t node, di_minor_t minor, int flags)
 		if ((dev_path = di_devfs_path(node)) == NULL) {
 			err_print(DI_DEVFS_PATH_FAILED, strerror(errno));
 			devfsadm_exit(1);
+			/*NOTREACHED*/
 		}
 		(void) snprintf(phy_path, sizeof (phy_path), "%s:%s",
 		    dev_path, di_minor_name(minor));
@@ -2932,6 +2967,7 @@ reset_node_permissions(di_node_t node, di_minor_t minor)
 	if ((dev_path = di_devfs_path(node)) == NULL) {
 		err_print(DI_DEVFS_PATH_FAILED, strerror(errno));
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 	(void) strcpy(lphy_path, dev_path);
 	di_devfs_path_free(dev_path);
@@ -3251,6 +3287,7 @@ devfsadm_rm_stale_links(char *dir_re, char *valid_link, di_node_t node,
 		if ((dev_path = di_devfs_path(node)) == NULL) {
 			err_print(DI_DEVFS_PATH_FAILED, strerror(errno));
 			devfsadm_exit(1);
+			/*NOTREACHED*/
 		}
 		(void) strcpy(phy_path, dev_path);
 		di_devfs_path_free(dev_path);
@@ -3862,6 +3899,7 @@ enter_dev_lock()
 	if (dev_lock_fd < 0) {
 		err_print(OPEN_FAILED, dev_lockfile, strerror(errno));
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 
 	lock.l_type = F_WRLCK;
@@ -3880,6 +3918,7 @@ enter_dev_lock()
 				err_print(LSEEK_FAILED, dev_lockfile,
 				    strerror(errno));
 				devfsadm_exit(1);
+				/*NOTREACHED*/
 			}
 			/*
 			 * wait for the dev lock. If we have the database open,
@@ -3897,6 +3936,7 @@ enter_dev_lock()
 				err_print(LOCK_FAILED, dev_lockfile,
 				    strerror(errno));
 				devfsadm_exit(1);
+				/*NOTREACHED*/
 			}
 		}
 	}
@@ -3913,12 +3953,14 @@ enter_dev_lock()
 	if (lseek(dev_lock_fd, 0, SEEK_SET) == (off_t)-1) {
 		err_print(LSEEK_FAILED, dev_lockfile, strerror(errno));
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 	pid = getpid();
 	n = write(dev_lock_fd, &pid, sizeof (pid_t));
 	if (n != sizeof (pid_t)) {
 		err_print(WRITE_FAILED, dev_lockfile, strerror(errno));
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 
 	return (last_owner_pid);
@@ -3930,7 +3972,7 @@ enter_dev_lock()
  * gets removed.
  */
 void
-exit_dev_lock()
+exit_dev_lock(int exiting)
 {
 	struct flock unlock;
 
@@ -3938,7 +3980,8 @@ exit_dev_lock()
 		return;
 	}
 
-	vprint(LOCK_MID, "exit_dev_lock: lock file %s\n", dev_lockfile);
+	vprint(LOCK_MID, "exit_dev_lock: lock file %s, exiting = %d\n",
+	    dev_lockfile, exiting);
 
 	unlock.l_type = F_UNLCK;
 	unlock.l_whence = SEEK_SET;
@@ -3953,7 +3996,9 @@ exit_dev_lock()
 
 	if (close(dev_lock_fd) == -1) {
 		err_print(CLOSE_FAILED, dev_lockfile, strerror(errno));
-		devfsadm_exit(1);
+		if (!exiting)
+			devfsadm_exit(1);
+			/*NOTREACHED*/
 	}
 }
 
@@ -3980,6 +4025,7 @@ enter_daemon_lock(void)
 	if (daemon_lock_fd < 0) {
 		err_print(OPEN_FAILED, daemon_lockfile, strerror(errno));
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 
 	lock.l_type = F_WRLCK;
@@ -3994,6 +4040,7 @@ enter_daemon_lock(void)
 				err_print(LOCK_FAILED, daemon_lockfile,
 				    strerror(errno));
 				devfsadm_exit(1);
+				/*NOTREACHED*/
 			}
 			return (lock.l_pid);
 		}
@@ -4006,7 +4053,7 @@ enter_daemon_lock(void)
  * Drop the advisory daemon lock, close lock file
  */
 void
-exit_daemon_lock(void)
+exit_daemon_lock(int exiting)
 {
 	struct flock lock;
 
@@ -4014,7 +4061,8 @@ exit_daemon_lock(void)
 		return;
 	}
 
-	vprint(LOCK_MID, "exit_daemon_lock: lock file %s\n", daemon_lockfile);
+	vprint(LOCK_MID, "exit_daemon_lock: lock file %s, exiting = %d\n",
+	    daemon_lockfile, exiting);
 
 	lock.l_type = F_UNLCK;
 	lock.l_whence = SEEK_SET;
@@ -4027,7 +4075,9 @@ exit_daemon_lock(void)
 
 	if (close(daemon_lock_fd) == -1) {
 		err_print(CLOSE_FAILED, daemon_lockfile, strerror(errno));
-		devfsadm_exit(1);
+		if (!exiting)
+			devfsadm_exit(1);
+			/*NOTREACHED*/
 	}
 }
 
@@ -6542,6 +6592,7 @@ build_links(devlinktab_list_t *entry, di_minor_t minor, di_node_t node)
 	if ((dev_path = di_devfs_path(node)) == NULL) {
 		err_print(DI_DEVFS_PATH_FAILED, strerror(errno));
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 	(void) strcpy(contents, dev_path);
 	di_devfs_path_free(dev_path);
@@ -6973,14 +7024,15 @@ devfsadm_exit(int status)
 		(void) dlclose(librcm_hdl);
 	}
 
-	exit_dev_lock();
-	exit_daemon_lock();
+	exit_dev_lock(1);
+	exit_daemon_lock(1);
 
 	if (logflag == TRUE) {
 		closelog();
 	}
 
 	exit(status);
+	/*NOTREACHED*/
 }
 
 /*
@@ -7509,6 +7561,7 @@ read_driver_aliases_file(void)
 	if ((afd = fopen(ALIASFILE, "r")) == NULL) {
 		err_print(FOPEN_FAILED, ALIASFILE, strerror(errno));
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 
 	while (fgets(line, sizeof (line), afd) != NULL) {
@@ -7602,6 +7655,7 @@ s_malloc(const size_t size)
 	if (rp == NULL) {
 		err_print(MALLOC_FAILED, size);
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 	return (rp);
 }
@@ -7616,6 +7670,7 @@ s_realloc(void *ptr, const size_t size)
 	if (ptr == NULL) {
 		err_print(REALLOC_FAILED, size);
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 	return (ptr);
 }
@@ -7629,6 +7684,7 @@ s_zalloc(const size_t size)
 	if (rp == NULL) {
 		err_print(CALLOC_FAILED, size);
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 	return (rp);
 }
@@ -7642,6 +7698,7 @@ s_strdup(const char *ptr)
 	if (rp == NULL) {
 		err_print(STRDUP_FAILED, ptr);
 		devfsadm_exit(1);
+		/*NOTREACHED*/
 	}
 	return (rp);
 }

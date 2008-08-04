@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -389,9 +389,9 @@ static int call_minor_init(module_t *module);
 static void load_module(char *module, char *cdir);
 static void invalidate_enumerate_cache(void);
 static pid_t enter_dev_lock(void);
-static void exit_dev_lock(void);
+static void exit_dev_lock(int exiting);
 static pid_t enter_daemon_lock(void);
-static void exit_daemon_lock(void);
+static void exit_daemon_lock(int exiting);
 static int process_devlink_compat(di_minor_t minor, di_node_t node);
 static int alias(char *, char *);
 static int devfsadm_copy(void);
