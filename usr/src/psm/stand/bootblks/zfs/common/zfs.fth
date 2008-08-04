@@ -1115,11 +1115,16 @@ new-device
       r>  +  -rot       ( #' adr' len' )
    ;
 
+
    /max-bsize  5 *
    /uber-block      +
    /dnode      6 *  +
-   /disk-block      +
-   constant alloc-size
+   /disk-block      +    ( size )
+   \ ugh - sg proms can't free 512k allocations
+   \ that aren't a multiple of 512k in size
+   h# 8.0000  roundup    ( size' )
+   constant  alloc-size
+
 
    : allocate-buffers  ( -- )
       alloc-size h# a0.0000 vmem-alloc  dup 0=  if

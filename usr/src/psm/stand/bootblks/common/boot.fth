@@ -83,17 +83,33 @@ headerless
 headers
 
 
+: check-elf ( base -- is-elf? )
+   l@  h# 7f454c46 ( \x7fELF )  =
+;
+
+: check-fcode ( base -- is-fcode? )
+   c@ dup  h# f0 h# f3 between  swap h# fd =  or
+;
+
+
 \ zfs bootblks with all headers exceeds 7.5k
 \ 'bigbootblk' allows us to load the fs reader from elsewhere
 [ifdef] bigbootblk
 
 : load-pkg  ( -- )
-   boot-dev$  2dup dev-open  ?dup 0=  if  ( dev$ )
+   boot-dev$                              ( dev$ )
+   2dup dev-open  ?dup 0=  if
       open-abort
    then  >r 2drop                         ( r: ih )
+
    /fs-fcode  mem-alloc                   ( adr  r: ih )
    dup  /fs-fcode fs-offset r@  read-disk
+
+   dup check-fcode  invert  if
+      " No fs fcode found"  die
+   then
    dup  1 byte-load
+
    /fs-fcode  mem-free                    ( r: ih )
    r>  dev-close
 ;
@@ -182,13 +198,6 @@ headers
 false value is-elf?
 false value is-archive?
 
-: check-elf ( base -- is-elf? )
-   l@  h# 7f454c46 ( \x7fELF )  =
-;
-
-: check-fcode ( base -- is-fcode? )
-   c@ dup  h# f0 h# f3 between  swap h# fd =  or
-;
 
 : >bootblk  ( adr -- adr' )  d# 512 +  ;
 
@@ -233,7 +242,6 @@ false     value    kern?
 /buf-len  buffer:  targ-file
 : targ-file$  ( -- file$ )  targ-file cscount  ;
 
-headerless
 : init-targ  ( -- )
    targ-file /buf-len erase
    " /platform/"  targ-file swap  move
@@ -249,7 +257,6 @@ headerless
    repeat  2drop                  ( name$ )
 ;
 
-headers
 \ does /platform/<name> exist?
 : try-platname  ( name$ -- name$ true | false )
    munge-name                           ( name$' )

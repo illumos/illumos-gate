@@ -109,18 +109,28 @@ new-device
 
    : dir-entrylen    ( -- n )    d# 0  +dr c@  ;
    : dir-block0      ( -- n )    d# 2  +dr xl@  ;
-   : dir-block0!     ( n -- )    d# 2  +dr xl! ;
    : dir-filesize    ( -- n )    d# 10 +dr xl@  ;
-   : dir-filesize!   ( n -- )    d# 10 +dr xl! ;
    : dir-flags       ( -- n )    d# 25 +dr c@  ;
-   : dir-flags!      ( n -- )    d# 25 +dr c! ;
    : dir-filenamelen ( -- n )    d# 32 +dr c@  ;
    : dir-filename    ( -- adr )  d# 33 +dr  ;
 
    : dir-isdir?      ( -- flag )  dir-flags  h# 02  and  0<>  ;
-   : dir-setdir      ( -- )       h# 02 dir-flags! ;
    : dir-file$       ( -- adr len )  dir-filename  dir-filenamelen  ;
    : dir-sualen      ( -- len )  dir-entrylen  d# 33 -  dir-filenamelen -  ;
+
+   \ ISO name, including dot & dot-dot check
+   : dir-iso$        ( -- adr len )
+      dir-filenamelen 1  =  if
+         dir-filename c@             ( name[0] )
+         dup 0=  if
+            drop " ."  exit          ( dot )
+         then
+         1 =  if                     (  )
+            " .."  exit              ( dot-dot )
+         then
+      then
+      dir-file$                      ( name$ )
+   ;
 
    false instance value symlink?
 
@@ -129,7 +139,6 @@ new-device
       1 cdir-blk +!
    ;
 
-   : root-dir? ( -- flag )  root-dir cdir-ptr = ;
    : froot  ( -- )  root-dir cdir-ptr !  ;
 
    \
@@ -150,8 +159,8 @@ new-device
    : suf-ce-len     ( -- len )      d# 20 +suf xl@ ;
 
    : init-sua     ( -- )
-      dir-file$ + /w roundup to sua-ptr
-      dir-sualen to sua-len
+      dir-file$ +  /w roundup  to sua-ptr
+      dir-sualen               to sua-len
    ;
 
    : next-suf  ( -- )
@@ -247,10 +256,10 @@ new-device
          end-sua  if
             suf-ce-process if
                suf-nm-size if
-                  suf-nm-buf suf-nm-size
+                  suf-nm-buf suf-nm-size       ( NM$ )
                else
-                  dir-file$
-               then
+                  dir-iso$                     ( iso$ )
+               then                            ( file$ )
                exit
             then
          then
@@ -324,38 +333,6 @@ new-device
       until  false
    ;
 
-   \ directory stack
-   struct
-      /x     field >dirs-size
-      /x     field >dirs-block0
-   constant /dirs-stack
-
-   d# 10 constant #dirs-stack
-   #dirs-stack /dirs-stack *  instance buffer: dirs-stack
-   instance variable dirs-stackp
-
-   : dirs-init  ( -- )
-      dirs-stack dirs-stackp !
-   ;
-   : dirs-push  ( -- )
-      dir-isdir? if
-         dirs-stackp @
-         cdir-blk0 @ over >dirs-block0 !
-         cdir-size @ over >dirs-size !
-         /dirs-stack + dirs-stackp !
-      then
-   ;
-   : dirs-pop  ( -- )
-      dirs-stackp @ dup dirs-stack = if
-         froot exit
-      then
-      /dirs-stack -
-      dup >dirs-block0 @ dir-block0!
-      dup >dirs-size @ dir-filesize!
-      dirs-stackp !
-      dir-setdir
-   ;
-      
    \ Look through current directory for file name 'file$'.
    \ Will leave current directory entry (cdir-ptr) pointing
    \ to matched entry on success.
@@ -363,16 +340,9 @@ new-device
       init-dent if
          true exit
       then
-      2dup " .." $= if
-         2drop dirs-pop false exit
-      then
-      2dup " ." $= if
-         2drop true to cdir-rescan false exit
-      then
-
       begin  get-dent 0=  while      ( file$ )
          2dup rr-file$ $=  if        ( file$ )
-            2drop dirs-push false  exit        ( succeeded )
+            2drop false  exit        ( succeeded )
          then                        ( file$ )
       repeat 2drop true              ( failed )
    ;
@@ -400,7 +370,6 @@ new-device
    ;
 
    : lookup  ( path$ -- error? )
-      dirs-init
       over c@  ascii /  =  if
 	 froot  str++                            ( path$' )
       then                                       ( path$ )
