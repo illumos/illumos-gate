@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -164,14 +164,14 @@ init_slot(int	s)
 		ch = child[s];
 
 		if ((ch->mutex = (mutex_t *)calloc(1,
-			sizeof (mutex_t))) == NULL) {
+		    sizeof (mutex_t))) == NULL) {
 			free(ch);
 			return (-1);
 		}
 		(void) mutex_init(ch->mutex, USYNC_THREAD, NULL);
 
 		if ((ch->cond = (cond_t *)calloc(1,
-			sizeof (cond_t))) == NULL) {
+		    sizeof (cond_t))) == NULL) {
 			free(ch->mutex);
 			free(ch);
 			return (-1);
@@ -233,13 +233,13 @@ get_cslot(
 	for (i = 0; i <= used_slot; i++) {
 		ch = child[i];
 		if (ch->child_state >= CHILD_STATE_UIDKNOWN &&
-			ch->child_uid == uid) {
+		    ch->child_uid == uid) {
 			ret = ch;
 			(void) mutex_unlock(&child_lock);
 
 			_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 			(me, "slot %d found with uid %d\n",
-				ret->child_slot, ret->child_uid);
+			    ret->child_slot, ret->child_uid);
 
 			return (ret);
 		}
@@ -264,7 +264,7 @@ get_cslot(
 				return (ret);
 			}
 			(void) memcpy(tmp, child, sizeof (child_t) *
-				max_pu_nscd);
+			    max_pu_nscd);
 			free(child);
 			child = tmp;
 			max_pu_nscd = newmax;
@@ -350,7 +350,7 @@ selfcred_kill(
 
 	if (fd != -1)
 		ret = _nscd_doorcall_fd(fd, NSCD_KILL, NULL, 0,
-			NULL, 0, NULL);
+		    NULL, 0, NULL);
 	else
 		ret = _nscd_doorcall(NSCD_KILL);
 
@@ -386,7 +386,7 @@ _nscd_kill_all_children()
 		if (child[i]->child_state >= CHILD_STATE_PIDKNOWN) {
 			_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 			(me, "killing child process %d (doorfd %d)\n",
-			child[i]->child_pid, child[i]->child_door);
+			    child[i]->child_pid, child[i]->child_door);
 
 			ret = selfcred_kill(child[i]->child_door);
 
@@ -409,7 +409,7 @@ selfcred_pulse(
 	(me, "start monitoring door %d\n", fd);
 
 	ret = _nscd_doorcall_fd(fd, NSCD_PULSE |(_whoami & NSCD_WHOAMI),
-		NULL, 0, NULL, 0, NULL);
+	    NULL, 0, NULL, 0, NULL);
 
 	_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 	(me, "door (%d) monitor exited (rc = %d)\n", fd, ret);
@@ -431,8 +431,8 @@ forker_monitor(
 	(void) selfcred_pulse(forking_door);
 
 	_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
-(me, "forker (pid = %d) exited or crashed, killing all child processes\n",
-		fpid);
+	(me, "forker (pid = %d) exited or crashed, "
+	    "killing all child processes\n", fpid);
 
 	(void) mutex_lock(&forking_lock);
 	forking_door = -1;
@@ -524,7 +524,7 @@ _nscd_proc_iamhere(
 		(me, "door_ucred failed: %s\n", strerror(errnum));
 
 		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, errnum,
-			NSCD_DOOR_UCRED_ERROR);
+		    NSCD_DOOR_UCRED_ERROR);
 	}
 	uid = ucred_geteuid(uc);
 
@@ -541,7 +541,7 @@ _nscd_proc_iamhere(
 
 
 			NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_MAIN_IMPOSTER);
+			    NSCD_SELF_CRED_MAIN_IMPOSTER);
 		}
 		break;
 
@@ -556,7 +556,7 @@ _nscd_proc_iamhere(
 
 
 			NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_FORKER_IMPOSTER);
+			    NSCD_SELF_CRED_FORKER_IMPOSTER);
 			break;
 		}
 
@@ -564,18 +564,18 @@ _nscd_proc_iamhere(
 		if (_whoami != NSCD_MAIN) {
 
 			NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_WRONG_NSCD);
+			    NSCD_SELF_CRED_WRONG_NSCD);
 			break;
 		}
 
 		if (ucred_getpid(uc) != forker_pid) {
 			_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
-		(me, "FORKER IMPOSTER CAUGHT: pid = %d should be %d\n",
-			ucred_getpid(uc), forker_pid);
+			(me, "FORKER IMPOSTER CAUGHT: pid = %d should be %d\n",
+			    ucred_getpid(uc), forker_pid);
 
 
 			NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_FORKER_IMPOSTER);
+			    NSCD_SELF_CRED_FORKER_IMPOSTER);
 			break;
 		}
 
@@ -585,13 +585,13 @@ _nscd_proc_iamhere(
 
 
 			NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_NO_DOOR);
+			    NSCD_SELF_CRED_NO_DOOR);
 			break;
 		}
 
 		if ((dp->d_attributes & DOOR_DESCRIPTOR) &&
-			dp->d_data.d_desc.d_descriptor > 0 &&
-			dp->d_data.d_desc.d_id != 0) {
+		    dp->d_data.d_desc.d_descriptor > 0 &&
+		    dp->d_data.d_desc.d_id != 0) {
 			(void) mutex_lock(&forking_lock);
 			if (forking_door != -1)
 				(void) close(forking_door);
@@ -609,7 +609,7 @@ _nscd_proc_iamhere(
 
 		/* monitor the forker nscd */
 		(void) thr_create(NULL, 0, forker_monitor, NULL,
-			THR_DETACHED, NULL);
+		    THR_DETACHED, NULL);
 
 		break;
 
@@ -620,7 +620,7 @@ _nscd_proc_iamhere(
 			(me, "CHILD IMPOSTER CAUGHT!\n");
 
 			NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_CHILD_IMPOSTER);
+			    NSCD_SELF_CRED_CHILD_IMPOSTER);
 			break;
 		}
 
@@ -640,38 +640,38 @@ _nscd_proc_iamhere(
 			(me, "bad slot number %d\n", cslot);
 
 			NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_INVALID_SLOT_NUMBER);
+			    NSCD_SELF_CRED_INVALID_SLOT_NUMBER);
 			break;
 		}
 
 		if (uid != ch->child_uid) {
 			_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "CHILD IMPOSTER CAUGHT: uid = %d should be %d\n",
-			uid, ch->child_uid);
+		    uid, ch->child_uid);
 
 			NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_CHILD_IMPOSTER);
+			    NSCD_SELF_CRED_CHILD_IMPOSTER);
 			break;
 		}
 
 		if (ch->child_state != CHILD_STATE_UIDKNOWN &&
-			ch->child_state != CHILD_STATE_FORKSENT) {
+		    ch->child_state != CHILD_STATE_FORKSENT) {
 			_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 			(me, "invalid slot/child state (%d) for uid %d\n",
-			ch->child_state, uid);
+			    ch->child_state, uid);
 
 			NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_INVALID_SLOT_STATE);
+			    NSCD_SELF_CRED_INVALID_SLOT_STATE);
 			break;
 		}
 
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "d_descriptor = %d, d_id = %lld\n",
-		dp->d_data.d_desc.d_descriptor, dp->d_data.d_desc.d_id);
+		    dp->d_data.d_desc.d_descriptor, dp->d_data.d_desc.d_id);
 
 		if ((dp->d_attributes & DOOR_DESCRIPTOR) &&
-			dp->d_data.d_desc.d_descriptor > 0 &&
-			dp->d_data.d_desc.d_id != 0) {
+		    dp->d_data.d_desc.d_descriptor > 0 &&
+		    dp->d_data.d_desc.d_id != 0) {
 			(void) mutex_lock(ch->mutex);
 			if (ch->child_door != -1)
 				(void) close(ch->child_door);
@@ -680,7 +680,7 @@ _nscd_proc_iamhere(
 			ch->child_state  = CHILD_STATE_PIDKNOWN;
 			_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 			(me, "child in slot %d has door %d\n",
-				cslot, ch->child_door);
+			    cslot, ch->child_door);
 
 			/*
 			 * let waiters know that the child is ready to
@@ -691,7 +691,7 @@ _nscd_proc_iamhere(
 
 			/* monitor the child nscd */
 			(void) thr_create(NULL, 0, child_monitor,
-				ch, THR_DETACHED, NULL);
+			    ch, THR_DETACHED, NULL);
 			NSCD_SET_STATUS_SUCCESS(phdr);
 			break;
 		} else {
@@ -720,7 +720,7 @@ _nscd_proc_pulse(
 		(me, "MAIN IMPOSTER CAUGHT! i am %d not NSCD_MAIN\n", iam);
 
 		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_MAIN_IMPOSTER);
+		    NSCD_SELF_CRED_MAIN_IMPOSTER);
 	}
 
 	/* forker doesn't return stats, it just pauses */
@@ -752,7 +752,7 @@ _nscd_proc_pulse(
 			last_active = activity;
 			_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 			(me, "active, sleep again for %d seconds\n",
-				pu_nscd_ttl);
+			    pu_nscd_ttl);
 		}
 		(void) mutex_unlock(&activity_lock);
 	}
@@ -785,11 +785,10 @@ _nscd_proc_fork(
 	/* only main nscd sends fork requests */
 	if (iam != NSCD_MAIN) {
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
-		(me, "MAIN IMPOSTER CAUGHT! i am %d not NSCD_MAIN\n",
-			iam);
+		(me, "MAIN IMPOSTER CAUGHT! i am %d not NSCD_MAIN\n", iam);
 
 		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_MAIN_IMPOSTER);
+		    NSCD_SELF_CRED_MAIN_IMPOSTER);
 	}
 
 	/* only forker handles fork requests */
@@ -798,7 +797,7 @@ _nscd_proc_fork(
 		(me, "MAIN IMPOSTER CAUGHT! I AM NOT FORKER!\n");
 
 		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_WRONG_NSCD);
+		    NSCD_SELF_CRED_WRONG_NSCD);
 	}
 
 	/* fork a child for the slot assigned by the main nscd */
@@ -814,7 +813,7 @@ _nscd_proc_fork(
 		(me, "bas slot number\n");
 
 		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-		NSCD_SELF_CRED_INVALID_SLOT_NUMBER);
+		    NSCD_SELF_CRED_INVALID_SLOT_NUMBER);
 	}
 
 	_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
@@ -855,8 +854,8 @@ _nscd_proc_fork(
 		ih.slot = slot;
 		for (ret = NSS_ALTRETRY; ret == NSS_ALTRETRY; )
 			ret = _nscd_doorcall_sendfd(_doorfd,
-				NSCD_IMHERE | (NSCD_CHILD & NSCD_WHOAMI),
-				&ih, sizeof (ih), NULL);
+			    NSCD_IMHERE | (NSCD_CHILD & NSCD_WHOAMI),
+			    &ih, sizeof (ih), NULL);
 
 			NSCD_RETURN_STATUS_SUCCESS(phdr);
 	} if (cid  == (pid_t)-1) {
@@ -881,7 +880,7 @@ _nscd_proc_fork(
 
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "child forked:  parent pid = %d, child pid = %d\n",
-		getpid(), cid);
+		    getpid(), cid);
 
 		NSCD_SET_STATUS_SUCCESS(phdr);
 	}
@@ -906,31 +905,32 @@ selfcred_fork(
 	/* if no door fd, do nothing */
 	if (doorfd == -1) {
 		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_NO_DOOR);
+		    NSCD_SELF_CRED_NO_DOOR);
 	}
 
 	_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 	(me, "sending fork request to door %d for slot %d "
-		"(uid = %d, gid = %d)\n", doorfd, cslot, uid, gid);
+	    "(uid = %d, gid = %d)\n", doorfd, cslot, uid, gid);
 
 	f.slot = cslot;
 	f.uid = uid;
 	f.gid = gid;
 
 	ret = _nscd_doorcall_fd(doorfd, NSCD_FORK|(_whoami&NSCD_WHOAMI),
-		&f, sizeof (f), NULL, 0, phdr);
+	    &f, sizeof (f), NULL, 0, phdr);
 
 	_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 	(me, "fork request sent to door %d for slot %d (rc = %d)\n",
-		doorfd, cslot, ret);
+	    doorfd, cslot, ret);
 
 	if (NSCD_STATUS_IS_NOT_OK(phdr)) {
 
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "fork request sent to door %d for slot %d failed: "
-		"status = %d, errno = %s, nscd status = %d\n", doorfd,
-		cslot, NSCD_GET_STATUS(phdr), strerror(NSCD_GET_ERRNO(phdr)),
-		NSCD_GET_NSCD_STATUS(phdr));
+		    "status = %d, errno = %s, nscd status = %d\n", doorfd,
+		    cslot, NSCD_GET_STATUS(phdr),
+		    strerror(NSCD_GET_ERRNO(phdr)),
+		    NSCD_GET_NSCD_STATUS(phdr));
 
 	}
 }
@@ -957,7 +957,7 @@ _nscd_proc_alt_get(
 		(me, "no door to talk to the forker\n");
 
 		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-		NSCD_SELF_CRED_NO_FORKER);
+		    NSCD_SELF_CRED_NO_FORKER);
 	}
 
 	/* get door client's credential information */
@@ -967,7 +967,7 @@ _nscd_proc_alt_get(
 		(me, "door_ucred failed: %s\n", strerror(errnum));
 
 		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, errnum,
-			NSCD_DOOR_UCRED_ERROR);
+		    NSCD_DOOR_UCRED_ERROR);
 	}
 
 	/* get door client's effective uid and effective gid */
@@ -984,10 +984,10 @@ _nscd_proc_alt_get(
 
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "no child slot available (child array = %p, slot = %d)\n",
-			child, ch->child_slot);
+		    child, ch->child_slot);
 
 		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_NO_CHILD_SLOT);
+		    NSCD_SELF_CRED_NO_CHILD_SLOT);
 	}
 
 	/* create the per user nscd if necessary */
@@ -1001,7 +1001,7 @@ _nscd_proc_alt_get(
 
 			/* ask forker to fork a new child */
 			selfcred_fork(&phdr1, forking_door, ch->child_slot,
-				set2uid, set2gid);
+			    set2uid, set2gid);
 			if (NSCD_STATUS_IS_NOT_OK(&phdr1)) {
 				(void) mutex_unlock(ch->mutex);
 				NSCD_COPY_STATUS(phdr, &phdr1);
@@ -1012,7 +1012,7 @@ _nscd_proc_alt_get(
 
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "waiting for door (slot = %d, uid = %d, gid = %d)\n",
-				ch->child_slot, set2uid, set2gid);
+		    ch->child_slot, set2uid, set2gid);
 
 		/* wait for the per user nscd to become available */
 		while (ch->child_state == CHILD_STATE_FORKSENT) {
@@ -1026,12 +1026,11 @@ _nscd_proc_alt_get(
 				(me, "cond_reltimedwait %d seconds\n", ttl);
 			err = cond_reltimedwait(ch->cond, ch->mutex, &to);
 			if (err == ETIME) {
-				ch->child_state =
-					CHILD_STATE_UIDKNOWN;
+				ch->child_state = CHILD_STATE_UIDKNOWN;
 				_NSCD_LOG(NSCD_LOG_SELF_CRED,
-					NSCD_LOG_LEVEL_DEBUG)
+				    NSCD_LOG_LEVEL_DEBUG)
 				(me, "door wait timedout (slot = %d)\n",
-					ch->child_slot);
+				    ch->child_slot);
 				break;
 			}
 		}
@@ -1041,14 +1040,14 @@ _nscd_proc_alt_get(
 	if (ch->child_state != CHILD_STATE_PIDKNOWN) {
 
 		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_INVALID_SLOT_STATE);
+		    NSCD_SELF_CRED_INVALID_SLOT_STATE);
 	}
 
 	*door = ch->child_door;
 
 	_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 	(me, "returning door %d for slot %d, uid %d, gid = %d\n",
-		*door, ch->child_slot, set2uid, set2gid);
+	    *door, ch->child_slot, set2uid, set2gid);
 
 	NSCD_RETURN_STATUS(phdr, NSS_ALTRETRY, 0);
 }
@@ -1138,9 +1137,9 @@ _nscd_start_forker(
 			rl.rlim_cur = rl.rlim_max = RLIM_INFINITY;
 			if (setrlimit(RLIMIT_NOFILE, &rl) < 0) {
 				_NSCD_LOG(NSCD_LOG_SELF_CRED,
-					NSCD_LOG_LEVEL_ERROR)
+				    NSCD_LOG_LEVEL_ERROR)
 				(me, "Cannot set open file limit: %s\n",
-					strerror(errno));
+				    strerror(errno));
 				exit(1);
 			}
 
@@ -1226,7 +1225,7 @@ _nscd_is_self_cred_on(int recheck, char **dblist)
 		(void) get_ldap_funcs(ldap_sc_func, (void **)&ldap_func);
 	if (ldap_func != NULL) {
 		if (ldap_func(&ldap_config) == NS_LDAP_SUCCESS &&
-			ldap_config != NS_LDAP_SELF_GSSAPI_CONFIG_NONE)
+		    ldap_config != NS_LDAP_SELF_GSSAPI_CONFIG_NONE)
 			ldap_on = 1;
 	}
 
@@ -1277,7 +1276,7 @@ _nscd_peruser_getadmin(
 		(me, "door_ucred failed: %s\n", strerror(errnum));
 
 		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, errnum,
-			NSCD_DOOR_UCRED_ERROR);
+		    NSCD_DOOR_UCRED_ERROR);
 	}
 
 	/* get door client's effective uid */
@@ -1292,12 +1291,12 @@ _nscd_peruser_getadmin(
 	ch = get_cslot(uid, 1);
 	if (ch == NULL) {
 		NSCD_RETURN_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
-			NSCD_SELF_CRED_NO_CHILD_SLOT);
+		    NSCD_SELF_CRED_NO_CHILD_SLOT);
 	}
 
 	ret = _nscd_doorcall_fd(ch->child_door, NSCD_GETADMIN,
-		NULL, sizeof (nscd_admin_t), result_mn,
-		sizeof (nscd_admin_t), phdr);
+	    NULL, sizeof (nscd_admin_t), result_mn,
+	    sizeof (nscd_admin_t), phdr);
 
 	if (ret == NSS_SUCCESS) {
 		phdr->data_len = sizeof (nscd_admin_t);
@@ -1311,20 +1310,22 @@ set_selfcred_cfg(
 	void	*data)
 {
 	int64_t	prop_int;
+	uint8_t prop_boolean;
 	char	*me = "set_selfcred_cfg";
 
-	if (param == 'a' || param == 'e') {
+	if (param == 'e') {
+		prop_boolean = *(uint8_t *)data;
 		pu_nscd_enabled = *(uint8_t *)get_smf_prop(
-			"enable_per_user_lookup", 'b', data);
+		    "enable_per_user_lookup", 'b', &prop_boolean);
 
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "self cred config: enabled = %d\n", pu_nscd_enabled);
 	}
 
-	if (param == 'a' || param == 't') {
+	if (param == 't') {
 		prop_int = *(int *)data;
 		pu_nscd_ttl = *(int64_t *)get_smf_prop(
-			"per_user_nscd_time_to_live", 'i', &prop_int);
+		    "per_user_nscd_time_to_live", 'i', &prop_int);
 
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "self cred config: PUN TTL = %d\n", pu_nscd_ttl);
@@ -1356,15 +1357,11 @@ _nscd_cfg_selfcred_notify(
 		*sc_cfg = *(nscd_cfg_global_selfcred_t *)data;
 
 		off = offsetof(nscd_cfg_global_selfcred_t,
-			enable_selfcred);
+		    enable_selfcred);
 		set_selfcred_cfg('e', (char *)data + off);
 
 		off = offsetof(nscd_cfg_global_selfcred_t,
-			max_per_user_nscd);
-		set_selfcred_cfg('n', (char *)data + off);
-
-		off = offsetof(nscd_cfg_global_selfcred_t,
-			per_user_nscd_ttl);
+		    per_user_nscd_ttl);
 		set_selfcred_cfg('t', (char *)data + off);
 
 		return (NSCD_SUCCESS);
@@ -1377,13 +1374,6 @@ _nscd_cfg_selfcred_notify(
 	if (pdesc->p_offset == off) {
 		sc_cfg->enable_selfcred = *(nscd_bool_t *)data;
 		set_selfcred_cfg('e', data);
-		return (NSCD_SUCCESS);
-	}
-
-	off = offsetof(nscd_cfg_global_selfcred_t, max_per_user_nscd);
-	if (pdesc->p_offset == off) {
-		sc_cfg->max_per_user_nscd = *(int *)data;
-		set_selfcred_cfg('n', data);
 		return (NSCD_SUCCESS);
 	}
 
@@ -1462,7 +1452,7 @@ retry:
 	(void) close(pfd);
 
 	if (info.pr_pid != pid &&
-		info.pr_uid == uid && info.pr_euid == euid)
+	    info.pr_uid == uid && info.pr_euid == euid)
 		return (0);
 	else
 		return (1);
@@ -1549,7 +1539,7 @@ static void *
 get_smf_prop(const char *var, char type, void *def_val)
 {
 	scf_simple_prop_t	*prop;
-	void			*val = def_val;
+	void			*val;
 	char			*me = "get_smf_prop";
 
 	prop = scf_simple_prop_get(NULL, NULL, "config", var);
@@ -1557,14 +1547,14 @@ get_smf_prop(const char *var, char type, void *def_val)
 		switch (type) {
 		case 'b':
 			val = scf_simple_prop_next_boolean(prop);
+			if (val != NULL)
+				(void) memcpy(def_val, val, sizeof (uint8_t));
 			break;
 
 		case 'i':
 			val = scf_simple_prop_next_integer(prop);
-			break;
-
-		case 'c':
-			val = scf_simple_prop_next_count(prop);
+			if (val != NULL)
+				(void) memcpy(def_val, val, sizeof (int64_t));
 			break;
 		}
 		scf_simple_prop_free(prop);
@@ -1583,16 +1573,15 @@ get_smf_prop(const char *var, char type, void *def_val)
 			break;
 
 		case 'i':
-		case 'c':
 			(void) sprintf(vs, "%lld", *(int64_t *)def_val);
 			break;
 
 		}
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_ALERT)
 		(me, "no value for config/%s (%s). "
-			"Using default \"%s\"\n", var,
-			scf_strerror(scf_error()), vs);
+		    "Using default \"%s\"\n", var,
+		    scf_strerror(scf_error()), vs);
 	}
 
-	return (val);
+	return (def_val);
 }

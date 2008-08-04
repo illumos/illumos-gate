@@ -777,6 +777,7 @@ release_conn_mgmt(ns_conn_mgmt_t *cmg, boolean_t unlock_cmg)
 			if (unlock_cmg == B_TRUE)
 				(void) mutex_unlock(&cmg->lock);
 			free_conn_mgmt(cmg);
+			__s_api_free_sessionPool();
 			return (NULL);
 		} else {
 			syslog(LOG_WARNING,

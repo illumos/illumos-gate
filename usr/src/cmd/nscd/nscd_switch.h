@@ -141,6 +141,9 @@ typedef struct nscd_getent_ctx_base {
  */
 typedef struct nscd_getent_context {
 	int				dbi;
+	mutex_t				getent_mutex;
+	int				aborted;
+	int				in_use;
 	nscd_seq_num_t			seq_num;
 	nscd_cookie_num_t		cookie_num;
 	pid_t				pid;	/* door client's pid */
@@ -318,6 +321,9 @@ _nscd_get_getent_ctx(
 
 void
 _nscd_put_getent_ctx(
+	nscd_getent_context_t	*ctx);
+void
+_nscd_free_ctx_if_aborted(
 	nscd_getent_context_t	*ctx);
 
 nscd_rc_t

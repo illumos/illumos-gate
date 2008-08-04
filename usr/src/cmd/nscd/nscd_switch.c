@@ -1442,7 +1442,8 @@ nscd_map_contextp(void *buffer, nss_getent_t *contextp,
 
 	if (ctx == NULL) {
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
-		(me, "invalid cookie # (%lld)\n", cookie->p1_cookie_num);
+		(me, "No matching context found (cookie number: %lld)\n",
+		    cookie->p1_cookie_num);
 
 		NSCD_RETURN_STATUS(pbuf, NSS_ERROR, EFAULT);
 	}
@@ -1453,6 +1454,7 @@ nscd_map_contextp(void *buffer, nss_getent_t *contextp,
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "invalid sequence # (%lld)\n", cookie->p1_seqnum);
 
+		_nscd_free_ctx_if_aborted(ctx);
 		NSCD_RETURN_STATUS(pbuf, NSS_ERROR, EFAULT);
 	}
 
@@ -1643,6 +1645,9 @@ nss_pgetent(void *buffer, size_t length)
 	status = nss_packed_context_init(buffer, length,
 	    NULL, &initf, &contextp, &arg);
 	if (status != NSS_SUCCESS) {
+		clear_initf_key();
+		_nscd_free_ctx_if_aborted(
+		    (nscd_getent_context_t *)contextp->ctx);
 		NSCD_RETURN_STATUS(pbuf, status, -1);
 	}
 
@@ -1662,6 +1667,8 @@ nss_pgetent(void *buffer, size_t length)
 		(me, "getent OK, new sequence # = %lld, len = %lld,"
 		    " data = >>%s<<\n", *seqnum_p,
 		    pbuf->data_len, (char *)buffer + pbuf->data_off);
+
+		_nscd_free_ctx_if_aborted(ctx);
 	} else {
 		/* release the resources used */
 		ctx = (nscd_getent_context_t *)contextp->ctx;

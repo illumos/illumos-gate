@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -365,11 +365,10 @@ typedef struct {
 /*
  * self credential param group (global)
  */
-#define	NSCD_CFG_GROUP_INFO_GLOBAL_SELFCRED	{3, 0x0007}
+#define	NSCD_CFG_GROUP_INFO_GLOBAL_SELFCRED	{2, 0x0003}
 typedef struct {
 	nscd_cfg_group_info_t	gi;
 	nscd_bool_t		enable_selfcred;
-	int			max_per_user_nscd;
 	int			per_user_nscd_ttl;
 } nscd_cfg_global_selfcred_t;
 

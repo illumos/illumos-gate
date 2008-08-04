@@ -2286,7 +2286,7 @@ __s_api_removeServer(const char *server)
 				(void) __ns_ldap_freeError(&error);
 			}
 
-			return (-1);
+			return (NS_CACHE_NOSERVER);
 		}
 
 		return (0);

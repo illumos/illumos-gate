@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,7 +102,7 @@ _nscd_add_getent_ctx(
 	nscd_cookie_num_t	cookie_num)
 {
 	int			size;
-	char			buf[2 * sizeof (cookie_num) + 1];
+	char			buf[32];
 	nscd_db_entry_t		*db_entry;
 	nscd_getent_ctx_t	*gnctx;
 
@@ -114,7 +114,7 @@ _nscd_add_getent_ctx(
 	size = sizeof (*gnctx);
 
 	db_entry = _nscd_alloc_db_entry(NSCD_DATA_CTX_ADDR,
-			(const char *)buf, size, 1, 1);
+	    (const char *)buf, size, 1, 1);
 	if (db_entry == NULL)
 		return (NSCD_NO_MEMORY);
 
@@ -124,7 +124,7 @@ _nscd_add_getent_ctx(
 
 	(void) rw_wrlock(&getent_ctxDB_rwlock);
 	(void) _nscd_add_db_entry(getent_ctxDB, buf, db_entry,
-		NSCD_ADD_DB_ENTRY_FIRST);
+	    NSCD_ADD_DB_ENTRY_FIRST);
 	(void) rw_unlock(&getent_ctxDB_rwlock);
 
 	return (NSCD_SUCCESS);
@@ -140,7 +140,7 @@ nscd_getent_context_t *
 _nscd_is_getent_ctx(
 	nscd_cookie_num_t	cookie_num)
 {
-	char			ptrstr[1 + 2 * sizeof (cookie_num)];
+	char			ptrstr[32];
 	const nscd_db_entry_t	*db_entry;
 	nscd_getent_context_t	*ret = NULL;
 
@@ -149,7 +149,7 @@ _nscd_is_getent_ctx(
 	(void) rw_rdlock(&getent_ctxDB_rwlock);
 
 	db_entry = _nscd_get_db_entry(getent_ctxDB, NSCD_DATA_CTX_ADDR,
-		(const char *)ptrstr, NSCD_GET_FIRST_DB_ENTRY, 0);
+	    (const char *)ptrstr, NSCD_GET_FIRST_DB_ENTRY, 0);
 
 	if (db_entry != NULL) {
 		nscd_getent_ctx_t *gnctx;
@@ -157,17 +157,52 @@ _nscd_is_getent_ctx(
 		gnctx = (nscd_getent_ctx_t *)*(db_entry->data_array);
 
 		/*
-		 * If the ctx is not to be deleted and
-		 * the cookie numbers match, return the ctx.
+		 * If the ctx is not to be deleted and the cookie number
+		 * match, return the ctx if not aborted and not in use,
 		 * Otherwise return NULL.
 		 */
-		if (gnctx->to_delete == 0 && gnctx->cookie_num == cookie_num)
+		if (gnctx->to_delete == 0 && gnctx->cookie_num == cookie_num) {
 			ret = gnctx->ptr;
+			(void) mutex_lock(&gnctx->ptr->getent_mutex);
+			if (ret->aborted == 1 || ret->in_use == 1)
+				ret = NULL;
+			else
+				ret->in_use = 1;
+			(void) mutex_unlock(&gnctx->ptr->getent_mutex);
+		}
 	}
 
 	(void) rw_unlock(&getent_ctxDB_rwlock);
 
 	return (ret);
+}
+
+/*
+ * FUNCTION: _nscd_free_ctx_if_aborted
+ *
+ * Check to see if the getent session associated with a getent context had
+ * been aborted. If so, return the getent context back to the pool.
+ */
+void
+_nscd_free_ctx_if_aborted(
+	nscd_getent_context_t	*ctx)
+{
+	int	aborted;
+	char	*me = "_nscd_free_ctx_if_aborted";
+
+	if (ctx->in_use != 1)
+		return;
+
+	(void) mutex_lock(&ctx->getent_mutex);
+	aborted = ctx->aborted;
+	(void) mutex_unlock(&ctx->getent_mutex);
+
+	if (aborted == 1) {
+		_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_DEBUG)
+		(me, "getent session aborted, return the getent context\n");
+		_nscd_put_getent_ctx(ctx);
+	}
+	ctx->in_use = 0;
 }
 
 /*
@@ -180,7 +215,7 @@ _nscd_del_getent_ctx(
 	nscd_getent_context_t	*ptr,
 	nscd_cookie_num_t	cookie_num)
 {
-	char			ptrstr[1 + 2 * sizeof (cookie_num)];
+	char			ptrstr[32];
 	nscd_getent_ctx_t	*gnctx;
 	const nscd_db_entry_t	*db_entry;
 
@@ -196,9 +231,9 @@ _nscd_del_getent_ctx(
 	 * the database.
 	 */
 	db_entry = _nscd_get_db_entry(getent_ctxDB,
-		NSCD_DATA_CTX_ADDR,
-		(const char *)ptrstr,
-		NSCD_GET_FIRST_DB_ENTRY, 0);
+	    NSCD_DATA_CTX_ADDR,
+	    (const char *)ptrstr,
+	    NSCD_GET_FIRST_DB_ENTRY, 0);
 	if (db_entry != NULL) {
 		gnctx = (nscd_getent_ctx_t *)*(db_entry->data_array);
 		if (gnctx->ptr == ptr && gnctx->cookie_num  == cookie_num) {
@@ -207,9 +242,9 @@ _nscd_del_getent_ctx(
 			(void) rw_wrlock(&getent_ctxDB_rwlock);
 
 			(void) _nscd_delete_db_entry(getent_ctxDB,
-				NSCD_DATA_CTX_ADDR,
-				(const char *)ptrstr,
-				NSCD_DEL_FIRST_DB_ENTRY, 0);
+			    NSCD_DATA_CTX_ADDR,
+			    (const char *)ptrstr,
+			    NSCD_DEL_FIRST_DB_ENTRY, 0);
 		}
 	}
 	(void) rw_unlock(&getent_ctxDB_rwlock);
@@ -272,7 +307,7 @@ _nscd_free_all_getent_ctx_base()
 			continue;
 
 		nscd_getent_ctx_base[i] = (nscd_getent_ctx_base_t *)
-			_nscd_set((nscd_acc_data_t *)base, NULL);
+		    _nscd_set((nscd_acc_data_t *)base, NULL);
 	}
 	(void) rw_unlock(&nscd_getent_ctx_base_lock);
 }
@@ -296,6 +331,7 @@ _nscd_create_getent_ctx(
 	gnctx->dbi = params->dbi;
 	gnctx->cookie_num = _nscd_get_cookie_num();
 	gnctx->pid = -1;
+	(void) mutex_init(&gnctx->getent_mutex, USYNC_THREAD, NULL);
 
 	if (_nscd_get_nsw_state(&db_root, params) != NSCD_SUCCESS) {
 		free(gnctx);
@@ -338,7 +374,7 @@ _nscd_get_getent_ctx(
 	 * available' signal.
 	 */
 	tmp = (nscd_getent_ctx_base_t *)_nscd_mutex_lock(
-		(nscd_acc_data_t *)base);
+	    (nscd_acc_data_t *)base);
 	assert(base == tmp);
 	if (base->first == NULL) {
 		if (base->num_getent_ctx == base->max_getent_ctx) {
@@ -346,13 +382,13 @@ _nscd_get_getent_ctx(
 			while (base->first == NULL) {
 
 				_NSCD_LOG(NSCD_LOG_GETENT_CTX,
-					NSCD_LOG_LEVEL_DEBUG)
+				    NSCD_LOG_LEVEL_DEBUG)
 				(me, "waiting for signal\n");
 
 				_nscd_cond_wait((nscd_acc_data_t *)base, NULL);
 
 				_NSCD_LOG(NSCD_LOG_GETENT_CTX,
-					NSCD_LOG_LEVEL_DEBUG)
+				    NSCD_LOG_LEVEL_DEBUG)
 				(me, "woke up\n");
 			}
 			base->num_waiter--;
@@ -365,7 +401,7 @@ _nscd_get_getent_ctx(
 				/* not able to create an getent ctx */
 
 				_NSCD_LOG(NSCD_LOG_GETENT_CTX,
-					NSCD_LOG_LEVEL_ERROR)
+				    NSCD_LOG_LEVEL_ERROR)
 				(me, "create getent ctx failed\n");
 
 				_nscd_mutex_unlock((nscd_acc_data_t *)base);
@@ -383,6 +419,7 @@ _nscd_get_getent_ctx(
 	base->first = c->next;
 	c->next = NULL;
 	c->seq_num = 1;
+	c->in_use = 1;
 
 	_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_DEBUG)
 	(me, "got a getent ctx %p\n", c);
@@ -444,11 +481,13 @@ _nscd_put_getent_ctx(
 	_nscd_put_nsw_state(gnctx->nsw_state);
 	gnctx->nsw_state = NULL;
 
+	gnctx->aborted = 0;
+	gnctx->in_use = 0;
 	_nscd_del_getent_ctx(gnctx, gnctx->cookie_num);
 
 	_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_DEBUG)
 	(me, "ctx (%p, cookie # = %lld) removed from getent ctx DB\n",
-		gnctx, gnctx->cookie_num);
+	    gnctx, gnctx->cookie_num);
 
 	if (base->num_waiter > 0) {
 		_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_DEBUG)
@@ -472,10 +511,10 @@ _nscd_init_getent_ctx_base(
 		(void) rw_rdlock(&nscd_getent_ctx_base_lock);
 
 	base = (nscd_getent_ctx_base_t *)_nscd_alloc(
-		NSCD_DATA_GETENT_CTX_BASE,
-		sizeof (nscd_getent_ctx_base_t),
-		_nscd_free_getent_ctx_base,
-		NSCD_ALLOC_MUTEX | NSCD_ALLOC_COND);
+	    NSCD_DATA_GETENT_CTX_BASE,
+	    sizeof (nscd_getent_ctx_base_t),
+	    _nscd_free_getent_ctx_base,
+	    NSCD_ALLOC_MUTEX | NSCD_ALLOC_COND);
 
 	if (base == NULL) {
 		if (lock)
@@ -491,9 +530,9 @@ _nscd_init_getent_ctx_base(
 	base->dbi = dbi;
 	base->max_getent_ctx = NSCD_SW_CFG(dbi).max_getent_ctx_per_db;
 	nscd_getent_ctx_base[dbi] =
-		(nscd_getent_ctx_base_t *)_nscd_set(
-		(nscd_acc_data_t *)nscd_getent_ctx_base[dbi],
-		(nscd_acc_data_t *)base);
+	    (nscd_getent_ctx_base_t *)_nscd_set(
+	    (nscd_acc_data_t *)nscd_getent_ctx_base[dbi],
+	    (nscd_acc_data_t *)base);
 
 	if (lock)
 		(void) rw_unlock(&nscd_getent_ctx_base_lock);
@@ -534,7 +573,7 @@ _nscd_alloc_getent_ctx_base()
 	(void) rw_wrlock(&nscd_getent_ctx_base_lock);
 
 	nscd_getent_ctx_base = calloc(NSCD_NUM_DB,
-			sizeof (nscd_getent_ctx_base_t *));
+	    sizeof (nscd_getent_ctx_base_t *));
 	if (nscd_getent_ctx_base == NULL) {
 		(void) rw_unlock(&nscd_getent_ctx_base_lock);
 		return (NSCD_NO_MEMORY);
@@ -582,7 +621,7 @@ reclaim_getent_ctx(void *arg)
 		(void) rw_rdlock(&getent_ctxDB_rwlock);
 
 		for (ep = _nscd_walk_db(getent_ctxDB, &cookie); ep != NULL;
-				ep = _nscd_walk_db(getent_ctxDB, &cookie)) {
+		    ep = _nscd_walk_db(getent_ctxDB, &cookie)) {
 
 			ctx = (nscd_getent_ctx_t *)*(ep->data_array);
 
@@ -595,13 +634,13 @@ reclaim_getent_ctx(void *arg)
 			if (gctx->pid != -1 && process_exited(gctx->pid)) {
 
 				_NSCD_LOG(NSCD_LOG_GETENT_CTX,
-					NSCD_LOG_LEVEL_DEBUG)
+				    NSCD_LOG_LEVEL_DEBUG)
 				(me, "process  %d exited, "
-				"getent context = %p, "
-				"db index = %d, cookie # = %lld, "
-				"sequence # = %lld\n",
-				gctx->pid, gctx, gctx->dbi,
-				gctx->cookie_num, gctx->seq_num);
+				    "getent context = %p, "
+				    "db index = %d, cookie # = %lld, "
+				    "sequence # = %lld\n",
+				    gctx->pid, gctx, gctx->dbi,
+				    gctx->cookie_num, gctx->seq_num);
 
 				if (first != NULL) {
 					last->next = gctx;
@@ -617,12 +656,20 @@ reclaim_getent_ctx(void *arg)
 
 
 		/*
-		 * return all the orphan getent contexts to the pool
+		 * return all the orphan getent contexts to the pool if not
+		 * in use
 		 */
 		for (gctx = first; gctx; ) {
+			int in_use;
 			c = gctx->next;
-			gctx->next = NULL;
-			_nscd_put_getent_ctx(gctx);
+			gctx->aborted = 1;
+			(void) mutex_lock(&gctx->getent_mutex);
+			in_use = gctx->in_use;
+			(void) mutex_unlock(&gctx->getent_mutex);
+			if (in_use != 1) {
+				gctx->next = NULL;
+				_nscd_put_getent_ctx(gctx);
+			}
 			gctx = c;
 		}
 		first = last = NULL;

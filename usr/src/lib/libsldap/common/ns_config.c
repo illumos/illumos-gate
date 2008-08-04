@@ -58,7 +58,7 @@
 #include "ns_cache_door.h"
 #include "ns_connmgmt.h"
 
-#pragma fini(__s_api_free_sessionPool, __s_api_shutdown_conn_mgmt, \
+#pragma fini(__s_api_shutdown_conn_mgmt, \
 	_free_config, __ns_ldap_doorfd_close)
 
 static mutex_t		ns_parse_lock = DEFAULTMUTEX;

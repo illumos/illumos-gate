@@ -1112,6 +1112,7 @@ __ns_ldap_getConnectionInfoFromDUA(const ns_dir_server_t *server,
 	Connection		*session = NULL;
 	char			errmsg[MAXERROR];
 	char			buffer[NSS_BUFLEN_HOSTS];
+	ns_conn_user_t		*cu = NULL;
 
 	if (errorp == NULL) {
 		__s_api_destroy_config(config_struct);
@@ -1194,6 +1195,11 @@ __ns_ldap_getConnectionInfoFromDUA(const ns_dir_server_t *server,
 
 	__s_api_setInitMode();
 
+	cu = __s_api_conn_user_init(NS_CONN_USER_SEARCH, NULL, B_FALSE);
+	if (cu == NULL) {
+		return (NS_LDAP_INTERNAL);
+	}
+
 	if ((ret_code = __s_api_getConnection(serverAddr,
 	    NS_LDAP_NEW_CONN,
 	    cred ? cred : &default_cred,
@@ -1202,7 +1208,8 @@ __ns_ldap_getConnectionInfoFromDUA(const ns_dir_server_t *server,
 	    errorp,
 	    0,
 	    0,
-	    NULL)) != NS_LDAP_SUCCESS) {
+	    cu)) != NS_LDAP_SUCCESS) {
+		__s_api_conn_user_free(cu);
 		__s_api_unsetInitMode();
 		return (ret_code);
 	}
@@ -1225,6 +1232,7 @@ __ns_ldap_getConnectionInfoFromDUA(const ns_dir_server_t *server,
 		    ret_code,
 		    strdup(errmsg),
 		    NS_LDAP_MEMORY);
+		__s_api_conn_user_free(cu);
 		DropConnection(sessionId, NS_LDAP_NEW_CONN);
 		return (ret_code);
 	}
@@ -1249,6 +1257,7 @@ __ns_ldap_getConnectionInfoFromDUA(const ns_dir_server_t *server,
 		    ret_code,
 		    strdup(errmsg),
 		    NS_LDAP_MEMORY);
+		__s_api_conn_user_free(cu);
 		DropConnection(sessionId, NS_LDAP_NEW_CONN);
 		return (ret_code);
 	}
@@ -1265,6 +1274,7 @@ __ns_ldap_getConnectionInfoFromDUA(const ns_dir_server_t *server,
 		free(duaProfile);
 	}
 
+	__s_api_conn_user_free(cu);
 	DropConnection(sessionId, NS_LDAP_NEW_CONN);
 
 	return (NS_LDAP_SUCCESS);
@@ -1302,6 +1312,7 @@ __ns_ldap_getRootDSE(const char *server_addr,
 	void			**paramVal = NULL;
 
 	ns_cred_t		anon;
+	ns_conn_user_t		*cu = NULL;
 
 	if (errorp == NULL) {
 		return (NS_LDAP_INVALID_PARAM);
@@ -1319,6 +1330,11 @@ __ns_ldap_getRootDSE(const char *server_addr,
 
 	__s_api_setInitMode();
 
+	cu = __s_api_conn_user_init(NS_CONN_USER_SEARCH, NULL, B_FALSE);
+	if (cu == NULL) {
+		return (NS_LDAP_INTERNAL);
+	}
+
 	/*
 	 * All the credentials will be taken from the current
 	 * libsldap configuration.
@@ -1331,7 +1347,7 @@ __ns_ldap_getRootDSE(const char *server_addr,
 	    errorp,
 	    0,
 	    0,
-	    NULL)) != NS_LDAP_SUCCESS) {
+	    cu)) != NS_LDAP_SUCCESS) {
 		/* Fallback to anonymous mode is disabled. Stop. */
 		if (anon_fallback == 0) {
 			syslog(LOG_WARNING,
@@ -1377,9 +1393,10 @@ __ns_ldap_getRootDSE(const char *server_addr,
 		    errorp,
 		    0,
 		    0,
-		    NULL);
+		    cu);
 
 		if (ret_code != NS_LDAP_SUCCESS) {
+			__s_api_conn_user_free(cu);
 			__s_api_unsetInitMode();
 			return (ret_code);
 		}
@@ -1435,8 +1452,10 @@ __ns_ldap_getRootDSE(const char *server_addr,
 			resultMsg = NULL;
 		}
 
+		__s_api_conn_user_free(cu);
 		return (NS_LDAP_OP_FAILED);
 	}
+	__s_api_conn_user_free(cu);
 
 	ret_code = convert_to_door_line(session->ld,
 	    resultMsg,

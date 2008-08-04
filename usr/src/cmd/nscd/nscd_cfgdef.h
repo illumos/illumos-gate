@@ -385,18 +385,6 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
-		"max-per-user-nscd",
-		NSCD_CFG_DATA_INTEGER,
-		NSCD_CFG_PFLAG_GLOBAL,
-		max_per_user_nscd,
-		nscd_cfg_global_selfcred_t,
-		sc,
-		nscd_cfg_global_data_t,
-		NULL,
-		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
-		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
-
-	NSCD_CFG_PARAM_DESC(
 		"per-user-nscd-ttl",
 		NSCD_CFG_DATA_INTEGER,
 		NSCD_CFG_PFLAG_GLOBAL,
@@ -792,7 +780,6 @@ static nscd_cfg_global_data_t nscd_cfg_global_default = {
 
 	NSCD_CFG_GROUP_INFO_GLOBAL_SELFCRED,
 	nscd_true,		/* enable_selfcred */
-	1000,			/* max_per_user_nscd */
 	120,			/* per_user_nscd_ttl: 120 seconds */
 
 	},

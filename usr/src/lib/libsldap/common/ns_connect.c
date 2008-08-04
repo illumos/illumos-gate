@@ -176,11 +176,18 @@ __s_api_requestServer(const char *request, const char *server,
 	 * from the local libsldap's list
 	 */
 	if (__s_api_isStandalone()) {
-		if (__s_api_findRootDSE(ireq,
+		if ((ret_code = __s_api_findRootDSE(ireq,
 		    server,
 		    addrType,
 		    ret,
-		    error) != NS_LDAP_SUCCESS) {
+		    error)) != NS_LDAP_SUCCESS) {
+			/*
+			 * get first server from local list only once
+			 * to prevent looping
+			 */
+			if (strcmp(ireq, NS_CACHE_NEW) != 0)
+				return (ret_code);
+
 			syslog(LOG_WARNING,
 			    "libsldap (\"standalone\" mode): "
 			    "can not find any available server. "
