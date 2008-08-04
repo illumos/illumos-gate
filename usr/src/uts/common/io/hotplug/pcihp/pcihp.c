@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * **********************************************************************
@@ -312,7 +310,7 @@ static int	pci_devlink_flags = 0;
 extern struct mod_ops mod_miscops;
 static struct modlmisc modlmisc = {
 	&mod_miscops,
-	"PCI nexus hotplug support v%I%",
+	"PCI nexus hotplug support",
 };
 
 static struct modlinkage modlinkage = {
@@ -1091,8 +1089,8 @@ pcihp_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		 */
 
 		/* copy user ioctl data first */
-#ifdef _MULTI_DATAMODEL
-		if (ddi_model_convert_from(mode & FMODELS) == DDI_MODEL_ILP32) {
+		switch (ddi_model_convert_from(mode & FMODELS)) {
+		case DDI_MODEL_ILP32: {
 			struct hpc_control32_data hpc_ctrldata32;
 
 			if (copyin((void *)arg, (void *)&hpc_ctrldata32,
@@ -1103,15 +1101,20 @@ pcihp_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			hpc_ctrldata.cmd = hpc_ctrldata32.cmd;
 			hpc_ctrldata.data =
 			    (void *)(intptr_t)hpc_ctrldata32.data;
+			break;
 		}
-#else
-		if (copyin((void *)arg, (void *)&hpc_ctrldata,
-			sizeof (struct hpc_control_data)) != 0) {
+		case DDI_MODEL_NONE:
+			if (copyin((void *)arg, (void *)&hpc_ctrldata,
+			    sizeof (struct hpc_control_data)) != 0) {
+				rv = EFAULT;
+			}
+			break;
+		default:
 			rv = EFAULT;
 			break;
 		}
-#endif
-
+		if (rv == EFAULT)
+			break;
 		/*
 		 * check for valid request:
 		 *	1. It is a hotplug slot.
@@ -1180,51 +1183,51 @@ pcihp_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 					break;
 
 				switch (led_info.state) {
-					case HPC_LED_OFF:
-						pcihp_hs_csr_op(pcihp_p,
-						pci_dev,
-						HPC_EVENT_SLOT_BLUE_LED_OFF);
-						rv = 0;
-						break;
-					case HPC_LED_ON:
-						/*
-						 * Please note that leaving
-						 * LED ON could be dangerous
-						 * as it means it is Ok to
-						 * remove the board, which
-						 * is not what we want to
-						 * convey. So it is upto the
-						 * user to take care of this
-						 * situation and usage.
-						 *
-						 * Normally, a Blink command
-						 * is more appropriate for
-						 * identifying a board.
-						 */
+				case HPC_LED_OFF:
+					pcihp_hs_csr_op(pcihp_p,
+					    pci_dev,
+					    HPC_EVENT_SLOT_BLUE_LED_OFF);
+					rv = 0;
+					break;
+				case HPC_LED_ON:
+					/*
+					 * Please note that leaving
+					 * LED ON could be dangerous
+					 * as it means it is Ok to
+					 * remove the board, which
+					 * is not what we want to
+					 * convey. So it is upto the
+					 * user to take care of this
+					 * situation and usage.
+					 *
+					 * Normally, a Blink command
+					 * is more appropriate for
+					 * identifying a board.
+					 */
+					pcihp_hs_csr_op(pcihp_p,
+					    pci_dev,
+					    HPC_EVENT_SLOT_BLUE_LED_ON);
+					rv = 0;
+					break;
+				case HPC_LED_BLINK:
+				{
+					int bl;
+
+					for (bl = 0; bl < 2; bl++) {
 						pcihp_hs_csr_op(pcihp_p,
 						    pci_dev,
 						    HPC_EVENT_SLOT_BLUE_LED_ON);
-						rv = 0;
-						break;
-					case HPC_LED_BLINK:
-					{
-						int bl;
-
-						for (bl = 0; bl < 2; bl++) {
-						pcihp_hs_csr_op(pcihp_p,
-						pci_dev,
-						HPC_EVENT_SLOT_BLUE_LED_ON);
 						delay(pcihp_cpci_led_blink);
-						pcihp_hs_csr_op(pcihp_p,
-						pci_dev,
-						HPC_EVENT_SLOT_BLUE_LED_OFF);
+					pcihp_hs_csr_op(pcihp_p,
+					    pci_dev,
+					    HPC_EVENT_SLOT_BLUE_LED_OFF);
 						delay(pcihp_cpci_led_blink);
-						}
-						rv = 0;
-						break;
 					}
-					default:
-						break;
+					rv = 0;
+					break;
+				}
+				default:
+					break;
 				}
 			}
 
