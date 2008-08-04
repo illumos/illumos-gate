@@ -109,7 +109,7 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, tnode_t *node, const char *pgname,
 {
 	int err;
 	char *fmri = NULL;
-	char vbuf[INT64BUFSZ], tbuf[32], *pval = NULL, *aval;
+	char vbuf[INT64BUFSZ], tbuf[32], *pval = NULL, *aval = NULL;
 
 	switch (pv->tp_type) {
 		case TOPO_TYPE_INT32: {
@@ -171,10 +171,13 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, tnode_t *node, const char *pgname,
 			if (topo_prop_get_fmri(node, pgname, pv->tp_name, &val,
 			    &err) == 0) {
 				if (topo_fmri_nvl2str(thp, val, &fmri, &err)
-				    == 0)
+				    == 0) {
+					nvlist_free(val);
 					pval = fmri;
-				else
+				} else {
+					nvlist_free(val);
 					return;
+				}
 			} else
 				return;
 			(void) snprintf(tbuf, 10, "%s", FMRI);
@@ -195,18 +198,28 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, tnode_t *node, const char *pgname,
 					(void) sprintf(vbuf, " 0x%x", val[i]);
 					(void) strcat(aval, vbuf);
 				}
+				topo_hdl_free(thp, val,
+				    nelem * sizeof (uint32_t));
 				(void) snprintf(tbuf, 10, "%s", UInt32_Arr);
 				pval = aval;
 			}
 			break;
 		}
+		default:
+			return;
 	}
 
 	begin_end_element(fp, Propval, Name, pv->tp_name, Type, tbuf,
 	    Value, pval, NULL);
 
+	if (pval != NULL && pv->tp_type == TOPO_TYPE_STRING)
+		topo_hdl_strfree(thp, pval);
+
 	if (fmri != NULL)
 		topo_hdl_strfree(thp, fmri);
+
+	if (aval != NULL)
+		free(aval);
 }
 
 static void
