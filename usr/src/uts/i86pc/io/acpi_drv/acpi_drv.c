@@ -361,7 +361,6 @@ static void acpi_drv_printf(struct acpi_drv_dev *devp, uint_t lev,
  */
 static int acpi_drv_output_init(ACPI_HANDLE hdl, struct acpi_drv_dev *dev);
 static void acpi_drv_output_notify(ACPI_HANDLE hdl, UINT32 val, void *ctx);
-static int acpi_drv_output_get_state(struct acpi_drv_output_state *op);
 static int acpi_drv_output_get_level(struct acpi_drv_output_state *op);
 static int acpi_drv_output_set_level(struct acpi_drv_output_state *op,
     uint32_t level);
@@ -2344,7 +2343,6 @@ acpi_drv_output_init(ACPI_HANDLE hdl, struct acpi_drv_dev *dev)
 		ACPI_DRV_DBG(CE_NOTE, NULL, "_BCL NOT supported\n");
 	}
 
-	(void) acpi_drv_output_get_state(op);
 	return (ACPI_DRV_OK);
 }
 
@@ -2438,28 +2436,6 @@ acpi_drv_idx2output(int idx)
 		op = op->next;
 	}
 	return (op);
-}
-
-/*
- * Output device status:
- *
- * Bits		Definition
- *
- * 0		Output connector exists in the system now.
- * 1		Output is activated.
- * 2		Output is ready to switch.
- * 3		Output is not defective.
- * 4		Device is attached (optional).
- * 5-31		Reserved (must be zero).
- */
-static int
-acpi_drv_output_get_state(struct acpi_drv_output_state *op)
-{
-	if (acpica_eval_int(op->dev.hdl, "_DCS", &op->state) != AE_OK) {
-		op->state = 0;
-		return (ACPI_DRV_ERR);
-	}
-	return (ACPI_DRV_OK);
 }
 
 /*
