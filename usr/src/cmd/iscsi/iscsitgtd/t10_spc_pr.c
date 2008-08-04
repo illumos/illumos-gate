@@ -307,12 +307,10 @@ done:
 	    : cmd->c_lu->l_cmd_table[cmd->c_cdb[0]].cmd_name,
 	    (rsrv == NULL)
 	    ? "<none>"
-	    : (rsrv->r_type == PR_IN_READ_KEYS)
-	    ? "Write Exclusive"
 	    : (rsrv->r_type == PGR_TYPE_WR_EX)
-	    ? "Exclusive Access"
+	    ? "Write Exclusive"
 	    : (rsrv->r_type == PGR_TYPE_EX_AC)
-	    ? "Report capabilties"
+	    ? "Exclusive Access"
 	    : (rsrv->r_type == PGR_TYPE_WR_EX_RO)
 	    ? "Write Exclusive, Registrants Only"
 	    : (rsrv->r_type == PGR_TYPE_EX_AC_RO)

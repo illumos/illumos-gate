@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -827,12 +827,17 @@ static void
 raw_persist_in(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 {
 	raw_io_t	*io;
+	uint32_t	len;
 
-	if ((io = do_datain(cmd, cdb, CDB_GROUP1, 0)) == NULL) {
+	len = (cdb[7] << 8) | cdb[8];
+	if ((io = do_datain(cmd, cdb, CDB_GROUP1, len)) == NULL) {
 		trans_send_complete(cmd, STATUS_CHECK);
 	} else {
-		trans_send_complete(cmd, io->r_status);
-		raw_free_io(io);
+		if (trans_send_datain(cmd, io->r_data, io->r_data_len, 0,
+		    raw_free_io, True, io) == False) {
+			spc_sense_create(cmd, KEY_HARDWARE_ERROR, 0);
+			trans_send_complete(cmd, STATUS_CHECK);
+		}
 	}
 }
 
