@@ -131,10 +131,13 @@ static sunFmFaultStatus_data_t
 faultstatus_lookup_index_exact(sunFmProblem_data_t *data, ulong_t index)
 {
 	if (index > data->d_nsuspects)
-		return (NULL);
+		return (0);
 
 	if (data->d_statuses == NULL)
-		return (NULL);
+		return (0);
+
+	if (data->d_valid != valid_stamp)
+		return (0);
 
 	return (data->d_statuses[index - 1]);
 }
@@ -214,6 +217,19 @@ problem_update_one(const fmd_adm_caseinfo_t *acp, void *arg)
 
 		DEBUGMSGTL((MODNAME_STR, "completed new problem %s@%p\n",
 		    data->d_aci_uuid, data));
+	} else {
+		uint8_t *statuses;
+		int i;
+
+		(void) nvlist_lookup_uint8_array(acp->aci_event,
+		    FM_SUSPECT_FAULT_STATUS, &statuses, &nelem);
+
+		ASSERT(nelem == data->d_nsuspects);
+
+		for (i = 0; i < nelem; i++)
+			data->d_statuses[i] = statuses[i];
+
+		data->d_valid = valid_stamp;
 	}
 
 	/*
@@ -570,7 +586,7 @@ sunFmProblemTable_pr(netsnmp_handler_registration *reginfo,
  */
 static sunFmFaultEvent_data_t *
 sunFmFaultEventTable_nextfe(netsnmp_handler_registration *reginfo,
-    netsnmp_table_request_info *table_info)
+    netsnmp_table_request_info *table_info, sunFmFaultStatus_data_t *statusp)
 {
 	sunFmProblem_data_t	*data;
 	sunFmFaultEvent_data_t	*rv;
@@ -592,6 +608,8 @@ sunFmFaultEventTable_nextfe(netsnmp_handler_registration *reginfo,
 
 			if ((data = sunFmProblemTable_pr(reginfo,
 			    table_info)) != NULL &&
+			    (*statusp = faultstatus_lookup_index_exact(data,
+			    index)) != 0 &&
 			    (rv = faultevent_lookup_index_exact(data, index)) !=
 			    NULL) {
 				snmp_set_var_typed_value(
@@ -653,99 +671,9 @@ sunFmFaultEventTable_nextfe(netsnmp_handler_registration *reginfo,
 	}
 }
 
-/*
- * Returns the ASN.1 lexicographically first fault event after the one
- * identified by table_info.  Indexes are updated to reflect the OID
- * of the data returned.  This allows us to implement GETNEXT.
- */
-static sunFmFaultStatus_data_t
-sunFmFaultStatusTable_nextfe(netsnmp_handler_registration *reginfo,
-    netsnmp_table_request_info *table_info)
-{
-	sunFmProblem_data_t	*data;
-	sunFmFaultStatus_data_t	rv;
-	netsnmp_variable_list	*var;
-	ulong_t			index;
-
-	for (;;) {
-		switch (table_info->number_indexes) {
-		case 2:
-		default:
-			DEBUGMSGTL((MODNAME_STR, "nextfe: 2 indices:\n"));
-			DEBUGMSGVAR((MODNAME_STR, table_info->indexes));
-			DEBUGMSG((MODNAME_STR, "\n"));
-			DEBUGMSGVAR((MODNAME_STR,
-			    table_info->indexes->next_variable));
-			DEBUGMSG((MODNAME_STR, "\n"));
-			index = *(ulong_t *)
-			    table_info->indexes->next_variable->val.integer + 1;
-
-			if ((data = sunFmProblemTable_pr(reginfo,
-			    table_info)) != NULL &&
-			    (rv = faultstatus_lookup_index_exact(data,
-			    index)) != NULL) {
-				snmp_set_var_typed_value(
-				    table_info->indexes->next_variable,
-				    ASN_UNSIGNED, (uchar_t *)&index,
-				    sizeof (index));
-				return (rv);
-			}
-
-			if (sunFmProblemTable_nextpr(reginfo, table_info) ==
-			    NULL)
-				return (NULL);
-			break;
-		case 1:
-			if ((data = sunFmProblemTable_pr(reginfo,
-			    table_info)) != NULL) {
-				oid tmpoid[MAX_OID_LEN];
-				index = 0;
-
-				DEBUGMSGTL((MODNAME_STR, "nextfe: 1 index:\n"));
-				DEBUGMSGVAR((MODNAME_STR, table_info->indexes));
-				DEBUGMSG((MODNAME_STR, "\n"));
-				var =
-				    SNMP_MALLOC_TYPEDEF(netsnmp_variable_list);
-				snmp_set_var_typed_value(var, ASN_UNSIGNED,
-				    (uchar_t *)&index, sizeof (index));
-				(void) memcpy(tmpoid, reginfo->rootoid,
-				    reginfo->rootoid_len * sizeof (oid));
-				tmpoid[reginfo->rootoid_len] = 1;
-				tmpoid[reginfo->rootoid_len + 1] =
-				    table_info->colnum;
-				if (build_oid_segment(var) != SNMPERR_SUCCESS) {
-					snmp_free_varbind(var);
-					return (NULL);
-				}
-				snmp_free_varbind(
-				    table_info->indexes->next_variable);
-				table_info->indexes->next_variable = var;
-				table_info->number_indexes = 2;
-				DEBUGMSGTL((MODNAME_STR, "nextfe: built fake "
-				    "index:\n"));
-				DEBUGMSGVAR((MODNAME_STR, table_info->indexes));
-				DEBUGMSG((MODNAME_STR, "\n"));
-				DEBUGMSGVAR((MODNAME_STR,
-				    table_info->indexes->next_variable));
-				DEBUGMSG((MODNAME_STR, "\n"));
-			} else {
-				if (sunFmProblemTable_nextpr(reginfo,
-				    table_info) == NULL)
-					return (NULL);
-			}
-			break;
-		case 0:
-			if (sunFmProblemTable_nextpr(reginfo, table_info) ==
-			    NULL)
-				return (NULL);
-			break;
-		}
-	}
-}
-
 static sunFmFaultEvent_data_t *
 sunFmFaultEventTable_fe(netsnmp_handler_registration *reginfo,
-    netsnmp_table_request_info *table_info)
+    netsnmp_table_request_info *table_info, sunFmFaultStatus_data_t *statusp)
 {
 	sunFmProblem_data_t	*data;
 
@@ -754,22 +682,11 @@ sunFmFaultEventTable_fe(netsnmp_handler_registration *reginfo,
 	if ((data = sunFmProblemTable_pr(reginfo, table_info)) == NULL)
 		return (NULL);
 
+	*statusp = faultstatus_lookup_index_exact(data,
+	    *(ulong_t *)table_info->indexes->next_variable->val.integer);
+	if (*statusp == 0)
+		return (NULL);
 	return (faultevent_lookup_index_exact(data,
-	    *(ulong_t *)table_info->indexes->next_variable->val.integer));
-}
-
-static sunFmFaultStatus_data_t
-sunFmFaultStatusTable_fe(netsnmp_handler_registration *reginfo,
-    netsnmp_table_request_info *table_info)
-{
-	sunFmProblem_data_t	*data;
-
-	ASSERT(table_info->number_indexes == 2);
-
-	if ((data = sunFmProblemTable_pr(reginfo, table_info)) == NULL)
-		return (NULL);
-
-	return (faultstatus_lookup_index_exact(data,
 	    *(ulong_t *)table_info->indexes->next_variable->val.integer));
 }
 
@@ -992,58 +909,30 @@ sunFmFaultEventTable_return(unsigned int reg, void *arg)
 	 *   for GETNEXT requests.
 	 */
 
-	if (table_info->colnum == SUNFMFAULTEVENT_COL_STATUS) {
-		switch (reqinfo->mode) {
-		case MODE_GET:
-			if ((status = sunFmFaultStatusTable_fe(reginfo,
-			    table_info)) == NULL) {
-				netsnmp_free_delegated_cache(cache);
-				(void) pthread_mutex_unlock(&update_lock);
-				return;
-			}
-			break;
-		case MODE_GETNEXT:
-		case MODE_GETBULK:
-			if ((status = sunFmFaultStatusTable_nextfe(reginfo,
-			    table_info)) == NULL) {
-				netsnmp_free_delegated_cache(cache);
-				(void) pthread_mutex_unlock(&update_lock);
-				return;
-			}
-			break;
-		default:
-			snmp_log(LOG_ERR, MODNAME_STR
-			    ": Unsupported request mode %d\n", reqinfo->mode);
+	switch (reqinfo->mode) {
+	case MODE_GET:
+		if ((data = sunFmFaultEventTable_fe(reginfo, table_info,
+		    &status)) == NULL) {
 			netsnmp_free_delegated_cache(cache);
 			(void) pthread_mutex_unlock(&update_lock);
 			return;
 		}
-	} else {
-		switch (reqinfo->mode) {
-		case MODE_GET:
-			if ((data = sunFmFaultEventTable_fe(reginfo,
-			    table_info)) == NULL) {
-				netsnmp_free_delegated_cache(cache);
-				(void) pthread_mutex_unlock(&update_lock);
-				return;
-			}
-			break;
-		case MODE_GETNEXT:
-		case MODE_GETBULK:
-			if ((data = sunFmFaultEventTable_nextfe(reginfo,
-			    table_info)) == NULL) {
-				netsnmp_free_delegated_cache(cache);
-				(void) pthread_mutex_unlock(&update_lock);
-				return;
-			}
-			break;
-		default:
-			snmp_log(LOG_ERR, MODNAME_STR
-			    ": Unsupported request mode %d\n", reqinfo->mode);
+		break;
+	case MODE_GETNEXT:
+	case MODE_GETBULK:
+		if ((data = sunFmFaultEventTable_nextfe(reginfo, table_info,
+		    &status)) == NULL) {
 			netsnmp_free_delegated_cache(cache);
 			(void) pthread_mutex_unlock(&update_lock);
 			return;
 		}
+		break;
+	default:
+		snmp_log(LOG_ERR, MODNAME_STR ": Unsupported request mode %d\n",
+		    reqinfo->mode);
+		netsnmp_free_delegated_cache(cache);
+		(void) pthread_mutex_unlock(&update_lock);
+		return;
 	}
 
 	switch (table_info->colnum) {
@@ -1131,7 +1020,7 @@ sunFmFaultEventTable_return(unsigned int reg, void *arg)
 	}
 	case SUNFMFAULTEVENT_COL_STATUS:
 	{
-		ulong_t	pl;
+		ulong_t	pl = SUNFMFAULTEVENT_STATE_OTHER;
 
 		if (status & FM_SUSPECT_FAULTY)
 			pl = SUNFMFAULTEVENT_STATE_FAULTY;
@@ -1144,7 +1033,7 @@ sunFmFaultEventTable_return(unsigned int reg, void *arg)
 		else if (status & FM_SUSPECT_ACQUITTED)
 			pl = SUNFMFAULTEVENT_STATE_ACQUITTED;
 		netsnmp_table_build_result(reginfo, request, table_info,
-		    ASN_UNSIGNED, (uchar_t *)&pl, sizeof (pl));
+		    ASN_INTEGER, (uchar_t *)&pl, sizeof (pl));
 		break;
 	}
 	case SUNFMFAULTEVENT_COL_LOCATION:

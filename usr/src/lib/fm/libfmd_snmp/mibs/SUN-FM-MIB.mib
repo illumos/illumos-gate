@@ -20,7 +20,7 @@
 --
 
 --
--- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+-- Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 -- Use is subject to license terms.
 --
 
@@ -41,7 +41,7 @@ IMPORTS
 		FROM NETWORK-SERVICES-MIB;
 
 sunFmMIB MODULE-IDENTITY
-	LAST-UPDATED	"200601130000Z"
+	LAST-UPDATED	"200808040000Z"
 	ORGANIZATION	"Sun Microsystems, Inc."
 	CONTACT-INFO	"Sun Microsystems, Inc.
 			 4150 Network Circle
@@ -53,12 +53,12 @@ sunFmMIB MODULE-IDENTITY
 			 http://www.sun.com
 			 or contact your local support representative"
 	DESCRIPTION
-		"Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+		"Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 		 Use is subject to license terms.
 
 		MIB providing access to Sun Fault Manager information"
-	REVISION	"200601130000Z"
-	DESCRIPTION	"Version: 1.0"
+	REVISION	"200808040000Z"
+	DESCRIPTION	"Version: 1.1"
 	::= { fm 1 }
 
 fm OBJECT IDENTIFIER ::= { products 195 }
@@ -90,6 +90,20 @@ SunFmResourceState ::= TEXTUAL-CONVENTION
 		degraded(3),
 		unknown(4),
 		faulted(5)
+	}
+
+SunFmEventState ::= TEXTUAL-CONVENTION
+	STATUS	current
+	DESCRIPTION
+		"Represents the status of a suspect as diagnosed
+		by the fault manager."
+	SYNTAX	INTEGER {
+		other(1),	-- Unknown or unsupported
+		faulty(2),
+		removed(3),
+		replaced(4),
+		repaired(5),
+		acquitted(6)
 	}
 
 --
@@ -229,7 +243,9 @@ SunFmFaultEventEntry ::= SEQUENCE {
 	sunFmFaultEventCertainty	Gauge32,
 	sunFmFaultEventASRU		URLString,
 	sunFmFaultEventFRU		URLString,
-	sunFmFaultEventResource		URLString
+	sunFmFaultEventResource		URLString,
+	sunFmFaultEventStatus		SunFmEventState,
+	sunFmFaultEventLocation		URLString
 }
 
 sunFmFaultEventUUIDIndex OBJECT-TYPE
@@ -305,6 +321,24 @@ sunFmFaultEventResource OBJECT-TYPE
 		"Sun FMRI of the resource responsible for the generation of
 		the telemetry leading to the diagnosis."
 	::= { sunFmFaultEventEntry 8 }
+
+sunFmFaultEventStatus OBJECT-TYPE
+	SYNTAX		SunFmEventState
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The current status of this suspect for this diagnosis. 
+		See fmadm(1M) faulty."
+	::= { sunFmFaultEventEntry 9 }
+
+sunFmFaultEventLocation OBJECT-TYPE
+	SYNTAX		URLString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"Label of the Field Replaceable Unit (FRU) that should be
+                replaced in order to repair the specified fault or defect."
+	::= { sunFmFaultEventEntry 10 }
 
 --
 -- sunFmModuleTable provides fmd configuration information equivalent to
@@ -465,6 +499,8 @@ sunFmObjectGroup OBJECT-GROUP OBJECTS {
 		sunFmFaultEventASRU,
 		sunFmFaultEventFRU,
 		sunFmFaultEventResource,
+		sunFmFaultEventStatus,
+		sunFmFaultEventLocation,
 		sunFmModuleName,
 		sunFmModuleVersion,
 		sunFmModuleStatus,
