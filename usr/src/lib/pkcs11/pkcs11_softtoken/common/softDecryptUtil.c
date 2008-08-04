@@ -48,6 +48,7 @@ soft_remove_pkcs7_padding(CK_BYTE *pData, CK_ULONG padded_len,
 {
 
 	CK_BYTE  pad_value;
+	ulong_t i;
 
 	pad_value = pData[padded_len - 1];
 
@@ -55,6 +56,10 @@ soft_remove_pkcs7_padding(CK_BYTE *pData, CK_ULONG padded_len,
 	/* Make sure there is a valid padding value. */
 	if ((pad_value == 0) || (pad_value > block_size))
 		return (CKR_ENCRYPTED_DATA_INVALID);
+
+	for (i = padded_len - pad_value; i < padded_len; i++)
+		if (pad_value != pData[i])
+			return (CKR_ENCRYPTED_DATA_INVALID);
 
 	*pulDataLen = padded_len - pad_value;
 	return (CKR_OK);
