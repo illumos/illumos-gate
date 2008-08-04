@@ -192,6 +192,7 @@ struct cpuid_info {
 	uint32_t cpi_socket;		/* Chip package/socket type */
 
 	struct mwait_info cpi_mwait;	/* fn 5: monitor/mwait info */
+	uint32_t cpi_apicid;
 };
 
 
@@ -221,6 +222,7 @@ static struct cpuid_info cpuid_info0;
 #define	CPI_MAXEAX_MAX		0x100		/* sanity control */
 #define	CPI_XMAXEAX_MAX		0x80000100
 #define	CPI_FN4_ECX_MAX		0x20		/* sanity: max fn 4 levels */
+#define	CPI_FNB_ECX_MAX		0x20		/* sanity: max fn B levels */
 
 /*
  * Function 4 (Deterministic Cache Parameters) macros
@@ -232,6 +234,7 @@ static struct cpuid_info cpuid_info0;
 #define	CPI_SELF_INIT_CACHE(regs)	BITX((regs)->cp_eax, 8, 8)
 #define	CPI_CACHE_LVL(regs)		BITX((regs)->cp_eax, 7, 5)
 #define	CPI_CACHE_TYPE(regs)		BITX((regs)->cp_eax, 4, 0)
+#define	CPI_CPU_LEVEL_TYPE(regs)	BITX((regs)->cp_ecx, 15, 8)
 
 #define	CPI_CACHE_WAYS(regs)		BITX((regs)->cp_ebx, 31, 22)
 #define	CPI_CACHE_PARTS(regs)		BITX((regs)->cp_ebx, 21, 12)
@@ -1297,6 +1300,8 @@ cpuid_pass1(cpu_t *cpu)
 		}
 	}
 
+	cpi->cpi_apicid = CPI_APIC_ID(cpi);
+
 	/*
 	 * Synthesize chip "revision" and socket type
 	 */
@@ -1457,6 +1462,55 @@ cpuid_pass2(cpu_t *cpu)
 		}
 		default:
 			break;
+		}
+	}
+
+	if (cpi->cpi_maxeax >= 0xB && cpi->cpi_vendor == X86_VENDOR_Intel) {
+		cp->cp_eax = 0xB;
+		cp->cp_ecx = 0;
+
+		(void) __cpuid_insn(cp);
+
+		/*
+		 * Check CPUID.EAX=0BH, ECX=0H:EBX is non-zero, which
+		 * indicates that the extended topology enumeration leaf is
+		 * available.
+		 */
+		if (cp->cp_ebx) {
+			uint32_t x2apic_id;
+			uint_t coreid_shift = 0;
+			uint_t ncpu_per_core = 1;
+			uint_t chipid_shift = 0;
+			uint_t ncpu_per_chip = 1;
+			uint_t i;
+			uint_t level;
+
+			for (i = 0; i < CPI_FNB_ECX_MAX; i++) {
+				cp->cp_eax = 0xB;
+				cp->cp_ecx = i;
+
+				(void) __cpuid_insn(cp);
+				level = CPI_CPU_LEVEL_TYPE(cp);
+
+				if (level == 1) {
+					x2apic_id = cp->cp_edx;
+					coreid_shift = BITX(cp->cp_eax, 4, 0);
+					ncpu_per_core = BITX(cp->cp_ebx, 15, 0);
+				} else if (level == 2) {
+					x2apic_id = cp->cp_edx;
+					chipid_shift = BITX(cp->cp_eax, 4, 0);
+					ncpu_per_chip = BITX(cp->cp_ebx, 15, 0);
+				}
+			}
+
+			cpi->cpi_apicid = x2apic_id;
+			cpi->cpi_ncpu_per_chip = ncpu_per_chip;
+			cpi->cpi_ncore_per_chip = ncpu_per_chip /
+			    ncpu_per_core;
+			cpi->cpi_chipid = x2apic_id >> chipid_shift;
+			cpi->cpi_clogid = x2apic_id & ((1 << chipid_shift) - 1);
+			cpi->cpi_coreid = x2apic_id >> coreid_shift;
+			cpi->cpi_pkgcoreid = cpi->cpi_clogid >> coreid_shift;
 		}
 	}
 
@@ -1996,7 +2050,7 @@ cpuid_pass3(cpu_t *cpu)
 		shft = 0;
 		for (i = 1; i < cpi->cpi_ncpu_shr_last_cache; i <<= 1)
 			shft++;
-		cpi->cpi_last_lvl_cacheid = CPI_APIC_ID(cpi) >> shft;
+		cpi->cpi_last_lvl_cacheid = cpi->cpi_apicid >> shft;
 	}
 
 	/*
@@ -3658,7 +3712,7 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
 		    "chunks", CPI_CHUNKS(cpi));
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
-		    "apic-id", CPI_APIC_ID(cpi));
+		    "apic-id", cpi->cpi_apicid);
 		if (cpi->cpi_chipid >= 0) {
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
 			    "chip#", cpi->cpi_chipid);

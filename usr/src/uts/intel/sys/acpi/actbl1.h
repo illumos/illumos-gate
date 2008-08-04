@@ -422,7 +422,9 @@ typedef struct apic_header
 #define APIC_IO_SAPIC           6
 #define APIC_LOCAL_SAPIC        7
 #define APIC_XRUPT_SOURCE       8
-#define APIC_RESERVED           9           /* 9 and greater are reserved */
+#define	X2APIC_PROCESSOR	9
+#define	X2APIC_LOCAL_NMI	10
+#define	APIC_RESERVED		11	/* 11 and greater are reserved */
 
 
 /* Flag definitions for MADT sub-tables */
@@ -563,6 +565,28 @@ typedef struct madt_interrupt_source
     UINT32                  Flags;              /* Interrupt Source Flags */
 
 } MADT_INTERRUPT_SOURCE;
+
+/* 9: Processor x2APIC */
+
+typedef	struct	madt_processor_ext_apic
+{
+    APIC_HEADER_DEF
+    UINT16                  Reserved;		/* Reserved - must be zero */
+    UINT32                  X2LocalApicId;     /* Processor's  x2APIC ID  */
+    ACPI_MADT_LFLAGS
+    UINT32                  ProcessorUID;     /* Extended x2APIC processor ID */
+} MADT_PROCESSOR_X2APIC;
+
+/* 10: Extended X2APIC NMI Structure */
+
+typedef struct madt_local_x2apic_nmi
+{
+    APIC_HEADER_DEF
+    ACPI_MADT_IFLAGS
+    UINT32                  ProcessorUID;     /* Processor's x2APIC ID */
+    UINT8                   Lint;    /* LINTn to which NMI is connected */
+    UINT8                   Reserved[3];
+} MADT_LOCAL_X2APIC_NMI;
 
 
 /*******************************************************************************

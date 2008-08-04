@@ -207,7 +207,7 @@ apic_interrupt_dump(apic_irq_t *irqp, struct av_head *avp,
 	char		ipl[3];
 	char		cpu_assigned[4];
 	char		evtchn[8];
-	ushort_t	assigned_cpu;
+	uint32_t	assigned_cpu;
 	struct autovec	avhp;
 
 	/* If invalid index; continue */

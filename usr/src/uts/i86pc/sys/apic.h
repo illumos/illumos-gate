@@ -101,6 +101,19 @@ extern "C" {
 /* Divider Configuration Register */
 #define	APIC_DIVIDE_REG		0xf8
 
+/* Various mode for local APIC. Modes are mutually exclusive  */
+#define	APIC_IS_DISABLED	0x0
+#define	APIC_MODE_NOTSET	0x1
+#define	LOCAL_APIC		0x2
+#define	LOCAL_X2APIC		0x3
+
+/* x2APIC SELF IPI Reguster */
+#define	X2APIC_SELF_IPI		0x100
+
+/* General x2APIC constants used at various places */
+#define	APIC_SVR		12
+#define	APIC_DIRECTED_EOI	24
+
 /* IRR register	*/
 #define	APIC_IRR_REG		0x80
 
@@ -109,6 +122,7 @@ extern "C" {
 
 #define	APIC_IO_REG		0x0
 #define	APIC_IO_DATA		0x4
+#define	APIC_IO_EOI		0x10
 
 /* Bit offset of APIC ID in LID_REG, INT_CMD and in DEST_REG */
 #define	APIC_ID_BIT_OFFSET	24
@@ -165,6 +179,15 @@ extern "C" {
 	((p) == PCI_PERIPH_PIC_IF_IO_APIC ||			\
 	(p) == PCI_PERIPH_PIC_IF_IOX_APIC))
 
+/*
+ * These macros are used in frequently called routines like
+ * apic_intr_enter().
+ */
+#define	X2APIC_WRITE(reg, v) \
+	wrmsr((REG_X2APIC_BASE_MSR + (reg >> 2)), v)
+
+#define	LOCAL_APIC_WRITE_REG(reg, v) \
+	apicadr[reg] = v
 
 /*
  * MP floating pointer structure defined in Intel MP Spec 1.1
@@ -447,8 +470,8 @@ typedef struct	apic_irq {
 	 */
 	major_t	airq_major;	/* major number corresponding to the device */
 	ushort_t airq_rdt_entry;	/* level, polarity & trig mode */
-	ushort_t airq_cpu;		/* Which CPU are we bound to ? */
-	ushort_t airq_temp_cpu; /* Could be diff from cpu due to disable_intr */
+	uint32_t airq_cpu;		/* Which CPU are we bound to ? */
+	uint32_t airq_temp_cpu; /* Could be diff from cpu due to disable_intr */
 	uchar_t	airq_vector;		/* Vector chosen for this irq */
 	uchar_t	airq_share;		/* number of interrupts at this irq */
 	uchar_t	airq_share_id;		/* id to identify source from irqno */
@@ -460,16 +483,16 @@ typedef struct	apic_irq {
 	struct apic_irq *airq_next;	/* chain of shared intpts */
 } apic_irq_t;
 
-#define	IRQ_USER_BOUND	0x8000	/* user requested bind if set in airq_cpu */
-#define	IRQ_UNBOUND	(ushort_t)-1 /* set in airq_cpu and airq_temp_cpu */
-#define	IRQ_UNINIT	(ushort_t)-2 /* in airq_temp_cpu till addspl called */
+#define	IRQ_USER_BOUND	0x80000000 /* user requested bind if set in airq_cpu */
+#define	IRQ_UNBOUND	(uint32_t)-1	/* set in airq_cpu and airq_temp_cpu */
+#define	IRQ_UNINIT	(uint32_t)-2 /* in airq_temp_cpu till addspl called */
 
 /* Macros to help deal with shared interrupts */
 #define	VIRTIRQ(irqno, share_id)	((irqno) | ((share_id) << 8))
 #define	IRQINDEX(irq)	((irq) & 0xFF)	/* Mask to get irq from virtual irq */
 
 typedef struct apic_cpus_info {
-	uchar_t	aci_local_id;
+	uint32_t aci_local_id;
 	uchar_t	aci_local_ver;
 	uchar_t	aci_status;
 	uchar_t	aci_redistribute;	/* Selected for redistribution */
@@ -492,6 +515,18 @@ typedef struct apic_cpus_info {
 
 #define	APIC_CPU_ONLINE		1
 #define	APIC_CPU_INTR_ENABLE	2
+
+/*
+ * APIC ops to support various flavors of APIC like APIC and x2APIC.
+ */
+typedef	struct apic_regs_ops {
+	uint64_t	(*apic_read)(uint32_t);
+	void 		(*apic_write)(uint32_t, uint64_t);
+	int		(*apic_get_pri)(void);
+	void		(*apic_write_task_reg)(uint64_t);
+	void		(*apic_write_int_cmd)(uint32_t, uint32_t);
+	void		(*apic_send_eoi)(uint32_t);
+} apic_reg_ops_t;
 
 /*
  * Various poweroff methods and ports & bits for them
@@ -542,6 +577,7 @@ typedef struct apic_cpus_info {
 
 extern uint32_t ioapic_read(int ioapic_ix, uint32_t reg);
 extern void ioapic_write(int ioapic_ix, uint32_t reg, uint32_t value);
+extern void ioapic_write_eoi(int ioapic_ix, uint32_t value);
 
 /* Macros for reading/writing the IOAPIC RDT entries */
 #define	READ_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic_ix, ipin) \
@@ -683,6 +719,7 @@ struct ioapic_reprogram_data {
 extern struct ioapic_reprogram_data apic_reprogram_info[];
 
 extern void apic_intr_exit(int ipl, int irq);
+extern void x2apic_intr_exit(int ipl, int irq);
 extern int apic_probe_common();
 extern void apic_init_common();
 extern void ioapic_init_intr();
@@ -695,7 +732,7 @@ extern uchar_t apic_xlate_vector(uchar_t vector);
 extern uchar_t apic_allocate_vector(int ipl, int irq, int pri);
 extern void apic_free_vector(uchar_t vector);
 extern int apic_allocate_irq(int irq);
-extern ushort_t apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid,
+extern uint32_t apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid,
     uchar_t intin);
 extern int apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
     struct ioapic_reprogram_data *drep);
@@ -731,6 +768,13 @@ extern void apic_pci_msi_enable_vector(dev_info_t *dip, int type, int inum,
     int vector, int count, int target_apic_id);
 extern char *apic_get_apic_type();
 extern uint16_t	apic_get_apic_version();
+extern void x2apic_send_ipi();
+extern void apic_ret();
+extern int apic_detect_x2apic();
+extern void apic_enable_x2apic();
+extern void apic_change_eoi();
+extern void apic_send_EOI(uint32_t);
+extern void apic_send_directed_EOI(uint32_t);
 
 extern volatile uint32_t *apicadr;	/* virtual addr of local APIC   */
 extern int apic_forceload;
@@ -769,6 +813,10 @@ extern int apic_multi_msi_max;
 extern int apic_msix_max;
 extern int apic_sci_vect;
 extern uchar_t apic_ipls[];
+extern apic_reg_ops_t *apic_reg_ops;
+extern int apic_mode;
+extern int apic_direct_EOI;
+extern void x2apic_update_psm();
 
 
 #ifdef	__cplusplus

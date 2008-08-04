@@ -2124,6 +2124,24 @@ lgrp_plat_process_srat(struct srat *tp, node_domain_map_t *node_domain,
 			    node_memory, start, end, domain) < 0)
 				return (-4);
 			break;
+		case SRAT_X2APIC:	/* x2apic CPU entry */
+			if (!(item->i.xp.flags & SRAT_ENABLED) ||
+			    cpu_node == NULL)
+				break;
+
+			/*
+			 * Calculate domain (node) ID and fill in APIC ID to
+			 * domain/node mapping table
+			 */
+			domain = item->i.xp.domain;
+			apic_id = item->i.xp.x2apic_id;
+
+			if (lgrp_plat_cpu_node_update(node_domain, node_cnt,
+			    cpu_node, cpu_count, apic_id, domain) < 0)
+				return (-3);
+
+			proc_entry_count++;
+			break;
 
 		default:
 			break;
@@ -2186,6 +2204,12 @@ lgrp_plat_srat_domains(struct srat *tp)
 			if (!(item->i.m.flags & SRAT_ENABLED))
 				break;
 			domain = item->i.m.domain;
+			break;
+
+		case SRAT_X2APIC:	/* x2apic CPU entry */
+			if (!(item->i.xp.flags & SRAT_ENABLED))
+				break;
+			domain = item->i.xp.domain;
 			break;
 
 		default:

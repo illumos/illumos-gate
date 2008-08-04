@@ -105,6 +105,13 @@ struct srat_processor {
 	uint8_t  reserved[4];
 };
 
+struct srat_x2apic {
+	uint8_t reserved[2];
+	uint32_t domain;
+	uint32_t x2apic_id;
+	uint32_t flags;
+};
+
 struct srat_memory {
 	uint32_t domain;
 	uint8_t	 reserved1[2];
@@ -121,6 +128,7 @@ struct srat_item {
 	union {
 		struct srat_processor p;
 		struct srat_memory m;
+		struct srat_x2apic xp;
 	} i;
 };
 
@@ -133,6 +141,7 @@ struct srat {
 
 #define	SRAT_PROCESSOR	  (0)
 #define	SRAT_MEMORY	  (1)
+#define	SRAT_X2APIC	  (2)
 
 #define	SRAT_ENABLED	  (1)
 #define	SRAT_HOT_PLUG	  (2)

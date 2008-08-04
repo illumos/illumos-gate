@@ -58,6 +58,7 @@
 
 int xen_psm_verbose = 0;
 
+/* As of now we don't support x2apic in xVM */
 volatile uint32_t *apicadr = NULL;	/* dummy, so common code will link */
 int apic_error = 0;
 int apic_verbose = 0;
@@ -1102,6 +1103,39 @@ ioapic_write(int apic_ix, uint32_t reg, uint32_t value)
 	apic.value = value;
 	if (HYPERVISOR_physdev_op(PHYSDEVOP_apic_write, &apic))
 		panic("write ioapic %d reg %d failed", apic_ix, reg);
+}
+
+/*
+ * This function was added as part of x2APIC support in pcplusmp.
+ */
+void
+ioapic_write_eoi(int apic_ix, uint32_t value)
+{
+	physdev_apic_t apic;
+
+	apic.apic_physbase = (unsigned long)apic_physaddr[apic_ix];
+	apic.reg = APIC_IO_EOI;
+	apic.value = value;
+	if (HYPERVISOR_physdev_op(PHYSDEVOP_apic_write, &apic))
+		panic("write ioapic reg : APIC_IO_EOI %d failed", apic_ix);
+}
+
+/*
+ * This function was added as part of x2APIC support in pcplusmp to resolve
+ * undefined symbol in xpv_psm.
+ */
+void
+x2apic_update_psm()
+{
+}
+
+/*
+ * This function was added as part of x2APIC support in pcplusmp to resolve
+ * undefined symbol in xpv_psm.
+ */
+void
+apic_ret()
+{
 }
 
 /*

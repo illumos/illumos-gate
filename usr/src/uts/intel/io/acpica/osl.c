@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -44,6 +44,7 @@
 
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
+#include <sys/acpi/acinterp.h>
 
 #define	MAX_DAT_FILE_SIZE	(64*1024)
 
@@ -82,7 +83,7 @@ int acpica_powering_off = 0;
 
 /* CPU mapping data */
 struct cpu_map_item {
-	MADT_PROCESSOR_APIC *mpa;
+	UINT32		proc_id;
 	ACPI_HANDLE	obj;
 };
 
@@ -1345,7 +1346,7 @@ acpica_add_processor_to_map(UINT32 acpi_id, ACPI_HANDLE obj)
 		if (cpu_map[cpu_id] == NULL)
 			continue;
 
-		if (cpu_map[cpu_id]->mpa->ProcessorId == acpi_id) {
+		if (cpu_map[cpu_id]->proc_id == acpi_id) {
 			if (cpu_map[cpu_id]->obj == NULL)
 				cpu_map[cpu_id]->obj = obj;
 			break;
@@ -1433,9 +1434,19 @@ acpica_probe_processor(ACPI_HANDLE obj, UINT32 level, void *ctx, void **rv)
 		AcpiOsFree(rb.Pointer);
 	} else if (objtype == ACPI_TYPE_DEVICE) {
 		/* process a processor Device */
-		cmn_err(CE_WARN, "!acpica: probe found a processor Device\n");
-		cmn_err(CE_WARN, "!acpica: no support for processor Devices\n");
-		return (AE_OK);
+		rb.Pointer = NULL;
+		rb.Length = ACPI_ALLOCATE_BUFFER;
+		status = AcpiGetObjectInfo(obj, &rb);
+		if (status != AE_OK) {
+			cmn_err(CE_WARN,
+			    "acpica: error probing Processor Device\n");
+			return (status);
+		}
+		ASSERT(((ACPI_OBJECT *)rb.Pointer)->Type ==
+		    ACPI_TYPE_DEVICE);
+		acpi_id = AcpiExStringToUnsignedInteger(
+		    ((ACPI_DEVICE_INFO *)rb.Pointer)->UniqueId.Value);
+		AcpiOsFree(rb.Pointer);
 	}
 
 	acpica_add_processor_to_map(acpi_id, obj);
@@ -1671,7 +1682,7 @@ acpica_devinfo_handler(ACPI_HANDLE obj, UINT32 func, void *data)
  *
  */
 void
-acpica_map_cpu(processorid_t cpuid, MADT_PROCESSOR_APIC *mpa)
+acpica_map_cpu(processorid_t cpuid, UINT32 proc_id)
 {
 	struct cpu_map_item *item;
 
@@ -1679,7 +1690,7 @@ acpica_map_cpu(processorid_t cpuid, MADT_PROCESSOR_APIC *mpa)
 		cpu_map = kmem_zalloc(sizeof (item) * NCPU, KM_SLEEP);
 
 	item = kmem_zalloc(sizeof (*item), KM_SLEEP);
-	item->mpa = mpa;
+	item->proc_id = proc_id;
 	item->obj = NULL;
 	cpu_map[cpuid] = item;
 	cpu_map_count++;

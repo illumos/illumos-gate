@@ -481,4 +481,23 @@ AcpiExUnsignedIntegerToString (
     }
 }
 
+ACPI_INTEGER
+AcpiExStringToUnsignedInteger (
+    char                    *String)
+{
+    UINT32              Count;
+    int                 i;
+
+    ACPI_FUNCTION_ENTRY ();
+
+    if (String == NULL || *String == '\0')
+        return (0);
+
+    i = (*String++ - '0');
+
+    while (*String != '\0')
+        i = 10 * i + (*String++ - '0');
+
+    return (i);
+}
 #endif

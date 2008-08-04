@@ -1930,6 +1930,10 @@ process_srat(struct srat *tp)
 	} processor;
 	struct {
 		uint32_t domain;
+		uint32_t x2apic_id;
+	} x2apic;
+	struct {
+		uint32_t domain;
 		uint64_t addr;
 		uint64_t length;
 		uint32_t flags;
@@ -1972,6 +1976,17 @@ process_srat(struct srat *tp)
 			bsetprop(prop_name, strlen(prop_name), &memory,
 			    sizeof (memory));
 			mem_num++;
+			break;
+		case SRAT_X2APIC:
+			if (!(item->i.xp.flags & SRAT_ENABLED))
+				break;
+			x2apic.domain = item->i.xp.domain;
+			x2apic.x2apic_id = item->i.xp.x2apic_id;
+			(void) snprintf(prop_name, 30, "acpi-srat-processor-%d",
+			    proc_num);
+			bsetprop(prop_name, strlen(prop_name), &x2apic,
+			    sizeof (x2apic));
+			proc_num++;
 			break;
 		}
 

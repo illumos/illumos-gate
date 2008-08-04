@@ -167,7 +167,7 @@ PCI_E_MISC_OBJS += pcie.o pcie_fault.o
 PCI_E_NEXUS_OBJS += npe.o npe_misc.o
 PCI_E_NEXUS_OBJS += pci_common.o pci_kstats.o pci_tools.o
 PCINEXUS_OBJS += pci.o pci_common.o pci_kstats.o pci_tools.o
-PCPLUSMP_OBJS += apic.o psm_common.o apic_introp.o mp_platform_common.o
+PCPLUSMP_OBJS += apic.o apic_regops.o psm_common.o apic_introp.o mp_platform_common.o
 
 ACPI_DRV_OBJS	+= acpi_drv.o
 include $(SRC)/common/mc/mc-amd/Makefile.mcamd

@@ -155,6 +155,9 @@ apic_navail_vector(dev_info_t *dip, int pri)
 	lowest = apic_ipltopri[pri - 1] + APIC_VECTOR_PER_IPL;
 	navail = count = 0;
 
+	if (highest < lowest) /* Both ipl and ipl - 1 map to same pri */
+		lowest -= APIC_VECTOR_PER_IPL;
+
 	/* It has to be contiguous */
 	for (i = lowest; i < highest; i++) {
 		count = 0;
@@ -188,6 +191,9 @@ apic_find_multi_vectors(int pri, int count)
 	highest = apic_ipltopri[pri] + APIC_VECTOR_MASK;
 	lowest = apic_ipltopri[pri - 1] + APIC_VECTOR_PER_IPL;
 	navail = 0;
+
+	if (highest < lowest) /* Both ipl and ipl - 1 map to same pri */
+		lowest -= APIC_VECTOR_PER_IPL;
 
 	/*
 	 * msibits is the no. of lower order message data bits for the
@@ -280,7 +286,7 @@ apic_get_pending(apic_irq_t *irqp, int type)
 
 	index = irqp->airq_vector / 32;
 	bit = irqp->airq_vector % 32;
-	irr = apicadr[APIC_IRR_REG + index];
+	irr = apic_reg_ops->apic_read(APIC_IRR_REG + index);
 
 	affinity_clear();
 	mutex_exit(&cpu_lock);
@@ -619,7 +625,7 @@ static int
 apic_grp_set_cpu(uint32_t vector, int new_cpu, int *result)
 {
 	dev_info_t *orig_dip;
-	uchar_t orig_cpu;
+	uint32_t orig_cpu;
 	ulong_t iflag;
 	apic_irq_t *irqps[PCI_MSI_MAX_INTRS];
 	int i;

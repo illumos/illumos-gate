@@ -213,6 +213,7 @@ extern "C" {
 
 #define	REG_TSC			0x10	/* timestamp counter */
 #define	REG_APIC_BASE_MSR	0x1b
+#define	REG_X2APIC_BASE_MSR	0x800	/* The MSR address offset of x2APIC */
 
 #define	MSR_DEBUGCTL		0x1d9
 

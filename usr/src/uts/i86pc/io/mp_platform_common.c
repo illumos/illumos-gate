@@ -119,7 +119,6 @@ static int apic_acpi_translate_pci_irq(dev_info_t *dip, int busid, int devid,
 static uchar_t acpi_find_ioapic(int irq);
 static int acpi_intr_compatible(iflag_t iflag1, iflag_t iflag2);
 
-
 /*
  * number of bits per byte, from <sys/param.h>
  */
@@ -599,12 +598,14 @@ acpi_probe(char *modname)
 	int			madt_seen, madt_size;
 	APIC_HEADER		*ap;
 	MADT_PROCESSOR_APIC	*mpa;
+	MADT_PROCESSOR_X2APIC	*mpx2a;
 	MADT_IO_APIC		*mia;
 	MADT_IO_SAPIC		*misa;
 	MADT_INTERRUPT_OVERRIDE	*mio;
 	MADT_NMI_SOURCE		*mns;
 	MADT_INTERRUPT_SOURCE	*mis;
 	MADT_LOCAL_APIC_NMI	*mlan;
+	MADT_LOCAL_X2APIC_NMI	*mx2alan;
 	MADT_ADDRESS_OVERRIDE	*mao;
 	ACPI_OBJECT_LIST 	arglist;
 	ACPI_OBJECT		arg;
@@ -612,8 +613,8 @@ acpi_probe(char *modname)
 	iflag_t			sci_flags;
 	volatile uint32_t	*ioapic;
 	int			apic_ix;
-	char			local_ids[NCPU];
-	char			proc_ids[NCPU];
+	uint32_t		local_ids[NCPU];
+	uint32_t		proc_ids[NCPU];
 	uchar_t			hid;
 
 	if (!apic_use_acpi)
@@ -628,7 +629,16 @@ acpi_probe(char *modname)
 	if (!apicadr)
 		return (PSM_FAILURE);
 
-	id = apicadr[APIC_LID_REG];
+	/*
+	 * We don't enable x2APIC when Solaris is running under xVM.
+	 */
+#if !defined(__xpv)
+	if (apic_detect_x2apic()) {
+		apic_enable_x2apic();
+	}
+#endif
+
+	id = apic_reg_ops->apic_read(APIC_LID_REG);
 	local_ids[0] = (uchar_t)(id >> 24);
 	apic_nproc = index = 1;
 	CPUSET_ONLY(apic_cpumask, 0);
@@ -645,12 +655,12 @@ acpi_probe(char *modname)
 			if (mpa->ProcessorEnabled) {
 				if (mpa->LocalApicId == local_ids[0]) {
 					proc_ids[0] = mpa->ProcessorId;
-					acpica_map_cpu(0, mpa);
+					acpica_map_cpu(0, mpa->ProcessorId);
 				} else if (apic_nproc < NCPU) {
 					local_ids[index] = mpa->LocalApicId;
 					proc_ids[index] = mpa->ProcessorId;
 					CPUSET_ADD(apic_cpumask, index);
-					acpica_map_cpu(index, mpa);
+					acpica_map_cpu(index, mpa->ProcessorId);
 					index++;
 					apic_nproc++;
 				} else
@@ -738,6 +748,51 @@ acpi_probe(char *modname)
 			    mis->TriggerMode, mis->InterruptType,
 			    mis->IoSapicVector);
 			break;
+
+		case X2APIC_PROCESSOR:
+			mpx2a = (MADT_PROCESSOR_X2APIC *) ap;
+
+			/*
+			 * All logical processors with APIC ID values
+			 * of 255 and greater will have their APIC
+			 * reported through Processor X2APIC structure.
+			 * All logical processors with APIC ID less than
+			 * 255 will have their APIC reported through
+			 * Processor Local APIC.
+			 */
+			if ((mpx2a->ProcessorEnabled) &&
+			    (mpx2a->X2LocalApicId >> 8)) {
+				if (apic_nproc < NCPU) {
+					local_ids[index] =
+					    mpx2a->X2LocalApicId;
+					CPUSET_ADD(apic_cpumask, index);
+					acpica_map_cpu(index,
+					    mpx2a->ProcessorUID);
+					index++;
+					apic_nproc++;
+				} else {
+					cmn_err(CE_WARN, "%s: exceeded"
+					    " maximum no. of CPUs ("
+					    "=%d)", psm_name, NCPU);
+				}
+			}
+
+			break;
+
+		case X2APIC_LOCAL_NMI:
+			/* UNIMPLEMENTED */
+			mx2alan = (MADT_LOCAL_X2APIC_NMI *) ap;
+			if (mx2alan->ProcessorUID >> 8)
+				acpi_nmi_ccnt++;
+
+#ifdef	DEBUG
+			cmn_err(CE_NOTE, "!apic: local x2apic nmi: %d %d %d %d"
+			    "\n", mx2alan->ProcessorUID, mx2alan->Polarity,
+			    mx2alan->TriggerMode, mx2alan->Lint);
+#endif
+
+			break;
+
 		default:
 			break;
 		}
@@ -755,11 +810,12 @@ acpi_probe(char *modname)
 	 * ACPI doesn't provide the local apic ver, get it directly from the
 	 * local apic
 	 */
-	ver = apicadr[APIC_VERS_REG];
+	ver = apic_reg_ops->apic_read(APIC_VERS_REG);
 	for (i = 0; i < apic_nproc; i++) {
 		apic_cpus[i].aci_local_id = local_ids[i];
 		apic_cpus[i].aci_local_ver = (uchar_t)(ver & 0xFF);
 	}
+
 	for (i = 0; i < apic_io_max; i++) {
 		apic_ix = i;
 
@@ -892,7 +948,7 @@ apic_handle_defconf()
 	CPUSET_ONLY(apic_cpumask, 0);
 	CPUSET_ADD(apic_cpumask, 1);
 	apic_nproc = 2;
-	lid = apicadr[APIC_LID_REG];
+	lid = apic_reg_ops->apic_read(APIC_LID_REG);
 	apic_cpus[0].aci_local_id = (uchar_t)(lid >> APIC_ID_BIT_OFFSET);
 	/*
 	 * According to the PC+MP spec 1.1, the local ids
@@ -986,7 +1042,7 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 		if (!bypass_cpus_and_ioapics &&
 		    procp->proc_cpuflags & CPUFLAGS_EN) {
 			if (procp->proc_cpuflags & CPUFLAGS_BP) { /* Boot CPU */
-				lid = apicadr[APIC_LID_REG];
+				lid = apic_reg_ops->apic_read(APIC_LID_REG);
 				apic_cpus[0].aci_local_id = procp->proc_apicid;
 				if (apic_cpus[0].aci_local_id !=
 				    (uchar_t)(lid >> APIC_ID_BIT_OFFSET)) {
@@ -995,9 +1051,9 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 				apic_cpus[0].aci_local_ver =
 				    procp->proc_version;
 			} else {
-
 				apic_cpus[apic_nproc].aci_local_id =
 				    procp->proc_apicid;
+
 				apic_cpus[apic_nproc].aci_local_ver =
 				    procp->proc_version;
 				apic_nproc++;
@@ -1424,7 +1480,7 @@ int
 apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 {
 	uchar_t vector;
-	ushort_t bind_cpu;
+	uint32_t bind_cpu;
 	int intin, irqindex;
 	int apic_ix;
 	apic_irq_t	*irqptr, *irqheadptr, *irqp;
@@ -1634,8 +1690,8 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 	if (max_ipl == PSM_INVALID_IPL) {
 		ASSERT(irqheadptr == irqptr);
 		bind_cpu = irqptr->airq_temp_cpu;
-		if (((ushort_t)bind_cpu != IRQ_UNBOUND) &&
-		    ((ushort_t)bind_cpu != IRQ_UNINIT)) {
+		if (((uint32_t)bind_cpu != IRQ_UNBOUND) &&
+		    ((uint32_t)bind_cpu != IRQ_UNINIT)) {
 			ASSERT((bind_cpu & ~IRQ_USER_BOUND) < apic_nproc);
 			if (bind_cpu & IRQ_USER_BOUND) {
 				/* If hardbound, temp_cpu == cpu */
@@ -2248,12 +2304,12 @@ apic_setup_irq_table(dev_info_t *dip, int irqno, struct apic_io_intr *intrp,
  * bound to a specific CPU. If so, return the cpu id with high bit set.
  * If not, use the policy to choose a cpu and return the id.
  */
-ushort_t
+uint32_t
 apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 {
 	int	instance, instno, prop_len, bind_cpu, count;
 	uint_t	i, rc;
-	ushort_t cpu;
+	uint32_t cpu;
 	major_t	major;
 	char	*name, *drv_name, *prop_val, *cptr;
 	char	prop_name[32];
@@ -2366,7 +2422,7 @@ apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 		    "vector 0x%x ioapic 0x%x intin 0x%x is bound to cpu %d\n",
 		    psm_name, irq, ioapicid, intin, bind_cpu & ~IRQ_USER_BOUND);
 
-	return ((ushort_t)bind_cpu);
+	return ((uint32_t)bind_cpu);
 }
 
 static struct apic_io_intr *
@@ -2767,7 +2823,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
     struct ioapic_reprogram_data *drep)
 {
 	int			ioapicindex, intin_no;
-	ushort_t		airq_temp_cpu;
+	uint32_t		airq_temp_cpu;
 	apic_cpus_info_t	*cpu_infop;
 	uint32_t		rdt_entry;
 	int			which_irq;
@@ -2817,7 +2873,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 		 * unmask the RDT entry.
 		 */
 
-		if ((ushort_t)bind_cpu == IRQ_UNBOUND) {
+		if ((uint32_t)bind_cpu == IRQ_UNBOUND) {
 			rdt_entry = AV_LDEST | AV_LOPRI |
 			    irq_ptr->airq_rdt_entry;
 
@@ -2893,7 +2949,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 			    irq_ptr->airq_origirq);
 		}
 	}
-	irq_ptr->airq_temp_cpu = (ushort_t)bind_cpu;
+	irq_ptr->airq_temp_cpu = (uint32_t)bind_cpu;
 	apic_redist_cpu_skip &= ~(1 << (bind_cpu & ~IRQ_USER_BOUND));
 	return (0);
 }
@@ -3428,7 +3484,7 @@ apic_intr_redistribute()
 				    most_free_cpu) == 0) {
 					/* Make change permenant */
 					max_busy_irq->airq_cpu =
-					    (ushort_t)most_free_cpu;
+					    (uint32_t)most_free_cpu;
 				}
 				lock_clear(&apic_ioapic_lock);
 			}
@@ -3448,7 +3504,7 @@ apic_intr_redistribute()
 				    most_free_cpu) == 0) {
 					/* Make change permenant */
 					min_busy_irq->airq_cpu =
-					    (ushort_t)most_free_cpu;
+					    (uint32_t)most_free_cpu;
 				}
 				lock_clear(&apic_ioapic_lock);
 			}
@@ -4019,17 +4075,18 @@ apic_save_state(struct apic_state *sp)
 	/*
 	 * First the local APIC.
 	 */
-	sp->as_task_reg = apicadr[APIC_TASK_REG];
-	sp->as_dest_reg = apicadr[APIC_DEST_REG];
-	sp->as_format_reg = apicadr[APIC_FORMAT_REG];
-	sp->as_local_timer = apicadr[APIC_LOCAL_TIMER];
-	sp->as_pcint_vect = apicadr[APIC_PCINT_VECT];
-	sp->as_int_vect0 = apicadr[APIC_INT_VECT0];
-	sp->as_int_vect1 = apicadr[APIC_INT_VECT1];
-	sp->as_err_vect = apicadr[APIC_ERR_VECT];
-	sp->as_init_count = apicadr[APIC_INIT_COUNT];
-	sp->as_divide_reg = apicadr[APIC_DIVIDE_REG];
-	sp->as_spur_int_reg = apicadr[APIC_SPUR_INT_REG];
+	sp->as_task_reg = apic_reg_ops->apic_get_pri();
+	sp->as_dest_reg =  apic_reg_ops->apic_read(APIC_DEST_REG);
+	if (apic_mode == LOCAL_APIC)
+		sp->as_format_reg = apic_reg_ops->apic_read(APIC_FORMAT_REG);
+	sp->as_local_timer = apic_reg_ops->apic_read(APIC_LOCAL_TIMER);
+	sp->as_pcint_vect = apic_reg_ops->apic_read(APIC_PCINT_VECT);
+	sp->as_int_vect0 = apic_reg_ops->apic_read(APIC_INT_VECT0);
+	sp->as_int_vect1 = apic_reg_ops->apic_read(APIC_INT_VECT1);
+	sp->as_err_vect = apic_reg_ops->apic_read(APIC_ERR_VECT);
+	sp->as_init_count = apic_reg_ops->apic_read(APIC_INIT_COUNT);
+	sp->as_divide_reg = apic_reg_ops->apic_read(APIC_DIVIDE_REG);
+	sp->as_spur_int_reg = apic_reg_ops->apic_read(APIC_SPUR_INT_REG);
 
 	/*
 	 * if on the boot processor then save the IO APICs.
@@ -4069,17 +4126,19 @@ apic_restore_state(struct apic_state *sp)
 	/*
 	 * First the local APIC.
 	 */
-	apicadr[APIC_TASK_REG] = sp->as_task_reg;
-	apicadr[APIC_DEST_REG] = sp->as_dest_reg;
-	apicadr[APIC_FORMAT_REG] = sp->as_format_reg;
-	apicadr[APIC_LOCAL_TIMER] = sp->as_local_timer;
-	apicadr[APIC_PCINT_VECT] = sp->as_pcint_vect;
-	apicadr[APIC_INT_VECT0] = sp->as_int_vect0;
-	apicadr[APIC_INT_VECT1] = sp->as_int_vect1;
-	apicadr[APIC_ERR_VECT] = sp->as_err_vect;
-	apicadr[APIC_INIT_COUNT] = sp->as_init_count;
-	apicadr[APIC_DIVIDE_REG] = sp->as_divide_reg;
-	apicadr[APIC_SPUR_INT_REG] = sp->as_spur_int_reg;
+	apic_reg_ops->apic_write_task_reg(sp->as_task_reg);
+	if (apic_mode == LOCAL_APIC) {
+		apic_reg_ops->apic_write(APIC_DEST_REG, sp->as_dest_reg);
+		apic_reg_ops->apic_write(APIC_FORMAT_REG, sp->as_format_reg);
+	}
+	apic_reg_ops->apic_write(APIC_LOCAL_TIMER, sp->as_local_timer);
+	apic_reg_ops->apic_write(APIC_PCINT_VECT, sp->as_pcint_vect);
+	apic_reg_ops->apic_write(APIC_INT_VECT0, sp->as_int_vect0);
+	apic_reg_ops->apic_write(APIC_INT_VECT1, sp->as_int_vect1);
+	apic_reg_ops->apic_write(APIC_ERR_VECT, sp->as_err_vect);
+	apic_reg_ops->apic_write(APIC_INIT_COUNT, sp->as_init_count);
+	apic_reg_ops->apic_write(APIC_DIVIDE_REG, sp->as_divide_reg);
+	apic_reg_ops->apic_write(APIC_SPUR_INT_REG, sp->as_spur_int_reg);
 
 	/*
 	 * the following only needs to be done once, so we do it on the

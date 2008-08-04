@@ -695,6 +695,10 @@ AcpiExUnsignedIntegerToString (
     ACPI_INTEGER            Value,
     char                    *OutString);
 
+ACPI_INTEGER
+AcpiExStringToUnsignedInteger (
+    char                    *String);
+
 
 /*
  * exregion - default OpRegion handlers

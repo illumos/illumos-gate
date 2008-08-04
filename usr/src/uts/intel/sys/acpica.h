@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,7 +126,7 @@ extern int acpica_get_bdf(dev_info_t *, int *, int *, int *);
 extern ACPI_STATUS acpica_get_devinfo(ACPI_HANDLE, dev_info_t **);
 extern ACPI_STATUS acpica_get_handle(dev_info_t *, ACPI_HANDLE *);
 extern ACPI_STATUS acpica_eval_int(ACPI_HANDLE, char *, int *);
-extern void acpica_map_cpu(processorid_t, MADT_PROCESSOR_APIC *);
+extern void acpica_map_cpu(processorid_t, UINT32);
 extern void acpica_build_processor_map();
 extern void acpica_ddi_save_resources(dev_info_t *);
 extern void acpica_ddi_restore_resources(dev_info_t *);
