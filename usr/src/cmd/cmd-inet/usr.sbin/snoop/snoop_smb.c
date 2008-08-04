@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -907,8 +906,11 @@ interpret_negprot(int flags, uchar_t *data, int len, char *xtra)
 		protodata += 2;
 		if (flags & F_SUM) {
 			while (bytecount > 1) {
-				length = sprintf(dialect, (char *)protodata+1);
+				length = snprintf(dialect, sizeof (dialect),
+				    "%s", (char *)protodata+1);
 				protodata += (length+2);
+				if (protodata >= data+len)
+					break;
 				bytecount -= (length+2);
 			}
 			sprintf(xtra, "LastDialect=%s ", dialect);
@@ -916,10 +918,13 @@ interpret_negprot(int flags, uchar_t *data, int len, char *xtra)
 		if (flags & F_DTAIL) {
 			sprintf(GETLINE, "ByteCount = %d", bytecount);
 			while (bytecount > 1) {
-				length = sprintf(dialect, (char *)protodata+1);
+				length = snprintf(dialect, sizeof (dialect),
+				    "%s", (char *)protodata+1);
 				sprintf(GETLINE, "Dialect String = %s",
-						dialect);
+				    dialect);
 				protodata += (length+2);
+				if (protodata >= data+len)
+					break;
 				bytecount -= (length+2);
 			}
 		}
@@ -1147,7 +1152,7 @@ interpret_trans(int flags, uchar_t *data, int len, char *xtra)
 			(void) unicode2ascii(
 				filename, 256, byteparms, bytecount);
 		} else {
-			strcpy(filename, (char *)byteparms);
+			strlcpy(filename, (char *)byteparms, sizeof (filename));
 		}
 		sprintf(GETLINE, "FileName = %s", filename);
 	}
@@ -1194,13 +1199,15 @@ interpret_tconX(int flags, uchar_t *data, int len, char *xtra)
 		tcondata += 6;
 		passwordlength = get2(tcondata);
 		tcondata = tcondata + 4 + passwordlength;
-		length = sprintf(tempstring, (char *)tcondata);
+		length = snprintf(tempstring, sizeof (tempstring), "%s",
+		    (char *)tcondata);
 		sprintf(xtra, "Share=%s ", tempstring);
 	}
 
 	if (flags & F_SUM && smbdata->flags & SERVER_RESPONSE) {
 		tcondata += 8;
-		length = sprintf(tempstring, (char *)tcondata);
+		length = snprintf(tempstring, sizeof (tempstring), "%s",
+		    (char *)tcondata);
 		sprintf(xtra, "Type=%s ", tempstring);
 	}
 
@@ -1222,10 +1229,12 @@ interpret_tconX(int flags, uchar_t *data, int len, char *xtra)
 		bytecount = get2(tcondata);
 		sprintf(GETLINE, "ByteCount = %d", bytecount);
 		tcondata = tcondata + 2 + passwordlength;
-		length = sprintf(tempstring, (char *)tcondata);
+		length = snprintf(tempstring, sizeof (tempstring), "%s",
+		    (char *)tcondata);
 		tcondata += (length+1);
 		sprintf(GETLINE, "FileName = %s", tempstring);
-		length = sprintf(tempstring, (char *)tcondata);
+		length = snprintf(tempstring, sizeof (tempstring), "%s",
+		    (char *)tcondata);
 		tcondata += (length+1);
 		sprintf(GETLINE, "ServiceName = %s", tempstring);
 	}
@@ -1244,10 +1253,12 @@ interpret_tconX(int flags, uchar_t *data, int len, char *xtra)
 		bytecount = get2(tcondata);
 		sprintf(GETLINE, "ByteCount = %d", bytecount);
 		tcondata += 2;
-		length = sprintf(tempstring, (char *)tcondata);
+		length = snprintf(tempstring, sizeof (tempstring), "%s",
+		    (char *)tcondata);
 		tcondata += (length+1);
 		sprintf(GETLINE, "ServiceName = %s", tempstring);
-		length = sprintf(tempstring, (char *)tcondata);
+		length = snprintf(tempstring, sizeof (tempstring), "%s",
+		    (char *)tcondata);
 		tcondata += (length+1);
 		sprintf(GETLINE, "NativeFS = %s", tempstring);
 	}
@@ -1293,7 +1304,8 @@ interpret_sesssetupX(int flags, uchar_t *data, int len, char *xtra)
 			(void) unicode2ascii(tempstring, 256, setupdata, 256);
 			sprintf(xtra, "Username=%s ", tempstring);
 		} else {
-			length = sprintf(tempstring, (char *)setupdata);
+			length = snprintf(tempstring, sizeof (tempstring), "%s",
+			    (char *)setupdata);
 			sprintf(xtra, "Username=%s ", tempstring);
 		}
 	}
@@ -1363,16 +1375,20 @@ interpret_sesssetupX(int flags, uchar_t *data, int len, char *xtra)
 			sprintf(GETLINE,
 					"NativeLanman = %s", tempstring);
 		} else {
-			length = sprintf(tempstring, (char *)setupdata);
+			length = snprintf(tempstring, sizeof (tempstring), "%s",
+			    (char *)setupdata);
 			setupdata += (length+1);
 			sprintf(GETLINE, "AccountName = %s", tempstring);
-			length = sprintf(tempstring, (char *)setupdata);
+			length = snprintf(tempstring, sizeof (tempstring), "%s",
+			    (char *)setupdata);
 			setupdata += (length+1);
 			sprintf(GETLINE, "DomainName = %s", tempstring);
-			length = sprintf(tempstring, (char *)setupdata);
+			length = snprintf(tempstring, sizeof (tempstring), "%s",
+			    (char *)setupdata);
 			setupdata += (length+1);
 			sprintf(GETLINE, "NativeOS = %s", tempstring);
-			sprintf(tempstring, (char *)setupdata);
+			snprintf(tempstring, sizeof (tempstring), "%s",
+			    (char *)setupdata);
 			sprintf(GETLINE, "NativeLanman = %s", tempstring);
 		}
 	}
@@ -1392,13 +1408,16 @@ interpret_sesssetupX(int flags, uchar_t *data, int len, char *xtra)
 		bytecount = get2(setupdata);
 		sprintf(GETLINE, "ByteCount = %d", bytecount);
 		setupdata += 2;
-		length = sprintf(tempstring, (char *)setupdata);
+		length = snprintf(tempstring, sizeof (tempstring), "%s",
+		    (char *)setupdata);
 		setupdata += (length+1);
 		sprintf(GETLINE, "NativeOS = %s", tempstring);
-		length = sprintf(tempstring, (char *)setupdata);
+		length = snprintf(tempstring, sizeof (tempstring), "%s",
+		    (char *)setupdata);
 		setupdata += (length+1);
 		sprintf(GETLINE, "NativeLanman = %s", tempstring);
-		length = sprintf(tempstring, (char *)setupdata);
+		length = snprintf(tempstring, sizeof (tempstring), "%s",
+		    (char *)setupdata);
 		sprintf(GETLINE, "DomainName = %s", tempstring);
 	}
 }
@@ -1660,7 +1679,8 @@ interpret_default(int flags, uchar_t *data, int len, char *xtra)
 		case 'S':
 		case 's':
 			prfmt = (flags & F_DTAIL) ? "%s = %s" : "%s=%s ";
-			slength = sprintf(tempstring, (char *)comdata);
+			slength = snprintf(tempstring, sizeof (tempstring),
+			    "%s", (char *)comdata);
 			if (printit)
 				sprintf(outstr, prfmt, label, tempstring);
 			comdata += (slength+1);
