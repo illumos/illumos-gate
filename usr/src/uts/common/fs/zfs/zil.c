@@ -505,7 +505,7 @@ zil_claim(char *osname, void *txarg)
 
 	error = dmu_objset_open(osname, DMU_OST_ANY, DS_MODE_USER, &os);
 	if (error) {
-		cmn_err(CE_WARN, "can't process intent log for %s", osname);
+		cmn_err(CE_WARN, "can't open objset for %s", osname);
 		return (0);
 	}
 
@@ -528,6 +528,83 @@ zil_claim(char *osname, void *txarg)
 	}
 
 	ASSERT3U(first_txg, ==, (spa_last_synced_txg(zilog->zl_spa) + 1));
+	dmu_objset_close(os);
+	return (0);
+}
+
+/*
+ * Check the log by walking the log chain.
+ * Checksum errors are ok as they indicate the end of the chain.
+ * Any other error (no device or read failure) returns an error.
+ */
+/* ARGSUSED */
+int
+zil_check_log_chain(char *osname, void *txarg)
+{
+	zilog_t *zilog;
+	zil_header_t *zh;
+	blkptr_t blk;
+	arc_buf_t *abuf;
+	objset_t *os;
+	char *lrbuf;
+	zil_trailer_t *ztp;
+	int error;
+
+	error = dmu_objset_open(osname, DMU_OST_ANY, DS_MODE_USER, &os);
+	if (error) {
+		cmn_err(CE_WARN, "can't open objset for %s", osname);
+		return (0);
+	}
+
+	zilog = dmu_objset_zil(os);
+	zh = zil_header_in_syncing_context(zilog);
+	blk = zh->zh_log;
+	if (BP_IS_HOLE(&blk)) {
+		dmu_objset_close(os);
+		return (0); /* no chain */
+	}
+
+	for (;;) {
+		error = zil_read_log_block(zilog, &blk, &abuf);
+		if (error)
+			break;
+		lrbuf = abuf->b_data;
+		ztp = (zil_trailer_t *)(lrbuf + BP_GET_LSIZE(&blk)) - 1;
+		blk = ztp->zit_next_blk;
+		VERIFY(arc_buf_remove_ref(abuf, &abuf) == 1);
+	}
+	dmu_objset_close(os);
+	if (error == ECKSUM)
+		return (0); /* normal end of chain */
+	return (error);
+}
+
+/*
+ * Clear a log chain
+ */
+/* ARGSUSED */
+int
+zil_clear_log_chain(char *osname, void *txarg)
+{
+	zilog_t *zilog;
+	zil_header_t *zh;
+	objset_t *os;
+	dmu_tx_t *tx;
+	int error;
+
+	error = dmu_objset_open(osname, DMU_OST_ANY, DS_MODE_USER, &os);
+	if (error) {
+		cmn_err(CE_WARN, "can't open objset for %s", osname);
+		return (0);
+	}
+
+	zilog = dmu_objset_zil(os);
+	tx = dmu_tx_create(zilog->zl_os);
+	(void) dmu_tx_assign(tx, TXG_WAIT);
+	zh = zil_header_in_syncing_context(zilog);
+	BP_ZERO(&zh->zh_log);
+	dsl_dataset_dirty(dmu_objset_ds(os), tx);
+	dmu_tx_commit(tx);
 	dmu_objset_close(os);
 	return (0);
 }

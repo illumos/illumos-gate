@@ -972,6 +972,9 @@ zfs_acl_node_read(znode_t *zp, zfs_acl_t **aclpp, boolean_t will_modify)
 
 	if (error != 0) {
 		zfs_acl_free(aclp);
+		/* convert checksum errors into IO errors */
+		if (error == ECKSUM)
+			error = EIO;
 		return (error);
 	}
 

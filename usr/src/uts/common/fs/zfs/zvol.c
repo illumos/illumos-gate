@@ -1284,8 +1284,12 @@ zvol_strategy(buf_t *bp)
 				dmu_tx_commit(tx);
 			}
 		}
-		if (error)
+		if (error) {
+			/* convert checksum errors into IO errors */
+			if (error == ECKSUM)
+				error = EIO;
 			break;
+		}
 		off += size;
 		addr += size;
 		resid -= size;
@@ -1388,8 +1392,12 @@ zvol_read(dev_t dev, uio_t *uio, cred_t *cr)
 			bytes = volsize - uio->uio_loffset;
 
 		error =  dmu_read_uio(zv->zv_objset, ZVOL_OBJ, uio, bytes);
-		if (error)
+		if (error) {
+			/* convert checksum errors into IO errors */
+			if (error == ECKSUM)
+				error = EIO;
 			break;
+		}
 	}
 	zfs_range_unlock(rl);
 	return (error);

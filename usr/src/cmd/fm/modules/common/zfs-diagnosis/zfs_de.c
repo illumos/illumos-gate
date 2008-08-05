@@ -563,6 +563,12 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		}
 
 		zfs_case_solve(hdl, zcp, "fault.fs.zfs.pool", B_TRUE);
+	} else if (fmd_nvl_class_match(hdl, nvl,
+	    ZFS_MAKE_EREPORT(FM_EREPORT_ZFS_LOG_REPLAY))) {
+		/*
+		 * Pool level fault for reading the intent logs.
+		 */
+		zfs_case_solve(hdl, zcp, "fault.fs.zfs.log_replay", B_TRUE);
 	} else if (fmd_nvl_class_match(hdl, nvl, "ereport.fs.zfs.vdev.*")) {
 		/*
 		 * Device fault.  If this occurred during pool open, then defer

@@ -45,3 +45,4 @@ fault.fs.zfs.vdev.io=14
 fault.fs.zfs.vdev.checksum=15
 fault.fs.zfs.io_failure_wait=16
 fault.fs.zfs.io_failure_continue=17
+fault.fs.zfs.log_replay=18

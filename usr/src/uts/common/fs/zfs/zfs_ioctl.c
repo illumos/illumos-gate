@@ -2669,6 +2669,21 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 	uint64_t txg;
 	int error;
 
+	/*
+	 * On zpool clear we also fix up missing slogs
+	 */
+	mutex_enter(&spa_namespace_lock);
+	spa = spa_lookup(zc->zc_name);
+	if (spa == NULL) {
+		mutex_exit(&spa_namespace_lock);
+		return (EIO);
+	}
+	if (spa->spa_log_state == SPA_LOG_MISSING) {
+		/* we need to let spa_open/spa_load clear the chains */
+		spa->spa_log_state = SPA_LOG_CLEAR;
+	}
+	mutex_exit(&spa_namespace_lock);
+
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 

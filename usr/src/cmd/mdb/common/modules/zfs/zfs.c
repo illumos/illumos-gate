@@ -1123,6 +1123,24 @@ do_print_vdev(uintptr_t addr, int flags, int depth, int stats,
 		case VDEV_AUX_BAD_LABEL:
 			aux = "BAD_LABEL";
 			break;
+		case VDEV_AUX_VERSION_NEWER:
+			aux = "VERS_NEWER";
+			break;
+		case VDEV_AUX_VERSION_OLDER:
+			aux = "VERS_OLDER";
+			break;
+		case VDEV_AUX_SPARED:
+			aux = "SPARED";
+			break;
+		case VDEV_AUX_ERR_EXCEEDED:
+			aux = "ERR_EXCEEDED";
+			break;
+		case VDEV_AUX_IO_FAILURE:
+			aux = "IO_FAILURE";
+			break;
+		case VDEV_AUX_BAD_LOG:
+			aux = "BAD_LOG";
+			break;
 		default:
 			aux = "UNKNOWN";
 			break;

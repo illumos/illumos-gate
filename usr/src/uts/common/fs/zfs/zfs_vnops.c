@@ -501,8 +501,12 @@ zfs_read(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 			error = mappedread(vp, nbytes, uio);
 		else
 			error = dmu_read_uio(os, zp->z_id, uio, nbytes);
-		if (error)
+		if (error) {
+			/* convert checksum errors into IO errors */
+			if (error == ECKSUM)
+				error = EIO;
 			break;
+		}
 
 		n -= nbytes;
 	}
@@ -3897,6 +3901,9 @@ zfs_fillpage(vnode_t *vp, u_offset_t off, struct seg *seg,
 		if (err) {
 			/* On error, toss the entire kluster */
 			pvn_read_done(pp, B_ERROR);
+			/* convert checksum errors into IO errors */
+			if (err == ECKSUM)
+				err = EIO;
 			return (err);
 		}
 		cur_pp = cur_pp->p_next;

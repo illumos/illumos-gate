@@ -108,7 +108,7 @@ typedef enum {
 
 /*
  * Pool properties are identified by these constants and must be added to the
- * end of this list to ensure that external conumsers are not affected
+ * end of this list to ensure that external consumers are not affected
  * by the change. If you make any changes to this list, be sure to update
  * the property table in usr/src/common/zfs/zpool_prop.c.
  */
@@ -409,7 +409,8 @@ typedef enum vdev_aux {
 	VDEV_AUX_VERSION_OLDER,	/* on-disk version is too old		*/
 	VDEV_AUX_SPARED,	/* hot spare used in another pool	*/
 	VDEV_AUX_ERR_EXCEEDED,	/* too many errors			*/
-	VDEV_AUX_IO_FAILURE	/* experienced I/O failure		*/
+	VDEV_AUX_IO_FAILURE,	/* experienced I/O failure		*/
+	VDEV_AUX_BAD_LOG	/* cannot read log chain(s)		*/
 } vdev_aux_t;
 
 /*

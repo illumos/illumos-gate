@@ -80,6 +80,13 @@ typedef struct spa_config_dirent {
 	char		*scd_path;
 } spa_config_dirent_t;
 
+typedef enum spa_log_state {
+	SPA_LOG_UNKNOWN = 0,	/* unknown log state */
+	SPA_LOG_MISSING,	/* missing log(s) */
+	SPA_LOG_CLEAR,		/* clear the log(s) */
+	SPA_LOG_GOOD,		/* log(s) are good */
+} spa_log_state_t;
+
 struct spa {
 	/*
 	 * Fields protected by spa_namespace_lock.
@@ -159,6 +166,7 @@ struct spa {
 	boolean_t	spa_import_faulted;	/* allow faulted vdevs */
 	boolean_t	spa_is_root;		/* pool is root */
 	int		spa_minref;		/* num refs when first opened */
+	spa_log_state_t spa_log_state;		/* log state */
 	/*
 	 * spa_refcnt & spa_config_lock must be the last elements
 	 * because refcount_t changes size based on compilation options.

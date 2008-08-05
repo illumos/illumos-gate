@@ -64,7 +64,8 @@ static char *zfs_msgid_table[] = {
 	"ZFS-8000-A5",
 	"ZFS-8000-EY",
 	"ZFS-8000-HC",
-	"ZFS-8000-JQ"
+	"ZFS-8000-JQ",
+	"ZFS-8000-K4",
 };
 
 #define	NMSGID	(sizeof (zfs_msgid_table) / sizeof (zfs_msgid_table[0]))
@@ -240,6 +241,14 @@ check_status(zpool_handle_t *zhp, nvlist_t *config, boolean_t isimport)
 			return (ZPOOL_STATUS_IO_FAILURE_CONTINUE);
 		else
 			return (ZPOOL_STATUS_IO_FAILURE_WAIT);
+	}
+
+	/*
+	 * Could not read a log.
+	 */
+	if (vs->vs_state == VDEV_STATE_CANT_OPEN &&
+	    vs->vs_aux == VDEV_AUX_BAD_LOG) {
+		return (ZPOOL_STATUS_BAD_LOG);
 	}
 
 	/*

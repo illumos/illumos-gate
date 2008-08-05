@@ -297,3 +297,20 @@ msgid "ZFS-8000-JQ.impact"
 msgstr "Read and write I/Os cannot be serviced."
 msgid "ZFS-8000-JQ.action"
 msgstr "Make sure the affected devices are connected, then run\n	    'zpool clear'."
+#
+# code: ZFS-8000-K4
+# keys: fault.fs.zfs.log_replay
+#
+msgid "ZFS-8000-K4.type"
+msgstr "Error"
+msgid "ZFS-8000-K4.severity"
+msgstr "Major"
+msgid "ZFS-8000-K4.description"
+msgstr "A ZFS intent log device could not be read.  Refer to %s for more information."
+msgid "ZFS-8000-K4.response"
+msgstr "No automated response will be taken."
+msgid "ZFS-8000-K4.impact"
+msgstr "The intent log(s) cannot be replayed."
+msgid "ZFS-8000-K4.action"
+msgstr "Either restore the affected device(s) and run 'zpool online',\n	    or ignore the intent log records by running 'zpool clear'."
+

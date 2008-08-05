@@ -207,6 +207,9 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 		    ZIO_PRIORITY_SYNC_READ, ZIO_FLAG_CANFAIL, &aflags, &zb);
 		if (err) {
 			kmem_free(osi, sizeof (objset_impl_t));
+			/* convert checksum errors into IO errors */
+			if (err == ECKSUM)
+				err = EIO;
 			return (err);
 		}
 		osi->os_phys = osi->os_phys_buf->b_data;

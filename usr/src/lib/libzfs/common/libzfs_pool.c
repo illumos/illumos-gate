@@ -137,8 +137,21 @@ zpool_get_prop_int(zpool_handle_t *zhp, zpool_prop_t prop, zprop_source_t *src)
 	uint64_t value;
 	zprop_source_t source;
 
-	if (zhp->zpool_props == NULL && zpool_get_all_props(zhp))
+	if (zhp->zpool_props == NULL && zpool_get_all_props(zhp)) {
+		/*
+		 * zpool_get_all_props() has most likely failed because
+		 * the pool is faulted, but if all we need is the top level
+		 * vdev's guid then get it from the zhp config nvlist.
+		 */
+		if ((prop == ZPOOL_PROP_GUID) &&
+		    (nvlist_lookup_nvlist(zhp->zpool_config,
+		    ZPOOL_CONFIG_VDEV_TREE, &nv) == 0) &&
+		    (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID, &value)
+		    == 0)) {
+			return (value);
+		}
 		return (zpool_prop_default_numeric(prop));
+	}
 
 	nvl = zhp->zpool_props;
 	if (nvlist_lookup_nvlist(nvl, zpool_prop_to_name(prop), &nv) == 0) {
@@ -169,7 +182,7 @@ zpool_state_to_name(vdev_state_t state, vdev_aux_t aux)
 	case VDEV_STATE_REMOVED:
 		return (gettext("REMOVED"));
 	case VDEV_STATE_CANT_OPEN:
-		if (aux == VDEV_AUX_CORRUPT_DATA)
+		if (aux == VDEV_AUX_CORRUPT_DATA || aux == VDEV_AUX_BAD_LOG)
 			return (gettext("FAULTED"));
 		else
 			return (gettext("UNAVAIL"));

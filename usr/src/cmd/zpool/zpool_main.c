@@ -1142,14 +1142,21 @@ show_import(nvlist_t *config)
 		(void) printf(gettext("status: The pool is formatted using an "
 		    "incompatible version.\n"));
 		break;
+
 	case ZPOOL_STATUS_HOSTID_MISMATCH:
 		(void) printf(gettext("status: The pool was last accessed by "
 		    "another system.\n"));
 		break;
+
 	case ZPOOL_STATUS_FAULTED_DEV_R:
 	case ZPOOL_STATUS_FAULTED_DEV_NR:
 		(void) printf(gettext("status: One or more devices are "
 		    "faulted.\n"));
+		break;
+
+	case ZPOOL_STATUS_BAD_LOG:
+		(void) printf(gettext("status: An intent log record cannot be "
+		    "read.\n"));
 		break;
 
 	default:
@@ -2553,7 +2560,7 @@ zpool_do_clear(int argc, char **argv)
 	pool = argv[1];
 	device = argc == 3 ? argv[2] : NULL;
 
-	if ((zhp = zpool_open(g_zfs, pool)) == NULL)
+	if ((zhp = zpool_open_canfail(g_zfs, pool)) == NULL)
 		return (1);
 
 	if (zpool_clear(zhp, device) != 0)
@@ -2838,6 +2845,10 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 
 		case VDEV_AUX_IO_FAILURE:
 			(void) printf(gettext("experienced I/O failures"));
+			break;
+
+		case VDEV_AUX_BAD_LOG:
+			(void) printf(gettext("bad intent log"));
 			break;
 
 		default:
@@ -3128,6 +3139,17 @@ status_callback(zpool_handle_t *zhp, void *data)
 		    "faulted in response to IO failures.\n"));
 		(void) printf(gettext("action: Make sure the affected devices "
 		    "are connected, then run 'zpool clear'.\n"));
+		break;
+
+	case ZPOOL_STATUS_BAD_LOG:
+		(void) printf(gettext("status: An intent log record "
+		    "could not be read.\n"
+		    "\tWaiting for adminstrator intervention to fix the "
+		    "faulted pool.\n"));
+		(void) printf(gettext("action: Either restore the affected "
+		    "device(s) and run 'zpool online',\n"
+		    "\tor ignore the intent log records by running "
+		    "'zpool clear'.\n"));
 		break;
 
 	default:

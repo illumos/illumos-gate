@@ -2338,9 +2338,6 @@ arc_read_done(zio_t *zio)
 		if (HDR_IN_HASH_TABLE(hdr))
 			buf_hash_remove(hdr);
 		freeable = refcount_is_zero(&hdr->b_refcnt);
-		/* convert checksum errors into IO errors */
-		if (zio->io_error == ECKSUM)
-			zio->io_error = EIO;
 	}
 
 	/*

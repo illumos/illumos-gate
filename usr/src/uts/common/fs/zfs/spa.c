@@ -956,6 +956,32 @@ spa_check_removed(vdev_t *vd)
 }
 
 /*
+ * Check for missing log devices
+ */
+int
+spa_check_logs(spa_t *spa)
+{
+	switch (spa->spa_log_state) {
+	case SPA_LOG_MISSING:
+		/* need to recheck in case slog has been restored */
+	case SPA_LOG_UNKNOWN:
+		if (dmu_objset_find(spa->spa_name, zil_check_log_chain, NULL,
+		    DS_FIND_CHILDREN)) {
+			spa->spa_log_state = SPA_LOG_MISSING;
+			return (1);
+		}
+		break;
+
+	case SPA_LOG_CLEAR:
+		(void) dmu_objset_find(spa->spa_name, zil_clear_log_chain, NULL,
+		    DS_FIND_CHILDREN);
+		break;
+	}
+	spa->spa_log_state = SPA_LOG_GOOD;
+	return (0);
+}
+
+/*
  * Load an existing storage pool, using the pool's builtin spa_config as a
  * source of configuration information.
  */
@@ -971,6 +997,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	uint64_t version;
 	zio_t *zio;
 	uint64_t autoreplace = 0;
+	char *ereport = FM_EREPORT_ZFS_POOL;
 
 	spa->spa_load_state = state;
 
@@ -1259,6 +1286,15 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		spa_config_exit(spa, FTAG);
 	}
 
+	if (spa_check_logs(spa)) {
+		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_BAD_LOG);
+		error = ENXIO;
+		ereport = FM_EREPORT_ZFS_LOG_REPLAY;
+		goto out;
+	}
+
+
 	spa->spa_delegation = zpool_prop_default_numeric(ZPOOL_PROP_DELEGATION);
 
 	error = zap_lookup(spa->spa_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
@@ -1368,7 +1404,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 out:
 	spa->spa_minref = refcount_count(&spa->spa_refcount);
 	if (error && error != EBADF)
-		zfs_ereport_post(FM_EREPORT_ZFS_POOL, spa, NULL, NULL, 0, 0);
+		zfs_ereport_post(ereport, spa, NULL, NULL, 0, 0);
 	spa->spa_load_state = SPA_LOAD_NONE;
 	spa->spa_ena = 0;
 
