@@ -243,6 +243,7 @@ DRV_KMODS	+= rootnex
 DRV_KMODS	+= ioat
 DRV_KMODS	+= isa
 DRV_KMODS	+= pci
+DRV_KMODS	+= pit_beep
 DRV_KMODS	+= npe
 DRV_KMODS	+= pci-ide
 DRV_KMODS	+= xsvc

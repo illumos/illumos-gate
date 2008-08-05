@@ -56,6 +56,8 @@ f none platform/i86xpv/kernel/drv/evtchn 755 root sys
 f none platform/i86xpv/kernel/drv/isa 755 root sys
 f none platform/i86xpv/kernel/drv/npe 755 root sys
 f none platform/i86xpv/kernel/drv/pci 755 root sys
+f none platform/i86xpv/kernel/drv/pit_beep 755 root sys
+f none platform/i86xpv/kernel/drv/pit_beep.conf 644 root sys
 f none platform/i86xpv/kernel/drv/privcmd 755 root sys
 f none platform/i86xpv/kernel/drv/rootnex 755 root sys
 f none platform/i86xpv/kernel/drv/xdb 755 root sys
@@ -91,6 +93,7 @@ f none platform/i86xpv/kernel/drv/amd64/evtchn 755 root sys
 f none platform/i86xpv/kernel/drv/amd64/isa 755 root sys
 f none platform/i86xpv/kernel/drv/amd64/npe 755 root sys
 f none platform/i86xpv/kernel/drv/amd64/pci 755 root sys
+f none platform/i86xpv/kernel/drv/amd64/pit_beep 755 root sys
 f none platform/i86xpv/kernel/drv/amd64/privcmd 755 root sys
 f none platform/i86xpv/kernel/drv/amd64/rootnex 755 root sys
 f none platform/i86xpv/kernel/drv/amd64/xenbus 755 root sys
