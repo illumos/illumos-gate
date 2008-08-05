@@ -1050,6 +1050,8 @@ typedef struct setup_pkt {
 #define	PRINT_MASK_DUMPING	0x00000100	/* Dump ehci info */
 #define	PRINT_MASK_ALL		0xFFFFFFFF
 
+#define	PCI_VENDOR_NVIDIA	0x10de		/* PCI Vendor-id NVIDIA */
+#define	PCI_DEVICE_NVIDIA_CK804	0x5b
 /*
  * workaround for ALI chips
  */

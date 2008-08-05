@@ -308,6 +308,32 @@ ehci_hcdi_pm_support(dev_info_t *dip)
 	return (USB_FAILURE);
 }
 
+void
+ehci_dma_attr_workaround(ehci_state_t	*ehcip)
+{
+	/*
+	 * Some Nvidia chips can not handle qh dma address above 2G.
+	 * The bit 31 of the dma address might be omitted and it will
+	 * cause system crash or other unpredicable result. So force
+	 * the dma address allocated below 2G to make ehci work.
+	 */
+	if (PCI_VENDOR_NVIDIA == ehcip->ehci_vendor_id) {
+		switch (ehcip->ehci_device_id) {
+			case PCI_DEVICE_NVIDIA_CK804:
+				USB_DPRINTF_L2(PRINT_MASK_ATTA,
+				    ehcip->ehci_log_hdl,
+				    "ehci_dma_attr_workaround: NVIDIA dma "
+				    "workaround enabled, force dma address "
+				    "to be allocated below 2G");
+				ehcip->ehci_dma_attr.dma_attr_addr_hi =
+				    0x7fffffffull;
+				break;
+			default:
+				break;
+
+		}
+	}
+}
 
 /*
  * Host Controller Driver (HCD) initialization functions
@@ -349,6 +375,7 @@ ehci_set_dma_attributes(ehci_state_t	*ehcip)
 	ehcip->ehci_dma_attr.dma_attr_sgllen = 1;
 	ehcip->ehci_dma_attr.dma_attr_granular = EHCI_DMA_ATTR_GRANULAR;
 	ehcip->ehci_dma_attr.dma_attr_flags = 0;
+	ehci_dma_attr_workaround(ehcip);
 }
 
 
@@ -451,6 +478,8 @@ ehci_allocate_pools(ehci_state_t	*ehcip)
 	    DDI_DMA_SLEEP,
 	    0,
 	    &ehcip->ehci_qh_pool_dma_handle) != DDI_SUCCESS) {
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+		    "ehci_allocate_pools: ddi_dma_alloc_handle failed");
 
 		goto failure;
 	}
@@ -465,6 +494,8 @@ ehci_allocate_pools(ehci_state_t	*ehcip)
 	    (caddr_t *)&ehcip->ehci_qh_pool_addr,
 	    &real_length,
 	    &ehcip->ehci_qh_pool_mem_handle) != DDI_SUCCESS) {
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+		    "ehci_allocate_pools: ddi_dma_mem_alloc failed");
 
 		goto failure;
 	}
