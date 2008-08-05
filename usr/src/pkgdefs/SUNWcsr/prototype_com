@@ -332,8 +332,6 @@ s none etc/whodo=../usr/sbin/whodo
 s none etc/wtmpx=../var/adm/wtmpx
 d none etc/rpcsec 755 root sys
 d none lib 755 root bin
-d none lib/crypto 755 root bin
-f none lib/crypto/kcfd 555 root bin
 d none lib/inet 755 root bin
 f none lib/inet/nwamd 555 root bin
 d none lib/svc 0755 root bin
@@ -397,7 +395,6 @@ d none root 700 root root
 d none sbin 755 root sys
 f none sbin/autopush 555 root bin
 f none sbin/bootadm 555 root bin
-f none sbin/cryptoadm 555 root bin
 f none sbin/devprop 555 root bin
 f none sbin/dhcpagent 555 root bin
 f none sbin/dhcpinfo 555 root bin

@@ -41,18 +41,8 @@ i depend
 i i.opensslcnf
 i r.opensslcnf
 d none etc 755 root sys
-d none etc/openssl 755 root sys
-d none etc/openssl/certs 755 root sys
-e opensslcnf etc/openssl/openssl.cnf 644 root sys
-d none etc/openssl/private 700 root sys
 d none etc/sfw 755 root bin
-s none etc/sfw/openssl=../openssl
-d none lib 755 root bin
-f none lib/libcrypto.so.0.9.8 755 root bin
-s none lib/libcrypto.so=./libcrypto.so.0.9.8
-f none lib/libssl.so.0.9.8 755 root bin
-s none lib/libssl.so=./libssl.so.0.9.8
-f none lib/llib-lcrypto 644 root bin
-f none lib/llib-lcrypto.ln 644 root bin
-f none lib/llib-lssl 644 root bin
-f none lib/llib-lssl.ln 644 root bin
+d none etc/sfw/openssl 755 root sys
+d none etc/sfw/openssl/certs 755 root sys
+d none etc/sfw/openssl/private 700 root sys
+e opensslcnf etc/sfw/openssl/openssl.cnf 644 root sys

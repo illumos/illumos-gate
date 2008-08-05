@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,8 +62,9 @@ LDLIBS32	+=	$(NSSLIBS)
 
 LIBS	=	$(DYNLIB)
 
-ROOTLIBDIR=	$(ROOTFS_LIBDIR)/crypto
-ROOTLIBDIR64=	$(ROOTFS_LIBDIR)/crypto/$(MACH64)
+ROOTLIBDIR=	$(ROOT)/usr/lib/security
+ROOTLIBDIR64=	$(ROOT)/usr/lib/security/$(MACH64)
+
 
 .KEEP_STATE:
 

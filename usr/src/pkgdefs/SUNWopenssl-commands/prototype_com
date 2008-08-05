@@ -44,6 +44,7 @@ i depend
 # SUNWopenssl-commands
 #
 d none usr 755 root sys
-d none usr/bin 755 root bin
-f none usr/bin/openssl 555 root bin
-f none usr/bin/CA.pl 555 root bin
+d none usr/sfw 755 root bin
+d none usr/sfw/bin 755 root bin
+f none usr/sfw/bin/openssl 555 root bin
+f none usr/sfw/bin/CA.pl 555 root bin

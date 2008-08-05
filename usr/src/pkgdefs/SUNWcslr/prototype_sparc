@@ -45,11 +45,6 @@
 #
 # SUNWcslr
 #
-d none lib/crypto/sparcv9 755 root bin
-s none lib/crypto/64=sparcv9
-f none lib/crypto/sparcv9/kmf_nss.so.1 755 root bin
-f none lib/crypto/sparcv9/kmf_openssl.so.1 755 root bin
-f none lib/crypto/sparcv9/kmf_pkcs11.so.1 755 root bin
 f none lib/libc.so.1 755 root bin
 d none lib/secure/sparcv9 755 root bin
 s none lib/secure/64=sparcv9
@@ -70,8 +65,6 @@ s none lib/sparcv9/libc_db.so=libc_db.so.1
 f none lib/sparcv9/libc_db.so.1 755 root bin
 s none lib/sparcv9/libcontract.so=libcontract.so.1
 f none lib/sparcv9/libcontract.so.1 755 root bin
-s none lib/sparcv9/libcryptoutil.so=libcryptoutil.so.1
-f none lib/sparcv9/libcryptoutil.so.1 755 root bin
 f none lib/sparcv9/libcmdutils.so.1 755 root bin
 f none lib/sparcv9/libctf.so.1 755 root bin
 s none lib/sparcv9/libctf.so=libctf.so.1
@@ -99,10 +92,6 @@ f none lib/sparcv9/libgen.so.1 755 root bin
 f none lib/sparcv9/libinetutil.so.1 755 root bin
 s none lib/sparcv9/libintl.so=libintl.so.1
 f none lib/sparcv9/libintl.so.1 755 root bin
-s none lib/sparcv9/libkmf.so=libkmf.so.1
-f none lib/sparcv9/libkmf.so.1 755 root bin
-s none lib/sparcv9/libkmfberder.so=libkmfberder.so.1
-f none lib/sparcv9/libkmfberder.so.1 755 root bin
 s none lib/sparcv9/libkstat.so=libkstat.so.1
 f none lib/sparcv9/libkstat.so.1 755 root bin
 f none lib/sparcv9/libld.so.4 755 root bin

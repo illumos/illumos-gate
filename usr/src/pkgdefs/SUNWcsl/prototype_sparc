@@ -104,9 +104,9 @@ f none usr/lib/security/sparcv9/crypt_sha512.so.1 755 root bin
 s none usr/lib/security/sparcv9/crypt_sha512.so=./crypt_sha512.so.1
 f none usr/lib/security/sparcv9/crypt_sunmd5.so.1 755 root bin
 s none usr/lib/security/sparcv9/crypt_sunmd5.so=./crypt_sunmd5.so.1
-s none usr/lib/security/sparcv9/kmf_nss.so.1=../../../../lib/security/sparcv9/kmf_nss.so.1
-s none usr/lib/security/sparcv9/kmf_openssl.so.1=../../../../lib/security/sparcv9/kmf_openssl.so.1
-s none usr/lib/security/sparcv9/kmf_pkcs11.so.1=../../../../lib/security/sparcv9/kmf_pkcs11.so.1
+f none usr/lib/security/sparcv9/kmf_nss.so.1 755 root bin
+f none usr/lib/security/sparcv9/kmf_openssl.so.1 755 root bin
+f none usr/lib/security/sparcv9/kmf_pkcs11.so.1 755 root bin
 f none usr/lib/security/sparcv9/pam_ldap.so.1 755 root bin
 s none usr/lib/security/sparcv9/pam_ldap.so=./pam_ldap.so.1
 f none usr/lib/security/sparcv9/pam_allow.so.1 755 root bin
@@ -161,8 +161,8 @@ s none usr/lib/sparcv9/libcmdutils.so.1=../../../lib/sparcv9/libcmdutils.so.1
 f none usr/lib/sparcv9/libcommputil.so.1 755 root bin
 s none usr/lib/sparcv9/libcommputil.so=libcommputil.so.1
 f none usr/lib/sparcv9/libcrle.so.1 755 root bin
-s none usr/lib/sparcv9/libcryptoutil.so=../../../lib/sparcv9/libcryptoutil.so.1
-s none usr/lib/sparcv9/libcryptoutil.so.1=../../../lib/sparcv9/libcryptoutil.so.1
+f none usr/lib/sparcv9/libcryptoutil.so.1 755 root bin
+s none usr/lib/sparcv9/libcryptoutil.so=libcryptoutil.so.1
 f none usr/lib/sparcv9/libcrypt.so.1 755 root bin
 s none usr/lib/sparcv9/libcrypt.so=./libcrypt.so.1
 s none usr/lib/sparcv9/libcrypt_i.so=./libcrypt.so
@@ -186,10 +186,10 @@ f none usr/lib/sparcv9/libipmi.so.1 755 root bin
 s none usr/lib/sparcv9/libipmi.so=libipmi.so.1
 f none usr/lib/sparcv9/libipp.so.1 755 root bin
 s none usr/lib/sparcv9/libipp.so=libipp.so.1
-s none usr/lib/sparcv9/libkmf.so=../../../lib/sparcv9/libkmf.so.1
-s none usr/lib/sparcv9/libkmf.so.1=../../../lib/sparcv9/libkmf.so.1
-s none usr/lib/sparcv9/libkmfberder.so=../../../lib/sparcv9/libkmfberder.so.1
-s none usr/lib/sparcv9/libkmfberder.so.1=../../../lib/sparcv9/libkmfberder.so.1
+f none usr/lib/sparcv9/libkmf.so.1 755 root bin
+s none usr/lib/sparcv9/libkmf.so=libkmf.so.1
+f none usr/lib/sparcv9/libkmfberder.so.1 755 root bin
+s none usr/lib/sparcv9/libkmfberder.so=libkmfberder.so.1
 f none usr/lib/sparcv9/libldap.so.4 755 root bin
 f none usr/lib/sparcv9/libldap.so.5 755 root bin
 s none usr/lib/sparcv9/libldap.so=libldap.so.5

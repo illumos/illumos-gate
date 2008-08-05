@@ -128,8 +128,8 @@ f none usr/lib/llib-lipmp 644 root bin
 f none usr/lib/llib-lipmp.ln 644 root bin
 f none usr/lib/llib-lipp 644 root bin
 f none usr/lib/llib-lipp.ln 644 root bin
-s none usr/lib/llib-lkmf.ln=../../lib/llib-lkmf.ln
-s none usr/lib/llib-lkmfberder.ln=../../lib/llib-lkmfberder.ln
+f none usr/lib/llib-lkmf.ln 644 root bin
+f none usr/lib/llib-lkmfberder.ln 644 root bin
 s none usr/lib/llib-lkstat=../../lib/llib-lkstat
 s none usr/lib/llib-lkstat.ln=../../lib/llib-lkstat.ln
 f none usr/lib/llib-lkvm 644 root bin

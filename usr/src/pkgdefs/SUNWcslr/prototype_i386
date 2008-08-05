@@ -47,6 +47,8 @@
 #
 d none lib/amd64 755 root bin
 s none lib/64=amd64
+d none lib/secure/amd64 755 root bin
+s none lib/secure/64=amd64
 f none lib/amd64/c_synonyms.so.1 755 root bin
 f none lib/amd64/ld.so.1 755 root bin
 s none lib/amd64/libadm.so=libadm.so.1
@@ -63,8 +65,6 @@ f none lib/amd64/libc_db.so.1 755 root bin
 f none lib/amd64/libcmdutils.so.1 755 root bin
 s none lib/amd64/libcontract.so=libcontract.so.1
 f none lib/amd64/libcontract.so.1 755 root bin
-f none lib/amd64/libcryptoutil.so.1 755 root bin
-s none lib/amd64/libcryptoutil.so=libcryptoutil.so.1
 s none lib/amd64/libctf.so=libctf.so.1
 f none lib/amd64/libctf.so.1 755 root bin
 s none lib/amd64/libcurses.so=libcurses.so.1
@@ -91,10 +91,6 @@ f none lib/amd64/libgen.so.1 755 root bin
 f none lib/amd64/libinetutil.so.1 755 root bin
 s none lib/amd64/libintl.so=libintl.so.1
 f none lib/amd64/libintl.so.1 755 root bin
-s none lib/amd64/libkmf.so=libkmf.so.1
-f none lib/amd64/libkmf.so.1 755 root bin
-s none lib/amd64/libkmfberder.so=libkmfberder.so.1
-f none lib/amd64/libkmfberder.so.1 755 root bin
 s none lib/amd64/libkstat.so=libkstat.so.1
 f none lib/amd64/libkstat.so.1 755 root bin
 f none lib/amd64/libld.so.4 755 root bin
@@ -170,14 +166,7 @@ f none lib/amd64/nss_files.so.1 755 root bin
 f none lib/amd64/nss_nis.so.1 755 root bin
 f none lib/amd64/nss_nisplus.so.1 755 root bin
 f none lib/amd64/nss_user.so.1 755 root bin
-d none lib/crypto/amd64 755 root bin
-s none lib/crypto/64=amd64
-f none lib/crypto/amd64/kmf_nss.so.1 755 root bin
-f none lib/crypto/amd64/kmf_openssl.so.1 755 root bin
-f none lib/crypto/amd64/kmf_pkcs11.so.1 755 root bin
 v none lib/libc.so.1 755 root bin
-d none lib/secure/amd64 755 root bin
-s none lib/secure/64=amd64
 d none etc 755 root sys
 d none etc/flash 755 root sys
 d none etc/flash/precreation 700 root sys

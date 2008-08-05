@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,7 +34,6 @@ OBJECTS=\
 	clasn1.o
 
 include $(SRC)/lib/Makefile.lib
-include $(SRC)/lib/Makefile.rootfs
 
 SRCDIR=	../common
 INCDIR=	../inc

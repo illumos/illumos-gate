@@ -95,8 +95,8 @@ f none usr/lib/amd64/llib-lgss.ln 644 root bin
 s none usr/lib/amd64/llib-lintl.ln=../../../lib/amd64/llib-lintl.ln
 f none usr/lib/amd64/llib-lipmi.ln 644 root bin
 f none usr/lib/amd64/llib-lipp.ln 644 root bin
-s none usr/lib/amd64/llib-lkmf.ln=../../../lib/amd64/llib-lkmf.ln
-s none usr/lib/amd64/llib-lkmfberder.ln=../../../lib/amd64/llib-lkmfberder.ln
+f none usr/lib/amd64/llib-lkmf.ln 644 root bin
+f none usr/lib/amd64/llib-lkmfberder.ln 644 root bin
 s none usr/lib/amd64/llib-lkstat.ln=../../../lib/amd64/llib-lkstat.ln
 f none usr/lib/amd64/llib-lkvm.ln 644 root bin
 f none usr/lib/amd64/llib-lldap.ln 644 root bin

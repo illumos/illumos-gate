@@ -53,7 +53,7 @@ $VERIFY="$openssl verify";
 $X509="$openssl x509";
 $PKCS12="$openssl pkcs12";
 
-$CATOP="/etc/openssl";
+$CATOP="/etc/sfw/openssl";
 $CAKEY="cakey.pem";
 $CAREQ="careq.pem";
 $CACERT="cacert.pem";
