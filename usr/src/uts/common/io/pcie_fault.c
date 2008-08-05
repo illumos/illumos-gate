@@ -1772,6 +1772,20 @@ pf_adjust_for_no_aer(pf_data_t *pfd_p)
 		 * another error like PTLP and MFP
 		 */
 		aer_ue &= ~PCIE_AER_UCE_ECRC;
+
+		/*
+		 * Generally if NFE is set, SERR should also be set. Exception:
+		 * When certain non-fatal errors are masked, and some of them
+		 * happened to be the cause of the NFE, SERR will not be set and
+		 * they can not be the source of this interrupt.
+		 *
+		 * On x86, URs are masked (NFE + UR can be set), if any other
+		 * non-fatal errors (i.e, PTLP, CTO, CA, UC, ECRC, ACS) did
+		 * occur, SERR should be set since they are not masked. So if
+		 * SERR is not set, none of them occurred.
+		 */
+		if (!(PCI_ERR_REG(pfd_p)->pci_err_status & PCI_STAT_S_SYSERR))
+			aer_ue &= ~PCIE_AER_UCE_TO;
 	}
 
 	if (!PCIE_IS_BDG(PCIE_PFD2BUS(pfd_p))) {
