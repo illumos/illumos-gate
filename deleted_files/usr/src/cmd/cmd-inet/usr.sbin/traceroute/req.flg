@@ -1,8 +1,0 @@
-#!/bin/sh
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-echo_file usr/src/cmd/cmd-inet/Makefile.cmd-inet
-echo_file usr/src/cmd/cmd-inet/common/Makefile
-echo_file usr/src/cmd/cmd-inet/common/ifaddrlist.c
-echo_file usr/src/cmd/cmd-inet/common/ifaddrlist.h
-
