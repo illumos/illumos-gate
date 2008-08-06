@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #	Configuration variables for the runtime environment of the nightly
 # build script and other tools for construction and packaging of releases.
@@ -52,12 +50,17 @@ CODEMGR_WS="/builds/$GATE";			export CODEMGR_WS
 # PARENT_WS is used to determine the parent of this workspace. This is
 # for the options that deal with the parent workspace (such as where the
 # proto area will go).
+#
+# If you use this, it must be local (or nfs): nightly cannot copy
+# over ssh or http.
 PARENT_WS="/ws/onnv-gate";			export PARENT_WS
 
-# CLONE_WS is the workspace nightly should do a bringover from. Since it's
-# going to bringover usr/src, this could take a while, so we use the
-# clone instead of the gate (see the gate's README).
-CLONE_WS="/ws/onnv-clone";			export CLONE_WS
+# CLONE_WS is the workspace nightly should do a bringover from.
+CLONE_WS="ssh://onnv.sfbay.sun.com//export/onnv-clone";	export CLONE_WS
+
+# CLOSED_CLONE_WS is the workspace from which nightly should acquire
+# the usr/closed tree.
+CLOSED_CLONE_WS="${CLONE_WS}/usr/closed";	export CLOSED_CLONE_WS
 
 # This flag controls whether to build the closed source.  If
 # undefined, nightly(1) and bldenv(1) will set it according to whether

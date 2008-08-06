@@ -24,9 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"setjmp.s"
 
 /*
  * The UCB setjmp(env) is the same as SYSV's sigsetjmp(env, 1)

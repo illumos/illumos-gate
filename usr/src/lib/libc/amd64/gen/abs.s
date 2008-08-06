@@ -24,9 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"abs.s"
 
 /*
  *	Assembler program to implement the following C program

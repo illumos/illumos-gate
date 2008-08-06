@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"_so_recv.s"
 
 /* C library -- _so_recv						*/
 /* int __so_recv(int sock, void *buffer, size_t len, int flags)		*/

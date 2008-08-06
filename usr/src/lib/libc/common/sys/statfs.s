@@ -27,9 +27,7 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"statfs.s"
 
 /* C library -- statfs						*/
 /* int statfs (const char *path, struct statfs *buf, int len,	*/

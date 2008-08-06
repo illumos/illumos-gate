@@ -34,9 +34,7 @@
  * cache size information. Cache information used by memset, strcpy, etc..
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"proc64_support.s"
 
 #include <sys/asm_linkage.h>
 #include "proc64_id.h"

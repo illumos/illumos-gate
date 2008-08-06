@@ -24,9 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"strchr.s"
 
 /*
  * The strchr() function returns a pointer to the first occurrence of c 

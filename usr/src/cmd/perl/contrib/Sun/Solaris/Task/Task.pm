@@ -1,7 +1,4 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -21,7 +18,12 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
 #
 # Task.pm provides the bootstrap for the Sun::Solaris::Task module.
 #
@@ -32,7 +34,7 @@ use warnings;
 
 package Sun::Solaris::Task;
 
-our $VERSION = '%I%';
+our $VERSION = '1.4';
 use XSLoader;
 XSLoader::load(__PACKAGE__, $VERSION);
 

@@ -24,9 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"strcpy.s"
 
 /*
  * strcpy(s1, s2)

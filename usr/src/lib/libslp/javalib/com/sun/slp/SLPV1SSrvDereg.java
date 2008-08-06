@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 1999 by Sun Microsystems, Inc.
  * All rights reserved.
  *
  */
 
-//  SCCS Status:      @(#)SLPV1SSrvDereg.java	2.9	02/10/98
 //  SLPV1SSrvDereg.java:    Message class for SLP service deregistration
 //			    request.
 //  Author:           James Kempf
@@ -47,7 +43,6 @@ import java.io.*;
  * The SLPV1SSrvDereg class models the server side SLP service
  * deregistration.
  *
- * @version 1.4 97/11/20
  * @author James Kempf
  */
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 1999 by Sun Microsystems, Inc.
  * All rights reserved.
  *
  */
 
-//  SCCS Status:      %W%	%G%
 //  URLAttributeVerifier.java: Parse a service template from a URL
 //  Author:           James Kempf
 //  Created On:       Mon Jun 23 11:52:04 1997
@@ -47,7 +43,6 @@ import java.io.*;
  * a URL. Most of the work is done by the superclass. This class
  * takes care of opening the Reader on the URL.
  *
- * @version %R%.%L% %D%
  * @author James Kempf
  *
  */

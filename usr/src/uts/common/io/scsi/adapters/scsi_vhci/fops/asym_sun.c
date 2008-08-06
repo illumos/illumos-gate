@@ -18,11 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Implementation of "scsi_vhci_f_asym_sun" asymmetric failover_ops.
@@ -50,7 +50,7 @@ char	*purple_dev_table[] = {
 };
 
 /* Failover module plumbing. */
-SCSI_FAILOVER_OP("f_asym_sun", purple, "%I%");
+SCSI_FAILOVER_OP("f_asym_sun", purple);
 
 #define	PURPLE_FO_CMD_RETRY_DELAY	1000000 /* 1 seconds */
 #define	PURPLE_FO_RETRY_DELAY		2000000 /* 2 seconds */

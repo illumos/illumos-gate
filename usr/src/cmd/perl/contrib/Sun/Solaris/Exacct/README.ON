@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 This module is released as Public Source via the Comprehensive Perl Archive
@@ -31,11 +28,10 @@ Network (http://www.cpan.org).  If it is updated for any reason, a new
 release should be pushed to CPAN.
 
 The version number of this module is derived from the $VERSION variable in
-Exacct.pm.  This in turn contains the SID of the Exacct.pm file, so if anything
-under this directory is modified, a delta should be made to Exacct.pm to
-update the module version number correctly.  If this is not done, it will not
-be possible to upload the generated archive to CPAN, as CPAN requires that
-uploaded archives have unique names.
+Exacct.pm.  If anything under this directory is modified, $VERSION should be 
+changed in Exacct.pm to update the module version number correctly.  If this 
+is not done, it will not be possible to upload the generated archive to CPAN, 
+as CPAN requires that uploaded archives have unique names.
 
 To prepare the contents of the directory for release, they should be packaged
 up as a .tar.gz archive.  The procedure for this is:

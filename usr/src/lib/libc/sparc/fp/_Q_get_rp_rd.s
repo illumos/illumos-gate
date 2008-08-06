@@ -24,9 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"_Q_get_rp_rd.s"
 
 #include <sys/asm_linkage.h>
 

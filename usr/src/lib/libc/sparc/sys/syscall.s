@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * C library -- int syscall(int sysnum, ...);
  * C library -- int __systemcall(sysret_t *, int sysnum, ...);
@@ -45,7 +43,7 @@
  * use it here because this code is shared between sparcv8 and sparcv9.
  */
 
-	.file	"%M%"
+	.file	"syscall.s"
 
 #include "SYS.h"
 

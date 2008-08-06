@@ -20,18 +20,20 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Wrapper for the GNU C compiler to make it accept the Sun C compiler
  * arguments where possible.
  *
  * Since the translation is inexact, this is something of a work-in-progress.
+ *
  */
+
+/* If you modify this file, you must increment CW_VERSION */
+#define	CW_VERSION	"1.25"
 
 /*
  * -#		Verbose mode
@@ -1863,7 +1865,7 @@ main(int argc, char **argv)
 	 *		ask each for its version if we know how.
 	 */
 	if (argc > 1 && strcmp(argv[1], "-_versions") == 0) {
-		(void) printf("%s", "cw version %I%");
+		(void) printf("cw version %s", CW_VERSION);
 		if (!do_shadow)
 			(void) printf(" (SHADOW MODE DISABLED)");
 		(void) printf("\n");

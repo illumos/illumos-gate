@@ -27,9 +27,7 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"mincore.s"
 
 /* C library -- mincore						*/
 /* int mincore(caddr_t addr, size_t len, char *vec)		*/

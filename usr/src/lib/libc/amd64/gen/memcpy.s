@@ -34,9 +34,7 @@
  *	Implements memcpy() and memmove() libc primitives.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"memcpy.s"
 
 #include <sys/asm_linkage.h>
 

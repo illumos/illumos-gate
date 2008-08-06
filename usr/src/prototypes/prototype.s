@@ -24,9 +24,7 @@
  * Use is subject to license terms.
  */
 
-	.ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"prototype.s"
 
 /*
  * Block comment that describes the contents of this file.

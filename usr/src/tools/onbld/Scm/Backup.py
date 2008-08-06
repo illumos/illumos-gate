@@ -17,8 +17,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 '''
 Workspace backup
@@ -362,7 +360,7 @@ class CdmMetadataBackup(object):
     def __init__(self, backup, ws):
         self.bu = backup
         self.ws = ws
-        self.files = ('hgrc', 'localtags', 'patches')
+        self.files = ('hgrc', 'localtags', 'patches', 'cdm')
 
     def backup(self):
         '''Backup workspace metadata'''

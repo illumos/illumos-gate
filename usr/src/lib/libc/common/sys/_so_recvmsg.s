@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"_so_recvmsg.s"
 
 /* C library -- __so_recvmsg					*/
 /* int __so_recvmsg(int sock, struct msghdr *msg, int flags)	*/

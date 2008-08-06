@@ -23,9 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"sbcp.s"
 
 #include <sys/asm_linkage.h>
 #include <sys/link.h>

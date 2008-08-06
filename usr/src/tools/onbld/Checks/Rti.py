@@ -24,8 +24,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # Check on RTI status for bug IDs passed.
@@ -63,17 +61,30 @@ def rti(bugids, gatePath=None, consolidation=None,
 
 	# Check to see if we were given a gate to lookup with
 	if gatePath != None:
-		# strip any trailing /
-		gatePath.rstrip('/')
-		gateName = os.path.split(gatePath)[1]
+
+		#
+		# The gate name should be the last component of the gate path,
+		# no matter how it's accessed.
+		#
+		# We make a special case for "closed," and check to see if it
+		# appears to be the "usr/closed" portion of a nested repository.
+		# In that case, we really want the parent repository name.
+		#
+		gatePath = gatePath.rstrip(os.path.sep).split(os.path.sep)
+		gateName = gatePath[-1]
+		try:
+			if gatePath[-2:] == ['usr', 'closed']:
+				gateName = gatePath[-3]
+		except IndexError:
+			pass
 
 		# Is this a patch gate?
-		if patchGateRe.search(gatePath):
+		if patchGateRe.search(gateName):
 			rtiType = "Patch"
 			gateType = "Patch"
 
 		# Is this a test gate?
-		if testGateRe.search(gatePath):
+		if testGateRe.search(gateName):
 			rtiType = "RTI"
 			gateType = "RTI"
 	else:

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -25,8 +26,6 @@
 
 #ifndef	_SYS_SCSI_ADAPTERS_SCSI_VHCI_H
 #define	_SYS_SCSI_ADAPTERS_SCSI_VHCI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Multiplexed I/O SCSI vHCI global include
@@ -620,9 +619,9 @@ struct scsi_failover_ops {
 /*
  * Macro to provide plumbing for basic failover module
  */
-#define	_SCSI_FAILOVER_OP(sfo_name, local_name, ops_name, vers)		\
+#define	_SCSI_FAILOVER_OP(sfo_name, local_name, ops_name)		\
 	static struct modlmisc modlmisc = {				\
-		&mod_miscops, sfo_name  " " vers			\
+		&mod_miscops, sfo_name					\
 	};								\
 	static struct modlinkage modlinkage = {				\
 		MODREV_1, (void *)&modlmisc, NULL			\
@@ -674,11 +673,11 @@ struct scsi_failover_ops {
 	}
 
 #ifdef	lint
-#define	SCSI_FAILOVER_OP(sfo_name, local_name, vers)			\
-	_SCSI_FAILOVER_OP(sfo_name, local_name, local_name, vers)
+#define	SCSI_FAILOVER_OP(sfo_name, local_name)				\
+	_SCSI_FAILOVER_OP(sfo_name, local_name, local_name)
 #else	/* lint */
-#define	SCSI_FAILOVER_OP(sfo_name, local_name, vers)			\
-	_SCSI_FAILOVER_OP(sfo_name, local_name, scsi_vhci, vers)
+#define	SCSI_FAILOVER_OP(sfo_name, local_name)				\
+	_SCSI_FAILOVER_OP(sfo_name, local_name, scsi_vhci)
 #endif	/* lint */
 
 /*

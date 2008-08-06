@@ -27,8 +27,6 @@
 #ifndef _HEADER_H
 #define	_HEADER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Block comment that describes the contents of this file.
  */

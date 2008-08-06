@@ -25,17 +25,18 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
-#ident	"@(#)wx	1.12	98/11/09 SMI" (from bonwick)
-#ident  "@(#)wxx 1.26     03/01/23 SMI" (from fiveash)
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 # wx -- workspace extensions.  Jeff Bonwick, December 1992.
 
 # The bugster cat/subcat = consolidation/os-net-tools
 
 version() {
-	echo "%Z%%M%	%I%	%E% SMI"
+	if [[ $(whence $0) = "/opt/onbld/bin/wx" ]] && \
+	    pkginfo SUNWonbld > /dev/null 2>&1; then
+		pkginfo -l SUNWonbld | egrep "PKGINST:|VERSION:|PSTAMP:"
+	else
+		ls -l $(whence $0)
+	fi    
 }
 
 ring_bell() {

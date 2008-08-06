@@ -21,9 +21,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-#
+
 #	Configuration variables for the runtime environment of the nightly
 # build script and other tools for construction and packaging of releases.
 # This script is sourced by 'nightly' and 'bldenv' to set up the environment
@@ -80,10 +78,9 @@ ACR=$ONBLD_BIN/acr;				export ACR
 # proto area will go).
 PARENT_WS="";			export PARENT_WS
 
-# CLONE_WS is the workspace nightly should do a bringover from. Since it's
-# going to bringover usr/src, this could take a while, so we use the
-# clone instead of the gate (see the gate's README).
-CLONE_WS="";			export CLONE_WS
+# CLONE_WS is the workspace nightly should do a bringover from.
+CLONE_WS="ssh://anon@hg.opensolaris.org//hg/onnv/onnv-gate"
+export CLONE_WS
 
 # The bringover, if any, is done as STAFFER.
 # Set STAFFER to your own login as gatekeeper or developer

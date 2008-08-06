@@ -24,9 +24,7 @@
  * Use is subject to license terms.
  */
 
-	.ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"memcpy.s"
 
 #include <sys/asm_linkage.h>
 

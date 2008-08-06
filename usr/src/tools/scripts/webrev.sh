@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -34,13 +34,6 @@
 # Acknowledgements to contributors to webrev are listed in the webrev(1)
 # man page.
 #
-
-#
-# The following variable is set to SCCS delta date 20YY/MM/DD.
-# Note this will have to be changed in 2100 or when SCCS has support for
-# 4 digit years; whichever is the sooner!
-#
-WEBREV_UPDATED=20%E%
 
 REMOVED_COLOR=brown
 CHANGED_COLOR=blue
@@ -1396,7 +1389,7 @@ function hg_active_wxfile
 	typeset parent=$2
 
 	TMPFLIST=/tmp/$$.active
-	$HG_ACTIVE -w $child -p $parent > $TMPFLIST
+	$HG_ACTIVE -w $child -p $parent -o $TMPFLIST
 	wxfile=$TMPFLIST
 }
 
@@ -2824,8 +2817,7 @@ print
 print
 print "<hr></hr>"
 print "<p style=\"font-size: small\">"
-print "This code review page was prepared using <b>$0</b>"
-print "(vers $WEBREV_UPDATED)."
+print "This code review page was prepared using <b>$0</b>."
 print "Webrev is maintained by the <a href=\"http://www.opensolaris.org\">"
 print "OpenSolaris</a> project.  The latest version may be obtained"
 print "<a href=\"http://src.opensolaris.org/source/xref/onnv/onnv-gate/usr/src/tools/scripts/webrev.sh\">here</a>.</p>"

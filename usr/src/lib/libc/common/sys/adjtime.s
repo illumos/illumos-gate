@@ -27,9 +27,7 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"adjtime.s"
 
 /* C Library -- adjtime						*/
 /* int adjtime(struct timeval *delta, struct timeval *olddelta)	*/

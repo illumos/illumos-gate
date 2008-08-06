@@ -27,9 +27,7 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"mprotect.s"
 
 /* C library -- mprotect					*/
 /* int mprotect(caddr_t addr, size_t len, int prot)		*/

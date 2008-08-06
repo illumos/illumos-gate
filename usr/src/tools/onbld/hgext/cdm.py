@@ -17,8 +17,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 '''workspace extensions for mercurial
 
@@ -39,7 +37,7 @@ Collapse all your changes into a single changeset	- recommit'''
 #
 #     If you change that, change this
 #
-import sys, os
+import sys, os, stat, termios, atexit
 sys.path.insert(1, "%s/../../" % os.path.dirname(__file__))
 
 from onbld.Scm import Version
@@ -51,7 +49,7 @@ except Version.VersionMismatch, badversion:
     raise util.Abort("Version Mismatch:\n %s\n" % badversion)
 
 import ConfigParser
-from mercurial import cmdutil, node
+from mercurial import cmdutil, node, ignore
 
 from onbld.Scm.WorkSpace import WorkSpace, ActiveEntry
 from onbld.Scm.Backup import CdmBackup
@@ -79,6 +77,62 @@ def yes_no(ui, msg, default):
     else:
         return default
 
+
+def _buildfilelist(repo, args):
+    '''build a list of files in which we're interested
+
+    If no files are specified, then we'll default to using
+    the entire active list.
+
+    Returns a dictionary, wherein the keys are cwd-relative file paths,
+    and the values (when present) are entries from the active list.
+    Instead of warning the user explicitly about files not in the active
+    list, we'll attempt to do checks on them.'''
+
+    fdict = {}
+
+    #
+    # If the user specified files on the command line, we'll only check
+    # those files.  We won't pull the active list at all.  That means we
+    # won't be smart about skipping deleted files and such, so the user
+    # needs to be smart enough to not explicitly specify a nonexistent
+    # file path.  Which seems reasonable.
+    #
+    if args:
+        for f in args:
+            fdict[f] = None
+
+    #
+    # Otherwise, if no files were listed explicitly, we assume that the
+    # checks should be run on all files in the active list.  So we determine
+    # it here.
+    #
+    # Tracking the file paths is a slight optimization, in that multiple
+    # check functions won't need to derive it themselves.  This also dovetails
+    # nicely with the expectation that explicitly specified files will be
+    # ${CWD}-relative paths, so the fdict keyspace will be consistent either
+    # way.
+    #
+    else:
+        active = wslist[repo].active()
+        for e in sorted(active):
+            fdict[wslist[repo].filepath(e.name)] = e
+
+    return fdict
+
+
+def not_check(repo, cmd):
+    '''return a function which returns boolean indicating whether a file
+    should be skipped for CMD.'''
+
+    notfile = repo.join('cdm/%s.NOT' % cmd)
+
+    if os.path.exists(notfile):
+        return ignore.ignore(repo.root, [notfile], repo.ui.warn)
+    else:
+        return util.never
+
+
 #
 # Adding a reference to WorkSpace from a repo causes a circular reference
 # repo <-> WorkSpace.
@@ -93,18 +147,36 @@ def yes_no(ui, msg, default):
 #
 wslist = {}
 
-
 def reposetup(ui, repo):
     if repo.local() and repo not in wslist:
         wslist[repo] = WorkSpace(repo)
 
+        ui.setconfig('hooks', 'preoutgoing.cdm_pbconfirm',
+                     'python:hgext_cdm.pbconfirm')
 
-def cdm_pdiffs(ui, repo, parent=None):
+def pbconfirm(ui, repo, hooktype, source):
+    def wrapper(settings=None):
+	    termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, settings)
+
+    if source == 'push':
+        if not yes_no(ui, "Are you sure you wish to push?", False):
+            return 1
+        else:
+            settings = termios.tcgetattr(sys.stdin.fileno())
+	    orig = list(settings)
+	    atexit.register(wrapper, orig)
+	    settings[3] = settings[3] & (~termios.ISIG) # c_lflag
+	    termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, settings)
+
+def cdm_pdiffs(ui, repo, *pats, **opts):
     '''list workspace diffs relative to parent workspace
 
     The parent tip is taken to be the latest revision shared between
     us and the parent workspace.'''
-    diffs = wslist[repo].pdiff(parent)
+
+    parent = opts['parent']
+
+    diffs = wslist[repo].pdiff(pats, opts, parent=parent)
     if diffs:
         ui.write(diffs)
 
@@ -197,43 +269,47 @@ def cdm_comchk(ui, repo, **opts):
 
     Check that checkin comments conform to O/N rules.'''
 
-    active = opts.get('active') or wslist[repo].active(opts['parent'])
+    active = wslist[repo].active(opts.get('parent'))
 
     ui.write('Comments check:\n')
 
-    check_db = not opts['nocheck']
+    check_db = not opts.get('nocheck')
     return Comments.comchk(active.comments(), check_db=check_db, output=ui)
 
 
-def cdm_cddlchk(ui, repo, **opts):
+def cdm_cddlchk(ui, repo, *args, **opts):
     '''check for a valid CDDL block in active files
 
     See http://www.opensolaris.org/os/community/on/devref_toc/devref_7/#7_2_3_nonformatting_considerations
     for more info.'''
 
-    active = opts.get('active') or wslist[repo].active(opts['parent'])
+    filelist = opts.get('filelist') or _buildfilelist(repo, args)
 
     ui.write('CDDL block check:\n')
 
     lenient = True
     ret = 0
 
-    for entry in sorted(active):
-        if entry.is_removed():
+    exclude = not_check(repo, 'cddlchk')
+
+    for f, e in filelist.iteritems():
+        if e and e.is_removed():
             continue
-        elif entry.is_added():
+        elif (e or opts.get('honour_nots')) and exclude(f):
+            ui.status('Skipping %s...\n' % f)
+            continue
+        elif e and e.is_added():
             lenient = False
         else:
             lenient = True
 
-        path = wslist[repo].filepath(entry.name)
-        fh = open(path, 'r')
+        fh = open(f, 'r')
         ret |= Cddl.cddlchk(fh, lenient=lenient, output=ui)
         fh.close()
     return ret
 
 
-def cdm_copyright(ui, repo, **opts):
+def cdm_copyright(ui, repo, *args, **opts):
     '''check active files for valid copyrights
 
     Check that all active files have a valid copyright containing the
@@ -241,110 +317,125 @@ def cdm_copyright(ui, repo, **opts):
     See http://www.opensolaris.org/os/project/muskoka/on_dev/golden_rules.txt
     for more info.'''
 
-    active = opts.get('active') or wslist[repo].active(opts['parent'])
+    filelist = opts.get('filelist') or _buildfilelist(repo, args)
 
     ui.write('Copyright check:\n')
 
     ret = 0
+    exclude = not_check(repo, 'copyright')
 
-    for entry in sorted(active):
-        if entry.is_removed():
+    for f, e in filelist.iteritems():
+        if e and e.is_removed():
+            continue
+        elif (e or opts.get('honour_nots')) and exclude(f):
+            ui.status('Skipping %s...\n' % f)
             continue
 
-        path = wslist[repo].filepath(entry.name)
-
-        fh = open(path, 'r')
+        fh = open(f, 'r')
         ret |= Copyright.copyright(fh, output=ui)
         fh.close()
     return ret
 
 
-def cdm_hdrchk(ui, repo, **opts):
+def cdm_hdrchk(ui, repo, *args, **opts):
     '''check active header files conform to O/N rules'''
 
-    active = opts.get('active') or wslist[repo].active(opts['parent'])
+    filelist = opts.get('filelist') or _buildfilelist(repo, args)
 
     ui.write('Header format check:\n')
 
     ret = 0
+    exclude = not_check(repo, 'hdrchk')
 
-    for entry in sorted(active):
-        if entry.is_removed():
+    for f, e in filelist.iteritems():
+        if e and e.is_removed():
+            continue
+        elif not f.endswith('.h'):
+            continue
+        elif (e or opts.get('honour_nots')) and exclude(f):
+            ui.status('Skipping %s...\n' % f)
             continue
 
-        path = wslist[repo].filepath(entry.name)
-
-        if entry.name.endswith('.h'):
-            fh = open(path, 'r')
-            ret |= HdrChk.hdrchk(fh, lenient=True, output=ui)
-            fh.close()
+        fh = open(f, 'r')
+        ret |= HdrChk.hdrchk(fh, lenient=True, output=ui)
+        fh.close()
     return ret
 
 
-def cdm_cstyle(ui, repo, **opts):
+def cdm_cstyle(ui, repo, *args, **opts):
     '''check active C source files conform to the C Style Guide
 
     See http://opensolaris.org/os/community/documentation/getting_started_docs/cstyle.ms.pdf'''
 
-    active = opts.get('active') or wslist[repo].active(opts['parent'])
+    filelist = opts.get('filelist') or _buildfilelist(repo, args)
 
     ui.write('C style check:\n')
 
     ret = 0
+    exclude = not_check(repo, 'cstyle')
 
-    for entry in sorted(active):
-        if entry.is_removed():
+    for f, e in filelist.iteritems():
+        if e and e.is_removed():
+            continue
+        elif not (f.endswith('.c') or f.endswith('.h')):
+            continue
+        elif (e or opts.get('honour_nots')) and exclude(f):
+            ui.status('Skipping %s...\n' % f)
             continue
 
-        path = wslist[repo].filepath(entry.name)
-
-        if entry.name.endswith('.c') or entry.name.endswith('.h'):
-            fh = open(path, 'r')
-            ret |= CStyle.cstyle(fh, output=ui,
-                                 picky=True, check_posix_types=True,
-                                 check_continuation=True)
-            fh.close()
+        fh = open(f, 'r')
+        ret |= CStyle.cstyle(fh, output=ui,
+                             picky=True, check_posix_types=True,
+                             check_continuation=True)
+        fh.close()
     return ret
 
 
-def cdm_jstyle(ui, repo, **opts):
+def cdm_jstyle(ui, repo, *args, **opts):
     'check active Java source files for common stylistic errors'
 
-    active = opts.get('active') or wslist[repo].active(opts['parent'])
+    filelist = opts.get('filelist') or _buildfilelist(repo, args)
 
     ui.write('Java style check:\n')
 
     ret = 0
+    exclude = not_check(repo, 'jstyle')
 
-    for entry in sorted(active):
-        if entry.is_removed():
+    for f, e in filelist.iteritems():
+        if e and e.is_removed():
+            continue
+        elif not f.endswith('.java'):
+            continue
+        elif (e or opts.get('honour_nots')) and exclude(f):
+            ui.status('Skipping %s...\n' % f)
             continue
 
-        path = wslist[repo].filepath(entry.name)
-
-        if entry.name.endswith('.java'):
-            fh = open(path, 'r')
-            ret |= JStyle.jstyle(fh, output=ui, picky=True)
-            fh.close()
+        fh = open(f, 'r')
+        ret |= JStyle.jstyle(fh, output=ui, picky=True)
+        fh.close()
     return ret
 
 
-def cdm_permchk(ui, repo, **opts):
+def cdm_permchk(ui, repo, *args, **opts):
     '''check active files permission - warn +x (execute) mode'''
 
-    active = opts.get('active') or wslist[repo].active(opts['parent'])
+    filelist = opts.get('filelist') or _buildfilelist(repo, args)
 
     ui.write('File permission check:\n')
 
     exeFiles = []
-    for entry in sorted(active):
-        if entry.is_removed():
+    exclude = not_check(repo, 'permchk')
+
+    for f, e in filelist.iteritems():
+        if e and e.is_removed():
+            continue
+        elif (e or opts.get('honour_nots')) and exclude(f):
+            ui.status('Skipping %s...\n' % f)
             continue
 
-        path = wslist[repo].filepath(entry.name)
-
-        if active.localtip.manifest().execf(path):
-            exeFiles.append(path)
+        mode = stat.S_IMODE(os.stat(f)[stat.ST_MODE])
+        if mode & stat.S_IEXEC:
+            exeFiles.append(f)
 
     if len(exeFiles) > 0:
         ui.write('Warning: the following active file(s) have executable mode '
@@ -360,7 +451,7 @@ def cdm_tagchk(ui, repo, **opts):
 
     Tag sharing among repositories is restricted to gatekeepers'''
 
-    active = opts.get('active') or wslist[repo].active(opts['parent'])
+    active = wslist[repo].active(opts.get('parent'))
 
     ui.write('Checking for new tags:\n')
 
@@ -439,7 +530,7 @@ def cdm_rtichk(ui, repo, **opts):
 
     Only works on SWAN.'''
 
-    if opts['nocheck']:
+    if opts.get('nocheck') or os.path.exists(repo.join('cdm/rtichk.NOT')):
         ui.status('Skipping RTI checks...\n')
         return 0
 
@@ -447,7 +538,8 @@ def cdm_rtichk(ui, repo, **opts):
         ui.write('RTI checks only work on SWAN, skipping...\n')
         return 0
 
-    active = opts.get('active') or wslist[repo].active(opts['parent'])
+    parent = wslist[repo].parent(opts.get('parent'))
+    active = wslist[repo].active(parent)
 
     ui.write('RTI check:\n')
 
@@ -459,23 +551,27 @@ def cdm_rtichk(ui, repo, **opts):
             bugs.append(match.group(1))
 
     # RTI normalizes the gate path for us
-    return int(not Rti.rti(bugs, gatePath=opts['parent'], output=ui))
+    return int(not Rti.rti(bugs, gatePath=parent, output=ui))
 
 
-def cdm_keywords(ui, repo, **opts):
+def cdm_keywords(ui, repo, *args, **opts):
     '''check source files do not contain SCCS keywords'''
 
-    active = opts.get('active') or wslist[repo].active(opts['parent'])
+    filelist = opts.get('filelist') or _buildfilelist(repo, args)
 
     ui.write('Keywords check:\n')
 
     ret = 0
-    for entry in sorted(active):
-        if entry.is_removed():
+    exclude = not_check(repo, 'keywords')
+
+    for f, e in filelist.iteritems():
+        if e and e.is_removed():
+            continue
+        elif (e or opts.get('honour_nots')) and exclude(f):
+            ui.status('Skipping %s...\n' % f)
             continue
 
-        path = wslist[repo].filepath(entry.name)
-        fh = open(path, 'r')
+        fh = open(f, 'r')
         ret |= Keywords.keywords(fh, output=ui)
         fh.close()
     return ret
@@ -503,7 +599,7 @@ def cdm_outchk(ui, repo, **opts):
 def cdm_mergechk(ui, repo, **opts):
     '''Warn the user if their workspace contains merges'''
 
-    active = opts.get('active') or wslist[repo].active(opts['parent'])
+    active = wslist[repo].active(opts.get('parent'))
 
     ui.write('Checking for merges:\n')
 
@@ -521,11 +617,12 @@ def cdm_mergechk(ui, repo, **opts):
     return 0
 
 
-def run_checks(ws, cmds, **opts):
+def run_checks(ws, cmds, *args, **opts):
     '''Run CMDS (with OPTS) over active files in WS'''
-    active = ws.active(opts['parent'])
 
     ret = 0
+
+    flist = _buildfilelist(ws.repo, args)
 
     for cmd in cmds:
         name = cmd.func_name.split('_')[1]
@@ -534,7 +631,8 @@ def run_checks(ws, cmds, **opts):
         else:
             ws.ui.pushbuffer()
 
-            result = cmd(ws.ui, ws.repo, active=active, **opts)
+            result = cmd(ws.ui, ws.repo, filelist=flist,
+                         honour_nots=True, *args, **opts)
             ret |= result
 
             output = ws.ui.popbuffer()
@@ -543,7 +641,7 @@ def run_checks(ws, cmds, **opts):
     return ret
 
 
-def cdm_nits(ui, repo, **opts):
+def cdm_nits(ui, repo, *args, **opts):
     '''check for stylistic nits in active files
 
     Run cddlchk, copyright, cstyle, hdrchk, jstyle, permchk, and
@@ -557,10 +655,10 @@ def cdm_nits(ui, repo, **opts):
         cdm_permchk,
         cdm_keywords]
 
-    return run_checks(wslist[repo], cmds, **opts)
+    return run_checks(wslist[repo], cmds, *args, **opts)
 
 
-def cdm_pbchk(ui, repo, **opts):
+def cdm_pbchk(ui, repo, *args, **opts):
     '''pre-putback check all active files
 
     Run cddlchk, comchk, copyright, cstyle, hdrchk, jstyle, permchk, tagchk,
@@ -586,7 +684,7 @@ def cdm_pbchk(ui, repo, **opts):
         cdm_outchk,
         cdm_mergechk]
 
-    return run_checks(wslist[repo], cmds, **opts)
+    return run_checks(wslist[repo], cmds, *args, **opts)
 
 
 def cdm_recommit(ui, repo, **opts):
@@ -871,8 +969,22 @@ cmdtable = {
               'hg pbchk [-N] [-p PARENT]'),
     'permchk': (cdm_permchk, [('p', 'parent', '', 'parent workspace')],
                 'hg permchk [-p PARENT]'),
-    '^pdiffs': (cdm_pdiffs, [('p', 'parent', '', 'parent workspace')],
-               'hg pdiffs [-p PARENT]'),
+    '^pdiffs': (cdm_pdiffs, [('p', 'parent', '', 'parent workspace'),
+                             ('a', 'text', None, 'treat all files as text'),
+                             ('g', 'git', None, 'use extended git diff format'),
+                             ('w', 'ignore-all-space', None,
+                              'ignore white space when comparing lines'),
+                             ('b', 'ignore-space-change', None,
+                              'ignore changes in the amount of white space'),
+                             ('B', 'ignore-blank-lines', None,
+                              'ignore changes whos lines are all blank'),
+                             ('U', 'unified', 3,
+                              'number of lines of context to show'),
+                             ('I', 'include', [],
+                              'include names matching the given patterns'),
+                             ('X', 'exclude', [],
+                              'exclude names matching the given patterns')],
+               'hg pdiffs [OPTION...] [-p PARENT] [FILE...]'),
     '^recommit|reci': (cdm_recommit, [('p', 'parent', '', 'parent workspace'),
                                       ('f', 'force', None, 'force operation'),
                                       ('m', 'message', '',

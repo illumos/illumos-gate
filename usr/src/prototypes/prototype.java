@@ -25,9 +25,5 @@
  */
 
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- */
-
-/*
  * Comment that describes the contents of this file.
  */

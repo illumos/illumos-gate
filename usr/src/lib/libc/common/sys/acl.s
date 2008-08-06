@@ -27,9 +27,7 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"acl.s"
 
 /* C library -- acl						*/
 /* int acl(const char *path, int cmd, int cnt, struct aclent *buf)	*/

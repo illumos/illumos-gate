@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"_so_sendmsg.s"
 
 /* C library -- __so_sendmsg						*/
 /* int __so_sendmsg(int sock, const struct msghdr *msg, int flags)	*/

@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"putmsg.s"
 
 /* C library -- putmsg						*/
 /* int __putmsg(int fd, struct const strbuf *ctlptr,		*/

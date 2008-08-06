@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "abi_audit.h"
 #include <time.h>
@@ -78,7 +75,7 @@ static scenario_t	detect_sequence(sequence_t *, liblist_t *);
 static scenario_t	sequence_match(liblist_t *, int);
 static sequence_t	*generate_sequence(sequence_t *, bvlist_t *,
 			liblist_t *);
-static void		add_sccs_keyword_and_release(FILE *);
+static void		add_copyright_and_release(FILE *);
 static void		cleanup(void);
 static void		decode_filename(char *);
 static void		detect_errors(symbol_t *, FILE *);
@@ -141,7 +138,7 @@ main(int argc, char *argv[])
 		}
 	} else {
 		/* print symbol info to file */
-		add_sccs_keyword_and_release(Db);
+		add_copyright_and_release(Db);
 		tree_traverse(Sym_List);
 	}
 
@@ -205,7 +202,7 @@ analyze_args(int argc, char *argv[])
 				if ((Db = fopen(optarg, "w")) == NULL) {
 					(void) fprintf(stderr,
 					"%s: fopen failed to open <%s>: %s\n",
-					program, optarg, strerror(errno));
+					    program, optarg, strerror(errno));
 					return (FAIL);
 				}
 				gflag ++;
@@ -748,8 +745,8 @@ proc_intf_check_dir(char *intf_check_dir)
 	/* look for release string file */
 	if ((dirp = opendir(intf_check_dir)) == NULL) {
 		(void) fprintf(stderr,
-			"%s: %s: %s: No such directory. Please try again.\n",
-			program, path, strerror(errno));
+		    "%s: %s: %s: No such directory. Please try again.\n",
+		    program, path, strerror(errno));
 		return (FAIL);
 	}
 
@@ -770,9 +767,8 @@ proc_intf_check_dir(char *intf_check_dir)
 			if (strlcpy(release, dp->d_name, MAXPATHLEN)
 			    >= MAXPATHLEN) {
 				(void) fprintf(stderr,
-					"%s: proc_intf_check_dir: "
-					"strlcpy: %s\n",
-					program, strerror(errno));
+				    "%s: proc_intf_check_dir: strlcpy: %s\n",
+				    program, strerror(errno));
 				errmsg = FAIL;
 				break;
 			}
@@ -1660,7 +1656,7 @@ detect_errors(symbol_t *sym, FILE *fp)
 			    (scenario == SCENARIO_18)) &&
 			    (p->st_lib->lt_libc_migrate == FALSE) && Tflag) {
 				if (!sflag)
-				    report_err_msg("WARNING", p, fp);
+					report_err_msg("WARNING", p, fp);
 			} else if (pflag && (scenario == SCENARIO_01)) {
 				if (!sflag)
 					report_err_msg("WARNING", p, fp);
@@ -1770,12 +1766,11 @@ report_err_msg(char *msg, symbol_t *sym, FILE *fp)
 }
 
 /*
- * Adds SCCS keyword, Copyright and customer releases captured
- * in ABI database file
+ * Adds Copyright and customer releases captured in ABI database file
  */
 
 static void
-add_sccs_keyword_and_release(FILE *fp)
+add_copyright_and_release(FILE *fp)
 {
 	int		i;
 	time_t		t;
@@ -1788,12 +1783,6 @@ add_sccs_keyword_and_release(FILE *fp)
 	    "# Copyright %d Sun Microsystems, Inc."
 	    "  All rights reserved.\n"
 	    "# Use is subject to license terms.\n"
-	    "#\n"
-	    "#ident\t\"%%"
-	    "Z%%%%"
-	    "M%%\t%%"
-	    "I%%\t%%"
-	    "E%% SMI\"\n"
 	    "#\n"
 	    "#Releases:", 1900 + gmt->tm_year);
 
@@ -1822,8 +1811,8 @@ generate_db(symbol_t *p, FILE *db)
 	char	*sym_ver;
 
 	if ((find_exported_release(p->st_lib, 0) != FAIL) &&
-		((bv_all_zero(p->st_lib->lt_cat->ct_public) != TRUE) ||
-		(bv_all_zero(p->st_lib->lt_cat->ct_private) != TRUE))) {
+	    ((bv_all_zero(p->st_lib->lt_cat->ct_public) != TRUE) ||
+	    (bv_all_zero(p->st_lib->lt_cat->ct_private) != TRUE))) {
 		(void) fprintf(db, "%s %s %d %d ", p->st_sym_name,
 		    p->st_lib->lt_lib_name, p->st_type, p->st_size);
 

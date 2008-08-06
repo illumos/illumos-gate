@@ -24,8 +24,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # Easy setup script for populating a user's ~/.hgrc
@@ -116,6 +114,7 @@ fi
 if getent hosts sunweb.central.sun.com >/dev/null; then
 	# on SWAN
 	echo "Detected SWAN connection"
+	ON_SWAN=1
 	ldapemail='preferredrfc822recipient'
 	ldapquery="uid=$login $ldapemail"
 	ldapcmd="$LDAPCLIENT -1 -h sun-ds -b dc=sun,dc=com $ldapquery"
@@ -163,8 +162,24 @@ hgext.cdm=$cdm_path
 from=$email
 
 [paths]
-onnv-gate=ssh://anon@hg.opensolaris.org/hg/onnv/onnv-gate
+EOF
 
+if [[ -n $ON_SWAN ]]; then
+	cat <<EOF >> $HGRC
+onnv-gate=ssh://onnv.sfbay.sun.com//export/onnv-gate
+onnv-clone=ssh://onnv.sfbay.sun.com//export/onnv-clone
+onnv-closed=ssh://onnv.sfbay.sun.com//export/onnv-gate/usr/closed
+onnv-closed-clone=ssh://onnv.sfbay.sun.com//export/onnv-clone/usr/closed
+
+EOF
+else
+	cat <<EOF >> $HGRC
+onnv-gate=ssh://anon@hg.opensolaris.org//hg/onnv/onnv-gate
+
+EOF
+fi
+
+cat <<EOF >> $HGRC
 [merge-tools]
 filemerge.gui=True
 filemerge.args=-a \$base \$local \$other \$output

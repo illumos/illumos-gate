@@ -17,8 +17,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # Theory:
@@ -638,7 +636,7 @@ class WorkSpace(object):
         self.activecache[parent] = act
         return act
 
-    def pdiff(self, parent=None):
+    def pdiff(self, pats, opts, parent=None):
         'Return diffs relative to PARENT, as best as we can make out'
 
         parent = self.parent(parent)
@@ -651,9 +649,12 @@ class WorkSpace(object):
         if not act.revs:
             return
 
+        names, match = cmdutil.matchpats(self.repo, pats, opts)[:2]
+        opts = patch.diffopts(self.ui, opts)
+
         ret = cStringIO.StringIO()
         patch.diff(self.repo, act.parenttip.node(), act.localtip.node(),
-                   fp=ret)
+                   names, fp=ret, opts=opts, match=match)
         return ret.getvalue()
 
     #

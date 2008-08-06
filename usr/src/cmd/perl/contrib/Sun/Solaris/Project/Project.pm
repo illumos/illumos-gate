@@ -1,13 +1,8 @@
-#
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +17,12 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
 #
 # Project.pm provides the bootstrap for the Sun::Solaris::Project module, and
 # also functions for reading, validating and writing out project(4) format
@@ -41,7 +41,7 @@ use POSIX qw(locale_h limits_h);
 
 package Sun::Solaris::Project;
 
-our $VERSION = '%I%';
+our $VERSION = '1.9';
 
 use XSLoader;
 XSLoader::load(__PACKAGE__, $VERSION);

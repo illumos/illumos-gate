@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 This module is released as Public Source via the Comprehensive Perl Archive
@@ -31,11 +29,10 @@ Network (http://www.cpan.org).  If it is updated for any reason, a new
 release should be pushed to CPAN.
 
 The version number of this module is derived from the $VERSION variable in
-Lgrp.pm.  This in turn contains the SID of the Lgrp.pm file, so if
-anything under this directory is modified, a delta should be made to Lgrp.pm
-to update the module version number correctly.  If this is not done, it will
-not be possible to upload the generated archive to CPAN, as CPAN requires that
-uploaded archives have unique names.
+Lgrp.pm.  If anything under this directory is modified, $VERSION should be 
+changed in Lgrp.pm to update the module version number correctly.  If this 
+is not done, it will not be possible to upload the generated archive to CPAN, 
+as CPAN requires that uploaded archives have unique names.
 
 To prepare the contents of the directory for release, they should be packaged
 up as a .tar.gz archive.  The procedure for this is:

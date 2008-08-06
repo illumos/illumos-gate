@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"write.s"
 
 /* C library -- write						*/
 /* ssize_t __write(int fildes, const void *buf, size_t nbyte);	*/

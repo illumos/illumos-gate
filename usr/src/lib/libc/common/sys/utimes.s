@@ -27,9 +27,7 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"utimes.s"
 
 /* C library -- utimes						*/
 /* int utimes (const char *path, const struct timeval *times);	*/

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 1999 by Sun Microsystems, Inc.
  * All rights reserved.
  *
  */
 
-//  SCCS Status:      @(#)ServiceURL.java	1.11	06/17/97
-//  *M% :  The service URL.
+//  ServiceURL.java :  The service URL.
 //  Author:           James Kempf, Erik Guttman
 //
 
@@ -42,7 +38,6 @@ import java.net.*;
  * The ServiceURL object models the SLP service URL. Both service: URLs
  * and regular URLs are handled by this class.
  *
- * @version 1.3 98/10/14
  * @author James Kempf, Erik Guttman
  */
 

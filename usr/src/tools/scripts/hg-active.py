@@ -18,8 +18,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 '''
 Create a wx-style active list on stdout based on a Mercurial
@@ -42,7 +40,7 @@ except Version.VersionMismatch, e:
     sys.exit(1)
 
 import getopt, binascii
-from mercurial import hg, repo
+from mercurial import hg, repo, util
 from onbld.Scm.WorkSpace import WorkSpace
 
 def usage():
@@ -52,17 +50,20 @@ def usage():
 
 def main(argv):
     try:
-        opts, args = getopt.getopt(argv, 'w:p:')
+        opts = getopt.getopt(argv, 'w:o:p:')[0]
     except getopt.GetoptError, e:
         sys.stderr.write(str(e) + '\n')
         usage()
 
     parentpath = None
     wspath = None
+    outputfile = None
 
     for opt, arg in opts:
         if opt == '-w':
             wspath = arg
+        elif opt == '-o':
+            outputfile = arg
         elif opt == '-p':
             parentpath = arg
 
@@ -74,36 +75,50 @@ def main(argv):
     except repo.RepoError, e:
         sys.stderr.write("failed to open repository: %s\n" % e)
         sys.exit(1)
-
+    
     ws = WorkSpace(repository)
     act = ws.active(parentpath)
 
     node = act.parenttip.node()
     parenttip = binascii.hexlify(node)
-    print "HG_PARENT=" + parenttip
+
+    fh = None
+    if outputfile:
+        try:
+            fh = open(outputfile, 'w')
+        except EnvironmentError, e:
+            sys.stderr.write("could not open output file: %s\n" % e)
+            sys.exit(1)
+    else:
+        fh = sys.stdout
+
+    fh.write("HG_PARENT=%s\n" % parenttip)
 
     entries = [i for i in act]
     entries.sort()
 
     for entry in entries:
         if entry.is_renamed():
-            print "%s %s" % (entry.name, entry.parentname)
+            fh.write("%s %s\n" % (entry.name, entry.parentname))
         else:
-            print entry.name
+            fh.write("%s\n" % entry.name)
 
         # Strip blank lines.
         comments = filter(lambda x: x and not x.isspace(),
                           entry.comments)
 
-        print
+        fh.write('\n')
         if comments:
-            print '\n'.join(comments)
+            fh.write('%s\n' % '\n'.join(comments))
         else:
-            print "*** NO COMMENTS ***"
-        print
+            fh.write("*** NO COMMENTS ***\n")
+        fh.write('\n')
 
 if __name__ == '__main__':
     try:
         main(sys.argv[1:])
     except KeyboardInterrupt:
+        sys.exit(1)
+    except util.Abort, msg:
+        sys.stderr.write("Abort: %s\n" % msg)
         sys.exit(1)

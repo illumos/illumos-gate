@@ -27,9 +27,7 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"priocntlset.s"
 
 /* C library -- priocntlset					*/
 /* long priocntlset(procset_t psp, int cmd, int arg)		*/

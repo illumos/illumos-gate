@@ -18,11 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Implementation of "scsi_vhci_f_tape" tape failover_ops.
@@ -50,7 +50,7 @@ static char *tape_dev_table[] = {
 };
 
 /* Failover module plumbing. */
-SCSI_FAILOVER_OP("f_tape", tape, "%I%");
+SCSI_FAILOVER_OP("f_tape", tape);
 
 /* ARGSUSED */
 static int

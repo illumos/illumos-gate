@@ -30,9 +30,7 @@
  * where it will be picked up by gcc, along with crti.o and crtn.o
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"crt1.s"
 
 	.globl	_start
 

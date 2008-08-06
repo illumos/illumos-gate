@@ -23,16 +23,12 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # Lgrp.pm provides procedural and object-oriented interface to the Solaris
 # liblgrp(3LIB) library.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 require 5.6.1;
 use strict;
@@ -41,7 +37,7 @@ use Carp;
 
 package Sun::Solaris::Lgrp;
 
-our $VERSION = '%I%';
+our $VERSION = '1.1';
 use XSLoader;
 XSLoader::load(__PACKAGE__, $VERSION);
 

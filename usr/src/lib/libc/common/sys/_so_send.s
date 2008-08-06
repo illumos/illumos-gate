@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"_so_send.s"
 
 /* C library -- __so_send						*/
 /* int __so_send(int socket, const void *buffer, size_t len, int flags)	*/

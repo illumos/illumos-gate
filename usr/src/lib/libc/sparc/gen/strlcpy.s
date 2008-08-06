@@ -24,9 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"strlcpy.s"
 /*
  * The strlcpy() function copies at most dstsize-1 characters
  * (dstsize being the size of the string buffer dst) from src

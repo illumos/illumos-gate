@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"waitid.s"
 
 /* C library -- waitid						*/
 /* int waitid(idtype_t idtype, id_t id, siginfo_t *infop,

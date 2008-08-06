@@ -23,8 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # MM_Solaris_ON.pm overrides various parts of MakeMaker so that perl modules
@@ -45,7 +43,7 @@ package ExtUtils::MM_Solaris_ON;
 use strict;
 use warnings;
 our ($VERSION, @ISA);
-$VERSION = '%I%';
+$VERSION = '1.3';
 require ExtUtils::MM_Any;
 require ExtUtils::MM_Unix;
 @ISA = qw(ExtUtils::MM_Any ExtUtils::MM_Unix);

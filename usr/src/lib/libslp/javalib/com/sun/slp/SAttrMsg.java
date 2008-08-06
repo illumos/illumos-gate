@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
- *
  * Copyright (c) 1999 by Sun Microsystems, Inc.
  * All rights reserved.
  *
  */
 
-//  SCCS Status:      %W%	%G%
 //  SAttrMsg.java:    Message class for SLP attribute request.
 //  Author:           James Kempf
 //  Created On:       Thu Oct  9 14:24:55 1997
@@ -47,7 +43,6 @@ import java.io.*;
  * Subclasses for other versions can specialize the
  * initialize() and makeReply() methods.
  *
- * @version %M%.%L% %D%
  * @author James Kempf
  */
 

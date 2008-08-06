@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"getmsg.s"
 
 /* C library -- getmsg						*/
 /* int __getmsg(int fd, struct strbuf *ctlptr,			*/

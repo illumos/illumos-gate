@@ -24,27 +24,5 @@
 # Use is subject to license terms.
 #
 
-#
-# This required package information file describes characteristics of the
-# package, such as package abbreviation, full package name, package version,
-# and package architecture.
-#
-ARCH="ISA"
-BASEDIR=/
-SUNW_PKGVERS="1.0"
-CATEGORY="system"
-CLASSES="none"
-DESC="Solstice Enterprise Agents 1.0.3 Simple Network Management Protocol"
-MAXINST="1000"
-NAME="Solstice Enterprise Agents 1.0.3 Simple Network Management Protocol"
-PKG="SUNWsasnm"
-SUNW_PRODNAME="SunOS"
-SUNW_PRODVERS="RELEASE/VERSION"
-VENDOR="Sun Microsystems, Inc."
-VERSION="ONVERS,REV=0.0.0"
-SUNW_PKGTYPE="usr"
-EMAIL=""
-HOTLINE="Please contact your local service provider"
-SUNW_PKG_ALLZONES="true"
-SUNW_PKG_HOLLOW="false"
-SUNW_PKG_THISZONE="false"
+syntax: glob
+*

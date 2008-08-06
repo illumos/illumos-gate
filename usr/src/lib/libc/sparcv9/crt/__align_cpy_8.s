@@ -24,9 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"__align_cpy_8.s"
 
 /* __align_cpy_8(s1, s2, n)
  *

@@ -18,11 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Implementation of "scsi_vhci_f_tpgs" T10 standard based failover_ops.
@@ -42,7 +42,7 @@
 char	*std_dev_table[] = { NULL };
 
 /* Failover module plumbing. */
-SCSI_FAILOVER_OP(SFO_NAME_TPGS, std, "%I%");
+SCSI_FAILOVER_OP(SFO_NAME_TPGS, std);
 
 #define	STD_FO_CMD_RETRY_DELAY	1000000 /* 1 seconds */
 #define	STD_FO_RETRY_DELAY	2000000 /* 2 seconds */

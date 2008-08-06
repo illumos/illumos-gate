@@ -24,9 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"memchr.s"
 
 /*
  * Return the ptr in sptr at which the character c1 appears;

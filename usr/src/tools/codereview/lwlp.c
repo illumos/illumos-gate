@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,13 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-static char sccsid[] = "%Z%%M%	%I%	%E% SMI";
 
 /*
  * lwlp - Convert ASCII text to PostScript
@@ -294,7 +289,7 @@ main(int argc, char **argv)
 
 	/*LINTED*/
 	if (iscodereview = strncmp(progname, CODEREVIEW,
-			sizeof (CODEREVIEW) - 1) == 0) {
+	    sizeof (CODEREVIEW) - 1) == 0) {
 		layoutp = &layout2;
 		numberwidth = 4;
 		columns = 85;		/* extra space for numbering */
@@ -302,7 +297,7 @@ main(int argc, char **argv)
 	}
 
 	while ((ch = getopt(argc, argv,
-			"1248B:c:deG:h:I:l:Ln:P:prt:vw:X:y:")) != -1) {
+	    "1248B:c:deG:h:I:l:Ln:P:prt:vw:X:y:")) != -1) {
 		switch (ch) {
 		case '1':
 			layoutp = &layout1;
@@ -418,12 +413,12 @@ main(int argc, char **argv)
 			break;
 		default:
 			(void) fprintf(stderr,
-					"usage: %s %s\n\t%s\n\t%s\n\t%s\n",
-					iscodereview ? LWLP : progname,
-					USAGE1, USAGE2, USAGE3, USAGE4);
+			    "usage: %s %s\n\t%s\n\t%s\n\t%s\n",
+			    iscodereview ? LWLP : progname,
+			    USAGE1, USAGE2, USAGE3, USAGE4);
 			if (iscodereview)
 				(void) fprintf(stderr, "\t%s [%s flags] %s\n",
-						CODEREVIEW, LWLP, USAGE6);
+				    CODEREVIEW, LWLP, USAGE6);
 			exit(1);
 		}
 	}
@@ -468,14 +463,14 @@ main(int argc, char **argv)
 		end_x = DEFAULT_PAGE_WIDTH * POINTS_PER_INCH;
 		if (wflag) {
 			point_size = DEFAULT_PAGE_WIDTH * POINTS_PER_INCH /
-					((columns + 0.5) * DEFAULT_CHAR_WIDTH);
+			    ((columns + 0.5) * DEFAULT_CHAR_WIDTH);
 			lines_per_page = DEFAULT_PAGE_HEIGHT * POINTS_PER_INCH /
-					point_size;
+			    point_size;
 		} else {
 			point_size = DEFAULT_PAGE_HEIGHT * POINTS_PER_INCH /
-					(lines_per_page + 0.5);
+			    (lines_per_page + 0.5);
 			columns = DEFAULT_PAGE_WIDTH * POINTS_PER_INCH /
-					(point_size * DEFAULT_CHAR_WIDTH);
+			    (point_size * DEFAULT_CHAR_WIDTH);
 		}
 	} else {
 		rot_text = 90 - layoutp->rotation;
@@ -484,28 +479,28 @@ main(int argc, char **argv)
 		end_x = DEFAULT_PAGE_HEIGHT * POINTS_PER_INCH;
 		if (wflag) {
 			point_size = DEFAULT_PAGE_HEIGHT * POINTS_PER_INCH /
-					((columns + 0.5) * DEFAULT_CHAR_WIDTH);
+			    ((columns + 0.5) * DEFAULT_CHAR_WIDTH);
 			lines_per_page = DEFAULT_PAGE_WIDTH * POINTS_PER_INCH /
-					point_size;
+			    point_size;
 		} else {
 			point_size = DEFAULT_PAGE_WIDTH * POINTS_PER_INCH /
-					(lines_per_page + 0.5);
+			    (lines_per_page + 0.5);
 			columns = DEFAULT_PAGE_HEIGHT * POINTS_PER_INCH /
-					(point_size * DEFAULT_CHAR_WIDTH);
+			    (point_size * DEFAULT_CHAR_WIDTH);
 		}
 	}
 
 	box_height = DEFAULT_PAGE_HEIGHT * POINTS_PER_INCH / layoutp->page_rows;
 	if (layoutp->rotation == 0)
 		box_width = box_height /
-				DEFAULT_PAGE_HEIGHT * DEFAULT_PAGE_WIDTH;
+		    DEFAULT_PAGE_HEIGHT * DEFAULT_PAGE_WIDTH;
 	else
 		box_width = box_height *
-				DEFAULT_PAGE_HEIGHT / DEFAULT_PAGE_WIDTH;
+		    DEFAULT_PAGE_HEIGHT / DEFAULT_PAGE_WIDTH;
 	gap_width = DEFAULT_PAPER_WIDTH * POINTS_PER_INCH /
-			layoutp->page_cols - box_width;
+	    layoutp->page_cols - box_width;
 	gap_height = DEFAULT_PAPER_HEIGHT * POINTS_PER_INCH /
-			layoutp->page_rows - box_height;
+	    layoutp->page_rows - box_height;
 	margin_x = gap_width/2;
 	margin_y = gap_height/2;
 
@@ -534,27 +529,26 @@ main(int argc, char **argv)
 		}
 
 		positions[j].base_x = margin_x +
-				phys_col * (box_width + gap_width);
+		    phys_col * (box_width + gap_width);
 		positions[j].base_y = margin_y +
-				phys_row * (box_height + gap_height);
+		    phys_row * (box_height + gap_height);
 		if (rot_text != 0) {
 			positions[j].base_x += box_width;
 		}
 	}
 
 	if (vflag) {
-		(void) fprintf(stderr, "%s: %s\n\n", progname, sccsid);
+		(void) fprintf(stderr, "%s:\n\n", progname);
 		(void) fprintf(stderr, "Lines/page = %d\n", lines_per_page);
 		(void) fprintf(stderr, "Columns = %d\n", columns);
 		for (j = 0; j < layoutp->pages; j++) {
 			(void) fprintf(stderr, "\tx=%3d, y=%3d\n",
-					positions[j].base_x,
-					positions[j].base_y);
+			    positions[j].base_x, positions[j].base_y);
 		}
 		(void) fprintf(stderr, "box_width=%3d, box_height=%3d\n",
-				box_width, box_height);
+		    box_width, box_height);
 		(void) fprintf(stderr, "gap_width=%3d, gap_height=%3d\n",
-				gap_width, gap_height);
+		    gap_width, gap_height);
 	}
 
 	setup();
@@ -564,13 +558,13 @@ main(int argc, char **argv)
 		char	command[BUFSIZ];
 
 		(void) snprintf(command, BUFSIZ, "diff -b -D %s %s %s",
-			CODEREVIEW, argv[first_file+1], argv[first_file]);
+		    CODEREVIEW, argv[first_file+1], argv[first_file]);
 		infile = popen(command, "r");
 		bannerfile = argv[first_file+1];
 		if (ungetc(getc(infile), infile) == EOF) {
 			(void) pclose(infile);
 			(void) sprintf(command,
-					"echo No differences encountered");
+			    "echo No differences encountered");
 			infile = popen(command, "r");
 		}
 		setheaderfile(bannerfile);
@@ -596,7 +590,7 @@ main(int argc, char **argv)
 			}
 			if (vflag)
 				(void) fprintf(stderr, "\tprinting %s\n",
-						argv[i]);
+				    argv[i]);
 			setheaderfile(argv[i]);
 			printfile(infile);
 			if (pflag)
@@ -630,8 +624,8 @@ preamble(void)
 	(void) printf("%%%%CreationDate: %s\n", currentdate);
 	(void) printf("%%%%For: %s\n", username);
 	(void) printf("%%%%DocumentFonts: %s %s %s %s\n",
-		default_font, default_font_bold,
-		default_font_italic, default_font_bold_italic);
+	    default_font, default_font_bold,
+	    default_font_italic, default_font_bold_italic);
 	(void) printf("%%%%Pages: (atend)\n");
 
 	if (prologue == NULL) {
@@ -655,13 +649,13 @@ preamble(void)
 	}
 
 	(void) printf("/%s {%f /%s %s}bind def\n", DEFAULT_FONT,
-			point_size, default_font, SELECT_FONT);
+	    point_size, default_font, SELECT_FONT);
 	(void) printf("/%s {%f /%s %s}bind def\n", DEFAULT_FONT_BOLD,
-			point_size, default_font_bold, SELECT_FONT);
+	    point_size, default_font_bold, SELECT_FONT);
 	(void) printf("/%s {%f /%s %s}bind def\n", DEFAULT_FONT_ITALIC,
-			point_size, default_font_italic, SELECT_FONT);
+	    point_size, default_font_italic, SELECT_FONT);
 	(void) printf("/%s {%f /%s %s}bind def\n", DEFAULT_FONT_BOLD_ITALIC,
-			point_size, default_font_bold_italic, SELECT_FONT);
+	    point_size, default_font_bold_italic, SELECT_FONT);
 }
 
 void
@@ -868,12 +862,9 @@ process_elide(FILE *outfile)
 			numberwidth = 0;
 			current.lineno++;
 			current.row -= point_size;
-			setcurrentfont(DEFAULT_FONT_BOLD_ITALIC,
-				outfile);
-			proc("______unchanged_portion_omitted_",
-				outfile);
-			restore_format_state(&format_state,
-				outfile);
+			setcurrentfont(DEFAULT_FONT_BOLD_ITALIC, outfile);
+			proc("______unchanged_portion_omitted_", outfile);
+			restore_format_state(&format_state, outfile);
 			savestate(outfile);
 			dots_inserted = 1;
 		}
@@ -942,10 +933,10 @@ printpage(FILE *infile, FILE *outfile)
 				altlinenumber = tmplinenumber;
 				if (!old_stuff)
 					setcurrentfont(DEFAULT_FONT_BOLD,
-							outfile);
+					    outfile);
 				else
 					setcurrentfont(DEFAULT_FONT_ITALIC,
-							outfile);
+					    outfile);
 			} else /* if (strcmp(command, "endif") == 0) */ {
 				in_change = 0;
 				makegray = 0;
@@ -990,10 +981,8 @@ startpage(FILE *outfile)
 		setcurrentfont((char *)NULL, outfile);
 	(void) fprintf(outfile, "%s ", SET_WIDTHS);
 	(void) fprintf(outfile, "%d %f %d %d %s\n",
-			rot_text, layoutp->scale,
-			positions[logical_page].base_x,
-			positions[logical_page].base_y,
-			START_PAGE);
+	    rot_text, layoutp->scale, positions[logical_page].base_x,
+	    positions[logical_page].base_y, START_PAGE);
 	lines = 0;
 	if (header) {
 		save_format_state(&format_state);
@@ -1003,14 +992,14 @@ startpage(FILE *outfile)
 
 		current.row -= point_size;
 		(void) fprintf(outfile, "%d %.2f %s\n", start_x, current.row,
-				MOVETO);
+		    MOVETO);
 		proc(headerstring, outfile);
 		(void) snprintf(buf, 8, "%d", current.logical_page_count + 1);
 		buflen = strlen(buf);
 		(void) fprintf(outfile, "%d %.2f %s (%s)%s\n",
-				(int)(end_x - (buflen + 0.5) *
-				    DEFAULT_CHAR_WIDTH * point_size),
-				current.row, MOVETO, buf, SHOW);
+		    (int)(end_x - (buflen + 0.5) *
+		    DEFAULT_CHAR_WIDTH * point_size),
+		    current.row, MOVETO, buf, SHOW);
 		current.row -= point_size;
 		restore_format_state(&format_state, outfile);
 		lines = 2;
@@ -1039,8 +1028,8 @@ setuppage(FILE *outfile)
 	if (layoutp->pages == 1)
 		return;
 
-	(void) fprintf(outfile, "%f %s %s\n",
-			RULE_WIDTH, SETLINEWIDTH, NEWPATH);
+	(void) fprintf(outfile, "%f %s %s\n", RULE_WIDTH, SETLINEWIDTH,
+	    NEWPATH);
 	begin = 0; end = DEFAULT_PAPER_WIDTH * POINTS_PER_INCH;
 	for (i = 1, ilimit = layoutp->page_rows; i < ilimit; i++) {
 		place = margin_y - gap_height/2 + i * (box_height+gap_height);
@@ -1101,8 +1090,7 @@ reversepages(FILE *outfile)
 
 	if (vflag)
 		(void) fprintf(stderr, "\nreversing %d page%s\n",
-				current.page_count,
-				current.page_count > 1 ? "s" : "");
+		    current.page_count, current.page_count > 1 ? "s" : "");
 	for (i = current.page_count - 1; i >= 0; i--) {
 		copypage(outfile, page_map[i], page_map[i+1]);
 	}
@@ -1178,15 +1166,15 @@ proc(char *in, FILE *outfile)
 			grayed++;
 			in += graylength;
 		} else if (boldlength &&
-				strncmp(in, boldstring, boldlength) == 0) {
+		    strncmp(in, boldstring, boldlength) == 0) {
 			altfont = DEFAULT_FONT_BOLD;
 			in += boldlength;
 		} else if (itlclength &&
-				strncmp(in, itlcstring, itlclength) == 0) {
+		    strncmp(in, itlcstring, itlclength) == 0) {
 			altfont = DEFAULT_FONT_ITALIC;
 			in += itlclength;
 		} else if (bitclength &&
-				strncmp(in, bitcstring, bitclength) == 0) {
+		    strncmp(in, bitcstring, bitclength) == 0) {
 			altfont = DEFAULT_FONT_BOLD_ITALIC;
 			in += bitclength;
 		} else
@@ -1194,11 +1182,12 @@ proc(char *in, FILE *outfile)
 	}
 	if (grayed) {
 		(void) fprintf(outfile, "%d %.2f %d %.2f %s\n",
-			start_x, current.row -
-				DEFAULT_DESCENDER_FRACTION * point_size,
-			end_x, current.row +
-				(1.0 - DEFAULT_DESCENDER_FRACTION) * point_size,
-			SHADE);
+		    start_x,
+		    current.row - DEFAULT_DESCENDER_FRACTION * point_size,
+		    end_x,
+		    current.row +
+			(1.0 - DEFAULT_DESCENDER_FRACTION) * point_size,
+		    SHADE);
 	}
 
 	linenumber++;
@@ -1209,18 +1198,18 @@ proc(char *in, FILE *outfile)
 
 	if (start_x != 0) {
 		(void) fprintf(outfile, "%d %.2f %s\n",
-				start_x, current.row, MOVETO);
+		    start_x, current.row, MOVETO);
 	}
 	else
 		(void) fprintf(outfile, "%.2f %s\n",
-				current.row, ZEROMOVETO);
+		    current.row, ZEROMOVETO);
 	if (numberwidth) {
 		setcurrentfont(DEFAULT_FONT, outfile);
 		(void) sprintf(bufout, "%*d", numberwidth, linenumber);
 		for (q = bufout, i = 0; *q == ' '; q++, i++)
 			;
 		(void) fprintf(outfile, "%d %s (%s)%s %d %s ",
-			i, TAB, q, SHOW, DEFAULT_SPACES_AFTER_NUMBER, TAB);
+		    i, TAB, q, SHOW, DEFAULT_SPACES_AFTER_NUMBER, TAB);
 	}
 	setcurrentfont(altfont, outfile);
 
@@ -1240,7 +1229,7 @@ proc(char *in, FILE *outfile)
 			}
 			if (currentp > 0) {	/* not beginning of line */
 				i = tabstop - (currentp % tabstop) +
-						tabc * tabstop;
+				    tabc * tabstop;
 				if (instr) {
 					(void) snprintf(q,
 					    BUFOUT - (q - bufout), ")%s ",
@@ -1271,7 +1260,7 @@ proc(char *in, FILE *outfile)
 			if (instr) {
 				*q = '\0';
 				(void) fprintf(outfile, "%s)%s\n",
-						bufout, SHOW);
+				    bufout, SHOW);
 			}
 			instr = 0;
 			if (currentp >= columns)
@@ -1294,17 +1283,17 @@ proc(char *in, FILE *outfile)
 			*q = '\0';
 			if (instr)
 				(void) fprintf(outfile, "%s)%s\n",
-						bufout, SHOW);
+				    bufout, SHOW);
 			else
 				(void) fprintf(outfile, "%s\n", bufout);
 			endpage(outfile);
 			(void) startpage(outfile);
 			current.row = start_y;
 			(void) fprintf(outfile, "%d %.2f %s\n",
-					start_x, current.row, MOVETO);
+			    start_x, current.row, MOVETO);
 			if (numberwidth)
 				(void) fprintf(outfile, "%d %s\n", numberwidth +
-					DEFAULT_SPACES_AFTER_NUMBER, TAB);
+				    DEFAULT_SPACES_AFTER_NUMBER, TAB);
 			q = bufout;
 			currentp = 0;
 			instr = 0;
@@ -1314,15 +1303,15 @@ proc(char *in, FILE *outfile)
 			if (instr) {
 				*q = '\0';
 				(void) fprintf(outfile, "%s)%s\n",
-						bufout, SHOW);
+				    bufout, SHOW);
 				instr = 0;
 				q = bufout;
 			}
 			(void) fprintf(outfile, "%d %.2f %s\n",
-					start_x, current.row, MOVETO);
+			    start_x, current.row, MOVETO);
 			if (numberwidth)
 				(void) fprintf(outfile, "%d %s\n", numberwidth +
-					DEFAULT_SPACES_AFTER_NUMBER, TAB);
+				    DEFAULT_SPACES_AFTER_NUMBER, TAB);
 			currentp = 0;
 			break;
 		case '\\':

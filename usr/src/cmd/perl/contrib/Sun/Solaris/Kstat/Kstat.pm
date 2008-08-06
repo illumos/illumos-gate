@@ -23,8 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # Kstat.pm provides the bootstrap for the Sun::Solaris::Kstat module.
@@ -34,7 +32,7 @@ package Sun::Solaris::Kstat;
 use strict;
 use DynaLoader;
 use vars qw($VERSION @ISA);
-$VERSION = '%I%';
+$VERSION = '1.3';
 @ISA = qw(DynaLoader);
 bootstrap Sun::Solaris::Kstat $VERSION;
 1;

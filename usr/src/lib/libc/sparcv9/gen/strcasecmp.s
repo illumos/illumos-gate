@@ -24,9 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"strcasecmp.s"
 
 /*
  * The strcasecmp() function is a case insensitive versions of strcmp().

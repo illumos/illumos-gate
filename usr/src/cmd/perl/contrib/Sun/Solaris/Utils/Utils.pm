@@ -23,8 +23,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # Utils.pm provides the bootstrap for the Sun::Solaris::Utils module.
@@ -35,7 +33,7 @@ use strict;
 use Exporter;
 use DynaLoader;
 use vars qw($VERSION @ISA @EXPORT_OK);
-$VERSION = '%I%';
+$VERSION = '1.3';
 @ISA = qw(Exporter DynaLoader);
 @EXPORT_OK = qw(gmatch gettext textdomain bindtextdomain dcgettext dgettext);
 bootstrap Sun::Solaris::Utils $VERSION;

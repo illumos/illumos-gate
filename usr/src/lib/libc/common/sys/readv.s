@@ -27,9 +27,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"readv.s"
 
 /* C library -- readv							*/
 /* ssize_t __readv(int fd, const struct iovec *iovp, int iovcnt)	*/

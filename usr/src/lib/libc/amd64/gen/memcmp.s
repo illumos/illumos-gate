@@ -45,9 +45,7 @@
  * regulations applicable in licensee's jurisdiction.
  */
 
-	.ident	"%Z%%M%	%I%	%E% SMI"
-
-	.file	"%M%"
+	.file	"memcmp.s"
 
 #include <sys/asm_linkage.h>
 
