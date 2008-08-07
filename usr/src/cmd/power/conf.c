@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * "pmconfig" performs a mixture of Energy-Star configuration tasks
@@ -275,9 +273,10 @@ update_cprconfig(void)
 		err_fmt = "cannot open/create \"%s\", %s\n";
 	else if (write(fd, wrt_cc, sizeof (*wrt_cc)) != sizeof (*wrt_cc))
 		err_fmt = "error writing \"%s\", %s\n";
-	(void) close(fd);
 	if (err_fmt)
 		mesg(MERR, err_fmt, cpr_conf, strerror(errno));
+	if (fd != -1)
+		(void) close(fd);
 	return (err_fmt != NULL);
 }
 

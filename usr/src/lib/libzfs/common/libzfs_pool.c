@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <alloca.h>
 #include <assert.h>
 #include <ctype.h>
@@ -288,7 +286,7 @@ bootfs_name_valid(const char *pool, char *bootfs)
 {
 	int len = strlen(pool);
 
-	if (!zfs_name_valid(bootfs, ZFS_TYPE_FILESYSTEM))
+	if (!zfs_name_valid(bootfs, ZFS_TYPE_FILESYSTEM|ZFS_TYPE_SNAPSHOT))
 		return (B_FALSE);
 
 	if (strncmp(pool, bootfs, len) == 0 &&

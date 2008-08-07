@@ -20,7 +20,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The zfs plug-in routines for GRUB are:
@@ -832,6 +831,8 @@ get_objset_mdn(dnode_phys_t *mosmdn, char *fsname, uint64_t *obj,
 	char *cname, ch;
 	blkptr_t *bp;
 	objset_phys_t *osp;
+	int issnapshot = 0;
+	char *snapname;
 
 	if (fsname == NULL && obj) {
 		headobj = *obj;
@@ -871,6 +872,13 @@ get_objset_mdn(dnode_phys_t *mosmdn, char *fsname, uint64_t *obj,
 		ch = *fsname;
 		*fsname = 0;
 
+		snapname = cname;
+		while (*snapname && !isspace(*snapname) && *snapname != '@')
+			snapname++;
+		if (*snapname == '@') {
+			issnapshot = 1;
+			*snapname = 0;
+		}
 		childobj =
 		    ((dsl_dir_phys_t *)DN_BONUS(mdn))->dd_child_dir_zapobj;
 		if (errnum = dnode_get(mosmdn, childobj,
@@ -885,6 +893,8 @@ get_objset_mdn(dnode_phys_t *mosmdn, char *fsname, uint64_t *obj,
 			return (errnum);
 
 		*fsname = ch;
+		if (issnapshot)
+			*snapname = '@';
 	}
 	headobj = ((dsl_dir_phys_t *)DN_BONUS(mdn))->dd_head_dataset_obj;
 	if (obj)
@@ -893,8 +903,23 @@ get_objset_mdn(dnode_phys_t *mosmdn, char *fsname, uint64_t *obj,
 skip:
 	if (errnum = dnode_get(mosmdn, headobj, DMU_OT_DSL_DATASET, mdn, stack))
 		return (errnum);
+	if (issnapshot) {
+		uint64_t snapobj;
 
-	/* TODO: Add snapshot support here - for fsname=snapshot-name */
+		snapobj = ((dsl_dataset_phys_t *)DN_BONUS(mdn))->
+		    ds_snapnames_zapobj;
+
+		if (errnum = dnode_get(mosmdn, snapobj,
+		    DMU_OT_DSL_DS_SNAP_MAP, mdn, stack))
+			return (errnum);
+		if (zap_lookup(mdn, snapname + 1, &headobj, stack))
+			return (ERR_FILESYSTEM_NOT_FOUND);
+		if (errnum = dnode_get(mosmdn, headobj,
+		    DMU_OT_DSL_DATASET, mdn, stack))
+			return (errnum);
+		if (obj)
+			*obj = headobj;
+	}
 
 	bp = &((dsl_dataset_phys_t *)DN_BONUS(mdn))->ds_bp;
 	osp = (objset_phys_t *)stack;
@@ -1123,6 +1148,7 @@ check_pool_label(int label, char *stack, char *outdevid, char *outpath)
 	uint64_t sector, pool_state, txg = 0;
 	char *nvlist, *nv;
 	uint64_t diskguid;
+	uint64_t version;
 
 	sector = (label * sizeof (vdev_label_t) + VDEV_SKIP_SIZE +
 	    VDEV_BOOT_HEADER_SIZE) >> SPA_MINBLOCKSHIFT;
@@ -1156,6 +1182,11 @@ check_pool_label(int label, char *stack, char *outdevid, char *outpath)
 	if (txg == 0)
 		return (ERR_NO_BOOTPATH);
 
+	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_VERSION, &version,
+	    DATA_TYPE_UINT64, NULL))
+		return (ERR_FSYS_CORRUPT);
+	if (version > SPA_VERSION)
+		return (ERR_NEWER_VERSION);
 	if (nvlist_lookup_value(nvlist, ZPOOL_CONFIG_VDEV_TREE, &nv,
 	    DATA_TYPE_NVLIST, NULL))
 		return (ERR_FSYS_CORRUPT);
