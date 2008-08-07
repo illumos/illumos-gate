@@ -20,10 +20,9 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 include $(SRC)/Makefile.master
 
@@ -39,9 +38,10 @@ pkg: install
 	@cd $(PKGDEFS) pwd; $(MAKE) awk_pkginfo
 	@cd $(PKGDEFS)/SUNWdtrt; pwd; $(MAKE) install
 
+$(ROOTOPTPKG)/% := FILEMODE = 0444
+
 $(ROOTOPTPKG):
 	$(INS.dir)
 
 $(ROOTOPTPKG)/%: ./% $(ROOTOPTPKG)
-	$(RM) $@
-	$(CP) $< $@
+	$(INS.file)
