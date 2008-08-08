@@ -4003,7 +4003,7 @@ zvol_create_link_common(libzfs_handle_t *hdl, const char *dataset, int ifexists)
 		if ((dhdl = di_devlink_init(ZFS_DRIVER,
 		    DI_MAKE_LINK)) == NULL) {
 			zfs_error_aux(hdl, strerror(errno));
-			zfs_error_fmt(hdl, errno,
+			(void) zfs_error_fmt(hdl, errno,
 			    dgettext(TEXT_DOMAIN, "cannot create device links "
 			    "for '%s'"), dataset);
 			(void) ioctl(hdl->libzfs_fd, ZFS_IOC_REMOVE_MINOR, &zc);
