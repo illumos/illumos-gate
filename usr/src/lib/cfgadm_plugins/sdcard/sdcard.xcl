@@ -1,0 +1,70 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# lib/cfgadm_plugins/sdcard/sdcard.xcl
+#
+msgid "/devices/"
+msgid "/devices"
+msgid "/"
+msgid "."
+msgid "C"
+msgid "\n"
+msgid "-"
+msgid "ap_id: "
+msgid " %s%s\n%s"
+msgid "%s/%s"
+msgid "%s\n"
+msgid "../"
+msgid ""
+msgid "cfga_change_state: get device path failed\n"
+msgid "cfga_change_state: get path failed\n"
+msgid "devctl_ap_unconfigure failed\n"
+#msgid "No valid option specified\n"
+msgid "cfga_list_ext: cannot locate target device\n"
+msgid "dsk/"
+msgid "/dev/dsk"
+msgid "/dsk/"
+msgid "/rdsk/"
+msgid "/dev/"
+msgid "/disk@0,0"
+msgid "/sdcard@"
+msgid "Mod: %s Rev: %d.%d Date: %d/%d SN: %X"
+msgid "::"
+msgid "cfga_msg"
+msgid "cfga_msg: NULL msgp\n"
+msgid "cfga_msg: null str\n"
+msgid "0123456789"
+msgid ".."
+msgid "[libcfgadm:sdcard] "
+      "setup_for_devctl_cmd: devctl_ap_acquire failed: %s\n"
+msgid "devctl_ap_getstate failed, errno: %d\n"
+msgid "do_control_ioctl: open: errno:%d\n"
+msgid "ioctl failed (size)"
+msgid " "
+msgid "  "
+msgid "%%-%ds  %%-%ds"
+msgid " cfgadm -c [configure|unconfigure|disconnect|connect] ap_id "
+      "[ap_id...]\n"
+msgid " cfgadm -x sdcard_reset_slot ap_id [ap_id...]\n"

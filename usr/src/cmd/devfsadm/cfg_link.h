@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,8 +27,6 @@
 
 #ifndef	_CFG_LINK_H
 #define	_CFG_LINK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <devfsadm.h>
 
@@ -42,6 +40,7 @@ extern "C" {
 #define	PCI_CFG_LINK_RE		"^cfg/[:alnum:]$"
 #define	IB_CFG_LINK_RE		"^cfg/(hca[0-9A-F]+)$"
 #define	SATA_CFG_LINK_RE	"^cfg/((sata[0-9]+)/([0-9]+)([.]([0-9])+)*)$"
+#define	SDCARD_CFG_LINK_RE	"^cfg/sdcard[0-9]+/[0-9]+$"
 #define	PCI_CFG_PATH_LINK_RE	\
 	"^cfg/(.*(pci[0-9]|pcie[0-9]|Slot[0-9]|\\<pci\\>|\\<pcie\\>).*)$"
 

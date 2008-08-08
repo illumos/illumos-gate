@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
 # and their location on the development machine when building the package.
@@ -187,6 +185,7 @@ f none kernel/misc/scsi_vhci/scsi_vhci_f_tpgs_tape 755 root sys
 f none kernel/misc/acpica 755 root sys
 f none kernel/misc/agpmaster 755 root sys
 f none kernel/misc/bignum 755 root sys
+f none kernel/misc/blk2scsa 755 root sys
 f none kernel/misc/bootdev 755 root sys
 f none kernel/misc/busra 755 root sys
 f none kernel/misc/cardbus 755 root sys
@@ -394,6 +393,7 @@ d none kernel/misc/amd64 755 root sys
 f none kernel/misc/amd64/acpica 755 root sys
 f none kernel/misc/amd64/agpmaster 755 root sys
 f none kernel/misc/amd64/bignum 755 root sys
+f none kernel/misc/amd64/blk2scsa 755 root sys
 f none kernel/misc/amd64/bootdev 755 root sys
 f none kernel/misc/amd64/busra 755 root sys
 f none kernel/misc/amd64/cardbus 755 root sys

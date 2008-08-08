@@ -1,0 +1,63 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+root	b2s_mod_fini
+root	b2s_mod_init
+root	b2s_alloc_nexus
+root	b2s_attach_leaf
+root	b2s_attach_nexus
+root	b2s_detach_leaf
+root	b2s_detach_nexus
+root	b2s_free_nexus
+root	b2s_request_dma
+root	b2s_tran_tgt_free
+root	b2s_tran_tgt_init
+
+root	b2s_tran_setup_pkt
+root	b2s_tran_start
+root	b2s_tran_teardown_pkt
+root	b2s_tran_tgt_free
+root	b2s_tran_tgt_init
+
+add	bus_ops::bus_config		targets	b2s_bus_config
+
+add 	scsi_pkt::pkt_comp		targets \
+					b2s_tran_teardown_pkt \
+					b2s_tran_setup_pkt \
+					b2s_tran_abort \
+					b2s_tran_reset \
+					b2s_tran_getcap \
+					b2s_tran_setcap \
+					b2s_tran_start
+
+add	b2s_nexus::n_request		targets	b2s_request_dma
+
+add	bus_ops::bus_add_eventcall	targets	warlock_dummy
+add	bus_ops::bus_unconfig		targets	warlock_dummy
+add	bus_ops::bus_get_eventcookie	targets warlock_dummy
+add	bus_ops::bus_intr_ctl		targets	warlock_dummy
+add	bus_ops::bus_post_event		targets warlock_dummy
+add	bus_ops::bus_remove_eventcall	targets warlock_dummy
+

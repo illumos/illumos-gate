@@ -18,10 +18,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # Common definitions for open and closed headers.
@@ -95,6 +93,9 @@ scsi/targets/%.check:	scsi/targets/%.h
 	$(DOT_H_CHECK)
 
 scsi/adapters/%.check:	scsi/adapters/%.h
+	$(DOT_H_CHECK)
+
+sdcard/%.check:		sdcard/%.h
 	$(DOT_H_CHECK)
 
 sysevent/%.check:     sysevent/%.h
@@ -178,6 +179,7 @@ ROOTDIRS=			\
 	$(ROOTDIR)/scsi/generic	\
 	$(ROOTDIR)/scsi/impl	\
 	$(ROOTDIR)/fc4		\
+	$(ROOTDIR)/sdcard	\
 	$(ROOTDIR)/sysevent     \
 	$(ROOTDIR)/contract     \
 	$(ROOTDIR)/usb		\
@@ -237,9 +239,12 @@ ROOTSCSIGENHDRS= $(SCSIGENHDRS:%=$(ROOTDIR)/scsi/generic/%)
 ROOTSCSIIMPLHDRS= $(SCSIIMPLHDRS:%=$(ROOTDIR)/scsi/impl/%)
 ROOTSCSITARGETSHDRS= $(SCSITARGETSHDRS:%=$(ROOTDIR)/scsi/targets/%)
 ROOTSCSICADHDRS= $(SCSICADHDRS:%=$(ROOTDIR)/scsi/adapters/%)
+ROOTSCSIADHDRS= $(SCSICADHDRS:%=$(ROOTDIR)/scsi/adapters/%)
 ROOTSCSIVHCIHDRS= $(SCSIVHCIHDRS:%=$(ROOTDIR)/scsi/adapters/%)
 
 ROOTFCHDRS= $(FCHDRS:%=$(ROOTDIR)/fc4/%)
+
+ROOTSDCARDHDRS= $(SDCARDHDRS:%=$(ROOTDIR)/sdcard/%)
 
 ROOTSYSEVENTHDRS= $(SYSEVENTHDRS:%=$(ROOTDIR)/sysevent/%)
 ROOTCONTRACTHDRS= $(CONTRACTHDRS:%=$(ROOTDIR)/contract/%)
@@ -344,6 +349,9 @@ $(ROOTDIR)/scsi/targets/%:	scsi/targets/%
 	$(INS.file)
 
 $(ROOTDIR)/fc4/%:		fc4/%
+	$(INS.file)
+
+$(ROOTDIR)/sdcard/%:		sdcard/%
 	$(INS.file)
 
 $(ROOTDIR)/sysevent/%:		sysevent/%

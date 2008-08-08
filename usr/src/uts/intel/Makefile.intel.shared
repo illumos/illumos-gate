@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 #	This makefile contains the common definitions for all intel
@@ -297,6 +295,8 @@ DRV_KMODS	+= sad
 DRV_KMODS	+= sctp
 DRV_KMODS	+= sctp6
 DRV_KMODS	+= sd
+DRV_KMODS	+= sdcard
+DRV_KMODS	+= sdhost
 DRV_KMODS	+= sgen
 DRV_KMODS	+= si3124
 DRV_KMODS	+= smbios
@@ -521,6 +521,7 @@ MISC_KMODS	+= agpmaster
 MISC_KMODS	+= amsrc2
 MISC_KMODS	+= audiosup
 MISC_KMODS	+= bignum
+MISC_KMODS	+= blk2scsa
 MISC_KMODS	+= bootdev
 MISC_KMODS	+= busra
 MISC_KMODS	+= cmlb
@@ -563,6 +564,7 @@ MISC_KMODS	+= rpcsec_gss
 MISC_KMODS	+= rsmops
 MISC_KMODS	+= sata
 MISC_KMODS	+= scsi
+MISC_KMODS	+= sda
 MISC_KMODS	+= strategy
 MISC_KMODS	+= strplumb
 MISC_KMODS	+= sysinit

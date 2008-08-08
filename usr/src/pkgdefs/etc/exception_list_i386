@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Exception List for protocmp
 #
 ###########################################
@@ -1076,6 +1074,13 @@ usr/lib/vscan/llib-lvscan.ln	i386
 # drivers.  There is no usr/ component to this sub-platform, but the
 # directory is created in the proto area to keep other tools happy.
 usr/platform/i86hvm		i386
+#
+# Private sdcard framework headers
+#
+usr/include/sys/sdcard			i386
+usr/include/sys/sdcard/sda.h		i386
+usr/include/sys/sdcard/sda_impl.h	i386
+usr/include/sys/sdcard/sda_ioctl.h	i386
 #
 # libsmbfs is private
 #

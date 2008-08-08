@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # This Makefile defines all file modules for the directory uts/common
 # and its children. These are the source files which may be considered
 # common to all SunOS systems.
@@ -1617,6 +1615,11 @@ NXGE_HCALL_OBJS =	\
 #
 KICONV_EMEA_OBJS += kiconv_emea.o
 
+#
+#	blk2scsa
+#
+BLK2SCSA_OBJS = blk2scsa.o
+
 KICONV_JA_OBJS += kiconv_ja.o
 
 KICONV_KO_OBJS += kiconv_cck_common.o kiconv_ko.o
@@ -1629,6 +1632,16 @@ KICONV_TC_OBJS += kiconv_cck_common.o kiconv_tc.o
 #	AAC module
 #
 AAC_OBJS = aac.o aac_ioctl.o
+
+#
+#	sdcard modules
+#
+SDA_OBJS =	sda_cmd.o sda_host.o sda_init.o sda_mem.o sda_mod.o \
+		sda_nexus.o sda_slot.o
+SDCARD_OBJS =	sdcard.o
+SDHOST_OBJS =	sdhost.o
+WBSD_OBJS =	wbsd.o
+
 #
 #	hxge 10G driver module
 #

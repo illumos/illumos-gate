@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
 # and their location on the development machine when building the package.
@@ -65,6 +63,8 @@ s none usr/ccs/lib/amd64/liby.so=../../../lib/amd64/liby.so.1
 d none usr/lib/cfgadm/amd64 755 root bin
 f none usr/lib/cfgadm/amd64/scsi.so.1 755 root bin
 s none usr/lib/cfgadm/amd64/scsi.so=./scsi.so.1
+f none usr/lib/cfgadm/amd64/sdcard.so.1 755 root bin
+s none usr/lib/cfgadm/amd64/sdcard.so=./sdcard.so.1
 f none usr/lib/cfgadm/amd64/pci.so.1 755 root bin
 s none usr/lib/cfgadm/amd64/pci.so=./pci.so.1
 f none usr/lib/cfgadm/amd64/usb.so.1 755 root bin

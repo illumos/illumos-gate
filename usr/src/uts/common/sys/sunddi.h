@@ -27,8 +27,6 @@
 #ifndef	_SYS_SUNDDI_H
 #define	_SYS_SUNDDI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Sun Specific DDI definitions
  */
@@ -212,6 +210,9 @@ extern "C" {
 
 #define	DDI_NT_SATA_ATTACHMENT_POINT	"ddi_ctl:attachment_point:sata"
 						/* sata attachment pt */
+
+#define	DDI_NT_SDCARD_ATTACHMENT_POINT	"ddi_ctl:attachment_point:sdcard"
+						/* sdcard attachment pt */
 
 #define	DDI_NT_PCI_ATTACHMENT_POINT	"ddi_ctl:attachment_point:pci"
 						/* PCI attachment pt */

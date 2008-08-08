@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include $(SRC)/uts/Makefile.uts
 
@@ -859,12 +857,20 @@ SCSITARGETSHDRS=	\
 	sddef.h		\
 	smp.h
 
+SCSIADHDRS=		\
+	blk2scsa.h
+
 SCSICADHDRS=
 
 SCSIVHCIHDRS=		\
 	scsi_vhci.h	\
 	mpapi_impl.h	\
 	mpapi_scsi_vhci.h
+
+SDCARDHDRS=		\
+	sda.h		\
+	sda_impl.h	\
+	sda_ioctl.h
 
 FCHDRS=			\
 	fc_transport.h	\
@@ -1049,12 +1055,14 @@ CHECKHDRS=						\
 	$(LVMHDRS:%.h=lvm/%.check)			\
 	$(PCMCIAHDRS:%.h=pcmcia/%.check)		\
 	$(SCSIHDRS:%.h=scsi/%.check)			\
-	$(SCSICONHDRS:%.h=scsi/conf/%.check)		\
+	$(SCSIADHDRS:%.h=scsi/adapters/%.check)		\
+	$(SCSICONFHDRS:%.h=scsi/conf/%.check)		\
 	$(SCSIIMPLHDRS:%.h=scsi/impl/%.check)		\
 	$(SCSITARGETSHDRS:%.h=scsi/targets/%.check)	\
 	$(SCSIVHCIHDRS:%.h=scsi/adapters/%.check)	\
 	$(FCHDRS:%.h=fc4/%.check)			\
 	$(SATAGENHDRS:%.h=sata/%.check)			\
+	$(SDCARDHDRS:%.h=sdcard/%.check)		\
 	$(SYSEVENTHDRS:%.h=sysevent/%.check)            \
 	$(CONTRACTHDRS:%.h=contract/%.check)            \
 	$(USBAUDHDRS:%.h=usb/clients/audio/%.check)   \
@@ -1096,11 +1104,13 @@ CHECKHDRS=						\
 	$(ROOTLVMHDRS)		\
 	$(ROOTPCMCIAHDRS)	\
 	$(ROOTSCSIHDRS)		\
+	$(ROOTSCSIADHDRS)	\
 	$(ROOTSCSICONFHDRS)	\
 	$(ROOTSCSIGENHDRS)	\
 	$(ROOTSCSIIMPLHDRS)	\
 	$(ROOTSCSIVHCIHDRS)	\
 	$(ROOTFCHDRS)		\
+	$(ROOTSDCARDHDRS)	\
 	$(ROOTSYSEVENTHDRS)     \
 	$(ROOTCONTRACTHDRS)     \
 	$(ROOTUSBHDRS)		\
@@ -1144,11 +1154,13 @@ install_h:			\
 	$(ROOTLVMHDRS)		\
 	$(ROOTPCMCIAHDRS)	\
 	$(ROOTSCSIHDRS)		\
+	$(ROOTSCSIADHDRS)	\
 	$(ROOTSCSICONFHDRS)	\
 	$(ROOTSCSIGENHDRS)	\
 	$(ROOTSCSIIMPLHDRS)	\
 	$(ROOTSCSIVHCIHDRS)	\
 	$(ROOTFCHDRS)		\
+	$(ROOTSDCARDHDRS)	\
 	$(ROOTSYSEVENTHDRS)     \
 	$(ROOTCONTRACTHDRS)     \
 	$(ROOTUSBHDRS)		\

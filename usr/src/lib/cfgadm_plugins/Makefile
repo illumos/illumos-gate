@@ -19,17 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # lib/cfgadm_plugins/Makefile
 #
 
 include $(SRC)/Makefile.master
 
-COMMON_SUBDIRS= scsi pci usb ib
+COMMON_SUBDIRS= scsi sdcard pci usb ib
 sparc_SUBDIRS=	sbd ac sysctrl
 
 i386_SUBDIRS= sata

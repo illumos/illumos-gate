@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This makefile contains the common definitions for all sparc
 #	implementation architecture independent modules.
 #
@@ -291,6 +289,9 @@ DRV_KMODS	+= sgen
 DRV_KMODS	+= smp
 DRV_KMODS	+= dad
 DRV_KMODS	+= scsi_vhci
+DRV_KMODS	+= sdcard
+DRV_KMODS	+= sdhost
+DRV_KMODS	+= wbsd
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= audioens
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= audiovia823x
@@ -391,6 +392,8 @@ MISC_KMODS	+= pcicfg.e fcodem fcpci
 MISC_KMODS	+= scsi_vhci_f_sym scsi_vhci_f_tpgs scsi_vhci_f_asym_sun
 MISC_KMODS	+= scsi_vhci_f_sym_hds
 MISC_KMODS	+= scsi_vhci_f_tape scsi_vhci_f_tpgs_tape
+MISC_KMODS	+= blk2scsa
+MISC_KMODS	+= sda
 
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= amsrc1
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= klmmod klmops

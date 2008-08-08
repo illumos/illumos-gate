@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Exception List for protocmp
 #
 ###########################################
@@ -1156,6 +1154,13 @@ usr/include/libvscan.h	sparc
 #
 usr/lib/vscan/llib-lvscan	sparc
 usr/lib/vscan/llib-lvscan.ln	sparc
+#
+# Private sdcard framework headers
+#
+usr/include/sys/sdcard			sparc
+usr/include/sys/sdcard/sda.h		sparc
+usr/include/sys/sdcard/sda_impl.h	sparc
+usr/include/sys/sdcard/sda_ioctl.h	sparc
 #
 # libsmbfs is private
 #

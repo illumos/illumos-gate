@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <devfsadm.h>
 #include <stdio.h>
@@ -59,6 +57,7 @@ static char	*get_roothub(const char *path, void *cb_arg);
 static int	pci_cfg_creat_cb(di_minor_t minor, di_node_t node);
 static int	ib_cfg_creat_cb(di_minor_t minor, di_node_t node);
 static int	sata_cfg_creat_cb(di_minor_t minor, di_node_t node);
+static int	sdcard_cfg_creat_cb(di_minor_t minor, di_node_t node);
 
 static di_node_t	pci_cfg_chassis_node(di_node_t, di_prom_handle_t);
 static char 	*pci_cfg_slotname(di_node_t, di_prom_handle_t, minor_t);
@@ -117,6 +116,9 @@ static devfsadm_create_t cfg_create_cbt[] = {
 	},
 	{ "attachment-point", DDI_NT_SATA_ATTACHMENT_POINT, NULL,
 	    TYPE_EXACT, ILEVEL_0, sata_cfg_creat_cb
+	},
+	{ "attachment-point", DDI_NT_SDCARD_ATTACHMENT_POINT, NULL,
+	    TYPE_EXACT, ILEVEL_0, sdcard_cfg_creat_cb
 	}
 };
 
@@ -146,7 +148,10 @@ static devfsadm_remove_t cfg_remove_cbt[] = {
 	},
 	{ "attachment-point", SATA_CFG_LINK_RE, RM_POST|RM_HOT|RM_ALWAYS,
 	    ILEVEL_0, devfsadm_rm_all
-	}
+	},
+	{ "attachment-point", SDCARD_CFG_LINK_RE, RM_POST|RM_HOT|RM_ALWAYS,
+	    ILEVEL_0, devfsadm_rm_all
+	},
 };
 
 DEVFSADM_REMOVE_INIT_V0(cfg_remove_cbt);
@@ -264,7 +269,7 @@ sata_cfg_creat_cb(di_minor_t minor, di_node_t node)
 	}
 
 	(void) snprintf(l_path, sizeof (l_path), "%s/sata%s/%s", CFG_DIRNAME,
-			buf, minor_nm);
+	    buf, minor_nm);
 	free(buf);
 
 	(void) devfsadm_mklink(l_path, node, minor, 0);
@@ -272,6 +277,39 @@ sata_cfg_creat_cb(di_minor_t minor, di_node_t node)
 	return (DEVFSADM_CONTINUE);
 }
 
+static int
+sdcard_cfg_creat_cb(di_minor_t minor, di_node_t node)
+{
+	char path[PATH_MAX +1], l_path[PATH_MAX], *buf, *devfspath;
+	char *minor_nm;
+	devfsadm_enumerate_t rules[1] =
+	    {"^cfg$/^sdcard([0-9]+)$", 1, MATCH_ADDR};
+
+	minor_nm = di_minor_name(minor);
+	if (minor_nm == NULL)
+		return (DEVFSADM_CONTINUE);
+
+	devfspath = di_devfs_path(node);
+	if (devfspath == NULL)
+		return (DEVFSADM_CONTINUE);
+
+	(void) snprintf(path, sizeof (path), "%s:%s", devfspath, minor_nm);
+	di_devfs_path_free(devfspath);
+
+	/* build the physical path from the components */
+	if (devfsadm_enumerate_int(path, 0, &buf, rules, 1) ==
+	    DEVFSADM_FAILURE) {
+		return (DEVFSADM_CONTINUE);
+	}
+
+	(void) snprintf(l_path, sizeof (l_path), "%s/sdcard%s/%s",
+	    CFG_DIRNAME, buf, minor_nm);
+	free(buf);
+
+	(void) devfsadm_mklink(l_path, node, minor, 0);
+
+	return (DEVFSADM_CONTINUE);
+}
 
 /*
  * get_roothub:
@@ -557,7 +595,7 @@ pci_cfg_iob_name(di_minor_t minor, di_node_t node, di_prom_handle_t ph,
 	serid = (uint64_t)*seridp;
 
 	if ((serid >> 40) != (uint64_t)IEEE_SUN_ID ||
-		!serid_printable(&serid)) {
+	    !serid_printable(&serid)) {
 		(void) snprintf(buf, bufsz, "%s%llx", IOB_PRE, serid);
 		return (1);
 	}
