@@ -23,11 +23,10 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Concatenate files.
@@ -240,9 +239,9 @@ main(int argc, char **argv)
 
 			if ((fi = fopen(*argv, "r")) == NULL) {
 				if (!silent)
-				    (void) fprintf(stderr,
+				(void) fprintf(stderr,
 				    gettext("cat: cannot open %s: %s\n"),
-					    *argv, strerror(errno));
+				    *argv, strerror(errno));
 				status = 2;
 				continue;
 			}
@@ -273,9 +272,9 @@ main(int argc, char **argv)
 		    !S_ISSOCK(target.st_mode) &&
 		    IDENTICAL(target, source)) {
 			if (!silent)
-			    (void) fprintf(stderr,
+			(void) fprintf(stderr,
 			    gettext("cat: input/output files '%s' identical\n"),
-				stdinflg?"-": *argv);
+			    stdinflg?"-": *argv);
 			if (fclose(fi) != 0)
 				(void) fprintf(stderr,
 				    gettext("cat: close error: %s\n"),
@@ -351,7 +350,7 @@ cat(FILE *fi, struct stat *statp, struct stat *outp, char *filenm)
 		 * Mmap time!
 		 */
 		bufferp = mmap((caddr_t)NULL, (size_t)mapsize, PROT_READ,
-			MAP_SHARED, fi_desc, (off_t)0);
+		    MAP_SHARED, fi_desc, (off_t)0);
 		if (bufferp == (caddr_t)-1)
 			mapsize = 0;	/* I guess we can't mmap today */
 	} else
@@ -394,12 +393,13 @@ cat(FILE *fi, struct stat *statp, struct stat *outp, char *filenm)
 							    "%s: "), filenm);
 						else
 							(void) fprintf(
-							stderr, gettext(
-							"cat: write error: "));
+							    stderr, gettext(
+							    "cat: write\
+ error: "));
 						perror("");
 					}
 					(void) munmap(bufferp,
-						(size_t)munmapsize);
+					    (size_t)munmapsize);
 					(void) lseek(fi_desc, (off_t)mapoffset,
 					    SEEK_SET);
 					return (2);
@@ -420,7 +420,7 @@ cat(FILE *fi, struct stat *statp, struct stat *outp, char *filenm)
 					perror(gettext("cat: mmap error"));
 				(void) munmap(bufferp, (size_t)munmapsize);
 				(void) lseek(fi_desc, (off_t)mapoffset,
-					SEEK_SET);
+				    SEEK_SET);
 				return (1);
 			}
 		}
@@ -469,7 +469,7 @@ cat(FILE *fi, struct stat *statp, struct stat *outp, char *filenm)
 			 */
 			do {
 				nwritten = write(1, bufferp+offset,
-					(size_t)nitems);
+				    (size_t)nitems);
 				if (nwritten < 0) {
 					if (!silent) {
 						if (nwritten == -1)
@@ -491,6 +491,7 @@ cat(FILE *fi, struct stat *statp, struct stat *outp, char *filenm)
 			(void) fprintf(stderr,
 			    gettext("cat: input error on %s: "), filenm);
 			perror("");
+			return (1);
 		}
 	}
 
