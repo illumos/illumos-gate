@@ -55,14 +55,10 @@ export LC_ALL="C"
 
 if [ -z "$GATEPATH" ]; then
 	GATEPATH=/ws/onnv-gate
-	test -d $GATEPATH || GATEPATH=/net/onnv.eng/export/gate
-fi
-if [ -z "$ARCHIVEPATH" ]; then
-	ARCHIVEPATH=/ws/onnv-gate
-	test -d $ARCHIVEPATH || ARCHIVEPATH=/net/onnv.eng/export
+	test -d $GATEPATH || GATEPATH=/net/onnv.eng/export/onnv-gate
 fi
 export GATE=${GATEPATH}
-export ARCHIVE=${ARCHIVEPATH}
+export ARCHIVE=${ARCHIVEPATH:-${GATEPATH}}
 
 #
 # NOTE:	Entries in *_files must expand to either the exact files required,
@@ -1973,7 +1969,7 @@ _EOF
 
 	manifest_src=${MANIFEST_SRC-$GATE/public/smf}
 	[[ -d $manifest_src ]] ||
-	    manifest_src=/net/onnv.eng/export/gate/public/smf
+	    manifest_src=${GATE}/public/smf
 	[[ -d $manifest_src ]] || manifest_src=/net/greenline.eng/meta0/smf
 
 	if smf_bkbfu_past_sysconfig ; then
@@ -2600,7 +2596,7 @@ if [ ! -x /usr/bin/ldd ]; then
 fi
 nss_rpath=`ldd -s $nss_lib | egrep "$rpath_msg" | head -1 | cut -d'=' -f2 | \
 		awk '{print $1}'`
-update_script="/ws/onnv-gate/public/bin/update_nsspkgs"
+update_script="${GATE}/public/bin/update_nsspkgs"
 if [ $valid_rpath != "$nss_rpath" ]; then
 	if [ "$force_override" = yes ]; then
 		echo "$nss_lib is not valid but -f is set; continuing."
@@ -2614,7 +2610,7 @@ if [ $target_isa = i386 -a ! -f $nss_lib64 ]; then
 	fail "Run $update_script to update the NSS packages."
 fi
 
-update_script="/ws/onnv-gate/public/bin/migrate_bind9"
+update_script="${GATE}/public/bin/migrate_bind9"
 if [[ ! -f $usr/lib/dns/libdns.so ]] && ! $ZCAT $cpiodir/generic.usr$ZFIX | \
 	    cpio -it 2>/dev/null |  egrep -s '^usr/sbin/ndc' ; then
 	if [ "$force_override" = yes ]; then
@@ -2625,7 +2621,7 @@ if [[ ! -f $usr/lib/dns/libdns.so ]] && ! $ZCAT $cpiodir/generic.usr$ZFIX | \
 	fi
 fi
 
-update_script="/ws/onnv-gate/public/bin/update_ce"
+update_script="${GATE}/public/bin/update_ce"
 if ifconfig -a | egrep '^ce' >/dev/null 2>/dev/null; then
 	# CE version 1.148 or later is required
 	cever=`modinfo | grep 'CE Ethernet' | sed 's/.*v1\.//' | tr -d ')' | \
@@ -2635,7 +2631,7 @@ if ifconfig -a | egrep '^ce' >/dev/null 2>/dev/null; then
 	fi
 fi
 
-update_script="/ws/onnv-gate/public/bin/update_dbus"
+update_script="${GATE}/public/bin/update_dbus"
 if [ ! -x $usr/lib/dbus-daemon ]; then
 	fail "Run $update_script to update D-Bus."
 fi
@@ -5358,7 +5354,7 @@ install_failsafe()
 {
 	if [ "$root" != "/" ] || \
 	    [ -f /boot/x86.miniroot-safe ] || \
-	    [ ! -x ${GATEPATH}/public/bin/update_failsafe ]; then
+	    [ ! -x ${GATE}/public/bin/update_failsafe ]; then
 		#
 		# Either we're not bfu'ing /, or the failsafe archives were
 		# already installed, or update_failsafe is not available.
@@ -5373,7 +5369,7 @@ install_failsafe()
 		fi
 	else
 		echo "Updating failsafe archives"
-		${GATEPATH}/public/bin/update_failsafe
+		${GATE}/public/bin/update_failsafe
 
 		# Force bootadm to update the failsafe entry
 		bootadm_f_flag="-f"
