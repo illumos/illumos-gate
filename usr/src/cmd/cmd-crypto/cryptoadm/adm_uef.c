@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <cryptoutil.h>
 #include <fcntl.h>
 #include <libintl.h>
@@ -377,7 +375,8 @@ list_mechlist_for_lib(char *libname, mechlist_t *mlist,
 			    "Hardware Version: %d.%d\n"
 			    "Firmware Version: %d.%d\n"
 			    "UTC Time: %.16s\n"
-			    "PIN Length: %d-%d\n"),
+			    "PIN Min Length: %d\n"
+			    "PIN Max Length: %d\n"),
 			    tokeninfo.label,
 			    tokeninfo.manufacturerID,
 			    tokeninfo.model,

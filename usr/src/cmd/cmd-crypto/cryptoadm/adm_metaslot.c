@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Administration for metaslot
  *
@@ -217,7 +215,8 @@ list_metaslot_info(boolean_t show_mechs, boolean_t verbose,
 	    "Hardware Version: %d.%d\n"
 	    "Firmware Version: %d.%d\n"
 	    "UTC Time: %.16s\n"
-	    "PIN Length: %d-%d\n"),
+	    "PIN Min Length: %d\n"
+	    "PIN Max Length: %d\n"),
 	    token_info.label,
 	    token_info.manufacturerID,
 	    token_info.model,
