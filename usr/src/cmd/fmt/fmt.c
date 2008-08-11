@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,6 +51,7 @@
 wchar_t	outbuf[BUFSIZ];			/* Sandbagged output line image */
 wchar_t	*outp;				/* Pointer in above */
 int	filler;				/* Filler amount in outbuf */
+char sobuf[BUFSIZ];	/* Global buffer */
 
 int	pfx;			/* Current leading blank count */
 int	width = 72;		/* Width that we will not exceed */
@@ -115,7 +114,6 @@ int
 main(int argc, char **argv)
 {
 	FILE *fi;
-	char sobuf[BUFSIZ];
 	char *cp;
 	int nofile;
 	char *locale;
@@ -227,7 +225,8 @@ fmt(FILE *fi)
 		 * Swipe trailing blanks from the line.
 		 */
 
-		for (cp2--; cp2 >= canonb && *cp2 == L' '; cp2--);
+		for (cp2--; cp2 >= canonb && *cp2 == L' '; cp2--) {
+		}
 		*++cp2 = '\0';
 
 			/* special processing to look for mail header lines */
@@ -237,7 +236,8 @@ fmt(FILE *fi)
 		case not_in_hdr:
 			/* look for an initial mail header line */
 			/* skip initial blanks */
-			for (cp = canonb; *cp == L' '; cp++);
+			for (cp = canonb; *cp == L' '; cp++) {
+			}
 			/*
 			 * Need to convert string from wchar_t to char,
 			 * since this is what ishead() expects.  Since we
@@ -309,7 +309,8 @@ prefix(wchar_t line[])
 			crown_state = c_reset;
 		return;
 	}
-	for (cp = line; *cp == L' '; cp++);
+	for (cp = line; *cp == L' '; cp++) {
+	}
 	np = cp - line;
 
 	/*
@@ -496,14 +497,16 @@ pack(wchar_t word[])
 	*outp = L'\0';
 	s = wscol(outbuf);
 	if (t+s <= width) {
-		for (cp = word; *cp; *outp++ = *cp++);
+		for (cp = word; *cp; *outp++ = *cp++) {
+		}
 		return;
 	}
 	if (s > filler) {
 		oflush();
 		leadin();
 	}
-	for (cp = word; *cp; *outp++ = *cp++);
+	for (cp = word; *cp; *outp++ = *cp++) {
+	}
 }
 
 /*
@@ -540,18 +543,21 @@ tabulate(wchar_t line[])
 		cp--;
 	*++cp = L'\0';
 	/* Count the leading blank space and tabulate */
-	for (cp = line; *cp == L' '; cp++);
+	for (cp = line; *cp == L' '; cp++) {
+	}
 	b = cp - line;
 	t = b >> 3;
 	b &= 07;
 	if (t > 0)
 		do
 			putc('\t', stdout);
-		while (--t);
+		while (--t) {
+		}
 	if (b > 0)
 		do
 			putc(' ', stdout);
-		while (--b);
+		while (--b) {
+		}
 	while (*cp)
 		putwc(*cp++, stdout);
 	putc('\n', stdout);
@@ -749,7 +755,8 @@ header_chk(void)
 		 */
 		for (l = 0; l < h_lines; l++) {
 			/* skip initial blanks */
-			for (cp = hdrbuf[l]; *cp == L' '; cp++);
+			for (cp = hdrbuf[l]; *cp == L' '; cp++) {
+			}
 			for (hp = &headnames[0]; *hp != (wchar_t *)0; hp++)
 				if (ispref(*hp, cp)) {
 					hdrcount++;
@@ -824,7 +831,8 @@ fill_hdrbuf(wchar_t line[])
 		return;
 	}
 	/* save this line as a potential mail header line */
-	for (i = 0, cp = line; (hdrbuf[h_lines][i] = *cp) != L'\0'; i++, cp++);
+	for (i = 0, cp = line; (hdrbuf[h_lines][i] = *cp) != L'\0'; i++, cp++) {
+	}
 	h_lines++;
 }
 
