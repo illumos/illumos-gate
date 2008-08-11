@@ -549,15 +549,13 @@ tabulate(wchar_t line[])
 	t = b >> 3;
 	b &= 07;
 	if (t > 0)
-		do
+		do {
 			putc('\t', stdout);
-		while (--t) {
-		}
+		} while (--t);
 	if (b > 0)
-		do
+		do {
 			putc(' ', stdout);
-		while (--b) {
-		}
+		} while (--b);
 	while (*cp)
 		putwc(*cp++, stdout);
 	putc('\n', stdout);
