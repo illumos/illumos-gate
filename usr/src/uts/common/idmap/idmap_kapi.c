@@ -30,7 +30,6 @@
  * Solaris UID and GIDs.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/ksynch.h>
@@ -91,6 +90,7 @@ typedef struct idmap_zone_specific {
 	idmap_cache_t	cache;
 	door_handle_t 	door_handle;
 	int		door_valid;
+	int		door_retried;
 	uint32_t	message_id;
 } idmap_zone_specific_t;
 
@@ -169,6 +169,7 @@ idmap_unreg_dh(zone_t *zone, door_handle_t dh)
 	door_ki_rele(zs->door_handle);
 
 	zs->door_valid = 0;
+	zs->door_retried = 0;
 	mutex_exit(&zs->zone_mutex);
 
 	return (0);
@@ -198,31 +199,44 @@ kidmap_call_door(idmap_zone_specific_t *zs, door_arg_t *arg)
 	door_handle_t 	dh;
 	door_info_t	di;
 	int		status = 0;
-	int		nretries = 0;
+	int		num_retries = 5;
+	int		door_retried;
 
 retry:
-	dh = NULL;
 	mutex_enter(&zs->zone_mutex);
 	if (zs->door_valid) {
 		dh = zs->door_handle;
 		door_ki_hold(dh);
+	} else {
+		dh = NULL;
+		door_retried = zs->door_retried;
 	}
 	mutex_exit(&zs->zone_mutex);
 
 	if (dh == NULL) {
+		/* The door has been retried before so dont wait */
+		if (door_retried)
+			return (-1);
+
 		/*
 		 * There is no door handle yet. Give
-		 * smf a chance to restarts the idmap daemon
+		 * smf a chance to restart idmapd
 		 */
-		if (nretries++ < 5) {
+		if (num_retries-- > 0) {
 			delay(hz);
 			goto retry;
 		}
+
 #ifdef	DEBUG
 		zcmn_err(zs->zone_id, CE_WARN,
 		    "idmap: Error no registered door to call the "
 		    "idmap daemon\n");
 #endif
+		mutex_enter(&zs->zone_mutex);
+		if (!zs->door_valid)
+			zs->door_retried = 1;
+		mutex_exit(&zs->zone_mutex);
+
 		return (-1);
 	}
 
@@ -237,8 +251,10 @@ retry:
 		/* If we took an interrupt we have to bail out. */
 		if (ttolwp(curthread) && ISSIG(curthread, JUSTLOOKING)) {
 			door_ki_rele(dh);
+#ifdef	DEBUG
 			zcmn_err(zs->zone_id, CE_WARN,
 			    "idmap: Interrupted\n");
+#endif
 			return (-1);
 		}
 		/*
@@ -263,6 +279,7 @@ retry:
 		mutex_enter(&zs->zone_mutex);
 		if (zs->door_valid && dh == zs->door_handle) {
 			zs->door_valid = 0;
+			zs->door_retried = 0;
 			door_ki_rele(zs->door_handle);
 		}
 		mutex_exit(&zs->zone_mutex);
