@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 /* cut : cut and paste columns of a table (projection of a relation) */
 /* Release 1.5; handles single backspaces as produced by nroff    */
@@ -178,13 +177,27 @@ main(int argc, char **argv)
 	do {	/* for all input files */
 		if (argc == 0 || strcmp(argv[filenr], "-") == 0)
 			inptr = stdin;
-		else
+		else {
 			if ((inptr = fopen(argv[filenr], "r")) == NULL) {
 				(void) fprintf(stderr, "cut: %s: %s\n",
 				    argv[filenr], strerror(errno));
 				status = 1;
 				continue;
 			}
+			/*
+			 * ftell() is used to check whether the file is an
+			 * open file descriptor and if the file is associate
+			 * with the a pipe, a FIFO,or a socket if file cannot
+			 * be opened ftell() can be used to check the status
+			 * of the file
+			 */
+			if (ftell(inptr) == -1) {
+				(void) fprintf(stderr, "cut: %s: %s\n",
+				    argv[filenr], strerror(errno));
+				status = 1;
+				continue;
+			}
+		}
 		(*funcp)();
 		(void) fclose(inptr);
 	} while (++filenr < argc);
