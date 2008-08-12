@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dmu_objset.h>
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_dir.h>
@@ -2064,7 +2062,10 @@ dsl_snapshot_rename_one(char *name, void *arg)
 	 * For recursive snapshot renames the parent won't be changing
 	 * so we just pass name for both the to/from argument.
 	 */
-	if (err = zfs_secpolicy_rename_perms(name, name, CRED())) {
+	err = zfs_secpolicy_rename_perms(name, name, CRED());
+	if (err == ENOENT) {
+		return (0);
+	} else if (err) {
 		(void) strcpy(ra->failed, name);
 		return (err);
 	}
