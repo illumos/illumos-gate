@@ -1155,6 +1155,9 @@ getcomments()
 	typeset p=$2
 	typeset pp=$3
 
+	if [[ -n $Nflag ]]; then
+		return
+	fi
 	#
 	# Mercurial support uses a file list in wx format, so this
 	# will be used there, too
@@ -1797,7 +1800,8 @@ pflag=
 lflag=
 wflag=
 Oflag=
-while getopts "i:o:p:lwO" opt
+Nflag=
+while getopts "i:o:p:lwON" opt
 do
 	case $opt in
 	i)	iflag=1
@@ -1820,6 +1824,8 @@ do
 	w)	wflag=1;;
 
 	O)	Oflag=1;;
+
+	N)	Nflag=1;;
 
 	?)	usage;;
 	esac
