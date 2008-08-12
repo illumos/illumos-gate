@@ -239,9 +239,9 @@ main(int argc, char **argv)
 
 			if ((fi = fopen(*argv, "r")) == NULL) {
 				if (!silent)
-				(void) fprintf(stderr,
-				    gettext("cat: cannot open %s: %s\n"),
-				    *argv, strerror(errno));
+					(void) fprintf(stderr, gettext(
+					    "cat: cannot open %s: %s\n"),
+					    *argv, strerror(errno));
 				status = 2;
 				continue;
 			}
@@ -392,10 +392,10 @@ cat(FILE *fi, struct stat *statp, struct stat *outp, char *filenm)
 							    "cat: cannot read "
 							    "%s: "), filenm);
 						else
-							(void) fprintf(
-							    stderr, gettext(
-							    "cat: write\
- error: "));
+							(void) fprintf(stderr,
+							    gettext(
+							    "cat: write "
+							    "error: "));
 						perror("");
 					}
 					(void) munmap(bufferp,
