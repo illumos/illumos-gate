@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Portions of this code from crypt_bsdmd5.so (bsdmd5.c) :
  * ----------------------------------------------------------------------------
@@ -260,7 +258,7 @@ crypt_genhash_impl(char *ctbuffer,
 		    "%srounds=%zu$", ctbuffer, rounds);
 	}
 
-	(void) strncat(ctbuffer, (const char *)salt, MAX_SALT_LEN);
+	(void) strncat(ctbuffer, (const char *)salt, salt_len);
 	(void) strlcat(ctbuffer, "$", ctbufflen);
 	p = ctbuffer + strlen(ctbuffer);
 	ctbufflen -= strlen(ctbuffer);
