@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dmu.h>
 #include <sys/dmu_impl.h>
 #include <sys/dmu_tx.h>
@@ -44,6 +42,7 @@
 #include <sys/zio_checksum.h>
 #ifdef _KERNEL
 #include <sys/vmsystm.h>
+#include <sys/zfs_znode.h>
 #endif
 
 const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
@@ -757,9 +756,9 @@ dmu_write_pages(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 		for (copied = 0; copied < tocpy; copied += PAGESIZE) {
 			ASSERT3U(pp->p_offset, ==, db->db_offset + bufoff);
 			thiscpy = MIN(PAGESIZE, tocpy - copied);
-			va = ppmapin(pp, PROT_READ, (caddr_t)-1);
+			va = zfs_map_page(pp, S_READ);
 			bcopy(va, (char *)db->db_data + bufoff, thiscpy);
-			ppmapout(va);
+			zfs_unmap_page(pp, va);
 			pp = pp->p_next;
 			bufoff += PAGESIZE;
 		}

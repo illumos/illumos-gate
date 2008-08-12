@@ -25,8 +25,6 @@
 
 /* Portions Copyright 2007 Jeremy Teo */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -47,6 +45,8 @@
 #include <vm/seg_vn.h>
 #include <vm/pvn.h>
 #include <vm/as.h>
+#include <vm/kpm.h>
+#include <vm/seg_kpm.h>
 #include <sys/mman.h>
 #include <sys/pathname.h>
 #include <sys/cmn_err.h>
@@ -303,6 +303,31 @@ zfs_ioctl(vnode_t *vp, int com, intptr_t data, int flag, cred_t *cred,
 }
 
 /*
+ * Utility functions to map and unmap a single physical page.  These
+ * are used to manage the mappable copies of ZFS file data, and therefore
+ * do not update ref/mod bits.
+ */
+caddr_t
+zfs_map_page(page_t *pp, enum seg_rw rw)
+{
+	if (kpm_enable)
+		return (hat_kpm_mapin(pp, 0));
+	ASSERT(rw == S_READ || rw == S_WRITE);
+	return (ppmapin(pp, PROT_READ | ((rw == S_WRITE) ? PROT_WRITE : 0),
+	    (caddr_t)-1));
+}
+
+void
+zfs_unmap_page(page_t *pp, caddr_t addr)
+{
+	if (kpm_enable) {
+		hat_kpm_mapout(pp, 0, addr);
+	} else {
+		ppmapout(addr);
+	}
+}
+
+/*
  * When a file is memory mapped, we must keep the IO data synchronized
  * between the DMU cache and the memory mapped pages.  What this means:
  *
@@ -339,13 +364,13 @@ mappedwrite(vnode_t *vp, int nbytes, uio_t *uio, dmu_tx_t *tx)
 			caddr_t va;
 
 			rw_exit(&zp->z_map_lock);
-			va = ppmapin(pp, PROT_READ | PROT_WRITE, (caddr_t)-1L);
+			va = zfs_map_page(pp, S_WRITE);
 			error = uiomove(va+off, bytes, UIO_WRITE, uio);
 			if (error == 0) {
 				dmu_write(zfsvfs->z_os, zp->z_id,
 				    woff, bytes, va+off, tx);
 			}
-			ppmapout(va);
+			zfs_unmap_page(pp, va);
 			page_unlock(pp);
 		} else {
 			error = dmu_write_uio(zfsvfs->z_os, zp->z_id,
@@ -388,9 +413,9 @@ mappedread(vnode_t *vp, int nbytes, uio_t *uio)
 		if (pp = page_lookup(vp, start, SE_SHARED)) {
 			caddr_t va;
 
-			va = ppmapin(pp, PROT_READ, (caddr_t)-1L);
+			va = zfs_map_page(pp, S_READ);
 			error = uiomove(va + off, bytes, UIO_READ, uio);
-			ppmapout(va);
+			zfs_unmap_page(pp, va);
 			page_unlock(pp);
 		} else {
 			error = dmu_read_uio(os, zp->z_id, uio, bytes);
@@ -3609,10 +3634,10 @@ top:
 	}
 
 	if (zp->z_blksz <= PAGESIZE) {
-		caddr_t va = ppmapin(pp, PROT_READ, (caddr_t)-1);
+		caddr_t va = zfs_map_page(pp, S_READ);
 		ASSERT3U(len, <=, PAGESIZE);
 		dmu_write(zfsvfs->z_os, zp->z_id, off, len, va, tx);
-		ppmapout(va);
+		zfs_unmap_page(pp, va);
 	} else {
 		err = dmu_write_pages(zfsvfs->z_os, zp->z_id, off, len, pp, tx);
 	}
@@ -3895,9 +3920,9 @@ zfs_fillpage(vnode_t *vp, u_offset_t off, struct seg *seg,
 	cur_pp = pp;
 	for (total = io_off + io_len; io_off < total; io_off += PAGESIZE) {
 		ASSERT3U(io_off, ==, cur_pp->p_offset);
-		va = ppmapin(cur_pp, PROT_READ | PROT_WRITE, (caddr_t)-1);
+		va = zfs_map_page(cur_pp, S_WRITE);
 		err = dmu_read(os, oid, io_off, PAGESIZE, va);
-		ppmapout(va);
+		zfs_unmap_page(cur_pp, va);
 		if (err) {
 			/* On error, toss the entire kluster */
 			pvn_read_done(pp, B_ERROR);

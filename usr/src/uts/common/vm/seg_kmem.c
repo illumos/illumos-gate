@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -1501,10 +1499,10 @@ segkmem_zio_init(void *zio_mem_base, size_t zio_mem_size)
 	ASSERT(zio_mem_base != NULL);
 	ASSERT(zio_mem_size != 0);
 
-	zio_arena = vmem_create("zio", zio_mem_base, zio_mem_size, PAGESIZE,
-	    NULL, NULL, NULL, 0, VM_SLEEP);
+	zio_arena = vmem_create("zfs_file_data", zio_mem_base, zio_mem_size,
+	    PAGESIZE, NULL, NULL, NULL, 0, VM_SLEEP);
 
-	zio_alloc_arena = vmem_create("zio_buf", NULL, 0, PAGESIZE,
+	zio_alloc_arena = vmem_create("zfs_file_data_buf", NULL, 0, PAGESIZE,
 	    segkmem_zio_alloc, segkmem_zio_free, zio_arena, 0, VM_SLEEP);
 
 	ASSERT(zio_arena != NULL);

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 #include <sys/types.h>
 #include <vm/page.h>
@@ -221,6 +219,7 @@ typedef struct memstat {
 	struct vnode    *ms_kvp;	/* Cached address of kernel vnode */
 	struct vnode    *ms_zvp;	/* Cached address of zio vnode    */
 	uint64_t	ms_kmem;	/* Pages of kernel memory	  */
+	uint64_t	ms_zfs_data;	/* Pages of zfs data		  */
 	uint64_t	ms_anon;	/* Pages of anonymous memory	  */
 	uint64_t	ms_vnode;	/* Pages of named (vnode) memory  */
 	uint64_t	ms_exec;	/* Pages of exec/library memory	  */
@@ -229,8 +228,10 @@ typedef struct memstat {
 } memstat_t;
 
 #define	MS_PP_ISKAS(pp, stats)				\
-	(((pp)->p_vnode == (stats)->ms_kvp) ||		\
-	    (((stats)->ms_zvp != NULL) && ((pp)->p_vnode == (stats)->ms_zvp)))
+	((pp)->p_vnode == (stats)->ms_kvp)
+
+#define	MS_PP_ISZFS_DATA(pp, stats)			\
+	(((stats)->ms_zvp != NULL) && ((pp)->p_vnode == (stats)->ms_zvp))
 
 /*
  * Summarize pages by type; called from page walker.
@@ -258,6 +259,8 @@ memstat_callback(page_t *page, page_t *pp, memstat_t *stats)
 		stats->ms_cachelist++;
 	else if (vp && IS_SWAPFSVP(vp))
 		stats->ms_anon++;
+	else if (MS_PP_ISZFS_DATA(pp, stats))
+		stats->ms_zfs_data++;
 	else if (MS_PP_ISKAS(pp, stats))
 		stats->ms_kmem++;
 	else if (vp && (((vp)->v_flag & VVMEXEC)) != 0)
@@ -371,6 +374,13 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    stats.ms_kmem,
 	    (uint64_t)stats.ms_kmem * pagesize / (1024 * 1024),
 	    MS_PCT_TOTAL(stats.ms_kmem));
+
+	if (stats.ms_zfs_data != 0)
+		mdb_printf("ZFS File Data    %16llu  %16llu  %3lu%%\n",
+		    stats.ms_zfs_data,
+		    (uint64_t)stats.ms_zfs_data * pagesize / (1024 * 1024),
+		    MS_PCT_TOTAL(stats.ms_zfs_data));
+
 	mdb_printf("Anon             %16llu  %16llu  %3lu%%\n",
 	    stats.ms_anon,
 	    (uint64_t)stats.ms_anon * pagesize / (1024 * 1024),
