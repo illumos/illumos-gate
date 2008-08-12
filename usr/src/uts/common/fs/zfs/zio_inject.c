@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ZFS fault injection
  *
@@ -365,6 +363,7 @@ zio_clear_fault(int id)
 void
 zio_inject_init(void)
 {
+	rw_init(&inject_lock, NULL, RW_DEFAULT, NULL);
 	list_create(&inject_handlers, sizeof (inject_handler_t),
 	    offsetof(inject_handler_t, zi_link));
 }
@@ -373,4 +372,5 @@ void
 zio_inject_fini(void)
 {
 	list_destroy(&inject_handlers);
+	rw_destroy(&inject_lock);
 }

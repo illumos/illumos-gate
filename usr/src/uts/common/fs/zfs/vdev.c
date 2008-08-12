@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/zfs_context.h>
 #include <sys/fm/fs/zfs.h>
 #include <sys/spa.h>
@@ -1541,6 +1539,12 @@ vdev_description(vdev_t *vd)
 
 	if (vd->vdev_path != NULL)
 		return (vd->vdev_path);
+
+	if (vd->vdev_physpath != NULL)
+		return (vd->vdev_physpath);
+
+	if (vd->vdev_devid != NULL)
+		return (vd->vdev_devid);
 
 	if (vd->vdev_parent == NULL)
 		return (spa_name(vd->vdev_spa));

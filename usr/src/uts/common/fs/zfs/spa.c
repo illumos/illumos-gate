@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains all the routines used when modifying on-disk SPA state.
  * This includes opening, importing, destroying, exporting a pool, and syncing a
@@ -2784,11 +2782,14 @@ int
 spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 {
 	uint64_t txg, open_txg;
-	int error;
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *oldvd, *newvd, *newrootvd, *pvd, *tvd;
 	vdev_ops_t *pvops;
 	int is_log;
+	dmu_tx_t *tx;
+	char *oldvdpath, *newvdpath;
+	int newvd_isspare;
+	int error;
 
 	txg = spa_vdev_enter(spa);
 
@@ -2937,6 +2938,9 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 
 	if (newvd->vdev_isspare)
 		spa_spare_activate(newvd);
+	oldvdpath = spa_strdup(vdev_description(oldvd));
+	newvdpath = spa_strdup(vdev_description(newvd));
+	newvd_isspare = newvd->vdev_isspare;
 
 	/*
 	 * Mark newvd's DTL dirty in this txg.
@@ -2944,6 +2948,21 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	vdev_dirty(tvd, VDD_DTL, newvd, txg);
 
 	(void) spa_vdev_exit(spa, newrootvd, open_txg, 0);
+
+	tx = dmu_tx_create_dd(spa_get_dsl(spa)->dp_mos_dir);
+	if (dmu_tx_assign(tx, TXG_WAIT) == 0) {
+		spa_history_internal_log(LOG_POOL_VDEV_ATTACH, spa, tx,
+		    CRED(),  "%s vdev=%s %s vdev=%s",
+		    replacing && newvd_isspare ? "spare in" :
+		    replacing ? "replace" : "attach", newvdpath,
+		    replacing ? "for" : "to", oldvdpath);
+		dmu_tx_commit(tx);
+	} else {
+		dmu_tx_abort(tx);
+	}
+
+	spa_strfree(oldvdpath);
+	spa_strfree(newvdpath);
 
 	/*
 	 * Kick off a resilver to update newvd.
