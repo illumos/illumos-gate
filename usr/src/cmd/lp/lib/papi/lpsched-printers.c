@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 
@@ -232,6 +230,9 @@ lpsched_printer_configuration_to_attributes(service_t *svc, printer_t *p,
 				"requesting-user-name-allowed", allowed);
 	papiAttributeListAddLPStrings(&p->attributes, PAPI_ATTR_REPLACE,
 				"requesting-user-name-denied", denied);
+
+	freelist(allowed);
+	freelist(denied);
 
 #ifdef LP_USE_PAPI_ATTR
 	if (tmp->ppd != NULL) {

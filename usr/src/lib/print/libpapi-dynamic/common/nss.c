@@ -27,8 +27,6 @@
 
 /* Id: nss.c 180 2006-07-20 17:33:02Z njacobs $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -101,18 +99,22 @@ solaris_lpsched_shortcircuit_hack(papi_attribute_t ***list)
 	papiAttributeListGetString(*list, NULL,
 				"printer-uri-supported", &printer);
 	/* if there is no printer-uri-supported, there is nothing to do */
-	if (printer == NULL)
+	if (printer == NULL) {
 		return;
+	}
 
 	if (uri_from_string(printer, &uri) < 0) {
 		papiAttributeListFree(*list);
 		*list = NULL;
+		uri_free(uri);
 		return;
 	}
 
 	/* already an lpsched URI ? */
-	if (strcasecmp(uri->scheme, "lpsched") == 0)
+	if (strcasecmp(uri->scheme, "lpsched") == 0) {
+		uri_free(uri);
 		return;
+	}
 
 	if ((printer = strrchr(uri->path, '/')) == NULL)
 		printer = uri->path;
@@ -122,17 +124,22 @@ solaris_lpsched_shortcircuit_hack(papi_attribute_t ***list)
 	/* is there an lpsched queue (printer/class) */
 	snprintf(buf, sizeof (buf), "/etc/lp/interfaces/%s", printer);
 	snprintf(buf2, sizeof (buf2), "/etc/lp/classes/%s", printer);
-	if ((access(buf, F_OK) < 0) && (access(buf2, F_OK) < 0))
+	if ((access(buf, F_OK) < 0) && (access(buf2, F_OK) < 0)) {
+		uri_free(uri);
 		return;
+	}
 
 	/* is this the "local" host */
-	if ((uri->host != NULL) && (is_localhost(uri->host) == 0))
+	if ((uri->host != NULL) && (is_localhost(uri->host) == 0)) {
+		uri_free(uri);
 		return;
+	}
 
 	snprintf(buf, sizeof (buf), "lpsched://%s/printers/%s",
 			(uri->host ? uri->host : "localhost"), printer);
 	papiAttributeListAddString(list, PAPI_ATTR_REPLACE,
 			"printer-uri-supported", buf);
+	uri_free(uri);
 }
 #endif
 
@@ -233,13 +240,13 @@ cvt_all_to_member_names(papi_attribute_t ***list)
 		return;
 
 	for (status = papiAttributeListGetString(*list, &iter, "all", &string);
-	     status == PAPI_OK;
-	     status = papiAttributeListGetString(*list, &iter, NULL, &string)) {
+	    status == PAPI_OK;
+	    status = papiAttributeListGetString(*list, &iter, NULL, &string)) {
 		char *s_iter = NULL, *value, *tmp = strdup(string);
 
 		for (value = strtok_r(tmp, ", \t", &s_iter);
-		     value != NULL;
-		     value = strtok_r(NULL, ", \t", &s_iter))
+		    value != NULL;
+		    value = strtok_r(NULL, ", \t", &s_iter))
 			papiAttributeListAddString(list, PAPI_ATTR_APPEND,
 					"member-names", value);
 		free(tmp);
@@ -266,9 +273,11 @@ _cvt_nss_entry_to_printer(char *entry)
 				papiAttributeListAddString(&list,
 					PAPI_ATTR_APPEND, "printer-name", buf);
 				in_namelist = 0;
-			} else if (key != NULL)
+			} else if (key != NULL) {
 				papiAttributeListAddString(&list,
 					PAPI_ATTR_APPEND, key, buf);
+				free(key);
+			}
 			memset(buf, 0, sizeof (buf));
 			buf_pos = 0;
 			key = NULL;
@@ -299,8 +308,10 @@ _cvt_nss_entry_to_printer(char *entry)
 
 	}
 
-	if (key != NULL)
+	if (key != NULL) {
 		papiAttributeListAddString(&list, PAPI_ATTR_APPEND, key, buf);
+		free(key);
+	}
 
 	/* resolve any "use" references in the configuration DB */
 	key = NULL;
