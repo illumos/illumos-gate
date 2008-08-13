@@ -24,8 +24,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # Check delta comments:
@@ -54,7 +52,7 @@ def normalize_arc(caseid):
 
 def comchk(comments, check_db=True, output=sys.stderr):
 	bugnospcre = re.compile(r'^(\d{7})([^ ].*)')
-	ignorere = re.compile(r'^(Contributed by .*|backout \d{7})')
+	ignorere = re.compile(r'^(Portions contributed by |Contributed by |back[ -]?out )')
 
 	errors = { 'bugnospc': [],
 		   'mutant': [],
