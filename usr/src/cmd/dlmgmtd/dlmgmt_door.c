@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Main door handler functions used by dlmgmtd to process the different door
  * call requests. Door call requests can come from the user-land applications,
@@ -38,7 +36,11 @@
 #include <priv_utils.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <syslog.h>
+#include <sys/sysevent/eventdefs.h>
+#include <libsysevent.h>
 #include <libdlmgmt.h>
+#include <librcm.h>
 #include "dlmgmt_impl.h"
 
 typedef void dlmgmt_door_handler_t(void *, void *);
@@ -65,6 +67,35 @@ dlmgmt_getlink_by_dev(char *devname)
 		}
 	}
 	return (NULL);
+}
+
+/*
+ * Post the EC_DATALINK sysevent for the given linkid. This sysevent will
+ * be consumed by the datalink sysevent module.
+ */
+static void
+dlmgmt_post_sysevent(const char *subclass, datalink_id_t linkid)
+{
+	nvlist_t	*nvl = NULL;
+	sysevent_id_t	eid;
+	int		err;
+
+	if (((err = nvlist_alloc(&nvl, NV_UNIQUE_NAME_TYPE, 0)) != 0) ||
+	    ((err = nvlist_add_uint64(nvl, RCM_NV_LINKID, linkid)) != 0)) {
+		goto done;
+	}
+
+	if (sysevent_post_event(EC_DATALINK, (char *)subclass, SUNW_VENDOR,
+	    (char *)progname, nvl, &eid) == -1) {
+		err = errno;
+	}
+
+done:
+	if (err != 0) {
+		dlmgmt_log(LOG_WARNING, "dlmgmt_post_sysevent(%d) failed: %s",
+		    linkid, strerror(err));
+	}
+	nvlist_free(nvl);
 }
 
 static void
@@ -165,8 +196,18 @@ done:
 	if (err == 0)
 		retvalp->lr_linkid = linkp->ll_linkid;
 
-	retvalp->lr_err = err;
 	dlmgmt_table_unlock();
+
+	if (err == 0) {
+		/*
+		 * Post the ESC_DATALINK_PHYS_ADD sysevent. This sysevent
+		 * is consumed by the datalink sysevent module which in
+		 * turn generates the RCM_RESOURCE_LINK_NEW RCM event.
+		 */
+		dlmgmt_post_sysevent(ESC_DATALINK_PHYS_ADD, retvalp->lr_linkid);
+	}
+
+	retvalp->lr_err = err;
 }
 
 static void

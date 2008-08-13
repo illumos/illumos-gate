@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Devfsadm replaces drvconfig, audlinks, disks, tapes, ports, devlinks
  * as a general purpose device administrative utility.	It creates
@@ -229,16 +227,6 @@ static mutex_t  nfp_mutex = DEFAULTMUTEX;
 static char *packaged_dirs[] =
 	{"dsk", "rdsk", "term", NULL};
 
-/* RCM related globals */
-static void *librcm_hdl;
-static rcm_handle_t *rcm_hdl = NULL;
-static thread_t process_rcm_events_tid;
-static struct rcm_eventq *volatile rcm_eventq_head = NULL;
-static struct rcm_eventq *rcm_eventq_tail = NULL;
-static mutex_t rcm_eventq_lock;
-static cond_t rcm_eventq_cv;
-static volatile int need_to_exit_rcm_event_thread = 0;
-
 /* Devname globals */
 static int devname_debug_msg = 1;
 static nvlist_t *devname_maps = NULL;
@@ -416,16 +404,11 @@ main(int argc, char *argv[])
 
 
 			/*
-			 * No need for rcm notifications when running
-			 * with an alternate root. So initialize rcm only
-			 * when devfsadm is running with root dir "/".
-			 * Similarly, logindevperms need only be set
+			 * logindevperms need only be set
 			 * in daemon mode and when root dir is "/".
 			 */
-			if (root_dir[0] == '\0') {
-				(void) rcm_init();
+			if (root_dir[0] == '\0')
 				login_dev_enable = TRUE;
-			}
 			daemon_update();
 			devfsadm_exit(0);
 			/*NOTREACHED*/
@@ -1034,14 +1017,11 @@ devi_tree_walk(struct dca_impl *dcip, int flags, char *ev_subclass)
 
 	/*
 	 * Finished creating devfs files and dev links.
-	 * Log sysevent and notify RCM.
+	 * Log sysevent.
 	 */
 	if (ev_subclass)
 		build_and_enq_event(EC_DEV_ADD, ev_subclass, dcip->dci_root,
 		    node, dcip->dci_minor);
-
-	if ((dcip->dci_flags & DCA_NOTIFY_RCM) && rcm_hdl)
-		(void) notify_rcm(node, dcip->dci_minor);
 
 	/* Add new device to device allocation database */
 	if (system_labeled && update_devdb) {
@@ -1769,9 +1749,7 @@ add_minor_pathname(char *node, char *minor, char *ev_subclass)
 	}
 
 	/*
-	 * We are being invoked in response to a hotplug
-	 * event. Also, notify RCM if nodetype indicates
-	 * a network device has been hotplugged.
+	 * We are being invoked in response to a hotplug event.
 	 */
 	dci.dci_flags = DCA_HOT_PLUG | DCA_CHECK_TYPE;
 
@@ -1835,7 +1813,6 @@ check_minor_type(di_node_t node, di_minor_t minor, void *arg)
 	if ((dcip->dci_flags & DCA_CHECK_TYPE) &&
 	    (nt = di_minor_nodetype(minor)) &&
 	    (strcmp(nt, DDI_NT_NET) == 0)) {
-		dcip->dci_flags |= DCA_NOTIFY_RCM;
 		dcip->dci_flags &= ~DCA_CHECK_TYPE;
 	}
 
@@ -7010,20 +6987,6 @@ devfsadm_exit(int status)
 		vprint(INFO_MID, "exit status = %d\n", status);
 	}
 
-	if (rcm_hdl) {
-		if (thr_self() != process_rcm_events_tid) {
-			(void) mutex_lock(&rcm_eventq_lock);
-			need_to_exit_rcm_event_thread = 1;
-			(void) cond_broadcast(&rcm_eventq_cv);
-			(void) mutex_unlock(&rcm_eventq_lock);
-
-			/* wait until process_rcm_events() thread exits */
-			(void) thr_join(process_rcm_events_tid, NULL, NULL);
-		}
-		librcm_free_handle(rcm_hdl);
-		(void) dlclose(librcm_hdl);
-	}
-
 	exit_dev_lock(1);
 	exit_daemon_lock(1);
 
@@ -7784,283 +7747,6 @@ is_minor_node(char *contents, char **mn_root)
 		*mn_root = contents;
 	}
 	return (DEVFSADM_FALSE);
-}
-
-/*
- * Lookup nvpair corresponding to the given name and type:
- *
- * The standard nvlist_lookup functions in libnvpair don't work as our
- * nvlist is not allocated with NV_UNIQUE_NAME or NV_UNIQUE_NAME_TYPE.
- */
-static nvpair_t *
-lookup_nvpair(nvlist_t *nvl, char *name, data_type_t type)
-{
-	nvpair_t *nvp;
-
-	for (nvp = nvlist_next_nvpair(nvl, NULL); nvp != NULL;
-	    nvp = nvlist_next_nvpair(nvl, nvp)) {
-		if (strcmp(name, nvpair_name(nvp)) == 0 &&
-		    nvpair_type(nvp) == type)
-			return (nvp);
-	}
-
-	return (NULL);
-}
-
-/*ARGSUSED*/
-static void
-process_rcm_events(void *arg)
-{
-	struct rcm_eventq *ev, *ev_next;
-	nvpair_t *nvp;
-	char *path, *driver;
-	int instance;
-	int err;
-	int need_to_exit;
-
-	for (;;) {
-		(void) mutex_lock(&rcm_eventq_lock);
-		while (rcm_eventq_head == NULL &&
-		    need_to_exit_rcm_event_thread == 0)
-			(void) cond_wait(&rcm_eventq_cv, &rcm_eventq_lock);
-
-		need_to_exit = need_to_exit_rcm_event_thread;
-		ev = rcm_eventq_head;
-		rcm_eventq_head = rcm_eventq_tail = NULL;
-		(void) mutex_unlock(&rcm_eventq_lock);
-
-		for (; ev != NULL; ev = ev_next) {
-			/*
-			 * Private notification interface to RCM:
-			 * Do not retry the RCM notification on an error since
-			 * we do not know whether the failure occurred in
-			 * librcm, rcm_daemon or rcm modules or scripts.
-			 */
-			if (librcm_notify_event(rcm_hdl,
-			    RCM_RESOURCE_NETWORK_NEW, 0, ev->nvl, NULL)
-			    != RCM_SUCCESS) {
-
-				err = errno;
-
-				if (((nvp = lookup_nvpair(ev->nvl,
-				    RCM_NV_DEVFS_PATH, DATA_TYPE_STRING))
-				    == NULL) ||
-				    (nvpair_value_string(nvp, &path) != 0))
-					path = "unknown";
-
-				if (((nvp = lookup_nvpair(ev->nvl,
-				    RCM_NV_DRIVER_NAME, DATA_TYPE_STRING))
-				    == NULL) ||
-				    (nvpair_value_string(nvp, &driver) != 0))
-					driver = "unknown";
-				if (((nvp = lookup_nvpair(ev->nvl,
-				    RCM_NV_INSTANCE, DATA_TYPE_INT32))
-				    == NULL) ||
-				    (nvpair_value_int32(nvp, &instance) != 0))
-					instance = -1;
-
-				err_print(RCM_NOTIFY_FAILED, path, driver,
-				    instance, strerror(err));
-			}
-
-			ev_next = ev->next;
-			nvlist_free(ev->nvl);
-			free(ev);
-		}
-
-		if (need_to_exit)
-			return;
-	}
-}
-
-/*
- * Initialize rcm related handles and function pointers.
- * Since RCM need not present in miniroot, we dlopen librcm.
- */
-static int
-rcm_init(void)
-{
-#define	LIBRCM_PATH	"/lib/librcm.so"
-	rcm_handle_t *hdl = NULL;
-	int err;
-
-	if ((librcm_hdl = dlopen(LIBRCM_PATH, RTLD_LAZY)) == NULL) {
-		/*
-		 * don't log an error here, since librcm may not be present
-		 * in miniroot.
-		 */
-		return (-1);
-	}
-
-	librcm_alloc_handle = (int (*)())dlsym(librcm_hdl, "rcm_alloc_handle");
-	librcm_free_handle = (void (*)())dlsym(librcm_hdl, "rcm_free_handle");
-	librcm_notify_event = (int (*)())dlsym(librcm_hdl, "rcm_notify_event");
-
-	if (librcm_alloc_handle == NULL || librcm_notify_event == NULL ||
-	    librcm_free_handle == NULL) {
-		err_print(MISSING_SYMBOLS, LIBRCM_PATH);
-		goto out;
-	}
-
-	/* Initialize the rcm handle */
-	if (librcm_alloc_handle(NULL, 0, NULL, &hdl) != RCM_SUCCESS) {
-		err_print(RCM_ALLOC_HANDLE_ERROR);
-		goto out;
-	}
-
-	(void) cond_init(&rcm_eventq_cv, USYNC_THREAD, 0);
-	(void) mutex_init(&rcm_eventq_lock, USYNC_THREAD, 0);
-
-	/* create a thread to notify RCM of events */
-	if ((err = thr_create(NULL, 0, (void *(*)(void *))process_rcm_events,
-	    NULL, 0, &process_rcm_events_tid)) != 0) {
-		err_print(CANT_CREATE_THREAD, "process_rcm_events",
-		    strerror(err));
-		goto out;
-	}
-
-	rcm_hdl = hdl;
-	return (0);
-
-out:
-	if (hdl)
-		librcm_free_handle(hdl);
-	(void) dlclose(librcm_hdl);
-	return (-1);
-}
-
-/*
- * Build an nvlist using the minor data. Pack it and add the packed nvlist
- * as a byte array to nv_list parameter.
- * Return 0 on success, errno on failure.
- */
-static int
-add_minor_data_to_nvl(nvlist_t *nv_list, di_minor_t minor)
-{
-	nvlist_t *nvl = NULL;
-	int32_t minor_type;
-	char *minor_name, *minor_node_type;
-	int err;
-	char *buf = NULL;
-	size_t buflen = 0;
-
-	if ((err = nvlist_alloc(&nvl, 0, 0)) != 0)
-		return (err);
-
-	minor_type = (int32_t)di_minor_type(minor);
-	if ((err = nvlist_add_int32(nvl, RCM_NV_MINOR_TYPE, minor_type)) != 0)
-		goto error;
-
-	minor_name = di_minor_name(minor);
-	if ((err = nvlist_add_string(nvl, RCM_NV_MINOR_NAME, minor_name)) != 0)
-		goto error;
-
-	if ((minor_node_type = di_minor_nodetype(minor)) == NULL)
-		minor_node_type = "";
-	if ((err = nvlist_add_string(nvl, RCM_NV_MINOR_NODE_TYPE,
-	    minor_node_type)) != 0)
-		goto error;
-
-	if ((err = nvlist_pack(nvl, &buf, &buflen, NV_ENCODE_NATIVE, 0)) != 0)
-		goto error;
-
-	err = nvlist_add_byte_array(nv_list, RCM_NV_MINOR_DATA,
-	    (uchar_t *)(buf), (uint_t)(buflen));
-
-error:
-	nvlist_free(nvl);
-	if (buf)
-		free(buf);
-	return (err);
-}
-
-static void
-enqueue_rcm_event(nvlist_t *nvl)
-{
-	struct rcm_eventq *ev;
-
-	ev = (struct rcm_eventq *)s_zalloc(sizeof (struct rcm_eventq));
-	ev->nvl = nvl;
-
-	(void) mutex_lock(&rcm_eventq_lock);
-	if (rcm_eventq_head == NULL)
-		rcm_eventq_head = ev;
-	else
-		rcm_eventq_tail->next = ev;
-	rcm_eventq_tail = ev;
-	(void) cond_broadcast(&rcm_eventq_cv);
-	(void) mutex_unlock(&rcm_eventq_lock);
-}
-
-/*
- * Generate an nvlist using the information given in node and minor_name.
- * If minor_name is NULL the nvlist will contain information on
- * all minor nodes. Otherwise the nvlist will contain information
- * only on the given minor_name. Notify RCM passing the nvlist.
- *
- * Return 0 upon successfully notifying RCM, errno on failure.
- */
-static int
-notify_rcm(di_node_t node, char *minor_name)
-{
-	nvlist_t *nvl = NULL;
-	char *path, *driver_name;
-	char *node_name;
-	int err;
-	int32_t instance;
-	di_minor_t minor;
-
-	if ((driver_name = di_driver_name(node)) == NULL)
-		driver_name = "";
-
-	instance = (int32_t)di_instance(node);
-
-	if ((path = di_devfs_path(node)) == NULL) {
-		err = errno;
-		goto error;
-	}
-
-	if ((err = nvlist_alloc(&nvl, 0, 0)) != 0)
-		goto error;
-
-	if ((err = nvlist_add_string(nvl, RCM_NV_DRIVER_NAME, driver_name))
-	    != 0)
-		goto error;
-
-	if ((err = nvlist_add_int32(nvl, RCM_NV_INSTANCE, instance)) != 0)
-		goto error;
-
-	if ((node_name = di_node_name(node)) == NULL)
-		node_name = "";
-	if ((err = nvlist_add_string(nvl, RCM_NV_NODE_NAME, node_name)) != 0)
-		goto error;
-
-	if ((err = nvlist_add_string(nvl, RCM_NV_DEVFS_PATH, path)) != 0)
-		goto error;
-
-	minor = di_minor_next(node, DI_MINOR_NIL);
-	while (minor != DI_MINOR_NIL) {
-		if ((minor_name == NULL) ||
-		    (strcmp(minor_name, di_minor_name(minor)) == 0)) {
-			if ((err = add_minor_data_to_nvl(nvl, minor)) != 0)
-				goto error;
-		}
-		minor = di_minor_next(node, minor);
-	}
-
-	enqueue_rcm_event(nvl);
-	di_devfs_path_free(path);
-	return (0);
-
-error:
-	err_print(RCM_NVLIST_BUILD_ERROR, ((path != NULL) ? path : "unknown"),
-	    driver_name, instance, strerror(err));
-
-	if (path)
-		di_devfs_path_free(path);
-	if (nvl)
-		nvlist_free(nvl);
-	return (err);
 }
 
 /*

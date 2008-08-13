@@ -26,8 +26,6 @@
 #ifndef	_SYS_SYSEVENT_EVENTDEFS_H
 #define	_SYS_SYSEVENT_EVENTDEFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -53,6 +51,7 @@ extern "C" {
 #define	EC_DEV_STATUS	"EC_dev_status"	/* device status event class */
 #define	EC_FM		"EC_fm"		/* FMA error report event */
 #define	EC_ZFS		"EC_zfs"	/* ZFS event */
+#define	EC_DATALINK	"EC_datalink"	/* datalink event */
 
 /*
  * The following event class is reserved for exclusive use
@@ -235,6 +234,11 @@ extern "C" {
 #define	ESC_ZFS_VDEV_CLEAR	"ESC_ZFS_vdev_clear"
 #define	ESC_ZFS_VDEV_CHECK	"ESC_ZFS_vdev_check"
 #define	ESC_ZFS_CONFIG_SYNC	"ESC_ZFS_config_sync"
+
+/*
+ * datalink subclass definitions.
+ */
+#define	ESC_DATALINK_PHYS_ADD	"ESC_datalink_phys_add"	/* new physical link */
 
 #ifdef	__cplusplus
 }

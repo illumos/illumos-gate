@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,8 +32,6 @@
 
 #ifndef	_DEVICE_INFO_H
 #define	_DEVICE_INFO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -179,7 +177,7 @@ extern int devfs_rm_minor_perm(char *, void (*)(minorperm_err_t, int));
 #define	DCA_FREE_LIST		0x000000002
 #define	DCA_LOAD_DRV		0x000000004
 #define	DCA_CHECK_TYPE		0x000000010
-#define	DCA_NOTIFY_RCM		0x000000020
+/* UNUSED was DCA_NOTIFY_RCM	0x000000020 (can be recycled) */
 #define	DCA_FLUSH_PATHINST	0x000000040
 #define	DCA_HOT_PLUG		0x000000080
 #define	DCA_DEVLINK_SYNC	0x000000100

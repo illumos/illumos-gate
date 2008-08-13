@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/syseventd/modules/Makefile
@@ -30,6 +28,7 @@
 .PARALLEL:
 
 SUBDIRS=			\
+	datalink_mod		\
 	devfsadmd_mod		\
 	sysevent_conf_mod	\
 	sysevent_reg_mod	\

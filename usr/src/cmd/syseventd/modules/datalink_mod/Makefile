@@ -23,47 +23,19 @@
 # Use is subject to license terms.
 #
 
-PROG=		dlmgmtd
-OBJS=		dlmgmt_main.o dlmgmt_door.o dlmgmt_util.o dlmgmt_db.o
-SRCS=		$(OBJS:.o=.c)
-SVCMETHOD=	svc-dlmgmtd
-MANIFEST=	dlmgmt.xml
-CFGFILES=	datalink.conf
+LIBRARY=	datalink_mod
 
-include ../Makefile.cmd
+include ../Makefile.com
 
-ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
-ROOTCFGDIR=		$(ROOTETC)/dladm
-ROOTCFGFILES=		$(CFGFILES:%=$(ROOTCFGDIR)/%)
-
-$(ROOTCFGFILES)	:= OWNER= dladm
-$(ROOTCFGFILES)	:= GROUP= sys
-$(ROOTCFGDIR)/datalink.conf	:= FILEMODE= 644
-
-LDLIBS += -ldladm -ldlpi -lavl -lnvpair -lsysevent
+LDLIBS += -lnvpair -lrcm
 
 .KEEP_STATE:
 
-all: $(PROG)
+all: $(DYNLIB)
 
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(POST_PROCESS)
-
-install: all $(ROOTSBINPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD) $(ROOTCFGDIR) \
-	$(ROOTCFGFILES)
-
-check:	$(CHKMANIFEST)
-
-clean:
-	$(RM) $(OBJS)
-
-lint:	lint_SRCS
-
-$(ROOTCFGDIR):
-	$(INS.dir)
-
-$(ROOTCFGDIR)/%: $(ROOTCFGDIR) %
-	$(INS.file)
+install: all				\
+	$(ROOTLIBSYSEVENTDIR)		\
+	$(ROOTLIBDIR)			\
+	$(ROOTLIBS)
 
 include ../Makefile.targ

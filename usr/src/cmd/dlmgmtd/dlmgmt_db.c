@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -648,10 +646,13 @@ process_db_write(dlmgmt_db_req_t *req, FILE *fp, FILE *nfp)
 	    process_link_line(buf, &link_in_file)) {
 		if (link_in_file == NULL || done) {
 			/*
-			 * this is a comment line, write it out.
+			 * this is a comment line or we are done updating the
+			 * link of the given link, write the rest of lines out.
 			 */
 			if (fputs(buf, nfp) == EOF)
 				err = errno;
+			if (link_in_file != NULL)
+				link_destroy(link_in_file);
 			continue;
 		}
 

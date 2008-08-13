@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The dlmgmtd daemon is started by the datalink-management SMF service.
  * This daemon is used to manage <link name, linkid> mapping and the
@@ -251,8 +249,11 @@ dlmgmt_init_privileges()
 	if ((dld_control_fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
 		return (errno);
 
+	/*
+	 * The PRIV_SYS_CONFIG privilege is needed to post sysevents.
+	 */
 	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET, UID_DLADM,
-	    GID_SYS, PRIV_SYS_NET_CONFIG, NULL) == -1) {
+	    GID_SYS, PRIV_SYS_NET_CONFIG, PRIV_SYS_CONFIG, NULL) == -1) {
 		(void) close(dld_control_fd);
 		dld_control_fd = -1;
 		return (EPERM);

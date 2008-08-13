@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_MESSAGE_H
 #define	_MESSAGE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -217,18 +215,6 @@ major_number ]\n\t\t[ -n ]\n\t\t[ -r rootdir ]\n\t\t[ -v ]\n")
 #define	DEVFSADM_UNLINK gettext("removing file: %s\n")
 
 #define	INVOKED_WITH gettext("invoked with %s\n")
-
-#define	MISSING_SYMBOLS gettext("missing symbols in %s\n")
-
-#define	RCM_ALLOC_HANDLE_ERROR gettext("Unable to allocate rcm handle\n")
-
-#define	RCM_NOTIFY_FAILED \
-	gettext("RCM notification failed: " \
-	"path = %s, driver = %s, instance = %d: %s\n")
-
-#define	RCM_NVLIST_BUILD_ERROR \
-	gettext("failed to build nvlist for notifying RCM: " \
-	"path = %s, driver = %s, instance = %d: %s\n")
 
 #define	INVALID_DEVLINK_SPEC gettext("Invalid devlink spec: '%s'\n")
 

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This RCM module adds support to the RCM framework for an abstract
  * namespace for network devices (DLPI providers).
@@ -56,20 +54,6 @@
 #define	CACHE_STALE	1	/* flags */
 #define	CACHE_NEW	2	/* flags */
 
-/* devfsadm attach nvpair values */
-#define	PROP_NV_DDI_NETWORK	"ddi_network"
-
-/*
- * Global NIC list to be configured after DR-attach
- */
-struct ni_list {
-	struct ni_list *next;
-	char dev[MAXNAMELEN];	/* device instance name (le0, ie0, etc.) */
-};
-
-static struct ni_list *nil_head = NULL;		/* Global new if list */
-static mutex_t nil_lock;			/* NIC list lock */
-
 /* operations */
 #define	NET_OFFLINE	1
 #define	NET_ONLINE	2
@@ -90,12 +74,6 @@ static net_cache_t	cache_head;
 static net_cache_t	cache_tail;
 static mutex_t		cache_lock;
 static int		events_registered = 0;
-
-struct devfs_minor_data {
-	int32_t minor_type;
-	char *minor_name;
-	char *minor_node_type;
-};
 
 /* module interface routines */
 static int net_register(rcm_handle_t *);
@@ -123,9 +101,6 @@ static void cache_remove(net_cache_t *node);
 static net_cache_t *cache_lookup(const char *resource);
 static void free_node(net_cache_t *);
 static void cache_insert(net_cache_t *);
-static int notify_new_link(rcm_handle_t *, const char *);
-static void process_minor(char *, int, struct devfs_minor_data *);
-static int process_nvlist(rcm_handle_t *, nvlist_t *);
 
 /*
  * Module-Private data
@@ -210,15 +185,15 @@ net_register(rcm_handle_t *hd)
 	 * getting attached, so we get attach event notifications
 	 */
 	if (!events_registered) {
-		if (rcm_register_event(hd, RCM_RESOURCE_NETWORK_NEW, 0, NULL)
+		if (rcm_register_event(hd, RCM_RESOURCE_LINK_NEW, 0, NULL)
 		    != RCM_SUCCESS) {
 			rcm_log_message(RCM_ERROR,
 			    _("NET: failed to register %s\n"),
-			    RCM_RESOURCE_NETWORK_NEW);
+			    RCM_RESOURCE_LINK_NEW);
 			return (RCM_FAILURE);
 		} else {
 			rcm_log_message(RCM_DEBUG, _("NET: registered %s\n"),
-			    RCM_RESOURCE_NETWORK_NEW);
+			    RCM_RESOURCE_LINK_NEW);
 			events_registered++;
 		}
 	}
@@ -256,15 +231,15 @@ net_unregister(rcm_handle_t *hd)
 	 * Need to unregister interest in all new resources
 	 */
 	if (events_registered) {
-		if (rcm_unregister_event(hd, RCM_RESOURCE_NETWORK_NEW, 0)
+		if (rcm_unregister_event(hd, RCM_RESOURCE_LINK_NEW, 0)
 		    != RCM_SUCCESS) {
 			rcm_log_message(RCM_ERROR,
 			    _("NET: failed to unregister %s\n"),
-			    RCM_RESOURCE_NETWORK_NEW);
+			    RCM_RESOURCE_LINK_NEW);
 			return (RCM_FAILURE);
 		} else {
 			rcm_log_message(RCM_DEBUG, _("NET: unregistered %s\n"),
-			    RCM_RESOURCE_NETWORK_NEW);
+			    RCM_RESOURCE_LINK_NEW);
 			events_registered--;
 		}
 	}
@@ -821,22 +796,16 @@ free_cache(void)
  * net_notify_event - Project private implementation to receive new
  *			resource events. It intercepts all new resource
  *			events. If the new resource is a network resource,
- *			pass up a event for the resource. The new resource
- *			need not be cached, since it is done at register again.
+ *			update the physical link cache.
  */
 /*ARGSUSED*/
 static int
 net_notify_event(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
     char **errorp, nvlist_t *nvl, rcm_info_t **depend_info)
 {
-	assert(hd != NULL);
-	assert(rsrc != NULL);
-	assert(id == (id_t)0);
-	assert(nvl != NULL);
-
 	rcm_log_message(RCM_TRACE1, _("NET: notify_event(%s)\n"), rsrc);
 
-	if (strcmp(rsrc, RCM_RESOURCE_NETWORK_NEW) != 0) {
+	if (strcmp(rsrc, RCM_RESOURCE_LINK_NEW) != 0) {
 		rcm_log_message(RCM_INFO,
 		    _("NET: unrecognized event for %s\n"), rsrc);
 		errno = EINVAL;
@@ -846,254 +815,8 @@ net_notify_event(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 	/* Update cache to reflect latest physical links */
 	update_cache(hd);
 
-	/* Process the nvlist for the event */
-	if (process_nvlist(hd, nvl) != 0) {
-		rcm_log_message(RCM_WARNING,
-		    _("NET: Error processing resource attributes(%s)\n"), rsrc);
-		rcm_log_message(RCM_WARNING,
-		    _("NET: One or more devices may not be configured.\n"));
-	}
-
 	rcm_log_message(RCM_TRACE1,
 	    _("NET: notify_event: device configuration complete\n"));
 
 	return (RCM_SUCCESS);
-}
-
-/*
- * process_nvlist() - Determine network interfaces on a new attach by
- *		      processing the nvlist
- */
-static int
-process_nvlist(rcm_handle_t *hd, nvlist_t *nvl)
-{
-	nvpair_t *nvp = NULL;
-	char *driver;
-	char *devfspath;
-	int32_t instance;
-	char *minor_byte_array; /* packed nvlist of minor_data */
-	uint_t nminor;		  /* # of minor nodes */
-	struct devfs_minor_data *mdata;
-	nvlist_t *mnvl;
-	nvpair_t *mnvp = NULL;
-	struct ni_list *nilp, *next;
-
-	rcm_log_message(RCM_TRACE1, "NET: process_nvlist\n");
-
-	while ((nvp = nvlist_next_nvpair(nvl, nvp)) != NULL) {
-		/* Get driver name */
-		if (strcmp(nvpair_name(nvp), RCM_NV_DRIVER_NAME) == 0) {
-			if (nvpair_value_string(nvp, &driver) != 0) {
-				rcm_log_message(RCM_WARNING,
-				    _("NET: cannot get driver name\n"));
-				return (-1);
-			}
-		}
-		/* Get instance */
-		if (strcmp(nvpair_name(nvp), RCM_NV_INSTANCE) == 0) {
-			if (nvpair_value_int32(nvp, &instance) != 0) {
-				rcm_log_message(RCM_WARNING,
-				    _("NET: cannot get device instance\n"));
-				return (-1);
-			}
-		}
-		/* Get devfspath */
-		if (strcmp(nvpair_name(nvp), RCM_NV_DEVFS_PATH) == 0) {
-			if (nvpair_value_string(nvp, &devfspath) != 0) {
-				rcm_log_message(RCM_WARNING,
-				    _("NET: cannot get device path\n"));
-				return (-1);
-			}
-			if (strncmp("/pseudo", devfspath,
-			    strlen("/pseudo")) == 0) {
-				/* Ignore pseudo devices, not really NICs */
-				rcm_log_message(RCM_DEBUG,
-				    _("NET: ignoring pseudo device %s\n"),
-				    devfspath);
-				return (0);
-			}
-		}
-
-		/* Get minor data */
-		if (strcmp(nvpair_name(nvp), RCM_NV_MINOR_DATA) == 0) {
-			if (nvpair_value_byte_array(nvp,
-			    (uchar_t **)&minor_byte_array, &nminor) != 0) {
-				rcm_log_message(RCM_WARNING,
-				    _("NET: cannot get device minor data\n"));
-				return (-1);
-			}
-			if (nvlist_unpack(minor_byte_array,
-			    nminor, &mnvl, 0) != 0) {
-				rcm_log_message(RCM_WARNING,
-				    _("NET: cannot get minor node data\n"));
-				return (-1);
-			}
-			mdata = (struct devfs_minor_data *)calloc(1,
-			    sizeof (struct devfs_minor_data));
-			if (mdata == NULL) {
-				rcm_log_message(RCM_WARNING,
-				    _("NET: calloc error(%s)\n"),
-				    strerror(errno));
-				nvlist_free(mnvl);
-				return (-1);
-			}
-			/* Enumerate minor node data */
-			while ((mnvp = nvlist_next_nvpair(mnvl, mnvp)) !=
-			    NULL) {
-				/* Get minor type */
-				if (strcmp(nvpair_name(mnvp),
-				    RCM_NV_MINOR_TYPE) == 0) {
-					if (nvpair_value_int32(mnvp,
-					    &mdata->minor_type) != 0) {
-						rcm_log_message(RCM_WARNING,
-						    _("NET: cannot get minor "
-						    "type \n"));
-						nvlist_free(mnvl);
-						return (-1);
-					}
-				}
-				/* Get minor name */
-				if (strcmp(nvpair_name(mnvp),
-				    RCM_NV_MINOR_NAME) == 0) {
-					if (nvpair_value_string(mnvp,
-					    &mdata->minor_name) != 0) {
-						rcm_log_message(RCM_WARNING,
-						    _("NET: cannot get minor "
-						    "name \n"));
-						nvlist_free(mnvl);
-						return (-1);
-					}
-				}
-				/* Get minor node type */
-				if (strcmp(nvpair_name(mnvp),
-				    RCM_NV_MINOR_NODE_TYPE) == 0) {
-					if (nvpair_value_string(mnvp,
-					    &mdata->minor_node_type) != 0) {
-						rcm_log_message(RCM_WARNING,
-						    _("NET: cannot get minor "
-						    "node type \n"));
-						nvlist_free(mnvl);
-						return (-1);
-					}
-				}
-			}
-			(void) process_minor(driver, instance, mdata);
-			nvlist_free(mnvl);
-		}
-	}
-
-	(void) mutex_lock(&nil_lock);
-
-	/* Notify the event for all new devices found, then clean up the list */
-	for (nilp = nil_head; nilp != NULL; nilp = next) {
-		if (notify_new_link(hd, nilp->dev) != 0) {
-			rcm_log_message(RCM_ERROR,
-			    _(": Notify %s event failed (%s)\n"),
-			    RCM_RESOURCE_LINK_NEW, nilp->dev);
-		}
-		next = nilp->next;
-		free(nilp);
-	}
-	nil_head = NULL;
-
-	(void) mutex_unlock(&nil_lock);
-
-	rcm_log_message(RCM_TRACE1, _("NET: process_nvlist success\n"));
-	return (0);
-}
-
-static void
-process_minor(char *name, int instance, struct devfs_minor_data *mdata)
-{
-	char dev[MAXNAMELEN];
-	struct ni_list **pp;
-	struct ni_list *p;
-
-	rcm_log_message(RCM_TRACE1, _("NET: process_minor %s%d\n"),
-	    name, instance);
-
-	if ((mdata->minor_node_type != NULL) &&
-	    strcmp(mdata->minor_node_type, PROP_NV_DDI_NETWORK) != 0) {
-		/* Process network devices only */
-		return;
-	}
-
-	(void) snprintf(dev, sizeof (dev), "%s%d", name, instance);
-
-	/* Add new interface to the list */
-	(void) mutex_lock(&nil_lock);
-	for (pp = &nil_head; (p = *pp) != NULL; pp = &(p->next)) {
-		if (strcmp(dev, p->dev) == 0)
-			break;
-	}
-	if (p != NULL) {
-		rcm_log_message(RCM_TRACE1,
-		    _("NET: secondary node - ignoring\n"));
-		goto done;
-	}
-
-	/* Add new device to the list */
-	if ((p = malloc(sizeof (struct ni_list))) == NULL) {
-		rcm_log_message(RCM_ERROR, _("NET: malloc failure(%s)\n"),
-		    strerror(errno));
-		goto done;
-	}
-	(void) strncpy(p->dev, dev, sizeof (p->dev));
-	p->next = NULL;
-	*pp = p;
-
-	rcm_log_message(RCM_TRACE1, _("NET: added new node %s\n"), dev);
-done:
-	(void) mutex_unlock(&nil_lock);
-}
-
-/*
- * Notify the RCM_RESOURCE_LINK_NEW event to other modules.
- * Return 0 on success, -1 on failure.
- */
-static int
-notify_new_link(rcm_handle_t *hd, const char *dev)
-{
-	nvlist_t *nvl = NULL;
-	datalink_id_t linkid;
-	uint64_t id;
-	int ret = -1;
-
-	rcm_log_message(RCM_TRACE1, _("NET: notify_new_link %s\n"), dev);
-	if (dladm_dev2linkid(dev, &linkid) != DLADM_STATUS_OK) {
-		rcm_log_message(RCM_TRACE1,
-		    _("NET: new link %s has not attached yet\n"), dev);
-		ret = 0;
-		goto done;
-	}
-
-	id = linkid;
-	if ((nvlist_alloc(&nvl, 0, 0) != 0) ||
-	    (nvlist_add_uint64(nvl, RCM_NV_LINKID, id) != 0)) {
-		rcm_log_message(RCM_ERROR,
-		    _("NET: failed to construct nvlist for %s\n"), dev);
-		goto done;
-	}
-
-	/*
-	 * Reset the active linkprop of this specific link.
-	 */
-	(void) dladm_init_linkprop(linkid, B_FALSE);
-
-	rcm_log_message(RCM_TRACE1, _("NET: notify new link %u (%s)\n"),
-	    linkid, dev);
-
-	if (rcm_notify_event(hd, RCM_RESOURCE_LINK_NEW, 0, nvl, NULL) !=
-	    RCM_SUCCESS) {
-		rcm_log_message(RCM_ERROR,
-		    _("NET: failed to notify %s event for %s\n"),
-		    RCM_RESOURCE_LINK_NEW, dev);
-		goto done;
-	}
-
-	ret = 0;
-done:
-	if (nvl != NULL)
-		nvlist_free(nvl);
-	return (ret);
 }

@@ -25,8 +25,6 @@
 #ifndef _DEVFSADM_IMPL_H
 #define	_DEVFSADM_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -70,7 +68,6 @@ extern "C" {
 #include <thread.h>
 #include <message.h>
 #include <sys/cladm.h>
-#include <librcm.h>
 #include <sys/sysevent/dev.h>
 #include <libzonecfg.h>
 #include <device_info.h>
@@ -352,12 +349,6 @@ struct dca_impl {
 	int dci_flags;
 };
 
-/* RCM related */
-struct rcm_eventq {
-	nvlist_t *nvl;
-	struct rcm_eventq *next;
-};
-
 /* sysevent queue related */
 typedef struct syseventq_s {
 	struct syseventq_s *next;
@@ -478,8 +469,6 @@ static void sync_handler(void *cookie, char *ap, size_t asize,
 static int zone_pathcheck(char *checkpath);
 static void process_deferred_links(struct dca_impl *dcip, int flag);
 static void event_handler(sysevent_t *ev);
-static int rcm_init(void);
-static int notify_rcm(di_node_t node, char *minor_name);
 static void dca_impl_init(char *root, char *minor, struct dca_impl *dcip);
 static void lock_dev(void);
 static void unlock_dev(int flag);
@@ -490,10 +479,6 @@ int load_devpolicy(void);
 static void load_dev_acl(void);
 static void load_minor_perm_file(void);
 
-static int (*librcm_alloc_handle)(char *, uint_t, void *, rcm_handle_t **);
-static void (*librcm_free_handle)(rcm_handle_t *);
-static int (*librcm_notify_event)(rcm_handle_t *, char *, uint_t, nvlist_t *,
-    rcm_info_t *);
 static nvlist_t *build_event_attributes(char *, char *, char *,
     di_node_t, char *, int, char *);
 static void log_event(char *, char *, nvlist_t *);

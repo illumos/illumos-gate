@@ -26,8 +26,6 @@
 #ifndef	_LIBRCM_H
 #define	_LIBRCM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libnvpair.h>
 #include <sys/types.h>
 #include <sys/processor.h>
@@ -97,20 +95,10 @@ extern "C" {
 #define	RCM_CLIENT_NAME		"rcm.client_name"
 #define	RCM_CLIENT_EXPORTS	"rcm.client_exports"
 
-/* Resource name to register for new resources */
-#define	RCM_RESOURCE_NETWORK_NEW	"SUNW_event/resource/new/network"
 /* Resource name to register for new links come up */
 #define	RCM_RESOURCE_LINK_NEW		"SUNW_event/resource/new/link"
 
 /* name-value pair definitions for rcm_notify_event() */
-#define	RCM_NV_DRIVER_NAME	"driver_name"
-#define	RCM_NV_INSTANCE		"instance"
-#define	RCM_NV_NODE_NAME	"node_name"
-#define	RCM_NV_DEVFS_PATH	"devfs_path"
-#define	RCM_NV_MINOR_DATA	"minor_data"
-#define	RCM_NV_MINOR_TYPE	"minor_type"
-#define	RCM_NV_MINOR_NAME	"minor_name"
-#define	RCM_NV_MINOR_NODE_TYPE	"minor_node_type"
 #define	RCM_NV_LINKID		"linkid"
 
 /*

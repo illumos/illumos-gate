@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The softmac driver is used to "unify" non-GLDv3 drivers to the GLDv3
  * framework.  It also creates the kernel datalink structure for each
@@ -63,7 +61,8 @@ static mod_hash_t	*softmac_hash;
 
 #define	SOFTMAC_HASHSZ		64
 
-static void softmac_mac_register(void *);
+static void softmac_create_task(void *);
+static void softmac_mac_register(softmac_t *);
 static int softmac_create_datalink(softmac_t *);
 static int softmac_m_start(void *);
 static void softmac_m_stop(void *);
@@ -147,10 +146,8 @@ softmac_create(dev_info_t *dip, dev_t dev)
 	char		devname[MAXNAMELEN];
 	softmac_t	*softmac;
 	softmac_dev_t	*softmac_dev = NULL;
-	datalink_id_t	linkid;
 	int		index;
 	int		ppa, err = 0;
-	mac_handle_t	mh;
 
 	/*
 	 * Force the softmac driver to be attached.
@@ -264,14 +261,6 @@ softmac_create(dev_info_t *dip, dev_t dev)
 	rw_exit(&softmac_hash_lock);
 
 	/*
-	 * Inform dlmgmtd of this link so that softmac_hold_device() is able
-	 * to know the existence of this link.  This could fail if dlmgmtd
-	 * is not yet started.
-	 */
-	(void) dls_mgmt_create(devname, makedevice(ddi_driver_major(dip),
-	    ppa + 1), DATALINK_CLASS_PHYS, DL_OTHER, B_TRUE, &linkid);
-
-	/*
 	 * No lock is needed for access this softmac pointer, as pre-detach and
 	 * post-attach won't happen at the same time.
 	 */
@@ -290,58 +279,26 @@ softmac_create(dev_info_t *dip, dev_t dev)
 		return (0);
 	}
 
-	if (!GLDV3_DRV(ddi_driver_major(dip))) {
-
-		/*
-		 * Note that this function could be called as a result of
-		 * a open() system call, and spec_open() already locked the
-		 * snode (SLOCKED is set).  Therefore, we must start a
-		 * taskq to finish the rest of work to sidestep the risk
-		 * that our ldi_open_by_dev() call would again try to hold
-		 * the same lock.
-		 *
-		 * If all the minor nodes have been attached, start the taskq
-		 * to finish the rest of the work.
-		 */
-		ASSERT(softmac->smac_taskq == NULL);
-		softmac->smac_taskq = taskq_dispatch(system_taskq,
-		    softmac_mac_register, softmac, TQ_SLEEP);
-		mutex_exit(&softmac->smac_mutex);
-		return (0);
-	}
-
-	if ((err = mac_open(softmac->smac_devname, &mh)) != 0)
-		goto done;
-
-	softmac->smac_media = (mac_info(mh))->mi_nativemedia;
-	softmac->smac_mh = mh;
-
 	/*
-	 * We can safely release the reference on the mac because
-	 * this mac will only be unregistered and destroyed when
-	 * the device detaches, and the softmac will be destroyed
-	 * before then (in the pre-detach routine of the device).
+	 * All of the minor nodes have been attached; start a taskq
+	 * to do the rest of the work.  We use a taskq instead of of
+	 * doing the work here because:
+	 *
+	 * - We could be called as a result of an open() system call
+	 *   where spec_open() already SLOCKED the snode.  Using a taskq
+	 *   sidesteps the risk that our ldi_open_by_dev() call would
+	 *   deadlock trying to set SLOCKED on the snode again.
+	 *
+	 * - The devfs design requires no interruptible function calls
+	 *   in the device post-attach routine, but we need to make an
+	 *   (interruptible) upcall.  Using a taskq to make the upcall
+	 *   sidesteps this.
 	 */
-	mac_close(mh);
-
-	/*
-	 * Create the GLDv3 datalink for this mac.
-	 */
-	err = softmac_create_datalink(softmac);
-
-done:
-	if (err != 0) {
-		softmac->smac_mh = NULL;
-		kmem_free(softmac_dev, sizeof (softmac_dev_t));
-		softmac->smac_softmac[index] = NULL;
-		--softmac->smac_attachok_cnt;
-	}
-	ASSERT(!(softmac->smac_flags & SOFTMAC_ATTACH_DONE));
-	softmac->smac_flags |= SOFTMAC_ATTACH_DONE;
-	softmac->smac_attacherr = err;
-	cv_broadcast(&softmac->smac_cv);
+	ASSERT(softmac->smac_taskq == NULL);
+	softmac->smac_taskq = taskq_dispatch(system_taskq,
+	    softmac_create_task, softmac, TQ_SLEEP);
 	mutex_exit(&softmac->smac_mutex);
-	return (err);
+	return (0);
 }
 
 static boolean_t
@@ -442,15 +399,23 @@ softmac_create_datalink(softmac_t *softmac)
 	ASSERT(MUTEX_HELD(&softmac->smac_mutex));
 
 	/*
-	 * First provide the media type of the physical link to dlmgmtd.
-	 *
-	 * If the new <linkname, linkid> mapping operation failed with EBADF
-	 * or ENOENT, it might because the dlmgmtd was not started in time
-	 * (e.g., diskless boot); ignore the failure and continue.  The
-	 * mapping will be recreated once the daemon has started.
+	 * Inform dlmgmtd of this link so that softmac_hold_device() is able
+	 * to know the existence of this link. If this failed with EBADF,
+	 * it might be because dlmgmtd was not started in time (e.g.,
+	 * diskless boot); ignore the failure and continue to create
+	 * the GLDv3 datalink if needed.
 	 */
-	if (((err = softmac_update_info(softmac, &linkid)) != 0) &&
-	    (err != EBADF) && (err != ENOENT)) {
+	err = dls_mgmt_create(softmac->smac_devname,
+	    makedevice(softmac->smac_umajor, softmac->smac_uppa + 1),
+	    DATALINK_CLASS_PHYS, DL_OTHER, B_TRUE, &linkid);
+	if (err != 0 && err != EBADF)
+		return (err);
+
+	/*
+	 * Provide the media type of the physical link to dlmgmtd.
+	 */
+	if ((err != EBADF) &&
+	    ((err = softmac_update_info(softmac, &linkid)) != 0)) {
 		return (err);
 	}
 
@@ -470,6 +435,47 @@ softmac_create_datalink(softmac_t *softmac)
 	return (0);
 }
 
+static void
+softmac_create_task(void *arg)
+{
+	softmac_t	*softmac = arg;
+	mac_handle_t	mh;
+	int		err;
+
+	if (!GLDV3_DRV(softmac->smac_umajor)) {
+		softmac_mac_register(softmac);
+		return;
+	}
+
+	if ((err = mac_open(softmac->smac_devname, &mh)) != 0)
+		goto done;
+
+	mutex_enter(&softmac->smac_mutex);
+	softmac->smac_media = (mac_info(mh))->mi_nativemedia;
+	softmac->smac_mh = mh;
+
+	/*
+	 * We can safely release the reference on the mac because
+	 * this mac will only be unregistered and destroyed when
+	 * the device detaches, and the softmac will be destroyed
+	 * before then (in the pre-detach routine of the device).
+	 */
+	mac_close(mh);
+
+	/*
+	 * Create the GLDv3 datalink for this mac.
+	 */
+	err = softmac_create_datalink(softmac);
+
+done:
+	ASSERT(!(softmac->smac_flags & SOFTMAC_ATTACH_DONE));
+	softmac->smac_flags |= SOFTMAC_ATTACH_DONE;
+	softmac->smac_attacherr = err;
+	softmac->smac_taskq = NULL;
+	cv_broadcast(&softmac->smac_cv);
+	mutex_exit(&softmac->smac_mutex);
+}
+
 /*
  * This function is only called for legacy devices. It:
  * 1. registers the MAC for the legacy devices whose media type is supported
@@ -477,9 +483,8 @@ softmac_create_datalink(softmac_t *softmac)
  * 2. creates the GLDv3 datalink if the media type is supported by GLDv3.
  */
 static void
-softmac_mac_register(void *arg)
+softmac_mac_register(softmac_t *softmac)
 {
-	softmac_t	*softmac = arg;
 	softmac_dev_t	*softmac_dev;
 	dev_t		dev;
 	ldi_handle_t	lh = NULL;
