@@ -350,6 +350,8 @@ usr/lib/llib-like.ln			i386
 usr/lib/llib-lipsecutil			i386
 usr/lib/libipsecutil.so			i386
 usr/lib/llib-lipsecutil.ln		i386
+usr/lib/amd64/libipsecutil.so		i386
+usr/lib/amd64/llib-lipsecutil.ln	i386
 #
 usr/include/inet/arp_impl.h		i386
 usr/include/inet/rawip_impl.h		i386

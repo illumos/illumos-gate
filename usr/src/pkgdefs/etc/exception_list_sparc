@@ -330,6 +330,8 @@ usr/lib/llib-like.ln			sparc
 usr/lib/llib-lipsecutil			sparc
 usr/lib/libipsecutil.so			sparc
 usr/lib/llib-lipsecutil.ln		sparc
+usr/lib/sparcv9/libipsecutil.so		sparc
+usr/lib/sparcv9/llib-lipsecutil.ln	sparc
 #
 # The following files are used by the dhcpmgr.
 #

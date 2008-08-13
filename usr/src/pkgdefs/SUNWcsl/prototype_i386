@@ -193,6 +193,7 @@ f none usr/lib/amd64/libipmi.so.1 755 root bin
 s none usr/lib/amd64/libipmi.so=./libipmi.so.1
 f none usr/lib/amd64/libipp.so.1 755 root bin
 s none usr/lib/amd64/libipp.so=libipp.so.1
+f none usr/lib/amd64/libipsecutil.so.1 755 root bin
 f none usr/lib/amd64/libkmf.so.1 755 root bin
 s none usr/lib/amd64/libkmf.so=libkmf.so.1
 f none usr/lib/amd64/libkmfberder.so.1 755 root bin

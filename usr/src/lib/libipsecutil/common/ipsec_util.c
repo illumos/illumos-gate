@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1589,7 +1587,7 @@ printsatime(FILE *file, int64_t lt, const char *msg, const char *pfx,
 	(void) fprintf(file, msg, pfx, tp);
 	if (vflag && (pfx2 != NULL))
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%s\t(raw time value %llu)\n"), pfx2, lt);
+		    "%s\t(raw time value %" PRIu64 ")\n"), pfx2, lt);
 }
 
 /*
@@ -1630,7 +1628,7 @@ print_lifetimes(FILE *file, time_t wallclock, struct sadb_lifetime *current,
 	if (current != NULL) {
 		/* Express values as current values. */
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%s%llu bytes protected, %u allocations used.\n"),
+		    "%s%" PRIu64 " bytes protected, %u allocations used.\n"),
 		    current_prefix, current->sadb_lifetime_bytes,
 		    current->sadb_lifetime_allocations);
 		printsatime(file, current->sadb_lifetime_addtime,
@@ -1652,20 +1650,20 @@ print_lifetimes(FILE *file, time_t wallclock, struct sadb_lifetime *current,
 		    "%sSoft lifetime information:  "),
 		    soft_prefix);
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%llu bytes of lifetime, %u "
+		    "%" PRIu64 " bytes of lifetime, %u "
 		    "allocations.\n"), soft->sadb_lifetime_bytes,
 		    soft->sadb_lifetime_allocations);
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%s%llu seconds of post-add lifetime.\n"),
+		    "%s%" PRIu64 " seconds of post-add lifetime.\n"),
 		    soft_prefix, soft->sadb_lifetime_addtime);
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%s%llu seconds of post-use lifetime.\n"),
+		    "%s%" PRIu64 " seconds of post-use lifetime.\n"),
 		    soft_prefix, soft->sadb_lifetime_usetime);
 		/* If possible, express values as time remaining. */
 		if (current != NULL) {
 			if (soft->sadb_lifetime_bytes != 0)
-				(void) fprintf(file, dgettext(TEXT_DOMAIN,
-				    "%s%llu more bytes can be protected.\n"),
+				(void) fprintf(file, dgettext(TEXT_DOMAIN, "%s%"
+				    PRIu64 " more bytes can be protected.\n"),
 				    soft_prefix,
 				    (soft->sadb_lifetime_bytes >
 				    current->sadb_lifetime_bytes) ?
@@ -1699,8 +1697,8 @@ print_lifetimes(FILE *file, time_t wallclock, struct sadb_lifetime *current,
 				if (scratch >= 0) {
 					(void) fprintf(file,
 					    dgettext(TEXT_DOMAIN,
-					    "Soft expiration occurs in %lld "
-					    "seconds, "), scratch);
+					    "Soft expiration occurs in %"
+					    PRId64 " seconds, "), scratch);
 				} else {
 					(void) fprintf(file,
 					    dgettext(TEXT_DOMAIN,
@@ -1717,19 +1715,19 @@ print_lifetimes(FILE *file, time_t wallclock, struct sadb_lifetime *current,
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "%sHard lifetime information:  "), hard_prefix);
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%llu bytes of lifetime, %u allocations.\n"),
+		    "%" PRIu64 " bytes of lifetime, %u allocations.\n"),
 		    hard->sadb_lifetime_bytes, hard->sadb_lifetime_allocations);
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%s%llu seconds of post-add lifetime.\n"),
+		    "%s%" PRIu64 " seconds of post-add lifetime.\n"),
 		    hard_prefix, hard->sadb_lifetime_addtime);
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%s%llu seconds of post-use lifetime.\n"),
+		    "%s%" PRIu64 " seconds of post-use lifetime.\n"),
 		    hard_prefix, hard->sadb_lifetime_usetime);
 		/* If possible, express values as time remaining. */
 		if (current != NULL) {
 			if (hard->sadb_lifetime_bytes != 0)
-				(void) fprintf(file, dgettext(TEXT_DOMAIN,
-				    "%s%llu more bytes can be protected.\n"),
+				(void) fprintf(file, dgettext(TEXT_DOMAIN, "%s%"
+				    PRIu64 " more bytes can be protected.\n"),
 				    hard_prefix,
 				    (hard->sadb_lifetime_bytes >
 				    current->sadb_lifetime_bytes) ?
@@ -1763,8 +1761,8 @@ print_lifetimes(FILE *file, time_t wallclock, struct sadb_lifetime *current,
 				if (scratch >= 0) {
 					(void) fprintf(file,
 					    dgettext(TEXT_DOMAIN,
-					    "Hard expiration occurs in %lld "
-					    "seconds, "), scratch);
+					    "Hard expiration occurs in %"
+					    PRId64 " seconds, "), scratch);
 				} else {
 					(void) fprintf(file,
 					    dgettext(TEXT_DOMAIN,
@@ -1900,11 +1898,11 @@ print_sens(FILE *file, char *prefix, struct sadb_sens *sens)
 	    sens->sadb_sens_integ_level);
 	for (i = 0; sens->sadb_sens_sens_len-- > 0; i++, bitmap++)
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%s Sensitivity BM extended word %d 0x%llx\n"),
+		    "%s Sensitivity BM extended word %d 0x%" PRIx64 "\n"),
 		    prefix, i, *bitmap);
 	for (i = 0; sens->sadb_sens_integ_len-- > 0; i++, bitmap++)
 		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
-		    "%s Integrity BM extended word %d 0x%llx\n"),
+		    "%s Integrity BM extended word %d 0x%" PRIx64 "\n"),
 		    prefix, i, *bitmap);
 }
 
@@ -1954,15 +1952,15 @@ print_prop(FILE *file, char *prefix, struct sadb_prop *prop)
 			(void) fprintf(file, dgettext(TEXT_DOMAIN, "alloc=%u "),
 			    combs[i].sadb_comb_hard_allocations);
 		if (combs[i].sadb_comb_hard_bytes)
-			(void) fprintf(file, dgettext(TEXT_DOMAIN,
-			    "bytes=%llu "), combs[i].sadb_comb_hard_bytes);
+			(void) fprintf(file, dgettext(TEXT_DOMAIN, "bytes=%"
+			    PRIu64 " "), combs[i].sadb_comb_hard_bytes);
 		if (combs[i].sadb_comb_hard_addtime)
 			(void) fprintf(file, dgettext(TEXT_DOMAIN,
-			    "post-add secs=%llu "),
+			    "post-add secs=%" PRIu64 " "),
 			    combs[i].sadb_comb_hard_addtime);
 		if (combs[i].sadb_comb_hard_usetime)
 			(void) fprintf(file, dgettext(TEXT_DOMAIN,
-			    "post-use secs=%llu"),
+			    "post-use secs=%" PRIu64 ""),
 			    combs[i].sadb_comb_hard_usetime);
 
 		(void) fprintf(file, dgettext(TEXT_DOMAIN, "\n%s SOFT: "),
@@ -1971,15 +1969,15 @@ print_prop(FILE *file, char *prefix, struct sadb_prop *prop)
 			(void) fprintf(file, dgettext(TEXT_DOMAIN, "alloc=%u "),
 			    combs[i].sadb_comb_soft_allocations);
 		if (combs[i].sadb_comb_soft_bytes)
-			(void) fprintf(file, dgettext(TEXT_DOMAIN,
-			    "bytes=%llu "), combs[i].sadb_comb_soft_bytes);
+			(void) fprintf(file, dgettext(TEXT_DOMAIN, "bytes=%"
+			    PRIu64 " "), combs[i].sadb_comb_soft_bytes);
 		if (combs[i].sadb_comb_soft_addtime)
 			(void) fprintf(file, dgettext(TEXT_DOMAIN,
-			    "post-add secs=%llu "),
+			    "post-add secs=%" PRIu64 " "),
 			    combs[i].sadb_comb_soft_addtime);
 		if (combs[i].sadb_comb_soft_usetime)
 			(void) fprintf(file, dgettext(TEXT_DOMAIN,
-			    "post-use secs=%llu"),
+			    "post-use secs=%" PRIu64 ""),
 			    combs[i].sadb_comb_soft_usetime);
 		(void) fprintf(file, "\n");
 	}
@@ -2013,24 +2011,24 @@ print_eprop(FILE *file, char *prefix, struct sadb_prop *eprop)
 		    prefix);
 		(void) fprintf(file, dgettext(TEXT_DOMAIN, "alloc=%u, "),
 		    ecomb->sadb_x_ecomb_hard_allocations);
-		(void) fprintf(file, dgettext(TEXT_DOMAIN, "bytes=%llu, "),
-		    ecomb->sadb_x_ecomb_hard_bytes);
-		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "post-add secs=%llu, "), ecomb->sadb_x_ecomb_hard_addtime);
-		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "post-use secs=%llu\n"), ecomb->sadb_x_ecomb_hard_usetime);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "bytes=%" PRIu64
+		    ", "), ecomb->sadb_x_ecomb_hard_bytes);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "post-add secs=%"
+		    PRIu64 ", "), ecomb->sadb_x_ecomb_hard_addtime);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "post-use secs=%"
+		    PRIu64 "\n"), ecomb->sadb_x_ecomb_hard_usetime);
 
 		(void) fprintf(file, dgettext(TEXT_DOMAIN, "%s SOFT: "),
 		    prefix);
 		(void) fprintf(file, dgettext(TEXT_DOMAIN, "alloc=%u, "),
 		    ecomb->sadb_x_ecomb_soft_allocations);
-		(void) fprintf(file, dgettext(TEXT_DOMAIN, "bytes=%llu, "),
-		    ecomb->sadb_x_ecomb_soft_bytes);
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "post-add secs=%llu, "),
+		    "bytes=%" PRIu64 ", "), ecomb->sadb_x_ecomb_soft_bytes);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "post-add secs=%" PRIu64 ", "),
 		    ecomb->sadb_x_ecomb_soft_addtime);
-		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "post-use secs=%llu\n"), ecomb->sadb_x_ecomb_soft_usetime);
+		(void) fprintf(file, dgettext(TEXT_DOMAIN, "post-use secs=%"
+		    PRIu64 "\n"), ecomb->sadb_x_ecomb_soft_usetime);
 
 		sofar = (uint64_t *)(ecomb + 1);
 		algdesc = (struct sadb_x_algdesc *)sofar;
@@ -2290,7 +2288,8 @@ print_samsg(FILE *file, uint64_t *buffer, boolean_t want_timestamp,
 			    ext->sadb_ext_type, lenbytes);
 			for (i = 0; i < ext->sadb_ext_len; i++)
 				(void) fprintf(file, dgettext(TEXT_DOMAIN,
-				    "UNK: 0x%llx\n"), ((uint64_t *)ext)[i]);
+				    "UNK: 0x%" PRIx64 "\n"),
+				    ((uint64_t *)ext)[i]);
 			break;
 		}
 		current += (lenbytes == 0) ?
@@ -2340,15 +2339,17 @@ save_lifetime(struct sadb_lifetime *lifetime, FILE *ofile)
 		return (B_FALSE);
 
 	if (lifetime->sadb_lifetime_bytes != 0 && fprintf(ofile,
-	    "%s_bytes %llu ", prefix, lifetime->sadb_lifetime_bytes) < 0)
+	    "%s_bytes %" PRIu64 " ", prefix, lifetime->sadb_lifetime_bytes) < 0)
 		return (B_FALSE);
 
 	if (lifetime->sadb_lifetime_addtime != 0 && fprintf(ofile,
-	    "%s_addtime %llu ", prefix, lifetime->sadb_lifetime_addtime) < 0)
+	    "%s_addtime %" PRIu64 " ", prefix,
+	    lifetime->sadb_lifetime_addtime) < 0)
 		return (B_FALSE);
 
 	if (lifetime->sadb_lifetime_usetime != 0 && fprintf(ofile,
-	    "%s_usetime %llu ", prefix, lifetime->sadb_lifetime_usetime) < 0)
+	    "%s_usetime %" PRIu64 " ", prefix,
+	    lifetime->sadb_lifetime_usetime) < 0)
 		return (B_FALSE);
 
 	return (B_TRUE);

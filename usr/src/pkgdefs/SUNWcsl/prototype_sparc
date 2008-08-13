@@ -186,6 +186,7 @@ f none usr/lib/sparcv9/libipmi.so.1 755 root bin
 s none usr/lib/sparcv9/libipmi.so=libipmi.so.1
 f none usr/lib/sparcv9/libipp.so.1 755 root bin
 s none usr/lib/sparcv9/libipp.so=libipp.so.1
+f none usr/lib/sparcv9/libipsecutil.so.1 755 root bin
 f none usr/lib/sparcv9/libkmf.so.1 755 root bin
 s none usr/lib/sparcv9/libkmf.so=libkmf.so.1
 f none usr/lib/sparcv9/libkmfberder.so.1 755 root bin

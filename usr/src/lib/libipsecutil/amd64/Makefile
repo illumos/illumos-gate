@@ -22,42 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+include ../Makefile.com
+include ../../Makefile.lib.64
 
-include ../Makefile.lib
-
-HDRS =		ipsec_util.h ikedoor.h errfp.h
-HDRDIR =	common
-SUBDIRS	=	$(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
-
-all := 		TARGET = all
-clean :=	TARGET = clean
-clobber :=	TARGET = clobber
-install	:=	TARGET = install
-lint :=		TARGET = lint
-
-#
-# Definitions for message catalog
-#
-MSGFILES =	`$(GREP) -l gettext common/*.[ch]`
-POFILE =	libipsecutil.po
-.KEEP_STATE:
-
-all clean clobber install lint: $(SUBDIRS)
-
-$(POFILE):	pofile_MSGFILES
-
-install_h:	$(ROOTHDRS)
-
-check:		$(CHECKHDRS)
-
-_msg:		$(MSGDOMAINPOFILE)
-
-include ../../Makefile.msg.targ
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
-
-include ../Makefile.targ
+install: all $(ROOTLIBS64) $(ROOTLINKS64)
