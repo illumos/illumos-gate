@@ -27,8 +27,6 @@
 #ifndef _BGE_HW_H
 #define	_BGE_HW_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -84,6 +82,7 @@ extern "C" {
 #define	DEVICE_ID_5755			0x167b
 #define	DEVICE_ID_5755M			0x1673
 #define	DEVICE_ID_5721			0x1659
+#define	DEVICE_ID_5722			0x165a
 #define	DEVICE_ID_5714C			0x1668
 #define	DEVICE_ID_5714S			0x1669
 #define	DEVICE_ID_5715C			0x1678

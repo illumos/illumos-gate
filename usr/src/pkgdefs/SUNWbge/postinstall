@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 # Function: check_add_drv()
 #
@@ -150,6 +148,7 @@ then
 	"pci14e4,1653"
 	"pci14e4,1654"
 	"pci14e4,1659"
+	"pciex14e4,165a"
 	"pci14e4,165d"
 	"pci14e4,165e"
 	"pci14e4,1668"
@@ -186,6 +185,7 @@ else if [ ${ARCH} = "sparc" ]
 	"pci14e4,16a8"
 	"pci14e4,1649"
 	"pciex14e4,1659"
+	"pciex14e4,165a"
 	"pci14e4,1668"
 	"pci14e4,1669"
 	"pci14e4,1677"

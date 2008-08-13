@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "bge_impl.h"
 #include <sys/sdt.h>
 #include <sys/mac.h>
@@ -34,7 +32,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "Broadcom Gb Ethernet v0.67";
+static char bge_ident[] = "Broadcom Gb Ethernet v0.68";
 
 /*
  * Property names
