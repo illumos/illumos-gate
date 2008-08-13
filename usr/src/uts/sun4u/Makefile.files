@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This Makefile defines all file modules for the directory uts/sun4u
 #	and it's children. These are the source files which are sun4u
 #	"implementation architecture" dependent.
@@ -97,7 +95,7 @@ PSYCHO_PCI_OBJS	+= $(PCI_COMMON_OBJS) pcipsy.o
 SCHIZO_PCI_OBJS	+= $(PCI_COMMON_OBJS) pcisch_asm.o pcisch.o pcix.o
 SIMBA_PCI_OBJS	+= simba.o
 DB21554_OBJS	+= db21554.o
-US_OBJS 	+= cpudrv.o cpudrv_plat.o
+US_OBJS 	+= cpudrv.o cpudrv_mach.o
 POWER_OBJS	+= power.o
 EPIC_OBJS	+= epic.o
 GRBEEP_OBJS	+= grbeep.o

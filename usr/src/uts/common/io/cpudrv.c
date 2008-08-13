@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * CPU Device driver. The driver is not DDI-compliant.
  *
@@ -48,8 +46,7 @@
 
 #include <sys/machsystm.h>
 #include <sys/x_call.h>
-#include <sys/cpudrv.h>
-#include <sys/cpudrv_plat.h>
+#include <sys/cpudrv_mach.h>
 #include <sys/msacct.h>
 
 /*
@@ -99,7 +96,7 @@ struct dev_ops cpudrv_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* modops */
-	"CPU Driver %I%",		/* linkinfo */
+	"CPU Driver",			/* linkinfo */
 	&cpudrv_ops,			/* dev_ops */
 };
 
@@ -112,7 +109,7 @@ static struct modlinkage modlinkage = {
 /*
  * Function prototypes
  */
-static int cpudrv_pm_init(cpudrv_devstate_t *cpudsp);
+static int cpudrv_pm_init_power(cpudrv_devstate_t *cpudsp);
 static void cpudrv_pm_free(cpudrv_devstate_t *cpudsp);
 static int cpudrv_pm_comp_create(cpudrv_devstate_t *cpudsp);
 static void cpudrv_pm_monitor_disp(void *arg);
@@ -157,11 +154,14 @@ int cpudrv_direct_pm = 0;
  * for current speed.
  */
 #define	CPUDRV_PM_MONITOR_INIT(cpudsp) { \
-	ASSERT(mutex_owned(&(cpudsp)->lock)); \
-	(cpudsp)->cpudrv_pm.timeout_id = timeout(cpudrv_pm_monitor_disp, \
-	    (cpudsp), (((cpudsp)->cpudrv_pm.cur_spd == NULL) ? \
-	    CPUDRV_PM_QUANT_CNT_OTHR : \
-	    (cpudsp)->cpudrv_pm.cur_spd->quant_cnt)); \
+	if (CPUDRV_PM_POWER_ENABLED(cpudsp)) { \
+		ASSERT(mutex_owned(&(cpudsp)->lock)); \
+		(cpudsp)->cpudrv_pm.timeout_id = \
+		    timeout(cpudrv_pm_monitor_disp, \
+		    (cpudsp), (((cpudsp)->cpudrv_pm.cur_spd == NULL) ? \
+		    CPUDRV_PM_QUANT_CNT_OTHR : \
+		    (cpudsp)->cpudrv_pm.cur_spd->quant_cnt)); \
+	} \
 }
 
 /*
@@ -170,16 +170,17 @@ int cpudrv_direct_pm = 0;
 #define	CPUDRV_PM_MONITOR_FINI(cpudsp) { \
 	timeout_id_t tmp_tid; \
 	ASSERT(mutex_owned(&(cpudsp)->lock)); \
-	ASSERT((cpudsp)->cpudrv_pm.timeout_id); \
 	tmp_tid = (cpudsp)->cpudrv_pm.timeout_id; \
 	(cpudsp)->cpudrv_pm.timeout_id = 0; \
 	mutex_exit(&(cpudsp)->lock); \
-	(void) untimeout(tmp_tid); \
-	mutex_enter(&(cpudsp)->cpudrv_pm.timeout_lock); \
-	while ((cpudsp)->cpudrv_pm.timeout_count != 0) \
-		cv_wait(&(cpudsp)->cpudrv_pm.timeout_cv, \
-		    &(cpudsp)->cpudrv_pm.timeout_lock); \
-	mutex_exit(&(cpudsp)->cpudrv_pm.timeout_lock); \
+	if (tmp_tid != 0) { \
+		(void) untimeout(tmp_tid); \
+		mutex_enter(&(cpudsp)->cpudrv_pm.timeout_lock); \
+		while ((cpudsp)->cpudrv_pm.timeout_count != 0) \
+			cv_wait(&(cpudsp)->cpudrv_pm.timeout_cv, \
+			    &(cpudsp)->cpudrv_pm.timeout_lock); \
+		mutex_exit(&(cpudsp)->cpudrv_pm.timeout_lock); \
+	} \
 	mutex_enter(&(cpudsp)->lock); \
 }
 
@@ -240,6 +241,8 @@ cpudrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	case DDI_ATTACH:
 		DPRINTF(D_ATTACH, ("cpudrv_attach: instance %d: "
 		    "DDI_ATTACH called\n", instance));
+		if (CPUDRV_PM_DISABLED())
+			return (DDI_FAILURE);
 		if (ddi_soft_state_zalloc(cpudrv_state, instance) !=
 		    DDI_SUCCESS) {
 			cmn_err(CE_WARN, "cpudrv_attach: instance %d: "
@@ -267,63 +270,78 @@ cpudrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			CPUDRV_PM_DISABLE();
 			return (DDI_FAILURE);
 		}
-		if (cpudrv_pm_init(cpudsp) != DDI_SUCCESS) {
+		if (!cpudrv_mach_pm_init(cpudsp)) {
 			ddi_soft_state_free(cpudrv_state, instance);
 			CPUDRV_PM_DISABLE();
 			return (DDI_FAILURE);
 		}
-		if (cpudrv_pm_comp_create(cpudsp) != DDI_SUCCESS) {
-			ddi_soft_state_free(cpudrv_state, instance);
-			CPUDRV_PM_DISABLE();
-			cpudrv_pm_free(cpudsp);
-			return (DDI_FAILURE);
-		}
-		if (ddi_prop_update_string(DDI_DEV_T_NONE,
-		    dip, "pm-class", "CPU") != DDI_PROP_SUCCESS) {
-			ddi_soft_state_free(cpudrv_state, instance);
-			CPUDRV_PM_DISABLE();
-			cpudrv_pm_free(cpudsp);
-			return (DDI_FAILURE);
-		}
-
-		/*
-		 * Taskq is used to dispatch routine to monitor CPU activities.
-		 */
-		cpudsp->cpudrv_pm.tq = taskq_create_instance(
-		    "cpudrv_pm_monitor",
-		    ddi_get_instance(dip), CPUDRV_PM_TASKQ_THREADS,
-		    (maxclsyspri - 1), CPUDRV_PM_TASKQ_MIN,
-		    CPUDRV_PM_TASKQ_MAX, TASKQ_PREPOPULATE|TASKQ_CPR_SAFE);
-
 		mutex_init(&cpudsp->lock, NULL, MUTEX_DRIVER, NULL);
-		mutex_init(&cpudsp->cpudrv_pm.timeout_lock, NULL, MUTEX_DRIVER,
-		    NULL);
-		cv_init(&cpudsp->cpudrv_pm.timeout_cv, NULL, CV_DEFAULT, NULL);
+		if (CPUDRV_PM_POWER_ENABLED(cpudsp)) {
+			if (cpudrv_pm_init_power(cpudsp) != DDI_SUCCESS) {
+				CPUDRV_PM_DISABLE();
+				cpudrv_pm_free(cpudsp);
+				ddi_soft_state_free(cpudrv_state, instance);
+				return (DDI_FAILURE);
+			}
+			if (cpudrv_pm_comp_create(cpudsp) != DDI_SUCCESS) {
+				CPUDRV_PM_DISABLE();
+				cpudrv_pm_free(cpudsp);
+				ddi_soft_state_free(cpudrv_state, instance);
+				return (DDI_FAILURE);
+			}
+			if (ddi_prop_update_string(DDI_DEV_T_NONE,
+			    dip, "pm-class", "CPU") != DDI_PROP_SUCCESS) {
+				CPUDRV_PM_DISABLE();
+				cpudrv_pm_free(cpudsp);
+				ddi_soft_state_free(cpudrv_state, instance);
+				return (DDI_FAILURE);
+			}
 
-		/*
-		 * Driver needs to assume that CPU is running at unknown speed
-		 * at DDI_ATTACH and switch it to the needed speed. We assume
-		 * that initial needed speed is full speed for us.
-		 */
-		/*
-		 * We need to take the lock because cpudrv_pm_monitor()
-		 * will start running in parallel with attach().
-		 */
-		mutex_enter(&cpudsp->lock);
-		cpudsp->cpudrv_pm.cur_spd = NULL;
-		cpudsp->cpudrv_pm.targ_spd = cpudsp->cpudrv_pm.head_spd;
-		cpudsp->cpudrv_pm.pm_started = B_FALSE;
-		/*
-		 * We don't call pm_raise_power() directly from attach because
-		 * driver attach for a slave CPU node can happen before the
-		 * CPU is even initialized. We just start the monitoring
-		 * system which understands unknown speed and moves CPU
-		 * to targ_spd when it have been initialized.
-		 */
-		CPUDRV_PM_MONITOR_INIT(cpudsp);
-		mutex_exit(&cpudsp->lock);
+			/*
+			 * Taskq is used to dispatch routine to monitor CPU
+			 * activities.
+			 */
+			cpudsp->cpudrv_pm.tq = taskq_create_instance(
+			    "cpudrv_pm_monitor",
+			    ddi_get_instance(dip), CPUDRV_PM_TASKQ_THREADS,
+			    (maxclsyspri - 1), CPUDRV_PM_TASKQ_MIN,
+			    CPUDRV_PM_TASKQ_MAX,
+			    TASKQ_PREPOPULATE|TASKQ_CPR_SAFE);
 
-		CPUDRV_PM_INSTALL_TOPSPEED_CHANGE_HANDLER(cpudsp, dip);
+			mutex_init(&cpudsp->cpudrv_pm.timeout_lock, NULL,
+			    MUTEX_DRIVER, NULL);
+			cv_init(&cpudsp->cpudrv_pm.timeout_cv, NULL,
+			    CV_DEFAULT, NULL);
+
+			/*
+			 * Driver needs to assume that CPU is running at
+			 * unknown speed at DDI_ATTACH and switch it to the
+			 * needed speed. We assume that initial needed speed
+			 * is full speed for us.
+			 */
+			/*
+			 * We need to take the lock because cpudrv_pm_monitor()
+			 * will start running in parallel with attach().
+			 */
+			mutex_enter(&cpudsp->lock);
+			cpudsp->cpudrv_pm.cur_spd = NULL;
+			cpudsp->cpudrv_pm.targ_spd =
+			    cpudsp->cpudrv_pm.head_spd;
+			cpudsp->cpudrv_pm.pm_started = B_FALSE;
+			/*
+			 * We don't call pm_raise_power() directly from attach
+			 * because driver attach for a slave CPU node can
+			 * happen before the CPU is even initialized. We just
+			 * start the monitoring system which understands
+			 * unknown speed and moves CPU to targ_spd when it
+			 * have been initialized.
+			 */
+			CPUDRV_PM_MONITOR_INIT(cpudsp);
+			mutex_exit(&cpudsp->lock);
+
+		}
+
+		CPUDRV_PM_INSTALL_MAX_CHANGE_HANDLER(cpudsp, dip);
 
 		ddi_report_dev(dip);
 		return (DDI_SUCCESS);
@@ -331,12 +349,16 @@ cpudrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	case DDI_RESUME:
 		DPRINTF(D_ATTACH, ("cpudrv_attach: instance %d: "
 		    "DDI_RESUME called\n", instance));
-		if ((cpudsp = ddi_get_soft_state(cpudrv_state, instance)) ==
-		    NULL) {
-			cmn_err(CE_WARN, "cpudrv_attach: instance %d: "
-			    "can't get state", instance);
-			return (DDI_FAILURE);
-		}
+
+		cpudsp = ddi_get_soft_state(cpudrv_state, instance);
+		ASSERT(cpudsp != NULL);
+
+		/*
+		 * Nothing to do for resume, if not doing active PM.
+		 */
+		if (!CPUDRV_PM_POWER_ENABLED(cpudsp))
+			return (DDI_SUCCESS);
+
 		mutex_enter(&cpudsp->lock);
 		/*
 		 * Driver needs to assume that CPU is running at unknown speed
@@ -382,12 +404,16 @@ cpudrv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_SUSPEND:
 		DPRINTF(D_DETACH, ("cpudrv_detach: instance %d: "
 		    "DDI_SUSPEND called\n", instance));
-		if ((cpudsp = ddi_get_soft_state(cpudrv_state, instance)) ==
-		    NULL) {
-			cmn_err(CE_WARN, "cpudrv_detach: instance %d: "
-			    "can't get state", instance);
-			return (DDI_FAILURE);
-		}
+
+		cpudsp = ddi_get_soft_state(cpudrv_state, instance);
+		ASSERT(cpudsp != NULL);
+
+		/*
+		 * Nothing to do for suspend, if not doing active PM.
+		 */
+		if (!CPUDRV_PM_POWER_ENABLED(cpudsp))
+			return (DDI_SUCCESS);
+
 		/*
 		 * During a checkpoint-resume sequence, framework will
 		 * stop interrupts to quiesce kernel activity. This will
@@ -476,10 +502,10 @@ cpudrv_power(dev_info_t *dip, int comp, int level)
 	 * In normal operation, we fail if we are busy and request is
 	 * to lower the power level. We let this go through if the driver
 	 * is in special direct pm mode. On x86, we also let this through
-	 * if the change is due to a request to throttle the max speed.
+	 * if the change is due to a request to govern the max speed.
 	 */
 	if (!cpudrv_direct_pm && (cpupm->pm_busycnt >= 1) &&
-	    !cpudrv_pm_is_throttle_thread(cpupm)) {
+	    !cpudrv_pm_is_governor_thread(cpupm)) {
 		if ((cpupm->cur_spd != NULL) &&
 		    (level < cpupm->cur_spd->pm_level)) {
 			mutex_exit(&cpudsp->lock);
@@ -492,7 +518,7 @@ cpudrv_power(dev_info_t *dip, int comp, int level)
 			break;
 	}
 	if (!new_spd) {
-		CPUDRV_PM_RESET_THROTTLE_THREAD(cpupm);
+		CPUDRV_PM_RESET_GOVERNOR_THREAD(cpupm);
 		mutex_exit(&cpudsp->lock);
 		cmn_err(CE_WARN, "cpudrv_power: instance %d: "
 		    "can't locate new CPU speed", instance);
@@ -513,12 +539,12 @@ cpudrv_power(dev_info_t *dip, int comp, int level)
 	if (!is_ready) {
 		DPRINTF(D_POWER, ("cpudrv_power: instance %d: "
 		    "CPU not ready for x-calls\n", instance));
-	} else if (!(is_ready = cpudrv_pm_all_instances_ready())) {
+	} else if (!(is_ready = cpudrv_pm_power_ready())) {
 		DPRINTF(D_POWER, ("cpudrv_power: instance %d: "
-		    "waiting for all CPUs to be ready\n", instance));
+		    "waiting for all CPUs to be power manageable\n", instance));
 	}
 	if (!is_ready) {
-		CPUDRV_PM_RESET_THROTTLE_THREAD(cpupm);
+		CPUDRV_PM_RESET_GOVERNOR_THREAD(cpupm);
 		mutex_exit(&cpudsp->lock);
 		return (DDI_FAILURE);
 	}
@@ -560,7 +586,7 @@ cpudrv_power(dev_info_t *dip, int comp, int level)
 	cpupm->lastquan_mstate[CMS_USER] = 0;
 	cpupm->lastquan_lbolt = 0;
 	cpupm->cur_spd = new_spd;
-	CPUDRV_PM_RESET_THROTTLE_THREAD(cpupm);
+	CPUDRV_PM_RESET_GOVERNOR_THREAD(cpupm);
 	mutex_exit(&cpudsp->lock);
 
 	return (DDI_SUCCESS);
@@ -607,7 +633,7 @@ set_supp_freqs(cpu_t *cp, cpudrv_pm_t *cpupm)
  * Initialize power management data.
  */
 static int
-cpudrv_pm_init(cpudrv_devstate_t *cpudsp)
+cpudrv_pm_init_power(cpudrv_devstate_t *cpudsp)
 {
 	cpudrv_pm_t 	*cpupm = &(cpudsp->cpudrv_pm);
 	cpudrv_pm_spd_t	*cur_spd;
@@ -618,14 +644,10 @@ cpudrv_pm_init(cpudrv_devstate_t *cpudsp)
 	int		user_cnt_percent;
 	int		i;
 
-	if (!cpudrv_pm_init_module(cpudsp))
-		return (DDI_FAILURE);
-
 	CPUDRV_PM_GET_SPEEDS(cpudsp, speeds, nspeeds);
 	if (nspeeds < 2) {
 		/* Need at least two speeds to power manage */
 		CPUDRV_PM_FREE_SPEEDS(speeds, nspeeds);
-		cpudrv_pm_free_module(cpudsp);
 		return (DDI_FAILURE);
 	}
 	cpupm->num_spd = nspeeds;
@@ -750,7 +772,7 @@ cpudrv_pm_free(cpudrv_devstate_t *cpudsp)
 		cur_spd = next_spd;
 	}
 	bzero(cpupm, sizeof (cpudrv_pm_t));
-	cpudrv_pm_free_module(cpudsp);
+	cpudrv_mach_pm_free(cpudsp);
 }
 
 /*
@@ -961,9 +983,9 @@ cpudrv_pm_monitor(void *arg)
 	if (!is_ready) {
 		DPRINTF(D_PM_MONITOR, ("cpudrv_pm_monitor: instance %d: "
 		    "CPU not ready for x-calls\n", ddi_get_instance(dip)));
-	} else if (!(is_ready = cpudrv_pm_all_instances_ready())) {
+	} else if (!(is_ready = cpudrv_pm_power_ready())) {
 		DPRINTF(D_PM_MONITOR, ("cpudrv_pm_monitor: instance %d: "
-		    "waiting for all CPUs to be ready\n",
+		    "waiting for all CPUs to be power manageable\n",
 		    ddi_get_instance(dip)));
 	}
 	if (!is_ready) {

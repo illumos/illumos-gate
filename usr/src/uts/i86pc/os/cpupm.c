@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cpupm.h>
 
@@ -82,7 +80,7 @@ static boolean_t cpupm_dependencies_valid = B_TRUE;
 /*
  * If any CPU fails to attach, then cpupm is disabled for all CPUs.
  */
-static boolean_t cpupm_enabled = B_TRUE;
+static uint32_t cpupm_enabled = CPUPM_P_STATES | CPUPM_T_STATES;
 
 /*
  * Until all CPUs have succesfully attached, we do not allow
@@ -197,7 +195,7 @@ boolean_t
 cpupm_is_ready()
 {
 #ifndef	__xpv
-	if (!cpupm_enabled)
+	if (cpupm_enabled == CPUPM_NO_STATES)
 		return (B_FALSE);
 	return (cpupm_ready);
 #else
@@ -205,16 +203,22 @@ cpupm_is_ready()
 #endif
 }
 
+boolean_t
+cpupm_is_enabled(uint32_t state)
+{
+	return ((cpupm_enabled & state) == state);
+}
+
 /*
- * By default, cpupm is enabled. But if there are any errors attaching
- * any of the CPU devices, then it is disabled.
+ * By default, all states are  enabled. But if there are any errors attaching
+ * any of the CPU devices, then they are disabled.
  */
 void
-cpupm_enable(boolean_t enable)
+cpupm_disable(uint32_t state)
 {
-	if (!enable)
+	cpupm_enabled &= ~state;
+	if (state & CPUPM_P_STATES)
 		cpupm_free_cpu_dependencies();
-	cpupm_enabled = enable;
 }
 
 /*
@@ -234,17 +238,10 @@ cpupm_post_startup()
 		(*cpupm_rebuild_cpu_domains)();
 
 	/*
-	 * If CPU power management was disabled, then there
-	 * is nothing to do.
+	 * Only initialize the topspeed if P-states are enabled.
 	 */
-	if (!cpupm_enabled)
-		return;
-
-	cpupm_ready = B_TRUE;
-
-	if (cpupm_init_topspeed != NULL)
+	if (cpupm_enabled & CPUPM_P_STATES && cpupm_init_topspeed != NULL)
 		(*cpupm_init_topspeed)();
-#else
-	cpupm_ready = B_TRUE;
 #endif
+	cpupm_ready = B_TRUE;
 }

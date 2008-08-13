@@ -26,8 +26,6 @@
 #ifndef _SYS_CPUDRV_H
 #define	_SYS_CPUDRV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/promif.h>
 #include <sys/cpuvar.h>
 #include <sys/taskq.h>
@@ -88,7 +86,7 @@ typedef struct cpudrv_pm {
 	kmutex_t	timeout_lock;	/* protect timeout_count */
 	kcondvar_t	timeout_cv;	/* wait on timeout_count change */
 #if defined(__x86)
-	kthread_t	*pm_throttle_thread; /* throttling thread */
+	kthread_t	*pm_governor_thread; /* governor thread */
 #endif
 	boolean_t	pm_started;	/* PM really started */
 } cpudrv_pm_t;
@@ -165,10 +163,7 @@ typedef struct cpudrv_devstate {
 	processorid_t	cpu_id;		/* CPU number for this node */
 	cpudrv_pm_t	cpudrv_pm;	/* power management data */
 	kmutex_t	lock;		/* protects state struct */
-#if defined(__x86)
-	void		*acpi_handle;	/* ACPI cache */
-	void		*module_state;  /* CPU module state */
-#endif
+	void		*mach_state; /* machine specific state */
 } cpudrv_devstate_t;
 
 extern void	*cpudrv_state;
@@ -199,10 +194,10 @@ extern uint_t	cpudrv_debug;
 
 extern int cpudrv_pm_change_speed(cpudrv_devstate_t *, cpudrv_pm_spd_t *);
 extern boolean_t cpudrv_pm_get_cpu_id(dev_info_t *, processorid_t *);
-extern boolean_t cpudrv_pm_all_instances_ready(void);
-extern boolean_t cpudrv_pm_is_throttle_thread(cpudrv_pm_t *);
-extern boolean_t cpudrv_pm_init_module(cpudrv_devstate_t *);
-extern void cpudrv_pm_free_module(cpudrv_devstate_t *);
+extern boolean_t cpudrv_pm_power_ready(void);
+extern boolean_t cpudrv_pm_is_governor_thread(cpudrv_pm_t *);
+extern boolean_t cpudrv_mach_pm_init(cpudrv_devstate_t *);
+extern void cpudrv_mach_pm_free(cpudrv_devstate_t *);
 
 #endif /* _KERNEL */
 

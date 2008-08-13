@@ -19,24 +19,22 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SPEEDSTEP_H
 #define	_SPEEDSTEP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <sys/cpudrv.h>
+#include <sys/cpudrv_mach.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern int speedstep_init(cpudrv_devstate_t *);
-extern void speedstep_fini(cpudrv_devstate_t *);
-extern int speedstep_power(cpudrv_devstate_t *, uint32_t);
+boolean_t speedstep_supported(uint_t, uint_t);
+
+cpudrv_pstate_ops_t speedstep_ops;
 
 #ifdef __cplusplus
 }

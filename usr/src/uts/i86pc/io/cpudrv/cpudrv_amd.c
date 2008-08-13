@@ -23,21 +23,29 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_PWRNOW_H
-#define	_PWRNOW_H
+/*
+ * AMD specific CPU power management support.
+ */
 
+#include <sys/x86_archext.h>
 #include <sys/cpudrv_mach.h>
+#include <sys/cpu_acpi.h>
+#include <sys/pwrnow.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+boolean_t
+cpudrv_amd_init(cpudrv_devstate_t *cpudsp)
+{
+	cpudrv_mach_state_t *mach_state = cpudsp->mach_state;
 
-boolean_t pwrnow_supported();
+	/* AMD? */
+	if (x86_vendor != X86_VENDOR_AMD)
+		return (B_FALSE);
 
-cpudrv_pstate_ops_t pwrnow_ops;
+	/*
+	 * If we support PowerNow! on this processor, then set the
+	 * correct pstate_ops for the processor.
+	 */
+	mach_state->cpupm_pstate_ops = pwrnow_supported() ? &pwrnow_ops : NULL;
 
-#ifdef __cplusplus
+	return (B_TRUE);
 }
-#endif
-
-#endif	/* _PWRNOW_H */

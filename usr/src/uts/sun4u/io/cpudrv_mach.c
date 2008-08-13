@@ -19,20 +19,19 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * CPU power management driver platform support.
+ * CPU power management driver support for sun4u.
  */
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#include <sys/cpudrv_plat.h>
-#include <sys/cpudrv.h>
+#include <sys/cpudrv_mach.h>
 #include <sys/machsystm.h>
+
+boolean_t cpudrv_enabled = B_TRUE;
 
 /*
  * Change CPU speed.
@@ -55,39 +54,49 @@ cpudrv_pm_get_cpu_id(dev_info_t *dip,  processorid_t *cpu_id)
 }
 
 /*
- * A noop for this platform.
+ * A noop for this machine type.
  */
 boolean_t
-cpudrv_pm_all_instances_ready(void)
+cpudrv_pm_power_ready(void)
 {
 	return (B_TRUE);
 }
 
 /*
- * A noop for this platform.
+ * A noop for this machine type.
  */
 /* ARGSUSED */
 boolean_t
-cpudrv_pm_is_throttle_thread(cpudrv_pm_t *cpupm)
+cpudrv_pm_is_governor_thread(cpudrv_pm_t *cpupm)
 {
 	return (B_FALSE);
 }
 
 /*
- * A noop for this platform.
+ * A noop for this machine type.
  */
 /*ARGSUSED*/
 boolean_t
-cpudrv_pm_init_module(cpudrv_devstate_t *cpudsp)
+cpudrv_mach_pm_init(cpudrv_devstate_t *cpudsp)
 {
 	return (B_TRUE);
 }
 
 /*
- * A noop for this platform.
+ * A noop for this machine type.
  */
 /*ARGSUSED*/
 void
-cpudrv_pm_free_module(cpudrv_devstate_t *cpudsp)
+cpudrv_mach_pm_free(cpudrv_devstate_t *cpudsp)
 {
+}
+
+/*
+ * On SPARC all instances support power management unless attach fails.
+ * In the case of attach failure, cpupm_enabled will be false.
+ */
+boolean_t
+cpudrv_pm_enabled()
+{
+	return (B_TRUE);
 }

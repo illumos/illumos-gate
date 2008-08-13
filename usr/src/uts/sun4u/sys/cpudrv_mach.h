@@ -19,16 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _SYS_CPUDRV_PLAT_H
-#define	_SYS_CPUDRV_PLAT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ifndef _SYS_CPUDRV_MACH_H
+#define	_SYS_CPUDRV_MACH_H
 
 #include <sys/cpu_module.h>
+#include <sys/cpudrv.h>
 
 #ifdef  __cplusplus
 extern "C" {
@@ -42,27 +41,34 @@ extern "C" {
 #define	CPUDRV_PM_XCALL_IS_READY(cpuid) (CPU_XCALL_READY(cpuid))
 
 /*
- * CPU power management is always enabled for this platform.
+ * If a failure occurs during attach(), then CPU power management
+ * is disabled.
  */
-#define	CPUDRV_PM_DISABLE()
+extern boolean_t cpudrv_enabled;
+
+#define	CPUDRV_PM_DISABLE() (cpudrv_enabled = B_FALSE)
+
+#define	CPUDRV_PM_DISABLED() (!cpudrv_enabled)
+
+#define	CPUDRV_PM_POWER_ENABLED(cpudsp) cpudrv_pm_enabled()
 
 /*
- * Currently, there is no throttling on this platform.
+ * Currently, there is no governor on sun4u,
  */
-#define	CPUDRV_PM_RESET_THROTTLE_THREAD(cpupm)
+#define	CPUDRV_PM_RESET_GOVERNOR_THREAD(cpupm)
 
 /*
- * Currently, there is no need for a throttling handler on this platform.
+ * Currently, there is no need for a handler on sun4u.
  */
-#define	CPUDRV_PM_INSTALL_TOPSPEED_CHANGE_HANDLER(cpudsp, dip)
+#define	CPUDRV_PM_INSTALL_MAX_CHANGE_HANDLER(cpudsp, dip)
 
 /*
- * There is no notion of changing topspeed on this platform.
+ * There is no notion of changing topspeed on sun4u.
  */
 #define	CPUDRV_PM_REDEFINE_TOPSPEED(dip)
 
 /*
- * There are no PPM callbacks for this platform.
+ * There are no PPM callbacks for sun4u.
  */
 #define	CPUDRV_PM_SET_PPM_CALLBACKS()
 
@@ -103,7 +109,7 @@ extern "C" {
 	((hwm * speeds[i - 1]) / speeds[i])
 
 /*
- * pm-components property defintions for this platform.
+ * pm-components property defintions for sun4u.
  *
  * Fully constructed pm-components property should be an array of
  * strings that look something like:
@@ -132,8 +138,10 @@ extern "C" {
 		    comp_spd, CPUDRV_PM_COMP_OTHER); \
 }
 
+extern boolean_t cpudrv_pm_enabled(void);
+
 #ifdef  __cplusplus
 }
 #endif
 
-#endif /* _SYS_CPUDRV_PLAT_H */
+#endif /* _SYS_CPUDRV_MACH_H */

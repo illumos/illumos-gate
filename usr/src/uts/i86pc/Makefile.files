@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This Makefile defines file modules in the directory uts/i86pc
 #	and its children. These are the source files which are i86pc
 #	"implementation architecture" dependent.
@@ -178,7 +176,16 @@ MCAMD_OBJS	+= \
 	mcamd_subr.o \
 	mcamd_pcicfg.o
 
-CPUDRV_OBJS	+= cpudrv.o cpudrv_plat.o cpu_acpi.o speedstep.o pwrnow.o
+CPUDRV_OBJS	+= \
+	cpudrv.o \
+	cpudrv_amd.o \
+	cpudrv_intel.o \
+	cpudrv_mach.o \
+	cpudrv_throttle.o \
+	cpu_acpi.o \
+	speedstep.o \
+	pwrnow.o
+
 PPM_OBJS	+= ppm_subr.o ppm.o ppm_plat.o
 
 ACPIPPM_OBJS	+= acpippm.o acpisleep.o

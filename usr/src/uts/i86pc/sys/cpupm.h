@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_CPUPM_H
 #define	_CPUPM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,6 +49,15 @@ typedef struct cpupm_cpu_dependency {
 } cpupm_cpu_dependency_t;
 
 /*
+ * If any states are added, then make sure to add them to
+ * CPUPM_ALL_STATES.
+ */
+#define	CPUPM_NO_STATES		0x00
+#define	CPUPM_P_STATES		0x01
+#define	CPUPM_T_STATES		0x02
+#define	CPUPM_ALL_STATES	(CPUPM_P_STATES | CPUPM_T_STATES)
+
+/*
  * Callbacks used for CPU power management.
  */
 extern void (*cpupm_rebuild_cpu_domains)(void);
@@ -71,7 +78,8 @@ extern void cpupm_free_cpu_dependencies();
  *
  */
 extern boolean_t cpupm_is_ready();
-extern void cpupm_enable(boolean_t);
+extern boolean_t cpupm_is_enabled(uint32_t);
+extern void cpupm_disable(uint32_t);
 extern void cpupm_post_startup();
 
 #ifdef __cplusplus

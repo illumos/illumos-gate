@@ -23,8 +23,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_PWRNOW_H
-#define	_PWRNOW_H
+#ifndef	_CPUDRV_THROTTLE_H
+#define	_CPUDRV_THROTTLE_H
 
 #include <sys/cpudrv_mach.h>
 
@@ -32,12 +32,10 @@
 extern "C" {
 #endif
 
-boolean_t pwrnow_supported();
-
-cpudrv_pstate_ops_t pwrnow_ops;
+cpudrv_tstate_ops_t cpudrv_throttle_ops;
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif	/* _PWRNOW_H */
+#endif	/* _CPUDRV_THROTTLE_H */
