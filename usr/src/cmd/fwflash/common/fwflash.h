@@ -26,8 +26,6 @@
 #ifndef	_FWFLASH_H
 #define	_FWFLASH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * fwflash.h
  */
@@ -50,7 +48,6 @@ int fwflash_debug;
 
 #define	FWFLASH_FLASH_IMAGES	2
 
-
 #define	FWPLUGINDIR		"/usr/lib/fwflash/identify"
 #define	FWVERIFYPLUGINDIR	"/usr/lib/fwflash/verify"
 
@@ -64,7 +61,6 @@ int fwflash_debug;
 struct devicelist;
 
 struct fw_plugin {
-
 	/*
 	 * An opaque handle for dlopen()/dlclose() to use.
 	 */
@@ -95,7 +91,6 @@ struct fw_plugin {
 	 */
 	int (*fw_readfw)(struct devicelist *device, char *filename);
 
-
 	/*
 	 * Function entry point to support the command-line "-f"
 	 * option - writes from persistent storage to device
@@ -103,7 +98,6 @@ struct fw_plugin {
 	 * All identification plugins must support this operation.
 	 */
 	int (*fw_writefw)(struct devicelist *device, char *filename);
-
 
 	/*
 	 * Function entry point used to build the list of valid, flashable
@@ -157,7 +151,6 @@ struct pluginlist {
 	TAILQ_ENTRY(pluginlist) nextplugin;
 };
 
-
 struct vpr {
 	/* vendor ID, eg "HITACHI " */
 	char *vid;
@@ -177,9 +170,6 @@ struct vpr {
 	void *encap_ident;
 };
 
-
-
-
 struct fwfile {
 	/*
 	 * The fully qualified filename. No default location for
@@ -193,8 +183,6 @@ struct fwfile {
 	/* pointer to the identification summary structure */
 	struct vpr *ident;
 };
-
-
 
 struct devicelist {
 	/*
@@ -257,7 +245,6 @@ struct devicelist {
  */
 
 struct vrfyplugin {
-
 	/*
 	 * fully-qualified filename in /usr/lib/fwflash/verify,
 	 * made up of [drivername]-[vendorname].so
@@ -330,8 +317,6 @@ struct vrfyplugin {
 	int (*vendorvrfy)(struct devicelist *devicenode);
 };
 
-
-
 /* Flags for argument parsing */
 #define	FWFLASH_HELP_FLAG	0x01
 #define	FWFLASH_VER_FLAG	0x02
@@ -343,17 +328,14 @@ struct vrfyplugin {
 #define	FWFLASH_READ_FLAG	0x80
 
 /* global variables for fwflash */
-
 TAILQ_HEAD(PLUGINLIST, pluginlist);
 TAILQ_HEAD(DEVICELIST, devicelist);
 struct PLUGINLIST *fw_pluginlist;
 struct DEVICELIST *fw_devices;
 
-
 struct vrfyplugin *verifier;
 di_node_t rootnode;
 struct fw_plugin *self;
-
 
 int manufacturing_mode = 0;
 
@@ -369,7 +351,6 @@ int manufacturing_mode = 0;
 #define	LOWBITS16		0x00ff
 #define	LOWBITS32		0x0000ffff
 #define	LOWBITS64		0x00000000ffffffffULL
-
 
 #if defined(_LITTLE_ENDIAN)
 #define	ARMSWAPBITS(bs)	(bs)
@@ -387,11 +368,8 @@ int manufacturing_mode = 0;
 
 #endif
 
-
 /* common functions for fwflash */
-
-void logmsg(int severity, char *msg, ...);
-
+void logmsg(int severity, const char *msg, ...);
 
 #ifdef __cplusplus
 }

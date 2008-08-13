@@ -21,8 +21,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # cmd/fwflash/Makefile.com
 #
 #
@@ -85,7 +83,5 @@ BUILD.SO=  $(CC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) $(LDLIBS)
 POST_PROCESS_O += ; $(CTFCONVERT_POST)
 POST_PROCESS_SO += ; $(CTFMERGE_POST)
 
-LINTFLAGS += -erroff=E_CONSTANT_CONDITION -D_POSIX_PTHREAD_SEMANTICS \
-	-erroff=E_CONST_TRUNCATED_BY_ASSIGN \
-	-erroff=E_SUPPRESSION_DIRECTIVE_UNUSED \
-	-erroff=E_BAD_PTR_CAST_ALIGN
+LINTFLAGS += -D_POSIX_PTHREAD_SEMANTICS -erroff=E_CONSTANT_CONDITION \
+	-erroff=E_SUPPRESSION_DIRECTIVE_UNUSED

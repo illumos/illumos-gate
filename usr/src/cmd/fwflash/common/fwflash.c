@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * fwflash.c
  */
@@ -32,7 +30,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <strings.h>
-#include <ctype.h>
 #include <errno.h>
 #include <sys/queue.h>
 #include <signal.h>
@@ -43,11 +40,9 @@
 #include <fcntl.h>
 #include <dlfcn.h>
 #include <dirent.h>
-#include <link.h>
 #include <sys/varargs.h>
 #include <libintl.h> /* for gettext(3c) */
 #include <libdevinfo.h>
-#include <note.h>
 #include <fwflash/fwflash.h>
 #include <sys/modctl.h> /* for MAXMODCONFNAME */
 
@@ -77,7 +72,6 @@ static char *sla [] = { "Copyright 2007 Sun Microsystems, Inc., 4150 Network "
 int	fwflash_arg_list = 0;
 char	*filelist[10];
 
-
 /* are we writing to flash? */
 static int fwflash_in_write = 0;
 
@@ -85,14 +79,12 @@ static int fwflash_in_write = 0;
  * If we *must* track the version string for fwflash, then
  * we should do so in this common file rather than the header
  * file since it will then be in sync with what the customer
- * sees
+ * sees. We should deprecate the "-v" option since it is not
+ * actually of any use - it doesn't line up with Mercurial's
+ * concept of the changeset.
  */
-
-
-#define	FWFLASH_VERSION		"%I%"
+#define	FWFLASH_VERSION		"v1.6"
 #define	FWFLASH_PROG_NAME	"fwflash"
-
-
 
 static int get_fileopts(char *options);
 static int flash_device_list();
@@ -103,13 +95,9 @@ static int fwflash_list_fw(char *class);
 static int fwflash_load_verifier(char *drv, char *vendorid, char *fwimg);
 static void fwflash_intr(int sig);
 static void fwflash_handle_signals(void);
-static void fwflash_usage();
-static void fwflash_help(void);
+static void fwflash_usage(char *arg);
 static void fwflash_version(void);
 static int confirm_target(struct devicelist *thisdev, char *file);
-
-
-
 
 /*
  * FWFlash main code
@@ -124,8 +112,6 @@ main(int argc, char **argv) {
 	char		*devclass = NULL;
 	char		*devpath = NULL;
 
-
-
 	/* local variables from env */
 	(void) setlocale(LC_ALL, "");
 
@@ -135,7 +121,6 @@ main(int argc, char **argv) {
 
 	(void) textdomain(TEXT_DOMAIN);
 
-
 	read_file = NULL;
 
 	if (argc < 2) {
@@ -144,49 +129,40 @@ main(int argc, char **argv) {
 		return (FWFLASH_FAILURE);
 	}
 
-
 	while ((ch = getopt(argc, argv, "hvylc:f:r:Qd:M")) != EOF) {
 		switch (ch) {
 		case 'h':
 			fwflash_arg_list |= FWFLASH_HELP_FLAG;
 			break;
-
 		case 'v':
 			fwflash_arg_list |= FWFLASH_VER_FLAG;
 			break;
-
 		case 'y':
 			fwflash_arg_list |= FWFLASH_YES_FLAG;
 			break;
-
 		case 'l':
 			fwflash_arg_list |= FWFLASH_LIST_FLAG;
 			break;
-
 		case 'c':
 			fwflash_arg_list |= FWFLASH_CLASS_FLAG;
 			/* we validate later */
 			devclass = strdup(optarg);
 			break;
-
 		case 'd':
 			fwflash_arg_list |= FWFLASH_DEVICE_FLAG;
 			devpath = strdup(optarg);
 			break;
-
 		case 'f':
 			fwflash_arg_list |= FWFLASH_FW_FLAG;
 			if ((rv = get_fileopts(optarg)) != FWFLASH_SUCCESS) {
-				fwflash_help();
+				fwflash_usage(NULL);
 				return (FWFLASH_FAILURE);
 			}
 			break;
-
 		case 'r':
 			fwflash_arg_list |= FWFLASH_READ_FLAG;
 			read_file = strdup(optarg);
 			break;
-
 		case 'Q':
 			/* NOT in the manpage */
 			fwflash_debug = 1;
@@ -211,7 +187,7 @@ main(int argc, char **argv) {
 	    ((fwflash_arg_list & FWFLASH_DEVICE_FLAG) &&
 		!((fwflash_arg_list & FWFLASH_FW_FLAG) ||
 		    (fwflash_arg_list & FWFLASH_READ_FLAG)))) {
-		fwflash_help();
+		fwflash_usage(NULL);
 		return (FWFLASH_SUCCESS);
 	}
 
@@ -282,9 +258,6 @@ main(int argc, char **argv) {
 }
 
 
-
-
-
 static int
 flash_load_plugins() {
 
@@ -301,7 +274,6 @@ flash_load_plugins() {
 #define	CLOSEFREE()	{			\
 	(void) dlclose(tmpplug->handle);	\
 	free(tmpplug); }
-
 
 	/*
 	 * Procedure:
@@ -361,7 +333,6 @@ flash_load_plugins() {
 		return (FWFLASH_FAILURE);
 	}
 
-	NOTE(CONSTCOND)
 	TAILQ_INIT(fw_pluginlist);
 
 	while ((readdir_r(dirp, plugdir, &plugdir) == 0) && (plugdir != NULL)) {
@@ -513,7 +484,6 @@ flash_load_plugins() {
 		return (FWFLASH_FAILURE);
 	}
 
-
 	if (errno != 0) {
 		logmsg(MSG_ERROR,
 		    gettext("Error reading directory entry in %s\n"),
@@ -527,8 +497,6 @@ flash_load_plugins() {
 	(void) closedir(dirp);
 	return (rval);
 }
-
-
 
 /*
  * fwflash_load_verifier dlload()s the appropriate firmware image
@@ -546,7 +514,6 @@ fwflash_load_verifier(char *drv, char *vendorid, char *fwimg) {
 	struct stat fwstat;
 	struct vrfyplugin *vrfy;
 	void *vrfysym;
-
 
 	/*
 	 * To make flashing multiple firmware images somewhat more
@@ -771,8 +738,6 @@ cleanup:
 	return (rv);
 }
 
-
-
 /*
  * cycles through the global list of plugins to find
  * each flashable device, which is added to fw_devices
@@ -791,7 +756,6 @@ flash_device_list()
 	int startidx = 0;
 	int sumrv = 0;
 	struct pluginlist *plugins;
-
 
 	/* we open rootnode here, and close it in fwflash_intr */
 	if ((rootnode = di_init("/", DINFOCPYALL)) == DI_NODE_NIL) {
@@ -838,16 +802,12 @@ flash_device_list()
 	return (rv);
 }
 
-
-
-
 static int
 fwflash_list_fw(char *class)
 {
 	int rv = 0;
 	struct devicelist *curdev;
 	int header = 1;
-
 
 	TAILQ_FOREACH(curdev, fw_devices, nextdev) {
 
@@ -872,22 +832,18 @@ fwflash_list_fw(char *class)
 			rv += curdev->plugin->fw_devinfo(curdev);
 		}
 	}
-
-
 	return (rv);
 }
 
-
 static int
-fwflash_update(char *device, char *filename, int flags) {
-
+fwflash_update(char *device, char *filename, int flags)
+{
 
 	int rv = FWFLASH_FAILURE;
 	int needsfree = 0;
 	int found = 0;
 	struct devicelist *curdev;
 	char *realfile;
-
 
 	/*
 	 * Here's how we operate:
@@ -901,9 +857,7 @@ fwflash_update(char *device, char *filename, int flags) {
 	 * There is no "force" flag to enable you to flash a firmware
 	 * image onto an incompatible device because the verifier
 	 * will return FWFLASH_FAILURE if the image doesn't match.
-	 *
 	 */
-
 
 	/* new firmware filename and device desc */
 	if (filename == NULL) {
@@ -921,8 +875,8 @@ fwflash_update(char *device, char *filename, int flags) {
 	if ((realfile = calloc(1, PATH_MAX + 1)) == NULL) {
 		logmsg(MSG_ERROR,
 		    gettext("Unable to allocate space for device "
-			"filename, operation might fail if %s is"
-			"a symbolic link\n"),
+		    "filename, operation might fail if %s is"
+		    "a symbolic link\n"),
 		    device);
 		realfile = device;
 	} else {
@@ -933,7 +887,7 @@ fwflash_update(char *device, char *filename, int flags) {
 		if (realpath(device, realfile) == NULL) {
 			logmsg(MSG_ERROR,
 			    gettext("Unable to resolve device filename"
-				": %s\n"),
+			    ": %s\n"),
 			    strerror(errno));
 			/* tidy up */
 			free(realfile);
@@ -957,7 +911,7 @@ fwflash_update(char *device, char *filename, int flags) {
 			if (rv == FWFLASH_FAILURE) {
 				logmsg(MSG_ERROR,
 				    gettext("Unable to load verifier "
-					"for device %s\n"),
+				    "for device %s\n"),
 				    curdev->access_devname);
 				return (FWFLASH_FAILURE);
 			}
@@ -972,7 +926,7 @@ fwflash_update(char *device, char *filename, int flags) {
 				return (rv);
 			}
 
-			if ((flags == FWFLASH_YES_FLAG) ||
+			if (((flags & FWFLASH_YES_FLAG) == FWFLASH_YES_FLAG) ||
 			    (rv = confirm_target(curdev, filename)) ==
 			    FWFLASH_YES_FLAG) {
 				logmsg(MSG_INFO,
@@ -983,15 +937,15 @@ fwflash_update(char *device, char *filename, int flags) {
 				if (rv == FWFLASH_FAILURE) {
 					logmsg(MSG_ERROR,
 					    gettext("Failed to flash "
-						"firmware file %s on "
-						"device %s: %d\n"),
+					    "firmware file %s on "
+					    "device %s: %d\n"),
 					    filename,
 					    curdev->access_devname, rv);
 				}
 			} else {
 				logmsg(MSG_ERROR,
 				    gettext("Flash operation not confirmed "
-					"by user\n"),
+				    "by user\n"),
 				    curdev->access_devname);
 				rv = FWFLASH_FAILURE;
 			}
@@ -1016,7 +970,6 @@ fwflash_update(char *device, char *filename, int flags) {
  * We validate that the device path is in our global device list and
  * that the filename exists, then palm things off to the relevant plugin.
  */
-
 static int
 fwflash_read_file(char *device, char *filename)
 {
@@ -1094,15 +1047,8 @@ fwflash_usage(char *arg)
 	    "\tthey must be listed together, separated by commas. The\n"
 	    "\timages will be flashed in the order specified.\n\n"));
 
-
 	(void) fprintf(stdout, "\n");
 }
-
-
-
-
-
-
 
 static void
 fwflash_version(void)
@@ -1110,17 +1056,8 @@ fwflash_version(void)
 	(void) fprintf(stdout, gettext("\n%s: "), FWFLASH_PROG_NAME);
 	(void) fprintf(stdout, gettext("version %s\n"),
 	    FWFLASH_VERSION);
-
-
 }
 
-static void
-fwflash_help(void)
-{
-	fwflash_usage(NULL);
-}
-
-/* ARGSUSED */
 static void
 fwflash_intr(int sig)
 {
@@ -1149,9 +1086,7 @@ fwflash_intr(int sig)
 	 * we need to close everything down properly, so
 	 * call the plugin closure routines
 	 */
-
 	if (fw_devices != NULL) {
-
 		TAILQ_FOREACH(thisdev, fw_devices, nextdev) {
 			/* free the components first */
 			free(thisdev->access_devname);
@@ -1167,9 +1102,7 @@ fwflash_intr(int sig)
 		}
 	}
 
-
 	if (fw_pluginlist != NULL) {
-
 		TAILQ_FOREACH(thisplug, fw_pluginlist, nextplugin) {
 			free(thisplug->filename);
 			free(thisplug->drvname);
@@ -1189,10 +1122,8 @@ fwflash_intr(int sig)
 			thisplug->plugin = NULL;
 			/* CONSTCOND */
 			TAILQ_REMOVE(fw_pluginlist, thisplug, nextplugin);
-
 		}
 	}
-
 
 	if (verifier != NULL) {
 		free(verifier->filename);
@@ -1208,7 +1139,6 @@ fwflash_intr(int sig)
 		verifier->handle = NULL;
 		free(verifier);
 	}
-
 	di_fini(rootnode);
 }
 
@@ -1232,7 +1162,6 @@ confirm_target(struct devicelist *thisdev, char *file)
 	int resp;
 
 	(void) fflush(stdin);
-
 	(void) printf(gettext("About to update firmware on %s\n"),
 	    thisdev->access_devname);
 	(void) printf(gettext("with file %s. Do you want to continue? "
@@ -1246,7 +1175,6 @@ confirm_target(struct devicelist *thisdev, char *file)
 	}
 
 	(void) fflush(stdin);
-
 	return (FWFLASH_FAILURE);
 }
 
@@ -1256,7 +1184,6 @@ get_fileopts(char *options)
 
 	int i;
 	char *files;
-
 
 	if (files = strtok(options, ",")) {
 		/* we have more than one */
@@ -1299,26 +1226,20 @@ get_fileopts(char *options)
 		    filelist[0]);
 	}
 	return (FWFLASH_SUCCESS);
-
 }
-
-
 
 /*
  * code reuse - cheerfully borrowed from stmsboot_util.c
  */
 void
-logmsg(int severity, char *msg, ...) {
+logmsg(int severity, const char *msg, ...) {
 
 	va_list ap;
 
-
 	if ((severity > MSG_INFO) ||
 	    ((severity == MSG_INFO) && (fwflash_debug > 0))) {
-
 		(void) fprintf(stderr, "%s: ", FWFLASH_PROG_NAME);
 		va_start(ap, msg);
-		/* LINTED - format specifier */
 		(void) vfprintf(stderr, msg, ap);
 		va_end(ap);
 	}

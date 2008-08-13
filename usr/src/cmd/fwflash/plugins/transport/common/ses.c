@@ -23,25 +23,19 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ses (SCSI Generic Device) specific functions.
  */
 
-
-#include <assert.h>
 #include <libnvpair.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/sysmacros.h>
 #include <sys/queue.h>
 #include <fcntl.h>
 #include <string.h>
-#include <strings.h>
 #include <scsi/libscsi.h>
 #include <scsi/libses.h>
 #include <libintl.h> /* for gettext(3c) */
@@ -302,7 +296,7 @@ fw_identify(int start)
 	char *devsuffix;
 	char *driver;
 	int idx = start;
-	int devlength = 0;
+	size_t devlength = 0;
 	nvlist_t *props;
 	ses_snap_t *snapshot;
 	ses_node_t *rootnodep, *nodep;
@@ -321,7 +315,7 @@ fw_identify(int start)
 	if (thisnode == DI_NODE_NIL) {
 		logmsg(MSG_INFO, gettext("No %s nodes in this system\n"),
 		    driver);
-		return (rv);
+		return (FWFLASH_FAILURE);
 	}
 
 	if ((devpath = calloc(1, MAXPATHLEN + 1)) == NULL) {
@@ -329,7 +323,7 @@ fw_identify(int start)
 		    gettext("%s: Unable to allocate space "
 		    "for a device node\n"),
 		    driver);
-		return (rv);
+		return (FWFLASH_FAILURE);
 	}
 
 	/* we've found one, at least */
@@ -345,7 +339,7 @@ fw_identify(int start)
 			    "to allocate space for device entry\n"),
 			    driver);
 			free(devpath);
-			return (rv);
+			return (FWFLASH_FAILURE);
 		}
 
 		/* calloc enough for /devices + devpath + devsuffix + '\0' */
@@ -497,9 +491,9 @@ fw_identify(int start)
 		}
 
 
-		if (di_prop_lookup_strings(DDI_DEV_T_ANY,
-		    thisnode, "target-port",
-		    &newdev->addresses[1]) < 0) {
+		rv = di_prop_lookup_strings(DDI_DEV_T_ANY,
+		    thisnode, "target-port", &newdev->addresses[1]);
+		if (rv < 0) {
 			logmsg(MSG_INFO,
 			    "%s: no target-port property "
 			    "for device %s\n",
