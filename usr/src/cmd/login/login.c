@@ -40,8 +40,6 @@
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* ONC_PLUS EXTRACT END */
 
 /*
@@ -634,8 +632,8 @@ main(int argc, char *argv[], char **renvp)
 	if (pwd->pw_uid == 0) {
 		if (dosyslog) {
 			if (remote_host[0]) {
-			    syslog(LOG_NOTICE, "ROOT LOGIN %s FROM %.*s",
-			    ttyn, HMAX, remote_host);
+				syslog(LOG_NOTICE, "ROOT LOGIN %s FROM %.*s",
+				    ttyn, HMAX, remote_host);
 			} else
 				syslog(LOG_NOTICE, "ROOT LOGIN %s", ttyn);
 		}
@@ -763,8 +761,7 @@ log_bad_attempts(void)
 		(void) strncat(log_entry[trys], ":", (size_t)1);
 		(void) strncat(log_entry[trys], ttyn, TTYN_SIZE);
 		(void) strncat(log_entry[trys], ":", (size_t)1);
-		(void) strncat(log_entry[trys], ctime(&timenow),
-				TIME_SIZE);
+		(void) strncat(log_entry[trys], ctime(&timenow), TIME_SIZE);
 		trys++;
 	}
 	if (count > flogin) {
@@ -913,7 +910,7 @@ login_conv(int num_msg, struct pam_message **msg,
 					envp++;
 
 				(void) strncpy(r->resp, inputline,
-					PAM_MAX_RESP_SIZE-1);
+				    PAM_MAX_RESP_SIZE-1);
 				r->resp[PAM_MAX_RESP_SIZE-1] = NULL;
 				len = strlen(r->resp);
 				if (r->resp[len-1] == '\n')
@@ -965,9 +962,7 @@ verify_passwd(void)
 	/*
 	 * PAM authenticates the user for us.
 	 */
-	if ((error = pam_authenticate(pamh, flag)) != PAM_SUCCESS) {
-		return (error);
-	}
+	error = pam_authenticate(pamh, flag);
 
 	/* get the user_name from the pam handle */
 	(void) pam_get_item(pamh, PAM_USER, (void**)&user);
@@ -978,7 +973,8 @@ verify_passwd(void)
 	SCPYL(user_name, user);
 	check_for_dueling_unix(user_name);
 
-	if ((pwd = getpwnam(user_name)) == NULL) {
+	if (((pwd = getpwnam(user_name)) == NULL) &&
+	    (error != PAM_USER_UNKNOWN)) {
 		return (PAM_SYSTEM_ERR);
 	}
 
@@ -1124,8 +1120,7 @@ get_user_name(void)
 
 	if ((fp = fopen(ISSUEFILE, "r")) != NULL) {
 		char    *ptr, buffer[BUFSIZ];
-		while ((ptr = fgets(buffer, sizeof (buffer),
-					fp)) != NULL) {
+		while ((ptr = fgets(buffer, sizeof (buffer), fp)) != NULL) {
 			(void) fputs(ptr, stdout);
 		}
 		(void) fclose(fp);
@@ -1172,7 +1167,7 @@ logins_disabled(char *user_name)
 	FILE	*nlfd;
 	int	c;
 	if (!EQN("root", user_name) &&
-			((nlfd = fopen(NOLOGIN, "r")) != (FILE *)NULL)) {
+	    ((nlfd = fopen(NOLOGIN, "r")) != (FILE *)NULL)) {
 		while ((c = getc(nlfd)) != EOF)
 			(void) putchar(c);
 		(void) fflush(stdout);
@@ -1427,7 +1422,7 @@ get_options(int argc, char *argv[])
 		case 'u':
 			if (!strlen(optarg)) {
 				(void) fprintf(stderr,
-					"Empty string supplied with -u\n");
+				    "Empty string supplied with -u\n");
 				login_exit(1);
 			}
 			SCPYL(identity, optarg);
@@ -1436,7 +1431,7 @@ get_options(int argc, char *argv[])
 		case 's':
 			if (!strlen(optarg)) {
 				(void) fprintf(stderr,
-					"Empty string supplied with -s\n");
+				    "Empty string supplied with -s\n");
 				login_exit(1);
 			}
 			SCPYL(sflagname, optarg);
@@ -1445,7 +1440,7 @@ get_options(int argc, char *argv[])
 		case 'R':
 			if (!strlen(optarg)) {
 				(void) fprintf(stderr,
-					"Empty string supplied with -R\n");
+				    "Empty string supplied with -R\n");
 				login_exit(1);
 			}
 			SCPYL(repository, optarg);
@@ -1454,7 +1449,7 @@ get_options(int argc, char *argv[])
 		case 't':
 			if (!strlen(optarg)) {
 				(void) fprintf(stderr,
-					"Empty string supplied with -t\n");
+				    "Empty string supplied with -t\n");
 				login_exit(1);
 			}
 			SCPYL(terminal, optarg);
@@ -1668,7 +1663,7 @@ validate_account(void)
 			tries = 1;
 			error = PAM_AUTHTOK_ERR;
 			while (error == PAM_AUTHTOK_ERR &&
-					tries <= DEF_ATTEMPTS) {
+			    tries <= DEF_ATTEMPTS) {
 				if (tries > 1)
 					(void) printf("Try again\n\n");
 
@@ -1687,8 +1682,8 @@ validate_account(void)
 			if (error != PAM_SUCCESS) {
 				if (dosyslog)
 					syslog(LOG_CRIT,
-						"change password failure: %s",
-						pam_strerror(pamh, error));
+					    "change password failure: %s",
+					    pam_strerror(pamh, error));
 				audit_error = ADT_FAIL_PAM + error;
 				login_exit(1);
 			} else {
@@ -1699,8 +1694,8 @@ validate_account(void)
 
 			if (dosyslog)
 				syslog(LOG_CRIT,
-					"login account failure: %s",
-						pam_strerror(pamh, error));
+				    "login account failure: %s",
+				    pam_strerror(pamh, error));
 			audit_error = ADT_FAIL_PAM + error;
 			login_exit(1);
 		}
@@ -1788,8 +1783,7 @@ login_authenticate(void)
 
 	do {
 		/* if scheme broken, then nothing to do but quit */
-		if (pam_get_item(pamh, PAM_USER, (void **)&user)
-							!= PAM_SUCCESS)
+		if (pam_get_item(pamh, PAM_USER, (void **)&user) != PAM_SUCCESS)
 			exit(1);
 
 		/*
@@ -1873,24 +1867,26 @@ login_authenticate(void)
 			if ((pwd = getpwnam(user_name)) != NULL) {
 				if (remote_host[0]) {
 					syslog(LOG_CRIT,
-					"REPEATED LOGIN FAILURES ON %s FROM "
-						"%.*s, %.*s",
-					ttyn, HMAX, remote_host, NMAX,
-					user_name);
+					    "REPEATED LOGIN FAILURES ON %s "
+					    "FROM %.*s, %.*s",
+					    ttyn, HMAX, remote_host, NMAX,
+					    user_name);
 				} else {
 					syslog(LOG_CRIT,
-					"REPEATED LOGIN FAILURES ON %s, %.*s",
-					ttyn, NMAX, user_name);
+					    "REPEATED LOGIN FAILURES ON "
+					    "%s, %.*s",
+					    ttyn, NMAX, user_name);
 				}
 			} else {
 				if (remote_host[0]) {
 					syslog(LOG_CRIT,
-					"REPEATED LOGIN FAILURES ON %s FROM "
-					"%.*s",
-					ttyn, HMAX, remote_host);
+					    "REPEATED LOGIN FAILURES ON %s "
+					    "FROM %.*s",
+					    ttyn, HMAX, remote_host);
 				} else {
 					syslog(LOG_CRIT,
-					"REPEATED LOGIN FAILURES ON %s", ttyn);
+					    "REPEATED LOGIN FAILURES ON %s",
+					    ttyn);
 				}
 			}
 		}
@@ -2020,7 +2016,7 @@ update_utmpx_entry(int sublogin)
 	int	err;
 	char	*user;
 	static char	*errmsg	= "No utmpx entry. "
-		"You must exec \"login\" from the lowest level \"shell\".";
+	    "You must exec \"login\" from the lowest level \"shell\".";
 	int	   tmplen;
 	struct utmpx  *u = (struct utmpx *)0;
 	struct utmpx  utmpx;
@@ -2152,7 +2148,7 @@ process_chroot_logins(void)
 		envinit[1] = (char *)NULL;
 		(void) printf("Subsystem root: %s\n", pwd->pw_dir);
 		(void) execle("/usr/bin/login", "login", (char *)0,
-			&envinit[0]);
+		    &envinit[0]);
 		(void) execle("/etc/login", "login", (char *)0, &envinit[0]);
 		(void) printf("No /usr/bin/login or /etc/login on root\n");
 
@@ -2186,8 +2182,8 @@ establish_user_environment(char **renvp)
 				;
 	}
 
-	envinit = (char **)calloc(lenvp - environ + 10
-		+ MAXARGS + idx, sizeof (char *));
+	envinit = (char **)calloc(lenvp - environ + 10 + MAXARGS + idx,
+	    sizeof (char *));
 	if (envinit == NULL) {
 		(void) printf("Calloc failed - out of swap space.\n");
 		login_exit(8);
@@ -2367,8 +2363,8 @@ establish_user_environment(char **renvp)
 		goto switch_env;	/* done */
 
 	for (j = 0, k = 0, l_index = 0;
-		*envp != NULL && j < (MAXARGS-1);
-		j++, envp++) {
+	    *envp != NULL && j < (MAXARGS-1);
+	    j++, envp++) {
 
 		/*
 		 * Scan each string provided.  If it doesn't have the
@@ -2389,7 +2385,7 @@ establish_user_environment(char **renvp)
 				login_exit(1);
 			}
 			(void) snprintf(envinit[basicenv+k], total, "L%d=%s",
-				l_index, *envp);
+			    l_index, *envp);
 
 			k++;
 			l_index++;
@@ -2403,12 +2399,12 @@ establish_user_environment(char **renvp)
 				 * any previously defined string
 				 */
 				for (i = 0, length = endptr + 1 - *envp;
-					i < basicenv + k; i++) {
-				    if (strncmp(*envp, envinit[i], length)
-						== 0) {
-					envinit[i] = *envp;
-					break;
-				    }
+				    i < basicenv + k; i++) {
+					if (strncmp(*envp, envinit[i], length)
+					    == 0) {
+						envinit[i] = *envp;
+						break;
+					}
 				}
 
 				/*
@@ -2445,17 +2441,17 @@ print_banner(void)
 	(void) printf("UNIX System V/386 Release %s\n%s\n"
 	    "Copyright (C) 1984, 1986, 1987, 1988 AT&T\n"
 	    "Copyright (C) 1987, 1988 Microsoft Corp.\nAll Rights Reserved\n",
-		un.release, un.nodename);
+	    un.release, un.nodename);
 #elif sun
 	(void) printf("SunOS Release %s Sun Microsystems %s\n%s\n"
 	    "Copyright (c) 1984, 1986, 1987, 1988 AT&T\n"
 	    "Copyright (c) 1988, 1989, 1990, 1991 Sun Microsystems\n"
 	    "All Rights Reserved\n",
-		un.release, un.machine, un.nodename);
+	    un.release, un.machine, un.nodename);
 #else
 	(void) printf("UNIX System V Release %s AT&T %s\n%s\n"
 	    "Copyright (c) 1984, 1986, 1987, 1988 AT&T\nAll Rights Reserved\n",
-		un.release, un.machine, un.nodename);
+	    un.release, un.machine, un.nodename);
 #endif /* i386 */
 #endif /* DOBANNER */
 }
@@ -2473,10 +2469,10 @@ display_last_login_time(void)
 
 		if (*ll.ll_host != '\0')
 			(void) printf("from %.*s\n", sizeof (ll.ll_host),
-					    ll.ll_host);
+			    ll.ll_host);
 		else
 			(void) printf("on %.*s\n", sizeof (ll.ll_line),
-					    ll.ll_line);
+			    ll.ll_line);
 	}
 }
 
@@ -2491,7 +2487,7 @@ exec_the_shell(void)
 	int i;
 
 	(void) strlcat(minusnam, basename(pwd->pw_shell),
-		sizeof (minusnam));
+	    sizeof (minusnam));
 
 	/*
 	 * Exec the shell
