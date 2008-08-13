@@ -34,8 +34,6 @@
 #ifndef _NFS4_CLNT_H
 #define	_NFS4_CLNT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/kstat.h>
@@ -1398,6 +1396,10 @@ typedef struct nfs4_ephemeral_tree {
 #define	NFS4_EPHEMERAL_TREE_UMOUNTING	0x10
 #define	NFS4_EPHEMERAL_TREE_LOCKED	0x20
 
+#define	NFS4_EPHEMERAL_TREE_PROCESSING	(NFS4_EPHEMERAL_TREE_DEROOTING | \
+	NFS4_EPHEMERAL_TREE_INVALID | NFS4_EPHEMERAL_TREE_UMOUNTING | \
+	NFS4_EPHEMERAL_TREE_LOCKED)
+
 /*
  * This macro evaluates to non-zero if the given op releases state at the
  * server.
@@ -1982,7 +1984,7 @@ extern int	nfs4_ephemeral_umount(mntinfo4_t *, int, cred_t *,
 extern void	nfs4_ephemeral_umount_unlock(bool_t *,
     nfs4_ephemeral_tree_t **);
 
-extern void	nfs4_record_ephemeral_mount(mntinfo4_t *mi, vnode_t *mvp);
+extern int	nfs4_record_ephemeral_mount(mntinfo4_t *mi, vnode_t *mvp);
 
 extern int	wait_for_recall(vnode_t *, vnode_t *, nfs4_op_hint_t,
 			nfs4_recov_state_t *);
