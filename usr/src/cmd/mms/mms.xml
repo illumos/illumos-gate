@@ -1,0 +1,302 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+    CDDL HEADER START
+
+    The contents of this file are subject to the terms of the
+    Common Development and Distribution License (the "License").
+    You may not use this file except in compliance with the License.
+
+    You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+    or http://www.opensolaris.org/os/licensing.
+    See the License for the specific language governing permissions
+    and limitations under the License.
+
+    When distributing Covered Code, include this CDDL HEADER in each
+    file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+    If applicable, add the following below this CDDL HEADER, with the
+    fields enclosed by brackets "[]" replaced with your own identifying
+    information: Portions Copyright [yyyy] [name of copyright owner]
+
+    CDDL HEADER END
+    Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+    Use is subject to license terms.
+
+-->
+
+<service_bundle type='manifest' name='SUNWmmsu:mms'>
+
+<service
+	name='application/management/mms'
+	type='service'
+	version='1'>
+
+	<dependency
+		name='network'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/milestone/network:default' />
+	</dependency>
+
+	<dependency
+		name='filesystem-local'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+		<service_fmri value='svc:/system/filesystem/local:default' />
+	</dependency>
+
+	<property_group name='general' type='framework'>
+            <propval
+		name='action_authorization'
+		type='astring'
+                value='solaris.smf.manage.mms' />
+            <propval
+		name='modify_authorization'
+		type='astring'
+                value='solaris.smf.modify.mms' />
+            <propval
+		name='value_authorization'
+		type='astring'
+                value='solaris.smf.value.mms' />
+            <propval
+		name='read_authorization'
+		type='astring'
+                value='solaris.smf.read.mms' />
+        </property_group>
+
+	<property_group name='config' type='application'>
+	    <propval
+		name='type'
+		type='astring'
+		value='server' />
+	</property_group>
+
+	<property_group name='manager' type='application'>
+	    <!-- MM and watcher shared data. -->
+	    <propval
+		name='host'
+		type='ustring'
+		value='localhost' />
+	    <propval
+		name='port'
+		type='integer'
+		value='7151' />
+            <propval
+		name='value_authorization'
+		type='astring'
+                value='solaris.smf.value.mms' />
+	</property_group>
+
+	<property_group name='ssl' type='application'>
+	    <!--
+	    MM and watcher shared ssl data files.
+	    -->
+            <propval
+                name='enabled'
+                type='boolean'
+                value='false' />
+            <propval
+                name='verify'
+                type='boolean'
+                value='false' />
+            <propval
+                name='cert_file'
+                type='astring'
+                value='' />
+            <propval
+                name='pass_file'
+                type='astring'
+                value='' />
+            <propval
+                name='dh_file'
+                type='astring'
+                value='' />
+            <propval
+                name='crl_file'
+                type='astring'
+                value='' />
+            <propval
+                name='cipher'
+                type='astring'
+                value='' />
+            <propval
+                name='peer_file'
+                type='astring'
+                value='' />
+            <propval
+		name='value_authorization'
+		type='astring'
+                value='solaris.smf.value.mms' />
+	</property_group>
+
+	<instance name='wcr' enabled='false'>
+		<!-- Watcher -->
+		<exec_method
+			type='method'
+			name='start'
+			exec='/lib/svc/method/mmswcr'
+			timeout_seconds='60'>
+		</exec_method>
+
+		<exec_method
+			type='method'
+			name='stop'
+			exec=':kill'
+			timeout_seconds='60'>
+		</exec_method>
+
+		<exec_method
+			type='method'
+			name='refresh'
+			exec=':kill -HUP'
+			timeout_seconds='60'>
+		</exec_method>
+		<property_group name='option' type='application'>
+		    <propval
+			name='ssi_path'
+			type='astring'
+			value='/opt/mms/bin/acsls' />
+		    <propval
+			name='libapi_path'
+			type='astring'
+			value='/opt/mms/lib/acsls' />
+		    <propval
+			name='value_authorization'
+			type='astring'
+			value='solaris.smf.value.mms' />
+		</property_group>
+	</instance>
+
+	<instance name='db' enabled='false'>
+		<!-- PostgreSQL Database -->
+		<method_context>
+			<method_credential user='postgres' group='postgres' />
+		</method_context>
+
+		<exec_method
+			type='method'
+			name='start'
+			exec='/lib/svc/method/mmsdb start'
+			timeout_seconds='60'>
+		</exec_method>
+
+		<exec_method
+			type='method'
+			name='stop'
+			exec='/lib/svc/method/mmsdb stop'
+			timeout_seconds='60'>
+		</exec_method>
+
+		<exec_method
+			type='method'
+			name='refresh'
+			exec='/lib/svc/method/mmsdb refresh'
+			timeout_seconds='60'>
+		</exec_method>
+
+		<property_group name='postgresql' type='application'>
+		    <propval
+			name='bin'
+			type='astring'
+			value='/usr/bin' />
+		    <propval
+			name='data'
+			type='astring'
+			value='/var/mms/db/data' />
+		    <propval
+			name='log'
+			type='astring'
+			value='log' />
+		</property_group>
+	</instance>
+
+	<instance name='mm' enabled='false'>
+		<!-- Media Manager -->
+
+		<exec_method
+			type='method'
+			name='start'
+			exec='/lib/svc/method/mmsmm'
+			timeout_seconds='60'>
+		</exec_method>
+
+		<exec_method
+			type='method'
+			name='stop'
+			exec=':kill'
+			timeout_seconds='60'>
+		</exec_method>
+
+		<exec_method
+			type='method'
+			name='refresh'
+			exec=':kill -HUP'
+			timeout_seconds='60'>
+		</exec_method>
+
+		<property_group name='db' type='application'>
+		    <propval
+			name='host'
+			type='ustring'
+			value='localhost' />
+		    <propval
+			name='port'
+			type='integer'
+			value='7656' />
+		    <propval
+			name='user'
+			type='astring'
+			value='postgres' />
+		    <propval
+			name='name'
+			type='astring'
+			value='mms' />
+	            <propval
+			name='value_authorization'
+			type='astring'
+			value='solaris.smf.value.mms' />
+		</property_group>
+
+		<property_group name='option' type='application'>
+		    <propval
+			name='trace'
+			type='astring'
+			value='developer' />
+		</property_group>
+
+		<property_group name='option' type='application'>
+		    <propval
+			name='db_reconnect_max_retry'
+			type='integer'
+			value='50' />
+		</property_group>
+
+		<property_group name='option' type='application'>
+		    <propval
+			name='db_reconnect_timeout'
+			type='integer'
+			value='3' />
+		</property_group>
+
+	</instance>
+
+	<stability value='Unstable' />
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+			Sun Media Management System service
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='mms_services' section='8'
+				manpath='/usr/man' />
+		</documentation>
+	</template>
+
+
+</service>
+
+</service_bundle>

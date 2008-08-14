@@ -189,6 +189,7 @@ COMMON_SUBDIRS = \
 	cmd/mkfile \
 	cmd/mkmsgs \
 	cmd/mknod \
+	cmd/mms	\
 	cmd/msgfmt \
 	cmd/msgid \
 	cmd/mt \
@@ -396,6 +397,7 @@ COMMON_SUBDIRS = \
 	lib/libzoneinfo \
 	lib/lvm \
 	lib/madv \
+	lib/mms	\
 	lib/mpss \
 	lib/nametoaddr \
 	lib/ncad_addr \

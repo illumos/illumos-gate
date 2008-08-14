@@ -1,0 +1,195 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+
+# This required package information file contains a list of package contents.
+# The 'pkgmk' command uses this file to identify the contents of a package
+# and their location on the development machine when building the package.
+# Can be created via a text editor or through use of the 'pkgproto' command.
+
+#!search <pathname pathname ...>	# where to find pkg objects
+#!include <filename>			# include another 'prototype' file
+#!default <mode> <owner> <group>	# default used if not specified on entry
+#!<param>=<value>			# puts parameter in pkg environment
+
+#
+#
+i pkginfo
+i depend
+i copyright
+i preremove
+i i.manifest
+i r.manifest
+
+d none etc 0755 root sys
+
+d none etc/mms 0755 root sys
+
+d none usr 0755 root sys
+d none usr/include 0755 root bin
+d none usr/lib 0755 root bin
+d none var/log 0755 root sys
+d none var/mms 0755 root sys
+
+d none lib 0755 root bin
+d none lib/svc 0755 root bin
+d none lib/svc/method 0755 root bin
+d none var/svc 0755 root sys
+d none var/svc/manifest 0755 root sys
+d none var/svc/manifest/application 0755 root sys
+d none var/svc/manifest/application/management 0755 root sys
+e manifest var/svc/manifest/application/management/mms.xml 644 root sys
+
+s none lib/svc/method/mmsmm=/usr/lib/mmsmm
+f none lib/svc/method/mmsdb 0555 root bin
+s none lib/svc/method/mmswcr=/usr/lib/mmswcr
+
+d none etc/mms/config 0755 root sys
+f none etc/mms/config/mm_paths.xml 0555 root other
+d none etc/mms/types 0755 root sys
+f none etc/mms/types/mm_types.xml 0555 root other
+d none etc/mms/passwd 0755 root sys
+d none var/mms/ssl 0755 root sys 
+d none var/mms/ssl/ca 0755 root sys 
+d none var/mms/ssl/pub 0755 root sys 
+f none var/mms/ssl/ca/mms_openssl.cnf 0555 root other
+
+d none var 0755 root sys
+d none var/mms/cores 0755 root sys
+d none var/log/mms 0755 root sys
+d none var/log/mms/mm 0755 root sys
+d none var/log/mms/dm 0755 root sys
+d none var/log/mms/lm 0755 root sys
+d none var/log/mms/wcr 0755 root sys
+d none var/log/mms/api 0755 root sys
+d none var/mms/handle 0755 root sys
+e none var/log/mms/mms_logadm.conf 0644 root other
+
+d none opt 0755 root sys
+
+f none etc/mms/release-note 0644 root other
+
+d none usr/bin 0755 root bin
+f none usr/bin/mmsssl.sh 0555 root bin
+f none usr/lib/mmsmm 0555 root bin
+f none usr/lib/mmswcr 0555 root bin
+f none usr/bin/mmsssi.sh 0555 root bin
+f none usr/lib/mmsdm 0555 root bin
+f none usr/lib/mmslm 0555 root bin
+
+f none usr/bin/mmsclient 0755 root bin
+f none usr/bin/mmsexplorer 755 root bin
+f none usr/bin/mmsinit 0555 root bin
+f none usr/bin/mmsadm 0555 root bin
+f none usr/bin/mmsmnt 4755 root bin
+
+d none usr/lib/mms 0755 root bin
+f none usr/lib/mms/libpg.so.1 0755 root other
+s none usr/lib/mms/libpg.so=libpg.so.1
+f none usr/lib/mms/llib-lpg.ln 0644 root other
+f none usr/lib/libmms.so.1 0755 root other
+s none usr/lib/libmms.so=libmms.so.1
+f none usr/lib/llib-lmms.ln 0644 root other
+f none usr/lib/mms/libmmsadm.so.1 0755 root other
+s none usr/lib/mms/libmmsadm.so=libmmsadm.so.1
+f none usr/lib/mms/llib-lmmsadm.ln 0644 root other
+
+f none usr/lib/mms/mm.cat 0555 root other
+
+d none usr/lib/mms/dm 0755 root bin
+f none usr/lib/mms/dm/libdm_default.so.1 0755 root bin
+s none usr/lib/mms/dm/libdm_default.so=libdm_default.so.1
+f none usr/lib/mms/dm/llib-ldm_default.ln 0644 root bin
+
+f none usr/lib/mms/dm/libSTK_9840.so.1 0755 root bin
+s none usr/lib/mms/dm/libSTK_9840.so=libSTK_9840.so.1
+f none usr/lib/mms/dm/llib-lSTK_9840.ln 0644 root bin
+f none usr/lib/mms/dm/libSTK_T9840B.so.1 0755 root bin
+s none usr/lib/mms/dm/libSTK_T9840B.so=libSTK_T9840B.so.1
+f none usr/lib/mms/dm/llib-lSTK_T9840B.ln 0644 root bin
+f none usr/lib/mms/dm/libSTK_T9840C.so.1 0755 root bin
+s none usr/lib/mms/dm/libSTK_T9840C.so=libSTK_T9840C.so.1
+f none usr/lib/mms/dm/llib-lSTK_T9840C.ln 0644 root bin
+f none usr/lib/mms/dm/libSEAGATE_ULTRIUM06242-XXX.so.1 0755 root bin
+s none usr/lib/mms/dm/libSEAGATE_ULTRIUM06242-XXX.so=libSEAGATE_ULTRIUM06242-XXX.so.1
+f none usr/lib/mms/dm/llib-lSEAGATE_ULTRIUM06242-XXX.ln 0644 root bin
+
+f none usr/lib/mms/dm/libIBM_ULTRIUM-TD1.so.1 0755 root bin
+s none usr/lib/mms/dm/libIBM_ULTRIUM-TD1.so=libIBM_ULTRIUM-TD1.so.1
+s none usr/lib/mms/dm/libIBM_ULT3580-TD1.so=libIBM_ULTRIUM-TD1.so
+f none usr/lib/mms/dm/llib-lIBM_ULTRIUM-TD1.ln 0644 root bin
+f none usr/lib/mms/dm/libIBM_ULTRIUM-TD2.so.1 0755 root bin
+s none usr/lib/mms/dm/libIBM_ULTRIUM-TD2.so=libIBM_ULTRIUM-TD2.so.1
+s none usr/lib/mms/dm/libIBM_ULT3580-TD2.so=libIBM_ULTRIUM-TD2.so
+f none usr/lib/mms/dm/llib-lIBM_ULTRIUM-TD2.ln 0644 root bin
+f none usr/lib/mms/dm/libIBM_ULTRIUM-TD3.so.1 0755 root bin
+s none usr/lib/mms/dm/libIBM_ULTRIUM-TD3.so=libIBM_ULTRIUM-TD3.so.1
+s none usr/lib/mms/dm/libIBM_ULT3580-TD3.so=libIBM_ULTRIUM-TD3.so
+f none usr/lib/mms/dm/llib-lIBM_ULTRIUM-TD3.ln 0644 root bin
+f none usr/lib/mms/dm/libIBM_ULTRIUM-TD4.so.1 0755 root bin
+s none usr/lib/mms/dm/libIBM_ULTRIUM-TD4.so=libIBM_ULTRIUM-TD4.so.1
+s none usr/lib/mms/dm/libIBM_ULT3580-TD4.so=libIBM_ULTRIUM-TD4.so
+f none usr/lib/mms/dm/llib-lIBM_ULTRIUM-TD4.ln 0644 root bin
+
+f none usr/lib/mms/dm/libHP_Ultrium_3-SCSI.so.1 0755 root bin
+s none usr/lib/mms/dm/libHP_Ultrium_3-SCSI.so=libHP_Ultrium_3-SCSI.so.1
+f none usr/lib/mms/dm/llib-lHP_Ultrium_3-SCSI.ln 0644 root bin
+
+f none usr/lib/mms/dm/libSUNW_DISK_ARCHIVING.so.1 0755 root bin
+s none usr/lib/mms/dm/libSUNW_DISK_ARCHIVING.so=libSUNW_DISK_ARCHIVING.so.1
+f none usr/lib/mms/dm/llib-lSUNW_DISK_ARCHIVING.ln 0644 root bin
+
+d none usr/lib/mms/lm 0755 root bin
+f none usr/lib/mms/lm/libDISK.so.1 0755 root other
+s none usr/lib/mms/lm/libDISK.so=libDISK.so.1
+f none usr/lib/mms/lm/llib-lDISK.ln 0644 root other
+
+d none usr/include/mms 0755 root bin
+f none usr/include/mms/mms.h 0644 root other
+f none usr/include/mms/mms_api.h 0644 root other
+f none usr/include/mms/mms_api_msg.h 0644 root other
+f none usr/include/mms/mms_cat.h 0644 root other
+f none usr/include/mms/mms_dmd.h 0644 root other
+f none usr/include/mms/mms_err.h 0644 root other
+f none usr/include/mms/mms_list.h 0644 root other
+f none usr/include/mms/mms_network.h 0644 root other
+f none usr/include/mms/mms_parser.h 0644 root other
+f none usr/include/mms/mms_strapp.h 0644 root other
+f none usr/include/mms/mms_sym.h 0644 root other
+f none usr/include/mms/mms_trace.h 0644 root other
+
+d none etc/mms/db 0755 root bin
+f none etc/mms/db/mms_db 0555 root other
+
+f none usr/lib/mms/lm/libL700_net.so.1 0755 root other
+s none usr/lib/mms/lm/libL700_net.so=libL700_net.so.1
+f none usr/lib/mms/lm/llib-lL700_net.ln 0644 root other
+f none usr/lib/mms/lm/libL500_net.so.1 0755 root other
+s none usr/lib/mms/lm/libL500_net.so=libL500_net.so.1
+s none usr/lib/mms/lm/libSL500_net.so=libL500_net.so
+f none usr/lib/mms/lm/llib-lL500_net.ln 0644 root other
+f none usr/lib/mms/lm/libL180_net.so.1 0755 root other
+s none usr/lib/mms/lm/libL180_net.so=libL180_net.so.1
+f none usr/lib/mms/lm/llib-lL180_net.ln 0644 root other

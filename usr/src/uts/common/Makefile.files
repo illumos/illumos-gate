@@ -1520,6 +1520,10 @@ MXFE_OBJS += mxfe.o
 
 SFE_OBJS += sfe.o sfe_util.o
 
+DDA_OBJS += dda.o
+
+DMD_OBJS += dmd.o
+
 #
 #	Build up defines and paths.
 #

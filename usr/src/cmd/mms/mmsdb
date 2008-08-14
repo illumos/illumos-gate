@@ -1,0 +1,103 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+. /lib/svc/share/smf_include.sh
+
+getproparg() {
+        val=`svcprop -c -p $1 $SMF_FMRI`
+        [ -n "$val" ] && echo $val
+}
+
+check_data_dir() {
+	if [ ! -d $PGDATA ]; then
+		echo "Error: postgresql/data directory $PGDATA does not exist"
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+
+	if [ ! -w $PGDATA ]; then
+		echo "Error: postgresql/data directory $PGDATA is not writable by postgres"
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+
+	if [ ! -d $PGDATA/base -o ! -d $PGDATA/global -o ! -f $PGDATA/PG_VERSION ]; then
+		echo "Error: postgresql/data directory $PGDATA is not empty, nor is it a valid PostgreSQL data directory"
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+}
+
+if [ -z "$SMF_FMRI" ]; then
+	echo "Error: SMF framework variables are not initialized."
+	exit $SMF_EXIT_ERR
+fi
+
+PGBIN=`getproparg postgresql/bin`
+PGDATA=`getproparg postgresql/data`
+PGUSER=`getproparg method_context/user`
+
+if [ -z "$PGDATA" ]; then
+        echo "Error: postgresql/data property not set"
+        exit $SMF_EXIT_ERR_CONFIG
+fi
+
+if [ -z "$PGBIN" ]; then
+        echo "Error: postgresql/bin property not set"
+        exit $SMF_EXIT_ERR_CONFIG
+fi
+
+if [ -z "$PGUSER" ]; then
+	echo "Error: method_context/user property not set"
+	exit $SMF_EXIT_ERR_CONFIG
+fi
+
+case "$1" in
+'start')
+	check_data_dir
+        $PGBIN/pg_ctl -D $PGDATA start
+        ;;
+
+'stop')
+	status=`$PGBIN/pg_ctl -D $PGDATA status | /bin/grep PID`
+        $PGBIN/pg_ctl -D $PGDATA stop -m fast
+	if [ -z "$status" ]; then
+		pattern="$PGBIN/postmaster -D $PGDATA"
+		/bin/pgrep -u $PGUSER -f "$pattern" > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			echo "Sending immediate shutdown signal."
+			/bin/pkill -QUIT -u $PGUSER -f "$pattern"
+		fi
+	fi
+        ;;
+
+'refresh')
+        $PGBIN/pg_ctl -D $PGDATA reload
+        ;;
+
+*)
+        echo "Usage: $0 {start|stop|refresh}"
+        exit 1
+        ;;
+
+esac
+exit $SMF_EXIT_OK

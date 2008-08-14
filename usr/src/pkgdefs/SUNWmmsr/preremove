@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"@(#)preremove	1.1	08/06/25 SMI"
+#
+
+DRVR_NAME=dmd
+DRVR_NAME2=dda
+
+# Remove the drivers entries but leave them attached.
+# Remove existing definition, if it exists. 
+if [ "${BASEDIR}" = "/" ]; then
+/usr/sbin/rem_drv ${DRVR_NAME} > /dev/null 2>&1
+else
+/usr/sbin/rem_drv -b "${BASEDIR}" ${DRVR_NAME} > /dev/null 2>&1
+fi
+
+if [ "${BASEDIR}" = "/" ]; then
+/usr/sbin/rem_drv ${DRVR_NAME2} > /dev/null 2>&1
+else
+/usr/sbin/rem_drv -b "${BASEDIR}" ${DRVR_NAME2} > /dev/null 2>&1
+fi
+
+exit 0

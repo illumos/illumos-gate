@@ -1,0 +1,36 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#pragma ident	"@(#)auth_attr	1.1	08/06/25 SMI"
+
+solaris.smf.manage.mms:::Manage MMS Service States::help=SmfManageMMS.html
+solaris.smf.modify.mms:::Add/Remove Values of MMS Service Properties::help=SmfModifyMMS.html
+solaris.smf.value.mms:::Change Values of MMS Service Properties::help=SmfValueMMS.html
+solaris.smf.read.mms:::Read Permission for Protected MMS Service Properties::help=SmfReadMMS.html
+solaris.mms.media:::MMS Media Import, Export, Label and Move::help=AuthMMSMedia.html
+solaris.mms.request:::Handle MMS Device Manager Requests::help=AuthMMSRequest.html
+solaris.mms.device.state:::Start and Stop MMS Device Managers::help=AuthMMSDeviceState.html
+solaris.mms.device.log:::Change MMS Trace and Message Levels::help=AuthMMSDeviceLog.html
+solaris.mms.io.read:::Read Permission for MMS Volumes::help=AuthMMSIORead.html
+solaris.mms.io.write:::Read and Write Permission for MMS Volumes::help=AuthMMSIOWrite.html

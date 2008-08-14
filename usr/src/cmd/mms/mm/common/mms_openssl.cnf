@@ -1,0 +1,103 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+
+#
+# MMS CA configuration file.
+#
+
+ssldir=/var/mms/ssl
+cadir=$ssldir/ca
+pubdir=$ssldir/pub
+expdays=3650
+
+[ ca ]
+default_ca = mms_ca
+
+[ mms_ca ]
+certificate	= $cadir/mms_ca_cert.pem
+database	= $cadir/index.txt
+new_certs_dir	= $cadir/certs
+private_key	= $cadir/mms_ca_key.pem
+serial		= $cadir/serial
+crl		= $pubdir/mms_crl.pem
+
+default_crl_days = $expdays
+default_days	= $expdays
+default_md	= sha1
+
+policy		= mms_ca_policy
+x509_extensions	= certificate_extensions
+
+nameopt		= default_ca
+certopt		= default_ca
+
+unique_subject  = no 
+
+prompt          = no
+distinguished_name = client_distinguished_name
+
+[ mms_ca_policy ]
+commonName	=  optional 
+stateOrProvinceName = optional
+countryName	= optional
+emailAddress	= optional
+organizationName = optional 
+organizationalUnitName = optional 
+localityName	= optional 
+
+[ certificate_extensions ]
+basicConstraints = CA:false
+
+[ client_distinguished_name ]
+commonName      = MMS Client
+stateOrProvinceName = .
+countryName     = US
+emailAddress    = .
+organizationName = SMI 
+organizationalUnitName = SDASH
+localityName    = . 
+
+[ req ]
+default_bits	= 2048
+default_keyfile	= $cadir/mms_ca_key.pem
+default_md	= sha1
+
+prompt		= no
+distinguished_name = mms_ca_distinguished_name
+
+x509_extensions	= mms_ca_extensions
+
+[ mms_ca_distinguished_name ]
+commonName	= MMS CA
+stateOrProvinceName = .
+countryName	= US
+emailAddress	= .
+organizationName = SMI
+organizationalUnitName = SDASH
+localityName	= . 
+
+[ mms_ca_extensions ]
+basicConstraints = CA:true

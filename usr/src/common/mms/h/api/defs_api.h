@@ -1,0 +1,267 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ *
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+
+#ifndef _DEFS_API_
+#define	_DEFS_API_
+#ifndef TRUE
+#define	TRUE		1
+#endif
+
+#ifndef FALSE
+#define	FALSE		0
+#endif
+
+typedef unsigned int		BOOLEAN;
+
+typedef void		*ALIGNED_BYTES;
+
+#define	MAX_MESSAGE_SIZE		4096
+#define	MAX_MESSAGE_BLOCK   (MAX_MESSAGE_SIZE / sizeof (ALIGNED_BYTES))
+
+#define	MAX_LINE_LEN		256
+
+
+#define	MAX_ID		42
+
+
+#define	MAX_DRG		20
+
+#define	MAX_SPN		20
+#define	FORCE		0x01
+#define	INTERMEDIATE		0x02
+#define	ACKNOWLEDGE		0x04
+#define	READONLY		0x08
+#define	BYPASS		0x10
+#define	VIRTAWARE		0x20
+#define	SCRATCH		0x40
+#define	SCRATCH		0x40
+#define	EXTENDED		0x80
+
+#define	VTV_DUPLEX		0X20
+#define	VTV_SCRATCH		0X40
+
+#define	WAIT		0x00000001
+#define	RESET		0x00000002
+#define	VIRTUAL		0x00000004
+#define	CONTINUOUS		0x00000008
+#define	RANGE		0x00000010
+#define	DIAGNOSTIC		0x00000020
+#define	BACKGROUND		0x10000000
+#define	ALL_DRIVES		0x20000000
+#define	AUTOMATIC		0x40000000
+#define	CLEAN_DRIVE		0x80000000
+typedef unsigned short		MESSAGE_ID;
+#define	MIN_MESSAGE		1
+#define	MAX_MESSAGE		65535
+
+#define	MAX_LOG_MSG_SIZE		256
+
+typedef enum {
+	COMMAND_FIRST = 0,
+	COMMAND_AUDIT,
+	COMMAND_CANCEL,
+	COMMAND_DISMOUNT,
+	COMMAND_EJECT,
+
+	COMMAND_ENTER,
+	COMMAND_IDLE,
+	COMMAND_MOUNT,
+	COMMAND_QUERY,
+	COMMAND_RECOVERY,
+
+	COMMAND_START,
+	COMMAND_VARY,
+	COMMAND_UNSOLICITED_EVENT,
+	COMMAND_TERMINATE,
+	COMMAND_ABORT,
+
+	COMMAND_SET_SCRATCH,
+	COMMAND_DEFINE_POOL,
+	COMMAND_DELETE_POOL,
+	COMMAND_SET_CLEAN,
+	COMMAND_MOUNT_SCRATCH,
+
+	COMMAND_UNLOCK,
+	COMMAND_LOCK,
+	COMMAND_CLEAR_LOCK,
+	COMMAND_QUERY_LOCK,
+	COMMAND_SET_CAP,
+
+	COMMAND_LS_RES_AVAIL,
+	COMMAND_LS_RES_REM,
+	COMMAND_INIT,
+	COMMAND_SELECT,
+	COMMAND_SET_OWNER,
+
+	COMMAND_DB_REQUEST,
+	COMMAND_MOUNT_PINFO,
+	COMMAND_MOVE,
+	COMMAND_RCVY,
+	COMMAND_SWITCH,
+
+	COMMAND_DISPLAY,
+	COMMAND_REGISTER,
+	COMMAND_UNREGISTER,
+	COMMAND_CHECK_REGISTRATION,
+	COMMAND_MONITOR_EVENT,
+
+	COMMAND_CONFIG,
+	COMMAND_CONFIRM_CONFIG,
+
+	COMMAND_LAST
+} COMMAND;
+
+typedef enum {
+	TYPE_FIRST = 0,
+	TYPE_ACS,
+	TYPE_AUDIT,
+	TYPE_CAP,
+	TYPE_CELL,
+
+	TYPE_CP,
+	TYPE_CSI,
+	TYPE_DISMOUNT,
+	TYPE_EJECT,
+	TYPE_EL,
+
+	TYPE_ENTER,
+	TYPE_DRIVE,
+	TYPE_IPC,
+	TYPE_LH,
+	TYPE_LM,
+
+	TYPE_LSM,
+	TYPE_MOUNT,
+	TYPE_NONE,
+	TYPE_PANEL,
+	TYPE_PORT,
+
+	TYPE_QUERY,
+	TYPE_RECOVERY,
+	TYPE_REQUEST,
+	TYPE_SA,
+	TYPE_SERVER,
+
+	TYPE_SUBPANEL,
+	TYPE_VARY,
+	TYPE_VOLUME,
+	TYPE_PD,
+	TYPE_SET_SCRATCH,
+
+	TYPE_DEFINE_POOL,
+	TYPE_DELETE_POOL,
+	TYPE_SCRATCH,
+	TYPE_POOL,
+	TYPE_MOUNT_SCRATCH,
+
+	TYPE_VOLRANGE,
+	TYPE_CLEAN,
+	TYPE_LOCK_SERVER,
+	TYPE_SET_CLEAN,
+	TYPE_SV,
+
+	TYPE_MT,
+	TYPE_IPC_CLEAN,
+	TYPE_SET_CAP,
+	TYPE_LOCK,
+	TYPE_CO_CSI,
+
+	TYPE_DISK_FULL,
+	TYPE_CM,
+	TYPE_SET_OWNER,
+	TYPE_MIXED_MEDIA_INFO,
+	TYPE_MEDIA_TYPE,
+
+	TYPE_SSI,
+	TYPE_DB_SERVER,
+	TYPE_DRIVE_GROUP,
+	TYPE_SUBPOOL_NAME,
+	TYPE_MOUNT_PINFO,
+
+	TYPE_VTDID,
+	TYPE_MGMT_CLAS,
+	TYPE_JOB_NAME,
+	TYPE_STEP_NAME,
+	TYPE_MOUNT_SCRATCH_PINFO,
+
+	TYPE_CONFIG,
+	TYPE_LMU,
+	TYPE_SWITCH,
+	TYPE_MV,
+	TYPE_ERRV,
+
+	TYPE_FIN,
+	TYPE_CR,
+	TYPE_MVD,
+	TYPE_MISSING,
+	TYPE_ERRANT,
+
+	TYPE_SURR,
+	TYPE_HAND,
+	TYPE_GETTYPES,
+	TYPE_PTP,
+	TYPE_DISP,
+
+	TYPE_CLMON,
+	TYPE_DISPLAY,
+	TYPE_ERROR,
+	TYPE_MON,
+	TYPE_CAP_CELL,
+
+	TYPE_DIAG_CELL,
+	TYPE_RECOV_CELL,
+	TYPE_DCONFIG,
+
+	TYPE_LAST
+} TYPE;
+
+typedef enum {
+	VERSION0 = 0,
+	VERSION1,
+	VERSION2,
+	VERSION3,
+	VERSION4,
+	VERSION_LAST
+} VERSION;
+
+#define	VERSION_MINIMUM_SUPPORTED		VERSION1
+
+typedef enum {
+	CLN_CART_FIRST = 0,
+	CLN_CART_NEVER,
+
+	CLN_CART_INDETERMINATE,
+
+	CLN_CART_ALWAYS,
+	CLN_CART_LAST
+} CLN_CART_CAPABILITY;
+
+#define	MM_MAX_COMPAT_TYPES	16
+
+
+#define	MEDIA_TYPE_NAME_LEN	10
+#define	DRIVE_TYPE_NAME_LEN	10
+
+#endif /* _DEFS_API_ */

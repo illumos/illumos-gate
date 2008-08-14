@@ -1,0 +1,2830 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+# This file contains the MMS data model and modifications.
+#
+# MMS Data Model:
+# IEEE MMS Std. 1244.1-2000 sections 11-19 relational database model.
+# Each MMS object is a SQL table.
+# Each MMS object instance is a SQL table row.
+#
+# MMS Data Model Modifications:
+# If you add an upgrade be sure to add a downgrade for the change.
+
+# Only put database version digits 1-9 in column 1.
+# Change existing database modifications in a new version.
+# A table column add or delete requires updating the system defined table.
+# SQL continuation lines can be indented.
+#
+# File Syntax:
+# <version><mod> <sql>
+# 	<sql-continued><sql-terminator>
+#
+# version = [1-9][0-9]+ starting in column 1
+# mod = u or d character for upgrade or downgrade
+# sql = SQL command
+# sql-continued = SQL command continuation lines can be indented.
+# sql-terminator = ;
+#
+# Example:
+# ---------
+# 2u ALTER TABLE "MM" ADD "Test1" text default 'value1';
+# 2u SELECT mm_system_defined_add('MM','Test1');
+# 
+# 2d ALTER TABLE "MM" DROP "Test1";
+# 2d SELECT mm_system_defined_del('MM','Test1');
+
+#
+# Load PostgreSQL PL/pgSQL Language
+#
+1u CREATE FUNCTION plpgsql_call_handler() RETURNS language_handler
+	LANGUAGE 'C' AS
+	'/usr/lib/plpgsql.so';
+
+1u CREATE LANGUAGE 'plpgsql' HANDLER plpgsql_call_handler
+	LANCOMPILER 'PL/pgSQL';
+
+#
+# Load Solaris UUID
+#
+1u CREATE FUNCTION pg_get_uuid() RETURNS text
+	LANGUAGE 'C' AS
+	'/usr/lib/mms/libpg.so';
+
+#
+# Load host name to IP address lookup
+#
+1u CREATE FUNCTION pg_host_ident(text) RETURNS text
+	LANGUAGE 'C' AS
+	'/usr/lib/mms/libpg.so';
+
+#
+# MMS Data Model Objects
+#
+
+1u CREATE TABLE "APPLICATION" (
+	"ApplicationName" text,
+	"SignatureAlgorithm" text
+		default 'undefined',
+	"AllowRemoteMount" boolean
+		default 'false' NOT NULL,
+	"BypassVerify" boolean
+		default 'true' NOT NULL,
+	"ReadWriteMode"	text
+		CONSTRAINT "ReadWriteMode_CC"
+		CHECK("ReadWriteMode" = 'fixed' OR
+		"ReadWriteMode" = 'variable')
+		default 'fixed',
+	"ValidateFileName" text
+		CONSTRAINT "ValidateFileName_CC"
+		CHECK("ValidateFileName" = 'yes' OR
+		"ValidateFileName" = 'no')
+		default 'no',
+	"ValidateVolumeID" text
+		CONSTRAINT "ValidateVolumeID_CC"
+		CHECK("ValidateVolumeID" = 'yes' OR
+		"ValidateVolumeID" = 'no')
+		default 'yes',
+	"ValidateExpirationDate" text
+		CONSTRAINT "ValidateExpirationDate_CC"
+		CHECK("ValidateExpirationDate" = 'yes' OR
+		"ValidateExpirationDate" = 'no')
+		default 'no',
+	"SwitchLabel" text
+		CONSTRAINT "SwitchLabel_CC"
+		CHECK("SwitchLabel" = 'yes' OR
+		"SwitchLabel" = 'ask' OR
+		"SwitchLabel" = 'no')
+		default 'yes',
+	"WriteOverExistingData" text
+		CONSTRAINT "WriteOverExistingData_CC"
+		CHECK("WriteOverExistingData" = 'yes' OR
+		"WriteOverExistingData" = 'ask' OR
+		"WriteOverExistingData" = 'no')
+		default 'yes',
+	"Retention" integer
+		CONSTRAINT "Retention_CC"
+		CHECK("Retention" >= 0 AND
+		"Retention" <= 99999)
+		default 0,
+	"Password" text,
+	CONSTRAINT "APPLICATION_PK" PRIMARY KEY("ApplicationName")
+	/* CLIENT-DEFINED */
+);
+
+1u CREATE TABLE "AI" (
+	"AIName" text
+		NOT NULL,
+	"ApplicationName" text
+		CONSTRAINT "ApplicationName_CC"
+		REFERENCES "APPLICATION",
+	"PrivilegeChangeable" boolean
+		default 'false' NOT NULL,
+	"DefaultPriority" integer
+		CONSTRAINT "DefaultPriority_CC"
+		CHECK("DefaultPriority" >= 0 AND
+		"DefaultPriority" <= 1000)
+		default 500,
+	"SessionsAllowed" text
+		CONSTRAINT "SessionsAllowed_CC"
+		CHECK("SessionsAllowed" = 'multiple' OR
+		"SessionsAllowed" = 'single')
+		default 'single',
+	"MessageLevel" text
+		CONSTRAINT "MessageLevel_CC"
+		CHECK("MessageLevel" = 'emergency' OR
+		"MessageLevel" = 'alert' OR
+		"MessageLevel" = 'critical' OR
+		"MessageLevel" = 'error' OR
+		"MessageLevel" = 'warning' OR
+		"MessageLevel" = 'notice' OR
+		"MessageLevel" = 'information' OR
+		"MessageLevel" = 'debug' OR
+		"MessageLevel" = 'developer')
+		default 'error',
+	CONSTRAINT "AI_PK" PRIMARY KEY("ApplicationName", "AIName")
+	/* CLIENT-DEFINED */
+);
+
+1u CREATE TABLE "CONNECTION" (
+	"Language" text
+		CONSTRAINT "Language_CC"
+		CHECK("Language" = 'MMP' OR
+		"Language" = 'DMP' OR
+		"Language" = 'LMP')
+		NOT NULL,
+	"Version" text
+		CONSTRAINT "Version_CC"
+		CHECK("Version" = '1.0')
+		default '1.0' NOT NULL,
+	"ConnectionClientName" text
+		NOT NULL,
+	"ConnectionClientInstance" text
+		NOT NULL,
+	"ConnectionClientHost" text
+		NOT NULL,
+	"ConnectionClientPort" text
+		NOT NULL,
+	"ConnectionTimeCreated" timestamp (3)
+		default current_timestamp NOT NULL,
+	"ConnectionTimeLastActive" timestamp (3)
+		default current_timestamp NOT NULL,
+	"ConnectionID" text /* uuid */,
+	CONSTRAINT "CONNECTION_PK" PRIMARY KEY("ConnectionID")
+);
+
+1u CREATE TABLE "SESSION" (
+	"SessionID" text /* uuid */,
+	"ApplicationName" text
+		CONSTRAINT "ApplicationName_CC"
+		REFERENCES "APPLICATION",
+	"AIName" text
+		NOT NULL,
+	"ConnectionID" text
+		CONSTRAINT "ConnectionID_CC"
+		REFERENCES "CONNECTION",
+	"Language" text
+		CONSTRAINT "Language_CC"
+		CHECK("Language" = 'MMP' OR
+		"Language" = 'DMP' OR
+		"Language" = 'LMP')
+		default 'MMP' NOT NULL,
+	"SessionAttached" boolean
+		default 'true' NOT NULL,
+	"SessionClientHost" text
+		NOT NULL,
+	"SessionClientPort" text
+		NOT NULL,
+	"SessionTimeCreated" timestamp (3)
+		default current_timestamp NOT NULL,
+	"SessionTimeLastActive" timestamp (3)
+		default current_timestamp NOT NULL,
+	"SessionTag" text
+		default NULL,
+	CONSTRAINT "SESSION_PK" PRIMARY KEY("SessionID"),
+	CONSTRAINT "SESSION_FK" FOREIGN KEY("ApplicationName", "AIName")
+		REFERENCES "AI"
+	/* CLIENT-DEFINED */
+);
+
+
+# Only the events currently implemented have a scope other than 'off'
+
+1u CREATE TABLE "NOTIFY" (
+	"ConnectionID" text,
+	"ConnectionClientName" text,
+	"ConnectionClientInstance" text,
+	"NotifyConfigChange" text
+		CONSTRAINT "NotifyConfigChange_CC"
+		CHECK("NotifyConfigChange" = 'global' OR
+		"NotifyConfigChange" = 'host' OR
+		"NotifyConfigChange" = 'off')
+		default 'off' NOT NULL,
+	"NotifyNewDrive" text
+		CONSTRAINT "NotifyNewDrive_CC"
+		CHECK("NotifyNewDrive" = 'global' OR
+		"NotifyNewDrive" = 'application' OR
+		"NotifyNewDrive" = 'off')
+		default 'off' NOT NULL,
+	"NotifyNewCartridge" text
+		CONSTRAINT "NotifyNewCartridge_CC"
+		CHECK("NotifyNewCartridge" = 'global' OR
+		"NotifyNewCartridge" = 'application' OR
+		"NotifyNewCartridge" = 'off')
+		default 'off' NOT NULL,
+	"NotifyMessage" text
+		CONSTRAINT "NotifyMessage_CC"
+		CHECK("NotifyMessage" = 'global' OR
+		"NotifyMessage" = 'off')
+		default 'off' NOT NULL,
+	"NotifyRequest" text
+		CONSTRAINT "NotifyRequest_CC"
+		CHECK("NotifyRequest" = 'global' OR
+		"NotifyRequest" = 'off')
+		default 'off' NOT NULL,
+	"NotifyVolumeInject" text
+		CONSTRAINT "NotifyVolumeInject_CC"
+		CHECK("NotifyVolumeInject" = 'global' OR
+		"NotifyVolumeInject" = 'application' OR
+		"NotifyVolumeInject" = 'instance' OR
+		"NotifyVolumeInject" = 'off')
+		default 'off' NOT NULL,
+	"NotifyVolumeEject" text
+		CONSTRAINT "NotifyVolumeEject_CC"
+		CHECK("NotifyVolumeEject" = 'global' OR
+		"NotifyVolumeEject" = 'application' OR
+		"NotifyVolumeEject" = 'instance' OR
+		"NotifyVolumeEject" = 'off')
+		default 'off' NOT NULL,
+	"NotifyVolumeAdd" text
+		CONSTRAINT "NotifyVolumeAdd_CC"
+		CHECK("NotifyVolumeAdd" = 'global' OR
+		"NotifyVolumeAdd" = 'application' OR
+		"NotifyVolumeAdd" = 'instance' OR
+		"NotifyVolumeAdd" = 'off')
+		default 'off' NOT NULL,
+	"NotifyVolumeDelete" text
+		CONSTRAINT "NotifyVolumeDelete_CC"
+		CHECK("NotifyVolumeDelete" = 'global' OR
+		"NotifyVolumeDelete" = 'application' OR
+		"NotifyVolumeDelete" = 'instance' OR
+		"NotifyVolumeDelete" = 'off')
+		default 'off' NOT NULL,
+	"NotifyDMUp" text
+		CONSTRAINT "NotifyDMUp_CC"
+		CHECK("NotifyDMUp" = 'global' OR
+		"NotifyDMUp" = 'host' OR
+		"NotifyDMUp" = 'off')
+		default 'off' NOT NULL,
+	"NotifyDMDown" text
+		CONSTRAINT "NotifyDMDown_CC"
+		CHECK("NotifyDMDown" = 'global' OR
+		"NotifyDMDown" = 'host' OR
+		"NotifyDMDown" = 'off')
+		default 'off' NOT NULL,
+	"NotifyDriveOnline" text
+		CONSTRAINT "NotifyDriveOnline_CC"
+		CHECK("NotifyDriveOnline" = 'global' OR
+		"NotifyDriveOnline" = 'application' OR
+		"NotifyDriveOnline" = 'off')
+		default 'off' NOT NULL,
+	"NotifyDriveOffline" text
+		CONSTRAINT "NotifyDriveOffline_CC"
+		CHECK("NotifyDriveOffline" = 'global' OR
+		"NotifyDriveOffline" = 'application' OR
+		"NotifyDriveOffline" = 'off')
+		default 'off' NOT NULL,
+	"NotifyLMUp" text
+		CONSTRAINT "NotifyLMUp_CC"
+		CHECK("NotifyLMUp" = 'global' OR
+		"NotifyLMUp" = 'off')
+		default 'off' NOT NULL,
+	"NotifyLMDown" text
+		CONSTRAINT "NotifyLMDown_CC"
+		CHECK("NotifyLMDown" = 'global' OR
+		"NotifyLMDown" = 'off')
+		default 'off' NOT NULL,
+	"NotifyLibraryCreate" text
+		CONSTRAINT "NotifyLibraryCreate_CC"
+		CHECK("NotifyLibraryCreate" = 'global' OR
+		"NotifyLibraryCreate" = 'off')
+		default 'off' NOT NULL,
+	"NotifyLibraryDelete" text
+		CONSTRAINT "NotifyLibraryDelete_CC"
+		CHECK("NotifyLibraryDelete" = 'global' OR
+		"NotifyLibraryDelete" = 'off')
+		default 'off' NOT NULL,
+	"NotifyDriveDelete" text
+		CONSTRAINT "NotifyDriveDelete_CC"
+		CHECK("NotifyDriveDelete" = 'global' OR
+		"NotifyDriveDelete" = 'off')
+		default 'off' NOT NULL,
+	"NotifyStatus" text
+		CONSTRAINT "NotifyStatus_CC"
+		CHECK("NotifyStatus" = 'global' OR
+		"NotifyStatus" = 'off')
+		default 'off' NOT NULL,
+	"NotifyCartridge" text
+		CONSTRAINT "NotifyCartridge_CC"
+		CHECK("NotifyCartridge" = 'global' OR
+		"NotifyCartridge" = 'off')
+		default 'off' NOT NULL,
+	"NotifyVolume" text
+		CONSTRAINT "NotifyVolume_CC"
+		CHECK("NotifyVolume" = 'global' OR
+		"NotifyVolume" = 'off')
+		default 'off' NOT NULL,
+	CONSTRAINT "NOTIFY_PK" PRIMARY KEY("ConnectionID")
+);
+
+1u CREATE TABLE "NOTIFYRULES"(
+	"ConnectionID" text,
+	"NotifyID" text,
+	"NotifyTag" text,
+	"NotifyObject" text,
+	"NotifyAction" text,
+	"NotifyScope" text
+);
+
+1u CREATE TABLE "EVENTRULES"(
+	"NotifyID" text,
+	"NotifyObject" text
+);
+
+1u CREATE TABLE "LIBRARY" (
+	"LibraryName" text,
+	"LibraryDisabled" text
+		CONSTRAINT "LibraryDisabled_CC"
+		CHECK("LibraryDisabled" = 'true' OR
+		"LibraryDisabled" = 'false' OR
+		"LibraryDisabled" = 'temporary')
+		default 'false',
+	"LibraryBroken" boolean
+		default 'false' NOT NULL,
+	"LMName" text,
+	"LibraryStateHard" text
+		CONSTRAINT "LibraryStateHard_CC"
+		CHECK("LibraryStateHard" = 'unknown')
+		default 'unknown',
+	"LibraryStateSoft" text
+		CONSTRAINT "LibraryStateSoft_CC"
+		CHECK("LibraryStateSoft" = 'ready' OR
+		"LibraryStateSoft" = 'in use')
+		default 'ready',
+	"LibraryOnline" text
+		CONSTRAINT "LibraryOnline_CC"
+		CHECK("LibraryOnline" = 'true' OR
+		"LibraryOnline" = 'false')
+		default 'false',
+	"LibraryType" text,
+	"LibraryConnection" text
+		CONSTRAINT "LibraryConnection_CC"
+		CHECK("LibraryConnection" = 'network' OR
+		"LibraryConnection" = 'direct')
+		default 'network',
+	"LibraryIP" text,
+	"LibraryPath" text,
+	"LibraryACS" text,
+	CONSTRAINT "LIBRARY_PK" PRIMARY KEY("LibraryName")
+	/* SYSTEM-DEFINED */
+);
+
+1u CREATE TABLE "LM" (
+	"LibraryName" text
+		CONSTRAINT "LibraryName_CC"
+		REFERENCES "LIBRARY",
+	"LMName" text,
+	"LMHost" text,
+	"LMTargetLibrary" text,
+	"LMTargetPath" text,
+	"LMTargetHost" text,
+	"LMPassword" text,
+	"LMMessageLevel" text
+		CONSTRAINT "LMMessageLevel_CC"
+		CHECK("LMMessageLevel" = 'emergency' OR
+		"LMMessageLevel" = 'alert' OR
+		"LMMessageLevel" = 'critical' OR
+		"LMMessageLevel" = 'error' OR
+		"LMMessageLevel" = 'warning' OR
+		"LMMessageLevel" = 'notice' OR
+		"LMMessageLevel" = 'information' OR
+		"LMMessageLevel" = 'debug' OR
+		"LMMessageLevel" = 'developer')
+		default 'error',
+	"LMStateHard" text
+		CONSTRAINT "LMStateHard_CC"
+		CHECK("LMStateHard" = 'ready' OR
+		"LMStateHard" = 'broken')
+		default 'ready',
+	"LMStateSoft" text
+		CONSTRAINT "LMStateSoft_CC"
+		CHECK("LMStateSoft" = 'absent' OR
+		"LMStateSoft" = 'present' OR
+		"LMStateSoft" = 'not ready' OR
+		"LMStateSoft" = 'disconnected' OR
+		"LMStateSoft" = 'ready')
+		default 'absent',
+	"LMDisabled" text
+		CONSTRAINT "LMDisabled_CC"
+		CHECK("LMDisabled" = 'false' OR
+		"LMDisabled" = 'true')
+		default 'false',
+	"TraceLevel" text 
+		CONSTRAINT "TraceLevel_CC"
+		CHECK("TraceLevel" = 'emergency' OR 
+		"TraceLevel" = 'alert' OR 
+		"TraceLevel" = 'critical' OR 
+		"TraceLevel" = 'operational' OR 
+		"TraceLevel" = 'error' OR 
+		"TraceLevel" = 'warning' OR 
+		"TraceLevel" = 'notice' OR 
+		"TraceLevel" = 'information' OR 
+		"TraceLevel" = 'debug' OR 
+		"TraceLevel" = 'developer') 
+		default 'debug',
+	"TraceFileSize" text
+		default '10M',
+	CONSTRAINT "LM_PK" PRIMARY KEY("LMName")
+	/* SYSTEM-DEFINED */
+);
+
+1u CREATE TABLE "BAY" (
+	"BayName" text
+		NOT NULL,
+	"LibraryName" text
+		CONSTRAINT "LibraryName_CC"
+		REFERENCES "LIBRARY",
+	"LMName" text
+		CONSTRAINT "LMName_CC"
+		REFERENCES "LM" ON DELETE CASCADE,
+	"BayAccessible" boolean
+		default 'false' NOT NULL,
+	CONSTRAINT "BAY_PK" PRIMARY KEY ("BayName", "LibraryName", "LMName")
+);
+
+1u CREATE TABLE "SLOTTYPE" (
+	"SlotTypeName" text
+		NOT NULL,
+	"CartridgeShapeName" text
+		NOT NULL,
+	CONSTRAINT "SLOTTYPE_PK"
+		PRIMARY KEY ("SlotTypeName", "CartridgeShapeName")
+	/* SYSTEM-DEFINED */
+);
+
+1u CREATE TABLE "CARTRIDGEGROUP" (
+	"CartridgeGroupName" text,
+	"CartridgeGroupPriority" integer
+		CONSTRAINT "CartridgeGroupPriority_CC"
+		CHECK("CartridgeGroupPriority" >= 0)
+		default 1000,
+	CONSTRAINT "CARTRIDGEGROUP_PK" PRIMARY KEY("CartridgeGroupName")
+	/* CLIENT-DEFINED */
+);
+
+1u CREATE TABLE "CARTRIDGETYPE" (
+	"CartridgeTypeName" text,
+	"CartridgeTypeNumberSides" integer
+		CONSTRAINT "CartridgeTypeNumberSides_CC"
+		CHECK("CartridgeTypeNumberSides" >= 1)
+		default 1,
+	"CartridgeTypeMediaLength" integer
+		CONSTRAINT "CartridgeTypeMediaLength_CC"
+		CHECK("CartridgeTypeMediaLength" >= 0)
+		default 0,
+	"CartridgeTypeMediaType" text
+		CONSTRAINT "CartridgeTypeMediaType_CC"
+		CHECK("CartridgeTypeMediaType" = 'data' OR
+		"CartridgeTypeMediaType" = 'cleaning' OR
+		"CartridgeTypeMediaType" = 'diagnostic' OR
+		"CartridgeTypeMediaType" = 'microcode' OR
+		"CartridgeTypeMediaType" = 'alignment' OR
+		"CartridgeTypeMediaType" = 'worm' OR
+		"CartridgeTypeMediaType" = 'volsafe'),
+	"MaxUseCount" integer
+		CONSTRAINT "MaxUseCount_CC"
+		CHECK("MaxUseCount" >= 0)
+		default 100000,
+	"CartridgeShapeName" text /* trigger REFERENCES "SLOTTYPE" */,
+	CONSTRAINT "CARTRIDGETYPE_PK" PRIMARY KEY("CartridgeTypeName")
+	/* SYSTEM-DEFINED */
+);
+
+1u CREATE TABLE "CARTRIDGE" (
+	"CartridgeID" text
+		default pg_get_uuid(),
+	"CartridgePCL" text
+		NOT NULL,
+	"CartridgeState" text
+		CONSTRAINT "CartridgeState_CC"
+		CHECK("CartridgeState" = 'defined' OR
+		"CartridgeState" = 'identified' OR
+		"CartridgeState" = 'allocatable' OR
+		"CartridgeState" = 'error' OR
+		"CartridgeState" = 'deallocated' OR
+		"CartridgeState" = 'recycled')
+		default 'defined',
+	"CartridgeStatus" text
+		CONSTRAINT "CartridgeStatus_CC"
+		CHECK("CartridgeStatus" = 'in use' OR
+		"CartridgeStatus" = 'unavailable' OR
+		"CartridgeStatus" = 'available')
+		default 'unavailable',
+	"CartridgeDriveOccupied" boolean
+		default 'false' NOT NULL,
+	"CartridgeTypeName" text
+		CONSTRAINT "CartridgeTypeName_CC"
+		REFERENCES "CARTRIDGETYPE" NOT NULL,
+	"CartridgeGroupName" text
+		CONSTRAINT "CartridgeGroupName_CC"
+		REFERENCES "CARTRIDGEGROUP",
+	"CartridgeTimeCreated" timestamp (3)
+		default current_timestamp NOT NULL,
+	"CartridgeTimeMountedLast" timestamp (3)
+		default '-infinity' NOT NULL,
+	"CartridgeTimeMountedTotal" timestamp (3)
+		default '-infinity' NOT NULL,
+	"CartridgeNumberMounts" integer
+		CONSTRAINT "CartridgeNumberMounts_CC"
+		CHECK("CartridgeNumberMounts" >= 0)
+		default 0,
+	"CartridgeNumberVolumes" integer
+		CONSTRAINT "CartridgeNumberVolumes_CC"
+		CHECK("CartridgeNumberVolumes" >= 0)
+		default 0,
+	"CartridgeWriteProtected" text
+		CONSTRAINT "CartridgeWriteProtected_CC"
+		CHECK("CartridgeWriteProtected" = 'yes' OR
+		"CartridgeWriteProtected" = 'no' OR
+		"CartridgeWriteProtected" = 'unknown' )
+		default 'unknown',
+	"CartridgeRecovededReads" text
+		default '0',
+	"CartridgeRecovededWrites" text
+		default '0',
+	"CartridgeUnrecovededReads" text
+		default '0',
+	"CartridgeUnrecovededWrites" text
+		default '0',
+	"CartridgeBytesRead" text
+		default '0',
+	"CartridgeBytesWritten" text
+		default '0',
+	"CartridgeMediaError" text
+		CONSTRAINT "CartridgeMediaError_CC"
+		CHECK("CartridgeMediaError" = 'yes' OR
+		"CartridgeMediaError" = 'no' )
+		default 'no',
+	"ApplicationName" text
+		CONSTRAINT "ApplicationName_CC"
+		REFERENCES "APPLICATION",
+	"LibraryName" text
+		CONSTRAINT "LibraryName_CC"
+		REFERENCES "LIBRARY",
+	CONSTRAINT "CARTRIDGE_PK" PRIMARY KEY("CartridgeID")
+	/* CLIENT-DEFINED */
+);
+
+1u CREATE TABLE "CARTRIDGEGROUPAPPLICATION" (
+	"ApplicationName" text
+		CONSTRAINT "ApplicationName_CC"
+		REFERENCES "APPLICATION",
+	"CartridgeGroupName" text
+		CONSTRAINT "CartridgeGroupName_CC"
+		REFERENCES "CARTRIDGEGROUP",
+	"CartridgeGroupApplicationPriority" integer
+		default 1000,
+	CONSTRAINT "CARTRIDGEGROUPAPPLICATION_PK"
+		PRIMARY KEY ("ApplicationName", "CartridgeGroupName")
+);
+
+1u CREATE TABLE "SIDE" (
+	"CartridgeID" text
+		CONSTRAINT "CartridgeID_CC"
+		REFERENCES "CARTRIDGE",
+	"SideName" text
+		NOT NULL,
+	"SideNumberMounts" integer
+		CONSTRAINT "SideNumberMounts_CC"
+		CHECK("SideNumberMounts" >= 0)
+		default 0,
+	"SideTimeCreated" timestamp (3)
+		default current_timestamp NOT NULL,
+	"SideTimeMountedLast" timestamp (3)
+		default '-infinity' NOT NULL,
+	"SideTimeMountedTotal" integer
+		CONSTRAINT "SideTimeMountedTotal_CC"
+		CHECK("SideTimeMountedTotal" >= 0)
+		default 0,
+	CONSTRAINT "SIDE_PK" PRIMARY KEY ("CartridgeID", "SideName")
+	/* CLIENT-DEFINED */
+);
+
+1u CREATE TABLE "PARTITION" (
+	"PartitionName" text
+		NOT NULL,
+	"CartridgeID" text
+		CONSTRAINT "CartridgeID_CC"
+		REFERENCES "CARTRIDGE",
+	"CartridgePCL" text
+		NOT NULL,
+	"LibraryName" text
+		CONSTRAINT "LibraryName_CC"
+		REFERENCES "LIBRARY",
+	"SideName" text
+		NOT NULL,
+	"PartitionSize" integer
+		CONSTRAINT "PartitionSize_CC"
+		CHECK("PartitionSize" >= -1)
+		default -1,
+	"PartitionAvailable" integer
+		CONSTRAINT "PartitionAvailable_CC"
+		CHECK("PartitionAvailable" >= -1)
+		default -1,
+	"PartitionPercentAvailable" integer
+		CONSTRAINT "PartitionPercentAvailable_CC"
+		CHECK("PartitionPercentAvailable" >= -1)
+		default -1,
+	"PartitionBitFormat" text
+		default 'bit_unknown',
+	"PartitionAllocatable" boolean
+		default 'true' NOT NULL,
+	"PartitionSignature" text
+		CONSTRAINT "PartitionSignature_CC"
+		CHECK("PartitionSignature" = 'undefined')
+		default 'undefined',
+	"PartitionSignatureState" text
+		CONSTRAINT "PartitionSignatureState_CC"
+		CHECK("PartitionSignatureState" = 'unimplemented' OR
+		"PartitionSignatureState" = 'unknown' OR
+		"PartitionSignatureState" = 'uninitialized' OR
+		"PartitionSignatureState" = 'system' OR
+		"PartitionSignatureState" = 'application' OR
+		"PartitionSignatureState" = 'sysactive' OR
+		"PartitionSignatureState" = 'appactive')
+		default 'unimplemented',
+	"PartitionSignatureAlgorithm" text
+		default 'undefined',
+	"PartitionSignatureType" text,
+	"PartitionMediaSerial" text
+		default 'undefined',
+	"PartitionMediaSerialState" text
+		CONSTRAINT "PartitionMediaSerialState_CC"
+		CHECK("PartitionMediaSerialState" = 'unknown' OR
+		"PartitionMediaSerialState" = 'uninitialized' OR
+		"PartitionMediaSerialState" = 'known' OR
+		"PartitionMediaSerialState" = 'unimplemented')
+		default 'unknown',
+	"PartitionNumberMounts" integer
+		CONSTRAINT "PartitionNumberMounts_CC"
+		CHECK("PartitionNumberMounts" >= 0)
+		default 0,
+	"PartitionTimeCreated" timestamp (3)
+		default current_timestamp NOT NULL,
+	"PartitionTimeMountedTotal" integer
+		CONSTRAINT "PartitionTimeMountedTotal_CC"
+		CHECK("PartitionTimeMountedTotal" >= 0)
+		default 0,
+	"PartitionTimeMountedLast" timestamp (3)
+		default '-infinity' NOT NULL,
+	"PartitionEOFPosType" smallint
+		default 0,
+	"PartitionEOFPos" bigint,
+	"PartitionRWMode" text
+		CONSTRAINT "PartitionRWMode_CC"
+		CHECK("PartitionRWMode" = 'readonly' OR
+		"PartitionRWMode" = 'readwrite')
+		default 'readwrite',
+	CONSTRAINT "PARTITION_FK"
+		FOREIGN KEY ("CartridgeID", "SideName") REFERENCES "SIDE",
+	CONSTRAINT "PARTITION_PK"
+		PRIMARY KEY ("CartridgeID", "SideName", "PartitionName")
+	/* CLIENT-DEFINED */
+);
+
+1u CREATE TABLE "VOLUME" (
+	"ApplicationName" text
+		CONSTRAINT "ApplicationName_CC"
+		REFERENCES "APPLICATION",
+	"AIName" text
+		default 'any' NOT NULL,
+	"VolumeName" text
+		NOT NULL,
+	"VolumeSerialNumber" text,
+	"LabelType" text
+		CONSTRAINT "LabelType_CC"
+		CHECK("LabelType" = 'ansi' OR
+		"LabelType" = 'ibm' OR
+		"LabelType" = 'nonlabeled' OR
+		"LabelType" = 'unknown')
+		default 'unknown',
+	"CartridgeID" text
+		CONSTRAINT "CartridgeID_CC"
+		REFERENCES "CARTRIDGE",
+	"SideName" text
+		NOT NULL,
+	"PartitionName" text
+		NOT NULL,
+	"VolumeNumberMounts" integer
+		CONSTRAINT "VolumeNumberMounts_CC"
+		CHECK("VolumeNumberMounts" >= 0)
+		default 0,
+	"VolumeTimeCreated" timestamp (3)
+		default current_timestamp NOT NULL,
+	"VolumeTimeMountedLast" timestamp (3)
+		default '-infinity' NOT NULL,
+	"VolumeTimeMountedTotal" integer
+		CONSTRAINT "VolumeTimeMountedTotal_CC"
+		CHECK("VolumeTimeMountedTotal" >= 0)
+		default 0,
+	CONSTRAINT "VOLUME_FK"
+		FOREIGN KEY ("CartridgeID", "SideName", "PartitionName")
+		REFERENCES "PARTITION",
+	CONSTRAINT "VOLUME_PK"
+		PRIMARY KEY ("VolumeName", "ApplicationName")
+	/* CLIENT-DEFINED */
+);
+
+1u CREATE TABLE "DRIVEGROUP" (
+	"DriveGroupName" text,
+	"DriveGroupUnloadTime" integer
+		CONSTRAINT "DriveGroupUnloadTime_CC"
+		CHECK("DriveGroupUnloadTime" >= 0)
+		default 60,
+	CONSTRAINT "DRIVEGROUP_PK" PRIMARY KEY("DriveGroupName")
+	/* SYSTEM-DEFINED */
+);
+
+1u CREATE TABLE "DRIVEGROUPAPPLICATION" (
+	"DriveGroupName" text
+		CONSTRAINT "DriveGroupName_CC"
+		REFERENCES "DRIVEGROUP",
+	"ApplicationName" text
+		CONSTRAINT "ApplicationName_CC"
+		REFERENCES "APPLICATION",
+	"DriveGroupApplicationPriority" integer
+		CONSTRAINT "DriveGroupApplicationPriority_CC"
+		CHECK("DriveGroupApplicationPriority" >= 0)
+		default 1000,
+	"DriveGroupApplicationUnloadTime" integer
+		CONSTRAINT "DriveGroupApplicationUnloadTime_CC"
+		CHECK("DriveGroupApplicationUnloadTime" >= 0)
+		default 60,
+	CONSTRAINT "DRIVEGROUPAPPLICATION_PK"
+		PRIMARY KEY ("DriveGroupName", "ApplicationName")
+);
+
+1u CREATE TABLE "DRIVE" (
+	"DriveName" text,
+	"DriveGroupName" text
+		CONSTRAINT "DriveGroupName_CC"
+		REFERENCES "DRIVEGROUP",
+	"DrivePriority" integer
+		CONSTRAINT "DrivePriority_CC"
+		CHECK("DrivePriority" >= 0 AND
+		"DrivePriority" <= 1000)
+		default 1000,
+	"DMName" text,
+	"DriveShapeName" text
+		default 'unknown',
+	"DriveDisabled" text
+		CONSTRAINT "DriveDisabled_CC"
+		CHECK("DriveDisabled" = 'true' OR
+		"DriveDisabled" = 'false' OR
+		"DriveDisabled" = 'temporary')
+		default 'false',
+	"DriveBroken" boolean
+		default 'false' NOT NULL,
+	"DriveStateSoft" text
+		CONSTRAINT "DriveStateSoft_CC"
+		CHECK("DriveStateSoft" = 'in use' OR
+		"DriveStateSoft" = 'ready' OR
+		"DriveStateSoft" = 'unavailable')
+		default 'unavailable',
+	"DriveStateHard" text
+		CONSTRAINT "DriveStateHard_CC"
+		CHECK("DriveStateHard" = 'loaded' OR
+		"DriveStateHard" = 'loading' OR
+		"DriveStateHard" = 'unloading' OR
+		"DriveStateHard" = 'unloaded')
+		default 'unloaded',
+	"DriveTimeCreated" timestamp (3)
+		default current_timestamp NOT NULL,
+	"DriveTimeMountedLast" timestamp (3)
+		default '-infinity' NOT NULL,
+	"DriveTimeMountedTotal" timestamp (3)
+		default '-infinity' NOT NULL,
+	"DriveNumberMounts" integer
+		CONSTRAINT "DriveNumberMounts_CC"
+		CHECK("DriveNumberMounts" >= 0)
+		default 0,
+	"DriveNumberMountsSinceCleaning" integer
+		CONSTRAINT "DriveNumberMountsSinceCleaning_CC"
+		CHECK("DriveNumberMountsSinceCleaning" >= 0)
+		default 0,
+	"LibraryName" text
+		CONSTRAINT "LibraryName_CC"
+		REFERENCES "LIBRARY",
+	"BayName" text,
+	"DriveLibraryAccessible" boolean
+		default 'false' NOT NULL,
+	"DriveLibraryOccupied" boolean
+		default 'false' NOT NULL,
+	"CartridgePCL" text /* trigger REFERENCES "CARTRIDGE" */,
+	"DriveNeedsCleaning" text
+		CONSTRAINT "DriveNeedsCleaning_CC"
+		CHECK("DriveNeedsCleaning" = 'true' OR
+		"DriveNeedsCleaning" = 'false' OR
+		"DriveNeedsCleaning" = 'advisory' OR
+		"DriveNeedsCleaning" = 'mandatory')
+		default 'false',
+	"MaxMounts" integer
+		CONSTRAINT "MaxMounts_CC"
+		CHECK("MaxMounts" >= 0)
+		default 0,
+	"ExclusiveAppName" text
+		default 'none' NOT NULL,
+	"ReserveDrive" text
+		CONSTRAINT "ReserveDrive_CC"
+		CHECK("ReserveDrive" = 'yes' OR
+		"ReserveDrive" = 'no')
+		default 'yes',
+	"DefaultBlocksize" integer
+		CONSTRAINT "DefaultBlocksize_CC"
+		CHECK("DefaultBlocksize" >= 0)
+		default '262144',
+	"DriveGeometry" text,
+	"DriveSerialNum" text,
+	"DriveOnline" boolean
+		default 'false' NOT NULL,
+	CONSTRAINT "DRIVE_PK" PRIMARY KEY("DriveName")
+	/* SYSTEM-DEFINED */
+);
+
+1u CREATE TABLE "DM" (
+	"DMName" text,
+	"DriveName" text
+		CONSTRAINT "DriveName_CC"
+		REFERENCES "DRIVE",
+	"DMHost" text,
+	"DMTargetLibrary" text,
+	"DMTargetPath" text,
+	"DMTargetHost" text,
+	"DMPassword" text,
+	"DMMessageLevel" text 
+		CONSTRAINT "DMMessageLevel_CC"
+		CHECK("DMMessageLevel" = 'emergency' OR 
+		"DMMessageLevel" = 'alert' OR 
+		"DMMessageLevel" = 'critical' OR 
+		"DMMessageLevel" = 'error' OR 
+		"DMMessageLevel" = 'warning' OR 
+		"DMMessageLevel" = 'notice' OR 
+		"DMMessageLevel" = 'information' OR 
+		"DMMessageLevel" = 'debug' OR 
+		"DMMessageLevel" = 'developer') 
+		default 'error',
+	"DMStateHard" text 
+		CONSTRAINT "DMStateHard_CC"
+		CHECK("DMStateHard" = 'ready' OR 
+		"DMStateHard" = 'broken') 
+		default 'ready',
+	"DMStateSoft" text 
+		CONSTRAINT "DMStateSoft_CC"
+		CHECK("DMStateSoft" = 'absent' OR 
+		"DMStateSoft" = 'present' OR 
+		"DMStateSoft" = 'not ready' OR 
+		"DMStateSoft" = 'disconnected' OR 
+		"DMStateSoft" = 'ready' OR 
+		"DMStateSoft" = 'reserved') 
+		default 'absent',
+	"DMDisabled" text
+		CONSTRAINT "DMDisabled_CC"
+		CHECK("DMDisabled" = 'false' OR
+		"DMDisabled" = 'true')
+		default 'false',
+	"TraceLevel" text 
+		CONSTRAINT "TraceLevel_CC"
+		CHECK("TraceLevel" = 'emergency' OR 
+		"TraceLevel" = 'alert' OR 
+		"TraceLevel" = 'critical' OR 
+		"TraceLevel" = 'operational' OR 
+		"TraceLevel" = 'error' OR 
+		"TraceLevel" = 'warning' OR 
+		"TraceLevel" = 'notice' OR 
+		"TraceLevel" = 'information' OR 
+		"TraceLevel" = 'debug' OR 
+		"TraceLevel" = 'developer') 
+		default 'debug',
+	"TraceFileSize" text
+		default '10M',
+	CONSTRAINT "DM_PK" PRIMARY KEY("DMName")
+	/* SYSTEM-DEFINED */
+);
+
+1u CREATE TABLE "DMCAPABILITY" (
+	"DriveName" text
+		CONSTRAINT "DriveName_CC"
+		REFERENCES "DRIVE" ON DELETE CASCADE,
+	"DMName" text
+		CONSTRAINT "DMName_CC"
+		REFERENCES "DM" ON DELETE CASCADE,
+	"DMCapabilityName" text
+		NOT NULL,
+	CONSTRAINT "DMCAPABILITY_PK"
+		PRIMARY KEY ("DriveName", "DMName", "DMCapabilityName")
+	/* CLIENT-DEFINED */
+);
+
+1u CREATE TABLE "DMCAPABILITYTOKEN" (
+	"DriveName" text
+		CONSTRAINT "DriveName_CC"
+		REFERENCES "DRIVE" ON DELETE CASCADE,
+	"DMName" text
+		CONSTRAINT "DMName_CC"
+		REFERENCES "DM" ON DELETE CASCADE,
+	"DMCapabilityName" text,
+	"DMCapabilityToken" text
+		NOT NULL,
+	CONSTRAINT "DMCAPABILITYTOKEN_FK"
+		FOREIGN KEY ("DriveName", "DMName", "DMCapabilityName")
+		REFERENCES "DMCAPABILITY" ON DELETE CASCADE
+);
+
+1u CREATE TABLE "DMCAPABILITYDEFAULTTOKEN" (
+	"DriveName" text
+		CONSTRAINT "DriveName_CC"
+		REFERENCES "DRIVE" ON DELETE CASCADE,
+	"DMName" text
+		CONSTRAINT "DMName_CC"
+		REFERENCES "DM" ON DELETE CASCADE,
+	"DMCapabilityToken" text
+		NOT NULL
+);
+
+1u CREATE TABLE "DMCAPABILITYGROUP" (
+	"DriveName" text
+		CONSTRAINT "DriveName_CC"
+		REFERENCES "DRIVE" ON DELETE CASCADE,
+	"DMName" text
+		CONSTRAINT "DMName_CC"
+		REFERENCES "DM" ON DELETE CASCADE,
+	"DMCapabilityGroupName" text
+		NOT NULL,
+	"DMCapabilityGroupDefaultName" text,
+	"DMCapabilityGroupType" text
+		CONSTRAINT "DMCapabilityGroupType_CC"
+		CHECK("DMCapabilityGroupType" = 'interchange' OR
+		"DMCapabilityGroupType" = 'access')
+		DEFAULT 'access',
+	CONSTRAINT "DMCAPABILITYGROUP_PK"
+		PRIMARY KEY("DriveName", "DMName", "DMCapabilityGroupName")
+);
+
+1u CREATE TABLE "DMCAPABILITYGROUPTOKEN" (
+	"DriveName" text,
+	"DMName" text,
+	"DMCapabilityGroupName" text,
+	"DMCapabilityToken" text
+		NOT NULL,
+	CONSTRAINT "DMCAPABILITYGROUPTOKEN_PK"
+		PRIMARY KEY ("DriveName", "DMName", "DMCapabilityToken"),
+	CONSTRAINT "DMCAPABILITYGROUPTOKEN_FK"
+		FOREIGN KEY ("DriveName", "DMName", "DMCapabilityGroupName")
+		REFERENCES "DMCAPABILITYGROUP" ON DELETE CASCADE
+);
+
+1u CREATE TABLE "DMBITFORMAT" (
+	"DriveName" text
+		CONSTRAINT "DriveName_CC"
+		REFERENCES "DRIVE" ON DELETE CASCADE,
+	"DMName" text
+		CONSTRAINT "DMName_CC"
+		REFERENCES "DM" ON DELETE CASCADE,
+	"DMBitFormatName" text,
+	"DMBitFormatDefaultToken" text
+		NOT NULL,
+	CONSTRAINT "DMBITFORMAT_PK"
+		PRIMARY KEY ("DriveName", "DMName", "DMBitFormatName")
+);
+
+1u CREATE TABLE "DMBITFORMATTOKEN" (
+	"DriveName" text
+		NOT NULL,
+	"DMName" text
+		NOT NULL,
+	"DMBitFormatName" text,
+	"DMCapabilityToken" text
+		NOT NULL,
+	CONSTRAINT "DMBITFORMATTOKEN_PK"
+		PRIMARY KEY ("DriveName", "DMName", "DMBitFormatName",
+		"DMCapabilityToken"),
+	CONSTRAINT "DMBITFORMATTOKEN_FK"
+		FOREIGN KEY ("DriveName", "DMName", "DMCapabilityToken")
+		REFERENCES "DMCAPABILITYGROUPTOKEN" ON DELETE CASCADE
+);
+
+1u CREATE TABLE "SLOTGROUP" (
+	"SlotGroupName" text
+		NOT NULL,
+	"Direction" text
+		CONSTRAINT "Direction_CC"
+		CHECK("Direction" = 'in' OR
+		"Direction" = 'out' OR
+		"Direction" = 'both' OR
+		"Direction" = 'none')
+		default 'none',
+	"Type" text
+		CONSTRAINT "Type_CC"
+		CHECK("Type" = 'port' OR
+		"Type" = 'magazine' OR
+		"Type" = 'ordinary')
+		default 'ordinary',
+	"LibraryName" text
+		CONSTRAINT "LibraryName_CC"
+		REFERENCES "LIBRARY",
+	"LMName" text
+		CONSTRAINT "LMName_CC"
+		REFERENCES "LM",
+	"BayName" text,
+	CONSTRAINT "SLOTGROUP_FK"
+		FOREIGN KEY("BayName", "LibraryName", "LMName")
+		REFERENCES "BAY" ON DELETE CASCADE,
+	CONSTRAINT "SLOTGROUP_PK" PRIMARY KEY ("SlotGroupName", "LibraryName")
+);
+
+1u CREATE TABLE "SLOT" (
+	"SlotName" text,
+	"LibraryName" text
+		CONSTRAINT "LibraryName_CC"
+		REFERENCES "LIBRARY",
+	"LMName" text
+		CONSTRAINT "LMName_CC"
+		REFERENCES "LM",
+	"BayName" text,
+	"SlotGroupName" text
+		NOT NULL,
+	"SlotTypeName" text /* trigger REFERENCES "SLOTTYPE" */,
+	"CartridgeID" text
+		CONSTRAINT "CartridgeID_CC"
+		REFERENCES "CARTRIDGE",
+	"CartridgePCL" text /* trigger REFERENCES "CARTRIDGE" */,
+	"SlotAccessable" boolean
+		default 'false' NOT NULL,
+	"SlotOccupied" boolean
+		default 'false' NOT NULL,
+	CONSTRAINT "SLOT_FK"
+		FOREIGN KEY ("SlotGroupName", "LibraryName")
+		REFERENCES "SLOTGROUP",
+	CONSTRAINT "SLOT_2ND_FK"
+		FOREIGN KEY ("BayName", "LibraryName", "LMName")
+		REFERENCES "BAY",
+	CONSTRAINT "SLOT_PK" PRIMARY KEY("SlotName")
+);
+
+1u CREATE TABLE "SLOTCONFIG" (
+	"LibraryName" text
+		CONSTRAINT "LibraryName_CC"
+		REFERENCES "LIBRARY" ON DELETE CASCADE,
+	"LMName" text
+		CONSTRAINT "LMName_CC"
+		REFERENCES "LM" ON DELETE CASCADE,
+	"BayName" text,
+	"SlotTypeName" text,
+	"SlotConfigNumberFree" integer
+		CONSTRAINT "SlotConfigNumberFree_CC"
+		CHECK("SlotConfigNumberFree" >= 0)
+		default 0,
+	"SlotConfigNumberTotal" integer
+		CONSTRAINT "SlotConfigNumberTotal_CC"
+		CHECK("SlotConfigNumberTotal" >= 0)
+		default 0,
+	CONSTRAINT "SLOTCONFIG_FK"
+		FOREIGN KEY ("BayName", "LibraryName", "LMName")
+		REFERENCES "BAY" ON DELETE CASCADE
+);
+
+1u CREATE TABLE "MOUNTLOGICAL" (
+	"ApplicationName" text
+		CONSTRAINT "ApplicationName_CC"
+		REFERENCES "APPLICATION",
+	"VolumeName" text
+		NOT NULL,
+	"PartitionName" text
+		NOT NULL,
+	"SideName" text
+		NOT NULL,
+	"CartridgeID" text
+		CONSTRAINT "CartridgeID_CC"
+		REFERENCES "CARTRIDGE",
+	"DriveName" text
+		CONSTRAINT "DriveName_CC"
+		REFERENCES "DRIVE",
+	"DMName" text
+		CONSTRAINT "DMName_CC"
+		REFERENCES "DM",
+	"DMCapabilityName" text,
+	"MountLogicalHandle" text,
+	"MountLogicalTimeWhenMounted" timestamp (3)
+		default current_timestamp NOT NULL,
+	CONSTRAINT "MOUNTLOGICAL_FK"
+		FOREIGN KEY ("VolumeName", "ApplicationName")
+		REFERENCES "VOLUME",
+	CONSTRAINT "MOUNTLOGICAL_PK" PRIMARY KEY("MountLogicalHandle")
+);
+
+1u CREATE TABLE "MOUNTPHYSICAL" (
+	"ApplicationName" text
+		CONSTRAINT "ApplicationName_CC"
+		REFERENCES "APPLICATION",
+	"DriveName" text
+		CONSTRAINT "DriveName_CC"
+		REFERENCES "DRIVE",
+	"LibraryName" text
+		CONSTRAINT "LibraryName_CC"
+		REFERENCES "LIBRARY",
+	"CartridgeID" text
+		CONSTRAINT "CartridgeID_CC"
+		REFERENCES "CARTRIDGE",
+	"CartridgePCL" text /* trigger REFERENCES "CARTRIDGE" */,
+	"SideName" text NOT NULL,
+	"SlotName" text NOT NULL,
+	"MountPhysicalTimeWhenMounted" timestamp (3)
+		default current_timestamp NOT NULL,
+	"SessionID" text
+		NOT NULL,
+	CONSTRAINT "MOUNTPHYSICAL_FK"
+		FOREIGN KEY ("CartridgeID", "SideName") REFERENCES "SIDE",
+	CONSTRAINT "MOUNTPHYSICAL_PK"
+		PRIMARY KEY ("ApplicationName", "DriveName", "LibraryName",
+		"CartridgeID", "SideName")
+);
+
+1u CREATE TABLE "DRIVECARTRIDGEACCESS" (
+	"DriveName" text
+		CONSTRAINT "DriveName_CC"
+		REFERENCES "DRIVE",
+	"DMName" text
+		CONSTRAINT "DMName_CC"
+		REFERENCES "DM",
+	"CartridgeID" text
+		CONSTRAINT "CartridgeID_CC"
+		REFERENCES "CARTRIDGE",
+	"SideName" text
+		NOT NULL,
+	"PartitionName" text
+		NOT NULL,
+	"ApplicationName" text
+		CONSTRAINT "ApplicationName_CC"
+		REFERENCES "APPLICATION",
+	"DriveCartridgeAccessTimeMount" timestamp (3)
+		default '-infinity' NOT NULL,
+	"DriveCartridgeAccessTimeUnmm_mount" timestamp (3)
+		default '-infinity' NOT NULL,
+	"DriveCartridgeAccessByteReadCount" integer
+		CONSTRAINT "DriveCartridgeAccessByteReadCount_CC"
+		CHECK("DriveCartridgeAccessByteReadCount" >= -1)
+		default -1,
+	"DriveCartridgeAccessByteWriteCount" integer
+		CONSTRAINT "DriveCartridgeAccessByteWriteCount_CC"
+		CHECK("DriveCartridgeAccessByteWriteCount" >= -1)
+		default -1,
+	"DriveCartridgeAccessHardReadErrorCount" integer
+		CONSTRAINT "DriveCartridgeAccessHardReadErrorCount_CC"
+		CHECK("DriveCartridgeAccessHardReadErrorCount" >= -1)
+		default -1,
+	"DriveCartridgeAccessSoftReadErrorCount" integer
+		CONSTRAINT "DriveCartridgeAccessSoftReadErrorCount_CC"
+		CHECK("DriveCartridgeAccessSoftReadErrorCount" >= -1)
+		default -1,
+	"DriveCartridgeAccessHardWriteErrorCount" integer
+		CONSTRAINT "DriveCartridgeAccessHardWriteErrorCount_CC"
+		CHECK("DriveCartridgeAccessHardWriteErrorCount" >= -1)
+		default -1,
+	"DriveCartridgeAccessSoftWriteErrorCount" integer
+		CONSTRAINT "DriveCartridgeAccessSoftWriteErrorCount_CC"
+		CHECK("DriveCartridgeAccessSoftWriteErrorCount" >= -1)
+		default -1,
+	CONSTRAINT "DRIVECARTRIDGEACCESS_FK"
+		FOREIGN KEY ("CartridgeID", "SideName", "PartitionName")
+		REFERENCES "PARTITION"
+	/* CLIENT-DEFINED */
+);
+
+1u CREATE TABLE "TASK" (
+	"TaskID" text,
+	"TaskType" text,
+	"TaskArrivalTime" timestamp (3)
+		default current_timestamp NOT NULL,
+	"TaskPriority" integer
+		CONSTRAINT "TaskPriority_CC"
+		CHECK("TaskPriority" >= 0)
+		default 1000,
+	"ApplicationName" text
+		CONSTRAINT "ApplicationName_CC"
+		REFERENCES "APPLICATION",
+	"AIName" text
+		NOT NULL,
+	"TaskStatement" text,
+	"TaskState" text
+		CONSTRAINT "TaskState_CC"
+		CHECK("TaskState" = 'blocked' OR
+		"TaskState" = 'dispatched')
+		default 'blocked',
+	"ClientTaskID" text,
+	CONSTRAINT "TASK_FK"
+		FOREIGN KEY("ApplicationName", "AIName") REFERENCES "AI",
+	CONSTRAINT "TASK_PK" PRIMARY KEY("TaskID")
+);
+
+1u CREATE TABLE "TASKCARTRIDGE" (
+	"TaskID" text
+		CONSTRAINT "TaskID_CC"
+		REFERENCES "TASK" ON DELETE CASCADE,
+	"CartridgeID" text
+		CONSTRAINT "CartridgeID_CC"
+		REFERENCES "CARTRIDGE"
+);
+
+1u CREATE TABLE "TASKDRIVE" (
+	"TaskID" text
+		CONSTRAINT "TaskID_CC"
+		REFERENCES "TASK" ON DELETE CASCADE,
+	"DriveName" text
+		CONSTRAINT "DriveName_CC"
+		REFERENCES "DRIVE"
+);
+
+1u CREATE TABLE "TASKLIBRARY" (
+	"TaskID" text
+		CONSTRAINT "TaskID_CC"
+		REFERENCES "TASK" ON DELETE CASCADE,
+	"LibraryName" text
+		CONSTRAINT "LibraryName_CC"
+		REFERENCES "LIBRARY"
+);
+
+1u CREATE TABLE "MESSAGE" (
+	"MessageID" text
+		default pg_get_uuid(),
+	"MessageSenderType" text
+		CONSTRAINT "MessageSenderType_CC"
+		CHECK("MessageSenderType" = 'LM' OR
+		"MessageSenderType" = 'DM' OR
+		"MessageSenderType" = 'MM' OR
+		"MessageSenderType" = 'AI'),
+	"MessageSenderName" text,
+	"MessageSenderInstance" text,
+	"MessageConnectionID" text,
+	"MessageHost" text,
+	"MessageLevel" text
+		CONSTRAINT "MessageLevel_CC"
+		CHECK("MessageLevel" = 'emergency' OR
+		"MessageLevel" = 'alert' OR
+		"MessageLevel" = 'critical' OR
+		"MessageLevel" = 'error' OR
+		"MessageLevel" = 'warning' OR
+		"MessageLevel" = 'notice' OR
+		"MessageLevel" = 'information' OR
+		"MessageLevel" = 'debug' OR
+		"MessageLevel" = 'developer'),
+	"MessageManufacturer" text,
+	"MessageModel" text,
+	"MessageNumber" text,
+	"MessageText" text,
+	"MessageTimeCreated" timestamp (3)
+		default current_timestamp NOT NULL,
+	CONSTRAINT "MESSAGE_PK" PRIMARY KEY("MessageID")
+);
+
+1u CREATE sequence request_seqnum minvalue 1 maxvalue 99999 cycle;
+
+1u CREATE TABLE "REQUEST" (
+	"RequestID" text,
+	"RequestingTaskID" text
+		/* trigger REFERENCES "TASK" ("TaskID") */,
+	"RequestingClient" text,
+	"RequestingInstance" text,
+	"RequestingConnectionID" text,
+	"RequestHost" text,
+	"RequestingClientType" text
+		CONSTRAINT "RequestingClientType_CC"
+		CHECK("RequestingClientType" = 'LM' OR
+		"RequestingClientType" = 'DM' OR
+		"RequestingClientType" = 'MM' OR
+		"RequestingClientType" = 'AI'),
+	"RequestPriority" integer
+		CONSTRAINT "RequestPriority_CC"
+		CHECK("RequestPriority" >= 0 AND
+		"RequestPriority" <= 1000),
+	"RequestState" text
+		CONSTRAINT "RequestState_CC"
+		CHECK("RequestState" = 'pending' OR
+		"RequestState" = 'accepted' OR
+		"RequestState" = 'responded')
+		default 'pending',
+	"RequestManufacturer" text,
+	"RequestModel" text,
+	"RequestNumber" text,
+	"RequestText" text,
+	"AcceptingClient" text,
+	"AcceptingInstance" text,
+	"AcceptingSessionID" text
+		/* trigger REFERENCES "SESSION" ("SessionID") */,
+	"ResponseManufacturer" text,
+	"ResponseModel" text,
+	"ResponseNumber" text,
+	"ResponseText" text,
+	"RequestTimeCreated" timestamp (3)
+		default current_timestamp NOT NULL,
+	"RequestTimeAccepted" timestamp (3)
+		default '-infinity' NOT NULL,
+	"RequestTimeResponded" timestamp (3)
+		default '-infinity' NOT NULL,
+	"RequestAlias" integer
+		default nextval('request_seqnum'),
+	CONSTRAINT "REQUEST_PK" PRIMARY KEY("RequestID")
+);
+
+1u CREATE function check_fd_limit(integer) returns boolean as '
+	begin
+	if $1 >= 30 and $1 <= 65536 then
+		return true;
+	end if;
+	if $1 = -1 then
+		return true;
+	end if;
+	return false;
+	end;
+	' language 'plpgsql';
+
+1u CREATE TABLE "SYSTEM" (
+	"Administrator" text
+		default 'unknown',
+	"AttendanceMode" text
+		CONSTRAINT "AttendanceMode_CC"
+		CHECK("AttendanceMode" = 'attended' OR
+		"AttendanceMode" = 'unattended')
+		default 'attended',
+	"SystemLogLevel" text
+		CONSTRAINT "SystemLogLevel_CC"
+		CHECK("SystemLogLevel" = 'emergency' OR
+		"SystemLogLevel" = 'alert' OR
+		"SystemLogLevel" = 'critical' OR
+		"SystemLogLevel" = 'error' OR
+		"SystemLogLevel" = 'warning' OR
+		"SystemLogLevel" = 'notice' OR
+		"SystemLogLevel" = 'information' OR
+		"SystemLogLevel" = 'debug' OR
+		"SystemLogLevel" = 'developer')
+		default 'error',
+	"SystemAcceptLevel" text
+		CONSTRAINT "SystemAcceptLevel_CC"
+		CHECK("SystemAcceptLevel" = 'emergency' OR
+		"SystemAcceptLevel" = 'alert' OR
+		"SystemAcceptLevel" = 'critical' OR
+		"SystemAcceptLevel" = 'error' OR
+		"SystemAcceptLevel" = 'warning' OR
+		"SystemAcceptLevel" = 'notice' OR
+		"SystemAcceptLevel" = 'information' OR
+		"SystemAcceptLevel" = 'debug' OR
+		"SystemAcceptLevel" = 'developer')
+		default 'error',
+	"SystemLogFile" text
+		default '/var/log/mms/system_log',
+	"SystemMessageLimit" integer
+		CONSTRAINT "SystemMessageLimit_CC"
+		CHECK("SystemMessageLimit" >= 0)
+		default 100,
+	"SystemMessageCount" integer
+		CONSTRAINT "SystemMessageCount_CC"
+		CHECK("SystemMessageCount" >= 0)
+		default 0,
+	"SystemRequestLimit" integer
+		CONSTRAINT "SystemRequestLimit_CC"
+		CHECK("SystemRequestLimit" >= 0)
+		default 100,
+	"SystemRequestCount" integer
+		CONSTRAINT "SystemRequestCount_CC"
+		CHECK("SystemRequestLimit" >= 0)
+		default 0,
+	"SystemSyncLimit" integer
+		CONSTRAINT "SystemSyncLimit_CC"
+		CHECK("SystemSyncLimit" >= 0)
+		default 1000,
+	"SystemDCALimit" integer
+		CONSTRAINT "SystemDCALimit_CC"
+		CHECK("SystemDCALimit" >= 0)
+		default 100,
+	"SystemDCACount" integer
+		CONSTRAINT "SystemDCACount_CC"
+		CHECK("SystemDCACount" >= 0)
+		default 0,
+	"ClearDriveAtLMConfig" text
+		CONSTRAINT "ClearDriveAtLMConfig_CC"
+		CHECK("ClearDriveAtLMConfig" = 'yes' OR
+		"ClearDriveAtLMConfig" = 'no')
+		default 'no',
+	"AskClearDriveAtLMConfig" text
+		CONSTRAINT "AskClearDriveAtLMConfig_CC"
+		CHECK("AskClearDriveAtLMConfig" = 'yes' OR
+		"AskClearDriveAtLMConfig" = 'no')
+		default 'yes',
+	"PreemptReservation" text
+		CONSTRAINT "PreemptReservation_CC"
+		CHECK("PreemptReservation" = 'yes' OR
+		"PreemptReservation" = 'ask' OR
+		"PreemptReservation" = 'no')
+		default 'yes',
+	/* MM settings --> */
+	"MessageLevel" text 
+		CONSTRAINT "MessageLevel_CC"
+		CHECK("MessageLevel" = 'emergency' OR 
+		"MessageLevel" = 'alert' OR 
+		"MessageLevel" = 'critical' OR 
+		"MessageLevel" = 'error' OR 
+		"MessageLevel" = 'warning' OR 
+		"MessageLevel" = 'notice' OR 
+		"MessageLevel" = 'information' OR 
+		"MessageLevel" = 'debug' OR 
+		"MessageLevel" = 'developer') 
+		default 'error',
+	"TraceLevel" text 
+		CONSTRAINT "TraceLevel_CC"
+		CHECK("TraceLevel" = 'emergency' OR 
+		"TraceLevel" = 'alert' OR 
+		"TraceLevel" = 'critical' OR 
+		"TraceLevel" = 'operational' OR 
+		"TraceLevel" = 'error' OR 
+		"TraceLevel" = 'warning' OR 
+		"TraceLevel" = 'notice' OR 
+		"TraceLevel" = 'information' OR 
+		"TraceLevel" = 'debug' OR 
+		"TraceLevel" = 'developer') 
+		default 'debug',
+	"TraceFileSize" text
+		default '10M',
+	"SocketFdLimit" integer
+		CONSTRAINT "SocketFdLimit_CC"
+		CHECK(check_fd_limit("SocketFdLimit"))
+		default -1,
+	"SystemLogFileSize" text
+		default '10M',
+	"SystemName" text,
+	"SystemInstance" text,
+	"UnloadDelayTime" integer
+		default '20',
+	"DefaultBlocksize" integer
+		CONSTRAINT "DefaultBlocksize_CC"
+		CHECK("DefaultBlocksize" >= 0)
+		default '262144',
+	CONSTRAINT "SYSTEM_PK" PRIMARY KEY("Administrator")
+	/* SYSTEM-DEFINED */
+);
+
+1u CREATE TABLE "STALEHANDLE" (
+	"ApplicationName" text
+		CONSTRAINT "ApplicationName_CC"
+		REFERENCES "APPLICATION",
+	"VolumeName" text
+		NOT NULL,
+	"PartitionName" text
+		NOT NULL,
+	"SideName" text
+		NOT NULL,
+	"CartridgeID" text
+		CONSTRAINT "CartridgeID_CC"
+		REFERENCES "CARTRIDGE",
+	"DriveName" text
+		CONSTRAINT "DriveName_CC"
+		REFERENCES "DRIVE",
+	"DMName" text
+		CONSTRAINT "DMName_CC"
+		REFERENCES "DM",
+	"MountLogicalHandle" text,
+	CONSTRAINT "STALEHANDLE_FK"
+		FOREIGN KEY ("VolumeName", "ApplicationName")
+		REFERENCES "VOLUME"
+);
+
+1u CREATE TABLE "MM" (
+	"DBInitialized" boolean
+		default 'false' NOT NULL,
+	"DBVersion" integer
+		CONSTRAINT "DBVersion_CC"
+		CHECK("DBVersion" >= 1)
+		default '1',
+
+	/* DBDevelopmentVersion is used to create a new base */
+	/* database version 1 upgrade by dropping the database, */
+	/* read the "how to" instructions below. */
+	"DBDevelopmentVersion" integer
+		CONSTRAINT "DBDevelopmentVersion"
+		CHECK("DBDevelopmentVersion" >= 1)
+		default '1'
+);
+
+1u CREATE TABLE "SYSTEM_DEFINED" (
+	objname text,
+	attribute text,
+	CONSTRAINT "SYSTEM_DEFINED_PK" PRIMARY KEY(objname, attribute)
+);
+
+1u CREATE table "EVENT"(
+	"ObjectName" text,
+	"Info1" text,
+	"Info2" text,
+	"Info3" text,
+	"Info4" text,
+	"Seen" boolean
+		default 'false'
+);
+
+1u CREATE table "DMSHAPEPRIORITY"(
+	"DMName" text
+		CONSTRAINT "DMName_CC"
+		REFERENCES "DM" ON DELETE CASCADE,
+	"DMShapePriority" integer,
+	"DMShapeName" text
+);
+
+1u CREATE table "DMDENSITYPRIORITY"(
+	"DMName" text
+		CONSTRAINT "DMName_CC"
+		REFERENCES "DM" ON DELETE CASCADE,
+	"DMDensityPriority" integer,
+	"DMDensityName" text
+);
+
+
+# SQL FUNCTIONS
+
+1u CREATE FUNCTION gettypename(text, text) RETURNS
+	SETOF "CARTRIDGE" AS $$
+	SELECT * FROM "CARTRIDGE"
+	WHERE "CartridgeID" = $1;
+	$$ LANGUAGE SQL;
+
+1u CREATE function getcarttype(text, text) returns
+	setof "CARTRIDGETYPE" as $$
+	select * from "CARTRIDGETYPE"
+	where "CartridgeTypeName" in
+	(select "CartridgeTypeName" from gettypename($1, $2));
+	$$language sql;
+
+1u CREATE function getdrivename(text, text) returns
+	setof "DMCAPABILITYGROUPTOKEN" as $$
+	select * from "DMCAPABILITYGROUPTOKEN"
+	where "DMCapabilityToken"
+	in (select distinct "CartridgeShapeName"
+	from getcarttype($1, $2));
+	$$language sql;
+
+1u CREATE function getdrivetable(text, text) returns
+	setof "DRIVE" as $$
+	select * from "DRIVE" where
+	"LibraryName" in (select "LibraryName"
+	from gettypename($1, $2));
+	$$language sql;
+
+# Below is backup func NOT USED NOW
+1u CREATE function getdrivetable2(text, text) returns
+	setof "DRIVE" as $$
+	select * from "DRIVE" where
+	"DriveName" in (select "DriveName"
+	from getdrivename($1, $2)) and
+	"LibraryName" in (select "LibraryName"
+	from gettypename($1, $2));
+	$$language sql;
+
+
+1u CREATE function getall(text, text, text)
+	returns setof "DM" as $$
+	select * from "DM"
+	where pg_host_ident("DMTargetHost") = pg_host_ident($2)
+	and "DriveName" in(select "DriveName" from getdrivetable($1, $2)
+	where "DriveGroupName" in
+	(select "DriveGroupName" from "DRIVEGROUPAPPLICATION"
+	where "ApplicationName" = $3));
+	$$language sql;
+
+1u CREATE FUNCTION gettype() RETURNS
+	SETOF "CARTRIDGE" AS $$ SELECT * FROM "CARTRIDGE";
+	$$ LANGUAGE SQL;
+
+1u CREATE FUNCTION getcart() RETURNS
+	SETOF "CARTRIDGE" AS $$
+	select * from "CARTRIDGE" where "CartridgeID"
+	IN (select "CartridgeID" from gettype());
+	$$ LANGUAGE SQL;
+
+1u CREATE function mm_obj_has_att(text,text) returns
+	boolean as $$ select case when $2 = (select attname
+	from pg_attribute where (attrelid = (select oid
+	from pg_class where relname = $1)) and (attname = $2))
+	then true else false end; $$ language sql;
+
+1u CREATE function drive_cart(text, text)
+	returns setof "DRIVE" as $$
+	select "DRIVE".* from "DRIVE"
+	cross join "DMCAPABILITYTOKEN"
+	cross join "SLOTTYPE"
+	cross join "CARTRIDGETYPE"
+	cross join "CARTRIDGE"
+	where (
+	 ("DRIVE"."DriveName" = "DMCAPABILITYTOKEN"."DriveName")
+	and
+	 ("SLOTTYPE"."CartridgeShapeName" =
+	"DMCAPABILITYTOKEN"."DMCapabilityToken") and
+	("CARTRIDGETYPE"."CartridgeShapeName" =
+	"SLOTTYPE"."CartridgeShapeName") and
+	("CARTRIDGE"."CartridgeTypeName" =
+	"CARTRIDGETYPE"."CartridgeTypeName") and
+	("DRIVE"."DriveName" = $1) and
+	("CARTRIDGE"."CartridgeID" = $2) ); $$ LANGUAGE SQL;
+
+1u CREATE function good_tok(text, text, text)
+	returns setof "DMCAPABILITYTOKEN" as $$
+	select "DMCAPABILITYTOKEN".* from "DMCAPABILITYTOKEN"
+	cross join "DM"
+	where (
+	("DM"."DMName" = "DMCAPABILITYTOKEN"."DMName") and
+	("DMCAPABILITYTOKEN"."DriveName" = $1) and
+	(pg_host_ident("DM"."DMTargetHost") = pg_host_ident($3)) and
+	("DMCAPABILITYTOKEN"."DMCapabilityToken" = $2) );
+	$$ LANGUAGE SQL;
+
+#
+# MMS data model object reference validation.
+#
+
+# Function and trigger for SLOTTYPE update or delete. Validate
+# SLOTTYPE references by CARTRIDGETYPE, SLOT, and SLOTCONFIG.
+1u CREATE FUNCTION mm_func_slottype() RETURNS TRIGGER AS '
+	DECLARE
+	name TEXT;
+	shape TEXT;
+	BEGIN
+	IF TG_OP = ''UPDATE'' THEN
+	    IF NEW."CartridgeShapeName" NOTNULL AND
+	    NEW."CartridgeShapeName" != OLD."CartridgeShapeName" THEN
+		--check cartridgetype shape reference to slottype
+		SELECT INTO shape "CartridgeShapeName" FROM
+		"CARTRIDGETYPE" WHERE
+		"CARTRIDGETYPE"."CartridgeShapeName" =
+		NEW."CartridgeShapeName";
+		IF FOUND THEN
+			RAISE EXCEPTION ''"CartridgeShapeName"
+			still referenced by "CARTRIDGETYPE" for update'';
+		END IF;
+	    END IF;
+	    IF NEW."SlotTypeName" NOTNULL AND
+	    NEW."SlotTypeName" != OLD."SlotTypeName" THEN
+		--check slot type reference to slottype
+		SELECT INTO name "SlotTypeName" FROM "SLOT"
+		WHERE "SLOT"."SlotTypeName" =
+		NEW."SlotTypeName";
+		IF FOUND THEN
+			RAISE EXCEPTION ''"SlotTypeName"
+			still referenced by "SLOT" for update'';
+		END IF;
+	    END IF;
+	    RETURN NEW;
+	ELSIF TG_OP = ''DELETE'' THEN
+		--check cartridgetype shape reference to slottype
+		SELECT INTO shape "CartridgeShapeName" FROM
+		"CARTRIDGETYPE" WHERE
+		"CARTRIDGETYPE"."CartridgeShapeName" =
+		OLD."CartridgeShapeName";
+		IF FOUND THEN
+			RAISE EXCEPTION ''"CartridgeShapeName"
+			still referenced by CARTRIDGETYPE for delete'';
+		END IF;
+		--check slot type reference to slottype
+		SELECT INTO name "SlotTypeName" FROM "SLOT"
+		WHERE "SLOT"."SlotTypeName" = OLD."SlotTypeName";
+		IF FOUND THEN
+			RAISE EXCEPTION ''"SlotTypeName"
+			still referenced by "SLOT" for delete'';
+		END IF;
+		RETURN OLD;
+	END IF;
+	END;
+	' LANGUAGE 'plpgsql';
+
+1u CREATE TRIGGER mm_trig_slottype BEFORE
+	UPDATE OR DELETE ON "SLOTTYPE"
+	FOR EACH ROW EXECUTE PROCEDURE mm_func_slottype();
+
+# Function and trigger for CARTRIDGETYPE insert or update. Validate
+# reference to SLOTTYPE.
+1u CREATE FUNCTION mm_func_cartridgetype_shape() RETURNS TRIGGER AS '
+	DECLARE
+	shape TEXT;
+	BEGIN
+	IF TG_OP = ''INSERT'' THEN
+		IF NEW."CartridgeShapeName" ISNULL THEN
+			RAISE EXCEPTION ''"CartridgeShapeName" is NULL'';
+		END IF;
+		SELECT INTO shape "CartridgeShapeName" FROM "SLOTTYPE"
+		WHERE "CartridgeShapeName" = NEW."CartridgeShapeName";
+		IF NOT FOUND THEN
+			RAISE EXCEPTION ''"CartridgeShapeName"
+			does not exist in "SLOTTYPE" for insert'';
+		END IF;
+		RETURN NEW;
+	ELSIF TG_OP = ''UPDATE'' AND
+	    NEW."CartridgeShapeName" NOTNULL THEN
+		SELECT INTO shape "CartridgeShapeName" FROM "SLOTTYPE"
+		WHERE "CartridgeShapeName" = NEW."CartridgeShapeName";
+		IF NOT FOUND THEN
+			RAISE EXCEPTION ''"CartridgeShapeName"
+			does not exist in "SLOTTYPE" for update'';
+		END IF;
+		RETURN NEW;
+	END IF;
+	END;
+	' LANGUAGE 'plpgsql';
+
+1u CREATE TRIGGER mm_trig_slottype_shape BEFORE
+	INSERT OR UPDATE ON "CARTRIDGETYPE"
+	FOR ROW EXECUTE PROCEDURE mm_func_cartridgetype_shape();
+
+# Function and trigger for SLOT and SLOTCONFIG. Validate
+# reference to SLOTTYPE.
+1u CREATE FUNCTION mm_func_slottypename() RETURNS TRIGGER AS '
+	DECLARE
+	name TEXT;
+	BEGIN
+	IF TG_OP = ''INSERT'' THEN
+		IF NEW."SlotTypeName" ISNULL THEN
+			RAISE EXCEPTION ''"SlotTypeName" is NULL'';
+		END IF;
+		SELECT INTO name "SlotTypeName" FROM "SLOTTYPE"
+		WHERE "SlotTypeName" = NEW."SlotTypeName";
+		IF NOT FOUND THEN
+			RAISE EXCEPTION ''"SlotTypeName"
+			does not exist in "SLOTTYPE" for insert'';
+		END IF;
+		RETURN NEW;
+	ELSIF TG_OP = ''UPDATE'' AND NEW."SlotTypeName" NOTNULL THEN
+		SELECT INTO name "SlotTypeName" FROM "SLOTTYPE"
+		WHERE "SlotTypeName" = NEW."SlotTypeName";
+		IF NOT FOUND THEN
+			RAISE EXCEPTION ''"SlotTypeName"
+			does not exist in "SLOTTYPE" for update'';
+		END IF;
+		RETURN NEW;
+	END IF;
+	END;
+	' LANGUAGE 'plpgsql';
+
+1u CREATE TRIGGER mm_trig_slot BEFORE
+	INSERT OR UPDATE ON "SLOT"
+	FOR ROW EXECUTE PROCEDURE mm_func_slottypename();
+
+1u CREATE TRIGGER mm_trig_slotconfig BEFORE
+	INSERT OR UPDATE ON "SLOTCONFIG"
+	FOR ROW EXECUTE PROCEDURE mm_func_slottypename();
+
+# Function and trigger for CARTRIDGE CartridgePCL validation.
+1u CREATE FUNCTION mm_func_cartridgepcl() RETURNS TRIGGER AS '
+	DECLARE
+	pcl TEXT;
+	BEGIN
+	IF TG_OP = ''UPDATE'' THEN
+	    IF NEW."CartridgePCL" NOTNULL AND
+	    NEW."CartridgePCL" != OLD."CartridgePCL" THEN
+		SELECT INTO pcl "CartridgePCL" FROM "DRIVE"
+		WHERE "CartridgePCL" = NEW."CartridgePCL";
+		IF FOUND THEN
+			RAISE EXCEPTION ''"CartridgePCL"
+			still referenced by "DRIVE" for update'';
+		END IF;
+		SELECT INTO pcl "CartridgePCL" FROM "SLOT"
+		WHERE "CartridgePCL" = NEW."CartridgePCL";
+		IF FOUND THEN
+			RAISE EXCEPTION ''"CartridgePCL"
+			still referenced by "SLOT" for update'';
+		END IF;
+		SELECT INTO pcl "CartridgePCL" FROM "MOUNTPHYSICAL"
+		WHERE "CartridgePCL" = NEW."CartridgePCL";
+		IF FOUND THEN
+			RAISE EXCEPTION ''"CartridgePCL"
+			still referenced by "MOUNTPHYSICAL" for update'';
+		END IF;
+	    END IF;
+	    RETURN NEW;
+	ELSIF TG_OP = ''DELETE'' THEN
+		SELECT INTO pcl "CartridgePCL" FROM "DRIVE"
+		WHERE "CartridgePCL" = OLD."CartridgePCL";
+		IF FOUND THEN
+			RAISE EXCEPTION ''"CartridgePCL"
+			still referenced by "DRIVE" for delete'';
+		END IF;
+		SELECT INTO pcl "CartridgePCL" FROM "SLOT"
+		WHERE "CartridgePCL" = OLD."CartridgePCL";
+		IF FOUND THEN
+			RAISE EXCEPTION ''"CartridgePCL"
+			still referenced by "SLOT" for delete'';
+		END IF;
+		SELECT INTO pcl "CartridgePCL" FROM "MOUNTPHYSICAL"
+		WHERE "CartridgePCL" = OLD."CartridgePCL";
+		IF FOUND THEN
+			RAISE EXCEPTION ''"CartridgePCL"
+			still referenced by "MOUNTPHYSICAL" for delete'';
+		END IF;
+		RETURN OLD;
+	END IF;
+	END;
+	' LANGUAGE 'plpgsql';
+
+1u CREATE TRIGGER mm_trig_cartridgepcl BEFORE
+	UPDATE OR DELETE ON "CARTRIDGE"
+	FOR ROW EXECUTE PROCEDURE mm_func_cartridgepcl();
+
+# Function and trigger for SLOT and SLOTCONFIG. Validate
+# reference to SLOTTYPE.
+1u CREATE FUNCTION mm_func_pcl() RETURNS TRIGGER AS '
+	DECLARE
+	pcl TEXT;
+	BEGIN
+	IF TG_OP = ''INSERT'' THEN
+		IF NEW."CartridgePCL" ISNULL THEN
+			IF TG_RELNAME = ''DRIVE'' THEN
+				RETURN NEW;
+			END IF;
+			RAISE EXCEPTION ''"CartridgePCL" is NULL'';
+		END IF;
+		SELECT INTO pcl "CartridgePCL" FROM "CARTRIDGE"
+		WHERE "CartridgePCL" = NEW."CartridgePCL";
+		IF NOT FOUND THEN
+			RAISE EXCEPTION ''"CartridgePCL"
+			does not exist in "CARTRIDGE" for insert'';
+		END IF;
+		RETURN NEW;
+	ELSIF TG_OP = ''UPDATE'' THEN
+	    IF NEW."CartridgePCL" NOTNULL THEN
+		SELECT INTO pcl "CartridgePCL" FROM "CARTRIDGE"
+		WHERE "CartridgePCL" = NEW."CartridgePCL";
+		IF NOT FOUND THEN
+			IF TG_RELNAME = ''DRIVE'' THEN
+				IF NEW."CartridgePCL" = ''non-MMS'' THEN
+					RETURN NEW;
+				END IF;
+			END IF;
+			RAISE EXCEPTION ''"CartridgePCL"
+			does not exist in "CARTRIDGE" for update'';
+		END IF;
+	    END IF;
+	    RETURN NEW;
+	END IF;
+	END;
+	' LANGUAGE 'plpgsql';
+
+1u CREATE TRIGGER mm_trig_drive_pcl BEFORE
+	INSERT OR UPDATE ON "DRIVE"
+	FOR ROW EXECUTE PROCEDURE mm_func_pcl();
+
+1u CREATE TRIGGER mm_trig_slot_pcl BEFORE
+	INSERT OR UPDATE ON "SLOT"
+	FOR ROW EXECUTE PROCEDURE mm_func_pcl();
+
+1u CREATE TRIGGER mm_trig_mountphysical_pcl BEFORE
+	INSERT OR UPDATE ON "MOUNTPHYSICAL"
+	FOR ROW EXECUTE PROCEDURE mm_func_pcl();
+
+# Verify drive bayname reference
+1u CREATE FUNCTION mm_func_drive_bayname() RETURNS TRIGGER AS '
+	DECLARE
+	bayname TEXT;
+	BEGIN
+	IF TG_OP = ''INSERT'' OR TG_OP = ''UPDATE'' THEN
+	    IF NEW."BayName" NOTNULL THEN
+		SELECT INTO bayname "BayName"
+			FROM "BAY"
+			WHERE NEW."BayName" = "BayName"
+			AND NEW."LibraryName" = "LibraryName";
+		IF NOT FOUND THEN
+			RAISE EXCEPTION ''"DRIVE"."BayName"
+			does not exist in "BAY" for insert/update'';
+		END IF;
+	    END IF;
+	    RETURN NEW;
+	END IF;
+	END;
+	' LANGUAGE 'plpgsql';
+
+1u CREATE TRIGGER mm_trig_drive_bayname BEFORE
+	INSERT OR UPDATE ON "DRIVE"
+	FOR ROW EXECUTE PROCEDURE mm_func_drive_bayname();
+
+# LMP full config mountphysical slotname reference to slot
+1u CREATE FUNCTION mm_func_mountphysical() RETURNS TRIGGER AS '
+	DECLARE
+	slotname TEXT;
+	sessionid TEXT;
+	BEGIN
+	IF TG_OP = ''INSERT'' OR TG_OP = ''UPDATE'' THEN
+	    IF NEW."SessionID" NOTNULL THEN
+		SELECT INTO sessionid "SessionID"
+			FROM "SESSION"
+			WHERE NEW."SessionID" = "SessionID";
+		IF NOT FOUND THEN
+			RAISE EXCEPTION ''"MOUNTPHYSICAL"."SessionID"
+			does not exist in "SESSION" for insert/update'';
+		END IF;
+	    END IF;
+	    RETURN NEW;
+	    IF NEW."SlotName" NOTNULL THEN
+		SELECT INTO slotname "SlotName"
+			FROM "SLOT"
+			WHERE NEW."SlotName" = "SlotName"
+			AND NEW."LibraryName" = "LibraryName";
+		IF NOT FOUND THEN
+			RAISE EXCEPTION ''"MOUNTPHYSICAL"."SlotName"
+			does not exist in "SLOT" for insert/update'';
+		END IF;
+	    END IF;
+	    RETURN NEW;
+	END IF;
+	END;
+	' LANGUAGE 'plpgsql';
+
+1u CREATE TRIGGER mm_trig_mountphysical BEFORE
+	INSERT OR UPDATE ON "MOUNTPHYSICAL"
+	FOR ROW EXECUTE PROCEDURE mm_func_mountphysical();
+
+# Request data validation.
+1u CREATE FUNCTION mm_func_request() RETURNS TRIGGER AS '
+	DECLARE
+	task TEXT;
+	session TEXT;
+	BEGIN
+	IF TG_OP = ''INSERT'' THEN
+		-- allow mm, dm, or lm request without task.taskid
+		IF NEW."RequestingTaskID" ISNULL THEN
+			RETURN NEW;
+		END IF;
+		-- validate request task.taskid before insert
+		SELECT INTO task "TaskID"
+			FROM "TASK" WHERE
+			NEW."RequestingTaskID" = "TaskID";
+		IF NOT FOUND THEN
+			RAISE EXCEPTION ''"REQUEST".
+			"RequestingTaskID" is not a
+			"TASK"."TaskID"'';
+		END IF;
+		RETURN NEW;
+	ELSIF TG_OP = ''UPDATE'' THEN
+		-- validate accepting session is connected
+		IF NEW."AcceptingSessionID" NOTNULL THEN
+			SELECT INTO session "SessionID"
+				FROM "SESSION" WHERE
+				NEW."AcceptingSessionID" =
+				"SessionID";
+			IF NOT FOUND THEN
+				RAISE EXCEPTION ''"REQUEST".
+				"AcceptingSessionID" is not a
+				"SESSION"."SessionID"'';
+			END IF;
+		END IF;
+		RETURN NEW;
+	END IF;
+	END;
+	' LANGUAGE 'plpgsql';
+
+1u CREATE TRIGGER mm_trig_request BEFORE
+	INSERT OR UPDATE ON "REQUEST"
+	FOR ROW EXECUTE PROCEDURE mm_func_request();
+
+1u CREATE FUNCTION mm_func_volume() RETURNS TRIGGER AS '
+	DECLARE
+	ainame TEXT;
+	BEGIN
+	IF TG_OP = ''INSERT'' OR TG_OP = ''UPDATE'' THEN
+	    IF NEW."AIName" NOTNULL THEN
+		SELECT INTO ainame "AIName" FROM "AI"
+		    WHERE "AI"."ApplicationName" =
+		    NEW."ApplicationName" AND
+		    "AI"."AIName" = NEW."AIName";
+	    IF NOT FOUND THEN
+		IF NEW."AIName" = ''any'' THEN
+		    RETURN NEW;
+		END IF;
+		RAISE EXCEPTION ''"AIName"
+		does not exist in "AI" for update'';
+	    END IF;
+	END IF;
+	END IF;
+	RETURN NEW;
+	END;
+	' LANGUAGE 'plpgsql';
+
+1u CREATE TRIGGER mm_trig_volume BEFORE
+	INSERT OR UPDATE ON "VOLUME"
+	FOR ROW EXECUTE PROCEDURE mm_func_volume();
+
+1u CREATE FUNCTION mm_func_dup_pcls() RETURNS TRIGGER AS '
+	DECLARE
+	pcl TEXT;
+	BEGIN
+	IF TG_OP = ''INSERT'' THEN
+	    IF NEW."CartridgePCL" NOTNULL AND
+		    NEW."LibraryName" NOTNULL THEN
+		SELECT INTO pcl "CartridgePCL" FROM "CARTRIDGE"
+		    WHERE "CARTRIDGE"."CartridgePCL" =
+		    NEW."CartridgePCL" AND
+		    "CARTRIDGE"."LibraryName" = NEW."LibraryName";
+		IF FOUND THEN
+		    RAISE EXCEPTION ''"CartridgePCL" already exists
+		    in library'';
+		END IF;
+	    END IF;
+	ELSIF TG_OP = ''UPDATE'' THEN
+	    IF NEW."CartridgePCL" NOTNULL AND
+		    NEW."LibraryName" NOTNULL THEN
+		SELECT INTO pcl "CartridgePCL" FROM "CARTRIDGE"
+		    WHERE "CARTRIDGE"."CartridgePCL" =
+		    NEW."CartridgePCL" AND
+		    "CARTRIDGE"."LibraryName" = NEW."LibraryName"
+		    AND OLD."CartridgePCL" != NEW."CartridgePCL";
+		IF FOUND THEN
+		    RAISE EXCEPTION ''"CartridgePCL" already exists
+		    in library'';
+		END IF;
+	    END IF;
+	END IF;
+	RETURN NEW;
+	END;
+	' LANGUAGE 'plpgsql';
+
+1u CREATE TRIGGER mm_trig_dup_pcls BEFORE
+	INSERT OR UPDATE ON "CARTRIDGE"
+	FOR ROW EXECUTE PROCEDURE mm_func_dup_pcls();
+
+
+# Triggers and Functions for Status Event table
+1u CREATE function mm_func_insert_event() returns trigger as '
+	begin
+	if TG_OP = ''UPDATE'' then
+		if TG_RELNAME = ''DRIVE'' then
+			insert into "EVENT" ("ObjectName",
+			"Info1") values(''DRIVE'',
+			NEW."DriveName");
+		end if;
+		if TG_RELNAME = ''DM'' then
+			insert into "EVENT" ("ObjectName",
+			"Info1") values(''DM'',
+			NEW."DMName");
+		end if;
+		if TG_RELNAME = ''LIBRARY'' then
+			insert into "EVENT" ("ObjectName",
+			"Info1") values(''LIBRARY'',
+			NEW."LibraryName");
+		end if;
+		if TG_RELNAME = ''LM'' then
+			insert into "EVENT" ("ObjectName",
+			"Info1") values(''LM'',
+			NEW."LMName");
+		end if;
+	end if;
+	if TG_RELNAME = ''REQUEST'' then
+		if TG_OP = ''DELETE'' then
+			insert into "EVENT" ("ObjectName",
+			"Info1","Info2","Info3") values(''REQUEST'',
+			OLD."RequestID",
+			OLD."RequestingClientType",
+			OLD."RequestingInstance");
+			return OLD;
+		else
+			insert into "EVENT" ("ObjectName",
+			"Info1","Info2","Info3") values(''REQUEST'',
+			NEW."RequestID",
+			NEW."RequestingClientType",
+			NEW."RequestingInstance");
+	    	end if;
+	end if;
+	if TG_RELNAME = ''MESSAGE'' then
+		insert into "EVENT" ("ObjectName",
+		"Info1","Info2","Info3") values(''MESSAGE'',
+		NEW."MessageID",
+		NEW."MessageSenderType",
+		NEW."MessageSenderInstance");
+	end if;
+	if TG_RELNAME = ''CARTRIDGE'' then
+		if TG_OP = ''DELETE'' then
+			insert into "EVENT" ("ObjectName",
+			"Info1","Info2") values(''CARTRIDGE'',
+			OLD."CartridgeID",
+			''delete'');
+			return OLD;
+		elsif TG_OP = ''UPDATE'' then
+			if OLD."CartridgeID" != NEW."CartridgeID" then
+				insert into "EVENT" ("ObjectName",
+				"Info1","Info2") values(''CARTRIDGE'',
+				OLD."CartridgeID",
+				''delete'');
+				insert into "EVENT" ("ObjectName",
+				"Info1","Info2") values(''CARTRIDGE'',
+				NEW."CartridgeID",
+				''new'');
+			else
+				insert into "EVENT" ("ObjectName",
+				"Info1","Info2") values(''CARTRIDGE'',
+				NEW."CartridgeID",
+				''change'');
+			end if;
+		elsif TG_OP = ''INSERT'' then
+			insert into "EVENT" ("ObjectName",
+			"Info1","Info2") values(''CARTRIDGE'',
+			NEW."CartridgeID",
+			''new'');
+	    	end if;
+	end if;
+	if TG_RELNAME = ''VOLUME'' then
+		if TG_OP = ''DELETE'' then
+			insert into "EVENT" ("ObjectName",
+			"Info1","Info2","Info3") values(''VOLUME'',
+			OLD."VolumeName",
+			OLD."ApplicationName",
+			''delete'');
+			return OLD;
+		elsif TG_OP = ''UPDATE'' then
+			if OLD."VolumeName" != NEW."VolumeName" AND
+			    OLD."ApplicationName" != NEW."ApplicationName"
+			then
+				insert into "EVENT" ("ObjectName",
+				"Info1","Info2","Info3")
+				values(''VOLUME'',
+				OLD."VolumeName",
+				OLD."ApplicationName",
+				''delete'');
+				insert into "EVENT" ("ObjectName",
+				"Info1","Info2","Info3")
+				values(''VOLUME'',
+				OLD."VolumeName",
+				OLD."ApplicationName",
+				''new'');
+			else
+				insert into "EVENT" ("ObjectName",
+				"Info1","Info2","Info3")
+				values(''VOLUME'',
+				NEW."VolumeName",
+				NEW."ApplicationName",
+				''change'');
+			end if;
+		elsif TG_OP = ''INSERT'' then
+			insert into "EVENT" ("ObjectName",
+			"Info1","Info2","Info3") values(''VOLUME'',
+			NEW."VolumeName",
+			NEW."ApplicationName",
+			''new'');
+	    	end if;
+	end if;
+	return NEW;
+	end;
+	' LANGUAGE 'plpgsql';
+
+1u CREATE trigger mm_trig_insert_dm_event
+	before insert or update on "DM"
+	for row execute procedure mm_func_insert_event();
+
+1u CREATE trigger mm_trig_insert_lm_event
+	before insert or update on "LM"
+	for row execute procedure mm_func_insert_event();
+
+1u CREATE trigger mm_trig_insert_drive_event
+	before insert or update on "DRIVE"
+	for row execute procedure mm_func_insert_event();
+
+1u CREATE trigger mm_trig_insert_library_event
+	before insert or update on "LIBRARY"
+	for row execute procedure mm_func_insert_event();
+
+1u CREATE trigger mm_trig_insert_request_event
+	before insert or update or delete on "REQUEST"
+	for row execute procedure mm_func_insert_event();
+
+1u CREATE trigger mm_trig_insert_message_event
+	before insert or update on "MESSAGE"
+	for row execute procedure mm_func_insert_event();
+
+1u CREATE trigger mm_trig_cartridge_event
+	before insert or update or delete on "CARTRIDGE"
+	for row execute procedure mm_func_insert_event();
+
+1u CREATE trigger mm_trig_volume_event
+	before insert or update or delete on "VOLUME"
+	for row execute procedure mm_func_insert_event();
+
+# Initialize Database
+1u INSERT INTO "APPLICATION" ("ApplicationName") VALUES ('MMS');
+
+1u INSERT INTO "AI" ("AIName", "ApplicationName", "PrivilegeChangeable",
+	"DefaultPriority", "SessionsAllowed")
+	VALUES ('admin', 'MMS', 'true', '0', 'multiple');
+
+1u INSERT INTO "AI" ("AIName", "ApplicationName", "PrivilegeChangeable",
+	"DefaultPriority", "SessionsAllowed")
+	VALUES ('oper', 'MMS', 'true', '0', 'multiple');
+
+1u INSERT INTO "AI" ("AIName", "ApplicationName", "PrivilegeChangeable",
+	"DefaultPriority", "SessionsAllowed")
+	VALUES('watcher', 'MMS', 'true', '0', 'multiple');
+
+1u INSERT INTO "SYSTEM" ("Administrator") VALUES ('admin');
+
+1u CREATE FUNCTION mm_system_defined_init() RETURNS boolean AS '
+        DECLARE
+		-- MMS objects with user or system defined attributes
+                table text[] = ''{ "APPLICATION", "AI", "SESSION", "LIBRARY",
+			"LM", "SLOTTYPE", "CARTRIDGEGROUP", "CARTRIDGETYPE",
+			"CARTRIDGE", "SIDE", "PARTITION", "VOLUME",
+			"DRIVEGROUP", "DRIVE", "DM", "DMCAPABILITY",
+			"DRIVECARTRIDGEACCESS", "SYSTEM", NULL }'';
+		i integer = 1;
+        BEGIN
+                -- Save MMS system defined object attributes
+		WHILE table[i] IS NOT NULL LOOP
+	                INSERT INTO "SYSTEM_DEFINED" (objname,attribute)
+				SELECT table[i],attname FROM pg_attribute
+				WHERE (attrelid = (select oid
+				FROM pg_class WHERE
+                        	relname = table[i])) AND attname ~ ''^[A-Z]'';
+			i := i + 1;
+		END LOOP;
+                RETURN true;
+        END;
+        ' LANGUAGE 'plpgsql';
+
+1u SELECT mm_system_defined_init();
+
+1u DROP FUNCTION mm_system_defined_init();
+
+1u INSERT INTO "MM" ("DBInitialized", "DBVersion") VALUES ('true', '1');
+
+# Add or delete system table columns.
+1u CREATE FUNCTION mm_system_defined_add(text,text) RETURNS boolean AS '
+	BEGIN
+		INSERT INTO "SYSTEM_DEFINED" (objname, attribute)
+			VALUES ($1, $2);
+		RETURN true;
+	END
+	' LANGUAGE 'plpgsql';
+
+1u CREATE FUNCTION mm_system_defined_del(text,text) RETURNS boolean AS '
+	BEGIN
+		DELETE FROM "SYSTEM_DEFINED" WHERE objname = $1 AND
+			attribute = $2;
+		RETURN true;
+	END
+	' LANGUAGE 'plpgsql';
+
+
+
+
+###############################################################################
+# To create a new version 1 database, move all version upgrades  
+# greater than 1 into the version above, delete the downgrades, and
+# increment the DBDevelopmentVersion below.
+#
+# It is ok to continue to do version upgrades and downgrades without
+# data loss. The developer who wants a new version 1 is responsible
+# for consolidating all upgrades into version 1 above.
+#
+# This version 1 change feature is for development only and will be removed
+# before MMS is released.
+###############################################################################
+1u UPDATE "MM" SET "DBDevelopmentVersion" = '3';
+
+2u ALTER TABLE "SYSTEM" ADD "SystemDiskMountTimeout" int default 5;
+2u SELECT mm_system_defined_add('SYSTEM','SystemDiskMountTimeout');
+ 
+2d ALTER TABLE "SYSTEM" DROP "SystemDiskMountTimeout";
+2d SELECT mm_system_defined_del('SYSTEM','SystemDiskMountTimeout');
+
+2u ALTER TABLE "CARTRIDGE" ADD "CartridgeMountPoint" text default '*none';
+2u SELECT mm_system_defined_add('CARTRIDGE','CartridgeMountPoint');
+ 
+2d ALTER TABLE "CARTRIDGE" DROP "CartridgeMountPoint";
+2d SELECT mm_system_defined_del('CARTRIDGE','CartridgeMountPoint');
+
+2u ALTER TABLE "CARTRIDGE" ADD "CartridgePath" text default '*none';
+2u SELECT mm_system_defined_add('CARTRIDGE','CartridgePath');
+ 
+2d ALTER TABLE "CARTRIDGE" DROP "CartridgePath";
+2d SELECT mm_system_defined_del('CARTRIDGE','CartridgePath');
+
+3u ALTER TABLE "LIBRARY" ALTER "LibraryConnection" DROP DEFAULT;
+3d ALTER TABLE "LIBRARY" ALTER "LibraryConnection" SET DEFAULT 'network';
+
+4u ALTER TABLE "EVENTRULES" ADD "Data1" text;
+4u ALTER TABLE "EVENTRULES" ADD "Data2" text;
+4u ALTER TABLE "EVENTRULES" ADD "Data3" text;
+4u ALTER TABLE "EVENTRULES" ADD "Data4" text;
+4u ALTER TABLE "EVENTRULES" ADD "Data5" text; 
+
+4d ALTER TABLE "EVENTRULES" DROP "Data1";
+4d ALTER TABLE "EVENTRULES" DROP "Data2";
+4d ALTER TABLE "EVENTRULES" DROP "Data3";
+4d ALTER TABLE "EVENTRULES" DROP "Data4";
+4d ALTER TABLE "EVENTRULES" DROP "Data5";
+
+5u CREATE table "DMMOUNTPOINT"(
+	"DMName" text
+		CONSTRAINT "DMName_CC"
+		REFERENCES "DM" ON DELETE CASCADE,
+	"DMMountPoint" text
+);
+
+5d DROP table "DMMOUNTPOINT";
+
+# Current version of Postgres (8.0.3) does not support bool to text
+# so use this function to cast
+6u create or replace function bool_to_text (boolean)
+    returns char
+    strict
+    language sql as '
+    select case
+        when $1 then \'t\'
+        else \'f\'
+        end;
+    ';
+6u create cast (boolean as char(1))
+    with function bool_to_text(boolean)
+    as implicit;
+
+#Create LIBRARY/DRIVE/CARTRIDGE LISTS
+
+7u CREATE table "LIBRARYLIST"(
+	"LibraryString" text NOT NULL,
+	CONSTRAINT "LIBRARYLIST_PK" PRIMARY KEY("LibraryString")
+);
+7u CREATE table "DRIVELIST"(
+	"DriveString" text NOT NULL,
+	CONSTRAINT "DRIVELIST_PK" PRIMARY KEY("DriveString")
+);
+7u CREATE table "CARTRIDGELIST"(
+	"CartridgeString" text NOT NULL,
+	CONSTRAINT "CARTRIDGELIST_PK" PRIMARY KEY("CartridgeString")
+);
+
+7d DROP table "LIBRARYLIST";
+7d DROP table "DRIVELIST";
+7d DROP table "CARTRIDGELIST";
+
+10u ALTER TABLE "DRIVE" ADD "DriveVendorID" text;
+10u ALTER TABLE "DRIVE" ADD "DriveProductID" text;
+10u ALTER TABLE "DRIVE" ADD "DriveTypeName" text;
+
+10d ALTER TABLE "DRIVE" DROP "DriveVendorID";
+10d ALTER TABLE "DRIVE" DROP "DriveProductID";
+10d ALTER TABLE "DRIVE" DROP "DriveTypeName";
+
+# Watcher LM and DM restart limits
+12u ALTER TABLE "SYSTEM" ADD "WatcherStartsLimit" integer
+	CONSTRAINT "WatcherStartsLimit_CC"
+	CHECK("WatcherStartsLimit" >= 3 OR
+	"WatcherStartsLimit" = -1)
+	default 3;
+12u ALTER TABLE "SYSTEM" ADD "WatcherTimeLimit" integer
+	CONSTRAINT "WatcherTimeLimit_CC"
+	CHECK("WatcherTimeLimit" >= 60)
+	default 60;
+12u SELECT mm_system_defined_add('SYSTEM','WatcherStartsLimit');
+12u SELECT mm_system_defined_add('SYSTEM','WatcherTimeLimit');
+
+12d ALTER TABLE "SYSTEM" DROP "WatcherStartsLimit";
+12d ALTER TABLE "SYSTEM" DROP "WatcherTimeLimit";
+12d SELECT mm_system_defined_del('SYSTEM','WatcherStartsLimit');
+12d SELECT mm_system_defined_del('SYSTEM','WatcherTimeLimit');
+
+# Solaris 11 position from ST
+13u ALTER TABLE "PARTITION" DROP "PartitionEOFPosType";
+13u SELECT mm_system_defined_del('PARTITION','PartitionEOFPosType');
+13u ALTER TABLE "PARTITION" DROP "PartitionEOFPos";
+13u ALTER TABLE "PARTITION" ADD "PartitionEOFPos" text;
+
+13d ALTER TABLE "PARTITION" ADD "PartitionEOFPosType" smallint
+	default 0;
+13d SELECT mm_system_defined_add('PARTITION','PartitionEOFPosType');
+13d ALTER TABLE "PARTITION" DROP "PartitionEOFPos";
+13d ALTER TABLE "PARTITION" ADD "PartitionEOFPos" bigint;
+
+14u ALTER TABLE "SYSTEM" ADD "DriveRecordRetention" integer
+	CONSTRAINT "DriveRecordRetention_CC"
+	CHECK("DriveRecordRetention" >= 1)
+	default 30;
+14u ALTER TABLE "DRIVECARTRIDGEACCESS" DROP "DriveCartridgeAccessTimeUnmm_mount";
+14u ALTER TABLE "DRIVECARTRIDGEACCESS"
+	ADD "DriveCartridgeAccessTimeUnmount" timestamp (3)
+	default '-infinity' NOT NULL;
+
+14d ALTER TABLE "SYSTEM" DROP "DriveRecordRetention";
+14d ALTER TABLE "DRIVECARTRIDGEACCESS" DROP "DriveCartridgeAccessTimeUnmount";
+14d ALTER TABLE "DRIVECARTRIDGEACCESS"
+	ADD "DriveCartridgeAccessTimeUnmm_mount" timestamp (3)
+	default '-infinity' NOT NULL;
+
+# Add attributes to DRIVECARTRIDGEACCESS
+14u ALTER TABLE "DRIVECARTRIDGEACCESS" ADD
+	"DriveCartridgeAccessMediumByteReadCount" bigint
+	CONSTRAINT "DriveCartridgeAccessMediumByteReadCount_CC"
+	CHECK("DriveCartridgeAccessMediumByteReadCount" >= 0)
+	default 0;
+
+14u ALTER TABLE "DRIVECARTRIDGEACCESS" ADD
+	"DriveCartridgeAccessMediumByteWriteCount" bigint
+	CONSTRAINT "DriveCartridgeAccessMediumByteWriteCount_CC"
+	CHECK("DriveCartridgeAccessMediumByteWriteCount" >= 0)
+	default 0;
+
+14u ALTER TABLE "DRIVECARTRIDGEACCESS" ADD "CartridgePCL" text;
+14u ALTER TABLE "DRIVECARTRIDGEACCESS" ADD "DriveSerialNum" text;
+14u ALTER TABLE "DRIVECARTRIDGEACCESS" ADD "CartridgeShapeName" text;
+14u ALTER TABLE "DRIVECARTRIDGEACCESS" ADD "DriveShapeName" text;
+
+14u ALTER TABLE "DRIVECARTRIDGEACCESS" DROP
+        "DriveCartridgeAccessByteReadCount";
+14u ALTER TABLE "DRIVECARTRIDGEACCESS" ADD
+        "DriveCartridgeAccessByteReadCount" bigint
+        CONSTRAINT "DriveCartridgeAccessByteReadCount_CC"
+        CHECK("DriveCartridgeAccessByteReadCount" >= -1)
+        default -1;
+14u ALTER TABLE "DRIVECARTRIDGEACCESS" DROP
+        "DriveCartridgeAccessByteWriteCount";
+14u ALTER TABLE "DRIVECARTRIDGEACCESS" ADD
+        "DriveCartridgeAccessByteWriteCount" bigint
+        CONSTRAINT "DriveCartridgeAccessByteWriteCount_CC"
+        CHECK("DriveCartridgeAccessByteWriteCount" >= -1)
+        default -1;
+
+14d ALTER TABLE "DRIVECARTRIDGEACCESS" DROP
+	"DriveCartridgeAccessMediumByteReadCount";
+14d ALTER TABLE "DRIVECARTRIDGEACCESS" DROP
+	"DriveCartridgeAccessMediumByteWriteCount";
+14d ALTER TABLE "DRIVECARTRIDGEACCESS" DROP "CartridgePCL";
+14d ALTER TABLE "DRIVECARTRIDGEACCESS" DROP "DriveSerialNum";
+14d ALTER TABLE "DRIVECARTRIDGEACCESS" DROP "CartridgeShapeName";
+14d ALTER TABLE "DRIVECARTRIDGEACCESS" DROP "DriveShapeName";
+14d ALTER TABLE "DRIVECARTRIDGEACCESS" DROP
+        "DriveCartridgeAccessByteReadCount";
+14d ALTER TABLE "DRIVECARTRIDGEACCESS" ADD
+        "DriveCartridgeAccessByteReadCount" int
+        CONSTRAINT "DriveCartridgeAccessByteReadCount_CC"
+        CHECK("DriveCartridgeAccessByteReadCount" >= -1)
+        default -1;
+14d ALTER TABLE "DRIVECARTRIDGEACCESS" DROP
+        "DriveCartridgeAccessByteWriteCount";
+14d ALTER TABLE "DRIVECARTRIDGEACCESS" ADD
+        "DriveCartridgeAccessByteWriteCount" int
+        CONSTRAINT "DriveCartridgeAccessByteWriteCount_CC"
+        CHECK("DriveCartridgeAccessByteWriteCount" >= -1)
+        default -1;
+
+# Add DRIVECARTRIDGEERROR
+15u CREATE table "DRIVECARTRIDGEERROR" (
+	"DriveName" text,
+	"DMName" text,
+	"CartridgeID" text,
+	"SideName" text NOT NULL,
+	"PartitionName" text NOT NULL,
+	"ApplicationName" text,
+	"CartridgePCL" text,
+	"DriveSerialNum" text,
+	"CartridgeShapeName" text,
+	"DriveShapeName" text,
+	"CDB" text,
+	"SCSICommand" text,
+	"IOStatus" text,
+	"SenseKey" text,
+	"AdditionalSenseCode" text,
+	"AdditionalSenseCodeQualifier" text,
+	"SenseBytes" text,
+	"ErrorText" text,
+	"TimeStamp" timestamp (3)
+		default current_timestamp NOT NULL
+);
+
+15u ALTER TABLE "DRIVECARTRIDGEACCESS"
+	DROP CONSTRAINT "DriveName_CC";
+15u ALTER TABLE "DRIVECARTRIDGEACCESS"
+	DROP CONSTRAINT "DMName_CC";
+15u ALTER TABLE "DRIVECARTRIDGEACCESS"
+	DROP CONSTRAINT "CartridgeID_CC";
+15u ALTER TABLE "DRIVECARTRIDGEACCESS"
+	DROP CONSTRAINT "ApplicationName_CC"; 
+15u ALTER TABLE "DRIVECARTRIDGEACCESS"
+	DROP CONSTRAINT "DRIVECARTRIDGEACCESS_FK";
+
+15d DROP TABLE "DRIVECARTRIDGEERROR";
+15d ALTER TABLE "DRIVECARTRIDGEACCESS"
+	ADD CONSTRAINT "DriveName_CC"
+	FOREIGN KEY ("DriveName")
+	REFERENCES "DRIVE";
+15d ALTER TABLE "DRIVECARTRIDGEACCESS"
+	ADD CONSTRAINT "DMName_CC"
+	FOREIGN KEY ("DMName")
+	REFERENCES "DM";
+15d ALTER TABLE "DRIVECARTRIDGEACCESS"
+	ADD CONSTRAINT "CartridgeID_CC"
+	FOREIGN KEY ("CartridgeID")
+	REFERENCES "CARTRIDGE";
+15d ALTER TABLE "DRIVECARTRIDGEACCESS"
+	ADD CONSTRAINT "ApplicationName_CC"
+	FOREIGN KEY ("ApplicationName")
+	REFERENCES "APPLICATION"; 
+15d ALTER TABLE "DRIVECARTRIDGEACCESS"
+	ADD CONSTRAINT "DRIVECARTRIDGEACCESS_FK"
+	FOREIGN KEY ("CartridgeID", "SideName", "PartitionName")
+	REFERENCES "PARTITION";
+
+16u TRUNCATE "DRIVECARTRIDGEERROR";
+16u TRUNCATE "DRIVECARTRIDGEACCESS";
+
+16u ALTER TABLE "DRIVECARTRIDGEERROR"
+	ADD CONSTRAINT "DRIVECARTRIDGEERROR_PK"
+	PRIMARY KEY("DriveName","CartridgeID","TimeStamp");
+16u ALTER TABLE "DRIVECARTRIDGEACCESS"
+	ADD CONSTRAINT "DRIVECARTRIDGEACCESS_PK"
+	PRIMARY KEY("CartridgeID", "DriveName",
+	"DriveCartridgeAccessTimeUnmount");
+
+16d ALTER TABLE "DRIVECARTRIDGEERROR"
+	DROP CONSTRAINT "DRIVECARTRIDGEERROR_PK";
+16d ALTER TABLE "DRIVECARTRIDGEACCESS"
+	DROP CONSTRAINT "DRIVECARTRIDGEACCESS_PK";
+
+
+17u ALTER TABLE "APPLICATION" DROP "Password";
+17u ALTER TABLE "DM" DROP "DMPassword";
+17u ALTER TABLE "LM" DROP "LMPassword";
+
+17u SELECT mm_system_defined_del('APPLICATION','Password');
+17u SELECT mm_system_defined_del('DM','DMPassword');
+17u SELECT mm_system_defined_del('LM','LMPassword');
+
+17u CREATE TABLE "MMPASSWORD" (
+	"ApplicationName" text,
+	"Password" text default 'changeme',
+	CONSTRAINT "MMPASSWORD_PK" PRIMARY KEY("ApplicationName")
+);
+
+17u CREATE FUNCTION mm_func_getpassword(text) RETURNS text AS '
+	DECLARE
+	newpass TEXT;
+	BEGIN
+		SELECT INTO newpass (select md5($1));
+		RETURN newpass;
+	END;
+	' LANGUAGE 'plpgsql';
+
+17u CREATE FUNCTION mm_func_setpassword() RETURNS TRIGGER AS '
+	DECLARE
+	newpass TEXT;
+	BEGIN
+	IF TG_OP = ''INSERT'' OR TG_OP = ''UPDATE'' THEN
+	    IF NEW."Password" NOTNULL THEN
+		IF length(NEW."Password") < 8 THEN
+			RAISE EXCEPTION
+			''"Password" length is less than 8 characters.'';
+		END IF;
+		SELECT INTO newpass
+			(select mm_func_getpassword(NEW."Password"));
+		-- let user reuse the same password 
+		-- IF TG_OP = ''UPDATE'' THEN
+		    -- internal mms app can reuse the same password 
+		    -- IF OLD."ApplicationName" NOTNULL AND
+			-- OLD."ApplicationName" != ''MMS'' AND
+			-- newpass = OLD."Password" THEN
+			-- RAISE EXCEPTION
+			-- ''"Password" not changed, new and old passwords are the same.'';
+		    -- END IF;
+		-- END IF;
+		SELECT INTO NEW."Password" newpass;
+	    END IF;
+	END IF;
+	RETURN NEW;
+	END;
+	' LANGUAGE 'plpgsql';
+
+17u CREATE TRIGGER mm_trig_setpassword BEFORE
+	INSERT OR UPDATE ON "MMPASSWORD"
+	FOR ROW EXECUTE PROCEDURE mm_func_setpassword();
+
+17u CREATE FUNCTION mm_func_defpassword() RETURNS TRIGGER AS '
+	BEGIN
+	IF TG_OP = ''INSERT'' THEN
+	    INSERT INTO "MMPASSWORD" ("ApplicationName","Password")
+		VALUES (NEW."ApplicationName",default);
+	ELSIF TG_OP = ''UPDATE'' THEN
+	    IF NEW."ApplicationName" != OLD."ApplicationName" THEN
+		UPDATE "MMPASSWORD" SET 
+		    "ApplicationName" = NEW."ApplicationName" WHERE
+		    "ApplicationName" = OLD."ApplicationName";
+	    END IF;
+	ELSIF TG_OP = ''DELETE'' THEN
+	    DELETE FROM "MMPASSWORD" WHERE
+		"ApplicationName" = OLD."ApplicationName";
+	    RETURN OLD;
+	END IF;
+	RETURN NEW;
+	END;
+	' LANGUAGE 'plpgsql';
+
+17u CREATE TRIGGER mm_trig_defpassword BEFORE
+	INSERT OR UPDATE OR DELETE ON "APPLICATION"
+	FOR ROW EXECUTE PROCEDURE mm_func_defpassword();
+
+17u INSERT INTO "MMPASSWORD" ("ApplicationName")
+	(select "ApplicationName" from "APPLICATION");
+
+17u UPDATE "MMPASSWORD" SET "Password" = 'summer05';
+
+
+
+
+17d DROP FUNCTION mm_func_getpassword(text) CASCADE;
+17d DROP FUNCTION mm_func_setpassword() CASCADE;
+17d DROP FUNCTION mm_func_defpassword() CASCADE;
+17d DROP TABLE "MMPASSWORD"; 
+r
+17d ALTER TABLE "APPLICATION" ADD "Password" text;
+17d ALTER TABLE "DM" ADD "DMPassword" text;
+17d ALTER TABLE "LM" ADD "LMPassword" text;
+
+17d SELECT mm_system_defined_add('APPLICATION','Password');
+17d SELECT mm_system_defined_add('DM','DMPassword');
+17d SELECT mm_system_defined_add('LM','LMPassword');
+
+18u ALTER TABLE "CARTRIDGE" ADD
+        "CartridgeSize" integer
+        CONSTRAINT "CartridgeSize_CC"
+        CHECK("CartridgeSize" >= -1)
+        default -1;
+
+18u ALTER TABLE "CARTRIDGE" ADD
+        "CartridgeAvailable" integer
+        CONSTRAINT "CartridgeAvailable_CC"
+        CHECK("CartridgeAvailable" >= -1)
+        default -1;
+
+18u ALTER TABLE "CARTRIDGE" ADD
+        "CartridgePercentAvailable" integer
+        CONSTRAINT "CartridgePercentAvailable_CC"
+        CHECK("CartridgePercentAvailable" >= -1)
+        default -1;
+
+18d ALTER TABLE "CARTRIDGE" DROP "CartridgeSize" ;
+18d ALTER TABLE "CARTRIDGE" DROP CONSTRAINT "CartridgeSize_CC";
+18d ALTER TABLE "CARTRIDGE" DROP "CartridgeAvailable" ;
+18d ALTER TABLE "CARTRIDGE" DROP CONSTRAINT "CartridgeAvailable_CC";
+18d ALTER TABLE "CARTRIDGE" DROP "CartridgePercentAvailable" ;
+18d ALTER TABLE "CARTRIDGE" DROP CONSTRAINT "CartridgePercentAvailable_CC";
+
+19u ALTER TABLE "LIBRARY" ADD "LibraryLSM" text;
+19d ALTER TABLE "LIBRARY" DROP "LibraryLSM";
+
+20u ALTER TABLE "LIBRARY" ADD "LibrarySerialNumber" text;
+20d ALTER TABLE "LIBRARY" DROP "LibrarySerialNumber";
+
+21u ALTER TABLE "CARTRIDGE" DROP "CartridgeSize" ;
+21u ALTER TABLE "CARTRIDGE" DROP "CartridgeAvailable" ;
+21u ALTER TABLE "CARTRIDGE" DROP "CartridgePercentAvailable" ;
+
+21u ALTER TABLE "CARTRIDGE" DROP "CartridgeRecovededReads";
+21u ALTER TABLE "CARTRIDGE" DROP "CartridgeRecovededWrites";
+21u ALTER TABLE "CARTRIDGE" DROP "CartridgeUnrecovededReads";
+21u ALTER TABLE "CARTRIDGE" DROP "CartridgeUnrecovededWrites";
+
+21u ALTER TABLE "CARTRIDGE" ADD
+	"CartridgeRecoveredReads" integer
+	CONSTRAINT "CartridgeRecoveredReads_CC"
+	CHECK("CartridgeRecoveredReads" >= 0)
+	default 0;
+
+21u ALTER TABLE "CARTRIDGE" ADD
+	"CartridgeRecoveredWrites" integer
+	CONSTRAINT "CartridgeRecoveredWrites_CC"
+	CHECK("CartridgeRecoveredWrites" >= 0)
+	default 0;
+
+21u ALTER TABLE "CARTRIDGE" ADD
+	"CartridgeUnrecoveredReads" integer
+	CONSTRAINT "CartridgeUnrecoveredReads_CC"
+	CHECK("CartridgeUnrecoveredReads" >= 0)
+	default 0;
+
+21u ALTER TABLE "CARTRIDGE" ADD
+	"CartridgeUnrecoveredWrites" integer
+	CONSTRAINT "CartridgeUnrecoveredWrites_CC"
+	CHECK("CartridgeUnrecoveredWrites" >= 0)
+	default 0;
+
+
+21d ALTER TABLE "CARTRIDGE" ADD
+        "CartridgeSize" integer
+        CONSTRAINT "CartridgeSize_CC"
+        CHECK("CartridgeSize" >= -1)
+        default -1;
+
+21d ALTER TABLE "CARTRIDGE" ADD
+        "CartridgeAvailable" integer
+        CONSTRAINT "CartridgeAvailable_CC"
+        CHECK("CartridgeAvailable" >= -1)
+        default -1;
+
+21d ALTER TABLE "CARTRIDGE" ADD
+        "CartridgePercentAvailable" integer
+        CONSTRAINT "CartridgePercentAvailable_CC"
+        CHECK("CartridgePercentAvailable" >= -1)
+        default -1;
+
+21d ALTER TABLE "CARTRIDGE" DROP "CartridgeRecoveredReads";
+21d ALTER TABLE "CARTRIDGE" DROP "CartridgeRecoveredWrites";
+21d ALTER TABLE "CARTRIDGE" DROP "CartridgeUnrecoveredReads";
+21d ALTER TABLE "CARTRIDGE" DROP "CartridgeUnrecoveredWrites";
+21d ALTER TABLE "CARTRIDGE" ADD
+	"CartridgeRecovededReads" text
+		default '0';
+21d ALTER TABLE "CARTRIDGE" ADD
+	"CartridgeRecovededWrites" text
+		default '0';
+21d ALTER TABLE "CARTRIDGE" ADD
+	"CartridgeUnrecovededReads" text
+		default '0';
+21d ALTER TABLE "CARTRIDGE" ADD
+	"CartridgeUnrecovededWrites" text
+		default '0';
+
+22u ALTER TABLE "LM" ADD
+        "LMSSIPort" int
+        CONSTRAINT "LMSSIPort_CC"
+        CHECK("LMSSIPort" > 0)
+        default 50004;
+22u ALTER TABLE "LIBRARY" ADD
+        "LibraryACSLSPort" int;
+
+22d ALTER TABLE "LM" DROP "LMSSIPort";
+22d ALTER TABLE "LIBRARY" DROP "LibraryACSLSPort";
+
+23u UPDATE "LM" SET "LMTargetHost" = NULL WHERE
+	"LMTargetHost" = 'localhost' OR
+	"LMTargetHost" = '127.0.0.1' OR
+	"LMTargetHost" = '::1'; 
+23u ALTER TABLE "LM" 
+	ADD CONSTRAINT "LMTargetHost_CC"
+	CHECK("LMTargetHost" != 'localhost' AND
+	"LMTargetHost" != '127.0.0.1' AND
+	"LMTargetHost" != '::1');
+23u UPDATE "DM" SET "DMTargetHost" = NULL WHERE
+	"DMTargetHost" = 'localhost' OR
+	"DMTargetHost" = '127.0.0.1' OR
+	"DMTargetHost" = '::1'; 
+23u ALTER TABLE "DM"
+	ADD CONSTRAINT "DMTargetHost_CC"
+	CHECK("DMTargetHost" != 'localhost' AND
+	"DMTargetHost" != '127.0.0.1' AND
+	"DMTargetHost" != '::1');
+23d ALTER TABLE "LM"
+	DROP CONSTRAINT "LMTargetHost_CC";
+23d ALTER TABLE "DM"
+	DROP CONSTRAINT "DMTargetHost_CC";
+
+24u ALTER TABLE "LM"
+	DROP "LMTargetLibrary";
+24u ALTER TABLE "DM"
+	DROP "DMTargetLibrary";
+24d ALTER TABLE "LM" ADD
+	"LMTargetLibrary" text;
+24d ALTER TABLE "DM" ADD
+	"DMTargetLibrary" text;
+	
+
+######################################################################
+#                                                                    #
+# Add your upgrade/downgrade version immediately before this comment #
+#                                                                    #
+######################################################################

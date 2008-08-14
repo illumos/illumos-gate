@@ -1,0 +1,123 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+
+SUNW_1.1 {
+	global:
+		drv_bind_raw_dev;
+		drv_blk_limit;
+		drv_bsb;
+		drv_bsf;
+		drv_clrerr;
+		drv_density;
+		drv_dev_dir;
+		drv_disallowed;
+		drv_disallowed_cmds;
+		drv_disallowed_ioctls;
+		drv_drive_type;
+		drv_eom;
+		drv_fsb;
+		drv_fsf;
+		drv_get_avail_capacity;
+		drv_get_blksize;
+		drv_get_capacity;
+		drv_get_density;
+		drv_get_drivetype;
+		drv_get_mounted;
+		drv_get_pos;
+		drv_get_serial_num;
+		drv_get_statistics;
+		drv_get_write_protect;
+		drv_init_dev;
+		drv_inquiry;
+		drv_load;
+		drv_locate;
+		drv_log_sense;
+		drv_mk_prsv_key;
+		drv_mode_select;
+		drv_mode_sense;
+		drv_mounted;
+		drv_num_disallowed_cmds;
+		drv_num_disallowed_ioctls;
+		drv_proc_error;
+		drv_prsv_clear;
+		drv_prsv_preempt;
+		drv_prsv_read_keys;
+		drv_prsv_read_rsv;
+		drv_prsv_register;
+		drv_prsv_release;
+		drv_prsv_reserve;
+		drv_read;
+		drv_rebind_target;
+		drv_release;
+		drv_req_sense;
+		drv_reserve;
+		drv_rewind;
+		drv_seek;
+		drv_set_blksize;
+		drv_set_compression;
+		drv_set_density;
+		drv_shape;
+		drv_shape_den;
+		drv_skaa_tab;
+		drv_tell;
+		drv_timeout;
+		drv_tur;
+		drv_unload;
+		drv_write;
+		drv_wtm;
+
+		char_to_uint32 = extern;
+		char_to_uint64 = extern;
+		dca = extern;
+		dm_bind_raw_dev = extern;
+		dm_disallowed = extern;
+		dm_get_log_sense_parm = extern;
+		dm_get_mt_error = extern;
+		dm_get_mtstat = extern;
+		dm_ioctl = extern;
+		dm_mk_prsv_key = extern;
+		dm_mtiocltop = extern;
+		dm_rebind_target = extern;
+		dm_send_cartridge_media_error = extern;
+		dm_send_clean_request = extern;
+		dm_send_drive_broken = extern;
+		dm_silent = extern;
+		dm_trace = extern;
+		dm_uscsi = extern;
+		drv = extern;
+		int32_to_char = extern;
+		jtab = extern;
+		mnt = extern;
+		serr = extern;
+
+	local:
+		*;
+};
+
+
+
+

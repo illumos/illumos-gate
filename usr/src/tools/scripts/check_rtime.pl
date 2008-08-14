@@ -24,7 +24,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -194,7 +193,8 @@ $SkipUnrefObject = qr{
 	/lib.*\ of\ .*libspmocommon\.so\.1 |			# non-OSNET
 	/lib.*\ of\ .*libssl3\.so |				# non-OSNET
 	/lib.*\ of\ .*libxml2\.so\.2 |				# non-OSNET
-	/lib.*\ of\ .*libxslt\.so\.1				# non-OSNET
+	/lib.*\ of\ .*libxslt\.so\.1 |				# non-OSNET
+	/lib.*\ of\ .*libpq\.so\.4				# non-OSNET
 }x;
 
 # Define any files that should only have unused (ldd -u) processing.

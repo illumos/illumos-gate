@@ -1,0 +1,96 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+
+SUNW_1.1 {
+	global:
+		drv_add_mounted;
+		drv_bind_raw_dev;
+		drv_bld_mounted;
+		drv_blk_limit;
+		drv_clrerr;
+		drv_density;
+		drv_dev_dir;
+		drv_disallowed;
+		drv_disallowed_cmds;
+		drv_disallowed_ioctls;
+		drv_drive_type;
+		drv_force_mount;
+		drv_get_avail_capacity;
+		drv_get_capacity;
+		drv_get_density;
+		drv_get_mnttab;
+		drv_get_mount_points;
+		drv_get_mounted;
+		drv_get_pos;
+		drv_get_serial_num;
+		drv_get_statistics;
+		drv_get_write_protect;
+		drv_init_dev;
+		drv_inquiry;
+		drv_load;
+		drv_log_sense;
+		drv_mk_prsv_key;
+		drv_mode_select;
+		drv_mode_sense;
+		drv_num_disallowed_cmds;
+		drv_num_disallowed_ioctls;
+		drv_prsv_clear;
+		drv_prsv_preempt;
+		drv_prsv_read_keys;
+		drv_prsv_read_rsv;
+		drv_prsv_register;
+		drv_prsv_release;
+		drv_prsv_reserve;
+		drv_prsv_supported;
+		drv_pthread_cleanup;
+		drv_rebind_target;
+		drv_release;
+		drv_reserve;
+		drv_set_compression;
+		drv_set_density;
+		drv_shape;
+		drv_shape_den;
+		drv_stat_mount_point;
+		drv_timeout;
+		drv_tur;
+
+		dm_get_attr_value = extern;
+		dm_msg_add = extern;
+		dm_msg_destroy = extern;
+		dm_show_mount_point = extern;
+		dm_show_virt_cart_path = extern;
+		dm_silent = extern;
+		dm_trace = extern;
+		drv = extern;
+		jtab = extern;
+		mnt = extern;
+	local:
+		*;
+};
+
+
+
+

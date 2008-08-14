@@ -292,6 +292,8 @@ DRV_KMODS	+= scsi_vhci
 DRV_KMODS	+= sdcard
 DRV_KMODS	+= sdhost
 DRV_KMODS	+= wbsd
+DRV_KMODS	+= dda
+DRV_KMODS	+= dmd
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= audioens
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= audiovia823x

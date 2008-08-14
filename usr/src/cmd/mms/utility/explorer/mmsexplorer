@@ -1,0 +1,884 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+
+#
+#  mmsexplorer
+#
+#  mmsexplorer is a script that gathers information about the installed system
+#  and places it in a file for MMS customer support.
+#
+#  NOTE: this script must be run as root.
+#
+# $Revision: 1.7 $
+#
+
+# Check for root user
+user=`/bin/id | /bin/grep root | /bin/wc -l`
+if [ $user -eq 0 ]; then
+        echo "Error, you must be root to run this script."
+        exit 1
+fi
+
+#  INPUT OPTIONS
+TGZ=ON
+while  getopts u OPT; do
+	case $OPT in
+		u)  TGZ=OFF;;
+		?)  echo "Usage: $0 [-u] [report_name] [num_lines]" 1>&2; exit 1;;
+		*)  echo "Usage: $0 [-u] [report_name] [num_lines]" 1>&2; exit 1;;
+	esac
+done
+shift `expr $OPTIND - 1`
+
+#  REPORT LOCATION
+REPORT=${1:-/tmp/MMSreport.`/bin/uname -n`.`/bin/date '+%Y'``/bin/date '+%m'``/bin/date '+%d'`.`/bin/date '+%H'``/bin/date '+%M'``/bin/date '+%Z'`}
+
+#  How many lines from log files, etc., to show in the output report.
+#  Default is 1,000, but your support provider may ask you to change
+#  this to provide additional historical log messages.
+HOW_MANY_LINES=${2:-1000}
+
+#  How many lines from the media manager log file to show in the output
+#  report.  Default is 5,000.
+MM_LINES=`/bin/expr $HOW_MANY_LINES \* 5`
+[ $MM_LINES -lt 5000 ] && MM_LINES=5000
+
+#  How many lines from a SMF service log file to show in the output
+#  report.  Default is 100.
+SVCLOG_LINES=`/bin/expr $HOW_MANY_LINES / 10`
+[ $SVCLOG_LINES -lt 100 ] && SVCLOG_LINES=100
+
+###
+#  CONFIGURATION VARIABLES
+
+#  The number of lines from each mdb invocation
+MDB_LINES=100000
+
+#  Locale for messages
+LOCALE=C
+
+#  END OF CONFIGURATION VARIABLES - NO CHANGES BELOW HERE, PLEASE
+###
+ 
+#  MMSreport name
+REPORTNAME=`basename $REPORT`
+
+#  MMSreport directory
+REPORTDIR=`dirname $REPORT`
+
+#  MMS Service Configuration
+PGADMIN=`/bin/svcprop -c -p method_context/user mms:db`
+PGDATA=`/bin/svcprop -c -p postgresql/data mms:db`
+PGHOST=`/bin/svcprop -c -p db/host mms:mm`
+PGPORT=`/bin/svcprop -c -p db/port mms:mm`
+DBNAME=`/bin/svcprop -c -p db/name mms:mm`
+PGUSER=`/bin/svcprop -c -p db/user mms:mm`
+PGPASS=${PGDATA}/../.pga
+
+#  Directories that MMS uses
+TMPDIR=/tmp
+ETCDIR=/etc/mms
+VARDIR=/var/mms
+USERDIR=/opt/mms
+
+#  Output files
+OUTDATABASE=${REPORTDIR}/${REPORTNAME}.database.gz
+OUTALLTRACE=${REPORTDIR}/${REPORTNAME}.trace.tar.gz
+
+#  Temporary work files
+TMP=$TMPDIR/$$.tmp
+TMPPAT=$TMPDIR/$$.mms_patchlist
+TMPPROC=$TMPDIR/$$.mms_procs
+TMPBGDF=$TMPDIR/$$.mms_bg_df
+
+#  A tag emitted on lines indicating serious problems
+TAG=":-( "
+
+#  The prompt we fake on echoed command lines
+PROMPT="`/bin/uname -n`# "
+
+#  Function definitions
+
+#  How many "."s on the current line?  999 means "too many".
+COUNT=999
+
+#  Note:  If you find the lines of dots aren't the same length, or you
+#         get extra "."s in your output file, then check to make sure you
+#         haven't done something like "verbose ls >>$REPORT", because then
+#         twiddle's dot will go to the report file instead of the screen!
+twiddle(){
+	COUNT=`expr $COUNT + 1`
+	if [ $COUNT -ge 45 ]; then
+		COUNT=1
+		echo
+		/bin/echo Please wait.\\c
+	fi
+	/bin/echo .\\c
+}
+
+#  Execute a command, echoing it as it does so.
+verbose(){
+	twiddle
+	echo ""		>>$REPORT 2>&1
+	echo $PROMPT $*		>>$REPORT 2>&1
+	eval $*		>>$REPORT 2>&1
+	echo ""		>>$REPORT 2>&1
+}
+
+#  Indenting version of the above verbose function.
+verbosei(){
+	twiddle
+	echo ""		>>$REPORT 2>&1
+	echo "    " $PROMPT $*		>>$REPORT 2>&1
+	(eval $*		| /bin/sed -e "s/^/     /" )>>$REPORT 2>&1
+	echo ""		>>$REPORT 2>&1
+}
+
+#  Head version of the above verbose function.
+verbosehead(){
+	twiddle
+	echo ""		>>$REPORT 2>&1
+	echo $PROMPT $*		>>$REPORT 2>&1
+	eval $* 2>&1 | head -100		>>$REPORT 2>&1
+	echo ""		>>$REPORT 2>&1
+}
+
+#  Show a file, with title and verbose echoing of the cat command.
+showfiles(){
+for file in $*; do
+	echo "------------------- $file -------------------" >>$REPORT 2>&1
+	if [ -d $file -o -c $file -o -b $file -o -p $file ]; then
+		verbose /bin/ls -l $file
+		echo $TAG "$file is a directory, char special, block special or pipe.">>$REPORT 2>&1
+		echo ""		>>$REPORT 2>&1
+	elif [ -r $file ]; then
+		verbose /bin/ls -l $file
+		verbose /bin/cat $file
+	elif [ -f $file ]; then
+		verbose /bin/ls -l $file
+		echo $file is not readable >>$REPORT 2>&1
+		echo ""		>>$REPORT 2>&1
+	else
+		echo $file does not exist >>$REPORT 2>&1
+		echo ""		>>$REPORT 2>&1
+	fi
+done
+}
+
+#  Indenting version of the above showfiles function.
+showifiles(){
+for file in $*; do
+	echo "     ------------------- $file -------------------" >>$REPORT 2>&1
+	if [ -d $file -o -c $file -o -b $file -o -p $file ]; then
+		verbosei /bin/ls -l $file
+		echo $TAG  "     $file is a directory, char special, block special or pipe.">>$REPORT 2>&1
+		echo ""		>>$REPORT 2>&1
+	elif [ -r $file ]; then
+		verbosei /bin/ls -l $file
+		verbosei /bin/cat $file
+	elif [ -f $file ]; then
+		verbosei /bin/ls -l $file
+		echo "     " $file is not readable >>$REPORT 2>&1
+		echo ""		>>$REPORT 2>&1
+	else
+		echo "     " $file does not exist >>$REPORT 2>&1
+		echo ""		>>$REPORT 2>&1
+	fi
+done
+}
+
+#  Show at least $HOW_MANY_LINES lines of a group of files
+showenuf(){
+ENUF=0
+REM=$HOW_MANY_LINES
+for file in $*; do
+	echo "------------------- $file -------------------" >>$REPORT 2>&1
+	if [ -d $file -o -c $file -o -b $file -o -p $file ]; then
+		verbose /bin/ls -l $file
+		echo $TAG "$file is a directory, char special, block special or pipe.">>$REPORT 2>&1
+		echo ""		>>$REPORT 2>&1
+	elif [ -r $file ]; then
+		verbose /bin/ls -l $file
+		if [ ! -s $file ]; then
+			echo $file is zero length >>$REPORT 2>&1
+			echo ""		>>$REPORT 2>&1
+		elif [ `/bin/file $file | /bin/grep -c text` -eq 0 ]; then
+			echo $file is not a text file >>$REPORT 2>&1
+			echo ""		>>$REPORT 2>&1
+		else
+			ENUF=`/bin/tail -$REM $file | /bin/wc | /bin/cut -c1-8`
+			verbose /bin/tail -$REM $file
+			if [ $ENUF -ge $REM ]; then
+				return
+			else
+				REM=`expr $REM - $ENUF`
+			fi
+		fi
+	elif [ -f $file ]; then
+		verbose /bin/ls -l $file
+		echo $file is not readable >>$REPORT 2>&1
+		echo ""		>>$REPORT 2>&1
+	else
+		echo $file does not exist >>$REPORT 2>&1
+		echo ""		>>$REPORT 2>&1
+	fi
+done
+}
+
+# Show at least n lines of a group of files 
+show_enuf(){
+	lines=$HOW_MANY_LINES
+	HOW_MANY_LINES=$1
+	shift
+	showenuf $*
+	HOW_MANY_LINES=$lines
+}
+
+#  Show just the last $HOW_MANY_LINES lines of a file
+showtails(){
+for file in $*; do
+	echo "------------------- $file -------------------" >>$REPORT 2>&1
+	if [ -d $file -o -c $file -o -b $file -o -p $file ]; then
+		verbose /bin/ls -l $file
+		echo $TAG "$file is a directory, char special, block special or pipe.">>$REPORT 2>&1
+		echo ""		>>$REPORT 2>&1
+	elif [ -r $file ]; then
+		verbose /bin/ls -l $file
+		if [ ! -s $file ]; then
+			echo $file is zero length >>$REPORT 2>&1
+			echo ""		>>$REPORT 2>&1
+		elif [ `/bin/file $file | /bin/grep -c text` -eq 0 ]; then
+			echo $file is not a text file >>$REPORT 2>&1
+			echo ""		>>$REPORT 2>&1
+		else
+			verbose /bin/tail -$HOW_MANY_LINES $file
+		fi
+	elif [ -f $file ]; then
+		verbose /bin/ls -l $file
+		echo $file is not readable >>$REPORT 2>&1
+		echo ""		>>$REPORT 2>&1
+	else
+		echo $file does not exist >>$REPORT 2>&1
+		echo ""		>>$REPORT 2>&1
+	fi
+done
+}
+
+# Show last n lines of a file 
+show_tails(){
+	lines=$HOW_MANY_LINES
+	HOW_MANY_LINES=$1
+	shift
+	showtails $*
+	HOW_MANY_LINES=$lines
+}
+
+
+#  End of function definitions
+
+#  Generate the report
+if [ $TGZ = "ON" ]; then
+	echo "Report name:     $REPORT.tar.gz"
+	echo "Lines per file:  $HOW_MANY_LINES"
+	echo "Output format:   tar.gz (default) Use -u for unarchived/uncompressed."
+else
+	echo "Report name:     $REPORT"
+	echo "Lines per file:  $HOW_MANY_LINES"
+	echo "Output format:   unarchived/uncompressed"
+fi
+
+/bin/rm -f $REPORT
+echo "MMS Software Support Report" >$REPORT
+echo " " >>$REPORT
+echo "Run at `/bin/date`" >>$REPORT
+echo "Run at `/bin/date -u`" >>$REPORT
+echo " " >>$REPORT
+echo "Run on `/bin/uname -n` by `/bin/id`" >>$REPORT
+echo " " >>$REPORT
+
+echo "This report generated into: $REPORT"   >>$REPORT
+echo ""   >>$REPORT 2>&1
+
+echo "------------------- locale --------------------------" >>$REPORT
+verbose /bin/locale
+LC_ALL=$LOCALE
+export LC_ALL
+
+echo "------------------- boot time -----------------------" >>$REPORT
+verbose /bin/who -b
+
+echo "------------------- uptime --------------------------" >>$REPORT
+verbose /bin/uptime 
+
+echo "------------------- system type ---------------------" >>$REPORT
+SYS_TYPE=`/bin/grep -i nexus /var/adm/messages* 2>&1 | head -1 | /bin/sed -e "s/^.*nexus = //"`
+if [ X = X$SYS_TYPE ]; then
+	SYS_TYPE="Not Available"
+fi
+echo "\n$SYS_TYPE" >>$REPORT
+echo "" >>$REPORT 2>&1
+
+echo "------------------- uname ---------------------------" >>$REPORT
+verbose /bin/uname -a
+
+#
+#  Check for some Solaris patches we know are required for proper operation
+#  of MMS.  There may be others; this list is subject to change.
+#  Issue a warning if the patch isn't there; otherwise echo the full patch id.
+#
+SOL_VER=`/bin/uname -r | /bin/cut -c1-5`
+if [ $SOL_VER = "5.11" ]; then
+	NEEDED="NONE"
+else
+	NEEDED="UNKNOWN"
+	echo $TAG "Unknown Solaris release level $SOL_VER"       >>$REPORT
+fi
+
+showfiles /etc/release
+
+echo "------------------- application architecture info ---" >>$REPORT
+
+verbose /bin/isainfo
+
+echo "------------------- kernel architecture info --------" >>$REPORT
+
+KERN_ARCH=`/bin/isainfo -kv`
+KERN_VER=` echo $KERN_ARCH | /bin/cut -c1-2`
+if [ X"$KERN_VER" = X64 ]; then
+	echo "\nSolaris is running in 64-bit kernel mode."  >>$REPORT
+else
+	echo "\nSolaris is running in 32-bit kernel mode."  >>$REPORT
+fi
+if [ X"$KERN_ARCH" != X ]; then
+	echo $KERN_ARCH >>$REPORT
+fi
+echo "" >>$REPORT 2>&1
+
+echo "------------------- check system patches ------------" >>$REPORT
+echo "\nPatches needed for Solaris ${SOL_VER}: $NEEDED\n" >>$REPORT
+if [ X"$NEEDED" = "XNONE" -o X"$NEEDED" = "XUNKNOWN" ]; then
+	NEEDED=""
+fi
+
+echo "\nPatches installed for Solaris:\n" >>$REPORT
+
+verbose "/bin/showrev -p 2>/dev/null | /bin/sed -e 's/Obso.*//' | /bin/sort > $TMPPAT"
+
+showifiles $TMPPAT
+for patch in $NEEDED; do
+	PATCHFOUND=`/bin/grep -w $patch $TMPPAT`
+	if [ "X$PATCHFOUND" = "X" ]; then
+		echo $TAG "Solaris patch " $patch " not installed.\n" >>$REPORT
+	else
+		echo "Solaris " $PATCHFOUND " installed.\n" >>$REPORT
+	fi
+done
+/bin/rm -f $TMPPAT
+
+echo "\nPatches installed for MMS:\n" >>$REPORT
+
+verbose "/bin/showrev -p 2>/dev/null | /bin/egrep 'SUNWhsmr|SUNWhsmu|SUNWmmsr|SUNWmmsu|SUNWpostgr|SUNWopenssl' | /bin/sed -e 's/Obso.*//' | /bin/sed -e 's/Patch: //' > $TMPPAT"
+
+showifiles $TMPPAT
+for i in `/bin/cat $TMPPAT`; do
+	verbose "/bin/ls -ld /var/sadm/patch/${i}"
+	verbose "/bin/ls -l /var/sadm/patch/${i}/log"
+done
+/bin/rm -f $TMPPAT
+
+#
+# SUNWhsmr	- Sun ADM HSM software Solaris 11 (root)
+# SUNWhsmu	- Sun ADM HSM software Solaris 11 (usr)
+# SUNWmmsr     - MMS Solaris (root)
+# SUNWmmsu     - MMS Solaris (usr)
+# SUNWpostgr	- Postgres psql (client programs)
+# SUNWpostgr-libs - Postgres libpq (client)
+# SUNWpostgr-server - Postgres postmaster (server)
+# SUNWopenssl-commands - OpenSSL commands (usr)
+# SUNWopenssl-libraries - OpenSSL libraries (usr)
+# SUNWopensslr	- OpenSSL (root)
+# STKacsls	- Automated Cartridge System Library Software by StorageTek
+# SUNWfcp       - Sun FCP SCSI Device Driver (system)
+# SUNWfcpx      - Sun FCP SCSI Device Driver 64-bit (system)
+# SUNWfctl      - Sun Fibre Channel Transport layer (system)
+# SUNWfctlx     - Sun Fibre Channel Transport layer 64-bit (system)
+# SUNWqlc       - Qlogic ISP 2200/2202 Fibre Channel Device Driver (system)
+# SUNWqlcx      - Qlogic ISP 2200/2202 Fibre Channel Device Driver 64-bit (system)
+# SUNWsmgr      - SANsurfer, QLogic Fibre Channel Administration (system)
+# JNIC          - JNI Fibre Channel SCSI HBA Driver (system)
+# QLA2200-3     - QLogic QLA2200 driver (system)
+#
+echo "------------------- package info --------------------" >>$REPORT
+
+for PACKAGE in SUNWhsmr SUNWhsmu SUNWmmsr SUNWmmsu SUNWpostgr SUNWpostgr-libs SUNWpostgr-server SUNWopenssl-commands SUNWopenssl-libraries SUNWopensslr STKacsls SUNWfcp SUNWfcpx SUNWfctl SUNWfctlx SUNWqlc SUNWqlcx SUNWsmgr JNIC QLA2200-3
+do
+	twiddle
+	echo "" >>$REPORT 2>&1
+	verbose /bin/pkginfo -l $PACKAGE
+	verbose /usr/sbin/pkgchk $PACKAGE
+done
+
+#showfiles /opt/SUNWsamfs/include/version.h
+
+echo "------------------- kernel info ---------------------" >>$REPORT
+echo ""                                      >>$REPORT 2>&1
+echo "/bin/ls -l /kernel/drv/dmd"            >>$REPORT 2>&1
+/bin/ls -l /kernel/drv/dmd                   >>$REPORT 2>&1
+echo "/bin/ls -l /kernel/drv/*/dmd"          >>$REPORT 2>&1
+/bin/ls -l /kernel/drv/*/dmd                 >>$REPORT 2>&1
+echo ""                                      >>$REPORT 2>&1
+echo "/bin/ls -l /kernel/drv/dda"            >>$REPORT 2>&1
+/bin/ls -l /kernel/drv/dda                   >>$REPORT 2>&1
+echo "/bin/ls -l /kernel/drv/*/dda"          >>$REPORT 2>&1
+/bin/ls -l /kernel/drv/*/dda                 >>$REPORT 2>&1
+echo ""   >>$REPORT 2>&1
+
+echo "------------------- modinfo output ------------------" >>$REPORT
+verbose "/usr/sbin/modinfo | /bin/grep ' dmd '"
+verbose "/usr/sbin/modinfo | /bin/grep ' dda '"
+verbose "/usr/sbin/modinfo | /bin/grep ' sd '"
+verbose "/usr/sbin/modinfo | /bin/grep ' st '"
+verbose "/usr/sbin/modinfo | /bin/egrep -i 'dmd|fcp|fctl|fp|qlc|ssd|disk|tape'"
+
+echo "------------------- storage array info ------------------" >>$REPORT
+if [ -f /usr/sbin/luxadm ]; then
+	verbose /usr/sbin/luxadm qlgc
+fi
+
+echo "------------------- device configuration info -----------" >>$REPORT
+if [ -f /usr/sbin/cfgadm ]; then
+	verbose /usr/sbin/cfgadm -al
+fi
+
+echo "------------------- ls -lR /opt/mms ------------" >>$REPORT
+verbose /bin/ls -lR  /opt/mms
+verbose /bin/ls -lL  /opt/mms
+
+echo "------------------- ls -lR /etc/mms ------------" >>$REPORT
+verbose /bin/ls -lR  /etc/mms
+verbose /bin/ls -lL  /etc/mms
+
+echo "------------------- ls -lR /var/mms ------------" >>$REPORT
+if [ -d /var/mms ]; then
+	verbose /bin/ls -l `/bin/find /var/mms -type d -print | /bin/grep -v "$PGDATA"`
+else
+	verbose /bin/ls -l /var/mms
+fi
+verbose /bin/ls -lL  /varmms
+
+showtails /var/adm/messages
+
+echo "------------------- service configuration -----------" >>$REPORT
+verbose /bin/svcprop -c mms
+
+showifiles $PGDATA/pg_hba.conf
+showifiles $PGDATA/pg_ident.conf
+showifiles $PGDATA/postgresql.conf
+showifiles $PGDATA/postgresql.pid
+verbose /bin/ls -lL /tmp/.s.PGSQL.$PGPORT /tmp/.s.PGSQL.${PGPORT}.lock
+
+verbose "/bin/ps -ef | /bin/egrep -i 'pg_ctl|psql|postmaster'"
+
+verbose /bin/svcs -xv mms:db
+
+show_tails $SVCLOG_LINES /var/svc/log/application-management-mms:db.log
+
+verbose /bin/ls -l $PGDATA/../mms_db /etc/mms/db/mms_db
+verbose /bin/ls -lL $PGDATA/../mms_db /etc/mms/db/mms_db
+
+# check for database downgrade
+verbose /bin/diff $PGDATA/../mms_db /etc/mms/db/mms_db
+
+# order database log files from current day of week
+DOW=`/bin/date +%a`
+CURRENT=
+BEFORE=
+AFTER=
+found=0
+for DAY in Sun Mon Tue Wed Thu Fri Sat; do
+	file="$PGDATA/../log/log.$DAY"
+        if [ "$DAY" = "$DOW" ]; then
+		CURRENT="$file"
+                found=1
+        elif [ $found -eq 1 ]; then
+                AFTER="$file $AFTER"
+        else
+                BEFORE="$file $BEFORE"
+        fi
+done
+showenuf $CURRENT $BEFORE $AFTER
+
+
+# database snapshot
+object="APPLICATION AI CONNECTION SESSION NOTIFY NOTIFYRULES "\
+"EVENTRULES LIBRARY LM BAY SLOTTYPE CARTRIDGEGROUP CARTRIDGETYPE "\
+"CARTRIDGE CARTRIDGEGROUPAPPLICATION SIDE PARTITION VOLUME DRIVEGROUP "\
+"DRIVEGROUPAPPLICATION DRIVE DM DMCAPABILITY DMCAPABILITYTOKEN "\
+"DMCAPABILITYDEFAULTTOKEN DMCAPABILITYGROUP DMCAPABILITYGROUPTOKEN "\
+"DMBITFORMAT DMBITFORMATTOKEN SLOTGROUP SLOT SLOTCONFIG MOUNTLOGICAL "\
+"MOUNTPHYSICAL DRIVECARTRIDGEACCESS TASK TASKCARTRIDGE TASKDRIVE "\
+"TASKLIBRARY MESSAGE REQUEST SYSTEM STALEHANDLE DMSHAPEPRIORITY "\
+"DMDENSITYPRIORITY DMMOUNTPOINT LIBRARYLIST DRIVELIST CARTRIDGELIST "\
+"DRIVECARTRIDGEERROR"
+
+cmd="select * from \\\"MM\\\";"
+cmd="$cmd select \\\"ApplicationName\\\",length(\\\"Password\\\") from \\\"MMPASSWORD\\\";"
+
+for table in $object; do
+	cmd="$cmd select * from \\\"$table\\\";"
+done
+
+/bin/su - $PGADMIN -c "PGPASSFILE=${PGPASS} ; export PGPASSFILE ; /bin/echo \"$cmd\" | /usr/bin/psql -h $PGHOST -p $PGPORT -d $DBNAME -U $PGUSER -e" 2>&1 | /bin/gzip -f > $OUTDATABASE
+
+echo "------------------- media manager service -----------" >>$REPORT
+echo ""		>>$REPORT 2>&1
+showfiles $ETCDIR/types/mm_types.xml
+
+verbose "/bin/ps -ef | /bin/egrep -i 'mmsmm'"
+
+verbose /usr/lib/mmsmm -v
+
+verbose /bin/svcs -xv mms:mm
+
+show_tails $SVCLOG_LINES /var/svc/log/application-management-mms:mm.log
+
+show_enuf $MM_LINES /var/log/mms/mm/mm.debug*
+
+showenuf /var/log/mms/system_log*
+
+echo "------------------- watcher service -----------------" >>$REPORT
+
+verbose "/bin/ps -ef | /bin/egrep -i 'mmswcr|mmslm|mmsdm'"
+
+verbose /bin/svcs -xv mms:wcr
+
+show_tails $SVCLOG_LINES /var/svc/log/application-management-mms:wcr.log
+
+showenuf /var/log/mms/wcr/wcr.debug*
+
+LMS=`/bin/ls /var/log/mms/lm/*.debug 2>/dev/null`
+for LM in $LMS; do
+	showenuf ${LM}*
+done
+
+DMS=`/bin/ls /var/log/mms/dm/*.debug 2>/dev/null`
+for DM in $DMS; do
+	showenuf ${DM}*
+done
+
+APIS=`/bin/ls /var/log/mms/api/*.debug 2>/dev/null`
+for API in $APIS; do
+	showenuf ${API}*
+done
+
+# all trace
+/bin/tar -cf - -C /var adm/messages -C /var/log mms | /bin/gzip -f > $OUTALLTRACE
+
+showfiles /kernel/drv/dmd.conf
+showfiles /kernel/drv/dda.conf
+showfiles /kernel/drv/st.conf
+showfiles /kernel/drv/fp.conf
+showfiles /kernel/drv/fcp.conf
+showfiles /kernel/drv/jni.conf
+showfiles /kernel/drv/qla*.conf
+showfiles /kernel/drv/qlc.conf
+showfiles /etc/driver_classes
+showfiles /etc/driver_aliases
+showfiles /etc/system
+showfiles /etc/devlink.tab
+
+echo "------------------- hostid --------------------------" >>$REPORT
+echo ""   >>$REPORT 2>&1
+echo "hostid is `/usr/bin/hostid`" >>$REPORT 2>&1
+echo ""   >>$REPORT 2>&1
+
+echo "------------------- network info --------------------" >>$REPORT
+verbose /usr/sbin/ifconfig -a
+verbose /bin/grep rpc      /etc/nsswitch.conf
+verbose /bin/grep services /etc/nsswitch.conf
+verbose /bin/grep mms     /etc/rpc
+verbose "/bin/ypcat rpc      | /bin/grep mms"
+verbose /bin/grep mms     /etc/services
+verbose /bin/grep mms     /etc/yp/src/services
+verbose "/bin/ypcat services | /bin/grep mms"
+showfiles /etc/hostname*
+showfiles /etc/inet/hosts
+showfiles /etc/inet/ipnodes
+showfiles /etc/inet/services
+showfiles /etc/nsswitch.conf
+
+echo "------------------- ipcs info -----------------------" >>$REPORT
+verbose /bin/ipcs -a
+
+echo "------------------- /devices/pseudo/dmd -------------" >>$REPORT
+echo ""                                      >>$REPORT 2>&1
+verbose /bin/ls -l /devices/pseudo/dmd@*
+verbose /bin/ls -Ll /devices/pseudo/dmd@*
+
+echo "------------------- /dev/dda ------------------------" >>$REPORT
+echo ""                                      >>$REPORT 2>&1
+verbose /bin/ls -l /dev/dda
+verbose /bin/ls -Ll /dev/dda
+
+echo "------------------- /dev/rmt ------------------------" >>$REPORT
+echo ""                                      >>$REPORT 2>&1
+echo "/bin/ls -l /dev/rmt/*[0-9]"            >>$REPORT 2>&1
+/bin/ls -l /dev/rmt/*[0-9]                   >>$REPORT 2>&1
+echo ""                                      >>$REPORT 2>&1
+echo "/bin/ls -Ll /dev/rmt/*[0-9]"           >>$REPORT 2>&1
+/bin/ls -Ll /dev/rmt/*[0-9]                  >>$REPORT 2>&1
+echo ""                                      >>$REPORT 2>&1
+
+echo "------------------- /dev/dsk ------------------------" >>$REPORT
+echo ""                                      >>$REPORT 2>&1
+echo "/bin/ls -l /dev/dsk/*s2"               >>$REPORT 2>&1
+/bin/ls -l /dev/dsk/*s2                      >>$REPORT 2>&1
+echo ""                                      >>$REPORT 2>&1
+echo "/bin/ls -Ll /dev/dsk/*s2"              >>$REPORT 2>&1
+/bin/ls -Ll /dev/dsk/*s2                     >>$REPORT 2>&1
+echo ""                                      >>$REPORT 2>&1
+
+echo "------------------- /dev/rdsk -----------------------" >>$REPORT
+echo ""                                      >>$REPORT 2>&1
+echo "/bin/ls -l /dev/rdsk/*s2"              >>$REPORT 2>&1
+/bin/ls -l /dev/rdsk/*s2                     >>$REPORT 2>&1
+echo ""                                      >>$REPORT 2>&1
+echo "/bin/ls -Ll /dev/rdsk/*s2"             >>$REPORT 2>&1
+/bin/ls -Ll /dev/rdsk/*s2                    >>$REPORT 2>&1
+echo ""                                      >>$REPORT 2>&1
+
+echo "------------------- threadlist of running system ----" >>$REPORT
+echo '=n"---- date/time ----"
+	time/y
+	lbolt/K
+	=n"---- utsname ----"
+	utsname::print
+	=n"---- threadlist ----"
+	::threadlist -v
+	=n"---- function call args ----"
+	::walk thread | ::findstack ".$c6"
+	=n"---- mms_ mdb end ----"' | /bin/mdb -k 2>&1 | head -$MDB_LINES >> $REPORT 2>&1
+
+echo "------------------- stack tracebacks ----------------" >>$REPORT
+# ps -e only returns 8 characters, so match on first 8.
+MMS=`/bin/ps -e | /bin/egrep -i 'mmsmm|mmswcr' | /bin/awk '{print $1}'`
+for mms in $MMS; do
+	echo "\n/bin/ptree $mms"		>>$REPORT
+	/bin/ptree $mms			>>$REPORT
+	/bin/ptree $mms > $TMPPROC
+	procs=`/bin/cat $TMPPROC | /bin/awk '{print $1}'`
+	for pid in $procs; do
+		verbose "/bin/pstack $pid; /bin/pflags $pid"
+	done
+	/bin/rm -f $TMPPROC
+done
+if [ "$MMS" = "" ]; then
+	echo "Sorry, mms_ processes not running.\n"	>>$REPORT
+fi
+
+echo "------------------- filesystem information ----------" >>$REPORT
+# Background this command so it doesn't hang the script
+# on file system problems.
+echo ""	    >>$REPORT 2>&1
+echo "    " $PROMPT /bin/df -kl >>$REPORT 2>&1
+/bin/df -kl > $TMPBGDF 2>&1 &
+sleep 5
+twiddle
+sleep 5
+if [ -s $TMPBGDF ]; then
+	/bin/cat $TMPBGDF | /bin/sed -e "s/^/     /"  >>$REPORT 2>&1
+else
+	echo "     $TAG /bin/df -kl timed out" >>$REPORT 2>&1
+fi
+echo ""     >>$REPORT 2>&1
+/bin/rm -f $TMPBGDF
+
+verbosei /etc/mount 
+
+showifiles /etc/mnttab /etc/vfstab /etc/dfs/dfstab /etc/inittab
+
+echo "" >>$REPORT 2>&1
+echo "------------------- ps -edalf -----------------------" >>$REPORT
+verbose /bin/ps -edalf
+
+echo "------------------- iostat --------------------------" >>$REPORT
+verbose "/bin/iostat -en | /bin/grep -v ' nfs'"
+
+echo "------------------- mpstat --------------------------" >>$REPORT
+verbose "/bin/mpstat"
+
+echo "------------------- kstat ---------------------------" >>$REPORT
+verbose "/bin/kstat -n cpu_info0"
+
+echo "------------------- prstat --------------------------" >>$REPORT
+verbose /bin/prstat 1 1
+
+echo "------------------- prtconf -------------------------" >>$REPORT
+verbose /usr/sbin/prtconf -V
+verbose /usr/sbin/prtconf
+
+echo "------------------- core files ----------------------" >>$REPORT
+echo "" >>$REPORT 2>&1
+
+ONLINE_CORE_FILES=""
+for DIR in $ETCDIR $VARDIR $USERDIR; do
+
+	CORE_FILES=""
+	if [ -d $DIR ]; then
+		if [ -r $DIR -a -x $DIR ]; then
+			echo "CORE_FILES=/bin/find $DIR -follow -name \"core*\" -type f -print" >>$REPORT
+			CORE_FILES=`/bin/find $DIR -follow -name "core*" -type f -print` 
+			for file in $CORE_FILES; do
+				verbose "/bin/ls -tlLd $file; /bin/file $file"
+			done
+		fi
+	else
+		echo $TAG missing $DIR >>$REPORT 2>&1
+	fi
+
+	if [ x"$CORE_FILES" != x ]; then
+		ONLINE_CORE_FILES="$ONLINE_CORE_FILES $CORE_FILES"
+	else
+		echo "" >>$REPORT 2>&1
+	fi
+
+done
+
+if [ -f /core ]; then
+	verbose "/bin/ls -tlLd /core; /bin/file /core"
+	ONLINE_CORE_FILES="$ONLINE_CORE_FILES /core"
+fi
+
+echo "------------------- core file stack tracebacks ------" >>$REPORT
+for CORE in $ONLINE_CORE_FILES; do
+	verbose "/bin/pstack $CORE; /bin/pflags $CORE"
+done
+
+echo "------------------- system panic dumps --------------" >>$REPORT
+verbose /usr/sbin/dumpadm 
+dumpdir=`/usr/sbin/dumpadm | /bin/grep "core dir" | /bin/sed -e "s/Savecore directory: //" | /bin/awk '{print $1}'`
+enabled=`/usr/sbin/dumpadm | /bin/grep "core ena" | /bin/sed -e "s/Savecore enabled: //" | /bin/awk '{print $1}'`
+if [ -n "$enabled" ]; then
+	if [ $enabled = "no" ]; then
+		echo $TAG Core dump program \'savecore\' disabled by /usr/sbin/dumpadm >>$REPORT
+	fi
+fi
+
+if [ -n "$dumpdir" ]; then
+	coredir=`eval echo $dumpdir`
+	verbose /bin/ls -ld $coredir
+	verbose /bin/ls -l $coredir
+	for unix in `ls $coredir/unix.[0-9]* 2>/dev/null`
+	do
+		twiddle
+		vmcore=`echo $unix | /bin/sed -e "s./unix./vmcore."`
+		verbose /bin/ls -l $unix $vmcore
+		verbose /bin/file $unix $vmcore
+		VM_SOL_VER=`/bin/file $vmcore | /bin/cut -d" " -f2`
+		# Only process vmcores that match the running Solaris release.
+		if [ $SOL_VER = $VM_SOL_VER ]; then
+			echo '=n"---- date/time ----"
+				time/y
+				lbolt/K
+				=n"---- utsname ----"
+				utsname::print
+				=n"---- panic string ----"
+				*panicstr/s
+				=n"----panic_regs/2K----"
+				panic_regs/2K
+				=n"---- stack traceback ----"
+				$c
+				=n"---- stack traceback verbose----"
+				$C
+				=n"---- message buffer ----"
+				$<msgbuf
+				=n"---- threadlist ----"
+				::threadlist -v
+				=n"---- function call args ----"
+				::walk thread | ::findstack ".$c6"
+				=n"---- mms_ mdb end ----"' | mdb -k $unix $vmcore 2>&1 | head -$MDB_LINES >>$REPORT 2>&1
+		fi
+	done
+fi
+
+echo "" >>$REPORT 2>&1
+echo "End at `/bin/date` on `/bin/uname -n` by `/bin/id`" >>$REPORT
+echo " " >>$REPORT
+echo "------------------- THE END -------------------------" >>$REPORT
+echo " "
+echo " "
+
+
+echo " "
+echo "The following files should now be ftp'ed to your support provider"
+echo "as ftp type binary."
+echo " "
+
+#
+# Use the following syntax for the report name in order to echo
+# any unspecified dot slash for the path.
+#
+if [ $TGZ = "ON" ]; then
+	echo "${REPORTDIR}/${REPORTNAME}.tar.gz"
+else
+	echo "${REPORTDIR}/${REPORTNAME}"
+fi
+chmod 444 ${REPORTDIR}/${REPORTNAME}
+
+TARFILES=$REPORTNAME
+for file in $OUTDATABASE $OUTALLTRACE; do
+	if [ -s $file ]; then
+		if [ $TGZ = "ON" ]; then
+			TARFILES="$TARFILES `basename $file`"
+		else
+			echo "$file"
+		fi
+		chmod 444 $file
+	fi
+done
+echo " "
+
+if [ $TGZ = "ON" ]; then
+	(
+		cd $REPORTDIR
+		/bin/tar cf ${REPORTNAME}.tar $TARFILES 2>/dev/null
+		chmod 555 ${REPORTNAME}.tar
+		/bin/rm -f $TARFILES
+		/bin/gzip ${REPORTNAME}.tar
+	)
+fi
+
+if [ x"$ONLINE_CORE_FILES" != x ]; then
+	echo "This script found the following core files.  Please ftp them as"
+	echo "binary files to your support provider only if they appear to be"
+	echo "from the MMS product."
+	echo " "
+	for file in $ONLINE_CORE_FILES; do
+		/bin/file $file | /bin/sed -e "s/:.*,/ :/" ; /bin/ls -tlLd $file
+		echo
+	done
+fi
+

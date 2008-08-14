@@ -1,0 +1,88 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"@(#)postinstall	1.2	08/07/21 SMI"
+#
+
+PATH="/usr/bin:/usr/sbin:${PATH}"; export PATH
+ 
+# Driver definitions
+DRVR_NAME=dmd; export DRVR_NAME
+DRVR_NAME2=dda; export DRVR_NAME2
+DRVR_PERM='* 0600 root sys'; export DRVR_PERM
+
+# Remove existing definition, if it exists. 
+if [ "${BASEDIR}" = "/" ]; then
+/usr/sbin/rem_drv ${DRVR_NAME} > /dev/null 2>&1
+else
+/usr/sbin/rem_drv -b "${BASEDIR}" ${DRVR_NAME} > /dev/null 2>&1
+fi
+
+if [ "${BASEDIR}" = "/" ]; then
+/usr/sbin/rem_drv ${DRVR_NAME2} > /dev/null 2>&1
+else
+/usr/sbin/rem_drv -b "${BASEDIR}" ${DRVR_NAME2} > /dev/null 2>&1
+fi
+
+#Add the drivers
+if [ "${BASEDIR}" = "/" ]; then
+/usr/sbin/add_drv ${DRVR_NAME}
+else
+/usr/sbin/add_drv -b "${BASEDIR}" ${DRVR_NAME}
+fi
+
+if [ "${BASEDIR}" = "/" ]; then
+/usr/sbin/add_drv ${DRVR_NAME2}
+dda_rc=$?
+else
+/usr/sbin/add_drv -b "${BASEDIR}" ${DRVR_NAME2}
+dda_rc=$?
+fi
+
+find_dda_devlink_rule()
+{
+	/bin/cat /etc/devlink.tab | /bin/nawk ' \
+	$0 ~ /^type\=ddi_pseudo;name\=dda\tdda\/\\N0\\M0/ \
+	{ print $0 }'
+}
+
+# Add dda devlinks
+dda_rule=`find_dda_devlink_rule`
+if [ "$dda_rule" = "" ]; then
+	echo "Updating /etc/devlink.tab with dda devlinks rule."
+	echo "type=ddi_pseudo;name=dda\tdda/\\N0\\M0" \
+		>> /etc/devlink.tab
+fi
+
+if [ $dda_rc = 0 ]; then
+	/usr/sbin/devfsadm -i dda
+fi
+
+/usr/sbin/installf -c rbac SUNWmmsr /etc/security/auth_attr
+/usr/sbin/installf -c rbac SUNWmmsr /etc/security/exec_attr
+/usr/sbin/installf -c rbac SUNWmmsr /etc/security/prof_attr
+/usr/sbin/installf -f SUNWmmsr
+
+exit 0
