@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _KERNEL
 #include <strings.h>
 #include <limits.h>
@@ -144,13 +142,10 @@ ccm_mode_encrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 		    (ctx->ccm_cb[1] & ~(ctx->ccm_counter_mask)) | counter;
 
 		/*
-		 * XOR the previous cipher block or IV with the
-		 * current clear block.
+		 * XOR encrypted counter block with the current clear block.
 		 */
-		xor_block(lastp, blockp);
+		xor_block(blockp, lastp);
 
-		ctx->ccm_lastp = blockp;
-		lastp = blockp;
 		ctx->ccm_processed_data_len += block_size;
 
 		if (out == NULL) {
