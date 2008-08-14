@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -263,7 +261,7 @@ zfs_ace_fuid_size(void *acep)
 		entry_type =
 		    (((zfs_ace_hdr_t *)acep)->z_flags & ACE_TYPE_FLAGS);
 		if (entry_type == ACE_OWNER ||
-		    entry_type == (ACE_GROUP | ACE_IDENTIFIER_GROUP) ||
+		    entry_type == OWNING_GROUP ||
 		    entry_type == ACE_EVERYONE)
 			return (sizeof (zfs_ace_hdr_t));
 		/*FALLTHROUGH*/
@@ -404,7 +402,7 @@ zfs_ace_valid(vtype_t obj_type, zfs_acl_t *aclp, uint16_t type, uint16_t iflags)
 
 	switch (iflags & ACE_TYPE_FLAGS) {
 	case ACE_OWNER:
-	case (ACE_IDENTIFIER_GROUP | ACE_GROUP):
+	case OWNING_GROUP:
 	case ACE_IDENTIFIER_GROUP:
 	case ACE_EVERYONE:
 	case 0:	/* User entry */
@@ -621,7 +619,7 @@ zfs_copy_fuid_2_ace(zfsvfs_t *zfsvfs, zfs_acl_t *aclp, cred_t *cr,
 
 		entry_type = (iflags & ACE_TYPE_FLAGS);
 		if ((entry_type != ACE_OWNER &&
-		    entry_type != (ACE_GROUP | ACE_IDENTIFIER_GROUP) &&
+		    entry_type != OWNING_GROUP &&
 		    entry_type != ACE_EVERYONE)) {
 			acep->a_who = zfs_fuid_map_id(zfsvfs, who,
 			    cr, (entry_type & ACE_IDENTIFIER_GROUP) ?
@@ -741,7 +739,7 @@ zfs_set_ace(zfs_acl_t *aclp, void *acep, uint32_t access_mask,
 	aclp->z_ops.ace_mask_set(acep, access_mask);
 	aclp->z_ops.ace_type_set(acep, access_type);
 	aclp->z_ops.ace_flags_set(acep, entry_type);
-	if ((type != ACE_OWNER && type != (ACE_GROUP | ACE_IDENTIFIER_GROUP) &&
+	if ((type != ACE_OWNER && type != OWNING_GROUP &&
 	    type != ACE_EVERYONE))
 		aclp->z_ops.ace_who_set(acep, fuid);
 }
@@ -767,13 +765,15 @@ zfs_mode_fuid_compute(znode_t *zp, zfs_acl_t *aclp, cred_t *cr,
 	while (acep = zfs_acl_next_ace(aclp, acep, &who,
 	    &access_mask, &iflags, &type)) {
 
-		/*
-		 * Skip over inherit only ACEs
-		 */
-		if (iflags & ACE_INHERIT_ONLY_ACE)
-			continue;
-
 		entry_type = (iflags & ACE_TYPE_FLAGS);
+
+		/*
+		 * Skip over owner@, group@ or everyone@ inherit only ACEs
+		 */
+		if ((iflags & ACE_INHERIT_ONLY_ACE) &&
+		    (entry_type == ACE_OWNER || entry_type == ACE_EVERYONE ||
+		    entry_type == OWNING_GROUP))
+			continue;
 
 		if (entry_type == ACE_OWNER) {
 			if ((access_mask & ACE_READ_DATA) &&
@@ -1840,7 +1840,8 @@ zfs_perm_init(znode_t *zp, znode_t *parent, int flag,
 	if (aclp == NULL) {
 		mutex_enter(&parent->z_lock);
 		if ((ZTOV(parent)->v_type == VDIR &&
-		    parent->z_phys->zp_flags & ZFS_INHERIT_ACE)) {
+		    (parent->z_phys->zp_flags & ZFS_INHERIT_ACE)) &&
+		    !(zp->z_phys->zp_flags & ZFS_XATTR)) {
 			mutex_enter(&parent->z_acl_lock);
 			VERIFY(0 == zfs_acl_node_read(parent, &paclp, B_FALSE));
 			mutex_exit(&parent->z_acl_lock);
