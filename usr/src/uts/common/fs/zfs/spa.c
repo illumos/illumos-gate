@@ -2785,7 +2785,6 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *oldvd, *newvd, *newrootvd, *pvd, *tvd;
 	vdev_ops_t *pvops;
-	int is_log;
 	dmu_tx_t *tx;
 	char *oldvdpath, *newvdpath;
 	int newvd_isspare;
@@ -2821,8 +2820,7 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	/*
 	 * Spares can't replace logs
 	 */
-	is_log = oldvd->vdev_islog;
-	if (is_log && newvd->vdev_isspare)
+	if (oldvd->vdev_top->vdev_islog && newvd->vdev_isspare)
 		return (spa_vdev_exit(spa, newrootvd, txg, ENOTSUP));
 
 	if (!replacing) {

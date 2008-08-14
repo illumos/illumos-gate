@@ -1300,7 +1300,7 @@ zpool_scrub(zpool_handle_t *zhp, pool_scrub_type_t type)
  */
 static nvlist_t *
 vdev_to_nvlist_iter(nvlist_t *nv, const char *search, uint64_t guid,
-    boolean_t *avail_spare, boolean_t *l2cache)
+    boolean_t *avail_spare, boolean_t *l2cache, boolean_t *log)
 {
 	uint_t c, children;
 	nvlist_t **child;
@@ -1308,6 +1308,7 @@ vdev_to_nvlist_iter(nvlist_t *nv, const char *search, uint64_t guid,
 	char *path;
 	uint64_t wholedisk = 0;
 	nvlist_t *ret;
+	uint64_t is_log;
 
 	verify(nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID, &theguid) == 0);
 
@@ -1340,16 +1341,30 @@ vdev_to_nvlist_iter(nvlist_t *nv, const char *search, uint64_t guid,
 	    &child, &children) != 0)
 		return (NULL);
 
-	for (c = 0; c < children; c++)
+	for (c = 0; c < children; c++) {
 		if ((ret = vdev_to_nvlist_iter(child[c], search, guid,
-		    avail_spare, l2cache)) != NULL)
+		    avail_spare, l2cache, NULL)) != NULL) {
+			/*
+			 * The 'is_log' value is only set for the toplevel
+			 * vdev, not the leaf vdevs.  So we always lookup the
+			 * log device from the root of the vdev tree (where
+			 * 'log' is non-NULL).
+			 */
+			if (log != NULL &&
+			    nvlist_lookup_uint64(child[c],
+			    ZPOOL_CONFIG_IS_LOG, &is_log) == 0 &&
+			    is_log) {
+				*log = B_TRUE;
+			}
 			return (ret);
+		}
+	}
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_SPARES,
 	    &child, &children) == 0) {
 		for (c = 0; c < children; c++) {
 			if ((ret = vdev_to_nvlist_iter(child[c], search, guid,
-			    avail_spare, l2cache)) != NULL) {
+			    avail_spare, l2cache, NULL)) != NULL) {
 				*avail_spare = B_TRUE;
 				return (ret);
 			}
@@ -1360,7 +1375,7 @@ vdev_to_nvlist_iter(nvlist_t *nv, const char *search, uint64_t guid,
 	    &child, &children) == 0) {
 		for (c = 0; c < children; c++) {
 			if ((ret = vdev_to_nvlist_iter(child[c], search, guid,
-			    avail_spare, l2cache)) != NULL) {
+			    avail_spare, l2cache, NULL)) != NULL) {
 				*l2cache = B_TRUE;
 				return (ret);
 			}
@@ -1372,7 +1387,7 @@ vdev_to_nvlist_iter(nvlist_t *nv, const char *search, uint64_t guid,
 
 nvlist_t *
 zpool_find_vdev(zpool_handle_t *zhp, const char *path, boolean_t *avail_spare,
-    boolean_t *l2cache)
+    boolean_t *l2cache, boolean_t *log)
 {
 	char buf[MAXPATHLEN];
 	const char *search;
@@ -1395,8 +1410,10 @@ zpool_find_vdev(zpool_handle_t *zhp, const char *path, boolean_t *avail_spare,
 
 	*avail_spare = B_FALSE;
 	*l2cache = B_FALSE;
+	if (log != NULL)
+		*log = B_FALSE;
 	return (vdev_to_nvlist_iter(nvroot, search, guid, avail_spare,
-	    l2cache));
+	    l2cache, log));
 }
 
 /*
@@ -1445,7 +1462,8 @@ zpool_vdev_online(zpool_handle_t *zhp, const char *path, int flags,
 	    dgettext(TEXT_DOMAIN, "cannot online %s"), path);
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
-	if ((tgt = zpool_find_vdev(zhp, path, &avail_spare, &l2cache)) == NULL)
+	if ((tgt = zpool_find_vdev(zhp, path, &avail_spare, &l2cache,
+	    NULL)) == NULL)
 		return (zfs_error(hdl, EZFS_NODEVICE, msg));
 
 	verify(nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_GUID, &zc.zc_guid) == 0);
@@ -1480,7 +1498,8 @@ zpool_vdev_offline(zpool_handle_t *zhp, const char *path, boolean_t istmp)
 	    dgettext(TEXT_DOMAIN, "cannot offline %s"), path);
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
-	if ((tgt = zpool_find_vdev(zhp, path, &avail_spare, &l2cache)) == NULL)
+	if ((tgt = zpool_find_vdev(zhp, path, &avail_spare, &l2cache,
+	    NULL)) == NULL)
 		return (zfs_error(hdl, EZFS_NODEVICE, msg));
 
 	verify(nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_GUID, &zc.zc_guid) == 0);
@@ -1605,8 +1624,8 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 	char msg[1024];
 	int ret;
 	nvlist_t *tgt;
-	boolean_t avail_spare, l2cache;
-	uint64_t val, is_log;
+	boolean_t avail_spare, l2cache, islog;
+	uint64_t val;
 	char *path, *newname;
 	nvlist_t **child;
 	uint_t children;
@@ -1621,7 +1640,8 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 		    "cannot attach %s to %s"), new_disk, old_disk);
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
-	if ((tgt = zpool_find_vdev(zhp, old_disk, &avail_spare, &l2cache)) == 0)
+	if ((tgt = zpool_find_vdev(zhp, old_disk, &avail_spare, &l2cache,
+	    &islog)) == 0)
 		return (zfs_error(hdl, EZFS_NODEVICE, msg));
 
 	if (avail_spare)
@@ -1652,8 +1672,9 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 	 */
 	if (replacing &&
 	    nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_IS_SPARE, &val) == 0 &&
-	    (zpool_find_vdev(zhp, newname, &avail_spare, &l2cache) == NULL ||
-	    !avail_spare) && is_replacing_spare(config_root, tgt, 1)) {
+	    (zpool_find_vdev(zhp, newname, &avail_spare, &l2cache,
+	    NULL) == NULL || !avail_spare) &&
+	    is_replacing_spare(config_root, tgt, 1)) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "can only be replaced by another hot spare"));
 		free(newname);
@@ -1666,8 +1687,9 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 	 */
 	if (replacing &&
 	    nvlist_lookup_string(child[0], ZPOOL_CONFIG_PATH, &path) == 0 &&
-	    zpool_find_vdev(zhp, newname, &avail_spare, &l2cache) != NULL &&
-	    avail_spare && is_replacing_spare(config_root, tgt, 0)) {
+	    zpool_find_vdev(zhp, newname, &avail_spare,
+	    &l2cache, NULL) != NULL && avail_spare &&
+	    is_replacing_spare(config_root, tgt, 0)) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "device has already been replaced with a spare"));
 		free(newname);
@@ -1692,10 +1714,7 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 		 * Can't attach to or replace this type of vdev.
 		 */
 		if (replacing) {
-			is_log = B_FALSE;
-			(void) nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_IS_LOG,
-			    &is_log);
-			if (is_log)
+			if (islog)
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 				    "cannot replace a log with a spare"));
 			else
@@ -1772,7 +1791,8 @@ zpool_vdev_detach(zpool_handle_t *zhp, const char *path)
 	    dgettext(TEXT_DOMAIN, "cannot detach %s"), path);
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
-	if ((tgt = zpool_find_vdev(zhp, path, &avail_spare, &l2cache)) == 0)
+	if ((tgt = zpool_find_vdev(zhp, path, &avail_spare, &l2cache,
+	    NULL)) == 0)
 		return (zfs_error(hdl, EZFS_NODEVICE, msg));
 
 	if (avail_spare)
@@ -1828,7 +1848,8 @@ zpool_vdev_remove(zpool_handle_t *zhp, const char *path)
 	    dgettext(TEXT_DOMAIN, "cannot remove %s"), path);
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
-	if ((tgt = zpool_find_vdev(zhp, path, &avail_spare, &l2cache)) == 0)
+	if ((tgt = zpool_find_vdev(zhp, path, &avail_spare, &l2cache,
+	    NULL)) == 0)
 		return (zfs_error(hdl, EZFS_NODEVICE, msg));
 
 	if (!avail_spare && !l2cache) {
@@ -1870,7 +1891,7 @@ zpool_clear(zpool_handle_t *zhp, const char *path)
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	if (path) {
 		if ((tgt = zpool_find_vdev(zhp, path, &avail_spare,
-		    &l2cache)) == 0)
+		    &l2cache, NULL)) == 0)
 			return (zfs_error(hdl, EZFS_NODEVICE, msg));
 
 		/*

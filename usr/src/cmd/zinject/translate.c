@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libzfs.h>
 
 #undef verify	/* both libzfs.h and zfs_context.h want to define this */
@@ -450,7 +448,7 @@ translate_device(const char *pool, const char *device, err_type_t label_type,
 
 	record->zi_guid = strtoull(device, &end, 16);
 	if (record->zi_guid == 0 || *end != '\0') {
-		tgt = zpool_find_vdev(zhp, device, &isspare, &iscache);
+		tgt = zpool_find_vdev(zhp, device, &isspare, &iscache, NULL);
 
 		if (tgt == NULL) {
 			(void) fprintf(stderr, "cannot find device '%s' in "

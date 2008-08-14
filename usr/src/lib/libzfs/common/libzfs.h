@@ -27,8 +27,6 @@
 #ifndef	_LIBZFS_H
 #define	_LIBZFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <libnvpair.h>
 #include <sys/param.h>
@@ -222,7 +220,7 @@ extern int zpool_vdev_degrade(zpool_handle_t *, uint64_t);
 extern int zpool_vdev_clear(zpool_handle_t *, uint64_t);
 
 extern nvlist_t *zpool_find_vdev(zpool_handle_t *, const char *, boolean_t *,
-    boolean_t *);
+    boolean_t *, boolean_t *);
 extern int zpool_label_disk(libzfs_handle_t *, zpool_handle_t *, char *);
 
 /*
