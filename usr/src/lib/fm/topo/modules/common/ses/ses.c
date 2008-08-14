@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <dirent.h>
 #include <devid.h>
 #include <fm/libdiskstatus.h>
@@ -55,15 +53,6 @@
  * ses_enum_enclosure_t, which contains a set of ses targets, and a list of all
  * nodes found so far.
  */
-
-typedef struct ses_enum_target {
-	topo_list_t		set_link;
-	ses_target_t		*set_target;
-	ses_snap_t		*set_snap;
-	struct timeval		set_snaptime;
-	char			*set_devpath;
-	int			set_refcount;
-} ses_enum_target_t;
 
 typedef struct ses_enum_node {
 	topo_list_t		sen_link;

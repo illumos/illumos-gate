@@ -27,8 +27,6 @@
 #ifndef	_SES_H
 #define	_SES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 
 #include <scsi/libses.h>
@@ -47,6 +45,15 @@ extern int ses_node_enum_facility(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 extern int ses_enc_enum_facility(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
+
+typedef struct ses_enum_target {
+	topo_list_t		set_link;
+	ses_target_t		*set_target;
+	ses_snap_t		*set_snap;
+	struct timeval		set_snaptime;
+	char			*set_devpath;
+	int			set_refcount;
+} ses_enum_target_t;
 
 #define	TOPO_PGROUP_SES		"ses"
 #define	TOPO_PROP_NODE_ID	"node-id"

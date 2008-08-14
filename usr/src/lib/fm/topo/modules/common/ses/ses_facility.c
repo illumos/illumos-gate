@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Facility node support for SES enclosures.  We support the following facility
  * nodes, based on the node type:
@@ -300,7 +298,8 @@ ses_sensor_state(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
     nvlist_t *in, nvlist_t **out)
 {
 	nvlist_t *nvl, *args, *props;
-	boolean_t value;
+	boolean_t value, asserted;
+	uint64_t status;
 	uint32_t state;
 	ses_node_t *np;
 	char *prop;
@@ -318,12 +317,23 @@ ses_sensor_state(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
+	if (nvlist_lookup_uint64(props, SES_PROP_STATUS_CODE, &status) != 0)
+		status = SES_ESC_UNSUPPORTED;
+
 	state = 0;
 	if (nvlist_lookup_string(args, TOPO_METH_SES_STATE_PROP,
 	    &prop) == 0) {
-		/* discrete sensor */
+		/* discrete (fault) sensor */
+
+		asserted = B_FALSE;
 		if (nvlist_lookup_boolean_value(props, prop, &value) == 0 &&
 		    value)
+			asserted = B_TRUE;
+		if (status == SES_ESC_UNRECOVERABLE ||
+		    status == SES_ESC_CRITICAL)
+			asserted = B_TRUE;
+
+		if (asserted)
 			state |= TOPO_SENSOR_STATE_GENERIC_STATE_ASSERTED;
 		else
 			state |= TOPO_SENSOR_STATE_GENERIC_STATE_DEASSERTED;
@@ -395,19 +405,19 @@ ses_psu_state(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 
 	state = 0;
 	if ((nvlist_lookup_boolean_value(props, SES_PSU_PROP_DC_FAIL,
-	    &value) && value) ||
+	    &value) == 0 && value) ||
 	    (nvlist_lookup_boolean_value(props, SES_PSU_PROP_AC_FAIL,
-	    &value) && value))
+	    &value) == 0 && value))
 		state |= TOPO_SENSOR_STATE_POWER_SUPPLY_INPUT_LOST;
 
 	if (nvlist_lookup_boolean_value(props, SES_PSU_PROP_DC_UNDER_VOLTAGE,
-	    &value) && value)
+	    &value) == 0 && value)
 		state |= TOPO_SENSOR_STATE_POWER_SUPPLY_INPUT_RANGE;
 
 	if ((nvlist_lookup_boolean_value(props, SES_PSU_PROP_DC_OVER_VOLTAGE,
-	    &value) && value) ||
+	    &value) == 0 && value) ||
 	    (nvlist_lookup_boolean_value(props, SES_PSU_PROP_DC_OVER_CURRENT,
-	    &value) && value))
+	    &value) == 0 && value))
 		state |= TOPO_SENSOR_STATE_POWER_SUPPLY_INPUT_RANGE_PRES;
 
 	nvl = NULL;
@@ -434,6 +444,7 @@ ses_add_fac_common(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	tnode_t *tn;
 	topo_pgroup_info_t pgi;
 	int err;
+	ses_enum_target_t *stp = topo_node_getspecific(pnode);
 
 	if ((tn = topo_node_facbind(mod, pnode, name, type)) == NULL) {
 		topo_mod_dprintf(mod, "failed to bind facility node %s\n",
@@ -441,7 +452,8 @@ ses_add_fac_common(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		return (NULL);
 	}
 
-	topo_node_setspecific(tn, topo_node_getspecific(pnode));
+	stp->set_refcount++;
+	topo_node_setspecific(tn, stp);
 
 	pgi.tpi_name = TOPO_PGROUP_FACILITY;
 	pgi.tpi_namestab = TOPO_STABILITY_PRIVATE;
@@ -783,7 +795,7 @@ ses_node_enum_facility(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 		 * Add the fan speed sensor, and a discrete sensor for
 		 * detecting failure.
 		 */
-		sd.sd_type = TOPO_SENSOR_TYPE_FAN;
+		sd.sd_type = TOPO_SENSOR_TYPE_THRESHOLD_STATE;
 		sd.sd_units = TOPO_SENSOR_UNITS_RPM;
 		sd.sd_propname = SES_COOLING_PROP_FAN_SPEED;
 		if (ses_add_indicator(mod, tn, nodeid, TOPO_LED_TYPE_SERVICE,
