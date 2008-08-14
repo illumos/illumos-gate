@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/zfs_context.h>
 #include <sys/dmu.h>
 #include <sys/dmu_impl.h>
@@ -1075,14 +1073,14 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 		return (dr);
 	}
 
-	if (db->db_level == 0) {
-		dnode_new_blkid(dn, db->db_blkid, tx);
-		ASSERT(dn->dn_maxblkid >= db->db_blkid);
-	}
-
 	if (!RW_WRITE_HELD(&dn->dn_struct_rwlock)) {
 		rw_enter(&dn->dn_struct_rwlock, RW_READER);
 		drop_struct_lock = TRUE;
+	}
+
+	if (db->db_level == 0) {
+		dnode_new_blkid(dn, db->db_blkid, tx, drop_struct_lock);
+		ASSERT(dn->dn_maxblkid >= db->db_blkid);
 	}
 
 	if (db->db_level+1 < dn->dn_nlevels) {

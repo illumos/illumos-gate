@@ -26,8 +26,6 @@
 #ifndef	_SYS_DNODE_H
 #define	_SYS_DNODE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/zfs_context.h>
 #include <sys/avl.h>
 #include <sys/spa.h>
@@ -230,7 +228,7 @@ void dnode_clear_range(dnode_t *dn, uint64_t blkid,
     uint64_t nblks, dmu_tx_t *tx);
 void dnode_diduse_space(dnode_t *dn, int64_t space);
 void dnode_willuse_space(dnode_t *dn, int64_t space, dmu_tx_t *tx);
-void dnode_new_blkid(dnode_t *dn, uint64_t blkid, dmu_tx_t *tx);
+void dnode_new_blkid(dnode_t *dn, uint64_t blkid, dmu_tx_t *tx, boolean_t);
 uint64_t dnode_block_freed(dnode_t *dn, uint64_t blkid);
 void dnode_init(void);
 void dnode_fini(void);

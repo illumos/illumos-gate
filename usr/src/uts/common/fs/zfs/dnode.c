@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/zfs_context.h>
 #include <sys/dbuf.h>
 #include <sys/dnode.h>
@@ -841,19 +839,32 @@ fail:
 	return (ENOTSUP);
 }
 
+/* read-holding callers must not rely on the lock being continuously held */
 void
-dnode_new_blkid(dnode_t *dn, uint64_t blkid, dmu_tx_t *tx)
+dnode_new_blkid(dnode_t *dn, uint64_t blkid, dmu_tx_t *tx, boolean_t have_read)
 {
 	uint64_t txgoff = tx->tx_txg & TXG_MASK;
-	int drop_struct_lock = FALSE;
 	int epbs, new_nlevels;
 	uint64_t sz;
 
 	ASSERT(blkid != DB_BONUS_BLKID);
 
-	if (!RW_WRITE_HELD(&dn->dn_struct_rwlock)) {
-		rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
-		drop_struct_lock = TRUE;
+	ASSERT(have_read ?
+	    RW_READ_HELD(&dn->dn_struct_rwlock) :
+	    RW_WRITE_HELD(&dn->dn_struct_rwlock));
+
+	/*
+	 * if we have a read-lock, check to see if we need to do any work
+	 * before upgrading to a write-lock.
+	 */
+	if (have_read) {
+		if (blkid <= dn->dn_maxblkid)
+			return;
+
+		if (!rw_tryupgrade(&dn->dn_struct_rwlock)) {
+			rw_exit(&dn->dn_struct_rwlock);
+			rw_enter(&dn->dn_struct_rwlock, RW_WRITER);
+		}
 	}
 
 	if (blkid <= dn->dn_maxblkid)
@@ -905,8 +916,8 @@ dnode_new_blkid(dnode_t *dn, uint64_t blkid, dmu_tx_t *tx)
 	}
 
 out:
-	if (drop_struct_lock)
-		rw_exit(&dn->dn_struct_rwlock);
+	if (have_read)
+		rw_downgrade(&dn->dn_struct_rwlock);
 }
 
 void
