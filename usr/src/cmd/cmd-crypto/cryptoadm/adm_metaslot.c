@@ -84,7 +84,7 @@ list_metaslot_info(boolean_t show_mechs, boolean_t verbose,
 
 	(void) printf(gettext("System-wide Meta Slot Configuration:\n"));
 	/*
-	 * TRANSLATION_NOTE:
+	 * TRANSLATION_NOTE
 	 * Strictly for appearance's sake, this line should be as long as
 	 * the length of the translated text above.
 	 */
@@ -113,7 +113,7 @@ list_metaslot_info(boolean_t show_mechs, boolean_t verbose,
 	if (verbose) {
 		(void) printf(gettext("\nDetailed Meta Slot Information:\n"));
 		/*
-		 * TRANSLATION_NOTE:
+		 * TRANSLATION_NOTE
 		 * Strictly for appearance's sake, this line should be as
 		 * long as the length of the translated text above.
 		 */

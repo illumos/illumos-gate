@@ -313,7 +313,7 @@ list_mechlist_for_lib(char *libname, mechlist_t *mlist,
 	for (i = 0; i < slot_count; i++) {
 		if (verbose)
 			/*
-			 * TRANSLATION_NOTE:
+			 * TRANSLATION_NOTE
 			 * In some languages, the # symbol should be
 			 * converted to "no", an "n" followed by a
 			 * superscript "o"..
@@ -1223,14 +1223,14 @@ print_uef_policy(uentry_t *puent)
 
 	if (puent->flag_norandom == B_TRUE)
 		/*
-		 * TRANSLATION_NOTE:
+		 * TRANSLATION_NOTE
 		 * "random" is a keyword and not to be translated.
 		 */
 		(void) printf(gettext(" %s is disabled."), "random");
 	else {
 		if (rng_flag == HAS_RNG)
 			/*
-			 * TRANSLATION_NOTE:
+			 * TRANSLATION_NOTE
 			 * "random" is a keyword and not to be translated.
 			 */
 			(void) printf(gettext(" %s is enabled."), "random");
@@ -1810,7 +1810,7 @@ display_verbose_mech_header()
 	(void) printf("%28s %s", " ", HDR6);
 	(void) printf("%-28.28s %s", gettext("mechanism name"), HDR7);
 	/*
-	 * TRANSLATION_NOTE:
+	 * TRANSLATION_NOTE
 	 * Strictly for appearance's sake, the first header line should be
 	 * as long as the length of the translated text above.  The format
 	 * lengths should all match too.

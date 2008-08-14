@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -214,7 +212,7 @@ list_policy_for_hard(char *provname)
 			    "%s: all mechanisms are enabled."), provname);
 			if (has_random)
 				/*
-				 * TRANSLATION_NOTE:
+				 * TRANSLATION_NOTE
 				 * "random" is a keyword and not to be
 				 * translated.
 				 */
@@ -387,7 +385,7 @@ disable_kef_software(char *provname, boolean_t rndflag, boolean_t allflag,
 		return (FAILURE);
 	} else if (is_active == B_FALSE) {
 		/*
-		 * TRANSLATION_NOTE:
+		 * TRANSLATION_NOTE
 		 * "disable" is a keyword and not to be translated.
 		 */
 		cryptoerror(LOG_STDERR,
@@ -1323,7 +1321,7 @@ unload_kef_soft(char *provname, boolean_t do_check)
 		cryptodebug("CRYPTO_UNLOAD_SOFT_MODULE ioctl return_value = "
 		    "%d", punload_soft->sm_return_value);
 		/*
-		 * If the return value is CRYPTO_UNKNOWN_PRIVDER, it means
+		 * If the return value is CRYPTO_UNKNOWN_PROVIDER, it means
 		 * that the provider is not registered yet.  Should just
 		 * continue.
 		 */

@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -54,7 +53,7 @@ enum subcommand_index {
 	CRYPTO_HELP };
 
 /*
- * TRANSLATION_NOTE:
+ * TRANSLATION_NOTE
  * Command keywords are not to be translated.
  */
 static char *cmd_table[] = {
@@ -83,7 +82,7 @@ typedef struct {
 } cryptoadm_provider_t;
 
 /*
- * TRANSLATION_NOTE:
+ * TRANSLATION_NOTE
  * Operand keywords are not to be translated.
  */
 static const char *KN_PROVIDER = "provider=";
@@ -198,7 +197,7 @@ static void
 usage(void)
 {
 	/*
-	 * TRANSLATION_NOTE:
+	 * TRANSLATION_NOTE
 	 * Command usage is not to be translated.  Only the word "Usage:"
 	 * along with localized expressions indicating what kind of value
 	 * is expected for arguments.
@@ -252,7 +251,7 @@ usage(void)
  * - PROV_KEF_SOFT if provname is a base name only
  * - PROV_KEF_HARD if provname contains one slash only and the slash is not
  *	the 1st character.
- * - PROV_BADNAME othewise.
+ * - PROV_BADNAME otherwise.
  */
 static int
 get_provider_type(char *provname)
@@ -305,7 +304,7 @@ get_provider(int argc, char **argv)
 			if ((provstr = strdup(argv[c])) == NULL) {
 				int err = errno;
 				/*
-				 * TRANSLATION_NOTE:
+				 * TRANSLATION_NOTE
 				 * "get_provider" is a function name and should
 				 * not be translated.
 				 */
@@ -483,7 +482,7 @@ process_mech_operands(int argc, char **argv, boolean_t quiet)
 	if (!found) {
 		if (!quiet)
 			/*
-			 * TRANSLATION_NOTE:
+			 * TRANSLATION_NOTE
 			 * "mechanism" could be either a literal keyword
 			 * and hence not to be translated, or a descriptive
 			 * word and translatable.  A choice was made to
@@ -663,7 +662,7 @@ do_list(int argc, char **argv)
 					    prov->cp_name);
 				} else {
 					/*
-					 * TRANSLATION_NOTE:
+					 * TRANSLATION_NOTE
 					 * "global" is keyword and not to
 					 * be translated.
 					 */
@@ -680,7 +679,7 @@ do_list(int argc, char **argv)
 					    prov->cp_name);
 				} else {
 					/*
-					 * TRANSLATION_NOTE:
+					 * TRANSLATION_NOTE
 					 * "global" is keyword and not to
 					 * be translated.
 					 */
@@ -778,7 +777,7 @@ do_disable(int argc, char **argv)
 			    allflag, mecharglist);
 		} else {
 			/*
-			 * TRANSLATION_NOTE:
+			 * TRANSLATION_NOTE
 			 * "disable" could be either a literal keyword
 			 * and hence not to be translated, or a verb and
 			 * translatable.  A choice was made to view it as
@@ -803,7 +802,7 @@ do_disable(int argc, char **argv)
 			    allflag, mecharglist);
 		} else {
 			/*
-			 * TRANSLATION_NOTE:
+			 * TRANSLATION_NOTE
 			 * "disable" could be either a literal keyword
 			 * and hence not to be translated, or a verb and
 			 * translatable.  A choice was made to view it as
@@ -911,7 +910,7 @@ do_enable(int argc, char **argv)
 			    mecharglist);
 		} else {
 			/*
-			 * TRANSLATION_NOTE:
+			 * TRANSLATION_NOTE
 			 * "enable" could be either a literal keyword
 			 * and hence not to be translated, or a verb and
 			 * translatable.  A choice was made to view it as
@@ -962,7 +961,7 @@ do_install(int argc, char **argv)
 	if (prov == NULL ||
 	    prov->cp_type == PROV_BADNAME || prov->cp_type == PROV_KEF_HARD) {
 		/*
-		 * TRANSLATION_NOTE:
+		 * TRANSLATION_NOTE
 		 * "install" could be either a literal keyword and hence
 		 * not to be translated, or a verb and translatable.  A
 		 * choice was made to view it as a literal keyword.
@@ -983,7 +982,7 @@ do_install(int argc, char **argv)
 	/* check if there are mechanism operands */
 	if (argc < 4) {
 		/*
-		 * TRANSLATION_NOTE:
+		 * TRANSLATION_NOTE
 		 * "mechanism" could be either a literal keyword and hence
 		 * not to be translated, or a descriptive word and
 		 * translatable.  A choice was made to view it as a literal
@@ -1002,7 +1001,7 @@ do_install(int argc, char **argv)
 
 	if (allflag == B_TRUE) {
 		/*
-		 * TRANSLATION_NOTE:
+		 * TRANSLATION_NOTE
 		 * "all", "mechanism", and "install" are all keywords and
 		 * not to be translated.
 		 */
@@ -1017,7 +1016,7 @@ do_install(int argc, char **argv)
 		rc = install_kef(prov->cp_name, mecharglist);
 	} else {
 		/*
-		 * TRANSLATION_NOTE:
+		 * TRANSLATION_NOTE
 		 * "install" could be either a literal keyword and hence
 		 * not to be translated, or a verb and translatable.  A
 		 * choice was made to view it as a literal keyword.
@@ -1052,7 +1051,7 @@ do_uninstall(int argc, char **argv)
 	if (prov == NULL ||
 	    prov->cp_type == PROV_BADNAME || prov->cp_type == PROV_KEF_HARD) {
 		/*
-		 * TRANSLATION_NOTE:
+		 * TRANSLATION_NOTE
 		 * "uninstall" could be either a literal keyword and hence
 		 * not to be translated, or a verb and translatable.  A
 		 * choice was made to view it as a literal keyword.
@@ -1070,7 +1069,7 @@ do_uninstall(int argc, char **argv)
 			rc = uninstall_kef(prov->cp_name);
 		} else {
 			/*
-			 * TRANSLATION_NOTE:
+			 * TRANSLATION_NOTE
 			 * "uninstall" could be either a literal keyword and
 			 * hence not to be translated, or a verb and
 			 * translatable.  A choice was made to view it as a
@@ -1122,7 +1121,7 @@ do_unload(int argc, char **argv)
 
 	if (getzoneid() != GLOBAL_ZONEID) {
 		/*
-		 * TRANSLATION_NOTE:
+		 * TRANSLATION_NOTE
 		 * "unload" could be either a literal keyword and hence
 		 * not to be translated, or a verb and translatable.
 		 * A choice was made to view it as a literal keyword.
@@ -1382,7 +1381,7 @@ list_mechlist_for_all(boolean_t verbose)
 	/* get user-level providers */
 	(void) printf(gettext("\nUser-level providers:\n"));
 	/*
-	 * TRANSLATION_NOTE:
+	 * TRANSLATION_NOTE
 	 * Strictly for appearance's sake, this line should be as long as
 	 * the length of the translated text above.
 	 */
@@ -1412,7 +1411,7 @@ list_mechlist_for_all(boolean_t verbose)
 	/* get kernel software providers */
 	(void) printf(gettext("\nKernel software providers:\n"));
 	/*
-	 * TRANSLATION_NOTE:
+	 * TRANSLATION_NOTE
 	 * Strictly for appearance's sake, this line should be as long as
 	 * the length of the translated text above.
 	 */
@@ -1487,7 +1486,7 @@ list_mechlist_for_all(boolean_t verbose)
 	/* Get kernel hardware providers and their mechanism lists */
 	(void) printf(gettext("\nKernel hardware providers:\n"));
 	/*
-	 * TRANSLATION_NOTE:
+	 * TRANSLATION_NOTE
 	 * Strictly for appearance's sake, this line should be as long as
 	 * the length of the translated text above.
 	 */
@@ -1542,7 +1541,7 @@ list_policy_for_all(void)
 	/* Get user-level providers */
 	(void) printf(gettext("\nUser-level providers:\n"));
 	/*
-	 * TRANSLATION_NOTE:
+	 * TRANSLATION_NOTE
 	 * Strictly for appearance's sake, this line should be as long as
 	 * the length of the translated text above.
 	 */
@@ -1569,7 +1568,7 @@ list_policy_for_all(void)
 	/* kernel software providers */
 	(void) printf(gettext("\nKernel software providers:\n"));
 	/*
-	 * TRANSLATION_NOTE:
+	 * TRANSLATION_NOTE
 	 * Strictly for appearance's sake, this line should be as long as
 	 * the length of the translated text above.
 	 */
@@ -1600,7 +1599,7 @@ list_policy_for_all(void)
 		/* kcf.conf not there in non-global zone, no policy info */
 
 		/*
-		 * TRANSLATION_NOTE:
+		 * TRANSLATION_NOTE
 		 * "global" is keyword and not to be translated.
 		 */
 		cryptoerror(LOG_STDERR, gettext(
@@ -1611,7 +1610,7 @@ list_policy_for_all(void)
 	/* Kernel hardware providers */
 	(void) printf(gettext("\nKernel hardware providers:\n"));
 	/*
-	 * TRANSLATION_NOTE:
+	 * TRANSLATION_NOTE
 	 * Strictly for appearance's sake, this line should be as long as
 	 * the length of the translated text above.
 	 */
@@ -1619,7 +1618,7 @@ list_policy_for_all(void)
 
 	if (getzoneid() != GLOBAL_ZONEID) {
 		/*
-		 * TRANSLATION_NOTE:
+		 * TRANSLATION_NOTE
 		 * "global" is keyword and not to be translated.
 		 */
 		cryptoerror(LOG_STDERR, gettext(
