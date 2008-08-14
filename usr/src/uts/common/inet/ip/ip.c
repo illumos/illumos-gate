@@ -25,8 +25,6 @@
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/dlpi.h>
@@ -1226,7 +1224,7 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 			IPI_PRIV | IPI_WR | IPI_REPL,
 			LIF_CMD, ip_sioctl_move, ip_sioctl_move },
 	/* 155 */ { SIOCSLIFGROUPNAME, sizeof (struct lifreq),
-			IPI_PRIV | IPI_WR,
+			IPI_PRIV | IPI_WR | IPI_REPL,
 			LIF_CMD, ip_sioctl_groupname, ip_sioctl_groupname },
 	/* 156 */ { SIOCGLIFGROUPNAME, sizeof (struct lifreq),
 			IPI_GET_CMD | IPI_REPL,

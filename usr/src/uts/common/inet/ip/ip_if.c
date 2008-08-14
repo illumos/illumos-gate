@@ -24,8 +24,6 @@
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the interface control functions for IP.
  */
@@ -17447,7 +17445,7 @@ ipif_move(ipif_t *ipif, ill_t *to_ill, queue_t *q, mblk_t *mp,
 	to_ipif = to_ill->ill_ipif;
 	if ((to_ill->ill_phyint->phyint_ifindex ==
 	    ipif->ipif_orig_ifindex) &&
-	    IPIF_REPL_CHECK(to_ipif, failback_cmd)) {
+	    to_ipif->ipif_replace_zero) {
 		ASSERT(to_ipif->ipif_id == 0);
 		remove_ipif = B_TRUE;
 		to_ipif->ipif_id = MAX_ADDRS_PER_IF;
