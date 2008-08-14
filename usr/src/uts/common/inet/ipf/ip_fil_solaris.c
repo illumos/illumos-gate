@@ -7,8 +7,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_fil_solaris.c	1.7 07/22/06 (C) 1993-2000 Darren Reed";
 static const char rcsid[] = "@(#)$Id: ip_fil_solaris.c,v 2.62.2.19 2005/07/13 21:40:46 darrenr Exp $";
@@ -1113,6 +1111,7 @@ mblk_t *m, **mpp;
 	fnew.fin_ifp = fin->fin_ifp;
 	fnew.fin_flx = FI_NOCKSUM;
 	fnew.fin_m = m;
+	fnew.fin_qfm = m;
 	fnew.fin_ip = ip;
 	fnew.fin_mp = mpp;
 	fnew.fin_hlen = hlen;

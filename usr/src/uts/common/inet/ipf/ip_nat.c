@@ -7,8 +7,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"$
-
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
 # undef _KERNEL
@@ -3790,8 +3788,10 @@ ipnat_t *np;
 /* ------------------------------------------------------------------------ */
 /* Function:    nat_update                                                  */
 /* Returns:     Nil                                                         */
-/* Parameters:  nat(I)    - pointer to NAT structure                        */
+/* Parameters:	fin(I) - pointer to packet information			    */
+/*		nat(I) - pointer to NAT structure			    */
 /*              np(I)     - pointer to NAT rule                             */
+/* Locks:	nat_lock						    */
 /*                                                                          */
 /* Updates the lifetime of a NAT table entry for non-TCP packets.  Must be  */
 /* called with fin_rev updated - i.e. after calling nat_proto().            */
@@ -3805,7 +3805,6 @@ ipnat_t *np;
 	ipftqent_t *tqe;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
-	MUTEX_ENTER(&nat->nat_lock);
 	tqe = &nat->nat_tqe;
 	ifq = tqe->tqe_ifq;
 
@@ -3833,7 +3832,6 @@ ipnat_t *np;
 
 		fr_movequeue(tqe, ifq, ifq2, ifs);
 	}
-	MUTEX_EXIT(&nat->nat_lock);
 }
 
 
@@ -3992,6 +3990,9 @@ maskloop:
 		rval = fr_natout(fin, nat, natadd, nflags);
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
+			nat_update(fin, nat, nat->nat_ptr);
+			nat->nat_bytes[1] += fin->fin_plen;
+			nat->nat_pkts[1]++;
 			nat->nat_ref++;
 			MUTEX_EXIT(&nat->nat_lock);
 			nat->nat_touched = ifs->ifs_fr_ticks;
@@ -4054,11 +4055,6 @@ u_32_t nflags;
 
 	if ((natadd != 0) && (fin->fin_flx & FI_FRAG))
 		(void) fr_nat_newfrag(fin, 0, nat);
-
-	MUTEX_ENTER(&nat->nat_lock);
-	nat->nat_bytes[1] += fin->fin_plen;
-	nat->nat_pkts[1]++;
-	MUTEX_EXIT(&nat->nat_lock);
 	
 	/*
 	 * Fix up checksums, not by recalculating them, but
@@ -4115,8 +4111,6 @@ u_32_t nflags;
 	}
 
 	fin->fin_ip->ip_src = nat->nat_outip;
-
-	nat_update(fin, nat, np);
 
 	/*
 	 * The above comments do not hold for layer 4 (or higher) checksums...
@@ -4315,6 +4309,9 @@ maskloop:
 		rval = fr_natin(fin, nat, natadd, nflags);
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
+			nat_update(fin, nat, nat->nat_ptr);
+			nat->nat_bytes[0] += fin->fin_plen;
+			nat->nat_pkts[0]++;
 			nat->nat_ref++;
 			MUTEX_EXIT(&nat->nat_lock);
 			nat->nat_touched = ifs->ifs_fr_ticks;
@@ -4403,11 +4400,6 @@ u_32_t nflags;
 	ipfsync_update(SMC_NAT, fin, nat->nat_sync);
 #endif
 
-	MUTEX_ENTER(&nat->nat_lock);
-	nat->nat_bytes[0] += fin->fin_plen;
-	nat->nat_pkts[0]++;
-	MUTEX_EXIT(&nat->nat_lock);
-
 	fin->fin_ip->ip_dst = nat->nat_inip;
 	fin->fin_fi.fi_daddr = nat->nat_inip.s_addr;
 	if (nflags & IPN_TCPUDP)
@@ -4446,8 +4438,6 @@ u_32_t nflags;
 
 		csump = nat_proto(fin, nat, nflags);
 	}
-
-	nat_update(fin, nat, np);
 
 	/*
 	 * In case they are being forwarded, inbound packets always need to have
