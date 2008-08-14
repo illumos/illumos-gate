@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	_SYSCALL32
 
@@ -144,9 +142,9 @@ establish_breakpoints(void)
 	/* allocate the breakpoint hash table */
 	if (bpt_hashtable == NULL) {
 		bpt_hashtable = my_malloc(HASHSZ * sizeof (struct bkpt *),
-			NULL);
+		    NULL);
 		(void) memset(bpt_hashtable, 0,
-			HASHSZ * sizeof (struct bkpt *));
+		    HASHSZ * sizeof (struct bkpt *));
 	}
 
 	/*
@@ -267,8 +265,8 @@ establish_stacks(void)
 	 * Iterate over unbound threads, establishing stacks.
 	 */
 	(void) td_ta_thr_iter(Thr_agent, thr_stack_traps, NULL,
-		TD_THR_ANY_STATE, TD_THR_LOWEST_PRIORITY,
-		TD_SIGNO_MASK, TD_THR_ANY_USER_FLAGS);
+	    TD_THR_ANY_STATE, TD_THR_LOWEST_PRIORITY,
+	    TD_SIGNO_MASK, TD_THR_ANY_USER_FLAGS);
 }
 
 void
@@ -281,8 +279,8 @@ do_symbol_iter(const char *object_name, struct dynpat *Dyp)
 	 * Always search the dynamic symbol table.
 	 */
 	(void) Psymbol_iter(Proc, object_name,
-		PR_DYNSYM, BIND_WEAK|BIND_GLOBAL|TYPE_FUNC,
-		symbol_iter, Dyp);
+	    PR_DYNSYM, BIND_WEAK|BIND_GLOBAL|TYPE_FUNC,
+	    symbol_iter, Dyp);
 
 	/*
 	 * Search the static symbol table if this is the
@@ -291,8 +289,8 @@ do_symbol_iter(const char *object_name, struct dynpat *Dyp)
 	 */
 	if (object_name == PR_OBJ_EXEC || Dyp->internal)
 		(void) Psymbol_iter(Proc, object_name,
-			PR_SYMTAB, BIND_ANY|TYPE_FUNC,
-			symbol_iter, Dyp);
+		    PR_SYMTAB, BIND_ANY|TYPE_FUNC,
+		    symbol_iter, Dyp);
 }
 
 /* ARGSUSED */
@@ -352,7 +350,7 @@ object_iter(void *cd, const prmap_t *pmp, const char *object_name)
 
 	if (hflag && not_consist)
 		(void) fprintf(stderr, "not_consist is TRUE, building %s\n",
-			Dp->lib_name);
+		    Dp->lib_name);
 
 	Dp->base = pmp->pr_vaddr;
 	Dp->size = pmp->pr_size;
@@ -609,22 +607,22 @@ report_htable_stats(void)
 	for (i = 0; i < HASHSZ; i++)
 		if (bucket[i])
 			(void) fprintf(stderr, "    %3u buckets of size %d\n",
-				bucket[i], i);
+			    bucket[i], i);
 
 	(void) fprintf(stderr, "truss-detected stacks --------\n");
 	for (Stk = callstack; Stk != NULL; Stk = Stk->next) {
 		(void) fprintf(stderr,
-			"    base = 0x%.8lx  end = 0x%.8lx  size = %ld\n",
-			(ulong_t)Stk->stkbase,
-			(ulong_t)Stk->stkend,
-			(ulong_t)(Stk->stkend - Stk->stkbase));
+		    "    base = 0x%.8lx  end = 0x%.8lx  size = %ld\n",
+		    (ulong_t)Stk->stkbase,
+		    (ulong_t)Stk->stkend,
+		    (ulong_t)(Stk->stkend - Stk->stkbase));
 	}
 	(void) fprintf(stderr, "primary unix stack --------\n");
 	(void) fprintf(stderr,
-		"    base = 0x%.8lx  end = 0x%.8lx  size = %ld\n",
-		(ulong_t)Psp->pr_stkbase,
-		(ulong_t)(Psp->pr_stkbase + Psp->pr_stksize),
-		(ulong_t)Psp->pr_stksize);
+	    "    base = 0x%.8lx  end = 0x%.8lx  size = %ld\n",
+	    (ulong_t)Psp->pr_stkbase,
+	    (ulong_t)(Psp->pr_stkbase + Psp->pr_stksize),
+	    (ulong_t)Psp->pr_stksize);
 	(void) fprintf(stderr, "nthr_create = %u\n", nthr_create);
 }
 
@@ -800,7 +798,7 @@ find_lwp_stack(uintptr_t sp)
 			Stk->ncall = 0;
 			Stk->maxcall = DEF_MAXCALL;
 			Stk->stack = my_malloc(
-				DEF_MAXCALL * sizeof (*Stk->stack), NULL);
+			    DEF_MAXCALL * sizeof (*Stk->stack), NULL);
 			break;
 		}
 	}
@@ -842,7 +840,7 @@ find_stack(uintptr_t sp)
 		Stk->ncall = 0;
 		Stk->maxcall = DEF_MAXCALL;
 		Stk->stack = my_malloc(DEF_MAXCALL * sizeof (*Stk->stack),
-			NULL);
+		    NULL);
 		return (Stk);
 	}
 
@@ -863,7 +861,7 @@ find_stack(uintptr_t sp)
 		Stk->ncall = 0;
 		Stk->maxcall = DEF_MAXCALL;
 		Stk->stack = my_malloc(DEF_MAXCALL * sizeof (*Stk->stack),
-			NULL);
+		    NULL);
 		return (Stk);
 	}
 
@@ -874,18 +872,18 @@ find_stack(uintptr_t sp)
 	if ((error = td_ta_map_lwp2thr(Thr_agent, lwpid, &th)) != TD_OK) {
 		if (hflag)
 			(void) fprintf(stderr,
-				"cannot get thread handle for "
-				"lwp#%d, error=%d, tref=0x%.8lx\n",
-				(int)lwpid, error, (long)tref);
+			    "cannot get thread handle for "
+			    "lwp#%d, error=%d, tref=0x%.8lx\n",
+			    (int)lwpid, error, (long)tref);
 		return (NULL);
 	}
 
 	if ((error = td_thr_get_info(&th, &thrinfo)) != TD_OK) {
 		if (hflag)
 			(void) fprintf(stderr,
-				"cannot get thread info for "
-				"lwp#%d, error=%d, tref=0x%.8lx\n",
-				(int)lwpid, error, (long)tref);
+			    "cannot get thread info for "
+			    "lwp#%d, error=%d, tref=0x%.8lx\n",
+			    (int)lwpid, error, (long)tref);
 		return (NULL);
 	}
 
@@ -904,19 +902,19 @@ find_stack(uintptr_t sp)
 		Stk->ncall = 0;
 		Stk->maxcall = DEF_MAXCALL;
 		Stk->stack = my_malloc(DEF_MAXCALL * sizeof (*Stk->stack),
-			NULL);
+		    NULL);
 		return (Stk);
 	}
 
 	/* stack bounds failure -- complain bitterly */
 	if (hflag) {
 		(void) fprintf(stderr,
-			"sp not within thread stack: "
-			"sp=0x%.8lx stkbase=0x%.8lx stkend=0x%.8lx\n",
-			(ulong_t)sp,
-			/* The bloody fools got this backwards! */
-			(ulong_t)thrinfo.ti_stkbase - thrinfo.ti_stksize,
-			(ulong_t)thrinfo.ti_stkbase);
+		    "sp not within thread stack: "
+		    "sp=0x%.8lx stkbase=0x%.8lx stkend=0x%.8lx\n",
+		    (ulong_t)sp,
+		    /* The bloody fools got this backwards! */
+		    (ulong_t)thrinfo.ti_stkbase - thrinfo.ti_stksize,
+		    (ulong_t)thrinfo.ti_stkbase);
 	}
 
 	return (NULL);
@@ -960,18 +958,18 @@ get_tid(struct callstack *Stk)
 	if ((error = td_ta_map_lwp2thr(Thr_agent, lwpid, &th)) != TD_OK) {
 		if (hflag)
 			(void) fprintf(stderr,
-				"cannot get thread handle for "
-				"lwp#%d, error=%d, tref=0x%.8lx\n",
-				(int)lwpid, error, (long)tref);
+			    "cannot get thread handle for "
+			    "lwp#%d, error=%d, tref=0x%.8lx\n",
+			    (int)lwpid, error, (long)tref);
 		Stk->tref = 0;
 		Stk->tid = 0;
 		Stk->nthr_create = 0;
 	} else if ((error = td_thr_get_info(&th, &thrinfo)) != TD_OK) {
 		if (hflag)
 			(void) fprintf(stderr,
-				"cannot get thread info for "
-				"lwp#%d, error=%d, tref=0x%.8lx\n",
-				(int)lwpid, error, (long)tref);
+			    "cannot get thread info for "
+			    "lwp#%d, error=%d, tref=0x%.8lx\n",
+			    (int)lwpid, error, (long)tref);
 		Stk->tref = 0;
 		Stk->tid = 0;
 		Stk->nthr_create = 0;
@@ -1145,8 +1143,8 @@ clear_breakpoints(void)
 	if (Thr_agent != NULL) {
 		td_thr_events_t events;
 
-		td_event_emptyset(&events);
-		(void) td_ta_set_event(Thr_agent, &events);
+		td_event_fillset(&events);
+		(void) td_ta_clear_event(Thr_agent, &events);
 		(void) td_ta_delete(Thr_agent);
 	}
 	Thr_agent = NULL;
@@ -1269,9 +1267,9 @@ function_trace(private_t *pri, int first, int clear, int dotrace)
 	if ((Bp = get_bkpt(pc)) == NULL) {
 		if (hflag)
 			(void) fprintf(stderr,
-				"function_trace(): "
-				"cannot find breakpoint for pc: 0x%.8lx\n",
-				(ulong_t)pc);
+			    "function_trace(): "
+			    "cannot find breakpoint for pc: 0x%.8lx\n",
+			    (ulong_t)pc);
 		return (-1);
 	}
 
@@ -1281,13 +1279,13 @@ function_trace(private_t *pri, int first, int clear, int dotrace)
 		if (hflag) {
 			if (Bp->flags & BPT_PREINIT)
 				(void) fprintf(stderr, "function_trace(): "
-					"RD_PREINIT breakpoint\n");
+				    "RD_PREINIT breakpoint\n");
 			if (Bp->flags & BPT_POSTINIT)
 				(void) fprintf(stderr, "function_trace(): "
-					"RD_POSTINIT breakpoint\n");
+				    "RD_POSTINIT breakpoint\n");
 			if (Bp->flags & BPT_DLACTIVITY)
 				(void) fprintf(stderr, "function_trace(): "
-					"RD_DLACTIVITY breakpoint\n");
+				    "RD_DLACTIVITY breakpoint\n");
 		}
 		if (rd_event_getmsg(Rdb_agent, &event_msg) == RD_OK) {
 			if (event_msg.type == RD_DLACTIVITY) {
@@ -1326,12 +1324,12 @@ function_trace(private_t *pri, int first, int clear, int dotrace)
 					break;
 				default:
 					(void) sprintf(buf, "0x%x",
-						event_msg.type);
+					    event_msg.type);
 					et = buf;
 					break;
 				}
 				(void) fprintf(stderr,
-					"event_msg.type = %s ", et);
+				    "event_msg.type = %s ", et);
 				switch (event_msg.u.state) {
 				case RD_NOSTATE:
 					et = "RD_NOSTATE";
@@ -1347,12 +1345,12 @@ function_trace(private_t *pri, int first, int clear, int dotrace)
 					break;
 				default:
 					(void) sprintf(buf, "0x%x",
-						event_msg.u.state);
+					    event_msg.u.state);
 					et = buf;
 					break;
 				}
 				(void) fprintf(stderr,
-					"event_msg.u.state = %s\n", et);
+				    "event_msg.u.state = %s\n", et);
 			}
 		}
 	}
@@ -1361,7 +1359,7 @@ function_trace(private_t *pri, int first, int clear, int dotrace)
 		nthr_create++;
 		if (hflag)
 			(void) fprintf(stderr, "function_trace(): "
-				"BPT_TD_CREATE breakpoint\n");
+			    "BPT_TD_CREATE breakpoint\n");
 		/* we don't care about the event message */
 	}
 
@@ -1547,7 +1545,7 @@ function_return(private_t *pri, struct callstack *Stk)
 
 	if ((i >= 0) && (!cflag)) {
 		show_function_return(pri, Lsp->pr_reg[R_R0], 0,
-			Stk, Stk->stack[i].fcn->dyn, Stk->stack[i].fcn);
+		    Stk, Stk->stack[i].fcn->dyn, Stk->stack[i].fcn);
 	}
 }
 
@@ -1593,7 +1591,7 @@ trap_one_stack(prgregset_t reg)
 		if (++nframe == maxframe) {
 			maxframe *= 2;
 			frame = my_realloc(frame, maxframe * sizeof (*frame),
-				NULL);
+			    NULL);
 		}
 	}
 
@@ -1860,7 +1858,7 @@ get_arguments32(long *argp)
 	int i;
 
 	narg = Pread(Proc, frame, sizeof (frame),
-		(uintptr_t)Lsp->pr_reg[R_SP]);
+	    (uintptr_t)Lsp->pr_reg[R_SP]);
 	narg -= sizeof (greg32_t);
 	if (narg <= 0)
 		return (0);
