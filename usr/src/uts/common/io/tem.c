@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ANSI terminal emulator module; parse ANSI X3.64 escape sequences and
@@ -60,7 +58,7 @@
 #ifdef _HAVE_TEM_FIRMWARE
 #include <sys/promif.h>
 #endif /* _HAVE_TEM_FIRMWARE */
-#include <sys/consconfig_dacf.h>
+#include <sys/consplat.h>
 
 /* Terminal emulator functions */
 static int	tem_setup_terminal(struct vis_devinit *, tem_t *,

@@ -27,15 +27,12 @@
 #ifndef	_SYS_CONSCONFIG_DACF_H
 #define	_SYS_CONSCONFIG_DACF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 #define	CONS_MS		1
 #define	CONS_KBD	2
-
 
 /*
  * This structure contains information about keyboard
@@ -115,31 +112,7 @@ typedef struct cons_state {
 
 #define	DPRINTF consconfig_dprintf
 
-/*
- * Implementation functions from consplat
- */
-extern int	plat_use_polled_debug(void);
-extern char	*plat_stdinpath(void);
-extern char	*plat_stdoutpath(void);
-extern char	*plat_fbpath(void);
-extern char	*plat_kbdpath(void);
-extern char	*plat_mousepath(void);
-extern int	plat_stdout_is_framebuffer(void);
-extern int	plat_stdin_is_keyboard(void);
-extern int	plat_virtual_console_path(char **);
-
-extern void	plat_tem_get_inverses(int *, int *);
-extern void	plat_tem_get_prom_font_size(int *, int *);
-extern void	plat_tem_get_prom_size(size_t *, size_t *);
-extern void	plat_tem_hide_prom_cursor(void);
-extern void	plat_tem_get_prom_pos(uint32_t *, uint32_t *);
-
-
-/*
- * Other external functions
- */
 extern void	kadb_uses_kernel(void);
-
 
 #ifdef	__cplusplus
 }

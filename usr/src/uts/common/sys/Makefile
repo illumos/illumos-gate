@@ -125,6 +125,7 @@ CHKHDRS=			\
 	conf.h			\
 	consdev.h		\
 	console.h		\
+        consplat.h              \
 	contract.h		\
 	contract_impl.h		\
 	copyops.h		\

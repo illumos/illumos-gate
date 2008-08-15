@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module performs two functions.  First, it kicks off the driver loading
  * of the console devices during boot in dynamic_console_config().
@@ -127,6 +125,7 @@
 #include <sys/kmem.h>
 #include <sys/dacf.h>
 #include <sys/consconfig_dacf.h>
+#include <sys/consplat.h>
 #include <sys/log.h>
 #include <sys/disp.h>
 
@@ -260,7 +259,7 @@ struct dacfsw dacfsw = {
 
 struct modldacf modldacf = {
 	&mod_dacfops,   /* Type of module */
-	"Consconfig DACF %I%",
+	"Consconfig DACF",
 	&dacfsw
 };
 

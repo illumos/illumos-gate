@@ -22,8 +22,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4 */
-
 /*
  * Ported from 4.1.1_PSRA: "@(#)openprom.c 1.19 91/02/19 SMI";
  *
@@ -56,6 +54,7 @@
 #include <sys/nvpair.h>
 #include <sys/wanboot_impl.h>
 #include <sys/zone.h>
+#include <sys/consplat.h>
 
 #define	MAX_OPENS	32	/* Up to this many simultaneous opens */
 
@@ -63,9 +62,6 @@
 #define	IOC_SNAP	1	/* snapshot in progress */
 #define	IOC_DONE	2	/* snapshot done, but not copied out */
 #define	IOC_COPY	3	/* copyout in progress */
-
-extern int plat_stdout_is_framebuffer(void);
-extern int plat_stdin_is_keyboard(void);
 
 /*
  * XXX	Make this dynamic.. or (better still) make the interface stateless
@@ -134,7 +130,7 @@ static struct dev_ops openeepr_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"OPENPROM/NVRAM Driver v%I%",
+	"OPENPROM/NVRAM Driver",
 	&openeepr_ops
 };
 
