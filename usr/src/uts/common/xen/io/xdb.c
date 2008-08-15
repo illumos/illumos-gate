@@ -48,8 +48,6 @@
  * There is an on-going effort to make xvdi_* cover all xenbus_*.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -814,7 +812,11 @@ xdb_setup_node(xdb_t *vdp, char *path)
 	if (xsnode == NULL)
 		return (DDI_FAILURE);
 
-	err = xenbus_read(XBT_NULL, xsnode, "params", (void **)&node, &len);
+	err = xenbus_read(XBT_NULL, xsnode, "dynamic-device-path",
+	    (void **)&node, &len);
+	if (err == ENOENT)
+		err = xenbus_read(XBT_NULL, xsnode, "params", (void **)&node,
+		    &len);
 	if (err != 0) {
 		xvdi_fatal_error(vdp->xs_dip, err, "reading 'params'");
 		return (DDI_FAILURE);
@@ -875,7 +877,11 @@ xdb_teardown_node(xdb_t *vdp)
 	if (xsnode == NULL)
 		return;
 
-	err = xenbus_read(XBT_NULL, xsnode, "params", (void **)&node, &len);
+	err = xenbus_read(XBT_NULL, xsnode, "dynamic-device-path",
+	    (void **)&node, &len);
+	if (err == ENOENT)
+		err = xenbus_read(XBT_NULL, xsnode, "params", (void **)&node,
+		    &len);
 	if (err != 0) {
 		xvdi_fatal_error(vdp->xs_dip, err, "reading 'params'");
 		return;
@@ -1522,7 +1528,7 @@ static struct dev_ops xdb_dev_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops,			/* Type of module. */
-	"vbd backend driver 1.4",	/* Name of the module */
+	"vbd backend driver 1.5",	/* Name of the module */
 	&xdb_dev_ops			/* driver ops */
 };
 
