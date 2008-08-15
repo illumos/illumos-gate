@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Internal utility routines for the ZFS library.
  */
@@ -414,7 +412,7 @@ zpool_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 
 	case EBUSY:
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "pool is busy"));
-		zfs_verror(hdl, EZFS_EXISTS, fmt, ap);
+		zfs_verror(hdl, EZFS_BUSY, fmt, ap);
 		break;
 
 	case ENXIO:
