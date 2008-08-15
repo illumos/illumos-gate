@@ -28,8 +28,6 @@
  * this module provides the simulated fault management exercise.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -972,10 +970,11 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 {
 	struct node *serdinst;
 	char *serdname;
+	char *serdresource;
 	struct node *nid;
 	struct serd_entry *newentp;
-	int i, serdn = -1, serdincrement = 1;
-	char *serdsuffix = NULL, *serdt = NULL;
+	int i, serdn = -1, serdincrement = 1, len = 0;
+	char *serdsuffix = NULL, *serdt = NULL, *ptr;
 	struct evalue *ep;
 
 	ASSERT(sp->t == N_UPSET);
@@ -1012,15 +1011,24 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 		return (-1);
 
 	serdname = ipath2str(serdinst->u.stmt.np->u.event.ename->u.name.s,
+	    NULL);
+	serdresource = ipath2str(NULL,
 	    ipath(serdinst->u.stmt.np->u.event.epname));
 
+	len = strlen(serdname) + strlen(serdresource) + 2;
+	if (serdsuffix != NULL)
+		len += strlen(serdsuffix);
+
+	ptr = MALLOC(len);
 	if (serdsuffix != NULL) {
-		int len = strlen(serdname) + strlen(serdsuffix) + 1;
-		char *ptr = MALLOC(len);
-		(void) snprintf(ptr, len, "%s%s", serdname, serdsuffix);
-		FREE(serdname);
-		serdname = ptr;
+		(void) snprintf(ptr, len, "%s%s@%s", serdname, serdsuffix,
+		    serdresource);
+	} else {
+		(void) snprintf(ptr, len, "%s@%s", serdname, serdresource);
 	}
+	FREE(serdname);
+	FREE(serdresource);
+	serdname = ptr;
 
 	/* handle serd engine "id" property, if there is one */
 	if ((nid =
