@@ -25,8 +25,6 @@
  * raidctl.c is the entry file of RAID configuration utility.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -1628,7 +1626,8 @@ snapshot_array(raid_obj_handle_t array_handle, uint8_t indent, uint8_t is_sub,
 					    arraypart_attr.tag.cidl.target_id,
 					    arraypart_attr.tag.cidl.lun);
 				}
-				(void) strcat(diskbuf, tempbuf);
+				(void) strlcat(diskbuf, tempbuf,
+				    sizeof (diskbuf));
 				(void) strcat(diskbuf, " ");
 				disknum++;
 				arraypart_handle =
@@ -1658,14 +1657,14 @@ snapshot_array(raid_obj_handle_t array_handle, uint8_t indent, uint8_t is_sub,
 				    arraypart_attr.tag.cidl.target_id,
 				    arraypart_attr.tag.cidl.lun);
 			}
-			(void) strcat(diskbuf, tempbuf);
+			(void) strlcat(diskbuf, tempbuf, sizeof (diskbuf));
 			(void) strcat(diskbuf, " ");
 			disknum++;
 			arraypart_handle = raidcfg_list_next(arraypart_handle);
 		}
 		(void) snprintf(tempbuf, sizeof (tempbuf), "%u ", disknum);
-		(void) strcat(arraybuf, tempbuf);
-		(void) strcat(arraybuf, diskbuf);
+		(void) strlcat(arraybuf, tempbuf, sizeof (arraybuf));
+		(void) strlcat(arraybuf, diskbuf, sizeof (arraybuf));
 
 		switch (array_attr.raid_level) {
 		case RAID_LEVEL_0:
@@ -1691,7 +1690,7 @@ snapshot_array(raid_obj_handle_t array_handle, uint8_t indent, uint8_t is_sub,
 			    gettext("N/A"));
 			break;
 		}
-		(void) strcat(arraybuf, tempbuf);
+		(void) strlcat(arraybuf, tempbuf, sizeof (arraybuf));
 		(void) fprintf(stdout, "%s ", arraybuf);
 
 		switch (array_attr.state) {
@@ -1794,7 +1793,7 @@ snapshot_disk(uint32_t ctl_tag, raid_obj_handle_t disk_handle, uint8_t indent,
 			    gettext("N/A"));
 		}
 
-		(void) strcat(diskbuf, tempbuf);
+		(void) strlcat(diskbuf, tempbuf, sizeof (diskbuf));
 		(void) fprintf(stdout, "%s\n", diskbuf);
 	}
 
@@ -2957,7 +2956,7 @@ size_to_string(uint64_t size, char *string, int len)
 	if ((strlen(string) + 1) >=  len) {
 		return (FAILURE);
 	}
-	(void) strcat(string, unit[i]);
+	(void) strlcat(string, unit[i], len);
 
 	return (SUCCESS);
 }

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -4432,6 +4430,7 @@ raid_list_destroy(raid_list_t *list)
 static int
 controller_id_to_path(uint32_t controller_id, char *path)
 {
+	int fd;
 	char buf[MAX_PATH_LEN] = {0}, buf1[MAX_PATH_LEN] = {0}, *colon;
 
 	(void) snprintf(buf, MAX_PATH_LEN, "%s/c%d", CFGDIR, controller_id);
@@ -4452,8 +4451,12 @@ controller_id_to_path(uint32_t controller_id, char *path)
 
 	(void) snprintf(path, MAX_PATH_LEN, "%s:devctl", buf);
 
-	if (access(path, F_OK) < 0)
+	fd = open(path, O_RDONLY | O_NDELAY);
+
+	if (fd < 0)
 		return (ERR_DRIVER_NOT_FOUND);
+
+	(void) close(fd);
 
 	return (SUCCESS);
 }
