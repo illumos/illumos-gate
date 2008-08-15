@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * System call I/F to doors (outside of vnodes I/F) and misc support
  * routines
@@ -569,8 +567,9 @@ door_call(int did, void *args)
 	 * This should be done in shuttle_resume(), just before going to
 	 * sleep, but we want to avoid overhead while holding door_knob.
 	 * prstop() is just a no-op if we don't really go to sleep.
+	 * We test not-kernel-address-space for the sake of clustering code.
 	 */
-	if (lwp && lwp->lwp_nostop == 0)
+	if (lwp && lwp->lwp_nostop == 0 && curproc->p_as != &kas)
 		prstop(PR_REQUESTED, 0);
 
 	mutex_enter(&door_knob);
@@ -1385,9 +1384,10 @@ door_return(caddr_t data_ptr, size_t data_size,
 	 * This should be done in shuttle_resume(), just before going to
 	 * sleep, but we want to avoid overhead while holding door_knob.
 	 * prstop() is just a no-op if we don't really go to sleep.
+	 * We test not-kernel-address-space for the sake of clustering code.
 	 */
 	lwp = ttolwp(curthread);
-	if (lwp && lwp->lwp_nostop == 0)
+	if (lwp && lwp->lwp_nostop == 0 && curproc->p_as != &kas)
 		prstop(PR_REQUESTED, 0);
 
 	/* Make sure the caller hasn't gone away */
@@ -3106,8 +3106,9 @@ door_upcall(vnode_t *vp, door_arg_t *param, struct cred *cred,
 	 * This should be done in shuttle_resume(), just before going to
 	 * sleep, but we want to avoid overhead while holding door_knob.
 	 * prstop() is just a no-op if we don't really go to sleep.
+	 * We test not-kernel-address-space for the sake of clustering code.
 	 */
-	if (lwp && lwp->lwp_nostop == 0)
+	if (lwp && lwp->lwp_nostop == 0 && curproc->p_as != &kas)
 		prstop(PR_REQUESTED, 0);
 
 	mutex_enter(&door_knob);
