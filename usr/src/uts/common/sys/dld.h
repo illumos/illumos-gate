@@ -26,8 +26,6 @@
 #ifndef	_SYS_DLD_H
 #define	_SYS_DLD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Data-Link Driver (public header).
  */
@@ -178,15 +176,13 @@ typedef struct dld_ioc_delete_vlan {
 	datalink_id_t	did_linkid;
 } dld_ioc_delete_vlan_t;
 
-#define	DLDIOC_SETAUTOPUSH	(DLDIOC | 0x0d)
-#define	DLDIOC_GETAUTOPUSH	(DLDIOC | 0x0e)
-#define	DLDIOC_CLRAUTOPUSH	(DLDIOC | 0x0f)
-typedef struct dld_ioc_ap {
-	datalink_id_t	dia_linkid;
-	uint_t  	dia_anchor;
-	uint_t		dia_npush;
-	char		dia_aplist[MAXAPUSH][FMNAMESZ+1];
-} dld_ioc_ap_t;
+/*
+ * The following constants have been removed, and the slots are open:
+ *
+ * #define DLDIOC_SETAUTOPUSH      (DLDIOC | 0x0d)
+ * #define DLDIOC_GETAUTOPUSH      (DLDIOC | 0x0e)
+ * #define DLDIOC_CLRAUTOPUSH      (DLDIOC | 0x0f)
+ */
 
 #define	DLDIOC_DOORSERVER	(DLDIOC | 0x10)
 typedef struct dld_ioc_door {
@@ -201,21 +197,17 @@ typedef struct dld_ioc_rename {
 } dld_ioc_rename_t;
 
 /*
- * DLDIOC_SETZID sets the zoneid of a given link. It could cause a VLAN to be
- * implicitly created.  Note that we will hold a reference for the given link
- * whenever it has a zoneid other than the global zone.
+ * The following constants have been removed, and the slots are open:
+ *
+ * #define DLDIOC_SETZID           (DLDIOC | 0x12)
+ * #define DLDIOC_GETZID           (DLDIOC | 0x13)
  */
-#define	DLDIOC_SETZID		(DLDIOC | 0x12)
-typedef struct dld_ioc_setzid {
-	char		dis_link[MAXLINKNAMELEN];
-	zoneid_t	dis_zid;
-} dld_ioc_setzid_t;
 
-#define	DLDIOC_GETZID  		(DLDIOC | 0x13)
-typedef struct dld_ioc_getzid {
-	datalink_id_t	dig_linkid;
-	zoneid_t	dig_zid;
-} dld_ioc_getzid_t;
+typedef struct dld_ioc_zid {
+	zoneid_t	diz_zid;
+	char		diz_link[MAXLINKNAMELEN];
+	boolean_t	diz_is_ppa_hack;
+} dld_ioc_zid_t;
 
 /*
  * data-link autopush configuration.

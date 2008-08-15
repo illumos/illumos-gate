@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <unistd.h>
 #include <errno.h>
@@ -35,6 +33,7 @@
 #include <sys/stat.h>
 #include <sys/dld.h>
 #include <sys/vlan.h>
+#include <zone.h>
 #include <librcm.h>
 #include <libdlpi.h>
 #include <libdevinfo.h>
@@ -259,51 +258,79 @@ dladm_linkduplex2str(link_duplex_t duplex, char *buf)
  * non-global zone.
  */
 dladm_status_t
-dladm_setzid(const char *link, zoneid_t zoneid)
+dladm_setzid(const char *dlname, char *zone_name)
 {
-	int			fd;
-	dladm_status_t		status = DLADM_STATUS_OK;
-	dld_ioc_setzid_t	dis;
+	datalink_id_t	linkid;
+	char		*val;
+	char		**prop_val;
+	char		link[MAXLINKNAMELEN];
+	uint_t		ppa;
+	char		dev[DLPI_LINKNAME_MAX];
+	int		valsize;
+	dladm_status_t	status = DLADM_STATUS_OK;
+	char		*prop_name = "zone";
+	boolean_t	needfree = B_FALSE;
+	char		delim = ':';
 
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (dladm_errno2status(errno));
+	/* If the link does not exist, it is a ppa-hacked vlan. */
+	status = dladm_name2info(dlname, &linkid, NULL, NULL, NULL);
+	switch (status) {
+	case DLADM_STATUS_NOTFOUND:
+		if (strlen(dlname) > MAXLINKNAMELEN)
+			return (DLADM_STATUS_BADVAL);
 
-	bzero(&dis, sizeof (dld_ioc_setzid_t));
-	(void) strlcpy(dis.dis_link, link, MAXLINKNAMELEN);
-	dis.dis_zid = zoneid;
+		if (strlen(zone_name) > ZONENAME_MAX)
+			return (DLADM_STATUS_BADVAL);
 
-	if (i_dladm_ioctl(fd, DLDIOC_SETZID, &dis, sizeof (dis)) < 0)
-		status = dladm_errno2status(errno);
+		status = dladm_parselink(dlname, dev, &ppa);
+		if (status != DLADM_STATUS_OK)
+			return (status);
 
-	(void) close(fd);
-	return (status);
-}
+		ppa = (uint_t)DLS_PPA2INST(ppa);
+		(void) snprintf(link, sizeof (link), "%s%d", dev, ppa);
 
-/*
- * Get zoneid of a given link
- */
-dladm_status_t
-dladm_getzid(datalink_id_t linkid, zoneid_t *zoneidp)
-{
-	int			fd;
-	dladm_status_t		status = DLADM_STATUS_OK;
-	dld_ioc_getzid_t	dig;
+		status = dladm_name2info(link, &linkid, NULL,  NULL, NULL);
+		if (status != DLADM_STATUS_OK)
+			return (status);
 
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (dladm_errno2status(errno));
+		/*
+		 * Since the link does not exist as yet, we've to pass the
+		 * link name too as part of data, so that the kernel can
+		 * create the link. Hence, we're packing the zone_name and
+		 * the link name into val.
+		 */
+		valsize = ZONENAME_MAX + MAXLINKNAMELEN + 1;
+		val = malloc(valsize);
+		if (val == NULL)
+			return (DLADM_STATUS_NOMEM);
+		needfree = B_TRUE;
 
-	bzero(&dig, sizeof (dld_ioc_getzid_t));
-	dig.dig_linkid = linkid;
-	dig.dig_zid = -1;
+		(void) snprintf(val, valsize, "%s%c%s", zone_name,
+		    delim, dlname);
 
-	if (i_dladm_ioctl(fd, DLDIOC_GETZID, &dig, sizeof (dig)) < 0)
-		status = dladm_errno2status(errno);
+		break;
+	case DLADM_STATUS_OK:
+		/*
+		 * The link exists, so only the zone_name is being passed as
+		 * val. We could also pass zone_name + linkname like in the
+		 * previous case just to maintain consistency, but other calls
+		 * like set_linkprop() in dladm.c [which is called when we run
+		 * 'dladm set-linkprop -p zone <linkname>' at the command line]
+		 * pass in the value entered at the command line [which is zone
+		 * name] as val.
+		 */
+		val = zone_name;
+		break;
+	default:
+		return (DLADM_STATUS_FAILED);
+	}
 
-	(void) close(fd);
+	prop_val = &val;
+	status = dladm_set_linkprop(linkid, prop_name, prop_val, 1,
+	    DLADM_OPT_ACTIVE);
 
-	if (status == DLADM_STATUS_OK)
-		*zoneidp = dig.dig_zid;
-
+	if (needfree)
+		free(val);
 	return (status);
 }
 

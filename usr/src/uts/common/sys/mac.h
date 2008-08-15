@@ -26,8 +26,6 @@
 #ifndef	_SYS_MAC_H
 #define	_SYS_MAC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -116,6 +114,8 @@ typedef enum {
 	MAC_PROP_AUTONEG,
 	MAC_PROP_EN_AUTONEG,
 	MAC_PROP_MTU,
+	MAC_PROP_ZONE,
+	MAC_PROP_AUTOPUSH,
 	MAC_PROP_FLOWCTRL,
 	MAC_PROP_ADV_1000FDX_CAP,
 	MAC_PROP_EN_1000FDX_CAP,

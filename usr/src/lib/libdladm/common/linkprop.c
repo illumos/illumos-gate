@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <strings.h>
 #include <errno.h>
@@ -48,7 +46,6 @@
 #include <inet/wifi_ioctl.h>
 #include <libdladm.h>
 #include <sys/param.h>
-#include <sys/dld.h>
 #include <inttypes.h>
 #include <sys/ethernet.h>
 
@@ -101,31 +98,35 @@ typedef dladm_status_t	pd_checkf_t(struct prop_desc *pd,
 			    uint_t cnt, val_desc_t *propval,
 			    datalink_media_t);
 
-typedef struct dld_public_prop_s {
+typedef struct dladm_public_prop_s {
 	mac_prop_id_t	pp_id;
 	size_t		pp_valsize;
 	char		*pp_name;
 	char		*pp_desc;
-} dld_public_prop_t;
+} dladm_public_prop_t;
 
-static dld_ioc_macprop_t *dld_buf_alloc(size_t, datalink_id_t, const char *,
+static dld_ioc_macprop_t *i_dladm_buf_alloc(size_t, datalink_id_t, const char *,
 					uint_t, dladm_status_t *);
-static dladm_status_t dld_set_prop(datalink_id_t, const char *, char **,
+static dladm_status_t i_dladm_set_prop(datalink_id_t, const char *, char **,
 					uint_t, uint_t);
-static dladm_status_t dld_get_prop(datalink_id_t, const char *, char **,
+static dladm_status_t i_dladm_get_prop(datalink_id_t, const char *, char **,
 					uint_t *, dladm_prop_type_t, uint_t);
+static dladm_public_prop_t *dladm_name2prop(const char *);
+static dld_ioc_macprop_t *i_dladm_get_public_prop(datalink_id_t, char *, uint_t,
+					dladm_status_t *);
 static pd_getf_t	do_get_zone, do_get_autopush, do_get_rate_mod,
 			do_get_rate_prop, do_get_channel_prop,
 			do_get_powermode_prop, do_get_radio_prop,
-			dld_duplex_get, dld_status_get,
-			dld_binary_get, dld_uint32_get, dld_flowctl_get;
-static pd_setf_t	do_set_zone, do_set_autopush, do_set_rate_prop,
+			i_dladm_duplex_get, i_dladm_status_get,
+			i_dladm_binary_get, i_dladm_uint32_get,
+			i_dladm_flowctl_get;
+static pd_setf_t	do_set_zone, do_set_rate_prop,
 			do_set_powermode_prop, do_set_radio_prop,
-			dld_set_public_prop;
+			i_dladm_set_public_prop;
 static pd_checkf_t	do_check_zone, do_check_autopush, do_check_rate,
-			dld_defmtu_check;
+			i_dladm_defmtu_check;
 
-static dladm_status_t	dld_speed_get(struct prop_desc *, datalink_id_t,
+static dladm_status_t	i_dladm_speed_get(struct prop_desc *, datalink_id_t,
 			char **, uint_t *, uint_t);
 
 typedef struct prop_desc {
@@ -179,7 +180,6 @@ typedef struct prop_desc {
 	uint_t			pd_flags;
 #define	PD_TEMPONLY	0x1	/* property is temporary only */
 #define	PD_CHECK_ALLOC	0x2	/* alloc vd_val as part of pd_check */
-#define	PD_EMPTY_RESET	0x4	/* Use "" to reset the link property */
 	/*
 	 * indicate link classes this property applies to.
 	 */
@@ -194,7 +194,7 @@ typedef struct prop_desc {
 #define	MAC_PROP_BUFSIZE(v)	sizeof (dld_ioc_macprop_t) + (v) - 1
 
 
-static dld_public_prop_t dld_prop[] = {
+static dladm_public_prop_t dladm_prop[] = {
 	{ MAC_PROP_DUPLEX,	sizeof (link_duplex_t),
 	    "duplex",		"link duplex mode" },
 
@@ -212,6 +212,12 @@ static dld_public_prop_t dld_prop[] = {
 
 	{ MAC_PROP_FLOWCTRL,	sizeof (link_flowctrl_t),
 	    "flowctrl",		"flowcontrol" },
+
+	{ MAC_PROP_ZONE,	sizeof (dld_ioc_zid_t),
+	    "zone",		"non-global zones" },
+
+	{ MAC_PROP_AUTOPUSH,	sizeof (struct dlautopush),
+	    "autopush",		"autopush modules" },
 
 	{ MAC_PROP_ADV_1000FDX_CAP, sizeof (uint8_t),
 	    "adv_1000fdx_cap",	"Adv 1000 Mbps fdx" },
@@ -310,97 +316,98 @@ static prop_desc_t	prop_table[] = {
 	    DATALINK_CLASS_PHYS, DATALINK_ANY_MEDIATYPE },
 
 	{ "autopush",	{ "", 0 }, NULL, 0,
-	    do_set_autopush, NULL,
-	    do_get_autopush, do_check_autopush, PD_CHECK_ALLOC|PD_EMPTY_RESET,
+	    i_dladm_set_public_prop, NULL,
+	    do_get_autopush, do_check_autopush, PD_CHECK_ALLOC,
 	    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE },
 
 	{ "zone",	{ "", 0 }, NULL, 0,
 	    do_set_zone, NULL,
-	    do_get_zone, do_check_zone, PD_TEMPONLY|PD_EMPTY_RESET,
+	    do_get_zone, do_check_zone, PD_TEMPONLY|PD_CHECK_ALLOC,
 	    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE },
 
 	{ "duplex", { "", 0 },
 	    link_duplex_vals, VALCNT(link_duplex_vals),
-	    NULL, NULL, dld_duplex_get, NULL,
+	    NULL, NULL, i_dladm_duplex_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "state", { "up", LINK_STATE_UP },
 	    link_status_vals, VALCNT(link_status_vals),
-	    NULL, NULL, dld_status_get, NULL,
+	    NULL, NULL, i_dladm_status_get, NULL,
 	    0, DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE },
 
 	{ "adv_autoneg_cap", { "1", 1 },
 	    link_01_vals, VALCNT(link_01_vals),
-	    dld_set_public_prop, NULL, dld_binary_get, NULL,
+	    i_dladm_set_public_prop, NULL, i_dladm_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "mtu", { "", 0 }, NULL, 0,
-	    dld_set_public_prop, NULL, dld_uint32_get,
-	    dld_defmtu_check, 0, DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE },
+	    i_dladm_set_public_prop, NULL, i_dladm_uint32_get,
+	    i_dladm_defmtu_check, 0, DATALINK_CLASS_ALL,
+	    DATALINK_ANY_MEDIATYPE },
 
 	{ "flowctrl", { "", 0 },
 	    link_flow_vals, VALCNT(link_flow_vals),
-	    dld_set_public_prop, NULL, dld_flowctl_get, NULL,
+	    i_dladm_set_public_prop, NULL, i_dladm_flowctl_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "adv_1000fdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
-	    NULL, NULL, dld_binary_get, NULL,
+	    NULL, NULL, i_dladm_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "en_1000fdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
-	    dld_set_public_prop, NULL, dld_binary_get, NULL,
+	    i_dladm_set_public_prop, NULL, i_dladm_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "adv_1000hdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
-	    NULL, NULL, dld_binary_get, NULL,
+	    NULL, NULL, i_dladm_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "en_1000hdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
-	    dld_set_public_prop, NULL, dld_binary_get, NULL,
+	    i_dladm_set_public_prop, NULL, i_dladm_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "adv_100fdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
-	    NULL, NULL, dld_binary_get, NULL,
+	    NULL, NULL, i_dladm_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "en_100fdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
-	    dld_set_public_prop, NULL, dld_binary_get, NULL,
+	    i_dladm_set_public_prop, NULL, i_dladm_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "adv_100hdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
-	    NULL, NULL, dld_binary_get, NULL,
+	    NULL, NULL, i_dladm_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "en_100hdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
-	    dld_set_public_prop, NULL, dld_binary_get, NULL,
+	    i_dladm_set_public_prop, NULL, i_dladm_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "adv_10fdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
-	    NULL, NULL, dld_binary_get, NULL,
+	    NULL, NULL, i_dladm_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "en_10fdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
-	    dld_set_public_prop, NULL, dld_binary_get, NULL,
+	    i_dladm_set_public_prop, NULL, i_dladm_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "adv_10hdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
-	    NULL, NULL, dld_binary_get, NULL,
+	    NULL, NULL, i_dladm_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER },
 
 	{ "en_10hdx_cap", { "", 0 },
 	    link_01_vals, VALCNT(link_01_vals),
-	    dld_set_public_prop, NULL, dld_binary_get, NULL,
+	    i_dladm_set_public_prop, NULL, i_dladm_binary_get, NULL,
 	    0, DATALINK_CLASS_PHYS, DL_ETHER }
 
 };
@@ -506,18 +513,26 @@ i_dladm_set_single_prop(datalink_id_t linkid, datalink_class_t class,
 		if (pdp->pd_defval.vd_name == NULL)
 			return (DLADM_STATUS_NOTSUP);
 
-		if ((pdp->pd_flags & PD_EMPTY_RESET) != 0 ||
+		cnt = 1;
+		if ((pdp->pd_flags & PD_CHECK_ALLOC) != 0 ||
 		    strlen(pdp->pd_defval.vd_name) > 0) {
 			if ((vdp = malloc(sizeof (val_desc_t))) == NULL)
 				return (DLADM_STATUS_NOMEM);
-			(void) memcpy(vdp, &pdp->pd_defval,
-			    sizeof (val_desc_t));
+
+			if (pdp->pd_check != NULL) {
+				status = pdp->pd_check(pdp, linkid, prop_val,
+				    cnt, vdp, media);
+				if (status != DLADM_STATUS_OK)
+					goto done;
+			} else {
+				(void) memcpy(vdp, &pdp->pd_defval,
+				    sizeof (val_desc_t));
+			}
 		} else {
 			status = i_dladm_getset_defval(pdp, linkid,
 			    media, flags);
 			return (status);
 		}
-		cnt = 1;
 	}
 	status = pdp->pd_set(pdp, linkid, vdp, cnt, flags, media);
 	if (needfree) {
@@ -567,7 +582,7 @@ i_dladm_set_linkprop(datalink_id_t linkid, const char *prop_name,
 	if (!found) {
 		if (prop_name[0] == '_') {
 			/* other private properties */
-			status = dld_set_prop(linkid, prop_name, prop_val,
+			status = i_dladm_set_prop(linkid, prop_name, prop_val,
 			    val_cnt, flags);
 		} else  {
 			status = DLADM_STATUS_NOTFOUND;
@@ -670,7 +685,7 @@ dladm_get_linkprop(datalink_id_t linkid, dladm_prop_type_t type,
 			/*
 			 * private property.
 			 */
-			return (dld_get_prop(linkid, prop_name,
+			return (i_dladm_get_prop(linkid, prop_name,
 			    prop_val, val_cntp, type, dld_flags));
 		} else {
 			return (DLADM_STATUS_NOTFOUND);
@@ -819,13 +834,19 @@ do_get_zone(struct prop_desc *pd, datalink_id_t linkid,
 	char		zone_name[ZONENAME_MAX];
 	zoneid_t	zid;
 	dladm_status_t	status;
+	char		*cp;
+	dld_ioc_macprop_t	*dip;
 
 	if (flags != 0)
 		return (DLADM_STATUS_NOTSUP);
 
-	status = dladm_getzid(linkid, &zid);
+	dip = i_dladm_get_public_prop(linkid, pd->pd_name, flags, &status);
 	if (status != DLADM_STATUS_OK)
 		return (status);
+
+	cp = dip->pr_val;
+	(void) memcpy(&zid, cp, sizeof (zid));
+	free(dip);
 
 	*val_cnt = 1;
 	if (zid != GLOBAL_ZONEID) {
@@ -912,41 +933,60 @@ static dladm_status_t
 do_set_zone(prop_desc_t *pd, datalink_id_t linkid, val_desc_t *vdp,
     uint_t val_cnt, uint_t flags, datalink_media_t media)
 {
-	dladm_status_t	status;
+	dladm_status_t	status = DLADM_STATUS_OK;
 	zoneid_t	zid_old, zid_new;
 	char		link[MAXLINKNAMELEN];
+	char		*cp;
+	dld_ioc_macprop_t	*dip;
+	dld_ioc_zid_t		*dzp;
 
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVALCNT);
 
-	status = dladm_getzid(linkid, &zid_old);
-	if (status != DLADM_STATUS_OK)
-		return (status);
+	dzp = (dld_ioc_zid_t *)vdp->vd_val;
+
+	/*
+	 * If diz_is_ppa_hack is set, then an implicit vlan must be created.
+	 * There is no old value to compare against, and vdp->vd_val is
+	 * already populated with the zoneid and linkname in the function
+	 * do_check_zone().
+	 */
+
+	if (dzp->diz_is_ppa_hack) {
+		zid_old = GLOBAL_ZONEID;
+	} else {
+		dip = i_dladm_get_public_prop(linkid, pd->pd_name,
+		    flags, &status);
+		if (status != DLADM_STATUS_OK)
+			return (status);
+
+		cp = dip->pr_val;
+		(void) memcpy(&zid_old, cp, sizeof (zid_old));
+		free(dip);
+	}
+
+	zid_new = dzp->diz_zid;
+	(void) strlcpy(link, dzp->diz_link, MAXLINKNAMELEN);
 
 	/* Do nothing if setting to current value */
-	zid_new = vdp->vd_val;
 	if (zid_new == zid_old)
-		return (DLADM_STATUS_OK);
-
-	if ((status = dladm_datalink_id2info(linkid, NULL, NULL, NULL,
-	    link, MAXLINKNAMELEN)) != DLADM_STATUS_OK) {
 		return (status);
-	}
 
 	if (zid_new != GLOBAL_ZONEID) {
 		/*
 		 * If the new zoneid is the global zone, we could destroy
 		 * the link (in the case of an implicitly-created VLAN) as a
-		 * result of the dladm_setzid() operation. In that case,
-		 * we defer the operation to the end of this function to avoid
-		 * recreating the VLAN and getting a different linkid during
-		 * the rollback if other operation fails.
+		 * result of setting the zoneid. In that case, we defer the
+		 * operation to the end of this function to avoid recreating
+		 * the VLAN and getting a different linkid during the rollback
+		 * if other operation fails.
 		 *
-		 * Otherwise, dladm_setzid() will hold a reference to the
+		 * Otherwise, this operation will hold a reference to the
 		 * link and prevent a link renaming, so we need to do it
 		 * before other operations.
 		 */
-		status = dladm_setzid(link, zid_new);
+		status = i_dladm_set_public_prop(pd, linkid, vdp, val_cnt,
+		    flags, media);
 		if (status != DLADM_STATUS_OK)
 			return (status);
 	}
@@ -971,9 +1011,17 @@ do_set_zone(prop_desc_t *pd, datalink_id_t linkid, val_desc_t *vdp,
 			goto rollback2;
 		}
 
+		if (dzp->diz_is_ppa_hack) {
+			if ((status = dladm_name2info(link, &linkid, NULL, NULL,
+			    NULL)) != DLADM_STATUS_OK) {
+				return (status);
+			}
+		}
+
 		(void) i_dladm_update_deventry(zid_new, linkid, B_TRUE);
 	} else {
-		status = dladm_setzid(link, zid_new);
+		status = i_dladm_set_public_prop(pd, linkid, vdp, val_cnt,
+		    flags, media);
 		if (status != DLADM_STATUS_OK)
 			goto rollback2;
 	}
@@ -986,8 +1034,12 @@ rollback2:
 	if (zid_old != GLOBAL_ZONEID)
 		(void) zone_add_datalink(zid_old, link);
 rollback1:
-	if (zid_new != GLOBAL_ZONEID)
-		(void) dladm_setzid(link, zid_old);
+	if (zid_new != GLOBAL_ZONEID) {
+		dzp->diz_zid = zid_old;
+		(void) i_dladm_set_public_prop(pd, linkid, vdp, val_cnt,
+		    flags, media);
+	}
+
 	return (status);
 }
 
@@ -996,29 +1048,83 @@ static dladm_status_t
 do_check_zone(struct prop_desc *pd, datalink_id_t linkid, char **prop_val,
     uint_t val_cnt, val_desc_t *vdp, datalink_media_t media)
 {
-	zoneid_t	zid;
+	char		*zone_name;
+	char		linkname[MAXLINKNAMELEN];
+	zoneid_t	zoneid;
+	char		*cp;
+	dladm_status_t	status = DLADM_STATUS_OK;
+	boolean_t	is_ppa_hack = B_FALSE;
+	dld_ioc_zid_t	*dzp;
 
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVALCNT);
 
-	if ((zid = getzoneidbyname(*prop_val)) == -1)
-		return (DLADM_STATUS_BADVAL);
+	dzp = malloc(sizeof (dld_ioc_zid_t));
+	if (dzp == NULL)
+		return (DLADM_STATUS_NOMEM);
 
-	if (zid != GLOBAL_ZONEID) {
-		ushort_t	flags;
-
-		if (zone_getattr(zid, ZONE_ATTR_FLAGS, &flags,
-		    sizeof (flags)) < 0) {
-			return (dladm_errno2status(errno));
+	if (prop_val) {
+		/*
+		 * The prop_val contains zone_name{:linkname}. The linkname is
+		 * present only when the link is a ppa-hacked vlan.
+		 */
+		cp = strchr(*prop_val, ':');
+		if (cp) {
+			(void) strlcpy(linkname, cp + 1, MAXLINKNAMELEN);
+			*cp = '\0';
+			is_ppa_hack = B_TRUE;
+		} else {
+			status = dladm_datalink_id2info(linkid, NULL, NULL,
+			    NULL, linkname, MAXLINKNAMELEN);
+			if (status != DLADM_STATUS_OK) {
+				goto done;
+			}
 		}
-
-		if (!(flags & ZF_NET_EXCL)) {
-			return (DLADM_STATUS_BADVAL);
+		zone_name = *prop_val;
+	} else {
+		zone_name = GLOBAL_ZONENAME;
+		if ((status = dladm_datalink_id2info(linkid, NULL, NULL, NULL,
+		    linkname, MAXLINKNAMELEN)) != DLADM_STATUS_OK) {
+			goto done;
 		}
 	}
 
-	vdp->vd_val = zid;
+	if (strlen(linkname) > MAXLINKNAMELEN) {
+		status = DLADM_STATUS_BADVAL;
+		goto done;
+	}
+
+	if ((zoneid = getzoneidbyname(zone_name)) == -1) {
+		status = DLADM_STATUS_BADVAL;
+		goto done;
+	}
+
+	if (zoneid != GLOBAL_ZONEID) {
+		ushort_t	flags;
+
+		if (zone_getattr(zoneid, ZONE_ATTR_FLAGS, &flags,
+		    sizeof (flags)) < 0) {
+			status = dladm_errno2status(errno);
+			goto done;
+		}
+
+		if (!(flags & ZF_NET_EXCL)) {
+			status = DLADM_STATUS_BADVAL;
+			goto done;
+		}
+	}
+
+	(void) memset(dzp, 0, sizeof (dld_ioc_zid_t));
+
+	dzp->diz_zid = zoneid;
+	(void) strlcpy(dzp->diz_link, linkname, MAXLINKNAMELEN);
+	dzp->diz_is_ppa_hack = is_ppa_hack;
+
+	vdp->vd_val = (uintptr_t)dzp;
 	return (DLADM_STATUS_OK);
+done:
+	free(dzp);
+	return (status);
 }
 
 /* ARGSUSED */
@@ -1026,32 +1132,32 @@ static dladm_status_t
 do_get_autopush(struct prop_desc *pd, datalink_id_t linkid,
     char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
-	dld_ioc_ap_t	dia;
-	int		fd, i, len;
+	struct		dlautopush dlap;
+	int		i, len;
+	dladm_status_t	status;
+	dld_ioc_macprop_t	*dip;
 
 	if (flags & MAC_PROP_DEFAULT)
 		return (DLADM_STATUS_NOTSUP);
 
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (dladm_errno2status(errno));
-
 	*val_cnt = 1;
-	dia.dia_linkid = linkid;
-	if (i_dladm_ioctl(fd, DLDIOC_GETAUTOPUSH, &dia, sizeof (dia)) < 0) {
+	dip = i_dladm_get_public_prop(linkid, pd->pd_name, flags, &status);
+	if (dip == NULL) {
 		(*prop_val)[0] = '\0';
 		goto done;
 	}
+	(void) memcpy(&dlap, dip->pr_val, sizeof (dlap));
 
-	for (i = 0, len = 0; i < dia.dia_npush; i++) {
+	for (i = 0, len = 0; i < dlap.dap_npush; i++) {
 		if (i != 0) {
 			(void) snprintf(*prop_val + len,
 			    DLADM_PROP_VAL_MAX - len, "%c", AP_DELIMITER);
 			len += 1;
 		}
 		(void) snprintf(*prop_val + len, DLADM_PROP_VAL_MAX - len,
-		    "%s", dia.dia_aplist[i]);
-		len += strlen(dia.dia_aplist[i]);
-		if (dia.dia_anchor - 1 == i) {
+		    "%s", dlap.dap_aplist[i]);
+		len += strlen(dlap.dap_aplist[i]);
+		if (dlap.dap_anchor - 1 == i) {
 			(void) snprintf(*prop_val + len,
 			    DLADM_PROP_VAL_MAX - len, "%c%s", AP_DELIMITER,
 			    AP_ANCHOR);
@@ -1059,46 +1165,9 @@ do_get_autopush(struct prop_desc *pd, datalink_id_t linkid,
 		}
 	}
 
+	free(dip);
 done:
-	(void) close(fd);
 	return (DLADM_STATUS_OK);
-}
-
-/* ARGSUSED */
-static dladm_status_t
-do_set_autopush(prop_desc_t *pd, datalink_id_t linkid, val_desc_t *vdp,
-    uint_t val_cnt, uint_t flags, datalink_media_t media)
-{
-	dld_ioc_ap_t		dia;
-	struct dlautopush	*dlap = (struct dlautopush *)vdp->vd_val;
-	dladm_status_t		status = DLADM_STATUS_OK;
-	int			fd, i;
-	int			ic_cmd;
-
-	if (val_cnt != 1)
-		return (DLADM_STATUS_BADVALCNT);
-
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (dladm_errno2status(errno));
-
-	dia.dia_linkid = linkid;
-	if (dlap != NULL) {
-		dia.dia_anchor = dlap->dap_anchor;
-		dia.dia_npush = dlap->dap_npush;
-		for (i = 0; i < dia.dia_npush; i++) {
-			(void) strlcpy(dia.dia_aplist[i], dlap->dap_aplist[i],
-			    FMNAMESZ+1);
-		}
-		ic_cmd = DLDIOC_SETAUTOPUSH;
-	} else {
-		ic_cmd = DLDIOC_CLRAUTOPUSH;
-	}
-
-	if (i_dladm_ioctl(fd, ic_cmd, &dia, sizeof (dia)) < 0)
-		status = dladm_errno2status(errno);
-
-	(void) close(fd);
-	return (status);
 }
 
 /*
@@ -1152,22 +1221,26 @@ do_check_autopush(struct prop_desc *pd, datalink_id_t linkid, char **prop_val,
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVALCNT);
 
-	dlap = malloc(sizeof (struct dlautopush));
-	if (dlap == NULL)
-		return (DLADM_STATUS_NOMEM);
+	if (prop_val != NULL) {
+		dlap = malloc(sizeof (struct dlautopush));
+		if (dlap == NULL)
+			return (DLADM_STATUS_NOMEM);
 
-	(void) memset(dlap, 0, sizeof (struct dlautopush));
-	(void) snprintf(delimiters, 4, " %c\n", AP_DELIMITER);
-	bcopy(*prop_val, val, DLADM_PROP_VAL_MAX);
-	module = strtok(val, delimiters);
-	while (module != NULL) {
-		status = i_dladm_add_ap_module(module, dlap);
-		if (status != DLADM_STATUS_OK)
-			return (status);
-		module = strtok(NULL, delimiters);
+		(void) memset(dlap, 0, sizeof (struct dlautopush));
+		(void) snprintf(delimiters, 4, " %c\n", AP_DELIMITER);
+		bcopy(*prop_val, val, DLADM_PROP_VAL_MAX);
+		module = strtok(val, delimiters);
+		while (module != NULL) {
+			status = i_dladm_add_ap_module(module, dlap);
+			if (status != DLADM_STATUS_OK)
+				return (status);
+			module = strtok(NULL, delimiters);
+		}
+
+		vdp->vd_val = (uintptr_t)dlap;
+	} else {
+		vdp->vd_val = 0;
 	}
-
-	vdp->vd_val = (uintptr_t)dlap;
 	return (DLADM_STATUS_OK);
 }
 
@@ -1219,7 +1292,8 @@ do_get_rate_prop(struct prop_desc *pd, datalink_id_t linkid,
     char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	if (media != DL_WIFI)
-		return (dld_speed_get(pd, linkid, prop_val, val_cnt, flags));
+		return (i_dladm_speed_get(pd, linkid, prop_val,
+		    val_cnt, flags));
 
 	return (do_get_rate_common(pd, linkid, prop_val, val_cnt,
 	    WL_DESIRED_RATES));
@@ -1614,12 +1688,12 @@ done:
 	return (status);
 }
 
-static dld_public_prop_t *
+static dladm_public_prop_t *
 dladm_name2prop(const char *prop_name)
 {
-	dld_public_prop_t *p;
+	dladm_public_prop_t *p;
 
-	for (p = dld_prop; p->pp_id != MAC_PROP_PRIVATE; p++) {
+	for (p = dladm_prop; p->pp_id != MAC_PROP_PRIVATE; p++) {
 		if (strcmp(p->pp_name, prop_name) == 0)
 			break;
 	}
@@ -1628,12 +1702,12 @@ dladm_name2prop(const char *prop_name)
 
 
 static dld_ioc_macprop_t *
-dld_buf_alloc(size_t valsize, datalink_id_t linkid, const char *prop_name,
+i_dladm_buf_alloc(size_t valsize, datalink_id_t linkid, const char *prop_name,
     uint_t flags, dladm_status_t *status)
 {
 	int dsize;
 	dld_ioc_macprop_t *dip;
-	dld_public_prop_t *p;
+	dladm_public_prop_t *p;
 
 	*status = DLADM_STATUS_OK;
 	p = dladm_name2prop(prop_name);
@@ -1658,7 +1732,7 @@ dld_buf_alloc(size_t valsize, datalink_id_t linkid, const char *prop_name,
 
 /* ARGSUSED */
 static dladm_status_t
-dld_set_public_prop(prop_desc_t *pd, datalink_id_t linkid,
+i_dladm_set_public_prop(prop_desc_t *pd, datalink_id_t linkid,
     val_desc_t *vdp, uint_t val_cnt, uint_t flags, datalink_media_t media)
 {
 	dld_ioc_macprop_t	*dip;
@@ -1669,7 +1743,7 @@ dld_set_public_prop(prop_desc_t *pd, datalink_id_t linkid,
 	uint32_t	u32;
 	void		*val;
 
-	dip = dld_buf_alloc(0, linkid, pd->pd_name, 0, &status);
+	dip = i_dladm_buf_alloc(0, linkid, pd->pd_name, 0, &status);
 	if (dip == NULL)
 		return (status);
 
@@ -1699,7 +1773,11 @@ dld_set_public_prop(prop_desc_t *pd, datalink_id_t linkid,
 		}
 	}
 
-	(void) memcpy(dip->pr_val, val, dip->pr_valsize);
+	if (val != NULL)
+		(void) memcpy(dip->pr_val, val, dip->pr_valsize);
+	else
+		dip->pr_valsize = 0;
+
 	dsize = MAC_PROP_BUFSIZE(dip->pr_valsize);
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
 		status = dladm_errno2status(errno);
@@ -1715,7 +1793,7 @@ done:
 }
 
 static dld_ioc_macprop_t *
-dld_get_public_prop(datalink_id_t linkid, char *prop_name, uint_t flags,
+i_dladm_get_public_prop(datalink_id_t linkid, char *prop_name, uint_t flags,
     dladm_status_t *status)
 {
 	int fd, dsize;
@@ -1723,7 +1801,7 @@ dld_get_public_prop(datalink_id_t linkid, char *prop_name, uint_t flags,
 
 	*status = DLADM_STATUS_OK;
 
-	dip = dld_buf_alloc(0, linkid, prop_name, flags, status);
+	dip = i_dladm_buf_alloc(0, linkid, prop_name, flags, status);
 	if (dip == NULL)
 		return (NULL);
 
@@ -1748,8 +1826,8 @@ done:
 
 /* ARGSUSED */
 static dladm_status_t
-dld_defmtu_check(struct prop_desc *pd, datalink_id_t linkid, char **prop_val,
-    uint_t val_cnt, val_desc_t *v, datalink_media_t media)
+i_dladm_defmtu_check(struct prop_desc *pd, datalink_id_t linkid,
+    char **prop_val, uint_t val_cnt, val_desc_t *v, datalink_media_t media)
 {
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVAL);
@@ -1759,7 +1837,7 @@ dld_defmtu_check(struct prop_desc *pd, datalink_id_t linkid, char **prop_val,
 
 /* ARGSUSED */
 static dladm_status_t
-dld_duplex_get(struct prop_desc *pd, datalink_id_t linkid,
+i_dladm_duplex_get(struct prop_desc *pd, datalink_id_t linkid,
     char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	link_duplex_t   link_duplex;
@@ -1789,7 +1867,7 @@ dld_duplex_get(struct prop_desc *pd, datalink_id_t linkid,
 
 /* ARGSUSED */
 static dladm_status_t
-dld_speed_get(struct prop_desc *pd, datalink_id_t linkid,
+i_dladm_speed_get(struct prop_desc *pd, datalink_id_t linkid,
     char **prop_val, uint_t *val_cnt, uint_t flags)
 {
 	uint64_t	ifspeed = 0;
@@ -1815,7 +1893,7 @@ dld_speed_get(struct prop_desc *pd, datalink_id_t linkid,
 
 /* ARGSUSED */
 static dladm_status_t
-dld_status_get(struct prop_desc *pd, datalink_id_t linkid,
+i_dladm_status_get(struct prop_desc *pd, datalink_id_t linkid,
     char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	link_state_t	link_state;
@@ -1825,7 +1903,7 @@ dld_status_get(struct prop_desc *pd, datalink_id_t linkid,
 
 	if (flags & MAC_PROP_DEFAULT)
 		return (DLADM_STATUS_NOTSUP);
-	dip = dld_get_public_prop(linkid, pd->pd_name, flags, &status);
+	dip = i_dladm_get_public_prop(linkid, pd->pd_name, flags, &status);
 	if (status != DLADM_STATUS_OK)
 		return (status);
 	cp = (uchar_t *)dip->pr_val;
@@ -1849,13 +1927,13 @@ dld_status_get(struct prop_desc *pd, datalink_id_t linkid,
 
 /* ARGSUSED */
 static dladm_status_t
-dld_binary_get(struct prop_desc *pd, datalink_id_t linkid,
+i_dladm_binary_get(struct prop_desc *pd, datalink_id_t linkid,
     char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	dld_ioc_macprop_t *dip;
 	dladm_status_t status;
 
-	dip = dld_get_public_prop(linkid, pd->pd_name, flags, &status);
+	dip = i_dladm_get_public_prop(linkid, pd->pd_name, flags, &status);
 	if (dip == NULL)
 		return (status);
 	(void) snprintf(*prop_val, DLADM_PROP_VAL_MAX, "%x", dip->pr_val[0]);
@@ -1866,7 +1944,7 @@ dld_binary_get(struct prop_desc *pd, datalink_id_t linkid,
 
 /* ARGSUSED */
 static dladm_status_t
-dld_uint32_get(struct prop_desc *pd, datalink_id_t linkid,
+i_dladm_uint32_get(struct prop_desc *pd, datalink_id_t linkid,
     char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	dld_ioc_macprop_t *dip;
@@ -1874,7 +1952,7 @@ dld_uint32_get(struct prop_desc *pd, datalink_id_t linkid,
 	uchar_t *cp;
 	dladm_status_t status;
 
-	dip = dld_get_public_prop(linkid, pd->pd_name, flags, &status);
+	dip = i_dladm_get_public_prop(linkid, pd->pd_name, flags, &status);
 	if (dip == NULL)
 		return (status);
 	cp = (uchar_t *)dip->pr_val;
@@ -1887,7 +1965,7 @@ dld_uint32_get(struct prop_desc *pd, datalink_id_t linkid,
 
 /* ARGSUSED */
 static dladm_status_t
-dld_flowctl_get(struct prop_desc *pd, datalink_id_t linkid,
+i_dladm_flowctl_get(struct prop_desc *pd, datalink_id_t linkid,
     char **prop_val, uint_t *val_cnt, datalink_media_t media, uint_t flags)
 {
 	dld_ioc_macprop_t *dip;
@@ -1895,7 +1973,7 @@ dld_flowctl_get(struct prop_desc *pd, datalink_id_t linkid,
 	dladm_status_t status;
 	uchar_t *cp;
 
-	dip = dld_get_public_prop(linkid, pd->pd_name, flags, &status);
+	dip = i_dladm_get_public_prop(linkid, pd->pd_name, flags, &status);
 	if (dip == NULL)
 		return (status);
 	cp = (uchar_t *)dip->pr_val;
@@ -1922,14 +2000,14 @@ dld_flowctl_get(struct prop_desc *pd, datalink_id_t linkid,
 
 /* ARGSUSED */
 static dladm_status_t
-dld_set_prop(datalink_id_t linkid, const char *prop_name,
+i_dladm_set_prop(datalink_id_t linkid, const char *prop_name,
     char **prop_val, uint_t val_cnt, uint_t flags)
 {
 	int		fd, i, slen;
 	int 		bufsize = 0, dsize;
 	dld_ioc_macprop_t *dip = NULL;
 	uchar_t 	*dp;
-	dld_public_prop_t *p;
+	dladm_public_prop_t *p;
 	dladm_status_t	status = DLADM_STATUS_OK;
 
 	if ((prop_name == NULL && prop_val != NULL) ||
@@ -1954,7 +2032,7 @@ dld_set_prop(datalink_id_t linkid, const char *prop_name,
 		bufsize += 1024;
 	}
 
-	dip = dld_buf_alloc(bufsize + 1, linkid, prop_name,
+	dip = i_dladm_buf_alloc(bufsize + 1, linkid, prop_name,
 	    (prop_val != NULL ? 0 : MAC_PROP_DEFAULT), &status);
 	if (dip == NULL)
 		return (status);
@@ -1998,14 +2076,14 @@ done:
 }
 
 static dladm_status_t
-dld_get_prop(datalink_id_t linkid, const char *prop_name,
+i_dladm_get_prop(datalink_id_t linkid, const char *prop_name,
     char **prop_val, uint_t *val_cnt, dladm_prop_type_t type, uint_t dld_flags)
 {
 	int		fd;
 	dladm_status_t  status = DLADM_STATUS_OK;
 	uint_t 		dsize;
 	dld_ioc_macprop_t *dip = NULL;
-	dld_public_prop_t *p;
+	dladm_public_prop_t *p;
 	char tmp = '\0';
 
 	if ((prop_name == NULL && prop_val != NULL) ||
@@ -2025,7 +2103,7 @@ dld_get_prop(datalink_id_t linkid, const char *prop_name,
 	/*
 	 * private properties: all parsing is done in the kernel.
 	 */
-	dip = dld_buf_alloc(1024, linkid, prop_name, dld_flags, &status);
+	dip = i_dladm_buf_alloc(1024, linkid, prop_name, dld_flags, &status);
 	if (dip == NULL)
 		return (status);
 	dsize = MAC_PROP_BUFSIZE(dip->pr_valsize);
@@ -2074,14 +2152,14 @@ i_dladm_getset_defval(prop_desc_t *pdp, datalink_id_t linkid,
 	}
 
 	/*
-	 * PD_EMPTY_RESET is used for properties like zone where the
-	 * "" itself is used to reset the property. So libdladm can
-	 * copy pdp->pd_defval over to the val_desc_t passed down on
-	 * the setprop using the global values in the table. For other
-	 * cases (PD_EMPTY_RESET is not set, vd_name is ""), doing
-	 * reset-linkprop will cause libdladm to do a getprop to find
-	 * the default value and then do a setprop to reset the value
-	 * to default.
+	 * For properties which have pdp->pd_defval.vd_name as a non-empty
+	 * string, the "" itself is used to reset the property (exceptions
+	 * are zone and autopush, which populate vdp->vd_val). So
+	 * libdladm can copy pdp->pd_defval over to the val_desc_t passed
+	 * down on the setprop using the global values in the table. For
+	 * other cases (vd_name is ""), doing reset-linkprop will cause
+	 * libdladm to do a getprop to find the default value and then do
+	 * a setprop to reset the value to default.
 	 */
 	status = pdp->pd_get(pdp, linkid, prop_vals, &cnt, media,
 	    MAC_PROP_DEFAULT);

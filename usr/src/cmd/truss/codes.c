@@ -27,8 +27,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -851,13 +849,12 @@ const struct ioc {
 		"dld_ioc_create_vlan"},
 	{ (uint_t)DLDIOC_DELETE_VLAN,	"DLDIOC_DELETE_VLAN",
 		"dld_ioc_delete_vlan"},
-	{ (uint_t)DLDIOC_SETAUTOPUSH,   "DLDIOC_SETAUTOPUSH", "dld_ioc_ap"},
-	{ (uint_t)DLDIOC_GETAUTOPUSH,   "DLDIOC_GETAUTOPUSH", "dld_ioc_ap"},
-	{ (uint_t)DLDIOC_CLRAUTOPUSH,   "DLDIOC_CLRAUTOPUSH", "dld_ioc_ap"},
 	{ (uint_t)DLDIOC_DOORSERVER,   "DLDIOC_DOORSERVER", "dld_ioc_door"},
 	{ (uint_t)DLDIOC_RENAME,   "DLDIOC_RENAME", "dld_ioc_rename"},
-	{ (uint_t)DLDIOC_SETZID,   "DLDIOC_SETZID", "dld_ioc_setzid"},
-	{ (uint_t)DLDIOC_GETZID,   "DLDIOC_GETZID", "dld_ioc_getzid"},
+	{ (uint_t)DLDIOC_SETMACPROP,   "DLDIOC_SETMACPROP",
+		"dld_ioc_macprop_s"},
+	{ (uint_t)DLDIOC_GETMACPROP,   "DLDIOC_GETMACPROP",
+		"dld_ioc_macprop_s"},
 
 	/* ZFS ioctls */
 	{ (uint_t)ZFS_IOC_POOL_CREATE,		"ZFS_IOC_POOL_CREATE",

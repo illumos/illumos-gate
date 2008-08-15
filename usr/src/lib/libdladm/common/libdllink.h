@@ -26,8 +26,6 @@
 #ifndef _LIBDLLINK_H
 #define	_LIBDLLINK_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file includes structures, macros and routines used by general
  * link administration (i.e. not limited to one specific type of link).
@@ -91,8 +89,7 @@ extern dladm_status_t	dladm_walk(dladm_walkcb_t *, void *, datalink_class_t,
 			    datalink_media_t, uint32_t);
 extern dladm_status_t	dladm_mac_walk(dladm_walkcb_t *, void *);
 extern dladm_status_t	dladm_info(datalink_id_t, dladm_attr_t *);
-extern dladm_status_t	dladm_setzid(const char *, zoneid_t);
-extern dladm_status_t	dladm_getzid(datalink_id_t, zoneid_t *);
+extern dladm_status_t	dladm_setzid(const char *, char *);
 
 extern dladm_status_t	dladm_rename_link(const char *, const char *);
 

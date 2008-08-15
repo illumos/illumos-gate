@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Data-Link Driver
  */
@@ -69,6 +67,9 @@ static void		drv_secobj_fini(void);
 static void		drv_ioc_secobj_set(dld_ctl_str_t *, mblk_t *);
 static void		drv_ioc_secobj_get(dld_ctl_str_t *, mblk_t *);
 static void		drv_ioc_secobj_unset(dld_ctl_str_t *, mblk_t *);
+static int		drv_ioc_setap(datalink_id_t, struct dlautopush *);
+static int		drv_ioc_getap(datalink_id_t, struct dlautopush *);
+static int		drv_ioc_clrap(datalink_id_t);
 
 /*
  * The following entry points are private to dld and are used for control
@@ -519,8 +520,11 @@ drv_ioc_prop_common(dld_ctl_str_t *ctls, mblk_t *mp, boolean_t set)
 	dls_vlan_t		*dvp;
 	datalink_id_t 		linkid;
 	mac_prop_t		macprop;
+	uchar_t			*cp;
+	struct dlautopush	*dlap;
+	dld_ioc_zid_t		*dzp;
 
-	if ((err = miocpullup(mp, sizeof (dld_ioc_macprop_t))) != 0)
+	if ((err = miocpullup(mp, sizeof (dld_ioc_macprop_t) - 1)) != 0)
 		goto done;
 	dipp = (dld_ioc_macprop_t *)mp->b_cont->b_rptr;
 
@@ -530,6 +534,37 @@ drv_ioc_prop_common(dld_ctl_str_t *ctls, mblk_t *mp, boolean_t set)
 	dipp = (dld_ioc_macprop_t *)mp->b_cont->b_rptr;
 
 	linkid = dipp->pr_linkid;
+
+	switch (dipp->pr_num) {
+	case MAC_PROP_ZONE:
+		if (set) {
+			dzp = (dld_ioc_zid_t *)dipp->pr_val;
+			err = dls_devnet_setzid(dzp->diz_link, dzp->diz_zid);
+			goto done;
+		} else {
+			cp = (uchar_t *)dipp->pr_val;
+			err = dls_devnet_getzid(linkid, (zoneid_t *)cp);
+			goto done;
+		}
+	case MAC_PROP_AUTOPUSH:
+		if (set) {
+			if (dipp->pr_valsize != 0) {
+				dlap = (struct dlautopush *)dipp->pr_val;
+				err = drv_ioc_setap(linkid, dlap);
+				goto done;
+			} else {
+				err = drv_ioc_clrap(linkid);
+				goto done;
+			}
+		} else {
+			dlap = (struct dlautopush *)dipp->pr_val;
+			err = drv_ioc_getap(linkid, dlap);
+			goto done;
+		}
+
+	default:
+		break;
+	}
 
 	if ((err = dls_devnet_hold_tmp(linkid, &dlh)) != 0)
 		goto done;
@@ -729,23 +764,14 @@ done:
 		miocnak(q, mp, 0, err);
 }
 
-/*
- * DLDIOC_SETAUTOPUSH
- */
-static void
-drv_ioc_setap(dld_ctl_str_t *ctls, mblk_t *mp)
+static int
+drv_ioc_setap(datalink_id_t linkid, struct dlautopush *dlap)
 {
-	dld_ioc_ap_t	*diap;
 	dld_ap_t	*dap;
 	int		i, err;
-	queue_t		*q = ctls->cs_wq;
 	mod_hash_key_t	key;
 
-	if ((err = miocpullup(mp, sizeof (dld_ioc_ap_t))) != 0)
-		goto failed;
-
-	diap = (dld_ioc_ap_t *)mp->b_cont->b_rptr;
-	if (diap->dia_npush == 0 || diap->dia_npush > MAXAPUSH) {
+	if (dlap->dap_npush == 0 || dlap->dap_npush > MAXAPUSH) {
 		err = EINVAL;
 		goto failed;
 	}
@@ -753,14 +779,14 @@ drv_ioc_setap(dld_ctl_str_t *ctls, mblk_t *mp)
 	/*
 	 * Validate that the specified list of modules exist.
 	 */
-	for (i = 0; i < diap->dia_npush; i++) {
-		if (fmodsw_find(diap->dia_aplist[i], FMODSW_LOAD) == NULL) {
+	for (i = 0; i < dlap->dap_npush; i++) {
+		if (fmodsw_find(dlap->dap_aplist[i], FMODSW_LOAD) == NULL) {
 			err = EINVAL;
 			goto failed;
 		}
 	}
 
-	key = (mod_hash_key_t)(uintptr_t)diap->dia_linkid;
+	key = (mod_hash_key_t)(uintptr_t)linkid;
 
 	rw_enter(&dld_ap_hash_lock, RW_WRITER);
 	if (mod_hash_find(dld_ap_hashp, key, (mod_hash_val_t *)&dap) != 0) {
@@ -771,7 +797,7 @@ drv_ioc_setap(dld_ctl_str_t *ctls, mblk_t *mp)
 			goto failed;
 		}
 
-		dap->da_linkid = diap->dia_linkid;
+		dap->da_linkid = linkid;
 		err = mod_hash_insert(dld_ap_hashp, key, (mod_hash_val_t)dap);
 		ASSERT(err == 0);
 	}
@@ -779,40 +805,29 @@ drv_ioc_setap(dld_ctl_str_t *ctls, mblk_t *mp)
 	/*
 	 * Update the configuration.
 	 */
-	dap->da_anchor = diap->dia_anchor;
-	dap->da_npush = diap->dia_npush;
-	for (i = 0; i < diap->dia_npush; i++) {
-		(void) strlcpy(dap->da_aplist[i], diap->dia_aplist[i],
+	dap->da_anchor = dlap->dap_anchor;
+	dap->da_npush = dlap->dap_npush;
+	for (i = 0; i < dlap->dap_npush; i++) {
+		(void) strlcpy(dap->da_aplist[i], dlap->dap_aplist[i],
 		    FMNAMESZ + 1);
 	}
 	rw_exit(&dld_ap_hash_lock);
 
-	miocack(q, mp, 0, 0);
-	return;
+	return (0);
 
 failed:
-	miocnak(q, mp, 0, err);
+	return (err);
 }
 
-/*
- * DLDIOC_GETAUTOPUSH
- */
-static void
-drv_ioc_getap(dld_ctl_str_t *ctls, mblk_t *mp)
+static int
+drv_ioc_getap(datalink_id_t linkid, struct dlautopush *dlap)
 {
-	dld_ioc_ap_t	*diap;
 	dld_ap_t	*dap;
 	int		i, err;
-	queue_t		*q = ctls->cs_wq;
-
-	if ((err = miocpullup(mp, sizeof (dld_ioc_ap_t))) != 0)
-		goto failed;
-
-	diap = (dld_ioc_ap_t *)mp->b_cont->b_rptr;
 
 	rw_enter(&dld_ap_hash_lock, RW_READER);
 	if (mod_hash_find(dld_ap_hashp,
-	    (mod_hash_key_t)(uintptr_t)diap->dia_linkid,
+	    (mod_hash_key_t)(uintptr_t)linkid,
 	    (mod_hash_val_t *)&dap) != 0) {
 		err = ENOENT;
 		rw_exit(&dld_ap_hash_lock);
@@ -822,54 +837,38 @@ drv_ioc_getap(dld_ctl_str_t *ctls, mblk_t *mp)
 	/*
 	 * Retrieve the configuration.
 	 */
-	diap->dia_anchor = dap->da_anchor;
-	diap->dia_npush = dap->da_npush;
+	dlap->dap_anchor = dap->da_anchor;
+	dlap->dap_npush = dap->da_npush;
 	for (i = 0; i < dap->da_npush; i++) {
-		(void) strlcpy(diap->dia_aplist[i], dap->da_aplist[i],
+		(void) strlcpy(dlap->dap_aplist[i], dap->da_aplist[i],
 		    FMNAMESZ + 1);
 	}
 	rw_exit(&dld_ap_hash_lock);
 
-	miocack(q, mp, sizeof (dld_ioc_ap_t), 0);
-	return;
+	return (0);
 
 failed:
-	miocnak(q, mp, 0, err);
+	return (err);
 }
 
-/*
- * DLDIOC_CLRAUTOPUSH
- */
-static void
-drv_ioc_clrap(dld_ctl_str_t *ctls, mblk_t *mp)
+static int
+drv_ioc_clrap(datalink_id_t linkid)
 {
-	dld_ioc_ap_t	*diap;
 	mod_hash_val_t	val;
 	mod_hash_key_t	key;
-	int		err;
-	queue_t		*q = ctls->cs_wq;
 
-	if ((err = miocpullup(mp, sizeof (dld_ioc_ap_t))) != 0)
-		goto done;
-
-	diap = (dld_ioc_ap_t *)mp->b_cont->b_rptr;
-	key = (mod_hash_key_t)(uintptr_t)diap->dia_linkid;
+	key = (mod_hash_key_t)(uintptr_t)linkid;
 
 	rw_enter(&dld_ap_hash_lock, RW_WRITER);
 	if (mod_hash_find(dld_ap_hashp, key, &val) != 0) {
 		rw_exit(&dld_ap_hash_lock);
-		goto done;
+		return (0);
 	}
 
 	VERIFY(mod_hash_remove(dld_ap_hashp, key, &val) == 0);
 	kmem_free(val, sizeof (dld_ap_t));
 	rw_exit(&dld_ap_hash_lock);
-
-done:
-	if (err == 0)
-		miocack(q, mp, 0, 0);
-	else
-		miocnak(q, mp, 0, err);
+	return (0);
 }
 
 /*
@@ -891,52 +890,6 @@ drv_ioc_doorserver(dld_ctl_str_t *ctls, mblk_t *mp)
 done:
 	if (err == 0)
 		miocack(q, mp, 0, 0);
-	else
-		miocnak(q, mp, 0, err);
-}
-
-/*
- * DLDIOC_SETZID
- */
-static void
-drv_ioc_setzid(dld_ctl_str_t *ctls, mblk_t *mp)
-{
-	queue_t			*q = ctls->cs_wq;
-	dld_ioc_setzid_t	*dis;
-	int			err;
-
-	if ((err = miocpullup(mp, sizeof (dld_ioc_setzid_t))) != 0)
-		goto done;
-
-	dis = (dld_ioc_setzid_t *)mp->b_cont->b_rptr;
-	err = dls_devnet_setzid(dis->dis_link, dis->dis_zid);
-
-done:
-	if (err == 0)
-		miocack(q, mp, 0, 0);
-	else
-		miocnak(q, mp, 0, err);
-}
-
-/*
- * DLDIOC_GETZID
- */
-static void
-drv_ioc_getzid(dld_ctl_str_t *ctls, mblk_t *mp)
-{
-	queue_t			*q = ctls->cs_wq;
-	dld_ioc_getzid_t	*dig;
-	int			err;
-
-	if ((err = miocpullup(mp, sizeof (dld_ioc_getzid_t))) != 0)
-		goto done;
-
-	dig = (dld_ioc_getzid_t *)mp->b_cont->b_rptr;
-	err = dls_devnet_getzid(dig->dig_linkid, &dig->dig_zid);
-
-done:
-	if (err == 0)
-		miocack(q, mp, sizeof (dld_ioc_getzid_t), 0);
 	else
 		miocnak(q, mp, 0, err);
 }
@@ -981,23 +934,8 @@ drv_ioc(dld_ctl_str_t *ctls, mblk_t *mp)
 	case DLDIOC_VLAN_ATTR:
 		drv_ioc_vlan_attr(ctls, mp);
 		return;
-	case DLDIOC_SETAUTOPUSH:
-		drv_ioc_setap(ctls, mp);
-		return;
-	case DLDIOC_GETAUTOPUSH:
-		drv_ioc_getap(ctls, mp);
-		return;
-	case DLDIOC_CLRAUTOPUSH:
-		drv_ioc_clrap(ctls, mp);
-		return;
 	case DLDIOC_DOORSERVER:
 		drv_ioc_doorserver(ctls, mp);
-		return;
-	case DLDIOC_SETZID:
-		drv_ioc_setzid(ctls, mp);
-		return;
-	case DLDIOC_GETZID:
-		drv_ioc_getzid(ctls, mp);
 		return;
 	case DLDIOC_RENAME:
 		drv_ioc_rename(ctls, mp);
