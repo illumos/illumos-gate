@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SCSI disk target driver.
  */
@@ -72,10 +70,10 @@
  * Loadable module info.
  */
 #if (defined(__fibre))
-#define	SD_MODULE_NAME	"SCSI SSA/FCAL Disk Driver %I%"
+#define	SD_MODULE_NAME	"SCSI SSA/FCAL Disk Driver 1.588"
 char _depends_on[]	= "misc/scsi misc/cmlb drv/fcp";
 #else
-#define	SD_MODULE_NAME	"SCSI Disk Driver %I%"
+#define	SD_MODULE_NAME	"SCSI Disk Driver 1.588"
 char _depends_on[]	= "misc/scsi misc/cmlb";
 #endif
 
@@ -1006,6 +1004,9 @@ static int sd_pm_idletime = 1;
 #define	sd_dump_memory			ssd_dump_memory
 #define	sd_get_media_info		ssd_get_media_info
 #define	sd_dkio_ctrl_info		ssd_dkio_ctrl_info
+#define	sd_nvpair_str_decode		ssd_nvpair_str_decode
+#define	sd_strtok_r			ssd_strtok_r
+#define	sd_set_properties		ssd_set_properties
 #define	sd_get_tunables_from_conf	ssd_get_tunables_from_conf
 #define	sd_setup_next_xfer		ssd_setup_next_xfer
 #define	sd_dkio_get_temp		ssd_dkio_get_temp
@@ -1125,6 +1126,9 @@ static void	sd_set_mmc_caps(struct sd_lun *un);
 
 static void sd_read_unit_properties(struct sd_lun *un);
 static int  sd_process_sdconf_file(struct sd_lun *un);
+static void sd_nvpair_str_decode(struct sd_lun *un, char *nvpair_str);
+static char *sd_strtok_r(char *string, const char *sepset, char **lasts);
+static void sd_set_properties(struct sd_lun *un, char *name, char *value);
 static void sd_get_tunables_from_conf(struct sd_lun *un, int flags,
     int *data_list, sd_tunables *values);
 static void sd_process_sdconf_table(struct sd_lun *un);
@@ -3414,7 +3418,7 @@ sd_read_unit_properties(struct sd_lun *un)
 /*
  *    Function: sd_process_sdconf_file
  *
- * Description: Use ddi_getlongprop to obtain the properties from the
+ * Description: Use ddi_prop_lookup(9F) to obtain the properties from the
  *		driver's config file (ie, sd.conf) and update the driver
  *		soft state structure accordingly.
  *
@@ -3426,17 +3430,32 @@ sd_read_unit_properties(struct sd_lun *un)
  *			     there was no vid/pid match. This indicates that
  *			     the static config table should be used.
  *
- * The config file has a property, "sd-config-list", which consists of
- * one or more duplets as follows:
+ * The config file has a property, "sd-config-list". Currently we support
+ * two kinds of formats. For both formats, the value of this property
+ * is a list of duplets:
  *
  *  sd-config-list=
  *	<duplet>,
- *	[<duplet>,]
- *	[<duplet>];
+ *	[,<duplet>]*;
  *
- * The structure of each duplet is as follows:
+ * For the improved format, where
  *
- *  <duplet>:= <vid+pid>,<data-property-name_list>
+ *     <duplet>:= "<vid+pid>","<tunable-list>"
+ *
+ * and
+ *
+ *     <tunable-list>:=   <tunable> [, <tunable> ]*;
+ *     <tunable> =        <name> : <value>
+ *
+ * The <vid+pid> is the string that is returned by the target device on a
+ * SCSI inquiry command, the <tunable-list> contains one or more tunables
+ * to apply to all target devices with the specified <vid+pid>.
+ *
+ * Each <tunable> is a "<name> : <value>" pair.
+ *
+ * For the old format, the structure of each duplet is as follows:
+ *
+ *  <duplet>:= "<vid+pid>","<data-property-name_list>"
  *
  * The first entry of the duplet is the device ID string (the concatenated
  * vid & pid; not to be confused with a device_id).  This is defined in
@@ -3462,27 +3481,24 @@ sd_read_unit_properties(struct sd_lun *un)
 static int
 sd_process_sdconf_file(struct sd_lun *un)
 {
-	char	*config_list = NULL;
-	int	config_list_len;
-	int	len;
-	int	dupletlen = 0;
+	char	**config_list = NULL;
+	uint_t	nelements;
 	char	*vidptr;
 	int	vidlen;
 	char	*dnlist_ptr;
 	char	*dataname_ptr;
-	int	dnlist_len;
-	int	dataname_len;
-	int	*data_list;
-	int	data_list_len;
+	char	*dataname_lasts;
+	int	*data_list = NULL;
+	uint_t	data_list_len;
 	int	rval = SD_FAILURE;
 	int	i;
 
 	ASSERT(un != NULL);
 
 	/* Obtain the configuration list associated with the .conf file */
-	if (ddi_getlongprop(DDI_DEV_T_ANY, SD_DEVINFO(un), DDI_PROP_DONTPASS,
-	    sd_config_list, (caddr_t)&config_list, &config_list_len)
-	    != DDI_PROP_SUCCESS) {
+	if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, SD_DEVINFO(un),
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, sd_config_list,
+	    &config_list, &nelements) != DDI_PROP_SUCCESS) {
 		return (SD_FAILURE);
 	}
 
@@ -3491,19 +3507,26 @@ sd_process_sdconf_file(struct sd_lun *un)
 	 * made, get the data value and update the soft state structure
 	 * accordingly.
 	 *
-	 * Note: This algorithm is complex and difficult to maintain. It should
-	 * be replaced with a more robust implementation.
+	 * Each duplet should show as a pair of strings, return SD_FAILURE
+	 * otherwise.
 	 */
-	for (len = config_list_len, vidptr = config_list; len > 0;
-	    vidptr += dupletlen, len -= dupletlen) {
+	if (nelements & 1) {
+		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+		    "sd-config-list should show as pairs of strings.\n");
+		if (config_list)
+			ddi_prop_free(config_list);
+		return (SD_FAILURE);
+	}
+
+	for (i = 0; i < nelements; i += 2) {
 		/*
 		 * Note: The assumption here is that each vid entry is on
 		 * a unique line from its associated duplet.
 		 */
-		vidlen = dupletlen = (int)strlen(vidptr);
+		vidptr = config_list[i];
+		vidlen = (int)strlen(vidptr);
 		if ((vidlen == 0) ||
 		    (sd_sdconf_id_match(un, vidptr, vidlen) != SD_SUCCESS)) {
-			dupletlen++;
 			continue;
 		}
 
@@ -3511,92 +3534,320 @@ sd_process_sdconf_file(struct sd_lun *un)
 		 * dnlist contains 1 or more blank separated
 		 * data-property-name entries
 		 */
-		dnlist_ptr = vidptr + vidlen + 1;
-		dnlist_len = (int)strlen(dnlist_ptr);
-		dupletlen += dnlist_len + 2;
+		dnlist_ptr = config_list[i + 1];
 
-		/*
-		 * Set a pointer for the first data-property-name
-		 * entry in the list
-		 */
-		dataname_ptr = dnlist_ptr;
-		dataname_len = 0;
-
-		/*
-		 * Loop through all data-property-name entries in the
-		 * data-property-name-list setting the properties for each.
-		 */
-		while (dataname_len < dnlist_len) {
-			int version;
-
+		if (strchr(dnlist_ptr, ':') != NULL) {
 			/*
-			 * Determine the length of the current
-			 * data-property-name entry by indexing until a
-			 * blank or NULL is encountered. When the space is
-			 * encountered reset it to a NULL for compliance
-			 * with ddi_getlongprop().
+			 * Decode the improved format sd-config-list.
 			 */
-			for (i = 0; ((dataname_ptr[i] != ' ') &&
-			    (dataname_ptr[i] != '\0')); i++) {
-				;
-			}
+			sd_nvpair_str_decode(un, dnlist_ptr);
+		} else {
+			/*
+			 * The old format sd-config-list, loop through all
+			 * data-property-name entries in the
+			 * data-property-name-list
+			 * setting the properties for each.
+			 */
+			for (dataname_ptr = sd_strtok_r(dnlist_ptr, " \t",
+			    &dataname_lasts); dataname_ptr != NULL;
+			    dataname_ptr = sd_strtok_r(NULL, " \t",
+			    &dataname_lasts)) {
+				int version;
 
-			dataname_len += i;
-			/* If not null terminated, Make it so */
-			if (dataname_ptr[i] == ' ') {
-				dataname_ptr[i] = '\0';
-			}
-			dataname_len++;
-			SD_INFO(SD_LOG_ATTACH_DETACH, un,
-			    "sd_process_sdconf_file: disk:%s, data:%s\n",
-			    vidptr, dataname_ptr);
-
-			/* Get the data list */
-			if (ddi_getlongprop(DDI_DEV_T_ANY, SD_DEVINFO(un), 0,
-			    dataname_ptr, (caddr_t)&data_list, &data_list_len)
-			    != DDI_PROP_SUCCESS) {
 				SD_INFO(SD_LOG_ATTACH_DETACH, un,
-				    "sd_process_sdconf_file: data property (%s)"
-				    " has no value\n", dataname_ptr);
-				dataname_ptr = dnlist_ptr + dataname_len;
-				continue;
-			}
+				    "sd_process_sdconf_file: disk:%s, "
+				    "data:%s\n", vidptr, dataname_ptr);
 
-			version = data_list[0];
+				/* Get the data list */
+				if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY,
+				    SD_DEVINFO(un), 0, dataname_ptr, &data_list,
+				    &data_list_len) != DDI_PROP_SUCCESS) {
+					SD_INFO(SD_LOG_ATTACH_DETACH, un,
+					    "sd_process_sdconf_file: data "
+					    "property (%s) has no value\n",
+					    dataname_ptr);
+					continue;
+				}
 
-			if (version == SD_CONF_VERSION_1) {
-				sd_tunables values;
+				version = data_list[0];
 
-				/* Set the properties */
-				if (sd_chk_vers1_data(un, data_list[1],
-				    &data_list[2], data_list_len, dataname_ptr)
-				    == SD_SUCCESS) {
-					sd_get_tunables_from_conf(un,
-					    data_list[1], &data_list[2],
-					    &values);
-					sd_set_vers1_properties(un,
-					    data_list[1], &values);
-					rval = SD_SUCCESS;
+				if (version == SD_CONF_VERSION_1) {
+					sd_tunables values;
+
+					/* Set the properties */
+					if (sd_chk_vers1_data(un, data_list[1],
+					    &data_list[2], data_list_len,
+					    dataname_ptr) == SD_SUCCESS) {
+						sd_get_tunables_from_conf(un,
+						    data_list[1], &data_list[2],
+						    &values);
+						sd_set_vers1_properties(un,
+						    data_list[1], &values);
+						rval = SD_SUCCESS;
+					} else {
+						rval = SD_FAILURE;
+					}
 				} else {
+					scsi_log(SD_DEVINFO(un), sd_label,
+					    CE_WARN, "data property %s version "
+					    "0x%x is invalid.",
+					    dataname_ptr, version);
 					rval = SD_FAILURE;
 				}
-			} else {
-				scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-				    "data property %s version 0x%x is invalid.",
-				    dataname_ptr, version);
-				rval = SD_FAILURE;
+				if (data_list)
+					ddi_prop_free(data_list);
 			}
-			kmem_free(data_list, data_list_len);
-			dataname_ptr = dnlist_ptr + dataname_len;
 		}
 	}
 
-	/* free up the memory allocated by ddi_getlongprop */
+	/* free up the memory allocated by ddi_prop_lookup_string_array(). */
 	if (config_list) {
-		kmem_free(config_list, config_list_len);
+		ddi_prop_free(config_list);
 	}
 
 	return (rval);
+}
+
+/*
+ *    Function: sd_nvpair_str_decode()
+ *
+ * Description: Parse the improved format sd-config-list to get
+ *    each entry of tunable, which includes a name-value pair.
+ *    Then call sd_set_properties() to set the property.
+ *
+ *   Arguments: un - driver soft state (unit) structure
+ *    nvpair_str - the tunable list
+ */
+static void
+sd_nvpair_str_decode(struct sd_lun *un, char *nvpair_str)
+{
+	char	*nv, *name, *value, *token;
+	char	*nv_lasts, *v_lasts, *x_lasts;
+
+	for (nv = sd_strtok_r(nvpair_str, ",", &nv_lasts); nv != NULL;
+	    nv = sd_strtok_r(NULL, ",", &nv_lasts)) {
+		token = sd_strtok_r(nv, ":", &v_lasts);
+		name  = sd_strtok_r(token, " \t", &x_lasts);
+		token = sd_strtok_r(NULL, ":", &v_lasts);
+		value = sd_strtok_r(token, " \t", &x_lasts);
+		if (name == NULL || value == NULL) {
+			SD_INFO(SD_LOG_ATTACH_DETACH, un,
+			    "sd_nvpair_str_decode: "
+			    "name or value is not valid!\n");
+		} else {
+			sd_set_properties(un, name, value);
+		}
+	}
+}
+
+/*
+ *    Function: sd_strtok_r()
+ *
+ * Description: This function uses strpbrk and strspn to break
+ *    string into tokens on sequentially subsequent calls. Return
+ *    NULL when no non-separator characters remain. The first
+ *    argument is NULL for subsequent calls.
+ */
+static char *
+sd_strtok_r(char *string, const char *sepset, char **lasts)
+{
+	char	*q, *r;
+
+	/* First or subsequent call */
+	if (string == NULL)
+		string = *lasts;
+
+	if (string == NULL)
+		return (NULL);
+
+	/* Skip leading separators */
+	q = string + strspn(string, sepset);
+
+	if (*q == '\0')
+		return (NULL);
+
+	if ((r = strpbrk(q, sepset)) == NULL)
+		*lasts = NULL;
+	else {
+		*r = '\0';
+		*lasts = r + 1;
+	}
+	return (q);
+}
+
+/*
+ *    Function: sd_set_properties()
+ *
+ * Description: Set device properties based on the improved
+ *    format sd-config-list.
+ *
+ *   Arguments: un - driver soft state (unit) structure
+ *    name  - supported tunable name
+ *    value - tunable value
+ */
+static void
+sd_set_properties(struct sd_lun *un, char *name, char *value)
+{
+	char	*endptr = NULL;
+	long	val = 0;
+
+	if (strcasecmp(name, "cache-nonvolatile") == 0) {
+		if (strcasecmp(value, "true") == 0) {
+			un->un_f_suppress_cache_flush = TRUE;
+		} else if (strcasecmp(value, "false") == 0) {
+			un->un_f_suppress_cache_flush = FALSE;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "suppress_cache_flush flag set to %d\n",
+		    un->un_f_suppress_cache_flush);
+		return;
+	}
+
+	if (strcasecmp(name, "controller-type") == 0) {
+		if (ddi_strtol(value, &endptr, 0, &val) == 0) {
+			un->un_ctype = val;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "ctype set to %d\n", un->un_ctype);
+		return;
+	}
+
+	if (strcasecmp(name, "delay-busy") == 0) {
+		if (ddi_strtol(value, &endptr, 0, &val) == 0) {
+			un->un_busy_timeout = drv_usectohz(val / 1000);
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "busy_timeout set to %d\n", un->un_busy_timeout);
+		return;
+	}
+
+	if (strcasecmp(name, "disksort") == 0) {
+		if (strcasecmp(value, "true") == 0) {
+			un->un_f_disksort_disabled = FALSE;
+		} else if (strcasecmp(value, "false") == 0) {
+			un->un_f_disksort_disabled = TRUE;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "disksort disabled flag set to %d\n",
+		    un->un_f_disksort_disabled);
+		return;
+	}
+
+	if (strcasecmp(name, "timeout-releasereservation") == 0) {
+		if (ddi_strtol(value, &endptr, 0, &val) == 0) {
+			un->un_reserve_release_time = val;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "reservation release timeout set to %d\n",
+		    un->un_reserve_release_time);
+		return;
+	}
+
+	if (strcasecmp(name, "reset-lun") == 0) {
+		if (strcasecmp(value, "true") == 0) {
+			un->un_f_lun_reset_enabled = TRUE;
+		} else if (strcasecmp(value, "false") == 0) {
+			un->un_f_lun_reset_enabled = FALSE;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "lun reset enabled flag set to %d\n",
+		    un->un_f_lun_reset_enabled);
+		return;
+	}
+
+	if (strcasecmp(name, "retries-busy") == 0) {
+		if (ddi_strtol(value, &endptr, 0, &val) == 0) {
+			un->un_busy_retry_count = val;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "busy retry count set to %d\n", un->un_busy_retry_count);
+		return;
+	}
+
+	if (strcasecmp(name, "retries-timeout") == 0) {
+		if (ddi_strtol(value, &endptr, 0, &val) == 0) {
+			un->un_retry_count = val;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "timeout retry count set to %d\n", un->un_retry_count);
+		return;
+	}
+
+	if (strcasecmp(name, "retries-notready") == 0) {
+		if (ddi_strtol(value, &endptr, 0, &val) == 0) {
+			un->un_notready_retry_count = val;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "notready retry count set to %d\n",
+		    un->un_notready_retry_count);
+		return;
+	}
+
+	if (strcasecmp(name, "retries-reset") == 0) {
+		if (ddi_strtol(value, &endptr, 0, &val) == 0) {
+			un->un_reset_retry_count = val;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "reset retry count set to %d\n",
+		    un->un_reset_retry_count);
+		return;
+	}
+
+	if (strcasecmp(name, "throttle-max") == 0) {
+		if (ddi_strtol(value, &endptr, 0, &val) == 0) {
+			un->un_saved_throttle = un->un_throttle = val;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "throttle set to %d\n", un->un_throttle);
+	}
+
+	if (strcasecmp(name, "throttle-min") == 0) {
+		if (ddi_strtol(value, &endptr, 0, &val) == 0) {
+			un->un_min_throttle = val;
+		} else {
+			goto value_invalid;
+		}
+		SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+		    "min throttle set to %d\n", un->un_min_throttle);
+	}
+
+	/*
+	 * Validate the throttle values.
+	 * If any of the numbers are invalid, set everything to defaults.
+	 */
+	if ((un->un_throttle < SD_LOWEST_VALID_THROTTLE) ||
+	    (un->un_min_throttle < SD_LOWEST_VALID_THROTTLE) ||
+	    (un->un_min_throttle > un->un_throttle)) {
+		un->un_saved_throttle = un->un_throttle = sd_max_throttle;
+		un->un_min_throttle = sd_min_throttle;
+	}
+	return;
+
+value_invalid:
+	SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_set_properties: "
+	    "value of prop %s is invalid\n", name);
 }
 
 /*
@@ -3905,7 +4156,7 @@ sd_blank_cmp(struct sd_lun *un, char *id, int idlen)
  *   Arguments: un	     - driver soft state (unit) structure
  *		flags	     - integer mask indicating properties to be set
  *		prop_list    - integer list of property values
- *		list_len     - length of user provided data
+ *		list_len     - number of the elements
  *
  * Return Code: SD_SUCCESS - Indicates the user provided data is valid
  *		SD_FAILURE - Indicates the user provided data is invalid
@@ -3954,7 +4205,7 @@ sd_chk_vers1_data(struct sd_lun *un, int flags, int *prop_list,
 		}
 		mask = 1 << i;
 	}
-	if ((list_len / sizeof (int)) < (index + 2)) {
+	if (list_len < (index + 2)) {
 		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
 		    "sd_chk_vers1_data: "
 		    "Data property list %s size is incorrect. "
@@ -6710,6 +6961,8 @@ sd_unit_attach(dev_info_t *devi)
 	}
 
 	un->un_cmd_timeout	= SD_IO_TIME;
+
+	un->un_busy_timeout  = SD_BSY_TIMEOUT;
 
 	/* Info on current states, statuses, etc. (Updated frequently) */
 	un->un_state		= SD_STATE_NORMAL;
@@ -13290,7 +13543,7 @@ got_pkt:
 				SD_UPDATE_KSTATS(un, kstat_runq_exit, bp);
 				bp = sd_mark_rqs_idle(un, xp);
 				sd_retry_command(un, bp, SD_RETRIES_STANDARD,
-				    NULL, NULL, EIO, SD_BSY_TIMEOUT / 500,
+				    NULL, NULL, EIO, un->un_busy_timeout / 500,
 				    kstat_waitq_enter);
 				goto exit;
 			}
@@ -13340,7 +13593,7 @@ got_pkt:
 				SD_UPDATE_KSTATS(un, kstat_runq_exit, bp);
 				un->un_direct_priority_timeid =
 				    timeout(sd_start_direct_priority_command,
-				    bp, SD_BSY_TIMEOUT / 500);
+				    bp, un->un_busy_timeout / 500);
 
 				goto exit;
 			}
@@ -13358,7 +13611,7 @@ got_pkt:
 			 * Note:x86: Is there a timeout value in the sd_lun
 			 * for this condition?
 			 */
-			sd_set_retry_bp(un, bp, SD_BSY_TIMEOUT / 500,
+			sd_set_retry_bp(un, bp, un->un_busy_timeout / 500,
 			    kstat_runq_back_to_waitq);
 			goto exit;
 
@@ -13950,7 +14203,7 @@ sd_retry_command(struct sd_lun *un, struct buf *bp, int retry_check_flag,
 			 * We are at the throttle limit for the target,
 			 * fall back to delayed retry.
 			 */
-			retry_delay = SD_BSY_TIMEOUT;
+			retry_delay = un->un_busy_timeout;
 			statp = kstat_waitq_enter;
 			SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un,
 			    "sd_retry_command: immed. retry hit "
@@ -14277,7 +14530,8 @@ sd_send_request_sense_command(struct sd_lun *un, struct buf *bp,
 		/* Don't retry if the command is flagged as non-retryable */
 		if ((pktp->pkt_flags & FLAG_DIAGNOSE) == 0) {
 			sd_retry_command(un, bp, SD_RETRIES_NOCHECK,
-			    NULL, NULL, 0, SD_BSY_TIMEOUT, kstat_waitq_enter);
+			    NULL, NULL, 0, un->un_busy_timeout,
+			    kstat_waitq_enter);
 			SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un,
 			    "sd_send_request_sense_command: "
 			    "at full throttle, retrying exit\n");
@@ -15576,14 +15830,14 @@ sd_validate_sense_data(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
 		    "Busy Status on REQUEST SENSE\n");
 		sd_retry_command(un, bp, SD_RETRIES_BUSY, NULL,
-		    NULL, EIO, SD_BSY_TIMEOUT / 500, kstat_waitq_enter);
+		    NULL, EIO, un->un_busy_timeout / 500, kstat_waitq_enter);
 		return (SD_SENSE_DATA_IS_INVALID);
 
 	case STATUS_QFULL:
 		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
 		    "QFULL Status on REQUEST SENSE\n");
 		sd_retry_command(un, bp, SD_RETRIES_STANDARD, NULL,
-		    NULL, EIO, SD_BSY_TIMEOUT / 500, kstat_waitq_enter);
+		    NULL, EIO, un->un_busy_timeout / 500, kstat_waitq_enter);
 		return (SD_SENSE_DATA_IS_INVALID);
 
 	case STATUS_CHECK:
@@ -16276,7 +16530,7 @@ sd_sense_key_not_ready(struct sd_lun *un,
 		 * in sd_start_stop_unit_task.
 		 */
 		un->un_startstop_timeid = timeout(sd_start_stop_unit_callback,
-		    un, SD_BSY_TIMEOUT / 2);
+		    un, un->un_busy_timeout / 2);
 		xp->xb_nr_retry_count++;
 		sd_set_retry_bp(un, bp, 0, kstat_waitq_enter);
 		return;
@@ -16319,7 +16573,7 @@ do_retry:
 	xp->xb_nr_retry_count++;
 	si.ssi_severity = SCSI_ERR_RETRYABLE;
 	sd_retry_command(un, bp, SD_RETRIES_NOCHECK, sd_print_sense_msg,
-	    &si, EIO, SD_BSY_TIMEOUT, NULL);
+	    &si, EIO, un->un_busy_timeout, NULL);
 
 	return;
 
@@ -17324,7 +17578,7 @@ sd_pkt_status_busy(struct sd_lun *un, struct buf *bp, struct sd_xbuf *xp,
 	 * we have already checked the retry counts above.
 	 */
 	sd_retry_command(un, bp, SD_RETRIES_NOCHECK, NULL, NULL,
-	    EIO, SD_BSY_TIMEOUT, NULL);
+	    EIO, un->un_busy_timeout, NULL);
 
 	SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un,
 	    "sd_pkt_status_busy: exit\n");
