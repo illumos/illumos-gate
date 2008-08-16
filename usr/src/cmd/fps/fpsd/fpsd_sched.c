@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <sys/types.h>
 #include <dirent.h>
@@ -420,6 +418,15 @@ test_fpu_thr(/* ARGSUSED */ void *arg)
 
 #define	INVOKE_PROG	{	\
 	fpuid = identify_fpu_to_run_test(&frequency, &group_no, &fpu_index);\
+	if (intvl != fpsd.d_interval) {	\
+		/*	\
+		 * Interval has changed due to change in	\
+		 * online processors/ config properties.	\
+		 */	\
+		intvl = fpsd.d_interval;	\
+		fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,	\
+			INTVL_CHANGED_MSG, intvl);	\
+	}	\
 	if (fpuid == -1) {\
 		/* Testing could not be done on any cpu */\
 		(void) poll(NULL, 0, 20); /* Wait for some time */\
@@ -443,7 +450,7 @@ test_fpu_thr(/* ARGSUSED */ void *arg)
 			fpsd.d_iteration++;	\
 		}	\
 	}	\
-	}
+}
 
 		/*
 		 * If power management is disabled (or not supported) on the
@@ -616,7 +623,8 @@ get_num_onln_cpus()
  */
 
 static int
-identify_fpu_to_run_test(int *freq, int *iteration, int *fpu_index) {
+identify_fpu_to_run_test(int *freq, int *iteration, int *fpu_index)
+{
 	int fpuid = -1;
 	int ascend;
 	int tmp_iter;
@@ -646,8 +654,8 @@ identify_fpu_to_run_test(int *freq, int *iteration, int *fpu_index) {
 			fpsd_read_config();
 		}
 		fpsd_message(FPSD_NO_EXIT, FPS_DEBUG, IDENTIFY_FPU_MSG,
-			fpsd.d_fpuid_index, fpsd.d_iteration,
-			fpsd.d_conf->total_iter, fpsd.d_conf->m_cpuids_size);
+		    fpsd.d_fpuid_index, fpsd.d_iteration,
+		    fpsd.d_conf->total_iter, fpsd.d_conf->m_cpuids_size);
 		if (fpsd.d_iteration == fpsd.d_conf->total_iter) {
 			/* One pass completed */
 			fpsd.d_iteration = 0;
@@ -661,16 +669,16 @@ identify_fpu_to_run_test(int *freq, int *iteration, int *fpu_index) {
 				fpsd.d_conf->m_cpus[i].previous_iteration = 0;
 				} else {
 				fpsd.d_conf->m_cpus[i].previous_iteration =
-				fpsd.d_conf->m_cpus[i].total_iterations + 1;
+				    fpsd.d_conf->m_cpus[i].total_iterations + 1;
 				}
 			}
 		}
 		if (fpsd.d_iteration == 0) { /* Beginning of one pass */
 			fpsd.d_fpuid_index = 0;
 			while (fpsd.d_fpuid_index <
-				fpsd.d_conf->m_cpuids_size) {
+			    fpsd.d_conf->m_cpuids_size) {
 				if (fpsd.d_conf->m_cpus[fpsd.d_fpuid_index].\
-					disable_test) {
+				    disable_test) {
 					fpsd.d_fpuid_index++;
 				} else {
 					break;
@@ -681,7 +689,7 @@ identify_fpu_to_run_test(int *freq, int *iteration, int *fpu_index) {
 			}
 		} else {
 			if (fpsd.d_fpuid_index ==
-				(fpsd.d_conf->m_cpuids_size-1)) {
+			    (fpsd.d_conf->m_cpuids_size-1)) {
 				/* One iteration done for all fpus */
 				fpsd.d_fpuid_index = 0;
 			} else {
@@ -709,7 +717,7 @@ identify_fpu_to_run_test(int *freq, int *iteration, int *fpu_index) {
 				continue;
 			} else {
 				fpsd.d_conf->m_cpus[fpsd.d_fpuid_index].\
-					previous_iteration++;
+				    previous_iteration++;
 			}
 		} else {
 			/* This FPU is tested in descending order of */
@@ -723,16 +731,17 @@ identify_fpu_to_run_test(int *freq, int *iteration, int *fpu_index) {
 				continue;
 			} else {
 				fpsd.d_conf->m_cpus[fpsd.d_fpuid_index].\
-					previous_iteration--;
+				    previous_iteration--;
 			}
 		}
 		*iteration =
-		fpsd.d_conf->m_cpus[fpsd.d_fpuid_index].previous_iteration;
+		    fpsd.d_conf->m_cpus[fpsd.d_fpuid_index].previous_iteration;
 		*fpu_index = fpsd.d_fpuid_index;
 		fpsd_message(FPSD_NO_EXIT, FPS_DEBUG, IDENTIFY_FPU_RTN_MSG,
-		fpuid, *iteration, *freq,
-		fpsd.d_conf->m_cpus[fpsd.d_fpuid_index].previous_iteration,
-		fps_cpu.total_iterations);
+		    fpuid, *iteration, *freq,
+		    fpsd.d_conf->m_cpus[fpsd.d_fpuid_index].\
+		    previous_iteration,
+		    fps_cpu.total_iterations);
 	}
 	return (fpuid);
 }

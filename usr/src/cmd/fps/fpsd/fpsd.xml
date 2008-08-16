@@ -1,29 +1,27 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
-	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-	Use is subject to license terms.
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
 
-	CDDL HEADER START
+ CDDL HEADER START
 
-	The contents of this file are subject to the terms of the
-	Common Development and Distribution License (the "License").
-	You may not use this file except in compliance with the License.
-	
-	You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-	or http://www.opensolaris.org/os/licensing.
-	See the License for the specific language governing permissions
-	and limitations under the License.
-	
-	When distributing Covered Code, include this CDDL HEADER in each
-	file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-	If applicable, add the following below this CDDL HEADER, with the
-	fields enclosed by brackets "[]" replaced with your own identifying
-	information: Portions Copyright [yyyy] [name of copyright owner]
-	
-	CDDL HEADER END
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
 
-	ident	"%Z%%M%	%I%	%E% SMI"
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -31,7 +29,7 @@
 	file.
 -->
 
-<service_bundle type='manifest' name='SUNWfps:fpsd'>
+<service_bundle type='manifest' name='SUNWfsr:fpsd'>
 
 <service
 	name='system/fpsd'
@@ -45,15 +43,14 @@
 	<!--
 	  FP Scrubber Dependencies, Part 1
 
-	    A dependency on
-	    the fpsd binary being present .
+	    A dependency on syslogd as logging is done through it.
 	-->
 	<dependency
-	    name='fpsd'
+	    name='syslogd'
 	    grouping='require_all'
 	    restart_on='none'
-	    type='path'>
-		<service_fmri value='file://localhost/usr/lib/fps/fpsd' />
+	    type='service'>
+		<service_fmri value='svc:/system/system-log:default' />
 	</dependency>
 
 	<!--
@@ -62,7 +59,7 @@
 	    fpsd should be started after fmd is running. 
 	-->
 	<dependency
-	    name='startup_req'
+	    name='fmd'
 	    grouping='require_all'
 	    restart_on='none'
 	    type='service'>
@@ -74,7 +71,7 @@
 	    type='method'
 	    name='start'
 	    exec='/usr/lib/fps/fpsd'
-	    timeout_seconds='0'>
+	    timeout_seconds='600'>
             <method_context>
                         <method_credential user='root' group='root' />
             </method_context> 
@@ -89,7 +86,7 @@
 	<exec_method
                 type='method'
                 name='refresh'
-                exec=':kill -1'
+                exec=':kill -HUP'
                 timeout_seconds='60' />
 
 	<property_group
@@ -106,7 +103,7 @@
 	<template>
 	    	<common_name>
 		    	<loctext xml:lang='C'>
-				Solaris FP Scrubber 
+				FP Scrubber - Online Floating Point Unit Test
 			</loctext>
 		</common_name>
 

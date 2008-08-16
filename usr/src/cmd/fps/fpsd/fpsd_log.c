@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Logging support for the FPS Daemon
  */
@@ -36,18 +34,19 @@
 #include <errno.h>
 #include <syslog.h>
 #include <stdlib.h>
-#include <thread.h>
+#include <pthread.h>
 #include <synch.h>
 #include <unistd.h>
 
 #include <fpsapi.h>
 
 #include "fpsd.h"
+#include "messages.h"
 
 #define	FPSD_MAX_MSG_HDR_LEN	256
 #define	FPSD_MAX_TIME_LEN	32
 
-mutex_t log_mutex;
+pthread_mutex_t log_mutex;
 
 static char *log_prio_str[] = {
 	"ERROR: ",	/* LOG_ERR */
@@ -73,20 +72,19 @@ fpsd_timestamp(char *buf, size_t buflen)
 	buf[0] = '\0';
 
 	if (gettimeofday(&now, NULL) != 0) {
-		(void) fprintf(stderr, "gettimeofday failed: %s\n",
+		(void) fprintf(stderr, GET_TIME_FAILED,
 		    strerror(errno));
 		return;
 	}
 
 	if (localtime_r(&now.tv_sec, &ltime) == NULL) {
-		(void) fprintf(stderr, "localtime_r failed: %s\n",
+		(void) fprintf(stderr, LOCAL_TIME_FAILED,
 		    strerror(errno));
 		return;
 	}
 
 	if (strftime(buf, buflen, "%b %e %T ", &ltime) == 0) {
-		(void) fprintf(stderr, "strftime failed: buffer[%d] too "
-		"small\n", buflen);
+		(void) fprintf(stderr, STRFTIME_FAILED, buflen);
 	/*
 	 * On failure, the contents of the buffer
 	 * are indeterminate. Restore it to a known
@@ -114,7 +112,7 @@ fpsd_log_msg(int prio, const char *fmt, va_list vap)
 	/* In debug mode, messages will be sent to the controlling terminal */
 
 	if (fpsd.d_fg || !fpsd.d_daemon) {
-		(void) fprintf(stderr, "%s", msgbuf);
+		(void) fprintf(stderr, PRINT_BUFFER, msgbuf);
 		(void) vfprintf(stderr, fmt, vap);
 		return;
 	}
@@ -144,11 +142,11 @@ void
 fpsd_message(int return_code, int msg_type, char *fmt,  ...)
 {
 	va_list vap;
-	(void) mutex_lock(&log_mutex);
+	(void) pthread_mutex_lock(&log_mutex);
 	va_start(vap, fmt);
 	fpsd_log_msg(msg_type, fmt, vap);
 	va_end(vap);
-	(void) mutex_unlock(&log_mutex);
+	(void) pthread_mutex_unlock(&log_mutex);
 
 	if (return_code > 0)  {
 		terminate_process();

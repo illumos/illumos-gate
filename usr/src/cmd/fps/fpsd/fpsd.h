@@ -27,8 +27,6 @@
 #ifndef _FPSD_H
 #define	_FPSD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * FPSD structure and global functions
  */
@@ -140,7 +138,7 @@ typedef struct fpsd_struct
 /* Defined in fpsd_main.c */
 extern int 			debug_level;
 extern fpsd_t  		fpsd;
-extern mutex_t log_mutex;	/* fpsd_log.c */
+extern pthread_mutex_t log_mutex;	/* fpsd_log.c */
 extern int  is_estar_system;	/* fpsd_esutil.c */
 extern int  sys_pm_state;	/* fpsd_esutil.c */
 

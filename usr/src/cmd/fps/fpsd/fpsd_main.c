@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
@@ -66,6 +64,8 @@
 #include "fpsd.h"
 #include "messages.h"
 
+#define	SMF_SNAPSHOT_RUNNING	"running"
+
 /* Only messages of priority 'debug_level' and lower will be logged */
 int debug_level = DFLT_DBG_LVL;
 
@@ -96,7 +96,7 @@ sig_hup_handler(int sig, siginfo_t *siginfo, void *sigctx)
 {
 	fpsd_message(FPSD_NO_EXIT, FPS_INFO,
 	    SIGNAL_INFO, "HUP", SIGHUP);
-	fpsd_read_config();
+	fpsd.d_conf->m_reprobe = 1;
 }
 
 void
@@ -107,7 +107,9 @@ fpsd_read_config()
 	ret = reprobe_and_reread_config();
 	if (NO_CPUS_2_TEST == ret) {
 		while (NO_CPUS_2_TEST == ret) {
-			(void) sleep(600);
+			if (!fpsd.d_conf->m_reprobe) {
+				(void) sleep(600);
+			}
 			ret = reprobe_and_reread_config();
 		}
 	}
@@ -117,11 +119,16 @@ static int
 reprobe_and_reread_config()
 {
 	int ret;
+	static int first_time = 1;
 
-	fpsd.d_conf->m_reprobe = 1;
-	if (fpsd_probe(fpsd.d_conf) != 0) {
-		(void) fpsd_message(FPSD_EXIT_ERROR,
-		    FPS_ERROR, UNSUPPORTED_SYSTEM);
+	if (!first_time) {
+		fpsd.d_conf->m_reprobe = 1;
+		if (fpsd_probe(fpsd.d_conf) != 0) {
+			(void) fpsd_message(FPSD_EXIT_ERROR,
+			    FPS_ERROR, UNSUPPORTED_SYSTEM);
+		}
+	} else {
+		first_time = 0;
 	}
 	ret = fpsd_probe_config();
 	if (ZERO_INTERVAL == ret) {
@@ -406,7 +413,7 @@ fpsd_probe(mach_conf_t *m_stat)
 	int i;
 	int cpuid_index;
 
-	processorid_t *cpuid_list;
+	processorid_t *cpuid_list = NULL;
 	kid_t ret;
 	int total_onln = sysconf(_SC_NPROCESSORS_ONLN);
 
@@ -445,6 +452,10 @@ fpsd_probe(mach_conf_t *m_stat)
 		    "malloc", strerror(errno));
 		return (-1);
 	}
+	/* Initialize cpuid_list */
+	for (i = 0; i < m_stat->m_num_fpus; i++) {
+		cpuid_list[i] = -1;
+	}
 
 	cpuid_index = 0;
 	for (i = 0; i < m_stat->m_max_cpuid; i++) {
@@ -480,6 +491,13 @@ fpsd_probe(mach_conf_t *m_stat)
 		supported = 0;
 		fps_kstat = NULL;
 
+		if ((cpuid_list[i] < 0) ||
+		    (cpuid_list[i] >= m_stat->m_max_cpuid)) {
+			fpsd_message(FPSD_NO_EXIT, FPS_INFO,
+			    INVALID_CPUID, cpuid_list[i]);
+			free(cpuid_list);
+			return (-1);
+		}
 		fps_kstat = kstat_lookup(kstat_ctl, "cpu_info",
 		    cpuid_list[i], NULL);
 		if (NULL == fps_kstat) {
@@ -578,6 +596,52 @@ ignore_cpu(int cpuid)
 }
 
 /*
+ * This function checks if the string has contiguous valid
+ * digits. Leading and trailing blanks are O.K. Returns 0
+ * if string is not a valid integer and 1 if valid.
+ */
+
+static int
+valid_integer(char *cpu_str)
+{
+	char *tmp_str = cpu_str;
+
+	if ((NULL == cpu_str) || (strlen(cpu_str) == 0)) {
+		return (0);
+	}
+	while (*tmp_str) {
+		if (isblank(*tmp_str)) {
+			tmp_str++;
+		} else if (isdigit(*tmp_str)) {
+			break;
+		} else {
+			return (0);
+		}
+	}
+	if (!(*tmp_str)) {
+		return (0);
+	}
+	while (*tmp_str) {
+		if (isdigit(*tmp_str)) {
+			tmp_str++;
+		} else if (isblank(*tmp_str)) {
+			break;
+		} else
+			return (0);
+	}
+	if (*tmp_str) {
+		while (*tmp_str) {
+			if (isblank(*tmp_str)) {
+				tmp_str++;
+			}
+			else
+				return (0);
+		}
+	}
+	return (1);
+}
+
+/*
  * This function parses the string of cpu-ids separated by
  * "," , constructs the list and disables testing on those
  * cpus. This function assumes fpsd_probe has been called and all
@@ -602,24 +666,23 @@ parse_and_set_cpu_id_list(char *strCPUs)
 	cpu_id = strtok_r(strCPUs, ",", &last);
 
 	while ((NULL != cpu_id) && (!invalid)) {
-		(void) strtol(cpu_id, (char **)NULL, 10);
-		if (errno != EINVAL) {
+		if (valid_integer(cpu_id)) {
 			tmp_cpus[num_cpus++] =
 			    (int)strtol(cpu_id, (char **)NULL, 10);
 			cpu_id = strtok_r(NULL, ",", &last);
 		} else {
 			fpsd_message(FPSD_NO_EXIT, FPS_ERROR,
-			    INVAL_PROP_VALUE, strCPUs);
+			    INVAL_PROP_VALUE, cpu_id);
 			invalid = 1;
 		}
-		if (num_cpus == fpsd.d_conf->m_num_fpus) {
+		if (num_cpus > fpsd.d_conf->m_num_fpus) {
 			/* More than max supported cpus */
 			fpsd_message(FPSD_NO_EXIT, FPS_ERROR,
 			    INVAL_PROP_VALUE, strCPUs);
 			invalid = 1;
 		}
 	}
-	if (num_cpus) {
+	if ((!invalid) && (num_cpus > 0)) {
 		fpsd.d_ignore_cpuid = (processorid_t *)malloc(
 		    sizeof (processorid_t) * (int) num_cpus);
 		if (NULL != fpsd.d_ignore_cpuid) {
@@ -630,7 +693,7 @@ parse_and_set_cpu_id_list(char *strCPUs)
 		} else {
 			fpsd.num_ignore_cpus = 0;
 		}
-	} else if ((num_cpus == 0) || (invalid)) {
+	} else {
 		fpsd.d_ignore_cpuid = NULL;
 		fpsd.num_ignore_cpus = 0;
 	}
@@ -678,6 +741,8 @@ parse_and_set_cpu_id_list(char *strCPUs)
 		scf_property_destroy(scf_prop_p);	\
 	if (value)	\
 		scf_value_destroy(value);	\
+	if (scf_snapshot_p)	\
+		scf_snapshot_destroy(scf_snapshot_p);	\
 }
 
 /* Read properties from SMF configuration repository using libscf APIs */
@@ -695,6 +760,7 @@ read_conf_props()
 	int64_t intvl;
 	int name_len;
 	char *strCPUs;
+	scf_snapshot_t *scf_snapshot_p = NULL;
 
 	scf_handle_p = scf_handle_create(SCF_VERSION);
 	if ((NULL != scf_handle_p) && (NULL != str_fps_fmri)) {
@@ -720,7 +786,24 @@ read_conf_props()
 				CLEAN_UP_SCF_STUFF
 				return (-1);
 			}
-			val = scf_instance_get_pg_composed(inst, NULL,
+			scf_snapshot_p = scf_snapshot_create(scf_handle_p);
+			if (NULL == scf_snapshot_p) {
+				fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
+				    SNAPSHOT_CREAT_FAIL,
+				    scf_strerror(scf_error()));
+				CLEAN_UP_SCF_STUFF
+				return (-1);
+			}
+			val = scf_instance_get_snapshot(inst,
+			    SMF_SNAPSHOT_RUNNING, scf_snapshot_p);
+			if (val == -1) {
+				fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
+				    INST_SNAPSHOT_GET_FAIL,
+				    scf_strerror(scf_error()));
+				CLEAN_UP_SCF_STUFF
+				return (-1);
+			}
+			val = scf_instance_get_pg_composed(inst, scf_snapshot_p,
 			    SMF_FPS_PROP_GRP_NAME, pg);
 			if (val != 0) {
 				fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
@@ -734,13 +817,23 @@ read_conf_props()
 			/* Read interval property if defined */
 			if (val == 0) {
 				value = scf_value_create(scf_handle_p);
-				val = scf_property_get_value(scf_prop_p, value);
-				val = scf_value_get_integer(value, &intvl);
-				if (intvl != 0) {
-					fpsd.d_interval = (int)intvl;
-					fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
-					    INTVL_VAL, intvl);
-					ret_val = 0;
+				if (NULL != value) {
+					val = scf_property_get_value(scf_prop_p,
+					    value);
+					if (0 == val) {
+						val =
+						    scf_value_get_integer(value,
+						    &intvl);
+						if ((0 == val) && (intvl > 0)) {
+							fpsd.d_interval =
+							    (int)intvl;
+							fpsd_message(
+							    FPSD_NO_EXIT,
+							    FPS_DEBUG,
+							    INTVL_VAL, intvl);
+							ret_val = 0;
+						}
+					}
 				}
 			} else {
 				fpsd_message(FPSD_NO_EXIT, FPS_INFO,
@@ -755,23 +848,31 @@ read_conf_props()
 			    scf_prop_p);
 			if (val == 0) {
 				val = scf_property_get_value(scf_prop_p, value);
-				name_len =
-				    scf_limit(SCF_LIMIT_MAX_NAME_LENGTH);
-				strCPUs = malloc(name_len +1);
-				if (NULL == strCPUs) {
-					fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
-					    LIBRARY_CALL_FAIL, "malloc");
-					CLEAN_UP_SCF_STUFF
-					return (-1);
-				}
-				val = scf_value_get_astring(value,
-				    strCPUs, name_len);
-				if (strlen(strCPUs) > 0) {
-					fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
-					    EXCL_CPUS, strCPUs);
-					ret_val =
-					    parse_and_set_cpu_id_list(
-					    strCPUs);
+				if (0 == val) {
+					name_len =
+					    scf_limit(
+					    SCF_LIMIT_MAX_NAME_LENGTH);
+					strCPUs = malloc(name_len +1);
+					if (NULL == strCPUs) {
+						fpsd_message(FPSD_NO_EXIT,
+						    FPS_DEBUG,
+						    LIBRARY_CALL_FAIL,
+						    "malloc");
+						CLEAN_UP_SCF_STUFF
+						return (-1);
+					}
+					val = scf_value_get_astring(value,
+					    strCPUs, name_len+1);
+					if ((val != -1) &&
+					    (strlen(strCPUs) > 0)) {
+						fpsd_message(FPSD_NO_EXIT,
+						    FPS_DEBUG,
+						    EXCL_CPUS, strCPUs);
+						ret_val =
+						    parse_and_set_cpu_id_list(
+						    strCPUs);
+					}
+					free(strCPUs);
 				}
 			} else {
 				fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
@@ -788,7 +889,9 @@ read_conf_props()
 	return (ret_val);
 }
 
-static int fpsd_init() {
+static int
+fpsd_init()
+{
 	mach_conf_t *m_conf_p;
 
 	debug_level = DFLT_DBG_LVL;
@@ -812,7 +915,7 @@ static int fpsd_init() {
 	m_conf_p->m_num_cpus_to_test = 0;
 	m_conf_p->m_num_fpus = (uint_t)sysconf(_SC_NPROCESSORS_MAX);
 
-	(void) mutex_init(&log_mutex, USYNC_THREAD, NULL);
+	(void) pthread_mutex_init(&log_mutex, NULL);
 
 	m_conf_p->m_max_cpuid = (int)sysconf(_SC_CPUID_MAX) + 1;
 
@@ -821,7 +924,7 @@ static int fpsd_init() {
 	 * supported by this platform.
 	 */
 	m_conf_p->m_cpus = malloc(sizeof (fps_cpu_t) *
-			m_conf_p->m_num_fpus);
+	    m_conf_p->m_num_fpus);
 	if (NULL == m_conf_p->m_cpus)
 		return (1);
 	else
@@ -830,7 +933,8 @@ static int fpsd_init() {
 }
 
 static void
-fpsd_fini() {
+fpsd_fini()
+{
 	if (fpsd.d_ignore_cpuid)
 		free(fpsd.d_ignore_cpuid);
 	if (fpsd.d_conf->m_cpus)
@@ -850,23 +954,12 @@ fpsd_probe_config()
 	 */
 
 	if (NULL != str_fps_fmri) {
-		const char *smf_state = smf_get_state(str_fps_fmri);
-		if ((smf_state) && (strncmp(smf_state,
-		    SCF_STATE_STRING_ONLINE,
-		    strlen(SCF_STATE_STRING_ONLINE)) == 0)) {
-			smf_invoked = 1;
-			(void) fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
-			    SMF_INVOKED, smf_state);
+		smf_invoked = 1;
 
-			/* Read SMF properties if invoked thro' SMF */
-			ret = read_conf_props();
-			if (ret == NO_CPUS_2_TEST) {
-				return (ret);
-			}
-		} else {
-			(void) fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
-			    CL_INVOKED, (smf_state) ?
-			    smf_state : "No SMF service named fpsd");
+		/* Read SMF properties if invoked thro' SMF */
+		ret = read_conf_props();
+		if (ret == NO_CPUS_2_TEST) {
+			return (ret);
 		}
 	}
 	calculateTotalIterations(fpsd.d_conf);
@@ -1065,12 +1158,21 @@ main(int argc, char **argv)
 		/* Exit child proces too */
 
 		if (NULL != str_fps_fmri) {
-			const char *smf_state = smf_get_state(str_fps_fmri);
-			if (NULL != smf_state) {
-				(void) smf_disable_instance(str_fps_fmri,
-				    SMF_TEMPORARY);
-				(void) fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
-				    FPSD_STATE, smf_state);
+			const char *smf_state;
+			ret =  smf_disable_instance(str_fps_fmri,
+			    SMF_TEMPORARY);
+			if (0 == ret) {
+				(void) fpsd_message(FPSD_NO_EXIT,
+				    FPS_ERROR, FPSD_STATE);
+			} else {
+				/* Unable to disable the service. */
+				smf_state = smf_get_state(str_fps_fmri);
+				if (NULL == smf_state) {
+					smf_state = " ";
+					(void) fpsd_message(FPSD_NO_EXIT,
+					    FPS_ERROR, DISABLE_SVC_FAILED,
+					    smf_state);
+				}
 				(void) poll(NULL, 0, 3*1000);
 			}
 		}
@@ -1083,6 +1185,8 @@ main(int argc, char **argv)
 	act.sa_flags = SA_SIGINFO;
 	(void) sigaction(SIGHUP, &act, NULL);
 	fpsd_read_config();
+	(void) sigfillset(&sigs);
+	(void) sigprocmask(SIG_BLOCK, &sigs, NULL);
 
 	/*
 	 * On estar-systems, if interval < MIN_INTERVAL, scheduling tests will
@@ -1095,9 +1199,6 @@ main(int argc, char **argv)
 		fpsd_message(FPSD_NO_EXIT, FPS_DEBUG, MIN_INTERVAL_MSG,
 		    fpsd.d_interval, MIN_INTERVAL);
 	}
-
-	(void) sigfillset(&sigs);
-	(void) sigprocmask(SIG_BLOCK, &sigs, NULL);
 
 	/* Run scheduling thread */
 	if ((ret == 0) && thr_create(NULL, 0,

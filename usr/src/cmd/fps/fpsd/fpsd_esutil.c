@@ -24,9 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <stdio.h>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -213,16 +210,17 @@ init_estar_db()
 			continue;
 		cpu_dpaths[cpu_i] = strdup(path);
 		di_devfs_path_free(path);
-	/*
-	 * Keep the mapping between path and processor IDs.
-	 * Currently, processor IDs are not used. But may be used in future.
-	 */
+		/*
+		 * Keep the mapping between path and processor IDs.
+		 * Currently, processor IDs are not used.
+		 * But may be used in future.
+		 */
 
-	/*
-	 * On workstation platforms (where CPU E* supported),
-	 * processor ID and instance numbers are same.
-	 * This may change in future. So watch out.
-	 */
+		/*
+		 * On workstation platforms (where CPU E* supported),
+		 * processor ID and instance numbers are same.
+		 * This may change in future. So watch out.
+		 */
 
 		proc_ids[cpu_i]  = di_instance(node); /* Currently unused. */
 		cpu_i++;
@@ -302,10 +300,11 @@ get_idle_rem_stats(int *min_idle, int *min_rem, int *max_rem)
 		if (*min_rem == -1 || pmstats[1] < *min_rem) {
 			*min_rem = pmstats[1];
 
-		/*
-		 * The remain time can be negative if there are 2 cpus
-		 * and 1 cpu is ready to transition and the other one is not
-		 */
+			/*
+			 * The remain time can be negative if there are 2 cpus
+			 * and 1 cpu is ready to transition
+			 * and the other one is not
+			 */
 			if (*min_rem < 0)
 				*min_rem = 0;
 		}
@@ -335,7 +334,7 @@ void
 wait_for_pm_state_change()
 {
 	int res;
-	static mutex_t wrlck;
+	static pthread_mutex_t wrlck;
 	static int  is_active = 0;
 	static pm_req_t  pmreq;
 	static pm_state_change_t  pmsc;
@@ -351,33 +350,35 @@ wait_for_pm_state_change()
 	pmreq.datasize  = 0;
 
 
-	(void) mutex_lock(&wrlck);
+	(void) pthread_mutex_lock(&wrlck);
 
 	if (!is_active) {    /* This is the first thread trying to wait */
 		is_active = 1;
-		(void) mutex_unlock(&wrlck);
+		(void) pthread_mutex_unlock(&wrlck);
 
 		pmsc.physpath = path;
 		pmsc.size = MAXPATHLEN;
 		path[0] = 0; /* init not required. Just in case... */
 
-	/*
-	 * PM starts buffering the state changes after the first call to
-	 * PM_GET_STATE_CHANGE/PM_GET_STATE_CHANGE_WAIT
-	 *
-	 *   The PM_GET_STATE_CHANGE is a non-blocking call where as _WAIT is
-	 * blocking call. The PM_GET_STATE_CHANGE also returns all the info
-	 * about the latest buffered state change if already buffered event is
-	 * available. So it is important to drain out all old events,
-	 * if you are only interested in future events.
-	 *
-	 * After the state changes the exact information/timestamp about
-	 * state changes are reflected in the ioctl struct.
-	 * To keep things simple, after draining out all buffered info,
-	 * we issue get current power to get the current power level and
-	 * then we issue another _WAIT command to get the next power change.
-	 *
-	 */
+		/*
+		 * PM starts buffering the state changes after the first call to
+		 * PM_GET_STATE_CHANGE/PM_GET_STATE_CHANGE_WAIT
+		 *
+		 * The PM_GET_STATE_CHANGE is a non-blocking call where as
+		 * _WAIT is blocking call. The PM_GET_STATE_CHANGE also
+		 * returns all the info * about the latest buffered state
+		 * change if already buffered event is available. So it is
+		 * important to drain out all old events,
+		 * if you are only interested in future events.
+		 *
+		 * After the state changes the exact information/timestamp about
+		 * state changes are reflected in the ioctl struct.
+		 * To keep things simple, after draining out all buffered info,
+		 * we issue get current power to get the current power level and
+		 * then we issue another _WAIT command to get the
+		 * next power change.
+		 *
+		 */
 
 		do {
 
@@ -436,10 +437,11 @@ wait_for_pm_state_change()
 				fpsd_message(FPSD_NO_EXIT, FPS_WARNING,
 				    INTERNAL_FAILURE_WARN2,
 				    strerror(errno));
-		/*
-		 * If there are failures in state change ioctl, just would
-		 * fall back to normal polling of status later. get out quiet.
-		 */
+			/*
+			 * If there are failures in state change ioctl,
+			 * just would fall back to normal polling of
+			 * status later. get out quiet.
+			 */
 			/* avoid busy loop -- 1 second sleep */
 			(void) poll(NULL, 0, 1000);
 			goto psc_complete;
@@ -451,26 +453,26 @@ wait_for_pm_state_change()
 		}
 
 psc_complete:
-		(void) mutex_lock(&wrlck);
+		(void) pthread_mutex_lock(&wrlck);
 		is_active = 0;
-		(void) mutex_unlock(&wrlck);
+		(void) pthread_mutex_unlock(&wrlck);
 
 	} else {
 		/* Release the lock first */
-		(void) mutex_unlock(&wrlck);
-	/*
-	 * Already one other thread is active issuing ioctl call.
-	 * Just poll here to check the local flag without any expensive
-	 * ioctl calls until the transition is complete.
-	 */
+		(void) pthread_mutex_unlock(&wrlck);
+		/*
+		 * Already one other thread is active issuing ioctl call.
+		 * Just poll here to check the local flag without any expensive
+		 * ioctl calls until the transition is complete.
+		 */
 		(void) poll(NULL, 0, 1000); /* first time 1 second wait */
 		for (;;) {
-			(void) mutex_lock(&wrlck);
+			(void) pthread_mutex_lock(&wrlck);
 			if (!is_active) {
-				(void) mutex_unlock(&wrlck);
+				(void) pthread_mutex_unlock(&wrlck);
 				break;
 			}
-			(void) mutex_unlock(&wrlck);
+			(void) pthread_mutex_unlock(&wrlck);
 			(void) poll(NULL, 0, 4000); /* 4 seconds wait */
 		}
 	}

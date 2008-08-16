@@ -27,8 +27,6 @@
 #ifndef	_MESSAGES_H
 #define	_MESSAGES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Messages
  */
@@ -72,6 +70,9 @@ extern "C" {
 
 #define	SYSTEM_CALL_FAIL	\
 	gettext("System call %s failed : %s\n")
+
+#define	INVALID_CPUID	\
+	gettext("Invalid cpuid: %s\n")
 
 #define	CPU_NOT_SUPPORTED	\
 	gettext("%s CPU brand of CPU ID %d is not supported by FP Scrubber.\n")
@@ -180,7 +181,8 @@ extern "C" {
 		"unavailability of resources; Trying again!\n")
 
 #define	INVAL_PROP_VALUE        \
-	gettext("Invalid property value defined\n")
+	gettext("Invalid property value defined: %s;\n"\
+		"\tIgnoring field exclude_cpus.\n")
 
 #define	FPU_EREPORT_FAIL_MSG	\
 	gettext("FP test on FPU %d could not file ereport.\n")
@@ -209,6 +211,9 @@ extern "C" {
 #define	EXIT_STAT_MSG	\
 	gettext("FP test exit status = %d\n")
 
+#define	INTVL_CHANGED_MSG	\
+	gettext("Interval changed in scheduler: %d\n")
+
 #define	RESCHEDULE_MSG	\
 	gettext("Rescheduling test for %d\n")
 
@@ -236,6 +241,12 @@ extern "C" {
 #define	HANDLE_DECODE_FAIL	\
 	gettext("Unable to decode FMRI : %s")
 
+#define	SNAPSHOT_CREAT_FAIL	\
+	gettext("Unable to create SCF snapshot: %s\n")
+
+#define	INST_SNAPSHOT_GET_FAIL	\
+	gettext("Unable to set snapshot in instance: %s\n")
+
 #define	INSTANCE_PG_GET_FAIL	\
 	gettext("Instance properties could not be obtained: %s\n")
 
@@ -255,7 +266,10 @@ extern "C" {
 	gettext("Searching for fptest binary location = %s\n")
 
 #define	FPSD_STATE	\
-	gettext("Attempted disabling the service; state = %s \n")
+	gettext("Service disabled successfully. \n")
+
+#define	DISABLE_SVC_FAILED	\
+	gettext("Disabling service failed; Current state = %s\n")
 
 #define	REPRBE_REQ	\
 	gettext("Reprobe request recd.\n")
@@ -276,6 +290,18 @@ extern "C" {
 #define	ALL_CPUS_EXCLDED	\
 	gettext("All cpus are excluded from testing through "\
 		"config/exclude_cpus properties for the service. \n")
+
+#define	GET_TIME_FAILED	\
+	gettext("gettimeofday failed: %s\n")
+
+#define	LOCAL_TIME_FAILED	\
+	gettext("localtime_r failed: %s\n")
+
+#define	STRFTIME_FAILED	\
+	gettext("strftime failed: buffer[%d] too small\n")
+
+#define	PRINT_BUFFER	\
+	gettext("%s")
 
 #ifdef __cplusplus
 }
