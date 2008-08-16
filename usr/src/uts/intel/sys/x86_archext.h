@@ -26,8 +26,6 @@
 #ifndef _SYS_X86_ARCHEXT_H
 #define	_SYS_X86_ARCHEXT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(_ASM)
 #include <sys/regset.h>
 #include <sys/processor.h>
@@ -582,12 +580,10 @@ extern void cpuid_mwait_free(struct cpu *);
 
 struct cpu_ucode_info;
 
-#if !defined(__xpv)
 extern void ucode_alloc_space(struct cpu *);
 extern void ucode_free_space(struct cpu *);
 extern void ucode_check(struct cpu *);
 extern void ucode_free();
-#endif
 
 #if !defined(__xpv)
 extern	char _tsc_mfence_start;

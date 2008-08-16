@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/asm_linkage.h>
 #include <sys/bootconf.h>
 #include <sys/cpuvar.h>
@@ -83,6 +81,9 @@ static ucode_errno_t ucode_locate(cpu_t *, struct cpu_ucode_info *,
     ucode_file_t *);
 static void ucode_update_intel(uint8_t *, struct cpu_ucode_info *);
 static void ucode_read_rev(struct cpu_ucode_info *);
+#ifdef	__xpv
+static void ucode_update_xpv(struct ucode_update_struct *, uint8_t *, uint32_t);
+#endif
 
 static const char ucode_failure_fmt[] =
 	"cpu%d: failed to update microcode from version 0x%x to 0x%x\n";
@@ -130,18 +131,21 @@ ucode_free()
  * Check whether or not a processor is capable of microcode operations
  * Returns 1 if it is capable, 0 if not.
  */
-/*ARGSUSED*/
 static int
 ucode_capable(cpu_t *cp)
 {
 	/* i86xpv guest domain can't update microcode */
-#ifdef	__xpv
+#ifndef	__xpv
+	extern int xpv_is_hvm;
+	if (xpv_is_hvm) {
+		return (0);
+	}
+#else
 	if (!DOMAIN_IS_INITDOMAIN(xen_info)) {
 		return (0);
 	}
 #endif
 
-#ifndef	__xpv
 	/*
 	 * At this point we only support microcode update for Intel
 	 * processors family 6 and above.
@@ -154,13 +158,6 @@ ucode_capable(cpu_t *cp)
 		return (0);
 	else
 		return (1);
-#else
-	/*
-	 * XXPV - remove when microcode loading works in dom0. Don't support
-	 * microcode loading in dom0 right now.
-	 */
-	return (0);
-#endif
 }
 
 /*
@@ -404,6 +401,7 @@ ucode_write(xc_arg_t arg1, xc_arg_t unused2, xc_arg_t unused3)
 
 	ASSERT(uusp->ucodep);
 
+#ifndef	__xpv
 	/*
 	 * Check one more time to see if it is really necessary to update
 	 * microcode just in case this is a hyperthreaded processor where
@@ -418,6 +416,7 @@ ucode_write(xc_arg_t arg1, xc_arg_t unused2, xc_arg_t unused3)
 
 	wrmsr(MSR_INTC_UCODE_WRITE,
 	    (uint64_t)(intptr_t)(uusp->ucodep));
+#endif
 	ucode_read_rev(uinfop);
 	uusp->new_rev = uinfop->cui_rev;
 
@@ -433,6 +432,38 @@ ucode_update_intel(uint8_t *ucode_body, struct cpu_ucode_info *uinfop)
 	ucode_read_rev(uinfop);
 	kpreempt_enable();
 }
+
+
+#ifdef	__xpv
+static void
+ucode_update_xpv(struct ucode_update_struct *uusp, uint8_t *ucode,
+    uint32_t size)
+{
+	struct cpu_ucode_info *uinfop;
+	xen_platform_op_t op;
+	int e;
+
+	ASSERT(DOMAIN_IS_INITDOMAIN(xen_info));
+
+	kpreempt_disable();
+	uinfop = CPU->cpu_m.mcpu_ucode_info;
+	op.cmd = XENPF_microcode_update;
+	op.interface_version = XENPF_INTERFACE_VERSION;
+	/*LINTED: constant in conditional context*/
+	set_xen_guest_handle(op.u.microcode.data, ucode);
+	op.u.microcode.length = size;
+	e = HYPERVISOR_platform_op(&op);
+	if (e != 0) {
+		cmn_err(CE_WARN, "hypervisor failed to accept uCode update");
+	}
+	ucode_read_rev(uinfop);
+	if (uusp != NULL) {
+		uusp->new_rev = uinfop->cui_rev;
+	}
+	kpreempt_enable();
+}
+#endif /* __xpv */
+
 
 static void
 ucode_read_rev(struct cpu_ucode_info *uinfop)
@@ -466,9 +497,12 @@ ucode_update(uint8_t *ucodep, int size)
 	ucode_errno_t	rc = EM_OK;
 	ucode_errno_t	search_rc = EM_NOMATCH; /* search result */
 	cpuset_t cpuset;
+#ifdef	__xpv
+	uint8_t *ustart;
+	uint32_t usize;
+#endif
 
 	ASSERT(ucodep);
-
 	CPUSET_ZERO(cpuset);
 
 	if (!ucode_capable(CPU))
@@ -550,6 +584,11 @@ ucode_update(uint8_t *ucodep, int size)
 				if (tmprc == EM_OK &&
 				    uusp->expected_rev < uhp->uh_rev) {
 					uusp->ucodep = &curbuf[header_size];
+#ifdef	__xpv
+					ustart = (uint8_t *)curbuf;
+					usize = UCODE_TOTAL_SIZE(
+					    uhp->uh_total_size);
+#endif
 					uusp->expected_rev = uhp->uh_rev;
 					bcopy(uusp, &cached, sizeof (cached));
 					cachedp = &cached;
@@ -563,6 +602,17 @@ ucode_update(uint8_t *ucodep, int size)
 		/* Nothing to do */
 		if (uusp->ucodep == NULL)
 			continue;
+
+#ifdef	__xpv
+		/*
+		 * for i86xpv, the hypervisor will update all the CPUs.
+		 * the hypervisor wants the header, data, and extended
+		 * signature tables. ucode_write will just read in the
+		 * updated version on all the CPUs after the update has
+		 * completed.
+		 */
+		ucode_update_xpv(uusp, ustart, usize);
+#endif
 
 		CPUSET_ADD(cpuset, id);
 		kpreempt_disable();
@@ -601,6 +651,13 @@ ucode_check(cpu_t *cp)
 {
 	struct cpu_ucode_info *uinfop;
 	ucode_errno_t rc = EM_OK;
+#ifdef	__xpv
+	uint32_t ext_offset;
+	uint32_t body_size;
+	uint32_t ext_size;
+	uint8_t *ustart;
+	uint32_t usize;
+#endif
 
 	ASSERT(cp);
 	if (cp->cpu_id == 0)
@@ -611,6 +668,18 @@ ucode_check(cpu_t *cp)
 
 	if (!ucode_capable(cp))
 		return;
+
+#ifdef	__xpv
+	/*
+	 * for i86xpv, the hypervisor will update all the CPUs. We only need
+	 * do do this on one of the CPUs (and there always is a CPU 0). We do
+	 * need to update the CPU version though. Do that before returning.
+	 */
+	if (cp->cpu_id != 0) {
+		ucode_read_rev(uinfop);
+		return;
+	}
+#endif
 
 	/*
 	 * The MSR_INTC_PLATFORM_ID is supported in Celeron and Xeon
@@ -627,7 +696,33 @@ ucode_check(cpu_t *cp)
 	 * Check to see if we need ucode update
 	 */
 	if ((rc = ucode_locate(cp, uinfop, &ucodefile)) == EM_OK) {
+#ifndef	__xpv
 		ucode_update_intel(ucodefile.uf_body, uinfop);
+#else
+		/*
+		 * the hypervisor wants the header, data, and extended
+		 * signature tables. We can only get here from the boot
+		 * CPU (cpu #0), so use BOP_ALLOC. Since we're using BOP_ALLOC,
+		 * We don't need to free.
+		 */
+		usize = UCODE_TOTAL_SIZE(ucodefile.uf_header.uh_total_size);
+		ustart = (uint8_t *)BOP_ALLOC(bootops, NULL, usize,
+		    MMU_PAGESIZE);
+
+		body_size = UCODE_BODY_SIZE(ucodefile.uf_header.uh_body_size);
+		ext_offset = body_size + UCODE_HEADER_SIZE;
+		ext_size = usize - ext_offset;
+		ASSERT(ext_size >= 0);
+
+		(void) memcpy(ustart, &ucodefile.uf_header, UCODE_HEADER_SIZE);
+		(void) memcpy(&ustart[UCODE_HEADER_SIZE], ucodefile.uf_body,
+		    body_size);
+		if (ext_size > 0) {
+			(void) memcpy(&ustart[ext_offset],
+			    ucodefile.uf_ext_table, ext_size);
+		}
+		ucode_update_xpv(NULL, ustart, usize);
+#endif
 
 		if (uinfop->cui_rev != ucodefile.uf_header.uh_rev)
 			cmn_err(CE_WARN, ucode_failure_fmt, cp->cpu_id,

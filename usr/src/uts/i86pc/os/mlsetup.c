@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/disp.h>
@@ -343,12 +341,10 @@ mlsetup(struct regs *rp)
 
 	ASSERT_STACK_ALIGNED();
 
-#if !defined(__xpv)
 	/*
 	 * Fill out cpu_ucode_info.  Update microcode if necessary.
 	 */
 	ucode_check(CPU);
-#endif
 
 	if (workaround_errata(CPU) != 0)
 		panic("critical workaround(s) missing for boot cpu");
