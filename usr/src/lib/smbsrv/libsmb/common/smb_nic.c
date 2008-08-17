@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_nic.c	1.6	08/07/24 SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -442,11 +442,6 @@ smb_nic_list_create(void)
 	} while	((iflist = list_next(&hlist.h_list, iflist)) != NULL);
 
 	smb_nic_hlist_destroy(&hlist);
-
-	if (smb_niclist.nl_cnt == 0) {
-		smb_nic_list_destroy();
-		return (-1);
-	}
 
 	return (0);
 }

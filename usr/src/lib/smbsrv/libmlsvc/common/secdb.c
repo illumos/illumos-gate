@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)secdb.c	1.5	08/07/08 SMI"
 
 /*
  * Security database interface.
@@ -46,10 +46,6 @@ extern uint32_t netlogon_logon(netr_client_t *clnt, smb_userinfo_t *uinfo);
 static uint32_t smb_logon_domain(netr_client_t *clnt, smb_userinfo_t *uinfo);
 static uint32_t smb_logon_local(netr_client_t *clnt, smb_userinfo_t *uinfo);
 static uint32_t smb_logon_none(netr_client_t *clnt, smb_userinfo_t *uinfo);
-
-static uint32_t
-smb_setup_signing_luinfo(smb_userinfo_t *uinfo, netr_client_t *clnt,
-	smb_passwd_t *smbpw);
 
 static uint32_t smb_setup_luinfo(smb_userinfo_t *, netr_client_t *, uid_t);
 
@@ -736,9 +732,13 @@ smb_logon_local(netr_client_t *clnt, smb_userinfo_t *uinfo)
 		    clnt->lm_password.lm_password_len,
 		    clnt->domain,
 		    clnt->username);
+		uinfo->session_key = NULL;
 	}
 
 	if (!lm_ok && (clnt->nt_password.nt_password_len != 0)) {
+		if ((uinfo->session_key =
+		    malloc(SMBAUTH_SESSION_KEY_SZ)) == NULL)
+			return (NT_STATUS_NO_MEMORY);
 		nt_ok = smb_auth_validate_nt(
 		    clnt->challenge_key.challenge_key_val,
 		    clnt->challenge_key.challenge_key_len,
@@ -746,7 +746,8 @@ smb_logon_local(netr_client_t *clnt, smb_userinfo_t *uinfo)
 		    clnt->nt_password.nt_password_val,
 		    clnt->nt_password.nt_password_len,
 		    clnt->domain,
-		    clnt->username);
+		    clnt->username,
+		    (uchar_t *)uinfo->session_key);
 	}
 
 	if (!nt_ok && !lm_ok) {
@@ -756,61 +757,8 @@ smb_logon_local(netr_client_t *clnt, smb_userinfo_t *uinfo)
 		    xlate_nt_status(status));
 		return (status);
 	}
-	if ((status = smb_setup_signing_luinfo(uinfo,
-	    clnt, &smbpw)) != NT_STATUS_SUCCESS)
-		return (status);
+
 	status = smb_setup_luinfo(uinfo, clnt, smbpw.pw_uid);
-	return (status);
-}
-
-/*
- * smb_setup_signing_luinfo
- *
- * Setup the session key for local workgroup users
- */
-static uint32_t
-smb_setup_signing_luinfo(smb_userinfo_t *uinfo, netr_client_t *clnt,
-	smb_passwd_t *smbpw)
-{
-	int level;
-	unsigned char *pw_hash;
-	unsigned char ntlmv2_hash[SMBAUTH_HASH_SZ];
-	smb_auth_info_t auth;
-	uint32_t status;
-
-	/*
-	 * If the nt_password_len == 24, then the session key requires
-	 * ntlm hash for the session key, otherwise it uses the ntlmv2
-	 * hash for the session key.  The nt_password_len is the
-	 * best information we have to determine this.  The redirector
-	 * uses smb_get_config to get this information, but here
-	 * we are the server we must determine this information
-	 * from the client information.
-	 */
-	if (clnt->nt_password.nt_password_len == 24) {
-		level = 2;
-		pw_hash = smbpw->pw_nthash;
-	} else {
-		level = 3;
-		if ((status = smb_auth_ntlmv2_hash(smbpw->pw_nthash,
-		    clnt->username, clnt->domain, ntlmv2_hash))
-		    != SMBAUTH_SUCCESS)
-			return (status);
-		pw_hash = ntlmv2_hash;
-	}
-	if (status = smb_auth_set_info(clnt->username, 0, pw_hash,
-	    clnt->domain, clnt->challenge_key.challenge_key_val,
-	    clnt->challenge_key.challenge_key_len, level, &auth)) {
-		return (status);
-	}
-
-	if ((uinfo->session_key = malloc(SMBAUTH_SESSION_KEY_SZ)) == NULL)
-		return (NT_STATUS_NO_MEMORY);
-
-	if ((status = smb_auth_gen_session_key(&auth,
-	    (unsigned char *)uinfo->session_key)) != SMBAUTH_SUCCESS)
-		return (NT_STATUS_INTERNAL_ERROR);
-
 	return (status);
 }
 

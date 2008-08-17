@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_server.c	1.10	08/08/07 SMI"
 
 /*
  * General Structures Layout
@@ -258,7 +258,7 @@ static smb_llist_t	smb_servers;
 /*
  * smb_server_svc_init
  *
- * This function must called from smb_drv_attach().
+ * This function must be called from smb_drv_attach().
  */
 int
 smb_server_svc_init(void)
@@ -272,6 +272,8 @@ smb_server_svc_init(void)
 			continue;
 		if (rc = smb_fem_init())
 			continue;
+		if (rc = smb_user_init())
+			continue;
 		if (rc = smb_notify_init())
 			continue;
 		if (rc = smb_net_init())
@@ -284,6 +286,7 @@ smb_server_svc_init(void)
 	}
 	smb_net_fini();
 	smb_notify_fini();
+	smb_user_fini();
 	smb_fem_fini();
 	smb_node_fini();
 	smb_vop_fini();
@@ -305,6 +308,7 @@ smb_server_svc_fini(void)
 		smb_kdoor_srv_stop();
 		smb_net_fini();
 		smb_notify_fini();
+		smb_user_fini();
 		smb_fem_fini();
 		smb_node_fini();
 		smb_vop_fini();
@@ -737,7 +741,7 @@ smb_server_tcp_receive(void)
 }
 
 int
-smb_server_set_gmtoff(uint32_t goff)
+smb_server_set_gmtoff(int32_t goff)
 {
 	int		rc;
 	smb_server_t	*sv;
@@ -822,15 +826,17 @@ smb_server_disconnect_share(char *sharename)
 }
 
 void
-smb_server_disconnect_volume(fs_desc_t *fsd)
+smb_server_disconnect_volume(const char *volname)
 {
 	smb_server_t	*sv;
 
 	if (smb_server_lookup(&sv))
 		return;
 
-	smb_session_disconnect_volume(&sv->sv_nbt_daemon.ld_session_list, fsd);
-	smb_session_disconnect_volume(&sv->sv_tcp_daemon.ld_session_list, fsd);
+	smb_session_disconnect_volume(&sv->sv_nbt_daemon.ld_session_list,
+	    volname);
+	smb_session_disconnect_volume(&sv->sv_tcp_daemon.ld_session_list,
+	    volname);
 
 	smb_server_release(sv);
 }
@@ -1094,9 +1100,6 @@ smb_server_kstat_init(smb_server_t *sv)
 	    KSTAT_FLAG_VIRTUAL);
 
 	if (sv->sv_ksp) {
-		(void) strlcpy(sv->sv_ks_data.state.name, "state",
-		    sizeof (sv->sv_ks_data.state.name));
-		sv->sv_ks_data.state.data_type = KSTAT_DATA_UINT32;
 		(void) strlcpy(sv->sv_ks_data.open_files.name, "open_files",
 		    sizeof (sv->sv_ks_data.open_files.name));
 		sv->sv_ks_data.open_files.data_type = KSTAT_DATA_UINT32;
@@ -1151,7 +1154,6 @@ smb_server_kstat_update_info(kstat_t *ksp, int rw)
 
 		ASSERT(sv->sv_magic == SMB_SERVER_MAGIC);
 
-		sv->sv_ks_data.state.value.ui32 = sv->sv_state;
 		sv->sv_ks_data.open_files.value.ui32 = sv->sv_open_files;
 		sv->sv_ks_data.open_trees.value.ui32 = sv->sv_open_trees;
 		sv->sv_ks_data.open_users.value.ui32 = sv->sv_open_users;

@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_set_information.c	1.7	08/08/08 SMI"
 
 /*
  * SMB: set_information
@@ -82,6 +82,7 @@ smb_com_set_information(smb_request_t *sr)
 	smb_attr_t		attr;
 	struct smb_node		*node;
 	char			*name;
+	uint32_t		last_wtime;
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		(void) smbsr_encode_empty_result(sr);
@@ -89,7 +90,7 @@ smb_com_set_information(smb_request_t *sr)
 	}
 
 	name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	if (smbsr_decode_vwv(sr, "wl10.", &dattr, &utime.tv_sec) != 0) {
+	if (smbsr_decode_vwv(sr, "wl10.", &dattr, &last_wtime) != 0) {
 		kmem_free(name, MAXNAMELEN);
 		return (SDRC_ERROR);
 	}
@@ -98,7 +99,6 @@ smb_com_set_information(smb_request_t *sr)
 		kmem_free(name, MAXNAMELEN);
 		return (SDRC_ERROR);
 	}
-	utime.tv_nsec = 0;
 
 	rc = smb_pathname_reduce(sr, sr->user_cr, path,
 	    sr->tid_tree->t_snode, sr->tid_tree->t_snode, &dir_node, name);
@@ -129,12 +129,14 @@ smb_com_set_information(smb_request_t *sr)
 	smb_node_set_dosattr(node, dattr);
 
 	/*
-	 * The behaviour when the time field is set to -1 is not
-	 * documented--we will treat it as if it was 0.
-	 * utime.tv_nsec is assumed to be 0.
+	 * The behaviour when the time field is set to -1
+	 * is not documented but is generally treated like 0,
+	 * meaning that that server file system assigned value
+	 * need not be changed.
 	 */
-	if (utime.tv_sec != 0 && utime.tv_sec != -1) {
-		utime.tv_sec = smb_local2gmt(sr, utime.tv_sec);
+	if (last_wtime != 0 && last_wtime != 0xFFFFFFFF) {
+		utime.tv_sec = smb_local2gmt(sr, last_wtime);
+		utime.tv_nsec = 0;
 		smb_node_set_time(node, 0, &utime, 0, 0, SMB_AT_MTIME);
 	}
 

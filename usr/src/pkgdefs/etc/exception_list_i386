@@ -989,7 +989,6 @@ usr/include/smbsrv/samlib.h		i386
 usr/include/smbsrv/smb.h		i386
 usr/include/smbsrv/smb_common_door.h	i386
 usr/include/smbsrv/smb_door_svc.h	i386
-usr/include/smbsrv/smb_fsd.h		i386
 usr/include/smbsrv/smb_fsops.h		i386
 usr/include/smbsrv/smb_i18n.h		i386
 usr/include/smbsrv/smb_idmap.h		i386

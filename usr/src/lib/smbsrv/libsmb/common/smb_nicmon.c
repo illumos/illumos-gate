@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_nicmon.c	1.7	08/07/24 SMI"
 
 /*
  * This is the SMB NIC monitoring module.
@@ -66,25 +66,16 @@ static char *smb_nicmon_caller_fmri = NULL;
 int
 smb_nicmon_start(const char *svc_fmri)
 {
-	int rc = 0;
+	if (smb_nic_init() != 0)
+		return (-1);
 
-	if ((rc = smb_nic_init()) != 0) {
-		syslog(LOG_ERR, "NIC monitor failed to initialize (%s)",
-		    strerror(errno));
-		return (rc);
-	}
-
-	rc = pthread_create(&smb_nicmon_thread, NULL, smb_nicmon_daemon, 0);
-	if (rc != 0) {
-		syslog(LOG_ERR, "NIC monitor failed to start (%s)",
-		    strerror(errno));
-		return (rc);
-	}
+	if (pthread_create(&smb_nicmon_thread, NULL, smb_nicmon_daemon, 0) != 0)
+		return (-1);
 
 	if (svc_fmri)
 		smb_nicmon_caller_fmri = (char *)svc_fmri;
 
-	return (rc);
+	return (0);
 }
 
 /*

@@ -26,7 +26,7 @@
 #ifndef _SMBSRV_SMB_VOPS_H
 #define	_SMBSRV_SMB_VOPS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_vops.h	1.9	08/08/07 SMI"
 
 /*
  * Common file system interfaces and definitions.
@@ -44,20 +44,18 @@
 #include <sys/acl.h>
 #include <sys/fcntl.h>
 #include <smbsrv/smb_i18n.h>
-#include <smbsrv/smb_fsd.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #define	ROOTVOL ""
-#define	CHKPNT ".chkpnt"
 #define	XATTR_DIR "xattr_dir"
 
 #define	SMB_STREAM_PREFIX "SUNWsmb"
 #define	SMB_STREAM_PREFIX_LEN (sizeof (SMB_STREAM_PREFIX) - 1)
 
-#define	MANGLE_NAMELEN 14
+#define	SMB_SHORTNAMELEN 14
 #define	SMB_EOF	0x7FFFFFFF
 
 /*
@@ -175,72 +173,6 @@ typedef struct smb_attr {
 			SMB_AT_ATIME|SMB_AT_MTIME|SMB_AT_CTIME|SMB_AT_RDEV|\
 			SMB_AT_BLKSIZE|SMB_AT_NBLOCKS|SMB_AT_SEQ|SMB_AT_SMB)
 
-/*
- * fs_online flags (meaning when set):
- *
- * FSOLF_NOMON		Do not monitor this FS.
- * FSOLF_UTF8_NAME	All names in this FS should be in UTF-8 format.
- * FSOLF_SYNCNOW	Flush all dirty blocks for this FS.
- * FSOLF_NODRIVE	Do not assign a drive letter to this FS.
- * FSOLF_STREAMS	This FS supports streams.
- * FSOLF_DISABLE_OPLOCKS  Oplocks are disabled on this FS.
- * FSOLF_RM_PENDING 	The volume is being removed (unmounted, deleted,
- *                      zapped etc.).
- * FSOLF_MDCACHE	Enable VFS meta-data caching for this FS.
- * FSOLF_ERROR 		Inconsistencies detected in the volume.
- * FSOLF_SYSTEM     	This is a system volume, no del, ren, dtq, quotas etc
- *                      allowed
- * FSOLF_COMPLIANT  	This volume is compliant; supports retention on
- *                      immutable and unlinkable (no delete, no rename).
- * FSOLF_LITE_COMPLIANT This volume has a less-stringent compliant capability
- * FSOLF_SYSAUDIT   	This volume supports the storing of system audit logs
- */
-#define	FSOLF_NOEXPORT		0x00000001
-#define	FSOLF_READONLY		0x00000002
-#define	FSOLF_LOCKED		0x00000004
-#define	FSOLF_NOMON		0x00000008
-#define	FSOLF_NOSHOWMNT		0x00000010
-#define	FSOLF_CASE_INSENSITIVE	0x00000020
-#define	FSOLF_SUPPORTS_ACLS	0x00000040
-#define	FSOLF_UTF8_NAME		0x00000080
-#define	FSOLF_MIRRORING		0x00000100
-#define	FSOLF_SYNCNOW		0x00000200
-#define	FSOLF_NODRIVE		0x00000400
-#define	FSOLF_OFFLINE		0x00000800
-#define	FSOLF_STREAMS		0x00001000
-#define	FSOLF_DISABLE_OPLOCKS	0x00002000
-#define	FSOLF_RM_PENDING	0x00004000
-#define	FSOLF_MDCACHE		0x00008000
-#define	FSOLF_MNT_IN_PROGRESS	0x00010000
-#define	FSOLF_NO_ATIME		0x00020000
-#define	FSOLF_ERROR		0x00040000
-#define	FSOLF_SYSTEM		0x00080000
-#define	FSOLF_COMPLIANT		0x00100000
-#define	FSOLF_LITE_COMPLIANT	0x00200000
-#define	FSOLF_SYSAUDIT		0x00400000
-#define	FSOLF_NO_CASE_SENSITIVE	0x00800000
-#define	FSOLF_XVATTR		0x02000000
-#define	FSOLF_DIRENTFLAGS	0x04000000
-
-/*
- * The following flags are shared between live and checkpoint volumes.
- */
-#define	FSOLF_SHARED_FLAGS	(FSOLF_CASE_INSENSITIVE | FSOLF_UTF8_NAME | \
-    FSOLF_STREAMS)
-
-/*
- * the following flags are dynamically set and reset so should not be stored
- * in volume.
- */
-#define	FSOLF_MASK		~(FSOLF_NOEXPORT | FSOLF_READONLY |  \
-				FSOLF_LOCKED | FSOLF_NOMON |        \
-				FSOLF_SYNCNOW | FSOLF_NOSHOWMNT |   \
-				FSOLF_NODRIVE | FSOLF_RM_PENDING)
-
-/*
- * case_flag: set FHF_IGNORECASE for case-insensitive compare.
- */
-
 struct fs_stream_info {
 	char name[MAXPATHLEN];
 	uint64_t size;
@@ -252,7 +184,7 @@ int smb_vop_init(void);
 void smb_vop_fini(void);
 void smb_vop_start(void);
 int smb_vop_open(vnode_t **, int, cred_t *);
-int smb_vop_close(vnode_t *, int, cred_t *);
+void smb_vop_close(vnode_t *, int, cred_t *);
 int smb_vop_read(vnode_t *, uio_t *, cred_t *);
 int smb_vop_write(vnode_t *, uio_t *, int, uint32_t *, cred_t *);
 int smb_vop_getattr(vnode_t *, vnode_t *, smb_attr_t *, int, cred_t *);

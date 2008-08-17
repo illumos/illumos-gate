@@ -27,7 +27,7 @@
 #ifndef _SMBD_H
 #define	_SMBD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smbd.h	1.8	08/07/17 SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,6 +46,7 @@ extern void smb_share_dsrv_stop(void);
 
 extern int smb_netlogon_init(void);
 extern void smb_set_netlogon_cred(void);
+extern int smbd_locate_dc_start(char *);
 
 extern smb_token_t *smbd_user_auth_logon(netr_client_t *);
 extern void smbd_user_nonauth_logon(uint32_t);

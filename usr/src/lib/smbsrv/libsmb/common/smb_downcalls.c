@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_downcalls.c	1.3	08/08/05 SMI"
 
 /*
  * Down calls to SMB Kmod for obtaining various kernel door services.
@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <rpc/xdr.h>
+#include <sys/errno.h>
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_common_door.h>
 #include <smbsrv/libsmb.h>
@@ -58,7 +59,7 @@ smb_dwncall_install_callback(smb_dwncall_get_desc_t get_desc_cb)
 	return (0);
 }
 
-int
+static int
 smb_dwncall_init_fd(uint_t opcode)
 {
 	int fd;
@@ -158,15 +159,15 @@ smb_dwncall_share(int op, char *path, char *sharename)
 	size_t buflen, rbufsize;
 	int32_t opcode = SMB_KDR_SHARE;
 	smb_dr_kshare_t kshare;
-	int fd, rc = -1;
+	int fd, rc = 0;
 
 	if ((op != SMB_SHROP_ADD) &&
 	    (op != SMB_SHROP_DELETE))
-		return (-1);
+		return (EINVAL);
 
 	if ((fd = smb_dwncall_init_fd(opcode)) < 0) {
 		syslog(LOG_ERR, "smb_dwncall_share: init error");
-		return (-1);
+		return (EBADF);
 	}
 
 	kshare.k_op = op;
@@ -177,7 +178,7 @@ smb_dwncall_share(int op, char *path, char *sharename)
 
 	if (!buf) {
 		syslog(LOG_ERR, "smb_dwncall_share: encode error");
-		return (-1);
+		return (ENOMEM);
 	}
 
 	rbufp = smb_dr_clnt_call(fd, buf, buflen, &rbufsize,
@@ -186,7 +187,7 @@ smb_dwncall_share(int op, char *path, char *sharename)
 	if (rbufp) {
 		if (smb_dr_decode_common(rbufp + SMB_DR_DATA_OFFSET,
 		    rbufsize - SMB_DR_DATA_OFFSET, xdr_int32_t, &rc) != 0) {
-			rc = -1;
+			rc = ENOMEM;
 		}
 	}
 

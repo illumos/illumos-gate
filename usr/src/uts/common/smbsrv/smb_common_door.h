@@ -26,7 +26,7 @@
 #ifndef _SMBSRV_SMB_COMMON_DOOR_H
 #define	_SMBSRV_SMB_COMMON_DOOR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_common_door.h	1.3	08/08/07 SMI"
 
 #include <smbsrv/wintypes.h>
 #include <smbsrv/smb_xdr.h>
@@ -113,7 +113,7 @@ extern void smb_dr_put_uint64(smb_dr_ctx_t *ctx, uint64_t num);
 extern void smb_dr_put_ushort(smb_dr_ctx_t *ctx, unsigned short num);
 
 extern char *smb_dr_get_string(smb_dr_ctx_t *ctx);
-extern void smb_dr_put_string(smb_dr_ctx_t *ctx, char *buf);
+extern void smb_dr_put_string(smb_dr_ctx_t *ctx, const char *buf);
 extern void smb_dr_free_string(char *buf);
 
 extern void smb_dr_put_word(smb_dr_ctx_t *ctx, WORD num);

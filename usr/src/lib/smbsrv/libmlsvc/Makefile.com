@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)Makefile.com	1.5	08/08/05 SMI"
 #
 
 LIBRARY =	libmlsvc.a
@@ -53,7 +53,6 @@ OBJS_COMMON =		\
 	secdb.o		\
 	smb_autohome.o	\
 	smb_share.o	\
-	smb_share_util.o \
 	srvsvc_client.o
 
 # Automatically generated from .ndl files

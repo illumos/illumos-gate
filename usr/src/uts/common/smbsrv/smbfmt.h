@@ -19,14 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SMBSRV_SMBFMT_H
 #define	_SMBSRV_SMBFMT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smbfmt.h	1.2	08/07/30 SMI"
 
 /*
  * SMB message header formats.
@@ -36,7 +36,6 @@
 extern "C" {
 #endif
 
-#define	SMB_RESUME_KEY_FMT ".11ccl4."
 #define	SMB_HEADER_ED_FMT "Mbbbwbww8c2.wwww"
 #define	SMB_HEADER_ED_LEN (4+1+1+1+2+1+2+12+2+2+2+2)
 #define	SMB_TRANSHDR_ED_FMT "wwwwb.wl2.wwwwb."

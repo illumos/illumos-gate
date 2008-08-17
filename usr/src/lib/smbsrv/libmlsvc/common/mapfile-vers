@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"@(#)mapfile-vers	1.8	08/08/05 SMI"
 
 SUNWprivate {
     global:
@@ -37,26 +37,17 @@ SUNWprivate {
 	mlsvc_netlogon;
 	smb_autohome_add;
 	smb_autohome_remove;
-	smb_build_lmshare_info;
-	smb_get_smb_share_group;
-	smb_is_autohome;
 	smb_logon;
-	smb_shr_add;
+	smb_shr_chkname;
 	smb_shr_count;
-	smb_shr_del;
-	smb_shr_exists;
+	smb_shr_create;
+	smb_shr_delete;
 	smb_shr_get;
-	smb_shr_get_realpath;
-	smb_shr_is_admin;
-	smb_shr_is_dir;
-	smb_shr_is_restricted;
-	smb_shr_is_special;
-	smb_shr_is_valid;
 	smb_shr_iterate;
 	smb_shr_iterinit;
 	smb_shr_list;
-	smb_shr_ren;
-	smb_shr_set;
+	smb_shr_modify;
+	smb_shr_rename;
 	smb_shr_start;
 	smb_shr_stop;
 	smb_token_destroy;

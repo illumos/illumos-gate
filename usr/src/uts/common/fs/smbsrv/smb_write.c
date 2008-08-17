@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_write.c	1.10	08/08/08 SMI"
 
 #include <sys/sdt.h>
 #include <smbsrv/smb_incl.h>
@@ -204,10 +204,7 @@ smb_com_write_and_close(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	if ((rc = smb_common_close(sr, param->rw_last_write)) != 0) {
-		smbsr_errno(sr, rc);
-		return (SDRC_ERROR);
-	}
+	smb_ofile_close(sr->fid_ofile, param->rw_last_write);
 
 	rc = smbsr_encode_result(sr, 1, 0, "bww", 1, param->rw_count, 0);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
@@ -559,14 +556,11 @@ smb_write_truncate(smb_request_t *sr, smb_rw_param_t *param)
  * if this is required, smb_write is called with a count of zero and
  * the appropriate file length in offset. The file should be resized
  * to the length specified by the offset.
- *
- * Returns 0 on success. Otherwise returns EACCES.
  */
 int
 smb_set_file_size(smb_request_t *sr, smb_node_t *node)
 {
 	smb_attr_t new_attr;
-	uint32_t dosattr;
 
 	if (node == NULL)
 		return (0);
@@ -576,20 +570,10 @@ smb_set_file_size(smb_request_t *sr, smb_node_t *node)
 
 	node->flags &= ~NODE_FLAGS_SET_SIZE;
 
-	dosattr = smb_node_get_dosattr(node);
-
-	if (dosattr & FILE_ATTRIBUTE_READONLY) {
-		if (((node->flags & NODE_FLAGS_CREATED) == 0) ||
-		    (sr->session->s_kid != node->n_orig_session_id))
-			return (EACCES);
-	}
-
 	bzero(&new_attr, sizeof (new_attr));
 	new_attr.sa_vattr.va_size = node->n_size;
 	new_attr.sa_mask = SMB_AT_SIZE;
 
-	(void) smb_fsop_setattr(sr, sr->user_cr, node, &new_attr,
-	    &node->attr);
-
-	return (0);
+	return (smb_fsop_setattr(sr, sr->user_cr, node, &new_attr,
+	    &node->attr));
 }

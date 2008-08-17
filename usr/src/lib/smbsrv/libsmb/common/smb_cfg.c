@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_cfg.c	1.5	08/07/08 SMI"
 
 /*
  * CIFS configuration management library
@@ -103,7 +103,6 @@ static smb_cfg_param_t smb_cfg_table[] =
 
 	{SMB_CI_SIGNING_ENABLE, "signing_enabled", SCF_TYPE_BOOLEAN, 0},
 	{SMB_CI_SIGNING_REQD, "signing_required", SCF_TYPE_BOOLEAN, 0},
-	{SMB_CI_SIGNING_CHECK, "signing_check", SCF_TYPE_BOOLEAN, 0},
 
 	/* Kmod tuning configuration */
 	{SMB_CI_SYNC_ENABLE, "sync_enable", SCF_TYPE_BOOLEAN, 0},

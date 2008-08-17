@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"@(#)Makefile	1.6	08/08/07 SMI"
 
 include ../../../Makefile.master
 
@@ -68,7 +68,6 @@ HDRS=	alloc.h			\
 	smb.h			\
 	smb_common_door.h	\
 	smb_door_svc.h		\
-	smb_fsd.h		\
 	smb_fsops.h		\
 	smb_i18n.h		\
 	smb_idmap.h		\

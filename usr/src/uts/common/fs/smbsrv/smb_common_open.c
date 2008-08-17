@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_common_open.c	1.13	08/08/08 SMI"
 
 /*
  * This module provides the common open functionality to the various
@@ -139,13 +139,8 @@ smb_denymode_to_sharemode(uint32_t desired_access, char *fname)
 	case SMB_DA_SHARE_COMPATIBILITY:
 		if (smb_is_executable(fname))
 			return (FILE_SHARE_READ | FILE_SHARE_WRITE);
-		else {
-			if ((desired_access &
-			    SMB_DA_ACCESS_MASK) == SMB_DA_ACCESS_READ)
-				return (FILE_SHARE_READ);
-			else
-				return (FILE_SHARE_NONE);
-		}
+
+		return (FILE_SHARE_ALL);
 
 	case SMB_DA_SHARE_EXCLUSIVE:
 		return (FILE_SHARE_NONE);
@@ -251,6 +246,28 @@ smb_common_open(smb_request_t *sr)
  *
  * - Oplocks must be acquired after open to ensure the correct
  * synchronization with NFS delegation and FEM installation.
+ *
+ *
+ * DOS readonly bit rules
+ *
+ * 1. The creator of a readonly file can write to/modify the size of the file
+ * using the original create fid, even though the file will appear as readonly
+ * to all other fids and via a CIFS getattr call.
+ *
+ * 2. A setinfo operation (using either an open fid or a path) to set/unset
+ * readonly will be successful regardless of whether a creator of a readonly
+ * file has an open fid (and has the special privilege mentioned in #1,
+ * above).  I.e., the creator of a readonly fid holding that fid will no longer
+ * have a special privilege.
+ *
+ * 3. The DOS readonly bit affects only data and some metadata.
+ * The following metadata can be changed regardless of the readonly bit:
+ * 	- security descriptors
+ *	- DOS attributes
+ *	- timestamps
+ *
+ * In the current implementation, the file size cannot be changed (except for
+ * the exceptions in #1 and #2, above).
  */
 
 static uint32_t
@@ -273,7 +290,6 @@ smb_open_subr(smb_request_t *sr)
 	int			is_stream = 0;
 	int			lookup_flags = SMB_FOLLOW_LINKS;
 	uint32_t		daccess;
-	uint32_t		share_access = op->share_access;
 	uint32_t		uniq_fid;
 
 	is_dir = (op->create_options & FILE_DIRECTORY_FILE) ? 1 : 0;
@@ -399,7 +415,7 @@ smb_open_subr(smb_request_t *sr)
 	/*
 	 * The uniq_fid is a CIFS-server-wide unique identifier for an ofile
 	 * which is used to uniquely identify open instances for the
-	 * VFS share reservation mechanism (accessed via smb_fsop_shrlock()).
+	 * VFS share reservation and POSIX locks.
 	 */
 
 	uniq_fid = SMB_UNIQ_FID();
@@ -487,8 +503,11 @@ smb_open_subr(smb_request_t *sr)
 		/*
 		 * Windows seems to check read-only access before file
 		 * sharing check.
+		 *
+		 * Check to see if the file is currently readonly (irrespective
+		 * of whether this open will make it readonly).
 		 */
-		if (NODE_IS_READONLY(node)) {
+		if (SMB_PATHFILE_IS_READONLY(sr, node)) {
 			/* Files data only */
 			if (node->attr.sa_vattr.va_type != VDIR) {
 				if (op->desired_access & (FILE_WRITE_DATA |
@@ -526,7 +545,7 @@ smb_open_subr(smb_request_t *sr)
 		}
 
 		status = smb_fsop_shrlock(sr->user_cr, node, uniq_fid,
-		    op->desired_access, share_access);
+		    op->desired_access, op->share_access);
 
 		if (status == NT_STATUS_SHARING_VIOLATION) {
 			rw_exit(&node->n_share_lock);
@@ -639,12 +658,40 @@ smb_open_subr(smb_request_t *sr)
 		smb_rwx_rwenter(&dnode->n_lock, RW_WRITER);
 
 		bzero(&new_attr, sizeof (new_attr));
+
+		/*
+		 * A file created with the readonly bit should not
+		 * stop the creator writing to the file until it is
+		 * closed.  Although the readonly bit will not be set
+		 * on the file until it is closed, it will be accounted
+		 * for on other fids and on queries based on the node
+		 * state.
+		 */
+
+		if (op->dattr) {
+			new_attr.sa_dosattr = op->dattr;
+
+			if (op->dattr & FILE_ATTRIBUTE_READONLY)
+				new_attr.sa_dosattr &=
+				    ~FILE_ATTRIBUTE_READONLY;
+
+			if (new_attr.sa_dosattr)
+				new_attr.sa_mask |= SMB_AT_DOSATTR;
+		}
+
+		if ((op->crtime.tv_sec != 0) &&
+		    (op->crtime.tv_sec != UINT_MAX)) {
+
+			new_attr.sa_mask |= SMB_AT_CRTIME;
+			new_attr.sa_crtime = op->crtime;
+		}
+
 		if (is_dir == 0) {
 			new_attr.sa_vattr.va_type = VREG;
 			new_attr.sa_vattr.va_mode = is_stream ? S_IRUSR :
 			    S_IRUSR | S_IRGRP | S_IROTH |
 			    S_IWUSR | S_IWGRP | S_IWOTH;
-			new_attr.sa_mask = SMB_AT_TYPE | SMB_AT_MODE;
+			new_attr.sa_mask |= SMB_AT_TYPE | SMB_AT_MODE;
 
 			if (op->dsize) {
 				new_attr.sa_vattr.va_size = op->dsize;
@@ -663,44 +710,31 @@ smb_open_subr(smb_request_t *sr)
 				return (sr->smb_error.status);
 			}
 
-			/*
-			 * A problem with setting the readonly bit at
-			 * create time is that this bit will prevent
-			 * writes to the file from the same fid (which
-			 * should be allowed).
-			 *
-			 * The solution is to set the bit at close time.
-			 * Meanwhile, to prevent racing opens from being
-			 * able to write to the file, set share reservations
-			 * to prevent write and delete access.
-			 */
-
-			if (op->dattr & FILE_ATTRIBUTE_READONLY)
-				share_access &= ~(FILE_SHARE_WRITE |
-				    FILE_SHARE_DELETE);
-
 			node = op->fqi.last_snode;
+
+			op->fqi.last_attr = node->attr;
 
 			rw_enter(&node->n_share_lock, RW_WRITER);
 
 			status = smb_fsop_shrlock(sr->user_cr, node, uniq_fid,
-			    op->desired_access, share_access);
+			    op->desired_access, op->share_access);
 
 			if (status == NT_STATUS_SHARING_VIOLATION) {
 				rw_exit(&node->n_share_lock);
+				SMB_DEL_NEWOBJ(op->fqi);
 				smb_node_release(node);
 				smb_node_release(dnode);
 				SMB_NULL_FQI_NODES(op->fqi);
 				return (status);
 			}
 
-			op->fqi.last_attr = node->attr;
 
 		} else {
 			op->dattr |= FILE_ATTRIBUTE_DIRECTORY;
 			new_attr.sa_vattr.va_type = VDIR;
 			new_attr.sa_vattr.va_mode = 0777;
-			new_attr.sa_mask = SMB_AT_TYPE | SMB_AT_MODE;
+			new_attr.sa_mask |= SMB_AT_TYPE | SMB_AT_MODE;
+
 			rc = smb_fsop_mkdir(sr, sr->user_cr, dnode,
 			    op->fqi.last_comp, &new_attr,
 			    &op->fqi.last_snode, &op->fqi.last_attr);
@@ -725,14 +759,47 @@ smb_open_subr(smb_request_t *sr)
 		op->desired_access |= max_allowed;
 	}
 
+	if (created) {
+		node->flags |= NODE_FLAGS_CREATED;
+
+		if (op->dattr & FILE_ATTRIBUTE_READONLY) {
+			op->created_readonly = B_TRUE;
+			op->dattr &= ~FILE_ATTRIBUTE_READONLY;
+		}
+	} else {
+		/*
+		 * If we reach here, it means that the file already exists.
+		 * If create disposition is one of FILE_SUPERSEDE,
+		 * FILE_OVERWRITE_IF, or FILE_OVERWRITE, the client wants to
+		 * overwrite or truncate the existing file and we have to
+		 * replace the destination file's DOS attributes with those
+		 * from the source file.
+		 */
+
+		switch (op->create_disposition) {
+		case FILE_SUPERSEDE:
+		case FILE_OVERWRITE_IF:
+		case FILE_OVERWRITE:
+			if (op->dattr & FILE_ATTRIBUTE_READONLY) {
+				op->created_readonly = B_TRUE;
+				op->dattr &= ~FILE_ATTRIBUTE_READONLY;
+			}
+
+			smb_node_set_dosattr(node, op->dattr);
+			(void) smb_sync_fsattr(sr, sr->user_cr, node);
+		}
+	}
+
+	op->dattr = smb_node_get_dosattr(node);
+
 	/*
 	 * smb_ofile_open() will copy node to of->node.  Hence
 	 * the hold on node (i.e. op->fqi.last_snode) will be "transferred"
 	 * to the "of" structure.
 	 */
 
-	of = smb_ofile_open(sr->tid_tree, node, sr->smb_pid, op->desired_access,
-	    op->create_options, share_access, SMB_FTYPE_DISK, uniq_fid, &err);
+	of = smb_ofile_open(sr->tid_tree, node, sr->smb_pid, op, SMB_FTYPE_DISK,
+	    uniq_fid, &err);
 
 	if (of == NULL) {
 		smb_fsop_unshrlock(sr->user_cr, node, uniq_fid);
@@ -757,7 +824,7 @@ smb_open_subr(smb_request_t *sr)
 			 * smb_fsop_unshrlock() and smb_fsop_close()
 			 * are called from smb_ofile_close()
 			 */
-			(void) smb_ofile_close(of, 0);
+			smb_ofile_close(of, 0);
 			smb_ofile_release(of);
 			if (created)
 				smb_rwx_rwexit(&dnode->n_lock);
@@ -785,46 +852,6 @@ smb_open_subr(smb_request_t *sr)
 		node->flags |= NODE_FLAGS_WRITE_THROUGH;
 
 	op->fileid = op->fqi.last_attr.sa_vattr.va_nodeid;
-
-	if (created) {
-		node->flags |= NODE_FLAGS_CREATED;
-		/*
-		 * Clients may set the DOS readonly bit on create but they
-		 * expect subsequent write operations on the open fid to
-		 * succeed.  Thus the DOS readonly bit is not set until
-		 * the file is closed.  The NODE_CREATED_READONLY flag
-		 * will act as the indicator to set the DOS readonly bit on
-		 * close.
-		 */
-		if (op->dattr & FILE_ATTRIBUTE_READONLY) {
-			node->flags |= NODE_CREATED_READONLY;
-			op->dattr &= ~FILE_ATTRIBUTE_READONLY;
-		}
-		smb_node_set_dosattr(node, op->dattr);
-		if ((op->crtime.tv_sec != 0) && (op->crtime.tv_sec != UINT_MAX))
-			smb_node_set_time(node, &op->crtime, NULL, NULL, NULL,
-			    SMB_AT_CRTIME);
-		(void) smb_sync_fsattr(sr, sr->user_cr, node);
-	} else {
-		/*
-		 * If we reach here, it means that file already exists
-		 * and if create disposition is one of: FILE_SUPERSEDE,
-		 * FILE_OVERWRITE_IF, or FILE_OVERWRITE it
-		 * means that client wants to overwrite (or truncate)
-		 * the existing file. So we should overwrite the dos
-		 * attributes of destination file with the dos attributes
-		 * of source file.
-		 */
-
-		switch (op->create_disposition) {
-		case FILE_SUPERSEDE:
-		case FILE_OVERWRITE_IF:
-		case FILE_OVERWRITE:
-			smb_node_set_dosattr(node, op->dattr);
-			(void) smb_sync_fsattr(sr, sr->user_cr, node);
-		}
-		op->dattr = smb_node_get_dosattr(node);
-	}
 
 	/*
 	 * Set up the file type in open_param for the response

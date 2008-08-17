@@ -26,7 +26,7 @@
  * Dispatching SMB requests.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_dispatch.c	1.7	08/08/07 SMI"
 
 /*
  * ALMOST EVERYTHING YOU NEED TO KNOW ABOUT A SERVER MESSAGE BLOCK
@@ -726,7 +726,7 @@ andx_more:
 
 		if (!(sdd->sdt_flags & SDDF_SUPPRESS_TID) &&
 		    (sr->tid_tree == NULL)) {
-			sr->tid_tree = smb_tree_lookup_by_tid(
+			sr->tid_tree = smb_user_lookup_tree(
 			    sr->uid_user, sr->smb_tid);
 			if (sr->tid_tree == NULL) {
 				smbsr_error(sr, 0, ERRSRV, ERRinvnid);
@@ -982,7 +982,7 @@ smbsr_decode_data(struct smb_request *sr, char *fmt, ...)
 void
 smbsr_send_reply(struct smb_request *sr)
 {
-	if (SMB_TREE_CASE_INSENSITIVE(sr))
+	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		sr->smb_flg |= SMB_FLAGS_CASE_INSENSITIVE;
 	else
 		sr->smb_flg &= ~SMB_FLAGS_CASE_INSENSITIVE;

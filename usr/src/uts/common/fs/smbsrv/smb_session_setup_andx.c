@@ -22,7 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_session_setup_andx.c	1.6	08/07/08 SMI"
 /*
  * SMB: session_setup_andx
  *
@@ -263,6 +263,7 @@ smb_com_session_setup_andx(smb_request_t *sr)
 	netr_client_t clnt_info;
 	smb_session_key_t *session_key = NULL;
 	int rc;
+	char ipaddr_buf[INET6_ADDRSTRLEN];
 
 	if (sr->session->dialect >= NT_LM_0_12) {
 		rc = smbsr_decode_vwv(sr, "b.wwwwlww4.l", &sr->andx_com,
@@ -495,6 +496,18 @@ smb_com_session_setup_andx(smb_request_t *sr)
 
 	if (session_key)
 		kmem_free(session_key, sizeof (smb_session_key_t));
+
+	if (!(sr->smb_flg2 & SMB_FLAGS2_SMB_SECURITY_SIGNATURE) &&
+	    (sr->sr_cfg->skc_signing_required)) {
+		(void) inet_ntop(AF_INET, (char *)&sr->session->ipaddr,
+		    ipaddr_buf, sizeof (ipaddr_buf));
+		cmn_err(CE_NOTE,
+		    "SmbSessonSetupX: client %s is not capable of signing",
+		    ipaddr_buf);
+		smbsr_error(sr, NT_STATUS_LOGON_FAILURE,
+		    ERRDOS, ERROR_LOGON_FAILURE);
+		return (SDRC_ERROR);
+	}
 
 	/*
 	 * NT systems use different native OS and native LanMan values

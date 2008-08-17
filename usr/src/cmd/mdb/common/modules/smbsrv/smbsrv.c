@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/mdb_modapi.h>
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb.h>
@@ -1099,10 +1097,11 @@ smb_dcmd_tree(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    "%</u>%</b>\n\n", addr);
 			mdb_printf("TID: %04x\n", tree->t_tid);
 			mdb_printf("State: %d (%s)\n", tree->t_state, state);
-			mdb_printf("Share name: %s\n", tree->t_sharename);
+			mdb_printf("Share: %s\n", tree->t_sharename);
 			mdb_printf("Resource: %s\n", tree->t_resource);
+			mdb_printf("Type: %s\n", tree->t_typename);
+			mdb_printf("Volume: %s\n", tree->t_volume);
 			mdb_printf("Umask: %04x\n", tree->t_umask);
-			mdb_printf("Access: %04x\n", tree->t_access);
 			mdb_printf("Flags: %08x\n", tree->t_flags);
 			mdb_printf("SMB Node: %llx\n", tree->t_snode);
 			mdb_printf("Reference Count: %d\n\n", tree->t_refcnt);

@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smbrdr_netuse.c	1.4	08/07/16 SMI"
 
 /*
  * Tree connect and disconnect functions to support SMB shares.
@@ -133,8 +133,8 @@ smbrdr_tree_connect(char *hostname, char *username, char *sharename,
 	    != NT_STATUS_SUCCESS) {
 		smbrdr_netuse_free(netuse);
 		smbrdr_session_unlock(session);
-		free(path);
 		syslog(LOG_DEBUG, "smbrdr_tree_connect: %s failed", path);
+		free(path);
 		return (status);
 	}
 

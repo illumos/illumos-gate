@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_autohome.c	1.6	08/08/05 SMI"
 
 #include <string.h>
 #include <stdlib.h>
@@ -77,13 +77,15 @@ smb_autohome_add(const char *username)
 
 	if (smb_shr_get((char *)username, &si) == NERR_Success) {
 		/*
-		 * autohome shares will be added for each login attempt
-		 * even if they already exist
+		 * A static share with this name already exists
 		 */
 		if ((si.shr_flags & SMB_SHRF_AUTOHOME) == 0)
 			return;
 
-		(void) smb_shr_add(&si, 0);
+		/*
+		 * autohome shares will be added for each login attempt
+		 */
+		(void) smb_shr_create(&si, B_FALSE);
 		return;
 	}
 
@@ -94,14 +96,11 @@ smb_autohome_add(const char *username)
 	(void) strlcpy(si.shr_path, ai->ah_path, MAXPATHLEN);
 	(void) strsubst(si.shr_path, '\\', '/');
 
-	if (smb_shr_is_dir(si.shr_path) == 0)
-		return;
-
 	(void) strlcpy(si.shr_name, username, MAXNAMELEN);
 	(void) strlcpy(si.shr_container, ai->ah_container, MAXPATHLEN);
 	si.shr_flags = SMB_SHRF_TRANS | SMB_SHRF_AUTOHOME;
 
-	(void) smb_shr_add(&si, 0);
+	(void) smb_shr_create(&si, B_FALSE);
 }
 
 /*
@@ -115,19 +114,9 @@ smb_autohome_remove(const char *username)
 	assert(username);
 
 	if (smb_shr_get((char *)username, &si) == NERR_Success) {
-		if (si.shr_flags & SMB_SHRF_AUTOHOME) {
-			(void) smb_shr_del((char *)username, 0);
-		}
+		if (si.shr_flags & SMB_SHRF_AUTOHOME)
+			(void) smb_shr_delete((char *)username, B_FALSE);
 	}
-}
-
-/*
- * Find out if a share is an autohome share.
- */
-boolean_t
-smb_is_autohome(const smb_share_t *si)
-{
-	return (si && (si->shr_flags & SMB_SHRF_AUTOHOME));
 }
 
 /*

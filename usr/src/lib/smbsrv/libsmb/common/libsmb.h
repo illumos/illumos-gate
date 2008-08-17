@@ -26,7 +26,7 @@
 #ifndef	_LIBSMB_H
 #define	_LIBSMB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)libsmb.h	1.12	08/07/30 SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -123,7 +123,6 @@ typedef enum {
 
 	SMB_CI_SIGNING_ENABLE,
 	SMB_CI_SIGNING_REQD,
-	SMB_CI_SIGNING_CHECK,
 
 	SMB_CI_SYNC_ENABLE,
 
@@ -161,6 +160,7 @@ extern int smb_smf_set_opaque_property(smb_scfhandle_t *, char *,
 extern int smb_smf_get_opaque_property(smb_scfhandle_t *, char *,
     void *, size_t);
 extern int smb_smf_create_service_pgroup(smb_scfhandle_t *, char *);
+extern int smb_smf_restart_service(void);
 
 /* Configuration management functions  */
 extern int smb_config_get(smb_cfg_id_t, char *, int);
@@ -205,7 +205,7 @@ extern bool_t xdr_smb_dr_joininfo_t(XDR *, smb_joininfo_t *);
 #define	SMB_DOMAIN_NOMACHINE_SID	-1
 #define	SMB_DOMAIN_NODOMAIN_SID		-2
 
-extern int nt_domain_init(char *resource_domain, uint32_t secmode);
+extern int nt_domain_init(char *, uint32_t);
 
 /* Following set of functions, manipulate WINS server configuration */
 extern int smb_wins_allow_list(char *config_list, char *allow_list);
@@ -226,9 +226,11 @@ typedef struct smb_ntdomain {
 } smb_ntdomain_t;
 
 /* SMB domain information management functions */
-extern smb_ntdomain_t *smb_getdomaininfo(uint32_t timeout);
-extern void smb_setdomaininfo(char *domain, char *server, uint32_t ipaddr);
-extern void smb_logdomaininfo(smb_ntdomain_t *di);
+extern smb_ntdomain_t *smb_getdomaininfo(uint32_t);
+extern void smb_setdomaininfo(char *, char *, uint32_t);
+extern void smb_logdomaininfo(smb_ntdomain_t *);
+extern uint32_t smb_get_dcinfo(smb_ntdomain_t *);
+extern bool_t xdr_smb_dr_domain_t(XDR *, smb_ntdomain_t *);
 
 /*
  * Following set of function, handle calls to SMB Kernel driver, via
@@ -489,7 +491,7 @@ extern int smb_auth_gen_session_key(smb_auth_info_t *, unsigned char *);
 boolean_t smb_auth_validate_lm(unsigned char *, uint32_t, smb_passwd_t *,
     unsigned char *, int, char *, char *);
 boolean_t smb_auth_validate_nt(unsigned char *, uint32_t, smb_passwd_t *,
-    unsigned char *, int, char *, char *);
+    unsigned char *, int, char *, char *, uchar_t *);
 
 /*
  * SMB MAC Signing

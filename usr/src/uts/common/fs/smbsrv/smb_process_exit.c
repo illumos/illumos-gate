@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_process_exit.c	1.4	08/08/07 SMI"
 
 /*
  * SMB: process_exit
@@ -86,13 +86,11 @@ smb_com_process_exit(smb_request_t *sr)
 	 * to be the only thing that sends this request these days and
 	 * it doesn't provide a TID.
 	 */
-	sr->tid_tree = smb_tree_lookup_by_tid(sr->uid_user, sr->smb_tid);
-	if (sr->tid_tree != NULL) {
-		smb_ofile_close_all_by_pid(sr->tid_tree, sr->smb_pid);
-		smb_odir_close_all_by_pid(sr->tid_tree, sr->smb_pid);
-	} else {
-		smb_tree_close_all_by_pid(sr->uid_user, sr->smb_pid);
-	}
+	sr->tid_tree = smb_user_lookup_tree(sr->uid_user, sr->smb_tid);
+	if (sr->tid_tree != NULL)
+		smb_tree_close_pid(sr->tid_tree, sr->smb_pid);
+	else
+		smb_user_close_pid(sr->uid_user, sr->smb_pid);
 
 	rc = smbsr_encode_empty_result(sr);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);

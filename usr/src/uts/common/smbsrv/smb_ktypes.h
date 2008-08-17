@@ -30,7 +30,7 @@
 #ifndef _SMBSRV_SMB_KTYPES_H
 #define	_SMBSRV_SMB_KTYPES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_ktypes.h	1.17	08/08/07 SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -45,6 +45,7 @@ extern "C" {
 #include <sys/socket.h>
 #include <sys/acl.h>
 #include <sys/sdt.h>
+#include <sys/stat.h>
 #include <sys/vnode.h>
 #include <sys/cred.h>
 #include <sys/fem.h>
@@ -56,7 +57,6 @@ extern "C" {
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/smb_vops.h>
-#include <smbsrv/smb_fsd.h>
 #include <smbsrv/mlsvc.h>
 
 struct smb_request;
@@ -68,6 +68,13 @@ int smb_noop(void *, size_t, int);
 #define	SMB_AUDIT_STACK_DEPTH	16
 #define	SMB_AUDIT_BUF_MAX_REC	16
 #define	SMB_AUDIT_NODE		0x00000001
+
+/*
+ * Maximum number of records returned in SMBsearch, SMBfind
+ * and SMBfindunique response. Value set to 10 for compatibility
+ * with Windows.
+ */
+#define	SMB_MAX_SEARCH		10
 
 extern uint32_t smb_audit_flags;
 
@@ -433,6 +440,7 @@ typedef struct smb_node {
 	uint32_t		n_orig_uid;
 	smb_llist_t		n_ofile_list;
 	smb_llist_t		n_lock_list;
+	struct smb_ofile	*readonly_creator;
 	volatile int		flags;	/* FILE_NOTIFY_CHANGE_* */
 	volatile int		waiting_event; /* # of clients requesting FCN */
 	smb_attr_t		attr;
@@ -444,11 +452,8 @@ typedef struct smb_node {
 	/* Credentials for delayed delete */
 	cred_t			*delete_on_close_cred;
 	char			od_name[MAXNAMELEN];
-	timestruc_t		set_mtime;
-	fs_desc_t		tree_fsd;
 	vnode_t			*vp;
 	smb_audit_buf_node_t	*n_audit_buf;
-
 } smb_node_t;
 
 #define	NODE_FLAGS_NOTIFY_CHANGE	0x10000fff
@@ -459,8 +464,6 @@ typedef struct smb_node {
 #define	NODE_LEVEL_II_OPLOCK		0x00003000
 #define	NODE_CAP_LEVEL_II		0x00010000
 #define	NODE_PROTOCOL_LOCK		0x00020000
-#define	NODE_READ_ONLY			0x00040000
-#define	NODE_CREATED_READONLY		0x00080000
 #define	NODE_FLAGS_WRITE_THROUGH	0x00100000
 #define	NODE_FLAGS_SYNCATIME		0x00200000
 #define	NODE_FLAGS_LOCKED		0x00400000
@@ -473,17 +476,15 @@ typedef struct smb_node {
 #define	NODE_FLAGS_DELETE_ON_CLOSE	0x40000000
 #define	NODE_FLAGS_EXECUTABLE		0x80000000
 
-#define	NODE_IS_READONLY(node)					\
-	((node->attr.sa_dosattr & FILE_ATTRIBUTE_READONLY) ||	\
-	(node->flags & NODE_READ_ONLY) ||			\
-	(node->flags & NODE_CREATED_READONLY))
-
 #define	OPLOCK_TYPE(n)			((n)->flags & NODE_OPLOCKS_IN_FORCE)
 #define	OPLOCKS_IN_FORCE(n)		(OPLOCK_TYPE(n) != NODE_OPLOCK_NONE)
 #define	EXCLUSIVE_OPLOCK_IN_FORCE(n)	\
 	(OPLOCK_TYPE(n) == NODE_EXCLUSIVE_OPLOCK)
 #define	BATCH_OPLOCK_IN_FORCE(n)	(OPLOCK_TYPE(n) == NODE_BATCH_OPLOCK)
 #define	LEVEL_II_OPLOCK_IN_FORCE(n)	(OPLOCK_TYPE(n) == NODE_LEVEL_II_OPLOCK)
+
+#define	SMB_NODE_VFS(node)	((node)->vp->v_vfsp)
+#define	SMB_NODE_FSID(node)	((node)->vp->v_vfsp->vfs_fsid)
 
 /*
  * Based on section 2.6.1.2 (Connection Management) of the June 13,
@@ -662,7 +663,7 @@ typedef struct smb_session {
 	kmem_cache_t		*s_cache;
 	kmem_cache_t		*s_cache_request;
 	struct smb_server	*s_server;
-	uint32_t		s_gmtoff;
+	int32_t			s_gmtoff;
 	uint32_t		keep_alive;
 	uint64_t		opentime;
 	uint16_t		vcnumber;
@@ -749,8 +750,25 @@ typedef struct smb_user {
 	uint32_t		u_audit_sid;
 } smb_user_t;
 
-#define	SMB_TREE_MAGIC 	0x54524545	/* 'TREE' */
-#define	SMB_TREE_TYPENAME_SZ 	8
+#define	SMB_TREE_MAGIC			0x54524545	/* 'TREE' */
+
+#define	SMB_TYPENAMELEN			_ST_FSTYPSZ
+#define	SMB_VOLNAMELEN			32
+
+#define	SMB_TREE_READONLY		0x00000001
+#define	SMB_TREE_SUPPORTS_ACLS		0x00000002
+#define	SMB_TREE_STREAMS		0x00000004
+#define	SMB_TREE_CASEINSENSITIVE	0x00000008
+#define	SMB_TREE_NO_CASESENSITIVE	0x00000010
+#define	SMB_TREE_NO_EXPORT		0x00000020
+#define	SMB_TREE_NO_OPLOCKS		0x00000040
+#define	SMB_TREE_NO_ATIME		0x00000080
+#define	SMB_TREE_XVATTR			0x00000100
+#define	SMB_TREE_DIRENTFLAGS		0x00000200
+#define	SMB_TREE_ACLONCREATE		0x00000400
+#define	SMB_TREE_ACEMASKONACCESS	0x00000800
+#define	SMB_TREE_NFS_MOUNTED		0x00001000
+#define	SMB_TREE_UFS			0x00002000
 
 typedef enum {
 	SMB_TREE_STATE_CONNECTED = 0,
@@ -780,58 +798,69 @@ typedef struct smb_tree {
 	uint32_t		t_flags;
 	int32_t			t_res_type;
 	uint16_t		t_tid;
-	uint16_t		t_access;
 	uint16_t		t_umask;
 	char			t_sharename[MAXNAMELEN];
 	char			t_resource[MAXPATHLEN];
-	char			t_typename[SMB_TREE_TYPENAME_SZ];
-	fs_desc_t		t_fsd;
+	char			t_typename[SMB_TYPENAMELEN];
+	char			t_volume[SMB_VOLNAMELEN];
 	acl_type_t		t_acltype;
 } smb_tree_t;
 
-/* Tree access bits */
-#define	SMB_TREE_NO_ACCESS		0x0000
-#define	SMB_TREE_READ_ONLY		0x0001
-#define	SMB_TREE_READ_WRITE		0x0002
+#define	SMB_TREE_VFS(tree)	((tree)->t_snode->vp->v_vfsp)
+#define	SMB_TREE_FSID(tree)	((tree)->t_snode->vp->v_vfsp->vfs_fsid)
 
-/*
- * Tree flags
- *
- * SMB_TREE_FLAG_ACLONCREATE        Underlying FS supports ACL on create.
- *
- * SMB_TREE_FLAG_ACEMASKONACCESS    Underlying FS understands 32-bit access mask
- */
-#define	SMB_TREE_FLAG_OPEN		0x0001
-#define	SMB_TREE_FLAG_CLOSE		0x0002
-#define	SMB_TREE_FLAG_ACLONCREATE	0x0004
-#define	SMB_TREE_FLAG_ACEMASKONACCESS	0x0008
-#define	SMB_TREE_FLAG_IGNORE_CASE	0x0010
-#define	SMB_TREE_FLAG_NFS_MOUNTED	0x0020
-#define	SMB_TREE_FLAG_UFS		0x0040
-#define	SMB_TREE_CLOSED(tree) ((tree)->t_flags & SMB_TREE_FLAG_CLOSE)
-
-/*
- * SMB_TREE_CASE_INSENSITIVE returns whether operations on a given tree
- * will be case-insensitive or not.  SMB_TREE_FLAG_IGNORE_CASE is set at
- * share set up time based on file system capability and client preference.
- */
-
-#define	SMB_TREE_CASE_INSENSITIVE(sr)                                 \
+#define	SMB_TREE_IS_READONLY(sr)                                        \
 	(((sr) && (sr)->tid_tree) ?                                     \
-	((sr)->tid_tree->t_flags & SMB_TREE_FLAG_IGNORE_CASE) : 0)
+	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_READONLY) : 0)
+
+#define	SMB_TREE_IS_CASEINSENSITIVE(sr)                                 \
+	(((sr) && (sr)->tid_tree) ?                                     \
+	smb_tree_has_feature((sr)->tid_tree, SMB_TREE_CASEINSENSITIVE) : 0)
 
 /*
- * SMB_TREE_ROOT_FS is called by certain smb_fsop_* functions to make sure
- * that a given vnode is in the same file system as the share root.
+ * SMB_TREE_CONTAINS_NODE is used to check that a node is in the same
+ * file system as the tree.
+ */
+#define	SMB_TREE_CONTAINS_NODE(sr, node)                                \
+	(((sr) && (sr)->tid_tree) ?                                     \
+	(SMB_TREE_VFS((sr)->tid_tree) == SMB_NODE_VFS(node)) : 1)
+
+/*
+ * SMB_NODE_IS_READONLY(node)
+ *
+ * This macro indicates whether the DOS readonly bit is set in the node's
+ * attribute cache.  The cache reflects what is on-disk.
  */
 
-#define	SMB_TREE_ROOT_FS(sr, node)                                      \
-	(((sr) && (sr)->tid_tree) ?                                      \
-	((sr)->tid_tree->t_snode->vp->v_vfsp == (node)->vp->v_vfsp) : 1)
+#define	SMB_NODE_IS_READONLY(node) \
+	((node) && (node)->attr.sa_dosattr & FILE_ATTRIBUTE_READONLY)
 
-#define	SMB_TREE_IS_READ_ONLY(sr) \
-	((sr) && ((sr)->tid_tree->t_access == SMB_TREE_READ_ONLY))
+/*
+ * SMB_OFILE_IS_READONLY reflects whether an ofile is readonly or not.
+ * The macro takes into account
+ *      - the tree readonly state
+ *      - the node readonly state
+ *      - whether the specified ofile is the readonly creator
+ * The readonly creator has write permission until the ofile is closed.
+ */
 
+#define	SMB_OFILE_IS_READONLY(of)                               \
+	(((of)->f_flags & SMB_OFLAGS_READONLY) ||               \
+	SMB_NODE_IS_READONLY((of)->f_node) ||                   \
+	(((of)->f_node->readonly_creator) &&                    \
+	((of)->f_node->readonly_creator != (of))))
+
+/*
+ * SMB_PATHFILE_IS_READONLY indicates whether or not a file is
+ * readonly when the caller has a path rather than an ofile.  Unlike
+ * SMB_OFILE_IS_READONLY, the caller cannot be the readonly creator,
+ * since that requires an ofile.
+ */
+
+#define	SMB_PATHFILE_IS_READONLY(sr, node)                       \
+	(SMB_TREE_IS_READONLY((sr)) ||                           \
+	SMB_NODE_IS_READONLY((node)) ||                          \
+	((node)->readonly_creator))
 
 #define	PIPE_STATE_AUTH_VERIFY	0x00000001
 
@@ -874,6 +903,7 @@ typedef struct smb_opipe {
  *   will be set for the file node upon close.
  */
 
+#define	SMB_OFLAGS_READONLY		0x0001
 #define	SMB_OFLAGS_SET_DELETE_ON_CLOSE	0x0004
 #define	SMB_OFLAGS_LLF_POS_VALID	0x0008
 
@@ -942,6 +972,7 @@ typedef struct smb_odir {
 
 	uint32_t		d_refcnt;
 	uint32_t		d_cookie;
+	uint32_t		d_cookies[SMB_MAX_SEARCH];
 	uint16_t		d_sid;
 	uint16_t		d_opened_by_pid;
 	uint16_t		d_sattr;
@@ -951,12 +982,12 @@ typedef struct smb_odir {
 } smb_odir_t;
 
 typedef struct smb_odir_context {
-	uint32_t		dc_cookie;
-	uint16_t		dc_dattr;
-	char			dc_name[MAXNAMELEN]; /* Real 'Xxxx.yyy.xx' */
-	char			dc_name83[14];    /* w/ dot 'XXXX    .XX ' */
-	char			dc_shortname[14]; /* w/ dot 'XXXX.XX' */
-	smb_attr_t		dc_attr;
+	uint32_t	dc_cookie;
+	uint16_t	dc_dattr;
+	char		dc_name[MAXNAMELEN]; /* Real 'Xxxx.yyy.xx' */
+	char		dc_name83[SMB_SHORTNAMELEN]; /* w/ dot 'XXXX    .XX ' */
+	char		dc_shortname[SMB_SHORTNAMELEN]; /* w/ dot 'XXXX.XX' */
+	smb_attr_t	dc_attr;
 } smb_odir_context_t;
 
 #define	SMB_LOCK_MAGIC 	0x4C4F434B	/* 'LOCK' */
@@ -1201,7 +1232,7 @@ typedef struct smb_request {
 	kmem_cache_t		*sr_cache;
 	struct smb_server	*sr_server;
 	pid_t			*sr_pid;
-	uint32_t		sr_gmtoff;
+	int32_t			sr_gmtoff;
 	smb_session_t		*session;
 	smb_kmod_cfg_t		*sr_cfg;
 	smb_notify_change_req_t	sr_ncr;
@@ -1285,6 +1316,7 @@ typedef struct smb_request {
 		uint32_t	share_access;
 		uint32_t	create_options;
 		uint32_t	create_disposition;
+		boolean_t	created_readonly;
 		uint32_t	ftype, devstate;
 		uint32_t	action_taken;
 		uint64_t	fileid;
@@ -1400,7 +1432,6 @@ typedef enum {
 #define	SMB_SERVER_MAGIC	0x53534552	/* 'SSER' */
 
 typedef struct {
-	kstat_named_t	state;
 	kstat_named_t	open_files;
 	kstat_named_t	open_trees;
 	kstat_named_t	open_users;
@@ -1444,7 +1475,7 @@ typedef struct smb_server {
 
 	door_handle_t		sv_lmshrd;
 
-	uint32_t		si_gmtoff;
+	int32_t			si_gmtoff;
 
 	smb_thread_t		si_thread_timers;
 

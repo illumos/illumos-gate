@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_path_name_reduction.c	1.6	08/08/07 SMI"
 
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
@@ -223,7 +223,7 @@ smb_pathname_reduce(
 			return (EACCES);
 	}
 
-	if (SMB_TREE_CASE_INSENSITIVE(sr))
+	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		lookup_flags |= FIGNORECASE;
 
 	if (path == NULL)

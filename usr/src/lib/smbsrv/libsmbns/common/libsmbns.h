@@ -26,7 +26,7 @@
 #ifndef	_LIBSMBNS_H
 #define	_LIBSMBNS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)libsmbns.h	1.10	08/07/24 SMI"
 
 #include <ldap.h>
 #include <smbsrv/libsmb.h>
@@ -90,7 +90,7 @@ extern int smb_ads_domain_change_cleanup(char *);
 extern int smb_ads_update_attrs(void);
 
 /* DYNDNS functions */
-extern int dns_msgid_init(void);
+extern void dns_msgid_init(void);
 extern int dyndns_update(char *);
 extern int dyndns_update_core(char *);
 extern int dyndns_clear_rev_zone(char *);

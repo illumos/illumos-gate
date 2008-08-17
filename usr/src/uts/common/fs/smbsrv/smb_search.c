@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_search.c	1.9	08/08/07 SMI"
 
 /*
  * SMB: search
@@ -146,18 +146,26 @@ smb_post_search(smb_request_t *sr)
 smb_sdrc_t
 smb_com_search(smb_request_t *sr)
 {
-	int			rc;
-	unsigned short		sattr, count, maxcount;
-	char			*path;
-	uint32_t		cookie;
-	char			name[14];
-	unsigned char		resume_char;
-	uint32_t		resume_key;
-	struct smb_node		*node;
-	unsigned char		type;
-	unsigned short		key_len;
-	fsvol_attr_t vol_attr;
+	int		rc;
+	unsigned short	sattr, count, maxcount;
+	char		*path;
+	uint16_t	index;
+	uint32_t	cookie;
+	char		name[SMB_SHORTNAMELEN];
+	unsigned char	resume_char;
+	uint32_t	client_key;
+	smb_tree_t	*tree;
+	smb_node_t	*node;
+	unsigned char	type;
+	unsigned short	key_len;
 	smb_odir_context_t *pc;
+	boolean_t	find_first = B_TRUE;
+	boolean_t	to_upper = B_FALSE;
+
+	if ((sr->session->dialect <= LANMAN1_0) ||
+	    ((sr->smb_flg2 & SMB_FLAGS2_KNOWS_LONG_NAMES) == 0)) {
+			to_upper = B_TRUE;
+	}
 
 	/* We only handle 8.3 name here */
 	sr->smb_flg2 &= ~SMB_FLAGS2_KNOWS_LONG_NAMES;
@@ -170,30 +178,28 @@ smb_com_search(smb_request_t *sr)
 	if ((rc != 0) || (type != 0x05))
 		return (SDRC_ERROR);
 
-	if ((rc = fsd_getattr(&sr->tid_tree->t_fsd, &vol_attr)) != 0) {
-		smbsr_errno(sr, rc);
-		return (SDRC_ERROR);
-	}
-
+	tree = sr->tid_tree;
 	count = 0;
 
 	if ((sattr == FILE_ATTRIBUTE_VOLUME) && (key_len != 21)) {
 		(void) memset(name, ' ', sizeof (name));
-		(void) strncpy(name, vol_attr.name, sizeof (name));
+		(void) strncpy(name, tree->t_volume, sizeof (name));
 
 		if (key_len >= 21) {
 			(void) smb_mbc_decodef(&sr->smb_data, "17.l",
-			    &resume_key);
+			    &client_key);
 		} else {
-			resume_key = 0;
+			client_key = 0;
 		}
 
 		(void) smb_mbc_encodef(&sr->reply, "bwwbwb11c5.lb8.13c",
 		    1, 0, VAR_BCC, 5, 0, 0, path+1,
-		    resume_key, sattr, name);
+		    client_key, sattr, name);
 		count++;
 	} else {
+		index = 0;
 		cookie = 0;
+
 		if (key_len == 0) {		/* begin search */
 			/*
 			 * Some MS clients pass NULL file names
@@ -210,22 +216,25 @@ smb_com_search(smb_request_t *sr)
 				return (SDRC_SUCCESS);
 			}
 			resume_char = 0;
-			resume_key = 0;
+			client_key = 0;
 		} else if (key_len == 21) {
 			if (smb_mbc_decodef(&sr->smb_data, "b12.wwl",
-			    &resume_char, &cookie, &sr->smb_sid,
-			    &resume_key) != 0) {
+			    &resume_char, &index, &sr->smb_sid, &client_key)
+			    != 0) {
 				/* We don't know which search to close! */
 				return (SDRC_ERROR);
 			}
 
-			sr->sid_odir = smb_odir_lookup_by_sid(sr->tid_tree,
+			sr->sid_odir = smb_odir_lookup_by_sid(tree,
 			    sr->smb_sid);
 			if (sr->sid_odir == NULL) {
 				smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 				    ERRDOS, ERRbadfid);
 				return (SDRC_ERROR);
 			}
+			cookie = sr->sid_odir->d_cookies[index];
+			if (cookie != 0)
+				find_first = B_FALSE;
 		} else {
 			/* We don't know which search to close! */
 			return (SDRC_ERROR);
@@ -238,12 +247,16 @@ smb_com_search(smb_request_t *sr)
 		pc->dc_cookie = cookie;
 		node = NULL;
 		rc = 0;
+		index = 0;
+
+		if (maxcount > SMB_MAX_SEARCH)
+			maxcount = SMB_MAX_SEARCH;
 
 		while (count < maxcount) {
 			if ((rc = smb_rdir_next(sr, &node, pc)) != 0)
 				break;
-			if ((strcmp(pc->dc_name, ".") == 0) ||
-			    (strcmp(pc->dc_name, "..") == 0)) {
+
+			if (smb_is_dot_or_dotdot(pc->dc_name)) {
 				if (node) {
 					smb_node_release(node);
 					node = NULL;
@@ -252,28 +265,30 @@ smb_com_search(smb_request_t *sr)
 			}
 
 			(void) memset(name, ' ', sizeof (name));
-			if (*pc->dc_shortname)
-				(void) strncpy(name, pc->dc_shortname, 13);
-			else {
-				(void) strncpy(name, pc->dc_name, 13);
-				if ((sr->session->dialect <= LANMAN1_0) ||
-				    ((sr->smb_flg2 &
-				    SMB_FLAGS2_KNOWS_LONG_NAMES) == 0))
+			if (*pc->dc_shortname) {
+				(void) strlcpy(name, pc->dc_shortname,
+				    SMB_SHORTNAMELEN - 1);
+			} else {
+				(void) strlcpy(name, pc->dc_name,
+				    SMB_SHORTNAMELEN - 1);
+				if (to_upper)
 					(void) utf8_strupr(name);
 			}
 
 			(void) smb_mbc_encodef(&sr->reply, "b8c3c.wwlbYl13c",
 			    resume_char,
 			    pc->dc_name83, pc->dc_name83+9,
-			    pc->dc_cookie, sr->smb_sid,
-			    resume_key,
+			    index, sr->smb_sid, client_key,
 			    pc->dc_dattr & 0xff,
-			    pc->dc_attr.sa_vattr.va_mtime.tv_sec,
+			    smb_gmt2local(sr,
+			    pc->dc_attr.sa_vattr.va_mtime.tv_sec),
 			    (int32_t)smb_node_get_size(node, &pc->dc_attr),
 			    name);
 			smb_node_release(node);
 			node = NULL;
+			sr->sid_odir->d_cookies[index] = pc->dc_cookie;
 			count++;
+			index++;
 		}
 
 		kmem_free(pc, sizeof (smb_odir_context_t));
@@ -285,9 +300,10 @@ smb_com_search(smb_request_t *sr)
 			return (SDRC_ERROR);
 		}
 
-		if (count == 0) {
+		if (count == 0 && find_first) {
 			smb_rdir_close(sr);
-			smbsr_error(sr, 0, ERRDOS, ERRnofiles);
+			smbsr_warn(sr, NT_STATUS_NO_MORE_FILES,
+			    ERRDOS, ERROR_NO_MORE_FILES);
 			return (SDRC_ERROR);
 		}
 	}

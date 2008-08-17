@@ -23,11 +23,15 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_vfs.c	1.3	08/08/07 SMI"
 
-#include <smbsrv/smb_incl.h>
-#include <smbsrv/smb_fsops.h>
+#include <sys/types.h>
+#include <sys/fsid.h>
 #include <sys/vfs.h>
+#include <sys/stat.h>
+#include <smbsrv/smb_ktypes.h>
+#include <smbsrv/smb_kproto.h>
+#include <smbsrv/string.h>
 
 static smb_vfs_t *smb_vfs_lookup(smb_server_t *, vnode_t *);
 
@@ -158,4 +162,49 @@ smb_vfs_lookup(smb_server_t *sv, vnode_t *rootvp)
 		smb_vfs = smb_llist_next(&sv->sv_vfs_list, smb_vfs);
 	}
 	return (NULL);
+}
+
+/*
+ * Returns true if both VFS pointers represent the same mounted
+ * file system.  Otherwise returns false.
+ */
+boolean_t
+smb_vfs_cmp(vfs_t *vfsp1, vfs_t *vfsp2)
+{
+	fsid_t *fsid1 = &vfsp1->vfs_fsid;
+	fsid_t *fsid2 = &vfsp2->vfs_fsid;
+	boolean_t result = B_FALSE;
+
+	if ((vfsp1 = getvfs(fsid1)) == NULL)
+		return (B_FALSE);
+
+	if ((vfsp2 = getvfs(fsid2)) == NULL) {
+		VFS_RELE(vfsp1);
+		return (B_FALSE);
+	}
+
+	if ((fsid1->val[0] == fsid2->val[0]) &&
+	    (fsid1->val[1] == fsid2->val[1])) {
+		result = B_TRUE;
+	}
+
+	VFS_RELE(vfsp2);
+	VFS_RELE(vfsp1);
+	return (result);
+}
+
+/*
+ * Check whether or not a file system is readonly.
+ */
+boolean_t
+smb_vfs_is_readonly(vfs_t *vfsp)
+{
+	boolean_t result;
+
+	if (getvfs(&vfsp->vfs_fsid) == NULL)
+		return (B_FALSE);
+
+	result = (vfsp->vfs_flag & VFS_RDONLY);
+	VFS_RELE(vfsp);
+	return (result);
 }

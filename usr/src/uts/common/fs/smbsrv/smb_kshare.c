@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_kshare.c	1.7	08/08/07 SMI"
 
 /*
  * Kernel door client for LanMan share management.
@@ -66,7 +66,7 @@ smb_kshare_fini(door_handle_t dhdl)
 }
 
 uint32_t
-smb_kshare_getinfo(door_handle_t dhdl, char *share_name, smb_share_t *si)
+smb_kshare_getinfo(door_handle_t dhdl, const char *share_name, smb_share_t *si)
 {
 	door_arg_t arg;
 	char *buf;

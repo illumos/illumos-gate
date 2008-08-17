@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_delete.c	1.10	08/08/07 SMI"
 
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
@@ -31,6 +31,7 @@
 #include <sys/nbmlock.h>
 
 static uint32_t smb_delete_check(smb_request_t *, smb_node_t *);
+static boolean_t smb_delete_check_path(smb_request_t *, boolean_t *);
 
 /*
  * smb_com_delete
@@ -106,17 +107,75 @@ smb_post_delete(smb_request_t *sr)
 	DTRACE_SMB_1(op__Delete__done, smb_request_t *, sr);
 }
 
+/*
+ * smb_com_delete
+ *
+ * readonly
+ * If a readonly entry is matched the search aborts with status
+ * NT_STATUS_CANNOT_DELETE. Entries found prior to the readonly
+ * entry will have been deleted.
+ *
+ * directories:
+ * smb_com_delete does not delete directories:
+ * A non-wildcard delete that finds a directory should result in
+ * NT_STATUS_FILE_IS_A_DIRECTORY.
+ * A wildcard delete that finds a directory will either:
+ *	- abort with status NT_STATUS_FILE_IS_A_DIRECTORY, if
+ *	  FILE_ATTRIBUTE_DIRECTORY is specified in the search attributes, or
+ *	- skip that entry, if FILE_ATTRIBUTE_DIRECTORY is NOT specified
+ *	  in the search attributes
+ * Entries found prior to the directory entry will have been deleted.
+ *
+ * search attribute not matched
+ * If an entry is found but it is either hidden or system and those
+ * attributes are not specified in the search attributes:
+ *	- if deleting a single file, status NT_STATUS_NO_SUCH_FILE
+ *	- if wildcard delete, skip the entry and continue
+ *
+ * path not found
+ * If smb_rdir_open cannot find the specified path, the error code
+ * is set to NT_STATUS_OBJECT_PATH_NOT_FOUND. If there are wildcards
+ * in the last_component, NT_STATUS_OBJECT_NAME_NOT_FOUND should be set
+ * instead.
+ *
+ * smb_delete_check_path() - checks dot, bad path syntax, wildcards in path
+ */
+
 smb_sdrc_t
 smb_com_delete(smb_request_t *sr)
 {
 	struct smb_fqi *fqi = &sr->arg.dirop.fqi;
-	int	rc;
-	int	deleted = 0;
+	int rc;
+	int deleted = 0;
 	struct smb_node *node = NULL;
 	smb_odir_context_t *pc;
+	unsigned short sattr;
+	boolean_t wildcards;
 
-	if (smb_rdir_open(sr, fqi->path, fqi->srch_attr) != 0)
+	if (smb_delete_check_path(sr, &wildcards) != B_TRUE)
 		return (SDRC_ERROR);
+
+	/*
+	 * specify all search attributes so that delete-specific
+	 * search attribute handling can be performed
+	 */
+	sattr = FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_HIDDEN |
+	    FILE_ATTRIBUTE_SYSTEM;
+
+	if (smb_rdir_open(sr, fqi->path, sattr) != 0) {
+		/*
+		 * If there are wildcards in the last_component,
+		 * NT_STATUS_OBJECT_NAME_NOT_FOUND
+		 * should be used in place of NT_STATUS_OBJECT_PATH_NOT_FOUND
+		 */
+		if ((wildcards == B_TRUE) &&
+		    (sr->smb_error.status == NT_STATUS_OBJECT_PATH_NOT_FOUND)) {
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
+			    ERRDOS, ERROR_FILE_NOT_FOUND);
+		}
+
+		return (SDRC_ERROR);
+	}
 
 	pc = kmem_zalloc(sizeof (*pc), KM_SLEEP);
 
@@ -128,20 +187,42 @@ smb_com_delete(smb_request_t *sr)
 	 */
 
 	while ((rc = smb_rdir_next(sr, &node, pc)) == 0) {
-
+		/* check directory */
 		if (pc->dc_dattr & FILE_ATTRIBUTE_DIRECTORY) {
-			smbsr_error(sr, NT_STATUS_FILE_IS_A_DIRECTORY,
-			    ERRDOS, ERROR_ACCESS_DENIED);
 			smb_node_release(node);
+			if (wildcards == B_FALSE) {
+				smbsr_error(sr, NT_STATUS_FILE_IS_A_DIRECTORY,
+				    ERRDOS, ERROR_ACCESS_DENIED);
+				goto delete_error;
+			} else {
+				if (SMB_SEARCH_DIRECTORY(fqi->srch_attr) != 0)
+					break;
+				else
+					continue;
+			}
+		}
+
+		/* check readonly */
+		if (SMB_PATHFILE_IS_READONLY(sr, node)) {
+			smb_node_release(node);
+			smbsr_error(sr, NT_STATUS_CANNOT_DELETE,
+			    ERRDOS, ERROR_ACCESS_DENIED);
 			goto delete_error;
 		}
 
-		if ((pc->dc_dattr & FILE_ATTRIBUTE_READONLY) ||
-		    (node->flags & NODE_CREATED_READONLY)) {
-			smbsr_error(sr, NT_STATUS_CANNOT_DELETE,
-			    ERRDOS, ERROR_ACCESS_DENIED);
+		/* check search attributes */
+		if (((pc->dc_dattr & FILE_ATTRIBUTE_HIDDEN) &&
+		    !(SMB_SEARCH_HIDDEN(fqi->srch_attr))) ||
+		    ((pc->dc_dattr & FILE_ATTRIBUTE_SYSTEM) &&
+		    !(SMB_SEARCH_SYSTEM(fqi->srch_attr)))) {
 			smb_node_release(node);
-			goto delete_error;
+			if (wildcards == B_FALSE) {
+				smbsr_error(sr, NT_STATUS_NO_SUCH_FILE,
+				    ERRDOS, ERROR_FILE_NOT_FOUND);
+				goto delete_error;
+			} else {
+				continue;
+			}
 		}
 
 		/*
@@ -193,7 +274,7 @@ smb_com_delete(smb_request_t *sr)
 	}
 
 	if (deleted == 0) {
-		if (sr->sid_odir->d_wildcards == 0)
+		if (wildcards == B_FALSE)
 			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
 			    ERRDOS, ERROR_FILE_NOT_FOUND);
 		else
@@ -212,6 +293,108 @@ delete_error:
 	smb_rdir_close(sr);
 	kmem_free(pc, sizeof (*pc));
 	return (SDRC_ERROR);
+}
+
+/*
+ * smb_delete_check_path
+ *
+ * Perform initial validation on the pathname and last_component.
+ *
+ * dot:
+ * A filename of '.' should result in NT_STATUS_OBJECT_NAME_INVALID
+ * Any wildcard filename that resolves to '.' should result in
+ * NT_STATUS_OBJECT_NAME_INVALID if the search attributes include
+ * FILE_ATTRIBUTE_DIRECTORY, otherwise handled as directory (see above).
+ *
+ * bad path syntax:
+ * On unix .. at the root of a file system links to the root. Thus
+ * an attempt to lookup "/../../.." will be the same as looking up "/"
+ * CIFs clients expect the above to result in
+ * NT_STATUS_OBJECT_PATH_SYNTAX_BAD. It is currently not possible
+ * (and questionable if it's desirable) to deal with all cases
+ * but paths beginning with \\.. are handled. See bad_paths[].
+ * Cases like "\\dir\\..\\.." will still result in "\\" which is
+ * contrary to windows behavior.
+ *
+ * wildcards in path:
+ * Wildcards in the path (excluding the last_component) should result
+ * in NT_STATUS_OBJECT_NAME_INVALID.
+ *
+ * Returns:
+ *	B_TRUE:  path is valid. Sets *wildcard to TRUE if wildcard delete
+ *	         i.e. if wildcards in last component
+ *	B_FALSE: path is invalid. Sets error information in sr.
+ */
+static boolean_t
+smb_delete_check_path(smb_request_t *sr, boolean_t *wildcard)
+{
+	struct smb_fqi *fqi = &sr->arg.dirop.fqi;
+	char *p, *last_component;
+	int i, wildcards;
+
+	struct {
+		char *name;
+		int len;
+	} *bad, bad_paths[] = {
+		{"\\..\0", 4},
+		{"\\..\\", 4},
+		{"..\0", 3},
+		{"..\\", 3}
+	};
+
+	wildcards = smb_convert_unicode_wildcards(fqi->path);
+
+	/* find last component, strip trailing '\\' */
+	p = fqi->path + strlen(fqi->path) - 1;
+	while (*p == '\\') {
+		*p = '\0';
+		--p;
+	}
+	if ((p = strrchr(fqi->path, '\\')) == NULL) {
+		last_component = fqi->path;
+	} else {
+		last_component = ++p;
+
+		/*
+		 * Any wildcards in path (excluding last_component) should
+		 * result in NT_STATUS_OBJECT_NAME_INVALID
+		 */
+		if (smb_convert_unicode_wildcards(last_component)
+		    != wildcards) {
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
+			    ERRDOS, ERROR_INVALID_NAME);
+			return (B_FALSE);
+		}
+	}
+
+	/*
+	 * path above the mount point => NT_STATUS_OBJECT_PATH_SYNTAX_BAD
+	 * This test doesn't cover all cases: e.g. \dir\..\..
+	 */
+	for (i = 0; i < sizeof (bad_paths) / sizeof (bad_paths[0]); ++i) {
+		bad = &bad_paths[i];
+		if (strncmp(fqi->path, bad->name, bad->len) == 0) {
+			smbsr_error(sr, NT_STATUS_OBJECT_PATH_SYNTAX_BAD,
+			    ERRDOS, ERROR_BAD_PATHNAME);
+			return (B_FALSE);
+		}
+	}
+
+	/*
+	 * Any file pattern that resolves to '.' is considered invalid.
+	 * In the wildcard case, only an error if FILE_ATTRIBUTE_DIRECTORY
+	 * is specified in search attributes, otherwise skipped (below)
+	 */
+	if ((strcmp(last_component, ".") == 0) ||
+	    (SMB_SEARCH_DIRECTORY(fqi->srch_attr) &&
+	    (smb_match(last_component, ".")))) {
+		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
+		    ERRDOS, ERROR_INVALID_NAME);
+		return (B_FALSE);
+	}
+
+	*wildcard = (wildcards != 0);
+	return (B_TRUE);
 }
 
 /*
@@ -237,7 +420,7 @@ smb_delete_check(smb_request_t *sr, smb_node_t *node)
 		return (status);
 	}
 
-	status = smb_range_check(sr, sr->user_cr, node, 0, UINT64_MAX, B_TRUE);
+	status = smb_range_check(sr, node, 0, UINT64_MAX, B_TRUE);
 
 	if (status != NT_STATUS_SUCCESS) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,

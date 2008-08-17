@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_rename.c	1.6	08/08/04 SMI"
 
 #include <smbsrv/nterror.h>
 #include <sys/synch.h>
@@ -210,8 +210,7 @@ smb_do_rename(
 		return (EPIPE); /* = ERRbadshare */
 	}
 
-	status = smb_range_check(sr, sr->user_cr, src_node, 0, UINT64_MAX,
-	    B_TRUE);
+	status = smb_range_check(sr, src_node, 0, UINT64_MAX, B_TRUE);
 
 	if (status != NT_STATUS_SUCCESS) {
 		smb_node_end_crit(src_node);

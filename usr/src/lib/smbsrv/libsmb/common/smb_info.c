@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_info.c	1.9	08/07/17 SMI"
 
 #include <sys/types.h>
 #include <stdarg.h>
@@ -105,8 +105,8 @@ smb_setdomaininfo(char *domain, char *server, uint32_t ipaddr)
 {
 	char *p;
 
+	(void) mutex_lock(&smbpdc_mtx);
 	bzero(&smbpdc_cache, sizeof (smb_ntdomain_t));
-
 	if (domain && server && ipaddr) {
 		(void) strlcpy(smbpdc_cache.domain, domain, SMB_PI_MAX_DOMAIN);
 		(void) strlcpy(smbpdc_cache.server, server, SMB_PI_MAX_DOMAIN);
@@ -121,11 +121,10 @@ smb_setdomaininfo(char *domain, char *server, uint32_t ipaddr)
 		if ((p = strchr(smbpdc_cache.server, '.')) != 0)
 			*p = '\0';
 
-		(void) mutex_lock(&smbpdc_mtx);
 		smbpdc_cache.ipaddr = ipaddr;
 		(void) cond_broadcast(&smbpdc_cv);
-		(void) mutex_unlock(&smbpdc_mtx);
 	}
+	(void) mutex_unlock(&smbpdc_mtx);
 }
 
 void
@@ -148,7 +147,6 @@ smb_load_kconfig(smb_kmod_cfg_t *kcfg)
 	kcfg->skc_restrict_anon = smb_config_getbool(SMB_CI_RESTRICT_ANON);
 	kcfg->skc_signing_enable = smb_config_getbool(SMB_CI_SIGNING_ENABLE);
 	kcfg->skc_signing_required = smb_config_getbool(SMB_CI_SIGNING_REQD);
-	kcfg->skc_signing_check = smb_config_getbool(SMB_CI_SIGNING_CHECK);
 	kcfg->skc_oplock_enable = smb_config_getbool(SMB_CI_OPLOCK_ENABLE);
 	kcfg->skc_sync_enable = smb_config_getbool(SMB_CI_SYNC_ENABLE);
 	kcfg->skc_secmode = smb_config_get_secmode();

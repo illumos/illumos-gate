@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_fsops.c	1.16	08/08/07 SMI"
 
 #include <sys/sid.h>
 #include <sys/nbmlock.h>
@@ -112,10 +112,10 @@ smb_fsop_open(smb_node_t *node, int mode, cred_t *cred)
 	return (smb_vop_open(&node->vp, mode, cred));
 }
 
-int
+void
 smb_fsop_close(smb_node_t *node, int mode, cred_t *cred)
 {
-	return (smb_vop_close(node->vp, mode, cred));
+	smb_vop_close(node->vp, mode, cred);
 }
 
 int
@@ -167,14 +167,14 @@ smb_fsop_create_with_sd(
 
 	ASSERT(fs_sd);
 
-	if (SMB_TREE_CASE_INSENSITIVE(sr))
+	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
 	ASSERT(cr);
 
 	is_dir = ((fs_sd->sd_flags & SMB_FSSD_FLAGS_DIR) != 0);
 
-	if (sr->tid_tree->t_flags & SMB_TREE_FLAG_ACLONCREATE) {
+	if (smb_tree_has_feature(sr->tid_tree, SMB_TREE_ACLONCREATE)) {
 		if (fs_sd->sd_secinfo & SMB_ACL_SECINFO) {
 			dacl = fs_sd->sd_zdacl;
 			sacl = fs_sd->sd_zsacl;
@@ -233,9 +233,8 @@ smb_fsop_create_with_sd(
 		}
 
 		if (set_attr.sa_mask) {
-			if (sr && sr->tid_tree)
-				if (sr->tid_tree->t_flags & SMB_TREE_FLAG_UFS)
-					no_xvattr = B_TRUE;
+			if (smb_tree_has_feature(sr->tid_tree, SMB_TREE_UFS))
+				no_xvattr = B_TRUE;
 			rc = smb_vop_setattr(snode->vp, NULL, &set_attr,
 			    0, kcred, no_xvattr);
 		}
@@ -261,7 +260,7 @@ smb_fsop_create_with_sd(
 		if (rc != 0)
 			return (rc);
 
-		if ((sr->tid_tree->t_flags & SMB_TREE_FLAG_NFS_MOUNTED) == 0)
+		if (!smb_tree_has_feature(sr->tid_tree, SMB_TREE_NFS_MOUNTED))
 			rc = smb_fsop_sdwrite(sr, kcred, snode, fs_sd, 1);
 	}
 
@@ -339,15 +338,16 @@ smb_fsop_create(
 	if (*name == 0)
 		return (EINVAL);
 
-	if (SMB_TREE_ROOT_FS(sr, dir_snode) == 0)
-		return (EACCES);
-
 	ASSERT(sr);
 	ASSERT(sr->tid_tree);
-	if (SMB_TREE_IS_READ_ONLY(sr))
+
+	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0)
+		return (EACCES);
+
+	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
 
-	if (SMB_TREE_CASE_INSENSITIVE(sr))
+	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
 	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -417,9 +417,8 @@ smb_fsop_create(
 			return (rc);
 		}
 
-		if (sr && sr->tid_tree)
-			if (sr->tid_tree->t_flags & SMB_TREE_FLAG_UFS)
-				no_xvattr = B_TRUE;
+		if (smb_tree_has_feature(sr->tid_tree, SMB_TREE_UFS))
+			no_xvattr = B_TRUE;
 
 		attr->sa_vattr.va_uid = file_attr.sa_vattr.va_uid;
 		attr->sa_vattr.va_gid = file_attr.sa_vattr.va_gid;
@@ -554,12 +553,13 @@ smb_fsop_mkdir(
 	if (*name == 0)
 		return (EINVAL);
 
-	if (SMB_TREE_ROOT_FS(sr, dir_snode) == 0)
-		return (EACCES);
-
 	ASSERT(sr);
 	ASSERT(sr->tid_tree);
-	if (SMB_TREE_IS_READ_ONLY(sr))
+
+	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0)
+		return (EACCES);
+
+	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
 
 	if (smb_maybe_mangled_name(name)) {
@@ -584,7 +584,7 @@ smb_fsop_mkdir(
 			return (rc);
 	}
 
-	if (SMB_TREE_CASE_INSENSITIVE(sr))
+	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
 	if (op->sd) {
@@ -675,10 +675,10 @@ smb_fsop_remove(
 	ASSERT(dir_snode);
 	ASSERT(dir_snode->n_magic == SMB_NODE_MAGIC);
 
-	if (SMB_TREE_ROOT_FS(sr, dir_snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0)
 		return (EACCES);
 
-	if (SMB_TREE_IS_READ_ONLY(sr))
+	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
 
 	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -695,7 +695,7 @@ smb_fsop_remove(
 	 * do a remove on the "first match."
 	 */
 
-	if ((od == 0) && SMB_TREE_CASE_INSENSITIVE(sr))
+	if ((od == 0) && SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
 	if (dir_snode->flags & NODE_XATTR_DIR) {
@@ -787,18 +787,19 @@ smb_fsop_remove_streams(smb_request_t *sr, cred_t *cr, smb_node_t *fnode)
 	int flags = 0;
 	int rc;
 
+	ASSERT(sr);
 	ASSERT(cr);
 	ASSERT(fnode);
 	ASSERT(fnode->n_magic == SMB_NODE_MAGIC);
 	ASSERT(fnode->n_state != SMB_NODE_STATE_DESTROYING);
 
-	if (SMB_TREE_ROOT_FS(sr, fnode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, fnode) == 0)
 		return (EACCES);
 
-	if (SMB_TREE_IS_READ_ONLY(sr))
+	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
 
-	if (SMB_TREE_CASE_INSENSITIVE(sr))
+	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
 	for (;;) {
@@ -848,10 +849,10 @@ smb_fsop_rmdir(
 	ASSERT(dir_snode);
 	ASSERT(dir_snode->n_magic == SMB_NODE_MAGIC);
 
-	if (SMB_TREE_ROOT_FS(sr, dir_snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0)
 		return (EACCES);
 
-	if (SMB_TREE_IS_READ_ONLY(sr))
+	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
 
 	/*
@@ -865,7 +866,7 @@ smb_fsop_rmdir(
 	 * do a rmdir on the "first match."
 	 */
 
-	if ((od == 0) && SMB_TREE_CASE_INSENSITIVE(sr))
+	if ((od == 0) && SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
 	rc = smb_vop_rmdir(dir_snode->vp, name, flags, cr);
@@ -925,7 +926,7 @@ smb_fsop_getattr(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	ASSERT(snode->n_magic == SMB_NODE_MAGIC);
 	ASSERT(snode->n_state != SMB_NODE_STATE_DESTROYING);
 
-	if (SMB_TREE_ROOT_FS(sr, snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, snode) == 0)
 		return (EACCES);
 
 	if (sr->fid_ofile) {
@@ -941,7 +942,8 @@ smb_fsop_getattr(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		if (status != NT_STATUS_SUCCESS)
 			return (EACCES);
 
-		if (sr->tid_tree->t_flags & SMB_TREE_FLAG_ACEMASKONACCESS)
+		if (smb_tree_has_feature(sr->tid_tree,
+		    SMB_TREE_ACEMASKONACCESS))
 			flags = ATTR_NOACLCHECK;
 	}
 
@@ -998,7 +1000,7 @@ smb_fsop_readdir(
 	ASSERT(dir_snode->n_magic == SMB_NODE_MAGIC);
 	ASSERT(dir_snode->n_state != SMB_NODE_STATE_DESTROYING);
 
-	if (SMB_TREE_ROOT_FS(sr, dir_snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0)
 		return (EACCES);
 
 	if (*cookie == SMB_EOF) {
@@ -1006,7 +1008,7 @@ smb_fsop_readdir(
 		return (0);
 	}
 
-	if (SMB_TREE_CASE_INSENSITIVE(sr))
+	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
 	od_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -1132,10 +1134,10 @@ smb_fsop_getdents(
 	ASSERT(dir_snode->n_magic == SMB_NODE_MAGIC);
 	ASSERT(dir_snode->n_state != SMB_NODE_STATE_DESTROYING);
 
-	if (SMB_TREE_ROOT_FS(sr, dir_snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0)
 		return (EACCES);
 
-	if (SMB_TREE_CASE_INSENSITIVE(sr))
+	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
 	return (smb_vop_getdents(dir_snode, cookie, 0, maxcnt, args, pattern,
@@ -1177,19 +1179,19 @@ smb_fsop_rename(
 	ASSERT(to_dir_snode->n_magic == SMB_NODE_MAGIC);
 	ASSERT(to_dir_snode->n_state != SMB_NODE_STATE_DESTROYING);
 
-	if (SMB_TREE_ROOT_FS(sr, from_dir_snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, from_dir_snode) == 0)
 		return (EACCES);
 
-	if (SMB_TREE_ROOT_FS(sr, to_dir_snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, to_dir_snode) == 0)
 		return (EACCES);
 
 	ASSERT(sr);
 	ASSERT(sr->tid_tree);
-	if (SMB_TREE_IS_READ_ONLY(sr))
+	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
 
 	/*
-	 * Note: There is no need to check SMB_TREE_CASE_INSENSITIVE(sr)
+	 * Note: There is no need to check SMB_TREE_IS_CASEINSENSITIVE
 	 * here.
 	 *
 	 * A case-sensitive rename is always done in this routine
@@ -1268,14 +1270,25 @@ smb_fsop_setattr(
 	ASSERT(snode->n_magic == SMB_NODE_MAGIC);
 	ASSERT(snode->n_state != SMB_NODE_STATE_DESTROYING);
 
-	if (SMB_TREE_ROOT_FS(sr, snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, snode) == 0)
 		return (EACCES);
 
-	if (SMB_TREE_IS_READ_ONLY(sr))
+	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
+
+	if (sr && (set_attr->sa_mask & SMB_AT_SIZE)) {
+		if (sr->fid_ofile) {
+			if (SMB_OFILE_IS_READONLY(sr->fid_ofile))
+				return (EACCES);
+		} else {
+			if (SMB_PATHFILE_IS_READONLY(sr, snode))
+				return (EACCES);
+		}
+	}
 
 	/* sr could be NULL in some cases */
 	if (sr && sr->fid_ofile) {
+
 		/* if uid and/or gid is requested */
 		if (set_attr->sa_mask & (SMB_AT_UID|SMB_AT_GID))
 			access |= WRITE_OWNER;
@@ -1288,7 +1301,8 @@ smb_fsop_setattr(
 		if (status != NT_STATUS_SUCCESS)
 			return (EACCES);
 
-		if (sr->tid_tree->t_flags & SMB_TREE_FLAG_ACEMASKONACCESS)
+		if (smb_tree_has_feature(sr->tid_tree,
+		    SMB_TREE_ACEMASKONACCESS))
 			flags = ATTR_NOACLCHECK;
 	}
 
@@ -1300,7 +1314,7 @@ smb_fsop_setattr(
 		unnamed_vp = unnamed_node->vp;
 	}
 	if (sr && sr->tid_tree)
-		if (sr->tid_tree->t_flags & SMB_TREE_FLAG_UFS)
+		if (smb_tree_has_feature(sr->tid_tree, SMB_TREE_UFS))
 			no_xvattr = B_TRUE;
 
 	rc = smb_vop_setattr(snode->vp, unnamed_vp, set_attr, flags, cr,
@@ -1312,7 +1326,8 @@ smb_fsop_setattr(
 		 * call is not being made on behalf of the user.
 		 */
 		ret_attr->sa_mask = SMB_AT_ALL;
-		rc = smb_vop_getattr(snode->vp, unnamed_vp, ret_attr, 0, kcred);
+		rc = smb_vop_getattr(snode->vp, unnamed_vp, ret_attr, flags,
+		    kcred);
 		if (rc == 0)
 			snode->attr = *ret_attr;
 	}
@@ -1340,6 +1355,7 @@ smb_fsop_read(
 {
 	smb_node_t *unnamed_node;
 	vnode_t *unnamed_vp = NULL;
+	caller_context_t ct;
 	int svmand;
 	int rc;
 
@@ -1373,14 +1389,16 @@ smb_fsop_read(
 	}
 
 	smb_node_start_crit(snode, RW_READER);
-	rc = nbl_svmand(snode->vp, cr, &svmand);
+	rc = nbl_svmand(snode->vp, kcred, &svmand);
 	if (rc) {
 		smb_node_end_crit(snode);
 		return (rc);
 	}
 
+	ct = smb_ct;
+	ct.cc_pid = sr->fid_ofile->f_uniqid;
 	rc = nbl_lock_conflict(snode->vp, NBL_READ, uio->uio_loffset,
-	    uio->uio_iov->iov_len, svmand, &smb_ct);
+	    uio->uio_iov->iov_len, svmand, &ct);
 
 	if (rc) {
 		smb_node_end_crit(snode);
@@ -1424,6 +1442,7 @@ smb_fsop_write(
 {
 	smb_node_t *unnamed_node;
 	vnode_t *unnamed_vp = NULL;
+	caller_context_t ct;
 	int svmand;
 	int rc;
 
@@ -1436,8 +1455,11 @@ smb_fsop_write(
 	ASSERT(sr->tid_tree);
 	ASSERT(sr->fid_ofile);
 
-	if (SMB_TREE_IS_READ_ONLY(sr))
+	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
+
+	if (SMB_OFILE_IS_READONLY(sr->fid_ofile))
+		return (EACCES);
 
 	rc = smb_ofile_access(sr->fid_ofile, cr, FILE_WRITE_DATA);
 	if (rc != NT_STATUS_SUCCESS) {
@@ -1462,13 +1484,16 @@ smb_fsop_write(
 	}
 
 	smb_node_start_crit(snode, RW_READER);
-	rc = nbl_svmand(snode->vp, cr, &svmand);
+	rc = nbl_svmand(snode->vp, kcred, &svmand);
 	if (rc) {
 		smb_node_end_crit(snode);
 		return (rc);
 	}
+
+	ct = smb_ct;
+	ct.cc_pid = sr->fid_ofile->f_uniqid;
 	rc = nbl_lock_conflict(snode->vp, NBL_WRITE, uio->uio_loffset,
-	    uio->uio_iov->iov_len, svmand, &smb_ct);
+	    uio->uio_iov->iov_len, svmand, &ct);
 
 	if (rc) {
 		smb_node_end_crit(snode);
@@ -1536,6 +1561,7 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	boolean_t acl_check = B_TRUE;
 	smb_node_t *unnamed_node;
 
+	ASSERT(sr);
 	ASSERT(cr);
 	ASSERT(snode);
 	ASSERT(snode->n_magic == SMB_NODE_MAGIC);
@@ -1544,7 +1570,7 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	if (faccess == 0)
 		return (NT_STATUS_SUCCESS);
 
-	if (SMB_TREE_IS_READ_ONLY(sr)) {
+	if (SMB_TREE_IS_READONLY(sr)) {
 		if (faccess & (FILE_WRITE_DATA|FILE_APPEND_DATA|
 		    FILE_WRITE_EA|FILE_DELETE_CHILD|FILE_WRITE_ATTRIBUTES|
 		    DELETE|WRITE_DAC|WRITE_OWNER)) {
@@ -1592,7 +1618,7 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	}
 
 	/* Links don't have ACL */
-	if (((sr->tid_tree->t_flags & SMB_TREE_FLAG_ACEMASKONACCESS) == 0) ||
+	if ((!smb_tree_has_feature(sr->tid_tree, SMB_TREE_ACEMASKONACCESS)) ||
 	    (snode->attr.sa_vattr.va_type == VLNK))
 		acl_check = B_FALSE;
 
@@ -1659,7 +1685,7 @@ smb_fsop_lookup_name(
 	 * The following check is required for streams processing, below
 	 */
 
-	if (SMB_TREE_CASE_INSENSITIVE(sr))
+	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags |= SMB_IGNORE_CASE;
 
 	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -1722,7 +1748,7 @@ smb_fsop_lookup_name(
 
 	if (rc == 0) {
 		ASSERT(ret_snode);
-		if (SMB_TREE_ROOT_FS(sr, *ret_snode) == 0) {
+		if (SMB_TREE_CONTAINS_NODE(sr, *ret_snode) == 0) {
 			smb_node_release(*ret_snode);
 			*ret_snode = NULL;
 			rc = EACCES;
@@ -1754,7 +1780,10 @@ smb_fsop_lookup_name(
  * Note: The returned ret_snode may be in a child mount.  This is ok for
  * readdir and getdents.
  *
- * Other smb_fsop_* routines will call SMB_TREE_ROOT_FS() to prevent
+ * ret_shortname and ret_name83 must each point to buffers of at least
+ * SMB_SHORTNAMELEN bytes.
+ *
+ * Other smb_fsop_* routines will call SMB_TREE_CONTAINS_NODE() to prevent
  * operations on files not in the parent mount.
  */
 int
@@ -1767,8 +1796,8 @@ smb_fsop_lookup(
     char	*name,
     smb_node_t	**ret_snode,
     smb_attr_t	*ret_attr,
-    char	*ret_shortname, /* Must be at least MANGLE_NAMELEN chars */
-    char	*ret_name83)    /* Must be at least MANGLE_NAMELEN chars */
+    char	*ret_shortname,
+    char	*ret_name83)
 {
 	smb_node_t *lnk_target_node;
 	smb_node_t *lnk_dnode;
@@ -1785,10 +1814,10 @@ smb_fsop_lookup(
 	if (name == NULL)
 		return (EINVAL);
 
-	if (SMB_TREE_ROOT_FS(sr, dir_snode) == 0)
+	if (SMB_TREE_CONTAINS_NODE(sr, dir_snode) == 0)
 		return (EACCES);
 
-	if (SMB_TREE_CASE_INSENSITIVE(sr))
+	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags |= SMB_IGNORE_CASE;
 
 	od_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -1947,7 +1976,7 @@ smb_fsop_stream_readdir(smb_request_t *sr, cred_t *cr, smb_node_t *fnode,
 	ASSERT(fnode->n_magic == SMB_NODE_MAGIC);
 	ASSERT(fnode->n_state != SMB_NODE_STATE_DESTROYING);
 
-	if (SMB_TREE_CASE_INSENSITIVE(sr))
+	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
 
 	rc = smb_vop_stream_readdir(fnode->vp, cookiep, stream_info, &vp,
@@ -1988,7 +2017,7 @@ smb_fsop_commit(smb_request_t *sr, cred_t *cr, smb_node_t *snode)
 
 	ASSERT(sr);
 	ASSERT(sr->tid_tree);
-	if (SMB_TREE_IS_READ_ONLY(sr))
+	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
 
 	return (smb_vop_commit(snode->vp, cr));
@@ -2044,7 +2073,7 @@ smb_fsop_aclread(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		snode = unnamed_node;
 	}
 
-	if (sr->tid_tree->t_flags & SMB_TREE_FLAG_ACEMASKONACCESS)
+	if (smb_tree_has_feature(sr->tid_tree, SMB_TREE_ACEMASKONACCESS))
 		flags = ATTR_NOACLCHECK;
 
 	error = smb_vop_acl_read(snode->vp, &acl, flags,
@@ -2085,7 +2114,7 @@ smb_fsop_aclwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 
 	ASSERT(sr);
 	ASSERT(sr->tid_tree);
-	if (SMB_TREE_IS_READ_ONLY(sr))
+	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
 
 	if (sr->fid_ofile) {
@@ -2140,7 +2169,8 @@ smb_fsop_aclwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	error = acl_translate(acl, target_flavor, (snode->vp->v_type == VDIR),
 	    fs_sd->sd_uid, fs_sd->sd_gid);
 	if (error == 0) {
-		if (sr->tid_tree->t_flags & SMB_TREE_FLAG_ACEMASKONACCESS)
+		if (smb_tree_has_feature(sr->tid_tree,
+		    SMB_TREE_ACEMASKONACCESS))
 			flags = ATTR_NOACLCHECK;
 
 		error = smb_vop_acl_write(snode->vp, acl, flags, cr);
@@ -2326,7 +2356,7 @@ smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 
 	ASSERT(sr);
 	ASSERT(sr->tid_tree);
-	if (SMB_TREE_IS_READ_ONLY(sr))
+	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
 
 	bzero(&set_attr, sizeof (smb_attr_t));
@@ -2500,7 +2530,7 @@ smb_fsop_eaccess(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		snode = unnamed_node;
 	}
 
-	if (sr->tid_tree->t_flags & SMB_TREE_FLAG_ACEMASKONACCESS) {
+	if (smb_tree_has_feature(sr->tid_tree, SMB_TREE_ACEMASKONACCESS)) {
 		dir_vp = (snode->dir_snode) ? snode->dir_snode->vp : NULL;
 		smb_vop_eaccess(snode->vp, (int *)eaccess, V_ACE_MASK, dir_vp,
 		    cr);
@@ -2629,7 +2659,7 @@ smb_fsop_frlock(smb_node_t *node, smb_lock_t *lock, boolean_t unlock,
 
 	bf.l_start = lock->l_start;
 	bf.l_len = lock->l_length;
-	bf.l_pid = IGN_PID;
+	bf.l_pid = lock->l_file->f_uniqid;
 	bf.l_sysid = smb_ct.cc_sysid;
 
 	return (smb_vop_frlock(node->vp, cr, flag, &bf));

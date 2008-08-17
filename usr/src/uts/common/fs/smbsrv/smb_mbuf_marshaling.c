@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_mbuf_marshaling.c	1.6	08/08/08 SMI"
 
 /*
  * SMB mbuf marshaling encode/decode.
@@ -324,7 +324,7 @@ unicode_translation:
 				if (mbc_marshal_get_short(mbc,
 				    (uint16_t *)&d) != 0)
 					return (-1);
-				*lvalp++ = dosfs_dos_to_ux_time(d, t);
+				*lvalp++ = smb_dos_to_ux_time(d, t);
 			}
 			break;
 
@@ -339,7 +339,7 @@ unicode_translation:
 				if (mbc_marshal_get_short(mbc,
 				    (uint16_t *)&t) != 0)
 					return (-1);
-				*lvalp++ = dosfs_dos_to_ux_time(d, t);
+				*lvalp++ = smb_dos_to_ux_time(d, t);
 			}
 			break;
 
@@ -495,6 +495,10 @@ smb_mbc_peek(mbuf_chain_t *mbc, int offset, char *fmt, ...)
  *
  *	Z	Unicode string. Store the unicode string into the mbuf chain
  *		without alignment considerations.
+ *
+ *	z	Pointer to a string. If appropriate convert to unicode and store
+ *		in mbuf chain without alignment ajustment (same as 'Z'),
+ *		otherwise store in mbuf chain as ascii (same as 's').
  */
 int
 smb_mbc_vencodef(mbuf_chain_t *mbc, char *fmt, va_list ap)
@@ -657,7 +661,7 @@ ascii_conversion:	cvalp = va_arg(ap, uint8_t *);
 				uint16_t	d, t;
 
 				lval = va_arg(ap, uint32_t);
-				(void) dosfs_ux_to_dos_time(lval,
+				(void) smb_ux_to_dos_time(lval,
 				    (short *)&d, (short *)&t);
 				if (mbc_marshal_put_short(mbc, t) != 0)
 					return (DECODE_NO_MORE_DATA);
@@ -671,7 +675,7 @@ ascii_conversion:	cvalp = va_arg(ap, uint8_t *);
 				uint16_t	d, t;
 
 				lval = va_arg(ap, uint32_t);
-				(void) dosfs_ux_to_dos_time(lval,
+				(void) smb_ux_to_dos_time(lval,
 				    (short *)&d, (short *)&t);
 				if (mbc_marshal_put_short(mbc, d) != 0)
 					return (DECODE_NO_MORE_DATA);
@@ -702,6 +706,19 @@ unicode_translation:
 			if (mbc_marshal_put_unicode_string(mbc,
 			    (char *)cvalp, repc) != 0)
 				return (DECODE_NO_MORE_DATA);
+			break;
+
+		case 'z':
+			cvalp = va_arg(ap, uint8_t *);
+			if (unicode) {
+				if (mbc_marshal_put_unicode_string(mbc,
+				    (char *)cvalp, repc) != 0)
+					return (DECODE_NO_MORE_DATA);
+			} else {
+				if (mbc_marshal_put_ascii_string(mbc,
+				    (char *)cvalp, repc) != 0)
+					return (DECODE_NO_MORE_DATA);
+			}
 			break;
 
 		default:

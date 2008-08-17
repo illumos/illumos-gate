@@ -19,11 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)srvsvc_client.c	1.3	08/07/16 SMI"
 
 /*
  * Server Service (srvsvc) client side RPC library interface. The
@@ -492,7 +492,8 @@ srvsvc_net_remote_tod(char *server, char *domain, struct timeval *tv,
 	if (tv) {
 		tv->tv_sec = tod->tod_elapsedt;
 		tv->tv_usec = tod->tod_msecs;
-		smb_tracef("RemoteTime: %s", ctime(&tv->tv_sec));
+		smb_tracef("RemoteTime from %s: %s", server,
+		    ctime(&tv->tv_sec));
 	}
 
 	if (tm) {
@@ -506,7 +507,7 @@ srvsvc_net_remote_tod(char *server, char *domain, struct timeval *tv,
 
 		(void) strftime(timebuf, sizeof (timebuf),
 		    "NetRemoteTOD: %D %T", tm);
-		smb_tracef("NetRemoteTOD: %s", timebuf);
+		smb_tracef("NetRemoteTOD from %s: %s", server, timebuf);
 	}
 
 	srvsvc_close(&handle, &heap);

@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smbns_dyndns.c	1.10	08/07/24 SMI"
 
 #include <assert.h>
 #include <errno.h>
@@ -61,20 +61,22 @@
 static uint16_t dns_msgid;
 mutex_t dns_msgid_mtx;
 
-int
+/*
+ * dns_msgid_init
+ *
+ * Initializes the DNS message ID counter using the algorithm
+ * that resolver library uses to initialize the ID field of any res
+ * structure.
+ */
+void
 dns_msgid_init(void)
 {
-	struct __res_state res;
+	struct timeval now;
 
-	bzero(&res, sizeof (struct __res_state));
-	if (res_ninit(&res) < 0)
-		return (-1);
-
+	(void) gettimeofday(&now, NULL);
 	(void) mutex_lock(&dns_msgid_mtx);
-	dns_msgid = res.id;
+	dns_msgid = (0xffff & (now.tv_sec ^ now.tv_usec ^ getpid()));
 	(void) mutex_unlock(&dns_msgid_mtx);
-	res_ndestroy(&res);
-	return (0);
 }
 
 static int
@@ -1651,11 +1653,7 @@ dyndns_remove_entry(int update_zone, const char *hostname, const char *ip_addr,
  *
  * Dynamic DNS update API for kclient.
  *
- * Returns:
- *   0: successful
- *  -1: dynamic update failure.
- *  -2: unable to obtain NIC info.
- *  -3: init failure
+ * Returns 0 upon success.  Otherwise, returns -1.
  */
 int
 dyndns_update(char *fqdn)
@@ -1663,11 +1661,9 @@ dyndns_update(char *fqdn)
 	int rc;
 
 	if (smb_nic_init() != 0)
-		return (-2);
+		return (-1);
 
-	if (dns_msgid_init() != 0)
-		return (-3);
-
+	dns_msgid_init();
 	rc = dyndns_update_core(fqdn);
 	smb_nic_fini();
 	return (rc);

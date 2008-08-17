@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_ofile.c	1.12	08/08/08 SMI"
 
 /*
  * General Structures Layout
@@ -180,9 +180,7 @@ smb_ofile_open(
     smb_tree_t		*tree,
     smb_node_t		*node,
     uint16_t		pid,
-    uint32_t		access_granted,
-    uint32_t		create_options,
-    uint32_t		share_access,
+    struct open_param	*op,
     uint16_t		ftype,
     uint32_t		uniqid,
     smb_error_t		*err)
@@ -204,9 +202,9 @@ smb_ofile_open(
 	of->f_fid = fid;
 	of->f_uniqid = uniqid;
 	of->f_opened_by_pid = pid;
-	of->f_granted_access = access_granted;
-	of->f_share_access = share_access;
-	of->f_create_options = create_options;
+	of->f_granted_access = op->desired_access;
+	of->f_share_access = op->share_access;
+	of->f_create_options = op->create_options;
 	of->f_cr = tree->t_user->u_cred;
 	crhold(of->f_cr);
 	of->f_ftype = ftype;
@@ -234,13 +232,11 @@ smb_ofile_open(
 		if (node->vp->v_type == VREG) {
 			of->f_mode =
 			    smb_fsop_amask_to_omode(of->f_granted_access);
-			if (smb_fsop_open(of->f_node, of->f_mode, of->f_cr)
-			    != 0) {
+			if (smb_fsop_open(node, of->f_mode, of->f_cr) != 0) {
 				of->f_magic = 0;
 				mutex_destroy(&of->f_mutex);
 				crfree(of->f_cr);
-				smb_idpool_free(&tree->t_fid_pool,
-				    of->f_fid);
+				smb_idpool_free(&tree->t_fid_pool, of->f_fid);
 				kmem_cache_free(tree->t_server->si_cache_ofile,
 				    of);
 				err->status = NT_STATUS_ACCESS_DENIED;
@@ -249,6 +245,12 @@ smb_ofile_open(
 				return (NULL);
 			}
 		}
+
+		if (tree->t_flags & SMB_TREE_READONLY)
+			of->f_flags |= SMB_OFLAGS_READONLY;
+
+		if (op->created_readonly)
+			node->readonly_creator = of;
 
 		smb_llist_enter(&node->n_ofile_list, RW_WRITER);
 		smb_llist_insert_tail(&node->n_ofile_list, of);
@@ -268,13 +270,11 @@ smb_ofile_open(
  *
  *
  */
-int
+void
 smb_ofile_close(
     smb_ofile_t		*of,
     uint32_t		last_wtime)
 {
-	int	rc = 0;
-
 	ASSERT(of);
 	ASSERT(of->f_magic == SMB_OFILE_MAGIC);
 
@@ -289,23 +289,21 @@ smb_ofile_close(
 		if (of->f_ftype == SMB_FTYPE_MESG_PIPE) {
 			smb_opipe_close(of);
 		} else {
-			if (of->f_node->flags & NODE_CREATED_READONLY) {
-				smb_node_set_dosattr(of->f_node,
-				    of->f_node->attr.sa_dosattr |
-				    FILE_ATTRIBUTE_READONLY);
-				of->f_node->flags &= ~NODE_CREATED_READONLY;
+			/*
+			 * For files created readonly, propagate the readonly
+			 * bit to the ofile now
+			 */
+
+			if (of->f_node->readonly_creator == of) {
+				of->f_node->attr.sa_dosattr |=
+				    FILE_ATTRIBUTE_READONLY;
+				of->f_node->what |= SMB_AT_DOSATTR;
+				of->f_node->readonly_creator = NULL;
 			}
 
 			smb_ofile_close_timestamp_update(of, last_wtime);
-			rc = smb_sync_fsattr(NULL, of->f_cr, of->f_node);
 			smb_commit_delete_on_close(of);
 			smb_oplock_release(of->f_node, B_FALSE);
-
-			/*
-			 * Share reservations cannot be removed until the
-			 * readonly bit has been set (if needed), above.
-			 * See comments in smb_open_subr().
-			 */
 			smb_fsop_unshrlock(of->f_cr, of->f_node, of->f_uniqid);
 			smb_node_destroy_lock_by_ofile(of->f_node, of);
 
@@ -327,7 +325,7 @@ smb_ofile_close(
 		ASSERT(of->f_state == SMB_OFILE_STATE_CLOSING);
 		of->f_state = SMB_OFILE_STATE_CLOSED;
 		mutex_exit(&of->f_mutex);
-		return (rc);
+		return;
 	}
 	case SMB_OFILE_STATE_CLOSED:
 	case SMB_OFILE_STATE_CLOSING:
@@ -338,7 +336,6 @@ smb_ofile_close(
 		break;
 	}
 	mutex_exit(&of->f_mutex);
-	return (rc);
 }
 
 /*
@@ -561,7 +558,11 @@ smb_ofile_seek(
 /*
  * smb_ofile_close_timestamp_update
  *
- *
+ * The last_wtime is specified in the request received
+ * from the client. If it is neither 0 nor -1, this time
+ * should be used as the file's mtime. It must first be
+ * converted from the server's localtime (as received in
+ * the client's request) to GMT.
  */
 void
 smb_ofile_close_timestamp_update(
@@ -572,28 +573,26 @@ smb_ofile_close_timestamp_update(
 	timestruc_t	mtime, atime;
 	unsigned int	what = 0;
 
-	mtime.tv_sec = last_wtime;
+	mtime.tv_sec = 0;
 	mtime.tv_nsec = 0;
 
-	if (mtime.tv_sec != 0 && mtime.tv_sec != 0xFFFFFFFF) {
-		mtime.tv_sec -= of->f_server->si_gmtoff;
+	if (last_wtime != 0 && last_wtime != 0xFFFFFFFF) {
+		mtime.tv_sec = last_wtime + of->f_server->si_gmtoff;
 		what |= SMB_AT_MTIME;
 	}
 
 	/*
 	 * NODE_FLAGS_SYNCATIME is set whenever something is
-	 * written to a file. Compliant volumes don't update
-	 * atime upon write, so don't update the atime if the
-	 * volume is compliant.
+	 * written to a file.
 	 */
 	node = of->f_node;
 	if (node->flags & NODE_FLAGS_SYNCATIME) {
-		node->flags &= ~NODE_FLAGS_SYNCATIME;
 		what |= SMB_AT_ATIME;
 		(void) microtime(&atime);
 	}
 
 	smb_node_set_time(node, 0, &mtime, &atime, 0, what);
+	(void) smb_sync_fsattr(NULL, of->f_cr, of->f_node);
 }
 
 /*
@@ -646,7 +645,7 @@ smb_ofile_close_and_next(
 		tree = of->f_tree;
 		mutex_exit(&of->f_mutex);
 		smb_llist_exit(&of->f_tree->t_ofile_list);
-		(void) smb_ofile_close(of, 0);
+		smb_ofile_close(of, 0);
 		smb_ofile_release(of);
 		smb_llist_enter(&tree->t_ofile_list, RW_READER);
 		next_of = smb_llist_head(&tree->t_ofile_list);

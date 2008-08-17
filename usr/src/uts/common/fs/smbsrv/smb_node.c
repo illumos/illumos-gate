@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_node.c	1.9	08/08/07 SMI"
 
 /*
  * SMB Node State Machine
@@ -200,7 +200,7 @@ smb_node_lookup(
 	smb_llist_t		*node_hdr;
 	smb_node_t		*node;
 	uint32_t		hashkey = 0;
-	fs_desc_t		fsd;
+	fsid_t			fsid;
 	int			error;
 	krw_t			lock_mode;
 	vnode_t			*unnamed_vp = NULL;
@@ -223,26 +223,22 @@ smb_node_lookup(
 	if (error)
 		return (NULL);
 
-	if (sr) {
-		if (sr->tid_tree) {
-			/*
-			 * The fsd for a file is that of the tree, even
-			 * if the file resides in a different mountpoint
-			 * under the share.
-			 */
-			fsd = sr->tid_tree->t_fsd;
-		} else {
-			/*
-			 * This should be getting executed only for the
-			 * tree's root smb_node.
-			 */
-			fsd = vp->v_vfsp->vfs_fsid;
-		}
+	if (sr && sr->tid_tree) {
+		/*
+		 * The fsid for a file is that of the tree, even
+		 * if the file resides in a different mountpoint
+		 * under the share.
+		 */
+		fsid = SMB_TREE_FSID(sr->tid_tree);
 	} else {
-		fsd = vp->v_vfsp->vfs_fsid;
+		/*
+		 * This should be getting executed only for the
+		 * tree root smb_node.
+		 */
+		fsid = vp->v_vfsp->vfs_fsid;
 	}
 
-	hashkey = fsd.val[0] + attr->sa_vattr.va_nodeid;
+	hashkey = fsid.val[0] + attr->sa_vattr.va_nodeid;
 	hashkey += (hashkey >> 24) + (hashkey >> 16) + (hashkey >> 8);
 	node_hdr = &smb_node_hash_table[(hashkey & SMBND_HASH_MASK)];
 	lock_mode = RW_READER;
@@ -315,7 +311,6 @@ smb_node_lookup(
 	node->vp = vp;
 	node->n_hashkey = hashkey;
 	node->n_refcnt = 1;
-	node->tree_fsd = vp->v_vfsp->vfs_fsid;
 	node->attr = *attr;
 	node->flags |= NODE_FLAGS_ATTR_VALID;
 	node->n_size = node->attr.sa_vattr.va_size;
@@ -325,9 +320,6 @@ smb_node_lookup(
 
 	ASSERT(od_name);
 	(void) strlcpy(node->od_name, od_name, sizeof (node->od_name));
-
-	if (fsd_chkcap(&vp->v_vfsp->vfs_fsid, FSOLF_READONLY) > 0)
-		node->flags |= NODE_READ_ONLY;
 
 	smb_llist_constructor(&node->n_ofile_list, sizeof (smb_ofile_t),
 	    offsetof(smb_ofile_t, f_nnd));
@@ -610,15 +602,11 @@ smb_node_root_init(vnode_t *vp, smb_server_t *sv, smb_node_t **root)
 	node->vp = vp;
 	node->n_hashkey = hashkey;
 	node->n_refcnt = 1;
-	node->tree_fsd = vp->v_vfsp->vfs_fsid;
 	node->attr = va;
 	node->flags |= NODE_FLAGS_ATTR_VALID;
 	node->n_size = node->attr.sa_vattr.va_size;
 	node->n_cache = sv->si_cache_node;
 	(void) strlcpy(node->od_name, ROOTVOL, sizeof (node->od_name));
-
-	if (fsd_chkcap(&vp->v_vfsp->vfs_fsid, FSOLF_READONLY) > 0)
-		node->flags |= NODE_READ_ONLY;
 
 	smb_llist_constructor(&node->n_ofile_list, sizeof (smb_ofile_t),
 	    offsetof(smb_ofile_t, f_nnd));
@@ -678,30 +666,26 @@ timeval_cmp(timestruc_t *a, timestruc_t *b)
  * smb_node_set_time
  *
  * This function will update the time stored in the node and
- * set the appropriate flags. If there is nothing to update
- * or the node is readonly, the function would return without
- * any updates. The update is only in the node level and the
- * attribute in the file system will be updated when client
- * close the file.
+ * set the appropriate flags. If there is nothing to update,
+ * the function will return without any updates.  The update
+ * is only in the node level and the attribute in the file system
+ * will be updated when client close the file.
  */
 void
 smb_node_set_time(struct smb_node *node, struct timestruc *crtime,
     struct timestruc *mtime, struct timestruc *atime,
     struct timestruc *ctime, unsigned int what)
 {
-	smb_rwx_xenter(&node->n_lock);
-	if (node->flags & NODE_READ_ONLY || what == 0) {
-		smb_rwx_xexit(&node->n_lock);
+	if (what == 0)
 		return;
-	}
 
 	if ((what & SMB_AT_CRTIME && crtime == 0) ||
 	    (what & SMB_AT_MTIME && mtime == 0) ||
 	    (what & SMB_AT_ATIME && atime == 0) ||
-	    (what & SMB_AT_CTIME && ctime == 0)) {
-		smb_rwx_xexit(&node->n_lock);
+	    (what & SMB_AT_CTIME && ctime == 0))
 		return;
-	}
+
+	smb_rwx_xenter(&node->n_lock);
 
 	if ((what & SMB_AT_CRTIME) &&
 	    timeval_cmp((timestruc_t *)&node->attr.sa_crtime,
@@ -808,14 +792,29 @@ smb_node_set_dosattr(smb_node_t *node, uint32_t dosattr)
 }
 
 /*
- * smb_node_get_dosattr
+ * smb_node_get_dosattr()
  *
- * This function will get dos attribute using the node.
+ * This function is used to provide clients with information as to whether
+ * the readonly bit is set.  Hence both the node attribute cache (which
+ * reflects the on-disk attributes) and node->readonly_creator (which
+ * reflects whether a readonly set is pending from a readonly create) are
+ * checked.  In the latter case, the readonly attribute should be visible to
+ * all clients even though the readonly creator fid is immune to the readonly
+ * bit until close.
  */
+
 uint32_t
 smb_node_get_dosattr(smb_node_t *node)
 {
-	return (smb_mode_to_dos_attributes(&node->attr));
+	uint32_t dosattr = node->attr.sa_dosattr;
+
+	if (node->readonly_creator)
+		dosattr |= FILE_ATTRIBUTE_READONLY;
+
+	if (!dosattr)
+		dosattr = FILE_ATTRIBUTE_NORMAL;
+
+	return (dosattr);
 }
 
 int

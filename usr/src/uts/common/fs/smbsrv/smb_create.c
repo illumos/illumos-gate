@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_create.c	1.7	08/08/08 SMI"
 
 #include <smbsrv/smb_incl.h>
 
@@ -184,7 +184,8 @@ smb_common_create(smb_request_t *sr)
 	struct open_param *op = &sr->arg.open;
 	uint32_t status;
 
-	op->crtime.tv_sec = smb_local2gmt(sr, op->crtime.tv_sec);
+	if ((op->crtime.tv_sec != 0) && (op->crtime.tv_sec != UINT_MAX))
+		op->crtime.tv_sec = smb_local2gmt(sr, op->crtime.tv_sec);
 	op->crtime.tv_nsec = 0;
 	op->omode = SMB_DA_ACCESS_READ_WRITE | SMB_DA_SHARE_COMPATIBILITY;
 	op->desired_access = smb_omode_to_amask(op->omode);

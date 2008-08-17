@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_find.c	1.7	08/07/30 SMI"
 
 #include <smbsrv/smb_incl.h>
 
@@ -228,12 +228,15 @@ smb_com_find(smb_request_t *sr)
 	int			rc;
 	unsigned short		sattr, count, maxcount;
 	char			*path;
-	char			filename[14];
+	unsigned char		resume_char;
+	uint32_t		client_key;
+	uint16_t		index;
 	uint32_t		cookie;
 	struct smb_node		*node;
 	unsigned char		type;
 	unsigned short		key_len;
-	smb_odir_context_t *pc;
+	smb_odir_context_t	*pc;
+	boolean_t		find_first = B_TRUE;
 
 	if (smbsr_decode_vwv(sr, "ww", &maxcount, &sattr) != 0)
 		return (SDRC_ERROR);
@@ -248,8 +251,8 @@ smb_com_find(smb_request_t *sr)
 		cookie = 0;
 	} else if (key_len == 21) {
 		sr->smb_sid = 0;
-		if (smb_mbc_decodef(&sr->smb_data, SMB_RESUME_KEY_FMT,
-		    filename, &sr->smb_sid, &cookie) != 0) {
+		if (smb_mbc_decodef(&sr->smb_data, "b12.wwl",
+		    &resume_char, &index, &sr->smb_sid, &client_key) != 0) {
 			/* We don't know which rdir to close */
 			return (SDRC_ERROR);
 		}
@@ -262,7 +265,9 @@ smb_com_find(smb_request_t *sr)
 			return (SDRC_ERROR);
 		}
 
-		cookie--;			/* +1 when returned */
+		cookie = sr->sid_odir->d_cookies[index];
+		if (cookie != 0)
+			find_first = B_FALSE;
 	} else {
 		/* We don't know which rdir to close */
 		return (SDRC_ERROR);
@@ -272,23 +277,33 @@ smb_com_find(smb_request_t *sr)
 
 	pc = kmem_zalloc(sizeof (smb_odir_context_t), KM_SLEEP);
 	pc->dc_cookie = cookie;
+	index = 0;
 	count = 0;
 	node = NULL;
 	rc = 0;
+
+	if (maxcount > SMB_MAX_SEARCH)
+		maxcount = SMB_MAX_SEARCH;
 
 	while (count < maxcount) {
 		if ((rc = smb_rdir_next(sr, &node, pc)) != 0)
 			break;
 
-		(void) smb_mbc_encodef(&sr->reply, ".8c3cbl4.bYl13c",
-		    pc->dc_name83, pc->dc_name83+9, sr->smb_sid,
-		    pc->dc_cookie+1, pc->dc_dattr,
+		(void) smb_mbc_encodef(&sr->reply, "b8c3c.wwlbYl13c",
+		    resume_char,
+		    pc->dc_name83, pc->dc_name83+9,
+		    index, sr->smb_sid, client_key,
+		    pc->dc_dattr & 0xff,
 		    smb_gmt2local(sr, pc->dc_attr.sa_vattr.va_mtime.tv_sec),
 		    (int32_t)smb_node_get_size(node, &pc->dc_attr),
-		    (*pc->dc_shortname) ? pc->dc_shortname : pc->dc_name);
+		    (*pc->dc_shortname) ? pc->dc_shortname :
+		    pc->dc_name);
+
 		smb_node_release(node);
 		node = NULL;
+		sr->sid_odir->d_cookies[index] = pc->dc_cookie;
 		count++;
+		index++;
 	}
 
 	kmem_free(pc, sizeof (smb_odir_context_t));
@@ -300,9 +315,10 @@ smb_com_find(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	if (count == 0) {
+	if (count == 0 && find_first) {
 		smb_rdir_close(sr);
-		smbsr_error(sr, 0, ERRDOS, ERRnofiles);
+		smbsr_warn(sr, NT_STATUS_NO_MORE_FILES,
+		    ERRDOS, ERROR_NO_MORE_FILES);
 		return (SDRC_ERROR);
 	}
 
@@ -412,8 +428,9 @@ smb_com_find_close(smb_request_t *sr)
 {
 	unsigned short		sattr, maxcount;
 	char			*path;
-	char			filename[14];
-	uint32_t		cookie;
+	unsigned char		resume_char;
+	uint32_t		resume_key;
+	uint16_t		index;
 	unsigned char		type;
 	unsigned short		key_len;
 	int			rc;
@@ -432,8 +449,8 @@ smb_com_find_close(smb_request_t *sr)
 
 	if (key_len == 21) {
 		sr->smb_sid = 0;
-		if (smb_mbc_decodef(&sr->smb_data, SMB_RESUME_KEY_FMT,
-		    filename, &sr->smb_sid, &cookie) != 0) {
+		if (smb_mbc_decodef(&sr->smb_data, "b12.wwl",
+		    &resume_char, &index, &sr->smb_sid, &resume_key) != 0) {
 			return (SDRC_ERROR);
 		}
 
@@ -444,8 +461,6 @@ smb_com_find_close(smb_request_t *sr)
 			    ERRDOS, ERRbadfid);
 			return (SDRC_ERROR);
 		}
-
-		cookie--;		/* +1 when returned */
 	} else {
 		return (SDRC_ERROR);
 	}

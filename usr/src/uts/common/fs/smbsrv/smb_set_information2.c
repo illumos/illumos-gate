@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_set_information2.c	1.5	08/08/08 SMI"
 
 /*
  * SMB: set_information2
@@ -73,16 +73,14 @@ smb_post_set_information2(smb_request_t *sr)
 smb_sdrc_t
 smb_com_set_information2(smb_request_t *sr)
 {
-	unsigned short		la_ddate, la_dtime;
-	unsigned short		lw_ddate, lw_dtime;
-	unsigned short		cr_ddate, cr_dtime;
+	uint32_t creation, last_access, last_write;  /* times */
 	timestruc_t		crtime, mtime, atime;
 	unsigned int 		what = 0;
 	struct smb_node		*node;
 	int			rc;
 
-	rc = smbsr_decode_vwv(sr, "wwwwwww", &sr->smb_fid, &cr_ddate, &cr_dtime,
-	    &la_ddate, &la_dtime, &lw_ddate, &lw_dtime);
+	rc = smbsr_decode_vwv(sr, "wyyy", &sr->smb_fid,
+	    &creation, &last_access, &last_write);
 	if (rc != 0)
 		return (SDRC_ERROR);
 
@@ -99,23 +97,25 @@ smb_com_set_information2(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
+	/*
+	 * The behaviour when the time field is set to -1
+	 * is not documented but is generally treated like 0,
+	 * meaning that that server file system assigned value
+	 * need not be changed.
+	 */
 	crtime.tv_nsec = mtime.tv_nsec = atime.tv_nsec = 0;
-
-	if (cr_ddate || cr_dtime) {
-		crtime.tv_sec = smb_local2gmt(sr,
-		    dosfs_dos_to_ux_time(cr_ddate, cr_dtime));
-		what |= SMB_AT_CRTIME;
-	}
-
-	if (lw_ddate || lw_dtime) {
-		mtime.tv_sec = smb_local2gmt(sr,
-		    dosfs_dos_to_ux_time(lw_ddate, lw_dtime));
+	if (last_write != 0 && last_write != UINT_MAX) {
+		mtime.tv_sec = smb_local2gmt(sr, last_write);
 		what |= SMB_AT_MTIME;
 	}
 
-	if (la_ddate || la_dtime) {
-		atime.tv_sec = smb_local2gmt(sr,
-		    dosfs_dos_to_ux_time(la_ddate, la_dtime));
+	if (creation != 0 && creation != UINT_MAX) {
+		crtime.tv_sec = smb_local2gmt(sr, creation);
+		what |= SMB_AT_CRTIME;
+	}
+
+	if (last_access != 0 && last_access != UINT_MAX) {
+		atime.tv_sec = smb_local2gmt(sr, last_access);
 		what |= SMB_AT_ATIME;
 	}
 

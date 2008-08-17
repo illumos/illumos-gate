@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smbd_door_ops.c	1.6	08/07/16 SMI"
 
 /*
  * SMBd door operations
@@ -58,6 +58,8 @@ static char *smb_dop_lookup_name(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
 static char *smb_dop_join(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
+static char *smb_dop_get_dcinfo(char *argp, size_t arg_size,
+    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
 
 /* SMB daemon's door operation table */
 smb_dr_op_t smb_doorsrv_optab[] =
@@ -70,6 +72,7 @@ smb_dr_op_t smb_doorsrv_optab[] =
 	smb_dop_lookup_sid,
 	smb_dop_lookup_name,
 	smb_dop_join,
+	smb_dop_get_dcinfo,
 };
 
 /*ARGSUSED*/
@@ -408,5 +411,30 @@ smb_dop_join(char *argp, size_t arg_size,
 		*rbufsize = 0;
 	}
 
+	return (rbuf);
+}
+
+/*ARGSUSED*/
+static char *
+smb_dop_get_dcinfo(char *argp, size_t arg_size,
+    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
+{
+	char *rbuf = NULL;
+	smb_ntdomain_t *ret_ntdomain_info = NULL;
+
+	*err = SMB_DR_OP_SUCCESS;
+	*rbufsize = 0;
+
+	ret_ntdomain_info = smb_getdomaininfo(0);
+	if (ret_ntdomain_info == NULL) {
+		*err = SMB_DR_OP_ERR_EMPTYBUF;
+		return (NULL);
+	}
+
+	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, ret_ntdomain_info,
+	    xdr_smb_dr_domain_t, rbufsize)) == NULL) {
+		*err = SMB_DR_OP_ERR_ENCODE;
+		*rbufsize = 0;
+	}
 	return (rbuf);
 }

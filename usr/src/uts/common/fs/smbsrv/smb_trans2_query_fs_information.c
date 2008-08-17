@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_trans2_query_fs_information.c	1.7	08/08/07 SMI"
 
 /*
  * SMB: trans2_query_fs_information
@@ -240,6 +240,11 @@ char ntfs[] = "NTFS";
 
 /*
  * smb_com_trans2_query_fs_information
+ *
+ * The fsid provides a system-wide unique file system ID.
+ * fsid.val[0] is the 32-bit dev for the file system of the share root
+ * smb_node.
+ * fsid.val[1] is the file system type.
  */
 smb_sdrc_t
 smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
@@ -251,12 +256,15 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 	unsigned short		infolev;
 	struct statvfs64	df;
 	int			sect_per_unit, length;
-	uint32_t 		total_units, avail_units;
-	struct smb_node 	*snode;
+	uint32_t		total_units, avail_units;
+	smb_tree_t		*tree;
+	smb_node_t		*snode;
 	char 			*fsname = "NTFS";
-	fsvol_attr_t		vol_attr;
+	fsid_t			fsid;
 
-	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
+	tree = sr->tid_tree;
+
+	if (!STYPE_ISDSK(tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRDOS, ERRnoaccess);
 		return (SDRC_ERROR);
 	}
@@ -264,11 +272,8 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 	if (smb_mbc_decodef(&xa->req_param_mb, "w", &infolev) != 0)
 		return (SDRC_ERROR);
 
-	snode = sr->tid_tree->t_snode;
-	if (fsd_getattr(&sr->tid_tree->t_fsd, &vol_attr) != 0) {
-		smbsr_errno(sr, ESTALE);
-		return (SDRC_ERROR);
-	}
+	snode = tree->t_snode;
+	fsid = SMB_NODE_FSID(snode);
 
 	switch (infolev) {
 	case SMB_INFO_ALLOCATION:
@@ -302,27 +307,20 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 		break;
 
 	case SMB_INFO_VOLUME:
-		length = strlen(vol_attr.name);
+		length = strlen(tree->t_volume);
 		encode_str = "%lbs";
-		/*
-		 * tree_fsd.val[0] is the 32-bit dev for the file system
-		 * of the share's root smb_node.
-		 *
-		 * Together with tree_fsd.val[1] (the file system type), it
-		 * comprises a system-wide unique file system ID.
-		 */
 
 		(void) smb_mbc_encodef(&xa->rep_data_mb, encode_str, sr,
-		    snode->tree_fsd.val[0], length, vol_attr.name);
+		    fsid.val[0], length, tree->t_volume);
 		break;
 
 	case SMB_QUERY_FS_VOLUME_INFO:
 		if ((sr->smb_flg2 & SMB_FLAGS2_UNICODE) ||
 		    (sr->session->native_os == NATIVE_OS_WIN95)) {
-			length = mts_wcequiv_strlen(vol_attr.name);
+			length = mts_wcequiv_strlen(tree->t_volume);
 			encode_str = "%qllb.U";
 		} else {
-			length = strlen(vol_attr.name);	/* label length */
+			length = strlen(tree->t_volume);
 			encode_str = "%qllb.s";
 		}
 
@@ -330,20 +328,12 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 		 * NT has the "supports objects" flag set to 1.
 		 */
 
-		/*
-		 * tree_fsd.val[0] is the 32-bit dev for the file system
-		 * of the share's root smb_node.
-		 *
-		 * Together with tree_fsd.val[1] (the file system type), it
-		 * comprises a system-wide unique file system ID.
-		 */
-
 		(void) smb_mbc_encodef(&xa->rep_data_mb, encode_str, sr,
 		    0ll,			/* Volume creation time */
-		    snode->tree_fsd.val[0],	/* Volume serial number */
+		    fsid.val[0],		/* Volume serial number */
 		    length,			/* label length */
 		    0,				/* Supports objects */
-		    vol_attr.name);
+		    tree->t_volume);
 		break;
 
 	case SMB_QUERY_FS_SIZE_INFO:
@@ -387,13 +377,13 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 		flags = FILE_CASE_PRESERVED_NAMES;
 		/* flags |= FILE_UNICODE_ON_DISK; */
 
-		if (vol_attr.flags & FSOLF_SUPPORTS_ACLS)
+		if (tree->t_flags & SMB_TREE_SUPPORTS_ACLS)
 			flags |= FILE_PERSISTENT_ACLS;
 
-		if ((vol_attr.flags & FSOLF_CASE_INSENSITIVE) == 0)
+		if ((tree->t_flags & SMB_TREE_CASEINSENSITIVE) == 0)
 			flags |= FILE_CASE_SENSITIVE_SEARCH;
 
-		if (vol_attr.flags & FSOLF_STREAMS)
+		if (tree->t_flags & SMB_TREE_STREAMS)
 			flags |= FILE_NAMED_STREAMS;
 
 		if (smb_announce_quota)

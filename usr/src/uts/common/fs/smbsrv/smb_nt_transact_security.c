@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_nt_transact_security.c	1.9	08/08/07 SMI"
 
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/ntstatus.h>
@@ -183,7 +183,7 @@ smb_nt_transact_set_security_info(struct smb_request *sr, struct smb_xa *xa)
 		return (SDRC_ERROR);
 	}
 
-	if (sr->fid_ofile->f_node->flags & NODE_READ_ONLY) {
+	if (SMB_TREE_IS_READONLY(sr)) {
 		smbsr_error(sr, NT_STATUS_MEDIA_WRITE_PROTECTED, 0, 0);
 		return (SDRC_ERROR);
 	}

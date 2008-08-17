@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_close.c	1.6	08/08/08 SMI"
 
 #include <smbsrv/smb_incl.h>
 
@@ -59,22 +59,18 @@ smb_post_close(smb_request_t *sr)
 smb_sdrc_t
 smb_com_close(smb_request_t *sr)
 {
-	int rc;
-
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
 	}
 
-	rc = smb_common_close(sr, sr->arg.timestamp);
-	if (rc) {
-		smbsr_errno(sr, rc);
-		return (SDRC_ERROR);
-	}
+	smb_ofile_close(sr->fid_ofile, sr->arg.timestamp);
 
-	rc = smbsr_encode_empty_result(sr);
-	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+	if (smbsr_encode_empty_result(sr) != 0)
+		return (SDRC_ERROR);
+
+	return (SDRC_SUCCESS);
 }
 
 /*
@@ -101,37 +97,20 @@ smb_post_close_and_tree_disconnect(smb_request_t *sr)
 smb_sdrc_t
 smb_com_close_and_tree_disconnect(smb_request_t *sr)
 {
-	int rc;
-
 	sr->fid_ofile = smb_ofile_lookup_by_fid(sr->tid_tree, sr->smb_fid);
 	if (sr->fid_ofile == NULL) {
 		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
 		return (SDRC_ERROR);
 	}
 
-	rc = smb_common_close(sr, sr->arg.timestamp);
-	smbsr_rq_notify(sr, sr->session, sr->tid_tree);
+	smb_ofile_close(sr->fid_ofile, sr->arg.timestamp);
+	smb_session_cancel_requests(sr->session, sr->tid_tree, sr);
 	smb_tree_disconnect(sr->tid_tree);
 
-	if (rc) {
-		smbsr_errno(sr, rc);
+	if (smbsr_encode_empty_result(sr) != 0)
 		return (SDRC_ERROR);
-	}
 
-	rc = smbsr_encode_empty_result(sr);
-	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
-}
-
-/*
- * smb_common_close
- *
- * Common close function called by SmbClose, SmbWriteAndClose,
- * and SMBCloseAndTreeDisconnect.
- */
-int
-smb_common_close(smb_request_t *sr, uint32_t last_wtime)
-{
-	return (smb_ofile_close(sr->fid_ofile, last_wtime));
+	return (SDRC_SUCCESS);
 }
 
 /*

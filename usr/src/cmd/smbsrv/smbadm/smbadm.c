@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smbadm.c	1.9	08/07/30 SMI"
 
 /*
  * This module contains smbadm CLI which offers smb configuration
@@ -39,6 +39,7 @@
 #include <zone.h>
 #include <grp.h>
 #include <libgen.h>
+#include <netinet/in.h>
 
 #include <smbsrv/libsmb.h>
 
@@ -60,6 +61,11 @@ typedef enum {
 #define	SMBADM_CMDF_USER	0x01
 #define	SMBADM_CMDF_GROUP	0x02
 #define	SMBADM_CMDF_TYPEMASK	0x0F
+
+#define	SMBADM_CHANGE_SECMODE	1
+#define	SMBADM_CHANGE_DOMAIN	2
+
+#define	SMBADM_ANSBUFSIZ	64
 
 typedef struct smbadm_cmdinfo {
 	char *name;
@@ -275,6 +281,115 @@ smbadm_usage(boolean_t requested)
 }
 
 /*
+ * smbadm_strcasecmplist
+ *
+ * Find a string 's' within a list of strings.
+ *
+ * Returns the index of the matching string or -1 if there is no match.
+ */
+static int
+smbadm_strcasecmplist(const char *s, ...)
+{
+	va_list ap;
+	char *p;
+	int ndx;
+
+	va_start(ap, s);
+
+	for (ndx = 0; ((p = va_arg(ap, char *)) != NULL); ++ndx) {
+		if (strcasecmp(s, p) == 0) {
+			va_end(ap);
+			return (ndx);
+		}
+	}
+
+	va_end(ap);
+	return (-1);
+}
+
+/*
+ * smbadm_answer_prompt
+ *
+ * Prompt for the answer to a question.  A default response must be
+ * specified, which will be used if the user presses <enter> without
+ * answering the question.
+ */
+static int
+smbadm_answer_prompt(const char *prompt, char *answer, const char *dflt)
+{
+	char buf[SMBADM_ANSBUFSIZ];
+	char *p;
+
+	(void) printf(gettext("%s [%s]: "), prompt, dflt);
+
+	if (fgets(buf, SMBADM_ANSBUFSIZ, stdin) == NULL)
+		return (-1);
+
+	if ((p = strchr(buf, '\n')) != NULL)
+		*p = '\0';
+
+	if (*buf == '\0')
+		(void) strlcpy(answer, dflt, SMBADM_ANSBUFSIZ);
+	else
+		(void) strlcpy(answer, buf, SMBADM_ANSBUFSIZ);
+
+	return (0);
+}
+
+/*
+ * smbadm_confirm
+ *
+ * Ask a question that requires a yes/no answer.
+ * A default response must be specified.
+ */
+static boolean_t
+smbadm_confirm(const char *prompt, const char *dflt)
+{
+	char buf[SMBADM_ANSBUFSIZ];
+
+	for (;;) {
+		if (smbadm_answer_prompt(prompt, buf, dflt) < 0)
+			return (B_FALSE);
+
+		if (smbadm_strcasecmplist(buf, "n", "no", 0) >= 0)
+			return (B_FALSE);
+
+		if (smbadm_strcasecmplist(buf, "y", "yes", 0) >= 0)
+			return (B_TRUE);
+
+		(void) printf(gettext("Please answer yes or no.\n"));
+	}
+}
+
+static boolean_t
+smbadm_join_prompt(char *curdom, int prmpt_type)
+{
+	boolean_t ret = B_FALSE;
+
+	switch (prmpt_type) {
+
+		case SMBADM_CHANGE_SECMODE:
+			(void) printf(gettext("This operation requires that "
+			    "the service be restarted.\n"));
+			ret = smbadm_confirm(
+			    "Would you like to continue ?", "no");
+			break;
+
+		case SMBADM_CHANGE_DOMAIN:
+			(void) printf(gettext("This system has already "
+			    "joined to '%s' domain.\n"), curdom);
+			ret = smbadm_confirm(
+			    "Would you like to join the new domain ?", "no");
+			break;
+
+		default:
+			break;
+	}
+
+	return (ret);
+}
+
+/*
  * smbadm_join
  *
  * Join the given domain/workgroup
@@ -286,6 +401,7 @@ smbadm_join(int argc, char **argv)
 	smb_joininfo_t jdi;
 	boolean_t join_w = B_FALSE;
 	boolean_t join_d = B_FALSE;
+	boolean_t mode_change = B_FALSE;
 	uint32_t status;
 	char curdom[MAXHOSTNAMELEN];
 
@@ -336,9 +452,25 @@ smbadm_join(int argc, char **argv)
 		smbadm_usage(B_FALSE);
 	}
 
+	if (smb_config_get_secmode() != jdi.mode)
+		mode_change = B_TRUE;
+
 	if (join_w) {
+
+		if (mode_change)
+			if (!smbadm_join_prompt(NULL, SMBADM_CHANGE_SECMODE))
+				return (0);
+
 		status = smb_join(&jdi);
 		if (status == NT_STATUS_SUCCESS) {
+
+			if (mode_change)
+				if (smb_smf_restart_service() != 0)
+					(void) fprintf(stderr, gettext(
+					    "Unable to restart smb service. "
+					    "Run 'svcs -xv smb/server' for "
+					    "more information."));
+
 			(void) printf(
 			    gettext("Successfully joined workgroup '%s'\n"),
 			    jdi.domain_name);
@@ -356,19 +488,14 @@ smbadm_join(int argc, char **argv)
 		(void) smb_getdomainname(curdom, MAXHOSTNAMELEN);
 		if (*curdom != 0 && strncasecmp(curdom, jdi.domain_name,
 		    strlen(curdom))) {
-			char reply[8];
-
-			(void) printf(gettext("This system has already "
-			    "joined to '%s' domain.\n"
-			    "Would you like to join the new domain "
-			    "[yes/no]? "),
-			    curdom);
-			(void) scanf("%8s", reply);
-			(void) trim_whitespace(reply);
-			if (strncasecmp(reply, "yes", 3) != 0)
+			if (!smbadm_join_prompt(curdom, SMBADM_CHANGE_DOMAIN))
 				return (0);
 		}
 	}
+
+	if (mode_change)
+		if (!smbadm_join_prompt(NULL, SMBADM_CHANGE_SECMODE))
+			return (0);
 
 	/* Join the domain */
 	if (*jdi.domain_passwd == '\0') {
@@ -391,6 +518,14 @@ smbadm_join(int argc, char **argv)
 
 	switch (status) {
 	case NT_STATUS_SUCCESS:
+
+		if (mode_change)
+			if (smb_smf_restart_service() != 0)
+				(void) fprintf(stderr, gettext(
+				    "Unable to restart smb service. "
+				    "Run 'svcs -xv smb/server' for "
+				    "more information."));
+
 		(void) printf(gettext("Successfully joined domain '%s'\n"),
 		    jdi.domain_name);
 
@@ -423,23 +558,36 @@ smbadm_list(int argc, char **argv)
 	char domain[MAXHOSTNAMELEN];
 	char modename[16];
 	int rc;
+	char ipstr[INET6_ADDRSTRLEN];
+	smb_ntdomain_t domain_info;
 
 	rc = smb_config_getstr(SMB_CI_SECURITY, modename, sizeof (modename));
 	if (rc != SMBD_SMF_OK) {
 		(void) fprintf(stderr,
-		    gettext("failed to get the security mode\n"));
+		    gettext("failed to get the connected mode\n"));
 		return (1);
 	}
-
-	(void) printf(gettext("security mode: %s\n"), modename);
 
 	if (smb_getdomainname(domain, sizeof (domain)) != 0) {
 		(void) fprintf(stderr, gettext("failed to get the %s name\n"),
 		    modename);
 		return (1);
 	}
+	if (strcmp(modename, "workgroup") == 0) {
+		(void) printf(gettext("Workgroup: %s\n"), domain);
+		return (0);
+	}
+	(void) printf(gettext("Domain: %s\n"), domain);
 
-	(void) printf(gettext("%s name: %s\n"), modename, domain);
+	bzero(&domain_info, sizeof (smb_ntdomain_t));
+	if ((smb_get_dcinfo(&domain_info) == NT_STATUS_SUCCESS) &&
+	    (*domain_info.domain != '\0') && (domain_info.ipaddr != 0)) {
+		(void) inet_ntop(AF_INET, (const void *)&domain_info.ipaddr,
+		    ipstr, sizeof (ipstr));
+		(void) printf(gettext("Selected Domain Controller: %s (%s)\n"),
+		    domain_info.server, ipstr);
+	}
+
 	return (0);
 }
 

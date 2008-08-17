@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)libshare_smb.c	1.16	08/08/05 SMI"
 
 /*
  * SMB specific functions
@@ -82,6 +82,9 @@ static int smb_enable_resource(sa_resource_t);
 static int smb_disable_resource(sa_resource_t);
 static uint64_t smb_share_features(void);
 static int smb_list_transient(sa_handle_t);
+
+static int smb_build_shareinfo(sa_share_t, sa_resource_t, smb_share_t *);
+static sa_group_t smb_get_defaultgrp(sa_handle_t);
 
 /* size of basic format allocation */
 #define	OPT_CHUNK	1024
@@ -151,7 +154,6 @@ struct option_defs optdefs[] = {
  * Lookup option "name" in the option table and return the table
  * index.
  */
-
 static int
 findopt(char *name)
 {
@@ -170,28 +172,28 @@ findopt(char *name)
  *
  * is the string a number in one of the forms we want to use?
  */
-
-static int
+static boolean_t
 is_a_number(char *number)
 {
-	int ret = 1;
-	int hex = 0;
+	boolean_t isnum = B_TRUE;
+	boolean_t ishex = B_FALSE;
 
-	if (strncmp(number, "0x", 2) == 0) {
+	if (number == NULL || *number == '\0')
+		return (B_FALSE);
+
+	if (strncasecmp(number, "0x", 2) == 0) {
 		number += 2;
-		hex = 1;
+		ishex = B_TRUE;
 	} else if (*number == '-') {
-		number++; /* skip the minus */
+		number++;
 	}
 
-	while (ret == 1 && *number != '\0') {
-		if (hex) {
-			ret = isxdigit(*number++);
-		} else {
-			ret = isdigit(*number++);
-		}
+	while (isnum && (*number != '\0')) {
+		isnum = (ishex) ? isxdigit(*number) : isdigit(*number);
+		number++;
 	}
-	return (ret);
+
+	return (isnum);
 }
 
 /*
@@ -202,7 +204,7 @@ is_a_number(char *number)
  *	" / \ [ ] : | < > + ; , ? * = \t
  * Note that space is included and there is a maximum length.
  */
-static int
+static boolean_t
 validresource(const char *name)
 {
 	const char *cp;
@@ -318,7 +320,6 @@ static int
 smb_enable_share(sa_share_t share)
 {
 	char *path;
-	char *rname;
 	smb_share_t si;
 	sa_resource_t resource;
 	boolean_t iszfs;
@@ -410,18 +411,14 @@ smb_enable_share(sa_share_t share)
 	for (resource = sa_get_share_resource(share, NULL);
 	    resource != NULL;
 	    resource = sa_get_next_resource(resource)) {
-		bzero(&si, sizeof (smb_share_t));
-		rname = sa_get_resource_attr(resource, "name");
-		if (rname == NULL) {
+		err = smb_build_shareinfo(share, resource, &si);
+		if (err != SA_OK) {
 			sa_free_attr_string(path);
-			return (SA_NO_SUCH_RESOURCE);
+			return (err);
 		}
 
-		smb_build_lmshare_info(rname, path, resource, &si);
-		sa_free_attr_string(rname);
-
 		if (!iszfs) {
-			err = smb_share_add(&si);
+			err = smb_share_create(&si);
 		} else {
 			share_t sh;
 
@@ -450,8 +447,6 @@ done:
 static int
 smb_enable_resource(sa_resource_t resource)
 {
-	char *path;
-	char *rname;
 	sa_share_t share;
 	smb_share_t si;
 	int ret = SA_OK;
@@ -467,27 +462,17 @@ smb_enable_resource(sa_resource_t resource)
 	 */
 	isonline = smb_isonline();
 	if (!isonline && !smb_isautoenable() && smb_isdisabled())
-		goto done;
+		return (SA_OK);
 
-	if (!isonline)
-		ret = smb_enable_service();
-	if (!smb_isonline()) {
-		ret = SA_OK;
-		goto done;
+	if (!isonline) {
+		(void) smb_enable_service();
+
+		if (!smb_isonline())
+			return (SA_OK);
 	}
 
-	path = sa_get_share_attr(share, "path");
-	if (path == NULL)
-		return (SA_SYSTEM_ERR);
-	rname = sa_get_resource_attr(resource, "name");
-	if (rname == NULL) {
-		sa_free_attr_string(path);
-		return (SA_NO_SUCH_RESOURCE);
-	}
-
-	smb_build_lmshare_info(rname, path, resource, &si);
-	sa_free_attr_string(path);
-	sa_free_attr_string(rname);
+	if ((ret = smb_build_shareinfo(share, resource, &si)) != SA_OK)
+		return (ret);
 
 	/*
 	 * Attempt to add the share. Any error that occurs if it was
@@ -496,15 +481,13 @@ smb_enable_resource(sa_resource_t resource)
 	 * service up will enable the share that was just added prior
 	 * to the attempt to enable.
 	 */
-
-	err = smb_share_add(&si);
+	err = smb_share_create(&si);
 	if (err == NERR_Success || !(!isonline && err == NERR_DuplicateName))
 		(void) sa_update_sharetab(share, "smb");
 	else
 		return (SA_NOT_SHARED);
 
-done:
-	return (ret);
+	return (SA_OK);
 }
 
 /*
@@ -522,7 +505,7 @@ smb_disable_resource(sa_resource_t resource)
 		return (SA_NO_SUCH_RESOURCE);
 
 	if (smb_isonline()) {
-		res = smb_share_del(rname);
+		res = smb_share_delete(rname);
 		if (res != NERR_Success) {
 			sa_free_attr_string(rname);
 			return (SA_CONFIG_ERR);
@@ -560,10 +543,14 @@ smb_share_changed(sa_share_t share)
 	char *path;
 	sa_resource_t resource;
 
+	if (!smb_isonline())
+		return (SA_OK);
+
 	/* get the path since it is important in several places */
 	path = sa_get_share_attr(share, "path");
 	if (path == NULL)
 		return (SA_NO_SUCH_PATH);
+
 	for (resource = sa_get_share_resource(share, NULL);
 	    resource != NULL;
 	    resource = sa_get_next_resource(resource))
@@ -583,50 +570,23 @@ static int
 smb_resource_changed(sa_resource_t resource)
 {
 	uint32_t res;
-	smb_share_t si;
-	smb_share_t new_si;
-	char *rname, *path;
 	sa_share_t share;
+	smb_share_t si;
 
-	rname = sa_get_resource_attr(resource, "name");
-	if (rname == NULL)
-		return (SA_NO_SUCH_RESOURCE);
-
-	share = sa_get_resource_parent(resource);
-	if (share == NULL) {
-		sa_free_attr_string(rname);
-		return (SA_CONFIG_ERR);
-	}
-
-	path = sa_get_share_attr(share, "path");
-	if (path == NULL) {
-		sa_free_attr_string(rname);
-		return (SA_NO_SUCH_PATH);
-	}
-
-	if (!smb_isonline()) {
-		sa_free_attr_string(rname);
+	if (!smb_isonline())
 		return (SA_OK);
-	}
 
-	/* Update the share cache in smb/server */
-	res = smb_share_get(rname, &si);
-	if (res != NERR_Success) {
-		sa_free_attr_string(path);
-		sa_free_attr_string(rname);
+	if ((share = sa_get_resource_parent(resource)) == NULL)
 		return (SA_CONFIG_ERR);
-	}
 
-	smb_build_lmshare_info(rname, path, resource, &new_si);
-	sa_free_attr_string(path);
-	sa_free_attr_string(rname);
+	if ((res = smb_build_shareinfo(share, resource, &si)) != SA_OK)
+		return (res);
 
-	/*
-	 * Update all fields from sa_share_t
-	 * Get derived values.
-	 */
-	if (smb_share_set(&new_si) != SMB_SHARE_DSUCCESS)
+	res = smb_share_modify(si.shr_name, si.shr_cmnt, si.shr_container);
+
+	if (res != NERR_Success)
 		return (SA_CONFIG_ERR);
+
 	return (smb_enable_service());
 }
 
@@ -670,7 +630,7 @@ smb_disable_share(sa_share_t share, char *path)
 			continue;
 		}
 		if (!iszfs) {
-			err = smb_share_del(rname);
+			err = smb_share_delete(rname);
 			switch (err) {
 			case NERR_NetNameNotFound:
 			case NERR_Success:
@@ -1055,14 +1015,10 @@ smb_load_proto_properties()
 static int
 smb_share_init(void)
 {
-	int ret = SA_OK;
-
 	if (sa_plugin_ops.sa_init != smb_share_init)
 		return (SA_SYSTEM_ERR);
 
-	ret = smb_load_proto_properties();
-
-	return (ret);
+	return (smb_load_proto_properties());
 }
 
 /*
@@ -1373,12 +1329,12 @@ smb_share_features(void)
 }
 
 /*
- * This should be used to convert lmshare_info to sa_resource_t
- * Should only be needed to build temp shares/resources to be
- * supplied to sharemanager to display temp shares.
+ * This should be used to convert smb_share_t to sa_resource_t
+ * Should only be needed to build transient shares/resources to be
+ * supplied to sharemgr to display.
  */
 static int
-smb_build_tmp_sa_resource(sa_handle_t handle, smb_share_t *si)
+smb_add_transient(sa_handle_t handle, smb_share_t *si)
 {
 	int err;
 	sa_share_t share;
@@ -1388,20 +1344,10 @@ smb_build_tmp_sa_resource(sa_handle_t handle, smb_share_t *si)
 	if (si == NULL)
 		return (SA_INVALID_NAME);
 
-	/*
-	 * First determine if the "share path" is already shared
-	 * somewhere. If it is, we have to use it as the authority on
-	 * where the transient share lives so will use it's parent
-	 * group. If it doesn't exist, it needs to land in "smb".
-	 */
-
-	share = sa_find_share(handle, si->shr_path);
-	if (share != NULL) {
-		group = sa_get_parent_group(share);
-	} else {
-		group = smb_get_smb_share_group(handle);
-		if (group == NULL)
+	if ((share = sa_find_share(handle, si->shr_path)) == NULL) {
+		if ((group = smb_get_defaultgrp(handle)) == NULL)
 			return (SA_NO_SUCH_GROUP);
+
 		share = sa_get_share(group, si->shr_path);
 		if (share == NULL) {
 			share = sa_add_share(group, si->shr_path,
@@ -1432,33 +1378,29 @@ smb_build_tmp_sa_resource(sa_handle_t handle, smb_share_t *si)
 }
 
 /*
- * Return smb transient shares.  Note that we really want to look at
- * all current shares from SMB in order to determine this. Transient
- * shares should be those that don't appear in either the SMF or ZFS
- * configurations.  Those that are in the repositories will be
- * filtered out by smb_build_tmp_sa_resource.
+ * Return smb transient shares.
  */
 static int
 smb_list_transient(sa_handle_t handle)
 {
-	int i, offset, num;
+	int i, offset;
 	smb_shrlist_t list;
 	int res;
 
-	num = smb_share_count();
-	if (num <= 0)
+	if (smb_share_count() <= 0)
 		return (SA_OK);
+
 	offset = 0;
-	while (smb_share_list(offset, &list) != NERR_InternalError) {
-		if (list.no == 0)
+	while (smb_share_list(offset, &list) == NERR_Success) {
+		if (list.sl_cnt == 0)
 			break;
-		for (i = 0; i < list.no; i++) {
-			res = smb_build_tmp_sa_resource(handle,
-			    &(list.smbshr[i]));
+
+		for (i = 0; i < list.sl_cnt; i++) {
+			res = smb_add_transient(handle, &(list.sl_shares[i]));
 			if (res != SA_OK)
 				return (res);
 		}
-		offset += list.no;
+		offset += list.sl_cnt;
 	}
 
 	return (SA_OK);
@@ -1841,11 +1783,14 @@ smb_rename_resource(sa_handle_t handle, sa_resource_t resource, char *newname)
 	int err;
 	char *oldname;
 
+	if (!smb_isonline())
+		return (SA_OK);
+
 	oldname = sa_get_resource_attr(resource, "name");
 	if (oldname == NULL)
 		return (SA_NO_SUCH_RESOURCE);
 
-	err = smb_share_ren(oldname, newname);
+	err = smb_share_rename(oldname, newname);
 
 	/* improve error values somewhat */
 	switch (err) {
@@ -1863,4 +1808,89 @@ smb_rename_resource(sa_handle_t handle, sa_resource_t resource, char *newname)
 	}
 
 	return (ret);
+}
+
+static int
+smb_build_shareinfo(sa_share_t share, sa_resource_t resource, smb_share_t *si)
+{
+	sa_property_t prop;
+	sa_optionset_t opts;
+	char *path;
+	char *rname;
+	char *val = NULL;
+
+	bzero(si, sizeof (smb_share_t));
+
+	if ((path = sa_get_share_attr(share, "path")) == NULL)
+		return (SA_NO_SUCH_PATH);
+
+	if ((rname = sa_get_resource_attr(resource, "name")) == NULL) {
+		sa_free_attr_string(path);
+		return (SA_NO_SUCH_RESOURCE);
+	}
+
+	si->shr_flags = (sa_is_persistent(share))
+	    ? SMB_SHRF_PERM : SMB_SHRF_TRANS;
+
+	(void) strlcpy(si->shr_path, path, sizeof (si->shr_path));
+	(void) strlcpy(si->shr_name, rname, sizeof (si->shr_name));
+	sa_free_attr_string(path);
+	sa_free_attr_string(rname);
+
+	val = sa_get_resource_description(resource);
+	if (val == NULL)
+		val = sa_get_share_description(share);
+
+	if (val != NULL) {
+		(void) strlcpy(si->shr_cmnt, val, sizeof (si->shr_cmnt));
+		sa_free_share_description(val);
+	}
+
+	opts = sa_get_derived_optionset(resource, SMB_PROTOCOL_NAME, 1);
+	if (opts == NULL)
+		return (SA_OK);
+
+	prop = sa_get_property(opts, SMB_SHROPT_AD_CONTAINER);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			(void) strlcpy(si->shr_container, val,
+			    sizeof (si->shr_container));
+			free(val);
+		}
+	}
+
+	sa_free_derived_optionset(opts);
+	return (SA_OK);
+}
+
+/*
+ * smb_get_defaultgrp
+ *
+ * If default group for CIFS shares (i.e. "smb") exists
+ * then it will return the group handle, otherwise it will
+ * create the group and return the handle.
+ *
+ * All the shares created by CIFS clients (this is only possible
+ * via RPC) will be added to "smb" groups.
+ */
+static sa_group_t
+smb_get_defaultgrp(sa_handle_t handle)
+{
+	sa_group_t group = NULL;
+	int err;
+
+	group = sa_get_group(handle, SMB_DEFAULT_SHARE_GROUP);
+	if (group != NULL)
+		return (group);
+
+	group = sa_create_group(handle, SMB_DEFAULT_SHARE_GROUP, &err);
+	if (group == NULL)
+		return (NULL);
+
+	if (sa_create_optionset(group, SMB_DEFAULT_SHARE_GROUP) == NULL) {
+		(void) sa_remove_group(group);
+		group = NULL;
+	}
+
+	return (group);
 }

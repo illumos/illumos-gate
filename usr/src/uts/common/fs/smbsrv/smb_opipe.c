@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_opipe.c	1.10	08/08/08 SMI"
 
 /*
  * This module provides the interface to NDR RPC.
@@ -83,8 +83,9 @@ smb_opipe_open(smb_request_t *sr)
 	if ((pipe_name = smb_opipe_lookup(op->fqi.path)) == NULL)
 		return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
 
-	of = smb_ofile_open(sr->tid_tree, NULL, sr->smb_pid,
-	    op->desired_access, 0, op->share_access,
+	op->create_options = 0;
+
+	of = smb_ofile_open(sr->tid_tree, NULL, sr->smb_pid, op,
 	    SMB_FTYPE_MESG_PIPE, SMB_UNIQ_FID(), &err);
 	if (of == NULL)
 		return (err.status);
@@ -97,7 +98,6 @@ smb_opipe_open(smb_request_t *sr)
 	    | SMB_PIPE_TYPE_MESSAGE
 	    | SMB_PIPE_UNLIMITED_INSTANCES; /* 0x05ff */
 	op->fileid = of->f_fid;
-	op->create_options = 0;
 
 	sr->smb_fid = of->f_fid;
 	sr->fid_ofile = of;
@@ -125,7 +125,7 @@ smb_opipe_open(smb_request_t *sr)
 		bzero(&opipe->p_hdr, sizeof (smb_opipe_hdr_t));
 		kmem_free(opipe->p_doorbuf, SMB_OPIPE_DOOR_BUFSIZE);
 		smb_opipe_exit(opipe);
-		(void) smb_ofile_close(of, 0);
+		smb_ofile_close(of, 0);
 		return (NT_STATUS_NO_MEMORY);
 	}
 

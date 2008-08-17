@@ -26,7 +26,7 @@
 #ifndef _SMB_IOCTL_H_
 #define	_SMB_IOCTL_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_ioctl.h	1.5	08/07/21 SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -52,7 +52,7 @@ extern "C" {
 typedef struct {
 	uint32_t	sio_version;
 	union {
-		uint32_t	gmtoff;
+		int32_t		gmtoff;
 		int		error;
 		smb_kmod_cfg_t	cfg;
 

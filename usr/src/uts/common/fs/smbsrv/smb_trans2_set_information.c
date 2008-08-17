@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_trans2_set_information.c	1.9	08/08/08 SMI"
 
 /*
  * This file contains the common code used by
@@ -79,11 +79,10 @@ smb_trans2_set_information(
 
 	switch (info->level) {
 	case SMB_INFO_STANDARD:
-	case SMB_INFO_QUERY_EA_SIZE:
 		return (smb_set_standard_info(sr, info, smberr));
 
-	case SMB_INFO_QUERY_ALL_EAS:
-		/* This info level is not supported */
+	case SMB_INFO_SET_EAS:
+		/* EAs not supported */
 		return (NT_STATUS_SUCCESS);
 
 	case SMB_SET_FILE_BASIC_INFO:
@@ -156,7 +155,7 @@ smb_info_passthru(unsigned short infolevel)
 /*
  * smb_set_standard_info
  *
- * SMB_INFO_STANDARD & SMB_INFO_QUERY_EA_SIZE
+ * SMB_INFO_STANDARD
  *
  *  Data Block Encoding                Description
  *  ================================== =================================
@@ -168,11 +167,13 @@ smb_info_passthru(unsigned short infolevel)
  *  SMB_DATE LastWriteDate;            Date of last write to the file
  *  SMB_TIME LastWriteTime;            Time of last write to the file
  *  ULONG  DataSize;                   File Size
- *  ULONG AllocationSize;              Size of filesystem allocation
- *                                      unit
+ *  ULONG AllocationSize;              Size of filesystem allocation unit
  *  USHORT Attributes;                 File Attributes
- *  ULONG EaSize;                      Size of file's EA information
- *                                      (SMB_INFO_QUERY_EA_SIZE)
+ *
+ * For exact compatibility with Windows (NT and later), the whole
+ * request is decoded (to ensure that all 22 bytes are present),
+ * and the DataSize, AllocationSize and Attributes values are
+ * ignored.
  */
 static DWORD
 smb_set_standard_info(
@@ -199,20 +200,15 @@ smb_set_standard_info(
 		return (NT_STATUS_DATA_ERROR);
 	}
 
-	if (DataSize != 0) {
-		node->flags |= NODE_FLAGS_SET_SIZE;
-		node->n_size = (u_offset_t)DataSize;
-	}
-
 	/*
-	 * IR101794 The behaviour when the time field is set to -1
-	 * is not documented, so we'll assume it should be treated
-	 * like 0.
+	 * The behaviour when the time field is set to -1
+	 * is not documented but is generally treated like 0,
+	 * meaning that that server file system assigned value
+	 * need not be changed.
 	 */
 	crtime.tv_nsec = mtime.tv_nsec = atime.tv_nsec = 0;
 	if (LastWrite != 0 && LastWrite != (uint32_t)-1) {
 		mtime.tv_sec = smb_local2gmt(sr, LastWrite);
-		node->set_mtime = mtime;
 		what |= SMB_AT_MTIME;
 	}
 
@@ -225,9 +221,6 @@ smb_set_standard_info(
 		atime.tv_sec = smb_local2gmt(sr, LastAccess);
 		what |= SMB_AT_ATIME;
 	}
-
-	if (Attributes != 0)
-		smb_node_set_dosattr(node, Attributes);
 
 	smb_node_set_time(node, &crtime, &mtime, &atime, 0, what);
 	rc = smb_sync_fsattr(sr, sr->user_cr, node);
@@ -268,9 +261,10 @@ smb_set_basic_info(
 	}
 
 	/*
-	 * IR101794 The behaviour when the time field is set to -1
-	 * is not documented, so we'll assume it should be treated
-	 * like 0.
+	 * The behaviour when the time field is set to -1
+	 * is not documented but is generally treated like 0,
+	 * meaning that that server file system assigned value
+	 * need not be changed.
 	 */
 	if (NT_Change != 0 && NT_Change != (uint64_t)-1) {
 		(void) nt_to_unix_time(NT_Change, &ctime);
@@ -284,7 +278,6 @@ smb_set_basic_info(
 
 	if (NT_LastWrite != 0 && NT_LastWrite != (uint64_t)-1) {
 		(void) nt_to_unix_time(NT_LastWrite, &mtime);
-		node->set_mtime = mtime;
 		what |= SMB_AT_MTIME;
 	}
 

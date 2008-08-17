@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_session.c	1.7	08/08/07 SMI"
 
 #include <sys/atomic.h>
 #include <sys/strsubr.h>
@@ -717,7 +717,7 @@ smb_session_cancel(smb_session_t *session)
 	smb_xa_t	*xa, *nextxa;
 
 	/* All the request currently being treated must be canceled. */
-	smb_session_cancel_requests(session);
+	smb_session_cancel_requests(session, NULL, NULL);
 
 	/*
 	 * We wait for the completion of all the requests associated with
@@ -739,26 +739,33 @@ smb_session_cancel(smb_session_t *session)
 	smb_user_logoff_all(session);
 }
 
+/*
+ * Cancel requests.  If a non-null tree is specified, only requests specific
+ * to that tree will be cancelled.  If a non-null sr is specified, that sr
+ * will be not be cancelled - this would typically be the caller's sr.
+ */
 void
 smb_session_cancel_requests(
-    smb_session_t	*session)
+    smb_session_t	*session,
+    smb_tree_t		*tree,
+    smb_request_t	*exclude_sr)
 {
 	smb_request_t	*sr;
-	smb_request_t	*tmp;
 
-	/* All the SMB requests on the notification queue are canceled. */
-	smb_process_session_notify_change_queue(session);
+	smb_process_session_notify_change_queue(session, tree);
 
 	smb_slist_enter(&session->s_req_list);
 	sr = smb_slist_head(&session->s_req_list);
+
 	while (sr) {
 		ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
-		tmp = smb_slist_next(&session->s_req_list, sr);
+		if ((sr != exclude_sr) &&
+		    (tree == NULL || sr->tid_tree == tree))
+			smb_request_cancel(sr);
 
-		smb_request_cancel(sr);
-
-		sr = tmp;
+		sr = smb_slist_next(&session->s_req_list, sr);
 	}
+
 	smb_slist_exit(&session->s_req_list);
 }
 
@@ -852,7 +859,7 @@ smb_session_disconnect_share(smb_session_list_t *se, char *sharename)
  * we are in this function.
  */
 void
-smb_session_disconnect_volume(smb_session_list_t *se, fs_desc_t *fsd)
+smb_session_disconnect_volume(smb_session_list_t *se, const char *volname)
 {
 	smb_session_t	*session;
 
@@ -871,7 +878,7 @@ smb_session_disconnect_volume(smb_session_list_t *se, fs_desc_t *fsd)
 
 			user = smb_user_lookup_by_state(session, NULL);
 			while (user) {
-				smb_user_disconnect_volume(user, fsd);
+				smb_user_disconnect_volume(user, volname);
 				next = smb_user_lookup_by_state(session, user);
 				smb_user_release(user);
 				user = next;

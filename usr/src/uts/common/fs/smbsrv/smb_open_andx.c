@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_open_andx.c	1.8	08/08/07 SMI"
 
 #include <smbsrv/smb_vops.h>
 
@@ -392,7 +392,7 @@ smb_com_open_andx(smb_request_t *sr)
 		op->action_taken &= ~SMB_OACT_LOCK;
 	}
 
-	granted_access = (sr->tid_tree->t_access == SMB_TREE_READ_ONLY)
+	granted_access = (SMB_TREE_IS_READONLY(sr))
 	    ? SMB_DA_ACCESS_READ : op->omode & SMB_DA_ACCESS_MASK;
 
 	file_attr = op->dattr & FILE_ATTRIBUTE_MASK;

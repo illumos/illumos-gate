@@ -19,11 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_common_door_decode.c	1.2	08/08/07 SMI"
 
 /*
  * Provides encode/decode routines for all door servers/clients.
@@ -198,7 +198,7 @@ smb_dr_put_uint32(smb_dr_ctx_t *ctx, uint32_t num)
 }
 
 void
-smb_dr_put_string(smb_dr_ctx_t *ctx, char *buf)
+smb_dr_put_string(smb_dr_ctx_t *ctx, const char *buf)
 {
 	int len;
 

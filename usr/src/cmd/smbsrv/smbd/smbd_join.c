@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smbd_join.c	1.9	08/07/17 SMI"
 
 #include <syslog.h>
 #include <synch.h>
@@ -72,6 +72,7 @@ static boolean_t nt4_domain_support = B_FALSE;
 
 static pthread_t lsa_monitor_thr;
 static pthread_t dc_browser_thr;
+static pthread_t locate_dc_thr;
 
 static void *smb_netlogon_lsa_monitor(void *arg);
 static void *smb_netlogon_dc_browser(void *arg);
@@ -573,4 +574,45 @@ smb_set_netlogon_cred(void)
 		}
 	}
 
+}
+
+/*
+ * smbd_locate_dc_thread()
+ *
+ * If necessary, set up Netlogon credential chain and locate a
+ * domain controller in the given resource domain.
+ */
+static void *
+smbd_locate_dc_thread(void *arg)
+{
+	char *resource_domain = (char *)arg;
+
+	if (!smb_match_netlogon_seqnum())
+		smb_set_netlogon_cred();
+	else
+		(void) smbd_locate_dc(resource_domain, "");
+
+	(void) lsa_query_primary_domain_info();
+
+	return (NULL);
+}
+
+/*
+ * smbd_locate_dc_start()
+ *
+ * Initialization of the locate dc thread.
+ * Returns 0 on success, an error number if thread creation fails.
+ */
+int
+smbd_locate_dc_start(char *resource_domain)
+{
+	pthread_attr_t tattr;
+	int rc;
+
+	(void) pthread_attr_init(&tattr);
+	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
+	rc = pthread_create(&locate_dc_thr, &tattr, smbd_locate_dc_thread,
+	    resource_domain);
+	(void) pthread_attr_destroy(&tattr);
+	return (rc);
 }

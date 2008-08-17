@@ -26,7 +26,7 @@
 #ifndef _SMBSRV_NTIFS_H
 #define	_SMBSRV_NTIFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)ntifs.h	1.3	08/07/30 SMI"
 
 /*
  * This file provides definitions compatible with the NT Installable
@@ -75,6 +75,10 @@ extern "C" {
 #define	FILE_ATTRIBUTE_VALID_FLAGS		0x00001fb7
 #define	FILE_ATTRIBUTE_VALID_SET_FLAGS		0x00001fa7
 #define	FILE_ATTRIBUTE_MASK			0x00003FFF
+
+#define	SMB_SEARCH_HIDDEN(sattr) ((sattr) & FILE_ATTRIBUTE_HIDDEN)
+#define	SMB_SEARCH_SYSTEM(sattr) ((sattr) & FILE_ATTRIBUTE_SYSTEM)
+#define	SMB_SEARCH_DIRECTORY(sattr) ((sattr) & FILE_ATTRIBUTE_DIRECTORY)
 
 /*
  * The create/open option flags: used in NtCreateAndx and NtTransactCreate

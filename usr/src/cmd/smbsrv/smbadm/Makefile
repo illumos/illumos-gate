@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"@(#)Makefile	1.5	08/07/16 SMI"
 #
 
 PROG=	smbadm
@@ -31,7 +31,7 @@ SRCS=	smbadm.c
 include ../../Makefile.cmd
 include ../Makefile.smbsrv.defs
 
-LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lsmb -lumem
+LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lsmb -lumem -lnsl
 LDFLAGS += -R/usr/lib/smbsrv
 
 all:		$(PROG)

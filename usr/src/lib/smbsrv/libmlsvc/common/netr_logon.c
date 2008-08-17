@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)netr_logon.c	1.8	08/08/08 SMI"
 
 /*
  * NETR SamLogon and SamLogoff RPC client functions.
@@ -90,10 +90,11 @@ DWORD
 netlogon_logon(netr_client_t *clnt, smb_userinfo_t *user_info)
 {
 	char resource_domain[SMB_PI_MAX_DOMAIN];
+	char server[MLSVC_DOMAIN_NAME_MAX * 2];
 	mlsvc_handle_t netr_handle;
 	smb_ntdomain_t *di;
 	DWORD status;
-	int retries = 0;
+	int retries = 0, server_changed = 0;
 
 	(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
 
@@ -114,7 +115,15 @@ netlogon_logon(netr_client_t *clnt, smb_userinfo_t *user_info)
 		if (status != 0)
 			return (status);
 
-		if ((netr_global_info.flags & NETR_FLG_VALID) == 0 ||
+		if (di->server && (*netr_global_info.server != '\0')) {
+			(void) snprintf(server, sizeof (server),
+			    "\\\\%s", di->server);
+			server_changed = strncasecmp(netr_global_info.server,
+			    server, strlen(server));
+		}
+
+		if (server_changed ||
+		    (netr_global_info.flags & NETR_FLG_VALID) == 0 ||
 		    !smb_match_netlogon_seqnum()) {
 			status = netlogon_auth(di->server, &netr_handle,
 			    NETR_FLG_NULL);
@@ -210,8 +219,8 @@ netr_setup_userinfo(struct netr_validation_info3 *info3,
 	}
 	/*
 	 * The UserSessionKey in NetrSamLogon RPC is obfuscated using the
-	 * 8 byte session key obtained in the NETLOGON credential chain.
-	 * The 8 byte session key is zero extended to 16 bytes. This 16 byte
+	 * session key obtained in the NETLOGON credential chain.
+	 * An 8 byte session key is zero extended to 16 bytes. This 16 byte
 	 * key is the key to the RC4 algorithm. The RC4 byte stream is
 	 * exclusively ored with the 16 byte UserSessionKey to recover
 	 * the the clear form.
@@ -219,7 +228,7 @@ netr_setup_userinfo(struct netr_validation_info3 *info3,
 	if ((user_info->session_key = malloc(SMBAUTH_SESSION_KEY_SZ)) == NULL)
 		return (NT_STATUS_NO_MEMORY);
 	bzero(rc4key, SMBAUTH_SESSION_KEY_SZ);
-	bcopy(netr_info->session_key, rc4key, 8);
+	bcopy(netr_info->session_key, rc4key, NETR_SESSION_KEY_SZ);
 	bcopy(info3->UserSessionKey.data, user_info->session_key,
 	    SMBAUTH_SESSION_KEY_SZ);
 	rand_hash((unsigned char *)user_info->session_key,

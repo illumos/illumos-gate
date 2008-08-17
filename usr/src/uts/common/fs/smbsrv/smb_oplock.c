@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_oplock.c	1.5	08/08/07 SMI"
 
 /*
  * SMB Locking library functions.
@@ -174,7 +174,7 @@ smb_oplock_acquire(
 	op->my_flags &= ~MYF_OPLOCK_MASK;
 
 	if ((sr->sr_cfg->skc_oplock_enable == 0) ||
-	    (fsd_chkcap(&of->f_tree->t_fsd, FSOLF_DISABLE_OPLOCKS) > 0))
+	    smb_tree_has_feature(of->f_tree, SMB_TREE_NO_OPLOCKS))
 		return (NT_STATUS_SUCCESS);
 
 	if (!((MYF_IS_EXCLUSIVE_OPLOCK(level)) ||

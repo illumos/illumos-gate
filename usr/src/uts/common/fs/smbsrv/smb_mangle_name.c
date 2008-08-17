@@ -19,11 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_mangle_name.c	1.3	08/08/07 SMI"
 
 #include <sys/types.h>
 #include <sys/sunddi.h>
@@ -53,7 +53,7 @@ static int smb_match_reserved(char *name, char *rsrv);
  */
 int
 smb_match_name(ino64_t fileid, char *name, char *shortname,
-    char *name83, char *pattern, int ignore_case)
+    char *name83, char *pattern, boolean_t ignore_case)
 {
 	int rc = 0;
 	int force;
@@ -682,7 +682,7 @@ smb_unmangle_name(struct smb_request *sr, cred_t *cred, smb_node_t *dir_node,
 	char *dot_pos = NULL;
 	char *readdir_name;
 	char *shortp;
-	char xxx[MANGLE_NAMELEN];
+	char namebuf[SMB_SHORTNAMELEN];
 
 	if (dir_node == NULL || name == NULL || real_name == NULL ||
 	    realname_size == 0)
@@ -709,9 +709,9 @@ smb_unmangle_name(struct smb_request *sr, cred_t *cred, smb_node_t *dir_node,
 	}
 
 	if (shortname == 0)
-		shortname = xxx;
+		shortname = namebuf;
 	if (name83 == 0)
-		name83 = xxx;
+		name83 = namebuf;
 
 	cookie = 0;
 

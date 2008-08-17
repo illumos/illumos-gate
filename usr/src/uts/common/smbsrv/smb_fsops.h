@@ -26,7 +26,7 @@
 #ifndef _SMBSRV_SMB_FSOPS_H
 #define	_SMBSRV_SMB_FSOPS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_fsops.h	1.8	08/07/15 SMI"
 
 /*
  * This header file contains all the functions for the interface between
@@ -47,7 +47,7 @@ int smb_fsop_amask_to_omode(uint32_t);
 
 int smb_fsop_open(smb_node_t *, int, cred_t *);
 
-int smb_fsop_close(smb_node_t *, int, cred_t *);
+void smb_fsop_close(smb_node_t *, int, cred_t *);
 
 int smb_fsop_oplock_install(smb_node_t *, int);
 

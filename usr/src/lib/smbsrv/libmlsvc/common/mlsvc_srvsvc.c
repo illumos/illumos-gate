@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)mlsvc_srvsvc.c	1.8	08/08/07 SMI"
 
 /*
  * Server Service RPC (SRVSVC) server-side interface definition.
@@ -49,7 +49,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include <smbsrv/smb_fsd.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/lmerr.h>
@@ -453,19 +452,9 @@ srvsvc_s_NetShareGetInfo(void *arg, struct mlrpc_xaction *mxa)
 
 	status = smb_shr_get((char *)param->netname, &si);
 	if (status != NERR_Success) {
-		if (strcasecmp((const char *)param->netname, "IPC$") == 0) {
-			/*
-			 * Windows clients don't send the \\PIPE path for IPC$.
-			 */
-			(void) memset(&si, 0, sizeof (smb_share_t));
-			(void) strcpy(si.shr_name, "IPC$");
-			(void) strcpy(si.shr_cmnt, "Remote IPC");
-			si.shr_type = (int)(STYPE_IPC | STYPE_SPECIAL);
-		} else {
-			bzero(param, sizeof (struct mlsm_NetShareGetInfo));
-			param->status = status;
-			return (MLRPC_DRC_OK);
-		}
+		bzero(param, sizeof (struct mlsm_NetShareGetInfo));
+		param->status = status;
+		return (MLRPC_DRC_OK);
 	}
 
 	if (strlen(si.shr_cmnt))
@@ -1128,7 +1117,7 @@ srvsvc_s_NetNameValidate(void *arg, struct mlrpc_xaction *mxa)
 
 	switch (param->type) {
 	case NAMETYPE_SHARE:
-		if (smb_shr_is_valid(name))
+		if (smb_shr_chkname(name))
 			param->status = ERROR_SUCCESS;
 		else
 			param->status = ERROR_INVALID_NAME;
@@ -1251,7 +1240,7 @@ srvsvc_s_NetShareAdd(void *arg, struct mlrpc_xaction *mxa)
 
 	si.shr_flags = SMB_SHRF_PERM;
 
-	param->status = smb_shr_add(&si, 1);
+	param->status = smb_shr_create(&si, B_TRUE);
 	param->parm_err = (native_os == NATIVE_OS_WIN95) ? 0 : &parm_err;
 	return (MLRPC_DRC_OK);
 }
@@ -1502,7 +1491,7 @@ mlsvc_NetShareEnumLevel0(struct mlrpc_xaction *mxa,
 	if (info0 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	smb_shr_iterinit(&iterator, SMB_SHRF_ALL);
+	smb_shr_iterinit(&iterator);
 
 	se->se_n_read = 0;
 	while ((si = smb_shr_iterate(&iterator)) != NULL) {
@@ -1513,10 +1502,10 @@ mlsvc_NetShareEnumLevel0(struct mlrpc_xaction *mxa,
 
 		++se->se_resume_handle;
 
-		if (sticky && (si->shr_type & STYPE_SPECIAL))
+		if (sticky && (si->shr_flags & SMB_SHRF_TRANS))
 			continue;
 
-		if (smb_is_autohome(si))
+		if (si->shr_flags & SMB_SHRF_AUTOHOME)
 			continue;
 
 		if (se->se_n_read >= se->se_n_enum) {
@@ -1562,7 +1551,7 @@ mlsvc_NetShareEnumLevel1(struct mlrpc_xaction *mxa,
 	if (info1 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	smb_shr_iterinit(&iterator, SMB_SHRF_ALL);
+	smb_shr_iterinit(&iterator);
 
 	se->se_n_read = 0;
 	while ((si = smb_shr_iterate(&iterator)) != 0) {
@@ -1573,10 +1562,10 @@ mlsvc_NetShareEnumLevel1(struct mlrpc_xaction *mxa,
 
 		++se->se_resume_handle;
 
-		if (sticky && (si->shr_type & STYPE_SPECIAL))
+		if (sticky && (si->shr_flags & SMB_SHRF_TRANS))
 			continue;
 
-		if (smb_is_autohome(si))
+		if (si->shr_flags & SMB_SHRF_AUTOHOME)
 			continue;
 
 		if (se->se_n_read >= se->se_n_enum) {
@@ -1622,7 +1611,7 @@ mlsvc_NetShareEnumLevel2(struct mlrpc_xaction *mxa,
 	if (info2 == 0)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	smb_shr_iterinit(&iterator, SMB_SHRF_ALL);
+	smb_shr_iterinit(&iterator);
 
 	se->se_n_read = 0;
 	while ((si = smb_shr_iterate(&iterator)) != 0) {
@@ -1633,10 +1622,10 @@ mlsvc_NetShareEnumLevel2(struct mlrpc_xaction *mxa,
 
 		++se->se_resume_handle;
 
-		if (sticky && (si->shr_type & STYPE_SPECIAL))
+		if (sticky && (si->shr_flags & SMB_SHRF_TRANS))
 			continue;
 
-		if (smb_is_autohome(si))
+		if (si->shr_flags & SMB_SHRF_AUTOHOME)
 			continue;
 
 		if (se->se_n_read >= se->se_n_enum) {
@@ -1683,7 +1672,7 @@ mlsvc_NetShareEnumLevel501(struct mlrpc_xaction *mxa,
 	if (info501 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	smb_shr_iterinit(&iterator, SMB_SHRF_ALL);
+	smb_shr_iterinit(&iterator);
 
 	se->se_n_read = 0;
 	while ((si = smb_shr_iterate(&iterator)) != 0) {
@@ -1694,10 +1683,10 @@ mlsvc_NetShareEnumLevel501(struct mlrpc_xaction *mxa,
 
 		++se->se_resume_handle;
 
-		if (sticky && (si->shr_type & STYPE_SPECIAL))
+		if (sticky && (si->shr_flags & SMB_SHRF_TRANS))
 			continue;
 
-		if (smb_is_autohome(si))
+		if (si->shr_flags & SMB_SHRF_AUTOHOME)
 			continue;
 
 		if (se->se_n_read >= se->se_n_enum) {
@@ -1744,7 +1733,7 @@ mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *mxa,
 	if (info502 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
-	smb_shr_iterinit(&iterator, SMB_SHRF_ALL);
+	smb_shr_iterinit(&iterator);
 
 	se->se_n_read = 0;
 	while ((si = smb_shr_iterate(&iterator)) != NULL) {
@@ -1755,10 +1744,10 @@ mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *mxa,
 
 		++se->se_resume_handle;
 
-		if (sticky && (si->shr_type & STYPE_SPECIAL))
+		if (sticky && (si->shr_flags & SMB_SHRF_TRANS))
 			continue;
 
-		if (smb_is_autohome(si))
+		if (si->shr_flags & SMB_SHRF_AUTOHOME)
 			continue;
 
 		if (se->se_n_read >= se->se_n_enum) {
@@ -1809,14 +1798,6 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
 	struct mslm_SHARE_INFO_502 *info502;
 	char shr_comment[SMB_SHARE_CMNT_MAX];
 	int i = se->se_n_read;
-
-	if ((si->shr_type & STYPE_MASK) == STYPE_IPC) {
-		/*
-		 * Windows clients don't send the \\PIPE path for IPC$.
-		 */
-		si->shr_path[0] = '\0';
-		(void) strcpy(si->shr_cmnt, "Remote IPC");
-	}
 
 	if (strlen(si->shr_cmnt))
 		(void) strlcpy(shr_comment, si->shr_cmnt, SMB_SHARE_CMNT_MAX);
@@ -2003,7 +1984,7 @@ srvsvc_s_NetShareDel(void *arg, struct mlrpc_xaction *mxa)
 		return (MLRPC_DRC_OK);
 	}
 
-	param->status = smb_shr_del((char *)param->netname, 1);
+	param->status = smb_shr_delete((char *)param->netname, B_TRUE);
 	return (MLRPC_DRC_OK);
 }
 

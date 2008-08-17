@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_util.c	1.8	08/08/08 SMI"
 
 #include <sys/tzfile.h>
 #include <sys/atomic.h>
@@ -104,9 +104,7 @@ smb_component_match(
     struct smb_odir *od,
     smb_odir_context_t *pc)
 {
-	int ci = (fsd_chkcap(&sr->tid_tree->t_fsd, FSOLF_CASE_INSENSITIVE) > 0);
-
-	int ignore_case = (ci || (SMB_TREE_CASE_INSENSITIVE(sr)));
+	boolean_t ignore_case = SMB_TREE_IS_CASEINSENSITIVE(sr);
 
 	return (smb_match_name(fileid, pc->dc_name, pc->dc_shortname,
 	    pc->dc_name83, od->d_pattern, ignore_case));
@@ -158,29 +156,6 @@ smb_convert_unicode_wildcards(char *path)
 
 	return (wildcards);
 }
-
-
-
-/*
- * smb_mode_to_dos_attributes
- *
- * This function converts unix mode from smb_attr_t structure to dos attr.
- *
- * The reason dos_attr is returned as uint32_t, unlike sattr as
- * unsigned short is the smb_trans_find_first2/next encodes dattr in
- * BOTH DIR info as long.
- */
-uint32_t
-smb_mode_to_dos_attributes(smb_attr_t *ap)
-{
-	uint32_t dos_attr = ap->sa_dosattr;
-
-	if (dos_attr == 0)
-		dos_attr = FILE_ATTRIBUTE_NORMAL;
-
-	return (dos_attr);
-}
-
 
 /*
  * smb_is_dot_or_dotdot
@@ -1593,10 +1568,27 @@ nt_to_unix_time(uint64_t nt_time, timestruc_t *unix_time)
 	return (seconds);
 }
 
-int32_t /*ARGSUSED*/
-dosfs_dos_to_ux_time(int32_t date, int time)
+/*
+ * smb_dos_to_ux_time
+ *
+ * Convert SMB_DATE & SMB_TIME values to a unix timestamp.
+ *
+ * A date/time field of 0 means that that server file system
+ * assigned value need not be changed. The behaviour when the
+ * date/time field is set to -1 is not documented but is
+ * generally treated like 0.
+ * If date or time is 0 or -1 the unix time is returned as 0
+ * so that the caller can identify and handle this special case.
+ */
+int32_t
+smb_dos_to_ux_time(int16_t date, int16_t time)
 {
 	struct tm	atm;
+
+	if (((date == 0) || (time == 0)) ||
+	    ((date == -1) || (time == -1))) {
+		return (0);
+	}
 
 	atm.tm_year = ((date >>  9) & 0x3F) + 80;
 	atm.tm_mon  = ((date >>  5) & 0x0F) - 1;
@@ -1608,8 +1600,8 @@ dosfs_dos_to_ux_time(int32_t date, int time)
 	return (smb_timegm(&atm));
 }
 
-int32_t /*ARGSUSED*/
-dosfs_ux_to_dos_time(int32_t ux_time, short *date_p, short *time_p)
+int32_t
+smb_ux_to_dos_time(int32_t ux_time, int16_t *date_p, int16_t *time_p)
 {
 	struct tm	atm;
 	int		i;
@@ -2012,9 +2004,6 @@ smb_sync_fsattr(struct smb_request *sr, cred_t *cr, smb_node_t *node)
 	uint32_t what;
 	int rc = 0;
 
-	if (node->flags & NODE_READ_ONLY)
-		return (0);
-
 	if (node->flags & NODE_FLAGS_SET_SIZE) {
 		node->flags &= ~NODE_FLAGS_SET_SIZE;
 		node->what |= SMB_AT_SIZE;
@@ -2036,6 +2025,9 @@ smb_sync_fsattr(struct smb_request *sr, cred_t *cr, smb_node_t *node)
 		if (rc) {
 			/* setattr failed, restore the dirty state? */
 			node->what = what;
+		} else {
+			if (what & SMB_AT_ATIME)
+				node->flags &= ~NODE_FLAGS_SYNCATIME;
 		}
 	}
 

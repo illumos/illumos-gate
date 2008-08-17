@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_init.c	1.4	08/07/08 SMI"
 
 #include <sys/types.h>
 #include <sys/ddi.h>
@@ -65,6 +65,7 @@ clock_t	smb_oplock_timeout = OPLOCK_STD_TIMEOUT;
 int	smb_flush_required = 1;
 int	smb_dirsymlink_enable = 1;
 int	smb_announce_quota = 0;
+int	smb_sign_debug = 0;
 
 /*
  * *****************************************************************************
@@ -109,7 +110,7 @@ static struct dev_ops devops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,					/* drv_modops */
-	"CIFS Server Protocol %I%",			/* drv_linkinfo */
+	"CIFS Server Protocol 1.4",			/* drv_linkinfo */
 	&devops,
 };
 

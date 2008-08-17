@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_nt_transact_notify_change.c	1.6	08/08/07 SMI"
 
 /*
  * File Change Notification (FCN)
@@ -115,6 +115,8 @@
 #include <sys/sdt.h>
 
 static void smb_notify_change_daemon(smb_thread_t *, void *);
+static boolean_t smb_notify_change_required(smb_request_t *, smb_node_t *);
+
 static boolean_t	smb_notify_initialized = B_FALSE;
 static smb_slist_t	smb_ncr_list;
 static smb_slist_t	smb_nce_list;
@@ -389,7 +391,9 @@ smb_reply_notify_change_request(smb_request_t *sr)
  * session.
  */
 void
-smb_process_session_notify_change_queue(struct smb_session *session)
+smb_process_session_notify_change_queue(
+    smb_session_t	*session,
+    smb_tree_t		*tree)
 {
 	smb_request_t	*sr;
 	smb_request_t	*tmp;
@@ -401,7 +405,8 @@ smb_process_session_notify_change_queue(struct smb_session *session)
 	while (sr) {
 		ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
 		tmp = smb_slist_next(&smb_ncr_list, sr);
-		if (sr->session == session) {
+		if ((sr->session == session) &&
+		    (tree == NULL || sr->tid_tree == tree)) {
 			mutex_enter(&sr->sr_mutex);
 			switch (sr->sr_state) {
 			case SMB_REQ_STATE_WAITING_EVENT:
@@ -551,16 +556,8 @@ smb_process_node_notify_change_queue(smb_node_t *node)
 	while (sr) {
 		ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
 		tmp = smb_slist_next(&smb_ncr_list, sr);
-		/*
-		 * send notify if:
-		 * - it's a request for the same node or
-		 * - it's a request from a DAVE client, its 'watch tree'
-		 *   flag is set and monitors a tree on the same volume.
-		 */
-		if ((sr->sr_ncr.nc_node == node) ||
-		    ((sr->sr_ncr.nc_flags & NODE_FLAGS_WATCH_TREE) &&
-		    (sr->session->native_os == NATIVE_OS_MACOS) &&
-		    !fsd_cmp(&sr->sr_ncr.nc_node->tree_fsd, &node->tree_fsd))) {
+
+		if (smb_notify_change_required(sr, node)) {
 			mutex_enter(&sr->sr_mutex);
 			switch (sr->sr_state) {
 			case SMB_REQ_STATE_WAITING_EVENT:
@@ -581,6 +578,29 @@ smb_process_node_notify_change_queue(smb_node_t *node)
 	smb_slist_exit(&smb_ncr_list);
 	if (sig)
 		smb_thread_signal(&smb_thread_notify_daemon);
+}
+
+/*
+ * Change notification is required if:
+ *	- the request node matches the specified node
+ * or
+ *	- the request is from a Mac client, the watch-tree flag
+ *	is set and it is monitoring a tree on the same volume.
+ */
+static boolean_t
+smb_notify_change_required(smb_request_t *sr, smb_node_t *node)
+{
+	smb_node_t *nc_node = sr->sr_ncr.nc_node;
+
+	if (nc_node == node)
+		return (B_TRUE);
+
+	if ((sr->sr_ncr.nc_flags & NODE_FLAGS_WATCH_TREE) &&
+	    (sr->session->native_os == NATIVE_OS_MACOS) &&
+	    smb_vfs_cmp(SMB_NODE_VFS(nc_node), SMB_NODE_VFS(node)))
+		return (B_TRUE);
+
+	return (B_FALSE);
 }
 
 /*

@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_scfutil.c	1.5	08/07/30 SMI"
 
 /* helper functions for using libscf with CIFS */
 
@@ -561,6 +561,17 @@ smb_smf_get_opaque_property(smb_scfhandle_t *handle, char *propname,
 	if (prop != NULL)
 		scf_property_destroy(prop);
 	return (ret);
+}
+
+/*
+ * smb_smf_restart_service()
+ *
+ * Restarts SMB SMF service.
+ */
+int
+smb_smf_restart_service(void)
+{
+	return (smf_restart_instance(SMBD_DEFAULT_INSTANCE_FMRI));
 }
 
 /*

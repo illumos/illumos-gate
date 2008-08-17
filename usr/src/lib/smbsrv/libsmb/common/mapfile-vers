@@ -21,7 +21,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"@(#)mapfile-vers	1.13	08/08/05 SMI"
 #
 
 SUNWprivate {
@@ -134,7 +134,6 @@ SUNWprivate {
 	smb_dr_get_res_stat;
 	smb_dr_get_share;
 	smb_dr_get_short;
-	smb_dr_get_shrlist;
 	smb_dr_get_string;
 	smb_dr_get_uint32;
 	smb_dr_get_uint64;
@@ -146,7 +145,6 @@ SUNWprivate {
 	smb_dr_put_int32;
 	smb_dr_put_share;
 	smb_dr_put_short;
-	smb_dr_put_shrlist;
 	smb_dr_put_string;
 	smb_dr_put_uint32;
 	smb_dr_put_uint64;
@@ -159,6 +157,7 @@ SUNWprivate {
 	smb_dwncall_install_callback;
 	smb_dwncall_share;
 	smb_dwncall_user_num;
+	smb_get_dcinfo;
 	smb_get_nameservers;
 	smb_getdomaininfo;
 	smb_getdomainname;
@@ -285,6 +284,7 @@ SUNWprivate {
 	smb_smf_get_integer_property;
 	smb_smf_get_opaque_property;
 	smb_smf_get_string_property;
+	smb_smf_restart_service;
 	smb_smf_scf_fini;
 	smb_smf_scf_init;
 	smb_smf_set_boolean_property;
@@ -326,6 +326,7 @@ SUNWprivate {
 	utf8_strncasecmp;
 	utf8_strupr;
 	xdr_smb_dr_bytes_t;
+	xdr_smb_dr_domain_t;
 	xdr_smb_dr_joininfo_t;
 	xdr_smb_dr_string_t;
 	xdr_smb_dr_ulist_t;

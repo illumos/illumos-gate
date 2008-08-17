@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_user.c	1.3	08/08/07 SMI"
 
 /*
  * General Structures Layout
@@ -168,8 +168,34 @@
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_door_svc.h>
 
-/* Static functions defined further down this file. */
-static void	smb_user_delete(smb_user_t *user);
+
+#define	ADMINISTRATORS_SID	"S-1-5-32-544"
+
+static smb_sid_t *smb_admins_sid = NULL;
+
+static void smb_user_delete(smb_user_t *user);
+static smb_tree_t *smb_user_get_tree(smb_llist_t *, smb_tree_t *);
+
+int
+smb_user_init(void)
+{
+	if (smb_admins_sid != NULL)
+		return (0);
+
+	if ((smb_admins_sid = smb_sid_fromstr(ADMINISTRATORS_SID)) == NULL)
+		return (-1);
+
+	return (0);
+}
+
+void
+smb_user_fini(void)
+{
+	if (smb_admins_sid != NULL) {
+		smb_sid_free(smb_admins_sid);
+		smb_admins_sid = NULL;
+	}
+}
 
 /*
  * smb_user_login
@@ -282,7 +308,7 @@ smb_user_logoff(
 		/*
 		 * All the trees hanging off of this user are disconnected.
 		 */
-		smb_tree_disconnect_all(user);
+		smb_user_disconnect_trees(user);
 		smb_user_auth_logoff(user->u_audit_sid);
 		mutex_enter(&user->u_mutex);
 		user->u_state = SMB_USER_STATE_LOGGED_OFF;
@@ -524,43 +550,181 @@ smb_user_lookup_by_state(
 }
 
 /*
- * smb_user_disconnect_share
- *
- * This function disconnects all the trees that have the sharename passed in.
+ * Find a tree by tree-id.
  */
-void
-smb_user_disconnect_share(
+smb_tree_t *
+smb_user_lookup_tree(
     smb_user_t		*user,
-    char		*sharename)
+    uint16_t		tid)
+
 {
 	smb_tree_t	*tree;
-	smb_tree_t	*next;
 
 	ASSERT(user);
 	ASSERT(user->u_magic == SMB_USER_MAGIC);
-	ASSERT(user->u_refcnt);
 
-	tree = smb_tree_lookup_by_name(user, sharename, NULL);
+	smb_llist_enter(&user->u_tree_list, RW_READER);
+	tree = smb_llist_head(&user->u_tree_list);
+
 	while (tree) {
 		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
-		smb_tree_disconnect(tree);
-		smbsr_rq_notify(NULL, user->u_session, tree);
-		next = smb_tree_lookup_by_name(user, sharename,
-		    tree);
+		ASSERT(tree->t_user == user);
+
+		if (tree->t_tid == tid) {
+			if (smb_tree_hold(tree)) {
+				smb_llist_exit(&user->u_tree_list);
+				return (tree);
+			} else {
+				smb_llist_exit(&user->u_tree_list);
+				return (NULL);
+			}
+		}
+
+		tree = smb_llist_next(&user->u_tree_list, tree);
+	}
+
+	smb_llist_exit(&user->u_tree_list);
+	return (NULL);
+}
+
+/*
+ * Find the first connected tree that matches the specified sharename.
+ * If the specified tree is NULL the search starts from the beginning of
+ * the user's tree list.  If a tree is provided the search starts just
+ * after that tree.
+ */
+smb_tree_t *
+smb_user_lookup_share(
+    smb_user_t		*user,
+    const char		*sharename,
+    smb_tree_t		*tree)
+{
+	ASSERT(user);
+	ASSERT(user->u_magic == SMB_USER_MAGIC);
+	ASSERT(sharename);
+
+	smb_llist_enter(&user->u_tree_list, RW_READER);
+
+	if (tree) {
+		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
+		ASSERT(tree->t_user == user);
+		tree = smb_llist_next(&user->u_tree_list, tree);
+	} else {
+		tree = smb_llist_head(&user->u_tree_list);
+	}
+
+	while (tree) {
+		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
+		ASSERT(tree->t_user == user);
+		if (utf8_strcasecmp(tree->t_sharename, sharename) == 0) {
+			if (smb_tree_hold(tree)) {
+				smb_llist_exit(&user->u_tree_list);
+				return (tree);
+			}
+		}
+		tree = smb_llist_next(&user->u_tree_list, tree);
+	}
+
+	smb_llist_exit(&user->u_tree_list);
+	return (NULL);
+}
+
+/*
+ * Find the first connected tree that matches the specified volume name.
+ * If the specified tree is NULL the search starts from the beginning of
+ * the user's tree list.  If a tree is provided the search starts just
+ * after that tree.
+ */
+smb_tree_t *
+smb_user_lookup_volume(
+    smb_user_t		*user,
+    const char		*name,
+    smb_tree_t		*tree)
+{
+	ASSERT(user);
+	ASSERT(user->u_magic == SMB_USER_MAGIC);
+	ASSERT(name);
+
+	smb_llist_enter(&user->u_tree_list, RW_READER);
+
+	if (tree) {
+		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
+		ASSERT(tree->t_user == user);
+		tree = smb_llist_next(&user->u_tree_list, tree);
+	} else {
+		tree = smb_llist_head(&user->u_tree_list);
+	}
+
+	while (tree) {
+		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
+		ASSERT(tree->t_user == user);
+
+		if (utf8_strcasecmp(tree->t_volume, name) == 0) {
+			if (smb_tree_hold(tree)) {
+				smb_llist_exit(&user->u_tree_list);
+				return (tree);
+			}
+		}
+
+		tree = smb_llist_next(&user->u_tree_list, tree);
+	}
+
+	smb_llist_exit(&user->u_tree_list);
+	return (NULL);
+}
+
+/*
+ * Disconnect all trees that match the specified client process-id.
+ */
+void
+smb_user_close_pid(
+    smb_user_t		*user,
+    uint16_t		pid)
+{
+	smb_tree_t	*tree;
+
+	ASSERT(user);
+	ASSERT(user->u_magic == SMB_USER_MAGIC);
+
+	tree = smb_user_get_tree(&user->u_tree_list, NULL);
+	while (tree) {
+		smb_tree_t *next;
+		ASSERT(tree->t_user == user);
+		smb_tree_close_pid(tree, pid);
+		next = smb_user_get_tree(&user->u_tree_list, tree);
 		smb_tree_release(tree);
 		tree = next;
 	}
 }
 
 /*
- * smb_user_disconnect_share
- *
- * This function disconnects all the trees that match fsd passed in.
+ * Disconnect all trees that this user has connected.
  */
 void
-smb_user_disconnect_volume(
-    smb_user_t	*user,
-    fs_desc_t	*fsd)
+smb_user_disconnect_trees(
+    smb_user_t		*user)
+{
+	smb_tree_t	*tree;
+
+	ASSERT(user);
+	ASSERT(user->u_magic == SMB_USER_MAGIC);
+
+	tree = smb_user_get_tree(&user->u_tree_list, NULL);
+	while (tree) {
+		ASSERT(tree->t_user == user);
+		smb_tree_disconnect(tree);
+		smb_tree_release(tree);
+		tree = smb_user_get_tree(&user->u_tree_list, NULL);
+	}
+}
+
+/*
+ * Disconnect all trees that match the specified share name.
+ */
+void
+smb_user_disconnect_share(
+    smb_user_t		*user,
+    const char		*sharename)
 {
 	smb_tree_t	*tree;
 	smb_tree_t	*next;
@@ -569,23 +733,70 @@ smb_user_disconnect_volume(
 	ASSERT(user->u_magic == SMB_USER_MAGIC);
 	ASSERT(user->u_refcnt);
 
-	tree = smb_tree_lookup_by_fsd(user, fsd, NULL);
+	tree = smb_user_lookup_share(user, sharename, NULL);
 	while (tree) {
 		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
+		smb_session_cancel_requests(user->u_session, tree, NULL);
 		smb_tree_disconnect(tree);
-		smbsr_rq_notify(NULL, user->u_session, tree);
-		next = smb_tree_lookup_by_fsd(user, fsd, tree);
+		next = smb_user_lookup_share(user, sharename, tree);
 		smb_tree_release(tree);
 		tree = next;
 	}
+}
+
+/*
+ * Disconnect all trees that match the specified volume name.
+ */
+void
+smb_user_disconnect_volume(
+    smb_user_t	*user,
+    const char	*volname)
+{
+	smb_tree_t	*tree;
+	smb_tree_t	*next;
+
+	ASSERT(user);
+	ASSERT(user->u_magic == SMB_USER_MAGIC);
+	ASSERT(user->u_refcnt);
+
+	tree = smb_user_lookup_volume(user, volname, NULL);
+	while (tree) {
+		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
+		smb_session_cancel_requests(user->u_session, tree, NULL);
+		smb_tree_disconnect(tree);
+		next = smb_user_lookup_volume(user, volname, tree);
+		smb_tree_release(tree);
+		tree = next;
+	}
+}
+
+/*
+ * Determine whether or not the user is an administrator.
+ * Members of the administrators group have administrative rights.
+ */
+boolean_t
+smb_user_is_admin(
+    smb_user_t		*user)
+{
+	cred_t		*u_cred;
+
+	ASSERT(user);
+	u_cred = user->u_cred;
+	ASSERT(u_cred);
+
+	if (smb_admins_sid == NULL)
+		return (B_FALSE);
+
+	if (smb_cred_is_member(u_cred, smb_admins_sid))
+		return (B_TRUE);
+
+	return (B_FALSE);
 }
 
 /* *************************** Static Functions ***************************** */
 
 /*
  * smb_user_delete
- *
- *
  */
 static void
 smb_user_delete(
@@ -617,4 +828,41 @@ smb_user_delete(
 	kmem_free(user->u_name, (size_t)user->u_name_len);
 	kmem_free(user->u_domain, (size_t)user->u_domain_len);
 	kmem_cache_free(user->u_server->si_cache_user, user);
+}
+
+/*
+ * Get the next connected tree in the list.  A reference is taken on
+ * the tree, which can be released later with smb_tree_release().
+ *
+ * If the specified tree is NULL the search starts from the beginning of
+ * the tree list.  If a tree is provided the search starts just after
+ * that tree.
+ *
+ * Returns NULL if there are no connected trees in the list.
+ */
+static smb_tree_t *
+smb_user_get_tree(
+    smb_llist_t		*tree_list,
+    smb_tree_t		*tree)
+{
+	ASSERT(tree_list);
+
+	smb_llist_enter(tree_list, RW_READER);
+
+	if (tree) {
+		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
+		tree = smb_llist_next(tree_list, tree);
+	} else {
+		tree = smb_llist_head(tree_list);
+	}
+
+	while (tree) {
+		if (smb_tree_hold(tree))
+			break;
+
+		tree = smb_llist_next(tree_list, tree);
+	}
+
+	smb_llist_exit(tree_list);
+	return (tree);
 }

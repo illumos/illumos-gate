@@ -26,7 +26,7 @@
 #ifndef _SMB_SHARE_H
 #define	_SMB_SHARE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_share.h	1.7	08/08/07 SMI"
 
 /*
  * This file defines the LanMan (CIFS/SMB) resource share interface.
@@ -35,7 +35,6 @@
 #include <sys/param.h>
 #include <smbsrv/string.h>
 #include <smbsrv/hash_table.h>
-#include <smbsrv/smb_fsd.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/lmerr.h>
 #include <smbsrv/smb_common_door.h>
@@ -95,7 +94,6 @@ extern "C" {
 #define	SMB_SHRF_AUTOHOME	0x0004
 #define	SMB_SHRF_LONGNAME	0x0008
 #define	SMB_SHRF_ADMIN		0x0010
-#define	SMB_SHRF_ALL		(SMB_SHRF_TRANS | SMB_SHRF_PERM)
 
 /*
  * refcnt is currently only used for autohome.  autohome needs a refcnt
@@ -117,14 +115,13 @@ typedef struct smb_share {
 typedef struct smb_shriter {
 	smb_share_t	si_share;
 	HT_ITERATOR	si_hashiter;
-	uint32_t	si_counter;
-	uint32_t	si_mode;
+	boolean_t	si_first;
 } smb_shriter_t;
 
 #define	LMSHARES_PER_REQUEST  10
 typedef struct smb_shrlist {
-	int		no;
-	smb_share_t	smbshr[LMSHARES_PER_REQUEST];
+	int		sl_cnt;
+	smb_share_t	sl_shares[LMSHARES_PER_REQUEST];
 } smb_shrlist_t;
 
 /*
@@ -161,54 +158,49 @@ typedef struct smb_enumshare_info {
 #ifndef _KERNEL
 
 /*
- * CIFS share management functions in libmlsvc
+ * CIFS share management functions exported by libmlsvc
  */
 int smb_shr_start(void);
 void smb_shr_stop(void);
-void smb_shr_iterinit(smb_shriter_t *, uint32_t);
-smb_share_t *smb_shr_iterate(smb_shriter_t *iterator);
-void smb_shr_list(int offset, smb_shrlist_t *list);
+void smb_shr_iterinit(smb_shriter_t *);
+smb_share_t *smb_shr_iterate(smb_shriter_t *);
+void smb_shr_list(int, smb_shrlist_t *);
 int smb_shr_count(void);
-uint32_t smb_shr_add(smb_share_t *si, int);
-uint32_t smb_shr_del(char *share_name, int);
-uint32_t smb_shr_ren(char *from, char *to, int);
-uint32_t smb_shr_get(char *share_name, smb_share_t *si);
-uint32_t smb_shr_set(smb_share_t *si, int);
-uint32_t smb_shr_get_realpath(const char *srcbuf, char *dstbuf, int maxlen);
+uint32_t smb_shr_create(smb_share_t *, boolean_t);
+uint32_t smb_shr_delete(char *, boolean_t);
+uint32_t smb_shr_rename(char *, char *);
+uint32_t smb_shr_get(char *, smb_share_t *);
+uint32_t smb_shr_modify(char *, const char *, const char *, boolean_t);
+uint32_t smb_shr_get_realpath(const char *, char *, int);
 
-int smb_shr_exists(char *share_name);
-int smb_shr_is_special(char *share_name);
-int smb_shr_is_restricted(char *share_name);
-int smb_shr_is_admin(char *share_name);
-int smb_shr_is_valid(char *share_name);
-int smb_shr_is_dir(char *path);
-uint32_t smb_shr_add_adminshare(char *volname, unsigned char drive);
-
-sa_group_t smb_get_smb_share_group(sa_handle_t);
-void smb_build_lmshare_info(char *, char *, sa_resource_t, smb_share_t *);
+boolean_t smb_shr_exists(char *);
+int smb_shr_is_special(char *);
+boolean_t smb_shr_is_restricted(char *);
+boolean_t smb_shr_is_admin(char *);
+boolean_t smb_shr_chkname(char *);
 
 /*
  * CIFS share management API exported for other processes
  */
-uint32_t smb_share_list(int offset, smb_shrlist_t *list);
+uint32_t smb_share_list(int, smb_shrlist_t *);
 int smb_share_count(void);
 uint32_t smb_share_get(char *, smb_share_t *);
-uint32_t smb_share_del(char *);
-uint32_t smb_share_ren(char *, char *);
-uint32_t smb_share_add(smb_share_t *);
-uint32_t smb_share_set(smb_share_t *);
+uint32_t smb_share_delete(char *);
+uint32_t smb_share_rename(char *, char *);
+uint32_t smb_share_create(smb_share_t *);
+uint32_t smb_share_modify(char *, char *, char *);
 
 #else
 
 door_handle_t smb_kshare_init(int);
 void smb_kshare_fini(door_handle_t);
-uint32_t smb_kshare_getinfo(door_handle_t, char *, smb_share_t *);
+uint32_t smb_kshare_getinfo(door_handle_t, const char *, smb_share_t *);
 int smb_kshare_upcall(door_handle_t, void *, boolean_t);
 uint32_t smb_kshare_enum(door_handle_t, smb_enumshare_info_t *);
 
 #endif
 
-#define	SMB_SHARE_DNAME		"/var/run/smb_lmshare_door"
+#define	SMB_SHARE_DNAME		"/var/run/smb_share_door"
 #define	SMB_SHARE_DSIZE		(65 * 1024)
 
 /*
@@ -221,7 +213,7 @@ uint32_t smb_kshare_enum(door_handle_t, smb_enumshare_info_t *);
 #define	SMB_SHROP_RENAME		3
 #define	SMB_SHROP_GETINFO		4
 #define	SMB_SHROP_ADD			5
-#define	SMB_SHROP_SETINFO		6
+#define	SMB_SHROP_MODIFY		6
 #define	SMB_SHROP_LIST			7
 #define	SMB_SHROP_ENUM			8
 
@@ -238,9 +230,6 @@ uint32_t smb_kshare_enum(door_handle_t, smb_enumshare_info_t *);
 
 void smb_dr_get_share(smb_dr_ctx_t *, smb_share_t *);
 void smb_dr_put_share(smb_dr_ctx_t *, smb_share_t *);
-
-void smb_dr_get_shrlist(smb_dr_ctx_t *, smb_shrlist_t *);
-void smb_dr_put_shrlist(smb_dr_ctx_t *, smb_shrlist_t *);
 
 void smb_share_dclose(void);
 

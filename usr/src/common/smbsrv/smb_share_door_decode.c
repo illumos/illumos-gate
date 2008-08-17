@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_share_door_decode.c	1.4	08/08/05 SMI"
 
 /*
  * Encode/decode functions used by both lmshare door server and client.
@@ -67,39 +67,6 @@ smb_dr_put_share(smb_dr_ctx_t *ctx, smb_share_t *si)
 		if (ctx->ptr + sizeof (smb_share_t) <= ctx->end_ptr) {
 			(void) memcpy(ctx->ptr, si, sizeof (smb_share_t));
 			ctx->ptr += sizeof (smb_share_t);
-		}
-		else
-			ctx->status = ENOSPC;
-	}
-	else
-		smb_dr_put_int32(ctx, 0);
-}
-
-void
-smb_dr_get_shrlist(smb_dr_ctx_t *ctx, smb_shrlist_t *shrlist)
-{
-	if (ctx->status == 0) {
-		if (smb_dr_get_int32(ctx)) {
-			(void) memcpy(shrlist,
-			    ctx->ptr, sizeof (smb_shrlist_t));
-			ctx->ptr += sizeof (smb_shrlist_t);
-		}
-		else
-			bzero(shrlist, sizeof (smb_shrlist_t));
-	}
-	else
-		bzero(shrlist, sizeof (smb_shrlist_t));
-}
-
-void
-smb_dr_put_shrlist(smb_dr_ctx_t *ctx, smb_shrlist_t *shrlist)
-{
-	if (shrlist) {
-		smb_dr_put_int32(ctx, 1);
-		if (ctx->ptr + sizeof (smb_shrlist_t) <= ctx->end_ptr) {
-			(void) memcpy(ctx->ptr,
-			    shrlist, sizeof (smb_shrlist_t));
-			ctx->ptr += sizeof (smb_shrlist_t);
 		}
 		else
 			ctx->status = ENOSPC;

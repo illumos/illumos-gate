@@ -1074,7 +1074,6 @@ usr/include/smbsrv/samlib.h		sparc
 usr/include/smbsrv/smb.h		sparc
 usr/include/smbsrv/smb_common_door.h	sparc
 usr/include/smbsrv/smb_door_svc.h	sparc
-usr/include/smbsrv/smb_fsd.h		sparc
 usr/include/smbsrv/smb_fsops.h		sparc
 usr/include/smbsrv/smb_i18n.h		sparc
 usr/include/smbsrv/smb_idmap.h		sparc

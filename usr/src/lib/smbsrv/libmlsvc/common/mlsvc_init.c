@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)mlsvc_init.c	1.5	08/07/22 SMI"
 
 #include <unistd.h>
 #include <pthread.h>
@@ -87,9 +87,8 @@ mlsvc_keepalive(void *arg)
 			domain = nt_domain_lookupbytype(NT_DOMAIN_PRIMARY);
 			if (domain == NULL)
 				(void) lsa_query_primary_domain_info();
+			(void) srvsvc_gettime(&t);
 		}
-
-		(void) srvsvc_gettime(&t);
 	}
 
 	/*NOTREACHED*/

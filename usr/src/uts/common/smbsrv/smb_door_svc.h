@@ -26,7 +26,7 @@
 #ifndef	_SMBSRV_SMB_DOOR_SVC_H
 #define	_SMBSRV_SMB_DOOR_SVC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_door_svc.h	1.5	08/07/16 SMI"
 
 #include <sys/door.h>
 #include <smbsrv/smb_token.h>
@@ -84,7 +84,8 @@ enum smb_dr_opcode_t {
 	SMB_DR_USER_LIST,
 	SMB_DR_LOOKUP_SID,
 	SMB_DR_LOOKUP_NAME,
-	SMB_DR_JOIN
+	SMB_DR_JOIN,
+	SMB_DR_GET_DCINFO
 };
 
 enum smb_kdr_opcode_t {

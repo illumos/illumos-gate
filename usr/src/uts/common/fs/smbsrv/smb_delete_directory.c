@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_delete_directory.c	1.5	08/08/04 SMI"
 
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
@@ -116,7 +116,11 @@ smb_com_delete_directory(smb_request_t *sr)
 	if (rc != 0) {
 		smb_node_release(dnode);
 		SMB_NULL_FQI_NODES(sr->arg.dirop.fqi);
-		smbsr_errno(sr, rc);
+		if (rc == EEXIST)
+			smbsr_error(sr, NT_STATUS_DIRECTORY_NOT_EMPTY,
+			    ERRDOS, ERROR_DIR_NOT_EMPTY);
+		else
+			smbsr_errno(sr, rc);
 		return (SDRC_ERROR);
 	}
 

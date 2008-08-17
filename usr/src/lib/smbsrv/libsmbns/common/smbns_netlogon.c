@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smbns_netlogon.c	1.7	08/07/16 SMI"
 
 /*
  * This module handles the primary domain controller location protocol.
@@ -534,7 +534,7 @@ smb_better_dc(uint32_t cur_ip, uint32_t new_ip)
 }
 
 /*
- * msdcs_lookup_ads
+ * smb_msdcs_lookup_ads
  *
  * Try to find a domain controller in ADS.
  *
@@ -548,7 +548,7 @@ smb_better_dc(uint32_t cur_ip, uint32_t new_ip)
 int
 smb_msdcs_lookup_ads(char *nbt_domain, char *server)
 {
-	smb_ads_host_info_t *hinfo = 0;
+	smb_ads_host_info_t *hinfo = NULL;
 	int ads_port = 0;
 	char ads_domain[MAXHOSTNAMELEN];
 	char *p;

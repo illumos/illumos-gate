@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_auth.c	1.5	08/07/08 SMI"
 
 #include <strings.h>
 #include <stdlib.h>
@@ -289,9 +289,9 @@ smb_auth_blob_to_string(smb_auth_data_blob_t *blob, unsigned char *data_blob)
  */
 int
 smb_auth_ntlmv2_hash(unsigned char *ntlm_hash,
-	char *username,
-	char *ntdomain,
-	unsigned char *ntlmv2_hash)
+    char *username,
+    char *ntdomain,
+    unsigned char *ntlmv2_hash)
 {
 	mts_wchar_t *data;
 	int data_len;
@@ -528,17 +528,24 @@ smb_ntlm_password_ok(
     unsigned char *challenge,
     uint32_t clen,
     unsigned char *ntlm_hash,
-    unsigned char *passwd)
+    unsigned char *passwd,
+    unsigned char *session_key)
 {
 	unsigned char ntlm_resp[SMBAUTH_LM_RESP_SZ];
 	int rc;
+	boolean_t ok;
 
 	rc = smb_auth_ntlm_response(ntlm_hash, challenge, clen, ntlm_resp);
-
 	if (rc != SMBAUTH_LM_RESP_SZ)
 		return (B_FALSE);
 
-	return (bcmp(ntlm_resp, passwd, SMBAUTH_LM_RESP_SZ) == 0);
+	ok = (bcmp(ntlm_resp, passwd, SMBAUTH_LM_RESP_SZ) == 0);
+	if (ok && (session_key)) {
+		rc = smb_auth_md4(session_key, ntlm_hash, SMBAUTH_HASH_SZ);
+		if (rc != SMBAUTH_SUCCESS)
+			ok = B_FALSE;
+	}
+	return (ok);
 }
 
 static boolean_t
@@ -549,7 +556,8 @@ smb_ntlmv2_password_ok(
     unsigned char *passwd,
     int pwdlen,
     char *domain,
-    char *username)
+    char *username,
+    uchar_t *session_key)
 {
 	unsigned char *clnt_blob;
 	int clnt_blob_len;
@@ -558,6 +566,7 @@ smb_ntlmv2_password_ok(
 	boolean_t ok = B_FALSE;
 	char *dest[3];
 	int i;
+	int rc;
 
 	clnt_blob_len = pwdlen - SMBAUTH_HASH_SZ;
 	clnt_blob = &passwd[SMBAUTH_HASH_SZ];
@@ -600,9 +609,15 @@ smb_ntlmv2_password_ok(
 			break;
 
 		ok = (bcmp(passwd, ntlmv2_resp, pwdlen) == 0);
-		if (ok == B_TRUE)
+		if (ok && session_key) {
+			rc = SMBAUTH_HMACT64(ntlmv2_resp,
+			    SMBAUTH_HASH_SZ, ntlmv2_hash,
+			    SMBAUTH_SESSION_KEY_SZ, session_key);
+			if (rc != SMBAUTH_SUCCESS) {
+				ok = B_FALSE;
+			}
 			break;
-
+		}
 	}
 
 	free(dest[1]);
@@ -661,9 +676,8 @@ smb_lmv2_password_ok(
 			break;
 
 		ok = (bcmp(passwd, lmv2_resp, SMBAUTH_LM_RESP_SZ) == 0);
-		if (ok == B_TRUE)
+		if (ok)
 			break;
-
 	}
 
 	free(dest[1]);
@@ -725,7 +739,8 @@ smb_auth_validate_nt(
     unsigned char *passwd,
     int pwdlen,
     char *domain,
-    char *username)
+    char *username,
+    uchar_t *session_key)
 {
 	int64_t lmlevel;
 	boolean_t ok;
@@ -738,10 +753,11 @@ smb_auth_validate_nt(
 
 	if (pwdlen > SMBAUTH_LM_RESP_SZ)
 		ok = smb_ntlmv2_password_ok(challenge, clen,
-		    smbpw->pw_nthash, passwd, pwdlen, domain, username);
+		    smbpw->pw_nthash, passwd, pwdlen,
+		    domain, username, session_key);
 	else
 		ok = smb_ntlm_password_ok(challenge, clen,
-		    smbpw->pw_nthash, passwd);
+		    smbpw->pw_nthash, passwd, session_key);
 
 	return (ok);
 }

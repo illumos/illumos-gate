@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_trans2_find.c	1.13	08/08/07 SMI"
 
 /*
  * This module provides functions for TRANS2_FIND_FIRST2 and
@@ -702,17 +702,11 @@ int smb_get_dents(
 	smb_node_t	*snode;
 	smb_attr_t	file_attr;
 	uint32_t	maxcnt = ihdr->uio.uio_iovcnt;
-	char		shortname[MANGLE_NAMELEN], name83[MANGLE_NAMELEN];
-	fsvol_attr_t	vol_attr;
+	char		shortname[SMB_SHORTNAMELEN], name83[SMB_SHORTNAMELEN];
 
 	namebuf = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
 	if (more)
 		*more = 0;
-
-	if ((rc = fsd_getattr(&sr->tid_tree->t_fsd, &vol_attr)) != 0) {
-		kmem_free(namebuf, MAXNAMELEN);
-		return (rc);
-	}
 
 	if (!wildcards) {
 		/* Already found entry? */
@@ -1002,7 +996,7 @@ smb_trans2_find_mbc_encode(
 		allocsz = ient->attr.sa_vattr.va_nblocks * DEV_BSIZE;
 		asize32 = (allocsz > UINT_MAX) ? UINT_MAX : (uint32_t)allocsz;
 
-		dattr = smb_mode_to_dos_attributes(&ient->attr);
+		dattr = smb_node_get_dosattr(ient->snode);
 	}
 
 	switch (infolev) {
@@ -1012,10 +1006,11 @@ smb_trans2_find_mbc_encode(
 			    ient->cookie);
 
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%yyyllwbu", sr,
-		    ient->attr.sa_crtime.tv_sec ? ient->attr.sa_crtime.tv_sec :
-		    ient->attr.sa_vattr.va_mtime.tv_sec,
-		    ient->attr.sa_vattr.va_atime.tv_sec,
-		    ient->attr.sa_vattr.va_mtime.tv_sec,
+		    ient->attr.sa_crtime.tv_sec ?
+		    smb_gmt2local(sr, ient->attr.sa_crtime.tv_sec) :
+		    smb_gmt2local(sr, ient->attr.sa_vattr.va_mtime.tv_sec),
+		    smb_gmt2local(sr, ient->attr.sa_vattr.va_atime.tv_sec),
+		    smb_gmt2local(sr, ient->attr.sa_vattr.va_mtime.tv_sec),
 		    dsize32,
 		    asize32,
 		    dattr,
@@ -1028,11 +1023,12 @@ smb_trans2_find_mbc_encode(
 			(void) smb_mbc_encodef(&xa->rep_data_mb, "l",
 			    ient->cookie);
 
-		(void) smb_mbc_encodef(&xa->rep_data_mb, "%yyyllwlbu", sr,
-		    ient->attr.sa_crtime.tv_sec ? ient->attr.sa_crtime.tv_sec :
-		    ient->attr.sa_vattr.va_mtime.tv_sec,
-		    ient->attr.sa_vattr.va_atime.tv_sec,
-		    ient->attr.sa_vattr.va_mtime.tv_sec,
+		(void) smb_mbc_encodef(&xa->rep_data_mb, "%yyyllwlbz", sr,
+		    ient->attr.sa_crtime.tv_sec ?
+		    smb_gmt2local(sr, ient->attr.sa_crtime.tv_sec) :
+		    smb_gmt2local(sr, ient->attr.sa_vattr.va_mtime.tv_sec),
+		    smb_gmt2local(sr, ient->attr.sa_vattr.va_atime.tv_sec),
+		    smb_gmt2local(sr, ient->attr.sa_vattr.va_mtime.tv_sec),
 		    dsize32,
 		    asize32,
 		    dattr,

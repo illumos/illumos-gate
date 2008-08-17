@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smbd_share_doorsvc.c	1.6	08/08/05 SMI"
 
 /*
  * LanMan share door server
@@ -149,6 +149,7 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 	unsigned int dec_status;
 	unsigned int enc_status;
 	char *sharename, *sharename2;
+	char *cmnt, *ad_container;
 	smb_share_t lmshr_info;
 	smb_shrlist_t lmshr_list;
 	smb_enumshare_info_t esi;
@@ -181,7 +182,7 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 			goto decode_error;
 		}
 
-		rc = smb_shr_del(sharename, 0);
+		rc = smb_shr_delete(sharename, B_FALSE);
 		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
 		smb_dr_free_string(sharename);
@@ -197,7 +198,7 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 			goto decode_error;
 		}
 
-		rc = smb_shr_ren(sharename, sharename2, 0);
+		rc = smb_shr_rename(sharename, sharename2);
 		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
 		smb_dr_free_string(sharename);
@@ -223,20 +224,30 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
 			goto decode_error;
 
-		rc = smb_shr_add(&lmshr_info, 0);
+		rc = smb_shr_create(&lmshr_info, B_FALSE);
 		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
 		smb_dr_put_share(enc_ctx, &lmshr_info);
 		break;
 
-	case SMB_SHROP_SETINFO:
-		smb_dr_get_share(dec_ctx, &lmshr_info);
-		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0)
+	case SMB_SHROP_MODIFY:
+		sharename = smb_dr_get_string(dec_ctx);
+		cmnt = smb_dr_get_string(dec_ctx);
+		ad_container = smb_dr_get_string(dec_ctx);
+		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0) {
+			smb_dr_free_string(sharename);
+			smb_dr_free_string(cmnt);
+			smb_dr_free_string(ad_container);
 			goto decode_error;
+		}
 
-		rc = smb_shr_set(&lmshr_info, 0);
+		rc = smb_shr_modify(sharename, cmnt, ad_container, B_FALSE);
 		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
+
+		smb_dr_free_string(sharename);
+		smb_dr_free_string(cmnt);
+		smb_dr_free_string(ad_container);
 		break;
 
 	case SMB_SHROP_LIST:
@@ -246,7 +257,8 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 
 		smb_shr_list(offset, &lmshr_list);
 		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
-		smb_dr_put_shrlist(enc_ctx, &lmshr_list);
+		smb_dr_put_buf(enc_ctx, (unsigned char *)&lmshr_list,
+		    sizeof (smb_shrlist_t));
 		break;
 
 	case SMB_SHROP_ENUM:
@@ -336,7 +348,7 @@ smb_share_dsrv_enum(smb_enumshare_info_t *esi)
 	remained = esi->es_bufsize;
 
 	/* Do the necessary calculations in the first round */
-	smb_shr_iterinit(&shi, SMB_SHRF_ALL);
+	smb_shr_iterinit(&shi);
 
 	while ((si = smb_shr_iterate(&shi)) != NULL) {
 		if (si->shr_flags & SMB_SHRF_LONGNAME)
@@ -372,7 +384,7 @@ smb_share_dsrv_enum(smb_enumshare_info_t *esi)
 	cmnt_offs = infolen;
 
 	/* Encode the data in the second round */
-	smb_shr_iterinit(&shi, SMB_SHRF_ALL);
+	smb_shr_iterinit(&shi);
 	autohome_added = B_FALSE;
 
 	while ((si = smb_shr_iterate(&shi)) != NULL) {

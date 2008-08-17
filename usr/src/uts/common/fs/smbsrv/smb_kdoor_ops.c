@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_kdoor_ops.c	1.5	08/08/05 SMI"
 
 /*
  * Kernel door operations
@@ -143,9 +143,6 @@ smb_kdr_op_share(char *argp, size_t arg_size, size_t *rbufsize, int *errno)
 	}
 
 	smb_dr_kshare_free(kshare);
-
-	if (error)
-		return (NULL);
 
 	rbuf = smb_kdr_encode_common(SMB_DR_OP_SUCCESS, &error, xdr_int32_t,
 	    rbufsize);

@@ -923,7 +923,6 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_common_open.o			\
 		smb_common_search.o			\
 		smb_common_transact.o			\
-		smb_common_tree.o			\
 		smb_create.o				\
 		smb_create_directory.o			\
 		smb_delete.o				\
@@ -934,7 +933,6 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_find.o				\
 		smb_find_unique.o			\
 		smb_flush.o				\
-		smb_fsd.o				\
 		smb_fsops.o				\
 		smb_init.o				\
 		smb_kdoor_encdec.o			\
@@ -942,8 +940,8 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_kdoor_clnt.o			\
 		smb_kdoor_srv.o				\
 		smb_kshare.o				\
+		smb_lock.o				\
 		smb_lock_byte_range.o			\
-		smb_lock_svc.o				\
 		smb_locking_andx.o			\
 		smb_logoff_andx.o			\
 		smb_mangle_name.o			\
@@ -992,8 +990,6 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_trans2_set_information.o		\
 		smb_trans2_set_path_information.o	\
 		smb_tree_connect.o			\
-		smb_tree_connect_andx.o			\
-		smb_tree_disconnect.o			\
 		smb_unlock_byte_range.o			\
 		smb_upcalls.o				\
 		smb_user.o				\

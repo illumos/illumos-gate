@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_vops.c	1.13	08/07/30 SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -158,10 +158,10 @@ smb_vop_open(vnode_t **vpp, int mode, cred_t *cred)
 	return (VOP_OPEN(vpp, mode, cred, &smb_ct));
 }
 
-int
+void
 smb_vop_close(vnode_t *vp, int mode, cred_t *cred)
 {
-	return (VOP_CLOSE(vp, mode, 1, (offset_t)0, cred, &smb_ct));
+	(void) VOP_CLOSE(vp, mode, 1, (offset_t)0, cred, &smb_ct);
 }
 
 int
@@ -992,8 +992,8 @@ smb_vop_readdir_entry(
 	int error = 0;
 	int len;
 	int rc;
-	char shortname[MANGLE_NAMELEN];
-	char name83[MANGLE_NAMELEN];
+	char shortname[SMB_SHORTNAMELEN];
+	char name83[SMB_SHORTNAMELEN];
 	char *ebuf = NULL;
 	edirent_t *edp;
 	dirent64_t *dp = NULL;
@@ -1250,8 +1250,8 @@ smb_vop_getdents_entries(
 	char		*tmp_name;
 	int		error;
 	int		rc;
-	char		shortname[MANGLE_NAMELEN];
-	char		name83[MANGLE_NAMELEN];
+	char		shortname[SMB_SHORTNAMELEN];
+	char		name83[SMB_SHORTNAMELEN];
 	char		*ebuf = NULL;
 	dirent64_t	*dp = NULL;
 	edirent_t	*edp;
@@ -1354,11 +1354,11 @@ smb_vop_getdents_entries(
 
 			if (rc != 1) {
 				(void) strlcpy(shortname, edp->ed_name,
-				    MANGLE_NAMELEN);
+				    SMB_SHORTNAMELEN);
 				(void) strlcpy(name83, edp->ed_name,
-				    MANGLE_NAMELEN);
-				shortname[MANGLE_NAMELEN - 1] = '\0';
-				name83[MANGLE_NAMELEN - 1] = '\0';
+				    SMB_SHORTNAMELEN);
+				shortname[SMB_SHORTNAMELEN - 1] = '\0';
+				name83[SMB_SHORTNAMELEN - 1] = '\0';
 			}
 
 			error = smb_gather_dents_info(arg, edp->ed_ino,

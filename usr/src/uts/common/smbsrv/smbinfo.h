@@ -26,7 +26,7 @@
 #ifndef	_SMBSRV_SMBINFO_H
 #define	_SMBSRV_SMBINFO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smbinfo.h	1.5	08/07/08 SMI"
 
 #include <sys/types.h>
 
@@ -129,7 +129,6 @@ typedef struct smb_kmod_cfg {
 	int32_t skc_restrict_anon;
 	int32_t skc_signing_enable;
 	int32_t skc_signing_required;
-	int32_t skc_signing_check;
 	int32_t skc_oplock_enable;
 	int32_t skc_sync_enable;
 	int32_t skc_secmode;

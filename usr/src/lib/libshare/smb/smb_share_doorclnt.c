@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_share_doorclnt.c	1.5	08/08/05 SMI"
 
 /*
  * User-space door client for LanMan share management.
@@ -162,6 +162,8 @@ smb_share_list(int offset, smb_shrlist_t *list)
 	smb_dr_ctx_t *enc_ctx;
 	uint32_t rc;
 
+	bzero(list, sizeof (smb_shrlist_t));
+
 	if ((arg = smb_share_denter()) == NULL)
 		return (NERR_InternalError);
 
@@ -188,7 +190,8 @@ smb_share_list(int offset, smb_shrlist_t *list)
 		return (NERR_InternalError);
 	}
 
-	smb_dr_get_shrlist(dec_ctx, list);
+	(void) smb_dr_get_buf(dec_ctx, (unsigned char *)list,
+	    sizeof (smb_shrlist_t));
 	if (smb_dr_decode_finish(dec_ctx) != 0) {
 		smb_share_dexit(arg, "decode error");
 		return (NERR_InternalError);
@@ -243,7 +246,7 @@ smb_share_count(void)
 }
 
 uint32_t
-smb_share_del(char *share_name)
+smb_share_delete(char *share_name)
 {
 	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
@@ -288,7 +291,7 @@ smb_share_del(char *share_name)
 }
 
 uint32_t
-smb_share_ren(char *from, char *to)
+smb_share_rename(char *from, char *to)
 {
 	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
@@ -378,7 +381,7 @@ smb_share_get(char *share_name, smb_share_t *si)
 }
 
 uint32_t
-smb_share_add(smb_share_t *si)
+smb_share_create(smb_share_t *si)
 {
 	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
@@ -423,7 +426,7 @@ smb_share_add(smb_share_t *si)
 }
 
 uint32_t
-smb_share_set(smb_share_t *si)
+smb_share_modify(char *sharename, char *cmnt, char *ad_container)
 {
 	door_arg_t *arg;
 	smb_dr_ctx_t *dec_ctx;
@@ -434,8 +437,10 @@ smb_share_set(smb_share_t *si)
 		return (NERR_InternalError);
 
 	enc_ctx = smb_dr_encode_start(arg->data_ptr, SMB_SHARE_DSIZE);
-	smb_dr_put_uint32(enc_ctx, SMB_SHROP_SETINFO);
-	smb_dr_put_share(enc_ctx, si);
+	smb_dr_put_uint32(enc_ctx, SMB_SHROP_MODIFY);
+	smb_dr_put_string(enc_ctx, sharename);
+	smb_dr_put_string(enc_ctx, cmnt);
+	smb_dr_put_string(enc_ctx, ad_container);
 
 	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
 	if (rc != 0) {

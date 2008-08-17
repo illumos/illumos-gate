@@ -26,42 +26,71 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)stype.d	1.4	08/08/07 SMI"
 
 #pragma D option flowindent
 
 /*
- * SmbSessionSetupX, SmbLogoffX and dispatcher
+ * Usage:	./stype.d -p `pgrep smbd`
+ *
+ * On multi-processor systems, it may be easier to follow the output
+ * if run on a single processor: see psradm.  For example, to disable
+ * the second processor on a dual-processor system:	psradm -f 1
  */
-smb_com_session_setup_andx:entry,
-smb_com_logoff_andx:entry,
-smb_com_session_setup_andx:return
+
+BEGIN
 {
+	printf("CIFS Trace Started");
+	printf("\n\n");
 }
 
-smb_com_*:entry
+END
+{
+	printf("CIFS Trace Ended");
+	printf("\n\n");
+}
+
+sdt:smbsrv::-smb_op-SessionSetupX-start
 {
 	sr = (struct smb_request *)arg0;
 
-	printf("cmd=%d [uid=%d tid=%d]",
-	    sr->smb_com, sr->smb_uid, sr->smb_tid);
+	printf("[%s] %s",
+	    (sr->session->s_local_port == 139) ? "NBT" : "TCP",
+	    (sr->session->s_local_port == 139) ?
+	    stringof(sr->session->workstation) : "");
 }
 
-sdt:smbsrv::smb-sessionsetup-clntinfo
+sdt:smbsrv::-smb_op-SessionSetupX-done,
+sdt:smbsrv::-smb_op-LogoffX-start
 {
-        clnt = (netr_client_t *)arg0;
+	sr = (struct smb_request *)arg0;
 
-        printf("domain=%s\n\n", stringof(clnt->domain));
-        printf("username=%s\n\n", stringof(clnt->username));
+	printf("uid %d: %s/%s", sr->smb_uid,
+	    stringof(sr->uid_user->u_domain),
+	    stringof(sr->uid_user->u_name));
 }
 
-smb_com_logoff_andx:return
+sdt:smbsrv::-smb_op-TreeConnectX-start
 {
-	exit(0);
+	tcon = (struct tcon *)arg1;
+
+	printf("[%s] %s",
+                stringof(tcon->service),
+                stringof(tcon->path));
+}
+
+sdt:smbsrv::-smb_op-TreeConnectX-done,
+sdt:smbsrv::-smb_op-TreeDisconnect-done
+{
+	sr = (struct smb_request *)arg0;
+
+	printf("tid %d: %s", sr->smb_tid,
+	    (sr->tid_tree == 0) ? "" :
+	    stringof(sr->tid_tree->t_sharename));
 }
 
 /*
- * Raise error functions (no return).
+ * Error functions
  */
 smbsr_error:entry
 {
@@ -73,72 +102,69 @@ smbsr_errno:entry
     printf("errno=%d", arg1);
 }
 
+smbsr_error:return,
+smbsr_errno:return
+{
+}
+
 /*
  * Share/tree connect.
  */
-smbsr_setup_share:entry
+smb_tree_connect:entry
 {
-	printf("sharename=%s stype=%d", stringof(arg1), arg2);
-	self->stype = arg2;
 }
 
-smbsr_setup_share:return
+smb_tree_get_sharename:entry
 {
+	printf("uncpath=%s", stringof(arg0));
+}
+
+smb_tree_get_stype:entry
+{
+	printf("sharename=%s service=%s", stringof(arg0), stringof(arg1));
+}
+
+smb_tree_connect_disk:entry
+{
+	printf("sharename=%s", stringof(arg1));
 	self->stype = 0;
 }
 
-smbsr_connect_tree:entry
+smb_tree_connect_ipc:entry
 {
+	printf("sharename=%s", stringof(arg1));
+	self->stype = 3;
 }
 
-smbsr_share_report:entry
+smb_tree_connect:return,
+smb_tree_get_sharename:return,
+smb_tree_get_stype:return,
+smb_tree_connect_disk:return,
+smb_tree_connect_ipc:return
 {
-	printf("%s: %s %s", stringof(arg1), stringof(arg2), stringof(arg3));
+	printf("rc=0x%08x", arg1);
 }
 
-smbsr_connect_tree:return,
-smbsr_share_report:return,
-smb_pathname_reduce:return
-{
-	printf("rc=%d", arg1);
-}
-
-smb_get_stype:entry
-{
-	printf("share=%s service=%s", stringof(arg0), stringof(arg1));
-}
-
-smb_get_stype:return
-{
-	printf("%d", arg1);
-}
-
-smb_tree_connect:entry
+smb_tree_alloc:entry
 /self->stype == 0/
 {
-	printf("share=%s service=%s volname=%s",
-		stringof(arg3),
-		stringof(arg4),
-		stringof(((fsvol_attr_t *)arg7)->name));
+	printf("share=%s service=%s", stringof(arg1), stringof(arg2));
 }
 
-smb_tree_connect:return
+smb_tree_alloc:return
 /self->stype == 0/
 {
-	printf("FS=%s", stringof(((smb_tree_t *)arg1)->t_typename));
+	printf("FS=%s flags=0x%08x",
+	    stringof(((smb_tree_t *)arg1)->t_typename),
+	    ((smb_tree_t *)arg1)->t_flags);
 }
 
-smb_pathname_reduce:entry
+smb_tree_disconnect:entry,
+smb_tree_disconnect:return
 {
-	printf("path=%s", stringof(arg2));
 }
 
-sdt:smbsrv::smb-vfs-volume
+smb_tree_log:entry
 {
-	printf("mntpnt=%s volname=%s", stringof(arg0), stringof(arg1));
-}
-
-sdt:smbsrv::smb-vfs-getflags
-{
-	printf("flags=0x%08x", arg0);
+	printf("%s: %s", stringof(arg1), stringof(arg2));
 }

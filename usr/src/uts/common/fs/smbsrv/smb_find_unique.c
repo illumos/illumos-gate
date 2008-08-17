@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_find_unique.c	1.6	08/07/30 SMI"
 
 #include <smbsrv/smb_incl.h>
 
@@ -225,7 +225,10 @@ smb_com_find_unique(struct smb_request *sr)
 	char			*path;
 	struct vardata_block	*vdb;
 	struct smb_node		*node;
-	smb_odir_context_t *pc;
+	uint16_t		index;
+	unsigned char		resume_char = '\0';
+	uint32_t		client_key = 0;
+	smb_odir_context_t 	*pc;
 
 	vdb = kmem_alloc(sizeof (struct vardata_block), KM_SLEEP);
 	if (smbsr_decode_vwv(sr, "ww", &maxcount, &sattr) != 0) {
@@ -254,21 +257,30 @@ smb_com_find_unique(struct smb_request *sr)
 	pc = kmem_zalloc(sizeof (*pc), KM_SLEEP);
 	pc->dc_cookie = 0;
 	count = 0;
+	index = 0;
 	node = (struct smb_node *)0;
 	rc = 0;
+
+	if (maxcount > SMB_MAX_SEARCH)
+		maxcount = SMB_MAX_SEARCH;
+
 	while (count < maxcount) {
 		if ((rc = smb_rdir_next(sr, &node, pc)) != 0)
 			break;
 
-		(void) smb_mbc_encodef(&sr->reply, ".8c3cbl4.bYl13c",
-		    pc->dc_name83, pc->dc_name83+9, sr->smb_sid,
-		    pc->dc_cookie+1, pc->dc_dattr,
+		(void) smb_mbc_encodef(&sr->reply, "b8c3c.wwlbYl13c",
+		    resume_char,
+		    pc->dc_name83, pc->dc_name83+9,
+		    index, sr->smb_sid, client_key,
+		    pc->dc_dattr & 0xff,
 		    smb_gmt2local(sr, pc->dc_attr.sa_vattr.va_mtime.tv_sec),
 		    (int32_t)smb_node_get_size(node, &pc->dc_attr),
 		    (*pc->dc_shortname) ? pc->dc_shortname : pc->dc_name);
+
 		smb_node_release(node);
 		node = (struct smb_node *)0;
 		count++;
+		index++;
 	}
 	kmem_free(pc, sizeof (*pc));
 
@@ -283,7 +295,8 @@ smb_com_find_unique(struct smb_request *sr)
 
 	if (count == 0) {
 		kmem_free(vdb, sizeof (struct vardata_block));
-		smbsr_error(sr, 0, ERRDOS, ERRnofiles);
+		smbsr_warn(sr, NT_STATUS_NO_MORE_FILES,
+		    ERRDOS, ERROR_NO_MORE_FILES);
 		return (SDRC_ERROR);
 	}
 
@@ -293,6 +306,7 @@ smb_com_find_unique(struct smb_request *sr)
 		kmem_free(vdb, sizeof (struct vardata_block));
 		return (SDRC_ERROR);
 	}
+
 	kmem_free(vdb, sizeof (struct vardata_block));
 	return (SDRC_SUCCESS);
 }

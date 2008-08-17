@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smbd_main.c	1.13	08/08/05 SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -47,6 +47,7 @@
 #include <time.h>
 #include <libscf.h>
 #include <zone.h>
+#include <time.h>
 #include <tzfile.h>
 #include <libgen.h>
 #include <pwd.h>
@@ -83,6 +84,7 @@ static void smbd_report(const char *fmt, ...);
 
 static void smbd_sig_handler(int sig);
 
+static int32_t smbd_gmtoff(void);
 static int smbd_localtime_init(void);
 static void *smbd_localtime_monitor(void *arg);
 
@@ -358,11 +360,7 @@ smbd_service_init(void)
 	if (smb_nicmon_start(SMBD_DEFAULT_INSTANCE_FMRI) != 0)
 		smbd_report("NIC monitoring failed to start");
 
-	if (dns_msgid_init() != 0) {
-		smbd_report("DNS message id initialization failed");
-		return (1);
-	}
-
+	dns_msgid_init();
 	smbrdr_init();
 
 	if (smb_netbios_start() != 0)
@@ -399,14 +397,9 @@ smbd_service_init(void)
 		return (rc);
 	}
 
-	if (smbd.s_secmode == SMB_SECMODE_DOMAIN) {
-		if (!smb_match_netlogon_seqnum())
-			smb_set_netlogon_cred();
-		else
-			(void) smbd_locate_dc(resource_domain, "");
-
-		(void) lsa_query_primary_domain_info();
-	}
+	if (smbd.s_secmode == SMB_SECMODE_DOMAIN)
+		if (smbd_locate_dc_start(resource_domain) != 0)
+			smbd_report("dc discovery failed %s", strerror(errno));
 
 	smbd.s_door_lmshr = smb_share_dsrv_start();
 	if (smbd.s_door_lmshr < 0) {
@@ -442,7 +435,12 @@ smbd_service_init(void)
 		return (rc);
 	}
 
-	return (smb_shr_start());
+	if ((rc = smb_shr_start()) != 0) {
+		smbd_report("share initialization failed: %s", strerror(errno));
+		return (rc);
+	}
+
+	return (0);
 }
 
 /*
@@ -650,7 +648,7 @@ smbd_kernel_bind(void)
 		smbd.s_drv_fd = -1;
 		return (errno);
 	}
-	smb_io.sio_data.gmtoff = (uint32_t)(-altzone);
+	smb_io.sio_data.gmtoff = smbd_gmtoff();
 	if (ioctl(smbd.s_drv_fd, SMB_IOC_GMTOFF, &smb_io) < 0) {
 		(void) close(smbd.s_drv_fd);
 		smbd.s_drv_fd = -1;
@@ -734,12 +732,12 @@ static void *
 smbd_localtime_monitor(void *arg)
 {
 	struct tm local_tm;
-	time_t secs, gmtoff;
-	time_t last_gmtoff = -1;
+	time_t secs;
+	int32_t gmtoff, last_gmtoff = -1;
 	int timeout;
 
 	for (;;) {
-		gmtoff = -altzone;
+		gmtoff = smbd_gmtoff();
 
 		if ((last_gmtoff != gmtoff) && (smbd.s_drv_fd != -1)) {
 			if (ioctl(smbd.s_drv_fd, SMB_IOC_GMTOFF, &gmtoff) < 0) {
@@ -761,6 +759,27 @@ smbd_localtime_monitor(void *arg)
 
 	/*NOTREACHED*/
 	return (NULL);
+}
+
+/*
+ * smbd_gmtoff
+ *
+ * Determine offset from GMT. If daylight saving time use altzone,
+ * otherwise use timezone.
+ */
+static int32_t
+smbd_gmtoff(void)
+{
+	time_t clock_val;
+	struct tm *atm;
+	int32_t gmtoff;
+
+	(void) time(&clock_val);
+	atm = localtime(&clock_val);
+
+	gmtoff = (atm->tm_isdst) ? altzone : timezone;
+
+	return (gmtoff);
 }
 
 static void

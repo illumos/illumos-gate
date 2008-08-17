@@ -26,7 +26,7 @@
 #ifndef	_LIBMLSVC_H
 #define	_LIBMLSVC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)libmlsvc.h	1.7	08/08/05 SMI"
 
 #include <sys/types.h>
 #include <smbsrv/smb_sid.h>
@@ -64,7 +64,6 @@ typedef struct smb_autohome {
 
 extern void smb_autohome_add(const char *);
 extern void smb_autohome_remove(const char *);
-extern boolean_t smb_is_autohome(const smb_share_t *);
 
 #ifdef	__cplusplus
 }

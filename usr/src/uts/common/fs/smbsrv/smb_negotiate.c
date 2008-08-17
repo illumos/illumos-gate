@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_negotiate.c	1.6	08/07/21 SMI"
 
 /*
  * Notes on the virtual circuit (VC) values in the SMB Negotiate
@@ -254,7 +254,7 @@ smb_com_negotiate(smb_request_t *sr)
 	uint32_t		capabilities = 0;
 	int			rc;
 	unsigned short		max_mpx_count;
-	WORD			tz_correction;
+	int16_t			tz_correction;
 	char			ipaddr_buf[INET_ADDRSTRLEN];
 
 	if (sr->session->s_state != SMB_SESSION_STATE_ESTABLISHED) {
@@ -290,8 +290,7 @@ smb_com_negotiate(smb_request_t *sr)
 	    &keylen, &sesskey);
 
 	(void) microtime(&time_val);
-	/* tz correct. (min) */
-	tz_correction = -(WORD)(sr->sr_gmtoff / 60);
+	tz_correction = sr->sr_gmtoff / 60;
 
 	switch (dialect) {
 	case DIALECT_UNKNOWN:
@@ -324,7 +323,7 @@ smb_com_negotiate(smb_request_t *sr)
 		    3,		/* raw mode (s/b 3) */
 		    sesskey,	/* session key */
 		    time_val.tv_sec, /* server time/date */
-		    tz_correction,  /* see smb_get_gmtoff */
+		    tz_correction,
 		    (short)keylen,	/* Encryption Key Length */
 				/* reserved field handled 2. */
 		    VAR_BCC,

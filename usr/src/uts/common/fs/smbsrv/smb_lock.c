@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_lock.c	1.10	08/08/04 SMI"
 
 /*
  * This module provides range lock functionality for CIFS/SMB clients.
@@ -41,8 +41,8 @@
 extern caller_context_t smb_ct;
 
 static void smb_lock_posix_unlock(smb_node_t *, smb_lock_t *, cred_t *);
-static boolean_t smb_is_range_unlocked(uint64_t, uint64_t, smb_llist_t *,
-    uint64_t *);
+static boolean_t smb_is_range_unlocked(uint64_t, uint64_t, uint32_t,
+    smb_llist_t *, uint64_t *);
 static int smb_lock_range_overlap(smb_lock_t *, uint64_t, uint64_t);
 static uint32_t smb_lock_range_lckrules(smb_request_t *, smb_ofile_t *,
     smb_node_t *, smb_lock_t *, smb_lock_t **);
@@ -122,6 +122,7 @@ smb_lock_range(
 	smb_lock_t	*lock;
 	smb_lock_t	*clock = NULL;
 	uint32_t	result = NT_STATUS_SUCCESS;
+	boolean_t	lock_has_timeout = (timeout != 0);
 
 	lock = smb_lock_create(sr, start, length, locktype, timeout);
 
@@ -173,9 +174,8 @@ smb_lock_range(
 			 * Locks with timeouts always return
 			 * NT_STATUS_FILE_LOCK_CONFLICT
 			 */
-			if (timeout != 0) {
+			if (lock_has_timeout)
 				result = NT_STATUS_FILE_LOCK_CONFLICT;
-			}
 
 			/*
 			 * Locks starting higher than 0xef000000 that do not
@@ -344,7 +344,7 @@ smb_lock_range_error(smb_request_t *sr, uint32_t status32)
  */
 
 DWORD
-smb_range_check(smb_request_t *sr, cred_t *cr, smb_node_t *node, uint64_t start,
+smb_range_check(smb_request_t *sr, smb_node_t *node, uint64_t start,
     uint64_t length, boolean_t will_write)
 {
 	smb_error_t smberr;
@@ -363,20 +363,17 @@ smb_range_check(smb_request_t *sr, cred_t *cr, smb_node_t *node, uint64_t start,
 
 	rc = smb_lock_range_access(sr, node, start, length, will_write);
 	if (rc)
-		return (NT_STATUS_UNSUCCESSFUL);
+		return (NT_STATUS_FILE_LOCK_CONFLICT);
 
-	if ((rc = nbl_svmand(node->vp, cr, &svmand)) != 0) {
+	if ((rc = nbl_svmand(node->vp, kcred, &svmand)) != 0) {
 		smbsr_map_errno(rc, &smberr);
 		return (smberr.status);
 	}
 
-	if (will_write)
-		nbl_op = NBL_WRITE;
-	else
-		nbl_op = NBL_READ;
+	nbl_op = (will_write) ? NBL_WRITE : NBL_READ;
 
 	if (nbl_lock_conflict(node->vp, nbl_op, start, length, svmand, &smb_ct))
-		return (NT_STATUS_UNSUCCESSFUL);
+		return (NT_STATUS_FILE_LOCK_CONFLICT);
 
 	return (NT_STATUS_SUCCESS);
 }
@@ -389,7 +386,7 @@ smb_range_check(smb_request_t *sr, cred_t *cr, smb_node_t *node, uint64_t start,
  * that are not in other locks
  *
  */
-void
+static void
 smb_lock_posix_unlock(smb_node_t *node, smb_lock_t *lock, cred_t *cr)
 {
 	uint64_t	new_mark;
@@ -397,6 +394,7 @@ smb_lock_posix_unlock(smb_node_t *node, smb_lock_t *lock, cred_t *cr)
 	uint64_t	unlock_end;
 	smb_lock_t	new_unlock;
 	smb_llist_t	*llist;
+	boolean_t	can_unlock;
 
 	new_mark = 0;
 	unlock_start = lock->l_start;
@@ -404,8 +402,9 @@ smb_lock_posix_unlock(smb_node_t *node, smb_lock_t *lock, cred_t *cr)
 	llist = &node->n_lock_list;
 
 	for (;;) {
-		if (smb_is_range_unlocked(unlock_start, unlock_end, llist,
-		    &new_mark)) {
+		can_unlock = smb_is_range_unlocked(unlock_start, unlock_end,
+		    lock->l_file->f_uniqid, llist, &new_mark);
+		if (can_unlock) {
 			if (new_mark) {
 				new_unlock = *lock;
 				new_unlock.l_start = unlock_start;
@@ -432,8 +431,13 @@ smb_lock_posix_unlock(smb_node_t *node, smb_lock_t *lock, cred_t *cr)
 /*
  * smb_lock_range_overlap
  *
- * Checks if lock range(start, length) overlaps
- * range in lock structure.
+ * Checks if lock range(start, length) overlaps range in lock structure.
+ *
+ * Zero-length byte range locks actually affect no single byte of the stream,
+ * meaning they can still be accessed even with such locks in place. However,
+ * they do conflict with other ranges in the following manner:
+ *  conflict will only exist if the positive-length range contains the
+ *  zero-length range's offset but doesn't start at it
  *
  * return values:
  *	0 - Lock range doesn't overlap
@@ -446,9 +450,13 @@ smb_lock_posix_unlock(smb_node_t *node, smb_lock_t *lock, cred_t *cr)
 static int
 smb_lock_range_overlap(struct smb_lock *lock, uint64_t start, uint64_t length)
 {
-	/* A zero-length range doesn't overlap anything */
-	if (length == 0 || lock->l_length == 0)
+	if (length == 0) {
+		if ((lock->l_start < start) &&
+		    ((lock->l_start + lock->l_length) > start))
+			return (RANGE_OVERLAP);
+
 		return (RANGE_NO_OVERLAP);
+	}
 
 	/* The following test is intended to catch roll over locks. */
 	if ((start == lock->l_start) && (length == lock->l_length))
@@ -774,6 +782,9 @@ smb_lock_destroy(smb_lock_t *lock)
  * smb_is_range_unlocked
  *
  * Checks if the current unlock byte range request overlaps another lock
+ * This function is used to determine where POSIX unlocks should be
+ * applied.
+ *
  * The return code and the value of new_mark must be interpreted as
  * follows:
  *
@@ -792,10 +803,10 @@ smb_lock_destroy(smb_lock_t *lock)
  */
 
 static boolean_t
-smb_is_range_unlocked(uint64_t start, uint64_t end, smb_llist_t *llist_head,
-    uint64_t *new_mark)
+smb_is_range_unlocked(uint64_t start, uint64_t end, uint32_t uniqid,
+    smb_llist_t *llist_head, uint64_t *new_mark)
 {
-	struct smb_lock *lk = 0;
+	struct smb_lock *lk = NULL;
 	uint64_t low_water_mark = MAXOFFSET_T;
 	uint64_t lk_start;
 	uint64_t lk_end;
@@ -803,6 +814,15 @@ smb_is_range_unlocked(uint64_t start, uint64_t end, smb_llist_t *llist_head,
 	*new_mark = 0;
 	lk = smb_llist_head(llist_head);
 	while (lk) {
+		if (lk->l_length == 0) {
+			lk = smb_llist_next(llist_head, lk);
+			continue;
+		}
+
+		if (lk->l_file->f_uniqid != uniqid) {
+			lk = smb_llist_next(llist_head, lk);
+			continue;
+		}
 
 		lk_end = lk->l_start + lk->l_length - 1;
 		lk_start = lk->l_start;

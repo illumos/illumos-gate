@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_trans2_set_file_information.c	1.8	08/08/08 SMI"
 
 /*
  * SMB: trans2_set_file_information
@@ -120,7 +120,7 @@ smb_com_trans2_set_file_information(struct smb_request *sr, struct smb_xa *xa)
 	}
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type) ||
-	    SMB_TREE_IS_READ_ONLY(sr)) {
+	    SMB_TREE_IS_READONLY(sr)) {
 		kmem_free(info, sizeof (smb_trans2_setinfo_t));
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 		    ERRDOS, ERROR_ACCESS_DENIED);
@@ -151,7 +151,7 @@ smb_com_trans2_set_file_information(struct smb_request *sr, struct smb_xa *xa)
 	if (status == NT_STATUS_DATA_ERROR)
 		return (SDRC_ERROR);
 
-	if (status == NT_STATUS_UNSUCCESSFUL) {
+	if (status != NT_STATUS_SUCCESS) {
 		smbsr_error(sr, smberr.status, smberr.errcls, smberr.errcode);
 		return (SDRC_ERROR);
 	}

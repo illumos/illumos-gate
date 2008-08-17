@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"@(#)Makefile.com	1.3	08/08/05 SMI"
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -34,8 +34,7 @@ SMBCOMMON_DIR	= $(SRC)/common/smbsrv
 LIBOBJS =	libshare_smb.o smb_share_doorclnt.o
 SMBCOMMON_OBJ =	smb_share_door_decode.o smb_common_door_decode.o
 SMBBASE_OBJ =	smb_cfg.o smb_scfutil.o
-SMBMLSVC_OBJ =	smb_share_util.o
-OBJECTS =	$(LIBOBJS) $(SMBCOMMON_OBJ) $(SMBBASE_OBJ) $(SMBMLSVC_OBJ)
+OBJECTS =	$(LIBOBJS) $(SMBCOMMON_OBJ) $(SMBBASE_OBJ)
 
 include ../../../Makefile.lib
 

@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_lgrp.c	1.5	08/07/29 SMI"
 
 #include <stdlib.h>
 #include <strings.h>
@@ -181,6 +181,7 @@ static void smb_lgrp_set_default_privs(smb_group_t *);
 static boolean_t smb_lgrp_chkname(char *);
 static boolean_t smb_lgrp_chkmember(uint16_t);
 static int smb_lgrp_getsid(int, uint32_t *, uint16_t, sqlite *, smb_sid_t **);
+static int smb_lgrp_getgid(uint32_t rid, gid_t *gid);
 
 /*
  * smb_lgrp_add
@@ -1102,7 +1103,7 @@ smb_lgrp_gtbl_lookup(sqlite *db, int key, smb_group_t *grp, int infolvl, ...)
 	char **result;
 	int nrow, ncol;
 	int rc, dom_idx;
-	smb_group_t kgrp;
+	smb_group_t grpkey;
 	va_list ap;
 
 	if (db == NULL)
@@ -1113,19 +1114,30 @@ smb_lgrp_gtbl_lookup(sqlite *db, int key, smb_group_t *grp, int infolvl, ...)
 
 	switch (key) {
 	case SMB_LGRP_GTBL_NAME:
-		kgrp.sg_name = va_arg(ap, char *);
+		grpkey.sg_name = va_arg(ap, char *);
 		sql = sqlite_mprintf("SELECT * FROM groups WHERE name = '%s'",
-		    kgrp.sg_name);
+		    grpkey.sg_name);
 		break;
 
 	case SMB_LGRP_GTBL_SIDRID:
-		kgrp.sg_rid = va_arg(ap, uint32_t);
-		kgrp.sg_domain = va_arg(ap, smb_gdomain_t);
-		dom_idx = (kgrp.sg_domain == SMB_LGRP_LOCAL)
-		    ? SMB_LGRP_LOCAL_IDX : SMB_LGRP_BUILTIN_IDX;
-		sql = sqlite_mprintf("SELECT * FROM groups"
+		grpkey.sg_rid = va_arg(ap, uint32_t);
+		grpkey.sg_domain = va_arg(ap, smb_gdomain_t);
+		if (grpkey.sg_domain == SMB_LGRP_LOCAL) {
+			dom_idx = SMB_LGRP_LOCAL_IDX;
+			/* need to map the given rid to a gid */
+			rc = smb_lgrp_getgid(grpkey.sg_rid,
+			    (gid_t *)&grpkey.sg_rid);
+			if (rc != SMB_LGRP_SUCCESS) {
+				va_end(ap);
+				return (rc);
+			}
+		} else {
+			dom_idx = SMB_LGRP_BUILTIN_IDX;
+		}
+
+		sql = sqlite_mprintf("SELECT * FROM groups "
 		    "WHERE (sid_idx = %d) AND (sid_rid = %u)",
-		    dom_idx, kgrp.sg_rid);
+		    dom_idx, grpkey.sg_rid);
 		break;
 
 	default:
@@ -1261,7 +1273,7 @@ smb_lgrp_gtbl_insert(sqlite *db, smb_group_t *grp)
 	plist.p_ids = privs;
 	smb_lgrp_encode_privset(grp, &plist);
 
-	sql = sqlite_mprintf("INSERT INTO groups"
+	sql = sqlite_mprintf("INSERT INTO groups "
 	    "(name, sid_idx, sid_rid, sid_type, sid_attrs, comment, "
 	    "n_privs, privs, n_members, members) "
 	    "VALUES('%s', %u, %u, %u, %u, '%q', %u, '%q', %u, '%q')",
@@ -2245,4 +2257,27 @@ smb_lgrp_getsid(int dom_idx, uint32_t *rid, uint16_t sid_type,
 
 	*sid = res_sid;
 	return (SMB_LGRP_SUCCESS);
+}
+
+/*
+ * smb_lgrp_getgid
+ *
+ * Converts given local RID to a local gid since for user
+ * defined local groups, gid is stored in the table.
+ */
+static int
+smb_lgrp_getgid(uint32_t rid, gid_t *gid)
+{
+	smb_sid_t *sid;
+	int idtype;
+	int rc;
+
+	if ((sid = smb_sid_splice(smb_lgrp_lsid, rid)) == NULL)
+		return (SMB_LGRP_NO_MEMORY);
+
+	idtype = SMB_IDMAP_GROUP;
+	rc = smb_idmap_getid(sid, gid, &idtype);
+	smb_sid_free(sid);
+
+	return ((rc == IDMAP_SUCCESS) ? SMB_LGRP_SUCCESS : SMB_LGRP_NOT_FOUND);
 }

@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)smb_acl.c	1.5	08/07/28 SMI"
 
 #include <sys/acl.h>
 #include <acl/acl_common.h>
@@ -99,17 +99,15 @@ static ace_t default_dacl[DEFAULT_DACL_ACENUM] = {
  * format
  */
 
-static idmap_stat smb_acl_getsids(smb_idmap_batch_t *, acl_t *, uid_t, gid_t);
-static acl_t *smb_acl_null_empty(boolean_t null);
-
+static idmap_stat smb_fsacl_getsids(smb_idmap_batch_t *, acl_t *, uid_t, gid_t);
+static acl_t *smb_fsacl_null_empty(boolean_t);
 static int smb_fsacl_inheritable(acl_t *, int);
-
 
 static void smb_ace_inherit(ace_t *, ace_t *, int);
 static boolean_t smb_ace_isvalid(smb_ace_t *, int);
 static uint16_t smb_ace_len(smb_ace_t *);
 static uint32_t smb_ace_mask_g2s(uint32_t);
-static uint16_t smb_ace_flags_tozfs(uint8_t, int);
+static uint16_t smb_ace_flags_tozfs(uint8_t);
 static uint8_t smb_ace_flags_fromzfs(uint16_t);
 
 smb_acl_t *
@@ -160,10 +158,7 @@ smb_acl_free(smb_acl_t *acl)
 uint16_t
 smb_acl_len(smb_acl_t *acl)
 {
-	if (acl == NULL)
-		return (0);
-
-	return (acl->sl_bsize);
+	return ((acl) ? acl->sl_bsize : 0);
 }
 
 boolean_t
@@ -315,7 +310,7 @@ smb_acl_from_zfs(acl_t *zacl, uid_t uid, gid_t gid)
 	if (idm_stat != IDMAP_SUCCESS)
 		return (NULL);
 
-	if (smb_acl_getsids(&sib, zacl, uid, gid) != IDMAP_SUCCESS) {
+	if (smb_fsacl_getsids(&sib, zacl, uid, gid) != IDMAP_SUCCESS) {
 		smb_idmap_batch_destroy(&sib);
 		return (NULL);
 	}
@@ -369,7 +364,7 @@ smb_acl_to_zfs(smb_acl_t *acl, uint32_t flags, int which_acl, acl_t **fs_acl)
 	smb_idmap_batch_t sib;
 	smb_idmap_t *sim;
 	idmap_stat idm_stat;
-	int i, isdir;
+	int i;
 
 	ASSERT(fs_acl);
 	ASSERT(*fs_acl == NULL);
@@ -379,7 +374,7 @@ smb_acl_to_zfs(smb_acl_t *acl, uint32_t flags, int which_acl, acl_t **fs_acl)
 
 	if ((acl == NULL) || (acl->sl_acecnt == 0)) {
 		if (which_acl == SMB_DACL_SECINFO) {
-			*fs_acl = smb_acl_null_empty(acl == NULL);
+			*fs_acl = smb_fsacl_null_empty(acl == NULL);
 		}
 
 		return (NT_STATUS_SUCCESS);
@@ -390,8 +385,6 @@ smb_acl_to_zfs(smb_acl_t *acl, uint32_t flags, int which_acl, acl_t **fs_acl)
 	if (idm_stat != IDMAP_SUCCESS)
 		return (NT_STATUS_INTERNAL_ERROR);
 
-	isdir = ((flags & ACL_IS_DIR) == ACL_IS_DIR);
-
 	zacl = smb_fsacl_alloc(acl->sl_acecnt, flags);
 
 	zace = zacl->acl_aclp;
@@ -401,8 +394,7 @@ smb_acl_to_zfs(smb_acl_t *acl, uint32_t flags, int which_acl, acl_t **fs_acl)
 	for (i = 0; i < acl->sl_acecnt; i++, zace++, ace++, sim++) {
 		zace->a_type = ace->se_hdr.se_type & ACE_ALL_TYPES;
 		zace->a_access_mask = smb_ace_mask_g2s(ace->se_mask);
-		zace->a_flags = smb_ace_flags_tozfs(ace->se_hdr.se_flags,
-		    isdir);
+		zace->a_flags = smb_ace_flags_tozfs(ace->se_hdr.se_flags);
 
 		if (smb_sid_cmp(ace->se_sid, &everyone_sid))
 			zace->a_flags |= ACE_EVERYONE;
@@ -447,12 +439,12 @@ smb_acl_to_zfs(smb_acl_t *acl, uint32_t flags, int which_acl, acl_t **fs_acl)
 }
 
 /*
- * smb_acl_getsids
+ * smb_fsacl_getsids
  *
  * Batch all the uid/gid in given ZFS ACL to get their corresponding SIDs.
  */
 static idmap_stat
-smb_acl_getsids(smb_idmap_batch_t *sib, acl_t *zacl, uid_t uid, gid_t gid)
+smb_fsacl_getsids(smb_idmap_batch_t *sib, acl_t *zacl, uid_t uid, gid_t gid)
 {
 	ace_t *zace;
 	idmap_stat idm_stat;
@@ -505,7 +497,7 @@ smb_acl_getsids(smb_idmap_batch_t *sib, acl_t *zacl, uid_t uid, gid_t gid)
 }
 
 /*
- * smb_acl_null_empty
+ * smb_fsacl_null_empty
  *
  * NULL DACL means everyone full-access
  * Empty DACL means everyone full-deny
@@ -519,7 +511,7 @@ smb_acl_getsids(smb_idmap_batch_t *sib, acl_t *zacl, uid_t uid, gid_t gid)
  * owner implicit permissions will be set.
  */
 static acl_t *
-smb_acl_null_empty(boolean_t null)
+smb_fsacl_null_empty(boolean_t null)
 {
 	acl_t *zacl;
 	ace_t *zace;
@@ -995,45 +987,6 @@ smb_fsacl_to_vsa(acl_t *acl_info, vsecattr_t *vsecattr, int *aclbsize)
  * new object (file/dir) specified by 'is_dir'.
  *
  * Note that the input ACL is a ZFS ACL not Windows ACL.
- *
- * Any ACE except creator owner/group:
- *
- *  FI   DI   NP   #F  #D
- * ---- ---- ---- ---- ----
- *  -    -    ?    0    0
- *  X    -    -    1    1
- *  X    -    X    1    0
- *  -    X    -    0    1
- *  -    X    X    0    1
- *  X    X    -    1    1
- *  X    X    X    1    1
- *
- * Creator owner/group ACE:
- *
- *  FI   DI   NP   #F  #D
- * ---- ---- ---- ---- ----
- *  -    -    ?    0    0
- *  X    -    -    1r   1c
- *  X    -    X    1r   0
- *  -    X    -    0    2
- *  -    X    X    0    1r
- *  X    X    -    1r   2
- *  X    X    X    1r   1r
- *
- * Legend:
- *
- *  FI: File Inherit
- *  DI: Dir Inherit
- *  NP: No Propagate
- *  #F: #ACE for a new file
- *  #D: #ACE for a new dir
- *
- *   X: bit is set
- *   -: bit is not set
- *   ?: don't care
- *
- *  1r: one owner/group ACE
- *  1c: one creator owner/group ACE
  */
 static int
 smb_fsacl_inheritable(acl_t *zacl, int is_dir)
@@ -1197,20 +1150,31 @@ static void
 smb_ace_inherit(ace_t *dir_zace, ace_t *zace, int is_dir)
 {
 	*zace = *dir_zace;
-	if (!(is_dir && ZACE_IS_PROPAGATE(dir_zace)))
-		zace->a_flags &= ~ACE_INHERIT_FLAGS;
+
+	/* This is an effective ACE so remove the inherit_only flag */
+	zace->a_flags &= ~ACE_INHERIT_ONLY_ACE;
+	/* Mark this ACE as inherited */
 	zace->a_flags |= ACE_INHERITED_ACE;
 
 	/*
-	 * Replace creator owner/group ACEs with
-	 * actual owner/group ACEs.
+	 * If this is a file or NO_PROPAGATE is set then this inherited
+	 * ACE is not inheritable so clear the inheritance flags
+	 */
+	if (!(is_dir && ZACE_IS_PROPAGATE(dir_zace)))
+		zace->a_flags &= ~ACE_INHERIT_FLAGS;
+
+	/*
+	 * Replace creator owner/group ACEs with actual owner/group ACEs.
+	 * This would be an effictive ACE which is not inheritable.
 	 */
 	if (ZACE_IS_CREATOR_OWNER(dir_zace)) {
 		zace->a_who = (uid_t)-1;
 		zace->a_flags |= ACE_OWNER;
+		zace->a_flags &= ~ACE_INHERIT_FLAGS;
 	} else if (ZACE_IS_CREATOR_GROUP(dir_zace)) {
 		zace->a_who = (uid_t)-1;
 		zace->a_flags |= ACE_GROUP;
+		zace->a_flags &= ~ACE_INHERIT_FLAGS;
 	}
 }
 
@@ -1250,8 +1214,15 @@ smb_ace_mask_g2s(uint32_t mask)
 	return (mask);
 }
 
+/*
+ * smb_ace_flags_tozfs
+ *
+ * This function maps the flags which have different values
+ * in Windows and Solaris. The ones with the same value are
+ * transferred untouched.
+ */
 static uint16_t
-smb_ace_flags_tozfs(uint8_t c_flags, int isdir)
+smb_ace_flags_tozfs(uint8_t c_flags)
 {
 	uint16_t z_flags = 0;
 
@@ -1264,12 +1235,7 @@ smb_ace_flags_tozfs(uint8_t c_flags, int isdir)
 	if (c_flags & INHERITED_ACE)
 		z_flags |= ACE_INHERITED_ACE;
 
-	/*
-	 * ZFS doesn't like any inheritance flags to be set on a
-	 * file's ACE, only directories. Windows doesn't care.
-	 */
-	if (isdir)
-		z_flags |= (c_flags & ACE_INHERIT_FLAGS);
+	z_flags |= (c_flags & ACE_INHERIT_FLAGS);
 
 	return (z_flags);
 }

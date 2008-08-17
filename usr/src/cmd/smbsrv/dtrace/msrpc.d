@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)msrpc.d	1.5	08/08/07 SMI"
 
 /*
  * Usage:	./msrpc.d -p `pgrep smbd`
@@ -159,6 +159,11 @@ smbsr_error:entry
 smbsr_errno:entry
 {
     printf("errno=%d", arg1);
+}
+
+smbsr_error:return,
+smbsr_errno:return
+{
 }
 
 /*
