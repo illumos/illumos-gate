@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Walk the LDOM PRI component nodes and create appropriate topology nodes
  */
@@ -60,6 +58,7 @@ typedef struct pi_enum_functions_s pi_enum_functions_t;
  * common nodes are listed first.
  */
 static pi_enum_functions_t pi_enum_fns_builtin[] = {
+	{pi_enum_cpu,		STRAND},
 	{pi_enum_cpu,		CPU},
 	{pi_enum_pciexrc,	PCIEX_ROOT},
 	{pi_enum_niu,		NIU},
