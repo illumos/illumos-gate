@@ -23,12 +23,11 @@
 
  CDDL HEADER END
 
-    ident	"%Z%%M%	%I%	%E% SMI"
 -->
 
 <topology name='chip' scheme='hc'>
 
-    <range name='chip' min='0' max='100'>
+    <range name='chip' min='0' max='256'>
 
         <set type='product'
 	    setlist='Sun-Fire(TM)-X2100|W1100z-2100z|Sun-Ultra-20-Workstation|Ultra20-M2|Sun-Ultra-40-M2-Workstation'>
@@ -353,7 +352,7 @@
         <range name='memory-controller' min='0' max='16'>
         <dependents grouping='children'>
 
-            <range name='dram-channel' min='0' max='1'>
+            <range name='dram-channel' min='0' max='3'>
             <dependents grouping='children'>
 	    
                 <range name='chip-select' min='0' max='7'>

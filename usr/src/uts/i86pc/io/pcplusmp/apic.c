@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PSMI 1.1 extensions are supported only in 2.6 and later versions.
  * PSMI 1.2 extensions are supported only in 2.7 and later versions.
@@ -68,6 +66,7 @@
 #include <sys/clock.h>
 #include <sys/dditypes.h>
 #include <sys/sunddi.h>
+#include <sys/x_call.h>
 
 /*
  *	Local Function Prototypes
@@ -131,6 +130,14 @@ int apic_error_display_delay = 100;
 /* vector at which performance counter overflow interrupts come in */
 int apic_cpcovf_vect;
 int apic_enable_cpcovf_intr = 1;
+
+/* vector at which CMCI interrupts come in */
+int apic_cmci_vect;
+extern int cmi_enable_cmci;
+extern void cmi_cmci_trap(void);
+
+static kmutex_t cmci_cpu_setup_lock;	/* protects cmci_cpu_setup_registered */
+static int cmci_cpu_setup_registered;
 
 /*
  * The following vector assignments influence the value of ipltopri and
@@ -505,6 +512,48 @@ apic_cpcovf_mask_clear(void)
 	    (apic_reg_ops->apic_read(APIC_PCINT_VECT) & ~APIC_LVT_MASK));
 }
 
+/*ARGSUSED*/
+static int
+apic_cmci_enable(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
+{
+	apic_reg_ops->apic_write(APIC_CMCI_VECT, apic_cmci_vect);
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+apic_cmci_disable(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
+{
+	apic_reg_ops->apic_write(APIC_CMCI_VECT, apic_cmci_vect | AV_MASK);
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+cmci_cpu_setup(cpu_setup_t what, int cpuid, void *arg)
+{
+	cpuset_t	cpu_set;
+
+	CPUSET_ONLY(cpu_set, cpuid);
+
+	switch (what) {
+		case CPU_ON:
+			xc_call(NULL, NULL, NULL, X_CALL_HIPRI, cpu_set,
+			    (xc_func_t)apic_cmci_enable);
+			break;
+
+		case CPU_OFF:
+			xc_call(NULL, NULL, NULL, X_CALL_HIPRI, cpu_set,
+			    (xc_func_t)apic_cmci_disable);
+			break;
+
+		default:
+			break;
+	}
+
+	return (0);
+}
+
 static void
 apic_init_intr()
 {
@@ -633,6 +682,33 @@ apic_init_intr()
 		apic_reg_ops->apic_write(APIC_ERR_VECT, apic_errvect);
 		apic_reg_ops->apic_write(APIC_ERROR_STATUS, 0);
 		apic_reg_ops->apic_write(APIC_ERROR_STATUS, 0);
+	}
+
+	/* Enable CMCI interrupt */
+	if (cmi_enable_cmci) {
+
+		mutex_enter(&cmci_cpu_setup_lock);
+		if (cmci_cpu_setup_registered == 0) {
+			mutex_enter(&cpu_lock);
+			register_cpu_setup_func(cmci_cpu_setup, NULL);
+			mutex_exit(&cpu_lock);
+			cmci_cpu_setup_registered = 1;
+		}
+		mutex_exit(&cmci_cpu_setup_lock);
+
+		if (apic_cmci_vect == 0) {
+			int ipl = 0x2;
+			int irq = apic_get_ipivect(ipl, -1);
+
+			ASSERT(irq != -1);
+			apic_cmci_vect = apic_irq_table[irq]->airq_vector;
+			ASSERT(apic_cmci_vect);
+
+			(void) add_avintr(NULL, ipl,
+			    (avfunc)cmi_cmci_trap,
+			    "apic cmci intr", irq, NULL, NULL, NULL, NULL);
+		}
+		apic_reg_ops->apic_write(APIC_CMCI_VECT, apic_cmci_vect);
 	}
 
 }

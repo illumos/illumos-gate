@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _GCPU_H
 #define	_GCPU_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/cpu_module_impl.h>
@@ -114,6 +112,8 @@ struct gcpu_bios_cfg {
 #define	GCPU_MPT_WHAT_CYC_ERR		0	/* cyclic-induced poll */
 #define	GCPU_MPT_WHAT_POKE_ERR		1	/* manually-induced poll */
 #define	GCPU_MPT_WHAT_UNFAULTING	2	/* discarded error state */
+#define	GCPU_MPT_WHAT_MC_ERR		3	/* MC# */
+#define	GCPU_MPT_WHAT_CMCI_ERR		4	/* CMCI interrupt */
 
 typedef struct gcpu_mca_poll_trace {
 	hrtime_t mpt_when;		/* timestamp of event */
@@ -127,6 +127,18 @@ typedef struct gcpu_mca_poll_trace_ctl {
 	gcpu_mca_poll_trace_t *mptc_tbufs;	/* trace buffers */
 	uint_t mptc_curtrace;			/* last buffer filled */
 } gcpu_mca_poll_trace_ctl_t;
+
+
+/*
+ * For counting some of the important number or time for runtime
+ * cmci enable/disable
+ */
+typedef struct gcpu_mca_cmci {
+	uint32_t cmci_cap;	/* cmci capability for this bank */
+	uint32_t ncmci;		/* number of correctable errors between polls */
+	uint32_t drtcmci;	/* duration of no cmci when cmci is disabled */
+	uint32_t cmci_enabled;	/* cmci enable/disable status for this bank */
+} gcpu_mca_cmci_t;
 
 /* Index for gcpu_mca_logout array below */
 #define	GCPU_MCA_LOGOUT_EXCEPTION	0	/* area for #MC */
@@ -144,6 +156,8 @@ typedef struct gcpu_mca {
 	uint_t gcpu_mca_flags;		/* GCPU_MCA_F_* */
 	hrtime_t gcpu_mca_lastpoll;
 	gcpu_mca_poll_trace_ctl_t gcpu_mca_polltrace;
+	uint32_t gcpu_mca_first_poll_cmci_enabled; /* cmci on in first poll */
+	gcpu_mca_cmci_t *gcpu_bank_cmci;
 } gcpu_mca_t;
 
 typedef struct gcpu_mce_status {
@@ -193,7 +207,13 @@ extern void gcpu_faulted_exit(cmi_hdl_t);
 extern void gcpu_mca_init(cmi_hdl_t);
 extern cmi_errno_t gcpu_msrinject(cmi_hdl_t, cmi_mca_regs_t *, uint_t, int);
 extern uint64_t gcpu_mca_trap(cmi_hdl_t, struct regs *);
+extern void gcpu_cmci_trap(cmi_hdl_t);
 extern void gcpu_hdl_poke(cmi_hdl_t);
+
+/*
+ * CMI global variable
+ */
+extern int cmi_enable_cmci;
 
 /*
  * Local functions
@@ -201,7 +221,7 @@ extern void gcpu_hdl_poke(cmi_hdl_t);
 extern void gcpu_mca_poll_init(cmi_hdl_t);
 extern void gcpu_mca_poll_start(cmi_hdl_t);
 extern void gcpu_mca_logout(cmi_hdl_t, struct regs *, uint64_t,
-    gcpu_mce_status_t *, boolean_t);
+    gcpu_mce_status_t *, boolean_t, int);
 
 #endif /* _KERNEL */
 

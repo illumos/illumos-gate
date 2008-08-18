@@ -26,8 +26,6 @@
 #ifndef _CHIP_H
 #define	_CHIP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <kstat.h>
 #include <libnvpair.h>
 #include <fm/libtopo.h>
@@ -43,6 +41,8 @@ extern "C" {
 #define	MCT_NODE_NAME	"memory-controller"
 #define	CHAN_NODE_NAME	"dram-channel"
 #define	CPU_NODE_NAME	"cpu"
+#define	CPU_CORE_NODE_NAME	"core"
+#define	CPU_STRAND_NODE_NAME	"strand"
 #define	CS_NODE_NAME	"chip-select"
 #define	DIMM_NODE_NAME	"dimm"
 #define	RANK_NODE_NAME	"rank"
@@ -153,10 +153,10 @@ extern void amd_mc_create(topo_mod_t *, tnode_t *, const char *, nvlist_t *,
  */
 extern int mc_offchip_open(void);
 extern int mc_offchip_create(topo_mod_t *, tnode_t *, const char *, nvlist_t *);
+extern void onchip_mc_create(topo_mod_t *, tnode_t *, const char *, nvlist_t *);
 
 extern char *get_fmtstr(topo_mod_t *, nvlist_t *);
 extern int store_prop_val(topo_mod_t *, char *, char *, nvlist_t **out);
-
 
 #ifdef __cplusplus
 }

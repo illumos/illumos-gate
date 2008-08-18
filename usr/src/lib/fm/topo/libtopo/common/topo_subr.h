@@ -27,8 +27,6 @@
 #ifndef _TOPO_SUBR_H
 #define	_TOPO_SUBR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fm/libtopo.h>
 #include <topo_list.h>
 
@@ -141,7 +139,7 @@ extern int topo_walk_byid(topo_walk_t *wp, const char *name, topo_instance_t);
 extern int topo_walk_bysibling(topo_walk_t *wp, const char *name,
     topo_instance_t);
 
-extern char *topo_cleanup_auth_str(topo_hdl_t *, char *);
+extern char *topo_cleanup_auth_str(topo_hdl_t *, const char *);
 
 #ifdef __cplusplus
 }

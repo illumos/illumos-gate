@@ -30,8 +30,6 @@
  *    All Rights Reserved
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * General assembly language routines.
  * It is the intent of this file to contain routines that are
@@ -1816,6 +1814,7 @@ repoutsd(int port, uint32_t *addr, int count)
  * void int3(void)
  * void int18(void)
  * void int20(void)
+ * void int_cmci(void)
  */
 
 #if defined(__lint)
@@ -1830,6 +1829,10 @@ int18(void)
 
 void
 int20(void)
+{}
+
+void
+int_cmci(void)
 {}
 
 #else	/* __lint */
@@ -1854,6 +1857,11 @@ int20(void)
 	rep;	ret	/* use 2 byte return instruction when branch target */
 			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(int20)
+
+	ENTRY(int_cmci)
+	int	$T_ENOEXTFLT
+	ret
+	SET_SIZE(int_cmci)
 
 #endif	/* __lint */
 

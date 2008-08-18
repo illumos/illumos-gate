@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,6 +69,11 @@ static const topo_pgroup_info_t chip_pgroup =
 	{ PGNAME(CHIP), TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
 static const topo_pgroup_info_t cpu_pgroup =
 	{ PGNAME(CPU), TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+static const topo_pgroup_info_t cpu_core_pgroup =
+	{ PGNAME(CPU_CORE), TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
+static const topo_pgroup_info_t cpu_strand_pgroup =
+	{ PGNAME(CPU_STRAND), TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE,
+	    1 };
 
 static const topo_method_t chip_methods[] = {
 	{ SIMPLE_CHIP_LBL, "Property method", 0,
@@ -136,6 +139,163 @@ _topo_fini(topo_mod_t *mod)
 	topo_mod_free(mod, chip, sizeof (chip_t));
 
 	topo_mod_unregister(mod);
+}
+
+static int
+cpu_strand_create(topo_mod_t *mod, tnode_t *pnode, const char *name, int chipid,
+    int coreid, chip_t *chip, int nstrand, nvlist_t *auth)
+{
+	kstat_named_t *k;
+	nvlist_t *fmri, *asru;
+	tnode_t *cnode;
+	int err, nerr = 0;
+	int cpuid, clogid, tcoreid, strandid;
+
+	if (topo_node_range_create(mod, pnode, name, 0,
+	    nstrand) < 0)
+		return (-1);
+
+	for (cpuid = 0; cpuid <= chip->chip_ncpustats; cpuid++) {
+		if (chip->chip_cpustats[cpuid] == NULL)
+			continue;
+
+		/*
+		 * The chip_id in the cpu_info kstat numbers the individual
+		 * chips from 0 to #chips - 1.
+		 */
+		if ((k = kstat_data_lookup(chip->chip_cpustats[cpuid],
+		    "chip_id")) == NULL) {
+			whinge(mod, &nerr,
+			    "cpu_strand_create: chip_id lookup via "
+			    "kstats failed\n");
+			continue;
+		}
+
+		if (k->value.l != chipid)
+			continue;	/* not an error */
+
+		if ((k = kstat_data_lookup(chip->chip_cpustats[cpuid],
+		    "clog_id")) == NULL) {
+			whinge(mod, &nerr,
+			    "cpu_strand_create: clog_id lookup via "
+			    "kstats failed\n");
+			continue;
+		}
+		clogid = k->value.l;
+		tcoreid = clogid / nstrand;
+
+		if (coreid != tcoreid)
+			continue;
+
+		strandid = clogid % nstrand;
+
+		if (mkrsrc(mod, pnode, name, strandid, auth, &fmri) != 0) {
+			whinge(mod, &nerr,
+			    "cpu_strand_create: mkrsrc failed\n");
+			continue;
+		}
+
+		if ((cnode = topo_node_bind(mod, pnode, name, strandid, fmri))
+		    == NULL) {
+			whinge(mod, &nerr,
+			    "cpu_strand_create: node bind failed\n");
+			nvlist_free(fmri);
+			continue;
+		}
+		nvlist_free(fmri);
+
+		if ((asru = cpu_fmri_create(mod, cpuid, NULL, 0)) != NULL) {
+			(void) topo_node_asru_set(cnode, asru, 0, &err);
+			nvlist_free(asru);
+		} else {
+			whinge(mod, &nerr, "cpu_strand_create: cpu_fmri_create "
+			    "failed\n");
+		}
+		(void) topo_node_fru_set(cnode, NULL, 0, &err);
+
+		(void) topo_pgroup_create(cnode, &cpu_strand_pgroup, &err);
+
+		(void) topo_prop_set_uint32(cnode, PGNAME(CPU_STRAND), "cpuid",
+		    TOPO_PROP_IMMUTABLE, cpuid, &err);
+
+		if (add_kstat_longprops(mod, cnode, chip->chip_cpustats[cpuid],
+		    PGNAME(CPU_STRAND), NULL, CPU_CHIP_ID, CPU_CORE_ID,
+		    CPU_CLOG_ID, CPU_PKG_CORE_ID, NULL) != 0)
+			nerr++;		/* have whinged elsewhere */
+	}
+
+	return (nerr == 0 ? 0 : -1);
+}
+
+static int
+cpu_core_create(topo_mod_t *mod, tnode_t *pnode, const char *name, int chipid,
+    chip_t *chip, int ncore, int ncpu, nvlist_t *auth)
+{
+	kstat_named_t *k;
+	nvlist_t *fmri;
+	tnode_t *cnode;
+	int clogid, cpuid, coreid;
+	int nstrand;
+	int err, nerr = 0;
+
+	if (topo_node_range_create(mod, pnode, name, 0,
+	    ncore) < 0)
+		return (-1);
+
+	nstrand = ncpu / ncore;
+	for (cpuid = 0; cpuid <= chip->chip_ncpustats; cpuid++) {
+		if (chip->chip_cpustats[cpuid] == NULL)
+			continue;
+
+		/*
+		 * The chip_id in the cpu_info kstat numbers the individual
+		 * chips from 0 to #chips - 1.
+		 */
+		if ((k = kstat_data_lookup(chip->chip_cpustats[cpuid],
+		    "chip_id")) == NULL) {
+			whinge(mod, &nerr,
+			    "cpu_core_create: chip_id lookup via "
+			    "kstats failed\n");
+			continue;
+		}
+
+		if (k->value.l != chipid)
+			continue;	/* not an error */
+
+		if ((k = kstat_data_lookup(chip->chip_cpustats[cpuid],
+		    "clog_id")) == NULL) {
+			whinge(mod, &nerr,
+			    "cpu_core_create: clog_id lookup via "
+			    "kstats failed\n");
+			continue;
+		}
+		clogid = k->value.l;
+		coreid = clogid / nstrand;
+
+		if (mkrsrc(mod, pnode, name, coreid, auth, &fmri) != 0) {
+			whinge(mod, &nerr, "cpu_core_create: mkrsrc failed\n");
+			continue;
+		}
+
+		if ((cnode = topo_node_bind(mod, pnode, name, coreid, fmri))
+		    == NULL) {
+			whinge(mod, &nerr,
+			    "cpu_core_create: node bind failed\n");
+			nvlist_free(fmri);
+			continue;
+		}
+		nvlist_free(fmri);
+
+		(void) topo_node_fru_set(cnode, NULL, 0, &err);
+
+		(void) topo_pgroup_create(cnode, &cpu_core_pgroup, &err);
+
+		if (cpu_strand_create(mod, cnode, CPU_STRAND_NODE_NAME, chipid,
+		    coreid, chip, nstrand, auth) != 0)
+			nerr++;		/* have whinged elsewhere */
+	}
+
+	return (nerr == 0 ? 0 : -1);
 }
 
 static int
@@ -229,13 +389,15 @@ cpu_create(topo_mod_t *mod, tnode_t *pnode, const char *name, int chipid,
 
 static int
 chip_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
-    topo_instance_t min, topo_instance_t max, chip_t *chip, nvlist_t *auth)
+    topo_instance_t min, topo_instance_t max, chip_t *chip, nvlist_t *auth,
+    int mc_offchip)
 {
 	int i, nerr = 0;
 	kstat_t *ksp;
 	ulong_t *chipmap;
 	tnode_t *cnode;
 	nvlist_t *fmri;
+	int ncore, ncpu;
 
 	if ((chipmap = topo_mod_zalloc(mod, BT_BITOUL(max) *
 	    sizeof (ulong_t))) == NULL)
@@ -307,8 +469,32 @@ chip_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		    fms, CHIP_FAMILY, CHIP_MODEL, CHIP_STEPPING, NULL) != 0)
 			nerr++;		/* have whinged elsewhere */
 
-		if (cpu_create(mod, cnode, CPU_NODE_NAME, chipid, chip, auth)
-		    != 0)
+		if ((k = kstat_data_lookup(ksp, "ncore_per_chip")) == NULL) {
+			whinge(mod, &nerr, "chip_create: ncore_per_chip lookup "
+			    "via kstats failed\n");
+			ncore = 0;
+			ncpu = 0;
+		} else {
+			ncore = k->value.l;
+
+			if ((k = kstat_data_lookup(ksp,
+			    "ncpu_per_chip")) == NULL) {
+				whinge(mod, &nerr,
+				    "chip_create: ncpu_per_chip lookup "
+				    "via kstats failed\n");
+				ncore = 0;
+				ncpu = 0;
+			} else {
+				ncpu = k->value.l;
+			}
+		}
+
+		if (ncore < ncpu) {
+			if (cpu_core_create(mod, cnode, CPU_CORE_NODE_NAME,
+			    chipid, chip, ncore, ncpu, auth) != 0)
+				nerr++;	/* have whinged elsewhere */
+		} else if (cpu_create(mod, cnode, CPU_NODE_NAME, chipid, chip,
+		    auth) != 0)
 			nerr++;		/* have whinged elsewhere */
 
 		/*
@@ -318,6 +504,8 @@ chip_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		if (strcmp(vendor, "AuthenticAMD") == 0)
 			amd_mc_create(mod, cnode, MCT_NODE_NAME, auth,
 			    fms[0], fms[1], fms[2], &nerr);
+		else if (!mc_offchip)
+			onchip_mc_create(mod, cnode, MCT_NODE_NAME, auth);
 	}
 
 	topo_mod_free(mod, chipmap, BT_BITOUL(max) * sizeof (ulong_t));
@@ -338,15 +526,16 @@ chip_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	int rv = 0;
 	chip_t *chip = (chip_t *)arg;
 	nvlist_t *auth = NULL;
-	int intel_mc;
+	int offchip_mc;
 
 	auth = topo_mod_auth(mod, pnode);
 
-	intel_mc = mc_offchip_open();
+	offchip_mc = mc_offchip_open();
 	if (strcmp(name, CHIP_NODE_NAME) == 0)
-		rv = chip_create(mod, pnode, name, min, max, chip, auth);
+		rv = chip_create(mod, pnode, name, min, max, chip, auth,
+		    offchip_mc);
 
-	if (intel_mc)
+	if (offchip_mc)
 		(void) mc_offchip_create(mod, pnode, "memory-controller", auth);
 
 	nvlist_free(auth);

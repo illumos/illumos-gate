@@ -18,14 +18,12 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_MCA_X86_H
 #define	_SYS_MCA_X86_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Constants for the Memory Check Architecture as implemented on generic x86
@@ -49,6 +47,7 @@ extern "C" {
 #define	MCG_CAP_CTL_P			0x00000100ULL
 #define	MCG_CAP_EXT_P			0x00000200ULL
 #define	MCG_CAP_TES_P			0x00000800ULL
+#define	MCG_CAP_MISC2_P			0x00000400ULL
 
 #define	MCG_CAP_COUNT_MASK		0x000000ffULL
 #define	MCG_CAP_COUNT(cap) ((cap) & MCG_CAP_COUNT_MASK)
@@ -90,9 +89,12 @@ extern "C" {
 #define	_IA32_MSR_OFFSET_ADDR		0x2	/* offset within a bank */
 #define	_IA32_MSR_OFFSET_MISC		0x3	/* offset within a bank */
 
+#define	_IA32_MSR_MC0_MISC2		0x280ULL /* first MCi_MISC2 reg */
 
 #define	IA32_MSR_MC(i, which) \
 	(_IA32_MSR_MC0_CTL + (i) * 4 + _IA32_MSR_OFFSET_##which)
+
+#define	IA32_MSR_MC_MISC2(i)	(_IA32_MSR_MC0_MISC2 + (i))
 
 /*
  * IA32_MSR_MCG_CAP.MCG_EXT_P indicates that a processor implements
@@ -189,9 +191,15 @@ typedef union mca_x86_mcistatus {
 #define	MSR_MC_STATUS_RESERVED_MASK	0x0180000000000000ULL
 #define	MSR_MC_STATUS_TBES_MASK		0x0060000000000000ULL
 #define	MSR_MC_STATUS_TBES_SHIFT	53
+#define	MSR_MC_STATUS_CEC_MASK		0x001fffc000000000ULL
+#define	MSR_MC_STATUS_CEC_SHIFT	38
 #define	MSR_MC_STATUS_MSERR_MASK	0x00000000ffff0000ULL
 #define	MSR_MC_STATUS_MSERR_SHIFT	16
 #define	MSR_MC_STATUS_MCAERR_MASK	0x000000000000ffffULL
+
+#define	MSR_MC_MISC2_EN			0x0000000040000000ULL
+#define	MSR_MC_MISC2_THRESHOLD_MASK	0x0000000000007fffULL
+#define	MSR_MC_MISC2_THRESHOLD_OVERFLOW	0x0000000000004000ULL
 
 /*
  * Macros to extract error code and model-specific error code.
@@ -265,6 +273,36 @@ typedef union mca_x86_mcistatus {
 #define	MCAX86_ERRCODE_T(code) \
 	(((code) & MCAX86_ERRCODE_T_MASK) >> MCAX86_ERRCODE_T_SHIFT)
 
+#define	MCAX86_ERRCODE_MMM_MASK		0x0070
+#define	MCAX86_ERRCODE_MMM_SHIFT	4
+#define	MCAX86_ERRCODE_MMM_GEN		0x0
+#define	MCAX86_ERRCODE_MMM_RD		0x1
+#define	MCAX86_ERRCODE_MMM_WR		0x2
+#define	MCAX86_ERRCODE_MMM_ADRCMD	0x3
+#define	MCAX86_ERRCODE_MMM(code) \
+	(((code) & MCAX86_ERRCODE_MMM_MASK) >> MCAX86_ERRCODE_MMM_SHIFT)
+
+#define	MCAX86_ERRCODE_CCCC_MASK	0x000f
+#define	MCAX86_ERRCODE_CCCC_SHIFT	0
+#define	MCAX86_ERRCODE_CCCC_CH0		0x0
+#define	MCAX86_ERRCODE_CCCC_CH1		0x1
+#define	MCAX86_ERRCODE_CCCC_CH2		0x2
+#define	MCAX86_ERRCODE_CCCC_CH3		0x3
+#define	MCAX86_ERRCODE_CCCC_CH4		0x4
+#define	MCAX86_ERRCODE_CCCC_CH5		0x5
+#define	MCAX86_ERRCODE_CCCC_CH6		0x6
+#define	MCAX86_ERRCODE_CCCC_CH7		0x7
+#define	MCAX86_ERRCODE_CCCC_CH8		0x8
+#define	MCAX86_ERRCODE_CCCC_CH9		0x9
+#define	MCAX86_ERRCODE_CCCC_CH10	0xa
+#define	MCAX86_ERRCODE_CCCC_CH11	0xb
+#define	MCAX86_ERRCODE_CCCC_CH12	0xc
+#define	MCAX86_ERRCODE_CCCC_CH13	0xd
+#define	MCAX86_ERRCODE_CCCC_CH14	0xe
+#define	MCAX86_ERRCODE_CCCC_GEN		0xf
+#define	MCAX86_ERRCODE_CCCC(code) \
+	(((code) & MCAX86_ERRCODE_CCCC_MASK) >> MCAX86_ERRCODE_CCCC_SHIFT)
+
 /*
  * Simple error encoding.  MASKON are bits that must be set for a match
  * at the same time bits indicated by MASKOFF are clear.
@@ -280,6 +318,9 @@ typedef union mca_x86_mcistatus {
 
 #define	MCAX86_SIMPLE_FRC_MASKON			0x0004
 #define	MCAX86_SIMPLE_FRC_MASKOFF			0xfffb
+
+#define	MCAX86_SIMPLE_INTERNAL_PARITY_MASKON		0x0005
+#define	MCAX86_SIMPLE_INTERNAL_PARITY_MASKOFF		0xfffa
 
 #define	MCAX86_SIMPLE_INTERNAL_TIMER_MASKON		0x0400
 #define	MCAX86_SIMPLE_INTERNAL_TIMER_MASKOFF		0xfbff
@@ -306,7 +347,7 @@ typedef union mca_x86_mcistatus {
  */
 #define	MCAX86_ERRCODE_ISSIMPLE(code) \
 	((code) >= MCAX86_SIMPLE_UNCLASSIFIED_MASKON && \
-	(code) <= MCAX86_SIMPLE_FRC_MASKON || \
+	(code) <= MCAX86_SIMPLE_INTERNAL_PARITY_MASKON || \
 	(code) == MCAX86_SIMPLE_INTERNAL_TIMER_MASKON || \
 	MCAX86_ERRCODE_ISSIMPLE_INTERNAL_UNCLASS(code))
 
@@ -325,6 +366,9 @@ typedef union mca_x86_mcistatus {
 
 #define	MCAX86_COMPOUND_BUS_INTERCONNECT_MASKON		0x0800
 #define	MCAX86_COMPOUND_BUS_INTERCONNECT_MASKOFF	0xe000
+
+#define	MCAX86_COMPOUND_MEMORY_CONTROLLER_MASKON	0x0080
+#define	MCAX86_COMPOUND_MEMORY_CONTROLLER_MASKOFF	0xff00
 
 /*
  * Macros to make compound error codes and to test for each type.
@@ -368,11 +412,21 @@ typedef union mca_x86_mcistatus {
 	MCAX86_COMPOUND_BUS_INTERCONNECT_MASKON && \
 	((code) & MCAX86_COMPOUND_BUS_INTERCONNECT_MASKOFF) == 0)
 
+#define	MCAX86_MKERRCODE_MEMORY_CONTROLLER (mmm, cccc) \
+	(MCAX86_COMPOUNT_MEMORY_CONTROLLER_MASKON | \
+	((mmm) << MCAX86_ERRCODE_MMM_SHIFT & MCAX86_ERRCODE_MMM_MASK) | \
+	((cccc) << MCAX86_ERRCODE_CCCC_SHIFT & MCAX86_ERRCODE_CCCC_MASK))
+#define	MCAX86_ERRCODE_ISMEMORY_CONTROLLER(code) \
+	(((code) & MCAX86_COMPOUND_MEMORY_CONTROLLER_MASKON) == \
+	MCAX86_COMPOUND_MEMORY_CONTROLLER_MASKON && \
+	((code) & MCAX86_COMPOUND_MEMORY_CONTROLLER_MASKOFF) == 0)
+
 #define	MCAX86_ERRCODE_ISCOMPOUND(code) \
 	(MCAX86_ERRCODE_ISGENERIC_MEMHIER(code) || \
 	MCAX86_ERRCODE_ISTLB(code) || \
-	MCAX86_ERRCODE_ISMEMHIER(code) \
-	MCAX86_ERRCODE_ISBUS_INTERCONNECT(code))
+	MCAX86_ERRCODE_ISMEMHIER(code) || \
+	MCAX86_ERRCODE_ISBUS_INTERCONNECT(code) || \
+	MCAX86_ERRCODE_ISMEMORY_CONTROLLER(code))
 
 #define	MCAX86_ERRCODE_UNKNOWN(code) \
 	(!MCAX86_ERRCODE_ISSIMPLE(code) && !MCAX86_ERRCODE_ISCOMPOUND(code))

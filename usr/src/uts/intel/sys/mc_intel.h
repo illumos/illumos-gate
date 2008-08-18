@@ -27,8 +27,6 @@
 #ifndef _MC_INTEL_H
 #define	_MC_INTEL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -40,9 +38,12 @@ extern "C" {
 
 #define	MCINTEL_NVLIST_VERS	MCINTEL_NVLIST_VERS0
 
+#define	MCINTEL_NVLIST_MEM	"memory-controller"
+#define	MCINTEL_NVLIST_NMEM	"memory-controllers"
 #define	MCINTEL_NVLIST_MC	"memory-channels"
 #define	MCINTEL_NVLIST_DIMMS	"memory-dimms"
 #define	MCINTEL_NVLIST_DIMMSZ	"memory-dimm-size"
+#define	MCINTEL_NVLIST_NRANKS	"dimm-max-ranks"
 #define	MCINTEL_NVLIST_RANKS	"dimm-ranks"
 #define	MCINTEL_NVLIST_ROWS	"dimm-rows"
 #define	MCINTEL_NVLIST_COL	"dimm-column"
@@ -190,6 +191,10 @@ extern "C" {
 #define	FM_EREPORT_PAYLOAD_INV_PIC			"invalid-pic-request"
 #define	FM_EREPORT_PAYLOAD_CACHE_NERRORS		"cache-error-count"
 
+#define	FM_EREPORT_PAYLOAD_NAME_RESOURCE		"resource"
+#define	FM_EREPORT_PAYLOAD_MEM_ECC_COUNTER_THIS	"mem_cor_ecc_counter"
+#define	FM_EREPORT_PAYLOAD_MEM_ECC_COUNTER_LAST	"mem_cor_ecc_counter_last"
+
 #define	INTEL_NB_5000P	0x25d88086
 #define	INTEL_NB_5000V	0x25d48086
 #define	INTEL_NB_5000X	0x25c08086
@@ -198,6 +203,57 @@ extern "C" {
 #define	INTEL_NB_5400A	0x40018086
 #define	INTEL_NB_5400B	0x40038086
 #define	INTEL_NB_7300	0x36008086
+
+#define	INTEL_NHM	0x2c408086
+#define	INTEL_QP_IO	0x34008086
+#define	INTEL_QP_36D	0x34068086
+#define	INTEL_QP_24D	0x34038086
+
+/* Intel QuickPath Bus Interconnect Errors */
+
+#define	MSR_MC_STATUS_QP_HEADER_PARITY		(1 << 16)
+#define	MSR_MC_STATUS_QP_DATA_PARITY		(1 << 17)
+#define	MSR_MC_STATUS_QP_RETRIES_EXCEEDED	(1 << 18)
+#define	MSR_MC_STATUS_QP_POISON		(1 << 19)
+
+#define	MSR_MC_STATUS_QP_UNSUPPORTED_MSG	(1 << 22)
+#define	MSR_MC_STATUS_QP_UNSUPPORTED_CREDIT	(1 << 23)
+#define	MSR_MC_STATUS_QP_FLIT_BUF_OVER		(1 << 24)
+#define	MSR_MC_STATUS_QP_FAILED_RESPONSE	(1 << 25)
+#define	MSR_MC_STATUS_QP_CLOCK_JITTER		(1 << 26)
+
+#define	MSR_MC_MISC_QP_CLASS		0x000000ff
+#define	MSR_MC_MISC_QP_RTID		0x00003f00
+#define	MSR_MC_MISC_QP_RHNID		0x00070000
+#define	MSR_MC_MISC_QP_IIB		0x01000000
+
+/* Intel QuickPath Memory Errors */
+
+#define	MCAX86_COMPOUND_BUS_MEMORY		0x0080
+#define	MCAX86_COMPOUND_BUS_MEMORY_MASK		0xff80
+#define	MCAX86_COMPOUND_BUS_MEMORY_TRANSACTION	0x0070
+#define	MCAX86_COMPOUND_BUS_MEMORY_READ		0x0010
+#define	MCAX86_COMPOUND_BUS_MEMORY_WRITE	0x0020
+#define	MCAX86_COMPOUND_BUS_MEMORY_CMD		0x0030
+#define	MCAX86_COMPOUND_BUS_MEMORY_CHANNEL	0x000f
+
+#define	MSR_MC_STATUS_MEM_ECC_READ	(1 << 16)
+#define	MSR_MC_STATUS_MEM_ECC_SCRUB	(1 << 17)
+#define	MSR_MC_STATUS_MEM_PARITY	(1 << 18)
+#define	MSR_MC_STATUS_MEM_REDUNDANT_MEM	(1 << 19)
+#define	MSR_MC_STATUS_MEM_SPARE_MEM	(1 << 20)
+#define	MSR_MC_STATUS_MEM_ILLEGAL_ADDR	(1 << 21)
+#define	MSR_MC_STATUS_MEM_BAD_ID	(1 << 22)
+#define	MSR_MC_STATUS_MEM_ADDR_PARITY	(1 << 23)
+#define	MSR_MC_STATUS_MEM_BYTE_PARITY	(1 << 24)
+
+#define	MSR_MC_MISC_MEM_RTID		0x00000000000000ffULL
+#define	MSR_MC_MISC_MEM_DIMM		0x0000000000030000ULL
+#define	MSR_MC_MISC_MEM_DIMM_SHIFT	16
+#define	MSR_MC_MISC_MEM_CHANNEL		0x00000000000c0000ULL
+#define	MSR_MC_MISC_MEM_CHANNEL_SHIFT	18
+#define	MSR_MC_MISC_MEM_SYNDROME	0xffffffff00000000ULL
+#define	MSR_MC_MISC_MEM_SYNDROME_SHIFT	32
 
 #ifdef __cplusplus
 }

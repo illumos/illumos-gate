@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * CPU Module Interface - hardware abstraction.
  */
@@ -43,6 +41,7 @@
 #include <sys/ontrap.h>
 #include <sys/controlregs.h>
 #include <sys/sunddi.h>
+#include <sys/trap.h>
 
 /*
  * Outside of this file consumers use the opaque cmi_hdl_t.  This
@@ -55,6 +54,7 @@ typedef struct cmi_hdl_impl {
 	uint_t cmih_chipid;			/* Chipid of cpu resource */
 	uint_t cmih_coreid;			/* Core within die */
 	uint_t cmih_strandid;			/* Thread within core */
+	boolean_t cmih_mstrand;			/* chip multithreading */
 	volatile uint32_t *cmih_refcntp;	/* Reference count pointer */
 	uint64_t cmih_msrsrc;			/* MSR data source flags */
 	void *cmih_hdlpriv;			/* cmi_hw.c private data */
@@ -516,6 +516,12 @@ ntv_strandid(cmi_hdl_impl_t *hdl)
 	return (hdl->cmih_strandid);
 }
 
+static boolean_t
+ntv_mstrand(cmi_hdl_impl_t *hdl)
+{
+	return (hdl->cmih_mstrand);
+}
+
 static uint32_t
 ntv_chiprev(cmi_hdl_impl_t *hdl)
 {
@@ -651,22 +657,26 @@ ntv_wrmsr(cmi_hdl_impl_t *hdl, uint_t msr, uint64_t val)
 
 /*ARGSUSED*/
 static int
-ntv_mcheck_xc(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
+ntv_int_xc(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
 {
 	cmi_errno_t *rcp = (cmi_errno_t *)arg3;
+	int int_no = (int)arg1;
 
-	int18();
+	if (int_no == T_MCE)
+		int18();
+	else
+		int_cmci();
 	*rcp = CMI_SUCCESS;
 
 	return (0);
 }
 
 static void
-ntv_mcheck(cmi_hdl_impl_t *hdl)
+ntv_int(cmi_hdl_impl_t *hdl, int int_no)
 {
 	cpu_t *cp = (cpu_t *)hdl->cmih_hdlpriv;
 
-	(void) call_func_ntv(cp->cpu_id, ntv_mcheck_xc, NULL, NULL);
+	(void) call_func_ntv(cp->cpu_id, ntv_int_xc, (xc_arg_t)int_no, NULL);
 }
 
 /*
@@ -681,6 +691,7 @@ struct cmi_hdl_ops {
 	uint_t (*cmio_chipid)(cmi_hdl_impl_t *);
 	uint_t (*cmio_coreid)(cmi_hdl_impl_t *);
 	uint_t (*cmio_strandid)(cmi_hdl_impl_t *);
+	boolean_t (*cmio_mstrand)(cmi_hdl_impl_t *);
 	uint32_t (*cmio_chiprev)(cmi_hdl_impl_t *);
 	const char *(*cmio_chiprevstr)(cmi_hdl_impl_t *);
 	uint32_t (*cmio_getsockettype)(cmi_hdl_impl_t *);
@@ -688,7 +699,7 @@ struct cmi_hdl_ops {
 	void (*cmio_setcr4)(cmi_hdl_impl_t *, ulong_t);
 	cmi_errno_t (*cmio_rdmsr)(cmi_hdl_impl_t *, uint_t, uint64_t *);
 	cmi_errno_t (*cmio_wrmsr)(cmi_hdl_impl_t *, uint_t, uint64_t);
-	void (*cmio_mcheck)(cmi_hdl_impl_t *);
+	void (*cmio_int)(cmi_hdl_impl_t *, int);
 } cmi_hdl_ops[] = {
 	/*
 	 * CMI_HDL_NATIVE - ops when apparently running on bare-metal
@@ -702,6 +713,7 @@ struct cmi_hdl_ops {
 		ntv_chipid,
 		ntv_coreid,
 		ntv_strandid,
+		ntv_mstrand,
 		ntv_chiprev,
 		ntv_chiprevstr,
 		ntv_getsockettype,
@@ -709,7 +721,7 @@ struct cmi_hdl_ops {
 		ntv_setcr4,
 		ntv_rdmsr,
 		ntv_wrmsr,
-		ntv_mcheck
+		ntv_int
 	},
 };
 
@@ -746,7 +758,7 @@ cpu_search(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 
 cmi_hdl_t
 cmi_hdl_create(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
-    uint_t strandid)
+    uint_t strandid, boolean_t mstrand)
 {
 	cmi_hdl_impl_t *hdl;
 	void *priv = NULL;
@@ -768,6 +780,7 @@ cmi_hdl_create(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 	hdl->cmih_chipid = chipid;
 	hdl->cmih_coreid = coreid;
 	hdl->cmih_strandid = strandid;
+	hdl->cmih_mstrand = mstrand;
 	hdl->cmih_hdlpriv = priv;
 	hdl->cmih_msrsrc = CMI_MSR_FLAG_RD_HWOK | CMI_MSR_FLAG_RD_INTERPOSEOK |
 	    CMI_MSR_FLAG_WR_HWOK | CMI_MSR_FLAG_WR_INTERPOSEOK;
@@ -1012,14 +1025,15 @@ CMI_HDL_OPFUNC(stepping, uint_t)
 CMI_HDL_OPFUNC(chipid, uint_t)
 CMI_HDL_OPFUNC(coreid, uint_t)
 CMI_HDL_OPFUNC(strandid, uint_t)
+CMI_HDL_OPFUNC(mstrand, boolean_t)
 CMI_HDL_OPFUNC(chiprev, uint32_t)
 CMI_HDL_OPFUNC(chiprevstr, const char *)
 CMI_HDL_OPFUNC(getsockettype, uint32_t)
 
 void
-cmi_hdl_mcheck(cmi_hdl_t ophdl)
+cmi_hdl_int(cmi_hdl_t ophdl, int num)
 {
-	IMPLHDL(ophdl)->cmih_ops->cmio_mcheck(IMPLHDL(ophdl));
+	IMPLHDL(ophdl)->cmih_ops->cmio_int(IMPLHDL(ophdl), num);
 }
 
 #ifndef	__xpv
@@ -1053,6 +1067,15 @@ cmi_ntv_hwstrandid(cpu_t *cp)
 	    cpuid_get_ncore_per_chip(cp);
 
 	return (cpuid_get_clogid(cp) % strands_per_core);
+}
+
+boolean_t
+cmi_ntv_hwmstrand(cpu_t *cp)
+{
+	int strands_per_core = cpuid_get_ncpu_per_chip(cp) /
+	    cpuid_get_ncore_per_chip(cp);
+
+	return (strands_per_core > 1);
 }
 #endif	/* __xpv */
 

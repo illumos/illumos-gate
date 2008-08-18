@@ -26,8 +26,6 @@
 #ifndef _SYS_APIC_APIC_H
 #define	_SYS_APIC_APIC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/psm_types.h>
 #include <sys/avintr.h>
 #include <sys/pci.h>
@@ -80,6 +78,7 @@ extern "C" {
 #define	APIC_LOCAL_TIMER	0xc8
 
 /* Local Interrupt Vector registers */
+#define	APIC_CMCI_VECT		0xbc
 #define	APIC_THERM_VECT		0xcc
 #define	APIC_PCINT_VECT		0xd0
 #define	APIC_INT_VECT0		0xd4

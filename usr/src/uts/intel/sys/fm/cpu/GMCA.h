@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_FM_CPU_GMCA_H
 #define	_SYS_FM_CPU_GMCA_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,6 +56,7 @@ extern "C" {
 #define	FM_EREPORT_CPU_GENERIC_MC_CODE_PARITY	"microcode_rom_parity"
 #define	FM_EREPORT_CPU_GENERIC_EXTERNAL		"external"
 #define	FM_EREPORT_CPU_GENERIC_FRC		"frc"
+#define	FM_EREPORT_CPU_GENERIC_INTERNAL_PARITY	"internal_parity"
 #define	FM_EREPORT_CPU_GENERIC_INTERNAL_TIMER	"internal_timer"
 #define	FM_EREPORT_CPU_GENERIC_INTERNAL_UNCLASS	"internal_unclassified"
 
@@ -77,6 +76,8 @@ extern "C" {
  *	5 - II interpretation
  *	6 - T interpretation
  *	7 - "_uc" if this is a compound error with MCi_STATUS.UC set, else ""
+ *	8 - CCCC interpretation
+ *	9 - MMM interpretation
  *
  * They can be selected in the format string using the %n$s specifier form.
  *
@@ -95,6 +96,7 @@ extern "C" {
 #define	FM_EREPORT_CPU_GENERIC_TLB		"%2$s" "%1$s" "tlb" "%7$s"
 #define	FM_EREPORT_CPU_GENERIC_MEMHIER		"%2$s" "%1$s" "cache" "%7$s"
 #define	FM_EREPORT_CPU_GENERIC_BUS_INTERCONNECT	"bus_interconnect" "%5$s" "%7$s"
+#define	FM_EREPORT_CPU_GENERIC_MEMORY_CONTROLLER "mc"
 
 /*
  * The "interpretation" expansions for the above ereport leaf subclasses.
@@ -129,6 +131,13 @@ extern "C" {
 
 #define	FM_EREPORT_CPU_GENERIC_T_NOTIMEOUT	""
 #define	FM_EREPORT_CPU_GENERIC_T_TIMEOUT	""
+
+#define	FM_EREPORT_CPU_GENERIC_CCCC		""
+
+#define	FM_EREPORT_CPU_GENERIC_MMM_ERR		""
+#define	FM_EREPORT_CPU_GENERIC_MMM_RD		""
+#define	FM_EREPORT_CPU_GENERIC_MMM_WR		""
+#define	FM_EREPORT_CPU_GENERIC_MMM_ADRCMD	""
 
 /*
  * Ereport payload member names together with bitmask values to select

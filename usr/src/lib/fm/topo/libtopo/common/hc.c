@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -129,6 +127,7 @@ static const hcc_t hc_canon[] = {
 	{ CHIP, TOPO_STABILITY_PRIVATE },
 	{ CHIP_SELECT, TOPO_STABILITY_PRIVATE },
 	{ CORE, TOPO_STABILITY_PRIVATE },
+	{ STRAND, TOPO_STABILITY_PRIVATE },
 	{ CONTROLLER, TOPO_STABILITY_PRIVATE },
 	{ CPU, TOPO_STABILITY_PRIVATE },
 	{ CPUBOARD, TOPO_STABILITY_PRIVATE },

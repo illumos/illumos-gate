@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_CPU_MODULE_IMPL_H
 #define	_SYS_CPU_MODULE_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cpu_module.h>
 #include <sys/cpuvar.h>
@@ -48,8 +46,9 @@ typedef uint32_t cmi_api_ver_t;
 
 #define	CMI_API_VERSION_0	_CMI_API_VERSION(0)
 #define	CMI_API_VERSION_1	_CMI_API_VERSION(1)
+#define	CMI_API_VERSION_2	_CMI_API_VERSION(2)
 
-#define	CMI_API_VERSION		CMI_API_VERSION_1
+#define	CMI_API_VERSION		CMI_API_VERSION_2
 
 typedef struct cmi_mc_ops {
 	cmi_errno_t (*cmi_mc_patounum)(void *, uint64_t, uint8_t, uint8_t,
@@ -67,6 +66,7 @@ typedef struct cmi_ops {
 	void (*cmi_faulted_exit)(cmi_hdl_t);
 	void (*cmi_mca_init)(cmi_hdl_t);
 	uint64_t (*cmi_mca_trap)(cmi_hdl_t, struct regs *);
+	void (*cmi_cmci_trap)();
 	cmi_errno_t (*cmi_msrinject)(cmi_hdl_t, cmi_mca_regs_t *, uint_t, int);
 	void (*cmi_hdl_poke)(cmi_hdl_t);
 	void (*cmi_fini)(cmi_hdl_t);

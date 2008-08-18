@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
 # and their location on the development machine when building the package.
@@ -74,6 +72,7 @@ f none platform/i86pc/kernel/drv/amd64/isa 755 root sys
 f none platform/i86pc/kernel/drv/amd64/mc-amd 755 root sys
 f none platform/i86pc/kernel/drv/amd64/npe 755 root sys
 f none platform/i86pc/kernel/drv/amd64/intel_nb5000 755 root sys
+f none platform/i86pc/kernel/drv/amd64/intel_nhm 755 root sys
 f none platform/i86pc/kernel/drv/amd64/pci 755 root sys
 f none platform/i86pc/kernel/drv/amd64/pit_beep 755 root sys
 f none platform/i86pc/kernel/drv/amd64/rootnex 755 root sys
@@ -83,6 +82,8 @@ f none platform/i86pc/kernel/drv/mc-amd 755 root sys
 f none platform/i86pc/kernel/drv/mc-amd.conf 644 root sys
 f none platform/i86pc/kernel/drv/intel_nb5000 755 root sys
 f none platform/i86pc/kernel/drv/intel_nb5000.conf 644 root sys
+f none platform/i86pc/kernel/drv/intel_nhm 755 root sys
+f none platform/i86pc/kernel/drv/intel_nhm.conf 644 root sys
 f none platform/i86pc/kernel/drv/npe 755 root sys
 f none platform/i86pc/kernel/drv/pci 755 root sys
 f none platform/i86pc/kernel/drv/pit_beep 755 root sys

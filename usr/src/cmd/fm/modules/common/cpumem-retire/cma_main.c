@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <cma.h>
 
 #include <strings.h>
@@ -219,6 +217,10 @@ static const cma_subscriber_t cma_subrs[] = {
 	{ "fault.cpu.intel.bus_interconnect", FM_FMRI_SCHEME_CPU,
 	    FM_CPU_SCHEME_VERSION, NULL },
 	{ "fault.cpu.intel.nb.*", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.cpu.intel.quickpath.*", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.cpu.generic-x86.mc", FM_FMRI_SCHEME_HC,
 	    FM_HC_SCHEME_VERSION, NULL },
 	{ "fault.cpu.intel.dma", FM_FMRI_SCHEME_HC,
 	    FM_HC_SCHEME_VERSION, NULL },

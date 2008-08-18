@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mca_x86.h>
 #include <sys/cpu_module_impl.h>
@@ -73,6 +71,9 @@ int gcpu_mca_stack_ereport_include = 0;
  */
 int gcpu_mca_telemetry_retries = 5;
 
+int gcpu_mca_cmci_throttling_threshold = 10;
+int gcpu_mca_cmci_reenable_threshold = 1000;
+
 static gcpu_error_disp_t gcpu_errtypes[] = {
 
 	/*
@@ -118,6 +119,18 @@ static gcpu_error_disp_t gcpu_errtypes[] = {
 		MCAX86_SIMPLE_FRC_MASKON,
 		MCAX86_SIMPLE_FRC_MASKOFF
 	},
+
+	/*
+	 * Internal parity error
+	 */
+	{
+		FM_EREPORT_CPU_GENERIC_INTERNAL_PARITY,
+		NULL,
+		FM_EREPORT_PAYLOAD_FLAGS_COMMON,
+		MCAX86_SIMPLE_INTERNAL_PARITY_MASKON,
+		MCAX86_SIMPLE_INTERNAL_PARITY_MASKOFF
+	},
+
 
 	/*
 	 * Internal timer error
@@ -183,6 +196,16 @@ static gcpu_error_disp_t gcpu_errtypes[] = {
 		FM_EREPORT_PAYLOAD_FLAGS_COMPOUND_ERR,
 		MCAX86_COMPOUND_BUS_INTERCONNECT_MASKON,
 		MCAX86_COMPOUND_BUS_INTERCONNECT_MASKOFF
+	},
+	/*
+	 * Compound error codes - memory controller errors
+	 */
+	{
+		FM_EREPORT_CPU_GENERIC_MEMORY_CONTROLLER,
+		"MC" "_" "%8$s" "_" "%9$s" "_ERR",
+		FM_EREPORT_PAYLOAD_FLAGS_COMPOUND_ERR,
+		MCAX86_COMPOUND_MEMORY_CONTROLLER_MASKON,
+		MCAX86_COMPOUND_MEMORY_CONTROLLER_MASKOFF
 	},
 };
 
@@ -283,6 +306,36 @@ static struct gcpu_mnexp gcpu_T_mnemonics[] = {	 /* MCAX86_ERRCODE_T_* */
 	{ "TIMEOUT", FM_EREPORT_CPU_GENERIC_T_TIMEOUT }		/* TIMEOUT */
 };
 
+static struct gcpu_mnexp gcpu_CCCC_mnemonics[] = { /* MCAX86_ERRCODE_CCCC_* */
+	{ "CH0", FM_EREPORT_CPU_GENERIC_CCCC },		/* CH0 */
+	{ "CH1", FM_EREPORT_CPU_GENERIC_CCCC },		/* CH1 */
+	{ "CH2", FM_EREPORT_CPU_GENERIC_CCCC },		/* CH2 */
+	{ "CH3", FM_EREPORT_CPU_GENERIC_CCCC },		/* CH3 */
+	{ "CH4", FM_EREPORT_CPU_GENERIC_CCCC },		/* CH4 */
+	{ "CH5", FM_EREPORT_CPU_GENERIC_CCCC },		/* CH5 */
+	{ "CH6", FM_EREPORT_CPU_GENERIC_CCCC },		/* CH6 */
+	{ "CH7", FM_EREPORT_CPU_GENERIC_CCCC },		/* CH7 */
+	{ "CH8", FM_EREPORT_CPU_GENERIC_CCCC },		/* CH8 */
+	{ "CH9", FM_EREPORT_CPU_GENERIC_CCCC },		/* CH9 */
+	{ "CH10", FM_EREPORT_CPU_GENERIC_CCCC },	/* CH10 */
+	{ "CH11", FM_EREPORT_CPU_GENERIC_CCCC },	/* CH11 */
+	{ "CH12", FM_EREPORT_CPU_GENERIC_CCCC },	/* CH12 */
+	{ "CH13", FM_EREPORT_CPU_GENERIC_CCCC },	/* CH13 */
+	{ "CH14", FM_EREPORT_CPU_GENERIC_CCCC },	/* CH14 */
+	{ "CH", FM_EREPORT_CPU_GENERIC_CCCC }		/* GEN */
+};
+
+static struct gcpu_mnexp gcpu_MMM_mnemonics[] = { /* MCAX86_ERRCODE_MMM_* */
+	{ "GEN", FM_EREPORT_CPU_GENERIC_MMM_ERR },	/* GEN ERR */
+	{ "RD", FM_EREPORT_CPU_GENERIC_MMM_RD },	/* READ  */
+	{ "WR", FM_EREPORT_CPU_GENERIC_MMM_WR },	/* WRITE  */
+	{ "ADDR_CMD", FM_EREPORT_CPU_GENERIC_MMM_ADRCMD },	/* ADDR, CMD  */
+	{ GCPU_MNEMONIC_RESVD, ""},			/* RESERVED  */
+	{ GCPU_MNEMONIC_RESVD, ""},			/* RESERVED  */
+	{ GCPU_MNEMONIC_RESVD, ""},			/* RESERVED  */
+	{ GCPU_MNEMONIC_RESVD, ""}			/* RESERVED  */
+};
+
 enum gcpu_mn_namespace {
 	GCPU_MN_NAMESPACE_COMPOUND,
 	GCPU_MN_NAMESPACE_EREPORT
@@ -318,7 +371,7 @@ gcpu_mnemonic(const struct gcpu_mnexp *tbl, size_t tbl_sz, uint8_t val,
  * we will expand this restricted format string ourselves.
  */
 
-#define	GCPU_CLASS_VARCOMPS	7
+#define	GCPU_CLASS_VARCOMPS	9
 
 #define	GCPU_MNEMONIC(code, name, nspace) \
 	gcpu_mnemonic(gcpu_##name##_mnemonics, \
@@ -343,6 +396,8 @@ gcpu_mn_fmt(const char *fmt, char *buf, size_t buflen, uint64_t status,
 	mn[4] = GCPU_MNEMONIC(code, II, nspace);
 	mn[5] = GCPU_MNEMONIC(code, T, nspace);
 	mn[6] = (status & MSR_MC_STATUS_UC) ? "_uc" : "";
+	mn[7] = GCPU_MNEMONIC(code, CCCC, nspace);
+	mn[8] = GCPU_MNEMONIC(code, MMM, nspace);
 
 	while (p < q - 1 && (c = *fmt++) != '\0') {
 		if (c != '%') {
@@ -367,6 +422,8 @@ nextfmt:
 		case '5':
 		case '6':
 		case '7':
+		case '8':
+		case '9':
 			if (which != -1) { /* allow only one positional digit */
 				error++;
 				break;
@@ -430,9 +487,9 @@ gcpu_erpt_clsfmt(const char *fmt, char *buf, size_t buflen, uint64_t status,
 }
 
 /*
- * Create an "hc" scheme FMRI identifying the given cpu.  We don't know
+ * Create an "hc" scheme FMRI identifying the given cpu.  If we don't know
  * the actual topology/connectivity of cpus in the system, so we'll
- * apply /motherboard=0/chip=.../cpu=... in all cases.
+ * apply /motherboard=0/chip=.../cpu=...
  */
 static nvlist_t *
 gcpu_fmri_create(cmi_hdl_t hdl, nv_alloc_t *nva)
@@ -442,10 +499,18 @@ gcpu_fmri_create(cmi_hdl_t hdl, nv_alloc_t *nva)
 	if ((nvl = fm_nvlist_create(nva)) == NULL)
 		return (NULL);
 
-	fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, NULL, 3,
-	    "motherboard", 0,
-	    "chip", cmi_hdl_chipid(hdl),
-	    "cpu", cmi_hdl_coreid(hdl));
+	if (cmi_hdl_mstrand(hdl)) {
+		fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, NULL, 4,
+		    "motherboard", 0,
+		    "chip", cmi_hdl_chipid(hdl),
+		    "core", cmi_hdl_coreid(hdl),
+		    "strand", cmi_hdl_strandid(hdl));
+	} else {
+		fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, NULL, 3,
+		    "motherboard", 0,
+		    "chip", cmi_hdl_chipid(hdl),
+		    "cpu", cmi_hdl_coreid(hdl));
+	}
 
 	return (nvl);
 }
@@ -482,8 +547,10 @@ gcpu_bleat(cmi_hdl_t hdl, gcpu_logout_t *gcl)
 	}
 	gcpu_last_bleat = now;
 
-	cmn_err(CE_WARN, "Machine-Check Errors unlogged on chip %d core %d, "
-	    "raw dump follows", cmi_hdl_chipid(hdl), cmi_hdl_coreid(hdl));
+	cmn_err(CE_WARN,
+	    "Machine-Check Errors unlogged on chip %d core %d strand %d, "
+	    "raw dump follows", cmi_hdl_chipid(hdl), cmi_hdl_coreid(hdl),
+	    cmi_hdl_strandid(hdl));
 	cmn_err(CE_WARN, "MCG_STATUS 0x%016llx",
 	    (u_longlong_t)gcl->gcl_mcg_status);
 	for (i = 0, gbl = &gcl->gcl_data[0]; i < gcl->gcl_nbanks; i++, gbl++) {
@@ -937,6 +1004,8 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	uint_t nbanks;
 	size_t mslsz;
 	int i;
+	int mcg_misc2_present;
+	uint32_t cmci_capable = 0;
 
 	if (gcpu == NULL)
 		return;
@@ -969,6 +1038,7 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	 * banks.
 	 */
 	mcg_ctl_present = cap & MCG_CAP_CTL_P;
+	mcg_misc2_present = cap & MCG_CAP_MISC2_P;
 
 	/*
 	 * We squirell values away for inspection/debugging.
@@ -1023,6 +1093,9 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	}
 	mca->gcpu_mca_nextpoll_idx = GCPU_MCA_LOGOUT_POLLER_1;
 
+	mca->gcpu_bank_cmci = kmem_zalloc(sizeof (gcpu_mca_cmci_t) * nbanks,
+	    KM_SLEEP);
+
 	/*
 	 * Create our errorq to transport the logout structures.  This
 	 * can fail so users of gcpu_mca_queue must be prepared for NULL.
@@ -1055,13 +1128,15 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	 */
 	for (i = 0; i < nbanks; i++) {
 		/*
-		 * On Intel family 6 and AMD family 6 we must not enable
-		 * machine check from bank 0 detectors.  In the Intel
-		 * case bank 0 is reserved for the platform, while in the
+		 * On AMD family 6 we must not enable
+		 * machine check from bank 0 detectors.
 		 * AMD case reports are that enabling bank 0 (DC) produces
 		 * spurious machine checks.
+		 * For Intel we let plug-in choose to skip bank if plug-in
+		 * is enabled otherwise we skip bank 0 for family 6
 		 */
-		if (i == 0 && ((vendor == X86_VENDOR_Intel ||
+		if (i == 0 &&
+		    (((vendor == X86_VENDOR_Intel && !cms_present(hdl)) ||
 		    vendor == X86_VENDOR_AMD) && family == 6))
 			continue;
 
@@ -1076,7 +1151,40 @@ gcpu_mca_init(cmi_hdl_t hdl)
 		 */
 		mca->gcpu_actv_banks |= 1 << i;
 		atomic_or_32(&gcpu->gcpu_shared->gcpus_actv_banks, 1 << i);
+
+		/*
+		 * check CMCI capability
+		 */
+		if (mcg_misc2_present) {
+			uint64_t misc2;
+			uint32_t cap = 0;
+			(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC_MISC2(i), &misc2);
+			if (misc2 & MSR_MC_MISC2_EN)
+				continue;
+			misc2 |= MSR_MC_MISC2_EN;
+			(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC_MISC2(i), misc2);
+			(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC_MISC2(i), &misc2);
+			mca->gcpu_bank_cmci[i].cmci_cap = cap =
+			    (misc2 & MSR_MC_MISC2_EN) ? 1 : 0;
+			if (cap)
+				cmci_capable ++;
+			/*
+			 * Set threshold to 1 while unset the en field, to avoid
+			 * CMCI trigged before APIC LVT entry init.
+			 */
+			misc2 = misc2 & (~MSR_MC_MISC2_EN) | 1;
+			(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC_MISC2(i), misc2);
+
+			/*
+			 * init cmci related count
+			 */
+			mca->gcpu_bank_cmci[i].cmci_enabled = 0;
+			mca->gcpu_bank_cmci[i].drtcmci = 0;
+			mca->gcpu_bank_cmci[i].ncmci = 0;
+		}
 	}
+	if (cmci_capable)
+		cmi_enable_cmci = 1;
 
 	/*
 	 * Log any valid telemetry lurking in the MCA banks, but do not
@@ -1094,7 +1202,8 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	if (!gcpu_suppress_log_on_init &&
 	    (vendor == X86_VENDOR_Intel && family >= 0xf ||
 	    vendor == X86_VENDOR_AMD))
-		gcpu_mca_logout(hdl, NULL, -1ULL, NULL, B_FALSE);
+		gcpu_mca_logout(hdl, NULL, -1ULL, NULL, B_FALSE,
+		    GCPU_MPT_WHAT_POKE_ERR);
 
 	/*
 	 * Initialize all MCi_CTL and clear all MCi_STATUS, allowing the
@@ -1319,9 +1428,89 @@ gcpu_mca_process(cmi_hdl_t hdl, struct regs *rp, int nerr, gcpu_data_t *gcpu,
 
 static uint32_t gcpu_deferrred_polled_clears;
 
+static void
+gcpu_cmci_logout(cmi_hdl_t hdl, int bank, gcpu_mca_cmci_t *bank_cmci_p,
+    uint64_t status, int what)
+{
+	uint64_t misc2;
+
+	if (bank_cmci_p->cmci_cap && (what == GCPU_MPT_WHAT_CYC_ERR) &&
+	    (!(status & MSR_MC_STATUS_VAL) || ((status & MSR_MC_STATUS_VAL) &&
+	    !(status & MSR_MC_STATUS_CEC_MASK)))) {
+
+		if (!(bank_cmci_p->cmci_enabled)) {
+			/*
+			 * when cmci is disabled, and the bank has no error or
+			 * no corrected error for
+			 * gcpu_mca_cmci_reenable_threshold consecutive polls,
+			 * turn on this bank's cmci.
+			 */
+
+			bank_cmci_p->drtcmci ++;
+
+			if (bank_cmci_p->drtcmci >=
+			    gcpu_mca_cmci_reenable_threshold) {
+
+				/* turn on cmci */
+
+				(void) cmi_hdl_rdmsr(hdl,
+				    IA32_MSR_MC_MISC2(bank), &misc2);
+				misc2 |= MSR_MC_MISC2_EN;
+				(void) cmi_hdl_wrmsr(hdl,
+				    IA32_MSR_MC_MISC2(bank), misc2);
+
+				/* reset counter and set flag */
+				bank_cmci_p->drtcmci = 0;
+				bank_cmci_p->cmci_enabled = 1;
+			}
+		} else {
+			/*
+			 * when cmci is enabled,if is in cyclic poll and the
+			 * bank has no error or no corrected error, reset ncmci
+			 * counter
+			 */
+			bank_cmci_p->ncmci = 0;
+		}
+	}
+}
+
+static void
+gcpu_cmci_throttle(cmi_hdl_t hdl, int bank, gcpu_mca_cmci_t *bank_cmci_p,
+    int what)
+{
+	uint64_t misc2 = 0;
+
+	/*
+	 * if cmci of this bank occurred beyond
+	 * gcpu_mca_cmci_throttling_threshold between 2 polls,
+	 * turn off this bank's CMCI;
+	 */
+	if (bank_cmci_p->cmci_enabled && what == GCPU_MPT_WHAT_CMCI_ERR) {
+
+		/* if it is cmci trap, increase the count */
+		bank_cmci_p->ncmci++;
+
+		if (bank_cmci_p->ncmci >= gcpu_mca_cmci_throttling_threshold) {
+
+			/* turn off cmci */
+
+			(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC_MISC2(bank),
+			    &misc2);
+			misc2 &= ~MSR_MC_MISC2_EN;
+			(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC_MISC2(bank),
+			    misc2);
+
+			/* clear the flag and count */
+
+			bank_cmci_p->cmci_enabled = 0;
+			bank_cmci_p->ncmci = 0;
+		}
+	}
+}
+
 void
 gcpu_mca_logout(cmi_hdl_t hdl, struct regs *rp, uint64_t bankmask,
-    gcpu_mce_status_t *mcesp, boolean_t clrstatus)
+    gcpu_mce_status_t *mcesp, boolean_t clrstatus, int what)
 {
 	gcpu_data_t *gcpu = cmi_hdl_getcmidata(hdl);
 	gcpu_mca_t *mca = &gcpu->gcpu_mca;
@@ -1391,6 +1580,9 @@ gcpu_mca_logout(cmi_hdl_t hdl, struct regs *rp, uint64_t bankmask,
 		if (cmi_hdl_rdmsr(hdl, IA32_MSR_MC(i, STATUS), &status) !=
 		    CMI_SUCCESS)
 			continue;
+
+		gcpu_cmci_logout(hdl, i, &mca->gcpu_bank_cmci[i], status, what);
+
 retry:
 		if (!(status & MSR_MC_STATUS_VAL))
 			continue;
@@ -1403,6 +1595,8 @@ retry:
 
 		if (status & MSR_MC_STATUS_MISCV)
 			(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC(i, MISC), &misc);
+
+		gcpu_cmci_throttle(hdl, i, &mca->gcpu_bank_cmci[i], what);
 
 		/*
 		 * Allow the model-specific code to extract bank telemetry.
@@ -1601,7 +1795,7 @@ gcpu_mca_trap(cmi_hdl_t hdl, struct regs *rp)
 		tooklock = 1;
 	}
 
-	gcpu_mca_logout(hdl, rp, 0, &mce, B_TRUE);
+	gcpu_mca_logout(hdl, rp, 0, &mce, B_TRUE, GCPU_MPT_WHAT_MC_ERR);
 
 	if (tooklock)
 		mutex_exit(poll_lock);

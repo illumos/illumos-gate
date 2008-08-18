@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_ARCHSYSTM_H
 #define	_SYS_ARCHSYSTM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * A selection of ISA-dependent interfaces
@@ -71,6 +69,7 @@ extern int interrupts_enabled(void);
 extern void int3(void);
 extern void int18(void);
 extern void int20(void);
+extern void int_cmci(void);
 
 #if defined(__amd64)
 extern void sys_syscall();

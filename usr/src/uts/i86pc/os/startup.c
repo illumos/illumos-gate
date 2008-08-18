@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -1486,7 +1484,8 @@ startup_modules(void)
 		cmi_hdl_t hdl;
 
 		if ((hdl = cmi_init(CMI_HDL_NATIVE, cmi_ntv_hwchipid(CPU),
-		    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU))) != NULL) {
+		    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU),
+		    cmi_ntv_hwmstrand(CPU))) != NULL) {
 			if (x86_feature & X86_MCA)
 				cmi_mca_init(hdl);
 		}

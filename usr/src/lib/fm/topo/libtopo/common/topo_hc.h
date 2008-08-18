@@ -27,8 +27,6 @@
 #ifndef _TOPO_HC_H
 #define	_TOPO_HC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -44,8 +42,9 @@ extern "C" {
 #define	CENTERPLANE	"centerplane"
 #define	CHASSIS		"chassis"
 #define	CHIP		"chip"
-#define	CHIP_SELECT	"chip-select"
 #define	CORE		"core"
+#define	STRAND		"strand"
+#define	CHIP_SELECT	"chip-select"
 #define	CONTROLLER	"controller"
 #define	CPU		"cpu"
 #define	CPUBOARD	"cpuboard"

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Public interface to routines implemented by CPU modules
@@ -71,6 +69,11 @@ int cmi_force_generic = 0;
 int cmi_panic_on_uncorrectable_error = 1;
 
 /*
+ * Set to indicate whether we are able to enable cmci interrupt.
+ */
+int cmi_enable_cmci = 0;
+
+/*
  * Subdirectory (relative to the module search path) in which we will
  * look for cpu modules.
  */
@@ -100,7 +103,8 @@ static kmutex_t cmi_load_lock;
  * Functions we need from cmi_hw.c that are not part of the cpu_module.h
  * interface.
  */
-extern cmi_hdl_t cmi_hdl_create(enum cmi_hdl_class, uint_t, uint_t, uint_t);
+extern cmi_hdl_t cmi_hdl_create(enum cmi_hdl_class, uint_t, uint_t, uint_t,
+    boolean_t);
 extern void cmi_hdl_setcmi(cmi_hdl_t, void *, void *);
 extern void *cmi_hdl_getcmi(cmi_hdl_t);
 extern void cmi_hdl_setmc(cmi_hdl_t, const struct cmi_mc_ops *, void *);
@@ -431,7 +435,7 @@ cmi_load_generic(cmi_hdl_t hdl, void **datap)
 
 cmi_hdl_t
 cmi_init(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
-    uint_t strandid)
+    uint_t strandid, boolean_t mstrand)
 {
 	cmi_t *cmi = NULL;
 	cmi_hdl_t hdl;
@@ -444,7 +448,8 @@ cmi_init(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 
 	mutex_enter(&cmi_load_lock);
 
-	if ((hdl = cmi_hdl_create(class, chipid, coreid, strandid)) == NULL) {
+	if ((hdl = cmi_hdl_create(class, chipid, coreid, strandid,
+	    mstrand)) == NULL) {
 		mutex_exit(&cmi_load_lock);
 		cmn_err(CE_WARN, "There will be no MCA support on chip %d "
 		    "core %d strand %d (cmi_hdl_create returned NULL)\n",
@@ -752,6 +757,38 @@ cmi_hdl_poke(cmi_hdl_t hdl)
 		return;
 
 	CMI_OPS(cmi)->cmi_hdl_poke(hdl);
+}
+
+void
+cmi_cmci_trap()
+{
+#ifndef	__xpv
+	cmi_hdl_t hdl = NULL;
+	cmi_t *cmi;
+
+	if (cmi_no_mca_init != 0)
+		return;
+
+	if ((hdl = cmi_hdl_lookup(CMI_HDL_NATIVE, cmi_ntv_hwchipid(CPU),
+	    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU))) == NULL ||
+	    (cmi = HDL2CMI(hdl)) == NULL ||
+	    !CMI_OP_PRESENT(cmi, cmi_cmci_trap)) {
+
+		cmn_err(CE_WARN, "CMCI interrupt on cpuid %d: %s",
+		    CPU->cpu_id,
+		    hdl ? "handle lookup ok but no CMCI handler found" :
+		    "handle lookup failed");
+
+		if (hdl != NULL)
+			cmi_hdl_rele(hdl);
+
+		return;
+	}
+
+	CMI_OPS(cmi)->cmi_cmci_trap(hdl);
+
+	cmi_hdl_rele(hdl);
+#endif	/* __xpv */
 }
 
 void

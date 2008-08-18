@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_CPU_MODULE_H
 #define	_SYS_CPU_MODULE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/cpuvar.h>
@@ -110,7 +108,8 @@ enum cmi_hdl_class {
 struct regs;
 struct cmi_mc_ops;	/* defined in cpu_module_impl.h */
 
-extern cmi_hdl_t cmi_init(enum cmi_hdl_class, uint_t, uint_t, uint_t);
+extern cmi_hdl_t cmi_init(enum cmi_hdl_class, uint_t, uint_t, uint_t,
+    boolean_t);
 extern void cmi_post_startup(void);
 extern void cmi_post_mpstartup(void);
 extern void cmi_fini(cmi_hdl_t);
@@ -147,6 +146,7 @@ extern uint_t cmi_hdl_chipid(cmi_hdl_t);
 extern uint_t cmi_hdl_dieid(cmi_hdl_t);
 extern uint_t cmi_hdl_coreid(cmi_hdl_t);
 extern uint_t cmi_hdl_strandid(cmi_hdl_t);
+extern boolean_t cmi_hdl_mstrand(cmi_hdl_t);
 extern uint32_t cmi_hdl_chiprev(cmi_hdl_t);
 extern const char *cmi_hdl_chiprevstr(cmi_hdl_t);
 extern uint32_t cmi_hdl_getsockettype(cmi_hdl_t);
@@ -155,6 +155,7 @@ extern uint32_t cmi_hdl_getsockettype(cmi_hdl_t);
 extern uint_t cmi_ntv_hwchipid(cpu_t *);
 extern uint_t cmi_ntv_hwcoreid(cpu_t *);
 extern uint_t cmi_ntv_hwstrandid(cpu_t *);
+extern boolean_t cmi_ntv_hwmstrand(cpu_t *);
 #endif	/* __xpv */
 
 typedef struct cmi_mca_regs {
@@ -184,7 +185,7 @@ extern void cmi_pci_putl(int, int, int, int, ddi_acc_handle_t, uint32_t);
 extern void cmi_mca_init(cmi_hdl_t);
 
 extern void cmi_hdl_poke(cmi_hdl_t);
-extern void cmi_hdl_mcheck(cmi_hdl_t);
+extern void cmi_hdl_int(cmi_hdl_t, int);
 
 extern void cmi_mca_trap(struct regs *);
 

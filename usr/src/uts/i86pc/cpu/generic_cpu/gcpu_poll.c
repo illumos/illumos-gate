@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Generic x86 CPU MCA poller.
  */
@@ -118,8 +116,26 @@ gcpu_ntv_mca_poll(cmi_hdl_t hdl, int what)
 	gcpu_mca_poll_trace_ctl_t *ptc = &gcpu->gcpu_mca.gcpu_mca_polltrace;
 	gcpu_mce_status_t mce;
 	int willpanic;
+	int i;
+	uint64_t misc2;
+	uint64_t bankmask;
 
 	ASSERT(MUTEX_HELD(&gcpu->gcpu_shared->gcpus_poll_lock));
+
+	/* Enable CMCI in first poll if is support */
+	if (cmi_enable_cmci && (!mca->gcpu_mca_first_poll_cmci_enabled)) {
+		for (i = 0; i < mca->gcpu_mca_nbanks; i++) {
+			if (mca->gcpu_bank_cmci[i].cmci_cap) {
+				(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC_MISC2(i),
+				    &misc2);
+				misc2 |= MSR_MC_MISC2_EN;
+				(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC_MISC2(i),
+				    misc2);
+				mca->gcpu_bank_cmci[i].cmci_enabled = 1;
+			}
+		}
+		mca->gcpu_mca_first_poll_cmci_enabled = 1;
+	}
 
 	if (mca->gcpu_mca_flags & GCPU_MCA_F_UNFAULTING) {
 		int i;
@@ -146,22 +162,31 @@ gcpu_ntv_mca_poll(cmi_hdl_t hdl, int what)
 	/*
 	 * Logout errors of the MCA banks of this cpu.
 	 */
-	gcpu_mca_logout(hdl, NULL,
-	    cms_poll_ownermask(hdl, gcpu_mca_poll_interval), &mce, B_TRUE);
+	if (what == GCPU_MPT_WHAT_CMCI_ERR) {
+		/*
+		 * for CMCI, all banks should be scanned for log out
+		 */
+		bankmask = -1ULL;
+	} else {
+		bankmask = cms_poll_ownermask(hdl, gcpu_mca_poll_interval);
+	}
+	gcpu_mca_logout(hdl, NULL, bankmask, &mce, B_TRUE, what);
 
 	gcpu_mca_poll_trace(ptc, what, mce.mce_nerr);
 	mca->gcpu_mca_lastpoll = gethrtime_waitfree();
 
 	willpanic = mce.mce_disp & CMI_ERRDISP_FORCEFATAL && cmi_panic_on_ue();
 
-	/*
-	 * Call to the memory-controller driver which may report some
-	 * errors not visible under the MCA (for off-chip NB).
-	 * Since there is typically a single MCH we arrange that
-	 * just one cpu perform this task at each cyclic fire.
-	 */
-	if (gcpu_mch_pollowner(hdl))
-		cmi_mc_logout(hdl, 0, willpanic);
+	if (what != GCPU_MPT_WHAT_CMCI_ERR) {
+		/*
+		 * Call to the memory-controller driver which may report some
+		 * errors not visible under the MCA (for off-chip NB).
+		 * Since there is typically a single MCH we arrange that
+		 * just one cpu perform this task at each cyclic fire.
+		 */
+		if (gcpu_mch_pollowner(hdl))
+			cmi_mc_logout(hdl, 0, willpanic);
+	}
 
 	/*
 	 * In the common case any polled error is considered non-fatal,
@@ -352,6 +377,23 @@ gcpu_hdl_poke(cmi_hdl_t hdl)
 	switch (cmi_hdl_class(hdl)) {
 	case CMI_HDL_NATIVE:
 		gcpu_ntv_mca_poll_wrapper(hdl, GCPU_MPT_WHAT_POKE_ERR);
+		break;
+
+	case CMI_HDL_SOLARIS_xVM_MCA:
+		/*
+		 * Implementation will call the xPV poll wrapper.
+		 */
+	default:
+		break;
+	}
+}
+
+void
+gcpu_cmci_trap(cmi_hdl_t hdl)
+{
+	switch (cmi_hdl_class(hdl)) {
+	case CMI_HDL_NATIVE:
+		gcpu_ntv_mca_poll_wrapper(hdl, GCPU_MPT_WHAT_CMCI_ERR);
 		break;
 
 	case CMI_HDL_SOLARIS_xVM_MCA:

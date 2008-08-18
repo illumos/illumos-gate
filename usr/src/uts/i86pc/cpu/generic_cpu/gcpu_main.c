@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Generic x86 CPU Module
@@ -115,7 +113,7 @@ gcpu_post_mpstartup(cmi_hdl_t hdl)
 	}
 }
 
-cmi_api_ver_t _cmi_api_version = CMI_API_VERSION_1;
+cmi_api_ver_t _cmi_api_version = CMI_API_VERSION_2;
 
 const cmi_ops_t _cmi_ops = {
 	gcpu_init,				/* cmi_init */
@@ -125,6 +123,7 @@ const cmi_ops_t _cmi_ops = {
 	gcpu_faulted_exit,			/* cmi_faulted_exit */
 	gcpu_mca_init,				/* cmi_mca_init */
 	gcpu_mca_trap,				/* cmi_mca_trap */
+	gcpu_cmci_trap,				/* cmi_cmci_trap */
 	gcpu_msrinject,				/* cmi_msrinject */
 	gcpu_hdl_poke,				/* cmi_hdl_poke */
 	NULL,					/* cmi_fini */

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <regex.h>
 #include <devfsadm.h>
 #include <stdio.h>
@@ -567,7 +565,8 @@ mc_node(di_minor_t minor, di_node_t node)
 		(void) snprintf(linkpath, sizeof (linkpath), "mc/mc%u",
 		    unitaddr - MC_AMD_DEV_OFFSET);
 	} else {
-		return (DEVFSADM_CONTINUE);
+		(void) snprintf(linkpath, sizeof (linkpath), "mc/mc%u",
+		    minor->dev_minor);
 	}
 	(void) devfsadm_mklink(linkpath, node, minor, 0);
 	return (DEVFSADM_CONTINUE);

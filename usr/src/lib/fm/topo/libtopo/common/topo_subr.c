@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <alloca.h>
 #include <ctype.h>
 #include <limits.h>
@@ -322,11 +320,13 @@ topo_search_path(topo_mod_t *mod, const char *rootdir, const char *file)
  * so we translate that to '-'.
  */
 char *
-topo_cleanup_auth_str(topo_hdl_t *thp, char *begin)
+topo_cleanup_auth_str(topo_hdl_t *thp, const char *begin)
 {
 	char buf[MAXNAMELEN];
-	size_t count;
-	char *str, *end, *pp;
+	const char *end, *cp;
+	char *pp;
+	char c;
+	int i;
 
 	end = begin + strlen(begin);
 
@@ -338,15 +338,19 @@ topo_cleanup_auth_str(topo_hdl_t *thp, char *begin)
 	if (begin >= end)
 		return (NULL);
 
-	count = end - begin;
-	count += 1;
-
-	if (count > sizeof (buf))
-		return (NULL);
-
-	(void) snprintf(buf, count, "%s", begin);
-	while ((str = strpbrk(buf, " :=/")) != NULL)
-		*str = '-';
+	cp = begin;
+	for (i = 0; i < MAXNAMELEN - 1; i++) {
+		if (cp >= end)
+			break;
+		c = *cp;
+		if (c == ':' || c == '=' || c == '/' || isspace(c) ||
+		    !isprint(c))
+			buf[i] = '-';
+		else
+			buf[i] = c;
+		cp++;
+	}
+	buf[i] = 0;
 
 	pp = topo_hdl_strdup(thp, buf);
 	return (pp);

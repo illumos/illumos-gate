@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
 #include <stdio.h>
@@ -89,9 +87,20 @@ mc_offchip_open()
 	return (mc_fd != -1);
 }
 
+static int
+mc_onchip(topo_instance_t id)
+{
+	char path[64];
+
+	(void) snprintf(path, sizeof (path), "/dev/mc/mc%d", id);
+	mc_fd = open(path, O_RDONLY);
+	return (mc_fd != -1);
+}
+
 void
 mc_add_ranks(topo_mod_t *mod, tnode_t *dnode, nvlist_t *auth, int dimm,
-    nvlist_t **ranks_nvp, int nranks, char *serial, char *part, char *rev)
+    nvlist_t **ranks_nvp, int nranks, char *serial, char *part, char *rev,
+    int maxranks)
 {
 	int i;
 	int rank;
@@ -100,7 +109,7 @@ mc_add_ranks(topo_mod_t *mod, tnode_t *dnode, nvlist_t *auth, int dimm,
 	nvlist_t *fmri;
 	int err = 0;
 
-	rank = dimm * 2;
+	rank = dimm * maxranks;
 	if (topo_node_range_create(mod, dnode, RANK, rank,
 	    rank + nranks - 1) < 0) {
 		whinge(mod, NULL, "mc_add_dimms: node range create failed"
@@ -143,7 +152,7 @@ mc_add_ranks(topo_mod_t *mod, tnode_t *dnode, nvlist_t *auth, int dimm,
 
 static void
 mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
-    nvlist_t **nvl, uint_t ndimms)
+    nvlist_t **nvl, uint_t ndimms, int maxranks)
 {
 	int i;
 	nvlist_t *fmri;
@@ -218,18 +227,20 @@ mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 
 		if (nranks) {
 			mc_add_ranks(mod, dnode, auth, i, ranks_nvp, nranks,
-			    serial, part, rev);
+			    serial, part, rev, maxranks);
 		}
 	}
 }
 
 static int
 mc_add_channel(topo_mod_t *mod, tnode_t *pnode, int channel, nvlist_t *auth,
-    nvlist_t *nvl)
+    nvlist_t *nvl, int maxranks)
 {
 	tnode_t *mc_channel;
 	nvlist_t *fmri;
 	nvlist_t **dimm_nvl;
+	nvpair_t *nvp;
+	char *name;
 	uint_t ndimms;
 	int err;
 
@@ -249,7 +260,15 @@ mc_add_channel(topo_mod_t *mod, tnode_t *pnode, int channel, nvlist_t *auth,
 	(void) topo_pgroup_create(mc_channel, &dimm_channel_pgroup, &err);
 	if (nvlist_lookup_nvlist_array(nvl, MCINTEL_NVLIST_DIMMS, &dimm_nvl,
 	    &ndimms) == 0) {
-		mc_add_dimms(mod, mc_channel, auth, dimm_nvl, ndimms);
+		mc_add_dimms(mod, mc_channel, auth, dimm_nvl, ndimms, maxranks);
+	}
+	for (nvp = nvlist_next_nvpair(nvl, NULL); nvp != NULL;
+	    nvp = nvlist_next_nvpair(nvl, nvp)) {
+		name = nvpair_name(nvp);
+		if (strcmp(name, MCINTEL_NVLIST_DIMMS) != 0) {
+			(void) nvprop_add(mod, nvp, PGNAME(CHAN),
+			    mc_channel);
+		}
 	}
 	return (0);
 }
@@ -261,10 +280,13 @@ mc_nb_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 	int err;
 	int i, j;
 	int channel;
-	int nmc;
+	uint8_t nmc;
+	uint8_t maxranks;
 	tnode_t *mcnode;
 	nvlist_t *fmri;
 	nvlist_t **channel_nvl;
+	nvpair_t *nvp;
+	char *pname;
 	uint_t nchannels;
 
 	if (nvlist_lookup_nvlist_array(nvl, MCINTEL_NVLIST_MC, &channel_nvl,
@@ -273,7 +295,18 @@ mc_nb_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 		    "mc_nb_create: failed to find channel information\n");
 		return (-1);
 	}
-	nmc = nchannels / 2;
+	if (nvlist_lookup_uint8(nvl, MCINTEL_NVLIST_NMEM, &nmc) != 0) {
+		/*
+		 * if number of memory controllers is not specified then there
+		 * are two channels per controller and the nchannels is total
+		 * we will set up nmc as number of controllers and convert
+		 * nchannels to channels per controller
+		 */
+		nmc = nchannels / 2;
+		nchannels = nchannels / nmc;
+	}
+	if (nvlist_lookup_uint8(nvl, MCINTEL_NVLIST_NRANKS, &maxranks) != 0)
+		maxranks = 2;
 	if (topo_node_range_create(mod, pnode, name, 0, nmc-1) < 0) {
 		whinge(mod, NULL,
 		    "mc_nb_create: node range create failed\n");
@@ -287,7 +320,7 @@ mc_nb_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 		}
 		if ((mcnode = topo_node_bind(mod, pnode, name, i,
 		    fmri)) == NULL) {
-			whinge(mod, NULL, "chip_create: node bind failed"
+			whinge(mod, NULL, "mc_nb_create: node bind failed"
 			    " for memory-controller\n");
 			nvlist_free(fmri);
 			return (-1);
@@ -298,17 +331,29 @@ mc_nb_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 		(void) topo_pgroup_create(mcnode, &mc_pgroup, &err);
 
 		if (topo_node_range_create(mod, mcnode, DRAMCHANNEL, channel,
-		    channel + 1) < 0) {
+		    channel + nchannels - 1) < 0) {
 			whinge(mod, NULL,
 			    "mc_nb_create: channel node range create failed\n");
 			return (-1);
 		}
-		for (j = 0; j < 2; j++) {
+		for (j = 0; j < nchannels; j++) {
 			if (mc_add_channel(mod, mcnode, channel, auth,
-			    channel_nvl[channel]) < 0) {
+			    channel_nvl[channel], maxranks) < 0) {
 				return (-1);
 			}
 			channel++;
+		}
+		for (nvp = nvlist_next_nvpair(nvl, NULL); nvp != NULL;
+		    nvp = nvlist_next_nvpair(nvl, nvp)) {
+			pname = nvpair_name(nvp);
+			if (strcmp(pname, MCINTEL_NVLIST_MC) != 0 &&
+			    strcmp(pname, MCINTEL_NVLIST_NMEM) != 0 &&
+			    strcmp(pname, MCINTEL_NVLIST_NRANKS) != 0 &&
+			    strcmp(pname, MCINTEL_NVLIST_VERSTR) != 0 &&
+			    strcmp(pname, MCINTEL_NVLIST_MEM) != 0) {
+				(void) nvprop_add(mod, nvp, PGNAME(MCT),
+				    mcnode);
+			}
 		}
 	}
 
@@ -316,7 +361,7 @@ mc_nb_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 }
 
 int
-mc_offchip_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
+mc_node_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
     nvlist_t *auth)
 {
 	mc_snapshot_info_t mcs;
@@ -354,4 +399,19 @@ mc_offchip_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 
 	nvlist_free(nvl);
 	return (rc);
+}
+
+void
+onchip_mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
+    nvlist_t *auth)
+{
+	if (mc_onchip(topo_node_instance(pnode)))
+		(void) mc_node_create(mod, pnode, name, auth);
+}
+
+int
+mc_offchip_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
+    nvlist_t *auth)
+{
+	return (mc_node_create(mod, pnode, name, auth));
 }

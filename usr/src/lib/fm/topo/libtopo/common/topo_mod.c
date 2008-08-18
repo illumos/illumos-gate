@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Topology Plugin Modules
  *
@@ -296,6 +294,7 @@ topo_mod_hcfmri(topo_mod_t *mod, tnode_t *pnode, int version, const char *name,
 	int err;
 	nvlist_t *pfmri = NULL, *fmri = NULL, *args = NULL;
 	nvlist_t *nfp = NULL;
+	char *lpart, *lrev, *lserial;
 
 	if (version != FM_HC_SCHEME_VERSION)
 		return (set_fmri_err(mod, EMOD_FMRI_VERSION));
@@ -329,13 +328,40 @@ topo_mod_hcfmri(topo_mod_t *mod, tnode_t *pnode, int version, const char *name,
 	 */
 	if (auth != NULL)
 		(void) nvlist_add_nvlist(args, TOPO_METH_FMRI_ARG_AUTH, auth);
-	if (part != NULL)
-		(void) nvlist_add_string(args, TOPO_METH_FMRI_ARG_PART, part);
-	if (rev != NULL)
-		(void) nvlist_add_string(args, TOPO_METH_FMRI_ARG_REV, rev);
-	if (serial != NULL)
-		(void) nvlist_add_string(args, TOPO_METH_FMRI_ARG_SER,
-		    serial);
+	if (part != NULL) {
+		lpart = topo_cleanup_auth_str(mod->tm_hdl, part);
+		if (lpart != NULL) {
+			(void) nvlist_add_string(args, TOPO_METH_FMRI_ARG_PART,
+			    lpart);
+			topo_hdl_free(mod->tm_hdl, lpart, strlen(lpart) + 1);
+		} else {
+			(void) nvlist_add_string(args, TOPO_METH_FMRI_ARG_PART,
+			    part);
+		}
+	}
+	if (rev != NULL) {
+		lrev = topo_cleanup_auth_str(mod->tm_hdl, rev);
+		if (lrev != NULL) {
+			(void) nvlist_add_string(args, TOPO_METH_FMRI_ARG_REV,
+			    lrev);
+			topo_hdl_free(mod->tm_hdl, lrev, strlen(lrev) + 1);
+		} else {
+			(void) nvlist_add_string(args, TOPO_METH_FMRI_ARG_REV,
+			    rev);
+		}
+	}
+	if (serial != NULL) {
+		lserial = topo_cleanup_auth_str(mod->tm_hdl, serial);
+		if (lserial != NULL) {
+			(void) nvlist_add_string(args, TOPO_METH_FMRI_ARG_SER,
+			    lserial);
+			topo_hdl_free(mod->tm_hdl, lserial,
+			    strlen(lserial) + 1);
+		} else {
+			(void) nvlist_add_string(args, TOPO_METH_FMRI_ARG_SER,
+			    serial);
+		}
+	}
 	if (hc_specific != NULL)
 		(void) nvlist_add_nvlist(args, TOPO_METH_FMRI_ARG_HCS,
 		    hc_specific);
