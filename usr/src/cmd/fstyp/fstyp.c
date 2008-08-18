@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,6 +43,8 @@
 #include <libfstyp.h>
 #include <sys/dktp/fdisk.h>
 #include <sys/fs/pc_label.h>
+
+#include "libadm.h"
 
 #define	FSTYP_LIBFS_DIR	"/usr/lib/fs"
 
@@ -411,8 +411,12 @@ dos_to_dev(char *path, char **devpath, int *num)
 		return (B_FALSE);
 	}
 	p[0] = '\0';
-	*devpath = strdup(path);
+	*devpath = getfullrawname(path);
 	p[0] = ':';
+	if (*devpath != NULL && **devpath == '\0') {
+		free(*devpath);
+		*devpath = NULL;
+	}
 	return (*devpath != NULL);
 }
 

@@ -19,19 +19,18 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=		fstyp
 
 include ../Makefile.cmd
 
-LDLIBS += -lnvpair -lfstyp
+LDLIBS += -lnvpair -lfstyp -ladm
 
-CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_POSIX_PTHREAD_SEMANTICS
+CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 \
+	    -D_POSIX_PTHREAD_SEMANTICS -I../../lib/libadm/inc
 
 CFLAGS += $(CCVERBOSE)
 
