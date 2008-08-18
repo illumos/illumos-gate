@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Dummy Cryptographic Provider:
@@ -6624,14 +6623,16 @@ dprov_session_task(dprov_req_t *taskq_req)
 
 		if (i == softc->ds_sessions_slots) {
 			/* ran out of slots, grow sessions array */
-			new_sessions = kmem_zalloc(2 * softc->ds_sessions_slots,
-			    KM_NOSLEEP);
+			new_sessions = kmem_zalloc(
+			    2 * softc->ds_sessions_slots *
+			    sizeof (dprov_session_t *), KM_NOSLEEP);
 			if (new_sessions == NULL) {
 				error = CRYPTO_SESSION_COUNT;
 				break;
 			}
 			bcopy(softc->ds_sessions, new_sessions,
-			    softc->ds_sessions_slots);
+			    softc->ds_sessions_slots *
+			    sizeof (dprov_session_t *));
 			kmem_free(softc->ds_sessions, softc->ds_sessions_slots *
 			    sizeof (dprov_session_t *));
 			softc->ds_sessions = new_sessions;
