@@ -31,8 +31,6 @@
  *	- revalidate geometry for removable devices
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/conf.h>
@@ -171,7 +169,7 @@ struct dev_ops xdf_devops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"virtual block driver %I%",	/* short description */
+	"virtual block driver",	/* short description */
 	&xdf_devops		/* driver specific ops */
 };
 
@@ -306,15 +304,6 @@ xdf_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 	if ((vdp = ddi_get_soft_state(vbd_ss, ddi_get_instance(dip))) == NULL)
 		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
 		    name, valuep, lengthp));
-
-	/* do cv_wait until connected or failed */
-	mutex_enter(&vdp->xdf_dev_lk);
-	if (xdf_connect(vdp, B_TRUE) != XD_READY) {
-		mutex_exit(&vdp->xdf_dev_lk);
-		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
-		    name, valuep, lengthp));
-	}
-	mutex_exit(&vdp->xdf_dev_lk);
 
 	return (cmlb_prop_op(vdp->xdf_vd_lbl,
 	    dev, dip, prop_op, mod_flags, name, valuep, lengthp,
