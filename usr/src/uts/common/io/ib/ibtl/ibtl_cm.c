@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ib/ibtl/impl/ibtl.h>
 #include <sys/ib/ibtl/impl/ibtl_cm.h>
@@ -322,8 +320,7 @@ ibtl_cm_get_cnt(ibt_path_attr_t *attr, ibt_path_flags_t flags,
 
 			if (attr->pa_hca_guid)
 				break;
-			hdevp = hdevp->hd_hca_dev_link;
-			continue;
+			goto search_next;
 		}
 
 		for (i = 0; i < hdevp->hd_hca_attr->hca_nports; i++) {
@@ -350,6 +347,27 @@ ibtl_cm_get_cnt(ibt_path_attr_t *attr, ibt_path_flags_t flags,
 					continue;
 			}
 
+			if ((flags & IBT_PATH_APM) && (!attr->pa_hca_guid) &&
+			    attr->pa_sgid.gid_prefix &&
+			    attr->pa_sgid.gid_guid) {
+				for (j = 0; j < pinfop->p_sgid_tbl_sz; j++) {
+					gid = pinfop->p_sgid_tbl[j];
+					if (gid.gid_prefix && gid.gid_guid) {
+						if ((attr->pa_sgid.gid_prefix !=
+						    gid.gid_prefix) ||
+						    (attr->pa_sgid.gid_guid !=
+						    gid.gid_guid)) {
+							continue;
+						} else {
+							attr->pa_hca_guid =
+							    hca_guid;
+							goto got_apm_hca_info;
+						}
+					}
+				}
+				goto search_next;
+			}
+got_apm_hca_info:
 			for (j = 0; j < pinfop->p_sgid_tbl_sz; j++) {
 				gid = pinfop->p_sgid_tbl[j];
 				if (gid.gid_prefix && gid.gid_guid) {
@@ -413,6 +431,7 @@ ibtl_cm_get_cnt(ibt_path_attr_t *attr, ibt_path_flags_t flags,
 				pcount = tmp_pcount;
 			}
 		}
+search_next:
 		hdevp = hdevp->hd_hca_dev_link;
 	}
 

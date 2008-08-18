@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ib/mgt/ibcm/ibcm_impl.h>
 #include <sys/ib/mgt/ibcm/ibcm_arp.h>
@@ -1021,9 +1019,26 @@ ibcm_saa_path_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 			retval = ibcm_get_single_pathrec(p_arg, sl, dinfo, 0xFF,
 			    &num_path_plus, &p_arg->paths[rec_found]);
 		} else {
+			uint8_t old_num_path_plus = num_path_plus;
+
 			/* MultiPathRec will be used for other queries. */
 			retval = ibcm_get_multi_pathrec(p_arg, sl, dinfo,
 			    &num_path_plus, &p_arg->paths[rec_found]);
+			if ((retval != IBT_SUCCESS) &&
+			    (retval != IBT_INSUFF_DATA) &&
+			    (p_arg->flags & IBT_PATH_APM) &&
+			    (sl->p_count > 0) &&
+			    (dinfo->num_dest > 0)) {
+				ibtl_cm_port_list_t sl_tmp = *sl;
+				ibcm_dinfo_t dinfo_tmp = *dinfo;
+
+				sl_tmp.p_count = 1;
+				dinfo_tmp.num_dest = 1;
+				num_path_plus = old_num_path_plus;
+				retval = ibcm_get_single_pathrec(p_arg, &sl_tmp,
+				    &dinfo_tmp, 0xFF, &num_path_plus,
+				    &p_arg->paths[rec_found]);
+			}
 		}
 		if ((retval != IBT_SUCCESS) && (retval != IBT_INSUFF_DATA)) {
 			IBTF_DPRINTF_L2(cmlog, "ibcm_saa_path_rec: "

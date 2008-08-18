@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_IB_MGT_SM_ATTR_H
 #define	_SYS_IB_MGT_SM_ATTR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains the definitions of the various attributes specified
@@ -554,6 +551,7 @@ typedef struct sm_portinfo_s {
 
 #define	SM_LINK_WIDTH_ACTIVE_1X			0x01
 #define	SM_LINK_WIDTH_ACTIVE_4X			0x02
+#define	SM_LINK_WIDTH_ACTIVE_8X			0x04
 #define	SM_LINK_WIDTH_ACTIVE_12X		0x08
 
 #define	SM_LINK_SPEED_SUPP_2_5_GBPS		0x1
@@ -583,6 +581,8 @@ typedef struct sm_portinfo_s {
 #define	SM_MKEY_PROT_BITS_SET_FAILX		0x3
 
 #define	SM_LINK_SPEED_ACTIVE_2_5_GBPS		0x1
+#define	SM_LINK_SPEED_ACTIVE_5_GBPS		0x2
+#define	SM_LINK_SPEED_ACTIVE_10_GBPS		0x4
 
 #define	SM_LINK_SPEED_ENABLED_NOP		0x0
 #define	SM_LINK_SPEED_ENABLED_2_5_GBPS		0x1

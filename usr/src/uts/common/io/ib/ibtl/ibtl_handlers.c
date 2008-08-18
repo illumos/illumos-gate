@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ib/ibtl/impl/ibtl.h>
 #include <sys/ib/ibtl/impl/ibtl_cm.h>
@@ -129,7 +127,7 @@ static void ibtl_dec_clnt_async_cnt(ibtl_clnt_t *clntp);
 static void ibtl_inc_clnt_async_cnt(ibtl_clnt_t *clntp);
 
 static kt_did_t *ibtl_async_did;	/* for thread_join() */
-static int ibtl_async_thread_init = 4;	/* total # of async_threads to create */
+int ibtl_async_thread_init = 4;	/* total # of async_threads to create */
 static int ibtl_async_thread_exit = 0;	/* set if/when thread(s) should exit */
 
 /* async lists for various structures */
@@ -1384,8 +1382,36 @@ ibtl_announce_new_hca(ibtl_hca_devinfo_t *hca_devp)
 			cv_wait(&ibtl_clnt_cv, &ibtl_clnt_list_mutex);
 	clntp = ibtl_clnt_list;
 	while (clntp != NULL) {
-		if ((clntp->clnt_modinfop->mi_clnt_class == IBT_DM) ||
-		    (clntp->clnt_modinfop->mi_clnt_class == IBT_CM)) {
+		if (clntp->clnt_modinfop->mi_clnt_class == IBT_DM) {
+			IBTF_DPRINTF_L4(ibtf_handlers, "ibtl_announce_new_hca: "
+			    "calling  %s", clntp->clnt_modinfop->mi_clnt_name);
+			if (clntp->clnt_modinfop->mi_async_handler) {
+				_NOTE(NO_COMPETING_THREADS_NOW)
+				new_hcap = kmem_alloc(sizeof (*new_hcap),
+				    KM_SLEEP);
+				new_hcap->nh_clntp = clntp;
+				new_hcap->nh_hca_devp = hca_devp;
+				new_hcap->nh_code = IBT_HCA_ATTACH_EVENT;
+#ifndef lint
+				_NOTE(COMPETING_THREADS_NOW)
+#endif
+				clntp->clnt_async_cnt++;
+				hca_devp->hd_async_task_cnt++;
+
+				(void) taskq_dispatch(ibtl_async_taskq,
+				    ibtl_tell_client_about_new_hca, new_hcap,
+				    TQ_SLEEP);
+			}
+			break;
+		}
+		clntp = clntp->clnt_list_link;
+	}
+	if (clntp != NULL)
+		while (clntp->clnt_async_cnt > 0)
+			cv_wait(&ibtl_clnt_cv, &ibtl_clnt_list_mutex);
+	clntp = ibtl_clnt_list;
+	while (clntp != NULL) {
+		if (clntp->clnt_modinfop->mi_clnt_class == IBT_CM) {
 			IBTF_DPRINTF_L4(ibtf_handlers, "ibtl_announce_new_hca: "
 			    "calling  %s", clntp->clnt_modinfop->mi_clnt_name);
 			if (clntp->clnt_modinfop->mi_async_handler) {
