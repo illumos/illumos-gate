@@ -17,7 +17,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 '''
 Minimal amount of code to check the version of Mercurial in use
@@ -38,7 +37,7 @@ class VersionMismatch(Exception):
 #
 # List of versions that are explicitly acceptable to us
 #
-GOOD_VERSIONS = ['1.0']
+GOOD_VERSIONS = ['1.0', '1.0.1', '1.0.2']
 
 
 def check_version():
