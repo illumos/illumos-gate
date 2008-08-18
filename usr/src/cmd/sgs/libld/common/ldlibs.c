@@ -27,8 +27,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Library processing
  */
@@ -45,7 +43,7 @@
 /*
  * List of support libraries specified (-S option).
  */
-static Listnode *	insert_lib;
+static Listnode	*insert_lib;
 
 /*
  * Function to handle -YL and -YU substitutions in LIBPATH.  It's probably
@@ -250,7 +248,7 @@ find_lib_name(const char *dir, const char *file, Ofl_desc *ofl, Rej_desc *rej)
 		rej->rej_name = strdup(path);
 	}
 
-	return (0);
+	return (NULL);
 }
 
 /*
@@ -280,7 +278,7 @@ ld_find_library(const char *name, Ofl_desc *ofl)
 	for (LIST_TRAVERSE(&ofl->ofl_ulibdirs, lnp, path)) {
 		Rej_desc	_rej = { 0 };
 
-		if ((ifl = find_lib_name(path, name, ofl, &_rej)) == 0) {
+		if ((ifl = find_lib_name(path, name, ofl, &_rej)) == NULL) {
 			if (_rej.rej_type && (rej.rej_type == 0))
 				rej = _rej;
 			continue;
@@ -294,7 +292,7 @@ ld_find_library(const char *name, Ofl_desc *ofl)
 	for (LIST_TRAVERSE(&ofl->ofl_dlibdirs, lnp, path)) {
 		Rej_desc	_rej = { 0 };
 
-		if ((ifl = find_lib_name(path, name, ofl, &_rej)) == 0) {
+		if ((ifl = find_lib_name(path, name, ofl, &_rej)) == NULL) {
 			if (_rej.rej_type && (rej.rej_type == 0))
 				rej = _rej;
 			continue;
@@ -340,7 +338,7 @@ ld_find_library(const char *name, Ofl_desc *ofl)
  * all taken as dirlist2.
  */
 uintptr_t
-ld_lib_setup(Ofl_desc * ofl)
+ld_lib_setup(Ofl_desc *ofl)
 {
 	char	*path, *cp = NULL;
 

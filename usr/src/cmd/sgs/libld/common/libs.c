@@ -26,7 +26,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Library processing
@@ -254,7 +253,7 @@ ld_ar_setup(const char *name, Elf *elf, Ofl_desc *ofl)
  *
  * Each time we process an archive member we use its offset value to scan this
  * `Ar_aux' list.  If the member has been extracted, each entry with the same
- * offset has its `Ar_mem' pointer set to FLG_AMMEM_PROC.  Thus if we cycle back
+ * offset has its `Ar_mem' pointer set to FLG_ARMEM_PROC.  Thus if we cycle back
  * through the archive symbol table we will ignore these symbols as they will
  * have already been added to the output image.  If a member has been processed
  * but found not to contain a symbol we need, each entry with the same offset
@@ -346,7 +345,7 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 	 * If this archive was processed with -z allextract, then all members
 	 * have already been extracted.
 	 */
-	if (adp->ad_elf == (Elf *)NULL)
+	if (adp->ad_elf == NULL)
 		return (1);
 
 	/*
@@ -514,6 +513,15 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 				    (FLG_IF_EXTRACT | FLG_IF_NEEDED),
 				    &arelf, adp->ad_elf, arsym->as_off,
 				    elf_kind(arelf));
+
+				/*
+				 * An ELF descriptor of zero indicates that
+				 * the archive member should be ignored.
+				 */
+				if (arelf == NULL) {
+					aup->au_mem = FLG_ARMEM_PROC;
+					continue;
+				}
 			}
 
 			/*
@@ -620,7 +628,7 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 	 * and if one had occurred issue a warning - its possible a user has
 	 * pointed at an archive containing the wrong class of elf members.
 	 */
-	if ((found == 0) && (rej.rej_type)) {
+	if ((found == 0) && rej.rej_type) {
 		Conv_reject_desc_buf_t rej_buf;
 
 		eprintf(ofl->ofl_lml, ERR_WARNING,
@@ -636,7 +644,7 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 	 */
 	if (allexrt) {
 		(void) elf_end(adp->ad_elf);
-		adp->ad_elf = (Elf *)NULL;
+		adp->ad_elf = NULL;
 	}
 
 	return (1);

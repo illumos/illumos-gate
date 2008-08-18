@@ -34,8 +34,6 @@
 #ifndef	_LIBLD_DOT_H
 #define	_LIBLD_DOT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libld.h>
 #include <_libelf.h>
 #include <debug.h>
@@ -188,7 +186,7 @@ typedef struct {
 	uintptr_t	(* mr_reloc_TLS)(Boolean, Rel_desc *, Ofl_desc *);
 	uintptr_t	(* mr_assign_got)(Ofl_desc *, Sym_desc *);
 
-	Gotndx *	(* mr_find_gotndx)(List *, Gotref, Ofl_desc *,
+	Gotndx		*(* mr_find_gotndx)(List *, Gotref, Ofl_desc *,
 			    Rel_desc *);
 	Xword		(* mr_calc_got_offset)(Rel_desc *, Ofl_desc *);
 	uintptr_t	(* mr_assign_got_ndx)(List *, Gotndx *, Gotref,
@@ -293,7 +291,7 @@ typedef struct reloc_list {
 
 typedef struct sym_s_list {
 	Word		sl_hval;
-	Sym_desc *	sl_sdp;
+	Sym_desc	*sl_sdp;
 } Sym_s_list;
 
 /*
@@ -722,7 +720,7 @@ extern uintptr_t	ld_map_parse(const char *, Ofl_desc *);
 
 extern uintptr_t	ld_open_outfile(Ofl_desc *);
 
-extern Os_desc *	ld_place_section(Ofl_desc *, Is_desc *, int, Word);
+extern Os_desc		*ld_place_section(Ofl_desc *, Is_desc *, int, Word);
 extern uintptr_t	ld_process_archive(const char *, int, Ar_desc *,
 			    Ofl_desc *);
 extern uintptr_t	ld_process_files(Ofl_desc *, int, char **);
@@ -794,7 +792,7 @@ extern int		ld_vers_verify(Ofl_desc *);
 extern uintptr_t	add_regsym(Sym_desc *, Ofl_desc *);
 extern Word		hashbkts(Word);
 extern Xword		lcm(Xword, Xword);
-extern Listnode *	list_where(List *, Word);
+extern Listnode		*list_where(List *, Word);
 
 
 /*

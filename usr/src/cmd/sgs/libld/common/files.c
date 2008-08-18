@@ -26,7 +26,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Processing of relocatable objects and shared objects.
@@ -1891,7 +1890,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
  */
 Ifl_desc *
 ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
-    Word flags, Ofl_desc * ofl, Rej_desc * rej)
+    Word flags, Ofl_desc *ofl, Rej_desc *rej)
 {
 	Ifl_desc	*ifl;
 	Ehdr		*ehdr;
@@ -1928,12 +1927,14 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 				/*
 				 * We've seen this file before so reuse the
 				 * original archive descriptor and discard the
-				 * new elf descriptor.
+				 * new elf descriptor.  Note that a file
+				 * descriptor is unnecessary, as the file is
+				 * already available in memory.
 				 */
 				DBG_CALL(Dbg_file_reuse(ofl->ofl_lml, name,
 				    adp->ad_name));
 				(void) elf_end(elf);
-				return ((Ifl_desc *)ld_process_archive(name, fd,
+				return ((Ifl_desc *)ld_process_archive(name, -1,
 				    adp, ofl));
 			}
 		}
@@ -1950,7 +1951,26 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 
 		ld_sup_file(ofl, name, ELF_K_AR, flags, elf);
 
-		return ((Ifl_desc *)ld_process_archive(name, fd, adp, ofl));
+		/*
+		 * Indicate that the ELF descriptor no longer requires a file
+		 * descriptor by reading the entire file.  The file is already
+		 * read via the initial mmap(2) behind elf_begin(3elf), thus
+		 * this operation is effectively a no-op.  However, a side-
+		 * effect is that the internal file descriptor, maintained in
+		 * the ELF descriptor, is set to -1.  This setting will not
+		 * be compared with any file descriptor that is passed to
+		 * elf_begin(), should this archive, or one of the archive
+		 * members, be processed again from the command line or
+		 * because of a -z rescan.
+		 */
+		if (elf_cntl(elf, ELF_C_FDREAD) == -1) {
+			eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_CNTL),
+			    name);
+			ofl->ofl_flags |= FLG_OF_FATAL;
+			return (NULL);
+		}
+
+		return ((Ifl_desc *)ld_process_archive(name, -1, adp, ofl));
 
 	case ELF_K_ELF:
 		/*
@@ -1982,7 +2002,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 				*rej = _rej;
 				rej->rej_name = strdup(_rej.rej_name);
 			}
-			return (0);
+			return (NULL);
 		}
 
 		/*
@@ -2077,7 +2097,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_FIL_SOINSTAT), name);
 				ofl->ofl_flags |= FLG_OF_FATAL;
-				return (0);
+				return (NULL);
 			}
 
 			/*
@@ -2124,7 +2144,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 				*rej = _rej;
 				rej->rej_name = strdup(_rej.rej_name);
 			}
-			return (0);
+			return (NULL);
 		}
 		break;
 	default:
@@ -2137,7 +2157,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 			*rej = _rej;
 			rej->rej_name = strdup(_rej.rej_name);
 		}
-		return (0);
+		return (NULL);
 	}
 	if ((error == 0) || (error == S_ERROR))
 		return ((Ifl_desc *)error);
@@ -2162,7 +2182,7 @@ ld_process_open(const char *opath, const char *ofile, int *fd, Ofl_desc *ofl,
 	if ((elf = elf_begin(*fd, ELF_C_READ, NULL)) == NULL) {
 		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_BEGIN), npath);
 		ofl->ofl_flags |= FLG_OF_FATAL;
-		return (0);
+		return (NULL);
 	}
 
 	/*
@@ -2182,7 +2202,7 @@ ld_process_open(const char *opath, const char *ofile, int *fd, Ofl_desc *ofl,
 	    elf_kind(elf));
 
 	if ((*fd == -1) || (elf == NULL))
-		return (0);
+		return (NULL);
 
 	return (ld_process_ifl(npath, nfile, *fd, elf, flags, ofl, rej));
 }
@@ -2317,10 +2337,9 @@ ld_finish_libs(Ofl_desc *ofl)
 				    0, &_rej);
 				if (fd != -1)
 					(void) close(fd);
-
-				if (ifl == (Ifl_desc *)S_ERROR) {
+				if (ifl == (Ifl_desc *)S_ERROR)
 					return (S_ERROR);
-				}
+
 				if (_rej.rej_type) {
 					Conv_reject_desc_buf_t rej_buf;
 

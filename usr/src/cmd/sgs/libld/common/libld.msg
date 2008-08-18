@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 @ _START_
 
@@ -571,6 +569,7 @@
 #	The elf_ function name represents a man page reference and should not
 #	be translated.
 @ MSG_ELF_BEGIN		"file %s: elf_begin"
+@ MSG_ELF_CNTL		"file %s: elf_cntl"
 @ MSG_ELF_GETARHDR	"file %s: elf_getarhdr"
 @ MSG_ELF_GETARSYM	"file %s: elf_getarsym"
 @ MSG_ELF_GETDATA	"file %s: elf_getdata"

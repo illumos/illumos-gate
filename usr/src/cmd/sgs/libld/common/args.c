@@ -26,7 +26,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Publicly available flags are defined in ld(1).   The following flags are
@@ -1650,29 +1649,12 @@ ld_process_files(Ofl_desc *ofl, int argc, char **argv)
 		DBG_CALL(Dbg_file_ar_rescan(ofl->ofl_lml));
 
 		for (LIST_TRAVERSE(&ofl->ofl_ars, lnp, adp)) {
-			const char	*name = adp->ad_name;
-			uintptr_t	error;
-			int		fd;
-
 			/*
 			 * If this archive was processed with -z allextract,
 			 * then all members have already been extracted.
 			 */
-			if (adp->ad_elf == (Elf *)NULL)
+			if (adp->ad_elf == NULL)
 				continue;
-
-			/*
-			 * Reopen the file.
-			 */
-			if ((fd = open(name, O_RDONLY)) == -1) {
-				int err = errno;
-
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_SYS_OPEN), name,
-				    strerror(err));
-				ofl->ofl_flags |= FLG_OF_FATAL;
-				return (S_ERROR);
-			}
 
 			/*
 			 * Reestablish any archive specific command line flags.
@@ -1680,10 +1662,13 @@ ld_process_files(Ofl_desc *ofl, int argc, char **argv)
 			ofl->ofl_flags1 &= ~MSK_OF1_ARCHIVE;
 			ofl->ofl_flags1 |= (adp->ad_flags & MSK_OF1_ARCHIVE);
 
-			error = ld_process_archive(adp->ad_name, fd, adp, ofl);
-			(void) close(fd);
-
-			if (error == S_ERROR)
+			/*
+			 * Re-process the archive.  Note that a file descriptor
+			 * is unnecessary, as the file is already available in
+			 * memory.
+			 */
+			if (ld_process_archive(adp->ad_name, -1,
+			    adp, ofl) == S_ERROR)
 				return (S_ERROR);
 			if (ofl->ofl_flags & FLG_OF_FATAL)
 				return (1);
