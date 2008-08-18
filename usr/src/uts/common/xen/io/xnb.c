@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef DEBUG
 #define	XNB_DEBUG 1
 #endif /* DEBUG */
@@ -306,14 +304,36 @@ xnb_process_cksum_flags(xnb_t *xnbp, mblk_t *mp, uint32_t capab)
 
 	switch (ipha->ipha_protocol) {
 	case IPPROTO_TCP:
-	case IPPROTO_UDP:
+	case IPPROTO_UDP: {
+		uint32_t start, length, stuff, cksum;
+		uint16_t *stuffp;
+
 		/*
-		 * This is a TCP/IPv4 or UDP/IPv4 packet.
-		 *
-		 * If the capabilities indicate that full checksum
-		 * offload is available, use it.
+		 * This is a TCP/IPv4 or UDP/IPv4 packet, for which we
+		 * can use full IPv4 and partial checksum offload.
 		 */
-		if ((capab & HCKSUM_INET_FULL_V4) != 0) {
+		if ((capab & (HCKSUM_INET_FULL_V4|HCKSUM_INET_PARTIAL)) == 0)
+			break;
+
+		start = IP_SIMPLE_HDR_LENGTH;
+		length = ntohs(ipha->ipha_length);
+		if (ipha->ipha_protocol == IPPROTO_TCP) {
+			stuff = start + TCP_CHECKSUM_OFFSET;
+			cksum = IP_TCP_CSUM_COMP;
+		} else {
+			stuff = start + UDP_CHECKSUM_OFFSET;
+			cksum = IP_UDP_CSUM_COMP;
+		}
+		stuffp = (uint16_t *)(mp->b_rptr + offset + stuff);
+
+		if (capab & HCKSUM_INET_FULL_V4) {
+			/*
+			 * Some devices require that the checksum
+			 * field of the packet is zero for full
+			 * offload.
+			 */
+			*stuffp = 0;
+
 			(void) hcksum_assoc(mp, NULL, NULL,
 			    0, 0, 0, 0,
 			    HCK_FULLCKSUM, KM_NOSLEEP);
@@ -323,12 +343,42 @@ xnb_process_cksum_flags(xnb_t *xnbp, mblk_t *mp, uint32_t capab)
 			return (mp);
 		}
 
-		/*
-		 * XXPV dme: If the capabilities indicate that partial
-		 * checksum offload is available, we should use it.
-		 */
+		if (capab & HCKSUM_INET_PARTIAL) {
+			if (*stuffp == 0) {
+				ipaddr_t src, dst;
 
+				/*
+				 * Older Solaris guests don't insert
+				 * the pseudo-header checksum, so we
+				 * calculate it here.
+				 */
+				src = ipha->ipha_src;
+				dst = ipha->ipha_dst;
+
+				cksum += (dst >> 16) + (dst & 0xFFFF);
+				cksum += (src >> 16) + (src & 0xFFFF);
+				cksum += length - IP_SIMPLE_HDR_LENGTH;
+
+				cksum = (cksum >> 16) + (cksum & 0xFFFF);
+				cksum = (cksum >> 16) + (cksum & 0xFFFF);
+
+				ASSERT(cksum <= 0xFFFF);
+
+				*stuffp = (uint16_t)(cksum ? cksum : ~cksum);
+			}
+
+			(void) hcksum_assoc(mp, NULL, NULL,
+			    start, stuff, length, 0,
+			    HCK_PARTIALCKSUM, KM_NOSLEEP);
+
+			xnbp->xnb_stat_csum_hardware++;
+
+			return (mp);
+		}
+
+		/* NOTREACHED */
 		break;
+	}
 
 	default:
 		/* Use software. */
@@ -1935,7 +1985,7 @@ xnb_hp_state_change(dev_info_t *dip, ddi_eventcookie_t id,
 }
 
 static struct modldrv modldrv = {
-	&mod_miscops, "xnb module %I%",
+	&mod_miscops, "xnb",
 };
 
 static struct modlinkage modlinkage = {

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *
  * Copyright (c) 2004 Christian Limpach.
@@ -79,6 +77,8 @@
 #include <sys/strsun.h>
 #include <sys/pattr.h>
 #include <inet/ip.h>
+#include <inet/ip_impl.h>
+#include <sys/gld.h>
 #include <sys/modctl.h>
 #include <sys/mac.h>
 #include <sys/mac_ether.h>
@@ -266,9 +266,9 @@ DDI_DEFINE_STREAM_OPS(xnf_dev_ops, nulldev, nulldev, xnf_attach, xnf_detach,
     nodev, NULL, D_MP, NULL);
 
 static struct modldrv xnf_modldrv = {
-	&mod_driverops,		/* Type of module.  This one is a driver */
-	IDENT " %I%",		/* short description */
-	&xnf_dev_ops		/* driver specific ops */
+	&mod_driverops,
+	"Virtual Ethernet driver",
+	&xnf_dev_ops
 };
 
 static struct modlinkage modlinkage = {
@@ -380,9 +380,9 @@ xnf_setup_rings(xnf_t *xnfp)
 	xnfp->xnf_tx_pkt_id_list = 0;
 	xnfp->xnf_tx_ring.rsp_cons = 0;
 	xnfp->xnf_tx_ring.req_prod_pvt = 0;
-	xnfp->xnf_tx_ring.sring->req_prod = 0;
-	xnfp->xnf_tx_ring.sring->rsp_prod = 0;
-	xnfp->xnf_tx_ring.sring->rsp_event = 1;
+
+	/* LINTED: constant in conditional context */
+	SHARED_RING_INIT(xnfp->xnf_tx_ring.sring);
 
 	mutex_exit(&xnfp->xnf_txlock);
 
@@ -425,9 +425,10 @@ xnf_setup_rings(xnf_t *xnfp)
 	 */
 	xnfp->xnf_rx_ring.rsp_cons = 0;
 	xnfp->xnf_rx_ring.req_prod_pvt = 0;
-	xnfp->xnf_rx_ring.sring->req_prod = 0;
-	xnfp->xnf_rx_ring.sring->rsp_prod = 0;
-	xnfp->xnf_rx_ring.sring->rsp_event = 1;
+
+	/* LINTED: constant in conditional context */
+	SHARED_RING_INIT(xnfp->xnf_rx_ring.sring);
+
 	for (i = 0; i < NET_RX_RING_SIZE; i++) {
 		xnfp->xnf_rx_ring.req_prod_pvt = i;
 		if (xnfp->xnf_rxpkt_bufptr[i] != NULL)
@@ -1109,6 +1110,75 @@ xnf_pullupmsg(xnf_t *xnfp, mblk_t *mp)
 	return (bdesc);
 }
 
+void
+xnf_pseudo_cksum(caddr_t buf, int length)
+{
+	struct ether_header *ehp;
+	uint16_t sap, len, *stuff;
+	uint32_t cksum;
+	size_t offset;
+	ipha_t *ipha;
+	ipaddr_t src, dst;
+
+	ASSERT(length >= sizeof (*ehp));
+	ehp = (struct ether_header *)buf;
+
+	if (ntohs(ehp->ether_type) == VLAN_TPID) {
+		struct ether_vlan_header *evhp;
+
+		ASSERT(length >= sizeof (*evhp));
+		evhp = (struct ether_vlan_header *)buf;
+		sap = ntohs(evhp->ether_type);
+		offset = sizeof (*evhp);
+	} else {
+		sap = ntohs(ehp->ether_type);
+		offset = sizeof (*ehp);
+	}
+
+	ASSERT(sap == ETHERTYPE_IP);
+
+	/* Packet should have been pulled up by the caller. */
+	if ((offset + sizeof (ipha_t)) > length) {
+		cmn_err(CE_WARN, "xnf_pseudo_cksum: no room for checksum");
+		return;
+	}
+
+	ipha = (ipha_t *)(buf + offset);
+
+	ASSERT(IPH_HDR_LENGTH(ipha) == IP_SIMPLE_HDR_LENGTH);
+
+	len = ntohs(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH;
+
+	switch (ipha->ipha_protocol) {
+	case IPPROTO_TCP:
+		stuff = IPH_TCPH_CHECKSUMP(ipha, IP_SIMPLE_HDR_LENGTH);
+		cksum = IP_TCP_CSUM_COMP;
+		break;
+	case IPPROTO_UDP:
+		stuff = IPH_UDPH_CHECKSUMP(ipha, IP_SIMPLE_HDR_LENGTH);
+		cksum = IP_UDP_CSUM_COMP;
+		break;
+	default:
+		cmn_err(CE_WARN, "xnf_pseudo_cksum: unexpected protocol %d",
+		    ipha->ipha_protocol);
+		return;
+	}
+
+	src = ipha->ipha_src;
+	dst = ipha->ipha_dst;
+
+	cksum += (dst >> 16) + (dst & 0xFFFF);
+	cksum += (src >> 16) + (src & 0xFFFF);
+	cksum += htons(len);
+
+	cksum = (cksum >> 16) + (cksum & 0xFFFF);
+	cksum = (cksum >> 16) + (cksum & 0xFFFF);
+
+	ASSERT(cksum <= 0xFFFF);
+
+	*stuff = (uint16_t)(cksum ? cksum : ~cksum);
+}
+
 /*
  *  xnf_send_one() -- send a packet
  *
@@ -1264,6 +1334,7 @@ xnf_send_one(xnf_t *xnfp, mblk_t *mp)
 		 * We _don't_ set the validated flag, because we haven't
 		 * validated that the data and the checksum match.
 		 */
+		xnf_pseudo_cksum(bufaddr, length);
 		txrp->flags |= NETTXF_csum_blank;
 		xnfp->xnf_stat_tx_cksum_deferred++;
 	}
@@ -2479,19 +2550,24 @@ xnf_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		uint32_t *capab = cap_data;
 
 		/*
-		 * We declare ourselves capable of HCKSUM_INET_PARTIAL
-		 * in order that the protocol stack insert the
-		 * pseudo-header checksum in packets that it passes
-		 * down to us.
+		 * Whilst the flag used to communicate with the IO
+		 * domain is called "NETTXF_csum_blank", the checksum
+		 * in the packet must contain the pseudo-header
+		 * checksum and not zero.
 		 *
-		 * Whilst the flag used to communicate with dom0 is
-		 * called "NETTXF_csum_blank", the checksum in the
-		 * packet must contain the pseudo-header checksum and
-		 * not zero. (In fact, a Solaris dom0 is happy to deal
-		 * with a checksum of zero, but a Linux dom0 is not.)
+		 * To help out the IO domain, we might use
+		 * HCKSUM_INET_PARTIAL. Unfortunately our stack will
+		 * then use checksum offload for IPv6 packets, which
+		 * the IO domain can't handle.
+		 *
+		 * As a result, we declare outselves capable of
+		 * HCKSUM_INET_FULL_V4. This means that we receive
+		 * IPv4 packets from the stack with a blank checksum
+		 * field and must insert the pseudo-header checksum
+		 * before passing the packet to the IO domain.
 		 */
 		if (xnfp->xnf_cksum_offload)
-			*capab = HCKSUM_INET_PARTIAL;
+			*capab = HCKSUM_INET_FULL_V4;
 		else
 			*capab = 0;
 		break;
