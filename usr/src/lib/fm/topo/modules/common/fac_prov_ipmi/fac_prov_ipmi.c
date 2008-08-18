@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -609,7 +607,7 @@ thumper_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		/*
 		 * Set the LED mode
 		 */
-		ipmi_set_sensor_reading_t sr_out;
+		ipmi_set_sensor_reading_t sr_out = { 0 };
 
 		if ((ret = nvlist_lookup_uint32(pargs, TOPO_PROP_VAL_VAL,
 		    &ledmode)) != 0) {

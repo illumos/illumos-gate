@@ -23,7 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libxml/parser.h>
 #include <libxml/xinclude.h>
@@ -1028,10 +1027,6 @@ pad_process(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
 		 */
 		if ((new = tf_pad_new(mp, pgcnt, dcnt)) == NULL)
 			return (-1);
-		if (dcnt == 0 && pgcnt == 0) {
-			*rpad = new;
-			return (0);
-		}
 
 		if (pgcnt > 0) {
 			new->tpad_pgs =
