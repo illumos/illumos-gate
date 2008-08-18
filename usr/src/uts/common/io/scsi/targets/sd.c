@@ -70,10 +70,10 @@
  * Loadable module info.
  */
 #if (defined(__fibre))
-#define	SD_MODULE_NAME	"SCSI SSA/FCAL Disk Driver 1.588"
+#define	SD_MODULE_NAME	"SCSI SSA/FCAL Disk Driver"
 char _depends_on[]	= "misc/scsi misc/cmlb drv/fcp";
 #else
-#define	SD_MODULE_NAME	"SCSI Disk Driver 1.588"
+#define	SD_MODULE_NAME	"SCSI Disk Driver"
 char _depends_on[]	= "misc/scsi misc/cmlb";
 #endif
 
@@ -9645,7 +9645,8 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 			 * supported device.
 			 */
 #if defined(__i386) || defined(__amd64)
-			if (un->un_f_sync_cache_supported ||
+			if ((un->un_f_sync_cache_supported &&
+			    un->un_f_sync_cache_required) ||
 			    un->un_f_dvdram_writable_device == TRUE) {
 #else
 			if (un->un_f_dvdram_writable_device == TRUE) {
@@ -10543,6 +10544,9 @@ sdstrategy(struct buf *bp)
 	SD_INFO(SD_LOG_IO, un, "sdstrategy: un_ncmds_in_driver = %ld\n",
 	    un->un_ncmds_in_driver);
 
+	if (bp->b_flags & B_WRITE)
+		un->un_f_sync_cache_required = TRUE;
+
 	mutex_exit(SD_MUTEX(un));
 
 	/*
@@ -10702,6 +10706,7 @@ sd_uscsi_strategy(struct buf *bp)
 	struct sd_uscsi_info	*uip;
 	struct sd_xbuf		*xp;
 	uchar_t			chain_type;
+	uchar_t			cmd;
 
 	ASSERT(bp != NULL);
 
@@ -10717,6 +10722,13 @@ sd_uscsi_strategy(struct buf *bp)
 
 	SD_TRACE(SD_LOG_IO, un, "sd_uscsi_strategy: entry: buf:0x%p\n", bp);
 
+	/*
+	 * A pointer to a struct sd_uscsi_info is expected in bp->b_private
+	 */
+	ASSERT(bp->b_private != NULL);
+	uip = (struct sd_uscsi_info *)bp->b_private;
+	cmd = ((struct uscsi_cmd *)(uip->ui_cmdp))->uscsi_cdb[0];
+
 	mutex_enter(SD_MUTEX(un));
 	/*
 	 * atapi: Since we are running the CD for now in PIO mode we need to
@@ -10731,13 +10743,12 @@ sd_uscsi_strategy(struct buf *bp)
 	un->un_ncmds_in_driver++;
 	SD_INFO(SD_LOG_IO, un, "sd_uscsi_strategy: un_ncmds_in_driver = %ld\n",
 	    un->un_ncmds_in_driver);
-	mutex_exit(SD_MUTEX(un));
 
-	/*
-	 * A pointer to a struct sd_uscsi_info is expected in bp->b_private
-	 */
-	ASSERT(bp->b_private != NULL);
-	uip = (struct sd_uscsi_info *)bp->b_private;
+	if ((bp->b_flags & B_WRITE) && (bp->b_bcount != 0) &&
+	    (cmd != SCMD_MODE_SELECT) && (cmd != SCMD_MODE_SELECT_G1))
+		un->un_f_sync_cache_required = TRUE;
+
+	mutex_exit(SD_MUTEX(un));
 
 	switch (uip->ui_flags) {
 	case SD_PATH_DIRECT:
@@ -19242,6 +19253,13 @@ sd_send_scsi_SYNCHRONIZE_CACHE(struct sd_lun *un, struct dk_callback *dkc)
 	bp->b_edev = SD_GET_DEV(un);
 	bp->b_dev = cmpdev(bp->b_edev);	/* maybe unnecessary? */
 
+	/*
+	 * Unset un_f_sync_cache_required flag
+	 */
+	mutex_enter(SD_MUTEX(un));
+	un->un_f_sync_cache_required = FALSE;
+	mutex_exit(SD_MUTEX(un));
+
 	(void) sd_uscsi_strategy(bp);
 
 	/*
@@ -19330,6 +19348,14 @@ sd_send_scsi_SYNCHRONIZE_CACHE_biodone(struct buf *bp)
 		}
 		/* FALLTHRU */
 	default:
+		/*
+		 * Turn on the un_f_sync_cache_required flag
+		 * since the SYNC CACHE command failed
+		 */
+		mutex_enter(SD_MUTEX(un));
+		un->un_f_sync_cache_required = TRUE;
+		mutex_exit(SD_MUTEX(un));
+
 		/*
 		 * Don't log an error message if this device
 		 * has removable media.
@@ -28143,6 +28169,13 @@ sd_set_unit_attributes(struct sd_lun *un, dev_info_t *devi)
 	 * Enable SYNC CACHE support for all devices.
 	 */
 	un->un_f_sync_cache_supported = TRUE;
+
+	/*
+	 * Set the sync cache required flag to false.
+	 * This would ensure that there is no SYNC CACHE
+	 * sent when there are no writes
+	 */
+	un->un_f_sync_cache_required = FALSE;
 
 	if (un->un_sd->sd_inq->inq_rmb) {
 		/*
