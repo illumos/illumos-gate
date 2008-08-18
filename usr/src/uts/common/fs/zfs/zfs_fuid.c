@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/zfs_context.h>
 #include <sys/sunddi.h>
 #include <sys/dmu.h>
@@ -235,6 +233,7 @@ zfs_fuid_find_by_domain(zfsvfs_t *zfsvfs, const char *domain, char **retdomain,
 {
 	fuid_domain_t searchnode, *findnode;
 	avl_index_t loc;
+	krw_t rw = RW_READER;
 
 	/*
 	 * If the dummy "nobody" domain then return an index of 0
@@ -253,11 +252,12 @@ zfs_fuid_find_by_domain(zfsvfs_t *zfsvfs, const char *domain, char **retdomain,
 	if (!zfsvfs->z_fuid_loaded)
 		zfs_fuid_init(zfsvfs, tx);
 
-	rw_enter(&zfsvfs->z_fuid_lock, RW_READER);
+retry:
+	rw_enter(&zfsvfs->z_fuid_lock, rw);
 	findnode = avl_find(&zfsvfs->z_fuid_domain, &searchnode, &loc);
-	rw_exit(&zfsvfs->z_fuid_lock);
 
 	if (findnode) {
+		rw_exit(&zfsvfs->z_fuid_lock);
 		ksiddomain_rele(searchnode.f_ksid);
 		return (findnode->f_idx);
 	} else {
@@ -270,10 +270,15 @@ zfs_fuid_find_by_domain(zfsvfs_t *zfsvfs, const char *domain, char **retdomain,
 		dmu_buf_t *db;
 		int i = 0;
 
+		if (rw == RW_READER && !rw_tryupgrade(&zfsvfs->z_fuid_lock)) {
+			rw_exit(&zfsvfs->z_fuid_lock);
+			rw = RW_WRITER;
+			goto retry;
+		}
+
 		domnode = kmem_alloc(sizeof (fuid_domain_t), KM_SLEEP);
 		domnode->f_ksid = searchnode.f_ksid;
 
-		rw_enter(&zfsvfs->z_fuid_lock, RW_WRITER);
 		retidx = domnode->f_idx = avl_numnodes(&zfsvfs->z_fuid_idx) + 1;
 
 		avl_add(&zfsvfs->z_fuid_domain, domnode);
