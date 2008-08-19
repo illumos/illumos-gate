@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 	
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
 #include <sys/regset.h>
@@ -99,19 +97,8 @@ wc_save_context(wc_cpu_t *pcpu)
 
 	movq	(%rsp), %rdx		/ return address
 	movq	%rdx, WC_RETADDR(%rdi)
-
-/*
- * C calling convention with no local variables, just use 1st arg ie %rdi
- * and the registers. Therefore push caller's fp, set out fp to be sp and
- * push %r12, %r13 %r14. At function end unwind this by: popping %r14, %r13
- * %r14, restore the sp from fp and pop caller's fp.
- */
-
 	pushq	%rbp
 	movq	%rsp,%rbp
-	pushq	%r12
-	pushq	%r13
-	pushq	%r14
 
 	movq    %rdi, WC_VIRTADDR(%rdi)
 	movq    %rdi, WC_RDI(%rdi)
@@ -179,27 +166,10 @@ wc_save_context(wc_cpu_t *pcpu)
 	pushfq
 	popq	WC_EFLAGS(%rdi)
 
-/*
- * call save_stack(cpup)
- * NB %rdi is the first arguemnt to both wc_save_context() and save_stack()
- * so it must not be modified during either of these calls.
- * The pushq will decrement the value of %rsp
- * we need to push the %rbp because it is the frame pointer and we need
- * to use the C calling convention
- */
-
-	pushq   %rbp
-	call	*save_stack_func
-	popq   %rbp
-
 	wbinvd				/ flush the cache
 
 	movq	$1, %rax		/ at suspend return 1
 
-/ see comment at function enter
-	popq	%r14
-	popq	%r13
-	popq	%r12
 	leave
 
 	ret
@@ -772,9 +742,8 @@ kernel_wc_code:
 	movq    WC_RSP(%rbx), %rsp
 
 	/*
-	 * APIC initialization (we dummy up a stack so we can make this call)
+	 * APIC initialization
 	 */
-	pushq   $0              /* null frame pointer terminates stack trace */
 	movq    %rsp, %rbp      /* stack aligned on 16-byte boundary */
 
 	/*
@@ -868,9 +837,6 @@ kernel_wc_code:
 	movq    WC_RDX(%rax), %rdx
 	movq    WC_RBX(%rax), %rbx
 
-	popq	%r14
-	popq	%r13
-	popq	%r12
 	leave
 
 	movq	WC_RETADDR(%rax), %rax

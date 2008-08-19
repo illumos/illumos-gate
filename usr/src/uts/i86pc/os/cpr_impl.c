@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Platform specific implementation code
  * Currently only suspend to RAM is supported (ACPI S3)
@@ -94,12 +92,6 @@ static void i_cpr_platform_free(psm_state_request_t *req);
 static int i_cpr_save_apic(psm_state_request_t *req);
 static int i_cpr_restore_apic(psm_state_request_t *req);
 static int wait_for_set(cpuset_t *set, int who);
-
-#if defined(__amd64)
-static void restore_stack(wc_cpu_t *cpup);
-static void save_stack(wc_cpu_t *cpup);
-void (*save_stack_func)(wc_cpu_t *) = save_stack;
-#endif	/* __amd64 */
 
 /*
  * restart paused slave cpus
@@ -882,10 +874,6 @@ i_cpr_start_cpu(void)
 	char *str = "i_cpr_start_cpu";
 	extern void init_cpu_syscall(struct cpu *cp);
 
-#if defined(__amd64)
-	wc_cpu_t	*cpup = wc_other_cpus + cp->cpu_id;
-#endif	/*	__amd64	*/
-
 	PMD(PMD_SX, ("%s() called\n", str))
 
 	PMD(PMD_SX, ("%s() #0 cp->cpu_base_spl %d\n", str,
@@ -922,11 +910,6 @@ i_cpr_start_cpu(void)
 
 
 	mutex_enter(&cpu_lock);
-
-#if defined(__amd64)
-	restore_stack(cpup);
-#endif	/*	__amd64	*/
-
 	CPUSET_ADD(procset, cp->cpu_id);
 	mutex_exit(&cpu_lock);
 
@@ -968,59 +951,6 @@ i_cpr_start_cpu(void)
 
 	/* return; */
 }
-
-#if defined(__amd64)
-/*
- * we only need to do this for amd64!
- */
-
-/*
- * save the stack
- */
-void
-save_stack(wc_cpu_t *cpup)
-{
-	char *str = "save_stack";
-	caddr_t base = curthread->t_stk;
-	caddr_t sp = (caddr_t)cpup->wc_rsp;
-
-
-	PMD(PMD_SX, ("%s() CPU->cpu_id %d\n", str, CPU->cpu_id))
-	PMD(PMD_SX, ("save_stack() curthread->t_stk = %p, sp = %p\n",
-	    (void *)base, (void *)sp))
-
-	ASSERT(base > sp);
-	/*LINTED*/
-	bcopy(sp, cpup->wc_stack, base - sp);
-
-}
-
-/*
- * restore the stack
- */
-static	void
-restore_stack(wc_cpu_t *cpup)
-{
-	/*
-	 * we only need to do this for amd64!
-	 */
-
-	char *str = "restore_stack";
-	caddr_t base = curthread->t_stk;
-	caddr_t sp = (caddr_t)cpup->wc_rsp;
-
-	PMD(PMD_SX, ("%s() CPU->cpu_id %d\n", str, CPU->cpu_id))
-	PMD(PMD_SX, ("%s() curthread->t_stk = %p, sp = %p\n", str,
-	    (void *)base, (void *)sp))
-
-	ASSERT(base > sp);
-	/*LINTED*/
-	bcopy(cpup->wc_stack, sp, base - sp);
-
-}
-
-#endif	/*	__amd64	*/
-
 
 void
 i_cpr_alloc_cpus(void)

@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_CPR_WC_H
 #define	_CPR_WC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -114,7 +112,6 @@ uint32_t wc_idt_pad1;
 	uint16_t wc_cs;
 	uint16_t wc_ds;
 	uint16_t wc_es;
-	char	wc_stack[400];
 	psm_state_request_t	wc_apic_state;
 
 
