@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
@@ -2289,7 +2287,7 @@ ipsecesp_send_keepalive(ipsa_t *assoc)
 	udpha_t *udpha;
 	ipsec_out_t *io;
 
-	ASSERT(!MUTEX_HELD(&assoc->ipsa_lock));
+	ASSERT(MUTEX_NOT_HELD(&assoc->ipsa_lock));
 
 	mp = allocb(sizeof (ipha_t) + sizeof (udpha_t) + 1, BPRI_HI);
 	if (mp == NULL)

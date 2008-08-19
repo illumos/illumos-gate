@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
@@ -255,7 +253,7 @@ sadb_freeassoc(ipsa_t *ipsa)
 	ipsec_stack_t	*ipss = ipsa->ipsa_netstack->netstack_ipsec;
 
 	ASSERT(ipss != NULL);
-	ASSERT(!MUTEX_HELD(&ipsa->ipsa_lock));
+	ASSERT(MUTEX_NOT_HELD(&ipsa->ipsa_lock));
 	ASSERT(ipsa->ipsa_refcnt == 0);
 	ASSERT(ipsa->ipsa_next == NULL);
 	ASSERT(ipsa->ipsa_ptpn == NULL);
@@ -1134,7 +1132,7 @@ sadb_cloneassoc(ipsa_t *ipsa)
 	ipsa_t *newbie;
 	boolean_t error = B_FALSE;
 
-	ASSERT(!MUTEX_HELD(&(ipsa->ipsa_lock)));
+	ASSERT(MUTEX_NOT_HELD(&(ipsa->ipsa_lock)));
 
 	newbie = kmem_alloc(sizeof (ipsa_t), KM_NOSLEEP);
 	if (newbie == NULL)
@@ -3465,8 +3463,9 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 
 	/* OKAY!  So let's do some reality check assertions. */
 
-	ASSERT(!MUTEX_HELD(&newbie->ipsa_lock));
-	ASSERT(newbie_clone == NULL || (!MUTEX_HELD(&newbie_clone->ipsa_lock)));
+	ASSERT(MUTEX_NOT_HELD(&newbie->ipsa_lock));
+	ASSERT(newbie_clone == NULL ||
+	    (MUTEX_NOT_HELD(&newbie_clone->ipsa_lock)));
 	/*
 	 * If hardware acceleration could happen, send it.
 	 */

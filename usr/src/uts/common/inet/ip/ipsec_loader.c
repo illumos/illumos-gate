@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -82,7 +80,7 @@ ipsec_loader(void *arg)
 			/* ipsec_loader_lock is held at this point! */
 			ASSERT(MUTEX_HELD(&ipss->ipsec_loader_lock));
 			CALLB_CPR_EXIT(&cprinfo);
-			ASSERT(!MUTEX_HELD(&ipss->ipsec_loader_lock));
+			ASSERT(MUTEX_NOT_HELD(&ipss->ipsec_loader_lock));
 			thread_exit();
 		}
 		mutex_exit(&ipss->ipsec_loader_lock);
@@ -128,7 +126,7 @@ ipsec_loader(void *arg)
 		mutex_enter(&ipss->ipsec_loader_lock);
 		if (!ipsec_failure) {
 			CALLB_CPR_EXIT(&cprinfo);
-			ASSERT(!MUTEX_HELD(&ipss->ipsec_loader_lock));
+			ASSERT(MUTEX_NOT_HELD(&ipss->ipsec_loader_lock));
 			ipsec_register_prov_update();
 			thread_exit();
 		}
