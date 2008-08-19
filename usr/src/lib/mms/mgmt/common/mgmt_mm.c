@@ -313,10 +313,9 @@ mms_mgmt_init_host(nvlist_t *opts, nvlist_t **errs)
 	char			*val;
 	char			*pass = NULL;
 	char			*hosttype = NULL;
-	int			scf_size = MMS_CFG_MAX_VALUE;
-	char			cfgvar[scf_size];
+	char			cfgvar[2048];
 	char			*bufp;
-	char			buf[scf_size];
+	char			buf[2048];
 	int			i;
 	nvlist_t		*init_errs = NULL;
 
@@ -564,8 +563,7 @@ mms_mgmt_get_opts(char *type, nvlist_t **opts)
 {
 	int			st;
 	int			i;
-	int			scf_size = MMS_CFG_MAX_VALUE;
-	char			buf[scf_size];
+	char			buf[2048];
 	void			*session = NULL;
 	void			*response = NULL;
 	char			tid[64];
@@ -671,9 +669,8 @@ mms_mgmt_set_opts(nvlist_t *optlist, nvlist_t *errlist)
 #ifdef	MMS_VAR_CFG
 	int			svc_to_check = 0;
 #endif	/* MMS_VAR_CFG */
-	int			scf_size = MMS_CFG_MAX_VALUE;
-	char			mmtype[scf_size];
-	char			buf[scf_size];
+	char			mmtype[2048];
+	char			buf[2048];
 	char			cmd[8192];
 	char			tid[64];
 	void			*session = NULL;

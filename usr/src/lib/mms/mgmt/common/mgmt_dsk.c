@@ -70,8 +70,7 @@ mms_mgmt_add_dklib(void *session, char *libname, nvlist_t *errs)
 	char		buf[1024];
 	nvlist_t	*dklib = NULL;
 	nvlist_t	*nva = NULL;
-	int		scf_size = MMS_CFG_MAX_VALUE;
-	char		mmhost[scf_size];
+	char		mmhost[NI_MAXHOST +  NI_MAXSERV + 2]; /* ':' + nul */
 
 	if (!mgmt_chk_auth("solaris.mms.create")) {
 		return (EACCES);

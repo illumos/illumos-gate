@@ -108,8 +108,7 @@ acs_dlsym(void)
 	int		st = 0;
 	void		*hdl = NULL;
 	char		buf[2048];
-	int		scf_size = MMS_CFG_MAX_VALUE;
-	char		acspath[scf_size];
+	char		acspath[2048];
 
 	st = mms_cfg_getvar(MMS_CFG_LIBAPI_PATH, acspath);
 	if (st != 0) {
@@ -165,8 +164,7 @@ acs_start_ssi(char *acshost, char *ssiport)
 	char    env_acshost[MAXHOSTNAMELEN + 13]; /* CSI_HOSTNAME=<hostname> */
 	char    env_acsport[128];
 	int	status;
-	int	scf_size = MMS_CFG_MAX_VALUE;
-	char	acspath[scf_size];
+	char	acspath[2048];
 	char	ssibuf[1024];
 	char	sockbuf[1024];
 	char	*cmd[3];

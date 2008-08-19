@@ -226,8 +226,7 @@ mgmt_get_db_opts(mmsdb_opts_t *opts)
 	int		st;
 	struct passwd	pwd;
 	struct passwd	*pwdp;
-	int		scf_size = MMS_CFG_MAX_VALUE;
-	char		buf[scf_size];
+	char		buf[2048];
 	char		*bufp;
 
 	if (opts == NULL) {
