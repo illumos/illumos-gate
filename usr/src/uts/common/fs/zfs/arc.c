@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * DVA-based Adjustable Replacement Cache
  *
@@ -1288,11 +1286,15 @@ arc_hdr_destroy(arc_buf_hdr_t *hdr)
 			 * a FREE_IN_PROGRESS flag is given to arc_free() to
 			 * give it priority.  l2arc_evict() can't destroy this
 			 * header while we are waiting on l2arc_buflist_mtx.
+			 *
+			 * The hdr may be removed from l2ad_buflist before we
+			 * grab l2arc_buflist_mtx, so b_l2hdr is rechecked.
 			 */
 			mutex_enter(&l2arc_buflist_mtx);
-			ASSERT(hdr->b_l2hdr != NULL);
-
-			list_remove(hdr->b_l2hdr->b_dev->l2ad_buflist, hdr);
+			if (hdr->b_l2hdr != NULL) {
+				list_remove(hdr->b_l2hdr->b_dev->l2ad_buflist,
+				    hdr);
+			}
 			mutex_exit(&l2arc_buflist_mtx);
 		} else {
 			list_remove(hdr->b_l2hdr->b_dev->l2ad_buflist, hdr);
@@ -2643,8 +2645,8 @@ top:
 				rzio = zio_read_phys(pio, vd, addr, size,
 				    buf->b_data, ZIO_CHECKSUM_OFF,
 				    l2arc_read_done, cb, priority, zio_flags |
-				    ZIO_FLAG_DONT_CACHE | ZIO_FLAG_CANFAIL,
-				    B_FALSE);
+				    ZIO_FLAG_DONT_CACHE | ZIO_FLAG_CANFAIL |
+				    ZIO_FLAG_DONT_PROPAGATE, B_FALSE);
 				DTRACE_PROBE2(l2arc__read, vdev_t *, vd,
 				    zio_t *, rzio);
 				spa_config_exit(spa, FTAG);
@@ -3840,9 +3842,10 @@ l2arc_read_done(zio_t *zio)
 			zio->io_done = NULL;
 			zio->io_flags &= ~ZIO_FLAG_DONT_CACHE;
 
-			rzio = zio_read(NULL, cb->l2rcb_spa, &cb->l2rcb_bp,
-			    buf->b_data, zio->io_size, arc_read_done, buf,
-			    zio->io_priority, cb->l2rcb_flags, &cb->l2rcb_zb);
+			rzio = zio_read(zio->io_parent, cb->l2rcb_spa,
+			    &cb->l2rcb_bp, buf->b_data, zio->io_size,
+			    arc_read_done, buf, zio->io_priority,
+			    cb->l2rcb_flags, &cb->l2rcb_zb);
 
 			(void) zio_nowait(rzio);
 		}
