@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <errno.h>
 #include <limits.h>
 #include <strings.h>
@@ -52,6 +50,8 @@ static int cpu_str2nvl(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
 static int cpu_fmri_asru(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
+static int cpu_fmri_create_meth(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
 static nvlist_t *fmri_create(topo_mod_t *, uint32_t, uint8_t, char *);
 
 static const topo_method_t cpu_methods[] = {
@@ -63,7 +63,7 @@ static const topo_method_t cpu_methods[] = {
 	    TOPO_METH_ASRU_COMPUTE_VERSION, TOPO_STABILITY_INTERNAL,
 	    cpu_fmri_asru },
 	{ TOPO_METH_FMRI, TOPO_METH_FMRI_DESC, TOPO_METH_FMRI_VERSION,
-	    TOPO_STABILITY_INTERNAL, cpu_fmri_asru },
+	    TOPO_STABILITY_INTERNAL, cpu_fmri_create_meth },
 	{ NULL }
 };
 
@@ -500,6 +500,44 @@ cpu_fmri_asru(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	(void) nvlist_lookup_uint8(in, FM_FMRI_CPU_MASK, &cpumask);
 
 	*out = fmri_create(mod, cpu_id, cpumask, serial);
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+cpu_fmri_create_meth(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	int		rc;
+	nvlist_t	*args;
+	uint32_t	cpu_id;
+	uint8_t		cpumask = 0;
+	char		*serial = NULL;
+
+	if (version > TOPO_METH_FMRI_VERSION) {
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+	}
+
+	rc = nvlist_lookup_nvlist(in, TOPO_METH_FMRI_ARG_NVL, &args);
+	if (rc != 0) {
+		/*
+		 * This routine requires arguments to be packed in the
+		 * format used in topo_fmri_create()
+		 */
+		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
+	}
+
+	if (nvlist_lookup_string(args, FM_FMRI_CPU_SERIAL_ID, &serial) != 0 ||
+	    nvlist_lookup_uint32(args, FM_FMRI_CPU_ID, &cpu_id) != 0 ||
+	    nvlist_lookup_uint8(args, FM_FMRI_CPU_MASK, &cpumask) != 0) {
+		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
+	}
+
+	*out = fmri_create(mod, cpu_id, cpumask, serial);
+	if (*out == NULL) {
+		return (-1);
+	}
 
 	return (0);
 }
