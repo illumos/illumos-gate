@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 SUNWprivate {
     global:
@@ -45,9 +43,12 @@ SUNWprivate {
 	brand_get_postclone;
 	brand_get_postinstall;
 	brand_get_postsnap;
+	brand_get_poststatechange;
 	brand_get_predetach;
 	brand_get_presnap;
+	brand_get_prestatechange;
 	brand_get_preuninstall;
+	brand_get_query;
 	brand_get_uninstall;
 	brand_get_user_cmd;
 	brand_get_validatesnap;

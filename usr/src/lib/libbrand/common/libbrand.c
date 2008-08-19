@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
@@ -66,10 +64,13 @@
 #define	DTD_ELEM_POSTCLONE	((const xmlChar *) "postclone")
 #define	DTD_ELEM_POSTINSTALL	((const xmlChar *) "postinstall")
 #define	DTD_ELEM_POSTSNAP	((const xmlChar *) "postsnap")
+#define	DTD_ELEM_POSTSTATECHG	((const xmlChar *) "poststatechange")
 #define	DTD_ELEM_PREDETACH	((const xmlChar *) "predetach")
 #define	DTD_ELEM_PRESNAP	((const xmlChar *) "presnap")
+#define	DTD_ELEM_PRESTATECHG	((const xmlChar *) "prestatechange")
 #define	DTD_ELEM_PREUNINSTALL	((const xmlChar *) "preuninstall")
 #define	DTD_ELEM_PRIVILEGE	((const xmlChar *) "privilege")
+#define	DTD_ELEM_QUERY		((const xmlChar *) "query")
 #define	DTD_ELEM_SYMLINK	((const xmlChar *) "symlink")
 #define	DTD_ELEM_UNINSTALL	((const xmlChar *) "uninstall")
 #define	DTD_ELEM_USER_CMD	((const xmlChar *) "user_cmd")
@@ -589,6 +590,15 @@ brand_get_postsnap(brand_handle_t bh, const char *zonename,
 }
 
 int
+brand_get_poststatechange(brand_handle_t bh, const char *zonename,
+    const char *zonepath, char *buf, size_t len)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_POSTSTATECHG, B_TRUE, B_TRUE));
+}
+
+int
 brand_get_predetach(brand_handle_t bh, const char *zonename,
     const char *zonepath, char *buf, size_t len)
 {
@@ -607,12 +617,30 @@ brand_get_presnap(brand_handle_t bh, const char *zonename,
 }
 
 int
+brand_get_prestatechange(brand_handle_t bh, const char *zonename,
+    const char *zonepath, char *buf, size_t len)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_PRESTATECHG, B_TRUE, B_TRUE));
+}
+
+int
 brand_get_preuninstall(brand_handle_t bh, const char *zonename,
     const char *zonepath, char *buf, size_t len)
 {
 	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
 	    buf, len, DTD_ELEM_PREUNINSTALL, B_TRUE, B_TRUE));
+}
+
+int
+brand_get_query(brand_handle_t bh, const char *zonename,
+    const char *zonepath, char *buf, size_t len)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_QUERY, B_TRUE, B_TRUE));
 }
 
 int

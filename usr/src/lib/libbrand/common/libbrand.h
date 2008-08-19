@@ -27,8 +27,6 @@
 #ifndef	_LIBBRAND_H
 #define	_LIBBRAND_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -75,11 +73,17 @@ extern int brand_get_postinstall(brand_handle_t, const char *, const char *,
     char *, size_t);
 extern int brand_get_postsnap(brand_handle_t, const char *, const char *,
     char *, size_t);
+extern int brand_get_poststatechange(brand_handle_t, const char *, const char *,
+    char *, size_t);
 extern int brand_get_predetach(brand_handle_t, const char *, const char *,
     char *, size_t);
 extern int brand_get_presnap(brand_handle_t, const char *, const char *,
     char *, size_t);
+extern int brand_get_prestatechange(brand_handle_t, const char *, const char *,
+    char *, size_t);
 extern int brand_get_preuninstall(brand_handle_t, const char *, const char *,
+    char *, size_t);
+extern int brand_get_query(brand_handle_t, const char *, const char *,
     char *, size_t);
 extern int brand_get_uninstall(brand_handle_t, const char *, const char *,
     char *, size_t);

@@ -152,6 +152,9 @@ static priv_set_t *zprivs = NULL;
 /* from libsocket, not in any header file */
 extern int getnetmaskbyaddr(struct in_addr, struct in_addr *);
 
+/* from zoneadmd */
+extern char query_hook[];
+
 /*
  * An optimization for build_mnttable: reallocate (and potentially copy the
  * data) only once every N times through the loop.
@@ -3137,6 +3140,24 @@ out:
 }
 
 static int
+get_implicit_datasets(zlog_t *zlogp, char **retstr)
+{
+	char cmdbuf[2 * MAXPATHLEN];
+
+	if (query_hook[0] == '\0')
+		return (0);
+
+	if (snprintf(cmdbuf, sizeof (cmdbuf), "%s datasets", query_hook)
+	    > sizeof (cmdbuf))
+		return (-1);
+
+	if (do_subproc(zlogp, cmdbuf, retstr) != 0)
+		return (-1);
+
+	return (0);
+}
+
+static int
 get_datasets(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 {
 	zone_dochandle_t handle;
@@ -3144,6 +3165,8 @@ get_datasets(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 	size_t total, offset, len;
 	int error = -1;
 	char *str = NULL;
+	char *implicit_datasets = NULL;
+	int implicit_len = 0;
 
 	*bufp = NULL;
 	*bufsizep = 0;
@@ -3158,6 +3181,11 @@ get_datasets(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 		return (-1);
 	}
 
+	if (get_implicit_datasets(zlogp, &implicit_datasets) != 0) {
+		zerror(zlogp, B_FALSE, "getting implicit datasets failed");
+		goto out;
+	}
+
 	if (zonecfg_setdsent(handle) != Z_OK) {
 		zerror(zlogp, B_FALSE, "%s failed", "zonecfg_setdsent");
 		goto out;
@@ -3167,6 +3195,11 @@ get_datasets(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 	while (zonecfg_getdsent(handle, &dstab) == Z_OK)
 		total += strlen(dstab.zone_dataset_name) + 1;
 	(void) zonecfg_enddsent(handle);
+
+	if (implicit_datasets != NULL)
+		implicit_len = strlen(implicit_datasets);
+	if (implicit_len > 0)
+		total += implicit_len + 1;
 
 	if (total == 0) {
 		error = 0;
@@ -3193,6 +3226,9 @@ get_datasets(zlog_t *zlogp, char **bufp, size_t *bufsizep)
 	}
 	(void) zonecfg_enddsent(handle);
 
+	if (implicit_len > 0)
+		(void) strlcpy(str + offset, implicit_datasets, total - offset);
+
 	error = 0;
 	*bufp = str;
 	*bufsizep = total;
@@ -3202,6 +3238,8 @@ out:
 		free(str);
 	if (handle != NULL)
 		zonecfg_fini_handle(handle);
+	if (implicit_datasets != NULL)
+		free(implicit_datasets);
 
 	return (error);
 }
@@ -4532,7 +4570,7 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 	brand_close(bh);
 
 	if ((strlen(cmdbuf) > EXEC_LEN) &&
-	    (do_subproc(zlogp, cmdbuf) != Z_OK)) {
+	    (do_subproc(zlogp, cmdbuf, NULL) != Z_OK)) {
 		zerror(zlogp, B_FALSE, "%s failed", cmdbuf);
 		goto error;
 	}

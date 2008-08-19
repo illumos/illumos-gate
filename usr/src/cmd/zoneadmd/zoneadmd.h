@@ -27,8 +27,6 @@
 #ifndef	_ZONEADMD_H
 #define	_ZONEADMD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -156,7 +154,7 @@ extern int init_template(void);
 /*
  * Routine to manage child processes.
  */
-extern int do_subproc(zlog_t *, char *);
+extern int do_subproc(zlog_t *, char *, char **);
 
 #ifdef __cplusplus
 }
