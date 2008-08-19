@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -50,6 +48,9 @@
 #include "libzfs_impl.h"
 
 #include <fletcher.c> /* XXX */
+
+static int zfs_receive_impl(libzfs_handle_t *, const char *, recvflags_t,
+    int, avl_tree_t *, char **);
 
 /*
  * Routines for dealing with the AVL tree of fs-nvlists
@@ -882,7 +883,8 @@ recv_rename(libzfs_handle_t *hdl, const char *name, const char *tryname,
 	zhp = zfs_open(hdl, name, ZFS_TYPE_DATASET);
 	if (zhp == NULL)
 		return (-1);
-	clp = changelist_gather(zhp, ZFS_PROP_NAME, flags.force ? MS_FORCE : 0);
+	clp = changelist_gather(zhp, ZFS_PROP_NAME, 0,
+	    flags.force ? MS_FORCE : 0);
 	zfs_close(zhp);
 	if (clp == NULL)
 		return (-1);
@@ -953,7 +955,8 @@ recv_destroy(libzfs_handle_t *hdl, const char *name, int baselen,
 	zhp = zfs_open(hdl, name, ZFS_TYPE_DATASET);
 	if (zhp == NULL)
 		return (-1);
-	clp = changelist_gather(zhp, ZFS_PROP_NAME, flags.force ? MS_FORCE : 0);
+	clp = changelist_gather(zhp, ZFS_PROP_NAME, 0,
+	    flags.force ? MS_FORCE : 0);
 	zfs_close(zhp);
 	if (clp == NULL)
 		return (-1);
@@ -1345,7 +1348,8 @@ again:
 
 static int
 zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
-    recvflags_t flags, dmu_replay_record_t *drr, zio_cksum_t *zc)
+    recvflags_t flags, dmu_replay_record_t *drr, zio_cksum_t *zc,
+    char **top_zfs)
 {
 	nvlist_t *stream_nv = NULL;
 	avl_tree_t *stream_avl = NULL;
@@ -1457,7 +1461,8 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 		 * zfs_receive_one() will take care of it (ie,
 		 * recv_skip() and return 0).
 		 */
-		error = zfs_receive(hdl, destname, flags, fd, stream_avl);
+		error = zfs_receive_impl(hdl, destname, flags, fd,
+		    stream_avl, top_zfs);
 		if (error == ENODATA) {
 			error = 0;
 			break;
@@ -1523,7 +1528,7 @@ recv_skip(libzfs_handle_t *hdl, int fd, boolean_t byteswap)
 		case DRR_WRITE:
 			if (byteswap) {
 				drr->drr_u.drr_write.drr_length =
-				    BSWAP_32(drr->drr_u.drr_write.drr_length);
+				    BSWAP_64(drr->drr_u.drr_write.drr_length);
 			}
 			(void) recv_read(hdl, fd, buf,
 			    drr->drr_u.drr_write.drr_length, B_FALSE, NULL);
@@ -1548,7 +1553,8 @@ recv_skip(libzfs_handle_t *hdl, int fd, boolean_t byteswap)
 static int
 zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
     recvflags_t flags, dmu_replay_record_t *drr,
-    dmu_replay_record_t *drr_noswap, avl_tree_t *stream_avl)
+    dmu_replay_record_t *drr_noswap, avl_tree_t *stream_avl,
+    char **top_zfs)
 {
 	zfs_cmd_t zc = { 0 };
 	time_t begin_time;
@@ -1759,7 +1765,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		if (!flags.dryrun && zhp->zfs_type == ZFS_TYPE_FILESYSTEM &&
 		    stream_wantsnewfs) {
 			/* We can't do online recv in this case */
-			clp = changelist_gather(zhp, ZFS_PROP_NAME, 0);
+			clp = changelist_gather(zhp, ZFS_PROP_NAME, 0, 0);
 			if (clp == NULL) {
 				zcmd_free_nvlists(&zc);
 				return (-1);
@@ -1931,18 +1937,24 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		*cp = '\0';
 		h = zfs_open(hdl, zc.zc_value,
 		    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME);
-		*cp = '@';
 		if (h != NULL) {
 			if (h->zfs_type == ZFS_TYPE_VOLUME) {
+				*cp = '@';
 				err = zvol_create_link(hdl, h->zfs_name);
 				if (err == 0 && ioctl_err == 0)
 					err = zvol_create_link(hdl,
 					    zc.zc_value);
 			} else if (newfs) {
-				err = zfs_mount(h, NULL, 0);
+				/*
+				 * Track the first/top of hierarchy fs,
+				 * for mounting and sharing later.
+				 */
+				if (top_zfs && *top_zfs == NULL)
+					*top_zfs = zfs_strdup(hdl, zc.zc_value);
 			}
 			zfs_close(h);
 		}
+		*cp = '@';
 	}
 
 	if (clp) {
@@ -1970,15 +1982,9 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	return (0);
 }
 
-/*
- * Restores a backup of tosnap from the file descriptor specified by infd.
- * Return 0 on total success, -2 if some things couldn't be
- * destroyed/renamed/promoted, -1 if some things couldn't be received.
- * (-1 will override -2).
- */
-int
-zfs_receive(libzfs_handle_t *hdl, const char *tosnap, recvflags_t flags,
-    int infd, avl_tree_t *stream_avl)
+static int
+zfs_receive_impl(libzfs_handle_t *hdl, const char *tosnap, recvflags_t flags,
+    int infd, avl_tree_t *stream_avl, char **top_zfs)
 {
 	int err;
 	dmu_replay_record_t drr, drr_noswap;
@@ -2044,14 +2050,53 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, recvflags_t flags,
 
 	if (drrb->drr_version == DMU_BACKUP_STREAM_VERSION) {
 		return (zfs_receive_one(hdl, infd, tosnap, flags,
-		    &drr, &drr_noswap, stream_avl));
+		    &drr, &drr_noswap, stream_avl, top_zfs));
 	} else if (drrb->drr_version == DMU_BACKUP_HEADER_VERSION) {
 		return (zfs_receive_package(hdl, infd, tosnap, flags,
-		    &drr, &zcksum));
+		    &drr, &zcksum, top_zfs));
 	} else {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "stream is unsupported version %llu"),
 		    drrb->drr_version);
 		return (zfs_error(hdl, EZFS_BADSTREAM, errbuf));
 	}
+}
+
+/*
+ * Restores a backup of tosnap from the file descriptor specified by infd.
+ * Return 0 on total success, -2 if some things couldn't be
+ * destroyed/renamed/promoted, -1 if some things couldn't be received.
+ * (-1 will override -2).
+ */
+int
+zfs_receive(libzfs_handle_t *hdl, const char *tosnap, recvflags_t flags,
+    int infd, avl_tree_t *stream_avl)
+{
+	char *top_zfs = NULL;
+	int err;
+
+	err = zfs_receive_impl(hdl, tosnap, flags, infd, stream_avl, &top_zfs);
+
+	if (err == 0 && top_zfs) {
+		zfs_handle_t *zhp;
+		prop_changelist_t *clp;
+
+		zhp = zfs_open(hdl, top_zfs, ZFS_TYPE_FILESYSTEM);
+		if (zhp != NULL) {
+			clp = changelist_gather(zhp, ZFS_PROP_MOUNTPOINT,
+			    CL_GATHER_MOUNT_ALWAYS, 0);
+			zfs_close(zhp);
+			if (clp != NULL) {
+				/* mount and share received datasets */
+				err = changelist_postfix(clp);
+				changelist_free(clp);
+			}
+		}
+		if (zhp == NULL || clp == NULL || err)
+			err = -1;
+	}
+	if (top_zfs)
+		free(top_zfs);
+
+	return (err);
 }

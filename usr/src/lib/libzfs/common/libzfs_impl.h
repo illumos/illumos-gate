@@ -27,8 +27,6 @@
 #ifndef	_LIBFS_IMPL_H
 #define	_LIBFS_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dmu.h>
 #include <sys/fs/zfs.h>
 #include <sys/zfs_ioctl.h>
@@ -138,6 +136,13 @@ int zprop_parse_value(libzfs_handle_t *, nvpair_t *, int, zfs_type_t,
 int zprop_expand_list(libzfs_handle_t *hdl, zprop_list_t **plp,
     zfs_type_t type);
 
+/*
+ * Use this changelist_gather() flag to force attempting mounts
+ * on each change node regardless of whether or not it is currently
+ * mounted.
+ */
+#define	CL_GATHER_MOUNT_ALWAYS	1
+
 typedef struct prop_changelist prop_changelist_t;
 
 int zcmd_alloc_dst_nvlist(libzfs_handle_t *, zfs_cmd_t *, size_t);
@@ -152,7 +157,7 @@ int changelist_postfix(prop_changelist_t *);
 void changelist_rename(prop_changelist_t *, const char *, const char *);
 void changelist_remove(prop_changelist_t *, const char *);
 void changelist_free(prop_changelist_t *);
-prop_changelist_t *changelist_gather(zfs_handle_t *, zfs_prop_t, int);
+prop_changelist_t *changelist_gather(zfs_handle_t *, zfs_prop_t, int, int);
 int changelist_unshare(prop_changelist_t *, zfs_share_proto_t *);
 int changelist_haszonedchild(prop_changelist_t *);
 

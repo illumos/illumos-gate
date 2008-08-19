@@ -1789,7 +1789,7 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 
 	prop = zfs_name_to_prop(propname);
 
-	if ((cl = changelist_gather(zhp, prop, 0)) == NULL)
+	if ((cl = changelist_gather(zhp, prop, 0, 0)) == NULL)
 		goto error;
 
 	if (prop == ZFS_PROP_MOUNTPOINT && changelist_haszonedchild(cl)) {
@@ -1979,7 +1979,7 @@ zfs_prop_inherit(zfs_handle_t *zhp, const char *propname)
 	/*
 	 * Determine datasets which will be affected by this change, if any.
 	 */
-	if ((cl = changelist_gather(zhp, prop, 0)) == NULL)
+	if ((cl = changelist_gather(zhp, prop, 0, 0)) == NULL)
 		return (-1);
 
 	if (prop == ZFS_PROP_MOUNTPOINT && changelist_haszonedchild(cl)) {
@@ -3575,7 +3575,7 @@ rollback_destroy(zfs_handle_t *zhp, void *data)
 		/* We must destroy this clone; first unmount it */
 		prop_changelist_t *clp;
 
-		clp = changelist_gather(zhp, ZFS_PROP_NAME,
+		clp = changelist_gather(zhp, ZFS_PROP_NAME, 0,
 		    cbp->cb_force ? MS_FORCE: 0);
 		if (clp == NULL || changelist_prefix(clp) != 0) {
 			cbp->cb_error = B_TRUE;
@@ -3851,7 +3851,7 @@ zfs_rename(zfs_handle_t *zhp, const char *target, boolean_t recursive)
 			goto error;
 		}
 	} else {
-		if ((cl = changelist_gather(zhp, ZFS_PROP_NAME, 0)) == NULL)
+		if ((cl = changelist_gather(zhp, ZFS_PROP_NAME, 0, 0)) == NULL)
 			return (-1);
 
 		if (changelist_haszonedchild(cl)) {
