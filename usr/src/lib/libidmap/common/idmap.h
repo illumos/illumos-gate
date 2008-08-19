@@ -30,7 +30,6 @@
 #ifndef _IDMAP_H
 #define	_IDMAP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <ctype.h>
@@ -73,6 +72,14 @@ extern void idmap_free(void *);
 
 
 /*
+ * Supported flag values for mapping requests.
+ * These flag values are applicable to the batch API and the
+ * Windows Name API below.
+ */
+/* Use the libidmap cache */
+#define	IDMAP_REQ_FLG_USE_CACHE	0x00000010
+
+/*
  * API to batch SID to UID/GID mapping requests
  */
 /* Create handle */
@@ -109,16 +116,18 @@ extern void idmap_get_destroy(idmap_get_handle_t *);
  * API to get Windows name by UID/GID and vice-versa
  */
 /* Given UID, get Windows name */
-extern idmap_stat idmap_getwinnamebyuid(uid_t, char **, char **);
+extern idmap_stat idmap_getwinnamebyuid(uid_t, int, char **, char **);
 
 /* Given GID, get Windows name */
-extern idmap_stat idmap_getwinnamebygid(gid_t, char **, char **);
+extern idmap_stat idmap_getwinnamebygid(gid_t, int, char **, char **);
 
 /* Given Windows name, get UID */
-extern idmap_stat idmap_getuidbywinname(const char *, const char *, uid_t *);
+extern idmap_stat idmap_getuidbywinname(const char *, const char *,
+	int, uid_t *);
 
 /* Given Windows name, get GID */
-extern idmap_stat idmap_getgidbywinname(const char *, const char *, gid_t *);
+extern idmap_stat idmap_getgidbywinname(const char *, const char *,
+	int, gid_t *);
 
 
 #ifdef __cplusplus

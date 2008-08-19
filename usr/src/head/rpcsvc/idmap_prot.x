@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* opaque type to support non-ASCII strings */
 typedef	string	idmap_utf8str<>;
@@ -137,14 +136,23 @@ struct idmap_ids_res {
 /*
  * Flag supported by mapping requests
  */
+
 /* Don't allocate a new value for the mapping */
 const IDMAP_REQ_FLG_NO_NEW_ID_ALLOC	= 0x00000001;
+
 /* Validate the given identity before mapping */
 const IDMAP_REQ_FLG_VALIDATE		= 0x00000002;
+
 /* Avoid name service lookups to prevent looping */
 const IDMAP_REQ_FLG_NO_NAMESERVICE	= 0x00000004;
+
 /* Request how a mapping was formed */
 const IDMAP_REQ_FLG_MAPPING_INFO	= 0x00000008;
+/*
+ * This libidmap only flag is defined in idmap.h
+ * It enables use of the libidmap cache
+ * const IDMAP_REQ_FLG_USE_CACHE	= 0x00000010;
+ */
 
 
 /*

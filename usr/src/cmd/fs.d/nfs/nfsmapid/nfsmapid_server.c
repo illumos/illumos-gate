@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Door server routines for nfsmapid daemon
@@ -145,7 +144,7 @@ nfsmapid_str_uid(struct mapid_arg *argp, size_t arg_size)
 		 * match the NFS domain, try to map it using
 		 * idmap service.
 		 */
-		rc = idmap_getuidbywinname(user, domain, &result.u_res.uid);
+		rc = idmap_getuidbywinname(user, domain, 0, &result.u_res.uid);
 		if (rc != IDMAP_SUCCESS) {
 			result.status = NFSMAPID_BADDOMAIN;
 			result.u_res.uid = UID_NOBODY;
@@ -227,7 +226,7 @@ nfsmapid_uid_str(struct mapid_arg *argp, size_t arg_size)
 	 * If uid is ephemeral then resolve it using idmap service
 	 */
 	if (uid > UID_MAX) {
-		rc = idmap_getwinnamebyuid(uid, &idmap_buf, NULL);
+		rc = idmap_getwinnamebyuid(uid, 0, &idmap_buf, NULL);
 		if (rc != IDMAP_SUCCESS) {
 			/*
 			 * We don't put stringified ephemeral uids on
@@ -395,7 +394,7 @@ nfsmapid_str_gid(struct mapid_arg *argp, size_t arg_size)
 		 * match the NFS domain, try to map it using
 		 * idmap service.
 		 */
-		rc = idmap_getgidbywinname(group, domain, &result.u_res.gid);
+		rc = idmap_getgidbywinname(group, domain, 0, &result.u_res.gid);
 		if (rc != IDMAP_SUCCESS) {
 			result.status = NFSMAPID_BADDOMAIN;
 			result.u_res.gid = GID_NOBODY;
@@ -479,7 +478,7 @@ nfsmapid_gid_str(struct mapid_arg *argp, size_t arg_size)
 	 * If gid is ephemeral then resolve it using idmap service
 	 */
 	if (gid > UID_MAX) {
-		rc = idmap_getwinnamebygid(gid, &idmap_buf, NULL);
+		rc = idmap_getwinnamebygid(gid, 0, &idmap_buf, NULL);
 		if (rc != IDMAP_SUCCESS) {
 			/*
 			 * We don't put stringified ephemeral gids on

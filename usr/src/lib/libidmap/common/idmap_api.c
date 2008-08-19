@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * libidmap API
@@ -42,6 +41,7 @@
 #include <libintl.h>
 #include <ucontext.h>
 #include "idmap_impl.h"
+#include "idmap_cache.h"
 
 /*LINTLIBRARY*/
 
@@ -1161,6 +1161,15 @@ idmap_getext_uidbysid(idmap_get_handle_t *gh, char *sidprefix, idmap_rid_t rid,
 	if (uid == NULL || sidprefix == NULL)
 		return (IDMAP_ERR_ARG);
 
+	if ((flag & IDMAP_REQ_FLG_USE_CACHE) &&
+	    !(flag & IDMAP_REQ_FLG_MAPPING_INFO)) {
+		retcode = idmap_cache_lookup_uidbysid(sidprefix, rid, uid);
+		if (retcode  == IDMAP_SUCCESS || retcode == IDMAP_ERR_MEMORY) {
+			*stat = retcode;
+			return (retcode);
+		}
+	}
+
 	/* Extend the request array and the return list */
 	if ((retcode = _get_ids_extend_batch(gh)) != IDMAP_SUCCESS)
 		goto errout;
@@ -1181,6 +1190,7 @@ idmap_getext_uidbysid(idmap_get_handle_t *gh, char *sidprefix, idmap_rid_t rid,
 	gh->retlist[gh->next].uid = uid;
 	gh->retlist[gh->next].stat = stat;
 	gh->retlist[gh->next].info = info;
+	gh->retlist[gh->next].cache_res = flag & IDMAP_REQ_FLG_USE_CACHE;
 
 	gh->next++;
 	return (IDMAP_SUCCESS);
@@ -1246,6 +1256,15 @@ idmap_getext_gidbysid(idmap_get_handle_t *gh, char *sidprefix, idmap_rid_t rid,
 	if (gid == NULL || sidprefix == NULL)
 		return (IDMAP_ERR_ARG);
 
+	if ((flag & IDMAP_REQ_FLG_USE_CACHE) &&
+	    !(flag & IDMAP_REQ_FLG_MAPPING_INFO)) {
+		retcode = idmap_cache_lookup_gidbysid(sidprefix, rid, gid);
+		if (retcode == IDMAP_SUCCESS || retcode == IDMAP_ERR_MEMORY) {
+			*stat = retcode;
+			return (retcode);
+		}
+	}
+
 	/* Extend the request array and the return list */
 	if ((retcode = _get_ids_extend_batch(gh)) != IDMAP_SUCCESS)
 		goto errout;
@@ -1266,6 +1285,7 @@ idmap_getext_gidbysid(idmap_get_handle_t *gh, char *sidprefix, idmap_rid_t rid,
 	gh->retlist[gh->next].gid = gid;
 	gh->retlist[gh->next].stat = stat;
 	gh->retlist[gh->next].info = info;
+	gh->retlist[gh->next].cache_res = flag & IDMAP_REQ_FLG_USE_CACHE;
 
 	gh->next++;
 	return (IDMAP_SUCCESS);
@@ -1335,6 +1355,16 @@ idmap_getext_pidbysid(idmap_get_handle_t *gh, char *sidprefix, idmap_rid_t rid,
 	if (pid == NULL || sidprefix == NULL || is_user == NULL)
 		return (IDMAP_ERR_ARG);
 
+	if ((flag & IDMAP_REQ_FLG_USE_CACHE) &&
+	    !(flag & IDMAP_REQ_FLG_MAPPING_INFO)) {
+		retcode = idmap_cache_lookup_pidbysid(sidprefix, rid, pid,
+		    is_user);
+		if (retcode  == IDMAP_SUCCESS || retcode == IDMAP_ERR_MEMORY) {
+			*stat = retcode;
+			return (retcode);
+		}
+	}
+
 	/* Extend the request array and the return list */
 	if ((retcode = _get_ids_extend_batch(gh)) != IDMAP_SUCCESS)
 		goto errout;
@@ -1357,6 +1387,7 @@ idmap_getext_pidbysid(idmap_get_handle_t *gh, char *sidprefix, idmap_rid_t rid,
 	gh->retlist[gh->next].is_user = is_user;
 	gh->retlist[gh->next].stat = stat;
 	gh->retlist[gh->next].info = info;
+	gh->retlist[gh->next].cache_res = flag & IDMAP_REQ_FLG_USE_CACHE;
 
 	gh->next++;
 	return (IDMAP_SUCCESS);
@@ -1421,6 +1452,15 @@ idmap_getext_sidbyuid(idmap_get_handle_t *gh, uid_t uid, int flag,
 	if (sidprefix == NULL)
 		return (IDMAP_ERR_ARG);
 
+	if ((flag & IDMAP_REQ_FLG_USE_CACHE) &&
+	    !(flag & IDMAP_REQ_FLG_MAPPING_INFO)) {
+		retcode = idmap_cache_lookup_sidbyuid(sidprefix, rid, uid);
+		if (retcode  == IDMAP_SUCCESS || retcode == IDMAP_ERR_MEMORY) {
+			*stat = retcode;
+			return (retcode);
+		}
+	}
+
 	/* Extend the request array and the return list */
 	if ((retcode = _get_ids_extend_batch(gh)) != IDMAP_SUCCESS)
 		goto errout;
@@ -1438,6 +1478,7 @@ idmap_getext_sidbyuid(idmap_get_handle_t *gh, uid_t uid, int flag,
 	gh->retlist[gh->next].rid = rid;
 	gh->retlist[gh->next].stat = stat;
 	gh->retlist[gh->next].info = info;
+	gh->retlist[gh->next].cache_res = flag & IDMAP_REQ_FLG_USE_CACHE;
 
 	gh->next++;
 	return (IDMAP_SUCCESS);
@@ -1502,6 +1543,15 @@ idmap_getext_sidbygid(idmap_get_handle_t *gh, gid_t gid, int flag,
 	if (sidprefix == NULL)
 		return (IDMAP_ERR_ARG);
 
+	if ((flag & IDMAP_REQ_FLG_USE_CACHE) &&
+	    !(flag & IDMAP_REQ_FLG_MAPPING_INFO)) {
+		retcode = idmap_cache_lookup_sidbygid(sidprefix, rid, gid);
+		if (retcode  == IDMAP_SUCCESS || retcode == IDMAP_ERR_MEMORY) {
+			*stat = retcode;
+			return (retcode);
+		}
+	}
+
 	/* Extend the request array and the return list */
 	if ((retcode = _get_ids_extend_batch(gh)) != IDMAP_SUCCESS)
 		goto errout;
@@ -1519,6 +1569,7 @@ idmap_getext_sidbygid(idmap_get_handle_t *gh, gid_t gid, int flag,
 	gh->retlist[gh->next].rid = rid;
 	gh->retlist[gh->next].stat = stat;
 	gh->retlist[gh->next].info = info;
+	gh->retlist[gh->next].cache_res = flag & IDMAP_REQ_FLG_USE_CACHE;
 
 	gh->next++;
 	return (IDMAP_SUCCESS);
@@ -1543,8 +1594,10 @@ idmap_get_mappings(idmap_get_handle_t *gh)
 	enum clnt_stat	clntstat;
 	idmap_retcode	retcode;
 	idmap_ids_res	res;
-	idmap_id	*id;
+	idmap_id	*res_id;
 	int		i;
+	idmap_id	*req_id;
+	int		direction;
 
 	if (gh == NULL) {
 		errno = EINVAL;
@@ -1573,46 +1626,101 @@ idmap_get_mappings(idmap_get_handle_t *gh)
 			continue;
 		}
 		*gh->retlist[i].stat = res.ids.ids_val[i].retcode;
-		id = &res.ids.ids_val[i].id;
-		switch (id->idtype) {
+		res_id = &res.ids.ids_val[i].id;
+		direction = res.ids.ids_val[i].direction;
+		req_id = &gh->batch.idmap_mapping_batch_val[i].id1;
+		switch (res_id->idtype) {
 		case IDMAP_UID:
 			if (gh->retlist[i].uid)
-				*gh->retlist[i].uid = id->idmap_id_u.uid;
+				*gh->retlist[i].uid = res_id->idmap_id_u.uid;
 			if (gh->retlist[i].is_user)
 				*gh->retlist[i].is_user = 1;
+
+			if (res.ids.ids_val[i].retcode == IDMAP_SUCCESS &&
+			    gh->retlist[i].cache_res) {
+				if (gh->retlist[i].is_user != NULL)
+					idmap_cache_add_sid2pid(
+					    req_id->idmap_id_u.sid.prefix,
+					    req_id->idmap_id_u.sid.rid,
+					    res_id->idmap_id_u.uid, 1,
+					    direction);
+				else
+					idmap_cache_add_sid2uid(
+					    req_id->idmap_id_u.sid.prefix,
+					    req_id->idmap_id_u.sid.rid,
+					    res_id->idmap_id_u.uid,
+					    direction);
+			}
 			break;
+
 		case IDMAP_GID:
 			if (gh->retlist[i].gid)
-				*gh->retlist[i].gid = id->idmap_id_u.gid;
+				*gh->retlist[i].gid = res_id->idmap_id_u.gid;
 			if (gh->retlist[i].is_user)
 				*gh->retlist[i].is_user = 0;
+
+			if (res.ids.ids_val[i].retcode == IDMAP_SUCCESS &&
+			    gh->retlist[i].cache_res) {
+				if (gh->retlist[i].is_user != NULL)
+					idmap_cache_add_sid2pid(
+					    req_id->idmap_id_u.sid.prefix,
+					    req_id->idmap_id_u.sid.rid,
+					    res_id->idmap_id_u.gid, 0,
+					    direction);
+				else
+					idmap_cache_add_sid2gid(
+					    req_id->idmap_id_u.sid.prefix,
+					    req_id->idmap_id_u.sid.rid,
+					    res_id->idmap_id_u.gid,
+					    direction);
+			}
 			break;
+
 		case IDMAP_POSIXID:
 			if (gh->retlist[i].uid)
 				*gh->retlist[i].uid = 60001;
 			if (gh->retlist[i].is_user)
 				*gh->retlist[i].is_user = -1;
 			break;
+
 		case IDMAP_SID:
 		case IDMAP_USID:
 		case IDMAP_GSID:
 			if (gh->retlist[i].rid)
-				*gh->retlist[i].rid = id->idmap_id_u.sid.rid;
+				*gh->retlist[i].rid =
+				    res_id->idmap_id_u.sid.rid;
 			if (gh->retlist[i].sidprefix) {
-				if (id->idmap_id_u.sid.prefix == NULL ||
-				    *id->idmap_id_u.sid.prefix == '\0') {
+				if (res_id->idmap_id_u.sid.prefix == NULL ||
+				    *res_id->idmap_id_u.sid.prefix == '\0') {
 					*gh->retlist[i].sidprefix = NULL;
 					break;
 				}
 				*gh->retlist[i].sidprefix =
-				    strdup(id->idmap_id_u.sid.prefix);
+				    strdup(res_id->idmap_id_u.sid.prefix);
 				if (*gh->retlist[i].sidprefix == NULL)
 					*gh->retlist[i].stat =
 					    IDMAP_ERR_MEMORY;
 			}
+			if (res.ids.ids_val[i].retcode == IDMAP_SUCCESS &&
+			    gh->retlist[i].cache_res) {
+				if (req_id->idtype == IDMAP_UID)
+					idmap_cache_add_sid2uid(
+					    res_id->idmap_id_u.sid.prefix,
+					    res_id->idmap_id_u.sid.rid,
+					    req_id->idmap_id_u.uid,
+					    direction);
+				else /* req_id->idtype == IDMAP_GID */
+					idmap_cache_add_sid2gid(
+					    res_id->idmap_id_u.sid.prefix,
+					    res_id->idmap_id_u.sid.rid,
+					    req_id->idmap_id_u.gid,
+					    direction);
+			}
 			break;
+
 		case IDMAP_NONE:
 			break;
+
 		default:
 			*gh->retlist[i].stat = IDMAP_ERR_NORESULT;
 			break;
@@ -2294,29 +2402,37 @@ idmap_info_free(idmap_info *info)
  * Get uid given Windows name
  */
 idmap_stat
-idmap_getuidbywinname(const char *name, const char *domain, uid_t *uid)
+idmap_getuidbywinname(const char *name, const char *domain, int flag,
+	uid_t *uid)
 {
 	idmap_handle_t	*ih;
 	idmap_retcode	rc;
 	int		is_user = 1;
 	int		is_wuser = -1;
+	int 		direction;
 
 	if (uid == NULL)
 		return (IDMAP_ERR_ARG);
 
+	if (flag & IDMAP_REQ_FLG_USE_CACHE) {
+		rc = idmap_cache_lookup_uidbywinname(name, domain, uid);
+		if (rc == IDMAP_SUCCESS || rc == IDMAP_ERR_MEMORY)
+			return (rc);
+	}
 	/* Get mapping */
 	if ((rc = idmap_init(&ih)) != IDMAP_SUCCESS)
 		return (rc);
-	rc = idmap_get_w2u_mapping(ih, NULL, NULL, name, domain, 0,
-	    &is_user, &is_wuser, uid, NULL, NULL, NULL);
+	rc = idmap_get_w2u_mapping(ih, NULL, NULL, name, domain, flag,
+	    &is_user, &is_wuser, uid, NULL, &direction, NULL);
 	(void) idmap_fini(ih);
 
-	/*
-	 * XXX Until we have diagonal mapping support, check if
-	 * the given name belongs to a user
-	 */
-	if (rc == IDMAP_SUCCESS && !is_user)
-		return (IDMAP_ERR_NOTUSER);
+	if (rc == IDMAP_SUCCESS && (flag & IDMAP_REQ_FLG_USE_CACHE)) {
+		/* If we have not got the domain don't store UID to winname */
+		if (domain == NULL)
+			direction = IDMAP_DIRECTION_W2U;
+		idmap_cache_add_winname2uid(name, domain, *uid, direction);
+	}
+
 	return (rc);
 }
 
@@ -2325,29 +2441,38 @@ idmap_getuidbywinname(const char *name, const char *domain, uid_t *uid)
  * Get gid given Windows name
  */
 idmap_stat
-idmap_getgidbywinname(const char *name, const char *domain, gid_t *gid)
+idmap_getgidbywinname(const char *name, const char *domain, int flag,
+	gid_t *gid)
 {
 	idmap_handle_t	*ih;
 	idmap_retcode	rc;
 	int		is_user = 0;
 	int		is_wuser = -1;
+	int		direction;
 
 	if (gid == NULL)
 		return (IDMAP_ERR_ARG);
 
+	if (flag & IDMAP_REQ_FLG_USE_CACHE) {
+		rc = idmap_cache_lookup_gidbywinname(name, domain, gid);
+		if (rc == IDMAP_SUCCESS || rc == IDMAP_ERR_MEMORY)
+			return (rc);
+	}
+
 	/* Get mapping */
 	if ((rc = idmap_init(&ih)) != IDMAP_SUCCESS)
 		return (rc);
-	rc = idmap_get_w2u_mapping(ih, NULL, NULL, name, domain, 0,
-	    &is_user, &is_wuser, gid, NULL, NULL, NULL);
+	rc = idmap_get_w2u_mapping(ih, NULL, NULL, name, domain, flag,
+	    &is_user, &is_wuser, gid, NULL, &direction, NULL);
 	(void) idmap_fini(ih);
 
-	/*
-	 * XXX Until we have diagonal mapping support, check if
-	 * the given name belongs to a group
-	 */
-	if (rc == IDMAP_SUCCESS && is_user)
-		return (IDMAP_ERR_NOTGROUP);
+	if (rc == IDMAP_SUCCESS && (flag & IDMAP_REQ_FLG_USE_CACHE)) {
+		/* If we have not got the domain don't store GID to winname */
+		if (domain == NULL)
+			direction = IDMAP_DIRECTION_W2U;
+		idmap_cache_add_winname2gid(name, domain, *gid, direction);
+	}
+
 	return (rc);
 }
 
@@ -2356,21 +2481,36 @@ idmap_getgidbywinname(const char *name, const char *domain, gid_t *gid)
  * Get winname given pid
  */
 static idmap_retcode
-idmap_getwinnamebypid(uid_t pid, int is_user, char **name, char **domain)
+idmap_getwinnamebypid(uid_t pid, int is_user, int flag, char **name,
+	char **domain)
 {
 	idmap_handle_t	*ih;
 	idmap_retcode	rc;
 	int		len;
 	char		*winname, *windomain;
+	int		direction;
 
 	if (name == NULL)
 		return (IDMAP_ERR_ARG);
 
+	if (flag & IDMAP_REQ_FLG_USE_CACHE) {
+		if (is_user)
+			rc = idmap_cache_lookup_winnamebyuid(&winname,
+			    &windomain, pid);
+		else
+			rc = idmap_cache_lookup_winnamebygid(&winname,
+			    &windomain, pid);
+		if (rc == IDMAP_SUCCESS)
+			goto out;
+		if (rc == IDMAP_ERR_MEMORY)
+			return (rc);
+	}
+
 	/* Get mapping */
 	if ((rc = idmap_init(&ih)) != IDMAP_SUCCESS)
 		return (rc);
-	rc = idmap_get_u2w_mapping(ih, &pid, NULL, 0, is_user, NULL, NULL,
-	    NULL, &winname, &windomain, NULL, NULL);
+	rc = idmap_get_u2w_mapping(ih, &pid, NULL, flag, is_user, NULL,
+	    NULL, NULL, &winname, &windomain, &direction, NULL);
 	(void) idmap_fini(ih);
 
 	/* Return on error */
@@ -2388,6 +2528,16 @@ idmap_getwinnamebypid(uid_t pid, int is_user, char **name, char **domain)
 		return (IDMAP_ERR_NORESULT);
 	}
 
+	if (flag & IDMAP_REQ_FLG_USE_CACHE) {
+		if (is_user)
+			idmap_cache_add_winname2uid(winname, windomain,
+			    pid, direction);
+		else
+			idmap_cache_add_winname2gid(winname, windomain,
+			    pid, direction);
+	}
+
+out:
 	if (domain != NULL) {
 		*name = winname;
 		*domain = windomain;
@@ -2401,6 +2551,7 @@ idmap_getwinnamebypid(uid_t pid, int is_user, char **name, char **domain)
 		idmap_free(winname);
 		idmap_free(windomain);
 	}
+
 	return (rc);
 }
 
@@ -2409,9 +2560,9 @@ idmap_getwinnamebypid(uid_t pid, int is_user, char **name, char **domain)
  * Get winname given uid
  */
 idmap_stat
-idmap_getwinnamebyuid(uid_t uid, char **name, char **domain)
+idmap_getwinnamebyuid(uid_t uid, int flag, char **name, char **domain)
 {
-	return (idmap_getwinnamebypid(uid, 1, name, domain));
+	return (idmap_getwinnamebypid(uid, 1, flag, name, domain));
 }
 
 
@@ -2419,9 +2570,9 @@ idmap_getwinnamebyuid(uid_t uid, char **name, char **domain)
  * Get winname given gid
  */
 idmap_stat
-idmap_getwinnamebygid(gid_t gid, char **name, char **domain)
+idmap_getwinnamebygid(gid_t gid, int flag, char **name, char **domain)
 {
-	return (idmap_getwinnamebypid(gid, 0, name, domain));
+	return (idmap_getwinnamebypid(gid, 0, flag, name, domain));
 }
 
 

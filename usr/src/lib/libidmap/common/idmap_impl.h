@@ -30,7 +30,6 @@
 #ifndef _IDMAP_IMPL_H
 #define	_IDMAP_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <rpc/xdr.h>
 #include <libscf.h>
@@ -89,6 +88,7 @@ typedef struct idmap_get_res {
 	idmap_rid_t	*rid;
 	idmap_stat	*stat;
 	idmap_info	*info;
+	int		cache_res;
 } idmap_get_res_t;
 
 struct idmap_get_handle {

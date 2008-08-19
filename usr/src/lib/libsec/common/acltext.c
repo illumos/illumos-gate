@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*LINTLIBRARY*/
 
 #include <grp.h>
@@ -140,19 +139,23 @@ prsidname(uid_t who, boolean_t user, char **sidp, int noresolve)
 	 */
 
 	if (user)
-		error = idmap_getwinnamebyuid(who, &name, &domain);
+		error = idmap_getwinnamebyuid(who, IDMAP_REQ_FLG_USE_CACHE,
+		    &name, &domain);
 	else
-		error = idmap_getwinnamebygid(who, &name, &domain);
+		error = idmap_getwinnamebygid(who, IDMAP_REQ_FLG_USE_CACHE,
+		    &name, &domain);
 
 	if (error) {
 		if (idmap_init(&idmap_hdl) == 0 &&
 		    idmap_get_create(idmap_hdl, &get_hdl) == 0) {
 			if (user)
 				error = idmap_get_sidbyuid(get_hdl, who,
-				    0, &domain, &rid, &status);
+				    IDMAP_REQ_FLG_USE_CACHE, &domain, &rid,
+				    &status);
 			else
 				error = idmap_get_sidbygid(get_hdl, who,
-				    0, &domain, &rid, &status);
+				    IDMAP_REQ_FLG_USE_CACHE, &domain, &rid,
+				    &status);
 			if (error == 0)
 				error = idmap_get_mappings(get_hdl);
 		}

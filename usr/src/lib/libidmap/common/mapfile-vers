@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 SUNWprivate {
@@ -93,6 +92,7 @@ SUNWprivate {
 	idmap_get_namemap;
 	idmap_init_namemaps;
 	idmap_fini_namemaps;
+	idmap_cache_get_data;
 	ad_disc_fini;
 	ad_disc_init;
 	ad_disc_get_DomainName;

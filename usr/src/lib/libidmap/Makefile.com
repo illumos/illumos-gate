@@ -22,19 +22,18 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	libidmap.a
 VERS =		.1
-OBJECTS =	idmap_xdr.o utils.o idmap_api.o namemaps.o addisc.o
-LINT_OBJECTS =	utils.o idmap_api.o namemaps.o addisc.o
+OBJECTS =	idmap_xdr.o utils.o idmap_api.o namemaps.o addisc.o idmap_cache.o
+LINT_OBJECTS =	utils.o idmap_api.o namemaps.o addisc.o idmap_cache.o
 
 include ../../Makefile.lib
 
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lnsl -lldap -lresolv -lsldap -lsocket
+LDLIBS +=	-lc -lnsl -lldap -lresolv -lsldap -lsocket -lavl
 CPPFLAGS += -I$(SRC)/lib/libsldap/common
 
 SRCDIR =	../common

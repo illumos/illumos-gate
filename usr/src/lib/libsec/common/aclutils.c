@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <string.h>
@@ -762,10 +761,12 @@ sid_to_id(char *sid, boolean_t user, uid_t *id)
 			    idmap_get_create(idmap_hdl, &get_hdl) == 0) {
 				if (user)
 					error = idmap_get_uidbysid(get_hdl,
-					    sid, rid, 0, id, &status);
+					    sid, rid, IDMAP_REQ_FLG_USE_CACHE,
+					    id, &status);
 				else
 					error = idmap_get_gidbysid(get_hdl,
-					    sid, rid, 0, id, &status);
+					    sid, rid, IDMAP_REQ_FLG_USE_CACHE,
+					    id, &status);
 			}
 		} else {
 			error = -1;
@@ -785,9 +786,11 @@ sid_to_id(char *sid, boolean_t user, uid_t *id)
 		*domain_start++ = '\0';
 
 		if (user)
-			error = idmap_getuidbywinname(name, domain_start, id);
+			error = idmap_getuidbywinname(name, domain_start,
+			    IDMAP_REQ_FLG_USE_CACHE, id);
 		else
-			error = idmap_getgidbywinname(name, domain_start, id);
+			error = idmap_getgidbywinname(name, domain_start,
+			    IDMAP_REQ_FLG_USE_CACHE, id);
 		*--domain_start = '@';
 	}
 
