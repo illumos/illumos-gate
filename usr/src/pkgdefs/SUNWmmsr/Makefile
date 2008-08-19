@@ -23,12 +23,10 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"@(#)Makefile	1.3	08/07/14 SMI"
-#
 
 include ../Makefile.com
 
-DATAFILES += i.rbac r.rbac i.initd
+DATAFILES += i.rbac r.rbac i.initd i.manifest r.manifest i.logadmconf
 LICENSEFILES += $(OSBL)
 CDDL=
 

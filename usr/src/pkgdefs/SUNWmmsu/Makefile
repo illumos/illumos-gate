@@ -23,12 +23,10 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"@(#)Makefile	1.1	08/06/25 SMI"
-#
 
 include ../Makefile.com
 
-DATAFILES += i.manifest r.manifest i.logadmconf
+DATAFILES +=
 LICENSEFILES += $(OSBL)
 CDDL=
 
