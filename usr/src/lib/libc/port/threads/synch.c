@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <sys/rtpriocntl.h>
@@ -2091,9 +2089,21 @@ mutex_lock_internal(mutex_t *mp, timespec_t *tsp, int try)
 			ASSERT(mtype & LOCK_ROBUST);
 			break;
 		case EDEADLK:
-			if (try == MUTEX_LOCK)
+			if (try == MUTEX_TRY) {
+				error = EBUSY;
+			} else if (tsp != NULL) {	/* simulate a timeout */
+				/*
+				 * Note: mutex_timedlock() never returns EINTR.
+				 */
+				timespec_t ts = *tsp;
+				timespec_t rts;
+
+				while (__nanosleep(&ts, &rts) == EINTR)
+					ts = rts;
+				error = ETIME;
+			} else {		/* simulate a deadlock */
 				stall();
-			error = EBUSY;
+			}
 			break;
 		}
 	} else if (mtype & USYNC_PROCESS) {
