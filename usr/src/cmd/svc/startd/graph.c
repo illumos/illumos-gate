@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * graph.c - master restarter graph engine
  *
@@ -3201,7 +3199,7 @@ do_uadmin(void)
 	sync();
 	sync();
 
-	(void) system("/sbin/umountall");
+	(void) system("/sbin/umountall -l");
 	(void) system("/sbin/umount /tmp >/dev/null 2>&1");
 	(void) system("/sbin/umount /var/adm >/dev/null 2>&1");
 	(void) system("/sbin/umount /var/run >/dev/null 2>&1");
