@@ -92,6 +92,12 @@ static const cma_subscriber_t cma_subrs[] = {
 	    NULL },
 	{ "fault.memory.link-f", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
+	{ "fault.memory.link-c", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.link-u", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.link-f", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
 
 	/*
 	 * The following ultraSPARC-T1/T2 faults do NOT retire a cpu thread,
@@ -116,6 +122,18 @@ static const cma_subscriber_t cma_subrs[] = {
 	    FM_CPU_SCHEME_VERSION, NULL },
 	{ "fault.cpu.*.lfu-p", FM_FMRI_SCHEME_CPU,
 	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.ultraSPARC-T1.freg", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.ultraSPARC-T1.l2cachedata", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.ultraSPARC-T1.l2cachetag", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.ultraSPARC-T1.l2cachectl", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.ultraSPARC-T1.mau", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.ultraSPARC-T2plus.chip", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
 	{ "fault.cpu.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
 	    cma_cpu_retire },
 #elif defined(opl)
@@ -192,16 +210,6 @@ static const cma_subscriber_t cma_subrs[] = {
 	 * and therefore must be intercepted before
 	 * the default "fault.cpu.*" dispatch to cma_cpu_retire.
 	 */
-	{ "fault.cpu.ultraSPARC-T1.freg", FM_FMRI_SCHEME_CPU,
-	    FM_CPU_SCHEME_VERSION, NULL },
-	{ "fault.cpu.ultraSPARC-T1.l2cachedata", FM_FMRI_SCHEME_CPU,
-	    FM_CPU_SCHEME_VERSION, NULL },
-	{ "fault.cpu.ultraSPARC-T1.l2cachetag", FM_FMRI_SCHEME_CPU,
-	    FM_CPU_SCHEME_VERSION, NULL },
-	{ "fault.cpu.ultraSPARC-T1.l2cachectl", FM_FMRI_SCHEME_CPU,
-	    FM_CPU_SCHEME_VERSION, NULL },
-	{ "fault.cpu.ultraSPARC-T1.mau", FM_FMRI_SCHEME_CPU,
-	    FM_CPU_SCHEME_VERSION, NULL },
 	{ "fault.cpu.amd.dramchannel", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
 	    NULL },
 	{ "fault.cpu.generic-x86.bus_interconnect_memory", FM_FMRI_SCHEME_CPU,
@@ -226,8 +234,6 @@ static const cma_subscriber_t cma_subrs[] = {
 	    FM_HC_SCHEME_VERSION, NULL },
 	{ "fault.cpu.intel.dma", FM_FMRI_SCHEME_CPU,
 	    FM_CPU_SCHEME_VERSION, NULL },
-#ifndef sun4v
-#ifndef opl
 	{ "fault.cpu.ultraSPARC-IVplus.l2cachedata-line",
 	    FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
 	    cma_cache_way_retire },
@@ -240,8 +246,7 @@ static const cma_subscriber_t cma_subrs[] = {
 	{ "fault.cpu.ultraSPARC-IVplus.l3cachetag-line",
 	    FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
 	    cma_cache_way_retire },
-#endif
-#endif
+
 	/*
 	 * Default "fault.cpu.*" for "mem" scheme ASRU dispatch.
 	 */
@@ -258,7 +263,6 @@ nvl2subr(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t **asrup)
 	nvlist_t *asru;
 	char *scheme;
 	uint8_t version;
-	char *fltclass = "(unknown)";
 	boolean_t retire;
 
 	if (nvlist_lookup_boolean_value(nvl, FM_SUSPECT_RETIRE, &retire) == 0 &&
@@ -283,9 +287,6 @@ nvl2subr(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t **asrup)
 		}
 	}
 
-	(void) nvlist_lookup_string(nvl, FM_CLASS, &fltclass);
-	fmd_hdl_error(hdl, "No handling disposition for %s with asru in "
-	    "scheme \"%s\"\n", fltclass, scheme);
 	cma_stats.nop_flts.fmds_value.ui64++;
 	return (NULL);
 }
