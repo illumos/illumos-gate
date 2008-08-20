@@ -653,6 +653,7 @@ spa_unload(spa_t *spa)
 		nvlist_free(spa->spa_spares.sav_config);
 		spa->spa_spares.sav_config = NULL;
 	}
+	spa->spa_spares.sav_count = 0;
 
 	for (i = 0; i < spa->spa_l2cache.sav_count; i++)
 		vdev_free(spa->spa_l2cache.sav_vdevs[i]);
@@ -665,6 +666,7 @@ spa_unload(spa_t *spa)
 		nvlist_free(spa->spa_l2cache.sav_config);
 		spa->spa_l2cache.sav_config = NULL;
 	}
+	spa->spa_l2cache.sav_count = 0;
 
 	spa->spa_async_suspended = 0;
 }
