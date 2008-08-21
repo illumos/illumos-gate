@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../Makefile.cmd
 
@@ -49,7 +47,7 @@ install: all $(ROOTUSRSBINPROG) install_data
 
 install_data: $(SECURITYFILES) $(ATTR)
 
-$(SECURITYFILES): $(ROOTAUDITDIR)
+$(SECURITYFILES): $(ROOTAUDITDIR) $(ATTR)
 	$(INS.file) $(ATTR)
 
 $(ROOTAUDITDIR):

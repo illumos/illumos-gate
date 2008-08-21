@@ -168,7 +168,7 @@ meminfosys		180
 rusagesys		181
 portfs			182
 pollsys			183
-tsolsys			184
+labelsys		184
 acl			185
 c2audit			186
 processor_bind		187

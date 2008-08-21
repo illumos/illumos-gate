@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Support routines for building audit records.
  */
@@ -813,7 +811,7 @@ au_to_in_addr_ex(int32_t *internet_addr)
 	adr_start(&adr, memtod(m, char *));
 
 	if (IN6_IS_ADDR_V4MAPPED((in6_addr_t *)internet_addr)) {
-		in_addr_t in4;
+		ipaddr_t in4;
 
 		/*
 		 * An IPv4-mapped IPv6 address is really an IPv4 address
@@ -822,7 +820,7 @@ au_to_in_addr_ex(int32_t *internet_addr)
 		IN6_V4MAPPED_TO_IPADDR((in6_addr_t *)internet_addr, in4);
 
 		adr_char(&adr, &data_header_v4, 1);
-		adr_char(&adr, (char *)&in4, sizeof (struct in_addr));
+		adr_char(&adr, (char *)&in4, sizeof (ipaddr_t));
 	} else {
 		adr_char(&adr, &data_header_v6, 1);
 		adr_int32(&adr, &type, 1);
@@ -1167,7 +1165,8 @@ au_to_label(bslabel_t *label)
 
 	adr_start(&adr, memtod(m, char *));
 	adr_char(&adr, &data_header, 1);
-	adr_char(&adr, (char *)label, sizeof (bslabel_t));
+	adr_char(&adr, (char *)label, sizeof (_mac_label_impl_t));
+
 	m->len = adr_count(&adr);
 
 	return (m);

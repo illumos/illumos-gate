@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the audit event table used to control the production
  * of audit records for each system call.
@@ -2597,7 +2595,7 @@ aui_labelsys(au_event_t e)
 
 	/* not security relevant if not changing kernel cache */
 	if (cmd == TNDB_GET)
-		return (NULL);
+		return (AUE_NULL);
 
 	switch (code) {
 	case TSOL_TNRH:
@@ -2618,7 +2616,6 @@ aui_labelsys(au_event_t e)
 
 }
 
-/*ARGSUSED*/
 static void
 aus_labelsys(struct t_audit_data *tad)
 {
@@ -2686,6 +2683,9 @@ aus_labelsys(struct t_audit_data *tad)
 			kmem_free(tpent, sizeof (tsol_tpent_t));
 			return;
 		}
+
+		/* Make sure that the template name is null-terminated. */
+		*(tpent->name + TNTNAMSIZ - 1) = '\0';
 
 		au_uwrite(au_to_text(tpent->name));
 		kmem_free(tpent, sizeof (tsol_tpent_t));

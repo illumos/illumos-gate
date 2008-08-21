@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the envelope code for system call auditing.
  */
@@ -291,7 +289,7 @@ audit_start(
 
 	/* get basic event for system call */
 	tad->tad_event = audit_s2e[scid].au_event;
-	if (audit_s2e[scid].au_init != NULL) {
+	if (audit_s2e[scid].au_init != (au_event_t)AUE_NULL) {
 		/* get specific event */
 		tad->tad_event = (*audit_s2e[scid].au_init)(tad->tad_event);
 	}
