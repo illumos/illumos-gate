@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/scsi/scsi.h>
 #include <sys/vtrace.h>
 
@@ -674,7 +672,7 @@ scsi_dmafree(struct scsi_pkt *pkt)
 void
 scsi_cache_dmafree(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	ASSERT(pkt->pkt_numcookies == 0);
+	ASSERT(pkt->pkt_numcookies == 0 || pkt->pkt_flags & PCW_BOUND);
 	ASSERT(pkt->pkt_handle != NULL);
 	scsi_dmafree_attr(pkt);
 
