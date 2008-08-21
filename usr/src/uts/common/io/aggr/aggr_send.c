@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IEEE 802.3ad Link Aggregation - Send code.
  *
@@ -88,11 +86,22 @@ aggr_send_port(aggr_grp_t *grp, mblk_t *mp)
 
 	if (ntohs(ehp->ether_type) == ETHERTYPE_VLAN) {
 		struct ether_vlan_header *evhp;
+		mblk_t *newmp = NULL;
 
-		ASSERT(MBLKL(mp) >= sizeof (struct ether_vlan_header));
-		evhp = (struct ether_vlan_header *)mp->b_rptr;
-		sap = ntohs(evhp->ether_type);
 		skip_len = sizeof (struct ether_vlan_header);
+		if (MBLKL(mp) < skip_len) {
+			/* the vlan tag is the payload, pull up first */
+			newmp = msgpullup(mp, -1);
+			if ((newmp == NULL) || (MBLKL(newmp) < skip_len)) {
+				goto done;
+			}
+			evhp = (struct ether_vlan_header *)newmp->b_rptr;
+		} else {
+			evhp = (struct ether_vlan_header *)mp->b_rptr;
+		}
+
+		sap = ntohs(evhp->ether_type);
+		freemsg(newmp);
 	} else {
 		sap = ntohs(ehp->ether_type);
 		skip_len = sizeof (struct ether_header);
@@ -112,7 +121,9 @@ aggr_send_port(aggr_grp_t *grp, mblk_t *mp)
 	case ETHERTYPE_IP: {
 		ipha_t *iphp;
 
-		ASSERT(MBLKL(mp) >= skip_len + sizeof (ipha_t));
+		if (MBLKL(mp) < (skip_len + sizeof (ipha_t)))
+			goto done;
+
 		iphp = (ipha_t *)(mp->b_rptr + skip_len);
 		proto = iphp->ipha_protocol;
 		skip_len += IPH_HDR_LENGTH(iphp);
@@ -134,7 +145,9 @@ aggr_send_port(aggr_grp_t *grp, mblk_t *mp)
 		 * ones handled by the ULP processor below, and will return 0
 		 * as the index
 		 */
-		ASSERT(MBLKL(mp) >= skip_len + sizeof (ip6_t));
+		if (MBLKL(mp) < (skip_len + sizeof (ip6_t)))
+			goto done;
+
 		ip6hp = (ip6_t *)(mp->b_rptr + skip_len);
 		proto = ip6hp->ip6_nxt;
 		skip_len += aggr_send_ip6_hdr_len(mp, ip6hp);

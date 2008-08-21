@@ -26,8 +26,6 @@
 #ifndef	_SYS_DLD_IMPL_H
 #define	_SYS_DLD_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ethernet.h>
@@ -223,7 +221,7 @@ struct dld_str {
 	 * above dld_ioctl().
 	 */
 	void			(*ds_ioctl)(queue_t *, mblk_t *);
-} dld_str;
+};
 
 #define	DLD_TX_ENTER(dsp) {					\
 	mutex_enter(&(dsp)->ds_tx_lock);			\
