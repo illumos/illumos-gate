@@ -992,11 +992,20 @@ out:
 int
 dsl_dataset_rollback(dsl_dataset_t *ds, dmu_objset_type_t ost)
 {
+	int err;
+
 	ASSERT(ds->ds_owner);
 
-	return (dsl_sync_task_do(ds->ds_dir->dd_pool,
+	dsl_dataset_make_exclusive(ds, ds->ds_owner);
+	err = dsl_sync_task_do(ds->ds_dir->dd_pool,
 	    dsl_dataset_rollback_check, dsl_dataset_rollback_sync,
-	    ds, &ost, 0));
+	    ds, &ost, 0);
+	/* drop exclusive access */
+	mutex_enter(&ds->ds_lock);
+	rw_exit(&ds->ds_rwlock);
+	cv_broadcast(&ds->ds_exclusive_cv);
+	mutex_exit(&ds->ds_lock);
+	return (err);
 }
 
 void *
@@ -2506,6 +2515,7 @@ dsl_dataset_promote(const char *name)
 		list_insert_tail(&pa.snap_list, snap);
 		last_snap = snap_obj;
 		snap_obj = snap->ds->ds_phys->ds_prev_snap_obj;
+		dsl_dataset_make_exclusive(snapds, FTAG);
 	}
 	snap = list_head(&pa.snap_list);
 	ASSERT(snap != NULL);

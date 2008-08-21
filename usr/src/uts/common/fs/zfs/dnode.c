@@ -1007,7 +1007,7 @@ dnode_free_range(dnode_t *dn, uint64_t off, uint64_t len, dmu_tx_t *tx)
 			blkid = 0;
 			nblks = 1;
 			goto done;
-		} else if (off > blkid) {
+		} else if (off >= blksz) {
 			/* Freeing past end-of-data */
 			goto out;
 		} else {
@@ -1045,11 +1045,11 @@ dnode_free_range(dnode_t *dn, uint64_t off, uint64_t len, dmu_tx_t *tx)
 	if (len == 0)
 		goto out;
 
-	ASSERT(ISP2(blksz));
 	/* If the remaining range is past end of file, we're done */
 	if ((off >> blkshift) > dn->dn_maxblkid)
 		goto out;
 
+	ASSERT(ISP2(blksz));
 	if (trunc)
 		tail = 0;
 	else
@@ -1271,6 +1271,7 @@ dnode_next_offset_level(dnode_t *dn, int flags, uint64_t *offset,
 
 	hole = flags & DNODE_FIND_HOLE;
 	inc = (flags & DNODE_FIND_BACKWARDS) ? -1 : 1;
+	ASSERT(txg == 0 || !hole);
 
 	if (lvl == dn->dn_phys->dn_nlevels) {
 		error = 0;
@@ -1280,9 +1281,18 @@ dnode_next_offset_level(dnode_t *dn, int flags, uint64_t *offset,
 		uint64_t blkid = dbuf_whichblock(dn, *offset) >> (epbs * lvl);
 		error = dbuf_hold_impl(dn, lvl, blkid, TRUE, FTAG, &db);
 		if (error) {
-			if (error == ENOENT)
-				return (hole ? 0 : ESRCH);
-			return (error);
+			if (error != ENOENT)
+				return (error);
+			if (hole)
+				return (0);
+			/*
+			 * This can only happen when we are searching up
+			 * the block tree for data.  We don't really need to
+			 * adjust the offset, as we will just end up looking
+			 * at the pointer to this block in its parent, and its
+			 * going to be unallocated, so we will skip over it.
+			 */
+			return (ESRCH);
 		}
 		error = dbuf_read(db, NULL, DB_RF_CANFAIL | DB_RF_HAVESTRUCT);
 		if (error) {
@@ -1294,6 +1304,10 @@ dnode_next_offset_level(dnode_t *dn, int flags, uint64_t *offset,
 
 	if (db && txg &&
 	    (db->db_blkptr == NULL || db->db_blkptr->blk_birth <= txg)) {
+		/*
+		 * This can only happen when we are searching up the tree
+		 * and these conditions mean that we need to keep climbing.
+		 */
 		error = ESRCH;
 	} else if (lvl == 0) {
 		dnode_phys_t *dnp = data;
@@ -1332,9 +1346,12 @@ dnode_next_offset_level(dnode_t *dn, int flags, uint64_t *offset,
 		    i >= 0 && i < epb; i += inc) {
 			if (bp[i].blk_fill >= minfill &&
 			    bp[i].blk_fill <= maxfill &&
-			    bp[i].blk_birth > txg)
+			    (hole || bp[i].blk_birth > txg))
 				break;
-			*offset += (1ULL << span) * inc;
+			if (inc < 0 && *offset < (1ULL << span))
+				*offset = 0;
+			else
+				*offset += (1ULL << span) * inc;
 		}
 		if (i < 0 || i == epb)
 			error = ESRCH;

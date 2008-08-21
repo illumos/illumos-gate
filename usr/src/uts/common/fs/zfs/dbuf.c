@@ -479,8 +479,14 @@ dbuf_read_impl(dmu_buf_impl_t *db, zio_t *zio, uint32_t *flags)
 		return;
 	}
 
+	/*
+	 * Recheck BP_IS_HOLE() after dnode_block_freed() in case dnode_sync()
+	 * processes the delete record and clears the bp while we are waiting
+	 * for the dn_mtx (resulting in a "no" from block_freed).
+	 */
 	if (db->db_blkptr == NULL || BP_IS_HOLE(db->db_blkptr) ||
-	    (db->db_level == 0 && dnode_block_freed(dn, db->db_blkid))) {
+	    (db->db_level == 0 && (dnode_block_freed(dn, db->db_blkid) ||
+	    BP_IS_HOLE(db->db_blkptr)))) {
 		arc_buf_contents_t type = DBUF_GET_BUFC_TYPE(db);
 
 		dbuf_set_data(db, arc_buf_alloc(dn->dn_objset->os_spa,

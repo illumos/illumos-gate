@@ -368,23 +368,24 @@ dmu_prefetch(objset_t *os, uint64_t object, uint64_t offset, uint64_t len)
 static int
 get_next_chunk(dnode_t *dn, uint64_t *offset, uint64_t limit)
 {
-	uint64_t len = limit - *offset;
+	uint64_t len = *offset - limit;
 	uint64_t chunk_len = dn->dn_datablksz * DMU_MAX_DELETEBLKCNT;
-	uint64_t dn_used;
-	int err;
+	uint64_t subchunk =
+	    dn->dn_datablksz * EPB(dn->dn_indblkshift, SPA_BLKPTRSHIFT);
 
 	ASSERT(limit <= *offset);
 
-	dn_used = dn->dn_phys->dn_used <<
-	    (dn->dn_phys->dn_flags & DNODE_FLAG_USED_BYTES ? 0 : DEV_BSHIFT);
-	if (len <= chunk_len || dn_used <= chunk_len) {
+	if (len <= chunk_len) {
 		*offset = limit;
 		return (0);
 	}
 
+	ASSERT(ISP2(subchunk));
+
 	while (*offset > limit) {
-		uint64_t initial_offset = *offset;
+		uint64_t initial_offset = P2ROUNDUP(*offset, subchunk);
 		uint64_t delta;
+		int err;
 
 		/* skip over allocated data */
 		err = dnode_next_offset(dn,
@@ -395,6 +396,7 @@ get_next_chunk(dnode_t *dn, uint64_t *offset, uint64_t limit)
 			return (err);
 
 		ASSERT3U(*offset, <=, initial_offset);
+		*offset = P2ALIGN(*offset, subchunk);
 		delta = initial_offset - *offset;
 		if (delta >= chunk_len) {
 			*offset += delta - chunk_len;
@@ -454,14 +456,15 @@ dmu_free_long_range_impl(objset_t *os, dnode_t *dn, uint64_t offset,
 
 		dnode_free_range(dn, start, trunc ? -1 : len, tx);
 
-		if (start == 0 && trunc && free_dnode)
+		if (start == 0 && free_dnode) {
+			ASSERT(trunc);
 			dnode_free(dn, tx);
+		}
 
 		length -= end - start;
 
 		dmu_tx_commit(tx);
 		end = start;
-		trunc = FALSE;
 	}
 	return (0);
 }
