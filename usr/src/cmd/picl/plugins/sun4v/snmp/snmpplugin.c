@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The SNMP picl plugin connects to the agent on the SP and creates
  * and populates the /physical-platform subtree in picl tree for use
@@ -285,6 +283,7 @@ register_group(char **g, int is_volatile)
 	}
 
 	snmp_register_group(hdl, oidstrs, n_oids, is_volatile);
+	free(oidstrs);
 }
 
 void
@@ -1469,6 +1468,9 @@ add_string_prop(picl_nodehdl_t node, char *propname, char *propval)
 	ptree_propinfo_t	propinfo;
 	int			err;
 
+	if (*propval == '\0')
+		return (PICL_SUCCESS);
+
 	err = ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
 	    PICL_PTYPE_CHARSTRING, PICL_READ, strlen(propval) + 1,
 	    propname, NULL, NULL);
@@ -1528,7 +1530,7 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 		ret = snmp_get_str(hdl, OID_entPhysicalSerialNum,
 		    row, &serial_num, snmp_syserr_p);
 		CHECK_LINKRESET_VOID(snmp_syserr_p)
-		if ((ret == 0) && serial_num && *serial_num) {
+		if ((ret == 0) && serial_num) {
 			(void) add_string_prop(nodeh,
 			    PICL_PROP_SERIAL_NUMBER, serial_num);
 			free((void *) serial_num);
@@ -1701,7 +1703,7 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 		ret = snmp_get_str(hdl, OID_entPhysicalHardwareRev,
 		    row, &hw_revision, snmp_syserr_p);
 		CHECK_LINKRESET_VOID(snmp_syserr_p)
-		if ((ret == 0) && hw_revision && *hw_revision) {
+		if ((ret == 0) && hw_revision) {
 			(void) add_string_prop(nodeh,
 			    PICL_PROP_HW_REVISION, hw_revision);
 			free((void *) hw_revision);
@@ -1716,7 +1718,7 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 		ret = snmp_get_str(hdl, OID_entPhysicalFirmwareRev,
 		    row, &fw_revision, snmp_syserr_p);
 		CHECK_LINKRESET_VOID(snmp_syserr_p)
-		if ((ret == 0) && fw_revision && *fw_revision) {
+		if ((ret == 0) && fw_revision) {
 			(void) add_string_prop(nodeh,
 			    PICL_PROP_FW_REVISION, fw_revision);
 			free((void *) fw_revision);
@@ -1731,7 +1733,7 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 		ret = snmp_get_str(hdl, OID_entPhysicalMfgName,
 		    row, &mfg_name, snmp_syserr_p);
 		CHECK_LINKRESET_VOID(snmp_syserr_p)
-		if ((ret == 0) && mfg_name && *mfg_name) {
+		if ((ret == 0) && mfg_name) {
 			(void) add_string_prop(nodeh,
 			    PICL_PROP_MFG_NAME, mfg_name);
 			free((void *) mfg_name);
@@ -1746,7 +1748,7 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 		ret = snmp_get_str(hdl, OID_entPhysicalModelName,
 		    row, &model_name, snmp_syserr_p);
 		CHECK_LINKRESET_VOID(snmp_syserr_p)
-		if ((ret == 0) && model_name && *model_name) {
+		if ((ret == 0) && model_name) {
 			(void) add_string_prop(nodeh,
 			    PICL_PROP_MODEL_NAME, model_name);
 			free((void *) model_name);
@@ -1761,7 +1763,7 @@ add_prop(picl_nodehdl_t nodeh, picl_prophdl_t *php, char *label,
 		ret = snmp_get_str(hdl, OID_entPhysicalDescr,
 		    row, &phys_descr, snmp_syserr_p);
 		CHECK_LINKRESET_VOID(snmp_syserr_p)
-		if ((ret == 0) && phys_descr && *phys_descr) {
+		if ((ret == 0) && phys_descr) {
 			(void) add_string_prop(nodeh,
 			    PICL_PROP_PHYS_DESCRIPTION, phys_descr);
 			free((void *) phys_descr);

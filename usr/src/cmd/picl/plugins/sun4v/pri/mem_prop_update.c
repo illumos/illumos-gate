@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
  * It does not populate the /device tree since there are no memory
  * controller devices on sun4v.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "priplugin.h"
 #include "../../common/memcfg/piclmemcfg.h"
@@ -213,6 +211,11 @@ add_bank_props(picl_nodehdl_t bankh, mde_cookie_t banklistp,
 
 	node_count = md_node_count(mdp);
 	dimmlistp = (mde_cookie_t *)malloc(node_count * sizeof (mde_cookie_t));
+	if (dimmlistp == NULL) {
+		pri_debug(LOG_NOTICE,
+		    "add_bank_props: can't allocate memory\n");
+		return;
+	}
 
 	if (!md_get_prop_val(mdp, banklistp, "size", &int_value)) {
 		add_md_prop(bankh, sizeof (int_value), PICL_PROP_SIZE,
@@ -269,6 +272,7 @@ add_bank_props(picl_nodehdl_t bankh, mde_cookie_t banklistp,
 			}
 		}
 	}
+	free(dimmlistp);
 }
 
 static uint64_t
