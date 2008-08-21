@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SCSI	 SCSA-compliant and not-so-DDI-compliant Tape Driver
  */
@@ -688,7 +686,7 @@ char _depends_on[] = "misc/scsi";
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module. This one is a driver */
-	"SCSI tape Driver %I%", /* Name of the module. */
+	"SCSI tape Driver", 	/* Name of the module. */
 	&st_ops			/* driver ops */
 };
 
@@ -16237,7 +16235,7 @@ st_check_if_media_changed(struct scsi_tape *un, caddr_t data, int size)
 	/*
 	 * find non alpha numeric working from the end.
 	 */
-	for (i = size - 1; i; i--) {
+	for (i = size - 1; i >= 0; i--) {
 		if (ISALNUM(data[i]) == 0 || data[i] == ' ') {
 			data[i] = 0;
 			size = i;
@@ -16486,11 +16484,21 @@ upsize:
 			goto upsize;
 		}
 
-		/*
-		 * set data pointer to point to the start of that serial number.
-		 */
-		un->un_media_id_method = st_get_media_id_via_media_serial_cmd;
-		rval = st_check_if_media_changed(un, &buf[4], act_size);
+		if (act_size == 0) {
+			ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "media serial number is not available");
+			un->un_status = 0;
+			rval = 0;
+		} else {
+			/*
+			 * set data pointer to point to the start
+			 * of that serial number.
+			 */
+			un->un_media_id_method =
+			    st_get_media_id_via_media_serial_cmd;
+			rval =
+			    st_check_if_media_changed(un, &buf[4], act_size);
+		}
 	}
 
 	kmem_free(ucmd, sizeof (struct uscsi_cmd));
