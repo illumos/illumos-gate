@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,23 +19,32 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2007, The Ohio State University. All rights reserved.
+ *
+ * Portions of this source code is developed by the team members of
+ * The Ohio State University's Network-Based Computing Laboratory (NBCL),
+ * headed by Professor Dhabaleswar K. (DK) Panda.
+ *
+ * Acknowledgements to contributions from developors:
+ *   Ranjit Noronha: noronha@cse.ohio-state.edu
+ *   Lei Chai      : chail@cse.ohio-state.edu
+ *   Weikuan Yu    : yuw@cse.ohio-state.edu
+ *
+ */
 
 #include <sys/systm.h>
 #include <sys/kstat.h>
 #include <sys/modctl.h>
+#include <sys/sdt.h>
 #include <rpc/rpc_rdma.h>
 
 #include <sys/ib/ibtl/ibti.h>
 
-/*
- * RDMA chunk size
- */
-#define	RDMA_MINCHUNK	1024
 uint_t rdma_minchunk = RDMA_MINCHUNK;
 
 /*
@@ -48,6 +56,8 @@ kmutex_t rdma_modload_lock;	/* protects rdma_modloaded flag */
 rdma_registry_t	*rdma_mod_head = NULL;	/* head for RDMA modules */
 krwlock_t	rdma_lock;		/* protects rdma_mod_head list */
 ldi_ident_t rpcmod_li = NULL;	/* identifies us with ldi_ framework */
+
+kmem_cache_t *clist_cache = NULL;
 
 /*
  * Statics
@@ -153,6 +163,18 @@ rdma_unregister_mod(rdma_mod_t *mod)
 	return (RDMA_FAILED);
 }
 
+struct clist *
+clist_alloc(void)
+{
+	struct clist *clp;
+
+	clp = kmem_cache_alloc(clist_cache, KM_SLEEP);
+
+	bzero(clp, sizeof (*clp));
+
+	return (clp);
+}
+
 /*
  * Creates a new chunk list entry, and
  * adds it to the end of a chunk list.
@@ -169,13 +191,13 @@ clist_add(struct clist **clp, uint32_t xdroff, int len,
 	while (*clp != NULL)
 		clp = &((*clp)->c_next);
 
-	cl = kmem_zalloc(sizeof (*cl), KM_SLEEP);
+	cl = clist_alloc();
 	cl->c_xdroff = xdroff;
 	cl->c_len = len;
-	cl->c_saddr = (uint64_t)(uintptr_t)saddr;
+	cl->w.c_saddr = (uint64_t)(uintptr_t)saddr;
 	if (shandle)
 		cl->c_smemhandle = *shandle;
-	cl->c_daddr = (uint64_t)(uintptr_t)daddr;
+	cl->u.c_daddr = (uint64_t)(uintptr_t)daddr;
 	if (dhandle)
 		cl->c_dmemhandle = *dhandle;
 	cl->c_next = NULL;
@@ -183,24 +205,35 @@ clist_add(struct clist **clp, uint32_t xdroff, int len,
 	*clp = cl;
 }
 
-int
-clist_register(CONN *conn, struct clist *cl, bool_t src)
+rdma_stat
+clist_register(CONN *conn, struct clist *cl, clist_dstsrc dstsrc)
 {
 	struct clist *c;
 	int status;
 
 	for (c = cl; c; c = c->c_next) {
-		if (src) {
+		if (c->c_len <= 0)
+			continue;
+		switch (dstsrc) {
+		case CLIST_REG_SOURCE:
 			status = RDMA_REGMEMSYNC(conn,
-			    (caddr_t)(uintptr_t)c->c_saddr, c->c_len,
-			    &c->c_smemhandle, (void **)&c->c_ssynchandle);
-		} else {
+			    (caddr_t)(struct as *)cl->c_adspc,
+			    (caddr_t)(uintptr_t)c->w.c_saddr3, c->c_len,
+			    &c->c_smemhandle, (void **)&c->c_ssynchandle,
+			    (void *)c->rb_longbuf.rb_private);
+			break;
+		case CLIST_REG_DST:
 			status = RDMA_REGMEMSYNC(conn,
-			    (caddr_t)(uintptr_t)c->c_daddr, c->c_len,
-			    &c->c_dmemhandle, (void **)&c->c_dsynchandle);
+			    (caddr_t)(struct as *)cl->c_adspc,
+			    (caddr_t)(uintptr_t)c->u.c_daddr3, c->c_len,
+			    &c->c_dmemhandle, (void **)&c->c_dsynchandle,
+			    (void *)c->rb_longbuf.rb_private);
+			break;
+		default:
+			return (RDMA_INVAL);
 		}
 		if (status != RDMA_SUCCESS) {
-			(void) clist_deregister(conn, cl, src);
+			(void) clist_deregister(conn, cl, dstsrc);
 			return (status);
 		}
 	}
@@ -208,31 +241,79 @@ clist_register(CONN *conn, struct clist *cl, bool_t src)
 	return (RDMA_SUCCESS);
 }
 
-int
-clist_deregister(CONN *conn, struct clist *cl, bool_t src)
+rdma_stat
+clist_deregister(CONN *conn, struct clist *cl, clist_dstsrc dstsrc)
 {
 	struct clist *c;
 
 	for (c = cl; c; c = c->c_next) {
-		if (src) {
+		switch (dstsrc) {
+		case CLIST_REG_SOURCE:
 			if (c->c_smemhandle.mrc_rmr != 0) {
 				(void) RDMA_DEREGMEMSYNC(conn,
-				    (caddr_t)(uintptr_t)c->c_saddr,
+				    (caddr_t)(uintptr_t)c->w.c_saddr3,
 				    c->c_smemhandle,
-				    (void *)(uintptr_t)c->c_ssynchandle);
+				    (void *)(uintptr_t)c->c_ssynchandle,
+				    (void *)c->rb_longbuf.rb_private);
 				c->c_smemhandle.mrc_rmr = 0;
 				c->c_ssynchandle = NULL;
 			}
-		} else {
+			break;
+		case CLIST_REG_DST:
 			if (c->c_dmemhandle.mrc_rmr != 0) {
 				(void) RDMA_DEREGMEMSYNC(conn,
-				    (caddr_t)(uintptr_t)c->c_daddr,
+				    (caddr_t)(uintptr_t)c->u.c_daddr3,
 				    c->c_dmemhandle,
-				    (void *)(uintptr_t)c->c_dsynchandle);
+				    (void *)(uintptr_t)c->c_dsynchandle,
+				    (void *)c->rb_longbuf.rb_private);
 				c->c_dmemhandle.mrc_rmr = 0;
 				c->c_dsynchandle = NULL;
 			}
+			break;
+		default:
+			return (RDMA_INVAL);
 		}
+	}
+
+	return (RDMA_SUCCESS);
+}
+
+rdma_stat
+clist_syncmem(CONN *conn, struct clist *cl, clist_dstsrc dstsrc)
+{
+	struct clist *c;
+	rdma_stat status;
+
+	c = cl;
+	switch (dstsrc) {
+	case CLIST_REG_SOURCE:
+		while (c != NULL) {
+			if (c->c_ssynchandle) {
+				status = RDMA_SYNCMEM(conn,
+				    (void *)(uintptr_t)c->c_ssynchandle,
+				    (caddr_t)(uintptr_t)c->w.c_saddr3,
+				    c->c_len, 0);
+				if (status != RDMA_SUCCESS)
+					return (status);
+			}
+			c = c->c_next;
+		}
+		break;
+	case CLIST_REG_DST:
+		while (c != NULL) {
+			if (c->c_ssynchandle) {
+				status = RDMA_SYNCMEM(conn,
+				    (void *)(uintptr_t)c->c_dsynchandle,
+				    (caddr_t)(uintptr_t)c->u.c_daddr3,
+				    c->c_len, 1);
+				if (status != RDMA_SUCCESS)
+					return (status);
+			}
+			c = c->c_next;
+		}
+		break;
+	default:
+		return (RDMA_INVAL);
 	}
 
 	return (RDMA_SUCCESS);
@@ -248,7 +329,7 @@ clist_free(struct clist *cl)
 
 	while (c != NULL) {
 		cl = cl->c_next;
-		kmem_free(c, sizeof (struct clist));
+		kmem_cache_free(clist_cache, c);
 		c = cl;
 	}
 }
@@ -258,18 +339,25 @@ rdma_clnt_postrecv(CONN *conn, uint32_t xid)
 {
 	struct clist *cl = NULL;
 	rdma_stat retval;
-	rdma_buf_t rbuf;
+	rdma_buf_t rbuf = {0};
 
 	rbuf.type = RECV_BUFFER;
 	if (RDMA_BUF_ALLOC(conn, &rbuf)) {
-		retval = RDMA_NORESOURCE;
-	} else {
-		clist_add(&cl, 0, rbuf.len, &rbuf.handle, rbuf.addr,
-			NULL, NULL);
-		retval = RDMA_CLNT_RECVBUF(conn, cl, xid);
-		clist_free(cl);
+		return (RDMA_NORESOURCE);
 	}
+
+	clist_add(&cl, 0, rbuf.len, &rbuf.handle, rbuf.addr,
+	    NULL, NULL);
+	retval = RDMA_CLNT_RECVBUF(conn, cl, xid);
+	clist_free(cl);
+
 	return (retval);
+}
+
+rdma_stat
+rdma_clnt_postrecv_remove(CONN *conn, uint32_t xid)
+{
+	return (RDMA_CLNT_RECVBUF_REMOVE(conn, xid));
 }
 
 rdma_stat
@@ -277,14 +365,14 @@ rdma_svc_postrecv(CONN *conn)
 {
 	struct clist *cl = NULL;
 	rdma_stat retval;
-	rdma_buf_t rbuf;
+	rdma_buf_t rbuf = {0};
 
 	rbuf.type = RECV_BUFFER;
 	if (RDMA_BUF_ALLOC(conn, &rbuf)) {
 		retval = RDMA_NORESOURCE;
 	} else {
 		clist_add(&cl, 0, rbuf.len, &rbuf.handle, rbuf.addr,
-			NULL, NULL);
+		    NULL, NULL);
 		retval = RDMA_SVC_RECVBUF(conn, cl);
 		clist_free(cl);
 	}
@@ -292,32 +380,9 @@ rdma_svc_postrecv(CONN *conn)
 }
 
 rdma_stat
-clist_syncmem(CONN *conn, struct clist *cl, bool_t src)
+rdma_buf_alloc(CONN *conn, rdma_buf_t *rbuf)
 {
-	struct clist *c;
-	rdma_stat status;
-
-	c = cl;
-	if (src) {
-		while (c != NULL) {
-			status = RDMA_SYNCMEM(conn,
-			    (void *)(uintptr_t)c->c_ssynchandle,
-			    (caddr_t)(uintptr_t)c->c_saddr, c->c_len, 0);
-			if (status != RDMA_SUCCESS)
-				return (status);
-			c = c->c_next;
-		}
-	} else {
-		while (c != NULL) {
-			status = RDMA_SYNCMEM(conn,
-			    (void *)(uintptr_t)c->c_dsynchandle,
-			    (caddr_t)(uintptr_t)c->c_daddr, c->c_len, 1);
-			if (status != RDMA_SUCCESS)
-				return (status);
-			c = c->c_next;
-		}
-	}
-	return (RDMA_SUCCESS);
+	return (RDMA_BUF_ALLOC(conn, rbuf));
 }
 
 void
@@ -326,14 +391,8 @@ rdma_buf_free(CONN *conn, rdma_buf_t *rbuf)
 	if (!rbuf || rbuf->addr == NULL) {
 		return;
 	}
-	if (rbuf->type != CHUNK_BUFFER) {
-		/* pool buffer */
-		RDMA_BUF_FREE(conn, rbuf);
-	} else {
-		kmem_free(rbuf->addr, rbuf->len);
-	}
-	rbuf->addr = NULL;
-	rbuf->len = 0;
+	RDMA_BUF_FREE(conn, rbuf);
+	bzero(rbuf, sizeof (rdma_buf_t));
 }
 
 /*
@@ -369,6 +428,11 @@ rdma_modload()
 
 	/* success */
 	rdma_kstat_init();
+
+	clist_cache = kmem_cache_create("rdma_clist",
+	    sizeof (struct clist), _POINTER_ALIGNMENT, NULL,
+	    NULL, NULL, NULL, 0, 0);
+
 	return (0);
 }
 

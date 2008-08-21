@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,26 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2007, The Ohio State University. All rights reserved.
+ *
+ * Portions of this source code is developed by the team members of
+ * The Ohio State University's Network-Based Computing Laboratory (NBCL),
+ * headed by Professor Dhabaleswar K. (DK) Panda.
+ *
+ * Acknowledgements to contributions from developors:
+ *   Ranjit Noronha: noronha@cse.ohio-state.edu
+ *   Lei Chai      : chail@cse.ohio-state.edu
+ *   Weikuan Yu    : yuw@cse.ohio-state.edu
+ *
+ */
+
 
 #ifndef _IB_H
 #define	_IB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ib.h, rpcib plugin interface.
@@ -41,12 +52,14 @@
 #include <rpc/rpc.h>
 #include <rpc/rpc_rdma.h>
 #include <sys/ib/ibtl/ibti.h>
+#include <sys/avl.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define	MAX_BUFS	256	/* max no. of buffers per pool */
+#define	MAX_BUFS	1024	/* max no. of buffers per pool */
+
 #define	DEF_CQ_SIZE	4096 - 1	/* default CQ size */
 				/*
 				 * Tavor returns the next higher power of 2
@@ -60,8 +73,6 @@ extern "C" {
 #define	DSEG_MAX	2
 #define	RQ_DSEG_MAX	1	/* default RQ data seg */
 #define	IBSRM_HB	0x8000	/* high order bit of pkey */
-#define	NFS_SEC_KEY0	0x6878	/* randomly selected NFS security key */
-#define	NFS_SEC_KEY1	0x8679
 
 /* max no. of refresh attempts on IBT_CM_CONN_STALE error */
 #define	REFRESH_ATTEMPTS	3
@@ -132,24 +143,6 @@ typedef struct {
 #define	IBD_NAME	"ibd"
 #define	N_IBD_INSTANCES	4
 
-typedef struct rpcib_ats_s {
-	int			ras_inst;
-	ib_pkey_t		ras_pkey;
-	ib_gid_t		ras_port_gid;
-	sa_family_t		ras_inet_type;
-	union {
-		struct sockaddr_in	ras_sockaddr;
-		struct sockaddr_in6	ras_sockaddr6;
-	} ra_sin;
-#define	ras_sin			ra_sin.ras_sockaddr
-#define	ras_sin6		ra_sin.ras_sockaddr6
-} rpcib_ats_t;
-
-typedef struct rpcib_ibd_insts_s {
-	int			rib_ibd_alloc;
-	int			rib_ibd_cnt;
-	rpcib_ats_t		*rib_ats;
-} rpcib_ibd_insts_t;
 
 /*
  * Service types supported by RPCIB
@@ -199,25 +192,7 @@ typedef struct rpcib_state {
 typedef struct rib_service rib_service_t;
 struct rib_service {
 	uint32_t		srv_type;	/* i.e, NFS, NLM, v4CBD */
-
-	/*
-	 * service name, i.e, <IP>::NFS or <IP>::NLM. Since
-	 * each type of service can be registered with many
-	 * IP addrs(srv_name) and is running on all ports
-	 * for all HCAs.
-	 */
-	char			*srv_name;
-
-	uint32_t		srv_port;	/* port on which registered */
-	ib_svc_id_t		srv_id;		/* from ibt_register call */
 	ibt_srv_hdl_t		srv_hdl;	/* from ibt_register call */
-	ibt_sbind_hdl_t		*srv_sbind_hdl;	/* from ibt_bind call */
-	ibt_ar_t		srv_ar;
-
-	/*
-	 * pointer to the next service registered on this
-	 * particular HCA
-	 */
 	rib_service_t		*srv_next;
 };
 
@@ -263,7 +238,6 @@ struct rib_hca_s {
 	rib_service_t	*service_list;
 	krwlock_t		service_list_lock;
 
-	rib_service_t	*ats_list;		/* Service list for ATS */
 
 	rib_conn_list_t		cl_conn_list;	/* client conn list */
 	rib_conn_list_t		srv_conn_list;	/* server conn list */
@@ -279,6 +253,18 @@ struct rib_hca_s {
 	rib_bufpool_t		*send_pool;	/* send buf pool */
 
 	void			*iblock;	/* interrupt cookie */
+
+	kmem_cache_t	*server_side_cache;	/* long reply pool */
+	avl_tree_t	avl_tree;
+	kmutex_t	avl_lock;
+	krwlock_t	avl_rw_lock;
+	volatile bool_t avl_init;
+	kmutex_t	cache_allocation;
+	ddi_taskq_t *reg_cache_clean_up;
+	ib_svc_id_t	srv_id;
+	ibt_srv_hdl_t 	srv_hdl;
+	uint_t		reg_state;
+
 };
 
 
@@ -294,6 +280,12 @@ struct send_wid {
 	rib_qp_t	*qp;
 	int		nsbufs;			/* # of send buffers posted */
 	uint64_t	sbufaddr[DSEG_MAX];	/* posted send buffers */
+	caddr_t		c;
+	caddr_t		c1;
+	int		l1;
+	caddr_t		c2;
+	int		l2;
+	int		wl, rl;
 };
 
 /*
@@ -362,6 +354,7 @@ struct rib_qp_s {
 	kcondvar_t 		cb_conn_cv;
 
 	caddr_t			q;	/* upstream queue */
+	struct send_wid		wd;
 };
 
 #define	ctoqp(conn)	((rib_qp_t *)((conn)->c_private))

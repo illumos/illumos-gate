@@ -28,8 +28,6 @@
  *	All Rights Reserved
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -3408,12 +3406,15 @@ recov_retry:
 			tsize = MIN(mi->mi_tsize, count);
 		else
 			tsize = MIN(mi->mi_curread, count);
+
 		rargs->offset = (offset4)offset;
 		rargs->count = (count4)tsize;
 		rargs->res_data_val_alt = NULL;
 		rargs->res_mblk = NULL;
 		rargs->res_uiop = NULL;
 		rargs->res_maxsize = 0;
+		rargs->wlist = NULL;
+
 		if (uiop)
 			rargs->res_uiop = uiop;
 		else
@@ -3501,7 +3502,6 @@ recov_retry:
 
 			NFS4_DEBUG(nfs4_client_recov_debug, (CE_NOTE,
 			    "nfs4read: initiating recovery\n"));
-
 			abort = nfs4_start_recovery(&e,
 			    mi, vp, NULL, &rargs->stateid,
 			    NULL, OP_READ, NULL);

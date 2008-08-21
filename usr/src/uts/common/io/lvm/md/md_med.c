@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -225,7 +223,7 @@ struct med_client {
 /*
  * unrecoverable RPC status codes; cf. rfscall()
  */
-#define	IS_UNRECOVERABLE_RPC(s)	(((s) == RPC_AUTHERROR) || \
+#define	MED_IS_UNRECOVERABLE_RPC(s)	(((s) == RPC_AUTHERROR) || \
 	((s) == RPC_CANTENCODEARGS) || \
 	((s) == RPC_CANTDECODERES) || \
 	((s) == RPC_VERSMISMATCH) || \
@@ -385,7 +383,7 @@ med_put_loopback_port(struct netbuf *addr, char *port)
 	 */
 	if ((dot = strchr(addr->buf, '.')) == (char *)NULL) {
 		TRIVIA(("put_loopb_port - malformed loopback addr %s\n",
-			addr->buf));
+		    addr->buf));
 		return;
 	}
 
@@ -448,8 +446,8 @@ loopb_u2t(const char *ua, struct netbuf *addr)
 		} else if (*univp == '\\') {
 			/* octal character */
 			*transp = (((*(univp+1) - '0') & 3) << 6) +
-				(((*(univp+2) - '0') & 7) << 3) +
-				((*(univp+3) - '0') & 7);
+			    (((*(univp+2) - '0') & 7) << 3) +
+			    ((*(univp+3) - '0') & 7);
 			univp += 4;
 		} else {
 			*transp = *univp;
@@ -509,8 +507,8 @@ med_rel_client(struct med_client *medc, int error)
 	/*LINTED*/
 	if (1 || error && error != EINTR) {
 		TRIVIA(("rel_client - destroying addr = (%p, %u %u)\n",
-			(void *) medc->addr.buf, medc->addr.len,
-			medc->addr.maxlen));
+		    (void *) medc->addr.buf, medc->addr.len,
+		    medc->addr.maxlen));
 		med_clnt_destroy(&medc->client);
 		if (medc->addr.buf) {
 			kmem_free(medc->addr.buf, medc->addr.maxlen);
@@ -553,13 +551,13 @@ med_get_pmap_addr(
 		med_put_inet_port(addr, htons(PMAPPORT));
 	} else {
 		TRIVIA(("get_pmap_addr - unsupported protofmly %s\n",
-			kncfp->knc_protofmly));
+		    kncfp->knc_protofmly));
 		status = RPC_UNKNOWNPROTO;
 		goto out;
 	}
 
 	TRIVIA(("get_pmap_addr - semantics=%u, protofmly=%s, proto=%s\n",
-		kncfp->knc_semantics, kncfp->knc_protofmly, kncfp->knc_proto));
+	    kncfp->knc_semantics, kncfp->knc_protofmly, kncfp->knc_proto));
 
 	/*
 	 * Mask signals for the duration of the handle creation and
@@ -668,11 +666,11 @@ med_get_rpcb_addr(
 		TRIVIA((
 		    "get_rpcb_addr - semantics=%s, protofmly=%s, proto=%s\n",
 		    (kncfp->knc_semantics == NC_TPI_CLTS ?
-			"NC_TPI_CLTS" : "?"),
+		    "NC_TPI_CLTS" : "?"),
 		    kncfp->knc_protofmly, kncfp->knc_proto));
 	} else {
 		TRIVIA(("get_rpcb_addr - unsupported protofmly %s\n",
-			kncfp->knc_protofmly));
+		    kncfp->knc_protofmly));
 		status = RPC_UNKNOWNPROTO;
 		goto out;
 	}
@@ -703,12 +701,11 @@ med_get_rpcb_addr(
 	client->cl_auth = authkern_create();
 
 	if ((status = CLNT_CALL(client, RPCBPROC_GETADDR,
-				xdr_rpcb, (char *)&parms,
-				xdr_wrapstring, (char *)&ua,
-				tmo)) != RPC_SUCCESS) {
+	    xdr_rpcb, (char *)&parms, xdr_wrapstring, (char *)&ua,
+	    tmo)) != RPC_SUCCESS) {
 		sigreplace(&oldmask, (k_sigset_t *)NULL);
 		MINUTE(("get_rpcb_addr - CLNT_CALL(GETADDR) returned %d\n",
-			status));
+		    status));
 		goto out;
 	}
 
@@ -780,7 +777,7 @@ med_get_rpc_handle(
 	 */
 	BSTAMP
 	status = med_get_pmap_addr(kncfp, prog, vers, addrp);
-	if (IS_UNRECOVERABLE_RPC(status) && status != RPC_UNKNOWNPROTO &&
+	if (MED_IS_UNRECOVERABLE_RPC(status) && status != RPC_UNKNOWNPROTO &&
 	    ! PMAP_WRONG_VERSION(status)) {
 		status = RPC_RPCBFAILURE;
 		goto bailout;
@@ -942,7 +939,7 @@ med_callrpc(
 	while (tries--) {
 		error = 0;
 		cl_stat = med_get_client(kncfp, addrp, prog, vers, &med_clnt);
-		if (IS_UNRECOVERABLE_RPC(cl_stat)) {
+		if (MED_IS_UNRECOVERABLE_RPC(cl_stat)) {
 			error = EINVAL;
 			goto rel_client;
 		} else if (cl_stat != RPC_SUCCESS) {
@@ -955,7 +952,7 @@ med_callrpc(
 
 		sigreplace(&newmask, &oldmask);
 		cl_stat = CLNT_CALL(med_clnt->client, proc, inproc, in,
-				outproc, out, *timout);
+		    outproc, out, *timout);
 		sigreplace(&oldmask, (k_sigset_t *)NULL);
 
 		switch (cl_stat) {
@@ -979,7 +976,7 @@ med_callrpc(
 		case RPC_CANTSEND:
 		case RPC_XPRTFAILED:
 		default:
-			if (IS_UNRECOVERABLE_RPC(cl_stat)) {
+			if (MED_IS_UNRECOVERABLE_RPC(cl_stat)) {
 				error = EINVAL;
 			} else {
 				error = EIO;
@@ -1403,7 +1400,7 @@ med_a_thr(med_thr_a_args_t *mtaap)
 	 * Register cpr callback
 	 */
 	CALLB_CPR_INIT(&cprinfo, &mtaap->mtaa_mthap->mtha_a_mx,
-		callb_generic_cpr, "med_a_thr");
+	    callb_generic_cpr, "med_a_thr");
 
 	mutex_enter(&mtaap->mtaa_mthap->mtha_a_mx);
 	if (mtaap->mtaa_mthap->mtha_flags & MDT_H_OK)
@@ -1457,7 +1454,7 @@ med_h_thr(med_thr_h_args_t *mthap)
 	 * Register cpr callback
 	 */
 	CALLB_CPR_INIT(&cprinfo, &mthap->mtha_mtp->mt_mx, callb_generic_cpr,
-		"med_a_thr");
+	    "med_a_thr");
 	/*
 	 * Lock mthap->mtha_mtp->mt_mx is held early to avoid releasing the
 	 * locks out of order.
@@ -1756,7 +1753,7 @@ med_get_t_ioctl(mddb_med_t_parm_t *tpp, int mode)
 		(void) strncpy(tpp->med_tp_ents[uapi].med_te_nm,
 		    uap->ua_devname, MED_TE_NM_LEN);
 		tpp->med_tp_ents[uapi].med_te_dev =
-			(md_dev64_t)uap->ua_kn.knc_rdev;
+		    (md_dev64_t)uap->ua_kn.knc_rdev;
 	}
 
 	tpp->med_tp_nents = med_addr_tab_nents;
@@ -1780,7 +1777,7 @@ med_set_t_ioctl(mddb_med_t_parm_t *tpp, int mode)
 
 		mutex_enter(&uap->ua_mutex);
 		uap->ua_kn.knc_rdev = md_dev64_to_dev(
-			tpp->med_tp_ents[uapi].med_te_dev);
+		    tpp->med_tp_ents[uapi].med_te_dev);
 		mutex_exit(&uap->ua_mutex);
 	}
 

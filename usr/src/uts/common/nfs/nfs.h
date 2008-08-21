@@ -29,7 +29,6 @@
 #ifndef	_NFS_NFS_H
 #define	_NFS_NFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*	nfs.h 2.38 88/08/19 SMI 	*/
 
 #include <sys/isa_defs.h>
@@ -38,6 +37,7 @@
 #include <rpc/types.h>
 #include <sys/types32.h>
 #ifdef _KERNEL
+#include <rpc/rpc_rdma.h>
 #include <rpc/rpc.h>
 #include <sys/fcntl.h>
 #include <sys/kstat.h>
@@ -470,6 +470,11 @@ struct nfswriteargs {
 	uint32_t	wa_count;
 	char		*wa_data;	/* data to write (up to NFS_MAXDATA) */
 	mblk_t		*wa_mblk;	/* pointer to mblks containing data */
+#ifdef _KERNEL
+	/* rdma related info */
+	struct clist	*wa_rlist;
+	CONN		*wa_conn;
+#endif /* _KERNEL */
 };
 #define	wa_fhandle	wa_args->otw_wa_fhandle
 #define	wa_begoff	wa_args->otw_wa_begoff
@@ -517,6 +522,12 @@ struct nfsreadargs {
 	uint32_t	ra_offset;	/* byte offset in file */
 	uint32_t	ra_count;	/* immediate read count */
 	uint32_t	ra_totcount;	/* total read cnt (from this offset) */
+#ifdef _KERNEL
+	/* used in rdma transports */
+	caddr_t		ra_data;	/* destination for read data */
+	struct clist	*ra_wlist;
+	CONN		*ra_conn;
+#endif
 };
 
 /*
@@ -528,6 +539,10 @@ struct nfsrrok {
 	char		*rrok_data;	/* data (up to NFS_MAXDATA bytes) */
 	uint_t		rrok_bufsize;	/* size of kmem_alloc'd buffer */
 	mblk_t		*rrok_mp;	/* mblk_t contains data for reply */
+#ifdef _KERNEL
+	uint_t		rrok_wlist_len;
+	struct clist    *rrok_wlist;
+#endif
 };
 
 /*
@@ -759,6 +774,7 @@ extern bool_t	xdr_getrddirres(XDR *, struct nfsrddirres *);
 extern bool_t	xdr_rdlnres(XDR *, struct nfsrdlnres *);
 extern bool_t	xdr_rdresult(XDR *, struct nfsrdresult *);
 extern bool_t	xdr_readargs(XDR *, struct nfsreadargs *);
+extern bool_t	xdr_readlink(XDR *, fhandle_t *);
 extern bool_t	xdr_rnmargs(XDR *, struct nfsrnmargs *);
 extern bool_t	xdr_rrok(XDR *, struct nfsrrok *);
 extern bool_t	xdr_saargs(XDR *, struct nfssaargs *);
@@ -1408,6 +1424,13 @@ struct READ3args {
 	nfs_fh3 file;
 	offset3 offset;
 	count3 count;
+#ifdef _KERNEL
+	/* for read using rdma */
+	char *res_data_val_alt;
+	struct uio *res_uiop;
+	struct clist *wlist;
+	CONN *conn;
+#endif
 };
 typedef struct READ3args READ3args;
 
@@ -1421,6 +1444,10 @@ struct READ3resok {
 		mblk_t *mp;
 	} data;
 	uint_t size;
+#ifdef _KERNEL
+	uint_t wlist_len;
+	struct clist *wlist;
+#endif
 };
 typedef struct READ3resok READ3resok;
 
@@ -1452,6 +1479,9 @@ struct READ3vres {
 		char *data_val;
 	} data;
 	uint_t size;
+
+	uint_t wlist_len;
+	struct clist *wlist;
 };
 typedef struct READ3vres READ3vres;
 #endif /* _KERNEL */
@@ -1466,6 +1496,10 @@ struct READ3uiores {
 	bool_t eof;
 	struct uio *uiop;
 	uint_t size;		/* maximum reply size */
+#ifdef _KERNEL
+	uint_t wlist_len;
+	struct clist *wlist;
+#endif
 };
 typedef struct READ3uiores READ3uiores;
 
@@ -1486,6 +1520,10 @@ struct WRITE3args {
 		char *data_val;
 	} data;
 	mblk_t *mblk;
+#ifdef _KERNEL
+	struct clist *rlist;
+	CONN *conn;
+#endif
 };
 typedef struct WRITE3args WRITE3args;
 

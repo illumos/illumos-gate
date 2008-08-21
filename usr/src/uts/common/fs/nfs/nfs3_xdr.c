@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -51,6 +49,7 @@
 
 #include <nfs/nfs.h>
 #include <nfs/rnode.h>
+#include <rpc/rpc_rdma.h>
 
 /*
  * These are the XDR routines used to serialize and deserialize
@@ -539,22 +538,22 @@ xdr_fattr3(XDR *xdrs, fattr3 *na)
 		return (TRUE);
 	}
 	if (!(xdr_enum(xdrs, (enum_t *)&na->type) &&
-		xdr_u_int(xdrs, &na->mode) &&
-		xdr_u_int(xdrs, &na->nlink) &&
-		xdr_u_int(xdrs, &na->uid) &&
-		xdr_u_int(xdrs, &na->gid) &&
-		xdr_u_longlong_t(xdrs, &na->size) &&
-		xdr_u_longlong_t(xdrs, &na->used) &&
-		xdr_u_int(xdrs, &na->rdev.specdata1) &&
-		xdr_u_int(xdrs, &na->rdev.specdata2) &&
-		xdr_u_longlong_t(xdrs, &na->fsid) &&
-		xdr_u_longlong_t(xdrs, &na->fileid) &&
-		xdr_u_int(xdrs, &na->atime.seconds) &&
-		xdr_u_int(xdrs, &na->atime.nseconds) &&
-		xdr_u_int(xdrs, &na->mtime.seconds) &&
-		xdr_u_int(xdrs, &na->mtime.nseconds) &&
-		xdr_u_int(xdrs, &na->ctime.seconds) &&
-		xdr_u_int(xdrs, &na->ctime.nseconds)))
+	    xdr_u_int(xdrs, &na->mode) &&
+	    xdr_u_int(xdrs, &na->nlink) &&
+	    xdr_u_int(xdrs, &na->uid) &&
+	    xdr_u_int(xdrs, &na->gid) &&
+	    xdr_u_longlong_t(xdrs, &na->size) &&
+	    xdr_u_longlong_t(xdrs, &na->used) &&
+	    xdr_u_int(xdrs, &na->rdev.specdata1) &&
+	    xdr_u_int(xdrs, &na->rdev.specdata2) &&
+	    xdr_u_longlong_t(xdrs, &na->fsid) &&
+	    xdr_u_longlong_t(xdrs, &na->fileid) &&
+	    xdr_u_int(xdrs, &na->atime.seconds) &&
+	    xdr_u_int(xdrs, &na->atime.nseconds) &&
+	    xdr_u_int(xdrs, &na->mtime.seconds) &&
+	    xdr_u_int(xdrs, &na->mtime.nseconds) &&
+	    xdr_u_int(xdrs, &na->ctime.seconds) &&
+	    xdr_u_int(xdrs, &na->ctime.nseconds)))
 			return (FALSE);
 	return (TRUE);
 }
@@ -668,16 +667,16 @@ xdr_fattr3_to_vattr(XDR *xdrs, fattr3_res *objp)
 		 * Slow path
 		 */
 		if (!(xdr_enum(xdrs, (enum_t *)&vap->va_type) &&
-			xdr_u_int(xdrs, &vap->va_mode) &&
-			xdr_u_int(xdrs, &vap->va_nlink) &&
-			xdr_u_int(xdrs, (uint_t *)&vap->va_uid) &&
-			xdr_u_int(xdrs, (uint_t *)&vap->va_gid) &&
-			xdr_u_longlong_t(xdrs, &vap->va_size) &&
-			xdr_u_longlong_t(xdrs, &used) &&
-			xdr_u_int(xdrs, &rdev.specdata1) &&
-			xdr_u_int(xdrs, &rdev.specdata2) &&
-			xdr_u_longlong_t(xdrs, &fsid) &&	/* ignored */
-			xdr_u_longlong_t(xdrs, &vap->va_nodeid)))
+		    xdr_u_int(xdrs, &vap->va_mode) &&
+		    xdr_u_int(xdrs, &vap->va_nlink) &&
+		    xdr_u_int(xdrs, (uint_t *)&vap->va_uid) &&
+		    xdr_u_int(xdrs, (uint_t *)&vap->va_gid) &&
+		    xdr_u_longlong_t(xdrs, &vap->va_size) &&
+		    xdr_u_longlong_t(xdrs, &used) &&
+		    xdr_u_int(xdrs, &rdev.specdata1) &&
+		    xdr_u_int(xdrs, &rdev.specdata2) &&
+		    xdr_u_longlong_t(xdrs, &fsid) &&	/* ignored */
+		    xdr_u_longlong_t(xdrs, &vap->va_nodeid)))
 				return (FALSE);
 
 		if (nfs_allow_preepoch_time) {
@@ -779,8 +778,8 @@ xdr_fattr3_to_vattr(XDR *xdrs, fattr3_res *objp)
 	case VDIR:
 	case VLNK:
 		vap->va_nblocks = (u_longlong_t)
-			((used + (size3)DEV_BSIZE - (size3)1) /
-			(size3)DEV_BSIZE);
+		    ((used + (size3)DEV_BSIZE - (size3)1) /
+		    (size3)DEV_BSIZE);
 		break;
 	case VBLK:
 		vap->va_blksize = DEV_BSIZE;
@@ -1199,6 +1198,23 @@ xdr_ACCESS3res(XDR *xdrs, ACCESS3res *objp)
 }
 
 bool_t
+xdr_READLINK3args(XDR *xdrs,  READLINK3args *objp)
+{
+	rdma_chunkinfo_t rci;
+	struct xdr_ops *xops = xdrrdma_xops();
+
+	if ((xdrs->x_ops == &xdrrdma_ops || xdrs->x_ops == xops) &&
+	    xdrs->x_op == XDR_ENCODE) {
+		rci.rci_type = RCI_REPLY_CHUNK;
+		rci.rci_len = MAXPATHLEN;
+		XDR_CONTROL(xdrs, XDR_RDMA_ADD_CHUNK, &rci);
+	}
+	if (!xdr_nfs_fh3(xdrs, (nfs_fh3 *)objp))
+		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
 xdr_READLINK3res(XDR *xdrs, READLINK3res *objp)
 {
 
@@ -1208,7 +1224,7 @@ xdr_READLINK3res(XDR *xdrs, READLINK3res *objp)
 		return (FALSE);
 	if (objp->status != NFS3_OK)
 		return (xdr_post_op_attr(xdrs,
-			&objp->resfail.symlink_attributes));
+		    &objp->resfail.symlink_attributes));
 
 	/* xdr_READLINK3resok */
 	resokp = &objp->resok;
@@ -1220,6 +1236,10 @@ xdr_READLINK3res(XDR *xdrs, READLINK3res *objp)
 bool_t
 xdr_READ3args(XDR *xdrs, READ3args *objp)
 {
+	rdma_chunkinfo_t rci;
+	rdma_wlist_conn_info_t rwci;
+	struct xdr_ops *xops = xdrrdma_xops();
+
 	switch (xdrs->x_op) {
 	case XDR_FREE:
 	case XDR_ENCODE:
@@ -1233,7 +1253,46 @@ xdr_READ3args(XDR *xdrs, READ3args *objp)
 	}
 	if (!xdr_u_longlong_t(xdrs, &objp->offset))
 		return (FALSE);
-	return (xdr_u_int(xdrs, &objp->count));
+	if (!xdr_u_int(xdrs, &objp->count))
+		return (FALSE);
+
+	DTRACE_PROBE1(xdr__i__read3_buf_len, int, objp->count);
+
+	objp->wlist = NULL;
+
+	/* if xdrrdma_sizeof in progress, then store the size */
+	if (xdrs->x_ops == xops && xdrs->x_op == XDR_ENCODE) {
+		rci.rci_type = RCI_WRITE_ADDR_CHUNK;
+		rci.rci_len = objp->count;
+		(void) XDR_CONTROL(xdrs, XDR_RDMA_ADD_CHUNK, &rci);
+	}
+
+	if (xdrs->x_ops != &xdrrdma_ops || xdrs->x_op == XDR_FREE)
+		return (TRUE);
+
+	if (xdrs->x_op == XDR_ENCODE) {
+
+		if (objp->res_uiop != NULL) {
+			rci.rci_type = RCI_WRITE_UIO_CHUNK;
+			rci.rci_a.rci_uiop = objp->res_uiop;
+			rci.rci_len = objp->count;
+			rci.rci_clpp = &objp->wlist;
+		} else {
+			rci.rci_type = RCI_WRITE_ADDR_CHUNK;
+			rci.rci_a.rci_addr = objp->res_data_val_alt;
+			rci.rci_len = objp->count;
+			rci.rci_clpp = &objp->wlist;
+		}
+
+		return (XDR_CONTROL(xdrs, XDR_RDMA_ADD_CHUNK, &rci));
+	}
+
+	/* XDR_DECODE case */
+	(void) XDR_CONTROL(xdrs, XDR_RDMA_GET_WCINFO, &rwci);
+	objp->wlist = rwci.rwci_wlist;
+	objp->conn = rwci.rwci_conn;
+
+	return (TRUE);
 }
 
 bool_t
@@ -1264,12 +1323,32 @@ xdr_READ3res(XDR *xdrs, READ3res *objp)
 		if (mp != NULL && xdrs->x_ops == &xdrmblk_ops) {
 			mp->b_wptr += resokp->count;
 			rndup = BYTES_PER_XDR_UNIT -
-				(resokp->data.data_len % BYTES_PER_XDR_UNIT);
+			    (resokp->data.data_len % BYTES_PER_XDR_UNIT);
 			if (rndup != BYTES_PER_XDR_UNIT)
 				for (i = 0; i < rndup; i++)
 					*mp->b_wptr++ = '\0';
 			if (xdrmblk_putmblk(xdrs, mp, resokp->count) == TRUE) {
 				resokp->data.mp = NULL;
+				return (TRUE);
+			}
+		} else if (mp == NULL) {
+			if (xdr_u_int(xdrs, &resokp->count) == FALSE) {
+				return (FALSE);
+			}
+			/*
+			 * If read data sent by wlist (RDMA_WRITE), don't do
+			 * xdr_bytes() below.   RDMA_WRITE transfers the data.
+			 * Note: this is encode-only because the client code
+			 * uses xdr_READ3vres/xdr_READ3uiores to decode results.
+			 */
+			if (resokp->wlist) {
+				if (resokp->wlist->c_len != resokp->count) {
+					resokp->wlist->c_len = resokp->count;
+				}
+				if (resokp->count != 0) {
+					return (xdrrdma_send_read_data(
+					    xdrs, resokp->wlist));
+				}
 				return (TRUE);
 			}
 		}
@@ -1281,6 +1360,8 @@ xdr_READ3res(XDR *xdrs, READ3res *objp)
 		 */
 	}
 
+	/* no RDMA_WRITE transfer -- send data inline */
+
 	ret = xdr_bytes(xdrs, (char **)&resokp->data.data_val,
 	    &resokp->data.data_len, nfs3tsize());
 
@@ -1290,6 +1371,7 @@ xdr_READ3res(XDR *xdrs, READ3res *objp)
 bool_t
 xdr_READ3vres(XDR *xdrs, READ3vres *objp)
 {
+	count3 ocount;
 	/*
 	 * DECODE or FREE only
 	 */
@@ -1314,6 +1396,31 @@ xdr_READ3vres(XDR *xdrs, READ3vres *objp)
 	if (!xdr_bool(xdrs, &objp->eof))
 		return (FALSE);
 
+	/*
+	 * If read data received via RDMA_WRITE, don't do xdr_bytes().
+	 * RDMA_WRITE already moved the data so decode length of RDMA_WRITE.
+	 */
+	if (xdrs->x_ops == &xdrrdma_ops) {
+		struct clist *cl;
+
+		XDR_CONTROL(xdrs, XDR_RDMA_GET_WLIST, &cl);
+
+		if (cl) {
+			if (!xdr_u_int(xdrs, &ocount)) {
+				return (FALSE);
+			}
+			if (ocount != objp->count) {
+				DTRACE_PROBE2(xdr__e__read3vres_fail,
+				    int, ocount, int, objp->count);
+				return (FALSE);
+			}
+
+			objp->wlist_len = cl->c_len;
+			objp->data.data_len = objp->wlist_len;
+			return (TRUE);
+		}
+	}
+
 	return (xdr_bytes(xdrs, (char **)&objp->data.data_val,
 	    &objp->data.data_len, nfs3tsize()));
 }
@@ -1321,6 +1428,7 @@ xdr_READ3vres(XDR *xdrs, READ3vres *objp)
 bool_t
 xdr_READ3uiores(XDR *xdrs, READ3uiores *objp)
 {
+	count3 ocount;
 	bool_t attributes;
 	mblk_t *mp;
 	size_t n;
@@ -1384,7 +1492,7 @@ xdr_READ3uiores(XDR *xdrs, READ3uiores *objp)
 			if ((n = MIN(uiop->uio_resid, n)) != 0) {
 
 				error = uiomove((char *)mp->b_rptr, n, UIO_READ,
-						uiop);
+				    uiop);
 				if (error)
 					return (FALSE);
 				mp->b_rptr += n;
@@ -1398,9 +1506,46 @@ xdr_READ3uiores(XDR *xdrs, READ3uiores *objp)
 		return (TRUE);
 	}
 
+	if (xdrs->x_ops == &xdrrdma_ops) {
+		struct clist *cl;
+
+		XDR_CONTROL(xdrs, XDR_RDMA_GET_WLIST, &cl);
+
+		objp->wlist = cl;
+
+		if (objp->wlist) {
+			if (!xdr_u_int(xdrs, &ocount)) {
+				objp->wlist = NULL;
+				return (FALSE);
+			}
+
+			if (ocount != objp->count) {
+				DTRACE_PROBE2(xdr__e__read3uiores_fail,
+				    int, ocount, int, objp->count);
+				objp->wlist = NULL;
+				return (FALSE);
+			}
+
+			objp->wlist_len = cl->c_len;
+
+			uiop->uio_resid -= objp->count;
+			uiop->uio_iov->iov_len -= objp->count;
+			uiop->uio_iov->iov_base += objp->count;
+			uiop->uio_loffset += objp->count;
+
+			/*
+			 * XXX: Assume 1 iov, needs to be changed.
+			 */
+			objp->size = objp->wlist_len;
+
+			return (TRUE);
+		}
+	}
+
 	/*
-	 * This isn't an xdrmblk stream.   Handle the likely
-	 * case that it can be inlined (ex. xdrmem).
+	 * This isn't an xdrmblk stream nor RDMA.
+	 * Handle the likely case that it can be
+	 * inlined (ex. xdrmem).
 	 */
 	if (!XDR_GETINT32(xdrs, (int32_t *)&objp->size))
 		return (FALSE);
@@ -1461,8 +1606,37 @@ xdr_WRITE3args(XDR *xdrs, WRITE3args *objp)
 			}
 		}
 		objp->mblk = NULL;
+
+		if (xdrs->x_ops == &xdrrdmablk_ops) {
+			if (xdrrdma_getrdmablk(xdrs, &objp->rlist,
+			    &objp->data.data_len,
+			    &objp->conn, nfs3tsize()) == TRUE) {
+				objp->data.data_val = NULL;
+				if (xdrrdma_read_from_client(
+				    &objp->rlist,
+				    &objp->conn,
+				    objp->count) == FALSE) {
+					return (FALSE);
+				}
+				return (TRUE);
+			}
+		}
+		objp->rlist = NULL;
+
 		/* Else fall thru for the xdr_bytes(). */
 	}
+
+	if (xdrs->x_op == XDR_FREE) {
+		if (objp->rlist != NULL) {
+			(void) xdrrdma_free_clist(objp->conn, objp->rlist);
+			objp->rlist = NULL;
+			objp->data.data_val = NULL;
+			return (TRUE);
+		}
+	}
+
+	DTRACE_PROBE1(xdr__i__write3_buf_len,
+	    int, objp->data.data_len);
 
 	return (xdr_bytes(xdrs, (char **)&objp->data.data_val,
 	    &objp->data.data_len, nfs3tsize()));
@@ -1764,6 +1938,9 @@ xdr_LINK3res(XDR *xdrs, LINK3res *objp)
 bool_t
 xdr_READDIR3args(XDR *xdrs, READDIR3args *objp)
 {
+	rdma_chunkinfo_t rci;
+	struct xdr_ops *xops = xdrrdma_xops();
+
 	if (xdrs->x_op == XDR_FREE)
 		return (TRUE);
 
@@ -1778,6 +1955,13 @@ xdr_READDIR3args(XDR *xdrs, READDIR3args *objp)
 			return (FALSE);
 		break;
 	}
+	if ((xdrs->x_ops == &xdrrdma_ops || xdrs->x_ops == xops) &&
+	    xdrs->x_op == XDR_ENCODE) {
+		rci.rci_type = RCI_REPLY_CHUNK;
+		rci.rci_len = objp->count;
+		XDR_CONTROL(xdrs, XDR_RDMA_ADD_CHUNK, &rci);
+	}
+
 	if (!xdr_u_longlong_t(xdrs, &objp->cookie))
 		return (FALSE);
 	/*
@@ -2023,6 +2207,9 @@ xdr_READDIR3vres(XDR *xdrs, READDIR3vres *objp)
 bool_t
 xdr_READDIRPLUS3args(XDR *xdrs, READDIRPLUS3args *objp)
 {
+	rdma_chunkinfo_t rci;
+	struct xdr_ops *xops = xdrrdma_xops();
+
 	if (xdrs->x_op == XDR_FREE)
 		return (TRUE);
 
@@ -2037,6 +2224,13 @@ xdr_READDIRPLUS3args(XDR *xdrs, READDIRPLUS3args *objp)
 			return (FALSE);
 		break;
 	}
+	if ((xdrs->x_ops == &xdrrdma_ops || xdrs->x_ops == xops) &&
+	    xdrs->x_op == XDR_ENCODE) {
+		rci.rci_type = RCI_REPLY_CHUNK;
+		rci.rci_len = objp->maxcount;
+		XDR_CONTROL(xdrs, XDR_RDMA_ADD_CHUNK, &rci);
+	}
+
 	if (!xdr_u_longlong_t(xdrs, &objp->cookie))
 		return (FALSE);
 	/*
@@ -2254,7 +2448,7 @@ xdr_READDIRPLUS3vres(XDR *xdrs, READDIRPLUS3vres *objp)
 			return (FALSE);
 
 		if (pov.attributes == TRUE &&
-				pov.fres.status == NFS3_OK)
+		    pov.fres.status == NFS3_OK)
 			va_valid = TRUE;
 		else
 			va_valid = FALSE;
@@ -2286,14 +2480,14 @@ xdr_READDIRPLUS3vres(XDR *xdrs, READDIRPLUS3vres *objp)
 		 * we cannot determine the type for.
 		 */
 		if (!(namlen == 1 && dp->d_name[0] == '.') &&
-			va_valid && fh_valid) {
+		    va_valid && fh_valid) {
 
 			/*
 			 * Do the DNLC caching
 			 */
 			nvp = makenfs3node_va(&fh, &va, dvp->v_vfsp,
-				objp->time, objp->credentials,
-				rp->r_path, dp->d_name);
+			    objp->time, objp->credentials,
+			    rp->r_path, dp->d_name);
 			dnlc_update(dvp, dp->d_name, nvp);
 			VN_RELE(nvp);
 		}

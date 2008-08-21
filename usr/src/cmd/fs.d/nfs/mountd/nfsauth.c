@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -75,6 +73,9 @@ nfsauth_access(auth_req *argp, auth_res *result)
 	nbuf.len = argp->req_client.n_len;
 	nbuf.buf = argp->req_client.n_bytes;
 
+	if (nbuf.len == 0 || nbuf.buf == NULL)
+		return;
+
 	if (netdir_getbyaddr(nconf, &clnames, &nbuf)) {
 		host = &tmp[0];
 		if (strcmp(nconf->nc_protofmly, NC_INET) == 0) {
@@ -88,7 +89,7 @@ nfsauth_access(auth_req *argp, auth_res *result)
 			/* LINTED pointer */
 			sa = (struct sockaddr_in6 *)nbuf.buf;
 			(void) inet_ntop(AF_INET6, sa->sin6_addr.s6_addr,
-				    tmp, INET6_ADDRSTRLEN);
+			    tmp, INET6_ADDRSTRLEN);
 		}
 		clnames = anon_client(host);
 	}
@@ -108,7 +109,7 @@ nfsauth_access(auth_req *argp, auth_res *result)
 
 	if (result->auth_perm == NFSAUTH_DENIED) {
 		syslog(LOG_ERR, "%s denied access to %s",
-			clnames->h_hostservs[0].h_host, argp->req_path);
+		    clnames->h_hostservs[0].h_host, argp->req_path);
 	}
 
 done:

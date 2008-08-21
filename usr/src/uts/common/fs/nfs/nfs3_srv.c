@@ -26,8 +26,6 @@
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -52,6 +50,7 @@
 #include <rpc/types.h>
 #include <rpc/auth.h>
 #include <rpc/svc.h>
+#include <rpc/rpc_rdma.h>
 
 #include <nfs/nfs.h>
 #include <nfs/export.h>
@@ -83,6 +82,7 @@ static int	vattr_to_fattr3(struct vattr *, fattr3 *);
 static int	vattr_to_wcc_attr(struct vattr *, wcc_attr *);
 static void	vattr_to_pre_op_attr(struct vattr *, pre_op_attr *);
 static void	vattr_to_wcc_data(struct vattr *, struct vattr *, wcc_data *);
+static int	rdma_setup_read_data3(READ3args *, READ3resok *);
 
 u_longlong_t nfs3_srv_caller_id;
 
@@ -906,6 +906,10 @@ rfs3_readlink_free(READLINK3res *resp)
 		kmem_free(resp->resok.data, MAXPATHLEN + 1);
 }
 
+/*
+ * Server routine to handle read
+ * May handle RDMA data as well as mblks
+ */
 /* ARGSUSED */
 void
 rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
@@ -1030,6 +1034,9 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 		resp->resok.data.data_len = 0;
 		resp->resok.data.data_val = NULL;
 		resp->resok.data.mp = NULL;
+		/* RDMA */
+		resp->resok.wlist = args->wlist;
+		resp->resok.wlist_len = resp->resok.count;
 		goto done;
 	}
 
@@ -1044,6 +1051,9 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 		resp->resok.data.data_len = 0;
 		resp->resok.data.data_val = NULL;
 		resp->resok.data.mp = NULL;
+		/* RDMA */
+		resp->resok.wlist = args->wlist;
+		resp->resok.wlist_len = resp->resok.count;
 		goto done;
 	}
 
@@ -1055,18 +1065,30 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 		args->count = rfs3_tsize(req);
 
 	/*
-	 * mp will contain the data to be sent out in the read reply.
-	 * This will be freed after the reply has been sent out (by the
-	 * driver).
-	 * Let's roundup the data to a BYTES_PER_XDR_UNIT multiple, so
-	 * that the call to xdrmblk_putmblk() never fails.
+	 * If returning data via RDMA Write, then grab the chunk list.
+	 * If we aren't returning READ data w/RDMA_WRITE, then grab
+	 * a mblk.
 	 */
-	mp = allocb_wait(RNDUP(args->count), BPRI_MED, STR_NOSIG, &alloc_err);
-	ASSERT(mp != NULL);
-	ASSERT(alloc_err == 0);
+	if (args->wlist) {
+		mp = NULL;
+		(void) rdma_get_wchunk(req, &iov, args->wlist);
+	} else {
+		/*
+		 * mp will contain the data to be sent out in the read reply.
+		 * This will be freed after the reply has been sent out (by the
+		 * driver).
+		 * Let's roundup the data to a BYTES_PER_XDR_UNIT multiple, so
+		 * that the call to xdrmblk_putmblk() never fails.
+		 */
+		mp = allocb_wait(RNDUP(args->count), BPRI_MED, STR_NOSIG,
+		    &alloc_err);
+		ASSERT(mp != NULL);
+		ASSERT(alloc_err == 0);
 
-	iov.iov_base = (caddr_t)mp->b_datap->db_base;
-	iov.iov_len = args->count;
+		iov.iov_base = (caddr_t)mp->b_datap->db_base;
+		iov.iov_len = args->count;
+	}
+
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_segflg = UIO_SYSSPACE;
@@ -1106,18 +1128,6 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 
 	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 
-#if 0 /* notyet */
-	/*
-	 * Don't do this.  It causes local disk writes when just
-	 * reading the file and the overhead is deemed larger
-	 * than the benefit.
-	 */
-	/*
-	 * Force modified metadata out to stable storage.
-	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
-#endif
-
 	if (in_crit)
 		nbl_end_crit(vp);
 
@@ -1129,11 +1139,18 @@ rfs3_read(READ3args *args, READ3res *resp, struct exportinfo *exi,
 	else
 		resp->resok.eof = FALSE;
 	resp->resok.data.data_len = resp->resok.count;
-	resp->resok.data.data_val = (char *)mp->b_datap->db_base;
-
 	resp->resok.data.mp = mp;
-
 	resp->resok.size = (uint_t)args->count;
+
+	if (args->wlist) {
+		resp->resok.data.data_val = (caddr_t)iov.iov_base;
+		if (!rdma_setup_read_data3(args, &(resp->resok))) {
+			resp->status = NFS3ERR_INVAL;
+		}
+	} else {
+		resp->resok.data.data_val = (caddr_t)mp->b_datap->db_base;
+		(resp->resok).wlist = NULL;
+	}
 
 done:
 	DTRACE_NFSV3_4(op__read__done, struct svc_req *, req,
@@ -1331,6 +1348,12 @@ rfs3_write(WRITE3args *args, WRITE3res *resp, struct exportinfo *exi,
 			iovp = kmem_alloc(sizeof (*iovp) * iovcnt, KM_SLEEP);
 		}
 		mblk_to_iov(args->mblk, iovcnt, iovp);
+
+	} else if (args->rlist != NULL) {
+		iovcnt = 1;
+		iovp = iov;
+		iovp->iov_base = (char *)((args->rlist)->u.c_daddr3);
+		iovp->iov_len = args->count;
 	} else {
 		iovcnt = 1;
 		iovp = iov;
@@ -4261,7 +4284,7 @@ vattr_to_wcc_attr(struct vattr *vap, wcc_attr *wccap)
 {
 
 	/* Return error if time or size overflow */
-	if (!  (NFS_TIME_T_OK(vap->va_mtime.tv_sec) &&
+	if (!(NFS_TIME_T_OK(vap->va_mtime.tv_sec) &&
 	    NFS_TIME_T_OK(vap->va_ctime.tv_sec) &&
 	    NFS3_SIZE_OK(vap->va_size))) {
 		return (EOVERFLOW);
@@ -4349,6 +4372,50 @@ rfs3_srvrinit(void)
 
 	nfs3_srv_caller_id = fs_new_caller_id();
 
+}
+
+static int
+rdma_setup_read_data3(READ3args *args, READ3resok *rok)
+{
+	struct clist	*wcl;
+	int		data_len, avail_len, num;
+	count3		count = rok->count;
+
+	data_len = num = avail_len = 0;
+
+	wcl = args->wlist;
+	while (wcl != NULL) {
+		if (wcl->c_dmemhandle.mrc_rmr == 0)
+			break;
+
+		avail_len += wcl->c_len;
+		if (wcl->c_len < count) {
+			data_len += wcl->c_len;
+		} else {
+			/* Can make the rest chunks all 0-len */
+			data_len += count;
+			wcl->c_len = count;
+		}
+		count -= wcl->c_len;
+		num ++;
+		wcl = wcl->c_next;
+	}
+
+	/*
+	 * MUST fail if there are still more data
+	 */
+	if (count > 0) {
+		DTRACE_PROBE2(nfss__e__read3_wlist_fail,
+		    int, data_len, int, count);
+		return (FALSE);
+	}
+
+	wcl = args->wlist;
+	rok->count = data_len;
+	rok->wlist_len = data_len;
+	rok->wlist = wcl;
+
+	return (TRUE);
 }
 
 void

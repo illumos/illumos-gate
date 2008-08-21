@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,8 +33,6 @@
 
 #ifndef	_RPCSEC_GSS_H
 #define	_RPCSEC_GSS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -201,6 +198,7 @@ void rpc_gss_secpurge(void *);
 enum auth_stat __svcrpcsec_gss(struct svc_req *,
 			struct rpc_msg *, bool_t *);
 bool_t rpc_gss_set_defaults(AUTH *, rpc_gss_service_t, uint_t);
+rpc_gss_service_t rpc_gss_get_service_type(AUTH *);
 
 
 #else

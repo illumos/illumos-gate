@@ -26,8 +26,6 @@
  *	All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -904,8 +902,8 @@ nfswrite(vnode_t *vp, caddr_t base, uint_t offset, int count, cred_t *cr)
  * Read from a file.  Reads data in largest chunks our interface can handle.
  */
 static int
-nfsread(vnode_t *vp, caddr_t base, uint_t offset, int count, size_t *residp,
-	cred_t *cr)
+nfsread(vnode_t *vp, caddr_t base, uint_t offset,
+    int count, size_t *residp, cred_t *cr)
 {
 	mntinfo_t *mi;
 	struct nfsreadargs ra;
@@ -946,6 +944,7 @@ nfsread(vnode_t *vp, caddr_t base, uint_t offset, int count, size_t *residp,
 			ra.ra_offset = offset;
 			ra.ra_totcount = tsize;
 			ra.ra_count = tsize;
+			ra.ra_data = base;
 			t = gethrtime();
 			error = rfs2call(mi, RFS_READ,
 			    xdr_readargs, (caddr_t)&ra,
@@ -1466,7 +1465,7 @@ nfs_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr, caller_context_t *ct)
 	douprintf = 1;
 
 	error = rfs2call(VTOMI(vp), RFS_READLINK,
-	    xdr_fhandle, (caddr_t)VTOFH(vp),
+	    xdr_readlink, (caddr_t)VTOFH(vp),
 	    xdr_rdlnres, (caddr_t)&rl, cr,
 	    &douprintf, &rl.rl_status, 0, &fi);
 
@@ -3356,6 +3355,7 @@ nfs_bio(struct buf *bp, cred_t *cr)
 	read_again:
 		error = bp->b_error = nfsread(bp->b_vp, bp->b_un.b_addr,
 		    offset, bp->b_bcount, &bp->b_resid, cred);
+
 		crfree(cred);
 		if (!error) {
 			if (bp->b_resid) {

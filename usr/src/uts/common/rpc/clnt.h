@@ -37,8 +37,6 @@
 #ifndef	_RPC_CLNT_H
 #define	_RPC_CLNT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <rpc/rpc_com.h>
 #include <rpc/clnt_stat.h>
@@ -78,6 +76,7 @@ extern "C" {
 	((s) == RPC_PROCUNAVAIL) || \
 	((s) == RPC_PROGUNAVAIL) || \
 	((s) == RPC_PROGVERSMISMATCH) || \
+	((s) == RPC_SYSTEMERROR) || \
 	((s) == RPC_CANTDECODEARGS))
 
 /* Maximum rpc backoff time */

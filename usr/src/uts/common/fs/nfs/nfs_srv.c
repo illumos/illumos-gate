@@ -28,8 +28,6 @@
  *	All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -52,6 +50,7 @@
 #include <sys/acl.h>
 #include <sys/nbmlock.h>
 #include <sys/policy.h>
+#include <sys/sdt.h>
 
 #include <rpc/types.h>
 #include <rpc/auth.h>
@@ -102,13 +101,9 @@ rfs_getattr(fhandle_t *fhp, struct nfsattrstat *ns, struct exportinfo *exi,
 	vnode_t *vp;
 	struct vattr va;
 
-	TRACE_0(TR_FAC_NFS, TR_RFS_GETATTR_START, "rfs_getattr_start:");
-
 	vp = nfs_fhtovp(fhp, exi);
 	if (vp == NULL) {
 		ns->ns_status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_GETATTR_END,
-		    "rfs_getattr_end:(%S)", "stale");
 		return;
 	}
 
@@ -116,9 +111,8 @@ rfs_getattr(fhandle_t *fhp, struct nfsattrstat *ns, struct exportinfo *exi,
 	 * Do the getattr.
 	 */
 	va.va_mask = AT_ALL;	/* we want all the attributes */
-	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
+
 	error = rfs4_delegated_getattr(vp, &va, 0, cr);
-	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
 
 	/* check for overflows */
 	if (!error) {
@@ -129,8 +123,6 @@ rfs_getattr(fhandle_t *fhp, struct nfsattrstat *ns, struct exportinfo *exi,
 	VN_RELE(vp);
 
 	ns->ns_status = puterrno(error);
-
-	TRACE_1(TR_FAC_NFS, TR_RFS_GETATTR_END, "rfs_getattr_end:(%S)", "done");
 }
 void *
 rfs_getattr_getfh(fhandle_t *fhp)
@@ -156,21 +148,16 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 	struct flock64 bf;
 	caller_context_t ct;
 
-	TRACE_0(TR_FAC_NFS, TR_RFS_SETATTR_START, "rfs_setattr_start:");
 
 	vp = nfs_fhtovp(&args->saa_fh, exi);
 	if (vp == NULL) {
 		ns->ns_status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_SETATTR_END,
-		    "rfs_setattr_end:(%S)", "stale");
 		return;
 	}
 
 	if (rdonly(exi, req) || vn_is_readonly(vp)) {
 		VN_RELE(vp);
 		ns->ns_status = NFSERR_ROFS;
-		TRACE_1(TR_FAC_NFS, TR_RFS_SETATTR_END,
-		    "rfs_setattr_end:(%S)", "rofs");
 		return;
 	}
 
@@ -178,8 +165,6 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 	if (error) {
 		VN_RELE(vp);
 		ns->ns_status = puterrno(error);
-		TRACE_1(TR_FAC_NFS, TR_RFS_SETATTR_END,
-		    "rfs_setattr_end:(%S)", "sattr");
 		return;
 	}
 
@@ -243,16 +228,14 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 		}
 
 		bva.va_mask = AT_UID | AT_SIZE;
-		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
+
 		error = VOP_GETATTR(vp, &bva, 0, cr, &ct);
-		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
+
 		if (error) {
 			if (in_crit)
 				nbl_end_crit(vp);
 			VN_RELE(vp);
 			ns->ns_status = puterrno(error);
-			TRACE_1(TR_FAC_NFS, TR_RFS_SETATTR_END,
-			    "rfs_setattr_end:(%S)", "getattr");
 			return;
 		}
 
@@ -282,11 +265,9 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 			bf.l_len = 0;
 			bf.l_sysid = 0;
 			bf.l_pid = 0;
-			TRACE_0(TR_FAC_NFS, TR_VOP_SPACE_START,
-			    "vop_space_start:");
+
 			error = VOP_SPACE(vp, F_FREESP, &bf, FWRITE,
 			    (offset_t)va.va_size, cr, &ct);
-			TRACE_0(TR_FAC_NFS, TR_VOP_SPACE_END, "vop_space_end:");
 		}
 		if (in_crit)
 			nbl_end_crit(vp);
@@ -297,9 +278,7 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 	 * Do the setattr.
 	 */
 	if (!error && va.va_mask) {
-		TRACE_0(TR_FAC_NFS, TR_VOP_SETATTR_START, "vop_setattr_start:");
 		error = VOP_SETATTR(vp, &va, flag, cr, &ct);
-		TRACE_0(TR_FAC_NFS, TR_VOP_SETATTR_END, "vop_setattr_end:");
 	}
 
 	/*
@@ -311,16 +290,13 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 	if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK)) {
 		VN_RELE(vp);
 		curthread->t_flag |= T_WOULDBLOCK;
-		TRACE_1(TR_FAC_NFS, TR_RFS_SETATTR_END,
-		    "rfs_setattr_end:(%S)", "delegated");
 		return;
 	}
 
 	if (!error) {
 		va.va_mask = AT_ALL;	/* get everything */
-		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
+
 		error = rfs4_delegated_getattr(vp, &va, 0, cr);
-		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
 
 		/* check for overflows */
 		if (!error) {
@@ -339,8 +315,6 @@ rfs_setattr(struct nfssaargs *args, struct nfsattrstat *ns,
 	VN_RELE(vp);
 
 	ns->ns_status = puterrno(error);
-
-	TRACE_1(TR_FAC_NFS, TR_RFS_SETATTR_END, "rfs_setattr_end:(%S)", "done");
 }
 void *
 rfs_setattr_getfh(struct nfssaargs *args)
@@ -365,8 +339,6 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 	struct sec_ol sec = {0, 0};
 	bool_t publicfh_flag = FALSE, auth_weak = FALSE;
 
-	TRACE_0(TR_FAC_NFS, TR_RFS_LOOKUP_START, "rfs_lookup_start:");
-
 	/*
 	 * Trusted Extension doesn't support NFSv2. MOUNT
 	 * will reject v2 clients. Need to prevent v2 client
@@ -374,8 +346,6 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 	 */
 	if (is_system_labeled() && req->rq_vers == 2) {
 		dr->dr_status = NFSERR_ACCES;
-		TRACE_1(TR_FAC_NFS, TR_RFS_LOOKUP_END,
-		    "rfs_lookup_end:(%S)", "access");
 		return;
 	}
 
@@ -384,8 +354,6 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 	 */
 	if (da->da_name == NULL || *da->da_name == '\0') {
 		dr->dr_status = NFSERR_ACCES;
-		TRACE_1(TR_FAC_NFS, TR_RFS_LOOKUP_END,
-		    "rfs_lookup_end:(%S)", "access");
 		return;
 	}
 
@@ -400,8 +368,6 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 		dvp = nfs_fhtovp(fhp, exi);
 		if (dvp == NULL) {
 			dr->dr_status = NFSERR_STALE;
-			TRACE_1(TR_FAC_NFS, TR_RFS_LOOKUP_END,
-			    "rfs_lookup_end:(%S)", "stale");
 			return;
 		}
 	}
@@ -415,8 +381,6 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 	    EQFID(&exi->exi_fid, (fid_t *)&fhp->fh_len)) {
 		VN_RELE(dvp);
 		dr->dr_status = NFSERR_NOENT;
-		TRACE_1(TR_FAC_NFS, TR_RFS_LOOKUP_END,
-		    "rfs_lookup_end:(%S)", "noent");
 		return;
 	}
 
@@ -437,17 +401,15 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 		/*
 		 * Do a normal single component lookup.
 		 */
-		TRACE_0(TR_FAC_NFS, TR_VOP_LOOKUP_START, "vop_lookup_start:");
 		error = VOP_LOOKUP(dvp, da->da_name, &vp, NULL, 0, NULL, cr,
 		    NULL, NULL, NULL);
-		TRACE_0(TR_FAC_NFS, TR_VOP_LOOKUP_END, "vop_lookup_end:");
 	}
 
 	if (!error) {
 		va.va_mask = AT_ALL;	/* we want everything */
-		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
+
 		error = rfs4_delegated_getattr(vp, &va, 0, cr);
-		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
+
 		/* check for overflows */
 		if (!error) {
 			acl_perm(vp, exi, &va, cr);
@@ -488,8 +450,6 @@ rfs_lookup(struct nfsdiropargs *da, struct nfsdiropres *dr,
 		dr->dr_status = (enum nfsstat)WNFSERR_CLNT_FLAVOR;
 	else
 		dr->dr_status = puterrno(error);
-
-	TRACE_1(TR_FAC_NFS, TR_RFS_LOOKUP_END, "rfs_lookup_end:(%S)", "done");
 }
 void *
 rfs_lookup_getfh(struct nfsdiropargs *da)
@@ -512,28 +472,21 @@ rfs_readlink(fhandle_t *fhp, struct nfsrdlnres *rl, struct exportinfo *exi,
 	vnode_t *vp;
 	struct vattr va;
 
-	TRACE_0(TR_FAC_NFS, TR_RFS_READLINK_START, "rfs_readlink_start:");
-
 	vp = nfs_fhtovp(fhp, exi);
 	if (vp == NULL) {
 		rl->rl_data = NULL;
 		rl->rl_status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_READLINK_END,
-		    "rfs_readlink_end:(%S)", "stale");
 		return;
 	}
 
 	va.va_mask = AT_MODE;
-	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
+
 	error = VOP_GETATTR(vp, &va, 0, cr, NULL);
-	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
 
 	if (error) {
 		VN_RELE(vp);
 		rl->rl_data = NULL;
 		rl->rl_status = puterrno(error);
-		TRACE_1(TR_FAC_NFS, TR_RFS_READLINK_END,
-		    "rfs_readlink_end:(%S)", "getattr error");
 		return;
 	}
 
@@ -541,8 +494,6 @@ rfs_readlink(fhandle_t *fhp, struct nfsrdlnres *rl, struct exportinfo *exi,
 		VN_RELE(vp);
 		rl->rl_data = NULL;
 		rl->rl_status = NFSERR_ACCES;
-		TRACE_1(TR_FAC_NFS, TR_RFS_READLINK_END,
-		    "rfs_readlink_end:(%S)", "access");
 		return;
 	}
 
@@ -554,8 +505,6 @@ rfs_readlink(fhandle_t *fhp, struct nfsrdlnres *rl, struct exportinfo *exi,
 		VN_RELE(vp);
 		rl->rl_data = NULL;
 		rl->rl_status = NFSERR_NXIO;
-		TRACE_1(TR_FAC_NFS, TR_RFS_READLINK_END,
-		    "rfs_readlink_end:(%S)", "nxio");
 		return;
 	}
 
@@ -579,21 +528,7 @@ rfs_readlink(fhandle_t *fhp, struct nfsrdlnres *rl, struct exportinfo *exi,
 	/*
 	 * Do the readlink.
 	 */
-	TRACE_0(TR_FAC_NFS, TR_VOP_READLINK_START, "vop_readlink_start:");
 	error = VOP_READLINK(vp, &uio, cr, NULL);
-	TRACE_0(TR_FAC_NFS, TR_VOP_READLINK_END, "vop_readlink_end:");
-
-#if 0 /* notyet */
-	/*
-	 * Don't do this.  It causes local disk writes when just
-	 * reading the file and the overhead is deemed larger
-	 * than the benefit.
-	 */
-	/*
-	 * Force modified metadata out to stable storage.
-	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
-#endif
 
 	VN_RELE(vp);
 
@@ -609,8 +544,6 @@ rfs_readlink(fhandle_t *fhp, struct nfsrdlnres *rl, struct exportinfo *exi,
 	else
 		rl->rl_status = puterrno(error);
 
-	TRACE_1(TR_FAC_NFS, TR_RFS_READLINK_END,
-	    "rfs_readlink_end:(%S)", "done");
 }
 void *
 rfs_readlink_getfh(fhandle_t *fhp)
@@ -626,6 +559,8 @@ rfs_rlfree(struct nfsrdlnres *rl)
 	if (rl->rl_data != NULL)
 		kmem_free(rl->rl_data, NFS_MAXPATHLEN);
 }
+
+static int rdma_setup_read_data2(struct nfsreadargs *, struct nfsrdresult *);
 
 /*
  * Read data.
@@ -646,14 +581,10 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 	int in_crit = 0;
 	caller_context_t ct;
 
-	TRACE_0(TR_FAC_NFS, TR_RFS_READ_START, "rfs_read_start:");
-
 	vp = nfs_fhtovp(&ra->ra_fhandle, exi);
 	if (vp == NULL) {
 		rr->rr_data = NULL;
 		rr->rr_status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
-		    "rfs_read_end:(%S)", "stale");
 		return;
 	}
 
@@ -661,8 +592,6 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 		VN_RELE(vp);
 		rr->rr_data = NULL;
 		rr->rr_status = NFSERR_ISDIR;
-		TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
-		    "rfs_read_end:(%S)", "isdir");
 		return;
 	}
 
@@ -683,45 +612,36 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 			VN_RELE(vp);
 			rr->rr_data = NULL;
 			rr->rr_status = NFSERR_ACCES;
-			TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
-			    "rfs_read_end:(%S)", " csf access error");
 			return;
 		}
 		in_crit = 1;
 	}
 
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWLOCK_START, "vop_rwlock_start:");
 	error = VOP_RWLOCK(vp, V_WRITELOCK_FALSE, &ct);
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWLOCK_END, "vop_rwlock_end:");
 
 	/* check if a monitor detected a delegation conflict */
 	if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK)) {
 		VN_RELE(vp);
 		/* mark as wouldblock so response is dropped */
 		curthread->t_flag |= T_WOULDBLOCK;
-		TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
-		    "rfs_read_end:(%S)", "delegated");
+
 		rr->rr_data = NULL;
 		return;
 	}
 
 	va.va_mask = AT_ALL;
-	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
+
 	error = VOP_GETATTR(vp, &va, 0, cr, &ct);
-	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
 
 	if (error) {
-		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START,
-		    "vop_rwunlock_start:");
 		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 		if (in_crit)
 			nbl_end_crit(vp);
-		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END, "vop_rwunlock_end:");
+
 		VN_RELE(vp);
 		rr->rr_data = NULL;
 		rr->rr_status = puterrno(error);
-		TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
-		    "rfs_read_end:(%S)", "getattr error");
+
 		return;
 	}
 
@@ -731,51 +651,41 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 	 * is always allowed to read it.
 	 */
 	if (crgetuid(cr) != va.va_uid) {
-		TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_START, "vop_access_start:");
 		error = VOP_ACCESS(vp, VREAD, 0, cr, &ct);
-		TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_END, "vop_access_end:");
+
 		if (error) {
 			/*
 			 * Exec is the same as read over the net because
 			 * of demand loading.
 			 */
-			TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_START,
-			    "vop_access_start:");
 			error = VOP_ACCESS(vp, VEXEC, 0, cr, &ct);
-			TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_END,
-			    "vop_access_end:");
 		}
 		if (error) {
-			TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START,
-			    "vop_rwunlock_start:");
 			VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 			if (in_crit)
 				nbl_end_crit(vp);
-			TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END,
-			    "vop_rwunlock_end:");
 			VN_RELE(vp);
 			rr->rr_data = NULL;
 			rr->rr_status = puterrno(error);
-			TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
-			    "rfs_read_end:(%S)", "access error");
+
 			return;
 		}
 	}
 
 	if (MANDLOCK(vp, va.va_mode)) {
-		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START,
-		    "vop_rwunlock_start:");
 		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 		if (in_crit)
 			nbl_end_crit(vp);
-		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END, "vop_rwunlock_end:");
+
 		VN_RELE(vp);
 		rr->rr_data = NULL;
 		rr->rr_status = NFSERR_ACCES;
-		TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
-		    "rfs_read_end:(%S)", "mand lock");
+
 		return;
 	}
+
+	rr->rr_ok.rrok_wlist_len = 0;
+	rr->rr_ok.rrok_wlist = NULL;
 
 	if ((u_offset_t)ra->ra_offset >= va.va_size) {
 		rr->rr_count = 0;
@@ -788,25 +698,32 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 		goto done;
 	}
 
-	/*
-	 * mp will contain the data to be sent out in the read reply.
-	 * This will be freed after the reply has been sent out (by the
-	 * driver).
-	 * Let's roundup the data to a BYTES_PER_XDR_UNIT multiple, so
-	 * that the call to xdrmblk_putmblk() never fails.
-	 */
-	mp = allocb_wait(RNDUP(ra->ra_count), BPRI_MED, STR_NOSIG,
-	    &alloc_err);
-	ASSERT(mp != NULL);
-	ASSERT(alloc_err == 0);
+	if (ra->ra_wlist) {
+		mp = NULL;
+		rr->rr_mp = NULL;
+		(void) rdma_get_wchunk(req, &iov, ra->ra_wlist);
+	} else {
+		/*
+		 * mp will contain the data to be sent out in the read reply.
+		 * This will be freed after the reply has been sent out (by the
+		 * driver).
+		 * Let's roundup the data to a BYTES_PER_XDR_UNIT multiple, so
+		 * that the call to xdrmblk_putmblk() never fails.
+		 */
+		mp = allocb_wait(RNDUP(ra->ra_count), BPRI_MED, STR_NOSIG,
+		    &alloc_err);
+		ASSERT(mp != NULL);
+		ASSERT(alloc_err == 0);
 
-	rr->rr_mp = mp;
+		rr->rr_mp = mp;
 
-	/*
-	 * Set up io vector
-	 */
-	iov.iov_base = (caddr_t)mp->b_datap->db_base;
-	iov.iov_len = ra->ra_count;
+		/*
+		 * Set up io vector
+		 */
+		iov.iov_base = (caddr_t)mp->b_datap->db_base;
+		iov.iov_len = ra->ra_count;
+	}
+
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_segflg = UIO_SYSSPACE;
@@ -814,12 +731,11 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 	uio.uio_loffset = (offset_t)ra->ra_offset;
 	uio.uio_resid = ra->ra_count;
 
-	TRACE_0(TR_FAC_NFS, TR_VOP_READ_START, "vop_read_start:");
 	error = VOP_READ(vp, &uio, 0, cr, &ct);
-	TRACE_0(TR_FAC_NFS, TR_VOP_READ_END, "vop_read_end:");
 
 	if (error) {
-		freeb(mp);
+		if (mp)
+			freeb(mp);
 
 		/*
 		 * check if a monitor detected a delegation conflict and
@@ -830,16 +746,13 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 		else
 			rr->rr_status = puterrno(error);
 
-		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START,
-		    "vop_rwunlock_start:");
 		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 		if (in_crit)
 			nbl_end_crit(vp);
-		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END, "vop_rwunlock_end:");
+
 		VN_RELE(vp);
 		rr->rr_data = NULL;
-		TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
-		    "rfs_read_end:(%S)", "read error");
+
 		return;
 	}
 
@@ -848,59 +761,50 @@ rfs_read(struct nfsreadargs *ra, struct nfsrdresult *rr,
 	 * time to the client side for his cache.
 	 */
 	va.va_mask = AT_ALL;
-	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
+
 	error = VOP_GETATTR(vp, &va, 0, cr, &ct);
-	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
+
 	if (error) {
-		freeb(mp);
-		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START,
-		    "vop_rwunlock_start:");
+		if (mp)
+			freeb(mp);
+
 		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 		if (in_crit)
 			nbl_end_crit(vp);
-		TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END,
-		    "vop_rwunlock_end:");
+
 		VN_RELE(vp);
 		rr->rr_data = NULL;
 		rr->rr_status = puterrno(error);
-		TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
-		    "rfs_read_end:(%S)", "read error");
+
 		return;
 	}
 
 	rr->rr_count = (uint32_t)(ra->ra_count - uio.uio_resid);
 
-	rr->rr_data = (char *)mp->b_datap->db_base;
-
+	if (mp) {
+		rr->rr_data = (char *)mp->b_datap->db_base;
+	} else {
+		if (ra->ra_wlist) {
+			rr->rr_data = (caddr_t)iov.iov_base;
+			if (!rdma_setup_read_data2(ra, rr)) {
+				rr->rr_data = NULL;
+				rr->rr_status = puterrno(NFSERR_INVAL);
+			}
+		}
+	}
 done:
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START, "vop_rwunlock_start:");
 	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &ct);
 	if (in_crit)
 		nbl_end_crit(vp);
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END, "vop_rwunlock_end:");
 
 	acl_perm(vp, exi, &va, cr);
 
 	/* check for overflows */
 	error = vattr_to_nattr(&va, &rr->rr_attr);
 
-#if 0 /* notyet */
-	/*
-	 * Don't do this.  It causes local disk writes when just
-	 * reading the file and the overhead is deemed larger
-	 * than the benefit.
-	 */
-	/*
-	 * Force modified metadata out to stable storage.
-	 */
-	(void) VOP_FSYNC(vp, FNODSYNC, cr, NULL);
-#endif
-
 	VN_RELE(vp);
 
 	rr->rr_status = puterrno(error);
-
-	TRACE_1(TR_FAC_NFS, TR_RFS_READ_END, "rfs_read_end:(%S)", "done");
 }
 
 /*
@@ -955,29 +859,21 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 	int in_crit = 0;
 	caller_context_t ct;
 
-	TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_START, "rfs_write_start:(%S)", "sync");
-
 	vp = nfs_fhtovp(&wa->wa_fhandle, exi);
 	if (vp == NULL) {
 		ns->ns_status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_END,
-		    "rfs_write_end:(%S)", "stale");
 		return;
 	}
 
 	if (rdonly(exi, req)) {
 		VN_RELE(vp);
 		ns->ns_status = NFSERR_ROFS;
-		TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_END,
-		    "rfs_write_end:(%S)", "rofs");
 		return;
 	}
 
 	if (vp->v_type != VREG) {
 		VN_RELE(vp);
 		ns->ns_status = NFSERR_ISDIR;
-		TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_END,
-		    "rfs_write_end:(%S)", "isdir");
 		return;
 	}
 
@@ -987,15 +883,13 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 	ct.cc_flags = CC_DONTBLOCK;
 
 	va.va_mask = AT_UID|AT_MODE;
-	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
+
 	error = VOP_GETATTR(vp, &va, 0, cr, &ct);
-	TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
 
 	if (error) {
 		VN_RELE(vp);
 		ns->ns_status = puterrno(error);
-		TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_END,
-		    "rfs_write_end:(%S)", "getattr error");
+
 		return;
 	}
 
@@ -1005,14 +899,11 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		 * with read only permission.  The owner of the file
 		 * is always allowed to write it.
 		 */
-		TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_START, "vop_access_start:");
 		error = VOP_ACCESS(vp, VWRITE, 0, cr, &ct);
-		TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_END, "vop_access_end:");
+
 		if (error) {
 			VN_RELE(vp);
 			ns->ns_status = puterrno(error);
-			TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_END,
-			    "rfs_write_end:(%S)", "access error");
 			return;
 		}
 	}
@@ -1025,8 +916,6 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 	if (MANDLOCK(vp, va.va_mode)) {
 		VN_RELE(vp);
 		ns->ns_status = NFSERR_ACCES;
-		TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_END,
-		    "rfs_write_end:(%S)", "mand lock");
 		return;
 	}
 
@@ -1044,23 +933,25 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		}
 	}
 
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWLOCK_START, "vop_rwlock_start:");
 	error = VOP_RWLOCK(vp, V_WRITELOCK_TRUE, &ct);
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWLOCK_END, "vop_rwlock_end:");
 
 	/* check if a monitor detected a delegation conflict */
 	if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK)) {
 		VN_RELE(vp);
 		/* mark as wouldblock so response is dropped */
 		curthread->t_flag |= T_WOULDBLOCK;
-		TRACE_1(TR_FAC_NFS, TR_RFS_READ_END,
-		    "rfs_write_end:(%S)", "delegated");
 		return;
 	}
 
-	if (wa->wa_data) {
-		iov[0].iov_base = wa->wa_data;
-		iov[0].iov_len = wa->wa_count;
+	if (wa->wa_data || wa->wa_rlist) {
+		/* Do the RDMA thing if necessary */
+		if (wa->wa_rlist) {
+			iov[0].iov_base = (char *)((wa->wa_rlist)->u.c_daddr3);
+			iov[0].iov_len = wa->wa_count;
+		} else  {
+			iov[0].iov_base = wa->wa_data;
+			iov[0].iov_len = wa->wa_count;
+		}
 		uio.uio_iov = iov;
 		uio.uio_iovcnt = 1;
 		uio.uio_segflg = UIO_SYSSPACE;
@@ -1079,8 +970,6 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		/*
 		 * for now we assume no append mode
 		 */
-		TRACE_1(TR_FAC_NFS, TR_VOP_WRITE_START,
-		    "vop_write_start:(%S)", "sync");
 		/*
 		 * We're changing creds because VM may fault and we need
 		 * the cred of the current thread to be used if quota
@@ -1090,7 +979,6 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		curthread->t_cred = cr;
 		error = VOP_WRITE(vp, &uio, FSYNC, cr, &ct);
 		curthread->t_cred = savecred;
-		TRACE_0(TR_FAC_NFS, TR_VOP_WRITE_END, "vop_write_end:");
 	} else {
 		iovcnt = 0;
 		for (m = wa->wa_mblk; m != NULL; m = m->b_cont)
@@ -1125,8 +1013,6 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		/*
 		 * For now we assume no append mode.
 		 */
-		TRACE_1(TR_FAC_NFS, TR_VOP_WRITE_START,
-		    "vop_write_start:(%S)", "iov sync");
 		/*
 		 * We're changing creds because VM may fault and we need
 		 * the cred of the current thread to be used if quota
@@ -1136,15 +1022,12 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		curthread->t_cred = cr;
 		error = VOP_WRITE(vp, &uio, FSYNC, cr, &ct);
 		curthread->t_cred = savecred;
-		TRACE_0(TR_FAC_NFS, TR_VOP_WRITE_END, "vop_write_end:");
 
 		if (iovp != iov)
 			kmem_free(iovp, sizeof (*iovp) * iovcnt);
 	}
 
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START, "vop_rwunlock_start:");
 	VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, &ct);
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END, "vop_rwunlock_end:");
 
 	if (!error) {
 		/*
@@ -1152,9 +1035,9 @@ rfs_write_sync(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		 * time to the client side for his cache.
 		 */
 		va.va_mask = AT_ALL;	/* now we want everything */
-		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
+
 		error = VOP_GETATTR(vp, &va, 0, cr, &ct);
-		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
+
 		/* check for overflows */
 		if (!error) {
 			acl_perm(vp, exi, &va, cr);
@@ -1174,7 +1057,6 @@ out:
 	else
 		ns->ns_status = puterrno(error);
 
-	TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_END, "rfs_write_end:(%S)", "sync");
 }
 
 struct rfs_async_write {
@@ -1246,9 +1128,6 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		return;
 	}
 
-	TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_START,
-	    "rfs_write_start:(%S)", "async");
-
 	/*
 	 * Initialize status to RFSWRITE_INITVAL instead of 0, since value of 0
 	 * is considered an OK.
@@ -1297,8 +1176,7 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		while (nrp->ns->ns_status == RFSWRITE_INITVAL)
 			cv_wait(&lp->cv, &rfs_async_write_lock);
 		mutex_exit(&rfs_async_write_lock);
-		TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_END,
-		    "rfs_write_end:(%S)", "cluster child");
+
 		return;
 	}
 
@@ -1346,8 +1224,7 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		}
 		cv_broadcast(&nlp->cv);
 		mutex_exit(&rfs_async_write_lock);
-		TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_END,
-		    "rfs_write_end:(%S)", "stale");
+
 		return;
 	}
 
@@ -1373,8 +1250,7 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		}
 		cv_broadcast(&nlp->cv);
 		mutex_exit(&rfs_async_write_lock);
-		TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_END,
-		    "rfs_write_end:(%S)", "isdir");
+
 		return;
 	}
 
@@ -1396,9 +1272,7 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 	 * Lock the file for writing.  This operation provides
 	 * the delay which allows clusters to grow.
 	 */
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWLOCK_START, "vop_wrlock_start:");
 	error = VOP_RWLOCK(vp, V_WRITELOCK_TRUE, &ct);
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWLOCK_END, "vop_wrlock_end");
 
 	/* check if a monitor detected a delegation conflict */
 	if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK)) {
@@ -1414,8 +1288,7 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		}
 		cv_broadcast(&nlp->cv);
 		mutex_exit(&rfs_async_write_lock);
-		TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_END,
-		    "rfs_write_end:(%S)", "delegated");
+
 		return;
 	}
 
@@ -1470,9 +1343,9 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		}
 
 		va.va_mask = AT_UID|AT_MODE;
-		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
+
 		error = VOP_GETATTR(vp, &va, 0, rp->cr, &ct);
-		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
+
 		if (!error) {
 			if (crgetuid(rp->cr) != va.va_uid) {
 				/*
@@ -1481,11 +1354,7 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 				 * owner of the file is always allowed to
 				 * write it.
 				 */
-				TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_START,
-				    "vop_access_start:");
 				error = VOP_ACCESS(vp, VWRITE, 0, rp->cr, &ct);
-				TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_END,
-				    "vop_access_end:");
 			}
 			if (!error && MANDLOCK(vp, va.va_mode))
 				error = EACCES;
@@ -1538,7 +1407,7 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		iovcnt = 0;
 		lrp = rp;
 		for (;;) {
-			if (lrp->wa->wa_data)
+			if (lrp->wa->wa_data || lrp->wa->wa_rlist)
 				iovcnt++;
 			else {
 				m = lrp->wa->wa_mblk;
@@ -1575,9 +1444,16 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		trp = rp;
 		count = 0;
 		do {
-			if (trp->wa->wa_data) {
-				iovp->iov_base = trp->wa->wa_data;
-				iovp->iov_len = trp->wa->wa_count;
+			if (trp->wa->wa_data || trp->wa->wa_rlist) {
+				if (trp->wa->wa_rlist) {
+					iovp->iov_base =
+					    (char *)((trp->wa->wa_rlist)->
+					    u.c_daddr3);
+					iovp->iov_len = trp->wa->wa_count;
+				} else  {
+					iovp->iov_base = trp->wa->wa_data;
+					iovp->iov_len = trp->wa->wa_count;
+				}
 				iovp++;
 			} else {
 				m = trp->wa->wa_mblk;
@@ -1616,8 +1492,6 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		/*
 		 * For now we assume no append mode.
 		 */
-		TRACE_1(TR_FAC_NFS, TR_VOP_WRITE_START,
-		    "vop_write_start:(%S)", "async");
 
 		/*
 		 * We're changing creds because VM may fault
@@ -1629,7 +1503,6 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 		curthread->t_cred = cr;
 		error = VOP_WRITE(vp, &uio, 0, rp->cr, &ct);
 		curthread->t_cred = savecred;
-		TRACE_0(TR_FAC_NFS, TR_VOP_WRITE_END, "vop_write_end:");
 
 		/* check if a monitor detected a delegation conflict */
 		if (error == EAGAIN && (ct.cc_flags & CC_WOULDBLOCK))
@@ -1646,11 +1519,9 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 			 * time to the client side for his cache.
 			 */
 			va.va_mask = AT_ALL;	/* now we want everything */
-			TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START,
-			    "vop_getattr_start:");
+
 			error = VOP_GETATTR(vp, &va, 0, rp->cr, &ct);
-			TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END,
-			    "vop_getattr_end:");
+
 			if (!error)
 				acl_perm(vp, exi, &va, rp->cr);
 		}
@@ -1678,20 +1549,14 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 	 * the data and metadata to stable storage.
 	 */
 	if (data_written) {
-		TRACE_0(TR_FAC_NFS, TR_VOP_PUTPAGE_START, "vop_putpage_start:");
 		error = VOP_PUTPAGE(vp, (u_offset_t)off, len, 0, cr, &ct);
-		TRACE_0(TR_FAC_NFS, TR_VOP_PUTPAGE_END, "vop_putpage_end:");
+
 		if (!error) {
-			TRACE_0(TR_FAC_NFS, TR_VOP_FSYNC_START,
-			    "vop_fsync_start:");
 			error = VOP_FSYNC(vp, FNODSYNC, cr, &ct);
-			TRACE_0(TR_FAC_NFS, TR_VOP_FSYNC_END, "vop_fsync_end:");
 		}
 	}
 
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START, "vop_rwunlock_start:");
 	VOP_RWUNLOCK(vp, V_WRITELOCK_TRUE, &ct);
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END, "vop_rwunlock_end:");
 
 	if (in_crit)
 		nbl_end_crit(vp);
@@ -1708,7 +1573,6 @@ rfs_write(struct nfswriteargs *wa, struct nfsattrstat *ns,
 	cv_broadcast(&nlp->cv);
 	mutex_exit(&rfs_async_write_lock);
 
-	TRACE_1(TR_FAC_NFS, TR_RFS_WRITE_END, "rfs_write_end:(%S)", "async");
 }
 
 void *
@@ -1739,31 +1603,23 @@ rfs_create(struct nfscreatargs *args, struct nfsdiropres *dr,
 	int lookup_ok;
 	bool_t trunc;
 
-	TRACE_0(TR_FAC_NFS, TR_RFS_CREATE_START, "rfs_create_start:");
-
 	/*
 	 * Disallow NULL paths
 	 */
 	if (name == NULL || *name == '\0') {
 		dr->dr_status = NFSERR_ACCES;
-		TRACE_1(TR_FAC_NFS, TR_RFS_CREATE_END,
-		    "rfs_create_end:(%S)", "access");
 		return;
 	}
 
 	dvp = nfs_fhtovp(args->ca_da.da_fhandle, exi);
 	if (dvp == NULL) {
 		dr->dr_status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_CREATE_END,
-		    "rfs_create_end:(%S)", "stale");
 		return;
 	}
 
 	error = sattr_to_vattr(args->ca_sa, &va);
 	if (error) {
 		dr->dr_status = puterrno(error);
-		TRACE_1(TR_FAC_NFS, TR_RFS_CREATE_END,
-		    "rfs_create_end:(%S)", "sattr");
 		return;
 	}
 
@@ -1773,8 +1629,6 @@ rfs_create(struct nfscreatargs *args, struct nfsdiropres *dr,
 	if (!(va.va_mask & AT_MODE)) {
 		VN_RELE(dvp);
 		dr->dr_status = NFSERR_INVAL;
-		TRACE_1(TR_FAC_NFS, TR_RFS_CREATE_END,
-		    "rfs_create_end:(%S)", "no mode");
 		return;
 	}
 
@@ -1827,20 +1681,14 @@ rfs_create(struct nfscreatargs *args, struct nfsdiropres *dr,
 	lookup_ok = 0;
 	mode = VWRITE;
 	if (!(va.va_mask & AT_SIZE) || va.va_type != VREG) {
-		TRACE_0(TR_FAC_NFS, TR_VOP_LOOKUP_START, "vop_lookup_start:");
 		error = VOP_LOOKUP(dvp, name, &tvp, NULL, 0, NULL, cr,
 		    NULL, NULL, NULL);
-		TRACE_0(TR_FAC_NFS, TR_VOP_LOOKUP_END, "vop_lookup_end:");
 		if (!error) {
 			struct vattr at;
 
 			lookup_ok = 1;
 			at.va_mask = AT_MODE;
-			TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START,
-			    "vop_getattr_start:");
 			error = VOP_GETATTR(tvp, &at, 0, cr, NULL);
-			TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END,
-			    "vop_getattr_end:");
 			if (!error)
 				mode = (at.va_mode & S_IWUSR) ? VWRITE : VREAD;
 			VN_RELE(tvp);
@@ -1925,10 +1773,8 @@ rfs_create(struct nfscreatargs *args, struct nfsdiropres *dr,
 		    exi->exi_export.ex_flags & EX_NOSUID)
 			va.va_mode &= ~(VSUID | VSGID);
 
-		TRACE_0(TR_FAC_NFS, TR_VOP_CREATE_START, "vop_create_start:");
 		error = VOP_CREATE(dvp, name, &va, NONEXCL, mode, &vp, cr, 0,
 		    NULL, NULL);
-		TRACE_0(TR_FAC_NFS, TR_VOP_CREATE_END, "vop_create_end:");
 
 		if (!error) {
 
@@ -1943,11 +1789,9 @@ rfs_create(struct nfscreatargs *args, struct nfsdiropres *dr,
 				goto out;
 			}
 			va.va_mask = AT_ALL;
-			TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START,
-			    "vop_getattr_start:");
+
 			error = VOP_GETATTR(vp, &va, 0, cr, NULL);
-			TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END,
-			    "vop_getattr_end:");
+
 			/* check for overflows */
 			if (!error) {
 				acl_perm(vp, exi, &va, cr);
@@ -1986,7 +1830,6 @@ out:
 
 	dr->dr_status = puterrno(error);
 
-	TRACE_1(TR_FAC_NFS, TR_RFS_CREATE_END, "rfs_create_end:(%S)", "done");
 }
 void *
 rfs_create_getfh(struct nfscreatargs *args)
@@ -2007,31 +1850,23 @@ rfs_remove(struct nfsdiropargs *da, enum nfsstat *status,
 	vnode_t *targvp;
 	int in_crit = 0;
 
-	TRACE_0(TR_FAC_NFS, TR_RFS_REMOVE_START, "rfs_remove_start:");
-
 	/*
 	 * Disallow NULL paths
 	 */
 	if (da->da_name == NULL || *da->da_name == '\0') {
 		*status = NFSERR_ACCES;
-		TRACE_1(TR_FAC_NFS, TR_RFS_REMOVE_END,
-		    "rfs_remove_end:(%S)", "access");
 		return;
 	}
 
 	vp = nfs_fhtovp(da->da_fhandle, exi);
 	if (vp == NULL) {
 		*status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_REMOVE_END,
-		    "rfs_remove_end:(%S)", "stale");
 		return;
 	}
 
 	if (rdonly(exi, req)) {
 		VN_RELE(vp);
 		*status = NFSERR_ROFS;
-		TRACE_1(TR_FAC_NFS, TR_RFS_REMOVE_END,
-		    "rfs_remove_end:(%S)", "rofs");
 		return;
 	}
 
@@ -2070,9 +1905,7 @@ rfs_remove(struct nfsdiropargs *da, enum nfsstat *status,
 		}
 	}
 
-	TRACE_0(TR_FAC_NFS, TR_VOP_REMOVE_START, "vop_remove_start:");
 	error = VOP_REMOVE(vp, da->da_name, cr, NULL, 0);
-	TRACE_0(TR_FAC_NFS, TR_VOP_REMOVE_END, "vop_remove_end:");
 
 	/*
 	 * Force modified data and metadata out to stable storage.
@@ -2087,7 +1920,6 @@ out:
 
 	*status = puterrno(error);
 
-	TRACE_1(TR_FAC_NFS, TR_RFS_REMOVE_END, "rfs_remove_end:(%S)", "done");
 }
 
 void *
@@ -2113,13 +1945,9 @@ rfs_rename(struct nfsrnmargs *args, enum nfsstat *status,
 	vnode_t *targvp;
 	int in_crit = 0;
 
-	TRACE_0(TR_FAC_NFS, TR_RFS_RENAME_START, "rfs_rename_start:");
-
 	fromvp = nfs_fhtovp(args->rna_from.da_fhandle, exi);
 	if (fromvp == NULL) {
 		*status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_RENAME_END,
-		    "rfs_rename_end:(%S)", "from stale");
 		return;
 	}
 
@@ -2128,8 +1956,6 @@ rfs_rename(struct nfsrnmargs *args, enum nfsstat *status,
 	if (to_exi == NULL) {
 		VN_RELE(fromvp);
 		*status = NFSERR_ACCES;
-		TRACE_1(TR_FAC_NFS, TR_RFS_RENAME_END,
-		    "rfs_rename_end:(%S)", "cross device");
 		return;
 	}
 	exi_rele(to_exi);
@@ -2137,8 +1963,6 @@ rfs_rename(struct nfsrnmargs *args, enum nfsstat *status,
 	if (to_exi != exi) {
 		VN_RELE(fromvp);
 		*status = NFSERR_XDEV;
-		TRACE_1(TR_FAC_NFS, TR_RFS_RENAME_END,
-		    "rfs_rename_end:(%S)", "from stale");
 		return;
 	}
 
@@ -2146,16 +1970,12 @@ rfs_rename(struct nfsrnmargs *args, enum nfsstat *status,
 	if (tovp == NULL) {
 		VN_RELE(fromvp);
 		*status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_RENAME_END,
-		    "rfs_rename_end:(%S)", "to stale");
 		return;
 	}
 
 	if (fromvp->v_type != VDIR || tovp->v_type != VDIR) {
 		VN_RELE(tovp);
 		VN_RELE(fromvp);
-		TRACE_1(TR_FAC_NFS, TR_RFS_RENAME_END,
-		    "rfs_rename_end:(%S)", "not dir");
 		*status = NFSERR_NOTDIR;
 		return;
 	}
@@ -2168,8 +1988,6 @@ rfs_rename(struct nfsrnmargs *args, enum nfsstat *status,
 		VN_RELE(tovp);
 		VN_RELE(fromvp);
 		*status = NFSERR_ACCES;
-		TRACE_1(TR_FAC_NFS, TR_RFS_RENAME_END,
-		    "rfs_rename_end:(%S)", "access");
 		return;
 	}
 
@@ -2177,8 +1995,6 @@ rfs_rename(struct nfsrnmargs *args, enum nfsstat *status,
 		VN_RELE(tovp);
 		VN_RELE(fromvp);
 		*status = NFSERR_ROFS;
-		TRACE_1(TR_FAC_NFS, TR_RFS_RENAME_END,
-		    "rfs_rename_end:(%S)", "rofs");
 		return;
 	}
 
@@ -2231,10 +2047,8 @@ rfs_rename(struct nfsrnmargs *args, enum nfsstat *status,
 		}
 	}
 
-	TRACE_0(TR_FAC_NFS, TR_VOP_RENAME_START, "vop_rename_start:");
 	error = VOP_RENAME(fromvp, args->rna_from.da_name,
 	    tovp, args->rna_to.da_name, cr, NULL, 0);
-	TRACE_0(TR_FAC_NFS, TR_VOP_RENAME_END, "vop_rename_end:");
 
 	if (error == 0)
 		vn_renamepath(tovp, srcvp, args->rna_to.da_name,
@@ -2255,7 +2069,6 @@ out:
 
 	*status = puterrno(error);
 
-	TRACE_1(TR_FAC_NFS, TR_RFS_RENAME_END, "rfs_rename_end:(%S)", "done");
 }
 void *
 rfs_rename_getfh(struct nfsrnmargs *args)
@@ -2277,13 +2090,9 @@ rfs_link(struct nfslinkargs *args, enum nfsstat *status,
 	struct exportinfo *to_exi;
 	fhandle_t *fh;
 
-	TRACE_0(TR_FAC_NFS, TR_RFS_LINK_START, "rfs_link_start:");
-
 	fromvp = nfs_fhtovp(args->la_from, exi);
 	if (fromvp == NULL) {
 		*status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_LINK_END,
-		    "rfs_link_end:(%S)", "from stale");
 		return;
 	}
 
@@ -2292,8 +2101,6 @@ rfs_link(struct nfslinkargs *args, enum nfsstat *status,
 	if (to_exi == NULL) {
 		VN_RELE(fromvp);
 		*status = NFSERR_ACCES;
-		TRACE_1(TR_FAC_NFS, TR_RFS_LINK_END,
-		    "rfs_link_end:(%S)", "cross device");
 		return;
 	}
 	exi_rele(to_exi);
@@ -2301,8 +2108,6 @@ rfs_link(struct nfslinkargs *args, enum nfsstat *status,
 	if (to_exi != exi) {
 		VN_RELE(fromvp);
 		*status = NFSERR_XDEV;
-		TRACE_1(TR_FAC_NFS, TR_RFS_LINK_END,
-		    "rfs_link_end:(%S)", "cross device");
 		return;
 	}
 
@@ -2310,8 +2115,6 @@ rfs_link(struct nfslinkargs *args, enum nfsstat *status,
 	if (tovp == NULL) {
 		VN_RELE(fromvp);
 		*status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_LINK_END,
-		    "rfs_link_end:(%S)", "to stale");
 		return;
 	}
 
@@ -2319,8 +2122,6 @@ rfs_link(struct nfslinkargs *args, enum nfsstat *status,
 		VN_RELE(tovp);
 		VN_RELE(fromvp);
 		*status = NFSERR_NOTDIR;
-		TRACE_1(TR_FAC_NFS, TR_RFS_LINK_END,
-		    "rfs_link_end:(%S)", "not dir");
 		return;
 	}
 	/*
@@ -2330,8 +2131,6 @@ rfs_link(struct nfslinkargs *args, enum nfsstat *status,
 		VN_RELE(tovp);
 		VN_RELE(fromvp);
 		*status = NFSERR_ACCES;
-		TRACE_1(TR_FAC_NFS, TR_RFS_LINK_END,
-		    "rfs_link_end:(%S)", "access");
 		return;
 	}
 
@@ -2339,14 +2138,10 @@ rfs_link(struct nfslinkargs *args, enum nfsstat *status,
 		VN_RELE(tovp);
 		VN_RELE(fromvp);
 		*status = NFSERR_ROFS;
-		TRACE_1(TR_FAC_NFS, TR_RFS_LINK_END,
-		    "rfs_link_end:(%S)", "rofs");
 		return;
 	}
 
-	TRACE_0(TR_FAC_NFS, TR_VOP_LINK_START, "vop_link_start:");
 	error = VOP_LINK(tovp, fromvp, args->la_to.da_name, cr, NULL, 0);
-	TRACE_0(TR_FAC_NFS, TR_VOP_LINK_END, "vop_link_end:");
 
 	/*
 	 * Force modified data and metadata out to stable storage.
@@ -2359,7 +2154,6 @@ rfs_link(struct nfslinkargs *args, enum nfsstat *status,
 
 	*status = puterrno(error);
 
-	TRACE_1(TR_FAC_NFS, TR_RFS_LINK_END, "rfs_link_end:(%S)", "done");
 }
 void *
 rfs_link_getfh(struct nfslinkargs *args)
@@ -2382,31 +2176,23 @@ rfs_symlink(struct nfsslargs *args, enum nfsstat *status,
 	vnode_t *svp;
 	int lerror;
 
-	TRACE_0(TR_FAC_NFS, TR_RFS_SYMLINK_START, "rfs_symlink_start:");
-
 	/*
 	 * Disallow NULL paths
 	 */
 	if (args->sla_from.da_name == NULL || *args->sla_from.da_name == '\0') {
 		*status = NFSERR_ACCES;
-		TRACE_1(TR_FAC_NFS, TR_RFS_SYMLINK_END,
-		    "rfs_symlink_end:(%S)", "access");
 		return;
 	}
 
 	vp = nfs_fhtovp(args->sla_from.da_fhandle, exi);
 	if (vp == NULL) {
 		*status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_SYMLINK_END,
-		    "rfs_symlink_end:(%S)", "stale");
 		return;
 	}
 
 	if (rdonly(exi, req)) {
 		VN_RELE(vp);
 		*status = NFSERR_ROFS;
-		TRACE_1(TR_FAC_NFS, TR_RFS_SYMLINK_END,
-		    "rfs_symlink_end:(%S)", "rofs");
 		return;
 	}
 
@@ -2414,34 +2200,27 @@ rfs_symlink(struct nfsslargs *args, enum nfsstat *status,
 	if (error) {
 		VN_RELE(vp);
 		*status = puterrno(error);
-		TRACE_1(TR_FAC_NFS, TR_RFS_SYMLINK_END,
-		    "rfs_symlink_end:(%S)", "sattr");
 		return;
 	}
 
 	if (!(va.va_mask & AT_MODE)) {
 		VN_RELE(vp);
 		*status = NFSERR_INVAL;
-		TRACE_1(TR_FAC_NFS, TR_RFS_SYMLINK_END,
-		    "rfs_symlink_end:(%S)", "no mode");
 		return;
 	}
 
 	va.va_type = VLNK;
 	va.va_mask |= AT_TYPE;
 
-	TRACE_0(TR_FAC_NFS, TR_VOP_SYMLINK_START, "vop_symlink_start:");
 	error = VOP_SYMLINK(vp, args->sla_from.da_name, &va, args->sla_tnm, cr,
 	    NULL, 0);
-	TRACE_0(TR_FAC_NFS, TR_VOP_SYMLINK_END, "vop_symlink_end:");
 
 	/*
 	 * Force new data and metadata out to stable storage.
 	 */
-	TRACE_0(TR_FAC_NFS, TR_VOP_LOOKUP_START, "vop_lookup_start:");
 	lerror = VOP_LOOKUP(vp, args->sla_from.da_name, &svp, NULL,
 	    0, NULL, cr, NULL, NULL, NULL);
-	TRACE_0(TR_FAC_NFS, TR_VOP_LOOKUP_END, "vop_lookup_end:");
+
 	if (!lerror) {
 		(void) VOP_FSYNC(svp, 0, cr, NULL);
 		VN_RELE(svp);
@@ -2456,7 +2235,6 @@ rfs_symlink(struct nfsslargs *args, enum nfsstat *status,
 
 	*status = puterrno(error);
 
-	TRACE_1(TR_FAC_NFS, TR_RFS_SYMLINK_END, "rfs_symlink_end:(%S)", "done");
 }
 void *
 rfs_symlink_getfh(struct nfsslargs *args)
@@ -2479,31 +2257,23 @@ rfs_mkdir(struct nfscreatargs *args, struct nfsdiropres *dr,
 	vnode_t *vp;
 	char *name = args->ca_da.da_name;
 
-	TRACE_0(TR_FAC_NFS, TR_RFS_MKDIR_START, "rfs_mkdir_start:");
-
 	/*
 	 * Disallow NULL paths
 	 */
 	if (name == NULL || *name == '\0') {
 		dr->dr_status = NFSERR_ACCES;
-		TRACE_1(TR_FAC_NFS, TR_RFS_MKDIR_END,
-		    "rfs_mkdir_end:(%S)", "access");
 		return;
 	}
 
 	vp = nfs_fhtovp(args->ca_da.da_fhandle, exi);
 	if (vp == NULL) {
 		dr->dr_status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_MKDIR_END,
-		    "rfs_mkdir_end:(%S)", "stale");
 		return;
 	}
 
 	if (rdonly(exi, req)) {
 		VN_RELE(vp);
 		dr->dr_status = NFSERR_ROFS;
-		TRACE_1(TR_FAC_NFS, TR_RFS_MKDIR_END,
-		    "rfs_mkdir_end:(%S)", "rofs");
 		return;
 	}
 
@@ -2511,25 +2281,19 @@ rfs_mkdir(struct nfscreatargs *args, struct nfsdiropres *dr,
 	if (error) {
 		VN_RELE(vp);
 		dr->dr_status = puterrno(error);
-		TRACE_1(TR_FAC_NFS, TR_RFS_MKDIR_END,
-		    "rfs_mkdir_end:(%S)", "sattr");
 		return;
 	}
 
 	if (!(va.va_mask & AT_MODE)) {
 		VN_RELE(vp);
 		dr->dr_status = NFSERR_INVAL;
-		TRACE_1(TR_FAC_NFS, TR_RFS_MKDIR_END,
-		    "rfs_mkdir_end:(%S)", "no mode");
 		return;
 	}
 
 	va.va_type = VDIR;
 	va.va_mask |= AT_TYPE;
 
-	TRACE_0(TR_FAC_NFS, TR_VOP_MKDIR_START, "vop_mkdir_start:");
 	error = VOP_MKDIR(vp, name, &va, &dvp, cr, NULL, 0, NULL);
-	TRACE_0(TR_FAC_NFS, TR_VOP_MKDIR_END, "vop_mkdir_end:");
 
 	if (!error) {
 		/*
@@ -2537,9 +2301,8 @@ rfs_mkdir(struct nfscreatargs *args, struct nfsdiropres *dr,
 		 * be returned to the client.
 		 */
 		va.va_mask = AT_ALL; /* We want everything */
-		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_START, "vop_getattr_start:");
 		error = VOP_GETATTR(dvp, &va, 0, cr, NULL);
-		TRACE_0(TR_FAC_NFS, TR_VOP_GETATTR_END, "vop_getattr_end:");
+
 		/* check for overflows */
 		if (!error) {
 			acl_perm(vp, exi, &va, cr);
@@ -2564,7 +2327,6 @@ rfs_mkdir(struct nfscreatargs *args, struct nfsdiropres *dr,
 
 	dr->dr_status = puterrno(error);
 
-	TRACE_1(TR_FAC_NFS, TR_RFS_MKDIR_END, "rfs_mkdir_end:(%S)", "done");
 }
 void *
 rfs_mkdir_getfh(struct nfscreatargs *args)
@@ -2583,31 +2345,24 @@ rfs_rmdir(struct nfsdiropargs *da, enum nfsstat *status,
 	int error;
 	vnode_t *vp;
 
-	TRACE_0(TR_FAC_NFS, TR_RFS_RMDIR_START, "rfs_rmdir_start:");
 
 	/*
 	 * Disallow NULL paths
 	 */
 	if (da->da_name == NULL || *da->da_name == '\0') {
 		*status = NFSERR_ACCES;
-		TRACE_1(TR_FAC_NFS, TR_RFS_RMDIR_END,
-		    "rfs_rmdir_end:(%S)", "access");
 		return;
 	}
 
 	vp = nfs_fhtovp(da->da_fhandle, exi);
 	if (vp == NULL) {
 		*status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_RMDIR_END,
-		    "rfs_rmdir_end:(%S)", "stale");
 		return;
 	}
 
 	if (rdonly(exi, req)) {
 		VN_RELE(vp);
 		*status = NFSERR_ROFS;
-		TRACE_1(TR_FAC_NFS, TR_RFS_RMDIR_END,
-		    "rfs_rmdir_end:(%S)", "rofs");
 		return;
 	}
 
@@ -2620,9 +2375,7 @@ rfs_rmdir(struct nfsdiropargs *da, enum nfsstat *status,
 	 * supplying a vnode known to exist and illegal to
 	 * remove.
 	 */
-	TRACE_0(TR_FAC_NFS, TR_VOP_RMDIR_START, "vop_rmdir_start:");
 	error = VOP_RMDIR(vp, da->da_name, rootdir, cr, NULL, 0);
-	TRACE_0(TR_FAC_NFS, TR_VOP_RMDIR_END, "vop_rmdir_end:");
 
 	/*
 	 * Force modified data and metadata out to stable storage.
@@ -2642,7 +2395,6 @@ rfs_rmdir(struct nfsdiropargs *da, enum nfsstat *status,
 	else
 		*status = puterrno(error);
 
-	TRACE_1(TR_FAC_NFS, TR_RFS_RMDIR_END, "rfs_rmdir_end:(%S)", "done");
 }
 void *
 rfs_rmdir_getfh(struct nfsdiropargs *da)
@@ -2661,14 +2413,10 @@ rfs_readdir(struct nfsrddirargs *rda, struct nfsrddirres *rd,
 	struct uio uio;
 	vnode_t *vp;
 
-	TRACE_0(TR_FAC_NFS, TR_RFS_READDIR_START, "rfs_readdir_start:");
-
 	vp = nfs_fhtovp(&rda->rda_fh, exi);
 	if (vp == NULL) {
 		rd->rd_entries = NULL;
 		rd->rd_status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_READDIR_END,
-		    "rfs_readdir_end:(%S)", "stale");
 		return;
 	}
 
@@ -2676,18 +2424,13 @@ rfs_readdir(struct nfsrddirargs *rda, struct nfsrddirres *rd,
 		VN_RELE(vp);
 		rd->rd_entries = NULL;
 		rd->rd_status = NFSERR_NOTDIR;
-		TRACE_1(TR_FAC_NFS, TR_RFS_READDIR_END,
-		    "rfs_readdir_end:(%S)", "notdir");
 		return;
 	}
 
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWLOCK_START, "vop_rwlock_start:");
 	(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, NULL);
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWLOCK_END, "vop_rwlock_end:");
 
-	TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_START, "vop_access_start:");
 	error = VOP_ACCESS(vp, VREAD, 0, cr, NULL);
-	TRACE_0(TR_FAC_NFS, TR_VOP_ACCESS_END, "vop_access_end:");
+
 	if (error) {
 		rd->rd_entries = NULL;
 		goto bad;
@@ -2723,9 +2466,7 @@ rfs_readdir(struct nfsrddirargs *rda, struct nfsrddirres *rd,
 	/*
 	 * read directory
 	 */
-	TRACE_0(TR_FAC_NFS, TR_VOP_READDIR_START, "vop_readdir_start:");
 	error = VOP_READDIR(vp, &uio, cr, &iseof, NULL, 0);
-	TRACE_0(TR_FAC_NFS, TR_VOP_READDIR_END, "vop_readdir_end:");
 
 	/*
 	 * Clean up
@@ -2745,9 +2486,7 @@ rfs_readdir(struct nfsrddirargs *rda, struct nfsrddirres *rd,
 	}
 
 bad:
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_START, "vop_rwunlock_start:");
 	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
-	TRACE_0(TR_FAC_NFS, TR_VOP_RWUNLOCK_END, "vop_rwunlock_end:");
 
 #if 0 /* notyet */
 	/*
@@ -2765,7 +2504,6 @@ bad:
 
 	rd->rd_status = puterrno(error);
 
-	TRACE_1(TR_FAC_NFS, TR_RFS_READDIR_END, "rfs_readdir_end:(%S)", "done");
 }
 void *
 rfs_readdir_getfh(struct nfsrddirargs *rda)
@@ -2788,13 +2526,9 @@ rfs_statfs(fhandle_t *fh, struct nfsstatfs *fs, struct exportinfo *exi,
 	struct statvfs64 sb;
 	vnode_t *vp;
 
-	TRACE_0(TR_FAC_NFS, TR_RFS_STATFS_START, "rfs_statfs_start:");
-
 	vp = nfs_fhtovp(fh, exi);
 	if (vp == NULL) {
 		fs->fs_status = NFSERR_STALE;
-		TRACE_1(TR_FAC_NFS, TR_RFS_STATFS_END,
-		    "rfs_statfs_end:(%S)", "stale");
 		return;
 	}
 
@@ -2812,7 +2546,6 @@ rfs_statfs(fhandle_t *fh, struct nfsstatfs *fs, struct exportinfo *exi,
 
 	fs->fs_status = puterrno(error);
 
-	TRACE_1(TR_FAC_NFS, TR_RFS_STATFS_END, "rfs_statfs_end:(%S)", "done");
 }
 void *
 rfs_statfs_getfh(fhandle_t *fh)
@@ -3114,4 +2847,48 @@ void
 rfs_srvrfini(void)
 {
 	mutex_destroy(&rfs_async_write_lock);
+}
+
+static int
+rdma_setup_read_data2(struct nfsreadargs *ra, struct nfsrdresult *rr)
+{
+	struct clist	*wcl;
+	int		data_len, avail_len, num;
+	uint32_t	count = rr->rr_count;
+
+	data_len = num = avail_len = 0;
+
+	wcl = ra->ra_wlist;
+	while (wcl != NULL) {
+		if (wcl->c_dmemhandle.mrc_rmr == 0)
+			break;
+
+		avail_len += wcl->c_len;
+		if (wcl->c_len < count) {
+			data_len += wcl->c_len;
+		} else {
+			/* Can make the rest chunks all 0-len */
+			data_len += count;
+			wcl->c_len = count;
+		}
+		count -= wcl->c_len;
+		num ++;
+		wcl = wcl->c_next;
+	}
+
+	/*
+	 * MUST fail if there are still more data
+	 */
+	if (count > 0) {
+		DTRACE_PROBE2(nfss__e__read__wlist__fail,
+		    int, data_len, int, count);
+		return (FALSE);
+	}
+
+	wcl = ra->ra_wlist;
+	rr->rr_count = data_len;
+	rr->rr_ok.rrok_wlist_len = data_len;
+	rr->rr_ok.rrok_wlist = wcl;
+
+	return (TRUE);
 }

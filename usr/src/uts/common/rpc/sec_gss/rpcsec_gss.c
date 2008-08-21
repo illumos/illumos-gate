@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
  *
@@ -1571,4 +1569,12 @@ int
 rpc_gss_max_data_length(AUTH *rpcgss_handle, int max_tp_unit_len)
 {
 	return (0);
+}
+
+rpc_gss_service_t
+rpc_gss_get_service_type(AUTH *auth)
+{
+	rpc_gss_data		*ap = AUTH_PRIVATE(auth);
+
+	return (ap->service);
 }

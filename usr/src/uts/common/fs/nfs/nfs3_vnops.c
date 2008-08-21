@@ -28,8 +28,6 @@
  *	All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -67,6 +65,7 @@
 #include <rpc/types.h>
 #include <rpc/auth.h>
 #include <rpc/clnt.h>
+#include <rpc/rpc_rdma.h>
 
 #include <nfs/nfs.h>
 #include <nfs/nfs_clnt.h>
@@ -476,6 +475,8 @@ nfs3_directio_read(vnode_t *vp, struct uio *uiop, cred_t *cr)
 
 	res.uiop = uiop;
 
+	res.wlist = NULL;
+
 	offset = uiop->uio_loffset;
 	count = uiop->uio_resid;
 
@@ -491,6 +492,9 @@ nfs3_directio_read(vnode_t *vp, struct uio *uiop, cred_t *cr)
 			args.offset = (offset3)offset;
 			args.count = (count3)tsize;
 			res.size = (uint_t)tsize;
+			args.res_uiop = uiop;
+			args.res_data_val_alt = NULL;
+
 			error = rfs3call(mi, NFSPROC3_READ,
 			    xdr_READ3args, (caddr_t)&args,
 			    xdr_READ3uiores, (caddr_t)&res, cr,
@@ -1111,6 +1115,7 @@ nfs3read(vnode_t *vp, caddr_t base, offset_t offset, int count,
 	res.pov.fres.vp = vp;
 	res.pov.fres.vap = &va;
 
+	res.wlist = NULL;
 	*residp = count;
 	do {
 		if (mi->mi_io_kstats) {
@@ -1130,6 +1135,9 @@ nfs3read(vnode_t *vp, caddr_t base, offset_t offset, int count,
 			res.data.data_len = tsize;
 			args.offset = (offset3)offset;
 			args.count = (count3)tsize;
+			args.res_uiop = NULL;
+			args.res_data_val_alt = base;
+
 			t = gethrtime();
 			error = rfs3call(mi, NFSPROC3_READ,
 			    xdr_READ3args, (caddr_t)&args,
@@ -1667,7 +1675,7 @@ nfs3_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr, caller_context_t *ct)
 	t = gethrtime();
 
 	error = rfs3call(VTOMI(vp), NFSPROC3_READLINK,
-	    xdr_nfs_fh3, (caddr_t)&args,
+	    xdr_READLINK3args, (caddr_t)&args,
 	    xdr_READLINK3res, (caddr_t)&res, cr,
 	    &douprintf, &res.status, 0, &fi);
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,19 +19,16 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <rpc/types.h>
 #include <rpc/xdr.h>
 #include <sys/types.h>
+#include <sys/sdt.h>
 #include <rpc/auth.h>
 #include <rpc/rpc_rdma.h>
-
-static struct xdr_ops *xdrrdma_xops(void);
 
 struct private {
 	int	min_chunk;
@@ -40,6 +36,8 @@ struct private {
 	int	num_chunk;
 	caddr_t	inline_buf;		/* temporary buffer for xdr inlining */
 	int	inline_len;		/* inline buffer length */
+	uint_t	xp_reply_chunk_len;
+	uint_t	xp_reply_chunk_len_alt;
 };
 
 /* ARGSUSED */
@@ -60,7 +58,7 @@ x_putbytes(XDR *xdrs, char *bp, int len)
 	 * min_chunk = 0, means that the stream of bytes, to estimate size of,
 	 * contains no chunks to seperate out. See xdrrdma_putbytes()
 	 */
-	if (len < xdrp->min_chunk || (xdrp->flags & RDMA_NOCHUNK)) {
+	if (len < xdrp->min_chunk || !(xdrp->flags & XDR_RDMA_CHUNK)) {
 		xdrs->x_handy += len;
 		return (TRUE);
 	}
@@ -68,6 +66,7 @@ x_putbytes(XDR *xdrs, char *bp, int len)
 	 * Chunk item. No impact on xdr size.
 	 */
 	xdrp->num_chunk++;
+
 	return (TRUE);
 }
 
@@ -91,10 +90,12 @@ x_control(XDR *xdrs, int request, void *info)
 {
 	int32_t *int32p;
 	uint_t in_flags;
+	rdma_chunkinfo_t *rcip = NULL;
+	rdma_chunkinfo_lengths_t *rcilp = NULL;
 	struct private *xdrp = (struct private *)xdrs->x_private;
 
 	switch (request) {
-	case XDR_RDMASET:
+	case XDR_RDMA_SET_FLAGS:
 		/*
 		 * Set the flags provided in the *info in xp_flags for rdma xdr
 		 * stream control.
@@ -105,13 +106,38 @@ x_control(XDR *xdrs, int request, void *info)
 		xdrp->flags = in_flags;
 		return (TRUE);
 
-	case XDR_RDMAGET:
+	case XDR_RDMA_GET_FLAGS:
 		/*
 		 * Get the flags provided in xp_flags return through *info
 		 */
 		int32p = (int32_t *)info;
 
 		*int32p = (int32_t)xdrp->flags;
+		return (TRUE);
+
+	case XDR_RDMA_GET_CHUNK_LEN:
+		rcilp = (rdma_chunkinfo_lengths_t *)info;
+		rcilp->rcil_len = xdrp->xp_reply_chunk_len;
+		rcilp->rcil_len_alt = xdrp->xp_reply_chunk_len_alt;
+
+		return (TRUE);
+
+	case XDR_RDMA_ADD_CHUNK:
+		rcip = (rdma_chunkinfo_t *)info;
+
+		switch (rcip->rci_type) {
+		case RCI_WRITE_UIO_CHUNK:
+			xdrp->xp_reply_chunk_len_alt += rcip->rci_len;
+			break;
+
+		case RCI_WRITE_ADDR_CHUNK:
+			xdrp->xp_reply_chunk_len_alt += rcip->rci_len;
+			break;
+
+		case RCI_REPLY_CHUNK:
+			xdrp->xp_reply_chunk_len += rcip->rci_len;
+			break;
+		}
 		return (TRUE);
 
 	default:
@@ -187,14 +213,18 @@ xdrrdma_common(XDR *xdrs, int min_chunk)
 	xdrp = (struct private *)xdrs->x_private;
 	xdrp->min_chunk = min_chunk;
 	xdrp->flags = 0;
-	if (xdrp->min_chunk == 0)
-		xdrp->flags |= RDMA_NOCHUNK;
+	if (xdrp->min_chunk != 0)
+		xdrp->flags |= XDR_RDMA_CHUNK;
+
+	xdrp->xp_reply_chunk_len = 0;
+	xdrp->xp_reply_chunk_len_alt = 0;
 
 	return (TRUE);
 }
 
 unsigned int
-xdrrdma_sizeof(xdrproc_t func, void *data, int min_chunk)
+xdrrdma_sizeof(xdrproc_t func, void *data, int min_chunk,
+    uint_t *reply_size, uint_t *reply_size_alt)
 {
 	XDR x;
 	struct xdr_ops ops;
@@ -207,6 +237,10 @@ xdrrdma_sizeof(xdrproc_t func, void *data, int min_chunk)
 	stat = func(&x, data);
 	xdrp = (struct private *)x.x_private;
 	if (xdrp) {
+		if (reply_size != NULL)
+			*reply_size = xdrp->xp_reply_chunk_len;
+		if (reply_size_alt != NULL)
+			*reply_size_alt = xdrp->xp_reply_chunk_len_alt;
 		if (xdrp->inline_buf)
 			mem_free(xdrp->inline_buf, xdrp->inline_len);
 		mem_free(xdrp, sizeof (struct private));
@@ -235,7 +269,7 @@ xdrrdma_authsize(AUTH *auth, struct cred *cred, int min_chunk)
 	return (stat == TRUE ? (unsigned int)x.x_handy: 0);
 }
 
-static struct xdr_ops *
+struct xdr_ops *
 xdrrdma_xops(void)
 {
 	static struct xdr_ops ops;

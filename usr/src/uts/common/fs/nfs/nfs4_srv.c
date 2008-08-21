@@ -28,8 +28,6 @@
  *	All Rights Reserved
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -80,9 +78,11 @@
 #define	RFS4_MAXLOCK_TRIES 4	/* Try to get the lock this many times */
 static int rfs4_maxlock_tries = RFS4_MAXLOCK_TRIES;
 #define	RFS4_LOCK_DELAY 10	/* Milliseconds */
-static clock_t rfs4_lock_delay = RFS4_LOCK_DELAY;
-
+static clock_t  rfs4_lock_delay = RFS4_LOCK_DELAY;
+extern struct svc_ops rdma_svc_ops;
 /* End of Tunables */
+
+static int rdma_setup_read_data4(READ4args *, READ4res *);
 
 /*
  * Used to bump the stateid4.seqid value and show changes in the stateid
@@ -144,13 +144,13 @@ time_t rfs4_start_time;			/* Initialized in rfs4_srvrinit */
 
 static sysid_t lockt_sysid;		/* dummy sysid for all LOCKT calls */
 
-u_longlong_t nfs4_srv_caller_id;
-uint_t nfs4_srv_vkey = 0;
+u_longlong_t	nfs4_srv_caller_id;
+uint_t		nfs4_srv_vkey = 0;
 
 verifier4	Write4verf;
 verifier4	Readdir4verf;
 
-void		rfs4_init_compound_state(struct compound_state *);
+void	rfs4_init_compound_state(struct compound_state *);
 
 static void	nullfree(caddr_t);
 static void	rfs4_op_inval(nfs_argop4 *, nfs_resop4 *, struct svc_req *,
@@ -264,11 +264,11 @@ static nfsstat4	do_rfs4_set_attrs(bitmap4 *resp, fattr4 *fattrp,
 		    struct compound_state *cs, struct nfs4_svgetit_arg *sargp,
 		    struct nfs4_ntov_table *ntovp, nfs4_attr_cmd_t cmd);
 
-fem_t	*deleg_rdops;
-fem_t	*deleg_wrops;
+fem_t		*deleg_rdops;
+fem_t		*deleg_wrops;
 
-rfs4_servinst_t	*rfs4_cur_servinst = NULL;	/* current server instance */
-kmutex_t	rfs4_servinst_lock;		/* protects linked list */
+rfs4_servinst_t *rfs4_cur_servinst = NULL;	/* current server instance */
+kmutex_t	rfs4_servinst_lock;	/* protects linked list */
 int		rfs4_seen_first_compound;	/* set first time we see one */
 
 /*
@@ -332,10 +332,10 @@ static struct rfsv4disp rfsv4disptab[] = {
 	{rfs4_op_locku, nullfree, 0},
 
 	/* OP_LOOKUP = 15 */
-	{rfs4_op_lookup, nullfree, (RPC_IDEMPOTENT|RPC_PUBLICFH_OK)},
+	{rfs4_op_lookup, nullfree, (RPC_IDEMPOTENT | RPC_PUBLICFH_OK)},
 
 	/* OP_LOOKUPP = 16 */
-	{rfs4_op_lookupp, nullfree, (RPC_IDEMPOTENT|RPC_PUBLICFH_OK)},
+	{rfs4_op_lookupp, nullfree, (RPC_IDEMPOTENT | RPC_PUBLICFH_OK)},
 
 	/* OP_NVERIFY = 17 */
 	{rfs4_op_nverify, nullfree, RPC_IDEMPOTENT},
@@ -413,12 +413,12 @@ static uint_t rfsv4disp_cnt = sizeof (rfsv4disptab) / sizeof (rfsv4disptab[0]);
 
 #ifdef DEBUG
 
-int rfs4_fillone_debug = 0;
-int rfs4_shrlock_debug = 0;
-int rfs4_no_stub_access = 1;
-int rfs4_rddir_debug = 0;
+int		rfs4_fillone_debug = 0;
+int		rfs4_shrlock_debug = 0;
+int		rfs4_no_stub_access = 1;
+int		rfs4_rddir_debug = 0;
 
-static char *rfs4_op_string[] = {
+static char    *rfs4_op_string[] = {
 	"rfs4_op_null",
 	"rfs4_op_1 unused",
 	"rfs4_op_2 unused",
@@ -463,9 +463,9 @@ static char *rfs4_op_string[] = {
 };
 #endif
 
-void rfs4_ss_chkclid(rfs4_client_t *);
+void	rfs4_ss_chkclid(rfs4_client_t *);
 
-extern size_t strlcpy(char *dst, const char *src, size_t dstsize);
+extern size_t   strlcpy(char *dst, const char *src, size_t dstsize);
 
 #ifdef	nextdp
 #undef nextdp
@@ -1321,8 +1321,8 @@ rfs4_op_access(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		    (!is_system_labeled() || admin_low_client ||
 		    blequal(clabel, slabel)))
 			resp->access |=
-			    (args->access & (ACCESS4_MODIFY|ACCESS4_EXTEND));
-		resp->supported |= (ACCESS4_MODIFY|ACCESS4_EXTEND);
+			    (args->access & (ACCESS4_MODIFY | ACCESS4_EXTEND));
+		resp->supported |= (ACCESS4_MODIFY | ACCESS4_EXTEND);
 	}
 
 	if (checkwriteperm &&
@@ -2218,8 +2218,8 @@ do_rfs4_op_getattr(bitmap4 breq, fattr4 *fattrp,
 		amap = ntov.amap;
 		for (i = 0; i < ntov.attrcnt; i++, na++, amap++) {
 			if (!(*nfs4_ntov_map[*amap].xfunc)(&xdr, na)) {
-				cmn_err(CE_WARN, "do_rfs4_op_getattr: xdr "
-				    "encode of attribute %d failed\n", *amap);
+				DTRACE_PROBE1(nfss__e__getattr4_encfail,
+				    int, *amap);
 				status = NFS4ERR_SERVERFAULT;
 				break;
 			}
@@ -3120,6 +3120,9 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		resp->data_len = 0;
 		resp->data_val = NULL;
 		resp->mblk = NULL;
+		/* RDMA */
+		resp->wlist = args->wlist;
+		resp->wlist_len = resp->data_len;
 		*cs->statusp = resp->status = NFS4_OK;
 		goto out;
 	}
@@ -3130,6 +3133,9 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		resp->data_len = 0;
 		resp->data_val = NULL;
 		resp->mblk = NULL;
+		/* RDMA */
+		resp->wlist = args->wlist;
+		resp->wlist_len = resp->data_len;
 		goto out;
 	}
 
@@ -3141,26 +3147,36 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 		args->count = rfs4_tsize(req);
 
 	/*
-	 * mp will contain the data to be sent out in the read reply.
-	 * It will be freed after the reply has been sent.
-	 * Let's roundup the data to a BYTES_PER_XDR_UNIT multiple,
-	 * so that the call to xdrmblk_putmblk() never fails.
-	 * If the first alloc of the requested size fails, then
-	 * decrease the size to something more reasonable and wait
-	 * for the allocation to occur.
+	 * If returning data via RDMA Write, then grab the chunk list. If we
+	 * aren't returning READ data w/RDMA_WRITE, then grab a mblk.
 	 */
-	mp = allocb(RNDUP(args->count), BPRI_MED);
-	if (mp == NULL) {
-		if (args->count > MAXBSIZE)
-			args->count = MAXBSIZE;
-		mp = allocb_wait(RNDUP(args->count), BPRI_MED,
-		    STR_NOSIG, &alloc_err);
-	}
-	ASSERT(mp != NULL);
-	ASSERT(alloc_err == 0);
+	if (args->wlist) {
+		mp = NULL;
+		(void) rdma_get_wchunk(req, &iov, args->wlist);
+	} else {
+		/*
+		 * mp will contain the data to be sent out in the read reply.
+		 * It will be freed after the reply has been sent. Let's
+		 * roundup the data to a BYTES_PER_XDR_UNIT multiple, so that
+		 * the call to xdrmblk_putmblk() never fails. If the first
+		 * alloc of the requested size fails, then decrease the size to
+		 * something more reasonable and wait for the allocation to
+		 * occur.
+		 */
+		mp = allocb(RNDUP(args->count), BPRI_MED);
+		if (mp == NULL) {
+			if (args->count > MAXBSIZE)
+				args->count = MAXBSIZE;
+			mp = allocb_wait(RNDUP(args->count), BPRI_MED,
+			    STR_NOSIG, &alloc_err);
+		}
+		ASSERT(mp != NULL);
+		ASSERT(alloc_err == 0);
 
-	iov.iov_base = (caddr_t)mp->b_datap->db_base;
-	iov.iov_len = args->count;
+		iov.iov_base = (caddr_t)mp->b_datap->db_base;
+		iov.iov_len = args->count;
+	}
+
 	uio.uio_iov = &iov;
 	uio.uio_iovcnt = 1;
 	uio.uio_segflg = UIO_SYSSPACE;
@@ -3183,13 +3199,25 @@ rfs4_op_read(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 
 	ASSERT(uio.uio_resid >= 0);
 	resp->data_len = args->count - uio.uio_resid;
-	resp->data_val = (char *)mp->b_datap->db_base;
+	if (mp) {
+		resp->data_val = (char *)mp->b_datap->db_base;
+	} else {
+		resp->data_val = (caddr_t)iov.iov_base;
+	}
 	resp->mblk = mp;
 
 	if (!verror && offset + resp->data_len == va.va_size)
 		resp->eof = TRUE;
 	else
 		resp->eof = FALSE;
+
+	if (args->wlist) {
+		if (!rdma_setup_read_data4(args, resp)) {
+			*cs->statusp = resp->status = NFS4ERR_INVAL;
+		}
+	} else {
+		resp->wlist = NULL;
+	}
 
 out:
 	if (in_crit)
@@ -3202,7 +3230,7 @@ out:
 static void
 rfs4_op_read_free(nfs_resop4 *resop)
 {
-	READ4res *resp = &resop->nfs_resop4_u.opread;
+	READ4res	*resp = &resop->nfs_resop4_u.opread;
 
 	if (resp->status == NFS4_OK && resp->mblk != NULL) {
 		freeb(resp->mblk);
@@ -3213,9 +3241,9 @@ rfs4_op_read_free(nfs_resop4 *resop)
 }
 
 static void
-rfs4_op_readdir_free(nfs_resop4 *resop)
+rfs4_op_readdir_free(nfs_resop4 * resop)
 {
-	READDIR4res *resp = &resop->nfs_resop4_u.opreaddir;
+	READDIR4res    *resp = &resop->nfs_resop4_u.opreaddir;
 
 	if (resp->status == NFS4_OK && resp->mblk != NULL) {
 		freeb(resp->mblk);
@@ -3228,13 +3256,13 @@ rfs4_op_readdir_free(nfs_resop4 *resop)
 /* ARGSUSED */
 static void
 rfs4_op_putpubfh(nfs_argop4 *args, nfs_resop4 *resop, struct svc_req *req,
-	struct compound_state *cs)
+    struct compound_state *cs)
 {
-	PUTPUBFH4res *resp = &resop->nfs_resop4_u.opputpubfh;
-	int error;
-	vnode_t *vp;
+	PUTPUBFH4res	*resp = &resop->nfs_resop4_u.opputpubfh;
+	int		error;
+	vnode_t		*vp;
 	struct exportinfo *exi, *sav_exi;
-	nfs_fh4_fmt_t *fh_fmtp;
+	nfs_fh4_fmt_t	*fh_fmtp;
 
 	DTRACE_NFSV4_1(op__putpubfh__start, struct compound_state *, cs);
 
@@ -5378,6 +5406,11 @@ rfs4_op_write(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 			iovp = kmem_alloc(sizeof (*iovp) * iovcnt, KM_SLEEP);
 		}
 		mblk_to_iov(args->mblk, iovcnt, iovp);
+	} else if (args->rlist != NULL) {
+		iovcnt = 1;
+		iovp = iov;
+		iovp->iov_base = (char *)((args->rlist)->u.c_daddr3);
+		iovp->iov_len = args->data_len;
 	} else {
 		iovcnt = 1;
 		iovp = iov;
@@ -9081,4 +9114,47 @@ void
 rfs4_unshare(rfs4_state_t *sp)
 {
 	(void) rfs4_shrlock(sp, F_UNSHARE);
+}
+
+static int
+rdma_setup_read_data4(READ4args * args, READ4res * rok)
+{
+	struct clist	*wcl;
+	int		data_len, avail_len, num;
+	count4		count = rok->data_len;
+
+	data_len = num = avail_len = 0;
+
+	wcl = args->wlist;
+	while (wcl != NULL) {
+		if (wcl->c_dmemhandle.mrc_rmr == 0)
+			break;
+
+		avail_len += wcl->c_len;
+		if (wcl->c_len < count) {
+			data_len += wcl->c_len;
+		} else {
+			/* Can make the rest chunks all 0-len */
+			data_len += count;
+			wcl->c_len = count;
+		}
+		count -= wcl->c_len;
+		num++;
+		wcl = wcl->c_next;
+	}
+
+	/*
+	 * MUST fail if there are still more data
+	 */
+	if (count > 0) {
+		DTRACE_PROBE2(nfss__e__read4_wlist_fail,
+		    int, data_len, int, count);
+		return (FALSE);
+	}
+	wcl = args->wlist;
+	rok->data_len = data_len;
+	rok->wlist_len = data_len;
+	rok->wlist = wcl;
+
+	return (TRUE);
 }

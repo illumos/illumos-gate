@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/asm_linkage.h>
 
 #if defined(__lint)
@@ -1014,6 +1012,7 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(rpcsec_gss, rpc_gss_get_versions,	nomod_zero);
 	NO_UNLOAD_STUB(rpcsec_gss, rpc_gss_max_data_length,	nomod_zero);
 	NO_UNLOAD_STUB(rpcsec_gss, rpc_gss_svc_max_data_length,	nomod_zero);
+	NO_UNLOAD_STUB(rpcsec_gss, rpc_gss_get_service_type,	nomod_zero);
 	END_MODULE(rpcsec_gss);
 #endif
 

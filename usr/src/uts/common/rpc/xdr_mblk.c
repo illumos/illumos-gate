@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * xdr_mblk.c, XDR implementation on kernel streams mblks.
@@ -116,7 +114,7 @@ xdrmblk_getint32(XDR *xdrs, int32_t *int32p)
 	 * align the mblk.
 	 */
 	if (!IS_P2ALIGNED(m->b_rptr, sizeof (int32_t)) ||
-			xdrs->x_handy < sizeof (int32_t)) {
+	    xdrs->x_handy < sizeof (int32_t)) {
 		while (!pullupmsg(m, sizeof (int32_t))) {
 			/*
 			 * Could have failed due to not
@@ -167,7 +165,7 @@ xdrmblk_putint32(XDR *xdrs, int32_t *int32p)
 			return (FALSE);
 		}
 		xdrs->x_handy = (int)(m->b_datap->db_lim - m->b_rptr -
-			    sizeof (int32_t));
+		    sizeof (int32_t));
 		ASSERT(m->b_rptr == m->b_wptr);
 		ASSERT(m->b_rptr >= m->b_datap->db_base);
 		ASSERT(m->b_rptr < m->b_datap->db_lim);
@@ -267,8 +265,6 @@ xdrmblk_getmblk(XDR *xdrs, mblk_t **mm, uint_t *lenp)
 	}
 	if (len < llen) {
 		if (m == NULL) {
-			/* not enough data in XDR stream */
-			printf("xdrmblk_getmblk failed\n");
 			return (FALSE);
 		} else {
 			int tail_bytes = llen - len;
@@ -530,7 +526,7 @@ xdrmblk_control(XDR *xdrs, int request, void *info)
 		int32p = (int32_t *)info;
 		len = RNDUP((int)(*int32p));
 		if (len < 0)
-		    return (FALSE);
+			return (FALSE);
 		while ((xdrs->x_handy -= len) < 0) {
 			if ((xdrs->x_handy += len) > 0) {
 				m->b_rptr += xdrs->x_handy;

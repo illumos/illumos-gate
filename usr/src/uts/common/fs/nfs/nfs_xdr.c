@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -41,6 +38,7 @@
 #include <sys/strsubr.h>
 #include <sys/debug.h>
 #include <sys/t_lock.h>
+#include <sys/sdt.h>
 
 #include <rpc/types.h>
 #include <rpc/xdr.h>
@@ -128,7 +126,8 @@ xdr_writeargs(XDR *xdrs, struct nfswriteargs *wa)
 	int32_t *ptr;
 	int32_t *fhp;
 
-	if (xdrs->x_op == XDR_DECODE) {
+	switch (xdrs->x_op) {
+	case XDR_DECODE:
 		wa->wa_args = &wa->wa_args_buf;
 		ptr = XDR_INLINE(xdrs, RNDUP(sizeof (fhandle_t)) +
 		    3 * BYTES_PER_XDR_UNIT);
@@ -153,11 +152,44 @@ xdr_writeargs(XDR *xdrs, struct nfswriteargs *wa)
 			 * an array of unknown length as to inline copy it.
 			 */
 			return (xdr_bytes(xdrs, &wa->wa_data,
-				    &wa->wa_count, NFS_MAXDATA));
+			    &wa->wa_count, NFS_MAXDATA));
 		}
-	}
+		if (xdr_fhandle(xdrs, &wa->wa_fhandle) &&
+		    xdr_u_int(xdrs, &wa->wa_begoff) &&
+		    xdr_u_int(xdrs, &wa->wa_offset) &&
+		    xdr_u_int(xdrs, &wa->wa_totcount)) {
+			/* deal with the variety of data transfer types */
 
-	if (xdrs->x_op == XDR_ENCODE) {
+			wa->wa_mblk = NULL;
+			wa->wa_data = NULL;
+			wa->wa_rlist = NULL;
+			wa->wa_conn = NULL;
+
+			if (xdrs->x_ops == &xdrmblk_ops) {
+				if (xdrmblk_getmblk(xdrs, &wa->wa_mblk,
+				    &wa->wa_count) == TRUE)
+					return (TRUE);
+			} else {
+				if (xdrs->x_ops == &xdrrdmablk_ops) {
+					if (xdrrdma_getrdmablk(xdrs,
+					    &wa->wa_rlist,
+					    &wa->wa_count,
+					    &wa->wa_conn,
+					    NFS_MAXDATA) == TRUE)
+					return (xdrrdma_read_from_client(
+					    &wa->wa_rlist,
+					    &wa->wa_conn,
+					    wa->wa_count));
+
+					wa->wa_rlist = NULL;
+					wa->wa_conn = NULL;
+				}
+			}
+			return (xdr_bytes(xdrs, &wa->wa_data,
+			    &wa->wa_count, NFS_MAXDATA));
+		}
+		return (FALSE);
+	case XDR_ENCODE:
 		ptr = XDR_INLINE(xdrs, RNDUP(sizeof (fhandle_t)) +
 		    3 * BYTES_PER_XDR_UNIT);
 		if (ptr != NULL) {
@@ -180,42 +212,19 @@ xdr_writeargs(XDR *xdrs, struct nfswriteargs *wa)
 			    xdr_u_int(xdrs, &wa->wa_totcount)))
 				return (FALSE);
 		}
-#if 0 /* notdef */
-		if (wa->wa_mblk != NULL && xdrs->x_ops == &xdrmblk_ops) {
-			mblk_t *mp;
 
-			mp = dupb(wa->wa_mblk);
-			if (mp != NULL) {
-				mp->b_wptr += wa->wa_count;
-				if (xdrmblk_putmblk(xdrs, mp,
-				    wa->wa_count) == TRUE) {
-					return (TRUE);
-				} else
-					freeb(mp);
-			}
-			/* else Fall thru for the xdr_bytes() */
-		}
-		/* wa_mblk == NULL || xdrs->x_ops != &xdrmblk_ops Fall thru */
-#endif /* notdef */
 		return (xdr_bytes(xdrs, &wa->wa_data, &wa->wa_count,
 		    NFS_MAXDATA));
-	}
+	case XDR_FREE:
+		if (wa->wa_rlist) {
+			(void) xdrrdma_free_clist(wa->wa_conn, wa->wa_rlist);
+			wa->wa_rlist = NULL;
+		}
 
-	if (xdrs->x_op == XDR_FREE) {
 		if (wa->wa_data != NULL) {
 			kmem_free(wa->wa_data, wa->wa_count);
 			wa->wa_data = NULL;
 		}
-		return (TRUE);
-	}
-
-	if (xdr_fhandle(xdrs, &wa->wa_fhandle) &&
-	    xdr_u_int(xdrs, &wa->wa_begoff) &&
-	    xdr_u_int(xdrs, &wa->wa_offset) &&
-	    xdr_u_int(xdrs, &wa->wa_totcount) &&
-	    (xdrs->x_op == XDR_DECODE && xdrs->x_ops == &xdrmblk_ops) ?
-	    xdrmblk_getmblk(xdrs, &wa->wa_mblk, &wa->wa_count) :
-	    xdr_bytes(xdrs, &wa->wa_data, &wa->wa_count, NFS_MAXDATA)) {
 		return (TRUE);
 	}
 	return (FALSE);
@@ -324,6 +333,25 @@ xdr_fastfattr(XDR *xdrs, struct nfsfattr *na)
 }
 #endif
 
+bool_t
+xdr_readlink(XDR *xdrs, fhandle_t *fh)
+{
+	rdma_chunkinfo_t rci;
+	struct xdr_ops *xops = xdrrdma_xops();
+
+	if (xdr_fhandle(xdrs, fh)) {
+		if ((xdrs->x_ops == &xdrrdma_ops || xdrs->x_ops == xops) &&
+		    xdrs->x_op == XDR_ENCODE) {
+			rci.rci_type = RCI_REPLY_CHUNK;
+			rci.rci_len = MAXPATHLEN;
+			XDR_CONTROL(xdrs, XDR_RDMA_ADD_CHUNK, &rci);
+		}
+
+		return (TRUE);
+	}
+	return (FALSE);
+}
+
 /*
  * Arguments to remote read
  */
@@ -332,12 +360,15 @@ xdr_readargs(XDR *xdrs, struct nfsreadargs *ra)
 {
 	int32_t *ptr;
 	int32_t *fhp;
+	rdma_chunkinfo_t rci;
+	rdma_wlist_conn_info_t rwci;
+	struct xdr_ops *xops = xdrrdma_xops();
 
 	if (xdrs->x_op == XDR_FREE)
 		return (TRUE);
 
 	ptr = XDR_INLINE(xdrs,
-			RNDUP(sizeof (fhandle_t)) + 3 * BYTES_PER_XDR_UNIT);
+	    RNDUP(sizeof (fhandle_t)) + 3 * BYTES_PER_XDR_UNIT);
 	if (ptr != NULL) {
 		if (xdrs->x_op == XDR_DECODE) {
 			fhp = (int32_t *)&ra->ra_fhandle;
@@ -366,20 +397,47 @@ xdr_readargs(XDR *xdrs, struct nfsreadargs *ra)
 			IXDR_PUT_INT32(ptr, ra->ra_count);
 			IXDR_PUT_INT32(ptr, ra->ra_totcount);
 		}
-		if (ra->ra_count > NFS_MAXDATA)
+	} else {
+		if (!xdr_fhandle(xdrs, &ra->ra_fhandle) ||
+		    !xdr_u_int(xdrs, &ra->ra_offset) ||
+		    !xdr_u_int(xdrs, &ra->ra_count) ||
+		    !xdr_u_int(xdrs, &ra->ra_totcount)) {
 			return (FALSE);
-		return (TRUE);
+		}
 	}
 
-	if (xdr_fhandle(xdrs, &ra->ra_fhandle) &&
-	    xdr_u_int(xdrs, &ra->ra_offset) &&
-	    xdr_u_int(xdrs, &ra->ra_count) &&
-	    xdr_u_int(xdrs, &ra->ra_totcount)) {
-		if (ra->ra_count > NFS_MAXDATA)
-			return (FALSE);
-		return (TRUE);
+	if (ra->ra_count > NFS_MAXDATA)
+		return (FALSE);
+
+	ra->ra_wlist = NULL;
+	ra->ra_conn = NULL;
+
+	/* If this is xdrrdma_sizeof, record the expect response size */
+	if (xdrs->x_ops == xops && xdrs->x_op == XDR_ENCODE) {
+		rci.rci_type = RCI_WRITE_ADDR_CHUNK;
+		rci.rci_len = ra->ra_count;
+		(void) XDR_CONTROL(xdrs, XDR_RDMA_ADD_CHUNK, &rci);
 	}
-	return (FALSE);
+	/* Nothing special to do, return */
+	if (xdrs->x_ops != &xdrrdma_ops || xdrs->x_op == XDR_FREE)
+		return (TRUE);
+
+	if (xdrs->x_op == XDR_ENCODE) {
+		/* Place the target data location into the RDMA header */
+		rci.rci_type = RCI_WRITE_ADDR_CHUNK;
+		rci.rci_a.rci_addr = ra->ra_data;
+		rci.rci_len = ra->ra_count;
+		rci.rci_clpp = &ra->ra_wlist;
+
+		return (XDR_CONTROL(xdrs, XDR_RDMA_ADD_CHUNK, &rci));
+	}
+
+	/* XDR_DECODE case */
+	(void) XDR_CONTROL(xdrs, XDR_RDMA_GET_WCINFO, &rwci);
+	ra->ra_wlist = rwci.rwci_wlist;
+	ra->ra_conn = rwci.rwci_conn;
+
+	return (TRUE);
 }
 
 
@@ -391,9 +449,68 @@ xdr_rrok(XDR *xdrs, struct nfsrrok *rrok)
 {
 	bool_t ret;
 	mblk_t *mp;
+	struct xdr_ops *xops = xdrrdma_xops();
 
 	if (xdr_fattr(xdrs, &rrok->rrok_attr) == FALSE)
 		return (FALSE);
+
+	/* deal with RDMA separately */
+	if (xdrs->x_ops == &xdrrdma_ops || xdrs->x_ops == xops) {
+		if (xdrs->x_op == XDR_ENCODE &&
+		    rrok->rrok_mp != NULL) {
+			ret = xdr_bytes(xdrs, (char **)&rrok->rrok_data,
+			    &rrok->rrok_count, NFS_MAXDATA);
+			return (ret);
+		}
+
+		if (xdrs->x_op == XDR_ENCODE) {
+			if (xdr_u_int(xdrs, &rrok->rrok_count) == FALSE) {
+				return (FALSE);
+			}
+			/*
+			 * If read data sent by wlist (RDMA_WRITE), don't do
+			 * xdr_bytes() below.   RDMA_WRITE transfers the data.
+			 */
+			if (rrok->rrok_wlist) {
+				/* adjust length to match in the rdma header */
+				if (rrok->rrok_wlist->c_len !=
+				    rrok->rrok_count) {
+					rrok->rrok_wlist->c_len =
+					    rrok->rrok_count;
+				}
+				if (rrok->rrok_count != 0) {
+					return (xdrrdma_send_read_data(
+					    xdrs, rrok->rrok_wlist));
+				}
+				return (TRUE);
+			}
+			if (rrok->rrok_count == 0) {
+				return (TRUE);
+			}
+		} else {
+			struct clist *cl;
+			uint32_t count;
+
+			XDR_CONTROL(xdrs, XDR_RDMA_GET_WLIST, &cl);
+
+			if (cl) {
+				if (!xdr_u_int(xdrs, &count))
+					return (FALSE);
+				if (count == 0) {
+					rrok->rrok_wlist_len = 0;
+					rrok->rrok_count = 0;
+				} else {
+					rrok->rrok_wlist_len = cl->c_len;
+					rrok->rrok_count = cl->c_len;
+				}
+				return (TRUE);
+			}
+		}
+		ret = xdr_bytes(xdrs, (char **)&rrok->rrok_data,
+		    &rrok->rrok_count, NFS_MAXDATA);
+
+		return (ret);
+	}
 
 	if (xdrs->x_op == XDR_ENCODE) {
 		int i, rndup;
@@ -402,16 +519,17 @@ xdr_rrok(XDR *xdrs, struct nfsrrok *rrok)
 		if (mp != NULL && xdrs->x_ops == &xdrmblk_ops) {
 			mp->b_wptr += rrok->rrok_count;
 			rndup = BYTES_PER_XDR_UNIT -
-				(rrok->rrok_count % BYTES_PER_XDR_UNIT);
+			    (rrok->rrok_count % BYTES_PER_XDR_UNIT);
 			if (rndup != BYTES_PER_XDR_UNIT)
 				for (i = 0; i < rndup; i++)
 					*mp->b_wptr++ = '\0';
 			if (xdrmblk_putmblk(xdrs, mp,
-					    rrok->rrok_count) == TRUE) {
+			    rrok->rrok_count) == TRUE) {
 				rrok->rrok_mp = NULL;
 				return (TRUE);
 			}
 		}
+
 		/*
 		 * Fall thru for the xdr_bytes()
 		 *
@@ -531,12 +649,22 @@ xdr_rddirargs(XDR *xdrs, struct nfsrddirargs *rda)
 {
 	int32_t *ptr;
 	int32_t *fhp;
+	rdma_chunkinfo_t rci;
+	struct xdr_ops *xops = xdrrdma_xops();
 
 	if (xdrs->x_op == XDR_FREE)
 		return (TRUE);
 
 	ptr = XDR_INLINE(xdrs,
 	    RNDUP(sizeof (fhandle_t)) + 2 * BYTES_PER_XDR_UNIT);
+
+	if ((xdrs->x_ops == &xdrrdma_ops || xdrs->x_ops == xops) &&
+	    xdrs->x_op == XDR_ENCODE) {
+		rci.rci_type = RCI_REPLY_CHUNK;
+		rci.rci_len = rda->rda_count;
+		XDR_CONTROL(xdrs, XDR_RDMA_ADD_CHUNK, &rci);
+	}
+
 	if (ptr != NULL) {
 		if (xdrs->x_op == XDR_DECODE) {
 			fhp = (int32_t *)&rda->rda_fh;
@@ -640,8 +768,8 @@ xdr_putrddirres(XDR *xdrs, struct nfsrddirres *rd)
 
 	bufsize = 1 * BYTES_PER_XDR_UNIT;
 	for (size = rd->rd_size, dp = rd->rd_entries;
-		size > 0;
-		size -= dp->d_reclen, dp = nextdp(dp)) {
+	    size > 0;
+	    size -= dp->d_reclen, dp = nextdp(dp)) {
 		if (dp->d_reclen == 0 /* || DIRSIZ(dp) > dp->d_reclen */)
 			return (FALSE);
 		if (dp->d_ino == 0)
@@ -826,7 +954,7 @@ xdr_diropargs(XDR *xdrs, struct nfsdiropargs *da)
 			IXDR_PUT_U_INT32(ptr, (uint32_t)size);
 			bcopy(da->da_name, ptr, size);
 			rndup = BYTES_PER_XDR_UNIT -
-				(size % BYTES_PER_XDR_UNIT);
+			    (size % BYTES_PER_XDR_UNIT);
 			if (rndup != BYTES_PER_XDR_UNIT) {
 				cptr = (char *)ptr + size;
 				for (i = 0; i < rndup; i++)

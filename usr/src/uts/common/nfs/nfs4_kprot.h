@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _NFS4_KPROT_H
 #define	_NFS4_KPROT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Kernel specific version.
@@ -39,6 +36,9 @@ extern "C" {
 #endif
 
 #include <rpc/rpc.h>
+#ifdef _KERNEL
+#include <rpc/rpc_rdma.h>
+#endif
 #include <sys/stream.h>
 
 #define	NFS4_FHSIZE 128
@@ -1091,7 +1091,10 @@ struct READ4args {
 	mblk_t *res_mblk;
 	struct uio *res_uiop;
 	uint_t res_maxsize;
-
+#ifdef _KERNEL
+	struct clist *wlist;
+	CONN *conn;
+#endif
 };
 typedef struct READ4args READ4args;
 
@@ -1101,6 +1104,10 @@ struct READ4res {
 	uint_t data_len;
 	char *data_val;
 	mblk_t *mblk;
+#ifdef _KERNEL
+	struct clist *wlist;
+	uint_t wlist_len;
+#endif
 };
 typedef struct READ4res READ4res;
 
@@ -1309,6 +1316,10 @@ struct WRITE4args {
 	uint_t data_len;
 	char *data_val;
 	mblk_t *mblk;
+#ifdef _KERNEL
+	struct clist *rlist;
+	CONN *conn;
+#endif
 };
 typedef struct WRITE4args WRITE4args;
 

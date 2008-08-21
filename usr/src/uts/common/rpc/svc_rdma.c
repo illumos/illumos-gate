@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -30,8 +29,6 @@
  * 4.3 BSD under license from the Regents of the University of
  * California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Server side of RPC over RDMA in the kernel.
@@ -66,6 +63,20 @@
 #include <inet/ip.h>
 #include <inet/ip6.h>
 
+#include <nfs/nfs.h>
+#include <sys/sdt.h>
+
+#define	SVC_RDMA_SUCCESS 0
+#define	SVC_RDMA_FAIL -1
+
+#define	SVC_CREDIT_FACTOR (0.5)
+
+#define	MSG_IS_RPCSEC_GSS(msg)		\
+	((msg)->rm_reply.rp_acpt.ar_verf.oa_flavor == RPCSEC_GSS)
+
+
+uint32_t rdma_bufs_granted = RDMA_BUFS_GRANT;
+
 /*
  * RDMA transport specific data associated with SVCMASTERXPRT
  */
@@ -81,11 +92,9 @@ struct rdma_data {
 struct clone_rdma_data {
 	CONN		*conn;		/* RDMA connection */
 	rdma_buf_t	rpcbuf;		/* RPC req/resp buffer */
+	struct clist	*cl_reply;	/* reply chunk buffer info */
+	struct clist	*cl_wlist;		/* write list clist */
 };
-
-#ifdef DEBUG
-int rdma_svc_debug = 0;
-#endif
 
 #define	MAXADDRLEN	128	/* max length for address mask */
 
@@ -106,6 +115,17 @@ static void		svc_rdma_kfreeres(SVCXPRT *);
 static void		svc_rdma_kclone_destroy(SVCXPRT *);
 static void		svc_rdma_kstart(SVCMASTERXPRT *);
 void			svc_rdma_kstop(SVCMASTERXPRT *);
+
+static int	svc_process_long_reply(SVCXPRT *, xdrproc_t,
+			caddr_t, struct rpc_msg *, bool_t, int *,
+			int *, int *, unsigned int *);
+
+static int	svc_compose_rpcmsg(SVCXPRT *, CONN *, xdrproc_t,
+			caddr_t, rdma_buf_t *, XDR **, struct rpc_msg *,
+			bool_t, uint_t *);
+static bool_t rpcmsg_length(xdrproc_t,
+		caddr_t,
+		struct rpc_msg *, bool_t, int);
 
 /*
  * Server transport operations vector.
@@ -137,6 +157,9 @@ struct {
 	kstat_named_t	rsdupchecks;
 	kstat_named_t	rsdupreqs;
 	kstat_named_t	rslongrpcs;
+	kstat_named_t	rstotalreplies;
+	kstat_named_t	rstotallongreplies;
+	kstat_named_t	rstotalinlinereplies;
 } rdmarsstat = {
 	{ "calls",	KSTAT_DATA_UINT64 },
 	{ "badcalls",	KSTAT_DATA_UINT64 },
@@ -145,14 +168,16 @@ struct {
 	{ "xdrcall",	KSTAT_DATA_UINT64 },
 	{ "dupchecks",	KSTAT_DATA_UINT64 },
 	{ "dupreqs",	KSTAT_DATA_UINT64 },
-	{ "longrpcs",	KSTAT_DATA_UINT64 }
+	{ "longrpcs",	KSTAT_DATA_UINT64 },
+	{ "totalreplies",	KSTAT_DATA_UINT64 },
+	{ "totallongreplies",	KSTAT_DATA_UINT64 },
+	{ "totalinlinereplies",	KSTAT_DATA_UINT64 },
 };
 
 kstat_named_t *rdmarsstat_ptr = (kstat_named_t *)&rdmarsstat;
 uint_t rdmarsstat_ndata = sizeof (rdmarsstat) / sizeof (kstat_named_t);
 
-#define	RSSTAT_INCR(x)	rdmarsstat.x.value.ui64++
-
+#define	RSSTAT_INCR(x)	atomic_add_64(&rdmarsstat.x.value.ui64, 1)
 /*
  * Create a transport record.
  * The transport record, output buffer, and private data structure
@@ -163,7 +188,7 @@ uint_t rdmarsstat_ndata = sizeof (rdmarsstat) / sizeof (kstat_named_t);
 /* ARGSUSED */
 int
 svc_rdma_kcreate(char *netid, SVC_CALLOUT_TABLE *sct, int id,
-	rdma_xprt_group_t *started_xprts)
+    rdma_xprt_group_t *started_xprts)
 {
 	int error;
 	SVCMASTERXPRT *xprt;
@@ -171,11 +196,13 @@ svc_rdma_kcreate(char *netid, SVC_CALLOUT_TABLE *sct, int id,
 	rdma_registry_t *rmod;
 	rdma_xprt_record_t *xprt_rec;
 	queue_t	*q;
-
 	/*
 	 * modload the RDMA plugins is not already done.
 	 */
 	if (!rdma_modloaded) {
+		/*CONSTANTCONDITION*/
+		ASSERT(sizeof (struct clone_rdma_data) <= SVC_P2LEN);
+
 		mutex_enter(&rdma_modload_lock);
 		if (!rdma_modloaded) {
 			error = rdma_modload();
@@ -239,7 +266,7 @@ svc_rdma_kcreate(char *netid, SVC_CALLOUT_TABLE *sct, int id,
 
 		if (netid != NULL) {
 			xprt->xp_netid = kmem_alloc(strlen(netid) + 1,
-						KM_SLEEP);
+			    KM_SLEEP);
 			(void) strcpy(xprt->xp_netid, netid);
 		}
 
@@ -260,8 +287,7 @@ svc_rdma_kcreate(char *netid, SVC_CALLOUT_TABLE *sct, int id,
 		rd->rd_data.svcid = id;
 		error = svc_xprt_register(xprt, id);
 		if (error) {
-			cmn_err(CE_WARN, "svc_rdma_kcreate: svc_xprt_register"
-				"failed");
+			DTRACE_PROBE(krpc__e__svcrdma__xprt__reg);
 			goto cleanup;
 		}
 
@@ -351,8 +377,7 @@ svc_rdma_kstop(SVCMASTERXPRT *xprt)
 	 */
 	(*rmod->rdma_ops->rdma_svc_stop)(svcdata);
 	if (svcdata->active)
-		cmn_err(CE_WARN, "rdma_stop: Failed to shutdown RDMA based kRPC"
-			"  listener");
+		DTRACE_PROBE(krpc__e__svcrdma__kstop);
 }
 
 /* ARGSUSED */
@@ -364,128 +389,103 @@ svc_rdma_kclone_destroy(SVCXPRT *clone_xprt)
 static bool_t
 svc_rdma_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 {
-	XDR *xdrs;
-	rdma_stat status;
-	struct recv_data *rdp = (struct recv_data *)mp->b_rptr;
-	CONN *conn;
-	struct clone_rdma_data *vd;
-	struct clist *cl;
-	uint_t vers, op, pos;
-	uint32_t xid;
+	XDR	*xdrs;
+	CONN	*conn;
 
-	vd = (struct clone_rdma_data *)clone_xprt->xp_p2buf;
+	rdma_recv_data_t	*rdp = (rdma_recv_data_t *)mp->b_rptr;
+	struct clone_rdma_data *crdp;
+	struct clist	*cl = NULL;
+	struct clist	*wcl = NULL;
+	struct clist	*cllong = NULL;
+
+	rdma_stat	status;
+	uint32_t vers, op, pos, xid;
+	uint32_t rdma_credit;
+	uint32_t wcl_total_length = 0;
+	bool_t	wwl = FALSE;
+
+	crdp = (struct clone_rdma_data *)clone_xprt->xp_p2buf;
 	RSSTAT_INCR(rscalls);
 	conn = rdp->conn;
 
-	/*
-	 * Post a receive descriptor on this
-	 * endpoint to ensure all packets are received.
-	 */
 	status = rdma_svc_postrecv(conn);
 	if (status != RDMA_SUCCESS) {
-		cmn_err(CE_NOTE,
-		    "svc_rdma_krecv: rdma_svc_postrecv failed %d", status);
+		DTRACE_PROBE(krpc__e__svcrdma__krecv__postrecv);
+		goto badrpc_call;
 	}
 
-	if (rdp->status != 0) {
-		RDMA_BUF_FREE(conn, &rdp->rpcmsg);
-		RDMA_REL_CONN(conn);
-		RSSTAT_INCR(rsbadcalls);
-		freeb(mp);
-		return (FALSE);
-	}
-
-	/*
-	 * Decode rpc message
-	 */
 	xdrs = &clone_xprt->xp_xdrin;
 	xdrmem_create(xdrs, rdp->rpcmsg.addr, rdp->rpcmsg.len, XDR_DECODE);
-
-	/*
-	 * Get the XID
-	 */
-	/*
-	 * Treat xid as opaque (xid is the first entity
-	 * in the rpc rdma message).
-	 */
 	xid = *(uint32_t *)rdp->rpcmsg.addr;
-	/* Skip xid and set the xdr position accordingly. */
 	XDR_SETPOS(xdrs, sizeof (uint32_t));
+
 	if (! xdr_u_int(xdrs, &vers) ||
+	    ! xdr_u_int(xdrs, &rdma_credit) ||
 	    ! xdr_u_int(xdrs, &op)) {
-		cmn_err(CE_WARN, "svc_rdma_krecv: xdr_u_int failed");
-		XDR_DESTROY(xdrs);
-		RDMA_BUF_FREE(conn, &rdp->rpcmsg);
-		RDMA_REL_CONN(conn);
-		freeb(mp);
-		RSSTAT_INCR(rsbadcalls);
-		return (FALSE);
-	}
-	if (op == RDMA_DONE) {
-		/*
-		 * Should not get RDMA_DONE
-		 */
-		freeb(mp);
-		XDR_DESTROY(xdrs);
-		RDMA_BUF_FREE(conn, &rdp->rpcmsg);
-		RDMA_REL_CONN(conn);
-		RSSTAT_INCR(rsbadcalls);
-		return (FALSE); /* no response */
+		DTRACE_PROBE(krpc__e__svcrdma__krecv__uint);
+		goto xdr_err;
 	}
 
-#ifdef DEBUG
-	if (rdma_svc_debug)
-		printf("svc_rdma_krecv: recv'd call xid %u\n", xid);
-#endif
-	/*
-	 * Now decode the chunk list
-	 */
-	cl = NULL;
-	if (! xdr_do_clist(xdrs, &cl)) {
-		cmn_err(CE_WARN, "svc_rdma_krecv: xdr_do_clist failed");
+	/* Checking if the status of the recv operation was normal */
+	if (rdp->status != 0) {
+		DTRACE_PROBE1(krpc__e__svcrdma__krecv__invalid__status,
+		    int, rdp->status);
+		goto badrpc_call;
 	}
+
+	if (! xdr_do_clist(xdrs, &cl)) {
+		DTRACE_PROBE(krpc__e__svcrdma__krecv__do__clist);
+		goto xdr_err;
+	}
+
+	if (!xdr_decode_wlist_svc(xdrs, &wcl, &wwl, &wcl_total_length, conn)) {
+		DTRACE_PROBE(krpc__e__svcrdma__krecv__decode__wlist);
+		if (cl)
+			clist_free(cl);
+		goto xdr_err;
+	}
+	crdp->cl_wlist = wcl;
+
+	crdp->cl_reply = NULL;
+	(void) xdr_decode_reply_wchunk(xdrs, &crdp->cl_reply);
 
 	/*
 	 * A chunk at 0 offset indicates that the RPC call message
 	 * is in a chunk. Get the RPC call message chunk.
 	 */
 	if (cl != NULL && op == RDMA_NOMSG) {
-		struct clist *cllong;	/* Long RPC chunk */
 
 		/* Remove RPC call message chunk from chunklist */
 		cllong = cl;
 		cl = cl->c_next;
 		cllong->c_next = NULL;
 
+
 		/* Allocate and register memory for the RPC call msg chunk */
-		cllong->c_daddr = (uint64)(uintptr_t)
-		    kmem_alloc(cllong->c_len, KM_SLEEP);
-		if (cllong->c_daddr == NULL) {
-			cmn_err(CE_WARN,
-				"svc_rdma_krecv: no memory for rpc call");
-			XDR_DESTROY(xdrs);
-			RDMA_BUF_FREE(conn, &rdp->rpcmsg);
-			RDMA_REL_CONN(conn);
-			freeb(mp);
-			RSSTAT_INCR(rsbadcalls);
-			clist_free(cl);
+		cllong->rb_longbuf.type = RDMA_LONG_BUFFER;
+		cllong->rb_longbuf.len = cllong->c_len > LONG_REPLY_LEN ?
+		    cllong->c_len : LONG_REPLY_LEN;
+
+		if (rdma_buf_alloc(conn, &cllong->rb_longbuf)) {
 			clist_free(cllong);
-			return (FALSE);
+			goto cll_malloc_err;
 		}
-		status = clist_register(conn, cllong, 0);
-		if (status) {
-			cmn_err(CE_WARN,
-				"svc_rdma_krecv: clist_register failed");
-			kmem_free((void *)(uintptr_t)cllong->c_daddr,
-			    cllong->c_len);
-			XDR_DESTROY(xdrs);
-			RDMA_BUF_FREE(conn, &rdp->rpcmsg);
-			RDMA_REL_CONN(conn);
-			freeb(mp);
-			RSSTAT_INCR(rsbadcalls);
-			clist_free(cl);
+
+		cllong->u.c_daddr3 = cllong->rb_longbuf.addr;
+
+		if (cllong->u.c_daddr == NULL) {
+			DTRACE_PROBE(krpc__e__svcrdma__krecv__nomem);
+			rdma_buf_free(conn, &cllong->rb_longbuf);
 			clist_free(cllong);
-			return (FALSE);
+			goto cll_malloc_err;
+		}
+
+		status = clist_register(conn, cllong, CLIST_REG_DST);
+		if (status) {
+			DTRACE_PROBE(krpc__e__svcrdma__krecv__clist__reg);
+			rdma_buf_free(conn, &cllong->rb_longbuf);
+			clist_free(cllong);
+			goto cll_malloc_err;
 		}
 
 		/*
@@ -493,67 +493,49 @@ svc_rdma_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 		 */
 		status = RDMA_READ(conn, cllong, WAIT);
 		if (status) {
-			cmn_err(CE_WARN,
-			    "svc_rdma_krecv: rdma_read failed %d", status);
-			(void) clist_deregister(conn, cllong, 0);
-			kmem_free((void *)(uintptr_t)cllong->c_daddr,
-			    cllong->c_len);
-			XDR_DESTROY(xdrs);
-			RDMA_BUF_FREE(conn, &rdp->rpcmsg);
-			RDMA_REL_CONN(conn);
-			freeb(mp);
-			RSSTAT_INCR(rsbadcalls);
-			clist_free(cl);
+			DTRACE_PROBE(krpc__e__svcrdma__krecv__read);
+			(void) clist_deregister(conn, cllong, CLIST_REG_DST);
+			rdma_buf_free(conn, &cllong->rb_longbuf);
 			clist_free(cllong);
-			return (FALSE);
+			goto cll_malloc_err;
 		}
-		/*
-		 * Sync memory for CPU after DMA
-		 */
-		status = clist_syncmem(conn, cllong, 0);
 
-		/*
-		 * Deregister the chunk
-		 */
-		(void) clist_deregister(conn, cllong, 0);
+		status = clist_syncmem(conn, cllong, CLIST_REG_DST);
+		(void) clist_deregister(conn, cllong, CLIST_REG_DST);
 
-		/*
-		 * Setup the XDR for the RPC call message
-		 */
-		xdrrdma_create(xdrs, (caddr_t)(uintptr_t)cllong->c_daddr,
+		xdrrdma_create(xdrs, (caddr_t)(uintptr_t)cllong->u.c_daddr3,
 		    cllong->c_len, 0, cl, XDR_DECODE, conn);
-		vd->rpcbuf.type = CHUNK_BUFFER;
-		vd->rpcbuf.addr = (caddr_t)(uintptr_t)cllong->c_daddr;
-		vd->rpcbuf.len = cllong->c_len;
-		vd->rpcbuf.handle.mrc_rmr = 0;
 
-		/*
-		 * Free the chunk element with the Long RPC details and
-		 * the message received.
-		 */
+		crdp->rpcbuf = cllong->rb_longbuf;
+		crdp->rpcbuf.len = cllong->c_len;
 		clist_free(cllong);
 		RDMA_BUF_FREE(conn, &rdp->rpcmsg);
 	} else {
 		pos = XDR_GETPOS(xdrs);
-
-		/*
-		 * Now the RPC call message header
-		 */
 		xdrrdma_create(xdrs, rdp->rpcmsg.addr + pos,
-			rdp->rpcmsg.len - pos, 0, cl, XDR_DECODE, conn);
-		vd->rpcbuf = rdp->rpcmsg;
+		    rdp->rpcmsg.len - pos, 0, cl, XDR_DECODE, conn);
+		crdp->rpcbuf = rdp->rpcmsg;
+
+		/* Use xdrrdmablk_ops to indicate there is a read chunk list */
+		if (cl != NULL) {
+			int32_t flg = XDR_RDMA_RLIST_REG;
+
+			XDR_CONTROL(xdrs, XDR_RDMA_SET_FLAGS, &flg);
+			xdrs->x_ops = &xdrrdmablk_ops;
+		}
 	}
+
+	if (crdp->cl_wlist) {
+		int32_t flg = XDR_RDMA_WLIST_REG;
+
+		XDR_CONTROL(xdrs, XDR_RDMA_SET_WLIST, crdp->cl_wlist);
+		XDR_CONTROL(xdrs, XDR_RDMA_SET_FLAGS, &flg);
+	}
+
 	if (! xdr_callmsg(xdrs, msg)) {
-		cmn_err(CE_WARN, "svc_rdma_krecv: xdr_callmsg failed");
-		if (cl != NULL)
-			clist_free(cl);
-		XDR_DESTROY(xdrs);
-		rdma_buf_free(conn, &vd->rpcbuf);
-		RDMA_REL_CONN(conn);
-		freeb(mp);
+		DTRACE_PROBE(krpc__e__svcrdma__krecv__callmsg);
 		RSSTAT_INCR(rsxdrcall);
-		RSSTAT_INCR(rsbadcalls);
-		return (FALSE);
+		goto callmsg_err;
 	}
 
 	/*
@@ -563,48 +545,224 @@ svc_rdma_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 	clone_xprt->xp_rtaddr.buf = conn->c_raddr.buf;
 	clone_xprt->xp_rtaddr.len = conn->c_raddr.len;
 	clone_xprt->xp_rtaddr.maxlen = conn->c_raddr.len;
-
-#ifdef DEBUG
-	if (rdma_svc_debug) {
-		struct sockaddr_in *sin4;
-		char print_addr[INET_ADDRSTRLEN];
-
-		sin4 = (struct sockaddr_in *)clone_xprt->xp_rtaddr.buf;
-		bzero(print_addr, INET_ADDRSTRLEN);
-		(void) inet_ntop(AF_INET,
-		    &sin4->sin_addr, print_addr, INET_ADDRSTRLEN);
-		cmn_err(CE_NOTE,
-		    "svc_rdma_krecv: remote clnt_addr: %s", print_addr);
-	}
-#endif
-
 	clone_xprt->xp_xid = xid;
-	vd->conn = conn;
+	crdp->conn = conn;
+
 	freeb(mp);
+
 	return (TRUE);
+
+callmsg_err:
+	rdma_buf_free(conn, &crdp->rpcbuf);
+
+cll_malloc_err:
+	if (cl)
+		clist_free(cl);
+xdr_err:
+	XDR_DESTROY(xdrs);
+
+badrpc_call:
+	RDMA_BUF_FREE(conn, &rdp->rpcmsg);
+	RDMA_REL_CONN(conn);
+	freeb(mp);
+	RSSTAT_INCR(rsbadcalls);
+	return (FALSE);
+}
+
+static int
+svc_process_long_reply(SVCXPRT * clone_xprt,
+    xdrproc_t xdr_results, caddr_t xdr_location,
+    struct rpc_msg *msg, bool_t has_args, int *msglen,
+    int *freelen, int *numchunks, unsigned int *final_len)
+{
+	int status;
+	XDR xdrslong;
+	struct clist *wcl = NULL;
+	int count = 0;
+	int alloc_len;
+	char  *memp;
+	rdma_buf_t long_rpc = {0};
+	struct clone_rdma_data *crdp;
+
+	crdp = (struct clone_rdma_data *)clone_xprt->xp_p2buf;
+
+	bzero(&xdrslong, sizeof (xdrslong));
+
+	/* Choose a size for the long rpc response */
+	if (MSG_IS_RPCSEC_GSS(msg)) {
+		alloc_len = RNDUP(MAX_AUTH_BYTES + *msglen);
+	} else {
+		alloc_len = RNDUP(*msglen);
+	}
+
+	if (alloc_len <= 64 * 1024) {
+		if (alloc_len > 32 * 1024) {
+			alloc_len = 64 * 1024;
+		} else {
+			if (alloc_len > 16 * 1024) {
+				alloc_len = 32 * 1024;
+			} else {
+				alloc_len = 16 * 1024;
+			}
+		}
+	}
+
+	long_rpc.type = RDMA_LONG_BUFFER;
+	long_rpc.len = alloc_len;
+	if (rdma_buf_alloc(crdp->conn, &long_rpc)) {
+		return (SVC_RDMA_FAIL);
+	}
+
+	memp = long_rpc.addr;
+	xdrmem_create(&xdrslong, memp, alloc_len, XDR_ENCODE);
+
+	msg->rm_xid = clone_xprt->xp_xid;
+
+	if (!(xdr_replymsg(&xdrslong, msg) &&
+	    (!has_args || SVCAUTH_WRAP(&clone_xprt->xp_auth, &xdrslong,
+	    xdr_results, xdr_location)))) {
+		rdma_buf_free(crdp->conn, &long_rpc);
+		DTRACE_PROBE(krpc__e__svcrdma__longrep__authwrap);
+		return (SVC_RDMA_FAIL);
+	}
+
+	*final_len = XDR_GETPOS(&xdrslong);
+
+	*numchunks = 0;
+	*freelen = 0;
+
+	wcl = crdp->cl_reply;
+	wcl->rb_longbuf = long_rpc;
+
+	count = *final_len;
+	while (wcl != NULL) {
+		if (wcl->c_dmemhandle.mrc_rmr == 0)
+			break;
+
+		if (wcl->c_len > count) {
+			wcl->c_len = count;
+		}
+		wcl->w.c_saddr3 = (caddr_t)memp;
+
+		count -= wcl->c_len;
+		*numchunks +=  1;
+		if (count == 0)
+			break;
+		memp += wcl->c_len;
+		wcl = wcl->c_next;
+	}
+
+	wcl = crdp->cl_reply;
+
+	/*
+	 * MUST fail if there are still more data
+	 */
+	if (count > 0) {
+		rdma_buf_free(crdp->conn, &long_rpc);
+		DTRACE_PROBE(krpc__e__svcrdma__longrep__dlen__clist);
+		return (SVC_RDMA_FAIL);
+	}
+
+	if (clist_register(crdp->conn, wcl, CLIST_REG_SOURCE) != RDMA_SUCCESS) {
+		rdma_buf_free(crdp->conn, &long_rpc);
+		DTRACE_PROBE(krpc__e__svcrdma__longrep__clistreg);
+		return (SVC_RDMA_FAIL);
+	}
+
+	status = clist_syncmem(crdp->conn, wcl, CLIST_REG_SOURCE);
+
+	if (status) {
+		(void) clist_deregister(crdp->conn, wcl, CLIST_REG_SOURCE);
+		rdma_buf_free(crdp->conn, &long_rpc);
+		DTRACE_PROBE(krpc__e__svcrdma__longrep__syncmem);
+		return (SVC_RDMA_FAIL);
+	}
+
+	status = RDMA_WRITE(crdp->conn, wcl, WAIT);
+
+	(void) clist_deregister(crdp->conn, wcl, CLIST_REG_SOURCE);
+	rdma_buf_free(crdp->conn, &wcl->rb_longbuf);
+
+	if (status != RDMA_SUCCESS) {
+		DTRACE_PROBE(krpc__e__svcrdma__longrep__write);
+		return (SVC_RDMA_FAIL);
+	}
+
+	return (SVC_RDMA_SUCCESS);
+}
+
+
+static int
+svc_compose_rpcmsg(SVCXPRT * clone_xprt, CONN * conn, xdrproc_t xdr_results,
+    caddr_t xdr_location, rdma_buf_t *rpcreply, XDR ** xdrs,
+    struct rpc_msg *msg, bool_t has_args, uint_t *len)
+{
+	/*
+	 * Get a pre-allocated buffer for rpc reply
+	 */
+	rpcreply->type = SEND_BUFFER;
+	if (rdma_buf_alloc(conn, rpcreply)) {
+		DTRACE_PROBE(krpc__e__svcrdma__rpcmsg__reply__nofreebufs);
+		return (SVC_RDMA_FAIL);
+	}
+
+	xdrrdma_create(*xdrs, rpcreply->addr, rpcreply->len,
+	    0, NULL, XDR_ENCODE, conn);
+
+	msg->rm_xid = clone_xprt->xp_xid;
+
+	if (has_args) {
+		if (!(xdr_replymsg(*xdrs, msg) &&
+		    (!has_args ||
+		    SVCAUTH_WRAP(&clone_xprt->xp_auth, *xdrs,
+		    xdr_results, xdr_location)))) {
+			rdma_buf_free(conn, rpcreply);
+			DTRACE_PROBE(
+			    krpc__e__svcrdma__rpcmsg__reply__authwrap1);
+			return (SVC_RDMA_FAIL);
+		}
+	} else {
+		if (!xdr_replymsg(*xdrs, msg)) {
+			rdma_buf_free(conn, rpcreply);
+			DTRACE_PROBE(
+			    krpc__e__svcrdma__rpcmsg__reply__authwrap2);
+			return (SVC_RDMA_FAIL);
+		}
+	}
+
+	*len = XDR_GETPOS(*xdrs);
+
+	return (SVC_RDMA_SUCCESS);
 }
 
 /*
  * Send rpc reply.
  */
 static bool_t
-svc_rdma_ksend(SVCXPRT *clone_xprt, struct rpc_msg *msg)
+svc_rdma_ksend(SVCXPRT * clone_xprt, struct rpc_msg *msg)
 {
-	struct clone_rdma_data *vd;
-	XDR *xdrs = &(clone_xprt->xp_xdrout), rxdrs;
-	int retval = FALSE;
-	xdrproc_t xdr_results;
-	caddr_t xdr_location;
-	bool_t has_args, reg = FALSE;
-	uint_t len, op;
-	uint_t vers;
-	struct clist *cl = NULL, *cle = NULL;
-	struct clist *sendlist = NULL;
-	int status;
-	int msglen;
-	rdma_buf_t clmsg, longreply, rpcreply;
+	XDR *xdrs_rpc = &(clone_xprt->xp_xdrout);
+	XDR xdrs_rhdr;
+	CONN *conn = NULL;
+	rdma_buf_t rbuf_resp = {0}, rbuf_rpc_resp = {0};
 
-	vd = (struct clone_rdma_data *)clone_xprt->xp_p2buf;
+	struct clone_rdma_data *crdp;
+	struct clist *cl_read = NULL;
+	struct clist *cl_send = NULL;
+	struct clist *cl_write = NULL;
+	xdrproc_t xdr_results;		/* results XDR encoding function */
+	caddr_t xdr_location;		/* response results pointer */
+
+	int retval = FALSE;
+	int status, msglen, num_wreply_segments = 0;
+	uint32_t rdma_credit = 0;
+	int freelen = 0;
+	bool_t has_args;
+	uint_t  final_resp_len, rdma_response_op, vers;
+
+	bzero(&xdrs_rhdr, sizeof (XDR));
+	crdp = (struct clone_rdma_data *)clone_xprt->xp_p2buf;
+	conn = crdp->conn;
 
 	/*
 	 * If there is a result procedure specified in the reply message,
@@ -624,343 +782,189 @@ svc_rdma_ksend(SVCXPRT *clone_xprt, struct rpc_msg *msg)
 	}
 
 	/*
-	 * Get the size of the rpc reply message. Need this
-	 * to determine if the rpc reply message will fit in
-	 * the pre-allocated RDMA buffers. If the rpc reply
-	 * message length is greater that the pre-allocated
-	 * buffers then, a one time use buffer is allocated
-	 * and registered for this rpc reply.
+	 * Given the limit on the inline response size (RPC_MSG_SZ),
+	 * there is a need to make a guess as to the overall size of
+	 * the response.  If the resultant size is beyond the inline
+	 * size, then the server needs to use the "reply chunk list"
+	 * provided by the client (if the client provided one).  An
+	 * example of this type of response would be a READDIR
+	 * response (e.g. a small directory read would fit in RPC_MSG_SZ
+	 * and that is the preference but it may not fit)
+	 *
+	 * Combine the encoded size and the size of the true results
+	 * and then make the decision about where to encode and send results.
+	 *
+	 * One important note, this calculation is ignoring the size
+	 * of the encoding of the authentication overhead.  The reason
+	 * for this is rooted in the complexities of access to the
+	 * encoded size of RPCSEC_GSS related authentiation,
+	 * integrity, and privacy.
+	 *
+	 * If it turns out that the encoded authentication bumps the
+	 * response over the RPC_MSG_SZ limit, then it may need to
+	 * attempt to encode for the reply chunk list.
+	 */
+
+	/*
+	 * Calculating the "sizeof" the RPC response header and the
+	 * encoded results.
 	 */
 	msglen = xdr_sizeof(xdr_replymsg, msg);
-	if (has_args && msg->rm_reply.rp_acpt.ar_verf.oa_flavor != RPCSEC_GSS) {
+
+	if (msglen > 0) {
+		RSSTAT_INCR(rstotalreplies);
+	}
+	if (has_args)
 		msglen += xdrrdma_sizeof(xdr_results, xdr_location,
-				rdma_minchunk);
-		if (msglen > RPC_MSG_SZ) {
+		    rdma_minchunk, NULL, NULL);
 
-			/*
-			 * Allocate chunk buffer for rpc reply
-			 */
-			rpcreply.type = CHUNK_BUFFER;
-			rpcreply.addr = kmem_zalloc(msglen, KM_SLEEP);
-			cle = kmem_zalloc(sizeof (*cle), KM_SLEEP);
-			cle->c_xdroff = 0;
-			cle->c_len  = rpcreply.len = msglen;
-			cle->c_saddr = (uint64)(uintptr_t)rpcreply.addr;
-			cle->c_next = NULL;
-			xdrrdma_create(xdrs, rpcreply.addr, msglen,
-			    rdma_minchunk, cle, XDR_ENCODE, NULL);
-			op = RDMA_NOMSG;
-		} else {
-			/*
-			 * Get a pre-allocated buffer for rpc reply
-			 */
-			rpcreply.type = SEND_BUFFER;
-			if (RDMA_BUF_ALLOC(vd->conn, &rpcreply)) {
-				cmn_err(CE_WARN,
-				    "svc_rdma_ksend: no free buffers!");
-				return (retval);
-			}
-			xdrrdma_create(xdrs, rpcreply.addr, rpcreply.len,
-			    rdma_minchunk, NULL, XDR_ENCODE, NULL);
-			op = RDMA_MSG;
-		}
+	DTRACE_PROBE1(krpc__i__svcrdma__ksend__msglen, int, msglen);
 
+	status = SVC_RDMA_SUCCESS;
+
+	if (msglen < RPC_MSG_SZ) {
 		/*
-		 * Initialize the XDR encode stream.
+		 * Looks like the response will fit in the inline
+		 * response; let's try
 		 */
-		msg->rm_xid = clone_xprt->xp_xid;
+		RSSTAT_INCR(rstotalinlinereplies);
 
-		if (!(xdr_replymsg(xdrs, msg) &&
-		    (!has_args || SVCAUTH_WRAP(&clone_xprt->xp_auth, xdrs,
-		    xdr_results, xdr_location)))) {
-			rdma_buf_free(vd->conn, &rpcreply);
-			if (cle)
-				clist_free(cle);
-			cmn_err(CE_WARN,
-			    "svc_rdma_ksend: xdr_replymsg/SVCAUTH_WRAP "
-			    "failed");
-			goto out;
+		rdma_response_op = RDMA_MSG;
+
+		status = svc_compose_rpcmsg(clone_xprt, conn, xdr_results,
+		    xdr_location, &rbuf_rpc_resp, &xdrs_rpc, msg,
+		    has_args, &final_resp_len);
+
+		DTRACE_PROBE1(krpc__i__srdma__ksend__compose_status,
+		    int, status);
+		DTRACE_PROBE1(krpc__i__srdma__ksend__compose_len,
+		    int, final_resp_len);
+
+		if (status == SVC_RDMA_SUCCESS && crdp->cl_reply) {
+			clist_free(crdp->cl_reply);
+			crdp->cl_reply = NULL;
 		}
-		len = XDR_GETPOS(xdrs);
-	}
-	if (has_args && msg->rm_reply.rp_acpt.ar_verf.oa_flavor == RPCSEC_GSS) {
-
-		/*
-		 * For RPCSEC_GSS since we cannot accurately presize the
-		 * buffer required for encoding, we assume that its going
-		 * to be a Long RPC to start with. We also create the
-		 * the XDR stream with min_chunk set to 0 which instructs
-		 * the XDR layer to not chunk the incoming byte stream.
-		 */
-		msglen += 2 * MAX_AUTH_BYTES + 2 * sizeof (struct opaque_auth);
-		msglen += xdr_sizeof(xdr_results, xdr_location);
-
-		/*
-		 * Long RPC. Allocate one time use custom buffer.
-		 */
-		longreply.type = CHUNK_BUFFER;
-		longreply.addr = kmem_zalloc(msglen, KM_SLEEP);
-		cle = kmem_zalloc(sizeof (*cle), KM_SLEEP);
-		cle->c_xdroff = 0;
-		cle->c_len  = longreply.len = msglen;
-		cle->c_saddr = (uint64)(uintptr_t)longreply.addr;
-		cle->c_next = NULL;
-		xdrrdma_create(xdrs, longreply.addr, msglen, 0, cle,
-		    XDR_ENCODE, NULL);
-		op = RDMA_NOMSG;
-		/*
-		 * Initialize the XDR encode stream.
-		 */
-		msg->rm_xid = clone_xprt->xp_xid;
-
-		if (!(xdr_replymsg(xdrs, msg) &&
-		    (!has_args || SVCAUTH_WRAP(&clone_xprt->xp_auth, xdrs,
-		    xdr_results, xdr_location)))) {
-			if (longreply.addr != xdrs->x_base) {
-				longreply.addr = xdrs->x_base;
-				longreply.len = xdr_getbufsize(xdrs);
-			}
-			rdma_buf_free(vd->conn, &longreply);
-			if (cle)
-				clist_free(cle);
-			cmn_err(CE_WARN,
-			    "svc_rdma_ksend: xdr_replymsg/SVCAUTH_WRAP "
-			    "failed");
-			goto out;
-		}
-
-		/*
-		 * If we had to allocate a new buffer while encoding
-		 * then update the addr and len.
-		 */
-		if (longreply.addr != xdrs->x_base) {
-			longreply.addr = xdrs->x_base;
-			longreply.len = xdr_getbufsize(xdrs);
-		}
-
-		len = XDR_GETPOS(xdrs);
-
-		/*
-		 * If it so happens that the encoded message is after all
-		 * not long enough to be a Long RPC then allocate a
-		 * SEND_BUFFER and copy the encoded message into it.
-		 */
-		if (len > RPC_MSG_SZ) {
-			rpcreply.type = CHUNK_BUFFER;
-			rpcreply.addr = longreply.addr;
-			rpcreply.len = longreply.len;
-		} else {
-			clist_free(cle);
-			XDR_DESTROY(xdrs);
-			/*
-			 * Get a pre-allocated buffer for rpc reply
-			 */
-			rpcreply.type = SEND_BUFFER;
-			if (RDMA_BUF_ALLOC(vd->conn, &rpcreply)) {
-				cmn_err(CE_WARN,
-				    "svc_rdma_ksend: no free buffers!");
-				rdma_buf_free(vd->conn, &longreply);
-				return (retval);
-			}
-			bcopy(longreply.addr, rpcreply.addr, len);
-			xdrrdma_create(xdrs, rpcreply.addr, len, 0, NULL,
-			    XDR_ENCODE, NULL);
-			rdma_buf_free(vd->conn, &longreply);
-			op = RDMA_MSG;
-		}
-	}
-
-	if (has_args == FALSE) {
-
-		if (msglen > RPC_MSG_SZ) {
-
-			/*
-			 * Allocate chunk buffer for rpc reply
-			 */
-			rpcreply.type = CHUNK_BUFFER;
-			rpcreply.addr = kmem_zalloc(msglen, KM_SLEEP);
-			cle = kmem_zalloc(sizeof (*cle), KM_SLEEP);
-			cle->c_xdroff = 0;
-			cle->c_len  = rpcreply.len = msglen;
-			cle->c_saddr = (uint64)(uintptr_t)rpcreply.addr;
-			cle->c_next = NULL;
-			xdrrdma_create(xdrs, rpcreply.addr, msglen,
-			    rdma_minchunk, cle, XDR_ENCODE, NULL);
-			op = RDMA_NOMSG;
-		} else {
-			/*
-			 * Get a pre-allocated buffer for rpc reply
-			 */
-			rpcreply.type = SEND_BUFFER;
-			if (RDMA_BUF_ALLOC(vd->conn, &rpcreply)) {
-				cmn_err(CE_WARN,
-				    "svc_rdma_ksend: no free buffers!");
-				return (retval);
-			}
-			xdrrdma_create(xdrs, rpcreply.addr, rpcreply.len,
-			    rdma_minchunk, NULL, XDR_ENCODE, NULL);
-			op = RDMA_MSG;
-		}
-
-		/*
-		 * Initialize the XDR encode stream.
-		 */
-		msg->rm_xid = clone_xprt->xp_xid;
-
-		if (!xdr_replymsg(xdrs, msg)) {
-			rdma_buf_free(vd->conn, &rpcreply);
-			if (cle)
-				clist_free(cle);
-			cmn_err(CE_WARN,
-			    "svc_rdma_ksend: xdr_replymsg/SVCAUTH_WRAP "
-			    "failed");
-			goto out;
-		}
-		len = XDR_GETPOS(xdrs);
 	}
 
 	/*
-	 * Get clist and a buffer for sending it across
+	 * If the encode failed (size?) or the message really is
+	 * larger than what is allowed, try the response chunk list.
 	 */
-	cl = xdrrdma_clist(xdrs);
-	clmsg.type = SEND_BUFFER;
-	if (RDMA_BUF_ALLOC(vd->conn, &clmsg)) {
-		rdma_buf_free(vd->conn, &rpcreply);
-		cmn_err(CE_WARN, "svc_rdma_ksend: no free buffers!!");
+	if (status != SVC_RDMA_SUCCESS || msglen >= RPC_MSG_SZ) {
+		/*
+		 * attempting to use a reply chunk list when there
+		 * isn't one won't get very far...
+		 */
+		if (crdp->cl_reply == NULL) {
+			DTRACE_PROBE(krpc__e__svcrdma__ksend__noreplycl);
+			goto out;
+		}
+
+		RSSTAT_INCR(rstotallongreplies);
+
+		msglen = xdr_sizeof(xdr_replymsg, msg);
+		msglen += xdrrdma_sizeof(xdr_results, xdr_location, 0,
+		    NULL, NULL);
+
+		status = svc_process_long_reply(clone_xprt, xdr_results,
+		    xdr_location, msg, has_args, &msglen, &freelen,
+		    &num_wreply_segments, &final_resp_len);
+
+		DTRACE_PROBE1(krpc__i__svcrdma__ksend__longreplen,
+		    int, final_resp_len);
+
+		if (status != SVC_RDMA_SUCCESS) {
+			DTRACE_PROBE(krpc__e__svcrdma__ksend__compose__failed);
+			goto out;
+		}
+
+		rdma_response_op = RDMA_NOMSG;
+	}
+
+	DTRACE_PROBE1(krpc__i__svcrdma__ksend__rdmamsg__len,
+	    int, final_resp_len);
+
+	rbuf_resp.type = SEND_BUFFER;
+	if (rdma_buf_alloc(conn, &rbuf_resp)) {
+		rdma_buf_free(conn, &rbuf_rpc_resp);
+		DTRACE_PROBE(krpc__e__svcrdma__ksend__nofreebufs);
 		goto out;
 	}
 
-	/*
-	 * Now register the chunks in the list
-	 */
-	if (cl != NULL) {
-		status = clist_register(vd->conn, cl, 1);
-		if (status != RDMA_SUCCESS) {
-			rdma_buf_free(vd->conn, &clmsg);
-			cmn_err(CE_WARN,
-				"svc_rdma_ksend: clist register failed");
-			goto out;
-		}
-		reg = TRUE;
-	}
+	rdma_credit = rdma_bufs_granted;
 
-	/*
-	 * XDR the XID, vers, and op
-	 */
-	/*
-	 * Treat xid as opaque (xid is the first entity
-	 * in the rpc rdma message).
-	 */
 	vers = RPCRDMA_VERS;
-	xdrs = &rxdrs;
-	xdrmem_create(xdrs, clmsg.addr, clmsg.len, XDR_ENCODE);
-	(*(uint32_t *)clmsg.addr) = msg->rm_xid;
+	xdrmem_create(&xdrs_rhdr, rbuf_resp.addr, rbuf_resp.len, XDR_ENCODE);
+	(*(uint32_t *)rbuf_resp.addr) = msg->rm_xid;
 	/* Skip xid and set the xdr position accordingly. */
-	XDR_SETPOS(xdrs, sizeof (uint32_t));
-	if (! xdr_u_int(xdrs, &vers) ||
-	    ! xdr_u_int(xdrs, &op)) {
-		rdma_buf_free(vd->conn, &rpcreply);
-		rdma_buf_free(vd->conn, &clmsg);
-		cmn_err(CE_WARN, "svc_rdma_ksend: xdr_u_int failed");
+	XDR_SETPOS(&xdrs_rhdr, sizeof (uint32_t));
+	if (!xdr_u_int(&xdrs_rhdr, &vers) ||
+	    !xdr_u_int(&xdrs_rhdr, &rdma_credit) ||
+	    !xdr_u_int(&xdrs_rhdr, &rdma_response_op)) {
+		rdma_buf_free(conn, &rbuf_rpc_resp);
+		rdma_buf_free(conn, &rbuf_resp);
+		DTRACE_PROBE(krpc__e__svcrdma__ksend__uint);
 		goto out;
 	}
 
 	/*
-	 * Now XDR the chunk list
+	 * Now XDR the read chunk list, actually always NULL
 	 */
-	(void) xdr_do_clist(xdrs, &cl);
+	(void) xdr_encode_rlist_svc(&xdrs_rhdr, cl_read);
 
-	clist_add(&sendlist, 0, XDR_GETPOS(xdrs), &clmsg.handle, clmsg.addr,
-		NULL, NULL);
-
-	if (op == RDMA_MSG) {
-		clist_add(&sendlist, 0, len, &rpcreply.handle, rpcreply.addr,
-			NULL, NULL);
-	} else {
-		cl->c_len = len;
-		RSSTAT_INCR(rslongrpcs);
+	/*
+	 * encode write list -- we already drove RDMA_WRITEs
+	 */
+	cl_write = crdp->cl_wlist;
+	if (!xdr_encode_wlist(&xdrs_rhdr, cl_write)) {
+		DTRACE_PROBE(krpc__e__svcrdma__ksend__enc__wlist);
+		rdma_buf_free(conn, &rbuf_rpc_resp);
+		rdma_buf_free(conn, &rbuf_resp);
+		goto out;
 	}
 
 	/*
-	 * Send the reply message to the client
+	 * XDR encode the RDMA_REPLY write chunk
 	 */
-	if (cl != NULL) {
-		status = clist_syncmem(vd->conn, cl, 1);
-		if (status != RDMA_SUCCESS) {
-			rdma_buf_free(vd->conn, &rpcreply);
-			rdma_buf_free(vd->conn, &clmsg);
-			goto out;
-		}
-#ifdef DEBUG
-	if (rdma_svc_debug)
-		printf("svc_rdma_ksend: chunk response len %d xid %u\n",
-			cl->c_len, msg->rm_xid);
-#endif
-		/*
-		 * Post a receive buffer because we expect a RDMA_DONE
-		 * message.
-		 */
-		status = rdma_svc_postrecv(vd->conn);
-
-		/*
-		 * Send the RPC reply message and wait for RDMA_DONE
-		 */
-		status = RDMA_SEND_RESP(vd->conn, sendlist, msg->rm_xid);
-		if (status != RDMA_SUCCESS) {
-#ifdef DEBUG
-			if (rdma_svc_debug)
-				cmn_err(CE_NOTE, "svc_rdma_ksend: "
-					"rdma_send_resp failed %d", status);
-#endif
-			goto out;
-		}
-#ifdef DEBUG
-	if (rdma_svc_debug)
-		printf("svc_rdma_ksend: got RDMA_DONE xid %u\n", msg->rm_xid);
-#endif
-	} else {
-#ifdef DEBUG
-	if (rdma_svc_debug)
-		printf("svc_rdma_ksend: msg response xid %u\n", msg->rm_xid);
-#endif
-		status = RDMA_SEND(vd->conn, sendlist, msg->rm_xid);
-		if (status != RDMA_SUCCESS) {
-#ifdef DEBUG
-			if (rdma_svc_debug)
-				cmn_err(CE_NOTE, "svc_rdma_ksend: "
-					"rdma_send failed %d", status);
-#endif
-			goto out;
-		}
+	if (!xdr_encode_reply_wchunk(&xdrs_rhdr, crdp->cl_reply,
+	    num_wreply_segments)) {
+		rdma_buf_free(conn, &rbuf_rpc_resp);
+		rdma_buf_free(conn, &rbuf_resp);
+		goto out;
 	}
 
-	retval = TRUE;
+	clist_add(&cl_send, 0, XDR_GETPOS(&xdrs_rhdr), &rbuf_resp.handle,
+	    rbuf_resp.addr, NULL, NULL);
+
+	if (rdma_response_op == RDMA_MSG) {
+		clist_add(&cl_send, 0, final_resp_len, &rbuf_rpc_resp.handle,
+		    rbuf_rpc_resp.addr, NULL, NULL);
+	}
+
+	status = RDMA_SEND(conn, cl_send, msg->rm_xid);
+
+	if (status == RDMA_SUCCESS) {
+		retval = TRUE;
+	}
+
 out:
-	/*
-	 * Deregister the chunks
-	 */
-	if (cl != NULL) {
-		if (reg)
-			(void) clist_deregister(vd->conn, cl, 1);
-		if (op == RDMA_NOMSG) {
-			/*
-			 * Long RPC reply in chunk. Free it up.
-			 */
-			rdma_buf_free(vd->conn, &rpcreply);
-		}
-		clist_free(cl);
-	}
-
 	/*
 	 * Free up sendlist chunks
 	 */
-	if (sendlist != NULL)
-		clist_free(sendlist);
+	if (cl_send != NULL)
+		clist_free(cl_send);
 
 	/*
 	 * Destroy private data for xdr rdma
 	 */
-	XDR_DESTROY(&(clone_xprt->xp_xdrout));
+	if (clone_xprt->xp_xdrout.x_ops != NULL) {
+		XDR_DESTROY(&(clone_xprt->xp_xdrout));
+	}
+
+	if (crdp->cl_reply) {
+		clist_free(crdp->cl_reply);
+		crdp->cl_reply = NULL;
+	}
 
 	/*
 	 * This is completely disgusting.  If public is set it is
@@ -968,9 +972,13 @@ out:
 	 * of the function to free that structure and any related
 	 * stuff.  (see rrokfree in nfs_xdr.c).
 	 */
-	if (xdrs->x_public) {
+	if (xdrs_rpc->x_public) {
 		/* LINTED pointer alignment */
-		(**((int (**)())xdrs->x_public))(xdrs->x_public);
+		(**((int (**)()) xdrs_rpc->x_public)) (xdrs_rpc->x_public);
+	}
+
+	if (xdrs_rhdr.x_ops != NULL) {
+		XDR_DESTROY(&xdrs_rhdr);
 	}
 
 	return (retval);
@@ -992,24 +1000,29 @@ static bool_t
 svc_rdma_kfreeargs(SVCXPRT *clone_xprt, xdrproc_t xdr_args,
     caddr_t args_ptr)
 {
-	struct clone_rdma_data *vd;
+	struct clone_rdma_data *crdp;
 	bool_t retval;
 
-	vd = (struct clone_rdma_data *)clone_xprt->xp_p2buf;
+	crdp = (struct clone_rdma_data *)clone_xprt->xp_p2buf;
+
+	/*
+	 * Free the args if needed then XDR_DESTROY
+	 */
 	if (args_ptr) {
 		XDR	*xdrs = &clone_xprt->xp_xdrin;
-		struct clist *cl;
-
-		cl = xdrrdma_clist(xdrs);
-		if (cl != NULL)
-			clist_free(cl);
 
 		xdrs->x_op = XDR_FREE;
 		retval = (*xdr_args)(xdrs, args_ptr);
 	}
+
 	XDR_DESTROY(&(clone_xprt->xp_xdrin));
-	rdma_buf_free(vd->conn, &vd->rpcbuf);
-	RDMA_REL_CONN(vd->conn);
+	rdma_buf_free(crdp->conn, &crdp->rpcbuf);
+	if (crdp->cl_reply) {
+		clist_free(crdp->cl_reply);
+		crdp->cl_reply = NULL;
+	}
+	RDMA_REL_CONN(crdp->conn);
+
 	return (retval);
 }
 
@@ -1139,7 +1152,6 @@ svc_rdma_kdup(struct svc_req *req, caddr_t res, int size, struct dupreq **drpp,
 		while (dr->dr_status == DUP_INPROGRESS) {
 			dr = dr->dr_next;
 			if (dr == rdmadrmru->dr_next) {
-				cmn_err(CE_WARN, "svc_rdma_kdup no slots free");
 				mutex_exit(&rdmadupreq_lock);
 				return (DUP_ERROR);
 			}
@@ -1236,4 +1248,33 @@ unhash(struct dupreq *dr)
 		drtprev = drt;
 		drt = drt->dr_chain;
 	}
+}
+
+bool_t
+rdma_get_wchunk(struct svc_req *req, iovec_t *iov, struct clist *wlist)
+{
+	struct clist	*clist;
+	uint32_t	tlen;
+
+	if (req->rq_xprt->xp_type != T_RDMA) {
+		return (FALSE);
+	}
+
+	tlen = 0;
+	clist = wlist;
+	while (clist) {
+		tlen += clist->c_len;
+		clist = clist->c_next;
+	}
+
+	/*
+	 * set iov to addr+len of first segment of first wchunk of
+	 * wlist sent by client.  krecv() already malloc'd a buffer
+	 * large enough, but registration is deferred until we write
+	 * the buffer back to (NFS) client using RDMA_WRITE.
+	 */
+	iov->iov_base = (caddr_t)(uintptr_t)wlist->w.c_saddr;
+	iov->iov_len = tlen;
+
+	return (TRUE);
 }
