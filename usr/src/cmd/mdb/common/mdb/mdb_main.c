@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <sys/priocntl.h>
@@ -110,6 +108,7 @@ int _mdb_self_fd = -1;			/* fd for self as for valid_frame */
 static void
 terminate(int status)
 {
+	(void) mdb_signal_blockall();
 	mdb_destroy();
 	exit(status);
 }
