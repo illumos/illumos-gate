@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
@@ -3529,8 +3527,17 @@ unshare_unmount_path(int op, char *path, int flags, boolean_t is_manual)
 	    ZFS_TYPE_FILESYSTEM)) == NULL)
 		return (1);
 
-
 	ret = 1;
+	if (stat64(entry.mnt_mountp, &statbuf) != 0) {
+		(void) fprintf(stderr, gettext("cannot %s '%s': %s\n"),
+		    cmdname, path, strerror(errno));
+		goto out;
+	} else if (statbuf.st_ino != path_inode) {
+		(void) fprintf(stderr, gettext("cannot "
+		    "%s '%s': not a mountpoint\n"), cmdname, path);
+		goto out;
+	}
+
 	if (op == OP_SHARE) {
 		char nfs_mnt_prop[ZFS_MAXPROPLEN];
 		char smbshare_prop[ZFS_MAXPROPLEN];
@@ -3558,13 +3565,7 @@ unshare_unmount_path(int op, char *path, int flags, boolean_t is_manual)
 		verify(zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mtpt_prop,
 		    sizeof (mtpt_prop), NULL, NULL, 0, B_FALSE) == 0);
 
-		if (stat64(entry.mnt_mountp, &statbuf) != 0) {
-			(void) fprintf(stderr, gettext("cannot %s '%s': %s\n"),
-			    cmdname, path, strerror(errno));
-		} else if (statbuf.st_ino != path_inode) {
-			(void) fprintf(stderr, gettext("cannot "
-			    "unmount '%s': not a mountpoint\n"), path);
-		} else if (is_manual) {
+		if (is_manual) {
 			ret = zfs_unmount(zhp, NULL, flags);
 		} else if (strcmp(mtpt_prop, "legacy") == 0) {
 			(void) fprintf(stderr, gettext("cannot unmount "
@@ -3577,6 +3578,7 @@ unshare_unmount_path(int op, char *path, int flags, boolean_t is_manual)
 		}
 	}
 
+out:
 	zfs_close(zhp);
 
 	return (ret != 0);
