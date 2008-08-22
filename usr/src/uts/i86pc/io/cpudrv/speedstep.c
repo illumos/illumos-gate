@@ -238,11 +238,19 @@ speedstep_power(cpudrv_devstate_t *cpudsp, uint32_t req_state)
 	cpuset_t cpus;
 	int ret;
 
-	CPUSET_ONLY(cpus, cpudsp->cpu_id);
-
+	/*
+	 * If thread is already running on target CPU then just
+	 * make the transition request. Otherwise, we'll need to
+	 * make a cross-call.
+	 */
 	kpreempt_disable();
-	xc_call((xc_arg_t)&ret, (xc_arg_t)cpudsp, (xc_arg_t)req_state,
-	    X_CALL_HIPRI, cpus, (xc_func_t)speedstep_pstate_transition);
+	if (cpudsp->cpu_id == CPU->cpu_id) {
+		speedstep_pstate_transition(&ret, cpudsp, req_state);
+	} else {
+		CPUSET_ONLY(cpus, cpudsp->cpu_id);
+		xc_call((xc_arg_t)&ret, (xc_arg_t)cpudsp, (xc_arg_t)req_state,
+		    X_CALL_HIPRI, cpus, (xc_func_t)speedstep_pstate_transition);
+	}
 	kpreempt_enable();
 
 	return (ret);
