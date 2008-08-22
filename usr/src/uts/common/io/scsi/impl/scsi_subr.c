@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/scsi/scsi.h>
 #include <sys/file.h>
 
@@ -2322,27 +2320,34 @@ scsi_uscsi_handle_cmd(dev_t dev, enum uio_seg dataspace,
 int
 scsi_uscsi_pktinit(struct uscsi_cmd *uscmd, struct scsi_pkt *pkt)
 {
-	int	path_instance;
-
-	/* get path_instance from uscsi_cmd */
-	path_instance = (uscmd->uscsi_flags & USCSI_PATH_INSTANCE) ?
-	    uscmd->uscsi_path_instance : 0;
 
 	/*
-	 * Check to make sure the scsi_pkt was allocated correctly before
-	 * transferring uscsi(7i) path_instance to scsi_pkt(9S).
+	 * See if path_instance was requested in uscsi_cmd.
 	 */
-	if (!scsi_pkt_allocated_correctly(pkt)) {
-		/* If path_instance is zero, pretend success */
-		if (path_instance == 0)
-			return (1);	/* pretend success */
-
-		return (0);		/* failure */
+	if ((uscmd->uscsi_flags & USCSI_PATH_INSTANCE) &&
+	    (uscmd->uscsi_path_instance != 0)) {
+		/*
+		 * Check to make sure the scsi_pkt was allocated correctly
+		 * before transferring uscsi(7i) path_instance to scsi_pkt(9S).
+		 */
+		if (scsi_pkt_allocated_correctly(pkt)) {
+			/* set pkt_path_instance and flag. */
+			pkt->pkt_flags |= FLAG_PKT_PATH_INSTANCE;
+			pkt->pkt_path_instance = uscmd->uscsi_path_instance;
+		} else {
+			return (0);	/* failure */
+		}
+	} else {
+		/*
+		 * Can only use pkt_path_instance if the packet
+		 * was correctly allocated.
+		 */
+		if (scsi_pkt_allocated_correctly(pkt)) {
+			pkt->pkt_path_instance = 0;
+		}
+		pkt->pkt_flags &= ~FLAG_PKT_PATH_INSTANCE;
 	}
 
-	/* set path_instance */
-	pkt->pkt_flags |= FLAG_PKT_PATH_INSTANCE;
-	pkt->pkt_path_instance = path_instance;
 	return (1);			/* success */
 }
 
