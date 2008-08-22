@@ -28,8 +28,6 @@
  * this module evaluates constraints.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -602,7 +600,7 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		 * in the already-allocated struct evalue.
 		 */
 		if ((serdvalp = (struct evalue *)lut_lookup(flt->serdprops,
-		    (void *)str, NULL)) == NULL) {
+		    (void *)str, (lut_cmp)strcmp)) == NULL) {
 			serdvalp = MALLOC(sizeof (*serdvalp));
 			alloced = 1;
 		}
@@ -645,13 +643,14 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 				serdvalp->v = (uintptr_t)stable(buf);
 				FREE(buf);
 			}
+
 			if (serdvalp->t == UINT64)
 				out(O_ALTFP|O_VERB2, " (%llu)", serdvalp->v);
 			else
 				out(O_ALTFP|O_VERB2, " (\"%s\")",
 				    (char *)(uintptr_t)serdvalp->v);
 			flt->serdprops = lut_add(flt->serdprops, (void *)str,
-			    (void *)serdvalp, NULL);
+			    (void *)serdvalp, (lut_cmp)strcmp);
 		}
 		valuep->t = UINT64;
 		valuep->v = 1;

@@ -1080,14 +1080,29 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 		uint_t nval;
 		hrtime_t tval;
 		const char *name;
+		char *tptr;
 		char *serd_name;
 		int i;
+		int tmplen;
 		char *ptr;
 		int got_n_override = 0, got_t_override = 0;
 
 		/* no SERD engine yet, so create it */
 		nodep = serdinst->u.stmt.np->u.event.epname;
-		name = serdinst->u.stmt.np->u.event.ename->u.name.s;
+		tmplen = strlen(serdinst->u.stmt.np->u.event.ename->u.name.s)
+		    + 2;
+		if (serdsuffix != NULL)
+			tmplen += strlen(serdsuffix);
+		tptr = MALLOC(tmplen);
+		if (serdsuffix != NULL) {
+			(void) snprintf(tptr, len, "%s%s",
+			    serdinst->u.stmt.np->u.event.ename->u.name.s,
+			    serdsuffix);
+		} else {
+			(void) snprintf(tptr, len, "%s",
+			    serdinst->u.stmt.np->u.event.ename->u.name.s);
+		}
+		name = (const char *)tptr;
 		path = ipath2str(NULL, ipath(nodep));
 		cp = config_lookup(fmep->config, path, 0);
 		FREE((void *)path);
@@ -1193,6 +1208,7 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 			FREE(ptr);
 		}
 		fmd_serd_create(hdl, serdname, nval, tval);
+		FREE(tptr);
 	}
 
 	newentp = MALLOC(sizeof (*newentp));
