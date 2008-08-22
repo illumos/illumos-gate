@@ -2225,6 +2225,15 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zprop_source_t *src,
 		case PROP_TYPE_NUMBER:
 		case PROP_TYPE_INDEX:
 			*val = getprop_uint64(zhp, prop, source);
+			/*
+			 * If we tried to use a defalut value for a
+			 * readonly property, it means that it was not
+			 * present; return an error.
+			 */
+			if (zfs_prop_readonly(prop) &&
+			    *source && (*source)[0] == '\0') {
+				return (-1);
+			}
 			break;
 
 		case PROP_TYPE_STRING:

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/bplist.h>
 #include <sys/zfs_context.h>
 
@@ -309,5 +307,43 @@ bplist_space(bplist_t *bpl, uint64_t *usedp, uint64_t *compp, uint64_t *uncompp)
 		*uncompp = uncomp;
 	}
 
+	return (err);
+}
+
+/*
+ * Return (in *dasizep) the amount of space on the deadlist which is:
+ * mintxg < blk_birth <= maxtxg
+ */
+int
+bplist_space_birthrange(bplist_t *bpl, uint64_t mintxg, uint64_t maxtxg,
+    uint64_t *dasizep)
+{
+	uint64_t size = 0;
+	uint64_t itor = 0;
+	blkptr_t bp;
+	int err;
+
+	/*
+	 * As an optimization, if they want the whole txg range, just
+	 * get bpl_bytes rather than iterating over the bps.
+	 */
+	if (mintxg < TXG_INITIAL && maxtxg == UINT64_MAX) {
+		mutex_enter(&bpl->bpl_lock);
+		err = bplist_hold(bpl);
+		if (err == 0)
+			*dasizep = bpl->bpl_phys->bpl_bytes;
+		mutex_exit(&bpl->bpl_lock);
+		return (err);
+	}
+
+	while ((err = bplist_iterate(bpl, &itor, &bp)) == 0) {
+		if (bp.blk_birth > mintxg && bp.blk_birth <= maxtxg) {
+			size +=
+			    bp_get_dasize(dmu_objset_spa(bpl->bpl_mos), &bp);
+		}
+	}
+	if (err == ENOENT)
+		err = 0;
+	*dasizep = size;
 	return (err);
 }

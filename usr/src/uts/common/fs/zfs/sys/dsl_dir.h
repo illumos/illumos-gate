@@ -26,8 +26,6 @@
 #ifndef	_SYS_DSL_DIR_H
 #define	_SYS_DSL_DIR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dmu.h>
 #include <sys/dsl_pool.h>
 #include <sys/dsl_synctask.h>
@@ -39,6 +37,17 @@ extern "C" {
 #endif
 
 struct dsl_dataset;
+
+typedef enum dd_used {
+	DD_USED_HEAD,
+	DD_USED_SNAP,
+	DD_USED_CHILD,
+	DD_USED_CHILD_RSRV,
+	DD_USED_REFRSRV,
+	DD_USED_NUM
+} dd_used_t;
+
+#define	DD_FLAG_USED_BREAKDOWN (1<<0)
 
 typedef struct dsl_dir_phys {
 	uint64_t dd_creation_time; /* not actually used */
@@ -59,7 +68,9 @@ typedef struct dsl_dir_phys {
 	uint64_t dd_reserved;
 	uint64_t dd_props_zapobj;
 	uint64_t dd_deleg_zapobj; /* dataset delegation permissions */
-	uint64_t dd_pad[20]; /* pad out to 256 bytes for good measure */
+	uint64_t dd_flags;
+	uint64_t dd_used_breakdown[DD_USED_NUM];
+	uint64_t dd_pad[14]; /* pad out to 256 bytes for good measure */
 } dsl_dir_phys_t;
 
 struct dsl_dir {
@@ -79,9 +90,6 @@ struct dsl_dir {
 	kmutex_t dd_lock;
 	list_t dd_prop_cbs; /* list of dsl_prop_cb_record_t's */
 
-	/* Accounting */
-	/* reflects any changes to dd_phys->dd_used_bytes made this syncing */
-	int64_t dd_used_bytes;
 	/* gross estimate of space used by in-flight tx's */
 	uint64_t dd_tempreserved[TXG_SIZE];
 	/* amount of space we expect to write; == amount of dirty data */
@@ -114,8 +122,10 @@ int dsl_dir_tempreserve_space(dsl_dir_t *dd, uint64_t mem,
     dmu_tx_t *tx);
 void dsl_dir_tempreserve_clear(void *tr_cookie, dmu_tx_t *tx);
 void dsl_dir_willuse_space(dsl_dir_t *dd, int64_t space, dmu_tx_t *tx);
-void dsl_dir_diduse_space(dsl_dir_t *dd,
+void dsl_dir_diduse_space(dsl_dir_t *dd, dd_used_t type,
     int64_t used, int64_t compressed, int64_t uncompressed, dmu_tx_t *tx);
+void dsl_dir_transfer_space(dsl_dir_t *dd, int64_t delta,
+    dd_used_t oldtype, dd_used_t newtype, dmu_tx_t *tx);
 int dsl_dir_set_quota(const char *ddname, uint64_t quota);
 int dsl_dir_set_reservation(const char *ddname, uint64_t reservation);
 int dsl_dir_rename(dsl_dir_t *dd, const char *newname);

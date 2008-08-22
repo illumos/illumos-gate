@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <stdlib.h>
@@ -719,7 +717,7 @@ dump_dsl_dir(objset_t *os, uint64_t object, void *data, size_t size)
 {
 	dsl_dir_phys_t *dd = data;
 	time_t crtime;
-	char used[6], compressed[6], uncompressed[6], quota[6], resv[6];
+	char nice[6];
 
 	if (dd == NULL)
 		return;
@@ -727,12 +725,6 @@ dump_dsl_dir(objset_t *os, uint64_t object, void *data, size_t size)
 	ASSERT3U(size, >=, sizeof (dsl_dir_phys_t));
 
 	crtime = dd->dd_creation_time;
-	nicenum(dd->dd_used_bytes, used);
-	nicenum(dd->dd_compressed_bytes, compressed);
-	nicenum(dd->dd_uncompressed_bytes, uncompressed);
-	nicenum(dd->dd_quota, quota);
-	nicenum(dd->dd_reserved, resv);
-
 	(void) printf("\t\tcreation_time = %s", ctime(&crtime));
 	(void) printf("\t\thead_dataset_obj = %llu\n",
 	    (u_longlong_t)dd->dd_head_dataset_obj);
@@ -742,15 +734,32 @@ dump_dsl_dir(objset_t *os, uint64_t object, void *data, size_t size)
 	    (u_longlong_t)dd->dd_origin_obj);
 	(void) printf("\t\tchild_dir_zapobj = %llu\n",
 	    (u_longlong_t)dd->dd_child_dir_zapobj);
-	(void) printf("\t\tused_bytes = %s\n", used);
-	(void) printf("\t\tcompressed_bytes = %s\n", compressed);
-	(void) printf("\t\tuncompressed_bytes = %s\n", uncompressed);
-	(void) printf("\t\tquota = %s\n", quota);
-	(void) printf("\t\treserved = %s\n", resv);
+	nicenum(dd->dd_used_bytes, nice);
+	(void) printf("\t\tused_bytes = %s\n", nice);
+	nicenum(dd->dd_compressed_bytes, nice);
+	(void) printf("\t\tcompressed_bytes = %s\n", nice);
+	nicenum(dd->dd_uncompressed_bytes, nice);
+	(void) printf("\t\tuncompressed_bytes = %s\n", nice);
+	nicenum(dd->dd_quota, nice);
+	(void) printf("\t\tquota = %s\n", nice);
+	nicenum(dd->dd_reserved, nice);
+	(void) printf("\t\treserved = %s\n", nice);
 	(void) printf("\t\tprops_zapobj = %llu\n",
 	    (u_longlong_t)dd->dd_props_zapobj);
 	(void) printf("\t\tdeleg_zapobj = %llu\n",
 	    (u_longlong_t)dd->dd_deleg_zapobj);
+	(void) printf("\t\tflags = %llx\n",
+	    (u_longlong_t)dd->dd_flags);
+
+#define	DO(which) \
+	nicenum(dd->dd_used_breakdown[DD_USED_ ## which], nice); \
+	(void) printf("\t\tused_breakdown[" #which "] = %s\n", nice)
+	DO(HEAD);
+	DO(SNAP);
+	DO(CHILD);
+	DO(CHILD_RSRV);
+	DO(REFRSRV);
+#undef DO
 }
 
 /*ARGSUSED*/
@@ -1145,8 +1154,8 @@ dump_dir(objset_t *os)
 	if (dds.dds_type == DMU_OST_META) {
 		dds.dds_creation_txg = TXG_INITIAL;
 		usedobjs = os->os->os_rootbp->blk_fill;
-		refdbytes =
-		    os->os->os_spa->spa_dsl_pool->dp_mos_dir->dd_used_bytes;
+		refdbytes = os->os->os_spa->spa_dsl_pool->
+		    dp_mos_dir->dd_phys->dd_used_bytes;
 	} else {
 		dmu_objset_space(os, &refdbytes, &scratch, &usedobjs, &scratch);
 	}

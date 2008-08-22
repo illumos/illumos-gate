@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/zio.h>
 #include <sys/spa.h>
 #include <sys/u8_textprep.h>
@@ -269,6 +267,15 @@ zfs_prop_init(void)
 	register_number(ZFS_PROP_VOLBLOCKSIZE, "volblocksize", 8192,
 	    PROP_ONETIME,
 	    ZFS_TYPE_VOLUME, "512 to 128k, power of 2",	"VOLBLOCK");
+	register_number(ZFS_PROP_USEDSNAP, "usedbysnapshots", 0, PROP_READONLY,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, "<size>", "USEDSNAP");
+	register_number(ZFS_PROP_USEDDS, "usedbydataset", 0, PROP_READONLY,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, "<size>", "USEDDS");
+	register_number(ZFS_PROP_USEDCHILD, "usedbychildren", 0, PROP_READONLY,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, "<size>", "USEDCHILD");
+	register_number(ZFS_PROP_USEDREFRESERV, "usedbyrefreservation", 0,
+	    PROP_READONLY,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, "<size>", "USEDREFRESERV");
 
 	/* default number properties */
 	register_number(ZFS_PROP_QUOTA, "quota", 0, PROP_DEFAULT,

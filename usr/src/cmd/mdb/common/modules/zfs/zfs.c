@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_ctf.h>
 #include <sys/zfs_context.h>
 #include <sys/mdb_modapi.h>
@@ -1324,7 +1322,6 @@ typedef struct mdb_spa {
 
 typedef struct mdb_dsl_dir {
 	uintptr_t dd_phys;
-	uint64_t dd_used_bytes;
 	int64_t dd_space_towrite[TXG_SIZE];
 } mdb_dsl_dir_t;
 
@@ -1428,8 +1425,6 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    dp_root_dir, dp_root_dir) ||
 	    GETMEMB(dp_root_dir, struct dsl_dir, dd_phys, dd.dd_phys) ||
 	    GETMEMB(dp_root_dir, struct dsl_dir,
-	    dd_used_bytes, dd.dd_used_bytes) ||
-	    GETMEMB(dp_root_dir, struct dsl_dir,
 	    dd_space_towrite, dd.dd_space_towrite) ||
 	    GETMEMB(dd.dd_phys, struct dsl_dir_phys,
 	    dd_used_bytes, dsp.dd_used_bytes) ||
@@ -1445,8 +1440,6 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    dd.dd_space_towrite[1] >> shift, suffix,
 	    dd.dd_space_towrite[2] >> shift, suffix,
 	    dd.dd_space_towrite[3] >> shift, suffix);
-	mdb_printf("dd_used_bytes = %llu%s\n",
-	    dd.dd_used_bytes >> shift, suffix);
 
 	mdb_printf("dd_phys.dd_used_bytes = %llu%s\n",
 	    dsp.dd_used_bytes >> shift, suffix);

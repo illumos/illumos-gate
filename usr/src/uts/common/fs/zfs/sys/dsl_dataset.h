@@ -26,8 +26,6 @@
 #ifndef	_SYS_DSL_DATASET_H
 #define	_SYS_DSL_DATASET_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dmu.h>
 #include <sys/spa.h>
 #include <sys/txg.h>
@@ -106,8 +104,9 @@ typedef struct dsl_dataset {
 	uint64_t ds_object;
 	uint64_t ds_fsid_guid;
 
-	/* only used in syncing context: */
-	struct dsl_dataset *ds_prev; /* only valid for non-snapshots */
+	/* only used in syncing context, only valid for non-snapshots: */
+	struct dsl_dataset *ds_prev;
+	uint64_t ds_origin_txg;
 
 	/* has internal locking: */
 	bplist_t ds_deadlist;

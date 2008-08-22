@@ -26,8 +26,6 @@
 #ifndef	_SYS_FS_ZFS_H
 #define	_SYS_FS_ZFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -103,6 +101,10 @@ typedef enum {
 	ZFS_PROP_GUID,
 	ZFS_PROP_PRIMARYCACHE,
 	ZFS_PROP_SECONDARYCACHE,
+	ZFS_PROP_USEDSNAP,
+	ZFS_PROP_USEDDS,
+	ZFS_PROP_USEDCHILD,
+	ZFS_PROP_USEDREFRESERV,
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 
@@ -245,13 +247,14 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_10			10ULL
 #define	SPA_VERSION_11			11ULL
 #define	SPA_VERSION_12			12ULL
+#define	SPA_VERSION_13			13ULL
 /*
  * When bumping up SPA_VERSION, make sure GRUB ZFS understands the on-disk
  * format change. Go to usr/src/grub/grub-0.95/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.
  */
-#define	SPA_VERSION			SPA_VERSION_12
-#define	SPA_VERSION_STRING		"12"
+#define	SPA_VERSION			SPA_VERSION_13
+#define	SPA_VERSION_STRING		"13"
 
 /*
  * Symbolic names for the changes that caused a SPA_VERSION switch.
@@ -285,6 +288,7 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_ORIGIN		SPA_VERSION_11
 #define	SPA_VERSION_DSL_SCRUB		SPA_VERSION_11
 #define	SPA_VERSION_SNAP_PROPS		SPA_VERSION_12
+#define	SPA_VERSION_USED_BREAKDOWN	SPA_VERSION_13
 
 /*
  * ZPL version - rev'd whenever an incompatible on-disk format change

@@ -26,8 +26,6 @@
 #ifndef	_SYS_BPLIST_H
 #define	_SYS_BPLIST_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dmu.h>
 #include <sys/spa.h>
 #include <sys/txg.h>
@@ -81,6 +79,8 @@ extern void bplist_sync(bplist_t *bpl, dmu_tx_t *tx);
 extern void bplist_vacate(bplist_t *bpl, dmu_tx_t *tx);
 extern int bplist_space(bplist_t *bpl,
     uint64_t *usedp, uint64_t *compp, uint64_t *uncompp);
+extern int bplist_space_birthrange(bplist_t *bpl,
+    uint64_t mintxg, uint64_t maxtxg, uint64_t *dasizep);
 
 #ifdef	__cplusplus
 }

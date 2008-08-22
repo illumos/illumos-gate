@@ -24,12 +24,10 @@
 #ifndef	_SYS_FS_ZFS_H
 #define	_SYS_FS_ZFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * On-disk version number.
  */
-#define	SPA_VERSION			12ULL
+#define	SPA_VERSION			13ULL
 
 /*
  * The following are configuration names used in the nvlist describing a pool's

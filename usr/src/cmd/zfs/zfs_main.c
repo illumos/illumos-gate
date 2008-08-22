@@ -361,7 +361,7 @@ usage(boolean_t requested)
 
 		(void) fprintf(fp, gettext("\nSizes are specified in bytes "
 		    "with standard units such as K, M, G, etc.\n"));
-		(void) fprintf(fp, gettext("\n\nUser-defined properties can "
+		(void) fprintf(fp, gettext("\nUser-defined properties can "
 		    "be specified by using a name containing a colon (:).\n"));
 
 	} else if (show_permissions) {
@@ -1756,12 +1756,12 @@ zfs_do_list(int argc, char **argv)
 	    "name,used,available,referenced,mountpoint";
 	int types = ZFS_TYPE_DATASET;
 	char *fields = NULL;
-	char *basic_fields = default_fields;
 	list_cbdata_t cb = { 0 };
 	char *value;
 	int ret;
 	char *type_subopts[] = { "filesystem", "volume", "snapshot", NULL };
 	zfs_sort_column_t *sortcol = NULL;
+	boolean_t gottypes = B_FALSE;
 
 	/* check options */
 	while ((c = getopt(argc, argv, ":o:rt:Hs:S:")) != -1) {
@@ -1792,6 +1792,7 @@ zfs_do_list(int argc, char **argv)
 			}
 			break;
 		case 't':
+			gottypes = B_TRUE;
 			types = 0;
 			while (*optarg != '\0') {
 				switch (getsubopt(&optarg, type_subopts,
@@ -1829,7 +1830,14 @@ zfs_do_list(int argc, char **argv)
 	argv += optind;
 
 	if (fields == NULL)
-		fields = basic_fields;
+		fields = default_fields;
+
+	/*
+	 * If they only specified "-o space" and no types, don't display
+	 * snapshots.
+	 */
+	if (strcmp(fields, "space") == 0 && !gottypes)
+		types &= ~ZFS_TYPE_SNAPSHOT;
 
 	/*
 	 * If the user specifies '-o all', the zprop_get_list() doesn't
