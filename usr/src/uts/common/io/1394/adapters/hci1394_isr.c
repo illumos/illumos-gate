@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * hci1394_isr.c
@@ -209,6 +206,9 @@ hci1394_isr(caddr_t parm)
 
 	ASSERT(soft_state != NULL);
 	TNF_PROBE_0_DEBUG(hci1394_isr_enter, HCI1394_TNF_HAL_STACK, "");
+
+	if (hci1394_state(&soft_state->drvinfo) == HCI1394_SHUTDOWN)
+		return (DDI_INTR_UNCLAIMED);
 
 	/*
 	 * Get all of the enabled 1394 interrupts which are currently
@@ -687,7 +687,7 @@ hci1394_isr_isoch_ir(hci1394_state_t *soft_state)
 			 */
 			if (ev & mask) {
 				ctxtp = hci1394_isoch_recv_ctxt_get(
-					soft_state->isoch, i);
+				    soft_state->isoch, i);
 				hci1394_ixl_interrupt(soft_state, ctxtp,
 				    B_FALSE);
 			}
@@ -739,7 +739,7 @@ hci1394_isr_isoch_it(hci1394_state_t *soft_state)
 			 */
 			if (ev & mask) {
 				ctxtp = hci1394_isoch_xmit_ctxt_get(
-					soft_state->isoch, i);
+				    soft_state->isoch, i);
 				hci1394_ixl_interrupt(soft_state, ctxtp,
 				    B_FALSE);
 			}
