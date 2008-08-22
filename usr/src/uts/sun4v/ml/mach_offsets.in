@@ -18,7 +18,7 @@
 \
 \ CDDL HEADER END
 \
-\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 \ offsets.in: input file to produce assym.h using the stabs program
@@ -69,8 +69,6 @@
 \ "\#define" escapes to add the offsets from the base structure/union
 \ and all of the nested structures/unions together.  See the many
 \ examples already in this file.
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	_GENASSYM
 #define	_GENASSYM
@@ -213,7 +211,7 @@ kpm_hlk		KPMHLK_SIZE KPMHLK_SHIFT
 	khl_lock	KPMHLK_LOCK
 
 kpm_spage	KPMSPAGE_SIZE KPMSPAGE_SHIFT
-	kp_mapped	KPMSPAGE_MAPPED
+	kp_mapped_flag	KPMSPAGE_MAPPED
 
 kpm_shlk	KPMSHLK_SIZE KPMSHLK_SHIFT
 	kshl_lock	KPMSHLK_LOCK

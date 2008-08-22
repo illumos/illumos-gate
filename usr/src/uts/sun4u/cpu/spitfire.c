@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -33,6 +31,7 @@
 #include <sys/cpu.h>
 #include <sys/elf_SPARC.h>
 #include <vm/hat_sfmmu.h>
+#include <vm/seg_kpm.h>
 #include <vm/page.h>
 #include <vm/vm_dep.h>
 #include <sys/cpuvar.h>
@@ -504,6 +503,13 @@ cpu_setup(void)
 	kpm_size = (size_t)(2ull * 1024 * 1024 * 1024 * 1024); /* 2TB */
 	kpm_size_shift = 41;
 	kpm_vbase = (caddr_t)0xfffffa0000000000ull; /* 16EB - 6TB */
+
+	/*
+	 * All UltraSPARC platforms should use small kpm page as default, as
+	 * the KPM large page VAC conflict code has no value to maintain. The
+	 * new generation of SPARC no longer have VAC conflict issue.
+	 */
+	kpm_smallpages = 1;
 
 #if defined(SF_ERRATA_57)
 	errata57_limit = (caddr_t)0x80000000ul;

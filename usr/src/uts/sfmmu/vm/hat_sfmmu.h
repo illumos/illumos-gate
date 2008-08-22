@@ -34,8 +34,6 @@
 #ifndef	_VM_HAT_SFMMU_H
 #define	_VM_HAT_SFMMU_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -2377,7 +2375,7 @@ extern void		sfmmu_patch_shctx(void);
 extern void		sfmmu_kpm_load_tsb(caddr_t, tte_t *, int);
 extern void		sfmmu_kpm_unload_tsb(caddr_t, int);
 extern void		sfmmu_kpm_tsbmtl(short *, uint_t *, int);
-extern int		sfmmu_kpm_stsbmtl(char *, uint_t *, int);
+extern int		sfmmu_kpm_stsbmtl(uchar_t *, uint_t *, int);
 extern caddr_t		kpm_vbase;
 extern size_t		kpm_size;
 extern struct memseg	*memseg_hash[];
@@ -2399,9 +2397,21 @@ extern uchar_t		kpmp_shift;
 #define	KPMTSBM_STOP		0
 #define	KPMTSBM_START		1
 
-/* kpm_smallpages kp_mapped values */
-#define	KPM_MAPPEDS		-1	/* small mapping valid, no conflict */
-#define	KPM_MAPPEDSC		1	/* small mapping valid, conflict */
+/*
+ * For kpm_smallpages, the state about how a kpm page is mapped and whether
+ * it is ready to go is indicated by the two 4-bit fields defined in the
+ * kpm_spage structure as follows:
+ * kp_mapped_flag bit[0:3] - the page is mapped cacheable or not
+ * kp_mapped_flag bit[4:7] - the mapping is ready to go or not
+ * If the bit KPM_MAPPED_GO is on, it indicates that the assembly tsb miss
+ * handler can drop the mapping in regardless of the caching state of the
+ * mapping. Otherwise, we will have C handler resolve the VAC conflict no
+ * matter the page is currently mapped cacheable or non-cacheable.
+ */
+#define	KPM_MAPPEDS		0x1	/* small mapping valid, no conflict */
+#define	KPM_MAPPEDSC		0x2	/* small mapping valid, conflict */
+#define	KPM_MAPPED_GO		0x10	/* the mapping is ready to go */
+#define	KPM_MAPPED_MASK		0xf
 
 /* Physical memseg address NULL marker */
 #define	MSEG_NULLPTR_PA		-1

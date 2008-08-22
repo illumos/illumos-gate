@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_MACH_KPM_H
 #define	_MACH_KPM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -97,7 +95,8 @@ int kpmp_hash_debug;
 #endif	/* DEBUG */
 
 /*
- * kpm virtual address to physical address
+ * kpm virtual address to physical address. Any changes in this macro must
+ * also be ported to the assembly implementation in sfmmu_asm.s
  */
 #ifdef VAC
 #define	SFMMU_KPM_VTOP(vaddr, paddr) {					\

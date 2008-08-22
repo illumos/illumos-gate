@@ -70,8 +70,6 @@
 \ and all of the nested structures/unions together.  See the many
 \ examples already in this file.
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	_GENASSYM
 #define	_GENASSYM
 #endif
@@ -179,7 +177,7 @@ kpm_hlk		KPMHLK_SIZE KPMHLK_SHIFT
 	khl_lock	KPMHLK_LOCK
 
 kpm_spage	KPMSPAGE_SIZE KPMSPAGE_SHIFT
-	kp_mapped	KPMSPAGE_MAPPED
+	kp_mapped_flag	KPMSPAGE_MAPPED
 
 kpm_shlk	KPMSHLK_SIZE KPMSHLK_SHIFT
 	kshl_lock	KPMSHLK_LOCK

@@ -26,8 +26,6 @@
 #ifndef _SYS_OPL_OLYMPUS_REGS_H
 #define	_SYS_OPL_OLYMPUS_REGS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/machasi.h>
 #include <sys/cpu_impl.h>
 
@@ -263,11 +261,9 @@ extern "C" {
 #define	OPL_ECACHE_SETSIZE	0x80000
 
 /*
- * The minimum size needed to ensure consistency on a virtually address
- * cache.  Computed by taking the largest virtually indexed cache and dividing
- * by its associativity.
+ * OPL platform has no vac consistent issue. So set it to 8KB.
  */
-#define	OPL_VAC_SIZE		0x4000
+#define	OPL_VAC_SIZE		0x2000
 
 /* these are field offsets for opl_errlog structure */
 #define	LOG_STICK_OFF	0x0

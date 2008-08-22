@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SFMMU primitives.  These primitives should only be used by sfmmu
  * routines.
@@ -4736,36 +4734,70 @@ label/**/_ok:
 	 *  g7 = kpm_vbase
 	 */
 
-	/* vaddr2pfn */
-	ldub	[%g6 + KPMTSBM_SZSHIFT], %g3
+	/*
+	 * Assembly implementation of SFMMU_KPM_VTOP(vaddr, paddr)
+	 * which is defined in mach_kpm.h. Any changes in that macro
+	 * should also be ported back to this assembly code.
+	 */
+	ldub	[%g6 + KPMTSBM_SZSHIFT], %g3	/* g3 = kpm_size_shift */
 	sub	%g2, %g7, %g4			/* paddr = vaddr-kpm_vbase */
-	srax    %g4, %g3, %g2			/* which alias range (r) */
-	brnz,pn	%g2, sfmmu_kpm_exception	/* if (r != 0) goto C handler */
-	  srlx	%g4, MMU_PAGESHIFT, %g2		/* %g2 = pfn */
+	srax    %g4, %g3, %g7			/* which alias range (r) */
+	brz,pt	%g7, 2f
+	  sethi   %hi(vac_colors_mask), %g5
+	ld	[%g5 + %lo(vac_colors_mask)], %g5
+
+	srlx	%g2, MMU_PAGESHIFT, %g1		/* vaddr >> MMU_PAGESHIFT */
+	and	%g1, %g5, %g1			/* g1 = v */
+	sllx	%g7, %g3, %g5			/* g5 = r << kpm_size_shift */
+	cmp	%g7, %g1			/* if (r > v) */
+	bleu,pn %xcc, 1f
+	  sub   %g4, %g5, %g4			/* paddr -= r << kpm_size_shift */
+	sub	%g7, %g1, %g5			/* g5 = r - v */
+	sllx	%g5, MMU_PAGESHIFT, %g7		/* (r-v) << MMU_PAGESHIFT */
+	add	%g4, %g7, %g4			/* paddr += (r-v)<<MMU_PAGESHIFT */
+	ba	2f
+	  nop
+1:
+	sllx	%g7, MMU_PAGESHIFT, %g5		/* else */
+	sub	%g4, %g5, %g4			/* paddr -= r << MMU_PAGESHIFT */
+
+	/*
+	 * paddr2pfn
+	 *  g1 = vcolor (not used)
+	 *  g2 = tag access register
+	 *  g3 = clobbered
+	 *  g4 = paddr
+	 *  g5 = clobbered
+	 *  g6 = per-CPU kpm tsbmiss area
+	 *  g7 = clobbered
+	 */
+2:
+	srlx	%g4, MMU_PAGESHIFT, %g2		/* g2 = pfn */
 
 	/*
 	 * Setup %asi
 	 * mseg_pa = page_numtomemseg_nolock_pa(pfn)
 	 * if (mseg not found) sfmmu_kpm_exception
-	 * g2=pfn
+	 * g2=pfn g6=per-CPU kpm tsbmiss area
+	 * g4 g5 g7 for scratch use.
 	 */
 	mov	ASI_MEM, %asi
 	PAGE_NUM2MEMSEG_NOLOCK_PA(%g2, %g3, %g6, %g4, %g5, %g7, kpmtsbmsp2m)
-	cmp	%g3, MSEG_NULLPTR_PA		
+	cmp	%g3, MSEG_NULLPTR_PA
 	be,pn	%xcc, sfmmu_kpm_exception	/* if mseg not found */
 	  nop
 
 	/*
 	 * inx = pfn - mseg_pa->kpm_pbase
-	 * g2=pfn g3=mseg_pa
+	 * g2=pfn  g3=mseg_pa  g6=per-CPU kpm tsbmiss area
 	 */
 	ldxa	[%g3 + MEMSEG_KPM_PBASE]%asi, %g7
-	sub	%g2, %g7, %g4	
+	sub	%g2, %g7, %g4
 
 #ifdef	DEBUG
 	/*
 	 * Validate inx value
-	 * g2=pfn g3=mseg_pa g4=inx
+	 * g2=pfn g3=mseg_pa g4=inx g6=per-CPU tsbmiss area
 	 */
 	ldxa	[%g3 + MEMSEG_KPM_NKPMPGS]%asi, %g5
 	cmp	%g4, %g5			/* inx - nkpmpgs */
@@ -4780,7 +4812,8 @@ label/**/_ok:
 
 	/*
 	 * KPMP_SHASH(kp)
-	 * g2=pfn g3=mseg_pa g4=inx g5=ksp g7=kpmp_stable_sz
+	 * g2=pfn g3=mseg_pa g4=inx g5=ksp
+	 * g6=per-CPU kpm tsbmiss area  g7=kpmp_stable_sz
 	 */
 	ldub	[%g6 + KPMTSBM_KPMPSHIFT], %g1	/* kpmp_shift */
 	sub	%g7, 1, %g7			/* mask */
@@ -4791,6 +4824,7 @@ label/**/_ok:
 	/*
 	 * Calculate physical kpm_spage pointer
 	 * g2=pfn g3=mseg_pa g4=offset g5=hashinx
+	 * g6=per-CPU kpm tsbmiss area
 	 */
 	ldxa	[%g3 + MEMSEG_KPM_PAGESPA]%asi, %g1 /* kpm_spagespa */
 	add	%g1, %g4, %g1			/* ksp_pa */
@@ -4799,18 +4833,20 @@ label/**/_ok:
 	 * Calculate physical hash lock address.
 	 * Note: Changes in kpm_shlk_t must be reflected here.
 	 * g1=ksp_pa g2=pfn g5=hashinx
+	 * g6=per-CPU kpm tsbmiss area
 	 */
 	ldx	[%g6 + KPMTSBM_KPMPTABLEPA], %g4 /* kpmp_stablepa */
 	sllx	%g5, KPMSHLK_SHIFT, %g5
 	add	%g4, %g5, %g3			/* hlck_pa */
 
 	/*
-	 * Assemble tte
+	 * Assemble non-cacheable tte initially
 	 * g1=ksp_pa g2=pfn g3=hlck_pa
+	 * g6=per-CPU kpm tsbmiss area
 	 */
 	sethi	%hi(TTE_VALID_INT), %g5		/* upper part */
 	sllx	%g5, 32, %g5		
-	mov	(TTE_CP_INT|TTE_CV_INT|TTE_PRIV_INT|TTE_HWWR_INT), %g4
+	mov	(TTE_CP_INT|TTE_PRIV_INT|TTE_HWWR_INT), %g4
 	or	%g5, %g4, %g5
 	sllx	%g2, MMU_PAGESHIFT, %g4
 	or	%g5, %g4, %g5			/* tte */
@@ -4819,18 +4855,23 @@ label/**/_ok:
 
 	/*
 	 * tsb dropin
-	 * g1=ksp_pa g2=ttarget g3=hlck_pa g4=ktsbp g5=tte
+	 * g1=ksp_pa g2=ttarget g3=hlck_pa g4=ktsbp g5=tte (non-cacheable)
+	 * g6=per-CPU kpm tsbmiss area  g7=scratch register
 	 */
 
 	/* KPMLOCK_ENTER(kpmlckp, tmp1, label1, asi) */
 	KPMLOCK_ENTER(%g3, %g7, kpmtsbsmlock, ASI_MEM)
 
 	/* use C-handler if there's no go for dropin */
-	ldsba	[%g1 + KPMSPAGE_MAPPED]%asi, %g7 /* kp_mapped */
-	cmp	%g7, -1
-	bne,pn	%xcc, 5f
-	  nop	
-
+	ldsba	[%g1 + KPMSPAGE_MAPPED]%asi, %g7	/* kp_mapped */
+	andcc	%g7, KPM_MAPPED_GO, %g0			/* go or no go ? */
+	bz,pt	%icc, 5f				/* no go */
+	  nop
+	and	%g7, KPM_MAPPED_MASK, %g7		/* go */
+	cmp	%g7, KPM_MAPPEDS			/* cacheable ? */
+	be,a,pn	%xcc, 3f
+	  or	%g5, TTE_CV_INT, %g5			/* cacheable */	
+3:
 #ifndef sun4v
 	ldub	[%g6 + KPMTSBM_FLAGS], %g7
 	mov	ASI_N, %g1
@@ -4905,7 +4946,7 @@ sfmmu_kpm_tsbmtl(short *kp_refcntc, uint_t *khl_lock, int cmd)
  */
 /* ARGSUSED */
 int
-sfmmu_kpm_stsbmtl(char *mapped, uint_t *kshl_lock, int val)
+sfmmu_kpm_stsbmtl(uchar_t *mapped, uint_t *kshl_lock, int val)
 {
 	return (0);
 }
@@ -4983,7 +5024,7 @@ sfmmu_kpm_stsbmtl_panic:
 	stb	%o2, [%o0]	
 	KPMLOCK_EXIT(%o1, ASI_N)
 
-	mov	%o5, %o0			/* return old val */
+	and	%o5, KPM_MAPPED_MASK, %o0	/* return old val */
 	retl
 	  wrpr	%g0, %o3, %pstate		/* enable interrupts */
 	SET_SIZE(sfmmu_kpm_stsbmtl)

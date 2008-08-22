@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Kernel Physical Mapping (segkpm) hat interface routines for sun4u.
@@ -96,7 +94,7 @@ hat_kpm_mapin(struct page *pp, struct kpme *kpme)
 	ASSERT(pp->p_kpmref >= 0);
 
 	vaddr = (pp->p_kpmref == 0) ?
-		sfmmu_kpm_mapin(pp) : hat_kpm_page2va(pp, 1);
+	    sfmmu_kpm_mapin(pp) : hat_kpm_page2va(pp, 1);
 
 	if (kpme != NULL) {
 		/*
@@ -152,7 +150,7 @@ hat_kpm_mapout(struct page *pp, struct kpme *kpme, caddr_t vaddr)
 
 		if (sfmmu_kpme_lookup(kpme, pp) == 0)
 			panic("hat_kpm_mapout: kpme not found pp=%p",
-				(void *)pp);
+			    (void *)pp);
 
 		ASSERT(pp->p_kpmref > 0);
 		sfmmu_kpme_sub(kpme, pp);
@@ -200,8 +198,8 @@ hat_kpm_page2va(struct page *pp, int checkswap)
 	if (vcolor_pa != vcolor) {
 		vaddr += ((uintptr_t)(vcolor - vcolor_pa) << MMU_PAGESHIFT);
 		vaddr += (vcolor_pa > vcolor) ?
-			((uintptr_t)vcolor_pa << kpm_size_shift) :
-			((uintptr_t)(vcolor - vcolor_pa) << kpm_size_shift);
+		    ((uintptr_t)vcolor_pa << kpm_size_shift) :
+		    ((uintptr_t)(vcolor - vcolor_pa) << kpm_size_shift);
 	}
 
 	return ((caddr_t)vaddr);
@@ -413,12 +411,12 @@ hat_kpm_delmem_mseg_update(struct memseg *msp, struct memseg **mspp)
 
 	if (mspp == &memsegs) {
 		memsegspa = (msp->next) ?
-				va_to_pa(msp->next) : MSEG_NULLPTR_PA;
+		    va_to_pa(msp->next) : MSEG_NULLPTR_PA;
 	} else {
 		lmsp = (struct memseg *)
-			((uint64_t)mspp - offsetof(struct memseg, next));
+		    ((uint64_t)mspp - offsetof(struct memseg, next));
 		lmsp->nextpa = (msp->next) ?
-				va_to_pa(msp->next) : MSEG_NULLPTR_PA;
+		    va_to_pa(msp->next) : MSEG_NULLPTR_PA;
 	}
 }
 
@@ -508,7 +506,7 @@ hat_kpm_split_mseg_update(struct memseg *msp, struct memseg **mspp,
 		memsegspa = (lo) ? va_to_pa(lo) : va_to_pa(mid);
 	} else {
 		lmsp = (struct memseg *)
-			((uint64_t)mspp - offsetof(struct memseg, next));
+		    ((uint64_t)mspp - offsetof(struct memseg, next));
 		lmsp->nextpa = (lo) ? va_to_pa(lo) : va_to_pa(mid);
 	}
 }
@@ -681,7 +679,7 @@ sfmmu_kpm_mapin(page_t *pp)
 				if (kp->kp_refcntc == -1) {
 					/* remove go indication */
 					sfmmu_kpm_tsbmtl(&kp->kp_refcntc,
-						&kpmp->khl_lock, KPMTSBM_STOP);
+					    &kpmp->khl_lock, KPMTSBM_STOP);
 				}
 				if (kp->kp_refcnt > 0 && kp->kp_refcntc == 0)
 					sfmmu_kpm_demap_large(vaddr);
@@ -735,7 +733,7 @@ sfmmu_kpm_mapin(page_t *pp)
 			/* Set go flag for TL tsbmiss handler */
 			if (kp->kp_refcntc == 0)
 				sfmmu_kpm_tsbmtl(&kp->kp_refcntc,
-						&kpmp->khl_lock, KPMTSBM_START);
+				    &kpmp->khl_lock, KPMTSBM_START);
 
 			ASSERT(kp->kp_refcntc == -1);
 		}
@@ -769,7 +767,7 @@ sfmmu_kpm_mapin(page_t *pp)
 
 			/* remove go indication */
 			sfmmu_kpm_tsbmtl(&kp->kp_refcntc, &kpmp->khl_lock,
-					KPMTSBM_STOP);
+			    KPMTSBM_STOP);
 		}
 		ASSERT(kp->kp_refcntc >= 0);
 	}
@@ -782,6 +780,12 @@ smallpages_mapin:
 		/* tte assembly */
 		KPM_TTE_VCACHED(tte.ll, pfn, TTE8K);
 	} else {
+		/*
+		 * Just in case this same page was mapped cacheable prior to
+		 * this and the old tte remains in tlb.
+		 */
+		sfmmu_kpm_demap_small(vaddr);
+
 		/* ASSERT(pp->p_share); XXX use hat_page_getshare */
 		pmtx = sfmmu_page_enter(pp);
 		PP_SETKPMC(pp);
@@ -796,8 +800,9 @@ smallpages_mapin:
 	PP2KPMSPG(pp, ksp);
 	kpmsp = KPMP_SHASH(ksp);
 
-	oldval = sfmmu_kpm_stsbmtl(&ksp->kp_mapped, &kpmsp->kshl_lock,
-				(uncached) ? KPM_MAPPEDSC : KPM_MAPPEDS);
+	oldval = sfmmu_kpm_stsbmtl(&ksp->kp_mapped_flag, &kpmsp->kshl_lock,
+	    (uncached) ? (KPM_MAPPED_GO | KPM_MAPPEDSC) :
+	    (KPM_MAPPED_GO | KPM_MAPPEDS));
 
 	if (oldval != 0)
 		panic("sfmmu_kpm_mapin: stale smallpages mapping");
@@ -844,7 +849,7 @@ sfmmu_kpm_mapout(page_t *pp, caddr_t vaddr)
 		ASSERT(PP_ISKPMS(pp) == 0);
 		if (kp->kp_refcnta <= 0) {
 			panic("sfmmu_kpm_mapout: bad refcnta kp=%p",
-				(void *)kp);
+			    (void *)kp);
 		}
 
 		if (PP_ISTNC(pp))  {
@@ -854,7 +859,7 @@ sfmmu_kpm_mapout(page_t *pp, caddr_t vaddr)
 				 * forced "small page" mode.
 				 */
 				panic("sfmmu_kpm_mapout: uncached page not "
-					"kpm marked");
+				    "kpm marked");
 			}
 			sfmmu_kpm_demap_small(vaddr);
 
@@ -900,7 +905,7 @@ sfmmu_kpm_mapout(page_t *pp, caddr_t vaddr)
 			/* remove go indication */
 			if (kp->kp_refcntc == -1) {
 				sfmmu_kpm_tsbmtl(&kp->kp_refcntc,
-					&kpmp->khl_lock, KPMTSBM_STOP);
+				    &kpmp->khl_lock, KPMTSBM_STOP);
 			}
 			ASSERT(kp->kp_refcntc == 0);
 
@@ -936,7 +941,7 @@ sfmmu_kpm_mapout(page_t *pp, caddr_t vaddr)
 		if (PP_ISKPMS(pp)) {
 			if (kp->kp_refcnts < 1) {
 				panic("sfmmu_kpm_mapout: bad refcnts kp=%p",
-					(void *)kp);
+				    (void *)kp);
 			}
 			sfmmu_kpm_demap_small(vaddr);
 
@@ -955,7 +960,7 @@ sfmmu_kpm_mapout(page_t *pp, caddr_t vaddr)
 					 * have forced "small page" mode.
 					 */
 					panic("sfmmu_kpm_mapout: uncached "
-						"page not kpm marked");
+					    "page not kpm marked");
 				}
 				conv_tnc(pp, TTE8K);
 			}
@@ -969,7 +974,7 @@ sfmmu_kpm_mapout(page_t *pp, caddr_t vaddr)
 		if (PP_ISKPMC(pp)) {
 			if (kp->kp_refcntc < 1) {
 				panic("sfmmu_kpm_mapout: bad refcntc kp=%p",
-					(void *)kp);
+				    (void *)kp);
 			}
 			pmtx = sfmmu_page_enter(pp);
 			PP_CLRKPMC(pp);
@@ -989,8 +994,8 @@ smallpages_mapout:
 	kpmsp = KPMP_SHASH(ksp);
 
 	if (PP_ISKPMC(pp) == 0) {
-		oldval = sfmmu_kpm_stsbmtl(&ksp->kp_mapped,
-					&kpmsp->kshl_lock, 0);
+		oldval = sfmmu_kpm_stsbmtl(&ksp->kp_mapped_flag,
+		    &kpmsp->kshl_lock, 0);
 
 		if (oldval != KPM_MAPPEDS) {
 			/*
@@ -1009,8 +1014,8 @@ smallpages_mapout:
 #endif
 
 	} else if (PP_ISTNC(pp)) {
-		oldval = sfmmu_kpm_stsbmtl(&ksp->kp_mapped,
-					&kpmsp->kshl_lock, 0);
+		oldval = sfmmu_kpm_stsbmtl(&ksp->kp_mapped_flag,
+		    &kpmsp->kshl_lock, 0);
 
 		if (oldval != KPM_MAPPEDSC || PP_ISKPMC(pp) == 0)
 			panic("sfmmu_kpm_mapout: inconsistent TNC mapping");
@@ -1031,8 +1036,8 @@ smallpages_mapout:
 		conv_tnc(pp, TTE8K);
 
 	} else {
-		oldval = sfmmu_kpm_stsbmtl(&ksp->kp_mapped,
-					&kpmsp->kshl_lock, 0);
+		oldval = sfmmu_kpm_stsbmtl(&ksp->kp_mapped_flag,
+		    &kpmsp->kshl_lock, 0);
 
 		if (oldval != KPM_MAPPEDSC)
 			panic("sfmmu_kpm_mapout: inconsistent mapping");
@@ -1076,8 +1081,8 @@ sfmmu_kpm_getvaddr(page_t *pp, int *kpm_vac_rangep)
 		*kpm_vac_rangep = abs(vcolor - vcolor_pa);
 		vaddr += ((uintptr_t)(vcolor - vcolor_pa) << MMU_PAGESHIFT);
 		vaddr += (vcolor_pa > vcolor) ?
-			((uintptr_t)vcolor_pa << kpm_size_shift) :
-			((uintptr_t)(vcolor - vcolor_pa) << kpm_size_shift);
+		    ((uintptr_t)vcolor_pa << kpm_size_shift) :
+		    ((uintptr_t)(vcolor - vcolor_pa) << kpm_size_shift);
 
 		ASSERT(!PP_ISMAPPED_LARGE(pp));
 	}
@@ -1162,7 +1167,7 @@ sfmmu_kpm_fault(caddr_t vaddr, struct memseg *mseg, page_t *pp)
 	inx = ptokpmp(kpmptop(ptokpmp(pfn)) - mseg->kpm_pbase);
 	if (inx >= mseg->kpm_nkpmpgs) {
 		cmn_err(CE_PANIC, "sfmmu_kpm_fault: kpm overflow in memseg "
-			"0x%p  pp 0x%p", (void *)mseg, (void *)pp);
+		    "0x%p  pp 0x%p", (void *)mseg, (void *)pp);
 	}
 
 	kp = &mseg->kpm_pages[inx];
@@ -1225,7 +1230,7 @@ sfmmu_kpm_fault(caddr_t vaddr, struct memseg *mseg, page_t *pp)
 		 * handler is disabled.
 		 */
 		badstate |= (kp->kp_refcnt == 0 || kp->kp_refcnts > 0 ||
-			PP_ISKPMC(pp) || PP_ISKPMS(pp) || PP_ISNC(pp));
+		    PP_ISKPMC(pp) || PP_ISKPMS(pp) || PP_ISNC(pp));
 
 		if (badstate == 0)
 			goto largeexit;
@@ -1240,9 +1245,9 @@ sfmmu_kpm_fault(caddr_t vaddr, struct memseg *mseg, page_t *pp)
 	 * more concise.
 	 */
 	tsbmcase = (((kp->kp_refcntc > 0) ? KPM_KC : 0) |
-			((kp->kp_refcnts > 0) ? KPM_KS : 0) |
-			(PP_ISKPMC(pp) ? KPM_C : 0) |
-			(PP_ISKPMS(pp) ? KPM_S : 0));
+	    ((kp->kp_refcnts > 0) ? KPM_KS : 0) |
+	    (PP_ISKPMC(pp) ? KPM_C : 0) |
+	    (PP_ISKPMS(pp) ? KPM_S : 0));
 
 	switch (tsbmcase) {
 	case KPM_TSBM_CONFL_GONE:		/* - - - - */
@@ -1260,7 +1265,7 @@ sfmmu_kpm_fault(caddr_t vaddr, struct memseg *mseg, page_t *pp)
 		if (PP_ISNC(pp) || kp->kp_refcnt <= 0 ||
 		    addr_to_vcolor(vaddr) != PP_GET_VCOLOR(pp)) {
 			panic("sfmmu_kpm_fault: inconsistent CONFL_GONE "
-				"state, pp=%p", (void *)pp);
+			    "state, pp=%p", (void *)pp);
 		}
 		goto largeexit;
 
@@ -1287,7 +1292,7 @@ sfmmu_kpm_fault(caddr_t vaddr, struct memseg *mseg, page_t *pp)
 		if (PP_ISNC(pp) || kp->kp_refcnt <= 0 ||
 		    addr_to_vcolor(vaddr) != PP_GET_VCOLOR(pp)) {
 			panic("sfmmu_kpm_fault:  inconsistent MAPS state, "
-				"pp=%p", (void *)pp);
+			    "pp=%p", (void *)pp);
 		}
 		kp->kp_refcnt--;
 		kp->kp_refcnts++;
@@ -1314,7 +1319,7 @@ sfmmu_kpm_fault(caddr_t vaddr, struct memseg *mseg, page_t *pp)
 		if (PP_ISNC(pp) ||
 		    addr_to_vcolor(vaddr) != PP_GET_VCOLOR(pp)) {
 			panic("sfmmu_kpm_fault:  inconsistent RPLS state, "
-				"pp=%p", (void *)pp);
+			    "pp=%p", (void *)pp);
 		}
 		goto smallexit;
 
@@ -1332,7 +1337,7 @@ sfmmu_kpm_fault(caddr_t vaddr, struct memseg *mseg, page_t *pp)
 		if (PP_ISNC(pp) || kp->kp_refcnt <= 0 ||
 		    addr_to_vcolor(vaddr) != PP_GET_VCOLOR(pp)) {
 			panic("sfmmu_kpm_fault:  inconsistent MAPS_BRKO state, "
-				"pp=%p", (void *)pp);
+			    "pp=%p", (void *)pp);
 		}
 		kp->kp_refcnt--;
 		kp->kp_refcnts++;
@@ -1351,7 +1356,7 @@ sfmmu_kpm_fault(caddr_t vaddr, struct memseg *mseg, page_t *pp)
 			 * must have bypassed the kpm alias prevention logic.
 			 */
 			panic("sfmmu_kpm_fault: stale VAC conflict, pp=%p",
-				(void *)pp);
+			    (void *)pp);
 		}
 
 		/*
@@ -1409,7 +1414,7 @@ sfmmu_kpm_fault(caddr_t vaddr, struct memseg *mseg, page_t *pp)
 			 * somehow bypassed the kpm alias prevention logic.
 			 */
 			panic("sfmmu_kpm_fault: stale VAC conflict, pp=%p",
-				(void *)pp);
+			    (void *)pp);
 		}
 
 		/*
@@ -1417,7 +1422,7 @@ sfmmu_kpm_fault(caddr_t vaddr, struct memseg *mseg, page_t *pp)
 		 */
 		if (!PP_ISNC(pp)) {
 			panic("sfmmu_kpm_fault: page not uncached, pp=%p",
-				(void *)pp);
+			    (void *)pp);
 		}
 		uncached = 1;
 		goto smallexit;
@@ -1425,7 +1430,7 @@ sfmmu_kpm_fault(caddr_t vaddr, struct memseg *mseg, page_t *pp)
 	default:
 badstate_exit:
 		panic("sfmmu_kpm_fault: inconsistent VAC state, vaddr=%p kp=%p "
-			"pp=%p", (void *)vaddr, (void *)kp, (void *)pp);
+		    "pp=%p", (void *)vaddr, (void *)kp, (void *)pp);
 	}
 
 smallexit:
@@ -1453,7 +1458,7 @@ largeexit:
 		if (kp->kp_refcntc == 0) {
 			/* Set "go" flag for TL tsbmiss handler */
 			sfmmu_kpm_tsbmtl(&kp->kp_refcntc, &kpmp->khl_lock,
-					KPMTSBM_START);
+			    KPMTSBM_START);
 		}
 		ASSERT(kp->kp_refcntc == -1);
 		error = 0;
@@ -1529,6 +1534,12 @@ sfmmu_kpm_fault_small(caddr_t vaddr, struct memseg *mseg, page_t *pp)
 			/* tsb dropin */
 			sfmmu_kpm_load_tsb(vaddr, &tte, MMU_PAGESHIFT);
 
+			oldval = sfmmu_kpm_stsbmtl(&ksp->kp_mapped_flag,
+			    &kpmsp->kshl_lock, (KPM_MAPPED_GO | KPM_MAPPEDSC));
+
+			if (oldval != KPM_MAPPEDSC)
+				panic("sfmmu_kpm_fault_small: "
+				    "stale smallpages mapping");
 		} else {
 			if (PP_ISKPMC(pp)) {
 				pmtx = sfmmu_page_enter(pp);
@@ -1542,12 +1553,12 @@ sfmmu_kpm_fault_small(caddr_t vaddr, struct memseg *mseg, page_t *pp)
 			/* tsb dropin */
 			sfmmu_kpm_load_tsb(vaddr, &tte, MMU_PAGESHIFT);
 
-			oldval = sfmmu_kpm_stsbmtl(&ksp->kp_mapped,
-					&kpmsp->kshl_lock, KPM_MAPPEDS);
+			oldval = sfmmu_kpm_stsbmtl(&ksp->kp_mapped_flag,
+			    &kpmsp->kshl_lock, (KPM_MAPPED_GO | KPM_MAPPEDS));
 
 			if (oldval != KPM_MAPPEDSC)
 				panic("sfmmu_kpm_fault_small: "
-					"stale smallpages mapping");
+				    "stale smallpages mapping");
 		}
 
 	} else {
@@ -1680,7 +1691,7 @@ sfmmu_kpm_pageunload(page_t *pp)
 
 		if (pp->p_kpmref == 0)
 			panic("sfmmu_kpm_pageunload: stale p_kpmref pp=%p "
-				"kpme=%p", (void *)pp, (void *)kpme);
+			    "kpme=%p", (void *)pp, (void *)kpme);
 
 		nkpme = kpme->kpe_next;
 
@@ -1796,7 +1807,7 @@ sfmmu_kpm_vac_unload(page_t *pp, caddr_t vaddr)
 	if (IS_KPM_ALIAS_RANGE(kpmvaddr)) {
 		if (kp->kp_refcnta < 1) {
 			panic("sfmmu_kpm_vac_unload: bad refcnta kpm_page=%p\n",
-				(void *)kp);
+			    (void *)kp);
 		}
 
 		if (PP_ISKPMC(pp) == 0) {
@@ -1826,7 +1837,7 @@ sfmmu_kpm_vac_unload(page_t *pp, caddr_t vaddr)
 		 * handler is disabled.
 		 */
 		badstate |= (kp->kp_refcnt == 0 || kp->kp_refcnts > 0 ||
-			PP_ISKPMC(pp) || PP_ISKPMS(pp) || PP_ISNC(pp));
+		    PP_ISKPMC(pp) || PP_ISKPMS(pp) || PP_ISNC(pp));
 	} else {
 		badstate |= (kp->kp_refcntc < 0);
 	}
@@ -1845,9 +1856,9 @@ sfmmu_kpm_vac_unload(page_t *pp, caddr_t vaddr)
 	 * handling more concise.
 	 */
 	vacunlcase = (((kp->kp_refcntc > 0) ? KPM_KC : 0) |
-			((kp->kp_refcnts > 0) ? KPM_KS : 0) |
-			(PP_ISKPMC(pp) ? KPM_C : 0) |
-			(PP_ISKPMS(pp) ? KPM_S : 0));
+	    ((kp->kp_refcnts > 0) ? KPM_KS : 0) |
+	    (PP_ISKPMC(pp) ? KPM_C : 0) |
+	    (PP_ISKPMS(pp) ? KPM_S : 0));
 
 	switch (vacunlcase) {
 	case KPM_VUL_BIG:				/* - - - - */
@@ -1858,7 +1869,7 @@ sfmmu_kpm_vac_unload(page_t *pp, caddr_t vaddr)
 		if (kp->kp_refcntc == -1) {
 			/* remove go indication */
 			sfmmu_kpm_tsbmtl(&kp->kp_refcntc,
-					&kpmp->khl_lock, KPMTSBM_STOP);
+			    &kpmp->khl_lock, KPMTSBM_STOP);
 		}
 		sfmmu_kpm_demap_large(kpmvaddr);
 
@@ -1918,7 +1929,7 @@ sfmmu_kpm_vac_unload(page_t *pp, caddr_t vaddr)
 
 	case KPM_VUL_TNC:				/* kc c ks s */
 		cmn_err(CE_NOTE, "sfmmu_kpm_vac_unload: "
-			"page not in NC state");
+		    "page not in NC state");
 		/* FALLTHRU */
 
 	default:
@@ -1927,8 +1938,8 @@ sfmmu_kpm_vac_unload(page_t *pp, caddr_t vaddr)
 exit:
 	if (badstate) {
 		panic("sfmmu_kpm_vac_unload: inconsistent VAC state, "
-			"kpmvaddr=%p kp=%p pp=%p",
-			(void *)kpmvaddr, (void *)kp, (void *)pp);
+		    "kpmvaddr=%p kp=%p pp=%p",
+		    (void *)kpmvaddr, (void *)kp, (void *)pp);
 	}
 	mutex_exit(&kpmp->khl_mutex);
 
@@ -1946,8 +1957,8 @@ smallpages_vac_unload:
 			/*
 			 * Stop TL tsbmiss handling
 			 */
-			(void) sfmmu_kpm_stsbmtl(&ksp->kp_mapped,
-					&kpmsp->kshl_lock, KPM_MAPPEDSC);
+			(void) sfmmu_kpm_stsbmtl(&ksp->kp_mapped_flag,
+			    &kpmsp->kshl_lock, KPM_MAPPEDSC);
 
 			sfmmu_kpm_demap_small(kpmvaddr);
 
@@ -2007,12 +2018,12 @@ sfmmu_kpm_hme_unload(page_t *pp)
 	if (IS_KPM_ALIAS_RANGE(vaddr)) {
 		if (kp->kp_refcnta < 1) {
 			panic("sfmmu_kpm_hme_unload: bad refcnta kpm_page=%p\n",
-				(void *)kp);
+			    (void *)kp);
 		}
 	} else {
 		if (kp->kp_refcntc < 1) {
 			panic("sfmmu_kpm_hme_unload: bad refcntc kpm_page=%p\n",
-				(void *)kp);
+			    (void *)kp);
 		}
 		kp->kp_refcntc--;
 	}
@@ -2157,7 +2168,7 @@ sfmmu_kpm_page_cache(page_t *pp, int flags, int cache_flush_tag)
 	if (IS_KPM_ALIAS_RANGE(kpmvaddr)) {
 		if (kp->kp_refcnta < 1) {
 			panic("sfmmu_kpm_page_cache: bad refcnta "
-				"kpm_page=%p\n", (void *)kp);
+			    "kpm_page=%p\n", (void *)kp);
 		}
 		sfmmu_kpm_demap_small(kpmvaddr);
 		if (flags == HAT_TMPNC) {
@@ -2177,7 +2188,7 @@ sfmmu_kpm_page_cache(page_t *pp, int flags, int cache_flush_tag)
 		 * handler is disabled.
 		 */
 		badstate |= (kp->kp_refcnt == 0 || kp->kp_refcnts > 0 ||
-			PP_ISKPMC(pp) || PP_ISKPMS(pp) || PP_ISNC(pp));
+		    PP_ISKPMC(pp) || PP_ISKPMS(pp) || PP_ISNC(pp));
 	} else {
 		badstate |= (kp->kp_refcntc < 0);
 	}
@@ -2191,9 +2202,9 @@ sfmmu_kpm_page_cache(page_t *pp, int flags, int cache_flush_tag)
 	 * handling more concise.
 	 */
 	pgcacase = (((kp->kp_refcntc > 0) ? KPM_KC : 0) |
-			((kp->kp_refcnts > 0) ? KPM_KS : 0) |
-			(PP_ISKPMC(pp) ? KPM_C : 0) |
-			(PP_ISKPMS(pp) ? KPM_S : 0));
+	    ((kp->kp_refcnts > 0) ? KPM_KS : 0) |
+	    (PP_ISKPMC(pp) ? KPM_C : 0) |
+	    (PP_ISKPMS(pp) ? KPM_S : 0));
 
 	if (flags == HAT_CACHE) {
 		switch (pgcacase) {
@@ -2224,7 +2235,7 @@ sfmmu_kpm_page_cache(page_t *pp, int flags, int cache_flush_tag)
 	case KPM_UNC_BIG:				/* - - - - */
 		if (kp->kp_refcnt < 1) {
 			panic("sfmmu_kpm_page_cache: bad refcnt "
-				"kpm_page=%p\n", (void *)kp);
+			    "kpm_page=%p\n", (void *)kp);
 		}
 
 		/*
@@ -2236,7 +2247,7 @@ sfmmu_kpm_page_cache(page_t *pp, int flags, int cache_flush_tag)
 		if (kp->kp_refcntc == -1) {
 			/* remove go indication */
 			sfmmu_kpm_tsbmtl(&kp->kp_refcntc,
-				&kpmp->khl_lock, KPMTSBM_STOP);
+			    &kpmp->khl_lock, KPMTSBM_STOP);
 		}
 		ASSERT(kp->kp_refcntc == 0);
 		sfmmu_kpm_demap_large(kpmvaddr);
@@ -2278,8 +2289,8 @@ sfmmu_kpm_page_cache(page_t *pp, int flags, int cache_flush_tag)
 exit:
 	if (badstate) {
 		panic("sfmmu_kpm_page_cache: inconsistent VAC state "
-			"kpmvaddr=%p kp=%p pp=%p", (void *)kpmvaddr,
-			(void *)kp, (void *)pp);
+		    "kpmvaddr=%p kp=%p pp=%p", (void *)kpmvaddr,
+		    (void *)kp, (void *)pp);
 	}
 	return;
 
@@ -2287,8 +2298,12 @@ smallpages_page_cache:
 	PP2KPMSPG(pp, ksp);
 	kpmsp = KPMP_SHASH(ksp);
 
-	oldval = sfmmu_kpm_stsbmtl(&ksp->kp_mapped,
-				&kpmsp->kshl_lock, KPM_MAPPEDSC);
+	/*
+	 * marked as nogo for we will fault in and resolve it
+	 * through sfmmu_kpm_fault_small
+	 */
+	oldval = sfmmu_kpm_stsbmtl(&ksp->kp_mapped_flag, &kpmsp->kshl_lock,
+	    KPM_MAPPEDSC);
 
 	if (!(oldval == KPM_MAPPEDS || oldval == KPM_MAPPEDSC))
 		panic("smallpages_page_cache: inconsistent mapping");

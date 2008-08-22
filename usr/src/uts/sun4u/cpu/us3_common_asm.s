@@ -25,8 +25,6 @@
  * Assembly code support for Cheetah/Cheetah+ modules
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(lint)
 #include "assym.h"
 #endif	/* !lint */
@@ -132,6 +130,33 @@
 	sub	arg2, tmp1, arg2					;\
 1:
 
+/*
+ * macro that flushes the entire dcache color
+ * dcache size = 64K, one way 16K
+ */
+#define DCACHE_FLUSHCOLOR(arg, way, tmp1, tmp2, tmp3)			\
+	ldxa	[%g0]ASI_DCU, tmp1;					\
+	btst	DCU_DC, tmp1;		/* is dcache enabled? */	\
+	bz,pn	%icc, 1f;						\
+	ASM_LD(tmp1, dcache_linesize)					\
+	set	MMU_PAGESIZE, tmp2;					\
+	/*								\
+	 * arg = virtual color						\
+	 * tmp2 = page size						\
+	 * tmp1 = cache line size					\
+	 */								\
+	sllx	arg, MMU_PAGESHIFT, arg; /* color to dcache page */	\
+	mov	way, tmp3;						\
+	sllx	tmp3, 14, tmp3;		 /* One way 16K */		\
+	or	arg, tmp3, arg;						\
+	sub	tmp2, tmp1, tmp2;					\
+2:									\
+	stxa	%g0, [arg + tmp2]ASI_DC_TAG;				\
+	membar	#Sync;							\
+	cmp	%g0, tmp2;						\
+	bne,pt	%icc, 2b;						\
+	  sub	tmp2, tmp1, tmp2;					\
+1:
 
 /* END CSTYLED */
 
@@ -478,23 +503,15 @@ vac_flushcolor(int vcolor, pfn_t pfnum)
 {}
 
 #else	/* lint */
-	/*
-	 * In UltraSPARC III flushcolor is same as as flushpage.
-	 * This is because we have an ASI to flush dcache using physical
-	 * address.
-	 * Flushing dcache using physical address is faster because we
-	 * don't have to deal with associativity of dcache.
-	 * The arguments to vac_flushpage() and vac_flushcolor() are same but
-	 * the order is reversed. this is because we maintain compatibility
-	 * with spitfire, in which vac_flushcolor has only one argument, namely
-	 * vcolor.
-	 */
 
 	ENTRY(vac_flushcolor)
 	/*
-	 * %o0 = vcolor, %o1 = pfnum
+	 * %o0 = vcolor
 	 */
-	DCACHE_FLUSHPAGE(%o1, %o0, %o2, %o3, %o4)
+	DCACHE_FLUSHCOLOR(%o0, 0, %o1, %o2, %o3)
+	DCACHE_FLUSHCOLOR(%o0, 1, %o1, %o2, %o3)
+	DCACHE_FLUSHCOLOR(%o0, 2, %o1, %o2, %o3)
+	DCACHE_FLUSHCOLOR(%o0, 3, %o1, %o2, %o3)
 	retl
 	  nop
 	SET_SIZE(vac_flushcolor)
@@ -514,9 +531,11 @@ vac_flushcolor_tl1(uint64_t vcolor, uint64_t pfnum)
 	ENTRY(vac_flushcolor_tl1)
 	/*
 	 * %g1 = vcolor
-	 * %g2 = pfnum
 	 */
-	DCACHE_FLUSHPAGE(%g2, %g1, %g3, %g4, %g5)
+	DCACHE_FLUSHCOLOR(%g1, 0, %g2, %g3, %g4)
+	DCACHE_FLUSHCOLOR(%g1, 1, %g2, %g3, %g4)
+	DCACHE_FLUSHCOLOR(%g1, 2, %g2, %g3, %g4)
+	DCACHE_FLUSHCOLOR(%g1, 3, %g2, %g3, %g4)
 	retry
 	SET_SIZE(vac_flushcolor_tl1)
 

@@ -39,8 +39,6 @@
 #ifndef	_VM_PAGE_H
 #define	_VM_PAGE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <vm/seg.h>
 
 #ifdef	__cplusplus
@@ -1033,17 +1031,35 @@ typedef struct kpm_hlk {
  * to save memory space. Alias range mappings and regular segkpm
  * mappings are done in units of PAGESIZE and can share the mapping
  * information and the mappings are always distinguishable by their
- * virtual address. Other information neeeded for VAC conflict prevention
- * is already available on a per page basis. There are basically 3 states
- * a kpm_spage can have: not mapped (0), mapped in Alias range or virtually
- * uncached (1) and mapped in the regular segkpm window (-1). The -1 value
- * is also used as "go" indication for the segkpm trap level tsbmiss
- * handler for small pages (value is kept the same as it is used for large
- * mappings).
+ * virtual address. Other information needed for VAC conflict prevention
+ * is already available on a per page basis.
+ *
+ * The state about how a kpm page is mapped and whether it is ready to go
+ * is indicated by the following 1 byte kpm_spage structure. This byte is
+ * split into two 4-bit parts - kp_mapped and kp_mapped_go.
+ * 	- kp_mapped == 1	the page is mapped cacheable
+ *	- kp_mapped == 2	the page is mapped non-cacheable
+ *	- kp_mapped_go == 1	the mapping is ready to be dropped in
+ *	- kp_mapped_go == 0	the mapping is not ready to be dropped in.
+ * When kp_mapped_go == 0, we will have C handler resolve the VAC conflict.
+ * Otherwise, the assembly tsb miss handler can simply drop in the mapping
+ * when a tsb miss occurs.
  */
-typedef struct kpm_spage {
-	char	kp_mapped;	/* page mapped small */
+typedef union kpm_spage {
+	struct {
+#ifdef  _BIG_ENDIAN
+		uchar_t mapped_go: 4;	/* go or nogo flag */
+		uchar_t mapped: 4;	/* page mapped small */
+#else
+		uchar_t mapped: 4;	/* page mapped small */
+		uchar_t mapped_go: 4;	/* go or nogo flag */
+#endif
+	} kpm_spage_un;
+	uchar_t kp_mapped_flag;
 } kpm_spage_t;
+
+#define	kp_mapped	kpm_spage_un.mapped
+#define	kp_mapped_go	kpm_spage_un.mapped_go
 
 /*
  * Note: kshl_lock offset changes must be reflected in sfmmu_asm.s

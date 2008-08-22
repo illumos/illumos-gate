@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * VM - Hardware Address Translation management for Spitfire MMU.
  *
@@ -3453,7 +3451,7 @@ sfmmu_vacconflict_array(caddr_t addr, page_t *pp, int *cflags)
 		return (0);
 	}
 
-	if (!PP_ISMAPPED(pp)) {
+	if (!PP_ISMAPPED(pp) && !PP_ISMAPPED_KPM(pp)) {
 		/*
 		 * Previous user of page had a differnet color
 		 * but since there are no current users
@@ -6740,6 +6738,9 @@ hat_page_relocate(page_t **target, page_t **replacement, spgcnt_t *nrelocp)
 	cpuset_t	cpuset;
 	int		cap_cpus;
 	int		ret;
+#ifdef VAC
+	int		cflags = 0;
+#endif
 
 	if (hat_kpr_enabled == 0 || !kcage_on || PP_ISNORELOC(*target)) {
 		PAGE_RELOCATE_LOG(target, replacement, EAGAIN, -1);
@@ -6806,21 +6807,6 @@ hat_page_relocate(page_t **target, page_t **replacement, spgcnt_t *nrelocp)
 
 	kpreempt_disable();
 
-#ifdef VAC
-	/*
-	 * If the replacement page is of a different virtual color
-	 * than the page it is replacing, we need to handle the VAC
-	 * consistency for it just as we would if we were setting up
-	 * a new mapping to a page.
-	 */
-	if ((tpp->p_szc == 0) && (PP_GET_VCOLOR(rpp) != NO_VCOLOR)) {
-		if (tpp->p_vcolor != rpp->p_vcolor) {
-			sfmmu_cache_flushcolor(PP_GET_VCOLOR(rpp),
-			    rpp->p_pagenum);
-		}
-	}
-#endif
-
 	/*
 	 * We raise our PIL to 13 so that we don't get captured by
 	 * another CPU or pinned by an interrupt thread.  We can't go to
@@ -6870,6 +6856,21 @@ hat_page_relocate(page_t **target, page_t **replacement, spgcnt_t *nrelocp)
 	 * this context.
 	 */
 	for (i = 0; i < npages; i++, tpp++, rpp++) {
+#ifdef VAC
+		/*
+		 * If the replacement has a different vcolor than
+		 * the one being replacd, we need to handle VAC
+		 * consistency for it just as we were setting up
+		 * a new mapping to it.
+		 */
+		if ((PP_GET_VCOLOR(rpp) != NO_VCOLOR) &&
+		    (tpp->p_vcolor != rpp->p_vcolor) &&
+		    !CacheColor_IsFlushed(cflags, PP_GET_VCOLOR(rpp))) {
+			CacheColor_SetFlushed(cflags, PP_GET_VCOLOR(rpp));
+			sfmmu_cache_flushcolor(PP_GET_VCOLOR(rpp),
+			    rpp->p_pagenum);
+		}
+#endif
 		/*
 		 * Copy the contents of the page.
 		 */
