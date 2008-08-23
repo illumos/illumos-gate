@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SunOS MT STREAMS ERI(PCI) 10/100 Mb Ethernet Device Driver
  */
@@ -319,8 +317,6 @@ static uint8_t	etherbroadcastaddr[] = {
 #define	ERI_DESC_HANDLE_ALLOC	0x0001
 #define	ERI_DESC_MEM_ALLOC	0x0002
 #define	ERI_DESC_MEM_MAP	0x0004
-#define	ERI_XMIT_HANDLE_ALLOC	0x0008
-#define	ERI_XMIT_HANDLE_BIND	0x0010
 #define	ERI_RCV_HANDLE_ALLOC	0x0020
 #define	ERI_RCV_HANDLE_BIND	0x0040
 #define	ERI_XMIT_DVMA_ALLOC	0x0100
@@ -432,6 +428,13 @@ static ddi_dma_attr_t desc_dma_attr = {
 	0			/* attribute flags */
 };
 
+static ddi_device_acc_attr_t buf_attr = {
+	DDI_DEVICE_ATTR_V0,	/* devacc_attr_version */
+	DDI_NEVERSWAP_ACC,	/* devacc_attr_endian_flags */
+	DDI_STRICTORDER_ACC,	/* devacc_attr_dataorder */
+	DDI_DEFAULT_ACC,	/* devacc_attr_access */
+};
+
 ddi_dma_lim_t eri_dma_limits = {
 	(uint64_t)ERI_LIMADDRLO, /* dlim_addr_lo */
 	(uint64_t)ERI_LIMADDRHI, /* dlim_addr_hi */
@@ -517,9 +520,7 @@ static	int	use_int_xcvr = 0;
 static	int	pace_size = 0;	/* Do not use pacing for now */
 
 static	int	eri_use_dvma_rx = 0;	/* =1:use dvma */
-static	int	eri_use_dvma_tx = 1;	/* =1:use dvma */
 static	int	eri_rx_bcopy_max = RX_BCOPY_MAX;	/* =1:use bcopy() */
-static	int	eri_tx_bcopy_max = TX_BCOPY_MAX;	/* =1:use bcopy() */
 static	int	eri_overflow_reset = 1;	/* global reset if rx_fifo_overflow */
 static	int	eri_tx_ring_size = 2048; /* number of entries in tx ring */
 static	int	eri_rx_ring_size = 1024; /* number of entries in rx ring */
@@ -971,10 +972,6 @@ eri_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	/* dvma handle case */
-	if (erip->eri_dvmaxh) {
-		(void) dvma_release(erip->eri_dvmaxh);
-		erip->eri_dvmaxh = NULL;
-	}
 
 	if (erip->eri_dvmarh) {
 		(void) dvma_release(erip->eri_dvmarh);
@@ -984,22 +981,19 @@ eri_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
  *	xmit_dma_mode, erip->ndmaxh[i]=NULL for dvma
  */
 	else {
-		for (i = 0; i < ERI_TPENDING; i++)
-			if (erip->ndmaxh[i])
-				ddi_dma_free_handle(&erip->ndmaxh[i]);
 		for (i = 0; i < ERI_RPENDING; i++)
 			if (erip->ndmarh[i])
 				ddi_dma_free_handle(&erip->ndmarh[i]);
 	}
 /*
- *	Release tiny TX buffers
+ *	Release TX buffer
  */
 	if (erip->tbuf_ioaddr != 0) {
 		(void) ddi_dma_unbind_handle(erip->tbuf_handle);
 		erip->tbuf_ioaddr = 0;
 	}
 	if (erip->tbuf_kaddr != NULL) {
-		kmem_free(erip->tbuf_kaddr, ERI_TPENDING * eri_tx_bcopy_max);
+		ddi_dma_mem_free(&erip->tbuf_acch);
 		erip->tbuf_kaddr = NULL;
 	}
 	if (erip->tbuf_handle != NULL) {
@@ -1615,35 +1609,6 @@ eri_init_macregs_generic(struct eri *erip)
 }
 
 static int
-eri_flush_txbufs(struct eri *erip)
-{
-	uint_t	i;
-	int	status = 0;
-	/*
-	 * Free and dvma_unload pending xmit  buffers.
-	 * Maintaining the 1-to-1 ordered sequence of
-	 * dvma_load() followed by dvma_unload() is critical.
-	 * Always unload anything before loading it again.
-	 * Never unload anything twice.  Always unload
-	 * before freeing the buffer.  We satisfy these
-	 * requirements by unloading only those descriptors
-	 * which currently have an mblk associated with them.
-	 */
-	for (i = 0; i < ERI_TPENDING; i++) {
-		if (erip->tmblkp[i]) {
-			if (erip->eri_dvmaxh)
-				dvma_unload(erip->eri_dvmaxh, 2*i, DONT_FLUSH);
-			else if ((ddi_dma_unbind_handle(erip->ndmaxh[i]) ==
-			    DDI_FAILURE))
-				status = -1;
-			freeb(erip->tmblkp[i]);
-			erip->tmblkp[i] = NULL;
-		}
-	}
-	return (status);
-}
-
-static int
 eri_flush_rxbufs(struct eri *erip)
 {
 	uint_t	i;
@@ -2032,7 +1997,7 @@ eri_freebufs(struct eri *erip)
 {
 	int status = 0;
 
-	status = eri_flush_rxbufs(erip) | eri_flush_txbufs(erip);
+	status = eri_flush_rxbufs(erip);
 	return (status);
 }
 
@@ -2221,15 +2186,6 @@ eri_unallocthings(struct eri *erip)
 
 	(void) eri_freebufs(erip);
 
-	if (flag & ERI_XMIT_HANDLE_ALLOC)
-		for (i = 0; i < erip->xmit_handle_cnt; i++)
-			ddi_dma_free_handle(&erip->ndmaxh[i]);
-
-	if (flag & ERI_XMIT_DVMA_ALLOC) {
-		(void) dvma_release(erip->eri_dvmaxh);
-		erip->eri_dvmaxh = NULL;
-	}
-
 	if (flag & ERI_RCV_HANDLE_ALLOC)
 		for (i = 0; i < erip->rcv_handle_cnt; i++)
 			ddi_dma_free_handle(&erip->ndmarh[i]);
@@ -2245,7 +2201,7 @@ eri_unallocthings(struct eri *erip)
 	}
 
 	if (flag & ERI_XBUFS_KMEM_ALLOC) {
-		kmem_free(erip->tbuf_kaddr, ERI_TPENDING * eri_tx_bcopy_max);
+		ddi_dma_mem_free(&erip->tbuf_acch);
 		erip->tbuf_kaddr = NULL;
 	}
 
@@ -2371,8 +2327,7 @@ eri_init(struct eri *erip)
 	 */
 	if (erip->global_reset_issued) {
 		if (erip->global_reset_issued == 2) { /* fast path */
-			if (eri_flush_txbufs(erip))
-				goto done;
+
 			/*
 			 * Hang out/Initialize descriptors and buffers.
 			 */
@@ -2701,42 +2656,12 @@ eri_allocthings(struct eri *erip)
  */
 	/*
 	 * In the current implementation, we use the ddi compliant
-	 * dma interface. We allocate ERI_TPENDING dma handles for
-	 * Transmit  activity and ERI_RPENDING dma handles for receive
-	 * activity. The actual dma mapping is done in the io functions
-	 * eri_start() and eri_read_dma(),
-	 * by calling the ddi_dma_addr_bind_handle.
+	 * dma interface. We allocate ERI_RPENDING dma handles for receive
+	 * activity. The actual dma mapping is done in the io function
+	 * eri_read_dma(), by calling the ddi_dma_addr_bind_handle.
 	 * Dma resources are deallocated by calling ddi_dma_unbind_handle
 	 * in eri_reclaim() for transmit and eri_read_dma(), for receive io.
 	 */
-
-	if (eri_use_dvma_tx &&
-	    (dvma_reserve(erip->dip, &eri_dma_limits, (ERI_TPENDING * 2),
-	    &erip->eri_dvmaxh)) == DDI_SUCCESS) {
-		erip->alloc_flag |= ERI_XMIT_DVMA_ALLOC;
-	} else {
-		erip->eri_dvmaxh = NULL;
-		for (i = 0; i < ERI_TPENDING; i++) {
-			rval = ddi_dma_alloc_handle(erip->dip,
-			    &dma_attr, DDI_DMA_DONTWAIT, 0,
-			    &erip->ndmaxh[i]);
-
-			if (rval != DDI_SUCCESS) {
-				ERI_FAULT_MSG1(erip, SEVERITY_HIGH,
-				    ERI_VERB_MSG, alloc_tx_dmah_msg);
-				alloc_stat++;
-				break;
-			}
-		}
-
-		erip->xmit_handle_cnt = i;
-
-		if (i)
-			erip->alloc_flag |= ERI_XMIT_HANDLE_ALLOC;
-
-		if (alloc_stat)
-			return (alloc_stat);
-	}
 
 	if (eri_use_dvma_rx &&
 	    (dvma_reserve(erip->dip, &eri_dma_limits, (ERI_RPENDING * 2),
@@ -2769,8 +2694,8 @@ eri_allocthings(struct eri *erip)
 	}
 
 /*
- *	Allocate tiny TX buffers
- *	Note: tinybufs must always be allocated in the native
+ *	Allocate TX buffer
+ *	Note: buffers must always be allocated in the native
  *	ordering of the CPU (always big-endian for Sparc).
  *	ddi_dma_mem_alloc returns memory in the native ordering
  *	of the bus (big endian for SBus, little endian for PCI).
@@ -2784,9 +2709,10 @@ eri_allocthings(struct eri *erip)
 		return (++alloc_stat);
 	}
 	erip->alloc_flag |= ERI_XBUFS_HANDLE_ALLOC;
-	size = ERI_TPENDING * eri_tx_bcopy_max;
-	erip->tbuf_kaddr = (caddr_t)kmem_alloc(size, KM_NOSLEEP);
-	if (erip->tbuf_kaddr == NULL) {
+	size = ERI_TPENDING * ERI_BUFSIZE;
+	if (ddi_dma_mem_alloc(erip->tbuf_handle, size, &buf_attr,
+	    DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL, &erip->tbuf_kaddr,
+	    &real_len, &erip->tbuf_acch) != DDI_SUCCESS) {
 		ERI_FAULT_MSG1(erip, SEVERITY_HIGH, ERI_VERB_MSG,
 		    alloc_tx_dmah_msg);
 		return (++alloc_stat);
@@ -2809,9 +2735,8 @@ eri_allocthings(struct eri *erip)
 	erip->eri_tmdlimp = &((erip->eri_tmdp)[ERI_TPENDING]);
 
 	/*
-	 * Zero out xmit and RCV holders.
+	 * Zero out RCV holders.
 	 */
-	bzero((caddr_t)erip->tmblkp, sizeof (erip->tmblkp));
 	bzero((caddr_t)erip->rmblkp, sizeof (erip->rmblkp));
 	return (alloc_stat);
 }
@@ -3524,10 +3449,8 @@ eri_send_msg(struct eri *erip, mblk_t *mp)
 {
 	volatile struct	eri_tmd	*tmdp = NULL;
 	volatile struct	eri_tmd	*tbasep = NULL;
-	mblk_t		*nmp;
-	uint32_t	len = 0, len_msg = 0, xover_len = TX_STREAM_MIN;
-	uint32_t	nmblks = 0;
-	uint32_t	i, j;
+	uint32_t	len_msg = 0;
+	uint32_t	i;
 	uint64_t	int_me = 0;
 	uint_t		tmdcsum = 0;
 	uint_t		start_offset = 0;
@@ -3538,8 +3461,6 @@ eri_send_msg(struct eri *erip, mblk_t *mp)
 	caddr_t	ptr;
 	uint32_t	offset;
 	uint64_t	ctrl;
-	uint32_t	count;
-	uint32_t	flag_dma;
 	ddi_dma_cookie_t	c;
 
 	if (!param_linkup) {
@@ -3548,8 +3469,6 @@ eri_send_msg(struct eri *erip, mblk_t *mp)
 		HSTAT(erip, oerrors);
 		return (B_TRUE);
 	}
-
-	nmp = mp;
 
 #ifdef ERI_HWCSUM
 	hcksum_retrieve(mp, NULL, NULL, &start_offset, &stuff_offset,
@@ -3566,43 +3485,21 @@ eri_send_msg(struct eri *erip, mblk_t *mp)
 		tmdcsum = ERI_TMD_CSENABL;
 	}
 #endif /* ERI_HWCSUM */
-	while (nmp != NULL) {
-		ASSERT(nmp->b_wptr >= nmp->b_rptr);
-		nmblks++; /* # of mbs */
-		nmp = nmp->b_cont;
+
+	if ((len_msg = msgsize(mp)) > ERI_BUFSIZE) {
+		/*
+		 * This sholdn't ever occur, as GLD should not send us
+		 * packets that are too big.
+		 */
+		HSTAT(erip, oerrors);
+		freemsg(mp);
+		return (B_TRUE);
 	}
-	len_msg = msgsize(mp);
 
 	/*
 	 * update MIB II statistics
 	 */
 	BUMP_OutNUcast(erip, mp->b_rptr);
-
-/*
- * 	----------------------------------------------------------------------
- *	here we deal with 3 cases.
- * 	1. pkt has exactly one mblk
- * 	2. pkt has exactly two mblks
- * 	3. pkt has more than 2 mblks. Since this almost
- *	   always never happens, we copy all of them into
- *	   a msh with one mblk.
- * 	for each mblk in the message, we allocate a tmd and
- * 	figure out the tmd index and tmblkp index.
- * 	----------------------------------------------------------------------
- */
-	if (nmblks > 2) { /* more than 2 mbs */
-		if ((nmp = eri_allocb(len_msg)) == NULL) {
-			HSTAT(erip, allocbfail);
-			HSTAT(erip, noxmtbuf);
-			freemsg(mp);
-			return (B_TRUE); /* bad case */
-		}
-		mcopymsg(mp, nmp->b_rptr);
-		nmp->b_wptr = nmp->b_rptr + len_msg;
-		mp = nmp;
-		nmblks = 1; /* make it one mb */
-	} else
-		nmp = mp;
 
 	mutex_enter(&erip->xmitlock);
 
@@ -3622,119 +3519,41 @@ eri_send_msg(struct eri *erip, mblk_t *mp)
 	if (i >= (ERI_TPENDING >> 1) && !(erip->starts & 0x7))
 		int_me = ERI_TMD_INTME;
 
-	for (j = 0; j < nmblks; j++) { /* for one or two mb cases */
+	i = tmdp - tbasep; /* index */
 
-		len = MBLKL(nmp);
-		i = tmdp - tbasep; /* index */
+	offset = (i * ERI_BUFSIZE);
+	ptr = erip->tbuf_kaddr + offset;
 
-		if (len_msg < eri_tx_bcopy_max) { /* tb-all mb */
-
-			offset = (i * eri_tx_bcopy_max);
-			ptr = erip->tbuf_kaddr + offset;
-
-			mcopymsg(mp, ptr);
+	mcopymsg(mp, ptr);
 
 #ifdef	ERI_HDX_BUG_WORKAROUND
-			if ((param_mode) || (eri_hdx_pad_enable == 0)) {
-				if (len_msg < ETHERMIN) {
-					bzero((ptr + len_msg),
-					    (ETHERMIN - len_msg));
-					len_msg = ETHERMIN;
-				}
-			} else {
-				if (len_msg < 97) {
-					bzero((ptr + len_msg), (97 - len_msg));
-					len_msg = 97;
-				}
-			}
+	if ((param_mode) || (eri_hdx_pad_enable == 0)) {
+		if (len_msg < ETHERMIN) {
+			bzero((ptr + len_msg), (ETHERMIN - len_msg));
+			len_msg = ETHERMIN;
+		}
+	} else {
+		if (len_msg < 97) {
+			bzero((ptr + len_msg), (97 - len_msg));
+			len_msg = 97;
+		}
+	}
 #endif
-			len = len_msg;
-			c.dmac_address = erip->tbuf_ioaddr + offset;
-			(void) ddi_dma_sync(erip->tbuf_handle,
-			    (off_t)offset, len_msg, DDI_DMA_SYNC_FORDEV);
-			nmblks = 1; /* exit this for loop */
-		} else if ((!j) && (len < eri_tx_bcopy_max)) { /* tb-1st mb */
+	c.dmac_address = erip->tbuf_ioaddr + offset;
+	(void) ddi_dma_sync(erip->tbuf_handle,
+	    (off_t)offset, len_msg, DDI_DMA_SYNC_FORDEV);
 
-			offset = (i * eri_tx_bcopy_max);
-			ptr = erip->tbuf_kaddr + offset;
+		/* first and last (and only!) descr of packet */
+	ctrl = ERI_TMD_SOP | ERI_TMD_EOP | int_me | tmdcsum |
+	    (start_offset << ERI_TMD_CSSTART_SHIFT) |
+	    (stuff_offset << ERI_TMD_CSSTUFF_SHIFT);
 
-			bcopy(mp->b_rptr, ptr, len);
+	PUT_TMD(tmdp, c, len_msg, ctrl);
+	ERI_SYNCIOPB(erip, tmdp, sizeof (struct eri_tmd),
+	    DDI_DMA_SYNC_FORDEV);
 
-			c.dmac_address = erip->tbuf_ioaddr + offset;
-			(void) ddi_dma_sync(erip->tbuf_handle,
-			    (off_t)offset, len, DDI_DMA_SYNC_FORDEV);
-			nmp = mp->b_cont;
-			mp->b_cont = NULL;
-			freeb(mp);
-		} else if (erip->eri_dvmaxh != NULL) { /* fast DVMA */
-
-			dvma_kaddr_load(erip->eri_dvmaxh,
-			    (caddr_t)nmp->b_rptr, len, 2 * i, &c);
-			dvma_sync(erip->eri_dvmaxh,
-			    2 * i, DDI_DMA_SYNC_FORDEV);
-
-			erip->tmblkp[i] = nmp;
-			if (!j) {
-				nmp = mp->b_cont;
-				mp->b_cont = NULL;
-			}
-
-		} else { /* DDI DMA */
-			if (len < xover_len)
-				flag_dma = DDI_DMA_WRITE | DDI_DMA_CONSISTENT;
-			else
-				flag_dma = DDI_DMA_WRITE | DDI_DMA_STREAMING;
-
-			if (ddi_dma_addr_bind_handle(erip->ndmaxh[i],
-			    NULL, (caddr_t)nmp->b_rptr, len,
-			    flag_dma, DDI_DMA_DONTWAIT, NULL, &c,
-			    &count) != DDI_DMA_MAPPED) {
-				if (j) { /* free previous DMV resources */
-					i = erip->tnextp - tbasep;
-					if (erip->ndmaxh[i]) { /* DDI DMA */
-						(void) ddi_dma_unbind_handle(
-						    erip->ndmaxh[i]);
-						erip->ndmaxh[i] = NULL;
-						freeb(mp);
-					}
-					freeb(nmp);
-				} else {
-					freemsg(mp);
-				}
-
-				mutex_exit(&erip->xmitlock);
-				HSTAT(erip, noxmtbuf);
-
-				return (B_TRUE); /* bad case */
-			}
-
-			erip->tmblkp[i] = nmp;
-			if (!j) {
-				nmp = mp->b_cont;
-				mp->b_cont = NULL;
-			}
-		}
-
-		ctrl = 0;
-		/* first descr of packet */
-		if (!j) {
-			ctrl = ERI_TMD_SOP| int_me | tmdcsum |
-			    (start_offset << ERI_TMD_CSSTART_SHIFT) |
-			    (stuff_offset << ERI_TMD_CSSTUFF_SHIFT);
-		}
-
-		/* last descr of packet */
-		if ((j + 1) == nmblks) {
-			ctrl |= ERI_TMD_EOP;
-		}
-
-		PUT_TMD(tmdp, c, len, ctrl);
-		ERI_SYNCIOPB(erip, tmdp, sizeof (struct eri_tmd),
-		    DDI_DMA_SYNC_FORDEV);
-
-		tmdp = NEXTTMD(erip, tmdp);
-		erip->tx_cur_cnt++;
-	} /* for each nmp */
+	tmdp = NEXTTMD(erip, tmdp);
+	erip->tx_cur_cnt++;
 
 	erip->tx_kick = tmdp - tbasep;
 	PUT_ETXREG(tx_kick, erip->tx_kick);
@@ -3807,8 +3626,6 @@ eri_reclaim(struct eri *erip, uint32_t tx_completion)
 	struct	eri_tmd	*tcomp;
 	struct	eri_tmd	*tbasep;
 	struct	eri_tmd	*tlimp;
-	mblk_t *bp;
-	int	i;
 	uint64_t	flags;
 	uint_t reclaimed = 0;
 
@@ -3828,24 +3645,6 @@ eri_reclaim(struct eri *erip, uint32_t tx_completion)
 
 		HSTATN(erip, obytes64, (flags & ERI_TMD_BUFSIZE));
 
-		i = tmdp - tbasep;
-		bp = erip->tmblkp[i];
-
-		/* dvma handle case */
-
-		if (bp) {
-			if (erip->eri_dvmaxh) {
-				dvma_unload(erip->eri_dvmaxh, 2 * i,
-				    (uint_t)DONT_FLUSH);
-			} else {
-				/* dma handle case. */
-				(void) ddi_dma_unbind_handle(erip->ndmaxh[i]);
-			}
-
-			freeb(bp);
-			erip->tmblkp[i] = NULL;
-
-		}
 		tmdp = NEXTTMDP(tbasep, tlimp, tmdp);
 		reclaimed++;
 	}

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_ERI_H
 #define	_SYS_ERI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -171,9 +169,7 @@ typedef struct stats {
 #define	HSTATN(erip, x, n)	erip->stats.x += n;
 
 
-#define	TX_BCOPY_MAX		704	/* bcopy for packets < 704 bytes */
 #define	RX_BCOPY_MAX		704	/* bcopy for packets < 704 bytes */
-#define	TX_STREAM_MIN		512
 
 /*
  * Per-Stream instance state information.
@@ -415,21 +411,19 @@ struct	eri {
 	 * by dvma_reserve
 	 */
 	ddi_dma_handle_t	eri_dvmarh;	/* dvma recv handle */
-	ddi_dma_handle_t	eri_dvmaxh;	/* dvma xmit handle */
 
 	/*
 	 * these are used if dvma reserve fails, and we have to fall
 	 * back on the older ddi_dma_addr_setup routines
 	 */
 	ddi_dma_handle_t	ndmarh[ERI_RMDMAX];
-	ddi_dma_handle_t	ndmaxh[ERI_TMDMAX];
 
 	ddi_dma_handle_t	tbuf_handle;
+	ddi_acc_handle_t	tbuf_acch;
 	caddr_t			tbuf_kaddr;
 	uint32_t		tbuf_ioaddr;
 
 	int			rcv_handle_cnt;
-	int			xmit_handle_cnt;
 
 	int			rx_reset_issued;
 	int			tx_reset_issued;
