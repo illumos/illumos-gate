@@ -17862,18 +17862,72 @@ ip_extract_move_args(queue_t *q, mblk_t *mp, ill_t **ill_from_v4,
 	    q, mp, ip_process_ioctl, &err, ipst);
 	if (err != 0) {
 		/*
-		 * There could be only v6.
+		 * A move may be in progress, EINPROGRESS looking up the "to"
+		 * ill means changes already done to the "from" ipsq need to
+		 * be undone to avoid potential deadlocks.
+		 *
+		 * ENXIO will usually be because there is only v6 on the ill,
+		 * that's not treated as an error unless an ENXIO is also
+		 * seen when looking up the v6 "to" ill.
+		 *
+		 * If EINPROGRESS, the mp has been enqueued and can not be
+		 * used to look up the v6 "to" ill, but a preemptive clean
+		 * up of changes to the v6 "from" ipsq is done.
 		 */
-		if (err != ENXIO)
+		if (err == EINPROGRESS) {
+			if (*ill_from_v4 != NULL) {
+				ill_t   *from_ill;
+				ipsq_t  *from_ipsq;
+
+				from_ill = ipif_v4->ipif_ill;
+				from_ipsq = from_ill->ill_phyint->phyint_ipsq;
+
+				mutex_enter(&from_ipsq->ipsq_lock);
+				from_ipsq->ipsq_current_ipif = NULL;
+				mutex_exit(&from_ipsq->ipsq_lock);
+			}
+			if (*ill_from_v6 != NULL) {
+				ill_t   *from_ill;
+				ipsq_t  *from_ipsq;
+
+				from_ill = ipif_v6->ipif_ill;
+				from_ipsq = from_ill->ill_phyint->phyint_ipsq;
+
+				mutex_enter(&from_ipsq->ipsq_lock);
+				from_ipsq->ipsq_current_ipif = NULL;
+				mutex_exit(&from_ipsq->ipsq_lock);
+			}
 			goto done;
+		}
+		ASSERT(err == ENXIO);
 		err = 0;
 	}
 
 	*ill_to_v6 = ill_lookup_on_ifindex(dst_index, B_TRUE,
 	    q, mp, ip_process_ioctl, &err, ipst);
 	if (err != 0) {
-		if (err != ENXIO)
+		/*
+		 * A move may be in progress, EINPROGRESS looking up the "to"
+		 * ill means changes already done to the "from" ipsq need to
+		 * be undone to avoid potential deadlocks.
+		 */
+		if (err == EINPROGRESS) {
+			if (*ill_from_v6 != NULL) {
+				ill_t   *from_ill;
+				ipsq_t  *from_ipsq;
+
+				from_ill = ipif_v6->ipif_ill;
+				from_ipsq = from_ill->ill_phyint->phyint_ipsq;
+
+				mutex_enter(&from_ipsq->ipsq_lock);
+				from_ipsq->ipsq_current_ipif = NULL;
+				mutex_exit(&from_ipsq->ipsq_lock);
+			}
 			goto done;
+		}
+		ASSERT(err == ENXIO);
+
+		/* Both v4 and v6 lookup failed */
 		if (*ill_to_v4 == NULL) {
 			err = ENXIO;
 			goto done;

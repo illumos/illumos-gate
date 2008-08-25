@@ -27018,7 +27018,6 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 	ip_extract_func_t *extract_funcp;
 	cmd_info_t ci;
 	int err;
-	boolean_t entered_ipsq = B_FALSE;
 
 	ip3dbg(("ip_process_ioctl: ioctl %X\n", iocp->ioc_cmd));
 
@@ -27086,10 +27085,6 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 		ASSERT(ci.ci_ipif != NULL);
 	}
 
-	/*
-	 * If ipsq is non-null, we are already being called exclusively
-	 */
-	ASSERT(ipsq == NULL || IAM_WRITER_IPSQ(ipsq));
 	if (!(ipip->ipi_flags & IPI_WR)) {
 		/*
 		 * A return value of EINPROGRESS means the ioctl is
@@ -27104,13 +27099,19 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 		return;
 	}
 
+	/*
+	 * If ipsq is non-null, we are already being called exclusively on an
+	 * ill but in the case of a failover in progress it is the "from" ill,
+	 *  rather than the "to" ill (which is the ill ptr passed in).
+	 * In order to ensure we are exclusive on both ILLs we rerun
+	 * ipsq_try_enter() here, ipsq's support recursive entry.
+	 */
+	ASSERT(ipsq == NULL || IAM_WRITER_IPSQ(ipsq));
 	ASSERT(ci.ci_ipif != NULL);
 
-	if (ipsq == NULL) {
-		ipsq = ipsq_try_enter(ci.ci_ipif, NULL, q, mp,
-		    ip_process_ioctl, NEW_OP, B_TRUE);
-		entered_ipsq = B_TRUE;
-	}
+	ipsq = ipsq_try_enter(ci.ci_ipif, NULL, q, mp, ip_process_ioctl,
+	    NEW_OP, B_TRUE);
+
 	/*
 	 * Release the ipif so that ipif_down and friends that wait for
 	 * references to go away are not misled about the current ipif_refcnt
@@ -27153,8 +27154,7 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 
 	ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), ipsq);
 
-	if (entered_ipsq)
-		ipsq_exit(ipsq);
+	ipsq_exit(ipsq);
 }
 
 /*
