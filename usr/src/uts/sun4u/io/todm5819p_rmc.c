@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * tod driver module for ALI M5819P part
@@ -130,8 +129,16 @@ _info(struct modinfo *modinfop)
 
 
 /*
+ * todm5819p_rmc is normally called once a second, from the clock thread.
+ * It may also be infrequently called from other contexts (eg. ddi framework),
+ * in which case our counting to NBAD_READ_LIMIT may be a few seconds short
+ * of the desired 15-minute timeframe; this slight inaccuracy is acceptable.
+ */
+#define	NBAD_READ_LIMIT	(900)   /* 15 minutes, in seconds */
+/*
  * Read the current time from the clock chip and convert to UNIX form.
- * Assumes that the year in the clock chip is valid.
+ * Checks the century, but otherwise assumes that the values in the clock
+ * chip are valid.
  * Must be called with tod_lock held.
  */
 static timestruc_t
@@ -141,6 +148,7 @@ todm5819p_rmc_get(void)
 	int s;
 	timestruc_t ts;
 	struct rtc_t rtc;
+	static int nbad_reads = 0;
 
 	ASSERT(MUTEX_HELD(&tod_lock));
 
@@ -154,7 +162,7 @@ todm5819p_rmc_get(void)
 		 */
 		if (ret == -1)
 			cmn_err(CE_WARN, "todm5819p: failed to set hardware "
-				"watchdog timer.");
+			    "watchdog timer.");
 	}
 
 	/*
@@ -179,6 +187,23 @@ todm5819p_rmc_get(void)
 		 */
 		tod_fault_reset();
 		return (hrestime);
+	}
+
+	DPRINTF("todm5819p_rmc_get: century=%d year=%d dom=%d hrs=%d\n",
+	    (int)rtc.rtc_century, (int)rtc.rtc_year, (int)rtc.rtc_dom,
+	    (int)rtc.rtc_hrs);
+
+	/* detect and correct invalid century register data */
+	if (rtc.rtc_century < 19) {
+		DPRINTF(
+		    "todm5819p_rmc_get: century invalid (%d), returning 20\n",
+		    (int)rtc.rtc_century);
+		rtc.rtc_century = 20;
+		if (++nbad_reads == NBAD_READ_LIMIT) {
+			nbad_reads = 0;
+			cmn_err(CE_WARN, "todm5819p: realtime clock century "
+			    "register appears to be defective.");
+		}
 	}
 
 	ts.tv_sec = tod_to_utc(rtc_to_tod(&rtc));
@@ -262,6 +287,10 @@ todm5819p_rmc_set(timestruc_t ts)
 	rtc.rtc_hrs	= (uint8_t)tod.tod_hour;
 	rtc.rtc_min	= (uint8_t)tod.tod_min;
 	rtc.rtc_sec	= (uint8_t)tod.tod_sec;
+
+	DPRINTF("todm5819p_rmc_set: century=%d year=%d dom=%d hrs=%d\n",
+	    (int)rtc.rtc_century, (int)rtc.rtc_year, (int)rtc.rtc_dom,
+	    (int)rtc.rtc_hrs);
 
 	write_rtc_time(&rtc);
 
