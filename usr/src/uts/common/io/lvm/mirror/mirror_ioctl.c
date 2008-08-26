@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -1111,6 +1109,7 @@ mirror_detach(
 			new_sm->sm_shared = old_sm->sm_shared;
 			new_sm->sm_hsp_id = old_sm->sm_hsp_id;
 			new_sm->sm_timestamp = old_sm->sm_timestamp;
+			bzero(old_sm, sizeof (mm_submirror_t));
 		}
 	}
 	mirror_commit(un, 0, NULL);
