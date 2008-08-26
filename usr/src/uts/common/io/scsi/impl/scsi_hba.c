@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/note.h>
 
 /*
@@ -619,8 +617,10 @@ scsi_hba_attach_setup(
 		 * common minimal SCSA fm implementation -  we called
 		 * ddi_fm_init(), so we are responsible for calling
 		 * ddi_fm_fini() in scsi_hba_detach().
+		 * NOTE: if ddi_fm_init fails in any reason, SKIP.
 		 */
-		hba_tran->tran_hba_flags |= SCSI_HBA_TRAN_FMSCSA;
+		if (DEVI(dip)->devi_fmhdl)
+			hba_tran->tran_hba_flags |= SCSI_HBA_TRAN_FMSCSA;
 	}
 
 	return (DDI_SUCCESS);
