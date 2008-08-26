@@ -22,7 +22,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Multiplexed I/O SCSI vHCI implementation
@@ -69,7 +68,7 @@ int vhci_prout_not_ready_retry = 180;
 /*
  * Version Macros
  */
-#define	VHCI_NAME_VERSION	"SCSI VHCI Driver %I%"
+#define	VHCI_NAME_VERSION	"SCSI VHCI Driver 1.78"
 char		vhci_version_name[] = VHCI_NAME_VERSION;
 
 int		vhci_first_time = 0;
@@ -4842,6 +4841,7 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	char				*guid;
 	struct scsi_failover		*sf;
 	struct scsi_failover_ops	*sfo;
+	char				*sfo_name;
 	char				*override;
 	scsi_vhci_priv_t		*svp = NULL;
 	struct buf			*bp;
@@ -4966,6 +4966,7 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	 *		name of the 'fops' module that should be used.
 	 */
 	sfo = NULL;	/* "NONE" */
+	sfo_name = NULL;
 	override = scsi_get_device_type_string(
 	    "scsi-vhci-failover-override", vdip, psd);
 
@@ -4979,8 +4980,7 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 
 			/* found failover module, supported under scsi_vhci */
 			sfo = sf->sf_sfo;
-			vlun->svl_fops_name =
-			    i_ddi_strdup(sfo->sfo_name, KM_SLEEP);
+			sfo_name = i_ddi_strdup(sfo->sfo_name, KM_SLEEP);
 			break;
 		}
 	} else if (strcasecmp(override, "NONE")) {
@@ -4993,10 +4993,9 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 
 			/* found failover module, supported under scsi_vhci */
 			sfo = sf->sf_sfo;
-			vlun->svl_fops_name = kmem_alloc(strlen("conf ") +
+			sfo_name = kmem_alloc(strlen("conf ") +
 			    strlen(sfo->sfo_name) + 1, KM_SLEEP);
-			(void) sprintf(vlun->svl_fops_name, "conf %s",
-			    sfo->sfo_name);
+			(void) sprintf(sfo_name, "conf %s", sfo->sfo_name);
 			break;
 		}
 	}
@@ -5015,6 +5014,16 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 
 	/* failover supported for device - save failover_ops in vlun */
 	vlun->svl_fops = sfo;
+	ASSERT(sfo_name != NULL);
+	/* to avoid memory leak, free the fops_name if it has already */
+	/* been set one, a vlun has more than one path, the function */
+	/* vhci_pathinfo_online() will be invoked when each path comes */
+	/* online, so the fops name might be set more than one times. */
+	if (vlun->svl_fops_name) {
+		kmem_free(vlun->svl_fops_name,
+		    strlen(vlun->svl_fops_name) + 1);
+	}
+	vlun->svl_fops_name = sfo_name;
 
 	/*
 	 * Obtain the device-type based mpxio options as specified in
