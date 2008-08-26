@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Xen event provider for DTrace
  *
@@ -403,24 +401,34 @@ xdt_attach_trace_buffers(void)
 	int err;
 	uint_t i;
 
-	/* set trace buffer size */
-	tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_set_size;
-	tbuf_op.size = xdt_tbuf_pages;
-	(void) xdt_sysctl_tbuf(&tbuf_op);
-
-	/* get trace buffer info */
+	/*
+	 * Xen does not support trace buffer re-sizing. If the buffers
+	 * have already been allocated we just use them as is.
+	 */
 	tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_get_info;
 	if ((err = xdt_sysctl_tbuf(&tbuf_op)) != 0)
 		return (err);
 
+	if (tbuf_op.size == 0) {
+		/* set trace buffer size */
+		tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_set_size;
+		tbuf_op.size = xdt_tbuf_pages;
+		(void) xdt_sysctl_tbuf(&tbuf_op);
+
+		/* get trace buffer info */
+		tbuf_op.cmd  = XEN_SYSCTL_TBUFOP_get_info;
+		if ((err = xdt_sysctl_tbuf(&tbuf_op)) != 0)
+			return (err);
+
+		if (tbuf_op.size == 0) {
+			cmn_err(CE_NOTE, "Couldn't allocate trace buffers.");
+			return (ENOBUFS);
+		}
+	}
+
 	tbuf.size = tbuf_op.size;
 	tbuf.start_mfn = (mfn_t)tbuf_op.buffer_mfn;
 	tbuf.cnt = xdt_ncpus;
-
-	if (tbuf.size == 0) {
-		cmn_err(CE_NOTE, "No trace buffers allocated!");
-		return (ENOBUFS);
-	}
 
 	ASSERT(tbuf.start_mfn != MFN_INVALID);
 	ASSERT(tbuf.cnt > 0);
