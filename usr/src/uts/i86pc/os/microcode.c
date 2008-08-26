@@ -611,7 +611,9 @@ ucode_update(uint8_t *ucodep, int size)
 		 * updated version on all the CPUs after the update has
 		 * completed.
 		 */
-		ucode_update_xpv(uusp, ustart, usize);
+		if (id == 0) {
+			ucode_update_xpv(uusp, ustart, usize);
+		}
 #endif
 
 		CPUSET_ADD(cpuset, id);
@@ -669,18 +671,6 @@ ucode_check(cpu_t *cp)
 	if (!ucode_capable(cp))
 		return;
 
-#ifdef	__xpv
-	/*
-	 * for i86xpv, the hypervisor will update all the CPUs. We only need
-	 * do do this on one of the CPUs (and there always is a CPU 0). We do
-	 * need to update the CPU version though. Do that before returning.
-	 */
-	if (cp->cpu_id != 0) {
-		ucode_read_rev(uinfop);
-		return;
-	}
-#endif
-
 	/*
 	 * The MSR_INTC_PLATFORM_ID is supported in Celeron and Xeon
 	 * (Family 6, model 5 and above) and all processors after.
@@ -691,6 +681,16 @@ ucode_check(cpu_t *cp)
 	}
 
 	ucode_read_rev(uinfop);
+
+#ifdef	__xpv
+	/*
+	 * for i86xpv, the hypervisor will update all the CPUs. We only need
+	 * do do this on one of the CPUs (and there always is a CPU 0).
+	 */
+	if (cp->cpu_id != 0) {
+		return;
+	}
+#endif
 
 	/*
 	 * Check to see if we need ucode update
