@@ -361,7 +361,8 @@ static ared_t	ip_ared_template = {
 	sizeof (ared_t),
 	IP_ARP_PROTO_TYPE,
 	sizeof (ared_t),
-	IP_ADDR_LEN
+	IP_ADDR_LEN,
+	0
 };
 
 static ared_t	ip6_ared_template = {
@@ -370,7 +371,8 @@ static ared_t	ip6_ared_template = {
 	sizeof (ared_t),
 	IP_ARP_PROTO_TYPE,
 	sizeof (ared_t),
-	IPV6_ADDR_LEN
+	IPV6_ADDR_LEN,
+	0
 };
 
 /*

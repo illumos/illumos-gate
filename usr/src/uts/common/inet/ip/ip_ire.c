@@ -24,9 +24,6 @@
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * This file contains routines that manipulate Internet Routing Entries (IREs).
  */
@@ -690,10 +687,17 @@ done:
 		 * TCP is really telling us to start over completely, and it
 		 * expects that we'll resend the ARP query.  Tell ARP to
 		 * discard the entry, if this is a local destination.
+		 *
+		 * But, if the ARP entry is permanent then it shouldn't be
+		 * deleted, so we set ARED_F_PRESERVE_PERM.
 		 */
 		ill = ire->ire_stq->q_ptr;
 		if (ire->ire_gateway_addr == 0 &&
 		    (arp_mp = ill_ared_alloc(ill, addr)) != NULL) {
+			ared_t *ared = (ared_t *)arp_mp->b_rptr;
+
+			ASSERT(ared->ared_cmd == AR_ENTRY_DELETE);
+			ared->ared_flags |= ARED_F_PRESERVE_PERM;
 			putnext(ill->ill_rq, arp_mp);
 		}
 

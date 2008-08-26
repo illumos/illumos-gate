@@ -24,8 +24,6 @@
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* AR - Address Resolution Protocol */
 
 #include <sys/types.h>
@@ -1635,13 +1633,22 @@ ar_entry_delete(queue_t *q, mblk_t *mp_orig)
 	 */
 	ace = ar_ce_lookup_from_area(as, mp, ar_ce_lookup);
 	if (ace != NULL) {
+		ared_t *ared = (ared_t *)mp->b_rptr;
+
 		/*
 		 * If it's a permanent entry, then the client is the one who
 		 * told us to delete it, so there's no reason to notify.
 		 */
 		if (ACE_NONPERM(ace))
 			ar_delete_notify(ace);
-		ar_ce_delete(ace);
+		/*
+		 * Only delete the ARP entry if it is non-permanent, or
+		 * ARED_F_PRESERVE_PERM flags is not set.
+		 */
+		if (ACE_NONPERM(ace) ||
+		    !(ared->ared_flags & ARED_F_PRESERVE_PERM)) {
+			ar_ce_delete(ace);
+		}
 		return (0);
 	}
 	return (ENXIO);

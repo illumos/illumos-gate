@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
 #ifndef	_INET_ARP_H
 #define	_INET_ARP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -83,6 +81,9 @@ extern "C" {
 #define	ACE_F_DELAYED		0x0800	/* rescheduled on arp_defend_rate */
 #define	ACE_F_DAD_ABORTED	0x1000	/* DAD was aborted on link down */
 
+/* ared_flags */
+#define	ARED_F_PRESERVE_PERM	0x0001	/* preserve permanent ace */
+
 /* ARP Command Structures */
 
 /* arc_t - Common command overlay */
@@ -119,6 +120,7 @@ typedef	struct ar_entry_delete_s {
 	uint32_t	ared_proto;
 	uint32_t	ared_proto_addr_offset;
 	uint32_t	ared_proto_addr_length;
+	uint32_t	ared_flags;
 } ared_t;
 
 typedef	struct ar_entry_query_s {
