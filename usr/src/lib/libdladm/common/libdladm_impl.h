@@ -26,8 +26,6 @@
 #ifndef _LIBDLADM_IMPL_H
 #define	_LIBDLADM_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libdladm.h>
 #include <stdio.h>
 
@@ -45,7 +43,6 @@ typedef struct val_desc {
 
 #define	VALCNT(vals)	(sizeof ((vals)) / sizeof (val_desc_t))
 
-extern int		i_dladm_ioctl(int, int, void *, int);
 extern dladm_status_t	dladm_errno2status(int);
 extern dladm_status_t   i_dladm_rw_db(const char *, mode_t,
 			    dladm_status_t (*)(void *, FILE *, FILE *),

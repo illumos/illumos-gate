@@ -23,10 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
-#include <stropts.h>
 #include <errno.h>
 #include <ctype.h>
 #include <fcntl.h>
@@ -39,23 +36,6 @@
 #include <libdlpi.h>
 
 static char		dladm_rootdir[MAXPATHLEN] = "/";
-
-/*
- * Issue an ioctl to the specified file descriptor attached to the
- * DLD control driver interface.
- */
-int
-i_dladm_ioctl(int fd, int ic_cmd, void *ic_dp, int ic_len)
-{
-	struct strioctl	iocb;
-
-	iocb.ic_cmd = ic_cmd;
-	iocb.ic_timout = 0;
-	iocb.ic_len = ic_len;
-	iocb.ic_dp = (char *)ic_dp;
-
-	return (ioctl(fd, I_STR, &iocb));
-}
 
 const char *
 dladm_status2str(dladm_status_t status, char *buf)
@@ -181,6 +161,7 @@ dladm_errno2status(int err)
 	case ENETDOWN:
 		return (DLADM_STATUS_NONOTIF);
 	case EACCES:
+	case EPERM:
 		return (DLADM_STATUS_DENIED);
 	case EIO:
 		return (DLADM_STATUS_IOERR);

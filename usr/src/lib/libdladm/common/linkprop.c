@@ -198,7 +198,7 @@ static dladm_public_prop_t dladm_prop[] = {
 	{ MAC_PROP_DUPLEX,	sizeof (link_duplex_t),
 	    "duplex",		"link duplex mode" },
 
-	{MAC_PROP_SPEED,	sizeof (uint64_t),
+	{ MAC_PROP_SPEED,	sizeof (uint64_t),
 	    "speed",		"link speed (bps)" },
 
 	{ MAC_PROP_STATUS,	sizeof (link_state_t),
@@ -1736,7 +1736,7 @@ i_dladm_set_public_prop(prop_desc_t *pd, datalink_id_t linkid,
     val_desc_t *vdp, uint_t val_cnt, uint_t flags, datalink_media_t media)
 {
 	dld_ioc_macprop_t	*dip;
-	int		fd, dsize;
+	int		fd;
 	dladm_status_t	status = DLADM_STATUS_OK;
 	uint8_t		u8;
 	uint16_t	u16;
@@ -1778,12 +1778,11 @@ i_dladm_set_public_prop(prop_desc_t *pd, datalink_id_t linkid,
 	else
 		dip->pr_valsize = 0;
 
-	dsize = MAC_PROP_BUFSIZE(dip->pr_valsize);
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
 		status = dladm_errno2status(errno);
 		goto done;
 	}
-	if (i_dladm_ioctl(fd, DLDIOC_SETMACPROP, dip, dsize) < 0)
+	if (ioctl(fd, DLDIOC_SETMACPROP, dip) < 0)
 		status = dladm_errno2status(errno);
 
 	(void) close(fd);
@@ -1796,7 +1795,7 @@ static dld_ioc_macprop_t *
 i_dladm_get_public_prop(datalink_id_t linkid, char *prop_name, uint_t flags,
     dladm_status_t *status)
 {
-	int fd, dsize;
+	int fd;
 	dld_ioc_macprop_t *dip = NULL;
 
 	*status = DLADM_STATUS_OK;
@@ -1805,15 +1804,12 @@ i_dladm_get_public_prop(datalink_id_t linkid, char *prop_name, uint_t flags,
 	if (dip == NULL)
 		return (NULL);
 
-	dsize = MAC_PROP_BUFSIZE(dip->pr_valsize);
-
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
 		*status = dladm_errno2status(errno);
 		goto done;
 	}
-	if (i_dladm_ioctl(fd, DLDIOC_GETMACPROP, dip, dsize) < 0) {
+	if (ioctl(fd, DLDIOC_GETMACPROP, dip) < 0)
 		*status = dladm_errno2status(errno);
-	}
 
 	(void) close(fd);
 done:
@@ -2004,7 +2000,7 @@ i_dladm_set_prop(datalink_id_t linkid, const char *prop_name,
     char **prop_val, uint_t val_cnt, uint_t flags)
 {
 	int		fd, i, slen;
-	int 		bufsize = 0, dsize;
+	int 		bufsize = 0;
 	dld_ioc_macprop_t *dip = NULL;
 	uchar_t 	*dp;
 	dladm_public_prop_t *p;
@@ -2038,14 +2034,13 @@ i_dladm_set_prop(datalink_id_t linkid, const char *prop_name,
 		return (status);
 
 	dp = (uchar_t *)dip->pr_val;
-	dsize = sizeof (dld_ioc_macprop_t) + bufsize;
 	slen = 0;
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
 		status = dladm_errno2status(errno);
 		goto done;
 	}
 	if (prop_val == NULL) {
-		if (i_dladm_ioctl(fd, DLDIOC_GETMACPROP, dip, dsize) < 0) {
+		if (ioctl(fd, DLDIOC_GETMACPROP, dip) < 0) {
 			status = dladm_errno2status(errno);
 			goto done;
 		}
@@ -2064,9 +2059,8 @@ i_dladm_set_prop(datalink_id_t linkid, const char *prop_name,
 			dp += (plen + 1);
 		}
 	}
-	if (i_dladm_ioctl(fd, DLDIOC_SETMACPROP, dip, dsize) < 0) {
+	if (ioctl(fd, DLDIOC_SETMACPROP, dip) < 0)
 		status = dladm_errno2status(errno);
-	}
 
 done:
 	if (fd > 0)
@@ -2081,7 +2075,6 @@ i_dladm_get_prop(datalink_id_t linkid, const char *prop_name,
 {
 	int		fd;
 	dladm_status_t  status = DLADM_STATUS_OK;
-	uint_t 		dsize;
 	dld_ioc_macprop_t *dip = NULL;
 	dladm_public_prop_t *p;
 	char tmp = '\0';
@@ -2106,14 +2099,13 @@ i_dladm_get_prop(datalink_id_t linkid, const char *prop_name,
 	dip = i_dladm_buf_alloc(1024, linkid, prop_name, dld_flags, &status);
 	if (dip == NULL)
 		return (status);
-	dsize = MAC_PROP_BUFSIZE(dip->pr_valsize);
 
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
 		free(dip);
 		return (DLADM_STATUS_BADARG);
 	}
 
-	if ((status = i_dladm_ioctl(fd, DLDIOC_GETMACPROP, dip, dsize)) < 0) {
+	if (ioctl(fd, DLDIOC_GETMACPROP, dip) < 0) {
 		status = dladm_errno2status(errno);
 	} else {
 		(void) strncpy(*prop_val, dip->pr_val, DLADM_PROP_VAL_MAX);

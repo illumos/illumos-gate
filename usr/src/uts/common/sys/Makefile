@@ -185,6 +185,7 @@ CHKHDRS=			\
 	dlpi.h			\
 	dld.h			\
 	dld_impl.h		\
+	dld_ioc.h		\
 	dls.h			\
 	dls_impl.h		\
 	dma_i8237A.h            \

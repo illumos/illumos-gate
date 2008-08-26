@@ -20,9 +20,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #  NOTE:  When a change is made to the source file for
@@ -52,34 +50,34 @@ do
 	rm -f $dest.$$
 
 	# potential additions
-	additions="aggr aggr:ctl bge dld:ctl dnet keysock ibd icmp icmp6 ipsecah ipsecesp openeepr random spdsock vni ipf pfil scsi_vhci"
+	additions="aggr bge dnet keysock ibd icmp icmp6 ipsecah ipsecesp openeepr random spdsock vni ipf pfil scsi_vhci"
 
 	for dev in $additions
 	do
 		# if an entry for this driver exists in the source
 		# file...
-		grep "$dev[ 	]" $src > /dev/null 2>&1
+		grep "^$dev[ 	]" $src > /dev/null 2>&1
 		if [ $? = 0 ] ; then
 			# ...and no entry exists in the destination
 			# file...
-			grep "$dev[ 	]" $dest > /dev/null 2>&1
+			grep "^$dev[ 	]" $dest > /dev/null 2>&1
 			if [ $? != 0 ] ; then
 				# ...then add the entry from
 				# the source file to the
 				# destination file.
-				grep "$dev[ 	]" $src >> $dest
+				grep "^$dev[ 	]" $src >> $dest
 			fi
 		fi
 	done
 
 	# potential deletions
-	deletions="elx dld le"
+	deletions="elx dld dld:ctl aggr:ctl vnic:ctl le"
 
 	for dev in $deletions
 	do
 		# if an entry for this driver exists in the destination
 		# file...
-		grep "$dev[ 	]" $dest > /dev/null 2>&1
+		grep "^$dev[ 	]" $dest > /dev/null 2>&1
 		if [ $? = 0 ] ; then
 			# ...and no entry exists in the source
 			# file...
@@ -88,7 +86,7 @@ do
 				# ...then remove the entry from
 				# the destination file.
 				cp $dest $dest.$$
-				grep -v "$dev[ 	]" $dest.$$ > $dest
+				grep -v "^$dev[ 	]" $dest.$$ > $dest
 				rm -f $dest.$$
 			fi
 		fi

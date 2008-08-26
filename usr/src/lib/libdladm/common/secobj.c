@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -55,6 +53,7 @@ static secobj_class_info_t secobj_class_table[] = {
 	{"wpa",	DLD_SECOBJ_CLASS_WPA}
 };
 
+#define	SECOBJ_MAXBUFSZ	65536
 #define	NSECOBJCLASS \
 	(sizeof (secobj_class_table) / sizeof (secobj_class_info_t))
 
@@ -154,10 +153,8 @@ dladm_set_secobj(const char *obj_name, dladm_secobj_class_t class,
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
 		return (dladm_errno2status(errno));
 
-	if (i_dladm_ioctl(fd, DLDIOC_SECOBJ_SET, &secobj_set,
-	    sizeof (secobj_set)) < 0) {
+	if (ioctl(fd, DLDIOC_SECOBJ_SET, &secobj_set) < 0)
 		status = dladm_errno2status(errno);
-	}
 
 	(void) close(fd);
 
@@ -198,8 +195,8 @@ dladm_get_secobj(const char *obj_name, dladm_secobj_class_t *classp,
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
 		return (dladm_errno2status(errno));
 
-	if (i_dladm_ioctl(fd, DLDIOC_SECOBJ_GET, &secobj_get,
-	    sizeof (secobj_get)) < 0)
+	secobj_get.sg_size = sizeof (secobj_get);
+	if (ioctl(fd, DLDIOC_SECOBJ_GET, &secobj_get) < 0)
 		status = dladm_errno2status(errno);
 
 	(void) close(fd);
@@ -233,8 +230,7 @@ dladm_unset_secobj(const char *obj_name, uint_t flags)
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
 		return (dladm_errno2status(errno));
 
-	if (i_dladm_ioctl(fd, DLDIOC_SECOBJ_UNSET, &secobj_unset,
-	    sizeof (secobj_unset)) < 0)
+	if (ioctl(fd, DLDIOC_SECOBJ_UNSET, &secobj_unset) < 0)
 		status = dladm_errno2status(errno);
 
 	(void) close(fd);
@@ -248,7 +244,6 @@ persist:
 	return (status);
 }
 
-#define	SECOBJ_BUFSZ	65536
 dladm_status_t
 dladm_walk_secobj(void *arg, boolean_t (*func)(void *, const char *),
     uint_t flags)
@@ -257,20 +252,40 @@ dladm_walk_secobj(void *arg, boolean_t (*func)(void *, const char *),
 	dladm_status_t		status = DLADM_STATUS_OK;
 	dld_ioc_secobj_get_t	*secobj_getp;
 	dld_secobj_t		*objp;
+	size_t			secobj_bufsz;
 
 	if ((flags & DLADM_OPT_PERSIST) != 0)
 		return (i_dladm_walk_secobj_db(arg, func));
 
-	secobj_getp = calloc(1, SECOBJ_BUFSZ);
-	if (secobj_getp == NULL)
-		return (DLADM_STATUS_NOMEM);
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
+		return (dladm_errno2status(errno));
 
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
+	/* Start with enough room for 10 objects, increase if necessary. */
+	secobj_bufsz = sizeof (*secobj_getp) + (10 * sizeof (*objp));
+	secobj_getp = calloc(1, secobj_bufsz);
+	if (secobj_getp == NULL) {
 		status = dladm_errno2status(errno);
 		goto done;
 	}
-	if (i_dladm_ioctl(fd, DLDIOC_SECOBJ_GET, secobj_getp,
-	    SECOBJ_BUFSZ) < 0) {
+
+tryagain:
+	secobj_getp->sg_size = secobj_bufsz;
+	if (ioctl(fd, DLDIOC_SECOBJ_GET, secobj_getp) < 0) {
+		if (errno == ENOSPC) {
+			/* Increase the buffer size and try again. */
+			secobj_bufsz *= 2;
+			if (secobj_bufsz > SECOBJ_MAXBUFSZ) {
+				status = dladm_errno2status(errno);
+				goto done;
+			}
+			secobj_getp = realloc(secobj_getp, secobj_bufsz);
+			if (secobj_getp == NULL) {
+				status = dladm_errno2status(errno);
+				goto done;
+			}
+			bzero(secobj_getp, secobj_bufsz);
+			goto tryagain;
+		}
 		status = dladm_errno2status(errno);
 		goto done;
 	}

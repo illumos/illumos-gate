@@ -54,7 +54,7 @@ i_dladm_info(int fd, const datalink_id_t linkid, dladm_attr_t *dap)
 
 	dia.dia_linkid = linkid;
 
-	if (i_dladm_ioctl(fd, DLDIOC_ATTR, &dia, sizeof (dia)) < 0)
+	if (ioctl(fd, DLDIOC_ATTR, &dia) < 0)
 		return (dladm_errno2status(errno));
 
 	dap->da_max_sdu = dia.dia_max_sdu;
@@ -358,7 +358,7 @@ i_dladm_rename_link_c1(datalink_id_t linkid1, const char *link1,
 		if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
 			return (dladm_errno2status(errno));
 
-		if (i_dladm_ioctl(fd, DLDIOC_RENAME, &dir, sizeof (dir)) < 0) {
+		if (ioctl(fd, DLDIOC_RENAME, &dir) < 0) {
 			status = dladm_errno2status(errno);
 			(void) close(fd);
 			return (status);
@@ -381,8 +381,7 @@ done:
 	if (flags & DLADM_OPT_ACTIVE) {
 		if (status != DLADM_STATUS_OK) {
 			(void) strlcpy(dir.dir_link, link1, MAXLINKNAMELEN);
-			(void) i_dladm_ioctl(fd, DLDIOC_RENAME, &dir,
-			    sizeof (dir));
+			(void) ioctl(fd, DLDIOC_RENAME, &dir);
 		}
 		(void) close(fd);
 	}
@@ -483,7 +482,7 @@ i_dladm_rename_link_c2(datalink_id_t linkid1, datalink_id_t linkid2)
 
 	dir.dir_linkid1 = linkid1;
 	dir.dir_linkid2 = linkid2;
-	if (i_dladm_ioctl(fd, DLDIOC_RENAME, &dir, sizeof (dir)) < 0)
+	if (ioctl(fd, DLDIOC_RENAME, &dir) < 0)
 		status = dladm_errno2status(errno);
 
 	if (status != DLADM_STATUS_OK) {
@@ -509,7 +508,7 @@ i_dladm_rename_link_c2(datalink_id_t linkid1, datalink_id_t linkid2)
 		dir.dir_linkid1 = linkid2;
 		dir.dir_linkid2 = linkid1;
 		(void) dladm_init_linkprop(linkid1, B_FALSE);
-		(void) i_dladm_ioctl(fd, DLDIOC_RENAME, &dir, sizeof (dir));
+		(void) ioctl(fd, DLDIOC_RENAME, &dir);
 		(void) close(fd);
 		return (status);
 	}
@@ -790,8 +789,7 @@ dladm_phys_info(datalink_id_t linkid, dladm_phys_attr_t *dpap, uint32_t flags)
 			return (dladm_errno2status(errno));
 
 		dip.dip_linkid = linkid;
-		if (i_dladm_ioctl(fd, DLDIOC_PHYS_ATTR, &dip, sizeof (dip))
-		    < 0) {
+		if (ioctl(fd, DLDIOC_PHYS_ATTR, &dip) < 0) {
 			status = dladm_errno2status(errno);
 			(void) close(fd);
 			return (status);

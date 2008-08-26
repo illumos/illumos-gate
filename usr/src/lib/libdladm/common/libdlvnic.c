@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -45,8 +43,6 @@
 /*
  * VNIC administration library.
  */
-
-#define	VNIC_DEV	"/devices/pseudo/vnic@0:" VNIC_CTL_NODE_NAME
 
 /* Limits on buffer size for VNIC_IOC_INFO request */
 #define	MIN_INFO_SIZE (4*1024)
@@ -73,7 +69,6 @@ typedef struct dladm_vnic_modify_attr {
 static dladm_status_t
 i_dladm_vnic_create_sys(int fd, dladm_vnic_attr_db_t *attr)
 {
-	int rc;
 	vnic_ioc_create_t ioc;
 
 	ioc.vc_vnic_id = attr->vt_vnic_id;
@@ -82,9 +77,7 @@ i_dladm_vnic_create_sys(int fd, dladm_vnic_attr_db_t *attr)
 	ioc.vc_mac_len = attr->vt_mac_len;
 	bcopy(attr->vt_mac_addr, ioc.vc_mac_addr, attr->vt_mac_len);
 
-	rc = i_dladm_ioctl(fd, VNIC_IOC_CREATE, &ioc, sizeof (ioc));
-
-	if (rc < 0)
+	if (ioctl(fd, VNIC_IOC_CREATE, &ioc) < 0)
 		return (dladm_errno2status(errno));
 
 	return (DLADM_STATUS_OK);
@@ -97,7 +90,7 @@ static dladm_status_t
 i_dladm_vnic_modify_sys(datalink_id_t vnic_id, uint32_t modify_mask,
     dladm_vnic_modify_attr_t *attr)
 {
-	int rc;
+	dladm_status_t status = DLADM_STATUS_OK;
 	int fd;
 	vnic_ioc_modify_t ioc;
 
@@ -111,17 +104,14 @@ i_dladm_vnic_modify_sys(datalink_id_t vnic_id, uint32_t modify_mask,
 	ioc.vm_mac_len = attr->vm_mac_len;
 	bcopy(attr->vm_mac_addr, ioc.vm_mac_addr, MAXMACADDRLEN);
 
-	if ((fd = open(VNIC_DEV, O_RDWR)) < 0)
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
 		return (dladm_errno2status(errno));
 
-	rc = i_dladm_ioctl(fd, VNIC_IOC_MODIFY, &ioc, sizeof (ioc));
+	if (ioctl(fd, VNIC_IOC_MODIFY, &ioc) < 0)
+		status = dladm_errno2status(errno);
 
 	(void) close(fd);
-
-	if (rc < 0)
-		return (dladm_errno2status(errno));
-
-	return (DLADM_STATUS_OK);
+	return (status);
 }
 
 /*
@@ -133,14 +123,14 @@ dladm_vnic_info(datalink_id_t vnic_id, dladm_vnic_attr_sys_t *attrp,
 {
 	vnic_ioc_info_t *ioc;
 	vnic_ioc_info_vnic_t *vnic;
-	int rc, bufsize, fd;
+	int bufsize, fd;
 	dladm_status_t status = DLADM_STATUS_OK;
 
 	/* for now, only temporary creations are supported */
 	if (flags & DLADM_OPT_PERSIST)
 		return (dladm_errno2status(ENOTSUP));
 
-	if ((fd = open(VNIC_DEV, O_RDWR)) == -1)
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) == -1)
 		return (dladm_errno2status(errno));
 
 	bufsize = sizeof (vnic_ioc_info_t) + sizeof (vnic_ioc_info_vnic_t);
@@ -151,8 +141,8 @@ dladm_vnic_info(datalink_id_t vnic_id, dladm_vnic_attr_sys_t *attrp,
 	}
 
 	ioc->vi_vnic_id = vnic_id;
-	rc = i_dladm_ioctl(fd, VNIC_IOC_INFO, ioc, bufsize);
-	if (rc != 0) {
+	ioc->vi_size = bufsize - sizeof (vnic_ioc_info_t);
+	if (ioctl(fd, VNIC_IOC_INFO, ioc) != 0) {
 		status = dladm_errno2status(errno);
 		goto bail;
 	}
@@ -178,13 +168,10 @@ static dladm_status_t
 i_dladm_vnic_delete_sys(int fd, dladm_vnic_attr_sys_t *attr)
 {
 	vnic_ioc_delete_t ioc;
-	int rc;
 
 	ioc.vd_vnic_id = attr->va_vnic_id;
 
-	rc = i_dladm_ioctl(fd, VNIC_IOC_DELETE, &ioc, sizeof (ioc));
-
-	if (rc < 0)
+	if (ioctl(fd, VNIC_IOC_DELETE, &ioc) < 0)
 		return (dladm_errno2status(errno));
 
 	return (DLADM_STATUS_OK);
@@ -283,7 +270,7 @@ dladm_vnic_create(const char *vnic, datalink_id_t linkid,
 	attr.vt_mac_len = mac_len;
 	bcopy(mac_addr, attr.vt_mac_addr, mac_len);
 
-	if ((fd = open(VNIC_DEV, O_RDWR)) < 0) {
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0) {
 		status = dladm_errno2status(errno);
 		goto done;
 	}
@@ -342,7 +329,7 @@ dladm_vnic_delete(datalink_id_t vnic_id, uint32_t flags)
 	if (flags & DLADM_OPT_PERSIST)
 		return (dladm_errno2status(ENOTSUP));
 
-	if ((fd = open(VNIC_DEV, O_RDWR)) < 0)
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
 		return (dladm_errno2status(errno));
 
 	sys_attr.va_vnic_id = vnic_id;

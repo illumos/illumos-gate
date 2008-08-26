@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -50,8 +48,6 @@
  * This library is used by administration tools such as dladm(1M) to
  * configure link aggregations.
  */
-
-#define	DLADM_AGGR_DEV	"/devices/pseudo/aggr@0:" AGGR_DEVNAME_CTL
 
 /* Limits on buffer size for LAIOC_INFO request */
 #define	MIN_INFO_SIZE (4*1024)
@@ -140,14 +136,14 @@ static dladm_aggr_port_state_t port_states[] = {
 	(sizeof (port_states) / sizeof (dladm_aggr_port_state_t))
 
 static int
-i_dladm_aggr_strioctl(int cmd, void *ptr, int ilen)
+i_dladm_aggr_ioctl(int cmd, void *ptr)
 {
 	int err, fd;
 
-	if ((fd = open(DLADM_AGGR_DEV, O_RDWR)) < 0)
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
 		return (-1);
 
-	err = i_dladm_ioctl(fd, cmd, ptr, ilen);
+	err = ioctl(fd, cmd, ptr);
 	(void) close(fd);
 
 	return (err);
@@ -213,7 +209,7 @@ static dladm_status_t
 i_dladm_aggr_info_active(datalink_id_t linkid, dladm_aggr_grp_attr_t *attrp)
 {
 	laioc_info_t *ioc;
-	int rc, bufsize;
+	int bufsize;
 	void *where;
 	dladm_status_t status = DLADM_STATUS_OK;
 
@@ -225,8 +221,8 @@ i_dladm_aggr_info_active(datalink_id_t linkid, dladm_aggr_grp_attr_t *attrp)
 	ioc->li_group_linkid = linkid;
 
 tryagain:
-	rc = i_dladm_aggr_strioctl(LAIOC_INFO, ioc, bufsize);
-	if (rc != 0) {
+	ioc->li_bufsize = bufsize;
+	if (i_dladm_aggr_ioctl(LAIOC_INFO, ioc) != 0) {
 		if (errno == ENOSPC) {
 			/*
 			 * The LAIOC_INFO call failed due to a short
@@ -549,7 +545,7 @@ destroyconf:
 	for (i = 0; i < nports; i++)
 		ioc_ports[i].lp_linkid = ports[i].lp_linkid;
 
-	if (i_dladm_aggr_strioctl(cmd, iocp, len) < 0)
+	if (i_dladm_aggr_ioctl(cmd, iocp) < 0)
 		status = dladm_errno2status(errno);
 
 done:
@@ -602,7 +598,7 @@ i_dladm_aggr_modify_sys(datalink_id_t linkid, uint32_t mask,
 	ioc.lu_lacp_mode = attr->ld_lacp_mode;
 	ioc.lu_lacp_timer = attr->ld_lacp_timer;
 
-	if (i_dladm_aggr_strioctl(LAIOC_MODIFY, &ioc, sizeof (ioc)) < 0) {
+	if (i_dladm_aggr_ioctl(LAIOC_MODIFY, &ioc) < 0) {
 		if (errno == EINVAL)
 			return (DLADM_STATUS_MACADDRINVAL);
 		else
@@ -621,7 +617,7 @@ i_dladm_aggr_create_sys(datalink_id_t linkid, uint16_t key, uint32_t nports,
     boolean_t mac_addr_fixed, const uchar_t *mac_addr,
     aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer, boolean_t force)
 {
-	int i, rc, len;
+	int i, len;
 	laioc_create_t *iocp = NULL;
 	laioc_port_t *ioc_ports;
 	dladm_status_t status = DLADM_STATUS_OK;
@@ -651,8 +647,7 @@ i_dladm_aggr_create_sys(datalink_id_t linkid, uint16_t key, uint32_t nports,
 	bcopy(mac_addr, iocp->lc_mac, ETHERADDRL);
 	iocp->lc_mac_fixed = mac_addr_fixed;
 
-	rc = i_dladm_aggr_strioctl(LAIOC_CREATE, iocp, len);
-	if (rc < 0)
+	if (i_dladm_aggr_ioctl(LAIOC_CREATE, iocp) < 0)
 		status = dladm_errno2status(errno);
 
 done:
@@ -726,7 +721,7 @@ i_dladm_aggr_up(datalink_id_t linkid, void *arg)
 	if ((status = dladm_up_datalink_id(linkid)) != DLADM_STATUS_OK) {
 		laioc_delete_t ioc;
 		ioc.ld_linkid = linkid;
-		(void) i_dladm_aggr_strioctl(LAIOC_DELETE, &ioc, sizeof (ioc));
+		(void) i_dladm_aggr_ioctl(LAIOC_DELETE, &ioc);
 		goto done;
 	}
 
@@ -1361,8 +1356,7 @@ dladm_aggr_delete(datalink_id_t linkid, uint32_t flags)
 
 	if (flags & DLADM_OPT_ACTIVE) {
 		ioc.ld_linkid = linkid;
-		if ((i_dladm_aggr_strioctl(LAIOC_DELETE, &ioc,
-		    sizeof (ioc)) < 0) &&
+		if ((i_dladm_aggr_ioctl(LAIOC_DELETE, &ioc) < 0) &&
 		    ((errno != ENOENT) || !(flags & DLADM_OPT_PERSIST))) {
 			status = dladm_errno2status(errno);
 			return (status);

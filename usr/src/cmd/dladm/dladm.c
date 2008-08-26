@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <ctype.h>
 #include <locale.h>
@@ -851,10 +849,6 @@ main(int argc, char *argv[])
 
 	if (argc < 2)
 		usage();
-
-	if (!priv_ineffect(PRIV_SYS_NET_CONFIG) ||
-	    !priv_ineffect(PRIV_NET_RAWACCESS))
-		die("insufficient privileges");
 
 	for (i = 0; i < sizeof (cmds) / sizeof (cmds[0]); i++) {
 		cmdp = &cmds[i];

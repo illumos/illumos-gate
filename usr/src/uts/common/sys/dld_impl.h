@@ -39,6 +39,9 @@
 extern "C" {
 #endif
 
+#define	DLD_CONTROL_MINOR_NAME	"ctl"
+#define	DLD_CONTROL_MINOR	0
+
 #define	DLD_CONTROL	0x00000001
 #define	DLD_DLPI	0x00000002
 

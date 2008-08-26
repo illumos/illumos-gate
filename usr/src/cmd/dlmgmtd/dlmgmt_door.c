@@ -997,7 +997,7 @@ dlmgmt_handler(void *cookie, char *argp, size_t argsz, door_desc_t *dp,
 	dlmgmt_door_info_t	*infop = NULL;
 	dlmgmt_retval_t		retval;
 	void			*retvalp;
-	int			err;
+	int			err = 0;
 	int			i;
 
 	for (i = 0; i < DLMGMT_INFO_TABLE_SIZE; i++) {
@@ -1023,11 +1023,11 @@ dlmgmt_handler(void *cookie, char *argp, size_t argsz, door_desc_t *dp,
 		}
 
 		eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-		if (eset == NULL || !priv_ismember(eset, PRIV_SYS_NET_CONFIG)) {
-			ucred_free(cred);
+		if (eset == NULL || !priv_ismember(eset, PRIV_SYS_DL_CONFIG))
 			err = EACCES;
+		ucred_free(cred);
+		if (err != 0)
 			goto fail;
-		}
 	}
 
 	/*

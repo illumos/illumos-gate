@@ -25,8 +25,6 @@
 INSERT COMMENT
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #
 # Privileges can be added to this file at any location, not
 # necessarily at the end.  For patches, it is probably best to
@@ -373,9 +371,13 @@ privilege PRIV_SYS_MOUNT
 	only control mounts performed from within said zone.
 	Outside the global zone, the "nodevices" option is always forced.
 
+privilege PRIV_SYS_DL_CONFIG
+
+	Allows a process to configure a system's datalink interfaces.
+
 privilege PRIV_SYS_IP_CONFIG
 
-	Allows a process to configure a system's network interfaces and routes.
+	Allows a process to configure a system's IP interfaces and routes.
 	Allows a process to configure network parameters using ndd.
 	Allows a process access to otherwise restricted information using ndd.
 	Allows a process to configure IPsec.
@@ -383,7 +385,7 @@ privilege PRIV_SYS_IP_CONFIG
 
 privilege PRIV_SYS_NET_CONFIG
 
-	Allows all that PRIV_SYS_IP_CONFIG allows.
+	Allows all that PRIV_SYS_IP_CONFIG and PRIV_SYS_DL_CONFIG allow.
 	Allows a process to push the rpcmod STREAMs module.
 	Allows a process to INSERT/REMOVE STREAMs modules on locations other
 	than the top of the module stack.

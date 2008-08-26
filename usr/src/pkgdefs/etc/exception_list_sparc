@@ -73,6 +73,7 @@ usr/include/sys/aggr.h			sparc
 usr/include/sys/aggr_impl.h		sparc
 usr/include/sys/dld.h			sparc
 usr/include/sys/dld_impl.h		sparc
+usr/include/sys/dld_ioc.h		sparc
 usr/include/sys/dls.h			sparc
 usr/include/sys/dls_impl.h		sparc
 usr/include/sys/mac.h			sparc

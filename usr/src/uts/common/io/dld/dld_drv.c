@@ -31,22 +31,14 @@
 #include	<sys/mkdev.h>
 #include	<sys/modctl.h>
 #include	<sys/stat.h>
-#include	<sys/strsun.h>
 #include	<sys/vlan.h>
 #include	<sys/mac.h>
 #include	<sys/dld_impl.h>
 #include	<sys/dls_impl.h>
 #include	<sys/softmac.h>
 #include 	<sys/vlan.h>
+#include	<sys/policy.h>
 #include	<inet/common.h>
-
-/*
- * dld control node state, one per open control node session.
- */
-typedef struct dld_ctl_str_s {
-	minor_t cs_minor;
-	queue_t *cs_wq;
-} dld_ctl_str_t;
 
 static void	drv_init(void);
 static int	drv_fini(void);
@@ -64,77 +56,61 @@ static kmem_cache_t	*drv_secobj_cachep;
 static mod_hash_t	*drv_secobj_hash;
 static void		drv_secobj_init(void);
 static void		drv_secobj_fini(void);
-static void		drv_ioc_secobj_set(dld_ctl_str_t *, mblk_t *);
-static void		drv_ioc_secobj_get(dld_ctl_str_t *, mblk_t *);
-static void		drv_ioc_secobj_unset(dld_ctl_str_t *, mblk_t *);
 static int		drv_ioc_setap(datalink_id_t, struct dlautopush *);
 static int		drv_ioc_getap(datalink_id_t, struct dlautopush *);
 static int		drv_ioc_clrap(datalink_id_t);
+
 
 /*
  * The following entry points are private to dld and are used for control
  * operations only. The entry points exported to mac drivers are defined
  * in dld_str.c. Refer to the comment on top of dld_str.c for details.
  */
-static int	drv_open(queue_t *, dev_t *, int, int, cred_t *);
-static int	drv_close(queue_t *);
+static int	drv_open(dev_t *, int, int, cred_t *);
+static int	drv_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 
-static void	drv_uw_put(queue_t *, mblk_t *);
-static void	drv_uw_srv(queue_t *);
-
-dev_info_t	*dld_dip;		/* dev_info_t for the driver */
-uint32_t	dld_opt = 0;		/* Global options */
-static vmem_t	*dld_ctl_vmem;		/* for control minor numbers */
+static dev_info_t	*dld_dip;	/* dev_info_t for the driver */
+uint32_t		dld_opt = 0;	/* Global options */
 
 #define	NAUTOPUSH 32
 static mod_hash_t *dld_ap_hashp;
 static krwlock_t dld_ap_hash_lock;
 
-static	struct	module_info	drv_info = {
-	0,			/* mi_idnum */
-	DLD_DRIVER_NAME,	/* mi_idname */
-	0,			/* mi_minpsz */
-	(64 * 1024),		/* mi_maxpsz */
-	1,			/* mi_hiwat */
-	0			/* mi_lowat */
+static struct cb_ops drv_cb_ops = {
+	drv_open,		/* open */
+	nulldev,		/* close */
+	nulldev,		/* strategy */
+	nulldev,		/* print */
+	nodev,			/* dump */
+	nodev,			/* read */
+	nodev,			/* write */
+	drv_ioctl,		/* ioctl */
+	nodev,			/* devmap */
+	nodev,			/* mmap */
+	nodev,			/* segmap */
+	nochpoll,		/* poll */
+	ddi_prop_op,		/* cb_prop_op */
+	0,			/* streamtab  */
+	D_MP			/* Driver compatibility flag */
 };
 
-static	struct qinit		drv_ur_init = {
-	NULL,			/* qi_putp */
-	NULL,			/* qi_srvp */
-	drv_open,		/* qi_qopen */
-	drv_close,		/* qi_qclose */
-	NULL,			/* qi_qadmin */
-	&drv_info,		/* qi_minfo */
-	NULL			/* qi_mstat */
+static struct dev_ops drv_ops = {
+	DEVO_REV,		/* devo_rev */
+	0,			/* refcnt */
+	drv_getinfo,		/* get_dev_info */
+	nulldev,		/* identify */
+	nulldev,		/* probe */
+	drv_attach,		/* attach */
+	drv_detach,		/* detach */
+	nodev,			/* reset */
+	&drv_cb_ops,		/* driver operations */
+	NULL,			/* bus operations */
+	nodev			/* dev power */
 };
-
-static	struct qinit		drv_uw_init = {
-	(pfi_t)drv_uw_put,	/* qi_putp */
-	(pfi_t)drv_uw_srv,	/* qi_srvp */
-	NULL,			/* qi_qopen */
-	NULL,			/* qi_qclose */
-	NULL,			/* qi_qadmin */
-	&drv_info,		/* qi_minfo */
-	NULL			/* qi_mstat */
-};
-
-static	struct streamtab	drv_stream = {
-	&drv_ur_init,		/* st_rdinit */
-	&drv_uw_init,		/* st_wrinit */
-	NULL,			/* st_muxrinit */
-	NULL			/* st_muxwinit */
-};
-
-DDI_DEFINE_STREAM_OPS(drv_ops, nulldev, nulldev, drv_attach, drv_detach,
-    nodev, drv_getinfo, D_MP, &drv_stream);
 
 /*
  * Module linkage information for the kernel.
  */
-
-extern	struct mod_ops		mod_driverops;
-
 static	struct modldrv		drv_modldrv = {
 	&mod_driverops,
 	DLD_INFO,
@@ -150,30 +126,13 @@ static	struct modlinkage	drv_modlinkage = {
 int
 _init(void)
 {
-	int	err;
-
-	drv_init();
-
-	if ((err = mod_install(&drv_modlinkage)) != 0)
-		return (err);
-
-	return (0);
+	return (mod_install(&drv_modlinkage));
 }
 
 int
 _fini(void)
 {
-	int	err;
-
-	if ((err = mod_remove(&drv_modlinkage)) != 0)
-		return (err);
-
-	if (drv_fini() != 0) {
-		(void) mod_install(&drv_modlinkage);
-		return (DDI_FAILURE);
-	}
-
-	return (err);
+	return (mod_remove(&drv_modlinkage));
 }
 
 int
@@ -188,8 +147,6 @@ _info(struct modinfo *modinfop)
 static void
 drv_init(void)
 {
-	dld_ctl_vmem = vmem_create("dld_ctl", (void *)1, MAXMIN, 1,
-	    NULL, NULL, NULL, 1, VM_SLEEP | VMC_IDENTIFIER);
 	drv_secobj_init();
 	dld_str_init();
 	/*
@@ -229,7 +186,6 @@ drv_fini(void)
 		return (err);
 
 	drv_secobj_fini();
-	vmem_destroy(dld_ctl_vmem);
 	mod_hash_destroy_idhash(dld_ap_hashp);
 	rw_destroy(&dld_ap_hash_lock);
 	return (0);
@@ -247,10 +203,10 @@ drv_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resp)
 
 	switch (cmd) {
 	case DDI_INFO_DEVT2INSTANCE:
-		*resp = (void *)0;
+		*resp = 0;
 		break;
 	case DDI_INFO_DEVT2DEVINFO:
-		*resp = (void *)dld_dip;
+		*resp = dld_dip;
 		break;
 	default:
 		return (DDI_FAILURE);
@@ -296,7 +252,7 @@ drv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	ASSERT(ddi_get_instance(dip) == 0);
-
+	drv_init();
 	drv_set_opt(dip);
 
 	/*
@@ -325,6 +281,8 @@ drv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	ASSERT(dld_dip == dip);
+	if (drv_fini() != 0)
+		return (DDI_FAILURE);
 
 	/*
 	 * Remove the control node.
@@ -340,137 +298,63 @@ drv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
  */
 /*ARGSUSED*/
 static int
-drv_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
+drv_open(dev_t *devp, int flag, int sflag, cred_t *credp)
 {
-	dld_ctl_str_t	*ctls;
-	minor_t		minor;
-	queue_t *oq =	OTHERQ(rq);
-
-	if (sflag == MODOPEN)
-		return (ENOTSUP);
-
 	/*
-	 * This is a cloning driver and therefore each queue should only
-	 * ever get opened once.
+	 * Only the control node can be opened.
 	 */
-	if (rq->q_ptr != NULL)
-		return (EBUSY);
-
-	minor = (minor_t)(uintptr_t)vmem_alloc(dld_ctl_vmem, 1, VM_NOSLEEP);
-	if (minor == 0)
-		return (ENOMEM);
-
-	ctls = kmem_zalloc(sizeof (dld_ctl_str_t), KM_NOSLEEP);
-	if (ctls == NULL) {
-		vmem_free(dld_ctl_vmem, (void *)(uintptr_t)minor, 1);
-		return (ENOMEM);
-	}
-
-	ctls->cs_minor = minor;
-	ctls->cs_wq = WR(rq);
-
-	rq->q_ptr = ctls;
-	oq->q_ptr = ctls;
-
-	/*
-	 * Enable the queue srv(9e) routine.
-	 */
-	qprocson(rq);
-
-	/*
-	 * Construct a cloned dev_t to hand back.
-	 */
-	*devp = makedevice(getmajor(*devp), ctls->cs_minor);
-	return (0);
-}
-
-/*
- * dld control node close procedure.
- */
-static int
-drv_close(queue_t *rq)
-{
-	dld_ctl_str_t	*ctls;
-
-	ctls = rq->q_ptr;
-	ASSERT(ctls != NULL);
-
-	/*
-	 * Disable the queue srv(9e) routine.
-	 */
-	qprocsoff(rq);
-
-	vmem_free(dld_ctl_vmem, (void *)(uintptr_t)ctls->cs_minor, 1);
-
-	kmem_free(ctls, sizeof (dld_ctl_str_t));
-
+	if (getminor(*devp) != DLD_CONTROL_MINOR)
+		return (ENODEV);
 	return (0);
 }
 
 /*
  * DLDIOC_ATTR
  */
-static void
-drv_ioc_attr(dld_ctl_str_t *ctls, mblk_t *mp)
+/* ARGSUSED */
+static int
+drv_ioc_attr(void *karg, intptr_t arg, int mode, cred_t *cred)
 {
-	dld_ioc_attr_t		*diap;
+	dld_ioc_attr_t		*diap = karg;
 	dls_dl_handle_t		dlh;
 	dls_vlan_t		*dvp;
 	int			err;
-	queue_t			*q = ctls->cs_wq;
-
-	if ((err = miocpullup(mp, sizeof (dld_ioc_attr_t))) != 0)
-		goto failed;
-
-	diap = (dld_ioc_attr_t *)mp->b_cont->b_rptr;
 
 	if ((err = dls_devnet_hold_tmp(diap->dia_linkid, &dlh)) != 0)
-		goto failed;
+		return (err);
 
 	if ((err = dls_vlan_hold(dls_devnet_mac(dlh),
 	    dls_devnet_vid(dlh), &dvp, B_FALSE, B_FALSE)) != 0) {
 		dls_devnet_rele_tmp(dlh);
-		goto failed;
+		return (err);
 	}
 	mac_sdu_get(dvp->dv_dlp->dl_mh, NULL, &diap->dia_max_sdu);
 
 	dls_vlan_rele(dvp);
 	dls_devnet_rele_tmp(dlh);
 
-	miocack(q, mp, sizeof (dld_ioc_attr_t), 0);
-	return;
-
-failed:
-	ASSERT(err != 0);
-	miocnak(q, mp, 0, err);
+	return (0);
 }
 
 /*
  * DLDIOC_PHYS_ATTR
  */
-static void
-drv_ioc_phys_attr(dld_ctl_str_t *ctls, mblk_t *mp)
+/* ARGSUSED */
+static int
+drv_ioc_phys_attr(void *karg, intptr_t arg, int mode, cred_t *cred)
 {
-	dld_ioc_phys_attr_t	*dipp;
+	dld_ioc_phys_attr_t	*dipp = karg;
 	int			err;
 	dls_dl_handle_t		dlh;
 	dls_dev_handle_t	ddh;
 	dev_t			phydev;
-	queue_t			*q = ctls->cs_wq;
-
-	if ((err = miocpullup(mp, sizeof (dld_ioc_phys_attr_t))) != 0)
-		goto failed;
-
-	dipp = (dld_ioc_phys_attr_t *)mp->b_cont->b_rptr;
 
 	/*
 	 * Every physical link should have its physical dev_t kept in the
 	 * daemon. If not, it is not a valid physical link.
 	 */
-	if (dls_mgmt_get_phydev(dipp->dip_linkid, &phydev) != 0) {
-		err = EINVAL;
-		goto failed;
-	}
+	if (dls_mgmt_get_phydev(dipp->dip_linkid, &phydev) != 0)
+		return (EINVAL);
 
 	/*
 	 * Although this is a valid physical link, it might already be removed
@@ -478,7 +362,7 @@ drv_ioc_phys_attr(dld_ctl_str_t *ctls, mblk_t *mp)
 	 * ENOENT in this case.
 	 */
 	if ((err = softmac_hold_device(phydev, &ddh)) != 0)
-		goto failed;
+		return (err);
 
 	if (dls_devnet_hold_tmp(dipp->dip_linkid, &dlh) != 0) {
 		/*
@@ -499,24 +383,20 @@ drv_ioc_phys_attr(dld_ctl_str_t *ctls, mblk_t *mp)
 	    ddi_major_to_name(getmajor(phydev)), getminor(phydev) - 1);
 
 	softmac_rele_device(ddh);
-
-	miocack(q, mp, sizeof (dld_ioc_phys_attr_t), 0);
-	return;
-
-failed:
-	miocnak(q, mp, 0, err);
+	return (0);
 }
 
 /*
  * DLDIOC_SETPROP
  */
-static void
-drv_ioc_prop_common(dld_ctl_str_t *ctls, mblk_t *mp, boolean_t set)
+static int
+drv_ioc_prop_common(dld_ioc_macprop_t *dipp, intptr_t arg, boolean_t set,
+    int mode)
 {
-	int		err = EINVAL, dsize;
-	queue_t		*q = ctls->cs_wq;
-	dld_ioc_macprop_t	*dipp;
-	dls_dl_handle_t 	dlh;
+	int		err = EINVAL;
+	size_t		dsize;
+	dld_ioc_macprop_t	*kdipp;
+	dls_dl_handle_t		dlh;
 	dls_vlan_t		*dvp;
 	datalink_id_t 		linkid;
 	mac_prop_t		macprop;
@@ -524,32 +404,45 @@ drv_ioc_prop_common(dld_ctl_str_t *ctls, mblk_t *mp, boolean_t set)
 	struct dlautopush	*dlap;
 	dld_ioc_zid_t		*dzp;
 
-	if ((err = miocpullup(mp, sizeof (dld_ioc_macprop_t) - 1)) != 0)
-		goto done;
-	dipp = (dld_ioc_macprop_t *)mp->b_cont->b_rptr;
-
+	/*
+	 * We only use pr_valsize from dipp, as the caller only did a
+	 * copyin() for sizeof (dld_ioc_prop_t), which doesn't cover
+	 * the property data.  We copyin the full dld_ioc_prop_t
+	 * including the data into kdipp down below.
+	 */
 	dsize = sizeof (dld_ioc_macprop_t) + dipp->pr_valsize - 1;
-	if ((err = miocpullup(mp, dsize)) != 0)
-		goto done;
-	dipp = (dld_ioc_macprop_t *)mp->b_cont->b_rptr;
+	if (dsize < dipp->pr_valsize)
+		return (EINVAL);
 
-	linkid = dipp->pr_linkid;
+	/*
+	 * The property data is variable size, so we need to allocate
+	 * a buffer for kernel use as this data was not part of the
+	 * dipp allocation and copyin() done by the framework.
+	 */
+	if ((kdipp = kmem_alloc(dsize, KM_NOSLEEP)) == NULL)
+		return (ENOMEM);
+	if (ddi_copyin((void *)arg, kdipp, dsize, mode) != 0) {
+		err = EFAULT;
+		goto done;
+	}
+
+	linkid = kdipp->pr_linkid;
 
 	switch (dipp->pr_num) {
 	case MAC_PROP_ZONE:
 		if (set) {
-			dzp = (dld_ioc_zid_t *)dipp->pr_val;
+			dzp = (dld_ioc_zid_t *)kdipp->pr_val;
 			err = dls_devnet_setzid(dzp->diz_link, dzp->diz_zid);
 			goto done;
 		} else {
-			cp = (uchar_t *)dipp->pr_val;
+			cp = (uchar_t *)kdipp->pr_val;
 			err = dls_devnet_getzid(linkid, (zoneid_t *)cp);
 			goto done;
 		}
 	case MAC_PROP_AUTOPUSH:
 		if (set) {
 			if (dipp->pr_valsize != 0) {
-				dlap = (struct dlautopush *)dipp->pr_val;
+				dlap = (struct dlautopush *)kdipp->pr_val;
 				err = drv_ioc_setap(linkid, dlap);
 				goto done;
 			} else {
@@ -557,7 +450,7 @@ drv_ioc_prop_common(dld_ctl_str_t *ctls, mblk_t *mp, boolean_t set)
 				goto done;
 			}
 		} else {
-			dlap = (struct dlautopush *)dipp->pr_val;
+			dlap = (struct dlautopush *)kdipp->pr_val;
 			err = drv_ioc_getap(linkid, dlap);
 			goto done;
 		}
@@ -575,124 +468,95 @@ drv_ioc_prop_common(dld_ctl_str_t *ctls, mblk_t *mp, boolean_t set)
 		goto done;
 	}
 
-	macprop.mp_name = dipp->pr_name;
-	macprop.mp_id = dipp->pr_num;
-	macprop.mp_flags = dipp->pr_flags;
+	macprop.mp_name = kdipp->pr_name;
+	macprop.mp_id = kdipp->pr_num;
+	macprop.mp_flags = kdipp->pr_flags;
 
-	if (set)
+	if (set) {
 		err = mac_set_prop(dvp->dv_dlp->dl_mh, &macprop,
-		    dipp->pr_val, dipp->pr_valsize);
-	else
+		    kdipp->pr_val, kdipp->pr_valsize);
+	} else {
 		err = mac_get_prop(dvp->dv_dlp->dl_mh, &macprop,
-		    dipp->pr_val, dipp->pr_valsize);
+		    kdipp->pr_val, kdipp->pr_valsize);
+	}
 
 	dls_vlan_rele(dvp);
 	dls_devnet_rele_tmp(dlh);
 done:
-	if (err == 0)
-		miocack(q, mp, dsize, 0);
-	else
-		miocnak(q, mp, 0, err);
+	if (!set && err == 0 &&
+	    ddi_copyout(kdipp, (void *)arg, dsize, mode) != 0)
+		err = EFAULT;
+	kmem_free(kdipp, dsize);
+	return (err);
 }
 
-static void
-drv_ioc_setprop(dld_ctl_str_t *ctls, mblk_t *mp)
+/* ARGSUSED */
+static int
+drv_ioc_setprop(void *karg, intptr_t arg, int mode, cred_t *cred)
 {
-	drv_ioc_prop_common(ctls, mp, B_TRUE);
+	return (drv_ioc_prop_common(karg, arg, B_TRUE, mode));
 }
 
-static void
-drv_ioc_getprop(dld_ctl_str_t *ctls, mblk_t *mp)
+/* ARGSUSED */
+static int
+drv_ioc_getprop(void *karg, intptr_t arg, int mode, cred_t *cred)
 {
-	drv_ioc_prop_common(ctls, mp, B_FALSE);
+	return (drv_ioc_prop_common(karg, arg, B_FALSE, mode));
 }
 
 /*
  * DLDIOC_CREATE_VLAN
  */
-static void
-drv_ioc_create_vlan(dld_ctl_str_t *ctls, mblk_t *mp)
+/* ARGSUSED */
+static int
+drv_ioc_create_vlan(void *karg, intptr_t arg, int mode, cred_t *cred)
 {
-	dld_ioc_create_vlan_t	*dicp;
-	int			err;
-	queue_t			*q = ctls->cs_wq;
+	dld_ioc_create_vlan_t	*dicp = karg;
 
-	if ((err = miocpullup(mp, sizeof (dld_ioc_create_vlan_t))) != 0)
-		goto failed;
-
-	dicp = (dld_ioc_create_vlan_t *)mp->b_cont->b_rptr;
-
-	if ((err = dls_devnet_create_vlan(dicp->dic_vlanid,
-	    dicp->dic_linkid, dicp->dic_vid, dicp->dic_force)) != 0) {
-		goto failed;
-	}
-
-	miocack(q, mp, 0, 0);
-	return;
-
-failed:
-	miocnak(q, mp, 0, err);
+	return (dls_devnet_create_vlan(dicp->dic_vlanid, dicp->dic_linkid,
+	    dicp->dic_vid, dicp->dic_force));
 }
 
 /*
  * DLDIOC_DELETE_VLAN
  */
-static void
-drv_ioc_delete_vlan(dld_ctl_str_t *ctls, mblk_t *mp)
+/* ARGSUSED */
+static int
+drv_ioc_delete_vlan(void *karg, intptr_t arg, int mode, cred_t *cred)
 {
-	dld_ioc_delete_vlan_t	*didp;
-	int			err;
-	queue_t			*q = ctls->cs_wq;
+	dld_ioc_delete_vlan_t	*didp = karg;
 
-	if ((err = miocpullup(mp, sizeof (dld_ioc_delete_vlan_t))) != 0)
-		goto done;
-
-	didp = (dld_ioc_delete_vlan_t *)mp->b_cont->b_rptr;
-	err = dls_devnet_destroy_vlan(didp->did_linkid);
-
-done:
-	if (err == 0)
-		miocack(q, mp, 0, 0);
-	else
-		miocnak(q, mp, 0, err);
+	return (dls_devnet_destroy_vlan(didp->did_linkid));
 }
 
 /*
  * DLDIOC_VLAN_ATTR
  */
-static void
-drv_ioc_vlan_attr(dld_ctl_str_t *ctls, mblk_t *mp)
+/* ARGSUSED */
+static int
+drv_ioc_vlan_attr(void *karg, intptr_t arg, int mode, cred_t *cred)
 {
-	dld_ioc_vlan_attr_t	*divp;
+	dld_ioc_vlan_attr_t	*divp = karg;
 	dls_dl_handle_t		dlh;
 	uint16_t		vid;
 	dls_vlan_t		*dvp;
 	int			err;
-	queue_t			*q = ctls->cs_wq;
-
-	if ((err = miocpullup(mp, sizeof (dld_ioc_vlan_attr_t))) != 0)
-		goto failed;
-
-	divp = (dld_ioc_vlan_attr_t *)mp->b_cont->b_rptr;
 
 	/*
 	 * Hold this link to prevent it from being deleted.
 	 */
-	err = dls_devnet_hold_tmp(divp->div_vlanid, &dlh);
-	if (err != 0)
-		goto failed;
+	if ((err = dls_devnet_hold_tmp(divp->div_vlanid, &dlh)) != 0)
+		return (err);
 
 	if ((vid = dls_devnet_vid(dlh)) == VLAN_ID_NONE) {
 		dls_devnet_rele_tmp(dlh);
-		err = EINVAL;
-		goto failed;
+		return (EINVAL);
 	}
 
 	err = dls_vlan_hold(dls_devnet_mac(dlh), vid, &dvp, B_FALSE, B_FALSE);
 	if (err != 0) {
 		dls_devnet_rele_tmp(dlh);
-		err = EINVAL;
-		goto failed;
+		return (err);
 	}
 
 	divp->div_linkid = dls_devnet_linkid(dlh);
@@ -702,11 +566,7 @@ drv_ioc_vlan_attr(dld_ctl_str_t *ctls, mblk_t *mp)
 
 	dls_vlan_rele(dvp);
 	dls_devnet_rele_tmp(dlh);
-	miocack(q, mp, sizeof (dld_ioc_vlan_attr_t), 0);
-	return;
-
-failed:
-	miocnak(q, mp, 0, err);
+	return (0);
 }
 
 /*
@@ -715,26 +575,21 @@ failed:
  * This function handles two cases of link renaming. See more in comments above
  * dls_datalink_rename().
  */
-static void
-drv_ioc_rename(dld_ctl_str_t *ctls, mblk_t *mp)
+/* ARGSUSED */
+static int
+drv_ioc_rename(void *karg, intptr_t arg, int mode, cred_t *cred)
 {
-	dld_ioc_rename_t	*dir;
+	dld_ioc_rename_t	*dir = karg;
 	mod_hash_key_t		key;
 	mod_hash_val_t		val;
 	int			err;
-	queue_t			*q = ctls->cs_wq;
 
-	if ((err = miocpullup(mp, sizeof (dld_ioc_rename_t))) != 0)
-		goto done;
-
-	dir = (dld_ioc_rename_t *)mp->b_cont->b_rptr;
 	if ((err = dls_devnet_rename(dir->dir_linkid1, dir->dir_linkid2,
-	    dir->dir_link)) != 0) {
-		goto done;
-	}
+	    dir->dir_link)) != 0)
+		return (err);
 
 	if (dir->dir_linkid2 == DATALINK_INVALID_LINKID)
-		goto done;
+		return (0);
 
 	/*
 	 * if dir_linkid2 is not DATALINK_INVALID_LINKID, it means this
@@ -750,41 +605,33 @@ drv_ioc_rename(dld_ctl_str_t *ctls, mblk_t *mp)
 	rw_enter(&dld_ap_hash_lock, RW_WRITER);
 	if (mod_hash_find(dld_ap_hashp, key, &val) != 0) {
 		rw_exit(&dld_ap_hash_lock);
-		goto done;
+		return (0);
 	}
 
 	VERIFY(mod_hash_remove(dld_ap_hashp, key, &val) == 0);
 	kmem_free(val, sizeof (dld_ap_t));
 	rw_exit(&dld_ap_hash_lock);
-
-done:
-	if (err == 0)
-		miocack(q, mp, 0, 0);
-	else
-		miocnak(q, mp, 0, err);
+	return (0);
 }
 
 static int
 drv_ioc_setap(datalink_id_t linkid, struct dlautopush *dlap)
 {
 	dld_ap_t	*dap;
-	int		i, err;
+	int		i;
 	mod_hash_key_t	key;
 
-	if (dlap->dap_npush == 0 || dlap->dap_npush > MAXAPUSH) {
-		err = EINVAL;
-		goto failed;
-	}
+	if (dlap->dap_npush == 0 || dlap->dap_npush > MAXAPUSH)
+		return (EINVAL);
 
 	/*
 	 * Validate that the specified list of modules exist.
 	 */
 	for (i = 0; i < dlap->dap_npush; i++) {
-		if (fmodsw_find(dlap->dap_aplist[i], FMODSW_LOAD) == NULL) {
-			err = EINVAL;
-			goto failed;
-		}
+		if (fmodsw_find(dlap->dap_aplist[i], FMODSW_LOAD) == NULL)
+			return (EINVAL);
 	}
+
 
 	key = (mod_hash_key_t)(uintptr_t)linkid;
 
@@ -793,13 +640,12 @@ drv_ioc_setap(datalink_id_t linkid, struct dlautopush *dlap)
 		dap = kmem_zalloc(sizeof (dld_ap_t), KM_NOSLEEP);
 		if (dap == NULL) {
 			rw_exit(&dld_ap_hash_lock);
-			err = ENOMEM;
-			goto failed;
+			return (ENOMEM);
 		}
 
 		dap->da_linkid = linkid;
-		err = mod_hash_insert(dld_ap_hashp, key, (mod_hash_val_t)dap);
-		ASSERT(err == 0);
+		VERIFY(mod_hash_insert(dld_ap_hashp, key,
+		    (mod_hash_val_t)dap) == 0);
 	}
 
 	/*
@@ -814,24 +660,20 @@ drv_ioc_setap(datalink_id_t linkid, struct dlautopush *dlap)
 	rw_exit(&dld_ap_hash_lock);
 
 	return (0);
-
-failed:
-	return (err);
 }
 
 static int
 drv_ioc_getap(datalink_id_t linkid, struct dlautopush *dlap)
 {
 	dld_ap_t	*dap;
-	int		i, err;
+	int		i;
 
 	rw_enter(&dld_ap_hash_lock, RW_READER);
 	if (mod_hash_find(dld_ap_hashp,
 	    (mod_hash_key_t)(uintptr_t)linkid,
 	    (mod_hash_val_t *)&dap) != 0) {
-		err = ENOENT;
 		rw_exit(&dld_ap_hash_lock);
-		goto failed;
+		return (ENOENT);
 	}
 
 	/*
@@ -846,9 +688,6 @@ drv_ioc_getap(datalink_id_t linkid, struct dlautopush *dlap)
 	rw_exit(&dld_ap_hash_lock);
 
 	return (0);
-
-failed:
-	return (err);
 }
 
 static int
@@ -874,106 +713,13 @@ drv_ioc_clrap(datalink_id_t linkid)
 /*
  * DLDIOC_DOORSERVER
  */
-static void
-drv_ioc_doorserver(dld_ctl_str_t *ctls, mblk_t *mp)
+/* ARGSUSED */
+static int
+drv_ioc_doorserver(void *karg, intptr_t arg, int mode, cred_t *cred)
 {
-	queue_t		*q = ctls->cs_wq;
-	dld_ioc_door_t	*did;
-	int		err;
+	dld_ioc_door_t	*did = karg;
 
-	if ((err = miocpullup(mp, sizeof (dld_ioc_door_t))) != 0)
-		goto done;
-
-	did = (dld_ioc_door_t *)mp->b_cont->b_rptr;
-	err = dls_mgmt_door_set(did->did_start_door);
-
-done:
-	if (err == 0)
-		miocack(q, mp, 0, 0);
-	else
-		miocnak(q, mp, 0, err);
-}
-
-/*
- * Process an IOCTL message received by the control node.
- */
-static void
-drv_ioc(dld_ctl_str_t *ctls, mblk_t *mp)
-{
-	uint_t	cmd;
-
-	cmd = ((struct iocblk *)mp->b_rptr)->ioc_cmd;
-	switch (cmd) {
-	case DLDIOC_ATTR:
-		drv_ioc_attr(ctls, mp);
-		return;
-	case DLDIOC_PHYS_ATTR:
-		drv_ioc_phys_attr(ctls, mp);
-		return;
-	case DLDIOC_SECOBJ_SET:
-		drv_ioc_secobj_set(ctls, mp);
-		return;
-	case DLDIOC_SECOBJ_GET:
-		drv_ioc_secobj_get(ctls, mp);
-		return;
-	case DLDIOC_SECOBJ_UNSET:
-		drv_ioc_secobj_unset(ctls, mp);
-		return;
-	case DLDIOC_SETMACPROP:
-		drv_ioc_setprop(ctls, mp);
-		return;
-	case DLDIOC_GETMACPROP:
-		drv_ioc_getprop(ctls, mp);
-		return;
-	case DLDIOC_CREATE_VLAN:
-		drv_ioc_create_vlan(ctls, mp);
-		return;
-	case DLDIOC_DELETE_VLAN:
-		drv_ioc_delete_vlan(ctls, mp);
-		return;
-	case DLDIOC_VLAN_ATTR:
-		drv_ioc_vlan_attr(ctls, mp);
-		return;
-	case DLDIOC_DOORSERVER:
-		drv_ioc_doorserver(ctls, mp);
-		return;
-	case DLDIOC_RENAME:
-		drv_ioc_rename(ctls, mp);
-		return;
-	default:
-		miocnak(ctls->cs_wq, mp, 0, ENOTSUP);
-		return;
-	}
-}
-
-/*
- * Write side put routine of the dld control node.
- */
-static void
-drv_uw_put(queue_t *q, mblk_t *mp)
-{
-	dld_ctl_str_t *ctls = q->q_ptr;
-
-	switch (mp->b_datap->db_type) {
-	case M_IOCTL:
-		drv_ioc(ctls, mp);
-		break;
-	default:
-		freemsg(mp);
-		break;
-	}
-}
-
-/*
- * Write-side service procedure.
- */
-void
-drv_uw_srv(queue_t *q)
-{
-	mblk_t *mp;
-
-	while (mp = getq(q))
-		drv_uw_put(q, mp);
+	return (dls_mgmt_door_set(did->did_start_door));
 }
 
 /*
@@ -1057,68 +803,57 @@ drv_secobj_fini(void)
 	rw_destroy(&drv_secobj_lock);
 }
 
-static void
-drv_ioc_secobj_set(dld_ctl_str_t *ctls, mblk_t *mp)
+/* ARGSUSED */
+static int
+drv_ioc_secobj_set(void *karg, intptr_t arg, int mode, cred_t *cred)
 {
-	dld_ioc_secobj_set_t	*ssp;
+	dld_ioc_secobj_set_t	*ssp = karg;
 	dld_secobj_t		*sobjp, *objp;
-	int			err = EINVAL;
-	queue_t			*q = ctls->cs_wq;
+	int			err;
 
-	if ((err = miocpullup(mp, sizeof (dld_ioc_secobj_set_t))) != 0)
-		goto failed;
-
-	ssp = (dld_ioc_secobj_set_t *)mp->b_cont->b_rptr;
 	sobjp = &ssp->ss_obj;
 
 	if (sobjp->so_class != DLD_SECOBJ_CLASS_WEP &&
 	    sobjp->so_class != DLD_SECOBJ_CLASS_WPA)
-		goto failed;
+		return (EINVAL);
 
 	if (sobjp->so_name[DLD_SECOBJ_NAME_MAX - 1] != '\0' ||
 	    sobjp->so_len > DLD_SECOBJ_VAL_MAX)
-		goto failed;
+		return (EINVAL);
 
 	rw_enter(&drv_secobj_lock, RW_WRITER);
 	err = mod_hash_find(drv_secobj_hash, (mod_hash_key_t)sobjp->so_name,
 	    (mod_hash_val_t *)&objp);
 	if (err == 0) {
 		if ((ssp->ss_flags & DLD_SECOBJ_OPT_CREATE) != 0) {
-			err = EEXIST;
 			rw_exit(&drv_secobj_lock);
-			goto failed;
+			return (EEXIST);
 		}
 	} else {
 		ASSERT(err == MH_ERR_NOTFOUND);
 		if ((ssp->ss_flags & DLD_SECOBJ_OPT_CREATE) == 0) {
-			err = ENOENT;
 			rw_exit(&drv_secobj_lock);
-			goto failed;
+			return (ENOENT);
 		}
 		objp = kmem_cache_alloc(drv_secobj_cachep, KM_SLEEP);
 		(void) strlcpy(objp->so_name, sobjp->so_name,
 		    DLD_SECOBJ_NAME_MAX);
 
-		err = mod_hash_insert(drv_secobj_hash,
-		    (mod_hash_key_t)objp->so_name, (mod_hash_val_t)objp);
-		ASSERT(err == 0);
+		VERIFY(mod_hash_insert(drv_secobj_hash,
+		    (mod_hash_key_t)objp->so_name, (mod_hash_val_t)objp) == 0);
 	}
 	bcopy(sobjp->so_val, objp->so_val, sobjp->so_len);
 	objp->so_len = sobjp->so_len;
 	objp->so_class = sobjp->so_class;
 	rw_exit(&drv_secobj_lock);
-	miocack(q, mp, 0, 0);
-	return;
-
-failed:
-	ASSERT(err != 0);
-	miocnak(q, mp, 0, err);
+	return (0);
 }
 
 typedef struct dld_secobj_state {
 	uint_t		ss_free;
 	uint_t		ss_count;
 	int		ss_rc;
+	int		ss_mode;
 	dld_secobj_t	*ss_objp;
 } dld_secobj_state_t;
 
@@ -1133,36 +868,29 @@ drv_secobj_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 		statep->ss_rc = ENOSPC;
 		return (MH_WALK_TERMINATE);
 	}
-	bcopy(sobjp, statep->ss_objp, sizeof (dld_secobj_t));
+	if (ddi_copyout(sobjp, statep->ss_objp, sizeof (*sobjp),
+	    statep->ss_mode) != 0) {
+		statep->ss_rc = EFAULT;
+		return (MH_WALK_TERMINATE);
+	}
 	statep->ss_objp++;
 	statep->ss_free -= sizeof (dld_secobj_t);
 	statep->ss_count++;
 	return (MH_WALK_CONTINUE);
 }
 
-static void
-drv_ioc_secobj_get(dld_ctl_str_t *ctls, mblk_t *mp)
+/* ARGSUSED */
+static int
+drv_ioc_secobj_get(void *karg, intptr_t arg, int mode, cred_t *cred)
 {
-	dld_ioc_secobj_get_t	*sgp;
+	dld_ioc_secobj_get_t	*sgp = karg;
 	dld_secobj_t		*sobjp, *objp;
-	int			err = EINVAL;
-	uint_t			extra = 0;
-	queue_t			*q = ctls->cs_wq;
-	mblk_t			*bp;
+	int			err;
 
-	if ((err = miocpullup(mp, sizeof (dld_ioc_secobj_get_t))) != 0)
-		goto failed;
-
-	if ((bp = msgpullup(mp->b_cont, -1)) == NULL)
-		goto failed;
-
-	freemsg(mp->b_cont);
-	mp->b_cont = bp;
-	sgp = (dld_ioc_secobj_get_t *)bp->b_rptr;
 	sobjp = &sgp->sg_obj;
 
 	if (sobjp->so_name[DLD_SECOBJ_NAME_MAX - 1] != '\0')
-		goto failed;
+		return (EINVAL);
 
 	rw_enter(&drv_secobj_lock, RW_READER);
 	if (sobjp->so_name[0] != '\0') {
@@ -1170,9 +898,8 @@ drv_ioc_secobj_get(dld_ctl_str_t *ctls, mblk_t *mp)
 		    (mod_hash_key_t)sobjp->so_name, (mod_hash_val_t *)&objp);
 		if (err != 0) {
 			ASSERT(err == MH_ERR_NOTFOUND);
-			err = ENOENT;
 			rw_exit(&drv_secobj_lock);
-			goto failed;
+			return (ENOENT);
 		}
 		bcopy(objp->so_val, sobjp->so_val, objp->so_len);
 		sobjp->so_len = objp->so_len;
@@ -1181,65 +908,212 @@ drv_ioc_secobj_get(dld_ctl_str_t *ctls, mblk_t *mp)
 	} else {
 		dld_secobj_state_t	state;
 
-		state.ss_free = MBLKL(bp) - sizeof (dld_ioc_secobj_get_t);
+		state.ss_free = sgp->sg_size - sizeof (dld_ioc_secobj_get_t);
 		state.ss_count = 0;
 		state.ss_rc = 0;
-		state.ss_objp = (dld_secobj_t *)(sgp + 1);
+		state.ss_mode = mode;
+		state.ss_objp = (dld_secobj_t *)((uchar_t *)arg +
+		    sizeof (dld_ioc_secobj_get_t));
+
 		mod_hash_walk(drv_secobj_hash, drv_secobj_walker, &state);
 		if (state.ss_rc != 0) {
-			err = state.ss_rc;
 			rw_exit(&drv_secobj_lock);
-			goto failed;
+			return (state.ss_rc);
 		}
 		sgp->sg_count = state.ss_count;
-		extra = state.ss_count * sizeof (dld_secobj_t);
 	}
 	rw_exit(&drv_secobj_lock);
-	miocack(q, mp, sizeof (dld_ioc_secobj_get_t) + extra, 0);
-	return;
-
-failed:
-	ASSERT(err != 0);
-	miocnak(q, mp, 0, err);
-
+	return (0);
 }
 
-static void
-drv_ioc_secobj_unset(dld_ctl_str_t *ctls, mblk_t *mp)
+/* ARGSUSED */
+static int
+drv_ioc_secobj_unset(void *karg, intptr_t arg, int mode, cred_t *cred)
 {
-	dld_ioc_secobj_unset_t	*sup;
+	dld_ioc_secobj_unset_t	*sup = karg;
 	dld_secobj_t		*objp;
 	mod_hash_val_t		val;
-	int			err = EINVAL;
-	queue_t			*q = ctls->cs_wq;
+	int			err;
 
-	if ((err = miocpullup(mp, sizeof (dld_ioc_secobj_unset_t))) != 0)
-		goto failed;
-
-	sup = (dld_ioc_secobj_unset_t *)mp->b_cont->b_rptr;
 	if (sup->su_name[DLD_SECOBJ_NAME_MAX - 1] != '\0')
-		goto failed;
+		return (EINVAL);
 
 	rw_enter(&drv_secobj_lock, RW_WRITER);
 	err = mod_hash_find(drv_secobj_hash, (mod_hash_key_t)sup->su_name,
 	    (mod_hash_val_t *)&objp);
 	if (err != 0) {
 		ASSERT(err == MH_ERR_NOTFOUND);
-		err = ENOENT;
 		rw_exit(&drv_secobj_lock);
-		goto failed;
+		return (ENOENT);
 	}
-	err = mod_hash_remove(drv_secobj_hash, (mod_hash_key_t)sup->su_name,
-	    (mod_hash_val_t *)&val);
-	ASSERT(err == 0);
+	VERIFY(mod_hash_remove(drv_secobj_hash, (mod_hash_key_t)sup->su_name,
+	    (mod_hash_val_t *)&val) == 0);
 	ASSERT(objp == (dld_secobj_t *)val);
 
 	kmem_cache_free(drv_secobj_cachep, objp);
 	rw_exit(&drv_secobj_lock);
-	miocack(q, mp, 0, 0);
-	return;
+	return (0);
+}
 
-failed:
-	ASSERT(err != 0);
-	miocnak(q, mp, 0, err);
+static dld_ioc_info_t drv_ioc_list[] = {
+	{DLDIOC_ATTR, DLDCOPYINOUT, sizeof (dld_ioc_attr_t),
+	    drv_ioc_attr},
+	{DLDIOC_PHYS_ATTR, DLDCOPYINOUT, sizeof (dld_ioc_phys_attr_t),
+	    drv_ioc_phys_attr},
+	{DLDIOC_SECOBJ_SET, DLDCOPYIN | DLDDLCONFIG,
+	    sizeof (dld_ioc_secobj_set_t), drv_ioc_secobj_set},
+	{DLDIOC_SECOBJ_GET, DLDCOPYINOUT | DLDDLCONFIG,
+	    sizeof (dld_ioc_secobj_get_t), drv_ioc_secobj_get},
+	{DLDIOC_SECOBJ_UNSET, DLDCOPYIN | DLDDLCONFIG,
+	    sizeof (dld_ioc_secobj_unset_t), drv_ioc_secobj_unset},
+	{DLDIOC_CREATE_VLAN, DLDCOPYIN | DLDDLCONFIG,
+	    sizeof (dld_ioc_create_vlan_t), drv_ioc_create_vlan},
+	{DLDIOC_DELETE_VLAN, DLDCOPYIN | DLDDLCONFIG,
+	    sizeof (dld_ioc_delete_vlan_t),
+	    drv_ioc_delete_vlan},
+	{DLDIOC_VLAN_ATTR, DLDCOPYINOUT, sizeof (dld_ioc_vlan_attr_t),
+	    drv_ioc_vlan_attr},
+	{DLDIOC_DOORSERVER, DLDCOPYIN | DLDDLCONFIG, sizeof (dld_ioc_door_t),
+	    drv_ioc_doorserver},
+	{DLDIOC_RENAME, DLDCOPYIN | DLDDLCONFIG, sizeof (dld_ioc_rename_t),
+	    drv_ioc_rename},
+	{DLDIOC_GETMACPROP, DLDCOPYIN, sizeof (dld_ioc_macprop_t),
+	    drv_ioc_getprop},
+	{DLDIOC_SETMACPROP, DLDCOPYIN | DLDDLCONFIG, sizeof (dld_ioc_macprop_t),
+	    drv_ioc_setprop}
+};
+
+typedef struct dld_ioc_modentry {
+	uint16_t	dim_modid;	/* Top 16 bits of ioctl command */
+	char		*dim_modname;	/* Module to be loaded */
+	dld_ioc_info_t	*dim_list;	/* array of ioctl structures */
+	uint_t		dim_count;	/* number of elements in dim_list */
+} dld_ioc_modentry_t;
+
+/*
+ * For all modules except for dld, dim_list and dim_count are assigned
+ * when the modules register their ioctls in dld_ioc_register().  We
+ * can statically initialize dld's ioctls in-line here; there's no
+ * need for it to call dld_ioc_register() itself.
+ */
+static dld_ioc_modentry_t dld_ioc_modtable[] = {
+	{DLD_IOC,	"dld",	drv_ioc_list, DLDIOCCNT(drv_ioc_list)},
+	{AGGR_IOC,	"aggr",	NULL, 0},
+	{VNIC_IOC,	"vnic",	NULL, 0}
+};
+#define	DLDIOC_CNT	\
+	(sizeof (dld_ioc_modtable) / sizeof (dld_ioc_modentry_t))
+
+static dld_ioc_modentry_t *
+dld_ioc_findmod(uint16_t modid)
+{
+	int	i;
+
+	for (i = 0; i < DLDIOC_CNT; i++) {
+		if (modid == dld_ioc_modtable[i].dim_modid)
+			return (&dld_ioc_modtable[i]);
+	}
+	return (NULL);
+}
+
+int
+dld_ioc_register(uint16_t modid, dld_ioc_info_t *list, uint_t count)
+{
+	dld_ioc_modentry_t *dim = dld_ioc_findmod(modid);
+
+	if (dim == NULL)
+		return (ENOENT);
+
+	dim->dim_list = list;
+	dim->dim_count = count;
+	return (0);
+}
+
+void
+dld_ioc_unregister(uint16_t modid)
+{
+	VERIFY(dld_ioc_register(modid, NULL, 0) == 0);
+}
+
+/*
+ * The general design with GLDv3 ioctls is that all ioctls issued
+ * through /dev/dld go through this drv_ioctl() function.  This
+ * function handles all ioctls on behalf of modules listed in
+ * dld_ioc_modtable.
+ *
+ * When an ioctl is received, this function looks for the associated
+ * module-id-specific ioctl information using dld_ioc_findmod().  The
+ * call to ddi_hold_devi_by_instance() on the associated device will
+ * cause the kernel module responsible for the ioctl to be loaded if
+ * it's not already loaded, which should result in that module calling
+ * dld_ioc_register(), thereby filling in the dim_list containing the
+ * details for the ioctl being processed.
+ *
+ * This function can then perform operations such as copyin() data and
+ * do credential checks based on the registered ioctl information,
+ * then issue the callback function di_func() registered by the
+ * responsible module.  Upon return, the appropriate copyout()
+ * operation can be performed and the operation completes.
+ */
+/* ARGSUSED */
+static int
+drv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred, int *rvalp)
+{
+	dld_ioc_modentry_t *dim;
+	dld_ioc_info_t	*info;
+	dev_info_t	*dip = NULL;
+	void		*buf = NULL;
+	size_t		sz;
+	int		i, err;
+
+	if ((dim = dld_ioc_findmod(DLD_IOC_MODID(cmd))) == NULL)
+		return (ENOTSUP);
+
+	dip = ddi_hold_devi_by_instance(ddi_name_to_major(dim->dim_modname),
+	    0, 0);
+	if (dip == NULL || dim->dim_list == NULL) {
+		err = ENODEV;
+		goto done;
+	}
+
+	for (i = 0; i < dim->dim_count; i++) {
+		if (cmd == dim->dim_list[i].di_cmd)
+			break;
+	}
+	if (i == dim->dim_count) {
+		err = ENOTSUP;
+		goto done;
+	}
+
+	info = &dim->dim_list[i];
+
+	if ((info->di_flags & DLDDLCONFIG) && secpolicy_dl_config(cred) != 0) {
+		err = EPERM;
+		goto done;
+	}
+
+	sz = info->di_argsize;
+	if ((buf = kmem_zalloc(sz, KM_NOSLEEP)) == NULL) {
+		err = ENOMEM;
+		goto done;
+	}
+
+	if ((info->di_flags & DLDCOPYIN) &&
+	    ddi_copyin((void *)arg, buf, sz, mode) != 0) {
+		err = EFAULT;
+		goto done;
+	}
+
+	err = info->di_func(buf, arg, mode, cred);
+
+	if ((info->di_flags & DLDCOPYOUT) &&
+	    ddi_copyout(buf, (void *)arg, sz, mode) != 0 && err == 0)
+		err = EFAULT;
+
+done:
+	if (buf != NULL)
+		kmem_free(buf, sz);
+	if (dip != NULL)
+		ddi_release_devi(dip);
+	return (err);
 }

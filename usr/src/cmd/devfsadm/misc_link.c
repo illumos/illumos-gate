@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <regex.h>
 #include <devfsadm.h>
 #include <stdio.h>
@@ -113,6 +111,9 @@ static devfsadm_create_t misc_cbt[] = {
 	    "(^ipf$)|(^ipnat$)|(^ipstate$)|(^ipauth$)|"
 	    "(^ipsync$)|(^ipscan$)|(^iplookup$)",
 	    TYPE_EXACT | DRV_RE, ILEVEL_0, minor_name,
+	},
+	{ "pseudo", "ddi_pseudo", "dld",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, node_name
 	},
 	{ "pseudo", "ddi_pseudo",
 	    "(^kdmouse$)|(^logi$)|(^rootprop$)|(^msm$)",

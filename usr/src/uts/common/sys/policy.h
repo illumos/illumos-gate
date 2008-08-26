@@ -26,8 +26,6 @@
 #ifndef	_SYS_POLICY_H
 #define	_SYS_POLICY_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* TSOL 8 */
-
 #include <sys/types.h>
 #include <sys/cred.h>
 #include <sys/vnode.h>
@@ -101,6 +99,7 @@ int secpolicy_fs_quota(const cred_t *, const struct vfs *);
 int secpolicy_idmap(const cred_t *);
 int secpolicy_ip(const cred_t *, int, boolean_t);
 int secpolicy_ip_config(const cred_t *, boolean_t);
+int secpolicy_dl_config(const cred_t *);
 int secpolicy_ipc_access(const cred_t *, const struct kipc_perm *, mode_t);
 int secpolicy_ipc_config(const cred_t *);
 int secpolicy_ipc_owner(const cred_t *, const struct kipc_perm *);

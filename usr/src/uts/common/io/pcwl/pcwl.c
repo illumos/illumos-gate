@@ -35,8 +35,6 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -3779,20 +3777,15 @@ pcwl_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 		miocnak(wq, mp, 0, EINVAL);
 		return;
 	case WLAN_GET_PARAM:
-		need_privilege = B_TRUE;
+		need_privilege = B_FALSE;
 		break;
 	case WLAN_SET_PARAM:
 	case WLAN_COMMAND:
 		break;
 	}
-	/*
-	 * Check net_config privilege
-	 */
-	if (need_privilege) {
-		if (ret = secpolicy_net_config(iocp->ioc_cr, B_FALSE)) {
-			miocnak(wq, mp, 0, ret);
-			return;
-		}
-	}
-	pcwl_wlan_ioctl(pcwl_p, wq, mp, cmd);
+
+	if (need_privilege && (ret = secpolicy_dl_config(iocp->ioc_cr)) != 0)
+		miocnak(wq, mp, 0, ret);
+	else
+		pcwl_wlan_ioctl(pcwl_p, wq, mp, cmd);
 }

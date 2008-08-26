@@ -26,8 +26,6 @@
 #ifndef	_SYS_AGGR_IMPL_H
 #define	_SYS_AGGR_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/mac.h>
 #include <sys/mac_ether.h>
@@ -174,7 +172,8 @@ typedef struct aggr_grp_s {
 }
 
 extern dev_info_t *aggr_dip;
-extern void aggr_ioctl(queue_t *, mblk_t *);
+extern int aggr_ioc_init(void);
+extern void aggr_ioc_fini(void);
 
 typedef int (*aggr_grp_info_new_grp_fn_t)(void *, datalink_id_t, uint32_t,
     uchar_t *, boolean_t, boolean_t, uint32_t, uint32_t, aggr_lacp_mode_t,

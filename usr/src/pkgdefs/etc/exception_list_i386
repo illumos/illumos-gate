@@ -84,6 +84,7 @@ usr/include/sys/aggr.h			i386
 usr/include/sys/aggr_impl.h		i386
 usr/include/sys/dld.h			i386
 usr/include/sys/dld_impl.h		i386
+usr/include/sys/dld_ioc.h		i386
 usr/include/sys/dls.h			i386
 usr/include/sys/dls_impl.h		i386
 usr/include/sys/mac.h			i386

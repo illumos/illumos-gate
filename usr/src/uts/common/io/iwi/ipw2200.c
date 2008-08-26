@@ -30,8 +30,6 @@
  * SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/byteorder.h>
 #include <sys/conf.h>
@@ -2405,23 +2403,14 @@ ipw2200_ioctl(struct ipw2200_softc *sc, queue_t *q, mblk_t *m)
 		return (IEEE80211_IOCTL_NOT_REQUIRED);
 	}
 
-	if (need_privilege) {
+	if (need_privilege && (ret = secpolicy_dl_config(iocp->ioc_cr)) != 0) {
+		miocnak(q, m, 0, ret);
 		/*
-		 * Check for specific net_config privilege on Solaris 10+.
-		 * Otherwise just check for root access ...
+		 * privilege check fail, do not need net80211 either
 		 */
-		if (secpolicy_net_config != NULL)
-			ret = secpolicy_net_config(iocp->ioc_cr, B_FALSE);
-		else
-			ret = drv_priv(iocp->ioc_cr);
-		if (ret != 0) {
-			miocnak(q, m, 0, ret);
-			/*
-			 * privilege check fail, do not need net80211 either
-			 */
-			return (IEEE80211_IOCTL_NOT_REQUIRED);
-		}
+		return (IEEE80211_IOCTL_NOT_REQUIRED);
 	}
+
 	/*
 	 * sanity check
 	 */

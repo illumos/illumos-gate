@@ -45,7 +45,6 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <stropts.h>
 #include <strings.h>
 #include <syslog.h>
 #include <sys/dld.h>
@@ -71,19 +70,13 @@ static int
 dlmgmt_set_doorfd(boolean_t start)
 {
 	dld_ioc_door_t did;
-	struct strioctl iocb;
 	int err = 0;
 
 	assert(dld_control_fd != -1);
 
 	did.did_start_door = start;
 
-	iocb.ic_cmd	= DLDIOC_DOORSERVER;
-	iocb.ic_timout	= 0;
-	iocb.ic_len	= sizeof (did);
-	iocb.ic_dp	= (char *)&did;
-
-	if (ioctl(dld_control_fd, I_STR, &iocb) == -1)
+	if (ioctl(dld_control_fd, DLDIOC_DOORSERVER, &did) == -1)
 		err = errno;
 
 	return (err);
@@ -250,10 +243,11 @@ dlmgmt_init_privileges()
 		return (errno);
 
 	/*
-	 * The PRIV_SYS_CONFIG privilege is needed to post sysevents.
+	 * We need PRIV_SYS_DL_CONFIG for the DLDIOC_DOORSERVER ioctl,
+	 * and PRIV_SYS_CONFIG to post sysevents.
 	 */
 	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET, UID_DLADM,
-	    GID_SYS, PRIV_SYS_NET_CONFIG, PRIV_SYS_CONFIG, NULL) == -1) {
+	    GID_SYS, PRIV_SYS_DL_CONFIG, PRIV_SYS_CONFIG, NULL) == -1) {
 		(void) close(dld_control_fd);
 		dld_control_fd = -1;
 		return (EPERM);

@@ -21,8 +21,6 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Device policy configuration file.   When devices are opened the
 # additional access controls in this file are enforced.
 #
@@ -78,9 +76,6 @@ scsi_vhci:devctl				write_priv_set=sys_devices
 #
 random						write_priv_set=sys_devices
 openeepr					write_priv_set=all
-dld:ctl		read_priv_set=sys_net_config	write_priv_set=sys_net_config
-aggr:ctl	read_priv_set=sys_net_config	write_priv_set=sys_net_config
-vnic:ctl	read_priv_set=sys_net_config	write_priv_set=sys_net_config
 #
 # IP Filter
 #

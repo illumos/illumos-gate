@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Data-Link Driver
  */
@@ -566,7 +564,8 @@ dld_init_ops(struct dev_ops *ops, const char *name)
 	stream->st_wrinit = wq;
 	ops->devo_cb_ops->cb_str = stream;
 
-	ops->devo_getinfo = &dld_getinfo;
+	if (ops->devo_getinfo == NULL)
+		ops->devo_getinfo = &dld_getinfo;
 }
 
 void

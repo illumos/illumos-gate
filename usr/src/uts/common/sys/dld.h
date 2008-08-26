@@ -28,10 +28,16 @@
 
 /*
  * Data-Link Driver (public header).
+ *
+ * Note that the datastructures defined here define an ioctl interface
+ * that is shared betwen user and kernel space.  The dld driver thus
+ * assumes that the structures have identical layout and size when
+ * compiled in either IPL32 or LP64.
  */
 
 #include <sys/types.h>
 #include <sys/stream.h>
+#include <sys/dld_ioc.h>
 #include <sys/conf.h>
 #include <sys/sad.h>
 #include <net/if.h>
@@ -79,26 +85,16 @@ extern "C" {
 #define	DLD_DRIVER_NAME		"dld"
 
 /*
- * The name of the control minor node of dld.
- */
-#define	DLD_CONTROL_MINOR_NAME	"ctl"
-#define	DLD_CONTROL_MINOR	0
-#define	DLD_CONTROL_DEV		"/devices/pseudo/" DLD_DRIVER_NAME "@0:" \
-				DLD_CONTROL_MINOR_NAME
-
-/*
  * IOCTL codes and data structures.
  */
-#define	DLDIOC		('D' << 24 | 'L' << 16 | 'D' << 8)
-
-#define	DLDIOC_ATTR	(DLDIOC | 0x03)
+#define	DLDIOC_ATTR	DLDIOC(0x03)
 
 typedef struct dld_ioc_attr {
 	datalink_id_t	dia_linkid;
 	uint_t		dia_max_sdu;
 } dld_ioc_attr_t;
 
-#define	DLDIOC_VLAN_ATTR	(DLDIOC | 0x04)
+#define	DLDIOC_VLAN_ATTR	DLDIOC(0x04)
 typedef struct dld_ioc_vlan_attr {
 	datalink_id_t	div_vlanid;
 	uint16_t	div_vid;
@@ -107,7 +103,7 @@ typedef struct dld_ioc_vlan_attr {
 	boolean_t	div_implicit;
 } dld_ioc_vlan_attr_t;
 
-#define	DLDIOC_PHYS_ATTR	(DLDIOC | 0x05)
+#define	DLDIOC_PHYS_ATTR	DLDIOC(0x05)
 #define	DLPI_LINKNAME_MAX	32
 
 typedef struct dld_ioc_phys_attr {
@@ -139,31 +135,32 @@ typedef struct dld_secobj {
 	uint_t			so_len;
 } dld_secobj_t;
 
-#define	DLDIOC_SECOBJ_SET	(DLDIOC | 0x06)
+#define	DLDIOC_SECOBJ_SET	DLDIOC(0x06)
 typedef struct dld_ioc_secobj_set {
 	dld_secobj_t		ss_obj;
 	uint_t			ss_flags;
 } dld_ioc_secobj_set_t;
 
-#define	DLDIOC_SECOBJ_GET	(DLDIOC | 0x07)
+#define	DLDIOC_SECOBJ_GET	DLDIOC(0x07)
 typedef struct dld_ioc_secobj_get {
 	dld_secobj_t		sg_obj;
 	uint_t			sg_count;
+	uint_t			sg_size;
 } dld_ioc_secobj_get_t;
 
 /*
  * The following two slots were used outside of ON, so don't reuse them.
  *
- * #define DLDIOCHOLDVLAN (DLDIOC | 0x08)
- * #define DLDIOCRELEVLAN (DLDIOC | 0x09)
+ * #define DLDIOCHOLDVLAN DLDIOC(0x08)
+ * #define DLDIOCRELEVLAN DLDIOC(0x09)
  */
 
-#define	DLDIOC_SECOBJ_UNSET	(DLDIOC | 0x0a)
+#define	DLDIOC_SECOBJ_UNSET	DLDIOC(0x0a)
 typedef struct dld_ioc_secobj_unset {
 	char			su_name[DLD_SECOBJ_NAME_MAX];
 } dld_ioc_secobj_unset_t;
 
-#define	DLDIOC_CREATE_VLAN	(DLDIOC | 0x0b)
+#define	DLDIOC_CREATE_VLAN	DLDIOC(0x0b)
 typedef struct dld_ioc_create_vlan {
 	datalink_id_t	dic_vlanid;
 	datalink_id_t	dic_linkid;
@@ -171,7 +168,7 @@ typedef struct dld_ioc_create_vlan {
 	boolean_t	dic_force;
 } dld_ioc_create_vlan_t;
 
-#define	DLDIOC_DELETE_VLAN	(DLDIOC | 0x0c)
+#define	DLDIOC_DELETE_VLAN	DLDIOC(0x0c)
 typedef struct dld_ioc_delete_vlan {
 	datalink_id_t	did_linkid;
 } dld_ioc_delete_vlan_t;
@@ -179,17 +176,17 @@ typedef struct dld_ioc_delete_vlan {
 /*
  * The following constants have been removed, and the slots are open:
  *
- * #define DLDIOC_SETAUTOPUSH      (DLDIOC | 0x0d)
- * #define DLDIOC_GETAUTOPUSH      (DLDIOC | 0x0e)
- * #define DLDIOC_CLRAUTOPUSH      (DLDIOC | 0x0f)
+ * #define DLDIOC_SETAUTOPUSH	DLDIOC(0x0d)
+ * #define DLDIOC_GETAUTOPUSH	DLDIOC(0x0e)
+ * #define DLDIOC_CLRAUTOPUSH	DLDIOC(0x0f)
  */
 
-#define	DLDIOC_DOORSERVER	(DLDIOC | 0x10)
+#define	DLDIOC_DOORSERVER	DLDIOC(0x10)
 typedef struct dld_ioc_door {
 	boolean_t	did_start_door;
 } dld_ioc_door_t;
 
-#define	DLDIOC_RENAME		(DLDIOC | 0x11)
+#define	DLDIOC_RENAME		DLDIOC(0x11)
 typedef struct dld_ioc_rename {
 	datalink_id_t	dir_linkid1;
 	datalink_id_t	dir_linkid2;
@@ -199,8 +196,8 @@ typedef struct dld_ioc_rename {
 /*
  * The following constants have been removed, and the slots are open:
  *
- * #define DLDIOC_SETZID           (DLDIOC | 0x12)
- * #define DLDIOC_GETZID           (DLDIOC | 0x13)
+ * #define DLDIOC_SETZID	DLDIOC(0x12)
+ * #define DLDIOC_GETZID	DLDIOC(0x13)
  */
 
 typedef struct dld_ioc_zid {
@@ -208,6 +205,12 @@ typedef struct dld_ioc_zid {
 	char		diz_link[MAXLINKNAMELEN];
 	boolean_t	diz_is_ppa_hack;
 } dld_ioc_zid_t;
+
+#define	DLDIOC_GETZID  		DLDIOC(0x13)
+typedef struct dld_ioc_getzid {
+	datalink_id_t	dig_linkid;
+	zoneid_t	dig_zid;
+} dld_ioc_getzid_t;
 
 /*
  * data-link autopush configuration.
@@ -218,10 +221,8 @@ struct dlautopush {
 	char	dap_aplist[MAXAPUSH][FMNAMESZ+1];
 };
 
-
-
-#define	DLDIOC_SETMACPROP		(DLDIOC | 0x14)
-#define	DLDIOC_GETMACPROP		(DLDIOC | 0x15)
+#define	DLDIOC_SETMACPROP	DLDIOC(0x14)
+#define	DLDIOC_GETMACPROP	DLDIOC(0x15)
 #define	MAC_PROP_VERSION	1
 
 typedef struct dld_ioc_macprop_s {

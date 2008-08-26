@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -1809,15 +1807,9 @@ ieee80211_ioctl(struct ieee80211com *ic, queue_t *wq, mblk_t *mp)
 		return (EINVAL);
 	}
 
-	if (need_privilege) {
-		/*
-		 * Check for specific net_config privilege on Solaris 10+.
-		 */
-		err = secpolicy_net_config(iocp->ioc_cr, B_FALSE);
-		if (err != 0) {
-			miocnak(wq, mp, 0, err);
-			return (err);
-		}
+	if (need_privilege && (err = secpolicy_dl_config(iocp->ioc_cr)) != 0) {
+		miocnak(wq, mp, 0, err);
+		return (err);
 	}
 
 	IEEE80211_LOCK(ic);

@@ -26,20 +26,23 @@
 #ifndef	_SYS_AGGR_H
 #define	_SYS_AGGR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/ethernet.h>
 #include <sys/mac.h>
 #include <sys/dls.h>
 #include <sys/param.h>
+#include <sys/dld_ioc.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-/* control interface name */
-#define	AGGR_DEVNAME_CTL	"ctl"
+/*
+ * Note that the datastructures defined here define an ioctl interface
+ * that is shared betwen user and kernel space.  The aggr driver thus
+ * assumes that the structures have identical layout and size when
+ * compiled in either IPL32 or LP64.
+ */
 
 /*
  * Transmit load balancing policies.
@@ -112,14 +115,12 @@ typedef union {
 	uint8_t state;
 } aggr_lacp_state_t;
 
-#define	LAIOC(x)		(('l' << 24) | ('a' << 16) | ('m' << 8) | (x))
-
 /* one of the ports of a link aggregation group */
 typedef struct laioc_port {
 	datalink_id_t	lp_linkid;
 } laioc_port_t;
 
-#define	LAIOC_CREATE		LAIOC(1)
+#define	LAIOC_CREATE		AGGRIOC(1)
 
 typedef struct laioc_create {
 	datalink_id_t	lc_linkid;
@@ -134,38 +135,13 @@ typedef struct laioc_create {
 			lc_pad_bits : 30;
 } laioc_create_t;
 
-#ifdef _SYSCALL32
-
-typedef struct laioc_create32 {
-	datalink_id_t	lc_linkid;
-	uint32_t	lc_key;
-	uint32_t	lc_nports;
-	uint32_t	lc_policy;
-	uchar_t		lc_mac[ETHERADDRL];
-	aggr_lacp_mode_t lc_lacp_mode;
-	aggr_lacp_timer_t lc_lacp_timer;
-	uint32_t	lc_mac_fixed : 1,
-			lc_force : 1,
-			lc_pad_bits : 30;
-} laioc_create32_t;
-
-#endif /* _SYSCALL32 */
-
-#define	LAIOC_DELETE		LAIOC(2)
+#define	LAIOC_DELETE		AGGRIOC(2)
 
 typedef struct laioc_delete {
 	datalink_id_t	ld_linkid;
 } laioc_delete_t;
 
-#ifdef _SYSCALL32
-
-typedef struct laioc_delete32 {
-	datalink_id_t	ld_linkid;
-} laioc_delete32_t;
-
-#endif /* _SYSCALL32 */
-
-#define	LAIOC_INFO		LAIOC(3)
+#define	LAIOC_INFO		AGGRIOC(3)
 
 typedef enum aggr_link_duplex {
 	AGGR_LINK_DUPLEX_FULL = 1,
@@ -201,10 +177,11 @@ typedef struct laioc_info_group {
 typedef struct laioc_info {
 	/* Must not be DLADM_INVALID_LINKID */
 	datalink_id_t	li_group_linkid;
+	uint32_t	li_bufsize;
 } laioc_info_t;
 
-#define	LAIOC_ADD		LAIOC(4)
-#define	LAIOC_REMOVE		LAIOC(5)
+#define	LAIOC_ADD		AGGRIOC(4)
+#define	LAIOC_REMOVE		AGGRIOC(5)
 
 typedef struct laioc_add_rem {
 	datalink_id_t	la_linkid;
@@ -212,17 +189,7 @@ typedef struct laioc_add_rem {
 	uint32_t	la_force;
 } laioc_add_rem_t;
 
-#ifdef _SYSCALL32
-
-typedef struct laioc_add_rem32 {
-	datalink_id_t	la_linkid;
-	uint32_t	la_nports;
-	uint32_t	la_force;
-} laioc_add_rem32_t;
-
-#endif /* _SYSCALL32 */
-
-#define	LAIOC_MODIFY			LAIOC(6)
+#define	LAIOC_MODIFY			AGGRIOC(6)
 
 #define	LAIOC_MODIFY_POLICY		0x01
 #define	LAIOC_MODIFY_MAC		0x02
@@ -238,20 +205,6 @@ typedef struct laioc_modify {
 	aggr_lacp_mode_t lu_lacp_mode;
 	aggr_lacp_timer_t lu_lacp_timer;
 } laioc_modify_t;
-
-#ifdef _SYSCALL32
-
-typedef struct laioc_modify32 {
-	datalink_id_t	lu_linkid;
-	uint8_t		lu_modify_mask;
-	uint32_t	lu_policy;
-	uchar_t		lu_mac[ETHERADDRL];
-	boolean_t	lu_mac_fixed;
-	aggr_lacp_mode_t lu_lacp_mode;
-	aggr_lacp_timer_t lu_lacp_timer;
-} laioc_modify32_t;
-
-#endif /* _SYSCALL32 */
 
 #ifdef	__cplusplus
 }

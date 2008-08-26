@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -58,7 +56,7 @@ i_dladm_vlan_info_active(datalink_id_t vlanid, dladm_vlan_attr_t *dvap)
 
 	div.div_vlanid = vlanid;
 
-	if (i_dladm_ioctl(fd, DLDIOC_VLAN_ATTR, &div, sizeof (div)) < 0)
+	if (ioctl(fd, DLDIOC_VLAN_ATTR, &div) < 0)
 		status = dladm_errno2status(errno);
 
 	dvap->dv_vid = div.div_vid;
@@ -193,8 +191,7 @@ dladm_vlan_create(const char *vlan, datalink_id_t linkid, uint16_t vid,
 		dic.dic_vid = vid;
 		dic.dic_force = (flags & DLADM_OPT_FORCE) != 0;
 
-		if (i_dladm_ioctl(fd, DLDIOC_CREATE_VLAN, &dic,
-		    sizeof (dic)) < 0) {
+		if (ioctl(fd, DLDIOC_CREATE_VLAN, &dic) < 0) {
 			status = dladm_errno2status(errno);
 			if (flags & DLADM_OPT_PERSIST)
 				(void) dladm_remove_conf(vlanid);
@@ -235,8 +232,7 @@ dladm_vlan_delete(datalink_id_t vlanid, uint32_t flags)
 			return (dladm_errno2status(errno));
 
 		did.did_linkid = vlanid;
-		if ((i_dladm_ioctl(fd, DLDIOC_DELETE_VLAN, &did,
-		    sizeof (did)) < 0) &&
+		if ((ioctl(fd, DLDIOC_DELETE_VLAN, &did) < 0) &&
 		    ((errno != ENOENT) || !(flags & DLADM_OPT_PERSIST))) {
 			(void) close(fd);
 			return (dladm_errno2status(errno));
@@ -300,7 +296,7 @@ i_dladm_vlan_up(datalink_id_t vlanid, void *arg)
 	}
 
 	dic.dic_vlanid = vlanid;
-	if (i_dladm_ioctl(fd, DLDIOC_CREATE_VLAN, &dic, sizeof (dic)) < 0) {
+	if (ioctl(fd, DLDIOC_CREATE_VLAN, &dic) < 0) {
 		status = dladm_errno2status(errno);
 		goto done;
 	}
@@ -309,8 +305,7 @@ i_dladm_vlan_up(datalink_id_t vlanid, void *arg)
 		dld_ioc_delete_vlan_t did;
 
 		did.did_linkid = vlanid;
-		(void) i_dladm_ioctl(fd, DLDIOC_DELETE_VLAN, &did,
-		    sizeof (did));
+		(void) ioctl(fd, DLDIOC_DELETE_VLAN, &did);
 	} else {
 		/*
 		 * Reset the active linkprop of this specific link.

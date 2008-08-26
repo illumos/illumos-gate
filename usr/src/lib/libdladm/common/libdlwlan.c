@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libintl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -816,27 +814,20 @@ done:
 	return (status);
 }
 
+/*
+ * Check to see if the link is wireless.
+ */
 static dladm_status_t
 dladm_wlan_validate(datalink_id_t linkid)
 {
-	wldp_t		*gbuf;
+	uint32_t	media;
 	dladm_status_t	status;
 
-	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL) {
-		status = DLADM_STATUS_NOMEM;
-		goto done;
+	status = dladm_datalink_id2info(linkid, NULL, NULL, &media, NULL, 0);
+	if (status == DLADM_STATUS_OK) {
+		if (media != DL_WIFI)
+			status = DLADM_STATUS_LINKINVAL;
 	}
-
-	/*
-	 * Check to see if the link is wireless.
-	 */
-	if ((status = do_get_bsstype(linkid, gbuf)) != DLADM_STATUS_OK) {
-		status = DLADM_STATUS_LINKINVAL;
-		goto done;
-	}
-
-done:
-	free(gbuf);
 	return (status);
 }
 
@@ -1084,7 +1075,7 @@ i_dladm_wlan_ioctl(datalink_id_t linkid, wldp_t *gbuf, uint_t id, size_t len,
 	 */
 	(void) snprintf(linkname, MAXPATHLEN, "/dev/net/%s", link);
 	if ((fd = open(linkname, O_RDWR)) < 0)
-		return (DLADM_STATUS_LINKINVAL);
+		return (dladm_errno2status(errno));
 
 	gbuf->wldp_type = NET_802_11;
 	gbuf->wldp_id	= id;

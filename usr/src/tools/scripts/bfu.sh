@@ -24,8 +24,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Upgrade a machine from a cpio archive area in about 5 minutes.
 # By Roger Faulkner and Jeff Bonwick, April 1993.
 # (bfu == Bonwick/Faulkner Upgrade, a.k.a. Blindingly Fast Upgrade)
@@ -7955,6 +7953,11 @@ mondo_loop() {
 				rm -rf $rootprefix/etc/dladm
 			fi
 		fi
+
+		# The global zone needs to have its /dev/dld symlink created
+		# during install so that processes can access it early in boot
+		# before devfsadm is run.
+		ln -s ../devices/pseudo/dld@0:ctl $rootprefix/dev/dld
 	fi
 
 	# Fix up audit permissions
@@ -8099,6 +8102,10 @@ fi
 
 print "Exiting post-bfu protected environment.  To reenter, type:"
 print LD_NOAUXFLTR=1 LD_LIBRARY_PATH=/tmp/bfulib $ldlib64 PATH=/tmp/bfubin \
+    /tmp/bfubin/ksh
+
+exit 0
+ \
     /tmp/bfubin/ksh
 
 exit 0

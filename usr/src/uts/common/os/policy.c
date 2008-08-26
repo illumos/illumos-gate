@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/param.h>
@@ -1700,6 +1698,18 @@ secpolicy_ip_config(const cred_t *cr, boolean_t checkonly)
 		return (PRIV_POLICY(cr, PRIV_SYS_IP_CONFIG, B_FALSE, EPERM,
 		    NULL));
 	}
+}
+
+/*
+ * PRIV_SYS_NET_CONFIG is a superset of PRIV_SYS_DL_CONFIG.
+ */
+int
+secpolicy_dl_config(const cred_t *cr)
+{
+	if (PRIV_POLICY_ONLY(cr, PRIV_SYS_NET_CONFIG, B_FALSE))
+		return (secpolicy_net_config(cr, B_FALSE));
+	return (PRIV_POLICY(cr, PRIV_SYS_DL_CONFIG, B_FALSE, EPERM,
+	    NULL));
 }
 
 
