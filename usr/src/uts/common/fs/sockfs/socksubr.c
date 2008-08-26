@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -918,6 +916,7 @@ so_ux_lookup(struct sonode *so, struct sockaddr_un *soun, int checkaccess,
 		vnode_t **vpp)
 {
 	vnode_t		*vp;	/* Underlying filesystem vnode */
+	vnode_t		*rvp;	/* real vnode */
 	vnode_t		*svp;	/* sockfs vnode */
 	struct sonode	*so2;
 	int		error;
@@ -930,6 +929,16 @@ so_ux_lookup(struct sonode *so, struct sockaddr_un *soun, int checkaccess,
 		eprintsoline(so, error);
 		return (error);
 	}
+
+	/*
+	 * Traverse lofs mounts get the real vnode
+	 */
+	if (VOP_REALVP(vp, &rvp, NULL) == 0) {
+		VN_HOLD(rvp);		/* hold the real vnode */
+		VN_RELE(vp);		/* release hold from lookup */
+		vp = rvp;
+	}
+
 	if (vp->v_type != VSOCK) {
 		error = ENOTSOCK;
 		eprintsoline(so, error);

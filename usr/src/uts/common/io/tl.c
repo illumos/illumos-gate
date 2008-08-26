@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Multithreaded STREAMS Local Transport Provider.
  *
@@ -921,7 +919,7 @@ optdb_obj_t tl_opt_obj = {
  * IMPLY(X, Y) means that X implies Y i.e. when X is true, Y
  * should also be true.
  *
- * EQUIV(X, Y) is logical equivalence. Both X and Y should be true or falce at
+ * EQUIV(X, Y) is logical equivalence. Both X and Y should be true or false at
  * the same time.
  */
 #define	IMPLY(X, Y)	(!(X) || (Y))
@@ -5274,7 +5272,7 @@ tl_find_peer(tl_endpt_t *tep, tl_addr_t *ap)
 /*
  * Find peer for a socket based on unix domain address.
  * For implicit addresses our peer can be found by minor number in ai hash. For
- * explici binds we look vnode address at addr_hash.
+ * explicit binds we look vnode address at addr_hash.
  */
 static tl_endpt_t *
 tl_sock_find_peer(tl_endpt_t *tep, soux_addr_t *ux_addr)
@@ -5287,20 +5285,29 @@ tl_sock_find_peer(tl_endpt_t *tep, soux_addr_t *ux_addr)
 
 	ASSERT(IS_SOCKET(tep));
 	ASSERT(EQUIV(rc == 0, peer_tep != NULL));
-	ASSERT(IMPLY(rc == 0,
-	    (tep->te_zoneid == peer_tep->te_zoneid) &&
-	    (tep->te_transport == peer_tep->te_transport)));
-	/*
-	 * Don't attempt to use closing peer.
-	 */
-	if ((peer_tep != NULL) &&
-	    (peer_tep->te_closing ||
-	    (peer_tep->te_zoneid != tep->te_zoneid))) {
-		tl_refrele(peer_tep);
-		peer_tep = NULL;
+	ASSERT(IMPLY(rc == 0, (tep->te_transport == peer_tep->te_transport)));
+
+	if (peer_tep != NULL) {
+		/* Don't attempt to use closing peer. */
+		if (peer_tep->te_closing)
+			goto errout;
+
+		/*
+		 * Cross-zone unix sockets are permitted, but for Trusted
+		 * Extensions only, the "server" for these must be in the
+		 * global zone.
+		 */
+		if ((peer_tep->te_zoneid != tep->te_zoneid) &&
+		    is_system_labeled() &&
+		    (peer_tep->te_zoneid != GLOBAL_ZONEID))
+			goto errout;
 	}
 
 	return (peer_tep);
+
+errout:
+	tl_refrele(peer_tep);
+	return (NULL);
 }
 
 /*
