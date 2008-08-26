@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ZFS volume emulation driver.
  *
@@ -134,6 +132,7 @@ typedef struct zvol_state {
  */
 #define	ZVOL_RDONLY	0x1
 #define	ZVOL_DUMPIFIED	0x2
+#define	ZVOL_EXCL	0x4
 
 /*
  * zvol maximum transfer in one DMU tx.
@@ -973,6 +972,17 @@ zvol_open(dev_t *devp, int flag, int otyp, cred_t *cr)
 		mutex_exit(&zvol_state_lock);
 		return (EROFS);
 	}
+	if (zv->zv_flags & ZVOL_EXCL) {
+		mutex_exit(&zvol_state_lock);
+		return (EBUSY);
+	}
+	if (flag & FEXCL) {
+		if (zv->zv_total_opens != 0) {
+			mutex_exit(&zvol_state_lock);
+			return (EBUSY);
+		}
+		zv->zv_flags |= ZVOL_EXCL;
+	}
 
 	if (zv->zv_open_count[otyp] == 0 || otyp == OTYP_LYR) {
 		zv->zv_open_count[otyp]++;
@@ -1002,13 +1012,9 @@ zvol_close(dev_t dev, int flag, int otyp, cred_t *cr)
 		return (ENXIO);
 	}
 
-	/*
-	 * The next statement is a workaround for the following DDI bug:
-	 * 6343604 specfs race: multiple "last-close" of the same device
-	 */
-	if (zv->zv_total_opens == 0) {
-		mutex_exit(&zvol_state_lock);
-		return (0);
+	if (zv->zv_flags & ZVOL_EXCL) {
+		ASSERT(zv->zv_total_opens == 1);
+		zv->zv_flags &= ~ZVOL_EXCL;
 	}
 
 	/*
@@ -1459,6 +1465,63 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 	return (error);
 }
 
+int
+zvol_getefi(void *arg, int flag, uint64_t vs, uint8_t bs)
+{
+	struct uuid uuid = EFI_RESERVED;
+	efi_gpe_t gpe = { 0 };
+	uint32_t crc;
+	dk_efi_t efi;
+	int length;
+	char *ptr;
+
+	if (ddi_copyin(arg, &efi, sizeof (dk_efi_t), flag))
+		return (EFAULT);
+	ptr = (char *)(uintptr_t)efi.dki_data_64;
+	length = efi.dki_length;
+	/*
+	 * Some clients may attempt to request a PMBR for the
+	 * zvol.  Currently this interface will return EINVAL to
+	 * such requests.  These requests could be supported by
+	 * adding a check for lba == 0 and consing up an appropriate
+	 * PMBR.
+	 */
+	if (efi.dki_lba < 1 || efi.dki_lba > 2 || length <= 0)
+		return (EINVAL);
+
+	gpe.efi_gpe_StartingLBA = LE_64(34ULL);
+	gpe.efi_gpe_EndingLBA = LE_64((vs >> bs) - 1);
+	UUID_LE_CONVERT(gpe.efi_gpe_PartitionTypeGUID, uuid);
+
+	if (efi.dki_lba == 1) {
+		efi_gpt_t gpt = { 0 };
+
+		gpt.efi_gpt_Signature = LE_64(EFI_SIGNATURE);
+		gpt.efi_gpt_Revision = LE_32(EFI_VERSION_CURRENT);
+		gpt.efi_gpt_HeaderSize = LE_32(sizeof (gpt));
+		gpt.efi_gpt_MyLBA = LE_64(1ULL);
+		gpt.efi_gpt_FirstUsableLBA = LE_64(34ULL);
+		gpt.efi_gpt_LastUsableLBA = LE_64((vs >> bs) - 1);
+		gpt.efi_gpt_PartitionEntryLBA = LE_64(2ULL);
+		gpt.efi_gpt_NumberOfPartitionEntries = LE_32(1);
+		gpt.efi_gpt_SizeOfPartitionEntry =
+		    LE_32(sizeof (efi_gpe_t));
+		CRC32(crc, &gpe, sizeof (gpe), -1U, crc32_table);
+		gpt.efi_gpt_PartitionEntryArrayCRC32 = LE_32(~crc);
+		CRC32(crc, &gpt, sizeof (gpt), -1U, crc32_table);
+		gpt.efi_gpt_HeaderCRC32 = LE_32(~crc);
+		if (ddi_copyout(&gpt, ptr, MIN(sizeof (gpt), length),
+		    flag))
+			return (EFAULT);
+		ptr += sizeof (gpt);
+		length -= sizeof (gpt);
+	}
+	if (length > 0 && ddi_copyout(&gpe, ptr, MIN(sizeof (gpe),
+	    length), flag))
+		return (EFAULT);
+	return (0);
+}
+
 /*
  * Dirtbag ioctls to support mkfs(1M) for UFS filesystems.  See dkio(7I).
  */
@@ -1469,10 +1532,7 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 	zvol_state_t *zv;
 	struct dk_cinfo dki;
 	struct dk_minfo dkm;
-	dk_efi_t efi;
 	struct dk_callback *dkc;
-	struct uuid uuid = EFI_RESERVED;
-	uint32_t crc;
 	int error = 0;
 	rl_t *rl;
 
@@ -1509,77 +1569,14 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 		return (error);
 
 	case DKIOCGETEFI:
-		if (ddi_copyin((void *)arg, &efi, sizeof (dk_efi_t), flag)) {
+		{
+			uint64_t vs = zv->zv_volsize;
+			uint8_t bs = zv->zv_min_bs;
+
 			mutex_exit(&zvol_state_lock);
-			return (EFAULT);
+			error = zvol_getefi((void *)arg, flag, vs, bs);
+			return (error);
 		}
-		efi.dki_data = (void *)(uintptr_t)efi.dki_data_64;
-
-		/*
-		 * Some clients may attempt to request a PMBR for the
-		 * zvol.  Currently this interface will return ENOTTY to
-		 * such requests.  These requests could be supported by
-		 * adding a check for lba == 0 and consing up an appropriate
-		 * PMBR.
-		 */
-		if (efi.dki_lba == 1) {
-			efi_gpt_t gpt;
-			efi_gpe_t gpe;
-
-			bzero(&gpt, sizeof (gpt));
-			bzero(&gpe, sizeof (gpe));
-
-			if (efi.dki_length < sizeof (gpt)) {
-				mutex_exit(&zvol_state_lock);
-				return (EINVAL);
-			}
-
-			gpt.efi_gpt_Signature = LE_64(EFI_SIGNATURE);
-			gpt.efi_gpt_Revision = LE_32(EFI_VERSION_CURRENT);
-			gpt.efi_gpt_HeaderSize = LE_32(sizeof (gpt));
-			gpt.efi_gpt_FirstUsableLBA = LE_64(34ULL);
-			gpt.efi_gpt_LastUsableLBA =
-			    LE_64((zv->zv_volsize >> zv->zv_min_bs) - 1);
-			gpt.efi_gpt_NumberOfPartitionEntries = LE_32(1);
-			gpt.efi_gpt_PartitionEntryLBA = LE_64(2ULL);
-			gpt.efi_gpt_SizeOfPartitionEntry = LE_32(sizeof (gpe));
-
-			UUID_LE_CONVERT(gpe.efi_gpe_PartitionTypeGUID, uuid);
-			gpe.efi_gpe_StartingLBA = gpt.efi_gpt_FirstUsableLBA;
-			gpe.efi_gpe_EndingLBA = gpt.efi_gpt_LastUsableLBA;
-
-			CRC32(crc, &gpe, sizeof (gpe), -1U, crc32_table);
-			gpt.efi_gpt_PartitionEntryArrayCRC32 = LE_32(~crc);
-
-			CRC32(crc, &gpt, sizeof (gpt), -1U, crc32_table);
-			gpt.efi_gpt_HeaderCRC32 = LE_32(~crc);
-
-			mutex_exit(&zvol_state_lock);
-			if (ddi_copyout(&gpt, efi.dki_data, sizeof (gpt), flag))
-				error = EFAULT;
-		} else if (efi.dki_lba == 2) {
-			efi_gpe_t gpe;
-
-			bzero(&gpe, sizeof (gpe));
-
-			if (efi.dki_length < sizeof (gpe)) {
-				mutex_exit(&zvol_state_lock);
-				return (EINVAL);
-			}
-
-			UUID_LE_CONVERT(gpe.efi_gpe_PartitionTypeGUID, uuid);
-			gpe.efi_gpe_StartingLBA = LE_64(34ULL);
-			gpe.efi_gpe_EndingLBA =
-			    LE_64((zv->zv_volsize >> zv->zv_min_bs) - 1);
-
-			mutex_exit(&zvol_state_lock);
-			if (ddi_copyout(&gpe, efi.dki_data, sizeof (gpe), flag))
-				error = EFAULT;
-		} else {
-			mutex_exit(&zvol_state_lock);
-			error = EINVAL;
-		}
-		return (error);
 
 	case DKIOCFLUSHWRITECACHE:
 		dkc = (struct dk_callback *)arg;
