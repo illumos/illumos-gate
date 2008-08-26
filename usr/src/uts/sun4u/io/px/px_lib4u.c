@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/kmem.h>
 #include <sys/conf.h>
@@ -667,10 +665,14 @@ px_lib_msiq_init(dev_info_t *dip)
 	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
 	px_msiq_state_t	*msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
 	px_dvma_addr_t	pg_index;
+	size_t		q_sz = msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t);
 	size_t		size;
-	int		ret;
+	int		i, ret;
 
 	DBG(DBG_LIB_MSIQ, dip, "px_lib_msiq_init: dip 0x%p\n", dip);
+
+	/* must aligned on q_sz (happens to be !!! page) boundary */
+	ASSERT(q_sz == 8 * 1024);
 
 	/*
 	 * Map the EQ memory into the Fire MMU (has to be 512KB aligned)
@@ -681,8 +683,13 @@ px_lib_msiq_init(dev_info_t *dip)
 	 * entry.  Note: The size of the mapping is assumed to be a multiple
 	 * of the page size.
 	 */
-	size = msiq_state_p->msiq_cnt *
-	    msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t);
+	size = msiq_state_p->msiq_cnt * q_sz;
+
+	msiq_state_p->msiq_buf_p = kmem_zalloc(size, KM_SLEEP);
+
+	for (i = 0; i < msiq_state_p->msiq_cnt; i++)
+		msiq_state_p->msiq_p[i].msiq_base_p = (msiqhead_t *)
+		    ((caddr_t)msiq_state_p->msiq_buf_p + (i * q_sz));
 
 	pxu_p->msiq_mapped_p = vmem_xalloc(px_p->px_mmu_p->mmu_dvma_map,
 	    size, (512 * 1024), 0, 0, NULL, NULL, VM_NOSLEEP | VM_BESTFIT);
@@ -744,6 +751,9 @@ px_lib_msiq_fini(dev_info_t *dip)
 	/* Free the entries from the Fire MMU */
 	vmem_xfree(px_p->px_mmu_p->mmu_dvma_map,
 	    (void *)pxu_p->msiq_mapped_p, size);
+
+	kmem_free(msiq_state_p->msiq_buf_p, msiq_state_p->msiq_cnt *
+	    msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t));
 
 	return (DDI_SUCCESS);
 }

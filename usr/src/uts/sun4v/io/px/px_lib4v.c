@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/ddi.h>
@@ -586,7 +584,19 @@ px_lib_msiq_init(dev_info_t *dip)
 
 	msiq_size = msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t);
 
+	/* sun4v requires all EQ allocation to be on q size boundary */
+	if ((msiq_state_p->msiq_buf_p = contig_mem_alloc_align(
+	    msiq_state_p->msiq_cnt * msiq_size, msiq_size)) == NULL) {
+		DBG(DBG_LIB_MSIQ, dip,
+		    "px_lib_msiq_init: Contig alloc failed\n");
+
+		return (DDI_FAILURE);
+	}
+
 	for (i = 0; i < msiq_state_p->msiq_cnt; i++) {
+		msiq_state_p->msiq_p[i].msiq_base_p = (msiqhead_t *)
+		    ((caddr_t)msiq_state_p->msiq_buf_p + (i * msiq_size));
+
 		ra = (r_addr_t)va_to_pa((caddr_t)msiq_state_p->msiq_buf_p +
 		    (i * msiq_size));
 
@@ -619,7 +629,16 @@ px_lib_msiq_init(dev_info_t *dip)
 int
 px_lib_msiq_fini(dev_info_t *dip)
 {
+	px_t		*px_p = DIP_TO_STATE(dip);
+	px_msiq_state_t	*msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
+	size_t		msiq_size;
+
 	DBG(DBG_LIB_MSIQ, dip, "px_lib_msiq_fini: dip 0x%p\n", dip);
+	msiq_size = msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t);
+
+	if (msiq_state_p->msiq_buf_p != NULL)
+		contig_mem_free(msiq_state_p->msiq_buf_p,
+		    msiq_state_p->msiq_cnt * msiq_size);
 
 	return (DDI_SUCCESS);
 }

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * px_msiq.c
  */
@@ -49,7 +47,6 @@ int
 px_msiq_attach(px_t *px_p)
 {
 	px_msiq_state_t	*msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
-	size_t		msiq_size;
 	int		i, ret = DDI_SUCCESS;
 
 	DBG(DBG_MSIQ, px_p->px_dip, "px_msiq_attach\n");
@@ -80,18 +77,12 @@ px_msiq_attach(px_t *px_p)
 	mutex_init(&msiq_state_p->msiq_mutex, NULL, MUTEX_DRIVER, NULL);
 	msiq_state_p->msiq_p = kmem_zalloc(msiq_state_p->msiq_cnt *
 	    sizeof (px_msiq_t), KM_SLEEP);
-	msiq_size = msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t);
-	msiq_state_p->msiq_buf_p = kmem_zalloc(msiq_state_p->msiq_cnt *
-	    msiq_size, KM_SLEEP);
 
 	for (i = 0; i < msiq_state_p->msiq_cnt; i++) {
 		msiq_state_p->msiq_p[i].msiq_id =
 		    msiq_state_p->msiq_1st_msiq_id + i;
 		msiq_state_p->msiq_p[i].msiq_refcnt = 0;
 		msiq_state_p->msiq_p[i].msiq_state = MSIQ_STATE_FREE;
-
-		msiq_state_p->msiq_p[i].msiq_base_p = (msiqhead_t *)
-		    ((caddr_t)msiq_state_p->msiq_buf_p + (i * msiq_size));
 	}
 
 	if ((ret = px_lib_msiq_init(px_p->px_dip)) != DDI_SUCCESS)
@@ -114,8 +105,6 @@ px_msiq_detach(px_t *px_p)
 		DBG(DBG_MSIQ, px_p->px_dip,
 		    "px_lib_msiq_fini: failed\n");
 	}
-	kmem_free(msiq_state_p->msiq_buf_p, msiq_state_p->msiq_cnt *
-	    msiq_state_p->msiq_rec_cnt * sizeof (msiq_rec_t));
 
 	mutex_destroy(&msiq_state_p->msiq_mutex);
 	kmem_free(msiq_state_p->msiq_p,
