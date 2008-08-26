@@ -26,7 +26,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains the functions responsible for opening the output file
@@ -319,12 +318,16 @@ create_outsec(Ofl_desc *ofl, Sg_desc *sgp, Os_desc *osp, Word ptype, int shidx,
 		sgp->sg_fscn = scn;
 
 	/*
-	 * Remove any SHF_ORDERED or SHF_LINK_ORDER flags.  If we are not
-	 * building a relocatable object, remove any SHF_GROUP flag.
+	 * If not building a relocatable object, remove any of the
+	 * following flags, as they have been acted upon and are not
+	 * meaningful in the output:
+	 *	SHF_ORDERED, SHF_LINK_ORDER, SHF_GROUP
+	 * For relocatable objects, we allow them to propagate to
+	 * the output object to be handled by the next linker that
+	 * sees them.
 	 */
-	osp->os_shdr->sh_flags &= ~ALL_SHF_ORDER;
 	if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0)
-		osp->os_shdr->sh_flags &= ~SHF_GROUP;
+		osp->os_shdr->sh_flags &= ~(ALL_SHF_ORDER|SHF_GROUP);
 
 	/*
 	 * If this is a TLS section, save it so that the PT_TLS program header

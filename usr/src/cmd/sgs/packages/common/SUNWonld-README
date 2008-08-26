@@ -21,11 +21,12 @@
 #
 # CDDL HEADER END
 #
-# Note: The '#ident' on the first line is also the key to
-#	the versioning information for the SGS toolset.  It must
-#	be maintained in the 'ident' form, and on the first 10 lines
-#	of the readme.  If it is ever updated, you must also update
-#	libconv/common/bld_vernote.ksh.  See bug#4519569 for more
+# Note: The contents of this file are used to determine the versioning
+#	information for the SGS toolset. The number of CRs listed in
+#	this file must grow monotonically, or the SGS version will
+#	move backwards, causing a great deal of confusion. As such,
+#	CRs must never be removed from this file. See
+#	libconv/common/bld_vernote.ksh, and bug#4519569 for more
 #	details on SGS versioning.
 #
 --------------------------------------------------------------------------------
@@ -1369,3 +1370,4 @@ Bugid   Risk Synopsis
 6724774 elfdump -n doesn't print siginfo structure
 6728555 Fix for amd64 aw (6617475) breaks pure gcc builds
 6734598 ld(1) archive processing failure due to mismatched file descriptors
+6684577 ld should propagate SHF_LINK_ORDER flag to ET_REL objects
