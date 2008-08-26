@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * MAC Services Module
@@ -80,6 +79,7 @@ static void i_mac_notify_thread(void *);
 static mblk_t *mac_vnic_tx(void *, mblk_t *);
 static mblk_t *mac_vnic_txloop(void *, mblk_t *);
 static void   mac_register_priv_prop(mac_impl_t *, mac_priv_prop_t *, uint_t);
+static void   mac_unregister_priv_prop(mac_impl_t *);
 
 /*
  * Private functions.
@@ -1774,6 +1774,8 @@ fail:
 		mac_minor_rele(minor);
 	}
 
+	mac_unregister_priv_prop(mip);
+
 	kmem_cache_free(i_mac_impl_cachep, mip);
 	return (err);
 }
@@ -1806,7 +1808,6 @@ mac_unregister(mac_handle_t mh)
 	mod_hash_val_t		val;
 	mac_multicst_addr_t	*p, *nextp;
 	mac_margin_req_t	*mmr, *nextmmr;
-	mac_priv_prop_t		*mpriv;
 
 	/*
 	 * See if there are any other references to this mac_t (e.g., VLAN's).
@@ -1882,10 +1883,9 @@ mac_unregister(mac_handle_t mh)
 	if (mip->mi_minor > MAC_MAX_MINOR)
 		mac_minor_rele(mip->mi_minor);
 
-	cmn_err(CE_NOTE, "!%s unregistered", mip->mi_name);
+	mac_unregister_priv_prop(mip);
 
-	mpriv = mip->mi_priv_prop;
-	kmem_free(mpriv, mip->mi_priv_prop_count * sizeof (*mpriv));
+	cmn_err(CE_NOTE, "!%s unregistered", mip->mi_name);
 
 	kmem_cache_free(i_mac_impl_cachep, mip);
 
@@ -2961,4 +2961,17 @@ mac_register_priv_prop(mac_impl_t *mip, mac_priv_prop_t *mpp, uint_t nprop)
 	(void) memcpy(mpriv, mpp, nprop * sizeof (*mpriv));
 	mip->mi_priv_prop = mpriv;
 	mip->mi_priv_prop_count = nprop;
+}
+
+static void
+mac_unregister_priv_prop(mac_impl_t *mip)
+{
+	mac_priv_prop_t	*mpriv;
+
+	mpriv = mip->mi_priv_prop;
+	if (mpriv != NULL) {
+		kmem_free(mpriv, mip->mi_priv_prop_count * sizeof (*mpriv));
+		mip->mi_priv_prop = NULL;
+	}
+	mip->mi_priv_prop_count = 0;
 }
