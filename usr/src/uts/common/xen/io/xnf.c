@@ -104,8 +104,6 @@
  *  Declarations and Module Linkage
  */
 
-#define	IDENT	"Virtual Ethernet driver"
-
 #if defined(DEBUG) || defined(__lint)
 #define	XNF_DEBUG
 int	xnfdebug = 0;
@@ -867,6 +865,9 @@ xnf_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 		xnfp->xnf_connected = B_FALSE;
 		mutex_exit(&xnfp->xnf_txlock);
 		mutex_exit(&xnfp->xnf_intrlock);
+
+		/* claim link to be down after disconnect */
+		mac_link_update(xnfp->xnf_mh, LINK_STATE_DOWN);
 		return (DDI_SUCCESS);
 
 	case DDI_DETACH:
@@ -2484,6 +2485,16 @@ xnf_stat(void *arg, uint_t stat, uint64_t *val)
 	ether_stat(MACRCV_ERRORS, mac_rcv_error);
 	ether_stat(TOOSHORT_ERRORS, runt);
 
+	/* always claim to be in full duplex mode */
+	case ETHER_STAT_LINK_DUPLEX:
+		*val = LINK_DUPLEX_FULL;
+		break;
+
+	/* always claim to be at 1Gb/s link speed */
+	case MAC_STAT_IFSPEED:
+		*val = 1000000000ull;
+		break;
+
 	default:
 		mutex_exit(&xnfp->xnf_txlock);
 		mutex_exit(&xnfp->xnf_intrlock);
@@ -2622,6 +2633,9 @@ oe_state_change(dev_info_t *dip, ddi_eventcookie_t id,
 		 * handling routine to handle them, if any
 		 */
 		(void) xnf_intr((caddr_t)xnfp);
+
+		/* mark as link up after get connected */
+		mac_link_update(xnfp->xnf_mh, LINK_STATE_UP);
 
 		break;
 
