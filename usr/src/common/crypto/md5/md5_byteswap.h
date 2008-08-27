@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_MD5_BYTESWAP_H
 #define	_MD5_BYTESWAP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * definitions for inline functions for little-endian loads.
@@ -40,8 +38,11 @@
  * same thing and must be changed together.
  */
 
+#include <sys/types.h>
 #if defined(__sparc)
 #include <v9/sys/asi.h>
+#elif defined(_LITTLE_ENDIAN)
+#include <sys/byteorder.h>
 #endif
 
 #ifdef	__cplusplus
@@ -95,25 +96,11 @@ load_little_32(uint32_t *addr)
 
 	__asm__(
 	    "lduwa	[%1] %2, %0\n\t"
-	: "=r" (value)
-	: "r" (addr), "i" (ASI_PL));
+	    : "=r" (value)
+	    : "r" (addr), "i" (ASI_PL));
 
 	return (value);
 }
-
-static __inline__ uint16_t
-load_little_16(uint16_t *addr)
-{
-	uint16_t value;
-
-	__asm__(
-	    "lduha	[%1] %2, %0\n\t"
-	: "=r" (value)
-	: "r" (addr), "i" (ASI_PL));
-
-	return (value);
-}
-
 #endif	/* !__lint && __GNUC__ */
 
 #if !defined(__GNUC__)
@@ -129,13 +116,14 @@ load_little_32(uint32_t *addr)
 }
 #endif	/* __lint */
 
-#else	/* !sun4u */
+#elif defined(_LITTLE_ENDIAN)
+#define	LOAD_LITTLE_32(addr)	htonl(addr)
 
+#else
 /* big endian -- will work on little endian, but slowly */
 /* Since we do byte operations, we don't have to check for alignment. */
 #define	LOAD_LITTLE_32(addr)	\
 	((addr)[0] | ((addr)[1] << 8) | ((addr)[2] << 16) | ((addr)[3] << 24))
-
 #endif	/* sun4u */
 
 #if defined(sun4v)
@@ -175,9 +163,9 @@ static __inline__ void
 set_little(uint8_t asi)
 {
 	__asm__ __volatile__(
-		"wr	%%g0, %0, %%asi\n\t"
-	: /* Nothing */
-	: "r" (asi));
+	    "wr	%%g0, %0, %%asi\n\t"
+	    : /* Nothing */
+	    : "r" (asi));
 }
 
 static __inline__ uint8_t
@@ -186,8 +174,8 @@ get_little(void)
 	uint8_t asi;
 
 	__asm__ __volatile__(
-		"rd	%%asi, %0\n\t"
-	: "=r" (asi));
+	    "rd	%%asi, %0\n\t"
+	    : "=r" (asi));
 
 	return (asi);
 }

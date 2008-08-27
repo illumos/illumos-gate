@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,8 +39,6 @@
 
 #ifndef _SYS_BYTEORDER_H
 #define	_SYS_BYTEORDER_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/isa_defs.h>
 #include <sys/int_types.h>
@@ -61,8 +59,10 @@ extern "C" {
 #if defined(_BIG_ENDIAN) && !defined(ntohl) && !defined(__lint)
 /* big-endian */
 #define	ntohl(x)	(x)
+#define	ntohll(x)	(x)
 #define	ntohs(x)	(x)
 #define	htonl(x)	(x)
+#define	htonll(x)	(x)
 #define	htons(x)	(x)
 
 #elif !defined(ntohl) /* little-endian */
@@ -80,14 +80,18 @@ typedef uint32_t in_addr_t;
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__) || defined(_XPG5)
 extern	uint32_t htonl(uint32_t);
 extern	uint16_t htons(uint16_t);
-extern 	uint32_t ntohl(uint32_t);
+extern	uint32_t ntohl(uint32_t);
 extern	uint16_t ntohs(uint16_t);
 #else
 extern	in_addr_t htonl(in_addr_t);
 extern	in_port_t htons(in_port_t);
-extern 	in_addr_t ntohl(in_addr_t);
+extern	in_addr_t ntohl(in_addr_t);
 extern	in_port_t ntohs(in_port_t);
 #endif	/* !defined(_XPG4_2) || defined(__EXTENSIONS__) || defined(_XPG5) */
+#if !(defined(_XPG4_2) || defined(_XPG5)) || defined(__EXTENSIONS__)
+extern	uint64_t htonll(uint64_t);
+extern	uint64_t ntohll(uint64_t);
+#endif	/* !(_XPG4_2||_XPG5) || __EXTENSIONS__ */
 #endif
 
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _KERNEL
 #include <strings.h>
 #include <limits.h>
@@ -36,6 +34,10 @@
 #include <modes/modes.h>
 #include <sys/crypto/common.h>
 #include <sys/crypto/impl.h>
+
+#ifdef _LITTLE_ENDIAN
+#include <sys/byteorder.h>
+#endif
 
 /*
  * Encrypt and decrypt multiple blocks of data in counter mode.
@@ -101,29 +103,13 @@ ctr_mode_contiguous_blocks(ctr_ctx_t *ctx, char *data, size_t length,
 		 * Increment counter. Counter bits are confined
 		 * to the bottom 64 bits of the counter block.
 		 */
+#ifdef _LITTLE_ENDIAN
+		counter = ntohll(ctx->ctr_cb[1] & ctx->ctr_counter_mask);
+		counter = htonll(counter + 1);
+#else
 		counter = ctx->ctr_cb[1] & ctx->ctr_counter_mask;
-#ifdef _LITTLE_ENDIAN
-		p = (uint8_t *)&counter;
-		counter = (((uint64_t)p[0] << 56) |
-		    ((uint64_t)p[1] << 48) |
-		    ((uint64_t)p[2] << 40) |
-		    ((uint64_t)p[3] << 32) |
-		    ((uint64_t)p[4] << 24) |
-		    ((uint64_t)p[5] << 16) |
-		    ((uint64_t)p[6] << 8) |
-		    (uint64_t)p[7]);
-#endif
 		counter++;
-#ifdef _LITTLE_ENDIAN
-		counter = (((uint64_t)p[0] << 56) |
-		    ((uint64_t)p[1] << 48) |
-		    ((uint64_t)p[2] << 40) |
-		    ((uint64_t)p[3] << 32) |
-		    ((uint64_t)p[4] << 24) |
-		    ((uint64_t)p[5] << 16) |
-		    ((uint64_t)p[6] << 8) |
-		    (uint64_t)p[7]);
-#endif
+#endif	/* _LITTLE_ENDIAN */
 		counter &= ctx->ctr_counter_mask;
 		ctx->ctr_cb[1] =
 		    (ctx->ctr_cb[1] & ~(ctx->ctr_counter_mask)) | counter;
@@ -224,25 +210,15 @@ ctr_init_ctx(ctr_ctx_t *ctr_ctx, ulong_t count, uint8_t *cb,
 void (*copy_block)(uint8_t *, uint8_t *))
 {
 	uint64_t mask = 0;
-#ifdef _LITTLE_ENDIAN
-	uint8_t *p8;
-#endif
 
 	if (count == 0 || count > 64) {
 		return (CRYPTO_MECHANISM_PARAM_INVALID);
 	}
 	while (count-- > 0)
 		mask |= (1ULL << count);
+
 #ifdef _LITTLE_ENDIAN
-	p8 = (uint8_t *)&mask;
-	mask = (((uint64_t)p8[0] << 56) |
-	    ((uint64_t)p8[1] << 48) |
-	    ((uint64_t)p8[2] << 40) |
-	    ((uint64_t)p8[3] << 32) |
-	    ((uint64_t)p8[4] << 24) |
-	    ((uint64_t)p8[5] << 16) |
-	    ((uint64_t)p8[6] << 8) |
-	    (uint64_t)p8[7]);
+	mask = htonll(mask);
 #endif
 	ctr_ctx->ctr_counter_mask = mask;
 	copy_block(cb, (uchar_t *)ctr_ctx->ctr_cb);

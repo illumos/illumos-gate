@@ -1,9 +1,7 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * MD4C.C - RSA Data Security, Inc., MD4 message-digest algorithm
@@ -37,6 +35,10 @@
 #else
 #include <strings.h>
 #endif /* _KERNEL */
+
+#if defined(__i386) || defined(__amd64)
+#define	UNALIGNED_POINTERS_PERMITTED
+#endif
 
 #include <sys/md4.h>
 
@@ -262,18 +264,20 @@ MD4Transform(uint32_t state[4], unsigned char block[64])
  * a multiple of 4.
  */
 static void
-Encode(output, input, len)
-	unsigned char *output;
-	uint32_t *input;
-	unsigned int len;
+Encode(unsigned char *output, uint32_t *input, unsigned int len)
 {
 	unsigned int i, j;
 
 	for (i = 0, j = 0; j < len; i++, j += 4) {
+#if defined(_LITTLE_ENDIAN) && defined(UNALIGNED_POINTERS_PERMITTED)
+		*(uint32_t *)&output[j] = input[i];
+#else
+		/* endian-independent code */
 		output[j] = (unsigned char)(input[i] & 0xff);
 		output[j+1] = (unsigned char)((input[i] >> 8) & 0xff);
 		output[j+2] = (unsigned char)((input[i] >> 16) & 0xff);
 		output[j+3] = (unsigned char)((input[i] >> 24) & 0xff);
+#endif	/* _LITTLE_ENDIAN && UNALIGNED_POINTERS_PERMITTED */
 	}
 }
 
@@ -282,16 +286,20 @@ Encode(output, input, len)
  * a multiple of 4.
  */
 static void
-Decode(output, input, len)
-	uint32_t *output;
-	unsigned char *input;
-	unsigned int len;
+Decode(uint32_t *output, unsigned char *input, unsigned int len)
 {
 	unsigned int i, j;
 
-	for (i = 0, j = 0; j < len; i++, j += 4)
+	for (i = 0, j = 0; j < len; i++, j += 4) {
+#if defined(_LITTLE_ENDIAN) && defined(UNALIGNED_POINTERS_PERMITTED)
+		output[i] = *(uint32_t *)&input[j];
+#else
+		/* endian-independent code */
 		output[i] = ((uint32_t)input[j]) |
-			(((uint32_t)input[j+1]) << 8) |
-			(((uint32_t)input[j+2]) << 16) |
-			(((uint32_t)input[j+3]) << 24);
+		    (((uint32_t)input[j+1]) << 8) |
+		    (((uint32_t)input[j+2]) << 16) |
+		    (((uint32_t)input[j+3]) << 24);
+#endif	/* _LITTLE_ENDIAN && UNALIGNED_POINTERS_PERMITTED */
+	}
+
 }

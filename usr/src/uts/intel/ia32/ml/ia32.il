@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /
 / Inline functions for i386 kernels.
@@ -88,6 +86,20 @@
 /
 / Networking byte order functions (too bad, Intel has the wrong byte order)
 /
+	.inline	htonll,4
+	movl	(%esp), %edx
+	movl	4(%esp), %eax
+	bswap	%edx
+	bswap	%eax
+	.end
+
+	.inline	ntohll,4
+	movl	(%esp), %edx
+	movl	4(%esp), %eax
+	bswap	%edx
+	bswap	%eax
+	.end
+
 	.inline	htonl,4
 	movl	(%esp), %eax
 	bswap	%eax

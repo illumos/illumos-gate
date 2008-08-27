@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The basic framework for this code came from the reference
  * implementation for MD5.  That implementation is Copyright (C)
@@ -29,7 +27,7 @@
  * documentation and/or software.
  *
  * NOTE: Cleaned-up and optimized, version of SHA1, based on the FIPS 180-1
- * standard, available at http://www.itl.nist.gov/div897/pubs/fip180-1.htm
+ * standard, available at http://www.itl.nist.gov/fipspubs/fip180-1.htm
  * Not as fast as one would like -- further optimizations are encouraged
  * and appreciated.
  */
@@ -47,6 +45,11 @@
 #include <errno.h>
 #include <sys/systeminfo.h>
 #endif  /* !_KERNEL */
+
+#ifdef _LITTLE_ENDIAN
+#include <sys/byteorder.h>
+#define	HAVE_HTONL
+#endif
 
 static void Encode(uint8_t *, const uint32_t *, size_t);
 
@@ -106,17 +109,6 @@ ROTATE_LEFT(uint64_t value, uint32_t n)
 
 #endif
 
-#if	defined(__GNUC__) && (defined(__i386) || defined(__amd64))
-
-#define	HAVE_BSWAP
-
-extern __inline__ uint32_t bswap(uint32_t value)
-{
-	__asm__("bswap %0" : "+r" (value));
-	return (value);
-}
-
-#endif
 
 /*
  * SHA1Init()
@@ -296,8 +288,8 @@ SHA1Update(SHA1_CTX *ctx, const void *inptr, size_t input_len)
 				 */
 				for (; i + 63 < input_len; i += 64) {
 					SHA1TransformVIS(X0,
-					/* LINTED E_BAD_PTR_CAST_ALIGN */
-					    (uint32_t *)&input[i],
+					    /* LINTED E_BAD_PTR_CAST_ALIGN */
+					    (uint32_t *)&input[i], /* CSTYLED */
 					    &ctx->state[0], VIS);
 				}
 
@@ -455,24 +447,16 @@ typedef uint32_t sha1word;
  */
 
 #if	defined(_BIG_ENDIAN)
-
 #define	LOAD_BIG_32(addr)	(*(uint32_t *)(addr))
 
-#else	/* !defined(_BIG_ENDIAN) */
+#elif	defined(HAVE_HTONL)
+#define	LOAD_BIG_32(addr) htonl(*((uint32_t *)(addr)))
 
-#if	defined(HAVE_BSWAP)
-
-#define	LOAD_BIG_32(addr) bswap(*((uint32_t *)(addr)))
-
-#else	/* !defined(HAVE_BSWAP) */
-
+#else
 /* little endian -- will work on big endian, but slowly */
 #define	LOAD_BIG_32(addr)	\
 	(((addr)[0] << 24) | ((addr)[1] << 16) | ((addr)[2] << 8) | (addr)[3])
-
-#endif	/* !defined(HAVE_BSWAP) */
-
-#endif	/* !defined(_BIG_ENDIAN) */
+#endif	/* _BIG_ENDIAN */
 
 /*
  * SHA1Transform()
@@ -537,14 +521,14 @@ SHA1Transform(uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e,
 	 * .rodata.
 	 *
 	 * unfortunately, loading from an array in this manner hurts
-	 * performance under intel.  so, there is a macro,
+	 * performance under Intel.  So, there is a macro,
 	 * SHA1_CONST(), used in SHA1Transform(), that either expands to
 	 * a reference to this array, or to the actual constant,
 	 * depending on what platform this code is compiled for.
 	 */
 
 	static const uint32_t sha1_consts[] = {
-		SHA1_CONST_0,	SHA1_CONST_1,	SHA1_CONST_2,	SHA1_CONST_3,
+		SHA1_CONST_0, SHA1_CONST_1, SHA1_CONST_2, SHA1_CONST_3
 	};
 
 	/*
@@ -629,9 +613,10 @@ SHA1Transform(uint32_t a, uint32_t b, uint32_t c, uint32_t d, uint32_t e,
 	}
 #else	/* !defined(__sparc) */
 
-void
+void /* CSTYLED */
 SHA1Transform(SHA1_CTX *ctx, const uint8_t blk[64])
 {
+	/* CSTYLED */
 	sha1word a = ctx->state[0];
 	sha1word b = ctx->state[1];
 	sha1word c = ctx->state[2];

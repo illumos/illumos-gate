@@ -22,8 +22,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -376,50 +374,50 @@ parsecmd(char *cmdstr, char *objstr)
 				{"rule",	IKE_SVC_GET_RULE},
 				{"preshared",	IKE_SVC_GET_PS},
 				{"defaults",	IKE_SVC_GET_DEFS},
-				{NULL,		IKE_SVC_ERROR},
+				{NULL,		IKE_SVC_ERROR}
 			}
 		},
 		{"set", IKE_SVC_ERROR, {
 				{"debug",	IKE_SVC_SET_DBG},
 				{"priv",	IKE_SVC_SET_PRIV},
-				{NULL,		IKE_SVC_ERROR},
+				{NULL,		IKE_SVC_ERROR}
 			}
 		},
 		{"add", IKE_SVC_ERROR, {
 				{"rule",	IKE_SVC_NEW_RULE},
 				{"preshared",	IKE_SVC_NEW_PS},
-				{NULL,		IKE_SVC_ERROR},
+				{NULL,		IKE_SVC_ERROR}
 			}
 		},
 		{"del", IKE_SVC_ERROR, {
 				{"p1",		IKE_SVC_DEL_P1},
 				{"rule",	IKE_SVC_DEL_RULE},
 				{"preshared",	IKE_SVC_DEL_PS},
-				{NULL,		IKE_SVC_ERROR},
+				{NULL,		IKE_SVC_ERROR}
 			}
 		},
 		{"dump", IKE_SVC_ERROR, {
 				{"p1",		IKE_SVC_DUMP_P1S},
 				{"rule",	IKE_SVC_DUMP_RULES},
 				{"preshared",	IKE_SVC_DUMP_PS},
-				{NULL,		IKE_SVC_ERROR},
+				{NULL,		IKE_SVC_ERROR}
 			}
 		},
 		{"flush", IKE_SVC_ERROR, {
 				{"p1",		IKE_SVC_FLUSH_P1S},
-				{NULL,		IKE_SVC_ERROR},
+				{NULL,		IKE_SVC_ERROR}
 			}
 		},
 		{"read", IKE_SVC_ERROR, {
 				{"rule",	IKE_SVC_READ_RULES},
 				{"preshared",	IKE_SVC_READ_PS},
-				{NULL,		IKE_SVC_ERROR},
+				{NULL,		IKE_SVC_ERROR}
 			}
 		},
 		{"write", IKE_SVC_ERROR, {
 				{"rule",	IKE_SVC_WRITE_RULES},
 				{"preshared",	IKE_SVC_WRITE_PS},
-				{NULL,		IKE_SVC_ERROR},
+				{NULL,		IKE_SVC_ERROR}
 			}
 		},
 		{"help", IKEADM_HELP_GENERAL, {
@@ -432,26 +430,26 @@ parsecmd(char *cmdstr, char *objstr)
 				{"read",	IKEADM_HELP_READ},
 				{"write",	IKEADM_HELP_WRITE},
 				{"help",	IKEADM_HELP_HELP},
-				{NULL,		IKE_SVC_ERROR},
+				{NULL,		IKE_SVC_ERROR}
 			}
 		},
 		{"exit", IKEADM_EXIT, {
-				{NULL,		IKE_SVC_ERROR},
+				{NULL,		IKE_SVC_ERROR}
 			}
 		},
 		{"quit", IKEADM_EXIT, {
-				{NULL,		IKE_SVC_ERROR},
+				{NULL,		IKE_SVC_ERROR}
 			}
 		},
 		{"dbg", IKE_SVC_ERROR, {
 				{"rbdump",	IKE_SVC_DBG_RBDUMP},
-				{NULL,		IKE_SVC_ERROR},
+				{NULL,		IKE_SVC_ERROR}
 			}
 		},
 		{NULL,	IKE_SVC_ERROR, {
-				{NULL,		IKE_SVC_ERROR},
+				{NULL,		IKE_SVC_ERROR}
 			}
-		},
+		}
 	};
 	struct cmdtbl	*ct = table;
 	struct objtbl	*ot;
@@ -1138,17 +1136,6 @@ bail:
 	return (-1);
 }
 
-/* stolen from libdhcputil (dhcp_inittab.c) */
-static uint64_t
-ike_ntohll(uint64_t nll)
-{
-#ifdef	_LITTLE_ENDIAN
-	return ((uint64_t)ntohl(nll & 0xffffffff) << 32 | ntohl(nll >> 32));
-#else
-	return (nll);
-#endif
-}
-
 /*
  * Printing functions
  *
@@ -1158,11 +1145,10 @@ ike_ntohll(uint64_t nll)
  * the ipsec_util.c functions actually print the string to the file named
  * in the second arg to the function (and are named dump_foo).
  *
- * The reason for this is that in the context of the ikeadm output, it
- * seemed like the localization of the text would be more straightforward
- * (and could more easily accomodate non-english grammar!) if more complete
- * phrases were being translated, rather than a bit of a phrase followed by
- * a call to dump_foo() followed by more of the phrase.
+ * Localization for ikeadm seems more straightforward when complete
+ * phrases are translated rather than: a part of a phrase, a call to
+ * dump_foo(), and more of the phrase.  It could also accommodate
+ * non-English grammar more easily.
  */
 
 static char *
@@ -1393,8 +1379,8 @@ print_hdr(char *prefix, ike_p1_hdr_t *hdrp)
 {
 	(void) printf(
 	    gettext("%s Cookies: Initiator 0x%llx  Responder 0x%llx\n"),
-	    prefix, ike_ntohll(hdrp->p1hdr_cookies.cky_i),
-	    ike_ntohll(hdrp->p1hdr_cookies.cky_r));
+	    prefix, ntohll(hdrp->p1hdr_cookies.cky_i),
+	    ntohll(hdrp->p1hdr_cookies.cky_r));
 	(void) printf(gettext("%s The local host is the %s.\n"), prefix,
 	    hdrp->p1hdr_isinit ? gettext("initiator") : gettext("responder"));
 	(void) printf(gettext("%s ISAKMP version %d.%d; %s exchange\n"), prefix,

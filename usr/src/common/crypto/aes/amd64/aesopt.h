@@ -54,20 +54,20 @@
  *    from brg_endian.h
  * 5. Undefined VIA_ACE_POSSIBLE and ASSUME_VIA_ACE_PRESENT
  * 6. Changed uint_8t and uint_32t to uint8_t and uint32_t
- * 7. cstyled and hdrchk code
+ * 7. Defined aes_sw32 as htonl() for byte swapping
+ * 8. Cstyled and hdrchk code
  *
  */
 
 #ifndef _AESOPT_H
 #define	_AESOPT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <sys/byteorder.h>
 #include <aes_impl.h>
 
 /*  SUPPORT FEATURES */
@@ -521,17 +521,20 @@ extern "C" {
 #define	DEC_UNROLL  NONE
 #endif
 
-#if defined(bswap32)
+#if (ALGORITHM_BYTE_ORDER == IS_LITTLE_ENDIAN)
+#define	aes_sw32	htonl
+#elif defined(bswap32)
 #define	aes_sw32	bswap32
 #elif defined(bswap_32)
 #define	aes_sw32	bswap_32
 #else
-#define	brot(x, n)   (((uint32_t)(x) <<  n) | ((uint32_t)(x) >> (32 - n)))
+#define	brot(x, n)  (((uint32_t)(x) << (n)) | ((uint32_t)(x) >> (32 - (n))))
 #define	aes_sw32(x) ((brot((x), 8) & 0x00ff00ff) | (brot((x), 24) & 0xff00ff00))
 #endif
 
+
 /*
- *  upr(x, n):  rotates bytes within words by n positions, moving bytes to
+ *	upr(x, n):  rotates bytes within words by n positions, moving bytes to
  *		higher index positions with wrap around into low positions
  *	ups(x, n):  moves bytes by n positions to higher index positions in
  *		words but without wrap around

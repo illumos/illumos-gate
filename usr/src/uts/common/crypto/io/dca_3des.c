@@ -21,11 +21,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Deimos - cryptographic acceleration based upon Broadcom 582x.
@@ -39,6 +37,11 @@
 #include <sys/crypto/common.h>
 #include <sys/crypto/spi.h>
 #include <sys/crypto/dca.h>
+
+#if defined(__i386) || defined(__amd64)
+#include <sys/byteorder.h>
+#define	UNALIGNED_POINTERS_PERMITTED
+#endif
 
 /*
  * 3DES implementation.
@@ -74,9 +77,15 @@ dca_3des(crypto_ctx_t *ctx, crypto_data_t *in,
 	 * If cd_miscdata non-null then this contains the IV.
 	 */
 	if (in->cd_miscdata != NULL) {
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		uint32_t	*p = (uint32_t *)in->cd_miscdata;
+		des_ctx->dr_ctx.iv[0] = htonl(p[0]);
+		des_ctx->dr_ctx.iv[1] = htonl(p[1]);
+#else
 		uchar_t	*p = (uchar_t *)in->cd_miscdata;
 		des_ctx->dr_ctx.iv[0] = p[0]<<24 | p[1]<<16 | p[2]<<8 | p[3];
 		des_ctx->dr_ctx.iv[1] = p[4]<<24 | p[5]<<16 | p[6]<<8 | p[7];
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
 
 	if (len > dca_length(out)) {
@@ -168,9 +177,15 @@ dca_3desupdate(crypto_ctx_t *ctx, crypto_data_t *in,
 	 * If cd_miscdata non-null then this contains the IV.
 	 */
 	if (in->cd_miscdata != NULL) {
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		uint32_t	*p = (uint32_t *)in->cd_miscdata;
+		des_ctx->dr_ctx.iv[0] = htonl(p[0]);
+		des_ctx->dr_ctx.iv[1] = htonl(p[1]);
+#else
 		uchar_t	*p = (uchar_t *)in->cd_miscdata;
 		des_ctx->dr_ctx.iv[0] = p[0]<<24 | p[1]<<16 | p[2]<<8 | p[3];
 		des_ctx->dr_ctx.iv[1] = p[4]<<24 | p[5]<<16 | p[6]<<8 | p[7];
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
 
 	if (len > dca_length(out)) {
@@ -392,7 +407,11 @@ dca_3desstart(dca_t *dca, uint32_t flags, dca_request_t *reqp)
 	 */
 	if (flags & DR_DECRYPT) {
 		uchar_t		ivstore[DESBLOCK];
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		uint32_t	*ivp = (uint32_t *)ivstore;
+#else
 		uchar_t		*ivp = ivstore;
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 
 		/* get last 8 bytes of ciphertext for IV of next op */
 		/*
@@ -420,10 +439,15 @@ dca_3desstart(dca_t *dca, uint32_t flags, dca_request_t *reqp)
 		}
 
 		/* store as a pair of native 32-bit values */
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		ctx->dr_ctx.iv[0] = htonl(ivp[0]);
+		ctx->dr_ctx.iv[1] = htonl(ivp[1]);
+#else
 		ctx->dr_ctx.iv[0] =
 		    ivp[0]<<24 | ivp[1]<<16 | ivp[2]<<8 | ivp[3];
 		ctx->dr_ctx.iv[1] =
 		    ivp[4]<<24 | ivp[5]<<16 | ivp[6]<<8 | ivp[7];
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
 
 	/* For now we force a pullup.  Add direct DMA later. */
@@ -550,20 +574,31 @@ dca_3desdone(dca_request_t *reqp, int errno)
 		 */
 		if (reqp->dr_flags & DR_ENCRYPT) {
 			uchar_t		ivstore[DESBLOCK];
+#ifdef UNALIGNED_POINTERS_PERMITTED
+			uint32_t	*iv = (uint32_t *)ivstore;
+#else
 			uchar_t		*iv = ivstore;
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 
 			/* get last 8 bytes for IV of next op */
-			errno = dca_getbufbytes(out, off, DESBLOCK, iv);
+			errno = dca_getbufbytes(out, off, DESBLOCK,
+			    (uchar_t *)iv);
 			if (errno != CRYPTO_SUCCESS) {
 				DBG(NULL, DWARN,
 				    "dca_3desdone: dca_getbufbytes() failed");
 				goto errout;
 			}
+
 			/* store as a pair of native 32-bit values */
+#ifdef UNALIGNED_POINTERS_PERMITTED
+			ctx->dr_ctx.iv[0] = htonl(iv[0]);
+			ctx->dr_ctx.iv[1] = htonl(iv[1]);
+#else
 			ctx->dr_ctx.iv[0] =
 			    iv[0]<<24 | iv[1]<<16 | iv[2]<<8 | iv[3];
 			ctx->dr_ctx.iv[1] =
 			    iv[4]<<24 | iv[5]<<16 | iv[6]<<8 | iv[7];
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 		}
 
 		/*
@@ -623,14 +658,24 @@ dca_3desctxinit(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 {
 	dca_request_t	*des_ctx;
 	dca_t		*dca = ctx->cc_provider;
+#ifdef UNALIGNED_POINTERS_PERMITTED
+	uint32_t	*param;
+	uint32_t	*value32;
+#else
 	uchar_t		*param;
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 	uchar_t		*value;
 	size_t		paramsz;
 	unsigned	len;
 	int		i, j;
 
 	paramsz = mechanism->cm_param_len;
+#ifdef UNALIGNED_POINTERS_PERMITTED
+	param = (uint32_t *)mechanism->cm_param;
+#else
 	param = (uchar_t *)mechanism->cm_param;
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
+
 	if ((paramsz != 0) && (paramsz != DES_IV_LEN)) {
 		DBG(NULL, DWARN,
 		    "dca_3desctxinit: parameter(IV) length not %d (%d)",
@@ -650,10 +695,15 @@ dca_3desctxinit(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	 */
 	if (param != NULL) {
 		ASSERT(paramsz == DES_IV_LEN);
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		des_ctx->dr_ctx.iv[0] = htonl(param[0]);
+		des_ctx->dr_ctx.iv[1] = htonl(param[1]);
+#else
 		des_ctx->dr_ctx.iv[0] = param[0]<<24 | param[1]<<16 |
 		    param[2]<<8 | param[3];
 		des_ctx->dr_ctx.iv[1] = param[4]<<24 | param[5]<<16 |
 		    param[6]<<8 | param[7];
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
 	des_ctx->dr_ctx.residlen = 0;
 	des_ctx->dr_ctx.activeresidlen = 0;
@@ -709,10 +759,18 @@ dca_3desctxinit(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 			dca_3desctxfree(ctx);
 			return (CRYPTO_KEY_SIZE_RANGE);
 		}
+
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		value32 = (uint32_t *)value;
+		des_ctx->dr_ctx.key[0] = htonl(value32[0]);
+		des_ctx->dr_ctx.key[1] = htonl(value32[1]);
+#else
 		des_ctx->dr_ctx.key[0] =
 		    value[0]<<24 | value[1]<<16 | value[2]<<8 | value[3];
 		des_ctx->dr_ctx.key[1] =
 		    value[4]<<24 | value[5]<<16 | value[6]<<8 | value[7];
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
+
 		/* for single des just repeat des key */
 		des_ctx->dr_ctx.key[4] =
 		    des_ctx->dr_ctx.key[2] = des_ctx->dr_ctx.key[0];

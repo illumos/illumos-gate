@@ -19,28 +19,46 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 	.file	"byteorder.s"
 
-#include "SYS.h"
+#include <sys/asm_linkage.h>
 
 	/*
-	 * NOTE: htonl/ntohl are identical routines, as are htons/ntohs.
-	 * As such, they could be implemented as a single routine, using
-	 * multiple ALTENTRY/SET_SIZE definitions. We don't do this so
+	 * NOTE: htonll/ntohll, htonl/ntohl, and htons/ntohs are identical
+	 * routines. As such, they could be implemented as a single routine,
+	 * using multiple ALTENTRY/SET_SIZE definitions. We don't do this so
 	 * that they will have unique addresses, allowing DTrace and
-	 * other debuggers to tell them apart. 
+	 * other debuggers to tell them apart.
 	 */
+
+/*
+ *	unsigned long long htonll( hll )
+ *	unsigned long long ntohll( hll )
+ *	unsigned long long hll;
+ *	reverses the byte order of 'uint64_t hll' on little endian machines
+ */
+	ENTRY(htonll)
+	movq	%rdi, %rax	/* %rax = hll */
+	bswapq	%rax		/* reverses the byte order of %rax */
+	ret			/* return (%rax) */
+	SET_SIZE(htonll)
+
+	ENTRY(ntohll)
+	movq	%rdi, %rax	/* %rax = hll */
+	bswapq	%rax		/* reverses the byte order of %rax */
+	ret			/* return (%rax) */
+	SET_SIZE(ntohll)
 
 
 /*
  *	unsigned long htonl( hl )
  *	unsigned long ntohl( hl )
- *	long hl;
- *	reverses the byte order of 'uint32_t hl'
+ *	unsigned long hl;
+ *	reverses the byte order of 'uint32_t hl' on little endian machines
  */
 	ENTRY(htonl)
 	movl	%edi, %eax	/* %eax = hl */
@@ -56,9 +74,8 @@
 
 /*
  *	unsigned short htons( hs )
- *	short hs;
- *
- *	reverses the byte order in hs.
+ *	unsigned short hs;
+ *	reverses the byte order of 'uint16_t hs' on little endian machines.
  */
 	ENTRY(htons)
 	movl	%edi, %eax	/* %eax = hs */

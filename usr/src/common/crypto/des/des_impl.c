@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/ddi.h>
@@ -38,6 +36,11 @@
 #include <strings.h>
 #include <stdlib.h>
 #endif	/* !_KERNEL */
+
+#if defined(__i386) || defined(__amd64)
+#include <sys/byteorder.h>
+#define	UNALIGNED_POINTERS_PERMITTED
+#endif
 
 /* EXPORT DELETE START */
 
@@ -518,29 +521,35 @@ des3_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
 		if (decrypt == B_TRUE)
 			/* LINTED */
 			*(uint64_t *)out_block = des_crypt_impl(
-			    ksch->ksch_decrypt,
-			    /* LINTED */
+			    ksch->ksch_decrypt, /* LINTED */
 			    *(uint64_t *)block, 3);
 		else
 			/* LINTED */
 			*(uint64_t *)out_block = des_crypt_impl(
-			    ksch->ksch_encrypt,
-			    /* LINTED */
+			    ksch->ksch_encrypt, /* LINTED */
 			    *(uint64_t *)block, 3);
-	} else {
-#endif
+	} else
+#endif	/* _BIG_ENDIAN */
+	{
 		uint64_t tmp;
 
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		tmp = htonll(*(uint64_t *)&block[0]);
+#else
 		tmp = (((uint64_t)block[0] << 56) | ((uint64_t)block[1] << 48) |
 		    ((uint64_t)block[2] << 40) | ((uint64_t)block[3] << 32) |
 		    ((uint64_t)block[4] << 24) | ((uint64_t)block[5] << 16) |
 		    ((uint64_t)block[6] << 8) | (uint64_t)block[7]);
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 
 		if (decrypt == B_TRUE)
 			tmp = des_crypt_impl(ksch->ksch_decrypt, tmp, 3);
 		else
 			tmp = des_crypt_impl(ksch->ksch_encrypt, tmp, 3);
 
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		*(uint64_t *)&out_block[0] = htonll(tmp);
+#else
 		out_block[0] = tmp >> 56;
 		out_block[1] = tmp >> 48;
 		out_block[2] = tmp >> 40;
@@ -549,9 +558,8 @@ des3_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
 		out_block[5] = tmp >> 16;
 		out_block[6] = tmp >> 8;
 		out_block[7] = (uint8_t)tmp;
-#ifdef _BIG_ENDIAN
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
-#endif
 /* EXPORT DELETE END */
 	return (CRYPTO_SUCCESS);
 }
@@ -574,30 +582,37 @@ des_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
 		if (decrypt == B_TRUE)
 			/* LINTED */
 			*(uint64_t *)out_block = des_crypt_impl(
-			    ksch->ksch_decrypt,
-			    /* LINTED */
+			    ksch->ksch_decrypt, /* LINTED */
 			    *(uint64_t *)block, 1);
 		else
 			/* LINTED */
 			*(uint64_t *)out_block = des_crypt_impl(
-			    ksch->ksch_encrypt,
-			    /* LINTED */
+			    ksch->ksch_encrypt, /* LINTED */
 			    *(uint64_t *)block, 1);
 
-	} else {
-#endif
+	} else
+#endif	/* _BIG_ENDIAN */
+	{
 		uint64_t tmp;
 
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		tmp = htonll(*(uint64_t *)&block[0]);
+#else
 		tmp = (((uint64_t)block[0] << 56) | ((uint64_t)block[1] << 48) |
 		    ((uint64_t)block[2] << 40) | ((uint64_t)block[3] << 32) |
 		    ((uint64_t)block[4] << 24) | ((uint64_t)block[5] << 16) |
 		    ((uint64_t)block[6] << 8) | (uint64_t)block[7]);
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
+
 
 		if (decrypt == B_TRUE)
 			tmp = des_crypt_impl(ksch->ksch_decrypt, tmp, 1);
 		else
 			tmp = des_crypt_impl(ksch->ksch_encrypt, tmp, 1);
 
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		*(uint64_t *)&out_block[0] = htonll(tmp);
+#else
 		out_block[0] = tmp >> 56;
 		out_block[1] = tmp >> 48;
 		out_block[2] = tmp >> 40;
@@ -606,9 +621,8 @@ des_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
 		out_block[5] = tmp >> 16;
 		out_block[6] = tmp >> 8;
 		out_block[7] = (uint8_t)tmp;
-#ifdef _BIG_ENDIAN
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
-#endif
 /* EXPORT DELETE END */
 	return (CRYPTO_SUCCESS);
 }
@@ -650,7 +664,7 @@ keycheck(uint8_t *key, uint8_t *corrected_key)
 		0x1ffe1ffe0efe0efeULL,	0xfe1ffe1ffe0efe0eULL,
 		0x011f011f010e010eULL,	0x1f011f010e010e01ULL,
 		0xe0fee0fef1fef1feULL,	0xfee0fee0fef1fef1ULL,
-#endif
+#endif	/* _LITTLE_ENDIAN */
 
 		/* We'll save the other possibly-weak keys for the future. */
 	};
@@ -658,6 +672,9 @@ keycheck(uint8_t *key, uint8_t *corrected_key)
 	if (key == NULL)
 		return (B_FALSE);
 
+#ifdef UNALIGNED_POINTERS_PERMITTED
+	key_so_far = htonll(*(uint64_t *)&key[0]);
+#else
 	/*
 	 * The code below reverses the bytes on LITTLE_ENDIAN machines.
 	 * On BIG_ENDIAN, the same code copies without reversing
@@ -667,6 +684,7 @@ keycheck(uint8_t *key, uint8_t *corrected_key)
 	    ((uint64_t)key[2] << 40) | ((uint64_t)key[3] << 32) |
 	    ((uint64_t)key[4] << 24) | ((uint64_t)key[5] << 16) |
 	    ((uint64_t)key[6] << 8) | (uint64_t)key[7]);
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 
 	/*
 	 * Fix parity.
@@ -680,6 +698,9 @@ keycheck(uint8_t *key, uint8_t *corrected_key)
 		}
 
 	if (corrected_key != NULL) {
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		*(uint64_t *)&corrected_key[0] = htonll(key_so_far);
+#else
 		/*
 		 * The code below reverses the bytes on LITTLE_ENDIAN machines.
 		 * On BIG_ENDIAN, the same code copies without reversing
@@ -693,6 +714,7 @@ keycheck(uint8_t *key, uint8_t *corrected_key)
 		corrected_key[5] = key_so_far >> 16;
 		corrected_key[6] = key_so_far >> 8;
 		corrected_key[7] = (uint8_t)key_so_far;
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
 /* EXPORT DELETE END */
 	return (B_TRUE);
@@ -743,7 +765,7 @@ des3_keycheck(uint8_t *key, uint8_t *corrected_key)
 	/*
 	 * Perform key equivalence checks, now that parity is properly set.
 	 * 1st and 2nd keys must be unique, the 3rd key can be the same as
-	 * the 1st key for the 2 key varient of 3DES.
+	 * the 1st key for the 2 key variant of 3DES.
 	 */
 	if (currentkey[0] == currentkey[1] || currentkey[1] == currentkey[2])
 		return (B_FALSE);
@@ -785,6 +807,9 @@ des_parity_fix(uint8_t *key, des_strength_t strength, uint8_t *corrected_key)
 	paritied_key = (uint8_t *)aligned_key;
 	while (strength > i) {
 		offset = 8 * i;
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		key_so_far = htonll(*(uint64_t *)&paritied_key[offset]);
+#else
 		key_so_far = (((uint64_t)paritied_key[offset + 0] << 56) |
 		    ((uint64_t)paritied_key[offset + 1] << 48) |
 		    ((uint64_t)paritied_key[offset + 2] << 40) |
@@ -793,9 +818,13 @@ des_parity_fix(uint8_t *key, des_strength_t strength, uint8_t *corrected_key)
 		    ((uint64_t)paritied_key[offset + 5] << 16) |
 		    ((uint64_t)paritied_key[offset + 6] << 8) |
 		    (uint64_t)paritied_key[offset + 7]);
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 
 		fix_des_parity(&key_so_far);
 
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		*(uint64_t *)&paritied_key[offset] = htonll(key_so_far);
+#else
 		paritied_key[offset + 0] = key_so_far >> 56;
 		paritied_key[offset + 1] = key_so_far >> 48;
 		paritied_key[offset + 2] = key_so_far >> 40;
@@ -804,6 +833,7 @@ des_parity_fix(uint8_t *key, des_strength_t strength, uint8_t *corrected_key)
 		paritied_key[offset + 5] = key_so_far >> 16;
 		paritied_key[offset + 6] = key_so_far >> 8;
 		paritied_key[offset + 7] = (uint8_t)key_so_far;
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 
 		i++;
 	}
@@ -855,10 +885,13 @@ des_init_keysched(uint8_t *cipherKey, des_strength_t strength, void *ks)
 			/* LINTED: pointer alignment */
 			key_uint64[i] = *((uint64_t *)&cipherKey[j]);
 		}
-	} else {
-#endif
+	} else
+#endif	/* _BIG_ENDIAN */
 	{
 		for (i = 0, j = 0; j < keysize; i++, j += 8) {
+#ifdef UNALIGNED_POINTERS_PERMITTED
+			key_uint64[i] = htonll(*(uint64_t *)&cipherKey[j]);
+#else
 			key_uint64[i] = (((uint64_t)cipherKey[j] << 56) |
 			    ((uint64_t)cipherKey[j + 1] << 48) |
 			    ((uint64_t)cipherKey[j + 2] << 40) |
@@ -867,11 +900,9 @@ des_init_keysched(uint8_t *cipherKey, des_strength_t strength, void *ks)
 			    ((uint64_t)cipherKey[j + 5] << 16) |
 			    ((uint64_t)cipherKey[j + 6] << 8) |
 			    (uint64_t)cipherKey[j + 7]);
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 		}
 	}
-#ifdef _BIG_ENDIAN
-	}
-#endif
 
 	switch (strength) {
 	case DES:
@@ -951,7 +982,7 @@ des_alloc_keysched(size_t *keysched_size, des_strength_t strength, int kmflag)
 /*
  * Replace the LSB of each byte by the xor of the other
  * 7 bits.  The tricky thing is that the original contents of the LSBs
- * are nullifed by including them twice in the xor computation.
+ * are nullified by including them twice in the xor computation.
  */
 static void
 fix_des_parity(uint64_t *keyp)
@@ -988,11 +1019,11 @@ des_xor_block(uint8_t *data, uint8_t *dst)
 	    IS_P2ALIGNED(data, sizeof (uint32_t))) {
 		/* LINTED: pointer alignment */
 		*(uint32_t *)&dst[0] ^=
-		/* LINTED: pointer alignment */
+		    /* LINTED: pointer alignment */
 		    *(uint32_t *)&data[0];
-		/* LINTED: pointer alignment */
+		    /* LINTED: pointer alignment */
 		*(uint32_t *)&dst[4] ^=
-		/* LINTED: pointer alignment */
+		    /* LINTED: pointer alignment */
 		    *(uint32_t *)&data[4];
 	} else {
 		DES_XOR_BLOCK(data, dst);

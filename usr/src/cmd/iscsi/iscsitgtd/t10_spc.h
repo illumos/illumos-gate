@@ -27,8 +27,6 @@
 #ifndef _T10_SPC_H
 #define	_T10_SPC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -46,6 +44,8 @@ extern "C" {
 #define	FIXED_SENSE_ADDL_INFO_LEN 0xFFFFFFFF
 #define	INFORMATION_SENSE_DESCR sizeof (struct scsi_information_sense_descr)
 
+#include <sys/types.h>
+#include <netinet/in.h>
 #include <sys/scsi/generic/inquiry.h>
 #include <sys/scsi/generic/mode.h>
 
@@ -83,15 +83,6 @@ Boolean_t spc_encode_lu_addr(uint8_t *buf, int select_field, uint32_t lun);
 #define	SPC_SENSE_EOM	0x01
 #define	SPC_SENSE_FM	0x02
 #define	SPC_SENSE_ILI	0x04
-
-#ifdef _BIG_ENDIAN
-#define	htonll(x)   (x)
-#define	ntohll(x)   (x)
-#else
-#define	htonll(x)   ((((unsigned long long)htonl(x & 0xffffffff)) << 32) + \
-		    htonl(x >> 32))
-#define	ntohll(x)   ((((unsigned long long)ntohl(x)) << 32) + ntohl(x >> 32))
-#endif
 
 /*
  * []------------------------------------------------------------------[]

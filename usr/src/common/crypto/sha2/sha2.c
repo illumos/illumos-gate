@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * The basic framework for this code came from the reference
  * implementation for MD5.  That implementation is Copyright (C)
@@ -29,7 +27,8 @@
  * documentation and/or software.
  *
  * NOTE: Cleaned-up and optimized, version of SHA2, based on the FIPS 180-2
- * standard, available at http://www.itl.nist.gov/div897/pubs/fip180-2.htm
+ * standard, available at
+ * http://csrc.nist.gov/publications/fips/fips180-2/fips180-2.pdf
  * Not as fast as one would like -- further optimizations are encouraged
  * and appreciated.
  */
@@ -59,6 +58,11 @@
 #pragma weak SHA512Final = SHA2Final
 
 #endif	/* _KERNEL */
+
+#ifdef _LITTLE_ENDIAN
+#include <sys/byteorder.h>
+#define	HAVE_HTONL
+#endif
 
 static void Encode(uint8_t *, uint32_t *, size_t);
 static void Encode64(uint8_t *, uint64_t *, size_t);
@@ -121,28 +125,23 @@ static uint8_t PADDING[128] = { 0x80, /* all zeros */ };
  */
 
 #if	defined(_BIG_ENDIAN)
-
 #define	LOAD_BIG_32(addr)	(*(uint32_t *)(addr))
-
-#else	/* little endian -- will work on big endian, but slowly */
-
-#define	LOAD_BIG_32(addr)	\
-	(((addr)[0] << 24) | ((addr)[1] << 16) | ((addr)[2] << 8) | (addr)[3])
-#endif
-
-
-#if	defined(_BIG_ENDIAN)
-
 #define	LOAD_BIG_64(addr)	(*(uint64_t *)(addr))
 
-#else	/* little endian -- will work on big endian, but slowly */
+#elif	defined(HAVE_HTONL)
+#define	LOAD_BIG_32(addr) htonl(*((uint32_t *)(addr)))
+#define	LOAD_BIG_64(addr) htonll(*((uint64_t *)(addr)))
 
+#else
+/* little endian -- will work on big endian, but slowly */
+#define	LOAD_BIG_32(addr)	\
+	(((addr)[0] << 24) | ((addr)[1] << 16) | ((addr)[2] << 8) | (addr)[3])
 #define	LOAD_BIG_64(addr)	\
 	(((uint64_t)(addr)[0] << 56) | ((uint64_t)(addr)[1] << 48) |	\
 	    ((uint64_t)(addr)[2] << 40) | ((uint64_t)(addr)[3] << 32) |	\
 	    ((uint64_t)(addr)[4] << 24) | ((uint64_t)(addr)[5] << 16) |	\
 	    ((uint64_t)(addr)[6] << 8) | (uint64_t)(addr)[7])
-#endif
+#endif	/* _BIG_ENDIAN */
 
 
 #if	!defined(__amd64)
@@ -715,8 +714,8 @@ SHA2Init(uint64_t mech, SHA2_CTX *ctx)
 		break;
 #ifdef _KERNEL
 	default:
-		cmn_err(CE_PANIC, "sha2_init: "
-		    "failed to find a supported algorithm: 0x%x",
+		cmn_err(CE_PANIC,
+		    "sha2_init: failed to find a supported algorithm: 0x%x",
 		    (uint32_t)mech);
 
 #endif /* _KERNEL */

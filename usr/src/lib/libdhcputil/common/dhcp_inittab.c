@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <string.h>
@@ -47,8 +45,6 @@
 #include "dhcp_symbol.h"
 #include "dhcp_inittab.h"
 
-static uint64_t		dhcp_htonll(uint64_t);
-static uint64_t		dhcp_ntohll(uint64_t);
 static void		inittab_msg(const char *, ...);
 static uchar_t		category_to_code(const char *);
 static boolean_t	encode_number(uint8_t, uint8_t, boolean_t, uint8_t,
@@ -1478,7 +1474,7 @@ decode_number(uint8_t n_entries, uint8_t size, boolean_t is_signed,
 		case 8:
 			(void) memcpy(&uint64, from, 8);
 			to += sprintf(to, is_signed ? "%lld" : "%llu",
-			    dhcp_ntohll(uint64));
+			    ntohll(uint64));
 			break;
 
 		default:
@@ -1574,7 +1570,7 @@ encode_number(uint8_t n_entries, uint8_t size, boolean_t is_signed,
 			break;
 
 		case 8:
-			uint64 = dhcp_htonll(strtoull(from, &endptr, 0));
+			uint64 = htonll(strtoull(from, &endptr, 0));
 			if (errno != 0 || from == endptr) {
 				goto error;
 			}
@@ -1695,37 +1691,6 @@ category_to_code(const char *category)
 }
 
 /*
- * dhcp_htonll(): converts a 64-bit number from host to network byte order
- *
- *   input: uint64_t: the number to convert
- *  output: uint64_t: its value in network byte order
- */
-
-static uint64_t
-dhcp_htonll(uint64_t uint64_hbo)
-{
-	return (dhcp_ntohll(uint64_hbo));
-}
-
-/*
- * dhcp_ntohll(): converts a 64-bit number from network to host byte order
- *
- *   input: uint64_t: the number to convert
- *  output: uint64_t: its value in host byte order
- */
-
-static uint64_t
-dhcp_ntohll(uint64_t uint64_nbo)
-{
-#ifdef	_LITTLE_ENDIAN
-	return ((uint64_t)ntohl(uint64_nbo & 0xffffffff) << 32 |
-	    ntohl(uint64_nbo >> 32));
-#else
-	return (uint64_nbo);
-#endif
-}
-
-/*
  * our internal table of DHCP option values, used by inittab_verify()
  */
 static dhcp_symbol_t inittab_table[] =
@@ -1745,7 +1710,7 @@ static dhcp_symbol_t inittab_table[] =
 { DSYM_FIELD,		16,	"Yiaddr",	DSYM_IP,	1,	1 },
 { DSYM_FIELD,		20,	"BootSrvA",	DSYM_IP,	1,	1 },
 { DSYM_FIELD,		24,	"Giaddr",	DSYM_IP,	1,	1 },
-{ DSYM_FIELD,		28,	"Chaddr",	DSYM_OCTET, 	1,	16 },
+{ DSYM_FIELD,		28,	"Chaddr",	DSYM_OCTET,	1,	16 },
 { DSYM_FIELD,		44,	"BootSrvN",	DSYM_ASCII,	1,	64 },
 { DSYM_FIELD,		108,	"BootFile",	DSYM_ASCII,	1,	128 },
 { DSYM_FIELD,		236,	"Magic",	DSYM_OCTET,	1,	4 },

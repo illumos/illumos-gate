@@ -26,55 +26,25 @@
 
 #include <sys/isa_defs.h>
 #include <sys/types.h>
+#include <netinet/in.h>
+#include <inttypes.h>
 
+#if (defined(_BIG_ENDIAN) || defined(_LP64)) && !defined(__lint)
 
-#if defined(_LITTLE_ENDIAN) && !defined(__lint)
+#error	Use ISA-dependent byteorder64.c only on a 32-bit little-endian machine.
 
-#error	Use ISA-specific byteorder.s on a little-endian machine.
-
-#else	/* !_LITTLE_ENDIAN */
-
-/*
- * htonll(), ntohll(), htonl(), ntohl(), htons(), ntohs()
- * These functions just return the input parameter, as the host
- * byte order is the same as the network byte order (big endian).
- * On little endian machines, these functions byte swap.
- */
+#else
 
 uint64_t
 htonll(uint64_t in)
 {
-	return (in);
+	return (htonl(in >> 32) | ((uint64_t)htonl(in) << 32));
 }
 
 uint64_t
 ntohll(uint64_t in)
 {
-	return (in);
+	return (ntohl(in >> 32) | (uint64_t)ntohl(in) << 32);
 }
 
-uint32_t
-htonl(uint32_t in)
-{
-	return (in);
-}
-
-uint32_t
-ntohl(uint32_t in)
-{
-	return (in);
-}
-
-uint16_t
-htons(uint16_t in)
-{
-	return (in);
-}
-
-uint16_t
-ntohs(uint16_t in)
-{
-	return (in);
-}
-
-#endif	/* _LITTLE_ENDIAN */
+#endif	/* (_BIG_ENDIAN) || _LP64) && !__lint */

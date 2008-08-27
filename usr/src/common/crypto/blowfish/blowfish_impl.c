@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Blowfish encryption/decryption and keyschedule code.
  */
@@ -50,8 +48,12 @@
 #include <strings.h>
 #include <stdlib.h>
 #define	BLOWFISH_ASSERT(x)
-
 #endif /* _KERNEL */
+
+#if defined(__i386) || defined(__amd64)
+#include <sys/byteorder.h>
+#define	UNALIGNED_POINTERS_PERMITTED
+#endif
 
 /* EXPORT DELETE START */
 
@@ -390,11 +392,16 @@ blowfish_encrypt_block(const void *cookie, const uint8_t *block,
 		b32 = (uint32_t *)block;
 		left = b32[0];
 		right = b32[1];
-	} else {
+	} else
 #endif
+	{
 	/*
 	 * Read input block and place in left/right in big-endian order.
 	 */
+#ifdef UNALIGNED_POINTERS_PERMITTED
+	left = htonl(*(uint32_t *)&block[0]);
+	right = htonl(*(uint32_t *)&block[4]);
+#else
 	left = ((uint32_t)block[0] << 24)
 	    | ((uint32_t)block[1] << 16)
 	    | ((uint32_t)block[2] << 8)
@@ -403,9 +410,8 @@ blowfish_encrypt_block(const void *cookie, const uint8_t *block,
 	    | ((uint32_t)block[5] << 16)
 	    | ((uint32_t)block[6] << 8)
 	    | (uint32_t)block[7];
-#ifdef _BIG_ENDIAN
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
-#endif
 
 	ROUND(left, right, 0);
 	ROUND(left, right, 1);
@@ -436,20 +442,24 @@ blowfish_encrypt_block(const void *cookie, const uint8_t *block,
 		b32 = (uint32_t *)out_block;
 		b32[0] = left;
 		b32[1] = right;
-	} else {
+	} else
 #endif
-	/* Put the block back into the user's block with final swap */
-	out_block[0] = left >> 24;
-	out_block[1] = left >> 16;
-	out_block[2] = left >> 8;
-	out_block[3] = left;
-	out_block[4] = right >> 24;
-	out_block[5] = right >> 16;
-	out_block[6] = right >> 8;
-	out_block[7] = right;
-#ifdef _BIG_ENDIAN
+	{
+		/* Put the block back into the user's block with final swap */
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		*(uint32_t *)&out_block[0] = htonl(left);
+		*(uint32_t *)&out_block[4] = htonl(right);
+#else
+		out_block[0] = left >> 24;
+		out_block[1] = left >> 16;
+		out_block[2] = left >> 8;
+		out_block[3] = left;
+		out_block[4] = right >> 24;
+		out_block[5] = right >> 16;
+		out_block[6] = right >> 8;
+		out_block[7] = right;
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
-#endif
 /* EXPORT DELETE END */
 	return (CRYPTO_SUCCESS);
 }
@@ -479,11 +489,16 @@ blowfish_decrypt_block(const void *cookie, const uint8_t *block,
 		b32 = (uint32_t *)block;
 		left = b32[0];
 		right = b32[1];
-	} else {
+	} else
 #endif
+	{
 	/*
 	 * Read input block and place in left/right in big-endian order.
 	 */
+#ifdef UNALIGNED_POINTERS_PERMITTED
+	left = htonl(*(uint32_t *)&block[0]);
+	right = htonl(*(uint32_t *)&block[4]);
+#else
 	left = ((uint32_t)block[0] << 24)
 	    | ((uint32_t)block[1] << 16)
 	    | ((uint32_t)block[2] << 8)
@@ -492,9 +507,8 @@ blowfish_decrypt_block(const void *cookie, const uint8_t *block,
 	    | ((uint32_t)block[5] << 16)
 	    | ((uint32_t)block[6] << 8)
 	    | (uint32_t)block[7];
-#ifdef _BIG_ENDIAN
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
-#endif
 
 	ROUND(left, right, 17);
 	ROUND(left, right, 16);
@@ -525,20 +539,24 @@ blowfish_decrypt_block(const void *cookie, const uint8_t *block,
 		b32 = (uint32_t *)out_block;
 		b32[0] = left;
 		b32[1] = right;
-	} else {
+	} else
 #endif
+	{
 	/* Put the block back into the user's block with final swap */
-	out_block[0] = left >> 24;
-	out_block[1] = left >> 16;
-	out_block[2] = left >> 8;
-	out_block[3] = left;
-	out_block[4] = right >> 24;
-	out_block[5] = right >> 16;
-	out_block[6] = right >> 8;
-	out_block[7] = right;
-#ifdef _BIG_ENDIAN
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		*(uint32_t *)&out_block[0] = htonl(left);
+		*(uint32_t *)&out_block[4] = htonl(right);
+#else
+		out_block[0] = left >> 24;
+		out_block[1] = left >> 16;
+		out_block[2] = left >> 8;
+		out_block[3] = left;
+		out_block[4] = right >> 24;
+		out_block[5] = right >> 16;
+		out_block[6] = right >> 8;
+		out_block[7] = right;
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 	}
-#endif
 /* EXPORT DELETE END */
 	return (CRYPTO_SUCCESS);
 }

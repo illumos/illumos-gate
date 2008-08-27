@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/ddi.h>
@@ -1490,10 +1488,7 @@ aes_init_keysched(const uint8_t *cipherKey, uint_t keyBits, void *keysched)
 
 #else	/* byte swap */
 	for (i = 0, j = 0; j < keysize; i++, j += 4) {
-		keyarr.ka32[i] = (((uint32_t)cipherKey[j] << 24) |
-		    ((uint32_t)cipherKey[j + 1] << 16) |
-		    ((uint32_t)cipherKey[j + 2] << 8) |
-		    (uint32_t)cipherKey[j + 3]);
+		keyarr.ka32[i] = htonl(*(uint32_t *)&cipherKey[j]);
 	}
 #endif
 
@@ -1530,15 +1525,10 @@ aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct)
 		bcopy(pt, &buffer, AES_BLOCK_LEN);
 
 #else	/* byte swap */
-		buffer[0] = (((uint32_t)pt[0] << 24) | ((uint32_t)pt[1] << 16) |
-		    ((uint32_t)pt[2] << 8) | (uint32_t)pt[3]);
-		buffer[1] = (((uint32_t)pt[4] << 24) | ((uint32_t)pt[5] << 16) |
-		    ((uint32_t)pt[6] << 8) | (uint32_t)pt[7]);
-		buffer[2] = (((uint32_t)pt[8] << 24) | ((uint32_t)pt[9] << 16) |
-		    ((uint32_t)pt[10] << 8) | (uint32_t)pt[11]);
-		buffer[3] = (((uint32_t)pt[12] << 24) |
-		    ((uint32_t)pt[13] << 16) | ((uint32_t)pt[14] << 8) |
-		    (uint32_t)pt[15]);
+		buffer[0] = htonl(*(uint32_t *)&pt[0]);
+		buffer[1] = htonl(*(uint32_t *)&pt[4]);
+		buffer[2] = htonl(*(uint32_t *)&pt[8]);
+		buffer[3] = htonl(*(uint32_t *)&pt[12]);
 #endif
 
 		AES_ENCRYPT_IMPL(&ksch->encr_ks.ks32[0], ksch->nr,
@@ -1550,22 +1540,10 @@ aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct)
 	}
 
 #else	/* byte swap */
-		ct[0] = buffer[0] >> 24;
-		ct[1] = buffer[0] >> 16;
-		ct[2] = buffer[0] >> 8;
-		ct[3] = (uint8_t)buffer[0];
-		ct[4] = buffer[1] >> 24;
-		ct[5] = buffer[1] >> 16;
-		ct[6] = buffer[1] >> 8;
-		ct[7] = (uint8_t)buffer[1];
-		ct[8] = buffer[2] >> 24;
-		ct[9] = buffer[2] >> 16;
-		ct[10] = buffer[2] >> 8;
-		ct[11] = (uint8_t)buffer[2];
-		ct[12] = buffer[3] >> 24;
-		ct[13] = buffer[3] >> 16;
-		ct[14] = buffer[3] >> 8;
-		ct[15] = (uint8_t)buffer[3];
+		*(uint32_t *)&ct[0] = htonl(buffer[0]);
+		*(uint32_t *)&ct[4] = htonl(buffer[1]);
+		*(uint32_t *)&ct[8] = htonl(buffer[2]);
+		*(uint32_t *)&ct[12] = htonl(buffer[3]);
 #endif
 /* EXPORT DELETE END */
 	return (CRYPTO_SUCCESS);
@@ -1600,18 +1578,10 @@ aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt)
 		bcopy(ct, &buffer, AES_BLOCK_LEN);
 
 #else	/* byte swap */
-		buffer[0] = (((uint32_t)ct[0] << 24) | ((uint32_t)ct[1] << 16) |
-		    ((uint32_t)ct[2] << 8) | (uint32_t)ct[3]);
-
-		buffer[1] = (((uint32_t)ct[4] << 24) | ((uint32_t)ct[5] << 16) |
-		    ((uint32_t)ct[6] << 8) | (uint32_t)ct[7]);
-
-		buffer[2] = (((uint32_t)ct[8] << 24) | ((uint32_t)ct[9] << 16) |
-		    ((uint32_t)ct[10] << 8) | (uint32_t)ct[11]);
-
-		buffer[3] = (((uint32_t)ct[12] << 24) |
-		    ((uint32_t)ct[13] << 16) | ((uint32_t)ct[14] << 8) |
-		    (uint32_t)ct[15]);
+		buffer[0] = htonl(*(uint32_t *)&ct[0]);
+		buffer[1] = htonl(*(uint32_t *)&ct[4]);
+		buffer[2] = htonl(*(uint32_t *)&ct[8]);
+		buffer[3] = htonl(*(uint32_t *)&ct[12]);
 #endif
 
 		AES_DECRYPT_IMPL(&ksch->decr_ks.ks32[0], ksch->nr,
@@ -1623,22 +1593,10 @@ aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt)
 	}
 
 #else	/* byte swap */
-		pt[0] = buffer[0] >> 24;
-		pt[1] = buffer[0] >> 16;
-		pt[2] = buffer[0] >> 8;
-		pt[3] = (uint8_t)buffer[0];
-		pt[4] = buffer[1] >> 24;
-		pt[5] = buffer[1] >> 16;
-		pt[6] = buffer[1] >> 8;
-		pt[7] = (uint8_t)buffer[1];
-		pt[8] = buffer[2] >> 24;
-		pt[9] = buffer[2] >> 16;
-		pt[10] = buffer[2] >> 8;
-		pt[11] = (uint8_t)buffer[2];
-		pt[12] = buffer[3] >> 24;
-		pt[13] = buffer[3] >> 16;
-		pt[14] = buffer[3] >> 8;
-		pt[15] = (uint8_t)buffer[3];
+	*(uint32_t *)&pt[0] = htonl(buffer[0]);
+	*(uint32_t *)&pt[4] = htonl(buffer[1]);
+	*(uint32_t *)&pt[8] = htonl(buffer[2]);
+	*(uint32_t *)&pt[12] = htonl(buffer[3]);
 #endif
 
 /* EXPORT DELETE END */

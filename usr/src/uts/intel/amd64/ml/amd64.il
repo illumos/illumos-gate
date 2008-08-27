@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /
 / In-line functions for amd64 kernels.
@@ -77,6 +75,16 @@
 /
 / Networking byte order functions (too bad, Intel has the wrong byte order)
 /
+
+	.inline	htonll,4
+	movq	%rdi, %rax
+	bswapq	%rax
+	.end
+
+	.inline	ntohll,4
+	movq	%rdi, %rax
+	bswapq	%rax
+	.end
 
 	.inline	htonl,4
 	movl	%edi, %eax

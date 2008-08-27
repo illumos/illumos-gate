@@ -110,7 +110,7 @@ catch_fault:
 	SET_SIZE(no_fault)
 
 #elif defined(__i386)
-			
+
 	ENTRY(on_fault)
 	movl	%gs:CPU_THREAD, %edx
 	movl	4(%esp), %eax			/* jumpbuf address */
@@ -905,7 +905,7 @@ _insque(caddr_t entryp, caddr_t predp)
 #if defined(__amd64)
 
 	ENTRY(_insque)
-	movq	(%rsi), %rax		/* predp->forw 			*/
+	movq	(%rsi), %rax		/* predp->forw			*/
 	movq	%rsi, CPTRSIZE(%rdi)	/* entryp->back = predp		*/
 	movq	%rax, (%rdi)		/* entryp->forw = predp->forw	*/
 	movq	%rdi, (%rsi)		/* predp->forw = entryp		*/
@@ -1080,7 +1080,7 @@ str_valid:
 #endif	/* __lint */
 
 	/*
-	 * Berkley 4.3 introduced symbolically named interrupt levels
+	 * Berkeley 4.3 introduced symbolically named interrupt levels
 	 * as a way deal with priority in a machine independent fashion.
 	 * Numbered priorities are machine specific, and should be
 	 * discouraged where possible.
@@ -1193,7 +1193,7 @@ splx(int level)
 	SET_SIZE(spl0)
 
 
-	/* splx implentation */
+	/* splx implementation */
 	ENTRY(splx)
 	jmp	do_splx		/* redirect to common splx code */
 	SET_SIZE(splx)
@@ -1882,7 +1882,7 @@ scanc(size_t size, uchar_t *cp, uchar_t *table, uchar_t mask)
 					/* rdx == table */
 					/* rcx == mask */
 	addq	%rsi, %rdi		/* end = &cp[size] */
-.scanloop:	
+.scanloop:
 	cmpq	%rdi, %rsi		/* while (cp < end */
 	jnb	.scandone
 	movzbq	(%rsi), %r8		/* %r8 = *cp */
@@ -1897,7 +1897,7 @@ scanc(size_t size, uchar_t *cp, uchar_t *table, uchar_t mask)
 	SET_SIZE(scanc)
 
 #elif defined(__i386)
-	
+
 	ENTRY(scanc)
 	pushl	%edi
 	pushl	%esi
@@ -1923,7 +1923,7 @@ scanc(size_t size, uchar_t *cp, uchar_t *table, uchar_t mask)
 	ret
 	SET_SIZE(scanc)
 
-#endif	/* __i386 */	
+#endif	/* __i386 */
 #endif	/* __lint */
 
 /*
@@ -2027,21 +2027,49 @@ curcpup(void)
 #endif	/* __i386 */
 #endif	/* __lint */
 
+/* htonll(), ntohll(), htonl(), ntohl(), htons(), ntohs()
+ * These functions reverse the byte order of the input parameter and returns
+ * the result.  This is to convert the byte order from host byte order
+ * (little endian) to network byte order (big endian), or vice versa.
+ */
+
 #if defined(__lint)
 
-/* ARGSUSED */
+uint64_t
+htonll(uint64_t i)
+{ return (i); }
+
+uint64_t
+ntohll(uint64_t i)
+{ return (i); }
+
 uint32_t
 htonl(uint32_t i)
-{ return (0); }
+{ return (i); }
 
-/* ARGSUSED */
 uint32_t
 ntohl(uint32_t i)
-{ return (0); }
+{ return (i); }
+
+uint16_t
+htons(uint16_t i)
+{ return (i); }
+
+uint16_t
+ntohs(uint16_t i)
+{ return (i); }
 
 #else	/* __lint */
 
 #if defined(__amd64)
+
+	ENTRY(htonll)
+	ALTENTRY(ntohll)
+	movq	%rdi, %rax
+	bswapq	%rax
+	ret
+	SET_SIZE(ntohll)
+	SET_SIZE(htonll)
 
 	/* XX64 there must be shorter sequences for this */
 	ENTRY(htonl)
@@ -2052,7 +2080,27 @@ ntohl(uint32_t i)
 	SET_SIZE(ntohl)
 	SET_SIZE(htonl)
 
+	/* XX64 there must be better sequences for this */
+	ENTRY(htons)
+	ALTENTRY(ntohs)
+	movl	%edi, %eax
+	bswap	%eax
+	shrl	$16, %eax
+	ret
+	SET_SIZE(ntohs)
+	SET_SIZE(htons)
+
 #elif defined(__i386)
+
+	ENTRY(htonll)
+	ALTENTRY(ntohll)
+	movl	4(%esp), %edx
+	movl	8(%esp), %eax
+	bswap	%edx
+	bswap	%eax
+	ret
+	SET_SIZE(ntohll)
+	SET_SIZE(htonll)
 
 	ENTRY(htonl)
 	ALTENTRY(ntohl)
@@ -2061,38 +2109,6 @@ ntohl(uint32_t i)
 	ret
 	SET_SIZE(ntohl)
 	SET_SIZE(htonl)
-
-#endif	/* __i386 */
-#endif	/* __lint */
-
-#if defined(__lint)
-
-/* ARGSUSED */
-uint16_t
-htons(uint16_t i)
-{ return (0); }
-
-/* ARGSUSED */
-uint16_t
-ntohs(uint16_t i)
-{ return (0); }
-
-
-#else	/* __lint */
-
-#if defined(__amd64)
-
-	/* XX64 there must be better sequences for this */
-	ENTRY(htons)
-	ALTENTRY(ntohs)
-	movl	%edi, %eax
-	bswap	%eax
-	shrl	$16, %eax
-	ret
-	SET_SIZE(ntohs)	
-	SET_SIZE(htons)
-
-#elif defined(__i386)
 
 	ENTRY(htons)
 	ALTENTRY(ntohs)

@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIB_PIC= libc_pic.a
 VERS=	.1
@@ -108,6 +106,7 @@ GENOBJS=			\
 	abs.o			\
 	alloca.o		\
 	byteorder.o		\
+	byteorder64.o		\
 	cuexit.o		\
 	ecvt.o			\
 	errlst.o		\
@@ -970,7 +969,7 @@ ALTPICS= $(TRACEOBJS:%=pics/%)
 $(DYNLIB) := PICS += $(ROOTFS_LIBDIR)/libc_i18n.a
 $(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS) $(LDLIBS)
 
-MAPFILES =	../port/mapfile-vers ../i386/mapfile-vers 
+MAPFILES =	../port/mapfile-vers ../i386/mapfile-vers
 
 #
 # EXTN_CPPFLAGS and EXTN_CFLAGS set in enclosing Makefile

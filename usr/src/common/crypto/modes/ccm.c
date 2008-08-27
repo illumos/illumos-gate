@@ -36,6 +36,11 @@
 #include <sys/crypto/common.h>
 #include <sys/crypto/impl.h>
 
+#if defined(__i386) || defined(__amd64)
+#include <sys/byteorder.h>
+#define	UNALIGNED_POINTERS_PERMITTED
+#endif
+
 /*
  * Encrypt multiple blocks of data in CCM mode.  Decrypt for CCM mode
  * is done in another function.
@@ -59,9 +64,6 @@ ccm_mode_encrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 	size_t out_data_1_len;
 	uint64_t counter;
 	uint8_t *mac_buf;
-#ifdef _LITTLE_ENDIAN
-	uint8_t *p;
-#endif
 
 	if (length + ctx->ccm_remainder_len < block_size) {
 		/* accumulate bytes here and return */
@@ -114,29 +116,13 @@ ccm_mode_encrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 		 * Increment counter. Counter bits are confined
 		 * to the bottom 64 bits of the counter block.
 		 */
+#ifdef _LITTLE_ENDIAN
+		counter = ntohll(ctx->ccm_cb[1] & ctx->ccm_counter_mask);
+		counter = htonll(counter + 1);
+#else
 		counter = ctx->ccm_cb[1] & ctx->ccm_counter_mask;
-#ifdef _LITTLE_ENDIAN
-		p = (uint8_t *)&counter;
-		counter = (((uint64_t)p[0] << 56) |
-		    ((uint64_t)p[1] << 48) |
-		    ((uint64_t)p[2] << 40) |
-		    ((uint64_t)p[3] << 32) |
-		    ((uint64_t)p[4] << 24) |
-		    ((uint64_t)p[5] << 16) |
-		    ((uint64_t)p[6] << 8) |
-		    (uint64_t)p[7]);
-#endif
 		counter++;
-#ifdef _LITTLE_ENDIAN
-		counter = (((uint64_t)p[0] << 56) |
-		    ((uint64_t)p[1] << 48) |
-		    ((uint64_t)p[2] << 40) |
-		    ((uint64_t)p[3] << 32) |
-		    ((uint64_t)p[4] << 24) |
-		    ((uint64_t)p[5] << 16) |
-		    ((uint64_t)p[6] << 8) |
-		    (uint64_t)p[7]);
-#endif
+#endif	/* _LITTLE_ENDIAN */
 		counter &= ctx->ccm_counter_mask;
 		ctx->ccm_cb[1] =
 		    (ctx->ccm_cb[1] & ~(ctx->ccm_counter_mask)) | counter;
@@ -316,8 +302,7 @@ ccm_encrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 					bcopy(ccm_mac_p, out_data_2,
 					    ctx->ccm_mac_len);
 				} else {
-					size_t len_not_used
-					    = out_data_1_len -
+					size_t len_not_used = out_data_1_len -
 					    ctx->ccm_remainder_len;
 					/*
 					 * part of mac in will be in
@@ -494,29 +479,13 @@ ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 		 * Increment counter.
 		 * Counter bits are confined to the bottom 64 bits
 		 */
+#ifdef _LITTLE_ENDIAN
+		counter = ntohll(ctx->ccm_cb[1] & ctx->ccm_counter_mask);
+		counter = htonll(counter + 1);
+#else
 		counter = ctx->ccm_cb[1] & ctx->ccm_counter_mask;
-#ifdef _LITTLE_ENDIAN
-		p = (uint8_t *)&counter;
-		counter = (((uint64_t)p[0] << 56) |
-		    ((uint64_t)p[1] << 48) |
-		    ((uint64_t)p[2] << 40) |
-		    ((uint64_t)p[3] << 32) |
-		    ((uint64_t)p[4] << 24) |
-		    ((uint64_t)p[5] << 16) |
-		    ((uint64_t)p[6] << 8) |
-		    (uint64_t)p[7]);
-#endif
 		counter++;
-#ifdef _LITTLE_ENDIAN
-		counter = (((uint64_t)p[0] << 56) |
-		    ((uint64_t)p[1] << 48) |
-		    ((uint64_t)p[2] << 40) |
-		    ((uint64_t)p[3] << 32) |
-		    ((uint64_t)p[4] << 24) |
-		    ((uint64_t)p[5] << 16) |
-		    ((uint64_t)p[6] << 8) |
-		    (uint64_t)p[7]);
-#endif
+#endif	/* _LITTLE_ENDIAN */
 		counter &= ctx->ccm_counter_mask;
 		ctx->ccm_cb[1] =
 		    (ctx->ccm_cb[1] & ~(ctx->ccm_counter_mask)) | counter;
@@ -704,9 +673,6 @@ ccm_format_initial_blocks(uchar_t *nonce, ulong_t nonceSize,
 	int i, j, k;
 	uint64_t mask = 0;
 	uint8_t *cb;
-#ifdef _LITTLE_ENDIAN
-	uint8_t *p8;
-#endif	/* _LITTLE_ENDIAN */
 
 	q = (uint8_t)((15 - nonceSize) & 0xFF);
 	t = (uint8_t)((aes_ctx->ccm_mac_len) & 0xFF);
@@ -748,15 +714,7 @@ ccm_format_initial_blocks(uchar_t *nonce, ulong_t nonceSize,
 	}
 
 #ifdef _LITTLE_ENDIAN
-	p8 = (uint8_t *)&mask;
-	mask = (((uint64_t)p8[0] << 56) |
-	    ((uint64_t)p8[1] << 48) |
-	    ((uint64_t)p8[2] << 40) |
-	    ((uint64_t)p8[3] << 32) |
-	    ((uint64_t)p8[4] << 24) |
-	    ((uint64_t)p8[5] << 16) |
-	    ((uint64_t)p8[6] << 8) |
-	    (uint64_t)p8[7]);
+	mask = htonll(mask);
 #endif
 	aes_ctx->ccm_counter_mask = mask;
 
@@ -777,6 +735,13 @@ ccm_format_initial_blocks(uchar_t *nonce, ulong_t nonceSize,
 static void
 encode_adata_len(ulong_t auth_data_len, uint8_t *encoded, size_t *encoded_len)
 {
+#ifdef UNALIGNED_POINTERS_PERMITTED
+	uint32_t	*lencoded_ptr;
+#ifdef _LP64
+	uint64_t	*llencoded_ptr;
+#endif
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
+
 	if (auth_data_len < ((1ULL<<16) - (1ULL<<8))) {
 		/* 0 < a < (2^16-2^8) */
 		*encoded_len = 2;
@@ -789,16 +754,26 @@ encode_adata_len(ulong_t auth_data_len, uint8_t *encoded, size_t *encoded_len)
 		*encoded_len = 6;
 		encoded[0] = 0xff;
 		encoded[1] = 0xfe;
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		lencoded_ptr = (uint32_t *)&encoded[2];
+		*lencoded_ptr = htonl(auth_data_len);
+#else
 		encoded[2] = (auth_data_len & 0xff000000) >> 24;
 		encoded[3] = (auth_data_len & 0xff0000) >> 16;
 		encoded[4] = (auth_data_len & 0xff00) >> 8;
 		encoded[5] = auth_data_len & 0xff;
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
+
 #ifdef _LP64
 	} else {
 		/* 2^32 <= a < 2^64 */
 		*encoded_len = 10;
 		encoded[0] = 0xff;
 		encoded[1] = 0xff;
+#ifdef UNALIGNED_POINTERS_PERMITTED
+		llencoded_ptr = (uint64_t *)&encoded[2];
+		*llencoded_ptr = htonl(auth_data_len);
+#else
 		encoded[2] = (auth_data_len & 0xff00000000000000) >> 56;
 		encoded[3] = (auth_data_len & 0xff000000000000) >> 48;
 		encoded[4] = (auth_data_len & 0xff0000000000) >> 40;
@@ -807,6 +782,7 @@ encode_adata_len(ulong_t auth_data_len, uint8_t *encoded, size_t *encoded_len)
 		encoded[7] = (auth_data_len & 0xff0000) >> 16;
 		encoded[8] = (auth_data_len & 0xff00) >> 8;
 		encoded[9] = auth_data_len & 0xff;
+#endif	/* UNALIGNED_POINTERS_PERMITTED */
 #endif	/* _LP64 */
 	}
 }

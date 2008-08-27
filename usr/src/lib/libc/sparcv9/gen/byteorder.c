@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/isa_defs.h>
 #include <sys/types.h>
@@ -35,6 +33,25 @@
 #error	Use ISA-specific byteorder.s on a little-endian machine.
 
 #else	/* !_LITTLE_ENDIAN */
+
+/*
+ * htonll(), ntohll(), htonl(), ntohl(), htons(), ntohs()
+ * These functions just return the input parameter, as the host
+ * byte order is the same as the network byte order (big endian).
+ * On little endian machines, these functions byte swap.
+ */
+
+uint64_t
+htonll(uint64_t in)
+{
+	return (in);
+}
+
+uint64_t
+ntohll(uint64_t in)
+{
+	return (in);
+}
 
 uint32_t
 htonl(uint32_t in)

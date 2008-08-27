@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # All function names added to this or any other libc mapfile
@@ -81,6 +79,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	getattrat;
 	getpagesizes2;
 	htonl;
+	htonll;
 	htons;
 	lio_listio;
 	mkdtemp;
@@ -99,6 +98,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	mq_unlink;
 	nanosleep;
 	ntohl;
+	ntohll;
 	ntohs;
 	posix_fadvise;
 	posix_fallocate;
@@ -1042,7 +1042,7 @@ SUNW_0.8 {		# SunOS 5.4 (Solaris 2.4)
 	iconv_close;
 	iconv_open;
 	lfmt;
-	mutex_destroy = 		NODYNSORT;
+	mutex_destroy =			NODYNSORT;
 	mutex_init;
 	mutex_lock =			NODYNSORT;
 	mutex_trylock =			NODYNSORT;
