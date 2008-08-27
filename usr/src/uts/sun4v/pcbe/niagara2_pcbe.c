@@ -27,8 +27,6 @@
  * Niagara2 Performance Counter Backend
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/cpuvar.h>
 #include <sys/systm.h>
 #include <sys/archsystm.h>
@@ -354,6 +352,9 @@ ni2_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 	ni2_event_t		*evp;
 	int			i;
 	uint32_t		evsel;
+#if defined(VFALLS_IMPL)
+	uint64_t		l2ctl = 0;
+#endif
 
 	/*
 	 * If we've been handed an existing configuration, we need only preset
@@ -387,19 +388,23 @@ ni2_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 			if ((attrs[i].ka_val | VFALLS_L2_CTL_MASK) !=
 			    VFALLS_L2_CTL_MASK)
 				return (CPC_ATTRIBUTE_OUT_OF_RANGE);
-			/*
-			 * Set PERF_CONTROL bits in L2_CONTROL_REG
-			 * only when events have SL bits equal to 3.
-			 */
-			if ((evsel & VFALLS_SL3_MASK) == VFALLS_SL3_MASK) {
-				if ((hv_niagara_setperf(HV_NIAGARA_L2_CTL,
-				    attrs[i].ka_val)) != 0)
-					return (CPC_HV_NO_ACCESS);
-			}
+			else
+				l2ctl = attrs[i].ka_val;
 #endif
 		} else
 			return (CPC_INVALID_ATTRIBUTE);
 	}
+
+#if defined(VFALLS_IMPL)
+	/*
+	 * Set PERF_CONTROL bits in L2_CONTROL_REG only when events have
+	 * SL bits equal to 3.
+	 */
+	if ((evsel & VFALLS_SL3_MASK) == VFALLS_SL3_MASK) {
+		if ((hv_niagara_setperf(HV_NIAGARA_L2_CTL, l2ctl)) != 0)
+			return (CPC_HV_NO_ACCESS);
+	}
+#endif
 
 	/*
 	 * Find other requests that will be programmed with this one, and ensure

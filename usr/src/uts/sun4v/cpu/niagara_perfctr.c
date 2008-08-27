@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/async.h>
@@ -174,7 +172,9 @@ niagara_dram_events[] = {
 	{"mem_reads",		0x0},
 	{"mem_writes",		0x1},
 	{"mem_read_write",	0x2},
+#if defined(NIAGARA_IMPL)
 	{"bank_busy_stalls",	0x3},
+#endif
 	{"rd_queue_latency",	0x4},
 	{"wr_queue_latency",	0x5},
 	{"rw_queue_latency",	0x6},
