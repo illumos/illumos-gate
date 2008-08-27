@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <assert.h>
 #include <sys/types.h>
@@ -220,66 +218,111 @@ sess_from_t10(void *v)
 	iscsi_sess_t	*s	= (iscsi_sess_t *)v;
 	msg_t		*m;
 	Boolean_t	process	= True;
+	t10_conn_shutdown_t t_c_s;
+	Boolean_t	sent_wait_for_destroy = False;
+
+	t_c_s.t10_to_conn_q = NULL;
+	t_c_s.conn_to_t10_q = NULL;
 
 	while (process == True) {
 		m = queue_message_get(s->s_t10q);
 		switch (m->msg_type) {
-			case msg_cmd_data_rqst:
-				queue_message_set(s->s_conn_head->c_dataq, 0,
-				    msg_cmd_data_rqst, m->msg_data);
-				break;
+		case msg_cmd_data_rqst:
+			queue_message_set(s->s_conn_head->c_dataq, 0,
+			    msg_cmd_data_rqst, m->msg_data);
+			break;
 
-			case msg_cmd_data_in:
-				queue_message_set(s->s_conn_head->c_dataq, 0,
-				    msg_cmd_data_in, m->msg_data);
-				break;
+		case msg_cmd_data_in:
+			queue_message_set(s->s_conn_head->c_dataq, 0,
+			    msg_cmd_data_in, m->msg_data);
+			break;
 
-			case msg_cmd_cmplt:
-				queue_message_set(s->s_conn_head->c_dataq, 0,
-				    msg_cmd_cmplt, m->msg_data);
-				break;
+		case msg_cmd_cmplt:
+			queue_message_set(s->s_conn_head->c_dataq, 0,
+			    msg_cmd_cmplt, m->msg_data);
+			break;
 
-			case msg_shutdown_rsp:
+		case msg_shutdown_rsp:
 
-				if (s->s_t10) {
-					if (t10_handle_destroy(s->s_t10, False)
-					    != 0) {
-						/*
-						 * Destroy couldn't complete,
-						 * put the message back on our
-						 * own queue to be picked up
-						 * later and tried again.
-						 */
-						queue_message_set(s->s_t10q, 0,
-						    msg_shutdown_rsp,
-						    m->msg_data);
-						break;
+			if (s->s_t10) {
+				if (!sent_wait_for_destroy) {
+					if (t_c_s.t10_to_conn_q == NULL) {
+						t_c_s.t10_to_conn_q =
+						    queue_alloc();
+						if (t_c_s.t10_to_conn_q
+						    == NULL) {
+							queue_message_set(
+							    s->s_t10q, 0,
+							    msg_shutdown_rsp,
+							    m->msg_data);
+							break;
+						}
 					}
-					s->s_t10 = NULL;
+					if (t_c_s.conn_to_t10_q == NULL) {
+						t_c_s.conn_to_t10_q =
+						    queue_alloc();
+						if (t_c_s.conn_to_t10_q ==
+						    NULL) {
+							queue_message_set(
+							    s->s_t10q, 0,
+							    msg_shutdown_rsp,
+							    m->msg_data);
+							break;
+						}
+					}
+					queue_message_set(
+					    s->s_conn_head->c_dataq, 0,
+					    msg_wait_for_destroy,
+					    (void *)&t_c_s);
+					queue_message_free(queue_message_get(
+					    t_c_s.conn_to_t10_q));
+					sent_wait_for_destroy = True;
 				}
 
-				(void) pthread_mutex_lock(&s->s_mutex);
-				s->s_state = SS_SHUTDOWN_CMPLT;
-				(void) pthread_mutex_unlock(&s->s_mutex);
+				if (t10_handle_destroy(s->s_t10, False) != 0) {
+					/*
+					 * Destroy couldn't complete,
+					 * put the message back on our
+					 * own queue to be picked up
+					 * later and tried again.
+					 */
+					queue_message_set(s->s_t10q, 0,
+					    msg_shutdown_rsp,
+					    m->msg_data);
+					break;
+				}
+				s->s_t10 = NULL;
+				queue_message_set(t_c_s.t10_to_conn_q,
+				    0, 1, (void *)NULL);
+				queue_message_free(queue_message_get(
+				    t_c_s.conn_to_t10_q));
+				queue_free(t_c_s.t10_to_conn_q, NULL);
+				queue_free(t_c_s.conn_to_t10_q, NULL);
+				sent_wait_for_destroy = False;
+			}
 
-				session_free(s);
+			(void) pthread_mutex_lock(&s->s_mutex);
+			s->s_state = SS_SHUTDOWN_CMPLT;
+			(void) pthread_mutex_unlock(&s->s_mutex);
 
-				/*
-				 * Let the connection, which is the last, know
-				 * about our completion of the shutdown.
-				 */
-				queue_message_set(s->s_conn_head->c_dataq, 0,
-				    msg_shutdown_rsp, (void *)True);
-				process		= False;
-				s->s_state	= SS_FREE;
-				break;
+			session_free(s);
 
-			default:
-				queue_prt(s->s_mgmtq, Q_SESS_ERRS,
-				    "SES%x  Unknown msg type (%d) from T10\n",
-				    s->s_num, m->msg_type);
-				queue_message_set(s->s_conn_head->c_dataq, 0,
-				    m->msg_type, m->msg_data);
+			/*
+			 * Let the connection, which is the last, know
+			 * about our completion of the shutdown.
+			 */
+			queue_message_set(s->s_conn_head->c_dataq, 0,
+			    msg_shutdown_rsp, (void *)True);
+			process		= False;
+			s->s_state	= SS_FREE;
+			break;
+
+		default:
+			queue_prt(s->s_mgmtq, Q_SESS_ERRS,
+			    "SES%x  Unknown msg type (%d) from T10\n",
+			    s->s_num, m->msg_type);
+			queue_message_set(s->s_conn_head->c_dataq, 0,
+			    m->msg_type, m->msg_data);
 				break;
 		}
 		queue_message_free(m);
@@ -431,12 +474,19 @@ sess_process(void *v)
 				if (s->s_t10 != NULL) {
 					t10_handle_disable(s->s_t10);
 				}
-				queue_message_set(s->s_t10q, 0,
-				    msg_shutdown_rsp, 0);
-				process = False;
+				/*
+				 * Do all work using the session pointer before
+				 * sending the shutdown response msg. The
+				 * session struct can get freed by the thread
+				 * that picks up and handles the shutdown
+				 * response.
+				 */
 				queue_message_set(s->s_mgmtq, 0,
 				    msg_pthread_join,
 				    (void *)(uintptr_t)pthread_self());
+				queue_message_set(s->s_t10q, 0,
+				    msg_shutdown_rsp, 0);
+				process = False;
 			} else {
 
 				/*

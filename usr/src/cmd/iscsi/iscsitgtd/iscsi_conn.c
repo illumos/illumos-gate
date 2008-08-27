@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <signal.h>
 #include <pthread.h>
 #include <assert.h>
@@ -225,6 +223,7 @@ conn_process(void *v)
 	mgmt_request_t	*mgmt;
 	char		debug[80];
 	time_t		tval = time((time_t *)0);
+	Boolean_t	drop_t10_cmds = False;
 
 	c->c_dataq	= queue_alloc();
 	c->c_maxcmdsn	= CMD_MAXOUTSTANDING;
@@ -312,9 +311,9 @@ conn_process(void *v)
 		case msg_shutdown:
 			if (c->c_state == S5_LOGGED_IN) {
 				conn_state(c, T8);
-			} else if (c->c_state == S4_IN_LOGIN)
+			} else if (c->c_state == S4_IN_LOGIN) {
 				conn_state(c, T7);
-			else {
+			} else {
 				process = False;
 			}
 			break;
@@ -335,14 +334,18 @@ conn_process(void *v)
 			 * The STE needs more data to complete
 			 * the write command.
 			 */
-			iscsi_conn_data_rqst((t10_cmd_t *)m->msg_data);
+			if (!drop_t10_cmds) {
+				iscsi_conn_data_rqst((t10_cmd_t *)m->msg_data);
+			}
 			break;
 
 		case msg_cmd_data_in:
 			/*
 			 * Data is available to satisfy the READ command
 			 */
-			iscsi_conn_data_in((t10_cmd_t *)m->msg_data);
+			if (!drop_t10_cmds) {
+				iscsi_conn_data_in((t10_cmd_t *)m->msg_data);
+			}
 			break;
 
 		case msg_cmd_cmplt:
@@ -351,8 +354,34 @@ conn_process(void *v)
 			 * The status may be good and the previous STEOut data
 			 * wasn't sent so we phase collapse.
 			 */
-			iscsi_conn_cmdcmplt((t10_cmd_t *)m->msg_data);
+			if (!drop_t10_cmds) {
+				iscsi_conn_cmdcmplt((t10_cmd_t *)m->msg_data);
+			}
 			break;
+
+		case msg_wait_for_destroy: {
+			t10_conn_shutdown_t *t_c_s;
+
+			/*
+			 * Handshake through private queues with
+			 * message sender. Acknowledge receipt of
+			 * the msg which indicates the start of t10
+			 * cmd destroy, wait for a reply indicating
+			 * the completion of cmd destroy handling,
+			 * ack that, then drop any subsequent t10 cmd
+			 * messages as they've already been canceled
+			 * and freed.
+			 */
+			t_c_s = (t10_conn_shutdown_t *)m->msg_data;
+			queue_message_set(t_c_s->conn_to_t10_q, 0, 1,
+			    (void *)NULL);
+			queue_message_free(queue_message_get(
+			    t_c_s->t10_to_conn_q));
+			queue_message_set(t_c_s->conn_to_t10_q, 0, 1,
+			    (void *)NULL);
+			drop_t10_cmds = True;
+			break;
+		}
 
 		default:
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
@@ -1289,10 +1318,9 @@ conn_state(iscsi_conn_t *c, iscsi_transition_t t)
 	case S5_LOGGED_IN:
 		switch (t) {
 		case T8:
+			c->c_state = S1_FREE;
 			queue_message_set(c->c_sessq, 0, msg_shutdown,
 			    (void *)c);
-			c->c_state = S1_FREE;
-
 			break;
 		case T9:
 			queue_message_set(c->c_sessq, 0, msg_shutdown,
@@ -1358,9 +1386,9 @@ conn_state(iscsi_conn_t *c, iscsi_transition_t t)
 	case S7_LOGOUT_REQUESTED:
 		switch (t) {
 		case T18:
+			c->c_state = S1_FREE;
 			queue_message_set(c->c_sessq, 0, msg_shutdown,
 			    (void *)c);
-			c->c_state = S1_FREE;
 			break;
 		case T10:
 			queue_message_set(c->c_sessq, 0, msg_shutdown,

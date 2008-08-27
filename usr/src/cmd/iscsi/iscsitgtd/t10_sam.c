@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <aio.h>
 #include <sys/aio.h>
 #include <sys/asynch.h>
@@ -261,7 +259,6 @@ t10_handle_disable(t10_targ_handle_t tp)
 
 	(void) pthread_mutex_lock(&t->s_mutex);
 	if (avl_numnodes(&t->s_open_lu) != 0) {
-
 		s.t_q = queue_alloc();
 		l = avl_first(&t->s_open_lu);
 		while (l != NULL) {
@@ -321,11 +318,83 @@ t10_handle_destroy(t10_targ_handle_t tp, Boolean_t wait)
 					if ((c2free->c_state ==
 					    T10_Cmd_S5_Wait) ||
 					    (c2free->c_state ==
-					    T10_Cmd_S6_Freeing_In) ||
-					    (c2free->c_state ==
+					    T10_Cmd_S6_Freeing_In)) {
+						t10_aio_t *a;
+
+						a = (t10_aio_t *)
+						    c2free->c_emul_id;
+						if (a != NULL) {
+							queue_prt(mgmtq,
+							    Q_STE_NONIO,
+							    "SAM%x ... "
+							    "S5 or S6 Cmd %p, "
+							    "errno/ret %d/%d\n",
+							    t->s_targ_num,
+							    c2free,
+							    a->a_aio.aio_errno,
+							    /*CSTYLED*/
+							    a->a_aio.aio_return);
+						}
+						fast_free++;
+						(void) t10_cmd_state_machine(
+						    c2free, T10_Cmd_T8);
+					} else if ((c2free->c_state ==
 					    T10_Cmd_S4_AIO) ||
 					    (c2free->c_state ==
 					    T10_Cmd_S7_Freeing_AIO)) {
+						t10_aio_t *a;
+
+						a = (t10_aio_t *)
+						    c2free->c_emul_id;
+						if (a == NULL) {
+							continue;
+						} else if (a->a_aio.aio_errno ==
+						    ECANCELED) {
+							fast_free++;
+							/*
+							 * Note, using T5 not T8
+							 * because S4 + T8 = S7
+							 * not S1, S1 is the
+							 * desired result.
+							 */
+							/*CSTYLED*/
+							(void) t10_cmd_state_machine(c2free, T10_Cmd_T5);
+							/*
+							 * Account for this cmd
+							 * in aio sema.
+							 */
+							(void) sema_post(
+							    &t10_aio_sema);
+						} else {
+							queue_prt(mgmtq,
+							    Q_STE_NONIO,
+							    "SAM%x ... "
+							    "S4 or S7 Cmd %p, "
+							    "errno/ret %d/%d\n",
+							    t->s_targ_num,
+							    c2free,
+							    a->a_aio.aio_errno,
+							    /*CSTYLED*/
+							    a->a_aio.aio_return);
+						}
+					} else if (c2free->c_state ==
+					    T10_Cmd_S3_Trans) {
+						t10_aio_t *a;
+
+						a = (t10_aio_t *)
+						    c2free->c_emul_id;
+						if (a != NULL) {
+							queue_prt(mgmtq,
+							    Q_STE_NONIO,
+							    "SAM%x ... "
+							    "S3 Cmd %p, "
+							    "errno/ret %d/%d\n",
+							    t->s_targ_num,
+							    c2free,
+							    a->a_aio.aio_errno,
+							    /*CSTYLED*/
+							    a->a_aio.aio_return);
+						}
 						fast_free++;
 						(void) t10_cmd_state_machine(
 						    c2free, T10_Cmd_T8);
@@ -371,6 +440,7 @@ t10_handle_destroy(t10_targ_handle_t tp, Boolean_t wait)
 	avl_destroy(&t->s_open_lu);
 	(void) pthread_mutex_unlock(&t->s_mutex);
 
+	(void) pthread_mutex_destroy(&t->s_mutex);
 	free(t->s_targ_base);
 	free(t->s_i_name);
 	free(t);
@@ -1791,7 +1861,6 @@ lu_runner(void *v)
 	void		*provo_err;
 	t10_shutdown_t	*s;
 	t10_aio_t	*a;
-	t10_targ_impl_t	*t;
 
 	util_title(mgmtq, Q_STE_NONIO, lu->l_internal_num, "Start LU");
 
@@ -1880,10 +1949,9 @@ lu_runner(void *v)
 			break;
 
 		case msg_shutdown:
-
 			s = (t10_shutdown_t *)m->msg_data;
+
 			itl = s->t_lu;
-			t = itl->l_targ;
 			(void) pthread_mutex_lock(&lu_list_mutex);
 			(void) pthread_mutex_lock(&lu->l_common_mutex);
 			assert(avl_find(&lu->l_all_open, (void *)itl, NULL) !=
@@ -1893,15 +1961,10 @@ lu_runner(void *v)
 			(*sam_emul_table[lu->l_dtype].t_per_fini)(itl);
 			avl_remove(&lu->l_all_open, (void *)itl);
 
-			queue_message_set(s->t_q, 0, msg_shutdown_rsp,
-			    (void *)(uintptr_t)itl->l_targ_lun);
 			if (avl_numnodes(&lu->l_all_open) == 0) {
 				/*
-				 * Acquire mutex and close backing
-				 * store, this is to sync up with
-				 * t10_handle_destroy.
+				 * Close backing store.
 				 */
-				(void) pthread_mutex_lock(&t->s_mutex);
 				queue_prt(mgmtq, Q_STE_NONIO,
 				    "LU_%x  No remaining targets for LU(%d)\n",
 				    lu->l_internal_num, lu->l_fd);
@@ -1922,7 +1985,6 @@ lu_runner(void *v)
 				util_title(mgmtq, Q_STE_NONIO,
 				    lu->l_internal_num, "End LU");
 				queue_free(lu->l_from_transports, NULL);
-				(void) pthread_mutex_unlock(&t->s_mutex);
 				(void) pthread_mutex_unlock(
 				    &lu->l_common_mutex);
 				(void) pthread_mutex_unlock(&lu_list_mutex);
@@ -1935,8 +1997,16 @@ lu_runner(void *v)
 				queue_message_free(m);
 				queue_message_set(mgmtq, 0, msg_pthread_join,
 				    (void *)(uintptr_t)pthread_self());
+				/*
+				 * Send the response after all the work here
+				 * is done.
+				 */
+				queue_message_set(s->t_q, 0, msg_shutdown_rsp,
+				    (void *)(uintptr_t)itl->l_targ_lun);
 				pthread_exit(NULL);
 			}
+			queue_message_set(s->t_q, 0, msg_shutdown_rsp,
+			    (void *)(uintptr_t)itl->l_targ_lun);
 			(void) pthread_mutex_unlock(&lu->l_common_mutex);
 			(void) pthread_mutex_unlock(&lu_list_mutex);
 			break;

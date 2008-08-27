@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _TARGET_QUEUE_H
 #define	_TARGET_QUEUE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -204,7 +202,9 @@ typedef enum {
 	 * Problem message by some of the auxiliary threads indication
 	 * problems.
 	 */
-	msg_status
+	msg_status,
+
+	msg_wait_for_destroy
 
 } msg_type_t;
 

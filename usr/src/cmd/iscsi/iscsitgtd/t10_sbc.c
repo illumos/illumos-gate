@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * []------------------------------------------------------------------[]
  * | Implementation of SBC-2 emulation					|
@@ -1874,6 +1872,15 @@ sbc_io_alloc(t10_cmd_t *c)
 
 	io->da_cmd	= c;
 	io->da_params	= d;
+	/* Enable detecting a change in state of the aio operation */
+	io->da_aio.a_aio.aio_return = AIO_INPROGRESS;
+	/*
+	 * Save the io pointer in the t10 cmd now rather than later. It's
+	 * needed during session shutdown processing to find the aio results
+	 * for determining if libaio has canceled the cmd, in which case
+	 * the cmd needs to be freed.
+	 */
+	c->c_emul_id	= io;
 
 	return (io);
 }

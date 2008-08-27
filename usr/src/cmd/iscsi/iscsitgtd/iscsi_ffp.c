@@ -29,8 +29,6 @@
  * of the protocol.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <poll.h>
 #include <strings.h>
@@ -103,7 +101,20 @@ iscsi_full_feature(iscsi_conn_t *c)
 		}
 	}
 
-	if ((c->c_state == S5_LOGGED_IN) && (c->c_header_digest == True)) {
+	(void) pthread_mutex_lock(&c->c_state_mutex);
+	if (c->c_state != S5_LOGGED_IN) {
+		(void) snprintf(debug, sizeof (debug),
+		    "CON%x  full_feature -- not in S5_LOGGED_IN state\n",
+		    c->c_num);
+		queue_str(c->c_mgmtq, Q_CONN_ERRS, msg_log, debug);
+		if (ahs != NULL)
+			free(ahs);
+		(void) pthread_mutex_unlock(&c->c_state_mutex);
+		return (False);
+	}
+	(void) pthread_mutex_unlock(&c->c_state_mutex);
+
+	if (c->c_header_digest == True) {
 		uint32_t	crc_actual;
 		uint32_t	crc_calculated;
 

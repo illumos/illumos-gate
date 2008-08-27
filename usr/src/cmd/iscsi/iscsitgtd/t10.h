@@ -27,8 +27,6 @@
 #ifndef _T10_H
 #define	_T10_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This header file describes the service level between the transport
  * layer and the emulation portion. These procedure calls can be thought
@@ -516,6 +514,11 @@ typedef struct sam_device_table {
 	void		(*t_task_mgmt)(t10_lu_common_t *, TaskOp_t);
 	char		*t_type_name;
 } sam_device_table_t;
+
+typedef struct t10_conn_shutdown {
+	target_queue_t *t10_to_conn_q;
+	target_queue_t *conn_to_t10_q;
+} t10_conn_shutdown_t;
 
 /*
  * []----

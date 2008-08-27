@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <string.h>
@@ -46,8 +44,8 @@
 
 pthread_mutex_t port_mutex;
 int port_conn_num;
-iscsi_conn_t	*conn_head,
-		*conn_tail;
+iscsi_conn_t	*conn_head = NULL;
+iscsi_conn_t	*conn_tail = NULL;
 
 void
 port_init(void)
