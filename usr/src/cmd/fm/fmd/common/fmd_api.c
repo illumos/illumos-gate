@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/fm/protocol.h>
 #include <fm/topo_hc.h>
@@ -2196,7 +2194,22 @@ fmd_xprt_close(fmd_hdl_t *hdl, fmd_xprt_t *xp)
 void
 fmd_xprt_post(fmd_hdl_t *hdl, fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt)
 {
+	nv_alloc_t *nva = nvlist_lookup_nv_alloc(nvl);
+	fmd_module_t *mp = fmd_api_module(hdl);
 	fmd_xprt_impl_t *xip = fmd_api_transport_impl(hdl, xp);
+	nvlist_t *tmp;
+
+	/*
+	 * If this event was allocated using the module-specific nvlist ops, we
+	 * need to create a copy using the standard fmd nvlist ops.  Otherwise,
+	 * the event may persist after the module has been unloaded and we'll
+	 * die when attempting to free the nvlist.
+	 */
+	if (nva == &mp->mod_nva_sleep || nva == &mp->mod_nva_nosleep) {
+		(void) nvlist_xdup(nvl, &tmp, &fmd.d_nva);
+		nvlist_free(nvl);
+		nvl = tmp;
+	}
 
 	/*
 	 * fmd_xprt_recv() must block during startup waiting for fmd to globally

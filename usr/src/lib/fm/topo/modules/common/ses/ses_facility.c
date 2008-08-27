@@ -341,20 +341,16 @@ ses_sensor_state(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 		/* threshold sensor */
 		if (nvlist_lookup_boolean_value(props,
 		    SES_PROP_WARN_UNDER, &value) == 0 && value)
-			state |=
-			    TOPO_SENSOR_THRESH_LOWER_NONCRIT_GOING_HIGH;
+			state |= TOPO_SENSOR_THRESH_LOWER_NONCRIT;
 		if (nvlist_lookup_boolean_value(props,
 		    SES_PROP_WARN_OVER, &value) == 0 && value)
-			state |=
-			    TOPO_SENSOR_THRESH_UPPER_NONCRIT_GOING_HIGH;
+			state |= TOPO_SENSOR_THRESH_UPPER_NONCRIT;
 		if (nvlist_lookup_boolean_value(props,
 		    SES_PROP_CRIT_UNDER, &value) == 0 && value)
-			state |=
-			    TOPO_SENSOR_THRESH_LOWER_CRIT_GOING_HIGH;
+			state |= TOPO_SENSOR_THRESH_LOWER_CRIT;
 		if (nvlist_lookup_boolean_value(props,
 		    SES_PROP_CRIT_OVER, &value) == 0 && value)
-			state |=
-			    TOPO_SENSOR_THRESH_UPPER_CRIT_GOING_HIGH;
+			state |= TOPO_SENSOR_THRESH_UPPER_CRIT;
 	}
 
 	nvl = NULL;

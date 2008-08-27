@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <pthread.h>
 #include <assert.h>
 #include <errno.h>
@@ -236,7 +234,7 @@ int
 topo_method_call(tnode_t *node, const char *method,
     topo_version_t version, nvlist_t *in, nvlist_t **out, int *err)
 {
-	int rc;
+	int rc, save;
 	topo_imethod_t *mp;
 
 	for (mp = topo_list_next(&node->tn_methods); mp != NULL;
@@ -253,6 +251,8 @@ topo_method_call(tnode_t *node, const char *method,
 		}
 
 		topo_method_enter(mp);
+		save = mp->tim_mod->tm_errno;
+		mp->tim_mod->tm_errno = 0;
 		if ((rc = mp->tim_func(mp->tim_mod, node, version, in, out))
 		    < 0) {
 			if (mp->tim_mod->tm_errno == 0)
@@ -260,6 +260,7 @@ topo_method_call(tnode_t *node, const char *method,
 			else
 				*err = mp->tim_mod->tm_errno;
 		}
+		mp->tim_mod->tm_errno = save;
 		topo_method_exit(mp);
 
 		return (rc);

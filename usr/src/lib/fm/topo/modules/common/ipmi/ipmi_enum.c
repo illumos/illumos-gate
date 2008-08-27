@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <fm/libtopo.h>
 #include <fm/topo_mod.h>
@@ -116,10 +114,14 @@ ipmi_present(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
 		} else {
 			if (topo_prop_get_string(tn, TOPO_PGROUP_IPMI,
 			    TOPO_PROP_IPMI_ENTITY_REF, &name, &err) != 0) {
-				topo_mod_dprintf(mod,
-				    "Failed to get prop %s (%s)\n",
-				    TOPO_PROP_IPMI_ENTITY_REF, strerror(err));
-				return (-1);
+				/*
+				 * Not all nodes have an entity_ref attribute.
+				 * For these cases, return ENOTSUP so that we
+				 * fall back to the default hc presence
+				 * detection.
+				 */
+				return (topo_mod_seterrno(mod,
+				    ETOPO_METHOD_NOTSUP));
 			}
 
 			if ((ep = ipmi_entity_lookup_sdr(ihp, name)) == NULL) {

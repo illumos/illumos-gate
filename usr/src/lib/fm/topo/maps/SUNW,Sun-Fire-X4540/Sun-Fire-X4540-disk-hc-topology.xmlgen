@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 $num_bays = 48;
 $bay_label = "HD_ID_";
@@ -87,7 +85,7 @@ print <<EOF;
 	  proptype='string' >
 	  <argval name='format' type='string' value='hdd\%d.ok2rm.led' />
 	  <argval name='offset' type='uint32' value='0' />
-	  <argval name='nparams' type='unit32' value='1' />
+	  <argval name='nparams' type='uint32' value='1' />
 	</propmethod>
 	<propmethod name='thumper_locate_mode' version='0'
 	  propname='mode' proptype='uint32' mutable='1'>
@@ -102,7 +100,7 @@ print <<EOF;
 	  proptype='string' >
 	  <argval name='format' type='string' value='hdd\%d.state' />
 	  <argval name='offset' type='uint32' value='0' />
-	  <argval name='nparams' type='unit32' value='1' />
+	  <argval name='nparams' type='uint32' value='1' />
 	</propmethod>
 	<propmethod name='thumper_indicator_mode' version='0'
 	  propname='mode' proptype='uint32' mutable='1'>
@@ -117,7 +115,7 @@ print <<EOF;
 	  proptype='string' >
 	  <argval name='format' type='string' value='hdd\%d.state' />
 	  <argval name='offset' type='uint32' value='0' />
-	  <argval name='nparams' type='unit32' value='1' />
+	  <argval name='nparams' type='uint32' value='1' />
 	</propmethod>
 	<propmethod name='thumper_indicator_mode' version='0' propname='mode'
 	  proptype='uint32' mutable='1'>
@@ -132,7 +130,7 @@ print <<EOF;
 	  proptype='string' >
 	  <argval name='format' type='string' value='hdd\%d.state' />
 	  <argval name='offset' type='uint32' value='0' />
-	  <argval name='nparams' type='unit32' value='1' />
+	  <argval name='nparams' type='uint32' value='1' />
 	</propmethod>
         <propmethod name='thumper_indicator_mode' version='0' propname='mode'
 	  proptype='uint32' mutable='1'>

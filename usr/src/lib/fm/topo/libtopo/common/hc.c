@@ -1655,11 +1655,28 @@ struct hc_args {
 	nvlist_t *ha_nvl;
 };
 
+static boolean_t
+hc_auth_changed(nvlist_t *nva, nvlist_t *nvb, const char *propname)
+{
+	char *stra, *strb;
+
+	if (nvlist_lookup_string(nva, propname, &stra) != 0 ||
+	    nvlist_lookup_string(nvb, propname, &strb) != 0)
+		return (B_FALSE);
+
+	if (strcmp(stra, strb) != 0)
+		return (B_TRUE);
+	else
+		return (B_FALSE);
+}
+
 static int
 hc_is_present(topo_mod_t *mod, tnode_t *node, void *pdata)
 {
 	int err;
 	struct hc_args *hap = (struct hc_args *)pdata;
+	nvlist_t *rsrc;
+	boolean_t present;
 
 	/*
 	 * check with the enumerator that created this FMRI
@@ -1670,14 +1687,39 @@ hc_is_present(topo_mod_t *mod, tnode_t *node, void *pdata)
 	    &err) < 0) {
 
 		/*
-		 * Err on the side of caution and return present
+		 * If the method exists but failed for some other reason,
+		 * propagate the error as making any decision over presence is
+		 * impossible.
 		 */
-		if (topo_mod_nvalloc(mod, &hap->ha_nvl, NV_UNIQUE_NAME) == 0)
-			if (nvlist_add_uint32(hap->ha_nvl,
-			    TOPO_METH_PRESENT_RET, 1) == 0)
-				return (0);
+		if (err != ETOPO_METHOD_NOTSUP)
+			return (err);
 
-		return (ETOPO_PROP_NVL);
+		/*
+		 * Check the authority information.  If the part id or serial
+		 * number doesn't match, then it isn't the same FMRI.
+		 * Otherwise, assume presence.
+		 */
+		if (topo_node_resource(node, &rsrc, &err) != 0)
+			return (err);
+
+		present = B_TRUE;
+		if (hc_auth_changed(hap->ha_fmri, rsrc,
+		    FM_FMRI_HC_SERIAL_ID) ||
+		    hc_auth_changed(hap->ha_fmri, rsrc,
+		    FM_FMRI_HC_PART)) {
+			present = B_FALSE;
+		}
+		nvlist_free(rsrc);
+
+		if (topo_mod_nvalloc(mod, &hap->ha_nvl, NV_UNIQUE_NAME) != 0)
+			return (EMOD_NOMEM);
+
+		if (nvlist_add_uint32(hap->ha_nvl,
+		    TOPO_METH_PRESENT_RET, present) != 0) {
+			nvlist_free(hap->ha_nvl);
+			hap->ha_nvl = NULL;
+			return (EMOD_NOMEM);
+		}
 	}
 
 	return (0);

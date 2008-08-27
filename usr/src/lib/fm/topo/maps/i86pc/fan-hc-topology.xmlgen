@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # The fan topologies can be quite complicated, but are ultimately regular.  This
@@ -290,10 +289,8 @@ sub process_topology
 		#
 		# Post-process IPMI enumerator method
 		#
-		if ($level->{provider}) {
-			printf("%*s<enum-method name='ipmi' version='1' ".
-			    "/>\n", $indent, "");
-		}
+		printf("%*s<enum-method name='ipmi' version='1' ".
+		    "/>\n", $indent, "");
 
 		#
 		# Children (if any)
