@@ -1004,7 +1004,7 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	uint_t nbanks;
 	size_t mslsz;
 	int i;
-	int mcg_misc2_present;
+	int mcg_ctl2_present;
 	uint32_t cmci_capable = 0;
 
 	if (gcpu == NULL)
@@ -1038,7 +1038,7 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	 * banks.
 	 */
 	mcg_ctl_present = cap & MCG_CAP_CTL_P;
-	mcg_misc2_present = cap & MCG_CAP_MISC2_P;
+	mcg_ctl2_present = cap & MCG_CAP_CTL2_P;
 
 	/*
 	 * We squirell values away for inspection/debugging.
@@ -1155,25 +1155,25 @@ gcpu_mca_init(cmi_hdl_t hdl)
 		/*
 		 * check CMCI capability
 		 */
-		if (mcg_misc2_present) {
-			uint64_t misc2;
+		if (mcg_ctl2_present) {
+			uint64_t ctl2;
 			uint32_t cap = 0;
-			(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC_MISC2(i), &misc2);
-			if (misc2 & MSR_MC_MISC2_EN)
+			(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC_CTL2(i), &ctl2);
+			if (ctl2 & MSR_MC_CTL2_EN)
 				continue;
-			misc2 |= MSR_MC_MISC2_EN;
-			(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC_MISC2(i), misc2);
-			(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC_MISC2(i), &misc2);
+			ctl2 |= MSR_MC_CTL2_EN;
+			(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC_CTL2(i), ctl2);
+			(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC_CTL2(i), &ctl2);
 			mca->gcpu_bank_cmci[i].cmci_cap = cap =
-			    (misc2 & MSR_MC_MISC2_EN) ? 1 : 0;
+			    (ctl2 & MSR_MC_CTL2_EN) ? 1 : 0;
 			if (cap)
 				cmci_capable ++;
 			/*
 			 * Set threshold to 1 while unset the en field, to avoid
 			 * CMCI trigged before APIC LVT entry init.
 			 */
-			misc2 = misc2 & (~MSR_MC_MISC2_EN) | 1;
-			(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC_MISC2(i), misc2);
+			ctl2 = ctl2 & (~MSR_MC_CTL2_EN) | 1;
+			(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC_CTL2(i), ctl2);
 
 			/*
 			 * init cmci related count
@@ -1432,7 +1432,7 @@ static void
 gcpu_cmci_logout(cmi_hdl_t hdl, int bank, gcpu_mca_cmci_t *bank_cmci_p,
     uint64_t status, int what)
 {
-	uint64_t misc2;
+	uint64_t ctl2;
 
 	if (bank_cmci_p->cmci_cap && (what == GCPU_MPT_WHAT_CYC_ERR) &&
 	    (!(status & MSR_MC_STATUS_VAL) || ((status & MSR_MC_STATUS_VAL) &&
@@ -1454,10 +1454,10 @@ gcpu_cmci_logout(cmi_hdl_t hdl, int bank, gcpu_mca_cmci_t *bank_cmci_p,
 				/* turn on cmci */
 
 				(void) cmi_hdl_rdmsr(hdl,
-				    IA32_MSR_MC_MISC2(bank), &misc2);
-				misc2 |= MSR_MC_MISC2_EN;
+				    IA32_MSR_MC_CTL2(bank), &ctl2);
+				ctl2 |= MSR_MC_CTL2_EN;
 				(void) cmi_hdl_wrmsr(hdl,
-				    IA32_MSR_MC_MISC2(bank), misc2);
+				    IA32_MSR_MC_CTL2(bank), ctl2);
 
 				/* reset counter and set flag */
 				bank_cmci_p->drtcmci = 0;
@@ -1478,7 +1478,7 @@ static void
 gcpu_cmci_throttle(cmi_hdl_t hdl, int bank, gcpu_mca_cmci_t *bank_cmci_p,
     int what)
 {
-	uint64_t misc2 = 0;
+	uint64_t ctl2 = 0;
 
 	/*
 	 * if cmci of this bank occurred beyond
@@ -1494,11 +1494,11 @@ gcpu_cmci_throttle(cmi_hdl_t hdl, int bank, gcpu_mca_cmci_t *bank_cmci_p,
 
 			/* turn off cmci */
 
-			(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC_MISC2(bank),
-			    &misc2);
-			misc2 &= ~MSR_MC_MISC2_EN;
-			(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC_MISC2(bank),
-			    misc2);
+			(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC_CTL2(bank),
+			    &ctl2);
+			ctl2 &= ~MSR_MC_CTL2_EN;
+			(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC_CTL2(bank),
+			    ctl2);
 
 			/* clear the flag and count */
 

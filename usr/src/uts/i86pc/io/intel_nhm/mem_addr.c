@@ -182,6 +182,8 @@ channel_address(int node, int channel, int rule, uint64_t addr)
 {
 	uint64_t caddr;
 
+	if (lockstep[node] || mirror_mode[node])
+		channel = 0;
 	caddr = (((addr >> 16) +
 	    (int64_t)sag_ch[node][channel][rule].offset) << 16) |
 	    (addr & 0xffc0);
@@ -431,6 +433,7 @@ dimm_to_addr(int node, int channel, int rank, uint64_t rank_addr,
 	uint64_t rlimit;
 	uint64_t rank_sz;
 	uint64_t base;
+	int lchannel;
 	int bits;
 	int no_interleave;
 	int sinterleave;
@@ -438,6 +441,10 @@ dimm_to_addr(int node, int channel, int rank, uint64_t rank_addr,
 	int rinterleave;
 	int found = 0;
 
+	if (lockstep[node] || mirror_mode[node])
+		lchannel = 0;
+	else
+		lchannel = channel;
 	addr = -1;
 	base = 0;
 	for (i = 0; i < MAX_TAD_DRAM_RULE && found == 0; i++) {
@@ -492,29 +499,29 @@ dimm_to_addr(int node, int channel, int rank, uint64_t rank_addr,
 			bits = 0;
 			addr = caddr;
 			baddr = cbaddr;
-			if (sag_ch[node][channel][i].divby3) {
+			if (sag_ch[node][lchannel][i].divby3) {
 				addr = (((addr >> 6) * 3) << 6) +
 				    (addr & 0x3f);
 				baddr = (((baddr >> 6) * 3) << 6);
 			}
-			if (sag_ch[node][channel][i].remove6) {
+			if (sag_ch[node][lchannel][i].remove6) {
 				bits = 1;
 				addr = ((addr & ~0x3f) << 1) | (addr & 0x3f);
 				baddr = (baddr & ~0x3f) << 1;
 			}
-			if (sag_ch[node][channel][i].remove7) {
+			if (sag_ch[node][lchannel][i].remove7) {
 				bits =  bits | 2;
 				addr = ((addr & ~0x7f) << 1) | (addr & 0x7f);
 				baddr = ((baddr & ~0x7f) << 1) | (baddr & 0x40);
 			}
-			if (sag_ch[node][channel][i].remove8) {
+			if (sag_ch[node][lchannel][i].remove8) {
 				bits =  bits | 4;
 				addr = ((addr & ~0xff) << 1) | (addr & 0xff);
 				baddr = ((baddr & ~0xff) << 1) | (baddr & 0xc0);
 			}
-			addr -= (int64_t)sag_ch[node][channel][i].offset << 16;
+			addr -= (int64_t)sag_ch[node][lchannel][i].offset << 16;
 			baddr -= (int64_t)
-			    sag_ch[node][channel][i].offset << 16;
+			    sag_ch[node][lchannel][i].offset << 16;
 			if (addr < tad[node][i].limit) {
 				sinterleave = socket_interleave(addr,
 				    node, channel, i, &way);

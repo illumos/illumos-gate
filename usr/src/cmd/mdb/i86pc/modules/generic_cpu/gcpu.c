@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 #include <generic_cpu/gcpu.h>
 #include <sys/cpu_module_impl.h>
@@ -37,6 +35,7 @@ typedef struct cmi_hdl_impl {
 	uint_t cmih_chipid;			/* Chipid of cpu resource */
 	uint_t cmih_coreid;			/* Core within die */
 	uint_t cmih_strandid;			/* Thread within core */
+	boolean_t cmih_mstrand;			/* chip multithreading */
 	volatile uint32_t *cmih_refcntp;	/* Reference count pointer */
 	uint64_t cmih_msrsrc;			/* MSR data source flags */
 	void *cmih_hdlpriv;			/* cmi_hw.c private data */
@@ -301,9 +300,9 @@ cmihdl_disp(uintptr_t addr, cmi_hdl_impl_t *hdl)
 	(void) mdb_snprintf(hwidstr, sizeof (hwidstr), "%d/%d/%d",
 	    hdl->cmih_chipid, hdl->cmih_coreid, hdl->cmih_strandid);
 
-	mdb_printf("%16lx %3d %3s %8s %2s %-13s %-24s\n", addr,
-	    refcnt, cpuidstr, hwidstr, hdl->cmih_mcops ? "Y" : "N",
-	    cmimodnm, cmsmodnm);
+	mdb_printf("%16lx %3d %3s %8s %3s %2s %-13s %-24s\n", addr,
+	    refcnt, cpuidstr, hwidstr, hdl->cmih_mstrand ? "M" : "S",
+	    hdl->cmih_mcops ? "Y" : "N", cmimodnm, cmsmodnm);
 
 	if (native)
 		mdb_free(cp, sizeof (cpu_t));
@@ -311,7 +310,7 @@ cmihdl_disp(uintptr_t addr, cmi_hdl_impl_t *hdl)
 	return (1);
 }
 
-#define	HDRFMT "%-16s %3s %3s %8s %2s %-13s %-24s\n"
+#define	HDRFMT "%-16s %3s %3s %8s %3s %2s %-13s %-24s\n"
 
 static int
 cmihdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -405,9 +404,9 @@ cmihdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		char *p = ul + sizeof (ul) - 1;
 
 		mdb_printf(HDRFMT HDRFMT,
-		    "HANDLE", "REF", "CPU", "CH/CR/ST", "MC",
+		    "HANDLE", "REF", "CPU", "CH/CR/ST", "CMT", "MC",
 		    "MODULE", "MODEL-SPECIFIC",
-		    p - 16,  p - 3, p - 3, p - 8, p - 2, p - 13, p - 24);
+		    p - 16,  p - 3, p - 3, p - 8, p - 3, p - 2, p - 13, p - 24);
 	}
 
 	hdl = mdb_alloc(sizeof (cmi_hdl_impl_t), UM_SLEEP);

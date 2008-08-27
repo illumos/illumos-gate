@@ -117,7 +117,7 @@ gcpu_ntv_mca_poll(cmi_hdl_t hdl, int what)
 	gcpu_mce_status_t mce;
 	int willpanic;
 	int i;
-	uint64_t misc2;
+	uint64_t ctl2;
 	uint64_t bankmask;
 
 	ASSERT(MUTEX_HELD(&gcpu->gcpu_shared->gcpus_poll_lock));
@@ -126,11 +126,11 @@ gcpu_ntv_mca_poll(cmi_hdl_t hdl, int what)
 	if (cmi_enable_cmci && (!mca->gcpu_mca_first_poll_cmci_enabled)) {
 		for (i = 0; i < mca->gcpu_mca_nbanks; i++) {
 			if (mca->gcpu_bank_cmci[i].cmci_cap) {
-				(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC_MISC2(i),
-				    &misc2);
-				misc2 |= MSR_MC_MISC2_EN;
-				(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC_MISC2(i),
-				    misc2);
+				(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC_CTL2(i),
+				    &ctl2);
+				ctl2 |= MSR_MC_CTL2_EN;
+				(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC_CTL2(i),
+				    ctl2);
 				mca->gcpu_bank_cmci[i].cmci_enabled = 1;
 			}
 		}

@@ -309,12 +309,12 @@ nehalem_ep_ereport_add_memory_error_counter(uint_t  chipid,
 }
 
 static int
-gintel_cpu_generation()
+gintel_cpu_generation(cmi_hdl_t hdl)
 {
 	int	cpu_generation = CPU_GENERATION_DONT_CARE;
 
-	if ((cpuid_getfamily(CPU) == INTEL_NEHALEM_CPU_FAMILY_ID) &&
-	    (cpuid_getmodel(CPU) == INTEL_NEHALEM_CPU_MODEL_ID))
+	if ((cmi_hdl_family(hdl) == INTEL_NEHALEM_CPU_FAMILY_ID) &&
+	    (cmi_hdl_model(hdl) == INTEL_NEHALEM_CPU_MODEL_ID))
 		cpu_generation = CPU_GENERATION_NEHALEM_EP;
 
 	return (cpu_generation);
@@ -366,9 +366,9 @@ gintel_ereport_add_logout(cmi_hdl_t hdl, nvlist_t *ereport,
 		    DATA_TYPE_NVLIST_ARRAY, 1, &resource, NULL);
 		fm_nvlist_destroy(resource, nva ? FM_NVA_RETAIN:FM_NVA_FREE);
 
-		if (gintel_cpu_generation() == CPU_GENERATION_NEHALEM_EP) {
+		if (gintel_cpu_generation(hdl) == CPU_GENERATION_NEHALEM_EP) {
 
-			chipid = cmi_ntv_hwchipid(CPU);
+			chipid = unum.unum_chip;
 			if (chipid < MAX_CPU_NODES) {
 				last_index = err_counter_index[chipid];
 				this_index =

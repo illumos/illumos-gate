@@ -47,7 +47,7 @@ extern "C" {
 #define	MCG_CAP_CTL_P			0x00000100ULL
 #define	MCG_CAP_EXT_P			0x00000200ULL
 #define	MCG_CAP_TES_P			0x00000800ULL
-#define	MCG_CAP_MISC2_P			0x00000400ULL
+#define	MCG_CAP_CTL2_P			0x00000400ULL
 
 #define	MCG_CAP_COUNT_MASK		0x000000ffULL
 #define	MCG_CAP_COUNT(cap) ((cap) & MCG_CAP_COUNT_MASK)
@@ -89,12 +89,12 @@ extern "C" {
 #define	_IA32_MSR_OFFSET_ADDR		0x2	/* offset within a bank */
 #define	_IA32_MSR_OFFSET_MISC		0x3	/* offset within a bank */
 
-#define	_IA32_MSR_MC0_MISC2		0x280ULL /* first MCi_MISC2 reg */
+#define	_IA32_MSR_MC0_CTL2		0x280ULL /* first MCi_CTL2 reg */
 
 #define	IA32_MSR_MC(i, which) \
 	(_IA32_MSR_MC0_CTL + (i) * 4 + _IA32_MSR_OFFSET_##which)
 
-#define	IA32_MSR_MC_MISC2(i)	(_IA32_MSR_MC0_MISC2 + (i))
+#define	IA32_MSR_MC_CTL2(i)	(_IA32_MSR_MC0_CTL2 + (i))
 
 /*
  * IA32_MSR_MCG_CAP.MCG_EXT_P indicates that a processor implements
@@ -197,9 +197,9 @@ typedef union mca_x86_mcistatus {
 #define	MSR_MC_STATUS_MSERR_SHIFT	16
 #define	MSR_MC_STATUS_MCAERR_MASK	0x000000000000ffffULL
 
-#define	MSR_MC_MISC2_EN			0x0000000040000000ULL
-#define	MSR_MC_MISC2_THRESHOLD_MASK	0x0000000000007fffULL
-#define	MSR_MC_MISC2_THRESHOLD_OVERFLOW	0x0000000000004000ULL
+#define	MSR_MC_CTL2_EN			0x0000000040000000ULL
+#define	MSR_MC_CTL2_THRESHOLD_MASK	0x0000000000007fffULL
+#define	MSR_MC_CTL2_THRESHOLD_OVERFLOW	0x0000000000004000ULL
 
 /*
  * Macros to extract error code and model-specific error code.
