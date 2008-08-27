@@ -134,6 +134,6 @@ check_add_drv()
 }
 
 check_add_drv -b "${BASEDIR}" \
-	-i '"TAD,wb-sdcard" \
+	-i '"TAD,wb-sdcard"' \
 	-m '* 0644 root root' wbsd
 
