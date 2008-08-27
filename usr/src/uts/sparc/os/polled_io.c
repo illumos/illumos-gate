@@ -18,13 +18,10 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This code sets up the callbacks(vx_handlers) so that the firmware may call
@@ -69,6 +66,9 @@
 #include <sys/consdev.h>
 #include <sys/polled_io.h>
 #include <sys/kdi.h>
+#ifdef sun4v
+#include <sys/ldoms.h>
+#endif
 
 /*
  * Internal Functions
@@ -113,7 +113,9 @@ polled_io_init(void)
 	 */
 	if (polled_vx_handlers_init != 0)
 		return;
-
+#ifdef sun4v
+	if (!domaining_enabled()) {
+#endif
 	/*
 	 * Add the vx_handlers for the different functions that
 	 * need to be accessed from firmware.
@@ -125,6 +127,9 @@ polled_io_init(void)
 	add_vx_handler("exit-input", 1, polled_take_input);
 
 	add_vx_handler("write", 1, polled_write);
+#ifdef sun4v
+	}
+#endif
 
 	/*
 	 * Initialize lock to protect multiple thread access to the
@@ -132,7 +137,7 @@ polled_io_init(void)
 	 * us from access in debug mode.
 	 */
 	mutex_init(&polled_input_device.polled_device_lock,
-		NULL, MUTEX_DRIVER, NULL);
+	    NULL, MUTEX_DRIVER, NULL);
 
 	/*
 	 * Initialize lock to protect multiple thread access to the
@@ -140,7 +145,7 @@ polled_io_init(void)
 	 * us from access in debug mode.
 	 */
 	mutex_init(&polled_output_device.polled_device_lock,
-		NULL, MUTEX_DRIVER, NULL);
+	    NULL, MUTEX_DRIVER, NULL);
 
 	polled_vx_handlers_init = 1;
 }
@@ -161,10 +166,9 @@ int				flags
 	 * structure as an input device.
 	 */
 	if ((polled_io->cons_polledio_getchar != NULL) &&
-		(polled_io->cons_polledio_ischar != NULL)) {
+	    (polled_io->cons_polledio_ischar != NULL)) {
 
-		polled_io_register(polled_io,
-			POLLED_IO_CONSOLE_INPUT, flags);
+		polled_io_register(polled_io, POLLED_IO_CONSOLE_INPUT, flags);
 	}
 
 	/*
@@ -173,8 +177,7 @@ int				flags
 	 */
 	if (polled_io->cons_polledio_putchar != NULL) {
 
-		polled_io_register(polled_io,
-			POLLED_IO_CONSOLE_OUTPUT, flags);
+		polled_io_register(polled_io, POLLED_IO_CONSOLE_OUTPUT, flags);
 	}
 
 	cons_polledio = polled_io;
@@ -278,6 +281,11 @@ int				flags
 )
 {
 
+#ifdef sun4v
+	if (domaining_enabled())
+		return (DDI_SUCCESS);
+#endif
+
 	switch (type) {
 	case POLLED_IO_CONSOLE_INPUT:
 		/*
@@ -291,15 +299,15 @@ int				flags
 		 * what the prom is doing
 		 */
 		prom_interpret(
-			"stdin @ swap ! trace-on \" /os-io\" input trace-off",
-			(uintptr_t)&polled_input_device.polled_old_handle,
-				0, 0, 0, 0);
+		    "stdin @ swap ! trace-on \" /os-io\" input trace-off",
+		    (uintptr_t)&polled_input_device.polled_old_handle,
+		    0, 0, 0, 0);
 #endif
 
 		prom_interpret(
-			"stdin @ swap ! \" /os-io\" open-dev stdin !",
-			(uintptr_t)&polled_input_device.polled_old_handle,
-				0, 0, 0, 0);
+		    "stdin @ swap ! \" /os-io\" open-dev stdin !",
+		    (uintptr_t)&polled_input_device.polled_old_handle,
+		    0, 0, 0, 0);
 
 		break;
 
@@ -309,10 +317,9 @@ int				flags
 		 * We will save the old value of stdout so that we can
 		 * restore it if the device is released.
 		 */
-		prom_interpret(
-			"stdout @ swap ! \" /os-io\" open-dev stdout !",
-			(uintptr_t)&polled_output_device.polled_old_handle,
-				0, 0, 0, 0);
+		prom_interpret("stdout @ swap ! \" /os-io\" open-dev stdout !",
+		    (uintptr_t)&polled_output_device.polled_old_handle,
+		    0, 0, 0, 0);
 
 		break;
 	}
@@ -337,8 +344,7 @@ polled_give_input(cell_t *cif)
 	/*
 	 * Calculate the offset of the return arguments
 	 */
-	out_args = CIF_MIN_SIZE +
-		p1275_cell2uint(cif[CIF_NUMBER_IN_ARGS]);
+	out_args = CIF_MIN_SIZE + p1275_cell2uint(cif[CIF_NUMBER_IN_ARGS]);
 
 	/*
 	 * There is one argument being passed back to firmware.
@@ -359,8 +365,7 @@ polled_give_input(cell_t *cif)
 	/*
 	 * Call down to the lower layers to save the state.
 	 */
-	polled_io->cons_polledio_enter(
-		polled_io->cons_polledio_argument);
+	polled_io->cons_polledio_enter(polled_io->cons_polledio_argument);
 }
 
 /*
@@ -478,7 +483,7 @@ polled_read(cell_t *cif)
 	 * Obtain the characters
 	 */
 	while (polled_io->cons_polledio_ischar(
-		polled_io->cons_polledio_argument) == B_TRUE) {
+	    polled_io->cons_polledio_argument) == B_TRUE) {
 
 		/*
 		 * Make sure that we don't overrun the buffer.
@@ -493,7 +498,7 @@ polled_read(cell_t *cif)
 		 * buffer.
 		 */
 		key = polled_io->cons_polledio_getchar(
-			polled_io->cons_polledio_argument);
+		    polled_io->cons_polledio_argument);
 
 		*(buffer + actual) = key;
 
@@ -537,8 +542,7 @@ polled_take_input(cell_t *cif)
 	/*
 	 * Calculate the offset of the return arguments
 	 */
-	out_args = CIF_MIN_SIZE +
-		p1275_cell2uint(cif[CIF_NUMBER_IN_ARGS]);
+	out_args = CIF_MIN_SIZE + p1275_cell2uint(cif[CIF_NUMBER_IN_ARGS]);
 
 	/*
 	 * There is one argument being passed back to firmware.
@@ -559,8 +563,7 @@ polled_take_input(cell_t *cif)
 	/*
 	 * Call down to the lower layers to save the state.
 	 */
-	polled_io->cons_polledio_exit(
-		polled_io->cons_polledio_argument);
+	polled_io->cons_polledio_exit(polled_io->cons_polledio_argument);
 }
 
 /*
