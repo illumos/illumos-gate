@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"@(#)postinstall	1.2	08/07/21 SMI"
-#
 
 PATH="/usr/bin:/usr/sbin:${PATH}"; export PATH
  
@@ -63,7 +61,7 @@ fi
 
 find_dda_devlink_rule()
 {
-	/bin/cat /etc/devlink.tab | /bin/nawk ' \
+	/bin/cat ${PKG_INSTALL_ROOT}/etc/devlink.tab | /bin/nawk ' \
 	$0 ~ /^type\=ddi_pseudo;name\=dda\tdda\/\\N0\\M0/ \
 	{ print $0 }'
 }
@@ -73,16 +71,12 @@ dda_rule=`find_dda_devlink_rule`
 if [ "$dda_rule" = "" ]; then
 	echo "Updating /etc/devlink.tab with dda devlinks rule."
 	echo "type=ddi_pseudo;name=dda\tdda/\\N0\\M0" \
-		>> /etc/devlink.tab
+		>> ${PKG_INSTALL_ROOT}/etc/devlink.tab
 fi
 
-if [ $dda_rc = 0 ]; then
-	/usr/sbin/devfsadm -i dda
-fi
-
-/usr/sbin/installf -c rbac SUNWmmsr /etc/security/auth_attr
-/usr/sbin/installf -c rbac SUNWmmsr /etc/security/exec_attr
-/usr/sbin/installf -c rbac SUNWmmsr /etc/security/prof_attr
+/usr/sbin/installf -c rbac SUNWmmsr ${BASEDIR}/etc/security/auth_attr
+/usr/sbin/installf -c rbac SUNWmmsr ${BASEDIR}/etc/security/exec_attr
+/usr/sbin/installf -c rbac SUNWmmsr ${BASEDIR}/etc/security/prof_attr
 /usr/sbin/installf -f SUNWmmsr
 
 exit 0
