@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,13 +20,39 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # r.manifest - smf(5) manifest remove class action script
 #
+
+MFSTSCAN=/lib/svc/bin/mfstscan
+SVCCFG=/usr/sbin/svccfg
+SVCPROP=/usr/bin/svcprop
+SVCADM=/usr/sbin/svcadm
+
+# number of seconds to wait before killing processes 
+STOP_DELAY=60
+
+wait_disable() {
+	svcinst=$1
+	wait_time=$2
+
+	while [ ${nsec:=0} -lt $wait_time ]; do
+		state=`$SVCPROP -p restarter/state $svcinst`
+		if [ "$state" = "disabled" -o "$state" = "maintenance" ]; then
+			nstate=`$SVCPROP -p restarter/next_state $svcinst`
+			if [ "$nstate" = "none" ]; then
+				return 0
+			fi
+		fi
+		/usr/bin/sleep 1
+		nsec=`expr ${nsec} + 1`
+	done
+
+	return 1
+}
 
 if [ "$PKG_INSTALL_ROOT" != "" -a "$PKG_INSTALL_ROOT" != "/" ]; then
 	#
@@ -44,28 +69,60 @@ else
 	fi
 fi
 
-MFSTSCAN=/lib/svc/bin/mfstscan
-SVCCFG=/usr/sbin/svccfg
-SVCPROP=/usr/bin/svcprop
-
 while read mfst; do
 	if [ "$smf_alive" = "yes" ]; then
 		ENTITIES=`$SVCCFG inventory $mfst`
 
 		for fmri in $ENTITIES; do
-			#
-			# Determine whether any of our instances are
-			# enabled.
-			#
-			en_p=`$SVCPROP -C -p general/enabled $fmri 2>/dev/null`
-			en_o=`$SVCPROP -C -p general_ovr/enabled $fmri 2>/dev/null`
 
-			if [ "$en_p" = "true" -o "$en_o" = "true" ]; then
-				echo "$fmri remains enabled; aborting"
-				exit 1
+			# Determine whether fmri refers to an instance or a service.
+			$SVCPROP -p restarter/state $fmri >/dev/null 2>&1
+			if [ $? -eq 1 ]; then
+				# this is a service fmri, all instances have been deleted
+				$SVCCFG delete $fmri 2>/dev/null
+				# process next instance
+				continue
 			fi
 
-			$SVCCFG delete $fmri
+			#
+			# Try to disable the instance within a reasonable amount of time
+			# (eg. 60 secs). If it fails, forcibly delete the instance.
+			#
+			echo "Waiting up to $STOP_DELAY seconds for $fmri to stop..."
+			$SVCADM disable $fmri 2>/dev/null 
+			if [ $? -eq 0 ]; then
+				wait_disable $fmri $STOP_DELAY
+				if [ $? -eq 0 ]; then
+					# the instance is disabled and can be safely deleted
+					$SVCCFG delete $fmri 2>/dev/null
+					# process next instance
+					continue
+				fi
+				echo "Failed to disable $fmri after $STOP_DELAY seconds"
+			else
+				echo "Failed to disable $fmri"
+			fi
+
+			echo "Force deleting $fmri"
+
+			ctid=`$SVCPROP -p restarter/contract $fmri 2>/dev/null`
+			tctid=`$SVCPROP -p restarter/transient_contract $fmri 2>/dev/null`
+
+			$SVCCFG delete -f $fmri
+
+			#
+			# Kill any remaining processes.
+			# pkill must occur after the delete to prevent startd
+			# from retrying the STOP method.
+			#
+			if [ -n "${tctid}" -a "${tctid}" -gt 1 ]; then
+				# kill the STOP method processes
+				/usr/bin/pkill -9 -c $tctid
+			fi
+			if [ -n "${ctid}" -a "${ctid}" -gt 1 ]; then
+				# kill any remaining running processes for the instance
+				/usr/bin/pkill -9 -c $ctid
+			fi
 		done
 
 		#
