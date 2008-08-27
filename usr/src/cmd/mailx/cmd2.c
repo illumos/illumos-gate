@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "rcv.h"
 #include <locale.h>
@@ -422,13 +420,13 @@ snarf(char linebuf[], int *flag, int erf)
 	 * Skip leading whitespace.
 	 */
 	for (line_beg = linebuf;
-	*line_beg && any(*line_beg, " \t");
-		line_beg++) {
+	    *line_beg && any(*line_beg, " \t");
+	    line_beg++) {
 		/* empty body */
 	}
 	if (!*line_beg) {
 		if (erf) {
-			printf(gettext("No file specified\n."));
+			printf(gettext("No file specified.\n"));
 		}
 		*flag = 0;
 		return (NOSTR);
@@ -458,7 +456,7 @@ snarf(char linebuf[], int *flag, int erf)
 			/* Search for the matching QUOTE character */
 			for (tok_beg = p, tok_end = NOSTR, p++;
 			    *p != '\0' && *p != qc;
-				p++) {
+			    p++) {
 				if (*p == '\\' && *(p+1) == qc) {
 					p++;
 				}
@@ -509,7 +507,7 @@ snarf(char linebuf[], int *flag, int erf)
 		return (tok_beg);
 	} else {
 		if (erf) {
-			printf(gettext("No file specified\n."));
+			printf(gettext("No file specified.\n"));
 		}
 		*flag = 0;
 		return (NOSTR);
