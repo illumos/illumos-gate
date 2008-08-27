@@ -8105,7 +8105,3 @@ print LD_NOAUXFLTR=1 LD_LIBRARY_PATH=/tmp/bfulib $ldlib64 PATH=/tmp/bfubin \
     /tmp/bfubin/ksh
 
 exit 0
- \
-    /tmp/bfubin/ksh
-
-exit 0
