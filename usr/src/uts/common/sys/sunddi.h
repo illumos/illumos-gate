@@ -1616,6 +1616,12 @@ ddi_deviname(dev_info_t *dip, char *name);
 char *
 ddi_pathname(dev_info_t *dip, char *path);
 
+char *
+ddi_pathname_obp(dev_info_t *dip, char *path);
+
+int
+ddi_pathname_obp_set(dev_info_t *dip, char *component);
+
 int
 ddi_dev_pathname(dev_t devt, int spec_type, char *name);
 

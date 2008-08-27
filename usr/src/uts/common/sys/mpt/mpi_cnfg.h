@@ -6,8 +6,6 @@
 #ifndef	_SYS_MPI_CNFG_H
 #define	_SYS_MPI_CNFG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -1097,6 +1095,22 @@ typedef struct config_page_raid_vol_0 {
 } config_page_raid_vol_0_t;
 
 #define	MPI_RAIDVOLPAGE0_PAGEVERSION			0x00
+
+typedef struct config_page_raid_vol_1
+{
+	config_page_header_t	Header;		/* 00h */
+	uint8_t			VolumeID;	/* 04h */
+	uint8_t			VolumeBus;	/* 05h */
+	uint8_t			VolumeIOC;	/* 06h */
+	uint8_t			Reserved0;	/* 07h */
+	uint8_t			GUID[24];	/* 08h */
+	uint8_t			Name[32];	/* 20h */
+	uint64_t		WWID;		/* 40h */
+	uint8_t			Reserved1;	/* 48h */
+	uint8_t			Reserved2;	/* 4Ch */
+} config_page_raid_vol_1_t;
+
+#define	MPI_RAIDVOLPAGE1_PAGEVERSION			0x01
 
 /*
  * RAID Physical Disk Config Pages

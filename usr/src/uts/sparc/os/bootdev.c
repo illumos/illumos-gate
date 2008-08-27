@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/pathname.h>
@@ -36,7 +33,6 @@
 
 struct parinfo {
 	dev_info_t *dip;
-	mdi_pathinfo_t *pip;
 	dev_info_t *pdip;
 };
 
@@ -45,11 +41,12 @@ struct parinfo {
  */
 static int resolve_devfs_name(char *, char *);
 static dev_info_t *find_alternate_node(dev_info_t *, major_t);
-static dev_info_t *get_path_parent(dev_info_t *, struct parinfo *);
+static dev_info_t *get_parent(dev_info_t *, struct parinfo *);
+static int i_devi_to_promname(dev_info_t *, char *, dev_info_t **alt_dipp);
 
 /* internal global data */
 static struct modlmisc modlmisc = {
-	&mod_miscops, "bootdev misc module 1.21"
+	&mod_miscops, "bootdev misc module 1.22"
 };
 
 static struct modlinkage modlinkage = {
@@ -94,6 +91,101 @@ i_promname_to_devname(char *prom_name, char *ret_buf)
 }
 
 /*
+ * The function is to get prom name according non-client dip node.
+ * And the function will set the alternate node of dip to alt_dip
+ * if it is exist which must be PROM node.
+ */
+static int
+i_devi_to_promname(dev_info_t *dip, char *prom_path, dev_info_t **alt_dipp)
+{
+	dev_info_t *pdip, *cdip, *idip;
+	char *unit_address, *nodename;
+	major_t major;
+	int depth, old_depth = 0;
+	struct parinfo *parinfo = NULL;
+	struct parinfo *info;
+	int ret = 0;
+
+	if (MDI_CLIENT(dip))
+		return (EINVAL);
+
+	if (ddi_pathname_obp(dip, prom_path) != NULL) {
+		return (0);
+	}
+	/*
+	 * ddi_pathname_obp return NULL, but the obp path still could
+	 * be different with the devfs path name, so need use a parents
+	 * stack to compose the path name string layer by layer.
+	 */
+
+	/* find the closest ancestor which is a prom node */
+	pdip = dip;
+	parinfo = kmem_alloc(OBP_STACKDEPTH * sizeof (*parinfo),
+	    KM_SLEEP);
+	for (depth = 0; ndi_dev_is_prom_node(pdip) == 0; depth++) {
+		if (depth == OBP_STACKDEPTH) {
+			ret = EINVAL;
+			/* must not have been an obp node */
+			goto out;
+		}
+		pdip = get_parent(pdip, &parinfo[depth]);
+	}
+	old_depth = depth;
+	ASSERT(pdip);	/* at least root is prom node */
+	if (pdip)
+		(void) ddi_pathname(pdip, prom_path);
+
+	ndi_hold_devi(pdip);
+
+	for (depth = old_depth; depth > 0; depth--) {
+		info = &parinfo[depth - 1];
+		idip = info->dip;
+		nodename = ddi_node_name(idip);
+		unit_address = ddi_get_name_addr(idip);
+
+		if (pdip) {
+			major = ddi_driver_major(idip);
+			cdip = find_alternate_node(pdip, major);
+			ndi_rele_devi(pdip);
+			if (cdip) {
+				nodename = ddi_node_name(cdip);
+			}
+		}
+
+		/*
+		 * node name + unitaddr to the prom_path
+		 */
+		(void) strcat(prom_path, "/");
+		(void) strcat(prom_path, nodename);
+		if (unit_address && (*unit_address)) {
+			(void) strcat(prom_path, "@");
+			(void) strcat(prom_path, unit_address);
+		}
+		pdip = cdip;
+	}
+
+	if (pdip) {
+		ndi_rele_devi(pdip); /* hold from find_alternate_node */
+	}
+	/*
+	 * Now pdip is the alternate node which is same hierarchy as dip
+	 * if it exists.
+	 */
+	*alt_dipp = pdip;
+out:
+	if (parinfo) {
+		/* release holds from get_parent() */
+		for (depth = old_depth; depth > 0; depth--) {
+			info = &parinfo[depth - 1];
+			if (info && info->pdip)
+				ndi_rele_devi(info->pdip);
+		}
+		kmem_free(parinfo, OBP_STACKDEPTH * sizeof (*parinfo));
+	}
+	return (ret);
+}
+
+/*
  * translate a devfs pathname to one that will be acceptable
  * by the prom.  In most cases, there is no translation needed.
  * For systems supporting generically named devices, the prom
@@ -108,7 +200,7 @@ i_promname_to_devname(char *prom_name, char *ret_buf)
  * prom is named "SUNW,ssd" but in /devices the name is "ssd".
  *
  * If MPxIO is enabled, the translation involves following
- * pathinfo nodes to the "best" parent. See get_obp_parent().
+ * pathinfo nodes to the "best" parent.
  *
  * return a 0 on success with the new device string in ret_buf.
  * Otherwise return the appropriate error code as we may be called
@@ -117,15 +209,15 @@ i_promname_to_devname(char *prom_name, char *ret_buf)
 int
 i_devname_to_promname(char *dev_name, char *ret_buf, size_t len)
 {
-	dev_info_t *dip, *pdip, *cdip, *idip;
+	dev_info_t *dip, *pdip, *cdip, *alt_dip = NULL;
+	mdi_pathinfo_t *pip = NULL;
 	char *dev_path, *prom_path;
 	char *unit_address, *minorname, *nodename;
 	major_t major;
-	int depth, old_depth;
-	struct parinfo *parinfo;
-	struct parinfo *info;
 	char *rptr, *optr, *offline;
 	size_t olen, rlen;
+	int circ;
+	int ret = 0;
 
 	/* do some sanity checks */
 	if ((dev_name == NULL) || (ret_buf == NULL) ||
@@ -166,57 +258,77 @@ i_devname_to_promname(char *dev_name, char *ret_buf, size_t len)
 		return (EINVAL);
 	}
 
-	/* find the closest ancestor which is a prom node */
-	pdip = dip;
-	parinfo = kmem_alloc(OBP_STACKDEPTH * sizeof (*parinfo), KM_SLEEP);
-	for (depth = 0; ndi_dev_is_prom_node(pdip) == 0; depth++) {
-		if (depth == OBP_STACKDEPTH) {
-			kmem_free(dev_path, MAXPATHLEN);
-			kmem_free(parinfo, OBP_STACKDEPTH * sizeof (*parinfo));
-			return (EINVAL); /* must not have been an obp node */
-		}
-
-		pdip = get_path_parent(pdip, &parinfo[depth]);
-	}
-	ASSERT(pdip);	/* at least root is prom node */
-	ASSERT(depth > 0);
-
-	prom_path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-
-	offline = kmem_zalloc(len, KM_SLEEP); /* offline paths */
-	olen = len;
+	prom_path = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
 	rlen = len;
-
 	rptr = ret_buf;
-	optr = offline;
 
-	old_depth = depth;
-	do {
-		bzero(prom_path, MAXPATHLEN);
-		if (pdip)
-			(void) ddi_pathname(pdip, prom_path);
+	if (!MDI_CLIENT(dip)) {
+		ret = i_devi_to_promname(dip, prom_path, &alt_dip);
+		if (ret == 0) {
+			minorname = strrchr(dev_name, ':');
+			if (minorname && (minorname[1] != '\0')) {
+				(void) strcat(prom_path, minorname);
+			}
+			(void) snprintf(rptr, rlen, "%s", prom_path);
+		}
+	} else {
+		/*
+		 * if get to here, means dip is a vhci client
+		 */
+		offline = kmem_zalloc(len, KM_SLEEP); /* offline paths */
+		olen = len;
+		optr = offline;
+		/*
+		 * The following code assumes that the phci client is at leaf
+		 * level.
+		 */
+		ndi_devi_enter(dip, &circ);
+		while ((pip = mdi_get_next_phci_path(dip, pip)) != NULL) {
+			/*
+			 * walk all paths associated to the client node
+			 */
+			bzero(prom_path, MAXPATHLEN);
 
-		ndi_hold_devi(pdip);
-		for (depth = old_depth; depth > 0; depth--) {
-			info = &parinfo[depth - 1];
-			idip = info->dip;
+			/*
+			 * replace with mdi_hold_path() when mpxio goes into
+			 * genunix
+			 */
+			MDI_PI_LOCK(pip);
+			MDI_PI_HOLD(pip);
+			MDI_PI_UNLOCK(pip);
 
-			nodename = ddi_node_name(idip);
-			if (info->pip) {
-				unit_address = MDI_PI(info->pip)->pi_addr;
-			} else {
-				unit_address = ddi_get_name_addr(idip);
+			if (mdi_pi_pathname_obp(pip, prom_path) != NULL) {
+				/*
+				 * The path has different obp path
+				 */
+				goto minor_pathinfo;
 			}
 
-			if (pdip) {
-				major = ddi_driver_major(idip);
-				cdip = find_alternate_node(pdip, major);
+			pdip = mdi_pi_get_phci(pip);
+			ndi_hold_devi(pdip);
+
+			/*
+			 * Get obp path name of the phci node firstly.
+			 * NOTE: if the alternate node of pdip exists,
+			 * the third argument of the i_devi_to_promname()
+			 * would be set to the alternate node.
+			 */
+			(void) i_devi_to_promname(pdip, prom_path, &alt_dip);
+			if (alt_dip != NULL) {
 				ndi_rele_devi(pdip);
-				if (cdip) {
-					nodename = ddi_node_name(cdip);
-				}
+				pdip = alt_dip;
+				ndi_hold_devi(pdip);
 			}
 
+			nodename = ddi_node_name(dip);
+			unit_address = MDI_PI(pip)->pi_addr;
+
+			major = ddi_driver_major(dip);
+			cdip = find_alternate_node(pdip, major);
+
+			if (cdip) {
+				nodename = ddi_node_name(cdip);
+			}
 			/*
 			 * node name + unitaddr to the prom_path
 			 */
@@ -226,81 +338,51 @@ i_devname_to_promname(char *dev_name, char *ret_buf, size_t len)
 				(void) strcat(prom_path, "@");
 				(void) strcat(prom_path, unit_address);
 			}
-			pdip = cdip;
-		}
-
-		if (pdip) {
-			ndi_rele_devi(pdip); /* hold from find_alternate_node */
-		}
-
-		minorname = strrchr(dev_name, ':');
-		if (minorname && (minorname[1] != '\0')) {
-			(void) strcat(prom_path, minorname);
-		}
-
-		if (!info || !info->pip || MDI_PI_IS_ONLINE(info->pip)) {
-			(void) snprintf(rptr, rlen, "%s", prom_path);
-			rlen -= strlen(rptr) + 1;
-			rptr += strlen(rptr) + 1;
-			if (rlen <= 0) /* drop paths we can't store */
-				break;
-		} else {	/* path is offline */
-			(void) snprintf(optr, olen, "%s", prom_path);
-			olen -= strlen(optr) + 1;
-			if (olen > 0) /* drop paths we can't store */
-				optr += strlen(optr) + 1;
-
-		}
-
-		/*
-		 * The following code assumes that the phci client is at leaf
-		 * level and that all phci nodes are prom nodes.
-		 */
-		info = &parinfo[0];
-		if (info && info->dip && info->pip) {
-			info->pip =
-			    (mdi_pathinfo_t *)MDI_PI(info->pip)->pi_client_link;
-			if (info->pip) {
-				pdip = mdi_pi_get_phci(info->pip);
-				pdip = ddi_get_parent(pdip);
-			} else {
-				break;
+			if (cdip) {
+				/* hold from find_alternate_node */
+				ndi_rele_devi(cdip);
 			}
-		} else {
-			break;
+			ndi_rele_devi(pdip);
+minor_pathinfo:
+			minorname = strrchr(dev_name, ':');
+			if (minorname && (minorname[1] != '\0')) {
+				(void) strcat(prom_path, minorname);
+			}
+
+			if (MDI_PI_IS_ONLINE(pip)) {
+				(void) snprintf(rptr, rlen, "%s", prom_path);
+				rlen -= strlen(rptr) + 1;
+				rptr += strlen(rptr) + 1;
+				if (rlen <= 0) /* drop paths we can't store */
+					break;
+			} else {	/* path is offline */
+				(void) snprintf(optr, olen, "%s", prom_path);
+				olen -= strlen(optr) + 1;
+				if (olen > 0) /* drop paths we can't store */
+					optr += strlen(optr) + 1;
+			}
+			MDI_PI_LOCK(pip);
+			MDI_PI_RELE(pip);
+			if (MDI_PI(pip)->pi_ref_cnt == 0)
+				cv_broadcast(&MDI_PI(pip)->pi_ref_cv);
+			MDI_PI_UNLOCK(pip);
 		}
-
-	} while (info && info->pip && pdip);
-
-	ndi_rele_devi(dip); /* release hold from e_ddi_hold_devi_by_path() */
-
-	/* release holds from get_path_parent() */
-	for (depth = old_depth; depth > 0; depth--) {
-		info = &parinfo[depth - 1];
-
-		/* replace with mdi_rele_path() when mpxio goes into genunix */
-		if (info && info->pip) {
-			MDI_PI_LOCK(info->pip);
-			MDI_PI_RELE(info->pip);
-			if (MDI_PI(info->pip)->pi_ref_cnt == 0)
-				cv_broadcast(&MDI_PI(info->pip)->pi_ref_cv);
-			MDI_PI_UNLOCK(info->pip);
+		ndi_devi_exit(dip, circ);
+		ret = 0;
+		if (rlen > 0) {
+			/* now add as much of offline to ret_buf as possible */
+			bcopy(offline, rptr, rlen);
 		}
-		if (info && info->pdip)
-			ndi_rele_devi(info->pdip);
+		kmem_free(offline, len);
 	}
-
-	/* now add as much of offline to ret_buf as possible */
-	bcopy(offline, rptr, rlen);
-
+	/* release hold from e_ddi_hold_devi_by_path() */
+	ndi_rele_devi(dip);
 	ret_buf[len - 1] = '\0';
 	ret_buf[len - 2] = '\0';
-
-	kmem_free(offline, len);
 	kmem_free(dev_path, MAXPATHLEN);
 	kmem_free(prom_path, MAXPATHLEN);
-	kmem_free(parinfo, OBP_STACKDEPTH * sizeof (*parinfo));
-	return (0);
+
+	return (ret);
 }
 
 /*
@@ -426,46 +508,16 @@ i_convert_boot_device_name(char *cur_path, char *new_path, size_t *len)
 }
 
 /*
- * Get the parent dip. If dip is mpxio client, get the first online
- * path and return the phci dip with both pathinfo and dip held
- * otherwise just return with the dip held.
+ * Get the parent dip.
  */
 static dev_info_t *
-get_path_parent(dev_info_t *dip, struct parinfo *info)
+get_parent(dev_info_t *dip, struct parinfo *info)
 {
 	dev_info_t *pdip;
-	mdi_pathinfo_t *pip;
-	int circ;
 
-	if (!MDI_CLIENT(dip)) {
-		pdip = ddi_get_parent(dip);
-		pip = NULL;
-		goto finish;
-	}
-
-	/* find and hold the pathinfo */
-
-	ndi_devi_enter(dip, &circ);
-	pip = mdi_get_next_phci_path(dip, NULL);
-
-	if (pip == NULL) {
-		ndi_devi_exit(dip, circ);
-		return (NULL);
-	}
-
-	/* replace with mdi_hold_path() when mpxio goes into genunix */
-	MDI_PI_LOCK(pip);
-	MDI_PI_HOLD(pip);
-	MDI_PI_UNLOCK(pip);
-
-	ndi_devi_exit(dip, circ);
-	pdip = mdi_pi_get_phci(pip);
-
-finish:
+	pdip = ddi_get_parent(dip);
 	ndi_hold_devi(pdip);
-
 	info->dip = dip;
-	info->pip = pip;
 	info->pdip = pdip;
 	return (pdip);
 }

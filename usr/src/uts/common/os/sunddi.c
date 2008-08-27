@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/note.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -6678,6 +6676,84 @@ char *
 ddi_pathname(dev_info_t *dip, char *path)
 {
 	return (pathname_work(dip, path));
+}
+
+static char *
+pathname_work_obp(dev_info_t *dip, char *path)
+{
+	char *bp;
+	char *obp_path;
+
+	/*
+	 * look up the "obp-path" property, return the path if it exists
+	 */
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "obp-path", &obp_path) == DDI_PROP_SUCCESS) {
+		(void) strcpy(path, obp_path);
+		ddi_prop_free(obp_path);
+		return (path);
+	}
+
+	/*
+	 * stop at root, no obp path
+	 */
+	if (dip == ddi_root_node()) {
+		return (NULL);
+	}
+
+	obp_path = pathname_work_obp(ddi_get_parent(dip), path);
+	if (obp_path == NULL)
+		return (NULL);
+
+	/*
+	 * append our component to parent's obp path
+	 */
+	bp = path + strlen(path);
+	if (*(bp - 1) != '/')
+		(void) strcat(bp++, "/");
+	(void) ddi_deviname(dip, bp);
+	return (path);
+}
+
+/*
+ * return the 'obp-path' based path for the given node, or NULL if the node
+ * does not have a different obp path. NOTE: Unlike ddi_pathname, this
+ * function can't be called from interrupt context (since we need to
+ * lookup a string property).
+ */
+char *
+ddi_pathname_obp(dev_info_t *dip, char *path)
+{
+	ASSERT(!servicing_interrupt());
+	if (dip == NULL || path == NULL)
+		return (NULL);
+
+	/* split work into a separate function to aid debugging */
+	return (pathname_work_obp(dip, path));
+}
+
+int
+ddi_pathname_obp_set(dev_info_t *dip, char *component)
+{
+	dev_info_t *pdip;
+	char obp_path[MAXPATHLEN];
+
+	bzero(obp_path, sizeof (obp_path));
+
+	if (dip == NULL)
+		return (DDI_FAILURE);
+	pdip = ddi_get_parent(dip);
+
+	if (ddi_pathname_obp(pdip, obp_path) == NULL) {
+		(void) ddi_pathname(pdip, obp_path);
+	}
+
+	if (component) {
+		(void) strncat(obp_path, "/", sizeof (obp_path));
+		(void) strncat(obp_path, component, sizeof (obp_path));
+	}
+	return (ddi_prop_update_string(DDI_DEV_T_NONE, dip, "obp-path",
+	    obp_path));
 }
 
 /*

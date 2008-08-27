@@ -26,8 +26,6 @@
 #ifndef	_SYS_SUNMDI_H
 #define	_SYS_SUNMDI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Multiplexed I/O global include
  */
@@ -231,6 +229,8 @@ mdi_pathinfo_state_t mdi_pi_get_state(mdi_pathinfo_t *);
 int mdi_pi_get_path_instance(mdi_pathinfo_t *);
 char *mdi_pi_pathname_by_instance(int path_instance);
 char *mdi_pi_pathname(mdi_pathinfo_t *);
+char *mdi_pi_pathname_obp(mdi_pathinfo_t *, char *);
+int mdi_pi_pathname_obp_set(mdi_pathinfo_t *, char *);
 
 /*
  * mdi_pathinfo Property handling functions
