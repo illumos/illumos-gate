@@ -23,7 +23,6 @@
 Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
-  ident	"%Z%%M%	%I%	%E% SMI"
 -->
 
 <specification>
@@ -167,11 +166,13 @@ Use is subject to license terms.
 
 	comment		Used by bsmrecord build to generate audit_record_attr.
 			Comment is explanation note printed with token type.
+			Colon (':') may not be used in a comment.
 			See example above for other tags related to bsmrecord.
 
 	token		Define allowed token names.
 			- id is the name of token; this name is used
 			as an <internal> id.
+			- a token id name may not end in digits.
 			- usage is an optional value.  At present, only
 			  "TSOL" is defined; it means that this data is
 			  to be used only in Trusted Solaris implementations.
@@ -764,7 +765,7 @@ Use is subject to license terms.
 	    <comment>client address</comment>
 	</entry>
 	<entry id="cmd">
-	    <internal token="command_1"/>
+	    <internal token="command_alt"/>
 	    <external opt="required" type="char *"/>
 	    <comment>inetd command</comment>
 	</entry>
@@ -1858,7 +1859,7 @@ Use is subject to license terms.
     </token>
     <token id="command">
     </token>
-    <token id="command_1">
+    <token id="command_alt">
     </token>
     <token id="date">
     </token>

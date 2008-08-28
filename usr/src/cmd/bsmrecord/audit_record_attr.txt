@@ -24,7 +24,6 @@
 ##
 ## CDDL HEADER END
 ##
-## ident	"%Z%%M%	%I%	%E% SMI"
 ##
 
 # source file for describing audit records.
@@ -131,7 +130,7 @@ label=AUE_ACCEPT
         comment=1, file descriptor, "so":
         comment=local/foreign address (0.0.0.0)
     case=...or if the socket address length = 0
-      format=[arg]1:[inet]1
+      format=[arg]1:[inet]2
         comment=1, file descriptor, "so":
         comment=local/foreign address (0.0.0.0)
     case=...or for all other conditions
@@ -937,7 +936,9 @@ label=AUE_LCHOWN
 
 label=AUE_LINK
   format=path1:[attr]2:path3
-     comment=from path:from path:to path
+     comment=from path:
+     comment=from path:
+     comment=to path
 # Not verified
 
 label=AUE_LSEEK
@@ -981,7 +982,7 @@ label=AUE_MMAP
       comment=1, segment address, "addr":
       comment=2, segment address, "len"
   case=With an invalid file descriptor
-    format=arg1;arg2:arg3
+    format=arg1:arg2:arg3
       comment=1, segment address, "addr":
       comment=2, segment address, "len":
       comment=1, file descriptor, "no path&colon; fd"
@@ -1277,7 +1278,7 @@ label=AUE_PROCESSOR_BIND
       comment=2, ID value, "ID":
       comment="PBIND_NONE"
   case=With processor bound
-    format=arg1:arg2:arg3:{proc]
+    format=arg1:arg2:arg3:[proc]
       comment=1, type of ID, "ID type":
       comment=2, ID value, "ID":
       comment=3, processor ID, "processor_id"
@@ -1355,13 +1356,15 @@ label=AUE_RECVMSG
 
 label=AUE_RENAME
   format=path1:[attr]1:[path]2
-  comment=from name:to name:
+  comment=from name:
+  comment=to name
 # not verified
 
 label=AUE_RENAMEAT
-  see openat(2)
+# see openat(2)
   format=path1:[attr]1:[path]2
-  comment=from name:to name:
+  comment=from name:
+  comment=to name
 # not verified
 
 label=AUE_RFSSYS
@@ -1615,15 +1618,15 @@ label=AUE_SETPRIORITY
 
 label=AUE_SETPPRIV
   case=operation privileges off
-  format=arg1,privset2
+  format=arg1:privset2
     comment=setppriv operation:
     comment=privileges actually switched off
   case=operation privileges on
-  format=arg1,privset2
+  format=arg1:privset2
     comment=setppriv operation:
     comment=privileges actually switched on
   case=operation privileges off
-  format=arg1,privset,privset
+  format=arg1:privset:privset
     comment=setppriv operation:
     comment=privileges before privset:
     comment=privileges after privset
@@ -1737,7 +1740,8 @@ label=AUE_SHUTDOWN
   case=If the socket address is invalid
     format=[arg]1:[text]2:[text]3
       comment=1, file descriptor, "fd":
-      comment=bad socket address:bad peer address
+      comment=bad socket address:
+      comment=bad peer address
   case=If the socket address is part of the AF_INET family
     case=..with zero file descriptor
       format=arg1:[arg]2:[arg]3:[arg]4
@@ -1746,7 +1750,7 @@ label=AUE_SHUTDOWN
 	comment=1, type, "type":
 	comment=2, how shutdown code, "how"
     case=...with non-zero file descriptor
-      format=arg1,arg2,inet
+      format=arg1:arg2:inet
 	comment=1, file descriptor, "so":
 	comment=2, how shutdown code, "how"
   case=If the socket address is AF_UNIX
@@ -1836,7 +1840,8 @@ label=AUE_SYMLINK
 
 label=AUE_SYSINFO
   format=arg1:[text]2
-    comment=1, command, "cmd":name
+    comment=1, command, "cmd":
+    comment=name
 #	header,85,2,sysinfo(2),,Thu Nov 08 15:02:07 2001, + 0 msec
 #	argument,1,0x202,cmd
 #	subject,tuser1,tuser1,staff,tuser1,staff,9662,497,0 0 tmach2
@@ -2204,7 +2209,8 @@ label=AUE_mountd_mount
   program=/usr/lib/nfs/mountd
   see=mountd(1M)
   format=text1:path2
-    comment=remote client hostname:mount dir
+    comment=remote client hostname:
+    comment=mount dir
 # See audit_mountd.c; old BSM manual is way off
 
 label=AUE_mountd_umount
@@ -2268,7 +2274,7 @@ label=AUE_shutdown_solaris
 
 label=AUE_smserverd
   program=/usr/lib/smedia/rpc.smserverd
-  format=[text]1,[text]2
+  format=[text]1:[text]2
     comment=state change:
     comment=vid, pid, major/minor device
 # see usr/src/cmd/smserverd
@@ -2279,7 +2285,8 @@ label=AUE_uadmin_solaris
   program=
   see=
   format=text1:text2
-  comment=function code:argument code
+  comment=function code:
+  comment=argument code
 # not used. Replaced by AUE_uadmin_* events, see uadmin.c, adt.xml
 
 label=AUE_LABELSYS_TNRH

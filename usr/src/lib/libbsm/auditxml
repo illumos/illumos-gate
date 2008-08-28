@@ -23,7 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # auditxml [-d] <xml input file>
@@ -566,7 +565,7 @@ sub generateTableC {
 	#	  'arg'			=> 'AUT_ARG',		# not defined
 	#	  'attr'		=> 'AUT_ATTR',
 		  'command'		=> 'AUT_CMD',
-		  'command_1'		=> 'ADT_CMD_ALT',	# dummy token id
+		  'command_alt'		=> 'ADT_CMD_ALT',	# dummy token id
 	#	  'date'		=> 'AUT_TEXT',		# not used
 	#	  'exec_args'   	=> 'AUT_EXEC_ARGS',	# not defined
 	#	  'exec_env'    	=> 'AUT_EXEC_ENV',	# not defined

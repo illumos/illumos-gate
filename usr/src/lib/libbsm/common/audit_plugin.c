@@ -19,12 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * private interfaces for auditd plugins and auditd.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <bsm/audit.h>
 #include <bsm/audit_record.h>
@@ -73,7 +72,7 @@ __audit_syslog(
 	int severity,
 	const char *message)
 {
-	pthread_once_t		once_control = PTHREAD_ONCE_INIT;
+	static pthread_once_t	once_control = PTHREAD_ONCE_INIT;
 	static int		logopen = 0;
 	static int		prev_facility = -1;
 
@@ -240,7 +239,7 @@ __logpost(char *name)
 		 * are not destroyed if there is another auditd running.
 		 */
 		if ((audit_data_fd = open(auditdata,
-			O_RDWR | O_APPEND | O_CREAT, 0660)) < 0) {
+		    O_RDWR | O_APPEND | O_CREAT, 0660)) < 0) {
 			__audit_dowarn("tmpfile", "", 0);
 			return (1);
 		}
