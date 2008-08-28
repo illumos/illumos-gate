@@ -36,8 +36,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/autoconf.h>
@@ -92,46 +90,6 @@ static int  nbssn_recv(struct nbpcb *nbp, mblk_t **mpp, int *lenp,
 	uint8_t *rpcodep, struct proc *p);
 static int  nb_disconnect(struct nbpcb *nbp);
 
-static int
-nb_wait_ack(TIUSER *tiptr, t_scalar_t ack_prim, int fmode)
-{
-	int			msgsz;
-	union T_primitives	*pptr;
-	mblk_t			*bp;
-	ptrdiff_t	diff;
-	int			error;
-
-	/*
-	 * wait for ack
-	 */
-	bp = NULL;
-	if ((error = tli_recv(tiptr, &bp, fmode)) != 0)
-		return (error);
-
-	diff = MBLKL(bp);
-	ASSERT(diff == (ptrdiff_t)((int)diff));
-	msgsz = (int)diff;
-
-	if (msgsz < sizeof (int)) {
-		freemsg(bp);
-		return (EPROTO);
-	}
-
-	/*LINTED*/
-	pptr = (union T_primitives *)bp->b_rptr;
-	if (pptr->type == ack_prim)
-		error = 0; /* Success */
-	else if (pptr->type == T_ERROR_ACK) {
-		if (pptr->error_ack.TLI_error == TSYSERR)
-			error = pptr->error_ack.UNIX_error;
-		else
-			error = t_tlitosyserr(pptr->error_ack.TLI_error);
-	} else
-		error = EPROTO;
-
-	freemsg(bp);
-	return (error);
-}
 
 /*
  * Internal set sockopt for int-sized options.
@@ -145,6 +103,7 @@ nb_setsockopt_int(TIUSER *tiptr, int level, int name, int val)
 	mblk_t *mp;
 	struct opthdr *opt;
 	struct T_optmgmt_req *tor;
+	struct T_optmgmt_ack *toa;
 	int *valp;
 	int error, mlen;
 
@@ -178,9 +137,60 @@ nb_setsockopt_int(TIUSER *tiptr, int level, int name, int val)
 	if ((error = tli_send(tiptr, mp, fmode)) != 0)
 		return (error);
 
+	/*
+	 * Wait for T_OPTMGMT_ACK
+	 */
+	mp = NULL;
 	fmode = 0; /* need to block */
-	error = nb_wait_ack(tiptr, T_OPTMGMT_ACK, fmode);
+	if ((error = tli_recv(tiptr, &mp, fmode)) != 0)
+		return (error);
+	/*LINTED*/
+	toa = (struct T_optmgmt_ack *)mp->b_rptr;
+	if (toa->PRIM_type != T_OPTMGMT_ACK)
+		error = EPROTO;
+	freemsg(mp);
+
 	return (error);
+}
+
+static void
+nb_setopts(struct nbpcb *nbp)
+{
+	int error;
+	TIUSER *tiptr = NULL;
+
+	tiptr = nbp->nbp_tiptr;
+	if (tiptr == NULL) {
+		NBDEBUG("no tiptr!\n");
+		return;
+	}
+
+	/*
+	 * Set various socket/TCP options.
+	 * Failures here are not fatal -
+	 * just log a complaint.
+	 *
+	 * We don't need these two:
+	 *   SO_RCVTIMEO, SO_SNDTIMEO
+	 */
+
+	error = nb_setsockopt_int(tiptr, SOL_SOCKET, SO_SNDBUF,
+	    nbp->nbp_sndbuf);
+	if (error)
+		NBDEBUG("can't set SO_SNDBUF");
+
+	error = nb_setsockopt_int(tiptr, SOL_SOCKET, SO_RCVBUF,
+	    nbp->nbp_rcvbuf);
+	if (error)
+		NBDEBUG("can't set SO_RCVBUF");
+
+	error = nb_setsockopt_int(tiptr, SOL_SOCKET, SO_KEEPALIVE, 1);
+	if (error)
+		NBDEBUG("can't set SO_KEEPALIVE");
+
+	error = nb_setsockopt_int(tiptr, IPPROTO_TCP, TCP_NODELAY, 1);
+	if (error)
+		NBDEBUG("can't set TCP_NODELAY");
 }
 
 /*
@@ -344,10 +354,9 @@ nb_snddis(TIUSER *tiptr)
 	if ((error = tli_send(tiptr, mp, fmode)) != 0)
 		return (error);
 
-#if 0 /* Now letting the IOD recv this. */
 	fmode = 0; /* need to block */
-	error = nb_wait_ack(tiptr, T_OK_ACK, fmode);
-#endif
+	error = get_ok_ack(tiptr, T_OK_ACK, fmode);
+
 	return (error);
 }
 
@@ -478,33 +487,6 @@ nb_connect_in(struct nbpcb *nbp, struct sockaddr_in *to, struct proc *p)
 	if (nbp->nbp_flags & NBF_CONNECTED)
 		return (EISCONN);
 
-	/*
-	 * Set various socket/TCP options.
-	 * Failures here are not fatal -
-	 * just log a complaint.
-	 *
-	 * We don't need these two:
-	 *   SO_RCVTIMEO, SO_SNDTIMEO
-	 */
-
-	error = nb_setsockopt_int(tiptr, SOL_SOCKET, SO_SNDBUF,
-	    nbp->nbp_sndbuf);
-	if (error)
-		NBDEBUG("nb_connect_in: set SO_SNDBUF");
-
-	error = nb_setsockopt_int(tiptr, SOL_SOCKET, SO_RCVBUF,
-	    nbp->nbp_rcvbuf);
-	if (error)
-		NBDEBUG("nb_connect_in: set SO_RCVBUF");
-
-	error = nb_setsockopt_int(tiptr, SOL_SOCKET, SO_KEEPALIVE, 1);
-	if (error)
-		NBDEBUG("nb_connect_in: set SO_KEEPALIVE");
-
-	error = nb_setsockopt_int(tiptr, IPPROTO_TCP, TCP_NODELAY, 1);
-	if (error)
-		NBDEBUG("nb_connect_in: set TCP_NODELAY");
-
 	/* Do local bind (any address) */
 	if ((error = t_kbind(tiptr, NULL, NULL)) != 0) {
 		NBDEBUG("nb_connect_in: bind local");
@@ -525,12 +507,6 @@ nb_connect_in(struct nbpcb *nbp, struct sockaddr_in *to, struct proc *p)
 	error = t_kconnect(tiptr, &call, NULL);
 	if (error) {
 		NBDEBUG("nb_connect_in: connect %d error", error);
-		/*
-		 * XXX: t_kconnect returning EPROTO here instead of ETIMEDOUT
-		 * here. Temporarily return ETIMEDOUT error if we get EPROTO.
-		 */
-		if (error == EPROTO)
-			error = ETIMEDOUT;
 	} else {
 		mutex_enter(&nbp->nbp_lock);
 		nbp->nbp_flags |= NBF_CONNECTED;
@@ -853,6 +829,9 @@ smb_nbst_create(struct smb_vc *vcp, struct proc *p)
 	nbp->nbp_rcvbuf = smb_tcprcvbuf;
 	mutex_init(&nbp->nbp_lock, NULL, MUTEX_DRIVER, NULL);
 	vcp->vc_tdata = nbp;
+
+	nb_setopts(nbp);
+
 	return (0);
 }
 
@@ -895,8 +874,10 @@ smb_nbst_bind(struct smb_vc *vcp, struct sockaddr *sap, struct proc *p)
 	NBDEBUG("\n");
 	error = EINVAL;
 
-	if (nbp->nbp_flags & NBF_LOCADDR)
-		goto out;
+	/*
+	 * Allow repeated bind calls on one endpoint.
+	 * This happens with reconnect.
+	 */
 
 	/*
 	 * Null name is an "anonymous" (NULL) bind request.
@@ -913,6 +894,8 @@ smb_nbst_bind(struct smb_vc *vcp, struct sockaddr *sap, struct proc *p)
 		goto out;
 	}
 	mutex_enter(&nbp->nbp_lock);
+	if (nbp->nbp_laddr)
+		smb_free_sockaddr((struct sockaddr *)nbp->nbp_laddr);
 	nbp->nbp_laddr = snb;
 	nbp->nbp_flags |= NBF_LOCADDR;
 	mutex_exit(&nbp->nbp_lock);
@@ -1028,8 +1011,10 @@ nb_disconnect(struct nbpcb *nbp)
 	}
 	mutex_exit(&nbp->nbp_lock);
 
-	if (save_flags & NBF_CONNECTED)
+	if (save_flags & NBF_CONNECTED) {
 		nb_snddis(tiptr);
+		(void) t_kunbind(tiptr);
+	}
 
 	if (nbp->nbp_state != NBST_RETARGET) {
 		nbp->nbp_state = NBST_CLOSED; /* really IDLE */

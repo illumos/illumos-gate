@@ -37,8 +37,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -905,12 +903,11 @@ nsmb_close(dev_t dev, int flags, int otyp, cred_t *cr)
 		/*
 		 * If this dev minor was doing session setup
 		 * and failed to authenticate (or whatever)
-		 * then we need to "kill" the VC here so any
-		 * other threads waiting for the VC setup to
-		 * finish will drop their references.
+		 * then we need to put the VC in a state that
+		 * allows later commands to try again.
 		 */
 		if (sdp->sd_flags & NSMBFL_NEWVC)
-			smb_vc_kill(vcp);
+			smb_iod_disconnect(vcp);
 		smb_vc_rele(vcp);
 	}
 	smb_credrele(&scred);

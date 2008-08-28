@@ -31,8 +31,10 @@
  *
  * $Id: smb_conn.c,v 1.27.166.1 2005/05/27 02:35:29 lindak Exp $
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 /*
  * Connection engine.
@@ -261,6 +263,62 @@ top:
 		created = 0;
 	SMB_CO_UNLOCK(&smb_vclist);
 
+	if (created == 0) {
+		/*
+		 * Found an existing VC.  Reuse it, but first,
+		 * wait for any other thread doing setup, etc.
+		 * Note: We hold a reference on the VC.
+		 */
+		error = 0;
+		SMB_VC_LOCK(vcp);
+		while (vcp->vc_state < SMBIOD_ST_VCACTIVE) {
+			if (vcp->vc_flags & SMBV_GONE)
+				break;
+			tmo = lbolt + SEC_TO_TICK(2);
+			tmo = cv_timedwait_sig(&vcp->vc_statechg,
+			    &vcp->vc_lock, tmo);
+			if (tmo == 0) {
+				error = EINTR;
+				break;
+			}
+		}
+		SMB_VC_UNLOCK(vcp);
+
+		/* Interrupted? */
+		if (error)
+			goto out;
+
+		/*
+		 * Was there a vc_kill while we waited?
+		 * If so, this VC is gone.  Start over.
+		 */
+		if (vcp->vc_flags & SMBV_GONE) {
+			smb_vc_rele(vcp);
+			goto top;
+		}
+
+		/*
+		 * The possible states here are:
+		 * SMBIOD_ST_VCACTIVE, SMBIOD_ST_DEAD
+		 *
+		 * SMBIOD_ST_VCACTIVE is the normal case,
+		 * where found a connection ready to use.
+		 *
+		 * We may find vc_state == SMBIOD_ST_DEAD
+		 * if a previous session has disconnected.
+		 * In this case, we'd like to reconnect,
+		 * so take over setting up this VC as if
+		 * this thread had created it.
+		 */
+		SMB_VC_LOCK(vcp);
+		if (vcp->vc_state == SMBIOD_ST_DEAD) {
+			vcp->vc_state = SMBIOD_ST_NOTCONN;
+			created = 1;
+			/* Will signal vc_statechg below */
+		}
+		SMB_VC_UNLOCK(vcp);
+	}
+
 	if (created) {
 		/*
 		 * We have a NEW VC, held, but not locked.
@@ -307,47 +365,19 @@ top:
 			break;
 		}
 
-		SMB_VC_LOCK(vcp);
-		cv_broadcast(&vcp->vc_statechg);
-		SMB_VC_UNLOCK(vcp);
-
-	} else {
-		/*
-		 * Found an existing VC.  Reuse it, but first,
-		 * wait for authentication to finish, etc.
-		 * Note: We hold a reference on the VC.
-		 */
-		error = 0;
-		SMB_VC_LOCK(vcp);
-		while (vcp->vc_state != SMBIOD_ST_VCACTIVE) {
-			tmo = lbolt + SEC_TO_TICK(5);
-			tmo = cv_timedwait_sig(&vcp->vc_statechg,
-			    &vcp->vc_lock, tmo);
-			if (tmo == 0) {
-				error = EINTR;
-				break;
-			}
-			if (vcp->vc_flags & SMBV_GONE)
-				break;
+		if (error) {
+			/*
+			 * Leave the VC in a state that allows the
+			 * next open to attempt a new connection.
+			 * This call does the cv_broadcast too,
+			 * so that's in the else part.
+			 */
+			smb_iod_disconnect(vcp);
+		} else {
+			SMB_VC_LOCK(vcp);
+			cv_broadcast(&vcp->vc_statechg);
+			SMB_VC_UNLOCK(vcp);
 		}
-		SMB_VC_UNLOCK(vcp);
-
-		/* Interrupted? */
-		if (error)
-			goto out;
-
-		/*
-		 * The other guy failed authentication,
-		 * or otherwise gave up on this VC.
-		 * Drop reference, start over.
-		 */
-		if (vcp->vc_flags & SMBV_GONE) {
-			smb_vc_rele(vcp);
-			goto top;
-		}
-
-		ASSERT(vcp->vc_state == SMBIOD_ST_VCACTIVE);
-		/* Success! */
 	}
 
 out:
