@@ -7,8 +7,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
 # undef _KERNEL
@@ -400,7 +398,7 @@ ipf_stack_t *ifs;
 			error = EPERM;
 			break;
 		}
-		fr_lock(data, &ifs->ifs_fr_auth_lock);
+		error = fr_lock(data, &ifs->ifs_fr_auth_lock);
 		break;
 
 	case SIOCATHST:

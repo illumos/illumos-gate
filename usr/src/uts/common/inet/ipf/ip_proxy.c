@@ -3,11 +3,9 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -315,7 +313,10 @@ ipf_stack_t *ifs;
 	switch (cmd)
 	{
 	case SIOCPROXY :
-		(void) BCOPYIN(data, &ctl, sizeof(ctl));
+		error = BCOPYIN(data, &ctl, sizeof(ctl));
+		if (error != 0)
+			return EFAULT;
+
 		ptr = NULL;
 
 		if (ctl.apc_dsize > 0) {

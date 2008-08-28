@@ -3870,22 +3870,27 @@ size_t size;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_lock                                                     */
-/* Returns:     (void)                                                      */
+/* Returns:	int - 0 = success, else error				    */
 /* Parameters:  data(I)  - pointer to lock value to set                     */
 /*              lockp(O) - pointer to location to store old lock value      */
 /*                                                                          */
 /* Get the new value for the lock integer, set it and return the old value  */
 /* in *lockp.                                                               */
 /* ------------------------------------------------------------------------ */
-void fr_lock(data, lockp)
+int fr_lock(data, lockp)
 caddr_t data;
 int *lockp;
 {
-	int arg;
+	int arg, err;
 
-	BCOPYIN(data, (caddr_t)&arg, sizeof(arg));
-	BCOPYOUT((caddr_t)lockp, data, sizeof(*lockp));
+	err = BCOPYIN(data, (caddr_t)&arg, sizeof(arg));
+	if (err != 0)
+		return (EFAULT);
+	err = BCOPYOUT((caddr_t)lockp, data, sizeof(*lockp));
+	if (err != 0)
+		return (EFAULT);
 	*lockp = arg;
+	return (0);
 }
 
 
@@ -4634,8 +4639,11 @@ int fr_resolvefunc(data)
 void *data;
 {
 	ipfunc_resolve_t res, *ft;
+	int err;
 
-	BCOPYIN(data, &res, sizeof(res));
+	err = BCOPYIN(data, &res, sizeof(res));
+	if (err != 0)
+		return EFAULT;
 
 	if (res.ipfu_addr == NULL && res.ipfu_name[0] != '\0') {
 		for (ft = fr_availfuncs; ft->ipfu_addr != NULL; ft++)
@@ -5435,7 +5443,9 @@ int type;
 	if ((type < 0) || (type > NUM_OBJ_TYPES-1))
 		return EINVAL;
 
-	BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
+	error = BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
+	if (error != 0)
+		return EFAULT;
 
 	if (obj.ipfo_type != type)
 		return EINVAL;
@@ -5496,7 +5506,9 @@ int type, sz;
 	if (((fr_objbytes[type][0] & 1) == 0) || (sz < fr_objbytes[type][1]))
 		return EINVAL;
 
-	BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
+	error = BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
+	if (error != 0)
+		return EFAULT;
 
 	if (obj.ipfo_type != type)
 		return EINVAL;
@@ -5545,7 +5557,9 @@ int type, sz;
 	    (sz < fr_objbytes[type][1]))
 		return EINVAL;
 
-	BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
+	error = BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
+	if (error != 0)
+		return EFAULT;
 
 	if (obj.ipfo_type != type)
 		return EINVAL;
@@ -5589,7 +5603,9 @@ int type;
 	if ((type < 0) || (type > NUM_OBJ_TYPES-1))
 		return EINVAL;
 
-	BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
+	error = BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
+	if (error != 0)
+		return EFAULT;
 
 	if (obj.ipfo_type != type)
 		return EINVAL;

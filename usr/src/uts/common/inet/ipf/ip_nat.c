@@ -647,8 +647,6 @@ ipf_stack_t *ifs;
 			error = fr_inobj(data, &natd, IPFOBJ_IPNAT);
 		}
 
-	} else if (cmd == (ioctlcmd_t)SIOCIPFFL) { /* SIOCFLNAT & SIOCCNATL */
-		BCOPYIN(data, &arg, sizeof(arg));
 	}
 
 	if (error != 0)
@@ -708,26 +706,35 @@ ipf_stack_t *ifs;
 			error = EPERM;
 		else {
 			tmp = ipflog_clear(IPL_LOGNAT, ifs);
-			BCOPYOUT((char *)&tmp, (char *)data, sizeof(tmp));
+			error = BCOPYOUT((char *)&tmp, (char *)data,
+					sizeof(tmp));
+			if (error != 0)
+				error = EFAULT;
 		}
 		break;
 	}
 	case SIOCSETLG :
-		if (!(mode & FWRITE))
+		if (!(mode & FWRITE)) {
 			error = EPERM;
-		else {
-			BCOPYIN((char *)data,
-				       (char *)&ifs->ifs_nat_logging,
-				sizeof(ifs->ifs_nat_logging));
+		} else {
+			error = BCOPYIN((char *)data,
+					(char *)&ifs->ifs_nat_logging,
+					sizeof(ifs->ifs_nat_logging));
+			if (error != 0)
+				error = EFAULT;
 		}
 		break;
 	case SIOCGETLG :
-		BCOPYOUT((char *)&ifs->ifs_nat_logging, (char *)data,
-			sizeof(ifs->ifs_nat_logging));
+		error = BCOPYOUT((char *)&ifs->ifs_nat_logging, (char *)data,
+				sizeof(ifs->ifs_nat_logging));
+		if (error != 0)
+			error = EFAULT;
 		break;
 	case FIONREAD :
 		arg = ifs->ifs_iplused[IPL_LOGNAT];
-		BCOPYOUT(&arg, data, sizeof(arg));
+		error = BCOPYOUT(&arg, data, sizeof(arg));
+		if (error != 0)
+			error = EFAULT;
 		break;
 #endif
 	case SIOCADNAT :
@@ -827,20 +834,26 @@ ipf_stack_t *ifs;
 		if (getlock) {
 			WRITE_ENTER(&ifs->ifs_ipf_nat);
 		}
-		error = 0;
-		if (arg == 0)
-			ret = nat_flushtable(ifs);
-		else if (arg == 1)
-			ret = nat_clearlist(ifs);
-		else if (arg >= 2 && arg <= 4)
-			ret = nat_extraflush(arg - 2, ifs);
-		else
-			error = EINVAL;
+		error = BCOPYIN(data, &arg, sizeof(arg));
+		if (error != 0) {
+			error = EFAULT;
+		} else {
+			if (arg == 0)
+				ret = nat_flushtable(ifs);
+			else if (arg == 1)
+				ret = nat_clearlist(ifs);
+			else if (arg >= 2 && arg <= 4)
+				ret = nat_extraflush(arg - 2, ifs);
+			else
+				error = EINVAL;
+		}
 		if (getlock) {
 			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 		}
 		if (error == 0) {
-			BCOPYOUT(&ret, data, sizeof(ret));
+			error = BCOPYOUT(&ret, data, sizeof(ret));
+			if (error != 0)
+				error = EFAULT;
 		}
 		break;
 	case SIOCPROXY :
@@ -850,7 +863,7 @@ ipf_stack_t *ifs;
 		if (!(mode & FWRITE)) {
 			error = EPERM;
 		} else {
-			fr_lock(data, &ifs->ifs_fr_nat_lock);
+			error = fr_lock(data, &ifs->ifs_fr_nat_lock);
 		}
 		break;
 	case SIOCSTPUT :
@@ -885,8 +898,12 @@ ipf_stack_t *ifs;
 			error = EACCES;
 		break;
 	case SIOCIPFDELTOK :
-		(void) BCOPYIN((caddr_t)data, (caddr_t)&arg, sizeof(arg));
-		error = ipf_deltoken(arg, uid, ctx, ifs);
+		error = BCOPYIN((caddr_t)data, (caddr_t)&arg, sizeof(arg));
+		if (error != 0) {
+			error = EFAULT;
+		} else {
+			error = ipf_deltoken(arg, uid, ctx, ifs);
+		}
 		break;
 	default :
 		error = EINVAL;
@@ -1187,8 +1204,11 @@ ipf_stack_t *ifs;
 	ap_session_t *aps;
 	nat_t *nat, *n;
 	natget_t ng;
+	int err;
 
-	BCOPYIN(data, &ng, sizeof(ng));
+	err = BCOPYIN(data, &ng, sizeof(ng));
+	if (err != 0)
+		return EFAULT;
 
 	nat = ng.ng_ptr;
 	if (!nat) {
@@ -1198,8 +1218,12 @@ ipf_stack_t *ifs;
 		 * Empty list so the size returned is 0.  Simple.
 		 */
 		if (nat == NULL) {
-			BCOPYOUT(&ng, data, sizeof(ng));
-			return 0;
+			err = BCOPYOUT(&ng, data, sizeof(ng));
+			if (err != 0) {
+				return EFAULT;
+			} else {
+				return 0;
+			}
 		}
 	} else {
 		/*
@@ -1225,7 +1249,9 @@ ipf_stack_t *ifs;
 			ng.ng_sz += aps->aps_psiz;
 	}
 
-	BCOPYOUT(&ng, data, sizeof(ng));
+	err = BCOPYOUT(&ng, data, sizeof(ng));
+	if (err != 0)
+		return EFAULT;
 	return 0;
 }
 
@@ -3972,9 +3998,15 @@ u_32_t *passp;
 		u_32_t hv, msk, nmsk;
 
 		/*
-		 * If there is no current entry in the nat table for this IP#,
-		 * create one for it (if there is a matching rule).
+		 * There is no current entry in the nat table for this packet.
+		 *
+		 * If the packet is a fragment, but not the first fragment,
+		 * then don't do anything.  Otherwise, if there is a matching
+		 * nat rule, try to create a new nat entry.
 		 */
+		if ((fin->fin_off != 0) && (fin->fin_flx & FI_TCPUDP))
+			goto nonatfrag;
+
 		msk = 0xffffffff;
 		nmsk = ifs->ifs_nat_masks;
 maskloop:
@@ -4037,6 +4069,7 @@ maskloop:
 		}
 	}
 
+nonatfrag:
 	if (nat != NULL) {
 		rval = fr_natout(fin, nat, natadd, nflags);
 		if (rval == 1) {
@@ -4292,12 +4325,18 @@ u_32_t *passp;
 	} else {
 		u_32_t hv, msk, rmsk;
 
+		/*
+		 * There is no current entry in the nat table for this packet.
+		 *
+		 * If the packet is a fragment, but not the first fragment,
+		 * then don't do anything.  Otherwise, if there is a matching
+		 * nat rule, try to create a new nat entry.
+		 */
+		if ((fin->fin_off != 0) && (fin->fin_flx & FI_TCPUDP))
+			goto nonatfrag;
+
 		rmsk = ifs->ifs_rdr_masks;
 		msk = 0xffffffff;
-		/*
-		 * If there is no current entry in the nat table for this IP#,
-		 * create one for it (if there is a matching rule).
-		 */
 maskloop:
 		iph = in.s_addr & htonl(msk);
 		hv = NAT_HASH_FN(iph, 0, ifs->ifs_ipf_rdrrules_sz);
@@ -4358,6 +4397,8 @@ maskloop:
 			}
 		}
 	}
+
+nonatfrag:
 	if (nat != NULL) {
 		rval = fr_natin(fin, nat, natadd, nflags);
 		if (rval == 1) {

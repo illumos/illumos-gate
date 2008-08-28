@@ -272,7 +272,7 @@ typedef	struct	fr_ip	{
 #define	FI_FRAGBODY	0x2000
 #define	FI_BADSRC	0x4000
 #define	FI_LOWTTL	0x8000
-#define	FI_CMP		0xcfe3	/* Not FI_FRAG,FI_NATED,FI_FRAGTAIL */
+#define	FI_CMP		0xcf03	/* Not FI_FRAG,FI_NATED,FI_FRAGTAIL,broadcast */
 #define	FI_ICMPCMP	0x0003	/* Flags we can check for ICMP error packets */
 #define	FI_WITH		0xeffe	/* Not FI_TCPUDP */
 #define	FI_V6EXTHDR	0x10000
@@ -1503,8 +1503,8 @@ extern	int		fr_ifpaddr __P((int, int, void *,
 					struct in_addr *, struct in_addr *,
 					ipf_stack_t *));
 extern	int		fr_initialise __P((ipf_stack_t *));
-extern	void		fr_lock __P((caddr_t, int *));
-extern  int		fr_makefrip __P((int, ip_t *, fr_info_t *));
+extern	int		fr_lock __P((caddr_t, int *));
+extern	int		fr_makefrip __P((int, ip_t *, fr_info_t *));
 extern	int		fr_matchtag __P((ipftag_t *, ipftag_t *));
 extern	int		fr_matchicmpqueryreply __P((int, icmpinfo_t *,
 						    struct icmp *, int));

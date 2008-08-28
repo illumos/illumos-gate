@@ -426,31 +426,48 @@ ipf_stack_t *ifs;
 	 * Delete an entry from the state table.
 	 */
 	case SIOCDELST :
-	    error = fr_state_remove(data, ifs);
+		error = fr_state_remove(data, ifs);
 		break;
 	/*
 	 * Flush the state table
 	 */
 	case SIOCIPFFL :
-		BCOPYIN(data, (char *)&arg, sizeof(arg));
-		if (arg == 0 || arg == 1) {
-			WRITE_ENTER(&ifs->ifs_ipf_state);
-			ret = fr_state_flush(arg, 4, ifs);
-			RWLOCK_EXIT(&ifs->ifs_ipf_state);
-			BCOPYOUT((char *)&ret, data, sizeof(ret));
-		} else
-			error = EINVAL;
+		error = BCOPYIN(data, (char *)&arg, sizeof(arg));
+		if (error != 0) {
+			error = EFAULT;
+		} else {
+			if (arg == 0 || arg == 1) {
+				WRITE_ENTER(&ifs->ifs_ipf_state);
+				ret = fr_state_flush(arg, 4, ifs);
+				RWLOCK_EXIT(&ifs->ifs_ipf_state);
+				error = BCOPYOUT((char *)&ret, data,
+						sizeof(ret));
+				if (error != 0)
+					return EFAULT;
+			} else {
+				error = EINVAL;
+			}
+		}
 		break;
+
 #ifdef	USE_INET6
 	case SIOCIPFL6 :
-		BCOPYIN(data, (char *)&arg, sizeof(arg));
-		if (arg == 0 || arg == 1) {
-			WRITE_ENTER(&ifs->ifs_ipf_state);
-			ret = fr_state_flush(arg, 6, ifs);
-			RWLOCK_EXIT(&ifs->ifs_ipf_state);
-			BCOPYOUT((char *)&ret, data, sizeof(ret));
-		} else
-			error = EINVAL;
+		error = BCOPYIN(data, (char *)&arg, sizeof(arg));
+		if (error != 0) {
+			error = EFAULT;
+		} else {
+			if (arg == 0 || arg == 1) {
+				WRITE_ENTER(&ifs->ifs_ipf_state);
+				ret = fr_state_flush(arg, 6, ifs);
+				RWLOCK_EXIT(&ifs->ifs_ipf_state);
+				error = BCOPYOUT((char *)&ret, data,
+						sizeof(ret));
+				if (error != 0)
+					return EFAULT;
+			} else {
+				error = EINVAL;
+			}
+		}
 		break;
 #endif
 #ifdef	IPFILTER_LOG
@@ -464,34 +481,43 @@ ipf_stack_t *ifs;
 			int tmp;
 
 			tmp = ipflog_clear(IPL_LOGSTATE, ifs);
-			BCOPYOUT((char *)&tmp, data, sizeof(tmp));
+			error = BCOPYOUT((char *)&tmp, data, sizeof(tmp));
+			if (error != 0)
+				error = EFAULT;
 		}
 		break;
 	/*
 	 * Turn logging of state information on/off.
 	 */
 	case SIOCSETLG :
-		if (!(mode & FWRITE))
+		if (!(mode & FWRITE)) {
 			error = EPERM;
-		else {
-			BCOPYIN((char *)data,
-				       (char *)&ifs->ifs_ipstate_logging,
-				       sizeof(ifs->ifs_ipstate_logging));
+		} else {
+			error = BCOPYIN((char *)data,
+					(char *)&ifs->ifs_ipstate_logging,
+					sizeof(ifs->ifs_ipstate_logging));
+			if (error != 0)
+				error = EFAULT;
 		}
 		break;
 	/*
 	 * Return the current state of logging.
 	 */
 	case SIOCGETLG :
-		BCOPYOUT((char *)&ifs->ifs_ipstate_logging, (char *)data,
-			sizeof(ifs->ifs_ipstate_logging));
+		error = BCOPYOUT((char *)&ifs->ifs_ipstate_logging,
+				(char *)data,
+				sizeof(ifs->ifs_ipstate_logging));
+		if (error != 0)
+			error = EFAULT;
 		break;
 	/*
 	 * Return the number of bytes currently waiting to be read.
 	 */
 	case FIONREAD :
 		arg = ifs->ifs_iplused[IPL_LOGSTATE]; /* returned in an int */
-		BCOPYOUT((char *)&arg, data, sizeof(arg));
+		error = BCOPYOUT((char *)&arg, data, sizeof(arg));
+		if (error != 0)
+			error = EFAULT;
 		break;
 #endif
 	/*
@@ -508,7 +534,7 @@ ipf_stack_t *ifs;
 		if (!(mode & FWRITE)) {
 			error = EPERM;
 		} else {
-			fr_lock(data, &ifs->ifs_fr_state_lock);
+			error = fr_lock(data, &ifs->ifs_fr_state_lock);
 		}
 		break;
 	/*
@@ -551,8 +577,12 @@ ipf_stack_t *ifs;
 	    }
 
 	case SIOCIPFDELTOK :
-		(void) BCOPYIN(data, (char *)&arg, sizeof(arg));
-		error = ipf_deltoken(arg, uid, ctx, ifs);
+		error = BCOPYIN(data, (char *)&arg, sizeof(arg));
+		if (error != 0) {
+			error = EFAULT;
+		} else {
+			error = ipf_deltoken(arg, uid, ctx, ifs);
+		}
 		break;
 
 	default :
@@ -1180,6 +1210,16 @@ u_int flags;
 		hv += is->is_src.i6[3];
 	}
 #endif
+	if ((fin->fin_v == 4) &&
+	    (fin->fin_flx & (FI_MULTICAST|FI_BROADCAST|FI_MBCAST))) {
+		if (fin->fin_out == 0) {
+			flags |= SI_W_DADDR|SI_CLONE;
+			hv -= is->is_daddr;
+		} else {
+			flags |= SI_W_SADDR|SI_CLONE;
+			hv -= is->is_saddr;
+		}
+	}
 
 	switch (is->is_p)
 	{
@@ -2557,6 +2597,14 @@ ipftq_t **ifqp;
 		}
 	}
 #endif
+	if ((v == 4) &&
+	    (fin->fin_flx & (FI_MULTICAST|FI_BROADCAST|FI_MBCAST))) {
+		if (fin->fin_out == 0) {
+			hv -= src.in4.s_addr;
+		} else {
+			hv -= dst.in4.s_addr;
+		}
+	}
 
 	/*
 	 * Search the hash table for matching packet header info.
@@ -2697,12 +2745,31 @@ retry_tcpudp:
 		}
 		RWLOCK_EXIT(&ifs->ifs_ipf_state);
 
-		if (!tryagain && ifs->ifs_ips_stats.iss_wild) {
-			hv -= dport;
-			hv -= sport;
-			tryagain = 1;
-			WRITE_ENTER(&ifs->ifs_ipf_state);
-			goto retry_tcpudp;
+		if (ifs->ifs_ips_stats.iss_wild) {
+			if (tryagain == 0) {
+				hv -= dport;
+				hv -= sport;
+			} else if (tryagain == 1) {
+				hv = fin->fin_fi.fi_p;
+				/*
+				 * If we try to pretend this is a reply to a
+				 * multicast/broadcast packet then we need to
+				 * exclude part of the address from the hash
+				 * calculation.
+				 */
+				if (fin->fin_out == 0) {
+					hv += src.in4.s_addr;
+				} else {
+					hv += dst.in4.s_addr;
+				}
+				hv += dport;
+				hv += sport;
+			}
+			tryagain++;
+			if (tryagain <= 2) {
+				WRITE_ENTER(&ifs->ifs_ipf_state);
+				goto retry_tcpudp;
+			}
 		}
 		fin->fin_flx |= oow;
 		break;

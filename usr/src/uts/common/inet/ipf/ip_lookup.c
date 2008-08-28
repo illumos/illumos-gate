@@ -3,11 +3,9 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -226,8 +224,10 @@ ipf_stack_t *ifs;
 	ip_pool_t *p;
 	int err;
 
-	err = 0;
-	BCOPYIN(data, &op, sizeof(op));
+	err = BCOPYIN(data, &op, sizeof(op));
+	if (err != 0)
+		return EFAULT;
+
 	op.iplo_name[sizeof(op.iplo_name) - 1] = '\0';
 
 	switch (op.iplo_type)
@@ -297,8 +297,9 @@ ipf_stack_t *ifs;
 	ip_pool_t *p;
 	int err;
 
-	err = 0;
-	BCOPYIN(data, &op, sizeof(op));
+	err = BCOPYIN(data, &op, sizeof(op));
+	if (err != 0)
+		return EFAULT;
 
 	op.iplo_name[sizeof(op.iplo_name) - 1] = '\0';
 
@@ -359,8 +360,9 @@ ipf_stack_t *ifs;
 	iplookupop_t op;
 	int err;
 
-	err = 0;
-	BCOPYIN(data, &op, sizeof(op));
+	err = BCOPYIN(data, &op, sizeof(op));
+	if (err != 0)
+		return EFAULT;
 
 	op.iplo_name[sizeof(op.iplo_name) - 1] = '\0';
 
@@ -403,7 +405,10 @@ ipf_stack_t *ifs;
 	iplookupop_t op;
 	int err;
 
-	BCOPYIN(data, &op, sizeof(op));
+	err = BCOPYIN(data, &op, sizeof(op));
+	if (err != 0)
+		return EFAULT;
+
 	op.iplo_name[sizeof(op.iplo_name) - 1] = '\0';
 
 	if (op.iplo_arg & IPLT_ANON)
@@ -445,8 +450,9 @@ ipf_stack_t *ifs;
 	iplookupop_t op;
 	int err;
 
-	err = 0;
-	BCOPYIN(data, &op, sizeof(op));
+	err = BCOPYIN(data, &op, sizeof(op));
+	if (err != 0)
+		return EFAULT;
 
 	switch (op.iplo_type)
 	{
@@ -481,8 +487,9 @@ ipf_stack_t *ifs;
 	int err, unit, num, type;
 	iplookupflush_t flush;
 
-	err = 0;
-	BCOPYIN(data, &flush, sizeof(flush));
+	err = BCOPYIN(data, &flush, sizeof(flush));
+	if (err != 0)
+		return EFAULT;
 
 	flush.iplf_name[sizeof(flush.iplf_name) - 1] = '\0';
 

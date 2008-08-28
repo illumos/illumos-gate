@@ -759,8 +759,12 @@ int *rp;
 		break;
 
 	case SIOCIPFDELTOK :
-		(void)BCOPYIN((caddr_t)data, (caddr_t)&tmp, sizeof(tmp));
-		error = ipf_deltoken(tmp, cp->cr_uid, curproc, ifs);
+		error = BCOPYIN((caddr_t)data, (caddr_t)&tmp, sizeof(tmp));
+		if (error != 0) {
+			error = EFAULT;
+		} else {
+			error = ipf_deltoken(tmp, cp->cr_uid, curproc, ifs);
+		}
 		break;
 
 	default :
