@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Descriptor parsing functions
@@ -77,7 +76,7 @@ usb_parse_data(char	*format,
 			uint8_t	*cp = (uint8_t *)structure;
 
 			cp = (uint8_t *)(((uintptr_t)cp + _CHAR_ALIGNMENT - 1) &
-							~(_CHAR_ALIGNMENT - 1));
+			    ~(_CHAR_ALIGNMENT - 1));
 			if (((data + 1) > dataend) ||
 			    ((cp + 1) > (uint8_t *)structend))
 				break;
@@ -94,8 +93,8 @@ usb_parse_data(char	*format,
 			uint16_t	*sp = (uint16_t *)structure;
 
 			sp = (uint16_t *)
-				(((uintptr_t)sp + _SHORT_ALIGNMENT - 1) &
-						~(_SHORT_ALIGNMENT - 1));
+			    (((uintptr_t)sp + _SHORT_ALIGNMENT - 1) &
+			    ~(_SHORT_ALIGNMENT - 1));
 			if (((data + 2) > dataend) ||
 			    ((sp + 1) > (uint16_t *)structend))
 				break;
@@ -113,15 +112,15 @@ usb_parse_data(char	*format,
 			uint32_t	*lp = (uint32_t *)structure;
 
 			lp = (uint32_t *)
-				(((uintptr_t)lp + _INT_ALIGNMENT - 1) &
-							~(_INT_ALIGNMENT - 1));
+			    (((uintptr_t)lp + _INT_ALIGNMENT - 1) &
+			    ~(_INT_ALIGNMENT - 1));
 			if (((data + 4) > dataend) ||
 			    ((lp + 1) > (uint32_t *)structend))
 				break;
 
 			*lp++ = (((((
-				(uint32_t)data[3] << 8) | data[2]) << 8) |
-						data[1]) << 8) | data[0];
+			    (uint32_t)data[3] << 8) | data[2]) << 8) |
+			    data[1]) << 8) | data[0];
 			data += 4;
 			structure = (void *)lp;
 			if (multiplier) {
@@ -134,17 +133,17 @@ usb_parse_data(char	*format,
 			uint64_t	*llp = (uint64_t *)structure;
 
 			llp = (uint64_t *)
-				(((uintptr_t)llp + _LONG_LONG_ALIGNMENT - 1) &
-						~(_LONG_LONG_ALIGNMENT - 1));
+			    (((uintptr_t)llp + _LONG_LONG_ALIGNMENT - 1) &
+			    ~(_LONG_LONG_ALIGNMENT - 1));
 			if (((data + 8) > dataend) ||
 			    ((llp + 1) >= (uint64_t *)structend))
 				break;
 
 			*llp++ = (((((((((((((data[7] << 8) |
-					data[6]) << 8) | data[5]) << 8) |
-					data[4]) << 8) | data[3]) << 8) |
-					data[2]) << 8) | data[1]) << 8) |
-					data[0];
+			    data[6]) << 8) | data[5]) << 8) |
+			    data[4]) << 8) | data[3]) << 8) |
+			    data[2]) << 8) | data[1]) << 8) |
+			    data[0];
 			data += 8;
 			structure = (void *)llp;
 			if (multiplier) {
@@ -175,7 +174,7 @@ usb_parse_CV_descr(char *format,
 	size_t	structlen)
 {
 	return (usb_parse_data(format, data, datalen, structure,
-		structlen));
+	    structlen));
 }
 
 
@@ -239,7 +238,7 @@ usb_parse_dev_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(DEVICE) */
 	}
 
 	return (usb_parse_data("ccsccccssscccc",
-		buf, buflen, ret_descr, ret_buf_len));
+	    buf, buflen, ret_descr, ret_buf_len));
 }
 
 
@@ -256,7 +255,7 @@ usb_parse_cfg_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 	}
 
 	return (usb_parse_data("ccsccccc",
-		buf, buflen, ret_descr, ret_buf_len));
+	    buf, buflen, ret_descr, ret_buf_len));
 }
 
 
@@ -277,7 +276,7 @@ usba_parse_cfg_pwr_descr(
 
 		if (buf[1] == USBA_DESCR_TYPE_CFG_PWR_1_1) {
 			return (usb_parse_data("ccsccccccccsss",
-				buf, buflen, ret_descr, ret_buf_len));
+			    buf, buflen, ret_descr, ret_buf_len));
 		}
 
 		/*
@@ -389,8 +388,8 @@ usba_parse_if_pwr_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 
 					return (
 					    usb_parse_data("cccccccccsss",
-						buf, bufend - buf, ret_descr,
-						ret_buf_len));
+					    buf, bufend - buf, ret_descr,
+					    ret_buf_len));
 				} else {
 					break;
 				}
@@ -435,8 +434,8 @@ usb_parse_ep_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 
 	while ((buf + 4) <= bufend) {
 		if (buf[1] == USB_DESCR_TYPE_IF &&
-			buf[2] == if_number &&
-			buf[3] == alt_if_setting) {
+		    buf[2] == if_number &&
+		    buf[3] == alt_if_setting) {
 			if ((buf = usb_nth_descr(buf, bufend - buf,
 			    USB_DESCR_TYPE_EP, ep_index,
 			    USB_DESCR_TYPE_IF, -1)) == NULL) {
@@ -445,8 +444,8 @@ usb_parse_ep_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 			}
 
 			return (usb_parse_data("ccccsc",
-						buf, bufend - buf,
-						ret_descr, ret_buf_len));
+			    buf, bufend - buf,
+			    ret_descr, ret_buf_len));
 		}
 
 		/*
@@ -508,13 +507,13 @@ usb_parse_CV_cfg_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 
 	if ((buf == NULL) || (ret_descr == NULL) || (fmt == NULL) ||
 	    (buflen < 2) || ((buf = usb_nth_descr(buf, buflen, descr_type,
-				descr_index, -1, -1)) == NULL)) {
+	    descr_index, -1, -1)) == NULL)) {
 
 		return (USB_PARSE_ERROR);
 	}
 
 	return (usb_parse_data(fmt, buf, bufend - buf, ret_descr,
-			ret_buf_len));
+	    ret_buf_len));
 }
 
 
@@ -547,7 +546,7 @@ usb_parse_CV_if_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 			}
 
 			return (usb_parse_data(fmt,
-				buf, bufend - buf, ret_descr, ret_buf_len));
+			    buf, bufend - buf, ret_descr, ret_buf_len));
 		}
 
 		/*
@@ -600,7 +599,7 @@ usb_parse_CV_ep_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 			}
 
 			return (usb_parse_data(fmt, buf, bufend - buf,
-						ret_descr, ret_buf_len));
+			    ret_descr, ret_buf_len));
 		}
 
 		/*

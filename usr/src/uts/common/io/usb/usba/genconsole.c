@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * USBA: Solaris USB Architecture support
@@ -125,7 +124,7 @@ usb_console_input_fini(usb_console_info_t console_input_info)
 	 * Call the lower layer to free any state information.
 	 */
 	ret = usba_device->usb_hcdi_ops->usba_hcdi_console_input_fini(
-		usb_console_input);
+	    usb_console_input);
 
 	if (ret == USB_FAILURE) {
 
@@ -170,7 +169,7 @@ usb_console_input_enter(usb_console_info_t console_input_info)
 	 * Call the lower layer to save state information.
 	 */
 	usba_device->usb_hcdi_ops->usba_hcdi_console_input_enter(
-		usb_console_input);
+	    usb_console_input);
 
 	return (USB_SUCCESS);
 }
@@ -204,7 +203,7 @@ usb_console_read(usb_console_info_t console_input_info, uint_t *num_characters)
 	 * of characters read into the buffer.
 	 */
 	return (usba_device->usb_hcdi_ops->usba_hcdi_console_read(
-		usb_console_input, num_characters));
+	    usb_console_input, num_characters));
 }
 
 
@@ -237,13 +236,13 @@ usb_console_input_exit(usb_console_info_t console_input_info)
 	 * Restore the state information.
 	 */
 	usba_device->usb_hcdi_ops->usba_hcdi_console_input_exit(
-		usb_console_input);
+	    usb_console_input);
 
 	return (USB_SUCCESS);
 }
 
 /*
- * Initialize USB OBP support.  This routine calls down to the lower
+ * Initialize USB OBP support.	This routine calls down to the lower
  * layers to initialize any state information.
  */
 int
@@ -265,18 +264,18 @@ usb_console_output_init(
 		return (USB_FAILURE);
 
 	usb_console_output = kmem_zalloc(sizeof (struct usb_console_info_impl),
-		KM_SLEEP);
+	    KM_SLEEP);
 	usb_console_output->uci_dip = dip;
 
 	/*
 	 * Call the lower layer to initialize any state information
 	 */
 	ret = usb_device->usb_hcdi_ops->usba_hcdi_console_output_init(
-		usba_get_ph_data(pipe_handle), usb_console_output);
+	    usba_get_ph_data(pipe_handle), usb_console_output);
 
 	if (ret == USB_FAILURE) {
 		kmem_free(usb_console_output,
-			sizeof (struct usb_console_info_impl));
+		    sizeof (struct usb_console_info_impl));
 
 		return (ret);
 	}
@@ -308,7 +307,7 @@ usb_console_output_fini(usb_console_info_t console_output_info)
 	 * Call the lower layer to free any state information.
 	 */
 	ret = usb_device->usb_hcdi_ops->usba_hcdi_console_output_fini(
-		usb_console_output);
+	    usb_console_output);
 
 	if (ret == USB_FAILURE) {
 
@@ -347,7 +346,7 @@ usb_console_output_enter(usb_console_info_t console_output_info)
 	 * Call the lower layer to save state information.
 	 */
 	usb_device->usb_hcdi_ops->usba_hcdi_console_output_enter(
-		usb_console_output);
+	    usb_console_output);
 
 	return (USB_SUCCESS);
 }
@@ -376,8 +375,8 @@ usb_console_write(usb_console_info_t console_output_info,
 	 * of characters read into the buffer.
 	 */
 	return (usb_device->usb_hcdi_ops->usba_hcdi_console_write(
-		usb_console_output, buf, num_characters,
-		num_characters_written));
+	    usb_console_output, buf, num_characters,
+	    num_characters_written));
 }
 
 /*
@@ -404,7 +403,7 @@ usb_console_output_exit(usb_console_info_t console_output_info)
 	 * Restore the state information.
 	 */
 	usb_device->usb_hcdi_ops->usba_hcdi_console_output_exit(
-		usb_console_output);
+	    usb_console_output);
 
 	return (USB_SUCCESS);
 }

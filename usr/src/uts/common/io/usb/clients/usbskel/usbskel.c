@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Sample skeleton USB driver.
@@ -173,7 +171,7 @@ static struct dev_ops usbskel_ops = {
 
 static struct modldrv usbskel_modldrv =	{
 	&mod_driverops,
-	"USB skeleton driver %I%",
+	"USB skeleton driver",
 	&usbskel_ops
 };
 
@@ -409,7 +407,7 @@ usbskel_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	usb_free_descr_tree(dip, usbskelp->usbskel_reg);
 
 	mutex_init(&usbskelp->usbskel_mutex, NULL, MUTEX_DRIVER,
-			usbskelp->usbskel_reg->dev_iblock_cookie);
+	    usbskelp->usbskel_reg->dev_iblock_cookie);
 
 	cv_init(&usbskelp->usbskel_serial_cv, NULL, CV_DRIVER, NULL);
 	usbskelp->usbskel_serial_inuse = B_FALSE;
@@ -466,7 +464,7 @@ usbskel_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	int		instance = ddi_get_instance(dip);
 	usbskel_state_t	*usbskelp =
-				ddi_get_soft_state(usbskel_statep, instance);
+	    ddi_get_soft_state(usbskel_statep, instance);
 	int		rval = DDI_FAILURE;
 
 	switch (cmd) {
@@ -681,7 +679,7 @@ usbskel_read(dev_t dev, struct uio *uio_p, cred_t *cred_p)
 	usbskel_log(usbskelp, USBSKEL_LOG_LOG, "read enter");
 
 	return (physio(usbskel_strategy, NULL, dev, B_READ,
-			usbskel_minphys, uio_p));
+	    usbskel_minphys, uio_p));
 }
 
 
@@ -693,7 +691,7 @@ static int
 usbskel_strategy(struct buf *bp)
 {
 	usbskel_state_t *usbskelp = ddi_get_soft_state(usbskel_statep,
-					getminor(bp->b_edev));
+	    getminor(bp->b_edev));
 	usb_pipe_handle_t pipe = usbskelp->usbskel_reg->dev_default_ph;
 	usb_ctrl_req_t 	*request;
 	int status;
@@ -819,7 +817,7 @@ usbskel_normal_callback(usb_pipe_handle_t pipe, usb_ctrl_req_t *request)
 {
 	struct buf *bp 		= (struct buf *)request->ctrl_client_private;
 	usbskel_state_t *usbskelp = ddi_get_soft_state(usbskel_statep,
-					getminor(bp->b_edev));
+	    getminor(bp->b_edev));
 	mblk_t *data 		= request->ctrl_data;
 	int amt_transferred 	= data->b_wptr - data->b_rptr;
 
@@ -878,7 +876,7 @@ usbskel_exception_callback(usb_pipe_handle_t pipe, usb_ctrl_req_t *request)
 {
 	struct buf *bp = (struct buf *)request->ctrl_client_private;
 	usbskel_state_t *usbskelp = ddi_get_soft_state(usbskel_statep,
-					getminor(bp->b_edev));
+	    getminor(bp->b_edev));
 	mblk_t 	*data = request->ctrl_data;
 	int 	amt_transferred = (data ? data->b_wptr - data->b_rptr : 0);
 
@@ -948,7 +946,7 @@ usbskel_disconnect_callback(dev_info_t *dip)
 {
 	int instance = ddi_get_instance(dip);
 	usbskel_state_t	*usbskelp =
-				ddi_get_soft_state(usbskel_statep, instance);
+	    ddi_get_soft_state(usbskel_statep, instance);
 
 	usbskel_log(usbskelp, USBSKEL_LOG_LOG, "disconnect: enter");
 
@@ -978,7 +976,7 @@ usbskel_reconnect_callback(dev_info_t *dip)
 {
 	int instance = ddi_get_instance(dip);
 	usbskel_state_t	*usbskelp =
-				ddi_get_soft_state(usbskel_statep, instance);
+	    ddi_get_soft_state(usbskel_statep, instance);
 
 	usbskel_log(usbskelp, USBSKEL_LOG_LOG, "reconnect: enter");
 
@@ -1086,7 +1084,7 @@ usbskel_cpr_suspend(dev_info_t *dip)
 {
 	int		instance = ddi_get_instance(dip);
 	usbskel_state_t	*usbskelp = ddi_get_soft_state(usbskel_statep,
-							instance);
+	    instance);
 
 	usbskel_log(usbskelp, USBSKEL_LOG_LOG, "suspend enter");
 
@@ -1155,7 +1153,7 @@ usbskel_cpr_resume(dev_info_t *dip)
 {
 	int		instance = ddi_get_instance(dip);
 	usbskel_state_t	*usbskelp = ddi_get_soft_state(usbskel_statep,
-							instance);
+	    instance);
 
 	usbskel_log(usbskelp, USBSKEL_LOG_LOG, "resume: enter");
 
@@ -1328,7 +1326,7 @@ usbskel_power(dev_info_t *dip, int comp, int level)
 	 * PM tries to power up all devices
 	 */
 	if ((usbskelp->usbskel_dev_state == USB_DEV_DISCONNECTED) ||
-		(usbskelp->usbskel_dev_state == USB_DEV_SUSPENDED)) {
+	    (usbskelp->usbskel_dev_state == USB_DEV_SUSPENDED)) {
 
 		usbskel_log(usbskelp, USBSKEL_LOG_LOG,
 		    "usbskel_power: disconnected/suspended "
@@ -1430,7 +1428,7 @@ usbskel_init_power_mgmt(usbskel_state_t *usbskelp)
 			    "usbskel_init_power_mgmt: created PM components");
 
 			usbskelpm->usbskel_pwr_states =
-						(uint8_t)pwr_states;
+			    (uint8_t)pwr_states;
 			(void) pm_raise_power(
 			    usbskelp->usbskel_dip, 0, USB_DEV_OS_FULL_PWR);
 		} else {

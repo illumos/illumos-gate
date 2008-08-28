@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * USB audio hid streams module - processes hid data
@@ -102,7 +101,7 @@ extern struct mod_ops mod_strmodops;
 
 static struct modlstrmod modlstrmod = {
 	&mod_strmodops,
-	"USB audio hid streams %I%",
+	"USB audio hid streams",
 	&fsw
 };
 

@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/usb/usba/usbai_version.h>
 #include <sys/usb/usba.h>
@@ -60,7 +59,7 @@ static struct fmodsw fsw = {
  */
 static struct modlstrmod modlstrmod = {
 	&mod_strmodops,
-	"USB mouse streams %I%",
+	"USB mouse streams",
 	&fsw
 };
 

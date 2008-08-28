@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is a dacf module for usb audio plumbing/unplumbing based
@@ -125,7 +124,7 @@ struct dacfsw usb_audio_dacfsw = {
 
 struct modldacf usb_audio_dacf = {
 	&mod_dacfops,	/* Type of module */
-	"USB_AC_DACF %I%",
+	"USB_AC_DACF",
 	&usb_audio_dacfsw
 };
 

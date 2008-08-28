@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Audio Streams Driver: This driver is responsible for
@@ -251,7 +250,7 @@ static struct dev_ops usb_as_dev_ops = {
 /* Linkage structure for loadable drivers */
 static struct modldrv usb_as_modldrv = {
 	&mod_driverops,			/* drv_modops */
-	"USB Audio Streaming Driver %I%",	/* drv_linkinfo */
+	"USB Audio Streaming Driver",	/* drv_linkinfo */
 	&usb_as_dev_ops			/* drv_dev_ops */
 };
 

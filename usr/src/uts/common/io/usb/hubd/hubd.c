@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * skeleton hub driver, the actual code is in hubdi.c
@@ -83,7 +81,7 @@ static struct dev_ops hubd_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module. This one is a driver */
-	"USB Hub Driver %I%", /* Name of the module. */
+	"USB Hub Driver", /* Name of the module. */
 	&hubd_ops,	/* driver ops */
 };
 
@@ -204,5 +202,5 @@ hubd_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	dev_info_t *dip = hubd_get_dip(dev);
 
 	return (usba_hubdi_ioctl(dip, dev, cmd, arg, mode,
-						credp, rvalp));
+	    credp, rvalp));
 }

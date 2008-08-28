@@ -22,7 +22,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Printer Class Driver for USB
@@ -175,7 +174,7 @@ static struct dev_ops usbprn_ops = {
 
 static struct modldrv usbprnmodldrv =	{
 	&mod_driverops,
-	"USB printer client driver %I%",
+	"USB printer client driver",
 	&usbprn_ops
 };
 

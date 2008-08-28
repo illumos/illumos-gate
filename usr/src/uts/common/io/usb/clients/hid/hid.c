@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Human Interface Device driver (HID)
@@ -235,7 +234,7 @@ static struct dev_ops hid_ops = {
 
 static struct modldrv hidmodldrv =	{
 	&mod_driverops,
-	"USB HID Client Driver %I%",
+	"USB HID Client Driver",
 	&hid_ops			/* driver ops */
 };
 

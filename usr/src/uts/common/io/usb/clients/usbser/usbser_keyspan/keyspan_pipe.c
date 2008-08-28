@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -100,8 +99,8 @@ keyspan_init_pipes(keyspan_state_t *ksp)
 	uint8_t		port_cnt = ksp->ks_dev_spec.port_cnt;
 	uint8_t		ep_addr, ep_cnt;
 	usb_ep_data_t	*dataout[KEYSPAN_MAX_PORT_NUM],
-			*datain[KEYSPAN_MAX_PORT_NUM],
-			*status = NULL, *ctrl = NULL, *tmp_ep;
+	    *datain[KEYSPAN_MAX_PORT_NUM],
+	    *status = NULL, *ctrl = NULL, *tmp_ep;
 	usb_alt_if_data_t *alt_data;
 	usb_if_data_t *if_data;
 
@@ -124,7 +123,7 @@ keyspan_init_pipes(keyspan_state_t *ksp)
 	 */
 	for (i = 0; i < ep_cnt; i++) {
 		tmp_ep = usb_lookup_ep_data(ksp->ks_dip, dev_data, ifc, alt, i,
-			    USB_EP_ATTR_BULK, USB_EP_DIR_IN);
+		    USB_EP_ATTR_BULK, USB_EP_DIR_IN);
 		if (tmp_ep == NULL) {
 			USB_DPRINTF_L3(DPRINT_ATTACH, ksp->ks_lh,
 			    "keyspan_init_pipes: can't find bulk in ep, i=%d,"
@@ -196,7 +195,7 @@ keyspan_init_pipes(keyspan_state_t *ksp)
 	 */
 	for (i = 0; i < ep_cnt; i++) {
 		tmp_ep = usb_lookup_ep_data(ksp->ks_dip, dev_data, ifc, alt, i,
-			    USB_EP_ATTR_BULK, USB_EP_DIR_OUT);
+		    USB_EP_ATTR_BULK, USB_EP_DIR_OUT);
 		if (tmp_ep == NULL) {
 			USB_DPRINTF_L3(DPRINT_ATTACH, ksp->ks_lh,
 			    "keyspan_init_pipes: can't find bulk out ep, i=%d,"
@@ -291,8 +290,8 @@ keyspan_init_pipes_usa49wg(keyspan_state_t *ksp)
 	uint8_t		port_cnt = ksp->ks_dev_spec.port_cnt;
 	uint8_t		ep_addr;
 	usb_ep_data_t	*dataout[KEYSPAN_MAX_PORT_NUM],
-			*datain[KEYSPAN_MAX_PORT_NUM],
-			*status = NULL, *tmp_ep;
+	    *datain[KEYSPAN_MAX_PORT_NUM],
+	    *status = NULL, *tmp_ep;
 
 	ifc = dev_data->dev_curr_if;
 	alt = 0;
@@ -303,10 +302,10 @@ keyspan_init_pipes_usa49wg(keyspan_state_t *ksp)
 	 * Different keyspan devices may has different EP addresses.
 	 */
 	tmp_ep = usb_lookup_ep_data(ksp->ks_dip, dev_data, ifc, alt, 0,
-		    USB_EP_ATTR_INTR, USB_EP_DIR_OUT);
+	    USB_EP_ATTR_INTR, USB_EP_DIR_OUT);
 	if (tmp_ep == NULL) {
 		USB_DPRINTF_L3(DPRINT_ATTACH, ksp->ks_lh,
-		"keyspan_init_pipes: can't find port1 data out ep");
+		    "keyspan_init_pipes: can't find port1 data out ep");
 
 		return (USB_FAILURE);
 		}
@@ -323,11 +322,12 @@ keyspan_init_pipes_usa49wg(keyspan_state_t *ksp)
 	 */
 	for (j = 1; j < port_cnt; j++) {
 		tmp_ep = usb_lookup_ep_data(ksp->ks_dip, dev_data, ifc, alt,
-				j-1, USB_EP_ATTR_BULK, USB_EP_DIR_OUT);
+		    j-1, USB_EP_ATTR_BULK, USB_EP_DIR_OUT);
 		if (tmp_ep == NULL) {
 			USB_DPRINTF_L3(DPRINT_ATTACH, ksp->ks_lh,
-			"keyspan_init_pipes: can't find port[%d] data out ep",
-			j);
+			    "keyspan_init_pipes: can't find port[%d] "
+			    "data out ep",
+			    j);
 			return (USB_FAILURE);
 		}
 
@@ -343,7 +343,7 @@ keyspan_init_pipes_usa49wg(keyspan_state_t *ksp)
 	 * get intr in EP descriptor as status EP, and then match with EP addrs
 	 */
 	tmp_ep = usb_lookup_ep_data(ksp->ks_dip, dev_data, ifc, alt, 0,
-		    USB_EP_ATTR_INTR, USB_EP_DIR_IN);
+	    USB_EP_ATTR_INTR, USB_EP_DIR_IN);
 	if (tmp_ep == NULL) {
 		USB_DPRINTF_L3(DPRINT_ATTACH, ksp->ks_lh,
 		    "keyspan_init_pipes: can't find status in ep");
@@ -362,7 +362,7 @@ keyspan_init_pipes_usa49wg(keyspan_state_t *ksp)
 	 * data in EP.
 	 */
 	tmp_ep = usb_lookup_ep_data(ksp->ks_dip, dev_data, ifc, alt, 0,
-		    USB_EP_ATTR_BULK, USB_EP_DIR_IN);
+	    USB_EP_ATTR_BULK, USB_EP_DIR_IN);
 	if (tmp_ep == NULL) {
 		USB_DPRINTF_L3(DPRINT_ATTACH, ksp->ks_lh,
 		    "keyspan_init_pipes: can't find bulk in ep");
@@ -385,14 +385,14 @@ keyspan_init_pipes_usa49wg(keyspan_state_t *ksp)
 	/* for data in/out pipes of each port */
 	for (i = 0; i < port_cnt; i++) {
 		ksp->ks_ports[i].kp_datain_pipe.pipe_ep_descr =
-			datain[0]->ep_descr;
+		    datain[0]->ep_descr;
 		keyspan_init_one_pipe(ksp, &ksp->ks_ports[i],
-				&ksp->ks_ports[i].kp_datain_pipe);
+		    &ksp->ks_ports[i].kp_datain_pipe);
 
 		ksp->ks_ports[i].kp_dataout_pipe.pipe_ep_descr =
 		    dataout[i]->ep_descr;
 		keyspan_init_one_pipe(ksp, &ksp->ks_ports[i],
-				&ksp->ks_ports[i].kp_dataout_pipe);
+		    &ksp->ks_ports[i].kp_dataout_pipe);
 	}
 
 	mutex_exit(&ksp->ks_mutex);
@@ -429,8 +429,8 @@ keyspan_fini_pipes(keyspan_state_t *ksp)
 			break;
 		default:
 			USB_DPRINTF_L2(DPRINT_CTLOP, ksp->ks_lh,
-				"keyspan_fini_pipes: the device's product id"
-				"can't be recognized");
+			    "keyspan_fini_pipes: the device's product id"
+			    "can't be recognized");
 	}
 }
 
@@ -485,8 +485,8 @@ keyspan_open_pipe_datain_usa49wg(keyspan_state_t *ksp, keyspan_pipe_t *pipe)
 		mutex_exit(&ksp->ks_mutex);
 
 		if ((rval = (usb_pipe_open(ksp->ks_dip, &pipe->pipe_ep_descr,
-			&pipe->pipe_policy, USB_FLAGS_SLEEP,
-			&pipe->pipe_handle))) == USB_SUCCESS) {
+		    &pipe->pipe_policy, USB_FLAGS_SLEEP,
+		    &pipe->pipe_handle))) == USB_SUCCESS) {
 				mutex_enter(&pipe->pipe_mutex);
 				pipe->pipe_state = KEYSPAN_PIPE_OPEN;
 				mutex_exit(&pipe->pipe_mutex);
@@ -528,7 +528,7 @@ keyspan_close_one_pipe(keyspan_pipe_t *pipe)
 	 */
 	if (pipe->pipe_handle != NULL) {
 		usb_pipe_close(pipe->pipe_ksp->ks_dip, pipe->pipe_handle,
-				USB_FLAGS_SLEEP, NULL, NULL);
+		    USB_FLAGS_SLEEP, NULL, NULL);
 		mutex_enter(&pipe->pipe_mutex);
 		pipe->pipe_handle = NULL;
 		pipe->pipe_state = KEYSPAN_PIPE_CLOSED;
@@ -553,8 +553,8 @@ keyspan_close_pipe_datain_usa49wg(keyspan_pipe_t *pipe)
 		if (!ksp->ks_datain_open_cnt) {
 			mutex_exit(&ksp->ks_mutex);
 			usb_pipe_close(pipe->pipe_ksp->ks_dip,
-				pipe->pipe_handle, USB_FLAGS_SLEEP,
-				NULL, NULL);
+			    pipe->pipe_handle, USB_FLAGS_SLEEP,
+			    NULL, NULL);
 		} else {
 			mutex_exit(&ksp->ks_mutex);
 		}
@@ -576,21 +576,21 @@ keyspan_open_dev_pipes_usa49(keyspan_state_t *ksp)
 	int		rval;
 
 	USB_DPRINTF_L4(DPRINT_OPEN, ksp->ks_lh,
-			"keyspan_open_dev_pipes_usa49");
+	    "keyspan_open_dev_pipes_usa49");
 
 	rval = keyspan_open_one_pipe(ksp, &ksp->ks_ctrlout_pipe);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_OPEN, ksp->ks_lh,
-		"keyspan_open_dev_pipes_usa49: open ctrl pipe failed %d", rval);
-
+		    "keyspan_open_dev_pipes_usa49: open ctrl pipe failed %d",
+		    rval);
 		return (rval);
 	}
 
 	rval = keyspan_open_one_pipe(ksp, &ksp->ks_statin_pipe);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_OPEN, ksp->ks_lh,
-		"keyspan_open_dev_pipes_usa49: open status pipe failed %d",
-			rval);
+		    "keyspan_open_dev_pipes_usa49: open status pipe failed %d",
+		    rval);
 
 		/* close the first opened pipe here */
 		keyspan_close_one_pipe(&ksp->ks_ctrlout_pipe);
@@ -602,7 +602,7 @@ keyspan_open_dev_pipes_usa49(keyspan_state_t *ksp)
 	rval = keyspan_receive_status(ksp);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_OPEN, ksp->ks_lh,
-		"keyspan_open_dev_pipes_usa49: receive device status"
+		    "keyspan_open_dev_pipes_usa49: receive device status"
 		    " failed %d", rval);
 
 		/* close opened pipes here */
@@ -629,8 +629,9 @@ keyspan_open_dev_pipes_usa49wg(keyspan_state_t *ksp)
 	rval = keyspan_open_one_pipe(ksp, &ksp->ks_statin_pipe);
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(DPRINT_OPEN, ksp->ks_lh,
-		"keyspan_open_dev_pipes_usa49wg: open status pipe failed %d",
-			rval);
+		    "keyspan_open_dev_pipes_usa49wg: "
+		    "open status pipe failed %d",
+		    rval);
 
 		return (rval);
 	}
@@ -662,8 +663,8 @@ keyspan_open_dev_pipes(keyspan_state_t *ksp)
 		break;
 	default:
 		USB_DPRINTF_L2(DPRINT_OPEN, ksp->ks_lh,
-			"keyspan_open_dev_pipes: the device's product id can't"
-			"be recognized");
+		    "keyspan_open_dev_pipes: the device's product id can't"
+		    "be recognized");
 
 		return (USB_FAILURE);
 	}
@@ -725,8 +726,8 @@ keyspan_close_port_pipes(keyspan_port_t *kp)
 		break;
 	default:
 		USB_DPRINTF_L2(DPRINT_CLOSE, kp->kp_lh,
-			"keyspan_close_port_pipes:"
-			"the device's product id can't be recognized");
+		    "keyspan_close_port_pipes:"
+		    "the device's product id can't be recognized");
 	}
 	keyspan_close_one_pipe(&kp->kp_dataout_pipe);
 }
@@ -753,8 +754,8 @@ keyspan_close_open_pipes(keyspan_state_t *ksp)
 				kp->kp_no_more_reads = B_TRUE;
 				mutex_exit(&kp->kp_mutex);
 				usb_pipe_reset(ksp->ks_dip,
-					kp->kp_datain_pipe.pipe_handle,
-					USB_FLAGS_SLEEP, NULL, NULL);
+				    kp->kp_datain_pipe.pipe_handle,
+				    USB_FLAGS_SLEEP, NULL, NULL);
 				keyspan_close_port_pipes(kp);
 			} else {
 				mutex_exit(&kp->kp_mutex);
@@ -776,8 +777,8 @@ keyspan_close_open_pipes(keyspan_state_t *ksp)
 		if (port_num >= 0) {
 			kp = &ksp->ks_ports[port_num];
 			usb_pipe_reset(ksp->ks_dip,
-				kp->kp_datain_pipe.pipe_handle,
-				USB_FLAGS_SLEEP, NULL, NULL);
+			    kp->kp_datain_pipe.pipe_handle,
+			    USB_FLAGS_SLEEP, NULL, NULL);
 		}
 
 		for (i = 0; i < ksp->ks_dev_spec.port_cnt; i++) {
@@ -794,8 +795,8 @@ keyspan_close_open_pipes(keyspan_state_t *ksp)
 		break;
 	default:
 		USB_DPRINTF_L2(DPRINT_CLOSE, ksp->ks_lh,
-			"keyspan_close_open_pipes:"
-			"the device's product id can't be recognized");
+		    "keyspan_close_open_pipes:"
+		    "the device's product id can't be recognized");
 
 	}
 }
@@ -822,14 +823,14 @@ keyspan_close_dev_pipes(keyspan_state_t *ksp)
 		 * Stop polling before close status in pipe
 		 */
 		usb_pipe_stop_intr_polling(ksp->ks_statin_pipe.pipe_handle,
-				USB_FLAGS_SLEEP);
+		    USB_FLAGS_SLEEP);
 		keyspan_close_one_pipe(&ksp->ks_statin_pipe);
 
 		break;
 	default:
 		USB_DPRINTF_L2(DPRINT_CLOSE, ksp->ks_lh,
-			"keyspan_close_dev_pipes:"
-			"the device's product id can't be recognized");
+		    "keyspan_close_dev_pipes:"
+		    "the device's product id can't be recognized");
 	}
 
 }
@@ -854,13 +855,13 @@ keyspan_open_port_pipes(keyspan_port_t *kp)
 		break;
 	case KEYSPAN_USA49WG_PID:
 		rval = keyspan_open_pipe_datain_usa49wg(ksp,
-				&kp->kp_datain_pipe);
+		    &kp->kp_datain_pipe);
 
 		break;
 	default:
 		USB_DPRINTF_L2(DPRINT_OPEN, kp->kp_lh,
-			"keyspan_open_port_pipes:"
-			"the device's product id can't be recognized");
+		    "keyspan_open_port_pipes:"
+		    "the device's product id can't be recognized");
 	}
 
 	if (rval != USB_SUCCESS) {
@@ -933,7 +934,7 @@ keyspan_bulkout_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 		 * due to the specification of keyspan_usa19hs.
 		 */
 		if ((kp->kp_ksp->ks_dev_spec.id_product ==
-			KEYSPAN_USA19HS_PID) && (data_len == 64)) {
+		    KEYSPAN_USA19HS_PID) && (data_len == 64)) {
 			kp->kp_tx_mp = allocb(0, BPRI_LO);
 			if (kp->kp_tx_mp) {
 				keyspan_tx_start(kp, NULL);
@@ -1049,7 +1050,7 @@ keyspan_bulkin_cb_process(keyspan_port_t *kp,
 		mutex_exit(&kp->kp_mutex);
 		if ((mp = allocb(2, BPRI_HI)) == NULL) {
 			USB_DPRINTF_L2(DPRINT_IN_PIPE, kp->kp_lh,
-			"keyspan_bulkin_cb_process: allocb failed");
+			    "keyspan_bulkin_cb_process: allocb failed");
 			mutex_enter(&kp->kp_mutex);
 
 			return (0);
@@ -1097,7 +1098,7 @@ keyspan_bulkin_cb_process(keyspan_port_t *kp,
 		mutex_exit(&kp->kp_mutex);
 		if ((mp = allocb(2, BPRI_HI)) == NULL) {
 			USB_DPRINTF_L2(DPRINT_IN_PIPE, kp->kp_lh,
-			"keyspan_bulkin_cb_process: allocb failed");
+			    "keyspan_bulkin_cb_process: allocb failed");
 			mutex_enter(&kp->kp_mutex);
 
 			return (0);
@@ -1156,7 +1157,7 @@ keyspan_bulkin_cb_usa49(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 		uchar_t	status = data->b_rptr[0];
 
 		if ((data_len = keyspan_bulkin_cb_process(kp, data_len,
-				status, data)) > 0) {
+		    status, data)) > 0) {
 			keyspan_put_tail(&kp->kp_rx_mp, data);
 			/*
 			 * the data will not be freed and
@@ -1189,17 +1190,17 @@ void
 keyspan_bulkin_cb_usa49wg(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 {
 	keyspan_port_t	*kp = (keyspan_port_t *)req->bulk_client_private,
-			*kp_true;
+	    *kp_true;
 	keyspan_state_t *ksp = (keyspan_state_t *)kp->kp_ksp;
 	mblk_t		*data = req->bulk_data,
-			*mp_data;
+	    *mp_data;
 	uint_t		cr = req->bulk_completion_reason,
-			port_data_len;
+	    port_data_len;
 	int		data_len, copy_len;
 	uint8_t		port_num,
-			port_cnt = 0,
-			port[4],
-			receive_flag = 1;
+	    port_cnt = 0,
+	    port[4],
+	    receive_flag = 1;
 	uint16_t	status;
 	unsigned char	*old_rptr;
 
@@ -1220,9 +1221,9 @@ keyspan_bulkin_cb_usa49wg(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 
 			if (port_num > 3) {
 				USB_DPRINTF_L2(DPRINT_IN_PIPE, ksp->ks_lh,
-				"keyspan_bulkin_cb_usa49wg,port num is not"
-				" correct: port=%d, len=%d, status=%x",
-				port_num, port_data_len, status);
+				    "keyspan_bulkin_cb_usa49wg,port num is not"
+				    " correct: port=%d, len=%d, status=%x",
+				    port_num, port_data_len, status);
 
 				break;
 			}
@@ -1235,7 +1236,8 @@ keyspan_bulkin_cb_usa49wg(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 				mutex_exit(&kp_true->kp_mutex);
 
 				USB_DPRINTF_L2(DPRINT_IN_PIPE, kp_true->kp_lh,
-				"keyspan_bulkin_cb_usa49wg,port isn't opened");
+				    "keyspan_bulkin_cb_usa49wg, "
+				    "port isn't opened");
 				data->b_rptr += port_data_len;
 				port_cnt--;
 
@@ -1247,14 +1249,14 @@ keyspan_bulkin_cb_usa49wg(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 			    status, port_data_len);
 
 			if ((copy_len = keyspan_bulkin_cb_process(kp_true,
-					port_data_len, status, data)) > 0) {
+			    port_data_len, status, data)) > 0) {
 
 				mutex_exit(&kp_true->kp_mutex);
 				if ((mp_data = allocb(copy_len, BPRI_HI))
-					== NULL) {
+				    == NULL) {
 					USB_DPRINTF_L2(DPRINT_IN_PIPE,
-					kp_true->kp_lh, "keyspan_bulkin_cb_"
-					"usa49wg: allocb failed");
+					    kp_true->kp_lh, "keyspan_bulkin_cb_"
+					    "usa49wg: allocb failed");
 
 					return;
 				}
@@ -1296,8 +1298,8 @@ keyspan_bulkin_cb_usa49wg(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 				mutex_exit(&kp_true->kp_mutex);
 				/* kick off another read */
 				(void) keyspan_receive_data(
-						&kp_true->kp_datain_pipe,
-						kp_true->kp_read_len, kp_true);
+				    &kp_true->kp_datain_pipe,
+				    kp_true->kp_read_len, kp_true);
 
 				receive_flag = 0;
 			} else {
@@ -1309,8 +1311,8 @@ keyspan_bulkin_cb_usa49wg(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	} else {
 		/* cr != USB_CR_OK, usb error happened */
 		USB_DPRINTF_L2(DPRINT_IN_PIPE, ksp->ks_lh,
-			"keyspan_bulkin_cb_usa49wg: port=%d, len=%d, status=%x",
-			data->b_rptr[0], data->b_rptr[1], data->b_rptr[2]);
+		    "keyspan_bulkin_cb_usa49wg: port=%d, len=%d, status=%x",
+		    data->b_rptr[0], data->b_rptr[1], data->b_rptr[2]);
 
 		mutex_enter(&kp->kp_mutex);
 		if (kp->kp_state != KEYSPAN_PORT_OPEN) {
@@ -1320,7 +1322,7 @@ keyspan_bulkin_cb_usa49wg(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 			mutex_exit(&kp->kp_mutex);
 			/* kick off another read */
 			(void) keyspan_receive_data(&kp->kp_datain_pipe,
-					kp->kp_read_len, kp);
+			    kp->kp_read_len, kp);
 		} else {
 			mutex_exit(&kp->kp_mutex);
 		}
@@ -1758,8 +1760,8 @@ keyspan_send_data_port0(keyspan_pipe_t *introut, mblk_t **mpp, void *cb_arg)
 	br->intr_exc_cb = keyspan_introut_cb_usa49wg;
 
 	USB_DPRINTF_L3(DPRINT_OUT_PIPE, introut->pipe_lh,
-			"keyspan_send_data_port0: intr_len = %d",
-			br->intr_len);
+	    "keyspan_send_data_port0: intr_len = %d",
+	    br->intr_len);
 
 	rval = usb_pipe_intr_xfer(introut->pipe_handle, br, 0);
 	if (rval == USB_SUCCESS) {
@@ -1897,13 +1899,14 @@ keyspan_intr_ex_cb_usa49wg(usb_pipe_handle_t pipe, usb_intr_req_t *req)
 	usb_free_intr_req(req);
 
 	if ((cr != USB_CR_PIPE_CLOSING) && (cr != USB_CR_STOPPED_POLLING) &&
-		(cr != USB_CR_FLUSHED) && (cr != USB_CR_DEV_NOT_RESP) &&
-		(cr != USB_CR_PIPE_RESET) && keyspan_dev_is_online(ksp)) {
+	    (cr != USB_CR_FLUSHED) && (cr != USB_CR_DEV_NOT_RESP) &&
+	    (cr != USB_CR_PIPE_RESET) && keyspan_dev_is_online(ksp)) {
 		keyspan_pipe_start_polling(&ksp->ks_statin_pipe);
 	} else {
 		USB_DPRINTF_L2(DPRINT_IN_PIPE,
-		(&ksp->ks_statin_pipe)->pipe_lh, "keyspan_intr_ex_cb_usa49wg:"
-		"get status failed: cr=%d", cr);
+		    (&ksp->ks_statin_pipe)->pipe_lh,
+		    "keyspan_intr_ex_cb_usa49wg:"
+		    "get status failed: cr=%d", cr);
 	}
 }
 
@@ -1918,7 +1921,7 @@ keyspan_pipe_start_polling(keyspan_pipe_t *intr)
 	int		rval;
 
 	USB_DPRINTF_L4(DPRINT_IN_PIPE, ksp->ks_lh,
-			"keyspan_pipe_start_polling");
+	    "keyspan_pipe_start_polling");
 
 	br = usb_alloc_intr_req(ksp->ks_dip, 0, USB_FLAGS_SLEEP);
 

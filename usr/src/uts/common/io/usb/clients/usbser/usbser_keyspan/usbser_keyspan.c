@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This driver includes code for Keyspan USA49WG/USA49WLC/USA19HS adapters. It
@@ -230,7 +229,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"USB keyspan usb2serial driver %I%",
+	"USB keyspan usb2serial driver",
 	&usbser_keyspan_ops,
 };
 
@@ -486,7 +485,7 @@ keyspan_set_cfg(dev_info_t *dip, uint8_t cfg_num)
 {
 
 	if (usb_set_cfg(dip, cfg_num, USB_FLAGS_SLEEP,
-				NULL, NULL) != USB_SUCCESS) {
+	    NULL, NULL) != USB_SUCCESS) {
 
 		return (USB_FAILURE);
 	}
@@ -561,7 +560,7 @@ keyspan_write_memory(keyspan_pipe_t *pipe, uint16_t addr, uchar_t *buf,
 	setup.attrs = 0;
 
 	while (usb_pipe_ctrl_xfer_wait(pipe->pipe_handle, &setup, &data,
-			&cr, &cb_flags, 0) != USB_SUCCESS) {
+	    &cr, &cb_flags, 0) != USB_SUCCESS) {
 
 		/* KEYSPAN_RETRY */
 		if (++retry > 3) {

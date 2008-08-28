@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Open Host Controller Driver (OHCI)
@@ -547,7 +546,7 @@ static struct dev_ops ohci_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops, 	/* Type of module. This one is a driver */
-	"USB OpenHCI Driver %I%", /* Name of the module. */
+	"USB OpenHCI Driver", /* Name of the module. */
 	&ohci_ops,		/* Driver ops */
 };
 

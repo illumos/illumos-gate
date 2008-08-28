@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * AUDIO CONTROL Driver: usb_ac is a streams multiplexor that sits
@@ -408,7 +407,7 @@ static struct dev_ops usb_ac_dev_ops = {
 /* Linkage structure for loadable drivers */
 static struct modldrv usb_ac_modldrv = {
 	&mod_driverops,				/* drv_modops */
-	"USB Audio Control Driver %I%",		/* drv_linkinfo */
+	"USB Audio Control Driver",		/* drv_linkinfo */
 	&usb_ac_dev_ops				/* drv_dev_ops */
 };
 

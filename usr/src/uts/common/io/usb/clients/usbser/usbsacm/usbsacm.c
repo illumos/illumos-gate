@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * USB Serial CDC ACM driver
@@ -398,7 +397,7 @@ extern struct mod_ops mod_driverops;
 /* modldrv structure */
 static struct modldrv modldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"USB Serial CDC ACM driver %I%",
+	"USB Serial CDC ACM driver",
 	&usbsacm_ops,
 };
 

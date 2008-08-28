@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,11 +18,10 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * UGEN: USB Generic Driver
@@ -114,7 +112,7 @@ static struct dev_ops ugen_skel_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* Module type */
-	"USB Generic driver %I%",	/* Name of the module. */
+	"USB Generic driver",	/* Name of the module. */
 	&ugen_skel_ops,			/* driver ops */
 };
 
@@ -131,7 +129,7 @@ _init()
 	int	rval;
 
 	if ((rval = ddi_soft_state_init(&ugen_skel_statep,
-		sizeof (ugen_skel_state_t), UGEN_INSTANCES)) != 0) {
+	    sizeof (ugen_skel_state_t), UGEN_INSTANCES)) != 0) {
 
 		return (rval);
 	}
@@ -175,7 +173,7 @@ ugen_skel_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 {
 	int		rval = DDI_FAILURE;
 	int		instance =
-			UGEN_MINOR_TO_INSTANCE(getminor((dev_t)arg));
+	    UGEN_MINOR_TO_INSTANCE(getminor((dev_t)arg));
 	ugen_skel_state_t *ugen_skelp;
 
 	switch (infocmd) {
@@ -241,7 +239,7 @@ ugen_skel_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ddi_soft_state_zalloc(ugen_skel_statep, instance) ==
 	    DDI_SUCCESS) {
 		ugen_skelp = ddi_get_soft_state(ugen_skel_statep,
-							instance);
+		    instance);
 	}
 	if (ugen_skelp == NULL) {
 
@@ -260,23 +258,23 @@ ugen_skel_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* get a ugen handle */
 	bzero(&usb_ugen_info, sizeof (usb_ugen_info));
 	usb_ugen_info.usb_ugen_flags =
-			USB_UGEN_ENABLE_PM | USB_UGEN_REMOVE_CHILDREN;
+	    USB_UGEN_ENABLE_PM | USB_UGEN_REMOVE_CHILDREN;
 	usb_ugen_info.usb_ugen_minor_node_ugen_bits_mask =
-				(dev_t)UGEN_MINOR_UGEN_BITS_MASK;
+	    (dev_t)UGEN_MINOR_UGEN_BITS_MASK;
 	usb_ugen_info.usb_ugen_minor_node_instance_mask =
-				(dev_t)~UGEN_MINOR_UGEN_BITS_MASK;
+	    (dev_t)~UGEN_MINOR_UGEN_BITS_MASK;
 	ugen_skelp->ugen_skel_hdl = usb_ugen_get_hdl(dip,
-				&usb_ugen_info);
+	    &usb_ugen_info);
 
 	if (usb_ugen_attach(ugen_skelp->ugen_skel_hdl, cmd) != USB_SUCCESS) {
 
-		    goto fail;
+		goto fail;
 	}
 
 	/* register for hotplug events */
 	if (usb_register_event_cbs(dip, &ugen_skel_events, 0) != USB_SUCCESS) {
 
-		    goto fail;
+		goto fail;
 	}
 
 	ddi_report_dev(dip);
@@ -287,9 +285,9 @@ fail:
 	if (ugen_skelp) {
 		usb_unregister_event_cbs(dip, &ugen_skel_events);
 		usb_ugen_release_hdl(ugen_skelp->
-					ugen_skel_hdl);
+		    ugen_skel_hdl);
 		ddi_soft_state_free(ugen_skel_statep,
-				    ugen_skelp->ugen_skel_instance);
+		    ugen_skelp->ugen_skel_instance);
 		usb_client_detach(dip, NULL);
 	}
 
@@ -305,7 +303,7 @@ ugen_skel_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	int		rval = USB_FAILURE;
 	ugen_skel_state_t *ugen_skelp = ddi_get_soft_state(ugen_skel_statep,
-				    ddi_get_instance(dip));
+	    ddi_get_instance(dip));
 
 	if (ugen_skelp) {
 		switch (cmd) {
@@ -313,9 +311,9 @@ ugen_skel_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			rval = usb_ugen_detach(ugen_skelp->ugen_skel_hdl, cmd);
 			if (rval == USB_SUCCESS) {
 				usb_unregister_event_cbs(dip,
-							&ugen_skel_events);
+				    &ugen_skel_events);
 				usb_ugen_release_hdl(ugen_skelp->
-							ugen_skel_hdl);
+				    ugen_skel_hdl);
 				ddi_soft_state_free(ugen_skel_statep,
 				    ugen_skelp->ugen_skel_instance);
 				usb_client_detach(dip, NULL);
@@ -343,7 +341,7 @@ static int
 ugen_skel_disconnect_ev_cb(dev_info_t *dip)
 {
 	ugen_skel_state_t *ugen_skelp = ddi_get_soft_state(ugen_skel_statep,
-						ddi_get_instance(dip));
+	    ddi_get_instance(dip));
 
 	return (usb_ugen_disconnect_ev_cb(ugen_skelp->ugen_skel_hdl));
 }
@@ -356,7 +354,7 @@ static int
 ugen_skel_reconnect_ev_cb(dev_info_t *dip)
 {
 	ugen_skel_state_t *ugen_skelp = ddi_get_soft_state(ugen_skel_statep,
-						ddi_get_instance(dip));
+	    ddi_get_instance(dip));
 
 	return (usb_ugen_reconnect_ev_cb(ugen_skelp->ugen_skel_hdl));
 }
@@ -378,7 +376,7 @@ ugen_skel_open(dev_t *devp, int flag, int sflag, cred_t *cr)
 	}
 
 	return (usb_ugen_open(ugen_skelp->ugen_skel_hdl, devp, flag,
-		sflag, cr));
+	    sflag, cr));
 }
 
 
@@ -389,10 +387,10 @@ static int
 ugen_skel_close(dev_t dev, int flag, int otype, cred_t *cr)
 {
 	ugen_skel_state_t *ugen_skelp = ddi_get_soft_state(ugen_skel_statep,
-			UGEN_MINOR_TO_INSTANCE(getminor(dev)));
+	    UGEN_MINOR_TO_INSTANCE(getminor(dev)));
 
 	return (usb_ugen_close(ugen_skelp->ugen_skel_hdl, dev, flag,
-		otype, cr));
+	    otype, cr));
 }
 
 
@@ -403,14 +401,14 @@ static int
 ugen_skel_read(dev_t dev, struct uio *uiop, cred_t *credp)
 {
 	ugen_skel_state_t *ugen_skelp = ddi_get_soft_state(ugen_skel_statep,
-			UGEN_MINOR_TO_INSTANCE(getminor(dev)));
+	    UGEN_MINOR_TO_INSTANCE(getminor(dev)));
 	if (ugen_skelp == NULL) {
 
 		return (ENXIO);
 	}
 
 	return (usb_ugen_read(ugen_skelp->ugen_skel_hdl, dev,
-					uiop, credp));
+	    uiop, credp));
 }
 
 
@@ -418,13 +416,13 @@ static int
 ugen_skel_write(dev_t dev, struct uio *uiop, cred_t *credp)
 {
 	ugen_skel_state_t *ugen_skelp = ddi_get_soft_state(ugen_skel_statep,
-			UGEN_MINOR_TO_INSTANCE(getminor(dev)));
+	    UGEN_MINOR_TO_INSTANCE(getminor(dev)));
 	if (ugen_skelp == NULL) {
 
 		return (ENXIO);
 	}
 	return (usb_ugen_write(ugen_skelp->ugen_skel_hdl,
-					dev, uiop, credp));
+	    dev, uiop, credp));
 }
 
 
@@ -436,14 +434,14 @@ ugen_skel_poll(dev_t dev, short events,
     int anyyet,  short *reventsp, struct pollhead **phpp)
 {
 	ugen_skel_state_t *ugen_skelp = ddi_get_soft_state(ugen_skel_statep,
-			UGEN_MINOR_TO_INSTANCE(getminor(dev)));
+	    UGEN_MINOR_TO_INSTANCE(getminor(dev)));
 	if (ugen_skelp == NULL) {
 
 		return (ENXIO);
 	}
 
 	return (usb_ugen_poll(ugen_skelp->ugen_skel_hdl, dev, events,
-					anyyet, reventsp, phpp));
+	    anyyet, reventsp, phpp));
 }
 
 
@@ -457,7 +455,7 @@ ugen_skel_power(dev_info_t *dip, int comp, int level)
 	int rval;
 
 	ugen_skel_state_t *ugen_skelp = ddi_get_soft_state(ugen_skel_statep,
-						ddi_get_instance(dip));
+	    ddi_get_instance(dip));
 	if (ugen_skelp == NULL) {
 
 		return (DDI_FAILURE);

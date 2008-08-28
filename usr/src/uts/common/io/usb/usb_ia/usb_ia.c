@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * usb interface association driver
@@ -172,7 +171,7 @@ static struct dev_ops usb_ia_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module. This one is a driver */
-	"USB Interface Association Driver %I%", /* Name of the module. */
+	"USB Interface Association Driver", /* Name of the module. */
 	&usb_ia_ops,	/* driver ops */
 };
 

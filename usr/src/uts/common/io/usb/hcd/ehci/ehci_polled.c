@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * EHCI Host Controller Driver (EHCI)
@@ -941,7 +940,7 @@ ehci_polled_stop_processing(ehci_polled_t	*ehci_polledp)
 	/* Only first leave keyboard entry turn off periodic list processing */
 	if (Get_OpReg(ehci_command) & EHCI_CMD_PERIODIC_SCHED_ENABLE) {
 		Set_OpReg(ehci_command, (Get_OpReg(ehci_command) &
-			~EHCI_CMD_PERIODIC_SCHED_ENABLE));
+		    ~EHCI_CMD_PERIODIC_SCHED_ENABLE));
 
 		/* Wait for few milliseconds */
 		drv_usecwait(EHCI_POLLED_TIMEWAIT);
@@ -1017,7 +1016,7 @@ ehci_polled_process_active_intr_qtd_list(ehci_polled_t	*ehci_polledp)
 	uint_t			ctrl;
 	ehci_trans_wrapper_t	*tw;
 	ehci_pipe_private_t	*pp;
-	usb_cr_t 		error;
+	usb_cr_t		error;
 
 	/* Sync QH and QTD pool */
 	if (ehci_polledp->ehci_polled_no_sync_flag == B_FALSE) {
@@ -1092,7 +1091,7 @@ ehci_polled_handle_normal_qtd(
 
 	/* Obtain the transfer wrapper from the QTD */
 	tw = (ehci_trans_wrapper_t *)EHCI_LOOKUP_ID((uint32_t)
-		Get_QTD(qtd->qtd_trans_wrapper));
+	    Get_QTD(qtd->qtd_trans_wrapper));
 
 	ASSERT(tw != NULL);
 
@@ -1224,9 +1223,9 @@ ehci_polled_insert_qtd(
  *
  * Note:
  * qtd_dma_offs - the starting offset into the TW buffer, where the QTD
- *                should transfer from. It should be 4K aligned. And when
- *                a TW has more than one QTDs, the QTDs must be filled in
- *                increasing order.
+ *		  should transfer from. It should be 4K aligned. And when
+ *		  a TW has more than one QTDs, the QTDs must be filled in
+ *		  increasing order.
  * qtd_length - the total bytes to transfer.
  */
 static void

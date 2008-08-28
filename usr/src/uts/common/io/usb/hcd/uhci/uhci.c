@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Universal Host Controller Driver (UHCI)
@@ -90,7 +89,7 @@ static struct dev_ops uhci_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module. This one is a driver */
-	"USB UHCI Controller Driver %I%",	/* Name of the module. */
+	"USB UHCI Controller Driver",	/* Name of the module. */
 	&uhci_ops,		/* Driver ops */
 };
 

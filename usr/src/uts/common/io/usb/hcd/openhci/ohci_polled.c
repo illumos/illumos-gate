@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Open Host Controller Driver (OHCI)
@@ -150,7 +149,7 @@ ohci_hcdi_polled_input_init(
 	 * copied into at this layer, so we need to keep track of it.
 	 */
 	ohci_polledp->ohci_polled_buf =
-		(uchar_t *)kmem_zalloc(POLLED_RAW_BUF_SIZE, KM_SLEEP);
+	    (uchar_t *)kmem_zalloc(POLLED_RAW_BUF_SIZE, KM_SLEEP);
 
 	*polled_buf = ohci_polledp->ohci_polled_buf;
 
@@ -861,7 +860,7 @@ ohci_polled_save_state(ohci_polled_t	*ohci_polledp)
 	 * on the ohci's interrupt ed
 	 */
 	polled_toggle = (Get_ED(polled_pp->pp_ept->hced_headp) &
-					HC_EPT_Carry) ? DATA1:DATA0;
+	    HC_EPT_Carry) ? DATA1:DATA0;
 
 	/*
 	 * If normal mode interrupt pipe endpoint is active, get the data
@@ -911,7 +910,7 @@ ohci_polled_save_state(ohci_polled_t	*ohci_polledp)
 	 * hence add this ED needs 4 entries in interrupt lattice.
 	 */
 	for (i = (ohcip->ohci_polled_enter_count -1); i < NUM_INTR_ED_LISTS;
-		i = i + MIN_LOW_SPEED_POLL_INTERVAL) {
+	    i = i + MIN_LOW_SPEED_POLL_INTERVAL) {
 		Set_HCCA(ohcip->ohci_hccap->HccaIntTble[i],
 		    ohci_ed_cpu_to_iommu(ohcip,
 		    ohci_polledp->ohci_polled_ed));
@@ -1153,7 +1152,7 @@ ohci_polled_restore_state(ohci_polled_t	*ohci_polledp)
 	 * on the on the ohci's interrupt ed
 	 */
 	polled_toggle = (Get_ED(polled_pp->pp_ept->hced_headp) &
-					HC_EPT_Carry) ? DATA1:DATA0;
+	    HC_EPT_Carry) ? DATA1:DATA0;
 
 	/*
 	 * If normal mode interrupt pipe endpoint is active, fix the
@@ -1345,8 +1344,8 @@ ohci_polled_pickup_done_list(
 		pp = tw->tw_pipe_private;
 
 		/*
-		 * Figure  out  which  done list to put this TD on and put it
-		 * there.   If  the  pipe handle  of the TD matches the pipe
+		 * Figure  out	which  done list to put this TD on and put it
+		 * there.   If	the  pipe handle  of the TD matches the pipe
 		 * handle  we  are  using for the input device, then this must
 		 * be an input TD, reverse the order and link to the list for
 		 * this input device. Else put the TD to the reserve done list
