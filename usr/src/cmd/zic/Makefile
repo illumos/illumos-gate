@@ -23,7 +23,7 @@ NOBJS= $(OBJS:%=$(NATIVE)/%)
 OWNER= root
 GROUP= bin
 
-CLOBBERFILES= $(NOBJS) $(NPROG) $(NATIVE)/zic.c $(NATIVE)/tzfile.h
+CLOBBERFILES= $(NOBJS) $(KSHPROG) $(NPROG) $(NATIVE)/zic.c $(NATIVE)/tzfile.h
 
 include ../Makefile.cmd
 
@@ -64,6 +64,15 @@ install: all $(DIRS) $(ROOTTZSRCD) $(ROOTTZTABD) $(ROOTUSRSBINPROG) $(ROOTLIBTZS
 
 $(NPROG): $(NATIVE) $(NOBJS)
 	$(NATIVECC) -o $@ $(NOBJS)
+
+#
+# XXX
+# There is a .ksh rule in Makefile.targ, but we need our custom POFILE rules.
+#
+$(KSHPROG):	$(KSHPROG).ksh
+	$(RM) $@
+	$(CAT) $(KSHPROG).ksh > $@
+	$(CHMOD) +x $@
 
 $(ROOTTZSRCD)/%: %
 	$(INS.file)
