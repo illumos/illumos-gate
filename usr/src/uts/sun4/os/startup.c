@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/machsystm.h>
 #include <sys/archsystm.h>
 #include <sys/vm.h>
@@ -3090,6 +3088,10 @@ extern caddr_t moddata;
 #define	HEAPTEXT_OVERSIZED(addr)	\
 	((uintptr_t)(addr) >= HEAPTEXT_BASE + HEAPTEXT_SIZE - HEAPTEXT_OVERSIZE)
 
+#define	HEAPTEXT_IN_NUCLEUSDATA(addr) \
+	(((uintptr_t)(addr) >= KERNELBASE + 2 * MMU_PAGESIZE4M) && \
+	((uintptr_t)(addr) < KERNELBASE + 3 * MMU_PAGESIZE4M))
+
 vmem_t *texthole_source[HEAPTEXT_NARENAS];
 vmem_t *texthole_arena[HEAPTEXT_NARENAS];
 kmutex_t texthole_lock;
@@ -3173,10 +3175,11 @@ kobj_texthole_alloc(caddr_t addr, size_t size)
 	char c[30];
 	uintptr_t base;
 
-	if (HEAPTEXT_OVERSIZED(addr)) {
+	if (HEAPTEXT_OVERSIZED(addr) || HEAPTEXT_IN_NUCLEUSDATA(addr)) {
 		/*
-		 * If this is an oversized allocation, there is no text hole
-		 * available for it; return NULL.
+		 * If this is an oversized allocation or it is allocated in
+		 * the nucleus data page, there is no text hole available for
+		 * it; return NULL.
 		 */
 		return (NULL);
 	}
