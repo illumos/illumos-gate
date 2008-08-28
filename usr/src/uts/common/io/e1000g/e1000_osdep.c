@@ -23,8 +23,6 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "e1000_osdep.h"
 #include "e1000_api.h"
 
@@ -106,14 +104,14 @@ phy_spd_state(struct e1000_hw *hw, boolean_t enable)
 		return;		/* no action */
 	}
 
-	e1000_read_phy_reg(hw, offset, &reg);
+	(void) e1000_read_phy_reg(hw, offset, &reg);
 
 	if (enable)
 		reg |= spd_bit;		/* enable: set the spd bit */
 	else
 		reg &= ~spd_bit;	/* disable: clear the spd bit */
 
-	e1000_write_phy_reg(hw, offset, reg);
+	(void) e1000_write_phy_reg(hw, offset, reg);
 }
 
 /*

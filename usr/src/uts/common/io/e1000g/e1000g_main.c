@@ -23,8 +23,6 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * **********************************************************************
  *									*
@@ -46,9 +44,9 @@
 #include "e1000g_sw.h"
 #include "e1000g_debug.h"
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.2.11";
+static char ident[] = "Intel PRO/1000 Ethernet 5.2.12";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.2.11";
+static char e1000g_version[] = "Driver Ver. 5.2.12";
 
 /*
  * Proto types for DDI entry points
@@ -1415,7 +1413,7 @@ e1000g_link_up(struct e1000g *Adapter)
 
 	hw = &Adapter->shared;
 
-	e1000_check_for_link(hw);
+	(void) e1000_check_for_link(hw);
 
 	if ((E1000_READ_REG(hw, E1000_STATUS) & E1000_STATUS_LU) ||
 	    ((!hw->mac.get_link_status) && (hw->mac.type == e1000_82543)) ||
@@ -1435,9 +1433,8 @@ e1000g_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
 	struct iocblk *iocp;
 	struct e1000g *e1000gp;
 	enum ioc_reply status;
-	int err;
 
-	iocp = (struct iocblk *)mp->b_rptr;
+	iocp = (struct iocblk *)(uintptr_t)mp->b_rptr;
 	iocp->ioc_error = 0;
 	e1000gp = (struct e1000g *)arg;
 
@@ -1798,7 +1795,7 @@ e1000g_intr_pciexpress(caddr_t arg)
 	struct e1000g *Adapter;
 	uint32_t icr;
 
-	Adapter = (struct e1000g *)arg;
+	Adapter = (struct e1000g *)(uintptr_t)arg;
 	icr = E1000_READ_REG(&Adapter->shared, E1000_ICR);
 
 	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
@@ -1834,7 +1831,7 @@ e1000g_intr(caddr_t arg)
 	struct e1000g *Adapter;
 	uint32_t icr;
 
-	Adapter = (struct e1000g *)arg;
+	Adapter = (struct e1000g *)(uintptr_t)arg;
 	icr = E1000_READ_REG(&Adapter->shared, E1000_ICR);
 
 	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
@@ -1905,7 +1902,7 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t icr)
 
 		/* Recycle the tx descriptors */
 		rw_enter(&Adapter->chip_lock, RW_READER);
-		e1000g_recycle(tx_ring);
+		(void) e1000g_recycle(tx_ring);
 		E1000G_DEBUG_STAT(tx_ring->stat_recycle_intr);
 		rw_exit(&Adapter->chip_lock);
 
@@ -2234,8 +2231,8 @@ e1000g_m_unicst_remove(void *arg, mac_addr_slot_t slot)
 		rw_exit(&Adapter->chip_lock);
 
 		/* Copy the default address to the passed slot */
-		if (err = e1000g_unicst_set(Adapter,
-		    Adapter->unicst_addr[0].mac.addr, slot) != 0) {
+		if ((err = e1000g_unicst_set(Adapter,
+		    Adapter->unicst_addr[0].mac.addr, slot)) != 0) {
 			rw_enter(&Adapter->chip_lock, RW_WRITER);
 			Adapter->unicst_addr[slot].mac.set = 1;
 			Adapter->unicst_avail--;
@@ -2319,7 +2316,6 @@ static int
 multicst_add(struct e1000g *Adapter, const uint8_t *multiaddr)
 {
 	struct e1000_hw *hw = &Adapter->shared;
-	unsigned i;
 	int res = 0;
 
 	rw_enter(&Adapter->chip_lock, RW_WRITER);
@@ -2548,7 +2544,6 @@ static boolean_t
 e1000g_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
 	struct e1000g *Adapter = (struct e1000g *)arg;
-	struct e1000_hw *hw = &Adapter->shared;
 
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM: {
@@ -2758,7 +2753,7 @@ reset:
 
 			err = mac_maxsdu_update(Adapter->mh, new_mtu);
 			if (err == 0) {
-				Adapter->max_frame_size = tmp;
+				Adapter->max_frame_size = (uint32_t)tmp;
 				Adapter->default_mtu = new_mtu;
 				e1000g_set_bufsize(Adapter);
 			}
@@ -2780,7 +2775,6 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_flags, uint_t pr_valsize, void *pr_val)
 {
 	struct e1000g *Adapter = arg;
-	struct e1000_mac_info *mac = &Adapter->shared.mac;
 	struct e1000_fc_info *fc = &Adapter->shared.fc;
 	int err = 0;
 	link_flowctrl_t flowctrl;
@@ -2884,7 +2878,7 @@ e1000g_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 	return (err);
 }
 
-/* ARGUSED */
+/* ARGSUSED2 */
 static int
 e1000g_set_priv_prop(struct e1000g *Adapter, const char *pr_name,
     uint_t pr_valsize, const void *pr_val)
@@ -3108,9 +3102,7 @@ static int
 e1000g_get_priv_prop(struct e1000g *Adapter, const char *pr_name,
     uint_t pr_flags, uint_t pr_valsize, void *pr_val)
 {
-	char valstr[MAXNAMELEN];
 	int err = ENOTSUP;
-	uint_t strsize;
 	boolean_t is_default = (pr_flags & MAC_PROP_DEFAULT);
 	int value;
 
@@ -3394,6 +3386,7 @@ e1000g_get_conf(struct e1000g *Adapter)
 		case e1000_82546_rev_3:
 			if (Adapter->lso_enable)
 				Adapter->lso_premature_issue = B_TRUE;
+			/* FALLTHRU */
 		case e1000_82571:
 		case e1000_82572:
 		case e1000_82573:
@@ -3490,7 +3483,7 @@ e1000g_link_check(struct e1000g *Adapter)
 		 * The Link is up, check whether it was marked as down earlier
 		 */
 		if (Adapter->link_state != LINK_STATE_UP) {
-			e1000_get_speed_and_duplex(hw, &speed, &duplex);
+			(void) e1000_get_speed_and_duplex(hw, &speed, &duplex);
 			Adapter->link_speed = speed;
 			Adapter->link_duplex = duplex;
 			Adapter->link_state = LINK_STATE_UP;
@@ -3522,10 +3515,10 @@ e1000g_link_check(struct e1000g *Adapter)
 			 * resolution.
 			 */
 			if (hw->phy.type == e1000_phy_igp) {
-				e1000_read_phy_reg(hw,
+				(void) e1000_read_phy_reg(hw,
 				    PHY_1000T_CTRL, &phydata);
 				phydata |= CR_1000T_MS_ENABLE;
-				e1000_write_phy_reg(hw,
+				(void) e1000_write_phy_reg(hw,
 				    PHY_1000T_CTRL, phydata);
 			}
 		} else {
@@ -3699,7 +3692,7 @@ e1000g_local_timer(void *ws)
 	/*
 	 * Long TTL workaround for 82541/82547
 	 */
-	e1000_igp_ttl_workaround_82547(hw);
+	(void) e1000_igp_ttl_workaround_82547(hw);
 
 	/*
 	 * Check for Adaptive IFS settings If there are lots of collisions
@@ -4054,11 +4047,11 @@ e1000g_smartspeed(struct e1000g *Adapter)
 		 * If Master/Slave config fault is asserted twice, we
 		 * assume back-to-back
 		 */
-		e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_status);
+		(void) e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_status);
 		if (!(phy_status & SR_1000T_MS_CONFIG_FAULT))
 			return;
 
-		e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_status);
+		(void) e1000_read_phy_reg(hw, PHY_1000T_STATUS, &phy_status);
 		if (!(phy_status & SR_1000T_MS_CONFIG_FAULT))
 			return;
 		/*
@@ -4066,7 +4059,7 @@ e1000g_smartspeed(struct e1000g *Adapter)
 		 * insists! there's a fault in the master/slave
 		 * relationship that was "negotiated"
 		 */
-		e1000_read_phy_reg(hw, PHY_1000T_CTRL, &phy_ctrl);
+		(void) e1000_read_phy_reg(hw, PHY_1000T_CTRL, &phy_ctrl);
 		/*
 		 * Is the phy configured for manual configuration of
 		 * master/slave?
@@ -4077,7 +4070,7 @@ e1000g_smartspeed(struct e1000g *Adapter)
 			 * auto configuration) of master/slave
 			 */
 			phy_ctrl &= ~CR_1000T_MS_ENABLE;
-			e1000_write_phy_reg(hw,
+			(void) e1000_write_phy_reg(hw,
 			    PHY_1000T_CTRL, phy_ctrl);
 			/*
 			 * Effectively starting the clock
@@ -4090,7 +4083,7 @@ e1000g_smartspeed(struct e1000g *Adapter)
 			    !e1000_read_phy_reg(hw, PHY_CONTROL, &phy_ctrl)) {
 				phy_ctrl |= (MII_CR_AUTO_NEG_EN |
 				    MII_CR_RESTART_AUTO_NEG);
-				e1000_write_phy_reg(hw,
+				(void) e1000_write_phy_reg(hw,
 				    PHY_CONTROL, phy_ctrl);
 			}
 		}
@@ -4112,9 +4105,9 @@ e1000g_smartspeed(struct e1000g *Adapter)
 		/*
 		 * If still no link, perhaps using 2/3 pair cable
 		 */
-		e1000_read_phy_reg(hw, PHY_1000T_CTRL, &phy_ctrl);
+		(void) e1000_read_phy_reg(hw, PHY_1000T_CTRL, &phy_ctrl);
 		phy_ctrl |= CR_1000T_MS_ENABLE;
-		e1000_write_phy_reg(hw, PHY_1000T_CTRL, phy_ctrl);
+		(void) e1000_write_phy_reg(hw, PHY_1000T_CTRL, phy_ctrl);
 		/*
 		 * Restart autoneg with phy enabled for manual
 		 * configuration of master/slave
@@ -4123,7 +4116,7 @@ e1000g_smartspeed(struct e1000g *Adapter)
 		    !e1000_read_phy_reg(hw, PHY_CONTROL, &phy_ctrl)) {
 			phy_ctrl |=
 			    (MII_CR_AUTO_NEG_EN | MII_CR_RESTART_AUTO_NEG);
-			e1000_write_phy_reg(hw, PHY_CONTROL, phy_ctrl);
+			(void) e1000_write_phy_reg(hw, PHY_CONTROL, phy_ctrl);
 		}
 		/*
 		 * Hopefully, there are no more faults and we've obtained
@@ -4222,7 +4215,7 @@ e1000g_pp_ioctl(struct e1000g *e1000gp, struct iocblk *iocp, mblk_t *mp)
 	if (mp->b_cont == NULL)
 		return (IOC_INVAL);
 
-	ppd = (e1000g_peekpoke_t *)mp->b_cont->b_rptr;
+	ppd = (e1000g_peekpoke_t *)(uintptr_t)mp->b_cont->b_rptr;
 
 	/*
 	 * Validate request parameters
@@ -4283,8 +4276,8 @@ e1000g_ioc_peek_reg(struct e1000g *e1000gp, e1000g_peekpoke_t *ppd)
 	uint32_t *regaddr;
 
 	handle = e1000gp->osdep.reg_handle;
-	regaddr =
-	    (uint32_t *)(e1000gp->shared.hw_addr + ppd->pp_acc_offset);
+	regaddr = (uint32_t *)((uintptr_t)e1000gp->shared.hw_addr +
+	    (uintptr_t)ppd->pp_acc_offset);
 
 	ppd->pp_acc_data = ddi_get32(handle, regaddr);
 }
@@ -4297,8 +4290,8 @@ e1000g_ioc_poke_reg(struct e1000g *e1000gp, e1000g_peekpoke_t *ppd)
 	uint32_t value;
 
 	handle = e1000gp->osdep.reg_handle;
-	regaddr =
-	    (uint32_t *)(e1000gp->shared.hw_addr + ppd->pp_acc_offset);
+	regaddr = (uint32_t *)((uintptr_t)e1000gp->shared.hw_addr +
+	    (uintptr_t)ppd->pp_acc_offset);
 	value = (uint32_t)ppd->pp_acc_data;
 
 	ddi_put32(handle, regaddr, value);
@@ -4447,7 +4440,7 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 		if (Adapter->phy_status & MII_SR_10T_FD_CAPS)
 			value += sizeof (lb_external10);
 
-		lbsp = (lb_info_sz_t *)mp->b_cont->b_rptr;
+		lbsp = (lb_info_sz_t *)(uintptr_t)mp->b_cont->b_rptr;
 		*lbsp = value;
 		break;
 
@@ -4477,7 +4470,7 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 			return (IOC_INVAL);
 
 		value = 0;
-		lbpp = (lb_property_t *)mp->b_cont->b_rptr;
+		lbpp = (lb_property_t *)(uintptr_t)mp->b_cont->b_rptr;
 		lbpp[value++] = lb_normal;
 		if ((Adapter->phy_ext_status & IEEE_ESR_1000T_FD_CAPS) ||
 		    (Adapter->phy_ext_status & IEEE_ESR_1000X_FD_CAPS) ||
@@ -4504,7 +4497,7 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 		if (iocp->ioc_count != size)
 			return (IOC_INVAL);
 
-		lbmp = (uint32_t *)mp->b_cont->b_rptr;
+		lbmp = (uint32_t *)(uintptr_t)mp->b_cont->b_rptr;
 		*lbmp = Adapter->loopback_mode;
 		break;
 
@@ -4513,7 +4506,7 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 		if (iocp->ioc_count != sizeof (uint32_t))
 			return (IOC_INVAL);
 
-		lbmp = (uint32_t *)mp->b_cont->b_rptr;
+		lbmp = (uint32_t *)(uintptr_t)mp->b_cont->b_rptr;
 		if (!e1000g_set_loopback_mode(Adapter, *lbmp))
 			return (IOC_INVAL);
 		break;
@@ -4650,7 +4643,7 @@ e1000g_set_internal_loopback(struct e1000g *Adapter)
 	/* Disable Smart Power Down */
 	phy_spd_state(hw, B_FALSE);
 
-	e1000_read_phy_reg(hw, PHY_CONTROL, &phy_ctrl);
+	(void) e1000_read_phy_reg(hw, PHY_CONTROL, &phy_ctrl);
 	phy_ctrl &= ~(MII_CR_AUTO_NEG_EN | MII_CR_SPEED_100 | MII_CR_SPEED_10);
 	phy_ctrl |= MII_CR_FULL_DUPLEX | MII_CR_SPEED_1000;
 
@@ -4662,33 +4655,35 @@ e1000g_set_internal_loopback(struct e1000g *Adapter)
 	case e1000_82546_rev_3:
 	case e1000_82573:
 		/* Auto-MDI/MDIX off */
-		e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, 0x0808);
+		(void) e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, 0x0808);
 		/* Reset PHY to update Auto-MDI/MDIX */
-		e1000_write_phy_reg(hw, PHY_CONTROL,
+		(void) e1000_write_phy_reg(hw, PHY_CONTROL,
 		    phy_ctrl | MII_CR_RESET | MII_CR_AUTO_NEG_EN);
 		/* Reset PHY to auto-neg off and force 1000 */
-		e1000_write_phy_reg(hw, PHY_CONTROL,
+		(void) e1000_write_phy_reg(hw, PHY_CONTROL,
 		    phy_ctrl | MII_CR_RESET);
 		/*
 		 * Disable PHY receiver for 82540/545/546 and 82573 Family.
 		 * See comments above e1000g_set_internal_loopback() for the
 		 * background.
 		 */
-		e1000_write_phy_reg(hw, 29, 0x001F);
-		e1000_write_phy_reg(hw, 30, 0x8FFC);
-		e1000_write_phy_reg(hw, 29, 0x001A);
-		e1000_write_phy_reg(hw, 30, 0x8FF0);
+		(void) e1000_write_phy_reg(hw, 29, 0x001F);
+		(void) e1000_write_phy_reg(hw, 30, 0x8FFC);
+		(void) e1000_write_phy_reg(hw, 29, 0x001A);
+		(void) e1000_write_phy_reg(hw, 30, 0x8FF0);
 		break;
 	case e1000_80003es2lan:
 		/* Force Link Up */
-		e1000_write_phy_reg(hw, GG82563_PHY_KMRN_MODE_CTRL, 0x1CC);
+		(void) e1000_write_phy_reg(hw, GG82563_PHY_KMRN_MODE_CTRL,
+		    0x1CC);
 		/* Sets PCS loopback at 1Gbs */
-		e1000_write_phy_reg(hw, GG82563_PHY_MAC_SPEC_CTRL, 0x1046);
+		(void) e1000_write_phy_reg(hw, GG82563_PHY_MAC_SPEC_CTRL,
+		    0x1046);
 		break;
 	}
 
 	/* Set loopback */
-	e1000_write_phy_reg(hw, PHY_CONTROL, phy_ctrl | MII_CR_LOOPBACK);
+	(void) e1000_write_phy_reg(hw, PHY_CONTROL, phy_ctrl | MII_CR_LOOPBACK);
 
 	msec_delay(250);
 
@@ -4815,20 +4810,20 @@ e1000g_set_external_loopback_1000(struct e1000g *Adapter)
 			 * settable values. For background, see comments above
 			 * e1000g_set_internal_loopback().
 			 */
-			e1000_write_phy_reg(hw, 0x0, 0x140);
+			(void) e1000_write_phy_reg(hw, 0x0, 0x140);
 			msec_delay(10);
-			e1000_write_phy_reg(hw, 0x9, 0x1A00);
-			e1000_write_phy_reg(hw, 0x12, 0xC10);
-			e1000_write_phy_reg(hw, 0x12, 0x1C10);
-			e1000_write_phy_reg(hw, 0x1F37, 0x76);
-			e1000_write_phy_reg(hw, 0x1F33, 0x1);
-			e1000_write_phy_reg(hw, 0x1F33, 0x0);
+			(void) e1000_write_phy_reg(hw, 0x9, 0x1A00);
+			(void) e1000_write_phy_reg(hw, 0x12, 0xC10);
+			(void) e1000_write_phy_reg(hw, 0x12, 0x1C10);
+			(void) e1000_write_phy_reg(hw, 0x1F37, 0x76);
+			(void) e1000_write_phy_reg(hw, 0x1F33, 0x1);
+			(void) e1000_write_phy_reg(hw, 0x1F33, 0x0);
 
-			e1000_write_phy_reg(hw, 0x1F35, 0x65);
-			e1000_write_phy_reg(hw, 0x1837, 0x3F7C);
-			e1000_write_phy_reg(hw, 0x1437, 0x3FDC);
-			e1000_write_phy_reg(hw, 0x1237, 0x3F7C);
-			e1000_write_phy_reg(hw, 0x1137, 0x3FDC);
+			(void) e1000_write_phy_reg(hw, 0x1F35, 0x65);
+			(void) e1000_write_phy_reg(hw, 0x1837, 0x3F7C);
+			(void) e1000_write_phy_reg(hw, 0x1437, 0x3FDC);
+			(void) e1000_write_phy_reg(hw, 0x1237, 0x3F7C);
+			(void) e1000_write_phy_reg(hw, 0x1137, 0x3FDC);
 
 			msec_delay(50);
 			break;
@@ -4860,11 +4855,12 @@ e1000g_set_external_loopback_1000(struct e1000g *Adapter)
 		}
 		break;
 	case e1000_80003es2lan:
-		e1000_read_phy_reg(hw, GG82563_REG(6, 16), &phydata);
-		e1000_write_phy_reg(hw, GG82563_REG(6, 16), phydata | (1 << 5));
+		(void) e1000_read_phy_reg(hw, GG82563_REG(6, 16), &phydata);
+		(void) e1000_write_phy_reg(hw, GG82563_REG(6, 16),
+		    phydata | (1 << 5));
 		Adapter->param_adv_autoneg = 1;
 		Adapter->param_adv_1000fdx = 1;
-		e1000g_reset_link(Adapter);
+		(void) e1000g_reset_link(Adapter);
 		break;
 	}
 }
@@ -4885,12 +4881,12 @@ e1000g_set_external_loopback_100(struct e1000g *Adapter)
 	    MII_CR_SPEED_100);
 
 	/* Force 100/FD, reset PHY */
-	e1000_write_phy_reg(hw, PHY_CONTROL,
+	(void) e1000_write_phy_reg(hw, PHY_CONTROL,
 	    phy_ctrl | MII_CR_RESET);	/* 0xA100 */
 	msec_delay(10);
 
 	/* Force 100/FD */
-	e1000_write_phy_reg(hw, PHY_CONTROL,
+	(void) e1000_write_phy_reg(hw, PHY_CONTROL,
 	    phy_ctrl);			/* 0x2100 */
 	msec_delay(10);
 
@@ -4922,12 +4918,12 @@ e1000g_set_external_loopback_10(struct e1000g *Adapter)
 	    MII_CR_SPEED_10);
 
 	/* Force 10/FD, reset PHY */
-	e1000_write_phy_reg(hw, PHY_CONTROL,
+	(void) e1000_write_phy_reg(hw, PHY_CONTROL,
 	    phy_ctrl | MII_CR_RESET);	/* 0x8100 */
 	msec_delay(10);
 
 	/* Force 10/FD */
-	e1000_write_phy_reg(hw, PHY_CONTROL,
+	(void) e1000_write_phy_reg(hw, PHY_CONTROL,
 	    phy_ctrl);			/* 0x0100 */
 	msec_delay(10);
 
@@ -5304,14 +5300,15 @@ e1000g_get_phy_state(struct e1000g *Adapter)
 {
 	struct e1000_hw *hw = &Adapter->shared;
 
-	e1000_read_phy_reg(hw, PHY_CONTROL, &Adapter->phy_ctrl);
-	e1000_read_phy_reg(hw, PHY_STATUS, &Adapter->phy_status);
-	e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &Adapter->phy_an_adv);
-	e1000_read_phy_reg(hw, PHY_AUTONEG_EXP, &Adapter->phy_an_exp);
-	e1000_read_phy_reg(hw, PHY_EXT_STATUS, &Adapter->phy_ext_status);
-	e1000_read_phy_reg(hw, PHY_1000T_CTRL, &Adapter->phy_1000t_ctrl);
-	e1000_read_phy_reg(hw, PHY_1000T_STATUS, &Adapter->phy_1000t_status);
-	e1000_read_phy_reg(hw, PHY_LP_ABILITY, &Adapter->phy_lp_able);
+	(void) e1000_read_phy_reg(hw, PHY_CONTROL, &Adapter->phy_ctrl);
+	(void) e1000_read_phy_reg(hw, PHY_STATUS, &Adapter->phy_status);
+	(void) e1000_read_phy_reg(hw, PHY_AUTONEG_ADV, &Adapter->phy_an_adv);
+	(void) e1000_read_phy_reg(hw, PHY_AUTONEG_EXP, &Adapter->phy_an_exp);
+	(void) e1000_read_phy_reg(hw, PHY_EXT_STATUS, &Adapter->phy_ext_status);
+	(void) e1000_read_phy_reg(hw, PHY_1000T_CTRL, &Adapter->phy_1000t_ctrl);
+	(void) e1000_read_phy_reg(hw, PHY_1000T_STATUS,
+	    &Adapter->phy_1000t_status);
+	(void) e1000_read_phy_reg(hw, PHY_LP_ABILITY, &Adapter->phy_lp_able);
 
 	Adapter->param_autoneg_cap =
 	    (Adapter->phy_status & MII_SR_AUTONEG_CAPS) ? 1 : 0;
@@ -5408,6 +5405,7 @@ e1000g_check_dma_handle(ddi_dma_handle_t handle)
 /*
  * The IO fault service error handling callback function
  */
+/* ARGSUSED2 */
 static int
 e1000g_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err, const void *impl_data)
 {
@@ -5506,7 +5504,6 @@ e1000g_get_def_val(struct e1000g *Adapter, mac_prop_id_t pr_num,
     uint_t pr_valsize, void *pr_val)
 {
 	link_flowctrl_t fl;
-	uint32_t fc;
 	int err = 0;
 
 	ASSERT(pr_valsize > 0);
@@ -5538,6 +5535,7 @@ e1000g_get_def_val(struct e1000g *Adapter, mac_prop_id_t pr_num,
 		*(uint8_t *)pr_val =
 		    ((Adapter->phy_status & MII_SR_100X_FD_CAPS) ||
 		    (Adapter->phy_status & MII_SR_100T2_FD_CAPS)) ? 1 : 0;
+		break;
 	case MAC_PROP_ADV_100HDX_CAP:
 	case MAC_PROP_EN_100HDX_CAP:
 		*(uint8_t *)pr_val =

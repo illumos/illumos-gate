@@ -23,8 +23,6 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IntelVersion: 1.80 v2008-02-29
  */
@@ -1354,6 +1352,8 @@ e1000_phy_force_speed_duplex_setup(struct e1000_hw *hw, u16 *phy_ctrl)
 		DEBUGOUT("Forcing 100mb\n");
 	} else {
 		ctrl &= ~(E1000_CTRL_SPD_1000 | E1000_CTRL_SPD_100);
+		/* OR 0x0000 constant for documenting intent */
+		/* LINTED E_EXPR_NULL_EFFECT */
 		*phy_ctrl |= MII_CR_SPEED_10;
 		*phy_ctrl &= ~(MII_CR_SPEED_1000 | MII_CR_SPEED_100);
 		DEBUGOUT("Forcing 10mb\n");
@@ -2178,7 +2178,7 @@ e1000_determine_phy_address(struct e1000_hw *hw)
 		i = 0;
 
 		do {
-			e1000_get_phy_id(hw);
+			(void) e1000_get_phy_id(hw);
 			phy_type = e1000_get_phy_type_from_id(hw->phy.id);
 
 			/*
@@ -2382,7 +2382,7 @@ e1000_access_phy_wakeup_reg_bm(struct e1000_hw *hw,
 	hw->phy.addr = 1;
 
 	/* Set page 769 */
-	e1000_write_phy_reg_mdic(hw, IGP01E1000_PHY_PAGE_SELECT,
+	(void) e1000_write_phy_reg_mdic(hw, IGP01E1000_PHY_PAGE_SELECT,
 	    (BM_WUC_ENABLE_PAGE << IGP_PAGE_SHIFT));
 
 	ret_val = e1000_read_phy_reg_mdic(hw, BM_WUC_ENABLE_REG, &phy_reg);
@@ -2437,7 +2437,7 @@ e1000_access_phy_wakeup_reg_bm(struct e1000_hw *hw,
 	/*
 	 * Restore 769_17.2 to its original value Set page 769
 	 */
-	e1000_write_phy_reg_mdic(hw, IGP01E1000_PHY_PAGE_SELECT,
+	(void) e1000_write_phy_reg_mdic(hw, IGP01E1000_PHY_PAGE_SELECT,
 	    (BM_WUC_ENABLE_PAGE << IGP_PAGE_SHIFT));
 
 	/* Clear 769_17.2 */

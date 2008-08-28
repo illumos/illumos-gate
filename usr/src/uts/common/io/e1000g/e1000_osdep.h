@@ -26,8 +26,6 @@
 #ifndef _E1000_OSDEP_H
 #define	_E1000_OSDEP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -47,6 +45,7 @@ extern "C" {
 #include <sys/sunddi.h>
 #include <sys/pci.h>
 #include <sys/atomic.h>
+#include <sys/note.h>
 #include "e1000g_debug.h"
 
 /*
@@ -98,17 +97,17 @@ extern "C" {
 /*
  * required by shared code
  */
-#define	E1000_WRITE_FLUSH(a)	E1000_READ_REG(a, E1000_STATUS)
+#define	E1000_WRITE_FLUSH(a)	(void)E1000_READ_REG(a, E1000_STATUS)
 
 #define	E1000_WRITE_REG(hw, reg, value)	\
 {\
 	if ((hw)->mac.type != e1000_82542) \
 		ddi_put32((OS_DEP(hw))->reg_handle, \
-		    (uint32_t *)((hw)->hw_addr + reg), \
+		    (uint32_t *)((uintptr_t)(hw)->hw_addr + reg), \
 		    value); \
 	else \
 		ddi_put32((OS_DEP(hw))->reg_handle, \
-		    (uint32_t *)((hw)->hw_addr + \
+		    (uint32_t *)((uintptr_t)(hw)->hw_addr + \
 		    e1000_translate_register_82542(reg)), \
 		    value); \
 }
@@ -116,20 +115,21 @@ extern "C" {
 #define	E1000_READ_REG(hw, reg) (\
 	((hw)->mac.type != e1000_82542) ? \
 	    ddi_get32((OS_DEP(hw))->reg_handle, \
-		(uint32_t *)((hw)->hw_addr + reg)) : \
+		(uint32_t *)((uintptr_t)(hw)->hw_addr + reg)) : \
 	    ddi_get32((OS_DEP(hw))->reg_handle, \
-		(uint32_t *)((hw)->hw_addr + \
+		(uint32_t *)((uintptr_t)(hw)->hw_addr + \
 		e1000_translate_register_82542(reg))))
 
 #define	E1000_WRITE_REG_ARRAY(hw, reg, offset, value) \
 {\
 	if ((hw)->mac.type != e1000_82542) \
 		ddi_put32((OS_DEP(hw))->reg_handle, \
-		    (uint32_t *)((hw)->hw_addr + reg + ((offset) << 2)),\
+		    (uint32_t *)((uintptr_t)(hw)->hw_addr + \
+		    reg + ((offset) << 2)),\
 		    value); \
 	else \
 		ddi_put32((OS_DEP(hw))->reg_handle, \
-		    (uint32_t *)((hw)->hw_addr + \
+		    (uint32_t *)((uintptr_t)(hw)->hw_addr + \
 		    e1000_translate_register_82542(reg) + \
 		    ((offset) << 2)), value); \
 }
@@ -137,42 +137,48 @@ extern "C" {
 #define	E1000_READ_REG_ARRAY(hw, reg, offset) (\
 	((hw)->mac.type != e1000_82542) ? \
 	    ddi_get32((OS_DEP(hw))->reg_handle, \
-		(uint32_t *)((hw)->hw_addr + reg + ((offset) << 2))) : \
+		(uint32_t *)((uintptr_t)(hw)->hw_addr + reg + \
+		((offset) << 2))) : \
 	    ddi_get32((OS_DEP(hw))->reg_handle, \
-		(uint32_t *)((hw)->hw_addr + \
+		(uint32_t *)((uintptr_t)(hw)->hw_addr + \
 		e1000_translate_register_82542(reg) + \
 		((offset) << 2))))
 
 
-#define	E1000_WRITE_REG_ARRAY_BYTE(a, reg, offset, value)	NULL
-#define	E1000_WRITE_REG_ARRAY_WORD(a, reg, offset, value)	NULL
-#define	E1000_WRITE_REG_ARRAY_DWORD(a, reg, offset, value)	NULL
-#define	E1000_READ_REG_ARRAY_BYTE(a, reg, offset)		NULL
-#define	E1000_READ_REG_ARRAY_WORD(a, reg, offset)		NULL
-#define	E1000_READ_REG_ARRAY_DWORD(a, reg, offset)		NULL
+#define	E1000_WRITE_REG_ARRAY_DWORD(a, reg, offset, value)	\
+	E1000_WRITE_REG_ARRAY(a, reg, offset, value)
+#define	E1000_READ_REG_ARRAY_DWORD(a, reg, offset)		\
+	E1000_READ_REG_ARRAY(a, reg, offset)
 
 
 #define	E1000_READ_FLASH_REG(hw, reg)	\
 	ddi_get32((OS_DEP(hw))->ich_flash_handle, \
-		(uint32_t *)((hw)->flash_address + (reg)))
+		(uint32_t *)((uintptr_t)(hw)->flash_address + (reg)))
 
 #define	E1000_READ_FLASH_REG16(hw, reg)	\
 	ddi_get16((OS_DEP(hw))->ich_flash_handle, \
-		(uint16_t *)((hw)->flash_address + (reg)))
+		(uint16_t *)((uintptr_t)(hw)->flash_address + (reg)))
 
 #define	E1000_WRITE_FLASH_REG(hw, reg, value)	\
 	ddi_put32((OS_DEP(hw))->ich_flash_handle, \
-		(uint32_t *)((hw)->flash_address + (reg)), (value))
+		(uint32_t *)((uintptr_t)(hw)->flash_address + (reg)), (value))
 
 #define	E1000_WRITE_FLASH_REG16(hw, reg, value)	\
 	ddi_put16((OS_DEP(hw))->ich_flash_handle, \
-		(uint16_t *)((hw)->flash_address + (reg)), (value))
+		(uint16_t *)((uintptr_t)(hw)->flash_address + (reg)), (value))
 
 /*
  * === END CONTENT FORMERLY IN FXHW.H ===
  */
 
 #define	msec_delay_irq	msec_delay
+
+#define	UNREFERENCED_1PARAMETER(_p)		_NOTE(ARGUNUSED(_p))
+#define	UNREFERENCED_2PARAMETER(_p, _q)		_NOTE(ARGUNUSED(_p, _q))
+#define	UNREFERENCED_3PARAMETER(_p, _q, _r)	_NOTE(ARGUNUSED(_p, _q, _r))
+#define	UNREFERENCED_4PARAMETER(_p, _q, _r, _s)	_NOTE(ARGUNUSED(_p, _q, _r, _s))
+#define	UNREFERENCED_5PARAMETER(_p, _q, _r, _s, _t)	\
+	_NOTE(ARGUNUSED(_p, _q, _r, _s, _t))
 
 typedef	int8_t		s8;
 typedef	int16_t		s16;

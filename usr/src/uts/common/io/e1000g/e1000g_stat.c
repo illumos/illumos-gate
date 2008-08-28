@@ -23,8 +23,6 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * **********************************************************************
  *									*
@@ -50,7 +48,6 @@ void
 e1000_tbi_adjust_stats(struct e1000g *Adapter,
     uint32_t frame_len, uint8_t *mac_addr)
 {
-	struct e1000_hw *hw = &Adapter->shared;
 	uint32_t carry_bit;
 	p_e1000g_stat_t e1000g_ksp;
 

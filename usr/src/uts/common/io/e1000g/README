@@ -22,8 +22,6 @@
 # Use is subject to license terms of the CDDLv1.
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 4.0.4 code drop from Intel on 1/30/2003
 =======================================
@@ -599,3 +597,8 @@ Notes on packaging:
    6693205 running sunvts7.0 on Generic s10u5build10 causes unix:cmi_mca_panic on thumper
    6694279 e1000g driver: internal loopback mode support needed for nic ESB-2
    6721574 max number of segments in e1000g_tx_dma_attr need to be updated when LSO is supported
+
+5.2.12
+======
+  This version has the following fix:
+   6634746 e1000g is missing lint target in Makefile

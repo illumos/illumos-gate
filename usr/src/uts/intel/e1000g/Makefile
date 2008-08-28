@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # uts/intel/e1000g/Makefile
 #
 #	This makefile drives the production of the iprb
@@ -85,13 +83,10 @@ clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
-#
-# we're not linting e1000g. Will revisit
-#
 
-lint:
+lint:		$(LINT_DEPS)
 
-modlintlib:
+modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 

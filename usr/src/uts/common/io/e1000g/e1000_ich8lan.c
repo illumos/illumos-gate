@@ -23,8 +23,6 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IntelVersion: 1.100 v2008-02-29
  */
@@ -1429,11 +1427,11 @@ e1000_update_nvm_checksum_ich8lan(struct e1000_hw *hw)
 	if (bank == 0) {
 		new_bank_offset = nvm->flash_bank_size;
 		old_bank_offset = 0;
-		e1000_erase_flash_bank_ich8lan(hw, 1);
+		(void) e1000_erase_flash_bank_ich8lan(hw, 1);
 	} else {
 		old_bank_offset = nvm->flash_bank_size;
 		new_bank_offset = 0;
-		e1000_erase_flash_bank_ich8lan(hw, 0);
+		(void) e1000_erase_flash_bank_ich8lan(hw, 0);
 	}
 
 	for (i = 0; i < E1000_SHADOW_RAM_WORDS; i++) {
@@ -1444,7 +1442,7 @@ e1000_update_nvm_checksum_ich8lan(struct e1000_hw *hw)
 		if (dev_spec->shadow_ram[i].modified) {
 			data = dev_spec->shadow_ram[i].value;
 		} else {
-			e1000_read_flash_word_ich8lan(hw,
+			(void) e1000_read_flash_word_ich8lan(hw,
 			    i + old_bank_offset,
 			    &data);
 		}
@@ -1495,7 +1493,7 @@ e1000_update_nvm_checksum_ich8lan(struct e1000_hw *hw)
 	 * bits are 11 to start with and we need to change bit 14 to 0b
 	 */
 	act_offset = new_bank_offset + E1000_ICH_NVM_SIG_WORD;
-	e1000_read_flash_word_ich8lan(hw, act_offset, &data);
+	(void) e1000_read_flash_word_ich8lan(hw, act_offset, &data);
 	data &= 0xBFFF;
 	ret_val = e1000_retry_write_flash_byte_ich8lan(hw,
 	    act_offset * 2 + 1,
@@ -1912,7 +1910,7 @@ e1000_get_bus_info_ich8lan(struct e1000_hw *hw)
 static s32
 e1000_reset_hw_ich8lan(struct e1000_hw *hw)
 {
-	u32 ctrl, icr, kab;
+	u32 ctrl, kab;
 	s32 ret_val;
 
 	DEBUGFUNC("e1000_reset_hw_ich8lan");
@@ -1975,7 +1973,7 @@ e1000_reset_hw_ich8lan(struct e1000_hw *hw)
 	}
 
 	E1000_WRITE_REG(hw, E1000_IMC, 0xffffffff);
-	icr = E1000_READ_REG(hw, E1000_ICR);
+	(void) E1000_READ_REG(hw, E1000_ICR);
 
 	kab = E1000_READ_REG(hw, E1000_KABGTXD);
 	kab |= E1000_KABGTXD_BGSQLBIAS;
@@ -2593,12 +2591,12 @@ e1000_get_cfg_done_ich8lan(struct e1000_hw *hw)
 {
 	s32 ret_val = E1000_SUCCESS;
 
-	e1000_get_cfg_done_generic(hw);
+	(void) e1000_get_cfg_done_generic(hw);
 
 	/* If EEPROM is not marked present, init the IGP 3 PHY manually */
 	if (((E1000_READ_REG(hw, E1000_EECD) & E1000_EECD_PRES) == 0) &&
 	    (hw->phy.type == e1000_phy_igp_3)) {
-		e1000_phy_init_script_igp3(hw);
+		(void) e1000_phy_init_script_igp3(hw);
 	}
 	return (ret_val);
 }
@@ -2631,23 +2629,21 @@ e1000_power_down_phy_copper_ich8lan(struct e1000_hw *hw)
 static void
 e1000_clear_hw_cntrs_ich8lan(struct e1000_hw *hw)
 {
-	volatile u32 temp;
-
 	DEBUGFUNC("e1000_clear_hw_cntrs_ich8lan");
 
 	e1000_clear_hw_cntrs_base_generic(hw);
 
-	temp = E1000_READ_REG(hw, E1000_ALGNERRC);
-	temp = E1000_READ_REG(hw, E1000_RXERRC);
-	temp = E1000_READ_REG(hw, E1000_TNCRS);
-	temp = E1000_READ_REG(hw, E1000_CEXTERR);
-	temp = E1000_READ_REG(hw, E1000_TSCTC);
-	temp = E1000_READ_REG(hw, E1000_TSCTFC);
+	(void) E1000_READ_REG(hw, E1000_ALGNERRC);
+	(void) E1000_READ_REG(hw, E1000_RXERRC);
+	(void) E1000_READ_REG(hw, E1000_TNCRS);
+	(void) E1000_READ_REG(hw, E1000_CEXTERR);
+	(void) E1000_READ_REG(hw, E1000_TSCTC);
+	(void) E1000_READ_REG(hw, E1000_TSCTFC);
 
-	temp = E1000_READ_REG(hw, E1000_MGTPRC);
-	temp = E1000_READ_REG(hw, E1000_MGTPDC);
-	temp = E1000_READ_REG(hw, E1000_MGTPTC);
+	(void) E1000_READ_REG(hw, E1000_MGTPRC);
+	(void) E1000_READ_REG(hw, E1000_MGTPDC);
+	(void) E1000_READ_REG(hw, E1000_MGTPTC);
 
-	temp = E1000_READ_REG(hw, E1000_IAC);
-	temp = E1000_READ_REG(hw, E1000_ICRXOC);
+	(void) E1000_READ_REG(hw, E1000_IAC);
+	(void) E1000_READ_REG(hw, E1000_ICRXOC);
 }

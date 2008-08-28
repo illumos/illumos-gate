@@ -23,8 +23,6 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * **********************************************************************
  *									*
@@ -96,7 +94,7 @@ e1000g_free_tx_swpkt(register p_tx_sw_packet_t packet)
 		break;
 #endif
 	case USE_DMA:
-		ddi_dma_unbind_handle(packet->tx_dma_handle);
+		(void) ddi_dma_unbind_handle(packet->tx_dma_handle);
 		break;
 	default:
 		break;
@@ -154,7 +152,6 @@ e1000g_m_tx(void *arg, mblk_t *mp)
 static boolean_t
 e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 {
-	struct e1000_hw *hw;
 	p_tx_sw_packet_t packet;
 	LIST_DESCRIBER pending_list;
 	size_t len;
@@ -168,7 +165,6 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	e1000g_tx_ring_t *tx_ring;
 	context_data_t cur_context;
 
-	hw = &Adapter->shared;
 	tx_ring = Adapter->tx_ring;
 
 	/* Get the total size and frags number of the message */
@@ -390,7 +386,7 @@ e1000g_retreive_context(mblk_t *mp, context_data_t *cur_context,
 	hcksum_retrieve(mp, NULL, NULL, &cur_context->cksum_start,
 	    &cur_context->cksum_stuff, NULL, NULL, &cur_context->cksum_flags);
 	/* retreive ethernet header size */
-	if (((struct ether_vlan_header *)mp->b_rptr)->ether_tpid ==
+	if (((struct ether_vlan_header *)(uintptr_t)mp->b_rptr)->ether_tpid ==
 	    htons(ETHERTYPE_VLAN))
 		cur_context->ether_header_size =
 		    sizeof (struct ether_vlan_header);
@@ -766,8 +762,6 @@ e1000g_tx_setup(struct e1000g *Adapter)
 	uint32_t buf_low;
 	uint32_t reg_tipg;
 	uint32_t reg_tctl;
-	uint32_t reg_tarc;
-	uint16_t speed, duplex;
 	int size;
 	e1000g_tx_ring_t *tx_ring;
 
@@ -925,8 +919,8 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 	/*
 	 * While there are still TxSwPackets in the used queue check them
 	 */
-	while (packet =
-	    (p_tx_sw_packet_t)QUEUE_GET_HEAD(&tx_ring->used_list)) {
+	while ((packet =
+	    (p_tx_sw_packet_t)QUEUE_GET_HEAD(&tx_ring->used_list)) != NULL) {
 
 		/*
 		 * Get hold of the next descriptor that the e1000g will
@@ -1086,7 +1080,7 @@ e1000g_fill_82544_desc(uint64_t address,
 
 	if (length <= 4) {
 		desc_array->descriptor[0].address = address;
-		desc_array->descriptor[0].length = length;
+		desc_array->descriptor[0].length = (uint32_t)length;
 		desc_array->elements = 1;
 		return (desc_array->elements);
 	}
@@ -1101,7 +1095,7 @@ e1000g_fill_82544_desc(uint64_t address,
 	    (safe_terminator > 4 && safe_terminator < 9) ||
 	    (safe_terminator > 0xC && safe_terminator <= 0xF)) {
 		desc_array->descriptor[0].address = address;
-		desc_array->descriptor[0].length = length;
+		desc_array->descriptor[0].length = (uint32_t)length;
 		desc_array->elements = 1;
 		return (desc_array->elements);
 	}
@@ -1397,7 +1391,7 @@ e1000g_fill_tx_desc(e1000g_tx_ring_t *tx_ring,
 
 	desc = &packet->desc[packet->num_desc];
 	desc->address = address;
-	desc->length = size;
+	desc->length = (uint32_t)size;
 
 	packet->num_desc++;
 
@@ -1488,7 +1482,7 @@ e1000g_tx_workaround_jumbo_82544(p_tx_sw_packet_t packet,
 		if (size_left > JUMBO_FRAG_LENGTH)
 			desc->length = JUMBO_FRAG_LENGTH;
 		else
-			desc->length = size_left;
+			desc->length = (uint32_t)size_left;
 
 		packet->num_desc++;
 		desc_count++;

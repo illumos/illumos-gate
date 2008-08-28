@@ -23,8 +23,6 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IntelVersion: 1.69 v2008-02-29
  */
@@ -671,47 +669,45 @@ e1000_pcix_mmrbc_workaround_generic(struct e1000_hw *hw)
 void
 e1000_clear_hw_cntrs_base_generic(struct e1000_hw *hw)
 {
-	volatile u32 temp;
-
 	DEBUGFUNC("e1000_clear_hw_cntrs_base_generic");
 
-	temp = E1000_READ_REG(hw, E1000_CRCERRS);
-	temp = E1000_READ_REG(hw, E1000_SYMERRS);
-	temp = E1000_READ_REG(hw, E1000_MPC);
-	temp = E1000_READ_REG(hw, E1000_SCC);
-	temp = E1000_READ_REG(hw, E1000_ECOL);
-	temp = E1000_READ_REG(hw, E1000_MCC);
-	temp = E1000_READ_REG(hw, E1000_LATECOL);
-	temp = E1000_READ_REG(hw, E1000_COLC);
-	temp = E1000_READ_REG(hw, E1000_DC);
-	temp = E1000_READ_REG(hw, E1000_SEC);
-	temp = E1000_READ_REG(hw, E1000_RLEC);
-	temp = E1000_READ_REG(hw, E1000_XONRXC);
-	temp = E1000_READ_REG(hw, E1000_XONTXC);
-	temp = E1000_READ_REG(hw, E1000_XOFFRXC);
-	temp = E1000_READ_REG(hw, E1000_XOFFTXC);
-	temp = E1000_READ_REG(hw, E1000_FCRUC);
-	temp = E1000_READ_REG(hw, E1000_GPRC);
-	temp = E1000_READ_REG(hw, E1000_BPRC);
-	temp = E1000_READ_REG(hw, E1000_MPRC);
-	temp = E1000_READ_REG(hw, E1000_GPTC);
-	temp = E1000_READ_REG(hw, E1000_GORCL);
-	temp = E1000_READ_REG(hw, E1000_GORCH);
-	temp = E1000_READ_REG(hw, E1000_GOTCL);
-	temp = E1000_READ_REG(hw, E1000_GOTCH);
-	temp = E1000_READ_REG(hw, E1000_RNBC);
-	temp = E1000_READ_REG(hw, E1000_RUC);
-	temp = E1000_READ_REG(hw, E1000_RFC);
-	temp = E1000_READ_REG(hw, E1000_ROC);
-	temp = E1000_READ_REG(hw, E1000_RJC);
-	temp = E1000_READ_REG(hw, E1000_TORL);
-	temp = E1000_READ_REG(hw, E1000_TORH);
-	temp = E1000_READ_REG(hw, E1000_TOTL);
-	temp = E1000_READ_REG(hw, E1000_TOTH);
-	temp = E1000_READ_REG(hw, E1000_TPR);
-	temp = E1000_READ_REG(hw, E1000_TPT);
-	temp = E1000_READ_REG(hw, E1000_MPTC);
-	temp = E1000_READ_REG(hw, E1000_BPTC);
+	(void) E1000_READ_REG(hw, E1000_CRCERRS);
+	(void) E1000_READ_REG(hw, E1000_SYMERRS);
+	(void) E1000_READ_REG(hw, E1000_MPC);
+	(void) E1000_READ_REG(hw, E1000_SCC);
+	(void) E1000_READ_REG(hw, E1000_ECOL);
+	(void) E1000_READ_REG(hw, E1000_MCC);
+	(void) E1000_READ_REG(hw, E1000_LATECOL);
+	(void) E1000_READ_REG(hw, E1000_COLC);
+	(void) E1000_READ_REG(hw, E1000_DC);
+	(void) E1000_READ_REG(hw, E1000_SEC);
+	(void) E1000_READ_REG(hw, E1000_RLEC);
+	(void) E1000_READ_REG(hw, E1000_XONRXC);
+	(void) E1000_READ_REG(hw, E1000_XONTXC);
+	(void) E1000_READ_REG(hw, E1000_XOFFRXC);
+	(void) E1000_READ_REG(hw, E1000_XOFFTXC);
+	(void) E1000_READ_REG(hw, E1000_FCRUC);
+	(void) E1000_READ_REG(hw, E1000_GPRC);
+	(void) E1000_READ_REG(hw, E1000_BPRC);
+	(void) E1000_READ_REG(hw, E1000_MPRC);
+	(void) E1000_READ_REG(hw, E1000_GPTC);
+	(void) E1000_READ_REG(hw, E1000_GORCL);
+	(void) E1000_READ_REG(hw, E1000_GORCH);
+	(void) E1000_READ_REG(hw, E1000_GOTCL);
+	(void) E1000_READ_REG(hw, E1000_GOTCH);
+	(void) E1000_READ_REG(hw, E1000_RNBC);
+	(void) E1000_READ_REG(hw, E1000_RUC);
+	(void) E1000_READ_REG(hw, E1000_RFC);
+	(void) E1000_READ_REG(hw, E1000_ROC);
+	(void) E1000_READ_REG(hw, E1000_RJC);
+	(void) E1000_READ_REG(hw, E1000_TORL);
+	(void) E1000_READ_REG(hw, E1000_TORH);
+	(void) E1000_READ_REG(hw, E1000_TOTL);
+	(void) E1000_READ_REG(hw, E1000_TOTH);
+	(void) E1000_READ_REG(hw, E1000_TPR);
+	(void) E1000_READ_REG(hw, E1000_TPT);
+	(void) E1000_READ_REG(hw, E1000_MPTC);
+	(void) E1000_READ_REG(hw, E1000_BPTC);
 }
 
 /*
@@ -759,7 +755,7 @@ e1000_check_for_copper_link_generic(struct e1000_hw *hw)
 	 * Check if there was DownShift, must be checked immediately after
 	 * link-up
 	 */
-	e1000_check_downshift_generic(hw);
+	(void) e1000_check_downshift_generic(hw);
 
 	/*
 	 * If we are forcing speed/duplex, then we simply return since we have

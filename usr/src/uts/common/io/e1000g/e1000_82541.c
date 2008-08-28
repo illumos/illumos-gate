@@ -23,8 +23,6 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IntelVersion: 1.55 v2008-02-29
  */
@@ -331,7 +329,7 @@ e1000_reset_hw_82541(struct e1000_hw *hw)
 #ifndef FIFO_WORKAROUND
 	struct e1000_dev_spec_82541 *dev_spec;
 #endif
-	u32 ledctl, ctrl, icr, manc;
+	u32 ledctl, ctrl, manc;
 
 	DEBUGFUNC("e1000_reset_hw_82541");
 
@@ -386,7 +384,7 @@ e1000_reset_hw_82541(struct e1000_hw *hw)
 	E1000_WRITE_REG(hw, E1000_MANC, manc);
 
 	if ((hw->mac.type == e1000_82541) || (hw->mac.type == e1000_82547)) {
-		e1000_phy_init_script_82541(hw);
+		(void) e1000_phy_init_script_82541(hw);
 
 		/* Configure activity LED after Phy reset */
 		ledctl = E1000_READ_REG(hw, E1000_LEDCTL);
@@ -400,7 +398,7 @@ e1000_reset_hw_82541(struct e1000_hw *hw)
 	E1000_WRITE_REG(hw, E1000_IMC, 0xFFFFFFFF);
 
 	/* Clear any pending interrupt events. */
-	icr = E1000_READ_REG(hw, E1000_ICR);
+	(void) E1000_READ_REG(hw, E1000_ICR);
 
 	return (E1000_SUCCESS);
 }
@@ -555,7 +553,7 @@ e1000_phy_hw_reset_82541(struct e1000_hw *hw)
 	if (ret_val)
 		goto out;
 
-	e1000_phy_init_script_82541(hw);
+	(void) e1000_phy_init_script_82541(hw);
 
 	if ((hw->mac.type == e1000_82541) || (hw->mac.type == e1000_82547)) {
 		/* Configure activity LED after PHY reset */
@@ -675,7 +673,7 @@ e1000_check_for_link_82541(struct e1000_hw *hw)
 	 * Check if there was DownShift, must be checked
 	 * immediately after link-up
 	 */
-	e1000_check_downshift_generic(hw);
+	(void) e1000_check_downshift_generic(hw);
 
 	/*
 	 * If we are forcing speed/duplex, then we simply return since
@@ -1584,33 +1582,31 @@ e1000_power_down_phy_copper_82541(struct e1000_hw *hw)
 static void
 e1000_clear_hw_cntrs_82541(struct e1000_hw *hw)
 {
-	volatile u32 temp;
-
 	DEBUGFUNC("e1000_clear_hw_cntrs_82541");
 
 	e1000_clear_hw_cntrs_base_generic(hw);
 
-	temp = E1000_READ_REG(hw, E1000_PRC64);
-	temp = E1000_READ_REG(hw, E1000_PRC127);
-	temp = E1000_READ_REG(hw, E1000_PRC255);
-	temp = E1000_READ_REG(hw, E1000_PRC511);
-	temp = E1000_READ_REG(hw, E1000_PRC1023);
-	temp = E1000_READ_REG(hw, E1000_PRC1522);
-	temp = E1000_READ_REG(hw, E1000_PTC64);
-	temp = E1000_READ_REG(hw, E1000_PTC127);
-	temp = E1000_READ_REG(hw, E1000_PTC255);
-	temp = E1000_READ_REG(hw, E1000_PTC511);
-	temp = E1000_READ_REG(hw, E1000_PTC1023);
-	temp = E1000_READ_REG(hw, E1000_PTC1522);
+	(void) E1000_READ_REG(hw, E1000_PRC64);
+	(void) E1000_READ_REG(hw, E1000_PRC127);
+	(void) E1000_READ_REG(hw, E1000_PRC255);
+	(void) E1000_READ_REG(hw, E1000_PRC511);
+	(void) E1000_READ_REG(hw, E1000_PRC1023);
+	(void) E1000_READ_REG(hw, E1000_PRC1522);
+	(void) E1000_READ_REG(hw, E1000_PTC64);
+	(void) E1000_READ_REG(hw, E1000_PTC127);
+	(void) E1000_READ_REG(hw, E1000_PTC255);
+	(void) E1000_READ_REG(hw, E1000_PTC511);
+	(void) E1000_READ_REG(hw, E1000_PTC1023);
+	(void) E1000_READ_REG(hw, E1000_PTC1522);
 
-	temp = E1000_READ_REG(hw, E1000_ALGNERRC);
-	temp = E1000_READ_REG(hw, E1000_RXERRC);
-	temp = E1000_READ_REG(hw, E1000_TNCRS);
-	temp = E1000_READ_REG(hw, E1000_CEXTERR);
-	temp = E1000_READ_REG(hw, E1000_TSCTC);
-	temp = E1000_READ_REG(hw, E1000_TSCTFC);
+	(void) E1000_READ_REG(hw, E1000_ALGNERRC);
+	(void) E1000_READ_REG(hw, E1000_RXERRC);
+	(void) E1000_READ_REG(hw, E1000_TNCRS);
+	(void) E1000_READ_REG(hw, E1000_CEXTERR);
+	(void) E1000_READ_REG(hw, E1000_TSCTC);
+	(void) E1000_READ_REG(hw, E1000_TSCTFC);
 
-	temp = E1000_READ_REG(hw, E1000_MGTPRC);
-	temp = E1000_READ_REG(hw, E1000_MGTPDC);
-	temp = E1000_READ_REG(hw, E1000_MGTPTC);
+	(void) E1000_READ_REG(hw, E1000_MGTPRC);
+	(void) E1000_READ_REG(hw, E1000_MGTPDC);
+	(void) E1000_READ_REG(hw, E1000_MGTPTC);
 }

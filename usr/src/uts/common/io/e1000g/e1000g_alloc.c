@@ -23,8 +23,6 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * **********************************************************************
  * Module Name:								*
@@ -631,7 +629,7 @@ static void
 e1000g_free_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 {
 	if (rx_ring->rbd_dma_handle != NULL) {
-		ddi_dma_unbind_handle(rx_ring->rbd_dma_handle);
+		(void) ddi_dma_unbind_handle(rx_ring->rbd_dma_handle);
 	}
 	if (rx_ring->rbd_acc_handle != NULL) {
 		ddi_dma_mem_free(&rx_ring->rbd_acc_handle);
@@ -651,7 +649,7 @@ static void
 e1000g_free_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 {
 	if (tx_ring->tbd_dma_handle != NULL) {
-		ddi_dma_unbind_handle(tx_ring->tbd_dma_handle);
+		(void) ddi_dma_unbind_handle(tx_ring->tbd_dma_handle);
 	}
 	if (tx_ring->tbd_acc_handle != NULL) {
 		ddi_dma_mem_free(&tx_ring->tbd_acc_handle);
@@ -895,7 +893,7 @@ e1000g_alloc_dma_buffer(struct e1000g *Adapter,
 	ASSERT(count == 1);
 	if (count != 1) {
 		if (buf->dma_handle != NULL) {
-			ddi_dma_unbind_handle(buf->dma_handle);
+			(void) ddi_dma_unbind_handle(buf->dma_handle);
 		}
 		if (buf->acc_handle != NULL) {
 			ddi_dma_mem_free(&buf->acc_handle);
@@ -923,7 +921,7 @@ static void
 e1000g_free_dma_buffer(dma_buffer_t *buf)
 {
 	if (buf->dma_handle != NULL) {
-		ddi_dma_unbind_handle(buf->dma_handle);
+		(void) ddi_dma_unbind_handle(buf->dma_handle);
 	} else {
 		return;
 	}
@@ -1326,6 +1324,7 @@ e1000g_release_dma_resources(struct e1000g *Adapter)
 	e1000g_free_packets(Adapter);
 }
 
+/* ARGSUSED */
 void
 e1000g_set_fma_flags(struct e1000g *Adapter, int acc_flag, int dma_flag)
 {

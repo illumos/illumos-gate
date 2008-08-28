@@ -23,8 +23,6 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * **********************************************************************
  *									*
@@ -58,11 +56,9 @@ static void e1000g_priv_devi_list_clean();
 void
 e1000g_rxfree_func(p_rx_sw_packet_t packet)
 {
-	struct e1000g *Adapter;
 	e1000g_rx_ring_t *rx_ring;
 
-	rx_ring = (e1000g_rx_ring_t *)packet->rx_ring;
-	Adapter = rx_ring->adapter;
+	rx_ring = (e1000g_rx_ring_t *)(uintptr_t)packet->rx_ring;
 
 	/*
 	 * Here the rx recycling processes different rx packets in different
@@ -386,10 +382,7 @@ e1000g_rx_setup(struct e1000g *Adapter)
 static p_rx_sw_packet_t
 e1000g_get_buf(e1000g_rx_ring_t *rx_ring)
 {
-	struct e1000g *Adapter;
 	p_rx_sw_packet_t packet;
-
-	Adapter = rx_ring->adapter;
 
 	mutex_enter(&rx_ring->freelist_lock);
 	packet = (p_rx_sw_packet_t)

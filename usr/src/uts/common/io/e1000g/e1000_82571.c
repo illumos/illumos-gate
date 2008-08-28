@@ -23,8 +23,6 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IntelVersion: 1.75 v2008-02-29
  */
@@ -623,7 +621,7 @@ e1000_validate_nvm_checksum_82571(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_validate_nvm_checksum_82571");
 
 	if (hw->nvm.type == e1000_nvm_flash_hw)
-		e1000_fix_nvm_checksum_82571(hw);
+		(void) e1000_fix_nvm_checksum_82571(hw);
 
 	return (e1000_validate_nvm_checksum_generic(hw));
 }
@@ -808,7 +806,7 @@ out:
 static s32
 e1000_reset_hw_82571(struct e1000_hw *hw)
 {
-	u32 ctrl, extcnf_ctrl, ctrl_ext, icr;
+	u32 ctrl, extcnf_ctrl, ctrl_ext;
 	s32 ret_val;
 	u16 i = 0;
 
@@ -882,7 +880,7 @@ e1000_reset_hw_82571(struct e1000_hw *hw)
 
 	/* Clear any pending interrupt events. */
 	E1000_WRITE_REG(hw, E1000_IMC, 0xffffffff);
-	icr = E1000_READ_REG(hw, E1000_ICR);
+	(void) E1000_READ_REG(hw, E1000_ICR);
 
 	if (!(e1000_check_alt_mac_addr_generic(hw)))
 		e1000_set_laa_state_82571(hw, TRUE);
@@ -953,7 +951,7 @@ e1000_init_hw_82571(struct e1000_hw *hw)
 		    E1000_TXDCTL_COUNT_DESC;
 		E1000_WRITE_REG(hw, E1000_TXDCTL(1), reg_data);
 	} else {
-		e1000_enable_tx_pkt_filtering(hw);
+		(void) e1000_enable_tx_pkt_filtering(hw);
 		reg_data = E1000_READ_REG(hw, E1000_GCR);
 		reg_data |= E1000_GCR_L1_ACT_WITHOUT_L0S_RX;
 		E1000_WRITE_REG(hw, E1000_GCR, reg_data);
@@ -1412,43 +1410,41 @@ e1000_power_down_phy_copper_82571(struct e1000_hw *hw)
 static void
 e1000_clear_hw_cntrs_82571(struct e1000_hw *hw)
 {
-	volatile u32 temp;
-
 	DEBUGFUNC("e1000_clear_hw_cntrs_82571");
 
 	e1000_clear_hw_cntrs_base_generic(hw);
-	temp = E1000_READ_REG(hw, E1000_PRC64);
-	temp = E1000_READ_REG(hw, E1000_PRC127);
-	temp = E1000_READ_REG(hw, E1000_PRC255);
-	temp = E1000_READ_REG(hw, E1000_PRC511);
-	temp = E1000_READ_REG(hw, E1000_PRC1023);
-	temp = E1000_READ_REG(hw, E1000_PRC1522);
-	temp = E1000_READ_REG(hw, E1000_PTC64);
-	temp = E1000_READ_REG(hw, E1000_PTC127);
-	temp = E1000_READ_REG(hw, E1000_PTC255);
-	temp = E1000_READ_REG(hw, E1000_PTC511);
-	temp = E1000_READ_REG(hw, E1000_PTC1023);
-	temp = E1000_READ_REG(hw, E1000_PTC1522);
+	(void) E1000_READ_REG(hw, E1000_PRC64);
+	(void) E1000_READ_REG(hw, E1000_PRC127);
+	(void) E1000_READ_REG(hw, E1000_PRC255);
+	(void) E1000_READ_REG(hw, E1000_PRC511);
+	(void) E1000_READ_REG(hw, E1000_PRC1023);
+	(void) E1000_READ_REG(hw, E1000_PRC1522);
+	(void) E1000_READ_REG(hw, E1000_PTC64);
+	(void) E1000_READ_REG(hw, E1000_PTC127);
+	(void) E1000_READ_REG(hw, E1000_PTC255);
+	(void) E1000_READ_REG(hw, E1000_PTC511);
+	(void) E1000_READ_REG(hw, E1000_PTC1023);
+	(void) E1000_READ_REG(hw, E1000_PTC1522);
 
-	temp = E1000_READ_REG(hw, E1000_ALGNERRC);
-	temp = E1000_READ_REG(hw, E1000_RXERRC);
-	temp = E1000_READ_REG(hw, E1000_TNCRS);
-	temp = E1000_READ_REG(hw, E1000_CEXTERR);
-	temp = E1000_READ_REG(hw, E1000_TSCTC);
-	temp = E1000_READ_REG(hw, E1000_TSCTFC);
+	(void) E1000_READ_REG(hw, E1000_ALGNERRC);
+	(void) E1000_READ_REG(hw, E1000_RXERRC);
+	(void) E1000_READ_REG(hw, E1000_TNCRS);
+	(void) E1000_READ_REG(hw, E1000_CEXTERR);
+	(void) E1000_READ_REG(hw, E1000_TSCTC);
+	(void) E1000_READ_REG(hw, E1000_TSCTFC);
 
-	temp = E1000_READ_REG(hw, E1000_MGTPRC);
-	temp = E1000_READ_REG(hw, E1000_MGTPDC);
-	temp = E1000_READ_REG(hw, E1000_MGTPTC);
+	(void) E1000_READ_REG(hw, E1000_MGTPRC);
+	(void) E1000_READ_REG(hw, E1000_MGTPDC);
+	(void) E1000_READ_REG(hw, E1000_MGTPTC);
 
-	temp = E1000_READ_REG(hw, E1000_IAC);
-	temp = E1000_READ_REG(hw, E1000_ICRXOC);
+	(void) E1000_READ_REG(hw, E1000_IAC);
+	(void) E1000_READ_REG(hw, E1000_ICRXOC);
 
-	temp = E1000_READ_REG(hw, E1000_ICRXPTC);
-	temp = E1000_READ_REG(hw, E1000_ICRXATC);
-	temp = E1000_READ_REG(hw, E1000_ICTXPTC);
-	temp = E1000_READ_REG(hw, E1000_ICTXATC);
-	temp = E1000_READ_REG(hw, E1000_ICTXQEC);
-	temp = E1000_READ_REG(hw, E1000_ICTXQMTC);
-	temp = E1000_READ_REG(hw, E1000_ICRXDMTC);
+	(void) E1000_READ_REG(hw, E1000_ICRXPTC);
+	(void) E1000_READ_REG(hw, E1000_ICRXATC);
+	(void) E1000_READ_REG(hw, E1000_ICTXPTC);
+	(void) E1000_READ_REG(hw, E1000_ICTXATC);
+	(void) E1000_READ_REG(hw, E1000_ICTXQEC);
+	(void) E1000_READ_REG(hw, E1000_ICTXQMTC);
+	(void) E1000_READ_REG(hw, E1000_ICRXDMTC);
 }

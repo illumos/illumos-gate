@@ -23,8 +23,6 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IntelVersion: 1.21 v2008-02-29
  */
@@ -259,7 +257,7 @@ e1000_mng_write_cmd_header_generic(struct e1000_hw *hw,
 	/* Write the relevant command block into the ram area. */
 	for (i = 0; i < length; i++) {
 		E1000_WRITE_REG_ARRAY_DWORD(hw, E1000_HOST_IF, i,
-		    *((u32 *) hdr + i));
+		    *((u32 *)(uintptr_t)hdr + i));
 		E1000_WRITE_FLUSH(hw);
 	}
 

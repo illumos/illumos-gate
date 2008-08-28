@@ -29,8 +29,6 @@
 #ifndef _E1000_DEFINES_H_
 #define	_E1000_DEFINES_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1462,13 +1460,6 @@ extern "C" {
 #define	E1000_GEN_CTL_READY	0x80000000
 #define	E1000_GEN_CTL_ADDRESS_SHIFT	8
 #define	E1000_GEN_POLL_TIMEOUT		640
-
-#define	UNREFERENCED_1PARAMETER(_p)	(_p)
-#define	UNREFERENCED_2PARAMETER(_p, _q)	(_p); (_q);
-#define	UNREFERENCED_3PARAMETER(_p, _q, _r)	(_p); (_q); (_r);
-#define	UNREFERENCED_4PARAMETER(_p, _q, _r, _s)	(_p); (_q); (_r); (_s);
-#define	UNREFERENCED_5PARAMETER(_p, _q, _r, _s, _t)	\
-	(_p); (_q); (_r); (_s); (_t);
 
 #ifdef __cplusplus
 }

@@ -23,8 +23,6 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IntelVersion: 1.38 v2008-02-29
  */
@@ -211,7 +209,7 @@ e1000_reset_hw_82542(struct e1000_hw *hw)
 {
 	struct e1000_bus_info *bus = &hw->bus;
 	s32 ret_val = E1000_SUCCESS;
-	u32 ctrl, icr;
+	u32 ctrl;
 
 	DEBUGFUNC("e1000_reset_hw_82542");
 
@@ -242,7 +240,7 @@ e1000_reset_hw_82542(struct e1000_hw *hw)
 	msec_delay(2);
 
 	E1000_WRITE_REG(hw, E1000_IMC, 0xffffffff);
-	icr = E1000_READ_REG(hw, E1000_ICR);
+	(void) E1000_READ_REG(hw, E1000_ICR);
 
 	if (hw->revision_id == E1000_REVISION_2) {
 		if (bus->pci_cmd_word & CMD_MEM_WRT_INVALIDATE)
@@ -536,22 +534,20 @@ e1000_translate_register_82542(u32 reg)
 static void
 e1000_clear_hw_cntrs_82542(struct e1000_hw *hw)
 {
-	volatile u32 temp;
-
 	DEBUGFUNC("e1000_clear_hw_cntrs_82542");
 
 	e1000_clear_hw_cntrs_base_generic(hw);
 
-	temp = E1000_READ_REG(hw, E1000_PRC64);
-	temp = E1000_READ_REG(hw, E1000_PRC127);
-	temp = E1000_READ_REG(hw, E1000_PRC255);
-	temp = E1000_READ_REG(hw, E1000_PRC511);
-	temp = E1000_READ_REG(hw, E1000_PRC1023);
-	temp = E1000_READ_REG(hw, E1000_PRC1522);
-	temp = E1000_READ_REG(hw, E1000_PTC64);
-	temp = E1000_READ_REG(hw, E1000_PTC127);
-	temp = E1000_READ_REG(hw, E1000_PTC255);
-	temp = E1000_READ_REG(hw, E1000_PTC511);
-	temp = E1000_READ_REG(hw, E1000_PTC1023);
-	temp = E1000_READ_REG(hw, E1000_PTC1522);
+	(void) E1000_READ_REG(hw, E1000_PRC64);
+	(void) E1000_READ_REG(hw, E1000_PRC127);
+	(void) E1000_READ_REG(hw, E1000_PRC255);
+	(void) E1000_READ_REG(hw, E1000_PRC511);
+	(void) E1000_READ_REG(hw, E1000_PRC1023);
+	(void) E1000_READ_REG(hw, E1000_PRC1522);
+	(void) E1000_READ_REG(hw, E1000_PTC64);
+	(void) E1000_READ_REG(hw, E1000_PTC127);
+	(void) E1000_READ_REG(hw, E1000_PTC255);
+	(void) E1000_READ_REG(hw, E1000_PTC511);
+	(void) E1000_READ_REG(hw, E1000_PTC1023);
+	(void) E1000_READ_REG(hw, E1000_PTC1522);
 }

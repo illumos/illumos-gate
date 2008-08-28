@@ -23,8 +23,6 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * **********************************************************************
  *									*
@@ -260,7 +258,7 @@ uint32_t
 e1000_read_reg(struct e1000_hw *hw, uint32_t offset)
 {
 	return (ddi_get32(((struct e1000g_osdep *)(hw)->back)->reg_handle,
-	    (uint32_t *)((hw)->hw_addr + offset)));
+	    (uint32_t *)((uintptr_t)(hw)->hw_addr + offset)));
 }
 
 
@@ -558,21 +556,21 @@ pciconfig_bar(void *instance, uint32_t offset, char *name)
 		if (base & PCI_BASE_SPACE_IO) {
 			bits_comm = PCI_COMM_IO;
 			size_mask = PCI_BASE_IO_ADDR_M;
-			strcpy(tag_type, "i/o port size:");
-			strcpy(tag_mem, "");
+			(void) strcpy(tag_type, "i/o port size:");
+			(void) strcpy(tag_mem, "");
 		/* memory factors that decode from the base address */
 		} else {
 			bits_comm = PCI_COMM_MAE;
 			size_mask = PCI_BASE_M_ADDR_M;
-			strcpy(tag_type, "memory size:");
+			(void) strcpy(tag_type, "memory size:");
 			if (base & PCI_BASE_TYPE_ALL)
-				strcpy(tag_mem, "64bit ");
+				(void) strcpy(tag_mem, "64bit ");
 			else
-				strcpy(tag_mem, "32bit ");
+				(void) strcpy(tag_mem, "32bit ");
 			if (base & PCI_BASE_PREF_M)
-				strcat(tag_mem, "prefetchable");
+				(void) strcat(tag_mem, "prefetchable");
 			else
-				strcat(tag_mem, "non-prefetchable");
+				(void) strcat(tag_mem, "non-prefetchable");
 		}
 
 		/* disable memory decode */

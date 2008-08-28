@@ -23,8 +23,6 @@
  * Use is subject to license terms of the CDDLv1.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IntelVersion: 1.79 v2008-02-29
  */
@@ -1230,7 +1228,7 @@ e1000_power_up_phy(struct e1000_hw *hw)
 	if (hw->phy.ops.power_up)
 		hw->phy.ops.power_up(hw);
 
-	e1000_setup_link(hw);
+	(void) e1000_setup_link(hw);
 }
 
 /*
