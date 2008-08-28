@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/varargs.h>
@@ -38,6 +37,7 @@
 #include <libintl.h>
 
 #include <passwdutil.h>
+#include <shadow.h>
 
 #define	SUNW_OLDRPCPASS "SUNW-OLD-RPC-PASSWORD"
 
@@ -99,7 +99,7 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	pwu_repository_t *pwu_rep;
 	char *user;
 	char *oldpw;
-	char *oldrpcpw = "*NP*";
+	char *oldrpcpw = NOPWDRTR;
 	char *newpw;
 	char *service;
 	struct pam_repository *auth_rep;

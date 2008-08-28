@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <pwd.h>
@@ -275,7 +274,7 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	/*
 	 * "rep_passwd" holds the encrypted password.
-	 * If, however, we detect that the password equals "*NP*",
+	 * If, however, we detect that the password equals NOPWDRTR,
 	 * while we've obtained it from NIS+, it
 	 * means that the permissions on the NIS+ table are too tight
 	 * for us to get the password without having Secure RPC
@@ -285,7 +284,7 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	 * and inform the administrator of this error.
 	 */
 	if (strcmp(repository_name, "nisplus") == 0 &&
-	    strcmp(rep_passwd, "*NP*") == 0) {
+	    strcmp(rep_passwd, NOPWDRTR) == 0) {
 		syslog(LOG_ERR, "pam_unix_auth: NIS+ permissions require that"
 		    "the pam_dhkeys module is on the PAM stack before "
 		    "pam_unix_auth");

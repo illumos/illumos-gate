@@ -30,7 +30,6 @@
  *  ("shadow") of the same table that stores vanilla passwd information.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <shadow.h>
@@ -205,7 +204,7 @@ nis_object2str(nobj, obj, be, argp)
 	 *   _nss_nisplus_getent(), but that's OK -- when we're doing
 	 *   enumerations we don't care what's in the argp->key union.
 	 */
-	if (strncmp(passwd, "*NP*", passwdlen) == 0) {
+	if (strncmp(passwd, NOPWDRTR, passwdlen) == 0) {
 		be->flag = 1;
 		argp->key.uid = uid;
 	}

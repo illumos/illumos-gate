@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <syslog.h>
@@ -63,6 +62,7 @@
 #include <passwdutil.h>
 
 #include "key_call_uid.h"
+#include <shadow.h>
 
 /* to keep track of codepath */
 #define	CODEPATH_PAM_SM_AUTHENTICATE	0
@@ -330,7 +330,7 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 	}
 
 	need_cred = (strcmp(repository_name, "nisplus") == 0 &&
-	    strcmp(repository_pass, "*NP*") == 0);
+	    strcmp(repository_pass, NOPWDRTR) == 0);
 	if (auth_path) {
 		auth_cred_flags =
 		    (need_cred ? flags : flags | PAM_SILENT);

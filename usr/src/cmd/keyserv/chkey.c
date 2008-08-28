@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
 #include <stdio.h>
@@ -1553,7 +1552,7 @@ main(int argc, char **argv)
 	/* Set eUID back to user */
 	(void) seteuid(uid);
 
-	if (strcmp(spw->sp_pwdp, "*NP*") == 0) {
+	if (strcmp(spw->sp_pwdp, NOPWDRTR) == 0) {
 		(void) fprintf(stderr,
 		"%s: do not have read access to the passwd field for %s\n",
 				program_name, pw->pw_name);

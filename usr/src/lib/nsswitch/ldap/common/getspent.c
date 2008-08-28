@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <shadow.h>
 #include <stdlib.h>
@@ -63,7 +62,6 @@ _nss_ldap_shadow2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 	unsigned long	len = 0L;
 	char		*tmp, *buffer = NULL;
 	char		*pw_passwd = NULL;
-	char		np[] = "*NP*";
 	ns_ldap_result_t	*result = be->result;
 	char		**uid, **passwd, **flag, *flag_str;
 
@@ -87,7 +85,7 @@ _nss_ldap_shadow2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 		 * ACL does not allow userpassword to return or
 		 * userpassword is not defined
 		 */
-		pw_passwd = np;
+		pw_passwd = NOPWDRTR;
 	} else if (strcmp(passwd[0], "") == 0) {
 		/*
 		 * An empty password is not supported
@@ -98,12 +96,12 @@ _nss_ldap_shadow2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 		if ((tmp = strstr(passwd[0], "{crypt}")) != NULL ||
 			(tmp = strstr(passwd[0], "{CRYPT}")) != NULL) {
 			if (tmp != passwd[0])
-				pw_passwd = np;
+				pw_passwd = NOPWDRTR;
 			else
 				pw_passwd = tmp + strlen("{crypt}");
 		} else {
-		/* Replace it with *NP* */
-			pw_passwd = np;
+		/* mark password as not retrievable */
+			pw_passwd = NOPWDRTR;
 		}
 	}
 	len += strlen(pw_passwd);

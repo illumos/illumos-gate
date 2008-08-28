@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <nsswitch.h>
@@ -901,10 +900,10 @@ nisplus_getsp_from_master(const char *name, char *domain)
 	SAFE_STRDUP(shadow, 7);
 
 	/*
-	 * If we got "*NP*" as password, try again with EUID set to
-	 * the UID of the record-owner.
+	 * If we got NOPWDRTR as password, try again with EUID set
+	 * to the UID of the record-owner.
 	 */
-	if (strncmp(shadow, "*NP*", 4) == 0) {
+	if (strncmp(shadow, NOPWDRTR, 4) == 0) {
 		char *p;
 		uid_t owner_uid;
 		uid_t euid = geteuid();
