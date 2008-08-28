@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Definitions common to command source.
 #
 # include global definitions; SRC should be defined in the shell.
@@ -55,6 +53,7 @@ ROOTBIN=		$(ROOT)/usr/bin
 ROOTLIB=		$(ROOT)/usr/lib
 ROOTLIBSVCBIN=		$(ROOT)/lib/svc/bin
 ROOTLIBSVCMETHOD=	$(ROOT)/lib/svc/method
+ROOTLIBXEN=		$(ROOT)/usr/lib/xen/bin
 ROOTLIBZONES=		$(ROOT)/lib/zones
 
 ROOTSHLIB=	$(ROOT)/usr/share/lib
@@ -342,6 +341,9 @@ $(ROOTETCZONES)/%: %
 	$(INS.file)
 
 $(ROOTLIBZONES)/%: %
+	$(INS.file)
+
+$(ROOTLIBXEN)/%: %
 	$(INS.file)
 
 $(ROOTUSRKVM)/%: %

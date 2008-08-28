@@ -1,8 +1,6 @@
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright (c) 1989-2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 NATIVE=native
@@ -66,16 +64,6 @@ install: all $(DIRS) $(ROOTTZSRCD) $(ROOTTZTABD) $(ROOTUSRSBINPROG) $(ROOTLIBTZS
 
 $(NPROG): $(NATIVE) $(NOBJS)
 	$(NATIVECC) -o $@ $(NOBJS)
-
-#
-# XXX
-# There should be a .ksh rule in default.mk.  Until there is, we
-# do it by hand.
-#
-$(KSHPROG):	$(KSHPROG).ksh
-	$(RM) $@
-	$(CAT) $(KSHPROG).ksh > $@
-	$(CHMOD) +x $@
 
 $(ROOTTZSRCD)/%: %
 	$(INS.file)

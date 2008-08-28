@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # The list is built of owner-group combinations.  ROOT.SYS occurs twice
@@ -202,7 +200,9 @@ XROOT.BIN= \
 i386_ROOT.BIN= \
 	/usr/lib/brand/lx \
 	/usr/lib/brand/lx/amd64 \
-	/usr/lib/brand/lx/distros
+	/usr/lib/brand/lx/distros \
+	/usr/lib/xen \
+	/usr/lib/xen/bin
 
 sparc_ROOT.BIN= \
 	/usr/lib/ldoms

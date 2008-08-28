@@ -150,6 +150,7 @@ i386_SUBDIRS= \
 	SUNWvia823x \
 	SUNWwpi \
 	SUNWxsvc \
+	SUNWxvmipa \
 	SUNWxvmpv
 
 i386_XMODS= \

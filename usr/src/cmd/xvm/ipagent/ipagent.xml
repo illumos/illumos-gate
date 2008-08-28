@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+    NOTE:  This service manifest is not editable; its contents will
+    be overwritten by package or patch operations, including
+    operating system upgrade.  Make customizations in a different
+    file.
+-->
+
+<service_bundle type='manifest' name='SUNWxvmdom:ipagent'>
+
+<service
+        name='system/xvm/ipagent' type='service' version='1'>
+	<create_default_instance enabled='false'/>
+        <single_instance />
+
+        <exec_method
+                type='method'
+                name='start'
+                exec='/lib/svc/method/svc-ipagent %m %{config/report_interval}'
+                timeout_seconds='60'>
+                <method_context>
+                        <method_credential user='root' />
+                </method_context>
+        </exec_method>
+
+        <exec_method
+                type='method'
+                name='stop'
+                exec=':kill'
+                timeout_seconds='60' />
+
+        <property_group name='config' type='application'>
+		<stability value='Unstable' />
+                <propval name='report_interval' type='integer' value='60' />
+        </property_group>
+
+        <stability value='Unstable' />
+
+        <template>
+                <common_name>
+                        <loctext xml:lang='C'>
+                        xVM PV domU IP address reporting agent
+                        </loctext>
+                </common_name>
+                <documentation>
+                        <manpage title='xVM' section='5'
+                             manpath='/usr/share/man' />
+                </documentation>
+        </template>
+</service>
+
+</service_bundle>
