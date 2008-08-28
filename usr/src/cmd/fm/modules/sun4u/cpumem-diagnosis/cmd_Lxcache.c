@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Support routines for managing per-Lxcache state.
  */
@@ -342,6 +340,8 @@ cmd_Lxcache_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 	fmd_hdl_debug(hdl, "found %d in version field\n",
 	    Lxcache->Lxcache_version);
 	cpu = cmd_restore_cpu_only(hdl, cp, Lxcache->Lxcache_cpu_bufname);
+	if (cpu == NULL)
+		return (NULL);
 	recovered_Lxcache = Lxcache;	/* save the recovered Lxcache */
 
 	for (Lxcache = cmd_list_next(&cpu->cpu_Lxcaches); Lxcache != NULL;

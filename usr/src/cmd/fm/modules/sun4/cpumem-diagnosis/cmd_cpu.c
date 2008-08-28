@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Support routines for managing per-CPU state.
  */
@@ -1939,9 +1937,18 @@ cmd_restore_cpu_only(fmd_hdl_t *hdl, fmd_case_t *cp, char *cpu_hdr_bufname)
 		fmd_hdl_debug(hdl, "restoring cpu from %s\n", cpu_hdr_bufname);
 
 		if ((cpusz = fmd_buf_size(hdl, NULL, cpu_hdr_bufname)) == 0) {
-			fmd_hdl_abort(hdl, "cpu referenced by case %s does "
-			    "not exist in saved state\n",
-			    fmd_case_uuid(hdl, cp));
+			if (fmd_case_solved(hdl, cp) ||
+			    fmd_case_closed(hdl, cp)) {
+				fmd_hdl_debug(hdl, "cpu buffer %s from case %s "
+				    "not found. Case is already solved or "
+				    "closed\n",
+				    cpu_hdr_bufname, fmd_case_uuid(hdl, cp));
+				return (NULL);
+			} else {
+				fmd_hdl_abort(hdl, "cpu referenced by case %s "
+				    "does not exist in saved state\n",
+				    fmd_case_uuid(hdl, cp));
+			}
 		} else if (cpusz > CMD_CPU_MAXSIZE || cpusz < CMD_CPU_MINSIZE) {
 			fmd_hdl_abort(hdl, "cpu buffer referenced by case %s "
 			    "is out of bounds (is %u bytes)\n",
@@ -2011,6 +2018,9 @@ cmd_cpu_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 	cmd_cpu_t *cpu;
 
 	cpu = cmd_restore_cpu_only(hdl, cp, ptr->ptr_name);
+	if (cpu == NULL)
+		return (NULL);
+
 	switch (ptr->ptr_subtype) {
 	case CMD_PTR_CPU_ICACHE:
 		cpu_case_restore(hdl, cpu, &cpu->cpu_icache, cp, "icache");
