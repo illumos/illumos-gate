@@ -534,7 +534,7 @@ des3_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
 		uint64_t tmp;
 
 #ifdef UNALIGNED_POINTERS_PERMITTED
-		tmp = htonll(*(uint64_t *)&block[0]);
+		tmp = htonll(*(uint64_t *)(void *)&block[0]);
 #else
 		tmp = (((uint64_t)block[0] << 56) | ((uint64_t)block[1] << 48) |
 		    ((uint64_t)block[2] << 40) | ((uint64_t)block[3] << 32) |
@@ -548,7 +548,7 @@ des3_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
 			tmp = des_crypt_impl(ksch->ksch_encrypt, tmp, 3);
 
 #ifdef UNALIGNED_POINTERS_PERMITTED
-		*(uint64_t *)&out_block[0] = htonll(tmp);
+		*(uint64_t *)(void *)&out_block[0] = htonll(tmp);
 #else
 		out_block[0] = tmp >> 56;
 		out_block[1] = tmp >> 48;
@@ -596,7 +596,7 @@ des_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
 		uint64_t tmp;
 
 #ifdef UNALIGNED_POINTERS_PERMITTED
-		tmp = htonll(*(uint64_t *)&block[0]);
+		tmp = htonll(*(uint64_t *)(void *)&block[0]);
 #else
 		tmp = (((uint64_t)block[0] << 56) | ((uint64_t)block[1] << 48) |
 		    ((uint64_t)block[2] << 40) | ((uint64_t)block[3] << 32) |
@@ -611,7 +611,7 @@ des_crunch_block(const void *cookie, const uint8_t block[DES_BLOCK_LEN],
 			tmp = des_crypt_impl(ksch->ksch_encrypt, tmp, 1);
 
 #ifdef UNALIGNED_POINTERS_PERMITTED
-		*(uint64_t *)&out_block[0] = htonll(tmp);
+		*(uint64_t *)(void *)&out_block[0] = htonll(tmp);
 #else
 		out_block[0] = tmp >> 56;
 		out_block[1] = tmp >> 48;
@@ -673,7 +673,7 @@ keycheck(uint8_t *key, uint8_t *corrected_key)
 		return (B_FALSE);
 
 #ifdef UNALIGNED_POINTERS_PERMITTED
-	key_so_far = htonll(*(uint64_t *)&key[0]);
+	key_so_far = htonll(*(uint64_t *)(void *)&key[0]);
 #else
 	/*
 	 * The code below reverses the bytes on LITTLE_ENDIAN machines.
@@ -699,7 +699,7 @@ keycheck(uint8_t *key, uint8_t *corrected_key)
 
 	if (corrected_key != NULL) {
 #ifdef UNALIGNED_POINTERS_PERMITTED
-		*(uint64_t *)&corrected_key[0] = htonll(key_so_far);
+		*(uint64_t *)(void *)&corrected_key[0] = htonll(key_so_far);
 #else
 		/*
 		 * The code below reverses the bytes on LITTLE_ENDIAN machines.
@@ -808,7 +808,7 @@ des_parity_fix(uint8_t *key, des_strength_t strength, uint8_t *corrected_key)
 	while (strength > i) {
 		offset = 8 * i;
 #ifdef UNALIGNED_POINTERS_PERMITTED
-		key_so_far = htonll(*(uint64_t *)&paritied_key[offset]);
+		key_so_far = htonll(*(uint64_t *)(void *)&paritied_key[offset]);
 #else
 		key_so_far = (((uint64_t)paritied_key[offset + 0] << 56) |
 		    ((uint64_t)paritied_key[offset + 1] << 48) |
@@ -823,7 +823,7 @@ des_parity_fix(uint8_t *key, des_strength_t strength, uint8_t *corrected_key)
 		fix_des_parity(&key_so_far);
 
 #ifdef UNALIGNED_POINTERS_PERMITTED
-		*(uint64_t *)&paritied_key[offset] = htonll(key_so_far);
+		*(uint64_t *)(void *)&paritied_key[offset] = htonll(key_so_far);
 #else
 		paritied_key[offset + 0] = key_so_far >> 56;
 		paritied_key[offset + 1] = key_so_far >> 48;
@@ -890,7 +890,8 @@ des_init_keysched(uint8_t *cipherKey, des_strength_t strength, void *ks)
 	{
 		for (i = 0, j = 0; j < keysize; i++, j += 8) {
 #ifdef UNALIGNED_POINTERS_PERMITTED
-			key_uint64[i] = htonll(*(uint64_t *)&cipherKey[j]);
+			key_uint64[i] =
+			    htonll(*(uint64_t *)(void *)&cipherKey[j]);
 #else
 			key_uint64[i] = (((uint64_t)cipherKey[j] << 56) |
 			    ((uint64_t)cipherKey[j + 1] << 48) |

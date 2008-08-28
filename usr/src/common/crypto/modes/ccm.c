@@ -376,9 +376,6 @@ ccm_mode_decrypt_contiguous_blocks(ccm_ctx_t *ctx, char *data, size_t length,
 	uint64_t counter;
 	size_t pt_len, total_decrypted_len, mac_len, pm_len, pd_len;
 	uint8_t *resultp;
-#ifdef _LITTLE_ENDIAN
-	uint8_t *p;
-#endif	/* _LITTLE_ENDIAN */
 
 
 	pm_len = ctx->ccm_processed_mac_len;

@@ -630,22 +630,22 @@ SHA1Transform(SHA1_CTX *ctx, const uint8_t blk[64])
 	sha1word	w_8, w_9, w_10, w_11, w_12, w_13, w_14, w_15;
 #endif	/* !defined(W_ARRAY) */
 
-	W(0)  = LOAD_BIG_32(blk +  0);
-	W(1)  = LOAD_BIG_32(blk +  4);
-	W(2)  = LOAD_BIG_32(blk +  8);
-	W(3)  = LOAD_BIG_32(blk + 12);
-	W(4)  = LOAD_BIG_32(blk + 16);
-	W(5)  = LOAD_BIG_32(blk + 20);
-	W(6)  = LOAD_BIG_32(blk + 24);
-	W(7)  = LOAD_BIG_32(blk + 28);
-	W(8)  = LOAD_BIG_32(blk + 32);
-	W(9)  = LOAD_BIG_32(blk + 36);
-	W(10) = LOAD_BIG_32(blk + 40);
-	W(11) = LOAD_BIG_32(blk + 44);
-	W(12) = LOAD_BIG_32(blk + 48);
-	W(13) = LOAD_BIG_32(blk + 52);
-	W(14) = LOAD_BIG_32(blk + 56);
-	W(15) = LOAD_BIG_32(blk + 60);
+	W(0)  = LOAD_BIG_32((void *)(blk +  0));
+	W(1)  = LOAD_BIG_32((void *)(blk +  4));
+	W(2)  = LOAD_BIG_32((void *)(blk +  8));
+	W(3)  = LOAD_BIG_32((void *)(blk + 12));
+	W(4)  = LOAD_BIG_32((void *)(blk + 16));
+	W(5)  = LOAD_BIG_32((void *)(blk + 20));
+	W(6)  = LOAD_BIG_32((void *)(blk + 24));
+	W(7)  = LOAD_BIG_32((void *)(blk + 28));
+	W(8)  = LOAD_BIG_32((void *)(blk + 32));
+	W(9)  = LOAD_BIG_32((void *)(blk + 36));
+	W(10) = LOAD_BIG_32((void *)(blk + 40));
+	W(11) = LOAD_BIG_32((void *)(blk + 44));
+	W(12) = LOAD_BIG_32((void *)(blk + 48));
+	W(13) = LOAD_BIG_32((void *)(blk + 52));
+	W(14) = LOAD_BIG_32((void *)(blk + 56));
+	W(15) = LOAD_BIG_32((void *)(blk + 60));
 
 #endif	/* !defined(__sparc) */
 

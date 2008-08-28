@@ -1488,7 +1488,7 @@ aes_init_keysched(const uint8_t *cipherKey, uint_t keyBits, void *keysched)
 
 #else	/* byte swap */
 	for (i = 0, j = 0; j < keysize; i++, j += 4) {
-		keyarr.ka32[i] = htonl(*(uint32_t *)&cipherKey[j]);
+		keyarr.ka32[i] = htonl(*(uint32_t *)(void *)&cipherKey[j]);
 	}
 #endif
 
@@ -1525,10 +1525,10 @@ aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct)
 		bcopy(pt, &buffer, AES_BLOCK_LEN);
 
 #else	/* byte swap */
-		buffer[0] = htonl(*(uint32_t *)&pt[0]);
-		buffer[1] = htonl(*(uint32_t *)&pt[4]);
-		buffer[2] = htonl(*(uint32_t *)&pt[8]);
-		buffer[3] = htonl(*(uint32_t *)&pt[12]);
+		buffer[0] = htonl(*(uint32_t *)(void *)&pt[0]);
+		buffer[1] = htonl(*(uint32_t *)(void *)&pt[4]);
+		buffer[2] = htonl(*(uint32_t *)(void *)&pt[8]);
+		buffer[3] = htonl(*(uint32_t *)(void *)&pt[12]);
 #endif
 
 		AES_ENCRYPT_IMPL(&ksch->encr_ks.ks32[0], ksch->nr,
@@ -1540,10 +1540,10 @@ aes_encrypt_block(const void *ks, const uint8_t *pt, uint8_t *ct)
 	}
 
 #else	/* byte swap */
-		*(uint32_t *)&ct[0] = htonl(buffer[0]);
-		*(uint32_t *)&ct[4] = htonl(buffer[1]);
-		*(uint32_t *)&ct[8] = htonl(buffer[2]);
-		*(uint32_t *)&ct[12] = htonl(buffer[3]);
+		*(uint32_t *)(void *)&ct[0] = htonl(buffer[0]);
+		*(uint32_t *)(void *)&ct[4] = htonl(buffer[1]);
+		*(uint32_t *)(void *)&ct[8] = htonl(buffer[2]);
+		*(uint32_t *)(void *)&ct[12] = htonl(buffer[3]);
 #endif
 /* EXPORT DELETE END */
 	return (CRYPTO_SUCCESS);
@@ -1578,10 +1578,10 @@ aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt)
 		bcopy(ct, &buffer, AES_BLOCK_LEN);
 
 #else	/* byte swap */
-		buffer[0] = htonl(*(uint32_t *)&ct[0]);
-		buffer[1] = htonl(*(uint32_t *)&ct[4]);
-		buffer[2] = htonl(*(uint32_t *)&ct[8]);
-		buffer[3] = htonl(*(uint32_t *)&ct[12]);
+		buffer[0] = htonl(*(uint32_t *)(void *)&ct[0]);
+		buffer[1] = htonl(*(uint32_t *)(void *)&ct[4]);
+		buffer[2] = htonl(*(uint32_t *)(void *)&ct[8]);
+		buffer[3] = htonl(*(uint32_t *)(void *)&ct[12]);
 #endif
 
 		AES_DECRYPT_IMPL(&ksch->decr_ks.ks32[0], ksch->nr,
@@ -1593,10 +1593,10 @@ aes_decrypt_block(const void *ks, const uint8_t *ct, uint8_t *pt)
 	}
 
 #else	/* byte swap */
-	*(uint32_t *)&pt[0] = htonl(buffer[0]);
-	*(uint32_t *)&pt[4] = htonl(buffer[1]);
-	*(uint32_t *)&pt[8] = htonl(buffer[2]);
-	*(uint32_t *)&pt[12] = htonl(buffer[3]);
+	*(uint32_t *)(void *)&pt[0] = htonl(buffer[0]);
+	*(uint32_t *)(void *)&pt[4] = htonl(buffer[1]);
+	*(uint32_t *)(void *)&pt[8] = htonl(buffer[2]);
+	*(uint32_t *)(void *)&pt[12] = htonl(buffer[3]);
 #endif
 
 /* EXPORT DELETE END */

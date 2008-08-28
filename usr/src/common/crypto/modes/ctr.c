@@ -59,9 +59,6 @@ ctr_mode_contiguous_blocks(ctr_ctx_t *ctx, char *data, size_t length,
 	uint8_t *out_data_2;
 	size_t out_data_1_len;
 	uint64_t counter;
-#ifdef _LITTLE_ENDIAN
-	uint8_t *p;
-#endif
 
 	if (length + ctx->ctr_remainder_len < block_size) {
 		/* accumulate bytes here and return */

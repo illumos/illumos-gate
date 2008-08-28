@@ -270,7 +270,7 @@ Encode(unsigned char *output, uint32_t *input, unsigned int len)
 
 	for (i = 0, j = 0; j < len; i++, j += 4) {
 #if defined(_LITTLE_ENDIAN) && defined(UNALIGNED_POINTERS_PERMITTED)
-		*(uint32_t *)&output[j] = input[i];
+		*(uint32_t *)(void *)&output[j] = input[i];
 #else
 		/* endian-independent code */
 		output[j] = (unsigned char)(input[i] & 0xff);
@@ -292,7 +292,7 @@ Decode(uint32_t *output, unsigned char *input, unsigned int len)
 
 	for (i = 0, j = 0; j < len; i++, j += 4) {
 #if defined(_LITTLE_ENDIAN) && defined(UNALIGNED_POINTERS_PERMITTED)
-		output[i] = *(uint32_t *)&input[j];
+		output[i] = *(uint32_t *)(void *)&input[j];
 #else
 		/* endian-independent code */
 		output[i] = ((uint32_t)input[j]) |

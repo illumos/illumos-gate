@@ -399,8 +399,8 @@ blowfish_encrypt_block(const void *cookie, const uint8_t *block,
 	 * Read input block and place in left/right in big-endian order.
 	 */
 #ifdef UNALIGNED_POINTERS_PERMITTED
-	left = htonl(*(uint32_t *)&block[0]);
-	right = htonl(*(uint32_t *)&block[4]);
+	left = htonl(*(uint32_t *)(void *)&block[0]);
+	right = htonl(*(uint32_t *)(void *)&block[4]);
 #else
 	left = ((uint32_t)block[0] << 24)
 	    | ((uint32_t)block[1] << 16)
@@ -447,8 +447,8 @@ blowfish_encrypt_block(const void *cookie, const uint8_t *block,
 	{
 		/* Put the block back into the user's block with final swap */
 #ifdef UNALIGNED_POINTERS_PERMITTED
-		*(uint32_t *)&out_block[0] = htonl(left);
-		*(uint32_t *)&out_block[4] = htonl(right);
+		*(uint32_t *)(void *)&out_block[0] = htonl(left);
+		*(uint32_t *)(void *)&out_block[4] = htonl(right);
 #else
 		out_block[0] = left >> 24;
 		out_block[1] = left >> 16;
@@ -496,8 +496,8 @@ blowfish_decrypt_block(const void *cookie, const uint8_t *block,
 	 * Read input block and place in left/right in big-endian order.
 	 */
 #ifdef UNALIGNED_POINTERS_PERMITTED
-	left = htonl(*(uint32_t *)&block[0]);
-	right = htonl(*(uint32_t *)&block[4]);
+	left = htonl(*(uint32_t *)(void *)&block[0]);
+	right = htonl(*(uint32_t *)(void *)&block[4]);
 #else
 	left = ((uint32_t)block[0] << 24)
 	    | ((uint32_t)block[1] << 16)
@@ -544,8 +544,8 @@ blowfish_decrypt_block(const void *cookie, const uint8_t *block,
 	{
 	/* Put the block back into the user's block with final swap */
 #ifdef UNALIGNED_POINTERS_PERMITTED
-		*(uint32_t *)&out_block[0] = htonl(left);
-		*(uint32_t *)&out_block[4] = htonl(right);
+		*(uint32_t *)(void *)&out_block[0] = htonl(left);
+		*(uint32_t *)(void *)&out_block[4] = htonl(right);
 #else
 		out_block[0] = left >> 24;
 		out_block[1] = left >> 16;
