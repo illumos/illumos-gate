@@ -24,7 +24,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/modctl.h>
 #include <sys/file.h>
@@ -182,7 +181,7 @@ static const char *fail_msg = "%stransport failed: reason '%s': %s";
 char _depends_on[] = "misc/scsi";
 
 static struct modldrv modldrv = {
-	&mod_driverops, "SCSI Enclosure Services %I%", &ses_dev_ops
+	&mod_driverops, "SCSI Enclosure Services 1.51", &ses_dev_ops
 };
 
 static struct modlinkage modlinkage = {
@@ -448,7 +447,7 @@ ses_doattach(dev_info_t *dip)
 	/* Call SoftC Init Routine A bit later... */
 
 	ssc->ses_rqbp = scsi_alloc_consistent_buf(SES_ROUTE(ssc),
-	    NULL, SENSE_LENGTH, B_READ, SLEEP_FUNC, NULL);
+	    NULL, MAX_SENSE_LENGTH, B_READ, SLEEP_FUNC, NULL);
 	if (ssc->ses_rqbp != NULL) {
 		ssc->ses_rqpkt = scsi_init_pkt(SES_ROUTE(ssc), NULL,
 		    ssc->ses_rqbp, CDB_GROUP0, 1, 0, PKT_CONSISTENT,
@@ -474,7 +473,7 @@ ses_doattach(dev_info_t *dip)
 	ssc->ses_rqpkt->pkt_cdbp[1] = 0;
 	ssc->ses_rqpkt->pkt_cdbp[2] = 0;
 	ssc->ses_rqpkt->pkt_cdbp[3] = 0;
-	ssc->ses_rqpkt->pkt_cdbp[4] = SENSE_LENGTH;
+	ssc->ses_rqpkt->pkt_cdbp[4] = MAX_SENSE_LENGTH;
 	ssc->ses_rqpkt->pkt_cdbp[5] = 0;
 
 	switch (scsi_ifgetcap(SES_ROUTE(ssc), "auto-rqsense", 1)) {
@@ -1051,20 +1050,28 @@ ses_get_pkt(struct buf *bp, int (*func)())
 	ses_softc_t *ssc = (ses_softc_t *)bp->b_back;
 	Uscmd *scmd = &ssc->ses_uscsicmd;
 	struct scsi_pkt *pkt;
-	int stat_size;
+	int stat_size = 1;
+	int flags = 0;
 
 	if ((scmd->uscsi_flags & USCSI_RQENABLE) && ssc->ses_arq) {
-		stat_size = sizeof (struct scsi_arq_status);
-	} else {
-		stat_size = 1;
+		if (scmd->uscsi_rqlen > SENSE_LENGTH) {
+			stat_size = (int)(scmd->uscsi_rqlen) +
+			    sizeof (struct scsi_arq_status) -
+			    sizeof (struct scsi_extended_sense);
+			flags = PKT_XARQ;
+		} else {
+			stat_size = sizeof (struct scsi_arq_status);
+		}
 	}
 
 	if (bp->b_bcount) {
 		pkt = scsi_init_pkt(SES_ROUTE(ssc), NULL, bp,
-		    scmd->uscsi_cdblen, stat_size, 0, 0, func, (caddr_t)ssc);
+		    scmd->uscsi_cdblen, stat_size, 0, flags,
+		    func, (caddr_t)ssc);
 	} else {
 		pkt = scsi_init_pkt(SES_ROUTE(ssc), NULL, NULL,
-		    scmd->uscsi_cdblen, stat_size, 0, 0, func, (caddr_t)ssc);
+		    scmd->uscsi_cdblen, stat_size, 0, flags,
+		    func, (caddr_t)ssc);
 	}
 	SET_BP_PKT(bp, pkt);
 	if (pkt == (struct scsi_pkt *)NULL)
@@ -1300,8 +1307,7 @@ CHECK_PKT:
 		if (ssc->ses_retries > SES_NO_RETRY) {
 			ssc->ses_retries -= SES_SENSE_RETRY;
 			scmd->uscsi_status = 0;
-			bzero(&ssc->ses_srqsbuf,
-			    sizeof (struct scsi_extended_sense));
+			bzero(&ssc->ses_srqsbuf, MAX_SENSE_LENGTH);
 
 			if (scsi_transport(ssc->ses_rqpkt) != TRAN_ACCEPT) {
 				SES_ENABLE_RESTART(SES_RESTART_TIME,
@@ -1348,6 +1354,8 @@ ses_decode_sense(struct scsi_pkt *pkt, int *err)
 	uchar_t status = SCBP_C(pkt) & STATUS_MASK;
 	char *err_action;
 	char action;
+	uchar_t rqlen;
+	int amt;
 
 	/*
 	 * Process manual request sense.
@@ -1359,13 +1367,12 @@ ses_decode_sense(struct scsi_pkt *pkt, int *err)
 	 */
 	if (pkt->pkt_flags & FLAG_SENSING) {
 		struct buf *sbp = ssc->ses_rqbp;
-		int amt = min(SENSE_LENGTH,
+		amt = min(MAX_SENSE_LENGTH,
 		    sbp->b_bcount - sbp->b_resid);
-
-		bcopy(sbp->b_un.b_addr, sense, amt);
-		scmd->uscsi_rqresid = scmd->uscsi_rqlen - amt;
+		rqlen = min((uchar_t)amt, scmd->uscsi_rqlen);
+		bcopy(sbp->b_un.b_addr, sense, rqlen);
+		scmd->uscsi_rqresid = scmd->uscsi_rqlen - rqlen;
 		sense_flag = 1;
-
 	/*
 	 * Process auto request sense.
 	 * Copy auto request sense to sense buffer.
@@ -1377,15 +1384,25 @@ ses_decode_sense(struct scsi_pkt *pkt, int *err)
 	} else if (ssc->ses_arq && pkt->pkt_state & STATE_ARQ_DONE) {
 		struct scsi_arq_status *arq =
 		    (struct scsi_arq_status *)(pkt->pkt_scbp);
-		int amt = min(sizeof (arq->sts_sensedata), SENSE_LENGTH);
 		uchar_t *arq_status = (uchar_t *)&arq->sts_rqpkt_status;
+		if (pkt->pkt_state & STATE_XARQ_DONE) {
+			amt = MAX_SENSE_LENGTH - arq->sts_rqpkt_resid;
+		} else {
+			if (arq->sts_rqpkt_resid > SENSE_LENGTH) {
+				amt = MAX_SENSE_LENGTH - arq->sts_rqpkt_resid;
+			} else {
+				amt = SENSE_LENGTH - arq->sts_rqpkt_resid;
+			}
+		}
 
 		if (arq->sts_rqpkt_reason != CMD_CMPLT) {
 			return (QUE_COMMAND);
 		}
-		bcopy(&arq->sts_sensedata, sense, amt);
+
+		rqlen = min((uchar_t)amt, scmd->uscsi_rqlen);
+		bcopy(&arq->sts_sensedata, sense, rqlen);
 		scmd->uscsi_status = status;
-		scmd->uscsi_rqresid = scmd->uscsi_rqlen - amt;
+		scmd->uscsi_rqresid = scmd->uscsi_rqlen - rqlen;
 		status = *arq_status & STATUS_MASK;
 		pkt->pkt_state &= ~STATE_ARQ_DONE;
 		sense_flag = 1;

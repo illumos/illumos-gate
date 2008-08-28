@@ -28,8 +28,6 @@
 #ifndef _SYS_SCSI_TARGETS_SES_H
 #define	_SYS_SCSI_TARGETS_SES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/note.h>
 
 #ifdef	__cplusplus
@@ -164,7 +162,7 @@ struct ses_softc {
 	 */
 	Uscmd		ses_uscsicmd;
 	uchar_t		ses_srqcdb[CDB_SIZE];
-	uchar_t		ses_srqsbuf[SENSE_LENGTH];
+	uchar_t		ses_srqsbuf[MAX_SENSE_LENGTH];
 };
 
 #ifndef	__lint				/* no warlock for X86 */
