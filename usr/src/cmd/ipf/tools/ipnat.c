@@ -9,8 +9,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
@@ -304,8 +302,8 @@ int fd, opts, alive;
 			nsp->ns_added, nsp->ns_expire);
 		printf("no memory\t%lu\tbad nat\t%lu\n",
 			nsp->ns_memfail, nsp->ns_badnat);
-		printf("inuse\t%lu\nrules\t%lu\n",
-			nsp->ns_inuse, nsp->ns_rules);
+		printf("inuse\t%lu\norphans\t%u\nrules\t%lu\n",
+			nsp->ns_inuse, nsp->ns_orphans, nsp->ns_rules);
 		printf("wilds\t%u\n", nsp->ns_wilds);
 		if (opts & OPT_VERBOSE)
 			printf("table %p list %p\n",

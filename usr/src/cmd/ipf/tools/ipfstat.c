@@ -7,8 +7,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __FreeBSD__
 # ifndef __FreeBSD_cc_version
 #  include <osreldate.h>
@@ -1063,8 +1061,10 @@ ips_stat_t *ipsp;
 			ipsp->iss_max, ipsp->iss_nomem, ipsp->iss_bucketfull);
 		PRINTF("\t%lu maximum\n\t%lu no memory\n\t%lu bkts in use\n",
 			ipsp->iss_max, ipsp->iss_nomem, ipsp->iss_inuse);
-		PRINTF("\t%lu active\n\t%lu expired\n\t%lu closed\n",
-			ipsp->iss_active, ipsp->iss_expire, ipsp->iss_fin);
+		PRINTF("\t%lu active\n\t%lu expired\n",
+			ipsp->iss_active, ipsp->iss_expire);
+		PRINTF("\t%lu closed\n\t%u orphans\n",
+			ipsp->iss_fin, ipsp->iss_orphans);
 
 		PRINTF("State logging %sabled\n",
 			state_logging ? "en" : "dis");

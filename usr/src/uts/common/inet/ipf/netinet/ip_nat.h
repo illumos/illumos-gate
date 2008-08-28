@@ -9,7 +9,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	__IP_NAT_H__
 #define	__IP_NAT_H__
@@ -409,6 +408,7 @@ typedef	struct	natstat	{
 	nattrpnt_t *ns_trpntlist;
 	hostmap_t *ns_maplist;
 	u_long	*ns_bucketlen[2];
+	u_int	ns_orphans;
 } natstat_t;
 
 typedef	struct	natlog {
@@ -431,6 +431,7 @@ typedef	struct	natlog {
 #define	NL_NEWRDR	NAT_REDIRECT
 #define	NL_NEWBIMAP	NAT_BIMAP
 #define	NL_NEWBLOCK	NAT_MAPBLK
+#define	NL_DESTROY	0xfffc
 #define	NL_CLONE	0xfffd
 #define	NL_FLUSH	0xfffe
 #define	NL_EXPIRE	0xffff
@@ -487,6 +488,7 @@ extern	nat_t	*nat_maplookup __P((void *, u_int, struct in_addr,
 extern	nat_t	*nat_lookupredir __P((natlookup_t *, ipf_stack_t *));
 extern	nat_t	*nat_icmperrorlookup __P((fr_info_t *, int));
 extern	nat_t	*nat_icmperror __P((fr_info_t *, u_int *, int));
+extern	void	nat_delete __P((struct nat *, int, ipf_stack_t *));
 extern	int	nat_insert __P((nat_t *, int, ipf_stack_t *));
 
 extern	int	fr_checknatout __P((fr_info_t *, u_32_t *));

@@ -142,7 +142,6 @@ static	int	nat_flushtable __P((ipf_stack_t *));
 static	int	nat_clearlist __P((ipf_stack_t *));
 static	void	nat_addnat __P((struct ipnat *, ipf_stack_t *));
 static	void	nat_addrdr __P((struct ipnat *, ipf_stack_t *));
-static	void	nat_delete __P((struct nat *, int, ipf_stack_t *));
 static	int	fr_natgetent __P((caddr_t, ipf_stack_t *));
 static	int	fr_natgetsz __P((caddr_t, ipf_stack_t *));
 static	int	fr_natputent __P((caddr_t, int, ipf_stack_t *));
@@ -1570,6 +1569,15 @@ ipf_stack_t *ifs;
 		ifs->ifs_nat_doflush = 1;
 
 	/*
+	 * If automatic flushing did not do its job, and the table
+	 * has filled up, don't try to create a new entry.
+	 */
+	if (ifs->ifs_nat_stats.ns_inuse >= ifs->ifs_ipf_nattable_max) {
+		ifs->ifs_nat_stats.ns_memfail++;
+		return ENOMEM;
+	}
+
+	/*
 	 * Initialise early because of code at junkput label.
 	 */
 	in = NULL;
@@ -1870,35 +1878,35 @@ junkput:
 /* Returns:     Nil                                                         */
 /* Parameters:  natd(I)    - pointer to NAT structure to delete             */
 /*              logtype(I) - type of LOG record to create before deleting   */
+/*		ifs - ipf stack instance				    */
 /* Write Lock:  ipf_nat                                                     */
 /*                                                                          */
 /* Delete a nat entry from the various lists and table.  If NAT logging is  */
 /* enabled then generate a NAT log record for this event.                   */
 /* ------------------------------------------------------------------------ */
-static void nat_delete(nat, logtype, ifs)
+void nat_delete(nat, logtype, ifs)
 struct nat *nat;
 int logtype;
 ipf_stack_t *ifs;
 {
 	struct ipnat *ipn;
+	int removed = 0;
 
 	if (logtype != 0 && ifs->ifs_nat_logging != 0)
 		nat_log(nat, logtype, ifs);
 
 	/*
-	 * Take it as a general indication that all the pointers are set if
-	 * nat_pnext is set.
+	 * Start by removing the entry from the hash table of nat entries
+	 * so it will not be "used" again.
+	 *
+	 * It will remain in the "list" of nat entries until all references
+	 * have been accounted for.
 	 */
-	if (nat->nat_pnext != NULL) {
+	if ((nat->nat_phnext[0] != NULL) && (nat->nat_phnext[1] != NULL)) {
+		removed = 1;
+
 		ifs->ifs_nat_stats.ns_bucketlen[0][nat->nat_hv[0]]--;
 		ifs->ifs_nat_stats.ns_bucketlen[1][nat->nat_hv[1]]--;
-
-		*nat->nat_pnext = nat->nat_next;
-		if (nat->nat_next != NULL) {
-			nat->nat_next->nat_pnext = nat->nat_pnext;
-			nat->nat_next = NULL;
-		}
-		nat->nat_pnext = NULL;
 
 		*nat->nat_phnext[0] = nat->nat_hnext[0];
 		if (nat->nat_hnext[0] != NULL) {
@@ -1918,31 +1926,67 @@ ipf_stack_t *ifs;
 			ifs->ifs_nat_stats.ns_wilds--;
 	}
 
+	/*
+	 * Next, remove it from the timeout queue it is in.
+	 */
+	fr_deletequeueentry(&nat->nat_tqe);
+
 	if (nat->nat_me != NULL) {
 		*nat->nat_me = NULL;
 		nat->nat_me = NULL;
 	}
 
-	fr_deletequeueentry(&nat->nat_tqe);
-
 	MUTEX_ENTER(&nat->nat_lock);
-	if (nat->nat_ref > 1) {
+ 	if (logtype == NL_DESTROY) {
+ 		/*
+ 		 * NL_DESTROY should only be passed when nat_ref >= 2.
+ 		 * This happens when a nat'd packet is blocked, we have
+		 * just created the nat table entry (reason why the ref
+		 * count is 2 or higher), but and we want to throw away
+		 * that NAT session as result of the blocked packet.
+ 		 */
+ 		if (nat->nat_ref > 2) {
+ 			nat->nat_ref -= 2;
+ 			MUTEX_EXIT(&nat->nat_lock);
+ 			if (removed)
+ 				ifs->ifs_nat_stats.ns_orphans++;
+ 			return;
+ 		}
+ 	} else if (nat->nat_ref > 1) {
 		nat->nat_ref--;
 		MUTEX_EXIT(&nat->nat_lock);
+ 		if (removed)
+ 			ifs->ifs_nat_stats.ns_orphans++;
 		return;
 	}
 	MUTEX_EXIT(&nat->nat_lock);
 
-	/*
-	 * At this point, nat_ref is 1, doing "--" would make it 0..
-	 */
 	nat->nat_ref = 0;
+
+	/*
+	 * If entry had already been removed,
+	 * it means we're cleaning up an orphan.
+	 */
+ 	if (!removed)
+ 		ifs->ifs_nat_stats.ns_orphans--;
 
 #ifdef	IPFILTER_SYNC
 	if (nat->nat_sync)
 		ipfsync_del(nat->nat_sync);
 #endif
 
+	/*
+	 * Now remove it from master list of nat table entries
+	 */
+	if (nat->nat_pnext != NULL) {
+		*nat->nat_pnext = nat->nat_next;
+		if (nat->nat_next != NULL) {
+			nat->nat_next->nat_pnext = nat->nat_pnext;
+			nat->nat_next = NULL;
+		}
+		nat->nat_pnext = NULL;
+	}
+ 
 	if (nat->nat_fr != NULL)
 		(void)fr_derefrule(&nat->nat_fr, ifs);
 
@@ -2528,6 +2572,10 @@ int direction;
 	if (NAT_TAB_WATER_LEVEL(ifs) > ifs->ifs_nat_flush_lvl_hi)
 		ifs->ifs_nat_doflush = 1;
 
+	/*
+	 * If automatic flushing did not do its job, and the table
+	 * has filled up, don't try to create a new entry.
+	 */
 	if (ifs->ifs_nat_stats.ns_inuse >= ifs->ifs_ipf_nattable_max) {
 		ifs->ifs_nat_stats.ns_memfail++;
 		return NULL;
@@ -2648,6 +2696,7 @@ int direction;
 
 	if (flags & SI_WILDP)
 		ifs->ifs_nat_stats.ns_wilds++;
+	fin->fin_flx |= FI_NEWNAT;
 	goto done;
 badnat:
 	ifs->ifs_nat_stats.ns_badnat++;
@@ -3866,7 +3915,9 @@ u_32_t *passp;
 	nat_t *nat;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (ifs->ifs_nat_stats.ns_rules == 0 || ifs->ifs_fr_nat_lock != 0)
+	if (ifs->ifs_fr_nat_lock != 0)
+		return 0;
+	if (ifs->ifs_nat_stats.ns_rules == 0 && ifs->ifs_nat_instances == NULL)
 		return 0;
 
 	natfailed = 0;
@@ -4183,7 +4234,9 @@ u_32_t *passp;
 	u_32_t iph;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
-	if (ifs->ifs_nat_stats.ns_rules == 0 || ifs->ifs_fr_nat_lock != 0)
+	if (ifs->ifs_fr_nat_lock != 0)
+		return 0;
+	if (ifs->ifs_nat_stats.ns_rules == 0 && ifs->ifs_nat_instances == NULL)
 		return 0;
 
 	tcp = NULL;

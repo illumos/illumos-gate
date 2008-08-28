@@ -10,8 +10,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	__IP_FIL_H__
 #define	__IP_FIL_H__
 
@@ -280,6 +278,7 @@ typedef	struct	fr_ip	{
 #define	FI_V6EXTHDR	0x10000
 #define	FI_COALESCE	0x20000
 #define	FI_ICMPQUERY	0x40000
+#define	FI_NEWNAT	0x80000
 #define	FI_NOCKSUM	0x20000000	/* don't do a L4 checksum validation */
 #define	FI_DONTCACHE	0x40000000	/* don't cache the result */
 #define	FI_IGNORE	0x80000000

@@ -10,8 +10,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	__IP_STATE_H__
 #define	__IP_STATE_H__
 
@@ -221,6 +219,7 @@ typedef	struct	ips_stat {
 	ipstate_t **iss_table;
 	ipstate_t *iss_list;
 	u_long	*iss_bucketlen;
+	u_int	iss_orphans;
 } ips_stat_t;
 
 typedef struct port_pair {

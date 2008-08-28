@@ -7,8 +7,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
 # undef _KERNEL
@@ -2550,8 +2548,16 @@ ipf_stack_t *ifs;
 	if (fin->fin_state != NULL)
 		fr_statederef((ipstate_t **)&fin->fin_state, ifs);
 
-	if (fin->fin_nat != NULL)
-		fr_natderef((nat_t **)&fin->fin_nat, ifs);
+	if (fin->fin_nat != NULL) {
+		if (FR_ISBLOCK(pass) && (fin->fin_flx & FI_NEWNAT)) {
+			WRITE_ENTER(&ifs->ifs_ipf_nat);
+			nat_delete((nat_t *)fin->fin_nat, NL_DESTROY, ifs);
+			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
+			fin->fin_nat = NULL;
+		} else {
+			fr_natderef((nat_t **)&fin->fin_nat, ifs);
+		}
+	}
 
 	/*
 	 * Only allow FR_DUP to work if a rule matched - it makes no sense to

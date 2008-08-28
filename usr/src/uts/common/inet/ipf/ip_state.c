@@ -3084,6 +3084,7 @@ ipf_stack_t *ifs;
 /* Returns:     Nil                                                         */
 /* Parameters:  is(I)  - pointer to state structure to delete               */
 /*              why(I) - if not 0, log reason why it was deleted            */
+/*		ifs - ipf stack instance				    */
 /* Write Locks: ipf_state/ipf_global                                        */
 /*                                                                          */
 /* Deletes a state entry from the enumerated list as well as the hash table */
@@ -3095,25 +3096,20 @@ ipstate_t *is;
 int why;
 ipf_stack_t *ifs;
 {
+	int removed = 0;
 
 	ASSERT(rw_write_held(&ifs->ifs_ipf_global.ipf_lk) == 0 ||
 		rw_write_held(&ifs->ifs_ipf_state.ipf_lk) == 0);
 
 	/*
-	 * Since we want to delete this, remove it from the state table,
-	 * where it can be found & used, first.
+	 * Start by removing the entry from the hash table of state entries
+	 * so it will not be "used" again.
+	 *
+	 * It will remain in the "list" of state entries until all references
+	 * have been accounted for.
 	 */
-	if (is->is_pnext != NULL) {
-		*is->is_pnext = is->is_next;
-
-		if (is->is_next != NULL)
-			is->is_next->is_pnext = is->is_pnext;
-
-		is->is_pnext = NULL;
-		is->is_next = NULL;
-	}
-
 	if (is->is_phnext != NULL) {
+		removed = 1;
 		*is->is_phnext = is->is_hnext;
 		if (is->is_hnext != NULL)
 			is->is_hnext->is_phnext = is->is_phnext;
@@ -3152,11 +3148,20 @@ ipf_stack_t *ifs;
 	if (is->is_ref > 1) {
 		is->is_ref--;
 		MUTEX_EXIT(&is->is_lock);
+		if (removed)
+			ifs->ifs_ips_stats.iss_orphans++;
 		return;
 	}
 	MUTEX_EXIT(&is->is_lock);
 
 	is->is_ref = 0;
+
+	/*
+	 * If entry has already been removed from table,
+	 * it means we're simply cleaning up an orphan.
+	 */
+	if (!removed)
+		ifs->ifs_ips_stats.iss_orphans--;
 
 	if (is->is_tqehead[0] != NULL)
 		(void) fr_deletetimeoutqueue(is->is_tqehead[0]);
@@ -3172,6 +3177,18 @@ ipf_stack_t *ifs;
 	(void) ipsc_detachis(is);
 #endif
 
+	/*
+	 * Now remove it from master list of state table entries.
+	 */
+	if (is->is_pnext != NULL) {
+		*is->is_pnext = is->is_next;
+		if (is->is_next != NULL) {
+			is->is_next->is_pnext = is->is_pnext;
+			is->is_next = NULL;
+		}
+		is->is_pnext = NULL;
+	}
+ 
 	if (ifs->ifs_ipstate_logging != 0 && why != 0)
 		ipstate_log(is, why, ifs);
 
