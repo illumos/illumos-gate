@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PICL plug-in that creates device tree nodes for all platforms
@@ -234,6 +232,7 @@ static	builtin_map_t	*builtin_map_ptr = NULL;
 static	int		builtin_map_size = 0;
 static	char		mach_name[SYS_NMLN];
 static	di_prom_handle_t	ph = DI_PROM_HANDLE_NIL;
+static	int		snapshot_stale;
 
 /*
  * UnitAddress mapping table
@@ -1506,6 +1505,35 @@ update_subtree(picl_nodehdl_t nodeh, di_node_t dinode)
 }
 
 /*
+ * Check for a stale OBP node. EINVAL is returned from the openprom(7D) driver
+ * if the nodeid stored in the snapshot is not valid.
+ */
+static int
+check_stale_node(di_node_t node, void *arg)
+{
+	di_prom_prop_t	promp;
+
+	errno = 0;
+	promp = di_prom_prop_next(ph, node, DI_PROM_PROP_NIL);
+	if (promp == DI_PROM_PROP_NIL && errno == EINVAL) {
+		snapshot_stale = 1;
+		return (DI_WALK_TERMINATE);
+	}
+	return (DI_WALK_CONTINUE);
+}
+
+/*
+ * Walk the snapshot and check the OBP properties of each node.
+ */
+static int
+is_snapshot_stale(di_node_t root)
+{
+	snapshot_stale = 0;
+	di_walk_node(root, DI_WALK_CLDFIRST, NULL, check_stale_node);
+	return (snapshot_stale);
+}
+
+/*
  * This function processes the data from libdevinfo and creates nodes
  * in the PICL tree.
  */
@@ -1529,6 +1557,21 @@ libdevinfo_init(picl_nodehdl_t rooth)
 
 	if ((ph = di_prom_init()) == NULL)
 		return (PICL_FAILURE);
+
+	/*
+	 * Check if the snapshot cache contains stale OBP nodeid references.
+	 * If it does release the snapshot and obtain a live snapshot from the
+	 * kernel.
+	 */
+	if (is_snapshot_stale(di_root)) {
+		syslog(LOG_INFO, "picld detected stale snapshot cache");
+		di_fini(di_root);
+		if ((di_root = di_init("/", DINFOCPYALL | DINFOFORCE)) ==
+		    DI_NODE_NIL) {
+			return (PICL_FAILURE);
+		}
+	}
+
 	/*
 	 * create platform PICL node using di_root node
 	 */
