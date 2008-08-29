@@ -303,6 +303,17 @@ extern "C" {
 #define	PRINT_BUFFER	\
 	gettext("%s")
 
+#define	ZERO_CPUS_2_TST	\
+	gettext("Assertion failed: While trying to calculate total"\
+		" iterations, no cpus to test.\n")
+
+#define	INVALID_FPU_ID	\
+	gettext("Assertion failed: An FPU could not be identified "\
+		"to schedule test.\n")
+
+#define	REPROBE_FAILURE	\
+	gettext("Reprobe failed. Exiting...\n")
+
 #ifdef __cplusplus
 }
 #endif

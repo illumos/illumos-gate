@@ -125,14 +125,14 @@ reprobe_and_reread_config()
 		fpsd.d_conf->m_reprobe = 1;
 		if (fpsd_probe(fpsd.d_conf) != 0) {
 			(void) fpsd_message(FPSD_EXIT_ERROR,
-			    FPS_ERROR, UNSUPPORTED_SYSTEM);
+			    FPS_WARNING, REPROBE_FAILURE);
 		}
 	} else {
 		first_time = 0;
 	}
 	ret = fpsd_probe_config();
 	if (ZERO_INTERVAL == ret) {
-		fpsd_message(FPSD_EXIT_ERROR, FPS_ERROR,
+		fpsd_message(FPSD_EXIT_ERROR, FPS_WARNING,
 		    FPSD_ZERO_INTVL, fpsd.d_interval);
 	}
 	return (ret);
@@ -179,7 +179,7 @@ fps_setup_door(void)
 	door_id = door_create(fps_door_handler, FPS_DOOR_COOKIE, 0);
 
 	if (door_id < 0) {
-		fpsd_message(FPSD_NO_EXIT, FPS_ERROR, DAEMON_DOOR_FAIL,
+		fpsd_message(FPSD_NO_EXIT, FPS_WARNING, DAEMON_DOOR_FAIL,
 		    strerror(errno));
 		return (-1);
 	}
@@ -320,8 +320,8 @@ calculateTotalIterations(mach_conf_t *m_stat)
 	int freq;
 
 	if (m_stat->m_cpuids_size <= 0) {
-		fpsd_message(FPSD_EXIT_ERROR, FPS_ERROR,
-		    FPSD_NO_CPUS_TO_TEST);
+		fpsd_message(FPSD_EXIT_ERROR, FPS_WARNING,
+		    ZERO_CPUS_2_TST);
 	}
 	m_stat->m_num_cpus_to_test = 0;
 	for (i = 0; i < m_stat->m_cpuids_size; i++) {
@@ -368,8 +368,8 @@ calculateTimeInterval()
 	int intvl;
 
 	if (total_iterations <= 0) {
-		fpsd_message(FPSD_EXIT_ERROR, FPS_ERROR, FPSD_MIS_CALCULATIONS,
-		    total_iterations);
+		fpsd_message(FPSD_EXIT_ERROR, FPS_WARNING,
+		    FPSD_MIS_CALCULATIONS, total_iterations);
 	}
 	intvl = (24*60*60) / (total_iterations);
 	fpsd.d_interval = intvl;
@@ -385,6 +385,9 @@ calculateTimeInterval()
 static int
 check_if_supported_CPU(char *cpu_brand, char *arch)
 {
+	if ((NULL == cpu_brand) || (NULL == arch)) {
+		return (0);
+	}
 	(void) snprintf(fps_tst_path, sizeof (fps_tst_path), "%s/%s/%s/%s",
 	    FPS_DIR, arch, cpu_brand, FPS_FPUTST_NAME);
 	fpsd_message(FPSD_NO_EXIT, FPS_DEBUG, FPTST_BIN_PTH, fps_tst_path);
@@ -479,7 +482,7 @@ fpsd_probe(mach_conf_t *m_stat)
 
 	kstat_ctl = kstat_open();
 	if (NULL == kstat_ctl) {
-		fpsd_message(FPSD_NO_EXIT, FPS_ERROR, LIBRARY_CALL_FAIL,
+		fpsd_message(FPSD_NO_EXIT, FPS_WARNING, LIBRARY_CALL_FAIL,
 		    "kstat_open", strerror(errno));
 		free(cpuid_list);
 		return (-1);
@@ -570,7 +573,7 @@ fpsd_probe(mach_conf_t *m_stat)
 	free(cpuid_list);
 	(void) kstat_close(kstat_ctl);
 	if (m_stat->m_num_cpus_to_test <= 0) {
-		fpsd_message(FPSD_NO_EXIT, FPS_ERROR,
+		fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
 		    FPSD_NO_CPUS_TO_TEST);
 		return (-1);
 	}
@@ -671,13 +674,13 @@ parse_and_set_cpu_id_list(char *strCPUs)
 			    (int)strtol(cpu_id, (char **)NULL, 10);
 			cpu_id = strtok_r(NULL, ",", &last);
 		} else {
-			fpsd_message(FPSD_NO_EXIT, FPS_ERROR,
+			fpsd_message(FPSD_NO_EXIT, FPS_INFO,
 			    INVAL_PROP_VALUE, cpu_id);
 			invalid = 1;
 		}
 		if (num_cpus > fpsd.d_conf->m_num_fpus) {
 			/* More than max supported cpus */
-			fpsd_message(FPSD_NO_EXIT, FPS_ERROR,
+			fpsd_message(FPSD_NO_EXIT, FPS_INFO,
 			    INVAL_PROP_VALUE, strCPUs);
 			invalid = 1;
 		}
@@ -714,11 +717,11 @@ parse_and_set_cpu_id_list(char *strCPUs)
 		fpsd.d_conf->m_num_cpus_to_test = num_cpus_to_test;
 		if (num_cpus_to_test <= 0)  {
 			if (1 == first_time) {
-				fpsd_message(FPSD_NO_EXIT, FPS_ERROR,
+				fpsd_message(FPSD_NO_EXIT, FPS_INFO,
 				    ALL_CPUS_EXCLDED);
 				first_time = 0;
 			} else {
-				fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
+				fpsd_message(FPSD_NO_EXIT, FPS_INFO,
 				    ALL_CPUS_EXCLDED);
 			}
 			return (NO_CPUS_2_TEST);
@@ -1112,7 +1115,7 @@ main(int argc, char **argv)
 		fpsd_message(FPSD_NO_EXIT, FPS_DEBUG, ESTAR_INFO);
 
 	if ((probe_status = fpsd_probe(fpsd.d_conf)) != 0) {
-		(void) fpsd_message(FPSD_NO_EXIT, FPS_ERROR,
+		(void) fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,
 		    UNSUPPORTED_SYSTEM);
 	}
 
@@ -1163,7 +1166,7 @@ main(int argc, char **argv)
 			    SMF_TEMPORARY);
 			if (0 == ret) {
 				(void) fpsd_message(FPSD_NO_EXIT,
-				    FPS_ERROR, FPSD_STATE);
+				    FPS_DEBUG, FPSD_STATE);
 			} else {
 				/* Unable to disable the service. */
 				smf_state = smf_get_state(str_fps_fmri);
@@ -1203,7 +1206,7 @@ main(int argc, char **argv)
 	/* Run scheduling thread */
 	if ((ret == 0) && thr_create(NULL, 0,
 	    test_fpu_thr, (void *) NULL, THR_BOUND, NULL) != 0) {
-		fpsd_message(FPSD_EXIT_ERROR, FPS_ERROR, THR_CREATION_FAIL);
+		fpsd_message(FPSD_EXIT_ERROR, FPS_WARNING, THR_CREATION_FAIL);
 	}
 
 	/*

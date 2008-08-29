@@ -151,13 +151,13 @@ init_estar_db()
 	fps_di_root = di_init("/", DINFOCPYALL);
 
 	if (DI_NODE_NIL == fps_di_root) {
-		fpsd_message(FPSD_EXIT_ERROR, FPS_ERROR, DI_INIT_FAIL);
+		fpsd_message(FPSD_EXIT_ERROR, FPS_WARNING, DI_INIT_FAIL);
 	}
 
 	fps_di_prom = di_prom_init();
 
 	if (DI_PROM_HANDLE_NIL == fps_di_prom) {
-		fpsd_message(FPSD_EXIT_ERROR, FPS_ERROR, DI_PROM_INIT_FAIL);
+		fpsd_message(FPSD_EXIT_ERROR, FPS_WARNING, DI_PROM_INIT_FAIL);
 		di_fini(fps_di_root);
 	}
 

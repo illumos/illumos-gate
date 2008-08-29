@@ -46,7 +46,7 @@ extern "C" {
 #define	FPS_CORE_DIR	"/var/fps/core"
 
 #define	FPU_TST_SRCH_DPTH	4	/* File search depth from FPS_DIR */
-#define	DFLT_DBG_LVL  0 /* Default debug level */
+#define	DFLT_DBG_LVL  1 /* Default debug level */
 #define	FPS_DOOR_COOKIE    ((void *)0xdeadbead)
 
 #define	SMF_PROP_INTVL "interval"

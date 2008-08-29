@@ -71,7 +71,7 @@ void  *test_fpu_thr(void *arg);
 
 #define	CPU_TST_FORK_FAIL	{\
 	error = errno;							\
-	fpsd_message(FPSD_NO_EXIT, FPS_ERROR, FORK_FAIL_MSG,	\
+	fpsd_message(FPSD_NO_EXIT, FPS_WARNING, FORK_FAIL_MSG,	\
 		testpath, strerror(error)); \
 	return (-1);							\
 	}
@@ -79,7 +79,7 @@ void  *test_fpu_thr(void *arg);
 #define	CPU_TST_EXEC_FAIL	{		\
 	error = errno;							\
 	fpsd_message(FPSD_EXIT_ERROR,\
-		FPS_ERROR, TST_EXEC_FAIL, testpath, strerror(error)); \
+		FPS_WARNING, TST_EXEC_FAIL, testpath, strerror(error)); \
 	}
 
 static int boot_tst_delay = FPS_BOOT_TST_DELAY;
@@ -157,7 +157,7 @@ check_invoke_prog(int   devid,		/* cpu-id */
 	/* Check if enough swap space is there; Return 0 if not. */
 
 	if (get_free_swap() < (uint64_t)(tstswap+FPS_SWAP_RESERVE)) {
-		fpsd_message(FPSD_NO_EXIT, FPS_WARNING, SWAP_WARN, testpath);
+		fpsd_message(FPSD_NO_EXIT, FPS_INFO, SWAP_WARN, testpath);
 		return (ret);
 	}
 
@@ -184,7 +184,7 @@ check_invoke_prog(int   devid,		/* cpu-id */
 	if (pid == -1)
 		CPU_TST_FORK_FAIL
 
-	/* Synchronously wait here till the child dies */
+	/* Synchronously wait here till the child exits */
 
 	elapsed_time = 0;
 	status_available = 0;
@@ -223,40 +223,40 @@ check_invoke_prog(int   devid,		/* cpu-id */
 		ret = 1;
 	} else if (exit_status == FPU_INVALID_ARG) {
 		/* This should not happen; so force exit */
-		fpsd_message(FPSD_EXIT_TEST_USAGE, FPS_ERROR,
+		fpsd_message(FPSD_EXIT_TEST_USAGE, FPS_WARNING,
 		    FPU_INVALID_ARG_MSG);
 	} else if ((exit_status == FPU_SIG_SEGV) ||
 	    (exit_status == FPU_SIG_BUS)) {
-		fpsd_message(FPSD_NO_EXIT, FPS_ERROR, FPU_SIG_RCVD,
+		fpsd_message(FPSD_NO_EXIT, FPS_INFO, FPU_SIG_RCVD,
 		    devid);
 		record_failure(devid, fpu_index);
 		ret = -1; /* Retry */
 	} else if (exit_status == FPU_SIG_FPE) {
-		fpsd_message(FPSD_NO_EXIT, FPS_ERROR, FPU_FPE_MSG,
+		fpsd_message(FPSD_NO_EXIT, FPS_INFO, FPU_FPE_MSG,
 		    devid);
 		record_failure(devid, fpu_index);
 		ret = -1;
 	} else if (exit_status == FPU_SIG_ILL) {
-		fpsd_message(FPSD_NO_EXIT, FPS_ERROR, FPU_SIG_ILL_MSG,
+		fpsd_message(FPSD_NO_EXIT, FPS_INFO, FPU_SIG_ILL_MSG,
 		    devid);
 		record_failure(devid, fpu_index);
 		ret = -1;
 	} else if (exit_status == FPU_SYSCALL_FAIL) {
-		fpsd_message(FPSD_NO_EXIT, FPS_ERROR, FPU_SYSCALL_FAIL_MSG,
+		fpsd_message(FPSD_NO_EXIT, FPS_INFO, FPU_SYSCALL_FAIL_MSG,
 		    devid);
 		record_failure(devid, fpu_index);
 		fpsd.d_iteration++; /* Iteration skipped */
 		ret = 1; /* Record failure and move on */
 	} else if (exit_status == FPU_EREPORT_INCOM) {
-		fpsd_message(FPSD_NO_EXIT, FPS_ERROR, FPU_EREPORT_INCOM_MSG,
+		fpsd_message(FPSD_NO_EXIT, FPS_INFO, FPU_EREPORT_INCOM_MSG,
 		    devid);
 		fpsd.d_conf->m_reprobe = 1;
 		ret = 1;
 	} else if (exit_status == FPU_SYSCALL_TRYAGAIN) {
-		fpsd_message(FPSD_NO_EXIT, FPS_ERROR, FPU_SYSCALL_TRYAGAIN_MSG);
+		fpsd_message(FPSD_NO_EXIT, FPS_INFO, FPU_SYSCALL_TRYAGAIN_MSG);
 		ret = -1; /* Retry as it could be some resource issue */
 	} else if (exit_status == FPU_EREPORT_FAIL) {
-		fpsd_message(FPSD_NO_EXIT, FPS_ERROR, FPU_EREPORT_FAIL_MSG,
+		fpsd_message(FPSD_NO_EXIT, FPS_INFO, FPU_EREPORT_FAIL_MSG,
 		    devid);
 		ret = -1;
 	} else if (exit_status == FPU_TIMED_OUT) {
@@ -271,7 +271,7 @@ check_invoke_prog(int   devid,		/* cpu-id */
 			(void) poll(NULL, 0, 10);
 			(void) kill(pid, SIGINT);
 		}
-		fpsd_message(FPSD_NO_EXIT, FPS_ERROR, FPU_TIMED_OUT_MSG, devid);
+		fpsd_message(FPSD_NO_EXIT, FPS_INFO, FPU_TIMED_OUT_MSG, devid);
 		record_failure(devid, fpu_index);
 		ret = -1;
 	}
@@ -367,12 +367,12 @@ test_fpu_thr(/* ARGSUSED */ void *arg)
 
 	/* Soft bind before once before starting test. */
 	if (processor_bind(P_PID, P_MYID, PBIND_SOFT, NULL) != 0) {
-		fpsd_message(FPSD_EXIT_ERROR, FPS_ERROR, SYSTEM_CALL_FAIL,
+		fpsd_message(FPSD_EXIT_ERROR, FPS_WARNING, SYSTEM_CALL_FAIL,
 		    "processor_bind", strerror(errno));
 	}
 
 	if (pset_bind(PS_SOFT, P_PID, P_MYID, NULL) != 0) {
-		fpsd_message(FPSD_EXIT_ERROR, FPS_ERROR, SYSTEM_CALL_FAIL,
+		fpsd_message(FPSD_EXIT_ERROR, FPS_WARNING, SYSTEM_CALL_FAIL,
 		    "pset_bind", strerror(errno));
 	}
 
@@ -429,7 +429,9 @@ test_fpu_thr(/* ARGSUSED */ void *arg)
 	}	\
 	if (fpuid == -1) {\
 		/* Testing could not be done on any cpu */\
-		(void) poll(NULL, 0, 20); /* Wait for some time */\
+		fpsd_message(FPSD_NO_EXIT, FPS_DEBUG,	\
+		    INVALID_FPU_ID);	\
+		last = time(NULL);	\
 		continue;\
 	}\
 	ret = check_invoke_prog(fpuid, &last, tswap, frequency,	\
