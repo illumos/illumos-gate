@@ -18,12 +18,9 @@
  *
  * CDDL HEADER END
  *
- *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,7 +84,7 @@ memcmp_pad_max(void *d1, uint_t d1_len, void *d2, uint_t d2_len, uint_t max_sz)
 		return (1);
 
 	/* If the rest of longer data is nulls or blanks, call it a match. */
-	while (len < extra_len)
+	while (len < extra_len && marker[len])
 		if (!isspace(marker[len++]))
 			/* CONSTCOND */
 			return (1);
