@@ -46,6 +46,7 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/systeminfo.h>
 #include <ctype.h>
+#include <zone.h>
 
 #include <config_admin.h>
 #include "cfgadm.h"
