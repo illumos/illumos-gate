@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/cpuvar.h>
 #include <sys/psm.h>
 #include <sys/archsystm.h>
@@ -162,6 +160,8 @@ local_x2apic_write(uint32_t msr, uint64_t value)
 	if (msr != APIC_EOI_REG) {
 		tmp = rdmsr(REG_X2APIC_BASE_MSR + (msr >> 2));
 		tmp = (tmp & 0xffffffff00000000) | value;
+	} else {
+		tmp = 0;
 	}
 
 	wrmsr((REG_X2APIC_BASE_MSR + (msr >> 2)), tmp);
