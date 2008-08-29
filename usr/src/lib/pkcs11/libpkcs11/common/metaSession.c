@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Session Management Functions
@@ -465,10 +463,14 @@ meta_SetOperationState(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pOperationState,
 			meta_operation_cleanup(session, session->op1.type,
 			    B_FALSE);
 
-		rv = meta_get_slot_session(opstate.state[0].op_slotnum,
-		    &slot_session, session->session_flags);
-		if (rv != CKR_OK)
-			goto cleanup;
+		if (session->op1.session != NULL) {
+			slot_session = session->op1.session;
+		} else {
+			rv = meta_get_slot_session(opstate.state[0].op_slotnum,
+			    &slot_session, session->session_flags);
+			if (rv != CKR_OK)
+				goto cleanup;
+		}
 
 		session->op1.type = opstate.state[0].op_type;
 		session->op1.session = slot_session;
