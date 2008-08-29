@@ -37,8 +37,6 @@
  */
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -4523,6 +4521,10 @@ rootconf()
 	RLOCK_VFSSW();
 	vsw = vfs_getvfsswbyname(fstyp);
 	RUNLOCK_VFSSW();
+	if (vsw == NULL) {
+		cmn_err(CE_CONT, "Cannot find %s filesystem\n", fstyp);
+		return (ENXIO);
+	}
 	VFS_INIT(rootvfs, &vsw->vsw_vfsops, 0);
 	VFS_HOLD(rootvfs);
 
@@ -4539,7 +4541,11 @@ rootconf()
 	rootdev = rootvfs->vfs_dev;
 
 	if (error)
-		panic("cannot mount root path %s", rootfs.bo_name);
+		cmn_err(CE_CONT, "Cannot mount root on %s fstype %s\n",
+		    rootfs.bo_name, fstyp);
+	else
+		cmn_err(CE_CONT, "?root on %s fstype %s\n",
+		    rootfs.bo_name, fstyp);
 	return (error);
 }
 
@@ -4558,9 +4564,23 @@ getfsname(char *askfor, char *name, size_t namelen)
 }
 
 /*
- * If server_path exists, then we are booting a diskless
- * client. Otherwise, we default to ufs. Zfs should perhaps be
- * another property.
+ * Init the root filesystem type (rootfs.bo_fstype) from the "fstype"
+ * property.
+ *
+ * Filesystem types starting with the prefix "nfs" are diskless clients;
+ * init the root filename name (rootfs.bo_name), too.
+ *
+ * If we are booting via NFS we currently have these options:
+ *	nfs -	dynamically choose NFS V2, V3, or V4 (default)
+ *	nfs2 -	force NFS V2
+ *	nfs3 -	force NFS V3
+ *	nfs4 -	force NFS V4
+ * Because we need to maintain backward compatibility with the naming
+ * convention that the NFS V2 filesystem name is "nfs" (see vfs_conf.c)
+ * we need to map "nfs" => "nfsdyn" and "nfs2" => "nfs".  The dynamic
+ * nfs module will map the type back to either "nfs", "nfs3", or "nfs4".
+ * This is only for root filesystems, all other uses such as cachefs
+ * will expect that "nfs" == NFS V2.
  */
 static void
 getrootfs(char **fstypp, char **fsmodp)
@@ -4568,7 +4588,10 @@ getrootfs(char **fstypp, char **fsmodp)
 	extern char *strplumb_get_netdev_path(void);
 	char *propstr = NULL;
 
-	/* check fstype property; it should be nfsdyn for diskless */
+	/*
+	 * Check fstype property; for diskless it should be one of "nfs",
+	 * "nfs2", "nfs3" or "nfs4".
+	 */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
 	    DDI_PROP_DONTPASS, "fstype", &propstr)
 	    == DDI_SUCCESS) {
@@ -4592,6 +4615,12 @@ getrootfs(char **fstypp, char **fsmodp)
 	}
 
 	++netboot;
+
+	if (strcmp(rootfs.bo_fstype, "nfs2") == 0)
+		(void) strcpy(rootfs.bo_fstype, "nfs");
+	else if (strcmp(rootfs.bo_fstype, "nfs") == 0)
+		(void) strcpy(rootfs.bo_fstype, "nfsdyn");
+
 	/*
 	 * check if path to network interface is specified in bootpath
 	 * or by a hypervisor domain configuration file.

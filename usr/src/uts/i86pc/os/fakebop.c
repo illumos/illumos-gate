@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the functionality that mimics the boot operations
  * on SPARC systems or the old boot.bin/multiboot programs on x86 systems.
@@ -900,7 +898,7 @@ xen_nfsroot_props(char *s)
 	};
 	int n_prop = sizeof (prop_map) / sizeof (prop_map[0]);
 
-	bsetprop("fstype", 6, "nfsdyn", 7);
+	bsetprop("fstype", 6, "nfs", 4);
 
 	xen_parse_props(s, prop_map, n_prop);
 
@@ -1103,7 +1101,7 @@ build_boot_properties(void)
 			xen_vbdroot_props(propbuf);
 		/*
 		 * While we're here, if we have a "xpv-nfsroot" property
-		 * then we need to set "fstype" to "nfsdyn" so we mount
+		 * then we need to set "fstype" to "nfs" so we mount
 		 * our root from the nfs server.  Also parse the xpv-nfsroot
 		 * property to create the properties that nfs_mountroot will
 		 * need to find the root and mount it.

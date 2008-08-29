@@ -23,8 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* ONC_PLUS EXTRACT END */
 
 /*
@@ -168,6 +166,11 @@ rootconf(void)
 	RLOCK_VFSSW();
 	vsw = vfs_getvfsswbyname(rootfs.bo_fstype);
 	RUNLOCK_VFSSW();
+	if (vsw == NULL) {
+		cmn_err(CE_CONT, "Cannot find %s filesystem\n",
+		    rootfs.bo_fstype);
+		return (ENXIO);
+	}
 	VFS_INIT(rootvfs, &vsw->vsw_vfsops, (caddr_t)0);
 	VFS_HOLD(rootvfs);
 
