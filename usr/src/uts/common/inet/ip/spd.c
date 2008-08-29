@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"@(#)spd.c	1.61	08/07/15 SMI"
 
 /*
  * IPsec Security Policy Database.
@@ -2567,7 +2567,6 @@ ipsec_check_inbound_policy(mblk_t *first_mp, conn_t *connp,
 	netstack_t	*ns;
 
 	ASSERT(connp != NULL);
-	ipl = connp->conn_latch;
 	ns = connp->conn_netstack;
 	ipss = ns->netstack_ipsec;
 	ipst = ns->netstack_ip;
@@ -2582,7 +2581,19 @@ clear:
 		 */
 		ASSERT(mp != NULL);
 
-		if (ipl != NULL) {
+		mutex_enter(&connp->conn_lock);
+		if (connp->conn_state_flags & CONN_CONDEMNED) {
+			mutex_exit(&connp->conn_lock);
+			ip_drop_packet(first_mp, B_TRUE, NULL,
+			    NULL, DROPPER(ipss, ipds_spd_got_clear),
+			    &ipss->ipsec_spd_dropper);
+			BUMP_MIB(&ipst->ips_ip_mib, ipsecInFailed);
+			return (NULL);
+		}
+		if ((ipl = connp->conn_latch) != NULL) {
+			/* Hold a reference in case the conn is closing */
+			IPLATCH_REFHOLD(ipl);
+			mutex_exit(&connp->conn_lock);
 			/*
 			 * Policy is cached in the conn.
 			 */
@@ -2593,6 +2604,7 @@ clear:
 				if (ret) {
 					BUMP_MIB(&ipst->ips_ip_mib,
 					    ipsecInSucceeded);
+					IPLATCH_REFRELE(ipl, ns);
 					return (first_mp);
 				} else {
 					ipsec_log_policy_failure(
@@ -2605,13 +2617,18 @@ clear:
 					    &ipss->ipsec_spd_dropper);
 					BUMP_MIB(&ipst->ips_ip_mib,
 					    ipsecInFailed);
+					IPLATCH_REFRELE(ipl, ns);
 					return (NULL);
 				}
 			} else {
 				BUMP_MIB(&ipst->ips_ip_mib, ipsecInSucceeded);
+				IPLATCH_REFRELE(ipl, ns);
 				return (first_mp);
 			}
 		} else {
+			uchar_t db_type;
+
+			mutex_exit(&connp->conn_lock);
 			/*
 			 * As this is a non-hardbound connection we need
 			 * to look at both per-socket policy and global
@@ -2620,7 +2637,7 @@ clear:
 			 * reported before calling ipsec_check_global_policy
 			 * so that it does not mistake it for IPSEC_IN.
 			 */
-			uchar_t db_type = mp->b_datap->db_type;
+			db_type = mp->b_datap->db_type;
 			mp->b_datap->db_type = M_DATA;
 			first_mp = ipsec_check_global_policy(first_mp, connp,
 			    ipha, ip6h, mctl_present, ns);
@@ -2651,7 +2668,24 @@ clear:
 
 	ASSERT(ii->ipsec_in_type == IPSEC_IN);
 
-	if (ipl == NULL) {
+	mutex_enter(&connp->conn_lock);
+	/* Connection is closing */
+	if (connp->conn_state_flags & CONN_CONDEMNED) {
+		mutex_exit(&connp->conn_lock);
+		ip_drop_packet(first_mp, B_TRUE, NULL,
+		    NULL, DROPPER(ipss, ipds_spd_got_clear),
+		    &ipss->ipsec_spd_dropper);
+		BUMP_MIB(&ipst->ips_ip_mib, ipsecInFailed);
+		return (NULL);
+	}
+
+	/*
+	 * Once a connection is latched it remains so for life, the conn_latch
+	 * pointer on the conn has not changed, simply initializing ipl here
+	 * as the earlier initialization was done only in the cleartext case.
+	 */
+	if ((ipl = connp->conn_latch) != NULL) {
+		mutex_exit(&connp->conn_lock);
 		/*
 		 * We don't have policies cached in the conn
 		 * for this stream. So, look at the global
@@ -2662,6 +2696,9 @@ clear:
 		    ipha, ip6h, mctl_present, ns));
 	}
 
+	IPLATCH_REFHOLD(ipl);
+	mutex_exit(&connp->conn_lock);
+
 	if (ipl->ipl_in_action != NULL) {
 		/* Policy is cached & latched; fast(er) path */
 		const char *reason;
@@ -2670,6 +2707,7 @@ clear:
 		if (ipsec_check_ipsecin_latch(ii, mp, ipl,
 		    ipha, ip6h, &reason, &counter, connp)) {
 			BUMP_MIB(&ipst->ips_ip_mib, ipsecInSucceeded);
+			IPLATCH_REFRELE(ipl, ns);
 			return (first_mp);
 		}
 		ipsec_rl_strlog(ns, IP_MOD_ID, 0, 0,
@@ -2679,9 +2717,11 @@ clear:
 		ip_drop_packet(first_mp, B_TRUE, NULL, NULL, counter,
 		    &ipss->ipsec_spd_dropper);
 		BUMP_MIB(&ipst->ips_ip_mib, ipsecInFailed);
+		IPLATCH_REFRELE(ipl, ns);
 		return (NULL);
 	} else if (ipl->ipl_in_policy == NULL) {
 		ipsec_weird_null_inbound_policy++;
+		IPLATCH_REFRELE(ipl, ns);
 		return (first_mp);
 	}
 
@@ -2695,6 +2735,7 @@ clear:
 	 */
 	if (first_mp != NULL)
 		ipsec_latch_inbound(ipl, ii);
+	IPLATCH_REFRELE(ipl, ns);
 	return (first_mp);
 }
 
