@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -793,7 +792,14 @@ sctp_process_timer(sctp_t *sctp)
 		 */
 		sctp->sctp_timer_mp = mp->b_cont;
 		mp->b_cont = NULL;
+		/*
+		 * We have a reference on the sctp, the lock must be
+		 * dropped to avoid deadlocks with functions potentially
+		 * called in this context which in turn call untimeout().
+		 */
+		mutex_exit(&sctp->sctp_lock);
 		sctp_timer_call(sctp, mp);
+		mutex_enter(&sctp->sctp_lock);
 	}
 	SCTP_REFRELE(sctp);
 }
