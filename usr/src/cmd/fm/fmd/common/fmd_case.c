@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * FMD Case Subsystem
  *
@@ -204,18 +202,18 @@ fmd_case_hash_apply(fmd_case_hash_t *chp,
 	cpc = chp->ch_count;
 
 	for (i = 0; i < chp->ch_hashlen; i++) {
-		for (cp = chp->ch_hash[i]; cp != NULL; cp = cp->ci_next) {
-			if (fmd_case_tryhold(cp) != NULL)
-				*cpp++ = cp;
-		}
+		for (cp = chp->ch_hash[i]; cp != NULL; cp = cp->ci_next)
+			*cpp++ = fmd_case_tryhold(cp);
 	}
 
 	ASSERT(cpp == cps + cpc);
 	(void) pthread_rwlock_unlock(&chp->ch_lock);
 
 	for (i = 0; i < cpc; i++) {
-		func((fmd_case_t *)cps[i], arg);
-		fmd_case_rele((fmd_case_t *)cps[i]);
+		if (cps[i] != NULL) {
+			func((fmd_case_t *)cps[i], arg);
+			fmd_case_rele((fmd_case_t *)cps[i]);
+		}
 	}
 
 	fmd_free(cps, cpc * sizeof (fmd_case_t *));
