@@ -7957,7 +7957,9 @@ mondo_loop() {
 		# The global zone needs to have its /dev/dld symlink created
 		# during install so that processes can access it early in boot
 		# before devfsadm is run.
-		ln -s ../devices/pseudo/dld@0:ctl $rootprefix/dev/dld
+		if [ ! -L $rootprefix/dev/dld ]; then
+			ln -s ../devices/pseudo/dld@0:ctl $rootprefix/dev/dld
+		fi
 	fi
 
 	# Fix up audit permissions
