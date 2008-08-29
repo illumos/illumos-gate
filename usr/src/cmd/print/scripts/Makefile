@@ -22,10 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/lp/etc/Makefile
-#
 
 include			../Makefile.sp
 
@@ -67,13 +63,29 @@ $(ROOTMANUFALIASES)	:= GROUP=lp
 $(ROOTMANUFALIASES)	:= FILEMODE=444
 
 LIBLPPROGS=	 	getmakes getmodels getppdfile getppds ppdfilename2mmp \
-			lpadmin
+			lpadmin \
+			desktop-print-management \
+			desktop-print-management-applet \
+			desktop-print-management-prefs
+
 ROOTLIBLPPROGS=		$(LIBLPPROGS:%=$(ROOTLIBLPBIN)/%)
 $(ROOTLIBLPPROGS)		:= OWNER=root
 $(ROOTLIBLPPROGS)		:= GROUP=lp
 $(ROOTLIBLPPROGS)		:= FILEMODE=555
 
 LIBLINKS=		$(ROOTLIB)/lpadmin $(ROOTLIB)/lpsystem
+
+APPFILES =	desktop-print-management.desktop
+APPFILES +=	desktop-print-management-prefs.desktop
+AUTOFILES =	desktop-print-management-applet.desktop
+
+ROOTAPPDIR =		$(ROOT)/usr/share/applications
+ROOTAUTODIR =		$(ROOT)/usr/share/gnome/autostart
+ROOTAPPFILES =		$(APPFILES:%=$(ROOTAPPDIR)/%)
+ROOTAUTOFILES =		$(AUTOFILES:%=$(ROOTAUTODIR)/%)
+
+$(ROOTAPPFILES)		:= FILEMODE = 444
+$(ROOTAUTOFILES)	:= FILEMODE = 444
 
 
 .KEEP_STATE:
@@ -87,6 +99,12 @@ $(ROOTLIBLPBIN)/%: %
 	$(INS.file)
 
 $(ROOTVARLPPPD)/%: %
+	$(INS.file)
+
+$(ROOTAPPDIR)/%:	%
+	$(INS.file)
+
+$(ROOTAUTODIR)/%:	%
 	$(INS.file)
 
 $(ROOTUSRSBIN) $(ROOTVARSPOOLPRINT) $(ROOTVARLP) $(ROOTVARLPPPD):
@@ -124,7 +142,8 @@ install:		$(ROOTLNKPROGS) \
 			$(ROOTVARSPOOLPRINT) $(ROOTPCONF) \
 			$(ROOTLIBLPPROGS) $(LIBLINKS) \
 			$(ROOTVARLP) $(ROOTVARLPPPD) \
-			$(ROOTMANUFALIASES)
+			$(ROOTMANUFALIASES) \
+			$(ROOTAPPFILES) $(ROOTAUTOFILES)
 
 $(SYMLINKS1):
 	$(RM) $@; $(SYMLINK) ../sbin/$(SBINPROG1) $@

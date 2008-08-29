@@ -39,7 +39,7 @@ SYMLINKS=	$(SYM.ROOT.SYS) $(SYM.ROOT.BIN) $(SYM.OTHERS)
 
 TARGETDIRS=	$(ROOT.SYS) $(ROOT.BIN) $(ROOT.SYS2) \
 		$(UUCP.UUCP) $(OTHERS) $(SYM.USRCCSLIB) $(SYM.USRLIB) \
-		$(ROOT.SFW)
+		$(ROOT.SFW) $(ROOT.OTHER)
 
 $(BUILD64)	TARGETDIRS += $(ROOT.SYS64.2) $(ROOT.BIN64) \
 		$(SYM.USRCCSLIB64) $(SYM.USRLIB64) $(ROOT.SFW64)
@@ -310,6 +310,7 @@ ROOT.BIN= \
 	/usr/share/audio \
 	/usr/share/audio/samples \
 	/usr/share/audio/samples/au \
+	/usr/share/gnome/autostart \
 	/usr/share/man \
 	/usr/share/man/man1m \
 	/usr/ucb \
@@ -371,6 +372,10 @@ ROOT.BIN64= \
 	/usr/ucblib/$(MACH64) \
 	/usr/xpg4/lib/$(MACH64) \
 	/var/ld/$(MACH64)
+
+ROOT.OTHER= \
+	/usr/share/applications \
+	/usr/share/gnome
 
 ROOT.SYS2= \
 	/usr/lib/fs \
@@ -540,6 +545,8 @@ $(ROOT.SYS:%=$(ROOT)%) \
 $(ROOT.SYS2:%=$(ROOT)%) \
 $(ROOT.SYS64.2:%=$(ROOT)%) \
 $(SYM.ROOT.SYS:%=$(ROOT)%):=	GROUP= sys
+
+$(ROOT.OTHER:%=$(ROOT)%):=	GROUP= other
 
 $(ROOT)/var/adm \
 $(ROOT)/var/adm/sa :=		DIRMODE= 775

@@ -18,11 +18,12 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# 
+#
+
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
 # and their location on the development machine when building the package.
@@ -72,3 +73,6 @@ f none usr/lib/lp/bin/printer-info 555 root lp
 d none usr/sbin 755 root bin
 f none usr/sbin/ppdmgr 0555 root lp
 s none usr/sbin/printmgr=../../usr/sadm/admin/bin/printmgr
+d none usr/share 755 root sys
+d none usr/share/applications 755 root other
+f none usr/share/applications/solaris-print-manager.desktop 444 root bin

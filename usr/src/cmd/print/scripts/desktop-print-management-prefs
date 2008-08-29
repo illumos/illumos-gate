@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -18,37 +19,15 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-include ../../Makefile.cmd
-
-SBINPROG =	print-service
-LPBINLINKS =	lp lpstat cancel enable disable
-LPRBINLINKS =	lpr lpq lprm lpc
-DESKTOPLINKS =  desktop-print-management desktop-print-management-applet
-DESKTOPLINKS += desktop-print-management-prefs
-BINLINKS =	$(LPBINLINKS) $(LPRBINLINKS) $(DESKTOPLINKS)
-SBINLINKS =	accept reject lpmove lpadmin
-
-ROOTUSRSBINPROG =	$(SBINPROG:%=$(ROOTUSRSBIN)/%)
-ROOTUSRBINLINKS =	$(BINLINKS:%=$(ROOTBIN)/%)
-ROOTUSRSBINLINKS =	$(SBINLINKS:%=$(ROOTUSRSBIN)/%)
-
-FILEMODE =	0555
-OWNER =		root
-
-$(ROOTUSRBINLINKS):
-	$(RM) $@; $(SYMLINK) ../sbin/$(SBINPROG) $@
-
-$(ROOTUSRSBINLINKS):
-	$(RM) $@; $(SYMLINK) $(SBINPROG) $@
-
-.KEEP_STATE:
-
-all check clean clobber lint:
-
-install:	$(ROOTUSRSBINPROG) $(ROOTUSRBINLINKS) $(ROOTUSRSBINLINKS)
-
+# This interface launches an available print management tool capable of
+# configuration management of the LP print service.
+#
+exec /usr/bin/ospm-preferences
+/bin/zenity --error --test "preferences are unavailable for the desktop print management tool"
+exit 0

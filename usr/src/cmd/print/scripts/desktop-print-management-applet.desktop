@@ -18,37 +18,20 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-include ../../Makefile.cmd
-
-SBINPROG =	print-service
-LPBINLINKS =	lp lpstat cancel enable disable
-LPRBINLINKS =	lpr lpq lprm lpc
-DESKTOPLINKS =  desktop-print-management desktop-print-management-applet
-DESKTOPLINKS += desktop-print-management-prefs
-BINLINKS =	$(LPBINLINKS) $(LPRBINLINKS) $(DESKTOPLINKS)
-SBINLINKS =	accept reject lpmove lpadmin
-
-ROOTUSRSBINPROG =	$(SBINPROG:%=$(ROOTUSRSBIN)/%)
-ROOTUSRBINLINKS =	$(BINLINKS:%=$(ROOTBIN)/%)
-ROOTUSRSBINLINKS =	$(SBINLINKS:%=$(ROOTUSRSBIN)/%)
-
-FILEMODE =	0555
-OWNER =		root
-
-$(ROOTUSRBINLINKS):
-	$(RM) $@; $(SYMLINK) ../sbin/$(SBINPROG) $@
-
-$(ROOTUSRSBINLINKS):
-	$(RM) $@; $(SYMLINK) $(SBINPROG) $@
-
-.KEEP_STATE:
-
-all check clean clobber lint:
-
-install:	$(ROOTUSRSBINPROG) $(ROOTUSRBINLINKS) $(ROOTUSRSBINLINKS)
-
+[Desktop Entry]
+Encoding=UTF-8
+Name=Desktop Printing Monitoring applet
+Comment=Show balloon dialog for printers 
+Icon=print-manager.png
+Exec=env DESKTOP_LAUNCHED=true /usr/bin/desktop-print-management-applet
+Terminal=false
+Type=Application
+Categories=
+OnlyShowIn=GNOME;
+X-GNOME-Autostart-enabled=true

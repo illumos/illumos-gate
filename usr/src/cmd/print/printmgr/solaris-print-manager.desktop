@@ -1,0 +1,61 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+[Desktop Entry]
+Encoding=UTF-8
+# SUN_BRANDING
+Name=Solaris LP Print Manager
+Name[cs]=Správce tisku
+Name[de]=Druck-Manager
+Name[es]=Administrador de impresión
+Name[fr]=Gestionnaire d'impression
+Name[hu]=Nyomtató-kezelő
+Name[it]=Gestione stampa
+Name[ja]=印刷マネージャ
+Name[ko]=인쇄 관리자
+Name[pl]=Menedżer wydruku
+Name[pt_BR]=Gerenciador Impressoras
+Name[ru]=Менеджер печати
+Name[sv]=Utskriftshanterare
+Name[zh_CN]=打印管理器
+Name[zh_HK]=印表機總管
+Name[zh_TW]=印表機總管
+# SUN_BRANDING
+Comment=Add and remove LP printers and queues
+Comment[de]=Hinzufügen und Entfernen von Druckern und Warteschlangen
+Comment[es]=Agregar y quitar impresoras y colas
+Comment[fr]=Ajouter ou supprimer des imprimantes et des files d'attente
+Comment[it]=Aggiungi e rimuovi stampanti e code
+Comment[ja]=プリンタやキューを追加や削除する
+Comment[ko]=프린터 및 대기열 추가 및 제거
+Comment[pt_BR]=Adição e remoção de impressoras e filas
+Comment[ru]=Добавление и удаление принтеров и очередей
+Comment[zh_CN]=添加和删除打印机和队列
+Comment[zh_HK]=增加和移除印表機和佇列
+Comment[zh_TW]=增加和移除印表機和佇列
+Exec=gksu /usr/sbin/printmgr
+Icon=print-manager
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=Application;System;Settings
