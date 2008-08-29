@@ -19,10 +19,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -636,21 +634,29 @@ update_label_cache()
 		#
 		tmpcachepath=$(/bin/mktemp -p "${ppdmgrtmpdir}" \
 		    tmpcachepath.XXXXXX 2>/dev/null)
-		newfileslist=$(changes_under_label "${dstlabelpath}" \
-		    "${varlabelcachepath}")
-		if [[ $? -eq 0 ]] ; then
-			err_files=$(generate_label_cache_file \
-			    "${newfileslist}" "${varlabelcachepath}" \
-			    "${dstlabelpath}" "${tmpcachepath}")
-			if [[ $? -ne 0 ]] ; then
-				#
-				# At least one PPD file was invalid.
-				# Don't return yet, as the cache info
-				# for the valid PPD files can still be
-				# used to generate a cache file.
-				#
-				echo "${err_files}"
-				ulc_rc=1
+
+		# if this is a system repository, check for a prepopulated cache
+		if [[ "${2}" = "${SYSTEM}" && -e ${FOOCACHEDIR}/${3}.cache ]] ; then
+			# copy prepopulated cache 
+			/bin/cp -f ${FOOCACHEDIR}/${3}.cache ${tmpcachepath}
+
+		else
+			newfileslist=$(changes_under_label "${dstlabelpath}" \
+			    "${varlabelcachepath}")
+			if [[ $? -eq 0 ]] ; then
+				err_files=$(generate_label_cache_file \
+				    "${newfileslist}" "${varlabelcachepath}" \
+				    "${dstlabelpath}" "${tmpcachepath}")
+				if [[ $? -ne 0 ]] ; then
+					#
+					# At least one PPD file was invalid.
+					# Don't return yet, as the cache info
+					# for the valid PPD files can still be
+					# used to generate a cache file.
+					#
+					echo "${err_files}"
+					ulc_rc=1
+				fi
 			fi
 		fi
 
@@ -1408,6 +1414,9 @@ USERREP=${VARDIR}
 RESERVEDREPS="${SYSTEMREP} ${ADMINREP} ${VENDORREP}"
 REPOSITORIES="${USERREP} ${RESERVEDREPS}"
 RESERVEDLABELS="all caches ppdcache manufaliases"
+ 
+# Directory where system:SUNWfoomatic is delivered
+FOOCACHEDIR=/usr/lib/lp/caches
 
 # Deliveries
 SYSTEM=system
