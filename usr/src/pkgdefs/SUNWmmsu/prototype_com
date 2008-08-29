@@ -47,8 +47,6 @@ d none usr/lib 0755 root bin
 
 d none usr/bin 0755 root bin
 f none usr/bin/mmsssl.sh 0555 root bin
-f none usr/lib/mmsmm 0555 root bin
-f none usr/lib/mmswcr 0555 root bin
 f none usr/bin/mmsssi.sh 0555 root bin
 f none usr/lib/mmsdm 0555 root bin
 f none usr/lib/mmslm 0555 root bin

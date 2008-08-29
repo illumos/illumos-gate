@@ -35,7 +35,7 @@ lint_SRCS = $(SRCS:%.c=%.ln)
 
 include ../../../Makefile.cmd
 
-ROOTCMDDIR=	$(ROOT)/usr/lib
+ROOTCMDDIR=	$(ROOT)/lib/svc/method
 
 CPPFLAGS += -DMMS_OPENSSL -D_REENTRANT
 CPPFLAGS += -I. -I../common -I$(SRC)/common/mms/mms
@@ -55,7 +55,6 @@ C99MODE=	$(C99_ENABLE)
 LIBSVC = $(ROOT)/lib/svc/method
 
 FILES += $(ROOTBIN)/mmsssi.sh
-FILES += $(LIBSVC)/mmswcr
 
 all: $(PROG)
 
@@ -85,6 +84,3 @@ include ../../../Makefile.targ
 $(ROOTBIN)/%:	../common/%
 	$(INS.file)
 
-$(LIBSVC)/mmswcr:
-	$(RM) $@ ;\
-	$(SYMLINK) /usr/lib/mmswcr $@

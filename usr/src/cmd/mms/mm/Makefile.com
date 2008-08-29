@@ -37,7 +37,7 @@ lint_SRCS = $(SRCS:%.c=%.ln)
 
 include ../../../Makefile.cmd
 
-ROOTCMDDIR=	$(ROOT)/usr/lib
+ROOTCMDDIR=	$(ROOT)/lib/svc/method
 
 CPPFLAGS += -DMMS_OPENSSL
 CPPFLAGS += -I. -I../common -I$(SRC)/common/mms/mms
@@ -154,7 +154,6 @@ FILES += $(SCBIN)/mmsssl.sh
 FILES += $(MMCAT)/mm.cat
 FILES += $(MMDB)/mms_db
 FILES += $(SSLCONF)/mms_openssl.cnf
-FILES += $(LIBSVC)/mmsmm
 
 install: all $(ROOTCMD) $(FILES) 
 
@@ -197,27 +196,31 @@ $(MMDB):
 $(SSLCONF):
 	$(INS.dir)
 
+$(MMPATHS)/% := FILEMODE = 0644
+
 $(MMPATHS)/%:	$(MMPATHS) ../common/%
 	$(INS.file)
 
+$(MMTYPES)/% := FILEMODE = 0644
+
 $(MMTYPES)/%:	$(MMTYPES) ../common/%
 	$(INS.file)
-	
+
 $(SCBIN)/%:	../common/%
 	$(INS.file)
 
+$(SSLCONF)/% := FILEMODE = 0644
+
 $(SSLCONF)/%:	$(SSLCONF) ../common/%
-	$(INS.file)	
+	$(INS.file)
 
 $(MMCAT)/%:	$(MMCAT) ../common/%
 	$(INS.file)
 
+$(MMDB)/% := FILEMODE = 0644
+
 $(MMDB)/%:	$(MMDB) ../common/%
 	$(INS.file)
-
-$(LIBSVC)/mmsmm:
-	$(RM) $@ ;\
-	$(SYMLINK) /usr/lib/mmsmm $@
 
 $(ETCPWD):
 	$(INS.dir)

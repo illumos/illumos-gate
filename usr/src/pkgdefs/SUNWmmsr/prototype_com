@@ -49,17 +49,17 @@ i space
 d none etc 0755 root sys
 d none etc/mms 0755 root sys
 d none etc/mms/config 0755 root sys
-f none etc/mms/config/mm_paths.xml 0555 root other
+f none etc/mms/config/mm_paths.xml 0644 root sys
 d none etc/mms/db 0755 root bin
-f none etc/mms/db/mms_db 0555 root other
+f none etc/mms/db/mms_db 0644 root sys
 d none etc/mms/types 0755 root sys
-f none etc/mms/types/mm_types.xml 0555 root other
+f none etc/mms/types/mm_types.xml 0644 root sys
 d none etc/mms/passwd 0755 root sys
-f none etc/mms/release-note 0644 root other
+f none etc/mms/release-note 0644 root sys
 d none etc/security 0755 root sys
-e rbac etc/security/auth_attr=../../usr/src/pkgdefs/SUNWmmsr/auth_attr 644 root sys
-e rbac etc/security/prof_attr=../../usr/src/pkgdefs/SUNWmmsr/prof_attr 644 root sys
-e rbac etc/security/exec_attr=../../usr/src/pkgdefs/SUNWmmsr/exec_attr 644 root sys
+e rbac etc/security/mms_auth_attr 644 root sys
+e rbac etc/security/mms_prof_attr 644 root sys
+e rbac etc/security/mms_exec_attr 644 root sys
 
 f none kernel/drv/dmd.conf 0644 root sys
 f none kernel/drv/dda.conf 0644 root sys
@@ -67,9 +67,9 @@ f none kernel/drv/dda.conf 0644 root sys
 d none lib 0755 root bin
 d none lib/svc 0755 root bin
 d none lib/svc/method 0755 root bin
-s none lib/svc/method/mmsmm=/usr/lib/mmsmm
+f none lib/svc/method/mmsmm 0555 root bin
 f none lib/svc/method/mmsdb 0555 root bin
-s none lib/svc/method/mmswcr=/usr/lib/mmswcr
+f none lib/svc/method/mmswcr 0555 root bin
 d none var/svc 0755 root sys
 d none var/svc/manifest 0755 root sys
 d none var/svc/manifest/application 0755 root sys
@@ -83,7 +83,7 @@ d none var/mms/handle 0755 root sys
 d none var/mms/ssl 0755 root sys 
 d none var/mms/ssl/ca 0755 root sys 
 d none var/mms/ssl/pub 0755 root sys 
-f none var/mms/ssl/ca/mms_openssl.cnf 0555 root other
+f none var/mms/ssl/ca/mms_openssl.cnf 0644 root sys
 
 d none var/log 0755 root sys
 d none var/log/mms 0755 root sys
@@ -92,4 +92,4 @@ d none var/log/mms/dm 0755 root sys
 d none var/log/mms/lm 0755 root sys
 d none var/log/mms/wcr 0755 root sys
 d none var/log/mms/api 0755 root sys
-e none var/log/mms/mms_logadm.conf 0644 root other
+e none var/log/mms/mms_logadm.conf 0644 root sys

@@ -21,8 +21,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
-#ident	"@(#)space	1.1	08/07/21 SMI"
-
-etc/security/auth_attr 1819 1
-etc/security/exec_attr 1190 1
-etc/security/prof_attr 1300 1
+etc/security/mms_auth_attr 1819 1
+etc/security/mms_exec_attr 1190 1
+etc/security/mms_prof_attr 1300 1
