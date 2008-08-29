@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 PROG=		dns-sd finger rdate ruptime rwho whois
 SUIDPROG=	rcp rlogin rsh
@@ -84,7 +82,7 @@ rcp lint-rcp :=		LDLIBS += -lsocket -lsec -lsendfile
 rdate lint-rdate:=	LDLIBS += -lsocket
 rlogin lint-rlogin :=	LDLIBS += -lnsl -lsocket
 rsh lint-rsh :=		LDLIBS += -lsocket
-whois :=		LDLIBS += -lnsl -lsocket
+whois :=		LDLIBS += -lsocket
 
 include  $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
 $(KCMDPROGS)	:=	LDLIBS += -lnsl -lmech_krb5

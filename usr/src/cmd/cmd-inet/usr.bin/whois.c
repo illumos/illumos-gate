@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,8 +36,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/socket.h>
 
@@ -46,27 +43,21 @@
 
 #include <stdio.h>
 #include <netdb.h>
-
-#ifdef SYSV
-#define	bcopy(a,b,c)	memcpy((b),(a),(c))
-#endif /* SYSV */
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #define	NICHOST	"whois.internic.net"
 
 int
-main(argc, argv)
-	int argc;
-	char *argv[];
+main(int argc, char *argv[])
 {
-	int s;
+	int s, rv;
 	register FILE *sfi, *sfo;
 	register int c;
 	char *host = NICHOST;
-	struct sockaddr_in sin;
-	struct hostent *hp;
-	struct servent *sp;
-	char hnamebuf[32];
-	int addrtype;
+	struct addrinfo *ai_head, *ai;
+	struct addrinfo hints;
 
 	argc--, argv++;
 	if (argc > 2 && strcmp(*argv, "-h") == 0) {
@@ -78,35 +69,38 @@ main(argc, argv)
 		fprintf(stderr, "usage: whois [ -h host ] name\n");
 		exit(1);
 	}
-	sin.sin_addr.s_addr = inet_addr(host);
-	if (sin.sin_addr.s_addr != -1 && sin.sin_addr.s_addr != 0) {
-		addrtype = AF_INET;
-	} else {
-		hp = gethostbyname(host);
-		if (hp == NULL) {
-			fprintf(stderr, "whois: %s: host unknown\n", host);
-			exit(1);
-		}
-		addrtype = hp->h_addrtype;
-		host = hp->h_name;
-		bcopy(hp->h_addr, &sin.sin_addr, hp->h_length);
+
+	memset(&hints, 0, sizeof (hints));
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
+	hints.ai_flags = AI_ADDRCONFIG;
+	rv = getaddrinfo(host, "whois", &hints, &ai_head);
+	if (rv != 0) {
+		fprintf(stderr, "whois: %s: %s\n", host, gai_strerror(rv));
+		freeaddrinfo(ai_head);
+		exit(1);
 	}
 
-	s = socket(addrtype, SOCK_STREAM, 0);
+	for (ai = ai_head; ai != NULL; ai = ai->ai_next) {
+		s = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+		if (s >= 0) {
+			rv = connect(s, ai->ai_addr, ai->ai_addrlen);
+			if (rv < 0)
+				close(s);
+			else
+				break;
+		}
+	}
+	freeaddrinfo(ai_head);
+
 	if (s < 0) {
 		perror("whois: socket");
 		exit(2);
-	}
-	sin.sin_family = addrtype;
-	sp = getservbyname("whois", "tcp");
-	if (sp == NULL) {
-		sin.sin_port = htons(IPPORT_WHOIS);
-	}
-	else sin.sin_port = sp->s_port;
-	if (connect(s, (struct sockaddr *) &sin, sizeof (sin)) < 0) {
+	} else if (rv < 0) {
 		perror("whois: connect");
 		exit(5);
 	}
+
 	sfi = fdopen(s, "r");
 	sfo = fdopen(s, "w");
 	if (sfi == NULL || sfo == NULL) {
