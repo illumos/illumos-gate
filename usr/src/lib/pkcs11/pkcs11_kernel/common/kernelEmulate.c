@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <stdio.h>
@@ -79,26 +77,29 @@ emulate_buf_init(kernel_session_t *session_p, int buflen, int opflag)
 
 	if (bufp != NULL) {
 		bufp->indata_len = 0;
+		/*
+		 * We can reuse the context structure, digest_buf_t.
+		 * See if we can reuse the scratch buffer in the context too.
+		 */
 		if (buflen > bufp->buf_len) {
-			free(bufp);
-			bufp = opp->context = NULL;
+			free(bufp->buf);
+			bufp->buf = NULL;
 		}
-	}
-
-	if (bufp == NULL) {
-		bufp = calloc(1, sizeof (digest_buf_t));
+	} else {
+		bufp = opp->context = calloc(1, sizeof (digest_buf_t));
 		if (bufp == NULL) {
 			return (CKR_HOST_MEMORY);
 		}
+	}
 
+	if (bufp->buf == NULL) {
 		bufp->buf = malloc(buflen);
 		if (bufp->buf == NULL) {
 			free(bufp);
+			opp->context = NULL;
 			return (CKR_HOST_MEMORY);
 		}
 		bufp->buf_len = buflen;
-		bufp->indata_len = 0;
-		opp->context = bufp;
 	}
 
 	return (CKR_OK);
