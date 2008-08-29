@@ -602,3 +602,5 @@ Notes on packaging:
 ======
   This version has the following fix:
    6634746 e1000g is missing lint target in Makefile
+   6705005 e1000g LINK/ACT LED behaviour is not consistent with the EEPROM default
+   6738552 e1000g rx_lock is not initialized and destroyed in the code

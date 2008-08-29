@@ -1100,6 +1100,8 @@ e1000g_init_locks(struct e1000g *Adapter)
 
 	rx_ring = Adapter->rx_ring;
 
+	mutex_init(&rx_ring->rx_lock, NULL,
+	    MUTEX_DRIVER, DDI_INTR_PRI(Adapter->intr_pri));
 	mutex_init(&rx_ring->freelist_lock, NULL,
 	    MUTEX_DRIVER, DDI_INTR_PRI(Adapter->intr_pri));
 }
@@ -1116,6 +1118,7 @@ e1000g_destroy_locks(struct e1000g *Adapter)
 	mutex_destroy(&tx_ring->freelist_lock);
 
 	rx_ring = Adapter->rx_ring;
+	mutex_destroy(&rx_ring->rx_lock);
 	mutex_destroy(&rx_ring->freelist_lock);
 
 	mutex_destroy(&Adapter->link_lock);
@@ -1327,6 +1330,12 @@ e1000g_init(struct e1000g *Adapter)
 		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_INVAL_STATE);
 		goto init_fail;
 	}
+
+	/*
+	 * Restore LED settings to the default from EEPROM
+	 * to meet the standard for Sun platforms.
+	 */
+	(void) e1000_cleanup_led(hw);
 
 	/* Disable Smart Power Down */
 	phy_spd_state(hw, B_FALSE);
