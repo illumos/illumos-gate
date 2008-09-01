@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/types.h>
@@ -1235,18 +1233,12 @@ ldl_sethead(ml_unit_t *ul, off_t data_lof, uint32_t tid)
 	uint32_t	new_ident;
 	daddr_t		beg_blkno;
 	daddr_t		end_blkno;
-	struct timeval	tv;
 
 	ASSERT(MUTEX_HELD(&ul->un_log_mutex));
 
 	if (data_lof == -1) {
 		/* log is empty */
-		uniqtime(&tv);
-		if (tv.tv_usec == ul->un_head_ident) {
-			tv.tv_usec++;
-		}
-		last_loghead_ident = tv.tv_usec;
-		new_ident = tv.tv_usec;
+		new_ident = lufs_hd_genid(ul);
 		new_lof = ul->un_tail_lof;
 
 	} else {
@@ -1336,19 +1328,13 @@ ldl_settail(ml_unit_t *ul, off_t lof, size_t nb)
 	uint32_t	new_ident;
 	daddr_t		beg_blkno;
 	daddr_t		end_blkno;
-	struct timeval	tv;
 
 	ASSERT(MUTEX_HELD(&ul->un_log_mutex));
 
 	if (lof == -1) {
-		uniqtime(&tv);
-		if (tv.tv_usec == ul->un_head_ident) {
-			tv.tv_usec++;
-		}
-		last_loghead_ident = tv.tv_usec;
 		ul->un_tail_lof = dbtob(btodb(ul->un_head_lof));
 		ul->un_head_lof = ul->un_tail_lof;
-		ul->un_head_ident = tv.tv_usec;
+		ul->un_head_ident = lufs_hd_genid(ul);
 		ul->un_tail_ident = ul->un_head_ident;
 
 		/* Commit to the database */

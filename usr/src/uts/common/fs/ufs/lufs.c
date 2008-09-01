@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/types.h>
@@ -48,6 +46,12 @@
 #include <sys/param.h>
 #include <sys/kstat.h>
 #include <sys/cmn_err.h>
+#include <sys/sdt.h>
+
+#define	LUFS_GENID_PRIME	UINT64_C(4294967291)
+#define	LUFS_GENID_BASE		UINT64_C(311)
+#define	LUFS_NEXT_ID(id)	((uint32_t)(((id) * LUFS_GENID_BASE) % \
+				    LUFS_GENID_PRIME))
 
 extern	kmutex_t	ufs_scan_lock;
 
@@ -66,7 +70,9 @@ uint32_t	ldl_mintransfer	= LDL_MINTRANSFER;
 uint32_t	ldl_maxtransfer	= LDL_MAXTRANSFER;
 uint32_t	ldl_minbufsize	= LDL_MINBUFSIZE;
 
-uint32_t	last_loghead_ident = 0;
+/* Generation of header ids */
+kmutex_t	genid_mutex;
+uint32_t	last_loghead_ident = UINT32_C(0);
 
 /*
  * Logging delta and roll statistics
@@ -427,6 +433,69 @@ lufs_snarf(ufsvfs_t *ufsvfsp, struct fs *fs, int ronly)
 	return (0);
 }
 
+uint32_t
+lufs_hd_genid(const ml_unit_t *up)
+{
+	uint32_t id;
+
+	mutex_enter(&genid_mutex);
+
+	/*
+	 * The formula below implements an exponential, modular sequence.
+	 *
+	 * ID(N) = (SEED * (BASE^N)) % PRIME
+	 *
+	 * The numbers will be pseudo random.  They depend on SEED, BASE, PRIME,
+	 * but will sweep through almost all of the range 1....PRIME-1.
+	 * Most  importantly  they  will  not  repeat  for PRIME-2 (4294967289)
+	 * repetitions.  If they would repeat that  could possibly cause  hangs,
+	 * panics at mount/umount and failed mount operations.
+	 */
+	id = LUFS_NEXT_ID(last_loghead_ident);
+
+	/* Checking if new identity used already */
+	if (up != NULL && up->un_head_ident == id) {
+		DTRACE_PROBE1(head_ident_collision, uint32_t, id);
+
+		/*
+		 * The  following  preserves  the  algorithm  for  the fix  for
+		 * "panic: free: freeing free frag, dev:0x2000000018, blk:34605,
+		 * cg:26, ino:148071,".
+		 * If  the header identities  un_head_ident  are  equal  to the
+		 * present element  in the sequence,  the next element  of  the
+		 * sequence is returned instead.
+		 */
+		id = LUFS_NEXT_ID(id);
+	}
+
+	last_loghead_ident = id;
+
+	mutex_exit(&genid_mutex);
+
+	return (id);
+}
+
+static void
+lufs_genid_init(void)
+{
+	uint64_t seed;
+
+	/* Initialization */
+	mutex_init(&genid_mutex, NULL, MUTEX_DEFAULT, NULL);
+
+	/* Seed the algorithm */
+	do {
+		timestruc_t tv;
+
+		gethrestime(&tv);
+
+		seed = (tv.tv_nsec << 3);
+		seed ^= tv.tv_sec;
+
+		last_loghead_ident = (uint32_t)(seed % LUFS_GENID_PRIME);
+	} while (last_loghead_ident == UINT32_C(0));
+}
+
 static int
 lufs_initialize(
 	ufsvfs_t *ufsvfsp,
@@ -436,7 +505,6 @@ lufs_initialize(
 {
 	ml_odunit_t	*ud, *ud2;
 	buf_t		*bp;
-	struct timeval	tv;
 
 	/* LINTED: warning: logical expression always true: op "||" */
 	ASSERT(sizeof (ml_odunit_t) < DEV_BSIZE);
@@ -458,12 +526,7 @@ lufs_initialize(
 
 	ud->od_statebno = INT32_C(0);
 
-	uniqtime(&tv);
-	if (tv.tv_usec == last_loghead_ident) {
-		tv.tv_usec++;
-	}
-	last_loghead_ident = tv.tv_usec;
-	ud->od_head_ident = tv.tv_usec;
+	ud->od_head_ident = lufs_hd_genid(NULL);
 	ud->od_tail_ident = ud->od_head_ident;
 	ud->od_chksum = ud->od_head_ident + ud->od_tail_ident;
 
@@ -1369,6 +1432,9 @@ lufs_init(void)
 		ksp->ks_update = delta_stats_update;
 		kstat_install(ksp);
 	}
+
+	/* Initialize  generation of logging ids */
+	lufs_genid_init();
 
 	/*
 	 * Set up the maximum amount of kmem that the crbs (system wide)
