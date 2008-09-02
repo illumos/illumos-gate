@@ -27,8 +27,6 @@
 #ifndef _TOPO_MOD_H
 #define	_TOPO_MOD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fm/libtopo.h>
 #include <fm/topo_hc.h>
 #include <libipmi.h>
@@ -117,7 +115,8 @@ extern void topo_method_unregister(topo_mod_t *, tnode_t *, const char *);
 extern void topo_method_unregister_all(topo_mod_t *, tnode_t *);
 
 extern di_node_t topo_mod_devinfo(topo_mod_t *);
-extern ipmi_handle_t *topo_mod_ipmi(topo_mod_t *);
+extern ipmi_handle_t *topo_mod_ipmi_hold(topo_mod_t *);
+extern void topo_mod_ipmi_rele(topo_mod_t *);
 extern di_prom_handle_t topo_mod_prominfo(topo_mod_t *);
 extern nvlist_t *topo_mod_auth(topo_mod_t *, tnode_t *);
 

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -65,7 +63,7 @@ ipmi_serial_lookup(topo_mod_t *mod, char *ipmi_tag, char *buf)
 	ipmi_fru_prod_info_t prod_info;
 
 	topo_mod_dprintf(mod, "ipmi_serial_lookup() called\n");
-	if ((hdl = topo_mod_ipmi(mod)) == NULL) {
+	if ((hdl = topo_mod_ipmi_hold(mod)) == NULL) {
 		topo_mod_dprintf(mod, "Failed to get IPMI handle\n");
 		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
 	}
@@ -75,6 +73,7 @@ ipmi_serial_lookup(topo_mod_t *mod, char *ipmi_tag, char *buf)
 	    == NULL) {
 		topo_mod_dprintf(mod, "Failed to lookup %s (%s)\n", ipmi_tag,
 		    ipmi_errmsg(hdl));
+		topo_mod_ipmi_rele(mod);
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
@@ -83,6 +82,7 @@ ipmi_serial_lookup(topo_mod_t *mod, char *ipmi_tag, char *buf)
 	if (ipmi_fru_read(hdl, fru_loc, &fru_data) < 0) {
 		topo_mod_dprintf(mod, "Failed to read FRU data (%s)\n",
 		    ipmi_errmsg(hdl));
+		topo_mod_ipmi_rele(mod);
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
@@ -91,9 +91,11 @@ ipmi_serial_lookup(topo_mod_t *mod, char *ipmi_tag, char *buf)
 		topo_mod_dprintf(mod, "Failed to read FRU product info (%s)\n",
 		    ipmi_errmsg(hdl));
 		free(fru_data);
+		topo_mod_ipmi_rele(mod);
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 	free(fru_data);
+	topo_mod_ipmi_rele(mod);
 
 	topo_mod_dprintf(mod, "FRU Product Serial: %s\n",
 	    prod_info.ifpi_product_serial);

@@ -627,19 +627,32 @@ topo_mod_devinfo(topo_mod_t *mod)
 }
 
 ipmi_handle_t *
-topo_mod_ipmi(topo_mod_t *mod)
+topo_mod_ipmi_hold(topo_mod_t *mod)
 {
 	topo_hdl_t *thp = mod->tm_hdl;
 	int err;
 	char *errmsg;
 
-	if (thp->th_ipmi == NULL)
-		if ((thp->th_ipmi = ipmi_open(&err, &errmsg)) == NULL)
+	(void) pthread_mutex_lock(&thp->th_ipmi_lock);
+	if (thp->th_ipmi == NULL) {
+		if ((thp->th_ipmi = ipmi_open(&err, &errmsg)) == NULL) {
 			topo_dprintf(mod->tm_hdl, TOPO_DBG_ERR,
 			    "ipmi_open() failed: %s (ipmi errno=%d)", errmsg,
 			    err);
+			(void) pthread_mutex_unlock(&thp->th_ipmi_lock);
+		}
+	}
+
 
 	return (thp->th_ipmi);
+}
+
+void
+topo_mod_ipmi_rele(topo_mod_t *mod)
+{
+	topo_hdl_t *thp = mod->tm_hdl;
+
+	(void) pthread_mutex_unlock(&thp->th_ipmi_lock);
 }
 
 di_prom_handle_t

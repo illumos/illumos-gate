@@ -27,8 +27,6 @@
 #ifndef _TOPO_TREE_H
 #define	_TOPO_TREE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fm/topo_mod.h>
 
 #include <libipmi.h>
@@ -128,6 +126,7 @@ struct topo_hdl {
 	int th_debug;			/* Debug mask */
 	int th_dbout;			/* Debug channel */
 	ipmi_handle_t *th_ipmi;		/* IPMI handle */
+	pthread_mutex_t th_ipmi_lock;	/* IPMI lock */
 };
 
 #define	TOPO_UUID_SIZE	37	/* libuuid limit + 1 */

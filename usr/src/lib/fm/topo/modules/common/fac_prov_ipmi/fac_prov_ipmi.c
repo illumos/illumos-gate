@@ -202,7 +202,7 @@ ipmi_sensor_state(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
-	if ((hdl = topo_mod_ipmi(mod)) == NULL) {
+	if ((hdl = topo_mod_ipmi_hold(mod)) == NULL) {
 		topo_mod_dprintf(mod, "Failed to get IPMI handle\n");
 		topo_mod_strfree(mod, entity_ref);
 		return (-1);
@@ -212,6 +212,7 @@ ipmi_sensor_state(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		topo_mod_dprintf(mod, "Failed to lookup SDR for %s (%s)\n",
 		    entity_ref, ipmi_errmsg(hdl));
 		topo_mod_strfree(mod, entity_ref);
+		topo_mod_ipmi_rele(mod);
 		return (-1);
 	}
 
@@ -228,6 +229,7 @@ ipmi_sensor_state(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 			topo_mod_dprintf(mod, "%s does not refer to a full or "
 			    "compact SDR\n", entity_ref);
 			topo_mod_strfree(mod, entity_ref);
+			topo_mod_ipmi_rele(mod);
 			return (-1);
 	}
 	if ((reading = ipmi_get_sensor_reading(hdl, sensor_num))
@@ -236,9 +238,11 @@ ipmi_sensor_state(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		    "%s, sensor_num=%d (%s)\n", entity_ref, sensor_num,
 		    ipmi_errmsg(hdl));
 		topo_mod_strfree(mod, entity_ref);
+		topo_mod_ipmi_rele(mod);
 		return (-1);
 	}
 	topo_mod_strfree(mod, entity_ref);
+	topo_mod_ipmi_rele(mod);
 
 	if (topo_mod_nvalloc(mod, &nvl, NV_UNIQUE_NAME) != 0 ||
 	    nvlist_add_string(nvl, TOPO_PROP_VAL_NAME,
@@ -278,7 +282,7 @@ ipmi_sensor_reading(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
-	if ((hdl = topo_mod_ipmi(mod)) == NULL) {
+	if ((hdl = topo_mod_ipmi_hold(mod)) == NULL) {
 		topo_mod_dprintf(mod, "Failed to get IPMI handle\n");
 		topo_mod_strfree(mod, entity_ref);
 		return (-1);
@@ -289,6 +293,7 @@ ipmi_sensor_reading(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		topo_mod_dprintf(mod, "Failed to lookup SDR for %s (%s)\n",
 		    entity_ref, ipmi_errmsg(hdl));
 		topo_mod_strfree(mod, entity_ref);
+		topo_mod_ipmi_rele(mod);
 		return (-1);
 	}
 
@@ -298,8 +303,11 @@ ipmi_sensor_reading(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		    "%s, sensor_num=%d (%s)\n", entity_ref,
 		    sensor->is_fs_number, ipmi_errmsg(hdl));
 		topo_mod_strfree(mod, entity_ref);
+		topo_mod_ipmi_rele(mod);
 		return (-1);
 	}
+	topo_mod_ipmi_rele(mod);
+
 	if (ipmi_sdr_conv_reading(sensor, reading->isr_reading, &conv_reading)
 	    != 0) {
 		topo_mod_dprintf(mod, "Failed to convert sensor reading for "
@@ -343,7 +351,7 @@ ipmi_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	 * Get an IPMI handle and then lookup the generic device locator sensor
 	 * data record referenced by the entity_ref prop val
 	 */
-	if ((hdl = topo_mod_ipmi(mod)) == NULL) {
+	if ((hdl = topo_mod_ipmi_hold(mod)) == NULL) {
 		topo_mod_dprintf(mod, "Failed to get IPMI handle\n");
 		return (-1);
 	}
@@ -352,6 +360,7 @@ ipmi_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	    &entity_ref, &err) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup entity_ref property "
 		    "(%s)", topo_strerror(err));
+		topo_mod_ipmi_rele(mod);
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
@@ -360,6 +369,7 @@ ipmi_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		topo_mod_dprintf(mod, "Failed to lookup SDR for %s (%s)\n",
 		    entity_ref, ipmi_errmsg(hdl));
 		topo_mod_strfree(mod, entity_ref);
+		topo_mod_ipmi_rele(mod);
 		return (-1);
 	}
 
@@ -377,6 +387,7 @@ ipmi_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 			topo_mod_dprintf(mod, "Failed to lookup %s nvpair "
 			    "(%s)\n", TOPO_PROP_VAL_VAL, strerror(ret));
 			topo_mod_strfree(mod, entity_ref);
+			topo_mod_ipmi_rele(mod);
 			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 		}
 		if (mode_in != TOPO_LED_STATE_OFF &&
@@ -384,6 +395,7 @@ ipmi_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 			topo_mod_dprintf(mod, "Invalid property value: %d\n",
 			    mode_in);
 			topo_mod_strfree(mod, entity_ref);
+			topo_mod_ipmi_rele(mod);
 			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 		}
 		ledmode = (uint8_t)mode_in;
@@ -393,6 +405,7 @@ ipmi_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 			topo_mod_dprintf(mod, "Failed to set LED mode for %s "
 			    "(%s)\n", entity_ref, ipmi_errmsg(hdl));
 			topo_mod_strfree(mod, entity_ref);
+			topo_mod_ipmi_rele(mod);
 			return (-1);
 		}
 	} else {
@@ -404,10 +417,12 @@ ipmi_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 			topo_mod_dprintf(mod, "Failed to get LED mode for %s "
 			    "(%s)\n", entity_ref, ipmi_errmsg(hdl));
 			topo_mod_strfree(mod, entity_ref);
+			topo_mod_ipmi_rele(mod);
 			return (-1);
 		}
 	}
 	topo_mod_strfree(mod, entity_ref);
+	topo_mod_ipmi_rele(mod);
 
 	if (topo_mod_nvalloc(mod, &nvl, NV_UNIQUE_NAME) != 0 ||
 	    nvlist_add_string(nvl, TOPO_PROP_VAL_NAME, TOPO_LED_MODE) != 0 ||
@@ -445,7 +460,7 @@ thumper_locate_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	 * Get an IPMI handle and then lookup the generic device locator sensor
 	 * data record referenced by the entity_ref prop val
 	 */
-	if ((hdl = topo_mod_ipmi(mod)) == NULL) {
+	if ((hdl = topo_mod_ipmi_hold(mod)) == NULL) {
 		topo_mod_dprintf(mod, "Failed to get IPMI handle\n");
 		return (-1);
 	}
@@ -454,6 +469,7 @@ thumper_locate_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	    &entity_ref, &err) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup entity_ref property "
 		    "(%s)", topo_strerror(err));
+		topo_mod_ipmi_rele(mod);
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
@@ -462,6 +478,7 @@ thumper_locate_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		topo_mod_dprintf(mod, "Failed to lookup SDR for %s (%s)\n",
 		    entity_ref, ipmi_errmsg(hdl));
 		topo_mod_strfree(mod, entity_ref);
+		topo_mod_ipmi_rele(mod);
 		return (-1);
 	}
 
@@ -479,6 +496,7 @@ thumper_locate_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 			topo_mod_dprintf(mod, "Failed to lookup %s nvpair "
 			    "(%s)\n", TOPO_PROP_VAL_VAL, strerror(ret));
 			topo_mod_strfree(mod, entity_ref);
+			topo_mod_ipmi_rele(mod);
 			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 		}
 		if (mode_in != TOPO_LED_STATE_OFF &&
@@ -486,6 +504,7 @@ thumper_locate_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 			topo_mod_dprintf(mod, "Invalid property value: %d\n",
 			    mode_in);
 			topo_mod_strfree(mod, entity_ref);
+			topo_mod_ipmi_rele(mod);
 			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 		}
 		if (mode_in == TOPO_LED_STATE_ON)
@@ -496,6 +515,7 @@ thumper_locate_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 			topo_mod_dprintf(mod, "Failed to set LED mode for %s "
 			    "(%s)\n", entity_ref, ipmi_errmsg(hdl));
 			topo_mod_strfree(mod, entity_ref);
+			topo_mod_ipmi_rele(mod);
 			return (-1);
 		}
 	} else {
@@ -506,10 +526,12 @@ thumper_locate_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 			topo_mod_dprintf(mod, "Failed to get LED mode for %s "
 			    "(%s)\n", entity_ref, ipmi_errmsg(hdl));
 			topo_mod_strfree(mod, entity_ref);
+			topo_mod_ipmi_rele(mod);
 			return (-1);
 		}
 	}
 	topo_mod_strfree(mod, entity_ref);
+	topo_mod_ipmi_rele(mod);
 
 	if (ledmode == IPMI_SUNOEM_LED_MODE_FAST)
 		ledmode = TOPO_LED_STATE_ON;
@@ -578,7 +600,7 @@ thumper_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	 * Get an IPMI handle and then lookup the compact sensor data record
 	 * referenced by the entity_ref prop val
 	 */
-	if ((hdl = topo_mod_ipmi(mod)) == NULL) {
+	if ((hdl = topo_mod_ipmi_hold(mod)) == NULL) {
 		topo_mod_dprintf(mod, "Failed to get IPMI handle\n");
 		return (-1);
 	}
@@ -587,6 +609,7 @@ thumper_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	    &entity_ref, &err) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup entity_ref property "
 		    "(%s)", topo_strerror(err));
+		topo_mod_ipmi_rele(mod);
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
@@ -595,6 +618,7 @@ thumper_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		topo_mod_dprintf(mod, "Failed to lookup SDR for %s (%s)\n",
 		    entity_ref, ipmi_errmsg(hdl));
 		topo_mod_strfree(mod, entity_ref);
+		topo_mod_ipmi_rele(mod);
 		return (-1);
 	}
 
@@ -614,6 +638,7 @@ thumper_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 			topo_mod_dprintf(mod, "Failed to lookup %s nvpair "
 			    "(%s)\n", TOPO_PROP_VAL_VAL, strerror(ret));
 			topo_mod_strfree(mod, entity_ref);
+			topo_mod_ipmi_rele(mod);
 			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 		}
 
@@ -627,6 +652,7 @@ thumper_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 			topo_mod_dprintf(mod, "Invalid LED mode: %d 0x%x\n",
 			    ledmode);
 			topo_mod_strfree(mod, entity_ref);
+			topo_mod_ipmi_rele(mod);
 			return (-1);
 		}
 		sr_out.iss_id = cs->is_cs_number;
@@ -636,6 +662,7 @@ thumper_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 			    "for sensor %s (%s)\n", entity_ref,
 			    ipmi_errmsg(hdl));
 			topo_mod_strfree(mod, entity_ref);
+			topo_mod_ipmi_rele(mod);
 			return (-1);
 		}
 	} else {
@@ -651,6 +678,7 @@ thumper_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 			    "for sensor %s (sensor num: %d) (error: %s)\n",
 			    entity_ref, cs->is_cs_number, ipmi_errmsg(hdl));
 			topo_mod_strfree(mod, entity_ref);
+			topo_mod_ipmi_rele(mod);
 			return (-1);
 		}
 		if (sr_in->isr_state & (uint16_t)mask)
@@ -659,6 +687,7 @@ thumper_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 			ledmode = TOPO_LED_STATE_OFF;
 	}
 	topo_mod_strfree(mod, entity_ref);
+	topo_mod_ipmi_rele(mod);
 
 	if (topo_mod_nvalloc(mod, &nvl, NV_UNIQUE_NAME) != 0 ||
 	    nvlist_add_string(nvl, TOPO_PROP_VAL_NAME, TOPO_LED_MODE) != 0 ||
@@ -860,7 +889,7 @@ ipmi_sensor_enum(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	ipmi_sdr_fru_locator_t *floc;
 	ipmi_sdr_generic_locator_t *gloc;
 
-	if ((hdl = topo_mod_ipmi(mod)) == NULL) {
+	if ((hdl = topo_mod_ipmi_hold(mod)) == NULL) {
 		topo_mod_dprintf(mod, "Failed to get IPMI handle\n");
 		return (-1);
 	}
@@ -873,6 +902,7 @@ ipmi_sensor_enum(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	    "entity_ref", &entity_ref, &err) != 0) {
 		topo_mod_dprintf(mod, "Failed to lookup entity_ref "
 		    "property (%s)\n", topo_strerror(err));
+		topo_mod_ipmi_rele(mod);
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
@@ -882,6 +912,7 @@ ipmi_sensor_enum(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		topo_mod_dprintf(mod, "Failed to lookup SDR (%s)\n",
 		    ipmi_errmsg(hdl));
 		topo_mod_strfree(mod, entity_ref);
+		topo_mod_ipmi_rele(mod);
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 	topo_mod_strfree(mod, entity_ref);
@@ -911,6 +942,7 @@ ipmi_sensor_enum(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		default:
 			topo_mod_dprintf(mod, "Failed to determine entity id "
 			    "and instance\n", ipmi_errmsg(hdl));
+			topo_mod_ipmi_rele(mod);
 			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 	topo_mod_dprintf(mod, "Entity ID = 0x%x, Entity Instance = 0x%x\n",
@@ -926,8 +958,12 @@ ipmi_sensor_enum(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	 */
 	if (ipmi_sdr_iter(hdl, sdr_callback, &ei) != 0) {
 		topo_mod_dprintf(mod, "ipmi_sdr_iter() failed\n");
+		topo_mod_ipmi_rele(mod);
 		return (-1);
 	}
+
+	topo_mod_ipmi_rele(mod);
+
 	return (0);
 }
 

@@ -1015,7 +1015,7 @@ pad_process(topo_mod_t *mp, tf_rdata_t *rd, xmlNodePtr pxn, tnode_t *ptn,
 				topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
 				    "pad_process: enumeration failed.\n");
 			}
-			topo_mod_free(mp, tmp_rd.rd_einfo, sizeof (tf_edata_t));
+			tf_edata_free(mp, tmp_rd.rd_einfo);
 		}
 		/*
 		 * Here we allocate an element in an intermediate data structure
