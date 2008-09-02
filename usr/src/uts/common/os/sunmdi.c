@@ -2197,6 +2197,14 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 		} else {
 			pip = (mdi_pathinfo_t *)MDI_PI(start)->pi_client_link;
 			if (pip == NULL) {
+				if ( flags & MDI_SELECT_NO_PREFERRED) {
+					/*
+					 * Return since we hit the end of list
+					 */
+					MDI_CLIENT_UNLOCK(ct);
+					return (MDI_NOPATH);
+				}
+
 				if (!sb) {
 					if (preferred == 0) {
 						/*
@@ -2263,6 +2271,15 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 					    MDI_PATHINFO_STATE_USER_DISABLE)))&&
 						MDI_PI(pip)->pi_preferred ==
 						preferred) ? 1 : 0);
+				} else if (flags ==
+				    (MDI_SELECT_STANDBY_PATH |
+				    MDI_SELECT_ONLINE_PATH |
+				    MDI_SELECT_NO_PREFERRED)) {
+					cond = (((MDI_PI(pip)->pi_state ==
+					    MDI_PATHINFO_STATE_ONLINE) ||
+					    (MDI_PI(pip)->pi_state ==
+					    MDI_PATHINFO_STATE_STANDBY))
+					    ? 1 : 0);
 				} else {
 					cond = 0;
 				}
@@ -2298,6 +2315,14 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 do_again:
 			next = (mdi_pathinfo_t *)MDI_PI(pip)->pi_client_link;
 			if (next == NULL) {
+				if ( flags & MDI_SELECT_NO_PREFERRED) {
+					/*
+					 * Bail out since we hit the end of list
+					 */
+					MDI_PI_UNLOCK(pip);
+					break;
+				}
+
 				if (!sb) {
 					if (preferred == 1) {
 						/*

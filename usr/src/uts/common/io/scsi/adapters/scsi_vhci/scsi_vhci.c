@@ -68,7 +68,7 @@ int vhci_prout_not_ready_retry = 180;
 /*
  * Version Macros
  */
-#define	VHCI_NAME_VERSION	"SCSI VHCI Driver 1.78"
+#define	VHCI_NAME_VERSION	"SCSI VHCI Driver 1.79"
 char		vhci_version_name[] = VHCI_NAME_VERSION;
 
 int		vhci_first_time = 0;
@@ -3683,7 +3683,7 @@ vhci_update_pathstates(void *arg)
 	    ddi_get_instance(ddi_get_parent(dip)));
 
 	sps = mdi_select_path(dip, NULL, (MDI_SELECT_ONLINE_PATH |
-	    MDI_SELECT_STANDBY_PATH), NULL, &npip);
+	    MDI_SELECT_STANDBY_PATH | MDI_SELECT_NO_PREFERRED), NULL, &npip);
 	if ((npip == NULL) || (sps != MDI_SUCCESS)) {
 		goto done;
 	}
@@ -3696,8 +3696,8 @@ vhci_update_pathstates(void *arg)
 		if (fo->sfo_path_get_opinfo(psd, &opinfo,
 		    vlun->svl_fops_ctpriv) != 0) {
 			sps = mdi_select_path(dip, NULL,
-			    (MDI_SELECT_ONLINE_PATH | MDI_SELECT_STANDBY_PATH),
-			    pip, &npip);
+			    (MDI_SELECT_ONLINE_PATH | MDI_SELECT_STANDBY_PATH |
+			    MDI_SELECT_NO_PREFERRED), pip, &npip);
 			mdi_rele_path(pip);
 			continue;
 		}
@@ -3708,8 +3708,8 @@ vhci_update_pathstates(void *arg)
 			    "!vhci_update_pathstates: prop lookup failed for "
 			    "path 0x%p\n", (void *)pip));
 			sps = mdi_select_path(dip, NULL,
-			    (MDI_SELECT_ONLINE_PATH | MDI_SELECT_STANDBY_PATH),
-			    pip, &npip);
+			    (MDI_SELECT_ONLINE_PATH | MDI_SELECT_STANDBY_PATH |
+			    MDI_SELECT_NO_PREFERRED), pip, &npip);
 			mdi_rele_path(pip);
 			continue;
 		}
@@ -3885,8 +3885,8 @@ vhci_update_pathstates(void *arg)
 		}
 		(void) mdi_prop_free(pclass);
 		sps = mdi_select_path(dip, NULL,
-		    (MDI_SELECT_ONLINE_PATH | MDI_SELECT_STANDBY_PATH),
-		    pip, &npip);
+		    (MDI_SELECT_ONLINE_PATH | MDI_SELECT_STANDBY_PATH |
+		    MDI_SELECT_NO_PREFERRED), pip, &npip);
 		mdi_rele_path(pip);
 
 	} while ((npip != NULL) && (sps == MDI_SUCCESS));

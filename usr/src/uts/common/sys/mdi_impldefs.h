@@ -26,7 +26,6 @@
 #ifndef	_SYS_MDI_IMPLDEFS_H
 #define	_SYS_MDI_IMPLDEFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/note.h>
 #include <sys/types.h>
@@ -1128,12 +1127,14 @@ dev_info_t	*mdi_phci_path2devinfo(dev_info_t *, caddr_t);
  * to mdi_select_path depends on the flags used.
  *
  *   <none>:				default, arg is pip
- *   MDI_SELECT_ONLINE_PATH:		select an ONLINE path, arg is pip
+ *   MDI_SELECT_ONLINE_PATH:		select an ONLINE path preferred-first,
+ *					arg is pip
  *   MDI_SELECT_STANDBY_PATH:		select a STANDBY path, arg is pip
  *   MDI_SELECT_USER_DISABLE_PATH:	select user disable for failover and
  *					auto_failback
  *   MDI_SELECT_PATH_INSTANCE:		select a specific path, arg is
  *					path instance
+ *   MDI_SELECT_NO_PREFERRED:		select path without preferred-first
  *
  * The selected paths are returned in an mdi_hold_path() state (pi_ref_cnt),
  * caller should release the hold by calling mdi_rele_path() at the end of
@@ -1152,6 +1153,7 @@ client_lb_t	mdi_get_lb_policy(dev_info_t *);
 #define	MDI_SELECT_STANDBY_PATH		0x0002
 #define	MDI_SELECT_USER_DISABLE_PATH	0x0004
 #define	MDI_SELECT_PATH_INSTANCE	0x0008
+#define	MDI_SELECT_NO_PREFERRED		0x0010
 
 /*
  * MDI client device utility functions
