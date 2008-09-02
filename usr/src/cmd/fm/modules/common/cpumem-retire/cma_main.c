@@ -299,7 +299,7 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 	uint_t nvc = 0;
 	uint_t keepopen;
 	int err = 0;
-	nvlist_t *asru;
+	nvlist_t *asru = NULL;
 	uint32_t index;
 
 	err |= nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid);
@@ -345,9 +345,13 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 	/*
 	 * Do not close the case if we are handling cache faults.
 	 */
-	if (nvlist_lookup_uint32(asru, FM_FMRI_CPU_CACHE_INDEX, &index) != 0) {
-		if (!keepopen && strcmp(class, FM_LIST_SUSPECT_CLASS) == 0) {
-			fmd_case_uuclose(hdl, uuid);
+	if (asru != NULL) {
+		if (nvlist_lookup_uint32(asru, FM_FMRI_CPU_CACHE_INDEX,
+		    &index) != 0) {
+			if (!keepopen && strcmp(class,
+			    FM_LIST_SUSPECT_CLASS) == 0) {
+				fmd_case_uuclose(hdl, uuid);
+			}
 		}
 	}
 	if (!keepopen && strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)
