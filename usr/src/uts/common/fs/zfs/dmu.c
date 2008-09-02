@@ -183,11 +183,13 @@ static int
 dmu_buf_hold_array_by_dnode(dnode_t *dn, uint64_t offset,
     uint64_t length, int read, void *tag, int *numbufsp, dmu_buf_t ***dbpp)
 {
+	dsl_pool_t *dp = NULL;
 	dmu_buf_t **dbp;
 	uint64_t blkid, nblks, i;
 	uint32_t flags;
 	int err;
 	zio_t *zio;
+	hrtime_t start;
 
 	ASSERT(length <= DMU_MAX_ACCESS);
 
@@ -214,6 +216,10 @@ dmu_buf_hold_array_by_dnode(dnode_t *dn, uint64_t offset,
 	}
 	dbp = kmem_zalloc(sizeof (dmu_buf_t *) * nblks, KM_SLEEP);
 
+	if (dn->dn_objset->os_dsl_dataset)
+		dp = dn->dn_objset->os_dsl_dataset->ds_dir->dd_pool;
+	if (dp && dsl_pool_sync_context(dp))
+		start = gethrtime();
 	zio = zio_root(dn->dn_objset->os_spa, NULL, NULL, TRUE);
 	blkid = dbuf_whichblock(dn, offset);
 	for (i = 0; i < nblks; i++) {
@@ -236,6 +242,9 @@ dmu_buf_hold_array_by_dnode(dnode_t *dn, uint64_t offset,
 
 	/* wait for async i/o */
 	err = zio_wait(zio);
+	/* track read overhead when we are in sync context */
+	if (dp && dsl_pool_sync_context(dp))
+		dp->dp_read_overhead += gethrtime() - start;
 	if (err) {
 		dmu_buf_rele_array(dbp, nblks, tag);
 		return (err);

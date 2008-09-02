@@ -26,8 +26,6 @@
 #ifndef	_SYS_DSL_POOL_H
 #define	_SYS_DSL_POOL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/spa.h>
 #include <sys/txg.h>
 #include <sys/txg_impl.h>
@@ -63,6 +61,8 @@ typedef struct dsl_pool {
 	/* No lock needed - sync context only */
 	blkptr_t dp_meta_rootbp;
 	list_t dp_synced_datasets;
+	hrtime_t dp_read_overhead;
+	uint64_t dp_throughput;
 	uint64_t dp_write_limit;
 
 	/* Uses dp_lock */

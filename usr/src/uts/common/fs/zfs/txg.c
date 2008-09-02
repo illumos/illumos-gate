@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/zfs_context.h>
 #include <sys/txg_impl.h>
 #include <sys/dmu_impl.h>
@@ -39,13 +37,6 @@ static void txg_sync_thread(dsl_pool_t *dp);
 static void txg_quiesce_thread(dsl_pool_t *dp);
 
 int zfs_txg_timeout = 30;	/* max seconds worth of delta per txg */
-int zfs_txg_synctime = 5;	/* target seconds to sync a txg */
-
-int zfs_write_limit_shift = 3;	/* 1/8th of physical memory */
-
-uint64_t zfs_write_limit_min = 32 << 20; /* min write limit is 32MB */
-uint64_t zfs_write_limit_max = 0; /* max data payload per txg */
-uint64_t zfs_write_limit_inflated = 0;
 
 /*
  * Prepare the txg subsystem.
@@ -280,15 +271,14 @@ txg_sync_thread(dsl_pool_t *dp)
 {
 	tx_state_t *tx = &dp->dp_tx;
 	callb_cpr_t cpr;
-	uint64_t timeout, start, delta, timer;
-	int target;
+	uint64_t start, delta;
 
 	txg_thread_enter(tx, &cpr);
 
 	start = delta = 0;
-	timeout = zfs_txg_timeout * hz;
 	for (;;) {
-		uint64_t txg, written;
+		uint64_t timer, timeout = zfs_txg_timeout * hz;
+		uint64_t txg;
 
 		/*
 		 * We sync when there's someone waiting on us, or the
@@ -336,50 +326,10 @@ txg_sync_thread(dsl_pool_t *dp)
 		dprintf("txg=%llu quiesce_txg=%llu sync_txg=%llu\n",
 		    txg, tx->tx_quiesce_txg_waiting, tx->tx_sync_txg_waiting);
 		mutex_exit(&tx->tx_sync_lock);
+
 		start = lbolt;
 		spa_sync(dp->dp_spa, txg);
-		delta = (lbolt - start) + 1;
-
-		written = dp->dp_space_towrite[txg & TXG_MASK];
-		dp->dp_space_towrite[txg & TXG_MASK] = 0;
-		ASSERT(dp->dp_tempreserved[txg & TXG_MASK] == 0);
-
-		/*
-		 * If the write limit max has not been explicitly set, set it
-		 * to a fraction of available phisical memory (default 1/8th).
-		 * Note that we must inflate the limit because the spa
-		 * inflates write sizes to account for data replication.
-		 * Check this each sync phase to catch changing memory size.
-		 */
-		if (zfs_write_limit_inflated == 0 ||
-		    (zfs_write_limit_shift && zfs_write_limit_max !=
-		    physmem * PAGESIZE >> zfs_write_limit_shift)) {
-			zfs_write_limit_max =
-			    physmem * PAGESIZE >> zfs_write_limit_shift;
-			zfs_write_limit_inflated =
-			    spa_get_asize(dp->dp_spa, zfs_write_limit_max);
-			if (zfs_write_limit_min > zfs_write_limit_inflated)
-				zfs_write_limit_inflated = zfs_write_limit_min;
-		}
-
-		/*
-		 * Attempt to keep the sync time consistant by adjusting the
-		 * amount of write traffic allowed into each transaction group.
-		 */
-		target = zfs_txg_synctime * hz;
-		if (delta > target) {
-			uint64_t old = MIN(dp->dp_write_limit, written);
-
-			dp->dp_write_limit = MAX(zfs_write_limit_min,
-			    old * target / delta);
-		} else if (written >= dp->dp_write_limit &&
-		    delta >> 3 < target >> 3) {
-			uint64_t rescale =
-			    MIN((100 * target) / delta, 200);
-
-			dp->dp_write_limit = MIN(zfs_write_limit_inflated,
-			    written * rescale / 100);
-		}
+		delta = lbolt - start;
 
 		mutex_enter(&tx->tx_sync_lock);
 		rw_enter(&tx->tx_suspend, RW_WRITER);

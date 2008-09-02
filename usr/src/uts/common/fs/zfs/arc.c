@@ -139,7 +139,7 @@ static uint8_t		arc_thread_exit;
 
 extern int zfs_write_limit_shift;
 extern uint64_t zfs_write_limit_max;
-extern uint64_t zfs_write_limit_inflated;
+extern kmutex_t zfs_write_limit_lock;
 
 #define	ARC_REDUCE_DNLC_PERCENT	3
 uint_t arc_reduce_dnlc_percent = ARC_REDUCE_DNLC_PERCENT;
@@ -3441,10 +3441,10 @@ arc_init(void)
 	arc_warm = B_FALSE;
 
 	if (zfs_write_limit_max == 0)
-		zfs_write_limit_max = physmem * PAGESIZE >>
-		    zfs_write_limit_shift;
+		zfs_write_limit_max = ptob(physmem) >> zfs_write_limit_shift;
 	else
 		zfs_write_limit_shift = 0;
+	mutex_init(&zfs_write_limit_lock, NULL, MUTEX_DEFAULT, NULL);
 }
 
 void
@@ -3483,6 +3483,8 @@ arc_fini(void)
 	mutex_destroy(&arc_mru_ghost->arcs_mtx);
 	mutex_destroy(&arc_mfu->arcs_mtx);
 	mutex_destroy(&arc_mfu_ghost->arcs_mtx);
+
+	mutex_destroy(&zfs_write_limit_lock);
 
 	buf_fini();
 }

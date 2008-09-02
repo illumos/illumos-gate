@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/dsl_pool.h>
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_dir.h>
@@ -40,8 +38,17 @@
 #include <sys/spa_impl.h>
 
 int zfs_no_write_throttle = 0;
+int zfs_write_limit_shift = 3;			/* 1/8th of physical memory */
+int zfs_txg_synctime = 5;			/* target secs to sync a txg */
+
+uint64_t zfs_write_limit_min = 32 << 20;	/* min write limit is 32MB */
+uint64_t zfs_write_limit_max = 0;		/* max data payload per txg */
+uint64_t zfs_write_limit_inflated = 0;
 uint64_t zfs_write_limit_override = 0;
 
+kmutex_t zfs_write_limit_lock;
+
+static pgcnt_t old_physmem = 0;
 
 static int
 dsl_pool_open_special_dir(dsl_pool_t *dp, const char *name, dsl_dir_t **ddp)
@@ -63,7 +70,6 @@ dsl_pool_open_impl(spa_t *spa, uint64_t txg)
 {
 	dsl_pool_t *dp;
 	blkptr_t *bp = spa_get_rootblkptr(spa);
-	extern uint64_t zfs_write_limit_min;
 
 	dp = kmem_zalloc(sizeof (dsl_pool_t), KM_SLEEP);
 	dp->dp_spa = spa;
@@ -281,10 +287,13 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	dsl_dataset_t *ds;
 	dsl_sync_task_group_t *dstg;
 	objset_impl_t *mosi = dp->dp_meta_objset->os;
+	hrtime_t start, write_time;
+	uint64_t data_written;
 	int err;
 
 	tx = dmu_tx_create_assigned(dp, txg);
 
+	dp->dp_read_overhead = 0;
 	zio = zio_root(dp->dp_spa, NULL, NULL, ZIO_FLAG_MUSTSUCCEED);
 	while (ds = txg_list_remove(&dp->dp_dirty_datasets, txg)) {
 		if (!list_link_active(&ds->ds_synced_link))
@@ -293,17 +302,27 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 			dmu_buf_rele(ds->ds_dbuf, ds);
 		dsl_dataset_sync(ds, zio, tx);
 	}
+	DTRACE_PROBE(pool_sync__1setup);
+
+	start = gethrtime();
 	err = zio_wait(zio);
+	write_time = gethrtime() - start;
 	ASSERT(err == 0);
+	DTRACE_PROBE(pool_sync__2rootzio);
 
 	while (dstg = txg_list_remove(&dp->dp_sync_tasks, txg))
 		dsl_sync_task_group_sync(dstg, tx);
+	DTRACE_PROBE(pool_sync__3task);
+
+	start = gethrtime();
 	while (dd = txg_list_remove(&dp->dp_dirty_dirs, txg))
 		dsl_dir_sync(dd, tx);
+	write_time += gethrtime() - start;
 
 	if (spa_sync_pass(dp->dp_spa) == 1)
 		dsl_pool_scrub_sync(dp, tx);
 
+	start = gethrtime();
 	if (list_head(&mosi->os_dirty_dnodes[txg & TXG_MASK]) != NULL ||
 	    list_head(&mosi->os_free_dnodes[txg & TXG_MASK]) != NULL) {
 		zio = zio_root(dp->dp_spa, NULL, NULL, ZIO_FLAG_MUSTSUCCEED);
@@ -313,8 +332,51 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 		dprintf_bp(&dp->dp_meta_rootbp, "meta objset rootbp is %s", "");
 		spa_set_rootblkptr(dp->dp_spa, &dp->dp_meta_rootbp);
 	}
+	write_time += gethrtime() - start;
+	DTRACE_PROBE2(pool_sync__4io, hrtime_t, write_time,
+	    hrtime_t, dp->dp_read_overhead);
+	write_time -= dp->dp_read_overhead;
 
 	dmu_tx_commit(tx);
+
+	data_written = dp->dp_space_towrite[txg & TXG_MASK];
+	dp->dp_space_towrite[txg & TXG_MASK] = 0;
+	ASSERT(dp->dp_tempreserved[txg & TXG_MASK] == 0);
+
+	/*
+	 * If the write limit max has not been explicitly set, set it
+	 * to a fraction of available physical memory (default 1/8th).
+	 * Note that we must inflate the limit because the spa
+	 * inflates write sizes to account for data replication.
+	 * Check this each sync phase to catch changing memory size.
+	 */
+	if (physmem != old_physmem && zfs_write_limit_shift) {
+		mutex_enter(&zfs_write_limit_lock);
+		old_physmem = physmem;
+		zfs_write_limit_max = ptob(physmem) >> zfs_write_limit_shift;
+		zfs_write_limit_inflated = MAX(zfs_write_limit_min,
+		    spa_get_asize(dp->dp_spa, zfs_write_limit_max));
+		mutex_exit(&zfs_write_limit_lock);
+	}
+
+	/*
+	 * Attempt to keep the sync time consistent by adjusting the
+	 * amount of write traffic allowed into each transaction group.
+	 * Weight the throughput calculation towards the current value:
+	 * 	thru = 3/4 old_thru + 1/4 new_thru
+	 */
+	ASSERT(zfs_write_limit_min > 0);
+	if (data_written > zfs_write_limit_min / 8 && write_time > 0) {
+		uint64_t throughput = (data_written * NANOSEC) / write_time;
+		if (dp->dp_throughput)
+			dp->dp_throughput = throughput / 4 +
+			    3 * dp->dp_throughput / 4;
+		else
+			dp->dp_throughput = throughput;
+		dp->dp_write_limit = MIN(zfs_write_limit_inflated,
+		    MAX(zfs_write_limit_min,
+		    dp->dp_throughput * zfs_txg_synctime));
+	}
 }
 
 void
@@ -416,7 +478,6 @@ dsl_pool_tempreserve_clear(dsl_pool_t *dp, int64_t space, dmu_tx_t *tx)
 void
 dsl_pool_memory_pressure(dsl_pool_t *dp)
 {
-	extern uint64_t zfs_write_limit_min;
 	uint64_t space_inuse = 0;
 	int i;
 

@@ -26,8 +26,6 @@
 #ifndef _SYS_ZFS_CONTEXT_H
 #define	_SYS_ZFS_CONTEXT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -160,6 +158,11 @@ _NOTE(CONSTCOND) } while (0)
  * kernel.  If they're being used in kernel code, re-define them out of
  * existence for their counterparts in libzpool.
  */
+
+#ifdef DTRACE_PROBE
+#undef	DTRACE_PROBE
+#define	DTRACE_PROBE(a)	((void)0)
+#endif	/* DTRACE_PROBE */
 
 #ifdef DTRACE_PROBE1
 #undef	DTRACE_PROBE1
@@ -441,6 +444,8 @@ extern void delay(clock_t ticks);
 
 #define	kcred		NULL
 #define	CRED()		NULL
+
+#define	ptob(x)		((x) * PAGESIZE)
 
 extern uint64_t physmem;
 
