@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_mac.h>
 #include <sys/nxge/nxge_hio.h>
@@ -2833,7 +2831,7 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	p_nxge_hw_pt_cfg_t p_cfgp;
 	p_nxge_ldgv_t ldgvp;
 	p_nxge_ldg_t ldgp, ptr;
-	p_nxge_ldv_t ldvp;
+	p_nxge_ldv_t ldvp, sysldvp;
 	nxge_status_t status = NXGE_OK;
 	nxge_grp_set_t *set;
 
@@ -2968,36 +2966,52 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		nldvs++;
 	}
 
-	ldv = NXGE_SYS_ERROR_LD;
-	ldvp->use_timer = B_TRUE;
+	/*
+	 * Port0 uses the HW based syserr interrupt, and port1 uses the
+	 * SW based syserr interrupt. There is only one syserr and the
+	 * function zero device gets it.
+	 */
 	if (own_sys_err && p_cfgp->ser_ldvid) {
 		ldv = p_cfgp->ser_ldvid;
+		/*
+		 * Port0 - HW based: use an intr vector
+		 */
 		/*
 		 * Unmask the system interrupt states.
 		 */
 		(void) nxge_fzc_sys_err_mask_set(nxgep, SYS_ERR_SMX_MASK |
 		    SYS_ERR_IPP_MASK | SYS_ERR_TXC_MASK |
 		    SYS_ERR_ZCP_MASK);
-	}
-	ldvp->ldv = (uint8_t)ldv;
-	ldvp->is_syserr = B_TRUE;
-	ldvp->ldv_intr_handler = nxge_syserr_intr;
-	ldvp->ldv_ldf_masks = 0;
-	ldvp->nxgep = nxgep;
-	ldgvp->ldvp_syserr = ldvp;
 
-	NXGE_DEBUG_MSG((nxgep, INT_CTL,
-	    "==> nxge_ldgv_init_n2(syserr): maxldvs %d ldv %d "
-	    "ldg %d ldgptr $%p ldvptr p%p",
-	    maxldvs, ldv, ldgp->ldg, ldgp, ldvp));
+		ldvp->use_timer = B_TRUE;
+		ldvp->ldv = (uint8_t)ldv;
+		ldvp->is_syserr = B_TRUE;
+		ldvp->ldv_intr_handler = nxge_syserr_intr;
+		ldvp->ldv_ldf_masks = 0;
+		ldvp->nxgep = nxgep;
+		ldgvp->ldvp_syserr = ldvp;
 
-	if (own_sys_err && p_cfgp->ser_ldvid) {
-		(void) nxge_ldgv_setup(&ldgp, &ldvp, ldv, endldg, nrequired_p);
+		NXGE_DEBUG_MSG((nxgep, INT_CTL,
+		    "==> nxge_ldgv_init_n2(syserr): maxldvs %d ldv %d "
+		    "ldg %d ldgptr $%p ldvptr p%p",
+		    maxldvs, ldv, ldgp->ldg, ldgp, ldvp));
+		nxge_ldgv_setup(&ldgp, &ldvp, ldv, endldg, nrequired_p);
+		nldvs++;
 	} else {
-		ldvp++;
+		/*
+		 * Port1 - SW based: allocate the ldv for the syserr since
+		 * the vector should not be consumed for port1
+		 */
+		sysldvp = KMEM_ZALLOC(sizeof (nxge_ldv_t), KM_SLEEP);
+		sysldvp->use_timer = B_TRUE;
+		sysldvp->ldv = NXGE_SYS_ERROR_LD;
+		sysldvp->is_syserr = B_TRUE;
+		sysldvp->ldv_intr_handler = nxge_syserr_intr;
+		sysldvp->ldv_ldf_masks = 0;
+		sysldvp->nxgep = nxgep;
+		ldgvp->ldvp_syserr = sysldvp;
+		ldgvp->ldvp_syserr_allocated = B_TRUE;
 	}
-
-	nldvs++;
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_ldgv_init_n2: "
 	    "(before rx) func %d nldvs %d navail %d nrequired %d",
@@ -3311,6 +3325,9 @@ nxge_ldgv_uninit(p_nxge_t nxgep)
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "<== nxge_ldgv_uninit: "
 		    "no logical group configured."));
 		return (NXGE_OK);
+	}
+	if (ldgvp->ldvp_syserr_allocated == B_TRUE) {
+		KMEM_FREE(ldgvp->ldvp_syserr, sizeof (nxge_ldv_t));
 	}
 	if (ldgvp->ldgp) {
 		KMEM_FREE(ldgvp->ldgp, sizeof (nxge_ldg_t) * ldgvp->maxldgs);

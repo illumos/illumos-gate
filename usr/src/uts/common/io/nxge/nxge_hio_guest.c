@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * nxge_hio_guest.c
  *
@@ -923,10 +921,13 @@ nxge_check_guest_state(
 
 	nxge->nxge_timerid = 0;
 
-	nxge_check_tx_hang(nxge);
+	if (nxge->nxge_mac_state == NXGE_MAC_STARTED) {
+		nxge_check_tx_hang(nxge);
 
-	nxge->nxge_timerid = timeout((void(*)(void *))nxge_check_guest_state,
-	    (caddr_t)vr, drv_usectohz(1000 * NXGE_GUEST_TIMER));
+		nxge->nxge_timerid = timeout((void(*)(void *))
+		    nxge_check_guest_state, (caddr_t)vr,
+		    drv_usectohz(1000 * NXGE_GUEST_TIMER));
+	}
 
 nxge_check_guest_state_exit:
 	MUTEX_EXIT(nxge->genlock);

@@ -26,8 +26,6 @@
 #ifndef	_SYS_NXGE_NXGE_H
 #define	_SYS_NXGE_NXGE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -509,6 +507,7 @@ typedef struct _nxge_ldgv_t {
 	p_nxge_ldg_t		ldgp;
 	p_nxge_ldv_t		ldvp;
 	p_nxge_ldv_t		ldvp_syserr;
+	int			ldvp_syserr_allocated;
 } nxge_ldgv_t, *p_nxge_ldgv_t;
 
 typedef enum {

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SunOs MT STREAMS NIU/Neptune 10Gb Ethernet Device Driver.
  */
@@ -943,6 +941,8 @@ nxge_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_STOP);
 
 	if (isLDOMguest(nxgep)) {
+		if (nxgep->nxge_mac_state == NXGE_MAC_STARTED)
+			nxge_m_stop((void *)nxgep);
 		nxge_hio_unregister(nxgep);
 	} else if (nxgep->mach && (status = mac_unregister(nxgep->mach)) != 0) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -3729,13 +3729,14 @@ nxge_m_stop(void *arg)
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "==> nxge_m_stop"));
 
+	MUTEX_ENTER(nxgep->genlock);
+	nxgep->nxge_mac_state = NXGE_MAC_STOPPING;
+
 	if (nxgep->nxge_timerid) {
 		nxge_stop_timer(nxgep, nxgep->nxge_timerid);
 		nxgep->nxge_timerid = 0;
 	}
 
-	MUTEX_ENTER(nxgep->genlock);
-	nxgep->nxge_mac_state = NXGE_MAC_STOPPING;
 	nxge_uninit(nxgep);
 
 	nxgep->nxge_mac_state = NXGE_MAC_STOPPED;
