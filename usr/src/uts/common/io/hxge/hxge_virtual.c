@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <hxge_impl.h>
 #include <hxge_vmac.h>
 #include <hxge_pfc.h>
@@ -666,7 +664,7 @@ hxge_ldgv_init(p_hxge_t hxgep, int *navail_p, int *nrequired_p)
 	ldgvp->ldvp_syserr = ldvp;
 
 	/* Reset PEU error mask to allow PEU error interrupts */
-	HXGE_REG_WR64(hxgep->hpi_handle, PEU_INTR_MASK, 0x0);
+	HXGE_REG_WR32(hxgep->hpi_handle, PEU_INTR_MASK, 0x0);
 
 	/*
 	 * Unmask the system interrupt states.
@@ -917,50 +915,13 @@ hxge_intr_mask_mgmt_set(p_hxge_t hxgep, boolean_t on)
 static hxge_status_t
 hxge_get_mac_addr_properties(p_hxge_t hxgep)
 {
-#if defined(_BIG_ENDIAN)
-	uchar_t		*prop_val;
-	uint_t		prop_len;
-#endif
 	uint32_t	num_macs;
 	hxge_status_t	status;
 
 	HXGE_DEBUG_MSG((hxgep, DDI_CTL, "==> hxge_get_mac_addr_properties "));
-#if defined(_BIG_ENDIAN)
-	/*
-	 * Get the ethernet address.
-	 */
-	(void) localetheraddr((struct ether_addr *)NULL, &hxgep->ouraddr);
 
-	/*
-	 * Check if it is an adapter with its own local mac address
-	 * If it is present, override the system mac address.
-	 */
-	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, hxgep->dip, 0,
-	    "local-mac-address", &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
-		if (prop_len == ETHERADDRL) {
-			hxgep->factaddr = *(p_ether_addr_t)prop_val;
-			HXGE_DEBUG_MSG((hxgep, DDI_CTL, "Local mac address = "
-			    "%02x:%02x:%02x:%02x:%02x:%02x",
-			    prop_val[0], prop_val[1], prop_val[2],
-			    prop_val[3], prop_val[4], prop_val[5]));
-		}
-		ddi_prop_free(prop_val);
-	}
-	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, hxgep->dip, 0,
-	    "local-mac-address?", &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
-		if (strncmp("true", (caddr_t)prop_val, (size_t)prop_len) == 0) {
-			hxgep->ouraddr = hxgep->factaddr;
-			HXGE_DEBUG_MSG((hxgep, DDI_CTL,
-			    "Using local MAC address"));
-		}
-		ddi_prop_free(prop_val);
-	} else {
-		hxgep->ouraddr = hxgep->factaddr;
-	}
-#else
 	(void) hxge_pfc_mac_addrs_get(hxgep);
 	hxgep->ouraddr = hxgep->factaddr;
-#endif
 
 	/*
 	 * Get the number of MAC addresses the Hydra supports per blade.

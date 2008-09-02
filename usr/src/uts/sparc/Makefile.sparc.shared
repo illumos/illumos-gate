@@ -255,6 +255,7 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS += rtls
 
 DRV_KMODS	+= afe
 DRV_KMODS	+= e1000g
+DRV_KMODS	+= hxge
 DRV_KMODS	+= mxfe
 DRV_KMODS	+= pcan
 DRV_KMODS	+= pcwl

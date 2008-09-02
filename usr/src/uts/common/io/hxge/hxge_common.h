@@ -26,8 +26,6 @@
 #ifndef	_SYS_HXGE_HXGE_COMMON_H
 #define	_SYS_HXGE_HXGE_COMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <hxge_defs.h>
 #include <hxge_pfc.h>
@@ -53,7 +51,7 @@ extern "C" {
 
 #define	HXGE_RBR_RBB_MIN	(128)
 #define	HXGE_RBR_RBB_MAX	(64 * 128 -1)
-#define	HXGE_RBR_RBB_DEFAULT	(64 * 16)		/* x86 hello */
+#define	HXGE_RBR_RBB_DEFAULT	(2048)		/* Number of RBR Blocks */
 #define	HXGE_RCR_MIN		(HXGE_RBR_RBB_MIN * 2)
 #define	HXGE_RCR_MAX		(65504)			/* 2^16 - 32 */
 

@@ -26,8 +26,6 @@
 #ifndef	_SYS_HXGE_HXGE_RXDMA_H
 #define	_SYS_HXGE_HXGE_RXDMA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -192,18 +190,16 @@ typedef union _rcr_entry_t {
 } rcr_entry_t, *p_rcr_entry_t;
 
 #define	RX_DMA_MAILBOX_BYTE_LENGTH	64
-#define	RX_DMA_MBOX_UNUSED_1		8
-#define	RX_DMA_MBOX_UNUSED_2		16
 
 typedef struct _rxdma_mailbox_t {
 	rdc_stat_t		rxdma_ctl_stat;		/* 8 bytes */
 	rdc_rbr_qlen_t		rbr_stat;		/* 8 bytes */
 	rdc_rbr_head_t		rbr_hdh;		/* 8 bytes */
-	uint8_t			resv_1[RX_DMA_MBOX_UNUSED_1];
+	uint64_t		resv_1;
 	rdc_rcr_tail_t		rcrstat_c;		/* 8 bytes */
-	uint8_t			resv_2[RX_DMA_MBOX_UNUSED_1];
+	uint64_t		resv_2;
 	rdc_rcr_qlen_t		rcrstat_a;		/* 8 bytes */
-	uint8_t			resv_3[RX_DMA_MBOX_UNUSED_1];
+	uint64_t		resv_3;
 } rxdma_mailbox_t, *p_rxdma_mailbox_t;
 
 /*

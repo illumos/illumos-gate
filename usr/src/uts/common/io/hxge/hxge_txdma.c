@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <hxge_impl.h>
 #include <hxge_txdma.h>
 #include <sys/llc1.h>
@@ -826,6 +824,13 @@ hxge_tx_intr(caddr_t arg1, caddr_t arg2)
 	if (arg2 == NULL || (void *) ldvp->hxgep != arg2) {
 		hxgep = ldvp->hxgep;
 	}
+
+	/*
+	 * If the interface is not started, just swallow the interrupt
+	 * and don't rearm the logical device.
+	 */
+	if (hxgep->hxge_mac_state != HXGE_MAC_STARTED)
+		return (DDI_INTR_CLAIMED);
 
 	HXGE_DEBUG_MSG((hxgep, INT_CTL,
 	    "==> hxge_tx_intr: hxgep(arg2) $%p ldvp(arg1) $%p", hxgep, ldvp));

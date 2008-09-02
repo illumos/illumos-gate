@@ -23,8 +23,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
+set -u
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
@@ -33,7 +33,14 @@ export PATH
 # Driver info 
 # 
 DRV=hxge
-DRVALIAS=" \"pci108e,aaaa\" "
+ARCH=`uname -p`
+if [ ${ARCH} = "i386" ]; then
+    DRVALIAS=" \"pci108e,aaaa\" "
+fi
+
+if [ ${ARCH} = "sparc" ]; then
+    DRVALIAS=" \"pciex108e,aaaa\" "
+fi
 
 DRVPERM='* 0600 root sys'
 # POLICY='read_priv_set=net_rawaccess write_priv_set=net_rawaccess'
@@ -44,9 +51,11 @@ MAJORDEV=11
 #
 if [ "${BASEDIR}" = "/" ]; then
         #
-        # Irrespective of whether hardware exists or not don't attempt to
-        # attach driver to the hardware. The driver will be attached when
-        # it is configured using ifconfig
+        # Irrespective of whether hardware exists
+        # or not don't attempt to attach driver
+        # to the hardware. This is to avoid problems
+        # with installing a 32 bit driver on a 64 bit
+        # running system.
         #
         ADD_DRV="add_drv -n"
 else
@@ -67,6 +76,7 @@ if [ $? -eq 1 ]; then
         ${ADD_DRV} -m "${DRVPERM}" -i "${DRVALIAS}" ${DRV}
         if [ $? -ne 0 ]; then
                 echo "\nFailed add_drv!\n"
+                exit 1
         fi
 fi
 
