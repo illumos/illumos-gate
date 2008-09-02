@@ -23,9 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -132,6 +129,7 @@ tgt_node_process(xmlTextReaderPtr r, tgt_node_t **node)
 	name = (xmlChar *)xmlTextReaderConstName(r);
 	if (name == NULL) {
 		node_free(n);
+		*node = NULL;
 		return (False);
 	}
 
@@ -172,11 +170,13 @@ tgt_node_process(xmlTextReaderPtr r, tgt_node_t **node)
 
 		if (node_name(n, name) == False) {
 			node_free(n);
+			*node = NULL;
 			return (False);
 		}
 	} else if ((value != NULL) && (node_type == XML_TEXT_NODE)) {
 		if (node_value(n, value, True) == False) {
 			node_free(n);
+			*node = NULL;
 			return (False);
 		}
 	} else if (node_type == XML_ELEMENT_DECL) {
@@ -188,14 +188,17 @@ tgt_node_process(xmlTextReaderPtr r, tgt_node_t **node)
 		n = node_child(n);
 		if (node_name(n, (xmlChar *)XML_COMMENT_STR) == False) {
 			node_free(n);
+			*node = NULL;
 			return (False);
 		}
 		if (node_value(n, (xmlChar *)value, False) == False) {
 			node_free(n);
+			*node = NULL;
 			return (False);
 		}
 	} else if (node_type != XML_DTD_NODE) {
 		node_free(n);
+		*node = NULL;
 		return (False);
 	}
 	return (True);
