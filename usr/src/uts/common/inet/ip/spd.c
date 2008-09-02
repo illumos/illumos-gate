@@ -2684,7 +2684,7 @@ clear:
 	 * pointer on the conn has not changed, simply initializing ipl here
 	 * as the earlier initialization was done only in the cleartext case.
 	 */
-	if ((ipl = connp->conn_latch) != NULL) {
+	if ((ipl = connp->conn_latch) == NULL) {
 		mutex_exit(&connp->conn_lock);
 		/*
 		 * We don't have policies cached in the conn
