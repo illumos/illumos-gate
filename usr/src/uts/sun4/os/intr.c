@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sysmacros.h>
 #include <sys/stack.h>
 #include <sys/cpuvar.h>
@@ -67,6 +65,12 @@ static uint64_t siron1_inum; /* backward compatibility */
 uint64_t poke_cpu_inum;
 uint_t poke_cpu_intr(caddr_t arg1, caddr_t arg2);
 uint_t siron_poke_cpu_intr(caddr_t arg1, caddr_t arg2);
+
+/*
+ * Variable to enable/disable printing a message when an invalid vecintr
+ * is received.
+ */
+uint_t ignore_invalid_vecintr = 0;
 
 /*
  * Note:-
@@ -325,8 +329,9 @@ siron_cpu_setup(cpu_setup_t what, int id, void *arg)
 void
 no_ivintr(struct regs *rp, int inum, int pil)
 {
-	cmn_err(CE_WARN, "invalid vector intr: number 0x%x, pil 0x%x",
-	    inum, pil);
+	if (!ignore_invalid_vecintr)
+		cmn_err(CE_WARN, "invalid vector intr: number 0x%x, pil 0x%x",
+		    inum, pil);
 
 #ifdef DEBUG_VEC_INTR
 	prom_enter_mon();

@@ -26,8 +26,6 @@
 #ifndef	_SYS_IVINTR_H
 #define	_SYS_IVINTR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -53,6 +51,8 @@ typedef	uint_t (*intrfunc)(caddr_t, caddr_t);
 typedef	uint_t (*softintrfunc)(caddr_t, caddr_t);
 typedef	struct intr_vec intr_vec_t;
 typedef	struct intr_vecx intr_vecx_t;
+
+extern uint_t ignore_invalid_vecintr;
 
 /* Software interrupt type */
 typedef enum softint_type {

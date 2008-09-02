@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Schizo specifics implementation:
@@ -261,14 +259,14 @@ pci_intr_setup(pci_t *pci_p)
 	int intr_len, intr_cnt, ret;
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"interrupts", (caddr_t)&intr_buf, &intr_len) != DDI_SUCCESS)
+	    "interrupts", (caddr_t)&intr_buf, &intr_len) != DDI_SUCCESS)
 		cmn_err(CE_PANIC, "%s%d: no interrupts property\n",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 
 	intr_cnt = BYTES_TO_1275_CELLS(intr_len);
 	if (intr_cnt < CBNINTR_CDMA)	/* CBNINTR_CDMA is 0 based */
 		cmn_err(CE_PANIC, "%s%d: <%d interrupts", ddi_driver_name(dip),
-			ddi_get_instance(dip), CBNINTR_CDMA);
+		    ddi_get_instance(dip), CBNINTR_CDMA);
 
 	if (intr_cnt == CBNINTR_CDMA)
 		intr_cnt++;
@@ -282,9 +280,9 @@ pci_intr_setup(pci_t *pci_p)
 	pci_p->pci_inos_len = CELLS_1275_TO_BYTES(intr_cnt);
 
 	if (ndi_prop_update_int_array(DDI_DEV_T_NONE, dip, "interrupts",
-		(int *)new_intr_buf, intr_cnt))
+	    (int *)new_intr_buf, intr_cnt))
 		cmn_err(CE_PANIC, "%s%d: cannot update interrupts property\n",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 
 	if (pci_p->pci_common_p->pci_common_refcnt == 0) {
 		cb_p->cb_no_of_inos = intr_cnt;
@@ -336,7 +334,7 @@ pci_schizo_cdma_sync(pbm_t *pbm_p)
 	pci_t *pci_p = pbm_p->pbm_pci_p;
 	hrtime_t start_time;
 	volatile uint64_t *clr_p = ib_clear_intr_reg_addr(pci_p->pci_ib_p,
-		pci_p->pci_inos[CBNINTR_CDMA]);
+	    pci_p->pci_inos[CBNINTR_CDMA]);
 	uint32_t fail_cnt = pci_cdma_intr_count;
 
 	mutex_enter(&pbm_p->pbm_sync_mutex);
@@ -426,7 +424,7 @@ pci_pbm_dma_sync(pbm_t *pbm_p, ib_ino_t ino)
 
 	if (flag_val && SYNC_HW_BUSY(sync_reg_pa, ino_mask) && !panicstr)
 		cmn_err(CE_PANIC, "%s: pbm dma sync %lx,%lx timeout!",
-			pbm_p->pbm_nameaddr_str, sync_reg_pa, flag_val);
+		    pbm_p->pbm_nameaddr_str, sync_reg_pa, flag_val);
 done:
 	/* optional: stdphysio(sync_reg_pa - 8, ino_mask); */
 	if (locked)
@@ -525,8 +523,9 @@ done:
 
 fail:
 	cmn_err(CE_WARN, "%s%d: unable to map reg entry %d\n",
-		ddi_driver_name(dip), ddi_get_instance(dip), len);
-	for (; len--; ddi_regs_map_free(&pci_p->pci_ac[len]));
+	    ddi_driver_name(dip), ddi_get_instance(dip), len);
+	for (; len--; ddi_regs_map_free(&pci_p->pci_ac[len]))
+		;
 	return (DDI_FAILURE);
 }
 
@@ -571,9 +570,9 @@ uint32_t
 ib_map_reg_get_cpu(volatile uint64_t reg)
 {
 	return (((reg & COMMON_INTR_MAP_REG_TID) >>
-		COMMON_INTR_MAP_REG_TID_SHIFT) |
-			((reg & SCHIZO_INTR_MAP_REG_NID) >>
-			(SCHIZO_INTR_MAP_REG_NID_SHIFT-5)));
+	    COMMON_INTR_MAP_REG_TID_SHIFT) |
+	    ((reg & SCHIZO_INTR_MAP_REG_NID) >>
+	    (SCHIZO_INTR_MAP_REG_NID_SHIFT-5)));
 }
 
 uint64_t *
@@ -824,7 +823,7 @@ pbm_configure(pbm_t *pbm_p)
 	 * Enable arbitration.
 	 */
 	l |= PCI_CHIP_ID(pci_p) == XMITS_VER_10 ? XMITS10_PCI_CTRL_ARB_EN_MASK :
-		SCHIZO_PCI_CTRL_ARB_EN_MASK;
+	    SCHIZO_PCI_CTRL_ARB_EN_MASK;
 
 	/*
 	 * Make sure SERR is clear
@@ -843,8 +842,8 @@ pbm_configure(pbm_t *pbm_p)
 		l &=	 ~(TOMATILLO_PCI_CTRL_DTO_INT_EN);
 
 	l |= TOMATILLO_PCI_CTRL_PEN_RD_MLTPL |
-		TOMATILLO_PCI_CTRL_PEN_RD_ONE |
-		TOMATILLO_PCI_CTRL_PEN_RD_LINE;
+	    TOMATILLO_PCI_CTRL_PEN_RD_ONE |
+	    TOMATILLO_PCI_CTRL_PEN_RD_LINE;
 
 	/*
 	 * Now finally write the control register with the appropriate value.
@@ -857,13 +856,13 @@ pbm_configure(pbm_t *pbm_p)
 	 */
 	if (CHIP_TYPE(pci_p) == PCI_CHIP_TOMATILLO) {
 		volatile uint64_t *ioc_csr_p = pbm_p->pbm_ctrl_reg +
-			((TOMATILLO_IOC_CSR_OFF -
-			SCHIZO_PCI_CTRL_REG_OFFSET) >> 3);
+		    ((TOMATILLO_IOC_CSR_OFF -
+		    SCHIZO_PCI_CTRL_REG_OFFSET) >> 3);
 		*ioc_csr_p = TOMATILLO_WRT_PEN |
-			(1 << TOMATILLO_POFFSET_SHIFT) |
-			TOMATILLO_C_PEN_RD_MLTPL |
-			TOMATILLO_C_PEN_RD_ONE |
-			TOMATILLO_C_PEN_RD_LINE;
+		    (1 << TOMATILLO_POFFSET_SHIFT) |
+		    TOMATILLO_C_PEN_RD_MLTPL |
+		    TOMATILLO_C_PEN_RD_ONE |
+		    TOMATILLO_C_PEN_RD_LINE;
 	}
 
 	/*
@@ -886,7 +885,7 @@ pbm_configure(pbm_t *pbm_p)
 	 * Clear any PBM errors.
 	 */
 	l = (SCHIZO_PCI_AFSR_E_MASK << SCHIZO_PCI_AFSR_PE_SHIFT) |
-		(SCHIZO_PCI_AFSR_E_MASK << SCHIZO_PCI_AFSR_SE_SHIFT);
+	    (SCHIZO_PCI_AFSR_E_MASK << SCHIZO_PCI_AFSR_SE_SHIFT);
 	*pbm_p->pbm_async_flt_status_reg = l;
 
 	/*
@@ -936,8 +935,8 @@ pbm_configure(pbm_t *pbm_p)
 	 * Clear error bits in configuration status register.
 	 */
 	s = PCI_STAT_PERROR | PCI_STAT_S_PERROR |
-		PCI_STAT_R_MAST_AB | PCI_STAT_R_TARG_AB |
-		PCI_STAT_S_TARG_AB | PCI_STAT_S_PERROR;
+	    PCI_STAT_R_MAST_AB | PCI_STAT_R_TARG_AB |
+	    PCI_STAT_S_TARG_AB | PCI_STAT_S_PERROR;
 	DEBUG1(DBG_ATTACH, dip, "pbm_configure: conf status reg=%x\n", s);
 	pbm_p->pbm_config_header->ch_status_reg = s;
 
@@ -951,13 +950,13 @@ pbm_configure(pbm_t *pbm_p)
 	if (pci_set_latency_timer_register) {
 		DEBUG1(DBG_ATTACH, dip,
 		    "pbm_configure: set schizo latency timer to %x\n",
-			pci_latency_timer);
+		    pci_latency_timer);
 		pbm_p->pbm_config_header->ch_latency_timer_reg =
-			pci_latency_timer;
+		    pci_latency_timer;
 	}
 
 	(void) ndi_prop_update_int(DDI_DEV_T_ANY, dip, "latency-timer",
-		(int)pbm_p->pbm_config_header->ch_latency_timer_reg);
+	    (int)pbm_p->pbm_config_header->ch_latency_timer_reg);
 
 	/*
 	 * Adjust xmits_upper_retry_counter if set in /etc/system
@@ -989,8 +988,8 @@ pbm_disable_pci_errors(pbm_t *pbm_p)
 	 * PBM control register.
 	 */
 	*pbm_p->pbm_ctrl_reg &=
-		~(SCHIZO_PCI_CTRL_ERR_INT_EN | SCHIZO_PCI_CTRL_SBH_INT_EN |
-		SCHIZO_PCI_CTRL_MMU_INT_EN);
+	    ~(SCHIZO_PCI_CTRL_ERR_INT_EN | SCHIZO_PCI_CTRL_SBH_INT_EN |
+	    SCHIZO_PCI_CTRL_MMU_INT_EN);
 
 	/*
 	 * Disable error interrupts via the interrupt mapping register.
@@ -1031,7 +1030,8 @@ pci_iommu_get_dvma_context(iommu_t *iommu_p, dvma_addr_t dvma_pg_index)
 	ASSERT(ctx_mask >> DCB_BMAP_BITS == 0);
 
 	if (ctx_mask & test)			/* quick check i bit */
-		for (i = 0, test = 1ull; test & ctx_mask; test <<= 1, i++);
+		for (i = 0, test = 1ull; test & ctx_mask; test <<= 1, i++)
+			;
 	if (i < DCB_BMAP_BITS)
 		ctx_mask |= test;
 	*bucket_ptr = ctx_mask;			/* unlock */
@@ -1039,8 +1039,8 @@ pci_iommu_get_dvma_context(iommu_t *iommu_p, dvma_addr_t dvma_pg_index)
 
 	ctx = i < DCB_BMAP_BITS ? (bucket_no << 6) | i : 0;
 	DEBUG3(DBG_DMA_MAP, iommu_p->iommu_pci_p->pci_dip,
-		"get_dvma_context: ctx_mask=0x%x.%x ctx=0x%x\n",
-		(uint32_t)(ctx_mask >> 32), (uint32_t)ctx_mask, ctx);
+	    "get_dvma_context: ctx_mask=0x%x.%x ctx=0x%x\n",
+	    (uint32_t)(ctx_mask >> 32), (uint32_t)ctx_mask, ctx);
 	return (ctx);
 }
 
@@ -1053,10 +1053,11 @@ pci_iommu_free_dvma_context(iommu_t *iommu_p, dvma_context_t ctx)
 	uint64_t *bucket_ptr = iommu_p->iommu_ctx_bitmap + bucket_no;
 
 	DEBUG1(DBG_DMA_MAP, iommu_p->iommu_pci_p->pci_dip,
-		"free_dvma_context: ctx=0x%x\n", ctx);
+	    "free_dvma_context: ctx=0x%x\n", ctx);
 
 	spl = ddi_enter_critical();			/* block interrupts */
-	while (ldstub((uint8_t *)bucket_ptr));		/* spin lock */
+	while (ldstub((uint8_t *)bucket_ptr))		/* spin lock */
+		;
 	ctx_mask = (*bucket_ptr << DCB_LOCK_BITS) >> DCB_LOCK_BITS;
 							/* clear lock bits */
 	ASSERT(ctx_mask & (1ull << bit_no));
@@ -1094,7 +1095,7 @@ pci_sc_ctx_inv(dev_info_t *dip, sc_t *sc_p, ddi_dma_impl_t *mp)
 	pci_ctx_unsuccess_count++;
 	if (pci_ctx_flush_warn)
 		cmn_err(pci_ctx_flush_warn, "%s%d: ctx flush unsuccessful\n",
-			NAMEINST(dip));
+		    NAMEINST(dip));
 	return (DDI_FAILURE);
 }
 
@@ -1113,6 +1114,8 @@ pci_cb_setup(pci_t *pci_p)
 			tm_mtlb_gc = 1;
 
 		if (PCI_CHIP_ID(pci_p) <= TOMATILLO_VER_23) {
+			/* Workaround for the Tomatillo ASIC Erratum #72 */
+			ignore_invalid_vecintr = 1;
 			tomatillo_store_store_wrka = 1;
 			tomatillo_disallow_bypass = 1;
 			if (pci_spurintr_msgs == PCI_SPURINTR_MSG_DEFAULT)
@@ -1140,11 +1143,11 @@ pci_cb_setup(pci_t *pci_p)
 	cb_p->cb_base_pa = pa << MMU_PAGESHIFT;
 
 	pa = pci_p->pci_address[3] ?
-		(uint64_t)hat_getpfnum(kas.a_hat, pci_p->pci_address[3]) : 0;
+	    (uint64_t)hat_getpfnum(kas.a_hat, pci_p->pci_address[3]) : 0;
 	cb_p->cb_icbase_pa = (pa == PFN_INVALID) ? 0 : pa << MMU_PAGESHIFT;
 
 	pa = (uint64_t)hat_getpfnum(kas.a_hat, pci_p->pci_address[0])
-		<< MMU_PAGESHIFT;
+	    << MMU_PAGESHIFT;
 	cb_p->cb_map_pa = pa + SCHIZO_IB_INTR_MAP_REG_OFFSET;
 	cb_p->cb_clr_pa = pa + SCHIZO_IB_CLEAR_INTR_REG_OFFSET;
 	cb_p->cb_obsta_pa = pa + COMMON_IB_OBIO_INTR_STATE_DIAG_REG;
@@ -1204,17 +1207,17 @@ pci_iommu_setup(iommu_t *iommu_p)
 	}
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"virtual-dma", (caddr_t)&dvma_prop, &dvma_prop_len) !=
-		DDI_PROP_SUCCESS)
+	    "virtual-dma", (caddr_t)&dvma_prop, &dvma_prop_len) !=
+	    DDI_PROP_SUCCESS)
 		goto tsb_done;
 
 	if (dvma_prop_len != sizeof (pci_dvma_range_prop_t)) {
 		cmn_err(CE_WARN, "%s%d: invalid virtual-dma property",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		goto tsb_end;
 	}
 	iommu_p->iommu_dvma_end = dvma_prop->dvma_base +
-		(dvma_prop->dvma_len - 1);
+	    (dvma_prop->dvma_len - 1);
 	tsb_size_prop = IOMMU_BTOP(dvma_prop->dvma_len) * sizeof (uint64_t);
 	tsb_size = MIN(tsb_size_prop, tsb_size);
 tsb_end:
@@ -1222,7 +1225,7 @@ tsb_end:
 tsb_done:
 	iommu_p->iommu_tsb_size = iommu_tsb_size_encode(tsb_size);
 	iommu_p->iommu_ctx_bitmap =
-		kmem_zalloc(IOMMU_CTX_BITMAP_SIZE, KM_SLEEP);
+	    kmem_zalloc(IOMMU_CTX_BITMAP_SIZE, KM_SLEEP);
 	*iommu_p->iommu_ctx_bitmap = 1ull;	/* reserve context 0 */
 
 	/*
@@ -1232,10 +1235,10 @@ tsb_done:
 	 */
 	a = (uintptr_t)pci_p->pci_address[0];
 	iommu_p->iommu_flush_ctx_reg =
-		(uint64_t *)(a + SCHIZO_IOMMU_FLUSH_CTX_REG_OFFSET);
+	    (uint64_t *)(a + SCHIZO_IOMMU_FLUSH_CTX_REG_OFFSET);
 	if (CHIP_TYPE(pci_p) == PCI_CHIP_TOMATILLO)
 		iommu_p->iommu_tfar_reg =
-			(uint64_t *)(a + TOMATILLO_IOMMU_ERR_TFAR_OFFSET);
+		    (uint64_t *)(a + TOMATILLO_IOMMU_ERR_TFAR_OFFSET);
 	return (a);	/* PCICSRBase */
 }
 
@@ -1258,7 +1261,7 @@ uintptr_t
 get_pbm_reg_base(pci_t *pci_p)
 {
 	return ((uintptr_t)
-		(pci_p->pci_address[0] + SCHIZO_PCI_CTRL_REG_OFFSET));
+	    (pci_p->pci_address[0] + SCHIZO_PCI_CTRL_REG_OFFSET));
 }
 
 /* ARGSUSED */
@@ -1313,9 +1316,9 @@ pci_pbm_setup(pbm_t *pbm_p)
 	pbm_p->pbm_ctrl_reg = (uint64_t *)(a + SCHIZO_PCI_CTRL_REG_OFFSET);
 	pbm_p->pbm_diag_reg = (uint64_t *)(a + SCHIZO_PCI_DIAG_REG_OFFSET);
 	pbm_p->pbm_async_flt_status_reg =
-		(uint64_t *)(a + SCHIZO_PCI_ASYNC_FLT_STATUS_REG_OFFSET);
+	    (uint64_t *)(a + SCHIZO_PCI_ASYNC_FLT_STATUS_REG_OFFSET);
 	pbm_p->pbm_async_flt_addr_reg =
-		(uint64_t *)(a + SCHIZO_PCI_ASYNC_FLT_ADDR_REG_OFFSET);
+	    (uint64_t *)(a + SCHIZO_PCI_ASYNC_FLT_ADDR_REG_OFFSET);
 	pbm_p->pbm_estar_reg = (uint64_t *)(a + SCHIZO_PCI_ESTAR_REG_OFFSET);
 	pbm_p->pbm_pcix_err_stat_reg = (uint64_t *)(a +
 	    XMITS_PCI_X_ERROR_STATUS_REG_OFFSET);
@@ -1391,8 +1394,7 @@ pci_ib_setup(ib_t *ib_p)
 	ib_p->ib_max_ino = SCHIZO_MAX_INO;
 	ib_p->ib_slot_intr_map_regs = a + SCHIZO_IB_SLOT_INTR_MAP_REG_OFFSET;
 	ib_p->ib_intr_map_regs = a + SCHIZO_IB_INTR_MAP_REG_OFFSET;
-	ib_p->ib_slot_clear_intr_regs =
-		a + SCHIZO_IB_CLEAR_INTR_REG_OFFSET;
+	ib_p->ib_slot_clear_intr_regs = a + SCHIZO_IB_CLEAR_INTR_REG_OFFSET;
 	return (a);
 }
 
@@ -1412,7 +1414,7 @@ pci_sc_setup(sc_t *sc_p)
 	sc_p->sc_sync_reg = (uint64_t *)(a + SCHIZO_SC_SYNC_REG_OFFSET);
 	sc_p->sc_ctx_invl_reg = (uint64_t *)(a + SCHIZO_SC_CTX_INVL_REG_OFFSET);
 	sc_p->sc_ctx_match_reg =
-		(uint64_t *)(a + SCHIZO_SC_CTX_MATCH_REG_OFFSET);
+	    (uint64_t *)(a + SCHIZO_SC_CTX_MATCH_REG_OFFSET);
 
 	/*
 	 * Determine the virtual addresses of the streaming cache
@@ -1527,11 +1529,11 @@ pci_cb_errstate_get(cb_t *cb_p, cb_errstate_t *cb_err_p)
 
 	if ((CB_CHIP_TYPE((cb_t *)cb_p)) == PCI_CHIP_XMITS) {
 		cb_err_p->cb_first_elog = lddphysio(pa +
-				XMITS_CB_FIRST_ERROR_LOG);
+		    XMITS_CB_FIRST_ERROR_LOG);
 		cb_err_p->cb_first_eaddr = lddphysio(pa +
-				XMITS_CB_FIRST_ERROR_ADDR);
+		    XMITS_CB_FIRST_ERROR_ADDR);
 		cb_err_p->cb_leaf_status = lddphysio(pa +
-				XMITS_CB_FIRST_ERROR_ADDR);
+		    XMITS_CB_FIRST_ERROR_ADDR);
 	}
 
 	/* Gather PBM state information for both sides of this chip */
@@ -1539,7 +1541,7 @@ pci_cb_errstate_get(cb_t *cb_p, cb_errstate_t *cb_err_p)
 		if (cb_p->cb_pci_cmn_p->pci_p[i] == NULL)
 			continue;
 		pci_pbm_errstate_get(((cb_t *)cb_p)->cb_pci_cmn_p->
-					    pci_p[i], &cb_err_p->cb_pbm[i]);
+		    pci_p[i], &cb_err_p->cb_pbm[i]);
 	}
 }
 
@@ -1635,8 +1637,8 @@ jbus_check_va_log(cb_t *cb_p, uint64_t fme_ena,
 		if (cb_err_p->cb_pbm[i].pbm_va_log) {
 			void *addr = (void *)&cb_err_p->cb_pbm[i].pbm_va_log;
 			ret = ndi_fmc_error(cb_p->cb_pci_cmn_p->pci_p[i]->
-					pci_dip, NULL, DMA_HANDLE, fme_ena,
-					(void *)addr);
+			    pci_dip, NULL, DMA_HANDLE, fme_ena,
+			    (void *)addr);
 			if (ret == DDI_FM_NONFATAL)
 				break;
 		}
@@ -1691,14 +1693,14 @@ jbus_err_handler(dev_info_t *dip, uint64_t fme_ena,
 			continue;
 		}
 		if (jbus_check_va_log(cb_p, fme_ena, cb_err_p)
-				!= DDI_FM_NONFATAL) {
+		    != DDI_FM_NONFATAL) {
 			fatal++;
 		}
 		cb_ereport_post(dip, fme_ena, cb_err_p);
 	}
 
 	return (fatal ? DDI_FM_FATAL : (nonfatal ? DDI_FM_NONFATAL :
-				DDI_FM_OK));
+	    DDI_FM_OK));
 }
 
 /*
@@ -1729,9 +1731,8 @@ cb_buserr_intr(caddr_t a)
 	if (CB_CHIP_TYPE(cb_p) == PCI_CHIP_TOMATILLO)
 		ret = jbus_err_handler(pci_p->pci_dip, derr.fme_ena, &cb_err);
 	else if ((CB_CHIP_TYPE(cb_p) == PCI_CHIP_SCHIZO) ||
-			(CB_CHIP_TYPE(cb_p) == PCI_CHIP_XMITS))
-		ret = safari_err_handler(pci_p->pci_dip, derr.fme_ena,
-		    &cb_err);
+	    (CB_CHIP_TYPE(cb_p) == PCI_CHIP_XMITS))
+		ret = safari_err_handler(pci_p->pci_dip, derr.fme_ena, &cb_err);
 
 	/*
 	 * Check for related errors in PBM and IOMMU. The IOMMU could cause
@@ -1853,27 +1854,27 @@ pci_ecc_classify(uint64_t err, ecc_errstate_t *ecc_err_p)
 
 	for (i = 0; ecc_err_tbl[i].ecc_err_class != NULL; i++) {
 		if (!(err & ecc_err_tbl[i].ecc_reg_bit) ||
-			(ecc_err_p->ecc_ii_p.ecc_type !=
-			    ecc_err_tbl[i].ecc_type) ||
-			(ecc_err_p->ecc_pri != ecc_err_tbl[i].ecc_pri))
+		    (ecc_err_p->ecc_ii_p.ecc_type !=
+		    ecc_err_tbl[i].ecc_type) ||
+		    (ecc_err_p->ecc_pri != ecc_err_tbl[i].ecc_pri))
 			continue;
 
 		ecc_p->flt_erpt_class = ecc_err_tbl[i].ecc_err_class;
 		flag = ecc_err_tbl[i].ecc_flag;
 
 		if (!ecc_err_tbl[i].ecc_pri ||
-				(ecc_err_tbl[i].ecc_type == CBNINTR_CE)) {
+		    (ecc_err_tbl[i].ecc_type == CBNINTR_CE)) {
 			fatal += (ecc_err_tbl[i].ecc_type == CBNINTR_UE) ?
-				1 : 0;
+			    1 : 0;
 			break;
 		}
 
 		if (flag == ACC_HANDLE &&
-			(region & ecc_err_tbl[i].ecc_region_bits)) {
+		    (region & ecc_err_tbl[i].ecc_region_bits)) {
 			ecc_err_p->ecc_region = ecc_err_tbl[i].ecc_region;
 			pci_format_ecc_addr(pci_p->pci_dip,
-					&ecc_err_p->ecc_err_addr,
-					ecc_err_p->ecc_region);
+			    &ecc_err_p->ecc_err_addr,
+			    ecc_err_p->ecc_region);
 		}
 
 		/*
@@ -1884,8 +1885,8 @@ pci_ecc_classify(uint64_t err, ecc_errstate_t *ecc_err_p)
 			if (cmn_p->pci_p[j] == NULL)
 				continue;
 			ret = ndi_fmc_error(cmn_p->pci_p[j]->pci_dip, NULL,
-					flag, ecc_err_p->ecc_ena,
-					(void *)&ecc_err_p->ecc_err_addr);
+			    flag, ecc_err_p->ecc_ena,
+			    (void *)&ecc_err_p->ecc_err_addr);
 			if (ret == DDI_FM_NONFATAL) {
 				fatal = 0;
 				break;
@@ -1952,7 +1953,7 @@ pcix_lookup_err_msgs(dev_info_t *dip, uint64_t ena, pcix_err_tbl_t t,
 	for (j = 0; j < t.err_rec_num; j++)  {
 		uint32_t msg_key = t.err_msg_tbl[j].msg_key;
 		if (pbm_err_p->pbm_multi ? !(err_bits & msg_key) : err_bits
-				!= msg_key)
+		    != msg_key)
 			continue;
 
 		(void) snprintf(buf, FM_MAX_CLASS, "%s.%s%s",
@@ -2109,14 +2110,14 @@ pci_pbm_classify(pbm_errstate_t *pbm_err_p)
 	int i;
 
 	err = pbm_err_p->pbm_pri ? PBM_AFSR_TO_PRIERR(pbm_err_p->pbm_afsr):
-		PBM_AFSR_TO_SECERR(pbm_err_p->pbm_afsr);
+	    PBM_AFSR_TO_SECERR(pbm_err_p->pbm_afsr);
 
 	for (i = 0; pbm_err_tbl[i].pbm_err_class != NULL; i++) {
 		if ((err & pbm_err_tbl[i].pbm_reg_bit) &&
 		    (pbm_err_p->pbm_pri == pbm_err_tbl[i].pbm_pri)) {
 			if (pbm_err_tbl[i].pbm_flag == FM_LOG_PCI)
 				pbm_err_p->pbm_pci.pci_err_class =
-					pbm_err_tbl[i].pbm_err_class;
+				    pbm_err_tbl[i].pbm_err_class;
 			else
 				pbm_err_p->pbm_err_class =
 				    pbm_err_tbl[i].pbm_err_class;
@@ -2164,7 +2165,7 @@ iommu_err_handler(dev_info_t *dip, uint64_t ena, pbm_errstate_t *pbm_err_p)
 	 * is bliss, but knowledge is power.
 	 */
 	ta_signalled = pbm_err_p->pbm_pci.pci_cfg_stat &
-		PCI_STAT_S_TARG_AB;
+	    PCI_STAT_S_TARG_AB;
 
 	if (stat & TOMATILLO_IOMMU_ERR_ILLTSBTBW) {
 		pbm_err_p->pbm_err_class = PCI_TOM_MMU_BAD_TSBTBW;
@@ -2202,7 +2203,7 @@ iommu_err_handler(dev_info_t *dip, uint64_t ena, pbm_errstate_t *pbm_err_p)
 			 * register to inform target driver of error
 			 */
 			ret = ndi_fmc_error(pci_p->pci_dip, NULL, DMA_HANDLE,
-				ena, (void *)&pbm_err_p->pbm_iommu.iommu_tfar);
+			    ena, (void *)&pbm_err_p->pbm_iommu.iommu_tfar);
 
 			if (ret != DDI_FM_NONFATAL)
 				if (ta_signalled)
@@ -2250,20 +2251,20 @@ pci_check_error(pci_t *pci_p)
 	pbm_afsr = *pbm_p->pbm_async_flt_status_reg;
 
 	if ((pci_cfg_stat & (PCI_STAT_S_PERROR | PCI_STAT_S_TARG_AB |
-				PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB |
-				PCI_STAT_S_SYSERR | PCI_STAT_PERROR)) ||
-			(pbm_ctl_stat & (SCHIZO_PCI_CTRL_BUS_UNUSABLE |
-				TOMATILLO_PCI_CTRL_PCI_DTO_ERR |
-				SCHIZO_PCI_CTRL_PCI_TTO_ERR |
-				SCHIZO_PCI_CTRL_PCI_RTRY_ERR |
-				SCHIZO_PCI_CTRL_PCI_MMU_ERR |
-				COMMON_PCI_CTRL_SBH_ERR |
-				COMMON_PCI_CTRL_SERR)) ||
-			(PBM_AFSR_TO_PRIERR(pbm_afsr)))
+	    PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB |
+	    PCI_STAT_S_SYSERR | PCI_STAT_PERROR)) ||
+	    (pbm_ctl_stat & (SCHIZO_PCI_CTRL_BUS_UNUSABLE |
+	    TOMATILLO_PCI_CTRL_PCI_DTO_ERR |
+	    SCHIZO_PCI_CTRL_PCI_TTO_ERR |
+	    SCHIZO_PCI_CTRL_PCI_RTRY_ERR |
+	    SCHIZO_PCI_CTRL_PCI_MMU_ERR |
+	    COMMON_PCI_CTRL_SBH_ERR |
+	    COMMON_PCI_CTRL_SERR)) ||
+	    (PBM_AFSR_TO_PRIERR(pbm_afsr)))
 		return (1);
 
 	if ((CHIP_TYPE(pci_p) == PCI_CHIP_XMITS) &&
-			(pbm_ctl_stat & XMITS_PCI_CTRL_X_MODE)) {
+	    (pbm_ctl_stat & XMITS_PCI_CTRL_X_MODE)) {
 
 		pbm_pcix_stat_reg = (uint64_t *)(a +
 		    XMITS_PCI_X_ERROR_STATUS_REG_OFFSET);
@@ -2397,13 +2398,13 @@ pci_pbm_err_handler(dev_info_t *dip, ddi_fm_error_t *derr,
 			nonfatal++;
 	}
 	if ((ret = pcix_log_pbm(pci_p, derr->fme_ena, &pbm_err))
-			== DDI_FM_FATAL)
+	    == DDI_FM_FATAL)
 		fatal++;
 	else if (ret == DDI_FM_NONFATAL)
 		nonfatal++;
 
 	if ((ret = pci_cfg_report(dip, derr, &pbm_err.pbm_pci, caller, prierr))
-			== DDI_FM_FATAL)
+	    == DDI_FM_FATAL)
 		fatal++;
 	else if (ret == DDI_FM_NONFATAL)
 		nonfatal++;
@@ -2412,7 +2413,7 @@ pci_pbm_err_handler(dev_info_t *dip, ddi_fm_error_t *derr,
 		if ((pbm_err.pbm_ctl_stat & pci_pbm_err_tbl[i].pbm_reg_bit) &&
 		    !prierr) {
 			pbm_err.pbm_err_class =
-				pci_pbm_err_tbl[i].pbm_err_class;
+			    pci_pbm_err_tbl[i].pbm_err_class;
 			pbm_ereport_post(dip, derr->fme_ena, &pbm_err);
 			if (pci_pbm_err_tbl[i].pbm_flag)
 				fatal++;
@@ -2451,7 +2452,7 @@ pci_pbm_err_handler(dev_info_t *dip, ddi_fm_error_t *derr,
 			DEBUG1(DBG_ERR_INTR, dip, "pci_pbm_err_handler: "
 			    "ereport_post: %s", buf);
 			(void) snprintf(buf, FM_MAX_CLASS, "%s.%s",
-				PCI_ERROR_SUBCLASS, PCI_REC_SERR);
+			    PCI_ERROR_SUBCLASS, PCI_REC_SERR);
 			ddi_fm_ereport_post(dip, buf, derr->fme_ena,
 			    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
 			    PCI_CONFIG_STATUS, DATA_TYPE_UINT16,
@@ -2473,7 +2474,7 @@ pci_pbm_err_handler(dev_info_t *dip, ddi_fm_error_t *derr,
 			nonfatal++;
 
 		(void) snprintf(buf, FM_MAX_CLASS, "%s.%s",
-			PCI_ERROR_SUBCLASS, PCI_DTO);
+		    PCI_ERROR_SUBCLASS, PCI_DTO);
 		ddi_fm_ereport_post(dip, buf, derr->fme_ena, DDI_NOSLEEP,
 		    FM_VERSION, DATA_TYPE_UINT8, 0,
 		    PCI_CONFIG_STATUS, DATA_TYPE_UINT16,
@@ -2489,7 +2490,7 @@ pci_pbm_err_handler(dev_info_t *dip, ddi_fm_error_t *derr,
 	 * and sent here to be logged.
 	 */
 	if ((pbm_err.pbm_pci.pci_cfg_stat & PCI_STAT_PERROR) &&
-			!(pbm_err.pbm_pci.pci_cfg_stat & PCI_STAT_S_SYSERR)) {
+	    !(pbm_err.pbm_pci.pci_cfg_stat & PCI_STAT_S_SYSERR)) {
 		/*
 		 * If we have an address then fault
 		 * it, if not probe for errant device
@@ -2512,7 +2513,7 @@ pci_pbm_err_handler(dev_info_t *dip, ddi_fm_error_t *derr,
 	/* PBM Detected IOMMU Error */
 	if (pbm_err.pbm_ctl_stat & SCHIZO_PCI_CTRL_PCI_MMU_ERR) {
 		if (iommu_err_handler(dip, derr->fme_ena, &pbm_err)
-				== DDI_FM_FATAL)
+		    == DDI_FM_FATAL)
 			fatal++;
 		else
 			nonfatal++;
@@ -2588,13 +2589,13 @@ pci_pbm_errstate_get(pci_t *pci_p, pbm_errstate_t *pbm_err_p)
 	pbm_err_p->pbm_bridge_type = PCI_BRIDGE_TYPE(pci_p->pci_common_p);
 
 	pbm_err_p->pbm_pci.pci_cfg_stat =
-		pbm_p->pbm_config_header->ch_status_reg;
+	    pbm_p->pbm_config_header->ch_status_reg;
 	pbm_err_p->pbm_ctl_stat = *pbm_p->pbm_ctrl_reg;
 	pbm_err_p->pbm_afsr = *pbm_p->pbm_async_flt_status_reg;
 	pbm_err_p->pbm_afar = *pbm_p->pbm_async_flt_addr_reg;
 	pbm_err_p->pbm_iommu.iommu_stat = *iommu_p->iommu_ctrl_reg;
 	pbm_err_p->pbm_pci.pci_cfg_comm =
-		pbm_p->pbm_config_header->ch_command_reg;
+	    pbm_p->pbm_config_header->ch_command_reg;
 	pbm_err_p->pbm_pci.pci_pa = *pbm_p->pbm_async_flt_addr_reg;
 
 	/*
@@ -2602,10 +2603,10 @@ pci_pbm_errstate_get(pci_t *pci_p, pbm_errstate_t *pbm_err_p)
 	 * Not stored in Tomatillo
 	 */
 	if (CHIP_TYPE(pci_p) == PCI_CHIP_XMITS ||
-			CHIP_TYPE(pci_p) == PCI_CHIP_SCHIZO) {
+	    CHIP_TYPE(pci_p) == PCI_CHIP_SCHIZO) {
 		pbm_err_p->pbm_err_sl = (pbm_err_p->pbm_ctl_stat &
-				SCHIZO_PCI_CTRL_ERR_SLOT) >>
-			SCHIZO_PCI_CTRL_ERR_SLOT_SHIFT;
+		    SCHIZO_PCI_CTRL_ERR_SLOT) >>
+		    SCHIZO_PCI_CTRL_ERR_SLOT_SHIFT;
 
 		/*
 		 * The bit 51 on XMITS rev1.0 is same as
@@ -2617,18 +2618,17 @@ pci_pbm_errstate_get(pci_t *pci_p, pbm_errstate_t *pbm_err_p)
 		 */
 		if (pbm_err_p->pbm_ctl_stat & XMITS_PCI_CTRL_DMA_WR_PERR) {
 			if ((PCI_CHIP_ID(pci_p) == XMITS_VER_10) ||
-				(PCI_CHIP_ID(pci_p) <= SCHIZO_VER_23)) {
+			    (PCI_CHIP_ID(pci_p) <= SCHIZO_VER_23)) {
 				/*
 				 * top 32 bits are W1C and we just want to
 				 * clear SLOT_LOCK. Leave bottom 32 bits
 				 * unchanged
 				 */
 				*pbm_p->pbm_ctrl_reg =
-					pbm_err_p->pbm_ctl_stat &
-					(SCHIZO_PCI_CTRL_ERR_SLOT_LOCK |
-					0xffffffff);
-				pbm_err_p->pbm_ctl_stat =
-					*pbm_p->pbm_ctrl_reg;
+				    pbm_err_p->pbm_ctl_stat &
+				    (SCHIZO_PCI_CTRL_ERR_SLOT_LOCK |
+				    0xffffffff);
+				pbm_err_p->pbm_ctl_stat = *pbm_p->pbm_ctrl_reg;
 			}
 		}
 	}
@@ -2646,14 +2646,14 @@ pci_pbm_errstate_get(pci_t *pci_p, pbm_errstate_t *pbm_err_p)
 	 * Xmits PCI-X register
 	 */
 	if ((CHIP_TYPE(pci_p) == PCI_CHIP_XMITS) &&
-			(pbm_err_p->pbm_ctl_stat & XMITS_PCI_CTRL_X_MODE)) {
+	    (pbm_err_p->pbm_ctl_stat & XMITS_PCI_CTRL_X_MODE)) {
 
 		pbm_pcix_stat_reg = (uint64_t *)(a +
 		    XMITS_PCI_X_ERROR_STATUS_REG_OFFSET);
 
 		pbm_err_p->pbm_pcix_stat = *pbm_pcix_stat_reg;
 		pbm_err_p->pbm_pcix_pfar = pbm_err_p->pbm_pcix_stat &
-				XMITS_PCI_X_STATUS_PFAR_MASK;
+		    XMITS_PCI_X_STATUS_PFAR_MASK;
 	}
 }
 
@@ -2674,7 +2674,7 @@ pci_clear_error(pci_t *pci_p, pbm_errstate_t *pbm_err_p)
 		iommu_tlb_scrub(pci_p->pci_iommu_p, 1);
 	}
 	pbm_p->pbm_config_header->ch_status_reg =
-		pbm_err_p->pbm_pci.pci_cfg_stat;
+	    pbm_err_p->pbm_pci.pci_cfg_stat;
 	*pbm_p->pbm_ctrl_reg = pbm_err_p->pbm_ctl_stat;
 	*pbm_p->pbm_async_flt_status_reg = pbm_err_p->pbm_afsr;
 	*iommu_p->iommu_ctrl_reg = pbm_err_p->pbm_iommu.iommu_stat;
@@ -2873,7 +2873,7 @@ iommu_ereport_post(dev_info_t *dip, uint64_t ena, pbm_errstate_t *pbm_err)
 	char buf[FM_MAX_CLASS];
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s",
-		    pbm_err->pbm_bridge_type, pbm_err->pbm_err_class);
+	    pbm_err->pbm_bridge_type, pbm_err->pbm_err_class);
 
 	ena = ena ? ena : fm_ena_generate(0, FM_ENA_FMT1);
 
@@ -2902,7 +2902,7 @@ pcix_ereport_post(dev_info_t *dip, uint64_t ena, pbm_errstate_t *pbm_err)
 	char buf[FM_MAX_CLASS];
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s.%s",
-		    pbm_err->pbm_bridge_type, pbm_err->pbm_err_class);
+	    pbm_err->pbm_bridge_type, pbm_err->pbm_err_class);
 
 	ena = ena ? ena : fm_ena_generate(0, FM_ENA_FMT1);
 
@@ -2942,12 +2942,12 @@ iommu_tlb_scrub(iommu_t *iommu_p, int scrub)
 	char *neg = "not ";
 
 	uint64_t base = (uint64_t)iommu_p->iommu_ctrl_reg -
-		COMMON_IOMMU_CTRL_REG_OFFSET;
+	    COMMON_IOMMU_CTRL_REG_OFFSET;
 
 	volatile uint64_t *tlb_tag = (volatile uint64_t *)
-		(base + COMMON_IOMMU_TLB_TAG_DIAG_ACC_OFFSET);
+	    (base + COMMON_IOMMU_TLB_TAG_DIAG_ACC_OFFSET);
 	volatile uint64_t *tlb_data = (volatile uint64_t *)
-		(base + COMMON_IOMMU_TLB_DATA_DIAG_ACC_OFFSET);
+	    (base + COMMON_IOMMU_TLB_DATA_DIAG_ACC_OFFSET);
 	for (i = 0; i < IOMMU_TLB_ENTRIES; i++) {
 		uint64_t tag = tlb_tag[i];
 		uint64_t data = tlb_data[i];
@@ -2959,7 +2959,7 @@ iommu_tlb_scrub(iommu_t *iommu_p, int scrub)
 
 		pfn = (iopfn_t)(data & TLBDATA_MEMPA_BITS);
 		errstat = (uint32_t)
-			((tag & TLBTAG_ERRSTAT_BITS) >> TLBTAG_ERRSTAT_SHIFT);
+		    ((tag & TLBTAG_ERRSTAT_BITS) >> TLBTAG_ERRSTAT_SHIFT);
 		if (errstat == TLBTAG_ERRSTAT_INVALID) {
 			if (scrub)
 				tlb_tag[i] = tlb_data[i] = 0ull;
@@ -2972,15 +2972,15 @@ iommu_tlb_scrub(iommu_t *iommu_p, int scrub)
 		cmn_err(CE_CONT, "%s%d: Error %x on IOMMU TLB entry %x:\n"
 		"\tContext=%lx %sWritable %sStreamable\n"
 		"\tPCI Page Size=%sk Address in page %lx\n",
-			ddi_driver_name(dip), ddi_get_instance(dip), errstat, i,
-			(tag & TLBTAG_CONTEXT_BITS) >> TLBTAG_CONTEXT_SHIFT,
-			(tag & TLBTAG_WRITABLE_BIT) ? "" : neg,
-			(tag & TLBTAG_STREAM_BIT) ? "" : neg,
-			(tag & TLBTAG_PGSIZE_BIT) ? "64" : "8",
-			(tag & TLBTAG_PCIVPN_BITS) << 13);
+		    ddi_driver_name(dip), ddi_get_instance(dip), errstat, i,
+		    (tag & TLBTAG_CONTEXT_BITS) >> TLBTAG_CONTEXT_SHIFT,
+		    (tag & TLBTAG_WRITABLE_BIT) ? "" : neg,
+		    (tag & TLBTAG_STREAM_BIT) ? "" : neg,
+		    (tag & TLBTAG_PGSIZE_BIT) ? "64" : "8",
+		    (tag & TLBTAG_PCIVPN_BITS) << 13);
 		cmn_err(CE_CONT, "Memory: %sValid %sCacheable Page Frame=%lx\n",
-			(data & TLBDATA_VALID_BIT) ? "" : neg,
-			(data & TLBDATA_CACHE_BIT) ? "" : neg, pfn);
+		    (data & TLBDATA_VALID_BIT) ? "" : neg,
+		    (data & TLBDATA_CACHE_BIT) ? "" : neg, pfn);
 	}
 	return (nerr);
 }
@@ -3024,7 +3024,7 @@ pci_iommu_config(iommu_t *iommu_p, uint64_t iommu_ctl, uint64_t cfgpa)
 	uintptr_t pbm_regbase = get_pbm_reg_base(iommu_p->iommu_pci_p);
 	volatile uint64_t *pbm_csr_p = (volatile uint64_t *)pbm_regbase;
 	volatile uint64_t *tgt_space_p = (volatile uint64_t *)(pbm_regbase |
-		(TOMATILLO_TGT_ADDR_SPACE_OFFSET - SCHIZO_PCI_CTRL_REG_OFFSET));
+	    (TOMATILLO_TGT_ADDR_SPACE_OFFSET - SCHIZO_PCI_CTRL_REG_OFFSET));
 	volatile uint64_t pbm_ctl = *pbm_csr_p;
 
 	volatile uint64_t *iommu_ctl_p = iommu_p->iommu_ctrl_reg;
@@ -3033,14 +3033,14 @@ pci_iommu_config(iommu_t *iommu_p, uint64_t iommu_ctl, uint64_t cfgpa)
 	uint64_t mask = pci_iommu_disp(iommu_p, &iommu_ctl);
 
 	DEBUG2(DBG_ATTACH, iommu_p->iommu_pci_p->pci_dip,
-		"\npci_iommu_config: pbm_csr_p=%llx pbm_ctl=%llx",
-		pbm_csr_p, pbm_ctl);
+	    "\npci_iommu_config: pbm_csr_p=%llx pbm_ctl=%llx",
+	    pbm_csr_p, pbm_ctl);
 	DEBUG2(DBG_ATTACH|DBG_CONT, iommu_p->iommu_pci_p->pci_dip,
-		"\n\tiommu_ctl_p=%llx iommu_ctl=%llx",
-		iommu_ctl_p, iommu_ctl);
+	    "\n\tiommu_ctl_p=%llx iommu_ctl=%llx",
+	    iommu_ctl_p, iommu_ctl);
 	DEBUG4(DBG_ATTACH|DBG_CONT, iommu_p->iommu_pci_p->pci_dip,
-		"\n\tcfgpa=%llx tgt_space_p=%llx mask=%x tsb=%llx\n",
-		cfgpa, tgt_space_p, mask, tsb_bar_val);
+	    "\n\tcfgpa=%llx tgt_space_p=%llx mask=%x tsb=%llx\n",
+	    cfgpa, tgt_space_p, mask, tsb_bar_val);
 
 	if (!cfgpa)
 		goto reprog;
@@ -3121,26 +3121,26 @@ void
 pci_kstat_init()
 {
 	pci_name_kstat = (pci_ksinfo_t *)kmem_alloc(sizeof (pci_ksinfo_t),
-		KM_NOSLEEP);
+	    KM_NOSLEEP);
 
 	if (pci_name_kstat == NULL) {
 		cmn_err(CE_WARN, "pcisch : no space for kstat\n");
 	} else {
 		pci_name_kstat->pic_no_evs =
-			sizeof (schizo_pci_events) / sizeof (pci_kev_mask_t);
+		    sizeof (schizo_pci_events) / sizeof (pci_kev_mask_t);
 		pci_name_kstat->pic_shift[0] = SCHIZO_SHIFT_PIC0;
 		pci_name_kstat->pic_shift[1] = SCHIZO_SHIFT_PIC1;
 		pci_create_name_kstat("pcis",
-			pci_name_kstat, schizo_pci_events);
+		    pci_name_kstat, schizo_pci_events);
 	}
 
 	saf_name_kstat = (pci_ksinfo_t *)kmem_alloc(sizeof (pci_ksinfo_t),
-		KM_NOSLEEP);
+	    KM_NOSLEEP);
 	if (saf_name_kstat == NULL) {
 		cmn_err(CE_WARN, "pcisch : no space for kstat\n");
 	} else {
 		saf_name_kstat->pic_no_evs =
-			sizeof (schizo_saf_events) / sizeof (pci_kev_mask_t);
+		    sizeof (schizo_saf_events) / sizeof (pci_kev_mask_t);
 		saf_name_kstat->pic_shift[0] = SCHIZO_SHIFT_PIC0;
 		saf_name_kstat->pic_shift[1] = SCHIZO_SHIFT_PIC1;
 		pci_create_name_kstat("saf", saf_name_kstat, schizo_saf_events);
@@ -3173,12 +3173,12 @@ pci_add_pci_kstat(pci_t *pci_p)
 	uintptr_t regbase = (uintptr_t)pci_p->pci_address[0];
 
 	cntr_addr_p->pcr_addr = (uint64_t *)
-		(regbase + SCHIZO_PERF_PCI_PCR_OFFSET);
+	    (regbase + SCHIZO_PERF_PCI_PCR_OFFSET);
 	cntr_addr_p->pic_addr = (uint64_t *)
-		(regbase + SCHIZO_PERF_PCI_PIC_OFFSET);
+	    (regbase + SCHIZO_PERF_PCI_PIC_OFFSET);
 
 	pci_p->pci_ksp = pci_create_cntr_kstat(pci_p, "pcis",
-		NUM_OF_PICS, pci_cntr_kstat_update, cntr_addr_p);
+	    NUM_OF_PICS, pci_cntr_kstat_update, cntr_addr_p);
 
 	if (pci_p->pci_ksp == NULL) {
 		cmn_err(CE_WARN, "pcisch : cannot create counter kstat");
@@ -3201,12 +3201,12 @@ pci_add_upstream_kstat(pci_t *pci_p)
 	uint64_t regbase = va_to_pa(pci_p->pci_address[1]);
 
 	cntr_pa_p->pcr_pa =
-		regbase + SCHIZO_PERF_SAF_PCR_OFFSET;
+	    regbase + SCHIZO_PERF_SAF_PCR_OFFSET;
 	cntr_pa_p->pic_pa =
-		regbase + SCHIZO_PERF_SAF_PIC_OFFSET;
+	    regbase + SCHIZO_PERF_SAF_PIC_OFFSET;
 
 	cmn_p->pci_common_uksp = pci_create_cntr_kstat(pci_p, "saf",
-		NUM_OF_PICS, pci_cntr_kstat_pa_update, cntr_pa_p);
+	    NUM_OF_PICS, pci_cntr_kstat_pa_update, cntr_pa_p);
 }
 
 /*
@@ -3221,7 +3221,7 @@ pci_identity_init(pci_t *pci_p)
 	dev_info_t *dip = pci_p->pci_dip;
 	char *name = ddi_binding_name(dip);
 	uint32_t ver = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"version#", 0);
+	    "version#", 0);
 
 	if (strcmp(name, "pci108e,a801") == 0)
 		return (CHIP_ID(PCI_CHIP_TOMATILLO, ver, 0x00));
@@ -3231,12 +3231,12 @@ pci_identity_init(pci_t *pci_p)
 
 	if (strcmp(name, "pci108e,8002") == 0) {
 		uint32_t mod_rev = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, "module-revision#", 0);
+		    DDI_PROP_DONTPASS, "module-revision#", 0);
 		return (CHIP_ID(PCI_CHIP_XMITS, ver, mod_rev));
 	}
 
 	cmn_err(CE_WARN, "%s%d: Unknown PCI Host bridge %s %x\n",
-		ddi_driver_name(dip), ddi_get_instance(dip), name, ver);
+	    ddi_driver_name(dip), ddi_get_instance(dip), name, ver);
 
 	return (PCI_CHIP_UNIDENTIFIED);
 }
@@ -3287,7 +3287,7 @@ pci_post_init_child(pci_t *pci_p, dev_info_t *child)
 	 * quiesce operation temporarily turns off PCI bus parking.
 	 */
 	if (ddi_prop_exists(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
-		"pci-req-removal") == 1) {
+	    "pci-req-removal") == 1) {
 
 		if (pbm_p->pbm_quiesce_count > 0) {
 			pbm_p->pbm_saved_ctrl_reg &= ~SCHIZO_PCI_CTRL_ARB_PARK;
@@ -3435,7 +3435,7 @@ pci_ecc_rem_intr(pci_t *pci_p, int inum, ecc_intr_info_t *eii_p)
 
 	if (CHIP_TYPE(pci_p) == PCI_CHIP_TOMATILLO)
 		pci_tom_nbintr_op(pci_p, inum, (intrfunc)ecc_intr,
-			(caddr_t)eii_p, PCI_OBJ_INTR_REMOVE);
+		    (caddr_t)eii_p, PCI_OBJ_INTR_REMOVE);
 }
 
 static uint_t
