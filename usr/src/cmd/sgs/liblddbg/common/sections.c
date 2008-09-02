@@ -23,8 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	"msg.h"
 #include	"_debug.h"
 #include	"libld.h"
@@ -115,7 +113,7 @@ Dbg_sec_unsup_strmerge(Lm_list *lml, Is_desc *isp)
 		str = (isp->is_file != NULL) ? isp->is_file->ifl_name :
 		    MSG_INTL(MSG_STR_NULL);
 		dbg_print(lml, MSG_INTL(MSG_SEC_STRMERGE_UNSUP),
-		    isp->is_basename, str, EC_XWORD(isp->is_shdr->sh_addralign),
+		    isp->is_name, str, EC_XWORD(isp->is_shdr->sh_addralign),
 		    EC_XWORD(isp->is_shdr->sh_entsize));
 	}
 }
@@ -191,11 +189,11 @@ Dbg_sec_discarded(Lm_list *lml, Is_desc *isp, Is_desc *disp)
 		 * discarded in favor of the generated merged string section.
 		 */
 		dbg_print(lml, MSG_INTL(MSG_SEC_STRMERGE_DISCARDED),
-		    isp->is_basename, isp->is_file->ifl_name);
+		    isp->is_name, isp->is_file->ifl_name);
 	} else {
 		/* Generic section discard */
-		dbg_print(lml, MSG_INTL(MSG_SEC_DISCARDED), isp->is_basename,
-		    isp->is_file->ifl_name, disp->is_basename,
+		dbg_print(lml, MSG_INTL(MSG_SEC_DISCARDED), isp->is_name,
+		    isp->is_file->ifl_name, disp->is_name,
 		    disp->is_file->ifl_name);
 	}
 }
@@ -203,18 +201,29 @@ Dbg_sec_discarded(Lm_list *lml, Is_desc *isp, Is_desc *disp)
 void
 Dbg_sec_group(Lm_list *lml, Is_desc *isp, Group_desc *gdp)
 {
-	const char	*fmt;
+	const char	*comdat;
 
 	if (DBG_NOTCLASS(DBG_C_SECTIONS))
 		return;
 
-	if (gdp->gd_flags & GRP_FLG_DISCARD)
-		fmt = MSG_INTL(MSG_SEC_GRP_DISCARDED);
+	if (gdp->gd_data[0] & GRP_COMDAT)
+		comdat = MSG_ORIG(MSG_STR_COMDAT);
 	else
-		fmt = MSG_INTL(MSG_SEC_GRP_INPUT);
+		comdat = MSG_ORIG(MSG_STR_EMPTY);
 
-	dbg_print(lml, fmt, isp->is_name, isp->is_file->ifl_name,
-	    gdp->gd_gsectname, gdp->gd_symname);
+	if (isp->is_shdr->sh_type == SHT_GROUP) {
+		dbg_print(lml, MSG_INTL(MSG_SEC_GRP_DEFINE), isp->is_name,
+		    isp->is_file->ifl_name, comdat, gdp->gd_name);
+	} else {
+		dbg_print(lml, MSG_INTL(MSG_SEC_GRP_MEMBER), isp->is_name,
+		    isp->is_file->ifl_name, comdat, gdp->gd_name);
+	}
+
+	if (gdp->gd_oisc) {
+		dbg_print(lml, MSG_INTL(MSG_SEC_GRP_DISCARDED), isp->is_name,
+		    isp->is_file->ifl_name, gdp->gd_name,
+		    gdp->gd_oisc->is_file->ifl_name);
+	}
 }
 
 void
@@ -287,7 +296,7 @@ Dbg_sec_order_list(Ofl_desc *ofl, int flag)
 			isp2 = ifl->ifl_isdesc[link];
 			dbg_print(lml, MSG_INTL(MSG_ORD_TITLE_3),
 			    isp1->is_name, ifl->ifl_name, msg, isp2->is_name,
-			    isp2->is_key);
+			    EC_WORD(isp2->is_keyident));
 		}
 	}
 	Dbg_util_nl(lml, DBG_NL_STD);
@@ -321,4 +330,31 @@ Dbg_sec_order_error(Lm_list *lml, Ifl_desc *ifl, Word ndx, int error)
 
 	if (error)
 		dbg_print(lml, MSG_INTL(order_errors[error - 1]));
+}
+
+void
+Dbg_sec_redirected(Lm_list *lml, const char *oname, const char *nname)
+{
+	if (DBG_NOTCLASS(DBG_C_SECTIONS))
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_SEC_REDIRECTED), oname, nname);
+}
+
+void
+Dbg_sec_gnu_comdat(Lm_list *lml, const char *name, uint_t comdat, uint_t relax)
+{
+	const char	*fmt;
+
+	if (DBG_NOTCLASS(DBG_C_SECTIONS))
+		return;
+
+	if (comdat && relax)
+		fmt = MSG_INTL(MSG_SEC_GNU_COMDAT_1);
+	else if (comdat)
+		fmt = MSG_INTL(MSG_SEC_GNU_COMDAT_2);
+	else
+		fmt = MSG_INTL(MSG_SEC_GNU_COMDAT_3);
+
+	dbg_print(lml, fmt, name);
 }

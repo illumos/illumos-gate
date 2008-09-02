@@ -27,8 +27,6 @@
 #ifndef	_DEBUG_H
 #define	_DEBUG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Global include file for lddbg debugging.
  *
@@ -333,9 +331,11 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_sec_discarded	Dbg64_sec_discarded
 #define	Dbg_sec_genstr_compress	Dbg64_sec_genstr_compress
 #define	Dbg_sec_group		Dbg64_sec_group
+#define	Dbg_sec_gnu_comdat	Dbg64_sec_gnu_comdat
 #define	Dbg_sec_in		Dbg64_sec_in
 #define	Dbg_sec_order_error	Dbg64_sec_order_error
 #define	Dbg_sec_order_list	Dbg64_sec_order_list
+#define	Dbg_sec_redirected	Dbg64_sec_redirected
 #define	Dbg_sec_strtab		Dbg64_sec_strtab
 #define	Dbg_sec_unsup_strmerge	Dbg64_sec_unsup_strmerge
 
@@ -536,9 +536,11 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_sec_discarded	Dbg32_sec_discarded
 #define	Dbg_sec_genstr_compress	Dbg32_sec_genstr_compress
 #define	Dbg_sec_group		Dbg32_sec_group
+#define	Dbg_sec_gnu_comdat	Dbg32_sec_gnu_comdat
 #define	Dbg_sec_in		Dbg32_sec_in
 #define	Dbg_sec_order_error	Dbg32_sec_order_error
 #define	Dbg_sec_order_list	Dbg32_sec_order_list
+#define	Dbg_sec_redirected	Dbg32_sec_redirected
 #define	Dbg_sec_strtab		Dbg32_sec_strtab
 #define	Dbg_sec_unsup_strmerge	Dbg32_sec_unsup_strmerge
 
@@ -774,9 +776,11 @@ extern	void	Dbg_sec_discarded(Lm_list *, Is_desc *, Is_desc *);
 extern	void	Dbg_sec_genstr_compress(Lm_list *, const char *,
 		    Xword, Xword);
 extern	void	Dbg_sec_group(Lm_list *, Is_desc *, Group_desc *);
+extern	void	Dbg_sec_gnu_comdat(Lm_list *, const char *, uint_t, uint_t);
 extern	void	Dbg_sec_in(Lm_list *, Is_desc *);
 extern	void	Dbg_sec_order_error(Lm_list *, Ifl_desc *, Word, int);
 extern	void	Dbg_sec_order_list(Ofl_desc *, int);
+extern	void	Dbg_sec_redirected(Lm_list *, const char *, const char *);
 extern	void	Dbg_sec_strtab(Lm_list *, Os_desc *, Str_tbl *);
 extern	void	Dbg_sec_unsup_strmerge(Lm_list *, Is_desc *);
 

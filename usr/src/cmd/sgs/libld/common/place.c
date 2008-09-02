@@ -26,7 +26,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Map file parsing and input section to output segment mapping.
@@ -50,7 +49,7 @@
 static void
 set_addralign(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 {
-	Shdr *		shdr = isp->is_shdr;
+	Shdr	*shdr = isp->is_shdr;
 
 	/* A discarded section has no influence on the output */
 	if (isp->is_flags & FLG_IS_DISCARD)
@@ -146,20 +145,194 @@ ld_append_isp(Ofl_desc * ofl, Os_desc *osp, Is_desc *isp, int mstr_only)
 }
 
 /*
+ * Determine whether this input COMDAT section already exists for the associated
+ * output section.  If so, then discard this input section.  Otherwise, this
+ * must be the first COMDAT section, thus it is kept for future comparisons.
+ */
+static uintptr_t
+add_comdat(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
+{
+	Aliste	idx;
+	Is_desc *cisp;
+
+	for (APLIST_TRAVERSE(osp->os_comdats, idx, cisp)) {
+		if (strcmp(isp->is_name, cisp->is_name))
+			continue;
+
+		isp->is_osdesc = osp;
+
+		/*
+		 * If this section hasn't already been identified as discarded,
+		 * generate a suitable diagnostic.
+		 */
+		if ((isp->is_flags & FLG_IS_DISCARD) == 0) {
+			isp->is_flags |= FLG_IS_DISCARD;
+			DBG_CALL(Dbg_sec_discarded(ofl->ofl_lml, isp, cisp));
+		}
+
+		/*
+		 * A discarded section does not require assignment to an output
+		 * section.  However, if relaxed relocations have been enabled
+		 * (either from -z relaxreloc, or asserted with .gnu.linkonce
+		 * processing), then this section must still be assigned to an
+		 * output section so that the sloppy relocation logic will have
+		 * the information necessary to do its work.
+		 */
+		if (ofl->ofl_flags1 & FLG_OF1_RLXREL)
+			return (1);
+		else
+			return (0);
+	}
+
+	/*
+	 * This is a new COMDAT section - so keep it.
+	 */
+	if (aplist_append(&(osp->os_comdats), isp, AL_CNT_OS_COMDATS) == NULL)
+		return (S_ERROR);
+
+	return (1);
+}
+
+/*
+ * Determine whether a GNU group COMDAT section name follows the convention
+ *
+ *	section-name.symbol-name
+ *
+ * Each section within the input file is compared to see if the full section
+ * name matches the beginning of the COMDAT section, with a following '.'.
+ * A pointer to the symbol name, starting with the '.' is returned so that the
+ * caller can strip off the required section name.
+ */
+static char *
+gnu_comdat_sym(Ifl_desc *ifl, Is_desc *gisp)
+{
+	size_t	ndx;
+
+	for (ndx = 1; ndx < ifl->ifl_shnum; ndx++) {
+		Is_desc	*isp;
+		size_t	ssize;
+
+		if (((isp = ifl->ifl_isdesc[ndx]) == NULL) ||
+		    (isp == gisp) || (isp->is_name == NULL))
+			continue;
+
+		/*
+		 * It's questionable whether this size should be cached in the
+		 * Is_desc.  However, this seems an infrequent operation and
+		 * adding Is_desc members can escalate memory usage for large
+		 * link-edits.  For now, size the section name dynamically.
+		 */
+		ssize = strlen(isp->is_name);
+		if ((strncmp(isp->is_name, gisp->is_name, ssize) != NULL) &&
+		    (gisp->is_name[ssize] == '.'))
+			return ((char *)&gisp->is_name[ssize]);
+	}
+	return (NULL);
+}
+
+/*
+ * GNU .gnu.linkonce sections follow a naming convention that indicates the
+ * required association with an output section.  Determine whether this input
+ * section follows the convention, and if so return the appropriate output
+ * section name.
+ *
+ *	.gnu.linkonce.b.*    ->	.bss
+ *	.gnu.linkonce.d.*    ->	.data
+ *	.gnu.linkonce.l.*    ->	.ldata
+ *	.gnu.linkonce.lb.*   ->	.lbss
+ *	.gnu.linkonce.lr.*   ->	.lrodata
+ *	.gnu.linkonce.r.*    ->	.rodata
+ *	.gnu.linkonce.s.*    ->	.sdata
+ *	.gnu.linkonce.s2.*   ->	.sdata2
+ *	.gnu.linkonce.sb.*   ->	.sbss
+ *	.gnu.linkonce.sb2.*  ->	.sbss2
+ *	.gnu.linkonce.t.*    ->	.text
+ *	.gnu.linkonce.tb.*   ->	.tbss
+ *	.gnu.linkonce.td.*   ->	.tdata
+ *	.gnu.linkonce.wi.*   ->	.debug_info
+ */
+#define	NSTR_CH1(ch) (*(nstr + 1) == (ch))
+#define	NSTR_CH2(ch) (*(nstr + 2) == (ch))
+#define	NSTR_CH3(ch) (*(nstr + 3) == (ch))
+
+static const char *
+gnu_linkonce_sec(const char *ostr)
+{
+	const char	*nstr = &ostr[MSG_SCN_GNU_LINKONCE_SIZE];
+
+	switch (*nstr) {
+	case 'b':
+		if (NSTR_CH1('.'))
+			return (MSG_ORIG(MSG_SCN_BSS));
+		break;
+	case 'd':
+		if (NSTR_CH1('.'))
+			return (MSG_ORIG(MSG_SCN_DATA));
+		break;
+	case 'l':
+		if (NSTR_CH1('.'))
+			return (MSG_ORIG(MSG_SCN_LDATA));
+		else if (NSTR_CH1('b') && NSTR_CH2('.'))
+			return (MSG_ORIG(MSG_SCN_LBSS));
+		else if (NSTR_CH1('r') && NSTR_CH2('.'))
+			return (MSG_ORIG(MSG_SCN_LRODATA));
+		break;
+	case 'r':
+		if (NSTR_CH1('.'))
+			return (MSG_ORIG(MSG_SCN_RODATA));
+		break;
+	case 's':
+		if (NSTR_CH1('.'))
+			return (MSG_ORIG(MSG_SCN_SDATA));
+		else if (NSTR_CH1('2') && NSTR_CH2('.'))
+			return (MSG_ORIG(MSG_SCN_SDATA2));
+		else if (NSTR_CH1('b') && NSTR_CH2('.'))
+			return (MSG_ORIG(MSG_SCN_SBSS));
+		else if (NSTR_CH1('b') && NSTR_CH2('2') && NSTR_CH3('.'))
+			return (MSG_ORIG(MSG_SCN_SBSS2));
+		break;
+	case 't':
+		if (NSTR_CH1('.'))
+			return (MSG_ORIG(MSG_SCN_TEXT));
+		else if (NSTR_CH1('b') && NSTR_CH2('.'))
+			return (MSG_ORIG(MSG_SCN_TBSS));
+		else if (NSTR_CH1('d') && NSTR_CH2('.'))
+			return (MSG_ORIG(MSG_SCN_TDATA));
+		break;
+	case 'w':
+		if (NSTR_CH1('i') && NSTR_CH2('.'))
+			return (MSG_ORIG(MSG_SCN_DEBUG_INFO));
+		break;
+	default:
+		break;
+	}
+
+	/*
+	 * No special name match found.
+	 */
+	return (ostr);
+}
+#undef	NSTR_CH1
+#undef	NSTR_CH2
+#undef	NSTR_CH3
+
+/*
  * Place a section into the appropriate segment.
  */
 Os_desc *
-ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
+ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 {
-	Listnode *	lnp1, * lnp2;
-	Ent_desc *	enp;
-	Sg_desc	*	sgp;
+	Listnode	*lnp1, *lnp2;
+	Ent_desc	*enp;
+	Sg_desc		*sgp;
 	Os_desc		*osp;
 	Aliste		idx1, idx2;
 	int		os_ndx;
-	Shdr *		shdr = isp->is_shdr;
+	Shdr		*shdr = isp->is_shdr;
 	Xword		shflagmask, shflags = shdr->sh_flags;
-	Ifl_desc *	ifl = isp->is_file;
+	Ifl_desc	*ifl = isp->is_file;
+	char		*oname, *sname;
+	uint_t		onamehash;
 
 	/*
 	 * Define any sections that must be thought of as referenced.  These
@@ -181,21 +354,24 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 
 	DBG_CALL(Dbg_sec_in(ofl->ofl_lml, isp));
 
+	/*
+	 * If this section identfies group members, or this section indicates
+	 * that it is a member of a group, determine whether the section is
+	 * still required.
+	 */
 	if ((shflags & SHF_GROUP) || (shdr->sh_type == SHT_GROUP)) {
-		Group_desc *	gdesc;
+		Group_desc	*gdesc;
 
-		if ((gdesc = ld_get_group(ofl, isp)) == (Group_desc *)S_ERROR)
-			return ((Os_desc *)S_ERROR);
-
-		if (gdesc) {
+		if ((gdesc = ld_get_group(ofl, isp)) != NULL) {
 			DBG_CALL(Dbg_sec_group(ofl->ofl_lml, isp, gdesc));
 
 			/*
-			 * If this group is marked as discarded, then this
-			 * section needs to be discarded.
+			 * If this group has been replaced by another group,
+			 * then this section needs to be discarded.
 			 */
-			if (gdesc->gd_flags & GRP_FLG_DISCARD) {
+			if (gdesc->gd_oisc) {
 				isp->is_flags |= FLG_IS_DISCARD;
+
 				/*
 				 * Since we're discarding the section, we
 				 * can skip assigning it to an output section.
@@ -288,73 +464,141 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	if ((sgp = enp->ec_segment) == 0)
 		sgp = ((Ent_desc *)(ofl->ofl_ents.tail->data))->ec_segment;
 
-	isp->is_basename = isp->is_name;
+	/*
+	 * By default, the output section for an input section has the same
+	 * section name as in the input sections name.  COMDAT, SHT_GROUP and
+	 * GNU name translations that follow, may indicate that a different
+	 * output section name be the target for this input section.
+	 */
+	oname = (char *)isp->is_name;
 
 	/*
-	 * Strip out the % from the section name in all cases except when '-r'
-	 * is used without '-M', and '-r' is used with '-M' without
-	 * the ?O flag.
+	 * Solaris section names may follow the convention:
+	 *
+	 *	section-name%symbol-name
+	 *
+	 * This convention has been used to order the layout of sections within
+	 * segments for objects built with the compilers -xF option.  However,
+	 * the final object should not contain individual section headers for
+	 * all such input sections, instead the symbol name is stripped from the
+	 * name to establish the final output section name.
+	 *
+	 * This convention has also been followed for COMDAT and sections
+	 * identified though SHT_GROUP data.
+	 *
+	 * Strip out the % from the section name in all cases except:
+	 *
+	 *    i.	when '-r' is used without '-M', and
+	 *    ii.	when '-r' is used with '-M' but without the ?O flag.
 	 */
-	if (((ofl->ofl_flags & FLG_OF_RELOBJ) &&
-	    (sgp->sg_flags & FLG_SG_ORDER)) ||
-	    !(ofl->ofl_flags & FLG_OF_RELOBJ)) {
-		char	*cp;
+	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) ||
+	    (sgp->sg_flags & FLG_SG_ORDER)) {
+		if ((sname = strchr(isp->is_name, '%')) != NULL) {
+			size_t	size = sname - isp->is_name;
 
-		if ((cp = strchr(isp->is_name, '%')) != NULL) {
-			char	*name;
-			size_t	size = (size_t)(cp - isp->is_name);
-
-			if ((name = libld_malloc(size + 1)) == 0)
+			if ((oname = libld_malloc(size + 1)) == NULL)
 				return ((Os_desc *)S_ERROR);
-			(void) strncpy(name, isp->is_name, size);
-			cp = name + size;
-			*cp = '\0';
-			isp->is_name = name;
+			(void) strncpy(oname, isp->is_name, size);
+			oname[size] = '\0';
+			DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp->is_name,
+			    oname));
 		}
 		isp->is_txtndx = enp->ec_ndx;
 	}
 
 	/*
-	 * Assign a hash value now that the section name has been finalized.
+	 * GNU section names may follow the convention:
+	 *
+	 *	.gnu.linkonce.*
+	 *
+	 * The .gnu.linkonce is a section naming convention that indicates a
+	 * COMDAT requirement.  Determine whether this section follows the GNU
+	 * pattern, and if so, determine whether this section should be
+	 * discarded or retained.  The comparison of 'g' and 'l' are an
+	 * optimization to skip using strncmp() too much.
 	 */
-	isp->is_namehash = sgs_str_hash(isp->is_name);
+	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) &&
+	    (isp->is_name == oname) &&
+	    (isp->is_name[1] == 'g') && (isp->is_name[5] == 'l') &&
+	    (strncmp(MSG_ORIG(MSG_SCN_GNU_LINKONCE), isp->is_name,
+	    MSG_SCN_GNU_LINKONCE_SIZE) == 0)) {
+		if ((oname =
+		    (char *)gnu_linkonce_sec(isp->is_name)) != isp->is_name) {
+			DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp->is_name,
+			    oname));
+		}
+
+		/*
+		 * Explicitly identify this section type as COMDAT.  Also,
+		 * enable lazy relocation processing, as this is typically a
+		 * requirement with .gnu.linkonce sections.
+		 */
+		isp->is_flags |= FLG_IS_COMDAT;
+		if ((ofl->ofl_flags1 & FLG_OF1_NRLXREL) == 0)
+			ofl->ofl_flags1 |= FLG_OF1_RLXREL;
+		Dbg_sec_gnu_comdat(ofl->ofl_lml, isp->is_name, 1,
+		    (ofl->ofl_flags1 & FLG_OF1_RLXREL));
+	}
+
+	/*
+	 * GNU section names may also follow the convention:
+	 *
+	 *	section-name.symbol-name
+	 *
+	 * This convention is used when defining SHT_GROUP sections of type
+	 * COMDAT.  Thus, any group processing will have discovered any group
+	 * sections, and this identification can be triggered by a pattern
+	 * match section names.
+	 */
+	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) &&
+	    (isp->is_name == oname) && (isp->is_flags & FLG_IS_COMDAT) &&
+	    ((sname = gnu_comdat_sym(ifl, isp)) != NULL)) {
+		size_t	size = sname - isp->is_name;
+
+		if ((oname = libld_malloc(size + 1)) == NULL)
+			return ((Os_desc *)S_ERROR);
+		(void) strncpy(oname, isp->is_name, size);
+		oname[size] = '\0';
+		DBG_CALL(Dbg_sec_redirected(ofl->ofl_lml, isp->is_name,
+		    oname));
+
+		/*
+		 * Enable lazy relocation processing, as this is typically a
+		 * requirement with GNU COMDAT sections.
+		 */
+		if ((ofl->ofl_flags1 & FLG_OF1_NRLXREL) == 0) {
+			ofl->ofl_flags1 |= FLG_OF1_RLXREL;
+			Dbg_sec_gnu_comdat(ofl->ofl_lml, isp->is_name, 0,
+			    (ofl->ofl_flags1 & FLG_OF1_RLXREL));
+		}
+	}
+
+	/*
+	 * Assign a hash value now that the output section name has been
+	 * finalized.
+	 */
+	onamehash = sgs_str_hash(oname);
 
 	if (sgp->sg_flags & FLG_SG_ORDER)
 		enp->ec_flags |= FLG_EC_USED;
 
 	/*
-	 * If the link is not 0, then the input section is going to be appended
-	 * to the output section.  The append occurs at the input section
+	 * If the link is not 0, then the input section is appended to the
+	 * defined output section.  The append occurs at the input section
 	 * pointed to by the link.
 	 */
-	if (link != 0) {
+	if (link) {
+		uintptr_t	err;
+
 		osp = isp->is_file->ifl_isdesc[link]->is_osdesc;
 
 		/*
-		 * If this is a COMDAT section, then see if this
-		 * section is a keeper and/or if it is to be discarded.
+		 * Process any COMDAT section, keeping the first and
+		 * discarding all others.
 		 */
-		if (shdr->sh_type == SHT_SUNW_COMDAT) {
-			Listnode *	clist;
-			Is_desc *	cisp;
-
-			for (LIST_TRAVERSE(&(osp->os_comdats), clist, cisp)) {
-				if (strcmp(isp->is_basename, cisp->is_basename))
-					continue;
-
-				isp->is_flags |= FLG_IS_DISCARD;
-				isp->is_osdesc = osp;
-				DBG_CALL(Dbg_sec_discarded(ofl->ofl_lml,
-				    isp, cisp));
-				return (0);
-			}
-
-			/*
-			 * This is a new COMDAT section - so keep it.
-			 */
-			if (list_appendc(&(osp->os_comdats), isp) == 0)
-				return ((Os_desc *)S_ERROR);
-		}
+		if ((isp->is_flags & FLG_IS_COMDAT) &&
+		    ((err = add_comdat(ofl, osp, isp)) != 1))
+			return ((Os_desc *)err);
 
 		/*
 		 * Set alignment
@@ -382,7 +626,7 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 		Sec_order	*scop;
 
 		for (APLIST_TRAVERSE(sgp->sg_secorder, idx, scop)) {
-			if (strcmp(scop->sco_secname, isp->is_name) == 0) {
+			if (strcmp(scop->sco_secname, oname) == 0) {
 				scop->sco_flags |= FLG_SGO_USED;
 				os_ndx = scop->sco_index;
 				break;
@@ -414,7 +658,7 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 
 		if ((ident == osp->os_scnsymndx) &&
 		    (ident != ld_targ.t_id.id_rel) &&
-		    (isp->is_namehash == osp->os_namehash) &&
+		    (onamehash == osp->os_namehash) &&
 		    (shdr->sh_type != SHT_GROUP) &&
 		    (shdr->sh_type != SHT_SUNW_dof) &&
 		    ((shdr->sh_type == _shdr->sh_type) ||
@@ -422,34 +666,16 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 		    (_shdr->sh_type == SHT_PROGBITS))) &&
 		    ((shflags & ~shflagmask) ==
 		    (_shdr->sh_flags & ~shflagmask)) &&
-		    (strcmp(isp->is_name, osp->os_name) == 0)) {
+		    (strcmp(oname, osp->os_name) == 0)) {
+			uintptr_t	err;
+
 			/*
-			 * If this is a COMDAT section, determine if this
-			 * section is a keeper, and/or if it is to be discarded.
+			 * Process any COMDAT section, keeping the first and
+			 * discarding all others.
 			 */
-			if (shdr->sh_type == SHT_SUNW_COMDAT) {
-				Listnode *	clist;
-				Is_desc *	cisp;
-
-				for (LIST_TRAVERSE(&(osp->os_comdats),
-				    clist, cisp)) {
-					if (strcmp(isp->is_basename,
-					    cisp->is_basename))
-						continue;
-
-					isp->is_flags |= FLG_IS_DISCARD;
-					isp->is_osdesc = osp;
-					DBG_CALL(Dbg_sec_discarded(ofl->ofl_lml,
-					    isp, cisp));
-					return (0);
-				}
-
-				/*
-				 * This is a new COMDAT section - so keep it.
-				 */
-				if (list_appendc(&(osp->os_comdats), isp) == 0)
-					return ((Os_desc *)S_ERROR);
-			}
+			if ((isp->is_flags & FLG_IS_COMDAT) &&
+			    ((err = add_comdat(ofl, osp, isp)) != 1))
+				return ((Os_desc *)err);
 
 			/*
 			 * Set alignment
@@ -552,7 +778,7 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 	 * count and associated string size.
 	 */
 	ofl->ofl_shdrcnt++;
-	if (st_insert(ofl->ofl_shdrsttab, isp->is_name) == -1)
+	if (st_insert(ofl->ofl_shdrsttab, oname) == -1)
 		return ((Os_desc *)S_ERROR);
 
 	/*
@@ -564,26 +790,28 @@ ld_place_section(Ofl_desc * ofl, Is_desc * isp, int ident, Word link)
 		return ((Os_desc *)S_ERROR);
 
 	/*
-	 * We convert COMDAT sections to PROGBITS if this is the first
-	 * section of a output section.
+	 * Convert COMDAT section to PROGBITS as this the first section of the
+	 * output section.  Save any COMDAT section for later processing, as
+	 * additional COMDAT sections that match this section need discarding.
 	 */
 	if (shdr->sh_type == SHT_SUNW_COMDAT) {
-		Shdr *	tshdr;
+		Shdr	*tshdr;
 
-		if ((tshdr = libld_malloc(sizeof (Shdr))) == 0)
+		if ((tshdr = libld_malloc(sizeof (Shdr))) == NULL)
 			return ((Os_desc *)S_ERROR);
 		*tshdr = *shdr;
 		isp->is_shdr = shdr = tshdr;
 		shdr->sh_type = SHT_PROGBITS;
-		if (list_appendc(&(osp->os_comdats), isp) == 0)
-			return ((Os_desc *)S_ERROR);
 	}
+	if ((isp->is_flags & FLG_IS_COMDAT) &&
+	    (aplist_append(&(osp->os_comdats), isp, AL_CNT_OS_COMDATS) == NULL))
+		return ((Os_desc *)S_ERROR);
 
 	osp->os_shdr->sh_type = shdr->sh_type;
 	osp->os_shdr->sh_flags = shdr->sh_flags;
 	osp->os_shdr->sh_entsize = shdr->sh_entsize;
-	osp->os_name = isp->is_name;
-	osp->os_namehash = isp->is_namehash;
+	osp->os_name = oname;
+	osp->os_namehash = onamehash;
 	osp->os_txtndx = os_ndx;
 	osp->os_sgdesc = sgp;
 

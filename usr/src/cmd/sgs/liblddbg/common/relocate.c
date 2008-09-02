@@ -23,7 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/elf_SPARC.h>
 #include	<debug.h>
@@ -243,7 +242,7 @@ Dbg_reloc_discard(Lm_list *lml, Half mach, Rel_desc *rsp)
 		return;
 
 	isp = rsp->rel_isdesc;
-	dbg_print(lml, MSG_INTL(MSG_REL_DISCARDED), isp->is_basename,
+	dbg_print(lml, MSG_INTL(MSG_REL_DISCARDED), isp->is_name,
 	    isp->is_file->ifl_name,
 	    conv_reloc_type(mach, rsp->rel_rtype, 0, &inv_buf),
 	    EC_OFF(rsp->rel_roffset));
@@ -261,7 +260,7 @@ Dbg_reloc_transition(Lm_list *lml, Half mach, Word rtype, Rel_desc *rsp)
 	isp = rsp->rel_isdesc;
 	dbg_print(lml, MSG_INTL(MSG_REL_TRANSITION),
 	    conv_reloc_type(mach, rsp->rel_rtype, 0, &inv_buf1),
-	    isp->is_basename, isp->is_file->ifl_name,
+	    isp->is_name, isp->is_file->ifl_name,
 	    EC_OFF(rsp->rel_roffset), rsp->rel_sname,
 	    conv_reloc_type(mach, rtype, 0, &inv_buf2));
 }

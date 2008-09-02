@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/auxv.h>
 #include <debug.h>
@@ -288,12 +286,16 @@ void	Dbg32_sec_discarded(Lm_list *, Is_desc *, Is_desc *);
 void	Dbg64_sec_discarded(Lm_list *, Is_desc *, Is_desc *);
 void	Dbg32_sec_group(Lm_list *, Is_desc *, Group_desc *);
 void	Dbg64_sec_group(Lm_list *, Is_desc *, Group_desc *);
+void	Dbg32_sec_gnu_comdat(Lm_list *, const char *, uint_t, uint_t);
+void	Dbg64_sec_gnu_comdat(Lm_list *, const char *, uint_t, uint_t);
 void	Dbg32_sec_in(Lm_list *, Is_desc *);
 void	Dbg64_sec_in(Lm_list *, Is_desc *);
 void	Dbg32_sec_order_error(Lm_list *, Ifl_desc *, Elf32_Word, int);
 void	Dbg64_sec_order_error(Lm_list *, Ifl_desc *, Elf64_Word, int);
 void	Dbg32_sec_order_list(Ofl_desc *, int);
 void	Dbg64_sec_order_list(Ofl_desc *, int);
+void	Dbg32_sec_redirected(Lm_list *, const char *, const char *);
+void	Dbg64_sec_redirected(Lm_list *, const char *, const char *);
 void	Dbg32_sec_strtab(Lm_list *, Os_desc *, Str_tbl *);
 void	Dbg64_sec_strtab(Lm_list *, Os_desc *, Str_tbl *);
 

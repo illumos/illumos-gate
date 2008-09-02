@@ -23,7 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Dump an elf file.
@@ -177,10 +176,10 @@ string(Cache *refsec, Word ndx, Cache *strsec, const char *file, Word name)
  */
 static const char *
 relsymname(Cache *cache, Cache *csec, Cache *strsec, Word symndx, Word symnum,
-    Word relndx, Sym *syms, char *secstr, size_t secsz, const char *file,
-    uint_t flags)
+    Word relndx, Sym *syms, char *secstr, size_t secsz, const char *file)
 {
-	Sym	*sym;
+	Sym		*sym;
+	const char	*name;
 
 	if (symndx >= symnum) {
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_RELBADSYMNDX),
@@ -189,24 +188,22 @@ relsymname(Cache *cache, Cache *csec, Cache *strsec, Word symndx, Word symnum,
 	}
 
 	sym = (Sym *)(syms + symndx);
+	name = string(csec, symndx, strsec, file, sym->st_name);
 
 	/*
 	 * If the symbol represents a section offset construct an appropriate
-	 * string.
+	 * string.  Note, although section symbol table entries typically have
+	 * a NULL name pointer, entries do exist that point into the string
+	 * table to their own NULL strings.
 	 */
-	if ((ELF_ST_TYPE(sym->st_info) == STT_SECTION) && (sym->st_name == 0)) {
-		if (flags & FLG_CTL_LONGNAME)
-			(void) snprintf(secstr, secsz,
-			    MSG_INTL(MSG_STR_L_SECTION),
-			    cache[sym->st_shndx].c_name);
-		else
-			(void) snprintf(secstr, secsz,
-			    MSG_INTL(MSG_STR_SECTION),
-			    cache[sym->st_shndx].c_name);
+	if ((ELF_ST_TYPE(sym->st_info) == STT_SECTION) &&
+	    ((sym->st_name == 0) || (*name == '\0'))) {
+		(void) snprintf(secstr, secsz, MSG_INTL(MSG_STR_SECTION),
+		    cache[sym->st_shndx].c_name);
 		return ((const char *)secstr);
 	}
 
-	return (string(csec, symndx, strsec, file, sym->st_name));
+	return (name);
 }
 
 /*
@@ -1399,7 +1396,7 @@ init_symtbl_state(SYMTBL_STATE *state, Cache *cache, Word shnum, Word secndx,
  * Determine the extended section index used for symbol tables entries.
  */
 static void
-symbols_getxindex(SYMTBL_STATE * state)
+symbols_getxindex(SYMTBL_STATE *state)
 {
 	uint_t	symn;
 	Word	symcnt;
@@ -1779,7 +1776,7 @@ sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
 				continue;
 			}
 			/* Fallthrough to process associated dynsym */
-			/*FALLTHROUGH*/
+			/* FALLTHROUGH */
 		case SHT_DYNSYM:
 			if (!init_symtbl_state(&dynsym_state, cache, shnum,
 			    symsecndx, ehdr, versym, file, flags))
@@ -1847,8 +1844,7 @@ sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
  * Search for and process any relocation sections.
  */
 static void
-reloc(Cache *cache, Word shnum, Ehdr *ehdr, const char *file,
-    uint_t flags)
+reloc(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 {
 	Word	cnt;
 
@@ -1935,8 +1931,7 @@ reloc(Cache *cache, Word shnum, Ehdr *ehdr, const char *file,
 			}
 
 			symname = relsymname(cache, _cache, strsec, symndx,
-			    symnum, relndx, syms, section, BUFSIZ, file,
-			    flags);
+			    symnum, relndx, syms, section, BUFSIZ, file);
 
 			/*
 			 * A zero symbol index is only valid for a few
@@ -2112,7 +2107,6 @@ dyn_test(dyn_test_t test_type, Word sh_type, Cache *sec_cache, Dyn *dyn,
  *	ehdr - ELF header for file
  *	file - Name of file
  */
-
 static void
 dyn_symtest(Dyn *dyn, const char *symname, Cache *symtab_cache,
     Cache *dynsym_cache, Cache *ldynsym_cache, Cache *cache,
@@ -2712,8 +2706,7 @@ move(Cache *cache, Word shnum, const char *file, uint_t flags)
 			}
 
 			symname = relsymname(cache, _cache, strsec,
-			    symndx, symnum, ndx, syms, section, BUFSIZ, file,
-			    flags);
+			    symndx, symnum, ndx, syms, section, BUFSIZ, file);
 			sym = (Sym *)(syms + symndx);
 
 			/*
@@ -3256,7 +3249,7 @@ group(Cache *cache, Word shnum, const char *file, uint_t flags)
 }
 
 static void
-got(Cache *cache, Word shnum, Ehdr *ehdr, const char *file, uint_t flags)
+got(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 {
 	Cache		*gotcache = NULL, *symtab = NULL;
 	Addr		gotbgn, gotend;
@@ -3436,7 +3429,7 @@ got(Cache *cache, Word shnum, Ehdr *ehdr, const char *file, uint_t flags)
 			if (symndx)
 				gip->g_symname = relsymname(cache, _cache,
 				    strsec, symndx, symnum, relndx, syms,
-				    section, BUFSIZ, file, flags);
+				    section, BUFSIZ, file);
 			gip->g_reltype = reltype;
 			gip->g_rel = rels;
 		}
@@ -3524,7 +3517,7 @@ sort_shdr_ndx_arr(const void *v1, const void *v2)
 
 static int
 shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
-    size_t shnum, Cache **cache_ret)
+    size_t shnum, Cache **cache_ret, Word flags)
 {
 	Elf_Scn		*scn;
 	Elf_Data	*data;
@@ -3646,8 +3639,44 @@ shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
 			if (_cache->c_shdr->sh_name &&
 			    /* LINTED */
 			    (nameshdr->sh_size > _cache->c_shdr->sh_name)) {
-				_cache->c_name =
-				    names + _cache->c_shdr->sh_name;
+				const char	*symname;
+				char		*secname;
+
+				secname = names + _cache->c_shdr->sh_name;
+
+				/*
+				 * A SUN naming convention employs a "%" within
+				 * a section name to indicate a section/symbol
+				 * name.  This originated from the compilers
+				 * -xF option, that places functions into their
+				 * own sections.  This convention (which has no
+				 * formal standard) has also been followed for
+				 * COMDAT sections.  To demangle the symbol
+				 * name, the name must be separated from the
+				 * section name.
+				 */
+				if (((flags & FLG_CTL_DEMANGLE) == 0) ||
+				    ((symname = strchr(secname, '%')) == NULL))
+					_cache->c_name = secname;
+				else {
+					size_t	secsz = ++symname - secname;
+					size_t	strsz;
+
+					symname = demangle(symname, flags);
+					strsz = secsz + strlen(symname) + 1;
+
+					if ((_cache->c_name =
+					    malloc(strsz)) == NULL) {
+						int err = errno;
+						(void) fprintf(stderr,
+						    MSG_INTL(MSG_ERR_MALLOC),
+						    file, strerror(err));
+						return (0);
+					}
+					(void) snprintf(_cache->c_name, strsz,
+					    MSG_ORIG(MSG_FMT_SECSYM),
+					    EC_WORD(secsz), secname, symname);
+				}
 				continue;
 			}
 
@@ -3910,7 +3939,8 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 		if (fake_shdr_cache(file, fd, elf, ehdr, &cache, &shnum) == 0)
 			return (ret);
 	} else {
-		if (shdr_cache(file, elf, ehdr, shstrndx, shnum, &cache) == 0)
+		if (shdr_cache(file, elf, ehdr, shstrndx, shnum,
+		    &cache, flags) == 0)
 			return (ret);
 	}
 
@@ -4062,7 +4092,7 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 		hash(cache, shnum, file, flags);
 
 	if (flags & FLG_SHOW_GOT)
-		got(cache, shnum, ehdr, file, flags);
+		got(cache, shnum, ehdr, file);
 
 	if (flags & FLG_SHOW_GROUP)
 		group(cache, shnum, file, flags);
@@ -4071,7 +4101,7 @@ regular(const char *file, int fd, Elf *elf, uint_t flags,
 		syminfo(cache, shnum, file);
 
 	if (flags & FLG_SHOW_RELOC)
-		reloc(cache, shnum, ehdr, file, flags);
+		reloc(cache, shnum, ehdr, file);
 
 	if (flags & FLG_SHOW_DYNAMIC)
 		dynamic(cache, shnum, ehdr, file);

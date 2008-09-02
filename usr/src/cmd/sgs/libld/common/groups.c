@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<stdio.h>
 #include	<string.h>
 #include	<link.h>
@@ -39,12 +37,13 @@
  */
 typedef struct {
 	const char	*gn_name;	/* group name */
+	Is_desc		*gn_isc;	/* group input section */
 	avl_node_t	gn_avl;		/* avl book-keeping (see SGSOFFSETOF) */
 	uint_t		gn_hash;	/* group name hash value */
 } Grp_node;
 
 static int
-gnavl_compare(const void * n1, const void * n2)
+gnavl_compare(const void *n1, const void *n2)
 {
 	uint_t		hash1, hash2;
 	const char	*st1, *st2;
@@ -71,10 +70,14 @@ gnavl_compare(const void * n1, const void * n2)
 
 /*
  * Determine whether a (COMDAT) group has already been encountered.  If so,
- * tag the new group having the same name as discardable.
+ * indicate that the group descriptor has an overriding group (gd_oisc).  This
+ * indication triggers the ld_place_section() to discard this group, while the
+ * gd_oisc information provides for complete diagnostics of the override.
+ * Otherwise, this is the first occurrence of this group, therefore the group
+ * descriptor is saved for future comparisons.
  */
 static uintptr_t
-gpavl_loaded(Ofl_desc *ofl, Group_desc * gdp)
+gpavl_loaded(Ofl_desc *ofl, Group_desc *gdp)
 {
 	Grp_node	gpn, *gpnp;
 	avl_tree_t	*avlt;
@@ -91,11 +94,11 @@ gpavl_loaded(Ofl_desc *ofl, Group_desc * gdp)
 		ofl->ofl_groups = avlt;
 	}
 
-	gpn.gn_name = gdp->gd_symname;
-	gpn.gn_hash = sgs_str_hash(gdp->gd_symname);
+	gpn.gn_name = gdp->gd_name;
+	gpn.gn_hash = sgs_str_hash(gdp->gd_name);
 
 	if ((gpnp = avl_find(avlt, &gpn, &where)) != NULL) {
-		gdp->gd_flags |= GRP_FLG_DISCARD;
+		gdp->gd_oisc = gpnp->gn_isc;
 		return (1);
 	}
 
@@ -107,6 +110,7 @@ gpavl_loaded(Ofl_desc *ofl, Group_desc * gdp)
 
 	gpnp->gn_name = gpn.gn_name;
 	gpnp->gn_hash = gpn.gn_hash;
+	gpnp->gn_isc = gdp->gd_isc;
 
 	avl_insert(avlt, gpnp, where);
 	return (0);
@@ -116,105 +120,9 @@ Group_desc *
 ld_get_group(Ofl_desc *ofl, Is_desc *isp)
 {
 	Ifl_desc	*ifl = isp->is_file;
-	Elf		*elf = ifl->ifl_elf;
 	uint_t		scnndx = isp->is_scnndx;
 	Group_desc	*gdp;
 	Aliste		idx;
-
-	/*
-	 * If this is the first SHF_GROUP section encountered for this file,
-	 * establish what group sections exist.
-	 */
-	if (ifl->ifl_groups == NULL) {
-		Elf_Scn	*scn = 0;
-
-		while (scn = elf_nextscn(elf, scn)) {
-			Shdr		*shdr, *_shdr;
-			Sym		*sym;
-			Elf_Scn		*_scn;
-			Elf_Data	*data;
-			Group_desc	gd;
-
-			shdr = elf_getshdr(scn);
-			if (shdr->sh_type != SHT_GROUP)
-				continue;
-
-			/*
-			 * Confirm that the sh_link points to a valid section.
-			 */
-			if ((shdr->sh_link == SHN_UNDEF) ||
-			    (shdr->sh_link >= ifl->ifl_shnum)) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_FIL_INVSHLINK),
-				    ifl->ifl_name, elf_strptr(elf,
-				    ifl->ifl_shstrndx, shdr->sh_name),
-				    EC_XWORD(shdr->sh_link));
-				ofl->ofl_flags |= FLG_OF_FATAL;
-				continue;
-			}
-
-			if (shdr->sh_entsize == 0) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_FIL_INVSHENTSIZE),
-				    ifl->ifl_name, elf_strptr(elf,
-				    ifl->ifl_shstrndx, shdr->sh_name),
-				    EC_XWORD(shdr->sh_entsize));
-				ofl->ofl_flags |= FLG_OF_FATAL;
-				continue;
-			}
-
-			/*
-			 * Get associated symbol table.
-			 */
-			_scn = elf_getscn(elf, shdr->sh_link);
-			_shdr = elf_getshdr(_scn);
-
-			/*
-			 * Sanity check the sh_link field (which points to
-			 * a symbol table entry) against the size of the
-			 * symbol table.
-			 */
-			if ((shdr->sh_info == SHN_UNDEF) ||
-			    (shdr->sh_info >= (Word)(_shdr->sh_size /
-			    _shdr->sh_entsize))) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_FIL_INVSHINFO),
-				    ifl->ifl_name, elf_strptr(elf,
-				    ifl->ifl_shstrndx, shdr->sh_name),
-				    EC_XWORD(shdr->sh_info));
-				ofl->ofl_flags |= FLG_OF_FATAL;
-				continue;
-			}
-
-			data = elf_getdata(_scn, 0);
-			sym = data->d_buf;
-			sym += shdr->sh_info;
-			data = elf_getdata(scn, 0);
-
-			gd.gd_gsectname =
-			    elf_strptr(elf, ifl->ifl_shstrndx, shdr->sh_name);
-			gd.gd_symname =
-			    elf_strptr(elf, _shdr->sh_link, sym->st_name);
-			gd.gd_scnndx = elf_ndxscn(scn);
-			gd.gd_data = data->d_buf;
-			gd.gd_cnt = data->d_size / sizeof (Word);
-			gd.gd_flags = 0;
-
-			/*
-			 * If this group is a COMDAT group, determine whether
-			 * this 'signature' symbol has already been detected.
-			 */
-			if ((gd.gd_data[0] & GRP_COMDAT) &&
-			    (ELF_ST_BIND(sym->st_info) != STB_LOCAL) &&
-			    (sym->st_shndx != SHN_UNDEF) &&
-			    (gpavl_loaded(ofl, &gd) == S_ERROR))
-				return ((Group_desc *)S_ERROR);
-
-			if (alist_append(&(ifl->ifl_groups),
-			    &gd, sizeof (Group_desc), AL_CNT_IFL_GROUPS) == 0)
-				return ((Group_desc *)S_ERROR);
-		}
-	}
 
 	/*
 	 * Scan the GROUP sections associated with this file to find the
@@ -222,10 +130,10 @@ ld_get_group(Ofl_desc *ofl, Is_desc *isp)
 	 */
 	for (ALIST_TRAVERSE(ifl->ifl_groups, idx, gdp)) {
 		size_t	ndx;
-		Word *	data;
+		Word	*data;
 
 		if (isp->is_shdr->sh_type == SHT_GROUP) {
-			if (isp->is_scnndx == gdp->gd_scnndx)
+			if (isp->is_scnndx == gdp->gd_isc->is_scnndx)
 				return (gdp);
 			continue;
 		}
@@ -240,5 +148,118 @@ ld_get_group(Ofl_desc *ofl, Is_desc *isp)
 	eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ELF_NOGROUPSECT),
 	    ifl->ifl_name, isp->is_name);
 	ofl->ofl_flags |= FLG_OF_FATAL;
-	return (0);
+	return (NULL);
+}
+
+uintptr_t
+ld_group_process(Is_desc *gisc, Ofl_desc *ofl)
+{
+	Ifl_desc	*gifl = gisc->is_file;
+	Shdr		*sshdr, *gshdr = gisc->is_shdr;
+	Is_desc		*isc;
+	Sym		*sym;
+	char		*str;
+	Group_desc	gd;
+	size_t		ndx;
+
+	/*
+	 * Confirm that the sh_link points to a valid section.
+	 */
+	if ((gshdr->sh_link == SHN_UNDEF) ||
+	    (gshdr->sh_link >= gifl->ifl_shnum) ||
+	    ((isc = gifl->ifl_isdesc[gshdr->sh_link]) == NULL)) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHLINK),
+		    gifl->ifl_name, gisc->is_name, EC_XWORD(gshdr->sh_link));
+		ofl->ofl_flags |= FLG_OF_FATAL;
+		return (0);
+	}
+	if (gshdr->sh_entsize == 0) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHENTSIZE),
+		    gifl->ifl_name, gisc->is_name, EC_XWORD(gshdr->sh_entsize));
+		ofl->ofl_flags |= FLG_OF_FATAL;
+		return (0);
+	}
+
+	/*
+	 * Get the associated symbol table.  Sanity check the sh_info field
+	 * (which points to the signature symbol table entry) against the size
+	 * of the symbol table.
+	 */
+	sshdr = isc->is_shdr;
+	sym = (Sym *)isc->is_indata->d_buf;
+
+	if ((sshdr->sh_info == SHN_UNDEF) ||
+	    (gshdr->sh_info >= (Word)(sshdr->sh_size / sshdr->sh_entsize)) ||
+	    ((isc = gifl->ifl_isdesc[sshdr->sh_link]) == NULL)) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHINFO),
+		    gifl->ifl_name, gisc->is_name, EC_XWORD(gshdr->sh_info));
+		ofl->ofl_flags |= FLG_OF_FATAL;
+		return (0);
+	}
+
+	sym += gshdr->sh_info;
+
+	/*
+	 * Get the symbol name from the associated string table.
+	 */
+	str = (char *)isc->is_indata->d_buf;
+	str += sym->st_name;
+
+	/*
+	 * Generate a group descriptor.
+	 */
+	gd.gd_isc = gisc;
+	gd.gd_oisc = NULL;
+	gd.gd_name = str;
+	gd.gd_data = gisc->is_indata->d_buf;
+	gd.gd_cnt = gisc->is_indata->d_size / sizeof (Word);
+
+	/*
+	 * If this group is a COMDAT group, validate the signature symbol.
+	 */
+	if ((gd.gd_data[0] & GRP_COMDAT) &&
+	    ((ELF_ST_BIND(sym->st_info) == STB_LOCAL) ||
+	    (sym->st_shndx == SHN_UNDEF))) {
+		/* FATAL or ignore? */
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_GRP_INVALSYM),
+		    gifl->ifl_name, gisc->is_name, str);
+		ofl->ofl_flags |= FLG_OF_FATAL;
+		return (0);
+	}
+
+	/*
+	 * Validate the section indices within the group.  If this is a COMDAT
+	 * group, mark each section as COMDAT.
+	 */
+	for (ndx = 1; ndx < gd.gd_cnt; ndx++) {
+		Word	gndx;
+
+		if ((gndx = gd.gd_data[ndx]) >= gifl->ifl_shnum) {
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_GRP_INVALNDX), gifl->ifl_name,
+			    gisc->is_name, ndx, gndx);
+			ofl->ofl_flags |= FLG_OF_FATAL;
+			return (0);
+		}
+
+		if (gd.gd_data[0] & GRP_COMDAT)
+			gifl->ifl_isdesc[gndx]->is_flags |= FLG_IS_COMDAT;
+	}
+
+	/*
+	 * If this is a COMDAT group, determine whether this group has already
+	 * been encountered, or whether this is the first instance of the group.
+	 */
+	if ((gd.gd_data[0] & GRP_COMDAT) &&
+	    (gpavl_loaded(ofl, &gd) == S_ERROR))
+		return (S_ERROR);
+
+	/*
+	 * Associate the group descriptor with this input file.
+	 */
+	if (alist_append(&(gifl->ifl_groups), &gd, sizeof (Group_desc),
+	    AL_CNT_IFL_GROUPS) == NULL)
+		return (S_ERROR);
+
+	return (1);
 }

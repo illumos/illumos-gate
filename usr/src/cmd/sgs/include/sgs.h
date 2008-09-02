@@ -33,9 +33,6 @@
 #ifndef	_SGS_H
 #define	_SGS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -227,9 +224,9 @@ typedef struct {
 #define	realloc			libld_realloc
 
 #define	libld_calloc(x, a)	libld_malloc(((size_t)x) * ((size_t)a))
-extern void		libld_free(void *);
-extern void		*libld_malloc(size_t);
-extern void		*libld_realloc(void *, size_t);
+extern void			libld_free(void *);
+extern void			*libld_malloc(size_t);
+extern void			*libld_realloc(void *, size_t);
 #endif
 
 

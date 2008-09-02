@@ -30,8 +30,6 @@
 #ifndef	_LIBLD_H
 #define	_LIBLD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <libelf.h>
 #include <sgs.h>
@@ -309,7 +307,7 @@ struct ofl_desc {
 #define	FLG_OF_VERDEF	0x00400000	/* record version definitions */
 #define	FLG_OF_VERNEED	0x00800000	/* record version dependencies */
 #define	FLG_OF_NOVERSEC 0x01000000	/* don't record version sections */
-
+#define	FLG_OF_KEY	0x02000000	/* file requires sort keys */
 #define	FLG_OF_PROCRED	0x04000000	/* process any symbol reductions by */
 					/*	effecting the symbol table */
 					/*	output and relocations */
@@ -329,6 +327,7 @@ struct ofl_desc {
 #define	FLG_OF_AUTOELM	0x002000000000	/* automatically eliminate  */
 					/*	unspecified global symbols */
 #define	FLG_OF_REDLSYM	0x004000000000	/* reduce local symbols */
+#define	FLG_OF_SECORDER	0x008000000000	/* section ordering is required */
 
 /*
  * In the flags1 arena, establish any options that are applicable to archive
@@ -348,7 +347,8 @@ struct ofl_desc {
 #define	FLG_OF1_OVHWCAP	0x00000040	/* override any input hardware or */
 #define	FLG_OF1_OVSFCAP	0x00000080	/*	software capabilities */
 #define	FLG_OF1_RELDYN	0x00000100	/* process .dynamic in rel obj */
-
+#define	FLG_OF1_NRLXREL	0x00000200	/* -z norelaxreloc flag set */
+#define	FLG_OF1_RLXREL	0x00000400	/* -z relaxreloc flag set */
 #define	FLG_OF1_IGNORE	0x00000800	/* ignore unused dependencies */
 
 #define	FLG_OF1_TEXTOFF 0x00002000	/* text relocations are ok */
@@ -364,7 +364,7 @@ struct ofl_desc {
 #define	FLG_OF1_TLSOREL	0x00100000	/* output relocation against .tlsbss */
 					/*	section */
 #define	FLG_OF1_MEMORY	0x00200000	/* produce a memory model */
-#define	FLG_OF1_RLXREL	0x00400000	/* -z relaxreloc flag set */
+
 #define	FLG_OF1_ENCDIFF	0x00800000	/* Host running linker has different */
 					/*	byte order than output object */
 #define	FLG_OF1_VADDR	0x01000000	/* vaddr was explicitly set */
@@ -549,11 +549,11 @@ struct ifl_desc {			/* input file descriptor */
 					/*	is included in the output */
 					/*	allocatable image */
 #define	FLG_IF_GNUVER	0x00010000	/* file used GNU-style versioning */
+#define	FLG_IF_ORDERED	0x00020000	/* ordered section processing */
+					/*	required */
 
 struct is_desc {			/* input section descriptor */
-	const char	*is_name;	/* the section name */
-	const char	*is_basename;	/* original section name (without */
-					/*	.<sect>%<func> munging */
+	const char	*is_name;	/* original section name */
 	Shdr		*is_shdr;	/* the elf section header */
 	Ifl_desc	*is_file;	/* infile desc for this section */
 	Os_desc		*is_osdesc;	/* new output section for this */
@@ -564,16 +564,14 @@ struct is_desc {			/* input section descriptor */
 	Word		is_txtndx;	/* Index for section.  Used to decide */
 					/*	where to insert section when */
 					/* 	reordering sections */
-	Word		is_ident;	/* preserved IDENT used for ordered */
-					/*	sections. */
-	uint_t		is_namehash;	/* hash on section name */
-	Half		is_key;		/* Used for SHF_ORDERED */
-	Half		is_flags;	/* Various flags */
+	Word		is_keyident;	/* key for SHF_ORDERED processing */
+					/*	and identifier used for */
+					/*	placing/ordering sections */
+	Word		is_flags;	/* Various flags */
 };
 
-#define	FLG_IS_ORDERED	0x0001		/* This is a SHF_ORDERED section */
-#define	FLG_IS_KEY	0x0002		/* This is a section pointed by */
-					/* sh_info of a SHF_ORDERED section */
+#define	FLG_IS_ORDERED	0x0001		/* this is a SHF_ORDERED section */
+#define	FLG_IS_KEY	0x0002		/* section requires sort keys */
 #define	FLG_IS_DISCARD	0x0004		/* section is to be discarded */
 #define	FLG_IS_RELUPD	0x0008		/* symbol defined here may have moved */
 #define	FLG_IS_SECTREF	0x0010		/* section has been referenced */
@@ -581,7 +579,9 @@ struct is_desc {			/* input section descriptor */
 #define	FLG_IS_EXTERNAL	0x0040		/* isp from an user file */
 #define	FLG_IS_INSTRMRG	0x0080		/* Usable SHF_MERGE|SHF_STRINGS sec */
 #define	FLG_IS_GNSTRMRG	0x0100		/* Generated mergeable string section */
-
+#define	FLG_IS_GROUPS	0x0200		/* section has groups to process */
+#define	FLG_IS_PLACE	0x0400		/* section requires to be placed */
+#define	FLG_IS_COMDAT	0x0800		/* section is COMDAT */
 
 /*
  * Map file and output file processing structures
@@ -598,7 +598,7 @@ struct os_desc {			/* Output section descriptor */
 	Sort_desc	*os_sort;	/* used for sorting sections */
 	Sg_desc		*os_sgdesc;	/* segment os_desc is placed on */
 	Elf_Data	*os_outdata;	/* output sections raw data */
-	List		os_comdats;	/* list of COMDAT sections present */
+	APlist		*os_comdats;	/* list of COMDAT sections present */
 					/*	in current output section */
 	Word		os_scnsymndx;	/* index in output symtab of section */
 					/*	symbol for this section */
@@ -610,7 +610,7 @@ struct os_desc {			/* Output section descriptor */
 	uchar_t		os_flags;	/* various flags */
 };
 
-#define	FLG_OS_ORDER_KEY	0x01	/* include a sort key section */
+#define	FLG_OS_KEY		0x01	/* section requires sort keys */
 #define	FLG_OS_OUTREL		0x02	/* output rel against this section */
 #define	FLG_OS_SECTREF		0x04	/* isps are not affected by -zignore */
 
@@ -657,7 +657,7 @@ struct sg_desc {			/* output segment descriptor */
 #define	FLG_SG_EMPTY	0x0200		/* an empty segment specification */
 					/*	no input sections will be */
 					/*	associated to this section */
-#define	FLG_SG_KEY	0x0400		/* include a key section */
+#define	FLG_SG_KEY	0x0400		/* segment requires sort keys */
 #define	FLG_SG_DISABLED	0x0800		/* this segment is disabled */
 #define	FLG_SG_PHREQ	0x1000		/* this segment requires a program */
 					/* header */
@@ -1007,21 +1007,18 @@ struct	uts_desc {
 	size_t		uts_osrelsz;	/*	and associated size */
 };
 
-
 /*
  * SHT_GROUP descriptor - used to track group sections at the global
- * level to resolve conflicts/determine which to keep.
+ * level to resolve conflicts and determine which to keep.
  */
 struct group_desc {
-	const char	*gd_gsectname;	/* group section name */
-	const char	*gd_symname;	/* symbol name */
+	Is_desc		*gd_isc;	/* input section descriptor */
+	Is_desc		*gd_oisc;	/* overriding input section */
+					/*	descriptor when discarded */
+	const char	*gd_name;	/* group name (signature symbol) */
 	Word		*gd_data;	/* data for group section */
-	size_t		gd_scnndx;	/* group section index */
 	size_t		gd_cnt;		/* number of entries in group data */
-	Word		gd_flags;
 };
-
-#define	GRP_FLG_DISCARD	0x0001		/* group is to be discarded */
 
 /*
  * Indexes into the ld_support_funcs[] table.
@@ -1037,7 +1034,6 @@ typedef enum {
 	LDS_SEC,
 	LDS_NUM
 } Support_ndx;
-
 
 /*
  * Structure to manage archive member caching.  Each archive has an archive

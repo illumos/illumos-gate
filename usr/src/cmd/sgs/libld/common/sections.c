@@ -26,7 +26,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Module sections. Initialize special sections
@@ -742,11 +741,11 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, List *list)
 
 	osp = isec->is_osdesc;
 
-	if ((ofl->ofl_osinitarray == 0) && (shtype == SHT_INIT_ARRAY))
+	if ((ofl->ofl_osinitarray == NULL) && (shtype == SHT_INIT_ARRAY))
 		ofl->ofl_osinitarray = osp;
-	if ((ofl->ofl_ospreinitarray == 0) && (shtype == SHT_PREINIT_ARRAY))
+	if ((ofl->ofl_ospreinitarray == NULL) && (shtype == SHT_PREINIT_ARRAY))
 		ofl->ofl_ospreinitarray = osp;
-	else if ((ofl->ofl_osfiniarray == 0) && (shtype == SHT_FINI_ARRAY))
+	else if ((ofl->ofl_osfiniarray == NULL) && (shtype == SHT_FINI_ARRAY))
 		ofl->ofl_osfiniarray = osp;
 
 	/*
@@ -849,7 +848,6 @@ make_dynamic(Ofl_desc *ofl)
 	 * objects. See the comment at the head of update_odynamic() in
 	 * update.c for details.
 	 */
-
 	if (new_section(ofl, SHT_DYNAMIC, MSG_ORIG(MSG_SCN_DYNAMIC), 0,
 	    &isec, &shdr, &data) == S_ERROR)
 		return (S_ERROR);
@@ -865,7 +863,7 @@ make_dynamic(Ofl_desc *ofl)
 	 * Reserve entries for any needed dependencies.
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_sos, lnp, ifl)) {
-		Sdf_desc *	sdf;
+		Sdf_desc	*sdf;
 
 		if (!(ifl->ifl_flags & (FLG_IF_NEEDED | FLG_IF_NEEDSTR)))
 			continue;
@@ -1455,6 +1453,7 @@ make_symtab(Ofl_desc *ofl)
 		    ld_targ.t_id.id_symtab_ndx, 0)) == (Os_desc *)S_ERROR)
 			return (S_ERROR);
 	}
+
 	/*
 	 * Calculated number of symbols, which need to be augmented by
 	 * the null first entry, the FILE symbol, and the .shstrtab entry.
@@ -1584,7 +1583,6 @@ make_dynsort(Ofl_desc *ofl)
 	Shdr		*shdr;
 	Elf_Data	*data;
 	Is_desc		*isec;
-
 
 	/* Only do it if the .SUNW_ldynsym section is present */
 	if (!OFL_ALLOW_LDYNSYM(ofl))
@@ -1771,7 +1769,7 @@ make_dynstr(Ofl_desc *ofl)
 		int	ndx;
 
 		for (ndx = 0; ndx < ofl->ofl_regsymsno; ndx++) {
-			Sym_desc *	sdp;
+			Sym_desc	*sdp;
 
 			if ((sdp = ofl->ofl_regsyms[ndx]) == 0)
 				continue;
@@ -2142,8 +2140,8 @@ ld_make_sunwmove(Ofl_desc *ofl, int mv_nums)
 	 * Copy move entries
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_parsym, lnp1, psym)) {
-		Listnode *	lnp2;
-		Mv_itm *	mvitm;
+		Listnode	*lnp2;
+		Mv_itm		*mvitm;
 
 		if (psym->psym_symd->sd_flags & FLG_SY_PAREXPN)
 			continue;

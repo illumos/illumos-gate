@@ -23,7 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<dlfcn.h>
@@ -204,12 +203,9 @@ Dbg_syms_discarded(Lm_list *lml, Sym_desc *sdp)
 		file = MSG_INTL(MSG_STR_UNKNOWN);
 
 	if (sdp->sd_isc) {
-		const char	*sec;
-
-		if ((sec = sdp->sd_isc->is_basename) == 0)
-			sec = sdp->sd_isc->is_name;
 		dbg_print(lml, MSG_INTL(MSG_SYM_DISCARD_SEC),
-		    Dbg_demangle_name(sdp->sd_name), sec, file);
+		    Dbg_demangle_name(sdp->sd_name), sdp->sd_isc->is_name,
+		    file);
 	} else
 		dbg_print(lml, MSG_INTL(MSG_SYM_DISCARD_FILE),
 		    Dbg_demangle_name(sdp->sd_name), file);

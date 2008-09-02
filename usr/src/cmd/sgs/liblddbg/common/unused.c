@@ -23,7 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"msg.h"
 #include	"_debug.h"
@@ -64,7 +63,7 @@ Dbg_unused_sec(Lm_list *lml, Is_desc *isp)
 	else
 		str = MSG_ORIG(MSG_STR_EMPTY);
 
-	dbg_print(lml, MSG_INTL(MSG_USD_SEC), isp->is_basename,
+	dbg_print(lml, MSG_INTL(MSG_USD_SEC), isp->is_name,
 	    EC_XWORD(isp->is_shdr->sh_size), isp->is_file->ifl_name, str);
 }
 

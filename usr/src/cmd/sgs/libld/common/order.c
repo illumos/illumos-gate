@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Processing of SHF_ORDERED sections.
  */
@@ -176,9 +174,10 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 	if ((error = is_keylink_ok(ifl, keylink, limit)) != 0) {
 		DBG_CALL(Dbg_sec_order_error(ofl->ofl_lml, ifl, ndx, error));
 		isp->is_flags &= ~FLG_IS_ORDERED;
-		if (isp->is_osdesc == NULL)
+		if (isp->is_osdesc == NULL) {
 			return ((uintptr_t)ld_place_section(ofl, isp,
-			    isp->is_key, 0));
+			    isp->is_keyident, 0));
+		}
 		return ((uintptr_t)isp->is_osdesc);
 	}
 
@@ -191,9 +190,10 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 		if ((dest_ndx = get_shfordered_dest(ofl, ifl,
 		    ndx, limit)) == 0) {
 			isp->is_flags &= ~FLG_IS_ORDERED;
-			if (isp->is_osdesc == NULL)
+			if (isp->is_osdesc == NULL) {
 				return ((uintptr_t)ld_place_section(ofl, isp,
-				    isp->is_key, 0));
+				    isp->is_keyident, 0));
+			}
 			return ((uintptr_t)isp->is_osdesc);
 		}
 	} else {
@@ -208,7 +208,7 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 	 * Place the section into it's output section.
 	 */
 	if ((osp = isp->is_osdesc) == NULL) {
-		if ((osp = ld_place_section(ofl, isp, isp->is_ident,
+		if ((osp = ld_place_section(ofl, isp, isp->is_keyident,
 		    dest_ndx)) == (Os_desc *)S_ERROR)
 			return ((uintptr_t)S_ERROR);
 		if (!osp)
@@ -254,10 +254,20 @@ ld_process_ordered(Ifl_desc *ifl, Ofl_desc *ofl, Word ndx, Word limit)
 			    isp2->is_scnndx);
 			return (S_ERROR);
 		}
-		osp2 = isp2->is_osdesc;
-		osp2->os_flags |= FLG_OS_ORDER_KEY;
-		osp2->os_sgdesc->sg_flags |= FLG_SG_KEY;
+
+		/*
+		 * Indicate that this ordered input section will require a sort
+		 * key created.  Propagate the key requirement through to the
+		 * associated output section, segment and file, to trigger the
+		 * sort key creation.  See ld_sec_validate();
+		 */
 		isp2->is_flags |= FLG_IS_KEY;
+
+		osp2 = isp2->is_osdesc;
+		osp2->os_flags |= FLG_OS_KEY;
+		osp2->os_sgdesc->sg_flags |= FLG_SG_KEY;
+
+		ofl->ofl_flags |= FLG_OF_KEY;
 	}
 
 	return ((uintptr_t)osp);
@@ -277,7 +287,7 @@ ld_sec_validate(Ofl_desc *ofl)
 {
 	Listnode	*lnp1;
 	Sg_desc		*sgp;
-	int 		key = 1;
+	Word 		key = 1;
 
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
 		Sec_order	*scop;
@@ -298,12 +308,12 @@ ld_sec_validate(Ofl_desc *ofl)
 			Listnode	*lnp2;
 			Is_desc		*isp;
 
-			if ((osp->os_flags & FLG_OS_ORDER_KEY) == 0)
+			if ((osp->os_flags & FLG_OS_KEY) == 0)
 				continue;
 
 			for (LIST_TRAVERSE(&(osp->os_isdescs), lnp2, isp)) {
 				if (isp->is_flags & FLG_IS_KEY)
-					isp->is_key = key++;
+					isp->is_keyident = key++;
 			}
 		}
 	}
@@ -372,24 +382,22 @@ comp(const void *ss1, const void *ss2)
 	Is_desc		*i1, *i2;
 	Word		ndx1, ndx2;
 
-	if (s1->is_shdr->sh_flags & SHF_ORDERED)  {
+	if (s1->is_shdr->sh_flags & SHF_ORDERED)
 		ndx1 = s1->is_shdr->sh_info;
-	} else {
+	else
 		ndx1 = s1->is_shdr->sh_link;
-	}
 
-	if (s2->is_shdr->sh_flags & SHF_ORDERED)  {
+	if (s2->is_shdr->sh_flags & SHF_ORDERED)
 		ndx2 = s2->is_shdr->sh_info;
-	} else {
+	else
 		ndx2 = s2->is_shdr->sh_link;
-	}
 
 	i1 = s1->is_file->ifl_isdesc[ndx1];
 	i2 = s2->is_file->ifl_isdesc[ndx2];
 
-	if (i1->is_key > i2->is_key)
+	if (i1->is_keyident > i2->is_keyident)
 		return (1);
-	if (i1->is_key < i2->is_key)
+	if (i1->is_keyident < i2->is_keyident)
 		return (-1);
 	return (0);
 }

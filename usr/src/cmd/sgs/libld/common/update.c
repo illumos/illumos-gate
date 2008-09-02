@@ -26,7 +26,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Update the new output file image, perform virtual address, offset and
@@ -3055,7 +3054,7 @@ update_move(Ofl_desc *ofl)
  * sh_link/sh_info fields as well as the section contents.
  */
 static uintptr_t
-update_ogroup(Ofl_desc * ofl)
+update_ogroup(Ofl_desc *ofl)
 {
 	Listnode	*lnp;
 	Os_desc		*osp;
@@ -3087,31 +3086,16 @@ update_ogroup(Ofl_desc * ofl)
 		 */
 		grpcnt = shdr->sh_size / shdr->sh_entsize;
 		gdata = (Word *)osp->os_outdata->d_buf;
+
 		for (i = 1; i < grpcnt; i++) {
-			Is_desc	*	_isp;
-			Os_desc	*	_osp;
-
-			/*
-			 * Perform a sanity check that the section index
-			 * stored in the SHT_GROUP section is valid
-			 * for the file it came from.
-			 */
-			if (gdata[i] >= ifl->ifl_shnum) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_GRP_INVALNDX), isp->is_name,
-				    ifl->ifl_name, i, gdata[i]);
-				error = S_ERROR;
-				gdata[i] = 0;
-				continue;
-			}
-
-			_isp = ifl->ifl_isdesc[gdata[i]];
+			Os_desc	*_osp;
+			Is_desc	*_isp = ifl->ifl_isdesc[gdata[i]];
 
 			/*
 			 * If the referenced section didn't make it to the
 			 * output file - just zero out the entry.
 			 */
-			if ((_osp = _isp->is_osdesc) == 0)
+			if ((_osp = _isp->is_osdesc) == NULL)
 				gdata[i] = 0;
 			else
 				gdata[i] = (Word)elf_ndxscn(_osp->os_scn);

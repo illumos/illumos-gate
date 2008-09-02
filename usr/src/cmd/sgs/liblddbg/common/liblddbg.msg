@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 @ _START_
 
@@ -174,8 +172,8 @@
 # symbols	display symbol table processing; detail flag shows internal
 #		    symbol table addition and resolution (ld only)
 # statistics	display processing statistics (ld only)
-# strtab	display information about string table compression (ld only)
-#		    detail shows layout of string tables
+# strtab	display information about string table compression; detail
+#		    flag shows layout of string tables (ld only)
 # tls		display TLS processing
 # unused	display unused/unreferenced files; detail flag shows unused
 #		   sections (ld only), and unused search paths (ld.so.1 only)
@@ -270,7 +268,7 @@
 # TRANSLATION_NOTE -- do not translate the first token `strtab'.
 @ MSG_USE_STRTAB	"strtab\t  display information about string table \
 			 compression; detail"
-@ MSG_USE_STRTAB_2	"\t\t    shows layout of string tables (ld only)"
+@ MSG_USE_STRTAB_2	"\t\t    flag shows layout of string tables (ld only)"
 
 # TRANSLATION_NOTE -- do not translate the first token `tls/TLS'.
 @ MSG_USE_TLS		"tls\t  display TLS processing info"
@@ -559,17 +557,27 @@
 @ MSG_SEC_INPUT_GENSTR	"section=%s; input generated merged string section"
 @ MSG_SEC_ADDED		"section=%s; added to segment=%s"
 @ MSG_SEC_CREATED	"section=%s; added to segment=%s (created)"
+@ MSG_SEC_REDIRECTED	"section=%s; redirected to section=%s"
 @ MSG_SEC_DISCARDED	"section=%s; input from file=%s; \
-			 discarded in favor of section=%s from file=%s"
-@ MSG_SEC_STRMERGE_DISCARDED	"section=%s; input from file=%s; \
+			 discarded in favor of section=%s; file=%s"
+
+@ MSG_SEC_GNU_COMDAT_1	"section=%s; identified as COMDAT with \
+			 relaxed relocations enabled" 
+@ MSG_SEC_GNU_COMDAT_2	"section=%s; identified as COMDAT"
+@ MSG_SEC_GNU_COMDAT_3	"section=%s; relaxed relocations enabled" 
+
+@ MSG_SEC_GRP_DEFINE	"section=%s; input from file=%s; defines %s\
+			 group: signature symbol: %s"
+@ MSG_SEC_GRP_MEMBER	"section=%s; input from file=%s; member of %s\
+			 group: signature symbol: %s"
+@ MSG_SEC_GRP_DISCARDED	"section=%s; input from file=%s; discarded in favor of \
+			 group: signature symbol: %s: file=%s"
+
+@ MSG_SEC_STRMERGE_DISCARDED "section=%s; input from file=%s; \
 			 discarded in favor of generated merged string section"
 @ MSG_SEC_STRMERGE_UNSUP "section=%s; input from file=%s; sh_addralign=%lld; \
 			 sh_entsize=%lld; unable to merge sections with this \
 			 size and alignment"
-@ MSG_SEC_GRP_INPUT	"section=%s; input from file=%s; \
-			 member of group: %s:%s"
-@ MSG_SEC_GRP_DISCARDED	"section=%s; input from file=%s; \
-			 discarded: member of existing group: %s:%s"
 
 @ MSG_SEC_STRTAB_STND	"strtab=%s; full size: %lld; uncompressed"
 @ MSG_SEC_STRTAB_COMP	"strtab=%s; full size: %lld; compressed down to: %lld"
@@ -697,7 +705,7 @@
 @ MSG_ORD_TITLE_0	" section=%s from %s is not an ordered section"
 @ MSG_ORD_TITLE_1	" section=%s from %s, %s=SHN_BEGIN"
 @ MSG_ORD_TITLE_2	" section=%s from %s, %s=SHN_AFTER"
-@ MSG_ORD_TITLE_3	" section=%s from %s, %s=%s, sort_val=%d"
+@ MSG_ORD_TITLE_3	" section=%s from %s, %s=%s, sort key=%u"
 
 @ MSG_ORD_ERR_TITLE	"the SHF_ORDERED section %s from %s has \
 			 an error;  flag ignored"
@@ -1131,6 +1139,7 @@
 
 @ MSG_STR_EMPTY		""
 @ MSG_STR_DELIMIT	",:"
+@ MSG_STR_COMDAT	"COMDAT "
 
 @ MSG_SCN_GOT		".got"
 @ MSG_SCN_PLT		".plt"

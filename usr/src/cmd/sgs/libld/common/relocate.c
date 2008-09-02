@@ -26,7 +26,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * set-up for relocations
@@ -1358,9 +1357,9 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 }
 
 /*
- * Given a relocation that references a local symbol from a discarded
- * COMDAT (or SHF_GROUP) section, replace the symbol with the
- * corresponding symbol from the section that was kept.
+ * Given a relocation that references a local symbol from a discarded COMDAT
+ * section, replace the symbol with the corresponding symbol from the section
+ * that was kept.
  *
  * entry:
  *	reld - Relocation
@@ -1371,11 +1370,10 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
  *	found, and NULL otherwise.
  *
  * note:
- *	[Note that I'm using the word "COMDAT" here loosely, to refer
- *	to actual COMDAT sections as well as to groups tied together
- *	with an SHF_GROUP section. SHF_GROUP is simply a more advanced
- *	version of the same idea: That multiple versions of the same thing
- *	can come in, but only one of them is used for the output.]
+ *	The word "COMDAT" is used to refer to actual COMDAT sections, COMDAT
+ *	groups tied together with an SHF_GROUP section, and .gnu.linkonce
+ *	sections which provide a simplified COMDAT requirement.  COMDAT
+ *	sections are identified with the FLG_IS_COMDAT section flag.
  *
  *	In principle, this sort of sloppy relocation remapping is
  *	a questionable practice. All self-referential sections should
@@ -1395,9 +1393,9 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
  *	that our heuristic is somewhat different than theirs, but the
  *	end result is close enough to solve the same problem.
  *
- *	It is our hope that gcc will eventually phase out the need
- *	for sloppy relocations, and this won't be needed. In the
- *	meantime, the option allows us to interoperate.
+ *	gcc may eventually phase out the need for sloppy relocations, and
+ *	then this logic won't be needed. In the meantime, relaxed relocation
+ *	processing allows us to interoperate.
  *
  *	Here is how we do it: The symbol points at the input section,
  *	and the input section points at the output section to which it
@@ -1415,30 +1413,10 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp)
 {
 	Listnode	*lnp;
 	Is_desc		*rep_isp;
-	const char	*is_name;
 	Sym		*sym = sdp->sd_sym;
 	Is_desc		*isp = sdp->sd_isc;
+	Ifl_desc	*ifl = sdp->sd_file;
 	Conv_inv_buf_t	inv_buf;
-
-	/*
-	 * ld_place_section() can alter the section name if it contains
-	 * a '%' character. We need to use the original name in this
-	 * case.
-	 */
-	is_name = isp->is_basename ? isp->is_basename : isp->is_name;
-
-	/*
-	 * 1) The caller is required to ensure that the input symbol is
-	 *	local. We don't check for that here.
-	 * 2) If the discarded section has not been assigned to an
-	 *	output section, we won't be able to continue.
-	 * 3) This operation only applies to SHT_SUNW_COMDAT sections
-	 *	or sections contained within a COMDAT group (SHF_GROUP).
-	 */
-	if ((isp->is_osdesc == NULL) ||
-	    ((isp->is_shdr->sh_type != SHT_SUNW_COMDAT) &&
-	    ((isp->is_shdr->sh_flags & SHF_GROUP) == 0)))
-		return (NULL);
 
 	/*
 	 * Examine each input section assigned to this output section.
@@ -1446,22 +1424,20 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp)
 	 *	- Have the same name as the original
 	 *	- Not have been discarded
 	 *	- Have the same size
-	 *	- Have the same section type (and note that this type may
-	 *		be SHT_SUNW_COMDAT).
+	 *	- Have the same section type
 	 *	- Have the same SHF_GROUP flag setting (either on or off)
 	 *	- Must be a COMDAT section of one form or the other.
 	 */
 	/* BEGIN CSTYLED */
 	for (LIST_TRAVERSE(&isp->is_osdesc->os_isdescs, lnp, rep_isp)) {
-	    const char *rep_is_name = rep_isp->is_basename ?
-		rep_isp->is_basename : rep_isp->is_name;
 
-	    if (!(rep_isp->is_flags & FLG_IS_DISCARD) &&
+	    if (((rep_isp->is_flags &
+		(FLG_IS_COMDAT | FLG_IS_DISCARD)) == FLG_IS_COMDAT) &&
 		(isp->is_indata->d_size == rep_isp->is_indata->d_size) &&
 		(isp->is_shdr->sh_type == rep_isp->is_shdr->sh_type) &&
 		((isp->is_shdr->sh_flags & SHF_GROUP) ==
 		(rep_isp->is_shdr->sh_flags & SHF_GROUP)) &&
-		(strcmp(rep_is_name, is_name) == 0)) {
+		(strcmp(rep_isp->is_name, isp->is_name) == 0)) {
 		/*
 		 * We found the kept COMDAT section. Now, look at all of the
 		 * symbols from the input file that contains it to find the
@@ -1498,15 +1474,13 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp)
 			(sym->st_other == rep_sym->st_other)) {
 
 			if (ofl->ofl_flags & FLG_OF_VERBOSE) {
-			    Ifl_desc *ifl = sdp->sd_file;
-
 			    if (sym->st_name != 0) {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_REL_SLOPCDATNAM),
 				    conv_reloc_type(ifl->ifl_ehdr->e_machine,
 					reld->rel_rtype, 0, &inv_buf),
 				    ifl->ifl_name, reld->rel_isdesc->is_name,
-				    rep_sdp->sd_name, is_name,
+				    rep_sdp->sd_name, isp->is_name,
 				    rep_sdp->sd_file->ifl_name);
 			    } else {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
@@ -1515,11 +1489,11 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp)
 					ifl->ifl_ehdr->e_machine,
 					reld->rel_rtype, 0, &inv_buf),
 				    ifl->ifl_name, reld->rel_isdesc->is_name,
-				    is_name, rep_sdp->sd_file->ifl_name);
+				    isp->is_name, rep_sdp->sd_file->ifl_name);
 			    }
 			}
 			DBG_CALL(Dbg_reloc_sloppycomdat(ofl->ofl_lml,
-			    is_name, rep_sdp));
+			    isp->is_name, rep_sdp));
 			return (rep_sdp);
 		    }
 		}
@@ -1530,7 +1504,6 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp)
 	/* If didn't return above, we didn't find it */
 	return (NULL);
 }
-
 
 /*
  * Generate a name for a relocation descriptor that has an STT_SECTION
@@ -1594,7 +1567,6 @@ ld_section_reld_name(Sym_desc *sdp, Is_desc *sd_isc)
 
 	return (NULL);
 }
-
 
 /*
  * Generate relocation descriptor and dispatch
@@ -1711,21 +1683,44 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 
 		if (ELF_ST_BIND(sdp->sd_sym->st_info) == STB_LOCAL) {
 			/*
-			 * If "-z relaxreloc", then check to see if
-			 * this is a reference to a discarded COMDAT
-			 * section that can be replaced with the
-			 * one that was kept.
+			 * If "-z relaxreloc", and the input section is COMDAT
+			 * that has been assigned to an output section, then
+			 * determine if this is a reference to a discarded
+			 * COMDAT section that can be replaced with a COMDAT
+			 * that has been kept.
+			 *
+			 * If a matching symbol can not be found, issue a
+			 * warning and ignore the relocation.  Note, the GNU
+			 * linker will act as though the symbol were defined at
+			 * the same offset in the copy of the linkonce section
+			 * that was kept.  This seems rather dangerous, and as
+			 * the situation only seems to apply to debugging
+			 * information, our choise is to ignore the relocation.
 			 */
-			if (ofl->ofl_flags1 & FLG_OF1_RLXREL)
-				nsdp = sloppy_comdat_reloc(ofl, reld, sdp);
-		} else if (reld->rel_sname == sdp->sd_name) {
+			if ((ofl->ofl_flags1 & FLG_OF1_RLXREL) &&
+			    sdp->sd_isc->is_osdesc &&
+			    (sdp->sd_isc->is_flags & FLG_IS_COMDAT) &&
+			    ((nsdp = sloppy_comdat_reloc(ofl, reld,
+			    sdp)) == NULL)) {
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_REL_SLOPCDATNOSYM),
+				    conv_reloc_type(ifl->ifl_ehdr->e_machine,
+				    reld->rel_rtype, 0, &inv_buf),
+				    ifl->ifl_name, isp->is_name,
+				    demangle(reld->rel_sname),
+				    sdp->sd_isc->is_name);
+				return (1);
+			}
+		} else if (reld->rel_sname == sdp->sd_name)
 			nsdp = ld_sym_find(sdp->sd_name, SYM_NOHASH, 0, ofl);
-		}
-		if (nsdp == 0) {
+
+		if (nsdp == NULL) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_REL_SYMDISC),
-			    ifl->ifl_name, isp->is_name,
-			    demangle(sdp->sd_name), sdp->sd_isc->is_name);
+			    conv_reloc_type(ifl->ifl_ehdr->e_machine,
+			    reld->rel_rtype, 0, &inv_buf), ifl->ifl_name,
+			    isp->is_name, demangle(reld->rel_sname),
+			    sdp->sd_isc->is_name);
 			return (S_ERROR);
 		}
 		ifl->ifl_oldndx[rsndx] = sdp = nsdp;

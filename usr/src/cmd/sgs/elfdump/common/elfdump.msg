@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 @ _START_
 
@@ -204,8 +202,7 @@
 @ MSG_STR_NULL		"(null)"
 @ MSG_STR_DEPRECATED	"(deprecated value)"
 @ MSG_STR_UNKNOWN	"<unknown>"
-@ MSG_STR_SECTION	"%.12s (section)"
-@ MSG_STR_L_SECTION	"%s (section)"
+@ MSG_STR_SECTION	"%s (section)"
 @ MSG_STR_CHECKSUM	"elf checksum: 0x%lx"
 
 @ MSG_FMT_SCNNDX	"section[%d]"
@@ -304,6 +301,7 @@
 @ MSG_FMT_ARNAME	"%s(%s)"
 @ MSG_FMT_NLSTR		"\n%s:"
 @ MSG_FMT_NLSTRNL	"\n%s:\n"
+@ MSG_FMT_SECSYM	"%.*s%s"
 
 @ MSG_HEXDUMP_ROW	"%*s%-*s%s"
 @ MSG_HEXDUMP_TOK	"%2.2x"

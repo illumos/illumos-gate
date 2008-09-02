@@ -333,6 +333,7 @@ typedef struct {
 #define	AL_CNT_OFL_DTSFLTRS	4	/* ofl_dtsfltrs initial alist count */
 #define	AL_CNT_OFL_SYMFLTRS	20	/* ofl_symfltrs initial alist count */
 #define	AL_CNT_OS_MSTRISDESCS	10	/* os_mstrisdescs */
+#define	AL_CNT_OS_COMDATS	20	/* os_comdats */
 #define	AL_CNT_SG_OSDESC	40	/* sg_osdescs initial alist count */
 #define	AL_CNT_SG_SECORDER	40	/* sg_secorder initial alist count */
 #define	AL_CNT_STRMRGREL	500	/* ld_make_strmerge() reloc alist cnt */
@@ -525,6 +526,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_find_library		ld64_find_library
 #define	ld_finish_libs		ld64_finish_libs
 #define	ld_get_group		ld64_get_group
+#define	ld_group_process	ld64_group_process
 #define	ld_lib_setup		ld64_lib_setup
 #define	ld_init			ld64_init
 #define	ld_lcm			ld64_lcm
@@ -608,6 +610,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_finish_libs		ld32_finish_libs
 #define	ld_section_reld_name	ld32_section_reld_name
 #define	ld_get_group		ld32_get_group
+#define	ld_group_process	ld32_group_process
 #define	ld_lib_setup		ld32_lib_setup
 #define	ld_init			ld32_init
 #define	ld_lcm			ld32_lcm
@@ -701,6 +704,7 @@ extern uintptr_t	ld_finish_libs(Ofl_desc *);
 extern const char	*ld_section_reld_name(Sym_desc *, Is_desc *);
 
 extern Group_desc	*ld_get_group(Ofl_desc *, Is_desc *);
+extern uintptr_t	ld_group_process(Is_desc *, Ofl_desc *);
 
 extern uintptr_t	ld_lib_setup(Ofl_desc *);
 

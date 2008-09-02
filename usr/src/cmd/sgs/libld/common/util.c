@@ -29,8 +29,6 @@
  *	  All Rights Reserved
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Utility functions
  */
@@ -85,46 +83,18 @@
  *	by libld_malloc() must be 8 byte-aligned.  Even in a 32-bit environment,
  *	u_longlog_t pointers are employed.
  *
- * MAP_ANON arrived in Solaris 8, thus a fall-back is provided for older
- * systems.
+ * Map anonymous memory via MAP_ANON (added in Solaris 8).
  */
 static void *
 dz_map(size_t size)
 {
 	void	*addr;
-	int	err;
-
-#if	defined(MAP_ANON)
-	static int	noanon = 0;
-
-	if (noanon == 0) {
-		if ((addr = mmap(0, size, (PROT_READ | PROT_WRITE | PROT_EXEC),
-		    (MAP_PRIVATE | MAP_ANON), -1, 0)) != MAP_FAILED)
-			return (addr);
-
-		if ((errno != EBADF) && (errno != EINVAL)) {
-			err = errno;
-			eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_MMAPANON),
-			    MSG_ORIG(MSG_PTH_DEVZERO), strerror(err));
-			return (MAP_FAILED);
-		} else
-			noanon = 1;
-	}
-#endif
-	if (dz_fd == -1) {
-		if ((dz_fd = open(MSG_ORIG(MSG_PTH_DEVZERO), O_RDONLY)) == -1) {
-			err = errno;
-			eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
-			    MSG_ORIG(MSG_PTH_DEVZERO), strerror(err));
-			return (MAP_FAILED);
-		}
-	}
 
 	if ((addr = mmap(0, size, (PROT_READ | PROT_WRITE | PROT_EXEC),
-	    MAP_PRIVATE, dz_fd, 0)) == MAP_FAILED) {
-		err = errno;
-		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_MMAP),
-		    MSG_ORIG(MSG_PTH_DEVZERO), strerror(err));
+	    (MAP_PRIVATE | MAP_ANON), -1, 0)) == MAP_FAILED) {
+		int	err = errno;
+		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_MMAPANON),
+		    strerror(err));
 		return (MAP_FAILED);
 	}
 	return (addr);
@@ -154,7 +124,7 @@ libld_malloc(size_t size)
 			tsize = HEAPBLOCK;
 
 		if ((nhp = dz_map(tsize)) == MAP_FAILED)
-			return (0);
+			return (NULL);
 
 		nhp->lh_next = chp;
 		nhp->lh_free = (void *)((size_t)nhp + hsize);
@@ -222,8 +192,8 @@ list_appendc(List *lst, const void *item)
 {
 	Listnode	*_lnp;
 
-	if ((_lnp = libld_malloc(sizeof (Listnode))) == 0)
-		return (0);
+	if ((_lnp = libld_malloc(sizeof (Listnode))) == NULL)
+		return (NULL);
 
 	_lnp->data = (void *)item;
 	_lnp->next = NULL;
@@ -246,8 +216,8 @@ list_insertc(List *lst, const void *item, Listnode *lnp)
 {
 	Listnode	*_lnp;
 
-	if ((_lnp = libld_malloc(sizeof (Listnode))) == 0)
-		return (0);
+	if ((_lnp = libld_malloc(sizeof (Listnode))) == NULL)
+		return (NULL);
 
 	_lnp->data = (void *)item;
 	_lnp->next = lnp->next;
@@ -266,8 +236,8 @@ list_prependc(List *lst, const void *item)
 {
 	Listnode	*_lnp;
 
-	if ((_lnp = libld_malloc(sizeof (Listnode))) == 0)
-		return (0);
+	if ((_lnp = libld_malloc(sizeof (Listnode))) == NULL)
+		return (NULL);
 
 	_lnp->data = (void *)item;
 
@@ -380,7 +350,7 @@ sdf_find(const char *name, List *lst)
 		if (strcmp(name, sdf->sdf_name) == 0)
 			return (sdf);
 
-	return (0);
+	return (NULL);
 }
 
 Sdf_desc *
@@ -427,11 +397,11 @@ add_string(char *old, char *str)
 		}
 
 		len = strlen(old) + strlen(str) + 2;
-		if ((new = libld_calloc(1, len)) == 0)
+		if ((new = libld_calloc(1, len)) == NULL)
 			return ((char *)S_ERROR);
 		(void) snprintf(new, len, MSG_ORIG(MSG_FMT_COLPATH), old, str);
 	} else {
-		if ((new = libld_malloc(strlen(str) + 1)) == 0)
+		if ((new = libld_malloc(strlen(str) + 1)) == NULL)
 			return ((char *)S_ERROR);
 		(void) strcpy(new, str);
 	}

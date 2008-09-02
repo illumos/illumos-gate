@@ -26,7 +26,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Map file parsing.
@@ -1114,6 +1113,7 @@ map_pipe(Ofl_desc *ofl, const char *mapfile, Sg_desc *sgp)
 	    AL_CNT_SG_SECORDER) == NULL)
 		return (S_ERROR);
 
+	ofl->ofl_flags |= FLG_OF_SECORDER;
 	DBG_CALL(Dbg_map_pipe(ofl->ofl_lml, sgp, sec_name, index));
 
 	if ((tok = gettoken(ofl, mapfile, 0)) != TK_SEMICOLON) {

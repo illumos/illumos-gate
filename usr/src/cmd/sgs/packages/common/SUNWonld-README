@@ -1371,3 +1371,6 @@ Bugid   Risk Synopsis
 6728555 Fix for amd64 aw (6617475) breaks pure gcc builds
 6734598 ld(1) archive processing failure due to mismatched file descriptors
 6684577 ld should propagate SHF_LINK_ORDER flag to ET_REL objects
+6735939 ld(1) discarded symbol relocations errors (Studio and GNU).
+6354160 Solaris linker includes more than one copy of code in binary when
+	linking gnu object code

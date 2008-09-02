@@ -50,7 +50,7 @@
  * Decide if we can link against this input file.
  */
 static int
-ifl_verify(Ehdr * ehdr, Ofl_desc * ofl, Rej_desc * rej)
+ifl_verify(Ehdr *ehdr, Ofl_desc *ofl, Rej_desc *rej)
 {
 	/*
 	 * Check the validity of the elf header information for compatibility
@@ -180,8 +180,8 @@ process_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	isp->is_name = name;
 	isp->is_scnndx = ndx;
 	isp->is_flags = FLG_IS_EXTERNAL;
-	/* LINTED */
-	isp->is_key = (Half)ident;
+	isp->is_keyident = ident;
+
 	if ((isp->is_indata = elf_getdata(scn, NULL)) == NULL) {
 		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_GETDATA),
 		    ifl->ifl_name);
@@ -196,25 +196,19 @@ process_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 
 	/*
 	 * Add the new input section to the files input section list and
-	 * to the output section list (some sections like .strtab and
-	 * .shstrtab are not added to the output section list).
-	 *
-	 * If the section has the SHF_ORDERED flag on, do the ld_place_section()
-	 * after all input sections from this file are read in.
+	 * flag whether the section needs placing in an output section.  This
+	 * placement is deferred until all input section processing has been
+	 * completed, as SHT_GROUP sections can provide information that will
+	 * affect how other sections within the file should be placed.
 	 */
 	ifl->ifl_isdesc[ndx] = isp;
-	if (ident && (shdr->sh_flags & ALL_SHF_ORDER) == 0)
-		return ((uintptr_t)ld_place_section(ofl, isp, ident, 0));
 
-	if (ident && (shdr->sh_flags & ALL_SHF_ORDER)) {
-		isp->is_flags |= FLG_IS_ORDERED;
-		isp->is_ident = ident;
-
-		if ((ndx != 0) && (ndx == shdr->sh_link) &&
-		    (shdr->sh_flags & SHF_ORDERED)) {
-			return ((uintptr_t)ld_place_section(ofl, isp,
-			    ident, 0));
+	if (ident) {
+		if (shdr->sh_flags & ALL_SHF_ORDER) {
+			isp->is_flags |= FLG_IS_ORDERED;
+			ifl->ifl_flags |= FLG_IF_ORDERED;
 		}
+		isp->is_flags |= FLG_IS_PLACE;
 	}
 	return (1);
 }
@@ -398,7 +392,7 @@ process_cap(Ifl_desc *ifl, Is_desc *cisp, Ofl_desc *ofl)
 static uintptr_t
 /* ARGSUSED5 */
 process_input(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
-	Word ndx, int ident, Ofl_desc *ofl)
+    Word ndx, int ident, Ofl_desc *ofl)
 {
 	return (process_section(name, ifl, shdr, scn, ndx,
 	    ld_targ.t_id.id_null, ofl));
@@ -413,7 +407,7 @@ process_input(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 static uintptr_t
 /* ARGSUSED5 */
 process_reloc(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
-	Word ndx, int ident, Ofl_desc *ofl)
+    Word ndx, int ident, Ofl_desc *ofl)
 {
 	if (process_section(name, ifl,
 	    shdr, scn, ndx, ld_targ.t_id.id_null, ofl) == S_ERROR)
@@ -438,7 +432,7 @@ process_reloc(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
  */
 static uintptr_t
 process_strtab(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
-	Word ndx, int ident, Ofl_desc *ofl)
+    Word ndx, int ident, Ofl_desc *ofl)
 {
 	char		*data;
 	size_t		size;
@@ -618,27 +612,38 @@ static uintptr_t
 process_array(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
     Word ndx, int ident, Ofl_desc *ofl)
 {
-	Os_desc	*osp;
-	Is_desc	*isp;
+	uintptr_t	error;
 
 	if (ident)
 		ident = ld_targ.t_id.id_array;
 
-	if (process_section(name, ifl, shdr, scn, ndx, ident, ofl) == S_ERROR)
-		return (S_ERROR);
+	error = process_section(name, ifl, shdr, scn, ndx, ident, ofl);
+	if ((error == 0) || (error == S_ERROR))
+		return (error);
 
-	if (((isp = ifl->ifl_isdesc[ndx]) == 0) ||
-	    ((osp = isp->is_osdesc) == 0))
+	return (1);
+}
+
+static uintptr_t
+/* ARGSUSED1 */
+array_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
+{
+	Os_desc	*osp;
+	Shdr	*shdr;
+
+	if ((isc == NULL) || ((osp = isc->is_osdesc) == NULL))
 		return (0);
 
+	shdr = isc->is_shdr;
+
 	if ((shdr->sh_type == SHT_FINI_ARRAY) &&
-	    (ofl->ofl_osfiniarray == 0))
+	    (ofl->ofl_osfiniarray == NULL))
 		ofl->ofl_osfiniarray = osp;
 	else if ((shdr->sh_type == SHT_INIT_ARRAY) &&
-	    (ofl->ofl_osinitarray == 0))
+	    (ofl->ofl_osinitarray == NULL))
 		ofl->ofl_osinitarray = osp;
 	else if ((shdr->sh_type == SHT_PREINIT_ARRAY) &&
-	    (ofl->ofl_ospreinitarray == 0))
+	    (ofl->ofl_ospreinitarray == NULL))
 		ofl->ofl_ospreinitarray = osp;
 
 	return (1);
@@ -1019,9 +1024,11 @@ process_dynamic_isgnu(const char *name, Ifl_desc *ifl, Shdr *shdr,
 {
 	Dyn		*dyn;
 	Elf_Data	*dp;
+	uintptr_t	error;
 
-	if (process_section(name, ifl, shdr, scn, ndx, ident, ofl) == S_ERROR)
-		return (S_ERROR);
+	error = process_section(name, ifl, shdr, scn, ndx, ident, ofl);
+	if ((error == 0) || (error == S_ERROR))
+		return (error);
 
 	/* Get the .dynamic data */
 	dp = elf_getdata(scn, NULL);
@@ -1153,7 +1160,7 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * Perform some SONAME sanity checks.
 	 */
 	if (ifl->ifl_flags & FLG_IF_NEEDED) {
-		Ifl_desc *	sifl;
+		Ifl_desc	*sifl;
 
 		/*
 		 * Determine if anyone else will cause the same SONAME to be
@@ -1214,6 +1221,28 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			return (0);
 		}
 	}
+	return (1);
+}
+
+/*
+ * Process a group section.
+ */
+static uintptr_t
+process_group(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
+    Word ndx, int ident, Ofl_desc *ofl)
+{
+	uintptr_t	error;
+
+	error = process_section(name, ifl, shdr, scn, ndx, ident, ofl);
+	if ((error == 0) || (error == S_ERROR))
+		return (error);
+
+	/*
+	 * Indicate that this input file has groups to process.  Groups are
+	 * processed after all input sections have been processed.
+	 */
+	ifl->ifl_flags |= FLG_IS_GROUPS;
+
 	return (1);
 }
 
@@ -1327,53 +1356,6 @@ process_exclude(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	return (process_section(name, ifl, shdr, scn, ndx, 0, ofl));
 }
 
-#if	defined(_ELF64)
-
-static uintptr_t
-process_amd64_unwind(const char *name, Ifl_desc *ifl, Shdr *shdr,
-    Elf_Scn *scn, Word ndx, int ident, Ofl_desc *ofl)
-{
-	Os_desc		*osp, *eosp;
-	Is_desc		*isp;
-	Listnode	*lnp;
-
-	if (process_section(name, ifl, shdr, scn, ndx, ident, ofl) == S_ERROR)
-		return (S_ERROR);
-
-	/*
-	 * When producing a relocatable object - just collect the sections.
-	 */
-	if (ofl->ofl_flags & FLG_OF_RELOBJ)
-		return (1);
-
-	/*
-	 * If producing a executable or shared library, keep track of all the
-	 * output UNWIND sections to allow the creation of the appropriate
-	 * frame_hdr information.
-	 *
-	 * If the section hasn't been placed in the output file, then there's
-	 * nothing for us to do.
-	 */
-	if (((isp = ifl->ifl_isdesc[ndx]) == 0) ||
-	    ((osp = isp->is_osdesc) == 0))
-		return (1);
-
-	/*
-	 * Check to see if this output section is already on the list, and if
-	 * not, add it.
-	 */
-	for (LIST_TRAVERSE(&ofl->ofl_unwind, lnp, eosp))
-		if (osp == eosp)
-			return (1);
-
-	if (list_appendc(&ofl->ofl_unwind, osp) == 0)
-		return (S_ERROR);
-
-	return (1);
-}
-
-#endif
-
 /*
  * Section processing state table.  `Initial' describes the required initial
  * procedure to be called (if any), `Final' describes the final processing
@@ -1401,7 +1383,7 @@ static uintptr_t (*Initial[SHT_NUM][2])() = {
 /* SHT_INIT_ARRAY */	process_array,		NULL,
 /* SHT_FINI_ARRAY */	process_array,		NULL,
 /* SHT_PREINIT_ARRAY */	process_array,		NULL,
-/* SHT_GROUP */		process_section,	invalid_section,
+/* SHT_GROUP */		process_group,		invalid_section,
 /* SHT_SYMTAB_SHNDX */	process_sym_shndx,	NULL
 };
 
@@ -1421,9 +1403,9 @@ static uintptr_t (*Final[SHT_NUM][2])() = {
 /* SHT_DYNSYM	*/	NULL,			ld_sym_process,
 /* SHT_UNKNOWN12 */	NULL,			NULL,
 /* SHT_UNKNOWN13 */	NULL,			NULL,
-/* SHT_INIT_ARRAY */	NULL,			NULL,
-/* SHT_FINI_ARRAY */	NULL,			NULL,
-/* SHT_PREINIT_ARRAY */	NULL,			NULL,
+/* SHT_INIT_ARRAY */	array_process,		NULL,
+/* SHT_FINI_ARRAY */	array_process,		NULL,
+/* SHT_PREINIT_ARRAY */	array_process,		NULL,
 /* SHT_GROUP */		NULL,			NULL,
 /* SHT_SYMTAB_SHNDX */	sym_shndx_process,	NULL
 };
@@ -1440,15 +1422,13 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 {
 	Elf_Scn		*scn;
 	Shdr		*shdr;
-	Word		ndx, sndx;
+	Word		ndx, sndx, ordndx = 0, ordcnt = 0;
 	char		*str, *name, _name[MAXNDXSIZE];
 	Word		row, column;
 	int		ident;
 	uintptr_t	error;
 	Is_desc		*vdfisp, *vndisp, *vsyisp, *sifisp, *capisp;
 	Sdf_desc	*sdf;
-	Word		ordered_shndx = 0; /* index to first ordered section */
-	Word		ordered_cnt = 0;
 
 	/*
 	 * First process the .shstrtab section so that later sections can
@@ -1526,6 +1506,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	scn = NULL;
 	while (scn = elf_nextscn(elf, scn)) {
 		ndx++;
+
 		/*
 		 * As we've already processed the .shstrtab don't do it again.
 		 */
@@ -1632,10 +1613,15 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 				sifisp = ifl->ifl_isdesc[ndx];
 				break;
 			case SHT_SUNW_ANNOTATE:
+				if (process_progbits(name, ifl, shdr, scn,
+				    ndx, ident, ofl) == S_ERROR)
+					return (S_ERROR);
+				break;
 			case SHT_SUNW_COMDAT:
 				if (process_progbits(name, ifl, shdr, scn,
 				    ndx, ident, ofl) == S_ERROR)
 					return (S_ERROR);
+				ifl->ifl_isdesc[ndx]->is_flags |= FLG_IS_COMDAT;
 				break;
 			case SHT_SUNW_verdef:
 				if (process_section(name, ifl, shdr, scn,
@@ -1680,6 +1666,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 				 */
 				if (ld_targ.t_m.m_mach != EM_AMD64)
 					goto do_default;
+
 				/*
 				 * Target is x86, so this really is
 				 * SHT_AMD64_UNWIND
@@ -1688,10 +1675,9 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 					/*
 					 * column == ET_REL
 					 */
-					if (process_amd64_unwind(name, ifl,
-					    shdr, scn, ndx,
-					    ld_targ.t_id.id_unwind, ofl) ==
-					    S_ERROR)
+					if (process_section(name, ifl, shdr,
+					    scn, ndx, ld_targ.t_id.id_unwind,
+					    ofl) == S_ERROR)
 						return (S_ERROR);
 				}
 				break;
@@ -1706,61 +1692,91 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 				break;
 			}
 		}
+	}
 
-		/*
-		 * If we have any sections that require ORDERED processing,
-		 * remember the index of the first ordered section.  This let's
-		 * us know if we need an ORDERED place_section pass, and if so,
-		 * where to start.
-		 */
-		if (ifl->ifl_isdesc[ndx] &&
-		    (ifl->ifl_isdesc[ndx]->is_shdr->sh_flags & ALL_SHF_ORDER)) {
-			ordered_cnt++;
-			if (ordered_shndx == 0)
-				ordered_shndx = ndx;
+	/*
+	 * Now that all input sections have been analyzed, and prior to placing
+	 * any input sections to their output sections, process any groups.
+	 * Groups can contribute COMDAT items, which may get discarded as part
+	 * of placement.  In addition, COMDAT names may require transformation
+	 * to indicate different output section placement.
+	 */
+	if (ifl->ifl_flags & FLG_IS_GROUPS) {
+		for (ndx = 1; ndx < ifl->ifl_shnum; ndx++) {
+			Is_desc	*isp;
+
+			if (((isp = ifl->ifl_isdesc[ndx]) == NULL) ||
+			    (isp->is_shdr->sh_type != SHT_GROUP))
+				continue;
+
+			if (ld_group_process(isp, ofl) == S_ERROR)
+				return (S_ERROR);
 		}
 	}
 
 	/*
-	 * Now that all of sections have been placed, scan through any sections
-	 * which have special ordering requirements and place them now.
+	 * Now that all of input sections have been processed, place them
+	 * in the appropriate output sections.
 	 */
-	if (ordered_shndx) {
-		Word	cnt;
+	for (ndx = 1; ndx < ifl->ifl_shnum; ndx++) {
+		Is_desc	*isp;
+		Shdr	*shdr;
 
-		for (ndx = ordered_shndx, cnt = 0;
-		    (ndx < ifl->ifl_shnum) && (cnt < ordered_cnt); ndx++) {
+		if (((isp = ifl->ifl_isdesc[ndx]) == NULL) ||
+		    ((isp->is_flags & FLG_IS_PLACE) == 0))
+			continue;
+
+		shdr = isp->is_shdr;
+
+		/*
+		 * Place all non-ordered sections within their appropriate
+		 * output section.
+		 *
+		 * Ordered sections are sorted based on the relative ordering
+		 * of the section pointed to by the sh_info entry.  An ordered
+		 * section, whose sh_link points to itself, must also be placed
+		 * in the output image so as to control the ordered processing
+		 * that follows (see FLG_IF_ORDERED below).
+		 */
+		if (((isp->is_flags & FLG_IS_ORDERED) == 0) ||
+		    ((ndx == shdr->sh_link) &&
+		    (shdr->sh_flags & SHF_ORDERED))) {
+			if (ld_place_section(ofl, isp,
+			    isp->is_keyident, 0) == (Os_desc *)S_ERROR)
+				return (S_ERROR);
+		}
+
+		/*
+		 * If a section requires ordered processing, keep track of the
+		 * section index and count to optimize later section traversal.
+		 */
+		if (isp->is_flags & FLG_IS_ORDERED) {
+			ordcnt++;
+			if (ordndx == 0)
+				ordndx = ndx;
+		}
+	}
+
+	/*
+	 * Some sections have special ordering requirements, that are based off
+	 * of the section pointed to by their sh_info entry.  This controlling
+	 * section will have been placed (above), and thus any ordered sections
+	 * can now be processed.
+	 */
+	if (ifl->ifl_flags & FLG_IF_ORDERED) {
+		Word	cnt = 0;
+
+		for (ndx = ordndx;
+		    (ndx < ifl->ifl_shnum) && (cnt < ordcnt); ndx++) {
 			Is_desc	*isp;
-			/* LINTED */
-			Os_desc	*osp;
 
-			if (((isp = ifl->ifl_isdesc[ndx]) == 0) ||
-			    ((isp->is_shdr->sh_flags & ALL_SHF_ORDER) == 0))
+			if (((isp = ifl->ifl_isdesc[ndx]) == NULL) ||
+			    ((isp->is_flags & FLG_IS_ORDERED) == 0))
 				continue;
 
-			/*
-			 * If this is an ordered section, process it.
-			 */
-			cnt++;
-			if ((osp = (Os_desc *)ld_process_ordered(ifl, ofl, ndx,
-			    ifl->ifl_shnum)) == (Os_desc *)S_ERROR)
+			if (ld_process_ordered(ifl, ofl, ndx,
+			    ifl->ifl_shnum) == S_ERROR)
 				return (S_ERROR);
-
-#if	defined(_ELF64)
-			/*
-			 * If this section is 'ordered' then it was not
-			 * caught in the previous 'place_section' operation.
-			 *
-			 * So - now that we have a OSP section for
-			 * the unwind info - record it.
-			 */
-			if (osp &&
-			    (osp->os_shdr->sh_type == SHT_AMD64_UNWIND) &&
-			    (ld_targ.t_uw.uw_append_unwind != NULL) &&
-			    ((*ld_targ.t_uw.uw_append_unwind)(osp, ofl) ==
-			    S_ERROR))
-				return (S_ERROR);
-#endif
 		}
 	}
 
@@ -1824,7 +1840,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	 * processing if necessary.
 	 */
 	for (ndx = 0; ndx < ifl->ifl_shnum; ndx++) {
-		Is_desc *	isp;
+		Is_desc	*isp;
 
 		if ((isp = ifl->ifl_isdesc[ndx]) == 0)
 			continue;
@@ -1848,10 +1864,29 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 		 * appropriate action routine.
 		 */
 		if (row < SHT_NUM) {
-			if (Final[row][column] != NULL)
-				if (Final[row][column](isp, ifl, ofl) ==
-				    S_ERROR)
+			if (Final[row][column] != NULL) {
+				if (Final[row][column](isp, ifl,
+				    ofl) == S_ERROR)
 					return (S_ERROR);
+			}
+#if	defined(_ELF64)
+		} else if ((row == SHT_AMD64_UNWIND) && (column == 0)) {
+			Os_desc	*osp = isp->is_osdesc;
+
+			/*
+			 * SHT_AMD64_UNWIND (0x70000001) is in the SHT_LOPROC -
+			 * SHT_HIPROC range reserved for processor-specific
+			 * semantics, and is only meaningful for amd64 targets.
+			 *
+			 * Only process unwind contents from relocatable
+			 * objects.
+			 */
+			if (osp && (ld_targ.t_m.m_mach == EM_AMD64) &&
+			    (ld_targ.t_uw.uw_append_unwind != NULL) &&
+			    ((*ld_targ.t_uw.uw_append_unwind)(osp, ofl) ==
+			    S_ERROR))
+				return (S_ERROR);
+#endif
 		}
 	}
 
@@ -2009,7 +2044,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 		 * Determine if we've already come across this file.
 		 */
 		if (!(flags & FLG_IF_EXTRACT)) {
-			List *	lst;
+			List	*lst;
 
 			if (ehdr->e_type == ET_REL)
 				lst = &ofl->ofl_objs;
@@ -2214,7 +2249,7 @@ ld_process_open(const char *opath, const char *ofile, int *fd, Ofl_desc *ofl,
  */
 static Ifl_desc *
 process_req_lib(Sdf_desc *sdf, const char *dir, const char *file,
-    Ofl_desc * ofl, Rej_desc * rej)
+    Ofl_desc *ofl, Rej_desc *rej)
 {
 	size_t		dlen, plen;
 	int		fd;

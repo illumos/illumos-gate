@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/isa_defs.h>
 #include <sys/link.h>
 #include <strings.h>
@@ -48,7 +46,8 @@ static mdb_gelf_file_t *
 gelf_sect_init(mdb_gelf_file_t *gf)
 {
 	mdb_gelf_sect_t *gsp, *shstr = &gf->gf_sects[gf->gf_shstrndx];
-	GElf_Half i, npbit = 0;
+	size_t i;
+	GElf_Half npbit = 0;
 	GElf_Shdr *shp;
 	GElf_Phdr *gpp;
 
@@ -78,7 +77,7 @@ gelf_sect_init(mdb_gelf_file_t *gf)
 
 		if (shp->sh_name >= shstr->gs_shdr.sh_size) {
 			warn("section name for %s:[%u] is corrupt: %u\n",
-			    IOP_NAME(gf->gf_io), (uint_t)i, shp->sh_name);
+			    IOP_NAME(gf->gf_io), i, shp->sh_name);
 			gsp->gs_name = shstr->gs_data; /* empty string */
 		}
 
@@ -231,12 +230,12 @@ gelf_shdrs_init(mdb_gelf_file_t *gf, size_t shdr_size,
     GElf_Shdr *(*elf2gelf)(const void *, GElf_Shdr *))
 {
 	caddr_t shdrs, shp;
-	GElf_Half i;
+	size_t i;
 
 	mdb_gelf_sect_t *gsp;
 	size_t nbytes;
 
-	mdb_dprintf(MDB_DBG_ELF, "loading %s section headers (%hu entries)\n",
+	mdb_dprintf(MDB_DBG_ELF, "loading %s section headers (%u entries)\n",
 	    IOP_NAME(gf->gf_io), gf->gf_shnum);
 
 	if (gf->gf_shnum == 0)
@@ -353,7 +352,7 @@ gelf_phdrs_init(mdb_gelf_file_t *gf, size_t phdr_size,
     GElf_Phdr *(*elf2gelf)(const void *, GElf_Phdr *))
 {
 	caddr_t phdrs, php;
-	GElf_Half i;
+	size_t i;
 
 	GElf_Phdr *gpp;
 	size_t nbytes;
@@ -827,7 +826,7 @@ void
 mdb_gelf_destroy(mdb_gelf_file_t *gf)
 {
 	mdb_gelf_sect_t *gsp;
-	GElf_Half i;
+	size_t i;
 
 	for (gsp = gf->gf_sects, i = 0; i < gf->gf_shnum; i++, gsp++) {
 		if (gsp->gs_data != NULL)
@@ -1092,7 +1091,7 @@ mdb_gelf_symtab_create_file(mdb_gelf_file_t *gf, GElf_Word elftype,
 	mdb_gelf_sect_t *gsp;
 	const char *dsname = NULL;
 	const char *ssname;
-	GElf_Half i;
+	size_t i;
 	GElf_Word link;
 
 	/*
@@ -1130,7 +1129,7 @@ mdb_gelf_symtab_create_file_by_name(mdb_gelf_file_t *gf,
 {
 	mdb_gelf_symtab_t *gst;
 	mdb_gelf_sect_t *gsp;
-	GElf_Half i;
+	size_t i;
 
 	gst = mdb_alloc(sizeof (mdb_gelf_symtab_t), UM_SLEEP);
 	(void) mdb_nv_create(&gst->gst_nv, UM_SLEEP);
@@ -1864,7 +1863,7 @@ static const GElf_Phdr *
 gelf_phdr_lookup(mdb_gelf_file_t *gf, uintptr_t addr)
 {
 	const GElf_Phdr *gpp = gf->gf_phdrs;
-	GElf_Half i;
+	size_t i;
 
 	for (i = 0; i < gf->gf_npload; i++, gpp++) {
 		if (addr >= gpp->p_vaddr && addr < gpp->p_vaddr + gpp->p_memsz)
@@ -1918,7 +1917,7 @@ mdb_gelf_rw(mdb_gelf_file_t *gf, void *buf, size_t nbytes, uintptr_t addr,
 mdb_gelf_sect_t *
 mdb_gelf_sect_by_name(mdb_gelf_file_t *gf, const char *name)
 {
-	int i;
+	size_t i;
 
 	for (i = 0; i < gf->gf_shnum; i++) {
 		if (strcmp(gf->gf_sects[i].gs_name, name) == 0)

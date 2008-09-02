@@ -209,9 +209,9 @@
 #
 # TRANSLATION_NOTE -- End of USAGE message
 #
-
-@ MSG_GRP_INVALNDX	"group section error: %s: file %s: entry %d: \
+@ MSG_GRP_INVALNDX	"file: %s: group section: %s: entry %d: \
 			 invalid section index: %d"
+@ MSG_GRP_INVALSYM	"file: %s: group section: %s: invalid group symbol %s:"
 
 # Relocation processing messages (some of these are required to satisfy
 # do_reloc(), which is common code used by cmd/sgs/rtld - make sure both
@@ -259,8 +259,9 @@
 			 unexpected relocation; generic processing performed"
 @ MSG_REL_UNEXPSYM	"relocation error: %s: file %s: symbol %s: \
 			 unexpected symbol referenced from file %s"
-@ MSG_REL_SYMDISC	"relocation error: file: %s section: %s symbol: %s: \
-			 symbol has been discarded with discarded section: %s"
+@ MSG_REL_SYMDISC	"relocation error: %s: file: %s section: %s \
+			 symbol: %s: symbol has been discarded with discarded \
+			 section: %s"
 @ MSG_REL_NOSYMBOL	"relocation error: %s: file %s: section: %s: \
 			 offset: 0x%llx: relocation requires reference symbol"
 @ MSG_REL_DISPREL1	"relocation error: %s: file %s: symbol %s: \
@@ -289,11 +290,15 @@
 			 object"
 
 @ MSG_REL_SLOPCDATNONAM	"relocation warning: %s: file %s: section %s: \
-			 relocation against discarded COMDAT section %s \
+			 relocation against discarded COMDAT section %s: \
 			 redirected to file %s"
 @ MSG_REL_SLOPCDATNAM	"relocation warning: %s: file %s: section %s: \
 			 symbol %s: relocation against discarded COMDAT \
-			 section %s redirected to file %s"
+			 section %s: redirected to file %s"
+@ MSG_REL_SLOPCDATNOSYM	"relocation warning: %s: file %s: section %s: \
+			 symbol %s: relocation against discarded COMDAT \
+			 section %s: symbol not found, relocation ignored"
+
 @ MSG_REL_NOREG		"relocation error: REGISTER relocation not supported \
 			 on target architecture"
 
@@ -385,8 +390,7 @@
 
 @ MSG_SYS_OPEN		"file %s: open failed: %s"
 @ MSG_SYS_UNLINK	"file %s: unlink failed: %s"
-@ MSG_SYS_MMAP		"file %s: mmap failed: %s"
-@ MSG_SYS_MMAPANON	"file %s: mmap anon failed: %s"
+@ MSG_SYS_MMAPANON	"mmap anon failed: %s"
 
 
 # Messages related to platform support
@@ -623,7 +627,6 @@
 @ MSG_FMT_NULLSYMNAM	"%s[%d]"
 
 @ MSG_PTH_RTLD		"/usr/lib/ld.so.1"
-@ MSG_PTH_DEVZERO	"/dev/zero"
 
 @ MSG_SUNW_OST_SGS	"SUNW_OST_SGS"
 
@@ -634,6 +637,7 @@
 @ MSG_SCN_DATA		".data"
 @ MSG_SCN_COMMENT	".comment"
 @ MSG_SCN_DEBUG		".debug"
+@ MSG_SCN_DEBUG_INFO	".debug_info"
 @ MSG_SCN_DYNAMIC	".dynamic"
 @ MSG_SCN_DYNSYMSORT	".SUNW_dynsymsort"
 @ MSG_SCN_DYNTLSSORT	".SUNW_dyntlssort"
@@ -648,18 +652,25 @@
 @ MSG_SCN_FINI		".fini"
 @ MSG_SCN_FINIARRAY	".finiarray"
 @ MSG_SCN_GOT		".got"
+@ MSG_SCN_GNU_LINKONCE	".gnu.linkonce."
 @ MSG_SCN_HASH		".hash"
 @ MSG_SCN_INDEX		".index"
 @ MSG_SCN_INIT		".init"
 @ MSG_SCN_INITARRAY	".initarray"
 @ MSG_SCN_INTERP	".interp"
 @ MSG_SCN_LBSS		".lbss"
+@ MSG_SCN_LDATA		".ldata"
 @ MSG_SCN_LINE		".line"
 @ MSG_SCN_LRODATA	".lrodata"
 @ MSG_SCN_PLT		".plt"
 @ MSG_SCN_PREINITARRAY	".preinitarray"
 @ MSG_SCN_REL		".rel"
 @ MSG_SCN_RELA		".rela"
+@ MSG_SCN_RODATA	".rodata"
+@ MSG_SCN_SBSS		".sbss"
+@ MSG_SCN_SBSS2		".sbss2"
+@ MSG_SCN_SDATA		".sdata"
+@ MSG_SCN_SDATA2	".sdata2"
 @ MSG_SCN_SHSTRTAB	".shstrtab"
 @ MSG_SCN_STAB		".stab"
 @ MSG_SCN_STABEXCL	".stab.exclstr"
@@ -675,6 +686,7 @@
 @ MSG_SCN_SYMTAB	".symtab"
 @ MSG_SCN_SYMTAB_SHNDX	".symtab_shndx"
 @ MSG_SCN_TBSS		".tbss"
+@ MSG_SCN_TDATA		".tdata"
 @ MSG_SCN_TEXT		".text"
 
 @ MSG_SYM_FINIARRAY	"finiarray"
@@ -1075,6 +1087,8 @@
 @ MSG_ARG_ZDEFNODEF	"-z[defs|nodefs]"
 @ MSG_ARG_ZNODEF	"-znodefs"
 @ MSG_ARG_ZNOINTERP	"-znointerp"
+@ MSG_ARG_ZRELAXRELOC	"-zrelaxreloc"
+@ MSG_ARG_ZNORELAXRELOC	"-znorelaxreloc"
 @ MSG_ARG_ZTEXT		"-ztext"
 @ MSG_ARG_ZTEXTOFF	"-ztextoff"
 @ MSG_ARG_ZTEXTWARN	"-ztextwarn"
@@ -1131,6 +1145,7 @@
 @ MSG_ARG_RESCAN	"rescan"
 @ MSG_ARG_NOLDYNSYM	"noldynsym"
 @ MSG_ARG_RELAXRELOC	"relaxreloc"
+@ MSG_ARG_NORELAXRELOC	"norelaxreloc"
 @ MSG_ARG_GLOBAUDIT	"globalaudit"
 @ MSG_ARG_TARGET	"target="
 
@@ -1201,3 +1216,4 @@
 @ MSG_FMT_INDEX		"[%lld]"
 
 @ MSG_STR_DTRACE	"PT_SUNWDTRACE"
+

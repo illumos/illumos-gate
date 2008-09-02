@@ -48,6 +48,9 @@
  *    -z nointerp		suppress the addition of an interpreter
  *				section.  This is used to generate the kernel,
  *				but makes no sense to be used by anyone else.
+ *
+ *    -z norelaxreloc		suppress the automatic addition of relaxed
+ *				relocations to GNU linkonce/COMDAT sections.
  */
 #include	<sys/link.h>
 #include	<stdio.h>
@@ -253,6 +256,14 @@ check_flags(Ofl_desc * ofl, int argc)
 	if (ofl->ofl_interp && (ofl->ofl_flags1 & FLG_OF1_NOINTRP)) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_INCOMP),
 		    MSG_ORIG(MSG_ARG_CI), MSG_ORIG(MSG_ARG_ZNOINTERP));
+		ofl->ofl_flags |= FLG_OF_FATAL;
+	}
+
+	if ((ofl->ofl_flags1 & (FLG_OF1_NRLXREL | FLG_OF1_RLXREL)) ==
+	    (FLG_OF1_NRLXREL | FLG_OF1_RLXREL)) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_ARG_INCOMP),
+		    MSG_ORIG(MSG_ARG_ZRELAXRELOC),
+		    MSG_ORIG(MSG_ARG_ZNORELAXRELOC));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 	}
 
@@ -1117,6 +1128,9 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_RELAXRELOC)) == 0) {
 				ofl->ofl_flags1 |= FLG_OF1_RLXREL;
+			} else if (strcmp(optarg,
+			    MSG_ORIG(MSG_ARG_NORELAXRELOC)) == 0) {
+				ofl->ofl_flags1 |= FLG_OF1_NRLXREL;
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_NOLDYNSYM)) == 0) {
 				ofl->ofl_flags |= FLG_OF_NOLDYNSYM;

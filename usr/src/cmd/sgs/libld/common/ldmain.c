@@ -26,7 +26,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Processing of relocatable objects and shared objects.
@@ -340,12 +339,14 @@ ld_main(int argc, char **argv, Half mach)
 		return (ld_exit(ofl));
 
 	/*
-	 * Now that all sections have been added to the output file, check to
-	 * see if any section ordering was specified and if so give a warning
-	 * if any ordering directives were not matched.
+	 * Now that all sections have been added to the output file, determine
+	 * whether any mapfile section ordering was specified, and verify that
+	 * all mapfile ordering directives have been matched.  Issue a warning
+	 * for any directives that have not been matched.
 	 * Also, if SHF_ORDERED sections exist, set up sort key values.
 	 */
-	ld_sec_validate(ofl);
+	if (ofl->ofl_flags & (FLG_OF_SECORDER | FLG_OF_KEY))
+		ld_sec_validate(ofl);
 
 	/*
 	 * Having collected all the input data create the initial output file
