@@ -26,8 +26,6 @@
 #ifndef	_META_H
 #define	_META_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -111,6 +109,13 @@ die right now
 
 /* disk label size */
 #define	VTOC_SIZE	(16)
+
+/* EFI geometry data */
+#define	MD_EFI_FG_HEADS		128
+#define	MD_EFI_FG_SECTORS	256
+#define	MD_EFI_FG_RPM		7200
+#define	MD_EFI_FG_WRI		1
+#define	MD_EFI_FG_RRI		1
 
 /* maximum ctd name size (in # of digits) for printing out */
 #define	CTD_FORMAT_LEN	6

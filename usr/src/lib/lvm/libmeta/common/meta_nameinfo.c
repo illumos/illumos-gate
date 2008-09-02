@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <dlfcn.h>
 #include <meta.h>
@@ -36,13 +34,6 @@
 #include <sys/scsi/generic/commands.h>
 #include <sys/scsi/generic/inquiry.h>
 #include <sys/efi_partition.h>
-
-#define	MD_EFI_FG_HEADS		128
-#define	MD_EFI_FG_SECTORS	256
-#define	MD_EFI_FG_RPM		7200
-#define	MD_EFI_FG_WRI		1
-#define	MD_EFI_FG_RRI		1
-
 
 typedef struct ctlr_cache {
 	char			*ctlr_nm;
@@ -68,7 +59,7 @@ metagetset(
 	/* metadevice */
 	if (metaismeta(np))
 		return (metasetnosetname(MD_MIN2SET(meta_getminor(np->dev)),
-						ep));
+		    ep));
 
 	/* regular device */
 	if (meta_is_drive_in_anyset(np->drivenamep, &sp, bypass_daemon,
@@ -108,7 +99,7 @@ meta_efi_to_mdgeom(struct dk_gpt *gpt, mdgeom_t	*mdgp)
 {
 	(void) memset(mdgp, '\0', sizeof (*mdgp));
 	mdgp->ncyl = (gpt->efi_last_u_lba - gpt->efi_first_u_lba) /
-					(MD_EFI_FG_HEADS * MD_EFI_FG_SECTORS);
+	    (MD_EFI_FG_HEADS * MD_EFI_FG_SECTORS);
 	mdgp->nhead = MD_EFI_FG_HEADS;
 	mdgp->nsect = MD_EFI_FG_SECTORS;
 	mdgp->rpm = MD_EFI_FG_RPM;
@@ -157,7 +148,7 @@ meta_efi_to_mdvtoc(struct dk_gpt *gpt, mdvtoc_t *mdvp)
 		if ((gpt->efi_parts[i].p_tag == V_RESERVED) &&
 		    (gpt->efi_parts[i].p_name != NULL)) {
 			(void) strlcpy(typename, gpt->efi_parts[i].p_name,
-					EFI_PART_NAME_LEN);
+			    EFI_PART_NAME_LEN);
 			/* Stop at first (if any) space or tab */
 			(void) strtok(typename, " \t");
 			mdvp->typename = Strdup(typename);
@@ -200,9 +191,9 @@ meta_mdvtoc_to_efi(mdvtoc_t *mdvp, struct dk_gpt **gpt)
 		 * we use p_name of the reserved partition
 		 */
 		if (((*gpt)->efi_parts[i].p_tag == V_RESERVED) &&
-			(mdvp->typename != NULL)) {
+		    (mdvp->typename != NULL)) {
 			(void) strlcpy((*gpt)->efi_parts[i].p_name, typename,
-				EFI_PART_NAME_LEN);
+			    EFI_PART_NAME_LEN);
 		}
 	}
 }
@@ -256,8 +247,8 @@ char *
 getdrvnode(mdname_t *np, md_error_t *ep)
 {
 	char	*devicespath,
-		*drvnode,
-		*cp;
+	    *drvnode,
+	    *cp;
 
 	if ((devicespath = metagetdevicesname(np, ep)) == NULL)
 		return (NULL);
@@ -298,8 +289,8 @@ static void *
 meta_load_dl(mdname_t *np, md_error_t *ep)
 {
 	char	*drvnode,
-		newpath[MAXPATHLEN],
-		*p;
+	    newpath[MAXPATHLEN],
+	    *p;
 	void	*cookie;
 
 	if ((drvnode = getdrvnode(np, ep)) != NULL) {
@@ -347,7 +338,7 @@ meta_match_names(mdname_t *np, struct dk_cinfo *cp, mdcinfo_t *mdcp,
 {
 	void		*cookie;
 	meta_convert_e	((*fptr)(mdname_t *, struct dk_cinfo *, mdcinfo_t *,
-			    md_error_t *));
+	    md_error_t *));
 
 	if ((cookie = meta_load_dl(np, ep)) != NULL) {
 		fptr = (meta_convert_e (*)(mdname_t *, struct dk_cinfo *,
@@ -365,8 +356,8 @@ int
 meta_match_enclosure(mdname_t *np, mdcinfo_t *mdcp, md_error_t *ep)
 {
 	meta_enclosure_e	e,
-				((*fptr)(mdname_t *, mdcinfo_t *,
-				    md_error_t *));
+	    ((*fptr)(mdname_t *, mdcinfo_t *,
+	    md_error_t *));
 	void			*cookie;
 
 	if ((cookie = meta_load_dl(np, ep)) != NULL) {
@@ -611,7 +602,7 @@ metagetvtoc(
 		if (partno >= gpt->efi_nparts) {
 			efi_free(gpt);
 			(void) mddeverror(ep, MDE_INVALID_PART, NODEV64,
-						rname);
+			    rname);
 			return (NULL);
 		}
 
@@ -1253,12 +1244,12 @@ meta_isopen(
 			 * Hence NO_LOG and NO_MCT
 			 */
 			err = mdmn_send_message(
-				sp->setno,
-				MD_MN_MSG_CLU_CHECK,
-				MD_MSGF_NO_MCT | MD_MSGF_STOP_ON_ERROR |
-				MD_MSGF_NO_LOG | MD_MSGF_OVERRIDE_SUSPEND,
-				(char *)&d, sizeof (md_isopen_t),
-				&resp, ep);
+			    sp->setno,
+			    MD_MN_MSG_CLU_CHECK,
+			    MD_MSGF_NO_MCT | MD_MSGF_STOP_ON_ERROR |
+			    MD_MSGF_NO_LOG | MD_MSGF_OVERRIDE_SUSPEND,
+			    (char *)&d, sizeof (md_isopen_t),
+			    &resp, ep);
 			if (err == 0) {
 				d.isopen = resp->mmr_exitval;
 			} else {

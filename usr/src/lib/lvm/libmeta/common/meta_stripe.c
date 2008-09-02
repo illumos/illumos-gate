@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Just in case we're not in a build environment, make sure that
  * TEXT_DOMAIN gets set to something.
@@ -1837,6 +1835,17 @@ stripe_geom(
 		is_sp = 1;
 	}
 
+	/*
+	 * If the stripe is to be multi-terabyte we should
+	 * use EFI geometries, else we can get rounding errors
+	 * in meta_setup_geom().
+	 */
+
+	if (ms->c.un_actual_tb > MD_MAX_BLKS_FOR_SMALL_DEVS) {
+		geomp->nhead = MD_EFI_FG_HEADS;
+		geomp->nsect = MD_EFI_FG_SECTORS;
+		geomp->rpm = MD_EFI_FG_RPM;
+	}
 
 	/* setup geometry from first device */
 	if (meta_setup_geom((md_unit_t *)ms, stripep->common.namep, geomp,
