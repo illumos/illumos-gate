@@ -890,6 +890,7 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	objset_impl_t *os = dn->dn_objset;
 	dbuf_dirty_record_t **drp, *dr;
 	int drop_struct_lock = FALSE;
+	boolean_t do_free_accounting = B_FALSE;
 	int txgoff = tx->tx_txg & TXG_MASK;
 
 	ASSERT(tx->tx_txg != 0);
@@ -994,22 +995,13 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 	if (db->db_blkid != DB_BONUS_BLKID) {
 		/*
 		 * Update the accounting.
+		 * Note: we delay "free accounting" until after we drop
+		 * the db_mtx.  This keeps us from grabbing other locks
+		 * (and possibly deadlocking) in bp_get_dasize() while
+		 * also holding the db_mtx.
 		 */
-		if (dbuf_block_freeable(db)) {
-			blkptr_t *bp = db->db_blkptr;
-			int64_t willfree = (bp && !BP_IS_HOLE(bp)) ?
-			    bp_get_dasize(os->os_spa, bp) : db->db.db_size;
-			/*
-			 * This is only a guess -- if the dbuf is dirty
-			 * in a previous txg, we don't know how much
-			 * space it will use on disk yet.  We should
-			 * really have the struct_rwlock to access
-			 * db_blkptr, but since this is just a guess,
-			 * it's OK if we get an odd answer.
-			 */
-			dnode_willuse_space(dn, -willfree, tx);
-		}
 		dnode_willuse_space(dn, db->db.db_size, tx);
+		do_free_accounting = dbuf_block_freeable(db);
 	}
 
 	/*
@@ -1077,6 +1069,19 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 		mutex_exit(&dn->dn_mtx);
 		dnode_setdirty(dn, tx);
 		return (dr);
+	} else if (do_free_accounting) {
+		blkptr_t *bp = db->db_blkptr;
+		int64_t willfree = (bp && !BP_IS_HOLE(bp)) ?
+		    bp_get_dasize(os->os_spa, bp) : db->db.db_size;
+		/*
+		 * This is only a guess -- if the dbuf is dirty
+		 * in a previous txg, we don't know how much
+		 * space it will use on disk yet.  We should
+		 * really have the struct_rwlock to access
+		 * db_blkptr, but since this is just a guess,
+		 * it's OK if we get an odd answer.
+		 */
+		dnode_willuse_space(dn, -willfree, tx);
 	}
 
 	if (!RW_WRITE_HELD(&dn->dn_struct_rwlock)) {
