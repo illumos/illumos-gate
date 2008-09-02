@@ -1932,7 +1932,7 @@ lu_runner(void *v)
 		case msg_reset_lu:
 			(void) pthread_mutex_lock(&lu->l_common_mutex);
 			itl = avl_first(&lu->l_all_open);
-			do {
+			while (itl != NULL) {
 				/*
 				 * The current implementation is that we
 				 * have a shared queue for each LU. That means
@@ -1944,7 +1944,7 @@ lu_runner(void *v)
 				(*sam_emul_table[lu->l_dtype].t_per_init)(itl);
 
 				itl = AVL_NEXT(&lu->l_all_open, itl);
-			} while (itl != NULL);
+			}
 			(void) pthread_mutex_unlock(&lu->l_common_mutex);
 			break;
 
