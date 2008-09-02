@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Page Retire - Big Theory Statement.
@@ -626,6 +624,14 @@ page_clear_transient_ue(page_t *pp)
 	pa_lo = (uint32_t)pa;
 
 	/*
+	 * Disable preemption to prevent the off chance that
+	 * we migrate while in the middle of running through
+	 * the bit pattern and run on a different processor
+	 * than what we started on.
+	 */
+	kpreempt_disable();
+
+	/*
 	 * Fill the page with each (0x00 - 0xFF] bit pattern, flushing
 	 * the cache in between reading and writing.  We do this under
 	 * on_trap() protection to avoid recursion.
@@ -661,6 +667,7 @@ page_clear_transient_ue(page_t *pp)
 	}
 out:
 	no_trap();
+	kpreempt_enable();
 	ppmapout(kaddr);
 
 	return (errors ? 0 : 1);
@@ -721,7 +728,7 @@ page_retire_kstat_update(kstat_t *ksp, int rw)
 	struct page_retire_kstat *pr;
 
 	if (ksp == NULL)
-	    return (EINVAL);
+		return (EINVAL);
 
 	switch (rw) {
 
