@@ -44,6 +44,7 @@ i i.rbac
 i r.rbac
 i i.manifest
 i r.manifest
+i i.logadmconf
 i space
 
 d none etc 0755 root sys
@@ -92,4 +93,4 @@ d none var/log/mms/dm 0755 root sys
 d none var/log/mms/lm 0755 root sys
 d none var/log/mms/wcr 0755 root sys
 d none var/log/mms/api 0755 root sys
-e none var/log/mms/mms_logadm.conf 0644 root sys
+e logadmconf var/log/mms/mms_logadm.conf 0644 root sys
