@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/debug.h>
@@ -167,7 +165,7 @@ static void vsw_ldc_rx_worker(void *arg);
 /* Misc support routines */
 static	caddr_t vsw_print_ethaddr(uint8_t *addr, char *ebuf);
 static void vsw_free_lane_resources(vsw_ldc_t *, uint64_t);
-static int vsw_free_ring(dring_info_t *);
+static void vsw_free_ring(dring_info_t *);
 static void vsw_save_lmacaddr(vsw_t *vswp, uint64_t macaddr);
 static int vsw_get_same_dest_list(struct ether_header *ehp,
     mblk_t **rhead, mblk_t **rtail, mblk_t **mpp);
@@ -2194,14 +2192,15 @@ vsw_dispatch_ctrl_task(vsw_ldc_t *ldcp, void *cpkt, vio_msg_tag_t *tagp)
 		if ((vswp->taskq_p == NULL) ||
 		    (ddi_taskq_dispatch(vswp->taskq_p, vsw_process_ctrl_pkt,
 		    ctaskp, DDI_NOSLEEP) != DDI_SUCCESS)) {
+			mutex_exit(&port->state_lock);
 			DERR(vswp, "%s: unable to dispatch task to taskq",
 			    __func__);
-			kmem_free(ctaskp, sizeof (vsw_ctrl_task_t));
-			mutex_exit(&port->state_lock);
 			vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
+			kmem_free(ctaskp, sizeof (vsw_ctrl_task_t));
 			return;
 		}
 	} else {
+		kmem_free(ctaskp, sizeof (vsw_ctrl_task_t));
 		DWARN(vswp, "%s: port %d detaching, not dispatching "
 		    "task", __func__, port->p_instance);
 	}
@@ -2234,6 +2233,7 @@ vsw_process_ctrl_pkt(void *arg)
 	if (ctaskp->hss_id < ldcp->hss_id) {
 		DWARN(vswp, "%s: discarding stale packet belonging to earlier"
 		    " (%ld) handshake session", __func__, ctaskp->hss_id);
+		kmem_free(ctaskp, sizeof (vsw_ctrl_task_t));
 		return;
 	}
 
@@ -5473,7 +5473,6 @@ vsw_free_lane_resources(vsw_ldc_t *ldcp, uint64_t dir)
 {
 	dring_info_t		*dp, *dpp;
 	lane_t			*lp = NULL;
-	int			rv = 0;
 
 	ASSERT(ldcp != NULL);
 
@@ -5510,12 +5509,10 @@ vsw_free_lane_resources(vsw_ldc_t *ldcp, uint64_t dir)
 			 */
 			WRITE_ENTER(&lp->dlistrw);
 			dp = lp->dringp;
-			rv = vsw_free_ring(dp);
+			vsw_free_ring(dp);
 			RW_EXIT(&lp->dlistrw);
 		}
-		if (rv == 0) {
-			lp->dringp = NULL;
-		}
+		lp->dringp = NULL;
 	}
 
 	D1(ldcp->ldc_vswp, "%s (%lld): exit", __func__, ldcp->ldc_id);
@@ -5526,12 +5523,12 @@ vsw_free_lane_resources(vsw_ldc_t *ldcp, uint64_t dir)
  *
  * Should be called with dlistrw rwlock held as writer.
  */
-static int
+static void
 vsw_free_ring(dring_info_t *dp)
 {
 	vsw_private_desc_t	*paddr = NULL;
 	dring_info_t		*dpp;
-	int			i, rv = 1;
+	int			i;
 
 	while (dp != NULL) {
 		mutex_enter(&dp->dlock);
@@ -5546,28 +5543,23 @@ vsw_free_ring(dring_info_t *dp)
 				    dp->priv_addr + i;
 				if (paddr->memhandle != NULL) {
 					if (paddr->bound == 1) {
-						rv = ldc_mem_unbind_handle(
-						    paddr->memhandle);
-
-						if (rv != 0) {
+						if (ldc_mem_unbind_handle(
+						    paddr->memhandle) != 0) {
 							DERR(NULL, "error "
 							"unbinding handle for "
 							"ring 0x%llx at pos %d",
 							    dp, i);
-							mutex_exit(&dp->dlock);
-							return (rv);
+							continue;
 						}
 						paddr->bound = 0;
 					}
 
-					rv = ldc_mem_free_handle(
-					    paddr->memhandle);
-					if (rv != 0) {
+					if (ldc_mem_free_handle(
+					    paddr->memhandle) != 0) {
 						DERR(NULL, "error freeing "
 						    "handle for ring 0x%llx "
 						    "at pos %d", dp, i);
-						mutex_exit(&dp->dlock);
-						return (rv);
+						continue;
 					}
 					paddr->memhandle = NULL;
 				}
@@ -5596,7 +5588,6 @@ vsw_free_ring(dring_info_t *dp)
 
 		dp = dpp;
 	}
-	return (0);
 }
 
 /*
