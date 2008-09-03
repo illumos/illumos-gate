@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Share control API
  */
@@ -3747,10 +3745,14 @@ sa_add_resource(sa_share_t share, char *resource, int persist, int *error)
 				    index);
 				(void) xmlSetProp(node, (xmlChar *)"id",
 				    (xmlChar *)istring);
-				if (!sa_group_is_zfs(group) &&
-				    sa_is_persistent((sa_group_t)share)) {
+
+				if (!sa_is_persistent((sa_group_t)share))
+					goto done;
+
+				if (!sa_group_is_zfs(group)) {
 					/* ZFS doesn't use resource names */
 					sa_handle_impl_t ihandle;
+
 					ihandle = (sa_handle_impl_t)
 					    sa_find_group_handle(
 					    group);
@@ -3760,10 +3762,13 @@ sa_add_resource(sa_share_t share, char *resource, int persist, int *error)
 						    share);
 					else
 						err = SA_SYSTEM_ERR;
+				} else {
+					err = sa_zfs_update((sa_share_t)group);
 				}
 			}
 		}
 	}
+done:
 	if (error != NULL)
 		*error = err;
 	return ((sa_resource_t)node);
@@ -3782,7 +3787,7 @@ sa_remove_resource(sa_resource_t resource)
 	sa_group_t group;
 	char *type;
 	int ret = SA_OK;
-	int transient = 0;
+	boolean_t transient = B_FALSE;
 	sa_optionset_t opt;
 
 	share = sa_get_resource_parent(resource);
@@ -3792,7 +3797,7 @@ sa_remove_resource(sa_resource_t resource)
 
 	if (type != NULL) {
 		if (strcmp(type, "persist") != 0)
-			transient = 1;
+			transient = B_TRUE;
 		sa_free_attr_string(type);
 	}
 
@@ -3810,13 +3815,18 @@ sa_remove_resource(sa_resource_t resource)
 	xmlFreeNode((xmlNode *)resource);
 
 	/* only do SMF action if permanent and not ZFS */
-	if (!transient && !sa_group_is_zfs(group)) {
+	if (transient)
+		return (ret);
+
+	if (!sa_group_is_zfs(group)) {
 		sa_handle_impl_t ihandle;
 		ihandle = (sa_handle_impl_t)sa_find_group_handle(group);
 		if (ihandle != NULL)
 			ret = sa_commit_share(ihandle->scfhandle, group, share);
 		else
 			ret = SA_SYSTEM_ERR;
+	} else {
+		ret = sa_zfs_update((sa_share_t)group);
 	}
 	return (ret);
 }
@@ -3889,11 +3899,16 @@ sa_rename_resource(sa_resource_t resource, char *newname)
 		 */
 		ret = proto_rename_resource(handle, group, resource, newname);
 		set_node_attr(resource, "name", newname);
-		if (!sa_group_is_zfs(group) &&
-		    sa_is_persistent((sa_group_t)share)) {
+
+		if (!sa_is_persistent((sa_group_t)share))
+			return (ret);
+
+		if (!sa_group_is_zfs(group)) {
 			sa_handle_impl_t ihandle = (sa_handle_impl_t)handle;
 			ret = sa_commit_share(ihandle->scfhandle, group,
 			    share);
+		} else {
+			ret = sa_zfs_update((sa_share_t)group);
 		}
 	}
 	return (ret);

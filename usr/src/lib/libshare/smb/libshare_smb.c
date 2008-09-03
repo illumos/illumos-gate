@@ -607,6 +607,7 @@ smb_disable_share(sa_share_t share, char *path)
 	boolean_t iszfs;
 	int err = SA_OK;
 	sa_handle_t handle;
+	boolean_t first = B_TRUE; /* work around sharetab issue */
 
 	if (path == NULL)
 		return (err);
@@ -623,7 +624,7 @@ smb_disable_share(sa_share_t share, char *path)
 		goto done;
 
 	for (resource = sa_get_share_resource(share, NULL);
-	    resource != NULL;
+	    resource != NULL || err != SA_OK;
 	    resource = sa_get_next_resource(resource)) {
 		rname = sa_get_resource_attr(resource, "name");
 		if (rname == NULL) {
@@ -646,6 +647,17 @@ smb_disable_share(sa_share_t share, char *path)
 			sa_sharetab_fill_zfs(share, &sh, "smb");
 			err = sa_share_zfs(share, (char *)path, &sh,
 			    rname, ZFS_UNSHARE_SMB);
+			/*
+			 * If we are no longer the first case, we
+			 * don't care about the sa_share_zfs err if it
+			 * is -1. This works around a problem in
+			 * sharefs and should be removed when sharefs
+			 * supports multiple entries per path.
+			 */
+			if (!first && err == -1)
+				err = SA_OK;
+			first = B_FALSE;
+
 			sa_emptyshare(&sh);
 		}
 		sa_free_attr_string(rname);

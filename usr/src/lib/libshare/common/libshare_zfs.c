@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <libzfs.h>
 #include <string.h>
@@ -1141,14 +1139,14 @@ sa_zfs_update(sa_group_t group)
 					    strlen(optstring) > 0) {
 						(void) snprintf(command,
 						    ZFS_MAXPROPLEN * 2,
-						    "%s set sharenfs=%s %s",
-						    COMMAND,
+						    "%s set share%s=%s %s",
+						    COMMAND, proto,
 						    optstring, dataset);
 					} else {
 						(void) snprintf(command,
 						    ZFS_MAXPROPLEN * 2,
-						    "%s set sharenfs=on %s",
-						    COMMAND,
+						    "%s set share%s=on %s",
+						    COMMAND, proto,
 						    dataset);
 					}
 					pfile = popen(command, "r");
