@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_CORECTL_H
 #define	_SYS_CORECTL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/zone.h>
@@ -96,7 +93,8 @@ extern "C" {
 #define	CC_CONTENT_DEFAULT	(CC_CONTENT_STACK | CC_CONTENT_HEAP | \
 	CC_CONTENT_ISM | CC_CONTENT_DISM | CC_CONTENT_SHM | \
 	CC_CONTENT_SHANON | CC_CONTENT_TEXT | CC_CONTENT_DATA | \
-	CC_CONTENT_RODATA | CC_CONTENT_ANON | CC_CONTENT_CTF)
+	CC_CONTENT_RODATA | CC_CONTENT_ANON | CC_CONTENT_CTF | \
+	CC_CONTENT_SYMTAB)
 #define	CC_CONTENT_INVALID	(-1ULL)
 
 typedef u_longlong_t	core_content_t;
