@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -355,21 +353,24 @@ sctp_disconnect(sctp_t *sctp)
 		/* FALLTHRU */
 	default:
 		/*
-		 * If SO_LINGER has set a zero linger time, abort the
-		 * connection with a reset.
+		 * If SO_LINGER has set a zero linger time, terminate the
+		 * association and send an ABORT.
 		 */
 		if (sctp->sctp_linger && sctp->sctp_lingertime == 0) {
-			sctp_user_abort(sctp, NULL, B_FALSE);
-			break;
+			sctp_user_abort(sctp, NULL);
+			WAKE_SCTP(sctp);
+			return (error);
 		}
 
 		/*
-		 * In there is unread data, send an ABORT
+		 * In there is unread data, send an ABORT and terminate the
+		 * association.
 		 */
 		if (sctp->sctp_rxqueued > 0 || sctp->sctp_irwnd >
 		    sctp->sctp_rwnd) {
-			sctp_user_abort(sctp, NULL, B_FALSE);
-			break;
+			sctp_user_abort(sctp, NULL);
+			WAKE_SCTP(sctp);
+			return (error);
 		}
 		/*
 		 * Transmit the shutdown before detaching the sctp_t.

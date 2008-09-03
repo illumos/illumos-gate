@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/stream.h>
@@ -95,7 +93,7 @@ sctp_link_abort(mblk_t *mp, uint16_t serror, char *details, size_t len,
 }
 
 void
-sctp_user_abort(sctp_t *sctp, mblk_t *data, boolean_t tbit)
+sctp_user_abort(sctp_t *sctp, mblk_t *data)
 {
 	mblk_t *mp;
 	int len, hdrlen;
@@ -129,8 +127,13 @@ sctp_user_abort(sctp_t *sctp, mblk_t *data, boolean_t tbit)
 		cause = NULL;
 		len = 0;
 	}
+	/*
+	 * Since it is a user abort, we should have the sctp_t and hence
+	 * the correct verification tag.  So we should not set the T-bit
+	 * in the ABORT.
+	 */
 	if ((len = sctp_link_abort(mp, SCTP_ERR_USER_ABORT, cause, len, 0,
-	    tbit)) < 0) {
+	    B_FALSE)) < 0) {
 		freemsg(mp);
 		return;
 	}
@@ -142,6 +145,9 @@ sctp_user_abort(sctp_t *sctp, mblk_t *data, boolean_t tbit)
 	CONN_INC_REF(sctp->sctp_connp);
 	mp->b_flag |= MSGHASREF;
 	IP_PUT(mp, sctp->sctp_connp, fp->isv4);
+
+	sctp_assoc_event(sctp, SCTP_COMM_LOST, 0, NULL);
+	sctp_clean_death(sctp, ECONNABORTED);
 }
 
 /*
@@ -220,7 +226,7 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 		bcopy(sctp->sctp_iphc6, p, sctp->sctp_hdr6_len);
 		ahip6h = (ip6_t *)p;
 		inip6h = (ip6_t *)inmp->b_rptr;
-		ip_hdr_len = sizeof (ip6_t);
+		ip_hdr_len = ip_hdr_length_v6(inmp, inip6h);
 
 		sh = (sctp_hdr_t *)(p + sctp->sctp_ip_hdr6_len);
 		ASSERT(OK_32PTR(sh));

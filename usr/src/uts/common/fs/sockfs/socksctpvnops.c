@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -238,8 +236,8 @@ socksctpv_close(struct vnode *vp, int flag, int count, offset_t offset,
 		}
 		mutex_exit(&so->so_lock);
 		pollwakeup(&ss->ss_poll_list, POLLIN|POLLRDNORM|POLLOUT);
+		mutex_enter(&so->so_lock);
 	}
-	mutex_enter(&so->so_lock);
 	so_unlock_single(so, SOLOCKED);
 	mutex_exit(&so->so_lock);
 

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/socket.h>
 #include <sys/ddi.h>
@@ -83,11 +81,11 @@ sctp_hash_init(sctp_stack_t *sctps)
 		    sctps->sctps_conn_hash_size);
 	}
 	sctps->sctps_conn_fanout =
-		(sctp_tf_t *)kmem_zalloc(sctps->sctps_conn_hash_size *
-		    sizeof (sctp_tf_t),	KM_SLEEP);
+	    (sctp_tf_t *)kmem_zalloc(sctps->sctps_conn_hash_size *
+	    sizeof (sctp_tf_t),	KM_SLEEP);
 	for (i = 0; i < sctps->sctps_conn_hash_size; i++) {
 		mutex_init(&sctps->sctps_conn_fanout[i].tf_lock, NULL,
-			    MUTEX_DEFAULT, NULL);
+		    MUTEX_DEFAULT, NULL);
 	}
 	sctps->sctps_listen_fanout = kmem_zalloc(SCTP_LISTEN_FANOUT_SIZE *
 	    sizeof (sctp_tf_t),	KM_SLEEP);
@@ -709,7 +707,7 @@ sctp_listen_hash_remove(sctp_t *sctp)
 	ASSERT(tf->tf_sctp);
 	if (tf->tf_sctp == sctp) {
 		tf->tf_sctp = sctp->sctp_listen_hash_next;
-		if (sctp->sctp_listen_hash_next) {
+		if (sctp->sctp_listen_hash_next != NULL) {
 			ASSERT(tf->tf_sctp->sctp_listen_hash_prev == sctp);
 			tf->tf_sctp->sctp_listen_hash_prev = NULL;
 		}
@@ -717,13 +715,13 @@ sctp_listen_hash_remove(sctp_t *sctp)
 		ASSERT(sctp->sctp_listen_hash_prev);
 		ASSERT(sctp->sctp_listen_hash_prev->sctp_listen_hash_next ==
 		    sctp);
+		ASSERT(sctp->sctp_listen_hash_next == NULL ||
+		    sctp->sctp_listen_hash_next->sctp_listen_hash_prev == sctp);
+
 		sctp->sctp_listen_hash_prev->sctp_listen_hash_next =
 		    sctp->sctp_listen_hash_next;
 
-		if (sctp->sctp_listen_hash_next) {
-			ASSERT(
-			sctp->sctp_listen_hash_next->sctp_listen_hash_prev ==
-			    sctp);
+		if (sctp->sctp_listen_hash_next != NULL) {
 			sctp->sctp_listen_hash_next->sctp_listen_hash_prev =
 			    sctp->sctp_listen_hash_prev;
 		}
@@ -831,7 +829,7 @@ sctp_bind_hash_remove(sctp_t *sctp)
 }
 
 /*
- * Similar to but more general than ip_sctp's conn_match().
+ * Similar to but different from sctp_conn_match().
  *
  * Matches sets of addresses as follows: if the argument addr set is
  * a complete subset of the corresponding addr set in the sctp_t, it
@@ -845,32 +843,37 @@ sctp_t *
 sctp_lookup(sctp_t *sctp1, in6_addr_t *faddr, sctp_tf_t *tf, uint32_t *ports,
     int min_state)
 {
-
 	sctp_t *sctp;
 	sctp_faddr_t *fp;
 
 	ASSERT(MUTEX_HELD(&tf->tf_lock));
 
-	for (sctp = tf->tf_sctp; sctp; sctp = sctp->sctp_conn_hash_next) {
+	for (sctp = tf->tf_sctp; sctp != NULL;
+	    sctp = sctp->sctp_conn_hash_next) {
 		if (*ports != sctp->sctp_ports || sctp->sctp_state <
 		    min_state) {
 			continue;
 		}
 
 		/* check for faddr match */
-		for (fp = sctp->sctp_faddrs; fp; fp = fp->next) {
+		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
 			if (IN6_ARE_ADDR_EQUAL(faddr, &fp->faddr)) {
 				break;
 			}
 		}
 
-		if (!fp) {
+		if (fp == NULL) {
 			/* no faddr match; keep looking */
 			continue;
 		}
 
-		/* check for laddr subset match */
-		if (sctp_compare_saddrs(sctp1, sctp) <= SCTP_ADDR_SUBSET) {
+		/*
+		 * There is an existing association with the same peer
+		 * address.  So now we need to check if our local address
+		 * set overlaps with the one of the existing association.
+		 * If they overlap, we should return it.
+		 */
+		if (sctp_compare_saddrs(sctp1, sctp) <= SCTP_ADDR_OVERLAP) {
 			goto done;
 		}
 
@@ -878,7 +881,7 @@ sctp_lookup(sctp_t *sctp1, in6_addr_t *faddr, sctp_tf_t *tf, uint32_t *ports,
 	}
 
 done:
-	if (sctp) {
+	if (sctp != NULL) {
 		SCTP_REFHOLD(sctp);
 	}
 	return (sctp);

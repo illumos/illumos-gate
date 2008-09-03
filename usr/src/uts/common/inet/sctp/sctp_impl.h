@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_SCTP_SCTP_IMPL_H
 #define	_INET_SCTP_SCTP_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/inttypes.h>
 #include <sys/taskq.h>
@@ -1130,7 +1128,7 @@ extern void	sctp_unlink_faddr(sctp_t *, sctp_faddr_t *);
 extern void	sctp_update_ire(sctp_t *sctp);
 extern in_port_t sctp_update_next_port(in_port_t, zone_t *zone, sctp_stack_t *);
 extern void	sctp_update_rtt(sctp_t *, sctp_faddr_t *, clock_t);
-extern void	sctp_user_abort(sctp_t *, mblk_t *, boolean_t);
+extern void	sctp_user_abort(sctp_t *, mblk_t *);
 
 extern void	sctp_validate_peer(sctp_t *);
 
