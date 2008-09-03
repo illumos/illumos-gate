@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 i pkginfo
 i copyright
 i depend
@@ -1473,3 +1471,4 @@ f none SUNWdtrt/tst/common/java_api/tst.MaxConsumers.ksh 0444 root bin
 f none SUNWdtrt/tst/common/java_api/tst.MaxConsumers.ksh.out 0444 root bin
 f none SUNWdtrt/tst/common/java_api/tst.Drop.ksh 0444 root bin
 f none SUNWdtrt/tst/common/java_api/tst.Drop.ksh.out 0444 root bin
+f none SUNWdtrt/tst/common/java_api/tst.GetAggregate.ksh 0444 root bin

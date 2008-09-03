@@ -22,8 +22,6 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  */
 package org.opensolaris.os.dtrace;
 
@@ -32,8 +30,6 @@ import java.util.*;
 /**
  * Implementation detail used by {@link Consumer#getAggregate()}.
  * Package level access.
- *
- * @author Tom Erickson
  */
 class AggregateSpec {
     private Set <String> includedAggregationNames;
@@ -90,7 +86,8 @@ class AggregateSpec {
 	if (includedAggregationNames == null) {
 	    includedAggregationNames = new HashSet <String> ();
 	}
-	includedAggregationNames.add(name);
+	includedAggregationNames.add(
+		Aggregate.filterUnnamedAggregationName(name));
     }
 
     /**
@@ -109,7 +106,8 @@ class AggregateSpec {
 	if (clearedAggregationNames == null) {
 	    clearedAggregationNames = new HashSet <String> ();
 	}
-	clearedAggregationNames.add(name);
+	clearedAggregationNames.add(
+		Aggregate.filterUnnamedAggregationName(name));
     }
 
     public Set <String>
@@ -130,18 +128,22 @@ class AggregateSpec {
 	return Collections. <String> unmodifiableSet(clearedAggregationNames);
     }
 
+    // Called by native code
     public boolean
     isIncluded(String aggregationName)
     {
 	return ((includedAggregationNames == null) ||
-		includedAggregationNames.contains(aggregationName));
+		includedAggregationNames.contains(
+		Aggregate.filterUnnamedAggregationName(aggregationName)));
     }
 
+    // Called by native code
     public boolean
     isCleared(String aggregationName)
     {
 	return ((clearedAggregationNames == null) ||
-		clearedAggregationNames.contains(aggregationName));
+		clearedAggregationNames.contains(
+		Aggregate.filterUnnamedAggregationName(aggregationName)));
     }
 
     public String
