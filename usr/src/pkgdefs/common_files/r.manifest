@@ -31,9 +31,55 @@ MFSTSCAN=/lib/svc/bin/mfstscan
 SVCCFG=/usr/sbin/svccfg
 SVCPROP=/usr/bin/svcprop
 SVCADM=/usr/sbin/svcadm
+AWK=/usr/bin/awk
+CP=/usr/bin/cp
+RM=/usr/bin/rm
 
 # number of seconds to wait before killing processes 
 STOP_DELAY=60
+
+#   
+# Helper function. Delete the manifest hash value.
+# Arguments: $1: manifest file.
+#
+svc_delhash()
+{
+	$SVCCFG delhash $1 >/dev/null 2>&1
+	if [ "$?" != "0" ];then
+		# this Solaris release doesn't have delhash command
+		pg_name=`$MFSTSCAN -t $1`
+		if $SVCPROP -q -p $pg_name smf/manifest; then
+			$SVCCFG -s smf/manifest delpg $pg_name
+		fi
+	fi
+}
+
+#
+# Helper function. Handle services deathrow file.
+# Arguments: $1:manifest file, $2:package name.
+#
+svc_deathrow()
+{
+	DEATHROW_FILE=${PKG_INSTALL_ROOT}/etc/svc/deathrow
+	# remove alternate root from manifest path
+	manifest=`echo "${PKG_INSTALL_ROOT} $1" | $AWK \
+	    '{ print substr($2, length($1)+1); }'`
+	#
+	# Services deathrow file handling, file format:
+	# <fmri>< ><manifest file>< ><package name>
+	# (field separator is a space character)
+	#
+	# Manifest file could be from another Solaris version, bypass the
+	# the service bundle and validation (we only need the fmris list).
+	# Calling svccfg inventory with SVCCFG_NOVALIDATE=1 is safe because
+	# there is no access to the alternate repository.
+	#
+	ENTITIES=`SVCCFG_NOVALIDATE=1 $SVCCFG inventory $1`
+	for fmri in $ENTITIES; do
+		# add to services deathrow file
+		echo ${fmri} ${manifest} $2 >> ${DEATHROW_FILE}
+	done
+}
 
 wait_disable() {
 	svcinst=$1
@@ -128,13 +174,13 @@ while read mfst; do
 		#
 		# Delete the manifest hash value.
 		#
-		pg_name=`$MFSTSCAN -t $mfst`
-		if $SVCPROP -q -p $pg_name smf/manifest; then
-			$SVCCFG -s smf/manifest delpg $pg_name
-		fi
+		svc_delhash $mfst
+	else
+		# deathrow handling
+		svc_deathrow $mfst $PKGINST
 	fi
 
-	/usr/bin/rm $mfst
+	$RM -f $mfst
 done
 
 exit 0

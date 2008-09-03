@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_LIBSCF_H
 #define	_LIBSCF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stddef.h>
 #include <sys/types.h>
@@ -178,6 +176,7 @@ typedef enum scf_error {
 #define	SCF_PG_OPTIONS_OVR		((const char *)"options_ovr")
 #define	SCF_PG_STARTD			((const char *)"startd")
 #define	SCF_PG_STARTD_PRIVATE		((const char *)"svc-startd-private")
+#define	SCF_PG_DEATHROW			((const char *)"deathrow")
 
 /*
  * Template property group names and prefix
@@ -198,6 +197,7 @@ typedef enum scf_error {
 #define	SCF_PROPERTY_DEGRADE_IMMEDIATE	((const char *)"degrade_immediate")
 #define	SCF_PROPERTY_DURATION		((const char *)"duration")
 #define	SCF_PROPERTY_ENABLED		((const char *)"enabled")
+#define	SCF_PROPERTY_DEATHROW		((const char *)"deathrow")
 #define	SCF_PROPERTY_ENTITY_STABILITY	((const char *)"entity_stability")
 #define	SCF_PROPERTY_ENTITIES		((const char *)"entities")
 #define	SCF_PROPERTY_EXEC		((const char *)"exec")

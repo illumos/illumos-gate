@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "svccfg.h"
 #include "svccfg_grammar.h"
@@ -79,6 +78,10 @@ struct help_message help_messages[] = {
 	},
 	{ SCC_DELPG, "delpg name\n\n"
 "Delete the named property group from the currently selected entity."
+	},
+	{ SCC_DELHASH, "delhash [-d] manifest\n\n"
+"Delete the named manifest hash entry (from smf/manifest).\n"
+"With -d, manifest file doesn't need to exist."
 	},
 	{ SCC_LISTPROP, "listprop [glob_pattern]\n\n"
 "List property groups and properties of the currently selected entity."

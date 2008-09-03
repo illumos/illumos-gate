@@ -25,7 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #pragma error_messages(off, E_BLOCK_DECL_UNUSED)
 #pragma error_messages(off, E_EQUALITY_NOT_ASSIGNMENT)
@@ -100,6 +99,7 @@ extern int yyerror(const char *);
 <INITIAL>listpg		{ BEGIN WORD; return (SCC_LISTPG); }
 <INITIAL>addpg		{ BEGIN WORD; return (SCC_ADDPG); }
 <INITIAL>delpg		{ BEGIN WORD; return (SCC_DELPG); }
+<INITIAL>delhash	{ BEGIN WORD; return (SCC_DELHASH); }
 <INITIAL>listprop	{ BEGIN WORD; return (SCC_LISTPROP); }
 <INITIAL>setprop	{ BEGIN WORD; return (SCC_SETPROP); }
 <INITIAL>delprop	{ BEGIN WORD; return (SCC_DELPROP); }

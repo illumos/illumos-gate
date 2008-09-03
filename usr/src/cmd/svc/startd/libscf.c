@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/contract/process.h>
 #include <assert.h>
@@ -931,6 +930,72 @@ libscf_lookup_instance(const char *fmri, scf_instance_t *inst)
 }
 
 /*
+ * int libscf_get_deathrow()
+ * Read deathrow for inst. Returns 0, ECONNABORTED if the connection to the
+ * repository is broken, ECANCELED if inst is deleted, or ENOENT if inst
+ * has no deathrow property group.
+ *
+ * If deathrow/deathrow was missing or invalid, *deathrow will be -1 and a
+ * debug message is logged.
+ */
+int
+libscf_get_deathrow(scf_handle_t *h, scf_instance_t *inst, int *deathrow)
+{
+	scf_propertygroup_t *pg;
+	int r;
+	uint8_t deathrow_8;
+
+	pg = safe_scf_pg_create(h);
+
+	if (scf_instance_get_pg_composed(inst, NULL, SCF_PG_DEATHROW, pg) !=
+	    0) {
+		switch (scf_error()) {
+		case SCF_ERROR_CONNECTION_BROKEN:
+		default:
+			scf_pg_destroy(pg);
+			return (ECONNABORTED);
+
+		case SCF_ERROR_DELETED:
+			scf_pg_destroy(pg);
+			return (ECANCELED);
+
+		case SCF_ERROR_NOT_FOUND:
+			*deathrow = -1;
+			break;
+
+		case SCF_ERROR_HANDLE_MISMATCH:
+		case SCF_ERROR_INVALID_ARGUMENT:
+		case SCF_ERROR_NOT_SET:
+			bad_error("libscf_get_deathrow", scf_error());
+		}
+	} else {
+		switch (r = get_boolean(pg,
+		    SCF_PROPERTY_DEATHROW, &deathrow_8)) {
+		case 0:
+			*deathrow = deathrow_8;
+			break;
+
+		case ECONNABORTED:
+		case ECANCELED:
+			scf_pg_destroy(pg);
+			return (r);
+
+		case ENOENT:
+		case EINVAL:
+			*deathrow = -1;
+			break;
+
+		default:
+			bad_error("get_boolean", r);
+		}
+	}
+
+	scf_pg_destroy(pg);
+
+	return (0);
+}
+
+/*
  * void libscf_get_basic_instance_data()
  *   Read enabled, enabled_ovr, and restarter_fmri (into an allocated
  *   buffer) for inst.  Returns 0, ECONNABORTED if the connection to the
@@ -1495,6 +1560,19 @@ libscf_set_enable_ovr(scf_instance_t *inst, int enable)
 	return (libscf_inst_set_boolean_prop(inst, SCF_PG_GENERAL_OVR,
 	    SCF_PG_GENERAL_OVR_TYPE, SCF_PG_GENERAL_OVR_FLAGS,
 	    SCF_PROPERTY_ENABLED, enable));
+}
+
+/*
+ * Returns 0 on success, ECONNABORTED if the repository connection is broken,
+ * ECANCELED if inst is deleted, EROFS if the backend is readonly, or EPERM if
+ * permission was denied.
+ */
+int
+libscf_set_deathrow(scf_instance_t *inst, int deathrow)
+{
+	return (libscf_inst_set_boolean_prop(inst, SCF_PG_DEATHROW,
+	    SCF_PG_DEATHROW_TYPE, SCF_PG_DEATHROW_FLAGS,
+	    SCF_PROPERTY_DEATHROW, deathrow));
 }
 
 /*
@@ -2776,6 +2854,8 @@ libscf_populate_graph(scf_handle_t *h)
 	svc_iter = safe_scf_iter_create(h);
 	inst_iter = safe_scf_iter_create(h);
 
+	deathrow_init();
+
 	if ((ret = scf_handle_get_local_scope(h, scope)) !=
 	    SCF_SUCCESS)
 		uu_die("retrieving local scope failed: %d\n", ret);
@@ -2802,6 +2882,8 @@ libscf_populate_graph(scf_handle_t *h)
 			}
 		}
 	}
+
+	deathrow_fini();
 
 	scf_iter_destroy(inst_iter);
 	scf_iter_destroy(svc_iter);

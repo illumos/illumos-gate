@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <alloca.h>
 #include <assert.h>
@@ -48,6 +47,7 @@
 #include <libxml/tree.h>
 
 #include "svccfg.h"
+#include "manifest_hash.h"
 
 /* The colon namespaces in each entity (each followed by a newline). */
 #define	COLON_NAMESPACES	":properties\n"
@@ -11020,6 +11020,40 @@ lscf_delpg(char *name)
 	}
 
 	lscf_delprop(name);
+}
+
+/*
+ * scf_delhash() is used to remove the property group related to the
+ * hash entry for a specific manifest in the repository. pgname will be
+ * constructed from the location of the manifest file. If deathrow isn't 0,
+ * manifest file doesn't need to exist (manifest string will be used as
+ * an absolute path).
+ */
+void
+lscf_delhash(char *manifest, int deathrow)
+{
+	char *pgname;
+
+	if (cur_snap != NULL ||
+	    cur_inst != NULL || cur_svc != NULL) {
+		warn(gettext("error, an entity is selected\n"));
+		return;
+	}
+
+	/* select smf/manifest */
+	lscf_select("smf/manifest");
+	/*
+	 * Translate the manifest file name to property name. In the deathrow
+	 * case, the manifest file does not need to exist.
+	 */
+	pgname = mhash_filename_to_propname(manifest,
+	    deathrow ? B_TRUE : B_FALSE);
+	if (pgname == NULL) {
+		warn(gettext("cannot resolve pathname for %s\n"), manifest);
+		return;
+	}
+	/* delete the hash property name */
+	lscf_delpg(pgname);
 }
 
 void

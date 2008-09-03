@@ -27,7 +27,6 @@
 #ifndef	_CMD_SVCCFG_H
 #define	_CMD_SVCCFG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -337,6 +336,7 @@ void lscf_add(const char *);
 void lscf_listpg(const char *);
 void lscf_addpg(const char *, const char *, const char *);
 void lscf_delpg(char *);
+void lscf_delhash(char *, int);
 void lscf_listprop(const char *);
 void lscf_addprop(char *, const char *, const uu_list_t *);
 void lscf_delprop(char *);

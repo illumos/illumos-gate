@@ -23,9 +23,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
-# 0.  Initialization.
+# 0a  Initialization.
 
 [ -f /lib/svc/share/smf_include.sh ] || exit 1
 
@@ -338,10 +337,27 @@ prepare_last_import () {
 	}
 }
 
+#
+# 0b Cleanup deathrow
+#
+deathrow=/etc/svc/deathrow
+if [ -s $deathrow ];then
+	#
+	# svc.startd has unconfigured the services found in deathrow,
+	# clean them now.
+	#
+	while read fmri mfst pkgname; do
+		# Delete services and instances from the deathrow file.
+		/usr/sbin/svccfg delete -f $fmri >/dev/null 2>&1
+		# Remove deathrow manifest hash.
+		/usr/sbin/svccfg delhash -d $mfst >/dev/null 2>&1
+	done < $deathrow
+	/usr/bin/mv $deathrow $deathrow.old
+fi
 SVCCFG_CHECKHASH=1 export SVCCFG_CHECKHASH
 
 #
-# 0. Clean up repository
+# 0c Clean up repository
 #
 if [ -z "$X" ] && /usr/bin/svcprop smf/manifest 2>/dev/null |
     /usr/bin/grep '^ar_svc_[^/]*/md5sum opaque ' >/dev/null

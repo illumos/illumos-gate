@@ -25,7 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libintl.h>
 
@@ -46,7 +45,7 @@ uu_list_pool_t *string_pool;
 %token SCC_VALIDATE SCC_IMPORT SCC_EXPORT SCC_ARCHIVE SCC_APPLY SCC_EXTRACT
 %token SCC_REPOSITORY SCC_INVENTORY SCC_SET SCC_END SCC_HELP SCC_RESTORE
 %token SCC_LIST SCC_ADD SCC_DELETE SCC_SELECT SCC_UNSELECT
-%token SCC_LISTPG SCC_ADDPG SCC_DELPG
+%token SCC_LISTPG SCC_ADDPG SCC_DELPG SCC_DELHASH
 %token SCC_LISTPROP SCC_SETPROP SCC_DELPROP SCC_EDITPROP
 %token SCC_ADDPROPVALUE SCC_DELPROPVALUE SCC_SETENV SCC_UNSETENV
 %token SCC_LISTSNAP SCC_SELECTSNAP SCC_REVERT SCC_REFRESH
@@ -92,6 +91,7 @@ command : terminator
 	| listpg_cmd
 	| addpg_cmd
 	| delpg_cmd
+	| delhash_cmd
 	| listprop_cmd
 	| setprop_cmd
 	| delprop_cmd
@@ -346,6 +346,25 @@ delpg_cmd : SCC_DELPG SCV_WORD terminator
 					{ lscf_delpg($2); free($2); }
 	| SCC_DELPG error terminator	{ synerr(SCC_DELPG); return(0); }
 
+delhash_cmd : SCC_DELHASH SCV_WORD terminator
+	{
+		lscf_delhash($2, 0); free($2);
+	}
+	| SCC_DELHASH SCV_WORD SCV_WORD terminator
+	{
+		if (strcmp($2, "-d") == 0) {
+			lscf_delhash($3, 1);
+			free($2);
+			free($3);
+		} else {
+			synerr(SCC_DELHASH);
+			free($2);
+			free($3);
+			return(0);
+		}
+	}
+	| SCC_DELHASH error terminator	{ synerr(SCC_DELHASH); return(0); }
+
 listprop_cmd : SCC_LISTPROP opt_word terminator
 					{ lscf_listprop($2); free($2); }
 	| SCC_LISTPROP error terminator	{ synerr(SCC_LISTPROP); return(0); }
@@ -527,6 +546,7 @@ command_token : SCC_VALIDATE	{ $$ = SCC_VALIDATE; }
 	| SCC_LISTPG		{ $$ = SCC_LISTPG; }
 	| SCC_ADDPG		{ $$ = SCC_ADDPG; }
 	| SCC_DELPG		{ $$ = SCC_DELPG; }
+	| SCC_DELHASH		{ $$ = SCC_DELHASH; }
 	| SCC_LISTPROP		{ $$ = SCC_LISTPROP; }
 	| SCC_SETPROP		{ $$ = SCC_SETPROP; }
 	| SCC_DELPROP		{ $$ = SCC_DELPROP; }

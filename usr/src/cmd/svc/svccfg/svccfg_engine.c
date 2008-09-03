@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * svccfg(1) interpreter and command execution engine.
@@ -216,6 +215,7 @@ static struct cmd_info {
 	{ "listpg", CS_SVC | CS_INST | CS_SNAP, NULL },
 	{ "addpg", CS_SVC | CS_INST, NULL },
 	{ "delpg", CS_SVC | CS_INST, NULL },
+	{ "delhash", CS_GLOBAL, complete_single_xml_file_arg },
 	{ "listprop", CS_SVC | CS_INST | CS_SNAP, NULL },
 	{ "setprop", CS_SVC | CS_INST, NULL },
 	{ "delprop", CS_SVC | CS_INST, NULL },

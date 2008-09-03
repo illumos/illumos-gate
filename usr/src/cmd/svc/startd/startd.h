@@ -26,7 +26,6 @@
 #ifndef	_STARTD_H
 #define	_STARTD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/time.h>
 #include <librestart.h>
@@ -287,6 +286,7 @@ typedef enum {
 #define	GV_ENABLED	0x02	/* Service should be online */
 #define	GV_ENBLD_NOOVR	0x04	/* GV_ENABLED, ignoring override */
 #define	GV_INSUBGRAPH	0x08	/* Current milestone depends on service */
+#define	GV_DEATHROW	0x10	/* Service is on deathrow */
 
 /* ID must come first to support search */
 typedef struct graph_vertex {
@@ -619,6 +619,7 @@ int libscf_inst_set_count_prop(scf_instance_t *, const char *,
     const char *pgtype, uint32_t, const char *, uint64_t);
 
 /* libscf.c - used by graph.c */
+int libscf_get_deathrow(scf_handle_t *, scf_instance_t *, int *);
 int libscf_get_basic_instance_data(scf_handle_t *, scf_instance_t *,
     const char *, int *, int *, char **);
 int libscf_inst_get_or_add_pg(scf_instance_t *, const char *, const char *,
@@ -630,6 +631,7 @@ gv_type_t depgroup_read_scheme(scf_handle_t *, scf_propertygroup_t *);
 depgroup_type_t depgroup_read_grouping(scf_handle_t *, scf_propertygroup_t *);
 restarter_error_t depgroup_read_restart(scf_handle_t *, scf_propertygroup_t *);
 int libscf_set_enable_ovr(scf_instance_t *, int);
+int libscf_set_deathrow(scf_instance_t *, int);
 int libscf_inst_delete_prop(scf_instance_t *, const char *, const char *);
 int libscf_delete_enable_ovr(scf_instance_t *);
 int libscf_get_milestone(scf_instance_t *, scf_property_t *, scf_value_t *,
@@ -755,6 +757,11 @@ void wait_ignore_by_fmri(const char *);
 
 /* proc.c */
 ctid_t proc_get_ctid();
+
+/* deathrow.c */
+extern void deathrow_init();
+extern void deathrow_fini();
+extern boolean_t is_fmri_in_deathrow(const char *);
 
 #ifdef	__cplusplus
 }

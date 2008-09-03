@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -113,7 +112,8 @@ main(int argc, char *argv[])
 
 	for (i = optind; i < argc; i++) {
 		if (tflag) {
-			char *pname = mhash_filename_to_propname(argv[i]);
+			char *pname = mhash_filename_to_propname(argv[i],
+			    B_FALSE);
 
 			if (pname != NULL)
 				(void) puts(pname);

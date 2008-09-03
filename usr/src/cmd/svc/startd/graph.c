@@ -1504,8 +1504,16 @@ dependency_satisfied(graph_vertex_t *v, boolean_t satbility)
 {
 	switch (v->gv_type) {
 	case GVT_INST:
-		if ((v->gv_flags & GV_CONFIGURED) == 0)
+		if ((v->gv_flags & GV_CONFIGURED) == 0) {
+			if (v->gv_flags & GV_DEATHROW) {
+				/*
+				 * A dependency on an instance with GV_DEATHROW
+				 * flag is always considered as satisfied.
+				 */
+				return (1);
+			}
 			return (-1);
+		}
 
 		switch (v->gv_state) {
 		case RESTARTER_STATE_ONLINE:
@@ -2869,6 +2877,7 @@ configure_vertex(graph_vertex_t *v, scf_instance_t *inst)
 	int enabled, enabled_ovr;
 	int err;
 	int *path;
+	int deathrow;
 
 	restarter_fmri[0] = '\0';
 
@@ -2880,9 +2889,84 @@ configure_vertex(graph_vertex_t *v, scf_instance_t *inst)
 	assert(should_be_in_subgraph(v) ==
 	    ((v->gv_flags & GV_INSUBGRAPH) != 0));
 
-	log_framework(LOG_DEBUG, "Graph adding %s.\n", v->gv_name);
+	/*
+	 * If the instance fmri is in the deathrow list then set the
+	 * GV_DEATHROW flag on the vertex and create and set to true the
+	 * SCF_PROPERTY_DEATHROW boolean property in the non-persistent
+	 * repository for this instance fmri.
+	 */
+	if ((v->gv_flags & GV_DEATHROW) ||
+	    (is_fmri_in_deathrow(v->gv_name) == B_TRUE)) {
+		if ((v->gv_flags & GV_DEATHROW) == 0) {
+			/*
+			 * Set flag GV_DEATHROW, create and set to true
+			 * the SCF_PROPERTY_DEATHROW property in the
+			 * non-persistent repository for this instance fmri.
+			 */
+			v->gv_flags |= GV_DEATHROW;
+
+			switch (err = libscf_set_deathrow(inst, 1)) {
+			case 0:
+				break;
+
+			case ECONNABORTED:
+			case ECANCELED:
+				startd_free(restarter_fmri, max_scf_value_size);
+				return (err);
+
+			case EROFS:
+				log_error(LOG_WARNING, "Could not set %s/%s "
+				    "for deathrow %s: %s.\n",
+				    SCF_PG_DEATHROW, SCF_PROPERTY_DEATHROW,
+				    v->gv_name, strerror(err));
+				break;
+
+			case EPERM:
+				uu_die("Permission denied.\n");
+				/* NOTREACHED */
+
+			default:
+				bad_error("libscf_set_deathrow", err);
+			}
+			log_framework(LOG_DEBUG, "Deathrow, graph set %s.\n",
+			    v->gv_name);
+		}
+		startd_free(restarter_fmri, max_scf_value_size);
+		return (0);
+	}
 
 	h = scf_instance_handle(inst);
+
+	/*
+	 * Using a temporary deathrow boolean property, set through
+	 * libscf_set_deathrow(), only for fmris on deathrow, is necessary
+	 * because deathrow_fini() may already have been called, and in case
+	 * of a refresh, GV_DEATHROW may need to be set again.
+	 * libscf_get_deathrow() sets deathrow to 1 only if this instance
+	 * has a temporary boolean property named 'deathrow' valued true
+	 * in a property group 'deathrow', -1 or 0 in all other cases.
+	 */
+	err = libscf_get_deathrow(h, inst, &deathrow);
+	switch (err) {
+	case 0:
+		break;
+
+	case ECONNABORTED:
+	case ECANCELED:
+		startd_free(restarter_fmri, max_scf_value_size);
+		return (err);
+
+	default:
+		bad_error("libscf_get_deathrow", err);
+	}
+
+	if (deathrow == 1) {
+		v->gv_flags |= GV_DEATHROW;
+		startd_free(restarter_fmri, max_scf_value_size);
+		return (0);
+	}
+
+	log_framework(LOG_DEBUG, "Graph adding %s.\n", v->gv_name);
 
 	/*
 	 * If the instance does not have a restarter property group,
@@ -4296,6 +4380,7 @@ dgraph_remove_instance(const char *fmri, scf_handle_t *h)
 	graph_walk_dependents(v, propagate_stop, (void *)RERR_RESTART);
 
 	v->gv_flags &= ~GV_CONFIGURED;
+	v->gv_flags &= ~GV_DEATHROW;
 
 	graph_walk_dependents(v, propagate_start, NULL);
 	propagate_satbility(v);

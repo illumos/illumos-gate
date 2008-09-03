@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_MANIFEST_HASH_H
 #define	_MANIFEST_HASH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <libscf.h>
@@ -50,7 +49,7 @@ extern "C" {
 #define	MHASH_RECONCILED	(1)
 #define	MHASH_FAILURE		(-1)
 
-char *mhash_filename_to_propname(const char *);
+char *mhash_filename_to_propname(const char *, boolean_t);
 int mhash_retrieve_entry(scf_handle_t *, const char *, uchar_t *);
 int mhash_store_entry(scf_handle_t *, const char *, uchar_t *, char **);
 int mhash_test_file(scf_handle_t *, const char *, uint_t, char **, uchar_t *);

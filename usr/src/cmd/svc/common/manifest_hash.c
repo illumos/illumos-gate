@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -48,18 +47,27 @@
 
 /*
  * Translate a file name to property name.  Return an allocated string or NULL
- * if realpath() fails.
+ * if realpath() fails. If deathrow is true, realpath() is skipped. This
+ * allows to return the property name even if the file doesn't exist.
  */
 char *
-mhash_filename_to_propname(const char *in)
+mhash_filename_to_propname(const char *in, boolean_t deathrow)
 {
 	char *out, *cp, *base;
 	size_t len, piece_len;
 
 	out = uu_zalloc(PATH_MAX + 1);
-	if (realpath(in, out) == NULL) {
-		uu_free(out);
-		return (NULL);
+	if (deathrow) {
+		/* used only for service deathrow handling */
+		if (strlcpy(out, in, PATH_MAX + 1) >= (PATH_MAX + 1)) {
+			uu_free(out);
+			return (NULL);
+		}
+	} else {
+		if (realpath(in, out) == NULL) {
+			uu_free(out);
+			return (NULL);
+		}
 	}
 
 	base = getenv("PKG_INSTALL_ROOT");
@@ -517,7 +525,7 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 		return (MHASH_NEWFILE);
 	}
 
-	pname = mhash_filename_to_propname(file);
+	pname = mhash_filename_to_propname(file, B_FALSE);
 	if (pname == NULL)
 		return (MHASH_FAILURE);
 
@@ -538,9 +546,9 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 		return (MHASH_NEWFILE);
 	}
 
-	do
+	do {
 		ret = stat64(file, &st);
-	while (ret < 0 && errno == EINTR);
+	} while (ret < 0 && errno == EINTR);
 	if (ret < 0) {
 		uu_free(pname);
 		return (MHASH_FAILURE);

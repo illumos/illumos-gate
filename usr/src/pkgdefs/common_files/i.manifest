@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,16 +20,57 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # i.manifest - smf(5) service manifest install class action script
 #
 
 repfile=$PKG_INSTALL_ROOT/etc/svc/repository.db
 export repfile
+
+SVCCFG=/usr/sbin/svccfg
+AWK=/usr/bin/awk
+RM=/usr/bin/rm
+CP=/usr/bin/cp
+MV=/usr/bin/mv
+CHMOD=/usr/bin/chmod
+CHOWN=/usr/bin/chown
+
+#
+# Helper function. Handle services deathrow file.
+# Arguments: $1:manifest file.
+#
+svc_deathrow()
+{
+	TEMP=/tmp/svc_deathrow.$$
+	DEATHROW_FILE=${PKG_INSTALL_ROOT}/etc/svc/deathrow
+	#
+	# Services deathrow file handling, file format:
+	# <fmri>< ><manifest file>< ><package name>
+	# (field separator is a space character)
+	#
+	if [ -s ${DEATHROW_FILE} ]; then
+		#
+		# Manifest file could be from another Solaris version, bypass
+		# the service bundle and validation (we only need the fmris
+		# list). Calling svccfg inventory with SVCCFG_NOVALIDATE=1 is
+		# safe because there is no access to the alternate repository.
+		#
+		ENTITIES=`SVCCFG_NOVALIDATE=1 $SVCCFG inventory $1`
+		for fmri in $ENTITIES; do
+			#
+			# If fmri matches one in deathrow file, remove the
+			# line from the file.
+			#
+			>${TEMP}
+			$AWK "(\$1==\"$fmri\") \
+			    {next}; {print}" ${DEATHROW_FILE} >>${TEMP} && \
+			    $MV ${TEMP} ${DEATHROW_FILE}
+			$RM -f ${TEMP}
+		done
+	fi
+}
 
 #
 # If the repository does not yet exist, create it from the appropriate seed.  If
@@ -41,15 +81,13 @@ if [ ! -f $repfile ]; then
 	if [ -n "$SUNW_PKG_INSTALL_ZONENAME" -a \
 	    "$SUNW_PKG_INSTALL_ZONENAME" != "global" ]; then
 		[ -f $PKG_INSTALL_ROOT/lib/svc/seed/nonglobal.db ] && \
-		/usr/bin/cp $PKG_INSTALL_ROOT/lib/svc/seed/nonglobal.db \
-		    $repfile
+		$CP $PKG_INSTALL_ROOT/lib/svc/seed/nonglobal.db $repfile
 	else
 		[ -f $PKG_INSTALL_ROOT/lib/svc/seed/global.db ] && \
-		/usr/bin/cp $PKG_INSTALL_ROOT/lib/svc/seed/global.db \
-		    $repfile
+		$CP $PKG_INSTALL_ROOT/lib/svc/seed/global.db $repfile
 	fi
-	/usr/bin/chmod 0600 $repfile
-	/usr/bin/chown root:sys $repfile
+	$CHMOD 0600 $repfile
+	$CHOWN root:sys $repfile
 fi
 
 if [ ! -r $PKG_INSTALL_ROOT/etc/svc/volatile/repository_door ]; then
@@ -59,17 +97,19 @@ if [ ! -r $PKG_INSTALL_ROOT/etc/svc/volatile/repository_door ]; then
 	# cannot consistently handle dependent placement.  Defer to next boot.
 	#
 	while read src dst; do
-		/usr/bin/cp -p $src $dst
+		$CP -p $src $dst
+		# deathrow handling
+		svc_deathrow $dst
 	done
 else
 	#
 	# Local package install.
 	#
 	while read src dst; do
-		/usr/bin/cp -p $src $dst
+		$CP -p $src $dst
 
 		[ "$PKG_INSTALL_ROOT" = "" -o "$PKG_INSTALL_ROOT" = "/" ] && \
-		    SVCCFG_CHECKHASH=1 /usr/sbin/svccfg import $dst
+		    SVCCFG_CHECKHASH=1 $SVCCFG import $dst
 	done
 fi
 

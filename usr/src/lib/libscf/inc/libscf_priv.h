@@ -26,7 +26,6 @@
 #ifndef	_LIBSCF_PRIV_H
 #define	_LIBSCF_PRIV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libscf.h>
 #include <unistd.h>
@@ -47,6 +46,9 @@ extern "C" {
 
 #define	SCF_PG_GENERAL_OVR_TYPE		SCF_GROUP_FRAMEWORK
 #define	SCF_PG_GENERAL_OVR_FLAGS	SCF_PG_FLAG_NONPERSISTENT
+
+#define	SCF_PG_DEATHROW_TYPE		SCF_GROUP_FRAMEWORK
+#define	SCF_PG_DEATHROW_FLAGS		SCF_PG_FLAG_NONPERSISTENT
 
 #define	SCF_PG_OPTIONS_TYPE		SCF_GROUP_FRAMEWORK
 #define	SCF_PG_OPTIONS_FLAGS		0
