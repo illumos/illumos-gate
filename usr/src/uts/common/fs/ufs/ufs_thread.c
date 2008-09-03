@@ -31,8 +31,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
@@ -52,6 +50,7 @@
 #include <sys/debug.h>
 #include <sys/cmn_err.h>
 #include <sys/sysmacros.h>
+#include <vm/pvn.h>
 
 extern pri_t 			minclsyspri;
 extern int			hash2ints();
@@ -647,6 +646,7 @@ ufs_idle_free(struct inode *ip)
 	kmutex_t		*ihm;
 	struct ufsvfs		*ufsvfsp	= ip->i_ufsvfs;
 	struct vnode		*vp		= ITOV(ip);
+	int			vn_has_data, vn_modified;
 
 	/*
 	 * inode is held
@@ -690,13 +690,21 @@ ufs_idle_free(struct inode *ip)
 		    "ufs_idle_free: vnode ref count is less than 2");
 
 	vp->v_count--;
-	if ((vp->v_type != VCHR && vn_has_cached_data(vp)) ||
-	    vp->v_count != 1 ||
-	    ip->i_flag & (IMOD|IMODACC|IACC|ICHG|IUPD|IATTCHG)) {
+
+	vn_has_data = (vp->v_type != VCHR && vn_has_cached_data(vp));
+	vn_modified = (ip->i_flag & (IMOD|IMODACC|IACC|ICHG|IUPD|IATTCHG));
+
+	if (vp->v_count != 1 ||
+	    ((vn_has_data || vn_modified) &&
+	    ((ip->i_flag & ISTALE) == 0))) {
 		/*
 		 * Another thread has referenced this inode while
-		 * we are trying to free it. Call VN_RELE() to
-		 * release our reference.
+		 * we are trying  to free  it.  Call VN_RELE() to
+		 * release our reference, if v_count > 1  data is
+		 * present  or one of the modified etc. flags was
+		 * set, whereby ISTALE wasn't set.
+		 * If we'd proceed with ISTALE set here, we might
+		 * get ourselves into a deadlock situation.
 		 */
 		mutex_exit(&vp->v_lock);
 		mutex_exit(ihm);
@@ -722,6 +730,17 @@ ufs_idle_free(struct inode *ip)
 		if ((ip->i_flag & ISTALE) == 0 && ip->i_dquot) {
 			TRANS_DQRELE(ufsvfsp, ip->i_dquot);
 			ip->i_dquot = NULL;
+		}
+		if ((ip->i_flag & ISTALE) &&
+		    vn_has_data) {
+			/*
+			 * ISTALE inodes may have data
+			 * and  this data needs  to be
+			 * cleaned up.
+			 */
+			(void) pvn_vplist_dirty(vp, (u_offset_t)0,
+			    ufs_putapage, B_INVAL | B_TRUNC,
+			    (struct cred *)NULL);
 		}
 		ufs_si_del(ip);
 		if (pages) {
