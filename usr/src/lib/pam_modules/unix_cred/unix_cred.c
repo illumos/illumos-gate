@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <nss_dbdefs.h>
 #include <pwd.h>
@@ -543,7 +541,8 @@ adt_done:
 
 	if (def == NULL) {
 		def = priv_str_to_set("basic", ",", NULL);
-		if (pathconf("/", _PC_CHOWN_RESTRICTED) == -1)
+		errno = 0;
+		if ((pathconf("/", _PC_CHOWN_RESTRICTED) == -1) && (errno == 0))
 			(void) priv_addset(def, PRIV_FILE_CHOWN_SELF);
 	}
 	/*
@@ -568,7 +567,7 @@ adt_done:
 	(void) setpflags(PRIV_AWARE, 1);
 	if (setppriv(PRIV_SET, PRIV_INHERITABLE, def) != 0) {
 		syslog(LOG_AUTH | LOG_ERR,
-			    "pam_setcred: setppriv(defaultpriv) failed: %m");
+		    "pam_setcred: setppriv(defaultpriv) failed: %m");
 		ret = PAM_CRED_ERR;
 	}
 
@@ -590,7 +589,7 @@ adt_done:
 		if (setppriv(PRIV_SET, PRIV_LIMIT, lim) != 0 ||
 		    setppriv(PRIV_SET, PRIV_PERMITTED, lim) != 0) {
 			syslog(LOG_AUTH | LOG_ERR,
-				"pam_setcred: setppriv(limitpriv) failed: %m");
+			    "pam_setcred: setppriv(limitpriv) failed: %m");
 			ret = PAM_CRED_ERR;
 		}
 	}
