@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBCBASE=.
 
@@ -594,6 +592,7 @@ PORTGEN=			\
 	strncasecmp.o		\
 	strpbrk.o		\
 	strrchr.o		\
+	strsep.o		\
 	strsignal.o		\
 	strspn.o		\
 	strstr.o		\

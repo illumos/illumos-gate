@@ -21,8 +21,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"@(#)mapfile-vers	1.13	08/08/05 SMI"
-#
 
 SUNWprivate {
     global:
@@ -314,7 +312,6 @@ SUNWprivate {
 	smbnative_os_value;
 	smbnative_pdc_value;
 	strcanon;
-	strsep;
 	strsubst;
 	trim_whitespace;
 	unicodestooems;

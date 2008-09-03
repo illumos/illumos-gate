@@ -1,5 +1,12 @@
 /* config.h.  Generated automatically by configure.  */
 /* config.hin.  Generated automatically from configure.in by autoheader.  */
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _CONFIG_H
+#define _CONFIG_H
 
 /* Define to empty if the keyword does not work.  */
 /* #undef const */
@@ -132,7 +139,7 @@
 #define HAVE_STRERROR 1
 
 /* Define if you have the strsep function.  */
-/* #undef HAVE_STRSEP */
+#define	HAVE_STRSEP 1
 
 /* Define if you have the sysconf function.  */
 #define HAVE_SYSCONF 1
@@ -177,3 +184,4 @@
 #define	_LARGE_FILES				/* AIX specific. */
 #define	_FILE_OFFSET_BITS	64
 #endif
+#endif /* _CONFIG_H */

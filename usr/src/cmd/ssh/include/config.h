@@ -2,14 +2,12 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 /* $Id: acconfig.h,v 1.145 2002/09/26 00:38:48 tim Exp $ */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_CONFIG_H
 #define	_CONFIG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -819,9 +817,6 @@ extern "C" {
 
 /* Define to 1 if you have the `strmode' function. */
 /* #undef HAVE_STRMODE */
-
-/* Define to 1 if you have the `strsep' function. */
-/* #undef HAVE_STRSEP */
 
 /* Define to 1 if `st_blksize' is member of `struct stat'. */
 #define	HAVE_STRUCT_STAT_ST_BLKSIZE 1

@@ -567,6 +567,7 @@ PORTGEN=			\
 	strlcpy.o		\
 	strncasecmp.o		\
 	strpbrk.o		\
+	strsep.o		\
 	strsignal.o		\
 	strspn.o		\
 	strstr.o		\

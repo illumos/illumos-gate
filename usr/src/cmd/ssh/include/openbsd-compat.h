@@ -29,8 +29,6 @@
 
 /* $Id: openbsd-compat.h,v 1.17 2002/09/12 00:33:02 djm Exp $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -52,7 +50,6 @@ extern "C" {
 #include "sigact.h"
 #include "inet_ntoa.h"
 #include "inet_ntop.h"
-#include "strsep.h"
 #include "setproctitle.h"
 #include "getgrouplist.h"
 #include "glob.h"

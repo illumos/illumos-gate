@@ -132,6 +132,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	sigtimedwait;
 	sigwaitinfo;
 	strnlen;
+	strsep;
 	thr_keycreate_once;
 	timer_create;
 	timer_delete;

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
@@ -277,44 +275,4 @@ rand_hash(
 		tmp = sbox[index_i] + sbox[index_j];
 		data[i] = data[i] ^ sbox[tmp];
 	}
-}
-
-/*
- * strsep
- *
- * The strsep() function locates, in the string referenced by *stringp, the
- * first occurrence of any character in the string delim (or the terminating
- * `\0' character) and replaces it with a `\0'.  The location of the next
- * character after the delimiter character (or NULL, if the end of the
- * string was reached) is stored in *stringp.  The original value of
- * *stringp is returned.
- *
- * If *stringp is initially NULL, strsep() returns NULL.
- */
-char *
-strsep(char **stringp, const char *delim)
-{
-	char *s;
-	const char *spanp;
-	int c, sc;
-	char *tok;
-
-	if ((s = *stringp) == NULL)
-		return (NULL);
-
-	for (tok = s; ; ) {
-		c = *s++;
-		spanp = delim;
-		do {
-			if ((sc = *spanp++) == c) {
-				if (c == 0)
-					s = NULL;
-				else
-					s[-1] = 0;
-				*stringp = s;
-				return (tok);
-			}
-		} while (sc != 0);
-	}
-	/* NOTREACHED */
 }

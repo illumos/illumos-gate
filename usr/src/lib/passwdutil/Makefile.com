@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY=	passwdutil.a
 VERS=		.1
@@ -41,8 +39,7 @@ OBJ=		__check_history.o \
 		nss_attr.o	\
 		switch_utils.o	\
 		utils.o		\
-		debug.o		\
-		bsd-strsep.o
+		debug.o
 
 DERIVED_OBJ=	nispasswd_xdr.o
 

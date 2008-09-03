@@ -23,14 +23,12 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _STRING_H
 #define	_STRING_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7.1.12 */
 
 #include <iso/string_iso.h>
 
@@ -100,6 +98,7 @@ extern int strcasecmp(const char *, const char *);
 extern int strncasecmp(const char *, const char *, size_t);
 extern size_t strlcpy(char *, const char *, size_t);
 extern size_t strlcat(char *, const char *, size_t);
+extern char *strsep(char **stringp, const char *delim);
 #endif /* defined(__EXTENSIONS__)... */
 
 #if defined(__EXTENSIONS__) || \
@@ -135,6 +134,7 @@ extern int strcasecmp();
 extern int strncasecmp();
 extern size_t strlcpy();
 extern size_t strlcat();
+extern char *strsep();
 #endif /* defined(__EXTENSIONS__) ... */
 
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)

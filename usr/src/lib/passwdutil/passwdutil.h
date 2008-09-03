@@ -26,8 +26,6 @@
 #ifndef	_PASSWDUTIL_H
 #define	_PASSWDUTIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -157,11 +155,6 @@ int def_getint(char *name, int defvalue);
  */
 void debug_init(void);
 void debug(char *, ...);
-
-/*
- * bsd-strsep.c
- */
-char *strsep(char **, const char *);
 
 /*
  * switch_utils.c

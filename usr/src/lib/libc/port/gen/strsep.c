@@ -1,9 +1,8 @@
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*	$OpenBSD: strsep.c,v 1.3 1997/08/20 04:28:14 millert Exp $	*/
 
 /*
@@ -39,6 +38,7 @@
  * SUCH DAMAGE.
  */
 
+#include "lint.h"
 #include <string.h>
 #include <stdio.h>
 

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Implementations of the functions described in vsnprintf(3C) and string(3C),
  * for use by the kernel, the standalone, and kmdb.  Unless otherwise specified,
@@ -647,6 +645,9 @@ strcspn(const char *string, const char *charset)
  * *stringp is returned.
  *
  * If *stringp is initially NULL, strsep() returns NULL.
+ *
+ * NOTE: This instance is left for in-kernel use. Libraries and programs
+ *       should use strsep from libc.
  */
 char *
 strsep(char **stringp, const char *delim)

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* LINTLIBRARY */
 /* PROTOLIB1 */
 
@@ -909,6 +907,9 @@ char *strpbrk(const char *string, const char *brkset);
 
 /* strrchr.c */
 char *strrchr(const char *sp, int c);
+
+/* strsep.c */
+char *strsep(char **stringp, const char *delim);
 
 /* strspn.c */
 size_t strspn(const char *string, const char *charset);

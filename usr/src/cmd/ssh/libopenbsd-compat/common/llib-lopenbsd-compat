@@ -21,10 +21,9 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <includes.h>
 #include <atomicio.h>
@@ -76,7 +75,6 @@
 #include <strlcat.h>
 #include <strlcpy.h>
 #include <strmode.h>
-#include <strsep.h>
 #include <sys-queue.h>
 #include <sys-tree.h>
 #include <tildexpand.h>
