@@ -1,4 +1,3 @@
-#!/bin/ksh
 #
 # CDDL HEADER START
 #
@@ -19,33 +18,17 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
 
-interval=$2
+include ../Makefile.com
 
-. /lib/svc/share/xvm_include.sh
+.KEEP_STATE:
 
-case $1 in 
-'start')
-	#
-	# This service should only be enabled in a PV domU.
-	#
-	is_dom0
-	if [ $? -eq 0 ] || [ `uname -i` != "i86xpv" ]; then
-		echo "This service will only run in a PV xVM domU."
-		svcadm disable -t svc:/system/xvm/ipagent:default
-		exit $SMF_EXIT_OK
-	fi
+all: $(FILES)
+install: all pkg
 
-	/usr/lib/xen/bin/ipagent $interval &
-
-	;;
-
-*)
-	echo "Usage: $0 start [report_interval]"
-	exit 1
-	;;
-esac	
-
-exit $?
+include ../Makefile.targ

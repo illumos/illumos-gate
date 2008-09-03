@@ -1,4 +1,3 @@
-#!/bin/ksh
 #
 # CDDL HEADER START
 #
@@ -19,33 +18,28 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
 
-interval=$2
-
-. /lib/svc/share/xvm_include.sh
-
-case $1 in 
-'start')
-	#
-	# This service should only be enabled in a PV domU.
-	#
-	is_dom0
-	if [ $? -eq 0 ] || [ `uname -i` != "i86xpv" ]; then
-		echo "This service will only run in a PV xVM domU."
-		svcadm disable -t svc:/system/xvm/ipagent:default
-		exit $SMF_EXIT_OK
-	fi
-
-	/usr/lib/xen/bin/ipagent $interval &
-
-	;;
-
-*)
-	echo "Usage: $0 start [report_interval]"
-	exit 1
-	;;
-esac	
-
-exit $?
+PKG=SUNWxvmipau
+NAME="xVM PV IP address agent (Usr)"
+ARCH="i386"
+VERSION="ONVERS,REV=0.0.0"
+SUNW_PRODNAME="SunOS"
+SUNW_PRODVERS="RELEASE/VERSION"
+SUNW_PKGVERS="1.0"
+SUNW_PKGTYPE="usr"
+MAXINST="1000"
+CATEGORY=system
+VENDOR="Sun Microsystems, Inc."
+DESC="xVM PV IP address agent"
+CLASSES="none preserve"
+HOTLINE="Please contact your local service provider"
+EMAIL=""
+BASEDIR=/
+SUNW_PKG_ALLZONES="true"
+SUNW_PKG_HOLLOW="true"
+SUNW_PKG_THISZONE="false"

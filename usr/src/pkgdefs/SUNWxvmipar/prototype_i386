@@ -42,16 +42,11 @@ i copyright
 i depend
 i postinstall
 
-# xVM IP address agent and service
+# xVM IP address agent service
 d none lib						0755	root	bin
 d none lib/svc						0755	root	bin
 d none lib/svc/method					0755	root	bin
 f none lib/svc/method/svc-ipagent			0555	root	bin
-d none usr						0755	root	sys
-d none usr/lib						0755	root	bin
-d none usr/lib/xen					0755	root	bin
-d none usr/lib/xen/bin					0755	root	bin
-f none usr/lib/xen/bin/ipagent				0555	root	bin
 d none var						0755	root	sys
 d none var/svc						0755	root	sys
 d none var/svc/manifest					0755	root	sys

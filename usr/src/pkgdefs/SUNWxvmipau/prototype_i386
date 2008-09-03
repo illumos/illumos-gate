@@ -24,22 +24,26 @@
 # Use is subject to license terms.
 #
 
-PKG=SUNWxvmipa
-NAME=xVM PV IP address agent
-ARCH="i386"
-VERSION="ONVERS,REV=0.0.0"
-SUNW_PRODNAME="SunOS"
-SUNW_PRODVERS="RELEASE/VERSION"
-SUNW_PKGVERS="1.0"
-SUNW_PKGTYPE="usr"
-MAXINST="1000"
-CATEGORY=system
-VENDOR="Sun Microsystems, Inc."
-DESC="xVM PV IP address agent"
-CLASSES="none preserve"
-HOTLINE="Please contact your local service provider"
-EMAIL=""
-BASEDIR=/
-SUNW_PKG_ALLZONES="true"
-SUNW_PKG_HOLLOW="true"
-SUNW_PKG_THISZONE="false"
+#
+# This required package information file contains a list of package contents.
+# The 'pkgmk' command uses this file to identify the contents of a package
+# and their location on the development machine when building the package.
+# Can be created via a text editor or through use of the 'pkgproto' command.
+
+#!search <pathname pathname ...>        # where to find pkg objects
+#!include <filename>                    # include another 'prototype' file
+#!default <mode> <owner> <group>        # default used if not specified on entry
+#!<param>=<value>                       # puts parameter in pkg environment
+
+#
+#
+i pkginfo
+i copyright
+i depend
+
+# xVM IP address agent
+d none usr						0755	root	sys
+d none usr/lib						0755	root	bin
+d none usr/lib/xen					0755	root	bin
+d none usr/lib/xen/bin					0755	root	bin
+f none usr/lib/xen/bin/ipagent				0555	root	bin
