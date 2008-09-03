@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/zfs_context.h>
 #include <sys/spa.h>
@@ -339,12 +337,22 @@ vdev_mirror_io_done(zio_t *zio)
 		}
 
 		/*
+		 * There's a hierachy of errors:
+		 *	EIO > other errors > ENXIO > 0
+		 *
 		 * We preserve any EIOs because those may be worth retrying;
 		 * whereas ECKSUM and ENXIO are more likely to be persistent.
+		 *
+		 * ENXIO should only be reported as an error in a mirror
+		 * if all children report ENXIO;
 		 */
 		if (mc->mc_error) {
-			if (zio->io_error != EIO)
-				zio->io_error = mc->mc_error;
+			if (zio->io_error != EIO) {
+				if (mc->mc_error != ENXIO)
+					zio->io_error = mc->mc_error;
+				else if (zio->io_error == 0)
+					zio->io_error = ENXIO;
+			}
 			if (!mc->mc_skipped)
 				unexpected_errors++;
 			zio->io_numerrors++;
