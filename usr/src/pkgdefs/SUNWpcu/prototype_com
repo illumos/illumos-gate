@@ -70,6 +70,6 @@ d none usr/share/applications 755 root other
 f none usr/share/applications/desktop-print-management.desktop 444 root bin
 f none usr/share/applications/desktop-print-management-prefs.desktop 444 root bin
 d none usr/share/gnome 755 root other
-d none usr/share/gnome/autostart 755 root other
+d none usr/share/gnome/autostart 755 root bin
 f none usr/share/gnome/autostart/desktop-print-management-applet.desktop 444 root bin
 
