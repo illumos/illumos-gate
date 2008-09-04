@@ -40,8 +40,6 @@
  * real MFN (!).
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <strings.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,8 +84,10 @@
 
 #if defined(__i386)
 #define	DEBUG_INFO 0xf4bff000
+#define	DEBUG_INFO_HVM 0xfe7ff000
 #elif defined(__amd64)
 #define	DEBUG_INFO 0xfffffffffb7ff000
+#define	DEBUG_INFO_HVM 0xfffffffffb7ff000
 #endif
 
 #define	PAGE_SIZE 0x1000
@@ -95,8 +95,11 @@
 #define	PAGE_OFFSET(a) ((a) & (PAGE_SIZE - 1))
 #define	PAGE_MASK(a) ((a) & ~(PAGE_SIZE - 1))
 #define	PAGE_ALIGNED(a) (((a) & (PAGE_SIZE -1)) == 0)
+#define	PT_PADDR_LGPG 0x000fffffffffe000ull
 #define	PT_PADDR 0x000ffffffffff000ull
 #define	PT_VALID 0x1
+#define	PT_PAGESIZE 0x080
+#define	PTE_IS_LGPG(p, l) ((l) > 0 && ((p) & PT_PAGESIZE))
 
 #define	XC_CORE_MAGIC 0xF00FEBED
 #define	XC_CORE_MAGIC_HVM 0xF00FEBEE
@@ -166,6 +169,7 @@ typedef struct xkb_elf {
 typedef struct xkb {
 	char *xkb_path;
 	int xkb_fd;
+	int xkb_is_hvm;
 
 	xkb_type_t xkb_type;
 	xkb_core_t xkb_core;
@@ -448,6 +452,57 @@ xkb_build_p2m(xkb_t *xkb)
 }
 
 /*
+ * For HVM images, we don't have the corresponding MFN list; the table
+ * is just a mapping from page index in the dump to the corresponding
+ * PFN.  To simplify the other code, we'll pretend that these PFNs are
+ * really MFNs as well, by populating xkb_p2m.
+ */
+static int
+xkb_build_fake_p2m(xkb_t *xkb)
+{
+	xkb_elf_t *xe = &xkb->xkb_elf;
+	mdb_gelf_sect_t *sect;
+	size_t size;
+	size_t i;
+
+	uint64_t *p2pfn;
+
+	sect = mdb_gelf_sect_by_name(xe->xe_gelf, ".xen_pfn");
+
+	if (sect == NULL) {
+		(void) xkb_fail(xkb, "cannot find section .xen_pfn");
+		return (0);
+	}
+
+	if ((p2pfn = mdb_gelf_sect_load(xe->xe_gelf, sect)) == NULL) {
+		(void) xkb_fail(xkb, "couldn't read .xen_pfn");
+		return (0);
+	}
+
+	for (i = 0; i < xkb->xkb_nr_pages; i++) {
+		if (p2pfn[i] > xkb->xkb_max_pfn)
+			xkb->xkb_max_pfn = p2pfn[i];
+	}
+
+	size = sizeof (xen_pfn_t) * (xkb->xkb_max_pfn + 1);
+	xkb->xkb_p2m = mdb_alloc(size, UM_SLEEP);
+	size = sizeof (size_t) * (xkb->xkb_max_pfn + 1);
+	xe->xe_off = mdb_alloc(size, UM_SLEEP);
+
+	for (i = 0; i <= xkb->xkb_max_pfn; i++) {
+		xkb->xkb_p2m[i] = PFN_INVALID;
+		xe->xe_off[i] = (size_t)-1;
+	}
+
+	for (i = 0; i < xkb->xkb_nr_pages; i++) {
+		xkb->xkb_p2m[p2pfn[i]] = p2pfn[i];
+		xe->xe_off[p2pfn[i]] = i;
+	}
+
+	return (1);
+}
+
+/*
  * Return the MFN of the top-level page table for the given as.
  */
 static mfn_t
@@ -473,13 +528,22 @@ xkb_as_to_mfn(xkb_t *xkb, struct as *as)
 	return (xkb->xkb_p2m[pfn]);
 }
 
+static mfn_t
+xkb_cr3_to_pfn(xkb_t *xkb)
+{
+	uint64_t cr3 = xkb->xkb_vcpus[0].ctrlreg[3];
+	if (xkb->xkb_is_hvm)
+		return (cr3 >> PAGE_SHIFT);
+	return (xen_cr3_to_pfn(cr3));
+}
+
 static ssize_t
 xkb_read_helper(xkb_t *xkb, struct as *as, int phys, uint64_t addr,
     void *buf, size_t size)
 {
 	size_t left = size;
 	int windowed = (xkb->xkb_pages == NULL);
-	mfn_t tlmfn = xen_cr3_to_pfn(xkb->xkb_vcpus[0].ctrlreg[3]);
+	mfn_t tlmfn = xkb_cr3_to_pfn(xkb);
 
 	if (as != NULL && (tlmfn = xkb_as_to_mfn(xkb, as)) == MFN_INVALID)
 		return (-1);
@@ -659,8 +723,8 @@ xkb_map_mfn(xkb_t *xkb, mfn_t mfn, mfn_map_t *mm)
 	return (mm->mm_map);
 }
 
-static mfn_t
-xkb_pte_to_mfn(mmu_info_t *mmu, char *ptep)
+static uint64_t
+xkb_get_pte(mmu_info_t *mmu, char *ptep)
 {
 	uint64_t pte = 0;
 
@@ -672,11 +736,17 @@ xkb_pte_to_mfn(mmu_info_t *mmu, char *ptep)
 		pte = *((uint32_t *)ptep);
 	}
 
-	if (!(pte & PT_VALID))
-		return (MFN_INVALID);
+	return (pte);
+}
 
-	/* XXX: doesn't do large pages */
-	pte &= PT_PADDR;
+static mfn_t
+xkb_pte_to_base_mfn(uint64_t pte, size_t level)
+{
+	if (PTE_IS_LGPG(pte, level)) {
+		pte &= PT_PADDR_LGPG;
+	} else {
+		pte &= PT_PADDR;
+	}
 
 	return (pte >> PAGE_SHIFT);
 }
@@ -689,25 +759,37 @@ static mfn_t
 xkb_va_to_mfn(xkb_t *xkb, uintptr_t va, mfn_t mfn)
 {
 	mmu_info_t *mmu = &xkb->xkb_mmu;
+	uint64_t pte;
 	size_t level;
 
 	for (level = mmu->mi_max; ; --level) {
 		size_t entry;
-		char *tmp;
 
 		if (xkb_map_mfn(xkb, mfn, &xkb->xkb_pt_map[level]) == NULL)
 			return (MFN_INVALID);
 
 		entry = (va >> mmu->mi_shift[level]) & (mmu->mi_ptes - 1);
 
-		tmp = (char *)xkb->xkb_pt_map[level].mm_map +
-		    entry * mmu->mi_ptesize;
+		pte = xkb_get_pte(mmu, (char *)xkb->xkb_pt_map[level].mm_map +
+		    entry * mmu->mi_ptesize);
 
-		if ((mfn = xkb_pte_to_mfn(mmu, tmp)) == MFN_INVALID)
+		if ((mfn = xkb_pte_to_base_mfn(pte, level)) == MFN_INVALID)
 			return (MFN_INVALID);
 
 		if (level == 0)
 			break;
+
+		/*
+		 * Currently 'mfn' refers to the base MFN of the
+		 * large-page mapping.  Add on the 4K-sized index into
+		 * the large-page mapping to get the right MFN within
+		 * the mapping.
+		 */
+		if (PTE_IS_LGPG(pte, level)) {
+			mfn += (va & ((1 << mmu->mi_shift[level]) - 1)) >>
+			    PAGE_SHIFT;
+			break;
+		}
 	}
 
 	return (mfn);
@@ -996,9 +1078,6 @@ xkb_open_core(xkb_t *xkb)
 	    xc->xc_hdr.xch_ctxt_offset) != sz)
 		return (xkb_fail(xkb, "cannot read VCPU contexts"));
 
-	if (xkb->xkb_vcpus[0].flags & VGCF_HVM_GUEST)
-		return (xkb_fail(xkb, "cannot process HVM images"));
-
 	/*
 	 * Try to map all the data pages. If we can't, fall back to the
 	 * window/pread() approach, which is significantly slower.
@@ -1116,10 +1195,10 @@ xkb_open_elf(xkb_t *xkb)
 		}
 	}
 
-	if (xe->xe_hdr.xeh_magic == XC_CORE_MAGIC_HVM)
-		return (xkb_fail(xkb, "cannot process HVM images"));
+	xkb->xkb_is_hvm = xe->xe_hdr.xeh_magic == XC_CORE_MAGIC_HVM;
 
-	if (xe->xe_hdr.xeh_magic != XC_CORE_MAGIC) {
+	if (xe->xe_hdr.xeh_magic != XC_CORE_MAGIC &&
+	    xe->xe_hdr.xeh_magic != XC_CORE_MAGIC_HVM) {
 		return (xkb_fail(xkb, "invalid magic %d",
 		    xe->xe_hdr.xeh_magic));
 	}
@@ -1164,8 +1243,13 @@ xkb_open_elf(xkb_t *xkb)
 	if (xkb->xkb_pages == (char *)MAP_FAILED)
 		xkb->xkb_pages = NULL;
 
-	if (!xkb_build_p2m(xkb))
-		return (NULL);
+	if (xkb->xkb_is_hvm) {
+		if (!xkb_build_fake_p2m(xkb))
+			return (NULL);
+	} else {
+		if (!xkb_build_p2m(xkb))
+			return (NULL);
+	}
 
 	return (xkb);
 }
@@ -1204,6 +1288,7 @@ xkb_t *
 xkb_open(const char *namelist, const char *corefile, const char *swapfile,
     int flag, const char *err)
 {
+	uintptr_t debug_info = DEBUG_INFO;
 	struct stat64 corestat;
 	xkb_t *xkb = NULL;
 	size_t i;
@@ -1216,10 +1301,13 @@ xkb_open(const char *namelist, const char *corefile, const char *swapfile,
 
 	xkb = mdb_zalloc(sizeof (*xkb), UM_SLEEP);
 
-	for (i = 0; i < 4; i++)
+	for (i = 0; i < 4; i++) {
+		xkb->xkb_pt_map[i].mm_mfn = MFN_INVALID;
 		xkb->xkb_pt_map[i].mm_map = (char *)MAP_FAILED;
+	}
 
 	xkb->xkb_type = XKB_FORMAT_UNKNOWN;
+	xkb->xkb_map.mm_mfn = MFN_INVALID;
 	xkb->xkb_map.mm_map = (char *)MAP_FAILED;
 	xkb->xkb_core.xc_p2m_buf = (char *)MAP_FAILED;
 	xkb->xkb_fd = -1;
@@ -1239,7 +1327,10 @@ xkb_open(const char *namelist, const char *corefile, const char *swapfile,
 	if (!xkb_build_m2p(xkb))
 		return (NULL);
 
-	if (xkb_read(xkb, DEBUG_INFO, &xkb->xkb_info,
+	if (xkb->xkb_is_hvm)
+		debug_info = DEBUG_INFO_HVM;
+
+	if (xkb_read(xkb, debug_info, &xkb->xkb_info,
 	    sizeof (xkb->xkb_info)) != sizeof (xkb->xkb_info))
 		return (xkb_fail(xkb, "cannot read debug_info"));
 
@@ -1347,7 +1438,7 @@ xkb_sym_io(xkb_t *xkb, const char *symfile)
 uint64_t
 xkb_vtop(xkb_t *xkb, struct as *as, uintptr_t addr)
 {
-	mfn_t tlmfn = xen_cr3_to_pfn(xkb->xkb_vcpus[0].ctrlreg[3]);
+	mfn_t tlmfn = xkb_cr3_to_pfn(xkb);
 	mfn_t mfn;
 
 	if (as != NULL && (tlmfn = xkb_as_to_mfn(xkb, as)) == MFN_INVALID)
