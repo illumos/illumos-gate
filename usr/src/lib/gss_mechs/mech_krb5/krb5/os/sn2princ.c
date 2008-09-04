@@ -1,9 +1,8 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/sn2princ.c
  *
@@ -177,8 +176,8 @@ krb5_sname_to_principal(krb5_context context, const char *hostname, const char *
  */
 krb5_error_code
 krb5int_lookup_host(int rev_lookup, const char *hostname, char **remote_host) {
-    struct hostent *hp;
-    struct hostent *hp2;
+    struct hostent *hp = NULL;
+    struct hostent *hp2 = NULL;
     int addr_family;
     int err;
 
@@ -238,23 +237,24 @@ try_getipnodebyname_again:
     
        hp2 = res_getipnodebyaddr(hp->h_addr, hp->h_length,
        			hp->h_addrtype, &err);
-       if (hp != NULL) {
-       res_freehostent(hp);
-       hp = NULL;
-       }
-    
        if (hp2 != NULL) {
-       free(*remote_host);
-       *remote_host = strdup(hp2->h_name);
-       if (!*remote_host){
-           res_freehostent(hp2);
-           return ENOMEM;
-       }
-       KRB5_LOG(KRB5_INFO, "krb5int_lookup_host() remote_host %s",
-       	*remote_host);
-       res_freehostent(hp2);
-       hp2 = NULL;
-       }
+	    free(*remote_host);
+	    *remote_host = strdup(hp2->h_name);
+	    if (!*remote_host) {
+		res_freehostent(hp2);
+		if (hp != NULL)
+		    res_freehostent(hp);
+		return ENOMEM;
+	    }
+	    KRB5_LOG(KRB5_INFO, "krb5int_lookup_host() remote_host %s",
+				*remote_host);
 	}
+    }
+    if (hp != NULL) {
+	res_freehostent(hp);
+    }
+    if (hp2 != NULL) {
+	res_freehostent(hp2);
+    }
     return (0);
 }
