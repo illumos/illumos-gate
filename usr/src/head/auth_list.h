@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This is an internal header file. Not to be shipped.
@@ -27,8 +27,6 @@
 
 #ifndef	_AUTH_LIST_H
 #define	_AUTH_LIST_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -59,6 +57,7 @@ extern "C" {
 #define	FILE_DOWNGRADE_SL_AUTH	"solaris.label.file.downgrade"
 #define	FILE_OWNER_AUTH		"solaris.file.owner"
 #define	FILE_UPGRADE_SL_AUTH	"solaris.label.file.upgrade"
+#define	MAINTENANCE_AUTH	"solaris.system.maintenance"
 #define	PRINT_ADMIN_AUTH	"solaris.print.admin"
 #define	PRINT_CANCEL_AUTH	"solaris.print.cancel"
 #define	PRINT_LIST_AUTH		"solaris.print.list"

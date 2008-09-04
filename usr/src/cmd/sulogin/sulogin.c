@@ -31,15 +31,14 @@
  *	All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	sulogin - special login program exec'd from init to let user
  *	come up single user, or go to default init state straight away.
  *
- *	Explain the scoop to the user, and prompt for root password or
- *	^D. Good root password gets you single user, ^D exits sulogin,
- *	and init will go to default init state.
+ *	Explain the scoop to the user, prompt for an authorized user
+ *	name or ^D and then prompt for password or ^D.  If the password
+ *	is correct, check if the user is authorized, if so enter
+ *	single user. ^D exits sulogin, and init will go to default init state.
  *
  *	If /etc/passwd is missing, or there's no entry for root,
  *	go single user, no questions asked.
@@ -71,6 +70,10 @@
 #include <limits.h>
 #include <errno.h>
 #include <crypt.h>
+#include <auth_attr.h>
+#include <auth_list.h>
+#include <nss_dbdefs.h>
+#include <user_attr.h>
 
 /*
  * Intervals to sleep after failed login
@@ -102,16 +105,19 @@ static struct termio	ttymodes;
 
 static char	*findttyname(int fd);
 static char	*stripttyname(char *);
-static char	*sulogin_getpass(char *);
+static char	*sulogin_getinput(char *, int);
 static void	noop(int);
 static void	single(const char *, char *);
-static void	main_loop(char *, struct spwd *, boolean_t);
+static void	main_loop(char *, boolean_t);
 static void	parenthandler();
 static void	termhandler(int);
 static void	setupsigs(void);
 static int	pathcmp(char *, char *);
-static void	doit(char *, char *, struct spwd *);
+static void	doit(char *, char *);
 static void	childcleanup(int);
+
+#define	ECHOON	0
+#define	ECHOOFF	1
 
 /* ARGSUSED */
 int
@@ -280,7 +286,7 @@ main(int argc, char **argv)
 				termhandler(0);
 				/* Never returns */
 
-			main_loop(cttyname, shpw, B_TRUE);
+			main_loop(cttyname, B_TRUE);
 			/* Never returns */
 		}
 	}
@@ -311,18 +317,18 @@ main(int argc, char **argv)
 		while (ptr != NULL) {
 			p = strchr(ptr, ' ');
 			if (p == NULL) {
-				doit(ptr, cttyname, shpw);
+				doit(ptr, cttyname);
 				break;
 			}
 			*p++ = '\0';
-			doit(ptr, cttyname, shpw);
+			doit(ptr, cttyname);
 			ptr = p;
 		}
 	}
 	if (pathcmp(cttyname, DEFAULT_CONSOLE) != 0) {
 		if ((pid = fork()) == (pid_t)0) {
 			setupsigs();
-			main_loop(DEFAULT_CONSOLE, shpw, B_FALSE);
+			main_loop(DEFAULT_CONSOLE, B_FALSE);
 		} else if (pid == -1)
 			return (EXIT_FAILURE);
 		pidlist[nchild++] = pid;
@@ -375,7 +381,7 @@ sanitize_tty(int fd)
  * Fork a child of sulogin for each of the auxiliary consoles.
  */
 static void
-doit(char *ptr, char *cttyname, struct spwd *shpw)
+doit(char *ptr, char *cttyname)
 {
 	pid_t	pid;
 
@@ -383,7 +389,7 @@ doit(char *ptr, char *cttyname, struct spwd *shpw)
 	    pathcmp(ptr, cttyname) != 0) {
 		if ((pid = fork()) == (pid_t)0) {
 			setupsigs();
-			main_loop(ptr, shpw, B_FALSE);
+			main_loop(ptr, B_FALSE);
 		} else if (pid == -1)
 			exit(EXIT_FAILURE);
 		pidlist[nchild++] = pid;
@@ -433,10 +439,15 @@ setupsigs()
 }
 
 static void
-main_loop(char *devname, struct spwd *shpw, boolean_t cttyflag)
+main_loop(char *devname, boolean_t cttyflag)
 {
 	int		fd, i;
+	char		*user = NULL;		/* authorized user */
 	char		*pass;			/* password from user */
+	char		*cpass;			/* crypted password */
+	struct spwd	spwd;
+	struct spwd	*lshpw;			/* local shadow */
+	char		shadow[NSS_BUFLEN_SHADOW];
 	FILE		*sysmsgfd;
 
 	for (i = 0; i < 3; i++)
@@ -461,51 +472,87 @@ main_loop(char *devname, struct spwd *shpw, boolean_t cttyflag)
 	sanitize_tty(fileno(stdin));
 
 	for (;;) {
-		(void) fputs("\nRoot password for system maintenance "
-		    "(control-d to bypass): ", stdout);
-
-		if ((pass = sulogin_getpass(devname)) == NULL) {
+		(void) printf("\nEnter user name for system maintenance "
+		    "(control-d to bypass): ");
+		if ((user = sulogin_getinput(devname, ECHOON)) == NULL) {
 			/* signal other children to exit */
 			(void) sigsend(P_PID, masterpid, SIGUSR1);
 			/* ^D, so straight to default init state */
 			exit(EXIT_FAILURE);
 		}
-		if (*shpw->sp_pwdp == '\0' && *pass == '\0') {
-			(void) fprintf(sysmsgfd,
-			    "\nsingle-user privilege assigned to %s.\n",
-			    devname);
+		(void) printf("\nEnter %s password for system maintenance "
+		    "(control-d to bypass): ", user);
+
+		if ((pass = sulogin_getinput(devname, ECHOOFF)) == NULL) {
+			/* signal other children to exit */
 			(void) sigsend(P_PID, masterpid, SIGUSR1);
-			(void) wait(NULL);
-			single(su, devname);
-		} else if (*shpw->sp_pwdp != '\0') {
-			/*
-			 * There is a special case error to catch here,
-			 * because sulogin is statically linked:
-			 * If the root password is hashed with an algorithm
-			 * other than the old unix crypt the call to crypt(3c)
-			 * could fail if /usr is corrupt or not available
-			 * since by default /etc/security/crypt.conf will
-			 * have the crypt_ modules located under /usr/lib.
-			 *
-			 * If this happens crypt(3c) will return NULL and
-			 * set errno to ELIBACC, in this case we just give
-			 * access because this is similar to the case of
-			 * root not existing in /etc/passwd.
-			 */
-			pass = crypt(pass, shpw->sp_pwdp);
-			if ((strcmp(pass, shpw->sp_pwdp) == 0) ||
-			    ((pass == NULL) && (errno == ELIBACC) &&
-			    (shpw->sp_pwdp[0] == '$'))) {
-				(void) fprintf(sysmsgfd,
-			    "\nsingle-user privilege assigned to %s.\n",
-				    devname);
-				(void) sigsend(P_PID, masterpid, SIGUSR1);
-				(void) wait(NULL);
-				single(su, devname);
-			}
+			/* ^D, so straight to default init state */
+			free(user);
+			exit(EXIT_FAILURE);
 		}
+		lshpw = getspnam_r(user, &spwd, shadow, sizeof (shadow));
+		if (lshpw == NULL) {
+			/*
+			 * the user entered doesn't exist, too bad.
+			 */
+			goto sorry;
+		}
+
+		/*
+		 * There is a special case error to catch here:
+		 * If the password is hashed with an algorithm
+		 * other than the old unix crypt the call to crypt(3c)
+		 * could fail if /usr is corrupt or not available
+		 * since by default /etc/security/crypt.conf will
+		 * have the crypt_ modules located under /usr/lib.
+		 * Or it could happen if /etc/security/crypt.conf
+		 * is corrupted.
+		 *
+		 * If this happens crypt(3c) will return NULL and
+		 * set errno to ELIBACC for the former condition or
+		 * EINVAL for the latter, in this case we bypass
+		 * authentication and just verify that the user is
+		 * authorized.
+		 */
+
+		errno = 0;
+		cpass = crypt(pass, lshpw->sp_pwdp);
+		if (((cpass == NULL) && (lshpw->sp_pwdp[0] == '$')) &&
+		    ((errno == ELIBACC) || (errno == EINVAL))) {
+			goto checkauth;
+		} else if ((cpass == NULL) ||
+		    (strcmp(cpass, lshpw->sp_pwdp) != 0)) {
+			goto sorry;
+		}
+
+checkauth:
+		/*
+		 * There is a special case error here as well.
+		 * If /etc/user_attr is corrupt, getusernam("root")
+		 * returns NULL.
+		 * In this case, we just give access because this is similar
+		 * to the case of root not existing in /etc/passwd.
+		 */
+
+		if ((getusernam("root") != NULL) &&
+		    (chkauthattr(MAINTENANCE_AUTH, user) != 1)) {
+			goto sorry;
+		}
+		(void) fprintf(sysmsgfd, "\nsingle-user privilege "
+		    "assigned to %s on %s.\n", user, devname);
+		(void) sigsend(P_PID, masterpid, SIGUSR1);
+		(void) wait(NULL);
+		free(user);
+		free(pass);
+		single(su, devname);
+		/* single never returns */
+
+sorry:
+		(void) printf("\nLogin incorrect or user %s not authorized\n",
+		    user);
+		free(user);
+		free(pass);
 		(void) sleep(sleeptime);
-		(void) printf("Login incorrect\n");
 	}
 }
 
@@ -569,53 +616,56 @@ single(const char *cmd, char *ttyn)
 }
 
 /*
- * sulogin_getpass() - hacked from the stdio library version so we can
- *		       distinguish newline and EOF.  also don't need this
- *		       routine to give a prompt.
+ * sulogin_getinput() - hacked from the standard PAM tty conversation
+ *			function getpassphrase() library version
+ *			so we can distinguish newline and EOF.
+ *		        also don't need this routine to give a prompt.
  *
  * returns the password string, or NULL if the used typed EOF.
  */
 
 static char *
-sulogin_getpass(char *devname)
+sulogin_getinput(char *devname, int echooff)
 {
 	struct termio	ttyb;
 	int		c;
 	FILE		*fi;
-	static char	pbuf[PASS_MAX + 1];
+	static char	input[PASS_MAX + 1];
 	void		(*saved_handler)();
-	char		*rval = pbuf;
+	char		*rval = input;
 	int		i = 0;
 
-	if ((fi = fopen(devname, "r")) == NULL)
+	if ((fi = fopen(devname, "r")) == NULL) {
 		fi = stdin;
-	else
-		setbuf(fi, NULL);
+	}
 
 	saved_handler = signal(SIGINT, SIG_IGN);
 
-	ttyb = ttymodes;
-	ttyb.c_lflag &= ~(ECHO | ECHOE | ECHONL);
-	(void) ioctl(fileno(fi), TCSETAF, &ttyb);
+	if (echooff) {
+		ttyb = ttymodes;
+		ttyb.c_lflag &= ~(ECHO | ECHOE | ECHONL);
+		(void) ioctl(fileno(fi), TCSETAF, &ttyb);
+	}
 
-	while ((c = getc(fi)) != '\n') {
-
-		if (c == EOF && i == 0) { 	/* ^D, No password */
+	/* get characters up to PASS_MAX, but don't overflow */
+	while ((c = getc(fi)) != '\n' && (c != '\r')) {
+		if (c == EOF && i == 0) {	/* ^D, no input */
 			rval = NULL;
 			break;
 		}
-
-		if (i < PASS_MAX)
-			pbuf[i++] = c;
+		if (i < PASS_MAX) {
+			input[i++] = (char)c;
+		}
 	}
-	pbuf[i] = '\0';
+	input[i] = '\0';
 	(void) fputc('\n', fi);
-	(void) ioctl(fileno(fi), TCSETAW, &ttymodes);
+	if (echooff) {
+		(void) ioctl(fileno(fi), TCSETAW, &ttymodes);
+	}
 
 	if (saved_handler != SIG_ERR)
 		(void) signal(SIGINT, saved_handler);
-
-	return (rval);
+	return (rval == NULL ? NULL : strdup(rval));
 }
 
 static char *

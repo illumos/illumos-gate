@@ -517,6 +517,7 @@ f none usr/lib/help/auths/locale/C/AuthReadSMB.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfWpaStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SysDate.html 444 root bin
 f none usr/lib/help/auths/locale/C/SysHeader.html 444 root bin
+f none usr/lib/help/auths/locale/C/SysMaintenance.html 444 root bin
 f none usr/lib/help/auths/locale/C/SysShutdown.html 444 root bin
 f none usr/lib/help/auths/locale/C/WifiConfig.html 444 root bin
 f none usr/lib/help/auths/locale/C/WifiWep.html 444 root bin

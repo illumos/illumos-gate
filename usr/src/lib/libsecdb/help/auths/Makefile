@@ -21,8 +21,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # lib/libsecdb/help/auths/Makefile
 #
 
@@ -62,6 +60,7 @@ HTMLENTS = \
 	SysHeader.html \
 	SysShutdown.html \
 	AllSolAuthsHeader.html \
+	SysMaintenance.html \
 	DhcpmgrHeader.html \
 	DhcpmgrWrite.html \
 	BindStates.html \

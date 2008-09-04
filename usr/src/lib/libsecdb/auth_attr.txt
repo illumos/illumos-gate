@@ -25,8 +25,6 @@
 #
 # authorizations. see auth_attr(4)
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 solaris.:::All Solaris Authorizations::help=AllSolAuthsHeader.html
 solaris.grant:::Grant All Solaris Authorizations::help=PriAdmin.html
 #
@@ -157,6 +155,7 @@ solaris.smf.read.ndmp:::Read permission for protected SMF NDMP Service Propertie
 #
 solaris.system.:::Machine Administration::help=SysHeader.html
 solaris.system.date:::Set Date & Time::help=SysDate.html
+solaris.system.maintenance:::Enter Maintenance (single-user) Mode::help=SysMaintenance.html
 solaris.system.shutdown:::Shutdown the System::help=SysShutdown.html
 solaris.system.power.:::System Power Management::help=SysPowerMgmtHeader.html
 solaris.system.power.suspend.:::Suspend the System::help=SysPowerMgmtSuspend.html
