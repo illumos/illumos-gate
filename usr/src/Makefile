@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Makefile for system source
 #
 # include global definitions
@@ -270,6 +268,7 @@ EXPORT_SRC:
 	@cd lib/pam_modules/krb5;   pwd; $(MAKE) EXPORT_SRC
 	@cd lib/udapl; pwd; $(MAKE) EXPORT_SRC
 	@cd lib/libresolv2; pwd; $(MAKE) EXPORT_SRC
+	@cd psm/stand/boot; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/common/crypto/io; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/common/des; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/common/rpc; pwd; $(MAKE) EXPORT_SRC
@@ -281,6 +280,7 @@ EXPORT_SRC:
 	@cd uts/common; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/sparc; pwd; $(MAKE) EXPORT_SRC
 	@cd $(CLOSED)/uts/sun4u/forthdebug; pwd; $(MAKE) EXPORT_SRC
+	@cd $(CLOSED)/uts/sun4v/forthdebug; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/intel; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/sun4u; pwd; $(MAKE) EXPORT_SRC
 	@cd $(CLOSED)/uts/sun4v/io/ncp;	pwd;	$(MAKE) EXPORT_SRC
