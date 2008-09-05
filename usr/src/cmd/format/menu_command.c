@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains functions that implement the command menu commands.
@@ -459,7 +457,10 @@ c_type()
 		    }
 		}
 		enter_critical();
-		free(cur_disk->disk_type);
+		if (delete_disk_type(cur_disk->disk_type) != 0) {
+			fmt_print("Autoconfiguration failed.\n");
+			return (-1);
+		}
 		cur_disk->disk_type = tptr;
 		cur_disk->disk_parts = tptr->dtype_plist;
 		init_globals(cur_disk);
