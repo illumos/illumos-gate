@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the idmap (Identity mapping between
 #	Solaris and Windows) kernel module.
@@ -59,9 +58,12 @@ LDFLAGS += -dy -N"sys/doorfs" -N"strmod/rpcmod"
 INC_PATH += -I$(SRC)/head/rpcsvc
 
 #
-# Lint warnings turned off (for rpcgen-generated code)
+# Lint warnings turned off
 #
-LINTFLAGS += -erroff=E_FUNC_VAR_UNUSED
+# Function variables unused for rpcgen-generated code
+# Constant conditions for do { } while (0) macros
+#
+LINTTAGS += -erroff=E_FUNC_VAR_UNUSED -erroff=E_CONSTANT_CONDITION
 
 #
 #	Define targets

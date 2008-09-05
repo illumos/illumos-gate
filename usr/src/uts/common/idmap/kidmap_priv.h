@@ -32,20 +32,42 @@
 #ifndef _KIDMAP_PRIV_H
 #define	_KIDMAP_PRIV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/avl.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
+typedef struct sid2pid {
+	avl_node_t	avl_link;
+	struct sid2pid	*flink;
+	struct sid2pid	*blink;
+	const char 	*sid_prefix;
+	uint32_t	rid;
+	uid_t		uid;
+	time_t		uid_ttl;
+	gid_t		gid;
+	time_t		gid_ttl;
+	int		is_user;
+} sid2pid_t;
+
+
+typedef struct pid2sid {
+	avl_node_t	avl_link;
+	struct pid2sid	*flink;
+	struct pid2sid	*blink;
+	const char 	*sid_prefix;
+	uint32_t	rid;
+	uid_t		pid;
+	time_t		ttl;
+} pid2sid_t;
+
 
 
 typedef struct idmap_sid2pid_cache {
 	avl_tree_t		tree;
 	kmutex_t		mutex;
-	struct sid2pid		*prev;
+	struct sid2pid		head;
 	time_t			purge_time;
 	int			uid_num;
 	int			gid_num;
@@ -56,7 +78,7 @@ typedef struct idmap_sid2pid_cache {
 typedef struct idmap_pid2sid_cache {
 	avl_tree_t		tree;
 	kmutex_t		mutex;
-	struct pid2sid		*prev;
+	struct pid2sid		head;
 	time_t			purge_time;
 } idmap_pid2sid_cache_t;
 

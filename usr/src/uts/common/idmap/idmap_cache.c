@@ -29,8 +29,6 @@
  * This module provides the kernel cache.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <sys/types.h>
 #include <sys/avl.h>
@@ -66,33 +64,38 @@ extern	int		space_store(char *key, uintptr_t ptr);
 #define	CACHE_PURGE_INTERVAL	(60 * 3)
 #define	CACHE_TTL		(60 * 10)
 
+
+
+#define	list_insert(head, ele)\
+	do {\
+		(ele)->flink = (head)->flink;\
+		(head)->flink = (ele);\
+		(ele)->blink = (ele)->flink->blink;\
+		(ele)->flink->blink = (ele);\
+	} while (0)
+
+
+
+#define	list_remove(ele)\
+	do {\
+		(ele)->flink->blink = (ele)->blink;\
+		(ele)->blink->flink = (ele)->flink;\
+	} while (0)
+
+
+#define	list_move(head, ele) \
+	do {\
+		if ((head)->flink != (ele)) {\
+			list_remove(ele);\
+			list_insert(head, ele);\
+		}\
+	} while (0)
+
+
 typedef struct sid_prefix_node {
 	avl_node_t	avl_link;
 	const char 	*sid_prefix;
 } sid_prefix_node_t;
-
-
-typedef struct sid2pid {
-	avl_node_t	avl_link;
-	const char 	*sid_prefix;
-	uint32_t	rid;
-	uid_t		uid;
-	time_t		uid_ttl;
-	gid_t		gid;
-	time_t		gid_ttl;
-	int		is_user;
-} sid2pid_t;
-
-
-typedef struct pid2sid {
-	avl_node_t	avl_link;
-	const char 	*sid_prefix;
-	uint32_t	rid;
-	uid_t		pid;
-	time_t		ttl;
-} pid2sid_t;
-
-
 
 
 typedef int (*avl_comp_fn)(const void*, const void*);
@@ -108,10 +111,10 @@ struct sid_prefix_store *kidmap_sid_prefix_store = NULL;
 
 
 static void
-kidmap_purge_sid2pid_avl(idmap_sid2pid_cache_t *cache, size_t limit);
+kidmap_purge_sid2pid_cache(idmap_sid2pid_cache_t *cache, size_t limit);
 
 static void
-kidmap_purge_pid2sid_avl(idmap_pid2sid_cache_t *cache, size_t limit);
+kidmap_purge_pid2sid_cache(idmap_pid2sid_cache_t *cache, size_t limit);
 
 
 /*
@@ -180,7 +183,8 @@ kidmap_cache_create(idmap_cache_t *cache)
 	    sizeof (sid2pid_t), offsetof(sid2pid_t, avl_link));
 	mutex_init(&cache->sid2pid.mutex, NULL, MUTEX_DEFAULT, NULL);
 	cache->sid2pid.purge_time = 0;
-	cache->sid2pid.prev = NULL;
+	cache->sid2pid.head.flink = &cache->sid2pid.head;
+	cache->sid2pid.head.blink = &cache->sid2pid.head;
 	cache->sid2pid.uid_num = 0;
 	cache->sid2pid.gid_num = 0;
 	cache->sid2pid.pid_num = 0;
@@ -189,13 +193,15 @@ kidmap_cache_create(idmap_cache_t *cache)
 	    sizeof (pid2sid_t), offsetof(pid2sid_t, avl_link));
 	mutex_init(&cache->uid2sid.mutex, NULL, MUTEX_DEFAULT, NULL);
 	cache->uid2sid.purge_time = 0;
-	cache->uid2sid.prev = NULL;
+	cache->uid2sid.head.flink = &cache->uid2sid.head;
+	cache->uid2sid.head.blink = &cache->uid2sid.head;
 
 	avl_create(&cache->gid2sid.tree, (avl_comp_fn)kidmap_compare_pid,
 	    sizeof (pid2sid_t), offsetof(pid2sid_t, avl_link));
 	mutex_init(&cache->gid2sid.mutex, NULL, MUTEX_DEFAULT, NULL);
 	cache->gid2sid.purge_time = 0;
-	cache->gid2sid.prev = NULL;
+	cache->gid2sid.head.flink = &cache->gid2sid.head;
+	cache->gid2sid.head.blink = &cache->gid2sid.head;
 }
 
 
@@ -271,7 +277,8 @@ kidmap_cache_purge(idmap_cache_t *cache)
 	avl_create(&cache->sid2pid.tree, (avl_comp_fn)kidmap_compare_sid,
 	    sizeof (sid2pid_t), offsetof(sid2pid_t, avl_link));
 	cache->sid2pid.purge_time = 0;
-	cache->sid2pid.prev = NULL;
+	cache->sid2pid.head.flink = &cache->sid2pid.head;
+	cache->sid2pid.head.blink = &cache->sid2pid.head;
 	cache->sid2pid.uid_num = 0;
 	cache->sid2pid.gid_num = 0;
 	cache->sid2pid.pid_num = 0;
@@ -288,7 +295,8 @@ kidmap_cache_purge(idmap_cache_t *cache)
 	avl_create(&cache->uid2sid.tree, (avl_comp_fn)kidmap_compare_pid,
 	    sizeof (pid2sid_t), offsetof(pid2sid_t, avl_link));
 	cache->uid2sid.purge_time = 0;
-	cache->uid2sid.prev = NULL;
+	cache->uid2sid.head.flink = &cache->uid2sid.head;
+	cache->uid2sid.head.blink = &cache->uid2sid.head;
 	mutex_exit(&cache->uid2sid.mutex);
 
 
@@ -302,7 +310,8 @@ kidmap_cache_purge(idmap_cache_t *cache)
 	avl_create(&cache->gid2sid.tree, (avl_comp_fn)kidmap_compare_pid,
 	    sizeof (pid2sid_t), offsetof(pid2sid_t, avl_link));
 	cache->gid2sid.purge_time = 0;
-	cache->gid2sid.prev = NULL;
+	cache->gid2sid.head.flink = &cache->gid2sid.head;
+	cache->gid2sid.head.blink = &cache->gid2sid.head;
 	mutex_exit(&cache->gid2sid.mutex);
 }
 
@@ -314,7 +323,7 @@ kidmap_cache_lookup_uidbysid(idmap_cache_t *cache, const char *sid_prefix,
 	sid2pid_t	entry;
 	sid2pid_t	*result;
 	avl_index_t	where;
-	int		status;
+	int		status = IDMAP_ERR_NOMAPPING;
 	time_t		now = gethrestime_sec();
 
 	entry.sid_prefix = sid_prefix;
@@ -323,18 +332,18 @@ kidmap_cache_lookup_uidbysid(idmap_cache_t *cache, const char *sid_prefix,
 	mutex_enter(&cache->sid2pid.mutex);
 
 	result = avl_find(&cache->sid2pid.tree, &entry, &where);
-
-	if (result && result->uid != UNDEF_UID && result->uid_ttl > now) {
-		*uid = result->uid;
-		status = IDMAP_SUCCESS;
-	} else
-		status = IDMAP_ERR_NOMAPPING;
+	if (result != NULL) {
+		list_move(&cache->sid2pid.head, result);
+		if (result->uid != UNDEF_UID && result->uid_ttl > now) {
+			*uid = result->uid;
+			status = IDMAP_SUCCESS;
+		}
+	}
 
 	mutex_exit(&cache->sid2pid.mutex);
 
 	return (status);
 }
-
 
 
 int
@@ -344,7 +353,7 @@ kidmap_cache_lookup_gidbysid(idmap_cache_t *cache, const char *sid_prefix,
 	sid2pid_t	entry;
 	sid2pid_t	*result;
 	avl_index_t	where;
-	int		status;
+	int		status = IDMAP_ERR_NOMAPPING;
 	time_t		now = gethrestime_sec();
 
 	entry.sid_prefix = sid_prefix;
@@ -353,19 +362,18 @@ kidmap_cache_lookup_gidbysid(idmap_cache_t *cache, const char *sid_prefix,
 	mutex_enter(&cache->sid2pid.mutex);
 
 	result = avl_find(&cache->sid2pid.tree, &entry, &where);
-
-	if (result && result->gid != UNDEF_GID && result->gid_ttl > now) {
-		*gid = result->gid;
-		status = IDMAP_SUCCESS;
-	} else
-		status = IDMAP_ERR_NOMAPPING;
+	if (result != NULL) {
+		list_move(&cache->sid2pid.head, result);
+		if (result->gid != UNDEF_GID && result->gid_ttl > now) {
+			*gid = result->gid;
+			status = IDMAP_SUCCESS;
+		}
+	}
 
 	mutex_exit(&cache->sid2pid.mutex);
 
 	return (status);
 }
-
-
 
 
 int
@@ -375,7 +383,7 @@ kidmap_cache_lookup_pidbysid(idmap_cache_t *cache, const char *sid_prefix,
 	sid2pid_t	entry;
 	sid2pid_t	*result;
 	avl_index_t	where;
-	int		status;
+	int		status = IDMAP_ERR_NOMAPPING;
 	time_t		now = gethrestime_sec();
 
 	entry.sid_prefix = sid_prefix;
@@ -384,20 +392,20 @@ kidmap_cache_lookup_pidbysid(idmap_cache_t *cache, const char *sid_prefix,
 	mutex_enter(&cache->sid2pid.mutex);
 
 	result = avl_find(&cache->sid2pid.tree, &entry, &where);
-
-	if (result && result->is_user != UNDEF_ISUSER) {
-		if (result->is_user && result->uid_ttl > now) {
-			*pid = result->uid;
-			*is_user = result->is_user;
-			status = IDMAP_SUCCESS;
-		} else if (!result->is_user && result->gid_ttl > now) {
-			*pid = result->gid;
-			*is_user = result->is_user;
-			status = IDMAP_SUCCESS;
-		} else
-			status = IDMAP_ERR_NOMAPPING;
-	} else
-		status = IDMAP_ERR_NOMAPPING;
+	if (result != NULL) {
+		list_move(&cache->sid2pid.head, result);
+		if (result->is_user != UNDEF_ISUSER) {
+			if (result->is_user && result->uid_ttl > now) {
+				*pid = result->uid;
+				*is_user = result->is_user;
+				status = IDMAP_SUCCESS;
+			} else if (!result->is_user && result->gid_ttl > now) {
+				*pid = result->gid;
+				*is_user = result->is_user;
+				status = IDMAP_SUCCESS;
+			}
+		}
+	}
 
 	mutex_exit(&cache->sid2pid.mutex);
 
@@ -413,7 +421,7 @@ kidmap_cache_lookup_sidbyuid(idmap_cache_t *cache, const char **sid_prefix,
 	pid2sid_t	entry;
 	pid2sid_t	*result;
 	avl_index_t	where;
-	int		status;
+	int		status = IDMAP_ERR_NOMAPPING;
 	time_t		now = gethrestime_sec();
 
 	entry.pid = uid;
@@ -421,18 +429,20 @@ kidmap_cache_lookup_sidbyuid(idmap_cache_t *cache, const char **sid_prefix,
 	mutex_enter(&cache->uid2sid.mutex);
 
 	result = avl_find(&cache->uid2sid.tree, &entry, &where);
-
-	if (result && result->ttl > now) {
-		*sid_prefix = result->sid_prefix;
-		*rid = result->rid;
-		status = IDMAP_SUCCESS;
-	} else
-		status = IDMAP_ERR_NOMAPPING;
+	if (result != NULL) {
+		list_move(&cache->uid2sid.head, result);
+		if (result->ttl > now) {
+			*sid_prefix = result->sid_prefix;
+			*rid = result->rid;
+			status = IDMAP_SUCCESS;
+		}
+	}
 
 	mutex_exit(&cache->uid2sid.mutex);
 
 	return (status);
 }
+
 
 int
 kidmap_cache_lookup_sidbygid(idmap_cache_t *cache, const char **sid_prefix,
@@ -441,7 +451,7 @@ kidmap_cache_lookup_sidbygid(idmap_cache_t *cache, const char **sid_prefix,
 	pid2sid_t	entry;
 	pid2sid_t	*result;
 	avl_index_t	where;
-	int		status;
+	int		status = IDMAP_ERR_NOMAPPING;
 	time_t		now = gethrestime_sec();
 
 	entry.pid = gid;
@@ -449,21 +459,19 @@ kidmap_cache_lookup_sidbygid(idmap_cache_t *cache, const char **sid_prefix,
 	mutex_enter(&cache->gid2sid.mutex);
 
 	result = avl_find(&cache->gid2sid.tree, &entry, &where);
-
-	if (result && result->ttl > now) {
-		*sid_prefix = result->sid_prefix;
-		*rid = result->rid;
-		status = IDMAP_SUCCESS;
-	} else
-		status = IDMAP_ERR_NOMAPPING;
+	if (result != NULL) {
+		list_move(&cache->gid2sid.head, result);
+		if (result->ttl > now) {
+			*sid_prefix = result->sid_prefix;
+			*rid = result->rid;
+			status = IDMAP_SUCCESS;
+		}
+	}
 
 	mutex_exit(&cache->gid2sid.mutex);
 
 	return (status);
 }
-
-
-
 
 
 void
@@ -472,7 +480,6 @@ kidmap_cache_add_sid2uid(idmap_cache_t *cache, const char *sid_prefix,
 
 {
 	avl_index_t	where;
-	int		purge_required;
 	time_t		ttl = CACHE_TTL + gethrestime_sec();
 
 
@@ -482,13 +489,12 @@ kidmap_cache_add_sid2uid(idmap_cache_t *cache, const char *sid_prefix,
 		sid2pid_t	*result;
 		sid2pid_t	*new;
 
-		purge_required = FALSE;
 		find.sid_prefix = sid_prefix;
 		find.rid = rid;
 
 		mutex_enter(&cache->sid2pid.mutex);
-		result = avl_find(&cache->sid2pid.tree, &find, &where);
 
+		result = avl_find(&cache->sid2pid.tree, &find, &where);
 		if (result) {
 			if (result->uid == UNDEF_UID)
 				cache->sid2pid.uid_num++;
@@ -505,20 +511,18 @@ kidmap_cache_add_sid2uid(idmap_cache_t *cache, const char *sid_prefix,
 			new->is_user = UNDEF_ISUSER; /* Unknown */
 			cache->sid2pid.uid_num++;
 
+			list_insert(&cache->sid2pid.head, new);
 			avl_insert(&cache->sid2pid.tree, new, where);
-
-			if ((avl_numnodes(&cache->sid2pid.tree) >
-			    CACHE_PID_TRIGGER_SIZE) &&
-			    (cache->sid2pid.purge_time + CACHE_PURGE_INTERVAL <
-			    gethrestime_sec()))
-				purge_required = TRUE;
 		}
 
-		mutex_exit(&cache->sid2pid.mutex);
-
-		if (purge_required)
-			kidmap_purge_sid2pid_avl(&cache->sid2pid,
+		if ((avl_numnodes(&cache->sid2pid.tree) >
+		    CACHE_PID_TRIGGER_SIZE) &&
+		    (cache->sid2pid.purge_time + CACHE_PURGE_INTERVAL <
+		    gethrestime_sec()))
+			kidmap_purge_sid2pid_cache(&cache->sid2pid,
 			    CACHE_PID_TRIGGER_SIZE);
+
+		mutex_exit(&cache->sid2pid.mutex);
 	}
 
 	if (direction == IDMAP_DIRECTION_BI ||
@@ -527,12 +531,11 @@ kidmap_cache_add_sid2uid(idmap_cache_t *cache, const char *sid_prefix,
 		pid2sid_t	*result;
 		pid2sid_t	*new;
 
-		purge_required = FALSE;
 		find.pid = uid;
 
 		mutex_enter(&cache->uid2sid.mutex);
-		result = avl_find(&cache->uid2sid.tree, &find, &where);
 
+		result = avl_find(&cache->uid2sid.tree, &find, &where);
 		if (result) {
 			result->sid_prefix = sid_prefix;
 			result->rid = rid;
@@ -544,19 +547,18 @@ kidmap_cache_add_sid2uid(idmap_cache_t *cache, const char *sid_prefix,
 			new->pid = uid;
 			new->ttl = ttl;
 
+			list_insert(&cache->uid2sid.head, new);
 			avl_insert(&cache->uid2sid.tree, new, where);
-
-			if ((avl_numnodes(&cache->uid2sid.tree) >
-			    CACHE_UID_TRIGGER_SIZE) &&
-			    (cache->uid2sid.purge_time + CACHE_PURGE_INTERVAL <
-			    gethrestime_sec()))
-				purge_required = TRUE;
 		}
-		mutex_exit(&cache->uid2sid.mutex);
 
-		if (purge_required)
-			kidmap_purge_pid2sid_avl(&cache->uid2sid,
+		if ((avl_numnodes(&cache->uid2sid.tree) >
+		    CACHE_UID_TRIGGER_SIZE) &&
+		    (cache->uid2sid.purge_time + CACHE_PURGE_INTERVAL <
+		    gethrestime_sec()))
+			kidmap_purge_pid2sid_cache(&cache->uid2sid,
 			    CACHE_UID_TRIGGER_SIZE);
+
+		mutex_exit(&cache->uid2sid.mutex);
 	}
 }
 
@@ -567,7 +569,6 @@ kidmap_cache_add_sid2gid(idmap_cache_t *cache, const char *sid_prefix,
 			uint32_t rid, gid_t gid, int direction)
 {
 	avl_index_t	where;
-	int		purge_required;
 	time_t		ttl = CACHE_TTL + gethrestime_sec();
 
 
@@ -577,13 +578,12 @@ kidmap_cache_add_sid2gid(idmap_cache_t *cache, const char *sid_prefix,
 		sid2pid_t	*result;
 		sid2pid_t	*new;
 
-		purge_required = FALSE;
 		find.sid_prefix = sid_prefix;
 		find.rid = rid;
 
 		mutex_enter(&cache->sid2pid.mutex);
-		result = avl_find(&cache->sid2pid.tree, &find, &where);
 
+		result = avl_find(&cache->sid2pid.tree, &find, &where);
 		if (result) {
 			if (result->gid == UNDEF_GID)
 				cache->sid2pid.gid_num++;
@@ -600,19 +600,18 @@ kidmap_cache_add_sid2gid(idmap_cache_t *cache, const char *sid_prefix,
 			new->is_user = UNDEF_ISUSER; /* Unknown */
 			cache->sid2pid.gid_num++;
 
+			list_insert(&cache->sid2pid.head, new);
 			avl_insert(&cache->sid2pid.tree, new, where);
-
-			if ((avl_numnodes(&cache->sid2pid.tree) >
-			    CACHE_PID_TRIGGER_SIZE) &&
-			    (cache->sid2pid.purge_time + CACHE_PURGE_INTERVAL <
-			    gethrestime_sec()))
-				purge_required = TRUE;
 		}
-		mutex_exit(&cache->sid2pid.mutex);
 
-		if (purge_required)
-			kidmap_purge_sid2pid_avl(&cache->sid2pid,
+		if ((avl_numnodes(&cache->sid2pid.tree) >
+		    CACHE_PID_TRIGGER_SIZE) &&
+		    (cache->sid2pid.purge_time + CACHE_PURGE_INTERVAL <
+		    gethrestime_sec()))
+			kidmap_purge_sid2pid_cache(&cache->sid2pid,
 			    CACHE_PID_TRIGGER_SIZE);
+
+		mutex_exit(&cache->sid2pid.mutex);
 	}
 
 	if (direction == IDMAP_DIRECTION_BI ||
@@ -621,12 +620,11 @@ kidmap_cache_add_sid2gid(idmap_cache_t *cache, const char *sid_prefix,
 		pid2sid_t	*result;
 		pid2sid_t	*new;
 
-		purge_required = FALSE;
 		find.pid = gid;
 
 		mutex_enter(&cache->gid2sid.mutex);
-		result = avl_find(&cache->gid2sid.tree, &find, &where);
 
+		result = avl_find(&cache->gid2sid.tree, &find, &where);
 		if (result) {
 			result->sid_prefix = sid_prefix;
 			result->rid = rid;
@@ -638,19 +636,18 @@ kidmap_cache_add_sid2gid(idmap_cache_t *cache, const char *sid_prefix,
 			new->pid = gid;
 			new->ttl = ttl;
 
+			list_insert(&cache->gid2sid.head, new);
 			avl_insert(&cache->gid2sid.tree, new, where);
-
-			if ((avl_numnodes(&cache->gid2sid.tree) >
-			    CACHE_GID_TRIGGER_SIZE) &&
-			    (cache->gid2sid.purge_time + CACHE_PURGE_INTERVAL <
-			    gethrestime_sec()))
-				purge_required = TRUE;
 		}
-		mutex_exit(&cache->gid2sid.mutex);
 
-		if (purge_required)
-			kidmap_purge_pid2sid_avl(&cache->gid2sid,
+		if ((avl_numnodes(&cache->gid2sid.tree) >
+		    CACHE_GID_TRIGGER_SIZE) &&
+		    (cache->gid2sid.purge_time + CACHE_PURGE_INTERVAL <
+		    gethrestime_sec()))
+			kidmap_purge_pid2sid_cache(&cache->gid2sid,
 			    CACHE_GID_TRIGGER_SIZE);
+
+		mutex_exit(&cache->gid2sid.mutex);
 	}
 }
 
@@ -660,7 +657,6 @@ kidmap_cache_add_sid2pid(idmap_cache_t *cache, const char *sid_prefix,
 			uint32_t rid, uid_t pid, int is_user, int direction)
 {
 	avl_index_t	where;
-	int		purge_required;
 	time_t		ttl = CACHE_TTL + gethrestime_sec();
 
 
@@ -670,13 +666,12 @@ kidmap_cache_add_sid2pid(idmap_cache_t *cache, const char *sid_prefix,
 		sid2pid_t	*result;
 		sid2pid_t	*new;
 
-		purge_required = FALSE;
 		find.sid_prefix = sid_prefix;
 		find.rid = rid;
 
 		mutex_enter(&cache->sid2pid.mutex);
-		result = avl_find(&cache->sid2pid.tree, &find, &where);
 
+		result = avl_find(&cache->sid2pid.tree, &find, &where);
 		if (result) {
 			if (result->is_user == UNDEF_ISUSER)
 				cache->sid2pid.pid_num++;
@@ -712,19 +707,18 @@ kidmap_cache_add_sid2pid(idmap_cache_t *cache, const char *sid_prefix,
 			}
 			cache->sid2pid.pid_num++;
 
+			list_insert(&cache->sid2pid.head, new);
 			avl_insert(&cache->sid2pid.tree, new, where);
-
-			if ((avl_numnodes(&cache->sid2pid.tree) >
-			    CACHE_PID_TRIGGER_SIZE) &&
-			    (cache->sid2pid.purge_time + CACHE_PURGE_INTERVAL <
-			    gethrestime_sec()))
-				purge_required = TRUE;
 		}
-		mutex_exit(&cache->sid2pid.mutex);
 
-		if (purge_required)
-			kidmap_purge_sid2pid_avl(&cache->sid2pid,
+		if ((avl_numnodes(&cache->sid2pid.tree) >
+		    CACHE_PID_TRIGGER_SIZE) &&
+		    (cache->sid2pid.purge_time + CACHE_PURGE_INTERVAL <
+		    gethrestime_sec()))
+			kidmap_purge_sid2pid_cache(&cache->sid2pid,
 			    CACHE_PID_TRIGGER_SIZE);
+
+		mutex_exit(&cache->sid2pid.mutex);
 	}
 
 	if (direction == IDMAP_DIRECTION_BI ||
@@ -733,12 +727,11 @@ kidmap_cache_add_sid2pid(idmap_cache_t *cache, const char *sid_prefix,
 		pid2sid_t	*result;
 		pid2sid_t	*new;
 
-		purge_required = FALSE;
 		find.pid = pid;
 		if (is_user) {
 			mutex_enter(&cache->uid2sid.mutex);
-			result = avl_find(&cache->uid2sid.tree, &find, &where);
 
+			result = avl_find(&cache->uid2sid.tree, &find, &where);
 			if (result) {
 				result->sid_prefix = sid_prefix;
 				result->rid = rid;
@@ -750,24 +743,23 @@ kidmap_cache_add_sid2pid(idmap_cache_t *cache, const char *sid_prefix,
 				new->pid = pid;
 				new->ttl = ttl;
 
+				list_insert(&cache->uid2sid.head, new);
 				avl_insert(&cache->uid2sid.tree, new, where);
-
-				if ((avl_numnodes(&cache->uid2sid.tree) >
-				    CACHE_UID_TRIGGER_SIZE) &&
-				    (cache->uid2sid.purge_time +
-				    CACHE_PURGE_INTERVAL <
-				    gethrestime_sec()))
-					purge_required = TRUE;
 			}
-			mutex_exit(&cache->uid2sid.mutex);
 
-			if (purge_required)
-				kidmap_purge_pid2sid_avl(&cache->uid2sid,
+			if ((avl_numnodes(&cache->uid2sid.tree) >
+			    CACHE_UID_TRIGGER_SIZE) &&
+			    (cache->uid2sid.purge_time +
+			    CACHE_PURGE_INTERVAL <
+			    gethrestime_sec()))
+				kidmap_purge_pid2sid_cache(&cache->uid2sid,
 				    CACHE_UID_TRIGGER_SIZE);
+
+			mutex_exit(&cache->uid2sid.mutex);
 		} else {
 			mutex_enter(&cache->gid2sid.mutex);
-			result = avl_find(&cache->gid2sid.tree, &find, &where);
 
+			result = avl_find(&cache->gid2sid.tree, &find, &where);
 			if (result) {
 				result->sid_prefix = sid_prefix;
 				result->rid = rid;
@@ -779,21 +771,18 @@ kidmap_cache_add_sid2pid(idmap_cache_t *cache, const char *sid_prefix,
 				new->pid = pid;
 				new->ttl = ttl;
 
+				list_insert(&cache->gid2sid.head, new);
 				avl_insert(&cache->gid2sid.tree, new, where);
-
-				if ((avl_numnodes(&cache->gid2sid.tree) >
-				    CACHE_GID_TRIGGER_SIZE) &&
-				    (cache->gid2sid.purge_time +
-				    CACHE_PURGE_INTERVAL <
-				    gethrestime_sec()))
-					purge_required = TRUE;
-
 			}
-			mutex_exit(&cache->gid2sid.mutex);
 
-			if (purge_required)
-				kidmap_purge_pid2sid_avl(&cache->gid2sid,
+			if ((avl_numnodes(&cache->gid2sid.tree) >
+			    CACHE_GID_TRIGGER_SIZE) &&
+			    (cache->gid2sid.purge_time +
+			    CACHE_PURGE_INTERVAL < gethrestime_sec()))
+				kidmap_purge_pid2sid_cache(&cache->gid2sid,
 				    CACHE_GID_TRIGGER_SIZE);
+
+			mutex_exit(&cache->gid2sid.mutex);
 		}
 	}
 }
@@ -803,110 +792,43 @@ kidmap_cache_add_sid2pid(idmap_cache_t *cache, const char *sid_prefix,
 
 
 static void
-kidmap_purge_sid2pid_avl(idmap_sid2pid_cache_t *avl, size_t limit)
+kidmap_purge_sid2pid_cache(idmap_sid2pid_cache_t *cache, size_t limit)
 {
 	time_t		now = gethrestime_sec();
-	sid2pid_t	*curr;
-	sid2pid_t	*prev;
-	sid2pid_t	*start;
-	int		last = FALSE;
+	sid2pid_t	*item;
 
-	mutex_enter(&avl->mutex);
-	if (avl_numnodes(&avl->tree) <= limit) {
-		mutex_exit(&avl->mutex);
-		return;
+	while (avl_numnodes(&cache->tree) > limit) {
+		/* Remove least recently used */
+		item = cache->head.blink;
+		list_remove(item);
+		avl_remove(&cache->tree, item);
+		if (item->uid != UNDEF_UID)
+			cache->uid_num--;
+		if (item->gid != UNDEF_GID)
+			cache->gid_num--;
+		if (item->is_user != UNDEF_ISUSER)
+			cache->pid_num--;
+		kmem_free(item, sizeof (sid2pid_t));
 	}
-
-	if (avl->prev == NULL)
-		start = avl_first(&avl->tree);
-	else
-		start = avl->prev;
-
-	prev = start;
-	curr = AVL_NEXT(&avl->tree, prev);
-	if (curr == NULL)
-		curr = avl_first(&avl->tree);
-
-	while (!last && avl_numnodes(&avl->tree) > limit) {
-		if (curr == start)
-			last = TRUE;
-		if (curr->uid_ttl < now && curr->gid_ttl < now) {
-			/* Old entry to remove */
-			avl_remove(&avl->tree, curr);
-			if (curr->uid != UNDEF_UID)
-				avl->uid_num--;
-			if (curr->gid != UNDEF_GID)
-				avl->gid_num--;
-			if (curr->is_user != UNDEF_ISUSER)
-				avl->pid_num--;
-			kmem_free(curr, sizeof (sid2pid_t));
-			curr = AVL_NEXT(&avl->tree, prev);
-			if (curr == NULL)
-				curr = avl_first(&avl->tree);
-			continue;
-		}
-		prev = curr;
-		curr = AVL_NEXT(&avl->tree, curr);
-		if (curr == NULL)
-			curr = avl_first(&avl->tree);
-	}
-	avl->purge_time = now;
-	avl->prev = prev;
-
-	mutex_exit(&avl->mutex);
+	cache->purge_time = now;
 }
 
 
 static void
-kidmap_purge_pid2sid_avl(idmap_pid2sid_cache_t *avl, size_t limit)
+kidmap_purge_pid2sid_cache(idmap_pid2sid_cache_t *cache, size_t limit)
 {
 	time_t		now = gethrestime_sec();
-	pid2sid_t	*curr;
-	pid2sid_t	*prev = NULL;
-	pid2sid_t	*start;
-	int		last = FALSE;
+	pid2sid_t	*item;
 
-	mutex_enter(&avl->mutex);
-	if (avl_numnodes(&avl->tree) <= limit) {
-		mutex_exit(&avl->mutex);
-		return;
+	while (avl_numnodes(&cache->tree) > limit) {
+		/* Remove least recently used */
+		item = cache->head.blink;
+		list_remove(item);
+		avl_remove(&cache->tree, item);
+		kmem_free(item, sizeof (pid2sid_t));
 	}
-
-	if (avl->prev == NULL)
-		start = avl_first(&avl->tree);
-	else
-		start = avl->prev;
-
-	prev = start;
-	curr = AVL_NEXT(&avl->tree, prev);
-	if (curr == NULL)
-		curr = avl_first(&avl->tree);
-
-	while (!last && avl_numnodes(&avl->tree) > limit) {
-		if (curr == start)
-			last = TRUE;
-		if (curr->ttl < now) {
-			/* Old entry to remove */
-			avl_remove(&avl->tree, curr);
-			kmem_free(curr, sizeof (pid2sid_t));
-			curr = AVL_NEXT(&avl->tree, prev);
-			if (curr == NULL)
-				curr = avl_first(&avl->tree);
-			continue;
-		}
-		prev = curr;
-		curr = AVL_NEXT(&avl->tree, curr);
-		if (curr == NULL)
-			curr = avl_first(&avl->tree);
-	}
-	avl->purge_time = now;
-	avl->prev = prev;
-
-	mutex_exit(&avl->mutex);
+	cache->purge_time = now;
 }
-
-
-
 
 
 void
