@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PCIC device/interrupt handler
  *	The "pcic" driver handles the Intel 82365SL, Cirrus Logic
@@ -79,6 +77,10 @@
 
 #include <sys/pcic_reg.h>
 #include <sys/pcic_var.h>
+
+#if defined(__i386) || defined(__amd64)
+#include <sys/pci_cfgspace.h>
+#endif
 
 #if defined(__sparc)
 #include <sys/pci/pci_nexus.h>
@@ -1731,6 +1733,13 @@ pcic_setup_adapter(pcicdev_t *pcic)
 	int i;
 	int value, flags;
 
+#if defined(__i386) || defined(__amd64)
+	pci_regspec_t *reg;
+	uchar_t bus, dev, func;
+	uint_t classcode;
+	int length;
+#endif
+
 	if (pcic->pc_flags & PCF_PCIBUS) {
 		/*
 		 * all PCI-to-PCMCIA bus bridges need memory and I/O enabled
@@ -1904,18 +1913,71 @@ pcic_setup_adapter(pcicdev_t *pcic)
 		    case PCIC_TI_PCI1510:
 		    case PCIC_TI_VENDOR:
 			if (pcic->pc_intr_mode == PCIC_INTR_MODE_ISA) {
+				/* functional intr routed by ExCA register */
 				cfg = ddi_get8(pcic->cfg_handle,
 					pcic->cfgaddr + PCIC_BRIDGE_CTL_REG);
 				cfg |= PCIC_FUN_INT_MOD_ISA;
 				ddi_put8(pcic->cfg_handle,
 					pcic->cfgaddr + PCIC_BRIDGE_CTL_REG,
 					cfg);
+
+				/* IRQ serialized interrupts */
+				cfg = ddi_get8(pcic->cfg_handle,
+					pcic->cfgaddr + PCIC_DEVCTL_REG);
+				cfg &= ~PCIC_DEVCTL_INTR_MASK;
+				cfg |= PCIC_DEVCTL_INTR_ISA;
+				ddi_put8(pcic->cfg_handle,
+					pcic->cfgaddr + PCIC_DEVCTL_REG,
+					cfg);
+				break;
 			}
+
+			/* CSC interrupt routed to PCI */
+			cfg = ddi_get8(pcic->cfg_handle,
+			    pcic->cfgaddr + PCIC_DIAG_REG);
+			cfg |= (PCIC_DIAG_CSC | PCIC_DIAG_ASYNC);
+			ddi_put8(pcic->cfg_handle,
+			    pcic->cfgaddr + PCIC_DIAG_REG, cfg);
+
+#if defined(__i386) || defined(__amd64)
+			/*
+			 * Some TI chips have 2 cardbus slots(function0 and
+			 * function1), and others may have just 1 cardbus slot.
+			 * The interrupt routing register is shared between the
+			 * 2 functions and can only be accessed through
+			 * function0. Here we check the presence of the second
+			 * cardbus slot and do the right thing.
+			 */
+
+			if (ddi_getlongprop(DDI_DEV_T_ANY, pcic->dip,
+			    DDI_PROP_DONTPASS, "reg", (caddr_t)&reg,
+			    &length) != DDI_PROP_SUCCESS) {
+			    cmn_err(CE_WARN, "pcic_setup_adapter(), failed to"
+				" read reg property\n");
+				break;
+			}
+
+			bus = PCI_REG_BUS_G(reg->pci_phys_hi);
+			dev = PCI_REG_DEV_G(reg->pci_phys_hi);
+			func = PCI_REG_FUNC_G(reg->pci_phys_hi);
+			kmem_free((caddr_t)reg, length);
+
+			if (func != 0) {
+				break;
+			}
+
+			classcode = (*pci_getl_func)(bus, dev, 1,
+					PCI_CONF_REVID);
+			classcode >>= 8;
+			if (classcode != 0x060700 &&
+			    classcode != 0x060500) {
+				break;
+			}
+
+			/* Parallel PCI interrupts only */
 			cfg = ddi_get8(pcic->cfg_handle,
 					pcic->cfgaddr + PCIC_DEVCTL_REG);
 			cfg &= ~PCIC_DEVCTL_INTR_MASK;
-			if (pcic->pc_intr_mode == PCIC_INTR_MODE_ISA)
-				cfg |= PCIC_DEVCTL_INTR_ISA;
 			ddi_put8(pcic->cfg_handle,
 					pcic->cfgaddr + PCIC_DEVCTL_REG,
 					cfg);
@@ -1926,11 +1988,8 @@ pcic_setup_adapter(pcicdev_t *pcic)
 			cfg |= PCIC_SYSCTL_INTRTIE;
 			ddi_put8(pcic->cfg_handle, (pcic->cfgaddr +
 				PCIC_SYSCTL_REG + 3), cfg);
-			cfg = ddi_get8(pcic->cfg_handle,
-			    pcic->cfgaddr + PCIC_DIAG_REG);
-			cfg |= (PCIC_DIAG_CSC | PCIC_DIAG_ASYNC);
-			ddi_put8(pcic->cfg_handle,
-			    pcic->cfgaddr + PCIC_DIAG_REG, cfg);
+#endif
+
 			break;
 		    case PCIC_TI_PCI1410:
 			cfg = ddi_get8(pcic->cfg_handle,
