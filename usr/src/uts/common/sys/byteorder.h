@@ -100,9 +100,30 @@ extern	uint64_t ntohll(uint64_t);
  * Macros to reverse byte order
  */
 #define	BSWAP_8(x)	((x) & 0xff)
+#if !defined(__i386) && !defined(__amd64)
 #define	BSWAP_16(x)	((BSWAP_8(x) << 8) | BSWAP_8((x) >> 8))
-#define	BSWAP_32(x)	((BSWAP_16(x) << 16) | BSWAP_16((x) >> 16))
-#define	BSWAP_64(x)	((BSWAP_32(x) << 32) | BSWAP_32((x) >> 32))
+#define	BSWAP_32(x)	(((uint32_t)(x) << 24) | \
+			(((uint32_t)(x) << 8) & 0xff0000) | \
+			(((uint32_t)(x) >> 8) & 0xff00) | \
+			((uint32_t)(x)  >> 24))
+#else /* x86 */
+#define	BSWAP_16(x)	htons(x)
+#define	BSWAP_32(x)	htonl(x)
+#endif	/* !__i386 && !__amd64 */
+
+#if (!defined(__i386) && !defined(__amd64)) || \
+	((defined(_XPG4_2) || defined(_XPG5)) && !defined(__EXTENSIONS__))
+#define	BSWAP_64(x)	(((uint64_t)(x) << 56) | \
+			(((uint64_t)(x) << 40) & 0xff000000000000ULL) | \
+			(((uint64_t)(x) << 24) & 0xff0000000000ULL) | \
+			(((uint64_t)(x) << 8)  & 0xff00000000ULL) | \
+			(((uint64_t)(x) >> 8)  & 0xff000000ULL) | \
+			(((uint64_t)(x) >> 24) & 0xff0000ULL) | \
+			(((uint64_t)(x) >> 40) & 0xff00ULL) | \
+			((uint64_t)(x)  >> 56))
+#else /* x86 with non-XPG extensions allowed */
+#define	BSWAP_64(x)	htonll(x)
+#endif	/* (!__i386&&!__amd64) || ((_XPG4_2||_XPG5) && !__EXTENSIONS__) */
 
 #define	BMASK_8(x)	((x) & 0xff)
 #define	BMASK_16(x)	((x) & 0xffff)
@@ -140,14 +161,25 @@ extern	uint64_t ntohll(uint64_t);
 #define	BE_IN8(xa) \
 	*((uint8_t *)(xa))
 
+#if !defined(__i386) && !defined(__amd64)
 #define	BE_IN16(xa) \
-	(((uint16_t)BE_IN8(xa) << 8) | BE_IN8((uint8_t *)(xa)+1))
+	(((uint16_t)BE_IN8(xa) << 8) | BE_IN8((uint8_t *)(xa) + 1))
 
 #define	BE_IN32(xa) \
-	(((uint32_t)BE_IN16(xa) << 16) | BE_IN16((uint8_t *)(xa)+2))
+	(((uint32_t)BE_IN16(xa) << 16) | BE_IN16((uint8_t *)(xa) + 2))
 
+#else /* x86 */
+#define	BE_IN16(xa) htons(*((uint16_t *)(void *)(xa)))
+#define	BE_IN32(xa) htonl(*((uint32_t *)(void *)(xa)))
+#endif	/* !__i386 && !__amd64 */
+
+#if (!defined(__i386) && !defined(__amd64)) || \
+	((defined(_XPG4_2) || defined(_XPG5)) && !defined(__EXTENSIONS__))
 #define	BE_IN64(xa) \
-	(((uint64_t)BE_IN32(xa) << 32) | BE_IN32((uint8_t *)(xa)+4))
+	(((uint64_t)BE_IN32(xa) << 32) | BE_IN32((uint8_t *)(xa) + 4))
+#else /* x86 with non-XPG extensions allowed */
+#define	BE_IN64(xa) htonll(*((uint64_t *)(void *)(xa)))
+#endif	/* (!__i386&&!__amd64) || ((_XPG4_2||_XPG5) && !__EXTENSIONS__) */
 
 #define	LE_IN8(xa) \
 	*((uint8_t *)(xa))
@@ -176,9 +208,14 @@ extern	uint64_t ntohll(uint64_t);
 	BE_OUT16((uint8_t *)(xa) + 2, yv); \
 	BE_OUT16((uint8_t *)(xa), (yv) >> 16);
 
+#if (!defined(__i386) && !defined(__amd64)) || \
+	((defined(_XPG4_2) || defined(_XPG5)) && !defined(__EXTENSIONS__))
 #define	BE_OUT64(xa, yv) \
 	BE_OUT32((uint8_t *)(xa) + 4, yv); \
 	BE_OUT32((uint8_t *)(xa), (yv) >> 32);
+#else /* x86 with non-XPG extensions allowed */
+#define	BE_OUT64(xa, yv) *((uint64_t *)(void *)(xa)) = htonll((uint64_t)(yv));
+#endif	/* (!__i386&&!__amd64) || ((_XPG4_2||_XPG5) && !__EXTENSIONS__) */
 
 #define	LE_OUT8(xa, yv) *((uint8_t *)(xa)) = (uint8_t)(yv);
 
