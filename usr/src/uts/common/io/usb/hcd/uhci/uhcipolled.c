@@ -493,7 +493,8 @@ uhci_polled_init(usba_pipe_handle_data_t	*ph,
 	}
 
 	/* Allocate and intitialize a polled mode state structure */
-	uhci_polledp = kmem_zalloc(sizeof (uhci_polled_t), KM_SLEEP);
+	uhci_polledp = (uhci_polled_t *)kmem_zalloc(sizeof (uhci_polled_t),
+	    KM_SLEEP);
 
 	/*
 	 * Keep a copy of normal mode state structure and pipe handle.
@@ -756,7 +757,7 @@ uhci_polled_restore_state(uhci_polled_t	*uhci_polledp)
 				pp->pp_data_toggle =
 				    (real_data_toggle == 0) ? 1 : 0;
 			} else {
-				pp->pp_data_toggle = real_data_toggle;
+				pp->pp_data_toggle = (uchar_t)real_data_toggle;
 			}
 		}
 		td = td->outst_td_next;

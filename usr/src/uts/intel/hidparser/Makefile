@@ -20,10 +20,9 @@
 #
 #
 # uts/intel/hidparser/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the hidparser driver 
 #	kernel module.
@@ -64,13 +63,6 @@ CLEANFILES	+= $(MODSTUBS_O)
 # depends on misc/usba
 #
 LDFLAGS         += -dy -Nmisc/usba
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
 
 #
 #	Default build targets.

@@ -68,6 +68,7 @@
 #include <sys/sunndi.h>
 #include <sys/ndi_impldefs.h>
 #include <sys/strsubr.h>
+#include <sys/strsun.h>
 
 #include <sys/audio.h>
 #include <sys/audiovar.h>
@@ -1618,7 +1619,7 @@ usb_ac_feature_unit_check(usb_ac_state_t *uacp, uint_t featureID,
 	    "usb_ac_feature_unit_check: ID=%d ch=%d cntrl=%d",
 	    featureID, channel, control);
 
-	ASSERT((featureID >= 0) && (featureID < uacp->usb_ac_max_unit));
+	ASSERT(featureID < uacp->usb_ac_max_unit);
 
 	/*
 	 * check if this control is supported on this channel
@@ -2774,7 +2775,8 @@ usb_ac_push_unit_id(usb_ac_state_t *uacp, uint_t unit)
 	    "usb_ac_push_unit_id: pushing %d at %d", unit,
 	    uacp->usb_ac_traverse_path_index);
 
-	uacp->usb_ac_traverse_path[uacp->usb_ac_traverse_path_index++] = unit;
+	uacp->usb_ac_traverse_path[uacp->usb_ac_traverse_path_index++] =
+	    (uchar_t)unit;
 	ASSERT(uacp->usb_ac_traverse_path_index < uacp->usb_ac_max_unit);
 }
 
@@ -4449,7 +4451,7 @@ usb_ac_get_maxmin_volume(usb_ac_state_t *uacp, uint_t channel, int cmd,
 	}
 
 	mutex_enter(&uacp->usb_ac_mutex);
-	ASSERT((data->b_wptr - data->b_rptr) == 2);
+	ASSERT(MBLKL(data) == 2);
 
 	max_or_min = (*(data->b_rptr+1) << 8) | *data->b_rptr;
 
@@ -4703,8 +4705,7 @@ usb_ac_send_as_cmd(usb_ac_state_t *uacp, usb_ac_plumbed_t *plumb_infop,
 			 * and returns alternate setting that matches
 			 */
 			ASSERT(mp->b_cont != NULL);
-			ASSERT((mp->b_cont->b_wptr - mp->b_cont->b_rptr) ==
-			    sizeof (int));
+			ASSERT(MBLKL(mp->b_cont) == sizeof (int));
 			USB_DPRINTF_L3(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 			    "alternate returned %d",
 			    *((int *)(mp->b_cont->b_rptr)));

@@ -738,7 +738,7 @@ ehci_calc_num_itds(
 			itd_count++;
 		}
 	} else {
-		itd_count = pkt_count;
+		itd_count = (uint_t)pkt_count;
 	}
 
 	return (itd_count);

@@ -34,6 +34,7 @@
 #include <sys/scsi/scsi.h>
 #include <sys/callb.h>		/* needed by scsa2usb.h */
 #include <sys/strsubr.h>
+#include <sys/strsun.h>
 
 #include <sys/usb/usba.h>
 #include <sys/usb/usba/usba_private.h>
@@ -588,10 +589,10 @@ scsa2usb_handle_csw_result(scsa2usb_state_t *scsa2usbp, mblk_t *data)
 	}
 
 	/* check if we got back CSW_LEN or not */
-	if ((data->b_wptr - data->b_rptr) != CSW_LEN) {
+	if (MBLKL(data) != CSW_LEN) {
 		USB_DPRINTF_L2(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 		    "scsa2usb_handle_csw_result: no enough data (%ld)",
-		    (long)(data->b_wptr - data->b_rptr));
+		    (long)(MBLKL(data)));
 
 		return (USB_FAILURE);
 	}
@@ -615,7 +616,7 @@ scsa2usb_handle_csw_result(scsa2usb_state_t *scsa2usbp, mblk_t *data)
 
 	/* Check for abnormal errors */
 	if ((signature != CSW_SIGNATURE) || (tag != cmd->cmd_tag) ||
-	    (status < CSW_STATUS_GOOD) || (status > CSW_STATUS_PHASE_ERROR)) {
+	    (status > CSW_STATUS_PHASE_ERROR)) {
 
 		USB_DPRINTF_L2(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 		    "CSW_ERR: Status = 0x%x, Tag = 0x%x xfercount = 0x%lx",
@@ -869,7 +870,7 @@ scsa2usb_bulk_only_get_max_lun(scsa2usb_state_t *scsa2usbp)
 		 * This check ensures that we have valid data returned back.
 		 * Otherwise we assume that device supports only one LUN.
 		 */
-		if ((data->b_wptr - data->b_rptr) != 1) {
+		if (MBLKL(data) != 1) {
 			USB_DPRINTF_L2(DPRINT_MASK_SCSA,
 			    scsa2usbp->scsa2usb_log_handle,
 			    "device reported incorrect luns (adjusting to 1)");

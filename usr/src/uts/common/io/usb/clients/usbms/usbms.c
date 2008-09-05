@@ -1612,8 +1612,7 @@ usbms_rput(queue_t		*q,
 	 * A data message, consisting of bytes from the mouse.
 	 * Make sure there are atleast "limit" number of bytes.
 	 */
-	if (((tmp_mp->b_wptr - tmp_mp->b_rptr) < limit) ||
-	    (((tmp_mp->b_wptr - tmp_mp->b_rptr) == limit) &&
+	if ((MBLKL(tmp_mp) < limit) || ((MBLKL(tmp_mp) == limit) &&
 	    (usbmsp->usbms_rptid != HID_REPORT_ID_UNDEFINED))) {
 		freemsg(mp);
 		return;
@@ -1660,8 +1659,7 @@ usbms_mctl_receive(register queue_t		*q,
 	case HID_GET_PARSER_HANDLE:
 		if ((data != NULL) &&
 		    (iocp->ioc_count == sizeof (hidparser_handle_t)) &&
-		    ((mp->b_cont->b_wptr - mp->b_cont->b_rptr) ==
-		    iocp->ioc_count)) {
+		    (MBLKL(mp->b_cont) == iocp->ioc_count)) {
 			usbmsd->usbms_report_descr_handle =
 			    *(hidparser_handle_t *)data;
 		} else {
@@ -2090,7 +2088,7 @@ usbms_make_copyreq(mblk_t 	*mp,
 			mp->b_cont = conttmp;
 		}
 	}
-	mp->b_datap->db_type = copytype;
+	mp->b_datap->db_type = (unsigned char)copytype;
 	mp->b_wptr = mp->b_rptr + sizeof (struct copyreq);
 
 	return (USB_SUCCESS);

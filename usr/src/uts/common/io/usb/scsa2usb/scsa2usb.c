@@ -54,6 +54,7 @@
 #include <sys/kobj.h>
 #include <sys/kobj_lex.h>
 #include <sys/strsubr.h>
+#include <sys/strsun.h>
 #include <sys/sysmacros.h>
 
 #include <sys/usb/usba.h>
@@ -433,7 +434,6 @@ static void	scsa2usb_test_mblk(scsa2usb_state_t *, boolean_t);
 
 static int	scsa2usb_ugen_open(dev_t *, int, int, cred_t *);
 static int	scsa2usb_ugen_close(dev_t, int, int, cred_t *);
-static int	scsa2usb_ugen_strategy(struct buf *);
 static int	scsa2usb_ugen_read(dev_t, struct uio *, cred_t *);
 static int	scsa2usb_ugen_write(dev_t, struct uio *, cred_t *);
 static int	scsa2usb_ugen_poll(dev_t, short, int,  short *,
@@ -3744,7 +3744,7 @@ scsa2usb_rw_transport(scsa2usb_state_t *scsa2usbp, struct scsi_pkt *pkt)
 
 	cmd->cmd_xfercount = xfer_count;
 	cmd->cmd_dir = (uchar_t)dir;
-	cmd->cmd_blksize = blk_size;
+	cmd->cmd_blksize = (int)blk_size;
 
 	/*
 	 * Having figure out the 'partial' xfer len based on he
@@ -4133,8 +4133,8 @@ scsa2usb_do_inquiry(scsa2usb_state_t *scsa2usbp, uint_t target, uint_t lun)
 
 	bzero(&ap, sizeof (struct scsi_address));
 	ap.a_hba_tran = scsa2usbp->scsa2usb_tran;
-	ap.a_target = target;
-	ap.a_lun = lun;
+	ap.a_target = (ushort_t)target;
+	ap.a_lun = (uchar_t)lun;
 
 	/* limit inquiry to 36 bytes */
 	mutex_exit(&scsa2usbp->scsa2usb_mutex);
@@ -4151,7 +4151,7 @@ scsa2usb_do_inquiry(scsa2usb_state_t *scsa2usbp, uint_t target, uint_t lun)
 	pkt = scsi_init_pkt(&ap, NULL, bp, CDB_GROUP0, 1,
 	    PKT_PRIV_LEN, PKT_CONSISTENT, SLEEP_FUNC, NULL);
 
-	RQ_MAKECOM_G0(pkt, FLAG_NOINTR, (char)SCMD_INQUIRY, 0, len);
+	RQ_MAKECOM_G0(pkt, FLAG_NOINTR, (char)SCMD_INQUIRY, 0, (char)len);
 
 	pkt->pkt_comp = NULL;
 	pkt->pkt_time = 5;
@@ -4848,7 +4848,7 @@ scsa2usb_handle_data_start(scsa2usb_state_t *scsa2usbp,
 #endif	/* SCSA2USB_BULK_ONLY_TEST */
 
 		ept_addr = scsa2usbp->scsa2usb_bulkout_ept.bEndpointAddress;
-		req->bulk_len = req->bulk_data->b_wptr - req->bulk_data->b_rptr;
+		req->bulk_len = MBLKL(req->bulk_data);
 		req->bulk_timeout = scsa2usb_bulk_timeout(cmd->cmd_timeout);
 		mutex_exit(&scsa2usbp->scsa2usb_mutex);
 
@@ -4905,7 +4905,7 @@ scsa2usb_handle_data_done(scsa2usb_state_t *scsa2usbp,
 	struct buf	*bp = cmd->cmd_bp;
 	struct scsi_pkt	*pkt = scsa2usbp->scsa2usb_cur_pkt;
 	mblk_t		*data = req->bulk_data;
-	int		len = data ? (data->b_wptr - data->b_rptr) : 0;
+	int		len = data ? MBLKL(data) : 0;
 	uint32_t	max_lba;
 
 	ASSERT(mutex_owned(&scsa2usbp->scsa2usb_mutex));
@@ -5095,7 +5095,7 @@ scsa2usb_init_bulk_req(scsa2usb_state_t *scsa2usbp, size_t length,
 	req = usb_alloc_bulk_req(scsa2usbp->scsa2usb_dip, length,
 	    flags | USB_FLAGS_SLEEP);
 
-	req->bulk_len = length;			/* xfer length */
+	req->bulk_len = (uint_t)length;			/* xfer length */
 	req->bulk_timeout = scsa2usb_bulk_timeout(timeout); /* xfer timeout */
 	req->bulk_attributes = attrs;		/* xfer attrs */
 	req->bulk_client_private = (usb_opaque_t)scsa2usbp; /* statep */

@@ -22,7 +22,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * USBA: Solaris USB Architecture support
@@ -798,7 +797,7 @@ hcdi_shared_cb_thread(void *arg)
 static uint_t
 hcdi_soft_intr(caddr_t arg1, caddr_t arg2)
 {
-	usba_hcdi_t		*hcdi = (usba_hcdi_t *)arg1;
+	usba_hcdi_t		*hcdi = (void *)arg1;
 	usba_req_wrapper_t	*req_wrp;
 	int			count = 0;
 

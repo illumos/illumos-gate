@@ -1711,9 +1711,9 @@ keyspan_init_port_params(keyspan_state_t *ksp)
 	if (usb_pipe_get_max_bulk_transfer_size(ksp->ks_dip, &sz) ==
 	    USB_SUCCESS) {
 		if (ksp->ks_dev_spec.id_product == KEYSPAN_USA49WG_PID) {
-			read_len = min(sz, KEYSPAN_BULKIN_MAX_LEN_49WG);
+			read_len = (uint_t)min(sz, KEYSPAN_BULKIN_MAX_LEN_49WG);
 		} else {
-			read_len = min(sz, KEYSPAN_BULKIN_MAX_LEN);
+			read_len = (uint_t)min(sz, KEYSPAN_BULKIN_MAX_LEN);
 		}
 	} else {
 		if (ksp->ks_dev_spec.id_product == KEYSPAN_USA49WG_PID) {
@@ -1868,7 +1868,7 @@ keyspan_send_cmd_usa49wg(keyspan_port_t *kp)
 	keyspan_state_t	*ksp = kp->kp_ksp;
 	mblk_t		*mp;
 	int		rval = USB_SUCCESS;
-	int		size = sizeof (keyspan_usa49_port_ctrl_msg_t);
+	uint16_t		size = sizeof (keyspan_usa49_port_ctrl_msg_t);
 	usb_cb_flags_t	cb_flags;
 	usb_cr_t	cr;
 	usb_ctrl_setup_t setup;

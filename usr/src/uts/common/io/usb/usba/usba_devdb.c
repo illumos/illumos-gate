@@ -26,6 +26,7 @@
 
 #define	USBA_FRAMEWORK
 #include <sys/ksynch.h>
+#include <sys/strsun.h>
 #include <sys/usb/usba/usba_impl.h>
 #include <sys/usb/usba/usba_devdb_impl.h>
 
@@ -356,7 +357,9 @@ usb_devdb_compare_pathnames(char *p1, char *p2)
 			 */
 			ustr = strrchr(p2, '/');
 			hstr = strrchr(p1, '/');
-			rval = strncmp(p1, p2, MAX(ustr - p2, hstr - p1));
+			rval = strncmp(p1, p2,
+			    MAX(_PTRDIFF(ustr, p2),
+			    _PTRDIFF(hstr, p1)));
 			if (rval < 0) {
 
 				return (-1);

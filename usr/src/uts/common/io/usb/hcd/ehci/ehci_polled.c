@@ -1121,7 +1121,7 @@ ehci_polled_handle_normal_qtd(
 	/* Copy the data into the message */
 	bcopy(buf, ehci_polledp->ehci_polled_buf, length);
 
-	return (length);
+	return ((int)length);
 }
 
 

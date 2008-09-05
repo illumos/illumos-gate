@@ -39,6 +39,7 @@
 #include <sys/usb/hcd/ehci/ehci_util.h>
 #include <sys/usb/hcd/ehci/ehci_isoch.h>
 #include <sys/usb/hcd/ehci/ehci_isoch_util.h>
+#include <sys/strsun.h>
 
 /*
  * Isochronous initialization functions
@@ -77,11 +78,6 @@ static int ehci_insert_sitd_req(
 	ehci_pipe_private_t	*pp,
 	ehci_isoc_xwrapper_t	*itw,
 	usb_flags_t		usb_flags);
-static int ehci_insert_isoc_with_frame_number(
-	ehci_state_t		*ehcip,
-	ehci_pipe_private_t	*pp,
-	ehci_isoc_xwrapper_t	*itw,
-	ehci_itd_t		*current_sitd);
 static void ehci_remove_isoc_itds(
 	ehci_state_t		*ehcip,
 	ehci_pipe_private_t	*pp);
@@ -392,8 +388,7 @@ ehci_allocate_isoc_resources(
 
 	} else {
 		ASSERT(isoc_reqp != NULL);
-		itw_xfer_size = isoc_reqp->isoc_data->b_wptr -
-		    isoc_reqp->isoc_data->b_rptr;
+		itw_xfer_size = MBLKL(isoc_reqp->isoc_data);
 	}
 
 	/* Check the size of isochronous request */
@@ -610,7 +605,7 @@ ehci_insert_itd_req(
 			    curr_isoc_pkt_descr->isoc_pkt_length;
 
 			curr_isoc_pkt_descr->isoc_pkt_actual_length
-			    = isoc_pkt_length;
+			    = (ushort_t)isoc_pkt_length;
 
 			xact_status = 0;
 
@@ -626,7 +621,7 @@ ehci_insert_itd_req(
 				return (USB_FAILURE);
 			}
 
-			xact_status = curr_isoc_xfer_offset;
+			xact_status = (uint32_t)curr_isoc_xfer_offset;
 			xact_status |= (pageselected << 12);
 			xact_status |= isoc_pkt_length << 16;
 			xact_status |= EHCI_ITD_XFER_ACTIVE;
@@ -771,7 +766,8 @@ ehci_insert_sitd_req(
 		curr_isoc_pkt_descr = itw->itw_curr_isoc_pktp;
 
 		isoc_pkt_length = curr_isoc_pkt_descr->isoc_pkt_length;
-		curr_isoc_pkt_descr->isoc_pkt_actual_length = isoc_pkt_length;
+		curr_isoc_pkt_descr->isoc_pkt_actual_length =
+		    (ushort_t)isoc_pkt_length;
 
 		/* Set the transfer state information */
 		xfer_state = 0;

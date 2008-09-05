@@ -42,6 +42,7 @@
 #include <sys/usb/hcd/openhci/ohcid.h>
 
 #include <sys/disp.h>
+#include <sys/strsun.h>
 
 /* Pointer to the state structure */
 static void *ohci_statep;
@@ -4802,7 +4803,7 @@ ohci_insert_ctrl_req(
 	    "ohci_create_setup_pkt: sdata = 0x%x", sdata);
 
 	ddi_put32(tw->tw_accesshandle,
-	    (uint_t *)(tw->tw_buf + sizeof (uint_t)), sdata);
+	    (uint_t *)((uintptr_t)tw->tw_buf + sizeof (uint_t)), sdata);
 
 	ctrl = HC_TD_SETUP|HC_TD_MS_DT|HC_TD_DT_0|HC_TD_6I;
 
@@ -5000,7 +5001,7 @@ ohci_insert_bulk_req(
 
 			/* Check for inserting residue data */
 			if (residue) {
-				bulk_pkt_size = residue;
+				bulk_pkt_size = (uint_t)residue;
 			}
 
 			/*
@@ -5581,8 +5582,7 @@ ohci_allocate_isoc_resources(
 
 	} else {
 		ASSERT(isoc_reqp != NULL);
-		tw_length = isoc_reqp->isoc_data->b_wptr -
-		    isoc_reqp->isoc_data->b_rptr;
+		tw_length = MBLKL(isoc_reqp->isoc_data);
 	}
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
@@ -5623,7 +5623,7 @@ ohci_allocate_isoc_resources(
 
 	if (ohci_allocate_tds_for_tw(ohcip, tw, td_count) ==
 	    USB_SUCCESS) {
-		tw->tw_num_tds = td_count;
+		tw->tw_num_tds = (uint_t)td_count;
 	} else {
 		ohci_deallocate_tw_resources(ohcip, pp, tw);
 
@@ -6759,7 +6759,7 @@ ohci_allocate_tw_resources(
 	} else {
 		if (ohci_allocate_tds_for_tw(ohcip, tw, td_count) ==
 		    USB_SUCCESS) {
-			tw->tw_num_tds = td_count;
+			tw->tw_num_tds = (uint_t)td_count;
 		} else {
 			ohci_deallocate_tw_resources(ohcip, pp, tw);
 			tw = NULL;
@@ -7164,7 +7164,7 @@ ohci_create_isoc_transfer_wrapper(
 	tw->tw_length = length;
 
 	/* Store the td numbers */
-	tw->tw_ncookies = td_count;
+	tw->tw_ncookies = (uint_t)td_count;
 
 	/* Store a back pointer to the pipe private structure */
 	tw->tw_pipe_private = pp;
@@ -7350,7 +7350,7 @@ ohci_xfer_timeout_handler(void *arg)
 		}
 
 		/* Remove tw from the timeout list */
-		if (tw->tw_timeout <= 0) {
+		if (tw->tw_timeout == 0) {
 
 			ohci_remove_tw_from_timeout_list(ohcip, tw);
 

@@ -1551,11 +1551,11 @@ ehci_insert_ctrl_req(
 	 */
 	setup_packet[0] = bmRequestType;
 	setup_packet[1] = bRequest;
-	setup_packet[2] = wValue;
+	setup_packet[2] = (uint8_t)wValue;
 	setup_packet[3] = wValue >> 8;
-	setup_packet[4] = wIndex;
+	setup_packet[4] = (uint8_t)wIndex;
 	setup_packet[5] = wIndex >> 8;
-	setup_packet[6] = wLength;
+	setup_packet[6] = (uint8_t)wLength;
 	setup_packet[7] = wLength >> 8;
 
 	bcopy(setup_packet, tw->tw_buf, SETUP_SIZE);
@@ -1765,7 +1765,7 @@ ehci_insert_bulk_req(
 
 			/* Check for inserting residue data */
 			if (residue) {
-				bulk_pkt_size = residue;
+				bulk_pkt_size = (uint_t)residue;
 			}
 		}
 
@@ -2928,7 +2928,7 @@ ehci_allocate_tw_resources(
 	} else {
 		if (ehci_allocate_tds_for_tw(ehcip, pp, tw, qtd_count) ==
 		    USB_SUCCESS) {
-			tw->tw_num_qtds = qtd_count;
+			tw->tw_num_qtds = (uint_t)qtd_count;
 		} else {
 			ehci_deallocate_tw(ehcip, pp, tw);
 			tw = NULL;

@@ -584,7 +584,7 @@ uint_t
 ehci_intr(caddr_t arg1, caddr_t arg2)
 {
 	uint_t			intr;
-	ehci_state_t		*ehcip = (ehci_state_t *)arg1;
+	ehci_state_t		*ehcip = (void *)arg1;
 
 	USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 	    "ehci_intr: Interrupt occurred, arg1 0x%p arg2 0x%p",

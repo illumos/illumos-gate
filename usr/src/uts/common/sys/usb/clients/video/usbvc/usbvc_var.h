@@ -26,7 +26,6 @@
 #ifndef _SYS_USB_USBVC_VAR_H
 #define	_SYS_USB_USBVC_VAR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {

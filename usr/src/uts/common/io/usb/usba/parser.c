@@ -29,6 +29,7 @@
  */
 #define	USBA_FRAMEWORK
 #include <sys/usb/usba/usba_impl.h>
+#include <sys/strsun.h>
 
 #define	INCREMENT_BUF(buf) \
 		if ((buf)[0] == 0) { \
@@ -313,7 +314,8 @@ usb_parse_ia_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 		    (buf[2] == first_if)) {
 
 			return (usb_parse_data("cccccccc",
-			    buf, bufend - buf, ret_descr, ret_buf_len));
+			    buf, _PTRDIFF(bufend, buf),
+			    ret_descr, ret_buf_len));
 		}
 
 		/*
@@ -348,7 +350,8 @@ usb_parse_if_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 		    (buf[3] == alt_if_setting)) {
 
 			return (usb_parse_data("ccccccccc",
-			    buf, bufend - buf, ret_descr, ret_buf_len));
+			    buf, _PTRDIFF(bufend, buf),
+			    ret_descr, ret_buf_len));
 		}
 
 		/*
@@ -387,8 +390,8 @@ usba_parse_if_pwr_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 				if (buf[1] == USBA_DESCR_TYPE_IF_PWR_1_1) {
 
 					return (
-					    usb_parse_data("cccccccccsss",
-					    buf, bufend - buf, ret_descr,
+					    usb_parse_data("cccccccccsss", buf,
+					    _PTRDIFF(bufend, buf), ret_descr,
 					    ret_buf_len));
 				} else {
 					break;
@@ -436,7 +439,8 @@ usb_parse_ep_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 		if (buf[1] == USB_DESCR_TYPE_IF &&
 		    buf[2] == if_number &&
 		    buf[3] == alt_if_setting) {
-			if ((buf = usb_nth_descr(buf, bufend - buf,
+			if ((buf = usb_nth_descr(buf,
+			    _PTRDIFF(bufend, buf),
 			    USB_DESCR_TYPE_EP, ep_index,
 			    USB_DESCR_TYPE_IF, -1)) == NULL) {
 
@@ -444,7 +448,7 @@ usb_parse_ep_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 			}
 
 			return (usb_parse_data("ccccsc",
-			    buf, bufend - buf,
+			    buf, _PTRDIFF(bufend, buf),
 			    ret_descr, ret_buf_len));
 		}
 
@@ -490,7 +494,7 @@ usba_ascii_string_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(STRING) */
 
 	*ret_descr++ = 0;
 
-	return (ret_descr - retstart);
+	return (_PTRDIFF(ret_descr, retstart));
 }
 
 
@@ -512,7 +516,8 @@ usb_parse_CV_cfg_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 		return (USB_PARSE_ERROR);
 	}
 
-	return (usb_parse_data(fmt, buf, bufend - buf, ret_descr,
+	return (usb_parse_data(fmt, buf,
+	    _PTRDIFF(bufend, buf), ret_descr,
 	    ret_buf_len));
 }
 
@@ -539,14 +544,16 @@ usb_parse_CV_if_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 		if ((buf[1] == USB_DESCR_TYPE_IF) &&
 		    (buf[2] == if_number) &&
 		    (buf[3] == alt_if_setting)) {
-			if ((buf = usb_nth_descr(buf, bufend - buf, descr_type,
+			if ((buf = usb_nth_descr(buf,
+			    _PTRDIFF(bufend, buf), descr_type,
 			    descr_index, USB_DESCR_TYPE_IF, -1)) ==
 			    NULL) {
 				break;
 			}
 
-			return (usb_parse_data(fmt,
-			    buf, bufend - buf, ret_descr, ret_buf_len));
+			return (usb_parse_data(fmt, buf,
+			    _PTRDIFF(bufend, buf),
+			    ret_descr, ret_buf_len));
 		}
 
 		/*
@@ -583,14 +590,16 @@ usb_parse_CV_ep_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 		if ((buf[1] == USB_DESCR_TYPE_IF) &&
 		    (buf[2] == if_number) &&
 		    (buf[3] == alt_if_setting)) {
-			if ((buf = usb_nth_descr(buf, bufend - buf,
+			if ((buf = usb_nth_descr(buf,
+			    _PTRDIFF(bufend, buf),
 			    USB_DESCR_TYPE_EP, ep_index,
 			    USB_DESCR_TYPE_IF, -1)) == NULL) {
 
 				break;
 			}
 
-			if ((buf = usb_nth_descr(buf, bufend - buf,
+			if ((buf = usb_nth_descr(buf,
+			    _PTRDIFF(bufend, buf),
 			    descr_type, descr_index,
 			    USB_DESCR_TYPE_EP,
 			    USB_DESCR_TYPE_IF)) == NULL) {
@@ -598,7 +607,8 @@ usb_parse_CV_ep_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 				break;
 			}
 
-			return (usb_parse_data(fmt, buf, bufend - buf,
+			return (usb_parse_data(fmt, buf,
+			    _PTRDIFF(bufend, buf),
 			    ret_descr, ret_buf_len));
 		}
 

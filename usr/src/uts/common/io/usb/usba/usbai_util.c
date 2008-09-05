@@ -32,6 +32,7 @@
 #define	USBA_FRAMEWORK
 #include <sys/usb/usba/usba_impl.h>
 #include <sys/usb/usba/hcdi_impl.h>
+#include <sys/strsun.h>
 
 extern void usba_free_evdata(usba_evdata_t *);
 
@@ -313,7 +314,7 @@ usb_get_string_descr(dev_info_t *dip,
 
 		goto done;
 	}
-	if (data->b_wptr - data->b_rptr == 0) {
+	if (MBLKL(data) == 0) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBA, usbai_log_handle,
 		    "0 bytes received");
 
@@ -362,7 +363,7 @@ usb_get_string_descr(dev_info_t *dip,
 		goto done;
 	}
 
-	if ((length = data->b_wptr - data->b_rptr) != 0) {
+	if ((length = MBLKL(data)) != 0) {
 		len = usba_ascii_string_descr(data->b_rptr, length, buf,
 		    buflen);
 		USB_DPRINTF_L4(DPRINT_MASK_USBA,
@@ -717,7 +718,7 @@ usb_get_cfg(dev_info_t		*dip,
 	    "rval=%d cb_flags=%d cr=%d", rval, cb_flags, completion_reason);
 
 	if ((rval == USB_SUCCESS) && data &&
-	    ((data->b_wptr - data->b_rptr) == 1)) {
+	    (MBLKL(data) == 1)) {
 		*cfgval = *(data->b_rptr);
 	} else {
 		*cfgval = 1;
@@ -835,7 +836,7 @@ usba_get_ifno(dev_info_t *dip)
 {
 	int interface_num = usb_get_if_number(dip);
 
-	return (interface_num < 0 ? 0 : interface_num);
+	return (uint8_t)(interface_num < 0 ? 0 : interface_num);
 }
 
 
@@ -1017,7 +1018,7 @@ usb_get_alt_if(dev_info_t	*dip,
 	    "rval=%d cb_flags=%d cr=%d", rval, cb_flags, completion_reason);
 
 	if ((rval == USB_SUCCESS) && data &&
-	    ((data->b_wptr - data->b_rptr) == 1)) {
+	    (MBLKL(data) == 1)) {
 		*alt_number = *(data->b_rptr);
 	} else {
 		*alt_number = 0;
@@ -1071,7 +1072,7 @@ usba_get_cfg_cloud(dev_info_t *dip, usb_pipe_handle_t default_ph, int cfg)
 	}
 
 	(void) usb_parse_cfg_descr(pdata->b_rptr,
-	    pdata->b_wptr - pdata->b_rptr, &cfg_descr, USB_CFG_DESCR_SIZE);
+	    MBLKL(pdata), &cfg_descr, USB_CFG_DESCR_SIZE);
 	freemsg(pdata);
 	pdata = NULL;
 
@@ -1176,7 +1177,7 @@ usb_check_same_device(dev_info_t *dip, usb_log_handle_t log_handle,
 	ASSERT(pdata != NULL);
 
 	(void) usb_parse_dev_descr(pdata->b_rptr,
-	    pdata->b_wptr - pdata->b_rptr, &usb_dev_descr,
+	    MBLKL(pdata), &usb_dev_descr,
 	    sizeof (usb_dev_descr_t));
 
 	freemsg(pdata);
@@ -1228,7 +1229,7 @@ usb_check_same_device(dev_info_t *dip, usb_log_handle_t log_handle,
 
 			if (bcmp((char *)cloud->b_rptr,
 			    usba_device->usb_cfg_array[cfg],
-			    cloud->b_wptr - cloud->b_rptr) != 0) {
+			    MBLKL(cloud)) != 0) {
 				freemsg(cloud);
 				break;
 			}
@@ -1443,7 +1444,7 @@ usb_get_status(dev_info_t		*dip,
 	    "rval=%d, cb_flags=%d, cr=%d", rval, cb_flags, completion_reason);
 
 	if ((rval == USB_SUCCESS) && data &&
-	    ((data->b_wptr - data->b_rptr) == USB_GET_STATUS_LEN)) {
+	    (MBLKL(data) == USB_GET_STATUS_LEN)) {
 		*status = (*(data->b_rptr + 1) << 8) | *(data->b_rptr);
 	} else {
 		*status = 0;
@@ -2165,6 +2166,7 @@ usba_mk_mctl(struct iocblk mctlmsg, void *buf, size_t len)
 	mblk_t *bp1, *bp2;
 
 	if ((bp1 = allocb(sizeof (struct iocblk), BPRI_HI)) != NULL) {
+		/* LINTED E_BAD_PTR_CAST_ALIGN */
 		*((struct iocblk *)bp1->b_datap->db_base) = mctlmsg;
 		bp1->b_datap->db_type = M_CTL;
 		bp1->b_wptr += sizeof (struct iocblk);

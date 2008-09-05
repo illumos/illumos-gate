@@ -1559,7 +1559,7 @@ ohci_polled_handle_normal_td(
 	    (uint8_t *)ohci_polledp->ohci_polled_buf,
 	    (uint8_t *)buf, length, DDI_DEV_AUTOINCR);
 
-	return (length);
+	return ((int)length);
 }
 
 

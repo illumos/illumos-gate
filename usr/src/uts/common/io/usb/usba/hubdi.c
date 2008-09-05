@@ -45,6 +45,7 @@
 #include <sys/kobj.h>
 #include <sys/kobj_lex.h>
 #include <sys/fs/dv_node.h>
+#include <sys/strsun.h>
 
 /*
  * Prototypes for static functions
@@ -146,7 +147,7 @@ static usba_list_entry_t	usba_hubdi_list;
 usb_log_handle_t	hubdi_log_handle;
 uint_t			hubdi_errlevel = USB_LOG_L4;
 uint_t			hubdi_errmask = (uint_t)-1;
-uint_t			hubdi_min_pm_threshold = 5; /* seconds */
+uint8_t			hubdi_min_pm_threshold = 5; /* seconds */
 
 /*
  * initialize private data
@@ -3022,7 +3023,7 @@ hubd_get_hub_descriptor(hubd_t *hubd)
 	/* only 32 ports are supported at present */
 	ASSERT(*(data->b_rptr + 2) <= 32);
 	if (usb_parse_CV_descr("cccscccccc",
-	    data->b_rptr, data->b_wptr - data->b_rptr,
+	    data->b_rptr, MBLKL(data),
 	    (void *)hub_descr, sizeof (usb_hub_descr_t)) == 0) {
 		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
 		    "parsing hub descriptor failed");
@@ -3318,7 +3319,7 @@ hubd_exception_cb(usb_pipe_handle_t pipe, usb_intr_req_t *reqp)
 static usb_port_mask_t
 hubd_mblk2portmask(mblk_t *data)
 {
-	int len = min(data->b_wptr - data->b_rptr, sizeof (usb_port_mask_t));
+	int len = min(MBLKL(data), sizeof (usb_port_mask_t));
 	usb_port_mask_t rval = 0;
 	int i;
 
@@ -3387,7 +3388,7 @@ hubd_read_cb(usb_pipe_handle_t pipe, usb_intr_req_t *reqp)
 
 	ASSERT(hubd->h_ep1_ph == pipe);
 
-	length = data->b_wptr - data->b_rptr;
+	length = MBLKL(data);
 
 	/*
 	 * Only look at the data and startup the hotplug thread if
@@ -4749,10 +4750,10 @@ hubd_determine_port_status(hubd_t *hubd, usb_port_t port,
 	}
 
 	mutex_enter(HUBD_MUTEX(hubd));
-	if ((data->b_wptr - data->b_rptr) != GET_STATUS_LENGTH) {
+	if (MBLKL(data) != GET_STATUS_LENGTH) {
 		USB_DPRINTF_L2(DPRINT_MASK_PORT, hubd->h_log_handle,
 		    "port %d: length incorrect %ld",
-		    port, data->b_wptr - data->b_rptr);
+		    port, MBLKL(data));
 		freemsg(data);
 		*status = *change = 0;
 
@@ -5353,7 +5354,7 @@ hubd_get_this_config_cloud(hubd_t *hubd, dev_info_t *dip,
 	    0)) == USB_SUCCESS) {
 
 		/* this must be true since we didn't allow data underruns */
-		if ((pdata->b_wptr - pdata->b_rptr) != USB_CFG_DESCR_SIZE) {
+		if (MBLKL(pdata) != USB_CFG_DESCR_SIZE) {
 			USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 			    "device returned incorrect configuration "
 			    "descriptor size.");
@@ -5366,7 +5367,7 @@ hubd_get_this_config_cloud(hubd_t *hubd, dev_info_t *dip,
 		 * Parse the configuration descriptor
 		 */
 		size = usb_parse_cfg_descr(pdata->b_rptr,
-		    pdata->b_wptr - pdata->b_rptr, confdescr,
+		    MBLKL(pdata), confdescr,
 		    USB_CFG_DESCR_SIZE);
 
 		/* if parse cfg descr error, it should return failure */
@@ -5408,7 +5409,7 @@ hubd_get_this_config_cloud(hubd_t *hubd, dev_info_t *dip,
 		    &cb_flags,
 		    0)) == USB_SUCCESS) {
 
-			if ((pdata->b_wptr - pdata->b_rptr) !=
+			if (MBLKL(pdata) !=
 			    confdescr->wTotalLength) {
 
 				USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG,
@@ -5791,7 +5792,7 @@ hubd_create_child(dev_info_t *dip,
 
 	size = usb_parse_dev_descr(
 	    pdata->b_rptr,
-	    pdata->b_wptr - pdata->b_rptr,
+	    MBLKL(pdata),
 	    &usb_dev_descr,
 	    sizeof (usb_dev_descr_t));
 
@@ -5908,7 +5909,7 @@ hubd_create_child(dev_info_t *dip,
 			if (pdata) {
 				int len = *(pdata->b_rptr);
 
-				length = pdata->b_wptr - pdata->b_rptr;
+				length = MBLKL(pdata);
 				if (length < len) {
 
 					goto fail_cleanup;
@@ -5926,7 +5927,7 @@ hubd_create_child(dev_info_t *dip,
 
 		size = usb_parse_dev_descr(
 		    pdata->b_rptr,
-		    pdata->b_wptr - pdata->b_rptr,
+		    MBLKL(pdata),
 		    &usb_dev_descr,
 		    sizeof (usb_dev_descr_t));
 

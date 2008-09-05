@@ -2206,14 +2206,14 @@ usbser_rx_massage_data(usbser_port_t *pp, mblk_t *mp)
 			}
 			USB_DPRINTF_L4(DPRINT_RX_CB, pp->port_lh,
 			    "usbser_rx_massage_data: mp=%p off=%ld(%ld)",
-			    (void *)mp, (long)(p - mp->b_rptr - 1),
+			    (void *)mp, _PTRDIFF(p,  mp->b_rptr) - 1,
 			    (long)MBLKL(mp));
 
 			/*
 			 * insert another 0377 after this one. all data after
 			 * the original 0377 have to be copied to the new mblk
 			 */
-			tailsz = mp->b_wptr - p;
+			tailsz = _PTRDIFF(mp->b_wptr, p);
 			if ((newmp = allocb(tailsz + 1, BPRI_HI)) == NULL) {
 				USB_DPRINTF_L2(DPRINT_RX_CB, pp->port_lh,
 				    "usbser_rx_massage_data: allocb failed");

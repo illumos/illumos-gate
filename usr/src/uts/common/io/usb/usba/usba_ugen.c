@@ -46,6 +46,7 @@
 #include <sys/usb/usba/usbai_version.h>
 #include <sys/usb/usba.h>
 #include <sys/sysmacros.h>
+#include <sys/strsun.h>
 
 #include "sys/usb/clients/ugen/usb_ugen.h"
 #include "sys/usb/usba/usba_ugen.h"
@@ -1900,10 +1901,10 @@ ugen_epxs_switch_cfg_alt(ugen_state_t *ugenp, ugen_ep_t *epp, dev_t dev)
 				return (rval);
 			}
 			mutex_enter(&epp->ep_mutex);
-			epp->ep_if = new_if;
+			epp->ep_if = (uchar_t)new_if;
 			switched++;
 		}
-		epp->ep_cfgidx = new_cfgidx;
+		epp->ep_cfgidx = (uchar_t)new_cfgidx;
 
 		mutex_exit(&epp->ep_mutex);
 	}
@@ -1942,7 +1943,7 @@ ugen_epxs_switch_cfg_alt(ugen_state_t *ugenp, ugen_ep_t *epp, dev_t dev)
 	}
 
 	mutex_enter(&epp->ep_mutex);
-	epp->ep_alt = new_alt;
+	epp->ep_alt = (uchar_t)new_alt;
 	ugen_update_ep_descr(ugenp, epp);
 
 	return (rval);
@@ -2408,14 +2409,12 @@ ugen_epx_ctrl_req(ugen_state_t *ugenp, ugen_ep_t *epp,
 	/* is this a read following a write with setup data? */
 	if (bp->b_flags & B_READ) {
 		if (epp->ep_data) {
-			int ep_len = epp->ep_data->b_wptr -
-			    epp->ep_data->b_rptr;
+			int ep_len = MBLKL(epp->ep_data);
 			int len = min(bp->b_bcount, ep_len);
 
 			bcopy(epp->ep_data->b_rptr, bp->b_un.b_addr, len);
 			epp->ep_data->b_rptr += len;
-			if ((epp->ep_data->b_wptr - epp->ep_data->b_rptr) ==
-			    0) {
+			if (MBLKL(epp->ep_data) == 0) {
 				freemsg(epp->ep_data);
 				epp->ep_data = NULL;
 			}
@@ -2669,8 +2668,7 @@ ugen_epx_bulk_req_cb(usb_pipe_handle_t ph, usb_bulk_req_t *reqp)
 	if (epp) {
 		mutex_enter(&epp->ep_mutex);
 		if (epp->ep_bp && reqp->bulk_data) {
-			int len = min(reqp->bulk_data->b_wptr -
-			    reqp->bulk_data->b_rptr,
+			int len = min(MBLKL(reqp->bulk_data),
 			    epp->ep_bp->b_bcount);
 			if (UGEN_XFER_DIR(epp) & USB_EP_DIR_IN) {
 				if (len) {
@@ -2726,7 +2724,7 @@ ugen_epx_intr_IN_req(ugen_state_t *ugenp, ugen_ep_t *epp,
 
 	/* can we satisfy this read? */
 	if (epp->ep_data) {
-		len = min(epp->ep_data->b_wptr - epp->ep_data->b_rptr,
+		len = min(MBLKL(epp->ep_data),
 		    bp->b_bcount);
 	}
 
@@ -2926,7 +2924,7 @@ ugen_epx_intr_IN_req_cb(usb_pipe_handle_t ph, usb_intr_req_t *reqp)
 	    (void *)epp, epp->ep_state, (void *)ph, (void *)reqp,
 	    reqp->intr_completion_reason, reqp->intr_cb_flags,
 	    (reqp->intr_data == NULL) ? 0 :
-	    reqp->intr_data->b_wptr - reqp->intr_data->b_rptr);
+	    MBLKL(reqp->intr_data));
 
 	ASSERT((reqp->intr_cb_flags & USB_CB_INTR_CONTEXT) == 0);
 
@@ -2985,13 +2983,13 @@ ugen_epx_intr_IN_req_cb(usb_pipe_handle_t ph, usb_intr_req_t *reqp)
 	if (epp->ep_data) {
 		USB_DPRINTF_L4(UGEN_PRINT_XFER, ugenp->ug_log_hdl,
 		    "ugen_epx_intr_IN_req_cb: data len=0x%lx",
-		    epp->ep_data->b_wptr - epp->ep_data->b_rptr);
+		    MBLKL(epp->ep_data));
 
 		ugen_epx_intr_IN_poll_wakeup(ugenp, epp);
 
 		/* if there is no space left, stop polling */
 		if (epp->ep_data &&
-		    ((epp->ep_data->b_wptr - epp->ep_data->b_rptr) >=
+		    (MBLKL(epp->ep_data) >=
 		    epp->ep_buf_limit)) {
 			ugen_epx_intr_IN_stop_polling(ugenp, epp);
 		}
@@ -3095,8 +3093,7 @@ ugen_epx_intr_OUT_req_cb(usb_pipe_handle_t ph, usb_intr_req_t *reqp)
 
 		mutex_enter(&epp->ep_mutex);
 		if (epp->ep_bp) {
-			len = min(reqp->intr_data->b_wptr -
-			    reqp->intr_data->b_rptr, epp->ep_bp->b_bcount);
+			len = min(MBLKL(reqp->intr_data), epp->ep_bp->b_bcount);
 
 			epp->ep_bp->b_resid = epp->ep_bp->b_bcount - len;
 
@@ -3179,7 +3176,7 @@ ugen_epx_isoc_IN_req(ugen_state_t *ugenp, ugen_ep_t *epp,
 
 	/* can we satisfy this read? */
 	if (epp->ep_data) {
-		len = min(epp->ep_data->b_wptr - epp->ep_data->b_rptr,
+		len = min(MBLKL(epp->ep_data),
 		    bp->b_bcount);
 		/*
 		 * every msg block in ep_data must be the size of
@@ -3403,7 +3400,7 @@ ugen_epx_isoc_IN_req_cb(usb_pipe_handle_t ph, usb_isoc_req_t *reqp)
 	    "isoc error count=%d, pkt cnt=%d", (void *)epp, epp->ep_state,
 	    (void *)ph, (void *)reqp, reqp->isoc_completion_reason,
 	    reqp->isoc_cb_flags, (reqp->isoc_data == NULL) ? 0 :
-	    reqp->isoc_data->b_wptr - reqp->isoc_data->b_rptr,
+	    MBLKL(reqp->isoc_data),
 	    reqp->isoc_error_count, reqp->isoc_pkts_count);
 
 	/* Too many packet errors during isoc transfer of this request */
@@ -3591,6 +3588,7 @@ ugen_epx_isoc_OUT_req(ugen_state_t *ugenp, ugen_ep_t *epp,
 		goto done;
 	}
 
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	pkth = (ugen_isoc_req_head_t *)bp->b_un.b_addr;
 	n_pkt = pkth->req_isoc_pkts_count;
 	head_len = sizeof (ugen_isoc_pkt_descr_t) * n_pkt +
@@ -3821,8 +3819,8 @@ ugen_epx_isoc_OUT_req_cb(usb_pipe_handle_t ph, usb_isoc_req_t *reqp)
 			headlen = info.isoc_pkts_count *
 			    sizeof (ugen_isoc_pkt_descr_t);
 
-			len = min(headlen + reqp->isoc_data->b_wptr -
-			    reqp->isoc_data->b_rptr, epp->ep_bp->b_bcount);
+			len = min(headlen + MBLKL(reqp->isoc_data),
+			    epp->ep_bp->b_bcount);
 
 			epp->ep_bp->b_resid = epp->ep_bp->b_bcount - len;
 

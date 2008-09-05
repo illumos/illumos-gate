@@ -270,7 +270,7 @@ _fini(void)
 	sp->usbkbm_save_led = usbkbm_led_state;
 
 	/* Save the layout */
-	sp->usbkbm_layout = usbkbm_layout;
+	sp->usbkbm_layout = (uchar_t)usbkbm_layout;
 
 	/*
 	 * Save entries of the keyboard structure that
@@ -1117,7 +1117,7 @@ usbkbm_rput(register queue_t *q, register mblk_t *mp)
 	 * Ram them through the translator, only if there are
 	 * correct no. of bytes.
 	 */
-	if ((mp->b_wptr - mp->b_rptr) == usbkbmd->usbkbm_packet_size) {
+	if (MBLKL(mp) == usbkbmd->usbkbm_packet_size) {
 		usbkbm_unpack_usb_packet(usbkbmd, usbkbm_streams_callback,
 		    (uchar_t *)mp->b_rptr, usbkbmd->usbkbm_packet_size);
 	}
@@ -1165,8 +1165,7 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 	case HID_GET_PARSER_HANDLE:
 		if ((data != NULL) &&
 		    (iocp->ioc_count == sizeof (hidparser_handle_t)) &&
-		    ((mp->b_cont->b_wptr - mp->b_cont->b_rptr) ==
-		    iocp->ioc_count)) {
+		    (MBLKL(mp->b_cont) == iocp->ioc_count)) {
 			usbkbmd->usbkbm_report_descr =
 			    *(hidparser_handle_t *)data;
 		} else {
@@ -1179,8 +1178,7 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 	case HID_GET_VID_PID:
 		if ((data != NULL) &&
 		    (iocp->ioc_count == sizeof (hid_vid_pid_t)) &&
-		    ((mp->b_cont->b_wptr - mp->b_cont->b_rptr) ==
-		    iocp->ioc_count)) {
+		    (MBLKL(mp->b_cont) == iocp->ioc_count)) {
 			bcopy(data, &usbkbmd->usbkbm_vid_pid, iocp->ioc_count);
 		}
 		freemsg(mp);
@@ -1195,7 +1193,7 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 		reply_mp = usbkbmd->usbkbm_pending_link;
 		if ((data != NULL) &&
 		    (iocp->ioc_count == size) &&
-		    ((mp->b_cont->b_wptr - mp->b_cont->b_rptr) == size)) {
+		    (MBLKL(mp->b_cont) == size)) {
 			/*
 			 *  Copy the information from hid into the
 			 * state structure

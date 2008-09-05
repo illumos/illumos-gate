@@ -46,6 +46,7 @@
 #include <sys/usb/clients/hid/hid.h>
 #include <sys/usb/clients/hidparser/hidparser.h>
 #include <sys/stropts.h>
+#include <sys/strsun.h>
 
 #include <sys/audio.h>
 #include <sys/audiovar.h>
@@ -436,8 +437,7 @@ usb_ah_rput(register queue_t *q, register mblk_t *mp)
 			freemsg(mp);	/* not ready to listen */
 
 			return;
-		} else if ((mp->b_wptr - mp->b_rptr) ==
-		    usb_ahd->usb_ah_packet_size) {
+		} else if (MBLKL(mp) == usb_ahd->usb_ah_packet_size) {
 
 			/*
 			 * Process this report if the device doesn't have
@@ -502,8 +502,7 @@ usb_ah_mctl_receive(register queue_t *q, register mblk_t *mp)
 		    "usb_ah_mctl_receive HID_GET_PARSER_HANDL mctl");
 		if ((data != NULL) &&
 		    (iocp->ioc_count == sizeof (hidparser_handle_t)) &&
-		    ((mp->b_cont->b_wptr - mp->b_cont->b_rptr) ==
-		    iocp->ioc_count)) {
+		    (MBLKL(mp->b_cont) == iocp->ioc_count)) {
 			usb_ahd->usb_ah_report_descr =
 			    *(hidparser_handle_t *)data;
 		} else {
@@ -652,7 +651,7 @@ usb_ah_cp_mblk(mblk_t *mp)
 	bp1->b_wptr += sizeof (struct iocblk);
 
 	ASSERT(mp->b_cont != NULL);
-	len = mp->b_cont->b_wptr - mp->b_cont->b_rptr;
+	len = MBLKL(mp->b_cont);
 
 	if (mp->b_cont->b_datap->db_base) {
 		if ((bp2 = allocb(len, BPRI_HI)) == NULL) {

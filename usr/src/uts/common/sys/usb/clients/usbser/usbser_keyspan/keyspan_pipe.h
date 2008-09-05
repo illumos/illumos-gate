@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_USB_USBSER_KEYSPAN_PIPE_H
 #define	_SYS_USB_USBSER_KEYSPAN_PIPE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * USB pipe management (mostly device-neutral)

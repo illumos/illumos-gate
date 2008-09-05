@@ -1121,7 +1121,7 @@ keyspan_bulkin_cb_process(keyspan_port_t *kp,
 		keyspan_put_tail(&kp->kp_rx_mp, mp);
 
 		if (data_len > 1) {
-			data_len = data->b_wptr - data->b_rptr;
+			data_len = MBLKL(data);
 		}
 	}
 	return (data_len);

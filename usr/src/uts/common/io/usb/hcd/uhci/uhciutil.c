@@ -2924,7 +2924,7 @@ uhci_insert_bulk_td(
 		}
 	}
 
-	bulk_xfer_info->num_tds	= num_bulk_tds;
+	bulk_xfer_info->num_tds	= (ushort_t)num_bulk_tds;
 
 	/*
 	 * Point the end of the lattice tree to the start of the bulk xfers
@@ -3249,7 +3249,7 @@ uhci_alloc_memory_for_tds(
 
 		bzero((void *)td_pool_ptr1->pool_addr,
 		    num * sizeof (uhci_td_t));
-		td_pool_ptr1->num_tds = num;
+		td_pool_ptr1->num_tds = (ushort_t)num;
 	}
 
 	return (USB_SUCCESS);
@@ -3429,7 +3429,7 @@ uhci_handle_bulk_td(uhci_state_t *uhcip, uhci_td_t *td)
 			}
 
 			pp->pp_qh->bulk_xfer_info = bulk_xfer_info;
-			bulk_xfer_info->num_tds	= num_bulk_tds;
+			bulk_xfer_info->num_tds	= (ushort_t)num_bulk_tds;
 			SetQH32(uhcip, pp->pp_qh->element_ptr,
 			    bulk_xfer_info->td_pools[0].cookie.dmac_address);
 		} else {
@@ -3846,7 +3846,7 @@ uhci_create_isoc_transfer_wrapper(
 	tw->tw_length = length;
 
 	for (i = 0; i < tmp_req->isoc_pkts_count; i++) {
-		tw->tw_isoc_bufs[i].index = i;
+		tw->tw_isoc_bufs[i].index = (ushort_t)i;
 
 		/* Allocate the DMA handle */
 		if ((result = ddi_dma_alloc_handle(uhcip->uhci_dip, &dma_attr,
@@ -4100,7 +4100,7 @@ uhci_insert_isoc_td(
 			uhci_fill_in_bulk_isoc_td(uhcip, &td_ptr[j],
 			    (uhci_td_t *)NULL, HC_END_OF_LIST, ph, index,
 			    bytes_to_xfer, tw);
-			td_ptr[j].isoc_pkt_index = index;
+			td_ptr[j].isoc_pkt_index = (ushort_t)index;
 			index++;
 		}
 
@@ -4228,7 +4228,7 @@ uhci_insert_isoc_td(
 			    uhcip->uhci_frame_lst_tablep[start_frame],
 			    ISOCTD_PADDR(td_pool_ptr, td_ptr));
 		}
-		td_ptr->starting_frame = start_frame;
+		td_ptr->starting_frame = (uint_t)start_frame;
 
 		if (++start_frame == NUM_FRAME_LST_ENTRIES)
 			start_frame = 0;

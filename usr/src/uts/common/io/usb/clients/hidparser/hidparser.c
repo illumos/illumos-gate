@@ -117,7 +117,6 @@ static entity_attribute_t	*hidparser_cp_attribute_list(
 static entity_attribute_t	*hidparser_find_attribute_end(
 				entity_attribute_t *);
 static entity_attribute_t	*hidparser_alloc_attrib_list(int);
-static	entity_item_t		*hidparser_find_item_end(entity_item_t *);
 static void			hidparser_report_err(int, int,
 					int, int, char *);
 static int			hidparser_isvalid_item(int);
@@ -2210,26 +2209,6 @@ hidparser_find_attribute_end(entity_attribute_t *head)
 	}
 	while (head->entity_attribute_next != NULL) {
 		head = head->entity_attribute_next;
-	}
-
-	return (head);
-}
-
-
-/*
- * hidparser_find_item_end:
- *	Search the siblings of items and find the last item in the list
- */
-static entity_item_t *
-hidparser_find_item_end(entity_item_t *head)
-{
-	if (!head) {
-
-		return (NULL);
-	}
-
-	while (head->entity_item_right_sibling) {
-		head = head->entity_item_right_sibling;
 	}
 
 	return (head);

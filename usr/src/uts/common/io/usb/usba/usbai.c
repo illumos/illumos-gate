@@ -35,6 +35,7 @@
  */
 #define	USBA_FRAMEWORK
 #include <sys/varargs.h>
+#include <sys/strsun.h>
 #include <sys/usb/usba/usba_impl.h>
 #include <sys/usb/usba/hcdi_impl.h>
 #include <sys/usb/usba/usba10.h>
@@ -307,7 +308,7 @@ usb_vprintf(dev_info_t *dip, int level, char *label, char *fmt, va_list ap)
 		*(usba_debug_buf + usba_debug_buf_size) = '\0';
 
 		if ((usba_buf_sptr + len) > usba_buf_eptr) {
-			size_t left = usba_buf_eptr - usba_buf_sptr;
+			size_t left = _PTRDIFF(usba_buf_eptr, usba_buf_sptr);
 
 			bcopy(usba_print_buf, usba_buf_sptr, left);
 			bcopy((caddr_t)usba_print_buf + left,

@@ -61,6 +61,7 @@
 #include <sys/usb/usba/usba_impl.h>
 #include <sys/usb/usba/hcdi_impl.h>
 #include <sys/strsubr.h>
+#include <sys/strsun.h>
 
 /* prototypes */
 static int usba_flags_attr_check(usba_pipe_handle_data_t *,
@@ -296,7 +297,7 @@ _usba_check_req(usba_pipe_handle_data_t *ph_data, usb_opaque_t req,
 		 * real isoc_pkts_length, it should be checked.
 		 */
 		if (direction == USB_EP_DIR_OUT) {
-			if ((data->b_wptr - data->b_rptr) <= 0) {
+			if (MBLKL(data) <= 0) {
 
 				return (USB_INVALID_REQUEST);
 			}
@@ -2162,7 +2163,7 @@ usb_alloc_isoc_req(dev_info_t		*dip,
 		    (((intptr_t)isoc_req) + (sizeof (usb_isoc_req_t)));
 
 		/* Initialize all the fields of usb isochronous request */
-		isoc_req->isoc_pkts_count = isoc_pkts_count;
+		isoc_req->isoc_pkts_count = (ushort_t)isoc_pkts_count;
 	}
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,

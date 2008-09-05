@@ -54,7 +54,6 @@ static int	ugen_skel_close(dev_t, int, int, cred_t *);
 static int	ugen_skel_attach(dev_info_t *, ddi_attach_cmd_t);
 static int	ugen_skel_detach(dev_info_t *, ddi_detach_cmd_t);
 static int	ugen_skel_power(dev_info_t *, int, int);
-static int	ugen_skel_strategy(struct buf *);
 static int	ugen_skel_read(dev_t, struct uio *, cred_t *);
 static int	ugen_skel_write(dev_t, struct uio *, cred_t *);
 static int	ugen_skel_poll(dev_t, short, int,  short *,

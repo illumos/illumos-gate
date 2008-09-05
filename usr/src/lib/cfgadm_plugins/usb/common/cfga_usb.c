@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "cfga_usb.h"
 
@@ -242,7 +240,7 @@ physpath_to_devlink(
 	(void) di_devlink_walk(hdl, "^cfg/", minor_path, DI_PRIMARY_LINK,
 	    (void *)&larg, get_link);
 
-	di_devlink_fini(&hdl);
+	(void) di_devlink_fini(&hdl);
 
 	if (*logpp == NULL) {
 		*l_errnop = errno;
@@ -304,7 +302,7 @@ set_msg(char **ret_str, ...)
 			return;
 		}
 
-		strcpy(*ret_str + total_len, str);
+		(void) strcpy(*ret_str + total_len, str);
 		total_len += len;
 	}
 
@@ -366,7 +364,8 @@ usb_err_msg(char **errstring, cfga_usb_ret_t rv, const char *ap_id, int l_errno)
 	case CFGA_USB_RCM_INFO:
 	case CFGA_USB_DEVCTL:
 	/* These messages also print ap_id.  */
-		set_msg(errstring, ERR_STR(rv), "ap_id: ", ap_id, "", NULL);
+		(void) set_msg(errstring, ERR_STR(rv),
+		    "ap_id: ", ap_id, "", NULL);
 		break;
 
 	case CFGA_USB_IOCTL:
@@ -1066,7 +1065,7 @@ cfga_change_state(
 			 * and then eventually give up
 			 */
 			for (i = 0; i < 12 && (devpath == NULL); i++) {
-				sleep(6);
+				(void) sleep(6);
 				devpath = usb_get_devicepath(ap_id);
 			}
 
@@ -1093,7 +1092,7 @@ cfga_change_state(
 		rv = CFGA_USB_OK;	/* Other statuses don't matter */
 
 		len = strlen(USB_CONFIRM_0) + strlen(USB_CONFIRM_1) +
-				strlen("Unconfigure") + strlen(ap_id);
+		    strlen("Unconfigure") + strlen(ap_id);
 		if ((msg = (char *)calloc(len + 3, 1)) != NULL) {
 			(void) snprintf(msg, len + 3, "Unconfigure %s%s\n%s",
 			    USB_CONFIRM_0, ap_id, USB_CONFIRM_1);
@@ -1144,7 +1143,7 @@ cfga_change_state(
 		rv = CFGA_USB_OK;	/* Other statuses don't matter */
 
 		len = strlen(USB_CONFIRM_0) + strlen(USB_CONFIRM_1) +
-				strlen("Disconnect") + strlen(ap_id);
+		    strlen("Disconnect") + strlen(ap_id);
 		if ((msg = (char *)calloc(len + 3, 1)) != NULL) {
 			(void) snprintf(msg, len + 3, "Disconnect %s%s\n%s",
 			    USB_CONFIRM_0, ap_id, USB_CONFIRM_1);
@@ -1264,7 +1263,7 @@ cfga_private_func(
 
 	if (strcmp(func, RESET_DEVICE) == 0) {	/* usb_reset? */
 		len = strlen(USB_CONFIRM_0) + strlen(USB_CONFIRM_1) +
-				strlen("Reset") + strlen(ap_id);
+		    strlen("Reset") + strlen(ap_id);
 		if ((msg = (char *)calloc(len + 3, 1)) != NULL) {
 			(void) snprintf(msg, len + 3, "Reset %s%s\n%s",
 			    USB_CONFIRM_0, ap_id, USB_CONFIRM_1);
@@ -1307,49 +1306,49 @@ cfga_private_func(
 		/* parse options specified */
 		while (*subopts != '\0') {
 			switch (getsubopt(&subopts, cfg_opts, &value)) {
-				case 0: /* config */
-					if (value == NULL) {
-						rv = CFGA_USB_OPNOTSUPP;
-						(void) cfga_help(msgp,
-						    options, flags);
-						goto bailout;
-					} else {
-						errno = 0;
-						config = strtol(value,
-						    (char **)NULL, 10);
-						if (errno) {
-							DPRINTF(
-							    "config conversion"
-							    "failed\n");
-							rv =
-							CFGA_USB_CONFIG_INVAL;
-							goto bailout;
-						}
-					}
-					cfg_opt_flag = B_TRUE;
-					break;
-
-				case 1: /* drv */
-					if (value == NULL) {
-						rv = CFGA_USB_OPNOTSUPP;
-						(void) cfga_help(msgp,
-						    options, flags);
-						goto bailout;
-					} else {
-						S_FREE(driver);
-						driver = strdup(value);
-						if (driver == NULL) {
-							rv =
-							CFGA_USB_INTERNAL_ERROR;
-							goto bailout;
-						}
-					}
-					break;
-
-				default:
+			case 0: /* config */
+				if (value == NULL) {
 					rv = CFGA_USB_OPNOTSUPP;
-					(void) cfga_help(msgp, options, flags);
+					(void) cfga_help(msgp,
+					    options, flags);
 					goto bailout;
+				} else {
+					errno = 0;
+					config = strtol(value,
+					    (char **)NULL, 10);
+					if (errno) {
+						DPRINTF(
+						    "config conversion"
+						    "failed\n");
+						rv =
+						    CFGA_USB_CONFIG_INVAL;
+						goto bailout;
+					}
+				}
+				cfg_opt_flag = B_TRUE;
+				break;
+
+			case 1: /* drv */
+				if (value == NULL) {
+					rv = CFGA_USB_OPNOTSUPP;
+					(void) cfga_help(msgp,
+					    options, flags);
+					goto bailout;
+				} else {
+					S_FREE(driver);
+					driver = strdup(value);
+					if (driver == NULL) {
+						rv =
+						    CFGA_USB_INTERNAL_ERROR;
+						goto bailout;
+					}
+				}
+				break;
+
+			default:
+				rv = CFGA_USB_OPNOTSUPP;
+				(void) cfga_help(msgp, options, flags);
+				goto bailout;
 			}
 		}
 
@@ -1362,8 +1361,8 @@ cfga_private_func(
 		DPRINTF("config = %x\n", config);
 
 		len = strlen(USB_CONFIRM_0) + strlen(USB_CONFIRM_1) +
-			strlen("Setting") + strlen(ap_id) +
-			strlen("to USB configuration");
+		    strlen("Setting") + strlen(ap_id) +
+		    strlen("to USB configuration");
 		/* len + 8 to account for config, \n and white space */
 		if ((msg = (char *)calloc(len + 8, 1)) != NULL) {
 			(void) snprintf(msg, len + 8,
@@ -1678,7 +1677,7 @@ cfga_msg(struct cfga_msg *msgp, const char *str)
 		return;
 	}
 
-	strcpy(q, str);
+	(void) strcpy(q, str);
 	(*msgp->message_routine)(msgp->appdata_ptr, q);
 
 	free(q);

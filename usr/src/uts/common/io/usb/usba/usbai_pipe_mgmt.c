@@ -52,8 +52,6 @@ extern	pri_t	minclsyspri;
 static	void	usba_pipe_do_async_func_thread(void *arg);
 static	int	usba_pipe_sync_close(dev_info_t *, usba_ph_impl_t *,
 			usba_pipe_async_req_t *, usb_flags_t);
-static	int	usba_pipe_sync_abort(dev_info_t *, usba_ph_impl_t *,
-			usba_pipe_async_req_t *, usb_flags_t);
 static	int	usba_pipe_sync_reset(dev_info_t *, usba_ph_impl_t *,
 			usba_pipe_async_req_t *, usb_flags_t);
 static	int	usba_pipe_sync_drain_reqs(dev_info_t *, usba_ph_impl_t *,

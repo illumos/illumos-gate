@@ -84,6 +84,7 @@
  */
 
 #include <sys/usb/usba.h>
+#include <sys/strsun.h>
 #include <sys/usb/clients/usbskel/usbskel.h>
 
 int		usbskel_errlevel = USBSKEL_LOG_LOG;
@@ -819,7 +820,7 @@ usbskel_normal_callback(usb_pipe_handle_t pipe, usb_ctrl_req_t *request)
 	usbskel_state_t *usbskelp = ddi_get_soft_state(usbskel_statep,
 	    getminor(bp->b_edev));
 	mblk_t *data 		= request->ctrl_data;
-	int amt_transferred 	= data->b_wptr - data->b_rptr;
+	int amt_transferred 	= MBLKL(data);
 
 	usbskel_log(usbskelp, USBSKEL_LOG_LOG, "normal callback enter");
 
@@ -878,7 +879,7 @@ usbskel_exception_callback(usb_pipe_handle_t pipe, usb_ctrl_req_t *request)
 	usbskel_state_t *usbskelp = ddi_get_soft_state(usbskel_statep,
 	    getminor(bp->b_edev));
 	mblk_t 	*data = request->ctrl_data;
-	int 	amt_transferred = (data ? data->b_wptr - data->b_rptr : 0);
+	int 	amt_transferred = (data ? MBLKL(data) : 0);
 
 	usbskel_log(usbskelp, USBSKEL_LOG_LOG,
 	    "at except cb entry, b_bcount = %lu, b_resid = %lu, trans = %d",
@@ -1593,7 +1594,7 @@ usbskel_check_same_device(usbskel_state_t *usbskelp)
 	ASSERT(pdata != NULL);
 
 	(void) usb_parse_data("2cs4c3s4c", pdata->b_rptr,
-	    pdata->b_wptr - pdata->b_rptr, &usb_dev_descr,
+	    MBLKL(pdata), &usb_dev_descr,
 	    sizeof (usb_dev_descr_t));
 
 	freemsg(pdata);

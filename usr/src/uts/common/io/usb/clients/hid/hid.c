@@ -1918,7 +1918,7 @@ hid_set_protocol(hid_state_t *hidp, int protocol)
 	setup.bmRequestType = USB_DEV_REQ_HOST_TO_DEV |
 	    USB_DEV_REQ_TYPE_CLASS | USB_DEV_REQ_RCPT_IF;
 	setup.bRequest = SET_PROTOCOL;
-	setup.wValue = protocol;
+	setup.wValue = (uint16_t)protocol;
 	setup.wIndex = hidp->hid_if_descr.bInterfaceNumber;
 	setup.wLength = 0;
 	setup.attrs = 0;
@@ -3194,7 +3194,6 @@ hid_polled_read(hid_polled_handle_t hid_polled_input, uchar_t **buffer)
 		return (0);
 	}
 
-	/*LINTED*/
 	_NOTE(NO_COMPETING_THREADS_NOW);
 
 	*buffer = hidp->hid_polled_raw_buf;

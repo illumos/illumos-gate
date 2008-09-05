@@ -26,7 +26,6 @@
 #ifndef _SYS_USB_UHCI_H
 #define	_SYS_USB_UHCI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
