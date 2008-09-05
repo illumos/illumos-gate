@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/esunddi.h>
@@ -83,9 +81,18 @@ promif_finddevice(void *p)
 
 	ASSERT(ci[1] == 1);
 
+	/*
+	 * We are passing the cpu pointer (CPU->cpu_id) explicitly to
+	 * thread_affinity_set() so that we don't attempt to grab the
+	 * cpu_lock internally in thread_affinity_set() and may sleep
+	 * as a result.
+	 * It is safe to pass CPU->cpu_id and it will always be valid.
+	 */
+	thread_affinity_set(curthread, CPU->cpu_id);
 	node = finddevice(p1275_cell2ptr(ci[3]));
 
 	ci[4] = p1275_dnode2cell(node);
+	thread_affinity_clear(curthread);
 
 	return (0);
 }
