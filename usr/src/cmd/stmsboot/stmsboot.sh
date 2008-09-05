@@ -1,4 +1,4 @@
-#!/sbin/sh
+#!/sbin/sh -p
 #
 # CDDL HEADER START
 #
@@ -20,12 +20,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
-
 PATH=/usr/bin:/usr/sbin:$PATH; export PATH
 STMSBOOTUTIL=/lib/mpxio/stmsboot_util
 STMSMETHODSCRIPT=/lib/svc/method/mpxio-upgrade
@@ -43,31 +41,36 @@ SUPPORTED_DRIVERS="fp|mpt"
 USAGE=`gettext "Usage: stmsboot [-D $SUPPORTED_DRIVERS] -e | -d | -u | -L | -l controller_number"`
 TEXTDOMAIN=SUNW_OST_OSCMD
 export TEXTDOMAIN
-STMSINSTANCE=system/device/mpxio-upgrade:default
+STMSINSTANCE=svc:system/device/mpxio-upgrade:default
 STMSBOOT=/usr/sbin/stmsboot
 BOOTADM=/sbin/bootadm
 MOUNT=/usr/sbin/mount
+EEPROM=/usr/sbin/eeprom
 EGREP=/usr/bin/egrep
 GREP=/usr/bin/grep
 AWK=/usr/bin/awk
+CP=/usr/bin/cp
+LS=/usr/bin/ls
+MV=/usr/bin/mv
+RM=/usr/bin/rm
 SORT=/usr/bin/sort
 UNIQ=/usr/bin/uniq
 EXPR=/usr/bin/expr
+MKDIR=/usr/bin/mkdir
+REBOOT=/usr/sbin/reboot
 SED=/usr/bin/sed
 SVCPROP=/usr/bin/svcprop
 SVCCFG=/usr/sbin/svccfg
 SVCS=/usr/bin/svcs
 SVCADM=/usr/sbin/svcadm
 
+NOW=`/usr/bin/date +%G%m%d_%H%M`
 MACH=`/usr/bin/uname -p`
-BOOTENV_FILE=/boot/solaris/bootenv.rc
-
-CLIENT_TYPE_VHCI="/scsi_vhci.*/ssd@|/scsi_vhci.*/disk@"
-# The phci client type egrep string will change based on the
-# drivers which we are operating on, and the cpu architecture
-# and we call stmsboot_util -n -D $drv to get that string
-CLIENT_TYPE_PHCI=
+BOOTENV_FILE=bootenv.rc
 reboot_needed=0
+new_bootpath=""
+CLIENT_TYPE_PHCI=""
+CLIENT_TYPE_VHCI="/scsi_vhci"
 
 #
 # Copy all entries (including comments) from source driver.conf
@@ -82,7 +85,9 @@ reboot_needed=0
 #
 delete_mpxio_disable_entries()
 {
-	sed '
+	# be careful here, we've got embedded \t characters
+	# in sed's pattern space.
+	$SED '
 		/^[ 	]*#/{ p
 			      d
 			    }
@@ -117,10 +122,8 @@ backup_lastsaved()
 {
 	for file in $*
 	do
-		file=`basename $file`
-		if [ -f $SAVEDIR/$file ]; then
-			mv $SAVEDIR/$file $SAVEDIR/${file}.old
-		fi
+		newfile=`basename $file`
+		$CP $file $SAVEDIR/$newfile.$cmd.$NOW
 	done
 }
 
@@ -142,11 +145,11 @@ build_recover()
 		gettext "\tUndo the modifications you made to STMS configuration.\n\tFor example undo any changes you made to " >> $RECOVERFILE
 		echo "/mnt$KDRVCONF." >> $RECOVERFILE
 	else
-		echo "\tcp /mnt${SAVEDIR}/$DRVCONF /mnt$KDRVCONF" >> $RECOVERFILE
+		echo "\tcp /mnt${SAVEDIR}/$DRVCONF.$cmd.$NOW /mnt$KDRVCONF" >> $RECOVERFILE
 	fi
 
 	if [ $1 -eq 1 ]; then
-		echo "\tcp /mnt${SAVEDIR}/vfstab /mnt$VFSTAB" >> $RECOVERFILE
+		echo "\tcp /mnt${SAVEDIR}/vfstab.$cmd.$NOW /mnt$VFSTAB" >> $RECOVERFILE
 
 		echo "repository /mnt/etc/svc/repository.db" > $SVCCFG_RECOVERY
 		echo "select $STMSINSTANCE" >> $SVCCFG_RECOVERY
@@ -156,7 +159,7 @@ build_recover()
 		echo "\t$SVCCFG -f /mnt$SVCCFG_RECOVERY" >> $RECOVERFILE
 
 		if [ "x$MACH" = "xi386" -a "x$new_bootpath" != "x" ]; then
-			echo "\tcp /mnt${SAVEDIR}/bootenv.rc /mnt$BOOTENV_FILE" >> $RECOVERFILE
+			echo "\tcp /mnt${SAVEDIR}/bootenv.rc.$cmd.$NOW /mnt/boot/solaris/$BOOTENV_FILE" >> $RECOVERFILE
 		fi
 	fi
 
@@ -164,6 +167,7 @@ build_recover()
 	echo "\tumount /mnt\n\treboot\n\n${rootdisk} \c" >> $RECOVERFILE
 	gettext "was your root device,\nbut it could be named differently after you boot net.\n" >> $RECOVERFILE
 }
+
 
 #
 # Arrange for /etc/vfstab and dump configuration to be updated
@@ -175,14 +179,15 @@ build_recover()
 update_sysfiles()
 {
 
-	gettext "WARNING: This operation will require a reboot.\nDo you want to continue ? [y/n] (default: y) "
+	gettext "WARNING: This operation will require a reboot.\n"
+	gettext "Do you want to continue ? [y/n] (default: y) "
 	read response
 
 	if [ "x$response" != x -a "x$response" != xy -a \
 	    "x$response" != xY ]; then
 		for d in $DRVLIST; do
 			TMPDRVCONF=/var/run/tmp.$d.conf.$$
-			rm -f $TMPDRVCONF > /dev/null 2>&1
+			$RM -f $TMPDRVCONF > /dev/null 2>&1
 		done;
 		return 0;
 	fi
@@ -198,10 +203,10 @@ update_sysfiles()
 			KDRVCONF=/kernel/drv/$d.conf
 			TMPDRVCONF=/var/run/tmp.$d.conf.$$
 
-			cp $KDRVCONF $SAVEDIR
+			$CP $KDRVCONF $SAVEDIR/`basename $KDRVCONF`.$cmd.$NOW
 			if [ -f $TMPDRVCONF ]; then
-				cp $TMPDRVCONF $KDRVCONF
-				rm -f $TMPDRVCONF
+				$CP $TMPDRVCONF $KDRVCONF
+				$RM -f $TMPDRVCONF
 			else
 				# if $TMPDRVCONF doesn't exist, then we
 				# haven't made any changes to it
@@ -222,17 +227,17 @@ update_sysfiles()
 			# depends upon the pathname of the parent node in the 
 			# device tree, which can be different on x86/x64 and sparc.
 
-			CLIENT_TYPE_PHCI=`$STMSBOOTUTIL -D $d -n`;
+			CLIENT_TYPE_PHCI=`$STMSBOOTUTIL -D $d -N`;
 
 			if [ "x$CLIENT_TYPE_PHCI" = "x" ]; then
 				continue;
 			fi
 
 			if [ "x$cmd" = "xenable" ]; then
-				ls -l /dev/dsk/*s2 2> /dev/null | \
+				$LS -l /dev/dsk/*s2 2> /dev/null | \
 				    $EGREP -s "$CLIENT_TYPE_PHCI"
 			else
-				ls -l /dev/dsk/*s2 2> /dev/null | \
+				$LS -l /dev/dsk/*s2 2> /dev/null | \
 				    $EGREP -s "$CLIENT_TYPE_VHCI"
 			fi
 
@@ -246,19 +251,12 @@ update_sysfiles()
 		need_bootscript=1
 		if [ "x$MACH" = "xi386" -a "x$new_bootpath" != "x" ]; then
 			#only update bootpath for x86.
-			cp $BOOTENV_FILE $SAVEDIR
-			/usr/sbin/eeprom bootpath=$new_bootpath
+			$CP /boot/solaris/$BOOTENV_FILE $SAVEDIR/$BOOTENV_FILE.$cmd.$NOW
+			$EEPROM bootpath="$new_bootpath"
 		fi
-		#
-		# Enable the mpxio-upgrade service, but don't run it now.
-		# The service will run during the next reboot and will do
-		# the actual job of modifying the system files.
-		#
+		# Enable the mpxio-upgrade service for the reboot
 		$SVCADM disable -t $STMSINSTANCE
-		$SVCCFG -f - << EOF
-select $STMSINSTANCE
-setprop general/enabled = true
-EOF
+		$SVCCFG -s $STMSINSTANCE "setprop general/enabled=true"
 	else
 		need_bootscript=0
 	fi
@@ -274,11 +272,12 @@ EOF
 
 	if [ "x$response" = x -o "x$response" = xy -o \
 	    "x$response" = xY ]; then
-		/usr/sbin/reboot
+		$REBOOT
 	fi
 
 	return 0
 }
+
 
 #
 # Enable or disable mpxio as specified by the cmd.
@@ -291,6 +290,8 @@ EOF
 #
 configure_mpxio()
 {
+	# be careful here, we've got embedded \t characters
+	# in sed's pattern space.
 	mpxiodisableno='mpxio-disable[ 	]*=[ 	]*"no"[ 	]*;'
 	mpxiodisableyes='mpxio-disable[ 	]*=[ 	]*"yes"[ 	]*;'
 
@@ -317,7 +318,7 @@ configure_mpxio()
 			if [ $? -ne 0 ]; then
 				# if all mpxiodisable entries are no/yes for
 				# enable/disable mpxio, notify the user
-				rm -f $TMPDRVCONF $TMPDRVCONF_MPXIO_ENTRY > /dev/null 2>&1
+				$RM -f $TMPDRVCONF $TMPDRVCONF_MPXIO_ENTRY > /dev/null 2>&1
 				continue;
 			else
 				reboot_needed=`$EXPR $reboot_needed + 1`
@@ -326,7 +327,7 @@ configure_mpxio()
 			# If mpxiodisable entries do not exist, always continue update
 		fi
 	else
-		rm -f $TMPDRVCONF $TMPDRVCONF_MPXIO_ENTRY > /dev/null 2>&1
+		$RM -f $TMPDRVCONF $TMPDRVCONF_MPXIO_ENTRY > /dev/null 2>&1
 		gettext "failed to update " 1>&2
 		echo "$KDRVCONF." 1>&2 
 		gettext "No changes were made to your STMS configuration.\n" 1>&2
@@ -349,9 +350,10 @@ setcmd()
 }
 
 #
-#Need to update bootpath on x86 if boot system from FC disk
-#Only update bootpath here when mpxio is enabled
-#If mpxio is disabled currently, will update bootpath in mpxio-upgrade
+# Need to update bootpath on x86 if boot system from FC disk
+# Only update bootpath here when mpxio is enabled
+# If mpxio is currently disabled, then we'll update bootpath in the
+# mpxio-upgrade service method on reboot.
 #
 
 get_newbootpath_for_stmsdev() {
@@ -359,34 +361,37 @@ get_newbootpath_for_stmsdev() {
 		return 0
 	fi
 
-	cur_bootpath=`/usr/sbin/eeprom bootpath | \
-	    $SED 's/bootpath=[ 	]*//g' | $SED 's/[ 	]*$//'`
-	if [ "x$cur_bootpath" = "x" ]; then
-		gettext "failed to get bootpath by eeprom\n" 1>&2
+	cur_bootpath=`$STMSBOOTUTIL -b`
+	if [ $? != 0 ]; then
 		return 1
 	fi
 
-	#only update bootpath for STMS path
-	echo $cur_bootpath|$EGREP $CLIENT_TYPE_VHCI > /dev/null 2>&1
-	if [ $? -eq 1 ]; then
-		return 0
+	# Since on x64 platforms the eeprom command doesn't update the
+	# kernel, the file /boot/solaris/bootenv.rc and the kernel's
+	# bootpath variable have a good chance of differing. We do some
+	# extra handwaving to get the correct bootpath variable setting. 
+
+	ONDISKVER=`$AWK '/bootpath/ {print $3}' /boot/solaris/bootenv.rc|\
+		$SED -e"s,',,g"`
+	if [ "x$ONDISKVER" != "x$cur_bootpath" ]; then
+		cur_bootpath="$ONDISKVER"
 	fi
 
-	new_bootpath=`$STMSBOOTUTIL -p /devices$cur_bootpath`
-	if [ $? -ne 0 ]; then
-		new_bootpath=""
-		return 1
-	fi
-
-	# we replace "sd" with "disk" if we need to work on the eeprom
-	# bootpath setting, since fibre-channel devices will report as
-	# being attached via "disk" and not "sd". One day we'll have a
-	# truly unified and architecture-independent view of the device
-	# tree, and this block will be redundant
-	fp_bootpath=`echo $new_bootpath|grep fp.*sd`
-	if [ "x$fp_bootpath" != "x" ]; then
-		new_bootpath=`echo $fp_bootpath |sed -e"s,sd,disk,g"`
-	fi
+	NEWBOOTPATH=""
+	for path in $cur_bootpath; do
+		mapped=`$STMSBOOTUTIL -p $path`
+		if [ "$mapped" != "NOT_MAPPED" ]; then
+			if [ "$mapped" != "$path" ]; then
+				NEWBOOTPATH=`echo "$path " | \
+				   $SED -e"s|$path|$mapped|"`" $NEWBOOTPATH"
+			else
+				NEWBOOTPATH="$NEWBOOTPATH $path"
+			fi
+		fi
+	done
+	# now strip off leading and trailing space chars
+	new_bootpath=`echo $NEWBOOTPATH`
+	return 0
 }
 
 #
@@ -408,9 +413,7 @@ emit_driver_warning_msg() {
 	gettext "         detected in a host. In your system, these controllers are\n\n"
 
 	for WARNDRV in `echo $SUPPORTED_DRIVERS| $SED -e"s,|, ,g"`; do
-		for i in `$STMSBOOTUTIL -D $WARNDRV -n | $SED -e"s,|, ,g"`; do
-			$GREP "$i.*$WARNDRV.$" /etc/path_to_inst | $AWK -F"\"" '{print "/devices"$2}'
-		done;
+		$STMSBOOTUTIL -D $WARNDRV -n
 	done;
 	
 	echo ""
@@ -426,11 +429,15 @@ emit_driver_warning_msg() {
 	    "x$response" != "xy" ]; then
 		exit
 	fi
-
 }
 
-cmd=none
 
+#
+#
+# main starts here
+#
+
+cmd=none
 # process options
 while getopts D:geduLl: c
 do
@@ -498,13 +505,22 @@ if [ $? -ne 0 ]; then
 	fi
 fi
 
+
+# make sure we can stash our data somewhere private
+if [ ! -d $SAVEDIR ]; then
+	$MKDIR -p $SAVEDIR
+fi
+# prime the cache
+$STMSBOOTUTIL -i
+
+
 if [ "x$cmd" = xenable -o "x$cmd" = xdisable -o "x$cmd" = xupdate ]; then
 	#
 	# The bootup script doesn't work on cache-only-clients as the script
 	# is executed before the plumbing for cachefs mounting of root is done.
 	#
 	if $MOUNT -v | $EGREP -s " on / type (nfs|cachefs) "; then
-		gettext "This command option is not supported on systems with nfs or cachefs mounted root filesystem.\n" 1>&2
+		gettext "This command option is not supported on systems with an nfs or cachefs mounted root filesystem.\n" 1>&2
 		exit 1
 	fi
 
@@ -514,8 +530,8 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable -o "x$cmd" = xupdate ]; then
 	# is in a sane state before allowing any further invocations, so 
 	# try to get the system admin to do so
 
-	ISARMED=`$SVCS -l $STMSINSTANCE |$GREP "enabled.*temporary"`
-	if [ $? -eq 0 ]; then
+	ISARMED=`$SVCS -l $STMSINSTANCE|$GREP "enabled.*false.*temporary"`
+	if [ ! $? ]; then
 		echo ""
 		gettext "You need to reboot the system in order to complete\n"
 		gettext "the previous invocation of stmsboot.\n"
@@ -525,7 +541,7 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable -o "x$cmd" = xupdate ]; then
 
 		if [ "x$response" = "x" -o "x$response" = "xY" -o \
 		    "x$response" = "xy" ]; then
-			/usr/sbin/reboot
+			$REBOOT
 		else
 			echo ""
 			gettext "Please reboot this system before continuing\n"
@@ -534,27 +550,21 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable -o "x$cmd" = xupdate ]; then
 		fi
 	fi
 
-	if [ -d $SAVEDIR ]; then
-		#
-		# keep a copy of the last saved files, useful for manual
-		# recovery in case of a problem.
-		#
-		for d in $DRVLIST; do
-			DRVCONF=$d.conf
-			KDRVCONF=/kernel/drv/$d.conf
-			TMPDRVCONF=/var/run/tmp.$d.conf.$$
-			TMPDRVCONF_MPXIO_ENTRY=/var/run/tmp.$d.conf.mpxioentry.$$;
-
-			if [ "x$MACH" = "xsparc" ]; then
-				backup_lastsaved $KDRVCONF $VFSTAB
-			else
-				backup_lastsaved $KDRVCONF $VFSTAB $BOOTENV_FILE
-			fi
-		done
-	else
-		mkdir $SAVEDIR
-	fi
-
+	#
+	# keep a copy of the last saved files, useful for manual
+	# recovery in case of a problem.
+	#
+	for d in $DRVLIST; do
+		DRVCONF=$d.conf
+		KDRVCONF=/kernel/drv/$d.conf
+		TMPDRVCONF=/var/run/tmp.$d.conf.$$
+		TMPDRVCONF_MPXIO_ENTRY=/var/run/tmp.$d.conf.mpxioentry.$$;
+		if [ "x$MACH" = "xsparc" ]; then
+			backup_lastsaved $KDRVCONF $VFSTAB
+		else
+			backup_lastsaved $KDRVCONF $VFSTAB /boot/solaris/$BOOTENV_FILE
+		fi
+	done
 fi
 
 if [ "x$cmd" = xenable -o "x$cmd" = xdisable ]; then
@@ -568,7 +578,6 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable ]; then
 	done
 
 	if [ $reboot_needed -ne 0 ]; then
-
 		# Need to update bootpath on x86 if our boot device is
 		# now accessed through mpxio.
 		# Only update bootpath before reboot when mpxio is enabled
@@ -578,7 +587,7 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable ]; then
 		if [ "x$MACH" = "xi386" -a "x$cmd" = "xdisable" ]; then
 			get_newbootpath_for_stmsdev
 			if [ $? -ne 0 ]; then
-				rm -f $TMPDRVCONF > /dev/null 2>&1
+				$RM -f $TMPDRVCONF > /dev/null 2>&1
 				gettext "failed to update bootpath.\n" 1>&2
 				gettext "No changes were made to your STMS configuration.\n" 1>&2
 				return 1

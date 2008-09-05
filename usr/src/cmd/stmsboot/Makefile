@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -41,8 +39,7 @@ CLOBBERFILES = $(SHFILES) $(STMSBOOT_UTIL) $(POFILE) $(OBJS)
 ROOTFSLIB_MPXIO = $(ROOT)/lib/mpxio
 
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEMDEVICE)
-
-LDLIBS += -ldevinfo -lgen -ldevid
+LDLIBS += -ldevinfo -ldevid -lnvpair -lumem
 
 .KEEP_STATE:
 

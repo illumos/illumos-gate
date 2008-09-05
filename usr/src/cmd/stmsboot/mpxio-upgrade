@@ -20,10 +20,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 . /lib/svc/share/fs_include.sh
 . /lib/svc/share/net_include.sh
@@ -34,25 +33,23 @@ STMSBOOTUTIL=/lib/mpxio/stmsboot_util
 SAVEDIR=/etc/mpxio
 RECOVERFILE=$SAVEDIR/recover_instructions
 DEVFSADM=/usr/sbin/devfsadm
+DUMPADM=/usr/sbin/dumpadm
 METADEVADM=/usr/sbin/metadevadm
 usrmounted=0
 MACH=`/usr/bin/uname -p`
+CP=/usr/bin/cp
+DF=/usr/bin/df
+LS=/usr/bin/ls
+RM=/usr/bin/rm
 EGREP=/usr/bin/egrep
 SED=/usr/bin/sed
-
-# map $special and $fsckdev
-mpxio_mapdev()
-{
-	new_special=`$STMSBOOTUTIL -m $special`
-	if [ $? -eq 0 ]; then
-		special=$new_special
-	fi
-
-	new_fsckdev=`$STMSBOOTUTIL -m $fsckdev`
-	if [ $? -eq 0 ]; then
-		fsckdev=$new_fsckdev
-	fi
-}
+ZPOOL=/usr/sbin/zpool
+AWK=/usr/bin/awk
+MOUNT=/sbin/mount
+UMOUNT=/sbin/mount
+EEPROM=/usr/sbin/eeprom
+BOOTADM=/usr/sbin/bootadm
+SVCADM=/usr/sbin/svcadm
 
 mpxio_error()
 {
@@ -72,14 +69,56 @@ mpxio_error()
 #
 mpxio_mount_root()
 {
-	exec < $vfstab; readvfstab /
-	mpxio_mapdev
+	HASZFSROOT=`$DF -g / |grep zfs`
 
-	checkopt "llock" $mntopts
-	mntopts='remount'
-	[ -n "$otherops" ] && mntopts="${mntopts},${otherops}"
-	/sbin/mount -m -F $fstype -o $mntopts $special $mountp \
->/dev/msglog 2>&1
+	# In single-user maintenance mode, we don't have a writable
+	# root partition, so we _cannot_ use devlinks. Therefore we
+	# have to do some dancing - first mount the physical path
+	# read-write, then re-run $STMSBOOTUTIL to get the real 
+	# devlink mapping, and then re-mount the root slice. Of course,
+	# if we all used ZFS this wouldn't be such a pain!
+	exec < $vfstab; readvfstab /
+	# ZFS root environments should _not_ have an entry for /
+	# in their /etc/vfstab.
+	if [ "x$special" != "x" ]; then
+		# sanity check for ZFSRoot _and_ / in /etc/vfstab
+		if [ "x$HASZFSROOT" != "x" ]; then
+			# ERROR - this would cause a failure later
+			# so let root know about it now and provide
+			# a chance to handle it before filesystem/usr
+			cecho "stmsboot: System has ZFS Root *and* an entry for / in /etc/vfstab\nstmsboot: Please remove the / entry from /etc/vfstab and then run\n# svcadm clear mpxio-upgrade"
+			exit 1
+		fi
+		ISPHYS=`echo $special |$AWK '/^\/dev\/dsk/ {print}'`;
+		if [ "x$ISPHYS" != "x" ]; then
+			new_special=`$STMSBOOTUTIL -m $special`
+			if [ "x$new_special" = "xNOT_MAPPED" ]; then
+				# this is a bad state to be in, exit
+				cecho "Error: Your root device is not mapped."
+				exit 1
+			fi
+	       		checkopt "llock" $mntopts
+			mntopts='remount'
+			[ -n "$otherops" ] && mntopts="${mntopts},${otherops}"
+			$MOUNT -m -F $fstype -o $mntopts $new_special \
+				$mountp >/dev/msglog 2>&1
+
+			# now re-run $STMSBOOTUTIL to get the real mapping
+			new_special=`$STMSBOOTUTIL -m $special`
+		else
+			# a metadevice, either /dev/md or /dev/vx
+			new_special=$special
+		fi
+		# mount root for real
+		$MOUNT -o remount,rw $new_special / >/dev/msglog 2>&1
+	else
+		if [ "x$HASZFSROOT" = "x" ]; then
+			cecho "stmsboot: Error: your root slice is invalid"
+			exit 1
+		else
+			cecho "stmsboot: Root is on ZFS"
+		fi
+	fi
 }
 
 #
@@ -90,7 +129,8 @@ mpxio_mount_usr()
 	exec < $vfstab; readvfstab "/usr"
 	ret_val=0
 	if [ -n "$mountp" ]; then
-		mpxio_mapdev
+		new_special=`$STMSBOOTUTIL -m $special`
+		
 		if [ "$fstype" = cachefs ]; then
 			# Mount read-only without the cache.
 			case "$mntopts" in
@@ -106,7 +146,7 @@ mpxio_mount_usr()
 				;;
 			esac
 			# see the comment below for /dev/null
-			/sbin/mount -m -F $cfsbacktype -o ro $special $mountp \
+			$MOUNT -m -F $cfsbacktype -o ro $new_special $mountp \
 >/dev/null 2>&1
 			ret_val=$?
 		else
@@ -128,24 +168,19 @@ mpxio_mount_usr()
 					mntopts="ro,$mntopts"
 				fi
 
-				#
 				# Requesting logging on a read-only mount
 				# causes errors to be displayed, so remove
 				# "logging" from the list of options.
-				#
-
 				checkopt logging $mntopts
 				if [ "x$option" = xlogging ]; then
 					mntopts="$otherops"
 				fi
 			fi
 
-			#
 			# In case of a manual restart of the service, mount
 			# will emit messages if /usr is already mounted.
 			# So redirect the output to /dev/null.
-			#
-			/sbin/mount -m -F $fstype -o $mntopts $special /usr \
+			$MOUNT -m -F $fstype -o $mntopts $new_special /usr \
 >/dev/null 2>&1
 			ret_val=$?
 		fi
@@ -160,29 +195,35 @@ mpxio_mount_usr()
 # update system dump configuration
 update_dumpconf()
 {
-	#
 	# Disable device-in-use checking (done in libdiskmgt).
 	# Without disabling this check, the configuration of dump device
 	# would fail as the device-in-use code incorrectly concludes that
 	# the device is in use and hence prevents configuration of the dump
 	# device.
-	#
 	NOINUSE_CHECK=1
 	export NOINUSE_CHECK
 
-	set -- `dumpadm -u 2>&1 | $EGREP 'cannot use /dev.* as dump device'`
-	if [ "x$4" != x ]; then
-		newname=`$STMSBOOTUTIL -M $4`
-		if [ $? -eq 0 ]; then
-			if /usr/sbin/dumpadm -d $newname > /dev/msglog 2> /dev/console; then
-				cecho "stmsboot: dump configuration has been \
-updated."
-			else
-				mpxio_error "failed to configure $newname as \
-the dump device.\nold dump device name: $4"
-				return 1
+	DUMPISZFS=`$AWK -F"=" '/DUMPADM_DEVICE/ {print $2}' /etc/dumpadm.conf|$EGREP zvol`
+	if [ "x$DUMPISZFS" = "x" ]; then
+		set -- `$DUMPADM -u 2>&1 | $EGREP 'cannot use /dev.* as dump device'`
+		if [ "x$4" != x ]; then
+			newname=`$STMSBOOTUTIL -m $4`
+			if [ $? -eq 0 ]; then
+				if $DUMPADM -d $newname > /dev/msglog 2> /dev/console; then
+					cecho "stmsboot: dump configuration \
+					has been updated."
+				else
+					mpxio_error "failed to configure \
+					the dump device.\nold \
+					dump device name: $4"
+					return 1
+				fi
 			fi
 		fi
+	else
+		# make sure we can get to it, force zfs to load fully
+		$LS $DUMPISZFS >>/dev/null 2>&1
+		cecho "stmsboot: dump on ZFS, no dumpadm update required"
 	fi
 	return 0
 }
@@ -190,31 +231,35 @@ the dump device.\nold dump device name: $4"
 # Update bootpath for x86 here when we are enabling mpxio on root
 update_bootpath()
 {
-	cur_bootpath=`/usr/sbin/eeprom bootpath | $SED 's/bootpath=[ 	]*//g' | $SED 's/[ 	].*//'`
-	# only take care of phci-based path here 
-	PHCIOPT=`$STMSBOOTUTIL -D mpt -n`
-	echo $cur_bootpath | $EGREP -s "/fp@.*/disk|$PHCIOPT"
-
-	if [ $? -eq 0 ]; then
-		new_bootpath=`$STMSBOOTUTIL -m /devices$cur_bootpath`
-		if [ $? -eq 0 -a "x$new_bootpath" != "x" ]; then
-			# stmsboot_util -m phci-based path got mapped path back means
-			# mpxio is enabled on bootpath
-			new_bootpath=`echo $new_bootpath|$SED "s/.*\/devices//"`
-			/usr/sbin/eeprom bootpath=$new_bootpath
-			cecho "stmsboot: bootpath has been updated"
-
-			/sbin/bootadm update-archive
-		fi
+	cur_bootpath=`$STMSBOOTUTIL -b`
+	if [ $? != 0 ]; then
+		cecho "stmsboot: ERROR! Unable to retrieve bootpath property\n"
+		exit 1
 	fi
+
+	NEWBOOTPATH=""
+	for path in $cur_bootpath; do
+		mapped=`$STMSBOOTUTIL -p $path`
+		if [ "$mapped" != "NOT_MAPPED" ]; then
+			if [ "x$mapped" != "x$path" ]; then
+				NEWBOOTPATH=`echo "$path " | \
+				    $SED -e"s|$path|$mapped|"`" $NEWBOOTPATH"
+			else
+				NEWBOOTPATH="$NEWBOOTPATH $path"
+			fi
+		fi
+	done
+	# now strip off leading and trailing space chars
+	new_bootpath=`echo $NEWBOOTPATH`
+	$EEPROM bootpath="$new_bootpath"
+	cecho "stmsboot: bootpath has been updated, now regenerating boot archive"
+	$BOOTADM update-archive	    
+	cecho ""
 }
 
-#
-# do the actual work
-#
+# Now do the actual work
 mpxio_main()
 {
-	#
 	# NOTE: If the first attempt to run the service has failed due to an
 	# expected error, users should be able to manually rerun the service.
 	#
@@ -240,7 +285,13 @@ mpxio_main()
 		$DEVFSADM
 
 		# update /etc/vfstab to reflect device name changes
-		if $STMSBOOTUTIL -u >/dev/msglog 2>&1; then
+		$STMSBOOTUTIL -u >/dev/msglog 2>&1
+		if [ $? -eq 0 ]; then
+			$CP /etc/vfstab /etc/vfstab.old
+			$CP $SAVEDIR/vfstab.new /etc/vfstab
+			$RM $SAVEDIR/vfstab.new
+			cecho ""
+			cecho "stmsboot: vfstab has been updated"
 			if update_dumpconf; then
 				# update svm configuration to reflect new names
 				if [ -s /kernel/drv/md.conf ] && \
@@ -256,13 +307,11 @@ mpxio_main()
 			mpxio_error "failed to update /etc/vfstab."
 		fi
 
-		/usr/sbin/svcadm disable system/device/mpxio-upgrade
-
-		/usr/sbin/reboot
+		$SVCADM disable system/device/mpxio-upgrade
 	else
 		mpxio_error "failed to mount the root filesystem."
 		if [ $usrmounted -eq 1 ]; then
-			/sbin/umount /usr
+			$UMOUNT /usr
 		fi
 	fi
 }

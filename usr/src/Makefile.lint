@@ -254,6 +254,7 @@ COMMON_SUBDIRS = \
 	cmd/split \
 	cmd/ssh \
 	cmd/stat \
+	cmd/stmsboot \
 	cmd/streams/strcmd \
 	cmd/strings \
 	cmd/su \
