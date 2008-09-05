@@ -26,8 +26,6 @@
 #ifndef _SYS_SPA_H
 #define	_SYS_SPA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/avl.h>
 #include <sys/zfs_context.h>
 #include <sys/nvpair.h>
@@ -87,6 +85,11 @@ struct dsl_pool;
 #define	SPA_MAXBLOCKSIZE	(1ULL << SPA_MAXBLOCKSHIFT)
 
 #define	SPA_BLOCKSIZES		(SPA_MAXBLOCKSHIFT - SPA_MINBLOCKSHIFT + 1)
+
+/*
+ * Size of block to hold the configuration data (a packed nvlist)
+ */
+#define	SPA_CONFIG_BLOCKSIZE	(1 << 14)
 
 /*
  * The DVA size encodings for LSIZE and PSIZE support blocks up to 32MB.
