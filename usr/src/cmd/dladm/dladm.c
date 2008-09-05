@@ -1825,6 +1825,7 @@ show_link(datalink_id_t linkid, void *arg)
 	/*
 	 * first get all the link attributes into lbuf;
 	 */
+	bzero(&lbuf, sizeof (link_fields_buf_t));
 	status = print_link(state, linkid, &lbuf);
 
 	if (status != DLADM_STATUS_OK)
@@ -1846,11 +1847,11 @@ done:
 static int
 show_link_stats(datalink_id_t linkid, void *arg)
 {
-	char link[DLPI_LINKNAME_MAX];
-	datalink_class_t class;
-	show_state_t *state = (show_state_t *)arg;
-	pktsum_t stats, diff_stats;
-	dladm_phys_attr_t dpa;
+	char			link[DLPI_LINKNAME_MAX];
+	datalink_class_t	class;
+	show_state_t		*state = (show_state_t *)arg;
+	pktsum_t		stats, diff_stats;
+	dladm_phys_attr_t	dpa;
 
 	if (state->ls_firstonly) {
 		if (state->ls_donefirst)
@@ -2337,6 +2338,7 @@ print_aggr(show_grp_state_t *state, datalink_id_t linkid)
 	uint32_t		flags;
 	dladm_status_t		status;
 
+	bzero(&ginfo, sizeof (dladm_aggr_grp_attr_t));
 	if ((status = dladm_datalink_id2info(linkid, &flags, NULL, NULL, link,
 	    MAXLINKNAMELEN)) != DLADM_STATUS_OK) {
 		return (status);
@@ -2994,10 +2996,11 @@ done:
 static int
 show_phys(datalink_id_t linkid, void *arg)
 {
-	show_state_t	*state = arg;
-	dladm_status_t	status;
+	show_state_t		*state = arg;
+	dladm_status_t		status;
 	link_fields_buf_t	pattr;
 
+	bzero(&pattr, sizeof (link_fields_buf_t));
 	status = print_phys(state, linkid, &pattr);
 	if (status != DLADM_STATUS_OK)
 		goto done;
@@ -3055,10 +3058,11 @@ done:
 static int
 show_vlan(datalink_id_t linkid, void *arg)
 {
-	show_state_t	*state = arg;
-	dladm_status_t	status;
+	show_state_t		*state = arg;
+	dladm_status_t		status;
 	link_fields_buf_t	lbuf;
 
+	bzero(&lbuf, sizeof (link_fields_buf_t));
 	status = print_vlan(state, linkid, &lbuf);
 	if (status != DLADM_STATUS_OK)
 		goto done;
@@ -3086,13 +3090,12 @@ do_show_phys(int argc, char *argv[], const char *use)
 	datalink_id_t	linkid = DATALINK_ALL_LINKID;
 	show_state_t	state;
 	dladm_status_t	status;
-	char			*fields_str = NULL;
-	print_field_t		**fields;
-	uint_t			nfields;
-	char			*all_active_fields =
+	char		*fields_str = NULL;
+	print_field_t	**fields;
+	uint_t		nfields;
+	char		*all_active_fields =
 	    "link,media,state,speed,duplex,device";
-	char			*all_inactive_fields =
-	    "link,device,media,flags";
+	char		*all_inactive_fields = "link,device,media,flags";
 
 	bzero(&state, sizeof (state));
 	opterr = 0;
@@ -3856,6 +3859,7 @@ show_wifi(datalink_id_t linkid, void *arg)
 		return (DLADM_WALK_CONTINUE);
 	}
 
+	/* dladm_wlan_get_linkattr() memsets attr with 0 */
 	status = dladm_wlan_get_linkattr(linkid, &attr);
 	if (status != DLADM_STATUS_OK)
 		die_dlerr(status, "cannot get link attributes for %s", link);
@@ -5237,6 +5241,7 @@ show_secobj(void *arg, const char *obj_name)
 	dladm_status_t		status;
 	secobj_fields_buf_t	sbuf;
 
+	bzero(&sbuf, sizeof (secobj_fields_buf_t));
 	if (statep->ss_persist)
 		flags |= DLADM_OPT_PERSIST;
 
@@ -5415,9 +5420,9 @@ do_show_ether(int argc, char **argv, const char *use)
 	boolean_t		o_arg = B_FALSE;
 	char			*fields_str;
 	uint_t			nfields;
-	char *all_fields =
+	char			*all_fields =
 	    "link,ptype,state,auto,speed-duplex,pause,rem_fault";
-	char *default_fields =
+	char			*default_fields =
 	    "link,ptype,state,auto,speed-duplex,pause";
 
 	fields_str = default_fields;
@@ -5493,14 +5498,15 @@ dladm_print_field(print_field_t *pf, void *arg)
 static int
 show_etherprop(datalink_id_t linkid, void *arg)
 {
-	print_ether_state_t *statep = arg;
-	char buf[DLADM_STRSIZE];
-	int speed;
-	uint64_t s;
-	uint32_t autoneg, pause, asmpause, adv_rf, cap_rf, lp_rf;
-	ether_fields_buf_t ebuf;
-	char speed_unit = 'M';
+	print_ether_state_t	*statep = arg;
+	char			buf[DLADM_STRSIZE];
+	int			speed;
+	uint64_t		s;
+	uint32_t		autoneg, pause, asmpause, adv_rf, cap_rf, lp_rf;
+	ether_fields_buf_t	ebuf;
+	char			speed_unit = 'M';
 
+	bzero(&ebuf, sizeof (ether_fields_buf_t));
 	if (dladm_datalink_id2info(linkid, NULL, NULL, NULL,
 	    ebuf.eth_link, sizeof (ebuf.eth_link)) != DLADM_STATUS_OK) {
 		return (DLADM_WALK_CONTINUE);
@@ -5741,11 +5747,11 @@ die_opterr(int opt, int opterr, const char *usage)
 static void
 show_ether_xprop(datalink_id_t linkid, void *arg)
 {
-	print_ether_state_t *statep = arg;
-	char buf[DLADM_STRSIZE];
-	uint32_t autoneg, pause, asmpause, adv_rf, cap_rf, lp_rf;
-	boolean_t add_comma, r1;
-	ether_fields_buf_t ebuf;
+	print_ether_state_t	*statep = arg;
+	char			buf[DLADM_STRSIZE];
+	uint32_t		autoneg, pause, asmpause, adv_rf, cap_rf, lp_rf;
+	boolean_t		add_comma, r1;
+	ether_fields_buf_t	ebuf;
 
 	/* capable */
 	bzero(&ebuf, sizeof (ebuf));
