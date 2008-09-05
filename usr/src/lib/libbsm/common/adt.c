@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
 #include <assert.h>
@@ -382,6 +380,25 @@ return_err_free:
 return_err:
 	adt_write_syslog("audit session create failed", errno);
 	return (-1);
+}
+
+/*
+ * adt_load_table()
+ *
+ * loads the event translation table into the audit session.
+ */
+
+void
+adt_load_table(const adt_session_data_t *session_data,
+    adt_translation_t **xlate, void (*preload)(au_event_t, adt_event_data_t *))
+{
+	adt_internal_state_t	*state = (adt_internal_state_t *)session_data;
+
+	if (state != NULL) {
+		assert(state->as_check == ADT_VALID);
+		state->as_xlate = xlate;
+		state->as_preload = preload;
+	}
 }
 
 /*
@@ -1485,6 +1502,8 @@ adt_init(adt_internal_state_t *state, int use_proc_data)
 		return (-1);  /* errno set by auditon */
 	}
 	state->as_check = ADT_VALID;
+	adt_load_table((adt_session_data_t *)state, &adt_xlate_table[0],
+	    &adt_preload);
 	return (0);
 }
 
@@ -1504,7 +1523,6 @@ adt_init(adt_internal_state_t *state, int use_proc_data)
 int
 adt_set_proc(const adt_session_data_t *session_data)
 {
-	int			rc;
 	adt_internal_state_t	*state;
 
 	if (auditstate == AUC_DISABLED || (session_data == NULL))
@@ -1520,11 +1538,10 @@ adt_set_proc(const adt_session_data_t *session_data)
 		goto return_err;
 	}
 
-	rc = setaudit_addr((auditinfo_addr_t *)&(state->as_info),
-	    sizeof (auditinfo_addr_t));
-
-	if (rc < 0)
+	if (setaudit_addr((auditinfo_addr_t *)&(state->as_info),
+	    sizeof (auditinfo_addr_t)) < 0) {
 		goto return_err;	/* errno set by setaudit_addr() */
+	}
 
 	state->as_session_model = ADT_PROCESS_MODEL;
 
@@ -1835,7 +1852,7 @@ adt_event_data_t
 	 * preload data so the adt_au_*() functions can detect un-supplied
 	 * values (0 and NULL are free via calloc()).
 	 */
-	adt_preload(event_id, return_event);
+	session_state->as_preload(event_id, return_event);
 
 return_ptr:
 	return (return_event);
@@ -1845,12 +1862,12 @@ return_ptr:
  * adt_getXlateTable -- look up translation table address for event id
  */
 
-static struct translation *
-adt_getXlateTable(au_event_t event_id)
+static adt_translation_t *
+adt_getXlateTable(adt_translation_t **xlate, au_event_t event_id)
 {
 	/* xlate_table is global in adt_xlate.c */
-	struct translation	**p_xlate = &xlate_table[0];
-	struct translation	*p_event;
+	adt_translation_t	**p_xlate = xlate;
+	adt_translation_t	*p_event;
 
 	while (*p_xlate != NULL) {
 		p_event = *p_xlate;
@@ -1941,10 +1958,10 @@ adt_calcOffsets(struct entry *p_entry, int tablesize, void *p_data)
  *
  */
 
-static void
+static int
 adt_generate_event(const adt_event_data_t *p_extdata,
     struct adt_event_state *p_event,
-    struct translation *p_xlate)
+    adt_translation_t *p_xlate)
 {
 	struct entry		*p_entry;
 	static mutex_t	lock = DEFAULTMUTEX;
@@ -1969,12 +1986,11 @@ adt_generate_event(const adt_event_data_t *p_extdata,
 		(void) mutex_unlock(&lock);
 	}
 	while (p_entry != NULL) {
-		adt_generate_token(p_entry, (char *)p_extdata,
-		    p_event);
+		adt_generate_token(p_entry, (char *)p_extdata, p_event);
 
 		p_entry = p_entry->en_next_token;
 	}
-	adt_token_close(p_event);
+	return (adt_token_close(p_event));
 }
 
 /*
@@ -1990,19 +2006,19 @@ int
 adt_put_event(const adt_event_data_t *event, int status, int return_val)
 {
 	struct adt_event_state	*event_state;
-	struct translation	*xlate;
-	int			rc = 0;
+	adt_translation_t	*xlate;
 
 	if (event == NULL) {
 		errno = EINVAL;
-		rc = -1;
-		goto return_rc;
+		return (-1);
 	}
 	event_state = (struct adt_event_state *)event;
 
 	/* if audit off or this is a broken session, exit */
-	if (auditstate == AUC_DISABLED || (event_state->ae_session == NULL))
-		goto return_rc;
+	if (auditstate == AUC_DISABLED ||
+	    (event_state->ae_session == NULL)) {
+		return (0);
+	}
 
 	assert(event_state->ae_check == ADT_VALID);
 
@@ -2011,20 +2027,20 @@ adt_put_event(const adt_event_data_t *event, int status, int return_val)
 
 	/* look up the event */
 
-	xlate = adt_getXlateTable(event_state->ae_event_id);
+	xlate = adt_getXlateTable(event_state->ae_session->as_xlate,
+	    event_state->ae_event_id);
 
 	if (xlate == NULL) {
 		errno = EINVAL;
-		rc = -1;
-		goto return_rc;
+		return (-1);
 	}
 	DPRINTF(("got event %d\n", xlate->tx_internal_event));
 
-	if (adt_selected(event_state, xlate->tx_internal_event, status))
-		adt_generate_event(event, event_state, xlate);
+	if (adt_selected(event_state, xlate->tx_internal_event, status)) {
+		return (adt_generate_event(event, event_state, xlate));
+	}
 
-return_rc:
-	return (rc);
+	return (0);
 }
 
 /*

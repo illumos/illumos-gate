@@ -30,8 +30,6 @@
 #ifndef _ADT_H
 #define	_ADT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <bsm/audit.h>
 #include <bsm/libbsm.h>
 #include <bsm/audit_record.h>
@@ -70,6 +68,7 @@ typedef struct adt_session_data	adt_session_data_t;
 typedef struct adt_export_data	adt_export_data_t;
 typedef union adt_event_data	adt_event_data_t;
 typedef struct adt_termid	adt_termid_t;
+typedef struct translation	adt_translation_t;
 
 /*
  * flag defs for the flags argument of adt_start_session()

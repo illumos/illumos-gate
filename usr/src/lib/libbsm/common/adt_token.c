@@ -21,12 +21,11 @@
 /*
  * adt_token.c
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This file does not provide any user callable functions.  See adt.c
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
@@ -132,7 +131,7 @@ adt_generate_token(struct entry *p_entry, void *p_data,
 
 /* call this last */
 
-void
+int
 adt_token_close(struct adt_event_state *event)
 {
 	int	rc;
@@ -141,6 +140,7 @@ adt_token_close(struct adt_event_state *event)
 	    event->ae_internal_id);
 	if (rc < 0)
 		adt_write_syslog("au_close failed", errno);
+	return (rc);
 }
 
 /*

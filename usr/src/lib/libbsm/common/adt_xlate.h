@@ -21,7 +21,7 @@
 /*
  * adt_xlate.h
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -29,12 +29,13 @@
 #ifndef _BSM_XLATE_H
 #define	_BSM_XLATE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include <priv.h>
 
 #include <bsm/libbsm.h>
-#include <priv.h>
-#include <bsm/adt_event.h>
+
 #include <tsol/label.h>
+
+#include "adt_event.h"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -203,6 +204,8 @@ struct adt_internal_state {
 	adt_session_flags_t	as_flags;
 	pid_t			as_pid;
 	m_label_t		*as_label;	/* if is_system_labeled */
+	adt_translation_t	**as_xlate;
+	void (*as_preload)(au_event_t, adt_event_data_t *);
 };
 
 /*
@@ -304,8 +307,6 @@ struct translation {
 	struct entry	*tx_top_entry;		/* first array element */
 };
 
-extern struct translation *xlate_table[];
-
 struct token_jmp {
 	long			jmp_id;
 	adt_token_func_t	jmp_to;
@@ -320,13 +321,10 @@ struct msg_text {
 
 extern void adt_write_syslog(const char *, int);
 extern void adt_token_open(struct adt_event_state *);
-extern void adt_token_close(struct adt_event_state *);
+extern int adt_token_close(struct adt_event_state *);
 extern void adt_generate_token(struct entry *, void *,
     struct adt_event_state *);
 extern void *adt_adjust_address(void *, size_t, size_t);
-extern void adt_preload(au_event_t, adt_event_data_t *);
-
-extern struct msg_text adt_msg_text[];
 
 #ifdef	__cplusplus
 }
