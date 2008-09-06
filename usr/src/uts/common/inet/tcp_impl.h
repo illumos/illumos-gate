@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_TCP_IMPL_H
 #define	_INET_TCP_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * TCP implementation private declarations.  These interfaces are
@@ -218,36 +216,33 @@ typedef struct tcpparam_s {
 #define	tcps_recv_hiwat			tcps_params[33].tcp_param_val
 #define	tcps_recv_hiwat_minmss		tcps_params[34].tcp_param_val
 #define	tcps_fin_wait_2_flush_interval	tcps_params[35].tcp_param_val
-#define	__tcps_not_used2		tcps_params[36].tcp_param_val
-#define	tcps_max_buf			tcps_params[37].tcp_param_val
-#define	tcps_strong_iss			tcps_params[38].tcp_param_val
-#define	tcps_rtt_updates		tcps_params[39].tcp_param_val
-#define	tcps_wscale_always		tcps_params[40].tcp_param_val
-#define	tcps_tstamp_always		tcps_params[41].tcp_param_val
-#define	tcps_tstamp_if_wscale		tcps_params[42].tcp_param_val
-#define	tcps_rexmit_interval_extra	tcps_params[43].tcp_param_val
-#define	tcps_deferred_acks_max		tcps_params[44].tcp_param_val
-#define	tcps_slow_start_after_idle	tcps_params[45].tcp_param_val
-#define	tcps_slow_start_initial		tcps_params[46].tcp_param_val
-#define	tcps_co_timer_interval		tcps_params[47].tcp_param_val
-#define	tcps_sack_permitted		tcps_params[48].tcp_param_val
-#define	tcps_trace			tcps_params[49].tcp_param_val
-#define	__tcps_not_used4		tcps_params[50].tcp_param_val
-#define	tcps_ipv6_hoplimit		tcps_params[51].tcp_param_val
-#define	tcps_mss_def_ipv6		tcps_params[52].tcp_param_val
-#define	tcps_mss_max_ipv6		tcps_params[53].tcp_param_val
-#define	tcps_rev_src_routes		tcps_params[54].tcp_param_val
-#define	tcps_local_dack_interval	tcps_params[55].tcp_param_val
-#define	tcps_ndd_get_info_interval	tcps_params[56].tcp_param_val
-#define	tcps_local_dacks_max		tcps_params[57].tcp_param_val
-#define	tcps_ecn_permitted		tcps_params[58].tcp_param_val
-#define	tcps_rst_sent_rate_enabled	tcps_params[59].tcp_param_val
-#define	tcps_rst_sent_rate		tcps_params[60].tcp_param_val
-#define	tcps_push_timer_interval	tcps_params[61].tcp_param_val
-#define	tcps_use_smss_as_mss_opt	tcps_params[62].tcp_param_val
-#define	tcps_keepalive_abort_interval_high	tcps_params[63].tcp_param_max
-#define	tcps_keepalive_abort_interval		tcps_params[63].tcp_param_val
-#define	tcps_keepalive_abort_interval_low	tcps_params[63].tcp_param_min
+#define	tcps_max_buf			tcps_params[36].tcp_param_val
+#define	tcps_strong_iss			tcps_params[37].tcp_param_val
+#define	tcps_rtt_updates		tcps_params[38].tcp_param_val
+#define	tcps_wscale_always		tcps_params[39].tcp_param_val
+#define	tcps_tstamp_always		tcps_params[40].tcp_param_val
+#define	tcps_tstamp_if_wscale		tcps_params[41].tcp_param_val
+#define	tcps_rexmit_interval_extra	tcps_params[42].tcp_param_val
+#define	tcps_deferred_acks_max		tcps_params[43].tcp_param_val
+#define	tcps_slow_start_after_idle	tcps_params[44].tcp_param_val
+#define	tcps_slow_start_initial		tcps_params[45].tcp_param_val
+#define	tcps_sack_permitted		tcps_params[46].tcp_param_val
+#define	__tcps_not_used2		tcps_params[47].tcp_param_val
+#define	tcps_ipv6_hoplimit		tcps_params[48].tcp_param_val
+#define	tcps_mss_def_ipv6		tcps_params[49].tcp_param_val
+#define	tcps_mss_max_ipv6		tcps_params[50].tcp_param_val
+#define	tcps_rev_src_routes		tcps_params[51].tcp_param_val
+#define	tcps_local_dack_interval	tcps_params[52].tcp_param_val
+#define	tcps_ndd_get_info_interval	tcps_params[53].tcp_param_val
+#define	tcps_local_dacks_max		tcps_params[54].tcp_param_val
+#define	tcps_ecn_permitted		tcps_params[55].tcp_param_val
+#define	tcps_rst_sent_rate_enabled	tcps_params[56].tcp_param_val
+#define	tcps_rst_sent_rate		tcps_params[57].tcp_param_val
+#define	tcps_push_timer_interval	tcps_params[58].tcp_param_val
+#define	tcps_use_smss_as_mss_opt	tcps_params[59].tcp_param_val
+#define	tcps_keepalive_abort_interval_high	tcps_params[60].tcp_param_max
+#define	tcps_keepalive_abort_interval		tcps_params[60].tcp_param_val
+#define	tcps_keepalive_abort_interval_low	tcps_params[60].tcp_param_min
 
 extern struct qinit tcp_loopback_rinit, tcp_rinitv4, tcp_rinitv6;
 extern boolean_t do_tcp_fusion;

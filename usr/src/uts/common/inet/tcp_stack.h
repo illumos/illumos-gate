@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_TCP_STACK_H
 #define	_INET_TCP_STACK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/netstack.h>
 #include <inet/ip.h>
@@ -198,15 +196,6 @@ struct tcp_stack {
 
 	/* TCP queue hash list - all tcp_t in case they will be an acceptor. */
 	struct tf_s	*tcps_acceptor_fanout;
-
-	/* The reserved port array. */
-	struct tcp_rport_s	*tcps_reserved_port;
-
-	/* Locks to protect the tcp_reserved_ports array. */
-	krwlock_t 	tcps_reserved_port_lock;
-
-	/* The number of ranges in the array. */
-	uint32_t	tcps_reserved_port_array_size;
 
 	/*
 	 * MIB-2 stuff for SNMP

@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 i pkginfo
 i copyright
@@ -101,6 +100,7 @@ f none usr/demo/dtrace/iothrough.d 644 root bin
 f none usr/demo/dtrace/iotime.d 644 root bin
 f none usr/demo/dtrace/ipio.d 644 root bin
 f none usr/demo/dtrace/ipproto.d 644 root bin
+f none usr/demo/dtrace/tcprst.d 644 root bin
 f none usr/demo/dtrace/iprb.d 644 root bin
 f none usr/demo/dtrace/kstat.d 644 root bin
 f none usr/demo/dtrace/ksyms.d 644 root bin

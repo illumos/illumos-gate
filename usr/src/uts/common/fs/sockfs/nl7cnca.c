@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -183,7 +179,6 @@ ncaparam_t	nca_tcp_obsolete_arr[] = {
  { 0, 0, 0, "tcp_recv_hiwat"},
  { 0, 0, 0, "tcp_recv_hiwat_minmss"},
  { 0, 0, 0, "tcp_fin_wait_2_flush_interval"},
- { 0, 0, 0, "tcp_co_min"},
  { 0, 0, 0, "tcp_max_buf"},
  { 0, 0, 0, "tcp_strong_iss"},
  { 0, 0, 0, "tcp_rtt_updates"},
@@ -194,7 +189,6 @@ ncaparam_t	nca_tcp_obsolete_arr[] = {
  { 0, 0, 0, "tcp_deferred_acks_max"},
  { 0, 0, 0, "tcp_slow_start_after_idle"},
  { 0, 0, 0, "tcp_slow_start_initial"},
- { 0, 0, 0, "tcp_co_timer_interval"},
  { 0, 0, 0, "tcp_sack_permitted"},
 #ifdef DEBUG
  { 0, 0, 0, "tcp_drop_oob"},
@@ -378,11 +372,11 @@ nca_param_register(ncaparam_t *ncapa, int cnt)
 
 	}
 	if (!nd_load(&nca_g_nd, "nca_version", nca_version_get, nil(pfi_t),
-			nil(caddr_t))) {
+	    nil(caddr_t))) {
 		goto error;
 	}
 	if (!nd_load(&nca_g_nd, "nca_logd_version", nca_logd_version_get,
-			nil(pfi_t), nil(caddr_t))) {
+	    nil(pfi_t), nil(caddr_t))) {
 		goto error;
 	}
 	if (!nd_load(&nca_g_nd, "nca_logging_on", nca_logging_on_get,
@@ -395,11 +389,11 @@ nca_param_register(ncaparam_t *ncapa, int cnt)
 		goto error;
 	}
 	if (!nd_load(&nca_g_nd, "nca_httpd_version", nca_httpd_version_get,
-			nil(pfi_t), nil(caddr_t))) {
+	    nil(pfi_t), nil(caddr_t))) {
 		goto error;
 	}
 	if (!nd_load(&nca_g_nd, "httpd_door_instance", nca_httpd_door_inst_get,
-			nil(pfi_t), nil(caddr_t))) {
+	    nil(pfi_t), nil(caddr_t))) {
 		nd_free(&nca_g_nd);
 		return (B_FALSE);
 	}

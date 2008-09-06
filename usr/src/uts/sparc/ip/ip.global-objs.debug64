@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 IP_MAJ
 cb_inet_devops
@@ -150,7 +149,6 @@ ipcl_conn_hash_size
 ipcl_debug_level
 ipcl_raw_fanout_size
 ipcl_udp_fanout_size
-ipclassifier_version
 ipif_loopback_name
 ipif_nv_tbl
 ipif_zero
@@ -201,7 +199,6 @@ lcl_tcp_mdt_max_pbufs_param
 lcl_tcp_mdt_tail_param
 lcl_tcp_param_arr
 lcl_tcp_wroff_xtra_param
-log_format
 mask_rnhead
 max_keylen
 modldrv
@@ -315,7 +312,6 @@ tcp_taskq
 tcp_timercache
 tcp_tx_pull_len
 tcp_valid_levels_arr
-tcp_version
 tcp_winfo
 tcp_winit
 tcpinfov4

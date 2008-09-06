@@ -25,10 +25,6 @@
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
-
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -92,7 +88,6 @@ const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
 #include <net/pfkeyv2.h>
 #include <inet/ipsec_info.h>
 #include <inet/ipdrop.h>
-#include <inet/tcp_trace.h>
 
 #include <inet/ipclassifier.h>
 #include <inet/ip_ire.h>
@@ -867,12 +862,6 @@ static int	tcp_conn_hash_report(queue_t *q, mblk_t *mp, caddr_t cp,
 		    cred_t *cr);
 static int	tcp_acceptor_hash_report(queue_t *q, mblk_t *mp, caddr_t cp,
 		    cred_t *cr);
-static int	tcp_host_param_set(queue_t *q, mblk_t *mp, char *value,
-		    caddr_t cp, cred_t *cr);
-static int	tcp_host_param_set_ipv6(queue_t *q, mblk_t *mp, char *value,
-		    caddr_t cp, cred_t *cr);
-static int	tcp_host_param_report(queue_t *q, mblk_t *mp, caddr_t cp,
-		    cred_t *cr);
 static void	tcp_timer(void *arg);
 static void	tcp_timer_callback(void *);
 static in_port_t tcp_update_next_port(in_port_t port, const tcp_t *tcp,
@@ -919,11 +908,6 @@ static void	tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp,
 		    uint32_t seg_seq, uint32_t seg_ack, int seg_len,
 		    tcph_t *tcph);
 boolean_t	tcp_paws_check(tcp_t *tcp, tcph_t *tcph, tcp_opt_t *tcpoptp);
-boolean_t	tcp_reserved_port_add(int, in_port_t *, in_port_t *);
-boolean_t	tcp_reserved_port_del(in_port_t, in_port_t);
-boolean_t	tcp_reserved_port_check(in_port_t, tcp_stack_t *);
-static tcp_t	*tcp_alloc_temp_tcp(in_port_t, tcp_stack_t *);
-static int	tcp_reserved_port_list(queue_t *, mblk_t *, caddr_t, cred_t *);
 static mblk_t	*tcp_mdt_info_mp(mblk_t *);
 static void	tcp_mdt_update(tcp_t *, ill_mdt_capab_t *, boolean_t);
 static int	tcp_mdt_add_attrs(multidata_t *, const mblk_t *,
@@ -1072,37 +1056,6 @@ struct streamtab tcpinfov6 = {
  */
 static taskq_t *tcp_taskq;
 
-/*
- * TCP has a private interface for other kernel modules to reserve a
- * port range for them to use.  Once reserved, TCP will not use any ports
- * in the range.  This interface relies on the TCP_EXCLBIND feature.  If
- * the semantics of TCP_EXCLBIND is changed, implementation of this interface
- * has to be verified.
- *
- * There can be TCP_RESERVED_PORTS_ARRAY_MAX_SIZE port ranges.  Each port
- * range can cover at most TCP_RESERVED_PORTS_RANGE_MAX ports.  A port
- * range is [port a, port b] inclusive.  And each port range is between
- * TCP_LOWESET_RESERVED_PORT and TCP_LARGEST_RESERVED_PORT inclusive.
- *
- * Note that the default anonymous port range starts from 32768.  There is
- * no port "collision" between that and the reserved port range.  If there
- * is port collision (because the default smallest anonymous port is lowered
- * or some apps specifically bind to ports in the reserved port range), the
- * system may not be able to reserve a port range even there are enough
- * unbound ports as a reserved port range contains consecutive ports .
- */
-#define	TCP_RESERVED_PORTS_ARRAY_MAX_SIZE	5
-#define	TCP_RESERVED_PORTS_RANGE_MAX		1000
-#define	TCP_SMALLEST_RESERVED_PORT		10240
-#define	TCP_LARGEST_RESERVED_PORT		20480
-
-/* Structure to represent those reserved port ranges. */
-typedef struct tcp_rport_s {
-	in_port_t	lo_port;
-	in_port_t	hi_port;
-	tcp_t		**temp_tcp_array;
-} tcp_rport_t;
-
 /* Setable only in /etc/system. Move to ndd? */
 boolean_t tcp_icmp_source_quench = B_FALSE;
 
@@ -1210,7 +1163,6 @@ static tcpparam_t	lcl_tcp_param_arr[] = {
  { TCP_RECV_LOWATER, (1<<30), TCP_RECV_HIWATER,"tcp_recv_hiwat"},
  { 1,		65536,		4,		"tcp_recv_hiwat_minmss"},
  { 1*SECONDS,	PARAM_MAX,	675*SECONDS,	"tcp_fin_wait_2_flush_interval"},
- { 0,		TCP_MSS_MAX,	64,		"tcp_co_min"},
  { 8192,	(1<<30),	1024*1024,	"tcp_max_buf"},
 /*
  * Question:  What default value should I set for tcp_strong_iss?
@@ -1224,9 +1176,7 @@ static tcpparam_t	lcl_tcp_param_arr[] = {
  { 0,		16,		2,		"tcp_deferred_acks_max"},
  { 1,		16384,		4,		"tcp_slow_start_after_idle"},
  { 1,		4,		4,		"tcp_slow_start_initial"},
- { 10*MS,	50*MS,		20*MS,		"tcp_co_timer_interval"},
  { 0,		2,		2,		"tcp_sack_permitted"},
- { 0,		1,		0,		"tcp_trace"},
  { 0,		1,		1,		"tcp_compression_enabled"},
  { 0,		IPV6_MAX_HOPS,	IPV6_DEFAULT_HOPS,	"tcp_ipv6_hoplimit"},
  { 1,		TCP_MSS_MAX_IPV6, 1220,		"tcp_mss_def_ipv6"},
@@ -2529,8 +2479,7 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
  * When a tcp_t structure is allocated, it gets all the default parameters.
  * In tcp_adapt_ire(), it gets those metric parameters, like rtt, rtt_sd,
  * spipe, rpipe, ... from the route metrics.  Route metric overrides the
- * default.  But if there is an associated tcp_host_param, it will override
- * the metrics.
+ * default.
  *
  * An incoming SYN with a multicast or broadcast destination address, is dropped
  * in 1 of 2 places.
@@ -4737,11 +4686,6 @@ tcp_free(tcp_t *tcp)
 	 * the following code is enough.
 	 */
 	tcp_close_mpp(&tcp->tcp_conn.tcp_eager_conn_ind);
-
-	if (tcp->tcp_tracebuf != NULL) {
-		kmem_free(tcp->tcp_tracebuf, sizeof (tcptrch_t));
-		tcp->tcp_tracebuf = NULL;
-	}
 }
 
 
@@ -5005,9 +4949,6 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 	connp->conn_flags |= (IPCL_TCP6|IPCL_EAGER);
 	connp->conn_fully_bound = B_FALSE;
 
-	if (tcps->tcps_trace)
-		tcp->tcp_tracebuf = kmem_zalloc(sizeof (tcptrch_t), KM_NOSLEEP);
-
 	/* Inherit information from the "parent" */
 	tcp->tcp_ipversion = ltcp->tcp_ipversion;
 	tcp->tcp_family = ltcp->tcp_family;
@@ -5216,10 +5157,6 @@ tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
 	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &connp->conn_remv6);
 	connp->conn_fport = *(uint16_t *)tcph->th_lport;
 	connp->conn_lport = *(uint16_t *)tcph->th_fport;
-
-	if (tcps->tcps_trace) {
-		tcp->tcp_tracebuf = kmem_zalloc(sizeof (tcptrch_t), KM_NOSLEEP);
-	}
 
 	/* Inherit information from the "parent" */
 	tcp->tcp_ipversion = ltcp->tcp_ipversion;
@@ -6057,9 +5994,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 
 	CONN_INC_REF(eager->tcp_connp);
 
-	TCP_RECORD_TRACE(eager, mp1, TCP_TRACE_SEND_PKT);
 	TCP_TIMER_RESTART(eager, eager->tcp_rto);
-
 
 	/*
 	 * Insert the eager in its own perimeter now. We are ready to deal
@@ -8193,15 +8128,6 @@ tcp_reinit_values(tcp)
 	PRESERVE(tcp->tcp_acceptor_id);
 	DONTCARE(tcp->tcp_ipsec_overhead);
 
-	/*
-	 * If tcp_tracing flag is ON (i.e. We have a trace buffer
-	 * in tcp structure and now tracing), Re-initialize all
-	 * members of tcp_traceinfo.
-	 */
-	if (tcp->tcp_tracebuf != NULL) {
-		bzero(tcp->tcp_tracebuf, sizeof (tcptrch_t));
-	}
-
 	PRESERVE(tcp->tcp_family);
 	if (tcp->tcp_family == AF_INET6) {
 		tcp->tcp_ipversion = IPV6_VERSION;
@@ -9370,8 +9296,6 @@ tcp_keepalive_killer(void *arg)
 			 * timer back.
 			 */
 			if (mp != NULL) {
-				TCP_RECORD_TRACE(tcp, mp,
-				    TCP_TRACE_SEND_PKT);
 				tcp_send_data(tcp, tcp->tcp_wq, mp);
 				BUMP_MIB(&tcps->tcps_mib,
 				    tcpTimKeepaliveProbe);
@@ -9868,9 +9792,6 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 #endif	/* _ILP32 */
 		tcp_acceptor_hash_insert(tcp->tcp_acceptor_id, tcp);
 	}
-
-	if (tcps->tcps_trace)
-		tcp->tcp_tracebuf = kmem_zalloc(sizeof (tcptrch_t), KM_SLEEP);
 
 	err = tcp_init(tcp, q);
 	if (err != 0) {
@@ -11531,23 +11452,8 @@ tcp_param_register(IDP *ndp, tcpparam_t *tcppa, int cnt, tcp_stack_t *tcps)
 		nd_free(ndp);
 		return (B_FALSE);
 	}
-	if (!nd_load(ndp, "tcp_host_param", tcp_host_param_report,
-	    tcp_host_param_set, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	if (!nd_load(ndp, "tcp_host_param_ipv6",
-	    tcp_host_param_report, tcp_host_param_set_ipv6, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
 	if (!nd_load(ndp, "tcp_1948_phrase", NULL,
 	    tcp_1948_phrase_set, NULL)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	if (!nd_load(ndp, "tcp_reserved_port_list",
-	    tcp_reserved_port_list, NULL, NULL)) {
 		nd_free(ndp);
 		return (B_FALSE);
 	}
@@ -12472,7 +12378,7 @@ tcp_sack_rxmit(tcp_t *tcp, uint_t *flags)
 		usable_swnd -= seg_len;
 		tcp->tcp_pipe += seg_len;
 		tcp->tcp_sack_snxt = begin + seg_len;
-		TCP_RECORD_TRACE(tcp, xmit_mp, TCP_TRACE_SEND_PKT);
+
 		tcp_send_data(tcp, tcp->tcp_wq, xmit_mp);
 
 		/*
@@ -13252,7 +13158,7 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 	flags = (unsigned int)tcph->th_flags[0] & 0xFF;
 
 	BUMP_LOCAL(tcp->tcp_ibsegs);
-	TCP_RECORD_TRACE(tcp, mp, TCP_TRACE_RECV_PKT);
+	DTRACE_PROBE2(tcp__trace__recv, mblk_t *, mp, tcp_t *, tcp);
 
 	if ((flags & TH_URG) && sqp != NULL) {
 		/*
@@ -13455,8 +13361,6 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 						    tcp->tcp_ack_tid);
 						tcp->tcp_ack_tid = 0;
 					}
-					TCP_RECORD_TRACE(tcp, ack_mp,
-					    TCP_TRACE_SEND_PKT);
 					tcp_send_data(tcp, tcp->tcp_wq, ack_mp);
 					BUMP_LOCAL(tcp->tcp_obsegs);
 					BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
@@ -13503,7 +13407,6 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		    NULL, NULL, tcp->tcp_iss, B_FALSE, NULL, B_FALSE);
 		if (mp1) {
 			DB_CPID(mp1) = tcp->tcp_cpid;
-			TCP_RECORD_TRACE(tcp, mp1, TCP_TRACE_SEND_PKT);
 			tcp_send_data(tcp, tcp->tcp_wq, mp1);
 			TCP_TIMER_RESTART(tcp, tcp->tcp_rto);
 		}
@@ -13591,8 +13494,7 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 	if (TCP_IS_DETACHED_NONEAGER(tcp) &&
 	    (seg_len > 0 && SEQ_GT(seg_seq + seg_len, tcp->tcp_rnxt))) {
 		BUMP_MIB(&tcps->tcps_mib, tcpInClosed);
-		TCP_RECORD_TRACE(tcp,
-		    mp, TCP_TRACE_RECV_PKT);
+		DTRACE_PROBE2(tcp__trace__recv, mblk_t *, mp, tcp_t *, tcp);
 
 		freemsg(mp);
 		/*
@@ -14700,7 +14602,6 @@ process_ack:
 		}
 		mp = tcp_ack_mp(tcp);
 		if (mp != NULL) {
-			TCP_RECORD_TRACE(tcp, mp, TCP_TRACE_SEND_PKT);
 			BUMP_LOCAL(tcp->tcp_obsegs);
 			BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
 			tcp_send_data(tcp, tcp->tcp_wq, mp);
@@ -15447,8 +15348,6 @@ xmit_check:
 				BUMP_MIB(&tcps->tcps_mib, tcpRetransSegs);
 				UPDATE_MIB(&tcps->tcps_mib,
 				    tcpRetransBytes, snd_size);
-				TCP_RECORD_TRACE(tcp, mp1,
-				    TCP_TRACE_SEND_PKT);
 				tcp_send_data(tcp, tcp->tcp_wq, mp1);
 			}
 		}
@@ -15529,7 +15428,6 @@ ack_check:
 		mp1 = tcp_ack_mp(tcp);
 
 		if (mp1 != NULL) {
-			TCP_RECORD_TRACE(tcp, mp1, TCP_TRACE_SEND_PKT);
 			tcp_send_data(tcp, tcp->tcp_wq, mp1);
 			BUMP_LOCAL(tcp->tcp_obsegs);
 			BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
@@ -16221,9 +16119,6 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 				} else {
 					pid = DB_CPID(mp->b_cont);
 				}
-
-				TCP_RECORD_TRACE(tcp, syn_mp,
-				    TCP_TRACE_SEND_PKT);
 				mblk_setcred(syn_mp, cr);
 				DB_CPID(syn_mp) = pid;
 				tcp_send_data(tcp, tcp->tcp_wq, syn_mp);
@@ -17807,7 +17702,6 @@ tcp_timer(void *arg)
 	tcp->tcp_csuna = tcp->tcp_snxt;
 	BUMP_MIB(&tcps->tcps_mib, tcpRetransSegs);
 	UPDATE_MIB(&tcps->tcps_mib, tcpRetransBytes, mss);
-	TCP_RECORD_TRACE(tcp, mp, TCP_TRACE_SEND_PKT);
 	tcp_send_data(tcp, tcp->tcp_wq, mp);
 
 }
@@ -18296,7 +18190,6 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 		*(uint32_t *)mp1->b_rptr  |= IP_FORWARD_PROG;
 		tcp->tcp_ip_forward_progress = B_FALSE;
 	}
-	TCP_RECORD_TRACE(tcp, mp1, TCP_TRACE_SEND_PKT);
 	tcp_send_data(tcp, tcp->tcp_wq, mp1);
 	return;
 
@@ -19532,6 +19425,8 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 	ipha = (ipha_t *)mp->b_rptr;
 	src = ipha->ipha_src;
 	dst = ipha->ipha_dst;
+
+	DTRACE_PROBE2(tcp__trace__send, mblk_t *, mp, tcp_t *, tcp);
 
 	/*
 	 * Drop off fast path for IPv6 and also if options are present or
@@ -21422,7 +21317,7 @@ tcp_multisend_data(tcp_t *tcp, ire_t *ire, const ill_t *ill, mblk_t *md_mp_head,
 	ASSERT(rconfirm != NULL);
 
 	/* adjust MIBs and IRE timestamp */
-	TCP_RECORD_TRACE(tcp, md_mp_head, TCP_TRACE_SEND_PKT);
+	DTRACE_PROBE2(tcp__trace__send, mblk_t *, md_mp_head, tcp_t *, tcp);
 	tcp->tcp_obsegs += obsegs;
 	UPDATE_MIB(&tcps->tcps_mib, tcpOutDataSegs, obsegs);
 	UPDATE_MIB(&tcps->tcps_mib, tcpOutDataBytes, obbytes);
@@ -21558,6 +21453,8 @@ tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
 	ipha = (ipha_t *)mp->b_rptr;
 	src = ipha->ipha_src;
 	dst = ipha->ipha_dst;
+
+	DTRACE_PROBE2(tcp__trace__send, mblk_t *, mp, tcp_t *, tcp);
 
 	ASSERT(ipha->ipha_ident == 0 || ipha->ipha_ident == IP_HDR_INCLUDED);
 	ipha->ipha_ident = (uint16_t)atomic_add_32_nv(&ire->ire_ident,
@@ -21888,7 +21785,6 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			BUMP_LOCAL(tcp->tcp_obsegs);
 			BUMP_MIB(&tcps->tcps_mib, tcpOutDataSegs);
 			UPDATE_MIB(&tcps->tcps_mib, tcpOutDataBytes, len);
-			TCP_RECORD_TRACE(tcp, mp, TCP_TRACE_SEND_PKT);
 			tcp_send_data(tcp, q, mp);
 			continue;
 		}
@@ -22107,7 +22003,6 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			tcp->tcp_ip_forward_progress = B_FALSE;
 		}
 
-		TCP_RECORD_TRACE(tcp, mp, TCP_TRACE_SEND_PKT);
 		if (do_lso_send) {
 			tcp_lsosend_data(tcp, mp, ire, ill, mss,
 			    num_lso_seg);
@@ -22918,7 +22813,6 @@ tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq, uint32_t ack, int ctl)
 	 */
 	sum = (sum >> 16) + (sum & 0xFFFF);
 	U16_TO_BE16(sum, tcph->th_sum);
-	TCP_RECORD_TRACE(tcp, mp, TCP_TRACE_SEND_PKT);
 	tcp_send_data(tcp, tcp->tcp_wq, mp);
 }
 
@@ -23302,7 +23196,6 @@ tcp_xmit_end(tcp_t *tcp)
 		    tcp->tcp_fss, B_FALSE, NULL, B_FALSE);
 
 		if (mp) {
-			TCP_RECORD_TRACE(tcp, mp, TCP_TRACE_SEND_PKT);
 			tcp_send_data(tcp, tcp->tcp_wq, mp);
 		} else {
 			/*
@@ -23960,7 +23853,6 @@ tcp_ack_timer(void *arg)
 	mp = tcp_ack_mp(tcp);
 
 	if (mp != NULL) {
-		TCP_RECORD_TRACE(tcp, mp, TCP_TRACE_SEND_PKT);
 		BUMP_LOCAL(tcp->tcp_obsegs);
 		BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
 		BUMP_MIB(&tcps->tcps_mib, tcpOutAckDelayed);
@@ -24119,380 +24011,6 @@ tcp_ack_mp(tcp_t *tcp)
 		}
 		return (mp1);
 	}
-}
-
-/*
- * To create a temporary tcp structure for inserting into bind hash list.
- * The parameter is assumed to be in network byte order, ready for use.
- */
-/* ARGSUSED */
-static tcp_t *
-tcp_alloc_temp_tcp(in_port_t port, tcp_stack_t *tcps)
-{
-	conn_t	*connp;
-	tcp_t	*tcp;
-
-	connp = ipcl_conn_create(IPCL_TCPCONN, KM_SLEEP, tcps->tcps_netstack);
-	if (connp == NULL)
-		return (NULL);
-
-	tcp = connp->conn_tcp;
-	tcp->tcp_tcps = tcps;
-	TCPS_REFHOLD(tcps);
-
-	/*
-	 * Only initialize the necessary info in those structures.  Note
-	 * that since INADDR_ANY is all 0, we do not need to set
-	 * tcp_bound_source to INADDR_ANY here.
-	 */
-	tcp->tcp_state = TCPS_BOUND;
-	tcp->tcp_lport = port;
-	tcp->tcp_exclbind = 1;
-	tcp->tcp_reserved_port = 1;
-
-	/* Just for place holding... */
-	tcp->tcp_ipversion = IPV4_VERSION;
-
-	return (tcp);
-}
-
-/*
- * To remove a port range specified by lo_port and hi_port from the
- * reserved port ranges.  This is one of the three public functions of
- * the reserved port interface.  Note that a port range has to be removed
- * as a whole.  Ports in a range cannot be removed individually.
- *
- * Params:
- *	in_port_t lo_port: the beginning port of the reserved port range to
- *		be deleted.
- *	in_port_t hi_port: the ending port of the reserved port range to
- *		be deleted.
- *
- * Return:
- *	B_TRUE if the deletion is successful, B_FALSE otherwise.
- *
- * Assumes that nca is only for zoneid=0
- */
-boolean_t
-tcp_reserved_port_del(in_port_t lo_port, in_port_t hi_port)
-{
-	int	i, j;
-	int	size;
-	tcp_t	**temp_tcp_array;
-	tcp_t	*tcp;
-	tcp_stack_t	*tcps;
-
-	tcps = netstack_find_by_stackid(GLOBAL_NETSTACKID)->netstack_tcp;
-	ASSERT(tcps != NULL);
-
-	rw_enter(&tcps->tcps_reserved_port_lock, RW_WRITER);
-
-	/* First make sure that the port ranage is indeed reserved. */
-	for (i = 0; i < tcps->tcps_reserved_port_array_size; i++) {
-		if (tcps->tcps_reserved_port[i].lo_port == lo_port) {
-			hi_port = tcps->tcps_reserved_port[i].hi_port;
-			temp_tcp_array =
-			    tcps->tcps_reserved_port[i].temp_tcp_array;
-			break;
-		}
-	}
-	if (i == tcps->tcps_reserved_port_array_size) {
-		rw_exit(&tcps->tcps_reserved_port_lock);
-		netstack_rele(tcps->tcps_netstack);
-		return (B_FALSE);
-	}
-
-	/*
-	 * Remove the range from the array.  This simple loop is possible
-	 * because port ranges are inserted in ascending order.
-	 */
-	for (j = i; j < tcps->tcps_reserved_port_array_size - 1; j++) {
-		tcps->tcps_reserved_port[j].lo_port =
-		    tcps->tcps_reserved_port[j+1].lo_port;
-		tcps->tcps_reserved_port[j].hi_port =
-		    tcps->tcps_reserved_port[j+1].hi_port;
-		tcps->tcps_reserved_port[j].temp_tcp_array =
-		    tcps->tcps_reserved_port[j+1].temp_tcp_array;
-	}
-
-	/* Remove all the temporary tcp structures. */
-	size = hi_port - lo_port + 1;
-	while (size > 0) {
-		tcp = temp_tcp_array[size - 1];
-		ASSERT(tcp != NULL);
-		tcp_bind_hash_remove(tcp);
-		CONN_DEC_REF(tcp->tcp_connp);
-		size--;
-	}
-	kmem_free(temp_tcp_array, (hi_port - lo_port + 1) * sizeof (tcp_t *));
-	tcps->tcps_reserved_port_array_size--;
-	rw_exit(&tcps->tcps_reserved_port_lock);
-	netstack_rele(tcps->tcps_netstack);
-	return (B_TRUE);
-}
-
-/*
- * Macro to remove temporary tcp structure from the bind hash list.  The
- * first parameter is the list of tcp to be removed.  The second parameter
- * is the number of tcps in the array.
- */
-#define	TCP_TMP_TCP_REMOVE(tcp_array, num, tcps) \
-{ \
-	while ((num) > 0) { \
-		tcp_t *tcp = (tcp_array)[(num) - 1]; \
-		tf_t *tbf; \
-		tcp_t *tcpnext; \
-		tbf = &tcps->tcps_bind_fanout[TCP_BIND_HASH(tcp->tcp_lport)]; \
-		mutex_enter(&tbf->tf_lock); \
-		tcpnext = tcp->tcp_bind_hash; \
-		if (tcpnext) { \
-			tcpnext->tcp_ptpbhn = \
-				tcp->tcp_ptpbhn; \
-		} \
-		*tcp->tcp_ptpbhn = tcpnext; \
-		mutex_exit(&tbf->tf_lock); \
-		kmem_free(tcp, sizeof (tcp_t)); \
-		(tcp_array)[(num) - 1] = NULL; \
-		(num)--; \
-	} \
-}
-
-/*
- * The public interface for other modules to call to reserve a port range
- * in TCP.  The caller passes in how large a port range it wants.  TCP
- * will try to find a range and return it via lo_port and hi_port.  This is
- * used by NCA's nca_conn_init.
- * NCA can only be used in the global zone so this only affects the global
- * zone's ports.
- *
- * Params:
- *	int size: the size of the port range to be reserved.
- *	in_port_t *lo_port (referenced): returns the beginning port of the
- *		reserved port range added.
- *	in_port_t *hi_port (referenced): returns the ending port of the
- *		reserved port range added.
- *
- * Return:
- *	B_TRUE if the port reservation is successful, B_FALSE otherwise.
- *
- * Assumes that nca is only for zoneid=0
- */
-boolean_t
-tcp_reserved_port_add(int size, in_port_t *lo_port, in_port_t *hi_port)
-{
-	tcp_t		*tcp;
-	tcp_t		*tmp_tcp;
-	tcp_t		**temp_tcp_array;
-	tf_t		*tbf;
-	in_port_t	net_port;
-	in_port_t	port;
-	int32_t		cur_size;
-	int		i, j;
-	boolean_t	used;
-	tcp_rport_t 	tmp_ports[TCP_RESERVED_PORTS_ARRAY_MAX_SIZE];
-	zoneid_t	zoneid = GLOBAL_ZONEID;
-	tcp_stack_t	*tcps;
-
-	/* Sanity check. */
-	if (size <= 0 || size > TCP_RESERVED_PORTS_RANGE_MAX) {
-		return (B_FALSE);
-	}
-
-	tcps = netstack_find_by_stackid(GLOBAL_NETSTACKID)->netstack_tcp;
-	ASSERT(tcps != NULL);
-
-	rw_enter(&tcps->tcps_reserved_port_lock, RW_WRITER);
-	if (tcps->tcps_reserved_port_array_size ==
-	    TCP_RESERVED_PORTS_ARRAY_MAX_SIZE) {
-		rw_exit(&tcps->tcps_reserved_port_lock);
-		netstack_rele(tcps->tcps_netstack);
-		return (B_FALSE);
-	}
-
-	/*
-	 * Find the starting port to try.  Since the port ranges are ordered
-	 * in the reserved port array, we can do a simple search here.
-	 */
-	*lo_port = TCP_SMALLEST_RESERVED_PORT;
-	*hi_port = TCP_LARGEST_RESERVED_PORT;
-	for (i = 0; i < tcps->tcps_reserved_port_array_size;
-	    *lo_port = tcps->tcps_reserved_port[i].hi_port + 1, i++) {
-		if (tcps->tcps_reserved_port[i].lo_port - *lo_port >= size) {
-			*hi_port = tcps->tcps_reserved_port[i].lo_port - 1;
-			break;
-		}
-	}
-	/* No available port range. */
-	if (i == tcps->tcps_reserved_port_array_size &&
-	    *hi_port - *lo_port < size) {
-		rw_exit(&tcps->tcps_reserved_port_lock);
-		netstack_rele(tcps->tcps_netstack);
-		return (B_FALSE);
-	}
-
-	temp_tcp_array = kmem_zalloc(size * sizeof (tcp_t *), KM_NOSLEEP);
-	if (temp_tcp_array == NULL) {
-		rw_exit(&tcps->tcps_reserved_port_lock);
-		netstack_rele(tcps->tcps_netstack);
-		return (B_FALSE);
-	}
-
-	/* Go thru the port range to see if some ports are already bound. */
-	for (port = *lo_port, cur_size = 0;
-	    cur_size < size && port <= *hi_port;
-	    cur_size++, port++) {
-		used = B_FALSE;
-		net_port = htons(port);
-		tbf = &tcps->tcps_bind_fanout[TCP_BIND_HASH(net_port)];
-		mutex_enter(&tbf->tf_lock);
-		for (tcp = tbf->tf_tcp; tcp != NULL;
-		    tcp = tcp->tcp_bind_hash) {
-			if (IPCL_ZONE_MATCH(tcp->tcp_connp, zoneid) &&
-			    net_port == tcp->tcp_lport) {
-				/*
-				 * A port is already bound.  Search again
-				 * starting from port + 1.  Release all
-				 * temporary tcps.
-				 */
-				mutex_exit(&tbf->tf_lock);
-				TCP_TMP_TCP_REMOVE(temp_tcp_array, cur_size,
-				    tcps);
-				*lo_port = port + 1;
-				cur_size = -1;
-				used = B_TRUE;
-				break;
-			}
-		}
-		if (!used) {
-			if ((tmp_tcp = tcp_alloc_temp_tcp(net_port, tcps)) ==
-			    NULL) {
-				/*
-				 * Allocation failure.  Just fail the request.
-				 * Need to remove all those temporary tcp
-				 * structures.
-				 */
-				mutex_exit(&tbf->tf_lock);
-				TCP_TMP_TCP_REMOVE(temp_tcp_array, cur_size,
-				    tcps);
-				rw_exit(&tcps->tcps_reserved_port_lock);
-				kmem_free(temp_tcp_array,
-				    (hi_port - lo_port + 1) *
-				    sizeof (tcp_t *));
-				netstack_rele(tcps->tcps_netstack);
-				return (B_FALSE);
-			}
-			temp_tcp_array[cur_size] = tmp_tcp;
-			tcp_bind_hash_insert(tbf, tmp_tcp, B_TRUE);
-			mutex_exit(&tbf->tf_lock);
-		}
-	}
-
-	/*
-	 * The current range is not large enough.  We can actually do another
-	 * search if this search is done between 2 reserved port ranges.  But
-	 * for first release, we just stop here and return saying that no port
-	 * range is available.
-	 */
-	if (cur_size < size) {
-		TCP_TMP_TCP_REMOVE(temp_tcp_array, cur_size, tcps);
-		rw_exit(&tcps->tcps_reserved_port_lock);
-		kmem_free(temp_tcp_array, size * sizeof (tcp_t *));
-		netstack_rele(tcps->tcps_netstack);
-		return (B_FALSE);
-	}
-	*hi_port = port - 1;
-
-	/*
-	 * Insert range into array in ascending order.  Since this function
-	 * must not be called often, we choose to use the simplest method.
-	 * The above array should not consume excessive stack space as
-	 * the size must be very small.  If in future releases, we find
-	 * that we should provide more reserved port ranges, this function
-	 * has to be modified to be more efficient.
-	 */
-	if (tcps->tcps_reserved_port_array_size == 0) {
-		tcps->tcps_reserved_port[0].lo_port = *lo_port;
-		tcps->tcps_reserved_port[0].hi_port = *hi_port;
-		tcps->tcps_reserved_port[0].temp_tcp_array = temp_tcp_array;
-	} else {
-		for (i = 0, j = 0; i < tcps->tcps_reserved_port_array_size;
-		    i++, j++) {
-			if (*lo_port < tcps->tcps_reserved_port[i].lo_port &&
-			    i == j) {
-				tmp_ports[j].lo_port = *lo_port;
-				tmp_ports[j].hi_port = *hi_port;
-				tmp_ports[j].temp_tcp_array = temp_tcp_array;
-				j++;
-			}
-			tmp_ports[j].lo_port =
-			    tcps->tcps_reserved_port[i].lo_port;
-			tmp_ports[j].hi_port =
-			    tcps->tcps_reserved_port[i].hi_port;
-			tmp_ports[j].temp_tcp_array =
-			    tcps->tcps_reserved_port[i].temp_tcp_array;
-		}
-		if (j == i) {
-			tmp_ports[j].lo_port = *lo_port;
-			tmp_ports[j].hi_port = *hi_port;
-			tmp_ports[j].temp_tcp_array = temp_tcp_array;
-		}
-		bcopy(tmp_ports, tcps->tcps_reserved_port, sizeof (tmp_ports));
-	}
-	tcps->tcps_reserved_port_array_size++;
-	rw_exit(&tcps->tcps_reserved_port_lock);
-	netstack_rele(tcps->tcps_netstack);
-	return (B_TRUE);
-}
-
-/*
- * Check to see if a port is in any reserved port range.
- *
- * Params:
- *	in_port_t port: the port to be verified.
- *
- * Return:
- *	B_TRUE is the port is inside a reserved port range, B_FALSE otherwise.
- */
-boolean_t
-tcp_reserved_port_check(in_port_t port, tcp_stack_t *tcps)
-{
-	int i;
-
-	rw_enter(&tcps->tcps_reserved_port_lock, RW_READER);
-	for (i = 0; i < tcps->tcps_reserved_port_array_size; i++) {
-		if (port >= tcps->tcps_reserved_port[i].lo_port ||
-		    port <= tcps->tcps_reserved_port[i].hi_port) {
-			rw_exit(&tcps->tcps_reserved_port_lock);
-			return (B_TRUE);
-		}
-	}
-	rw_exit(&tcps->tcps_reserved_port_lock);
-	return (B_FALSE);
-}
-
-/*
- * To list all reserved port ranges.  This is the function to handle
- * ndd tcp_reserved_port_list.
- */
-/* ARGSUSED */
-static int
-tcp_reserved_port_list(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
-{
-	int i;
-	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
-
-	rw_enter(&tcps->tcps_reserved_port_lock, RW_READER);
-	if (tcps->tcps_reserved_port_array_size > 0)
-		(void) mi_mpprintf(mp, "The following ports are reserved:");
-	else
-		(void) mi_mpprintf(mp, "No port is reserved.");
-	for (i = 0; i < tcps->tcps_reserved_port_array_size; i++) {
-		(void) mi_mpprintf(mp, "%d-%d",
-		    tcps->tcps_reserved_port[i].lo_port,
-		    tcps->tcps_reserved_port[i].hi_port);
-	}
-	rw_exit(&tcps->tcps_reserved_port_lock);
-	return (0);
 }
 
 /*
@@ -24663,294 +24181,6 @@ tcp_acceptor_hash_remove(tcp_t *tcp)
 	mutex_exit(lockp);
 	tcp->tcp_acceptor_lockp = NULL;
 }
-
-/* ARGSUSED */
-static int
-tcp_host_param_setvalue(queue_t *q, mblk_t *mp, char *value, caddr_t cp, int af)
-{
-	int error = 0;
-	int retval;
-	char *end;
-	tcp_hsp_t *hsp;
-	tcp_hsp_t *hspprev;
-	ipaddr_t addr = 0;		/* Address we're looking for */
-	in6_addr_t v6addr;		/* Address we're looking for */
-	uint32_t hash;			/* Hash of that address */
-	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
-
-	/*
-	 * If the following variables are still zero after parsing the input
-	 * string, the user didn't specify them and we don't change them in
-	 * the HSP.
-	 */
-
-	ipaddr_t mask = 0;		/* Subnet mask */
-	in6_addr_t v6mask;
-	long sendspace = 0;		/* Send buffer size */
-	long recvspace = 0;		/* Receive buffer size */
-	long timestamp = 0;	/* Originate TCP TSTAMP option, 1 = yes */
-	boolean_t delete = B_FALSE;	/* User asked to delete this HSP */
-
-	rw_enter(&tcps->tcps_hsp_lock, RW_WRITER);
-
-	/* Parse and validate address */
-	if (af == AF_INET) {
-		retval = inet_pton(af, value, &addr);
-		if (retval == 1)
-			IN6_IPADDR_TO_V4MAPPED(addr, &v6addr);
-	} else if (af == AF_INET6) {
-		retval = inet_pton(af, value, &v6addr);
-	} else {
-		error = EINVAL;
-		goto done;
-	}
-	if (retval == 0) {
-		error = EINVAL;
-		goto done;
-	}
-
-	while ((*value) && *value != ' ')
-		value++;
-
-	/* Parse individual keywords, set variables if found */
-	while (*value) {
-		/* Skip leading blanks */
-
-		while (*value == ' ' || *value == '\t')
-			value++;
-
-		/* If at end of string, we're done */
-
-		if (!*value)
-			break;
-
-		/* We have a word, figure out what it is */
-
-		if (strncmp("mask", value, 4) == 0) {
-			value += 4;
-			while (*value == ' ' || *value == '\t')
-				value++;
-			/* Parse subnet mask */
-			if (af == AF_INET) {
-				retval = inet_pton(af, value, &mask);
-				if (retval == 1) {
-					V4MASK_TO_V6(mask, v6mask);
-				}
-			} else if (af == AF_INET6) {
-				retval = inet_pton(af, value, &v6mask);
-			}
-			if (retval != 1) {
-				error = EINVAL;
-				goto done;
-			}
-			while ((*value) && *value != ' ')
-				value++;
-		} else if (strncmp("sendspace", value, 9) == 0) {
-			value += 9;
-
-			if (ddi_strtol(value, &end, 0, &sendspace) != 0 ||
-			    sendspace < TCP_XMIT_HIWATER ||
-			    sendspace >= (1L<<30)) {
-				error = EINVAL;
-				goto done;
-			}
-			value = end;
-		} else if (strncmp("recvspace", value, 9) == 0) {
-			value += 9;
-
-			if (ddi_strtol(value, &end, 0, &recvspace) != 0 ||
-			    recvspace < TCP_RECV_HIWATER ||
-			    recvspace >= (1L<<30)) {
-				error = EINVAL;
-				goto done;
-			}
-			value = end;
-		} else if (strncmp("timestamp", value, 9) == 0) {
-			value += 9;
-
-			if (ddi_strtol(value, &end, 0, &timestamp) != 0 ||
-			    timestamp < 0 || timestamp > 1) {
-				error = EINVAL;
-				goto done;
-			}
-
-			/*
-			 * We increment timestamp so we know it's been set;
-			 * this is undone when we put it in the HSP
-			 */
-			timestamp++;
-			value = end;
-		} else if (strncmp("delete", value, 6) == 0) {
-			value += 6;
-			delete = B_TRUE;
-		} else {
-			error = EINVAL;
-			goto done;
-		}
-	}
-
-	/* Hash address for lookup */
-
-	hash = TCP_HSP_HASH(addr);
-
-	if (delete) {
-		/*
-		 * Note that deletes don't return an error if the thing
-		 * we're trying to delete isn't there.
-		 */
-		if (tcps->tcps_hsp_hash == NULL)
-			goto done;
-		hsp = tcps->tcps_hsp_hash[hash];
-
-		if (hsp) {
-			if (IN6_ARE_ADDR_EQUAL(&hsp->tcp_hsp_addr_v6,
-			    &v6addr)) {
-				tcps->tcps_hsp_hash[hash] = hsp->tcp_hsp_next;
-				mi_free((char *)hsp);
-			} else {
-				hspprev = hsp;
-				while ((hsp = hsp->tcp_hsp_next) != NULL) {
-					if (IN6_ARE_ADDR_EQUAL(
-					    &hsp->tcp_hsp_addr_v6, &v6addr)) {
-						hspprev->tcp_hsp_next =
-						    hsp->tcp_hsp_next;
-						mi_free((char *)hsp);
-						break;
-					}
-					hspprev = hsp;
-				}
-			}
-		}
-	} else {
-		/*
-		 * We're adding/modifying an HSP.  If we haven't already done
-		 * so, allocate the hash table.
-		 */
-
-		if (!tcps->tcps_hsp_hash) {
-			tcps->tcps_hsp_hash = (tcp_hsp_t **)
-			    mi_zalloc(sizeof (tcp_hsp_t *) * TCP_HSP_HASH_SIZE);
-			if (!tcps->tcps_hsp_hash) {
-				error = EINVAL;
-				goto done;
-			}
-		}
-
-		/* Get head of hash chain */
-
-		hsp = tcps->tcps_hsp_hash[hash];
-
-		/* Try to find pre-existing hsp on hash chain */
-		/* Doesn't handle CIDR prefixes. */
-		while (hsp) {
-			if (IN6_ARE_ADDR_EQUAL(&hsp->tcp_hsp_addr_v6, &v6addr))
-				break;
-			hsp = hsp->tcp_hsp_next;
-		}
-
-		/*
-		 * If we didn't, create one with default values and put it
-		 * at head of hash chain
-		 */
-
-		if (!hsp) {
-			hsp = (tcp_hsp_t *)mi_zalloc(sizeof (tcp_hsp_t));
-			if (!hsp) {
-				error = EINVAL;
-				goto done;
-			}
-			hsp->tcp_hsp_next = tcps->tcps_hsp_hash[hash];
-			tcps->tcps_hsp_hash[hash] = hsp;
-		}
-
-		/* Set values that the user asked us to change */
-
-		hsp->tcp_hsp_addr_v6 = v6addr;
-		if (IN6_IS_ADDR_V4MAPPED(&v6addr))
-			hsp->tcp_hsp_vers = IPV4_VERSION;
-		else
-			hsp->tcp_hsp_vers = IPV6_VERSION;
-		hsp->tcp_hsp_subnet_v6 = v6mask;
-		if (sendspace > 0)
-			hsp->tcp_hsp_sendspace = sendspace;
-		if (recvspace > 0)
-			hsp->tcp_hsp_recvspace = recvspace;
-		if (timestamp > 0)
-			hsp->tcp_hsp_tstamp = timestamp - 1;
-	}
-
-done:
-	rw_exit(&tcps->tcps_hsp_lock);
-	return (error);
-}
-
-/* Set callback routine passed to nd_load by tcp_param_register. */
-/* ARGSUSED */
-static int
-tcp_host_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *cr)
-{
-	return (tcp_host_param_setvalue(q, mp, value, cp, AF_INET));
-}
-/* ARGSUSED */
-static int
-tcp_host_param_set_ipv6(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
-    cred_t *cr)
-{
-	return (tcp_host_param_setvalue(q, mp, value, cp, AF_INET6));
-}
-
-/* TCP host parameters report triggered via the Named Dispatch mechanism. */
-/* ARGSUSED */
-static int
-tcp_host_param_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
-{
-	tcp_hsp_t *hsp;
-	int i;
-	char addrbuf[INET6_ADDRSTRLEN], subnetbuf[INET6_ADDRSTRLEN];
-	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
-
-	rw_enter(&tcps->tcps_hsp_lock, RW_READER);
-	(void) mi_mpprintf(mp,
-	    "Hash HSP     " MI_COL_HDRPAD_STR
-	    "Address         Subnet Mask     Send       Receive    TStamp");
-	if (tcps->tcps_hsp_hash) {
-		for (i = 0; i < TCP_HSP_HASH_SIZE; i++) {
-			hsp = tcps->tcps_hsp_hash[i];
-			while (hsp) {
-				if (hsp->tcp_hsp_vers == IPV4_VERSION) {
-					(void) inet_ntop(AF_INET,
-					    &hsp->tcp_hsp_addr,
-					    addrbuf, sizeof (addrbuf));
-					(void) inet_ntop(AF_INET,
-					    &hsp->tcp_hsp_subnet,
-					    subnetbuf, sizeof (subnetbuf));
-				} else {
-					(void) inet_ntop(AF_INET6,
-					    &hsp->tcp_hsp_addr_v6,
-					    addrbuf, sizeof (addrbuf));
-					(void) inet_ntop(AF_INET6,
-					    &hsp->tcp_hsp_subnet_v6,
-					    subnetbuf, sizeof (subnetbuf));
-				}
-				(void) mi_mpprintf(mp,
-				    " %03d " MI_COL_PTRFMT_STR
-				    "%s %s %010d %010d      %d",
-				    i,
-				    (void *)hsp,
-				    addrbuf,
-				    subnetbuf,
-				    hsp->tcp_hsp_sendspace,
-				    hsp->tcp_hsp_recvspace,
-				    hsp->tcp_hsp_tstamp);
-
-				hsp = hsp->tcp_hsp_next;
-			}
-		}
-	}
-	rw_exit(&tcps->tcps_hsp_lock);
-	return (0);
-}
-
 
 /* Data for fast netmask macro used by tcp_hsp_lookup */
 
@@ -25738,7 +24968,6 @@ tcp_stack_init(netstackid_t stackid, netstack_t *ns)
 	cv_init(&tcps->tcps_g_q_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&tcps->tcps_iss_key_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&tcps->tcps_epriv_port_lock, NULL, MUTEX_DEFAULT, NULL);
-	rw_init(&tcps->tcps_reserved_port_lock, NULL, RW_DEFAULT, NULL);
 
 	tcps->tcps_g_num_epriv_ports = TCP_NUM_EPRIV_PORTS;
 	tcps->tcps_g_epriv_ports[0] = 2049;
@@ -25749,8 +24978,6 @@ tcp_stack_init(netstackid_t stackid, netstack_t *ns)
 	    TCP_BIND_FANOUT_SIZE, KM_SLEEP);
 	tcps->tcps_acceptor_fanout = kmem_zalloc(sizeof (tf_t) *
 	    TCP_FANOUT_SIZE, KM_SLEEP);
-	tcps->tcps_reserved_port = kmem_zalloc(sizeof (tcp_rport_t) *
-	    TCP_RESERVED_PORTS_ARRAY_MAX_SIZE, KM_SLEEP);
 
 	for (i = 0; i < TCP_BIND_FANOUT_SIZE; i++) {
 		mutex_init(&tcps->tcps_bind_fanout[i].tf_lock, NULL,
@@ -25868,16 +25095,11 @@ tcp_stack_fini(netstackid_t stackid, void *arg)
 	kmem_free(tcps->tcps_acceptor_fanout, sizeof (tf_t) * TCP_FANOUT_SIZE);
 	tcps->tcps_acceptor_fanout = NULL;
 
-	kmem_free(tcps->tcps_reserved_port, sizeof (tcp_rport_t) *
-	    TCP_RESERVED_PORTS_ARRAY_MAX_SIZE);
-	tcps->tcps_reserved_port = NULL;
-
 	mutex_destroy(&tcps->tcps_iss_key_lock);
 	rw_destroy(&tcps->tcps_hsp_lock);
 	mutex_destroy(&tcps->tcps_g_q_lock);
 	cv_destroy(&tcps->tcps_g_q_cv);
 	mutex_destroy(&tcps->tcps_epriv_port_lock);
-	rw_destroy(&tcps->tcps_reserved_port_lock);
 
 	ip_drop_unregister(&tcps->tcps_dropper);
 
@@ -26452,7 +25674,7 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	BUMP_LOCAL(tcp->tcp_ibsegs);
-	TCP_RECORD_TRACE(tcp, mp, TCP_TRACE_RECV_PKT);
+	DTRACE_PROBE2(tcp__trace__recv, mblk_t *, mp, tcp_t *, tcp);
 
 	flags = (unsigned int)tcph->th_flags[0] & 0xFF;
 	new_swnd = BE16_TO_U16(tcph->th_win) <<

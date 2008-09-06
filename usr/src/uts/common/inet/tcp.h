@@ -27,8 +27,6 @@
 #ifndef	_INET_TCP_H
 #define	_INET_TCP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -285,7 +283,6 @@ typedef struct tcp_s {
 		tcp_snd_ws_ok  : 1,
 		tcp_exclbind	: 1,	/* ``exclusive'' binding */
 
-		tcp_reserved_port : 1,
 		tcp_hdr_grown	: 1,
 		tcp_in_free_list : 1,
 		tcp_snd_zcopy_on : 1,	/* xmit zero-copy enabled */
@@ -299,7 +296,7 @@ typedef struct tcp_s {
 		tcp_cork : 1,		/* tcp_cork option */
 		tcp_tconnind_started : 1, /* conn_ind message is being sent */
 		tcp_lso :1,		/* Lower layer is capable of LSO */
-		tcp_pad_to_bit_31 : 16;
+		tcp_pad_to_bit_31 : 17;
 
 	uint32_t	tcp_if_mtu;	/* Outgoing interface MTU. */
 
@@ -487,7 +484,6 @@ typedef struct tcp_s {
 	uint8_t		tcp_cleandeathtag;
 	mblk_t		tcp_closemp;
 	timeout_id_t	tcp_linger_tid;	/* Linger timer ID */
-	void		*tcp_tracebuf;
 
 	struct tcp_s *tcp_acceptor_hash; /* Acceptor hash chain */
 	struct tcp_s **tcp_ptpahn; /* Pointer to previous accept hash next. */

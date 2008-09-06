@@ -19,13 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-const char ipclassifier_version[] = "@(#)ipclassifier.c	%I%	%E% SMI";
 
 /*
  * IP PACKET CLASSIFIER
@@ -647,6 +643,8 @@ ipcl_conn_destroy(conn_t *connp)
 	ASSERT(!MUTEX_HELD(&connp->conn_lock));
 	ASSERT(connp->conn_ref == 0);
 	ASSERT(connp->conn_ire_cache == NULL);
+
+	DTRACE_PROBE1(conn__destroy, conn_t *, connp);
 
 	if (connp->conn_peercred != NULL &&
 	    connp->conn_peercred != connp->conn_cred)

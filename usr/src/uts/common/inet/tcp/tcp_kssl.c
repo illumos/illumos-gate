@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -53,7 +51,6 @@
 #include <inet/tcp.h>
 #include <inet/ipsec_impl.h>
 #include <inet/ipdrop.h>
-#include <inet/tcp_trace.h>
 #include <inet/tcp_impl.h>
 
 #include <sys/squeue.h>
