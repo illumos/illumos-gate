@@ -32,7 +32,10 @@
  * $Id: smb_iod.c,v 1.32 2005/02/12 00:17:09 lindak Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #ifdef DEBUG
 /* See sys/queue.h */
@@ -539,7 +542,7 @@ smb_iod_recvall(struct smb_vc *vcp)
 				vcp->vc_flags |= SMBV_GONE;
 				SMB_VC_UNLOCK(vcp);
 				smb_iod_disconnect(vcp);
-				continue; /* wait for ACK */
+				break;
 			}
 			SMB_VC_UNLOCK(vcp);
 			continue;

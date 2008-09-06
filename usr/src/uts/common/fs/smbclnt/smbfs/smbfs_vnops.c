@@ -37,8 +37,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/systm.h>
 #include <sys/cred.h>
 #include <sys/vnode.h>
@@ -1676,18 +1674,22 @@ smbfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 	error = smbfslookup(dvp, nm, &vp, cr, 0, ct);
 	if (error == 0) {
 		/*
-		 * file already exists
+		 * The file already exists.  Error?
+		 * NB: have a hold from smbfslookup
 		 */
 		if (exclusive == EXCL) {
 			error = EEXIST;
+			VN_RELE(vp);
 			goto out;
 		}
 		/*
 		 * Verify requested access.
 		 */
 		error = smbfs_access(vp, mode, 0, cr, ct);
-		if (error)
+		if (error) {
+			VN_RELE(vp);
 			goto out;
+		}
 
 		/*
 		 * Truncate (if requested).
@@ -1695,8 +1697,10 @@ smbfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 		if ((vattr.va_mask & AT_SIZE) && vattr.va_size == 0) {
 			vattr.va_mask = AT_SIZE;
 			error = smbfssetattr(vp, &vattr, 0, cr);
-			if (error)
+			if (error) {
+				VN_RELE(vp);
 				goto out;
+			}
 		}
 		/* Success! */
 #ifdef NOT_YET
@@ -2130,9 +2134,10 @@ smbfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 		}
 
 		/*
-		 * Nodes that are "not active" here appear to have
-		 * v_count=2 (should be 1. XXX investigate later)
-		 * Code here is similar to smbfs_remove.
+		 * Nodes that are "not active" here have v_count=2
+		 * because vn_renameat (our caller) did a lookup on
+		 * both the source and target before this call.
+		 * Otherwise this similar to smbfs_remove.
 		 */
 		nnp = VTOSMB(nvp);
 		mutex_enter(&nnp->r_statelock);

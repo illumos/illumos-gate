@@ -355,7 +355,7 @@ nb_snddis(TIUSER *tiptr)
 		return (error);
 
 	fmode = 0; /* need to block */
-	error = get_ok_ack(tiptr, T_OK_ACK, fmode);
+	error = get_ok_ack(tiptr, T_DISCON_REQ, fmode);
 
 	return (error);
 }
@@ -676,6 +676,8 @@ nbssn_recv(struct nbpcb *nbp, mblk_t **mpp, int *lenp,
 
 	/* We should be the only reader. */
 	ASSERT(nbp->nbp_flags & NBF_RECVLOCK);
+	if ((nbp->nbp_flags & NBF_CONNECTED) == 0)
+		return (ENOTCONN);
 
 	if (tiptr == NULL)
 		return (EBADF);
