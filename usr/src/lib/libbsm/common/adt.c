@@ -1852,7 +1852,9 @@ adt_event_data_t
 	 * preload data so the adt_au_*() functions can detect un-supplied
 	 * values (0 and NULL are free via calloc()).
 	 */
-	session_state->as_preload(event_id, return_event);
+	if (session_data != NULL) {
+		session_state->as_preload(event_id, return_event);
+	}
 
 return_ptr:
 	return (return_event);
