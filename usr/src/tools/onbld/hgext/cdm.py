@@ -836,6 +836,10 @@ def cdm_reparent(ui, repo, parent):
 
     filename = repo.join('hgrc')
 
+    p = ui.expandpath(parent)
+    if not p:
+        raise util.Abort("could not find parent: %s" % parent)
+
     cp = util.configparser()
     try:
         cp.read(filename)
@@ -849,7 +853,7 @@ def cdm_reparent(ui, repo, parent):
 
     if not cp.has_section('paths'):
         cp.add_section('paths')
-    cp.set('paths', 'default', parent)
+    cp.set('paths', 'default', p)
     cp.write(fh)
     fh.close()
 
