@@ -1768,7 +1768,8 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
 	nvlist_t *nvl = NULL, *realprops;
 	zfs_prop_t prop;
-	int do_prefix = 1;
+	boolean_t do_prefix;
+	uint64_t idx;
 
 	(void) snprintf(errbuf, sizeof (errbuf),
 	    dgettext(TEXT_DOMAIN, "cannot set property for '%s'"),
@@ -1800,13 +1801,16 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 		goto error;
 	}
 
-
-	/* do not unmount dataset if canmount is being set to noauto */
-	if (prop == ZFS_PROP_CANMOUNT && *propval == ZFS_CANMOUNT_NOAUTO)
-		do_prefix = 0;
+	/*
+	 * If the dataset's canmount property is being set to noauto,
+	 * then we want to prevent unmounting & remounting it.
+	 */
+	do_prefix = !((prop == ZFS_PROP_CANMOUNT) &&
+	    (zprop_string_to_index(prop, propval, &idx,
+	    ZFS_TYPE_DATASET) == 0) && (idx == ZFS_CANMOUNT_NOAUTO));
 
 	if (do_prefix && (ret = changelist_prefix(cl)) != 0)
-			goto error;
+		goto error;
 
 	/*
 	 * Execute the corresponding ioctl() to set this property.
