@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/rpcsvc/Makefile
 
@@ -70,7 +69,6 @@ $(SPROG) :=	LDLIBS += -lrpcsvc
 $(TPROG) :=	LDLIBS += -lrpcsvc
 spray :=	LDLIBS += -lrpcsvc
 
-CP=	cp
 
 SUBDIRS= rpc.bootparamd nis/utils nis/bin nis/cachemgr nis/rpc.nisd \
 	 nis/rpc.nispasswdd

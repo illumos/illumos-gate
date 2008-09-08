@@ -30,7 +30,6 @@
 include $(SRC)/Makefile.master
 
 LN=		ln
-CP=		cp
 SH=		sh
 ECHO=		echo
 MKDIR=		mkdir

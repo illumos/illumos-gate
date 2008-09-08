@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include	../Makefile.lib
@@ -47,7 +46,6 @@ POFILES=	generic.po
 
 SED=	sed
 GREP=	grep
-CP=	cp
 
 #definitions for install_h target
 HDRS=		tnfctl.h
