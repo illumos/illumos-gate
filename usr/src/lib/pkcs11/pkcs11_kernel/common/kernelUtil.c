@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <string.h>
@@ -808,7 +807,7 @@ process_object_attributes(CK_ATTRIBUTE_PTR pTemplate, CK_ULONG ulCount,
 			value_len = sizeof (ulong_t);
 			if (pTemplate[i].pValue != NULL &&
 			    (pTemplate[i].ulValueLen < value_len)) {
-				rv = CKR_BUFFER_TOO_SMALL;
+				rv = CKR_ATTRIBUTE_VALUE_INVALID;
 				cur_i = i;
 				goto fail_cleanup;
 			}

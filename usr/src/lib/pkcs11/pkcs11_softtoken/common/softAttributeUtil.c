@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <string.h>
 #include <security/cryptoki.h>
@@ -852,15 +850,20 @@ get_ulong_attr_from_object(CK_ULONG value, CK_ATTRIBUTE_PTR template)
  * Copy the CK_ULONG data type attribute value from a template to the
  * object.
  */
-void
+static CK_RV
 get_ulong_attr_from_template(CK_ULONG *value, CK_ATTRIBUTE_PTR template)
 {
+
+	if (template->ulValueLen < sizeof (CK_ULONG))
+		return (CKR_ATTRIBUTE_VALUE_INVALID);
 
 	if (template->pValue != NULL) {
 		*value = *(CK_ULONG_PTR)template->pValue;
 	} else {
 		*value = 0;
 	}
+
+	return (CKR_OK);
 }
 
 /*
@@ -1484,8 +1487,10 @@ soft_build_public_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 
 		case CKA_MODULUS_BITS:
 			isModulusBits = 1;
-			get_ulong_attr_from_template(&modulus_bits,
+			rv = get_ulong_attr_from_template(&modulus_bits,
 			    &template[i]);
+			if (rv != CKR_OK)
+				goto fail_cleanup;
 			break;
 
 		case CKA_LABEL:
@@ -2086,8 +2091,10 @@ soft_build_private_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 
 		case CKA_VALUE_BITS:
 			isValueBits = 1;
-			get_ulong_attr_from_template(&value_bits,
+			rv = get_ulong_attr_from_template(&value_bits,
 			    &template[i]);
+			if (rv != CKR_OK)
+				goto fail_cleanup;
 			break;
 
 		case CKA_LABEL:
@@ -2613,8 +2620,10 @@ soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 
 		case CKA_VALUE_LEN:
 			isValueLen = 1;
-			get_ulong_attr_from_template(&sck->sk_value_len,
+			rv = get_ulong_attr_from_template(&sck->sk_value_len,
 			    &template[i]);
+			if (rv != CKR_OK)
+				goto fail_cleanup;
 			break;
 
 		case CKA_LABEL:
