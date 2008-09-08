@@ -25,7 +25,6 @@
 #ifndef _SYS_AUDIOHD_IMPL_H_
 #define	_SYS_AUDIOHD_IMPL_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/thread.h>
@@ -44,26 +43,11 @@ extern "C" {
 #endif
 
 /*
- * vendor IDs and device IDs of supported devices
+ * vendor IDs of PCI audio controllers
  */
-#define	AUDIOHD_VID_ALC260	0x10ec0260
-#define	AUDIOHD_VID_ALC262	0x10ec0262
-#define	AUDIOHD_VID_ALC880	0x10ec0880
-#define	AUDIOHD_VID_ALC882	0x10ec0882
-#define	AUDIOHD_VID_ALC883	0x10ec0883
-#define	AUDIOHD_VID_ALC885	0x10ec0885
-#define	AUDIOHD_VID_ALC888	0x10ec0888
-#define	AUDIOHD_VID_STAC9200	0x83847690
-#define	AUDIOHD_VID_STAC9200D	0x83847691
-#define	AUDIOHD_VID_CXD9872RD	0x83847661
-#define	AUDIOHD_VID_STAC9872AK	0x83847662
-#define	AUDIOHD_VID_CXD9872AKD	0x83847664
-#define	AUDIOHD_VID_AD1986A	0x11d41986
-#define	AUDIOHD_VID_AD1988A	0x11d41988
-#define	AUDIOHD_VID_AD1988B	0x11d4198b
-
 #define	AUDIOHD_VID_INTEL	0x8086
 #define	AUDIOHD_VID_ATI		0x1002
+#define	AUDIOHD_VID_NVIDIA	0x10de
 
 
 /*
@@ -78,9 +62,9 @@ extern "C" {
  */
 #define	AUDIOHD_ATI_PCI_MISC2	0x42
 #define	AUDIOHD_ATI_MISC2_SNOOP	0x02
-
 #define	AUDIOHDC_NID(x)		x
 #define	AUDIOHDC_NULL_NODE	-1
+#define	AUDIOHD_NULL_CONN	((uint_t)(-1))
 /*
  * currently, only the format of 48K sample rate, 16-bit
  * 2-channel is supported.
@@ -88,9 +72,84 @@ extern "C" {
 #define	AUDIOHD_FMT_PCMOUT	0x0011
 #define	AUDIOHD_FMT_PCMIN	0x0011
 
+/* NVIDIA snoop */
+#define	AUDIOHD_NVIDIA_SNOOP	0x0f
 
-#define	AUDIOHD_CODEC_MAX	15
+/* Power On/Off */
+#define	AUDIOHD_PW_OFF		1
+#define	AUDIOHD_PW_ON		0
+#define	AUDIOHD_PW_D0		0
+#define	AUDIOHD_PW_D2		2
+
+#define	AUDIOHD_INTEL_TCS_MASK	0xf8
+#define	AUDIOHD_ATI_MISC2_MASK	0xf8
+
+/* Pin speaker On/Off */
+#define	AUDIOHD_SP_ON		1
+#define	AUDIOHD_SP_OFF		0
+
+#define	AUDIOHD_CODEC_MAX	16
 #define	AUDIOHD_MEMIO_LEN	0x4000
+
+#define	AUDIOHD_RETRY_TIMES	60
+#define	AUDIOHD_OUTSTR_NUM_OFF	12
+#define	AUDIOHD_INSTR_NUM_OFF	8
+
+#define	AUDIOHD_CORB_SIZE_OFF	0x4e
+
+#define	AUDIOHD_URCAP_OFF	8
+#define	AUDIOHD_DTCCAP_OFF	3
+#define	AUDIOHD_UR_ENABLE_OFF	8
+#define	AUDIOHD_UR_TAG_MASK	0x1f
+
+#define	AUDIOHD_CIS_OFF		31
+
+#define	AUDIOHD_RIRB_UR_OFF	5
+#define	AUDIOHD_RIRB_CODEC_MASK	0xf
+#define	AUDIOHD_RIRB_WID_OFF	27
+
+#define	AUDIOHD_FORM_MASK	0x0080
+#define	AUDIOHD_LEN_MASK	0x007f
+#define	AUDIOHD_PIN_CAP_MASK	0x00000010
+#define	AUDIOHD_PIN_CONF_MASK	0xc0000000
+#define	AUDIOHD_PIN_CON_MASK	3
+#define	AUDIOHD_PIN_CON_STEP	30
+#define	AUDIOHD_PIN_IO_MASK	0X0018
+#define	AUDIOHD_PIN_SEQ_MASK	0x0000000f
+#define	AUDIOHD_PIN_ASO_MASK	0x000000f0
+#define	AUDIOHD_PIN_ASO_OFF	0x4
+#define	AUDIOHD_PIN_DEV_MASK	0x00f00000
+#define	AUDIOHD_PIN_DEV_OFF	20
+#define	AUDIOHD_PIN_NUMS	6
+#define	AUDIOHD_PIN_NO_CONN	0x40000000
+#define	AUDIOHD_PIN_IN_ENABLE	0x20
+#define	AUDIOHD_PIN_PRES_OFF	0x20
+#define	AUDIOHD_PIN_CONTP_OFF	0x1e
+#define	AUDIOHD_PIN_CON_JACK	0
+#define	AUDIOHD_PIN_CON_FIXED	0x2
+#define	AUDIOHD_PIN_CONTP_MASK	0x3
+
+#define	AUDIOHD_VERB_ADDR_OFF	28
+#define	AUDIOHD_VERB_NID_OFF	20
+#define	AUDIOHD_VERB_CMD_OFF	8
+#define	AUDIOHD_VERB_CMD16_OFF	16
+
+#define	AUDIOHD_RING_MAX_SIZE	0x00ff
+#define	AUDIOHD_POS_MASK	~0x00000003
+#define	AUDIOHD_REC_TAG_OFF	4
+#define	AUDIOHD_PLAY_TAG_OFF	4
+#define	AUDIOHD_PLAY_CTL_OFF	2
+#define	AUDIOHD_REC_CTL_OFF	2
+
+#define	AUDIOHD_SPDIF_ON	1
+#define	AUDIOHD_SPDIF_MASK	0x00ff
+
+#define	AUDIOHD_GAIN_OFF	8
+
+#define	AUDIOHD_CODEC_STR_OFF	16
+#define	AUDIOHD_CODEC_STR_MASK	0x000000ff
+#define	AUDIOHD_CODEC_NUM_MASK	0x000000ff
+#define	AUDIOHD_CODEC_TYPE_MASK	0x000000ff
 
 #define	AUDIOHD_BDLE_BUF_ALIGN	128
 #define	AUDIOHD_CMDIO_ENT_MASK	0x00ff	/* 256 entries for CORB/RIRB */
@@ -225,6 +284,7 @@ extern "C" {
 #define	AUDIOHDR_RIRBCTL_RINTCTL	0x01
 #define	AUDIOHDR_RIRBCTL_DMARUN		0x02
 #define	AUDIOHDR_RIRBCTL_RIRBOIC	0x04
+#define	AUDIOHDR_RIRBCTL_RSTINT		0xfe
 
 /* bits for RIRBWP register */
 #define	AUDIOHDR_RIRBWP_RESET		0x8000
@@ -272,10 +332,21 @@ extern "C" {
 #define	AUDIOHDC_VERB_SET_PIN_CTRL		0x707
 
 #define	AUDIOHDC_VERB_GET_UNS_ENABLE		0xf08
+
 #define	AUDIOHDC_VERB_GET_PIN_SENSE		0xf09
 #define	AUDIOHDC_VERB_EXEC_PIN_SENSE		0x709
+
 #define	AUDIOHDC_VERB_GET_BEEP_GEN		0xf0a
+
+#define	AUDIOHDC_VERB_GET_EAPD			0xf0c
+#define	AUDIOHDC_VERB_SET_EAPD			0x70c
+
 #define	AUDIOHDC_VERB_GET_DEFAULT_CONF		0xf1c
+#define	AUDIOHDC_VERB_GET_SPDIF_CONTROL		0xf0d
+#define	AUDIOHDC_VERB_SET_SPDIF_LCONTROL	0x70d
+
+#define	AUDIOHDC_VERB_SET_URCTRL		0x708
+#define	AUDIOHDC_VERB_GET_PIN_SENSE		0xf09
 
 /*
  * 4-bit verbs
@@ -299,12 +370,12 @@ extern "C" {
 #define	AUDIOHDC_PAR_PCM			0x0a
 #define	AUDIOHDC_PAR_STREAM			0x0b
 #define	AUDIOHDC_PAR_PIN_CAP			0x0c
-#define	AUDIOHDC_PAR_AMP_IN_CAP			0x0d
+#define	AUDIOHDC_PAR_INAMP_CAP			0x0d
 #define	AUDIOHDC_PAR_CONNLIST_LEN		0x0e
 #define	AUDIOHDC_PAR_POWER_STATE		0x0f
 #define	AUDIOHDC_PAR_PROC_CAP			0x10
 #define	AUDIOHDC_PAR_GPIO_CAP			0x11
-#define	AUDIOHDC_PAR_AMP_OUT_CAP		0x12
+#define	AUDIOHDC_PAR_OUTAMP_CAP			0x12
 
 /*
  * bits for get/set amplifier gain/mute
@@ -314,6 +385,7 @@ extern "C" {
 #define	AUDIOHDC_AMP_SET_LEFT			0x2000
 #define	AUDIOHDC_AMP_SET_RIGHT			0x1000
 #define	AUDIOHDC_AMP_SET_MUTE			0x0080
+#define	AUDIOHDC_AMP_SET_LNR			0x3000
 #define	AUDIOHDC_AMP_SET_LR_INPUT		0x7000
 #define	AUDIOHDC_AMP_SET_LR_OUTPUT		0xb000
 #define	AUDIOHDC_AMP_SET_INDEX_OFFSET		8
@@ -321,6 +393,9 @@ extern "C" {
 #define	AUDIOHDC_GAIN_MAX			0x7f
 #define	AUDIOHDC_GAIN_BITS			7
 #define	AUDIOHDC_GAIN_DEFAULT			0x0f
+
+#define	AUDIOHDC_AMP_GET_OUTPUT			0x8000
+#define	AUDIOHDC_AMP_GET_INPUT			0x0000
 
 /* value used to set max volume for left output */
 #define	AUDIOHDC_AMP_LOUT_MAX	\
@@ -351,38 +426,27 @@ extern "C" {
 #define	AUDIOHDC_AMP_CAP_0DB_OFFSET		0x0000007f
 
 
-#define	AUDIOHD_CODEC_FAILURE	(uint32_t)(-1)
-
-
 /*
- * input index for analog mixer (nid=0x20) of AD1988 CODEC
+ * Bits for Audio Widget Capabilities
  */
-enum {
-	AD1988_NID20H_INPUT_INDEX_MIC1 = 0,
-	AD1988_NID20H_INPUT_INDEX_LINE_IN = 1,
-	AD1988_NID20H_INPUT_INDEX_MIC2 = 4,
-	AD1988_NID20H_INPUT_INDEX_CD = 6,
-	AD1988_NID20H_INPUT_INDEX_NULL = -1
-};
+#define	AUDIOHD_WIDCAP_STEREO		0x00000001
+#define	AUDIOHD_WIDCAP_INAMP		0x00000002
+#define	AUDIOHD_WIDCAP_OUTAMP		0x00000004
+#define	AUDIOHD_WIDCAP_AMP_OVRIDE	0x00000008
+#define	AUDIOHD_WIDCAP_FMT_OVRIDE	0x00000010
+#define	AUDIOHD_WIDCAP_STRIP		0x00000020
+#define	AUDIOHD_WIDCAP_PROC_WID		0x00000040
+#define	AUDIOHD_WIDCAP_UNSOL		0x00000080
+#define	AUDIOHD_WIDCAP_CONNLIST		0x00000100
+#define	AUDIOHD_WIDCAP_DIGIT		0x00000200
+#define	AUDIOHD_WIDCAP_PWRCTRL		0x00000400
+#define	AUDIOHD_WIDCAP_LRSWAP		0x00000800
+#define	AUDIOHD_WIDCAP_TYPE		0x00f00000
+#define	AUDIOHD_WIDCAP_TO_WIDTYPE(wcap)		\
+	((wcap & AUDIOHD_WIDCAP_TYPE) >> 20)
 
-struct audiohd_codec_ops;
-typedef struct  {
-	uint8_t		hc_addr;	/* codec address */
-	uint32_t	hc_vid;		/* vendor id and device id */
-	uint32_t	hc_revid;	/* revision id */
 
-	/*
-	 * although the following are the parameters/capabilities
-	 * of audio function group, but we just care about AFG,
-	 * therefore, it is no different that codec or AFG has
-	 * the parameters
-	 */
-	uint32_t	hc_afg_id;	/* id of AFG */
-	uint32_t	hc_sid;		/* sybsystem id for AFG */
-
-	struct audiohd_codec_ops *hc_ops;
-
-}audiohd_hda_codec_t;
+#define	AUDIOHD_CODEC_FAILURE	(uint32_t)(-1)
 
 /*
  * buffer descriptor list entry of stream descriptor
@@ -401,6 +465,216 @@ typedef struct {
 #define	AUDIOHD_PLAY_PAUSED		0x00000004
 #define	AUDIOHD_RECORD_STARTED		0x00000008
 
+enum audiohda_widget_type {
+	WTYPE_AUDIO_OUT = 0,
+	WTYPE_AUDIO_IN,
+	WTYPE_AUDIO_MIX,
+	WTYPE_AUDIO_SEL,
+	WTYPE_PIN,
+	WTYPE_POWER,
+	WTYPE_VOL_KNOB,
+	WTYPE_BEEP,
+	WTYPE_VENDOR = 0xf
+};
+
+enum audiohda_device_type {
+	DTYPE_LINEOUT = 0,
+	DTYPE_SPEAKER,
+	DTYPE_HP_OUT,
+	DTYPE_CD,
+	DTYPE_SPDIF_OUT,
+	DTYPE_DIGIT_OUT,
+	DTYPE_MODEM_SIDE,
+	DTYPE_MODEM_HNAD_SIDE,
+	DTYPE_LINE_IN,
+	DTYPE_AUX,
+	DTYPE_MIC_IN,
+	DTYPE_TEL,
+	DTYPE_SPDIF_IN,
+	DTYPE_DIGIT_IN,
+	DTYPE_OTHER = 0x0f,
+};
+
+/* values for audiohd_widget.path_flags */
+#define	AUDIOHD_PATH_DAC	(1 << 0)
+#define	AUDIOHD_PATH_ADC	(1 << 1)
+#define	AUDIOHD_PATH_MON	(1 << 2)
+#define	AUDIOHD_PATH_NOMON	(1 << 3)
+
+
+typedef struct audiohd_ostream	audiohd_ostream_t;
+typedef struct audiohd_istream	audiohd_istream_t;
+typedef struct audiohd_widget	audiohd_widget_t;
+typedef struct audiohd_mixer	audiohd_mixer_t;
+typedef struct audiohd_state	audiohd_state_t;
+typedef struct audiohd_pin	audiohd_pin_t;
+typedef struct hda_codec	hda_codec_t;
+typedef uint32_t	wid_t;		/* id of widget */
+typedef	struct audiohd_entry_prop	audiohd_entry_prop_t;
+
+#define	AUDIOHD_MAX_WIDGET		128
+#define	AUDIOHD_MAX_CONN		16
+#define	AUDIOHD_MAX_PINS		16
+#define	AUDIOHD_MAX_DEPTH		8
+
+struct audiohd_entry_prop {
+	uint32_t	conn_len;
+	uint32_t	mask_range;
+	uint32_t	mask_wid;
+	wid_t		input_wid;
+	int		conns_per_entry;
+	int		bits_per_conn;
+};
+struct audiohd_widget {
+	wid_t		wid_wid;
+	hda_codec_t	*codec;
+	enum audiohda_widget_type type;
+
+	uint32_t	widget_cap;
+	uint32_t	pcm_format;
+	uint32_t	inamp_cap;
+	uint32_t	outamp_cap;
+
+	uint32_t	path_flags;
+
+	int		out_weight;
+	int		in_weight;
+	int		finish;
+
+	/*
+	 * wid of possible & selected input connections
+	 */
+	wid_t		avail_conn[AUDIOHD_MAX_CONN];
+	wid_t		selconn;
+	/*
+	 * for monitor path
+	 */
+	wid_t		selmon[AUDIOHD_MAX_CONN];
+	uint16_t 	used;
+
+	/*
+	 * available (input) connections. 0 means this widget
+	 * has fixed connection
+	 */
+	int		nconns;
+
+	/*
+	 * pointer to struct depending on widget type:
+	 *	1. DAC	audiohd_ostream_t
+	 *	2. ADC	audiohd_istream_t
+	 *	3. PIN	audiohd_pin_t
+	 */
+	void	*priv;
+};
+
+#define	AUDIOHD_FLAG_LINEOUT		(1 << 0)
+#define	AUDIOHD_FLAG_SPEAKER		(1 << 1)
+#define	AUDIOHD_FLAG_HP			(1 << 2)
+#define	AUDIOHD_FLAG_MONO		(1 << 3)
+
+#define	AUDIOHD_MAX_MIXER		5
+#define	AUDIOHD_MAX_PIN			4
+struct audiohd_ostream {
+	wid_t	dac_wid;	/* wid of DAC widget */
+	wid_t	pin_wid[AUDIOHD_MAX_PINS];
+	int	pin_nums;
+	/*
+	 * the mixer wid in each ostream path.
+	 * this is used to build the monitor path
+	 */
+	int	mon_wid[AUDIOHD_MAX_PIN][AUDIOHD_MAX_MIXER];
+	/*
+	 * The max num of mixer widget on the path of the pin
+	 */
+	int		maxmixer[AUDIOHD_MAX_PINS];
+	int		inuse;
+	wid_t		mute_wid;	/* node used to mute this pin */
+	int		mute_dir;	/* 1: input, 2: output */
+	wid_t		gain_wid;	/* node for gain control */
+	int		gain_dir;	/* _OUTPUT/_INPUT */
+	uint32_t	gain_bits;
+	uint32_t	pin_outputs;
+	audiohd_ostream_t	*next_stream;
+
+	/*
+	 * this is used to mark the ostream which is now
+	 * used by sada.
+	 */
+	boolean_t	in_use;
+};
+
+struct audiohd_istream {
+	wid_t	adc_wid;
+
+	/*
+	 * wid of sum, which can be a selector or mixer. And all pin
+	 * widgets whose wid is in pin_wid[] array can route to this
+	 * sum widget. If there is no such sum, sum_wid is 0, in this
+	 * case, pin_nums must be 1, that means, this stream has only
+	 * one pin widget input. But we should remember that sum_wid
+	 * can be non-zero when pin_nums is 1.
+	 */
+	wid_t	sum_wid;
+
+	/*
+	 * the index of sum widget inputs which can go through the
+	 * path and arrive input pin widget.
+	 */
+	int		sum_selconn[AUDIOHD_MAX_PINS];
+
+	wid_t		pin_wid[AUDIOHD_MAX_PINS];
+	int		pin_nums;
+
+	wid_t		mute_wid;	/* node used to mute this pin */
+	int		mute_dir;	/* 1: input, 2: output */
+	wid_t		gain_wid;	/* node for gain control */
+	int		gain_dir;	/* _OUTPUT/_INPUT */
+	uint32_t	gain_bits;
+
+	audiohd_istream_t	*next_stream;
+
+	/*
+	 * this is used to mark the istream which is now
+	 * used by sada.
+	 */
+
+	boolean_t	in_use;
+};
+
+struct audiohd_pin {
+	audiohd_pin_t	*next;
+	wid_t		wid;
+	wid_t		mute_wid;	/* node used to mute this pin */
+	int		mute_dir;	/* 1: input, 2: output */
+	wid_t		gain_wid;	/* node for gain control */
+	int		gain_dir;	/* _OUTPUT/_INPUT */
+	uint32_t	gain_bits;
+
+	enum audiohda_device_type	device;
+	uint32_t	cap;
+	uint32_t	config;
+	uint32_t	ctrl;
+	uint32_t	assoc;
+	uint32_t	seq;
+	wid_t		adc_dac_wid; /* AD/DA wid which can route to this pin */
+	int		no_phys_conn;
+	/*
+	 * mg_dir, mg_gain, mg_wid are used to store the monitor gain control
+	 * widget wid.
+	 */
+	int		mg_dir[AUDIOHD_MAX_CONN];
+	int		mg_gain[AUDIOHD_MAX_CONN];
+	int		mg_wid[AUDIOHD_MAX_CONN];
+	int		num;
+	int		finish;
+
+	/* this is used for SADA driver only. we should remove it later */
+#define	AUDIOHD_SADA_OUTPUT		0x8000
+#define	AUDIOHD_SADA_INPUT		0x4000
+#define	AUDIOHD_SADA_PORTMASK		0x00ff
+	uint_t	sada_porttype;
+};
+
 typedef struct {
 	ddi_dma_handle_t	ad_dmahdl;
 	ddi_acc_handle_t	ad_acchdl;
@@ -409,6 +683,29 @@ typedef struct {
 	size_t		ad_req_sz;	/* required size of memory */
 	size_t		ad_real_sz;	/* real size of memory */
 } audiohd_dma_t;
+
+struct hda_codec {
+	uint8_t		index;		/* codec address */
+	uint32_t	vid;		/* vendor id and device id */
+	uint32_t	revid;		/* revision id */
+	wid_t		wid_afg;	/* id of AFG */
+	wid_t		first_wid;	/* wid of 1st subnode of AFG */
+	wid_t		last_wid;	/* wid of the last subnode of AFG */
+	int		nnodes;		/* # of subnodes of AFG */
+
+	uint32_t	outamp_cap;
+	uint32_t	inamp_cap;
+	uint32_t	stream_format;
+	uint32_t	pcm_format;
+
+	audiohd_state_t		*soft_statep;
+
+	/* use wid as index to the array of widget pointers */
+	audiohd_widget_t	*widget[AUDIOHD_MAX_WIDGET];
+	audiohd_ostream_t	*ostream;
+	audiohd_istream_t	*istream;
+	audiohd_pin_t		*first_pin;
+};
 
 struct audiohd_state {
 	audiohdl_t	hda_ahandle;
@@ -457,62 +754,33 @@ struct audiohd_state {
 	boolean_t	hda_outputs_muted;
 
 	uint_t		hda_monitor_gain;
-	uint_t		hda_mgain_max;
 	uint_t		hda_play_stag;		/* tag of playback stream */
 	uint_t		hda_record_stag;	/* tag of record stream */
 	uint_t		hda_play_regbase;	/* regbase for play stream */
 	uint_t		hda_record_regbase;	/* regbase for record stream */
 	uint_t		hda_play_lgain;		/* left gain for playback */
 	uint_t		hda_play_rgain;		/* right gain for playback */
-	uint_t		hda_pgain_max;		/* max gain for playback */
 	uint_t		hda_record_lgain;	/* left gain for recording */
 	uint_t		hda_record_rgain;	/* right gain for recording */
-	uint_t		hda_rgain_max;		/* max gain for record */
 	uint_t		hda_play_format;
 	uint_t		hda_record_format;
 	uint_t		hda_out_ports;		/* active outputs */
-	uint_t		hda_in_ports;		/* active inputs */
+	uint_t		hda_in_port;		/* active inputs */
 
-	audiohd_hda_codec_t	*hda_codec;
-
-	boolean_t	suspended;		/* suspend/resume state */
-	int		hda_busy_cnt;		/* device busy count */
+	/*
+	 * Now, for the time being, we add some fields
+	 * for parsing codec topology
+	 */
+	hda_codec_t	*codec[AUDIOHD_CODEC_MAX];
+	/*
+	 * Suspend/Resume used fields
+	 */
+	boolean_t	suspended;
+	int		hda_busy_cnt;
 	kcondvar_t	hda_cv;
+
 };
 
-typedef struct audiohd_state audiohd_state_t;
-
-struct audiohd_codec_ops {
-	int (*ac_init_codec)(audiohd_state_t *);
-	int (*ac_set_pcm_fmt)(audiohd_state_t *, int, uint_t);
-	int (*ac_set_gain)(audiohd_state_t *, int, int, int);
-	int (*ac_set_port)(audiohd_state_t *, int, int);
-	int (*ac_mute_outputs)(audiohd_state_t *, boolean_t);
-	int (*ac_set_monitor_gain)(audiohd_state_t *, int);
-	void (*ac_get_max_gain)
-		(audiohd_state_t *, uint_t *, uint_t *, uint_t *);
-};
-
-#define	AUDIOHD_CODEC_INIT_CODEC(x) \
-	x->hda_codec->hc_ops->ac_init_codec(x);
-
-#define	AUDIOHD_CODEC_SET_PCM_FORMAT(x, y, z) \
-	x->hda_codec->hc_ops->ac_set_pcm_fmt(x, y, z);
-
-#define	AUDIOHD_CODEC_SET_GAIN(x, y, z, w) \
-	x->hda_codec->hc_ops->ac_set_gain(x, y, z, w)
-
-#define	AUDIOHD_CODEC_SET_PORT(x, y, z) \
-	x->hda_codec->hc_ops->ac_set_port(x, y, z)
-
-#define	AUDIOHD_CODEC_MUTE_OUTPUTS(x, y) \
-	x->hda_codec->hc_ops->ac_mute_outputs(x, y)
-
-#define	AUDIOHD_CODEC_SET_MON_GAIN(x, y) \
-	x->hda_codec->hc_ops->ac_set_monitor_gain(x, y)
-
-#define	AUDIOHD_CODEC_MAX_GAIN(x, y, z, w) \
-	x->hda_codec->hc_ops->ac_get_max_gain(x, y, z, w)
 
 /*
  * Operation for high definition audio control system bus
@@ -552,81 +820,17 @@ struct audiohd_codec_ops {
 
 
 /*
- * This is used to initialize ADC node of CODEC
- */
-#define	AUDIOHD_NODE_INIT_ADC(statep, caddr, nid) \
-{	\
-	/* for ADC node, set channel and stream tag */ \
-	if (audioha_codec_verb_get(statep, \
-	    caddr, nid, AUDIOHDC_VERB_SET_STREAM_CHANN, \
-	    statep->hda_record_stag << 4) == AUDIOHD_CODEC_FAILURE) \
-		return (AUDIO_FAILURE); \
-	\
-	/* set input amp of ADC node to max */ \
-	if (audioha_codec_4bit_verb_get(statep, \
-	    caddr, nid, AUDIOHDC_VERB_SET_AMP_MUTE, \
-	    AUDIOHDC_AMP_SET_LR_INPUT | AUDIOHDC_GAIN_MAX) == \
-	    AUDIOHD_CODEC_FAILURE) \
-		return (AUDIO_FAILURE); \
-}
-
-/*
- * This is used to initialize DAC node of CODEC
- */
-#define	AUDIOHD_NODE_INIT_DAC(statep, caddr, nid) \
-{	\
-	if (audioha_codec_verb_get(statep, \
-	    caddr, nid, AUDIOHDC_VERB_SET_STREAM_CHANN, \
-	    statep->hda_play_stag << 4) == AUDIOHD_CODEC_FAILURE) \
-		return (AUDIO_FAILURE); \
-	\
-	/* set output amp of DAC to max */ \
-	if (audioha_codec_4bit_verb_get(statep, \
-	    caddr, nid, AUDIOHDC_VERB_SET_AMP_MUTE, \
-	    AUDIOHDC_AMP_SET_LR_OUTPUT | AUDIOHDC_GAIN_MAX) == \
-	    AUDIOHD_CODEC_FAILURE) \
-		return (AUDIO_FAILURE); \
-}
-
-
-/*
- * unmute specified one of a mixer's inputs, and set the
- * left & right output volume of mixer to specified value
- */
-#define	AUDIOHD_NODE_INIT_MIXER(statep, caddr, nid_m, in_num) \
-{ \
-	/* unmute input of mixer */ \
-	if (audioha_codec_4bit_verb_get(statep, caddr, nid_m, \
-	    AUDIOHDC_VERB_SET_AMP_MUTE, \
-	    AUDIOHDC_AMP_SET_LR_INPUT | AUDIOHDC_GAIN_MAX | \
-		(in_num << AUDIOHDC_AMP_SET_INDEX_OFFSET)) == \
-	    AUDIOHD_CODEC_FAILURE) \
-		return (AUDIO_FAILURE); \
-	\
-	/* output left amp of mixer */ \
-	(void) audioha_codec_4bit_verb_get(statep, caddr, nid_m, \
-	    AUDIOHDC_VERB_SET_AMP_MUTE, AUDIOHDC_AMP_SET_OUTPUT | \
-	    AUDIOHDC_AMP_SET_LEFT | statep->hda_play_lgain); \
-	\
-	/* output right amp of mixer */ \
-	(void) audioha_codec_4bit_verb_get(statep, caddr, nid_m, \
-	    AUDIOHDC_VERB_SET_AMP_MUTE, AUDIOHDC_AMP_SET_OUTPUT | \
-	    AUDIOHDC_AMP_SET_RIGHT | statep->hda_play_rgain); \
-}
-
-
-/*
  * enable a pin widget to output
  */
-#define	AUDIOHD_NODE_ENABLE_PIN_OUT(statep, caddr, nid) \
+#define	AUDIOHD_ENABLE_PIN_OUT(statep, caddr, wid) \
 { \
 	uint32_t	lTmp; \
 \
-	lTmp = audioha_codec_verb_get(statep, caddr, nid, \
+	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
 	    AUDIOHDC_VERB_GET_PIN_CTRL, 0); \
 	if (lTmp == AUDIOHD_CODEC_FAILURE) \
 		return (AUDIO_FAILURE); \
-	lTmp = audioha_codec_verb_get(statep, caddr, nid, \
+	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
 	    AUDIOHDC_VERB_SET_PIN_CTRL, \
 	    (lTmp | AUDIOHDC_PIN_CONTROL_OUT_ENABLE | \
 	    AUDIOHDC_PIN_CONTROL_HP_ENABLE)); \
@@ -637,15 +841,15 @@ struct audiohd_codec_ops {
 /*
  * disable output pin
  */
-#define	AUDIOHD_NODE_DISABLE_PIN_OUT(statep, caddr, nid) \
+#define	AUDIOHD_DISABLE_PIN_OUT(statep, caddr, wid) \
 { \
 	uint32_t	lTmp; \
 \
-	lTmp = audioha_codec_verb_get(statep, caddr, nid, \
+	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
 	    AUDIOHDC_VERB_GET_PIN_CTRL, 0); \
 	if (lTmp == AUDIOHD_CODEC_FAILURE) \
 		return (AUDIO_FAILURE); \
-	lTmp = audioha_codec_verb_get(statep, caddr, nid, \
+	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
 	    AUDIOHDC_VERB_SET_PIN_CTRL, \
 	    (lTmp & ~AUDIOHDC_PIN_CONTROL_OUT_ENABLE)); \
 	if (lTmp == AUDIOHD_CODEC_FAILURE) \
@@ -655,9 +859,9 @@ struct audiohd_codec_ops {
 /*
  * enable a pin widget to input
  */
-#define	AUDIOHD_NODE_ENABLE_PIN_IN(statep, caddr, nid) \
+#define	AUDIOHD_ENABLE_PIN_IN(statep, caddr, wid) \
 { \
-	(void) audioha_codec_verb_get(statep, caddr, nid, \
+	(void) audioha_codec_verb_get(statep, caddr, wid, \
 	    AUDIOHDC_VERB_SET_PIN_CTRL, AUDIOHDC_PIN_CONTROL_IN_ENABLE | 4); \
 }
 
@@ -665,15 +869,15 @@ struct audiohd_codec_ops {
 /*
  * disable input pin
  */
-#define	AUDIOHD_NODE_DISABLE_PIN_IN(statep, caddr, nid) \
+#define	AUDIOHD_DISABLE_PIN_IN(statep, caddr, wid) \
 { \
 	uint32_t	lTmp; \
 \
-	lTmp = audioha_codec_verb_get(statep, caddr, nid, \
+	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
 	    AUDIOHDC_VERB_GET_PIN_CTRL, 0); \
 	if (lTmp == AUDIOHD_CODEC_FAILURE) \
 		return (AUDIO_FAILURE); \
-	lTmp = audioha_codec_verb_get(statep, caddr, nid, \
+	lTmp = audioha_codec_verb_get(statep, caddr, wid, \
 	    AUDIOHDC_VERB_SET_PIN_CTRL, \
 	    (lTmp & ~AUDIOHDC_PIN_CONTROL_IN_ENABLE)); \
 	if (lTmp == AUDIOHD_CODEC_FAILURE) \
@@ -683,10 +887,10 @@ struct audiohd_codec_ops {
 /*
  * unmute an output pin
  */
-#define	AUDIOHD_NODE_UNMUTE_OUT(statep, caddr, nid) \
+#define	AUDIOHD_NODE_UNMUTE_OUT(statep, caddr, wid) \
 { \
 	if (audioha_codec_4bit_verb_get(statep, \
-	    caddr, nid, AUDIOHDC_VERB_SET_AMP_MUTE, \
+	    caddr, wid, AUDIOHDC_VERB_SET_AMP_MUTE, \
 	    AUDIOHDC_AMP_SET_LR_OUTPUT | AUDIOHDC_GAIN_MAX) == \
 	    AUDIOHD_CODEC_FAILURE) \
 		return (AUDIO_FAILURE); \
