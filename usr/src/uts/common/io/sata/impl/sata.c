@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * SATA Framework
@@ -45,6 +44,7 @@
 #include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent/dr.h>
 #include <sys/taskq.h>
+#include <sys/disp.h>
 
 #include <sys/sata/impl/sata.h>
 #include <sys/sata/sata_hba.h>
@@ -126,6 +126,8 @@ static	void sata_inject_pkt_fault(sata_pkt_t *, uint8_t, int *, int);
 #endif
 
 #define	LEGACY_HWID_LEN	64	/* Model (40) + Serial (20) + pad */
+
+static char sata_rev_tag[] = {"1.37"};
 
 /*
  * SATA cb_ops functions
@@ -368,7 +370,7 @@ extern uchar_t	scsi_cdb_size[];
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,			/* Type of module */
-	"SATA Module v%I%"		/* module name */
+	"SATA Module"			/* module name */
 };
 
 
@@ -2769,6 +2771,18 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx, int *reason)
 		/* all OK; pkt reason will be overwritten later */
 		break;
 	}
+	/*
+	 * If in an interrupt context, reject packet if it is to be
+	 * executed in polling mode
+	 */
+	if (servicing_interrupt() &&
+	    (spx->txlt_scsi_pkt->pkt_flags & FLAG_NOINTR) != 0) {
+		SATADBG1(SATA_DBG_INTR_CTX, spx->txlt_sata_hba_inst,
+		    "sata_scsi_start: rejecting synchronous command because "
+		    "of interrupt context\n", NULL);
+		return (TRAN_BUSY);
+	}
+
 	sdinfo = sata_get_device_info(spx->txlt_sata_hba_inst,
 	    &spx->txlt_sata_pkt->satapkt_device);
 
@@ -3212,6 +3226,12 @@ done:
  * Always NO SENSE, because any sense data should be reported by ARQ sense.
  *
  * Returns TRAN_ACCEPT and appropriate values in scsi_pkt fields.
+ *
+ * Note: There is a mismatch between already implemented Informational
+ * Exception Mode Select page 0x1C and this function.
+ * When MRIE bit is set in page 0x1C, Request Sense is supposed to return
+ * NO SENSE and set additional sense code to the exception code - this is not
+ * implemented here.
  */
 static int
 sata_txlt_request_sense(sata_pkt_txlate_t *spx)
@@ -3811,11 +3831,15 @@ done:
  * by mode select pages. The first error terminates further execution.
  * Operations performed successully are not backed-up in such case.
  *
- * NOTE: only caching mode select page is implemented.
+ * NOTE: Implemented pages:
+ * - caching page
+ * - informational exception page
+ * - acoustic management page
  * Caching setup is remembered so it could be re-stored in case of
  * an unexpected device reset.
  *
- * Returns TRAN_ACCEPT and appropriate values in scsi_pkt fields.
+ * Returns TRAN_XXXX.
+ * If TRAN_ACCEPT is returned, appropriate values are set in scsi_pkt fields.
  */
 
 static int
@@ -3841,6 +3865,17 @@ sata_txlt_mode_select(sata_pkt_txlate_t *spx)
 	    TRAN_ACCEPT) || (reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
+	}
+	/*
+	 * If in interrupt context, reject this packet because it may result
+	 * in issuing a synchronous command to HBA.
+	 */
+	if (servicing_interrupt()) {
+		SATADBG1(SATA_DBG_INTR_CTX, spx->txlt_sata_hba_inst,
+		    "sata_txlt_mode_select: rejecting command because "
+		    "of interrupt context\n", NULL);
+		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		return (TRAN_BUSY);
 	}
 
 	rval = TRAN_ACCEPT;
@@ -4122,6 +4157,18 @@ sata_txlt_log_sense(sata_pkt_txlate_t *spx)
 		kmem_free(buf, MAX_LOG_SENSE_PAGE_SIZE);
 		return (rval);
 	}
+	/*
+	 * If in interrupt context, reject this packet because it may result
+	 * in issuing a synchronous command to HBA.
+	 */
+	if (servicing_interrupt()) {
+		SATADBG1(SATA_DBG_INTR_CTX, spx->txlt_sata_hba_inst,
+		    "sata_log_sense: rejecting command because "
+		    "of interrupt context\n", NULL);
+		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		kmem_free(buf, MAX_LOG_SENSE_PAGE_SIZE);
+		return (TRAN_BUSY);
+	}
 
 	scsipkt->pkt_reason = CMD_CMPLT;
 	scsipkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
@@ -4179,7 +4226,6 @@ sata_txlt_log_sense(sata_pkt_txlate_t *spx)
 		sdinfo = sata_get_device_info(
 		    spx->txlt_sata_hba_inst,
 		    &spx->txlt_sata_pkt->satapkt_device);
-
 
 		/*
 		 * Add requested pages.
@@ -4889,6 +4935,16 @@ sata_txlt_write_buffer(sata_pkt_txlate_t *spx)
 	if ((rval = sata_txlt_generic_pkt_info(spx, &reason)) != TRAN_ACCEPT) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
+	}
+	/*
+	 * If in interrupt context, reject this packet because it would issue
+	 * a synchronous command to HBA.
+	 */
+	if (servicing_interrupt()) {
+		SATADBG1(SATA_DBG_INTR_CTX, spx->txlt_sata_hba_inst,
+		    "sata_txlt_write_buffer: rejecting command because "
+		    "of interrupt context\n", NULL);
+		return (TRAN_BUSY);
 	}
 
 	/* Use synchronous mode */
@@ -6077,6 +6133,7 @@ sata_mode_select_page_8(sata_pkt_txlate_t *spx, struct mode_cache_scsi3 *page,
 		*rval = TRAN_ACCEPT;
 		return (SATA_SUCCESS);
 	}
+
 	/*
 	 * Need to flip some setting
 	 * Set-up Internal SET FEATURES command(s)
@@ -6155,8 +6212,15 @@ failure:
  * The only changeable bit is dexcpt (disable exceptions).
  * MRIE (method of reporting informational exceptions) must be
  * "only on request".
+ * This page applies to informational exceptions that report
+ * additional sense codes with the ADDITIONAL SENSE CODE field set to 5Dh
+ * (e.g.,FAILURE PREDICTION THRESHOLD EXCEEDED) or 0Bh (e.g., WARNING_).
+ * Informational exception conditions occur as the result of background scan
+ * errors, background self-test errors, or vendor specific events within a
+ * logical unit. An informational exception condition may occur asynchronous
+ * to any commands.
  *
- * Return SATA_SUCCESS if operation succeeded, SATA_FAILURE otherwise.
+ * Returns: SATA_SUCCESS if operation succeeded, SATA_FAILURE otherwise.
  * If operation resulted in changing device setup, dmod flag should be set to
  * one (1). If parameters were not changed, dmod flag should be set to 0.
  * Upon return, if operation required sending command to the device, the rval
@@ -6167,6 +6231,8 @@ failure:
  * This function has to be called with a port mutex held.
  *
  * Returns SATA_SUCCESS if operation was successful, SATA_FAILURE otherwise.
+ *
+ * Cannot be called in the interrupt context.
  */
 static	int
 sata_mode_select_page_1c(
@@ -6250,6 +6316,16 @@ sata_mode_select_page_1c(
 	return (SATA_FAILURE);
 }
 
+/*
+ * Process mode select acoustic management control page 0x30
+ *
+ *
+ * This function has to be called with a port mutex held.
+ *
+ * Returns SATA_SUCCESS if operation was successful, SATA_FAILURE otherwise.
+ *
+ * Cannot be called in the interrupt context.
+ */
 int
 sata_mode_select_page_30(sata_pkt_txlate_t *spx, struct
     mode_acoustic_management *page, int parmlen, int *pagelen,
@@ -6375,6 +6451,19 @@ sata_build_lsense_page_0(sata_drive_info_t *sdinfo, uint8_t *buf)
  * in which to create the page information as well as a sata_hba_inst_t *.
  *
  * Returns the number of bytes valid in the buffer.
+ *
+ * Note: Self test and SMART data is accessible in device log pages.
+ * The log pages can be accessed by SMART READ/WRITE LOG (up to 255 sectors
+ * of data can be transferred by a single command), or by the General Purpose
+ * Logging commands (GPL) READ LOG EXT and WRITE LOG EXT (up to 65,535 sectors
+ * - approximately 33MB - can be transferred by a single command.
+ * The SCT Command response (either error or command) is the same for both
+ * the SMART and GPL methods of issuing commands.
+ * This function uses READ LOG EXT command when drive supports LBA48, and
+ * SMART READ command otherwise.
+ *
+ * Since above commands are executed in a synchronous mode, this function
+ * should not be called in an interrupt context.
  */
 static	int
 sata_build_lsense_page_10(
@@ -6774,12 +6863,15 @@ done:
 
 /*
  * sata_build_lsense_page_2f() is used to create the
- * SCSI LOG SENSE page 0x10 (informational exceptions)
+ * SCSI LOG SENSE page 0x2f (informational exceptions)
  *
  * Takes a sata_drive_info t * and the address of a buffer
  * in which to create the page information as well as a sata_hba_inst_t *.
  *
  * Returns the number of bytes valid in the buffer.
+ *
+ * Because it invokes function(s) that send synchronously executed command
+ * to the HBA, it cannot be called in the interrupt context.
  */
 static	int
 sata_build_lsense_page_2f(
@@ -12997,6 +13089,8 @@ fail:
 
 /*
  * Used by LOG SENSE page 0x10
+ * Reads (in synchronous mode) the self test log data using Read Log Ext cmd.
+ * Note: cannot be called in the interrupt context.
  *
  * return 0 for success, -1 otherwise
  *

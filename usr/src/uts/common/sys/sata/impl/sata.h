@@ -27,8 +27,6 @@
 #ifndef _SATA_H
 #define	_SATA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -733,6 +731,7 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 #define	SATA_DBG_DEV_SETTINGS	0x800
 #define	SATA_DBG_ATAPI		0x1000
 #define	SATA_DBG_ATAPI_PACKET	0x8000
+#define	SATA_DBG_INTR_CTX	0x10000
 
 typedef struct sata_atapi_cmd {
 	uint8_t acdb[SATA_ATAPI_MAX_CDB_LEN];
@@ -763,6 +762,8 @@ typedef struct sata_atapi_cmd {
 #define	SATADBG3(flag, dip, frmt, arg1, arg2, arg3)
 
 #endif
+
+/* sata_rev_tag 1.37 */
 
 #ifdef	__cplusplus
 }
