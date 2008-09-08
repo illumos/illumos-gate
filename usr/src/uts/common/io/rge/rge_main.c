@@ -23,15 +23,13 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "rge.h"
 
 /*
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char rge_ident[] = "Realtek 1Gb Ethernet v%I%";
+static char rge_ident[] = "Realtek 1Gb Ethernet v1.11";
 
 /*
  * Used for buffers allocated by ddi_dma_mem_alloc()
@@ -220,7 +218,6 @@ rge_slice_chunk(dma_area_t *slice, dma_area_t *chunk,
 	size_t totsize;
 
 	totsize = qty*size;
-	ASSERT(size >= 0);
 	ASSERT(totsize <= chunk->alength);
 
 	*slice = *chunk;

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "rge.h"
 
@@ -179,7 +177,7 @@ rge_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *credp)
 	if (new_value < ndp->ndp_min || new_value > ndp->ndp_max)
 		return (EINVAL);
 
-	ndp->ndp_val = new_value;
+	ndp->ndp_val = (int)new_value;
 	ndp->ndp_info += 1;
 	return (0);
 }
