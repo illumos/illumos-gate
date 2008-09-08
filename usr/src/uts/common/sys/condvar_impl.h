@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_CONDVAR_IMPL_H
 #define	_SYS_CONDVAR_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Implementation-private definitions for condition variables
@@ -98,6 +96,14 @@ typedef	struct	cvwaitlock_s	{
 	mutex_enter(&(_c)->cvw_lock);			\
 	ASSERT((_c)->cvw_refcnt == -1);			\
 	(_c)->cvw_refcnt = 0;				\
+	cv_broadcast(&(_c)->cvw_waiter);		\
+	mutex_exit(&(_c)->cvw_lock);			\
+}
+
+#define	CVW_WRITE_TO_READ(_c)	{			\
+	mutex_enter(&(_c)->cvw_lock);			\
+	ASSERT((_c)->cvw_refcnt == -1);			\
+	(_c)->cvw_refcnt = 1;				\
 	cv_broadcast(&(_c)->cvw_waiter);		\
 	mutex_exit(&(_c)->cvw_lock);			\
 }

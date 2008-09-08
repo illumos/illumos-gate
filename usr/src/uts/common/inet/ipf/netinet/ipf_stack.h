@@ -7,8 +7,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef	__IPF_STACK_H__
 #define	__IPF_STACK_H__
 
@@ -41,7 +39,10 @@
  * IPF stack instances
  */
 struct ipf_stack {
-	netstack_t		*ifs_netstack;
+	struct ipf_stack	*ifs_next;
+	struct ipf_stack	**ifs_pnext;
+	netid_t			ifs_netid;
+	zoneid_t		ifs_zone;
 
 	/* ipf module */
 
@@ -108,15 +109,16 @@ struct ipf_stack {
 	ipftuneable_t	*ifs_ipf_tunelist;
 
 	/* ip_fil_solaris.c */
-	hook_t	ifs_ipfhook4_in;
-	hook_t	ifs_ipfhook4_out;
-	hook_t	ifs_ipfhook4_loop_in;
-	hook_t	ifs_ipfhook4_loop_out;
-	hook_t	ifs_ipfhook6_in;
-	hook_t	ifs_ipfhook6_out;
-	hook_t	ifs_ipfhook6_loop_in;
-	hook_t	ifs_ipfhook6_loop_out;
-	hook_t	ifs_ipfhook_nicevents;
+	hook_t		*ifs_ipfhook4_in;
+	hook_t		*ifs_ipfhook4_out;
+	hook_t		*ifs_ipfhook4_loop_in;
+	hook_t		*ifs_ipfhook4_loop_out;
+	hook_t		*ifs_ipfhook4_nicevents;
+	hook_t		*ifs_ipfhook6_in;
+	hook_t		*ifs_ipfhook6_out;
+	hook_t		*ifs_ipfhook6_loop_in;
+	hook_t		*ifs_ipfhook6_loop_out;
+	hook_t		*ifs_ipfhook6_nicevents;
 
 	/* flags to indicate whether hooks are registered. */
 	boolean_t	ifs_hook4_physical_in;
@@ -131,8 +133,8 @@ struct ipf_stack {
 	boolean_t	ifs_hook6_loopback_out;
 
 	int		ifs_ipf_loopback;
-	net_data_t	ifs_ipf_ipv4;
-	net_data_t	ifs_ipf_ipv6;
+	net_handle_t	ifs_ipf_ipv4;
+	net_handle_t	ifs_ipf_ipv6;
 
 	/* ip_auth.c */
 	int			ifs_fr_authsize;

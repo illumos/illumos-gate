@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_ARP_IMPL_H
 #define	_ARP_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -124,13 +122,14 @@ typedef struct ace_s {
 	if ((_hook).he_interested) {                       	\
 		hook_pkt_event_t info;                          \
 								\
+		info.hpe_protocol = as->as_net_data;		\
 		info.hpe_ifp = _ilp;                       	\
 		info.hpe_ofp = 0;                       	\
 		info.hpe_hdr = _hdr;                            \
 		info.hpe_mp = &(_fm);                           \
 		info.hpe_mb = _m;                               \
-		if (hook_run(_event, (hook_data_t)&info, 	\
-		    as->as_netstack) != 0) {			\
+		if (hook_run(as->as_net_data->netd_hooks,	\
+		    _event, (hook_data_t)&info) != 0) {		\
 			if (_fm != NULL) {                      \
 				freemsg(_fm);                   \
 				_fm = NULL;                     \
@@ -148,13 +147,14 @@ typedef struct ace_s {
 	if ((_hook).he_interested) {                       	\
 		hook_pkt_event_t info;                          \
 								\
+		info.hpe_protocol = as->as_net_data;		\
 		info.hpe_ifp = 0;                       	\
 		info.hpe_ofp = _olp;                       	\
 		info.hpe_hdr = _hdr;                            \
 		info.hpe_mp = &(_fm);                           \
 		info.hpe_mb = _m;                               \
-		if (hook_run(_event, (hook_data_t)&info,	\
-		    as->as_netstack) != 0) {			\
+		if (hook_run(as->as_net_data->netd_hooks,	\
+		    _event, (hook_data_t)&info) != 0) {		\
 			if (_fm != NULL) {                      \
 				freemsg(_fm);                   \
 				_fm = NULL;                     \
@@ -211,7 +211,7 @@ struct arp_stack {
 	hook_event_token_t	as_arp_physical_out;
 	hook_event_token_t	as_arpnicevents;
 
-	net_data_t	as_net_data;
+	net_handle_t	as_net_data;
 };
 typedef struct arp_stack arp_stack_t;
 
@@ -236,7 +236,7 @@ typedef struct ar_s {
 
 extern void	arp_hook_init(arp_stack_t *);
 extern void	arp_hook_destroy(arp_stack_t *);
-extern void	arp_net_init(arp_stack_t *, netstack_t *);
+extern void	arp_net_init(arp_stack_t *, netstackid_t);
 extern void	arp_net_destroy(arp_stack_t *);
 
 #endif	/* _KERNEL */

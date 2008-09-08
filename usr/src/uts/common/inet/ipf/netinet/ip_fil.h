@@ -1316,6 +1316,7 @@ extern	void	ipfilterattach __P((int));
 extern	int	ipl_enable __P((void));
 extern	int	ipl_disable __P((void));
 # ifdef MENTAT
+extern	ipf_stack_t *ipf_find_stack(const zoneid_t zone);
 extern	int	fr_check __P((struct ip *, int, void *, int, void *,
 			      mblk_t **, ipf_stack_t *));
 #  if SOLARIS
@@ -1419,7 +1420,7 @@ extern	int	count4bits __P((u_32_t));
 extern	int	count6bits __P((u_32_t *));
 extern	int	frrequest __P((int, ioctlcmd_t, caddr_t, int, int, ipf_stack_t *));
 extern	char	*getifname __P((struct ifnet *));
-extern	int	iplattach __P((ipf_stack_t *, netstack_t *));
+extern	int	iplattach __P((ipf_stack_t *));
 extern	int	ipldetach __P((ipf_stack_t *));
 extern	u_short	ipf_cksum __P((u_short *, int));
 extern	int	copyinptr __P((void *, void *, size_t));

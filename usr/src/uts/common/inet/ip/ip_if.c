@@ -4309,7 +4309,7 @@ ill_delete_interface_type(ill_if_t *interface)
 static void
 ill_glist_delete(ill_t *ill)
 {
-	hook_nic_event_t *info;
+	hook_nic_event_int_t *info;
 	ip_stack_t	*ipst;
 
 	if (ill == NULL)
@@ -4353,7 +4353,7 @@ ill_glist_delete(ill_t *ill)
 	 * order of them in the kernel.
 	 */
 	info = ill->ill_nic_event_info;
-	if (info != NULL && info->hne_event == NE_DOWN) {
+	if (info != NULL && info->hnei_event.hne_event == NE_DOWN) {
 		mutex_enter(&ill->ill_lock);
 		ill_nic_info_dispatch(ill);
 		mutex_exit(&ill->ill_lock);
@@ -22748,7 +22748,7 @@ ill_nic_info_plumb(ill_t *ill, boolean_t group)
 void
 ill_nic_info_dispatch(ill_t *ill)
 {
-	hook_nic_event_t *info;
+	hook_nic_event_int_t *info;
 
 	ASSERT(MUTEX_HELD(&ill->ill_lock));
 
@@ -22757,9 +22757,11 @@ ill_nic_info_dispatch(ill_t *ill)
 		    ip_ne_queue_func, info, DDI_SLEEP) == DDI_FAILURE) {
 			ip2dbg(("ill_nic_info_dispatch: "
 			    "ddi_taskq_dispatch failed\n"));
-			if (info->hne_data != NULL)
-				kmem_free(info->hne_data, info->hne_datalen);
-			kmem_free(info, sizeof (hook_nic_event_t));
+			if (info->hnei_event.hne_data != NULL) {
+				kmem_free(info->hnei_event.hne_data,
+				    info->hnei_event.hne_datalen);
+			}
+			kmem_free(info, sizeof (*info));
 		}
 		ill->ill_nic_event_info = NULL;
 	}
@@ -24384,12 +24386,14 @@ ill_hook_event2str(nic_event_t event)
 static void
 ill_hook_event_destroy(ill_t *ill)
 {
-	hook_nic_event_t	*info;
+	hook_nic_event_int_t	*info;
 
 	if ((info = ill->ill_nic_event_info) != NULL) {
-		if (info->hne_data != NULL)
-			kmem_free(info->hne_data, info->hne_datalen);
-		kmem_free(info, sizeof (hook_nic_event_t));
+		if (info->hnei_event.hne_data != NULL) {
+			kmem_free(info->hnei_event.hne_data,
+			    info->hnei_event.hne_datalen);
+		}
+		kmem_free(info, sizeof (*info));
 
 		ill->ill_nic_event_info = NULL;
 	}
@@ -24401,39 +24405,41 @@ ill_hook_event_create(ill_t *ill, lif_if_t lif, nic_event_t event,
     nic_event_data_t data, size_t datalen)
 {
 	ip_stack_t		*ipst = ill->ill_ipst;
-	hook_nic_event_t	*info;
+	hook_nic_event_int_t	*info;
 	const char		*str = NULL;
 
 	/* destroy nic event info if it exists */
 	if ((info = ill->ill_nic_event_info) != NULL) {
-		str = ill_hook_event2str(info->hne_event);
+		str = ill_hook_event2str(info->hnei_event.hne_event);
 		ip2dbg(("ill_hook_event_create: unexpected nic event %s "
 		    "attached for %s\n", str, ill->ill_name));
 		ill_hook_event_destroy(ill);
 	}
 
 	/* create a new nic event info */
-	if ((info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP)) == NULL)
+	info = kmem_alloc(sizeof (*info), KM_NOSLEEP);
+	if (info == NULL)
 		goto fail;
 
 	ill->ill_nic_event_info = info;
 
 	if (event == NE_UNPLUMB)
-		info->hne_nic = ill->ill_phyint->phyint_ifindex;
+		info->hnei_event.hne_nic = ill->ill_phyint->phyint_ifindex;
 	else
-		info->hne_nic = ill->ill_phyint->phyint_hook_ifindex;
-	info->hne_lif = lif;
-	info->hne_event = event;
-	info->hne_family = ill->ill_isv6 ?
+		info->hnei_event.hne_nic = ill->ill_phyint->phyint_hook_ifindex;
+	info->hnei_event.hne_lif = lif;
+	info->hnei_event.hne_event = event;
+	info->hnei_event.hne_protocol = ill->ill_isv6 ?
 	    ipst->ips_ipv6_net_data : ipst->ips_ipv4_net_data;
-	info->hne_data = NULL;
-	info->hne_datalen = 0;
+	info->hnei_event.hne_data = NULL;
+	info->hnei_event.hne_datalen = 0;
+	info->hnei_stackid = ipst->ips_netstack->netstack_stackid;
 
 	if (data != NULL && datalen != 0) {
-		info->hne_data = kmem_alloc(datalen, KM_NOSLEEP);
-		if (info->hne_data != NULL) {
-			bcopy(data, info->hne_data, datalen);
-			info->hne_datalen = datalen;
+		info->hnei_event.hne_data = kmem_alloc(datalen, KM_NOSLEEP);
+		if (info->hnei_event.hne_data != NULL) {
+			bcopy(data, info->hnei_event.hne_data, datalen);
+			info->hnei_event.hne_datalen = datalen;
 		} else {
 			ill_hook_event_destroy(ill);
 			goto fail;

@@ -3,11 +3,9 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ipf.h"
 #include "ipt.h"
@@ -40,7 +38,6 @@ void	drain_log __P((char *, ipf_stack_t *ifs));
 void	fixv4sums __P((mb_t *, ip_t *));
 ipf_stack_t *get_ifs __P((void));
 ipf_stack_t *create_ifs __P((void));
-netstack_t *create_ns __P((void));
 
 
 #if defined(__NetBSD__) || defined(__OpenBSD__) || SOLARIS || \
@@ -84,7 +81,6 @@ char *argv[];
 	mb_t	mb, *m;
 	ip_t	*ip;
 	ipf_stack_t *ifs;
-	netstack_t *ns;
 
 	m = &mb;
 	dir = 0;
@@ -99,8 +95,6 @@ char *argv[];
 
 	initparse();
 	ifs = create_ifs();
-	ns = create_ns();
-	ifs->ifs_netstack = ns;
 
 #if defined(IPFILTER_DEFAULT_BLOCK)
         ifs->ifs_fr_pass = FR_BLOCK|FR_NOMATCH;
@@ -828,14 +822,4 @@ ipf_stack_t *
 get_ifs()
 {
 	return (gifs);
-}
-
-netstack_t *
-create_ns()
-{
-	netstack_t *ns;
-
-	KMALLOCS(ns, netstack_t *, sizeof (*ns));
-	bzero(ns, sizeof (*ns));
-	return (ns);
 }

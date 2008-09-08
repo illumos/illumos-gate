@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/rwlock.h>
@@ -72,15 +70,15 @@ netinfolist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_warn("couldn't read netinfo at %p", p);
 			return (DCMD_ERR);
 		}
-		if (!nd.netd_info.neti_protocol) {
+		if (!nd.netd_info.netp_name) {
 			mdb_warn("netinfo at %p has null protocol",
-			    nd.netd_info.neti_protocol);
+			    nd.netd_info.netp_name);
 			return (DCMD_ERR);
 		}
 		if (mdb_readstr((char *)str, sizeof (str),
-		    (uintptr_t)nd.netd_info.neti_protocol) == -1) {
+		    (uintptr_t)nd.netd_info.netp_name) == -1) {
 			mdb_warn("couldn't read protocol at %p",
-			    nd.netd_info.neti_protocol);
+			    nd.netd_info.netp_name);
 			return (DCMD_ERR);
 		}
 

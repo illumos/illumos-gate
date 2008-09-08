@@ -7,8 +7,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-2000 Darren Reed";
 static const char rcsid[] = "@(#)$Id: ip_fil.c,v 2.133.2.9 2005/01/08 14:22:18 darrenr Exp $";
@@ -175,9 +173,8 @@ static int	write_output __P((struct ifnet *, struct mbuf *,
 #endif
 
 
-int iplattach(ifs, ns)
+int iplattach(ifs)
 ipf_stack_t *ifs;
-netstack_t *ns;
 {
 	ifs->ifs_fr_running = 1;
 	return 0;
@@ -311,7 +308,7 @@ int mode;
 			if (error)
 				break;
 			if (tmp)
-				error = iplattach(ifs, NULL);
+				error = iplattach(ifs);
 			else
 				error = ipldetach(ifs);
 		}

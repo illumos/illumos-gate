@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/sysmacros.h>
 #include <sys/vm.h>
@@ -435,7 +433,7 @@ netstack_zone_shutdown(zoneid_t zoneid, void *arg)
 	 * Call the shutdown function for all registered modules for this
 	 * netstack.
 	 */
-	apply_all_modules(ns, netstack_apply_shutdown);
+	apply_all_modules_reverse(ns, netstack_apply_shutdown);
 
 	/* Tell any waiting netstack_register/netstack_unregister to proceed */
 	mutex_enter(&ns->netstack_lock);
@@ -546,7 +544,7 @@ netstack_stack_inactive(netstack_t *ns)
 	 * leave nms_flags the way it is i.e. with NSS_DESTROY_COMPLETED set.
 	 * That is different than in the netstack_unregister() case.
 	 */
-	apply_all_modules(ns, netstack_apply_shutdown);
+	apply_all_modules_reverse(ns, netstack_apply_shutdown);
 	apply_all_modules_reverse(ns, netstack_apply_destroy);
 
 	/* Tell any waiting netstack_register/netstack_unregister to proceed */
@@ -676,6 +674,7 @@ netstack_apply_create(kmutex_t *lockp, netstack_t *ns, int moduleid)
 		DTRACE_PROBE2(netstack__create__start,
 		    netstackid_t, stackid,
 		    netstack_t *, ns);
+printf("ns[%d](%d).create\n", moduleid, stackid);
 		result = (ns_reg[moduleid].nr_create)(stackid, ns);
 		DTRACE_PROBE2(netstack__create__end,
 		    void *, result, netstack_t *, ns);
@@ -737,6 +736,7 @@ netstack_apply_shutdown(kmutex_t *lockp, netstack_t *ns, int moduleid)
 		DTRACE_PROBE2(netstack__shutdown__start,
 		    netstackid_t, stackid,
 		    void *, netstack_module);
+printf("ns[%d](%d).shutdown\n", moduleid, stackid);
 		(ns_reg[moduleid].nr_shutdown)(stackid, netstack_module);
 		DTRACE_PROBE1(netstack__shutdown__end,
 		    netstack_t *, ns);
@@ -796,6 +796,7 @@ netstack_apply_destroy(kmutex_t *lockp, netstack_t *ns, int moduleid)
 		DTRACE_PROBE2(netstack__destroy__start,
 		    netstackid_t, stackid,
 		    void *, netstack_module);
+printf("ns[%d](%d).destroy\n", moduleid, stackid);
 		(ns_reg[moduleid].nr_destroy)(stackid, netstack_module);
 		DTRACE_PROBE1(netstack__destroy__end,
 		    netstack_t *, ns);

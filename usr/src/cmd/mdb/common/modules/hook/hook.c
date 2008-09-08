@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/rwlock.h>
@@ -47,6 +45,8 @@ hooklist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char hrstr[MAX_LENGTH];
 	GElf_Sym sym;
 	char buf[MDB_SYM_NAMLEN + 1];
+	char *hintname;
+	hook_t *h;
 
 	if (argc)
 		return (DCMD_USAGE);
@@ -56,8 +56,9 @@ hooklist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	mdb_printf("%<u>%?s %10s %20s %?s%</u>\n",
-	    "ADDR", "FLAG", "FUNC", "NAME");
+	mdb_printf("%<u>%?s %8s %20s %4s %24s %24s%</u>\n",
+	    "ADDR", "FLAG", "FUNC", "HINT", "NAME", "HINTVALUE");
+	h = &hl.hi_hook;
 	hlp = TAILQ_FIRST(&hr.hei_head);
 	while (hlp) {
 		if (mdb_vread((void *)&hl, sizeof (hl),
@@ -66,29 +67,38 @@ hooklist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    hlp);
 			return (DCMD_ERR);
 		}
-		if (!hl.hi_hook.h_name) {
-			mdb_warn("hook list at %p has null role",
-			    hl.hi_hook);
+		if (!h->h_name) {
+			mdb_warn("hook list at %p has null role", h);
 			return (DCMD_ERR);
 		}
 		if (mdb_readstr((char *)hrstr, sizeof (hrstr),
-		    (uintptr_t)hl.hi_hook.h_name) == -1) {
-			mdb_warn("couldn't read list role at %p",
-			    hl.hi_hook.h_name);
+		    (uintptr_t)h->h_name) == -1) {
+			mdb_warn("couldn't read list role at %p", h->h_name);
 			return (DCMD_ERR);
 		}
-		if (mdb_lookup_by_addr((uintptr_t)hl.hi_hook.h_func,
+		switch (h->h_hint) {
+		case HH_BEFORE :
+		case HH_AFTER :
+			hintname =  h->h_hintvalue ?
+			    (char *)h->h_hintvalue : "";
+			break;
+		default :
+			hintname = "";
+			break;
+		}
+		if (mdb_lookup_by_addr((uintptr_t)h->h_func,
 		    MDB_SYM_EXACT, buf, sizeof (buf), &sym) == -1)
-			mdb_printf("%0?p %10x %0?p %10s\n",
-			    hlp, hl.hi_hook.h_flags, hl.hi_hook.h_func, hrstr);
+			mdb_printf("%0?p %8x %0?p %4d %24s %24s\n",
+			    hlp, h->h_flags, h->h_func,
+			    h->h_hint, hrstr, hintname);
 		else
-			mdb_printf("%0?p %10x %20s %10s\n",
-			    hlp, hl.hi_hook.h_flags, buf, hrstr);
+			mdb_printf("%0?p %8x %20s %4d %24s %24s\n",
+			    hlp, h->h_flags, buf,
+			    h->h_hint, hrstr, hintname);
 		hlp = TAILQ_NEXT(&hl, hi_entry);
 	}
 	return (DCMD_OK);
 }
-
 
 /*
  * List pfhooks event information.
@@ -217,7 +227,7 @@ hookevent_stack_walk_init(mdb_walk_state_t *wsp)
 	}
 	wsp->walk_addr = (uintptr_t)SLIST_FIRST(&hf.hfi_head);
 	return (wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
-		    wsp->walk_cbdata));
+	    wsp->walk_cbdata));
 }
 
 static int
@@ -234,7 +244,7 @@ hookevent_stack_walk_step(mdb_walk_state_t *wsp)
 	if (wsp->walk_addr == NULL)
 		return (WALK_DONE);
 	return (wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
-		    wsp->walk_cbdata));
+	    wsp->walk_cbdata));
 }
 
 static const mdb_dcmd_t dcmds[] = {

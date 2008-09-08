@@ -5,11 +5,9 @@
  *
  * $Id: ip_log.c,v 2.75.2.7 2005/06/11 07:47:44 darrenr Exp $
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #if defined(KERNEL) || defined(_KERNEL)
@@ -242,7 +240,7 @@ u_int flags;
 	u_char p;
 	mb_t *m;
 # if SOLARIS && defined(_KERNEL)
-	net_data_t nif;
+	net_handle_t nif;
 	void *ifp;
 # else
 #  if defined(__hpux) && defined(_KERNEL)

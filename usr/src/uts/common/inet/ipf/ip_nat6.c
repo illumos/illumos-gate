@@ -7,8 +7,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"$
-
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
 # undef _KERNEL
@@ -2220,7 +2218,7 @@ u_32_t nflags;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
 #if SOLARIS && defined(_KERNEL)
-	net_data_t net_data_p = ifs->ifs_ipf_ipv6;
+	net_handle_t net_data_p = ifs->ifs_ipf_ipv6;
 #endif
 
 	tcp = NULL;
@@ -2509,7 +2507,7 @@ u_32_t nflags;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
 #if SOLARIS && defined(_KERNEL)
-	net_data_t net_data_p = ifs->ifs_ipf_ipv6;
+	net_handle_t net_data_p = ifs->ifs_ipf_ipv6;
 #endif
 
 	tcp = NULL;

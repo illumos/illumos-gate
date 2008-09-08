@@ -229,6 +229,7 @@ static mblk_t	*ar_cmd_dequeue(arl_t *arl);
 
 static void	*arp_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	arp_stack_fini(netstackid_t stackid, void *arg);
+static void	arp_stack_shutdown(netstackid_t stackid, void *arg);
 /*
  * All of these are alterable, within the min/max values given,
  * at run time. arp_publish_interval and arp_publish_count are
@@ -1042,8 +1043,8 @@ ar_close(queue_t *q)
 		info.hne_event = NE_UNPLUMB;
 		info.hne_data = name;
 		info.hne_datalen = strlen(name);
-		(void) hook_run(as->as_arpnicevents, (hook_data_t)&info,
-		    as->as_netstack);
+		(void) hook_run(as->as_net_data->netd_hooks,
+		    as->as_arpnicevents, (hook_data_t)&info);
 	}
 	netstack_rele(as->as_netstack);
 	return (0);
@@ -3730,8 +3731,8 @@ ar_slifname(queue_t *q, mblk_t *mp_orig)
 	info.hne_event = NE_PLUMB;
 	info.hne_data = arl->arl_name;
 	info.hne_datalen = strlen(arl->arl_name);
-	(void) hook_run(as->as_arpnicevents, (hook_data_t)&info,
-	    as->as_netstack);
+	(void) hook_run(as->as_net_data->netd_hooks, as->as_arpnicevents,
+	    (hook_data_t)&info);
 
 	/* Chain in the new arl. */
 	rw_enter(&as->as_arl_lock, RW_WRITER);
@@ -4473,7 +4474,8 @@ arp_ddi_init(void)
 	 * destroyed in the kernel, so we can maintain the
 	 * set of arp_stack_t's.
 	 */
-	netstack_register(NS_ARP, arp_stack_init, NULL, arp_stack_fini);
+	netstack_register(NS_ARP, arp_stack_init, arp_stack_shutdown,
+	    arp_stack_fini);
 }
 
 void
@@ -4506,10 +4508,20 @@ arp_stack_init(netstackid_t stackid, netstack_t *ns)
 	as->as_arp_counter_wrapped = 0;
 
 	rw_init(&as->as_arl_lock, NULL, RW_DRIVER, NULL);
-	arp_net_init(as, ns);
+	arp_net_init(as, stackid);
 	arp_hook_init(as);
 
 	return (as);
+}
+
+/* ARGSUSED */
+static void
+arp_stack_shutdown(netstackid_t stackid, void *arg)
+{
+	arp_stack_t *as = (arp_stack_t *)arg;
+
+	arp_hook_destroy(as);
+	arp_net_destroy(as);
 }
 
 /*
@@ -4521,10 +4533,7 @@ arp_stack_fini(netstackid_t stackid, void *arg)
 {
 	arp_stack_t *as = (arp_stack_t *)arg;
 
-	arp_hook_destroy(as);
-	arp_net_destroy(as);
 	rw_destroy(&as->as_arl_lock);
-
 	nd_free(&as->as_nd);
 	kmem_free(as->as_param_arr, sizeof (arp_param_arr));
 	as->as_param_arr = NULL;

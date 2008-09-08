@@ -4129,7 +4129,7 @@ u_32_t nflags;
 	}
 
 #if SOLARIS && defined(_KERNEL)
-	net_data_t net_data_p = ifs->ifs_ipf_ipv4;
+	net_handle_t net_data_p = ifs->ifs_ipf_ipv4;
 #endif
 
 	tcp = NULL;
@@ -4459,7 +4459,7 @@ u_32_t nflags;
 	}
 
 #if SOLARIS && defined(_KERNEL)
-	net_data_t net_data_p = ifs->ifs_ipf_ipv4;
+	net_handle_t net_data_p = ifs->ifs_ipf_ipv4;
 #endif
 
 	tcp = NULL;

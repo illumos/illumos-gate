@@ -495,7 +495,7 @@ IP6_OBJS +=	ip6ddi.o
 
 HOOK_OBJS +=	hook.o
 
-NETI_OBJS +=	neti.o
+NETI_OBJS +=	neti_impl.o neti_mod.o neti_stack.o
 
 KEYSOCK_OBJS +=	keysockddi.o keysock.o keysock_opt_data.o
 

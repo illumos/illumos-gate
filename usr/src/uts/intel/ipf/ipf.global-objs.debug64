@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 fr_availfuncs
 fr_features
@@ -40,7 +39,10 @@ ipf_devfiles
 ipf_kstat_tmp
 ipf_ops
 ipf_proxy_debug
+ipf_stack_lock
+ipf_stacks
 ipfilter_version
+ipfncb
 ipl_magic
 iplmod
 ipopts

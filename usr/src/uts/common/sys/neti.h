@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_NETI_H
 #define	_SYS_NETI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <netinet/in.h>
 #include <sys/int_types.h>
@@ -81,9 +79,7 @@ extern "C" {
 typedef uintptr_t	phy_if_t;
 typedef intptr_t	lif_if_t;
 typedef uintptr_t	net_ifdata_t;
-
-struct net_data;
-typedef struct net_data *net_data_t;
+typedef id_t		netid_t;
 
 /*
  * Netinfo interface specification
@@ -106,33 +102,41 @@ typedef enum inject {
 	NI_DIRECT_OUT
 } inject_t;
 
+/*
+ * net_inject - public interface
+ */
 typedef struct net_inject {
+	int			ni_version;
+	netid_t			ni_netid;
 	mblk_t			*ni_packet;
 	struct sockaddr_storage	ni_addr;
 	phy_if_t		ni_physical;
 } net_inject_t;
 
+typedef struct net_data *net_handle_t;
 
 /*
- * net_info_t public interface
+ * net_protocol_t private interface
  */
-typedef struct net_info {
-	int		neti_version;
-	char		*neti_protocol;
-	int		(*neti_getifname)(phy_if_t, char *, const size_t,
-			    netstack_t *);
-	int		(*neti_getmtu)(phy_if_t, lif_if_t, netstack_t *);
-	int		(*neti_getpmtuenabled)(netstack_t *);
-	int		(*neti_getlifaddr)(phy_if_t, lif_if_t, size_t,
-			    net_ifaddr_t [], void *, netstack_t *);
-	phy_if_t	(*neti_phygetnext)(phy_if_t, netstack_t *);
-	phy_if_t	(*neti_phylookup)(const char *, netstack_t *);
-	lif_if_t	(*neti_lifgetnext)(phy_if_t, lif_if_t, netstack_t *);
-	int		(*neti_inject)(inject_t, net_inject_t *, netstack_t *);
-	phy_if_t	(*neti_routeto)(struct sockaddr *, netstack_t *);
-	int		(*neti_ispartialchecksum)(mblk_t *);
-	int		(*neti_isvalidchecksum)(mblk_t *);
-} net_info_t;
+struct net_protocol_s {
+	int		netp_version;
+	char		*netp_name;
+	int		(*netp_getifname)(net_handle_t, phy_if_t, char *,
+			    const size_t);
+	int		(*netp_getmtu)(net_handle_t, phy_if_t, lif_if_t);
+	int		(*netp_getpmtuenabled)(net_handle_t);
+	int		(*netp_getlifaddr)(net_handle_t, phy_if_t, lif_if_t,
+			    size_t, net_ifaddr_t [], void *);
+	phy_if_t	(*netp_phygetnext)(net_handle_t, phy_if_t);
+	phy_if_t	(*netp_phylookup)(net_handle_t, const char *);
+	lif_if_t	(*netp_lifgetnext)(net_handle_t, phy_if_t, lif_if_t);
+	int		(*netp_inject)(net_handle_t, inject_t, net_inject_t *);
+	phy_if_t	(*netp_routeto)(net_handle_t, struct sockaddr *,
+			    struct sockaddr *);
+	int		(*netp_ispartialchecksum)(net_handle_t, mblk_t *);
+	int		(*netp_isvalidchecksum)(net_handle_t, mblk_t *);
+};
+typedef struct net_protocol_s net_protocol_t;
 
 
 /*
@@ -140,10 +144,11 @@ typedef struct net_info {
  */
 struct net_data {
 	LIST_ENTRY(net_data)		netd_list;
-	net_info_t			netd_info;
+	net_protocol_t			netd_info;
 	int				netd_refcnt;
 	hook_family_int_t		*netd_hooks;
-	netstack_t 			*netd_netstack;
+	struct neti_stack_s		*netd_stack;
+	int				netd_condemned;
 };
 
 
@@ -162,53 +167,117 @@ typedef struct injection_s {
 #define	MAP_IPIF_ID(x)		((x) + 1)
 #define	UNMAP_IPIF_ID(x)	(((x) > 0) ? (x) - 1 : (x))
 
-
-/*
- * neti stack instances
- */
-struct neti_stack {
-	krwlock_t nts_netlock;
-
-	/* list of net_data_t */
-	LIST_HEAD(netd_listhead, net_data) nts_netd_head;
-	netstack_t *nts_netstack;
+struct net_instance_s {
+	int				nin_version;
+	char				*nin_name;
+	void				*(*nin_create)(const netid_t);
+	void				(*nin_destroy)(const netid_t, void *);
+	void				(*nin_shutdown)(const netid_t, void *);
 };
-typedef struct neti_stack neti_stack_t;
+typedef struct net_instance_s net_instance_t;
 
+struct net_instance_int_s {
+	LIST_ENTRY(net_instance_int_s)	nini_next;
+	int				nini_ref;
+	void				*nini_created;
+	struct net_instance_int_s	*nini_parent;
+	net_instance_t			*nini_instance;
+	hook_notify_t			nini_notify;
+	uint32_t			nini_flags;
+	kcondvar_t			nini_cv;
+};
+typedef struct net_instance_int_s net_instance_int_t;
+LIST_HEAD(nini_head_s, net_instance_int_s);
+typedef struct nini_head_s nini_head_t;
+
+#define	nini_version	nini_instance->nin_version
+#define	nini_name	nini_instance->nin_name
+#define	nini_create	nini_instance->nin_create
+#define	nini_destroy	nini_instance->nin_destroy
+#define	nini_shutdown	nini_instance->nin_shutdown
 
 /*
- * Data management functions
+ * netinfo stack instances
  */
-extern net_data_t net_register(const net_info_t *, netstackid_t);
-extern net_data_t net_register_impl(const net_info_t *, netstack_t *);
-extern int net_unregister(net_data_t);
-extern net_data_t net_lookup(const char *, netstackid_t);
-extern net_data_t net_lookup_impl(const char *, netstack_t *);
-extern int net_release(net_data_t);
-extern net_data_t net_walk(net_data_t, netstackid_t);
-extern net_data_t net_walk_impl(net_data_t, netstack_t *);
+struct neti_stack_s {
+	kmutex_t			nts_lock;
+	LIST_ENTRY(neti_stack_s)	nts_next;
+	netid_t				nts_id;
+	zoneid_t			nts_zoneid;
+	netstackid_t			nts_stackid;
+	netstack_t			*nts_netstack;
+	nini_head_t			nts_instances;
+	uint32_t			nts_flags;
+	kcondvar_t			nts_cv;
+	/* list of net_handle_t */
+	LIST_HEAD(netd_listhead, net_data) nts_netd_head;
+};
+typedef struct neti_stack_s neti_stack_t;
+LIST_HEAD(neti_stack_head_s, neti_stack_s);
+typedef struct neti_stack_head_s neti_stack_head_t;
 
 /*
- * Accessor functions
+ * Internal functions that need to be exported within the module.
  */
-extern int net_register_family(net_data_t, hook_family_t *);
-extern int net_unregister_family(net_data_t, hook_family_t *);
-extern hook_event_token_t net_register_event(net_data_t, hook_event_t *);
-extern int net_unregister_event(net_data_t, hook_event_t *);
-extern int net_register_hook(net_data_t, char *, hook_t *);
-extern int net_unregister_hook(net_data_t, char *, hook_t *);
-extern int net_getifname(net_data_t, phy_if_t, char *, const size_t);
-extern int net_getmtu(net_data_t, phy_if_t, lif_if_t);
-extern int net_getpmtuenabled(net_data_t);
-extern int net_getlifaddr(net_data_t, phy_if_t, lif_if_t,
+extern void neti_init(void);
+extern void neti_fini(void);
+extern neti_stack_t *net_getnetistackbyid(netid_t);
+extern netstackid_t net_getnetstackidbynetid(netid_t);
+extern netid_t net_getnetidbynetstackid(netstackid_t);
+extern netid_t net_zoneidtonetid(zoneid_t);
+extern zoneid_t net_getzoneidbynetid(netid_t);
+
+/*
+ * Functions available for public use.
+ */
+extern hook_event_token_t net_event_register(net_handle_t, hook_event_t *);
+extern int net_event_unregister(net_handle_t, hook_event_t *);
+extern int net_event_notify_register(net_handle_t, char *,
+    hook_notify_fn_t, void *);
+extern int net_event_notify_unregister(net_handle_t, char *, hook_notify_fn_t);
+
+extern int net_family_register(net_handle_t, hook_family_t *);
+extern int net_family_unregister(net_handle_t, hook_family_t *);
+
+extern int net_hook_register(net_handle_t, char *, hook_t *);
+extern int net_hook_unregister(net_handle_t, char *, hook_t *);
+
+extern int net_inject(net_handle_t, inject_t, net_inject_t *);
+extern net_inject_t *net_inject_alloc(const int);
+extern void net_inject_free(net_inject_t *);
+
+extern net_instance_t *net_instance_alloc(const int version);
+extern void net_instance_free(net_instance_t *);
+extern int net_instance_register(net_instance_t *);
+extern int net_instance_unregister(net_instance_t *);
+extern int net_instance_notify_register(netid_t, hook_notify_fn_t, void *);
+extern int net_instance_notify_unregister(netid_t netid, hook_notify_fn_t);
+
+extern kstat_t *net_kstat_create(netid_t, char *, int, char *, char *,
+    uchar_t, ulong_t, uchar_t);
+extern void net_kstat_delete(netid_t, kstat_t *);
+
+extern net_handle_t net_protocol_lookup(netid_t, const char *);
+extern net_handle_t net_protocol_register(netid_t, const net_protocol_t *);
+extern int net_protocol_release(net_handle_t);
+extern int net_protocol_unregister(net_handle_t);
+extern net_handle_t net_protocol_walk(netid_t, net_handle_t);
+extern int net_protocol_notify_register(net_handle_t, hook_notify_fn_t, void *);
+extern int net_protocol_notify_unregister(net_handle_t, hook_notify_fn_t);
+
+
+extern int net_getifname(net_handle_t, phy_if_t, char *, const size_t);
+extern int net_getmtu(net_handle_t, phy_if_t, lif_if_t);
+extern int net_getpmtuenabled(net_handle_t);
+extern int net_getlifaddr(net_handle_t, phy_if_t, lif_if_t,
     int, net_ifaddr_t [], void *);
-extern phy_if_t net_phygetnext(net_data_t, phy_if_t);
-extern phy_if_t net_phylookup(net_data_t, const char *);
-extern lif_if_t net_lifgetnext(net_data_t, phy_if_t, lif_if_t);
-extern int net_inject(net_data_t, inject_t, net_inject_t *);
-extern phy_if_t net_routeto(net_data_t, struct sockaddr *);
-extern int net_ispartialchecksum(net_data_t, mblk_t *);
-extern int net_isvalidchecksum(net_data_t, mblk_t *);
+extern phy_if_t net_phygetnext(net_handle_t, phy_if_t);
+extern phy_if_t net_phylookup(net_handle_t, const char *);
+extern lif_if_t net_lifgetnext(net_handle_t, phy_if_t, lif_if_t);
+extern phy_if_t net_routeto(net_handle_t, struct sockaddr *,
+    struct sockaddr *);
+extern int net_ispartialchecksum(net_handle_t, mblk_t *);
+extern int net_isvalidchecksum(net_handle_t, mblk_t *);
 
 #ifdef	__cplusplus
 }

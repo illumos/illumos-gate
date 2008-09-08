@@ -28,8 +28,6 @@
 #ifndef	_INET_IP_H
 #define	_INET_IP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -1894,7 +1892,7 @@ typedef struct ill_s {
 	/*
 	 * NIC event information attached, to be used by nic event hooks.
 	 */
-	hook_nic_event_t	*ill_nic_event_info;
+	hook_nic_event_int_t	*ill_nic_event_info;
 
 	/* Used for IP frag reassembly throttling on a per ILL basis.  */
 	uint_t	ill_ipf_gen;		/* Generation of next fragment queue */
@@ -2989,12 +2987,13 @@ extern struct module_info ip_mod_info;
 			    (_olp))->ill_phyint->phyint_hook_ifindex;	\
 		else							\
 			info.hpe_ofp = 0;				\
+		info.hpe_protocol = ipst->ips_ipv4_net_data;		\
 		info.hpe_hdr = _iph;					\
 		info.hpe_mp = &(_fm);					\
 		info.hpe_mb = _m;					\
 		info.hpe_flags = _llm;					\
-		if (hook_run(_event, (hook_data_t)&info,		\
-		    ipst->ips_netstack) != 0) {				\
+		if (hook_run(ipst->ips_ipv4_net_data->netd_hooks,	\
+		    _event, (hook_data_t)&info) != 0) {			\
 			ip2dbg(("%s hook dropped mblk chain %p hdr %p\n",\
 			    (_hook).he_name, (void *)_fm, (void *)_m));	\
 			if (_fm != NULL) {				\
@@ -3032,12 +3031,13 @@ extern struct module_info ip_mod_info;
 			    (_olp))->ill_phyint->phyint_hook_ifindex;	\
 		else							\
 			info.hpe_ofp = 0;				\
+		info.hpe_protocol = ipst->ips_ipv6_net_data;		\
 		info.hpe_hdr = _iph;					\
 		info.hpe_mp = &(_fm);					\
 		info.hpe_mb = _m;					\
 		info.hpe_flags = _llm;					\
-		if (hook_run(_event, (hook_data_t)&info,		\
-		    ipst->ips_netstack) != 0) {				\
+		if (hook_run(ipst->ips_ipv6_net_data->netd_hooks,	\
+		    _event, (hook_data_t)&info) != 0) {			\
 			ip2dbg(("%s hook dropped mblk chain %p hdr %p\n",\
 			    (_hook).he_name, (void *)_fm, (void *)_m));	\
 			if (_fm != NULL) {				\

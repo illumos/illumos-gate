@@ -5710,6 +5710,18 @@ ip_stack_shutdown(netstackid_t stackid, void *arg)
 
 	/* Get rid of loopback interfaces and their IREs */
 	ip_loopback_cleanup(ipst);
+
+	/*
+	 * The destroy functions here will end up causing notify callbacks
+	 * in the hook framework and these need to be run before the shtudown
+	 * of the hook framework is begun - that happens from netstack after
+	 * IP shutdown has completed.  If we leave doing these actions until
+	 * ip_stack_fini then the notify callbacks for the net_*_unregister
+	 * are happening against a backdrop of shattered terain.
+	 */
+	ipv4_hook_destroy(ipst);
+	ipv6_hook_destroy(ipst);
+	ip_net_destroy(ipst);
 }
 
 /*
@@ -5724,10 +5736,6 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 #ifdef NS_DEBUG
 	printf("ip_stack_fini(%p, stack %d)\n", (void *)ipst, stackid);
 #endif
-	ipv4_hook_destroy(ipst);
-	ipv6_hook_destroy(ipst);
-	ip_net_destroy(ipst);
-
 	rw_destroy(&ipst->ips_srcid_lock);
 
 	ip_kstat_fini(stackid, ipst->ips_ip_mibkp);

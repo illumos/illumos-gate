@@ -27,8 +27,6 @@
 #ifndef	_INET_IP_STACK_H
 #define	_INET_IP_STACK_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -412,8 +410,8 @@ struct ip_stack {
 	hook_event_token_t	ips_ipv6firewall_loopback_out;
 	hook_event_token_t	ips_ipv6nicevents;
 
-	net_data_t		ips_ipv4_net_data;
-	net_data_t		ips_ipv6_net_data;
+	net_handle_t		ips_ipv4_net_data;
+	net_handle_t		ips_ipv6_net_data;
 };
 typedef struct ip_stack ip_stack_t;
 

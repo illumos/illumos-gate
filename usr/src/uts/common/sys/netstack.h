@@ -26,8 +26,6 @@
 #ifndef _SYS_NETSTACK_H
 #define	_SYS_NETSTACK_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/kstat.h>
 
 #ifdef	__cplusplus
@@ -64,24 +62,23 @@ typedef id_t	netstackid_t;
  * done ine in decending order).
  */
 #define	NS_ALL		-1	/* Match all */
-#define	NS_HOOK		0
-#define	NS_NETI		1
-#define	NS_ARP		2
-#define	NS_IP		3
-#define	NS_ICMP		4
-#define	NS_UDP		5
-#define	NS_TCP		6
-#define	NS_SCTP		7
-#define	NS_RTS		8
-#define	NS_IPSEC	9
-#define	NS_KEYSOCK	10
-#define	NS_SPDSOCK	11
-#define	NS_IPSECAH	12
-#define	NS_IPSECESP	13
-#define	NS_TUN		14
-#define	NS_IPF		15
-#define	NS_STR		16	/* autopush list etc */
-#define	NS_MAX		(NS_STR+1)
+#define	NS_STR		0	/* autopush list etc */
+#define	NS_HOOK		1
+#define	NS_NETI		2
+#define	NS_ARP		3
+#define	NS_IP		4
+#define	NS_ICMP		5
+#define	NS_UDP		6
+#define	NS_TCP		7
+#define	NS_SCTP		8
+#define	NS_RTS		9
+#define	NS_IPSEC	10
+#define	NS_KEYSOCK	11
+#define	NS_SPDSOCK	12
+#define	NS_IPSECAH	13
+#define	NS_IPSECESP	14
+#define	NS_TUN		15
+#define	NS_MAX		(NS_TUN+1)
 
 /*
  * State maintained for each module which tracks the state of
@@ -138,6 +135,7 @@ struct netstack {
 	union {
 		void	*nu_modules[NS_MAX];
 		struct {
+			struct str_stack	*nu_str;
 			struct hook_stack	*nu_hook;
 			struct neti_stack	*nu_neti;
 			struct arp_stack	*nu_arp;
@@ -153,11 +151,10 @@ struct netstack {
 			struct ipsecah_stack	*nu_ipsecah;
 			struct ipsecesp_stack	*nu_ipsecesp;
 			struct tun_stack	*nu_tun;
-			struct ipf_stack	*nu_ipf;
-			struct str_stack	*nu_str;
 		} nu_s;
 	} netstack_u;
 #define	netstack_modules	netstack_u.nu_modules
+#define	netstack_str		netstack_u.nu_s.nu_str
 #define	netstack_hook		netstack_u.nu_s.nu_hook
 #define	netstack_neti		netstack_u.nu_s.nu_neti
 #define	netstack_arp		netstack_u.nu_s.nu_arp
@@ -173,8 +170,6 @@ struct netstack {
 #define	netstack_ipsecah	netstack_u.nu_s.nu_ipsecah
 #define	netstack_ipsecesp	netstack_u.nu_s.nu_ipsecesp
 #define	netstack_tun		netstack_u.nu_s.nu_tun
-#define	netstack_ipf		netstack_u.nu_s.nu_ipf
-#define	netstack_str		netstack_u.nu_s.nu_str
 
 	nm_state_t	netstack_m_state[NS_MAX]; /* module state */
 

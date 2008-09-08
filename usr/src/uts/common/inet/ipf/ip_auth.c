@@ -368,7 +368,7 @@ ipf_stack_t *ifs;
 	frauth_t auth, *au = &auth, *fra;
 	int i, error = 0, len;
 	char *t;
-	net_data_t net_data_p;
+	net_handle_t net_data_p;
 	net_inject_t inj_data;
 	int ret;
 

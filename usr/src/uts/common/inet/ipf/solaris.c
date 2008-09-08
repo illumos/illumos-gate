@@ -3,13 +3,11 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* #pragma ident   "@(#)solaris.c	1.12 6/5/96 (C) 1995 Darren Reed"*/
 #pragma ident "@(#)$Id: solaris.c,v 2.73.2.6 2005/07/13 21:40:47 darrenr Exp $"
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/types.h>
@@ -39,7 +37,6 @@
 #if SOLARIS2 >= 6
 # include <net/if_types.h>
 #endif
-#include <sys/netstack.h>
 #include <net/af.h>
 #include <net/route.h>
 #include <netinet/in.h>
@@ -71,6 +68,8 @@ static	int	ipf_identify __P((dev_info_t *));
 #endif
 static	int	ipf_attach __P((dev_info_t *, ddi_attach_cmd_t));
 static	int	ipf_detach __P((dev_info_t *, ddi_detach_cmd_t));
+static	void	*ipf_stack_create __P((const netid_t));
+static	void	ipf_stack_destroy __P((const netid_t, void *));
 static	int	ipf_property_g_update __P((dev_info_t *));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
@@ -117,6 +116,10 @@ static struct dev_ops ipf_ops = {
 	(struct bus_ops *)0
 };
 
+
+static net_instance_t *ipfncb = NULL;
+static ipf_stack_t *ipf_stacks = NULL;
+static kmutex_t ipf_stack_lock;
 extern struct mod_ops mod_driverops;
 static struct modldrv iplmod = {
 	&mod_driverops, IPL_VERSION, &ipf_ops };
@@ -217,44 +220,50 @@ static const filter_kstats_t ipf_kstat_tmp = {
 static int	ipf_kstat_update(kstat_t *ksp, int rwflag);
 
 static void
-ipf_kstat_init(ipf_stack_t *ifs, netstackid_t stackid)
+ipf_kstat_init(ipf_stack_t *ifs)
 {
-	int 	i;
+	ifs->ifs_kstatp[0] = net_kstat_create(ifs->ifs_netid, "ipf", 0,
+	    "inbound", "net", KSTAT_TYPE_NAMED,
+	    sizeof (filter_kstats_t) / sizeof (kstat_named_t), 0);
+	if (ifs->ifs_kstatp[0] != NULL) {
+		bcopy(&ipf_kstat_tmp, ifs->ifs_kstatp[0]->ks_data,
+		    sizeof (filter_kstats_t));
+		ifs->ifs_kstatp[0]->ks_update = ipf_kstat_update;
+		ifs->ifs_kstatp[0]->ks_private = &ifs->ifs_frstats[0];
+		kstat_install(ifs->ifs_kstatp[0]);
+	}
 
-	for (i = 0; i < 2; i++) {
-		ifs->ifs_kstatp[i] = kstat_create_netstack("ipf", 0,
-			(i==0)?"inbound":"outbound",
-			"net",
-			KSTAT_TYPE_NAMED,
-			sizeof (filter_kstats_t) / sizeof (kstat_named_t),
-			0, stackid);
-		if (ifs->ifs_kstatp[i] != NULL) {
-			bcopy(&ipf_kstat_tmp, ifs->ifs_kstatp[i]->ks_data,
-				sizeof (filter_kstats_t));
-			ifs->ifs_kstatp[i]->ks_update = ipf_kstat_update;
-			ifs->ifs_kstatp[i]->ks_private = &ifs->ifs_frstats[i];
-			kstat_install(ifs->ifs_kstatp[i]);
-		}
+	ifs->ifs_kstatp[1] = net_kstat_create(ifs->ifs_netid, "ipf", 0,
+	    "outbound", "net", KSTAT_TYPE_NAMED,
+	    sizeof (filter_kstats_t) / sizeof (kstat_named_t), 0);
+	if (ifs->ifs_kstatp[1] != NULL) {
+		bcopy(&ipf_kstat_tmp, ifs->ifs_kstatp[1]->ks_data,
+		    sizeof (filter_kstats_t));
+		ifs->ifs_kstatp[1]->ks_update = ipf_kstat_update;
+		ifs->ifs_kstatp[1]->ks_private = &ifs->ifs_frstats[1];
+		kstat_install(ifs->ifs_kstatp[1]);
 	}
 
 #ifdef	IPFDEBUG
-	cmn_err(CE_NOTE, "IP Filter: ipf_kstat_init() installed 0x%x, 0x%x",
-		ifs->ifs_kstatp[0], ifs->ifs_kstatp[1]);
+	cmn_err(CE_NOTE, "IP Filter: ipf_kstat_init(%p) installed %p, %p",
+		ifs, ifs->ifs_kstatp[0], ifs->ifs_kstatp[1]);
 #endif
 }
 
+
 static void
-ipf_kstat_fini(ipf_stack_t *ifs, netstackid_t stackid)
+ipf_kstat_fini(ipf_stack_t *ifs)
 {
 	int i;
 
 	for (i = 0; i < 2; i++) {
 		if (ifs->ifs_kstatp[i] != NULL) {
-			kstat_delete_netstack(ifs->ifs_kstatp[i], stackid);
+			net_kstat_delete(ifs->ifs_netid, ifs->ifs_kstatp[i]);
 			ifs->ifs_kstatp[i] = NULL;
 		}
 	}
 }
+
 
 static int
 ipf_kstat_update(kstat_t *ksp, int rwflag)
@@ -309,6 +318,7 @@ int _init()
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: _init() = %d", ipfinst);
 #endif
+	mutex_init(&ipf_stack_lock, NULL, MUTEX_DRIVER, NULL);
 	return ipfinst;
 }
 
@@ -332,7 +342,7 @@ struct modinfo *modinfop;
 
 	ipfinst = mod_info(&modlink1, modinfop);
 #ifdef	IPFDEBUG
-	cmn_err(CE_NOTE, "IP Filter: _info(%x) = %x", modinfop, ipfinst);
+	cmn_err(CE_NOTE, "IP Filter: _info(%p) = %d", modinfop, ipfinst);
 #endif
 	return ipfinst;
 }
@@ -343,7 +353,7 @@ static int ipf_identify(dip)
 dev_info_t *dip;
 {
 # ifdef	IPFDEBUG
-	cmn_err(CE_NOTE, "IP Filter: ipf_identify(%x)", dip);
+	cmn_err(CE_NOTE, "IP Filter: ipf_identify(%p)", dip);
 # endif
 	if (strcmp(ddi_get_name(dip), "ipf") == 0)
 		return (DDI_IDENTIFIED);
@@ -355,18 +365,16 @@ dev_info_t *dip;
  * Initialize things for IPF for each stack instance
  */
 static void *
-ipf_stack_init(netstackid_t stackid, netstack_t *ns)
+ipf_stack_create(const netid_t id)
 {
 	ipf_stack_t	*ifs;
 
-#ifdef NS_DEBUG
-	(void) printf("ipf_stack_init(%d)\n", stackid);
+#ifdef IPFDEBUG
+	cmn_err(CE_NOTE, "IP Filter:stack_create id=%d", id);
 #endif
 
-	KMALLOCS(ifs, ipf_stack_t *, sizeof (*ifs));
+	ifs = (ipf_stack_t *)kmem_alloc(sizeof (*ifs), KM_SLEEP);
 	bzero(ifs, sizeof (*ifs));
-
-	ifs->ifs_netstack = ns;
 
 	ifs->ifs_hook4_physical_in	= B_FALSE;
 	ifs->ifs_hook4_physical_out	= B_FALSE;
@@ -384,8 +392,13 @@ ipf_stack_init(netstackid_t stackid, netstack_t *ns)
 	 */
 	RWLOCK_INIT(&ifs->ifs_ipf_global, "ipf filter load/unload mutex");
 	RWLOCK_INIT(&ifs->ifs_ipf_mutex, "ipf filter rwlock");
-#ifdef KERNEL
-	ipf_kstat_init(ifs, stackid);
+
+	ifs->ifs_netid = id;
+	ifs->ifs_zone = net_getzoneidbynetid(id);
+	ipf_kstat_init(ifs);
+
+#ifdef IPFDEBUG
+	cmn_err(CE_CONT, "IP Filter:stack_create zone=%d", ifs->ifs_zone);
 #endif
 
 	/*
@@ -396,11 +409,43 @@ ipf_stack_init(netstackid_t stackid, netstack_t *ns)
 	RWLOCK_EXIT(&ifs->ifs_ipf_global);
 
 	/* Limit to global stack */
-	if (stackid == GLOBAL_NETSTACKID)
+	if (ifs->ifs_zone == GLOBAL_ZONEID)
 		cmn_err(CE_CONT, "!%s, running.\n", ipfilter_version);
+
+	mutex_enter(&ipf_stack_lock);
+	if (ipf_stacks != NULL)
+		ipf_stacks->ifs_pnext = &ifs->ifs_next;
+	ifs->ifs_next = ipf_stacks;
+	ifs->ifs_pnext = &ipf_stacks;
+	ipf_stacks = ifs;
+	mutex_exit(&ipf_stack_lock);
 
 	return (ifs);
 }
+
+
+/*
+ * This function should only ever be used to find the pointer to the
+ * ipfilter stack structure for the zone that is currently being
+ * executed... so if you're running in the context of zone 1, you
+ * should not attempt to find the ipf_stack_t for zone 0 or 2 or
+ * anything else but 1.  In that way, the returned pointer is safe
+ * as it will only be nuked when the instance is destroyed as part
+ * of the final shutdown of a zone.
+ */
+ipf_stack_t *ipf_find_stack(const zoneid_t zone)
+{
+	ipf_stack_t *ifs;
+
+	mutex_enter(&ipf_stack_lock);
+	for (ifs = ipf_stacks; ifs != NULL; ifs = ifs->ifs_next) {
+		if (ifs->ifs_zone == zone)
+			break;
+	}
+	mutex_exit(&ipf_stack_lock);
+	return ifs;
+}
+
 
 static int ipf_detach_check_zone(ipf_stack_t *ifs)
 {
@@ -430,38 +475,32 @@ static int ipf_detach_check_zone(ipf_stack_t *ifs)
 	return (0);
 }
 
+
 static int ipf_detach_check_all()
 {
-	netstack_handle_t nh;
-	netstack_t *ns;
-	int ret;
+	ipf_stack_t *ifs;
 
-	netstack_next_init(&nh);
-	while ((ns = netstack_next(&nh)) != NULL) {
-		ret = ipf_detach_check_zone(ns->netstack_ipf);
-		netstack_rele(ns);
-		if (ret != 0) {
-			netstack_next_fini(&nh);
-			return (-1);
-		}
-	}
-
-	netstack_next_fini(&nh);
-	return (0);
+	mutex_enter(&ipf_stack_lock);
+	for (ifs = ipf_stacks; ifs != NULL; ifs = ifs->ifs_next)
+		if (ipf_detach_check_zone(ifs) != 0)
+			break;
+	mutex_exit(&ipf_stack_lock);
+	return ((ifs == NULL) ? 0 : -1);
 }
+
 
 /*
  * Destroy things for ipf for one stack.
  */
 /* ARGSUSED */
 static void
-ipf_stack_fini(netstackid_t stackid, void *arg)
+ipf_stack_destroy(const netid_t id, void *arg)
 {
 	ipf_stack_t *ifs = (ipf_stack_t *)arg;
+	timeout_id_t tid;
 
-#ifdef NS_DEBUG
-	(void) printf("ipf_stack_destroy(%p, stackid %d)\n",
-	    (void *)ifs, stackid);
+#ifdef IPFDEBUG
+	(void) printf("ipf_stack_destroy(%p)\n", (void *)ifs);
 #endif
 
 	/*
@@ -474,19 +513,24 @@ ipf_stack_fini(netstackid_t stackid, void *arg)
 		return;
 	}
 	ifs->ifs_fr_running = -2;
+	tid = ifs->ifs_fr_timer_id;
+	ifs->ifs_fr_timer_id = NULL;
 	RWLOCK_EXIT(&ifs->ifs_ipf_global);
 
-#ifdef KERNEL
-	ipf_kstat_fini(ifs, stackid);
-#endif
-	if (ifs->ifs_fr_timer_id != 0) {
-		(void) untimeout(ifs->ifs_fr_timer_id);
-		ifs->ifs_fr_timer_id = 0;
-	}
+	mutex_enter(&ipf_stack_lock);
+	if (ifs->ifs_next != NULL)
+		ifs->ifs_next->ifs_pnext = ifs->ifs_pnext;
+	*ifs->ifs_pnext = ifs->ifs_next;
+	mutex_exit(&ipf_stack_lock);
+
+	ipf_kstat_fini(ifs);
+
+	if (tid != NULL)
+		(void) untimeout(tid);
 
 	WRITE_ENTER(&ifs->ifs_ipf_global);
 	if (ipldetach(ifs) != 0) {
-		printf("ipf_stack_fini: ipldetach failed\n");
+		printf("ipf_stack_destroy: ipldetach failed\n");
 	}
 
 	ipftuneable_free(ifs);
@@ -498,6 +542,7 @@ ipf_stack_fini(netstackid_t stackid, void *arg)
 	KFREE(ifs);
 }
 
+
 static int ipf_attach(dip, cmd)
 dev_info_t *dip;
 ddi_attach_cmd_t cmd;
@@ -507,7 +552,7 @@ ddi_attach_cmd_t cmd;
 	int instance;
 
 #ifdef	IPFDEBUG
-	cmn_err(CE_NOTE, "IP Filter: ipf_attach(%x,%x)", dip, cmd);
+	cmn_err(CE_NOTE, "IP Filter: ipf_attach(%p,%x)", dip, cmd);
 #endif
 
 	switch (cmd)
@@ -519,7 +564,7 @@ ddi_attach_cmd_t cmd;
 			return DDI_FAILURE;
 
 #ifdef	IPFDEBUG
-		cmn_err(CE_NOTE, "IP Filter: attach ipf instance %d", instance);
+		cmn_err(CE_CONT, "IP Filter: attach ipf instance %d", instance);
 #endif
 
 		(void) ipf_property_g_update(dip);
@@ -538,8 +583,18 @@ ddi_attach_cmd_t cmd;
 		}
 
 		ipf_dev_info = dip;
-		netstack_register(NS_IPF, ipf_stack_init, NULL,
-		    ipf_stack_fini);
+
+		ipfncb = net_instance_alloc(NETINFO_VERSION);
+		ipfncb->nin_name = "ipf";
+		ipfncb->nin_create = ipf_stack_create;
+		ipfncb->nin_destroy = ipf_stack_destroy;
+		ipfncb->nin_shutdown = NULL;
+		i = net_instance_register(ipfncb);
+
+#ifdef IPFDEBUG
+		cmn_err(CE_CONT, "IP Filter:stack_create callback_reg=%d", i);
+#endif
+
 		return DDI_SUCCESS;
 		/* NOTREACHED */
 	default:
@@ -559,7 +614,7 @@ ddi_detach_cmd_t cmd;
 	int i;
 
 #ifdef	IPFDEBUG
-	cmn_err(CE_NOTE, "IP Filter: ipf_detach(%x,%x)", dip, cmd);
+	cmn_err(CE_NOTE, "IP Filter: ipf_detach(%p,%x)", dip, cmd);
 #endif
 	switch (cmd) {
 	case DDI_DETACH:
@@ -579,7 +634,9 @@ ddi_detach_cmd_t cmd;
 			return DDI_FAILURE;
 		}
 
-		netstack_unregister(NS_IPF);
+		(void) net_instance_unregister(ipfncb);
+		net_instance_free(ipfncb);
+
 		return DDI_SUCCESS;
 		/* NOTREACHED */
 	default:
@@ -600,7 +657,7 @@ void *arg, **result;
 
 	error = DDI_FAILURE;
 #ifdef	IPFDEBUG
-	cmn_err(CE_NOTE, "IP Filter: ipf_getinfo(%x,%x,%x)", dip, infocmd, arg);
+	cmn_err(CE_NOTE, "IP Filter: ipf_getinfo(%p,%x,%p)", dip, infocmd, arg);
 #endif
 	switch (infocmd) {
 	case DDI_INFO_DEVT2DEVINFO:

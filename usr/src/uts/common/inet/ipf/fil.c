@@ -5651,7 +5651,7 @@ fr_info_t *fin;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
-	net_data_t net_data_p;
+	net_handle_t net_data_p;
 	if (fin->fin_v == 4)
 		net_data_p = ifs->ifs_ipf_ipv4;
 	else
