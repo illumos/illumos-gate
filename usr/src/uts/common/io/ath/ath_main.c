@@ -36,8 +36,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Driver for the Atheros Wireless LAN controller.
  *
@@ -2297,6 +2295,9 @@ ath_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+	if (mac_disable(asc->asc_isc.ic_mach) != 0)
+		return (DDI_FAILURE);
+
 	ath_stop_scantimer(asc);
 
 	/* disable interrupts */
@@ -2305,8 +2306,7 @@ ath_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	/*
 	 * Unregister from the MAC layer subsystem
 	 */
-	if (mac_unregister(asc->asc_isc.ic_mach) != 0)
-		return (DDI_FAILURE);
+	(void) mac_unregister(asc->asc_isc.ic_mach);
 
 	/* free intterrupt resources */
 	ddi_remove_intr(devinfo, 0, asc->asc_iblock);

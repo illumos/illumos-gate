@@ -25,8 +25,6 @@
  * http://www.ralinktech.com/
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/byteorder.h>
 #include <sys/conf.h>
@@ -265,7 +263,7 @@ DDI_DEFINE_STREAM_OPS(ural_dev_ops, nulldev, nulldev, ural_attach,
 
 static struct modldrv ural_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"ural driver v%I%",	/* short description */
+	"ural driver",	/* short description */
 	&ural_dev_ops		/* driver specific ops */
 };
 
@@ -2337,14 +2335,16 @@ ural_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
 
+	if (mac_disable(sc->sc_ic.ic_mach) != 0)
+		return (DDI_FAILURE);
+
 	ural_stop(sc);
 	usb_unregister_hotplug_cbs(devinfo);
 
 	/*
 	 * Unregister from the MAC layer subsystem
 	 */
-	if (mac_unregister(sc->sc_ic.ic_mach) != 0)
-		return (DDI_FAILURE);
+	(void) mac_unregister(sc->sc_ic.ic_mach);
 
 	/*
 	 * detach ieee80211 layer

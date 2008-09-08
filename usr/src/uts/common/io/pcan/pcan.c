@@ -477,6 +477,11 @@ pcan_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	if (!(pcan_p->pcan_flag & PCAN_ATTACHED))
 		return (DDI_FAILURE);
+
+	ret = mac_disable(pcan_p->pcan_mh);
+	if (ret != 0)
+		return (DDI_FAILURE);
+
 	if (pcan_p->pcan_device_type == PCAN_DEVICE_PCI) {
 		mutex_enter(&pcan_p->pcan_glock);
 		pcan_stop_locked(pcan_p);
@@ -500,9 +505,7 @@ pcan_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	list_destroy(&pcan_p->an_scan_list);
 	mutex_exit(&pcan_p->pcan_scanlist_lock);
 
-	ret = mac_unregister(pcan_p->pcan_mh);
-	if (ret != 0)
-		return (DDI_FAILURE);
+	(void) mac_unregister(pcan_p->pcan_mh);
 
 	mutex_enter(&pcan_p->pcan_glock);
 	if (pcan_p->pcan_device_type == PCAN_DEVICE_PCI) {

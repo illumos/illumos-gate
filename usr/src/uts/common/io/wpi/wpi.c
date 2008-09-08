@@ -20,8 +20,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Driver for Intel PRO/Wireless 3945ABG 802.11 network adapters.
  */
@@ -704,6 +702,10 @@ wpi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (!(sc->sc_flags & WPI_F_ATTACHED))
 		return (DDI_FAILURE);
 
+	err = mac_disable(sc->sc_ic.ic_mach);
+	if (err != DDI_SUCCESS)
+		return (err);
+
 	/*
 	 * Destroy the mf_thread
 	 */
@@ -720,9 +722,7 @@ wpi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	/*
 	 * Unregiste from the MAC layer subsystem
 	 */
-	err = mac_unregister(sc->sc_ic.ic_mach);
-	if (err != DDI_SUCCESS)
-		return (err);
+	(void) mac_unregister(sc->sc_ic.ic_mach);
 
 	mutex_enter(&sc->sc_glock);
 	wpi_free_fw_dma(sc);

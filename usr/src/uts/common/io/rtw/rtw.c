@@ -34,10 +34,6 @@
  * OF SUCH DAMAGE.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/signal.h>
@@ -3404,6 +3400,9 @@ rtw_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 	if (!(rsc->sc_flags & RTW_F_ATTACHED))
+		return (DDI_FAILURE);
+
+	if (mac_disable(rsc->sc_ic.ic_mach) != 0)
 		return (DDI_FAILURE);
 
 	/* free intterrupt resources */

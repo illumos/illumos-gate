@@ -663,6 +663,10 @@ ipw2200_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+	err = mac_disable(sc->sc_ic.ic_mach);
+	if (err != DDI_SUCCESS)
+		return (err);
+
 	ipw2200_stop(sc);
 
 	/*
@@ -679,9 +683,7 @@ ipw2200_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	/*
 	 * Unregister from the MAC layer subsystem
 	 */
-	err = mac_unregister(sc->sc_ic.ic_mach);
-	if (err != DDI_SUCCESS)
-		return (err);
+	(void) mac_unregister(sc->sc_ic.ic_mach);
 
 	ddi_remove_intr(dip, IPW2200_PCI_INTR_NUM, sc->sc_iblk);
 
