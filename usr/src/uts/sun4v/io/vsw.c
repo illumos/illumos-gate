@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/debug.h>
@@ -97,6 +95,9 @@ static	int vsw_port_read_props(vsw_port_t *portp, vsw_t *vswp,
 	md_t *mdp, mde_cookie_t *node);
 static	void vsw_read_pri_eth_types(vsw_t *vswp, md_t *mdp,
 	mde_cookie_t node);
+static	void vsw_mtu_read(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
+	uint32_t *mtu);
+static	int vsw_mtu_update(vsw_t *vswp, uint32_t mtu);
 static	void vsw_update_md_prop(vsw_t *, md_t *, mde_cookie_t);
 static void vsw_save_lmacaddr(vsw_t *vswp, uint64_t macaddr);
 
@@ -151,6 +152,8 @@ extern uint32_t vsw_vlan_frame_untag(void *arg, int type, mblk_t **np,
 extern mblk_t *vsw_vlan_frame_pretag(void *arg, int type, mblk_t *mp);
 extern void vsw_hio_cleanup(vsw_t *vswp);
 extern void vsw_hio_start_ports(vsw_t *vswp);
+extern void vsw_reset_ports(vsw_t *vswp);
+extern void vsw_port_reset(vsw_port_t *portp);
 void vsw_hio_port_update(vsw_port_t *portp, boolean_t hio_enabled);
 
 /*
@@ -241,15 +244,28 @@ uint32_t vsw_ntxds = VSW_RING_NUM_EL;
 uint32_t vsw_chain_len = (VSW_NUM_MBLKS * 0.6);
 
 /*
- * Tunables for three different pools, that is, the size and
- * number of mblks for each pool.
+ * Internal tunables for receive buffer pools, that is,  the size and number of
+ * mblks for each pool. At least 3 sizes must be specified if these are used.
+ * The sizes must be specified in increasing order. Non-zero value of the first
+ * size will be used as a hint to use these values instead of the algorithm
+ * that determines the sizes based on MTU.
  */
-uint32_t vsw_mblk_size1 = VSW_MBLK_SZ_128;	/* size=128 for pool1 */
-uint32_t vsw_mblk_size2 = VSW_MBLK_SZ_256;	/* size=256 for pool2 */
-uint32_t vsw_mblk_size3 = VSW_MBLK_SZ_2048;	/* size=2048 for pool3 */
+uint32_t vsw_mblk_size1 = 0;
+uint32_t vsw_mblk_size2 = 0;
+uint32_t vsw_mblk_size3 = 0;
+uint32_t vsw_mblk_size4 = 0;
 uint32_t vsw_num_mblks1 = VSW_NUM_MBLKS;	/* number of mblks for pool1 */
 uint32_t vsw_num_mblks2 = VSW_NUM_MBLKS;	/* number of mblks for pool2 */
 uint32_t vsw_num_mblks3 = VSW_NUM_MBLKS;	/* number of mblks for pool3 */
+uint32_t vsw_num_mblks4 = VSW_NUM_MBLKS;	/* number of mblks for pool4 */
+
+/*
+ * Set this to non-zero to enable additional internal receive buffer pools
+ * based on the MTU of the device for better performance at the cost of more
+ * memory consumption. This is turned off by default, to use allocb(9F) for
+ * receive buffer allocations of sizes > 2K.
+ */
+boolean_t vsw_jumbo_rxpools = B_FALSE;
 
 /*
  * vsw_max_tx_qcount is the maximum # of packets that can be queued
@@ -355,6 +371,7 @@ static char vsw_dvid_propname[] = "default-vlan-id";
 static char port_pvid_propname[] = "remote-port-vlan-id";
 static char port_vid_propname[] = "remote-vlan-id";
 static char hybrid_propname[] = "hybrid";
+static char vsw_mtu_propname[] = "mtu";
 
 /*
  * Matching criteria passed to the MDEG to register interest
@@ -1039,7 +1056,7 @@ vsw_mac_register(vsw_t *vswp)
 	macp->m_src_addr = (uint8_t *)&vswp->if_addr;
 	macp->m_callbacks = &vsw_m_callbacks;
 	macp->m_min_sdu = 0;
-	macp->m_max_sdu = vsw_ethermtu;
+	macp->m_max_sdu = vswp->mtu;
 	macp->m_margin = VLAN_TAGSZ;
 	rv = mac_register(macp, &vswp->if_mh);
 	mac_free(macp);
@@ -1054,9 +1071,6 @@ vsw_mac_register(vsw_t *vswp)
 	}
 
 	vswp->if_state |= VSW_IF_REG;
-
-	vswp->max_frame_size = vsw_ethermtu + sizeof (struct ether_header)
-	    + VLAN_TAGSZ;
 
 	D1(vswp, "%s: exit", __func__);
 
@@ -1117,7 +1131,7 @@ vsw_m_stat(void *arg, uint_t stat, uint64_t *val)
 static void
 vsw_m_stop(void *arg)
 {
-	vsw_t		*vswp = (vsw_t *)arg;
+	vsw_t	*vswp = (vsw_t *)arg;
 
 	D1(vswp, "%s: enter", __func__);
 
@@ -1734,6 +1748,14 @@ vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		ASSERT(vswp->smode_num != 0);
 	}
 
+	/* read mtu */
+	vsw_mtu_read(vswp, mdp, node, &vswp->mtu);
+	if (vswp->mtu < ETHERMTU || vswp->mtu > VNET_MAX_MTU) {
+		vswp->mtu = ETHERMTU;
+	}
+	vswp->max_frame_size = vswp->mtu + sizeof (struct ether_header) +
+	    VLAN_TAGSZ;
+
 	/* read vlan id properties of this vsw instance */
 	vsw_vlan_read_ids(vswp, VSW_LOCALDEV, mdp, node, &vswp->pvid,
 	    &vswp->vids, &vswp->nvids, &vswp->default_vlan_id);
@@ -1907,6 +1929,105 @@ vsw_read_pri_eth_types(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	(void) vio_create_mblks(vsw_pri_tx_nmblks, mblk_sz, &vswp->pri_tx_vmp);
 }
 
+static void
+vsw_mtu_read(vsw_t *vswp, md_t *mdp, mde_cookie_t node, uint32_t *mtu)
+{
+	int		rv;
+	int		inst;
+	uint64_t	val;
+	char		*mtu_propname;
+
+	mtu_propname = vsw_mtu_propname;
+	inst = vswp->instance;
+
+	rv = md_get_prop_val(mdp, node, mtu_propname, &val);
+	if (rv != 0) {
+		D3(vswp, "%s: prop(%s) not found", __func__, mtu_propname);
+		*mtu = vsw_ethermtu;
+	} else {
+
+		*mtu = val & 0xFFFF;
+		D2(vswp, "%s: %s(%d): (%d)\n", __func__,
+		    mtu_propname, inst, *mtu);
+	}
+}
+
+/*
+ * Update the mtu of the vsw device. We first check if the device has been
+ * plumbed and if so fail the mtu update. Otherwise, we continue to update the
+ * new mtu and reset all ports to initiate handshake re-negotiation with peers
+ * using the new mtu.
+ */
+static int
+vsw_mtu_update(vsw_t *vswp, uint32_t mtu)
+{
+	int	rv;
+
+	WRITE_ENTER(&vswp->if_lockrw);
+
+	if (vswp->if_state & VSW_IF_UP) {
+
+		RW_EXIT(&vswp->if_lockrw);
+
+		cmn_err(CE_NOTE, "!vsw%d: Unable to process mtu update"
+		    " as the device is plumbed\n", vswp->instance);
+		return (EBUSY);
+
+	} else {
+
+		D2(vswp, "%s: curr_mtu(%d) new_mtu(%d)\n",
+		    __func__, vswp->mtu, mtu);
+
+		vswp->mtu = mtu;
+		vswp->max_frame_size = vswp->mtu +
+		    sizeof (struct ether_header) + VLAN_TAGSZ;
+
+		rv = mac_maxsdu_update(vswp->if_mh, mtu);
+		if (rv != 0) {
+			cmn_err(CE_NOTE,
+			    "!vsw%d: Unable to update mtu with mac"
+			    " layer\n", vswp->instance);
+		}
+
+		RW_EXIT(&vswp->if_lockrw);
+
+		WRITE_ENTER(&vswp->mac_rwlock);
+
+		if (vswp->mh == 0) {
+			/*
+			 * Physical device is not available yet; mtu will be
+			 * updated after we open it successfully, as we have
+			 * saved the new mtu.
+			 */
+			D2(vswp, "%s: Physical device:%s is not "
+			    "available yet; can't update its mtu\n",
+			    __func__, vswp->physname);
+
+		} else {
+
+			/*
+			 * Stop and restart to enable the
+			 * new mtu in the physical device.
+			 */
+			vsw_mac_detach(vswp);
+			rv = vsw_mac_attach(vswp);
+			if (rv != 0) {
+				RW_EXIT(&vswp->mac_rwlock);
+				return (EIO);
+			}
+
+		}
+
+		RW_EXIT(&vswp->mac_rwlock);
+
+		/* Reset ports to renegotiate with the new mtu */
+		vsw_reset_ports(vswp);
+
+	}
+
+	return (0);
+}
+
 /*
  * Check to see if the relevant properties in the specified node have
  * changed, and if so take the appropriate action.
@@ -1932,11 +2053,13 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 				MD_physname = 0x2,
 				MD_macaddr = 0x4,
 				MD_smode = 0x8,
-				MD_vlans = 0x10} updated;
+				MD_vlans = 0x10,
+				MD_mtu = 0x20} updated;
 	int		rv;
 	uint16_t	pvid;
 	uint16_t	*vids;
 	uint16_t	nvids;
+	uint32_t	mtu;
 
 	updated = MD_init;
 
@@ -2040,6 +2163,18 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	    ((nvids != 0) && (vswp->nvids != 0) &&	/* vids changed? */
 	    bcmp(vids, vswp->vids, sizeof (uint16_t) * nvids))) {
 		updated |= MD_vlans;
+	}
+
+	/* Read mtu */
+	vsw_mtu_read(vswp, mdp, node, &mtu);
+	if (mtu != vswp->mtu) {
+		if (mtu >= ETHERMTU && mtu <= VNET_MAX_MTU) {
+			updated |= MD_mtu;
+		} else {
+			cmn_err(CE_NOTE, "!vsw%d: Unable to process mtu update"
+			    " as the specified value:%d is invalid\n",
+			    vswp->instance, mtu);
+		}
 	}
 
 	/*
@@ -2192,6 +2327,15 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		if (nvids != 0) {
 			kmem_free(vids, sizeof (uint16_t) * nvids);
 		}
+	}
+
+	if (updated & MD_mtu) {
+
+		rv = vsw_mtu_update(vswp, mtu);
+		if (rv != 0) {
+			goto fail_update;
+		}
+
 	}
 
 	return;

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -315,6 +313,8 @@ vio_destroy_multipools(vio_multi_pool_t *vmultip, vio_mblk_pool_t **fvmp)
 	vmultip->bufsz_tbl = NULL;
 	vmultip->nbuf_tbl = NULL;
 	vmultip->vmpp = NULL;
+	vmultip->num_pools = 0;
+	vmultip->tbsz = 0;
 }
 
 

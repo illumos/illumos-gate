@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/modctl.h>
 #include <sys/prom_plat.h>
 #include <sys/ddi.h>
@@ -78,6 +76,7 @@ typedef struct vdds_cb_arg {
 	dev_info_t *dip;
 	uint64_t cookie;
 	uint64_t macaddr;
+	uint32_t max_frame_size;
 } vdds_cb_arg_t;
 
 
@@ -90,9 +89,10 @@ void vdds_process_dds_msg(vnet_t *vnetp, vio_dds_msg_t *dmsg);
 void vdds_cleanup_hybrid_res(vnet_t *vnetp);
 
 /* Support functions to create/destory Hybrid device */
-static dev_info_t *vdds_create_niu_node(uint64_t cookie, uint64_t macaddr);
+static dev_info_t *vdds_create_niu_node(uint64_t cookie,
+    uint64_t macaddr, uint32_t max_frame_size);
 static int vdds_destroy_niu_node(dev_info_t *niu_dip, uint64_t cookie);
-static dev_info_t *vdds_create_new_node(uint64_t cookie, uint64_t macddr,
+static dev_info_t *vdds_create_new_node(vdds_cb_arg_t *cba,
     dev_info_t *pdip, int (*new_node_func)(dev_info_t *dip,
     void *arg, uint_t flags));
 static int vdds_new_nexus_node(dev_info_t *dip, void *arg, uint_t flags);
@@ -362,6 +362,7 @@ vdds_process_dds_msg_task(void *arg)
 	vnet_dds_info_t	*vdds = &vnetp->vdds_info;
 	vio_dds_msg_t	*dmsg = &vdds->dmsg;
 	dev_info_t	*dip;
+	uint32_t	max_frame_size;
 	uint64_t	hio_cookie;
 	int		rv;
 
@@ -371,8 +372,15 @@ vdds_process_dds_msg_task(void *arg)
 	case VNET_DDS_TASK_ADD_SHARE:
 		DBG2(vdds, "ADD_SHARE task...");
 		hio_cookie = dmsg->msg.share_msg.cookie;
+		/*
+		 * max-frame-size value need to be set to
+		 * the full ethernet frame size. That is,
+		 * header + payload + checksum.
+		 */
+		max_frame_size = vnetp->mtu +
+		    sizeof (struct  ether_vlan_header) + ETHERFCSL;
 		dip = vdds_create_niu_node(hio_cookie,
-		    dmsg->msg.share_msg.macaddr);
+		    dmsg->msg.share_msg.macaddr, max_frame_size);
 		if (dip == NULL) {
 			(void) vdds_send_dds_resp_msg(vnetp, dmsg, B_FALSE);
 			DERR(vdds, "Failed to create HIO node");
@@ -484,10 +492,11 @@ vdds_send_dds_resp_msg(vnet_t *vnetp, vio_dds_msg_t *dmsg, int ack)
  *	node also created if it doesn't exist already.
  */
 dev_info_t *
-vdds_create_niu_node(uint64_t cookie, uint64_t macaddr)
+vdds_create_niu_node(uint64_t cookie, uint64_t macaddr, uint32_t max_frame_size)
 {
 	dev_info_t *nexus_dip;
 	dev_info_t *niu_dip;
+	vdds_cb_arg_t cba;
 
 	DBG1(NULL, "Called");
 
@@ -501,7 +510,11 @@ vdds_create_niu_node(uint64_t cookie, uint64_t macaddr)
 		/*
 		 * NIU nexus node not found, so create it now.
 		 */
-		nexus_dip = vdds_create_new_node(cookie, macaddr, NULL,
+		cba.dip = NULL;
+		cba.cookie = cookie;
+		cba.macaddr = macaddr;
+		cba.max_frame_size = max_frame_size;
+		nexus_dip = vdds_create_new_node(&cba, NULL,
 		    vdds_new_nexus_node);
 		if (nexus_dip == NULL) {
 			return (NULL);
@@ -513,7 +526,11 @@ vdds_create_niu_node(uint64_t cookie, uint64_t macaddr)
 	niu_dip = vdds_find_node(cookie, nexus_dip,
 	    vdds_match_niu_node);
 	if (niu_dip == NULL) {
-		niu_dip = vdds_create_new_node(cookie, macaddr, nexus_dip,
+		cba.dip = NULL;
+		cba.cookie = cookie;
+		cba.macaddr = macaddr;
+		cba.max_frame_size = max_frame_size;
+		niu_dip = vdds_create_new_node(&cba, nexus_dip,
 		    vdds_new_niu_node);
 		if (niu_dip == NULL) {
 			DWARN(NULL, "create_niu_hio_node returned NULL");
@@ -920,6 +937,14 @@ vdds_new_niu_node(dev_info_t *dip, void *arg, uint_t flags)
 	}
 
 
+	/* create "max_frame_size" property */
+	if (ndi_prop_update_int(DDI_DEV_T_NONE, dip, "max-frame-size",
+	    cba->max_frame_size) != DDI_SUCCESS) {
+		DERR(NULL, "Failed to update max-frame-size property(dip=0x%p)",
+		    dip);
+		return (DDI_WALK_ERROR);
+	}
+
 	cba->dip = dip;
 	/* Hold the dip */
 	ndi_hold_devi(dip);
@@ -963,20 +988,15 @@ vdds_find_node(uint64_t cookie, dev_info_t *sdip,
  * vdds_create_new_node -- A common function to create NIU nexus/NIU node.
  */
 static dev_info_t *
-vdds_create_new_node(uint64_t cookie, uint64_t macaddr, dev_info_t *pdip,
+vdds_create_new_node(vdds_cb_arg_t *cbap, dev_info_t *pdip,
     int (*new_node_func)(dev_info_t *dip, void *arg, uint_t flags))
 {
 	devi_branch_t br;
 	int circ, rv;
-	vdds_cb_arg_t cba;
 
-	DBG1(NULL, "Called cookie=0x%lx", cookie);
+	DBG1(NULL, "Called cookie=0x%lx", cbap->cookie);
 
-	cba.dip = NULL;
-	cba.cookie = cookie;
-	cba.macaddr = macaddr;
-
-	br.arg = (void *)&cba;
+	br.arg = (void *)cbap;
 	br.type = DEVI_BRANCH_SID;
 	br.create.sid_branch_create = new_node_func;
 	br.devi_branch_callback = NULL;
@@ -992,8 +1012,8 @@ vdds_create_new_node(uint64_t cookie, uint64_t macaddr, dev_info_t *pdip,
 		return (NULL);
 	}
 	ndi_devi_exit(pdip, circ);
-	DBG1(NULL, "Returning(dip=0x%p", cba.dip);
-	return (cba.dip);
+	DBG1(NULL, "Returning(dip=0x%p", cbap->dip);
+	return (cbap->dip);
 }
 
 /*

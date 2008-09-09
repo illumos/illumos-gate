@@ -33,8 +33,6 @@
 #ifndef	_VSW_H
 #define	_VSW_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -163,7 +161,9 @@ typedef struct	vsw {
 	uint32_t		fdb_nchains;	/* # of hash chains in fdb */
 	mod_hash_t		*vlan_hashp;	/* vlan hash table */
 	uint32_t		vlan_nchains;	/* # of vlan hash chains */
+	uint32_t		mtu;		/* mtu of the device */
 	uint32_t		max_frame_size;	/* max frame size supported */
+	uint32_t		mtu_physdev_orig; /* orig mtu of the physdev */
 
 	mod_hash_t		*mfdb;		/* multicast FDB */
 	krwlock_t		mfdbrw;		/* rwlock for mFDB */

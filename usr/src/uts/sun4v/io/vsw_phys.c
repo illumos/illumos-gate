@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/debug.h>
@@ -84,6 +82,7 @@ static	int vsw_set_hw_promisc(vsw_t *, vsw_port_t *, int);
 static	int vsw_unset_hw_addr(vsw_t *, int);
 static	int vsw_unset_hw_promisc(vsw_t *, vsw_port_t *, int);
 static int vsw_prog_if(vsw_t *);
+static	void vsw_mac_set_mtu(vsw_t *vswp, uint32_t mtu);
 
 /* Support functions */
 static int vsw_prog_ports(vsw_t *);
@@ -99,6 +98,8 @@ void vsw_set_addrs(vsw_t *vswp);
 int vsw_get_hw_maddr(vsw_t *);
 mblk_t *vsw_tx_msg(vsw_t *, mblk_t *);
 void vsw_publish_macaddr(vsw_t *vswp, uint8_t *addr);
+
+static char mac_mtu_propname[] = "mtu";
 
 /*
  * Tunables used in this file.
@@ -398,6 +399,8 @@ vsw_mac_attach(vsw_t *vswp)
 
 	D2(vswp, "vsw_mac_attach: using device %s", vswp->physname);
 
+	vsw_mac_set_mtu(vswp, vswp->mtu);
+
 	if (vsw_multi_ring_enable) {
 		/*
 		 * Initialize the ring table.
@@ -471,6 +474,9 @@ vsw_mac_detach(vsw_t *vswp)
 			mac_rx_remove(vswp->mh, vswp->mrh, B_TRUE);
 		if (vswp->mresources)
 			mac_resource_set(vswp->mh, NULL, NULL);
+		if (vswp->mtu != vswp->mtu_physdev_orig) {
+			vsw_mac_set_mtu(vswp, vswp->mtu_physdev_orig);
+		}
 	}
 
 	vswp->mrh = NULL;
@@ -1442,4 +1448,45 @@ vsw_publish_macaddr(vsw_t *vswp, uint8_t *addr)
 	}
 
 	freemsg(mp);
+}
+
+static void
+vsw_mac_set_mtu(vsw_t *vswp, uint32_t mtu)
+{
+	mac_prop_t	mp;
+	uint32_t	val;
+	int		rv;
+	mp.mp_id = MAC_PROP_MTU;
+	mp.mp_name = mac_mtu_propname;
+	mp.mp_flags = 0;
+
+	/* Get the mtu of the physical device */
+	rv = mac_get_prop(vswp->mh, &mp, (void *)&val, sizeof (uint32_t));
+	if (rv != 0) {
+		cmn_err(CE_NOTE,
+		    "!vsw%d: Unable to get the mtu of the physical device:%s\n",
+		    vswp->instance, vswp->physname);
+		return;
+	}
+
+	/* save the original mtu of physdev to reset it back later if needed */
+	vswp->mtu_physdev_orig = val;
+
+	if (val == mtu) {
+		/* no need to set, as the device already has the right mtu */
+		return;
+	}
+
+	mp.mp_id = MAC_PROP_MTU;
+	mp.mp_name = mac_mtu_propname;
+	mp.mp_flags = 0;
+
+	/* Set the mtu in the physical device */
+	rv = mac_set_prop(vswp->mh, &mp, &mtu, sizeof (uint32_t));
+	if (rv != 0) {
+		cmn_err(CE_NOTE,
+		    "!vsw%d: Unable to set the mtu:%d, in the "
+		    "physical device:%s\n",
+		    vswp->instance, mtu, vswp->physname);
+	}
 }

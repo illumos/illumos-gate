@@ -526,6 +526,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int		status = DDI_SUCCESS;
 	uint8_t		portn;
 	nxge_mmac_t	*mmac_info;
+	p_nxge_param_t	param_arr;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_attach"));
 
@@ -727,6 +728,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (isLDOMguest(nxgep)) {
 		uchar_t *prop_val;
 		uint_t prop_len;
+		uint32_t max_frame_size;
 
 		extern void nxge_get_logical_props(p_nxge_t);
 
@@ -756,6 +758,23 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ddi_prop_free(prop_val);
 		nxge_get_logical_props(nxgep);
 
+		/*
+		 * Enable Jumbo property based on the "max-frame-size"
+		 * property value.
+		 */
+		max_frame_size = ddi_prop_get_int(DDI_DEV_T_ANY,
+		    nxgep->dip, DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+		    "max-frame-size", NXGE_MTU_DEFAULT_MAX);
+		if ((max_frame_size > NXGE_MTU_DEFAULT_MAX) &&
+		    (max_frame_size <= TX_JUMBO_MTU)) {
+			param_arr = nxgep->param_arr;
+
+			param_arr[param_accept_jumbo].value = 1;
+			nxgep->mac.is_jumbo = B_TRUE;
+			nxgep->mac.maxframesize = (uint16_t)max_frame_size;
+			nxgep->mac.default_mtu = nxgep->mac.maxframesize -
+			    NXGE_EHEADER_VLAN_CRC;
+		}
 	} else {
 		status = nxge_xcvr_find(nxgep);
 

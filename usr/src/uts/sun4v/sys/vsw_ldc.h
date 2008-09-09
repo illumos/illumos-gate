@@ -72,8 +72,6 @@
 #ifndef	_VSW_LDC_H
 #define	_VSW_LDC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -313,6 +311,7 @@ typedef struct vsw_ldc {
 	lane_t			lane_out;	/* Outbound lane */
 	uint8_t			dev_class;	/* Peer device class */
 	vio_multi_pool_t	vmp;		/* Receive mblk pools */
+	uint32_t		max_rxpool_size; /* max size of rxpool in use */
 	uint64_t		*ldcmsg;	/* msg buffer for ldc_read() */
 	uint64_t		msglen;		/* size of ldcmsg */
 

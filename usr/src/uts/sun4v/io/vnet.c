@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/param.h>
@@ -94,7 +92,7 @@ static void vnet_stop_resources(vnet_t *vnetp);
 static void vnet_dispatch_res_task(vnet_t *vnetp);
 static void vnet_res_start_task(void *arg);
 static void vnet_handle_res_err(vio_net_handle_t vrh, vio_net_err_val_t err);
-
+int vnet_mtu_update(vnet_t *vnetp, uint32_t mtu);
 
 /* Exported to to vnet_dds */
 int vnet_send_dds_msg(vnet_t *vnetp, void *dmsg);
@@ -151,6 +149,14 @@ uint32_t vnet_ldcwd_interval = VNET_LDCWD_INTERVAL; /* watchdog freq in msec */
 uint32_t vnet_ldcwd_txtimeout = VNET_LDCWD_TXTIMEOUT;  /* tx timeout in msec */
 uint32_t vnet_ldc_mtu = VNET_LDC_MTU;		/* ldc mtu */
 
+/*
+ * Set this to non-zero to enable additional internal receive buffer pools
+ * based on the MTU of the device for better performance at the cost of more
+ * memory consumption. This is turned off by default, to use allocb(9F) for
+ * receive buffer allocations of sizes > 2K.
+ */
+boolean_t vnet_jumbo_rxpools = B_FALSE;
+
 /* # of chains in fdb hash table */
 uint32_t	vnet_fdb_nchains = VNET_NFDB_HASH;
 
@@ -182,7 +188,7 @@ static char macaddr_propname[] = "local-mac-address";
 /*
  * This is the string displayed by modinfo(1m).
  */
-static char vnet_ident[] = "vnet driver v%I%";
+static char vnet_ident[] = "vnet driver";
 extern struct mod_ops mod_driverops;
 static struct cb_ops cb_vnetops = {
 	nulldev,		/* cb_open */
@@ -756,7 +762,7 @@ vnet_mac_register(vnet_t *vnetp)
 	macp->m_src_addr = vnetp->curr_macaddr;
 	macp->m_callbacks = &vnet_m_callbacks;
 	macp->m_min_sdu = 0;
-	macp->m_max_sdu = vnet_ethermtu;
+	macp->m_max_sdu = vnetp->mtu;
 	macp->m_margin = VLAN_TAGSZ;
 
 	/*
@@ -975,6 +981,46 @@ vnet_tx_update(vio_net_handle_t vrh)
 	if ((vnetp != NULL) && (vnetp->mh != NULL)) {
 		mac_tx_update(vnetp->mh);
 	}
+}
+
+/*
+ * Update the new mtu of vnet into the mac layer. First check if the device has
+ * been plumbed and if so fail the mtu update. Returns 0 on success.
+ */
+int
+vnet_mtu_update(vnet_t *vnetp, uint32_t mtu)
+{
+	int	rv;
+
+	if (vnetp == NULL || vnetp->mh == NULL) {
+		return (EINVAL);
+	}
+
+	WRITE_ENTER(&vnetp->vrwlock);
+
+	if (vnetp->flags & VNET_STARTED) {
+		RW_EXIT(&vnetp->vrwlock);
+		cmn_err(CE_NOTE, "!vnet%d: Unable to process mtu "
+		    "update as the device is plumbed\n",
+		    vnetp->instance);
+		return (EBUSY);
+	}
+
+	/* update mtu in the mac layer */
+	rv = mac_maxsdu_update(vnetp->mh, mtu);
+	if (rv != 0) {
+		RW_EXIT(&vnetp->vrwlock);
+		cmn_err(CE_NOTE,
+		    "!vnet%d: Unable to update mtu with mac layer\n",
+		    vnetp->instance);
+		return (EIO);
+	}
+
+	vnetp->mtu = mtu;
+
+	RW_EXIT(&vnetp->vrwlock);
+
+	return (0);
 }
 
 /*

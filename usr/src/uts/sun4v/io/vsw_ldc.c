@@ -94,6 +94,8 @@ vsw_port_t *vsw_lookup_port(vsw_t *vswp, int p_instance);
 void vsw_vlan_unaware_port_reset(vsw_port_t *portp);
 int vsw_send_msg(vsw_ldc_t *, void *, int, boolean_t);
 void vsw_hio_port_reset(vsw_port_t *portp, boolean_t immediate);
+void vsw_reset_ports(vsw_t *vswp);
+void vsw_port_reset(vsw_port_t *portp);
 
 /* Interrupt routines */
 static	uint_t vsw_ldc_cb(uint64_t cb, caddr_t arg);
@@ -224,11 +226,14 @@ extern uint32_t vsw_chain_len;
 extern uint32_t vsw_mblk_size1;
 extern uint32_t vsw_mblk_size2;
 extern uint32_t vsw_mblk_size3;
+extern uint32_t vsw_mblk_size4;
 extern uint32_t vsw_num_mblks1;
 extern uint32_t vsw_num_mblks2;
 extern uint32_t vsw_num_mblks3;
+extern uint32_t vsw_num_mblks4;
 extern boolean_t vsw_obp_ver_proto_workaround;
 extern uint32_t vsw_publish_macaddr_count;
+extern boolean_t vsw_jumbo_rxpools;
 
 #define	LDC_ENTER_LOCK(ldcp)	\
 				mutex_enter(&((ldcp)->ldc_cblock));\
@@ -254,7 +259,7 @@ extern uint32_t vsw_publish_macaddr_count;
 	    (ldcp)->lane_out.ver_minor >= (minor)))
 
 /* supported versions */
-static	ver_sup_t	vsw_versions[] = { {1, 3} };
+static	ver_sup_t	vsw_versions[] = { {1, 4} };
 
 /*
  * For the moment the state dump routines have their own
@@ -572,6 +577,109 @@ vsw_port_delete(vsw_port_t *port)
 	return (0);
 }
 
+static int
+vsw_init_multipools(vsw_ldc_t *ldcp, vsw_t *vswp)
+{
+	size_t		data_sz;
+	int		rv;
+	uint32_t	sz1 = 0;
+	uint32_t	sz2 = 0;
+	uint32_t	sz3 = 0;
+	uint32_t	sz4 = 0;
+
+	/*
+	 * We round up the mtu specified to be a multiple of 2K to limit the
+	 * number of rx buffer pools created for a given mtu.
+	 */
+	data_sz = vswp->max_frame_size + VNET_IPALIGN + VNET_LDCALIGN;
+	data_sz = VNET_ROUNDUP_2K(data_sz);
+
+	/*
+	 * If pool sizes are specified, use them. Note that the presence of
+	 * the first tunable will be used as a hint.
+	 */
+	if (vsw_mblk_size1 != 0) {
+		sz1 = vsw_mblk_size1;
+		sz2 = vsw_mblk_size2;
+		sz3 = vsw_mblk_size3;
+		sz4 = vsw_mblk_size4;
+
+		if (sz4 == 0) { /* need 3 pools */
+
+			ldcp->max_rxpool_size = sz3;
+			rv = vio_init_multipools(&ldcp->vmp,
+			    VSW_NUM_VMPOOLS, sz1, sz2, sz3,
+			    vsw_num_mblks1, vsw_num_mblks2, vsw_num_mblks3);
+
+		} else {
+
+			ldcp->max_rxpool_size = sz4;
+			rv = vio_init_multipools(&ldcp->vmp,
+			    VSW_NUM_VMPOOLS + 1, sz1, sz2, sz3, sz4,
+			    vsw_num_mblks1, vsw_num_mblks2, vsw_num_mblks3,
+			    vsw_num_mblks4);
+
+		}
+
+		return (rv);
+	}
+
+	/*
+	 * Pool sizes are not specified. We select the pool sizes based on the
+	 * mtu if vnet_jumbo_rxpools is enabled.
+	 */
+	if (vsw_jumbo_rxpools == B_FALSE || data_sz == VNET_2K) {
+		/*
+		 * Receive buffer pool allocation based on mtu is disabled.
+		 * Use the default mechanism of standard size pool allocation.
+		 */
+		sz1 = VSW_MBLK_SZ_128;
+		sz2 = VSW_MBLK_SZ_256;
+		sz3 = VSW_MBLK_SZ_2048;
+		ldcp->max_rxpool_size = sz3;
+
+		rv = vio_init_multipools(&ldcp->vmp, VSW_NUM_VMPOOLS,
+		    sz1, sz2, sz3,
+		    vsw_num_mblks1, vsw_num_mblks2, vsw_num_mblks3);
+
+		return (rv);
+	}
+
+	switch (data_sz) {
+
+	case VNET_4K:
+
+		sz1 = VSW_MBLK_SZ_128;
+		sz2 = VSW_MBLK_SZ_256;
+		sz3 = VSW_MBLK_SZ_2048;
+		sz4 = sz3 << 1;			/* 4K */
+		ldcp->max_rxpool_size = sz4;
+
+		rv = vio_init_multipools(&ldcp->vmp, VSW_NUM_VMPOOLS + 1,
+		    sz1, sz2, sz3, sz4,
+		    vsw_num_mblks1, vsw_num_mblks2, vsw_num_mblks3,
+		    vsw_num_mblks4);
+		break;
+
+	default:	/* data_sz:  4K+ to 16K */
+
+		sz1 = VSW_MBLK_SZ_256;
+		sz2 = VSW_MBLK_SZ_2048;
+		sz3 = data_sz >> 1;	/* Jumbo-size/2 */
+		sz4 = data_sz;	/* Jumbo-size */
+		ldcp->max_rxpool_size = sz4;
+
+		rv = vio_init_multipools(&ldcp->vmp, VSW_NUM_VMPOOLS + 1,
+		    sz1, sz2, sz3, sz4,
+		    vsw_num_mblks1, vsw_num_mblks2, vsw_num_mblks3,
+		    vsw_num_mblks4);
+		break;
+	}
+
+	return (rv);
+
+}
+
 /*
  * Attach a logical domain channel (ldc) under a specified port.
  *
@@ -586,11 +694,10 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 	ldc_attr_t 	attr;
 	ldc_status_t	istatus;
 	int 		status = DDI_FAILURE;
-	int		rv;
 	char		kname[MAXNAMELEN];
-	enum		{ PROG_init = 0x0, PROG_mblks = 0x1,
-			    PROG_callback = 0x2, PROG_rx_thread = 0x4,
-			    PROG_tx_thread = 0x8}
+	enum		{ PROG_init = 0x0,
+			    PROG_callback = 0x1, PROG_rx_thread = 0x2,
+			    PROG_tx_thread = 0x4}
 			progress;
 
 	progress = PROG_init;
@@ -603,19 +710,6 @@ vsw_ldc_attach(vsw_port_t *port, uint64_t ldc_id)
 		return (1);
 	}
 	ldcp->ldc_id = ldc_id;
-
-	/* Allocate pools of receive mblks */
-	rv = vio_init_multipools(&ldcp->vmp, VSW_NUM_VMPOOLS,
-	    vsw_mblk_size1, vsw_mblk_size2, vsw_mblk_size3,
-	    vsw_num_mblks1, vsw_num_mblks2, vsw_num_mblks3);
-	if (rv) {
-		DWARN(vswp, "%s: unable to create free mblk pools for"
-		    " channel %ld (rv %d)", __func__, ldc_id, rv);
-		kmem_free(ldcp, sizeof (vsw_ldc_t));
-		return (1);
-	}
-
-	progress |= PROG_mblks;
 
 	mutex_init(&ldcp->ldc_txlock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&ldcp->ldc_rxlock, NULL, MUTEX_DRIVER, NULL);
@@ -762,9 +856,6 @@ ldc_attach_fail:
 	rw_destroy(&ldcp->lane_in.dlistrw);
 	rw_destroy(&ldcp->lane_out.dlistrw);
 
-	if (progress & PROG_mblks) {
-		vio_destroy_multipools(&ldcp->vmp, &vswp->rxh);
-	}
 	kmem_free(ldcp, sizeof (vsw_ldc_t));
 
 	return (1);
@@ -1276,6 +1367,54 @@ vsw_hio_port_reset(vsw_port_t *portp, boolean_t immediate)
 	RW_EXIT(&ldclp->lockrw);
 }
 
+void
+vsw_port_reset(vsw_port_t *portp)
+{
+	vsw_ldc_list_t 	*ldclp;
+	vsw_ldc_t	*ldcp;
+
+	ldclp = &portp->p_ldclist;
+
+	READ_ENTER(&ldclp->lockrw);
+
+	/*
+	 * NOTE: for now, we will assume we have a single channel.
+	 */
+	if (ldclp->head == NULL) {
+		RW_EXIT(&ldclp->lockrw);
+		return;
+	}
+	ldcp = ldclp->head;
+
+	mutex_enter(&ldcp->ldc_cblock);
+
+	/*
+	 * reset channel and terminate the connection.
+	 */
+	vsw_process_conn_evt(ldcp, VSW_CONN_RESTART);
+
+	mutex_exit(&ldcp->ldc_cblock);
+
+	RW_EXIT(&ldclp->lockrw);
+}
+
+void
+vsw_reset_ports(vsw_t *vswp)
+{
+	vsw_port_list_t	*plist = &vswp->plist;
+	vsw_port_t	*portp;
+
+	READ_ENTER(&plist->lockrw);
+	for (portp = plist->head; portp != NULL; portp = portp->p_next) {
+		if ((portp->p_hio_capable) && (portp->p_hio_enabled)) {
+			vsw_hio_stop_port(portp);
+		}
+		vsw_port_reset(portp);
+	}
+	RW_EXIT(&plist->lockrw);
+}
+
+
 /*
  * Search for and remove the specified port from the port
  * list. Returns 0 if able to locate and remove port, otherwise
@@ -1416,6 +1555,9 @@ vsw_ldc_reinit(vsw_ldc_t *ldcp)
 	vsw_ldc_list_t	*ldcl;
 
 	D1(vswp, "%s: enter", __func__);
+
+	/* free receive mblk pools for the channel */
+	vio_destroy_multipools(&ldcp->vmp, &vswp->rxh);
 
 	port = ldcp->ldc_port;
 	ldcl = &port->p_ldclist;
@@ -1998,27 +2140,30 @@ vsw_set_vnet_proto_ops(vsw_ldc_t *ldcp)
 	vsw_t	*vswp = ldcp->ldc_vswp;
 	lane_t	*lp = &ldcp->lane_out;
 
-	if (VSW_VER_GTEQ(ldcp, 1, 3)) {
+	if (VSW_VER_GTEQ(ldcp, 1, 4)) {
 		/*
-		 * If the version negotiated with peer is >= 1.3,
-		 * set the mtu in our attributes to max_frame_size.
+		 * If the version negotiated with peer is >= 1.4(Jumbo Frame
+		 * Support), set the mtu in our attributes to max_frame_size.
 		 */
 		lp->mtu = vswp->max_frame_size;
+	} else if (VSW_VER_EQ(ldcp, 1, 3)) {
+		/*
+		 * If the version negotiated with peer is == 1.3 (Vlan Tag
+		 * Support) set the attr.mtu to ETHERMAX + VLAN_TAGSZ.
+		 */
+		lp->mtu = ETHERMAX + VLAN_TAGSZ;
 	} else {
 		vsw_port_t	*portp = ldcp->ldc_port;
 		/*
 		 * Pre-1.3 peers expect max frame size of ETHERMAX.
-		 * We can negotiate that size with those peers provided the
-		 * following conditions are true:
-		 * - Our max_frame_size is greater only by VLAN_TAGSZ (4).
-		 * - Only pvid is defined for our peer and there are no vids.
-		 * If the above conditions are true, then we can send/recv only
-		 * untagged frames of max size ETHERMAX. Note that pvid of the
-		 * peer can be different, as vsw has to serve the vnet in that
-		 * vlan even if itself is not assigned to that vlan.
+		 * We can negotiate that size with those peers provided only
+		 * pvid is defined for our peer and there are no vids. Then we
+		 * can send/recv only untagged frames of max size ETHERMAX.
+		 * Note that pvid of the peer can be different, as vsw has to
+		 * serve the vnet in that vlan even if itself is not assigned
+		 * to that vlan.
 		 */
-		if ((vswp->max_frame_size == ETHERMAX + VLAN_TAGSZ) &&
-		    portp->nvids == 0) {
+		if (portp->nvids == 0) {
 			lp->mtu = ETHERMAX;
 		}
 	}
@@ -2522,6 +2667,10 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 	vsw_t			*vswp = ldcp->ldc_vswp;
 	vsw_port_t		*port = ldcp->ldc_port;
 	uint64_t		macaddr = 0;
+	lane_t			*lane_out = &ldcp->lane_out;
+	lane_t			*lane_in = &ldcp->lane_in;
+	uint32_t		mtu;
+	boolean_t		ack = B_TRUE;
 	int			i;
 
 	D1(vswp, "%s(%lld) enter", __func__, ldcp->ldc_id);
@@ -2543,9 +2692,46 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 		 * If the attributes are unacceptable then we NACK back.
 		 */
 		if (vsw_check_attr(attr_pkt, ldcp)) {
+			ack = B_FALSE;
 
 			DERR(vswp, "%s (chan %d): invalid attributes",
 			    __func__, ldcp->ldc_id);
+
+		} else {
+
+			if (VSW_VER_GTEQ(ldcp, 1, 4)) {
+				/*
+				 * Versions >= 1.4:
+				 * The mtu is negotiated down to the
+				 * minimum of our mtu and peer's mtu.
+				 */
+				mtu = MIN(attr_pkt->mtu, vswp->max_frame_size);
+
+				/*
+				 * If we have received an ack for the attr info
+				 * that we sent, then check if the mtu computed
+				 * above matches the mtu that the peer had ack'd
+				 * (saved in local hparams). If they don't
+				 * match, we fail the handshake.
+				 */
+				if (lane_out->lstate & VSW_ATTR_ACK_RECV) {
+					if (mtu != lane_out->mtu) {
+						/* send NACK */
+						ack = B_FALSE;
+					}
+				} else {
+					/*
+					 * Save the mtu computed above in our
+					 * attr parameters, so it gets sent in
+					 * the attr info from us to the peer.
+					 */
+					lane_out->mtu = mtu;
+				}
+			}
+
+		}
+
+		if (ack == B_FALSE) {
 
 			vsw_free_lane_resources(ldcp, INBOUND);
 
@@ -2565,13 +2751,18 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 		 * Otherwise store attributes for this lane and update
 		 * lane state.
 		 */
-		ldcp->lane_in.mtu = attr_pkt->mtu;
-		ldcp->lane_in.addr = attr_pkt->addr;
-		ldcp->lane_in.addr_type = attr_pkt->addr_type;
-		ldcp->lane_in.xfer_mode = attr_pkt->xfer_mode;
-		ldcp->lane_in.ack_freq = attr_pkt->ack_freq;
+		lane_in->mtu = attr_pkt->mtu;
+		lane_in->addr = attr_pkt->addr;
+		lane_in->addr_type = attr_pkt->addr_type;
+		lane_in->xfer_mode = attr_pkt->xfer_mode;
+		lane_in->ack_freq = attr_pkt->ack_freq;
 
-		macaddr = ldcp->lane_in.addr;
+		if (VSW_VER_GTEQ(ldcp, 1, 4)) {
+			/* save the MIN mtu in the msg to be replied */
+			attr_pkt->mtu = mtu;
+		}
+
+		macaddr = lane_in->addr;
 		for (i = ETHERADDRL - 1; i >= 0; i--) {
 			port->p_macaddr.ether_addr_octet[i] = macaddr & 0xFF;
 			macaddr >>= 8;
@@ -2586,16 +2777,16 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 		/* setup device specifc xmit routines */
 		mutex_enter(&port->tx_lock);
 		if ((VSW_VER_GTEQ(ldcp, 1, 2) &&
-		    (ldcp->lane_in.xfer_mode & VIO_DRING_MODE_V1_2)) ||
+		    (lane_in->xfer_mode & VIO_DRING_MODE_V1_2)) ||
 		    (VSW_VER_LT(ldcp, 1, 2) &&
-		    (ldcp->lane_in.xfer_mode == VIO_DRING_MODE_V1_0))) {
+		    (lane_in->xfer_mode == VIO_DRING_MODE_V1_0))) {
 			D2(vswp, "%s: mode = VIO_DRING_MODE", __func__);
 			port->transmit = vsw_dringsend;
-		} else if (ldcp->lane_in.xfer_mode == VIO_DESC_MODE) {
+		} else if (lane_in->xfer_mode == VIO_DESC_MODE) {
 			D2(vswp, "%s: mode = VIO_DESC_MODE", __func__);
 			vsw_create_privring(ldcp);
 			port->transmit = vsw_descrsend;
-			ldcp->lane_out.xfer_mode = VIO_DESC_MODE;
+			lane_out->xfer_mode = VIO_DESC_MODE;
 		}
 
 		/*
@@ -2603,7 +2794,7 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 		 * So, set hio_capable to true only when in DRING mode.
 		 */
 		if (VSW_VER_GTEQ(ldcp, 1, 3) &&
-		    (ldcp->lane_in.xfer_mode != VIO_DESC_MODE)) {
+		    (lane_in->xfer_mode != VIO_DESC_MODE)) {
 			(void) atomic_swap_32(&port->p_hio_capable, B_TRUE);
 		} else {
 			(void) atomic_swap_32(&port->p_hio_capable, B_FALSE);
@@ -2616,7 +2807,7 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 
 		DUMP_TAG_PTR((vio_msg_tag_t *)attr_pkt);
 
-		ldcp->lane_in.lstate |= VSW_ATTR_ACK_SENT;
+		lane_in->lstate |= VSW_ATTR_ACK_SENT;
 
 		(void) vsw_send_msg(ldcp, (void *)attr_pkt,
 		    sizeof (vnet_attr_msg_t), B_TRUE);
@@ -2630,7 +2821,40 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 		if (vsw_check_flag(ldcp, OUTBOUND, VSW_ATTR_ACK_RECV))
 			return;
 
-		ldcp->lane_out.lstate |= VSW_ATTR_ACK_RECV;
+		if (VSW_VER_GTEQ(ldcp, 1, 4)) {
+			/*
+			 * Versions >= 1.4:
+			 * The ack msg sent by the peer contains the minimum of
+			 * our mtu (that we had sent in our attr info) and the
+			 * peer's mtu.
+			 *
+			 * If we have sent an ack for the attr info msg from
+			 * the peer, check if the mtu that was computed then
+			 * (saved in lane_out params) matches the mtu that the
+			 * peer has ack'd. If they don't match, we fail the
+			 * handshake.
+			 */
+			if (lane_in->lstate & VSW_ATTR_ACK_SENT) {
+				if (lane_out->mtu != attr_pkt->mtu) {
+					return;
+				}
+			} else {
+				/*
+				 * If the mtu ack'd by the peer is > our mtu
+				 * fail handshake. Otherwise, save the mtu, so
+				 * we can validate it when we receive attr info
+				 * from our peer.
+				 */
+				if (attr_pkt->mtu > lane_out->mtu) {
+					return;
+				}
+				if (attr_pkt->mtu <= lane_out->mtu) {
+					lane_out->mtu = attr_pkt->mtu;
+				}
+			}
+		}
+
+		lane_out->lstate |= VSW_ATTR_ACK_RECV;
 		vsw_next_milestone(ldcp);
 		break;
 
@@ -2640,7 +2864,7 @@ vsw_process_ctrl_attr_pkt(vsw_ldc_t *ldcp, void *pkt)
 		if (vsw_check_flag(ldcp, OUTBOUND, VSW_ATTR_NACK_RECV))
 			return;
 
-		ldcp->lane_out.lstate |= VSW_ATTR_NACK_RECV;
+		lane_out->lstate |= VSW_ATTR_NACK_RECV;
 		vsw_next_milestone(ldcp);
 		break;
 
@@ -3217,6 +3441,7 @@ vsw_process_data_dring_pkt(vsw_ldc_t *ldcp, void *dpkt)
 	boolean_t		prev_desc_ack = B_FALSE;
 	int			read_attempts = 0;
 	struct ether_header	*ehp;
+	lane_t			*lp = &ldcp->lane_out;
 
 	D1(vswp, "%s(%lld): enter", __func__, ldcp->ldc_id);
 
@@ -3345,6 +3570,13 @@ vsw_recheck_desc:
 			    __func__, ldcp->ldc_id, pos, &desc,
 			    desc.hdr.dstate, desc.nbytes);
 
+			if ((desc.nbytes < ETHERMIN) ||
+			    (desc.nbytes > lp->mtu)) {
+				/* invalid size; drop the packet */
+				ldcp->ldc_stats.ierrors++;
+				goto vsw_process_desc_done;
+			}
+
 			/*
 			 * Ensure that we ask ldc for an aligned
 			 * number of bytes. Data is padded to align on 8
@@ -3352,29 +3584,34 @@ vsw_recheck_desc:
 			 * i.e. minus that padding.
 			 */
 			nbytes = (desc.nbytes + VNET_IPALIGN + 7) & ~7;
-
-			mp = vio_multipool_allocb(&ldcp->vmp, nbytes);
-			if (mp == NULL) {
-				ldcp->ldc_stats.rx_vio_allocb_fail++;
-				/*
-				 * No free receive buffers available, so
-				 * fallback onto allocb(9F). Make sure that
-				 * we get a data buffer which is a multiple
-				 * of 8 as this is required by ldc_mem_copy.
-				 */
-				DTRACE_PROBE(allocb);
-				if ((mp = allocb(desc.nbytes + VNET_IPALIGN + 8,
-				    BPRI_MED)) == NULL) {
-					DERR(vswp, "%s(%ld): allocb failed",
-					    __func__, ldcp->ldc_id);
-					rng_rv = vnet_dring_entry_set_dstate(
-					    pub_addr, dp->dring_mtype,
-					    dp->handle, pos, pos,
-					    VIO_DESC_DONE);
-					ldcp->ldc_stats.ierrors++;
-					ldcp->ldc_stats.rx_allocb_fail++;
-					break;
+			if (nbytes > ldcp->max_rxpool_size) {
+				mp = allocb(desc.nbytes + VNET_IPALIGN + 8,
+				    BPRI_MED);
+			} else {
+				mp = vio_multipool_allocb(&ldcp->vmp, nbytes);
+				if (mp == NULL) {
+					ldcp->ldc_stats.rx_vio_allocb_fail++;
+					/*
+					 * No free receive buffers available,
+					 * so fallback onto allocb(9F). Make
+					 * sure that we get a data buffer which
+					 * is a multiple of 8 as this is
+					 * required by ldc_mem_copy.
+					 */
+					DTRACE_PROBE(allocb);
+					mp = allocb(desc.nbytes +
+					    VNET_IPALIGN + 8, BPRI_MED);
 				}
+			}
+			if (mp == NULL) {
+				DERR(vswp, "%s(%ld): allocb failed",
+				    __func__, ldcp->ldc_id);
+				rng_rv = vnet_dring_entry_set_dstate(pub_addr,
+				    dp->dring_mtype, dp->handle, pos, pos,
+				    VIO_DESC_DONE);
+				ldcp->ldc_stats.ierrors++;
+				ldcp->ldc_stats.rx_allocb_fail++;
+				break;
 			}
 
 			rv = ldc_mem_copy(ldcp->ldc_handle,
@@ -3434,6 +3671,7 @@ vsw_recheck_desc:
 				chain++;
 			}
 
+vsw_process_desc_done:
 			/* mark we are finished with this descriptor */
 			if ((rng_rv = vnet_dring_entry_set_dstate(pub_addr,
 			    dp->dring_mtype, dp->handle, pos, pos,
@@ -4700,6 +4938,7 @@ vsw_create_dring_info_pkt(vsw_ldc_t *ldcp)
 	vio_dring_reg_msg_t	*mp;
 	dring_info_t		*dp;
 	vsw_t			*vswp = ldcp->ldc_vswp;
+	int			rv;
 
 	D1(vswp, "vsw_create_dring_info_pkt enter\n");
 
@@ -4709,6 +4948,15 @@ vsw_create_dring_info_pkt(vsw_ldc_t *ldcp)
 	 */
 	if ((dp = vsw_create_dring(ldcp)) == NULL)
 		return (NULL);
+
+	/* Allocate pools of receive mblks */
+	rv = vsw_init_multipools(ldcp, vswp);
+	if (rv) {
+		DWARN(vswp, "%s: unable to create free mblk pools for"
+		    " channel %ld (rv %d)", __func__, ldcp->ldc_id, rv);
+		vsw_free_lane_resources(ldcp, OUTBOUND);
+		return (NULL);
+	}
 
 	mp = kmem_zalloc(sizeof (vio_dring_reg_msg_t), KM_SLEEP);
 
@@ -5109,6 +5357,7 @@ vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
 	static char		*name = "vsw_setup_ring";
 	int			i, j, nc, rv;
 	size_t			data_sz;
+	void			*data_addr;
 
 	priv_addr = dp->priv_addr;
 	pub_addr = dp->pub_addr;
@@ -5121,15 +5370,41 @@ vsw_setup_ring(vsw_ldc_t *ldcp, dring_info_t *dp)
 	 * the data the descriptors will refer to.
 	 */
 	data_sz = vswp->max_frame_size + VNET_IPALIGN + VNET_LDCALIGN;
-	data_sz = VNET_ROUNDUP_2K(data_sz);
+
+	/*
+	 * In order to ensure that the number of ldc cookies per descriptor is
+	 * limited to be within the default MAX_COOKIES (2), we take the steps
+	 * outlined below:
+	 *
+	 * Align the entire data buffer area to 8K and carve out per descriptor
+	 * data buffers starting from this 8K aligned base address.
+	 *
+	 * We round up the mtu specified to be a multiple of 2K or 4K.
+	 * For sizes up to 12K we round up the size to the next 2K.
+	 * For sizes > 12K we round up to the next 4K (otherwise sizes such as
+	 * 14K could end up needing 3 cookies, with the buffer spread across
+	 * 3 8K pages:  8K+6K, 2K+8K+2K, 6K+8K, ...).
+	 */
+	if (data_sz <= VNET_12K) {
+		data_sz = VNET_ROUNDUP_2K(data_sz);
+	} else {
+		data_sz = VNET_ROUNDUP_4K(data_sz);
+	}
+
 	dp->desc_data_sz = data_sz;
-	dp->data_sz = vsw_ntxds * data_sz;
-	dp->data_addr = kmem_alloc(dp->data_sz, KM_SLEEP);
+
+	/* allocate extra 8K bytes for alignment */
+	dp->data_sz = (vsw_ntxds * data_sz) + VNET_8K;
+	data_addr = kmem_alloc(dp->data_sz, KM_SLEEP);
+	dp->data_addr = data_addr;
 
 	D2(vswp, "%s: allocated %lld bytes at 0x%llx\n", name,
 	    dp->data_sz, dp->data_addr);
 
-	tmpp = (uint64_t *)dp->data_addr;
+	/* align the starting address of the data area to 8K */
+	data_addr = (void *)VNET_ROUNDUP_8K((uintptr_t)data_addr);
+
+	tmpp = (uint64_t *)data_addr;
 	offset = dp->desc_data_sz/sizeof (tmpp);
 
 	/*
@@ -5385,14 +5660,18 @@ vsw_check_attr(vnet_attr_msg_t *pkt, vsw_ldc_t *ldcp)
 		}
 	}
 
-	/*
-	 * Note: for the moment we only support ETHER
-	 * frames. This may change in the future.
-	 */
-	if ((pkt->mtu > lp->mtu) || (pkt->mtu <= 0)) {
-		D2(NULL, "vsw_check_attr: invalid MTU (0x%llx)\n",
-		    pkt->mtu);
-		ret = 1;
+	if (VSW_VER_LT(ldcp, 1, 4)) {
+		/* versions < 1.4, mtu must match */
+		if (pkt->mtu != lp->mtu) {
+			D2(NULL, "vsw_check_attr: invalid MTU (0x%llx)\n",
+			    pkt->mtu);
+			ret = 1;
+		}
+	} else {
+		/* Ver >= 1.4, validate mtu of the peer is at least ETHERMAX */
+		if (pkt->mtu < ETHERMAX) {
+			ret = 1;
+		}
 	}
 
 	D1(NULL, "vsw_check_attr exit\n");

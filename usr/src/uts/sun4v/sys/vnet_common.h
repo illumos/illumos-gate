@@ -27,8 +27,6 @@
 #ifndef _VNET_COMMON_H
 #define	_VNET_COMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -49,9 +47,23 @@ extern "C" {
 #define	VNET_ISS		0x1
 
 #define	VNET_2K			(1 << 11)
+#define	VNET_4K			(1 << 12)
+#define	VNET_8K			(1 << 13)
+#define	VNET_12K		((VNET_8K) + (VNET_4K))
 #define	VNET_IPALIGN		6	/* padding for IP header alignment */
 #define	VNET_LDCALIGN		8	/* padding for ldc_mem_copy() align */
 #define	VNET_ROUNDUP_2K(n)	(((n) + (VNET_2K - 1)) & ~(VNET_2K - 1))
+#define	VNET_ROUNDUP_4K(n)	(((n) + (VNET_4K - 1)) & ~(VNET_4K - 1))
+#define	VNET_ROUNDUP_8K(n)	(((n) + (VNET_8K - 1)) & ~(VNET_8K - 1))
+
+/*
+ * Maximum MTU value currently supported. MAX_COOKIES for data has been defined
+ * already based on ETHERMAX. Hence we limit the MTU to be within 2 8K pages
+ * and take some additional steps (see related code in .c files) to ensure that
+ * ldc cookies for each data buffer is within the MAX_COOKIES. This allows us
+ * to support Jumbo MTUs without changing the size of the descriptor.
+ */
+#define	VNET_MAX_MTU		16000
 
 #define	VNET_NUM_HANDSHAKES	6	/* # of handshake attempts */
 

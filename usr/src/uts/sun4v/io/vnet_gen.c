@@ -24,10 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/errno.h>
+#include <sys/sysmacros.h>
 #include <sys/param.h>
 #include <sys/stream.h>
 #include <sys/strsubr.h>
@@ -91,6 +90,8 @@ static int vgen_read_mdprops(vgen_t *vgenp);
 static void vgen_update_md_prop(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex);
 static void vgen_read_pri_eth_types(vgen_t *vgenp, md_t *mdp,
 	mde_cookie_t node);
+static void vgen_mtu_read(vgen_t *vgenp, md_t *mdp, mde_cookie_t node,
+	uint32_t *mtu);
 static void vgen_detach_ports(vgen_t *vgenp);
 static void vgen_port_detach(vgen_port_t *portp);
 static void vgen_port_list_insert(vgen_port_t *portp);
@@ -211,6 +212,7 @@ static int vgen_dds_rx(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp);
 
 /* externs */
 extern void vnet_dds_rx(void *arg, void *dmsg);
+extern int vnet_mtu_update(vnet_t *vnetp, uint32_t mtu);
 
 /*
  * The handshake process consists of 5 phases defined below, with VH_PHASE0
@@ -311,9 +313,10 @@ static char vgen_vid_propname[] = "vlan-id";
 static char vgen_dvid_propname[] = "default-vlan-id";
 static char port_pvid_propname[] = "remote-port-vlan-id";
 static char port_vid_propname[] = "remote-vlan-id";
+static char vgen_mtu_propname[] = "mtu";
 
 /* versions supported - in decreasing order */
-static vgen_ver_t vgen_versions[VGEN_NUM_VER] = { {1, 3} };
+static vgen_ver_t vgen_versions[VGEN_NUM_VER] = { {1, 4} };
 
 /* Tunables */
 uint32_t vgen_hwd_interval = 5;		/* handshake watchdog freq in sec */
@@ -334,16 +337,21 @@ int vgen_rcv_thread_enabled = 1;	/* Enable Recieve thread */
 uint32_t vgen_chain_len = (VGEN_NRBUFS * 0.6);
 
 /*
- * Tunables for each receive buffer size and number of buffers for
- * each buffer size.
+ * Internal tunables for receive buffer pools, that is,  the size and number of
+ * mblks for each pool. At least 3 sizes must be specified if these are used.
+ * The sizes must be specified in increasing order. Non-zero value of the first
+ * size will be used as a hint to use these values instead of the algorithm
+ * that determines the sizes based on MTU.
  */
-uint32_t vgen_rbufsz1 = VGEN_DBLK_SZ_128;
-uint32_t vgen_rbufsz2 = VGEN_DBLK_SZ_256;
-uint32_t vgen_rbufsz3 = VGEN_DBLK_SZ_2048;
+uint32_t vgen_rbufsz1 = 0;
+uint32_t vgen_rbufsz2 = 0;
+uint32_t vgen_rbufsz3 = 0;
+uint32_t vgen_rbufsz4 = 0;
 
 uint32_t vgen_nrbufs1 = VGEN_NRBUFS;
 uint32_t vgen_nrbufs2 = VGEN_NRBUFS;
 uint32_t vgen_nrbufs3 = VGEN_NRBUFS;
+uint32_t vgen_nrbufs4 = VGEN_NRBUFS;
 
 /*
  * In the absence of "priority-ether-types" property in MD, the following
@@ -424,6 +432,7 @@ extern uint32_t vnet_ldc_mtu;
 extern uint32_t vnet_nrbufs;
 extern uint32_t	vnet_ethermtu;
 extern uint16_t	vnet_default_vlan_id;
+extern boolean_t vnet_jumbo_rxpools;
 
 #ifdef DEBUG
 
@@ -478,8 +487,6 @@ vgen_init(void *vnetp, uint64_t regprop, dev_info_t *vnetdip,
 	    sizeof (struct ether_addr), KM_SLEEP);
 	vgenp->mccount = 0;
 	vgenp->mcsize = VGEN_INIT_MCTAB_SIZE;
-	vgenp->max_frame_size = vnet_ethermtu + sizeof (struct ether_header)
-	    + VLAN_TAGSZ;
 
 	mutex_init(&vgenp->lock, NULL, MUTEX_DRIVER, NULL);
 	rw_init(&vgenp->vgenports.rwlock, NULL, RW_DRIVER, NULL);
@@ -1568,7 +1575,18 @@ vgen_read_mdprops(vgen_t *vgenp)
 		if (vgenp->regprop != cfgh)
 			continue;
 
-		/* now read all properties of this vnet instance */
+		/*
+		 * Read the mtu. Note that we set the mtu of vnet device within
+		 * this routine itself, after validating the range.
+		 */
+		vgen_mtu_read(vgenp, mdp, listp[i], &vnetp->mtu);
+		if (vnetp->mtu < ETHERMTU || vnetp->mtu > VNET_MAX_MTU) {
+			vnetp->mtu = ETHERMTU;
+		}
+		vgenp->max_frame_size = vnetp->mtu +
+		    sizeof (struct ether_header) + VLAN_TAGSZ;
+
+		/* read priority ether types */
 		vgen_read_pri_eth_types(vgenp, mdp, listp[i]);
 
 		/* read vlan id properties of this vnet instance */
@@ -1870,6 +1888,27 @@ vgen_read_pri_eth_types(vgen_t *vgenp, md_t *mdp, mde_cookie_t node)
 	    &vgenp->pri_tx_vmp);
 }
 
+static void
+vgen_mtu_read(vgen_t *vgenp, md_t *mdp, mde_cookie_t node, uint32_t *mtu)
+{
+	int		rv;
+	uint64_t	val;
+	char		*mtu_propname;
+
+	mtu_propname = vgen_mtu_propname;
+
+	rv = md_get_prop_val(mdp, node, mtu_propname, &val);
+	if (rv != 0) {
+		DWARN(vgenp, NULL, "prop(%s) not found", mtu_propname);
+		*mtu = vnet_ethermtu;
+	} else {
+
+		*mtu = val & 0xFFFF;
+		DBG2(vgenp, NULL, "%s(%d): (%d)\n", mtu_propname,
+		    vgenp->instance, *mtu);
+	}
+}
+
 /* register with MD event generator */
 static int
 vgen_mdeg_reg(vgen_t *vgenp)
@@ -2146,7 +2185,13 @@ vgen_update_md_prop(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex)
 	uint16_t	*vids;
 	uint16_t	nvids;
 	vnet_t		*vnetp = vgenp->vnetp;
-	boolean_t	updated_vlans = B_FALSE;
+	uint32_t	mtu;
+	enum		{ MD_init = 0x1,
+			    MD_vlans = 0x2,
+			    MD_mtu = 0x4 } updated;
+	int		rv;
+
+	updated = MD_init;
 
 	/* Read the vlan ids */
 	vgen_vlan_read_ids(vgenp, VGEN_LOCAL, mdp, mdex, &pvid, &vids,
@@ -2157,29 +2202,58 @@ vgen_update_md_prop(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex)
 	    (nvids != vnetp->nvids) ||		/* # of vids changed? */
 	    ((nvids != 0) && (vnetp->nvids != 0) &&	/* vids changed? */
 	    bcmp(vids, vnetp->vids, sizeof (uint16_t) * nvids))) {
-		updated_vlans = B_TRUE;
+		updated |= MD_vlans;
 	}
 
-	if (updated_vlans == B_FALSE) {
+	/* Read mtu */
+	vgen_mtu_read(vgenp, mdp, mdex, &mtu);
+	if (mtu != vnetp->mtu) {
+		if (mtu >= ETHERMTU && mtu <= VNET_MAX_MTU) {
+			updated |= MD_mtu;
+		} else {
+			cmn_err(CE_NOTE, "!vnet%d: Unable to process mtu update"
+			    " as the specified value:%d is invalid\n",
+			    vnetp->instance, mtu);
+		}
+	}
+
+	/* Now process the updated props */
+
+	if (updated & MD_vlans) {
+
+		/* save the new vlan ids */
+		vnetp->pvid = pvid;
+		if (vnetp->nvids != 0) {
+			kmem_free(vnetp->vids,
+			    sizeof (uint16_t) * vnetp->nvids);
+			vnetp->nvids = 0;
+		}
+		if (nvids != 0) {
+			vnetp->nvids = nvids;
+			vnetp->vids = vids;
+		}
+
+		/* reset vlan-unaware peers (ver < 1.3) and restart handshake */
+		vgen_reset_vlan_unaware_ports(vgenp);
+
+	} else {
+
 		if (nvids != 0) {
 			kmem_free(vids, sizeof (uint16_t) * nvids);
 		}
-		return;
 	}
 
-	/* save the new vlan ids */
-	vnetp->pvid = pvid;
-	if (vnetp->nvids != 0) {
-		kmem_free(vnetp->vids, sizeof (uint16_t) * vnetp->nvids);
-		vnetp->nvids = 0;
-	}
-	if (nvids != 0) {
-		vnetp->nvids = nvids;
-		vnetp->vids = vids;
-	}
+	if (updated & MD_mtu) {
 
-	/* reset vlan-unaware peers (ver < 1.3) and restart handshake */
-	vgen_reset_vlan_unaware_ports(vgenp);
+		DBG2(vgenp, NULL, "curr_mtu(%d) new_mtu(%d)\n",
+		    vnetp->mtu, mtu);
+
+		rv = vnet_mtu_update(vnetp, mtu);
+		if (rv == 0) {
+			vgenp->max_frame_size = mtu +
+			    sizeof (struct ether_header) + VLAN_TAGSZ;
+		}
+	}
 }
 
 /* add a new port to the device */
@@ -2560,6 +2634,108 @@ vgen_port_stat(vgen_port_t *portp, uint_t stat)
 	return (val);
 }
 
+/* allocate receive resources */
+static int
+vgen_init_multipools(vgen_ldc_t *ldcp)
+{
+	size_t		data_sz;
+	vgen_t		*vgenp = LDC_TO_VGEN(ldcp);
+	int		status;
+	uint32_t	sz1 = 0;
+	uint32_t	sz2 = 0;
+	uint32_t	sz3 = 0;
+	uint32_t	sz4 = 0;
+
+	/*
+	 * We round up the mtu specified to be a multiple of 2K.
+	 * We then create rx pools based on the rounded up size.
+	 */
+	data_sz = vgenp->max_frame_size + VNET_IPALIGN + VNET_LDCALIGN;
+	data_sz = VNET_ROUNDUP_2K(data_sz);
+
+	/*
+	 * If pool sizes are specified, use them. Note that the presence of
+	 * the first tunable will be used as a hint.
+	 */
+	if (vgen_rbufsz1 != 0) {
+
+		sz1 = vgen_rbufsz1;
+		sz2 = vgen_rbufsz2;
+		sz3 = vgen_rbufsz3;
+		sz4 = vgen_rbufsz4;
+
+		if (sz4 == 0) { /* need 3 pools */
+
+			ldcp->max_rxpool_size = sz3;
+			status = vio_init_multipools(&ldcp->vmp,
+			    VGEN_NUM_VMPOOLS, sz1, sz2, sz3, vgen_nrbufs1,
+			    vgen_nrbufs2, vgen_nrbufs3);
+
+		} else {
+
+			ldcp->max_rxpool_size = sz4;
+			status = vio_init_multipools(&ldcp->vmp,
+			    VGEN_NUM_VMPOOLS + 1, sz1, sz2, sz3, sz4,
+			    vgen_nrbufs1, vgen_nrbufs2, vgen_nrbufs3,
+			    vgen_nrbufs4);
+		}
+		return (status);
+	}
+
+	/*
+	 * Pool sizes are not specified. We select the pool sizes based on the
+	 * mtu if vnet_jumbo_rxpools is enabled.
+	 */
+	if (vnet_jumbo_rxpools == B_FALSE || data_sz == VNET_2K) {
+		/*
+		 * Receive buffer pool allocation based on mtu is disabled.
+		 * Use the default mechanism of standard size pool allocation.
+		 */
+		sz1 = VGEN_DBLK_SZ_128;
+		sz2 = VGEN_DBLK_SZ_256;
+		sz3 = VGEN_DBLK_SZ_2048;
+		ldcp->max_rxpool_size = sz3;
+
+		status = vio_init_multipools(&ldcp->vmp, VGEN_NUM_VMPOOLS,
+		    sz1, sz2, sz3,
+		    vgen_nrbufs1, vgen_nrbufs2, vgen_nrbufs3);
+
+		return (status);
+	}
+
+	switch (data_sz) {
+
+	case VNET_4K:
+
+		sz1 = VGEN_DBLK_SZ_128;
+		sz2 = VGEN_DBLK_SZ_256;
+		sz3 = VGEN_DBLK_SZ_2048;
+		sz4 = sz3 << 1;			/* 4K */
+		ldcp->max_rxpool_size = sz4;
+
+		status = vio_init_multipools(&ldcp->vmp, VGEN_NUM_VMPOOLS + 1,
+		    sz1, sz2, sz3, sz4,
+		    vgen_nrbufs1, vgen_nrbufs2, vgen_nrbufs3, vgen_nrbufs4);
+		break;
+
+	default:	/* data_sz:  4K+ to 16K */
+
+		sz1 = VGEN_DBLK_SZ_256;
+		sz2 = VGEN_DBLK_SZ_2048;
+		sz3 = data_sz >> 1;	/* Jumbo-size/2 */
+		sz4 = data_sz;		/* Jumbo-size  */
+		ldcp->max_rxpool_size = sz4;
+
+		status = vio_init_multipools(&ldcp->vmp, VGEN_NUM_VMPOOLS + 1,
+		    sz1, sz2, sz3, sz4,
+		    vgen_nrbufs1, vgen_nrbufs2, vgen_nrbufs3, vgen_nrbufs4);
+		break;
+
+	}
+
+	return (status);
+}
+
 /* attach the channel corresponding to the given ldc_id to the port */
 static int
 vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
@@ -2651,9 +2827,7 @@ vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
 	attach_state |= AST_alloc_tx_ring;
 
 	/* allocate receive resources */
-	status = vio_init_multipools(&ldcp->vmp, VGEN_NUM_VMPOOLS,
-	    vgen_rbufsz1, vgen_rbufsz2, vgen_rbufsz3,
-	    vgen_nrbufs1, vgen_nrbufs2, vgen_nrbufs3);
+	status = vgen_init_multipools(ldcp);
 	if (status != 0) {
 		goto ldc_attach_failed;
 	}
@@ -3087,11 +3261,35 @@ vgen_init_tbufs(vgen_ldc_t *ldcp)
 	bzero(ldcp->tbufp, sizeof (*tbufp) * (ldcp->num_txds));
 	bzero(ldcp->txdp, sizeof (*txdp) * (ldcp->num_txds));
 
+	/*
+	 * In order to ensure that the number of ldc cookies per descriptor is
+	 * limited to be within the default MAX_COOKIES (2), we take the steps
+	 * outlined below:
+	 *
+	 * Align the entire data buffer area to 8K and carve out per descriptor
+	 * data buffers starting from this 8K aligned base address.
+	 *
+	 * We round up the mtu specified to be a multiple of 2K or 4K.
+	 * For sizes up to 12K we round up the size to the next 2K.
+	 * For sizes > 12K we round up to the next 4K (otherwise sizes such as
+	 * 14K could end up needing 3 cookies, with the buffer spread across
+	 * 3 8K pages:  8K+6K, 2K+8K+2K, 6K+8K, ...).
+	 */
 	data_sz = vgenp->max_frame_size + VNET_IPALIGN + VNET_LDCALIGN;
-	data_sz = VNET_ROUNDUP_2K(data_sz);
-	ldcp->tx_data_sz = data_sz * ldcp->num_txds;
+	if (data_sz <= VNET_12K) {
+		data_sz = VNET_ROUNDUP_2K(data_sz);
+	} else {
+		data_sz = VNET_ROUNDUP_4K(data_sz);
+	}
+
+	/* allocate extra 8K bytes for alignment */
+	ldcp->tx_data_sz = (data_sz * ldcp->num_txds) + VNET_8K;
 	datap = kmem_zalloc(ldcp->tx_data_sz, KM_SLEEP);
 	ldcp->tx_datap = datap;
+
+
+	/* align the starting address of the data area to 8K */
+	datap = (caddr_t)VNET_ROUNDUP_8K((uintptr_t)datap);
 
 	/*
 	 * for each private descriptor, allocate a ldc mem_handle which is
@@ -4131,13 +4329,18 @@ vgen_set_vnet_proto_ops(vgen_ldc_t *ldcp)
 	vgen_hparams_t	*lp = &ldcp->local_hparams;
 	vgen_t		*vgenp = LDC_TO_VGEN(ldcp);
 
-	if (VGEN_VER_GTEQ(ldcp, 1, 3)) {
-
+	if (VGEN_VER_GTEQ(ldcp, 1, 4)) {
 		/*
-		 * If the version negotiated with peer is >= 1.3,
-		 * set the mtu in our attributes to max_frame_size.
+		 * If the version negotiated with peer is >= 1.4(Jumbo Frame
+		 * Support), set the mtu in our attributes to max_frame_size.
 		 */
 		lp->mtu = vgenp->max_frame_size;
+	} else  if (VGEN_VER_EQ(ldcp, 1, 3)) {
+		/*
+		 * If the version negotiated with peer is == 1.3 (Vlan Tag
+		 * Support) set the attr.mtu to ETHERMAX + VLAN_TAGSZ.
+		 */
+		lp->mtu = ETHERMAX + VLAN_TAGSZ;
 	} else {
 		vgen_port_t	*portp = ldcp->portp;
 		vnet_t		*vnetp = vgenp->vnetp;
@@ -4145,14 +4348,12 @@ vgen_set_vnet_proto_ops(vgen_ldc_t *ldcp)
 		 * Pre-1.3 peers expect max frame size of ETHERMAX.
 		 * We can negotiate that size with those peers provided the
 		 * following conditions are true:
-		 * - Our max_frame_size is greater only by VLAN_TAGSZ (4).
 		 * - Only pvid is defined for our peer and there are no vids.
 		 * - pvids are equal.
 		 * If the above conditions are true, then we can send/recv only
 		 * untagged frames of max size ETHERMAX.
 		 */
-		if ((vgenp->max_frame_size == ETHERMAX + VLAN_TAGSZ) &&
-		    portp->nvids == 0 && portp->pvid == vnetp->pvid) {
+		if (portp->nvids == 0 && portp->pvid == vnetp->pvid) {
 			lp->mtu = ETHERMAX;
 		}
 	}
@@ -4814,11 +5015,22 @@ vgen_check_attr_info(vgen_ldc_t *ldcp, vnet_attr_msg_t *msg)
 {
 	vgen_hparams_t	*lp = &ldcp->local_hparams;
 
-	if ((msg->mtu != lp->mtu) ||
-	    (msg->addr_type != ADDR_TYPE_MAC) ||
+	if ((msg->addr_type != ADDR_TYPE_MAC) ||
 	    (msg->ack_freq > 64) ||
 	    (msg->xfer_mode != lp->xfer_mode)) {
 		return (VGEN_FAILURE);
+	}
+
+	if (VGEN_VER_LT(ldcp, 1, 4)) {
+		/* versions < 1.4, mtu must match */
+		if (msg->mtu != lp->mtu) {
+			return (VGEN_FAILURE);
+		}
+	} else {
+		/* Ver >= 1.4, validate mtu of the peer is at least ETHERMAX */
+		if (msg->mtu < ETHERMAX) {
+			return (VGEN_FAILURE);
+		}
 	}
 
 	return (VGEN_SUCCESS);
@@ -4831,10 +5043,13 @@ vgen_check_attr_info(vgen_ldc_t *ldcp, vnet_attr_msg_t *msg)
 static int
 vgen_handle_attr_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 {
-	vgen_t *vgenp = LDC_TO_VGEN(ldcp);
-	vnet_attr_msg_t *attrmsg = (vnet_attr_msg_t *)tagp;
-	int		ack = 0;
+	vgen_t		*vgenp = LDC_TO_VGEN(ldcp);
+	vnet_attr_msg_t	*msg = (vnet_attr_msg_t *)tagp;
+	vgen_hparams_t	*lp = &ldcp->local_hparams;
+	vgen_hparams_t	*rp = &ldcp->peer_hparams;
+	int		ack = 1;
 	int		rv = 0;
+	uint32_t	mtu;
 
 	DBG1(vgenp, ldcp, "enter\n");
 	if (ldcp->hphase != VH_PHASE2) {
@@ -4850,23 +5065,64 @@ vgen_handle_attr_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		ldcp->hstate |= ATTR_INFO_RCVD;
 
 		/* save peer's values */
-		ldcp->peer_hparams.mtu = attrmsg->mtu;
-		ldcp->peer_hparams.addr = attrmsg->addr;
-		ldcp->peer_hparams.addr_type = attrmsg->addr_type;
-		ldcp->peer_hparams.xfer_mode = attrmsg->xfer_mode;
-		ldcp->peer_hparams.ack_freq = attrmsg->ack_freq;
+		rp->mtu = msg->mtu;
+		rp->addr = msg->addr;
+		rp->addr_type = msg->addr_type;
+		rp->xfer_mode = msg->xfer_mode;
+		rp->ack_freq = msg->ack_freq;
 
-		if (vgen_check_attr_info(ldcp, attrmsg) == VGEN_FAILURE) {
+		rv = vgen_check_attr_info(ldcp, msg);
+		if (rv == VGEN_FAILURE) {
 			/* unsupported attr, send NACK */
-			tagp->vio_subtype = VIO_SUBTYPE_NACK;
+			ack = 0;
 		} else {
-			ack = 1;
+
+			if (VGEN_VER_GTEQ(ldcp, 1, 4)) {
+
+				/*
+				 * Versions >= 1.4:
+				 * The mtu is negotiated down to the
+				 * minimum of our mtu and peer's mtu.
+				 */
+				mtu = MIN(msg->mtu, vgenp->max_frame_size);
+
+				/*
+				 * If we have received an ack for the attr info
+				 * that we sent, then check if the mtu computed
+				 * above matches the mtu that the peer had ack'd
+				 * (saved in local hparams). If they don't
+				 * match, we fail the handshake.
+				 */
+				if (ldcp->hstate & ATTR_ACK_RCVD) {
+					if (mtu != lp->mtu) {
+						/* send NACK */
+						ack = 0;
+					}
+				} else {
+					/*
+					 * Save the mtu computed above in our
+					 * attr parameters, so it gets sent in
+					 * the attr info from us to the peer.
+					 */
+					lp->mtu = mtu;
+				}
+
+				/* save the MIN mtu in the msg to be replied */
+				msg->mtu = mtu;
+
+			}
+		}
+
+
+		if (ack) {
 			tagp->vio_subtype = VIO_SUBTYPE_ACK;
+		} else {
+			tagp->vio_subtype = VIO_SUBTYPE_NACK;
 		}
 		tagp->vio_sid = ldcp->local_sid;
 
 		/* send reply msg back to peer */
-		rv = vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (*attrmsg),
+		rv = vgen_sendmsg(ldcp, (caddr_t)tagp, sizeof (*msg),
 		    B_FALSE);
 		if (rv != VGEN_SUCCESS) {
 			return (rv);
@@ -4888,6 +5144,39 @@ vgen_handle_attr_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		break;
 
 	case VIO_SUBTYPE_ACK:
+
+		if (VGEN_VER_GTEQ(ldcp, 1, 4)) {
+			/*
+			 * Versions >= 1.4:
+			 * The ack msg sent by the peer contains the minimum of
+			 * our mtu (that we had sent in our attr info) and the
+			 * peer's mtu.
+			 *
+			 * If we have sent an ack for the attr info msg from
+			 * the peer, check if the mtu that was computed then
+			 * (saved in local hparams) matches the mtu that the
+			 * peer has ack'd. If they don't match, we fail the
+			 * handshake.
+			 */
+			if (ldcp->hstate & ATTR_ACK_SENT) {
+				if (lp->mtu != msg->mtu) {
+					return (VGEN_FAILURE);
+				}
+			} else {
+				/*
+				 * If the mtu ack'd by the peer is > our mtu
+				 * fail handshake. Otherwise, save the mtu, so
+				 * we can validate it when we receive attr info
+				 * from our peer.
+				 */
+				if (msg->mtu > lp->mtu) {
+					return (VGEN_FAILURE);
+				}
+				if (msg->mtu <= lp->mtu) {
+					lp->mtu = msg->mtu;
+				}
+			}
+		}
 
 		ldcp->hstate |= ATTR_ACK_RCVD;
 
@@ -5482,6 +5771,7 @@ vgen_process_dring_data(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 	struct ether_header *ehp;
 	vio_dring_msg_t *dringmsg = (vio_dring_msg_t *)tagp;
 	vgen_t *vgenp = LDC_TO_VGEN(ldcp);
+	vgen_hparams_t	*lp = &ldcp->local_hparams;
 
 	DBG1(vgenp, ldcp, "enter\n");
 
@@ -5550,6 +5840,7 @@ vgen_recv_retry:
 		}
 
 		if ((rxd.nbytes < ETHERMIN) ||
+		    (rxd.nbytes > lp->mtu) ||
 		    (rxd.ncookies == 0) ||
 		    (rxd.ncookies > MAX_COOKIES)) {
 			rxd_err = B_TRUE;
@@ -5560,18 +5851,22 @@ vgen_recv_retry:
 			 * If this fails, use allocb().
 			 */
 			nbytes = (VNET_IPALIGN + rxd.nbytes + 7) & ~7;
-			mp = vio_multipool_allocb(&ldcp->vmp, nbytes);
-			if (!mp) {
-				/*
-				 * The data buffer returned by
-				 * allocb(9F) is 8byte aligned. We
-				 * allocate extra 8 bytes to ensure
-				 * size is multiple of 8 bytes for
-				 * ldc_mem_copy().
-				 */
-				statsp->rx_vio_allocb_fail++;
+			if (nbytes > ldcp->max_rxpool_size) {
 				mp = allocb(VNET_IPALIGN + rxd.nbytes + 8,
 				    BPRI_MED);
+			} else {
+				mp = vio_multipool_allocb(&ldcp->vmp, nbytes);
+				if (mp == NULL) {
+					statsp->rx_vio_allocb_fail++;
+					/*
+					 * Data buffer returned by allocb(9F)
+					 * is 8byte aligned. We allocate extra
+					 * 8 bytes to ensure size is multiple
+					 * of 8 bytes for ldc_mem_copy().
+					 */
+					mp = allocb(VNET_IPALIGN +
+					    rxd.nbytes + 8, BPRI_MED);
+				}
 			}
 		}
 		if ((rxd_err) || (mp == NULL)) {

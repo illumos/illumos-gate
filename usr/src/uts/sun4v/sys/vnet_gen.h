@@ -27,8 +27,6 @@
 #ifndef _VNET_GEN_H
 #define	_VNET_GEN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -223,6 +221,7 @@ typedef struct vgen_ldc {
 	caddr_t			tx_datap;	/* prealloc'd tx data area */
 	size_t			tx_data_sz;	/* alloc'd size of tx databuf */
 	vio_multi_pool_t	vmp;		/* rx mblk pools */
+	uint32_t		max_rxpool_size; /* max size of rxpool in use */
 	uint64_t		*ldcmsg;	/* msg buffer for ldc_read() */
 	uint64_t		msglen;		/* size of ldcmsg */
 

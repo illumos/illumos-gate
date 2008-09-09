@@ -27,8 +27,6 @@
 #ifndef _VNET_H
 #define	_VNET_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -121,7 +119,7 @@ typedef struct vnet {
 	mod_hash_t		*fdb_hashp;	/* forwarding database */
 	vnet_res_t		*vsw_fp;	/* cached fdb entry of vsw */
 	krwlock_t		vsw_fp_rw;	/* lock to protect vsw_fp */
-	uint32_t		max_frame_size;	/* max frame size supported */
+	uint32_t		mtu;		/* mtu of the device */
 
 	uint16_t		default_vlan_id; /* default vlan id */
 	uint16_t		pvid;		/* port vlan id (untagged) */
