@@ -674,7 +674,6 @@ netstack_apply_create(kmutex_t *lockp, netstack_t *ns, int moduleid)
 		DTRACE_PROBE2(netstack__create__start,
 		    netstackid_t, stackid,
 		    netstack_t *, ns);
-printf("ns[%d](%d).create\n", moduleid, stackid);
 		result = (ns_reg[moduleid].nr_create)(stackid, ns);
 		DTRACE_PROBE2(netstack__create__end,
 		    void *, result, netstack_t *, ns);
@@ -736,7 +735,6 @@ netstack_apply_shutdown(kmutex_t *lockp, netstack_t *ns, int moduleid)
 		DTRACE_PROBE2(netstack__shutdown__start,
 		    netstackid_t, stackid,
 		    void *, netstack_module);
-printf("ns[%d](%d).shutdown\n", moduleid, stackid);
 		(ns_reg[moduleid].nr_shutdown)(stackid, netstack_module);
 		DTRACE_PROBE1(netstack__shutdown__end,
 		    netstack_t *, ns);
@@ -796,7 +794,6 @@ netstack_apply_destroy(kmutex_t *lockp, netstack_t *ns, int moduleid)
 		DTRACE_PROBE2(netstack__destroy__start,
 		    netstackid_t, stackid,
 		    void *, netstack_module);
-printf("ns[%d](%d).destroy\n", moduleid, stackid);
 		(ns_reg[moduleid].nr_destroy)(stackid, netstack_module);
 		DTRACE_PROBE1(netstack__destroy__end,
 		    netstack_t *, ns);
