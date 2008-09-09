@@ -1275,10 +1275,31 @@ rge_m_resources(void *arg)
 static boolean_t
 rge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
+	rge_t *rgep = arg;
+
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM: {
 		uint32_t *hcksum_txflags = cap_data;
-		*hcksum_txflags = HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM;
+		switch (rgep->chipid.mac_ver) {
+		case MAC_VER_8169:
+		case MAC_VER_8169S_D:
+		case MAC_VER_8169S_E:
+		case MAC_VER_8169SB:
+		case MAC_VER_8169SC:
+		case MAC_VER_8168:
+		case MAC_VER_8168B_B:
+		case MAC_VER_8168B_C:
+		case MAC_VER_8101E:
+			*hcksum_txflags = HCKSUM_INET_FULL_V4 |
+			    HCKSUM_IPHDRCKSUM;
+			break;
+		case MAC_VER_8168B_D:
+		case MAC_VER_8101E_B:
+		case MAC_VER_8101E_C:
+		default:
+			*hcksum_txflags = 0;
+			break;
+		}
 		break;
 	}
 	case MAC_CAPAB_POLL:

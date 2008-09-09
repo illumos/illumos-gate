@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "rge.h"
 
 #define	REG32(rgep, reg)	((uint32_t *)(rgep->io_regs+(reg)))
@@ -710,6 +708,7 @@ rge_chip_ident(rge_t *rgep)
 	case MAC_VER_8168B_B:
 	case MAC_VER_8168B_C:
 	case MAC_VER_8101E:
+	case MAC_VER_8101E_B:
 		chip->is_pcie = B_TRUE;
 		break;
 
@@ -888,12 +887,15 @@ rge_chip_init(rge_t *rgep)
 		/*
 		 * Increase the threshold voltage of RX sensitivity
 		 */
-		if (chip->mac_ver != MAC_VER_8168)
+		if (chip->mac_ver != MAC_VER_8168 &&
+		    chip->mac_ver != MAC_VER_8101E_B)
 			rge_ephy_put16(rgep, 0x01, 0x1bd3);
 
 		val16 = rge_reg_get8(rgep, PHY_STATUS_REG);
 		val16 = 0x12<<8 | val16;
 		if (rgep->chipid.mac_ver != MAC_VER_8101E &&
+		    rgep->chipid.mac_ver != MAC_VER_8101E_B &&
+		    rgep->chipid.mac_ver != MAC_VER_8101E_C &&
 		    rgep->chipid.mac_ver != MAC_VER_8168B_C) {
 			rge_reg_put16(rgep, PHY_STATUS_REG, val16);
 			rge_reg_put32(rgep, RT_CSI_DATA_REG, 0x00021c01);

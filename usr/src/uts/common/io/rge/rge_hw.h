@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _RGE_HW_H
 #define	_RGE_HW_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -170,7 +168,10 @@ extern "C" {
 #define	MAC_VER_8168			0x20000000
 #define	MAC_VER_8168B_B			0x30000000
 #define	MAC_VER_8168B_C			0x38000000
+#define	MAC_VER_8168B_D			0x3c000000
 #define	MAC_VER_8101E			0x34000000
+#define	MAC_VER_8101E_B			0x24800000
+#define	MAC_VER_8101E_C			0x34800000
 
 #define	TX_CONFIG_DEFAULT		(TX_INTERFRAME_GAP_802_3 | \
 					    TX_DMA_BURST_1024B)
