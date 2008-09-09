@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/zfs_context.h>
 #include <sys/spa.h>
 #include <sys/dmu.h>
@@ -182,17 +180,20 @@ zil_read_log_block(zilog_t *zilog, const blkptr_t *bp, arc_buf_t **abufpp)
 		zio_cksum_t cksum = bp->blk_cksum;
 
 		/*
+		 * Validate the checksummed log block.
+		 *
 		 * Sequence numbers should be... sequential.  The checksum
 		 * verifier for the next block should be bp's checksum plus 1.
+		 *
+		 * Also check the log chain linkage and size used.
 		 */
 		cksum.zc_word[ZIL_ZC_SEQ]++;
 
-		if (bcmp(&cksum, &ztp->zit_next_blk.blk_cksum, sizeof (cksum)))
-			error = ESTALE;
-		else if (BP_IS_HOLE(&ztp->zit_next_blk))
-			error = ENOENT;
-		else if (ztp->zit_nused > (blksz - sizeof (zil_trailer_t)))
-			error = EOVERFLOW;
+		if (bcmp(&cksum, &ztp->zit_next_blk.blk_cksum,
+		    sizeof (cksum)) || BP_IS_HOLE(&ztp->zit_next_blk) ||
+		    (ztp->zit_nused > (blksz - sizeof (zil_trailer_t)))) {
+			error = ECKSUM;
+		}
 
 		if (error) {
 			VERIFY(arc_buf_remove_ref(*abufpp, abufpp) == 1);
@@ -1332,20 +1333,20 @@ zil_free(zilog_t *zilog)
 /*
  * return true if the initial log block is not valid
  */
-static int
+static boolean_t
 zil_empty(zilog_t *zilog)
 {
 	const zil_header_t *zh = zilog->zl_header;
 	arc_buf_t *abuf = NULL;
 
 	if (BP_IS_HOLE(&zh->zh_log))
-		return (1);
+		return (B_TRUE);
 
 	if (zil_read_log_block(zilog, &zh->zh_log, &abuf) != 0)
-		return (1);
+		return (B_TRUE);
 
 	VERIFY(arc_buf_remove_ref(abuf, &abuf) == 1);
-	return (0);
+	return (B_FALSE);
 }
 
 /*
