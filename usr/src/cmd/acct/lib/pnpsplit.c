@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7	*/
 
 /*
  * pnpsplit splits interval into prime & nonprime portions
@@ -42,13 +39,15 @@
 #include <time.h>
 #include <ctype.h>
 
-/* validate that hours and minutes of prime/non-prime read in
+/*
+ * validate that hours and minutes of prime/non-prime read in
  * from holidays file fall within proper boundaries.
- * Time is expected in the form and range of 0000-2359.
+ * Time is expected in the form and range of 0000-2400.
  */
 
 static int	thisyear = 1970;	/* this is changed by holidays file */
 static int	holidays[NHOLIDAYS];	/* holidays file day-of-year table */
+
 
 static int day_tab[2][13] = {
 	{0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31},
@@ -65,7 +64,7 @@ static struct hours {
 	int	h_hour;		/* initialized from holidays file (time/100) */
 	long	h_type;		/* prime/nonprime of previous period */
 } h[4];
-int	daysend[] = {60, 59, 23};	/* the sec, min, hr of the day's end */
+int	daysend[] = {0, 60, 23};	/* the sec, min, hr of the day's end */
 
 struct tm *localtime();
 long	tmsecs();
@@ -88,16 +87,16 @@ ulong_t etime;
 	char *memcpy();
 
 	/* once holidays file is read, this is zero */
-	if (thisyear && (checkhol() == 0)) {
+	if(thisyear && (checkhol() == 0)) {
 		return(0);
 	}
 	tcur = start;
-	tend = start+etime;
+	tend = start + etime;
 	memcpy(&end, localtime(&tend), sizeof(end));
 	result[PRIME] = 0;
 	result[NONPRIME] = 0;
 
-	while (tcur < tend) {	/* one iteration per day or part thereof */
+	while ( tcur < tend ) {	/* one iteration per day or part thereof */
 		memcpy(&cur, localtime(&tcur), sizeof(cur));
 		sameday = cur.tm_yday == end.tm_yday;
 		if (ssh(&cur)) {	/* ssh:only NONPRIME */
@@ -242,15 +241,25 @@ inithol()
 			h[0].h_hour = (pstart/100==24) ? 0 : pstart/100;
 			h[0].h_type = NONPRIME;
 
-			/* Set up start of non-prime time; 2400 == 0000 */
+			/* Set up start of non-prime time; 2400 == 2360 */
+			if ((npstart/100) == 24) {
+				h[1].h_sec = 0;
+				h[1].h_min = 60;
+				h[1].h_hour = 23;
+			} else {
+				h[1].h_sec = 0;
+				h[1].h_min = npstart % 100;
+				h[1].h_hour = npstart / 100;
+			}
+
 			h[1].h_sec = 0;
 			h[1].h_min = npstart%100;
 			h[1].h_hour = (npstart/100==24) ? 0 : npstart/100;
 			h[1].h_type = PRIME ;
 
 			/* This is the end of the day */
-			h[2].h_sec = 60;
-			h[2].h_min = 59;
+			h[2].h_sec = 0;
+			h[2].h_min = 60;
 			h[2].h_hour = 23;
 			h[2].h_type = NONPRIME;
 
