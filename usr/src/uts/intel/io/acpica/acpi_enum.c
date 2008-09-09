@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ACPI enumerator
@@ -132,16 +130,15 @@ static void
 parse_resources_irq(ACPI_RESOURCE *resource_ptr, int *interrupt_count)
 {
 	int i;
-	ACPI_RESOURCE_IRQ irq = resource_ptr->Data.Irq;
 
-	for (i = 0; i < irq.InterruptCount; i++) {
+	for (i = 0; i < resource_ptr->Data.Irq.InterruptCount; i++) {
 		interrupt[(*interrupt_count)++] =
-		    irq.Interrupts[i];
-		used_interrupts |= 1 << irq.Interrupts[i];
+		    resource_ptr->Data.Irq.Interrupts[i];
+		used_interrupts |= 1 << resource_ptr->Data.Irq.Interrupts[i];
 		if (acpi_enum_debug & PARSE_RES_IRQ) {
 			cmn_err(CE_NOTE, "parse_resources() "\
 			    "IRQ num %u, intr # = %u",
-			    i, irq.Interrupts[i]);
+			    i, resource_ptr->Data.Irq.Interrupts[i]);
 		}
 	}
 }
@@ -150,15 +147,14 @@ static void
 parse_resources_dma(ACPI_RESOURCE *resource_ptr, int *dma_count)
 {
 	int i;
-	ACPI_RESOURCE_DMA acpi_dma = resource_ptr->Data.Dma;
 
-	for (i = 0; i < acpi_dma.ChannelCount; i++) {
-		dma[(*dma_count)++] = acpi_dma.Channels[i];
-		used_dmas |= 1 << acpi_dma.Channels[i];
+	for (i = 0; i < resource_ptr->Data.Dma.ChannelCount; i++) {
+		dma[(*dma_count)++] = resource_ptr->Data.Dma.Channels[i];
+		used_dmas |= 1 << resource_ptr->Data.Dma.Channels[i];
 		if (acpi_enum_debug & PARSE_RES_DMA) {
 			cmn_err(CE_NOTE, "parse_resources() "\
 			    "DMA num %u, channel # = %u",
-			    i, acpi_dma.Channels[i]);
+			    i, resource_ptr->Data.Dma.Channels[i]);
 		}
 	}
 }
@@ -375,6 +371,13 @@ parse_resources_addr64(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 		    "Minimum 0x%lX, "\
 		    "Maximum 0x%lX, "\
 		    "length: 0x%lX\n",
+		    addr64.ProducerConsumer == ACPI_CONSUMER ?
+		    "CONSUMER" : "PRODUCER",
+		    addr64.MinAddressFixed,
+		    addr64.MaxAddressFixed,
+		    addr64.Minimum,
+		    addr64.Maximum,
+		    addr64.AddressLength);
 #else
 		cmn_err(CE_NOTE, "parse_resources() "\
 		    "%s "\
@@ -383,7 +386,6 @@ parse_resources_addr64(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 		    "Minimum 0x%llX, "\
 		    "Maximum 0x%llX, "\
 		    "length: 0x%llX\n",
-#endif
 		    addr64.ProducerConsumer == ACPI_CONSUMER ?
 		    "CONSUMER" : "PRODUCER",
 		    addr64.MinAddressFixed,
@@ -391,6 +393,7 @@ parse_resources_addr64(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 		    addr64.Minimum,
 		    addr64.Maximum,
 		    addr64.AddressLength);
+#endif
 	}
 	if (addr64.ProducerConsumer == ACPI_PRODUCER ||
 	    (addr64.ResourceType != ACPI_MEMORY_RANGE &&
@@ -738,7 +741,7 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 	rb.Pointer = NULL;
 	if (AcpiGetObjectInfo(ObjHandle, &rb) != AE_OK) {
 		cmn_err(CE_WARN, "!acpi_enum: could not get device"
-			    " info for %s", path);
+		    " info for %s", path);
 		goto done;
 	}
 	info = (ACPI_DEVICE_INFO *)rb.Pointer;
