@@ -78,19 +78,6 @@ session_alloc(iscsi_conn_t *c, uint8_t *isid)
 	if (s == NULL)
 		return (False);
 
-	(void) pthread_mutex_lock(&sess_mutex);
-	s->s_num	= sess_num++;
-	s->s_state	= SS_STARTED;
-
-	if (sess_head == NULL)
-		sess_head = s;
-	else {
-		for (n = sess_head; n->s_next; n = n->s_next)
-			;
-		n->s_next = s;
-	}
-	(void) pthread_mutex_unlock(&sess_mutex);
-
 	bcopy(isid, s->s_isid, 6);
 
 	(void) pthread_mutex_init(&s->s_mutex, NULL);
@@ -104,6 +91,19 @@ session_alloc(iscsi_conn_t *c, uint8_t *isid)
 	s->s_tsid	= s->s_num;
 
 	sess_set_auth(s);
+
+	(void) pthread_mutex_lock(&sess_mutex);
+	s->s_num	= sess_num++;
+	s->s_state	= SS_STARTED;
+
+	if (sess_head == NULL)
+		sess_head = s;
+	else {
+		for (n = sess_head; n->s_next; n = n->s_next)
+			;
+		n->s_next = s;
+	}
+	(void) pthread_mutex_unlock(&sess_mutex);
 
 	(void) pthread_create(&s->s_thr_id_t10, NULL, sess_from_t10, s);
 	(void) pthread_create(&s->s_thr_id_conn, NULL, sess_process, s);
@@ -130,6 +130,7 @@ session_free(iscsi_sess_t *s)
 	if (s == NULL)
 		return;
 
+	(void) pthread_mutex_lock(&sess_mutex);
 	if (s->s_i_name)
 		free(s->s_i_name);
 	if (s->s_t_name)
@@ -137,7 +138,6 @@ session_free(iscsi_sess_t *s)
 	if (s->s_i_alias)
 		free(s->s_i_alias);
 
-	(void) pthread_mutex_lock(&sess_mutex);
 	if (sess_head == s)
 		sess_head = s->s_next;
 	else {

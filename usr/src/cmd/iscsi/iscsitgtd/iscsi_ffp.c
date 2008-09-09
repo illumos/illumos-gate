@@ -102,7 +102,7 @@ iscsi_full_feature(iscsi_conn_t *c)
 	}
 
 	(void) pthread_mutex_lock(&c->c_state_mutex);
-	if (c->c_state != S5_LOGGED_IN) {
+	if (c->c_state != S5_LOGGED_IN && c->c_state != S7_LOGOUT_REQUESTED) {
 		(void) snprintf(debug, sizeof (debug),
 		    "CON%x  full_feature -- not in S5_LOGGED_IN state\n",
 		    c->c_num);

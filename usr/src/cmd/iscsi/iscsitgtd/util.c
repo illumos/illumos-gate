@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <strings.h>
 #include <stdlib.h>
@@ -860,7 +859,7 @@ connection_parameters_default(iscsi_conn_t *c)
 	c->c_initialR2T = True;			/* InitialR2T */
 	c->c_immediate_data = True;		/* ImmediateData */
 	c->c_max_recv_data = 8192;		/* MaxRecvDataSegmentLength */
-	c->c_max_burst_len = 262214;		/* MaxBurstLength */
+	c->c_max_burst_len = 262144;		/* MaxBurstLength */
 	c->c_first_burst_len = 65536;		/* FirstBurstLength */
 	c->c_default_time_2_wait = 2;		/* DefaultTime2Wait */
 	c->c_default_time_2_retain = 20;	/* DefaultTime2Retain */

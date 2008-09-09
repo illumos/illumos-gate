@@ -314,6 +314,8 @@ conn_process(void *v)
 			} else if (c->c_state == S4_IN_LOGIN) {
 				conn_state(c, T7);
 			} else {
+				(void) pthread_join(c->c_thr_id_poller,
+				    &thr_status);
 				process = False;
 			}
 			break;
@@ -626,7 +628,7 @@ iscsi_conn_data_rqst(t10_cmd_t *t)
 	rtt.itt		= cmd->c_itt;
 	rtt.ttt		= cmd->c_ttt;
 	rtt.data_offset = htonl(T10_DATA_OFFSET(t));
-	rtt.data_length = htonl(T10_DATA_LEN(t));
+	rtt.data_length = htonl(MIN(T10_DATA_LEN(t), c->c_max_burst_len));
 	rtt.rttsn	= htonl(cmd->c_datasn++);
 
 	(void) pthread_mutex_lock(&c->c_sess->s_mutex);
@@ -1257,8 +1259,11 @@ void
 conn_state(iscsi_conn_t *c, iscsi_transition_t t)
 {
 	iscsi_state_t	old_state = c->c_state;
+	Boolean_t	lock = False;
 
 	(void) pthread_mutex_lock(&c->c_state_mutex);
+	lock = True;
+
 	switch (c->c_state) {
 	case S1_FREE:
 		switch (t) {
@@ -1329,6 +1334,12 @@ conn_state(iscsi_conn_t *c, iscsi_transition_t t)
 			break;
 		case T11:
 			c->c_state = S7_LOGOUT_REQUESTED;
+			/*
+			 * need to unlock here conn_state may get
+			 * call again, which can create deadlock
+			 */
+			(void) pthread_mutex_unlock(&c->c_state_mutex);
+			lock = False;
 			send_async_logout(c);
 			break;
 		case T15:
@@ -1372,6 +1383,12 @@ conn_state(iscsi_conn_t *c, iscsi_transition_t t)
 					ISCSI_LOGOUT_RESPONSE(&info);
 				}
 
+				/*
+				 * need to unlock here conn_state may get
+				 * call again, which can create deadlock
+				 */
+				(void) pthread_mutex_unlock(&c->c_state_mutex);
+				lock = False;
 				send_iscsi_pkt(c, c->c_last_pkg, NULL);
 				free(c->c_last_pkg);
 			}
@@ -1411,7 +1428,8 @@ conn_state(iscsi_conn_t *c, iscsi_transition_t t)
 	queue_prt(c->c_mgmtq, Q_CONN_NONIO, "CON%x  ---- %s(%s) -> %s\n",
 	    c->c_num, state_to_str(old_state), event_to_str(t),
 	    state_to_str(c->c_state));
-	(void) pthread_mutex_unlock(&c->c_state_mutex);
+	if (lock)
+		(void) pthread_mutex_unlock(&c->c_state_mutex);
 }
 
 /*
