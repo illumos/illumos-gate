@@ -686,6 +686,7 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	xnfp->xnf_connected = B_FALSE;
 	xnfp->xnf_cksum_offload = xnf_cksum_offload;
 	xnfp->xnf_tx_pages_readonly = xnf_tx_pages_readonly;
+	xnfp->xnf_need_sched = B_FALSE;
 
 	xnfp->xnf_rx_hvcopy = xnf_hvcopy_peer_status(devinfo) && xnf_rx_hvcopy;
 #ifdef XPV_HVM_DRIVER
@@ -1396,6 +1397,8 @@ xnf_send(void *arg, mblk_t *mp)
 			ec_notify_via_evtchn(xnfp->xnf_evtchn);
 	}
 
+	xnfp->xnf_need_sched = !sent_something;
+
 	mutex_exit(&xnfp->xnf_txlock);
 
 	return (mp);
@@ -1408,7 +1411,7 @@ static uint_t
 xnf_intr(caddr_t arg)
 {
 	xnf_t *xnfp = (xnf_t *)arg;
-	int tx_ring_space;
+	boolean_t sched = B_FALSE;
 
 	mutex_enter(&xnfp->xnf_intrlock);
 
@@ -1436,22 +1439,24 @@ xnf_intr(caddr_t arg)
 			mac_rx(xnfp->xnf_mh, xnfp->xnf_rx_handle, mp);
 	}
 
+	xnfp->xnf_stat_interrupts++;
+	mutex_exit(&xnfp->xnf_intrlock);
+
 	/*
 	 * Clean tx ring and try to start any blocked xmit streams if
 	 * there is now some space.
 	 */
 	mutex_enter(&xnfp->xnf_txlock);
-	tx_ring_space = xnf_clean_tx_ring(xnfp);
-	mutex_exit(&xnfp->xnf_txlock);
-	if (tx_ring_space > XNF_TX_FREE_THRESH) {
-		mutex_exit(&xnfp->xnf_intrlock);
-		mac_tx_update(xnfp->xnf_mh);
-		mutex_enter(&xnfp->xnf_intrlock);
+	if (xnf_clean_tx_ring(xnfp) > 0) {
+		sched = xnfp->xnf_need_sched;
+		xnfp->xnf_need_sched = B_FALSE;
 	}
+	mutex_exit(&xnfp->xnf_txlock);
 
-	xnfp->xnf_stat_interrupts++;
-	mutex_exit(&xnfp->xnf_intrlock);
-	return (DDI_INTR_CLAIMED); /* indicate that the interrupt was for us */
+	if (sched)
+		mac_tx_update(xnfp->xnf_mh);
+
+	return (DDI_INTR_CLAIMED);
 }
 
 /*

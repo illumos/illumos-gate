@@ -29,8 +29,6 @@
 #ifndef _SYS_XNB_H
 #define	_SYS_XNB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/kstat.h>
 #include <sys/stream.h>
@@ -152,6 +150,7 @@ struct xnb {
 	int			xnb_rx_unmop_count;
 	int			xnb_rx_buf_count;
 	boolean_t		xnb_rx_pages_writable;
+	boolean_t		xnb_rx_always_copy;
 
 	netif_rx_back_ring_t	xnb_rx_ring;	/* rx interface struct ptr */
 	void			*xnb_rx_ring_addr;

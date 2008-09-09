@@ -84,7 +84,15 @@
  */
 #define	TX_BUFFER_HEADROOM	16
 
+/*
+ * Should we attempt to defer checksum calculation?
+ */
 static boolean_t	xnb_cksum_offload = B_TRUE;
+/*
+ * When receiving packets from a guest, should they be copied
+ * or used as-is (esballoc)?
+ */
+static boolean_t	xnb_rx_always_copy = B_TRUE;
 
 static boolean_t	xnb_connect_rings(dev_info_t *);
 static void		xnb_disconnect_rings(dev_info_t *);
@@ -416,6 +424,7 @@ xnb_attach(dev_info_t *dip, xnb_flavour_t *flavour, void *flavour_data)
 	xnbp->xnb_detachable = B_FALSE;
 	xnbp->xnb_peer = xvdi_get_oeid(dip);
 	xnbp->xnb_rx_pages_writable = B_FALSE;
+	xnbp->xnb_rx_always_copy = xnb_rx_always_copy;
 
 	xnbp->xnb_rx_buf_count = 0;
 	xnbp->xnb_rx_unmop_count = 0;
@@ -1472,7 +1481,8 @@ xnb_recv(xnb_t *xnbp)
 	 * packet be destined for this host) will modify the packet
 	 * 'in place'.
 	 */
-	boolean_t copy = !xnbp->xnb_rx_pages_writable;
+	boolean_t copy = xnbp->xnb_rx_always_copy ||
+	    !xnbp->xnb_rx_pages_writable;
 
 	/*
 	 * For each individual request, the sequence of actions is:

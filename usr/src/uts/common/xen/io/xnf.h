@@ -27,8 +27,6 @@
 #ifndef _SYS_XNF_H
 #define	_SYS_XNF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -40,9 +38,6 @@ extern "C" {
 #define	XNF_FRAMESIZE	1514		/* frame size including MAC header */
 
 #define	XNF_MAX_RXDESCS	256
-
-/* Watermark for causing "interrupt on completion" for outgoing packets */
-#define	XNF_TX_FREE_THRESH	(NET_TX_RING_SIZE / 10)
 
 #define	MCAST_HASHBITS		256
 
@@ -147,6 +142,7 @@ typedef struct xnf {
 	kmutex_t		xnf_txlock;
 	kmutex_t		xnf_intrlock;
 	boolean_t		xnf_tx_pages_readonly;
+	boolean_t		xnf_need_sched;
 
 	netif_tx_front_ring_t	xnf_tx_ring;	/* tx interface struct ptr */
 	ddi_dma_handle_t	xnf_tx_ring_dma_handle;
