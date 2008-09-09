@@ -2137,6 +2137,9 @@ release_bootstrap(void)
 	page_t *pp;
 	extern void kobj_boot_unmountroot(void);
 	extern dev_t rootdev;
+#if !defined(__xpv)
+	pfn_t	pfn;
+#endif
 
 	/* unmount boot ramdisk and release kmem usage */
 	kobj_boot_unmountroot();
@@ -2180,29 +2183,26 @@ release_bootstrap(void)
 #if !defined(__xpv)
 /* XXPV -- note this following bunch of code needs to be revisited in Xen 3.0 */
 	/*
-	 * Find 1 page below 1 MB so that other processors can boot up.
+	 * Find 1 page below 1 MB so that other processors can boot up or
+	 * so that any processor can resume.
 	 * Make sure it has a kernel VA as well as a 1:1 mapping.
 	 * We should have just free'd one up.
 	 */
-	if (use_mp) {
-		pfn_t pfn;
-
-		for (pfn = 1; pfn < btop(1*1024*1024); pfn++) {
-			if (page_numtopp_alloc(pfn) == NULL)
-				continue;
-			rm_platter_va = i86devmap(pfn, 1,
-			    PROT_READ | PROT_WRITE | PROT_EXEC);
-			rm_platter_pa = ptob(pfn);
-			hat_devload(kas.a_hat,
-			    (caddr_t)(uintptr_t)rm_platter_pa, MMU_PAGESIZE,
-			    pfn, PROT_READ | PROT_WRITE | PROT_EXEC,
-			    HAT_LOAD_NOCONSIST);
-			break;
-		}
-		if (pfn == btop(1*1024*1024))
-			panic("No page available for starting "
-			    "other processors");
+	for (pfn = 1; pfn < btop(1*1024*1024); pfn++) {
+		if (page_numtopp_alloc(pfn) == NULL)
+			continue;
+		rm_platter_va = i86devmap(pfn, 1,
+		    PROT_READ | PROT_WRITE | PROT_EXEC);
+		rm_platter_pa = ptob(pfn);
+		hat_devload(kas.a_hat,
+		    (caddr_t)(uintptr_t)rm_platter_pa, MMU_PAGESIZE,
+		    pfn, PROT_READ | PROT_WRITE | PROT_EXEC,
+		    HAT_LOAD_NOCONSIST);
+		break;
 	}
+	if (pfn == btop(1*1024*1024) && use_mp)
+		panic("No page below 1M available for starting "
+		    "other processors or for resuming from system-suspend");
 #endif	/* !__xpv */
 }
 

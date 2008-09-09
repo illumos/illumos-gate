@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/smp_impldefs.h>
 #include <sys/promif.h>
@@ -74,27 +72,6 @@ extern int tsc_gethrtime_enable;
 extern cpuset_t cpu_ready_set;
 extern void *(*cpu_pause_func)(void *);
 
-/*
- * This probably belong in apic.c, along with the save/restore stuff.
- */
-static void
-reinit_picmode(void)
-{
-	ACPI_OBJECT_LIST	arglist;
-	ACPI_OBJECT		arg;
-	ACPI_STATUS		status;
-
-	/* Setup parameter object */
-	arglist.Count = 1;
-	arglist.Pointer = &arg;
-	arg.Type = ACPI_TYPE_INTEGER;
-	arg.Integer.Value = 1;
-
-	status = AcpiEvaluateObject(NULL, "\\_PIC", &arglist, NULL);
-	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND) {
-		PMD(PMD_SX, ("Method _PIC failed, %d\n", status))
-	}
-}
 
 
 /*
@@ -203,13 +180,6 @@ acpi_exit_sleepstate(s3a_t *s3ap)
 		PT(PT_DRTC_FAIL);
 		PMD(PMD_SX, ("Problem w/ DisableEvent(RTC)\n"))
 	}
-
-	PMD(PMD_SX, ("Restore state of APICs\n"))
-
-	/* Restore state of APICs */
-	PT(PT_ACPIREINIT);
-	reinit_picmode();
-	PT(PT_ACPIRESTORE);
 
 	PMD(PMD_SX, ("Exiting acpi_sleepstate() => 0\n"))
 

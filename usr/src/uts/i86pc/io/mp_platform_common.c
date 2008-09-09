@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PSMI 1.1 extensions are supported only in 2.6 and later versions.
  * PSMI 1.2 extensions are supported only in 2.7 and later versions.
@@ -97,6 +95,7 @@ static void delete_defer_repro_ent(int which_irq);
 static void apic_ioapic_wait_pending_clear(int ioapicindex,
     int intin_no);
 static boolean_t apic_is_ioapic_AMD_813x(uint32_t physaddr);
+static int apic_acpi_enter_apicmode(void);
 
 int apic_debug_mps_id = 0;	/* 1 - print MPS ID strings */
 
@@ -592,7 +591,7 @@ apic_set_pwroff_method_from_mpcnfhdr(struct apic_mp_cnf_hdr *hdrp)
 static int
 acpi_probe(char *modname)
 {
-	int			i, intmax, index, rv;
+	int			i, intmax, index;
 	uint32_t		id, ver;
 	int			acpi_verboseflags = 0;
 	int			madt_seen, madt_size;
@@ -607,12 +606,10 @@ acpi_probe(char *modname)
 	MADT_LOCAL_APIC_NMI	*mlan;
 	MADT_LOCAL_X2APIC_NMI	*mx2alan;
 	MADT_ADDRESS_OVERRIDE	*mao;
-	ACPI_OBJECT_LIST 	arglist;
-	ACPI_OBJECT		arg;
 	int			sci;
 	iflag_t			sci_flags;
 	volatile uint32_t	*ioapic;
-	int			apic_ix;
+	int			ioapic_ix;
 	uint32_t		local_ids[NCPU];
 	uint32_t		proc_ids[NCPU];
 	uchar_t			hid;
@@ -656,14 +653,15 @@ acpi_probe(char *modname)
 				if (mpa->LocalApicId == local_ids[0]) {
 					proc_ids[0] = mpa->ProcessorId;
 					acpica_map_cpu(0, mpa->ProcessorId);
-				} else if (apic_nproc < NCPU) {
+				} else if (apic_nproc < NCPU && use_mp &&
+				    apic_nproc < boot_ncpus) {
 					local_ids[index] = mpa->LocalApicId;
 					proc_ids[index] = mpa->ProcessorId;
 					CPUSET_ADD(apic_cpumask, index);
 					acpica_map_cpu(index, mpa->ProcessorId);
 					index++;
 					apic_nproc++;
-				} else
+				} else if (apic_nproc == NCPU)
 					cmn_err(CE_WARN, "%s: exceeded "
 					    "maximum no. of CPUs (= %d)",
 					    psm_name,  NCPU);
@@ -673,7 +671,7 @@ acpi_probe(char *modname)
 		case APIC_IO:
 			mia = (MADT_IO_APIC *) ap;
 			if (apic_io_max < MAX_IO_APIC) {
-				apic_ix = apic_io_max;
+				ioapic_ix = apic_io_max;
 				apic_io_id[apic_io_max] = mia->IoApicId;
 				apic_io_vectbase[apic_io_max] =
 				    mia->Interrupt;
@@ -762,7 +760,8 @@ acpi_probe(char *modname)
 			 */
 			if ((mpx2a->ProcessorEnabled) &&
 			    (mpx2a->X2LocalApicId >> 8)) {
-				if (apic_nproc < NCPU) {
+				if (apic_nproc < NCPU && use_mp &&
+				    apic_nproc < boot_ncpus) {
 					local_ids[index] =
 					    mpx2a->X2LocalApicId;
 					CPUSET_ADD(apic_cpumask, index);
@@ -770,7 +769,7 @@ acpi_probe(char *modname)
 					    mpx2a->ProcessorUID);
 					index++;
 					apic_nproc++;
-				} else {
+				} else if (apic_nproc == NCPU) {
 					cmn_err(CE_WARN, "%s: exceeded"
 					    " maximum no. of CPUs ("
 					    "=%d)", psm_name, NCPU);
@@ -817,7 +816,7 @@ acpi_probe(char *modname)
 	}
 
 	for (i = 0; i < apic_io_max; i++) {
-		apic_ix = i;
+		ioapic_ix = i;
 
 		/*
 		 * need to check Sitka on the following acpi problem
@@ -826,7 +825,7 @@ acpi_probe(char *modname)
 		 * to Intel. Until they fix the problem, we will get the
 		 * actual id directly from the ioapic.
 		 */
-		id = ioapic_read(apic_ix, APIC_ID_CMD);
+		id = ioapic_read(ioapic_ix, APIC_ID_CMD);
 		hid = (uchar_t)(id >> 24);
 
 		if (hid != apic_io_id[i]) {
@@ -834,10 +833,10 @@ acpi_probe(char *modname)
 				apic_io_id[i] = hid;
 			else { /* set ioapic id to whatever reported by ACPI */
 				id = ((uint32_t)apic_io_id[i]) << 24;
-				ioapic_write(apic_ix, APIC_ID_CMD, id);
+				ioapic_write(ioapic_ix, APIC_ID_CMD, id);
 			}
 		}
-		ver = ioapic_read(apic_ix, APIC_VERS_CMD);
+		ver = ioapic_read(ioapic_ix, APIC_VERS_CMD);
 		apic_io_ver[i] = (uchar_t)(ver & 0xff);
 		intmax = (ver >> 16) & 0xff;
 		apic_io_vectend[i] = apic_io_vectbase[i] + intmax;
@@ -889,12 +888,7 @@ acpi_probe(char *modname)
 		goto cleanup;
 
 	/* Enable ACPI APIC interrupt routing */
-	arglist.Count = 1;
-	arglist.Pointer = &arg;
-	arg.Type = ACPI_TYPE_INTEGER;
-	arg.Integer.Value = ACPI_APIC_MODE;	/* 1 */
-	rv = AcpiEvaluateObject(NULL, "\\_PIC", &arglist, NULL);
-	if (rv == AE_OK) {
+	if (apic_acpi_enter_apicmode() != PSM_FAILURE) {
 		build_reserved_irqlist((uchar_t *)apic_reserved_irqlist);
 		apic_enable_acpi = 1;
 		if (apic_use_acpi_madt_only) {
@@ -995,10 +989,11 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 	struct	apic_bus	*busp;
 	struct	apic_io_entry	*ioapicp;
 	struct	apic_io_intr	*intrp;
-	int			apic_ix;
+	int			ioapic_ix;
 	uint_t	lid;
 	uint32_t	id;
 	uchar_t hid;
+	int	warned = 0;
 
 	/*LINTED: pointer cast may result in improper alignment */
 	procp = (struct apic_procent *)(mpct + sizeof (struct apic_mp_cnf_hdr));
@@ -1011,15 +1006,20 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 		CPUSET_ZERO(apic_cpumask);
 		while (procp->proc_entry == APIC_CPU_ENTRY) {
 			if (procp->proc_cpuflags & CPUFLAGS_EN) {
-				if (apic_nproc < NCPU)
+				if (apic_nproc < NCPU && use_mp &&
+				    apic_nproc < boot_ncpus) {
 					CPUSET_ADD(apic_cpumask, apic_nproc);
-				apic_nproc++;
+					apic_nproc++;
+				} else if (apic_nproc == NCPU && !warned) {
+					cmn_err(CE_WARN, "%s: exceeded "
+					    "maximum no. of CPUs (= %d)",
+					    psm_name, NCPU);
+					warned = 1;
+				}
+
 			}
 			procp++;
 		}
-		if (apic_nproc > NCPU)
-			cmn_err(CE_WARN, "%s: exceeded "
-			    "maximum no. of CPUs (= %d)", psm_name, NCPU);
 		apic_cpus_size = apic_nproc * sizeof (*apic_cpus);
 		if (!apic_nproc || !(apic_cpus = (apic_cpus_info_t *)
 		    kmem_zalloc(apic_cpus_size, KM_NOSLEEP)))
@@ -1050,7 +1050,8 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 				}
 				apic_cpus[0].aci_local_ver =
 				    procp->proc_version;
-			} else {
+			} else if (apic_nproc < NCPU && use_mp &&
+			    apic_nproc < boot_ncpus) {
 				apic_cpus[apic_nproc].aci_local_id =
 				    procp->proc_apicid;
 
@@ -1107,8 +1108,8 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 				    apic_is_ioapic_AMD_813x(
 				    ioapicp->io_apic_addr);
 
-				apic_ix = apic_io_max;
-				id = ioapic_read(apic_ix, APIC_ID_CMD);
+				ioapic_ix = apic_io_max;
+				id = ioapic_read(ioapic_ix, APIC_ID_CMD);
 				hid = (uchar_t)(id >> 24);
 
 				if (hid != apic_io_id[apic_io_max]) {
@@ -1128,7 +1129,7 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 						    apic_io_id[apic_io_max]) <<
 						    24;
 
-						ioapic_write(apic_ix,
+						ioapic_write(ioapic_ix,
 						    APIC_ID_CMD, id);
 					}
 				}
@@ -1274,7 +1275,7 @@ apic_init_common()
 void
 ioapic_init_intr(int mask_apic)
 {
-	int apic_ix;
+	int ioapic_ix;
 	struct intrspec ispec;
 	apic_irq_t *irqptr;
 	int i, j;
@@ -1287,11 +1288,12 @@ ioapic_init_intr(int mask_apic)
 	for (j = 0; j < apic_io_max && mask_apic; j++) {
 		int intin_max;
 
-		apic_ix = j;
+		ioapic_ix = j;
 		/* Bits 23-16 define the maximum redirection entries */
-		intin_max = (ioapic_read(apic_ix, APIC_VERS_CMD) >> 16) & 0xff;
+		intin_max = (ioapic_read(ioapic_ix, APIC_VERS_CMD) >> 16)
+		    & 0xff;
 		for (i = 0; i < intin_max; i++)
-			ioapic_write(apic_ix, APIC_RDT_CMD + 2 * i, AV_MASK);
+			ioapic_write(ioapic_ix, APIC_RDT_CMD + 2 * i, AV_MASK);
 	}
 
 	/*
@@ -1482,7 +1484,7 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 	uchar_t vector;
 	uint32_t bind_cpu;
 	int intin, irqindex;
-	int apic_ix;
+	int ioapic_ix;
 	apic_irq_t	*irqptr, *irqheadptr, *irqp;
 	ulong_t iflag;
 
@@ -1682,9 +1684,9 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 		 * can induce the same erratum result we're trying to
 		 * avoid.
 		 */
-		apic_ix = irqptr->airq_ioapicindex;
+		ioapic_ix = irqptr->airq_ioapicindex;
 		intin = irqptr->airq_intin_no;
-		ioapic_write(apic_ix, APIC_RDT_CMD + 2 * intin, AV_MASK);
+		ioapic_write(ioapic_ix, APIC_RDT_CMD + 2 * intin, AV_MASK);
 	}
 
 	if (max_ipl == PSM_INVALID_IPL) {
@@ -2317,6 +2319,9 @@ apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid, uchar_t intin)
 
 	if (apic_intr_policy == INTR_LOWEST_PRIORITY)
 		return (IRQ_UNBOUND);
+
+	if (apic_nproc == 1)
+		return (0);
 
 	drv_name = NULL;
 	rc = DDI_PROP_NOT_FOUND;
@@ -4062,14 +4067,36 @@ struct apic_state {
 	int32_t as_init_count;
 	int32_t as_divide_reg;
 	int32_t as_spur_int_reg;
-	int32_t as_ioapic[6][24];	/* spec says 23 */
+	uint32_t as_ioapic_ids[MAX_IO_APIC];
 };
+
+
+static int
+apic_acpi_enter_apicmode(void)
+{
+	ACPI_OBJECT_LIST	arglist;
+	ACPI_OBJECT		arg;
+	ACPI_STATUS		status;
+
+	/* Setup parameter object */
+	arglist.Count = 1;
+	arglist.Pointer = &arg;
+	arg.Type = ACPI_TYPE_INTEGER;
+	arg.Integer.Value = ACPI_APIC_MODE;
+
+	status = AcpiEvaluateObject(NULL, "\\_PIC", &arglist, NULL);
+	if (ACPI_FAILURE(status))
+		return (PSM_FAILURE);
+	else
+		return (PSM_SUCCESS);
+}
 
 
 static void
 apic_save_state(struct apic_state *sp)
 {
 	int	i;
+	ulong_t	iflag;
 
 	PMD(PMD_SX, ("apic_save_state %p\n", (void *)sp))
 	/*
@@ -4089,28 +4116,18 @@ apic_save_state(struct apic_state *sp)
 	sp->as_spur_int_reg = apic_reg_ops->apic_read(APIC_SPUR_INT_REG);
 
 	/*
-	 * if on the boot processor then save the IO APICs.
+	 * If on the boot processor then save the IOAPICs' IDs
 	 */
 	if (psm_get_cpu_id() == 0) {
-		for (i = 0; i < apic_io_max; i++) {
-			volatile uint32_t *ioapic = apicioadr[i];
-			int	intin_max, j;
 
-			/* Bits 23-16 define the maximum redirection entries */
-			ioapic[APIC_IO_REG] = APIC_VERS_CMD;
-			intin_max = (ioapic[APIC_IO_DATA] >> 16) & 0xff;
-#if 0	/* debug */
-			prom_printf("\nIOAPIC %d (%d redirs):\n",
-			    i, intin_max+1);
-#endif	/* debug */
-			for (j = 0; j <= intin_max; j++) {
-				ioapic[APIC_IO_REG] = APIC_RDT_CMD + 2*j;
-				sp->as_ioapic[i][j] = ioapic[APIC_IO_DATA];
-#if 0	/* debug */
-				prom_printf("\t%d: %x\n", j, as_ioapic[i][j]);
-#endif	/* debug */
-			}
-		}
+		iflag = intr_clear();
+		lock_set(&apic_ioapic_lock);
+
+		for (i = 0; i < apic_io_max; i++)
+			sp->as_ioapic_ids[i] = ioapic_read(i, APIC_ID_CMD);
+
+		lock_clear(&apic_ioapic_lock);
+		intr_restore(iflag);
 	}
 }
 
@@ -4119,9 +4136,6 @@ apic_restore_state(struct apic_state *sp)
 {
 	int	i;
 	ulong_t	iflag;
-	apic_irq_t	*irqp;
-	int	rv;
-	int	retval = 0;
 
 	/*
 	 * First the local APIC.
@@ -4145,38 +4159,22 @@ apic_restore_state(struct apic_state *sp)
 	 * boot processor, since we know that we only have one of those
 	 */
 	if (psm_get_cpu_id() == 0) {
-		/*
-		 * regenerate the IO APICs.
-		 */
 
 		iflag = intr_clear();
 		lock_set(&apic_ioapic_lock);
 
-		for (i = apic_min_device_irq; i < apic_max_device_irq; i++) {
-			if ((irqp = apic_irq_table[i]) == NULL)
-				continue;
-			for (; irqp; irqp = irqp->airq_next) {
-				if (irqp->airq_mps_intr_index == FREE_INDEX)
-					continue;
-				if (irqp->airq_temp_cpu != IRQ_UNINIT) {
-					rv = apic_setup_io_intr(irqp, i,
-					    B_FALSE);
-					if (rv) {
-						PMD(PMD_SX,
-						    ("apic_setup_io_intr(%p, "
-						    "%d) %d\n", (void *)irqp,
-						    i, rv));
-					}
-					retval |= rv;
-				}
-			}
+		/* Restore IOAPICs' APIC IDs */
+		for (i = 0; i < apic_io_max; i++) {
+			ioapic_write(i, APIC_ID_CMD, sp->as_ioapic_ids[i]);
 		}
-
-		PMD(PMD_SX, ("apic_restore_state retval %x\n", retval))
 
 		lock_clear(&apic_ioapic_lock);
 		intr_restore(iflag);
 
+		/*
+		 * Reenter APIC mode before restoring LNK devices
+		 */
+		(void) apic_acpi_enter_apicmode();
 
 		/*
 		 * restore acpi link device mappings

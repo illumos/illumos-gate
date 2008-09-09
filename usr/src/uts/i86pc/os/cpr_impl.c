@@ -192,9 +192,6 @@ i_cpr_save_context(void *arg)
 	 */
 	resuming = (wc_save_context(wc_other_cpus + index) == 0);
 
-	PMD(PMD_SX, ("i_cpr_save_context: wc_save_context returns %d\n",
-	    resuming))
-
 	/*
 	 * do NOT call any functions after this point, because doing so
 	 * will modify the stack that we are running on
@@ -210,7 +207,7 @@ i_cpr_save_context(void *arg)
 		/*
 		 * Enable interrupts on this cpu.
 		 * Do not bind interrupts to this CPU's local APIC until
-		 * the CPU is ready to recieve interrupts.
+		 * the CPU is ready to receive interrupts.
 		 */
 		ASSERT(CPU->cpu_id != i_cpr_bootcpuid());
 		mutex_enter(&cpu_lock);
@@ -227,7 +224,22 @@ i_cpr_save_context(void *arg)
 		PMD(PMD_SX,
 		    ("i_cpr_save_context() resuming cpu %d in cpu_ready_set\n",
 		    CPU->cpu_id))
+	} else {
+		/*
+		 * Disable interrupts on this CPU so that PSM knows not to bind
+		 * interrupts here on resume until the CPU has executed
+		 * cpu_enable_intr() (above) in the resume path.
+		 * We explicitly do not grab cpu_lock here because at this point
+		 * in the suspend process, the boot cpu owns cpu_lock and all
+		 * other cpus are also executing in the pause thread (only
+		 * modifying their respective CPU structure).
+		 */
+		(void) cpu_disable_intr(CPU);
 	}
+
+	PMD(PMD_SX, ("i_cpr_save_context: wc_save_context returns %d\n",
+	    resuming))
+
 	return (NULL);
 }
 
@@ -274,6 +286,16 @@ i_cpr_pre_resume_cpus()
 
 	/*LINTED*/
 	rm_platter_t *real_mode_platter = (rm_platter_t *)rm_platter_va;
+
+	/*
+	 * If startup wasn't able to find a page under 1M, we cannot
+	 * proceed.
+	 */
+	if (rm_platter_va == 0) {
+		cmn_err(CE_WARN, "Cannot suspend the system because no "
+		    "memory below 1M could be found for processor startup");
+		return;
+	}
 
 	/*
 	 * Copy the real mode code at "real_mode_start" to the
@@ -740,12 +762,14 @@ i_cpr_free_memory_resources(void)
 static int
 i_cpr_platform_alloc(psm_state_request_t *req)
 {
+#ifdef DEBUG
 	char	*str = "i_cpr_platform_alloc";
+#endif
 
 	PMD(PMD_SX, ("cpu = %d, %s(%p) \n", CPU->cpu_id, str, (void *)req))
 
-	if (ncpus == 1) {
-		PMD(PMD_SX, ("%s() : ncpus == 1\n", str))
+	if (psm_state == NULL) {
+		PMD(PMD_SX, ("%s() : psm_state == NULL\n", str))
 		return (0);
 	}
 
@@ -759,12 +783,15 @@ i_cpr_platform_alloc(psm_state_request_t *req)
 static void
 i_cpr_platform_free(psm_state_request_t *req)
 {
+#ifdef DEBUG
 	char	*str = "i_cpr_platform_free";
+#endif
 
 	PMD(PMD_SX, ("cpu = %d, %s(%p) \n", CPU->cpu_id, str, (void *)req))
 
-	if (ncpus == 1) {
-		PMD(PMD_SX, ("%s() : ncpus == 1\n", str))
+	if (psm_state == NULL) {
+		PMD(PMD_SX, ("%s() : psm_state == NULL\n", str))
+		return;
 	}
 
 	req->psr_cmd = PSM_STATE_FREE;
@@ -774,10 +801,12 @@ i_cpr_platform_free(psm_state_request_t *req)
 static int
 i_cpr_save_apic(psm_state_request_t *req)
 {
+#ifdef DEBUG
 	char	*str = "i_cpr_save_apic";
+#endif
 
-	if (ncpus == 1) {
-		PMD(PMD_SX, ("%s() : ncpus == 1\n", str))
+	if (psm_state == NULL) {
+		PMD(PMD_SX, ("%s() : psm_state == NULL\n", str))
 		return (0);
 	}
 
@@ -788,10 +817,12 @@ i_cpr_save_apic(psm_state_request_t *req)
 static int
 i_cpr_restore_apic(psm_state_request_t *req)
 {
+#ifdef DEBUG
 	char	*str = "i_cpr_restore_apic";
+#endif
 
-	if (ncpus == 1) {
-		PMD(PMD_SX, ("%s() : ncpus == 1\n", str))
+	if (psm_state == NULL) {
+		PMD(PMD_SX, ("%s() : psm_state == NULL\n", str))
 		return (0);
 	}
 
