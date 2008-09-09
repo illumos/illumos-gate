@@ -79,37 +79,6 @@ volatile int pwrnow_debug = 0;
 #endif
 
 /*
- * Read the status register.
- */
-static int
-read_status(cpu_acpi_handle_t handle, uint32_t *stat)
-{
-	cpu_acpi_pct_t *pct_stat;
-	uint64_t reg;
-	int ret = 0;
-
-	pct_stat = CPU_ACPI_PCT_STATUS(handle);
-
-	switch (pct_stat->cr_addrspace_id) {
-	case ACPI_ADR_SPACE_FIXED_HARDWARE:
-		reg = rdmsr(PWRNOW_PERF_STATUS_MSR);
-		*stat = reg & 0xFFFFFFFF;
-		ret = 0;
-		break;
-
-	default:
-		DTRACE_PROBE1(pwrnow_status_unsupported_type, uint8_t,
-		    pct_stat->cr_addrspace_id);
-		return (-1);
-	}
-
-	DTRACE_PROBE1(pwrnow_status_read, uint32_t, *stat);
-	DTRACE_PROBE1(pwrnow_status_read_err, int, ret);
-
-	return (ret);
-}
-
-/*
  * Write the ctrl register.
  */
 static int
@@ -151,8 +120,6 @@ pwrnow_pstate_transition(int *ret, cpudrv_devstate_t *cpudsp,
 	cpu_acpi_handle_t handle = mach_state->acpi_handle;
 	cpu_acpi_pstate_t *req_pstate;
 	uint32_t ctrl;
-	uint32_t stat;
-	int i;
 
 	req_pstate = (cpu_acpi_pstate_t *)CPU_ACPI_PSTATES(handle);
 	req_pstate += req_state;
@@ -165,21 +132,6 @@ pwrnow_pstate_transition(int *ret, cpudrv_devstate_t *cpudsp,
 	ctrl = CPU_ACPI_PSTATE_CTRL(req_pstate);
 	if (write_ctrl(handle, ctrl) != 0) {
 		*ret = PWRNOW_RET_UNSUP_STATE;
-		return;
-	}
-
-	/* Wait until switch is complete, but bound the loop just in case. */
-	for (i = CPU_ACPI_PSTATE_TRANSLAT(req_pstate) * 2; i >= 0;
-	    i -= PWRNOW_LATENCY_WAIT) {
-		if (read_status(handle, &stat) == 0 &&
-		    CPU_ACPI_PSTATE_STAT(req_pstate) == stat)
-				break;
-		drv_usecwait(PWRNOW_LATENCY_WAIT);
-	}
-
-	if (CPU_ACPI_PSTATE_STAT(req_pstate) != stat) {
-		DTRACE_PROBE(pwrnow_transition_incomplete);
-		*ret = PWRNOW_RET_TRANS_INCOMPLETE;
 		return;
 	}
 
