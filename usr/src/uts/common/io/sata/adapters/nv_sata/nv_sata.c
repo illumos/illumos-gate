@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *
  * nv_sata is a combo SATA HBA driver for ck804/mcp55 based chipsets.
@@ -67,7 +65,13 @@
 #include <sys/scsi/scsi.h>
 #include <sys/pci.h>
 #include <sys/byteorder.h>
+#include <sys/sunddi.h>
 #include <sys/sata/sata_hba.h>
+#ifdef SGPIO_SUPPORT
+#include <sys/sata/adapters/nv_sata/nv_sgpio.h>
+#include <sys/devctl.h>
+#include <sys/sdt.h>
+#endif
 #include <sys/sata/adapters/nv_sata/nv_sata.h>
 #include <sys/disp.h>
 #include <sys/note.h>
@@ -155,6 +159,31 @@ static int nv_wait(nv_port_t *nvp, uchar_t onbits, uchar_t offbits,
     uint_t timeout_usec, int type_wait);
 static int nv_start_rqsense_pio(nv_port_t *nvp, nv_slot_t *nv_slotp);
 
+#ifdef SGPIO_SUPPORT
+static int nv_open(dev_t *devp, int flag, int otyp, cred_t *credp);
+static int nv_close(dev_t dev, int flag, int otyp, cred_t *credp);
+static int nv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
+    cred_t *credp, int *rvalp);
+
+static void nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle);
+static int nv_sgp_detect(ddi_acc_handle_t pci_conf_handle, uint16_t *csrpp,
+    uint32_t *cbpp);
+static int nv_sgp_init(nv_ctl_t *nvc);
+static void nv_sgp_reset(nv_ctl_t *nvc);
+static int nv_sgp_init_cmd(nv_ctl_t *nvc);
+static int nv_sgp_check_set_cmn(nv_ctl_t *nvc);
+static int nv_sgp_csr_read(nv_ctl_t *nvc);
+static void nv_sgp_csr_write(nv_ctl_t *nvc, uint32_t val);
+static int nv_sgp_write_data(nv_ctl_t *nvc);
+static void nv_sgp_activity_led_ctl(void *arg);
+static void nv_sgp_drive_connect(nv_ctl_t *nvc, int drive);
+static void nv_sgp_drive_disconnect(nv_ctl_t *nvc, int drive);
+static void nv_sgp_drive_active(nv_ctl_t *nvc, int drive);
+static void nv_sgp_locate(nv_ctl_t *nvc, int drive, int value);
+static void nv_sgp_error(nv_ctl_t *nvc, int drive, int value);
+static void nv_sgp_cleanup(nv_ctl_t *nvc);
+#endif
+
 
 /*
  * DMA attributes for the data buffer for x86.  dma_attr_burstsizes is unused.
@@ -204,6 +233,29 @@ static ddi_device_acc_attr_t accattr = {
 };
 
 
+#ifdef SGPIO_SUPPORT
+static struct cb_ops nv_cb_ops = {
+	nv_open,		/* open */
+	nv_close,		/* close */
+	nodev,			/* strategy (block) */
+	nodev,			/* print (block) */
+	nodev,			/* dump (block) */
+	nodev,			/* read */
+	nodev,			/* write */
+	nv_ioctl,		/* ioctl */
+	nodev,			/* devmap */
+	nodev,			/* mmap */
+	nodev,			/* segmap */
+	nochpoll,		/* chpoll */
+	ddi_prop_op,		/* prop_op */
+	NULL,			/* streams */
+	D_NEW | D_MP |
+	D_64BIT | D_HOTPLUG,	/* flags */
+	CB_REV			/* rev */
+};
+#endif  /* SGPIO_SUPPORT */
+
+
 static struct dev_ops nv_dev_ops = {
 	DEVO_REV,		/* devo_rev */
 	0,			/* refcnt  */
@@ -213,7 +265,11 @@ static struct dev_ops nv_dev_ops = {
 	nv_attach,		/* attach */
 	nv_detach,		/* detach */
 	nodev,			/* no reset */
+#ifdef SGPIO_SUPPORT
+	&nv_cb_ops,		/* driver operations */
+#else
 	(struct cb_ops *)0,	/* driver operations */
+#endif
 	NULL,			/* bus operations */
 	NULL			/* power */
 };
@@ -239,7 +295,7 @@ extern struct mod_ops mod_driverops;
 
 static  struct modldrv modldrv = {
 	&mod_driverops,	/* driverops */
-	"Nvidia ck804/mcp55 HBA v%I%",
+	"Nvidia ck804/mcp55 HBA",
 	&nv_dev_ops,	/* driver ops */
 };
 
@@ -425,6 +481,10 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	nv_ctl_t *nvc;
 	uint8_t subclass;
 	uint32_t reg32;
+#ifdef SGPIO_SUPPORT
+	pci_regspec_t *regs;
+	int rlen;
+#endif
 
 	switch (cmd) {
 
@@ -595,6 +655,21 @@ nv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			break;
 		}
 
+#ifdef SGPIO_SUPPORT
+		/*
+		 * save off the controller number
+		 */
+		(void) ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
+		    "reg", (caddr_t)&regs, &rlen);
+		nvc->nvc_ctlr_num = PCI_REG_FUNC_G(regs->pci_phys_hi);
+		kmem_free(regs, rlen);
+
+		/*
+		 * initialize SGPIO
+		 */
+		nv_sgp_led_init(nvc, pci_conf_handle);
+#endif	/* SGPIO_SUPPORT */
+
 		/*
 		 * attach to sata module
 		 */
@@ -759,6 +834,13 @@ nv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 */
 		nv_uninit_ctl(nvc);
 
+#ifdef SGPIO_SUPPORT
+		/*
+		 * release SGPIO resources
+		 */
+		nv_sgp_cleanup(nvc);
+#endif
+
 		/*
 		 * unregister from the sata module
 		 */
@@ -822,6 +904,186 @@ nv_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 	}
 	return (DDI_SUCCESS);
 }
+
+
+#ifdef SGPIO_SUPPORT
+/* ARGSUSED */
+static int
+nv_open(dev_t *devp, int flag, int otyp, cred_t *credp)
+{
+	nv_ctl_t *nvc = ddi_get_soft_state(nv_statep, getminor(*devp));
+
+	if (nvc == NULL) {
+		return (ENXIO);
+	}
+
+	return (0);
+}
+
+
+/* ARGSUSED */
+static int
+nv_close(dev_t dev, int flag, int otyp, cred_t *credp)
+{
+	return (0);
+}
+
+
+/* ARGSUSED */
+static int
+nv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
+{
+	nv_ctl_t *nvc;
+	int inst;
+	int status;
+	int ctlr, port;
+	int drive;
+	uint8_t curr_led;
+	struct dc_led_ctl led;
+
+	inst = getminor(dev);
+	if (inst == -1) {
+		return (EBADF);
+	}
+
+	nvc = ddi_get_soft_state(nv_statep, inst);
+	if (nvc == NULL) {
+		return (EBADF);
+	}
+
+	switch (cmd) {
+	case DEVCTL_SET_LED:
+		status = ddi_copyin((void *)arg, &led,
+		    sizeof (struct dc_led_ctl), mode);
+		if (status != 0)
+			return (EFAULT);
+
+		/*
+		 * Since only the first two controller currently support
+		 * SGPIO (as per NVIDIA docs), this code will as well.
+		 * Note that this validate the port value within led_state
+		 * as well.
+		 */
+
+		ctlr = SGP_DRV_TO_CTLR(led.led_number);
+		if ((ctlr != 0) && (ctlr != 1))
+			return (ENXIO);
+
+		if ((led.led_state & DCL_STATE_FAST_BLNK) ||
+		    (led.led_state & DCL_STATE_SLOW_BLNK)) {
+			return (EINVAL);
+		}
+
+		drive = led.led_number;
+
+		if ((led.led_ctl_active == DCL_CNTRL_OFF) ||
+		    (led.led_state == DCL_STATE_OFF)) {
+
+			if (led.led_type == DCL_TYPE_DEVICE_FAIL) {
+				nv_sgp_error(nvc, drive, TR_ERROR_DISABLE);
+			} else if (led.led_type == DCL_TYPE_DEVICE_OK2RM) {
+				nv_sgp_locate(nvc, drive, TR_LOCATE_DISABLE);
+			} else {
+				return (ENXIO);
+			}
+
+			port = SGP_DRV_TO_PORT(led.led_number);
+			nvc->nvc_port[port].nvp_sgp_ioctl_mod |= led.led_type;
+		}
+
+		if (led.led_ctl_active == DCL_CNTRL_ON) {
+			if (led.led_type == DCL_TYPE_DEVICE_FAIL) {
+				nv_sgp_error(nvc, drive, TR_ERROR_ENABLE);
+			} else if (led.led_type == DCL_TYPE_DEVICE_OK2RM) {
+				nv_sgp_locate(nvc, drive, TR_LOCATE_ENABLE);
+			} else {
+				return (ENXIO);
+			}
+
+			port = SGP_DRV_TO_PORT(led.led_number);
+			nvc->nvc_port[port].nvp_sgp_ioctl_mod |= led.led_type;
+		}
+
+		break;
+
+	case DEVCTL_GET_LED:
+		status = ddi_copyin((void *)arg, &led,
+		    sizeof (struct dc_led_ctl), mode);
+		if (status != 0)
+			return (EFAULT);
+
+		/*
+		 * Since only the first two controller currently support
+		 * SGPIO (as per NVIDIA docs), this code will as well.
+		 * Note that this validate the port value within led_state
+		 * as well.
+		 */
+
+		ctlr = SGP_DRV_TO_CTLR(led.led_number);
+		if ((ctlr != 0) && (ctlr != 1))
+			return (ENXIO);
+
+		curr_led = SGPIO0_TR_DRV(nvc->nvc_sgp_cbp->sgpio0_tr,
+		    led.led_number);
+
+		port = SGP_DRV_TO_PORT(led.led_number);
+		if (nvc->nvc_port[port].nvp_sgp_ioctl_mod & led.led_type) {
+			led.led_ctl_active = DCL_CNTRL_ON;
+
+			if (led.led_type == DCL_TYPE_DEVICE_FAIL) {
+				if (TR_ERROR(curr_led) == TR_ERROR_DISABLE)
+					led.led_state = DCL_STATE_OFF;
+				else
+					led.led_state = DCL_STATE_ON;
+			} else if (led.led_type == DCL_TYPE_DEVICE_OK2RM) {
+				if (TR_LOCATE(curr_led) == TR_LOCATE_DISABLE)
+					led.led_state = DCL_STATE_OFF;
+				else
+					led.led_state = DCL_STATE_ON;
+			} else {
+				return (ENXIO);
+			}
+		} else {
+			led.led_ctl_active = DCL_CNTRL_OFF;
+			/*
+			 * Not really off, but never set and no constant for
+			 * tri-state
+			 */
+			led.led_state = DCL_STATE_OFF;
+		}
+
+		status = ddi_copyout(&led, (void *)arg,
+		    sizeof (struct dc_led_ctl), mode);
+		if (status != 0)
+			return (EFAULT);
+
+		break;
+
+	case DEVCTL_NUM_LEDS:
+		led.led_number = SGPIO_DRV_CNT_VALUE;
+		led.led_ctl_active = 1;
+		led.led_type = 3;
+
+		/*
+		 * According to documentation, NVIDIA SGPIO is supposed to
+		 * support blinking, but it does not seem to work in practice.
+		 */
+		led.led_state = DCL_STATE_ON;
+
+		status = ddi_copyout(&led, (void *)arg,
+		    sizeof (struct dc_led_ctl), mode);
+		if (status != 0)
+			return (EFAULT);
+
+		break;
+
+	default:
+		return (EINVAL);
+	}
+
+	return (0);
+}
+#endif	/* SGPIO_SUPPORT */
 
 
 /*
@@ -961,6 +1223,11 @@ nv_sata_probe(dev_info_t *dip, sata_device_t *sd)
 	 * A device is present so clear hotremoved flag
 	 */
 	nvp->nvp_state &= ~NV_PORT_HOTREMOVED;
+
+#ifdef SGPIO_SUPPORT
+	nv_sgp_drive_connect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
+	    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
+#endif
 
 	/*
 	 * If the signature was acquired previously there is no need to
@@ -1776,6 +2043,10 @@ nv_start_common(nv_port_t *nvp, sata_pkt_t *spkt)
 
 	if ((ret = (*nv_slotp->nvslot_start)(nvp, slot)) ==
 	    SATA_TRAN_ACCEPTED) {
+#ifdef SGPIO_SUPPORT
+		nv_sgp_drive_active(nvp->nvp_ctlp,
+		    (nvp->nvp_ctlp->nvc_ctlr_num * 2) + nvp->nvp_port_num);
+#endif
 		nv_slotp->nvslot_stime = ddi_get_lbolt();
 
 		/*
@@ -5016,6 +5287,11 @@ nv_resume(nv_port_t *nvp)
 		return;
 	}
 
+#ifdef SGPIO_SUPPORT
+	nv_sgp_drive_connect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
+	    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
+#endif
+
 	(*(nvp->nvp_ctlp->nvc_set_intr))(nvp, NV_INTR_CLEAR_ALL|NV_INTR_ENABLE);
 
 	/*
@@ -5041,6 +5317,11 @@ nv_suspend(nv_port_t *nvp)
 	NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp, "nv_suspend()"));
 
 	mutex_enter(&nvp->nvp_mutex);
+
+#ifdef SGPIO_SUPPORT
+	nv_sgp_drive_disconnect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
+	    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
+#endif
 
 	if (nvp->nvp_state & NV_PORT_INACTIVE) {
 		mutex_exit(&nvp->nvp_mutex);
@@ -5344,3 +5625,706 @@ nv_start_rqsense_pio(nv_port_t *nvp, nv_slot_t *nv_slotp)
 
 	return (NV_SUCCESS);
 }
+
+
+#ifdef SGPIO_SUPPORT
+/*
+ * NVIDIA specific SGPIO LED support
+ * Please refer to the NVIDIA documentation for additional details
+ */
+
+/*
+ * nv_sgp_led_init
+ * Detect SGPIO support.  If present, initialize.
+ */
+static void
+nv_sgp_led_init(nv_ctl_t *nvc, ddi_acc_handle_t pci_conf_handle)
+{
+	uint16_t csrp;		/* SGPIO_CSRP from PCI config space */
+	uint32_t cbp;		/* SGPIO_CBP from PCI config space */
+	nv_sgp_cmn_t *cmn;	/* shared data structure */
+	char tqname[SGPIO_TQ_NAME_LEN];
+	extern caddr_t psm_map_phys_new(paddr_t, size_t, int);
+
+	/*
+	 * The NVIDIA SGPIO support can nominally handle 6 drives.
+	 * However, the current implementation only supports 4 drives.
+	 * With two drives per controller, that means only look at the
+	 * first two controllers.
+	 */
+	if ((nvc->nvc_ctlr_num != 0) && (nvc->nvc_ctlr_num != 1))
+		return;
+
+	/* confirm that the SGPIO registers are there */
+	if (nv_sgp_detect(pci_conf_handle, &csrp, &cbp) != NV_SUCCESS) {
+		NVLOG((NVDBG_INIT, nvc, NULL,
+		    "SGPIO registers not detected"));
+		return;
+	}
+
+	/* save off the SGPIO_CSR I/O address */
+	nvc->nvc_sgp_csr = csrp;
+
+	/* map in Command Block */
+	nvc->nvc_sgp_cbp = (nv_sgp_cb_t *)psm_map_phys_new(cbp,
+	    sizeof (nv_sgp_cb_t), PROT_READ | PROT_WRITE);
+
+	/* initialize the SGPIO h/w */
+	if (nv_sgp_init(nvc) == NV_FAILURE) {
+		nv_cmn_err(CE_WARN, nvc, NULL,
+		    "!Unable to initialize SGPIO");
+	}
+
+	if (nvc->nvc_ctlr_num == 0) {
+		/*
+		 * Controller 0 on the MCP55/IO55 initialized the SGPIO
+		 * and the data that is shared between the controllers.
+		 * The clever thing to do would be to let the first controller
+		 * that comes up be the one that initializes all this.
+		 * However, SGPIO state is not necessarily zeroed between
+		 * between OS reboots, so there might be old data there.
+		 */
+
+		/* allocate shared space */
+		cmn = (nv_sgp_cmn_t *)kmem_zalloc(sizeof (nv_sgp_cmn_t),
+		    KM_SLEEP);
+		if (cmn == NULL) {
+			nv_cmn_err(CE_WARN, nvc, NULL,
+			    "!Failed to allocate shared data");
+			return;
+		}
+
+		nvc->nvc_sgp_cmn = cmn;
+
+		/* initialize the shared data structure */
+		cmn->nvs_magic = SGPIO_MAGIC;
+		cmn->nvs_in_use = (1 << nvc->nvc_ctlr_num);
+		cmn->nvs_connected = 0;
+		cmn->nvs_activity = 0;
+
+		mutex_init(&cmn->nvs_slock, NULL, MUTEX_DRIVER, NULL);
+		mutex_init(&cmn->nvs_tlock, NULL, MUTEX_DRIVER, NULL);
+		cv_init(&cmn->nvs_cv, NULL, CV_DRIVER, NULL);
+
+		/* put the address in the SGPIO scratch register */
+#if defined(__amd64)
+		nvc->nvc_sgp_cbp->sgpio_sr = (uint64_t)cmn;
+#else
+		nvc->nvc_sgp_cbp->sgpio_sr = (uint32_t)cmn;
+#endif
+
+		/* start the activity LED taskq */
+
+		/*
+		 * The taskq name should be unique and the time
+		 */
+		(void) snprintf(tqname, SGPIO_TQ_NAME_LEN,
+		    "nvSataLed%x", (short)(ddi_get_lbolt() & 0xffff));
+		cmn->nvs_taskq = ddi_taskq_create(nvc->nvc_dip, tqname, 1,
+		    TASKQ_DEFAULTPRI, 0);
+		if (cmn->nvs_taskq == NULL) {
+			cmn->nvs_taskq_delay = 0;
+			nv_cmn_err(CE_WARN, nvc, NULL,
+			    "!Failed to start activity LED taskq");
+		} else {
+			cmn->nvs_taskq_delay = SGPIO_LOOP_WAIT_USECS;
+			(void) ddi_taskq_dispatch(cmn->nvs_taskq,
+			    nv_sgp_activity_led_ctl, nvc, DDI_SLEEP);
+		}
+
+	} else if (nvc->nvc_ctlr_num == 1) {
+		/*
+		 * Controller 1 confirms that SGPIO has been initialized
+		 * and, if so, try to get the shared data pointer, otherwise
+		 * get the shared data pointer when accessing the data.
+		 */
+
+		if (nvc->nvc_sgp_cbp->sgpio_sr != 0) {
+			cmn = (nv_sgp_cmn_t *)nvc->nvc_sgp_cbp->sgpio_sr;
+
+			/*
+			 * It looks like a pointer, but is it the shared data?
+			 */
+			if (cmn->nvs_magic == SGPIO_MAGIC) {
+				nvc->nvc_sgp_cmn = cmn;
+
+				cmn->nvs_in_use |= (1 << nvc->nvc_ctlr_num);
+			}
+		}
+	}
+}
+
+/*
+ * nv_sgp_detect
+ * Read the SGPIO_CSR and SGPIO_CBP values from PCI config space and
+ * report back whether both were readable.
+ */
+static int
+nv_sgp_detect(ddi_acc_handle_t pci_conf_handle, uint16_t *csrpp,
+    uint32_t *cbpp)
+{
+	/* get the SGPIO_CSRP */
+	*csrpp = pci_config_get16(pci_conf_handle, SGPIO_CSRP);
+	if (*csrpp == 0) {
+		return (NV_FAILURE);
+	}
+
+	/* SGPIO_CSRP is good, get the SGPIO_CBP */
+	*cbpp = pci_config_get32(pci_conf_handle, SGPIO_CBP);
+	if (*cbpp == 0) {
+		return (NV_FAILURE);
+	}
+
+	/* SGPIO_CBP is good, so we must support SGPIO */
+	return (NV_SUCCESS);
+}
+
+/*
+ * nv_sgp_init
+ * Initialize SGPIO.  The process is specified by NVIDIA.
+ */
+static int
+nv_sgp_init(nv_ctl_t *nvc)
+{
+	uint32_t status;
+	int drive_count;
+
+	/*
+	 * if SGPIO status set to SGPIO_STATE_RESET, logic has been
+	 * reset and needs to be initialized.
+	 */
+	status = nv_sgp_csr_read(nvc);
+	if (SGPIO_CSR_SSTAT(status) == SGPIO_STATE_RESET) {
+		if (nv_sgp_init_cmd(nvc) == NV_FAILURE) {
+			/* reset and try again */
+			nv_sgp_reset(nvc);
+			if (nv_sgp_init_cmd(nvc) == NV_FAILURE) {
+				NVLOG((NVDBG_ALWAYS, nvc, NULL,
+				    "SGPIO init failed"));
+				return (NV_FAILURE);
+			}
+		}
+	}
+
+	/*
+	 * NVIDIA recommends reading the supported drive count even
+	 * though they also indicate that it is 4 at this time.
+	 */
+	drive_count = SGP_CR0_DRV_CNT(nvc->nvc_sgp_cbp->sgpio_cr0);
+	if (drive_count != SGPIO_DRV_CNT_VALUE) {
+		NVLOG((NVDBG_ALWAYS, nvc, NULL,
+		    "SGPIO reported undocumented drive count - %d",
+		    drive_count));
+	}
+
+	NVLOG((NVDBG_INIT, nvc, NULL,
+	    "initialized ctlr: %d csr: 0x%08x",
+	    nvc->nvc_ctlr_num, nvc->nvc_sgp_csr));
+
+	return (NV_SUCCESS);
+}
+
+static void
+nv_sgp_reset(nv_ctl_t *nvc)
+{
+	uint32_t cmd;
+	uint32_t status;
+
+	cmd = SGPIO_CMD_RESET;
+	nv_sgp_csr_write(nvc, cmd);
+
+	status = nv_sgp_csr_read(nvc);
+
+	if (SGPIO_CSR_CSTAT(status) != SGPIO_CMD_OK) {
+		NVLOG((NVDBG_ALWAYS, nvc, NULL,
+		    "SGPIO reset failed: CSR - 0x%x", status));
+	}
+}
+
+static int
+nv_sgp_init_cmd(nv_ctl_t *nvc)
+{
+	int seq;
+	hrtime_t start, end;
+	uint32_t status;
+	uint32_t cmd;
+
+	/* get the old sequence value */
+	status = nv_sgp_csr_read(nvc);
+	seq = SGPIO_CSR_SEQ(status);
+
+	/* check the state since we have the info anyway */
+	if (SGPIO_CSR_SSTAT(status) != SGPIO_STATE_OPERATIONAL) {
+		NVLOG((NVDBG_ALWAYS, nvc, NULL,
+		    "SGPIO init_cmd: state not operational"));
+	}
+
+	/* issue command */
+	cmd = SGPIO_CSR_CMD_SET(SGPIO_CMD_READ_PARAMS);
+	nv_sgp_csr_write(nvc, cmd);
+
+	DTRACE_PROBE2(sgpio__cmd, int, cmd, int, status);
+
+	/* poll for completion */
+	start = gethrtime();
+	end = start + NV_SGP_CMD_TIMEOUT;
+	for (;;) {
+		status = nv_sgp_csr_read(nvc);
+
+		/* break on error */
+		if (SGPIO_CSR_CSTAT(status) == SGPIO_CMD_ERROR)
+			break;
+
+		/* break on command completion (seq changed) */
+		if (SGPIO_CSR_SEQ(status) != seq) {
+			if (SGPIO_CSR_CSTAT(status) == SGPIO_CMD_ACTIVE) {
+				NVLOG((NVDBG_ALWAYS, nvc, NULL,
+				    "Seq changed but command still active"));
+			}
+
+			break;
+		}
+
+		/* Wait 400 ns and try again */
+		NV_DELAY_NSEC(400);
+
+		if (gethrtime() > end)
+			break;
+	}
+
+	if (SGPIO_CSR_CSTAT(status) == SGPIO_CMD_OK)
+		return (NV_SUCCESS);
+
+	return (NV_FAILURE);
+}
+
+static int
+nv_sgp_check_set_cmn(nv_ctl_t *nvc)
+{
+	nv_sgp_cmn_t *cmn;
+
+	/* check to see if Scratch Register is set */
+	if (nvc->nvc_sgp_cbp->sgpio_sr != 0) {
+		nvc->nvc_sgp_cmn =
+		    (nv_sgp_cmn_t *)nvc->nvc_sgp_cbp->sgpio_sr;
+
+		if (nvc->nvc_sgp_cmn->nvs_magic != SGPIO_MAGIC)
+			return (NV_FAILURE);
+
+		cmn = nvc->nvc_sgp_cmn;
+
+		mutex_enter(&cmn->nvs_slock);
+		cmn->nvs_in_use |= (1 << nvc->nvc_ctlr_num);
+		mutex_exit(&cmn->nvs_slock);
+
+		return (NV_SUCCESS);
+	}
+
+	return (NV_FAILURE);
+}
+
+/*
+ * nv_sgp_csr_read
+ * This is just a 32-bit port read from the value that was obtained from the
+ * PCI config space.
+ *
+ * XXX It was advised to use the in[bwl] function for this, even though they
+ * are obsolete interfaces.
+ */
+static int
+nv_sgp_csr_read(nv_ctl_t *nvc)
+{
+	return (inl(nvc->nvc_sgp_csr));
+}
+
+/*
+ * nv_sgp_csr_write
+ * This is just a 32-bit I/O port write.  The port number was obtained from
+ * the PCI config space.
+ *
+ * XXX It was advised to use the out[bwl] function for this, even though they
+ * are obsolete interfaces.
+ */
+static void
+nv_sgp_csr_write(nv_ctl_t *nvc, uint32_t val)
+{
+	outl(nvc->nvc_sgp_csr, val);
+}
+
+/*
+ * nv_sgp_write_data
+ * Cause SGPIO to send Command Block data
+ */
+static int
+nv_sgp_write_data(nv_ctl_t *nvc)
+{
+	hrtime_t start, end;
+	uint32_t status;
+	uint32_t cmd;
+
+	/* issue command */
+	cmd = SGPIO_CSR_CMD_SET(SGPIO_CMD_WRITE_DATA);
+	nv_sgp_csr_write(nvc, cmd);
+
+	/* poll for completion */
+	start = gethrtime();
+	end = start + NV_SGP_CMD_TIMEOUT;
+	for (;;) {
+		status = nv_sgp_csr_read(nvc);
+
+		/* break on error completion */
+		if (SGPIO_CSR_CSTAT(status) == SGPIO_CMD_ERROR)
+			break;
+
+		/* break on successful completion */
+		if (SGPIO_CSR_CSTAT(status) == SGPIO_CMD_OK)
+			break;
+
+		/* Wait 400 ns and try again */
+		NV_DELAY_NSEC(400);
+
+		if (gethrtime() > end)
+			break;
+	}
+
+	if (SGPIO_CSR_CSTAT(status) == SGPIO_CMD_OK)
+		return (NV_SUCCESS);
+
+	return (NV_FAILURE);
+}
+
+/*
+ * nv_sgp_activity_led_ctl
+ * This is run as a taskq.  It wakes up at a fixed interval and checks to
+ * see if any of the activity LEDs need to be changed.
+ */
+static void
+nv_sgp_activity_led_ctl(void *arg)
+{
+	nv_ctl_t *nvc = (nv_ctl_t *)arg;
+	nv_sgp_cmn_t *cmn;
+	volatile nv_sgp_cb_t *cbp;
+	clock_t ticks;
+	uint8_t drv_leds;
+	uint32_t old_leds;
+	uint32_t new_led_state;
+	int i;
+
+	cmn = nvc->nvc_sgp_cmn;
+	cbp = nvc->nvc_sgp_cbp;
+
+	do {
+		/* save off the old state of all of the LEDs */
+		old_leds = cbp->sgpio0_tr;
+
+		DTRACE_PROBE3(sgpio__activity__state,
+		    int, cmn->nvs_connected, int, cmn->nvs_activity,
+		    int, old_leds);
+
+		new_led_state = 0;
+
+		/* for each drive */
+		for (i = 0; i < SGPIO_DRV_CNT_VALUE; i++) {
+
+			/* get the current state of the LEDs for the drive */
+			drv_leds = SGPIO0_TR_DRV(old_leds, i);
+
+			if ((cmn->nvs_connected & (1 << i)) == 0) {
+				/* if not connected, turn off activity */
+				drv_leds &= ~TR_ACTIVE_MASK;
+				drv_leds |= TR_ACTIVE_SET(TR_ACTIVE_DISABLE);
+
+				new_led_state &= SGPIO0_TR_DRV_CLR(i);
+				new_led_state |=
+				    SGPIO0_TR_DRV_SET(drv_leds, i);
+
+				continue;
+			}
+
+			if ((cmn->nvs_activity & (1 << i)) == 0) {
+				/* connected, but not active */
+				drv_leds &= ~TR_ACTIVE_MASK;
+				drv_leds |= TR_ACTIVE_SET(TR_ACTIVE_ENABLE);
+
+				new_led_state &= SGPIO0_TR_DRV_CLR(i);
+				new_led_state |=
+				    SGPIO0_TR_DRV_SET(drv_leds, i);
+
+				continue;
+			}
+
+			/* connected and active */
+			if (TR_ACTIVE(drv_leds) == TR_ACTIVE_ENABLE) {
+				/* was enabled, so disable */
+				drv_leds &= ~TR_ACTIVE_MASK;
+				drv_leds |=
+				    TR_ACTIVE_SET(TR_ACTIVE_DISABLE);
+
+				new_led_state &= SGPIO0_TR_DRV_CLR(i);
+				new_led_state |=
+				    SGPIO0_TR_DRV_SET(drv_leds, i);
+			} else {
+				/* was disabled, so enable */
+				drv_leds &= ~TR_ACTIVE_MASK;
+				drv_leds |= TR_ACTIVE_SET(TR_ACTIVE_ENABLE);
+
+				new_led_state &= SGPIO0_TR_DRV_CLR(i);
+				new_led_state |=
+				    SGPIO0_TR_DRV_SET(drv_leds, i);
+			}
+
+			/*
+			 * clear the activity bit
+			 * if there is drive activity again within the
+			 * loop interval (now 1/16 second), nvs_activity
+			 * will be reset and the "connected and active"
+			 * condition above will cause the LED to blink
+			 * off and on at the loop interval rate.  The
+			 * rate may be increased (interval shortened) as
+			 * long as it is not more than 1/30 second.
+			 */
+			mutex_enter(&cmn->nvs_slock);
+			cmn->nvs_activity &= ~(1 << i);
+			mutex_exit(&cmn->nvs_slock);
+		}
+
+		DTRACE_PROBE1(sgpio__new__led__state, int, new_led_state);
+
+		/* write out LED values */
+
+		mutex_enter(&cmn->nvs_slock);
+		cbp->sgpio0_tr &= ~TR_ACTIVE_MASK_ALL;
+		cbp->sgpio0_tr |= new_led_state;
+		cbp->sgpio_cr0 = SGP_CR0_ENABLE_MASK;
+		mutex_exit(&cmn->nvs_slock);
+
+		if (nv_sgp_write_data(nvc) == NV_FAILURE) {
+			NVLOG((NVDBG_VERBOSE, nvc, NULL,
+			    "nv_sgp_write_data failure updating active LED"));
+		}
+
+		/* now rest for the interval */
+		mutex_enter(&cmn->nvs_tlock);
+		ticks = drv_usectohz(cmn->nvs_taskq_delay);
+		if (ticks > 0)
+			(void) cv_timedwait(&cmn->nvs_cv, &cmn->nvs_tlock,
+			    ddi_get_lbolt() + ticks);
+		mutex_exit(&cmn->nvs_tlock);
+	} while (ticks > 0);
+}
+
+/*
+ * nv_sgp_drive_connect
+ * Set the flag used to indicate that the drive is attached to the HBA.
+ * Used to let the taskq know that it should turn the Activity LED on.
+ */
+static void
+nv_sgp_drive_connect(nv_ctl_t *nvc, int drive)
+{
+	nv_sgp_cmn_t *cmn;
+
+	if (nv_sgp_check_set_cmn(nvc) == NV_FAILURE)
+		return;
+	cmn = nvc->nvc_sgp_cmn;
+
+	mutex_enter(&cmn->nvs_slock);
+	cmn->nvs_connected |= (1 << drive);
+	mutex_exit(&cmn->nvs_slock);
+}
+
+/*
+ * nv_sgp_drive_disconnect
+ * Clears the flag used to indicate that the drive is no longer attached
+ * to the HBA.  Used to let the taskq know that it should turn the
+ * Activity LED off.  The flag that indicates that the drive is in use is
+ * also cleared.
+ */
+static void
+nv_sgp_drive_disconnect(nv_ctl_t *nvc, int drive)
+{
+	nv_sgp_cmn_t *cmn;
+
+	if (nv_sgp_check_set_cmn(nvc) == NV_FAILURE)
+		return;
+	cmn = nvc->nvc_sgp_cmn;
+
+	mutex_enter(&cmn->nvs_slock);
+	cmn->nvs_connected &= ~(1 << drive);
+	cmn->nvs_activity &= ~(1 << drive);
+	mutex_exit(&cmn->nvs_slock);
+}
+
+/*
+ * nv_sgp_drive_active
+ * Sets the flag used to indicate that the drive has been accessed and the
+ * LED should be flicked off, then on.  It is cleared at a fixed time
+ * interval by the LED taskq and set by the sata command start.
+ */
+static void
+nv_sgp_drive_active(nv_ctl_t *nvc, int drive)
+{
+	nv_sgp_cmn_t *cmn;
+
+	if (nv_sgp_check_set_cmn(nvc) == NV_FAILURE)
+		return;
+	cmn = nvc->nvc_sgp_cmn;
+
+	DTRACE_PROBE1(sgpio__active, int, drive);
+
+	mutex_enter(&cmn->nvs_slock);
+	cmn->nvs_connected |= (1 << drive);
+	cmn->nvs_activity |= (1 << drive);
+	mutex_exit(&cmn->nvs_slock);
+}
+
+
+/*
+ * nv_sgp_locate
+ * Turns the Locate/OK2RM LED off or on for a particular drive.  State is
+ * maintained in the SGPIO Command Block.
+ */
+static void
+nv_sgp_locate(nv_ctl_t *nvc, int drive, int value)
+{
+	uint8_t leds;
+	volatile nv_sgp_cb_t *cb = nvc->nvc_sgp_cbp;
+	nv_sgp_cmn_t *cmn;
+
+	if (nv_sgp_check_set_cmn(nvc) == NV_FAILURE)
+		return;
+	cmn = nvc->nvc_sgp_cmn;
+
+	if ((drive < 0) || (drive >= SGPIO_DRV_CNT_VALUE))
+		return;
+
+	DTRACE_PROBE2(sgpio__locate, int, drive, int, value);
+
+	mutex_enter(&cmn->nvs_slock);
+
+	leds = SGPIO0_TR_DRV(cb->sgpio0_tr, drive);
+
+	leds &= ~TR_LOCATE_MASK;
+	leds |= TR_LOCATE_SET(value);
+
+	cb->sgpio0_tr &= SGPIO0_TR_DRV_CLR(drive);
+	cb->sgpio0_tr |= SGPIO0_TR_DRV_SET(leds, drive);
+
+	cb->sgpio_cr0 = SGP_CR0_ENABLE_MASK;
+
+	mutex_exit(&cmn->nvs_slock);
+
+	if (nv_sgp_write_data(nvc) == NV_FAILURE) {
+		nv_cmn_err(CE_WARN, nvc, NULL,
+		    "!nv_sgp_write_data failure updating OK2RM/Locate LED");
+	}
+}
+
+/*
+ * nv_sgp_error
+ * Turns the Error/Failure LED off or on for a particular drive.  State is
+ * maintained in the SGPIO Command Block.
+ */
+static void
+nv_sgp_error(nv_ctl_t *nvc, int drive, int value)
+{
+	uint8_t leds;
+	volatile nv_sgp_cb_t *cb = nvc->nvc_sgp_cbp;
+	nv_sgp_cmn_t *cmn;
+
+	if (nv_sgp_check_set_cmn(nvc) == NV_FAILURE)
+		return;
+	cmn = nvc->nvc_sgp_cmn;
+
+	if ((drive < 0) || (drive >= SGPIO_DRV_CNT_VALUE))
+		return;
+
+	DTRACE_PROBE2(sgpio__error, int, drive, int, value);
+
+	mutex_enter(&cmn->nvs_slock);
+
+	leds = SGPIO0_TR_DRV(cb->sgpio0_tr, drive);
+
+	leds &= ~TR_ERROR_MASK;
+	leds |= TR_ERROR_SET(value);
+
+	cb->sgpio0_tr &= SGPIO0_TR_DRV_CLR(drive);
+	cb->sgpio0_tr |= SGPIO0_TR_DRV_SET(leds, drive);
+
+	cb->sgpio_cr0 = SGP_CR0_ENABLE_MASK;
+
+	mutex_exit(&cmn->nvs_slock);
+
+	if (nv_sgp_write_data(nvc) == NV_FAILURE) {
+		nv_cmn_err(CE_WARN, nvc, NULL,
+		    "!nv_sgp_write_data failure updating Fail/Error LED");
+	}
+}
+
+static void
+nv_sgp_cleanup(nv_ctl_t *nvc)
+{
+	int drive;
+	uint8_t drv_leds;
+	uint32_t led_state;
+	volatile nv_sgp_cb_t *cb = nvc->nvc_sgp_cbp;
+	nv_sgp_cmn_t *cmn = nvc->nvc_sgp_cmn;
+	extern void psm_unmap_phys(caddr_t, size_t);
+
+	/* turn off activity LEDs for this controller */
+	drv_leds = TR_ACTIVE_SET(TR_ACTIVE_DISABLE);
+
+	/* get the existing LED state */
+	led_state = cb->sgpio0_tr;
+
+	/* turn off port 0 */
+	drive = SGP_CTLR_PORT_TO_DRV(nvc->nvc_ctlr_num, 0);
+	led_state &= SGPIO0_TR_DRV_CLR(drive);
+	led_state |= SGPIO0_TR_DRV_SET(drv_leds, drive);
+
+	/* turn off port 1 */
+	drive = SGP_CTLR_PORT_TO_DRV(nvc->nvc_ctlr_num, 1);
+	led_state &= SGPIO0_TR_DRV_CLR(drive);
+	led_state |= SGPIO0_TR_DRV_SET(drv_leds, drive);
+
+	/* set the new led state, which should turn off this ctrl's LEDs */
+	cb->sgpio_cr0 = SGP_CR0_ENABLE_MASK;
+	(void) nv_sgp_write_data(nvc);
+
+	/* clear the controller's in use bit */
+	mutex_enter(&cmn->nvs_slock);
+	cmn->nvs_in_use &= ~(1 << nvc->nvc_ctlr_num);
+	mutex_exit(&cmn->nvs_slock);
+
+	if (cmn->nvs_in_use == 0) {
+		/* if all "in use" bits cleared, take everything down */
+
+		if (cmn->nvs_taskq != NULL) {
+			/* allow activity taskq to exit */
+			cmn->nvs_taskq_delay = 0;
+			cv_broadcast(&cmn->nvs_cv);
+
+			/* then destroy it */
+			ddi_taskq_destroy(cmn->nvs_taskq);
+		}
+
+		/* turn off all of the LEDs */
+		cb->sgpio0_tr = 0;
+		cb->sgpio_cr0 = SGP_CR0_ENABLE_MASK;
+		(void) nv_sgp_write_data(nvc);
+
+		cb->sgpio_sr = NULL;
+
+		/* free resources */
+		cv_destroy(&cmn->nvs_cv);
+		mutex_destroy(&cmn->nvs_tlock);
+		mutex_destroy(&cmn->nvs_slock);
+
+		kmem_free(nvc->nvc_sgp_cmn, sizeof (nv_sgp_cmn_t));
+	}
+
+	nvc->nvc_sgp_cmn = NULL;
+
+	/* unmap the SGPIO Command Block */
+	psm_unmap_phys((caddr_t)nvc->nvc_sgp_cbp, sizeof (nv_sgp_cb_t));
+}
+#endif	/* SGPIO_SUPPORT */

@@ -26,8 +26,6 @@
 #ifndef	_SYS_DEVCTL_H
 #define	_SYS_DEVCTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Device control interfaces
  */
@@ -172,6 +170,10 @@ typedef struct devctl_ap_state32 {
 #define	DEVCTL_PM_BUS_STRICT_TEST	(DEVCTL_IOC | 36)
 #define	DEVCTL_PM_NO_LOWER_POWER	(DEVCTL_IOC | 37)
 #define	DEVCTL_PM_BUS_NO_INVOL		(DEVCTL_IOC | 38)
+#define	DEVCTL_SET_LED		(DEVCTL_IOC | 39)
+#define	DEVCTL_GET_LED		(DEVCTL_IOC | 40)
+#define	DEVCTL_NUM_LEDS		(DEVCTL_IOC | 41)
+
 
 /*
  * is (c) in the range of possible devctl IOCTL commands?
@@ -232,6 +234,30 @@ typedef struct devctl_ap_state32 {
 
 #define	DEVCTL_CONSTRUCT	0x1
 #define	DEVCTL_OFFLINE		0x2
+
+/*
+ * Drive status LED control
+ */
+struct dc_led_ctl {
+	uint32_t	led_number : 16;	/* LED/device number */
+	uint32_t	led_ctl_active : 1;	/* Control active */
+	uint32_t	led_type : 9;		/* LED type */
+	uint32_t	led_state : 6;		/* LED ON/OFF/Blink state */
+};
+
+/* Control active field */
+#define	DCL_CNTRL_OFF		0	/* Control inactive */
+#define	DCL_CNTRL_ON		1	/* Control active */
+
+/* LED type field */
+#define	DCL_TYPE_DEVICE_FAIL	1	/* Device FAIL LED type */
+#define	DCL_TYPE_DEVICE_OK2RM	2	/* Device OK2RM LED type */
+
+/* LED state field */
+#define	DCL_STATE_OFF		0	/* LED state OFF */
+#define	DCL_STATE_ON		1	/* LED state ON */
+#define	DCL_STATE_SLOW_BLNK	2	/* LED slow blink */
+#define	DCL_STATE_FAST_BLNK	3	/* LED fast blink */
 
 #ifdef	__cplusplus
 }
