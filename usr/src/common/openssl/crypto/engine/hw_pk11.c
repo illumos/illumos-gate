@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* crypto/engine/hw_pk11.c */
 /* This product includes software developed by the OpenSSL Project for 
  * use in the OpenSSL Toolkit (http://www.openssl.org/).
@@ -95,6 +93,7 @@
 #include <openssl/aes.h>
 #include <cryptlib.h>
 #include <dlfcn.h>
+#include <pthread.h>
 
 #ifndef OPENSSL_NO_HW
 #ifndef OPENSSL_NO_HW_PK11
@@ -141,19 +140,40 @@ int *hw_cnids;
 int *hw_dnids;
 #endif	/* SOLARIS_HW_SLOT_SELECTION */
 
-/*
- * Heads of the free PK11 session lists. We have three groups of algorithms in
- * the engine. Public key mechanisms, random operations, and symetric ciphers
- * and digests. We can use a different slot for each group so we must keep a
- * separate cache of sessions for them.
- */
-static struct PK11_SESSION_st *pubkey_free_session = NULL;
-static struct PK11_SESSION_st *rand_free_session = NULL;
-static struct PK11_SESSION_st *free_session = NULL;
+/* PKCS#11 session caches and their locks for all operation types */
+static PK11_CACHE session_cache[OP_MAX];
 
-/* Create all secret key objects in a global session so that they are available
+/*
+ * As stated in v2.20, 11.7 Object Management Function, in section for
+ * C_FindObjectsInit(), at most one search operation may be active at a given
+ * time in a given session. Therefore, C_Find{,Init,Final}Objects() should be
+ * grouped together to form one atomic search operation. This is already
+ * ensured by the property of unique PKCS#11 session handle used for each
+ * PK11_SESSION object.
+ *
+ * This is however not the biggest concern - maintaining consistency of the
+ * underlying object store is more important. The same section of the spec also
+ * says that one thread can be in the middle of a search operation while another
+ * thread destroys the object matching the search template which would result in
+ * invalid handle returned from the search operation.
+ *
+ * Hence, the following locks are used for both protection of the object stores.
+ * They are also used for active list protection.
+ */
+pthread_mutex_t *find_lock[OP_MAX] = { NULL };
+
+/*
+ * lists of asymmetric key handles which are active (referenced by at least one
+ * PK11_SESSION structure, either held by a thread or present in free_session
+ * list) for given algorithm type
+ */
+PK11_active *active_list[OP_MAX] = { NULL };
+
+/*
+ * Create all secret key objects in a global session so that they are available
  * to use for other sessions. These other sessions may be opened or closed
- * without losing the secret key objects */
+ * without losing the secret key objects.
+ */
 static CK_SESSION_HANDLE	global_session = CK_INVALID_HANDLE;
 
 /* ENGINE level stuff */
@@ -174,8 +194,9 @@ static int pk11_rand_status(void);
 PK11_SESSION *pk11_get_session(PK11_OPTYPE optype);
 void pk11_return_session(PK11_SESSION *sp, PK11_OPTYPE optype);
 
-/* active list manipulation functions used here */
-int pk11_active_delete(CK_OBJECT_HANDLE h);
+/* active list manipulation functions used in this file */
+extern int pk11_active_delete(CK_OBJECT_HANDLE h, PK11_OPTYPE type);
+extern void pk11_free_active_list(PK11_OPTYPE type);
 
 #ifndef OPENSSL_NO_RSA
 int pk11_destroy_rsa_key_objects(PK11_SESSION *session);
@@ -194,7 +215,7 @@ int pk11_destroy_dh_object(PK11_SESSION *session, CK_BBOOL uselock);
 
 /* Local helper functions */
 static int pk11_free_all_sessions(void);
-static int pk11_free_session_list(PK11_SESSION **sp);
+static int pk11_free_session_list(PK11_OPTYPE optype);
 static int pk11_setup_session(PK11_SESSION *sp, PK11_OPTYPE optype);
 static int pk11_destroy_cipher_key_objects(PK11_SESSION *session);
 static int pk11_destroy_object(CK_SESSION_HANDLE session,
@@ -247,6 +268,9 @@ static void pk11_get_digest(CK_FUNCTION_LIST_PTR pflist, int slot_id,
     CK_MECHANISM_TYPE mech, int *current_slot_n_digest, int *local_digest_nids,
     int id);
 
+static int pk11_init_all_locks(void);
+static void pk11_free_all_locks(void);
+
 #ifdef	SOLARIS_HW_SLOT_SELECTION
 static int check_hw_mechanisms(void);
 static int nid_in_table(int nid, int *nid_table);
@@ -285,16 +309,16 @@ enum pk11_digest_id {
 	PK11_DIGEST_MAX
 };
 
-#define	TRY_OBJ_DESTROY(sess_hdl, obj_hdl, retval, uselock)		\
+#define	TRY_OBJ_DESTROY(sess_hdl, obj_hdl, retval, uselock, alg_type)	\
 	{								\
 	if (uselock)							\
-		CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);			\
-	if (pk11_active_delete(obj_hdl) == 1)				\
+		LOCK_OBJSTORE(alg_type);				\
+	if (pk11_active_delete(obj_hdl, alg_type) == 1)			\
 		{							\
 		retval = pk11_destroy_object(sess_hdl, obj_hdl);	\
 		}							\
 	if (uselock)							\
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);		\
+		UNLOCK_OBJSTORE(alg_type);				\
 	}
 
 static int cipher_nids[PK11_CIPHER_MAX];
@@ -749,10 +773,94 @@ static CK_BBOOL false = FALSE;
 static CK_SLOT_ID pubkey_SLOTID = 0;
 static CK_SLOT_ID rand_SLOTID = 0;
 static CK_SLOT_ID SLOTID = 0;
-static int pk11_library_initialized = 0;
+static CK_BBOOL pk11_library_initialized = FALSE;
+static CK_BBOOL pk11_atfork_initialized = FALSE;
 static int pk11_pid = 0;
 
 static DSO *pk11_dso = NULL;
+
+/* allocate and initialize all locks used by the engine itself */
+static int pk11_init_all_locks(void)
+	{
+	int type;
+
+#ifndef OPENSSL_NO_RSA
+	find_lock[OP_RSA] = OPENSSL_malloc(sizeof (pthread_mutex_t));
+	if (find_lock[OP_RSA] == NULL)
+		goto malloc_err;
+	(void) pthread_mutex_init(find_lock[OP_RSA], NULL);
+#endif /* OPENSSL_NO_RSA */
+
+#ifndef OPENSSL_NO_DSA
+	find_lock[OP_DSA] = OPENSSL_malloc(sizeof (pthread_mutex_t));
+	if (find_lock[OP_DSA] == NULL)
+		goto malloc_err;
+	(void) pthread_mutex_init(find_lock[OP_DSA], NULL);
+#endif /* OPENSSL_NO_DSA */
+
+#ifndef OPENSSL_NO_DH
+	find_lock[OP_DH] = OPENSSL_malloc(sizeof (pthread_mutex_t));
+	if (find_lock[OP_DH] == NULL)
+		goto malloc_err;
+	(void) pthread_mutex_init(find_lock[OP_DH], NULL);
+#endif /* OPENSSL_NO_DH */
+
+	for (type = 0; type < OP_MAX; type++)
+		{
+		session_cache[type].lock =
+		    OPENSSL_malloc(sizeof (pthread_mutex_t));
+		if (session_cache[type].lock == NULL)
+			goto malloc_err;
+		(void) pthread_mutex_init(session_cache[type].lock, NULL);
+		}
+
+	return (1);
+
+malloc_err:
+	pk11_free_all_locks();
+	PK11err(PK11_F_INIT_ALL_LOCKS, PK11_R_MALLOC_FAILURE);
+	return (0);
+	}
+
+static void pk11_free_all_locks(void)
+	{
+	int type;
+
+#ifndef OPENSSL_NO_RSA
+	if (find_lock[OP_RSA] != NULL)
+		{
+		(void) pthread_mutex_destroy(find_lock[OP_RSA]);
+		OPENSSL_free(find_lock[OP_RSA]);
+		find_lock[OP_RSA] = NULL;
+		}
+#endif /* OPENSSL_NO_RSA */
+#ifndef OPENSSL_NO_DSA
+	if (find_lock[OP_DSA] != NULL)
+		{
+		(void) pthread_mutex_destroy(find_lock[OP_DSA]);
+		OPENSSL_free(find_lock[OP_DSA]);
+		find_lock[OP_DSA] = NULL;
+		}
+#endif /* OPENSSL_NO_DSA */
+#ifndef OPENSSL_NO_DH
+	if (find_lock[OP_DH] != NULL)
+		{
+		(void) pthread_mutex_destroy(find_lock[OP_DH]);
+		OPENSSL_free(find_lock[OP_DH]);
+		find_lock[OP_DH] = NULL;
+		}
+#endif /* OPENSSL_NO_DH */
+
+	for (type = 0; type < OP_MAX; type++)
+		{
+		if (session_cache[type].lock != NULL)
+			{
+			(void) pthread_mutex_destroy(session_cache[type].lock);
+			OPENSSL_free(session_cache[type].lock);
+			session_cache[type].lock = NULL;
+			}
+		}
+	}
 
 /*
  * This internal function is used by ENGINE_pk11() and "dynamic" ENGINE support.
@@ -764,7 +872,7 @@ static int bind_pk11(ENGINE *e)
 	RSA_METHOD *pk11_rsa = PK11_RSA();
 #endif	/* OPENSSL_NO_RSA */
 	if (!pk11_library_initialized)
-		pk11_library_init(e);
+		(void) pk11_library_init(e);
 
 	if(!ENGINE_set_id(e, engine_pk11_id) ||
 	   !ENGINE_set_name(e, engine_pk11_name) ||
@@ -942,6 +1050,51 @@ static long set_PK11_LIBNAME(const char *name)
 	return ((PK11_LIBNAME = BUF_strdup(name)) != NULL ? 1 : 0);
 	}
 
+/* acquire all engine specific mutexes before fork */
+static void pk11_fork_prepare(void)
+	{
+	int i;
+
+	LOCK_OBJSTORE(OP_RSA);
+	LOCK_OBJSTORE(OP_DSA);
+	LOCK_OBJSTORE(OP_DH);
+	for (i = 0; i < OP_MAX; i++)
+		{
+		(void) pthread_mutex_lock(session_cache[i].lock);
+		}
+	}
+
+/* release all engine specific mutexes */
+static void pk11_fork_parent(void)
+	{
+	int i;
+
+	for (i = OP_MAX - 1; i >= 0; i--)
+		{
+		(void) pthread_mutex_unlock(session_cache[i].lock);
+		}
+	UNLOCK_OBJSTORE(OP_DH);
+	UNLOCK_OBJSTORE(OP_DSA);
+	UNLOCK_OBJSTORE(OP_RSA);
+	}
+
+/*
+ * same situation as in parent - we need to unlock all locks to make them
+ * accessible to all threads.
+ */
+static void pk11_fork_child(void)
+	{
+	int i;
+
+	for (i = OP_MAX - 1; i >= 0; i--)
+		{
+		(void) pthread_mutex_unlock(session_cache[i].lock);
+		}
+	UNLOCK_OBJSTORE(OP_DH);
+	UNLOCK_OBJSTORE(OP_DSA);
+	UNLOCK_OBJSTORE(OP_RSA);
+	}
+
 /* Initialization function for the pk11 engine */
 static int pk11_init(ENGINE *e)
 {
@@ -961,6 +1114,7 @@ static int pk11_library_init(ENGINE *e)
 	CK_INFO info;
 	CK_ULONG ul_state_len;
 	int any_slot_found;
+	int i;
 
 	/*
 	 * pk11_library_initialized is set to 0 in pk11_finish() which is called
@@ -976,9 +1130,19 @@ static int pk11_library_init(ENGINE *e)
 	if (pk11_library_initialized)
 		{
 		if (pk11_pid == getpid())
+			{
 			return 1;
+			}
 		else
+			{
 			global_session = CK_INVALID_HANDLE;
+			/*
+			 * free the locks first to prevent memory leak in case
+			 * the application calls fork() without finishing the
+			 * engine first.
+			 */
+			pk11_free_all_locks();
+			}
 		}
 	
 	if (pk11_dso == NULL)
@@ -1071,8 +1235,34 @@ static int pk11_library_init(ENGINE *e)
 		digest_count = 0;
 	}
 
-	pk11_library_initialized = 1;
+	pk11_library_initialized = TRUE;
 	pk11_pid = getpid();
+	/*
+	 * if initialization of the locks fails pk11_init_all_locks()
+	 * will do the cleanup.
+	 */
+	if (!pk11_init_all_locks())
+		goto err;
+	for (i = 0; i < OP_MAX; i++)
+		session_cache[i].head = NULL;
+	/*
+	 * initialize active lists. We only use active lists
+	 * for asymmetric ciphers.
+	 */
+	for (i = 0; i < OP_MAX; i++)
+		active_list[i] = NULL;
+
+	if (!pk11_atfork_initialized)
+		{
+		if (pthread_atfork(pk11_fork_prepare, pk11_fork_parent,
+		    pk11_fork_child) != 0)
+			{
+			PK11err(PK11_F_LIBRARY_INIT, PK11_R_ATFORK_FAILED);
+			goto err;
+			}
+		pk11_atfork_initialized = TRUE;
+		}
+
 	return 1;
 
 err:
@@ -1093,6 +1283,8 @@ static int pk11_destroy(ENGINE *e)
  */
 static int pk11_finish(ENGINE *e)
 	{
+	int i;
+
 	if (pk11_dso == NULL)
 		{
 		PK11err(PK11_F_FINISH, PK11_R_NOT_LOADED);
@@ -1103,6 +1295,10 @@ static int pk11_finish(ENGINE *e)
 
 	if (pk11_free_all_sessions() == 0)
 		goto err;
+
+	/* free all active lists */
+	for (i = 0; i < OP_MAX; i++)
+		pk11_free_active_list(i);
 
 	pFuncList->C_CloseSession(global_session);
 	global_session = CK_INVALID_HANDLE;
@@ -1122,8 +1318,9 @@ static int pk11_finish(ENGINE *e)
 		}
 	pk11_dso = NULL;
 	pFuncList = NULL;
-	pk11_library_initialized = 0;
+	pk11_library_initialized = FALSE;
 	pk11_pid = 0;
+	pk11_free_all_locks();
 
 	return 1;
 
@@ -1220,26 +1417,55 @@ static int pk11_rand_status(void)
 /*
  * Free all BIGNUM structures from PK11_SESSION.
  */
-static void pk11_free_nums(PK11_SESSION *sp)
+static void pk11_free_nums(PK11_SESSION *sp, PK11_OPTYPE optype)
 	{
+	switch (optype)
+		{
 #ifndef	OPENSSL_NO_RSA
-		if (sp->rsa_n_num != NULL)
-			BN_free(sp->rsa_n_num);
-		if (sp->rsa_e_num != NULL)
-			BN_free(sp->rsa_e_num);
-		if (sp->rsa_d_num != NULL)
-			BN_free(sp->rsa_d_num);
+		case OP_RSA:
+			if (sp->opdata_rsa_n_num != NULL)
+				{
+				BN_free(sp->opdata_rsa_n_num);
+				sp->opdata_rsa_n_num = NULL;
+				}
+			if (sp->opdata_rsa_e_num != NULL)
+				{
+				BN_free(sp->opdata_rsa_e_num);
+				sp->opdata_rsa_e_num = NULL;
+				}
+			if (sp->opdata_rsa_d_num != NULL)
+				{
+				BN_free(sp->opdata_rsa_d_num);
+				sp->opdata_rsa_d_num = NULL;
+				}
+			break;
 #endif
 #ifndef	OPENSSL_NO_DSA
-		if (sp->dsa_pub_num != NULL)
-			BN_free(sp->dsa_pub_num);
-		if (sp->dsa_priv_num != NULL)
-			BN_free(sp->dsa_priv_num);
+		case OP_DSA:
+			if (sp->opdata_dsa_pub_num != NULL)
+				{
+				BN_free(sp->opdata_dsa_pub_num);
+				sp->opdata_dsa_pub_num = NULL;
+				}
+			if (sp->opdata_dsa_priv_num != NULL)
+				{
+				BN_free(sp->opdata_dsa_priv_num);
+				sp->opdata_dsa_priv_num = NULL;
+				}
+			break;
 #endif
 #ifndef	OPENSSL_NO_DH
-		if (sp->dh_priv_num != NULL)
-			BN_free(sp->dh_priv_num);
+		case OP_DH:
+			if (sp->opdata_dh_priv_num != NULL)
+				{
+				BN_free(sp->opdata_dh_priv_num);
+				sp->opdata_dh_priv_num = NULL;
+				}
+			break;
 #endif
+		default:
+			break;
+		}
 	}
 
 /*
@@ -1250,27 +1476,27 @@ static void pk11_free_nums(PK11_SESSION *sp)
  */
 PK11_SESSION *pk11_get_session(PK11_OPTYPE optype)
 	{
-	PK11_SESSION *sp, *sp1, *freelist;
+	PK11_SESSION *sp = NULL, *sp1, *freelist;
+	pthread_mutex_t *freelist_lock;
 	CK_RV rv;
 
-	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
 	switch (optype)
 		{
-		case OP_PUBKEY:
-			freelist = pubkey_free_session;
-			break;
+		case OP_RSA:
+		case OP_DSA:
+		case OP_DH:
 		case OP_RAND:
-			freelist = rand_free_session;
-			break;
 		case OP_DIGEST:
 		case OP_CIPHER:
-			freelist = free_session;
+			freelist_lock = session_cache[optype].lock;
 			break;
 		default:
 			PK11err(PK11_F_GET_SESSION, 
 				PK11_R_INVALID_OPERATION_TYPE);
-			goto err;
+			return (NULL);
 		}
+	(void) pthread_mutex_lock(freelist_lock);
+	freelist = session_cache[optype].head;
 	sp = freelist;
 
 	/*
@@ -1307,9 +1533,12 @@ PK11_SESSION *pk11_get_session(PK11_OPTYPE optype)
 			 * here because it would close underlying PKCS#11
 			 * sessions and destroy all objects.
 			 */
-			pk11_free_nums(sp1);
+			pk11_free_nums(sp1, optype);
 			OPENSSL_free(sp1);
 			}
+
+		/* we have to free the active list as well. */
+		pk11_free_active_list(optype);
 
 		/* Initialize the process */
 		rv = pFuncList->C_Initialize(NULL_PTR);
@@ -1366,25 +1595,14 @@ PK11_SESSION *pk11_get_session(PK11_OPTYPE optype)
 			}
 		}
 
-	switch (optype)
-		{
-		case OP_PUBKEY:
-			pubkey_free_session = freelist;
-			break;
-		case OP_RAND:
-			rand_free_session = freelist;
-			break;
-		case OP_DIGEST:
-		case OP_CIPHER:
-			free_session = freelist;
-			break;
-		}
+	/* set new head for the list of PK11_SESSION objects */
+	session_cache[optype].head = freelist;
 
 err:
 	if (sp != NULL)
 		sp->next = NULL;
 
-	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+	(void) pthread_mutex_unlock(freelist_lock);
 
 	return sp;
 	}
@@ -1392,29 +1610,33 @@ err:
 
 void pk11_return_session(PK11_SESSION *sp, PK11_OPTYPE optype)
 	{
+	pthread_mutex_t *freelist_lock;
+	PK11_SESSION *freelist;
+
 	if (sp == NULL || sp->pid != getpid())
 		return;
 	
-	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
-
 	switch (optype)
 		{
-		case OP_PUBKEY:
-			sp->next = pubkey_free_session;
-			pubkey_free_session = sp;
-			break;
+		case OP_RSA:
+		case OP_DSA:
+		case OP_DH:
 		case OP_RAND:
-			sp->next = rand_free_session;
-			rand_free_session = sp;
-			break;
 		case OP_DIGEST:
 		case OP_CIPHER:
-			sp->next = free_session;
-			free_session = sp;
+			freelist_lock = session_cache[optype].lock;
 			break;
+		default:
+			PK11err(PK11_F_RETURN_SESSION,
+				PK11_R_INVALID_OPERATION_TYPE);
+			return;
 		}
 
-	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+	(void) pthread_mutex_lock(freelist_lock);
+	freelist = session_cache[optype].head;
+	sp->next = freelist;
+	session_cache[optype].head = sp;
+	(void) pthread_mutex_unlock(freelist_lock);
 	}
 
 
@@ -1423,6 +1645,7 @@ void pk11_return_session(PK11_SESSION *sp, PK11_OPTYPE optype)
 static int pk11_free_all_sessions()
 	{
 	int ret = 1;
+	int type;
 
 #ifndef OPENSSL_NO_RSA
 	(void) pk11_destroy_rsa_key_objects(NULL);
@@ -1439,30 +1662,48 @@ static int pk11_free_all_sessions()
 	 * We try to release as much as we can but any error means that we will
 	 * return 0 on exit.
 	 */
-	if (pk11_free_session_list(&free_session) == 0)
-		ret = 0;
-	if (pk11_free_session_list(&pubkey_free_session) == 0)
-		ret = 0;
-	if (pk11_free_session_list(&rand_free_session) == 0)
-		ret = 0;
+	for (type = 0; type < OP_MAX; type++)
+		{
+		if (pk11_free_session_list(type) == 0)
+			ret = 0;
+		}
 
 	return ret;
 	}
 	
 /*
- * Destroy session structures from the specified linked list. Free as many
- * sessions as possible but any failure in C_CloseSession() means that we return
- * an error on return.
+ * Destroy session structures from the linked list specified. Free as many
+ * sessions as possible but any failure in C_CloseSession() means that we
+ * return an error on return.
  */
-static int pk11_free_session_list(PK11_SESSION **sessions)
+static int pk11_free_session_list(PK11_OPTYPE optype)
 	{
 	CK_RV rv;
 	PK11_SESSION *sp = NULL;
+	PK11_SESSION *freelist = NULL;
 	pid_t mypid = getpid();
+	pthread_mutex_t *freelist_lock;
 	int ret = 1;
 
-	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
-	while ((sp = *sessions) != NULL)
+	switch (optype)
+		{
+		case OP_RSA:
+		case OP_DSA:
+		case OP_DH:
+		case OP_RAND:
+		case OP_DIGEST:
+		case OP_CIPHER:
+			freelist_lock = session_cache[optype].lock;
+			break;
+		default:
+			PK11err(PK11_F_FREE_ALL_SESSIONS,
+				PK11_R_INVALID_OPERATION_TYPE);
+			return (0);
+		}
+
+	(void) pthread_mutex_lock(freelist_lock);
+	freelist = session_cache[optype].head;
+	while ((sp = freelist) != NULL)
 		{
 		if (sp->session != CK_INVALID_HANDLE && sp->pid == mypid)
 			{
@@ -1474,22 +1715,12 @@ static int pk11_free_session_list(PK11_SESSION **sessions)
 				ret = 0;
 				}
 			}
-		if (sp->session_cipher != CK_INVALID_HANDLE && sp->pid == mypid)
-			{
-			rv = pFuncList->C_CloseSession(sp->session_cipher);
-			if (rv != CKR_OK)
-				{
-				PK11err_add_data(PK11_F_FREE_ALL_SESSIONS, 
-					PK11_R_CLOSESESSION, rv);
-				ret = 0;
-				}
-			}
-		*sessions = sp->next;
-		pk11_free_nums(sp);
+		freelist = sp->next;
+		pk11_free_nums(sp, optype);
 		OPENSSL_free(sp);
 		}
 
-	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+	(void) pthread_mutex_unlock(freelist_lock);
 	return ret;
 	}
 
@@ -1501,7 +1732,9 @@ static int pk11_setup_session(PK11_SESSION *sp, PK11_OPTYPE optype)
 
 	switch (optype)
 		{
-		case OP_PUBKEY:
+		case OP_RSA:
+		case OP_DSA:
+		case OP_DH:
 			myslot = pubkey_SLOTID;
 			break;
 		case OP_RAND:
@@ -1529,7 +1762,7 @@ static int pk11_setup_session(PK11_SESSION *sp, PK11_OPTYPE optype)
 		 * We are probably a child process so force the
 		 * reinitialize of the session
 		 */
-		pk11_library_initialized = 0;
+		pk11_library_initialized = FALSE;
 		(void) pk11_library_init(NULL);
 		rv = pFuncList->C_OpenSession(myslot, CKF_SERIAL_SESSION,
 			NULL_PTR, NULL_PTR, &sp->session);
@@ -1540,43 +1773,43 @@ static int pk11_setup_session(PK11_SESSION *sp, PK11_OPTYPE optype)
 		return 0;
 		}
 
-	sp->session_cipher = CK_INVALID_HANDLE;
-	rv = pFuncList->C_OpenSession(myslot, CKF_SERIAL_SESSION,
-		NULL_PTR, NULL_PTR, &sp->session_cipher);
-	if (rv != CKR_OK)
-		{
-		(void) pFuncList->C_CloseSession(sp->session);
-		sp->session = CK_INVALID_HANDLE;
-
-		PK11err_add_data(PK11_F_SETUP_SESSION, PK11_R_OPENSESSION, rv);
-		return 0;
-		}
-
 	sp->pid = getpid();
-	sp->rsa_pub_key = CK_INVALID_HANDLE;
-	sp->rsa_priv_key = CK_INVALID_HANDLE;
-	sp->dsa_pub_key = CK_INVALID_HANDLE;
-	sp->dsa_priv_key = CK_INVALID_HANDLE;
-	sp->dh_key = CK_INVALID_HANDLE;
-	sp->cipher_key = CK_INVALID_HANDLE;
+
+	switch (optype)
+		{
 #ifndef OPENSSL_NO_RSA
-	sp->rsa_pub = NULL;
-	sp->rsa_n_num = NULL;
-	sp->rsa_e_num = NULL;
-	sp->rsa_priv = NULL;
-	sp->rsa_d_num = NULL;
+		case OP_RSA:
+			sp->opdata_rsa_pub_key = CK_INVALID_HANDLE;
+			sp->opdata_rsa_priv_key = CK_INVALID_HANDLE;
+			sp->opdata_rsa_pub = NULL;
+			sp->opdata_rsa_n_num = NULL;
+			sp->opdata_rsa_e_num = NULL;
+			sp->opdata_rsa_priv = NULL;
+			sp->opdata_rsa_d_num = NULL;
+			break;
 #endif	/* OPENSSL_NO_RSA */
 #ifndef OPENSSL_NO_DSA
-	sp->dsa_pub = NULL;
-	sp->dsa_pub_num = NULL;
-	sp->dsa_priv = NULL;
-	sp->dsa_priv_num = NULL;
+		case OP_DSA:
+			sp->opdata_dsa_pub_key = CK_INVALID_HANDLE;
+			sp->opdata_dsa_priv_key = CK_INVALID_HANDLE;
+			sp->opdata_dsa_pub = NULL;
+			sp->opdata_dsa_pub_num = NULL;
+			sp->opdata_dsa_priv = NULL;
+			sp->opdata_dsa_priv_num = NULL;
+			break;
 #endif	/* OPENSSL_NO_DSA */
 #ifndef OPENSSL_NO_DH
-	sp->dh = NULL;
-	sp->dh_priv_num = NULL;
+		case OP_DH:
+			sp->opdata_dh_key = CK_INVALID_HANDLE;
+			sp->opdata_dh = NULL;
+			sp->opdata_dh_priv_num = NULL;
+			break;
 #endif	/* OPENSSL_NO_DH */
-	sp->encrypt = -1;
+		case OP_CIPHER:
+			sp->opdata_cipher_key = CK_INVALID_HANDLE;
+			sp->opdata_encrypt = -1;
+			break;
+		}
 
 	return 1;
 	}
@@ -1587,17 +1820,22 @@ int pk11_destroy_rsa_object_pub(PK11_SESSION *sp, CK_BBOOL uselock)
 	{
 	int ret = 0;
 
-	if (sp->rsa_pub_key != CK_INVALID_HANDLE)
+	if (sp->opdata_rsa_pub_key != CK_INVALID_HANDLE)
 		{
-		TRY_OBJ_DESTROY(sp->session, sp->rsa_pub_key, ret, uselock);
-		sp->rsa_pub_key = CK_INVALID_HANDLE;
-		sp->rsa_pub = NULL;
-		if (sp->rsa_n_num != NULL)
-			BN_free(sp->rsa_n_num);
-		sp->rsa_n_num = NULL;
-		if (sp->rsa_e_num != NULL)
-			BN_free(sp->rsa_e_num);
-		sp->rsa_e_num = NULL;
+		TRY_OBJ_DESTROY(sp->session, sp->opdata_rsa_pub_key,
+		    ret, uselock, OP_RSA);
+		sp->opdata_rsa_pub_key = CK_INVALID_HANDLE;
+		sp->opdata_rsa_pub = NULL;
+		if (sp->opdata_rsa_n_num != NULL)
+			{
+			BN_free(sp->opdata_rsa_n_num);
+			sp->opdata_rsa_n_num = NULL;
+			}
+		if (sp->opdata_rsa_e_num != NULL)
+			{
+			BN_free(sp->opdata_rsa_e_num);
+			sp->opdata_rsa_e_num = NULL;
+			}
 		}
 
 	return (ret);
@@ -1608,14 +1846,17 @@ int pk11_destroy_rsa_object_priv(PK11_SESSION *sp, CK_BBOOL uselock)
 	{
 	int ret = 0;
 
-	if (sp->rsa_priv_key != CK_INVALID_HANDLE)
+	if (sp->opdata_rsa_priv_key != CK_INVALID_HANDLE)
 		{
-		TRY_OBJ_DESTROY(sp->session, sp->rsa_priv_key, ret, uselock);
-		sp->rsa_priv_key = CK_INVALID_HANDLE;
-		sp->rsa_priv = NULL;
-		if (sp->rsa_d_num != NULL)
-			BN_free(sp->rsa_d_num);
-		sp->rsa_d_num = NULL;
+		TRY_OBJ_DESTROY(sp->session, sp->opdata_rsa_priv_key,
+		    ret, uselock, OP_RSA);
+		sp->opdata_rsa_priv_key = CK_INVALID_HANDLE;
+		sp->opdata_rsa_priv = NULL;
+		if (sp->opdata_rsa_d_num != NULL)
+			{
+			BN_free(sp->opdata_rsa_d_num);
+			sp->opdata_rsa_d_num = NULL;
+			}
 		}
 
 	return (ret);
@@ -1636,8 +1877,8 @@ int pk11_destroy_rsa_key_objects(PK11_SESSION *session)
 		local_free_session = session;
 	else
 		{
-		CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
-		local_free_session = pubkey_free_session;
+		(void) pthread_mutex_lock(session_cache[OP_RSA].lock);
+		local_free_session = session_cache[OP_RSA].head;
 		uselock = FALSE;
 		}
 
@@ -1665,7 +1906,7 @@ int pk11_destroy_rsa_key_objects(PK11_SESSION *session)
 		}
 
 	if (session == NULL)
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+		(void) pthread_mutex_unlock(session_cache[OP_RSA].lock);
 
 	return ret;
 	}
@@ -1677,14 +1918,17 @@ int pk11_destroy_dsa_object_pub(PK11_SESSION *sp, CK_BBOOL uselock)
 	{
 	int ret = 0;
 
-	if (sp->dsa_pub_key != CK_INVALID_HANDLE)
+	if (sp->opdata_dsa_pub_key != CK_INVALID_HANDLE)
 		{
-		TRY_OBJ_DESTROY(sp->session, sp->dsa_pub_key, ret, uselock);
-		sp->dsa_pub_key = CK_INVALID_HANDLE;
-		sp->dsa_pub = NULL;
-		if (sp->dsa_pub_num != NULL)
-			BN_free(sp->dsa_pub_num);
-		sp->dsa_pub_num = NULL;
+		TRY_OBJ_DESTROY(sp->session, sp->opdata_dsa_pub_key,
+		    ret, uselock, OP_DSA);
+		sp->opdata_dsa_pub_key = CK_INVALID_HANDLE;
+		sp->opdata_dsa_pub = NULL;
+		if (sp->opdata_dsa_pub_num != NULL)
+			{
+			BN_free(sp->opdata_dsa_pub_num);
+			sp->opdata_dsa_pub_num = NULL;
+			}
 		}
 
 	return (ret);
@@ -1695,14 +1939,17 @@ int pk11_destroy_dsa_object_priv(PK11_SESSION *sp, CK_BBOOL uselock)
 	{
 	int ret = 0;
 
-	if (sp->dsa_priv_key != CK_INVALID_HANDLE)
+	if (sp->opdata_dsa_priv_key != CK_INVALID_HANDLE)
 		{
-		TRY_OBJ_DESTROY(sp->session, sp->dsa_priv_key, ret, uselock);
-		sp->dsa_priv_key = CK_INVALID_HANDLE;
-		sp->dsa_priv = NULL;
-		if (sp->dsa_priv_num != NULL)
-			BN_free(sp->dsa_priv_num);
-		sp->dsa_priv_num = NULL;
+		TRY_OBJ_DESTROY(sp->session, sp->opdata_dsa_priv_key,
+		    ret, uselock, OP_DSA);
+		sp->opdata_dsa_priv_key = CK_INVALID_HANDLE;
+		sp->opdata_dsa_priv = NULL;
+		if (sp->opdata_dsa_priv_num != NULL)
+			{
+			BN_free(sp->opdata_dsa_priv_num);
+			sp->opdata_dsa_priv_num = NULL;
+			}
 		}
 
 	return (ret);
@@ -1723,8 +1970,8 @@ int pk11_destroy_dsa_key_objects(PK11_SESSION *session)
 		local_free_session = session;
 	else
 		{
-		CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
-		local_free_session = pubkey_free_session;
+		(void) pthread_mutex_lock(session_cache[OP_DSA].lock);
+		local_free_session = session_cache[OP_DSA].head;
 		uselock = FALSE;
 		}
 
@@ -1752,7 +1999,7 @@ int pk11_destroy_dsa_key_objects(PK11_SESSION *session)
 		}
 
 	if (session == NULL)
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+		(void) pthread_mutex_unlock(session_cache[OP_DSA].lock);
 
 	return ret;
 	}
@@ -1764,14 +2011,17 @@ int pk11_destroy_dh_object(PK11_SESSION *sp, CK_BBOOL uselock)
 	{
 	int ret = 0;
 
-	if (sp->dh_key != CK_INVALID_HANDLE)
+	if (sp->opdata_dh_key != CK_INVALID_HANDLE)
 		{
-		TRY_OBJ_DESTROY(sp->session, sp->dh_key, ret, uselock);
-		sp->dh_key = CK_INVALID_HANDLE;
-		sp->dh = NULL;
-		if (sp->dh_priv_num != NULL)
-			BN_free(sp->dh_priv_num);
-		sp->dh_priv_num = NULL;
+		TRY_OBJ_DESTROY(sp->session, sp->opdata_dh_key,
+		    ret, uselock, OP_DH);
+		sp->opdata_dh_key = CK_INVALID_HANDLE;
+		sp->opdata_dh = NULL;
+		if (sp->opdata_dh_priv_num != NULL)
+			{
+			BN_free(sp->opdata_dh_priv_num);
+			sp->opdata_dh_priv_num = NULL;
+			}
 		}
 
 	return (ret);
@@ -1794,8 +2044,8 @@ int pk11_destroy_dh_key_objects(PK11_SESSION *session)
 		local_free_session = session;
 	else
 		{
-		CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
-		local_free_session = pubkey_free_session;
+		(void) pthread_mutex_lock(session_cache[OP_DH].lock);
+		local_free_session = session_cache[OP_DH].head;
 		uselock = FALSE;
 		}
 
@@ -1815,7 +2065,7 @@ int pk11_destroy_dh_key_objects(PK11_SESSION *session)
 		}
 err:
 	if (session == NULL)
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+		(void) pthread_mutex_unlock(session_cache[OP_DH].lock);
 
 	return ret;
 	}
@@ -1921,11 +2171,11 @@ static int pk11_init_symmetric(EVP_CIPHER_CTX *ctx, PK11_CIPHER *pcipher,
 
 	/* if we get here, the encryption needs to be reinitialized */
 	if (ctx->encrypt)
-		rv = pFuncList->C_EncryptInit(sp->session_cipher, pmech,
-			sp->cipher_key);
+		rv = pFuncList->C_EncryptInit(sp->session, pmech,
+			sp->opdata_cipher_key);
 	else
-		rv = pFuncList->C_DecryptInit(sp->session_cipher, pmech,
-			sp->cipher_key);
+		rv = pFuncList->C_DecryptInit(sp->session, pmech,
+			sp->opdata_cipher_key);
 
 	if (rv != CKR_OK)
 		{
@@ -1990,7 +2240,8 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 	 * then just reuse it. However, we must not forget to reinitialize the
 	 * context that was finalized in pk11_cipher_cleanup().
 	 */
-	if (sp->cipher_key != CK_INVALID_HANDLE && sp->encrypt == ctx->encrypt)
+	if (sp->opdata_cipher_key != CK_INVALID_HANDLE &&
+	    sp->opdata_encrypt == ctx->encrypt)
 		{
 		state->sp = sp;
 		if (pk11_init_symmetric(ctx, p_ciph_table_row, sp, &mech) == 0)
@@ -2002,13 +2253,13 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 	/* Check if the key has been invalidated. If so, a new key object
 	 * needs to be created.
 	 */
-	if (sp->cipher_key == CK_INVALID_HANDLE)
+	if (sp->opdata_cipher_key == CK_INVALID_HANDLE)
 		{
-		sp->cipher_key = pk11_get_cipher_key(
+		sp->opdata_cipher_key = pk11_get_cipher_key(
 			ctx, key, p_ciph_table_row->key_type, sp);
 		}
 
-	if (sp->encrypt != ctx->encrypt && sp->encrypt != -1)
+	if (sp->opdata_encrypt != ctx->encrypt && sp->opdata_encrypt != -1)
 		{
 		/* The previous encryption/decryption
 		 * is different. Need to terminate the previous
@@ -2021,7 +2272,7 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 			}
 		}
 
-	if (sp->cipher_key == CK_INVALID_HANDLE)
+	if (sp->opdata_cipher_key == CK_INVALID_HANDLE)
 		{
 		pk11_return_session(sp, OP_CIPHER);
 		return 0;
@@ -2031,7 +2282,7 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 	if (pk11_init_symmetric(ctx, p_ciph_table_row, sp, &mech) == 0)
 		return (0);
 
-	sp->encrypt = ctx->encrypt;
+	sp->opdata_encrypt = ctx->encrypt;
 	state->sp = sp;
 
 	return 1;
@@ -2053,7 +2304,7 @@ pk11_cipher_final(PK11_SESSION *sp)
 	{
 	CK_RV rv;
 
-	rv = pFuncList->C_CloseSession(sp->session_cipher);
+	rv = pFuncList->C_CloseSession(sp->session);
 	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_CIPHER_FINAL, PK11_R_CLOSESESSION, rv);
@@ -2061,7 +2312,7 @@ pk11_cipher_final(PK11_SESSION *sp)
 		}
 
 	rv = pFuncList->C_OpenSession(SLOTID, CKF_SERIAL_SESSION,
-		NULL_PTR, NULL_PTR, &sp->session_cipher);
+		NULL_PTR, NULL_PTR, &sp->session);
 	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_CIPHER_FINAL, PK11_R_OPENSESSION, rv);
@@ -2096,7 +2347,7 @@ pk11_cipher_do_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 
 	if (ctx->encrypt)
 		{
-		rv = pFuncList->C_EncryptUpdate(sp->session_cipher, 
+		rv = pFuncList->C_EncryptUpdate(sp->session,
 			(unsigned char *)in, inl, out, &outl);
 
 		if (rv != CKR_OK)
@@ -2108,7 +2359,7 @@ pk11_cipher_do_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 		}
 	else
 		{
-		rv = pFuncList->C_DecryptUpdate(sp->session_cipher, 
+		rv = pFuncList->C_DecryptUpdate(sp->session,
 			(unsigned char *)in, inl, out, &outl);
 
 		if (rv != CKR_OK)
@@ -2156,10 +2407,10 @@ pk11_cipher_cleanup(EVP_CIPHER_CTX *ctx)
 		 */
 		if (ctx->encrypt)
 			rv = pFuncList->C_EncryptFinal(
-			    state->sp->session_cipher, buf, &len);
+			    state->sp->session, buf, &len);
 		else
 			rv = pFuncList->C_DecryptFinal(
-			    state->sp->session_cipher, buf, &len);
+			    state->sp->session, buf, &len);
 
 		if (rv != CKR_OK)
 			{
@@ -2330,9 +2581,9 @@ static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx,
 	/* Save the key information used in this session.
 	 * The max can be saved is PK11_KEY_LEN_MAX.
 	 */
-	sp->key_len = ctx->key_len > PK11_KEY_LEN_MAX ? 
+	sp->opdata_key_len = ctx->key_len > PK11_KEY_LEN_MAX ?
 		PK11_KEY_LEN_MAX : ctx->key_len;
-	memcpy(sp->key, key, sp->key_len);
+	memcpy(sp->opdata_key, key, sp->opdata_key_len);
 err:
 
 	return h_key;
@@ -2533,7 +2784,7 @@ pk11_digest_cleanup(EVP_MD_CTX *ctx)
 		 * that might have been allocated in the token when
 		 * pk11_digest_init() was called.
 		 */
-		(void) pk11_digest_final(ctx,buf);
+		(void) pk11_digest_final(ctx, buf);
 		pk11_return_session(state->sp, OP_DIGEST);
 		state->sp = NULL;
 		}
@@ -2552,7 +2803,8 @@ pk11_digest_cleanup(EVP_MD_CTX *ctx)
 static int check_new_cipher_key(PK11_SESSION *sp, const unsigned char *key,
 	int key_len)
 	{
-	if (sp->key_len != key_len || memcmp(sp->key, key, key_len) != 0)
+	if (sp->opdata_key_len != key_len ||
+	    memcmp(sp->opdata_key, key, key_len) != 0)
 		{
 		(void) pk11_destroy_cipher_key_objects(sp);
 		return (0);
@@ -2568,29 +2820,34 @@ static int pk11_destroy_cipher_key_objects(PK11_SESSION *session)
 	PK11_SESSION *sp = NULL;
 	PK11_SESSION *local_free_session;
 
-	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
-	if (session)
+	if (session != NULL)
 		local_free_session = session;
 	else
-		local_free_session = free_session;
+		{
+		(void) pthread_mutex_lock(session_cache[OP_CIPHER].lock);
+		local_free_session = session_cache[OP_CIPHER].head;
+		}
+
 	while ((sp = local_free_session) != NULL)
 		{
 		local_free_session = sp->next;
 
-		if (sp->cipher_key != CK_INVALID_HANDLE)
+		if (sp->opdata_cipher_key != CK_INVALID_HANDLE)
 			{
 			/* The secret key object is created in the 
 			 * global_session. See pk11_get_cipher_key
 			 */
 			if (pk11_destroy_object(global_session, 
-				sp->cipher_key) == 0)
+				sp->opdata_cipher_key) == 0)
 				goto err;
-			sp->cipher_key = CK_INVALID_HANDLE;
+			sp->opdata_cipher_key = CK_INVALID_HANDLE;
 			}
 		}
 	ret = 1;
 err:
-	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+
+	if (session == NULL)
+		(void) pthread_mutex_unlock(session_cache[OP_CIPHER].lock);
 
 	return ret;
 	}
@@ -2786,6 +3043,7 @@ pk11_choose_slots(int *any_slot_found)
 			{
 			slot_has_dsa = CK_TRUE;
 			}
+
 #endif	/* OPENSSL_NO_DSA */
 
 #ifndef OPENSSL_NO_DH
@@ -2892,31 +3150,31 @@ pk11_choose_slots(int *any_slot_found)
 			cipher_count = slot_n_cipher = current_slot_n_cipher;
 			digest_count = slot_n_digest = current_slot_n_digest;
 			memcpy(cipher_nids, local_cipher_nids,
-			    sizeof(local_cipher_nids));
-			memcpy(digest_nids, local_digest_nids, 
-			    sizeof(local_digest_nids));
+			    sizeof (local_cipher_nids));
+			memcpy(digest_nids, local_digest_nids,
+			    sizeof (local_digest_nids));
 			}
 		}
 
 #ifdef	DEBUG_SLOT_SELECTION
 	fprintf(stderr,
-	  "%s: chosen pubkey slot: %d\n", PK11_DBG, pubkey_SLOTID);
+	    "%s: chosen pubkey slot: %d\n", PK11_DBG, pubkey_SLOTID);
 	fprintf(stderr,
-	  "%s: chosen rand slot: %d\n", PK11_DBG, rand_SLOTID);
+	    "%s: chosen rand slot: %d\n", PK11_DBG, rand_SLOTID);
 	fprintf(stderr,
-	  "%s: chosen cipher/digest slot: %d\n", PK11_DBG, SLOTID);
+	    "%s: chosen cipher/digest slot: %d\n", PK11_DBG, SLOTID);
 	fprintf(stderr,
-	  "%s: pk11_have_rsa %d\n", PK11_DBG, pk11_have_rsa);
+	    "%s: pk11_have_rsa %d\n", PK11_DBG, pk11_have_rsa);
 	fprintf(stderr,
-	  "%s: pk11_have_dsa %d\n", PK11_DBG, pk11_have_dsa);
+	    "%s: pk11_have_dsa %d\n", PK11_DBG, pk11_have_dsa);
 	fprintf(stderr,
-	  "%s: pk11_have_dh %d\n", PK11_DBG, pk11_have_dh);
+	    "%s: pk11_have_dh %d\n", PK11_DBG, pk11_have_dh);
 	fprintf(stderr,
-	  "%s: pk11_have_random %d\n", PK11_DBG, pk11_have_random);
+	    "%s: pk11_have_random %d\n", PK11_DBG, pk11_have_random);
 	fprintf(stderr,
-	  "%s: cipher_count %d\n", PK11_DBG, cipher_count);
+	    "%s: cipher_count %d\n", PK11_DBG, cipher_count);
 	fprintf(stderr,
-	  "%s: digest_count %d\n", PK11_DBG, digest_count);
+	    "%s: digest_count %d\n", PK11_DBG, digest_count);
 #endif	/* DEBUG_SLOT_SELECTION */
 		
 	if (pSlotList != NULL)

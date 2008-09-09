@@ -2,7 +2,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* crypto/engine/hw_pk11_pub.c */
 /* This product includes software developed by the OpenSSL Project for 
@@ -91,6 +90,7 @@
 #include <openssl/objects.h>
 #include <openssl/x509.h>
 #include <cryptlib.h>
+#include <pthread.h>
 
 #ifndef OPENSSL_NO_HW
 #ifndef OPENSSL_NO_HW_PK11
@@ -99,43 +99,22 @@
 #include "security/pkcs11.h"
 #include "hw_pk11_err.c"
 
-/*
- * structure for tracking handles of asymmetric key objects
- *
- * this can be split into multiple active lists per asymmetric cipher (RSA, DSA,
- * DH) if needed in the future.
- */
-typedef struct PK11_active_st
-	{
-	CK_OBJECT_HANDLE h;
-	unsigned int refcnt;
-	struct PK11_active_st *prev;
-	struct PK11_active_st *next;
-	} PK11_active;
-
-/*
- * list of asymmetric key handles which are active (referenced by at least
- * one PK11_SESSION structure, either held by a thread or present
- * in free_session list)
- */
-static PK11_active *active_list = NULL;
-
 #ifndef OPENSSL_NO_RSA
 /* RSA stuff */
-static int pk11_RSA_public_encrypt(int flen, const unsigned char *from, 
+static int pk11_RSA_public_encrypt(int flen, const unsigned char *from,
 	unsigned char *to, RSA *rsa, int padding);
-static int pk11_RSA_private_encrypt(int flen, const unsigned char *from, 
+static int pk11_RSA_private_encrypt(int flen, const unsigned char *from,
 	unsigned char *to, RSA *rsa, int padding);
-static int pk11_RSA_public_decrypt(int flen, const unsigned char *from, 
+static int pk11_RSA_public_decrypt(int flen, const unsigned char *from,
 	unsigned char *to, RSA *rsa, int padding);
-static int pk11_RSA_private_decrypt(int flen, const unsigned char *from, 
+static int pk11_RSA_private_decrypt(int flen, const unsigned char *from,
 	unsigned char *to, RSA *rsa, int padding);
 static int pk11_RSA_init(RSA *rsa);
 static int pk11_RSA_finish(RSA *rsa);
 static int pk11_RSA_sign(int type, const unsigned char *m, unsigned int m_len,
 	unsigned char *sigret, unsigned int *siglen, const RSA *rsa);
-static int pk11_RSA_verify(int dtype, const unsigned char *m, 
-	unsigned int m_len, unsigned char *sigbuf, unsigned int siglen, 
+static int pk11_RSA_verify(int dtype, const unsigned char *m,
+	unsigned int m_len, unsigned char *sigbuf, unsigned int siglen,
 	const RSA *rsa);
 EVP_PKEY *pk11_load_privkey(ENGINE*, const char* pubkey_file,
 	UI_METHOD *ui_method, void *callback_data);
@@ -196,14 +175,33 @@ static int init_template_value(BIGNUM *bn, CK_VOID_PTR *pValue,
         CK_ULONG *ulValueLen);
 
 /*
- * Find active list entry according to object handle and return pointer
- * to the entry otherwise return NULL.
+ * increment/create reference for an asymmetric key handle via active list
+ * manipulation. If active list operation fails, unlock (if locked), set error
+ * variable and jump to the specified label.
  */
-static PK11_active *pk11_active_find(CK_OBJECT_HANDLE h)
+#define	KEY_HANDLE_REFHOLD(key_handle, alg_type, unlock, var, label)	\
+	{								\
+	if (pk11_active_add(key_handle, alg_type) < 0)			\
+		{							\
+		var = TRUE;						\
+		if (unlock)						\
+			UNLOCK_OBJSTORE(alg_type);			\
+		goto label;						\
+		}							\
+	}
+
+/*
+ * Find active list entry according to object handle and return pointer to the
+ * entry otherwise return NULL.
+ *
+ * This function presumes it is called with lock protecting the active list
+ * held.
+ */
+static PK11_active *pk11_active_find(CK_OBJECT_HANDLE h, PK11_OPTYPE type)
 	{
 	PK11_active *entry;
 
-	for (entry = active_list; entry != NULL; entry = entry->next)
+	for (entry = active_list[type]; entry != NULL; entry = entry->next)
 		if (entry->h == h)
 			return (entry);
 
@@ -212,13 +210,13 @@ static PK11_active *pk11_active_find(CK_OBJECT_HANDLE h)
 
 /*
  * Search for an entry in the active list using PKCS#11 object handle as a
- * search key and return refcnt of the found/created entry or -1 in case
- * of failure.
+ * search key and return refcnt of the found/created entry or -1 in case of
+ * failure.
  *
- * This function presumes we are called with lock protecting the active
- * list held.
+ * This function presumes it is called with lock protecting the active list
+ * held.
  */
-int pk11_active_add(CK_OBJECT_HANDLE h)
+int pk11_active_add(CK_OBJECT_HANDLE h, PK11_OPTYPE type)
 	{
 	PK11_active *entry = NULL;
 
@@ -229,7 +227,7 @@ int pk11_active_add(CK_OBJECT_HANDLE h)
 		}
 
 	/* search for entry in the active list */
-	if ((entry = pk11_active_find(h)) != NULL)
+	if ((entry = pk11_active_find(h, type)) != NULL)
 		entry->refcnt++;
 	else
 		{
@@ -245,17 +243,72 @@ int pk11_active_add(CK_OBJECT_HANDLE h)
 		entry->prev = NULL;
 		entry->next = NULL;
 		/* connect the newly created entry to the list */
-		if (active_list == NULL)
-			active_list = entry;
+		if (active_list[type] == NULL)
+			active_list[type] = entry;
 		else /* make the entry first in the list */
 			{
-			entry->next = active_list;
-			active_list->prev = entry;
-			active_list = entry;
+			entry->next = active_list[type];
+			active_list[type]->prev = entry;
+			active_list[type] = entry;
 			}
 		}
 
 	return (entry->refcnt);
+	}
+
+/*
+ * Remove active list entry from the list and free it.
+ *
+ * This function presumes it is called with lock protecting the active list
+ * held.
+ */
+void pk11_active_remove(PK11_active *entry, PK11_OPTYPE type)
+	{
+	PK11_active *prev_entry;
+
+	/* remove the entry from the list and free it */
+	if ((prev_entry = entry->prev) != NULL)
+		{
+		prev_entry->next = entry->next;
+		if (entry->next != NULL)
+			entry->next->prev = prev_entry;
+		}
+	else
+		{
+		active_list[type] = entry->next;
+		/* we were the first but not the only one */
+		if (entry->next != NULL)
+			entry->next->prev = NULL;
+		}
+
+	/* sanitization */
+	entry->h = CK_INVALID_HANDLE;
+	entry->prev = NULL;
+	entry->next = NULL;
+	OPENSSL_free(entry);
+	}
+
+/* Free all entries from the active list. */
+void pk11_free_active_list(PK11_OPTYPE type)
+	{
+	PK11_active *entry;
+
+	/* only for asymmetric types since only they have C_Find* locks. */
+	switch (type)
+		{
+		case OP_RSA:
+		case OP_DSA:
+		case OP_DH:
+			break;
+		default:
+			return;
+		}
+
+	/* see find_lock array definition for more info on object locking */
+	LOCK_OBJSTORE(type);
+	while ((entry = active_list[type]) != NULL)
+		pk11_active_remove(entry, type);
+	UNLOCK_OBJSTORE(type);
 	}
 
 /*
@@ -265,15 +318,14 @@ int pk11_active_add(CK_OBJECT_HANDLE h)
  * Return 1 if the PKCS#11 object associated with the entry has no references,
  * return 0 if there is at least one reference, -1 on error.
  *
- * This function presumes it is called with lock protecting the active
- * list held.
+ * This function presumes it is called with lock protecting the active list
+ * held.
  */
-int pk11_active_delete(CK_OBJECT_HANDLE h)
+int pk11_active_delete(CK_OBJECT_HANDLE h, PK11_OPTYPE type)
 	{
-	PK11_active *prev_entry = NULL;
 	PK11_active *entry = NULL;
 
-	if ((entry = pk11_active_find(h)) == NULL)
+	if ((entry = pk11_active_find(h, type)) == NULL)
 		{
 		PK11err(PK11_F_ACTIVE_DELETE, PK11_R_INVALID_HANDLE);
 		return (-1);
@@ -283,26 +335,7 @@ int pk11_active_delete(CK_OBJECT_HANDLE h)
 	entry->refcnt--;
 	if (entry->refcnt == 0)
 		{
-		/* remove the entry from the list and free it */
-		if ((prev_entry = entry->prev) != NULL)
-			{
-			prev_entry->next = entry->next;
-			if (entry->next != NULL)
-				entry->next->prev = prev_entry;
-			}
-		else
-			{
-			active_list = entry->next;
-			/* we are the first but not the only one */
-			if (entry->next != NULL)
-				entry->next->prev = NULL;
-			}
-
-		/* sanitization */
-		entry->h = CK_INVALID_HANDLE;
-		entry->prev = NULL;
-		entry->next = NULL;
-		OPENSSL_free(entry);
+		pk11_active_remove(entry, type);
 		return (1);
 		}
 
@@ -523,7 +556,8 @@ static int pk11_RSA_private_decrypt(int flen, const unsigned char *from,
 		}
 
 	/* make data into a big number */
-	if (BN_bin2bn(from,(int)flen,&f) == NULL) goto err;
+	if (BN_bin2bn(from, (int)flen, &f) == NULL)
+		goto err;
 
 	if (BN_ucmp(&f, rsa->n) >= 0)
 		{
@@ -604,7 +638,8 @@ static int pk11_RSA_public_decrypt(int flen, const unsigned char *from,
 		goto err;
 		}
 
-	if (BN_bin2bn(from,flen,&f) == NULL) goto err;
+	if (BN_bin2bn(from, flen, &f) == NULL)
+		goto err;
 
 	if (BN_ucmp(&f, rsa->n) >= 0)
 		{
@@ -665,16 +700,17 @@ static int pk11_RSA_public_encrypt_low(int flen,
 	CK_OBJECT_HANDLE h_pub_key = CK_INVALID_HANDLE;
 	PK11_SESSION *sp;
 	
-	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
+	if ((sp = pk11_get_session(OP_RSA)) == NULL)
 		return -1;
 
 	(void) check_new_rsa_key_pub(sp, rsa);
 	
-	h_pub_key = sp->rsa_pub_key;
+	h_pub_key = sp->opdata_rsa_pub_key;
 	if (h_pub_key == CK_INVALID_HANDLE)
-		h_pub_key = sp->rsa_pub_key =
-			pk11_get_public_rsa_key(rsa, &sp->rsa_pub,
-			    &sp->rsa_n_num, &sp->rsa_e_num, sp->session);
+		h_pub_key = sp->opdata_rsa_pub_key =
+			pk11_get_public_rsa_key(rsa, &sp->opdata_rsa_pub,
+			    &sp->opdata_rsa_n_num, &sp->opdata_rsa_e_num,
+			    sp->session);
 
 	if (h_pub_key != CK_INVALID_HANDLE)
 		{
@@ -685,7 +721,7 @@ static int pk11_RSA_public_encrypt_low(int flen,
 			{
 			PK11err_add_data(PK11_F_RSA_PUB_ENC_LOW, 
 			    PK11_R_ENCRYPTINIT, rv);
-			pk11_return_session(sp, OP_PUBKEY);
+			pk11_return_session(sp, OP_RSA);
 			return -1;
 			}
 	
@@ -696,13 +732,13 @@ static int pk11_RSA_public_encrypt_low(int flen,
 			{
 			PK11err_add_data(PK11_F_RSA_PUB_ENC_LOW, PK11_R_ENCRYPT,
 			  rv);
-			pk11_return_session(sp, OP_PUBKEY);
+			pk11_return_session(sp, OP_RSA);
 			return -1;
 			}
 		retval = bytes_encrypted;
 		}
 	
-	pk11_return_session(sp, OP_PUBKEY);
+	pk11_return_session(sp, OP_RSA);
 	return retval;
 	}
 
@@ -722,16 +758,16 @@ static int pk11_RSA_private_encrypt_low(int flen,
 	CK_OBJECT_HANDLE h_priv_key= CK_INVALID_HANDLE;
 	PK11_SESSION *sp;
 	
-	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
+	if ((sp = pk11_get_session(OP_RSA)) == NULL)
 		return -1;
 	
 	(void) check_new_rsa_key_priv(sp, rsa);
 	
-	h_priv_key = sp->rsa_priv_key;
+	h_priv_key = sp->opdata_rsa_priv_key;
 	if (h_priv_key == CK_INVALID_HANDLE)
-		h_priv_key = sp->rsa_priv_key =
-			pk11_get_private_rsa_key(rsa, &sp->rsa_priv,
-			    &sp->rsa_d_num, sp->session);
+		h_priv_key = sp->opdata_rsa_priv_key =
+			pk11_get_private_rsa_key(rsa, &sp->opdata_rsa_priv,
+			    &sp->opdata_rsa_d_num, sp->session);
 	
 	if (h_priv_key != CK_INVALID_HANDLE)
 		{
@@ -742,7 +778,7 @@ static int pk11_RSA_private_encrypt_low(int flen,
 			{
 			PK11err_add_data(PK11_F_RSA_PRIV_ENC_LOW,
 			    PK11_R_SIGNINIT, rv);
-			pk11_return_session(sp, OP_PUBKEY);
+			pk11_return_session(sp, OP_RSA);
 			return -1;
 			}
 	
@@ -753,14 +789,14 @@ static int pk11_RSA_private_encrypt_low(int flen,
 			{
 			PK11err_add_data(PK11_F_RSA_PRIV_ENC_LOW, PK11_R_SIGN,
 			    rv);
-			pk11_return_session(sp, OP_PUBKEY);
+			pk11_return_session(sp, OP_RSA);
 			return -1;
 			}
 
 		retval = ul_sig_len;
 		}
 	
-	pk11_return_session(sp, OP_PUBKEY);
+	pk11_return_session(sp, OP_RSA);
 	return retval;
 	}
 
@@ -780,16 +816,16 @@ static int pk11_RSA_private_decrypt_low(int flen,
 	CK_OBJECT_HANDLE h_priv_key;
 	PK11_SESSION *sp;
 	
-	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
+	if ((sp = pk11_get_session(OP_RSA)) == NULL)
 		return -1;
 	
 	(void) check_new_rsa_key_priv(sp, rsa);
 	
-	h_priv_key = sp->rsa_priv_key;
+	h_priv_key = sp->opdata_rsa_priv_key;
 	if (h_priv_key == CK_INVALID_HANDLE)
-		h_priv_key = sp->rsa_priv_key =
-			pk11_get_private_rsa_key(rsa, &sp->rsa_priv,
-			    &sp->rsa_d_num, sp->session);
+		h_priv_key = sp->opdata_rsa_priv_key =
+			pk11_get_private_rsa_key(rsa, &sp->opdata_rsa_priv,
+			    &sp->opdata_rsa_d_num, sp->session);
 
 	if (h_priv_key != CK_INVALID_HANDLE)
 		{
@@ -800,7 +836,7 @@ static int pk11_RSA_private_decrypt_low(int flen,
 			{
 			PK11err_add_data(PK11_F_RSA_PRIV_DEC_LOW, 
 				PK11_R_DECRYPTINIT, rv);
-			pk11_return_session(sp, OP_PUBKEY);
+			pk11_return_session(sp, OP_RSA);
 			return -1;
 			}
 	
@@ -811,13 +847,13 @@ static int pk11_RSA_private_decrypt_low(int flen,
 			{
 			PK11err_add_data(PK11_F_RSA_PRIV_DEC_LOW,
 			    PK11_R_DECRYPT, rv);
-			pk11_return_session(sp, OP_PUBKEY);
+			pk11_return_session(sp, OP_RSA);
 			return -1;
 			}
 		retval = bytes_decrypted;
 		}
 
-	pk11_return_session(sp, OP_PUBKEY);
+	pk11_return_session(sp, OP_RSA);
 	return retval;
 	}
 
@@ -837,16 +873,17 @@ static int pk11_RSA_public_decrypt_low(int flen,
 	CK_OBJECT_HANDLE h_pub_key = CK_INVALID_HANDLE;
 	PK11_SESSION *sp;
 	
-	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
+	if ((sp = pk11_get_session(OP_RSA)) == NULL)
 		return -1;
 	
 	(void) check_new_rsa_key_pub(sp, rsa);
 	
-	h_pub_key = sp->rsa_pub_key;
+	h_pub_key = sp->opdata_rsa_pub_key;
 	if (h_pub_key == CK_INVALID_HANDLE)
-		h_pub_key = sp->rsa_pub_key =
-			pk11_get_public_rsa_key(rsa, &sp->rsa_pub,
-			    &sp->rsa_n_num, &sp->rsa_e_num, sp->session);
+		h_pub_key = sp->opdata_rsa_pub_key =
+			pk11_get_public_rsa_key(rsa, &sp->opdata_rsa_pub,
+			    &sp->opdata_rsa_n_num, &sp->opdata_rsa_e_num,
+			    sp->session);
 
 	if (h_pub_key != CK_INVALID_HANDLE)
 		{	
@@ -857,7 +894,7 @@ static int pk11_RSA_public_decrypt_low(int flen,
 			{
 			PK11err_add_data(PK11_F_RSA_PUB_DEC_LOW, 
 				PK11_R_VERIFYRECOVERINIT, rv);
-			pk11_return_session(sp, OP_PUBKEY);
+			pk11_return_session(sp, OP_RSA);
 			return -1;
 			}
 	
@@ -868,13 +905,13 @@ static int pk11_RSA_public_decrypt_low(int flen,
 			{
 			PK11err_add_data(PK11_F_RSA_PUB_DEC_LOW, 
 			    PK11_R_VERIFYRECOVER, rv);
-			pk11_return_session(sp, OP_PUBKEY);
+			pk11_return_session(sp, OP_RSA);
 			return -1;
 			}
 		retval = bytes_decrypted;
 		}
 
-	pk11_return_session(sp, OP_PUBKEY);
+	pk11_return_session(sp, OP_RSA);
 	return retval;
 	}
 
@@ -980,19 +1017,20 @@ static int pk11_RSA_sign(int type, const unsigned char *m, unsigned int m_len,
 			goto err;
 			}
 		p=s;
-		i2d_X509_SIG(&sig,&p);
+		(void) i2d_X509_SIG(&sig, &p);
 		}
 	
-	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
+	if ((sp = pk11_get_session(OP_RSA)) == NULL)
 		goto err;
 
 	(void) check_new_rsa_key_priv(sp, rsa);
 	
-	h_priv_key = sp->rsa_priv_key;
+	h_priv_key = sp->opdata_rsa_priv_key;
 	if (h_priv_key == CK_INVALID_HANDLE)
-		h_priv_key = sp->rsa_priv_key =
-			pk11_get_private_rsa_key((RSA *)rsa, &sp->rsa_priv,
-			    &sp->rsa_d_num, sp->session);
+		h_priv_key = sp->opdata_rsa_priv_key =
+			pk11_get_private_rsa_key((RSA *)rsa,
+			    &sp->opdata_rsa_priv,
+			    &sp->opdata_rsa_d_num, sp->session);
 
 	if (h_priv_key != CK_INVALID_HANDLE)
 		{
@@ -1024,7 +1062,7 @@ err:
 		OPENSSL_free(s);
 		}
 	
-	pk11_return_session(sp, OP_PUBKEY);
+	pk11_return_session(sp, OP_RSA);
 	return ret;
 	}
 
@@ -1102,16 +1140,17 @@ static int pk11_RSA_verify(int type, const unsigned char *m,
 		i2d_X509_SIG(&sig,&p);
 		}
 	
-	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
+	if ((sp = pk11_get_session(OP_RSA)) == NULL)
 		goto err;
 	
 	(void) check_new_rsa_key_pub(sp, rsa);
 	
-	h_pub_key = sp->rsa_pub_key;
+	h_pub_key = sp->opdata_rsa_pub_key;
 	if (h_pub_key == CK_INVALID_HANDLE)
-		h_pub_key = sp->rsa_pub_key =
-			pk11_get_public_rsa_key((RSA *)rsa, &sp->rsa_pub,
-			    &sp->rsa_n_num, &sp->rsa_e_num, sp->session);
+		h_pub_key = sp->opdata_rsa_pub_key =
+			pk11_get_public_rsa_key((RSA *)rsa, &sp->opdata_rsa_pub,
+			    &sp->opdata_rsa_n_num, &sp->opdata_rsa_e_num,
+			    sp->session);
 
 	if (h_pub_key != CK_INVALID_HANDLE)
 		{
@@ -1142,7 +1181,7 @@ err:
 		OPENSSL_free(s);
 		}
 
-	pk11_return_session(sp, OP_PUBKEY);
+	pk11_return_session(sp, OP_RSA);
 	return ret;
 	}
 
@@ -1156,7 +1195,7 @@ EVP_PKEY *pk11_load_privkey(ENGINE* e, const char* privkey_file,
 	RSA *rsa;
 	PK11_SESSION *sp;
 
-	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
+	if ((sp = pk11_get_session(OP_RSA)) == NULL)
 		return NULL;
 
 	if ((pubkey=fopen(privkey_file,"r")) != NULL)
@@ -1170,9 +1209,10 @@ EVP_PKEY *pk11_load_privkey(ENGINE* e, const char* privkey_file,
 				{
 				(void) check_new_rsa_key_priv(sp, rsa);
 	
-				h_priv_key = sp->rsa_priv_key =
+				h_priv_key = sp->opdata_rsa_priv_key =
 				    pk11_get_private_rsa_key(rsa,
-				    &sp->rsa_priv, &sp->rsa_d_num, sp->session);
+				    &sp->opdata_rsa_priv, &sp->opdata_rsa_d_num,
+				    sp->session);
 				if (h_priv_key == CK_INVALID_HANDLE)
 					{
 					EVP_PKEY_free(pkey);
@@ -1187,7 +1227,7 @@ EVP_PKEY *pk11_load_privkey(ENGINE* e, const char* privkey_file,
 			}
 		}
 
-	pk11_return_session(sp, OP_PUBKEY);
+	pk11_return_session(sp, OP_RSA);
 	return(pkey);
 	}
 
@@ -1201,7 +1241,7 @@ EVP_PKEY *pk11_load_pubkey(ENGINE* e, const char* pubkey_file,
 	RSA *rsa;
 	PK11_SESSION *sp;
 
-	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
+	if ((sp = pk11_get_session(OP_RSA)) == NULL)
 		return NULL;
 
 	if ((pubkey=fopen(pubkey_file,"r")) != NULL)
@@ -1215,10 +1255,10 @@ EVP_PKEY *pk11_load_pubkey(ENGINE* e, const char* pubkey_file,
 				{
 				(void) check_new_rsa_key_pub(sp, rsa);
 	
-				h_pub_key = sp->rsa_pub_key =
+				h_pub_key = sp->opdata_rsa_pub_key =
 				    pk11_get_public_rsa_key(rsa,
-				    &sp->rsa_pub, &sp->rsa_n_num,
-				    &sp->rsa_e_num, sp->session);
+				    &sp->opdata_rsa_pub, &sp->opdata_rsa_n_num,
+				    &sp->opdata_rsa_e_num, sp->session);
 				if (h_pub_key == CK_INVALID_HANDLE)
 					{
 					EVP_PKEY_free(pkey);
@@ -1233,11 +1273,13 @@ EVP_PKEY *pk11_load_pubkey(ENGINE* e, const char* pubkey_file,
 			}
 		}
 
-	pk11_return_session(sp, OP_PUBKEY);
+	pk11_return_session(sp, OP_RSA);
 	return(pkey);
 	}
 
-/* Create a public key object in a session from a given rsa structure.
+/*
+ * Create a public key object in a session from a given rsa structure.
+ * The *rsa_n_num and *rsa_e_num pointers are non-NULL for RSA public keys.
  */
 static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
     RSA** key_ptr, BIGNUM **rsa_n_num, BIGNUM **rsa_e_num,
@@ -1249,6 +1291,7 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 	CK_OBJECT_CLASS o_key = CKO_PUBLIC_KEY;
 	CK_KEY_TYPE k_type = CKK_RSA;
 	CK_ULONG ul_key_attr_count = 7;
+	CK_BBOOL rollback = FALSE;
 
 	CK_ATTRIBUTE  a_key_template[] =
 		{
@@ -1272,7 +1315,7 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 	if (a_key_template[5].pValue == NULL)
 		{
 		PK11err(PK11_F_GET_PUB_RSA_KEY, PK11_R_MALLOC_FAILURE);
-		goto err;
+		goto malloc_err;
 		}
 
 	BN_bn2bin(rsa->n, a_key_template[5].pValue);
@@ -1283,18 +1326,13 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 	if (a_key_template[6].pValue == NULL)
 		{
 		PK11err(PK11_F_GET_PUB_RSA_KEY, PK11_R_MALLOC_FAILURE);
-		goto err;
+		goto malloc_err;
 		}
 
 	BN_bn2bin(rsa->e, a_key_template[6].pValue);
 
-	/*
-	 * As stated in v2.20, 11.7 Object Management Function, in section for
-	 * C_FindObjectsInit(), at most one search operation may be active at
-	 * a given time in a given session. Therefore, we must group these
-	 * three calls in one atomic operation.
-	 */
-	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
+	/* see find_lock array definition for more info on object locking */
+	LOCK_OBJSTORE(OP_RSA);
 	rv = pFuncList->C_FindObjectsInit(session, a_key_template, 
 		ul_key_attr_count);
 
@@ -1302,7 +1340,6 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 		{
 		PK11err_add_data(PK11_F_GET_PUB_RSA_KEY, PK11_R_FINDOBJECTSINIT,
 		    rv);
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1311,7 +1348,6 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_GET_PUB_RSA_KEY, PK11_R_FINDOBJECTS, rv);
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1321,7 +1357,6 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 		{
 		PK11err_add_data(PK11_F_GET_PUB_RSA_KEY,
 		    PK11_R_FINDOBJECTSFINAL, rv);
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1333,31 +1368,42 @@ static CK_OBJECT_HANDLE pk11_get_public_rsa_key(RSA* rsa,
 			{
 			PK11err_add_data(PK11_F_GET_PUB_RSA_KEY, 
 			    PK11_R_CREATEOBJECT, rv);
-			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 			goto err;
 			}
 		}
 
-	(void) pk11_active_add(h_key);
-	if (key_ptr != NULL)
-		*key_ptr = rsa;
 	if (rsa_n_num != NULL)
 		if ((*rsa_n_num = BN_dup(rsa->n)) == NULL)
 			{
 			PK11err(PK11_F_GET_PUB_RSA_KEY, PK11_R_MALLOC_FAILURE);
-			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+			rollback = TRUE;
 			goto err;
 			}
 	if (rsa_e_num != NULL)
 		if ((*rsa_e_num = BN_dup(rsa->e)) == NULL)
 			{
 			PK11err(PK11_F_GET_PUB_RSA_KEY, PK11_R_MALLOC_FAILURE);
-			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+			BN_free(*rsa_n_num);
+			*rsa_n_num = NULL;
+			rollback = TRUE;
 			goto err;
 			}
-	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+
+	KEY_HANDLE_REFHOLD(h_key, OP_RSA, FALSE, rollback, err);
+	if (key_ptr != NULL)
+		*key_ptr = rsa;
 
 err:
+	if (rollback)
+		{
+		if (found == 0)
+			(void) pFuncList->C_DestroyObject(session, h_key);
+		h_key = CK_INVALID_HANDLE;
+		}
+
+	UNLOCK_OBJSTORE(OP_RSA);
+
+malloc_err:
 	for (i = 5; i <= 6; i++)
 		{
 		if (a_key_template[i].pValue != NULL)
@@ -1370,7 +1416,9 @@ err:
 	return h_key;
 	}
 
-/* Create a private key object in the session from a given rsa structure
+/*
+ * Create a private key object in the session from a given rsa structure.
+ * The *rsa_d_num pointer is non-NULL for RSA private keys.
  */
 static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa,
     RSA** key_ptr, BIGNUM **rsa_d_num, CK_SESSION_HANDLE session)
@@ -1382,6 +1430,7 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa,
 	CK_OBJECT_CLASS o_key = CKO_PRIVATE_KEY;
 	CK_KEY_TYPE k_type = CKK_RSA;
 	CK_ULONG ul_key_attr_count = 14;
+	CK_BBOOL rollback = FALSE;
 
 	/* Both CKA_TOKEN and CKA_SENSITIVE have to be FALSE for session keys
 	 */
@@ -1425,16 +1474,11 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa,
 		&a_key_template[13].ulValueLen) == 0)
 		{
 		PK11err(PK11_F_GET_PRIV_RSA_KEY, PK11_R_MALLOC_FAILURE);
-		goto err;
+		goto malloc_err;
 		}
 
-	/*
-	 * As stated in v2.20, 11.7 Object Management Function, in section for
-	 * C_FindObjectsInit(), at most one search operation may be active at
-	 * a given time in a given session. Therefore, we must group these
-	 * three calls in one atomic operation.
-	 */
-	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
+	/* see find_lock array definition for more info on object locking */
+	LOCK_OBJSTORE(OP_RSA);
 	rv = pFuncList->C_FindObjectsInit(session, a_key_template, 
 		ul_key_attr_count);
 
@@ -1442,7 +1486,6 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa,
 		{
 		PK11err_add_data(PK11_F_GET_PRIV_RSA_KEY,
 		    PK11_R_FINDOBJECTSINIT, rv);
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1451,7 +1494,6 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa,
 	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_GET_PRIV_RSA_KEY, PK11_R_FINDOBJECTS, rv);
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1461,7 +1503,6 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa,
 		{
 		PK11err_add_data(PK11_F_GET_PRIV_RSA_KEY,
 		    PK11_R_FINDOBJECTSFINAL, rv);
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1473,24 +1514,33 @@ static CK_OBJECT_HANDLE pk11_get_private_rsa_key(RSA* rsa,
 			{
 			PK11err_add_data(PK11_F_GET_PRIV_RSA_KEY, 
 				PK11_R_CREATEOBJECT, rv);
-			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 			goto err;
 			}
 		}
 
-	(void) pk11_active_add(h_key);
-	if (key_ptr != NULL)
-		*key_ptr = rsa;
 	if (rsa_d_num != NULL)
 		if ((*rsa_d_num = BN_dup(rsa->d)) == NULL)
 			{
 			PK11err(PK11_F_GET_PRIV_RSA_KEY, PK11_R_MALLOC_FAILURE);
-			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+			rollback = TRUE;
 			goto err;
 			}
-	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+
+	KEY_HANDLE_REFHOLD(h_key, OP_RSA, FALSE, rollback, err);
+	if (key_ptr != NULL)
+		*key_ptr = rsa;
 
 err:
+	if (rollback)
+		{
+		if (found == 0)
+			(void) pFuncList->C_DestroyObject(session, h_key);
+		h_key = CK_INVALID_HANDLE;
+		}
+
+	UNLOCK_OBJSTORE(OP_RSA);
+
+malloc_err:
 	/* 6 to 13 entries in the key template are key components
 	 * They need to be freed apon exit or error.
 	 */
@@ -1520,9 +1570,9 @@ static int check_new_rsa_key_pub(PK11_SESSION *sp, const RSA *rsa)
 	 * key matter here so it is sufficient to compare them with values
 	 * cached in PK11_SESSION structure.
 	 */
-	if ((sp->rsa_pub != rsa) ||
-	    (BN_cmp(sp->rsa_n_num, rsa->n) != 0) ||
-	    (BN_cmp(sp->rsa_e_num, rsa->e) != 0))
+	if ((sp->opdata_rsa_pub != rsa) ||
+	    (BN_cmp(sp->opdata_rsa_n_num, rsa->n) != 0) ||
+	    (BN_cmp(sp->opdata_rsa_e_num, rsa->e) != 0))
 		{
 		/*
 		 * We do not check the return value because even in case of
@@ -1548,8 +1598,8 @@ static int check_new_rsa_key_priv(PK11_SESSION *sp, const RSA *rsa)
 	 * key with value cached in PK11_SESSION structure should
 	 * be sufficient.
 	 */
-	if ((sp->rsa_priv != rsa) ||
-	    (BN_cmp(sp->rsa_d_num, rsa->d) != 0))
+	if ((sp->opdata_rsa_priv != rsa) ||
+	    (BN_cmp(sp->opdata_rsa_d_num, rsa->d) != 0))
 		{
 		/*
 		 * We do not check the return value because even in case of
@@ -1613,16 +1663,17 @@ pk11_dsa_do_sign(const unsigned char *dgst, int dlen, DSA *dsa)
 		goto ret;
 		}
 
-	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
+	if ((sp = pk11_get_session(OP_DSA)) == NULL)
 		goto ret;
 
 	(void) check_new_dsa_key_priv(sp, dsa);
 
-	h_priv_key = sp->dsa_priv_key;
+	h_priv_key = sp->opdata_dsa_priv_key;
 	if (h_priv_key == CK_INVALID_HANDLE)
-		h_priv_key = sp->dsa_priv_key =
-			pk11_get_private_dsa_key((DSA *)dsa, &sp->dsa_priv,
-			    &sp->dsa_priv_num, sp->session);
+		h_priv_key = sp->opdata_dsa_priv_key =
+			pk11_get_private_dsa_key((DSA *)dsa,
+			    &sp->opdata_dsa_priv,
+			    &sp->opdata_dsa_priv_num, sp->session);
 
 	if (h_priv_key != CK_INVALID_HANDLE)
 		{
@@ -1665,8 +1716,12 @@ pk11_dsa_do_sign(const unsigned char *dgst, int dlen, DSA *dsa)
 		goto ret;
 		}
 
-	BN_bin2bn(sigret, siglen2, r);
-	BN_bin2bn(&sigret[siglen2], siglen2, s);
+	if (BN_bin2bn(sigret, siglen2, r) == NULL ||
+	    BN_bin2bn(&sigret[siglen2], siglen2, s) == NULL)
+		{
+		PK11err(PK11_F_DSA_SIGN, PK11_R_MALLOC_FAILURE);
+		goto ret;
+		}
 
 	dsa_sig->r = r;
 	dsa_sig->s = s;
@@ -1680,7 +1735,7 @@ ret:
 			BN_free(s);
 		}
 
-	pk11_return_session(sp, OP_PUBKEY);
+	pk11_return_session(sp, OP_DSA);
 	return (dsa_sig);
 	}
 
@@ -1724,16 +1779,16 @@ pk11_dsa_do_verify(const unsigned char *dgst, int dlen, DSA_SIG *sig,
 		goto ret;
 		}
 
-	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
+	if ((sp = pk11_get_session(OP_DSA)) == NULL)
 		goto ret;
 	
 	(void) check_new_dsa_key_pub(sp, dsa);
 
-	h_pub_key = sp->dsa_pub_key;
+	h_pub_key = sp->opdata_dsa_pub_key;
 	if (h_pub_key == CK_INVALID_HANDLE)
-		h_pub_key = sp->dsa_pub_key =
-			pk11_get_public_dsa_key((DSA *)dsa, &sp->dsa_pub,
-			    &sp->dsa_pub_num, sp->session);
+		h_pub_key = sp->opdata_dsa_pub_key =
+			pk11_get_public_dsa_key((DSA *)dsa, &sp->opdata_dsa_pub,
+			    &sp->opdata_dsa_pub_num, sp->session);
 
 	if (h_pub_key != CK_INVALID_HANDLE)
 		{
@@ -1770,12 +1825,14 @@ pk11_dsa_do_verify(const unsigned char *dgst, int dlen, DSA_SIG *sig,
 	retval = 1;
 ret:
 
-	pk11_return_session(sp, OP_PUBKEY);
+	pk11_return_session(sp, OP_DSA);
 	return retval;
 	}
 
 
-/* Create a public key object in a session from a given dsa structure.
+/*
+ * Create a public key object in a session from a given dsa structure.
+ * The *dsa_pub_num pointer is non-NULL for DSA public keys.
  */
 static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
     DSA **key_ptr, BIGNUM **dsa_pub_num, CK_SESSION_HANDLE session)
@@ -1786,6 +1843,7 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
 	CK_ULONG found;
 	CK_KEY_TYPE k_type = CKK_DSA;
 	CK_ULONG ul_key_attr_count = 8;
+	CK_BBOOL rollback = FALSE;
 	int i;
 
 	CK_ATTRIBUTE  a_key_template[] =
@@ -1813,17 +1871,11 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
 		&a_key_template[7].ulValueLen) == 0)
 		{
 		PK11err(PK11_F_GET_PUB_DSA_KEY, PK11_R_MALLOC_FAILURE);
-		goto err;
+		goto malloc_err;
 		}
 
-
-	/*
-	 * As stated in v2.20, 11.7 Object Management Function, in section for
-	 * C_FindObjectsInit(), at most one search operation may be active at
-	 * a given time in a given session. Therefore, we must group these
-	 * three calls in one atomic operation.
-	 */
-	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
+	/* see find_lock array definition for more info on object locking */
+	LOCK_OBJSTORE(OP_DSA);
 	rv = pFuncList->C_FindObjectsInit(session, a_key_template, 
 		ul_key_attr_count);
 
@@ -1831,7 +1883,6 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
 		{
 		PK11err_add_data(PK11_F_GET_PUB_DSA_KEY, PK11_R_FINDOBJECTSINIT,
 		    rv);
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1840,7 +1891,6 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
 	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_GET_PUB_DSA_KEY, PK11_R_FINDOBJECTS, rv);
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1850,7 +1900,6 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
 		{
 		PK11err_add_data(PK11_F_GET_PUB_DSA_KEY,
 		    PK11_R_FINDOBJECTSFINAL, rv);
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1862,24 +1911,33 @@ static CK_OBJECT_HANDLE pk11_get_public_dsa_key(DSA* dsa,
 			{
 			PK11err_add_data(PK11_F_GET_PUB_DSA_KEY, 
 			    PK11_R_CREATEOBJECT, rv);
-			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 			goto err;
 			}
 		}
 
-	(void) pk11_active_add(h_key);
-	if (key_ptr != NULL)
-		*key_ptr = dsa;
 	if (dsa_pub_num != NULL)
 		if ((*dsa_pub_num = BN_dup(dsa->pub_key)) == NULL)
 			{
 			PK11err(PK11_F_GET_PUB_DSA_KEY, PK11_R_MALLOC_FAILURE);
-			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+			rollback = TRUE;
 			goto err;
 			}
-	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+
+	KEY_HANDLE_REFHOLD(h_key, OP_DSA, FALSE, rollback, err);
+	if (key_ptr != NULL)
+		*key_ptr = dsa;
 
 err:
+	if (rollback)
+		{
+		if (found == 0)
+			(void) pFuncList->C_DestroyObject(session, h_key);
+		h_key = CK_INVALID_HANDLE;
+		}
+
+	UNLOCK_OBJSTORE(OP_DSA);
+
+malloc_err:
 	for (i = 4; i <= 7; i++)
 		{
 		if (a_key_template[i].pValue != NULL)
@@ -1890,10 +1948,11 @@ err:
 		}
 
 	return h_key;
-
 	}
 
-/* Create a private key object in the session from a given dsa structure
+/*
+ * Create a private key object in the session from a given dsa structure
+ * The *dsa_priv_num pointer is non-NULL for DSA private keys.
  */
 static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa,
     DSA **key_ptr, BIGNUM **dsa_priv_num, CK_SESSION_HANDLE session)
@@ -1905,6 +1964,7 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa,
 	CK_ULONG found;
 	CK_KEY_TYPE k_type = CKK_DSA;
 	CK_ULONG ul_key_attr_count = 9;
+	CK_BBOOL rollback = FALSE;
 
 	/* Both CKA_TOKEN and CKA_SENSITIVE have to be FALSE for session keys
 	 */
@@ -1936,16 +1996,11 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa,
 		&a_key_template[8].ulValueLen) == 0)
 		{
 		PK11err(PK11_F_GET_PRIV_DSA_KEY, PK11_R_MALLOC_FAILURE);
-		goto err;
+		goto malloc_err;
 		}
 
-	/*
-	 * As stated in v2.20, 11.7 Object Management Function, in section for
-	 * C_FindObjectsInit(), at most one search operation may be active at
-	 * a given time in a given session. Therefore, we must group these
-	 * three calls in one atomic operation.
-	 */
-	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
+	/* see find_lock array definition for more info on object locking */
+	LOCK_OBJSTORE(OP_DSA);
 	rv = pFuncList->C_FindObjectsInit(session, a_key_template, 
 		ul_key_attr_count);
 
@@ -1953,7 +2008,6 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa,
 		{
 		PK11err_add_data(PK11_F_GET_PRIV_DSA_KEY,
 		    PK11_R_FINDOBJECTSINIT, rv);
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1962,7 +2016,6 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa,
 	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_GET_PRIV_DSA_KEY, PK11_R_FINDOBJECTS, rv);
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1972,7 +2025,6 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa,
 		{
 		PK11err_add_data(PK11_F_GET_PRIV_DSA_KEY,
 		    PK11_R_FINDOBJECTSFINAL, rv);
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -1984,24 +2036,33 @@ static CK_OBJECT_HANDLE pk11_get_private_dsa_key(DSA* dsa,
 			{
 			PK11err_add_data(PK11_F_GET_PRIV_DSA_KEY, 
 			    PK11_R_CREATEOBJECT, rv);
-			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 			goto err;
 			}
 		}
 
-	(void) pk11_active_add(h_key);
-	if (key_ptr != NULL)
-		*key_ptr = dsa;
 	if (dsa_priv_num != NULL)
 		if ((*dsa_priv_num = BN_dup(dsa->priv_key)) == NULL)
 			{
 			PK11err(PK11_F_GET_PRIV_DSA_KEY, PK11_R_MALLOC_FAILURE);
-			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+			rollback = TRUE;
 			goto err;
 			}
-	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+
+	KEY_HANDLE_REFHOLD(h_key, OP_DSA, FALSE, rollback, err);
+	if (key_ptr != NULL)
+		*key_ptr = dsa;
 
 err:
+	if (rollback)
+		{
+		if (found == 0)
+			(void) pFuncList->C_DestroyObject(session, h_key);
+		h_key = CK_INVALID_HANDLE;
+		}
+
+	UNLOCK_OBJSTORE(OP_DSA);
+
+malloc_err:
 	/* 5 to 8 entries in the key template are key components
 	 * They need to be freed apon exit or error.
 	 */
@@ -2017,7 +2078,6 @@ err:
 		}
 
 	return h_key;
-
 	}
 
 /*
@@ -2032,8 +2092,8 @@ static int check_new_dsa_key_pub(PK11_SESSION *sp, DSA *dsa)
 	 * key matters here so it is sufficient to compare it with value
 	 * cached in PK11_SESSION structure.
 	 */
-	if ((sp->dsa_pub != dsa) ||
-	    (BN_cmp(sp->dsa_pub_num, dsa->pub_key) != 0))
+	if ((sp->opdata_dsa_pub != dsa) ||
+	    (BN_cmp(sp->opdata_dsa_pub_num, dsa->pub_key) != 0))
 		{
 		/*
 		 * We do not check the return value because even in case of
@@ -2059,8 +2119,8 @@ static int check_new_dsa_key_priv(PK11_SESSION *sp, DSA *dsa)
 	 * key matters here so it is sufficient to compare it with value
 	 * cached in PK11_SESSION structure.
 	 */
-	if ((sp->dsa_priv != dsa) ||
-	    (BN_cmp(sp->dsa_priv_num, dsa->priv_key) != 0))
+	if ((sp->opdata_dsa_priv != dsa) ||
+	    (BN_cmp(sp->opdata_dsa_priv_num, dsa->priv_key) != 0))
 		{
 		/*
 		 * We do not check the return value because even in case of
@@ -2182,7 +2242,7 @@ static int pk11_DH_generate_key(DH *dh)
 	 *	 a session handle. The objects created in this function are
 	 *	 destroyed before return and thus not cached.
 	 */
-	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
+	if ((sp = pk11_get_session(OP_DH)) == NULL)
 		goto err;
 	
 	rv = pFuncList->C_GenerateKeyPair(sp->session,
@@ -2212,9 +2272,9 @@ static int pk11_DH_generate_key(DH *dh)
 		reuse_mem_len = pub_key_template[2].ulValueLen + DH_BUF_RESERVE;
 		}
 
-	rv = pFuncList->C_GetAttributeValue(sp->session, h_pub_key, 
+	rv = pFuncList->C_GetAttributeValue(sp->session, h_pub_key,
 		pub_key_result, pub_key_attr_result_count);
-	rv1 = pFuncList->C_GetAttributeValue(sp->session, h_priv_key, 
+	rv1 = pFuncList->C_GetAttributeValue(sp->session, h_priv_key,
 		priv_key_result, priv_key_attr_result_count);
 
 	if (rv != CKR_OK || rv1 != CKR_OK)
@@ -2255,6 +2315,11 @@ static int pk11_DH_generate_key(DH *dh)
 				}
 		dh->pub_key = BN_bin2bn(pub_key_result[0].pValue, 
 			pub_key_result[0].ulValueLen, dh->pub_key);
+		if (dh->pub_key == NULL)
+			{
+			PK11err(PK11_F_DH_GEN_KEY, PK11_R_MALLOC_FAILURE);
+			goto err;
+			}
 		}
 
 	/* Reuse the memory allocated */
@@ -2281,6 +2346,11 @@ static int pk11_DH_generate_key(DH *dh)
 				}
 		dh->priv_key = BN_bin2bn(priv_key_result[0].pValue, 
 			priv_key_result[0].ulValueLen, dh->priv_key);
+		if (dh->priv_key == NULL)
+			{
+			PK11err(PK11_F_DH_GEN_KEY, PK11_R_MALLOC_FAILURE);
+			goto err;
+			}
 		}
 
 	ret = 1;
@@ -2316,7 +2386,7 @@ err:
 			}
 		}
 
-	pk11_return_session(sp, OP_PUBKEY);
+	pk11_return_session(sp, OP_DH);
 	return ret;
 	}
 
@@ -2352,7 +2422,7 @@ static int pk11_DH_compute_key(unsigned char *key,const BIGNUM *pub_key,DH *dh)
 	priv_key_template[0].pValue = &key_class;
 	priv_key_template[1].pValue = &key_type;
 
-	if ((sp = pk11_get_session(OP_PUBKEY)) == NULL)
+	if ((sp = pk11_get_session(OP_DH)) == NULL)
 		goto err;
 
 	mechanism.ulParameterLen = BN_num_bytes(pub_key);
@@ -2366,11 +2436,11 @@ static int pk11_DH_compute_key(unsigned char *key,const BIGNUM *pub_key,DH *dh)
 
 	(void) check_new_dh_key(sp, dh);
 
-	h_key = sp->dh_key;
+	h_key = sp->opdata_dh_key;
 	if (h_key == CK_INVALID_HANDLE)
-		h_key = sp->dh_key =
-			pk11_get_dh_key((DH*) dh, &sp->dh,
-			    &sp->dh_priv_num, sp->session);
+		h_key = sp->opdata_dh_key =
+			pk11_get_dh_key((DH*) dh, &sp->opdata_dh,
+			    &sp->opdata_dh_priv_num, sp->session);
 
 	if (h_key == CK_INVALID_HANDLE)
 		{
@@ -2395,7 +2465,8 @@ static int pk11_DH_compute_key(unsigned char *key,const BIGNUM *pub_key,DH *dh)
 
 	if (rv != CKR_OK)
 		{
-		PK11err_add_data(PK11_F_DH_COMP_KEY, PK11_R_GETATTRIBUTVALUE, rv);
+		PK11err_add_data(PK11_F_DH_COMP_KEY, PK11_R_GETATTRIBUTVALUE,
+		    rv);
 		goto err;
 		}
 
@@ -2417,7 +2488,8 @@ static int pk11_DH_compute_key(unsigned char *key,const BIGNUM *pub_key,DH *dh)
 
 	if (rv != CKR_OK)
 		{
-		PK11err_add_data(PK11_F_DH_COMP_KEY, PK11_R_GETATTRIBUTVALUE, rv);
+		PK11err_add_data(PK11_F_DH_COMP_KEY, PK11_R_GETATTRIBUTVALUE,
+		    rv);
 		goto err;
 		}
 
@@ -2456,7 +2528,7 @@ err:
 			}
 		}
 	if (priv_key_result[0].pValue)
-		{ 
+		{
 		OPENSSL_free(priv_key_result[0].pValue);
 		priv_key_result[0].pValue = NULL;
 		}
@@ -2467,7 +2539,7 @@ err:
 		mechanism.pParameter = NULL;
 		}
 
-	pk11_return_session(sp, OP_PUBKEY);
+	pk11_return_session(sp, OP_DH);
 	return ret;
 	}
 
@@ -2480,6 +2552,7 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 	CK_OBJECT_CLASS class = CKO_PRIVATE_KEY;
 	CK_KEY_TYPE key_type = CKK_DH;
 	CK_ULONG found;
+	CK_BBOOL rollback = FALSE;
 	int i;
 
 	CK_ULONG ul_key_attr_count = 7;
@@ -2503,7 +2576,7 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 	if (key_template[4].pValue == NULL)
 		{
 		PK11err(PK11_F_GET_DH_KEY, PK11_R_MALLOC_FAILURE);
-		goto err;
+		goto malloc_err;
 		}
 
 	BN_bn2bin(dh->p, key_template[4].pValue);
@@ -2514,7 +2587,7 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 	if (key_template[5].pValue == NULL)
 		{
 		PK11err(PK11_F_GET_DH_KEY, PK11_R_MALLOC_FAILURE);
-		goto err;
+		goto malloc_err;
 		}
 
 	BN_bn2bin(dh->g, key_template[5].pValue);
@@ -2525,25 +2598,19 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 	if (key_template[6].pValue == NULL)
 		{
 		PK11err(PK11_F_GET_DH_KEY, PK11_R_MALLOC_FAILURE);
-		goto err;
+		goto malloc_err;
 		}
 
 	BN_bn2bin(dh->priv_key, key_template[6].pValue);
 
-	/*
-	 * As stated in v2.20, 11.7 Object Management Function, in section for
-	 * C_FindObjectsInit(), at most one search operation may be active at
-	 * a given time in a given session. Therefore, we must group these
-	 * three calls in one atomic operation.
-	 */
-	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
+	/* see find_lock array definition for more info on object locking */
+	LOCK_OBJSTORE(OP_DH);
 	rv = pFuncList->C_FindObjectsInit(session, key_template, 
 		ul_key_attr_count);
 
 	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_GET_DH_KEY, PK11_R_FINDOBJECTSINIT, rv);
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -2552,7 +2619,6 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 	if (rv != CKR_OK)
 		{
 		PK11err_add_data(PK11_F_GET_DH_KEY, PK11_R_FINDOBJECTS, rv);
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		goto err;
 		}
 
@@ -2560,8 +2626,8 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 
 	if (rv != CKR_OK)
 		{
-		PK11err_add_data(PK11_F_GET_DH_KEY, PK11_R_FINDOBJECTSFINAL, rv);
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+		PK11err_add_data(PK11_F_GET_DH_KEY, PK11_R_FINDOBJECTSFINAL,
+		    rv);
 		goto err;
 		}
 
@@ -2573,24 +2639,33 @@ static CK_OBJECT_HANDLE pk11_get_dh_key(DH* dh,
 			{
 			PK11err_add_data(PK11_F_GET_DH_KEY, PK11_R_CREATEOBJECT,
 			    rv);
-			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 			goto err;
 			}
 		}
 
-	(void) pk11_active_add(h_key);
-	if (key_ptr != NULL)
-		*key_ptr = dh;
 	if (dh_priv_num != NULL)
 		if ((*dh_priv_num = BN_dup(dh->priv_key)) == NULL)
 			{
 			PK11err(PK11_F_GET_DH_KEY, PK11_R_MALLOC_FAILURE);
-			CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+			rollback = TRUE;
 			goto err;
 			}
-	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
+
+	KEY_HANDLE_REFHOLD(h_key, OP_DH, FALSE, rollback, err);
+	if (key_ptr != NULL)
+		*key_ptr = dh;
 
 err:
+	if (rollback)
+		{
+		if (found == 0)
+			(void) pFuncList->C_DestroyObject(session, h_key);
+		h_key = CK_INVALID_HANDLE;
+		}
+
+	UNLOCK_OBJSTORE(OP_DH);
+
+malloc_err:
 	for (i = 4; i <= 6; i++)
 		{
 		if (key_template[i].pValue != NULL)
@@ -2607,7 +2682,7 @@ err:
  * Check for cache miss and clean the object pointer and handle
  * in such case. Return 1 for cache hit, 0 for cache miss.
  *
- * Note: we rely on pk11_destroy_dh_key_objects() to set sp->dh
+ * Note: we rely on pk11_destroy_dh_key_objects() to set sp->opdata_dh
  *       to CK_INVALID_HANDLE even when it fails to destroy the object.
  */
 static int check_new_dh_key(PK11_SESSION *sp, DH *dh)
@@ -2618,8 +2693,8 @@ static int check_new_dh_key(PK11_SESSION *sp, DH *dh)
 	 * is unique so it is sufficient to compare it with value cached
 	 * in PK11_SESSION structure.
 	 */
-	if ((sp->dh != dh) ||
-	    (BN_cmp(sp->dh_priv_num, dh->priv_key) != 0))
+	if ((sp->opdata_dh != dh) ||
+	    (BN_cmp(sp->opdata_dh_priv_num, dh->priv_key) != 0))
 		{
 		/*
 		 * We do not check the return value because even in case of
