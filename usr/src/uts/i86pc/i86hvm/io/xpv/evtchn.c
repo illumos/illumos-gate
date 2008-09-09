@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/xpv_support.h>
 #include <sys/hypervisor.h>
@@ -230,7 +228,14 @@ evtchn_callback_fcn(caddr_t arg0, caddr_t arg1)
 	int low, high;
 	ulong_t sels;
 
-	vci = &HYPERVISOR_shared_info->vcpu_info[CPU->cpu_id];
+	/*
+	 * Xen hard-codes all notifications to VCPU0, so we bind
+	 * ourselves via xpv.conf.  Note that this also assumes that all
+	 * evtchns are bound to VCPU0, which is true by default.
+	 */
+	ASSERT(CPU->cpu_id == 0);
+
+	vci = &HYPERVISOR_shared_info->vcpu_info[0];
 
 again:
 	DTRACE_PROBE2(evtchn__scan__start, int, vci->evtchn_upcall_pending,
