@@ -1323,3 +1323,21 @@ dsl_dir_transfer_possible(dsl_dir_t *sdd, dsl_dir_t *tdd, uint64_t space)
 
 	return (0);
 }
+
+void
+dsl_dir_new_refreservation(dsl_dir_t *dd, dsl_dataset_t *ds,
+    uint64_t new_reservation, cred_t *cr, dmu_tx_t *tx)
+{
+	int64_t delta;
+
+	mutex_enter(&dd->dd_lock);
+	delta = dsl_dataset_new_refreservation(ds, new_reservation, tx);
+	mutex_exit(&dd->dd_lock);
+
+	dsl_dir_diduse_space(dd, DD_USED_REFRSRV, delta, 0, 0, tx);
+	dsl_prop_set_uint64_sync(dd, "refreservation", new_reservation, cr, tx);
+
+	spa_history_internal_log(LOG_DS_REFRESERV,
+	    dd->dd_pool->dp_spa, tx, cr, "%lld dataset = %llu",
+	    (longlong_t)new_reservation, ds->ds_object);
+}

@@ -3005,6 +3005,25 @@ dsl_dataset_set_quota(const char *dsname, uint64_t quota)
 	return (err);
 }
 
+int64_t
+dsl_dataset_new_refreservation(dsl_dataset_t *ds, uint64_t new_reservation,
+    dmu_tx_t *tx)
+{
+	int64_t delta;
+	uint64_t unique;
+
+	dmu_buf_will_dirty(ds->ds_dbuf, tx);
+
+	mutex_enter(&ds->ds_lock);
+	unique = dsl_dataset_unique(ds);
+	delta = MAX(0, (int64_t)(new_reservation - unique)) -
+	    MAX(0, (int64_t)(ds->ds_reserved - unique));
+	ds->ds_reserved = new_reservation;
+	mutex_exit(&ds->ds_lock);
+
+	return (delta);
+}
+
 static int
 dsl_dataset_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
@@ -3054,27 +3073,8 @@ dsl_dataset_set_reservation_sync(void *arg1, void *arg2, cred_t *cr,
 	dsl_dataset_t *ds = arg1;
 	uint64_t *reservationp = arg2;
 	uint64_t new_reservation = *reservationp;
-	uint64_t unique;
-	int64_t delta;
 
-	dmu_buf_will_dirty(ds->ds_dbuf, tx);
-
-	mutex_enter(&ds->ds_lock);
-	unique = dsl_dataset_unique(ds);
-	delta = MAX(0, (int64_t)(new_reservation - unique)) -
-	    MAX(0, (int64_t)(ds->ds_reserved - unique));
-	ds->ds_reserved = new_reservation;
-	mutex_exit(&ds->ds_lock);
-
-	dsl_prop_set_uint64_sync(ds->ds_dir, "refreservation",
-	    new_reservation, cr, tx);
-
-	dsl_dir_diduse_space(ds->ds_dir, DD_USED_REFRSRV, delta, 0, 0, tx);
-
-	spa_history_internal_log(LOG_DS_REFRESERV,
-	    ds->ds_dir->dd_pool->dp_spa, tx, cr, "%lld dataset = %llu",
-	    (longlong_t)new_reservation,
-	    ds->ds_dir->dd_phys->dd_head_dataset_obj);
+	dsl_dir_new_refreservation(ds->ds_dir, ds, new_reservation, cr, tx);
 }
 
 int

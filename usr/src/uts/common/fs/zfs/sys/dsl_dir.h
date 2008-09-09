@@ -132,6 +132,8 @@ int dsl_dir_rename(dsl_dir_t *dd, const char *newname);
 int dsl_dir_transfer_possible(dsl_dir_t *sdd, dsl_dir_t *tdd, uint64_t space);
 int dsl_dir_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx);
 boolean_t dsl_dir_is_clone(dsl_dir_t *dd);
+void dsl_dir_new_refreservation(dsl_dir_t *dd, struct dsl_dataset *ds,
+    uint64_t reservation, cred_t *cr, dmu_tx_t *tx);
 
 /* internal reserved dir name */
 #define	MOS_DIR_NAME "$MOS"
