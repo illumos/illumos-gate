@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pthread.h>
 #include <stdio.h>
@@ -449,7 +447,7 @@ soft_delete_object_cleanup(soft_object_t *objp)
 		 */
 		objp->obj_delete_sync |= OBJECT_REFCNT_WAITING;
 		(void) pthread_cond_wait(&objp->obj_free_cond,
-			&objp->object_mutex);
+		    &objp->object_mutex);
 	}
 
 	objp->obj_delete_sync &= ~OBJECT_REFCNT_WAITING;
@@ -587,7 +585,7 @@ search_for_objects(CK_ATTRIBUTE_PTR pTemplate, CK_ULONG ulCount,
 {
 	soft_session_t *session_p;
 	soft_object_t *obj;
-	CK_OBJECT_CLASS pclasses[6]; /* classes attrs possiblely exist */
+	CK_OBJECT_CLASS pclasses[6]; /* classes attrs possibly exist */
 	CK_ULONG num_pclasses;	/* number of possible classes */
 	CK_ULONG num_result_alloc = 0; /* spaces allocated for results */
 	CK_RV rv = CKR_OK;
@@ -979,7 +977,7 @@ soft_object_write_access_check(soft_session_t *sp, soft_object_t *objp)
 			 * object, but not for private token/session object.
 			 */
 			if ((objp->object_type == TOKEN_PRIVATE) ||
-				(objp->object_type == SESSION_PRIVATE)) {
+			    (objp->object_type == SESSION_PRIVATE)) {
 				return (CKR_USER_NOT_LOGGED_IN);
 			}
 		} else {
@@ -1256,24 +1254,24 @@ refresh_token_objects()
 	soft_object_t *in_core_obj, *tmp_incore_obj, *new_objp = NULL;
 	CK_RV rv = CKR_OK;
 
-			/* deleted in-core objects */
-	soft_object_t	*del_objs_list = NULL,
-			*end_del_objs_list = NULL,
+	/* deleted in-core objects */
+	soft_object_t *del_objs_list = NULL;
+	soft_object_t *end_del_objs_list = NULL;
 
-			/* modified in-core objects */
-			*mod_objs_list = NULL,
-			*end_mod_objs_list = NULL,
+	/* modified in-core objects */
+	soft_object_t *mod_objs_list = NULL;
+	soft_object_t *end_mod_objs_list = NULL;
 
-			/*
-			 * copy of modified in-core objects, in case we need
-			 * undo the change
-			 */
-			*copy_of_mod_objs_list = NULL,
-			*end_copy_of_mod_objs_list = NULL,
+	/*
+	 * copy of modified in-core objects, in case we need
+	 * undo the change
+	 */
+	soft_object_t *copy_of_mod_objs_list = NULL;
+	soft_object_t *end_copy_of_mod_objs_list = NULL;
 
-			/* objects to be added to the in-core list */
-			*added_objs_list = NULL,
-			*end_added_objs_list = NULL;
+	/* objects to be added to the in-core list */
+	soft_object_t *added_objs_list = NULL;
+	soft_object_t *end_added_objs_list = NULL;
 
 	if (soft_keystore_get_version(&on_disk_ks_version, B_FALSE) != 0) {
 		return (CKR_FUNCTION_FAILED);

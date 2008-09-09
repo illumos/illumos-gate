@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -425,7 +423,7 @@ kernel_delete_object_cleanup(kernel_object_t *objp)
 		 */
 		objp->obj_delete_sync |= OBJECT_REFCNT_WAITING;
 		(void) pthread_cond_wait(&objp->obj_free_cond,
-			&objp->object_mutex);
+		    &objp->object_mutex);
 	}
 
 	objp->obj_delete_sync &= ~OBJECT_REFCNT_WAITING;
@@ -594,7 +592,7 @@ search_for_objects(kernel_session_t *sp, CK_ATTRIBUTE_PTR pTemplate,
 {
 	kernel_session_t *session_p;
 	kernel_object_t *obj;
-	CK_OBJECT_CLASS pclasses[6]; /* classes attrs possiblely exist */
+	CK_OBJECT_CLASS pclasses[6]; /* classes attrs possibly exist */
 	CK_ULONG num_pclasses;	/* number of possible classes */
 	CK_ULONG num_result_alloc = 0; /* spaces allocated for results */
 	CK_RV rv = CKR_OK;

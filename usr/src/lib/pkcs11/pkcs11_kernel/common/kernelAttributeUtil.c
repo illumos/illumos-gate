@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <string.h>
 #include <security/cryptoki.h>
@@ -3572,7 +3570,7 @@ kernel_copy_secret_key_attr(secret_key_obj_t *old_secret_key_obj_p,
  * of these attributes are in the template, make a list of classes
  * that can have these attributes.  This would speed up the search later,
  * because we can immediately skip an object if the class of that
- * object can not possiblely contain one of the attributes.
+ * object can not possibly contain one of the attributes.
  *
  */
 void
@@ -3710,7 +3708,7 @@ kernel_find_match_attrs(kernel_object_t *obj, CK_OBJECT_CLASS *pclasses,
 
 	/*
 	 * Check if the class of this object match with any
-	 * of object classes that can possiblely contain the
+	 * of object classes that can possibly contain the
 	 * requested attributes.
 	 */
 	if (num_pclasses > 0) {
@@ -3721,7 +3719,7 @@ kernel_find_match_attrs(kernel_object_t *obj, CK_OBJECT_CLASS *pclasses,
 		}
 		if (i == num_pclasses) {
 			/*
-			 * this object can't possiblely contain one or
+			 * this object can't possibly contain one or
 			 * more attributes, don't need to check this object
 			 */
 			return (B_FALSE);
