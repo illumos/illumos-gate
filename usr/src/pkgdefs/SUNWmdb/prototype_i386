@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 !include prototype_com
 
@@ -38,13 +36,9 @@ d none usr/platform/i86pc/lib 755 root bin
 d none usr/platform/i86pc/lib/mdb 755 root sys
 d none usr/platform/i86pc/lib/mdb/kvm 755 root sys
 d none usr/platform/i86pc/lib/mdb/kvm/amd64 755 root sys
-f none usr/platform/i86pc/lib/mdb/kvm/amd64/cpu.generic.so 555 root sys
-f none usr/platform/i86pc/lib/mdb/kvm/amd64/cpu_ms.AuthenticAMD.15.so 555 root sys
 f none usr/platform/i86pc/lib/mdb/kvm/amd64/pcplusmp.so 555 root sys
 f none usr/platform/i86pc/lib/mdb/kvm/amd64/uppc.so 555 root sys
 f none usr/platform/i86pc/lib/mdb/kvm/amd64/unix.so 555 root sys
-f none usr/platform/i86pc/lib/mdb/kvm/cpu.generic.so 555 root sys
-f none usr/platform/i86pc/lib/mdb/kvm/cpu_ms.AuthenticAMD.15.so 555 root sys
 f none usr/platform/i86pc/lib/mdb/kvm/pcplusmp.so 555 root sys
 f none usr/platform/i86pc/lib/mdb/kvm/uppc.so 555 root sys
 f none usr/platform/i86pc/lib/mdb/kvm/unix.so 555 root sys
@@ -65,6 +59,8 @@ d none usr/lib/mdb/kvm/amd64 755 root sys
 f none usr/lib/mdb/kvm/amd64/arp.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/audiosup.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/cpc.so 555 root sys
+f none usr/lib/mdb/kvm/amd64/cpu.generic.so 555 root sys
+f none usr/lib/mdb/kvm/amd64/cpu_ms.AuthenticAMD.15.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/crypto.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/genunix.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/ip.so 555 root sys
@@ -95,6 +91,8 @@ f none usr/lib/mdb/kvm/amd64/usba.so 555 root sys
 f none usr/lib/mdb/kvm/arp.so 555 root sys
 f none usr/lib/mdb/kvm/audiosup.so 555 root sys
 f none usr/lib/mdb/kvm/cpc.so 555 root sys
+f none usr/lib/mdb/kvm/cpu.generic.so 555 root sys
+f none usr/lib/mdb/kvm/cpu_ms.AuthenticAMD.15.so 555 root sys
 f none usr/lib/mdb/kvm/crypto.so 555 root sys
 f none usr/lib/mdb/kvm/genunix.so 555 root sys
 f none usr/lib/mdb/kvm/ip.so 555 root sys

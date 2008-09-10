@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 !include prototype_com
 
@@ -31,6 +29,8 @@ d none kernel/kmdb/amd64 755 root sys
 f none kernel/kmdb/amd64/arp 555 root sys
 f none kernel/kmdb/amd64/audiosup 555 root sys
 f none kernel/kmdb/amd64/cpc 555 root sys
+f none kernel/kmdb/amd64/cpu.generic 555 root sys
+f none kernel/kmdb/amd64/cpu_ms.AuthenticAMD.15 555 root sys
 f none kernel/kmdb/amd64/crypto 555 root sys
 f none kernel/kmdb/amd64/genunix 555 root sys
 f none kernel/kmdb/amd64/ip 555 root sys
@@ -60,6 +60,8 @@ f none kernel/kmdb/amd64/usba 555 root sys
 f none kernel/kmdb/arp 555 root sys
 f none kernel/kmdb/audiosup 555 root sys
 f none kernel/kmdb/cpc 555 root sys
+f none kernel/kmdb/cpu.generic 555 root sys
+f none kernel/kmdb/cpu_ms.AuthenticAMD.15 555 root sys
 f none kernel/kmdb/crypto 555 root sys
 f none kernel/kmdb/genunix 555 root sys
 f none kernel/kmdb/ip 555 root sys
@@ -92,13 +94,9 @@ d none platform/i86pc 755 root sys
 d none platform/i86pc/kernel 755 root sys
 d none platform/i86pc/kernel/kmdb 755 root sys
 d none platform/i86pc/kernel/kmdb/amd64 755 root sys
-f none platform/i86pc/kernel/kmdb/amd64/cpu.generic 555 root sys
-f none platform/i86pc/kernel/kmdb/amd64/cpu_ms.AuthenticAMD.15 555 root sys
 f none platform/i86pc/kernel/kmdb/amd64/pcplusmp 555 root sys
 f none platform/i86pc/kernel/kmdb/amd64/uppc 555 root sys
 f none platform/i86pc/kernel/kmdb/amd64/unix 555 root sys
-f none platform/i86pc/kernel/kmdb/cpu.generic 555 root sys
-f none platform/i86pc/kernel/kmdb/cpu_ms.AuthenticAMD.15 555 root sys
 f none platform/i86pc/kernel/kmdb/pcplusmp 555 root sys
 f none platform/i86pc/kernel/kmdb/uppc 555 root sys
 f none platform/i86pc/kernel/kmdb/unix 555 root sys

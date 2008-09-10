@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -36,6 +34,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <fm/topo_mod.h>
+#include <sys/devfm.h>
+#include <fm/fmd_agent.h>
 
 #define	BUFSZ	128
 
@@ -474,44 +474,47 @@ g4_chip_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 
 /*
  * Utility function used by a4fplus_chip_label to determine the number of chips
- * (as opposed to processors) that are installed in the system by dividing the
- * number of installed processors (cores) by the number of cores per chip
- * (from kstat).  This assumes that an an A4F+ blade won't have some weird
- * configuration of mixed chip models with differing numbers of cores per chip,
- * which I think is a relatively safe assumption here.
+ * (as opposed to processors) that are installed in the system by counting
+ * the unique chipids.
  */
 static int
 get_num_chips(topo_mod_t *mod)
 {
-	kstat_t *ksp;
-	kstat_ctl_t *kctl;
-	kstat_named_t *k;
+	fmd_agent_hdl_t *hdl;
+	nvlist_t **cpus;
+	uint_t ncpu;
+	int i, nchip = 0;
+	int32_t chipid;
+	uint64_t bitmap = 0;
 
-	if ((kctl = kstat_open()) == NULL) {
-		topo_mod_dprintf(mod, NULL, "kstat_open failed (%s)\n",
-		    strerror(errno));
+	if ((hdl = fmd_agent_open(FMD_AGENT_VERSION)) == NULL)
+		return (-1);
+	if (fmd_agent_physcpu_info(hdl, &cpus, &ncpu) == -1) {
+		topo_mod_dprintf(mod, "get physcpu info failed:%s\n",
+		    fmd_agent_errmsg(hdl));
+		fmd_agent_close(hdl);
 		return (-1);
 	}
-	if ((ksp = kstat_lookup(kctl, "cpu_info", -1, NULL)) == NULL) {
-		topo_mod_dprintf(mod, NULL, "kstat_lookup failed (%s)\n",
-		    strerror(errno));
-		(void) kstat_close(kctl);
-		return (-1);
+	fmd_agent_close(hdl);
+
+	for (i = 0; i < ncpu; i++) {
+		if (nvlist_lookup_int32(cpus[i], FM_PHYSCPU_INFO_CHIP_ID,
+		    &chipid) != 0 || chipid >= 64) {
+			topo_mod_dprintf(mod, "lookup chipid failed\n");
+			nchip = -1;
+			break;
+		}
+		if ((bitmap & (1 << chipid)) != 0) {
+			bitmap |= (1 << chipid);
+			nchip++;
+		}
 	}
-	if (kstat_read(kctl, ksp, NULL) < 0) {
-		topo_mod_dprintf(mod, NULL, "kstat_read failed (%s)\n",
-		    strerror(errno));
-		(void) kstat_close(kctl);
-		return (-1);
-	}
-	if ((k = kstat_data_lookup(ksp, "ncore_per_chip")) == NULL) {
-		topo_mod_dprintf(mod, NULL, "kstat_data_lookup failed (%s)\n",
-		    strerror(errno));
-		(void) kstat_close(kctl);
-		return (-1);
-	}
-	(void) kstat_close(kctl);
-	return (sysconf(_SC_NPROCESSORS_CONF) / k->value.l);
+
+	for (i = 0; i < ncpu; i++)
+		nvlist_free(cpus[i]);
+	umem_free(cpus, sizeof (nvlist_t *) * ncpu);
+
+	return (nchip);
 }
 
 /*

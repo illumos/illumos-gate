@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/file.h>
 #include <sys/errno.h>
@@ -985,6 +983,40 @@ privcmd_HYPERVISOR_sched_op(int cmd, void *arg)
 	return (error);
 }
 
+static int
+privcmd_HYPERVISOR_mca(uint32_t cmd, xen_mc_arg_t *uargp)
+{
+	xen_mc_arg_t cmdarg;
+	import_export_t cmdarg_ie, sub_ie;
+	int error = 0;
+
+	if (import_buffer(&cmdarg_ie, uargp, &cmdarg, sizeof (cmdarg),
+	    IE_IMPEXP) != 0)
+		return (-X_EFAULT);
+
+	sub_ie = null_ie;
+
+	switch (cmd) {
+	case XEN_MC_CMD_physcpuinfo:
+		error = import_handle(&sub_ie, &cmdarg.mc_physcpuinfo.info,
+		    (cmdarg.mc_physcpuinfo.ncpus *
+		    sizeof (xen_mc_logical_cpu_t)), IE_EXPORT);
+		break;
+	case XEN_MC_CMD_offlinecpu:
+		break;
+	default:
+		return (-X_EINVAL);
+	}
+
+	if (error == 0)
+		error = HYPERVISOR_mca(cmd, &cmdarg);
+
+	export_buffer(&cmdarg_ie, &error);
+	export_buffer(&sub_ie, &error);
+
+	return (error);
+}
+
 int allow_all_hypercalls = 0;
 int privcmd_efault_debug = 0;
 
@@ -1043,6 +1075,10 @@ do_privcmd_hypercall(void *uarg, int mode, cred_t *cr, int *rval)
 	case __HYPERVISOR_sched_op:
 		error = privcmd_HYPERVISOR_sched_op(
 		    (int)hc->arg[0], (void *)hc->arg[1]);
+		break;
+	case __HYPERVISOR_mca:
+		error = privcmd_HYPERVISOR_mca((uint32_t)hc->arg[0],
+		    (xen_mc_arg_t *)hc->arg[1]);
 		break;
 	default:
 		if (allow_all_hypercalls)

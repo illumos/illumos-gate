@@ -680,6 +680,9 @@ startup(void)
 #if !defined(__xpv)
 	startup_pci_bios();
 #endif
+#if defined(__xpv)
+	startup_xen_mca();
+#endif
 	startup_modules();
 #if !defined(__xpv)
 	startup_bios_disk();
@@ -1389,6 +1392,7 @@ startup_modules(void)
 {
 	unsigned int i;
 	extern void prom_setup(void);
+	cmi_hdl_t hdl;
 
 	PRM_POINT("startup_modules() starting...");
 
@@ -1474,22 +1478,40 @@ startup_modules(void)
 	 */
 	setup_ddi();
 
-#ifndef __xpv
-	{
-		/*
-		 * Set up the CPU module subsystem.  Modifies the device tree,
-		 * so it must be done after setup_ddi().
-		 */
+	/*
+	 * Set up the CPU module subsystem for the boot cpu in the native
+	 * case, and all physical cpu resource in the xpv dom0 case.
+	 * Modifies the device tree, so this must be done after
+	 * setup_ddi().
+	 */
+#ifdef __xpv
+	/*
+	 * If paravirtualized and on dom0 then we initialize all physical
+	 * cpu handles now;  if paravirtualized on a domU then do not
+	 * initialize.
+	 */
+	if (DOMAIN_IS_INITDOMAIN(xen_info)) {
+		xen_mc_lcpu_cookie_t cpi;
 
-		cmi_hdl_t hdl;
-
-		if ((hdl = cmi_init(CMI_HDL_NATIVE, cmi_ntv_hwchipid(CPU),
-		    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU),
-		    cmi_ntv_hwmstrand(CPU))) != NULL) {
-			if (x86_feature & X86_MCA)
+		for (cpi = xen_physcpu_next(NULL); cpi != NULL;
+		    cpi = xen_physcpu_next(cpi)) {
+			if ((hdl = cmi_init(CMI_HDL_SOLARIS_xVM_MCA,
+			    xen_physcpu_chipid(cpi), xen_physcpu_coreid(cpi),
+			    xen_physcpu_strandid(cpi))) != NULL &&
+			    (x86_feature & X86_MCA))
 				cmi_mca_init(hdl);
 		}
 	}
+#else
+	/*
+	 * Initialize a handle for the boot cpu - others will initialize
+	 * as they startup.  Do not do this if we know we are in an HVM domU.
+	 */
+	if (!xpv_is_hvm &&
+	    (hdl = cmi_init(CMI_HDL_NATIVE, cmi_ntv_hwchipid(CPU),
+	    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU))) != NULL &&
+	    (x86_feature & X86_MCA))
+			cmi_mca_init(hdl);
 #endif	/* __xpv */
 
 	/*
@@ -2085,7 +2107,8 @@ post_startup(void)
 		 * Startup the memory scrubber.
 		 * XXPV	This should be running somewhere ..
 		 */
-		memscrub_init();
+		if (!xpv_is_hvm)
+			memscrub_init();
 #endif
 	}
 

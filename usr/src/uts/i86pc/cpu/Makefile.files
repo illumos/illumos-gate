@@ -17,10 +17,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 CPU_AO_OBJS = \
@@ -33,7 +31,14 @@ CPU_AO_OBJS = \
 CPU_GCPU_OBJS = \
 	gcpu_main.o \
 	gcpu_mca.o \
-	gcpu_poll.o
+	gcpu_poll_subr.o
+
+CPU_GCPU_NTV_OBJS = \
+	gcpu_poll_ntv.o
+
+CPU_GCPU_XPV_OBJS = \
+	gcpu_mca_xpv.o \
+	gcpu_poll_xpv.o
 
 CPU_AUTHAMD_OBJS = \
 	authamd_main.o

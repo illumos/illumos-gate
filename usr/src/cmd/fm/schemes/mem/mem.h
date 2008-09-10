@@ -27,8 +27,6 @@
 #ifndef _MEM_H
 #define	_MEM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/nvpair.h>
 
@@ -158,7 +156,6 @@ extern int mem_unum_contains(const char *, const char *);
 extern int mem_unum_rewrite(nvlist_t *, nvlist_t **);
 
 extern void mem_strarray_free(char **, size_t);
-extern int mem_page_cmd(int, nvlist_t *);
 
 extern mem_t mem;
 

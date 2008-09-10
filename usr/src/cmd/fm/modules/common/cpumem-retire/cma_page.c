@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Page retirement can be an extended process due to the fact that a retirement
  * may not be possible when the original request is made.  The kernel will
@@ -56,8 +54,9 @@
 #include <strings.h>
 #include <fm/fmd_api.h>
 #include <fm/libtopo.h>
+#include <fm/fmd_fmri.h>
+#include <fm/fmd_agent.h>
 #include <sys/fm/protocol.h>
-#include <sys/mem.h>
 
 static void
 cma_page_free(fmd_hdl_t *hdl, cma_page_t *page)
@@ -75,9 +74,9 @@ cma_page_free(fmd_hdl_t *hdl, cma_page_t *page)
  * diagnosis but may not be later following DR, DIMM removal, or interleave
  * changes.  On SPARC, this issue was solved by exporting the DIMM offset
  * and pushing the entire FMRI to the platform memory controller through
- * /dev/mem so it can derive the current PA from the DIMM and offset.
- * On x64, we also use DIMM and offset, but the mem:/// unum string is an
- * encoded hc:/// FMRI that is then used by the x64 memory controller driver.
+ * /dev/fm so it can derive the current PA from the DIMM and offset.
+ * On x86, we also encode DIMM and offset in hc-specific, which is then used
+ * by the x64 memory controller driver.
  * At some point these three approaches need to be rationalized: all platforms
  * should use the same scheme, either with decoding in the kernel or decoding
  * in userland (i.e. with a libtopo method to compute and update the PA).
@@ -89,36 +88,58 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 {
 	cma_page_t *page;
 	uint64_t pageaddr;
-	char *unumstr;
-	nvlist_t *asrucp = NULL;
+	nvlist_t *fmri = NULL;
 	const char *action = repair ? "unretire" : "retire";
+	int rc;
+#ifdef i386
+	nvlist_t *rsrc, *hcsp;
 
-	if (nvlist_dup(asru, &asrucp, 0) != 0) {
+	/*
+	 * On x86, retire is done by resource
+	 */
+	if (nvlist_lookup_nvlist(nvl, FM_FAULT_RESOURCE, &rsrc) != 0) {
+		fmd_hdl_debug(hdl, "page retire resource lookup failed\n");
+		cma_stats.bad_flts.fmds_value.ui64++;
+		return (CMA_RA_FAILURE);
+	}
+	if (nvlist_dup(rsrc, &fmri, 0) != 0) {
+		fmd_hdl_debug(hdl, "page retire nvlist dup failed\n");
+		return (CMA_RA_FAILURE);
+	}
+#else /* i386 */
+	if (nvlist_dup(asru, &fmri, 0) != 0) {
 		fmd_hdl_debug(hdl, "page retire nvlist dup failed\n");
 		return (CMA_RA_FAILURE);
 	}
 
 	/* It should already be expanded, but we'll do it again anyway */
-	if (fmd_nvl_fmri_expand(hdl, asrucp) < 0) {
+	if (fmd_nvl_fmri_expand(hdl, fmri) < 0) {
 		fmd_hdl_debug(hdl, "failed to expand page asru\n");
 		cma_stats.bad_flts.fmds_value.ui64++;
-		nvlist_free(asrucp);
+		nvlist_free(fmri);
 		return (CMA_RA_FAILURE);
 	}
+#endif /* i386 */
 
-	if (!repair && !fmd_nvl_fmri_present(hdl, asrucp)) {
+	if (!repair && !fmd_nvl_fmri_present(hdl, fmri)) {
 		fmd_hdl_debug(hdl, "page retire overtaken by events\n");
 		cma_stats.page_nonent.fmds_value.ui64++;
-		nvlist_free(asrucp);
+		nvlist_free(fmri);
 		return (CMA_RA_SUCCESS);
 	}
 
-	if (nvlist_lookup_uint64(asrucp, FM_FMRI_MEM_PHYSADDR, &pageaddr)
+#ifdef i386
+	if (nvlist_lookup_nvlist(fmri, FM_FMRI_HC_SPECIFIC, &hcsp) != 0 ||
+	    (nvlist_lookup_uint64(hcsp, "asru-" FM_FMRI_HC_SPECIFIC_PHYSADDR,
+	    &pageaddr) != 0 && nvlist_lookup_uint64(hcsp,
+	    FM_FMRI_HC_SPECIFIC_PHYSADDR, &pageaddr) != 0)) {
+#else
+	if (nvlist_lookup_uint64(fmri, FM_FMRI_MEM_PHYSADDR, &pageaddr)
 	    != 0) {
-		fmd_hdl_debug(hdl, "mem fault missing '%s'\n",
-		    FM_FMRI_MEM_PHYSADDR);
+#endif
+		fmd_hdl_debug(hdl, "mem fault missing 'physaddr'\n");
 		cma_stats.bad_flts.fmds_value.ui64++;
-		nvlist_free(asrucp);
+		nvlist_free(fmri);
 		return (CMA_RA_FAILURE);
 	}
 
@@ -127,7 +148,7 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 			fmd_hdl_debug(hdl, "suppressed unretire of page %llx\n",
 			    (u_longlong_t)pageaddr);
 			cma_stats.page_supp.fmds_value.ui64++;
-			nvlist_free(asrucp);
+			nvlist_free(fmri);
 			return (CMA_RA_SUCCESS);
 		}
 	} else {
@@ -135,61 +156,32 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 			fmd_hdl_debug(hdl, "suppressed retire of page %llx\n",
 			    (u_longlong_t)pageaddr);
 			cma_stats.page_supp.fmds_value.ui64++;
-			nvlist_free(asrucp);
+			nvlist_free(fmri);
 			return (CMA_RA_FAILURE);
 		}
 	}
 
-	/*
-	 * If the unum is an hc fmri string expand it to an fmri and include
-	 * that in a modified asru nvlist.
-	 */
-	if (nvlist_lookup_string(asrucp, FM_FMRI_MEM_UNUM, &unumstr) == 0 &&
-	    strncmp(unumstr, "hc:/", 4) == 0) {
-		int err;
-		nvlist_t *unumfmri;
-		struct topo_hdl *thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION);
-
-		if (topo_fmri_str2nvl(thp, unumstr, &unumfmri, &err) != 0) {
-			fmd_hdl_debug(hdl, "page retire str2nvl failed: %s\n",
-			    topo_strerror(err));
-			fmd_hdl_topo_rele(hdl, thp);
-			nvlist_free(asrucp);
-			return (CMA_RA_FAILURE);
-		}
-
-		fmd_hdl_topo_rele(hdl, thp);
-
-		if (nvlist_add_nvlist(asrucp, FM_FMRI_MEM_UNUM "-fmri",
-		    unumfmri) != 0) {
-			fmd_hdl_debug(hdl, "page retire failed to add "
-			    "unumfmri to modified asru");
-			nvlist_free(unumfmri);
-			nvlist_free(asrucp);
-			return (CMA_RA_FAILURE);
-		}
-		nvlist_free(unumfmri);
-	}
-
-	if (cma_page_cmd(hdl,
-	    repair ? MEM_PAGE_FMRI_UNRETIRE : MEM_PAGE_FMRI_RETIRE, asrucp)
-	    == 0) {
+	if (repair)
+		rc = cma_fmri_page_unretire(hdl, fmri);
+	else
+		rc = cma_fmri_page_retire(hdl, fmri);
+	if (rc == FMD_AGENT_RETIRE_DONE) {
 		fmd_hdl_debug(hdl, "%sd page 0x%llx\n",
 		    action, (u_longlong_t)pageaddr);
 		if (repair)
 			cma_stats.page_repairs.fmds_value.ui64++;
 		else
 			cma_stats.page_flts.fmds_value.ui64++;
-		nvlist_free(asrucp);
+		nvlist_free(fmri);
 		return (CMA_RA_SUCCESS);
-	} else if (repair || errno != EAGAIN) {
+	} else if (repair || rc != FMD_AGENT_RETIRE_ASYNC) {
 		fmd_hdl_debug(hdl, "%s of page 0x%llx failed, will not "
 		    "retry: %s\n", action, (u_longlong_t)pageaddr,
 		    strerror(errno));
 
 		cma_stats.page_fails.fmds_value.ui64++;
 
-		nvlist_free(asrucp);
+		nvlist_free(fmri);
 		return (CMA_RA_FAILURE);
 	}
 
@@ -201,7 +193,7 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 
 	page = fmd_hdl_zalloc(hdl, sizeof (cma_page_t), FMD_SLEEP);
 	page->pg_addr = pageaddr;
-	page->pg_fmri = asrucp;
+	page->pg_fmri = fmri;
 	if (uuid != NULL)
 		page->pg_uuid = fmd_hdl_strdup(hdl, uuid, FMD_SLEEP);
 
@@ -216,13 +208,15 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 	cma.cma_page_timerid =
 	    fmd_timer_install(hdl, NULL, NULL, cma.cma_page_curdelay);
 
-	/* Don't free asrucp here.  This FMRI will be needed for retry. */
+	/* Don't free fmri here.  This FMRI will be needed for retry. */
 	return (CMA_RA_FAILURE);
 }
 
 static int
 page_retry(fmd_hdl_t *hdl, cma_page_t *page)
 {
+	int rc;
+
 	if (page->pg_fmri != NULL && !fmd_nvl_fmri_present(hdl,
 	    page->pg_fmri)) {
 		fmd_hdl_debug(hdl, "page retire overtaken by events");
@@ -233,7 +227,8 @@ page_retry(fmd_hdl_t *hdl, cma_page_t *page)
 		return (1); /* no longer a page to retire */
 	}
 
-	if (cma_page_cmd(hdl, MEM_PAGE_FMRI_ISRETIRED, page->pg_fmri) == 0) {
+	rc = cma_fmri_page_service_state(hdl, page->pg_fmri);
+	if (rc == FMD_SERVICE_STATE_UNUSABLE) {
 		fmd_hdl_debug(hdl, "retired page 0x%llx on retry %u\n",
 		    page->pg_addr, page->pg_nretries);
 		cma_stats.page_flts.fmds_value.ui64++;
@@ -243,21 +238,14 @@ page_retry(fmd_hdl_t *hdl, cma_page_t *page)
 		return (1); /* page retired */
 	}
 
-	if (errno == EAGAIN) {
+	if (rc == FMD_SERVICE_STATE_ISOLATE_PENDING) {
 		fmd_hdl_debug(hdl, "scheduling another retry for 0x%llx\n",
 		    page->pg_addr);
 		return (0); /* schedule another retry */
 	} else {
-		if (errno == EIO) {
-			fmd_hdl_debug(hdl, "failed to retry page 0x%llx "
-			    "retirement: page isn't scheduled for retirement"
-			    "(request made beyond page_retire limit?)\n",
-			    page->pg_addr);
-		} else {
-			fmd_hdl_debug(hdl, "failed to retry page 0x%llx "
-			    "retirement: %s\n", page->pg_addr,
-			    strerror(errno));
-		}
+		fmd_hdl_debug(hdl, "failed to retry page 0x%llx "
+		    "retirement: %s\n", page->pg_addr,
+		    strerror(errno));
 
 		cma_stats.page_fails.fmds_value.ui64++;
 		return (1); /* give up */

@@ -44,6 +44,7 @@
 #include <sys/ontrap.h>
 #include <sys/psw.h>
 #include <sys/privregs.h>
+#include <sys/machsystm.h>
 
 /*
  * Set to force cmi_init to fail.
@@ -68,10 +69,12 @@ int cmi_force_generic = 0;
  */
 int cmi_panic_on_uncorrectable_error = 1;
 
+#ifndef __xpv
 /*
  * Set to indicate whether we are able to enable cmci interrupt.
  */
 int cmi_enable_cmci = 0;
+#endif
 
 /*
  * Subdirectory (relative to the module search path) in which we will
@@ -103,11 +106,12 @@ static kmutex_t cmi_load_lock;
  * Functions we need from cmi_hw.c that are not part of the cpu_module.h
  * interface.
  */
-extern cmi_hdl_t cmi_hdl_create(enum cmi_hdl_class, uint_t, uint_t, uint_t,
-    boolean_t);
+extern cmi_hdl_t cmi_hdl_create(enum cmi_hdl_class, uint_t, uint_t, uint_t);
 extern void cmi_hdl_setcmi(cmi_hdl_t, void *, void *);
 extern void *cmi_hdl_getcmi(cmi_hdl_t);
 extern void cmi_hdl_setmc(cmi_hdl_t, const struct cmi_mc_ops *, void *);
+extern void cmi_hdl_inj_begin(cmi_hdl_t);
+extern void cmi_hdl_inj_end(cmi_hdl_t);
 
 #define	HDL2CMI(hdl)		cmi_hdl_getcmi(hdl)
 
@@ -435,7 +439,7 @@ cmi_load_generic(cmi_hdl_t hdl, void **datap)
 
 cmi_hdl_t
 cmi_init(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
-    uint_t strandid, boolean_t mstrand)
+    uint_t strandid)
 {
 	cmi_t *cmi = NULL;
 	cmi_hdl_t hdl;
@@ -448,8 +452,7 @@ cmi_init(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 
 	mutex_enter(&cmi_load_lock);
 
-	if ((hdl = cmi_hdl_create(class, chipid, coreid, strandid,
-	    mstrand)) == NULL) {
+	if ((hdl = cmi_hdl_create(class, chipid, coreid, strandid)) == NULL) {
 		mutex_exit(&cmi_load_lock);
 		cmn_err(CE_WARN, "There will be no MCA support on chip %d "
 		    "core %d strand %d (cmi_hdl_create returned NULL)\n",
@@ -497,7 +500,8 @@ cmi_fini(cmi_hdl_t hdl)
 }
 
 /*
- * cmi_post_startup is called from post_startup for the boot cpu only.
+ * cmi_post_startup is called from post_startup for the boot cpu only (no
+ * other cpus are started yet).
  */
 void
 cmi_post_startup(void)
@@ -520,7 +524,8 @@ cmi_post_startup(void)
 /*
  * Called just once from start_other_cpus when all processors are started.
  * This will not be called for each cpu, so the registered op must not
- * assume it is called as such.
+ * assume it is called as such.  We are not necessarily executing on
+ * the boot cpu.
  */
 void
 cmi_post_mpstartup(void)
@@ -759,10 +764,10 @@ cmi_hdl_poke(cmi_hdl_t hdl)
 	CMI_OPS(cmi)->cmi_hdl_poke(hdl);
 }
 
+#ifndef	__xpv
 void
 cmi_cmci_trap()
 {
-#ifndef	__xpv
 	cmi_hdl_t hdl = NULL;
 	cmi_t *cmi;
 
@@ -788,14 +793,20 @@ cmi_cmci_trap()
 	CMI_OPS(cmi)->cmi_cmci_trap(hdl);
 
 	cmi_hdl_rele(hdl);
-#endif	/* __xpv */
 }
+#endif	/* __xpv */
 
 void
 cmi_mc_register(cmi_hdl_t hdl, const cmi_mc_ops_t *mcops, void *mcdata)
 {
 	if (!cmi_no_mca_init)
 		cmi_hdl_setmc(hdl, mcops, mcdata);
+}
+
+void
+cmi_mc_sw_memscrub_disable(void)
+{
+	memscrub_disable();
 }
 
 cmi_errno_t
@@ -830,6 +841,7 @@ cmi_mc_unumtopa(mc_unum_t *up, nvlist_t *nvl, uint64_t *pap)
 	const struct cmi_mc_ops *mcops;
 	cmi_hdl_t hdl;
 	cmi_errno_t rv;
+	nvlist_t *hcsp;
 
 	if (up != NULL && nvl != NULL)
 		return (CMIERR_API);	/* convert from just one form */
@@ -842,8 +854,12 @@ cmi_mc_unumtopa(mc_unum_t *up, nvlist_t *nvl, uint64_t *pap)
 	    mcops->cmi_mc_unumtopa == NULL) {
 		cmi_hdl_rele(hdl);
 
-		if (nvl != NULL && nvlist_lookup_uint64(nvl,
-		    FM_FMRI_MEM_PHYSADDR, pap) == 0) {
+		if (nvl != NULL && nvlist_lookup_nvlist(nvl,
+		    FM_FMRI_HC_SPECIFIC, &hcsp) == 0 &&
+		    (nvlist_lookup_uint64(hcsp,
+		    "asru-" FM_FMRI_HC_SPECIFIC_PHYSADDR, pap) == 0 ||
+		    nvlist_lookup_uint64(hcsp, FM_FMRI_HC_SPECIFIC_PHYSADDR,
+		    pap) == 0)) {
 			return (CMIERR_MC_PARTIALUNUMTOPA);
 		} else {
 			return (mcops && mcops->cmi_mc_unumtopa ?
@@ -875,15 +891,36 @@ cmi_hdl_msrinject(cmi_hdl_t hdl, cmi_mca_regs_t *regs, uint_t nregs,
     int force)
 {
 	cmi_t *cmi = cmi_hdl_getcmi(hdl);
+	cmi_errno_t rc;
 
 	if (!CMI_OP_PRESENT(cmi, cmi_msrinject))
 		return (CMIERR_NOTSUP);
 
-	return (CMI_OPS(cmi)->cmi_msrinject(hdl, regs, nregs, force));
+	cmi_hdl_inj_begin(hdl);
+	rc = CMI_OPS(cmi)->cmi_msrinject(hdl, regs, nregs, force);
+	cmi_hdl_inj_end(hdl);
+
+	return (rc);
 }
 
 boolean_t
 cmi_panic_on_ue(void)
 {
 	return (cmi_panic_on_uncorrectable_error ? B_TRUE : B_FALSE);
+}
+
+void
+cmi_panic_callback(void)
+{
+	cmi_hdl_t hdl;
+	cmi_t *cmi;
+
+	if (cmi_no_mca_init || (hdl = cmi_hdl_any()) == NULL)
+		return;
+
+	cmi = cmi_hdl_getcmi(hdl);
+	if (CMI_OP_PRESENT(cmi, cmi_panic_callback))
+		CMI_OPS(cmi)->cmi_panic_callback();
+
+	cmi_hdl_rele(hdl);
 }

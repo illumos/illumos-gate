@@ -41,6 +41,7 @@ CORE_OBJS +=			\
 	cms.o			\
 	confunix.o		\
 	cpuid.o			\
+	cpuid_subr.o		\
 	cpupm.o			\
 	dis_tables.o		\
 	ddi_impl.o		\
@@ -168,13 +169,6 @@ PCINEXUS_OBJS += pci.o pci_common.o pci_kstats.o pci_tools.o
 PCPLUSMP_OBJS += apic.o apic_regops.o psm_common.o apic_introp.o mp_platform_common.o
 
 ACPI_DRV_OBJS	+= acpi_drv.o
-include $(SRC)/common/mc/mc-amd/Makefile.mcamd
-MCAMD_OBJS	+= \
-	$(MCAMD_CMN_OBJS) \
-	mcamd_drv.o \
-	mcamd_dimmcfg.o \
-	mcamd_subr.o \
-	mcamd_pcicfg.o
 
 CPUDRV_OBJS	+= \
 	cpudrv.o \

@@ -21,7 +21,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 {
 	fmd_buf_create = FUNCTION extern;
@@ -83,6 +82,8 @@
 	fmd_nvl_fmri_present = FUNCTION extern;
 	fmd_nvl_fmri_replaced = FUNCTION extern;
 	fmd_nvl_fmri_unusable = FUNCTION extern;
+	fmd_nvl_fmri_retire = FUNCTION extern;
+	fmd_nvl_fmri_unretire = FUNCTION extern;
 	fmd_nvl_fmri_service_state = FUNCTION extern;
 	fmd_nvl_fmri_has_fault = FUNCTION extern;
 	fmd_nvl_fmri_contains = FUNCTION extern;

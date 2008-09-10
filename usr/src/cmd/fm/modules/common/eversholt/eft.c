@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include <fm/fmd_api.h>
@@ -205,7 +203,6 @@ dosubscribe(struct node *lhs, struct node *rhs, void *arg)
 {
 	char *ename = ename_strdup(lhs);
 
-	out(O_DEBUG, "subscribe: \"%s\"", ename);
 	fmd_hdl_subscribe(Hdl, ename);
 	FREE(ename);
 }

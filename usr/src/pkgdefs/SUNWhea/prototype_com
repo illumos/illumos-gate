@@ -748,6 +748,7 @@ f none usr/include/sys/des.h 644 root bin
 f none usr/include/sys/devctl.h 644 root bin
 f none usr/include/sys/devcache.h 644 root bin
 f none usr/include/sys/devcache_impl.h 644 root bin
+f none usr/include/sys/devfm.h 644 root bin
 f none usr/include/sys/devid_cache.h 644 root bin
 f none usr/include/sys/devinfo_impl.h 644 root bin
 f none usr/include/sys/devops.h 644 root bin

@@ -26,6 +26,8 @@
 
 #include <cma.h>
 
+#include <unistd.h>
+#include <fcntl.h>
 #include <strings.h>
 #include <errno.h>
 #include <time.h>
@@ -39,6 +41,10 @@
 
 static fmd_hdl_t *init_hdl;
 ldom_hdl_t *cma_lhp;
+#endif
+
+#ifdef i386
+boolean_t cma_is_native;
 #endif
 
 extern const char *fmd_fmri_get_platform();
@@ -71,7 +77,116 @@ typedef struct cma_subscriber {
 } cma_subscriber_t;
 
 static const cma_subscriber_t cma_subrs[] = {
-#if defined(sun4v)
+#if defined(i386)
+	/*
+	 * On x86, the ASRUs are expected to be in hc scheme.  When
+	 * cpumem-retire wants to retire a cpu or mem page, it calls the
+	 * methods registered in the topo node to do that.  The topo
+	 * enumerator, which necessarily knows all the config info that
+	 * we'd ever need in deciding what/how to retire etc.  This takes
+	 * away much of that complexity from the agent into the entity
+	 * that knows all config/topo information.
+	 */
+	{ "fault.memory.page", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    cma_page_retire },
+	{ "fault.memory.page_sb", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    cma_page_retire },
+	{ "fault.memory.page_ck", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    cma_page_retire },
+	{ "fault.memory.page_ue", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    cma_page_retire },
+	{ "fault.memory.generic-x86.page_ce", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, cma_page_retire },
+	{ "fault.memory.generic-x86.page_ue", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, cma_page_retire },
+	{ "fault.memory.intel.page_ce", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, cma_page_retire },
+	{ "fault.memory.intel.page_ue", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, cma_page_retire },
+	{ "fault.memory.dimm", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.dimm_sb", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.dimm_ck", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.dimm_ue", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.generic-x86.dimm_ce", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.memory.generic-x86.dimm_ue", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.memory.intel.dimm_ce", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.memory.intel.dimm_ue", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.memory.intel.fbd.*", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.memory.dimm_testfail", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.memory.bank", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.datapath", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
+	{ "fault.cpu.intel.quickpath.*", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.cpu.generic-x86.mc", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.cpu.intel.dma", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.cpu.intel.dma", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+
+	/*
+	 * The ASRU for cpu faults are in cpu scheme on native and in hc
+	 * scheme on xpv.  So each cpu fault class needs to be listed twice.
+	 */
+
+	/*
+	 * The following faults do NOT retire a cpu thread,
+	 * and therefore must be intercepted before
+	 * the default "fault.cpu.*" dispatch to cma_cpu_retire.
+	 */
+	{ "fault.cpu.amd.dramchannel", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
+	{ "fault.cpu.amd.dramchannel", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.generic-x86.bus_interconnect_memory", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.cpu.generic-x86.bus_interconnect_memory", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.generic-x86.bus_interconnect_io", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.cpu.generic-x86.bus_interconnect_io", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.generic-x86.bus_interconnect", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.cpu.generic-x86.bus_interconnect", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.intel.bus_interconnect_memory", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.cpu.intel.bus_interconnect_memory", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.intel.bus_interconnect_io", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.cpu.intel.bus_interconnect_io", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.intel.bus_interconnect", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.cpu.intel.bus_interconnect", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.intel.nb.*", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
+	{ "fault.cpu.intel.nb.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
+	    NULL },
+	{ "fault.cpu.intel.dma", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
+	{ "fault.cpu.intel.dma", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
+	    NULL },
+	{ "fault.cpu.*", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    cma_cpu_hc_retire },
+	{ "fault.cpu.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
+	    cma_cpu_hc_retire },
+#elif defined(sun4v)
 	{ "fault.memory.page", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    cma_page_retire },
 	{ "fault.memory.dimm", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
@@ -163,7 +278,10 @@ static const cma_subscriber_t cma_subrs[] = {
 		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
 	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VII.core.ce-offlinereq",
 		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
-#else /* Generic */
+#else
+	/*
+	 * For platforms excluding i386, sun4v and opl.
+	 */
 	{ "fault.memory.page", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    cma_page_retire },
 	{ "fault.memory.page_sb", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
@@ -172,14 +290,6 @@ static const cma_subscriber_t cma_subrs[] = {
 	    cma_page_retire },
 	{ "fault.memory.page_ue", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    cma_page_retire },
-	{ "fault.memory.generic-x86.page_ce", FM_FMRI_SCHEME_MEM,
-	    FM_MEM_SCHEME_VERSION, cma_page_retire },
-	{ "fault.memory.generic-x86.page_ue", FM_FMRI_SCHEME_MEM,
-	    FM_MEM_SCHEME_VERSION, cma_page_retire },
-	{ "fault.memory.intel.page_ce", FM_FMRI_SCHEME_MEM,
-	    FM_MEM_SCHEME_VERSION, cma_page_retire },
-	{ "fault.memory.intel.page_ue", FM_FMRI_SCHEME_MEM,
-	    FM_MEM_SCHEME_VERSION, cma_page_retire },
 	{ "fault.memory.dimm", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
 	{ "fault.memory.dimm_sb", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
@@ -188,16 +298,6 @@ static const cma_subscriber_t cma_subrs[] = {
 	    NULL },
 	{ "fault.memory.dimm_ue", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
-	{ "fault.memory.generic-x86.dimm_ce", FM_FMRI_SCHEME_MEM,
-	    FM_MEM_SCHEME_VERSION, NULL },
-	{ "fault.memory.generic-x86.dimm_ue", FM_FMRI_SCHEME_MEM,
-	    FM_MEM_SCHEME_VERSION, NULL },
-	{ "fault.memory.intel.dimm_ce", FM_FMRI_SCHEME_MEM,
-	    FM_MEM_SCHEME_VERSION, NULL },
-	{ "fault.memory.intel.dimm_ue", FM_FMRI_SCHEME_MEM,
-	    FM_MEM_SCHEME_VERSION, NULL },
-	{ "fault.memory.intel.fbd.*", FM_FMRI_SCHEME_HC,
-	    FM_HC_SCHEME_VERSION, NULL },
 	{ "fault.memory.dimm_testfail", FM_FMRI_SCHEME_MEM,
 	    FM_MEM_SCHEME_VERSION, NULL },
 	{ "fault.memory.bank", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
@@ -210,30 +310,6 @@ static const cma_subscriber_t cma_subrs[] = {
 	 * and therefore must be intercepted before
 	 * the default "fault.cpu.*" dispatch to cma_cpu_retire.
 	 */
-	{ "fault.cpu.amd.dramchannel", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
-	    NULL },
-	{ "fault.cpu.generic-x86.bus_interconnect_memory", FM_FMRI_SCHEME_CPU,
-	    FM_CPU_SCHEME_VERSION, NULL },
-	{ "fault.cpu.generic-x86.bus_interconnect_io", FM_FMRI_SCHEME_CPU,
-	    FM_CPU_SCHEME_VERSION, NULL },
-	{ "fault.cpu.generic-x86.bus_interconnect", FM_FMRI_SCHEME_CPU,
-	    FM_CPU_SCHEME_VERSION, NULL },
-	{ "fault.cpu.intel.bus_interconnect_memory", FM_FMRI_SCHEME_CPU,
-	    FM_CPU_SCHEME_VERSION, NULL },
-	{ "fault.cpu.intel.bus_interconnect_io", FM_FMRI_SCHEME_CPU,
-	    FM_CPU_SCHEME_VERSION, NULL },
-	{ "fault.cpu.intel.bus_interconnect", FM_FMRI_SCHEME_CPU,
-	    FM_CPU_SCHEME_VERSION, NULL },
-	{ "fault.cpu.intel.nb.*", FM_FMRI_SCHEME_HC,
-	    FM_HC_SCHEME_VERSION, NULL },
-	{ "fault.cpu.intel.quickpath.*", FM_FMRI_SCHEME_HC,
-	    FM_HC_SCHEME_VERSION, NULL },
-	{ "fault.cpu.generic-x86.mc", FM_FMRI_SCHEME_HC,
-	    FM_HC_SCHEME_VERSION, NULL },
-	{ "fault.cpu.intel.dma", FM_FMRI_SCHEME_HC,
-	    FM_HC_SCHEME_VERSION, NULL },
-	{ "fault.cpu.intel.dma", FM_FMRI_SCHEME_CPU,
-	    FM_CPU_SCHEME_VERSION, NULL },
 	{ "fault.cpu.ultraSPARC-IVplus.l2cachedata-line",
 	    FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
 	    cma_cache_way_retire },
@@ -248,7 +324,7 @@ static const cma_subscriber_t cma_subrs[] = {
 	    cma_cache_way_retire },
 
 	/*
-	 * Default "fault.cpu.*" for "mem" scheme ASRU dispatch.
+	 * Default "fault.cpu.*" for "cpu" scheme ASRU dispatch.
 	 */
 	{ "fault.cpu.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
 	    cma_cpu_retire },
@@ -300,7 +376,9 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 	uint_t keepopen;
 	int err = 0;
 	nvlist_t *asru = NULL;
+#ifndef i386
 	uint32_t index;
+#endif
 
 	err |= nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid);
 	err |= nvlist_lookup_nvlist_array(nvl, FM_SUSPECT_FAULT_LIST,
@@ -342,6 +420,8 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 				keepopen--;
 		}
 	}
+
+#ifndef i386
 	/*
 	 * Do not close the case if we are handling cache faults.
 	 */
@@ -354,6 +434,8 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 			}
 		}
 	}
+#endif
+
 	if (!keepopen && strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)
 		fmd_case_uuresolved(hdl, uuid);
 }
@@ -459,13 +541,33 @@ _fmd_init(fmd_hdl_t *hdl)
 {
 	hrtime_t nsec;
 #ifdef i386
+	char buf[BUFSIZ];
+	const char *dom0 = "control_d";
+
 	/*
-	 * Abort the cpumem-retire module if Solaris is running under the Xen
-	 * hypervisor.
+	 * Abort the cpumem-retire module if Solaris is running under DomU.
 	 */
-	if (strcmp(fmd_fmri_get_platform(), "i86xpv") == 0)
+	if (sysinfo(SI_PLATFORM, buf, sizeof (buf)) == -1)
 		return;
-#endif
+
+	if (strncmp(buf, "i86pc", sizeof (buf)) == 0) {
+		cma_is_native = B_TRUE;
+	} else if (strncmp(buf, "i86xpv", sizeof (buf)) != 0) {
+		return;
+	} else {
+		int fd = open("/dev/xen/domcaps", O_RDONLY);
+
+		if (fd != -1) {
+			if (read(fd, buf, sizeof (buf)) <= 0 ||
+			    strncmp(buf, dom0, strlen(dom0)) != 0) {
+				(void) close(fd);
+				return;
+			}
+			(void) close(fd);
+		}
+		cma_is_native = B_FALSE;
+	}
+#endif /* i386 */
 
 	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) != 0)
 		return; /* invalid data in configuration file */

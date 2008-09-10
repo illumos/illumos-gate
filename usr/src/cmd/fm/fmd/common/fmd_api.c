@@ -1897,6 +1897,40 @@ fmd_nvl_fmri_unusable(fmd_hdl_t *hdl, nvlist_t *nvl)
 }
 
 int
+fmd_nvl_fmri_retire(fmd_hdl_t *hdl, nvlist_t *nvl)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	int rv;
+
+	if (nvl == NULL) {
+		fmd_api_error(mp, EFMD_NVL_INVAL,
+		    "invalid nvlist %p\n", (void *)nvl);
+	}
+
+	rv = fmd_fmri_retire(nvl);
+	fmd_module_unlock(mp);
+
+	return (rv);
+}
+
+int
+fmd_nvl_fmri_unretire(fmd_hdl_t *hdl, nvlist_t *nvl)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	int rv;
+
+	if (nvl == NULL) {
+		fmd_api_error(mp, EFMD_NVL_INVAL,
+		    "invalid nvlist %p\n", (void *)nvl);
+	}
+
+	rv = fmd_fmri_unretire(nvl);
+	fmd_module_unlock(mp);
+
+	return (rv);
+}
+
+int
 fmd_nvl_fmri_service_state(fmd_hdl_t *hdl, nvlist_t *nvl)
 {
 	fmd_module_t *mp = fmd_api_module_lock(hdl);

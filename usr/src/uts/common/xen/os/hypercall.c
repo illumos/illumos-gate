@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Provides basic C wrappers around hypervisor invocation.
  *
@@ -418,4 +416,40 @@ HYPERVISOR_suspend(ulong_t start_info_mfn)
 
 	return (__hypercall3(__HYPERVISOR_sched_op, SCHEDOP_shutdown,
 	    (ulong_t)&sched_shutdown, start_info_mfn));
+}
+
+long
+HYPERVISOR_mca(uint32_t cmd, xen_mc_arg_t *arg)
+{
+	xen_mc_t xmc;
+	long rv;
+
+	switch (cmd) {
+	case XEN_MC_CMD_fetch:
+	case XEN_MC_CMD_physcpuinfo:
+	case XEN_MC_CMD_msrinject:
+	case XEN_MC_CMD_mceinject:
+	case XEN_MC_CMD_offlinecpu:
+		if (arg == NULL)
+			return (EINVAL);
+		break;
+
+	case XEN_MC_CMD_notifydomain:
+		return (ENOTSUP);
+
+	default:
+		return (EINVAL);
+	}
+
+	xmc.interface_version = XEN_MCA_INTERFACE_VERSION;
+	xmc.cmd = cmd;
+	if (arg != NULL)
+		xmc.u = *arg;
+
+	rv = __hypercall1(__HYPERVISOR_mca, (ulong_t)&xmc);
+
+	if (rv == XEN_MC_HCALL_SUCCESS && arg != NULL)
+		*arg = xmc.u;
+
+	return (rv);
 }

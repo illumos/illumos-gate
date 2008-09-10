@@ -663,27 +663,32 @@ nhm_unumtopa(void *arg, mc_unum_t *unump, nvlist_t *nvl, uint64_t *pap)
 	int channel;
 	int rank;
 	int i;
-	nvlist_t *fu, **hcl;
+	nvlist_t **hcl, *hcsp;
 	uint_t npr;
 	uint64_t rank_addr;
 	char *hcnm, *hcid;
 	long v;
 
 	if (unump == NULL) {
-		if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET,
-		    &rank_addr) != 0 ||
-		    nvlist_lookup_nvlist(nvl, FM_FMRI_MEM_UNUM "-fmri",
-		    &fu) != 0 ||
-		    nvlist_lookup_nvlist_array(fu, FM_FMRI_HC_LIST, &hcl,
-		    &npr) != 0) {
-			if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR,
-			    &pa) == 0) {
-				rt = CMI_SUCCESS;
+		if (nvlist_lookup_nvlist(nvl, FM_FMRI_HC_SPECIFIC,
+		    &hcsp) != 0)
+			return (CMIERR_UNKNOWN);
+		if (nvlist_lookup_uint64(hcsp,
+		    "asru-" FM_FMRI_HC_SPECIFIC_OFFSET, &rank_addr) != 0 &&
+		    nvlist_lookup_uint64(hcsp, FM_FMRI_HC_SPECIFIC_OFFSET,
+		    &rank_addr) != 0) {
+			if (nvlist_lookup_uint64(hcsp,
+			    "asru-" FM_FMRI_HC_SPECIFIC_PHYSADDR, &pa) == 0 ||
+			    nvlist_lookup_uint64(hcsp,
+			    FM_FMRI_HC_SPECIFIC_PHYSADDR, &pa) == 0) {
 				*pap = pa;
-				return (rt);
+				return (CMI_SUCCESS);
 			}
 			return (CMIERR_UNKNOWN);
 		}
+		if (nvlist_lookup_nvlist_array(nvl, FM_FMRI_HC_LIST,
+		    &hcl, &npr) != 0)
+			return (CMIERR_UNKNOWN);
 		node = -1;
 		channel = -1;
 		rank = -1;

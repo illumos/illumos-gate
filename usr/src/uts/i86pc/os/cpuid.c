@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Various routines to handle identification
  * and classification of x86 processors.
@@ -47,6 +45,10 @@
 #include <sys/auxv_386.h>
 #include <sys/bitmap.h>
 #include <sys/memnode.h>
+
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#endif
 
 /*
  * Pass 0 of cpuid feature analysis happens in locore. It contains special code
@@ -108,12 +110,6 @@ uint_t pentiumpro_bug4046376;
 uint_t pentiumpro_bug4064495;
 
 uint_t enable486;
-
-/*
- * This set of strings are for processors rumored to support the cpuid
- * instruction, and is used by locore.s to figure out how to set x86_vendor
- */
-const char CyrixInstead[] = "CyrixInstead";
 
 /*
  * monitor/mwait info.
@@ -272,119 +268,6 @@ static struct cpuid_info cpuid_info0;
 	cpi->cpi_family >= 0xf)
 
 /*
- * AMD family 0xf and family 0x10 socket types.
- * First index :
- *		0 for family 0xf, revs B thru E
- *		1 for family 0xf, revs F and G
- *		2 for family 0x10, rev B
- * Second index by (model & 0x3)
- */
-static uint32_t amd_skts[3][4] = {
-	/*
-	 * Family 0xf revisions B through E
-	 */
-#define	A_SKTS_0			0
-	{
-		X86_SOCKET_754,		/* 0b00 */
-		X86_SOCKET_940,		/* 0b01 */
-		X86_SOCKET_754,		/* 0b10 */
-		X86_SOCKET_939		/* 0b11 */
-	},
-	/*
-	 * Family 0xf revisions F and G
-	 */
-#define	A_SKTS_1			1
-	{
-		X86_SOCKET_S1g1,	/* 0b00 */
-		X86_SOCKET_F1207,	/* 0b01 */
-		X86_SOCKET_UNKNOWN,	/* 0b10 */
-		X86_SOCKET_AM2		/* 0b11 */
-	},
-	/*
-	 * Family 0x10 revisions A and B
-	 * It is not clear whether, as new sockets release, that
-	 * model & 0x3 will id socket for this family
-	 */
-#define	A_SKTS_2			2
-	{
-		X86_SOCKET_F1207,	/* 0b00 */
-		X86_SOCKET_F1207,	/* 0b01 */
-		X86_SOCKET_F1207,	/* 0b10 */
-		X86_SOCKET_F1207,	/* 0b11 */
-	}
-};
-
-/*
- * Table for mapping AMD Family 0xf and AMD Family 0x10 model/stepping
- * combination to chip "revision" and socket type.
- *
- * The first member of this array that matches a given family, extended model
- * plus model range, and stepping range will be considered a match.
- */
-static const struct amd_rev_mapent {
-	uint_t rm_family;
-	uint_t rm_modello;
-	uint_t rm_modelhi;
-	uint_t rm_steplo;
-	uint_t rm_stephi;
-	uint32_t rm_chiprev;
-	const char *rm_chiprevstr;
-	int rm_sktidx;
-} amd_revmap[] = {
-	/*
-	 * =============== AuthenticAMD Family 0xf ===============
-	 */
-
-	/*
-	 * Rev B includes model 0x4 stepping 0 and model 0x5 stepping 0 and 1.
-	 */
-	{ 0xf, 0x04, 0x04, 0x0, 0x0, X86_CHIPREV_AMD_F_REV_B, "B", A_SKTS_0 },
-	{ 0xf, 0x05, 0x05, 0x0, 0x1, X86_CHIPREV_AMD_F_REV_B, "B", A_SKTS_0 },
-	/*
-	 * Rev C0 includes model 0x4 stepping 8 and model 0x5 stepping 8
-	 */
-	{ 0xf, 0x04, 0x05, 0x8, 0x8, X86_CHIPREV_AMD_F_REV_C0, "C0", A_SKTS_0 },
-	/*
-	 * Rev CG is the rest of extended model 0x0 - i.e., everything
-	 * but the rev B and C0 combinations covered above.
-	 */
-	{ 0xf, 0x00, 0x0f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_CG, "CG", A_SKTS_0 },
-	/*
-	 * Rev D has extended model 0x1.
-	 */
-	{ 0xf, 0x10, 0x1f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_D, "D", A_SKTS_0 },
-	/*
-	 * Rev E has extended model 0x2.
-	 * Extended model 0x3 is unused but available to grow into.
-	 */
-	{ 0xf, 0x20, 0x3f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_E, "E", A_SKTS_0 },
-	/*
-	 * Rev F has extended models 0x4 and 0x5.
-	 */
-	{ 0xf, 0x40, 0x5f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_F, "F", A_SKTS_1 },
-	/*
-	 * Rev G has extended model 0x6.
-	 */
-	{ 0xf, 0x60, 0x6f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_G, "G", A_SKTS_1 },
-
-	/*
-	 * =============== AuthenticAMD Family 0x10 ===============
-	 */
-
-	/*
-	 * Rev A has model 0 and stepping 0/1/2 for DR-{A0,A1,A2}.
-	 * Give all of model 0 stepping range to rev A.
-	 */
-	{ 0x10, 0x00, 0x00, 0x0, 0x2, X86_CHIPREV_AMD_10_REV_A, "A", A_SKTS_2 },
-
-	/*
-	 * Rev B has model 2 and steppings 0/1/0xa/2 for DR-{B0,B1,BA,B2}.
-	 * Give all of model 2 stepping range to rev B.
-	 */
-	{ 0x10, 0x02, 0x02, 0x0, 0xf, X86_CHIPREV_AMD_10_REV_B, "B", A_SKTS_2 },
-};
-
-/*
  * Info for monitor/mwait idle loop.
  *
  * See cpuid section of "Intel 64 and IA-32 Architectures Software Developer's
@@ -407,53 +290,14 @@ static const struct amd_rev_mapent {
 #define	MWAIT_NUM_SUBC_STATES(cpi, c_state)			\
 	BITX((cpi)->cpi_std[5].cp_edx, c_state + 3, c_state)
 
-static void
-synth_amd_info(struct cpuid_info *cpi)
-{
-	const struct amd_rev_mapent *rmp;
-	uint_t family, model, step;
-	int i;
-
-	/*
-	 * Currently only AMD family 0xf and family 0x10 use these fields.
-	 */
-	if (cpi->cpi_family != 0xf && cpi->cpi_family != 0x10)
-		return;
-
-	family = cpi->cpi_family;
-	model = cpi->cpi_model;
-	step = cpi->cpi_step;
-
-	for (i = 0, rmp = amd_revmap; i < sizeof (amd_revmap) / sizeof (*rmp);
-	    i++, rmp++) {
-		if (family == rmp->rm_family &&
-		    model >= rmp->rm_modello && model <= rmp->rm_modelhi &&
-		    step >= rmp->rm_steplo && step <= rmp->rm_stephi) {
-			cpi->cpi_chiprev = rmp->rm_chiprev;
-			cpi->cpi_chiprevstr = rmp->rm_chiprevstr;
-			cpi->cpi_socket = amd_skts[rmp->rm_sktidx][model & 0x3];
-			return;
-		}
-	}
-}
-
-static void
-synth_info(struct cpuid_info *cpi)
-{
-	cpi->cpi_chiprev = X86_CHIPREV_UNKNOWN;
-	cpi->cpi_chiprevstr = "Unknown";
-	cpi->cpi_socket = X86_SOCKET_UNKNOWN;
-
-	switch (cpi->cpi_vendor) {
-	case X86_VENDOR_AMD:
-		synth_amd_info(cpi);
-		break;
-
-	default:
-		break;
-
-	}
-}
+/*
+ * Functions we consune from cpuid_subr.c;  don't publish these in a header
+ * file to try and keep people using the expected cpuid_* interfaces.
+ */
+extern uint32_t _cpuid_skt(uint_t, uint_t, uint_t, uint_t);
+extern uint32_t _cpuid_chiprev(uint_t, uint_t, uint_t, uint_t);
+extern const char *_cpuid_chiprevstr(uint_t, uint_t, uint_t, uint_t);
+extern uint_t _cpuid_vendorstr_to_vendorcode(char *);
 
 /*
  * Apply up various platform-dependent restrictions where the
@@ -465,16 +309,19 @@ static void
 platform_cpuid_mangle(uint_t vendor, uint32_t eax, struct cpuid_regs *cp)
 {
 	switch (eax) {
-	case 1:
+	case 1: {
+		uint32_t mcamask = DOMAIN_IS_INITDOMAIN(xen_info) ?
+		    0 : CPUID_INTC_EDX_MCA;
 		cp->cp_edx &=
-		    ~(CPUID_INTC_EDX_PSE |
+		    ~(mcamask |
+		    CPUID_INTC_EDX_PSE |
 		    CPUID_INTC_EDX_VME | CPUID_INTC_EDX_DE |
-		    CPUID_INTC_EDX_MCA |	/* XXPV true on dom0? */
 		    CPUID_INTC_EDX_SEP | CPUID_INTC_EDX_MTRR |
 		    CPUID_INTC_EDX_PGE | CPUID_INTC_EDX_PAT |
 		    CPUID_AMD_EDX_SYSC | CPUID_INTC_EDX_SEP |
 		    CPUID_INTC_EDX_PSE36 | CPUID_INTC_EDX_HTT);
 		break;
+	}
 
 	case 0x80000001:
 		cp->cp_edx &=
@@ -626,36 +473,7 @@ cpuid_pass1(cpu_t *cpu)
 		*(char *)&cpi->cpi_vendorstr[12] = '\0';
 	}
 
-	/*
-	 * Map the vendor string to a type code
-	 */
-	if (strcmp(cpi->cpi_vendorstr, "GenuineIntel") == 0)
-		cpi->cpi_vendor = X86_VENDOR_Intel;
-	else if (strcmp(cpi->cpi_vendorstr, "AuthenticAMD") == 0)
-		cpi->cpi_vendor = X86_VENDOR_AMD;
-	else if (strcmp(cpi->cpi_vendorstr, "GenuineTMx86") == 0)
-		cpi->cpi_vendor = X86_VENDOR_TM;
-	else if (strcmp(cpi->cpi_vendorstr, CyrixInstead) == 0)
-		/*
-		 * CyrixInstead is a variable used by the Cyrix detection code
-		 * in locore.
-		 */
-		cpi->cpi_vendor = X86_VENDOR_Cyrix;
-	else if (strcmp(cpi->cpi_vendorstr, "UMC UMC UMC ") == 0)
-		cpi->cpi_vendor = X86_VENDOR_UMC;
-	else if (strcmp(cpi->cpi_vendorstr, "NexGenDriven") == 0)
-		cpi->cpi_vendor = X86_VENDOR_NexGen;
-	else if (strcmp(cpi->cpi_vendorstr, "CentaurHauls") == 0)
-		cpi->cpi_vendor = X86_VENDOR_Centaur;
-	else if (strcmp(cpi->cpi_vendorstr, "RiseRiseRise") == 0)
-		cpi->cpi_vendor = X86_VENDOR_Rise;
-	else if (strcmp(cpi->cpi_vendorstr, "SiS SiS SiS ") == 0)
-		cpi->cpi_vendor = X86_VENDOR_SiS;
-	else if (strcmp(cpi->cpi_vendorstr, "Geode by NSC") == 0)
-		cpi->cpi_vendor = X86_VENDOR_NSC;
-	else
-		cpi->cpi_vendor = X86_VENDOR_IntelClone;
-
+	cpi->cpi_vendor = _cpuid_vendorstr_to_vendorcode(cpi->cpi_vendorstr);
 	x86_vendor = cpi->cpi_vendor; /* for compatibility */
 
 	/*
@@ -1305,7 +1123,12 @@ cpuid_pass1(cpu_t *cpu)
 	/*
 	 * Synthesize chip "revision" and socket type
 	 */
-	synth_info(cpi);
+	cpi->cpi_chiprev = _cpuid_chiprev(cpi->cpi_vendor, cpi->cpi_family,
+	    cpi->cpi_model, cpi->cpi_step);
+	cpi->cpi_chiprevstr = _cpuid_chiprevstr(cpi->cpi_vendor,
+	    cpi->cpi_family, cpi->cpi_model, cpi->cpi_step);
+	cpi->cpi_socket = _cpuid_skt(cpi->cpi_vendor, cpi->cpi_family,
+	    cpi->cpi_model, cpi->cpi_step);
 
 pass1_done:
 #if !defined(__xpv)
@@ -3954,6 +3777,7 @@ void
 patch_tsc_read(int flag)
 {
 	size_t cnt;
+
 	switch (flag) {
 	case X86_NO_TSC:
 		cnt = &_no_rdtsc_end - &_no_rdtsc_start;

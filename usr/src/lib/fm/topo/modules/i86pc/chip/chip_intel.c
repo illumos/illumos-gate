@@ -61,12 +61,6 @@ static const topo_pgroup_info_t rank_pgroup =
 	{ PGNAME(RANK), TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
 static const topo_pgroup_info_t mc_pgroup =
 	{ PGNAME(MCT), TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
-static const topo_method_t rank_methods[] = {
-	{ TOPO_METH_ASRU_COMPUTE, TOPO_METH_ASRU_COMPUTE_DESC,
-	    TOPO_METH_ASRU_COMPUTE_VERSION, TOPO_STABILITY_INTERNAL,
-	    mem_asru_compute },
-	{ NULL }
-};
 
 static const topo_method_t dimm_methods[] = {
 	{ SIMPLE_DIMM_LBL, "Property method", 0, TOPO_STABILITY_INTERNAL,
@@ -77,6 +71,9 @@ static const topo_method_t dimm_methods[] = {
 	    seq_dimm_label},
 	{ NULL }
 };
+
+extern const topo_method_t rank_methods[];
+extern const topo_method_t ntv_page_retire_methods[];
 
 static int mc_fd;
 
@@ -135,6 +132,11 @@ mc_add_ranks(topo_mod_t *mod, tnode_t *dnode, nvlist_t *auth, int dimm,
 
 		if (topo_method_register(mod, rnode, rank_methods) < 0)
 			whinge(mod, &err, "rank_create: "
+			    "topo_method_register failed");
+
+		if (! is_xpv() && topo_method_register(mod, rnode,
+		    ntv_page_retire_methods) < 0)
+			whinge(mod, &err, "mc_add_ranks: "
 			    "topo_method_register failed");
 
 		(void) topo_node_asru_set(rnode, fmri, TOPO_ASRU_COMPUTE, &err);

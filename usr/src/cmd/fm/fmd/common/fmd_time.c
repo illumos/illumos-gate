@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/fm/protocol.h>
 #include <signal.h>
@@ -178,6 +176,17 @@ fmd_time_tod2hrt(hrtime_t hrt_base, const fmd_timeval_t *tod_base,
  * and the time the error is queued (when we capture a full 64-bits of hrtime).
  * We extract the relevant ENA time bits as 't0' and subtract the difference
  * between these bits and the corresponding low bits of 'hrt' from 'hrt'.
+ *
+ * Under xVM dom0, the UE ereport is prepared after panic, therefore
+ * the full 64-bit hrtime of 't0' can be bigger than 'hrt'.  In such case,
+ * we should just return 'hrt'.
+ *
+ * 't0' contains only the low bits of 64bit hrtime.  It is tricky to tell
+ * whether 'hrt' or 't0' happened first.  We assume there should be short
+ * period between 'hrt' and 't0', therefore to check which one came first, we
+ * test their subtraction against the highest bit of mask, if the bit is not
+ * set, then 't0' is earlier.  This is equivalent to
+ * 	((hrt - t0) & mask) < ((mask + 1) / 2)
  */
 hrtime_t
 fmd_time_ena2hrt(hrtime_t hrt, uint64_t ena)
@@ -188,12 +197,14 @@ fmd_time_ena2hrt(hrtime_t hrt, uint64_t ena)
 	case FM_ENA_FMT1:
 		t0 = (ena & ENA_FMT1_TIME_MASK) >> ENA_FMT1_TIME_SHFT;
 		mask = ENA_FMT1_TIME_MASK >> ENA_FMT1_TIME_SHFT;
-		hrt -= (hrt - t0) & mask;
+		if (((hrt - t0) & ((mask + 1) >> 1)) == 0)
+			hrt -= (hrt - t0) & mask;
 		break;
 	case FM_ENA_FMT2:
 		t0 = (ena & ENA_FMT2_TIME_MASK) >> ENA_FMT2_TIME_SHFT;
 		mask = ENA_FMT2_TIME_MASK >> ENA_FMT2_TIME_SHFT;
-		hrt -= (hrt - t0) & mask;
+		if (((hrt - t0) & ((mask + 1) >> 1)) == 0)
+			hrt -= (hrt - t0) & mask;
 		break;
 	}
 

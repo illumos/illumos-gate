@@ -178,3 +178,4 @@ domcaps:* 0444 root sys
 evtchn:* 0666 root sys
 privcmd:* 0666 root sys
 xenbus:* 0666 root sys
+fm:* 0644 root sys

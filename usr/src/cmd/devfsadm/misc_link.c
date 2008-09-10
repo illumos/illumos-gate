@@ -182,6 +182,9 @@ static devfsadm_create_t misc_cbt[] = {
 	{ "pseudo", "ddi_pseudo", "mem_cache",
 	    TYPE_EXACT | DRV_RE, ILEVEL_1, minor_name,
 	},
+	{ "pseudo", "ddi_pseudo", "fm",
+	    TYPE_EXACT | DRV_RE, ILEVEL_1, minor_name,
+	}
 };
 
 DEVFSADM_CREATE_INIT_V0(misc_cbt);

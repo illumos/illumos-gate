@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <cma.h>
 
 #include <fcntl.h>
@@ -33,9 +31,103 @@
 #include <errno.h>
 #include <time.h>
 #include <fm/fmd_api.h>
+#include <fm/fmd_agent.h>
 #include <sys/fm/protocol.h>
 #include <sys/bl.h>
 #include <sys/processor.h>
+
+#ifdef i386
+/*
+ * On x86, retire/unretire are done via the topo methods.
+ * To minimize the impact on existing/legacy sparc work, we leave
+ * some residual #ifdef ugliness.  The long-term intention would be to
+ * leave that legacy stuff to die a natural death when sparc diagnosis
+ * work can use the topo way of doing things.
+ */
+
+/*
+ * Check if the resource in the fault is in motherboard/chip/cpu topo.
+ */
+static boolean_t
+old_topo_fault(nvlist_t *nvl)
+{
+	nvlist_t *rsrc, **hcl;
+	uint_t nhcl = 0;
+	char *name;
+
+	if (nvlist_lookup_nvlist(nvl, FM_FAULT_RESOURCE, &rsrc) == 0 &&
+	    nvlist_lookup_nvlist_array(rsrc, FM_FMRI_HC_LIST, &hcl, &nhcl)
+	    == 0 && nhcl == 3 &&
+	    nvlist_lookup_string(hcl[0], FM_FMRI_HC_NAME, &name) == 0 &&
+	    strcmp(name, "motherboard") == 0 &&
+	    nvlist_lookup_string(hcl[1], FM_FMRI_HC_NAME, &name) == 0 &&
+	    strcmp(name, "chip") == 0 &&
+	    nvlist_lookup_string(hcl[2], FM_FMRI_HC_NAME, &name) == 0 &&
+	    strcmp(name, "cpu") == 0)
+		return (1);
+
+	return (0);
+}
+
+/* ARGSUSED */
+int
+cma_cpu_hc_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
+    const char *uuid, boolean_t repair)
+{
+	int err;
+	int rc = CMA_RA_SUCCESS;
+	nvlist_t *rsrc;
+
+	/*
+	 * For the cached faults which were diagnosed under the old
+	 * chip/cpu topology, when in native, we call p_online(2) for the
+	 * "cpu" scheme ASRUs.  Under Dom0, since logic cpuid in "cpu"
+	 * scheme ASRU makes no sense, the fault should be ignored.
+	 */
+	if (old_topo_fault(nvl)) {
+		if (cma_is_native)
+			return (cma_cpu_retire(hdl, nvl, asru, uuid, repair));
+		return (CMA_RA_FAILURE);
+	}
+
+	/*
+	 * Lookup the resource and call its topo methods to do retire/unretire
+	 */
+	if ((! repair && ! cma.cma_cpu_dooffline) ||
+	    (repair && ! cma.cma_cpu_doonline)) {
+		fmd_hdl_debug(hdl, "suppressed %s of CPU\n",
+		    repair ? "unretire" : "retire");
+		cma_stats.cpu_supp.fmds_value.ui64++;
+	} else {
+		err = FMD_AGENT_RETIRE_FAIL;
+		if (nvlist_lookup_nvlist(nvl, FM_FAULT_RESOURCE, &rsrc) == 0) {
+			err = repair ? fmd_nvl_fmri_unretire(hdl, rsrc) :
+			    fmd_nvl_fmri_retire(hdl, rsrc);
+		}
+		if (err == FMD_AGENT_RETIRE_DONE) {
+			if (repair)
+				cma_stats.cpu_repairs.fmds_value.ui64++;
+			else
+				cma_stats.cpu_flts.fmds_value.ui64++;
+		} else {
+			rc = CMA_RA_FAILURE;
+			cma_stats.bad_flts.fmds_value.ui64++;
+		}
+	}
+
+	if ((! repair && ! cma.cma_cpu_doblacklist) ||
+	    (repair && ! cma.cma_cpu_dounblacklist)) {
+		fmd_hdl_debug(hdl, "suppressed %s of CPU\n",
+		    repair ? "unblacklist" : "blacklist");
+		cma_stats.cpu_blsupp.fmds_value.ui64++;
+	} else {
+		if (cma_cpu_blacklist(hdl, nvl, asru, repair) < 0)
+			cma_stats.cpu_blfails.fmds_value.ui64++;
+	}
+
+	return (rc);
+}
+#endif /* i386 */
 
 /* ARGSUSED */
 static int

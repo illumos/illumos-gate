@@ -93,6 +93,8 @@ extern int topo_fmri_contains(topo_hdl_t *, nvlist_t *, nvlist_t *, int *);
 extern int topo_fmri_expand(topo_hdl_t *, nvlist_t *, int *);
 extern int topo_fmri_unusable(topo_hdl_t *, nvlist_t *, int *);
 extern int topo_fmri_service_state(topo_hdl_t *, nvlist_t *, int *);
+extern int topo_fmri_retire(topo_hdl_t *, nvlist_t *, int *);
+extern int topo_fmri_unretire(topo_hdl_t *, nvlist_t *, int *);
 extern int topo_fmri_nvl2str(topo_hdl_t *, nvlist_t *, char **, int *);
 extern int topo_fmri_str2nvl(topo_hdl_t *, const char *, nvlist_t **, int *);
 extern int topo_fmri_asru(topo_hdl_t *, nvlist_t *, nvlist_t **, int *);
@@ -123,6 +125,7 @@ extern int topo_node_asru(tnode_t *, nvlist_t **, nvlist_t *, int *);
 extern int topo_node_fru(tnode_t *, nvlist_t **, nvlist_t *, int *);
 extern int topo_node_resource(tnode_t *, nvlist_t **, int *);
 extern int topo_node_label(tnode_t *, char **, int *);
+extern tnode_t *topo_node_lookup(tnode_t *, const char *, topo_instance_t);
 extern int topo_method_invoke(tnode_t *node, const char *, topo_version_t,
     nvlist_t *, nvlist_t **, int *);
 extern boolean_t topo_method_supported(tnode_t *, const char *,

@@ -23,8 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
+
 #	This Makefile defines file modules in the directory uts/i86xpv
 #	and its children. These are the source files which are i86xpv
 #	"implementation architecture" dependent.
@@ -43,6 +42,7 @@ CORE_OBJS +=			\
 	cms.o			\
 	confunix.o		\
 	cpuid.o			\
+	cpuid_subr.o		\
 	cpupm.o			\
 	dis_tables.o		\
 	ddi_impl.o		\

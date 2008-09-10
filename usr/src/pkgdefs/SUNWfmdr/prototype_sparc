@@ -20,11 +20,11 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 !include prototype_com
 
+d none kernel/drv/sparcv9 755 root sys
+f none kernel/drv/sparcv9/fm 755 root sys

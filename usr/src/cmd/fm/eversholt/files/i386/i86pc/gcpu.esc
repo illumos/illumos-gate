@@ -41,7 +41,6 @@
  */
 
 #define SMPL_EVENT(leafclass) \
-	event ereport.cpu.generic-x86.leafclass@chip/cpu { within(1s) }; \
 	event ereport.cpu.generic-x86.leafclass@chip/core/strand { within(1s) }
 
 SMPL_EVENT(unknown);	
@@ -61,22 +60,10 @@ SMPL_EVENT(internal_unclassified);
 
 #define	SMPL_N	3
 
-engine serd.cpu.generic-x86.simple@chip/cpu, N=SMPL_N, T=72h;
-event fault.cpu.generic-x86.internal@chip/cpu,
-    engine=serd.cpu.generic-x86.simple@chip/cpu;
 engine serd.cpu.generic-x86.simple@chip/core/strand, N=SMPL_N, T=72h;
 event fault.cpu.generic-x86.internal@chip/core/strand,
     engine=serd.cpu.generic-x86.simple@chip/core/strand;
 
-prop fault.cpu.generic-x86.internal@chip/cpu
-    { payloadprop("error_uncorrected") == 1 ?
-	setserdincrement(SMPL_N + 1) : 1 } (1)->
-    ereport.cpu.generic-x86.microcode_rom_parity@chip/cpu,
-    ereport.cpu.generic-x86.internal_timer@chip/cpu,
-    ereport.cpu.generic-x86.internal_parity@chip/cpu,
-    ereport.cpu.generic-x86.unclassified@chip/cpu,
-    ereport.cpu.generic-x86.internal_unclassified@chip/cpu,
-    ereport.cpu.generic-x86.frc@chip/cpu;
 prop fault.cpu.generic-x86.internal@chip/core/strand
     { payloadprop("error_uncorrected") == 1 ?
 	setserdincrement(SMPL_N + 1) : 1 } (1)->
@@ -90,12 +77,10 @@ prop fault.cpu.generic-x86.internal@chip/core/strand
 /*
  * Ereports for Compound error codes.  These are in pairs "foo" and "foo_uc"
  * for the corrected and uncorrected version of each error type.  All are
- * detected at chip/cpu and chip/core/strand.
+ * detected at chip/core[/strand].
  */
 
 #define	CMPND_EVENT(leafclass) \
-	event ereport.cpu.generic-x86.leafclass@chip/cpu { within(1s) }; \
-	event ereport.cpu.generic-x86.leafclass/**/_uc@chip/cpu { within(1s) };\
 	event ereport.cpu.generic-x86.leafclass@chip/core/strand \
 	{ within(1s) }; \
 	event ereport.cpu.generic-x86.leafclass/**/_uc@chip/core/strand \
@@ -162,18 +147,10 @@ CMPND_EVENT(mc);
  */
 
 #define	CMPND_FLT_PROP_1(erptleaf, fltleaf, n, t) \
-	engine serd.cpu.generic-x86.fltleaf@chip/cpu, N=n, T=t;		\
-	event fault.cpu.generic-x86.fltleaf@chip/cpu,			\
-	    engine=serd.cpu.generic-x86.fltleaf@chip/cpu;		\
 	engine serd.cpu.generic-x86.fltleaf@chip/core/strand, N=n, T=t;	\
 	event fault.cpu.generic-x86.fltleaf@chip/core/strand,		\
 	    engine=serd.cpu.generic-x86.fltleaf@chip/core/strand;	\
 									\
-        prop fault.cpu.generic-x86.fltleaf@chip/cpu (0)->		\
-            ereport.cpu.generic-x86.erptleaf@chip/cpu;                  \
-	prop fault.cpu.generic-x86.fltleaf@chip/cpu			\
-	    { setserdincrement(n + 1) } (0)->				\
-	    ereport.cpu.generic-x86.erptleaf/**/_uc@chip/cpu;		\
         prop fault.cpu.generic-x86.fltleaf@chip/core/strand (0)->	\
             ereport.cpu.generic-x86.erptleaf@chip/core/strand;		\
 	prop fault.cpu.generic-x86.fltleaf@chip/core/strand		\
@@ -181,18 +158,10 @@ CMPND_EVENT(mc);
 	    ereport.cpu.generic-x86.erptleaf/**/_uc@chip/core/strand
 
 #define	CMPND_FLT_PROP_2(erptleaf, fltleaf, n, t) \
-	engine serd.cpu.generic-x86.fltleaf@chip/cpu, N=n, T=t;		\
-	event fault.cpu.generic-x86.fltleaf@chip/cpu, retire=0,		\
-	    response=0, engine=serd.cpu.generic-x86.fltleaf@chip/cpu;	\
 	engine serd.cpu.generic-x86.fltleaf@chip/core/strand, N=n, T=t;	\
 	event fault.cpu.generic-x86.fltleaf@chip/core/strand, retire=0,	\
 	    response=0, engine=serd.cpu.generic-x86.fltleaf@chip/core/strand;\
 									\
-        prop fault.cpu.generic-x86.fltleaf@chip/cpu (0)->		\
-            ereport.cpu.generic-x86.erptleaf@chip/cpu;                  \
-	prop fault.cpu.generic-x86.fltleaf@chip/cpu			\
-	    { setserdincrement(n + 1) } (0)->				\
-	    ereport.cpu.generic-x86.erptleaf/**/_uc@chip/cpu;		\
         prop fault.cpu.generic-x86.fltleaf@chip/core/strand (0)->	\
             ereport.cpu.generic-x86.erptleaf@chip/core/strand;		\
 	prop fault.cpu.generic-x86.fltleaf@chip/core/strand		\
@@ -238,12 +207,6 @@ CMPND_FLT_PROP_2(mc, mc, 10, 72h);
 /*
  * Discards - not enough info to diagnose.
  */
-event upset.discard@chip/cpu;
-
-prop upset.discard@chip/cpu (0)->
-    ereport.cpu.generic-x86.external@chip/cpu,
-    ereport.cpu.generic-x86.unknown@chip/cpu;
-
 event upset.discard@chip/core/strand;
 
 prop upset.discard@chip/core/strand (0)->

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Memory special file
  */
@@ -96,9 +94,6 @@ static int mm_kstat_update(kstat_t *ksp, int rw);
 static int mm_kstat_snapshot(kstat_t *ksp, void *buf, int rw);
 
 static int mm_read_mem_name(intptr_t data, mem_name_t *mem_name);
-static int mm_read_mem_page(intptr_t data, mem_page_t *mpage);
-static int mm_get_mem_fmri(mem_page_t *mpage, nvlist_t **nvl);
-static int mm_get_paddr(nvlist_t *nvl, uint64_t *paddr);
 
 /*ARGSUSED1*/
 static int
@@ -558,45 +553,6 @@ mmioctl_page_retire(int cmd, intptr_t data)
 	return (EINVAL);
 }
 
-/*
- * Given a mem-scheme FMRI for a page, execute the given page retire
- * command on it.
- */
-static int
-mmioctl_page_fmri_retire(int cmd, intptr_t data)
-{
-	mem_page_t mpage;
-	uint64_t pa;
-	nvlist_t *nvl;
-	int err;
-
-	if ((err = mm_read_mem_page(data, &mpage)) < 0)
-		return (err);
-
-	if ((err = mm_get_mem_fmri(&mpage, &nvl)) != 0)
-		return (err);
-
-	if ((err = mm_get_paddr(nvl, &pa)) != 0) {
-		nvlist_free(nvl);
-		return (err);
-	}
-
-	nvlist_free(nvl);
-
-	switch (cmd) {
-	case MEM_PAGE_FMRI_ISRETIRED:
-		return (page_retire_check(pa, NULL));
-
-	case MEM_PAGE_FMRI_RETIRE:
-		return (page_retire(pa, PR_FMA));
-
-	case MEM_PAGE_FMRI_UNRETIRE:
-		return (page_unretire(pa));
-	}
-
-	return (EINVAL);
-}
-
 #ifdef __sparc
 /*
  * Given a syndrome, syndrome type, and address return the
@@ -751,11 +707,6 @@ mmioctl(dev_t dev, int cmd, intptr_t data, int flag, cred_t *cred, int *rvalp)
 	case MEM_PAGE_GETERRORS:
 	case MEM_PAGE_RETIRE_TEST:
 		return (mmioctl_page_retire(cmd, data));
-
-	case MEM_PAGE_FMRI_RETIRE:
-	case MEM_PAGE_FMRI_ISRETIRED:
-	case MEM_PAGE_FMRI_UNRETIRE:
-		return (mmioctl_page_fmri_retire(cmd, data));
 
 #ifdef __sparc
 	case MEM_NAME:
@@ -971,7 +922,7 @@ static struct dev_ops mm_ops = {
 };
 
 static struct modldrv modldrv = {
-	&mod_driverops, "memory driver %I%", &mm_ops,
+	&mod_driverops, "memory driver", &mm_ops,
 };
 
 static struct modlinkage modlinkage = {
@@ -1073,121 +1024,5 @@ mm_read_mem_name(intptr_t data, mem_name_t *mem_name)
 	}
 #endif	/* _SYSCALL32 */
 
-	return (0);
-}
-
-/*
- * Read a mem_page_t from user-space and store it in the mem_page_t
- * pointed to by the mpage argument.
- */
-static int
-mm_read_mem_page(intptr_t data, mem_page_t *mpage)
-{
-	if (get_udatamodel() == DATAMODEL_NATIVE) {
-		if (copyin((void *)data, mpage, sizeof (mem_page_t)) != 0)
-			return (EFAULT);
-	}
-#ifdef _SYSCALL32
-	else {
-		mem_page32_t	mpage32;
-
-		if (copyin((void *)data, &mpage32, sizeof (mem_page32_t)) != 0)
-			return (EFAULT);
-
-		mpage->m_fmri = (caddr_t)(uintptr_t)mpage32.m_fmri;
-		mpage->m_fmrisz = mpage32.m_fmrisz;
-	}
-#endif	/* _SYSCALL32 */
-
-	return (0);
-}
-
-/*
- * Expand an FMRI from a mem_page_t.
- */
-static int
-mm_get_mem_fmri(mem_page_t *mpage, nvlist_t **nvl)
-{
-	char *buf;
-	int err;
-
-	if (mpage->m_fmri == NULL || mpage->m_fmrisz > MEM_FMRI_MAX_BUFSIZE)
-		return (EINVAL);
-
-	buf = kmem_alloc(mpage->m_fmrisz, KM_SLEEP);
-	if (copyin(mpage->m_fmri, buf, mpage->m_fmrisz) != 0) {
-		kmem_free(buf, mpage->m_fmrisz);
-		return (EFAULT);
-	}
-
-	err = nvlist_unpack(buf, mpage->m_fmrisz, nvl, KM_SLEEP);
-	kmem_free(buf, mpage->m_fmrisz);
-
-	return (err);
-}
-
-static int
-mm_get_paddr(nvlist_t *nvl, uint64_t *paddr)
-{
-	uint8_t version;
-	uint64_t pa;
-	char *scheme;
-	int err;
-#ifdef __sparc
-	uint64_t offset;
-	char *unum;
-	char **serids;
-	uint_t nserids;
-#endif
-
-	/* Verify FMRI scheme name and version number */
-	if ((nvlist_lookup_string(nvl, FM_FMRI_SCHEME, &scheme) != 0) ||
-	    (strcmp(scheme, FM_FMRI_SCHEME_MEM) != 0) ||
-	    (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0) ||
-	    version > FM_MEM_SCHEME_VERSION) {
-		return (EINVAL);
-	}
-
-	/*
-	 * There are two ways a physical address can be  obtained from a mem
-	 * scheme FMRI.  One way is to use the "offset" and  "serial"
-	 * members, if they are present, together with the "unum" member to
-	 * calculate a physical address.  This is the preferred way since
-	 * it is independent of possible changes to the programming of
-	 * underlying hardware registers that may change the physical address.
-	 * If the "offset" member is not present, then the address is
-	 * retrieved from the "physaddr" member.
-	 */
-#if defined(__sparc)
-	if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &offset) != 0) {
-		if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &pa) !=
-		    0) {
-			return (EINVAL);
-		}
-	} else if (nvlist_lookup_string(nvl, FM_FMRI_MEM_UNUM, &unum) != 0 ||
-	    nvlist_lookup_string_array(nvl, FM_FMRI_MEM_SERIAL_ID, &serids,
-	    &nserids) != 0) {
-		return (EINVAL);
-	} else {
-		err = cpu_get_mem_addr(unum, serids[0], offset, &pa);
-		if (err != 0) {
-			if (err == ENOTSUP) {
-				/* Fall back to physaddr */
-				if (nvlist_lookup_uint64(nvl,
-				    FM_FMRI_MEM_PHYSADDR, &pa) != 0)
-					return (EINVAL);
-			} else
-				return (err);
-		}
-	}
-#elif defined(__x86)
-	if ((err = cmi_mc_unumtopa(NULL, nvl, &pa)) != CMI_SUCCESS &&
-	    err != CMIERR_MC_PARTIALUNUMTOPA)
-		return (EINVAL);
-#else
-#error "port me"
-#endif /* __sparc */
-
-	*paddr = pa;
 	return (0);
 }

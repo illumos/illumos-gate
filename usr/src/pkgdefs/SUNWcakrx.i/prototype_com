@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
-#
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
 # and their location on the development machine when building the package.
@@ -47,6 +45,16 @@ i copyright
 d none platform 755 root sys
 d none platform/i86xpv 755 root sys
 d none platform/i86xpv/kernel 755 root sys
+d none platform/i86xpv/kernel/cpu 755 root sys
+d none platform/i86xpv/kernel/cpu/amd64 755 root sys
+f none platform/i86xpv/kernel/cpu/amd64/cpu_ms.AuthenticAMD 755 root sys
+f none platform/i86xpv/kernel/cpu/amd64/cpu_ms.AuthenticAMD.15 755 root sys
+f none platform/i86xpv/kernel/cpu/amd64/cpu_ms.GenuineIntel 755 root sys
+f none platform/i86xpv/kernel/cpu/amd64/cpu.generic 755 root sys
+f none platform/i86xpv/kernel/cpu/cpu_ms.AuthenticAMD 755 root sys
+f none platform/i86xpv/kernel/cpu/cpu_ms.AuthenticAMD.15 755 root sys
+f none platform/i86xpv/kernel/cpu/cpu_ms.GenuineIntel 755 root sys
+f none platform/i86xpv/kernel/cpu/cpu.generic 755 root sys
 d none platform/i86xpv/kernel/dacf 755 root sys
 f none platform/i86xpv/kernel/dacf/consconfig_dacf 755 root sys
 d none platform/i86xpv/kernel/drv 755 root sys

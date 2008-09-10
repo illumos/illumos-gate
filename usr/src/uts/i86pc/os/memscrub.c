@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * i86pc Memory Scrubbing
@@ -187,7 +185,7 @@ memscrub_init()
 	for (src = phys_install; src; src = src->next) {
 		if (memscrub_add_span(src->address, src->size)) {
 			cmn_err(CE_WARN,
-			    "Memory scrubber failed to initialize\n");
+			    "Software memory scrubber failed to initialize\n");
 			return;
 		}
 	}
@@ -213,7 +211,7 @@ memscrub_disable(void)
 }
 
 #ifdef MEMSCRUB_DEBUG
-void
+static void
 memscrub_printmemlist(char *title, struct memlist *listp)
 {
 	struct memlist *list;
@@ -228,7 +226,7 @@ memscrub_printmemlist(char *title, struct memlist *listp)
 #endif /* MEMSCRUB_DEBUG */
 
 /* ARGSUSED */
-void
+static void
 memscrub_wakeup(void *c)
 {
 	/*
@@ -256,7 +254,7 @@ compute_interval_sec()
 		    (memscrub_phys_pages/memscrub_span_pages));
 }
 
-void
+static void
 memscrubber()
 {
 	time_t deadline;
@@ -408,7 +406,7 @@ memscrubber()
 memscrub_exit:
 
 	if (!disable_memscrub_quietly)
-		cmn_err(CE_NOTE, "memory scrubber exiting.");
+		cmn_err(CE_NOTE, "Software memory scrubber exiting.");
 	/*
 	 * We are about to bail, but don't have the memscrub_lock,
 	 * and it is needed for CALLB_CPR_EXIT.

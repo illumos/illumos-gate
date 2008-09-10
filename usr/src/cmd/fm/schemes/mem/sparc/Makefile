@@ -20,17 +20,15 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.com
 
 
 CPPFLAGS += -I$(ROOT)/usr/platform/sun4v/include
-LDLIBS += -L$(ROOTLIB)/fm -lmdesc -ltopo -lldom
+LDLIBS += -L$(ROOTLIB)/fm -lfmd_agent -lmdesc -ltopo -lldom
 LDFLAGS += -R/usr/lib/fm
 
 include ../../Makefile.targ

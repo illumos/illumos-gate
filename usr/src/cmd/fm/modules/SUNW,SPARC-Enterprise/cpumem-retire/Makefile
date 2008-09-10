@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 PLATFORMS = SUNW,SPARC-Enterprise
 CLASS = plat
@@ -48,7 +47,7 @@ CMA_VERSION = "1.1"
 LIBDIRS = $(ROOT)/usr/platform/$(PLATFORMS)/lib
 CPPFLAGS += $(INCDIRS:%=-I%) -DCMA_VERSION='$(CMA_VERSION)' -Dopl
 LDFLAGS += -R/usr/lib/fm
-LDLIBS += -L$(ROOTLIB)/fm -ltopo
+LDLIBS += -L$(ROOTLIB)/fm -lfmd_agent
 
 %.o: $(CPUMEM_RETIRE_COMMON)/%.c
 	$(COMPILE.c) -o $@ $<

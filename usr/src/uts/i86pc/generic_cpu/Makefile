@@ -17,10 +17,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -34,6 +32,7 @@ UTSBASE = ../..
 MODULE		= cpu.generic
 #
 OBJECTS		= $(CPU_GCPU_OBJS:%=$(OBJS_DIR)/%)
+OBJECTS		+= $(CPU_GCPU_NTV_OBJS:%=$(OBJS_DIR)/%)
 LINTS           = $(CPU_GCPU_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE      = $(ROOT_PSM_CPU_DIR)/$(MODULE)
 

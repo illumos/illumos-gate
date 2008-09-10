@@ -27,8 +27,6 @@
 #ifndef	_FMD_FMRI_H
 #define	_FMD_FMRI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/fm/protocol.h>
 #include <libnvpair.h>
@@ -94,6 +92,8 @@ extern int fmd_fmri_present(nvlist_t *);
 extern int fmd_fmri_replaced(nvlist_t *);
 extern int fmd_fmri_service_state(nvlist_t *);
 extern int fmd_fmri_unusable(nvlist_t *);
+extern int fmd_fmri_retire(nvlist_t *);
+extern int fmd_fmri_unretire(nvlist_t *);
 extern int fmd_fmri_contains(nvlist_t *, nvlist_t *);
 extern nvlist_t *fmd_fmri_translate(nvlist_t *, nvlist_t *);
 
@@ -109,6 +109,7 @@ extern nvlist_t *fmd_fmri_translate(nvlist_t *, nvlist_t *);
 #define	FMD_SERVICE_STATE_DEGRADED_PENDING_RESET	4
 #define	FMD_SERVICE_STATE_UNUSABLE_PENDING_RESET	5
 #define	FMD_SERVICE_STATE_UNUSABLE_UNTIL_REPLACED	6
+#define	FMD_SERVICE_STATE_ISOLATE_PENDING		7
 
 #ifdef	__cplusplus
 }

@@ -26,8 +26,6 @@
 #ifndef _CMA_H
 #define	_CMA_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fm/fmd_api.h>
 #include <sys/types.h>
 
@@ -40,6 +38,10 @@ extern "C" {
 
 #ifdef opl
 #define	FM_FMRI_HC_CPUIDS	"hc-xscf-cpuids"
+#endif
+
+#ifdef i386
+extern boolean_t cma_is_native;
 #endif
 
 typedef struct cma_page {
@@ -106,10 +108,8 @@ extern cma_t cma;
 
 extern int cma_cpu_retire(fmd_hdl_t *, nvlist_t *, nvlist_t *,
     const char *, boolean_t);
-#ifdef opl
 extern int cma_cpu_hc_retire(fmd_hdl_t *, nvlist_t *, nvlist_t *,
     const char *, boolean_t);
-#endif
 extern int cma_page_retire(fmd_hdl_t *, nvlist_t *, nvlist_t *,
     const char *, boolean_t);
 extern void cma_page_retry(fmd_hdl_t *);
@@ -124,7 +124,9 @@ extern int cma_cache_way_retire(fmd_hdl_t *, nvlist_t *, nvlist_t *,
 extern int cma_cpu_blacklist(fmd_hdl_t *, nvlist_t *, nvlist_t *, boolean_t);
 extern int cma_cpu_statechange(fmd_hdl_t *, nvlist_t *, const char *, int,
     boolean_t);
-extern int cma_page_cmd(fmd_hdl_t *, int, nvlist_t *);
+extern int cma_fmri_page_service_state(fmd_hdl_t *, nvlist_t *);
+extern int cma_fmri_page_retire(fmd_hdl_t *, nvlist_t *);
+extern int cma_fmri_page_unretire(fmd_hdl_t *, nvlist_t *);
 
 #ifdef sun4v
 extern void cma_cpu_fini(fmd_hdl_t *);

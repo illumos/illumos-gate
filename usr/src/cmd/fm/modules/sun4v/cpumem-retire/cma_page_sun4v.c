@@ -23,49 +23,50 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <cma.h>
-
 #include <sys/fm/ldom.h>
-
-#include <assert.h>
 #include <errno.h>
-#include <sys/mem.h>
+#include <fm/fmd_api.h>
+#include <fm/fmd_agent.h>
+#include <fm/fmd_fmri.h>
 
 extern ldom_hdl_t *cma_lhp;
 
-/*
- * cma_page_cmd()
- *    Retire a page or check if it is retired.
- *    Return: 0 upon successful, -1 otherwise.
- */
+/* ARGSUSED */
 int
-cma_page_cmd(fmd_hdl_t *hdl, int cmd, nvlist_t *nvl)
+cma_fmri_page_service_state(fmd_hdl_t *hdl, nvlist_t *nvl)
 {
-	int rc;
+	errno = ldom_fmri_status(cma_lhp, nvl);
 
-	fmd_hdl_debug(hdl, "cma_page_cmd(%d)\n", cmd);
+	if (errno == 0 || errno == EINVAL)
+		return (FMD_SERVICE_STATE_UNUSABLE);
+	if (errno == EAGAIN)
+		return (FMD_SERVICE_STATE_ISOLATE_PENDING);
 
-	switch (cmd) {
-	case MEM_PAGE_FMRI_RETIRE:
-		rc = ldom_fmri_retire(cma_lhp, nvl);
-		break;
-	case MEM_PAGE_FMRI_UNRETIRE:
-		rc = ldom_fmri_unretire(cma_lhp, nvl);
-		break;
-	case MEM_PAGE_FMRI_ISRETIRED:
-		rc = ldom_fmri_status(cma_lhp, nvl);
-		break;
-	default:
-		errno = EINVAL;
-		rc = -1;
-	}
+	return (FMD_SERVICE_STATE_OK);
+}
 
-	if (rc > 0) {
-		errno = rc;
-		rc = -1;
-	}
+/* ARGSUSED */
+int
+cma_fmri_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl)
+{
+	errno = ldom_fmri_retire(cma_lhp, nvl);
 
-	return (rc);
+	if (errno == 0 || errno == EIO || errno == EINVAL)
+		return (FMD_AGENT_RETIRE_DONE);
+	if (errno == EAGAIN)
+		return (FMD_AGENT_RETIRE_ASYNC);
+
+	return (FMD_AGENT_RETIRE_FAIL);
+}
+
+/* ARGSUSED */
+int
+cma_fmri_page_unretire(fmd_hdl_t *hdl, nvlist_t *nvl)
+{
+	errno = ldom_fmri_unretire(cma_lhp, nvl);
+
+	if (errno == 0 || errno == EIO)
+		return (FMD_AGENT_RETIRE_DONE);
+
+	return (FMD_AGENT_RETIRE_FAIL);
 }

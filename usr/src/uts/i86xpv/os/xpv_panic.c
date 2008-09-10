@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/clock.h>
 #include <sys/psm.h>
@@ -112,6 +110,11 @@ static void (*xpv_panic_printf)(const char *, ...) = xpv_panic_console_print;
 #define	CONSOLE_BUF_SIZE	256
 static char console_buffer[CONSOLE_BUF_SIZE];
 static boolean_t use_polledio;
+
+/*
+ * Pointers to machine check panic info (if any).
+ */
+xpv_mca_panic_data_t *xpv_mca_panic_data = NULL;
 
 static void
 xpv_panic_putc(int m)
@@ -662,6 +665,10 @@ xpv_do_panic(void *arg)
 	 * initiated.  This is ordinarily done as part of vpanic().  Since
 	 * we already have all the register state saved by the hypervisor,
 	 * we skip that and jump straight into the panic processing code.
+	 *
+	 * XXX If another thread grabs and wins the panic_quiesce trigger
+	 * then we'll have two threads in panicsys believing they are in
+	 * charge of the panic attempt!
 	 */
 	(void) panic_trigger(&panic_quiesce);
 
@@ -766,6 +773,10 @@ xpv_do_panic(void *arg)
 		modules.mod_prev->mod_next = xpv_modctl;
 		modules.mod_prev = xpv_modctl;
 	}
+
+	if (pip->pi_mca.mpd_magic == MCA_PANICDATA_MAGIC)
+		xpv_mca_panic_data = &pip->pi_mca;
+
 	xpv_panic_printf = printf;
 	xpv_panicsys((struct regs *)pip->pi_regs, pip->pi_panicstr);
 	xpv_panic_printf("Failed to reboot following panic.\n");

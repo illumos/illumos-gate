@@ -377,19 +377,42 @@ extern "C" {
  * implementation features and helps guide
  * the interpretation of the cpuid instruction.
  */
-#define	X86_VENDOR_Intel	0	/* GenuineIntel */
-#define	X86_VENDOR_IntelClone	1	/* (an Intel clone) */
-#define	X86_VENDOR_AMD		2	/* AuthenticAMD */
-#define	X86_VENDOR_Cyrix	3	/* CyrixInstead */
-#define	X86_VENDOR_UMC		4	/* UMC UMC UMC  */
-#define	X86_VENDOR_NexGen	5	/* NexGenDriven */
-#define	X86_VENDOR_Centaur	6	/* CentaurHauls */
-#define	X86_VENDOR_Rise		7	/* RiseRiseRise */
-#define	X86_VENDOR_SiS		8	/* SiS SiS SiS  */
-#define	X86_VENDOR_TM		9	/* GenuineTMx86 */
-#define	X86_VENDOR_NSC		10	/* Geode by NSC */
+#define	X86_VENDOR_Intel	0
+#define	X86_VENDORSTR_Intel	"GenuineIntel"
 
-#define	X86_VENDOR_STRLEN	13	/* vendor string max len + \0 */
+#define	X86_VENDOR_IntelClone	1
+
+#define	X86_VENDOR_AMD		2
+#define	X86_VENDORSTR_AMD	"AuthenticAMD"
+
+#define	X86_VENDOR_Cyrix	3
+#define	X86_VENDORSTR_CYRIX	"CyrixInstead"
+
+#define	X86_VENDOR_UMC		4
+#define	X86_VENDORSTR_UMC	"UMC UMC UMC "
+
+#define	X86_VENDOR_NexGen	5
+#define	X86_VENDORSTR_NexGen	"NexGenDriven"
+
+#define	X86_VENDOR_Centaur	6
+#define	X86_VENDORSTR_Centaur	"CentaurHauls"
+
+#define	X86_VENDOR_Rise		7
+#define	X86_VENDORSTR_Rise	"RiseRiseRise"
+
+#define	X86_VENDOR_SiS		8
+#define	X86_VENDORSTR_SiS	"SiS SiS SiS "
+
+#define	X86_VENDOR_TM		9
+#define	X86_VENDORSTR_TM	"GenuineTMx86"
+
+#define	X86_VENDOR_NSC		10
+#define	X86_VENDORSTR_NSC	"Geode by NSC"
+
+/*
+ * Vendor string max len + \0
+ */
+#define	X86_VENDOR_STRLEN	13
 
 /*
  * Some vendor/family/model/stepping ranges are commonly grouped under

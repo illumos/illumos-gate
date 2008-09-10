@@ -24,11 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mem.h>
 #include <fm/fmd_fmri.h>
 #include <fm/libtopo.h>
+#include <fm/fmd_agent.h>
 
 #include <string.h>
 #include <strings.h>
@@ -50,6 +49,23 @@ mem_fmri_get_unum(nvlist_t *nvl, char **unump)
 	*unump = unum;
 
 	return (0);
+}
+
+static int
+page_isretired(nvlist_t *fmri, int *errp)
+{
+	fmd_agent_hdl_t *hdl;
+	int rc, err;
+
+	if ((hdl = fmd_agent_open(FMD_AGENT_VERSION)) == NULL)
+		return (-1);
+	rc = fmd_agent_page_isretired(hdl, fmri);
+	err = fmd_agent_errno(hdl);
+	fmd_agent_close(hdl);
+
+	if (errp != NULL)
+		*errp = err;
+	return (rc);
 }
 
 ssize_t
@@ -283,8 +299,8 @@ fmd_fmri_present(nvlist_t *nvl)
 	if (rc == 1 && nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &val) ==
 	    0 && nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &val) == 0 &&
 	    mem_unum_rewrite(nvl, &nvlcp) == 0 && nvlcp != NULL) {
-		int rval = mem_page_cmd(MEM_PAGE_FMRI_ISRETIRED, nvlcp);
-		if (rval == -1 && errno == EINVAL)
+		int page_err, rval = page_isretired(nvlcp, &page_err);
+		if (rval == FMD_AGENT_RETIRE_DONE && page_err == EINVAL)
 			rc = 0;
 		nvlist_free(nvlcp);
 	}
@@ -386,8 +402,8 @@ fmd_fmri_replaced(nvlist_t *nvl)
 	    nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &val) == 0 &&
 	    nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &val) == 0 &&
 	    mem_unum_rewrite(nvl, &nvlcp) == 0 && nvlcp != NULL) {
-		int rval = mem_page_cmd(MEM_PAGE_FMRI_ISRETIRED, nvlcp);
-		if (rval == -1 && errno == EINVAL)
+		int page_err, rval = page_isretired(nvlcp, &page_err);
+		if (rval == FMD_AGENT_RETIRE_DONE && page_err == EINVAL)
 			rc = FMD_OBJ_STATE_NOT_PRESENT;
 		nvlist_free(nvlcp);
 	}
@@ -479,15 +495,16 @@ fmd_fmri_unusable(nvlist_t *nvl)
 	 * hc FMRI or the original mem FMRI with the specified offset or PA.
 	 * Refer to the kernel's page_retire_check() for the error codes.
 	 */
-	rc = mem_page_cmd(MEM_PAGE_FMRI_ISRETIRED, nvlcp ? nvlcp : nvl);
+	rc = page_isretired(nvlcp ? nvlcp : nvl, NULL);
 
-	if (rc == -1 && errno == EIO) {
+	if (rc == FMD_AGENT_RETIRE_FAIL) {
 		/*
 		 * The page is not retired and is not scheduled for retirement
 		 * (i.e. no request pending and has not seen any errors)
 		 */
 		retval = 0;
-	} else if (rc == 0 || errno == EAGAIN || errno == EINVAL) {
+	} else if (rc == FMD_AGENT_RETIRE_DONE ||
+	    rc == FMD_AGENT_RETIRE_ASYNC) {
 		/*
 		 * The page has been retired, is in the process of being
 		 * retired, or doesn't exist.  The latter is valid if the page

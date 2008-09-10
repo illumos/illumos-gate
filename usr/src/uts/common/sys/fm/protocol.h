@@ -27,8 +27,6 @@
 #ifndef	_SYS_FM_PROTOCOL_H
 #define	_SYS_FM_PROTOCOL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -232,6 +230,7 @@ extern "C" {
 
 /* hc-specific member names */
 #define	FM_FMRI_HC_SPECIFIC_OFFSET	"offset"
+#define	FM_FMRI_HC_SPECIFIC_PHYSADDR	"physaddr"
 
 /* fmd module scheme member names */
 #define	FM_FMRI_FMD_NAME		"mod-name"

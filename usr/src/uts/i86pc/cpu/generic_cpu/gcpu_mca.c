@@ -71,8 +71,10 @@ int gcpu_mca_stack_ereport_include = 0;
  */
 int gcpu_mca_telemetry_retries = 5;
 
+#ifndef __xpv
 int gcpu_mca_cmci_throttling_threshold = 10;
 int gcpu_mca_cmci_reenable_threshold = 1000;
+#endif
 
 static gcpu_error_disp_t gcpu_errtypes[] = {
 
@@ -219,6 +221,12 @@ static gcpu_error_disp_t gcpu_unknown = {
 
 static errorq_t *gcpu_mca_queue;
 static kmutex_t gcpu_mca_queue_lock;
+
+#ifdef __xpv
+static int isxpv = 1;
+#else
+static int isxpv = 0;
+#endif
 
 static const gcpu_error_disp_t *
 gcpu_disp_match(uint16_t code)
@@ -487,9 +495,8 @@ gcpu_erpt_clsfmt(const char *fmt, char *buf, size_t buflen, uint64_t status,
 }
 
 /*
- * Create an "hc" scheme FMRI identifying the given cpu.  If we don't know
- * the actual topology/connectivity of cpus in the system, so we'll
- * apply /motherboard=0/chip=.../cpu=...
+ * Create an "hc" scheme FMRI identifying the given cpu with
+ * motherboard/chip/core/strand instance numbers.
  */
 static nvlist_t *
 gcpu_fmri_create(cmi_hdl_t hdl, nv_alloc_t *nva)
@@ -499,18 +506,11 @@ gcpu_fmri_create(cmi_hdl_t hdl, nv_alloc_t *nva)
 	if ((nvl = fm_nvlist_create(nva)) == NULL)
 		return (NULL);
 
-	if (cmi_hdl_mstrand(hdl)) {
-		fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, NULL, 4,
-		    "motherboard", 0,
-		    "chip", cmi_hdl_chipid(hdl),
-		    "core", cmi_hdl_coreid(hdl),
-		    "strand", cmi_hdl_strandid(hdl));
-	} else {
-		fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, NULL, 3,
-		    "motherboard", 0,
-		    "chip", cmi_hdl_chipid(hdl),
-		    "cpu", cmi_hdl_coreid(hdl));
-	}
+	fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, NULL, 4,
+	    "motherboard", 0,
+	    "chip", cmi_hdl_chipid(hdl),
+	    "core", cmi_hdl_coreid(hdl),
+	    "strand", cmi_hdl_strandid(hdl));
 
 	return (nvl);
 }
@@ -885,6 +885,15 @@ gcpu_ereport_post(const gcpu_logout_t *gcl, int bankidx,
 	}
 
 	/*
+	 * If injection has taken place anytime in the past then note this
+	 * on the ereport.
+	 */
+	if (cmi_inj_tainted() == B_TRUE) {
+		fm_payload_set(ereport, "__injected", DATA_TYPE_BOOLEAN_VALUE,
+		    B_TRUE, NULL);
+	}
+
+	/*
 	 * Post ereport.
 	 */
 	if (panicstr) {
@@ -1004,8 +1013,10 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	uint_t nbanks;
 	size_t mslsz;
 	int i;
+#ifndef __xpv
 	int mcg_ctl2_present;
 	uint32_t cmci_capable = 0;
+#endif
 
 	if (gcpu == NULL)
 		return;
@@ -1026,9 +1037,7 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	 * machine checks, will not have cmi_mca_init called since their
 	 * CPUID information will not indicate both MCA and MCE features.
 	 */
-#ifndef	__xpv
 	ASSERT(x86_feature & X86_MCA);
-#endif /* __xpv */
 
 	/*
 	 * Determine whether the IA32_MCG_CTL register is present.  If it
@@ -1038,7 +1047,9 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	 * banks.
 	 */
 	mcg_ctl_present = cap & MCG_CAP_CTL_P;
+#ifndef __xpv
 	mcg_ctl2_present = cap & MCG_CAP_CTL2_P;
+#endif
 
 	/*
 	 * We squirell values away for inspection/debugging.
@@ -1091,10 +1102,17 @@ gcpu_mca_init(cmi_hdl_t hdl)
 		    sizeof (gcpu_bank_logout_t);
 
 	}
+
+#ifdef __xpv
+	gcpu_xpv_mca_init(nbanks);
+#endif
+
 	mca->gcpu_mca_nextpoll_idx = GCPU_MCA_LOGOUT_POLLER_1;
 
+#ifndef __xpv
 	mca->gcpu_bank_cmci = kmem_zalloc(sizeof (gcpu_mca_cmci_t) * nbanks,
 	    KM_SLEEP);
+#endif
 
 	/*
 	 * Create our errorq to transport the logout structures.  This
@@ -1128,12 +1146,13 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	 */
 	for (i = 0; i < nbanks; i++) {
 		/*
-		 * On AMD family 6 we must not enable
-		 * machine check from bank 0 detectors.
-		 * AMD case reports are that enabling bank 0 (DC) produces
-		 * spurious machine checks.
-		 * For Intel we let plug-in choose to skip bank if plug-in
-		 * is enabled otherwise we skip bank 0 for family 6
+		 * On AMD family 6 we must not enable machine check from
+		 * bank 0 detectors - reports are that enabling bank 0
+		 * (DC) produces spurious machine checks.
+		 *
+		 * For Intel we let model-specific support choose to skip
+		 * a bank if model-specific support is present;
+		 * otherwise we skip bank 0 for family 6
 		 */
 		if (i == 0 &&
 		    (((vendor == X86_VENDOR_Intel && !cms_present(hdl)) ||
@@ -1152,6 +1171,7 @@ gcpu_mca_init(cmi_hdl_t hdl)
 		mca->gcpu_actv_banks |= 1 << i;
 		atomic_or_32(&gcpu->gcpu_shared->gcpus_actv_banks, 1 << i);
 
+#ifndef __xpv
 		/*
 		 * check CMCI capability
 		 */
@@ -1182,10 +1202,15 @@ gcpu_mca_init(cmi_hdl_t hdl)
 			mca->gcpu_bank_cmci[i].drtcmci = 0;
 			mca->gcpu_bank_cmci[i].ncmci = 0;
 		}
+#endif
 	}
+
+#ifndef __xpv
 	if (cmci_capable)
 		cmi_enable_cmci = 1;
+#endif
 
+#ifndef __xpv
 	/*
 	 * Log any valid telemetry lurking in the MCA banks, but do not
 	 * clear the status registers.  Ignore the disposition returned -
@@ -1258,13 +1283,14 @@ gcpu_mca_init(cmi_hdl_t hdl)
 			    cms_bankstatus_val(hdl, i, 0ULL));
 		}
 	}
-
+#endif
 	/*
 	 * Now let the model-specific support perform further initialization
 	 * of non-architectural features.
 	 */
 	cms_mca_init(hdl, nbanks);
 
+#ifndef __xpv
 	(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MCG_STATUS, 0ULL);
 	membar_producer();
 
@@ -1272,11 +1298,14 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	if (mcg_ctl_present)
 		(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MCG_CTL,
 		    cms_mcgctl_val(hdl, nbanks, -1ULL));
+#endif
 
 	mutex_exit(&gcpu->gcpu_shared->gcpus_cfglock);
 
+#ifndef __xpv
 	/* enable machine-check exception in CR4 */
 	cmi_hdl_enable_mce(hdl);
+#endif
 }
 
 static uint64_t
@@ -1428,6 +1457,7 @@ gcpu_mca_process(cmi_hdl_t hdl, struct regs *rp, int nerr, gcpu_data_t *gcpu,
 
 static uint32_t gcpu_deferrred_polled_clears;
 
+#ifndef __xpv
 static void
 gcpu_cmci_logout(cmi_hdl_t hdl, int bank, gcpu_mca_cmci_t *bank_cmci_p,
     uint64_t status, int what)
@@ -1507,7 +1537,9 @@ gcpu_cmci_throttle(cmi_hdl_t hdl, int bank, gcpu_mca_cmci_t *bank_cmci_p,
 		}
 	}
 }
+#endif
 
+/*ARGSUSED5*/
 void
 gcpu_mca_logout(cmi_hdl_t hdl, struct regs *rp, uint64_t bankmask,
     gcpu_mce_status_t *mcesp, boolean_t clrstatus, int what)
@@ -1581,7 +1613,9 @@ gcpu_mca_logout(cmi_hdl_t hdl, struct regs *rp, uint64_t bankmask,
 		    CMI_SUCCESS)
 			continue;
 
+#ifndef __xpv
 		gcpu_cmci_logout(hdl, i, &mca->gcpu_bank_cmci[i], status, what);
+#endif
 
 retry:
 		if (!(status & MSR_MC_STATUS_VAL))
@@ -1596,7 +1630,9 @@ retry:
 		if (status & MSR_MC_STATUS_MISCV)
 			(void) cmi_hdl_rdmsr(hdl, IA32_MSR_MC(i, MISC), &misc);
 
+#ifndef __xpv
 		gcpu_cmci_throttle(hdl, i, &mca->gcpu_bank_cmci[i], what);
+#endif
 
 		/*
 		 * Allow the model-specific code to extract bank telemetry.
@@ -1639,10 +1675,13 @@ retry:
 			goto serialize;
 
 		/*
-		 * For machine checks we always clear status here.  For polls
-		 * we must be a little more cautious since there is an
-		 * outside chance that we may clear telemetry from a shared
-		 * MCA bank on which a sibling core is machine checking.
+		 * For i86xpv we always clear status in order to invalidate
+		 * the interposed telemetry.
+		 *
+		 * For native machine checks we always clear status here.  For
+		 * native polls we must be a little more cautious since there
+		 * is an outside chance that we may clear telemetry from a
+		 * shared MCA bank on which a sibling core is machine checking.
 		 *
 		 * For polled observations of errors that look like they may
 		 * produce a machine check (UC/PCC and ENabled, although these
@@ -1653,7 +1692,7 @@ retry:
 		 * is only the clearing of MCi_STATUS which may be
 		 * deferred until the next wakeup.
 		 */
-		if (ismc || !IS_MCE_CANDIDATE(status)) {
+		if (isxpv || ismc || !IS_MCE_CANDIDATE(status)) {
 			(void) cmi_hdl_wrmsr(hdl, IA32_MSR_MC(i, STATUS), 0ULL);
 			goto serialize;
 		}
@@ -1697,16 +1736,21 @@ retry:
 		}
 
 serialize:
-		/*
-		 * Intel Vol 3A says to execute a serializing instruction
-		 * here, ie CPUID.  Well WRMSR is also defined to be
-		 * serializing, so the status clear above should suffice.
-		 * To be a good citizen, and since some clears are deferred,
-		 * we'll execute a CPUID instruction here.
-		 */
 		{
+#ifdef __xpv
+			;
+#else
+			/*
+			 * Intel Vol 3A says to execute a serializing
+			 * instruction here, ie CPUID.  Well WRMSR is also
+			 * defined to be serializing, so the status clear above
+			 * should suffice.  To be a good citizen, and since
+			 * some clears are deferred, we'll execute a CPUID
+			 * instruction here.
+			 */
 			struct cpuid_regs tmp;
 			(void) __cpuid_insn(&tmp);
+#endif
 		}
 	}
 
@@ -1751,6 +1795,7 @@ serialize:
 	}
 }
 
+#ifndef __xpv
 int gcpu_mca_trap_vomit_summary = 0;
 
 /*
@@ -1816,6 +1861,7 @@ gcpu_mca_trap(cmi_hdl_t hdl, struct regs *rp)
 
 	return (mce.mce_disp);
 }
+#endif
 
 /*ARGSUSED*/
 void

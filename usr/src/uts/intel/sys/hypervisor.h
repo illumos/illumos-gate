@@ -52,8 +52,6 @@
 #ifndef _SYS_HYPERVISOR_H
 #define	_SYS_HYPERVISOR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -108,6 +106,7 @@ extern void xpv_time_suspend(void);
 extern void xpv_time_resume(void);
 
 extern void startup_xen_version(void);
+extern void startup_xen_mca(void);
 
 extern void mach_cpucontext_reset(cpu_t *);
 extern void mach_cpucontext_restore(cpu_t *);
@@ -119,6 +118,22 @@ extern cpuset_t cpu_suspend_lost_set;
 
 extern int xen_gdt_setprot(cpu_t *, uint_t);
 extern int xen_ldt_setprot(user_desc_t *, size_t, uint_t);
+
+/* -- while you're down there, move these too -- */
+
+typedef struct xen_mc_lcpu_cookie *xen_mc_lcpu_cookie_t;
+
+extern xen_mc_lcpu_cookie_t xen_physcpu_next(xen_mc_lcpu_cookie_t);
+extern const char *xen_physcpu_vendorstr(xen_mc_lcpu_cookie_t);
+extern int xen_physcpu_family(xen_mc_lcpu_cookie_t);
+extern int xen_physcpu_model(xen_mc_lcpu_cookie_t);
+extern int xen_physcpu_stepping(xen_mc_lcpu_cookie_t);
+extern id_t xen_physcpu_chipid(xen_mc_lcpu_cookie_t);
+extern id_t xen_physcpu_coreid(xen_mc_lcpu_cookie_t);
+extern id_t xen_physcpu_strandid(xen_mc_lcpu_cookie_t);
+extern boolean_t xen_physcpu_is_cmt(xen_mc_lcpu_cookie_t);
+extern id_t xen_physcpu_logical_id(xen_mc_lcpu_cookie_t);
+extern uint64_t xen_physcpu_mcg_cap(xen_mc_lcpu_cookie_t);
 
 /*
  * Wrappered versions of the hypercalls that diagnose/panic on failure
@@ -135,6 +150,11 @@ extern long xen_vcpu_up(processorid_t);
 extern long xen_vcpu_down(processorid_t);
 extern void xen_enable_user_iopl(void);
 extern void xen_disable_user_iopl(void);
+
+extern int xen_get_physinfo(xen_sysctl_physinfo_t *);
+extern int xen_get_mc_physcpuinfo(xen_mc_logical_cpu_t *, uint_t *);
+extern uint_t xen_phys_ncpus;
+extern xen_mc_logical_cpu_t *xen_phys_cpus;
 
 /*
  * A quick way to ask if we're DOM0 or not ..
@@ -217,6 +237,7 @@ extern long HYPERVISOR_hvm_op(int cmd, void *);
 extern long HYPERVISOR_sysctl(xen_sysctl_t *);
 extern long HYPERVISOR_domctl(xen_domctl_t *domctl);
 /* *** __HYPERVISOR_kexec_op *** NOT IMPLEMENTED */
+extern long HYPERVISOR_mca(uint32_t, xen_mc_arg_t *);
 
 
 /*

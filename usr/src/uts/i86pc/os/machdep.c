@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -117,6 +115,7 @@
 #include <sys/mem.h>
 #include <sys/dumphdr.h>
 #include <sys/compress.h>
+#include <sys/cpu_module.h>
 #if defined(__xpv)
 #include <sys/hypervisor.h>
 #include <sys/xpv_panic.h>
@@ -827,6 +826,8 @@ panic_quiesce_hw(panic_data_t *pdp)
 {
 	psm_notifyf(PSM_PANIC_ENTER);
 
+	cmi_panic_callback();
+
 #ifdef	TRAPTRACE
 	/*
 	 * Turn off TRAPTRACE
@@ -1019,7 +1020,6 @@ get_cpu_mstate(cpu_t *cpu, hrtime_t *times)
 	}
 	scalehrtime(&times[CMS_SYSTEM]);
 }
-
 
 /*
  * This is a version of the rdmsr instruction that allows

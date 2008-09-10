@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* derived from netbsd's xen_machdep.c 1.1.2.1 */
 
 /*
@@ -101,6 +99,10 @@
 int cpr_debug;
 cpuset_t cpu_suspend_lost_set;
 static int xen_suspend_debug;
+
+uint_t xen_phys_ncpus;
+xen_mc_logical_cpu_t *xen_phys_cpus;
+int xen_physinfo_debug = 0;
 
 /*
  * Determine helpful version information.
@@ -922,6 +924,59 @@ startup_xen_version(void)
 	xen_pte_workaround();
 }
 
+int xen_mca_simulate_mc_physinfo_failure = 0;
+
+void
+startup_xen_mca(void)
+{
+	if (!DOMAIN_IS_INITDOMAIN(xen_info))
+		return;
+
+	xen_phys_ncpus = 0;
+	xen_phys_cpus = NULL;
+
+	if (xen_mca_simulate_mc_physinfo_failure ||
+	    xen_get_mc_physcpuinfo(NULL, &xen_phys_ncpus) != 0) {
+		cmn_err(CE_WARN,
+		    "%sxen_get_mc_physinfo failure during xen MCA startup: "
+		    "there will be no machine check support",
+		    xen_mca_simulate_mc_physinfo_failure ? "(simulated) " : "");
+		return;
+	}
+
+	xen_phys_cpus = kmem_alloc(xen_phys_ncpus *
+	    sizeof (xen_mc_logical_cpu_t), KM_NOSLEEP);
+
+	if (xen_phys_cpus == NULL) {
+		cmn_err(CE_WARN,
+		    "xen_get_physinfo failure: can't allocate CPU array");
+		return;
+	}
+
+	if (xen_get_mc_physcpuinfo(xen_phys_cpus, &xen_phys_ncpus) != 0) {
+		cmn_err(CE_WARN, "xen_get_mc_physinfo failure: no "
+		    "physical CPU info");
+		kmem_free(xen_phys_cpus,
+		    xen_phys_ncpus * sizeof (xen_mc_logical_cpu_t));
+		xen_phys_ncpus = 0;
+		xen_phys_cpus = NULL;
+	}
+
+	if (xen_physinfo_debug) {
+		xen_mc_logical_cpu_t *xcp;
+		unsigned i;
+
+		cmn_err(CE_NOTE, "xvm mca: %u physical cpus:\n",
+		    xen_phys_ncpus);
+		for (i = 0; i < xen_phys_ncpus; i++) {
+			xcp = &xen_phys_cpus[i];
+			cmn_err(CE_NOTE, "cpu%u: (%u, %u, %u) apid %u",
+			    xcp->mc_cpunr, xcp->mc_chipid, xcp->mc_coreid,
+			    xcp->mc_threadid, xcp->mc_apicid);
+		}
+	}
+}
+
 /*
  * Miscellaneous hypercall wrappers with slightly more verbose diagnostics.
  */
@@ -1121,4 +1176,138 @@ done:
 	}
 
 	return (err);
+}
+
+int
+xen_get_physinfo(xen_sysctl_physinfo_t *pi)
+{
+	xen_sysctl_t op;
+	int ret;
+
+	bzero(&op, sizeof (op));
+	op.cmd = XEN_SYSCTL_physinfo;
+	op.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
+
+	ret = HYPERVISOR_sysctl(&op);
+
+	if (ret != 0)
+		return (ret);
+
+	bcopy(&op.u.physinfo, pi, sizeof (op.u.physinfo));
+	return (0);
+}
+
+int
+xen_get_mc_physcpuinfo(xen_mc_logical_cpu_t *log_cpus, uint_t *ncpus)
+{
+	struct xen_mc_physcpuinfo cpi;
+
+	cpi.ncpus = *ncpus;
+	/*LINTED: constant in conditional context*/
+	set_xen_guest_handle(cpi.info, log_cpus);
+
+	if (HYPERVISOR_mca(XEN_MC_CMD_physcpuinfo, (xen_mc_arg_t *)&cpi) !=
+	    XEN_MC_HCALL_SUCCESS)
+		return (-1);
+
+	*ncpus = cpi.ncpus;
+	return (0);
+}
+
+void
+print_panic(const char *str)
+{
+	xen_printf(str);
+}
+
+/*
+ * Interfaces to iterate over real cpu information, but only that info
+ * which we choose to expose here.  These are of interest to dom0
+ * only (and the backing hypercall should not work for domu).
+ */
+
+xen_mc_lcpu_cookie_t
+xen_physcpu_next(xen_mc_lcpu_cookie_t cookie)
+{
+	xen_mc_logical_cpu_t *xcp = (xen_mc_logical_cpu_t *)cookie;
+
+	if (!DOMAIN_IS_INITDOMAIN(xen_info))
+		return (NULL);
+
+	if (cookie == NULL)
+		return ((xen_mc_lcpu_cookie_t)xen_phys_cpus);
+
+	if (xcp == xen_phys_cpus + xen_phys_ncpus - 1)
+		return (NULL);
+	else
+		return ((xen_mc_lcpu_cookie_t)++xcp);
+}
+
+#define	COOKIE2XCP(c) ((xen_mc_logical_cpu_t *)(c))
+
+const char *
+xen_physcpu_vendorstr(xen_mc_lcpu_cookie_t cookie)
+{
+	xen_mc_logical_cpu_t *xcp = COOKIE2XCP(cookie);
+
+	return ((const char *)&xcp->mc_vendorid[0]);
+}
+
+int
+xen_physcpu_family(xen_mc_lcpu_cookie_t cookie)
+{
+	return (COOKIE2XCP(cookie)->mc_family);
+}
+
+int
+xen_physcpu_model(xen_mc_lcpu_cookie_t cookie)
+{
+	return (COOKIE2XCP(cookie)->mc_model);
+}
+
+int
+xen_physcpu_stepping(xen_mc_lcpu_cookie_t cookie)
+{
+	return (COOKIE2XCP(cookie)->mc_step);
+}
+
+id_t
+xen_physcpu_chipid(xen_mc_lcpu_cookie_t cookie)
+{
+	return (COOKIE2XCP(cookie)->mc_chipid);
+}
+
+id_t
+xen_physcpu_coreid(xen_mc_lcpu_cookie_t cookie)
+{
+	return (COOKIE2XCP(cookie)->mc_coreid);
+}
+
+id_t
+xen_physcpu_strandid(xen_mc_lcpu_cookie_t cookie)
+{
+	return (COOKIE2XCP(cookie)->mc_threadid);
+}
+
+id_t
+xen_physcpu_logical_id(xen_mc_lcpu_cookie_t cookie)
+{
+	return (COOKIE2XCP(cookie)->mc_cpunr);
+}
+
+boolean_t
+xen_physcpu_is_cmt(xen_mc_lcpu_cookie_t cookie)
+{
+	return (COOKIE2XCP(cookie)->mc_nthreads > 1);
+}
+
+uint64_t
+xen_physcpu_mcg_cap(xen_mc_lcpu_cookie_t cookie)
+{
+	xen_mc_logical_cpu_t *xcp = COOKIE2XCP(cookie);
+
+	/*
+	 * Need to #define the indices, or search through the array.
+	 */
+	return (xcp->mc_msrvalues[0].value);
 }

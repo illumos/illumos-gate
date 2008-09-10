@@ -23,7 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This Makefile defines all file modules and build rules for the
 # directory uts/intel and its children. These are the source files which
@@ -286,3 +286,25 @@ INC_PATH	+= -I$(UTSBASE)/intel
 
 
 CPR_INTEL_OBJS +=	cpr_intel.o
+
+#
+# AMD family 0xf memory controller module
+#
+include $(SRC)/common/mc/mc-amd/Makefile.mcamd
+MCAMD_OBJS	+= \
+	$(MCAMD_CMN_OBJS) \
+	mcamd_drv.o \
+	mcamd_dimmcfg.o \
+	mcamd_subr.o \
+	mcamd_pcicfg.o
+
+#
+# Intel 5000/5400/7300 MCH module
+#
+INTEL_NB5000_OBJS += \
+	intel_nb5000.o \
+	intel_nbdrv.o \
+	dimm_addr.o \
+	nb_pci_cfg.o \
+	nb5000_init.o
+

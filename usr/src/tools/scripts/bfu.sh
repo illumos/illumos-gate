@@ -5766,6 +5766,14 @@ mondo_loop() {
 	rm -f $usr/lib/fm/prtopo
 
 	#
+	# Remove fm driver
+	#
+	rm -f $root/kernel/drv/fm
+	rm -f $root/kernel/drv/fm.conf
+	rm -f $root/kernel/drv/amd64/fm
+	rm -f $root/kernel/drv/sparcv9/fm
+
+	#
 	# Remove old AMD cpu module, to be replaced by extended cpu.generic
 	# with AMD-specific support layered on top as a model-specific module.
 	# Also remove the corresponding mdb and kmdb support.  Backwards BFU
@@ -5774,6 +5782,14 @@ mondo_loop() {
 	rm -f $root/platform/i86pc/kernel/cpu/amd64/cpu.AuthenticAMD.15
 	rm -f $root/usr/platform/i86pc/lib/mdb/kvm/cpu.AuthenticAMD.15.so
 	rm -f $root/usr/platform/i86pc/lib/mdb/kvm/amd64/cpu.AuthenticAMD.15.so
+	rm -f $root/usr/platform/i86pc/lib/mdb/kvm/cpu.generic.so
+	rm -f $root/usr/platform/i86pc/lib/mdb/kvm/amd64/cpu.generic.so
+	rm -f $root/usr/platform/i86pc/lib/mdb/kvm/cpu_ms.AuthenticAMD.15.so
+	rm -f $root/usr/platform/i86pc/lib/mdb/kvm/amd64/cpu_ms.AuthenticAMD.15.so
+	rm -f $root/usr/lib/mdb/kvm/cpu.generic.so
+	rm -f $root/usr/lib/mdb/kvm/amd64/cpu.generic.so
+	rm -f $root/usr/lib/mdb/kvm/cpu_ms.AuthenticAMD.15.so
+	rm -f $root/usr/lib/mdb/kvm/amd64/cpu_ms.AuthenticAMD.15.so
 
 	# Remove cpu.generic from i86xpv platform
 	rm -f $root/platform/i86xpv/kernel/cpu/cpu.generic

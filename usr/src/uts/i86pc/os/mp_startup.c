@@ -1599,8 +1599,7 @@ mp_startup(void)
 		cmi_hdl_t hdl;
 
 		if ((hdl = cmi_init(CMI_HDL_NATIVE, cmi_ntv_hwchipid(CPU),
-		    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU),
-		    cmi_ntv_hwmstrand(CPU))) != NULL) {
+		    cmi_ntv_hwcoreid(CPU), cmi_ntv_hwstrandid(CPU))) != NULL) {
 			if (x86_feature & X86_MCA)
 				cmi_mca_init(hdl);
 		}

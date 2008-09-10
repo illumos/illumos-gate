@@ -21,8 +21,6 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Special Cases Database. ABI Versions Exceptions.
 #
 # Please contact abi-team@sun.com for removal of any entries in this file.
@@ -387,6 +385,9 @@ PSARC 2004/619: RULE W3: usr/lib/fm/amd64/libdiagcode.so.1
 4897400: RULE W3: usr/lib/fm/libfmd_adm.so.1
 4897400: RULE W3: usr/lib/fm/sparcv9/libfmd_adm.so.1
 PSARC 2004/619: RULE W3: usr/lib/fm/amd64/libfmd_adm.so.1
+6567641: RULE W3: usr/lib/fm/libfma_agent.so.1
+6567641: RULE W3: usr/lib/fm/sparcv9/libfma_agent.so.1
+6567641: RULE W3: usr/lib/fm/amd64/libfma_agent.so.1
 4897400: RULE W3: usr/lib/fm/libfmd_log.so.1
 4897400: RULE W3: usr/lib/fm/sparcv9/libfmd_log.so.1
 PSARC 2004/619: RULE W3: usr/lib/fm/amd64/libfmd_log.so.1

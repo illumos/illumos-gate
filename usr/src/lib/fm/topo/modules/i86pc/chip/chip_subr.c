@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Support function for the i86pc chip enumerator
  */
@@ -34,7 +32,10 @@
 #include <stdarg.h>
 #include <strings.h>
 #include <fm/fmd_fmri.h>
+#include <sys/systeminfo.h>
 #include <sys/fm/protocol.h>
+#include <fm/topo_mod.h>
+#include <fm/fmd_agent.h>
 
 #include "chip.h"
 
@@ -134,22 +135,20 @@ nvprop_add(topo_mod_t *mod, nvpair_t *nvp, const char *pgname, tnode_t *node)
 }
 
 /*
- * Lookup string data named pname in the given kstat_t and add that
+ * Lookup string data named pname in the given nvlist and add that
  * as property named pname in the given property group pgname on the indicated
  * topo node.  Fill pvalp with a pointer to the string value, valid until
- * kstat_close is called (or the given kstat_t is otherwise invalidated).
+ * nvlist_free is called.
  */
 int
-add_kstat_strprop(topo_mod_t *mod, tnode_t *node, kstat_t *ksp,
+add_nvlist_strprop(topo_mod_t *mod, tnode_t *node, nvlist_t *nvl,
     const char *pgname, const char *pname, const char **pvalp)
 {
-	const char *pval;
-	kstat_named_t *k;
+	char *pval;
 	int err = 0;
 
-	if ((k = kstat_data_lookup(ksp, (char *)pname)) == NULL)
+	if (nvlist_lookup_string(nvl, pname, &pval) != 0)
 		return (-1);
-	pval = k->value.str.addr.ptr;
 
 	if (topo_prop_set_string(node, pgname, pname,
 	    TOPO_PROP_IMMUTABLE, pval, &err) == 0) {
@@ -157,28 +156,26 @@ add_kstat_strprop(topo_mod_t *mod, tnode_t *node, kstat_t *ksp,
 			*pvalp = pval;
 		return (0);
 	} else {
-		whinge(mod, &err, "chip_strprop: failed to add '%s'\n",
+		whinge(mod, &err, "add_nvlist_strprop: failed to add '%s'\n",
 		    pname);
 		return (-1);
 	}
 }
 
 /*
- * Lookup an int32 item named pname in the given kstat_t and add that
+ * Lookup an int32 item named pname in the given nvlist and add that
  * as property named pname in the given property group pgname on the indicated
  * topo node.  Fill pvalp with the property value.
  */
 int
-add_kstat_longprop(topo_mod_t *mod, tnode_t *node, kstat_t *ksp,
+add_nvlist_longprop(topo_mod_t *mod, tnode_t *node, nvlist_t *nvl,
     const char *pgname, const char *pname, int32_t *pvalp)
 {
-	kstat_named_t *k;
 	int32_t pval;
 	int err;
 
-	if ((k = kstat_data_lookup(ksp, (char *)pname)) == NULL)
+	if ((nvlist_lookup_int32(nvl, pname, &pval)) != 0)
 		return (-1);
-	pval = k->value.l;
 
 	if (topo_prop_set_int32(node, pgname, pname,
 	    TOPO_PROP_IMMUTABLE, pval, &err) == 0) {
@@ -186,19 +183,19 @@ add_kstat_longprop(topo_mod_t *mod, tnode_t *node, kstat_t *ksp,
 			*pvalp = pval;
 		return (0);
 	} else {
-		whinge(mod, &err, "chip_longprop: failed to add '%s'\n",
+		whinge(mod, &err, "add_nvlist_longprop: failed to add '%s'\n",
 		    pname);
 		return (-1);
 	}
 }
 
 /*
- * In a given kstat_t lookup a variable number of int32 properties named in
+ * In a given nvlist lookup a variable number of int32 properties named in
  * const char * varargs and each each in the given property group on the
  * node.  Fill an array of the retrieved values.
  */
 int
-add_kstat_longprops(topo_mod_t *mod, tnode_t *node, kstat_t *ksp,
+add_nvlist_longprops(topo_mod_t *mod, tnode_t *node, nvlist_t *nvl,
     const char *pgname, int32_t *pvalap, ...)
 {
 	const char *pname;
@@ -207,7 +204,7 @@ add_kstat_longprops(topo_mod_t *mod, tnode_t *node, kstat_t *ksp,
 
 	va_start(ap, pvalap);
 	while ((pname = va_arg(ap, const char *)) != NULL) {
-		if (add_kstat_longprop(mod, node, ksp, pgname, pname,
+		if (add_nvlist_longprop(mod, node, nvl, pgname, pname,
 		    pvalap) != 0)
 			nerr++;		/* have whinged elsewhere */
 
@@ -260,99 +257,14 @@ cpu_fmri_create(topo_mod_t *mod, uint32_t cpuid, char *s, uint8_t cpumask)
 	return (asru);
 }
 
-/*
- * Construct a mem scheme FMRI for the given unum string; the caller must
- * free the allocated nvlist with nvlist_free().
- */
-nvlist_t *
-mem_fmri_create(topo_mod_t *mod, const char *unum)
-{
-	nvlist_t *asru;
-
-	if (topo_mod_nvalloc(mod, &asru, NV_UNIQUE_NAME) != 0)
-		return (NULL);
-
-	if (nvlist_add_string(asru, FM_FMRI_SCHEME, FM_FMRI_SCHEME_MEM) != 0 ||
-	    nvlist_add_uint8(asru, FM_VERSION, FM_MEM_SCHEME_VERSION) != 0 ||
-	    nvlist_add_string(asru, FM_FMRI_MEM_UNUM, unum) != 0) {
-		nvlist_free(asru);
-		return (NULL);
-	}
-
-	return (asru);
-}
-
-/*
- * Registered method for asru computation for rank nodes.  The 'node'
- * argument identifies the node for which we seek an asru.  The 'in'
- * argument is used to select which asru we will return, as follows:
- *
- * - the node name must be "dimm" or "rank"
- * - if 'in' is NULL then return any statically defined asru for this node
- * - if 'in' is an "hc" scheme fmri then we construct a "mem" scheme asru
- *   with unum being the hc path to the dimm or rank (this method is called
- *   as part of dynamic asru computation for rank nodes only, but
- *   it is also called directly to construct a "mem" scheme asru for a dimm
- *   node)
- * - if 'in' in addition includes an hc-specific member which specifies
- *   asru-physaddr or asru-offset then these are includes in the "mem" scheme
- *   asru as additional members physaddr and offset
- */
-int
-mem_asru_create(topo_mod_t *mod, nvlist_t *fmri, nvlist_t **asru)
-{
-	int incl_pa = 0, incl_offset = 0;
-	nvlist_t *hcsp, *ap;
-	char *unum, *scheme;
-	uint64_t pa, offset;
-	int err = 0;
-
-	if (nvlist_lookup_string(fmri, FM_FMRI_SCHEME, &scheme) != 0 ||
-	    strcmp(scheme, FM_FMRI_SCHEME_HC) != 0)
-		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
-
-	if (nvlist_lookup_nvlist(fmri, FM_FMRI_HC_SPECIFIC, &hcsp) == 0) {
-		if (nvlist_lookup_uint64(hcsp, "asru-"FM_FMRI_MEM_PHYSADDR,
-		    &pa) == 0)
-			incl_pa = 1;
-
-		if (nvlist_lookup_uint64(hcsp, "asru-"FM_FMRI_MEM_OFFSET,
-		    &offset) == 0)
-			incl_offset = 1;
-	}
-
-	/* use 'fmri' to obtain resource path;  could use node resource */
-	if (topo_mod_nvl2str(mod, fmri, &unum) < 0)
-		return (-1);  /* mod errno set */
-
-	ap = mem_fmri_create(mod, unum);
-	topo_mod_strfree(mod, unum);
-	if (ap == NULL)
-		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
-
-	if (incl_pa)
-		err += nvlist_add_uint64(ap, FM_FMRI_MEM_PHYSADDR, pa) != 0;
-	if (incl_offset)
-		err += nvlist_add_uint64(ap, FM_FMRI_MEM_OFFSET, offset) != 0;
-
-	if (err != 0) {
-		nvlist_free(ap);
-		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
-	}
-
-	*asru = ap;
-
-	return (0);
-}
-
 /*ARGSUSED*/
 int
 mem_asru_compute(topo_mod_t *mod, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
 {
-	nvlist_t *asru;
-	nvlist_t *args, *pargs;
+	nvlist_t *asru, *args, *pargs, *hcsp;
 	int err;
+	uint64_t pa, offset;
 
 	if (strcmp(topo_node_name(node), RANK_NODE_NAME) != 0 &&
 	    strcmp(topo_node_name(node), DIMM_NODE_NAME) != 0 &&
@@ -364,16 +276,44 @@ mem_asru_compute(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 
 	if ((err = nvlist_lookup_nvlist(in, TOPO_PROP_PARGS, &pargs)) != 0) {
 		if (err == ENOENT) {
-			if (topo_mod_nvdup(mod, args, &asru) < 0)
-				return (topo_mod_seterrno(mod, EMOD_NOMEM));
+			pargs = args;
 		} else {
 			return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
 		}
-	} else if (mem_asru_create(mod, pargs, &asru) != 0) {
-		return (-1); /* mod errno already set */
 	}
 
-	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) < 0) {
+	if (topo_mod_nvdup(mod, pargs, &asru) != 0)
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+
+	err = 0;
+
+	/*
+	 * if 'in' includes an hc-specific member which specifies asru-physaddr
+	 * or asru-offset then rename them to asru and physaddr respectively.
+	 */
+	if (nvlist_lookup_nvlist(asru, FM_FMRI_HC_SPECIFIC, &hcsp) == 0) {
+		if (nvlist_lookup_uint64(hcsp,
+		    "asru-"FM_FMRI_HC_SPECIFIC_PHYSADDR, &pa) == 0) {
+			err += nvlist_remove(hcsp,
+			    "asru-"FM_FMRI_HC_SPECIFIC_PHYSADDR,
+			    DATA_TYPE_UINT64);
+			err += nvlist_add_uint64(hcsp,
+			    FM_FMRI_HC_SPECIFIC_PHYSADDR,
+			    pa);
+		}
+
+		if (nvlist_lookup_uint64(hcsp,
+		    "asru-"FM_FMRI_HC_SPECIFIC_OFFSET, &offset) == 0) {
+			err += nvlist_remove(hcsp,
+			    "asru-"FM_FMRI_HC_SPECIFIC_OFFSET,
+			    DATA_TYPE_UINT64);
+			err += nvlist_add_uint64(hcsp,
+			    FM_FMRI_HC_SPECIFIC_OFFSET,
+			    offset);
+		}
+	}
+
+	if (err != 0 || topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) < 0) {
 		nvlist_free(asru);
 		return (topo_mod_seterrno(mod, EMOD_NOMEM));
 	}
@@ -389,6 +329,23 @@ mem_asru_compute(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 
 	nvlist_free(asru);
 
+	return (0);
+}
+
+static int
+set_retnvl(topo_mod_t *mod, nvlist_t **out, const char *retname, uint32_t ret)
+{
+	nvlist_t *nvl;
+
+	if (topo_mod_nvalloc(mod, &nvl, NV_UNIQUE_NAME) < 0)
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+
+	if (nvlist_add_uint32(nvl, retname, ret) != 0) {
+		nvlist_free(nvl);
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+
+	*out = nvl;
 	return (0);
 }
 
@@ -442,18 +399,8 @@ rank_fmri_present(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 
 	topo_mod_strfree(mod, curr_serial);
 done:
-	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) < 0) {
-		whinge(mod, &err,
-		    "rank_fmri_present: failed to allocate nvlist!");
-		return (topo_mod_seterrno(mod, EMOD_NOMEM));
-	}
 
-	if (nvlist_add_uint32(*out, TOPO_METH_PRESENT_RET, is_present) != 0) {
-		nvlist_free(*out);
-		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
-	}
-
-	return (0);
+	return (set_retnvl(mod, out, TOPO_METH_PRESENT_RET, is_present));
 }
 
 /*
@@ -508,16 +455,333 @@ rank_fmri_replaced(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 
 	topo_mod_strfree(mod, curr_serial);
 done:
-	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) < 0) {
-		whinge(mod, &err,
-		    "rank_fmri_present: failed to allocate nvlist!");
-		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+	return (set_retnvl(mod, out, TOPO_METH_REPLACED_RET, rval));
+}
+
+static void
+fmri_dprint(topo_mod_t *mod, const char *op, uint32_t rc, nvlist_t *fmri)
+{
+	char *fmristr;
+	const char *status;
+
+	if (getenv("TOPOCHIPDBG") == NULL)
+		return;
+
+	switch (rc) {
+	case FMD_AGENT_RETIRE_DONE:
+		status = "sync success";
+		break;
+	case FMD_AGENT_RETIRE_ASYNC:
+		status = "async retiring";
+		break;
+	case FMD_AGENT_RETIRE_FAIL:
+		status = "not retired";
+		break;
+	default:
+		status = "unknown status";
+	}
+	if (fmri != NULL && topo_mod_nvl2str(mod, fmri, &fmristr) == 0) {
+		topo_mod_dprintf(mod, "[%s]: %s => \"%s\"\n", fmristr,
+		    op, status);
+		topo_mod_strfree(mod, fmristr);
+	}
+}
+
+struct strand_walk_data {
+	tnode_t		*parent;
+	fmd_agent_hdl_t	*hdl;
+	int		(*func)(fmd_agent_hdl_t *, int, int, int);
+	int		err;
+	int		done;
+	int		fail;
+	int		async;
+};
+
+static int
+strand_walker(topo_mod_t *mod, tnode_t *node, void *pdata)
+{
+	struct strand_walk_data *swdp = pdata;
+	int32_t chipid, coreid, strandid;
+	int err, rc;
+
+	/*
+	 * Terminate the walk if we reach start-node's sibling
+	 */
+	if (node != swdp->parent &&
+	    topo_node_parent(node) == topo_node_parent(swdp->parent))
+		return (TOPO_WALK_TERMINATE);
+
+	if (strcmp(topo_node_name(node), STRAND) != 0)
+		return (TOPO_WALK_NEXT);
+
+	if (topo_prop_get_int32(node, PGNAME(STRAND), STRAND_CHIP_ID,
+	    &chipid, &err) < 0 ||
+	    topo_prop_get_int32(node, PGNAME(STRAND), STRAND_CORE_ID,
+	    &coreid, &err) < 0) {
+		swdp->err++;
+		return (TOPO_WALK_NEXT);
+	}
+	strandid = topo_node_instance(node);
+	rc = swdp->func(swdp->hdl, chipid, coreid, strandid);
+
+	if (rc == FMD_AGENT_RETIRE_DONE)
+		swdp->done++;
+	else if (rc == FMD_AGENT_RETIRE_FAIL)
+		swdp->fail++;
+	else if (rc == FMD_AGENT_RETIRE_ASYNC)
+		swdp->async++;
+	else
+		swdp->err++;
+
+	if (getenv("TOPOCHIPDBG") != NULL) {
+		const char *op;
+
+		if (swdp->func == fmd_agent_cpu_retire)
+			op = "retire";
+		else if (swdp->func == fmd_agent_cpu_unretire)
+			op = "unretire";
+		else if (swdp->func == fmd_agent_cpu_isretired)
+			op = "check status";
+		else
+			op = "unknown op";
+
+		topo_mod_dprintf(mod, "%s cpu (%d:%d:%d): rc = %d, err = %s\n",
+		    op, (int)chipid, (int)coreid, (int)strandid, rc,
+		    fmd_agent_errmsg(swdp->hdl));
 	}
 
-	if (nvlist_add_uint32(*out, TOPO_METH_REPLACED_RET, rval) != 0) {
-		nvlist_free(*out);
-		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	return (TOPO_WALK_NEXT);
+}
+
+static int
+walk_strands(topo_mod_t *mod, struct strand_walk_data *swdp, tnode_t *parent,
+    int (*func)(fmd_agent_hdl_t *, int, int, int))
+{
+	topo_walk_t *twp;
+	int err;
+
+	swdp->parent = parent;
+	swdp->func = func;
+	swdp->err = swdp->done = swdp->fail = swdp->async = 0;
+	if ((swdp->hdl = fmd_agent_open(FMD_AGENT_VERSION)) == NULL) {
+		swdp->fail++;
+		return (0);
 	}
+
+	twp = topo_mod_walk_init(mod, parent, strand_walker, swdp, &err);
+	if (twp == NULL) {
+		fmd_agent_close(swdp->hdl);
+		return (-1);
+	}
+
+	err = topo_walk_step(twp, TOPO_WALK_CHILD);
+	topo_walk_fini(twp);
+	fmd_agent_close(swdp->hdl);
+
+	if (err == TOPO_WALK_ERR || swdp->err > 0)
+		return (-1);
 
 	return (0);
+}
+
+/* ARGSUSED */
+int
+retire_strands(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	struct strand_walk_data swd;
+	uint32_t rc;
+
+	if (version > TOPO_METH_RETIRE_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	if (walk_strands(mod, &swd, node, fmd_agent_cpu_retire) == -1)
+		return (-1);
+
+	if (swd.fail > 0)
+		rc = FMD_AGENT_RETIRE_FAIL;
+	else if (swd.async > 0)
+		rc = FMD_AGENT_RETIRE_ASYNC;
+	else
+		rc = FMD_AGENT_RETIRE_DONE;
+
+	return (set_retnvl(mod, out, TOPO_METH_RETIRE_RET, rc));
+}
+
+/* ARGSUSED */
+int
+unretire_strands(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	struct strand_walk_data swd;
+	uint32_t rc;
+
+	if (version > TOPO_METH_UNRETIRE_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	if (walk_strands(mod, &swd, node, fmd_agent_cpu_unretire) == -1)
+		return (-1);
+
+	if (swd.fail > 0)
+		rc = FMD_AGENT_RETIRE_FAIL;
+	else if (swd.async > 0)
+		rc = FMD_AGENT_RETIRE_ASYNC;
+	else
+		rc = FMD_AGENT_RETIRE_DONE;
+
+	return (set_retnvl(mod, out, TOPO_METH_UNRETIRE_RET, rc));
+}
+
+/* ARGSUSED */
+int
+service_state_strands(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	struct strand_walk_data swd;
+	uint32_t rc;
+
+	if (version > TOPO_METH_SERVICE_STATE_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	if (walk_strands(mod, &swd, node, fmd_agent_cpu_isretired) == -1)
+		return (-1);
+
+	if (swd.done > 0)
+		rc = (swd.fail + swd.async > 0) ? FMD_SERVICE_STATE_DEGRADED :
+		    FMD_SERVICE_STATE_UNUSABLE;
+	else if (swd.async > 0)
+		rc = FMD_SERVICE_STATE_ISOLATE_PENDING;
+	else if (swd.fail > 0)
+		rc = FMD_SERVICE_STATE_OK;
+	else
+		rc = FMD_SERVICE_STATE_UNKNOWN;
+
+	return (set_retnvl(mod, out, TOPO_METH_SERVICE_STATE_RET, rc));
+}
+
+/* ARGSUSED */
+int
+unusable_strands(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	struct strand_walk_data swd;
+	uint32_t rc;
+
+	if (version > TOPO_METH_UNUSABLE_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	if (walk_strands(mod, &swd, node, fmd_agent_cpu_isretired) == -1)
+		return (-1);
+
+	rc = (swd.fail + swd.async > 0 || swd.done == 0) ? 0 : 1;
+
+	return (set_retnvl(mod, out, TOPO_METH_UNUSABLE_RET, rc));
+}
+
+static boolean_t
+is_page_fmri(nvlist_t *nvl)
+{
+	nvlist_t *hcsp;
+	uint64_t val;
+
+	if (nvlist_lookup_nvlist(nvl, FM_FMRI_HC_SPECIFIC, &hcsp) == 0 &&
+	    (nvlist_lookup_uint64(hcsp, FM_FMRI_HC_SPECIFIC_OFFSET,
+	    &val) == 0 ||
+	    nvlist_lookup_uint64(hcsp, "asru-" FM_FMRI_HC_SPECIFIC_OFFSET,
+	    &val) == 0 ||
+	    nvlist_lookup_uint64(hcsp, FM_FMRI_HC_SPECIFIC_PHYSADDR,
+	    &val) == 0 ||
+	    nvlist_lookup_uint64(hcsp, "asru-" FM_FMRI_HC_SPECIFIC_PHYSADDR,
+	    &val) == 0))
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
+/* ARGSUSED */
+int
+ntv_page_retire(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	fmd_agent_hdl_t *hdl;
+	uint32_t rc = FMD_AGENT_RETIRE_FAIL;
+
+	if (version > TOPO_METH_RETIRE_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+	if (is_page_fmri(in)) {
+		if ((hdl = fmd_agent_open(FMD_AGENT_VERSION)) != NULL) {
+			rc = fmd_agent_page_retire(hdl, in);
+			fmd_agent_close(hdl);
+		}
+	}
+	fmri_dprint(mod, "ntv_page_retire", rc, in);
+	return (set_retnvl(mod, out, TOPO_METH_RETIRE_RET, rc));
+}
+
+/* ARGSUSED */
+int
+ntv_page_unretire(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	fmd_agent_hdl_t *hdl;
+	uint32_t rc = FMD_AGENT_RETIRE_FAIL;
+
+	if (version > TOPO_METH_UNRETIRE_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+	if (is_page_fmri(in)) {
+		if ((hdl = fmd_agent_open(FMD_AGENT_VERSION)) != NULL) {
+			rc = fmd_agent_page_unretire(hdl, in);
+			fmd_agent_close(hdl);
+		}
+	}
+	fmri_dprint(mod, "ntv_page_unretire", rc, in);
+	return (set_retnvl(mod, out, TOPO_METH_UNRETIRE_RET, rc));
+}
+
+/* ARGSUSED */
+int
+ntv_page_service_state(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	fmd_agent_hdl_t *hdl;
+	uint32_t rc = FMD_SERVICE_STATE_UNKNOWN;
+
+	if (version > TOPO_METH_SERVICE_STATE_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+	if (is_page_fmri(in)) {
+		if ((hdl = fmd_agent_open(FMD_AGENT_VERSION)) != NULL) {
+			rc = fmd_agent_page_isretired(hdl, in);
+			fmd_agent_close(hdl);
+			if (rc == FMD_AGENT_RETIRE_DONE)
+				rc = FMD_SERVICE_STATE_UNUSABLE;
+			else if (rc == FMD_AGENT_RETIRE_FAIL)
+				rc = FMD_SERVICE_STATE_OK;
+			else if (rc == FMD_AGENT_RETIRE_ASYNC)
+				rc = FMD_SERVICE_STATE_ISOLATE_PENDING;
+		}
+	}
+
+	topo_mod_dprintf(mod, "ntv_page_service_state: rc = %u\n", rc);
+	return (set_retnvl(mod, out, TOPO_METH_SERVICE_STATE_RET, rc));
+}
+
+/* ARGSUSED */
+int
+ntv_page_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	fmd_agent_hdl_t *hdl;
+	uint32_t rc = FMD_AGENT_RETIRE_FAIL;
+
+	if (version > TOPO_METH_UNUSABLE_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+	if (is_page_fmri(in)) {
+		if ((hdl = fmd_agent_open(FMD_AGENT_VERSION)) != NULL) {
+			rc = fmd_agent_page_isretired(hdl, in);
+			fmd_agent_close(hdl);
+		}
+	}
+	topo_mod_dprintf(mod, "ntv_page_unusable: rc = %u\n", rc);
+	return (set_retnvl(mod, out, TOPO_METH_UNUSABLE_RET,
+	    rc == FMD_AGENT_RETIRE_DONE ? 1 : 0));
 }

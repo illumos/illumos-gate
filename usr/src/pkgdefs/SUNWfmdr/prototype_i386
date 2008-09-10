@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -38,3 +36,6 @@
 #
 # SUNWfmdr
 #
+f none kernel/drv/fm 755 root sys
+d none kernel/drv/amd64 755 root sys
+f none kernel/drv/amd64/fm 755 root sys

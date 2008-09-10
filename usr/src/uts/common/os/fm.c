@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Fault Management Architecture (FMA) Resource and Protocol Support
@@ -310,6 +308,19 @@ fm_nvprintr(nvlist_t *nvl, int d, int c, int cols)
 			c = fm_printf(d + 1, c, cols, " ]");
 			break;
 
+		case DATA_TYPE_NVLIST_ARRAY: {
+			nvlist_t **val;
+			uint_t i, nelem;
+
+			c = fm_printf(d + 1, c, cols, "[");
+			(void) nvpair_value_nvlist_array(nvp, &val, &nelem);
+			for (i = 0; i < nelem; i++) {
+				c = fm_nvprintr(val[i], d + 1, c, cols);
+			}
+			c = fm_printf(d + 1, c, cols, " ]");
+			}
+			break;
+
 		case DATA_TYPE_BOOLEAN_ARRAY:
 		case DATA_TYPE_BYTE_ARRAY:
 		case DATA_TYPE_INT8_ARRAY:
@@ -321,7 +332,6 @@ fm_nvprintr(nvlist_t *nvl, int d, int c, int cols)
 		case DATA_TYPE_INT64_ARRAY:
 		case DATA_TYPE_UINT64_ARRAY:
 		case DATA_TYPE_STRING_ARRAY:
-		case DATA_TYPE_NVLIST_ARRAY:
 			c = fm_printf(d + 1, c, cols, "[...]");
 			break;
 		case DATA_TYPE_UNKNOWN:

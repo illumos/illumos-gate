@@ -37,33 +37,38 @@ extern "C" {
 
 #define	CHIP_VERSION		TOPO_VERSION
 
-#define	CHIP_NODE_NAME	"chip"
-#define	MCT_NODE_NAME	"memory-controller"
-#define	CHAN_NODE_NAME	"dram-channel"
-#define	CPU_NODE_NAME	"cpu"
-#define	CPU_CORE_NODE_NAME	"core"
-#define	CPU_STRAND_NODE_NAME	"strand"
-#define	CS_NODE_NAME	"chip-select"
-#define	DIMM_NODE_NAME	"dimm"
-#define	RANK_NODE_NAME	"rank"
+#define	CHIP_NODE_NAME		"chip"
+#define	CORE_NODE_NAME		"core"
+#define	STRAND_NODE_NAME	"strand"
+#define	MCT_NODE_NAME		"memory-controller"
+#define	CHAN_NODE_NAME		"dram-channel"
+#define	CS_NODE_NAME		"chip-select"
+#define	DIMM_NODE_NAME		"dimm"
+#define	RANK_NODE_NAME		"rank"
 
 #define	PGNAME(prefix)	(prefix##_NODE_NAME "-properties")
 
 /*
  * chip-properties
  */
-#define	CHIP_VENDOR_ID	"vendor_id"
-#define	CHIP_FAMILY	"family"
-#define	CHIP_MODEL	"model"
-#define	CHIP_STEPPING	"stepping"
+#define	CHIP_VENDOR_ID		"vendor_id"
+#define	CHIP_FAMILY		"family"
+#define	CHIP_MODEL		"model"
+#define	CHIP_STEPPING		"stepping"
+#define	CHIP_NCORE		"ncore_per_chip"
 
 /*
- * cpu-properties
+ * core-properties
  */
-#define	CPU_CHIP_ID	"chip_id"
-#define	CPU_CORE_ID	"core_id"
-#define	CPU_PKG_CORE_ID	"pkg_core_id"
-#define	CPU_CLOG_ID	"clog_id"
+#define	CORE_CHIP_ID		"chip_id"
+
+/*
+ * strand-properties
+ */
+#define	STRAND_CHIP_ID		"chip_id"
+#define	STRAND_CORE_ID		"core_id"
+#define	STRAND_PKG_CORE_ID	"pkg_core_id"
+#define	STRAND_CPU_ID		"cpuid"
 
 /*
  * label property methods
@@ -83,21 +88,12 @@ extern "C" {
  */
 #define	GET_DIMM_SERIAL		"get_dimm_serial"
 
-typedef struct chip {
-	kstat_ctl_t *chip_kc;
-	kstat_t **chip_cpustats;
-	uint_t chip_ncpustats;
-} chip_t;
-
 extern int simple_dimm_label(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
-
 extern int simple_dimm_label_mp(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
-
 extern int seq_dimm_label(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
-
 extern int g4_dimm_label(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
 
@@ -106,16 +102,12 @@ extern int g12f_dimm_label(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
 
 extern int simple_chip_label(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
-
 extern int g4_chip_label(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
-
 extern int a4fplus_chip_label(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
-
 extern int simple_cs_label_mp(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
-
 extern int get_dimm_serial(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
 
@@ -124,22 +116,43 @@ extern int get_dimm_serial(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
  */
 extern void whinge(topo_mod_t *, int *, const char *, ...);
 extern int nvprop_add(topo_mod_t *, nvpair_t *, const char *, tnode_t *);
-extern int add_kstat_strprop(topo_mod_t *, tnode_t *, kstat_t *,
+extern int add_nvlist_strprop(topo_mod_t *, tnode_t *, nvlist_t *,
     const char *, const char *, const char **);
-extern int add_kstat_longprop(topo_mod_t *, tnode_t *, kstat_t *,
+extern int add_nvlist_longprop(topo_mod_t *, tnode_t *, nvlist_t *,
     const char *, const char *, int32_t *);
-extern int add_kstat_longprops(topo_mod_t *, tnode_t *, kstat_t *,
+extern int add_nvlist_longprops(topo_mod_t *, tnode_t *, nvlist_t *,
     const char *, int32_t *, ...);
 extern int mkrsrc(topo_mod_t *, tnode_t *, const char *, int,
     nvlist_t *, nvlist_t **);
 extern nvlist_t *cpu_fmri_create(topo_mod_t *, uint32_t, char *, uint8_t);
-extern nvlist_t *mem_fmri_create(topo_mod_t *, const char *);
+extern boolean_t is_xpv();
+
+/*
+ * topo methods
+ */
 extern int mem_asru_compute(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 extern int rank_fmri_present(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 extern int rank_fmri_replaced(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
+extern int retire_strands(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+extern int unretire_strands(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+extern int service_state_strands(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+extern int unusable_strands(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+extern int ntv_page_retire(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+extern int ntv_page_service_state(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+extern int ntv_page_unretire(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+extern int ntv_page_unusable(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+
 extern int mem_asru_create(topo_mod_t *, nvlist_t *, nvlist_t **);
 
 /*

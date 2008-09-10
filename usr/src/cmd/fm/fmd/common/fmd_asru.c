@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/fm/protocol.h>
 #include <uuid/uuid.h>
 
@@ -514,10 +512,35 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	 * Check to see if the resource is still present in the system.
 	 */
 	ps = fmd_asru_replacement_state(flt);
-	if (ps == FMD_OBJ_STATE_STILL_PRESENT || ps == FMD_OBJ_STATE_UNKNOWN)
-		ap->asru_flags |= FMD_ASRU_PRESENT;
-	else if (ps == FMD_OBJ_STATE_REPLACED)
+	if (ps == FMD_OBJ_STATE_REPLACED) {
 		replaced = FMD_B_TRUE;
+	} else if (ps == FMD_OBJ_STATE_STILL_PRESENT ||
+	    ps == FMD_OBJ_STATE_UNKNOWN) {
+		ap->asru_flags |= FMD_ASRU_PRESENT;
+		if (nvlist_lookup_nvlist(alp->al_event, FM_FAULT_ASRU,
+		    &asru) == 0) {
+			int us;
+
+			switch (fmd_fmri_service_state(asru)) {
+			case FMD_SERVICE_STATE_UNUSABLE:
+				unusable = FMD_B_TRUE;
+				break;
+			case FMD_SERVICE_STATE_OK:
+			case FMD_SERVICE_STATE_DEGRADED:
+				unusable = FMD_B_FALSE;
+				break;
+			case FMD_SERVICE_STATE_UNKNOWN:
+			case -1:
+				/* not supported by scheme */
+				us = fmd_fmri_unusable(asru);
+				if (us > 0)
+					unusable = FMD_B_TRUE;
+				else if (us == 0)
+					unusable = FMD_B_FALSE;
+				break;
+			}
+		}
+	}
 
 	nvlist_free(flt);
 

@@ -99,21 +99,45 @@ gcpu_post_startup(cmi_hdl_t hdl)
 {
 	gcpu_data_t *gcpu = cmi_hdl_getcmidata(hdl);
 
-	if (gcpu_disable || gcpu == NULL)
+	if (gcpu_disable)
 		return;
 
-	cms_post_startup(hdl);
+	if (gcpu != NULL)
+		cms_post_startup(hdl);
+#ifdef __xpv
+	/*
+	 * All cpu handles are initialized so we can begin polling now.
+	 * Furthermore, our virq mechanism requires that everything
+	 * be run on cpu 0 so we can assure that by starting from here.
+	 */
+	gcpu_mca_poll_start(hdl);
+#endif
 }
 
 void
 gcpu_post_mpstartup(cmi_hdl_t hdl)
-{	if (!gcpu_disable) {
-		cms_post_mpstartup(hdl);
+{
+	if (gcpu_disable)
+		return;
+
+	cms_post_mpstartup(hdl);
+
+#ifndef __xpv
+		/*
+		 * All cpu handles are initialized only once all cpus
+		 * are started, so we can begin polling post mp startup.
+		 */
 		gcpu_mca_poll_start(hdl);
-	}
+#endif
 }
 
-cmi_api_ver_t _cmi_api_version = CMI_API_VERSION_2;
+#ifdef __xpv
+#define	GCPU_OP(ntvop, xpvop)	xpvop
+#else
+#define	GCPU_OP(ntvop, xpvop)	ntvop
+#endif
+
+cmi_api_ver_t _cmi_api_version = CMI_API_VERSION_3;
 
 const cmi_ops_t _cmi_ops = {
 	gcpu_init,				/* cmi_init */
@@ -122,11 +146,12 @@ const cmi_ops_t _cmi_ops = {
 	gcpu_faulted_enter,			/* cmi_faulted_enter */
 	gcpu_faulted_exit,			/* cmi_faulted_exit */
 	gcpu_mca_init,				/* cmi_mca_init */
-	gcpu_mca_trap,				/* cmi_mca_trap */
-	gcpu_cmci_trap,				/* cmi_cmci_trap */
+	GCPU_OP(gcpu_mca_trap, NULL),		/* cmi_mca_trap */
+	GCPU_OP(gcpu_cmci_trap, NULL),		/* cmi_cmci_trap */
 	gcpu_msrinject,				/* cmi_msrinject */
-	gcpu_hdl_poke,				/* cmi_hdl_poke */
+	GCPU_OP(gcpu_hdl_poke, NULL),		/* cmi_hdl_poke */
 	NULL,					/* cmi_fini */
+	GCPU_OP(NULL, gcpu_xpv_panic_callback),	/* cmi_panic_callback */
 };
 
 static struct modlcpu modlcpu = {

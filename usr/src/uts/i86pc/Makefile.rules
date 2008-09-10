@@ -59,10 +59,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/genuineintel/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/intel_nb5000/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/intel_nhm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -80,10 +76,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/cpudrv/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/ioat/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/mc/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -226,10 +218,6 @@ ATOMIC_SUBDIR		= $(ATOMIC_SUBDIR_$(CLASS))
 $(OBJS_DIR)/%.o:		$(SRC)/common/atomic/$(ATOMIC_SUBDIR)/%.s
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:		$(SRC)/common/mc/mc-amd/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 #
 # dtrace stubs
 #
@@ -261,9 +249,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/generic_cpu/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/genuineintel/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/intel_nb5000/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/intel_nhm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -277,9 +262,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/cpudrv/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/ioat/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/mc/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pci/%.c
@@ -334,9 +316,6 @@ $(LINTS_DIR)/%.ln:		$(SRC)/common/dis/i386/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(SRC)/common/atomic/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(SRC)/common/mc/mc-amd/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/gfx_private/%.c

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <strings.h>
@@ -1419,6 +1417,18 @@ mem_request(struct ldom_hdl *lhp, uint32_t msg_type, uint64_t pa,
 				rc = EIO;	/* is already retired */
 			else if (respmsg->status == FMA_MEM_STAT_NOTRETIRED)
 				rc = EAGAIN;	/* is scheduled to retire */
+			else if (respmsg->status == FMA_MEM_STAT_ILLEGAL)
+				rc = EINVAL;
+		}
+	} else if (msg_type == FMA_MEM_REQ_RESURRECT) {
+		if (respmsg->result == FMA_MEM_RESP_OK) {
+			if (respmsg->status == FMA_MEM_STAT_NOTRETIRED)
+				rc = 0;		/* is successfully unretired */
+		} if (respmsg->result == FMA_MEM_RESP_FAILURE) {
+			if (respmsg->status == FMA_MEM_STAT_RETIRED)
+				rc = EAGAIN; 	/* page couldn't be locked */
+			else if (respmsg->status == FMA_MEM_STAT_NOTRETIRED)
+				rc = EIO;	/* page isn't retired already */
 			else if (respmsg->status == FMA_MEM_STAT_ILLEGAL)
 				rc = EINVAL;
 		}

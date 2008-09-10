@@ -171,6 +171,7 @@ CHKHDRS=			\
 	devctl.h		\
 	devcache.h		\
 	devcache_impl.h		\
+	devfm.h			\
 	devid_cache.h		\
 	devinfo_impl.h		\
 	devops.h		\

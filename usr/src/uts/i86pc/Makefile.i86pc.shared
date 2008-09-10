@@ -252,7 +252,6 @@ DRV_KMODS	+= pci
 DRV_KMODS	+= npe
 DRV_KMODS	+= pci-ide
 DRV_KMODS	+= xsvc
-DRV_KMODS	+= mc-amd
 DRV_KMODS	+= tzmon
 DRV_KMODS	+= acpi_drv 
 DRV_KMODS	+= ioat
@@ -264,8 +263,6 @@ DRV_KMODS	+= cpudrv
 # 
 DRV_KMODS	+= ppm acpippm
 
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= memtest
-
 #
 #	CPU Modules
 #
@@ -273,7 +270,6 @@ CPU_KMODS	+= amd_opteron
 CPU_KMODS	+= generic_cpu
 CPU_KMODS	+= authenticamd
 CPU_KMODS	+= genuineintel
-CPU_KMODS	+= intel_nb5000
 CPU_KMODS	+= intel_nhm
 
 #

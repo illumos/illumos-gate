@@ -109,24 +109,30 @@ struct gcpu_bios_cfg {
 	struct gcpu_bios_bankcfg *bios_bankcfg;
 };
 
+/*
+ * Events types in poll trace records.  Keep these in sync with
+ * the generic cpu mdb module names for each (see gcpu_mpt_dump in mdb).
+ */
 #define	GCPU_MPT_WHAT_CYC_ERR		0	/* cyclic-induced poll */
 #define	GCPU_MPT_WHAT_POKE_ERR		1	/* manually-induced poll */
 #define	GCPU_MPT_WHAT_UNFAULTING	2	/* discarded error state */
 #define	GCPU_MPT_WHAT_MC_ERR		3	/* MC# */
 #define	GCPU_MPT_WHAT_CMCI_ERR		4	/* CMCI interrupt */
+#define	GCPU_MPT_WHAT_XPV_VIRQ		5	/* MCA_VIRQ in dom0 */
+#define	GCPU_MPT_WHAT_XPV_VIRQ_LOGOUT	6	/* MCA_VIRQ logout complete */
 
-typedef struct gcpu_mca_poll_trace {
+typedef struct gcpu_poll_trace {
 	hrtime_t mpt_when;		/* timestamp of event */
 	uint8_t mpt_what;		/* GCPU_MPT_WHAT_* (which event?) */
 	uint8_t mpt_nerr;		/* number of errors discovered */
 	uint16_t mpt_pad1;
 	uint32_t mpt_pad2;
-} gcpu_mca_poll_trace_t;
+} gcpu_poll_trace_t;
 
-typedef struct gcpu_mca_poll_trace_ctl {
-	gcpu_mca_poll_trace_t *mptc_tbufs;	/* trace buffers */
+typedef struct gcpu_poll_trace_ctl {
+	gcpu_poll_trace_t *mptc_tbufs;	/* trace buffers */
 	uint_t mptc_curtrace;			/* last buffer filled */
-} gcpu_mca_poll_trace_ctl_t;
+} gcpu_poll_trace_ctl_t;
 
 
 /*
@@ -155,7 +161,7 @@ typedef struct gcpu_mca {
 	size_t gcpu_mca_lgsz;		/* size of gcpu_mca_logout structs */
 	uint_t gcpu_mca_flags;		/* GCPU_MCA_F_* */
 	hrtime_t gcpu_mca_lastpoll;
-	gcpu_mca_poll_trace_ctl_t gcpu_mca_polltrace;
+	gcpu_poll_trace_ctl_t gcpu_polltrace;
 	uint32_t gcpu_mca_first_poll_cmci_enabled; /* cmci on in first poll */
 	gcpu_mca_cmci_t *gcpu_bank_cmci;
 } gcpu_mca_t;
@@ -206,9 +212,13 @@ extern void gcpu_faulted_enter(cmi_hdl_t);
 extern void gcpu_faulted_exit(cmi_hdl_t);
 extern void gcpu_mca_init(cmi_hdl_t);
 extern cmi_errno_t gcpu_msrinject(cmi_hdl_t, cmi_mca_regs_t *, uint_t, int);
+#ifndef __xpv
 extern uint64_t gcpu_mca_trap(cmi_hdl_t, struct regs *);
 extern void gcpu_cmci_trap(cmi_hdl_t);
 extern void gcpu_hdl_poke(cmi_hdl_t);
+#else
+extern void gcpu_xpv_panic_callback(void);
+#endif
 
 /*
  * CMI global variable
@@ -220,8 +230,13 @@ extern int cmi_enable_cmci;
  */
 extern void gcpu_mca_poll_init(cmi_hdl_t);
 extern void gcpu_mca_poll_start(cmi_hdl_t);
+extern void gcpu_poll_trace_init(gcpu_poll_trace_ctl_t *);
+extern void gcpu_poll_trace(gcpu_poll_trace_ctl_t *, uint8_t, uint8_t);
 extern void gcpu_mca_logout(cmi_hdl_t, struct regs *, uint64_t,
     gcpu_mce_status_t *, boolean_t, int);
+#ifdef __xpv
+extern void gcpu_xpv_mca_init(int);
+#endif /* __xpv */
 
 #endif /* _KERNEL */
 

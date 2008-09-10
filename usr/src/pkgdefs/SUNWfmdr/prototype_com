@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 i pkginfo
@@ -40,6 +38,9 @@ d none etc/sma/snmp 755 root bin
 f none etc/sma/snmp/fmd-trapgen.conf 600 root bin
 d none etc/sma/snmp/mibs 755 root bin
 f none etc/sma/snmp/mibs/SUN-FM-MIB.mib 644 root bin
+d none kernel 755 root sys
+d none kernel/drv 755 root sys
+f none kernel/drv/fm.conf 644 root sys
 d none var/fm 755 root sys
 d none var/fm/fmd 755 root sys
 d none var/fm/fmd/ckpt 700 root sys

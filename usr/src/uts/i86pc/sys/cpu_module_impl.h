@@ -47,16 +47,9 @@ typedef uint32_t cmi_api_ver_t;
 #define	CMI_API_VERSION_0	_CMI_API_VERSION(0)
 #define	CMI_API_VERSION_1	_CMI_API_VERSION(1)
 #define	CMI_API_VERSION_2	_CMI_API_VERSION(2)
+#define	CMI_API_VERSION_3	_CMI_API_VERSION(3)
 
-#define	CMI_API_VERSION		CMI_API_VERSION_2
-
-typedef struct cmi_mc_ops {
-	cmi_errno_t (*cmi_mc_patounum)(void *, uint64_t, uint8_t, uint8_t,
-	    uint32_t, int, mc_unum_t *);
-	cmi_errno_t (*cmi_mc_unumtopa)(void *, mc_unum_t *, nvlist_t *,
-	    uint64_t *);
-	void (*cmi_mc_logout)(cmi_hdl_t, boolean_t, boolean_t);
-} cmi_mc_ops_t;
+#define	CMI_API_VERSION		CMI_API_VERSION_3
 
 typedef struct cmi_ops {
 	int (*cmi_init)(cmi_hdl_t, void **);
@@ -70,6 +63,7 @@ typedef struct cmi_ops {
 	cmi_errno_t (*cmi_msrinject)(cmi_hdl_t, cmi_mca_regs_t *, uint_t, int);
 	void (*cmi_hdl_poke)(cmi_hdl_t);
 	void (*cmi_fini)(cmi_hdl_t);
+	void (*cmi_panic_callback)(void);
 } cmi_ops_t;
 
 /*

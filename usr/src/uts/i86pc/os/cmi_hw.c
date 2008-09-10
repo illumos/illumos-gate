@@ -42,6 +42,12 @@
 #include <sys/controlregs.h>
 #include <sys/sunddi.h>
 #include <sys/trap.h>
+#include <sys/mca_x86.h>
+#include <sys/processor.h>
+
+#ifdef __xpv
+#include <sys/hypervisor.h>
+#endif
 
 /*
  * Outside of this file consumers use the opaque cmi_hdl_t.  This
@@ -50,11 +56,11 @@
  */
 typedef struct cmi_hdl_impl {
 	enum cmi_hdl_class cmih_class;		/* Handle nature */
-	struct cmi_hdl_ops *cmih_ops;		/* Operations vector */
+	const struct cmi_hdl_ops *cmih_ops;	/* Operations vector */
 	uint_t cmih_chipid;			/* Chipid of cpu resource */
 	uint_t cmih_coreid;			/* Core within die */
 	uint_t cmih_strandid;			/* Thread within core */
-	boolean_t cmih_mstrand;			/* chip multithreading */
+	boolean_t cmih_mstrand;			/* cores are multithreaded */
 	volatile uint32_t *cmih_refcntp;	/* Reference count pointer */
 	uint64_t cmih_msrsrc;			/* MSR data source flags */
 	void *cmih_hdlpriv;			/* cmi_hw.c private data */
@@ -63,9 +69,46 @@ typedef struct cmi_hdl_impl {
 	void *cmih_cmidata;			/* cpu mod private data */
 	const struct cmi_mc_ops *cmih_mcops;	/* Memory-controller ops */
 	void *cmih_mcdata;			/* Memory-controller data */
+	uint64_t cmih_flags;			/* See CMIH_F_* below */
 } cmi_hdl_impl_t;
 
 #define	IMPLHDL(ophdl)	((cmi_hdl_impl_t *)ophdl)
+#define	HDLOPS(hdl)	((hdl)->cmih_ops)
+
+#define	CMIH_F_INJACTV		0x1ULL
+
+/*
+ * Ops structure for handle operations.
+ */
+struct cmi_hdl_ops {
+	/*
+	 * These ops are required in an implementation.
+	 */
+	uint_t (*cmio_vendor)(cmi_hdl_impl_t *);
+	const char *(*cmio_vendorstr)(cmi_hdl_impl_t *);
+	uint_t (*cmio_family)(cmi_hdl_impl_t *);
+	uint_t (*cmio_model)(cmi_hdl_impl_t *);
+	uint_t (*cmio_stepping)(cmi_hdl_impl_t *);
+	uint_t (*cmio_chipid)(cmi_hdl_impl_t *);
+	uint_t (*cmio_coreid)(cmi_hdl_impl_t *);
+	uint_t (*cmio_strandid)(cmi_hdl_impl_t *);
+	uint32_t (*cmio_chiprev)(cmi_hdl_impl_t *);
+	const char *(*cmio_chiprevstr)(cmi_hdl_impl_t *);
+	uint32_t (*cmio_getsockettype)(cmi_hdl_impl_t *);
+	id_t (*cmio_logical_id)(cmi_hdl_impl_t *);
+	/*
+	 * These ops are optional in an implementation.
+	 */
+	ulong_t (*cmio_getcr4)(cmi_hdl_impl_t *);
+	void (*cmio_setcr4)(cmi_hdl_impl_t *, ulong_t);
+	cmi_errno_t (*cmio_rdmsr)(cmi_hdl_impl_t *, uint_t, uint64_t *);
+	cmi_errno_t (*cmio_wrmsr)(cmi_hdl_impl_t *, uint_t, uint64_t);
+	cmi_errno_t (*cmio_msrinterpose)(cmi_hdl_impl_t *, uint_t, uint64_t);
+	void (*cmio_int)(cmi_hdl_impl_t *, int);
+	int (*cmio_online)(cmi_hdl_impl_t *, int, int *);
+};
+
+static const struct cmi_hdl_ops cmi_hdl_ops;
 
 /*
  * Handles are looked up from contexts such as polling, injection etc
@@ -82,7 +125,7 @@ typedef struct cmi_hdl_impl {
  * structure for the resource, and a reference count for the handle.
  * Reference counts are modified atomically.  The public cmi_hdl_hold
  * always succeeds because this can only be used after handle creation
- * and before the call to destruct, so the hold count it already at least one.
+ * and before the call to destruct, so the hold count is already at least one.
  * In other functions that lookup a handle (cmi_hdl_lookup, cmi_hdl_any)
  * we must be certain that the count has not already decrmented to zero
  * before applying our hold.
@@ -190,6 +233,37 @@ call_func_ntv(int cpuid, xc_func_t func, xc_arg_t arg1, xc_arg_t arg2)
 	return (rc != -1 ? rc : CMIERR_DEADLOCK);
 }
 
+static uint64_t injcnt;
+
+void
+cmi_hdl_inj_begin(cmi_hdl_t ophdl)
+{
+	cmi_hdl_impl_t *hdl = IMPLHDL(ophdl);
+
+	if (hdl != NULL)
+		hdl->cmih_flags |= CMIH_F_INJACTV;
+	if (injcnt++ == 0) {
+		cmn_err(CE_NOTE, "Hardware error injection/simulation "
+		    "activity noted");
+	}
+}
+
+void
+cmi_hdl_inj_end(cmi_hdl_t ophdl)
+{
+	cmi_hdl_impl_t *hdl = IMPLHDL(ophdl);
+
+	ASSERT(hdl == NULL || hdl->cmih_flags & CMIH_F_INJACTV);
+	if (hdl != NULL)
+		hdl->cmih_flags &= ~CMIH_F_INJACTV;
+}
+
+boolean_t
+cmi_inj_tainted(void)
+{
+	return (injcnt != 0 ? B_TRUE : B_FALSE);
+}
+
 /*
  *	 =======================================================
  *	|	MSR Interposition				|
@@ -221,26 +295,26 @@ struct cmi_msri_hashent {
 static struct cmi_msri_bkt msrihash[CMI_MSRI_HASHSZ];
 
 static void
-msri_addent(cmi_hdl_impl_t *hdl, cmi_mca_regs_t *regp)
+msri_addent(cmi_hdl_impl_t *hdl, uint_t msr, uint64_t val)
 {
-	int idx = CMI_MSRI_HASHIDX(hdl, regp->cmr_msrnum);
+	int idx = CMI_MSRI_HASHIDX(hdl, msr);
 	struct cmi_msri_bkt *hbp = &msrihash[idx];
 	struct cmi_msri_hashent *hep;
 
 	mutex_enter(&hbp->msrib_lock);
 
 	for (hep = hbp->msrib_head; hep != NULL; hep = hep->msrie_next) {
-		if (CMI_MSRI_MATCH(hep, hdl, regp->cmr_msrnum))
+		if (CMI_MSRI_MATCH(hep, hdl, msr))
 			break;
 	}
 
 	if (hep != NULL) {
-		hep->msrie_msrval = regp->cmr_msrval;
+		hep->msrie_msrval = val;
 	} else {
 		hep = kmem_alloc(sizeof (*hep), KM_SLEEP);
 		hep->msrie_hdl = hdl;
-		hep->msrie_msrnum = regp->cmr_msrnum;
-		hep->msrie_msrval = regp->cmr_msrval;
+		hep->msrie_msrnum = msr;
+		hep->msrie_msrval = val;
 
 		if (hbp->msrib_head != NULL)
 			hbp->msrib_head->msrie_prev = hep;
@@ -375,6 +449,8 @@ pcii_addent(int bus, int dev, int func, int reg, uint32_t val, int asz)
 	struct cmi_pcii_bkt *hbp = &pciihash[idx];
 	struct cmi_pcii_hashent *hep;
 
+	cmi_hdl_inj_begin(NULL);
+
 	mutex_enter(&hbp->pciib_lock);
 
 	for (hep = hbp->pciib_head; hep != NULL; hep = hep->pcii_next) {
@@ -401,6 +477,8 @@ pcii_addent(int bus, int dev, int func, int reg, uint32_t val, int asz)
 	}
 
 	mutex_exit(&hbp->pciib_lock);
+
+	cmi_hdl_inj_end(NULL);
 }
 
 /*
@@ -457,6 +535,8 @@ pcii_rment(int bus, int dev, int func, int reg, int asz)
 	mutex_exit(&hbp->pciib_lock);
 }
 
+#ifndef __xpv
+
 /*
  *	 =======================================================
  *	|	Native methods					|
@@ -467,34 +547,36 @@ pcii_rment(int bus, int dev, int func, int reg, int asz)
  *	---------------------------------------------------------
  */
 
+#define	HDLPRIV(hdl)	((cpu_t *)(hdl)->cmih_hdlpriv)
+
 static uint_t
 ntv_vendor(cmi_hdl_impl_t *hdl)
 {
-	return (cpuid_getvendor((cpu_t *)hdl->cmih_hdlpriv));
+	return (cpuid_getvendor(HDLPRIV(hdl)));
 }
 
 static const char *
 ntv_vendorstr(cmi_hdl_impl_t *hdl)
 {
-	return (cpuid_getvendorstr((cpu_t *)hdl->cmih_hdlpriv));
+	return (cpuid_getvendorstr(HDLPRIV(hdl)));
 }
 
 static uint_t
 ntv_family(cmi_hdl_impl_t *hdl)
 {
-	return (cpuid_getfamily((cpu_t *)hdl->cmih_hdlpriv));
+	return (cpuid_getfamily(HDLPRIV(hdl)));
 }
 
 static uint_t
 ntv_model(cmi_hdl_impl_t *hdl)
 {
-	return (cpuid_getmodel((cpu_t *)hdl->cmih_hdlpriv));
+	return (cpuid_getmodel(HDLPRIV(hdl)));
 }
 
 static uint_t
 ntv_stepping(cmi_hdl_impl_t *hdl)
 {
-	return (cpuid_getstep((cpu_t *)hdl->cmih_hdlpriv));
+	return (cpuid_getstep(HDLPRIV(hdl)));
 }
 
 static uint_t
@@ -516,28 +598,28 @@ ntv_strandid(cmi_hdl_impl_t *hdl)
 	return (hdl->cmih_strandid);
 }
 
-static boolean_t
-ntv_mstrand(cmi_hdl_impl_t *hdl)
-{
-	return (hdl->cmih_mstrand);
-}
-
 static uint32_t
 ntv_chiprev(cmi_hdl_impl_t *hdl)
 {
-	return (cpuid_getchiprev((cpu_t *)hdl->cmih_hdlpriv));
+	return (cpuid_getchiprev(HDLPRIV(hdl)));
 }
 
 static const char *
 ntv_chiprevstr(cmi_hdl_impl_t *hdl)
 {
-	return (cpuid_getchiprevstr((cpu_t *)hdl->cmih_hdlpriv));
+	return (cpuid_getchiprevstr(HDLPRIV(hdl)));
 }
 
 static uint32_t
 ntv_getsockettype(cmi_hdl_impl_t *hdl)
 {
-	return (cpuid_getsockettype((cpu_t *)hdl->cmih_hdlpriv));
+	return (cpuid_getsockettype(HDLPRIV(hdl)));
+}
+
+static id_t
+ntv_logical_id(cmi_hdl_impl_t *hdl)
+{
+	return (HDLPRIV(hdl)->cpu_id);
 }
 
 /*ARGSUSED*/
@@ -556,7 +638,7 @@ ntv_getcr4_xc(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
 static ulong_t
 ntv_getcr4(cmi_hdl_impl_t *hdl)
 {
-	cpu_t *cp = (cpu_t *)hdl->cmih_hdlpriv;
+	cpu_t *cp = HDLPRIV(hdl);
 	ulong_t val;
 
 	(void) call_func_ntv(cp->cpu_id, ntv_getcr4_xc, (xc_arg_t)&val, NULL);
@@ -580,7 +662,7 @@ ntv_setcr4_xc(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
 static void
 ntv_setcr4(cmi_hdl_impl_t *hdl, ulong_t val)
 {
-	cpu_t *cp = (cpu_t *)hdl->cmih_hdlpriv;
+	cpu_t *cp = HDLPRIV(hdl);
 
 	(void) call_func_ntv(cp->cpu_id, ntv_setcr4_xc, (xc_arg_t)val, NULL);
 }
@@ -614,7 +696,10 @@ ntv_rdmsr_xc(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
 static cmi_errno_t
 ntv_rdmsr(cmi_hdl_impl_t *hdl, uint_t msr, uint64_t *valp)
 {
-	cpu_t *cp = (cpu_t *)hdl->cmih_hdlpriv;
+	cpu_t *cp = HDLPRIV(hdl);
+
+	if (!(hdl->cmih_msrsrc & CMI_MSR_FLAG_RD_HWOK))
+		return (CMIERR_INTERPOSE);
 
 	return (call_func_ntv(cp->cpu_id, ntv_rdmsr_xc,
 	    (xc_arg_t)msr, (xc_arg_t)valp));
@@ -649,10 +734,20 @@ ntv_wrmsr_xc(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
 static cmi_errno_t
 ntv_wrmsr(cmi_hdl_impl_t *hdl, uint_t msr, uint64_t val)
 {
-	cpu_t *cp = (cpu_t *)hdl->cmih_hdlpriv;
+	cpu_t *cp = HDLPRIV(hdl);
+
+	if (!(hdl->cmih_msrsrc & CMI_MSR_FLAG_WR_HWOK))
+		return (CMI_SUCCESS);
 
 	return (call_func_ntv(cp->cpu_id, ntv_wrmsr_xc,
 	    (xc_arg_t)msr, (xc_arg_t)&val));
+}
+
+static cmi_errno_t
+ntv_msrinterpose(cmi_hdl_impl_t *hdl, uint_t msr, uint64_t val)
+{
+	msri_addent(hdl, msr, val);
+	return (CMI_SUCCESS);
 }
 
 /*ARGSUSED*/
@@ -674,116 +769,349 @@ ntv_int_xc(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
 static void
 ntv_int(cmi_hdl_impl_t *hdl, int int_no)
 {
-	cpu_t *cp = (cpu_t *)hdl->cmih_hdlpriv;
+	cpu_t *cp = HDLPRIV(hdl);
 
 	(void) call_func_ntv(cp->cpu_id, ntv_int_xc, (xc_arg_t)int_no, NULL);
 }
 
-/*
- * Ops structure for handle operations.
- */
-struct cmi_hdl_ops {
-	uint_t (*cmio_vendor)(cmi_hdl_impl_t *);
-	const char *(*cmio_vendorstr)(cmi_hdl_impl_t *);
-	uint_t (*cmio_family)(cmi_hdl_impl_t *);
-	uint_t (*cmio_model)(cmi_hdl_impl_t *);
-	uint_t (*cmio_stepping)(cmi_hdl_impl_t *);
-	uint_t (*cmio_chipid)(cmi_hdl_impl_t *);
-	uint_t (*cmio_coreid)(cmi_hdl_impl_t *);
-	uint_t (*cmio_strandid)(cmi_hdl_impl_t *);
-	boolean_t (*cmio_mstrand)(cmi_hdl_impl_t *);
-	uint32_t (*cmio_chiprev)(cmi_hdl_impl_t *);
-	const char *(*cmio_chiprevstr)(cmi_hdl_impl_t *);
-	uint32_t (*cmio_getsockettype)(cmi_hdl_impl_t *);
-	ulong_t (*cmio_getcr4)(cmi_hdl_impl_t *);
-	void (*cmio_setcr4)(cmi_hdl_impl_t *, ulong_t);
-	cmi_errno_t (*cmio_rdmsr)(cmi_hdl_impl_t *, uint_t, uint64_t *);
-	cmi_errno_t (*cmio_wrmsr)(cmi_hdl_impl_t *, uint_t, uint64_t);
-	void (*cmio_int)(cmi_hdl_impl_t *, int);
-} cmi_hdl_ops[] = {
-	/*
-	 * CMI_HDL_NATIVE - ops when apparently running on bare-metal
-	 */
-	{
-		ntv_vendor,
-		ntv_vendorstr,
-		ntv_family,
-		ntv_model,
-		ntv_stepping,
-		ntv_chipid,
-		ntv_coreid,
-		ntv_strandid,
-		ntv_mstrand,
-		ntv_chiprev,
-		ntv_chiprevstr,
-		ntv_getsockettype,
-		ntv_getcr4,
-		ntv_setcr4,
-		ntv_rdmsr,
-		ntv_wrmsr,
-		ntv_int
-	},
-};
+static int
+ntv_online(cmi_hdl_impl_t *hdl, int new_status, int *old_status)
+{
+	processorid_t cpuid = HDLPRIV(hdl)->cpu_id;
 
-#ifndef __xpv
+	return (p_online_internal(cpuid, new_status, old_status));
+}
+
+#else	/* __xpv */
+
+/*
+ *	 =======================================================
+ *	|	xVM dom0 methods				|
+ *	|	----------------				|
+ *	|							|
+ *	| These are used when we are running as dom0 in		|
+ *	| a Solaris xVM context.				|
+ *	---------------------------------------------------------
+ */
+
+#define	HDLPRIV(hdl)	((xen_mc_lcpu_cookie_t)(hdl)->cmih_hdlpriv)
+
+extern uint_t _cpuid_vendorstr_to_vendorcode(char *);
+
+
+static uint_t
+xpv_vendor(cmi_hdl_impl_t *hdl)
+{
+	return (_cpuid_vendorstr_to_vendorcode((char *)xen_physcpu_vendorstr(
+	    HDLPRIV(hdl))));
+}
+
+static const char *
+xpv_vendorstr(cmi_hdl_impl_t *hdl)
+{
+	return (xen_physcpu_vendorstr(HDLPRIV(hdl)));
+}
+
+static uint_t
+xpv_family(cmi_hdl_impl_t *hdl)
+{
+	return (xen_physcpu_family(HDLPRIV(hdl)));
+}
+
+static uint_t
+xpv_model(cmi_hdl_impl_t *hdl)
+{
+	return (xen_physcpu_model(HDLPRIV(hdl)));
+}
+
+static uint_t
+xpv_stepping(cmi_hdl_impl_t *hdl)
+{
+	return (xen_physcpu_stepping(HDLPRIV(hdl)));
+}
+
+static uint_t
+xpv_chipid(cmi_hdl_impl_t *hdl)
+{
+	return (hdl->cmih_chipid);
+}
+
+static uint_t
+xpv_coreid(cmi_hdl_impl_t *hdl)
+{
+	return (hdl->cmih_coreid);
+}
+
+static uint_t
+xpv_strandid(cmi_hdl_impl_t *hdl)
+{
+	return (hdl->cmih_strandid);
+}
+
+extern uint32_t _cpuid_chiprev(uint_t, uint_t, uint_t, uint_t);
+
+static uint32_t
+xpv_chiprev(cmi_hdl_impl_t *hdl)
+{
+	return (_cpuid_chiprev(xpv_vendor(hdl), xpv_family(hdl),
+	    xpv_model(hdl), xpv_stepping(hdl)));
+}
+
+extern const char *_cpuid_chiprevstr(uint_t, uint_t, uint_t, uint_t);
+
+static const char *
+xpv_chiprevstr(cmi_hdl_impl_t *hdl)
+{
+	return (_cpuid_chiprevstr(xpv_vendor(hdl), xpv_family(hdl),
+	    xpv_model(hdl), xpv_stepping(hdl)));
+}
+
+extern uint32_t _cpuid_skt(uint_t, uint_t, uint_t, uint_t);
+
+static uint32_t
+xpv_getsockettype(cmi_hdl_impl_t *hdl)
+{
+	return (_cpuid_skt(xpv_vendor(hdl), xpv_family(hdl),
+	    xpv_model(hdl), xpv_stepping(hdl)));
+}
+
+static id_t
+xpv_logical_id(cmi_hdl_impl_t *hdl)
+{
+	return (xen_physcpu_logical_id(HDLPRIV(hdl)));
+}
+
+static cmi_errno_t
+xpv_rdmsr(cmi_hdl_impl_t *hdl, uint_t msr, uint64_t *valp)
+{
+	switch (msr) {
+	case IA32_MSR_MCG_CAP:
+		*valp = xen_physcpu_mcg_cap(HDLPRIV(hdl));
+		break;
+
+	default:
+		return (CMIERR_NOTSUP);
+	}
+
+	return (CMI_SUCCESS);
+}
+
+/*
+ * Request the hypervisor to write an MSR for us.  The hypervisor
+ * will only accept MCA-related MSRs, as this is for MCA error
+ * simulation purposes alone.  We will pre-screen MSRs for injection
+ * so we don't bother the HV with bogus requests.  We will permit
+ * injection to any MCA bank register, and to MCG_STATUS.
+ */
+
+#define	IS_MCA_INJ_MSR(msr) \
+	(((msr) >= IA32_MSR_MC(0, CTL) && (msr) <= IA32_MSR_MC(10, MISC)) || \
+	(msr) == IA32_MSR_MCG_STATUS)
+
+static cmi_errno_t
+xpv_wrmsr_cmn(cmi_hdl_impl_t *hdl, uint_t msr, uint64_t val, boolean_t intpose)
+{
+	struct xen_mc_msrinject mci;
+
+	if (!(hdl->cmih_flags & CMIH_F_INJACTV))
+		return (CMIERR_NOTSUP);		/* for injection use only! */
+
+	if (!IS_MCA_INJ_MSR(msr))
+		return (CMIERR_API);
+
+	if (panicstr)
+		return (CMIERR_DEADLOCK);
+
+	mci.mcinj_cpunr = xen_physcpu_logical_id(HDLPRIV(hdl));
+	mci.mcinj_flags = intpose ? MC_MSRINJ_F_INTERPOSE : 0;
+	mci.mcinj_count = 1;	/* learn to batch sometime */
+	mci.mcinj_msr[0].reg = msr;
+	mci.mcinj_msr[0].value = val;
+
+	return (HYPERVISOR_mca(XEN_MC_CMD_msrinject, (xen_mc_arg_t *)&mci) ==
+	    XEN_MC_HCALL_SUCCESS ?  CMI_SUCCESS : CMIERR_NOTSUP);
+}
+
+static cmi_errno_t
+xpv_wrmsr(cmi_hdl_impl_t *hdl, uint_t msr, uint64_t val)
+{
+	return (xpv_wrmsr_cmn(hdl, msr, val, B_FALSE));
+}
+
+
+static cmi_errno_t
+xpv_msrinterpose(cmi_hdl_impl_t *hdl, uint_t msr, uint64_t val)
+{
+	return (xpv_wrmsr_cmn(hdl, msr, val, B_TRUE));
+}
+
+static void
+xpv_int(cmi_hdl_impl_t *hdl, int int_no)
+{
+	struct xen_mc_mceinject mce;
+
+	if (!(hdl->cmih_flags & CMIH_F_INJACTV))
+		return;
+
+	if (int_no != T_MCE) {
+		cmn_err(CE_WARN, "xpv_int: int_no %d unimplemented\n",
+		    int_no);
+	}
+
+	mce.mceinj_cpunr = xen_physcpu_logical_id(HDLPRIV(hdl));
+
+	(void) HYPERVISOR_mca(XEN_MC_CMD_mceinject, (xen_mc_arg_t *)&mce);
+}
+
+#define	CSM_XLATE_SUNOS2XEN	1
+#define	CSM_XLATE_XEN2SUNOS	2
+
+#define	CSM_MAPENT(suffix)	{ P_##suffix, MC_CPU_P_##suffix }
+
+static int
+cpu_status_xlate(int in, int direction, int *outp)
+{
+	struct cpu_status_map {
+		int csm_val[2];
+	} map[] = {
+		CSM_MAPENT(STATUS),
+		CSM_MAPENT(ONLINE),
+		CSM_MAPENT(OFFLINE),
+		CSM_MAPENT(FAULTED),
+		CSM_MAPENT(SPARE),
+		CSM_MAPENT(POWEROFF)
+	};
+
+	int cmpidx = (direction == CSM_XLATE_XEN2SUNOS);
+	int i;
+
+	for (i = 0; i < sizeof (map) / sizeof (struct cpu_status_map); i++) {
+		if (map[i].csm_val[cmpidx] == in) {
+			*outp = map[i].csm_val[!cmpidx];
+			return (1);
+		}
+	}
+
+	return (0);
+}
+
+static int
+xpv_online(cmi_hdl_impl_t *hdl, int new_status, int *old_status)
+{
+	struct xen_mc_offline mco;
+	int flag, rc;
+
+	new_status &= ~P_FORCED;
+
+	if (!cpu_status_xlate(new_status, CSM_XLATE_SUNOS2XEN, &flag))
+		return (ENOSYS);
+
+	mco.mco_cpu = xen_physcpu_logical_id(HDLPRIV(hdl));
+	mco.mco_flag = flag;
+
+	if ((rc = HYPERVISOR_mca(XEN_MC_CMD_offlinecpu,
+	    (xen_mc_arg_t *)&mco)) == XEN_MC_HCALL_SUCCESS) {
+		flag = mco.mco_flag;
+		if (!cpu_status_xlate(flag, CSM_XLATE_XEN2SUNOS, old_status))
+			cmn_err(CE_NOTE, "xpv_online: unknown status %d.",
+			    flag);
+	}
+
+	return (-rc);
+}
+
+#endif
+
+/*ARGSUSED*/
 static void *
 cpu_search(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
     uint_t strandid)
 {
-	switch (class) {
-	case CMI_HDL_NATIVE: {
-		cpu_t *cp, *startcp;
+#ifdef __xpv
+	xen_mc_lcpu_cookie_t cpi;
 
-		kpreempt_disable();
-		cp = startcp = CPU;
-		do {
-			if (cmi_ntv_hwchipid(cp) == chipid &&
-			    cmi_ntv_hwcoreid(cp) == coreid &&
-			    cmi_ntv_hwstrandid(cp) == strandid) {
-				kpreempt_enable();
-				return ((void *)cp);
-			}
-
-			cp = cp->cpu_next;
-		} while (cp != startcp);
-		kpreempt_enable();
-		return (NULL);
+	for (cpi = xen_physcpu_next(NULL); cpi != NULL;
+	    cpi = xen_physcpu_next(cpi)) {
+		if (xen_physcpu_chipid(cpi) == chipid &&
+		    xen_physcpu_coreid(cpi) == coreid &&
+		    xen_physcpu_strandid(cpi) == strandid)
+			return ((void *)cpi);
 	}
+	return (NULL);
 
-	default:
-		return (NULL);
-	}
+#else	/* __xpv */
+
+	cpu_t *cp, *startcp;
+
+	kpreempt_disable();
+	cp = startcp = CPU;
+	do {
+		if (cmi_ntv_hwchipid(cp) == chipid &&
+		    cmi_ntv_hwcoreid(cp) == coreid &&
+		    cmi_ntv_hwstrandid(cp) == strandid) {
+			kpreempt_enable();
+			return ((void *)cp);
+		}
+
+		cp = cp->cpu_next;
+	} while (cp != startcp);
+	kpreempt_enable();
+	return (NULL);
+#endif	/* __ xpv */
 }
-#endif
+
+static boolean_t
+cpu_is_cmt(void *priv)
+{
+#ifdef __xpv
+	return (xen_physcpu_is_cmt((xen_mc_lcpu_cookie_t)priv));
+#else /* __xpv */
+	cpu_t *cp = (cpu_t *)priv;
+
+	int strands_per_core = cpuid_get_ncpu_per_chip(cp) /
+	    cpuid_get_ncore_per_chip(cp);
+
+	return (strands_per_core > 1);
+#endif /* __xpv */
+}
 
 cmi_hdl_t
 cmi_hdl_create(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
-    uint_t strandid, boolean_t mstrand)
+    uint_t strandid)
 {
 	cmi_hdl_impl_t *hdl;
-	void *priv = NULL;
+	void *priv;
 	int idx;
+
+#ifdef __xpv
+	ASSERT(class == CMI_HDL_SOLARIS_xVM_MCA);
+#else
+	ASSERT(class == CMI_HDL_NATIVE);
+#endif
 
 	if (chipid > CMI_MAX_CHIPS - 1 || coreid > CMI_MAX_CORES_PER_CHIP - 1 ||
 	    strandid > CMI_MAX_STRANDS_PER_CORE - 1)
 		return (NULL);
 
-#ifndef __xpv
 	if ((priv = cpu_search(class, chipid, coreid, strandid)) == NULL)
 		return (NULL);
-#endif
 
 	hdl = kmem_zalloc(sizeof (*hdl), KM_SLEEP);
 
 	hdl->cmih_class = class;
-	hdl->cmih_ops = &cmi_hdl_ops[class];
+	HDLOPS(hdl) = &cmi_hdl_ops;
 	hdl->cmih_chipid = chipid;
 	hdl->cmih_coreid = coreid;
 	hdl->cmih_strandid = strandid;
-	hdl->cmih_mstrand = mstrand;
+	hdl->cmih_mstrand = cpu_is_cmt(priv);
 	hdl->cmih_hdlpriv = priv;
+#ifdef __xpv
+	hdl->cmih_msrsrc = CMI_MSR_FLAG_RD_INTERPOSEOK |
+	    CMI_MSR_FLAG_WR_INTERPOSEOK;
+#else	/* __xpv */
 	hdl->cmih_msrsrc = CMI_MSR_FLAG_RD_HWOK | CMI_MSR_FLAG_RD_INTERPOSEOK |
 	    CMI_MSR_FLAG_WR_HWOK | CMI_MSR_FLAG_WR_INTERPOSEOK;
+#endif
 
 	if (cmi_hdl_arr == NULL) {
 		size_t sz = CMI_HDL_ARR_SZ * sizeof (struct cmi_hdl_arr_ent);
@@ -940,6 +1268,13 @@ cmi_hdl_lookup(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 
 	idx = CMI_HDL_ARR_IDX(chipid, coreid, strandid);
 
+	if (class == CMI_HDL_NEUTRAL)
+#ifdef __xpv
+		class = CMI_HDL_SOLARIS_xVM_MCA;
+#else
+		class = CMI_HDL_NATIVE;
+#endif
+
 	if (!cmi_hdl_canref(idx))
 		return (NULL);
 
@@ -1013,7 +1348,7 @@ cmi_hdl_class(cmi_hdl_t ophdl)
 	type							\
 	cmi_hdl_##what(cmi_hdl_t ophdl)				\
 	{							\
-		return (IMPLHDL(ophdl)->cmih_ops->		\
+		return (HDLOPS(IMPLHDL(ophdl))->		\
 		    cmio_##what(IMPLHDL(ophdl)));		\
 	}
 
@@ -1025,15 +1360,33 @@ CMI_HDL_OPFUNC(stepping, uint_t)
 CMI_HDL_OPFUNC(chipid, uint_t)
 CMI_HDL_OPFUNC(coreid, uint_t)
 CMI_HDL_OPFUNC(strandid, uint_t)
-CMI_HDL_OPFUNC(mstrand, boolean_t)
 CMI_HDL_OPFUNC(chiprev, uint32_t)
 CMI_HDL_OPFUNC(chiprevstr, const char *)
 CMI_HDL_OPFUNC(getsockettype, uint32_t)
+CMI_HDL_OPFUNC(logical_id, id_t)
+
+boolean_t
+cmi_hdl_is_cmt(cmi_hdl_t ophdl)
+{
+	return (IMPLHDL(ophdl)->cmih_mstrand);
+}
 
 void
 cmi_hdl_int(cmi_hdl_t ophdl, int num)
 {
-	IMPLHDL(ophdl)->cmih_ops->cmio_int(IMPLHDL(ophdl), num);
+	if (HDLOPS(IMPLHDL(ophdl))->cmio_int == NULL)
+		return;
+
+	cmi_hdl_inj_begin(ophdl);
+	HDLOPS(IMPLHDL(ophdl))->cmio_int(IMPLHDL(ophdl), num);
+	cmi_hdl_inj_end(NULL);
+}
+
+int
+cmi_hdl_online(cmi_hdl_t ophdl, int new_status, int *old_status)
+{
+	return (HDLOPS(IMPLHDL(ophdl))->cmio_online(IMPLHDL(ophdl),
+	    new_status, old_status));
 }
 
 #ifndef	__xpv
@@ -1067,15 +1420,6 @@ cmi_ntv_hwstrandid(cpu_t *cp)
 	    cpuid_get_ncore_per_chip(cp);
 
 	return (cpuid_get_clogid(cp) % strands_per_core);
-}
-
-boolean_t
-cmi_ntv_hwmstrand(cpu_t *cp)
-{
-	int strands_per_core = cpuid_get_ncpu_per_chip(cp) /
-	    cpuid_get_ncore_per_chip(cp);
-
-	return (strands_per_core > 1);
 }
 #endif	/* __xpv */
 
@@ -1111,10 +1455,10 @@ cmi_hdl_rdmsr(cmi_hdl_t ophdl, uint_t msr, uint64_t *valp)
 	    msri_lookup(hdl, msr, valp))
 		return (CMI_SUCCESS);
 
-	if (!(hdl->cmih_msrsrc & CMI_MSR_FLAG_RD_HWOK))
-		return (CMIERR_INTERPOSE);
+	if (HDLOPS(hdl)->cmio_rdmsr == NULL)
+		return (CMIERR_NOTSUP);
 
-	return (hdl->cmih_ops->cmio_rdmsr(hdl, msr, valp));
+	return (HDLOPS(hdl)->cmio_rdmsr(hdl, msr, valp));
 }
 
 cmi_errno_t
@@ -1125,19 +1469,25 @@ cmi_hdl_wrmsr(cmi_hdl_t ophdl, uint_t msr, uint64_t val)
 	/* Invalidate any interposed value */
 	msri_rment(hdl, msr);
 
-	if (!(hdl->cmih_msrsrc & CMI_MSR_FLAG_WR_HWOK))
-		return (CMI_SUCCESS);
+	if (HDLOPS(hdl)->cmio_wrmsr == NULL)
+		return (CMI_SUCCESS);	/* pretend all is ok */
 
-	return (hdl->cmih_ops->cmio_wrmsr(hdl, msr, val));
+	return (HDLOPS(hdl)->cmio_wrmsr(hdl, msr, val));
 }
 
 void
 cmi_hdl_enable_mce(cmi_hdl_t ophdl)
 {
 	cmi_hdl_impl_t *hdl = IMPLHDL(ophdl);
-	ulong_t cr4 = hdl->cmih_ops->cmio_getcr4(hdl);
+	ulong_t cr4;
 
-	hdl->cmih_ops->cmio_setcr4(hdl, cr4 | CR4_MCE);
+	if (HDLOPS(hdl)->cmio_getcr4 == NULL ||
+	    HDLOPS(hdl)->cmio_setcr4 == NULL)
+		return;
+
+	cr4 = HDLOPS(hdl)->cmio_getcr4(hdl);
+
+	HDLOPS(hdl)->cmio_setcr4(hdl, cr4 | CR4_MCE);
 }
 
 void
@@ -1146,9 +1496,31 @@ cmi_hdl_msrinterpose(cmi_hdl_t ophdl, cmi_mca_regs_t *regs, uint_t nregs)
 	cmi_hdl_impl_t *hdl = IMPLHDL(ophdl);
 	int i;
 
-	for (i = 0; i < nregs; i++)
-		msri_addent(hdl, regs++);
+	if (HDLOPS(hdl)->cmio_msrinterpose == NULL)
+		return;
+
+	cmi_hdl_inj_begin(ophdl);
+
+	for (i = 0; i < nregs; i++, regs++)
+		HDLOPS(hdl)->cmio_msrinterpose(hdl, regs->cmr_msrnum,
+		    regs->cmr_msrval);
+
+	cmi_hdl_inj_end(ophdl);
 }
+
+/*ARGSUSED*/
+void
+cmi_hdl_msrforward(cmi_hdl_t ophdl, cmi_mca_regs_t *regs, uint_t nregs)
+{
+#ifdef __xpv
+	cmi_hdl_impl_t *hdl = IMPLHDL(ophdl);
+	int i;
+
+	for (i = 0; i < nregs; i++, regs++)
+		msri_addent(hdl, regs->cmr_msrnum, regs->cmr_msrval);
+#endif
+}
+
 
 void
 cmi_pcird_nohw(void)
@@ -1285,23 +1657,75 @@ cmi_pci_put_cmn(int bus, int dev, int func, int reg, int asz,
 	}
 }
 
-extern void
+void
 cmi_pci_putb(int bus, int dev, int func, int reg, ddi_acc_handle_t hdl,
     uint8_t val)
 {
 	cmi_pci_put_cmn(bus, dev, func, reg, 1, hdl, val);
 }
 
-extern void
+void
 cmi_pci_putw(int bus, int dev, int func, int reg, ddi_acc_handle_t hdl,
     uint16_t val)
 {
 	cmi_pci_put_cmn(bus, dev, func, reg, 2, hdl, val);
 }
 
-extern void
+void
 cmi_pci_putl(int bus, int dev, int func, int reg, ddi_acc_handle_t hdl,
     uint32_t val)
 {
 	cmi_pci_put_cmn(bus, dev, func, reg, 4, hdl, val);
 }
+
+static const struct cmi_hdl_ops cmi_hdl_ops = {
+#ifdef __xpv
+	/*
+	 * CMI_HDL_SOLARIS_xVM_MCA - ops when we are an xVM dom0
+	 */
+	xpv_vendor,		/* cmio_vendor */
+	xpv_vendorstr,		/* cmio_vendorstr */
+	xpv_family,		/* cmio_family */
+	xpv_model,		/* cmio_model */
+	xpv_stepping,		/* cmio_stepping */
+	xpv_chipid,		/* cmio_chipid */
+	xpv_coreid,		/* cmio_coreid */
+	xpv_strandid,		/* cmio_strandid */
+	xpv_chiprev,		/* cmio_chiprev */
+	xpv_chiprevstr,		/* cmio_chiprevstr */
+	xpv_getsockettype,	/* cmio_getsockettype */
+	xpv_logical_id,		/* cmio_logical_id */
+	NULL,			/* cmio_getcr4 */
+	NULL,			/* cmio_setcr4 */
+	xpv_rdmsr,		/* cmio_rdmsr */
+	xpv_wrmsr,		/* cmio_wrmsr */
+	xpv_msrinterpose,	/* cmio_msrinterpose */
+	xpv_int,		/* cmio_int */
+	xpv_online		/* cmio_online */
+
+#else	/* __xpv */
+
+	/*
+	 * CMI_HDL_NATIVE - ops when apparently running on bare-metal
+	 */
+	ntv_vendor,		/* cmio_vendor */
+	ntv_vendorstr,		/* cmio_vendorstr */
+	ntv_family,		/* cmio_family */
+	ntv_model,		/* cmio_model */
+	ntv_stepping,		/* cmio_stepping */
+	ntv_chipid,		/* cmio_chipid */
+	ntv_coreid,		/* cmio_coreid */
+	ntv_strandid,		/* cmio_strandid */
+	ntv_chiprev,		/* cmio_chiprev */
+	ntv_chiprevstr,		/* cmio_chiprevstr */
+	ntv_getsockettype,	/* cmio_getsockettype */
+	ntv_logical_id,		/* cmio_logical_id */
+	ntv_getcr4,		/* cmio_getcr4 */
+	ntv_setcr4,		/* cmio_setcr4 */
+	ntv_rdmsr,		/* cmio_rdmsr */
+	ntv_wrmsr,		/* cmio_wrmsr */
+	ntv_msrinterpose,	/* cmio_msrinterpose */
+	ntv_int,		/* cmio_int */
+	ntv_online		/* cmio_online */
+#endif
+};

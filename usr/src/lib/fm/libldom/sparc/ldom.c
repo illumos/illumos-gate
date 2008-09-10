@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -46,6 +44,7 @@
 #include <sys/bl.h>
 #include <sys/fm/protocol.h>
 #include <fm/fmd_fmri.h>
+#include <fm/fmd_agent.h>
 #include <sys/pri.h>
 
 #include "ldom.h"
@@ -364,69 +363,6 @@ cpu_phys2virt(ldom_hdl_t *lhp, uint32_t cpuid)
 	return (vid);
 }
 
-/*
- * if checking for status of a retired page:
- *   0 - page is retired
- *   EAGAIN - page is scheduled for retirement
- *   EIO - page not scheduled for retirement
- *   EINVAL - error
- *
- * if retiring a page:
- *   0 - success in retiring page
- *   EIO - page is already retired
- *   EAGAIN - page is scheduled for retirement
- *   EINVAL - error
- *
- * the original decoder for ioctl() return values is
- * http://fma.eng/documents/engineering/cpumem/page_retire_api.txt
- */
-static int
-os_mem_page_retire(ldom_hdl_t *lhp, int cmd, nvlist_t *nvl)
-{
-	mem_page_t mpage;
-	char *fmribuf;
-	size_t fmrisz;
-	int fd, rc, err;
-
-	if (cmd != MEM_PAGE_RETIRE && cmd != MEM_PAGE_FMRI_RETIRE &&
-	    cmd != MEM_PAGE_ISRETIRED && cmd != MEM_PAGE_FMRI_ISRETIRED &&
-	    cmd != MEM_PAGE_UNRETIRE && cmd != MEM_PAGE_FMRI_UNRETIRE)
-		return (EINVAL);
-
-	if ((fd = open("/dev/mem", O_RDONLY)) < 0)
-		return (EINVAL);
-
-	if ((errno = nvlist_size(nvl, &fmrisz, NV_ENCODE_NATIVE)) != 0 ||
-	    fmrisz > MEM_FMRI_MAX_BUFSIZE ||
-	    (fmribuf = lhp->allocp(fmrisz)) == NULL) {
-		(void) close(fd);
-		return (EINVAL);
-	}
-
-	if ((errno = nvlist_pack(nvl, &fmribuf, &fmrisz,
-	    NV_ENCODE_NATIVE, 0)) != 0) {
-		lhp->freep(fmribuf, fmrisz);
-		(void) close(fd);
-		return (EINVAL);
-	}
-
-	mpage.m_fmri = fmribuf;
-	mpage.m_fmrisz = fmrisz;
-
-	rc = ioctl(fd, cmd, &mpage);
-	err = errno;
-
-	lhp->freep(fmribuf, fmrisz);
-	(void) close(fd);
-
-	if (rc < 0) {
-		rc = err;
-	}
-
-	return (rc);
-}
-
-
 int
 ldom_fmri_status(ldom_hdl_t *lhp, nvlist_t *nvl)
 {
@@ -453,8 +389,19 @@ ldom_fmri_status(ldom_hdl_t *lhp, nvlist_t *nvl)
 			    == 0 && (vid = cpu_phys2virt(lhp, cpuid)) != -1)
 				return (p_online(vid, P_STATUS));
 		} else if (strcmp(name, FM_FMRI_SCHEME_MEM) == 0) {
-			return (os_mem_page_retire(lhp,
-			    MEM_PAGE_FMRI_ISRETIRED, nvl));
+			fmd_agent_hdl_t *hdl;
+			int err;
+			if ((hdl = fmd_agent_open(FMD_AGENT_VERSION)) == NULL) {
+				err = errno;
+			} else {
+				err = fmd_agent_page_isretired(hdl, nvl);
+				if (err == FMD_AGENT_RETIRE_DONE)
+					err = 0;
+				else
+					err = fmd_agent_errno(hdl);
+				fmd_agent_close(hdl);
+			}
+			return (err);
 		}
 
 		return (EINVAL);
@@ -507,8 +454,19 @@ ldom_fmri_retire(ldom_hdl_t *lhp, nvlist_t *nvl)
 			    == 0 && (vid = cpu_phys2virt(lhp, cpuid)) != -1)
 				return (p_online(vid, P_FAULTED));
 		} else if (strcmp(name, FM_FMRI_SCHEME_MEM) == 0) {
-			return (os_mem_page_retire(lhp,
-			    MEM_PAGE_FMRI_RETIRE, nvl));
+			fmd_agent_hdl_t *hdl;
+			int err;
+			if ((hdl = fmd_agent_open(FMD_AGENT_VERSION)) == NULL) {
+				err = errno;
+			} else {
+				err = fmd_agent_page_retire(hdl, nvl);
+				if (err == FMD_AGENT_RETIRE_DONE)
+					err = 0;
+				else
+					err = fmd_agent_errno(hdl);
+				fmd_agent_close(hdl);
+			}
+			return (err);
 		}
 
 		return (EINVAL);
@@ -560,8 +518,19 @@ ldom_fmri_unretire(ldom_hdl_t *lhp, nvlist_t *nvl)
 			    == 0 && (vid = cpu_phys2virt(lhp, cpuid)) != -1)
 				return (p_online(vid, P_ONLINE));
 		} else if (strcmp(name, FM_FMRI_SCHEME_MEM) == 0) {
-			return (os_mem_page_retire(lhp,
-			    MEM_PAGE_FMRI_UNRETIRE, nvl));
+			fmd_agent_hdl_t *hdl;
+			int err;
+			if ((hdl = fmd_agent_open(FMD_AGENT_VERSION)) == NULL) {
+				err = errno;
+			} else {
+				err = fmd_agent_page_unretire(hdl, nvl);
+				if (err == FMD_AGENT_RETIRE_DONE)
+					err = 0;
+				else
+					err = fmd_agent_errno(hdl);
+				fmd_agent_close(hdl);
+			}
+			return (err);
 		}
 
 		return (EINVAL);

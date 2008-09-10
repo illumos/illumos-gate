@@ -235,6 +235,7 @@ DRV_KMODS	+= chxge
 DRV_KMODS	+= smbsrv
 DRV_KMODS	+= vscan
 DRV_KMODS	+= nsmb
+DRV_KMODS	+= fm
 
 #
 # Don't build some of these for OpenSolaris, since they will be

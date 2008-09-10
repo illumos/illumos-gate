@@ -824,6 +824,8 @@ DRM_OBJS += drm_sunmod.o drm_kstat.o drm_agpsupport.o \
 	    drm_lock.o drm_memory.o drm_msg.o drm_pci.o drm_scatter.o \
 	    ati_pcigart.o
 
+FM_OBJS += devfm.o devfm_machdep.o
+
 #
 #			exec modules
 #

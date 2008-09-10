@@ -23,12 +23,12 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 !include prototype_com
 
 d none usr/lib/fm/amd64 755 root bin
+f none usr/lib/fm/amd64/libfmd_agent.so.1 755 root bin
+s none usr/lib/fm/amd64/libfmd_agent.so=./libfmd_agent.so.1
 f none usr/lib/fm/amd64/libdiagcode.so.1 755 root bin
 s none usr/lib/fm/amd64/libdiagcode.so=./libdiagcode.so.1
 f none usr/lib/fm/amd64/libdiskstatus.so.1 755 root bin
@@ -43,6 +43,7 @@ f none usr/lib/fm/amd64/libfmd_snmp.so.1 755 root bin
 s none usr/lib/fm/amd64/libfmd_snmp.so=./libfmd_snmp.so.1
 f none usr/lib/fm/amd64/libtopo.so.1 755 root bin
 s none usr/lib/fm/amd64/libtopo.so=libtopo.so.1
+f none usr/lib/fm/amd64/llib-lfmd_agent.ln 644 root bin
 f none usr/lib/fm/amd64/llib-ldiagcode.ln 644 root bin
 f none usr/lib/fm/amd64/llib-ldiskstatus.ln 644 root bin
 f none usr/lib/fm/amd64/llib-lfmd_adm.ln 644 root bin

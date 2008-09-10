@@ -26,8 +26,6 @@
 #ifndef _SYS_MEM_H
 #define	_SYS_MEM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -80,9 +78,6 @@ typedef struct mem_vtop32 {
 #define	MEM_PAGE_RETIRE_TEST	(('M' << 8) | 0x0A)
 
 #define	MEM_SID			(('M' << 8) | 0x0B)
-#define	MEM_PAGE_FMRI_RETIRE	(('M' << 8) | 0x0C)
-#define	MEM_PAGE_FMRI_ISRETIRED	(('M' << 8) | 0x0D)
-#define	MEM_PAGE_FMRI_UNRETIRE	(('M' << 8) | 0x0E)
 
 /*
  * Bits returned from MEM_PAGE_GETERRORS ioctl for use by fmd(1M).
@@ -93,18 +88,6 @@ typedef struct mem_vtop32 {
 #define	MEM_PAGE_ERR_FMA_REQ	0x8
 
 #define	MEM_FMRI_MAX_BUFSIZE	8192	/* maximum allowed packed FMRI size */
-
-typedef struct mem_page {
-	caddr_t		m_fmri;		/* buffer containing packed FMRI */
-	size_t		m_fmrisz;	/* size of packed FMRI */
-} mem_page_t;
-
-#if	defined(_SYSCALL32)
-typedef struct mem_page32 {
-	caddr32_t	m_fmri;
-	size32_t	m_fmrisz;
-} mem_page32_t;
-#endif	/* _SYSCALL32 */
 
 typedef struct mem_name {
 	uint64_t	m_addr;		/* memory address */

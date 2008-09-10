@@ -24,80 +24,82 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
- * Page retirement can be an extended process due to the fact that a retirement
- * may not be possible when the original request is made.  The kernel will
- * repeatedly attempt to retire a given page, but will not let us know when the
- * page has been retired.  We therefore have to poll to see if the retirement
- * has been completed.  This poll is implemented with a bounded exponential
- * backoff to reduce the burden which we impose upon the system.
- *
- * To reduce the burden on fmd in the face of retirement storms, we schedule
- * all retries as a group.  In the simplest case, we attempt to retire a single
- * page.  When forced to retry, we initially schedule a retry at a configurable
- * interval t.  If the retry fails, we schedule another at 2 * t, and so on,
- * until t reaches the maximum interval (also configurable).  Future retries
- * for that page will occur with t equal to the maximum interval value.  We
- * will never give up on a retirement.
- *
- * With multiple retirements, the situation gets slightly more complicated.  As
- * indicated above, we schedule retries as a group.  We don't want to deny new
- * pages their short retry intervals, so we'll (re)set the retry interval to the
- * value appropriate for the newest page.
- */
-
-#include <cma.h>
-
-#include <fcntl.h>
-#include <errno.h>
-#include <unistd.h>
-#include <strings.h>
 #include <fm/fmd_api.h>
-#include <fm/libtopo.h>
-#include <sys/fm/protocol.h>
-#include <sys/mem.h>
+#include <fm/fmd_agent.h>
+#include <fm/fmd_fmri.h>
+
+#ifdef i386
+/*
+ * On x86, we call topo interfaces to invoke the retire/unretire methods in the
+ * corresponding topo node.
+ *
+ */
+int
+cma_fmri_page_service_state(fmd_hdl_t *hdl, nvlist_t *nvl)
+{
+	return (fmd_nvl_fmri_service_state(hdl, nvl));
+}
 
 int
-cma_page_cmd(fmd_hdl_t *hdl, int cmd, nvlist_t *nvl)
+cma_fmri_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl)
 {
-	mem_page_t mpage;
-	char *fmribuf;
-	size_t fmrisz;
-	int fd, rc, err;
-
-	if ((fd = open("/dev/mem", O_RDONLY)) < 0)
-		return (-1); /* errno is set for us */
-
-	if ((errno = nvlist_size(nvl, &fmrisz, NV_ENCODE_NATIVE)) != 0 ||
-	    fmrisz > MEM_FMRI_MAX_BUFSIZE ||
-	    (fmribuf = fmd_hdl_alloc(hdl, fmrisz, FMD_SLEEP)) == NULL) {
-		(void) close(fd);
-		return (-1); /* errno is set for us */
-	}
-
-	if ((errno = nvlist_pack(nvl, &fmribuf, &fmrisz,
-	    NV_ENCODE_NATIVE, 0)) != 0) {
-		fmd_hdl_free(hdl, fmribuf, fmrisz);
-		(void) close(fd);
-		return (-1); /* errno is set for us */
-	}
-
-	mpage.m_fmri = fmribuf;
-	mpage.m_fmrisz = fmrisz;
-
-	if ((rc = ioctl(fd, cmd, &mpage)) < 0)
-		err = errno;
-
-	fmd_hdl_free(hdl, fmribuf, fmrisz);
-
-	(void) close(fd);
-
-	if (rc < 0) {
-		errno = err;
-		return (-1);
-	}
-
-	return (0);
+	return (fmd_nvl_fmri_retire(hdl, nvl));
 }
+
+int
+cma_fmri_page_unretire(fmd_hdl_t *hdl, nvlist_t *nvl)
+{
+	return (fmd_nvl_fmri_unretire(hdl, nvl));
+}
+#else
+/* ARGSUSED */
+int
+cma_fmri_page_service_state(fmd_hdl_t *hdl, nvlist_t *nvl)
+{
+	fmd_agent_hdl_t *fa_hdl;
+	int rc = FMD_SERVICE_STATE_UNKNOWN;
+
+	if ((fa_hdl = fmd_agent_open(FMD_AGENT_VERSION)) != NULL) {
+		rc = fmd_agent_page_isretired(fa_hdl, nvl);
+		if (rc == FMD_AGENT_RETIRE_DONE)
+			rc = FMD_SERVICE_STATE_UNUSABLE;
+		else if (rc == FMD_AGENT_RETIRE_FAIL)
+			rc = FMD_SERVICE_STATE_OK;
+		else if (rc == FMD_AGENT_RETIRE_ASYNC)
+			rc = FMD_SERVICE_STATE_ISOLATE_PENDING;
+		fmd_agent_close(fa_hdl);
+	}
+
+	return (rc);
+}
+
+/* ARGSUSED */
+int
+cma_fmri_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl)
+{
+	fmd_agent_hdl_t *fa_hdl;
+	int rc = FMD_AGENT_RETIRE_FAIL;
+
+	if ((fa_hdl = fmd_agent_open(FMD_AGENT_VERSION)) != NULL) {
+		rc = fmd_agent_page_retire(fa_hdl, nvl);
+		fmd_agent_close(fa_hdl);
+	}
+
+	return (rc);
+}
+
+/* ARGSUSED */
+int
+cma_fmri_page_unretire(fmd_hdl_t *hdl, nvlist_t *nvl)
+{
+	fmd_agent_hdl_t *fa_hdl;
+	int rc = FMD_AGENT_RETIRE_FAIL;
+
+	if ((fa_hdl = fmd_agent_open(FMD_AGENT_VERSION)) != NULL) {
+		rc = fmd_agent_page_unretire(fa_hdl, nvl);
+		fmd_agent_close(fa_hdl);
+	}
+
+	return (rc);
+}
+#endif

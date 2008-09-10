@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 #	This Makefile defines the build rules for the directory uts/i86xpv
@@ -50,6 +48,10 @@
 #	Section 1a: C object build rules
 #
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/conf/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86xpv/cpu/generic_cpu/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 

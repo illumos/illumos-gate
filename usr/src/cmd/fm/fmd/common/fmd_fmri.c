@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ctype.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -371,6 +369,41 @@ fmd_fmri_unusable(nvlist_t *nvl)
 	(void) pthread_mutex_unlock(&sp->sch_opslock);
 
 	fmd_scheme_hash_release(fmd.d_schemes, sp);
+	return (rv);
+}
+
+/*
+ * Someday we'll retire the scheme plugins.  For the
+ * retire/unretire operations, the topo interfaces
+ * are called directly.
+ */
+int
+fmd_fmri_retire(nvlist_t *nvl)
+{
+	topo_hdl_t *thp;
+	int rv, err;
+
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
+		return (-1);
+
+	rv = topo_fmri_retire(thp, nvl, &err);
+	fmd_fmri_topo_rele(thp);
+
+	return (rv);
+}
+
+int
+fmd_fmri_unretire(nvlist_t *nvl)
+{
+	topo_hdl_t *thp;
+	int rv, err;
+
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
+		return (-1);
+
+	rv = topo_fmri_unretire(thp, nvl, &err);
+	fmd_fmri_topo_rele(thp);
+
 	return (rv);
 }
 

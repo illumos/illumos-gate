@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.lib
@@ -35,6 +33,7 @@ sparc_SUBDIRS = \
 i386_SUBDIRS =
 
 SUBDIRS = \
+	libfmd_agent \
 	libdiagcode \
 	libdiskstatus \
 	libfmd_adm \
@@ -44,10 +43,10 @@ SUBDIRS = \
 	$($(MACH)_SUBDIRS) \
 	topo
 
-libldom: libmdesc
+libldom: libmdesc libfmd_agent
 
 libfmd_snmp: libfmd_adm topo
 
-topo: $($(MACH)_SUBDIRS)
+topo: $($(MACH)_SUBDIRS) libfmd_agent
 
 include ./Makefile.subdirs

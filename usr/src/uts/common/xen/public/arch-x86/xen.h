@@ -24,18 +24,27 @@
  * Copyright (c) 2004-2006, K A Fraser
  */
 
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#include "../xen.h"
+
 #ifndef __XEN_PUBLIC_ARCH_X86_XEN_H__
 #define __XEN_PUBLIC_ARCH_X86_XEN_H__
 
 /* Structural guest handles introduced in 0x00030201. */
 #if __XEN_INTERFACE_VERSION__ >= 0x00030201
-#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
+#define ___DEFINE_XEN_GUEST_HANDLE(name, type) \
     typedef struct { type *p; } __guest_handle_ ## name
 #else
-#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
+#define ___DEFINE_XEN_GUEST_HANDLE(name, type) \
     typedef type * __guest_handle_ ## name
 #endif
 
+#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
+    ___DEFINE_XEN_GUEST_HANDLE(name, type)
 #define DEFINE_XEN_GUEST_HANDLE(name)   __DEFINE_XEN_GUEST_HANDLE(name, name)
 #define __XEN_GUEST_HANDLE(name)        __guest_handle_ ## name
 #define XEN_GUEST_HANDLE(name)          __XEN_GUEST_HANDLE(name)
@@ -85,6 +94,10 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 
 /* Maximum number of virtual CPUs in multi-processor guests. */
 #define MAX_VIRT_CPUS 32
+
+
+/* Machine check support */
+#include "xen-mca.h"
 
 #ifndef __ASSEMBLY__
 
@@ -183,6 +196,23 @@ struct arch_shared_info {
 };
 typedef struct arch_shared_info arch_shared_info_t;
 
+#define	MCA_PANICDATA_MAGIC	0x5044	/* "PD" */
+#define	MCA_PANICDATA_VERS	1
+
+typedef struct xpv_mca_panic_data {
+	uint16_t mpd_magic;
+	uint16_t mpd_version;
+	int mpd_fwdptr_offset;
+	int mpd_revptr_offset;
+	int mpd_dataptr_offset;
+	void *mpd_urgent_processing;
+	void *mpd_urgent_dangling;
+	void *mpd_urgent_committed;
+	void *mpd_nonurgent_processing;
+	void *mpd_nonurgent_dangling;
+	void *mpd_nonurgent_committed;
+} xpv_mca_panic_data_t;
+
 typedef struct panic_regs panic_regs_t;
 struct panic_info {
 	int		pi_version;	/* panic_info format version */
@@ -197,6 +227,7 @@ struct panic_info {
 	struct domain	*pi_domain;	/* Panicking domain */
 	struct vcpu	*pi_vcpu;	/* Panicking vcpu */
 	int		pi_dom0cpu;	/* cpu number - if a dom0 panic */
+	xpv_mca_panic_data_t pi_mca;	/* Machine check error telemetry */
 };
 
 struct panic_frame {
@@ -204,7 +235,7 @@ struct panic_frame {
 	unsigned long	pf_pc;
 };
 
-#define PANIC_INFO_VERSION	2
+#define PANIC_INFO_VERSION	3
 
 #endif /* !__ASSEMBLY__ */
 

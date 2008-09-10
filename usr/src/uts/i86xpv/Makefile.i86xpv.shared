@@ -25,7 +25,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile contains the common definitions for the i86xpv unix
 #	and all i86xpv implementation architecture dependent modules.
@@ -261,6 +261,14 @@ DRV_KMODS	+= privcmd
 DRV_KMODS	+= domcaps
 DRV_KMODS	+= evtchn
 DRV_KMODS	+= balloon
+
+#
+#	CPU Modules
+#
+CPU_KMODS	+= generic_cpu
+CPU_KMODS	+= amd_opteron
+CPU_KMODS	+= genuineintel
+CPU_KMODS	+= authenticamd
 
 #
 #	Exec Class Modules (/kernel/exec):

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Eversholt rules for generic AMD with on-chip memory-controller(s), as seen
  * in AMD family 0xf and 0x10.
@@ -94,8 +92,8 @@
 
 #define	SET_ADDR (setpayloadprop("asru-physaddr", payloadprop("IA32_MCi_ADDR"))) 
 /* Generic memory ereports. */
-event ereport.cpu.generic-x86.mem_ce@chip/cpu { within(1s) };
-event ereport.cpu.generic-x86.mem_ue@chip/cpu { within(1s) };
+event ereport.cpu.generic-x86.mem_ce@chip/core/strand { within(1s) };
+event ereport.cpu.generic-x86.mem_ue@chip/core/strand { within(1s) };
 
 /*
  *	 ========= Propogations for correctable memory faults ==========
@@ -142,16 +140,16 @@ event fault.memory.generic-x86.dimm_ce@CSPATH,
 
 prop fault.memory.generic-x86.page_ce@CSPATH
     { ADDR_VALID && CONTAINS_CS && !CS_PGFLT_LIMIT_REACHED && SET_ADDR } (1)->
-    ereport.cpu.generic-x86.mem_ce@chip/cpu;
+    ereport.cpu.generic-x86.mem_ce@chip/core/strand;
 
 prop fault.memory.generic-x86.dimm_ce@CSPATH
     { ADDR_VALID && CONTAINS_CS && CS_DIMMSB_THRESH_REACHED } (1)->
-    ereport.cpu.generic-x86.mem_ce@chip/cpu;
+    ereport.cpu.generic-x86.mem_ce@chip/core/strand;
 
-event upset.memory.generic-x86.discard@chip/cpu;
-prop upset.memory.generic-x86.discard@chip/cpu
+event upset.memory.generic-x86.discard@chip/core/strand;
+prop upset.memory.generic-x86.discard@chip/core/strand
     { !payloadprop_defined("resource") || !ADDR_VALID } (1)->
-    ereport.cpu.generic-x86.mem_ce@chip/cpu;
+    ereport.cpu.generic-x86.mem_ce@chip/core/strand;
 
 /*
  *	 ========= Propogations for uncorrectable page faults ==========
@@ -167,16 +165,16 @@ event fault.memory.generic-x86.dimm_ue@CSPATH;
 
 prop fault.memory.generic-x86.page_ue@CSPATH
     { ADDR_VALID && CONTAINS_CS && SET_ADDR } (1)->
-    ereport.cpu.generic-x86.mem_ue@chip/cpu;
+    ereport.cpu.generic-x86.mem_ue@chip/core/strand;
 
 prop fault.memory.generic-x86.dimm_ue@CSPATH
     { ADDR_VALID && CONTAINS_CS } (1)->
-    ereport.cpu.generic-x86.mem_ue@chip/cpu;
+    ereport.cpu.generic-x86.mem_ue@chip/core/strand;
 
 event upset.memory.generic-x86.discard3@CSPATH;
 prop upset.memory.generic-x86.discard3@CSPATH
     { !payloadprop_defined("resource") || !ADDR_VALID } (1)->
-    ereport.cpu.generic-x86.mem_ue@chip/cpu;
+    ereport.cpu.generic-x86.mem_ue@chip/core/strand;
 
 /*
  *	 ========= Propogations for GART Table Walk Errors =============
@@ -189,8 +187,8 @@ prop upset.memory.generic-x86.discard3@CSPATH
  *	|===============================================================| 
  */
 
-event ereport.cpu.generic-x86.gart_tbl_walk@chip/cpu { within(1s) };
-event upset.cpu.generic-x86.gart_tbl_walk@chip/cpu;
+event ereport.cpu.generic-x86.gart_tbl_walk@chip/core/strand { within(1s) };
+event upset.cpu.generic-x86.gart_tbl_walk@chip/core/strand;
 
-prop upset.cpu.generic-x86.gart_tbl_walk@chip/cpu (1)->
-    ereport.cpu.generic-x86.gart_tbl_walk@chip/cpu;
+prop upset.cpu.generic-x86.gart_tbl_walk@chip/core/strand (1)->
+    ereport.cpu.generic-x86.gart_tbl_walk@chip/core/strand;

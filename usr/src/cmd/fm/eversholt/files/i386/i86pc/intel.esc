@@ -35,7 +35,6 @@
  */
 
 #define SMPL_EVENT(leafclass, t) \
-	event ereport.cpu.intel.leafclass@chip/cpu { within(t) }; \
 	event ereport.cpu.intel.leafclass@chip/core/strand { within(t) }
 
 SMPL_EVENT(unknown, 1s);	
@@ -54,20 +53,10 @@ SMPL_EVENT(internal_unclassified, 1s);
  * trips.
  */
 
-engine serd.cpu.intel.simple@chip/cpu, N=3, T=72h;
-event fault.cpu.intel.internal@chip/cpu, engine=serd.cpu.intel.simple@chip/cpu;
 engine serd.cpu.intel.simple@chip/core/strand, N=3, T=72h;
 event fault.cpu.intel.internal@chip/core/strand,
     engine=serd.cpu.intel.simple@chip/core/strand;
 
-prop fault.cpu.intel.internal@chip/cpu
-    { payloadprop("error_uncorrected") == 1 ? setserdincrement(4) : 1} (0)->
-    ereport.cpu.intel.microcode_rom_parity@chip/cpu,
-    ereport.cpu.intel.internal_timer@chip/cpu,
-    ereport.cpu.intel.internal_parity@chip/cpu,
-    ereport.cpu.intel.unclassified@chip/cpu,
-    ereport.cpu.intel.internal_unclassified@chip/cpu,
-    ereport.cpu.intel.frc@chip/cpu;
 prop fault.cpu.intel.internal@chip/core/strand
     { payloadprop("error_uncorrected") == 1 ? setserdincrement(4) : 1} (0)->
     ereport.cpu.intel.microcode_rom_parity@chip/core/strand,
@@ -80,12 +69,10 @@ prop fault.cpu.intel.internal@chip/core/strand
 /*
  * Ereports for Compound error codes.  These are in pairs "foo" and "foo_uc"
  * for the corrected and uncorrected version of each error type.  All are
- * detected at chip/cpu and chip/core/strand.
+ * detected at chip/core/strand.
  */
 
 #define	CMPND_EVENT(leafclass, t) \
-	event ereport.cpu.intel.leafclass@chip/cpu { within(t) }; \
-	event ereport.cpu.intel.leafclass/**/_uc@chip/cpu { within(t) }; \
 	event ereport.cpu.intel.leafclass@chip/core/strand { within(t) }; \
 	event ereport.cpu.intel.leafclass/**/_uc@chip/core/strand { within(t) }
 
@@ -149,41 +136,25 @@ CMPND_EVENT(bus_interconnect_io, 1s);
  */
 
 #define	CMPND_FLT_PROP_1(erptleaf, fltleaf, n, t)			\
-	engine serd.cpu.intel.fltleaf@chip/cpu, N=n, T=t;		\
-	event fault.cpu.intel.fltleaf@chip/cpu,				\
-	    engine=serd.cpu.intel.fltleaf@chip/cpu;			\
 	engine serd.cpu.intel.fltleaf@chip/core/strand, N=n, T=t;	\
 	event fault.cpu.intel.fltleaf@chip/core/strand,			\
 	    engine=serd.cpu.intel.fltleaf@chip/core/strand;		\
 									\
-	prop fault.cpu.intel.fltleaf@chip/cpu (0)->			\
-	    ereport.cpu.intel.erptleaf@chip/cpu;			\
 	prop fault.cpu.intel.fltleaf@chip/core/strand (0)->		\
 	    ereport.cpu.intel.erptleaf@chip/core/strand;		\
 									\
-	prop fault.cpu.intel.fltleaf@chip/cpu				\
-	    { setserdincrement(n + 1) } (0)->				\
-	    ereport.cpu.intel.erptleaf/**/_uc@chip/cpu;			\
 	prop fault.cpu.intel.fltleaf@chip/core/strand			\
 	    { setserdincrement(n + 1) } (0)->				\
 	    ereport.cpu.intel.erptleaf/**/_uc@chip/core/strand
 
 #define	CMPND_FLT_PROP_2(erptleaf, fltleaf, n, t)			\
-	engine serd.cpu.intel.fltleaf@chip/cpu, N=n, T=t;		\
-	event fault.cpu.intel.fltleaf@chip/cpu, retire=0, response=0,	\
-	    engine=serd.cpu.intel.fltleaf@chip/cpu;			\
 	engine serd.cpu.intel.fltleaf@chip/core/strand, N=n, T=t;	\
 	event fault.cpu.intel.fltleaf@chip/core/strand, retire=0, response=0,\
 	    engine=serd.cpu.intel.fltleaf@chip/core/strand;		\
 									\
-	prop fault.cpu.intel.fltleaf@chip/cpu (0)->			\
-	    ereport.cpu.intel.erptleaf@chip/cpu;			\
 	prop fault.cpu.intel.fltleaf@chip/core/strand (0)->		\
 	    ereport.cpu.intel.erptleaf@chip/core/strand;		\
 									\
-	prop fault.cpu.intel.fltleaf@chip/cpu 				\
-	    { setserdincrement(n + 1) } (0)->				\
-	    ereport.cpu.intel.erptleaf/**/_uc@chip/cpu;			\
 	prop fault.cpu.intel.fltleaf@chip/core/strand 			\
 	    { setserdincrement(n + 1) } (0)->				\
 	    ereport.cpu.intel.erptleaf/**/_uc@chip/core/strand
@@ -222,12 +193,6 @@ CMPND_FLT_PROP_2(bus_interconnect, bus_interconnect, 10, 72h);
 CMPND_FLT_PROP_2(bus_interconnect_memory, bus_interconnect_memory, 10, 72h);
 CMPND_FLT_PROP_2(bus_interconnect_io, bus_interconnect_io, 10, 72h);
 
-event upset.discard@chip/cpu;
-
-prop upset.discard@chip/cpu (0)->
-    ereport.cpu.intel.external@chip/cpu,
-    ereport.cpu.intel.unknown@chip/cpu;
-
 event upset.discard@chip/core/strand;
 
 prop upset.discard@chip/core/strand (0)->
@@ -249,11 +214,6 @@ prop upset.discard@chip/core/strand (0)->
     setpayloadprop("asru-offset", payloadprop("offset")))
 
 #define EREPORT_BUS_ERROR						\
-    ereport.cpu.intel.bus_interconnect_memory_uc@chip/cpu,		\
-    ereport.cpu.intel.bus_interconnect_uc@chip/cpu,			\
-    ereport.cpu.intel.bus_interconnect_memory@chip/cpu,			\
-    ereport.cpu.intel.bus_interconnect@chip/cpu,			\
-    ereport.cpu.intel.external@chip/cpu,				\
     ereport.cpu.intel.bus_interconnect_memory_uc@chip/core/strand,	\
     ereport.cpu.intel.bus_interconnect_uc@chip/core/strand,		\
     ereport.cpu.intel.bus_interconnect_memory@chip/core/strand,		\

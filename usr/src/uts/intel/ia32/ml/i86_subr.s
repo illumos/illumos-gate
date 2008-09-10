@@ -2235,19 +2235,19 @@ dtrace_interrupt_disable(void)
 	leaq	xpv_panicking, %rdi
 	movl	(%rdi), %edi
 	cmpl	$0, %edi
-	jne	1f
+	jne	.dtrace_interrupt_disable_done
 	CLIRET(%rdi, %dl)	/* returns event mask in %dl */
 	/*
 	 * Synthesize the PS_IE bit from the event mask bit
 	 */
 	andq    $_BITNOT(PS_IE), %rax
 	testb	$1, %dl
-	jnz	1f
+	jnz	.dtrace_interrupt_disable_done
 	orq	$PS_IE, %rax
-1:
 #else
 	CLI(%rdx)
 #endif
+.dtrace_interrupt_disable_done:
 	ret
 	SET_SIZE(dtrace_interrupt_disable)
 
@@ -2260,19 +2260,19 @@ dtrace_interrupt_disable(void)
 	leal	xpv_panicking, %edx
 	movl	(%edx), %edx
 	cmpl	$0, %edx
-	jne	1f
+	jne	.dtrace_interrupt_disable_done
 	CLIRET(%edx, %cl)	/* returns event mask in %cl */
 	/*
 	 * Synthesize the PS_IE bit from the event mask bit
 	 */
 	andl    $_BITNOT(PS_IE), %eax
 	testb	$1, %cl
-	jnz	1f
+	jnz	.dtrace_interrupt_disable_done
 	orl	$PS_IE, %eax
-1:
 #else
 	CLI(%edx)
 #endif
+.dtrace_interrupt_disable_done:
 	ret
 	SET_SIZE(dtrace_interrupt_disable)
 
@@ -2297,7 +2297,7 @@ dtrace_interrupt_enable(dtrace_icookie_t cookie)
 	leaq	xpv_panicking, %rdx
 	movl	(%rdx), %edx
 	cmpl	$0, %edx
-	jne	1f
+	jne	.dtrace_interrupt_enable_done
 	/*
 	 * Since we're -really- running unprivileged, our attempt
 	 * to change the state of the IF bit will be ignored. The
@@ -2305,6 +2305,7 @@ dtrace_interrupt_enable(dtrace_icookie_t cookie)
 	 */
 	IE_TO_EVENT_MASK(%rdx, %rdi)
 #endif
+.dtrace_interrupt_enable_done:
 	ret
 	SET_SIZE(dtrace_interrupt_enable)
 
@@ -2318,7 +2319,7 @@ dtrace_interrupt_enable(dtrace_icookie_t cookie)
 	leal	xpv_panicking, %edx
 	movl	(%edx), %edx
 	cmpl	$0, %edx
-	jne	1f
+	jne	.dtrace_interrupt_enable_done
 	/*
 	 * Since we're -really- running unprivileged, our attempt
 	 * to change the state of the IF bit will be ignored. The
@@ -2326,6 +2327,7 @@ dtrace_interrupt_enable(dtrace_icookie_t cookie)
 	 */
 	IE_TO_EVENT_MASK(%edx, %eax)
 #endif
+.dtrace_interrupt_enable_done:
 	ret
 	SET_SIZE(dtrace_interrupt_enable)
 

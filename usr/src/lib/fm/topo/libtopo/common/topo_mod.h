@@ -154,6 +154,18 @@ extern nvlist_t *topo_mod_auth(topo_mod_t *, tnode_t *);
 #define	TOPO_METH_SERVICE_STATE_VERSION	TOPO_METH_SERVICE_STATE_VERSION0
 #define	TOPO_METH_SERVICE_STATE_RET	"service_state-ret"
 
+#define	TOPO_METH_RETIRE		"topo_retire"
+#define	TOPO_METH_RETIRE_DESC		"retire action"
+#define	TOPO_METH_RETIRE_VERSION0	0
+#define	TOPO_METH_RETIRE_VERSION	TOPO_METH_RETIRE_VERSION0
+#define	TOPO_METH_RETIRE_RET		"retire-ret"
+
+#define	TOPO_METH_UNRETIRE		"topo_unretire"
+#define	TOPO_METH_UNRETIRE_DESC		"unretire action"
+#define	TOPO_METH_UNRETIRE_VERSION0	0
+#define	TOPO_METH_UNRETIRE_VERSION	TOPO_METH_UNRETIRE_VERSION0
+#define	TOPO_METH_UNRETIRE_RET		"unretire-ret"
+
 #define	TOPO_METH_EXPAND		"topo_expand"
 #define	TOPO_METH_EXPAND_DESC		"expand FMRI"
 #define	TOPO_METH_EXPAND_VERSION0	0

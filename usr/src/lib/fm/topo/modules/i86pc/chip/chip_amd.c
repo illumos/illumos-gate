@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * AMD memory enumeration
  */
@@ -74,7 +72,7 @@ static const topo_method_t dimm_methods[] = {
 	{ NULL }
 };
 
-static const topo_method_t rank_methods[] = {
+const topo_method_t rank_methods[] = {
 	{ TOPO_METH_ASRU_COMPUTE, TOPO_METH_ASRU_COMPUTE_DESC,
 	    TOPO_METH_ASRU_COMPUTE_VERSION, TOPO_STABILITY_INTERNAL,
 	    mem_asru_compute },
@@ -84,6 +82,19 @@ static const topo_method_t rank_methods[] = {
 	{ TOPO_METH_REPLACED, TOPO_METH_REPLACED_DESC,
 	    TOPO_METH_REPLACED_VERSION, TOPO_STABILITY_INTERNAL,
 	    rank_fmri_replaced },
+	{ NULL }
+};
+
+const topo_method_t ntv_page_retire_methods[] = {
+	{ TOPO_METH_RETIRE, TOPO_METH_RETIRE_DESC,
+	    TOPO_METH_RETIRE_VERSION, TOPO_STABILITY_INTERNAL,
+	    ntv_page_retire },
+	{ TOPO_METH_UNRETIRE, TOPO_METH_UNRETIRE_DESC,
+	    TOPO_METH_UNRETIRE_VERSION, TOPO_STABILITY_INTERNAL,
+	    ntv_page_unretire },
+	{ TOPO_METH_SERVICE_STATE, TOPO_METH_SERVICE_STATE_DESC,
+	    TOPO_METH_SERVICE_STATE_VERSION, TOPO_STABILITY_INTERNAL,
+	    ntv_page_service_state },
 	{ NULL }
 };
 
@@ -338,6 +349,11 @@ amd_rank_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *dimmnvl,
 			whinge(mod, &nerr, "amd_rank_create: "
 			    "topo_method_register failed");
 
+		if (! is_xpv() && topo_method_register(mod, ranknode,
+		    ntv_page_retire_methods) < 0)
+			whinge(mod, &nerr, "amd_rank_create: "
+			    "topo_method_register failed");
+
 		(void) topo_node_asru_set(ranknode, cs_fmri[csnumarr[i]],
 		    TOPO_ASRU_COMPUTE, &err);
 
@@ -365,7 +381,7 @@ amd_dimm_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	int i, err, nerr = 0;
 	nvpair_t *nvp;
 	tnode_t *dimmnode;
-	nvlist_t *fmri, *asru, **dimmarr = NULL;
+	nvlist_t *fmri, **dimmarr = NULL;
 	uint64_t num;
 	uint_t ndimm;
 
@@ -406,21 +422,7 @@ amd_dimm_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 			whinge(mod, &nerr, "amd_dimm_create: "
 			    "topo_method_register failed");
 
-		/*
-		 * Use the mem computation method directly to publish the asru
-		 * in the "mem" scheme.
-		 */
-		if (mem_asru_create(mod, fmri, &asru) == 0) {
-			(void) topo_node_asru_set(dimmnode, asru, 0, &err);
-			nvlist_free(asru);
-		} else {
-
-			nvlist_free(fmri);
-			whinge(mod, &nerr, "amd_dimm_create: "
-			    "mem_asru_create failed\n");
-			continue;
-		}
-
+		(void) topo_node_asru_set(dimmnode, fmri, 0, &err);
 		(void) topo_node_fru_set(dimmnode, fmri, 0, &err);
 
 		nvlist_free(fmri);

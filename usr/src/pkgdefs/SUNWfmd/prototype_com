@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 i pkginfo
 i copyright
@@ -33,6 +31,7 @@ i depend
 d none usr 755 root sys
 d none usr/include 755 root bin
 d none usr/include/fm 755 root bin
+f none usr/include/fm/fmd_agent.h 644 root bin
 f none usr/include/fm/diagcode.h 644 root bin
 f none usr/include/fm/libdiskstatus.h 644 root bin
 f none usr/include/fm/fmd_adm.h 644 root bin
@@ -103,10 +102,14 @@ f none usr/lib/fm/fmd/schemes/mem.so 555 root bin
 f none usr/lib/fm/fmd/schemes/mod.so 555 root bin
 f none usr/lib/fm/fmd/schemes/pkg.so 555 root bin
 f none usr/lib/fm/fmd/schemes/zfs.so 555 root bin
+f none usr/lib/fm/libfmd_agent.so.1 755 root bin
+s none usr/lib/fm/libfmd_agent.so=libfmd_agent.so.1
 f none usr/lib/fm/libdiagcode.so.1 755 root bin
 s none usr/lib/fm/libdiagcode.so=libdiagcode.so.1
 f none usr/lib/fm/libdiskstatus.so.1 755 root bin
 s none usr/lib/fm/libdiskstatus.so=libdiskstatus.so.1
+f none usr/lib/fm/llib-lfmd_agent 644 root bin
+f none usr/lib/fm/llib-lfmd_agent.ln 644 root bin
 f none usr/lib/fm/llib-ldiagcode 644 root bin
 f none usr/lib/fm/llib-ldiagcode.ln 644 root bin
 f none usr/lib/fm/llib-ldiskstatus 644 root bin

@@ -27,8 +27,6 @@
 #ifndef	_FMD_API_H
 #define	_FMD_API_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <libnvpair.h>
 #include <stdarg.h>
@@ -226,6 +224,8 @@ extern int fmd_nvl_class_match(fmd_hdl_t *, nvlist_t *, const char *);
 extern int fmd_nvl_fmri_expand(fmd_hdl_t *, nvlist_t *);
 extern int fmd_nvl_fmri_present(fmd_hdl_t *, nvlist_t *);
 extern int fmd_nvl_fmri_unusable(fmd_hdl_t *, nvlist_t *);
+extern int fmd_nvl_fmri_retire(fmd_hdl_t *, nvlist_t *);
+extern int fmd_nvl_fmri_unretire(fmd_hdl_t *, nvlist_t *);
 extern int fmd_nvl_fmri_replaced(fmd_hdl_t *, nvlist_t *);
 extern int fmd_nvl_fmri_service_state(fmd_hdl_t *, nvlist_t *);
 extern int fmd_nvl_fmri_has_fault(fmd_hdl_t *, nvlist_t *, int, char *);

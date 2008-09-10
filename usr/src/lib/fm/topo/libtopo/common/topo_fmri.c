@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ctype.h>
 #include <string.h>
 #include <limits.h>
@@ -56,6 +54,8 @@
  *	- unusable
  *	- service_state
  *	- nvl2str
+ *	- retire
+ *	- unretire
  *
  * In addition, the following operations are supported per-FMRI:
  *
@@ -254,15 +254,9 @@ topo_fmri_contains(topo_hdl_t *thp, nvlist_t *fmri, nvlist_t *subfmri, int *err)
 		return (set_error(thp, ETOPO_FMRI_NVL, err, TOPO_METH_CONTAINS,
 		    in));
 
-	if (topo_hdl_nvalloc(thp, &out, NV_UNIQUE_NAME) != 0)
-		return (set_error(thp, ETOPO_FMRI_NVL, err, TOPO_METH_CONTAINS,
-		    out));
-
 	if (topo_method_invoke(rnode, TOPO_METH_CONTAINS,
-	    TOPO_METH_CONTAINS_VERSION, in, &out, err) < 0) {
-		nvlist_free(out);
+	    TOPO_METH_CONTAINS_VERSION, in, &out, err) < 0)
 		return (set_error(thp, *err, err, TOPO_METH_CONTAINS, in));
-	}
 
 	(void) nvlist_lookup_uint32(out, TOPO_METH_CONTAINS_RET, &contains);
 	nvlist_free(in);
@@ -295,6 +289,64 @@ topo_fmri_unusable(topo_hdl_t *thp, nvlist_t *fmri, int *err)
 	nvlist_free(out);
 
 	return (unusable);
+}
+
+int
+topo_fmri_retire(topo_hdl_t *thp, nvlist_t *fmri, int *err)
+{
+	char *scheme;
+	uint32_t status;
+	nvlist_t *out = NULL;
+	tnode_t *rnode;
+
+	if (nvlist_lookup_string(fmri, FM_FMRI_SCHEME, &scheme) != 0)
+		return (set_error(thp, ETOPO_FMRI_MALFORM, err,
+		    TOPO_METH_RETIRE, out));
+
+	if ((rnode = topo_hdl_root(thp, scheme)) == NULL)
+		return (set_error(thp, ETOPO_METHOD_NOTSUP, err,
+		    TOPO_METH_RETIRE, out));
+
+	if (topo_method_invoke(rnode, TOPO_METH_RETIRE,
+	    TOPO_METH_RETIRE_VERSION, fmri, &out, err) < 0)
+		return (set_error(thp, *err, err, TOPO_METH_RETIRE, out));
+
+	if (nvlist_lookup_uint32(out, TOPO_METH_RETIRE_RET, &status) != 0)
+		return (set_error(thp, ETOPO_METHOD_FAIL, err,
+		    TOPO_METH_RETIRE, out));
+	nvlist_free(out);
+
+	return (status);
+}
+
+int
+topo_fmri_unretire(topo_hdl_t *thp, nvlist_t *fmri, int *err)
+{
+	char *scheme;
+	uint32_t status;
+	nvlist_t *out = NULL;
+	tnode_t *rnode;
+
+	if (nvlist_lookup_string(fmri, FM_FMRI_SCHEME, &scheme) != 0)
+		return (set_error(thp, ETOPO_FMRI_MALFORM, err,
+		    TOPO_METH_UNRETIRE, out));
+
+	if ((rnode = topo_hdl_root(thp, scheme)) == NULL)
+		return (set_error(thp, ETOPO_METHOD_NOTSUP, err,
+		    TOPO_METH_UNRETIRE, out));
+
+	if (topo_method_invoke(rnode, TOPO_METH_UNRETIRE,
+	    TOPO_METH_UNRETIRE_VERSION, fmri, &out, err) < 0)
+		return (set_error(thp, *err, err, TOPO_METH_UNRETIRE, out));
+
+	if (nvlist_lookup_uint32(out, TOPO_METH_UNRETIRE_RET, &status) != 0) {
+		nvlist_free(out);
+		return (set_error(thp, ETOPO_METHOD_FAIL, err,
+		    TOPO_METH_UNRETIRE, out));
+	}
+	nvlist_free(out);
+
+	return (status);
 }
 
 int

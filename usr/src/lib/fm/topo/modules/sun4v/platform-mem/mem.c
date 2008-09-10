@@ -24,14 +24,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <strings.h>
 #include <umem.h>
 #include <fm/topo_mod.h>
 #include <fm/fmd_fmri.h>
+#include <fm/fmd_agent.h>
 #include <sys/fm/protocol.h>
-#include <sys/mem.h>
 
 #include <mem_mdesc.h>
 
@@ -376,34 +374,77 @@ mem_expand(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 }
 
 int
-mem_page_cmd(topo_mod_t *mod, int cmd, nvlist_t *nvl)
+mem_page_isretired(topo_mod_t *mod, nvlist_t *nvl)
 {
-	int rc;
 	ldom_hdl_t *lhp;
+	int rc;
 
 	if ((lhp = ldom_init(mem_alloc, mem_free)) == NULL) {
-		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+		errno = ENOMEM;
+		return (FMD_AGENT_RETIRE_FAIL);
 	}
 
-	if (cmd == MEM_PAGE_ISRETIRED || cmd == MEM_PAGE_FMRI_ISRETIRED) {
-		rc = ldom_fmri_status(lhp, nvl);
-	} else if (cmd == MEM_PAGE_RETIRE || cmd == MEM_PAGE_FMRI_RETIRE) {
-		rc = ldom_fmri_retire(lhp, nvl);
-	} else {
-		ldom_fini(lhp);
-		errno = ENOTSUP;
-		return (-1);
-	}
-
-	/* Make the return value and errno value similar to the ioctl() call */
-	if (rc > 0) {
-		ldom_fini(lhp);
-		errno = rc;
-		return (-1);
-	}
+	rc = ldom_fmri_status(lhp, nvl);
 
 	ldom_fini(lhp);
-	return (0);
+	errno = rc;
+
+	if (rc == 0 || rc == EINVAL)
+		return (FMD_AGENT_RETIRE_DONE);
+	if (rc == EAGAIN)
+		return (FMD_AGENT_RETIRE_ASYNC);
+
+	return (FMD_AGENT_RETIRE_FAIL);
+}
+
+int
+mem_page_retire(topo_mod_t *mod, nvlist_t *nvl)
+{
+	ldom_hdl_t *lhp;
+	int rc;
+
+	if ((lhp = ldom_init(mem_alloc, mem_free)) == NULL) {
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+		errno = ENOMEM;
+		return (FMD_AGENT_RETIRE_FAIL);
+	}
+
+	rc = ldom_fmri_retire(lhp, nvl);
+
+	ldom_fini(lhp);
+	errno = rc;
+
+	if (rc == 0 || rc == EIO || rc == EINVAL)
+		return (FMD_AGENT_RETIRE_DONE);
+	if (rc == EAGAIN)
+		return (FMD_AGENT_RETIRE_ASYNC);
+
+	return (FMD_AGENT_RETIRE_FAIL);
+}
+
+int
+mem_page_unretire(topo_mod_t *mod, nvlist_t *nvl)
+{
+	ldom_hdl_t *lhp;
+	int rc;
+
+	if ((lhp = ldom_init(mem_alloc, mem_free)) == NULL) {
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+		errno = ENOMEM;
+		return (FMD_AGENT_RETIRE_FAIL);
+	}
+
+	rc = ldom_fmri_unretire(lhp, nvl);
+
+	ldom_fini(lhp);
+	errno = rc;
+
+	if (rc == 0 || rc == EIO)
+		return (FMD_AGENT_RETIRE_DONE);
+
+	return (FMD_AGENT_RETIRE_FAIL);
+
 }
 
 /*ARGSUSED*/
@@ -435,15 +476,16 @@ mem_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	 * the original mem FMRI with the specified offset or PA.
 	 * Refer to the kernel's page_retire_check() for the error codes.
 	 */
-	rc = mem_page_cmd(mod, MEM_PAGE_FMRI_ISRETIRED, in);
+	rc = mem_page_isretired(mod, in);
 
-	if (rc == -1 && errno == EIO) {
+	if (rc == FMD_AGENT_RETIRE_FAIL) {
 		/*
 		 * The page is not retired and is not scheduled for retirement
 		 * (i.e. no request pending and has not seen any errors)
 		 */
 		retval = 0;
-	} else if (rc == 0 || errno == EAGAIN || errno == EINVAL) {
+	} else if (rc == FMD_AGENT_RETIRE_DONE ||
+	    rc == FMD_AGENT_RETIRE_ASYNC) {
 		/*
 		 * The page has been retired, is in the process of being
 		 * retired, or doesn't exist.  The latter is valid if the page
@@ -476,7 +518,7 @@ static int
 mem_contains(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
     nvlist_t *in, nvlist_t **out)
 {
-	int rc = -1;
+	int rc = -1, ret = 1;
 	uint8_t version;
 	unsigned int erx, eex, ersiz, eesiz;
 	nvlist_t *er, *ee;
@@ -514,20 +556,19 @@ mem_contains(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		}
 		if (rc != 0) {
 			/* failed -- no containment */
-			if (nvlist_add_uint32(*out,
-			    TOPO_METH_CONTAINS_RET, 0) != 0) {
-				nvlist_free(*out);
-				return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
-			}
-			return (0);
+			ret = 0;
+			break;
 		}
 	}
 	/* success */
-	if (nvlist_add_uint32(*out, TOPO_METH_CONTAINS_RET, 1) != 0) {
-		nvlist_free(*out);
-		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) == 0) {
+		if (nvlist_add_uint32(*out, TOPO_METH_CONTAINS_RET, ret) != 0) {
+			nvlist_free(*out);
+			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+		}
+		return (0);
 	}
-	return (0);
+	return (-1);
 }
 
 static nvlist_t *

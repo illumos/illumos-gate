@@ -24,8 +24,6 @@
  * Use is subject to license terms. 
  */ 
  
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma dictionary "AMD" 
 
 /*
@@ -56,7 +54,7 @@
  * ereports) exists and one if its members matches the path for the
  * rank node.  Our memory propogation are of the form
  *
- * "prop foo@chip/memory-controller/dimm/rank -> blah@chip/cpu"
+ * "prop foo@chip/memory-controller/dimm/rank -> blah@chip/core/strand"
  *
  * since cpus detect memory errors;  in eversholt such a propogation, where
  * the lhs path and rhs path do not match, expands to the cross-product of
@@ -121,10 +119,10 @@
  * on page faults.
  */
 
-event ereport.cpu.amd.ic.inf_sys_ecc1@chip/cpu{within(5s)};
-event ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu{within(5s)};
-event ereport.cpu.amd.bu.s_ecc1@chip/cpu{within(5s)};
-event ereport.cpu.amd.nb.mem_ce@chip/cpu{within(5s)};
+event ereport.cpu.amd.ic.inf_sys_ecc1@chip/core/strand{within(5s)};
+event ereport.cpu.amd.dc.inf_sys_ecc1@chip/core/strand{within(5s)};
+event ereport.cpu.amd.bu.s_ecc1@chip/core/strand{within(5s)};
+event ereport.cpu.amd.nb.mem_ce@chip/core/strand{within(5s)};
 
 /*
  * Single-bit correctable errors feed into per-rank
@@ -245,28 +243,28 @@ event fault.memory.dimm_ck@chip/memory-controller/dimm/rank,
 prop fault.memory.page_sb@chip/memory-controller/dimm/rank
     { CONTAINS_RANK && SINGLE_BIT_CE &&
       SB_PGFLTS + CK_PGFLTS < RANK_PGFLT_MAX && SET_ADDR && SET_OFFSET } (1)->
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
-    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
-    ereport.cpu.amd.nb.mem_ce@chip/cpu;
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/core/strand,
+    ereport.cpu.amd.bu.s_ecc1@chip/core/strand,
+    ereport.cpu.amd.nb.mem_ce@chip/core/strand;
 
 prop fault.memory.page_ck@chip/memory-controller/dimm/rank
     { CONTAINS_RANK && !SINGLE_BIT_CE &&
       SB_PGFLTS + CK_PGFLTS < RANK_PGFLT_MAX && SET_ADDR && SET_OFFSET } (1)->
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
-    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
-    ereport.cpu.amd.nb.mem_ce@chip/cpu;
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/core/strand,
+    ereport.cpu.amd.bu.s_ecc1@chip/core/strand,
+    ereport.cpu.amd.nb.mem_ce@chip/core/strand;
 
 prop fault.memory.dimm_sb@chip/memory-controller/dimm/rank
     { CONTAINS_RANK && SB_PGFLTS + CK_PGFLTS > RANK_THRESH &&
       SB_PGFLTS > RANK_THRESH / 2 } (1)->
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
-    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
-    ereport.cpu.amd.nb.mem_ce@chip/cpu;
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/core/strand,
+    ereport.cpu.amd.bu.s_ecc1@chip/core/strand,
+    ereport.cpu.amd.nb.mem_ce@chip/core/strand;
 
 prop fault.memory.dimm_ck@chip/memory-controller/dimm/rank
     { CONTAINS_RANK && SB_PGFLTS + CK_PGFLTS > RANK_THRESH &&
       CK_PGFLTS > RANK_THRESH / 2 } (1)->
-    ereport.cpu.amd.nb.mem_ce@chip/cpu;
+    ereport.cpu.amd.nb.mem_ce@chip/core/strand;
 
 /*
  * If the address is not valid then no resource member will be included
@@ -276,13 +274,13 @@ prop fault.memory.dimm_ck@chip/memory-controller/dimm/rank
  * We will discard such ereports.  An alternative may be to SERD them 
  * on a per MC basis and trip if we see too many such events.
  */
-event upset.memory.discard1@chip/cpu;
-prop upset.memory.discard1@chip/cpu
+event upset.memory.discard1@chip/core/strand;
+prop upset.memory.discard1@chip/core/strand
     { !RESOURCE_EXISTS } (1)->
-    ereport.cpu.amd.ic.inf_sys_ecc1@chip/cpu,
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
-    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
-    ereport.cpu.amd.nb.mem_ce@chip/cpu;
+    ereport.cpu.amd.ic.inf_sys_ecc1@chip/core/strand,
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/core/strand,
+    ereport.cpu.amd.bu.s_ecc1@chip/core/strand,
+    ereport.cpu.amd.nb.mem_ce@chip/core/strand;
 
 /* 								#DIMM_UE#
  *								#PAGE_UE#
@@ -297,10 +295,10 @@ prop upset.memory.discard1@chip/cpu
  * we won't actually receive these ereports since the system will be reset.
  */ 
 
-event ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu{within(5s)};
-event ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu{within(5s)};
-event ereport.cpu.amd.bu.s_eccm@chip/cpu{within(5s)};
-event ereport.cpu.amd.nb.mem_ue@chip/cpu{within(5s)};
+event ereport.cpu.amd.ic.inf_sys_eccm@chip/core/strand{within(5s)};
+event ereport.cpu.amd.dc.inf_sys_eccm@chip/core/strand{within(5s)};
+event ereport.cpu.amd.bu.s_eccm@chip/core/strand{within(5s)};
+event ereport.cpu.amd.nb.mem_ue@chip/core/strand{within(5s)};
 
 event fault.memory.dimm_ue@chip/memory-controller/dimm/rank;
 event fault.memory.page_ue@chip/memory-controller/dimm/rank, message=0,
@@ -308,25 +306,25 @@ event fault.memory.page_ue@chip/memory-controller/dimm/rank, message=0,
 
 prop fault.memory.dimm_ue@chip/memory-controller/dimm/rank
     { CONTAINS_RANK } (1)->
-    ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu,
-    ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu,
-    ereport.cpu.amd.bu.s_eccm@chip/cpu,
-    ereport.cpu.amd.nb.mem_ue@chip/cpu;
+    ereport.cpu.amd.ic.inf_sys_eccm@chip/core/strand,
+    ereport.cpu.amd.dc.inf_sys_eccm@chip/core/strand,
+    ereport.cpu.amd.bu.s_eccm@chip/core/strand,
+    ereport.cpu.amd.nb.mem_ue@chip/core/strand;
 
 prop fault.memory.page_ue@chip/memory-controller/dimm/rank
     { CONTAINS_RANK && SET_ADDR && SET_OFFSET } (1)->
-    ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu,
-    ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu,
-    ereport.cpu.amd.bu.s_eccm@chip/cpu,
-    ereport.cpu.amd.nb.mem_ue@chip/cpu;
+    ereport.cpu.amd.ic.inf_sys_eccm@chip/core/strand,
+    ereport.cpu.amd.dc.inf_sys_eccm@chip/core/strand,
+    ereport.cpu.amd.bu.s_eccm@chip/core/strand,
+    ereport.cpu.amd.nb.mem_ue@chip/core/strand;
 
-event upset.memory.discard3@chip/cpu;
-prop upset.memory.discard3@chip/cpu
+event upset.memory.discard3@chip/core/strand;
+prop upset.memory.discard3@chip/core/strand
     { !RESOURCE_EXISTS } (1)->
-    ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu,
-    ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu,
-    ereport.cpu.amd.bu.s_eccm@chip/cpu,
-    ereport.cpu.amd.nb.mem_ue@chip/cpu;
+    ereport.cpu.amd.ic.inf_sys_eccm@chip/core/strand,
+    ereport.cpu.amd.dc.inf_sys_eccm@chip/core/strand,
+    ereport.cpu.amd.bu.s_eccm@chip/core/strand,
+    ereport.cpu.amd.nb.mem_ue@chip/core/strand;
 
 /*								#CSTESTFAIL#
  * If the BIOS fails a chip-select during POST, or perhaps after a
@@ -367,11 +365,11 @@ prop fault.memory.dimm_testfail@chip/memory-controller/dimm/rank (1)->
  *    the error.
  */
 
-event ereport.cpu.amd.nb.dramaddr_par@chip/cpu{within(5s)};
+event ereport.cpu.amd.nb.dramaddr_par@chip/core/strand{within(5s)};
 event fault.cpu.amd.dramchannel@chip/memory-controller/dram-channel, response=0;
 
 prop fault.cpu.amd.dramchannel@chip/memory-controller/dram-channel[y] (0)->
-    ereport.cpu.amd.nb.dramaddr_par@chip/cpu {
+    ereport.cpu.amd.nb.dramaddr_par@chip/core/strand {
     ((payloadprop("IA32_MCi_STATUS") >> 32 & 0x200) ? 1 : 0) == y };
 
 /* 								#L2D_SINGLE#
@@ -385,17 +383,17 @@ prop fault.cpu.amd.dramchannel@chip/memory-controller/dram-channel[y] (0)->
 #define L2CACHEDATA_SB_COUNT	3
 #define L2CACHEDATA_SB_TIME	12h
 
-event ereport.cpu.amd.ic.inf_l2_ecc1@chip/cpu{within(5s)};
-event ereport.cpu.amd.dc.inf_l2_ecc1@chip/cpu{within(5s)};
-event ereport.cpu.amd.bu.l2d_ecc1@chip/cpu{within(5s)};
-engine serd.cpu.amd.l2d_sb@chip/cpu,
+event ereport.cpu.amd.ic.inf_l2_ecc1@chip/core/strand{within(5s)};
+event ereport.cpu.amd.dc.inf_l2_ecc1@chip/core/strand{within(5s)};
+event ereport.cpu.amd.bu.l2d_ecc1@chip/core/strand{within(5s)};
+engine serd.cpu.amd.l2d_sb@chip/core/strand,
     N=L2CACHEDATA_SB_COUNT, T=L2CACHEDATA_SB_TIME;
-event fault.cpu.amd.l2cachedata@chip/cpu, engine=serd.cpu.amd.l2d_sb@chip/cpu;
+event fault.cpu.amd.l2cachedata@chip/core/strand, engine=serd.cpu.amd.l2d_sb@chip/core/strand;
 
-prop fault.cpu.amd.l2cachedata@chip/cpu (0)->
-    ereport.cpu.amd.ic.inf_l2_ecc1@chip/cpu,
-    ereport.cpu.amd.dc.inf_l2_ecc1@chip/cpu,
-    ereport.cpu.amd.bu.l2d_ecc1@chip/cpu;
+prop fault.cpu.amd.l2cachedata@chip/core/strand (0)->
+    ereport.cpu.amd.ic.inf_l2_ecc1@chip/core/strand,
+    ereport.cpu.amd.dc.inf_l2_ecc1@chip/core/strand,
+    ereport.cpu.amd.bu.l2d_ecc1@chip/core/strand;
 
 /* 								#L2D_MULTI#
  * A multi-bit data array fault in an l2 cache can cause:
@@ -405,15 +403,15 @@ prop fault.cpu.amd.l2cachedata@chip/cpu (0)->
  *  - l2d_eccm : reported by bu on copyback or on snoop from another cpu 
  */ 
 
-event ereport.cpu.amd.ic.inf_l2_eccm@chip/cpu{within(5s)};
-event ereport.cpu.amd.dc.inf_l2_eccm@chip/cpu{within(5s)};
-event ereport.cpu.amd.bu.l2d_eccm@chip/cpu{within(5s)};
+event ereport.cpu.amd.ic.inf_l2_eccm@chip/core/strand{within(5s)};
+event ereport.cpu.amd.dc.inf_l2_eccm@chip/core/strand{within(5s)};
+event ereport.cpu.amd.bu.l2d_eccm@chip/core/strand{within(5s)};
 
-prop fault.cpu.amd.l2cachedata@chip/cpu
+prop fault.cpu.amd.l2cachedata@chip/core/strand
     { setserdincrement(L2CACHEDATA_SB_COUNT + 1) } (0)->
-    ereport.cpu.amd.ic.inf_l2_eccm@chip/cpu,
-    ereport.cpu.amd.dc.inf_l2_eccm@chip/cpu,
-    ereport.cpu.amd.bu.l2d_eccm@chip/cpu;
+    ereport.cpu.amd.ic.inf_l2_eccm@chip/core/strand,
+    ereport.cpu.amd.dc.inf_l2_eccm@chip/core/strand,
+    ereport.cpu.amd.bu.l2d_eccm@chip/core/strand;
 
 /* 								#L2T_SINGLE#
  * A single bit tag array fault in an l2 cache can cause:
@@ -425,15 +423,15 @@ prop fault.cpu.amd.l2cachedata@chip/cpu
 #define L2CACHETAG_SB_COUNT	3
 #define L2CACHETAG_SB_TIME	12h
 
-event ereport.cpu.amd.bu.l2t_ecc1@chip/cpu{within(5s)};
-event ereport.cpu.amd.bu.l2t_par@chip/cpu{within(5s)};
-engine serd.cpu.amd.l2t_sb@chip/cpu,
+event ereport.cpu.amd.bu.l2t_ecc1@chip/core/strand{within(5s)};
+event ereport.cpu.amd.bu.l2t_par@chip/core/strand{within(5s)};
+engine serd.cpu.amd.l2t_sb@chip/core/strand,
     N=L2CACHETAG_SB_COUNT, T=L2CACHETAG_SB_TIME;
-event fault.cpu.amd.l2cachetag@chip/cpu, engine=serd.cpu.amd.l2t_sb@chip/cpu;
+event fault.cpu.amd.l2cachetag@chip/core/strand, engine=serd.cpu.amd.l2t_sb@chip/core/strand;
 
-prop fault.cpu.amd.l2cachetag@chip/cpu (0)->
-    ereport.cpu.amd.bu.l2t_ecc1@chip/cpu,
-    ereport.cpu.amd.bu.l2t_par@chip/cpu;
+prop fault.cpu.amd.l2cachetag@chip/core/strand (0)->
+    ereport.cpu.amd.bu.l2t_ecc1@chip/core/strand,
+    ereport.cpu.amd.bu.l2t_par@chip/core/strand;
 
 /* 								#L2T_MULTI#
  * A multi-bit tag array fault in an l2 cache can cause:
@@ -442,12 +440,12 @@ prop fault.cpu.amd.l2cachetag@chip/cpu (0)->
  *  - l2t_par : reported by bu on this cpu when detected other than during snoop
  */ 
 
-event ereport.cpu.amd.bu.l2t_eccm@chip/cpu{within(5s)};
+event ereport.cpu.amd.bu.l2t_eccm@chip/core/strand{within(5s)};
 
-prop fault.cpu.amd.l2cachetag@chip/cpu
+prop fault.cpu.amd.l2cachetag@chip/core/strand
     { setserdincrement(L2CACHETAG_SB_COUNT + 1) } (0)->
-    ereport.cpu.amd.bu.l2t_eccm@chip/cpu,
-    ereport.cpu.amd.bu.l2t_par@chip/cpu;
+    ereport.cpu.amd.bu.l2t_eccm@chip/core/strand,
+    ereport.cpu.amd.bu.l2t_par@chip/core/strand;
 
 /* 								#ICD_PAR#
  * A data array parity fault in an I cache can cause:
@@ -458,14 +456,14 @@ prop fault.cpu.amd.l2cachetag@chip/cpu
 #define ICACHEDATA_SB_COUNT	2
 #define ICACHEDATA_SB_TIME	168h
 
-event ereport.cpu.amd.ic.data_par@chip/cpu{within(5s)};
-engine serd.cpu.amd.icachedata@chip/cpu,
+event ereport.cpu.amd.ic.data_par@chip/core/strand{within(5s)};
+engine serd.cpu.amd.icachedata@chip/core/strand,
     N=ICACHEDATA_SB_COUNT, T=ICACHEDATA_SB_TIME;
-event fault.cpu.amd.icachedata@chip/cpu,
-    engine=serd.cpu.amd.icachedata@chip/cpu;
+event fault.cpu.amd.icachedata@chip/core/strand,
+    engine=serd.cpu.amd.icachedata@chip/core/strand;
 
-prop fault.cpu.amd.icachedata@chip/cpu (0)->
-    ereport.cpu.amd.ic.data_par@chip/cpu;
+prop fault.cpu.amd.icachedata@chip/core/strand (0)->
+    ereport.cpu.amd.ic.data_par@chip/core/strand;
 
 /* 								#ICT_PAR#
  * A tag array parity fault in an I cache can cause:
@@ -476,13 +474,13 @@ prop fault.cpu.amd.icachedata@chip/cpu (0)->
 #define ICACHETAG_SB_COUNT	2
 #define ICACHETAG_SB_TIME	168h
 
-event ereport.cpu.amd.ic.tag_par@chip/cpu{within(5s)};
-engine serd.cpu.amd.icachetag@chip/cpu,
+event ereport.cpu.amd.ic.tag_par@chip/core/strand{within(5s)};
+engine serd.cpu.amd.icachetag@chip/core/strand,
     N=ICACHETAG_SB_COUNT, T=ICACHETAG_SB_TIME;
-event fault.cpu.amd.icachetag@chip/cpu, engine=serd.cpu.amd.icachetag@chip/cpu;
+event fault.cpu.amd.icachetag@chip/core/strand, engine=serd.cpu.amd.icachetag@chip/core/strand;
 
-prop fault.cpu.amd.icachetag@chip/cpu (0)->
-    ereport.cpu.amd.ic.tag_par@chip/cpu;
+prop fault.cpu.amd.icachetag@chip/core/strand (0)->
+    ereport.cpu.amd.ic.tag_par@chip/core/strand;
 
 /* 								#ICT_SNOOP#
  * A snoop tag array parity fault in an I cache can cause:
@@ -490,11 +488,11 @@ prop fault.cpu.amd.icachetag@chip/cpu (0)->
  *  - stag_par : reported by ic on this cpu
  */ 
 
-event ereport.cpu.amd.ic.stag_par@chip/cpu{within(5s)};
-event fault.cpu.amd.icachestag@chip/cpu;
+event ereport.cpu.amd.ic.stag_par@chip/core/strand{within(5s)};
+event fault.cpu.amd.icachestag@chip/core/strand;
  
-prop fault.cpu.amd.icachestag@chip/cpu (1)->
-    ereport.cpu.amd.ic.stag_par@chip/cpu;
+prop fault.cpu.amd.icachestag@chip/core/strand (1)->
+    ereport.cpu.amd.ic.stag_par@chip/core/strand;
 
 /* 								#ICTLB_1#
  * An l1tlb parity fault in an I cache can cause:
@@ -505,13 +503,13 @@ prop fault.cpu.amd.icachestag@chip/cpu (1)->
 #define ICACHEL1TLB_SB_COUNT	2
 #define ICACHEL1TLB_SB_TIME	168h
 
-event ereport.cpu.amd.ic.l1tlb_par@chip/cpu{within(5s)};
-engine serd.cpu.amd.l1itlb@chip/cpu,
+event ereport.cpu.amd.ic.l1tlb_par@chip/core/strand{within(5s)};
+engine serd.cpu.amd.l1itlb@chip/core/strand,
     N=ICACHEL1TLB_SB_COUNT, T=ICACHEL1TLB_SB_TIME;
-event fault.cpu.amd.l1itlb@chip/cpu, engine=serd.cpu.amd.l1itlb@chip/cpu;
+event fault.cpu.amd.l1itlb@chip/core/strand, engine=serd.cpu.amd.l1itlb@chip/core/strand;
 
-prop fault.cpu.amd.l1itlb@chip/cpu (0)->
-    ereport.cpu.amd.ic.l1tlb_par@chip/cpu;
+prop fault.cpu.amd.l1itlb@chip/core/strand (0)->
+    ereport.cpu.amd.ic.l1tlb_par@chip/core/strand;
 
 /* 								#ICTLB_2#
  * An l2tlb parity fault in an I cache can cause:
@@ -522,13 +520,13 @@ prop fault.cpu.amd.l1itlb@chip/cpu (0)->
 #define ICACHEL2TLB_SB_COUNT	2
 #define ICACHEL2TLB_SB_TIME	168h
 
-event ereport.cpu.amd.ic.l2tlb_par@chip/cpu{within(5s)};
-engine serd.cpu.amd.l2itlb@chip/cpu,
+event ereport.cpu.amd.ic.l2tlb_par@chip/core/strand{within(5s)};
+engine serd.cpu.amd.l2itlb@chip/core/strand,
     N=ICACHEL2TLB_SB_COUNT, T=ICACHEL2TLB_SB_TIME;
-event fault.cpu.amd.l2itlb@chip/cpu, engine=serd.cpu.amd.l2itlb@chip/cpu;
+event fault.cpu.amd.l2itlb@chip/core/strand, engine=serd.cpu.amd.l2itlb@chip/core/strand;
 
-prop fault.cpu.amd.l2itlb@chip/cpu (0)->
-    ereport.cpu.amd.ic.l2tlb_par@chip/cpu;
+prop fault.cpu.amd.l2itlb@chip/core/strand (0)->
+    ereport.cpu.amd.ic.l2tlb_par@chip/core/strand;
 
 /* 								#DCD_SINGLE#
  * A single bit data array fault in an D cache can cause:
@@ -543,14 +541,14 @@ prop fault.cpu.amd.l2itlb@chip/cpu (0)->
 #define DCACHEDATA_SB_COUNT	2
 #define DCACHEDATA_SB_TIME	168h
 
-event ereport.cpu.amd.dc.data_ecc1@chip/cpu{within(5s)};
-event ereport.cpu.amd.dc.data_ecc1_uc@chip/cpu{within(5s)};
-engine serd.cpu.amd.dc_sb@chip/cpu,
+event ereport.cpu.amd.dc.data_ecc1@chip/core/strand{within(5s)};
+event ereport.cpu.amd.dc.data_ecc1_uc@chip/core/strand{within(5s)};
+engine serd.cpu.amd.dc_sb@chip/core/strand,
     N=DCACHEDATA_SB_COUNT, T=DCACHEDATA_SB_TIME;
-event fault.cpu.amd.dcachedata@chip/cpu, engine=serd.cpu.amd.dc_sb@chip/cpu;
+event fault.cpu.amd.dcachedata@chip/core/strand, engine=serd.cpu.amd.dc_sb@chip/core/strand;
 
-prop fault.cpu.amd.dcachedata@chip/cpu (0)->
-    ereport.cpu.amd.dc.data_ecc1@chip/cpu;
+prop fault.cpu.amd.dcachedata@chip/core/strand (0)->
+    ereport.cpu.amd.dc.data_ecc1@chip/core/strand;
 
 /* 								#DCD_MULTI#
  * A multi-bit data array fault in an D cache can cause:
@@ -558,12 +556,12 @@ prop fault.cpu.amd.dcachedata@chip/cpu (0)->
  *  - data_eccm : reported by dc on this cpu
  */ 
 
-event ereport.cpu.amd.dc.data_eccm@chip/cpu{within(5s)};
+event ereport.cpu.amd.dc.data_eccm@chip/core/strand{within(5s)};
 
-prop fault.cpu.amd.dcachedata@chip/cpu
+prop fault.cpu.amd.dcachedata@chip/core/strand
     { setserdincrement(L2CACHETAG_SB_COUNT + 1) } (0)->
-    ereport.cpu.amd.dc.data_eccm@chip/cpu,
-    ereport.cpu.amd.dc.data_ecc1_uc@chip/cpu;
+    ereport.cpu.amd.dc.data_eccm@chip/core/strand,
+    ereport.cpu.amd.dc.data_ecc1_uc@chip/core/strand;
 
 /* 								#DCT_PAR#
  * A tag array parity fault in an D cache can cause:
@@ -571,11 +569,11 @@ prop fault.cpu.amd.dcachedata@chip/cpu
  *  - tag_par : reported by dc on this cpu
  */ 
 
-event ereport.cpu.amd.dc.tag_par@chip/cpu{within(5s)};
-event fault.cpu.amd.dcachetag@chip/cpu;
+event ereport.cpu.amd.dc.tag_par@chip/core/strand{within(5s)};
+event fault.cpu.amd.dcachetag@chip/core/strand;
  
-prop fault.cpu.amd.dcachetag@chip/cpu (1)->
-    ereport.cpu.amd.dc.tag_par@chip/cpu;
+prop fault.cpu.amd.dcachetag@chip/core/strand (1)->
+    ereport.cpu.amd.dc.tag_par@chip/core/strand;
 
 /* 								#DCT_SNOOP#
  * A snoop tag array parity fault in an D cache can cause:
@@ -583,11 +581,11 @@ prop fault.cpu.amd.dcachetag@chip/cpu (1)->
  *  - stag_par : reported by dc on this cpu
  */ 
 
-event ereport.cpu.amd.dc.stag_par@chip/cpu{within(5s)};
-event fault.cpu.amd.dcachestag@chip/cpu;
+event ereport.cpu.amd.dc.stag_par@chip/core/strand{within(5s)};
+event fault.cpu.amd.dcachestag@chip/core/strand;
  
-prop fault.cpu.amd.dcachestag@chip/cpu (1)->
-    ereport.cpu.amd.dc.stag_par@chip/cpu;
+prop fault.cpu.amd.dcachestag@chip/core/strand (1)->
+    ereport.cpu.amd.dc.stag_par@chip/core/strand;
 
 /* 								#DCTLB_1#
  * An l1tlb parity fault in an D cache can cause:
@@ -595,11 +593,11 @@ prop fault.cpu.amd.dcachestag@chip/cpu (1)->
  *  - l1tlb_par : reported by dc on this cpu
  */ 
 
-event ereport.cpu.amd.dc.l1tlb_par@chip/cpu{within(5s)};
-event fault.cpu.amd.l1dtlb@chip/cpu;
+event ereport.cpu.amd.dc.l1tlb_par@chip/core/strand{within(5s)};
+event fault.cpu.amd.l1dtlb@chip/core/strand;
  
-prop fault.cpu.amd.l1dtlb@chip/cpu (1)->
-    ereport.cpu.amd.dc.l1tlb_par@chip/cpu;
+prop fault.cpu.amd.l1dtlb@chip/core/strand (1)->
+    ereport.cpu.amd.dc.l1tlb_par@chip/core/strand;
 
 /* 								#DCTLB_2#
  * An l2tlb parity fault in an D cache can cause:
@@ -607,11 +605,11 @@ prop fault.cpu.amd.l1dtlb@chip/cpu (1)->
  *  - l2tlb_par : reported by dc on this cpu
  */ 
 
-event ereport.cpu.amd.dc.l2tlb_par@chip/cpu{within(5s)};
-event fault.cpu.amd.l2dtlb@chip/cpu;
+event ereport.cpu.amd.dc.l2tlb_par@chip/core/strand{within(5s)};
+event fault.cpu.amd.l2dtlb@chip/core/strand;
  
-prop fault.cpu.amd.l2dtlb@chip/cpu (1)->
-    ereport.cpu.amd.dc.l2tlb_par@chip/cpu;
+prop fault.cpu.amd.l2dtlb@chip/core/strand (1)->
+    ereport.cpu.amd.dc.l2tlb_par@chip/core/strand;
 
 /*								#MISC#
  * Ereports that should not normally happen and which we will discard
@@ -636,29 +634,29 @@ prop fault.cpu.amd.l2dtlb@chip/cpu (1)->
  * to avoid "no subscription" complaints during test harness runs.
  */
 
-event ereport.cpu.amd.nb.ma@cpu{within(5s)};
-event ereport.cpu.amd.nb.ta@cpu{within(5s)};
-event ereport.cpu.amd.ls.s_rde@cpu{within(5s)};
-event ereport.cpu.amd.ic.rdde@cpu{within(5s)};
-event ereport.cpu.amd.bu.s_rde@cpu{within(5s)};
-event ereport.cpu.amd.nb.gart_walk@cpu{within(5s)};
-event ereport.cpu.amd.nb.ht_sync@cpu{within(5s)};
-event ereport.cpu.amd.nb.ht_crc@cpu{within(5s)};
-event ereport.cpu.amd.nb.rmw@cpu{within(5s)};
-event ereport.cpu.amd.nb.wdog@cpu{within(5s)};
-event ereport.cpu.amd.unknown@cpu{within(5s)};
+event ereport.cpu.amd.nb.ma@strand{within(5s)};
+event ereport.cpu.amd.nb.ta@strand{within(5s)};
+event ereport.cpu.amd.ls.s_rde@strand{within(5s)};
+event ereport.cpu.amd.ic.rdde@strand{within(5s)};
+event ereport.cpu.amd.bu.s_rde@strand{within(5s)};
+event ereport.cpu.amd.nb.gart_walk@strand{within(5s)};
+event ereport.cpu.amd.nb.ht_sync@strand{within(5s)};
+event ereport.cpu.amd.nb.ht_crc@strand{within(5s)};
+event ereport.cpu.amd.nb.rmw@strand{within(5s)};
+event ereport.cpu.amd.nb.wdog@strand{within(5s)};
+event ereport.cpu.amd.unknown@strand{within(5s)};
 
-event upset.null_diag@cpu;
+event upset.null_diag@strand;
 
-prop upset.null_diag@cpu (1)->
-    ereport.cpu.amd.nb.ma@cpu,
-    ereport.cpu.amd.nb.ta@cpu,
-    ereport.cpu.amd.ls.s_rde@cpu,
-    ereport.cpu.amd.ic.rdde@cpu,
-    ereport.cpu.amd.bu.s_rde@cpu,
-    ereport.cpu.amd.nb.gart_walk@cpu,
-    ereport.cpu.amd.nb.ht_sync@cpu,
-    ereport.cpu.amd.nb.ht_crc@cpu,
-    ereport.cpu.amd.nb.rmw@cpu,
-    ereport.cpu.amd.nb.wdog@cpu,
-    ereport.cpu.amd.unknown@cpu;
+prop upset.null_diag@strand (1)->
+    ereport.cpu.amd.nb.ma@strand,
+    ereport.cpu.amd.nb.ta@strand,
+    ereport.cpu.amd.ls.s_rde@strand,
+    ereport.cpu.amd.ic.rdde@strand,
+    ereport.cpu.amd.bu.s_rde@strand,
+    ereport.cpu.amd.nb.gart_walk@strand,
+    ereport.cpu.amd.nb.ht_sync@strand,
+    ereport.cpu.amd.nb.ht_crc@strand,
+    ereport.cpu.amd.nb.rmw@strand,
+    ereport.cpu.amd.nb.wdog@strand,
+    ereport.cpu.amd.unknown@strand;
