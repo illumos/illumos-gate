@@ -21,7 +21,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Include stdio.h before shared.h, because we can't define
    WITHOUT_LIBC_STUBS here.  */
@@ -3039,11 +3038,6 @@ amd64_config_cpu(void)
 
         if (!BITX(stdfeatures, 13, 13)) {
                 grub_printf("amd64: CPU does NOT support PGE\n");
-                isamd64--;
-        }
-
-        if (!BITX(stdfeatures, 17, 17)) {
-                grub_printf("amd64: CPU does NOT support PSE\n");
                 isamd64--;
         }
 
