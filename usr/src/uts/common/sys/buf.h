@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,6 @@
 
 #ifndef _SYS_BUF_H
 #define	_SYS_BUF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types32.h>
 #include <sys/t_lock.h>
@@ -187,6 +185,7 @@ struct biostats {
 #define	B_FAILFAST	0x1000000	/* Fail promptly if device goes away */
 #define	B_STARTED	0x2000000	/* io:::start probe called for buf */
 #define	B_ABRWRITE	0x4000000	/* Application based recovery active */
+#define	B_PAGE_NOWAIT	0x8000000	/* Skip the page if it is locked */
 
 /*
  * Insq/Remq for the buffer hash lists.

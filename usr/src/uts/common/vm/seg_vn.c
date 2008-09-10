@@ -36,8 +36,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * VM - shared or copy-on-write from a vnode/anonymous memory.
  */
@@ -7361,7 +7359,9 @@ segvn_sync(struct seg *seg, caddr_t addr, size_t len, int attr, uint_t flags)
 		 */
 		VN_HOLD(vp);
 		err = VOP_PUTPAGE(vp, (offset_t)off, PAGESIZE,
-		    bflags, svd->cred, NULL);
+		    (bflags | (IS_SWAPFSVP(vp) ? B_PAGE_NOWAIT : 0)),
+		    svd->cred, NULL);
+
 		VN_RELE(vp);
 		if (err)
 			break;

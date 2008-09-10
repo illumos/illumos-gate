@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -496,6 +494,7 @@ swap_putpage(
 	u_offset_t io_off;
 	size_t io_len = 0;
 	int err = 0;
+	int nowait;
 	struct async_reqs *arg;
 
 	if (swap_nopage)
@@ -503,10 +502,12 @@ swap_putpage(
 
 	ASSERT(vp->v_count != 0);
 
+	nowait = flags & B_PAGE_NOWAIT;
+
 	/*
 	 * Clear force flag so that p_lckcnt pages are not invalidated.
 	 */
-	flags &= ~B_FORCE;
+	flags &= ~(B_FORCE | B_PAGE_NOWAIT);
 
 	SWAPFS_PRINT(SWAP_VOPS,
 	    "swap_putpage: vp %p, off %llx len %lx, flags %x\n",
@@ -567,12 +568,13 @@ swap_putpage(
 			 * routine page_lookup_nowait() to prevent
 			 * reclaiming them from the free list.
 			 */
-			if ((flags & B_INVAL) ||
-			    (flags & (B_ASYNC | B_FREE)) == B_FREE)
+			if (!nowait && ((flags & B_INVAL) ||
+			    (flags & (B_ASYNC | B_FREE)) == B_FREE))
 				pp = page_lookup(vp, io_off, SE_EXCL);
 			else
 				pp = page_lookup_nowait(vp, io_off,
-				    (flags & B_FREE) ? SE_EXCL : SE_SHARED);
+				    (flags & (B_FREE | B_INVAL)) ?
+				    SE_EXCL : SE_SHARED);
 
 			if (pp == NULL || pvn_getdirty(pp, flags) == 0)
 				io_len = PAGESIZE;
