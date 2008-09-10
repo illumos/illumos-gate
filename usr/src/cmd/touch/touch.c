@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +28,6 @@
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -160,7 +157,7 @@ main(int argc, char *argv[])
 
 	if (timespecified == 0) {
 		if (argc >= 2 && isnumber(*argv) && (strlen(*argv) == 8 ||
-			strlen(*argv) == 10)) {
+		    strlen(*argv) == 10)) {
 			/*
 			 * time is specified as an operand.
 			 * use it.
@@ -182,15 +179,34 @@ main(int argc, char *argv[])
 	for (c = 0; c < argc; c++) {
 		if (stat(argv[c], &stbuf)) {
 			/*
-			 * if stat failed for reasons other than ENOENT,
-			 * the file should not be created, since this
-			 * can clobber the contents of an existing file
-			 * (for example, a large file that results in overflow).
+			 * If stat failed for reasons other than EOVERFLOW or
+			 * ENOENT, the file should not be created, since this
+			 * can clobber the contents of an existing file.
 			 */
-			if (errno != ENOENT) {
+			if (errno == EOVERFLOW) {
+				if (aflag == 0 || mflag == 0) {
+					(void) fprintf(stderr,
+					    gettext("%s: %s: current timestamps"
+					    " unavailable:\n%s"),
+					    myname, argv[c], aflag > 0 ?
+					    gettext("consider trying again"
+					    " without -a option\n") :
+					    gettext("consider trying again"
+					    " without -m option\n"));
+					status++;
+					continue;
+				}
+				/*
+				 * Since we have EOVERFLOW, we know the file
+				 * exists. Since both atime and mtime are being
+				 * changed to known values, we don't care that
+				 * st_atime and st_mtime from the file aren't
+				 * available.
+				 */
+			} else if (errno != ENOENT) {
 				(void) fprintf(stderr,
-				    gettext("%s: %s cannot stat\n"),
-				    myname, argv[c]);
+				    gettext("%s: cannot stat %s: %s\n"),
+				    myname, argv[c], strerror(errno));
 				status++;
 				continue;
 			} else if (cflag) {
@@ -199,16 +215,16 @@ main(int argc, char *argv[])
 			    (S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)))
 			    < 0) {
 				(void) fprintf(stderr,
-				    gettext("%s: %s cannot create\n"),
-				    myname, argv[c]);
+				    gettext("%s: cannot create %s: %s\n"),
+				    myname, argv[c], strerror(errno));
 				status++;
 				continue;
 			} else {
 				(void) close(fd);
 				if (stat(argv[c], &stbuf)) {
 					(void) fprintf(stderr,
-					    gettext("%s: %s cannot stat\n"),
-					    myname, argv[c]);
+					    gettext("%s: cannot stat %s: %s\n"),
+					    myname, argv[c], strerror(errno));
 					status++;
 					continue;
 				}
@@ -240,8 +256,8 @@ main(int argc, char *argv[])
 
 		if (utimes(argv[c], (usecurrenttime) ? NULL : times)) {
 			(void) fprintf(stderr,
-			    gettext("%s: cannot change times on %s\n"),
-			    myname, argv[c]);
+			    gettext("%s: cannot change times on %s: %s\n"),
+			    myname, argv[c], strerror(errno));
 			status++;
 			continue;
 		}
@@ -388,8 +404,7 @@ usage(const int settime)
 {
 	if (settime)
 		(void) fprintf(stderr, gettext(
-		    "usage: %s [-f file] [mmddhhmm[yy]] file...\n"),
-		    myname);
+		    "usage: %s [-f file] [mmddhhmm[yy]] file...\n"), myname);
 	else
 		(void) fprintf(stderr, gettext(
 		    "usage: %s [-acm] [-r ref_file] file...\n"
