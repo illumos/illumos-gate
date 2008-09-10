@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
@@ -974,7 +973,8 @@ struct FTW *state;
 			val = 1;
 			break;
 		case XATTR:
-			filename = gettail(name);
+			filename = (walkflags & FTW_CHDIR) ?
+				gettail(name) : name;
 			val = (pathconf(filename, _PC_XATTR_EXISTS) == 1);
 			break;
 		case ACL:
@@ -983,8 +983,9 @@ struct FTW *state;
 			 * already chdir()ed into the directory (performed in
 			 * nftw()) of the file
 			 */
-			filename = gettail(name);
-			val = acl_trivial(name);
+			filename = (walkflags & FTW_CHDIR) ?
+				gettail(name) : name;
+			val = acl_trivial(filename);
 			break;
 		}
 		/*
