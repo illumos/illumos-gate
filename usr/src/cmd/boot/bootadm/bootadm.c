@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * bootadm(1M) is a new utility for managing bootability of
  * Solaris *Newboot* environments. It has two primary tasks:
@@ -45,6 +43,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/mnttab.h>
+#include <sys/mntent.h>
 #include <sys/statvfs.h>
 #include <libnvpair.h>
 #include <ftw.h>
@@ -2412,7 +2411,8 @@ update_all(char *root, char *opt)
 	while (getextmntent(fp, &mnt, sizeof (mnt)) == 0) {
 		if (mnt.mnt_special == NULL)
 			continue;
-		if (strncmp(mnt.mnt_special, "/dev/", strlen("/dev/")) != 0)
+		if ((strcmp(mnt.mnt_fstype, MNTTYPE_ZFS) != 0) &&
+		    (strncmp(mnt.mnt_special, "/dev/", strlen("/dev/")) != 0))
 			continue;
 		if (strcmp(mnt.mnt_mountp, "/") == 0)
 			continue;
