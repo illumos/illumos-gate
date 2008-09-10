@@ -439,11 +439,6 @@ struct arc_buf_hdr {
 
 	l2arc_buf_hdr_t		*b_l2hdr;
 	list_node_t		b_l2node;
-	/*
-	 * scrub code can lockout access to the buf while it changes
-	 * bp's contained within it.
-	 */
-	krwlock_t		b_datalock;
 };
 
 static arc_buf_t *arc_eviction_list;
@@ -760,9 +755,19 @@ hdr_cons(void *vbuf, void *unused, int kmflag)
 	refcount_create(&buf->b_refcnt);
 	cv_init(&buf->b_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&buf->b_freeze_lock, NULL, MUTEX_DEFAULT, NULL);
-	rw_init(&buf->b_datalock, NULL, RW_DEFAULT, NULL);
 
 	ARCSTAT_INCR(arcstat_hdr_size, HDR_SIZE);
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+buf_cons(void *vbuf, void *unused, int kmflag)
+{
+	arc_buf_t *buf = vbuf;
+
+	bzero(buf, sizeof (arc_buf_t));
+	rw_init(&buf->b_lock, NULL, RW_DEFAULT, NULL);
 	return (0);
 }
 
@@ -779,9 +784,17 @@ hdr_dest(void *vbuf, void *unused)
 	refcount_destroy(&buf->b_refcnt);
 	cv_destroy(&buf->b_cv);
 	mutex_destroy(&buf->b_freeze_lock);
-	rw_destroy(&buf->b_datalock);
 
 	ARCSTAT_INCR(arcstat_hdr_size, -HDR_SIZE);
+}
+
+/* ARGSUSED */
+static void
+buf_dest(void *vbuf, void *unused)
+{
+	arc_buf_t *buf = vbuf;
+
+	rw_destroy(&buf->b_lock);
 }
 
 /*
@@ -827,7 +840,7 @@ retry:
 	hdr_cache = kmem_cache_create("arc_buf_hdr_t", sizeof (arc_buf_hdr_t),
 	    0, hdr_cons, hdr_dest, hdr_recl, NULL, NULL, 0);
 	buf_cache = kmem_cache_create("arc_buf_t", sizeof (arc_buf_t),
-	    0, NULL, NULL, NULL, NULL, NULL, 0);
+	    0, buf_cons, buf_dest, NULL, NULL, NULL, 0);
 
 	for (i = 0; i < 256; i++)
 		for (ct = zfs_crc64_table + i, *ct = i, j = 8; j > 0; j--)
@@ -1159,28 +1172,21 @@ arc_buf_add_ref(arc_buf_t *buf, void* tag)
 	kmutex_t *hash_lock;
 
 	/*
-	 * Check to see if this buffer is currently being evicted via
-	 * arc_do_user_evicts().
+	 * Check to see if this buffer is evicted.  Callers
+	 * must verify b_data != NULL to know if the add_ref
+	 * was successful.
 	 */
-	mutex_enter(&arc_eviction_mtx);
-	hdr = buf->b_hdr;
-	if (hdr == NULL) {
-		mutex_exit(&arc_eviction_mtx);
-		return;
-	}
-	hash_lock = HDR_LOCK(hdr);
-	mutex_exit(&arc_eviction_mtx);
-
-	mutex_enter(hash_lock);
+	rw_enter(&buf->b_lock, RW_READER);
 	if (buf->b_data == NULL) {
-		/*
-		 * This buffer is evicted.
-		 */
-		mutex_exit(hash_lock);
+		rw_exit(&buf->b_lock);
 		return;
 	}
+	hdr = buf->b_hdr;
+	ASSERT(hdr != NULL);
+	hash_lock = HDR_LOCK(hdr);
+	mutex_enter(hash_lock);
+	rw_exit(&buf->b_lock);
 
-	ASSERT(buf->b_hdr == hdr);
 	ASSERT(hdr->b_state == arc_mru || hdr->b_state == arc_mfu);
 	add_reference(hdr, hash_lock, tag);
 	arc_access(hdr, hash_lock);
@@ -1317,12 +1323,14 @@ arc_hdr_destroy(arc_buf_hdr_t *hdr)
 
 		if (buf->b_efunc) {
 			mutex_enter(&arc_eviction_mtx);
+			rw_enter(&buf->b_lock, RW_WRITER);
 			ASSERT(buf->b_hdr != NULL);
 			arc_buf_destroy(hdr->b_buf, FALSE, FALSE);
 			hdr->b_buf = buf->b_next;
 			buf->b_hdr = &arc_eviction_hdr;
 			buf->b_next = arc_eviction_list;
 			arc_eviction_list = buf;
+			rw_exit(&buf->b_lock);
 			mutex_exit(&arc_eviction_mtx);
 		} else {
 			arc_buf_destroy(hdr->b_buf, FALSE, TRUE);
@@ -1471,6 +1479,10 @@ arc_evict(arc_state_t *state, spa_t *spa, int64_t bytes, boolean_t recycle,
 			ASSERT(ab->b_datacnt > 0);
 			while (ab->b_buf) {
 				arc_buf_t *buf = ab->b_buf;
+				if (!rw_tryenter(&buf->b_lock, RW_WRITER)) {
+					missed += 1;
+					break;
+				}
 				if (buf->b_data) {
 					bytes_evicted += ab->b_size;
 					if (recycle && ab->b_type == type &&
@@ -1489,17 +1501,20 @@ arc_evict(arc_state_t *state, spa_t *spa, int64_t bytes, boolean_t recycle,
 					buf->b_next = arc_eviction_list;
 					arc_eviction_list = buf;
 					mutex_exit(&arc_eviction_mtx);
+					rw_exit(&buf->b_lock);
 				} else {
+					rw_exit(&buf->b_lock);
 					arc_buf_destroy(buf,
 					    buf->b_data == stolen, TRUE);
 				}
 			}
-			ASSERT(ab->b_datacnt == 0);
-			arc_change_state(evicted_state, ab, hash_lock);
-			ASSERT(HDR_IN_HASH_TABLE(ab));
-			ab->b_flags |= ARC_IN_HASH_TABLE;
-			ab->b_flags &= ~ARC_BUF_AVAILABLE;
-			DTRACE_PROBE1(arc__evict, arc_buf_hdr_t *, ab);
+			if (ab->b_datacnt == 0) {
+				arc_change_state(evicted_state, ab, hash_lock);
+				ASSERT(HDR_IN_HASH_TABLE(ab));
+				ab->b_flags |= ARC_IN_HASH_TABLE;
+				ab->b_flags &= ~ARC_BUF_AVAILABLE;
+				DTRACE_PROBE1(arc__evict, arc_buf_hdr_t *, ab);
+			}
 			if (!have_lock)
 				mutex_exit(hash_lock);
 			if (bytes >= 0 && bytes_evicted >= bytes)
@@ -1685,7 +1700,9 @@ arc_do_user_evicts(void)
 	while (arc_eviction_list != NULL) {
 		arc_buf_t *buf = arc_eviction_list;
 		arc_eviction_list = buf->b_next;
+		rw_enter(&buf->b_lock, RW_WRITER);
 		buf->b_hdr = NULL;
+		rw_exit(&buf->b_lock);
 		mutex_exit(&arc_eviction_mtx);
 
 		if (buf->b_efunc != NULL)
@@ -2420,13 +2437,13 @@ arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_buf_t *pbuf,
 
 	ASSERT(!refcount_is_zero(&pbuf->b_hdr->b_refcnt));
 	ASSERT3U((char *)bp - (char *)pbuf->b_data, <, pbuf->b_hdr->b_size);
-	rw_enter(&pbuf->b_hdr->b_datalock, RW_READER);
+	rw_enter(&pbuf->b_lock, RW_READER);
 
 	err = arc_read_nolock(pio, spa, bp, done, private, priority,
 	    zio_flags, arc_flags, zb);
 
 	ASSERT3P(hdr, ==, pbuf->b_hdr);
-	rw_exit(&pbuf->b_hdr->b_datalock);
+	rw_exit(&pbuf->b_lock);
 	return (err);
 }
 
@@ -2740,45 +2757,28 @@ arc_buf_evict(arc_buf_t *buf)
 	kmutex_t *hash_lock;
 	arc_buf_t **bufp;
 
-	mutex_enter(&arc_eviction_mtx);
+	rw_enter(&buf->b_lock, RW_WRITER);
 	hdr = buf->b_hdr;
 	if (hdr == NULL) {
 		/*
 		 * We are in arc_do_user_evicts().
 		 */
 		ASSERT(buf->b_data == NULL);
-		mutex_exit(&arc_eviction_mtx);
+		rw_exit(&buf->b_lock);
 		return (0);
+	} else if (buf->b_data == NULL) {
+		arc_buf_t copy = *buf; /* structure assignment */
+		/*
+		 * We are on the eviction list; process this buffer now
+		 * but let arc_do_user_evicts() do the reaping.
+		 */
+		buf->b_efunc = NULL;
+		rw_exit(&buf->b_lock);
+		VERIFY(copy.b_efunc(&copy) == 0);
+		return (1);
 	}
 	hash_lock = HDR_LOCK(hdr);
-	mutex_exit(&arc_eviction_mtx);
-
 	mutex_enter(hash_lock);
-
-	if (buf->b_data == NULL) {
-		/*
-		 * We are on the eviction list.
-		 */
-		mutex_exit(hash_lock);
-		mutex_enter(&arc_eviction_mtx);
-		if (buf->b_hdr == NULL) {
-			/*
-			 * We are already in arc_do_user_evicts().
-			 */
-			mutex_exit(&arc_eviction_mtx);
-			return (0);
-		} else {
-			arc_buf_t copy = *buf; /* structure assignment */
-			/*
-			 * Process this buffer now
-			 * but let arc_do_user_evicts() do the reaping.
-			 */
-			buf->b_efunc = NULL;
-			mutex_exit(&arc_eviction_mtx);
-			VERIFY(copy.b_efunc(&copy) == 0);
-			return (1);
-		}
-	}
 
 	ASSERT(buf->b_hdr == hdr);
 	ASSERT3U(refcount_count(&hdr->b_refcnt), <, hdr->b_datacnt);
@@ -2816,6 +2816,7 @@ arc_buf_evict(arc_buf_t *buf)
 		mutex_exit(&old_state->arcs_mtx);
 	}
 	mutex_exit(hash_lock);
+	rw_exit(&buf->b_lock);
 
 	VERIFY(buf->b_efunc(buf) == 0);
 	buf->b_efunc = NULL;
@@ -2834,10 +2835,13 @@ arc_buf_evict(arc_buf_t *buf)
 void
 arc_release(arc_buf_t *buf, void *tag)
 {
-	arc_buf_hdr_t *hdr = buf->b_hdr;
-	kmutex_t *hash_lock = HDR_LOCK(hdr);
-	l2arc_buf_hdr_t *l2hdr = NULL;
+	arc_buf_hdr_t *hdr;
+	kmutex_t *hash_lock;
+	l2arc_buf_hdr_t *l2hdr;
 	uint64_t buf_size;
+
+	rw_enter(&buf->b_lock, RW_WRITER);
+	hdr = buf->b_hdr;
 
 	/* this buffer is not on any list */
 	ASSERT(refcount_count(&hdr->b_refcnt) > 0);
@@ -2849,15 +2853,24 @@ arc_release(arc_buf_t *buf, void *tag)
 		ASSERT(BUF_EMPTY(hdr));
 		ASSERT(buf->b_efunc == NULL);
 		arc_buf_thaw(buf);
+		rw_exit(&buf->b_lock);
 		return;
 	}
 
+	hash_lock = HDR_LOCK(hdr);
 	mutex_enter(hash_lock);
+
+	l2hdr = hdr->b_l2hdr;
+	if (l2hdr) {
+		mutex_enter(&l2arc_buflist_mtx);
+		hdr->b_l2hdr = NULL;
+		buf_size = hdr->b_size;
+	}
 
 	/*
 	 * Do we have more than one buf?
 	 */
-	if (hdr->b_buf != buf || buf->b_next != NULL) {
+	if (hdr->b_datacnt > 1) {
 		arc_buf_hdr_t *nhdr;
 		arc_buf_t **bufp;
 		uint64_t blksz = hdr->b_size;
@@ -2865,7 +2878,7 @@ arc_release(arc_buf_t *buf, void *tag)
 		arc_buf_contents_t type = hdr->b_type;
 		uint32_t flags = hdr->b_flags;
 
-		ASSERT(hdr->b_datacnt > 1);
+		ASSERT(hdr->b_buf != buf || buf->b_next != NULL);
 		/*
 		 * Pull the data off of this buf and attach it to
 		 * a new anonymous buf.
@@ -2885,12 +2898,6 @@ arc_release(arc_buf_t *buf, void *tag)
 			atomic_add_64(size, -hdr->b_size);
 		}
 		hdr->b_datacnt -= 1;
-		if (hdr->b_l2hdr != NULL) {
-			mutex_enter(&l2arc_buflist_mtx);
-			l2hdr = hdr->b_l2hdr;
-			hdr->b_l2hdr = NULL;
-			buf_size = hdr->b_size;
-		}
 		arc_cksum_verify(buf);
 
 		mutex_exit(hash_lock);
@@ -2908,19 +2915,15 @@ arc_release(arc_buf_t *buf, void *tag)
 		nhdr->b_freeze_cksum = NULL;
 		(void) refcount_add(&nhdr->b_refcnt, tag);
 		buf->b_hdr = nhdr;
+		rw_exit(&buf->b_lock);
 		atomic_add_64(&arc_anon->arcs_size, blksz);
 	} else {
+		rw_exit(&buf->b_lock);
 		ASSERT(refcount_count(&hdr->b_refcnt) == 1);
 		ASSERT(!list_link_active(&hdr->b_arc_node));
 		ASSERT(!HDR_IO_IN_PROGRESS(hdr));
 		arc_change_state(arc_anon, hdr, hash_lock);
 		hdr->b_arc_access = 0;
-		if (hdr->b_l2hdr != NULL) {
-			mutex_enter(&l2arc_buflist_mtx);
-			l2hdr = hdr->b_l2hdr;
-			hdr->b_l2hdr = NULL;
-			buf_size = hdr->b_size;
-		}
 		mutex_exit(hash_lock);
 
 		bzero(&hdr->b_dva, sizeof (dva_t));
@@ -2935,28 +2938,42 @@ arc_release(arc_buf_t *buf, void *tag)
 		list_remove(l2hdr->b_dev->l2ad_buflist, hdr);
 		kmem_free(l2hdr, sizeof (l2arc_buf_hdr_t));
 		ARCSTAT_INCR(arcstat_l2_size, -buf_size);
-	}
-	if (MUTEX_HELD(&l2arc_buflist_mtx))
 		mutex_exit(&l2arc_buflist_mtx);
+	}
 }
 
 int
 arc_released(arc_buf_t *buf)
 {
-	return (buf->b_data != NULL && buf->b_hdr->b_state == arc_anon);
+	int released;
+
+	rw_enter(&buf->b_lock, RW_READER);
+	released = (buf->b_data != NULL && buf->b_hdr->b_state == arc_anon);
+	rw_exit(&buf->b_lock);
+	return (released);
 }
 
 int
 arc_has_callback(arc_buf_t *buf)
 {
-	return (buf->b_efunc != NULL);
+	int callback;
+
+	rw_enter(&buf->b_lock, RW_READER);
+	callback = (buf->b_efunc != NULL);
+	rw_exit(&buf->b_lock);
+	return (callback);
 }
 
 #ifdef ZFS_DEBUG
 int
 arc_referenced(arc_buf_t *buf)
 {
-	return (refcount_count(&buf->b_hdr->b_refcnt));
+	int referenced;
+
+	rw_enter(&buf->b_lock, RW_READER);
+	referenced = (refcount_count(&buf->b_hdr->b_refcnt));
+	rw_exit(&buf->b_lock);
+	return (referenced);
 }
 #endif
 

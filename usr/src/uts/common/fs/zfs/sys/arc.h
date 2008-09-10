@@ -26,8 +26,6 @@
 #ifndef	_SYS_ARC_H
 #define	_SYS_ARC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/zfs_context.h>
 
 #ifdef	__cplusplus
@@ -50,6 +48,7 @@ arc_done_func_t arc_getbuf_func;
 struct arc_buf {
 	arc_buf_hdr_t		*b_hdr;
 	arc_buf_t		*b_next;
+	krwlock_t		b_lock;
 	void			*b_data;
 	arc_evict_func_t	*b_efunc;
 	void			*b_private;
