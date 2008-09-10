@@ -24,7 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * LDoms virtual disk client (vdc) device driver
@@ -148,6 +147,7 @@ static void	vdc_store_label_efi(vdc_t *, efi_gpt_t *, efi_gpe_t *);
 static void	vdc_store_label_vtoc(vdc_t *, struct dk_geom *, struct vtoc *);
 static void	vdc_store_label_unk(vdc_t *vdc);
 static boolean_t vdc_is_opened(vdc_t *vdc);
+static void	vdc_update_size(vdc_t *vdc, size_t, size_t, size_t);
 
 /* handshake with vds */
 static int		vdc_init_ver_negotiation(vdc_t *vdc, vio_ver_t ver);
@@ -669,6 +669,16 @@ vdc_do_attach(dev_info_t *dip)
 
 	(void) md_fini_handle(mdp);
 
+	/* Create the kstats for saving the I/O statistics used by iostat(1M) */
+	vdc_create_io_kstats(vdc);
+	vdc_create_err_kstats(vdc);
+
+	/* Initialize remaining structures before starting the msg thread */
+	vdc->vdisk_label = VD_DISK_LABEL_UNK;
+	vdc->vtoc = kmem_zalloc(sizeof (struct vtoc), KM_SLEEP);
+	vdc->geom = kmem_zalloc(sizeof (struct dk_geom), KM_SLEEP);
+	vdc->minfo = kmem_zalloc(sizeof (struct dk_minfo), KM_SLEEP);
+
 	/* initialize the thread responsible for managing state with server */
 	vdc->msg_proc_thr = thread_create(NULL, 0, vdc_process_msg_thread,
 	    vdc, 0, &p0, TS_RUN, minclsyspri);
@@ -680,10 +690,6 @@ vdc_do_attach(dev_info_t *dip)
 
 	vdc->initialized |= VDC_THREAD;
 
-	/* Create the kstats for saving the I/O statistics used by iostat(1M) */
-	vdc_create_io_kstats(vdc);
-	vdc_create_err_kstats(vdc);
-
 	atomic_inc_32(&vdc_instance_count);
 
 	/*
@@ -692,10 +698,6 @@ vdc_do_attach(dev_info_t *dip)
 	 * the handshake do be done so that we know the type of the disk (slice
 	 * or full disk) and the appropriate device nodes can be created.
 	 */
-	vdc->vdisk_label = VD_DISK_LABEL_UNK;
-	vdc->vtoc = kmem_zalloc(sizeof (struct vtoc), KM_SLEEP);
-	vdc->geom = kmem_zalloc(sizeof (struct dk_geom), KM_SLEEP);
-	vdc->minfo = kmem_zalloc(sizeof (struct dk_minfo), KM_SLEEP);
 
 	mutex_enter(&vdc->lock);
 	(void) vdc_validate_geometry(vdc);
@@ -4820,20 +4822,9 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 			    vdc->instance);
 			attr_msg->vdisk_size = 0;
 		}
-
-		/*
-		 * If the disk size is already set check that it hasn't changed.
-		 */
-		if ((vdc->vdisk_size != 0) && (attr_msg->vdisk_size != 0) &&
-		    (vdc->vdisk_size != attr_msg->vdisk_size)) {
-			DMSG(vdc, 0, "[%d] Different disk size from vds "
-			    "(old=0x%lx - new=0x%lx", vdc->instance,
-			    vdc->vdisk_size, attr_msg->vdisk_size)
-			status = EINVAL;
-			break;
-		}
-
-		vdc->vdisk_size = attr_msg->vdisk_size;
+		/* update disk, block and transfer sizes */
+		vdc_update_size(vdc, attr_msg->vdisk_size,
+		    attr_msg->vdisk_block_size, attr_msg->max_xfer_sz);
 		vdc->vdisk_type = attr_msg->vdisk_type;
 		vdc->operations = attr_msg->operations;
 		if (vio_ver_is_supported(vdc->ver, 1, 1))
@@ -4846,23 +4837,6 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 		DMSG(vdc, 0, "[%d] vdisk_block_size: sent %lx acked %x\n",
 		    vdc->instance, vdc->block_size,
 		    attr_msg->vdisk_block_size);
-
-		/*
-		 * We don't know at compile time what the vDisk server will
-		 * think are good values but we apply a large (arbitrary)
-		 * upper bound to prevent memory exhaustion in vdc if it was
-		 * allocating a DRing based of huge values sent by the server.
-		 * We probably will never exceed this except if the message
-		 * was garbage.
-		 */
-		if ((attr_msg->max_xfer_sz * attr_msg->vdisk_block_size) <=
-		    (PAGESIZE * DEV_BSIZE)) {
-			vdc->max_xfer_sz = attr_msg->max_xfer_sz;
-			vdc->block_size = attr_msg->vdisk_block_size;
-		} else {
-			DMSG(vdc, 0, "[%d] vds block transfer size too big;"
-			    " using max supported by vdc", vdc->instance);
-		}
 
 		if ((attr_msg->xfer_mode != VIO_DRING_MODE_V1_0) ||
 		    (attr_msg->vdisk_size > INT64_MAX) ||
@@ -6571,18 +6545,15 @@ vdc_ownership_update(vdc_t *vdc, int ownership_flags)
 
 /*
  * Get the size and the block size of a virtual disk from the vdisk server.
- * We need to use this operation when the vdisk_size attribute was not
- * available during the handshake with the vdisk server.
  */
 static int
-vdc_check_capacity(vdc_t *vdc)
+vdc_get_capacity(vdc_t *vdc, size_t *dsk_size, size_t *blk_size)
 {
 	int rv = 0;
 	size_t alloc_len;
 	vd_capacity_t *vd_cap;
 
-	if (vdc->vdisk_size != 0)
-		return (0);
+	ASSERT(MUTEX_NOT_HELD(&vdc->lock));
 
 	alloc_len = P2ROUNDUP(sizeof (vd_capacity_t), sizeof (uint64_t));
 
@@ -6591,17 +6562,36 @@ vdc_check_capacity(vdc_t *vdc)
 	rv = vdc_do_sync_op(vdc, VD_OP_GET_CAPACITY, (caddr_t)vd_cap, alloc_len,
 	    0, 0, CB_SYNC, (void *)(uint64_t)FKIOCTL, VIO_both_dir, B_TRUE);
 
-	if (rv == 0) {
-		if (vd_cap->vdisk_block_size != vdc->block_size ||
-		    vd_cap->vdisk_size == VD_SIZE_UNKNOWN ||
-		    vd_cap->vdisk_size == 0)
-			rv = EINVAL;
-		else
-			vdc->vdisk_size = vd_cap->vdisk_size;
-	}
+	*dsk_size = vd_cap->vdisk_size;
+	*blk_size = vd_cap->vdisk_block_size;
 
 	kmem_free(vd_cap, alloc_len);
 	return (rv);
+}
+
+/*
+ * Check the disk capacity. Disk size information is updated if size has
+ * changed.
+ *
+ * Return 0 if the disk capacity is available, or non-zero if it is not.
+ */
+static int
+vdc_check_capacity(vdc_t *vdc)
+{
+	size_t dsk_size, blk_size;
+	int rv;
+
+	if ((rv = vdc_get_capacity(vdc, &dsk_size, &blk_size)) != 0)
+		return (rv);
+
+	if (dsk_size == VD_SIZE_UNKNOWN || dsk_size == 0)
+		return (EINVAL);
+
+	mutex_enter(&vdc->lock);
+	vdc_update_size(vdc, dsk_size, blk_size, vdc->max_xfer_sz);
+	mutex_exit(&vdc->lock);
+
+	return (0);
 }
 
 /*
@@ -6951,8 +6941,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode, int *rvalp)
 	case DKIOCGMEDIAINFO:
 	{
 		ASSERT(vdc->vdisk_size != 0);
-		if (vdc->minfo->dki_capacity == 0)
-			vdc->minfo->dki_capacity = vdc->vdisk_size;
+		ASSERT(vdc->minfo->dki_capacity != 0);
 		rv = ddi_copyout(vdc->minfo, (void *)arg,
 		    sizeof (struct dk_minfo), mode);
 		if (rv != 0)
@@ -7586,6 +7575,49 @@ vdc_lbl2cksum(struct dk_label *label)
 	return (sum);
 }
 
+static void
+vdc_update_size(vdc_t *vdc, size_t dsk_size, size_t blk_size, size_t xfr_size)
+{
+	vd_err_stats_t  *stp;
+
+	ASSERT(MUTEX_HELD(&vdc->lock));
+	ASSERT(xfr_size != 0);
+
+	/*
+	 * If the disk size is unknown or sizes are unchanged then don't
+	 * update anything.
+	 */
+	if (dsk_size == VD_SIZE_UNKNOWN || dsk_size == 0 ||
+	    (blk_size == vdc->block_size && dsk_size == vdc->vdisk_size &&
+	    xfr_size == vdc->max_xfer_sz))
+		return;
+
+	/*
+	 * We don't know at compile time what the vDisk server will think
+	 * are good values but we apply a large (arbitrary) upper bound to
+	 * prevent memory exhaustion in vdc if it was allocating a DRing
+	 * based of huge values sent by the server. We probably will never
+	 * exceed this except if the message was garbage.
+	 */
+	if ((xfr_size * blk_size) > (PAGESIZE * DEV_BSIZE)) {
+		DMSG(vdc, 0, "[%d] vds block transfer size too big;"
+		    " using max supported by vdc", vdc->instance);
+		xfr_size = maxphys / DEV_BSIZE;
+		dsk_size = (dsk_size * blk_size) / DEV_BSIZE;
+		blk_size = DEV_BSIZE;
+	}
+
+	vdc->max_xfer_sz = xfr_size;
+	vdc->block_size = blk_size;
+	vdc->vdisk_size = dsk_size;
+
+	stp = (vd_err_stats_t *)vdc->err_stats->ks_data;
+	stp->vd_capacity.value.ui64 = dsk_size * blk_size;
+
+	vdc->minfo->dki_capacity = dsk_size;
+	vdc->minfo->dki_lbsize = (uint_t)blk_size;
+}
+
 /*
  * Function:
  *	vdc_validate_geometry
@@ -7623,7 +7655,11 @@ vdc_validate_geometry(vdc_t *vdc)
 	ASSERT(MUTEX_HELD(&vdc->lock));
 
 	mutex_exit(&vdc->lock);
-
+	/*
+	 * Check the disk capacity in case it has changed. If that fails then
+	 * we proceed and we will be using the disk size we currently have.
+	 */
+	(void) vdc_check_capacity(vdc);
 	dev = makedevice(ddi_driver_major(vdc->dip),
 	    VD_MAKE_DEV(vdc->instance, 0));
 
@@ -7641,11 +7677,9 @@ vdc_validate_geometry(vdc_t *vdc)
 		 * be able to read an EFI label.
 		 */
 		if (vdc->vdisk_size == 0) {
-			if ((rv = vdc_check_capacity(vdc)) != 0) {
-				mutex_enter(&vdc->lock);
-				vdc_store_label_unk(vdc);
-				return (rv);
-			}
+			mutex_enter(&vdc->lock);
+			vdc_store_label_unk(vdc);
+			return (EIO);
 		}
 
 		VD_EFI_DEV_SET(edev, vdc, vd_process_efi_ioctl);

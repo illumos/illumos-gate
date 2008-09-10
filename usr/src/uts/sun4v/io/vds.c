@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Virtual disk server
  */
@@ -604,7 +602,7 @@ static const size_t	vds_num_versions =
 static void vd_free_dring_task(vd_t *vdp);
 static int vd_setup_vd(vd_t *vd);
 static int vd_setup_single_slice_disk(vd_t *vd);
-static int vd_setup_mediainfo(vd_t *vd);
+static int vd_backend_check_size(vd_t *vd);
 static boolean_t vd_enabled(vd_t *vd);
 static ushort_t vd_lbl2cksum(struct dk_label *label);
 static int vd_file_validate_geometry(vd_t *vd);
@@ -1365,7 +1363,7 @@ vd_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t vblk, size_t vlen)
 		 * The block size was not available during the attach,
 		 * try to update it now.
 		 */
-		if (vd_setup_mediainfo(vd) != 0)
+		if (vd_backend_check_size(vd) != 0)
 			return (EIO);
 	}
 
@@ -3476,7 +3474,6 @@ vd_get_capacity(vd_task_t *task)
 	vd_capacity_t vd_cap = { 0 };
 
 	ASSERT(request->operation == VD_OP_GET_CAPACITY);
-	ASSERT(vd->scsi);
 
 	PR0("Performing VD_OP_GET_CAPACITY");
 
@@ -3488,11 +3485,12 @@ vd_get_capacity(vd_task_t *task)
 		return (EINVAL);
 	}
 
-	if (vd->vdisk_size == VD_SIZE_UNKNOWN) {
-		if (vd_setup_mediainfo(vd) != 0)
-			ASSERT(vd->vdisk_size == VD_SIZE_UNKNOWN);
-	}
+	/*
+	 * Check the backend size in case it has changed. If the check fails
+	 * then we will return the last known size.
+	 */
 
+	(void) vd_backend_check_size(vd);
 	ASSERT(vd->vdisk_size != 0);
 
 	request->status = 0;
@@ -4037,7 +4035,7 @@ vd_set_exported_operations(vd_t *vd)
 	 */
 	if (vio_ver_is_supported(vd->version, 1, 1)) {
 		ASSERT(vd->open_flags & FREAD);
-		vd->operations |= VD_OP_MASK_READ;
+		vd->operations |= VD_OP_MASK_READ | (1 << VD_OP_GET_CAPACITY);
 
 		if (vd->open_flags & FWRITE)
 			vd->operations |= VD_OP_MASK_WRITE;
@@ -5152,29 +5150,6 @@ vd_is_atapi_device(vd_t *vd)
 }
 
 static int
-vd_setup_mediainfo(vd_t *vd)
-{
-	int status, rval;
-	struct dk_minfo	dk_minfo;
-
-	ASSERT(vd->ldi_handle[0] != NULL);
-	ASSERT(vd->vdisk_block_size != 0);
-
-	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCGMEDIAINFO,
-	    (intptr_t)&dk_minfo, (vd->open_flags | FKIOCTL),
-	    kcred, &rval)) != 0)
-		return (status);
-
-	ASSERT(dk_minfo.dki_lbsize % vd->vdisk_block_size == 0);
-
-	vd->block_size = dk_minfo.dki_lbsize;
-	vd->vdisk_size = (dk_minfo.dki_capacity * dk_minfo.dki_lbsize) /
-	    vd->vdisk_block_size;
-	vd->vdisk_media = DK_MEDIATYPE2VD_MEDIATYPE(dk_minfo.dki_media_type);
-	return (0);
-}
-
-static int
 vd_setup_full_disk(vd_t *vd)
 {
 	int		status;
@@ -5185,14 +5160,8 @@ vd_setup_full_disk(vd_t *vd)
 
 	vd->vdisk_block_size = DEV_BSIZE;
 
-	/*
-	 * At this point, vdisk_size is set to the size of partition 2 but
-	 * this does not represent the size of the disk because partition 2
-	 * may not cover the entire disk and its size does not include reserved
-	 * blocks. So we call vd_get_mediainfo to udpate this information and
-	 * set the block size and the media type of the disk.
-	 */
-	status = vd_setup_mediainfo(vd);
+	/* set the disk size, block size and the media type of the disk */
+	status = vd_backend_check_size(vd);
 
 	if (status != 0) {
 		if (!vd->scsi) {
@@ -5947,6 +5916,96 @@ vd_setup_single_slice_disk(vd_t *vd)
 	}
 
 	return (status);
+}
+
+static int
+vd_backend_check_size(vd_t *vd)
+{
+	size_t backend_size, old_size, new_size;
+	struct dk_minfo minfo;
+	vattr_t vattr;
+	int rval, rv;
+
+	if (vd->file) {
+
+		/* file (slice or full disk) */
+		vattr.va_mask = AT_SIZE;
+		rv = VOP_GETATTR(vd->file_vnode, &vattr, 0, kcred, NULL);
+		if (rv != 0) {
+			PR0("VOP_GETATTR(%s) = errno %d", vd->device_path, rv);
+			return (rv);
+		}
+		backend_size = vattr.va_size;
+
+	} else if (vd->vdisk_type == VD_DISK_TYPE_SLICE) {
+
+		/* slice or device exported as a slice */
+		rv = ldi_get_size(vd->ldi_handle[0], &backend_size);
+		if (rv != DDI_SUCCESS) {
+			PR0("ldi_get_size() failed for %s", vd->device_path);
+			return (EIO);
+		}
+
+	} else {
+
+		/* disk or device exported as a disk */
+		ASSERT(vd->vdisk_type == VD_DISK_TYPE_DISK);
+		rv = ldi_ioctl(vd->ldi_handle[0], DKIOCGMEDIAINFO,
+		    (intptr_t)&minfo, (vd->open_flags | FKIOCTL),
+		    kcred, &rval);
+		if (rv != 0) {
+			PR0("DKIOCGMEDIAINFO failed for %s (err=%d)",
+			    vd->device_path, rv);
+			return (rv);
+		}
+		backend_size = minfo.dki_capacity * minfo.dki_lbsize;
+	}
+
+	old_size = vd->vdisk_size;
+	new_size = backend_size / DEV_BSIZE;
+
+	/* check if size has changed */
+	if (old_size != VD_SIZE_UNKNOWN && old_size == new_size)
+		return (0);
+
+	vd->vdisk_size = new_size;
+
+	if (vd->file)
+		vd->file_size = backend_size;
+
+	/*
+	 * If we are exporting a single-slice disk and the size of the backend
+	 * has changed then we regenerate the partition setup so that the
+	 * partitioning matches with the new disk backend size.
+	 */
+
+	if (vd->vdisk_type == VD_DISK_TYPE_SLICE) {
+		/* slice or file or device exported as a slice */
+		if (vd->vdisk_label == VD_DISK_LABEL_VTOC) {
+			rv = vd_setup_partition_vtoc(vd);
+			if (rv != 0) {
+				PR0("vd_setup_partition_vtoc() failed for %s "
+				    "(err = %d)", vd->device_path, rv);
+				return (rv);
+			}
+		} else {
+			rv = vd_setup_partition_efi(vd);
+			if (rv != 0) {
+				PR0("vd_setup_partition_efi() failed for %s "
+				    "(err = %d)", vd->device_path, rv);
+				return (rv);
+			}
+		}
+
+	} else if (!vd->file) {
+		/* disk or device exported as a disk */
+		ASSERT(vd->vdisk_type == VD_DISK_TYPE_DISK);
+		vd->block_size = minfo.dki_lbsize;
+		vd->vdisk_media =
+		    DK_MEDIATYPE2VD_MEDIATYPE(minfo.dki_media_type);
+	}
+
+	return (0);
 }
 
 /*

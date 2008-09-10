@@ -27,8 +27,6 @@
 #ifndef	_VDSK_COMMON_H
 #define	_VDSK_COMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -152,8 +150,7 @@ extern "C" {
 	((1 << VD_OP_SCSICMD) |			\
 	(1 << VD_OP_RESET) |			\
 	(1 << VD_OP_GET_ACCESS) |		\
-	(1 << VD_OP_SET_ACCESS) |		\
-	(1 << VD_OP_GET_CAPACITY))
+	(1 << VD_OP_SET_ACCESS))
 
 /*
  * macro to check if the operation 'op' is supported by checking the list
