@@ -542,10 +542,7 @@ ccm_decrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 {
 	size_t mac_remain, pt_len;
 	uint8_t *pt, *mac_buf, *macp, *ccm_mac_p;
-	void *iov_or_mp;
-	offset_t offset;
-	uint8_t *out_data_1, *out_data_2;
-	size_t out_data_1_len;
+	int rv;
 
 	pt_len = ctx->ccm_data_len;
 
@@ -586,14 +583,9 @@ ccm_decrypt_final(ccm_ctx_t *ctx, crypto_data_t *out, size_t block_size,
 		/* They don't match */
 		return (CRYPTO_INVALID_MAC);
 	} else {
-		crypto_init_ptrs(out, &iov_or_mp, &offset);
-		crypto_get_ptrs(out, &iov_or_mp, &offset, &out_data_1,
-		    &out_data_1_len, &out_data_2, pt_len);
-		bcopy(ctx->ccm_pt_buf, out_data_1, out_data_1_len);
-		if (out_data_2 != NULL) {
-			bcopy((ctx->ccm_pt_buf) + out_data_1_len,
-			    out_data_2, pt_len - out_data_1_len);
-		}
+		rv = crypto_put_output_data(ctx->ccm_pt_buf, out, pt_len);
+		if (rv != CRYPTO_SUCCESS)
+			return (rv);
 		out->cd_offset += pt_len;
 	}
 	return (CRYPTO_SUCCESS);
