@@ -20,11 +20,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Device Strategy
@@ -50,7 +48,7 @@ static struct buf *qmerge_nextbp(struct que_data *qfp, struct buf *bp_merge,
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,	/* Type of module */
-	"Device Strategy Objects %I%"
+	"Device Strategy Objects"
 };
 
 static struct modlinkage modlinkage = {

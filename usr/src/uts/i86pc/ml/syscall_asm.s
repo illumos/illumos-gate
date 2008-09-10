@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation		*/
 /*	  All Rights Reserved					*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
@@ -189,7 +187,7 @@
 #if defined(DEBUG)
 
 __lwptoregs_msg:
-	.string	"%M%:%d lwptoregs(%p) [%p] != rp [%p]"
+	.string	"syscall_asm.s:%d lwptoregs(%p) [%p] != rp [%p]"
 
 #define	ASSERT_LWPTOREGS(t, rp)				\
 	movl	T_LWP(t), %esi;				\

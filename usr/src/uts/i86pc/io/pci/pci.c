@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	Host to PCI local bus driver
  */
@@ -164,7 +162,7 @@ static int pci_initchild(dev_info_t *child);
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"host to PCI nexus driver %I%",
+	"host to PCI nexus driver",
 	&pci_ops,	/* driver ops */
 };
 

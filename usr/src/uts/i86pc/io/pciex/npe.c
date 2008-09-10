@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	Host to PCI-Express local bus driver
  */
@@ -176,7 +174,7 @@ extern void	npe_intel_error_mask(ddi_acc_handle_t cfg_hdl);
  */
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"Host to PCIe nexus driver %I%",
+	"Host to PCIe nexus driver",
 	&npe_ops,	/* driver ops */
 };
 

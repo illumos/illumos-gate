@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
@@ -243,13 +241,13 @@
 #if !defined(__lint)
 
 __lwptoregs_msg:
-	.string	"%M%:%d lwptoregs(%p) [%p] != rp [%p]"
+	.string	"syscall_asm_amd64.s:%d lwptoregs(%p) [%p] != rp [%p]"
 
 __codesel_msg:
-	.string	"%M%:%d rp->r_cs [%ld] != %ld"
+	.string	"syscall_asm_amd64.s:%d rp->r_cs [%ld] != %ld"
 
 __no_rupdate_msg:
-	.string	"%M%:%d lwp %p, pcb_rupdate != 0"
+	.string	"syscall_asm_amd64.s:%d lwp %p, pcb_rupdate != 0"
 
 #endif	/* !__lint */
 

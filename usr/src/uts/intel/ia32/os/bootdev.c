@@ -20,18 +20,16 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/modctl.h>
 #include <sys/sunddi.h>
 
 /* internal global data */
 static struct modlmisc modlmisc = {
-	&mod_miscops, "bootdev misc module %I%"
+	&mod_miscops, "bootdev misc module"
 };
 
 static struct modlinkage modlinkage = {

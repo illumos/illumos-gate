@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	PSMI_1_5
 
 #include <sys/mutex.h>
@@ -1246,7 +1244,7 @@ static struct psm_info xen_psm_info = {
 	PSM_OWN_EXCLUSIVE,	/* ownership				*/
 	&xen_psm_ops,		/* operation				*/
 	"xVM_psm",		/* machine name				*/
-	"platform module %I%"	/* machine descriptions			*/
+	"platform module"	/* machine descriptions			*/
 };
 
 static void *xen_psm_hdlp;

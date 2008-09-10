@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/file.h>
 #include <sys/errno.h>
@@ -381,7 +379,7 @@ static struct dev_ops privcmd_dv_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"privcmd driver %I%",
+	"privcmd driver",
 	&privcmd_dv_ops
 };
 

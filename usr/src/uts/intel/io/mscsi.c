@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	HBA to MSCSI BUS nexus driver
@@ -103,7 +101,7 @@ struct dev_ops mscsi_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"scsi mscsi_bus nexus driver %I%",
+	"scsi mscsi_bus nexus driver",
 	&mscsi_ops,	/* driver ops */
 };
 

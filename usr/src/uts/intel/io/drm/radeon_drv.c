@@ -34,8 +34,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "drmP.h"
 #include "drm.h"
 #include "radeon_drm.h"
@@ -91,7 +89,7 @@ static struct dev_ops radeon_dev_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* drv_modops */
-	"radeon DRM driver %I%",	/* drv_linkinfo */
+	"radeon DRM driver",		/* drv_linkinfo */
 	&radeon_dev_ops,			/* drv_dev_ops */
 };
 

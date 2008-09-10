@@ -20,11 +20,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Private interfaces for graphics drivers for which there
@@ -43,7 +41,7 @@
 #include "gfx_private.h"
 
 static struct modlmisc modlmisc = {
-	&mod_miscops, "gfx private interfaces %I%"
+	&mod_miscops, "gfx private interfaces"
 };
 
 static struct modlinkage modlinkage = {

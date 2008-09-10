@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Determine the PCI configuration mechanism recommended by the BIOS.
  */
@@ -53,7 +51,7 @@ void pci_setup_tree(void);
 void pci_reprogram(void);
 
 static struct modlmisc modlmisc = {
-	&mod_miscops, "PCI BIOS interface %I%"
+	&mod_miscops, "PCI BIOS interface"
 };
 
 static struct modlinkage modlinkage = {

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -83,7 +81,7 @@ static struct dev_ops ioat_dev_ops = {
 
 static struct modldrv ioat_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"ioat driver v%I%",	/* Name of the module. */
+	"ioat driver",		/* Name of the module. */
 	&ioat_dev_ops,		/* driver ops */
 };
 

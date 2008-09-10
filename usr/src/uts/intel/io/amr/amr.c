@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -57,7 +57,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/int_types.h>
 #include <sys/scsi/scsi.h>
@@ -231,7 +230,7 @@ static struct dev_ops   amr_ops = {
 extern struct mod_ops mod_driverops;
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module. driver here */
-	"AMR Driver V%I%",	/* Name of the module. */
+	"AMR Driver",		/* Name of the module. */
 	&amr_ops,		/* Driver ops vector */
 };
 

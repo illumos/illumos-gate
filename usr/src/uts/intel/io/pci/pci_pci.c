@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PCI to PCI bus bridge nexus driver
  */
@@ -183,7 +181,7 @@ struct dev_ops ppb_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"PCI to PCI bridge nexus driver %I%",
+	"PCI to PCI bridge nexus driver",
 	&ppb_ops,	/* driver ops */
 };
 

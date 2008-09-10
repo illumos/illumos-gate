@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/scsi/scsi.h>
 #include <sys/dktp/cm.h>
 #include <sys/dktp/quetypes.h>
@@ -191,7 +189,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, 	/* Type of module. This one is a driver */
-	"Common Direct Access Disk %I%",
+	"Common Direct Access Disk",
 	&cmdk_ops, 				/* driver ops 		*/
 };
 

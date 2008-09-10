@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	ISA bus nexus driver
@@ -170,7 +168,7 @@ struct dev_ops isa_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This is ISA bus driver */
-	"isa nexus driver for 'ISA' %I%",
+	"isa nexus driver for 'ISA'",
 	&isa_ops,	/* driver ops */
 };
 

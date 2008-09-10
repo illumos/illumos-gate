@@ -20,15 +20,13 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -209,7 +207,7 @@ static char	happyface_boot;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"VGA text driver v%I%",	/* Name of the module. */
+	"VGA text driver",	/* Name of the module. */
 	&vgatext_ops,		/* driver ops */
 };
 
