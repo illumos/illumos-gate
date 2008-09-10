@@ -608,6 +608,12 @@ zfs_get_handle(zfs_handle_t *zhp)
 	return (zhp->zfs_hdl);
 }
 
+zpool_handle_t *
+zfs_get_pool_handle(const zfs_handle_t *zhp)
+{
+	return (zhp->zpool_hdl);
+}
+
 /*
  * Given a name, determine whether or not it's a valid path
  * (starts with '/' or "./").  If so, walk the mnttab trying

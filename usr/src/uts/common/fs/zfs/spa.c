@@ -288,6 +288,7 @@ spa_prop_validate(spa_t *spa, nvlist_t *props)
 
 		case ZPOOL_PROP_DELEGATION:
 		case ZPOOL_PROP_AUTOREPLACE:
+		case ZPOOL_PROP_LISTSNAPS:
 			error = nvpair_value_uint64(elem, &intval);
 			if (!error && intval > 1)
 				error = EINVAL;

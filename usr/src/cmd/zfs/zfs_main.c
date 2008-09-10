@@ -1106,8 +1106,7 @@ static int
 zfs_do_get(int argc, char **argv)
 {
 	zprop_get_cbdata_t cb = { 0 };
-	boolean_t recurse = B_FALSE;
-	int i, c;
+	int i, c, flags = 0;
 	char *value, *fields;
 	int ret;
 	zprop_list_t fake_name = { 0 };
@@ -1129,7 +1128,7 @@ zfs_do_get(int argc, char **argv)
 			cb.cb_literal = B_TRUE;
 			break;
 		case 'r':
-			recurse = B_TRUE;
+			flags |= ZFS_ITER_RECURSE;
 			break;
 		case 'H':
 			cb.cb_scripted = B_TRUE;
@@ -1257,8 +1256,8 @@ zfs_do_get(int argc, char **argv)
 	cb.cb_first = B_TRUE;
 
 	/* run for each object */
-	ret = zfs_for_each(argc, argv, recurse, ZFS_TYPE_DATASET, NULL,
-	    &cb.cb_proplist, get_callback, &cb, B_FALSE);
+	ret = zfs_for_each(argc, argv, flags, ZFS_TYPE_DATASET, NULL,
+	    &cb.cb_proplist, get_callback, &cb);
 
 	if (cb.cb_proplist == &fake_name)
 		zprop_free_list(fake_name.pl_next);
@@ -1308,17 +1307,17 @@ inherit_cb(zfs_handle_t *zhp, void *data)
 static int
 zfs_do_inherit(int argc, char **argv)
 {
-	boolean_t recurse = B_FALSE;
 	int c;
 	zfs_prop_t prop;
 	char *propname;
 	int ret;
+	int flags = 0;
 
 	/* check options */
 	while ((c = getopt(argc, argv, "r")) != -1) {
 		switch (c) {
 		case 'r':
-			recurse = B_TRUE;
+			flags |= ZFS_ITER_RECURSE;
 			break;
 		case '?':
 		default:
@@ -1369,12 +1368,12 @@ zfs_do_inherit(int argc, char **argv)
 		usage(B_FALSE);
 	}
 
-	if (recurse) {
-		ret = zfs_for_each(argc, argv, recurse, ZFS_TYPE_DATASET,
-		    NULL, NULL, inherit_recurse_cb, propname, B_FALSE);
+	if (flags & ZFS_ITER_RECURSE) {
+		ret = zfs_for_each(argc, argv, flags, ZFS_TYPE_DATASET,
+		    NULL, NULL, inherit_recurse_cb, propname);
 	} else {
-		ret = zfs_for_each(argc, argv, recurse, ZFS_TYPE_DATASET,
-		    NULL, NULL, inherit_cb, propname, B_FALSE);
+		ret = zfs_for_each(argc, argv, flags, ZFS_TYPE_DATASET,
+		    NULL, NULL, inherit_cb, propname);
 	}
 
 	return (ret);
@@ -1499,18 +1498,18 @@ upgrade_set_callback(zfs_handle_t *zhp, void *data)
 static int
 zfs_do_upgrade(int argc, char **argv)
 {
-	boolean_t recurse = B_FALSE;
 	boolean_t all = B_FALSE;
 	boolean_t showversions = B_FALSE;
 	int ret;
 	upgrade_cbdata_t cb = { 0 };
 	char c;
+	int flags = ZFS_ITER_ARGS_CAN_BE_PATHS;
 
 	/* check options */
 	while ((c = getopt(argc, argv, "rvV:a")) != -1) {
 		switch (c) {
 		case 'r':
-			recurse = B_TRUE;
+			flags |= ZFS_ITER_RECURSE;
 			break;
 		case 'v':
 			showversions = B_TRUE;
@@ -1537,9 +1536,10 @@ zfs_do_upgrade(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if ((!all && !argc) && (recurse | cb.cb_version))
+	if ((!all && !argc) && ((flags & ZFS_ITER_RECURSE) | cb.cb_version))
 		usage(B_FALSE);
-	if (showversions && (recurse || all || cb.cb_version || argc))
+	if (showversions && (flags & ZFS_ITER_RECURSE || all ||
+	    cb.cb_version || argc))
 		usage(B_FALSE);
 	if ((all || argc) && (showversions))
 		usage(B_FALSE);
@@ -1567,8 +1567,8 @@ zfs_do_upgrade(int argc, char **argv)
 		/* Upgrade filesystems */
 		if (cb.cb_version == 0)
 			cb.cb_version = ZPL_VERSION;
-		ret = zfs_for_each(argc, argv, recurse, ZFS_TYPE_FILESYSTEM,
-		    NULL, NULL, upgrade_set_callback, &cb, B_TRUE);
+		ret = zfs_for_each(argc, argv, flags, ZFS_TYPE_FILESYSTEM,
+		    NULL, NULL, upgrade_set_callback, &cb);
 		(void) printf(gettext("%llu filesystems upgraded\n"),
 		    cb.cb_numupgraded);
 		if (cb.cb_numsamegraded) {
@@ -1584,15 +1584,16 @@ zfs_do_upgrade(int argc, char **argv)
 		(void) printf(gettext("This system is currently running "
 		    "ZFS filesystem version %llu.\n\n"), ZPL_VERSION);
 
-		ret = zfs_for_each(0, NULL, B_TRUE, ZFS_TYPE_FILESYSTEM,
-		    NULL, NULL, upgrade_list_callback, &cb, B_TRUE);
+		flags |= ZFS_ITER_RECURSE;
+		ret = zfs_for_each(0, NULL, flags, ZFS_TYPE_FILESYSTEM,
+		    NULL, NULL, upgrade_list_callback, &cb);
 
 		found = cb.cb_foundone;
 		cb.cb_foundone = B_FALSE;
 		cb.cb_newer = B_TRUE;
 
-		ret = zfs_for_each(0, NULL, B_TRUE, ZFS_TYPE_FILESYSTEM,
-		    NULL, NULL, upgrade_list_callback, &cb, B_TRUE);
+		ret = zfs_for_each(0, NULL, flags, ZFS_TYPE_FILESYSTEM,
+		    NULL, NULL, upgrade_list_callback, &cb);
 
 		if (!cb.cb_foundone && !found) {
 			(void) printf(gettext("All filesystems are "
@@ -1750,18 +1751,17 @@ static int
 zfs_do_list(int argc, char **argv)
 {
 	int c;
-	boolean_t recurse = B_FALSE;
 	boolean_t scripted = B_FALSE;
 	static char default_fields[] =
 	    "name,used,available,referenced,mountpoint";
-	int types = ZFS_TYPE_DATASET;
+	int types = ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME;
+	boolean_t types_specified = B_FALSE;
 	char *fields = NULL;
 	list_cbdata_t cb = { 0 };
 	char *value;
 	int ret;
-	char *type_subopts[] = { "filesystem", "volume", "snapshot", NULL };
 	zfs_sort_column_t *sortcol = NULL;
-	boolean_t gottypes = B_FALSE;
+	int flags = ZFS_ITER_PROP_LISTSNAPS | ZFS_ITER_ARGS_CAN_BE_PATHS;
 
 	/* check options */
 	while ((c = getopt(argc, argv, ":o:rt:Hs:S:")) != -1) {
@@ -1770,7 +1770,7 @@ zfs_do_list(int argc, char **argv)
 			fields = optarg;
 			break;
 		case 'r':
-			recurse = B_TRUE;
+			flags |= ZFS_ITER_RECURSE;
 			break;
 		case 'H':
 			scripted = B_TRUE;
@@ -1792,9 +1792,13 @@ zfs_do_list(int argc, char **argv)
 			}
 			break;
 		case 't':
-			gottypes = B_TRUE;
 			types = 0;
+			types_specified = B_TRUE;
+			flags &= ~ZFS_ITER_PROP_LISTSNAPS;
 			while (*optarg != '\0') {
+				static char *type_subopts[] = { "filesystem",
+				    "volume", "snapshot", "all", NULL };
+
 				switch (getsubopt(&optarg, type_subopts,
 				    &value)) {
 				case 0:
@@ -1806,6 +1810,10 @@ zfs_do_list(int argc, char **argv)
 				case 2:
 					types |= ZFS_TYPE_SNAPSHOT;
 					break;
+				case 3:
+					types = ZFS_TYPE_DATASET;
+					break;
+
 				default:
 					(void) fprintf(stderr,
 					    gettext("invalid type '%s'\n"),
@@ -1833,10 +1841,9 @@ zfs_do_list(int argc, char **argv)
 		fields = default_fields;
 
 	/*
-	 * If they only specified "-o space" and no types, don't display
-	 * snapshots.
+	 * If "-o space" and no types were specified, don't display snapshots.
 	 */
-	if (strcmp(fields, "space") == 0 && !gottypes)
+	if (strcmp(fields, "space") == 0 && types_specified == B_FALSE)
 		types &= ~ZFS_TYPE_SNAPSHOT;
 
 	/*
@@ -1851,8 +1858,8 @@ zfs_do_list(int argc, char **argv)
 	cb.cb_scripted = scripted;
 	cb.cb_first = B_TRUE;
 
-	ret = zfs_for_each(argc, argv, recurse, types, sortcol, &cb.cb_proplist,
-	    list_callback, &cb, B_TRUE);
+	ret = zfs_for_each(argc, argv, flags, types, sortcol, &cb.cb_proplist,
+	    list_callback, &cb);
 
 	zprop_free_list(cb.cb_proplist);
 	zfs_free_sort_columns(sortcol);
@@ -2234,8 +2241,8 @@ zfs_do_set(int argc, char **argv)
 		usage(B_FALSE);
 	}
 
-	ret = zfs_for_each(argc - 2, argv + 2, B_FALSE,
-	    ZFS_TYPE_DATASET, NULL, NULL, set_callback, &cb, B_FALSE);
+	ret = zfs_for_each(argc - 2, argv + 2, NULL,
+	    ZFS_TYPE_DATASET, NULL, NULL, set_callback, &cb);
 
 	return (ret);
 }
@@ -2856,14 +2863,17 @@ zfs_do_unallow(int argc, char **argv)
 	char *ds;
 	int error;
 	nvlist_t *zperms = NULL;
+	int flags = 0;
 
 	if (parse_allow_args(&argc, &argv, B_TRUE,
 	    &ds, &recurse, &zperms) == -1)
 		return (1);
 
-	error = zfs_for_each(argc, argv, recurse,
+	if (recurse)
+		flags |= ZFS_ITER_RECURSE;
+	error = zfs_for_each(argc, argv, flags,
 	    ZFS_TYPE_FILESYSTEM|ZFS_TYPE_VOLUME, NULL,
-	    NULL, unallow_callback, (void *)zperms, B_FALSE);
+	    NULL, unallow_callback, (void *)zperms);
 
 	if (zperms)
 		nvlist_free(zperms);
