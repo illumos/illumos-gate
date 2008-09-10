@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Kernel memory allocator, as described in the following two papers and a
  * statement about the consolidator:
@@ -524,7 +522,7 @@
  *      static object_t *
  *      object_alloc(container_t *container)
  *      {
- *              object_t *object = kmem_cache_create(object_cache, 0);
+ *              object_t *object = kmem_cache_alloc(object_cache, 0);
  *              ... set any initial state not set by the constructor ...
  *              rw_enter(OBJECT_RWLOCK(object), RW_READER);
  *              mutex_enter(&container->c_objects_lock);
@@ -985,7 +983,6 @@ int kmem_flags = KMF_AUDIT | KMF_DEADBEEF | KMF_REDZONE | KMF_CONTENTS;
 int kmem_flags = 0;
 #endif
 int kmem_ready;
-static boolean_t kmem_mp_init_done = B_FALSE;
 
 static kmem_cache_t	*kmem_slab_cache;
 static kmem_cache_t	*kmem_bufctl_cache;
@@ -1694,8 +1691,10 @@ kmem_slab_alloc(kmem_cache_t *cp, int kmflag)
 {
 	kmem_slab_t *sp;
 	void *buf;
+	boolean_t test_destructor;
 
 	mutex_enter(&cp->cache_lock);
+	test_destructor = (cp->cache_slab_alloc == 0);
 	sp = avl_first(&cp->cache_partial_slabs);
 	if (sp == NULL) {
 		ASSERT(cp->cache_bufslab == 0);
@@ -1720,6 +1719,24 @@ kmem_slab_alloc(kmem_cache_t *cp, int kmflag)
 	    avl_numnodes(&cp->cache_partial_slabs) +
 	    (cp->cache_defrag == NULL ? 0 : cp->cache_defrag->kmd_deadcount)));
 	mutex_exit(&cp->cache_lock);
+
+	if (test_destructor && cp->cache_destructor != NULL) {
+		/*
+		 * On the first kmem_slab_alloc(), assert that it is valid to
+		 * call the destructor on a newly constructed object without any
+		 * client involvement.
+		 */
+		if ((cp->cache_constructor == NULL) ||
+		    cp->cache_constructor(buf, cp->cache_private,
+		    kmflag) == 0) {
+			cp->cache_destructor(buf, cp->cache_private);
+		}
+		copy_pattern(KMEM_UNINITIALIZED_PATTERN, buf,
+		    cp->cache_bufsize);
+		if (cp->cache_flags & KMF_DEADBEEF) {
+			copy_pattern(KMEM_FREE_PATTERN, buf, cp->cache_verify);
+		}
+	}
 
 	return (buf);
 }
@@ -3147,38 +3164,6 @@ kmem_partial_slab_cmp(const void *p0, const void *p1)
 	return (0);
 }
 
-static void
-kmem_check_destructor(kmem_cache_t *cp)
-{
-	void *buf;
-
-	if (cp->cache_destructor == NULL)
-		return;
-
-	/*
-	 * Assert that it is valid to call the destructor on a newly constructed
-	 * object without any intervening client code using the object.
-	 * Allocate from the slab layer to ensure that the client has not
-	 * touched the buffer.
-	 */
-	buf = kmem_slab_alloc(cp, KM_NOSLEEP);
-	if (buf == NULL)
-		return;
-
-	if (cp->cache_flags & KMF_BUFTAG) {
-		if (kmem_cache_alloc_debug(cp, buf, KM_NOSLEEP, 1,
-		    caller()) != 0)
-			return;
-	} else if (cp->cache_constructor != NULL &&
-	    cp->cache_constructor(buf, cp->cache_private, KM_NOSLEEP) != 0) {
-		atomic_add_64(&cp->cache_alloc_fail, 1);
-		kmem_slab_free(cp, buf);
-		return;
-	}
-
-	kmem_slab_free_constructed(cp, buf, B_FALSE);
-}
-
 /*
  * It must be valid to call the destructor (if any) on a newly created object.
  * That is, the constructor (if any) must leave the object in a valid state for
@@ -3475,10 +3460,6 @@ kmem_cache_create(
 	if (kmem_ready)
 		kmem_cache_magazine_enable(cp);
 
-	if (kmem_mp_init_done && cp->cache_destructor != NULL) {
-		kmem_check_destructor(cp);
-	}
-
 	return (cp);
 }
 
@@ -3548,23 +3529,7 @@ kmem_cache_set_move(kmem_cache_t *cp,
 
 	if (KMEM_IS_MOVABLE(cp)) {
 		if (cp->cache_move == NULL) {
-			/*
-			 * We want to assert that the client has not allocated
-			 * any objects from this cache before setting a move
-			 * callback function. However, it's possible that
-			 * kmem_check_destructor() has created a slab between
-			 * the time that the client called kmem_cache_create()
-			 * and this call to kmem_cache_set_move(). Currently
-			 * there are no correctness issues involved; the client
-			 * could allocate many objects before setting a
-			 * callback, but we want to enforce the rule anyway to
-			 * allow the greatest flexibility for the consolidator
-			 * in the future.
-			 *
-			 * It's possible that kmem_check_destructor() can be
-			 * called twice for the same cache.
-			 */
-			ASSERT(cp->cache_slab_alloc <= 2);
+			ASSERT(cp->cache_slab_alloc == 0);
 
 			cp->cache_defrag = defrag;
 			defrag = NULL; /* nothing to free */
@@ -3993,13 +3958,6 @@ kmem_mp_init(void)
 	mutex_exit(&cpu_lock);
 
 	kmem_update_timeout(NULL);
-
-	kmem_mp_init_done = B_TRUE;
-	/*
-	 * Defer checking destructors until now to avoid constructor
-	 * dependencies during startup.
-	 */
-	kmem_cache_applyall(kmem_check_destructor, NULL, 0);
 }
 
 /*
